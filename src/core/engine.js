@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { VObject } from "../base/object.js";
-import { VColors } from "../base/color.js";
+import { VColors } from "../base/colors.js";
 import { VView } from "./view.js";
 import { VInput } from "./input.js";
 import { VGameInstance } from "./gameinstance.js";
@@ -283,7 +283,7 @@ export class VEngine extends VObject {
 			this.Time.FramesThisSecond = 0;
 			this.Time.LastFPSTime = timestamp;
 		}
-		this.Time.FramesThisSecond++;
+		++this.Time.FramesThisSecond;
 
 
 		return timeDelta;
