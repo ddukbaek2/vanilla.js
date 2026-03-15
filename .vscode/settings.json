@@ -1,0 +1,26 @@
+{
+	"files.exclude": {
+		"**/.git": true,
+		"**/.backup": true,
+		"**/.DS_Store": true,
+		"**/.gitkeep": true
+	},
+	"terminal.integrated.showExitAlert": false,
+	"terminal.integrated.defaultProfile.windows": "Command Prompt",
+	"terminal.integrated.profiles.windows": {
+		"Command Prompt": {
+			"path": [
+				"${env:windir}\\System32\\cmd.exe",
+				"${env:windir}\\SysWOW64\\cmd.exe"
+			]
+		}
+	},
+	"terminal.integrated.defaultProfile.linux": "bash",
+	"terminal.integrated.defaultProfile.osx": "bash",
+	"geminicodeassist.updateChannel": "Insiders",
+
+	"liveServer.settings.host": "127.0.0.1",
+	"liveServer.settings.port": 5502
+	// "liveServer.settings.NoBrowser": false,
+	// "liveServer.settings.AdvanceCustomBrowserCmdLine": ""
+}

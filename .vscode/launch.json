@@ -1,0 +1,23 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+
+		// 라이브 서버 확장을 통한 서버베이스의 실행. (라이브 서버 수동 실행 필요)
+		{
+			"name": "Launch Live Server",
+			"type": "chrome",
+			"request": "launch",
+			"url": "http://127.0.0.1:5502/index.html",
+			"webRoot": "${workspaceFolder}"
+		},
+
+		// 크롬으로 파일 실행.
+		{
+			"name": "Launch Chrome",
+			"type": "chrome",
+			"request": "launch",
+			"file": "${workspaceFolder}/index.html",
+			"webRoot": "${workspaceFolder}"
+		}
+	]
+}

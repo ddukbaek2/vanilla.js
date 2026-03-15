@@ -1,0 +1,125 @@
+//==============================================================================
+// 포함 모듈 목록.
+//==============================================================================
+import { VObject } from "./object.js";
+import { VVector2 } from "./vector2.js";
+
+
+//==============================================================================
+// 사각 영역.
+//==============================================================================
+export class VRect extends VObject {
+	//==============================================================================
+	// 멤버 변수 목록.
+	//==============================================================================
+	/** @public @type { VVector2 } */ position; // left-top.
+	/** @public @type { VVector2 } */ size;
+
+	//==============================================================================
+	// 생성.
+	//==============================================================================
+	/**
+	 * @constructor
+	 * @param { VVector2 } position
+	 * @param { VVector2 } size
+	 */
+	constructor() {
+		super();
+
+		this.position = VVector2.zero();
+		this.size = VVector2.zero();
+	}
+
+	//==============================================================================
+	// 겹치는지 여부.
+	//==============================================================================
+	/**
+	 * @constructor
+	 * @param { VVector2 | VRect } other
+	 * @returns { boolean }
+	 */
+	overlaps(other) {
+		if (typeof other === VVector2) {
+			return false;
+		}
+		else if (other instanceof VRect) {
+			return false;
+		}
+		
+		throw new Error("Invalid type: 'other' must be an instance of VVector2 or VRect.");
+	}
+
+	//==============================================================================
+	// 중앙 위치 설정.
+	//==============================================================================
+	/**
+	 * @param { VVector2 } other
+	 */
+	set center(value) {
+		this.position.x = value.x - this.width / 2;
+		this.position.y = value.y - this.height / 2;
+	}
+
+	//==============================================================================
+	// 중앙 위치 반환.
+	//==============================================================================
+	/**
+	 * @returns { VVector2 }
+	 */
+	get center() {
+		const origin = this.position.clone();
+		origin.x += this.width / 2;
+		origin.y += this.height / 2;
+		return origin;
+	}
+
+	set left(value) {
+		this.position.x = value;
+	}
+	get left() {
+		return this.position.x;
+	}
+	set top(value) {
+		this.position.y = value;
+	}
+	get top() {
+		return this.position.y;
+	}
+	set right(value) {
+		this.position.x = value - this.width;
+	}
+	get right() {
+		return this.position.x + this.width;
+	}
+	set bottom(value) {
+		this.position.y = value - this.height;
+	}
+	get bottom() {
+		return this.position.y + this.height;
+	}
+
+	//==============================================================================
+	// 새로운 사각 영역 생성.
+	//==============================================================================
+	/**
+	 * @param { VVector2 } position
+	 * @param { VVector2 } size
+	 * @returns { VRect }
+	 */
+	static create(position, size) {
+		var obj = new VRect();
+		obj.position = position;
+		obj.size = size;
+		return obj;
+	}
+
+	//==============================================================================
+	// 크기가 없는 빈 사각 영역 생성.
+	//==============================================================================
+	/**
+	 * @returns { VRect }
+	 */
+	static zero() {
+		return VRect.create(VVector2.zero(), VVector2.zero());
+	}
+}
