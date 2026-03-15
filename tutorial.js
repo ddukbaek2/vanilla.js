@@ -58,5 +58,5 @@ if (canvas === null) {
 
 // 엔진 실행.
 const engine = new VEngine(800, 1280, "tutorial", true);
-document.title = "vinilla.js";
+document.title = "vanilla.js";
 engine.run(new Tutorial());
