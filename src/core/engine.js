@@ -450,17 +450,17 @@ export class VEngine extends VObject {
 		// this.canvasContext.canvas.style.textRendering = 'optimizeLegibility';
 
 		if (this.#gameInstance) {
-			if (typeof this.#gameInstance.onUpdate === "function") {
-				this.#gameInstance.onUpdate(this.Time.TimeDelta);
+			if (typeof this.#gameInstance.update === "function") {
+				this.#gameInstance.update(this.Time.TimeDelta);
 			}
-			if (typeof this.#gameInstance.onPreDraw === "function") {
-				this.#gameInstance.onPreDraw(this.renderer);
+			if (typeof this.#gameInstance.preDraw === "function") {
+				this.#gameInstance.preDraw(this.renderer);
 			}
-			if (typeof this.#gameInstance.onDraw === "function") {
-				this.#gameInstance.onDraw(this.renderer);
+			if (typeof this.#gameInstance.draw === "function") {
+				this.#gameInstance.draw(this.renderer);
 			}
-			if (typeof this.#gameInstance.onPostDraw === "function") {
-				this.#gameInstance.onPostDraw(this.renderer);
+			if (typeof this.#gameInstance.postDraw === "function") {
+				this.#gameInstance.postDraw(this.renderer);
 			}
 		}
 		if (this.isDevelopment) {

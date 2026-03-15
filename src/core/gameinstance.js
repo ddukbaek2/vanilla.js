@@ -39,7 +39,17 @@ export class VGameInstance extends VObject
 	/**
 	 * @param { number } timeDelta 
 	 */
-	onUpdate(timeDelta) {
+	update(timeDelta) {
+
+	}
+
+	//==============================================================================
+	// 갱신됨.
+	//==============================================================================
+	/**
+	 * @param { number } timeDelta 
+	 */
+	lateUpdate(timeDelta) {
 
 	}
 
@@ -50,7 +60,7 @@ export class VGameInstance extends VObject
 	 * @method
 	 * @param { VRenderer } renderer 
 	 */
-	onPreDraw(renderer) {
+	preDraw(renderer) {
 		this.#engine.viewIdentity();
 		this.#engine.gameViewIdentity();
 	}
@@ -62,7 +72,7 @@ export class VGameInstance extends VObject
 	 * @method
 	 * @param { VRenderer } renderer 
 	 */
-	onDraw(renderer) {
+	draw(renderer) {
 	}
 
 	//==============================================================================
@@ -72,7 +82,7 @@ export class VGameInstance extends VObject
 	 * @method
 	 * @param { VRenderer } renderer 
 	 */
-	onPostDraw(renderer) {
+	postDraw(renderer) {
 	}
 
 	//==============================================================================
