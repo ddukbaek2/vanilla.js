@@ -2,6 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { VObject } from "../base/object.js";
+import { VColors } from "../base/color.js";
 import { VView } from "./view.js";
 import { VInput } from "./input.js";
 import { VGameInstance } from "./gameinstance.js";
@@ -292,26 +293,52 @@ export class VEngine extends VObject {
 	// 개발모드 출력.
 	//==============================================================================
 	/**
-	 * @param { VEngine } engine 
 	 * @param { CanvasRenderingContext2D } canvasContext 
 	 */
-	#drawDevelopment(engine, canvasContext) {
-		if (!engine.isDevelopment)
+	#drawDevelopment(canvasContext) {
+		if (!this.isDevelopment)
 			return;
 	
+		const engine = this;
 		const SYSTEM_FONT_STRING = '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+		if (this.terminalFont !== null) {
+			// this.terminalFont = new FontFace(`VT323`, `url('https://fonts.gstatic.com/s/vt323/v17/pxiKyp0ihIEF2isfFJU.woff2')`);
+			this.terminalFont = new FontFace(`DOSGothic`, `url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff')`);
+			this.terminalFont.load().then((loadedFont) => {
+				document.fonts.add(loadedFont);
+			});
+		}
 
-		let x = 10;
-		let y = 10;
+		let textOffsetX = 16;
+		let textOffsetY = 16;
+		const drawOutlineText = (text) => {
+			canvasContext.fillText(text, textOffsetX, textOffsetY);
 
-		// 기본 위치인 화면 좌상단으로 이동.
-		canvasContext.setTransform(1, 0, 0, 1, 0, 0);
-		canvasContext.font = `24px ${SYSTEM_FONT_STRING}`;
-		canvasContext.fillStyle = "white";
-		canvasContext.textAlign = "left";
+			// 자동 외곽선 출력.
+			// canvasContext.strokeText(text, textOffsetX, textOffsetY);
+			// canvasContext.fillText(text, textOffsetX, textOffsetY);
 
-		// 초당 프레임 체크.
-		y += 24; canvasContext.fillText(`framePerSecond: ${engine.Time.FPS}`, x, y);
+			// 수동 외곽선 출력.
+			// const offsets = [
+			// 	[-2, -2], [2, -2], [-2, 2], [2, 2], 
+			// 	[-2, 0], [2, 0], [0, -2], [0, 2]
+			// ];
+
+			// canvasContext.fillStyle = VColors.black;
+			// for (let i = 0; i < offsets.length; ++i) {
+			// 	canvasContext.fillText(text, textOffsetX + offsets[i][0], textOffsetY + offsets[i][1]);
+			// }
+
+			// canvasContext.fillStyle = VColors.white;
+			// canvasContext.fillText(text, textOffsetX, textOffsetY);
+
+			textOffsetY += 16;
+
+			const metrics = canvasContext.measureText(text);
+			const width = metrics.width; // metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight)
+			const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+			return { width, height };
+		};
 
 		const formatSizeString = (bytes) => {
 			let killo = bytes / 1024;
@@ -330,6 +357,26 @@ export class VEngine extends VObject {
 		};
 
 
+		// 기본 위치인 화면 좌상단으로 이동.
+		canvasContext.setTransform(1, 0, 0, 1, 0, 0);
+		// canvasContext.letterSpacing = "-1px";
+		canvasContext.font = `16px DOSGothic`;//${SYSTEM_FONT_STRING}`;
+		canvasContext.textBaseline = "top";
+		canvasContext.fillStyle = VColors.black; // VColors.lightVanilla
+		// canvasContext.fillStyle = VColors.white; // VColors.lightVanilla;
+		// canvasContext.lineWidth = 4;
+		// canvasContext.strokeStyle = VColors.black; // VColors.darkVanilla;
+		// canvasContext.textRendering = "auto"; //optimizeLegibility"; //"geometricPrecision";
+		// canvasContext.shadowColor = VColors.white;
+		// canvasContext.shadowOffsetX = 0.5;
+		// canvasContext.shadowOffsetY = 0.5;
+		canvasContext.textAlign = "left";
+		canvasContext.imageSmoothingEnabled = false;
+		canvasContext.scale(1.6, 1.6);
+
+		// 초당 프레임 체크.
+		drawOutlineText(`framePerSecond: ${engine.Time.FPS}`);
+
 		// 메모리 사용량 체크.
 		// 크로미움 기반 API. (비표준)
 		const memory = performance.memory;
@@ -338,20 +385,20 @@ export class VEngine extends VObject {
 			const usedJSHeapSize = formatSizeString(memory.usedJSHeapSize);
 			const totalJSHeapSize = formatSizeString(memory.totalJSHeapSize);
 			const jsHeapSizeLimit = formatSizeString(memory.jsHeapSizeLimit);
-			y += 26; canvasContext.fillText(`usedJSHeapSize: ${usedJSHeapSize}`, x, y);
-			y += 26; canvasContext.fillText(`totalJSHeapSize: ${totalJSHeapSize}`, x, y);
-			y += 26; canvasContext.fillText(`jsHeapSizeLimit: ${jsHeapSizeLimit}`, x, y);
+			drawOutlineText(`usedJSHeapSize: ${usedJSHeapSize}`);
+			drawOutlineText(`totalJSHeapSize: ${totalJSHeapSize}`);
+			drawOutlineText(`jsHeapSizeLimit: ${jsHeapSizeLimit}`);
 		}
 		else
 		{
-			y += 26; canvasContext.fillText(`usedJSHeapSize: Not Supported`, x, y);
-			y += 26; canvasContext.fillText(`totalJSHeapSize: Not Supported`, x, y);
-			y += 26; canvasContext.fillText(`jsHeapSizeLimit: Not Supported`, x, y);
+			drawOutlineText(`usedJSHeapSize: Not Supported`);
+			drawOutlineText(`totalJSHeapSize: Not Supported`);
+			drawOutlineText(`jsHeapSizeLimit: Not Supported`);
 		}
 
 		this.platform.getPlatformInfo();
-		y += 26; canvasContext.fillText(`platformName: ${this.platform.platformName}`, x, y);
-		y += 26; canvasContext.fillText(`browserName: ${this.platform.browserName}`, x, y);
+		drawOutlineText(`platformName: ${this.platform.platformName}`);
+		drawOutlineText(`browserName: ${this.platform.browserName}`);
 
 		var resourceUsage = this.platform.getResouceUsage();
 		const totalTransferSize = formatSizeString(resourceUsage.totalTransferSize);
@@ -359,7 +406,7 @@ export class VEngine extends VObject {
 		const loadedFiles = resourceUsage.loadedFiles;
 
 		// // 다운 로드된 리소스 목록.
-		// y += 26; canvasContext.fillText(`totalTransferSize: ${totalTransferSize}`, x, y);
+		// y += 26; drawOutlineText(`totalTransferSize: ${totalTransferSize}`, x, y);
 		// for (let i = 0; i < loadedFiles.length; ++i)
 		// {
 		// 	const loadedFile = loadedFiles[i];
@@ -368,11 +415,11 @@ export class VEngine extends VObject {
 		// 		continue;
 
 		// 	const transferSizeString = formatSizeString(loadedFile.transferSize);
-		// 	y += 26; canvasContext.fillText(` - ${name} (${transferSizeString})`, x, y);
+		// 	y += 26; drawOutlineText(` - ${name} (${transferSizeString})`, x, y);
 		// }
 
 		// 로드된 리소스 목록.
-		y += 26; canvasContext.fillText(`totalDecodedSize: ${totalDecodedSize}`, x, y);
+		drawOutlineText(`totalDecodedSize: ${totalDecodedSize}`);
 		// for (let i = 0; i < loadedFiles.length; ++i)
 		// {
 		// 	const loadedFile = loadedFiles[i];
@@ -381,7 +428,7 @@ export class VEngine extends VObject {
 		// 		continue;
 
 		// 	const decodedSizeString = formatSizeString(loadedFile.decodedSize);
-		// 	y += 26; canvasContext.fillText(` - ${name} (${decodedSizeString})`, x, y);
+		// 	y += 26; drawOutlineText(` - ${name} (${decodedSizeString})`, x, y);
 		// }
 	}
 
@@ -417,7 +464,7 @@ export class VEngine extends VObject {
 			}
 		}
 		if (this.isDevelopment) {
-			this.#drawDevelopment(this, this.canvasContext);
+			this.#drawDevelopment(this.canvasContext);
 		}
 		
 		this.#input.justPressed = false;
