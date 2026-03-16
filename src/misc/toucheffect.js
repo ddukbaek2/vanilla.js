@@ -109,18 +109,18 @@ export class VTouchEffect extends VNode {
 		canvasContext.globalCompositeOperation = "lighter";
 		for (let i = 0; i < this.touchParticles.length; ++i) {
 			const particle = this.touchParticles[i];
-			const alpha = Math.max(0, particle.life / particle.maxLife);
+			const opacity = Math.max(0, particle.life / particle.maxLife);
 
-			const gradient = canvasContext.createRadialGradient(
+			const radialGradient = canvasContext.createRadialGradient(
 				particle.position.x, particle.position.y, 0, 
-				particle.position.x, particle.position.y, 
-				particle.radius);
-			gradient.addColorStop(0, `rgba(100, 200, 255, ${alpha * 0.8})`);
-			gradient.addColorStop(1, `rgba(100, 200, 255, 0)`);
+				particle.position.x, particle.position.y, particle.radius);
+				
+			radialGradient.addColorStop(0, `rgba(100, 200, 255, ${opacity * 0.8})`);
+			radialGradient.addColorStop(1, `rgba(100, 200, 255, 0)`);
 
 			canvasContext.beginPath();
 			canvasContext.arc(particle.position.x, particle.position.y, particle.radius, 0, Math.PI * 2);
-			canvasContext.fillStyle = gradient;
+			canvasContext.fillStyle = radialGradient;
 			canvasContext.fill();
 		}
 	}

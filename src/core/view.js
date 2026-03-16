@@ -3,6 +3,8 @@
 //==============================================================================
 import { VObject } from "../base/object.js";
 import { VVector2 } from "../base/vector2.js";
+import { VRect } from "../base/rect.js";
+import { VEngine } from "./engine.js";
 
 
 //==============================================================================
@@ -12,37 +14,47 @@ export class VView extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	ScreenWidth = 0;
-	ScreenHeight = 0;
-	devicePixelRatio = 1;
-	X = 0;
-	Y = 0;
-	width = 0;
-	height = 0;
-	Scale = 1;
+	/** @public @type { number } */ devicePixelRatio;
+	/** @public @type { number } */ scale;
+	/** @public @type { VVector2 } */ screen; // 전체 영역.
+	/** @public @type { VRect } */ view; // 보여지는 영역.
 
-	/** @type { VVector2 } */ Screen = null;
-	/** @type { VVector2 } */ View = null;
-	/** @type { VVector2 } */ Local = null;
-	
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
-	constructor(args) {
+	/**
+	 * @constructor
+	 * @param { VEngine } engine 
+	 */
+	constructor(engine) {
 		super();
-
-		this.Screen = VVector2.zero();
-		this.view = VVector2.zero();
-		this.Local = VVector2.zero();
-
-		this.ScreenWidth = 0;
-		this.ScreenHeight = 0;
 		this.devicePixelRatio = 1;
-		this.X = 0;
-		this.Y = 0;
-		this.width = 0;
-		this.height = 0;
-		this.Scale = 1;
+		this.scale = 1;
+		this.screen = VVector2.zero();
+		this.view = VRect.zero();
+	}
+	
+	//==============================================================================
+	// 갱신.
+	//==============================================================================
+	update() {
+
+	}
+
+	//==============================================================================
+	// 대상 좌표가 클라이언트 영역 안에 존재하는지 여부.
+	//==============================================================================
+	/**
+	 * @private
+	 * @method
+	 */
+	isInsideView(x, y) {
+		return (
+			x >= this.view.position.x &&
+			x <= this.view.position.x + this.view.size.x &&
+			y >= this.view.position.y &&
+			y <= this.view.position.y + this.view.size.y
+		);
 	}
 }

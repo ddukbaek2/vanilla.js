@@ -3,6 +3,7 @@
 //==============================================================================
 import { VObject } from "../base/object.js";
 import { VColors } from "../base/colors.js";
+import { VTime } from "./time.js";
 import { VView } from "./view.js";
 import { VInput } from "./input.js";
 import { VGameInstance } from "./gameinstance.js";
@@ -17,23 +18,19 @@ export class VEngine extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { () => void  } */ #onResizeCallback = null;
-	/** @private @type { FrameRequestCallback } */ #onEngineUpdateCallback = null;
-	/** @private @type { VGameInstance } */ #gameInstance = null;
+	/** @public @type { VPlatform } */ platform;
+	/** @private @type { () => void  } */ #onResizeCallback;
+	/** @private @type { FrameRequestCallback } */ #onEngineUpdateCallback;
+	/** @private @type { VGameInstance } */ #gameInstance;
+	/** @private @type { VTime } */ #time;
+	/** @private @type { VView } */ #view;
+	/** @private @type { VInput } */ #input;
+	/** @private @type { HTMLCanvasElement } */ #canvas;
+	/** @public @type { VRenderer } */ renderer;
+	/** @public @type { number } */ width;
+	/** @public @type { number } */ height;
+	/** @public @type { boolean } */ isDevelopment;
 
-	/** @public @type { HTMLCanvasElement } */ canvas = null;
-	/** @public @type { CanvasRenderingContext2D } */ canvasContext = null;	
-
-	/** @public @type { VInput } */ #input = null;
-	/** @public @type { } */ Time = null;
-	/** @public @type { VView } */ view = null;
-
-	/** @public @type { number } */ width = 0;
-	/** @public @type { number } */ height = 0;
-
-	/** @public @type { boolean } */ isDevelopment = false;
-	/** @public @type { VPlatform } */ platform = null;
-	/** @public @type { VRenderer } */ renderer = null;
 
 	//==============================================================================
 	// 생성.
@@ -41,34 +38,23 @@ export class VEngine extends VObject {
 	constructor(width, height, canvasId, isDevelopment = true) {
 		super();
 
+		this.platform = new VPlatform();
+		this.#onResizeCallback = this.#resized.bind(this);
+		this.#onEngineUpdateCallback = this.#updateEngine.bind(this);
+		this.#gameInstance = null;
+		this.#time = new VTime(this);
+		this.#view = new VView(this);
+		this.#input = new VInput(this);
+
+		this.#canvas = document.getElementById(canvasId);
+		const canvasContext = this.#canvas.getContext("2d", { alpha: false });
+		this.renderer = new VRenderer(this, canvasContext);
 		this.width = width;
 		this.height = height;
-		this.canvas = document.getElementById(canvasId);
-		this.canvasContext = this.canvas.getContext("2d", { alpha: false });
-
-		this.view = new VView();
-
-		this.#input = new VInput();
-
-		this.Time = {
-			Last: 0,
-			TimeDelta: 0,
-			ElapsedTime: 0,
-			FPS: 0,
-			FramesThisSecond: 0,
-			LastFPSTime: 0
-		};
-
-		this.#gameInstance = null;
-
-		this.#onResizeCallback = this.#onResize.bind(this);
-		this.#onEngineUpdateCallback = this.#updateEngine.bind(this);
 		this.isDevelopment = isDevelopment;
-		this.platform = new VPlatform();
-		this.renderer = new VRenderer(this);
 
 		this.#setupAllEvents();
-		this.#onResize();
+		this.#resized();
 	}
 
 	//==============================================================================
@@ -107,38 +93,34 @@ export class VEngine extends VObject {
 	 * @private
 	 * @method
 	 */
-	#onResize() {
-		const screenWidth = window.innerWidth;
-		const screenHeight = window.innerHeight;
+	#resized() {
 		const devicePixelRatio = window.devicePixelRatio || 1;
+		const clientWidth = window.innerWidth;
+		const clientHeight = window.innerHeight;
+		this.#canvas.width = Math.round(clientWidth * devicePixelRatio);
+		this.#canvas.height = Math.round(clientHeight * devicePixelRatio);
+		this.#canvas.style.width = `${clientWidth}px`;
+		this.#canvas.style.height = `${clientHeight}px`;
 
-		this.canvas.width = Math.round(screenWidth * devicePixelRatio);
-		this.canvas.height = Math.round(screenHeight * devicePixelRatio);
-		this.canvas.style.width = `${screenWidth}px`;
-		this.canvas.style.height = `${screenHeight}px`;
-
-		const scale = Math.min(
-			screenWidth / this.width,
-			screenHeight / this.height
-		);
-
+		// 전체 화면 설정.
+		const scale = Math.min(clientWidth / this.width, clientHeight / this.height);
 		const viewWidth = Math.round(this.width * scale);
 		const viewHeight = Math.round(this.height * scale);
-		const viewX = Math.floor((screenWidth - viewWidth) * 0.5);
-		const viewY = Math.floor((screenHeight - viewHeight) * 0.5);
+		const viewX = Math.floor((clientWidth - viewWidth) * 0.5);
+		const viewY = Math.floor((clientHeight - viewHeight) * 0.5);
 
-		this.view.ScreenWidth = screenWidth;
-		this.view.ScreenHeight = screenHeight;
-		this.view.devicePixelRatio = devicePixelRatio;
-		this.view.X = viewX;
-		this.view.Y = viewY;
-		this.view.width = viewWidth;
-		this.view.height = viewHeight;
-		this.view.Scale = scale;
+		// 뷰 화면 설정.
+		this.#view.devicePixelRatio = devicePixelRatio;
+		this.#view.scale = scale;
+		this.#view.screen.x = clientWidth;
+		this.#view.screen.y = clientHeight;
+		this.#view.view.position.x = viewX;
+		this.#view.view.position.y = viewY;
+		this.#view.view.size.x = viewWidth;
+		this.#view.view.size.y = viewHeight;
 
-		if (this.#gameInstance && typeof this.#gameInstance.onResize === "function")
-		{
-			this.#gameInstance.onResize(this);
+		if (this.#gameInstance && typeof this.#gameInstance.resized === "function") {
+			this.#gameInstance.resized(this);
 		}
 	}
 
@@ -150,11 +132,8 @@ export class VEngine extends VObject {
 	 * @method
 	 */
 	#setupAllEvents() {
-		const canvas = this.canvas;
-
-		canvas.addEventListener("mousedown", (touchEvent) => 
-			{
-				// if (!this.#IsInsideView(touchEvent.clientX, touchEvent.clientY)) {
+		this.#canvas.addEventListener("mousedown", (touchEvent) => {
+				// if (!this.#view.isInsideView(touchEvent.clientX, touchEvent.clientY)) {
 				// 	return;
 				// }
 
@@ -163,24 +142,21 @@ export class VEngine extends VObject {
 				this.#updatePointer(touchEvent.clientX, touchEvent.clientY);
 			});
 
-		window.addEventListener("mousemove", (touchEvent) =>
-			{
+		window.addEventListener("mousemove", (touchEvent) => {
 				this.#updatePointer(touchEvent.clientX, touchEvent.clientY);
 			});
 
-		window.addEventListener("mouseup", (touchEvent) =>
-			{
+		window.addEventListener("mouseup", (touchEvent) => {
 				this.#input.isDown = false;
 				this.#input.justReleased = true;
 				this.#updatePointer(touchEvent.clientX, touchEvent.clientY);
 			});
 
-		canvas.addEventListener("touchstart", (touchEvent) =>
-			{
+		this.#canvas.addEventListener("touchstart", (touchEvent) => {
 				const touch = touchEvent.changedTouches[0];
 				if (!touch) return;
 
-				// if (!this.#IsInsideView(touch.clientX, touch.clientY)) {
+				// if (!this.#view.isInsideView(touch.clientX, touch.clientY)) {
 				// 	return;
 				// }
 
@@ -190,8 +166,7 @@ export class VEngine extends VObject {
 				touchEvent.preventDefault();
 			}, { passive: false });
 
-		window.addEventListener("touchmove", (touchEvent) =>
-			{
+		window.addEventListener("touchmove", (touchEvent) => {
 				const touch = touchEvent.changedTouches[0];
 				if (!touch) return;
 
@@ -199,8 +174,7 @@ export class VEngine extends VObject {
 				touchEvent.preventDefault();
 			}, { passive: false });
 
-		window.addEventListener("touchend", (touchEvent) =>
-			{
+		window.addEventListener("touchend", (touchEvent) => {
 				const touch = touchEvent.changedTouches[0];
 				if (touch) {
 					this.#updatePointer(touch.clientX, touch.clientY);
@@ -222,71 +196,17 @@ export class VEngine extends VObject {
 	}
 
 	//==============================================================================
-	// 대상 좌표가 클라이언트 영역 안에 존재하는지 여부.
-	//==============================================================================
-	/**
-	 * @private
-	 * @method
-	 */
-	#isInsideView(x, y) {
-		return (
-			x >= this.view.X &&
-			x <= this.view.X + this.view.width &&
-			y >= this.view.Y &&
-			y <= this.view.Y + this.view.height
-		);
-	}
-
-	//==============================================================================
 	// 입력 좌표 갱신.
 	//==============================================================================
 	/**
 	 * @private
 	 * @method
+	 * @param { number } clientX
+	 * @param { number } clientY
 	 */
-	#updatePointer(x, y) {
-		const localX = x - this.view.X;
-		const localY = y - this.view.Y;
-		this.#input.position.x = (localX / this.view.width) * this.width;
-		this.#input.position.y = (localY / this.view.height) * this.height;
-	}
-
-	//==============================================================================
-	// 시간 갱신.
-	//==============================================================================
-	/**
-	 * @private
-	 * @method
-	 * @param { number } timestamp
-	 * @returns { number }
-	 */
-	#updateTime(timestamp) {
-		if (this.Time.Last === 0) {
-			this.Time.Last = timestamp;
-			this.Time.LastFPSTime = timestamp; // FPS 타이머 초기화
-		}
-
-		let timeDelta = (timestamp - this.Time.Last) / 1000;
-		this.Time.Last = timestamp;
-
-		if (timeDelta > 0.033) {
-			timeDelta = 0.033;
-		}
-
-		this.Time.TimeDelta = timeDelta;
-		this.Time.ElapsedTime += timeDelta;
-
-		// FPS 계산
-		if (timestamp > this.Time.LastFPSTime + 1000)
-		{
-			this.Time.FPS = this.Time.FramesThisSecond;
-			this.Time.FramesThisSecond = 0;
-			this.Time.LastFPSTime = timestamp;
-		}
-		++this.Time.FramesThisSecond;
-
-
-		return timeDelta;
+	#updatePointer(clientX, clientY) {
+		this.#input.position.x = ((clientX - this.#view.view.position.x) / this.#view.view.size.x) * this.width;
+		this.#input.position.y = ((clientY - this.#view.view.position.y) / this.#view.view.size.y) * this.height;
 	}
 	
 	//==============================================================================
@@ -375,7 +295,7 @@ export class VEngine extends VObject {
 		canvasContext.scale(1.6, 1.6);
 
 		// 초당 프레임 체크.
-		drawOutlineText(`framePerSecond: ${engine.Time.FPS}`);
+		drawOutlineText(`framePerSecond: ${engine.#time.fps}`);
 
 		// 메모리 사용량 체크.
 		// 크로미움 기반 API. (비표준)
@@ -441,17 +361,19 @@ export class VEngine extends VObject {
 	 * @param { number } timestamp
 	 */
 	#updateEngine(timestamp) {
-		this.#updateTime(timestamp);
+
+		// 시간 갱신.
+		this.#time.update(timestamp);
 
 		// // 화면 더 부드럽게.
-		// this.CanvasContext.scale(this.view.devicePixelRatio, this.view.devicePixelRatio);
+		// this.CanvasContext.scale(this.#view.devicePixelRatio, this.#view.devicePixelRatio);
 		// this.CanvasContext.imageSmoothingEnabled = true;
     	// this.CanvasContext.imageSmoothingQuality = 'high';
 		// this.canvasContext.canvas.style.textRendering = 'optimizeLegibility';
 
 		if (this.#gameInstance) {
 			if (typeof this.#gameInstance.update === "function") {
-				this.#gameInstance.update(this.Time.TimeDelta);
+				this.#gameInstance.update(this.#time.timeDelta);
 			}
 			if (typeof this.#gameInstance.preDraw === "function") {
 				this.#gameInstance.preDraw(this.renderer);
@@ -464,7 +386,8 @@ export class VEngine extends VObject {
 			}
 		}
 		if (this.isDevelopment) {
-			this.#drawDevelopment(this.canvasContext);
+			const canvasContext = this.renderer.getCanvasContext();
+			this.#drawDevelopment(canvasContext);
 		}
 		
 		this.#input.justPressed = false;
@@ -499,12 +422,14 @@ export class VEngine extends VObject {
 	 * @param { string } color
 	 */
 	viewIdentity(color = "#000000") {
+		const canvasContext = this.renderer.getCanvasContext();
+
 		// 좌표계 초기화.
-		this.canvasContext.setTransform(1, 0, 0, 1, 0, 0);
+		canvasContext.setTransform(1, 0, 0, 1, 0, 0);
 
 		// 영역 전체 칠하기.
-		this.canvasContext.fillStyle = color;
-		this.canvasContext.fillRect(0, 0, this.canvas.width, this.canvas.height);
+		canvasContext.fillStyle = color;
+		canvasContext.fillRect(0, 0, this.#canvas.width, this.#canvas.height);
 	}
 
 	//==============================================================================
@@ -516,17 +441,15 @@ export class VEngine extends VObject {
 	 * @param { string } color
 	 */
 	gameViewIdentity(color = "#000000") {
+		const canvasContext = this.renderer.getCanvasContext();
+
 		// 좌표계 초기화.
-		const devicePixelRatio = this.view.devicePixelRatio;
-		this.canvasContext.setTransform(
-			this.view.Scale * devicePixelRatio, 0,
-			0, this.view.Scale * devicePixelRatio,
-			this.view.X * devicePixelRatio, this.view.Y * devicePixelRatio
-		);
+		const devicePixelRatio = this.#view.devicePixelRatio;
+		canvasContext.setTransform(this.#view.scale * devicePixelRatio, 0, 0, this.#view.scale * devicePixelRatio, this.#view.view.position.x * devicePixelRatio, this.#view.view.position.y * devicePixelRatio);
 
 		// 영역 전체 칠하기.
-		this.canvasContext.fillStyle = color;
-		this.canvasContext.fillRect(0, 0, this.width, this.height);
+		canvasContext.fillStyle = color;
+		canvasContext.fillRect(0, 0, this.width, this.height);
 	}
 
 	//==============================================================================

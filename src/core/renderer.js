@@ -15,19 +15,20 @@ export class VRenderer extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @public @type { VEngine } */ #engine;
-	/** @public @type { CanvasRenderingContext2D } */ #canvasContext;
+	/** @private @type { VEngine } */ #engine;
+	/** @private @type { CanvasRenderingContext2D } */ #canvasContext;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	/**
-	 * @param { VEngine } engine 
+	 * @param { VEngine } engine
+	 * @param { CanvasRenderingContext2D } canvasContext
 	 */
-	constructor(engine) {
+	constructor(engine, canvasContext) {
 		super();
 		this.#engine = engine;
-		this.#canvasContext = engine.canvasContext;
+		this.#canvasContext = canvasContext;
 	}
 
 	//==============================================================================
