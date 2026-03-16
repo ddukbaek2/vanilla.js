@@ -29,7 +29,7 @@ export class VGameInstance extends VObject
 	/**
 	 * @param { VEngine } engine 
 	 */
-	onInitialize(engine) {
+	initialize(engine) {
 		this.#engine = engine;
 	}
 

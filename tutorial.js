@@ -31,7 +31,7 @@ class Tutorial extends VGameInstance {
 		super.onDraw(renderer);
 
 		const engine = this.getEngine();
-		const clientSize = VVector2.create(engine.width, engine.height);
+		const view = engine.getView();
 
 		// 전체 영역 초기화.
 		engine.viewIdentity(COLOR_VANILLA);
@@ -42,7 +42,7 @@ class Tutorial extends VGameInstance {
 		// 사각형 그리기.
 		let boxPosition = VVector2.create(0, 0);
 		let boxSize = VVector2.create(100, 100);
-		boxPosition = boxPosition.add(clientSize.divide(2)).subtract(boxSize.divide(2));
+		boxPosition = boxPosition.add(view.resolution.divide(2)).subtract(boxSize.divide(2));
 		renderer.drawRect(VRect.create(boxPosition, boxSize), COLOR_DARKVANILLA);
 		// console.log(boxPosition);
 	}

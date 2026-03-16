@@ -18,18 +18,18 @@ export class VEngine extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @public @type { VPlatform } */ platform;
-	/** @private @type { () => void  } */ #onResizeCallback;
-	/** @private @type { FrameRequestCallback } */ #onEngineUpdateCallback;
-	/** @private @type { VGameInstance } */ #gameInstance;
+	/** @private @type { VPlatform } */ #platform;
 	/** @private @type { VTime } */ #time;
 	/** @private @type { VView } */ #view;
 	/** @private @type { VInput } */ #input;
 	/** @private @type { HTMLCanvasElement } */ #canvas;
-	/** @public @type { VRenderer } */ renderer;
-	/** @public @type { number } */ width;
-	/** @public @type { number } */ height;
-	/** @public @type { boolean } */ isDevelopment;
+	/** @private @type { VRenderer } */ #renderer;
+
+	/** @private @type { () => void  } */ #onResizeCallback;
+	/** @private @type { FrameRequestCallback } */ #onEngineUpdateCallback;
+	/** @private @type { VGameInstance } */ #gameInstance;
+	/** @private @type { VScene } */ #scene;
+	/** @private @type { boolean } */ #isDevelopment;
 
 
 	//==============================================================================
@@ -38,21 +38,22 @@ export class VEngine extends VObject {
 	constructor(width, height, canvasId, isDevelopment = true) {
 		super();
 
-		this.platform = new VPlatform();
+		this.#platform = new VPlatform();
+		this.#time = new VTime(this);
+		this.#view = new VView(this);
+		this.#view.resolution.x = width;
+		this.#view.resolution.y = height;
+		this.#input = new VInput(this);
+		this.#canvas = document.getElementById(canvasId);
+		const canvasContext = this.#canvas.getContext("2d", { alpha: false });
+		this.#renderer = new VRenderer(this, canvasContext);
+
 		this.#onResizeCallback = this.#resized.bind(this);
 		this.#onEngineUpdateCallback = this.#updateEngine.bind(this);
 		this.#gameInstance = null;
-		this.#time = new VTime(this);
-		this.#view = new VView(this);
-		this.#input = new VInput(this);
-
-		this.#canvas = document.getElementById(canvasId);
-		const canvasContext = this.#canvas.getContext("2d", { alpha: false });
-		this.renderer = new VRenderer(this, canvasContext);
-		this.width = width;
-		this.height = height;
-		this.isDevelopment = isDevelopment;
-
+		this.#scene = null;
+		this.#isDevelopment = isDevelopment;
+		
 		this.#setupAllEvents();
 		this.#resized();
 	}
@@ -67,8 +68,8 @@ export class VEngine extends VObject {
 	 */
 	setGameInstance(gameInstance) {
 		this.#gameInstance = gameInstance;
-		if (this.#gameInstance && typeof this.#gameInstance.onInitialize === "function") {
-			this.#gameInstance.onInitialize(this);
+		if (this.#gameInstance && typeof this.#gameInstance.initialize === "function") {
+			this.#gameInstance.initialize(this);
 		}
 	}
 
@@ -103,9 +104,9 @@ export class VEngine extends VObject {
 		this.#canvas.style.height = `${clientHeight}px`;
 
 		// 전체 화면 설정.
-		const scale = Math.min(clientWidth / this.width, clientHeight / this.height);
-		const viewWidth = Math.round(this.width * scale);
-		const viewHeight = Math.round(this.height * scale);
+		const scale = Math.min(clientWidth / this.#view.resolution.x, clientHeight / this.#view.resolution.y);
+		const viewWidth = Math.round(this.#view.resolution.x * scale);
+		const viewHeight = Math.round(this.#view.resolution.y * scale);
 		const viewX = Math.floor((clientWidth - viewWidth) * 0.5);
 		const viewY = Math.floor((clientHeight - viewHeight) * 0.5);
 
@@ -205,8 +206,8 @@ export class VEngine extends VObject {
 	 * @param { number } clientY
 	 */
 	#updatePointer(clientX, clientY) {
-		this.#input.position.x = ((clientX - this.#view.view.position.x) / this.#view.view.size.x) * this.width;
-		this.#input.position.y = ((clientY - this.#view.view.position.y) / this.#view.view.size.y) * this.height;
+		this.#input.position.x = ((clientX - this.#view.view.position.x) / this.#view.view.size.x) * this.#view.resolution.x;
+		this.#input.position.y = ((clientY - this.#view.view.position.y) / this.#view.view.size.y) * this.#view.resolution.y;
 	}
 	
 	//==============================================================================
@@ -216,7 +217,7 @@ export class VEngine extends VObject {
 	 * @param { CanvasRenderingContext2D } canvasContext 
 	 */
 	#drawDevelopment(canvasContext) {
-		if (!this.isDevelopment)
+		if (!this.#isDevelopment)
 			return;
 	
 		const engine = this;
@@ -282,7 +283,7 @@ export class VEngine extends VObject {
 		// canvasContext.letterSpacing = "-1px";
 		canvasContext.font = `16px DOSGothic`;//${SYSTEM_FONT_STRING}`;
 		canvasContext.textBaseline = "top";
-		canvasContext.fillStyle = VColors.black; // VColors.lightVanilla
+		canvasContext.fillStyle = VColors.white; // VColors.lightVanilla
 		// canvasContext.fillStyle = VColors.white; // VColors.lightVanilla;
 		// canvasContext.lineWidth = 4;
 		// canvasContext.strokeStyle = VColors.black; // VColors.darkVanilla;
@@ -316,11 +317,11 @@ export class VEngine extends VObject {
 			drawOutlineText(`jsHeapSizeLimit: Not Supported`);
 		}
 
-		this.platform.getPlatformInfo();
-		drawOutlineText(`platformName: ${this.platform.platformName}`);
-		drawOutlineText(`browserName: ${this.platform.browserName}`);
+		this.#platform.getPlatformInfo();
+		drawOutlineText(`platformName: ${this.#platform.platformName}`);
+		drawOutlineText(`browserName: ${this.#platform.browserName}`);
 
-		var resourceUsage = this.platform.getResouceUsage();
+		var resourceUsage = this.#platform.getResouceUsage();
 		const totalTransferSize = formatSizeString(resourceUsage.totalTransferSize);
 		const totalDecodedSize = formatSizeString(resourceUsage.totalDecodedSize);
 		const loadedFiles = resourceUsage.loadedFiles;
@@ -376,17 +377,17 @@ export class VEngine extends VObject {
 				this.#gameInstance.update(this.#time.timeDelta);
 			}
 			if (typeof this.#gameInstance.preDraw === "function") {
-				this.#gameInstance.preDraw(this.renderer);
+				this.#gameInstance.preDraw(this.#renderer);
 			}
 			if (typeof this.#gameInstance.draw === "function") {
-				this.#gameInstance.draw(this.renderer);
+				this.#gameInstance.draw(this.#renderer);
 			}
 			if (typeof this.#gameInstance.postDraw === "function") {
-				this.#gameInstance.postDraw(this.renderer);
+				this.#gameInstance.postDraw(this.#renderer);
 			}
 		}
-		if (this.isDevelopment) {
-			const canvasContext = this.renderer.getCanvasContext();
+		if (this.#isDevelopment) {
+			const canvasContext = this.#renderer.getCanvasContext();
 			this.#drawDevelopment(canvasContext);
 		}
 		
@@ -422,7 +423,7 @@ export class VEngine extends VObject {
 	 * @param { string } color
 	 */
 	viewIdentity(color = "#000000") {
-		const canvasContext = this.renderer.getCanvasContext();
+		const canvasContext = this.#renderer.getCanvasContext();
 
 		// 좌표계 초기화.
 		canvasContext.setTransform(1, 0, 0, 1, 0, 0);
@@ -441,7 +442,7 @@ export class VEngine extends VObject {
 	 * @param { string } color
 	 */
 	gameViewIdentity(color = "#000000") {
-		const canvasContext = this.renderer.getCanvasContext();
+		const canvasContext = this.#renderer.getCanvasContext();
 
 		// 좌표계 초기화.
 		const devicePixelRatio = this.#view.devicePixelRatio;
@@ -449,11 +450,35 @@ export class VEngine extends VObject {
 
 		// 영역 전체 칠하기.
 		canvasContext.fillStyle = color;
-		canvasContext.fillRect(0, 0, this.width, this.height);
+		canvasContext.fillRect(0, 0, this.#view.resolution.x, this.#view.resolution.y);;
 	}
 
 	//==============================================================================
-	// 입력 반환.
+	// 시간 정보 반환.
+	//==============================================================================
+	/**
+	 * @public
+	 * @method
+	 * @returns { VTime }
+	 */
+	getTime() {
+		return this.#time;
+	}
+	
+	//==============================================================================
+	// 뷰 정보 반환.
+	//==============================================================================
+	/**
+	 * @public
+	 * @method
+	 * @returns { VView }
+	 */
+	getView() {
+		return this.#view;
+	}
+
+	//==============================================================================
+	// 입력 정보 반환.
 	//==============================================================================
 	/**
 	 * @public
@@ -462,5 +487,17 @@ export class VEngine extends VObject {
 	 */
 	getInput() {
 		return this.#input;
+	}
+
+	//==============================================================================
+	// 렌더러 정보 반환.
+	//==============================================================================
+	/**
+	 * @public
+	 * @method
+	 * @returns { VRenderer }
+	 */
+	getRenderer() {
+		return this.#renderer;
 	}
 }

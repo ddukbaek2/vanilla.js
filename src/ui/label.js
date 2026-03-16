@@ -44,6 +44,8 @@ export class VLabel extends VNode {
 	 */
 	draw(renderer) {
 		// super.draw(renderer);
+
+		// const view = getEngine
 		const canvasContext = renderer.getCanvasContext();
 		const SYSTEM_FONT_STRING = '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 		canvasContext.fillStyle = "#000000";

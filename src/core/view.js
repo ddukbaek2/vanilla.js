@@ -16,8 +16,9 @@ export class VView extends VObject {
 	//==============================================================================
 	/** @public @type { number } */ devicePixelRatio;
 	/** @public @type { number } */ scale;
-	/** @public @type { VVector2 } */ screen; // 전체 영역.
-	/** @public @type { VRect } */ view; // 보여지는 영역.
+	/** @public @type { VVector2 } */ resolution; // 원하는 영역.
+	/** @public @type { VVector2 } */ screen; // 전체 화면 영역.
+	/** @public @type { VRect } */ view; // 보여지는 실제 영역.
 
 
 	//==============================================================================
@@ -31,6 +32,7 @@ export class VView extends VObject {
 		super();
 		this.devicePixelRatio = 1;
 		this.scale = 1;
+		this.resolution = VVector2.zero();
 		this.screen = VVector2.zero();
 		this.view = VRect.zero();
 	}
@@ -46,15 +48,17 @@ export class VView extends VObject {
 	// 대상 좌표가 클라이언트 영역 안에 존재하는지 여부.
 	//==============================================================================
 	/**
-	 * @private
+	 * @public
 	 * @method
+	 * @param { number } touchX
+	 * @param { number } touchY 
 	 */
-	isInsideView(x, y) {
+	isInsideView(touchX, touchY) {
 		return (
-			x >= this.view.position.x &&
-			x <= this.view.position.x + this.view.size.x &&
-			y >= this.view.position.y &&
-			y <= this.view.position.y + this.view.size.y
+			touchX >= this.view.position.x &&
+			touchX <= this.view.position.x + this.view.size.x &&
+			touchY >= this.view.position.y &&
+			touchY <= this.view.position.y + this.view.size.y
 		);
 	}
 }
