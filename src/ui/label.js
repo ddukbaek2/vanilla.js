@@ -43,14 +43,16 @@ export class UILabel extends UINode {
 	 * @param { VRenderer } renderer 
 	 */
 	draw(renderer) {
-		// super.draw(renderer);
+		super.draw(renderer);
+		// const view =
+		const position = super.getPosition();
+		const size = super.getSize();
 
-		// const view = getEngine
 		const canvasContext = renderer.getCanvasContext();
 		const SYSTEM_FONT_STRING = '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 		canvasContext.fillStyle = "#000000";
 		canvasContext.font = `bold 64px ${SYSTEM_FONT_STRING}`;
 		canvasContext.textAlign = "center";
-		canvasContext.fillText(`${this.Score}`, engine.width / 2, 236);
+		canvasContext.fillText(`${this.Score}`, position.x, position.y, size.x, size.y);
 	}
 }

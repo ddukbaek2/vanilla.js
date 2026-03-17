@@ -22,7 +22,7 @@ const COLOR_VANILLA = "#f3e5ab";
 class Tutorial extends VGameInstance {
 
 	//==============================================================================
-	// 출력됨.
+	// 출력.
 	//==============================================================================
 	/**
 	 * @param { VRenderer } renderer 
@@ -30,7 +30,7 @@ class Tutorial extends VGameInstance {
 	onDraw(renderer) {
 		super.onDraw(renderer);
 
-		const engine = this.getEngine();
+		const engine = super.getEngine();
 		const view = engine.getView();
 
 		// 전체 영역 초기화.
