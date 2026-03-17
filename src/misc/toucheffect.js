@@ -40,19 +40,6 @@ export class VTouchEffect extends VNode {
 	}
 
 	//==============================================================================
-	// 터치 파티클 생성.
-	//==============================================================================
-	createTouchParticle(x, y) {
-		const particle = new VParticle();
-		particle.position = VVector2.create(x + (Math.random() - 0.5) * 10, y + (Math.random() - 0.5) * 10);
-		particle.velocity = VVector2.create((Math.random() - 0.5) * 120, (Math.random() - 0.5) * 120);
-		particle.life = 1.0;
-		particle.maxLife = 1.0;
-		particle.radius = Math.random() * 25 + 10;
-		this.touchParticles.push(particle);
-	}
-
-	//==============================================================================
 	// 갱신.
 	//==============================================================================
 	/**
@@ -65,6 +52,32 @@ export class VTouchEffect extends VNode {
 	}
 
 	//==============================================================================
+	// 출력 상태 시작.
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { VRenderer } renderer 
+	 */
+	beginDrawState(renderer) {
+		super.beginDrawState(renderer);
+		const canvasContext = renderer.getCanvasContext();
+		canvasContext.globalCompositeOperation = "lighter";
+	}
+
+	//==============================================================================
+	// 출력 상태 종료.
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { VRenderer } renderer 
+	 */
+	endDrawState(renderer) {
+		super.endDrawState(renderer);
+		const canvasContext = renderer.getCanvasContext();
+		canvasContext.globalCompositeOperation = "source-over";
+	}
+
+	//==============================================================================
 	// 출력.
 	//==============================================================================
 	/**
@@ -72,8 +85,23 @@ export class VTouchEffect extends VNode {
 	 * @param { VRenderer } renderer 
 	 */
 	draw(renderer) {
+		this.beginDrawState(renderer);
 		super.draw(renderer);
 		this.drawTouchParticles(renderer);
+		this.endDrawState(renderer);
+	}
+
+	//==============================================================================
+	// 터치 파티클 생성.
+	//==============================================================================
+	createTouchParticle(x, y) {
+		const particle = new VParticle();
+		particle.position = VVector2.create(x + (Math.random() - 0.5) * 10, y + (Math.random() - 0.5) * 10);
+		particle.velocity = VVector2.create((Math.random() - 0.5) * 120, (Math.random() - 0.5) * 120);
+		particle.life = 1.0;
+		particle.maxLife = 1.0;
+		particle.radius = Math.random() * 25 + 10;
+		this.touchParticles.push(particle);
 	}
 
 	//==============================================================================
@@ -106,7 +134,6 @@ export class VTouchEffect extends VNode {
 		}
 
 		const canvasContext = renderer.getCanvasContext();
-		canvasContext.globalCompositeOperation = "lighter";
 		for (let i = 0; i < this.touchParticles.length; ++i) {
 			const particle = this.touchParticles[i];
 			const opacity = Math.max(0, particle.life / particle.maxLife);

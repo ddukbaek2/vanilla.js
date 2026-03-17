@@ -32,23 +32,25 @@ export class VRenderer extends VObject {
 	}
 
 	//==============================================================================
-	// 출력.
+	// 노드 출력.
 	//==============================================================================
 	/**
 	 * @type { VNode } node
 	 */
-	draw(node) {
+	drawNode(node) {
 		if (node === null) {
 			return;
 		}
 		
+		node.beginDrawState(this);
 		node.preDraw(this);
 		node.draw(this);
 		node.postDraw(this);
+		node.endDrawState(this);
 	}
 
 	//==============================================================================
-	// 사각형 렌더링.
+	// 사각형 출력.
 	//==============================================================================
 	/**
 	 * @param { VRect } rect 
@@ -61,7 +63,7 @@ export class VRenderer extends VObject {
 		canvasContext.globalAlpha = opacity;
 		canvasContext.fillStyle = color;
 		canvasContext.fillRect(rect.position.x, rect.position.y, rect.size.x, rect.size.y);
-		// canvasContext.globalAlpha = 1.0;
+		canvasContext.globalAlpha = 1.0;
 	}
 
 	//==============================================================================

@@ -91,7 +91,7 @@ export class VGameInstance extends VObject
 	/**
 	 * @param { VEngine } engine 
 	 */
-	resized(engine) {
+	resize(engine) {
 
 	}
 

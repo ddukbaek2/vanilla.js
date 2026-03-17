@@ -49,14 +49,22 @@ export class VEngine extends VObject {
 		this.#input = new VInput(this);
 		this.#renderer = new VRenderer(this, canvasContext);
 
-		this.#onResizeCallback = this.#resized.bind(this);
+		this.#onResizeCallback = this.#resize.bind(this);
 		this.#onEngineUpdateCallback = this.#updateEngine.bind(this);
 		this.#gameInstance = null;
 		this.#scene = null;
 		this.#isDevelopment = isDevelopment;
 		
+		if (this.terminalFont !== null) {
+			// this.terminalFont = new FontFace(`VT323`, `url('https://fonts.gstatic.com/s/vt323/v17/pxiKyp0ihIEF2isfFJU.woff2')`);
+			this.terminalFont = new FontFace(`DOSGothic`, `url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff')`);
+			this.terminalFont.load().then((loadedFont) => {
+				document.fonts.add(loadedFont);
+			});
+		}
+
 		this.#setupAllEvents();
-		this.#resized();
+		this.#resize();
 	}
 
 	//==============================================================================
@@ -95,7 +103,7 @@ export class VEngine extends VObject {
 	 * @private
 	 * @method
 	 */
-	#resized() {
+	#resize() {
 		const devicePixelRatio = window.devicePixelRatio || 1;
 		const clientWidth = window.innerWidth;
 		const clientHeight = window.innerHeight;
@@ -121,8 +129,8 @@ export class VEngine extends VObject {
 		this.#view.view.size.x = viewWidth;
 		this.#view.view.size.y = viewHeight;
 
-		if (this.#gameInstance && typeof this.#gameInstance.resized === "function") {
-			this.#gameInstance.resized(this);
+		if (this.#gameInstance && typeof this.#gameInstance.resize === "function") {
+			this.#gameInstance.resize(this);
 		}
 	}
 
@@ -223,13 +231,7 @@ export class VEngine extends VObject {
 	
 		const engine = this;
 		const SYSTEM_FONT_STRING = '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-		if (this.terminalFont !== null) {
-			// this.terminalFont = new FontFace(`VT323`, `url('https://fonts.gstatic.com/s/vt323/v17/pxiKyp0ihIEF2isfFJU.woff2')`);
-			this.terminalFont = new FontFace(`DOSGothic`, `url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff')`);
-			this.terminalFont.load().then((loadedFont) => {
-				document.fonts.add(loadedFont);
-			});
-		}
+
 
 		let textOffsetX = 16;
 		let textOffsetY = 16;
@@ -424,10 +426,15 @@ export class VEngine extends VObject {
 	 * @param { string } color
 	 */
 	viewIdentity(color = "#000000") {
-		const canvasContext = this.#renderer.getCanvasContext();
+		const renderer = this.getRenderer();
+		const canvasContext = renderer.getCanvasContext();
 
 		// 좌표계 초기화.
 		canvasContext.setTransform(1, 0, 0, 1, 0, 0);
+		
+		// 상태 초기화.
+		// canvasContext.save();
+		canvasContext.beginPath();
 
 		// 영역 전체 칠하기.
 		canvasContext.fillStyle = color;
