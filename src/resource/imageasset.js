@@ -11,7 +11,7 @@ export class VImageAsset extends VAsset {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { Image } */ image = null;
+	/** @type { HTMLImageElement } */ image = null;
 
 
 	//==============================================================================
@@ -19,7 +19,7 @@ export class VImageAsset extends VAsset {
 	//==============================================================================
 	constructor() {
 		super();
-		this.image = new Image();
+		this.image = new window.Image();
 	}
 
 	//==============================================================================
@@ -38,7 +38,7 @@ export class VImageAsset extends VAsset {
 		}
 
 		super.assetPath = assetPath;
-		this.image = new Image();
+		this.image = new window.Image();
 		this.image.src = assetPath;
 
 		// 불러오기.

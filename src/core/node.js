@@ -82,7 +82,13 @@ export class VNode extends VObject {
 	 * @param { VRenderer } renderer 
 	 */
 	draw(renderer) {
-		// renderer.canvasContext.draw()
+		// const canvasContext = renderer.getCanvasContext();
+		// canvasContext.save();
+		// canvasContext.translate(this.#position.x, this.#position.y);
+		// canvasContext.rotate(this.#rotation);
+		// canvasContext.scale(this.#size.x, this.#size.y);
+		// // 출력.		
+		// canvasContext.restore();
 	}
 
 	//==============================================================================

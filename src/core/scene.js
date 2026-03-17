@@ -17,7 +17,7 @@ export class VScene extends VObject {
 	//==============================================================================
 	// 생성.
 	//==============================================================================
-	constructor(args) {
+	constructor() {
 		super();
 		this.#nodes = [];
 	}
@@ -30,6 +30,25 @@ export class VScene extends VObject {
 	 * @param { VEngine } engine 
 	 */
 	update(engine) {
-		
+		const time = engine.getTime();
+		const timeDelta = time.timeDelta;
+		for (let i = 0; i < this.#nodes.length; ++i) {
+			const node = this.#nodes[i];
+			node.update(timeDelta);
+		}
+	}
+
+	//==============================================================================
+	// 출력.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { VRenderer } renderer 
+	 */
+	draw(renderer) {
+		for (let i = 0; i < this.#nodes.length; ++i) {
+			const node = this.#nodes[i];
+			renderer.drawNode(node);
+		}
 	}
 }

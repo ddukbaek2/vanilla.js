@@ -67,13 +67,13 @@ export class VRenderer extends VObject {
 	}
 
 	//==============================================================================
-	// 이미지 렌더링.
+	// 이미지 출력.
 	//==============================================================================
 	/**
 	 * @param { VVector2 } position
 	 * @param { VVector2 } size
 	 * @param { number } rotation,
-	 * @param { Image } image,
+	 * @param { HTMLImageElement } image,
 	 * @param { string } color 
 	 * @param { number } opacity 
 	 */
@@ -94,6 +94,49 @@ export class VRenderer extends VObject {
 			canvasContext.drawImage(image, position.x, position.y, size.x, size.y);
 		}
 		// this.#canvasContext.globalAlpha = 1.0;
+	}
+
+	//==============================================================================
+	// 이미지 나인패치 출력.
+	//==============================================================================
+	/**
+	 * @static
+	 * @param { HTMLImageElement } image
+	 * @param { VVector2 } position
+	 * @param { VVector2 } size
+	 * @param { VRect } patch
+	 */
+	drawImageNinePatch(image, position, size, patch) {
+		const canvasContext = this.getCanvasContext();
+		const sw = image.width;
+		const sh = image.height;
+		const dx = position.x;
+		const dy = position.y;
+		const dw = size.x;
+		const dh = size.y;
+		const left = patch.position.x;
+		const top = patch.position.y;
+		const right = patch.size.x;
+		const bottom = patch.size.y;
+		const centerSrcW = sw - left - right;
+		const centerSrcH = sh - top - bottom;
+		const centerDstW = dw - left - right;
+		const centerDstH = dh - top - bottom;
+
+		// 위쪽.
+		canvasContext.drawImage(image, 0, 0, left, top, dx, dy, left, top); // 왼쪽.
+		canvasContext.drawImage(image, left, 0, centerSrcW, top, dx + left, dy, centerDstW, top); // 가운데쪽.
+		canvasContext.drawImage(image, sw - right, 0, right, top, dx + dw - right, dy, right, top); // 오른쪽.
+
+		// 가운데쪽.
+		canvasContext.drawImage(image, 0, top, left, centerSrcH, dx, dy + top, left, centerDstH); // 왼쪽.
+		canvasContext.drawImage(image, left, top, centerSrcW, centerSrcH, dx + left, dy + top, centerDstW, centerDstH); // 가운데쪽.
+		canvasContext.drawImage(image, sw - right, top, right, centerSrcH, dx + dw - right, dy + top, right, centerDstH); // 오른쪽.
+
+		// 아래쪽.
+		canvasContext.drawImage(image, 0, sh - bottom, left, bottom, dx, dy + dh - bottom, left, bottom); // 왼쪽.
+		canvasContext.drawImage(image, left, sh - bottom, centerSrcW, bottom, dx + left, dy + dh - bottom, centerDstW, bottom); // 가운데쪽.
+		canvasContext.drawImage(image, sw - right, sh - bottom, right, bottom, dx + dw - right, dy + dh - bottom, right, bottom); // 오른쪽.
 	}
 
 	//==============================================================================
@@ -137,4 +180,40 @@ export class VRenderer extends VObject {
 	getCanvasContext() {
 		return this.#canvasContext;
 	}
+}
+
+
+class GL2D {
+	constructor(canvasContext) {
+		this.canvasContext = canvasContext;
+	}
+	glIdentity() {
+		// this.canvasContext.setTransform(1, 0, 0, 1, 0, 0);
+		this.canvasContext.resetTransform();
+	}
+	glTranslate(x, y) {
+		this.canvasContext.translate(x, y);	
+	}
+	glScale(x, y) {
+		this.canvasContext.scale(x, y);
+	}
+	glRotate(angle) {
+		this.canvasContext.rotate(angle);
+	}
+	glTransform(matrix) {
+		this.canvasContext.transform(matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]);
+	}
+	glViewport(x, y, width, height) {
+		this.canvasContext.viewport(x, y, width, height);
+	}
+	glClearColor(r, g, b, a) {
+		this.canvasContext.clearColor(r, g, b, a);
+	}
+	glPushMatrix() {
+		this.canvasContext.save();
+	}
+	glPopMatrix() {
+		this.canvasContext.restore();
+	}
+
 }

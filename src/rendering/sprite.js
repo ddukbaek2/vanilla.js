@@ -13,7 +13,7 @@ export class VSprite extends VColoredNode {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { Image } */ #image;
+	/** @private @type { HTMLImageElement } */ #image;
 
 	//==============================================================================
 	// 생성.
@@ -50,7 +50,7 @@ export class VSprite extends VColoredNode {
 	// 이미지 설정.
 	//==============================================================================
 	/**
-	 * @param { Image } image 
+	 * @param { HTMLImageElement } image 
 	 */
 	setImage(image) {
 		this.#image = image;	
@@ -60,7 +60,7 @@ export class VSprite extends VColoredNode {
 	// 이미지 반환.
 	//==============================================================================
 	/**
-	 * @returns { Image }
+	 * @returns { HTMLImageElement }
 	 */
 	getImage() {
 		return this.#image;
