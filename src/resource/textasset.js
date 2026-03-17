@@ -1,67 +1,65 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VVector2 } from "../base/vector2.js";
-import { VRenderer } from "../core/renderer.js";
-import { UINode } from "./uinode.js";
-// import { VFontAsset } from "../core/fontasset.js";
+import { VAsset } from "../core/asset.js";
 
 
 //==============================================================================
-// UI 버튼.
+// 텍스트 애셋.
 //==============================================================================
-export class UIButton extends UINode {
+export class VTextAsset extends VAsset
+{
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	// /** @type { VFontAsset } */ fontAsset = null;
+	/** @type { string } */ text;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	constructor() {
 		super();
-		this.fontAsset = null;
+		this.text = "";
 	}
 
 	//==============================================================================
-	// 갱신.
+	// 비동기 애셋 로드.
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta 
+	 * @param { string } assetPath 
 	 */
-	update(timeDelta) {
-		super.update(timeDelta);
+	async load(assetPath) {
+		await super.load(assetPath);
+
+		// 이미 로드 된 상태라면.
+		if (super.isLoaded) {
+			return Promise.resolve();
+		}
+		else {
+			try {
+				// 로드.
+				const response = await fetch(assetPath);
+				this.text = await response.text();
+				super.isLoaded = true;
+			}
+			catch (error) {
+				// 예외.
+				console.error(`Error loading text: ${super.assetPath}`, error);
+				throw error;
+			}
+		}
 	}
 
 	//==============================================================================
-	// 출력.
+	// 애셋 언로드.
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { VRenderer } renderer 
+	 * @method
 	 */
-	draw(renderer) {
-		// super.draw(renderer);
-	}
-
-	//==============================================================================
-	// 상태 변경.
-	//==============================================================================
-	setState() {
-
-	}
-
-	//==============================================================================
-	// 영역에 충돌 되었는지 여부.
-	//==============================================================================
-	/**
-	 * @override
-	 * @param { Vector2 } position
-	 * @returns { boolean }
-	 */
-	isHitTest(position) {
-		return false;
+	unload() {
+		super.unload();
+		this.text = "";
 	}
 }

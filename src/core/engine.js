@@ -246,12 +246,12 @@ export class VEngine extends VObject {
 			// 	[-2, 0], [2, 0], [0, -2], [0, 2]
 			// ];
 
-			// canvasContext.fillStyle = VColors.black;
+			// canvasContext.fillStyle = Colors.black;
 			// for (let i = 0; i < offsets.length; ++i) {
 			// 	canvasContext.fillText(text, textOffsetX + offsets[i][0], textOffsetY + offsets[i][1]);
 			// }
 
-			// canvasContext.fillStyle = VColors.white;
+			// canvasContext.fillStyle = Colors.white;
 			// canvasContext.fillText(text, textOffsetX, textOffsetY);
 
 			textOffsetY += 16;
@@ -284,12 +284,12 @@ export class VEngine extends VObject {
 		// canvasContext.letterSpacing = "-1px";
 		canvasContext.font = `16px DOSGothic`;//${SYSTEM_FONT_STRING}`;
 		canvasContext.textBaseline = "top";
-		canvasContext.fillStyle = VColors.white; // VColors.lightVanilla
-		// canvasContext.fillStyle = VColors.white; // VColors.lightVanilla;
+		canvasContext.fillStyle = VColors.white; // Colors.lightVanilla
+		// canvasContext.fillStyle = Colors.white; // Colors.lightVanilla;
 		// canvasContext.lineWidth = 4;
-		// canvasContext.strokeStyle = VColors.black; // VColors.darkVanilla;
+		// canvasContext.strokeStyle = Colors.black; // Colors.darkVanilla;
 		// canvasContext.textRendering = "auto"; //optimizeLegibility"; //"geometricPrecision";
-		// canvasContext.shadowColor = VColors.white;
+		// canvasContext.shadowColor = Colors.white;
 		// canvasContext.shadowOffsetX = 0.5;
 		// canvasContext.shadowOffsetY = 0.5;
 		canvasContext.textAlign = "left";

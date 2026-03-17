@@ -1,7 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import * as Reflection from "./reflection.js";
+import * as VReflection from "./reflection.js";
 
 
 //==============================================================================
@@ -28,7 +28,7 @@ export class VObject {
 	 * @returns { this }
 	 */
 	clone() {
-		const obj = Reflection.clone(this);
+		const obj = VReflection.clone(this);
 		return obj;
 	}
 
@@ -41,7 +41,7 @@ export class VObject {
 	 * @returns { this }
 	 */
 	structuredClone() {
-		const obj = Reflection.structuredClone(this);
+		const obj = VReflection.structuredClone(this);
 		return obj;	
 	}
 }
