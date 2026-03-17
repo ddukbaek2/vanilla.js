@@ -16,12 +16,13 @@ export class VNode extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { VNode } */ #parent;
-	/** @type { VNode[] } */ #children;
-	/** @type { VVector2 } */ #position;
-	/** @type { VVector2 } */ #size;
-	/** @type { number } */ #rotation;
-	/** @type { boolean } */ #isVisible;
+	/** @private @type { VNode | null } */ #parent; // 부모 노드.
+	/** @private @type { VNode[] } */ #children; // 자식 노드 목록.
+	/** @private @type { VVector2 } */ #position; // 위치.
+	/** @private @type { VVector2 } */ #size; // 크기.
+	/** @private @type { number } */ #rotation; // 회전값.
+	/** @private @type { boolean } */ #isActive; // 활성화 여부.
+	/** @private @type { boolean } */ #isVisible; // 렌더링 여부.
 
 	//==============================================================================
 	// 생성.
@@ -36,6 +37,7 @@ export class VNode extends VObject {
 		this.#position = VVector2.zero();
 		this.#size = VVector2.zero();
 		this.#rotation = 0.0;
+		this.#isActive = true;
 		this.#isVisible = true;
 	}
 
@@ -51,7 +53,18 @@ export class VNode extends VObject {
 	}
 
 	//==============================================================================
-	// 이전 출력.
+	// 출력 상태 시작.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { VRenderer } renderer 
+	 */
+	beginDrawState(renderer) {
+
+	}
+
+	//==============================================================================
+	// 출력 상태 시작.
 	//==============================================================================
 	/**
 	 * @virtual
@@ -73,13 +86,24 @@ export class VNode extends VObject {
 	}
 
 	//==============================================================================
-	// 이후 출력.
+	// 출력 상태 시작.
 	//==============================================================================
 	/**
 	 * @virtual
 	 * @param { VRenderer } renderer 
 	 */
 	postDraw(renderer) {
+
+	}
+
+	//==============================================================================
+	// 출력 상태 종료.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { VRenderer } renderer 
+	 */
+	endDrawState(renderer) {
 
 	}
 
@@ -114,6 +138,16 @@ export class VNode extends VObject {
 			// 자식 추가.
 			parent.#children.push(this);
 		}
+	}
+	
+	//==============================================================================
+	// 부모가 없는지 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { VNode } 
+	 */
+	isRoot() {
+		return this.#parent === null;
 	}
 
 	//==============================================================================
@@ -217,6 +251,49 @@ export class VNode extends VObject {
 	}
 
 	//==============================================================================
+	// 활성화 상태 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } active 
+	 */
+	setActive(active) {
+		this.#isActive = active;
+	}
+
+	//==============================================================================
+	// 현재부터 루트까지 계층 전체의 활성화 상태 반환. (루트까지 하나라도 비활성화상태면 false 반환)
+	//==============================================================================
+	/**
+	 * @returns { boolean } 
+	 */
+	isActiveInHierarchy() {
+		if (this.isActive()) {
+			let current = this;
+			while (current !== null) {
+				if (current.isActive()) {
+					current = current.getParent();
+				}
+				else {
+					return false;
+				}
+			}
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	//==============================================================================
+	// 활성화 상태 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 
+	 */
+	isActive() {
+		return this.#isActive;		
+	}
+
+	//==============================================================================
 	// 가시 상태 설정.
 	//==============================================================================
 	/**
@@ -224,6 +301,29 @@ export class VNode extends VObject {
 	 */
 	setVisible(visible) {
 		this.#isVisible = visible;
+	}
+
+	//==============================================================================
+	// 현재부터 루트까지 계층 전체의 가시 상태 반환. (루트까지 하나라도 비활성화상태면 false 반환)
+	//==============================================================================
+	/**
+	 * @returns { boolean } 
+	 */
+	isVisibleInHierarchy() {
+		if (this.isVisible()) {
+			let current = this;
+			while (current !== null) {
+				if (current.isVisible()) {
+					current = current.getParent();
+				}
+				else {
+					return false;
+				}
+			}
+			return true;
+		} else {
+			return false;
+		}
 	}
 
 	//==============================================================================

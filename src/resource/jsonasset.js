@@ -5,25 +5,21 @@ import { VAsset } from "../core/asset.js";
 
 
 //==============================================================================
-// 폰트 애셋.
+// 데이터 애셋.
 //==============================================================================
-export class VFontAsset extends VAsset
+export class VJsonAsset extends VAsset
 {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { string } */ family = "";
-	/** @type { FontFace } */ fontFace = null;
+	/** @type { Object } */ data;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	constructor() {
 		super();
-		// super.assetPath = "";
-		// super.isLoaded = false;
-		this.family = "";
-		this.fontFace = null;
+		this.data = null;
 	}
 
 	//==============================================================================
@@ -40,31 +36,19 @@ export class VFontAsset extends VAsset
 		if (super.isLoaded) {
 			return Promise.resolve();
 		}
-	}
-
-	//==============================================================================
-	// 비동기 애셋 로드.
-	//==============================================================================
-	/**
-	 * @param { string } family 
-	 * @param { string } assetPath 
-	 */
-	async load(family, assetPath) {
-		await super.load(assetPath);
-
-		if (this.fontFace)
-			return Promise.resolve();
-		
-		this.family = family;
-		this.AssetPath = assetPath;
-
-		// this.FontFace = new FontFace(this.Family, `url(${this.AssetPath}) format("woff2")`);
-		this.fontFace = new FontFace(this.family, `url(${this.AssetPath})`);
-		await this.fontFace.load();
-
-		// 브라우저 폰트셋 등록.
-		document.fonts.add(this.fontFace);
-		super.IsLoaded = true;
+		else {
+			try {
+				// 로드.
+				const response = await fetch(assetPath);
+				this.data = await response.json();
+				super.isLoaded = true;
+			}
+			catch (error) {
+				// 예외.
+				console.error(`Error loading json: ${super.assetPath}`, error);
+				throw error;
+			}
+		}
 	}
 
 	//==============================================================================
@@ -76,11 +60,6 @@ export class VFontAsset extends VAsset
 	 */
 	unload() {
 		super.unload();
-		if (this.fontFace == null)
-			return;
-
-		document.fonts.delete(this.fontFace);
-		this.fontFace = null;
-		super.IsLoaded = false;
+		this.data = null;
 	}
 }
