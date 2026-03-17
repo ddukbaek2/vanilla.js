@@ -18,11 +18,11 @@ export class VEngine extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
+	/** @private @type { HTMLCanvasElement } */ #canvas;
 	/** @private @type { VPlatform } */ #platform;
 	/** @private @type { VTime } */ #time;
 	/** @private @type { VView } */ #view;
 	/** @private @type { VInput } */ #input;
-	/** @private @type { HTMLCanvasElement } */ #canvas;
 	/** @private @type { VRenderer } */ #renderer;
 
 	/** @private @type { () => void  } */ #onResizeCallback;
@@ -38,14 +38,15 @@ export class VEngine extends VObject {
 	constructor(width, height, canvasId, isDevelopment = true) {
 		super();
 
+		this.#canvas = document.getElementById(canvasId);
+		const canvasContext = this.#canvas.getContext("2d", { alpha: false });
+
 		this.#platform = new VPlatform();
 		this.#time = new VTime(this);
 		this.#view = new VView(this);
 		this.#view.resolution.x = width;
 		this.#view.resolution.y = height;
 		this.#input = new VInput(this);
-		this.#canvas = document.getElementById(canvasId);
-		const canvasContext = this.#canvas.getContext("2d", { alpha: false });
 		this.#renderer = new VRenderer(this, canvasContext);
 
 		this.#onResizeCallback = this.#resized.bind(this);
@@ -446,11 +447,38 @@ export class VEngine extends VObject {
 
 		// 좌표계 초기화.
 		const devicePixelRatio = this.#view.devicePixelRatio;
-		canvasContext.setTransform(this.#view.scale * devicePixelRatio, 0, 0, this.#view.scale * devicePixelRatio, this.#view.view.position.x * devicePixelRatio, this.#view.view.position.y * devicePixelRatio);
+		const a = this.#view.scale * devicePixelRatio;
+		const e = this.#view.view.position.x * devicePixelRatio;
+		const f = this.#view.view.position.y * devicePixelRatio;
+		canvasContext.setTransform(a, 0, 0, a, e, f);
 
 		// 영역 전체 칠하기.
 		canvasContext.fillStyle = color;
 		canvasContext.fillRect(0, 0, this.#view.resolution.x, this.#view.resolution.y);;
+	}
+
+	//==============================================================================
+	// 캔버스 정보 반환.
+	//==============================================================================
+	/**
+	 * @public
+	 * @method
+	 * @returns { HTMLCanvasElement }
+	 */
+	getCanvas() {
+		return this.#canvas;
+	}
+
+	//==============================================================================
+	// 플랫폼 정보 반환.
+	//==============================================================================
+	/**
+	 * @public
+	 * @method
+	 * @returns { VPlatform }
+	 */
+	getCanvas() {
+		return this.#platform;
 	}
 
 	//==============================================================================
