@@ -85,10 +85,8 @@ export class VTouchEffect extends VNode {
 	 * @param { VRenderer } renderer 
 	 */
 	draw(renderer) {
-		this.beginDrawState(renderer);
-		super.draw(renderer);
+		// super.draw(renderer);
 		this.drawTouchParticles(renderer);
-		this.endDrawState(renderer);
 	}
 
 	//==============================================================================

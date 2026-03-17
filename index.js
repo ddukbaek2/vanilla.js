@@ -29,7 +29,6 @@ import { VNode  } from "./src/core/node.js";
 //==============================================================================
 // 렌더링 목록.
 //==============================================================================
-import { VColoredNode } from "./src/rendering/colorednode.js";
 import { VSprite } from "./src/rendering/sprite.js";
 import { VAnimatedSprite } from "./src/rendering/animatedsprite.js";
 

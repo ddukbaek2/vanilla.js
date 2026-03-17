@@ -29,7 +29,7 @@ export class VScene extends VObject {
 	 * @virtual
 	 * @param { VEngine } engine 
 	 */
-	update(engine) {
+	updateAllNodes(engine) {
 		const time = engine.getTime();
 		const timeDelta = time.timeDelta;
 		for (let i = 0; i < this.#nodes.length; ++i) {
@@ -45,7 +45,7 @@ export class VScene extends VObject {
 	 * @virtual
 	 * @param { VRenderer } renderer 
 	 */
-	draw(renderer) {
+	drawAllNodes(renderer) {
 		for (let i = 0; i < this.#nodes.length; ++i) {
 			const node = this.#nodes[i];
 			renderer.drawNode(node);

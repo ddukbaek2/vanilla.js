@@ -33,7 +33,6 @@ class VImagAsset
 
 
 # 렌더링 클래스: 화면 출력 관련 처리 객체.
-class VColoredNode
 class VSprite
 class VAnimatedSprite
 

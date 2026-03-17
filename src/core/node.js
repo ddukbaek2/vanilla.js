@@ -23,6 +23,9 @@ export class VNode extends VObject {
 	/** @private @type { number } */ #rotation; // 회전값.
 	/** @private @type { boolean } */ #isActive; // 활성화 여부.
 	/** @private @type { boolean } */ #isVisible; // 렌더링 여부.
+	/** @private @type { string } */ #color; // 컬러.
+	/** @private @type { number } */ #opacity; // 투명도.
+
 
 	//==============================================================================
 	// 생성.
@@ -39,6 +42,8 @@ export class VNode extends VObject {
 		this.#rotation = 0.0;
 		this.#isActive = true;
 		this.#isVisible = true;
+		this.#color = "#ffffff"; // rgba(255, 255, 255, 1.0);
+		this.#opacity = 1.0;
 	}
 
 	//==============================================================================
@@ -60,7 +65,8 @@ export class VNode extends VObject {
 	 * @param { VRenderer } renderer 
 	 */
 	beginDrawState(renderer) {
-
+		const canvasContext = renderer.getCanvasContext();
+		canvasContext.save();
 	}
 
 	//==============================================================================
@@ -71,7 +77,12 @@ export class VNode extends VObject {
 	 * @param { VRenderer } renderer 
 	 */
 	preDraw(renderer) {
-
+		const canvasContext = renderer.getCanvasContext();
+		canvasContext.translate(this.#position.x, this.#position.y);
+		canvasContext.rotate(this.#rotation);
+		canvasContext.scale(1, 1);
+		canvasContext.globalAlpha = this.#opacity;
+		canvasContext.fillStyle = this.#color;
 	}
 
 	//==============================================================================
@@ -82,13 +93,8 @@ export class VNode extends VObject {
 	 * @param { VRenderer } renderer 
 	 */
 	draw(renderer) {
-		// const canvasContext = renderer.getCanvasContext();
-		// canvasContext.save();
-		// canvasContext.translate(this.#position.x, this.#position.y);
-		// canvasContext.rotate(this.#rotation);
-		// canvasContext.scale(this.#size.x, this.#size.y);
-		// // 출력.		
-		// canvasContext.restore();
+		const canvasContext = renderer.getCanvasContext();
+		canvasContext.fillRect(0, 0, this.#size.x, this.#size.y);
 	}
 
 	//==============================================================================
@@ -99,7 +105,8 @@ export class VNode extends VObject {
 	 * @param { VRenderer } renderer 
 	 */
 	postDraw(renderer) {
-
+		const canvasContext = renderer.getCanvasContext();
+		canvasContext.globalAlpha = 1.0;
 	}
 
 	//==============================================================================
@@ -110,7 +117,8 @@ export class VNode extends VObject {
 	 * @param { VRenderer } renderer 
 	 */
 	endDrawState(renderer) {
-
+		const canvasContext = renderer.getCanvasContext();
+		canvasContext.restore();
 	}
 
 	//==============================================================================
@@ -380,6 +388,26 @@ export class VNode extends VObject {
 	 */
 	isVisible() {
 		return this.#isVisible;
+	}
+
+	//==============================================================================
+	// 투명도 설정.
+	//==============================================================================
+	/**
+	 * @param { number } opacity 
+	 */
+	setOpacity(opacity) {
+		this.#opacity = opacity;
+	}
+
+	//==============================================================================
+	// 투명도 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 
+	 */
+	getOpacity() {
+		return this.#opacity;
 	}
 
 	//==============================================================================
