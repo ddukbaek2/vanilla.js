@@ -70,14 +70,15 @@ export class VRenderer extends VObject {
 	// 이미지 출력.
 	//==============================================================================
 	/**
+	 * @param { HTMLImageElement } image
 	 * @param { VVector2 } position
 	 * @param { VVector2 } size
-	 * @param { number } rotation,
-	 * @param { HTMLImageElement } image,
+	 * @param { VRect } slices
+	 * @param { number } rotation
 	 * @param { string } color 
 	 * @param { number } opacity 
 	 */
-	drawImage(image, position = VVector2.zero(), size = VVector2.zero(), rotation = 0.0, color = "#ffffff", opacity = 1.0) {
+	drawImage(image, position = VVector2.zero(), size = VVector2.zero(), slices = null, rotation = 0.0, color = "#ffffff", opacity = 1.0) {
 		if (image === null){
 			throw new Error("image is null");
 		}
@@ -90,8 +91,11 @@ export class VRenderer extends VObject {
 		if (size === VVector2.zero()) {
 			canvasContext.drawImage(image, position.x, position.y, image.width, image.height);
 		}
-		else {
+		else if (slices === null || slices == VRect.zero()) {
 			canvasContext.drawImage(image, position.x, position.y, size.x, size.y);
+		}
+		else {
+			canvasContext.drawImage(image, slices.position.x, slices.position.y, slices.size.x, slices.size.y, position.x, position.y, size.x, size.y);
 		}
 		// this.#canvasContext.globalAlpha = 1.0;
 	}

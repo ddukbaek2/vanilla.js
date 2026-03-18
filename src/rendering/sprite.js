@@ -78,11 +78,12 @@ export class VSprite extends VNode {
 		// super.draw(renderer);
 		const size = super.getSize();
 		const pivot = super.getPivot();
+		const slices = this.getSlices();
 		// 기본은 좌상이므로 0,0이라치고...
 		// 거기서 0~1, 0~1을 뺀다...
 		const offset = VVector2.zero().subtract(size.multiply(pivot));
-		console.log(`pivot=(${pivot.x}, ${pivot.y}) offset=(${offset.x}, ${offset.y})`);
-		renderer.drawImage(this.#image, offset, size);
+		// console.log(`pivot=(${pivot.x}, ${pivot.y}) offset=(${offset.x}, ${offset.y})`);
+		renderer.drawImage(this.#image, offset, size, slices);
 	}
 
 	//==============================================================================
@@ -111,7 +112,7 @@ export class VSprite extends VNode {
 	/**
 	 * @param { VRect } slices
 	 */
-	setSlice(slices) {
+	setSlices(slices) {
 		this.#slices = slices;
 	}
 
@@ -121,7 +122,7 @@ export class VSprite extends VNode {
 	/**
 	 * @returns { VRect }
 	 */
-	getSlice(slices) {
+	getSlices() {
 		return this.#slices;
 	}
 
