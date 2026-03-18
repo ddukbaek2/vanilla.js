@@ -4,7 +4,7 @@
 import { VVector2 } from "../base/vector2.js";
 import { VRenderer } from "../core/renderer.js";
 import { UINode } from "./uinode.js";
-import { VFontAsset } from "../core/fontasset.js";
+import { VFontAsset } from "../resource/fontasset.js";
 
 
 //==============================================================================

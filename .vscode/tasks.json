@@ -11,7 +11,7 @@
 		{
 			"label": "BUILD_LIBRARY_DEBUG",
 			"type": "shell",
-			"command": "esbuild index.js --bundle --outfile=vanilla.js --format=iife --keep-names --global-name=Vanilla --sourcemap",
+			"command": "esbuild index.js --bundle --outfile=build/vanilla.js --format=iife --keep-names --global-name=Vanilla --sourcemap",
 			"group": {
 				"kind": "build",
 				"isDefault": true
@@ -21,7 +21,7 @@
 		{
 			"label": "BUILD_LIBRARY_RELEASE",
 			"type": "shell",
-			"command": "esbuild index.js --bundle --outfile=vanilla.min.js --format=iife --keep-names --global-name=Vanilla --minify",
+			"command": "esbuild index.js --bundle --outfile=build/vanilla.min.js --format=iife --keep-names --global-name=Vanilla --minify",
 			"group": "build",
 			"problemMatcher": []
 		}

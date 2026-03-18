@@ -5,7 +5,7 @@ import { VObject } from "../base/object.js";
 import { VVector2 } from "../base/vector2.js";
 import { VRenderer } from "../core/renderer.js"
 import { VSprite } from "./sprite.js";
-import { VImageAsset } from "./resource/imageasset.js";
+import { VImageAsset } from "../resource/imageasset.js";
 
 
 //==============================================================================

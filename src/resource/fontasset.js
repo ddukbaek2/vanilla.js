@@ -49,7 +49,7 @@ export class VFontAsset extends VAsset
 	 * @param { string } family 
 	 * @param { string } assetPath 
 	 */
-	async load(family, assetPath) {
+	async loadFont(family, assetPath) {
 		await super.load(assetPath);
 
 		if (this.fontFace)
