@@ -6,8 +6,7 @@
  * @param { number } right
  * @returns { number }
  */
-export function min(left, right)
-{
+export function min(left, right) {
 	return left < right ? left : right;
 }
 
@@ -28,12 +27,12 @@ export function max(left, right) {
 //==============================================================================
 /**
  * @param { number } value
- * @param { number } min
- * @param { number } max
+ * @param { number } minValue
+ * @param { number } maxValue
  * @returns { number }
  */
-export function clamp(value, min, max) {
-	return max(min, min(max, value));
+export function clamp(value, minValue, maxValue) {
+	return max(minValue, min(maxValue, value));
 }
 
 //==============================================================================

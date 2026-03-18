@@ -78,7 +78,10 @@ export class VSprite extends VNode {
 		// super.draw(renderer);
 		const size = super.getSize();
 		const pivot = super.getPivot();
-		const offset = size.multiply(pivot);
+		// 기본은 좌상이므로 0,0이라치고...
+		// 거기서 0~1, 0~1을 뺀다...
+		const offset = VVector2.zero().subtract(size.multiply(pivot));
+		console.log(`pivot=(${pivot.x}, ${pivot.y}) offset=(${offset.x}, ${offset.y})`);
 		renderer.drawImage(this.#image, offset, size);
 	}
 

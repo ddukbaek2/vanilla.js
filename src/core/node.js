@@ -4,20 +4,21 @@
 import { VObject } from "../base/object.js";
 import { VVector2 } from "../base/vector2.js";
 import { VRenderer } from "./renderer.js";
+import * as VMath from "../base/math.js";
 
 
 //==============================================================================
-// 피봇.
+// 피봇. (2D 좌표계를 기준으로 좌상(0,0) ~ 우하(1,1)을 기준으로 삼는다.)
 //==============================================================================
-export const Pivot = {
+export const Pivot2D = {
 	topLeft: VVector2.create(0, 0),
-	topCenter: VVector2.create(0, 0.5),
-	topRight: VVector2.create(0, 1),
-	middleLeft: VVector2.create(0.5, 0),
-	middle: VVector2.create(0.5, 0.5),
-	middleRight: VVector2.create(0.5, 1),
-	bottomLeft: VVector2.create(1, 0),
-	bottomCenter: VVector2.create(1, 0.5),
+	topCenter: VVector2.create(0.5, 0),
+	topRight: VVector2.create(1, 0),
+	middleLeft: VVector2.create(0, 0.5),
+	middleCenter: VVector2.create(0.5, 0.5),
+	middleRight: VVector2.create(1, 0.5),
+	bottomLeft: VVector2.create(0, 1),
+	bottomCenter: VVector2.create(0.5, 1),
 	bottomRight: VVector2.create(1, 1),
 }
 
@@ -62,7 +63,7 @@ export class VNode extends VObject {
 		this.#isVisible = true;
 		this.#color = "#ffffff"; // rgba(255, 255, 255, 1.0);
 		this.#opacity = 1.0;
-		this.#pivot = Pivot.middle;
+		this.#pivot = Pivot2D.middleCenter;
 	}
 
 	//==============================================================================
@@ -495,14 +496,14 @@ export class VNode extends VObject {
 		return this.#pivot;
 	}
 
-	//==============================================================================
-	// 새로운 노드 생성.
-	//==============================================================================
-	/**
-	 * @returns { VNode }
-	 */
-	static create() {
-		var obj = new VNode();
-		return obj;
-	}
+	// //==============================================================================
+	// // 새로운 노드 생성.
+	// //==============================================================================
+	// /**
+	//  * @returns { VNode }
+	//  */
+	// static create() {
+	// 	var obj = new VNode();
+	// 	return obj;
+	// }
 }
