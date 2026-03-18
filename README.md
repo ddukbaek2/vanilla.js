@@ -10,7 +10,6 @@
 	- Task Explorer   
 - Node.js v24.14.0
 	- jsdoc (API 도큐먼트 생성 도구)   
-- 기타
 	- esbuild (라이브러리 번들링 도구)
 
 ## 작업 스펙
