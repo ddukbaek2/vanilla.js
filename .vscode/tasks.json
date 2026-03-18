@@ -1,5 +1,29 @@
 {
 	"version": "2.0.0",
 	"tasks": [
+		{
+			"label": "BUILD_JSDOC",
+			"type": "shell",
+			"command": "jsdoc -c jsdoc.conf.json",
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "BUILD_LIBRARY_DEBUG",
+			"type": "shell",
+			"command": "esbuild index.js --bundle --outfile=vanilla.js --format=iife --keep-names --global-name=Vanilla --sourcemap",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "BUILD_LIBRARY_RELEASE",
+			"type": "shell",
+			"command": "esbuild index.js --bundle --outfile=vanilla.min.js --format=iife --keep-names --global-name=Vanilla --minify",
+			"group": "build",
+			"problemMatcher": []
+		}
 	]
 }

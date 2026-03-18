@@ -47,9 +47,9 @@ import { VJsonAsset } from "./src/resource/jsonasset.js";
 // UI 목록.
 //==============================================================================
 import { UINode } from "./src/ui/uinode.js";
-import { UIPanel } from "./src/ui/panel.js";
-import { UIButton } from "./src/ui/button.js";
-import { UILabel } from "./src/ui/label.js";
+import { UIPanel } from "./src/ui/uipanel.js";
+import { UIButton } from "./src/ui/uibutton.js";
+import { UILabel } from "./src/ui/uilabel.js";
 
 
 //==============================================================================

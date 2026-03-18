@@ -7,6 +7,22 @@ import { VRenderer } from "./renderer.js";
 
 
 //==============================================================================
+// 피봇.
+//==============================================================================
+export const Pivot = {
+	topLeft: VVector2.create(0, 0),
+	topCenter: VVector2.create(0, 0.5),
+	topRight: VVector2.create(0, 1),
+	middleLeft: VVector2.create(0.5, 0),
+	middle: VVector2.create(0.5, 0.5),
+	middleRight: VVector2.create(0.5, 1),
+	bottomLeft: VVector2.create(1, 0),
+	bottomCenter: VVector2.create(1, 0.5),
+	bottomRight: VVector2.create(1, 1),
+}
+
+
+//==============================================================================
 // 영역 및 계층 객체.
 //==============================================================================
 /**
@@ -20,12 +36,13 @@ export class VNode extends VObject {
 	/** @private @type { VNode[] } */ #children; // 자식 노드 목록.
 	/** @private @type { VVector2 } */ #position; // 위치.
 	/** @private @type { VVector2 } */ #size; // 크기.
+	/** @private @type { VVector2 } */ #scale; // 크기.
 	/** @private @type { number } */ #rotation; // 회전값.
 	/** @private @type { boolean } */ #isActive; // 활성화 여부.
 	/** @private @type { boolean } */ #isVisible; // 렌더링 여부.
 	/** @private @type { string } */ #color; // 컬러.
 	/** @private @type { number } */ #opacity; // 투명도.
-
+	/** @private @type { VVector2 } */ #pivot;
 
 	//==============================================================================
 	// 생성.
@@ -39,11 +56,13 @@ export class VNode extends VObject {
 		this.#children = [];
 		this.#position = VVector2.zero();
 		this.#size = VVector2.zero();
+		this.#scale = VVector2.one();
 		this.#rotation = 0.0;
 		this.#isActive = true;
 		this.#isVisible = true;
 		this.#color = "#ffffff"; // rgba(255, 255, 255, 1.0);
 		this.#opacity = 1.0;
+		this.#pivot = Pivot.middle;
 	}
 
 	//==============================================================================
@@ -77,10 +96,13 @@ export class VNode extends VObject {
 	 * @param { VRenderer } renderer 
 	 */
 	preDraw(renderer) {
+		const position = this.getPosition();
+		const rotation = this.getRotation();
+		const scale = this.getScale();
 		const canvasContext = renderer.getCanvasContext();
-		canvasContext.translate(this.#position.x, this.#position.y);
-		canvasContext.rotate(this.#rotation);
-		canvasContext.scale(1, 1);
+		canvasContext.translate(position.x, position.y);
+		canvasContext.rotate(rotation);
+		canvasContext.scale(scale.x, scale.y);
 		canvasContext.globalAlpha = this.#opacity;
 		canvasContext.fillStyle = this.#color;
 	}
@@ -285,6 +307,26 @@ export class VNode extends VObject {
 	}
 
 	//==============================================================================
+	// 크기 설정.
+	//==============================================================================
+	/**
+	 * @param { VVector2 } scale 
+	 */
+	setScale(scale) {
+		this.#scale = scale;
+	}
+
+	//==============================================================================
+	// 크기 반환.
+	//==============================================================================
+	/**
+	 * @returns { VVector2 } 
+	 */
+	getScale() {
+		return this.#scale;
+	}
+
+	//==============================================================================
 	// 회전 설정.
 	//==============================================================================
 	/**
@@ -391,6 +433,27 @@ export class VNode extends VObject {
 	}
 
 	//==============================================================================
+	// 색상 설정.
+	//==============================================================================
+	/**
+	 * @param { string } color 
+	 */
+	setColor(color) {
+		this.#color = color;
+	}
+
+	//==============================================================================
+	// 색상 반환.
+	//==============================================================================
+	/**
+	 * @returns { string } 
+	 */
+	getColor() {
+		return this.#color;
+	}
+
+
+	//==============================================================================
 	// 투명도 설정.
 	//==============================================================================
 	/**
@@ -408,6 +471,28 @@ export class VNode extends VObject {
 	 */
 	getOpacity() {
 		return this.#opacity;
+	}
+
+	//==============================================================================
+	// 피봇 설정.
+	//==============================================================================
+	/**
+	 * @param { VVector2 } pivot
+	 */
+	setPivot(pivot) {
+		this.#pivot = pivot;
+		this.#pivot.x = VMath.clamp(this.#pivot.x, 0, 1);
+		this.#pivot.y = VMath.clamp(this.#pivot.y, 0, 1);
+	}
+
+	//==============================================================================
+	// 피봇 반환.
+	//==============================================================================
+	/**
+	 * @returns { VVector2 }
+	 */
+	getPivot() {
+		return this.#pivot;
 	}
 
 	//==============================================================================

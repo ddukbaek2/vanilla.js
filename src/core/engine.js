@@ -489,7 +489,7 @@ export class VEngine extends VObject {
 	 * @method
 	 * @returns { VPlatform }
 	 */
-	getCanvas() {
+	getPlatform() {
 		return this.#platform;
 	}
 

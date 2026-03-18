@@ -9,16 +9,14 @@
 	- Live Server
 	- Task Explorer   
 - Node.js v24.14.0
-	- woff2 (예정)  
-	- 
+	- jsdoc (API 도큐먼트 생성 도구)   
 - 기타
-	- webm 변환기 (https://www.ezyzip.com/kr-wav-webm.html)
+	- esbuild (라이브러리 번들링 도구)
 
 ## 작업 스펙
 - 외부 의존성 없는 바닐라 자바스크립트.   
 - 경량 게임 프레임워크.   
-- JSDoc 기반의 타입 힌팅.   
-
+- JSDoc 기반의 타입 힌팅 및 문서화.   
 
 ## 테스트 페이지
 - https://playable.ddukbaek2.com/vanilla.js/
