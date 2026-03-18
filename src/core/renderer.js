@@ -110,14 +110,46 @@ export class VRenderer extends VObject {
 	 * @param { VVector2 } size
 	 * @param { VRect } patch
 	 */
-	drawImageNinePatch(image, position, size, patch) {
+	// drawImageNinePatch(image, position, size, patch) {
+	// 	const canvasContext = this.getCanvasContext();
+	// 	const sw = image.width;
+	// 	const sh = image.height;
+	// 	const dx = position.x;
+	// 	const dy = position.y;
+	// 	const dw = size.x;
+	// 	const dh = size.y;
+	// 	const left = patch.position.x;
+	// 	const top = patch.position.y;
+	// 	const right = patch.size.x;
+	// 	const bottom = patch.size.y;
+	// 	const centerSrcW = sw - left - right;
+	// 	const centerSrcH = sh - top - bottom;
+	// 	const centerDstW = dw - left - right;
+	// 	const centerDstH = dh - top - bottom;
+
+	// 	// 위쪽.
+	// 	canvasContext.drawImage(image, 0, 0, left, top, dx, dy, left, top); // 왼쪽.
+	// 	canvasContext.drawImage(image, left, 0, centerSrcW, top, dx + left, dy, centerDstW, top); // 가운데쪽.
+	// 	canvasContext.drawImage(image, sw - right, 0, right, top, dx + dw - right, dy, right, top); // 오른쪽.
+
+	// 	// 가운데쪽.
+	// 	canvasContext.drawImage(image, 0, top, left, centerSrcH, dx, dy + top, left, centerDstH); // 왼쪽.
+	// 	canvasContext.drawImage(image, left, top, centerSrcW, centerSrcH, dx + left, dy + top, centerDstW, centerDstH); // 가운데쪽.
+	// 	canvasContext.drawImage(image, sw - right, top, right, centerSrcH, dx + dw - right, dy + top, right, centerDstH); // 오른쪽.
+
+	// 	// 아래쪽.
+	// 	canvasContext.drawImage(image, 0, sh - bottom, left, bottom, dx, dy + dh - bottom, left, bottom); // 왼쪽.
+	// 	canvasContext.drawImage(image, left, sh - bottom, centerSrcW, bottom, dx + left, dy + dh - bottom, centerDstW, bottom); // 가운데쪽.
+	// 	canvasContext.drawImage(image, sw - right, sh - bottom, right, bottom, dx + dw - right, dy + dh - bottom, right, bottom); // 오른쪽.
+	// }
+drawImageNinePatch(image, position, size, patch) {
 		const canvasContext = this.getCanvasContext();
 		const sw = image.width;
 		const sh = image.height;
-		const dx = position.x;
-		const dy = position.y;
-		const dw = size.x;
-		const dh = size.y;
+		const dx = Math.floor(position.x);
+		const dy = Math.floor(position.y);
+		const dw = Math.ceil(size.x);
+		const dh = Math.ceil(size.y);
 		const left = patch.position.x;
 		const top = patch.position.y;
 		const right = patch.size.x;
@@ -128,21 +160,21 @@ export class VRenderer extends VObject {
 		const centerDstH = dh - top - bottom;
 
 		// 위쪽.
-		canvasContext.drawImage(image, 0, 0, left, top, dx, dy, left, top); // 왼쪽.
-		canvasContext.drawImage(image, left, 0, centerSrcW, top, dx + left, dy, centerDstW, top); // 가운데쪽.
-		canvasContext.drawImage(image, sw - right, 0, right, top, dx + dw - right, dy, right, top); // 오른쪽.
+		canvasContext.drawImage(image, 0, 0, left, top, dx, dy, left + 1, top + 1); 
+		canvasContext.drawImage(image, left, 0, centerSrcW, top, dx + left, dy, centerDstW + 1, top + 1); 
+		canvasContext.drawImage(image, sw - right, 0, right, top, dx + dw - right, dy, right + 1, top + 1); 
 
 		// 가운데쪽.
-		canvasContext.drawImage(image, 0, top, left, centerSrcH, dx, dy + top, left, centerDstH); // 왼쪽.
-		canvasContext.drawImage(image, left, top, centerSrcW, centerSrcH, dx + left, dy + top, centerDstW, centerDstH); // 가운데쪽.
-		canvasContext.drawImage(image, sw - right, top, right, centerSrcH, dx + dw - right, dy + top, right, centerDstH); // 오른쪽.
+		canvasContext.drawImage(image, 0, top, left, centerSrcH, dx, dy + top, left + 1, centerDstH + 1); 
+		canvasContext.drawImage(image, left, top, centerSrcW, centerSrcH, dx + left, dy + top, centerDstW + 1, centerDstH + 1); 
+		canvasContext.drawImage(image, sw - right, top, right, centerSrcH, dx + dw - right, dy + top, right + 1, centerDstH + 1); 
 
 		// 아래쪽.
-		canvasContext.drawImage(image, 0, sh - bottom, left, bottom, dx, dy + dh - bottom, left, bottom); // 왼쪽.
-		canvasContext.drawImage(image, left, sh - bottom, centerSrcW, bottom, dx + left, dy + dh - bottom, centerDstW, bottom); // 가운데쪽.
-		canvasContext.drawImage(image, sw - right, sh - bottom, right, bottom, dx + dw - right, dy + dh - bottom, right, bottom); // 오른쪽.
+		canvasContext.drawImage(image, 0, sh - bottom, left, bottom, dx, dy + dh - bottom, left + 1, bottom + 1); 
+		canvasContext.drawImage(image, left, sh - bottom, centerSrcW, bottom, dx + left, dy + dh - bottom, centerDstW + 1, bottom + 1); 
+		canvasContext.drawImage(image, sw - right, sh - bottom, right, bottom, dx + dw - right, dy + dh - bottom, right + 1, bottom + 1); 
 	}
-
+	
 	//==============================================================================
 	// 출력 영역 제한 시작.
 	//==============================================================================

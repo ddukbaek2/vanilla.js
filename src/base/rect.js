@@ -39,11 +39,19 @@ export class VRect extends VObject {
 	 * @returns { boolean }
 	 */
 	overlaps(other) {
-		if (typeof other === VVector2) {
-			return false;
+		if (other instanceof VVector2) {
+			if (other.x < this.position.x || other.x > this.position.x + this.size.x)
+				return false;
+			if (other.y < this.position.y || other.y > this.position.y + this.size.y)
+				return false;
+			return true;
 		}
 		else if (other instanceof VRect) {
-			return false;
+			if (this.position.x + this.size.x < other.position.x || this.position.x > other.position.x + other.size.x)
+				return false;
+			if (this.position.y + this.size.y < other.position.y || this.position.y > other.position.y + other.size.y)
+				return false;
+			return true;
 		}
 		
 		throw new Error("Invalid type: 'other' must be an instance of VVector2 or VRect.");
@@ -141,6 +149,23 @@ export class VRect extends VObject {
 		var obj = new VRect();
 		obj.position = position;
 		obj.size = size;
+		return obj;
+	}
+
+	//==============================================================================
+	// 새로운 사각 영역 생성.
+	//==============================================================================
+	/**
+	 * @param { number } x
+	 * @param { number } y
+	 * @param { number } width
+	 * @param { number } height
+	 * @returns { VRect }
+	 */
+	static createFromValue(x, y, width, height) {
+		var obj = new VRect();
+		obj.position = VVector2.create(x, y);
+		obj.size = VVector2.create(width, height);
 		return obj;
 	}
 
