@@ -56,5 +56,5 @@ export { UILabel } from "./src/ui/uilabel.js";
 //==============================================================================
 // 그 외 목록.
 //==============================================================================
-export { VGlobalIdentifier } from "./src/misc/identifier.js";
+export { VIdentifier, VEnum } from "./src/misc/identifier.js";
 export { VTouchEffect } from "./src/misc/toucheffect.js";

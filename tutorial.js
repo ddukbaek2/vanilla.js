@@ -43,7 +43,7 @@ class Tutorial extends VGameInstance {
 		let boxPosition = VVector2.create(0, 0);
 		let boxSize = VVector2.create(100, 100);
 		boxPosition = boxPosition.add(view.resolution.divide(2)).subtract(boxSize.divide(2));
-		renderer.drawRect(VRect.create(boxPosition, boxSize), COLOR_DARKVANILLA);
+		renderer.drawRect(VRect.create(boxPosition.x, boxPosition.y, boxSize.x, boxSize.y), COLOR_DARKVANILLA);
 		// console.log(boxPosition);
 	}
 }

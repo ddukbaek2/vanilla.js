@@ -59,7 +59,7 @@ export class VTouchEffect extends VNode {
 	 * @param { VRenderer } renderer 
 	 */
 	beginDrawState(renderer) {
-		super.beginDrawState(renderer);
+		// super.beginDrawState(renderer);
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.globalCompositeOperation = "lighter";
 	}
@@ -72,7 +72,7 @@ export class VTouchEffect extends VNode {
 	 * @param { VRenderer } renderer 
 	 */
 	endDrawState(renderer) {
-		super.endDrawState(renderer);
+		// super.endDrawState(renderer);
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.globalCompositeOperation = "source-over";
 	}

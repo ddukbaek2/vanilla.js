@@ -137,20 +137,20 @@ export class VRect extends VObject {
 		return this.position.y + this.height;
 	}
 
-	//==============================================================================
-	// 새로운 사각 영역 생성.
-	//==============================================================================
-	/**
-	 * @param { VVector2 } position
-	 * @param { VVector2 } size
-	 * @returns { VRect }
-	 */
-	static create(position, size) {
-		var obj = new VRect();
-		obj.position = position;
-		obj.size = size;
-		return obj;
-	}
+	// //==============================================================================
+	// // 새로운 사각 영역 생성.
+	// //==============================================================================
+	// /**
+	//  * @param { VVector2 } position
+	//  * @param { VVector2 } size
+	//  * @returns { VRect }
+	//  */
+	// static create(position, size) {
+	// 	var obj = new VRect();
+	// 	obj.position = position;
+	// 	obj.size = size;
+	// 	return obj;
+	// }
 
 	//==============================================================================
 	// 새로운 사각 영역 생성.
@@ -162,7 +162,7 @@ export class VRect extends VObject {
 	 * @param { number } height
 	 * @returns { VRect }
 	 */
-	static createFromValue(x, y, width, height) {
+	static create(x, y, width, height) {
 		var obj = new VRect();
 		obj.position = VVector2.create(x, y);
 		obj.size = VVector2.create(width, height);
@@ -176,6 +176,6 @@ export class VRect extends VObject {
 	 * @returns { VRect }
 	 */
 	static zero() {
-		return VRect.create(VVector2.zero(), VVector2.zero());
+		return VRect.create(0, 0, 0, 0);
 	}
 }

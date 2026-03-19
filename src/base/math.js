@@ -47,3 +47,13 @@ export function clamp(value, minValue, maxValue) {
 export function lerp(a, b, t) {
 	return a * (1 - t) + b * t;
 }
+
+//==============================================================================
+// 랜덤 반환. (0 ~ 1)
+//==============================================================================
+/**
+ * @returns { number }
+ */
+export function random() {
+	return Math.random();
+}

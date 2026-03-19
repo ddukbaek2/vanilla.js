@@ -274,7 +274,7 @@ var VVector2 = class _VVector2 extends VObject {
 };
 
 // libs/vanilla.js/src/base/rect.js
-var VRect = class _VRect extends VObject {
+var VRect = class VRect extends VObject {
   static {
     __name(this, "VRect");
   }
@@ -310,7 +310,7 @@ var VRect = class _VRect extends VObject {
   overlaps(other) {
     if (typeof other === VVector2) {
       return false;
-    } else if (other instanceof _VRect) {
+    } else if (other instanceof VRect) {
       return false;
     }
     throw new Error("Invalid type: 'other' must be an instance of VVector2 or VRect.");
@@ -394,7 +394,7 @@ var VRect = class _VRect extends VObject {
    * @returns { VRect }
    */
   static create(position, size) {
-    var obj = new _VRect();
+    var obj = new VRect();
     obj.position = position;
     obj.size = size;
     return obj;
@@ -406,7 +406,7 @@ var VRect = class _VRect extends VObject {
    * @returns { VRect }
    */
   static zero() {
-    return _VRect.create(VVector2.zero(), VVector2.zero());
+    return VRect.create(VVector2.zero(), VVector2.zero());
   }
 };
 

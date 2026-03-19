@@ -2,6 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { VObject } from "./object.js";
+import { VRect } from "./rect.js";
 
 
 //==============================================================================
@@ -145,5 +146,38 @@ export class VPlatform extends VObject {
 			totalDecodedSize,
 			loadedFiles
 		};
+	}
+
+	//==============================================================================
+	// 세이프 에어리어 반환.
+	//==============================================================================
+	/**
+     * @param @type { HTMLCanvasElement | null } canvas
+	 * @returns { VRect }
+	*/
+	getSafeAreaRect(canvas) {
+		const div = document.createElement('div');
+		div.style.position = 'absolute';
+		div.style.visibility = 'hidden';
+		div.style.paddingTop = 'env(safe-area-inset-top)';
+		div.style.paddingRight = 'env(safe-area-inset-right)';
+		div.style.paddingBottom = 'env(safe-area-inset-bottom)';
+		div.style.paddingLeft = 'env(safe-area-inset-left)';
+		document.body.appendChild(div);
+
+		const style = getComputedStyle(div);
+		const top = parseInt(style.paddingTop) || 0;
+		const right = parseInt(style.paddingRight) || 0;
+		const bottom = parseInt(style.paddingBottom) || 0;
+		const left = parseInt(style.paddingLeft) || 0;
+
+		document.body.removeChild(div);
+
+		if (canvas === null) {
+			return VRect.create(left, top, window.innerWidth - left - right, window.innerHeight - top - bottom);
+		}
+		else {
+			return VRect.create(left, top, canvas.width - left - right, canvas.height - top - bottom);
+		}
 	}
 }

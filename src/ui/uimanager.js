@@ -2,42 +2,47 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { VObject } from "../base/object.js";
-import { VVector2 } from "../base/vector2.js";
-import { VEngine } from "./engine.js";
+import { VEngine } from "../core/engine.js";
 
 
 //==============================================================================
-// 입력 클래스.
+// 이미지 매니저.
 //==============================================================================
-export class VInput extends VObject {
+export class UIManager extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { VVector2 } */ position;
-	/** @type { boolean } */ justPressed; // 입력시 딱 한번 눌림.
-	/** @type { boolean } */ justReleased; // 입력시 딱 한번 뗌.
-	/** @type { boolean } */ isDown; // 입력시 뗄 때가지 계속 눌림.
+	// /** @private @type { number } */ #increaseNumber;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { VEngine } engine 
 	 */
-	constructor(engine) {
+	constructor() {
 		super();
+	}
 
-		this.position = VVector2.zero();
-		this.isDown = false;
-		this.justPressed = false;
-		this.justReleased = false;	
+	//==============================================================================
+	// 불러오기.
+	//==============================================================================
+	async load() {
+
 	}
 
 	//==============================================================================
 	// 갱신.
 	//==============================================================================
-	update() {
-
+	/**
+	 * @param { VEngine } engine 
+	 */
+	update(engine) {
+		const input = engine.getInput();
+		if (input.justPressed) {
+			// input.position
+		}
+		else {
+		}
 	}
 }

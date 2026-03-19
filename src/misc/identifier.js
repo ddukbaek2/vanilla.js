@@ -11,49 +11,78 @@ export class VIdentifier extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { number } */ #increaseNumber;
+	/** @private @type { number } */ #serialNumber; // 누적.
+	/** @private @type { number } */ #increaseNumber; // 증가.
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	/**
+	 * @param { number} initialSerialNumber  
 	 * @param { number} initialIncreaseNumber 
 	 */
-	constructor(initialIncreaseNumber = 0) {
+	constructor(initialSerialNumber = 0, initialIncreaseNumber = 1) {
 		super();
-		this.#increaseNumber = initialIncreaseNumber ?? 0;
+		this.#serialNumber = initialSerialNumber;
+		this.#increaseNumber = initialIncreaseNumber;
 	}
 
 	//==============================================================================
-	// 아이디 자동 생성 후 반환.
+	// 초기 상태로 되돌림.
+	//==============================================================================
+	reset() {
+		this.#serialNumber = this.#serialNumber;
+	}
+
+	//==============================================================================
+	// 호출마다 (1 or custom)씩 증가되는 식별자 반환.
 	//==============================================================================
 	/**
 	 * @description 아이디 자동 생성 후 반환.
+	 * @param { number } increaseNumber
 	 * @returns { number }
 	 */
-	auto() {
-		return ++this.#increaseNumber;
+	auto(increaseNumber = 0) {
+		if (increaseNumber) {
+			this.#serialNumber += increaseNumber;
+		}
+		else {
+			this.#serialNumber += this.#increaseNumber
+		}
+		return this.#serialNumber;
 	}
 }
 
 
 //==============================================================================
-// 식별자 생성기.
+// 열거 식별자 생성기.q
 //==============================================================================
-export class VGlobalIdentifier extends VObject {
+export class VEnum extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @static @type { VIdentifier } */ static #identifier = new VIdentifier(0);
+	/** @private @static @type { VIdentifier } */ static #identifier = new VIdentifier(0, 1);
 
 	//==============================================================================
-	// 아이디 자동 생성 후 반환.
+	// 시작값으로 출발.
+	//==============================================================================
+	/**
+	 * @static
+	 * @returns { number }
+	 */
+	static clear() {
+		VEnum.#identifier.reset();
+		return VEnum.auto();
+	}
+
+	//==============================================================================
+	// 값을 증가시켜서 반환.
 	//==============================================================================
 	/**
 	 * @static
 	 * @returns { number }
 	 */
 	static auto() {
-		return VGlobalIdentifier.#identifier.auto();
+		return VEnum.#identifier.auto();
 	}
 }
