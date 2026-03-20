@@ -105,12 +105,12 @@ export class VNode extends VObject {
 
 		const position = this.getPosition();
 		const rotation = this.getRotation();
-		const scale = this.getScale();
+		const transformScale = this.calculateTransformScale();
 
 		// 트랜스폼 조정.
-		canvasContext.translate(position.x, position.y);
-		canvasContext.rotate(rotation);
-		canvasContext.scale(scale.x, scale.y);
+		canvasContext.translate(position.x, position.y); // 위치.
+		canvasContext.rotate(rotation); // 회전.
+		canvasContext.scale(transformScale.x, transformScale.y); // 크기.
 	}
 
 	//==============================================================================
@@ -122,14 +122,11 @@ export class VNode extends VObject {
 	 */
 	draw(renderer) {
 		const canvasContext = renderer.getCanvasContext();
-		const size = this.getSize();
-		const pivot = this.getPivot();
-
-		// 피봇 조정.
-		const finalPivot = VVector2.zero().subtract(size.multiply(pivot));
+		const size = super.getSize();
+		const pivotPosition = this.calculatePivotPosition();
 
 		// 출력.
-		canvasContext.fillRect(finalPivot.x, finalPivot.y, size.x , size.y);
+		canvasContext.fillRect(pivotPosition.x, pivotPosition.y, size.x , size.y);
 	}
 
 	//==============================================================================
@@ -156,6 +153,32 @@ export class VNode extends VObject {
 
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.restore();
+	}
+
+	//==============================================================================
+	// 최종 크기 계산. (플립 기능으로 인해 뒤집어진 크기 계산)
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @returns { VVector2 }
+	 */
+	calculateTransformScale() {
+		const scale = this.getScale();
+		return scale;
+	}
+
+	//==============================================================================
+	// 최종 위치 계산. (피봇 기능으로 인해 스케일 반전되며 틀어진 출력 중심점 위치를 포함하여 중심점 위치 계산)
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @returns { VVector2 }
+	 */
+	calculatePivotPosition() {
+		const size = this.getSize();
+		const pivot = this.getPivot();
+		const pivotPosition = VVector2.zero().subtract(size.multiply(pivot)); // (0,0) - (size * (0~1,0~1))
+		return pivotPosition;
 	}
 
 	//==============================================================================

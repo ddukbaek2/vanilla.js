@@ -41,27 +41,6 @@ export class VSprite extends VNode {
 	update(timeDelta) {
 		super.update(timeDelta);
 	}
-	
-	//==============================================================================
-	// 출력 상태 시작.
-	//==============================================================================
-	/**
-	 * @override
-	 * @param { VRenderer } renderer 
-	 */
-	preDraw(renderer) {
-		// super.preDraw(renderer);
-
-		const canvasContext = renderer.getCanvasContext();
-		const position = super.getPosition();
-		const rotation = super.getRotation();
-		const flippedScale = this.calculateFlippedScale();
-
-		// 트랜스폼 조정.
-		canvasContext.translate(position.x, position.y); // 위치.
-		canvasContext.rotate(rotation); // 회전.
-		canvasContext.scale(flippedScale.x, flippedScale.y); // 크기.
-	}
 
 	//==============================================================================
 	// 출력.
@@ -78,16 +57,16 @@ export class VSprite extends VNode {
 			return;
 		}
 
-		const size = super.getSize();
-
 		// 소스 조정.
 		let slices = this.getSlices();
 		if (slices === null || slices.equals(VRect.zero())) {
 			slices = VRect.create(0, 0, image.width, image.height);
 		}
 
-		// 출력.
+		const size = super.getSize();
 		const pivotPosition = this.calculatePivotPosition();
+
+		// 출력.
 		canvasContext.drawImage(image, slices.position.x, slices.position.y, slices.size.x, slices.size.y, pivotPosition.x, pivotPosition.y, size.x, size.y);
 	}
 
@@ -95,30 +74,33 @@ export class VSprite extends VNode {
 	// 플립 기능으로 인해 뒤집어진 크기 계산.
 	//==============================================================================
 	/**
+	 * @override
 	 * @returns { VVector2 }
 	 */
-	calculateFlippedScale() {
-		const scale = super.getScale();
+	calculateTransformScale() {
+		const scale = super.calculateTransformScale();
 		const isHorizontalFlip = this.isHorizontalFlip();
 		const isVerticalFlip = this.isVerticalFlip();
-		let flippedScale = VVector2.create(isHorizontalFlip ? -scale.x : scale.x, scale.x, isVerticalFlip ? -scale.y : scale.y);
+		let flippedScale = VVector2.create(isHorizontalFlip ? -scale.x : scale.x, isVerticalFlip ? -scale.y : scale.y);
 		return flippedScale;
 	}
 
 	//==============================================================================
-	// 피봇 기능으로 인해 변경된 출력 중심점 위치 계산.
+	// 피봇 기능으로 인해 스케일 반전되며 틀어진 출력 중심점 위치를 포함하여 중심점 위치 계산.
 	//==============================================================================
 	/**
+	 * @override
 	 * @returns { VVector2 }
 	 */
 	calculatePivotPosition() {
+		const pivotPosition = super.calculatePivotPosition();
+		const isHorizontalFlip = this.isHorizontalFlip();
+		const isVerticalFlip = this.isVerticalFlip();
 		const size = super.getSize();
-		const pivot = super.getPivot();
-		let pivotPosition = VVector2.zero().subtract(size.multiply(pivot));
-		if (this.isHorizontalFlip()) {
+		if (isHorizontalFlip) {
 			pivotPosition.x = -size.x - pivotPosition.x;
 		}
-		if (this.isVerticalFlip()) {
+		if (isVerticalFlip) {
 			pivotPosition.y = -size.y - pivotPosition.y;
 		}
 		return pivotPosition;

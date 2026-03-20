@@ -2,10 +2,11 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { VObject } from "../base/object.js";
+import { VNode } from "./node.js";
 import { VRect } from "../base/rect.js";
 import { VVector2 } from "../base/vector2.js";
 import { VEngine } from "./engine.js";
-// import { VNode } from "./node.js";
+
 
 
 //==============================================================================
@@ -44,24 +45,6 @@ export class VRenderer extends VObject {
 		const canvasContext = this.getCanvasContext();
 		canvasContext.imageSmoothingEnabled = true;
 		canvasContext.imageSmoothingQuality = "high";
-	}
-
-	//==============================================================================
-	// 노드 출력.
-	//==============================================================================
-	/**
-	 * @type { VNode } node
-	 */
-	drawNode(node) {
-		if (node === null) {
-			return;
-		}
-		
-		node.beginDrawState(this);
-		node.preDraw(this);
-		node.draw(this);
-		node.postDraw(this);
-		node.endDrawState(this);
 	}
 
 	//==============================================================================
@@ -195,6 +178,27 @@ drawImageNinePatch(image, position, size, patch) {
 		canvasContext.drawImage(image, sw - right, sh - bottom, right, bottom, dx + dw - right, dy + dh - bottom, right + 1, bottom + 1); 
 	}
 	
+	//==============================================================================
+	// 노드 출력.
+	//==============================================================================
+	/**
+	 * @type { VNode } node
+	 */
+	drawNode(node) {
+		if (node === null) {
+			return;
+		}
+		
+		node.beginDrawState(this);
+		node.preDraw(this);
+		node.draw(this);
+		node.postDraw(this);
+		node.endDrawState(this);
+		for (const child in node.getChildren()) {
+			this.drawNode(child);
+		}
+	}
+
 	//==============================================================================
 	// 출력 영역 제한 시작.
 	//==============================================================================

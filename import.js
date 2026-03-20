@@ -2,6 +2,7 @@
 // 기반 목록.
 //==============================================================================
 export { VObject } from "./src/base/object.js";
+export { VSingleton } from "./src/base/singleton.js"
 export { VVector2 } from "./src/base/vector2.js";
 export { VRect } from "./src/base/rect.js";
 export { VColors } from "./src/base/colors.js";
@@ -9,8 +10,6 @@ export * as VWait from "./src/base/wait.js";
 export * as VMath from "./src/base/math.js";
 export * as VReflection from "./src/base/reflection.js";
 export { VPlatform } from "./src/base/platform.js";
-export { VListener } from "./src/base/listener.js";
-// export { VBrowser } from "./src/base/browser.js";
 
 
 //==============================================================================
@@ -25,6 +24,8 @@ export { VRenderer } from "./src/core/renderer.js";
 export { VGameInstance } from "./src/core/gameinstance.js";
 export { VScene } from "./src/core/scene.js";
 export { VNode  } from "./src/core/node.js";
+export { VListener } from "./src/core/listener.js";
+export { VTransform } from "./src/core/transform.js";
 
 
 //==============================================================================

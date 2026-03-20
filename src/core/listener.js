@@ -2,54 +2,33 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { VObject } from "../base/object.js";
-import { VEngine } from "./engine.js";
-import { VRenderer } from "./renderer.js";
 
 
 //==============================================================================
-// 씬.
+// 리스너.
 //==============================================================================
-export class VScene extends VObject {
+export class VListener extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { VNode[] } */ #nodes;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
-	constructor() {
+	/**
+	 * @constructor
+	 */
+	constructor(engine) {
 		super();
-		this.#nodes = [];
 	}
 
 	//==============================================================================
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @virtual
-	 * @param { VEngine } engine 
+	 * @method
 	 */
-	updateAllNodes(engine) {
-		const time = engine.getTime();
-		const timeDelta = time.timeDelta;
-		for (let i = 0; i < this.#nodes.length; ++i) {
-			const node = this.#nodes[i];
-			node.update(timeDelta);
-		}
-	}
+	update() {
 
-	//==============================================================================
-	// 출력.
-	//==============================================================================
-	/**
-	 * @virtual
-	 * @param { VRenderer } renderer 
-	 */
-	drawAllNodes(renderer) {
-		for (let i = 0; i < this.#nodes.length; ++i) {
-			const node = this.#nodes[i];
-			renderer.drawNode(node);
-		}
 	}
 }

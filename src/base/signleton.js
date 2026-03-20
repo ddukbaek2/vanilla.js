@@ -5,12 +5,13 @@ import { VObject } from "./object.js";
 
 
 //==============================================================================
-// 리스너.
+// 공유 클래스.
 //==============================================================================
-export class VListener extends VObject {
+export class VSingleton extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
+	/** @static @type { Map } */ static #instances = new Map();
 
 	//==============================================================================
 	// 생성.
@@ -18,17 +19,29 @@ export class VListener extends VObject {
 	/**
 	 * @constructor
 	 */
-	constructor(engine) {
+	constructor() {
 		super();
+		const T = this.constructor;
+		if (VSingleton.#instances.has(T)) {
+			return VSingleton.#instances.get(T);
+		}
+
+		// 등록.
+		VSingleton.#instances.set(T, this);
 	}
 
 	//==============================================================================
-	// 갱신.
+	// 공유 인스턴스 반환.
 	//==============================================================================
 	/**
+	 * @static
 	 * @method
 	 */
-	update() {
-
+	static getInstance() {
+		const T = this;
+		if (!VSingleton.#instances.has(T)) {
+			const obj = new T();
+		}
+		return VSingleton.#instances.get(T);
 	}
 }
