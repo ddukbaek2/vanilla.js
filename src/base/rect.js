@@ -137,6 +137,32 @@ export class VRect extends VObject {
 		return this.position.y + this.height;
 	}
 
+	//==============================================================================
+	// 비교.
+	//==============================================================================
+	/**
+	 * @override
+	 * @method
+	 * @public
+	 * @param { any } other
+	 * @returns { boolean }
+	 */
+	equals(other) {
+		if (super.equals(other)) {
+			return true;
+		}
+		
+		if (other) {
+			if (other instanceof VRect) {
+				if (this.position.equals(other.position) && this.size.equals(other.size)) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
 	// //==============================================================================
 	// // 새로운 사각 영역 생성.
 	// //==============================================================================

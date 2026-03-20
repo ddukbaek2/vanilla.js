@@ -24,7 +24,8 @@ export const Pivot2D = {
 
 
 //==============================================================================
-// 영역 및 계층 객체.
+// 계층 및 영역 객체.
+// - 이미지 출력 기능은 없음.
 //==============================================================================
 /**
  * @class
@@ -43,7 +44,7 @@ export class VNode extends VObject {
 	/** @private @type { boolean } */ #isVisible; // 렌더링 여부.
 	/** @private @type { string } */ #color; // 컬러.
 	/** @private @type { number } */ #opacity; // 투명도.
-	/** @private @type { VVector2 } */ #pivot;
+	/** @private @type { VVector2 } */ #pivot; // 출력 기준점.
 
 	//==============================================================================
 	// 생성.
@@ -87,6 +88,9 @@ export class VNode extends VObject {
 	beginDrawState(renderer) {
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.save();
+
+		canvasContext.globalAlpha = this.#opacity;
+		canvasContext.fillStyle = this.#color;
 	}
 
 	//==============================================================================
@@ -97,15 +101,16 @@ export class VNode extends VObject {
 	 * @param { VRenderer } renderer 
 	 */
 	preDraw(renderer) {
+		const canvasContext = renderer.getCanvasContext();
+
 		const position = this.getPosition();
 		const rotation = this.getRotation();
 		const scale = this.getScale();
-		const canvasContext = renderer.getCanvasContext();
+
+		// 트랜스폼 조정.
 		canvasContext.translate(position.x, position.y);
 		canvasContext.rotate(rotation);
 		canvasContext.scale(scale.x, scale.y);
-		canvasContext.globalAlpha = this.#opacity;
-		canvasContext.fillStyle = this.#color;
 	}
 
 	//==============================================================================
@@ -117,7 +122,14 @@ export class VNode extends VObject {
 	 */
 	draw(renderer) {
 		const canvasContext = renderer.getCanvasContext();
-		canvasContext.fillRect(0, 0, this.#size.x, this.#size.y);
+		const size = this.getSize();
+		const pivot = this.getPivot();
+
+		// 피봇 조정.
+		const finalPivot = VVector2.zero().subtract(size.multiply(pivot));
+
+		// 출력.
+		canvasContext.fillRect(finalPivot.x, finalPivot.y, size.x , size.y);
 	}
 
 	//==============================================================================
@@ -128,8 +140,7 @@ export class VNode extends VObject {
 	 * @param { VRenderer } renderer 
 	 */
 	postDraw(renderer) {
-		const canvasContext = renderer.getCanvasContext();
-		canvasContext.globalAlpha = 1.0;
+
 	}
 
 	//==============================================================================
@@ -140,6 +151,9 @@ export class VNode extends VObject {
 	 * @param { VRenderer } renderer 
 	 */
 	endDrawState(renderer) {
+		// const canvasContext = renderer.getCanvasContext();
+		// canvasContext.globalAlpha = 1.0;
+
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.restore();
 	}

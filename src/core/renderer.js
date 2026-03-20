@@ -22,6 +22,7 @@ export class VRenderer extends VObject {
 	// 생성.
 	//==============================================================================
 	/**
+	 * @constructor
 	 * @param { VEngine } engine
 	 * @param { CanvasRenderingContext2D } canvasContext
 	 */
@@ -29,6 +30,20 @@ export class VRenderer extends VObject {
 		super();
 		this.#engine = engine;
 		this.#canvasContext = canvasContext;
+	}
+
+	//==============================================================================
+	// 갱신.
+	//==============================================================================
+	/**
+	 * @param { VEngine } engine
+	 */
+	update(engine) {
+		// 품질 갱신.
+		// 왜 매 렌더링마다 실시간 업데이트를 하지 않으면 반영되지 않는지는 모름.
+		const canvasContext = this.getCanvasContext();
+		canvasContext.imageSmoothingEnabled = true;
+		canvasContext.imageSmoothingQuality = "high";
 	}
 
 	//==============================================================================
@@ -88,15 +103,20 @@ export class VRenderer extends VObject {
 		canvasContext.globalAlpha = opacity;
 		canvasContext.fillStyle = color;
 		canvasContext.rotate(rotation);
-		if (size === VVector2.zero()) {
-			canvasContext.drawImage(image, position.x, position.y, image.width, image.height);
+		// if (size === VVector2.zero()) {
+		// 	canvasContext.drawImage(image, position.x, position.y, image.width, image.height);
+		// }
+		// else if (slices === null || slices == VRect.zero()) {
+		// 	canvasContext.drawImage(image, position.x, position.y, size.x, size.y);
+		// }
+		// else {
+		// 	canvasContext.drawImage(image, slices.position.x, slices.position.y, slices.size.x, slices.size.y, position.x, position.y, size.x, size.y);
+		// }
+		if (slices === null || slices == VRect.zero()) {
+			slices = VRect.create(0, 0, image.width, image.height);
 		}
-		else if (slices === null || slices == VRect.zero()) {
-			canvasContext.drawImage(image, position.x, position.y, size.x, size.y);
-		}
-		else {
-			canvasContext.drawImage(image, slices.position.x, slices.position.y, slices.size.x, slices.size.y, position.x, position.y, size.x, size.y);
-		}
+
+		canvasContext.drawImage(image, slices.position.x, slices.position.y, slices.size.x, slices.size.y, position.x, position.y, size.x, size.y);
 		// this.#canvasContext.globalAlpha = 1.0;
 	}
 

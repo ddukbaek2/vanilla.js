@@ -30,6 +30,32 @@ export class VVector2 extends VObject
 	}
 
 	//==============================================================================
+	// 비교.
+	//==============================================================================
+	/**
+	 * @override
+	 * @method
+	 * @public
+	 * @param { any } other
+	 * @returns { boolean }
+	 */
+	equals(other) {
+		if (super.equals(other)) {
+			return true;
+		}
+		
+		if (other) {
+			if (other instanceof VVector2) {
+				if (this.x === other.x && this.y === other.y) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	//==============================================================================
 	// 길이.
 	//==============================================================================
 	/**

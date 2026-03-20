@@ -4,18 +4,35 @@
 import { VObject } from "../base/object.js";
 import { VVector2 } from "../base/vector2.js";
 import { VEnum } from "../base/identifier.js";
+import * as VMath from "../base/math.js";
 
 
 //==============================================================================
 // 동작 타입.
 //==============================================================================
-const EaseType = {
+export const EaseType = {
 	linear: VEnum.auto(),
 	easeIn: VEnum.auto(),
 	easeOut: VEnum.auto(),
 	easeInOut: VEnum.auto(),
 };
 
+
+export const Sample = {
+	numberSample: (from, to, normalizedTime) => {
+		normalizedTime = VMath.clamp(normalizedTime, 0, 1);
+		const current = VMath.lerp(from, to, normalizedTime);
+		return current;
+	},
+	vector2Sample: (from, to, normalizedTime) => {
+		normalizedTime = VMath.clamp(normalizedTime, 0, 1);
+		const current = VVector2.create(
+			Sample.numberSample(from.x, to.x, normalizedTime),
+			Sample.numberSample(from.y, to.y, normalizedTime)
+		);
+		return current;
+	},
+};
 
 //==============================================================================
 // 터치 효과.

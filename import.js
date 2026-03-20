@@ -48,9 +48,9 @@ export { VJsonAsset } from "./src/resource/jsonasset.js";
 // UI 목록.
 //==============================================================================
 export { UINode } from "./src/ui/uinode.js";
-export { UIPanel } from "./src/ui/uipanel.js";
 export { UIButton } from "./src/ui/uibutton.js";
 export { UILabel } from "./src/ui/uilabel.js";
+export { UIImage } from "./src/ui/uiimage.js";
 
 
 //==============================================================================

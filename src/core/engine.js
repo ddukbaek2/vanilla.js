@@ -295,7 +295,7 @@ export class VEngine extends VObject {
 		// canvasContext.shadowOffsetX = 0.5;
 		// canvasContext.shadowOffsetY = 0.5;
 		canvasContext.textAlign = "left";
-		canvasContext.imageSmoothingEnabled = false;
+		// canvasContext.imageSmoothingEnabled = false;
 		canvasContext.scale(1.6, 1.6);
 
 		// 초당 프레임 체크.
@@ -365,6 +365,9 @@ export class VEngine extends VObject {
 	 * @param { number } timestamp
 	 */
 	#updateEngine(timestamp) {
+
+		// 렌더러 갱신.
+		this.#renderer.update(this);
 
 		// 시간 갱신.
 		this.#time.update(timestamp);

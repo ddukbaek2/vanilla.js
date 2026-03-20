@@ -51,20 +51,16 @@ export class VSprite extends VNode {
 	 */
 	preDraw(renderer) {
 		// super.preDraw(renderer);
+
+		const canvasContext = renderer.getCanvasContext();
 		const position = super.getPosition();
 		const rotation = super.getRotation();
-		const scale = super.getScale();
-		const opacity = super.getOpacity();
-		const color = super.getColor();
-		const canvasContext = renderer.getCanvasContext();
-		canvasContext.translate(position.x, position.y);
-		canvasContext.rotate(rotation);
-		
-		const flip = VVector2.create(this.isHorizontalFlip() ? -1 : 1, this.isVerticalFlip() ? -1 : 1);
-		const finalScale = scale.multiply(flip);
-		canvasContext.scale(finalScale.x, finalScale.y);
-		canvasContext.globalAlpha = opacity;
-		canvasContext.fillStyle = color;
+		const flippedScale = this.calculateFlippedScale();
+
+		// 트랜스폼 조정.
+		canvasContext.translate(position.x, position.y); // 위치.
+		canvasContext.rotate(rotation); // 회전.
+		canvasContext.scale(flippedScale.x, flippedScale.y); // 크기.
 	}
 
 	//==============================================================================
@@ -75,15 +71,57 @@ export class VSprite extends VNode {
 	 * @param { VRenderer } renderer 
 	 */
 	draw(renderer) {
-		// super.draw(renderer);
+		const canvasContext = renderer.getCanvasContext();
+		const image = this.getImage();
+		if (image === null) {
+			super.draw(renderer);
+			return;
+		}
+
+		const size = super.getSize();
+
+		// 소스 조정.
+		let slices = this.getSlices();
+		if (slices === null || slices.equals(VRect.zero())) {
+			slices = VRect.create(0, 0, image.width, image.height);
+		}
+
+		// 출력.
+		const pivotPosition = this.calculatePivotPosition();
+		canvasContext.drawImage(image, slices.position.x, slices.position.y, slices.size.x, slices.size.y, pivotPosition.x, pivotPosition.y, size.x, size.y);
+	}
+
+	//==============================================================================
+	// 플립 기능으로 인해 뒤집어진 크기 계산.
+	//==============================================================================
+	/**
+	 * @returns { VVector2 }
+	 */
+	calculateFlippedScale() {
+		const scale = super.getScale();
+		const isHorizontalFlip = this.isHorizontalFlip();
+		const isVerticalFlip = this.isVerticalFlip();
+		let flippedScale = VVector2.create(isHorizontalFlip ? -scale.x : scale.x, scale.x, isVerticalFlip ? -scale.y : scale.y);
+		return flippedScale;
+	}
+
+	//==============================================================================
+	// 피봇 기능으로 인해 변경된 출력 중심점 위치 계산.
+	//==============================================================================
+	/**
+	 * @returns { VVector2 }
+	 */
+	calculatePivotPosition() {
 		const size = super.getSize();
 		const pivot = super.getPivot();
-		const slices = this.getSlices();
-		// 기본은 좌상이므로 0,0이라치고...
-		// 거기서 0~1, 0~1을 뺀다...
-		const offset = VVector2.zero().subtract(size.multiply(pivot));
-		// console.log(`pivot=(${pivot.x}, ${pivot.y}) offset=(${offset.x}, ${offset.y})`);
-		renderer.drawImage(this.#image, offset, size, slices);
+		let pivotPosition = VVector2.zero().subtract(size.multiply(pivot));
+		if (this.isHorizontalFlip()) {
+			pivotPosition.x = -size.x - pivotPosition.x;
+		}
+		if (this.isVerticalFlip()) {
+			pivotPosition.y = -size.y - pivotPosition.y;
+		}
+		return pivotPosition;
 	}
 
 	//==============================================================================
