@@ -134,7 +134,7 @@ export class UIButton extends UINode {
 	 * @param { Vector2 } position
 	 * @returns { boolean }
 	 */
-	overlaps(position) {
+	contains(position) {
 		const rect = VRect.create(this.position.x, this.position.y, this.size.x, this.size.y);
 		if (rect.overlaps(position)) {
 			return true;

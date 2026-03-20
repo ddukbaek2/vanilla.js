@@ -188,12 +188,20 @@ drawImageNinePatch(image, position, size, patch) {
 		if (node === null) {
 			return;
 		}
-		
+
+		const engine = this.getEngine();
+
 		node.beginDrawState(this);
 		node.preDraw(this);
 		node.draw(this);
 		node.postDraw(this);
 		node.endDrawState(this);
+		
+		if (engine.isDevelopment()) {
+			node.drawGizmos(this);
+		}
+
+		// 자식 출력.
 		for (const child in node.getChildren()) {
 			this.drawNode(child);
 		}

@@ -63,7 +63,7 @@ export class VSprite extends VNode {
 			slices = VRect.create(0, 0, image.width, image.height);
 		}
 
-		const size = super.getSize();
+		const size = super.getContentSize();
 		const pivotPosition = this.calculatePivotPosition();
 
 		// 출력.
@@ -96,7 +96,7 @@ export class VSprite extends VNode {
 		const pivotPosition = super.calculatePivotPosition();
 		const isHorizontalFlip = this.isHorizontalFlip();
 		const isVerticalFlip = this.isVerticalFlip();
-		const size = super.getSize();
+		const size = super.getContentSize();
 		if (isHorizontalFlip) {
 			pivotPosition.x = -size.x - pivotPosition.x;
 		}

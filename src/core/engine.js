@@ -468,8 +468,10 @@ export class VEngine extends VObject {
 		canvasContext.setTransform(a, 0, 0, a, e, f);
 
 		// 영역 전체 칠하기.
-		canvasContext.fillStyle = color;
-		canvasContext.fillRect(0, 0, this.#view.resolution.x, this.#view.resolution.y);;
+		if (color !== null) {
+			canvasContext.fillStyle = color;
+			canvasContext.fillRect(0, 0, this.#view.resolution.x, this.#view.resolution.y);
+		}
 	}
 
 	//==============================================================================
@@ -542,5 +544,17 @@ export class VEngine extends VObject {
 	 */
 	getRenderer() {
 		return this.#renderer;
+	}
+
+	//==============================================================================
+	// 개발 모드 여부 반환.
+	//==============================================================================
+	/**
+	 * @public
+	 * @method
+	 * @returns { boolean }
+	 */
+	isDevelopment() {
+		return this.#isDevelopment;
 	}
 }

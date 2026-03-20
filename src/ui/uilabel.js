@@ -46,7 +46,7 @@ export class UILabel extends UINode {
 		super.draw(renderer);
 		// const view =
 		const position = super.getPosition();
-		const size = super.getSize();
+		const size = super.getContentSize();
 
 		const canvasContext = renderer.getCanvasContext();
 		const SYSTEM_FONT_STRING = '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';

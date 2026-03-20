@@ -5,6 +5,8 @@ import { VObject } from "../base/object.js";
 import { VVector2 } from "../base/vector2.js";
 import { VRenderer } from "./renderer.js";
 import * as VMath from "../base/math.js";
+import { VRect } from "../base/rect.js";
+import { VOBB } from "../base/OBB.js";
 
 
 //==============================================================================
@@ -37,9 +39,9 @@ export class VNode extends VObject {
 	/** @private @type { VNode | null } */ #parent; // 부모 노드.
 	/** @private @type { VNode[] } */ #children; // 자식 노드 목록.
 	/** @private @type { VVector2 } */ #position; // 위치.
-	/** @private @type { VVector2 } */ #size; // 크기.
+	/** @private @type { VVector2 } */ #contentSize; // 크기.
 	/** @private @type { VVector2 } */ #scale; // 크기.
-	/** @private @type { number } */ #rotation; // 회전값.
+	/** @private @type { number } */ #rotation; // 회전값. (degree)
 	/** @private @type { boolean } */ #isActive; // 활성화 여부.
 	/** @private @type { boolean } */ #isVisible; // 렌더링 여부.
 	/** @private @type { string } */ #color; // 컬러.
@@ -57,7 +59,7 @@ export class VNode extends VObject {
 		this.#parent = null;
 		this.#children = [];
 		this.#position = VVector2.zero();
-		this.#size = VVector2.zero();
+		this.#contentSize = VVector2.zero();
 		this.#scale = VVector2.one();
 		this.#rotation = 0.0;
 		this.#isActive = true;
@@ -104,12 +106,13 @@ export class VNode extends VObject {
 		const canvasContext = renderer.getCanvasContext();
 
 		const position = this.getPosition();
-		const rotation = this.getRotation();
+		const degree = this.getRotation();
+		let radian = VMath.degreeToRadian(degree);
 		const transformScale = this.calculateTransformScale();
 
 		// 트랜스폼 조정.
 		canvasContext.translate(position.x, position.y); // 위치.
-		canvasContext.rotate(rotation); // 회전.
+		canvasContext.rotate(radian); // 회전.
 		canvasContext.scale(transformScale.x, transformScale.y); // 크기.
 	}
 
@@ -122,7 +125,7 @@ export class VNode extends VObject {
 	 */
 	draw(renderer) {
 		const canvasContext = renderer.getCanvasContext();
-		const size = super.getSize();
+		const size = this.getContentSize();
 		const pivotPosition = this.calculatePivotPosition();
 
 		// 출력.
@@ -156,6 +159,53 @@ export class VNode extends VObject {
 	}
 
 	//==============================================================================
+	// 기즈모 출력.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { VRenderer } renderer 
+	 */
+	drawGizmos(renderer) {
+		const engine = renderer.getEngine();
+		const canvasContext = renderer.getCanvasContext();
+		const worldBounds = this.getWorldBounds();
+
+		const degree = this.getRotation();
+		let radian = VMath.degreeToRadian(degree);
+
+		// 이미지 회전이 반영된 기준점 출력. (문제있음)
+		canvasContext.fillStyle = "#00ff00";
+		const worldCorners = this.getWorldCorners();
+
+		const pivots = [Pivot2D.topLeft, Pivot2D.topRight, Pivot2D.bottomRight, Pivot2D.bottomLeft];
+		for (let i = 0; i < worldCorners.length; ++i) {
+			const worldCorner = worldCorners[i];
+			canvasContext.save();
+			engine.gameViewIdentity(null);
+			canvasContext.translate(worldCorner.x, worldCorner.y);
+			canvasContext.rotate(radian);
+			const contentSize = VVector2.create(16, 16);
+			const pivotPosition = VVector2.zero().subtract(contentSize.multiply(pivots[i]));
+			canvasContext.fillRect(pivotPosition.x, pivotPosition.y, contentSize.x, contentSize.y);
+			canvasContext.restore();
+		}
+
+		// 영역 출력.
+		canvasContext.save();
+		engine.gameViewIdentity(null);
+		canvasContext.strokeStyle = "#00ff00";
+		canvasContext.lineWidth = 2;
+		canvasContext.beginPath();
+		canvasContext.moveTo(worldCorners[0].x, worldCorners[0].y);
+		for (let i = 1; i < worldCorners.length; ++i) {
+			canvasContext.lineTo(worldCorners[i].x, worldCorners[i].y);
+		}
+		canvasContext.closePath();
+		canvasContext.stroke();
+		canvasContext.restore();
+	}
+
+	//==============================================================================
 	// 최종 크기 계산. (플립 기능으로 인해 뒤집어진 크기 계산)
 	//==============================================================================
 	/**
@@ -175,7 +225,7 @@ export class VNode extends VObject {
 	 * @returns { VVector2 }
 	 */
 	calculatePivotPosition() {
-		const size = this.getSize();
+		const size = this.getContentSize();
 		const pivot = this.getPivot();
 		const pivotPosition = VVector2.zero().subtract(size.multiply(pivot)); // (0,0) - (size * (0~1,0~1))
 		return pivotPosition;
@@ -330,8 +380,8 @@ export class VNode extends VObject {
 	/**
 	 * @param { VVector2 } size 
 	 */
-	setSize(size) {
-		this.#size = size;
+	setContentSize(size) {
+		this.#contentSize = size;
 	}
 
 	//==============================================================================
@@ -340,8 +390,8 @@ export class VNode extends VObject {
 	/**
 	 * @returns { VVector2 } 
 	 */
-	getSize() {
-		return this.#size;
+	getContentSize() {
+		return this.#contentSize;
 	}
 
 	//==============================================================================
@@ -532,6 +582,133 @@ export class VNode extends VObject {
 	getPivot() {
 		return this.#pivot;
 	}
+
+	// //==============================================================================
+	// // 실제 화면에 그려지는 영역 반환. (회전 무시한 AABB)
+	// //==============================================================================
+	// /**
+	//  * @returns { VRect }
+	//  */
+	// getWorldRect() {
+	// 	const position = this.getPosition();
+	//     const contentSize = this.getContentSize();
+	//     const scale = this.getScale();
+	//     const pivot = this.getPivot();
+
+	//     const width = contentSize.x * Math.abs(scale.x);
+	//     const height = contentSize.y * Math.abs(scale.y);
+	//     const x = position.x - (width * pivot.x);
+	//     const y = position.y - (height * pivot.y);
+
+	//     return VRect.create(x, y, width, height);
+	// }
+
+	//==============================================================================
+	// 실제 화면에 그려지는 영역 반환. (회전 반영된 AABB)
+	//==============================================================================
+	/**
+	 * @returns { VRect }
+	 */
+	getWorldBounds() {
+		const position = this.getPosition();
+		const contentSize = this.getContentSize();
+		const scale = this.getScale();
+		const pivot = this.getPivot();
+		const degree = this.getRotation();
+		const radian = VMath.degreeToRadian(degree);
+
+		const width = contentSize.x * Math.abs(scale.x);
+		const height = contentSize.y * Math.abs(scale.y);
+
+		const left = -(width * pivot.x);
+		const right = width * (1 - pivot.x);
+		const top = -(height * pivot.y);
+		const bottom = height * (1 - pivot.y);
+
+		const corners = [
+			{ x: left, y: top },
+			{ x: right, y: top },
+			{ x: right, y: bottom },
+			{ x: left, y: bottom }
+		];
+
+		const cosR = Math.cos(radian);
+		const sinR = Math.sin(radian);
+
+		let minX = Infinity;
+		let minY = Infinity;
+		let maxX = -Infinity;
+		let maxY = -Infinity;
+
+		for (const corner of corners) {
+			const rotatedX = corner.x * cosR - corner.y * sinR;
+			const rotatedY = corner.x * sinR + corner.y * cosR;
+
+			const globalX = rotatedX + position.x;
+			const globalY = rotatedY + position.y;
+
+			if (globalX < minX) minX = globalX;
+			if (globalX > maxX) maxX = globalX;
+			if (globalY < minY) minY = globalY;
+			if (globalY > maxY) maxY = globalY;
+		}
+
+		return VRect.create(minX, minY, maxX - minX, maxY - minY);
+	}
+
+	//==============================================================================
+	// 실제 화면에 그려지는 영역 반환. (OBB)
+	//==============================================================================
+	/**
+	 * @returns { VVector2[] }
+	 */
+	getWorldCorners() {
+		const position = this.getPosition();
+		const contentSize = this.getContentSize();
+		const scale = this.getScale();
+		const pivot = this.getPivot();
+		const degree = this.getRotation();
+
+		const width = contentSize.x * Math.abs(scale.x);
+		const height = contentSize.y * Math.abs(scale.y);
+
+		const left = -(width * pivot.x);
+		const right = width * (1 - pivot.x);
+		const top = -(height * pivot.y);
+		const bottom = height * (1 - pivot.y);
+
+		const radR = VMath.degreeToRadian(degree);
+		const cosR = Math.cos(radR);
+		const sinR = Math.sin(radR);
+
+		return [
+			VVector2.create(left * cosR - top * sinR + position.x, left * sinR + top * cosR + position.y),
+			VVector2.create(right * cosR - top * sinR + position.x, right * sinR + top * cosR + position.y),
+			VVector2.create(right * cosR - bottom * sinR + position.x, right * sinR + bottom * cosR + position.y),
+			VVector2.create(left * cosR - bottom * sinR + position.x, left * sinR + bottom * cosR + position.y)
+		];
+	}
+
+	//==============================================================================
+	// getWorldCorners() 를 통한 충돌 검출.
+	//==============================================================================
+	/**
+	 * @param { VVector2 } position
+	 * @returns { boolean }
+	 */
+	contains(position) {
+		if (position === null) {
+			return false;
+		}
+		const worldCorners = this.getWorldCorners();
+		const obb = new VOBB();
+		obb.setEdges(worldCorners);
+		const isInside = obb.contains(position);
+		return isInside;
+	}
+
+	// overlaps(other) {
+	// }
 
 	// //==============================================================================
 	// // 새로운 노드 생성.

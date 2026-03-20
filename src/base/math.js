@@ -57,3 +57,15 @@ export function lerp(a, b, t) {
 export function random() {
 	return Math.random();
 }
+
+//==============================================================================
+// 디그리를 라디안으로 변환.
+//==============================================================================
+/**
+ * @param { number } degree
+ * @returns { number }
+ */
+export function degreeToRadian(degree) {
+	const radian = degree * (Math.PI / 180);
+	return radian;
+}
