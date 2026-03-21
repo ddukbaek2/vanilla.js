@@ -182,7 +182,7 @@ drawImageNinePatch(image, position, size, patch) {
 	// 노드 출력.
 	//==============================================================================
 	/**
-	 * @type { VNode } node
+	 * @param { VNode } node
 	 */
 	drawNode(node) {
 		if (node === null) {
@@ -191,20 +191,28 @@ drawImageNinePatch(image, position, size, patch) {
 
 		const engine = this.getEngine();
 
-		node.beginDrawState(this);
-		node.preDraw(this);
-		node.draw(this);
-		node.postDraw(this);
-		node.endDrawState(this);
+		try {
+			node.pushState(this);
+			node.draw(this);
+			node.popState(this);
+		}
+		catch (error) {
+			throw error;
+		}
 		
 		if (engine.isDevelopment()) {
 			node.drawGizmos(this);
 		}
 
 		// 자식 출력.
-		for (const child in node.getChildren()) {
+		for (const child of node.getChildren()) {
 			this.drawNode(child);
 		}
+
+		// for (let i = 0; i < node.getChildCount(); ++i) {
+		// 	const child = node.getChild(i);
+		// 	this.drawNode(child);
+		// }
 	}
 
 	//==============================================================================

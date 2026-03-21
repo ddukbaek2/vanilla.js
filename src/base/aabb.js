@@ -1,59 +1,72 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "../base/object.js";
-import { VEngine } from "./engine.js";
-import { VRenderer } from "./renderer.js";
+import { VObject } from "./object.js";
+import { VVector2 } from "./vector2.js";
+import { VRect } from "./rect.js";
+import { VOBB } from "./obb.js";
 
 
 //==============================================================================
-// 씬.
+// 축 정렬된 바운딩 박스.
 //==============================================================================
-export class VScene extends VObject {
+export class VAABB extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { VNode[] } */ #nodes;
+	/** @private @type { VVector2 } */ #position;
+	/** @private @type { VVector2 } */ #size;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
+	/**
+	 * @constructor
+	 */
 	constructor() {
 		super();
-		this.#nodes = [];
+		this.#position = VVector2.zero();
+		this.#size = VVector2.zero();
 	}
 
 	//==============================================================================
-	// 갱신.
+	// 좌표와 충돌 검출.
 	//==============================================================================
 	/**
-	 * @virtual
-	 * @param { VEngine } engine 
+	 * @param { VVector2 } other
+	 * @returns { boolean }
 	 */
-	updateAllNodes(engine) {
-		const time = engine.getTime();
-		const timeDelta = time.timeDelta;
-		for (let i = 0; i < this.#nodes.length; ++i) {
-			const node = this.#nodes[i];
-			node.update(timeDelta);
+	contains(other) {
+		if (other === null) {
+			return false;
 		}
+		else if (other instanceof VVector2) {
+
+		}
+		
+		return false;
 	}
 
 	//==============================================================================
-	// 출력.
+	// 좌표와 충돌 검출.
 	//==============================================================================
 	/**
-	 * @virtual
-	 * @param { VRenderer } renderer 
+	 * @param { VRect | VAABB | VOBB } other
+	 * @returns { boolean }
 	 */
-	drawAllNodes(renderer) {
-		for (let i = 0; i < this.#nodes.length; ++i) {
-			const node = this.#nodes[i];
-			renderer.drawNode(node);
+	overlaps(other) {
+		if (other === null) {
+			return false;
 		}
-	}
+		else if (other instanceof VRect) {
 
-	addChild(node) {
-		this.#nodes.push(node);
+		}
+		else if (other instanceof VAABB) {
+
+		}
+		else if (other instanceof VOBB) {
+
+		}
+		return false;
 	}
 }

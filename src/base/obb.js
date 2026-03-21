@@ -3,6 +3,8 @@
 //==============================================================================
 import { VObject } from "./object.js";
 import { VVector2 } from "./vector2.js";
+import { VRect } from "./rect.js";
+import { VAABB } from "./aabb.js";
 
 
 //==============================================================================
@@ -25,7 +27,6 @@ export class VOBB extends VObject {
 		this.#edges = [VVector2.zero(), VVector2.zero(), VVector2.zero(), VVector2.zero()];
 	}
 
-
 	//==============================================================================
 	// 좌표와 충돌 검출.
 	//==============================================================================
@@ -33,32 +34,35 @@ export class VOBB extends VObject {
 	 * @param { VVector2 } point
 	 * @returns { boolean }
 	 */
-	contains(point) {
-		if (point === null) {
+	contains(other) {
+		if (other === null) {
 			return false;
 		}
-		
-		const edges = this.getEdges();
-		let isInside = false;
-		for (let i = 0, j = edges.length - 1; i < edges.length; j = i++) {
-			const xi = edges[i].x;
-			const yi = edges[i].y;
-			const xj = edges[j].x;
-			const yj = edges[j].y;
-			const intersect = ((yi > point.y) !== (yj > point.y)) && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
-			if (intersect) {
-				isInside = !isInside;
+		else if (other instanceof VVector2) {
+			const edges = this.getEdges();
+			let isInside = false;
+			for (let i = 0, j = edges.length - 1; i < edges.length; j = i++) {
+				const xi = edges[i].x;
+				const yi = edges[i].y;
+				const xj = edges[j].x;
+				const yj = edges[j].y;
+				const intersect = ((yi > other.y) !== (yj > other.y)) && (other.x < (xj - xi) * (other.y - yi) / (yj - yi) + xi);
+				if (intersect) {
+					isInside = !isInside;
+				}
 			}
+
+			return isInside;
 		}
 
-		return isInside;
+		return false;
 	}
 
 	//==============================================================================
 	// 분리축 정리(SAT)를 이용한 다각형(OBB) 간의 충돌 검출.
 	//==============================================================================
 	/**
-	 * @param { VOBB } other
+	 * @param { VRect | VAABB | VOBB } other
 	 * @returns { boolean }
 	 */
 	overlaps(other) {

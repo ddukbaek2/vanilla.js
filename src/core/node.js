@@ -6,7 +6,7 @@ import { VVector2 } from "../base/vector2.js";
 import { VRenderer } from "./renderer.js";
 import * as VMath from "../base/math.js";
 import { VRect } from "../base/rect.js";
-import { VOBB } from "../base/OBB.js";
+import { VOBB } from "../base/obb.js";
 
 
 //==============================================================================
@@ -47,6 +47,7 @@ export class VNode extends VObject {
 	/** @private @type { string } */ #color; // 컬러.
 	/** @private @type { number } */ #opacity; // 투명도.
 	/** @private @type { VVector2 } */ #pivot; // 출력 기준점.
+	/** @private @type { boolean } */ #isVisibleGizmos; // 기즈모 출력 여부.
 
 	//==============================================================================
 	// 생성.
@@ -67,6 +68,7 @@ export class VNode extends VObject {
 		this.#color = "#ffffff"; // rgba(255, 255, 255, 1.0);
 		this.#opacity = 1.0;
 		this.#pivot = Pivot2D.middleCenter;
+		this.#isVisibleGizmos = false;
 	}
 
 	//==============================================================================
@@ -87,23 +89,11 @@ export class VNode extends VObject {
 	 * @virtual
 	 * @param { VRenderer } renderer 
 	 */
-	beginDrawState(renderer) {
+	pushState(renderer) {
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.save();
-
 		canvasContext.globalAlpha = this.#opacity;
 		canvasContext.fillStyle = this.#color;
-	}
-
-	//==============================================================================
-	// 출력 상태 시작.
-	//==============================================================================
-	/**
-	 * @virtual
-	 * @param { VRenderer } renderer 
-	 */
-	preDraw(renderer) {
-		const canvasContext = renderer.getCanvasContext();
 
 		const position = this.getPosition();
 		const degree = this.getRotation();
@@ -133,28 +123,15 @@ export class VNode extends VObject {
 	}
 
 	//==============================================================================
-	// 출력 상태 시작.
-	//==============================================================================
-	/**
-	 * @virtual
-	 * @param { VRenderer } renderer 
-	 */
-	postDraw(renderer) {
-
-	}
-
-	//==============================================================================
 	// 출력 상태 종료.
 	//==============================================================================
 	/**
 	 * @virtual
 	 * @param { VRenderer } renderer 
 	 */
-	endDrawState(renderer) {
-		// const canvasContext = renderer.getCanvasContext();
-		// canvasContext.globalAlpha = 1.0;
-
+	popState(renderer) {
 		const canvasContext = renderer.getCanvasContext();
+		canvasContext.globalAlpha = 1.0;
 		canvasContext.restore();
 	}
 
@@ -166,17 +143,19 @@ export class VNode extends VObject {
 	 * @param { VRenderer } renderer 
 	 */
 	drawGizmos(renderer) {
+		if (!this.isVisibleGizmos()) {
+			return;
+		}
+		
 		const engine = renderer.getEngine();
 		const canvasContext = renderer.getCanvasContext();
-		const worldBounds = this.getWorldBounds();
 
 		const degree = this.getRotation();
-		let radian = VMath.degreeToRadian(degree);
+		const radian = VMath.degreeToRadian(degree);
 
-		// 이미지 회전이 반영된 기준점 출력. (문제있음)
+		// 이미지 회전이 반영된 기준점 출력.
 		canvasContext.fillStyle = "#00ff00";
 		const worldCorners = this.getWorldCorners();
-
 		const pivots = [Pivot2D.topLeft, Pivot2D.topRight, Pivot2D.bottomRight, Pivot2D.bottomLeft];
 		for (let i = 0; i < worldCorners.length; ++i) {
 			const worldCorner = worldCorners[i];
@@ -184,13 +163,13 @@ export class VNode extends VObject {
 			engine.gameViewIdentity(null);
 			canvasContext.translate(worldCorner.x, worldCorner.y);
 			canvasContext.rotate(radian);
-			const contentSize = VVector2.create(16, 16);
+			const contentSize = VVector2.create(4, 4);//.divide(this.getScale());
 			const pivotPosition = VVector2.zero().subtract(contentSize.multiply(pivots[i]));
 			canvasContext.fillRect(pivotPosition.x, pivotPosition.y, contentSize.x, contentSize.y);
 			canvasContext.restore();
 		}
 
-		// 영역 출력.
+		// 월드 코너 출력.
 		canvasContext.save();
 		engine.gameViewIdentity(null);
 		canvasContext.strokeStyle = "#00ff00";
@@ -288,8 +267,13 @@ export class VNode extends VObject {
 	// 모든 자식 제거. (직계 자식 목록만 비우기 때문에 자식들이 소유한 계층 구조는 유지됨)
 	//==============================================================================
 	removeChildren() {
-		for (let i = 0; i < this.#children.length; ++i) {
-			const child = this.#children[i];
+		// for (let i = 0; i < this.#children.length; ++i) {
+		// 	const child = this.#children[i];
+		// 	this.removeChild(child);
+		// 	--i;
+		// }
+		while (this.#children.length > 0) {
+			const child = this.#children[0];
 			this.removeChild(child);
 		}
 	}
@@ -603,58 +587,58 @@ export class VNode extends VObject {
 	//     return VRect.create(x, y, width, height);
 	// }
 
-	//==============================================================================
-	// 실제 화면에 그려지는 영역 반환. (회전 반영된 AABB)
-	//==============================================================================
-	/**
-	 * @returns { VRect }
-	 */
-	getWorldBounds() {
-		const position = this.getPosition();
-		const contentSize = this.getContentSize();
-		const scale = this.getScale();
-		const pivot = this.getPivot();
-		const degree = this.getRotation();
-		const radian = VMath.degreeToRadian(degree);
+	// //==============================================================================
+	// // 실제 화면에 그려지는 영역 반환. (회전 반영된 AABB)
+	// //==============================================================================
+	// /**
+	//  * @returns { VRect }
+	//  */
+	// getWorldBounds() {
+	// 	const position = this.getPosition();
+	// 	const contentSize = this.getContentSize();
+	// 	const scale = this.getScale();
+	// 	const pivot = this.getPivot();
+	// 	const degree = this.getRotation();
+	// 	const radian = VMath.degreeToRadian(degree);
 
-		const width = contentSize.x * Math.abs(scale.x);
-		const height = contentSize.y * Math.abs(scale.y);
+	// 	const width = contentSize.x * VMath.abs(scale.x);
+	// 	const height = contentSize.y * VMath.abs(scale.y);
 
-		const left = -(width * pivot.x);
-		const right = width * (1 - pivot.x);
-		const top = -(height * pivot.y);
-		const bottom = height * (1 - pivot.y);
+	// 	const left = -(width * pivot.x);
+	// 	const right = width * (1 - pivot.x);
+	// 	const top = -(height * pivot.y);
+	// 	const bottom = height * (1 - pivot.y);
 
-		const corners = [
-			{ x: left, y: top },
-			{ x: right, y: top },
-			{ x: right, y: bottom },
-			{ x: left, y: bottom }
-		];
+	// 	const corners = [
+	// 		{ x: left, y: top },
+	// 		{ x: right, y: top },
+	// 		{ x: right, y: bottom },
+	// 		{ x: left, y: bottom }
+	// 	];
 
-		const cosR = Math.cos(radian);
-		const sinR = Math.sin(radian);
+	// 	const cosR = VMath.cos(radian);
+	// 	const sinR = VMath.sin(radian);
 
-		let minX = Infinity;
-		let minY = Infinity;
-		let maxX = -Infinity;
-		let maxY = -Infinity;
+	// 	let minX = Infinity;
+	// 	let minY = Infinity;
+	// 	let maxX = -Infinity;
+	// 	let maxY = -Infinity;
 
-		for (const corner of corners) {
-			const rotatedX = corner.x * cosR - corner.y * sinR;
-			const rotatedY = corner.x * sinR + corner.y * cosR;
+	// 	for (const corner of corners) {
+	// 		const rotatedX = corner.x * cosR - corner.y * sinR;
+	// 		const rotatedY = corner.x * sinR + corner.y * cosR;
 
-			const globalX = rotatedX + position.x;
-			const globalY = rotatedY + position.y;
+	// 		const globalX = rotatedX + position.x;
+	// 		const globalY = rotatedY + position.y;
 
-			if (globalX < minX) minX = globalX;
-			if (globalX > maxX) maxX = globalX;
-			if (globalY < minY) minY = globalY;
-			if (globalY > maxY) maxY = globalY;
-		}
+	// 		if (globalX < minX) minX = globalX;
+	// 		if (globalX > maxX) maxX = globalX;
+	// 		if (globalY < minY) minY = globalY;
+	// 		if (globalY > maxY) maxY = globalY;
+	// 	}
 
-		return VRect.create(minX, minY, maxX - minX, maxY - minY);
-	}
+	// 	return VRect.create(minX, minY, maxX - minX, maxY - minY);
+	// }
 
 	//==============================================================================
 	// 실제 화면에 그려지는 영역 반환. (OBB)
@@ -669,8 +653,8 @@ export class VNode extends VObject {
 		const pivot = this.getPivot();
 		const degree = this.getRotation();
 
-		const width = contentSize.x * Math.abs(scale.x);
-		const height = contentSize.y * Math.abs(scale.y);
+		const width = contentSize.x * VMath.abs(scale.x);
+		const height = contentSize.y * VMath.abs(scale.y);
 
 		const left = -(width * pivot.x);
 		const right = width * (1 - pivot.x);
@@ -678,8 +662,8 @@ export class VNode extends VObject {
 		const bottom = height * (1 - pivot.y);
 
 		const radR = VMath.degreeToRadian(degree);
-		const cosR = Math.cos(radR);
-		const sinR = Math.sin(radR);
+		const cosR = VMath.cos(radR);
+		const sinR = VMath.sin(radR);
 
 		return [
 			VVector2.create(left * cosR - top * sinR + position.x, left * sinR + top * cosR + position.y),
@@ -687,6 +671,58 @@ export class VNode extends VObject {
 			VVector2.create(right * cosR - bottom * sinR + position.x, right * sinR + bottom * cosR + position.y),
 			VVector2.create(left * cosR - bottom * sinR + position.x, left * sinR + bottom * cosR + position.y)
 		];
+	}
+
+	//==============================================================================
+	// getWorldCorners()를 기반으로 최소, 최대위치를 만들어 바운딩박스를 형성.
+	//==============================================================================
+	/**
+	 * @returns { VRect }
+	 */
+	getWorldBounds() {
+		const worldCorners = this.getWorldCorners();
+		// const width = worldCorners[1].x - worldCorners[0].x; // rt - lt;
+		// const height = worldCorners[2].y - worldCorners[0].y; // rb - lt;
+		// return VRect.create(worldCorners[0].x, worldCorners[0].y, width, height);
+
+		let min = VVector2.positiveInfinity();
+		let max = VVector2.negativeInfinity();
+		for (let i = 1; i < worldCorners.length; ++i) {
+			const worldCorner = worldCorners[i];
+			if (min.x > worldCorner.x) {
+				min.x = worldCorner.x;
+			}
+			if (min.y > worldCorner.y) {
+				min.y = worldCorner.y;
+			}
+			if (max.x < worldCorner.x) {
+				max.x = worldCorner.x;
+			}
+			if (max.y < worldCorner.y) {
+				max.y = worldCorner.y;
+			}
+		}
+		return VRect.create(min.x, min.y, max.x - min.x, max.y - min.y);
+	}
+
+	//==============================================================================
+	// 기즈모 그리기 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean }
+	 */
+	setVisibleGizmos(visible) {
+		this.#isVisibleGizmos = visible;
+	}
+
+	//==============================================================================
+	// 기즈모 그리기 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isVisibleGizmos() {
+		return this.#isVisibleGizmos;
 	}
 
 	//==============================================================================

@@ -6,7 +6,10 @@ import { VVector2 } from "../base/vector2.js";
 import { VNode } from "../core/node.js";
 
 
-export class VParticle extends VObject {
+//==============================================================================
+// 터치 입자.
+//==============================================================================
+export class VTouchParticle extends VObject {
 	/** @type { VVector2 } */ position;
 	/** @type { VVector2 } */ velocity;
 	/** @type { number } */ life;
@@ -29,7 +32,7 @@ export class VTouchEffect extends VNode {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { VParticle[] } */ touchParticles;
+	/** @type { VTouchParticle[] } */ touchParticles;
 
 	//==============================================================================
 	// 생성.
@@ -58,8 +61,8 @@ export class VTouchEffect extends VNode {
 	 * @override
 	 * @param { VRenderer } renderer 
 	 */
-	beginDrawState(renderer) {
-		// super.beginDrawState(renderer);
+	pushState(renderer) {
+		super.pushState(renderer);
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.globalCompositeOperation = "lighter";
 	}
@@ -71,10 +74,10 @@ export class VTouchEffect extends VNode {
 	 * @override
 	 * @param { VRenderer } renderer 
 	 */
-	endDrawState(renderer) {
-		// super.endDrawState(renderer);
+	popState(renderer) {
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.globalCompositeOperation = "source-over";
+		super.popState(renderer);
 	}
 
 	//==============================================================================
@@ -85,7 +88,7 @@ export class VTouchEffect extends VNode {
 	 * @param { VRenderer } renderer 
 	 */
 	draw(renderer) {
-		// super.draw(renderer);
+		super.draw(renderer);
 		this.drawTouchParticles(renderer);
 	}
 
@@ -93,7 +96,7 @@ export class VTouchEffect extends VNode {
 	// 터치 파티클 생성.
 	//==============================================================================
 	createTouchParticle(x, y) {
-		const particle = new VParticle();
+		const particle = new VTouchParticle();
 		particle.position = VVector2.create(x + (Math.random() - 0.5) * 10, y + (Math.random() - 0.5) * 10);
 		particle.velocity = VVector2.create((Math.random() - 0.5) * 120, (Math.random() - 0.5) * 120);
 		particle.life = 1.0;

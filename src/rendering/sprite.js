@@ -42,6 +42,10 @@ export class VSprite extends VNode {
 		super.update(timeDelta);
 	}
 
+	// pushState(renderer) {
+	// 	super.pushState(renderer);
+	// }
+
 	//==============================================================================
 	// 출력.
 	//==============================================================================

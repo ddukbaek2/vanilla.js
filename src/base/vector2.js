@@ -3,6 +3,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { VObject } from "./object.js";
+import * as VMath from "../base/math.js";
 
 
 //==============================================================================
@@ -62,7 +63,7 @@ export class VVector2 extends VObject
 	 * @returns { number }
 	 */
 	length() {
-		const length = Math.sqrt(this.x * this.x + this.y * this.y);
+		const length = VMath.sqrt(this.x * this.x + this.y * this.y);
 		return length;
 	}
 
@@ -200,6 +201,17 @@ export class VVector2 extends VObject
 	}
 
 	//==============================================================================
+	// 절반.
+	//==============================================================================
+	/**
+	 * @returns { VVector2 }
+	 */
+	half() {
+		const obj = this.divide(0.5);
+		return obj;
+	}
+	
+	//==============================================================================
 	// 빼기.
 	//==============================================================================
 	/**
@@ -290,4 +302,25 @@ export class VVector2 extends VObject
 	static one() {
 		return VVector2.create(1, 1);
 	}
+
+	//==============================================================================
+	// 최대값 벡터 생성.
+	//==============================================================================
+	/**
+	 * @returns { VVector2 }
+	 */
+	static positiveInfinity() {
+		return VVector2.create(Infinity, Infinity);
+	}
+
+	//==============================================================================
+	// 최소값 벡터 생성.
+	//==============================================================================
+	/**
+	 * @returns { VVector2 }
+	 */
+	static negativeInfinity() {
+		return VVector2.create(-Infinity, -Infinity);
+	}
+
 }

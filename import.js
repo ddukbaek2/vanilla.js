@@ -5,6 +5,8 @@ export { VObject } from "./src/base/object.js";
 export { VSingleton } from "./src/base/singleton.js"
 export { VVector2 } from "./src/base/vector2.js";
 export { VRect } from "./src/base/rect.js";
+export { VAABB } from "./src/base/aabb.js";
+export { VOBB } from "./src/base/obb.js";
 export { VColors } from "./src/base/colors.js";
 export * as VWait from "./src/base/wait.js";
 export * as VMath from "./src/base/math.js";
@@ -25,7 +27,7 @@ export { VGameInstance } from "./src/core/gameinstance.js";
 export { VScene } from "./src/core/scene.js";
 export { VNode  } from "./src/core/node.js";
 export { VListener } from "./src/core/listener.js";
-export { VTransform } from "./src/core/transform.js";
+export { VTransform2D } from "./src/core/transform2d.js";
 
 
 //==============================================================================
