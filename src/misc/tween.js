@@ -12,16 +12,16 @@ export class VTween extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-    /** @private @type { Object } */ #valuesStart = {};
-    /** @private @type { Object } */ #valuesEnd = {};
-    /** @private @type { number } */ #duration = 1.0;
-    /** @private @type { number } */ #delayTime = 0;
-    /** @private @type { number } */ #startTime = 0;
-    /** @private @type { Function } */ #easingFunction = VTween.easingFunctions.linear;
-    /** @private @type { Function } */ #tickCallback = null;
-    /** @private @type { Function } */ #completeCallback = null;
-    /** @private @type { boolean } */ #isPlaying = false;
-    /** @private @type { boolean } */ #isFinished = false;
+    /** @private @type { Object } */ #valuesStart;
+    /** @private @type { Object } */ #valuesEnd;
+    /** @private @type { number } */ #duration;
+    /** @private @type { number } */ #delay;
+    /** @private @type { number } */ #elapsedTime;
+    /** @private @type { Function } */ #easingFunction;
+    /** @private @type { Function } */ #tickCallback;
+    /** @private @type { Function } */ #completeCallback;
+    /** @private @type { boolean } */ #isPlaying;
+    /** @private @type { boolean } */ #isFinished;
 
 	//==============================================================================
 	// 생성.
@@ -36,8 +36,8 @@ export class VTween extends VObject {
         this.#valuesStart = { ...initialValues };
 		this.#valuesEnd = { };
 		this.#duration = 1.0;
-		this.#delayTime = 0;
-		this.#startTime = 0;
+		this.#delay = 0;
+		this.#elapsedTime = 0;
 		this.#easingFunction = VTween.easingFunctions.linear;
 		this.#tickCallback = null;
 		this.#completeCallback = null;
@@ -56,7 +56,7 @@ export class VTween extends VObject {
     to(properties, duration) {
         this.#valuesEnd = properties;
         if (duration !== undefined) {
-            this.#duration = duration * 1.0; // seconds to ms
+            this.#duration = duration;
         }
         return this;
     }
@@ -65,12 +65,11 @@ export class VTween extends VObject {
 	// 완료값 설정.
 	//==============================================================================
 	/**
-	 * @param { Array } properties
-	 * @param { number } duration 
+	 * @param { number } amount 
 	 * @returns { VTween }
 	 */
     delay(amount) {
-        this.#delayTime = amount * 1.0; // seconds to ms
+        this.#delay = amount;
         return this;
     }
 
@@ -120,7 +119,7 @@ export class VTween extends VObject {
 
         this.#isPlaying = true;
         this.#isFinished = false;
-        this.#startTime = Date.now() + this.#delayTime;
+        this.#elapsedTime = 0;
     }
 
 	//==============================================================================
@@ -138,35 +137,44 @@ export class VTween extends VObject {
 	 * @param { number } timeDelta 
 	 */
 	tick(timeDelta) {
-        if (!this.#isPlaying) {
+        if (!this.#isPlaying || this.#isFinished) {
             return;
         }
 
-        const now = Date.now();
-        if (now < this.#startTime) {
+        this.#elapsedTime += timeDelta;
+
+        if (this.#elapsedTime < this.#delay) {
             return;
         }
+
+        let progress = (this.#elapsedTime - this.#delay) / this.#duration;
+        progress = Math.max(0, Math.min(progress, 1));
         
-        let elapsed = (now - this.#startTime) / this.#duration;
-        elapsed = elapsed > 1 ? 1 : elapsed;
-        
-        const value = this.#easingFunction(elapsed);
+        const easedProgress = this.#easingFunction(progress);
 
         const newValues = {};
-        for (const property in this.#valuesEnd) {
-            const start = this.#valuesStart[property];
-            const end = this.#valuesEnd[property];
-            newValues[property] = start + (end - start) * value;
+        for (const key in this.#valuesEnd) {
+            const startValue = this.#valuesStart[key];
+            const endValue = this.#valuesEnd[key];
+
+            if (startValue === undefined) {
+                continue;
+            }
+
+            if (typeof startValue === 'number') {
+                newValues[key] = startValue + (endValue - startValue) * easedProgress;
+            } else if (startValue.constructor.name === 'VVector2' && endValue.constructor.name === 'VVector2') {
+                newValues[key] = startValue.lerp(endValue, easedProgress);
+            }
         }
         
-        if (this.#tickCallback !== null) {
+        if (this.#tickCallback) {
             this.#tickCallback(newValues);
         }
 
-        if (elapsed === 1) {
-            this.#isPlaying = false;
-            this.#isFinished = true;
-            if (this.#completeCallback !== null) {
+        if (progress >= 1) {
+            this.stop();
+            if (this.#completeCallback) {
                 this.#completeCallback();
             }
         }
