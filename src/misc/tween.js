@@ -3,6 +3,7 @@
 //==============================================================================
 import { VObject } from "../base/object.js";
 import * as VMath from "../base/math.js";
+import { VVector2 } from "../base/vector2.js";
 
 
 //==============================================================================
@@ -142,13 +143,12 @@ export class VTween extends VObject {
         }
 
         this.#elapsedTime += timeDelta;
-
         if (this.#elapsedTime < this.#delay) {
             return;
         }
 
         let progress = (this.#elapsedTime - this.#delay) / this.#duration;
-        progress = Math.max(0, Math.min(progress, 1));
+        progress = VMath.clamp(progress, 0, 1);
         
         const easedProgress = this.#easingFunction(progress);
 
@@ -161,10 +161,13 @@ export class VTween extends VObject {
                 continue;
             }
 
-            if (typeof startValue === 'number') {
+            // 일반 숫자.
+            if (typeof startValue === "number" && typeof endValue === "number") {
                 newValues[key] = startValue + (endValue - startValue) * easedProgress;
-            } else if (startValue.constructor.name === 'VVector2' && endValue.constructor.name === 'VVector2') {
-                newValues[key] = startValue.lerp(endValue, easedProgress);
+            }
+            // 2차원 벡터.
+            else if (startValue instanceof VVector2 && endValue instanceof VVector2) {
+                newValues[key] = VVector2.lerp(startValue, endValue, easedProgress);
             }
         }
         
@@ -230,9 +233,9 @@ VTween.easingFunctions = {
         }
     },
     sinusoidal: {
-		in: function ( k ) { return 1 - Math.cos( k * Math.PI / 2 ); },
-		out: function ( k ) { return Math.sin( k * Math.PI / 2 ); },
-		inOut: function ( k ) { return 0.5 * ( 1 - Math.cos( Math.PI * k ) ); }
+		in: function ( k ) { return 1 - Math.cos( k * VMath.PI / 2 ); },
+		out: function ( k ) { return VMath.sin( k * VMath.PI / 2 ); },
+		inOut: function ( k ) { return 0.5 * ( 1 - VMath.cos( VMath.PI * k ) ); }
 	},
     exponential: {
         in: function(k) { return k === 0 ? 0 : Math.pow(1024, k - 1); },
@@ -245,10 +248,10 @@ VTween.easingFunctions = {
         }
     },
     circular: {
-        in: function(k) { return 1 - Math.sqrt(1 - k * k); },
-        out: function(k) { return Math.sqrt(1 - (--k * k)); },
+        in: function(k) { return 1 - VMath.sqrt(1 - k * k); },
+        out: function(k) { return VMath.sqrt(1 - (--k * k)); },
         inOut: function(k) {
-            if ((k *= 2) < 1) return -0.5 * (Math.sqrt(1 - k * k) - 1);
+            if ((k *= 2) < 1) return -0.5 * (VMath.sqrt(1 - k * k) - 1);
             return 0.5 * (Math.sqrt(1 - (k -= 2) * k) + 1);
         }
     },
@@ -258,25 +261,25 @@ VTween.easingFunctions = {
             if (k === 0) return 0;
             if (k === 1) return 1;
             if (!a || a < 1) { a = 1; s = p / 4; }
-            else s = p * Math.asin(1 / a) / (2 * Math.PI);
-            return -(a * Math.pow(2, 10 * (k -= 1)) * Math.sin((k - s) * (2 * Math.PI) / p));
+            else s = p * Math.asin(1 / a) / (2 * VMath.PI);
+            return -(a * Math.pow(2, 10 * (k -= 1)) * VMath.sin((k - s) * (2 * VMath.PI) / p));
         },
         out: function(k) {
             let s, a = 0.1, p = 0.4;
             if (k === 0) return 0;
             if (k === 1) return 1;
             if (!a || a < 1) { a = 1; s = p / 4; }
-            else s = p * Math.asin(1 / a) / (2 * Math.PI);
-            return (a * Math.pow(2, -10 * k) * Math.sin((k - s) * (2 * Math.PI) / p) + 1);
+            else s = p * Math.asin(1 / a) / (2 * VMath.PI);
+            return (a * Math.pow(2, -10 * k) * VMath.sin((k - s) * (2 * VMath.PI) / p) + 1);
         },
         inOut: function(k) {
             let s, a = 0.1, p = 0.4;
             if (k === 0) return 0;
             if (k === 1) return 1;
             if (!a || a < 1) { a = 1; s = p / 4; }
-            else s = p * Math.asin(1 / a) / (2 * Math.PI);
-            if ((k *= 2) < 1) return -0.5 * (a * Math.pow(2, 10 * (k -= 1)) * Math.sin((k - s) * (2 * Math.PI) / p));
-            return a * Math.pow(2, -10 * (k -= 1)) * Math.sin((k - s) * (2 * Math.PI) / p) * 0.5 + 1;
+            else s = p * Math.asin(1 / a) / (2 * VMath.PI);
+            if ((k *= 2) < 1) return -0.5 * (a * VMath.pow(2, 10 * (k -= 1)) * VMath.sin((k - s) * (2 * VMath.PI) / p));
+            return a * Math.pow(2, -10 * (k -= 1)) * VMath.sin((k - s) * (2 * VMath.PI) / p) * 0.5 + 1;
         }
     },
     back: {

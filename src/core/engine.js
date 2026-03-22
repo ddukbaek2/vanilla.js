@@ -25,8 +25,8 @@ export class VEngine extends VObject {
 	/** @private @type { VView } */ #view;
 	/** @private @type { VInput } */ #input;
 	/** @private @type { VRenderer } */ #renderer;
-	/** @private @type { () => void  } */ #resizeEvent;
-	/** @private @type { FrameRequestCallback } */ #updateEngineEvent;
+	/** @private @type { () => void  } */ #resizeCallback;
+	/** @private @type { FrameRequestCallback } */ #updateEngineCallback;
 	// /** @private @type { VGameInstance } */ #gameInstance;
 	/** @private @type { VScene[] } */ #scenes;
 	/** @private @type { boolean } */ #isDevelopment;
@@ -49,8 +49,8 @@ export class VEngine extends VObject {
 		this.#input = new VInput(this);
 		this.#renderer = new VRenderer(this, canvasContext);
 
-		this.#resizeEvent = this.#resize.bind(this);
-		this.#updateEngineEvent = this.#updateEngine.bind(this);
+		this.#resizeCallback = this.#resize.bind(this);
+		this.#updateEngineCallback = this.#updateEngine.bind(this);
 		// this.#gameInstance = null;
 		this.#scenes = [];
 		this.#isDevelopment = isDevelopment;
@@ -103,8 +103,8 @@ export class VEngine extends VObject {
 	 */
 	run(scene) {
 		this.loadScene(scene);
-		window.addEventListener("resize", this.#resizeEvent);
-		window.requestAnimationFrame(this.#updateEngineEvent);
+		window.addEventListener("resize", this.#resizeCallback);
+		window.requestAnimationFrame(this.#updateEngineCallback);
 	}
 
 	//==============================================================================
@@ -392,6 +392,7 @@ export class VEngine extends VObject {
 		// 씬 처리.
 		for (let i = 0; i < this.#scenes.length; ++i) {
 			const scene = this.#scenes[i];
+			
 			// 주기적 갱신.
 			scene.tick(this.#time.timeDelta);
 
@@ -422,7 +423,7 @@ export class VEngine extends VObject {
 		this.#input.justReleased = false;
 
 		// 다음 프레임 호출 요청.
-		window.requestAnimationFrame(this.#updateEngineEvent);
+		window.requestAnimationFrame(this.#updateEngineCallback);
 	}
 
 	//==============================================================================
