@@ -9,6 +9,7 @@ import { VInput } from "./input.js";
 import { VGameInstance } from "./gameinstance.js";
 import { VPlatform, PlatformType, BrowserType } from "../base/platform.js";
 import { VRenderer } from "./renderer.js";
+import { VScene } from "./scene.js";
 
 
 //==============================================================================
@@ -24,11 +25,10 @@ export class VEngine extends VObject {
 	/** @private @type { VView } */ #view;
 	/** @private @type { VInput } */ #input;
 	/** @private @type { VRenderer } */ #renderer;
-
-	/** @private @type { () => void  } */ #onResizeCallback;
-	/** @private @type { FrameRequestCallback } */ #onEngineUpdateCallback;
-	/** @private @type { VGameInstance } */ #gameInstance;
-	/** @private @type { VScene } */ #scene;
+	/** @private @type { () => void  } */ #resizeEvent;
+	/** @private @type { FrameRequestCallback } */ #updateEngineEvent;
+	// /** @private @type { VGameInstance } */ #gameInstance;
+	/** @private @type { VScene[] } */ #scenes;
 	/** @private @type { boolean } */ #isDevelopment;
 
 
@@ -38,7 +38,7 @@ export class VEngine extends VObject {
 	constructor(width, height, canvasId, isDevelopment = true) {
 		super();
 
-		this.#canvas = document.getElementById(canvasId);
+		this.#canvas = this.getOrAddCanvas(canvasId);
 		const canvasContext = this.#canvas.getContext("2d", { alpha: false });
 
 		this.#platform = new VPlatform();
@@ -49,10 +49,10 @@ export class VEngine extends VObject {
 		this.#input = new VInput(this);
 		this.#renderer = new VRenderer(this, canvasContext);
 
-		this.#onResizeCallback = this.#resize.bind(this);
-		this.#onEngineUpdateCallback = this.#updateEngine.bind(this);
-		this.#gameInstance = null;
-		this.#scene = null;
+		this.#resizeEvent = this.#resize.bind(this);
+		this.#updateEngineEvent = this.#updateEngine.bind(this);
+		// this.#gameInstance = null;
+		this.#scenes = [];
 		this.#isDevelopment = isDevelopment;
 		
 		if (this.terminalFont !== null) {
@@ -67,33 +67,44 @@ export class VEngine extends VObject {
 		this.#resize();
 	}
 
-	//==============================================================================
-	// 게임 인스턴스 설정.
-	//==============================================================================
-	/**
-	 * @method
-	 * @public
-	 * @param { VGameInstance } gameInstance
-	 */
-	setGameInstance(gameInstance) {
-		this.#gameInstance = gameInstance;
-		if (this.#gameInstance && typeof this.#gameInstance.initialize === "function") {
-			this.#gameInstance.initialize(this);
-		}
-	}
+	// //==============================================================================
+	// // 게임 인스턴스 설정.
+	// //==============================================================================
+	// /**
+	//  * @method
+	//  * @public
+	//  * @param { VGameInstance } gameInstance
+	//  */
+	// setGameInstance(gameInstance) {
+	// 	this.#gameInstance = gameInstance;
+	// 	if (this.#gameInstance && typeof this.#gameInstance.initialize === "function") {
+	// 		this.#gameInstance.initialize(this);
+	// 	}
+	// }
 
+	// //==============================================================================
+	// // 시작.
+	// //==============================================================================
+	// /**
+	//  * @param { VGameInstance } gameInstance
+	//  */
+	// run(gameInstance) {
+	// 	if (gameInstance != null)
+	// 		this.setGameInstance(gameInstance);
+
+	// 	window.addEventListener("resize", this.#resizeEvent);
+	// 	window.requestAnimationFrame(this.#updateEngineEvent);
+	// }
 	//==============================================================================
 	// 시작.
 	//==============================================================================
 	/**
 	 * @param { VGameInstance } gameInstance
 	 */
-	run(gameInstance) {
-		if (gameInstance != null)
-			this.setGameInstance(gameInstance);
-
-		window.addEventListener("resize", this.#onResizeCallback);
-		window.requestAnimationFrame(this.#onEngineUpdateCallback);
+	run(scene) {
+		this.loadScene(scene);
+		window.addEventListener("resize", this.#resizeEvent);
+		window.requestAnimationFrame(this.#updateEngineEvent);
 	}
 
 	//==============================================================================
@@ -129,9 +140,9 @@ export class VEngine extends VObject {
 		this.#view.view.size.x = viewWidth;
 		this.#view.view.size.y = viewHeight;
 
-		if (this.#gameInstance && typeof this.#gameInstance.resize === "function") {
-			this.#gameInstance.resize(this);
-		}
+		// if (this.#gameInstance && typeof this.#gameInstance.resize === "function") {
+		// 	this.#gameInstance.resize(this);
+		// }
 	}
 
 	//==============================================================================
@@ -225,7 +236,7 @@ export class VEngine extends VObject {
 	/**
 	 * @param { CanvasRenderingContext2D } canvasContext 
 	 */
-	#drawDevelopment(canvasContext) {
+	drawDevelopment(canvasContext) {
 		if (!this.#isDevelopment)
 			return;
 	
@@ -378,28 +389,80 @@ export class VEngine extends VObject {
     	// this.CanvasContext.imageSmoothingQuality = 'high';
 		// this.canvasContext.canvas.style.textRendering = 'optimizeLegibility';
 
-		if (this.#gameInstance) {
-			try {
-				if (typeof this.#gameInstance.update === "function") {
-					this.#gameInstance.update(this.#time.timeDelta);
-				}
-				if (typeof this.#gameInstance.draw === "function") {
-					this.#gameInstance.draw(this.#renderer);
-				}
-			}
-			catch (e) {
-				console.error(e);
-			}
+		// 씬 처리.
+		for (let i = 0; i < this.#scenes.length; ++i) {
+			const scene = this.#scenes[i];
+			// 주기적 갱신.
+			scene.tick(this.#time.timeDelta);
+
+			// 출력.
+			scene.draw(this.#renderer);
 		}
+
+		// if (this.#gameInstance) {
+		// 	try {
+		// 		if (typeof this.#gameInstance.update === "function") {
+		// 			this.#gameInstance.update(this.#time.timeDelta);
+		// 		}
+		// 		if (typeof this.#gameInstance.draw === "function") {
+		// 			this.#gameInstance.draw(this.#renderer);
+		// 		}
+		// 	}
+		// 	catch (e) {
+		// 		console.error(e);
+		// 	}
+		// }
 		if (this.#isDevelopment) {
 			const canvasContext = this.#renderer.getCanvasContext();
-			this.#drawDevelopment(canvasContext);
+			this.drawDevelopment(canvasContext);
 		}
 		
+		// 입력 처리.
 		this.#input.justPressed = false;
 		this.#input.justReleased = false;
 
-		window.requestAnimationFrame(this.#onEngineUpdateCallback);
+		// 다음 프레임 호출 요청.
+		window.requestAnimationFrame(this.#updateEngineEvent);
+	}
+
+	//==============================================================================
+	// 씬 로드.
+	//==============================================================================
+	/**
+	 * 
+	 * @param { VScene } scene 
+	 */
+	async loadScene(scene) {
+		if (scene && scene instanceof VScene) {
+			scene.initialize(this);
+			await scene.load(this);
+			this.#scenes.push(scene);
+		}
+	}
+
+	//==============================================================================
+	// 씬 언로드.
+	//==============================================================================
+	/**
+	 * 
+	 * @param { VScene } scene 
+	 */
+	async unloadScene(scene) {
+		if (scene && scene instanceof VScene) {
+			await scene.unload(this);
+			scene.finalize();
+			this.#scenes.splice(this.#scenes.indexOf(scene), 1);
+		}
+	}
+
+	//==============================================================================
+	// 모든 씬 언로드.
+	//==============================================================================
+	async unloadAllScenes() {
+		while (this.#scenes.length > 0) {
+			const scene = this.#scenes[0];
+			await this.unloadScene(scene);
+		}
 	}
 
 	//==============================================================================
@@ -436,9 +499,9 @@ export class VEngine extends VObject {
 		
 		// 상태 초기화.
 		// canvasContext.save();
-		canvasContext.beginPath();
 
 		// 영역 전체 칠하기.
+		canvasContext.beginPath();
 		canvasContext.fillStyle = color;
 		canvasContext.fillRect(0, 0, this.#canvas.width, this.#canvas.height);
 	}
@@ -550,5 +613,25 @@ export class VEngine extends VObject {
 	 */
 	isDevelopment() {
 		return this.#isDevelopment;
+	}
+
+	//==============================================================================
+	// 캔버스 생성 or 반환.
+	//==============================================================================
+	/**
+	 * @public
+	 * @method
+	 * @param { string } canvasId
+	 * @returns { HTMLCanvasElement }
+	 */
+	getOrAddCanvas(canvasId) {
+		let canvas = document.getElementById(canvasId);
+		if (canvas === null) {
+			canvas = document.createElement("canvas");
+			canvas.id = canvasId;
+			document.body.appendChild(canvas);
+		}
+
+		return canvas;
 	}
 }

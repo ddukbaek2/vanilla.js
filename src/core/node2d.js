@@ -14,12 +14,11 @@ import { VPivot2D } from "../base/pivot2d.js";
 
 //==============================================================================
 // 계층 및 영역 객체.
-// - 이미지 출력 기능은 없음.
 //==============================================================================
 /**
  * @class
  */
-export class VNode extends VObject {
+export class VNode2D extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -31,11 +30,7 @@ export class VNode extends VObject {
 	/** @private @type { VVector2 } */ #scale; // 크기.
 	/** @private @type { number } */ #rotation; // 회전값. (degree)
 	/** @private @type { boolean } */ #isActive; // 활성화 여부.
-	/** @private @type { boolean } */ #isVisible; // 렌더링 여부.
-	/** @private @type { string } */ #color; // 컬러.
-	/** @private @type { number } */ #opacity; // 투명도.
 	/** @private @type { VVector2 } */ #pivot; // 출력 기준점.
-	/** @private @type { boolean } */ #isVisibleGizmos; // 기즈모 출력 여부.
 
 	//==============================================================================
 	// 생성.
@@ -53,22 +48,7 @@ export class VNode extends VObject {
 		this.#scale = VVector2.one();
 		this.#rotation = 0.0;
 		this.#isActive = true;
-		this.#isVisible = true;
-		this.#color = "#ffffff"; // rgba(255, 255, 255, 1.0);
-		this.#opacity = 1.0;
 		this.#pivot = VPivot2D.middleCenter;
-		this.#isVisibleGizmos = false;
-	}
-
-	//==============================================================================
-	// 갱신.
-	//==============================================================================
-	/**
-	 * @virtual
-	 * @param { number } timeDelta 
-	 */
-	update(timeDelta) {
-
 	}
 
 	//==============================================================================
@@ -78,12 +58,10 @@ export class VNode extends VObject {
 	 * @virtual
 	 * @param { VRenderer } renderer 
 	 */
-	pushState(renderer) {
+	pushTransform(renderer) {
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.save();
-		canvasContext.globalAlpha = this.#opacity;
-		canvasContext.fillStyle = this.#color;
-
+		
 		const position = this.getPosition();
 		const degree = this.getRotation();
 		let radian = VMath.degreeToRadian(degree);
@@ -118,60 +96,60 @@ export class VNode extends VObject {
 	 * @virtual
 	 * @param { VRenderer } renderer 
 	 */
-	popState(renderer) {
+	popTransform(renderer) {
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.globalAlpha = 1.0;
 		canvasContext.restore();
 	}
 
-	//==============================================================================
-	// 기즈모 출력.
-	//==============================================================================
-	/**
-	 * @virtual
-	 * @param { VRenderer } renderer 
-	 */
-	drawGizmos(renderer) {
-		if (!this.isVisibleGizmos()) {
-			return;
-		}
+	// //==============================================================================
+	// // 기즈모 출력.
+	// //==============================================================================
+	// /**
+	//  * @virtual
+	//  * @param { VRenderer } renderer 
+	//  */
+	// drawGizmos(renderer) {
+	// 	if (!this.isVisibleGizmos()) {
+	// 		return;
+	// 	}
 		
-		const engine = renderer.getEngine();
-		const canvasContext = renderer.getCanvasContext();
+	// 	const engine = renderer.getEngine();
+	// 	const canvasContext = renderer.getCanvasContext();
 
-		const degree = this.getRotation();
-		const radian = VMath.degreeToRadian(degree);
+	// 	const degree = this.getRotation();
+	// 	const radian = VMath.degreeToRadian(degree);
 
-		// 이미지 회전이 반영된 기준점 출력.
-		canvasContext.fillStyle = "#00ff00";
-		const worldCorners = this.getWorldCorners();
-		const pivots = [VPivot2D.topLeft, VPivot2D.topRight, VPivot2D.bottomRight, VPivot2D.bottomLeft];
-		for (let i = 0; i < worldCorners.length; ++i) {
-			const worldCorner = worldCorners[i];
-			canvasContext.save();
-			engine.gameViewIdentity(null);
-			canvasContext.translate(worldCorner.x, worldCorner.y);
-			canvasContext.rotate(radian);
-			const contentSize = VVector2.create(4, 4);//.divide(this.getScale());
-			const pivotPosition = VVector2.zero().subtract(contentSize.multiply(pivots[i]));
-			canvasContext.fillRect(pivotPosition.x, pivotPosition.y, contentSize.x, contentSize.y);
-			canvasContext.restore();
-		}
+	// 	// 이미지 회전이 반영된 기준점 출력.
+	// 	canvasContext.fillStyle = "#00ff00";
+	// 	const worldCorners = this.getWorldCorners();
+	// 	const pivots = [VPivot2D.topLeft, VPivot2D.topRight, VPivot2D.bottomRight, VPivot2D.bottomLeft];
+	// 	for (let i = 0; i < worldCorners.length; ++i) {
+	// 		const worldCorner = worldCorners[i];
+	// 		canvasContext.save();
+	// 		engine.gameViewIdentity(null);
+	// 		canvasContext.translate(worldCorner.x, worldCorner.y);
+	// 		canvasContext.rotate(radian);
+	// 		const contentSize = VVector2.create(4, 4);//.divide(this.getScale());
+	// 		const pivotPosition = VVector2.zero().subtract(contentSize.multiply(pivots[i]));
+	// 		canvasContext.fillRect(pivotPosition.x, pivotPosition.y, contentSize.x, contentSize.y);
+	// 		canvasContext.restore();
+	// 	}
 
-		// 월드 코너 출력.
-		canvasContext.save();
-		engine.gameViewIdentity(null);
-		canvasContext.strokeStyle = "#00ff00";
-		canvasContext.lineWidth = 2;
-		canvasContext.beginPath();
-		canvasContext.moveTo(worldCorners[0].x, worldCorners[0].y);
-		for (let i = 1; i < worldCorners.length; ++i) {
-			canvasContext.lineTo(worldCorners[i].x, worldCorners[i].y);
-		}
-		canvasContext.closePath();
-		canvasContext.stroke();
-		canvasContext.restore();
-	}
+	// 	// 월드 코너 출력.
+	// 	canvasContext.save();
+	// 	engine.gameViewIdentity(null);
+	// 	canvasContext.strokeStyle = "#00ff00";
+	// 	canvasContext.lineWidth = 2;
+	// 	canvasContext.beginPath();
+	// 	canvasContext.moveTo(worldCorners[0].x, worldCorners[0].y);
+	// 	for (let i = 1; i < worldCorners.length; ++i) {
+	// 		canvasContext.lineTo(worldCorners[i].x, worldCorners[i].y);
+	// 	}
+	// 	canvasContext.closePath();
+	// 	canvasContext.stroke();
+	// 	canvasContext.restore();
+	// }
 
 	//==============================================================================
 	// 최종 크기 계산. (플립 기능으로 인해 뒤집어진 크기 계산)
@@ -451,90 +429,6 @@ export class VNode extends VObject {
 	}
 
 	//==============================================================================
-	// 가시 상태 설정.
-	//==============================================================================
-	/**
-	 * @param { boolean } visible 
-	 */
-	setVisible(visible) {
-		this.#isVisible = visible;
-	}
-
-	//==============================================================================
-	// 현재부터 루트까지 계층 전체의 가시 상태 반환. (루트까지 하나라도 비활성화상태면 false 반환)
-	//==============================================================================
-	/**
-	 * @returns { boolean } 
-	 */
-	isVisibleInHierarchy() {
-		if (this.isVisible()) {
-			let current = this;
-			while (current !== null) {
-				if (current.isVisible()) {
-					current = current.getParent();
-				}
-				else {
-					return false;
-				}
-			}
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	//==============================================================================
-	// 가시 상태 반환.
-	//==============================================================================
-	/**
-	 * @returns { boolean } 
-	 */
-	isVisible() {
-		return this.#isVisible;
-	}
-
-	//==============================================================================
-	// 색상 설정.
-	//==============================================================================
-	/**
-	 * @param { string } color 
-	 */
-	setColor(color) {
-		this.#color = color;
-	}
-
-	//==============================================================================
-	// 색상 반환.
-	//==============================================================================
-	/**
-	 * @returns { string } 
-	 */
-	getColor() {
-		return this.#color;
-	}
-
-
-	//==============================================================================
-	// 투명도 설정.
-	//==============================================================================
-	/**
-	 * @param { number } opacity 
-	 */
-	setOpacity(opacity) {
-		this.#opacity = opacity;
-	}
-
-	//==============================================================================
-	// 투명도 반환.
-	//==============================================================================
-	/**
-	 * @returns { number } 
-	 */
-	getOpacity() {
-		return this.#opacity;
-	}
-
-	//==============================================================================
 	// 피봇 설정.
 	//==============================================================================
 	/**
@@ -555,79 +449,6 @@ export class VNode extends VObject {
 	getPivot() {
 		return this.#pivot;
 	}
-
-	// //==============================================================================
-	// // 실제 화면에 그려지는 영역 반환. (회전 무시한 AABB)
-	// //==============================================================================
-	// /**
-	//  * @returns { VRect }
-	//  */
-	// getWorldRect() {
-	// 	const position = this.getPosition();
-	//     const contentSize = this.getContentSize();
-	//     const scale = this.getScale();
-	//     const pivot = this.getPivot();
-
-	//     const width = contentSize.x * Math.abs(scale.x);
-	//     const height = contentSize.y * Math.abs(scale.y);
-	//     const x = position.x - (width * pivot.x);
-	//     const y = position.y - (height * pivot.y);
-
-	//     return VRect.create(x, y, width, height);
-	// }
-
-	// //==============================================================================
-	// // 실제 화면에 그려지는 영역 반환. (회전 반영된 AABB)
-	// //==============================================================================
-	// /**
-	//  * @returns { VRect }
-	//  */
-	// getWorldBounds() {
-	// 	const position = this.getPosition();
-	// 	const contentSize = this.getContentSize();
-	// 	const scale = this.getScale();
-	// 	const pivot = this.getPivot();
-	// 	const degree = this.getRotation();
-	// 	const radian = VMath.degreeToRadian(degree);
-
-	// 	const width = contentSize.x * VMath.abs(scale.x);
-	// 	const height = contentSize.y * VMath.abs(scale.y);
-
-	// 	const left = -(width * pivot.x);
-	// 	const right = width * (1 - pivot.x);
-	// 	const top = -(height * pivot.y);
-	// 	const bottom = height * (1 - pivot.y);
-
-	// 	const corners = [
-	// 		{ x: left, y: top },
-	// 		{ x: right, y: top },
-	// 		{ x: right, y: bottom },
-	// 		{ x: left, y: bottom }
-	// 	];
-
-	// 	const cosR = VMath.cos(radian);
-	// 	const sinR = VMath.sin(radian);
-
-	// 	let minX = Infinity;
-	// 	let minY = Infinity;
-	// 	let maxX = -Infinity;
-	// 	let maxY = -Infinity;
-
-	// 	for (const corner of corners) {
-	// 		const rotatedX = corner.x * cosR - corner.y * sinR;
-	// 		const rotatedY = corner.x * sinR + corner.y * cosR;
-
-	// 		const globalX = rotatedX + position.x;
-	// 		const globalY = rotatedY + position.y;
-
-	// 		if (globalX < minX) minX = globalX;
-	// 		if (globalX > maxX) maxX = globalX;
-	// 		if (globalY < minY) minY = globalY;
-	// 		if (globalY > maxY) maxY = globalY;
-	// 	}
-
-	// 	return VRect.create(minX, minY, maxX - minX, maxY - minY);
-	// }
 
 	//==============================================================================
 	// 실제 화면에 그려지는 영역 반환. (OBB)
@@ -695,26 +516,6 @@ export class VNode extends VObject {
 	}
 
 	//==============================================================================
-	// 기즈모 그리기 설정.
-	//==============================================================================
-	/**
-	 * @param { boolean }
-	 */
-	setVisibleGizmos(visible) {
-		this.#isVisibleGizmos = visible;
-	}
-
-	//==============================================================================
-	// 기즈모 그리기 여부 반환.
-	//==============================================================================
-	/**
-	 * @returns { boolean }
-	 */
-	isVisibleGizmos() {
-		return this.#isVisibleGizmos;
-	}
-
-	//==============================================================================
 	// getWorldCorners() 를 통한 충돌 검출.
 	//==============================================================================
 	/**
@@ -731,18 +532,4 @@ export class VNode extends VObject {
 		const isInside = obb.contains(position);
 		return isInside;
 	}
-
-	// overlaps(other) {
-	// }
-
-	// //==============================================================================
-	// // 새로운 노드 생성.
-	// //==============================================================================
-	// /**
-	//  * @returns { VNode }
-	//  */
-	// static create() {
-	// 	var obj = new VNode();
-	// 	return obj;
-	// }
 }

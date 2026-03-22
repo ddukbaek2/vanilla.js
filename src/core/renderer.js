@@ -8,7 +8,6 @@ import { VVector2 } from "../base/vector2.js";
 import { VEngine } from "./engine.js";
 
 
-
 //==============================================================================
 // 렌더러.
 //==============================================================================
@@ -145,7 +144,7 @@ export class VRenderer extends VObject {
 	// 	canvasContext.drawImage(image, left, sh - bottom, centerSrcW, bottom, dx + left, dy + dh - bottom, centerDstW, bottom); // 가운데쪽.
 	// 	canvasContext.drawImage(image, sw - right, sh - bottom, right, bottom, dx + dw - right, dy + dh - bottom, right, bottom); // 오른쪽.
 	// }
-drawImageNinePatch(image, position, size, patch) {
+	drawImageNinePatch(image, position, size, patch) {
 		const canvasContext = this.getCanvasContext();
 		const sw = image.width;
 		const sh = image.height;
@@ -256,40 +255,4 @@ drawImageNinePatch(image, position, size, patch) {
 	getCanvasContext() {
 		return this.#canvasContext;
 	}
-}
-
-
-class GL2D {
-	constructor(canvasContext) {
-		this.canvasContext = canvasContext;
-	}
-	glIdentity() {
-		// this.canvasContext.setTransform(1, 0, 0, 1, 0, 0);
-		this.canvasContext.resetTransform();
-	}
-	glTranslate(x, y) {
-		this.canvasContext.translate(x, y);	
-	}
-	glScale(x, y) {
-		this.canvasContext.scale(x, y);
-	}
-	glRotate(angle) {
-		this.canvasContext.rotate(angle);
-	}
-	glTransform(matrix) {
-		this.canvasContext.transform(matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]);
-	}
-	glViewport(x, y, width, height) {
-		this.canvasContext.viewport(x, y, width, height);
-	}
-	glClearColor(r, g, b, a) {
-		this.canvasContext.clearColor(r, g, b, a);
-	}
-	glPushMatrix() {
-		this.canvasContext.save();
-	}
-	glPopMatrix() {
-		this.canvasContext.restore();
-	}
-
 }

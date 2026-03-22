@@ -4,6 +4,7 @@
 import { VObject } from "../base/object.js";
 import { VEngine } from "./engine.js";
 import { VRenderer } from "./renderer.js";
+import { VNode } from "./node.js";
 
 
 //==============================================================================
@@ -13,30 +14,69 @@ export class VScene extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { VNode[] } */ #nodes;
+	/** @private @type { VEngine } */ #engine;
+	/** @private @type { VNode } */ #root;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	constructor() {
 		super();
-		this.#nodes = [];
+		this.#root = new VNode();
 	}
 
 	//==============================================================================
-	// 갱신.
+	// 초기화.
 	//==============================================================================
 	/**
 	 * @virtual
 	 * @param { VEngine } engine 
 	 */
-	updateAllNodes(engine) {
-		const time = engine.getTime();
-		const timeDelta = time.timeDelta;
-		for (let i = 0; i < this.#nodes.length; ++i) {
-			const node = this.#nodes[i];
-			node.update(timeDelta);
-		}
+	initialize(engine) {
+		this.#engine = engine;
+	}
+
+	//==============================================================================
+	// 파괴.
+	//==============================================================================
+	/**
+	 * @virtual
+	 */
+	finalize() {
+
+	}
+
+	//==============================================================================
+	// 비동기 로딩.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { VEngine } engine 
+	 */
+	async load(engine) {
+		await Promise.resolve();
+	}
+
+	//==============================================================================
+	// 비동기 로딩 해제.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { VEngine } engine 
+	 */
+	async unload(engine) {
+		await Promise.resolve();
+	}
+
+	//==============================================================================
+	// 주기적 갱신.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { number } timeDelta 
+	 */
+	tick(timeDelta) {
+		this.#root.update(timeDelta);
 	}
 
 	//==============================================================================
@@ -46,14 +86,27 @@ export class VScene extends VObject {
 	 * @virtual
 	 * @param { VRenderer } renderer 
 	 */
-	drawAllNodes(renderer) {
-		for (let i = 0; i < this.#nodes.length; ++i) {
-			const node = this.#nodes[i];
-			renderer.drawNode(node);
-		}
+	draw(renderer) {
+		renderer.drawNode(this.#root);
 	}
 
-	addChild(node) {
-		this.#nodes.push(node);
+	//==============================================================================
+	// 엔진 반환.
+	//==============================================================================
+	/**
+	 * @returns { VEngine } 
+	 */
+	getEngine() {
+		return this.#engine;
+	}
+	
+	//==============================================================================
+	// 루트 노드 반환.
+	//==============================================================================
+	/**
+	 * @returns { VRenderer } 
+	 */
+	getRoot() {
+		return this.#root;
 	}
 }
