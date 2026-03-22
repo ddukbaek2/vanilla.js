@@ -68,7 +68,11 @@ export class VNode extends VObject {
 	 * @param { number } timeDelta 
 	 */
 	update(timeDelta) {
-
+		for (const child of this.#children) {
+			if (child.isActive()) {
+				child.update(timeDelta);
+			}
+		}
 	}
 
 	//==============================================================================
