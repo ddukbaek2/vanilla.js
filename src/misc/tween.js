@@ -3,7 +3,7 @@
 //==============================================================================
 import { VObject } from "../base/object.js";
 import { VVector2 } from "../base/vector2.js";
-import { VEnum } from "../base/identifier.js";
+import { VEnum } from "./identifier.js";
 import * as VMath from "../base/math.js";
 
 
