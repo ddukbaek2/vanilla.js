@@ -1,166 +1,251 @@
-export class VTween {
-    /** @private */ _valuesStart = {};
-    /** @private */ _valuesEnd = {};
-    /** @private */ _duration = 1000;
-    /** @private */ _delayTime = 0;
-    /** @private */ _startTime = 0;
-    /** @private */ _easingFunction = VTween.Easing.Linear.None;
-    /** @private */ _onUpdateCallback = null;
-    /** @private */ _onCompleteCallback = null;
-    /** @private */ _isPlaying = false;
-    /** @private */ _isFinished = false;
+//==============================================================================
+// 포함 모듈 목록.
+//==============================================================================
+import { VObject } from "../base/object.js";
+import * as VMath from "../base/math.js";
 
-    constructor(initialValues) {
-        this._valuesStart = { ...initialValues };
+
+//==============================================================================
+// 트윈.
+//==============================================================================
+export class VTween extends VObject {
+	//==============================================================================
+	// 멤버 변수 목록.
+	//==============================================================================
+    /** @private @type { Object } */ #valuesStart = {};
+    /** @private @type { Object } */ #valuesEnd = {};
+    /** @private @type { number } */ #duration = 1.0;
+    /** @private @type { number } */ #delayTime = 0;
+    /** @private @type { number } */ #startTime = 0;
+    /** @private @type { Function } */ #easingFunction = VTween.easingFunctions.linear;
+    /** @private @type { Function } */ #tickCallback = null;
+    /** @private @type { Function } */ #completeCallback = null;
+    /** @private @type { boolean } */ #isPlaying = false;
+    /** @private @type { boolean } */ #isFinished = false;
+
+	//==============================================================================
+	// 생성.
+	//==============================================================================
+	/**
+	 * 
+	 * @param { Object } initialValues 
+	 */
+	constructor(initialValues) {
+		super();
+
+        this.#valuesStart = { ...initialValues };
+		this.#valuesEnd = { };
+		this.#duration = 1.0;
+		this.#delayTime = 0;
+		this.#startTime = 0;
+		this.#easingFunction = VTween.easingFunctions.linear;
+		this.#tickCallback = null;
+		this.#completeCallback = null;
+		this.#isPlaying = false;
+		this.#isFinished = false;
     }
 
+	//==============================================================================
+	// 목표값 설정.
+	//==============================================================================
+	/**
+	 * @param { Object } properties
+	 * @param { number } duration 
+	 * @returns { VTween }
+	 */
     to(properties, duration) {
-        this._valuesEnd = properties;
+        this.#valuesEnd = properties;
         if (duration !== undefined) {
-            this._duration = duration * 1000; // seconds to ms
+            this.#duration = duration * 1.0; // seconds to ms
         }
         return this;
     }
 
+	//==============================================================================
+	// 완료값 설정.
+	//==============================================================================
+	/**
+	 * @param { Array } properties
+	 * @param { number } duration 
+	 * @returns { VTween }
+	 */
     delay(amount) {
-        this._delayTime = amount * 1000; // seconds to ms
+        this.#delayTime = amount * 1.0; // seconds to ms
         return this;
     }
 
+	//==============================================================================
+	// 트윈 함수 설정.
+	//==============================================================================
+	/**
+	 * @param { Function } easingFunction
+	 * @returns { VTween }
+	 */
     easing(easingFunction) {
-        this._easingFunction = easingFunction;
+        this.#easingFunction = easingFunction;
         return this;
     }
 
+	//==============================================================================
+	// 갱신 콜백 설정.
+	//==============================================================================
+	/**
+	 * @param { Function } callback
+	 * @returns { VTween }
+	 */
     onUpdate(callback) {
-        this._onUpdateCallback = callback;
+        this.#tickCallback = callback;
         return this;
     }
 
+	//==============================================================================
+	// 완료 콜백 설정.
+	//==============================================================================
+	/**
+	 * @param { Function } callback
+	 * @returns { VTween }
+	 */
     onComplete(callback) {
-        this._onCompleteCallback = callback;
+        this.#completeCallback = callback;
         return this;
     }
 
+	//==============================================================================
+	// 시작.
+	//==============================================================================
     start() {
-        if (this._isPlaying) {
+        if (this.#isPlaying) {
             return;
         }
 
-        this._isPlaying = true;
-        this._isFinished = false;
-        this._startTime = Date.now() + this._delayTime;
-        
-        return this;
+        this.#isPlaying = true;
+        this.#isFinished = false;
+        this.#startTime = Date.now() + this.#delayTime;
     }
 
+	//==============================================================================
+	// 정지.
+	//==============================================================================
     stop() {
-        this._isPlaying = false;
-        this._isFinished = true;
-        return this;
+        this.#isPlaying = false;
+        this.#isFinished = true;
     }
 
-    tick(timeDelta) {
-        if (!this._isPlaying) {
+	//==============================================================================
+	// 갱신.
+	//==============================================================================
+	/**
+	 * @param { number } timeDelta 
+	 */
+	tick(timeDelta) {
+        if (!this.#isPlaying) {
             return;
         }
 
         const now = Date.now();
-        if (now < this._startTime) {
+        if (now < this.#startTime) {
             return;
         }
         
-        let elapsed = (now - this._startTime) / this._duration;
+        let elapsed = (now - this.#startTime) / this.#duration;
         elapsed = elapsed > 1 ? 1 : elapsed;
         
-        const value = this._easingFunction(elapsed);
+        const value = this.#easingFunction(elapsed);
 
         const newValues = {};
-        for (const property in this._valuesEnd) {
-            const start = this._valuesStart[property];
-            const end = this._valuesEnd[property];
+        for (const property in this.#valuesEnd) {
+            const start = this.#valuesStart[property];
+            const end = this.#valuesEnd[property];
             newValues[property] = start + (end - start) * value;
         }
         
-        if (this._onUpdateCallback !== null) {
-            this._onUpdateCallback(newValues);
+        if (this.#tickCallback !== null) {
+            this.#tickCallback(newValues);
         }
 
         if (elapsed === 1) {
-            this._isPlaying = false;
-            this._isFinished = true;
-            if (this._onCompleteCallback !== null) {
-                this._onCompleteCallback();
+            this.#isPlaying = false;
+            this.#isFinished = true;
+            if (this.#completeCallback !== null) {
+                this.#completeCallback();
             }
         }
     }
     
+	//==============================================================================
+	// 완료 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 
+	 */
     isFinished() {
-        return this._isFinished;
+        return this.#isFinished;
     }
 }
 
-VTween.Easing = {
-    Linear: {
-        None: function(k) { return k; }
-    },
-    Quadratic: {
-        In: function(k) { return k * k; },
-        Out: function(k) { return k * (2 - k); },
-        InOut: function(k) {
+
+//==============================================================================
+// 트윈 함수.
+//==============================================================================
+VTween.easingFunctions = {
+    linear: function(k) { return k; },
+    quadratic: {
+        in: function(k) { return k * k; },
+        out: function(k) { return k * (2 - k); },
+        inOut: function(k) {
             if ((k *= 2) < 1) { return 0.5 * k * k; }
             return -0.5 * (--k * (k - 2) - 1);
         }
     },
-    Cubic: {
-		In: function ( k ) { return k * k * k; },
-		Out: function ( k ) { return --k * k * k + 1; },
-		InOut: function ( k ) {
+    cubic: {
+		in: function ( k ) { return k * k * k; },
+		out: function ( k ) { return --k * k * k + 1; },
+		inOut: function ( k ) {
 			if ( ( k *= 2 ) < 1 ) return 0.5 * k * k * k;
 			return 0.5 * ( ( k -= 2 ) * k * k + 2 );
 		}
 	},
-    Quartic: {
-        In: function ( k ) { return k * k * k * k; },
-        Out: function ( k ) { return 1 - ( --k * k * k * k ); },
-        InOut: function ( k ) {
+    quartic: {
+        in: function ( k ) { return k * k * k * k; },
+        out: function ( k ) { return 1 - ( --k * k * k * k ); },
+        inOut: function ( k ) {
             if ( ( k *= 2 ) < 1) return 0.5 * k * k * k * k;
             return - 0.5 * ( ( k -= 2 ) * k * k * k - 2 );
         }
     },
-    Quintic: {
-        In: function ( k ) { return k * k * k * k * k; },
-        Out: function ( k ) { return --k * k * k * k * k + 1; },
-        InOut: function ( k ) {
+    quintic: {
+        in: function ( k ) { return k * k * k * k * k; },
+        out: function ( k ) { return --k * k * k * k * k + 1; },
+        inOut: function ( k ) {
             if ( ( k *= 2 ) < 1 ) return 0.5 * k * k * k * k * k;
             return 0.5 * ( ( k -= 2 ) * k * k * k * k + 2 );
         }
     },
-    Sinusoidal: {
-		In: function ( k ) { return 1 - Math.cos( k * Math.PI / 2 ); },
-		Out: function ( k ) { return Math.sin( k * Math.PI / 2 ); },
-		InOut: function ( k ) { return 0.5 * ( 1 - Math.cos( Math.PI * k ) ); }
+    sinusoidal: {
+		in: function ( k ) { return 1 - Math.cos( k * Math.PI / 2 ); },
+		out: function ( k ) { return Math.sin( k * Math.PI / 2 ); },
+		inOut: function ( k ) { return 0.5 * ( 1 - Math.cos( Math.PI * k ) ); }
 	},
-    Exponential: {
-        In: function(k) { return k === 0 ? 0 : Math.pow(1024, k - 1); },
-        Out: function(k) { return k === 1 ? 1 : 1 - Math.pow(2, -10 * k); },
-        InOut: function(k) {
+    exponential: {
+        in: function(k) { return k === 0 ? 0 : Math.pow(1024, k - 1); },
+        out: function(k) { return k === 1 ? 1 : 1 - Math.pow(2, -10 * k); },
+        inOut: function(k) {
             if (k === 0) return 0;
             if (k === 1) return 1;
             if ((k *= 2) < 1) return 0.5 * Math.pow(1024, k - 1);
             return 0.5 * (-Math.pow(2, -10 * (k - 1)) + 2);
         }
     },
-    Circular: {
-        In: function(k) { return 1 - Math.sqrt(1 - k * k); },
-        Out: function(k) { return Math.sqrt(1 - (--k * k)); },
-        InOut: function(k) {
+    circular: {
+        in: function(k) { return 1 - Math.sqrt(1 - k * k); },
+        out: function(k) { return Math.sqrt(1 - (--k * k)); },
+        inOut: function(k) {
             if ((k *= 2) < 1) return -0.5 * (Math.sqrt(1 - k * k) - 1);
             return 0.5 * (Math.sqrt(1 - (k -= 2) * k) + 1);
         }
     },
-    Elastic: {
-        In: function(k) {
+    elastic: {
+        in: function(k) {
             let s, a = 0.1, p = 0.4;
             if (k === 0) return 0;
             if (k === 1) return 1;
@@ -168,7 +253,7 @@ VTween.Easing = {
             else s = p * Math.asin(1 / a) / (2 * Math.PI);
             return -(a * Math.pow(2, 10 * (k -= 1)) * Math.sin((k - s) * (2 * Math.PI) / p));
         },
-        Out: function(k) {
+        out: function(k) {
             let s, a = 0.1, p = 0.4;
             if (k === 0) return 0;
             if (k === 1) return 1;
@@ -176,7 +261,7 @@ VTween.Easing = {
             else s = p * Math.asin(1 / a) / (2 * Math.PI);
             return (a * Math.pow(2, -10 * k) * Math.sin((k - s) * (2 * Math.PI) / p) + 1);
         },
-        InOut: function(k) {
+        inOut: function(k) {
             let s, a = 0.1, p = 0.4;
             if (k === 0) return 0;
             if (k === 1) return 1;
@@ -186,24 +271,24 @@ VTween.Easing = {
             return a * Math.pow(2, -10 * (k -= 1)) * Math.sin((k - s) * (2 * Math.PI) / p) * 0.5 + 1;
         }
     },
-    Back: {
-        In: function(k) {
+    back: {
+        in: function(k) {
             const s = 1.70158;
             return k * k * ((s + 1) * k - s);
         },
-        Out: function(k) {
+        out: function(k) {
             const s = 1.70158;
             return --k * k * ((s + 1) * k + s) + 1;
         },
-        InOut: function(k) {
+        inOut: function(k) {
             const s = 1.70158 * 1.525;
             if ((k *= 2) < 1) return 0.5 * (k * k * ((s + 1) * k - s));
             return 0.5 * ((k -= 2) * k * ((s + 1) * k + s) + 2);
         }
     },
-    Bounce: {
-        In: function(k) { return 1 - VTween.Easing.Bounce.Out(1 - k); },
-        Out: function(k) {
+    bounce: {
+        in: function(k) { return 1 - VTween.easingFunctions.bounce.out(1 - k); },
+        out: function(k) {
             if (k < (1 / 2.75)) {
                 return 7.5625 * k * k;
             } else if (k < (2 / 2.75)) {
@@ -214,9 +299,9 @@ VTween.Easing = {
                 return 7.5625 * (k -= (2.625 / 2.75)) * k + 0.984375;
             }
         },
-        InOut: function(k) {
-            if (k < 0.5) return VTween.Easing.Bounce.In(k * 2) * 0.5;
-            return VTween.Easing.Bounce.Out(k * 2 - 1) * 0.5 + 0.5;
+        inOut: function(k) {
+            if (k < 0.5) return VTween.easingFunctions.bounce.in(k * 2) * 0.5;
+            return VTween.easingFunctions.bounce.out(k * 2 - 1) * 0.5 + 0.5;
         }
     }
 };
