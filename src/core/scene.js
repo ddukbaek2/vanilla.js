@@ -86,7 +86,7 @@ export class VScene extends VObject {
 	 * @param { number } timeDelta 
 	 */
 	tick(timeDelta) {
-		this.#root.update(timeDelta);
+		this.#root.tick(timeDelta);
 	}
 
 	//==============================================================================

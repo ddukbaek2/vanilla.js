@@ -14,7 +14,7 @@ export class UILabel extends UINode {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { FontFace } */ #font;
+	/** @private @type { FontFace } */ #fontFace;
 	/** @private @type { string } */ #text = "";
 	/** @private @type { number } */ #fontSize = 32;
 	/** @private @type { string } */ #textColor = "black";
@@ -28,7 +28,7 @@ export class UILabel extends UINode {
 	//==============================================================================
 	constructor() {
 		super();
-		this.#font = null;
+		this.#fontFace = null;
 		this.#text = "";
 		this.#fontSize = 32;
 		this.#textColor = "black";
@@ -45,8 +45,8 @@ export class UILabel extends UINode {
 	 * @override
 	 * @param { number } timeDelta 
 	 */
-	update(timeDelta) {
-		super.update(timeDelta);
+	tick(timeDelta) {
+		super.tick(timeDelta);
 	}
 
 	//==============================================================================
@@ -57,27 +57,29 @@ export class UILabel extends UINode {
 	 * @param { VRenderer } renderer 
 	 */
 	draw(renderer) {
-		super.draw(renderer);
+		// super.draw(renderer);
 
 		if (!this.#text) {
 			return;
 		}
 
 		const canvasContext = renderer.getCanvasContext();
-		
-		const fontFamily = this.#font ? this.#font.family : '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+		const fontFamily = this.#fontFace ? this.#fontFace.family : '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 		canvasContext.font = `${this.#fontSize}px ${fontFamily}`;
 		canvasContext.textAlign = this.#textAlign;
 		canvasContext.textBaseline = this.#textBaseline;
 
+		// const contentSize = this.getContentSize();
+		const pivotPosition = this.calculatePivotPosition();
+
 		if (this.#strokeColor && this.#strokeWidth > 0) {
 			canvasContext.strokeStyle = this.#strokeColor;
 			canvasContext.lineWidth = this.#strokeWidth;
-			canvasContext.strokeText(this.#text, 0, 0);
+			canvasContext.strokeText(this.#text, pivotPosition.x, pivotPosition.y);
 		}
 
 		canvasContext.fillStyle = this.#textColor;
-		canvasContext.fillText(this.#text, 0, 0);
+		canvasContext.fillText(this.#text, pivotPosition.x, pivotPosition.y);
 	}
 
 	//==============================================================================
@@ -88,13 +90,13 @@ export class UILabel extends UINode {
 	 */
 	setFont(font) {
 		if (font === null) {
-			this.#font = null;
+			this.#fontFace = null;
 		}
 		else if (font instanceof FontFace) {
-			this.#font = font;
+			this.#fontFace = font;
 		}
 		else if (font instanceof VFontAsset) {
-			this.#font = font.fontFace;
+			this.#fontFace = font.fontFace;
 		}
 	}
 
@@ -105,7 +107,7 @@ export class UILabel extends UINode {
 	 * @returns { FontFace } 
 	 */
 	getFont() {
-		return this.#font
+		return this.#fontFace
 	}
 
 	//==============================================================================

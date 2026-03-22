@@ -39,8 +39,8 @@ export class VSprite extends VNode {
 	 * @override
 	 * @param { number } timeDelta 
 	 */
-	update(timeDelta) {
-		super.update(timeDelta);
+	tick(timeDelta) {
+		super.tick(timeDelta);
 	}
 
 	// pushState(renderer) {

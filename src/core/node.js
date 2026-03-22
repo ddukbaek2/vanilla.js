@@ -67,10 +67,10 @@ export class VNode extends VObject {
 	 * @virtual
 	 * @param { number } timeDelta 
 	 */
-	update(timeDelta) {
+	tick(timeDelta) {
 		for (const child of this.#children) {
 			if (child.isActive()) {
-				child.update(timeDelta);
+				child.tick(timeDelta);
 			}
 		}
 	}
@@ -82,7 +82,7 @@ export class VNode extends VObject {
 	 * @virtual
 	 * @param { VRenderer } renderer 
 	 */
-	pushState(renderer) {
+	pushTransform(renderer) {
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.save();
 		canvasContext.globalAlpha = this.#opacity;
@@ -108,11 +108,11 @@ export class VNode extends VObject {
 	 */
 	draw(renderer) {
 		const canvasContext = renderer.getCanvasContext();
-		const size = this.getContentSize();
+		const contentSize = this.getContentSize();
 		const pivotPosition = this.calculatePivotPosition();
 
 		// 출력.
-		canvasContext.fillRect(pivotPosition.x, pivotPosition.y, size.x , size.y);
+		canvasContext.fillRect(pivotPosition.x, pivotPosition.y, contentSize.x , contentSize.y);
 	}
 
 	//==============================================================================
@@ -122,7 +122,7 @@ export class VNode extends VObject {
 	 * @virtual
 	 * @param { VRenderer } renderer 
 	 */
-	popState(renderer) {
+	popTransform(renderer) {
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.globalAlpha = 1.0;
 		canvasContext.restore();
@@ -197,9 +197,9 @@ export class VNode extends VObject {
 	 * @returns { VVector2 }
 	 */
 	calculatePivotPosition() {
-		const size = this.getContentSize();
+		const contentSize = this.getContentSize();
 		const pivot = this.getPivot();
-		const pivotPosition = VVector2.zero().subtract(size.multiply(pivot)); // (0,0) - (size * (0~1,0~1))
+		const pivotPosition = VVector2.zero().subtract(contentSize.multiply(pivot)); // (0,0) - (size * (0~1,0~1))
 		return pivotPosition;
 	}
 

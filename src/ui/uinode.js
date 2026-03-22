@@ -32,8 +32,8 @@ export class UINode extends VNode {
 	 * @override
 	 * @param { number } timeDelta 
 	 */
-	update(timeDelta) {
-		super.update(timeDelta);
+	tick(timeDelta) {
+		super.tick(timeDelta);
 	}
 
 	//==============================================================================
@@ -43,8 +43,8 @@ export class UINode extends VNode {
 	 * @override
 	 * @param { VRenderer } renderer 
 	 */
-	pushState(renderer) {
-		super.pushState(renderer);
+	pushTransform(renderer) {
+		super.pushTransform(renderer);
 	}
 
 	//==============================================================================
@@ -65,8 +65,8 @@ export class UINode extends VNode {
 	 * @override
 	 * @param { VRenderer } renderer 
 	 */
-	popState(renderer) {
-		super.popState(renderer);
+	popTransform(renderer) {
+		super.popTransform(renderer);
 	}
 
 	//==============================================================================

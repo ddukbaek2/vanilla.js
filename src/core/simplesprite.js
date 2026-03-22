@@ -136,9 +136,9 @@ export class VSimpleSprite extends VObject {
 	 * @returns { VVector2 }
 	 */
 	calculatePivotPosition() {
-		const size = this.getContentSize();
+		const contentSize = this.getContentSize();
 		const pivot = this.getPivot();
-		const pivotPosition = VVector2.zero().subtract(size.multiply(pivot)); // (0,0) - (size * (0~1,0~1))
+		const pivotPosition = VVector2.zero().subtract(contentSize.multiply(pivot)); // (0,0) - (size * (0~1,0~1))
 		return pivotPosition;
 	}
 

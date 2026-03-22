@@ -191,9 +191,15 @@ export class VRenderer extends VObject {
 		const engine = this.getEngine();
 
 		try {
-			node.pushState(this);
+			node.pushTransform(this);
 			node.draw(this);
-			node.popState(this);
+
+			// 자식 출력.
+			for (const child of node.getChildren()) {
+				this.drawNode(child);
+			}
+
+			node.popTransform(this);
 		}
 		catch (error) {
 			throw error;
@@ -203,15 +209,7 @@ export class VRenderer extends VObject {
 			node.drawGizmos(this);
 		}
 
-		// 자식 출력.
-		for (const child of node.getChildren()) {
-			this.drawNode(child);
-		}
 
-		// for (let i = 0; i < node.getChildCount(); ++i) {
-		// 	const child = node.getChild(i);
-		// 	this.drawNode(child);
-		// }
 	}
 
 	//==============================================================================

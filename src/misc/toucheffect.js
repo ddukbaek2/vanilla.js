@@ -49,8 +49,8 @@ export class VTouchEffect extends VNode {
 	 * @override
 	 * @param { number } timeDelta 
 	 */
-	update(timeDelta) {
-		super.update(timeDelta);
+	tick(timeDelta) {
+		super.tick(timeDelta);
 		this.updateTouchParticles(timeDelta);
 	}
 
@@ -61,8 +61,8 @@ export class VTouchEffect extends VNode {
 	 * @override
 	 * @param { VRenderer } renderer 
 	 */
-	pushState(renderer) {
-		super.pushState(renderer);
+	pushTransform(renderer) {
+		super.pushTransform(renderer);
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.globalCompositeOperation = "lighter";
 	}
@@ -74,10 +74,10 @@ export class VTouchEffect extends VNode {
 	 * @override
 	 * @param { VRenderer } renderer 
 	 */
-	popState(renderer) {
+	popTransform(renderer) {
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.globalCompositeOperation = "source-over";
-		super.popState(renderer);
+		super.popTransform(renderer);
 	}
 
 	//==============================================================================
