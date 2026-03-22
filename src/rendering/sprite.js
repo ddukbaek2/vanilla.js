@@ -6,6 +6,7 @@ import * as VMath from "../base/math.js";
 import { VRenderer } from "../core/renderer.js"
 import { VNode } from "../core/node.js";
 import { VRect } from "../base/rect.js";
+import { VImageAsset } from "../resource/imageasset.js";
 
 
 //==============================================================================
@@ -114,10 +115,18 @@ export class VSprite extends VNode {
 	// 이미지 설정.
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement } image 
+	 * @param { HTMLImageElement | VImageAsset } image 
 	 */
 	setImage(image) {
-		this.#image = image;	
+		if (image === null) {
+			this.#image = null;
+		}
+		else if (image instanceof HTMLImageElement) {
+			this.#image = image;
+		}
+		else if (image instanceof VImageAsset) {
+			this.#image = image.image;
+		}
 	}
 
 	//==============================================================================
