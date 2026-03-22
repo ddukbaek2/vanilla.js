@@ -14,14 +14,14 @@ export class UILabel extends UINode {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { VFontAsset } */ fontAsset = null;
+	/** @private @type { FontFace } */ #font;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	constructor() {
 		super();
-		this.fontAsset = null;
+		this.#font = null;
 	}
 
 	//==============================================================================
@@ -54,5 +54,33 @@ export class UILabel extends UINode {
 		canvasContext.font = `bold 64px ${SYSTEM_FONT_STRING}`;
 		canvasContext.textAlign = "center";
 		canvasContext.fillText(`${this.Score}`, position.x, position.y, size.x, size.y);
+	}
+
+	//==============================================================================
+	// 폰트 설정.
+	//==============================================================================
+	/**
+	 * @param { FontFace | VFontAsset } font 
+	 */
+	setFont(font) {
+		if (font === null) {
+			this.#font = null;
+		}
+		else if (font instanceof FontFace) {
+			this.#font = font;
+		}
+		else if (font instanceof VFontAsset) {
+			this.#font = font.fontFace;
+		}
+	}
+
+	//==============================================================================
+	// 폰트 반환.
+	//==============================================================================
+	/**
+	 * @returns { FontFace } 
+	 */
+	getFont() {
+		return this.#font
 	}
 }
