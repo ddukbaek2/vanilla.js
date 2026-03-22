@@ -17,7 +17,9 @@ export const EaseType = {
 	easeInOut: VEnum.auto(),
 };
 
-
+//==============================================================================
+// 샘플링 함수.
+//==============================================================================
 export const Sample = {
 	numberSample: (from, to, normalizedTime) => {
 		normalizedTime = VMath.clamp(normalizedTime, 0, 1);
