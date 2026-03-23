@@ -39,7 +39,7 @@ export class VTween extends VObject {
 		this.#duration = 1.0;
 		this.#delay = 0;
 		this.#elapsedTime = 0;
-		this.#easingFunction = VTween.easingFunctions.linear;
+		this.#easingFunction = VTween.easingFunction.linear;
 		this.#tickCallback = null;
 		this.#completeCallback = null;
 		this.#isPlaying = false;
@@ -63,7 +63,7 @@ export class VTween extends VObject {
     }
 
 	//==============================================================================
-	// 완료값 설정.
+	// 시작 전 대기 시간 설정.
 	//==============================================================================
 	/**
 	 * @param { number } amount 
@@ -93,7 +93,7 @@ export class VTween extends VObject {
 	 * @param { Function } callback
 	 * @returns { VTween }
 	 */
-    onUpdate(callback) {
+    setUpdate(callback) {
         this.#tickCallback = callback;
         return this;
     }
@@ -105,7 +105,7 @@ export class VTween extends VObject {
 	 * @param { Function } callback
 	 * @returns { VTween }
 	 */
-    onComplete(callback) {
+    setComplete(callback) {
         this.#completeCallback = callback;
         return this;
     }
@@ -198,7 +198,7 @@ export class VTween extends VObject {
 //==============================================================================
 // 트윈 함수.
 //==============================================================================
-VTween.easingFunctions = {
+VTween.easingFunction = {
     linear: function(k) { return k; },
     quadratic: {
         in: function(k) { return k * k; },
@@ -298,7 +298,7 @@ VTween.easingFunctions = {
         }
     },
     bounce: {
-        in: function(k) { return 1 - VTween.easingFunctions.bounce.out(1 - k); },
+        in: function(k) { return 1 - VTween.easingFunction.bounce.out(1 - k); },
         out: function(k) {
             if (k < (1 / 2.75)) {
                 return 7.5625 * k * k;
@@ -311,8 +311,8 @@ VTween.easingFunctions = {
             }
         },
         inOut: function(k) {
-            if (k < 0.5) return VTween.easingFunctions.bounce.in(k * 2) * 0.5;
-            return VTween.easingFunctions.bounce.out(k * 2 - 1) * 0.5 + 0.5;
+            if (k < 0.5) return VTween.easingFunction.bounce.in(k * 2) * 0.5;
+            return VTween.easingFunction.bounce.out(k * 2 - 1) * 0.5 + 0.5;
         }
     }
 };

@@ -7,7 +7,7 @@ import { VVector2 } from "./vector2.js";
 //==============================================================================
 // 피봇. (2D 좌표계를 기준으로 좌상(0,0) ~ 우하(1,1)을 기준으로 삼는다.)
 //==============================================================================
-export const VPivot2D = {
+export const VPivot = {
 	topLeft: VVector2.create(0, 0),
 	topCenter: VVector2.create(0.5, 0),
 	topRight: VVector2.create(1, 0),

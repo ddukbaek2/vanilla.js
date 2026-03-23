@@ -8,7 +8,7 @@ import { VRect } from "./rect.js";
 //==============================================================================
 // 플랫폼 타입.
 //==============================================================================
-export const PlatformType = { //Object.freeze({
+export const VPlatformType = { //Object.freeze({
 	windows: "Windows",
 	macOS: "macOS",
 	android: "Android",
@@ -24,7 +24,7 @@ export const PlatformType = { //Object.freeze({
 //==============================================================================
 // 브라우저 타입.
 //==============================================================================
-export const BrowserType = { //Object.freeze({
+export const VBrowserType = { //Object.freeze({
 	chrome: "Chrome",
 	edge: "Edge",
 	firefox: "Firefox",
@@ -42,8 +42,8 @@ export class VPlatform extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { string } */ platformName = PlatformType.unknown;
-	/** @type { string } */ browserName = BrowserType.unknown;
+	/** @type { string } */ platformName = VPlatformType.unknown;
+	/** @type { string } */ browserName = VBrowserType.unknown;
 	/** @type { boolean } */ isMobile = false;
 
 
@@ -91,22 +91,22 @@ export class VPlatform extends VObject {
 		this.isMobile = /Mobi|Android|iPhone|iPad/i.test(userAgent);
 
 		// 플랫폼 감지.
-		if (/Windows/i.test(userAgent)) this.platformName = PlatformType.windows;
-		else if (/Valve Steam GameOverlay/i.test(userAgent)) this.platformName = PlatformType.steamDeck;
-		else if (/iPad/i.test(userAgent)) this.platformName = PlatformType.iPadOS;
-		else if (/iPhone|iPod/i.test(userAgent)) this.platformName = PlatformType.iOS;
-		else if (/Macintosh|Mac OS X/i.test(userAgent)) this.platformName = PlatformType.macOS;
-		else if (/Android/i.test(userAgent)) this.platformName = PlatformType.android;
-		else if (/Linux/i.test(userAgent)) this.platformName = PlatformType.linux;
-		else this.platformName = PlatformType.unknown;
+		if (/Windows/i.test(userAgent)) this.platformName = VPlatformType.windows;
+		else if (/Valve Steam GameOverlay/i.test(userAgent)) this.platformName = VPlatformType.steamDeck;
+		else if (/iPad/i.test(userAgent)) this.platformName = VPlatformType.iPadOS;
+		else if (/iPhone|iPod/i.test(userAgent)) this.platformName = VPlatformType.iOS;
+		else if (/Macintosh|Mac OS X/i.test(userAgent)) this.platformName = VPlatformType.macOS;
+		else if (/Android/i.test(userAgent)) this.platformName = VPlatformType.android;
+		else if (/Linux/i.test(userAgent)) this.platformName = VPlatformType.linux;
+		else this.platformName = VPlatformType.unknown;
 
 		// 브라우저 감지.
-		if (/Edg/i.test(userAgent)) this.browserName = BrowserType.edge;
-		else if (/Chrome/i.test(userAgent) && !/Edg/i.test(userAgent)) this.browserName = BrowserType.chrome;
-		else if (/Safari/i.test(userAgent) && !/Chrome/i.test(userAgent) && !/Edg/i.test(userAgent)) this.browserName = BrowserType.safari;
-		else if (/Firefox/i.test(userAgent)) this.browserName = BrowserType.firefox;
-		else if (/MSIE|Trident/i.test(userAgent)) this.browserName = BrowserType.internetExplorer;
-		else this.browserName = BrowserType.unknown;
+		if (/Edg/i.test(userAgent)) this.browserName = VBrowserType.edge;
+		else if (/Chrome/i.test(userAgent) && !/Edg/i.test(userAgent)) this.browserName = VBrowserType.chrome;
+		else if (/Safari/i.test(userAgent) && !/Chrome/i.test(userAgent) && !/Edg/i.test(userAgent)) this.browserName = VBrowserType.safari;
+		else if (/Firefox/i.test(userAgent)) this.browserName = VBrowserType.firefox;
+		else if (/MSIE|Trident/i.test(userAgent)) this.browserName = VBrowserType.internetExplorer;
+		else this.browserName = VBrowserType.unknown;
 
 		return {
 			platformName: this.platformName,

@@ -6,8 +6,7 @@ import { VColors } from "../base/colors.js";
 import { VTime } from "./time.js";
 import { VView } from "./view.js";
 import { VInput } from "./input.js";
-import { VGameInstance } from "./gameinstance.js";
-import { VPlatform, PlatformType, BrowserType } from "../base/platform.js";
+import { VPlatform, VPlatformType, VBrowserType } from "../base/platform.js";
 import { VRenderer } from "./renderer.js";
 import { VScene } from "./scene.js";
 
@@ -27,7 +26,6 @@ export class VEngine extends VObject {
 	/** @private @type { VRenderer } */ #renderer;
 	/** @private @type { () => void  } */ #resizeCallback;
 	/** @private @type { FrameRequestCallback } */ #updateEngineCallback;
-	// /** @private @type { VGameInstance } */ #gameInstance;
 	/** @private @type { VScene[] } */ #scenes;
 	/** @private @type { boolean } */ #isDevelopment;
 
@@ -67,34 +65,6 @@ export class VEngine extends VObject {
 		this.#resize();
 	}
 
-	// //==============================================================================
-	// // 게임 인스턴스 설정.
-	// //==============================================================================
-	// /**
-	//  * @method
-	//  * @public
-	//  * @param { VGameInstance } gameInstance
-	//  */
-	// setGameInstance(gameInstance) {
-	// 	this.#gameInstance = gameInstance;
-	// 	if (this.#gameInstance && typeof this.#gameInstance.initialize === "function") {
-	// 		this.#gameInstance.initialize(this);
-	// 	}
-	// }
-
-	// //==============================================================================
-	// // 시작.
-	// //==============================================================================
-	// /**
-	//  * @param { VGameInstance } gameInstance
-	//  */
-	// run(gameInstance) {
-	// 	if (gameInstance != null)
-	// 		this.setGameInstance(gameInstance);
-
-	// 	window.addEventListener("resize", this.#resizeEvent);
-	// 	window.requestAnimationFrame(this.#updateEngineEvent);
-	// }
 	//==============================================================================
 	// 시작.
 	//==============================================================================
@@ -158,7 +128,7 @@ export class VEngine extends VObject {
 				// 	return;
 				// }
 
-				this.#input.isDown = true;
+				this.#input.justMoved = true;
 				this.#input.justPressed = true;
 				this.#updatePointer(touchEvent.clientX, touchEvent.clientY);
 			});
@@ -168,7 +138,7 @@ export class VEngine extends VObject {
 			});
 
 		window.addEventListener("mouseup", (touchEvent) => {
-				this.#input.isDown = false;
+				this.#input.justMoved = false;
 				this.#input.justReleased = true;
 				this.#updatePointer(touchEvent.clientX, touchEvent.clientY);
 			});
@@ -181,7 +151,7 @@ export class VEngine extends VObject {
 				// 	return;
 				// }
 
-				this.#input.isDown = true;
+				this.#input.justMoved = true;
 				this.#input.justPressed = true;
 				this.#updatePointer(touch.clientX, touch.clientY);
 				touchEvent.preventDefault();
@@ -201,7 +171,7 @@ export class VEngine extends VObject {
 					this.#updatePointer(touch.clientX, touch.clientY);
 				}
 
-				this.#input.isDown = false;
+				this.#input.justMoved = false;
 				this.#input.justReleased = true;
 				touchEvent.preventDefault();
 			}, { passive: false });
@@ -393,26 +363,20 @@ export class VEngine extends VObject {
 		for (let i = 0; i < this.#scenes.length; ++i) {
 			const scene = this.#scenes[i];
 			
-			// 주기적 갱신.
-			scene.tick(this.#time.timeDelta);
+			try {
+				// 주기적 갱신.
+				scene.tick(this.#time.timeDelta);
 
-			// 출력.
-			scene.draw(this.#renderer);
+				// 출력.
+				scene.preDraw(this.#renderer);
+				scene.draw(this.#renderer);
+				scene.postDraw(this.#renderer);
+			}
+			catch (error) {
+				console.error(error);
+			}
 		}
 
-		// if (this.#gameInstance) {
-		// 	try {
-		// 		if (typeof this.#gameInstance.update === "function") {
-		// 			this.#gameInstance.update(this.#time.timeDelta);
-		// 		}
-		// 		if (typeof this.#gameInstance.draw === "function") {
-		// 			this.#gameInstance.draw(this.#renderer);
-		// 		}
-		// 	}
-		// 	catch (e) {
-		// 		console.error(e);
-		// 	}
-		// }
 		if (this.#isDevelopment) {
 			const canvasContext = this.#renderer.getCanvasContext();
 			this.drawDevelopment(canvasContext);

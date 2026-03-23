@@ -2,110 +2,132 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { VVector2 } from "../base/vector2.js";
+import { VRect } from "../base/rect.js";
+import * as VMath from "../base/math.js";
+import { VOBB } from "../base/obb.js";
 import { VRenderer } from "../core/renderer.js";
-import { VNode } from "../core/node.js";
+import { VBoundsComponent } from "./bounds.js";
 
 
 //==============================================================================
-// UI 기반 뷰.
+// 버튼 상태.
 //==============================================================================
-export class UINode extends VNode {
+export const VButtonState = {
+	normal: VEnum.auto(),
+	hover: VEnum.auto(),
+	pressed: VEnum.auto(),
+	released: VEnum.auto(),
+	selected: VEnum.auto(),
+	disabled: VEnum.auto(),
+}
+
+//==============================================================================
+// 버튼 컴포넌트.
+//==============================================================================
+export class VButtonComponent extends VBoundsComponent {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { Vector2 } */ #anchorMin;
-	/** @private @type { Vector2 } */ #anchorMax;
+	/** @private @type { ButtonState } */ #buttonState;
+	/** @private @type { Function } */ #clickEvent;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
+	/**
+	 * @construct
+	 */
 	constructor() {
 		super();
-		this.#anchorMin = VVector2.zero();
-		this.#anchorMax = VVector2.zero();
+		this.#buttonState = VButtonState.normal;
+		this.#clickEvent = null;
 	}
 
 	//==============================================================================
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @override
 	 * @param { number } timeDelta 
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
-	}
-
-	//==============================================================================
-	// 출력 상태 시작.
-	//==============================================================================
-	/**
-	 * @override
-	 * @param { VRenderer } renderer 
-	 */
-	pushMatrix(renderer) {
-		super.pushMatrix(renderer);
+		this.updateButtonState();
 	}
 
 	//==============================================================================
 	// 출력.
 	//==============================================================================
 	/**
-	 * @override
 	 * @param { VRenderer } renderer 
 	 */
 	draw(renderer) {
-		super.draw(renderer);
+		// super.draw(renderer);
 	}
 
 	//==============================================================================
-	// 출력 상태 종료.
+	// 버튼 갱신.
 	//==============================================================================
-	/**
-	 * @override
-	 * @param { VRenderer } renderer 
-	 */
-	popMatrix(renderer) {
-		super.popMatrix(renderer);
+	updateButtonState() {
+		const buttonState = this.getButtonState();
+		switch (buttonState) {
+			case VButtonState.normal: {
+					break;
+				}
+			case VButtonState.hover: {
+					break;
+				}
+			case VButtonState.pressed: {
+					break;
+				}
+			case VButtonState.released: {
+					break;
+				}
+			case VButtonState.selected: {
+					break;
+				}
+			case VButtonState.disabled: {
+					break;
+				}
+		}
 	}
 
 	//==============================================================================
-	// 앵커 설정.
+	// 버튼 상태 변경.
 	//==============================================================================
 	/**
-	 * @param { VVector2 } anchorMin 
+	 * @param { ButtonState } buttonState
 	 */
-	setAnchorMin(anchorMin) {
-		this.#anchorMin = anchorMin;
+	setButtonState(buttonState) {
+		this.#buttonState = buttonState;
 	}
 
 	//==============================================================================
-	// 앵커 설정.
+	// 버튼 상태 반환.
 	//==============================================================================
 	/**
-	 * @param { VVector2 } anchorMax 
+	 * @returns { ButtonState }
 	 */
-	setAnchorMax(anchorMax) {
-		this.#anchorMax = anchorMax;
+	getButtonState() {
+		return this.#buttonState;
 	}
 
 	//==============================================================================
-	// 앵커 반환.
+	// 클릭 이벤트 설정.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @param { Function } clickEvent
 	 */
-	getAnchorMin() {
-		return this.#anchorMin;
+	setClickEvent(clickEvent) {
+		this.#clickEvent = clickEvent;
 	}
 
 	//==============================================================================
-	// 앵커 반환.
+	// 클릭 이벤트 반환.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @returns { Function }
 	 */
-	getAnchorMax() {
-		return this.#anchorMax;
+	getClickEvent() {
+		return this.#clickEvent;
 	}
 }

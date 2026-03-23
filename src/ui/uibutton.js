@@ -7,8 +7,12 @@ import { VRenderer } from "../core/renderer.js";
 import { VEnum } from "../misc/identifier.js";
 import { UINode } from "./uinode.js";
 // import { VFontAsset } from "../core/fontasset.js";
+import { VSprite } from "../rendering/sprite.js";
 
 
+//==============================================================================
+// 버튼 상태.
+//==============================================================================
 export const ButtonState = {
 	normal: VEnum.auto(),
 	hover: VEnum.auto(),
@@ -18,6 +22,7 @@ export const ButtonState = {
 	disabled: VEnum.auto(),
 }
 
+
 //==============================================================================
 // UI 버튼.
 //==============================================================================
@@ -25,8 +30,9 @@ export class UIButton extends UINode {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { ButtonState } */ #buttonState;
-	/** @type { Function } */ #clickEvent;
+	/** @private @type { ButtonState } */ #buttonState;
+	/** @private @type { Function } */ #clickEvent;
+	/** @private @type { VSprite } */ #sprite;
 
 	//==============================================================================
 	// 생성.
@@ -35,6 +41,8 @@ export class UIButton extends UINode {
 		super();
 		this.#buttonState = ButtonState.normal;
 		this.#clickEvent = null;
+		this.#sprite = new VSprite();
+		this.addChild(this.#sprite);
 	}
 
 	//==============================================================================
@@ -140,9 +148,5 @@ export class UIButton extends UINode {
 			return true;
 		}
 		return false;
-	}
-
-	worldCorners() {
-
 	}
 }

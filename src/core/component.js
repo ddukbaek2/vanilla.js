@@ -1,21 +1,19 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "./object.js";
-import { VVector2 } from "./vector2.js";
-import { VRect } from "./rect.js";
-import { VOBB } from "./obb.js";
+import { VObject } from "../base/object.js";
+import { VNode } from "./node.js";
+import { VRenderer } from "../core/renderer.js";
 
 
 //==============================================================================
-// 축 정렬된 바운딩 박스.
+// 컴포넌트.
 //==============================================================================
-export class VAABB extends VObject {
+export class VComponent extends VObject {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { VVector2 } */ #position;
-	/** @private @type { VVector2 } */ #size;
+	/** @private @type { VNode } */ #node;
 
 	//==============================================================================
 	// 생성.
@@ -25,48 +23,48 @@ export class VAABB extends VObject {
 	 */
 	constructor() {
 		super();
-		this.#position = VVector2.zero();
-		this.#size = VVector2.zero();
+		this.#node = null;
 	}
 
 	//==============================================================================
-	// 좌표와 충돌 검출.
+	// 갱신.
 	//==============================================================================
 	/**
-	 * @param { VVector2 } other
-	 * @returns { boolean }
+	 * @virtual
+	 * @param { number } timeDelta 
 	 */
-	contains(other) {
-		if (other === null) {
-			return false;
-		}
-		else if (other instanceof VVector2) {
-
-		}
-		
-		return false;
+	tick(timeDelta) {
+		// 갱신.
 	}
 
 	//==============================================================================
-	// 좌표와 충돌 검출.
+	// 출력.
 	//==============================================================================
 	/**
-	 * @param { VRect | VAABB | VOBB } other
-	 * @returns { boolean }
+	 * @virtual
+	 * @param { VRenderer } renderer 
 	 */
-	overlaps(other) {
-		if (other === null) {
-			return false;
-		}
-		else if (other instanceof VRect) {
+	draw(renderer) {
+		// 출력.
+	}
 
-		}
-		else if (other instanceof VAABB) {
+	//==============================================================================
+	// 소유권자 설정.
+	//==============================================================================
+	/**
+	 * @param { VNode } node 
+	 */
+	setNode(node) {
+		this.#node = node;
+	}
 
-		}
-		else if (other instanceof VOBB) {
-
-		}
-		return false;
+	//==============================================================================
+	// 소유권자 반환.
+	//==============================================================================
+	/**
+	 * @returns { VNode } 
+	 */
+	getNode() {
+		return this.#node;
 	}
 }

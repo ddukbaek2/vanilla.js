@@ -1,47 +1,31 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "./object.js";
+import { VVector2 } from "../base/vector2.js";
+import { VNode } from "./node.js";
 
 
 //==============================================================================
-// 공유 클래스.
+// UI에 특화된 노드.
 //==============================================================================
-export class VSingleton extends VObject {
+export class VUINode extends VNode {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @static @type { Map } */ static #instances = new Map();
+	/** @private @type { VVector2 } */ #pivot;
+	/** @private @type { VVector2 } */ #contentSize;
+	/** @private @type { VVector2 } */ #anchorMin;
+	/** @private @type { VVector2 } */ #anchorMax;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
-	/**
-	 * @constructor
-	 */
 	constructor() {
 		super();
-		const T = this.constructor;
-		if (VSingleton.#instances.has(T)) {
-			return VSingleton.#instances.get(T);
-		}
-
-		// 등록.
-		VSingleton.#instances.set(T, this);
-	}
-
-	//==============================================================================
-	// 공유 인스턴스 반환.
-	//==============================================================================
-	/**
-	 * @static
-	 * @method
-	 */
-	static getInstance() {
-		const T = this;
-		if (!VSingleton.#instances.has(T)) {
-			const obj = new T();
-		}
-		return VSingleton.#instances.get(T);
+		
+		this.#pivot = VVector2.zero();
+		this.#contentSize = VVector2.zero();
+		this.#anchorMin = VVector2.zero();
+		this.#anchorMax = VVector2.zero();
 	}
 }

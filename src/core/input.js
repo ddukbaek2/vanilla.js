@@ -16,7 +16,7 @@ export class VInput extends VObject {
 	/** @type { VVector2 } */ position;
 	/** @type { boolean } */ justPressed; // 입력시 딱 한번 눌림.
 	/** @type { boolean } */ justReleased; // 입력시 딱 한번 뗌.
-	/** @type { boolean } */ isDown; // 입력시 뗄 때가지 계속 눌림.
+	/** @type { boolean } */ justMoved; // 입력시 뗄 때가지 계속 눌림.
 
 	//==============================================================================
 	// 생성.
@@ -29,7 +29,7 @@ export class VInput extends VObject {
 		super();
 
 		this.position = VVector2.zero();
-		this.isDown = false;
+		this.justMoved = false;
 		this.justPressed = false;
 		this.justReleased = false;	
 	}

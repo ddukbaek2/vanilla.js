@@ -191,7 +191,7 @@ export class VRenderer extends VObject {
 		const engine = this.getEngine();
 
 		try {
-			node.pushTransform(this);
+			node.pushMatrix(this);
 			node.draw(this);
 
 			// 자식 출력.
@@ -199,17 +199,15 @@ export class VRenderer extends VObject {
 				this.drawNode(child);
 			}
 
-			node.popTransform(this);
+			node.popMatrix(this);
 		}
 		catch (error) {
 			throw error;
 		}
 		
-		if (engine.isDevelopment()) {
-			node.drawGizmos(this);
-		}
-
-
+		// if (engine.isDevelopment()) {
+		// 	node.drawGizmos(this);
+		// }
 	}
 
 	//==============================================================================

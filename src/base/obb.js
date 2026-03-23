@@ -3,8 +3,6 @@
 //==============================================================================
 import { VObject } from "./object.js";
 import { VVector2 } from "./vector2.js";
-import { VRect } from "./rect.js";
-import { VAABB } from "./aabb.js";
 
 
 //==============================================================================
@@ -62,7 +60,7 @@ export class VOBB extends VObject {
 	// 분리축 정리(SAT)를 이용한 다각형(OBB) 간의 충돌 검출.
 	//==============================================================================
 	/**
-	 * @param { VRect | VAABB | VOBB } other
+	 * @param { VOBB } other
 	 * @returns { boolean }
 	 */
 	overlaps(other) {

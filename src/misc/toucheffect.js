@@ -61,8 +61,8 @@ export class VTouchEffect extends VNode {
 	 * @override
 	 * @param { VRenderer } renderer 
 	 */
-	pushTransform(renderer) {
-		super.pushTransform(renderer);
+	pushMatrix(renderer) {
+		super.pushMatrix(renderer);
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.globalCompositeOperation = "lighter";
 	}
@@ -74,10 +74,10 @@ export class VTouchEffect extends VNode {
 	 * @override
 	 * @param { VRenderer } renderer 
 	 */
-	popTransform(renderer) {
+	popMatrix(renderer) {
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.globalCompositeOperation = "source-over";
-		super.popTransform(renderer);
+		super.popMatrix(renderer);
 	}
 
 	//==============================================================================
