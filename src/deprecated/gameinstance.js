@@ -52,7 +52,7 @@
 // 	 * @param { Renderer } renderer 
 // 	 */
 // 	draw(renderer) {
-// 		this.#engine.viewIdentity();
+// 		this.#engine.clear();
 // 		this.#engine.gameViewIdentity();
 // 	}
 

@@ -34,27 +34,38 @@ export class Rect extends Object {
 	// 겹치는지 여부.
 	//==============================================================================
 	/**
-	 * @constructor
-	 * @param { Vector2 | Rect } other
+	 * @param { Vector2 } value
 	 * @returns { boolean }
 	 */
-	overlaps(other) {
-		if (other instanceof Vector2) {
-			if (other.x < this.position.x || other.x > this.position.x + this.size.x)
+	contains(value) {
+		if (value !== null && value instanceof Vector2) {
+			if (value.x < this.position.x || value.x > this.position.x + this.size.x)
 				return false;
-			if (other.y < this.position.y || other.y > this.position.y + this.size.y)
+			if (value.y < this.position.y || value.y > this.position.y + this.size.y)
 				return false;
 			return true;
 		}
-		else if (other instanceof Rect) {
-			if (this.position.x + this.size.x < other.position.x || this.position.x > other.position.x + other.size.x)
+
+		return false;
+	}
+
+	//==============================================================================
+	// 겹치는지 여부.
+	//==============================================================================
+	/**
+	 * @param { Rect } value
+	 * @returns { boolean }
+	 */
+	overlaps(value) {
+		if (value !== null && value instanceof Rect) {
+			if (this.position.x + this.size.x < value.position.x || this.position.x > value.position.x + value.size.x)
 				return false;
-			if (this.position.y + this.size.y < other.position.y || this.position.y > other.position.y + other.size.y)
+			if (this.position.y + this.size.y < value.position.y || this.position.y > value.position.y + value.size.y)
 				return false;
 			return true;
 		}
 		
-		throw new Error("Invalid type: 'other' must be an instance of Vector2 or Rect.");
+		return false;
 	}
 
 	//==============================================================================

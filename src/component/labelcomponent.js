@@ -23,6 +23,7 @@ export class LabelComponent extends Component {
 	/** @private @type { number } */ #strokeWidth;
 	/** @private @type { "left" | "center" | "right" } */ #textAlign;
 	/** @private @type { "top" | "middle" | "bottom" } */ #textBaseline;
+	/** @private @type { boolean } */ #autoContentSize;
 
 
 	//==============================================================================
@@ -38,6 +39,7 @@ export class LabelComponent extends Component {
 		this.#strokeWidth = 0;
 		this.#textAlign = "center";
 		this.#textBaseline = "middle";
+		this.#autoContentSize = true;
 	}
 
 	//==============================================================================

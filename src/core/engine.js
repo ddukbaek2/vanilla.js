@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+const System = globalThis;
 import { Object } from "../base/object.js";
 import { Colors } from "../base/colors.js";
 import { Vector2 } from "../base/vector2.js";
@@ -16,13 +17,13 @@ import { Scene } from "./scene.js";
 // 엔진 설정.
 //==============================================================================
 export class EngineConfiguration extends Object {
-	/** @type { Scene } */ scene;
+	// /** @type { Scene } */ scene;
 	/** @type { Vector2 } */ referenceResolution;
 	/** @type { string } */ canvasId;
 	/** @type { boolean } */ isDevelopment;
 	constructor() {
 		super();
-		this.scene = null;
+		// this.scene = null;
 		this.referenceResolution = Vector2.zero();
 		this.canvasId = "";
 		this.isDevelopment = false;
@@ -66,8 +67,7 @@ export class Engine extends Object {
 
 		this.#platform = new Platform();
 		this.#timeManager = new TimeManager(this);
-		this.#viewManager = new ViewManager(this);
-		this.#viewManager.resolution = engineConfiguration.resolution;
+		this.#viewManager = new ViewManager(this, engineConfiguration.resolution);
 		this.#inputManager = new InputManager(this);
 		this.#renderer = new Renderer(this, canvasContext);
 
@@ -92,7 +92,7 @@ export class Engine extends Object {
 	// 시작.
 	//==============================================================================
 	/**
-	 * @param { VGameInstance } gameInstance
+	 * @param { Scene } scene
 	 */
 	run(scene) {
 		this.loadScene(scene);
@@ -108,40 +108,22 @@ export class Engine extends Object {
 	 * @method
 	 */
 	#resize() {
-		const devicePixelRatio = window.devicePixelRatio || 1;
-		const clientSize = Vector2.create(window.innerWidth, window.innerHeight);
-		const canvasSize = Vector2.create(Math.round(clientSize.x * devicePixelRatio), Math.round(clientSize.y * devicePixelRatio));
+		const viewManager = this.getViewManager();
+		viewManager.update();
+		const clientSize = viewManager.getClientSize();
+		const canvasSize = viewManager.getCanvasSize();
 		this.#canvas.width = canvasSize.x; 
 		this.#canvas.height = canvasSize.y;
 		this.#canvas.style.width = `${clientSize.x}px`;
 		this.#canvas.style.height = `${clientSize.y}px`;
-
-		// 전체 화면 설정.
-		const scale = Math.min(clientSize.x / this.#viewManager.resolution.x, clientSize.y / this.#viewManager.resolution.y);
-		const viewWidth = Math.round(this.#viewManager.resolution.x * scale);
-		const viewHeight = Math.round(this.#viewManager.resolution.y * scale);
-		const viewX = Math.floor((clientSize.x - viewWidth) * 0.5);
-		const viewY = Math.floor((clientSize.y - viewHeight) * 0.5);
-
-		// 뷰 화면 설정.
-		this.#viewManager.devicePixelRatio = devicePixelRatio;
-		this.#viewManager.scale = scale;
-		this.#viewManager.screen.x = clientSize.x;
-		this.#viewManager.screen.y = clientSize.y;
-		this.#viewManager.view.position.x = viewX;
-		this.#viewManager.view.position.y = viewY;
-		this.#viewManager.view.size.x = viewWidth;
-		this.#viewManager.view.size.y = viewHeight;
 
 		// if (this.#gameInstance && typeof this.#gameInstance.resize === "function") {
 		// 	this.#gameInstance.resize(this);
 		// }
 		// 씬 리사이즈.
 		for (let i = 0; i < this.#scenes.length; ++i) {
-			const scene = this.#scenes[i];
-			
+			const scene = this.#scenes[i];			
 			try {
-				// 주기적 갱신.
 				scene.resize(clientSize);
 			}
 			catch (error) {
@@ -231,8 +213,13 @@ export class Engine extends Object {
 	 * @param { number } clientY
 	 */
 	#updatePointer(clientX, clientY) {
-		this.#inputManager.position.x = ((clientX - this.#viewManager.view.position.x) / this.#viewManager.view.size.x) * this.#viewManager.resolution.x;
-		this.#inputManager.position.y = ((clientY - this.#viewManager.view.position.y) / this.#viewManager.view.size.y) * this.#viewManager.resolution.y;
+		const inputManager = this.getInputManager();
+		const viewManager = this.getViewManager();
+		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
+		const viewRect = viewManager.getViewRect();
+
+		inputManager.position.x = ((clientX - viewRect.position.x) / viewRect.size.x) * referenceResolutionSize.x;
+		inputManager.position.y = ((clientY - viewRect.position.y) / viewRect.size.y) * referenceResolutionSize.y;
 	}
 	
 	//==============================================================================
@@ -274,6 +261,7 @@ export class Engine extends Object {
 
 			textOffsetY += 16;
 
+			// 영역 출력.
 			const metrics = canvasContext.measureText(text);
 			const width = metrics.width; // metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight)
 			const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
@@ -490,20 +478,17 @@ export class Engine extends Object {
 	 * @method
 	 * @param { string } color
 	 */
-	viewIdentity(color = "#000000") {
+	clear(color = "#000000") {
 		const renderer = this.getRenderer();
 		const canvasContext = renderer.getCanvasContext();
-
-		// 좌표계 초기화.
-		canvasContext.setTransform(1, 0, 0, 1, 0, 0);
-		
-		// 상태 초기화.
-		// canvasContext.save();
+		const viewManager = this.getViewManager();
+		const canvasSize = viewManager.getCanvasSize();
+		viewManager.applyCanvasSize(canvasContext);
 
 		// 영역 전체 칠하기.
 		canvasContext.beginPath();
 		canvasContext.fillStyle = color;
-		canvasContext.fillRect(0, 0, this.#canvas.width, this.#canvas.height);
+		canvasContext.fillRect(0, 0, canvasSize.x, canvasSize.y);
 	}
 
 	//==============================================================================
@@ -516,19 +501,14 @@ export class Engine extends Object {
 	 */
 	gameViewIdentity(color = "#000000") {
 		const canvasContext = this.#renderer.getCanvasContext();
-
-		// 좌표계 초기화.
-		const devicePixelRatio = this.#viewManager.devicePixelRatio;
-		const a = this.#viewManager.scale * devicePixelRatio;
-		const e = this.#viewManager.view.position.x * devicePixelRatio;
-		const f = this.#viewManager.view.position.y * devicePixelRatio;
-		canvasContext.setTransform(a, 0, 0, a, e, f);
+		const viewManager = this.getViewManager();
+		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
+		viewManager.applyViewRect(canvasContext);
 
 		// 영역 전체 칠하기.
-		if (color !== null) {
-			canvasContext.fillStyle = color;
-			canvasContext.fillRect(0, 0, this.#viewManager.resolution.x, this.#viewManager.resolution.y);
-		}
+		canvasContext.beginPath();
+		canvasContext.fillStyle = color;
+		canvasContext.fillRect(0, 0, referenceResolutionSize.x, referenceResolutionSize.y);
 	}
 
 	//==============================================================================

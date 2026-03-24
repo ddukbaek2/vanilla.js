@@ -13,7 +13,7 @@ export class OBB extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { Vector2[] } */ #edges;
+	/** @type { Vector2[] } */ #edges; // 4개의 모서리.
 
 	//==============================================================================
 	// 생성.
@@ -32,14 +32,14 @@ export class OBB extends Object {
 	// 좌표와 충돌 검출.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } point
+	 * @param { Vector2 } worldPosition
 	 * @returns { boolean }
 	 */
-	contains(other) {
-		if (other === null) {
+	contains(worldPosition) {
+		if (worldPosition === null) {
 			return false;
 		}
-		else if (other instanceof Vector2) {
+		else if (worldPosition instanceof Vector2) {
 			const edges = this.getEdges();
 			let isInside = false;
 			for (let i = 0, j = edges.length - 1; i < edges.length; j = i++) {
@@ -47,7 +47,7 @@ export class OBB extends Object {
 				const yi = edges[i].y;
 				const xj = edges[j].x;
 				const yj = edges[j].y;
-				const intersect = ((yi > other.y) !== (yj > other.y)) && (other.x < (xj - xi) * (other.y - yi) / (yj - yi) + xi);
+				const intersect = ((yi > worldPosition.y) !== (yj > worldPosition.y)) && (worldPosition.x < (xj - xi) * (worldPosition.y - yi) / (yj - yi) + xi);
 				if (intersect) {
 					isInside = !isInside;
 				}

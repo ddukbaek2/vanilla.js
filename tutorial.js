@@ -34,7 +34,7 @@ class Tutorial extends Scene {
 		const viewManager = engine.getViewManager();
 
 		// 전체 영역 초기화.
-		engine.viewIdentity(COLOR_VANILLA);
+		engine.clear(COLOR_VANILLA);
 
 		// 게임 영역 초기화.
 		engine.gameViewIdentity(COLOR_LIGHTVANILLA);
