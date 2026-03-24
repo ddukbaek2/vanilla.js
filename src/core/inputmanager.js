@@ -52,12 +52,13 @@ export class InputManager extends Object {
 	}
 
 	//==============================================================================
-	// 갱신.
+	// 입력 위치 반환. (복사 후 반환)
 	//==============================================================================
 	/**
 	 * @returns { Vector2 } 
 	 */
 	getInputPosition() {
-		return this.#position;
+		// return this.#position;
+		return this.#position.clone();
 	}
 }

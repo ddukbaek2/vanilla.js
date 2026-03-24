@@ -146,18 +146,18 @@ export class Engine extends Object {
 				const inputManager = this.getInputManager();
 				inputManager.justMoved = true;
 				inputManager.justPressed = true;
-				this.updatePointer(touchEvent.clientX, touchEvent.clientY);
+				this.updateInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
 		canvas.addEventListener("mousemove", (touchEvent) => {
-				this.updatePointer(touchEvent.clientX, touchEvent.clientY);
+				this.updateInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
 		canvas.addEventListener("mouseup", (touchEvent) => {
 				const inputManager = this.getInputManager();
 				inputManager.justMoved = false;
 				inputManager.justReleased = true;
-				this.updatePointer(touchEvent.clientX, touchEvent.clientY);
+				this.updateInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
 		canvas.addEventListener("touchstart", (touchEvent) => {
@@ -171,7 +171,7 @@ export class Engine extends Object {
 				const inputManager = this.getInputManager();
 				inputManager.justMoved = true;
 				inputManager.justPressed = true;
-				this.updatePointer(touch.clientX, touch.clientY);
+				this.updateInputPosition(touch.clientX, touch.clientY);
 				touchEvent.preventDefault();
 			}, { passive: false });
 
@@ -179,14 +179,14 @@ export class Engine extends Object {
 				const touch = touchEvent.changedTouches[0];
 				if (!touch) return;
 
-				this.updatePointer(touch.clientX, touch.clientY);
+				this.updateInputPosition(touch.clientX, touch.clientY);
 				touchEvent.preventDefault();
 			}, { passive: false });
 
 		canvas.addEventListener("touchend", (touchEvent) => {
 				const touch = touchEvent.changedTouches[0];
 				if (touch) {
-					this.updatePointer(touch.clientX, touch.clientY);
+					this.updateInputPosition(touch.clientX, touch.clientY);
 				}
 
 				const inputManager = this.getInputManager();
@@ -214,7 +214,7 @@ export class Engine extends Object {
 	 * @param { number } clientX
 	 * @param { number } clientY
 	 */
-	updatePointer(clientX, clientY) {
+	updateInputPosition(clientX, clientY) {
 		const viewManager = this.getViewManager();
 		const canvas = viewManager.getCanvas();
 		const canvasRect = canvas.getBoundingClientRect();

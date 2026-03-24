@@ -72,8 +72,11 @@ export class ViewManager extends Object {
 		const canvas = this.getCanvas();
 		const devicePixelRatio = System.window.devicePixelRatio || 1;
 		const clientNativeSize = Vector2.create(System.window.innerWidth, System.window.innerHeight);
-		const canvasNativeRect = canvas.getBoundingClientRect();
-		const canvasNativeSize = Vector2.create(Math.round(canvasNativeRect.width), Math.round(canvasNativeRect.height));
+
+		// 이슈: 실제 브라우저 리사이즈 후 바로 캔버스 크기를 가져왔을 때 실제 크기와 달라 오차가 발생되는 경우가 존재. (임시 방편으로 화면 전체 사이즈로 강제 처리)
+		// const canvasNativeRect = canvas.getBoundingClientRect();
+		// const canvasNativeSize = Vector2.create(Math.round(canvasNativeRect.width), Math.round(canvasNativeRect.height));
+		const canvasNativeSize = Vector2.create(clientNativeSize.x, clientNativeSize.y);
 		const canvasPixelSize = Vector2.create(Math.round(canvasNativeSize.x * devicePixelRatio), Math.round(canvasNativeSize.y * devicePixelRatio));
 		this.#devicePixelRatio = devicePixelRatio;
 		this.#clientNativeSize = clientNativeSize;
@@ -360,6 +363,16 @@ export class ViewManager extends Object {
 	 */
 	getViewRect() {
 		return this.#viewRect;
+	}
+
+	//==============================================================================
+	// 배율 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 }
+	 */
+	getTargetResolutionScale() {
+		return this.#targetResolutionScale;
 	}
 
 	//==============================================================================
