@@ -483,7 +483,7 @@ export class Engine extends Object {
 		const canvasContext = renderer.getCanvasContext();
 		const viewManager = this.getViewManager();
 		const canvasSize = viewManager.getCanvasSize();
-		viewManager.applyCanvasSize(canvasContext);
+		viewManager.applyCanvasRect(canvasContext);
 
 		// 영역 전체 칠하기.
 		canvasContext.beginPath();
