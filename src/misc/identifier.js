@@ -70,7 +70,7 @@ export class Enum extends Object {
 	 * @static
 	 * @returns { number }
 	 */
-	static clear() {
+	static begin() {
 		Enum.#identifier.reset();
 		return Enum.auto();
 	}

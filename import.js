@@ -30,7 +30,7 @@ export { Colors } from "./src/base/colors.js";
 export { EngineConfiguration, Engine } from "./src/core/engine.js";
 export { Asset } from "./src/core/asset.js";
 export { TimeManager } from "./src/core/timemanager.js";
-export { ViewManager } from "./src/core/viewmanager.js";
+export { ViewScaleMode, ViewManager } from "./src/core/viewmanager.js";
 export { InputManager } from "./src/core/inputmanager.js";
 export { Renderer } from "./src/core/renderer.js";
 export { Scene } from "./src/core/scene.js";

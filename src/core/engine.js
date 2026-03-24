@@ -109,7 +109,7 @@ export class Engine extends Object {
 	 */
 	#resize() {
 		const viewManager = this.getViewManager();
-		viewManager.calculateViewRect();
+		viewManager.calculateViewScale();
 		const clientSize = viewManager.getClientSize();
 		const canvasSize = viewManager.getCanvasSize();
 		this.#canvas.width = canvasSize.x; 
@@ -145,8 +145,9 @@ export class Engine extends Object {
 				// 	return;
 				// }
 
-				this.#inputManager.justMoved = true;
-				this.#inputManager.justPressed = true;
+				const inputManager = this.getInputManager();
+				inputManager.justMoved = true;
+				inputManager.justPressed = true;
 				this.#updatePointer(touchEvent.clientX, touchEvent.clientY);
 			});
 
@@ -155,8 +156,9 @@ export class Engine extends Object {
 			});
 
 		window.addEventListener("mouseup", (touchEvent) => {
-				this.#inputManager.justMoved = false;
-				this.#inputManager.justReleased = true;
+				const inputManager = this.getInputManager();
+				inputManager.justMoved = false;
+				inputManager.justReleased = true;
 				this.#updatePointer(touchEvent.clientX, touchEvent.clientY);
 			});
 
@@ -168,8 +170,9 @@ export class Engine extends Object {
 				// 	return;
 				// }
 
-				this.#inputManager.justMoved = true;
-				this.#inputManager.justPressed = true;
+				const inputManager = this.getInputManager();
+				inputManager.justMoved = true;
+				inputManager.justPressed = true;
 				this.#updatePointer(touch.clientX, touch.clientY);
 				touchEvent.preventDefault();
 			}, { passive: false });
@@ -188,8 +191,9 @@ export class Engine extends Object {
 					this.#updatePointer(touch.clientX, touch.clientY);
 				}
 
-				this.#inputManager.justMoved = false;
-				this.#inputManager.justReleased = true;
+				const inputManager = this.getInputManager();
+				inputManager.justMoved = false;
+				inputManager.justReleased = true;
 				touchEvent.preventDefault();
 			}, { passive: false });
 
@@ -218,8 +222,12 @@ export class Engine extends Object {
 		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
 		const viewRect = viewManager.getViewRect();
 
-		inputManager.position.x = ((clientX - viewRect.position.x) / viewRect.size.x) * referenceResolutionSize.x;
-		inputManager.position.y = ((clientY - viewRect.position.y) / viewRect.size.y) * referenceResolutionSize.y;
+		// 스케일모드가 오토일때 공식.
+		// inputManager.position.x = ((clientX - viewRect.position.x) / viewRect.size.x) * referenceResolutionSize.x;
+		// inputManager.position.y = ((clientY - viewRect.position.y) / viewRect.size.y) * referenceResolutionSize.y;
+		
+		inputManager.position.x = ((clientX - viewRect.position.x) / viewRect.size.x) * viewRect.size.x;
+		inputManager.position.y = ((clientY - viewRect.position.y) / viewRect.size.y) * viewRect.size.y;
 	}
 	
 	//==============================================================================
@@ -424,6 +432,7 @@ export class Engine extends Object {
 		if (scene && scene instanceof Scene) {
 			scene.initialize(this);
 			await scene.load(this);
+			scene.postInitialize(this);
 			this.#scenes.push(scene);
 		}
 	}
