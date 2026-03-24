@@ -148,18 +148,18 @@ export class Engine extends Object {
 				const inputManager = this.getInputManager();
 				inputManager.justMoved = true;
 				inputManager.justPressed = true;
-				this.#updatePointer(touchEvent.clientX, touchEvent.clientY);
+				this.updatePointer(touchEvent.clientX, touchEvent.clientY);
 			});
 
 		window.addEventListener("mousemove", (touchEvent) => {
-				this.#updatePointer(touchEvent.clientX, touchEvent.clientY);
+				this.updatePointer(touchEvent.clientX, touchEvent.clientY);
 			});
 
 		window.addEventListener("mouseup", (touchEvent) => {
 				const inputManager = this.getInputManager();
 				inputManager.justMoved = false;
 				inputManager.justReleased = true;
-				this.#updatePointer(touchEvent.clientX, touchEvent.clientY);
+				this.updatePointer(touchEvent.clientX, touchEvent.clientY);
 			});
 
 		this.#canvas.addEventListener("touchstart", (touchEvent) => {
@@ -173,7 +173,7 @@ export class Engine extends Object {
 				const inputManager = this.getInputManager();
 				inputManager.justMoved = true;
 				inputManager.justPressed = true;
-				this.#updatePointer(touch.clientX, touch.clientY);
+				this.updatePointer(touch.clientX, touch.clientY);
 				touchEvent.preventDefault();
 			}, { passive: false });
 
@@ -181,14 +181,14 @@ export class Engine extends Object {
 				const touch = touchEvent.changedTouches[0];
 				if (!touch) return;
 
-				this.#updatePointer(touch.clientX, touch.clientY);
+				this.updatePointer(touch.clientX, touch.clientY);
 				touchEvent.preventDefault();
 			}, { passive: false });
 
 		window.addEventListener("touchend", (touchEvent) => {
 				const touch = touchEvent.changedTouches[0];
 				if (touch) {
-					this.#updatePointer(touch.clientX, touch.clientY);
+					this.updatePointer(touch.clientX, touch.clientY);
 				}
 
 				const inputManager = this.getInputManager();
@@ -216,7 +216,7 @@ export class Engine extends Object {
 	 * @param { number } clientX
 	 * @param { number } clientY
 	 */
-	#updatePointer(clientX, clientY) {
+	updatePointer(clientX, clientY) {
 		const inputManager = this.getInputManager();
 		const viewManager = this.getViewManager();
 		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
@@ -225,9 +225,11 @@ export class Engine extends Object {
 		let nativeInputPosition = Vector2.create(clientX, clientY);
 		// inputManager.position.x = ((nativeInputPosition.x - viewRect.position.x) / viewRect.size.x) * referenceResolutionSize.x;
 		// inputManager.position.y = ((nativeInputPosition.x - viewRect.position.y) / viewRect.size.y) * referenceResolutionSize.y;
-		// let inputPosition = Vector2.create(((nativeInputPosition.x - viewRect.position.x) / viewRect.size.x) * referenceResolutionSize.x,
+		// const inputPosition = Vector2.create(
+		//	((nativeInputPosition.x - viewRect.position.x) / viewRect.size.x) * referenceResolutionSize.x,
 		// 	((nativeInputPosition.y - viewRect.position.y) / viewRect.size.y) * referenceResolutionSize.y);
-		let inputPosition = Vector2.create(((nativeInputPosition.x - viewRect.position.x) / viewRect.size.x) * viewRect.size.x,
+		const inputPosition = Vector2.create(
+			((nativeInputPosition.x - viewRect.position.x) / viewRect.size.x) * viewRect.size.x,
 			((nativeInputPosition.y - viewRect.position.y) / viewRect.size.y) * viewRect.size.y);
 
 		inputManager.setInputPosition(inputPosition);
@@ -240,8 +242,9 @@ export class Engine extends Object {
 	 * @param { Renderer } renderer 
 	 */
 	drawStatistics(renderer) {
-		if (!this.#isDevelopment)
+		if (!this.#isDevelopment) {
 			return;
+		}
 	
 		const canvasContext = renderer.getCanvasContext();
 		const timeManager = this.getTimeManager();
