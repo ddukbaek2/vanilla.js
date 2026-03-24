@@ -30,8 +30,9 @@ export class ViewManager extends Object {
 	/** @private @type { ViewScaleMode } */ #viewScaleMode;
 	/** @private @type { number } */ #devicePixelRatio; // 장치의 화면 배율.
 	/** @private @type { number } */ #targetResolutionScale; // 기준 해상도와 화면 해상도 사이의 크기 배율.
-	/** @private @type { Vector2 } */ #clientSize; // 전체 화면 영역. (devicePixelRatio 반영 전)
-	/** @private @type { Vector2 } */ #canvasSize; // 전체 화면 영역. (devicePixelRatio 반영 후)
+	/** @private @type { Vector2 } */ #clientSize; // 웹페이지 전체 화면 영역. (devicePixelRatio 반영 전)
+	/** @private @type { Vector2 } */ #canvasSize; // 논리적 전체 화면 영역. (devicePixelRatio 반영 후)
+	/** @private @type { Vector2 } */ #screenSize; // 최종 전체 화면 영역.	
 	/** @private @type { Vector2 } */ #referenceResolutionSize; // 기준 화면 영역.
 	/** @private @type { Rect } */ #viewRect; // 실제 사용 화면 영역.
 
@@ -51,6 +52,7 @@ export class ViewManager extends Object {
 		this.#targetResolutionScale = 1;
 		this.#clientSize = Vector2.zero();
 		this.#canvasSize = Vector2.zero();
+		this.#screenSize = Vector2.zero();
 		this.#referenceResolutionSize = referenceResolutionSize;
 		this.#viewRect = Rect.zero();
 
@@ -78,6 +80,7 @@ export class ViewManager extends Object {
 					const viewX = Math.floor((clientSize.x - viewWidth) * 0.5);
 					const viewY = Math.floor((clientSize.y - viewHeight) * 0.5);
 					this.#targetResolutionScale = targetResolutionScale;
+					this.#screenSize = this.#clientSize.divide(targetResolutionScale);
 					this.#viewRect.position.set(viewX, viewY);
 					this.#viewRect.size.set(viewWidth, viewHeight);
 					break;
@@ -89,6 +92,7 @@ export class ViewManager extends Object {
 					const viewWidth = Math.round(clientSize.x * targetResolutionScale);
 					const viewHeight = Math.round(clientSize.y * targetResolutionScale);
 					this.#targetResolutionScale = targetResolutionScale;
+					this.#screenSize = this.#clientSize.divide(targetResolutionScale);
 					this.#viewRect.position.set(viewX, viewY);
 					this.#viewRect.size.set(viewWidth, viewHeight);
 					break;
@@ -100,6 +104,7 @@ export class ViewManager extends Object {
 					const viewX = Math.floor((clientSize.x - viewWidth) * 0.5);
 					const viewY = Math.floor((clientSize.y - viewHeight) * 0.5);
 					this.#targetResolutionScale = targetResolutionScale;
+					this.#screenSize = this.#clientSize.divide(targetResolutionScale);
 					this.#viewRect.position.set(viewX, viewY);
 					this.#viewRect.size.set(viewWidth, viewHeight);
 					break;
@@ -111,6 +116,7 @@ export class ViewManager extends Object {
 					const viewX = Math.floor((clientSize.x - viewWidth) * 0.5);
 					const viewY = Math.floor((clientSize.y - viewHeight) * 0.5);
 					this.#targetResolutionScale = targetResolutionScale;
+					this.#screenSize = this.#clientSize.divide(targetResolutionScale);
 					this.#viewRect.position.set(viewX, viewY);
 					this.#viewRect.size.set(viewWidth, viewHeight);
 					break;
@@ -122,6 +128,7 @@ export class ViewManager extends Object {
 					const viewX = Math.floor((clientSize.x - viewWidth) * 0.5);
 					const viewY = Math.floor((clientSize.y - viewHeight) * 0.5);
 					this.#targetResolutionScale = targetResolutionScale;
+					this.#screenSize = this.#clientSize.divide(targetResolutionScale);
 					this.#viewRect.position.set(viewX, viewY);
 					this.#viewRect.size.set(viewWidth, viewHeight);
 					break;
@@ -260,6 +267,16 @@ export class ViewManager extends Object {
 	}
 
 	//==============================================================================
+	// 화면 전체 영역 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 }
+	 */
+	getScreenSize() {
+		return this.#screenSize;
+	}
+
+	//==============================================================================
 	// 실제 사용 화면 영역 반환.
 	//==============================================================================
 	/**
@@ -267,5 +284,29 @@ export class ViewManager extends Object {
 	 */
 	getViewRect() {
 		return this.#viewRect;
+	}
+
+	//==============================================================================
+	// 클라이언트 좌표를 뷰 좌표로 변환.
+	//==============================================================================
+	/**
+	 * @public
+	 * @method
+	 * @param { Vector2 } clientPoint
+	 * @returns { Vector2 }
+	 */
+	transformToViewPoint(clientPoint) {
+		const relativeX = clientPoint.x - this.#viewRect.position.x;
+		const relativeY = clientPoint.y - this.#viewRect.position.y;
+
+		const scale = this.#targetResolutionScale;
+		if (scale === 0) {
+			return Vector2.zero();
+		}
+
+		const viewX = relativeX / scale;
+		const viewY = relativeY / scale;
+
+		return Vector2.create(viewX, viewY);
 	}
 }

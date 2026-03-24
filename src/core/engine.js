@@ -217,21 +217,11 @@ export class Engine extends Object {
 	 * @param { number } clientY
 	 */
 	updatePointer(clientX, clientY) {
+		const canvasRect = this.#canvas.getBoundingClientRect();
 		const inputManager = this.getInputManager();
 		const viewManager = this.getViewManager();
-		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
-		const viewRect = viewManager.getViewRect();
-
-		let nativeInputPosition = Vector2.create(clientX, clientY);
-		// inputManager.position.x = ((nativeInputPosition.x - viewRect.position.x) / viewRect.size.x) * referenceResolutionSize.x;
-		// inputManager.position.y = ((nativeInputPosition.x - viewRect.position.y) / viewRect.size.y) * referenceResolutionSize.y;
-		// const inputPosition = Vector2.create(
-		//	((nativeInputPosition.x - viewRect.position.x) / viewRect.size.x) * referenceResolutionSize.x,
-		// 	((nativeInputPosition.y - viewRect.position.y) / viewRect.size.y) * referenceResolutionSize.y);
-		const inputPosition = Vector2.create(
-			((nativeInputPosition.x - viewRect.position.x) / viewRect.size.x) * viewRect.size.x,
-			((nativeInputPosition.y - viewRect.position.y) / viewRect.size.y) * viewRect.size.y);
-
+		const clientPoint = Vector2.create(clientX - canvasRect.left, clientY - canvasRect.top);
+		const inputPosition = viewManager.transformToViewPoint(clientPoint);
 		inputManager.setInputPosition(inputPosition);
 	}
 	
@@ -330,16 +320,22 @@ export class Engine extends Object {
 		drawOutlineText(``);
 
 		// 화면 정보 출력.
+		const clientSize = viewManager.getClientSize();
 		const canvasSize = viewManager.getCanvasSize();
 		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
 		const viewScaleMode = viewManager.getViewScaleMode();
+		const screenSize = viewManager.getScreenSize();
+		screenSize.x = Math.round(screenSize.x);
+		screenSize.y = Math.round(screenSize.y);
 		const viewRect = viewManager.getViewRect();
 		const inputPosition = inputManager.getInputPosition();
 		inputPosition.x = Math.round(inputPosition.x);
 		inputPosition.y = Math.round(inputPosition.y);
+		drawOutlineText(`clientSize: ${clientSize.x}x${clientSize.y}`);
 		drawOutlineText(`canvasSize: ${canvasSize.x}x${canvasSize.y}`);
 		drawOutlineText(`referenceResolutionSize: ${referenceResolutionSize.x}x${referenceResolutionSize.y}`);
 		drawOutlineText(`viewScaleMode: ${viewScaleMode}`);
+		drawOutlineText(`screenSize: ${screenSize.x}x${screenSize.y}`);
 		drawOutlineText(`viewRectSize: ${viewRect.size.x}x${viewRect.size.y}`);
 		drawOutlineText(`inputPosition: ${inputPosition.x}x${inputPosition.y}`);
 		drawOutlineText(``);
