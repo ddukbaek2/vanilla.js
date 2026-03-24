@@ -62,12 +62,13 @@ export class Engine extends Object {
 			throw new System.Error(`engineConfiguration is invalid.`);
 		}
 		this.#engineConfiguration = engineConfiguration;
-		this.#canvas = this.getOrAddCanvas(engineConfiguration.canvasId);
-		const canvasContext = this.#canvas.getContext("2d", { alpha: false });
+		const canvas = this.getOrAddCanvas(engineConfiguration.canvasId);
+		const canvasContext = canvas.getContext("2d", { alpha: false });
 
 		this.#platform = new Platform();
 		this.#timeManager = new TimeManager(this);
 		this.#viewManager = new ViewManager(this, engineConfiguration.resolution);
+		this.#viewManager.setCanvas(canvas);
 		this.#inputManager = new InputManager(this);
 		this.#renderer = new Renderer(this, canvasContext);
 
@@ -110,12 +111,6 @@ export class Engine extends Object {
 	#resize() {
 		const viewManager = this.getViewManager();
 		viewManager.calculateViewRect();
-		const clientSize = viewManager.getClientSize();
-		const canvasSize = viewManager.getCanvasSize();
-		this.#canvas.width = canvasSize.x; 
-		this.#canvas.height = canvasSize.y;
-		this.#canvas.style.width = `${clientSize.x}px`;
-		this.#canvas.style.height = `${clientSize.y}px`;
 
 		// if (this.#gameInstance && typeof this.#gameInstance.resize === "function") {
 		// 	this.#gameInstance.resize(this);
@@ -124,7 +119,7 @@ export class Engine extends Object {
 		for (let i = 0; i < this.#scenes.length; ++i) {
 			const scene = this.#scenes[i];			
 			try {
-				scene.resize(clientSize);
+				scene.resize(clientNativeSize);
 			}
 			catch (error) {
 				console.error(error);
@@ -140,7 +135,10 @@ export class Engine extends Object {
 	 * @method
 	 */
 	#setupAllEvents() {
-		this.#canvas.addEventListener("mousedown", (touchEvent) => {
+		const viewManager = this.getViewManager();
+		const canvas = viewManager.getCanvas();
+
+		canvas.addEventListener("mousedown", (touchEvent) => {
 				// if (!this.#view.isInsideView(touchEvent.clientX, touchEvent.clientY)) {
 				// 	return;
 				// }
@@ -151,18 +149,18 @@ export class Engine extends Object {
 				this.updatePointer(touchEvent.clientX, touchEvent.clientY);
 			});
 
-		window.addEventListener("mousemove", (touchEvent) => {
+		canvas.addEventListener("mousemove", (touchEvent) => {
 				this.updatePointer(touchEvent.clientX, touchEvent.clientY);
 			});
 
-		window.addEventListener("mouseup", (touchEvent) => {
+		canvas.addEventListener("mouseup", (touchEvent) => {
 				const inputManager = this.getInputManager();
 				inputManager.justMoved = false;
 				inputManager.justReleased = true;
 				this.updatePointer(touchEvent.clientX, touchEvent.clientY);
 			});
 
-		this.#canvas.addEventListener("touchstart", (touchEvent) => {
+		canvas.addEventListener("touchstart", (touchEvent) => {
 				const touch = touchEvent.changedTouches[0];
 				if (!touch) return;
 
@@ -177,7 +175,7 @@ export class Engine extends Object {
 				touchEvent.preventDefault();
 			}, { passive: false });
 
-		window.addEventListener("touchmove", (touchEvent) => {
+		canvas.addEventListener("touchmove", (touchEvent) => {
 				const touch = touchEvent.changedTouches[0];
 				if (!touch) return;
 
@@ -185,7 +183,7 @@ export class Engine extends Object {
 				touchEvent.preventDefault();
 			}, { passive: false });
 
-		window.addEventListener("touchend", (touchEvent) => {
+		canvas.addEventListener("touchend", (touchEvent) => {
 				const touch = touchEvent.changedTouches[0];
 				if (touch) {
 					this.updatePointer(touch.clientX, touch.clientY);
@@ -217,11 +215,14 @@ export class Engine extends Object {
 	 * @param { number } clientY
 	 */
 	updatePointer(clientX, clientY) {
-		const canvasRect = this.#canvas.getBoundingClientRect();
-		const inputManager = this.getInputManager();
 		const viewManager = this.getViewManager();
+		const canvas = viewManager.getCanvas();
+		const canvasRect = canvas.getBoundingClientRect();
+		const inputManager = this.getInputManager();
 		const clientPoint = Vector2.create(clientX - canvasRect.left, clientY - canvasRect.top);
 		const inputPosition = viewManager.transformToViewPoint(clientPoint);
+		inputPosition.x = Math.round(inputPosition.x);
+		inputPosition.y = Math.round(inputPosition.y);
 		inputManager.setInputPosition(inputPosition);
 	}
 	
@@ -320,21 +321,19 @@ export class Engine extends Object {
 		drawOutlineText(``);
 
 		// 화면 정보 출력.
-		const clientSize = viewManager.getClientSize();
-		const canvasSize = viewManager.getCanvasSize();
-		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
+		const clientNativeSize = viewManager.getClientNativeSize();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		const canvasPixelSize = viewManager.getCanvasPixelSize();
 		const viewScaleMode = viewManager.getViewScaleMode();
+		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
 		const screenSize = viewManager.getScreenSize();
-		screenSize.x = Math.round(screenSize.x);
-		screenSize.y = Math.round(screenSize.y);
 		const viewRect = viewManager.getViewRect();
 		const inputPosition = inputManager.getInputPosition();
-		inputPosition.x = Math.round(inputPosition.x);
-		inputPosition.y = Math.round(inputPosition.y);
-		drawOutlineText(`clientSize: ${clientSize.x}x${clientSize.y}`);
-		drawOutlineText(`canvasSize: ${canvasSize.x}x${canvasSize.y}`);
-		drawOutlineText(`referenceResolutionSize: ${referenceResolutionSize.x}x${referenceResolutionSize.y}`);
+		drawOutlineText(`clientNativeSize: ${clientNativeSize.x}x${clientNativeSize.y}`);
+		drawOutlineText(`canvasNativeSize: ${canvasNativeSize.x}x${canvasNativeSize.y}`);
+		drawOutlineText(`canvasPixelSize: ${canvasPixelSize.x}x${canvasPixelSize.y}`);
 		drawOutlineText(`viewScaleMode: ${viewScaleMode}`);
+		drawOutlineText(`referenceResolutionSize: ${referenceResolutionSize.x}x${referenceResolutionSize.y}`);
 		drawOutlineText(`screenSize: ${screenSize.x}x${screenSize.y}`);
 		drawOutlineText(`viewRectSize: ${viewRect.size.x}x${viewRect.size.y}`);
 		drawOutlineText(`inputPosition: ${inputPosition.x}x${inputPosition.y}`);
@@ -523,13 +522,14 @@ export class Engine extends Object {
 		const renderer = this.getRenderer();
 		const canvasContext = renderer.getCanvasContext();
 		const viewManager = this.getViewManager();
-		const canvasSize = viewManager.getCanvasSize();
-		viewManager.applyCanvasRect(canvasContext);
+		const canvasPixelSize = viewManager.getCanvasPixelSize();
+		const screenSize = viewManager.getScreenSize();
+		viewManager.applyCanvasPixelRect(canvasContext);
 
 		// 영역 전체 칠하기.
 		canvasContext.beginPath();
 		canvasContext.fillStyle = color;
-		canvasContext.fillRect(0, 0, canvasSize.x, canvasSize.y);
+		canvasContext.fillRect(0, 0, screenSize.x, screenSize.y);
 	}
 
 	//==============================================================================
@@ -543,13 +543,13 @@ export class Engine extends Object {
 	gameViewIdentity(color = "#000000") {
 		const canvasContext = this.#renderer.getCanvasContext();
 		const viewManager = this.getViewManager();
-		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
+		const viewSize = viewManager.getViewRect();
 		viewManager.applyViewRect(canvasContext);
 
 		// 영역 전체 칠하기.
 		canvasContext.beginPath();
 		canvasContext.fillStyle = color;
-		canvasContext.fillRect(0, 0, referenceResolutionSize.x, referenceResolutionSize.y);
+		canvasContext.fillRect(0, 0, viewSize.x, viewSize.y);
 	}
 
 	//==============================================================================
@@ -561,7 +561,8 @@ export class Engine extends Object {
 	 * @returns { HTMLCanvasElement }
 	 */
 	getCanvas() {
-		return this.#canvas;
+		const viewManager = this.getViewManager();
+		return viewManager.getCanvas();
 	}
 
 	//==============================================================================

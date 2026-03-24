@@ -4,6 +4,7 @@
 export const System = globalThis;
 // System.Math
 // System.Object
+// HTMLCanvasElement
 // CanvasRenderingContext2D
 // HTMLImageElement
 
