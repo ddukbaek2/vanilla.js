@@ -149,16 +149,17 @@ export class Scene extends Object {
 	tickTouch(timeDelta) {
 		const engine = this.getEngine();
 		const inputManager = engine.getInputManager();
+		const position = inputManager.getInputPosition();
 
 		// 터치 처리.
 		if (inputManager.justPressed) {
-			this.touchPress(inputManager.x, inputManager.y);
+			this.touchPress(position.x, position.y);
 		}
 		else if (inputManager.justReleased) {
-			this.touchRelease(inputManager.x, inputManager.y);
+			this.touchRelease(position.x, position.y);
 		}
 		else if (inputManager.justMoved) {
-			this.touchMove(inputManager.position);
+			this.touchMove(position);
 		}
 
 		// 터치 효과 갱신.

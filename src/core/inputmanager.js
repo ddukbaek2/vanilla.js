@@ -13,7 +13,7 @@ export class InputManager extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { Vector2 } */ position;
+	/** @type { Vector2 } */ #position;
 	/** @type { boolean } */ justPressed; // 입력시 딱 한번 눌림.
 	/** @type { boolean } */ justReleased; // 입력시 딱 한번 뗌.
 	/** @type { boolean } */ justMoved; // 입력시 뗄 때가지 계속 눌림.
@@ -28,7 +28,7 @@ export class InputManager extends Object {
 	constructor(engine) {
 		super();
 
-		this.position = Vector2.zero();
+		this.#position = Vector2.zero();
 		this.justMoved = false;
 		this.justPressed = false;
 		this.justReleased = false;	
@@ -39,5 +39,25 @@ export class InputManager extends Object {
 	//==============================================================================
 	update() {
 
+	}
+
+	//==============================================================================
+	// 갱신.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } position 
+	 */
+	setInputPosition(position) {
+		this.#position = position;
+	}
+
+	//==============================================================================
+	// 갱신.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 } 
+	 */
+	getInputPosition() {
+		return this.#position;
 	}
 }

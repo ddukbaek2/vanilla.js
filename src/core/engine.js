@@ -109,7 +109,7 @@ export class Engine extends Object {
 	 */
 	#resize() {
 		const viewManager = this.getViewManager();
-		viewManager.calculateViewScale();
+		viewManager.calculateViewRect();
 		const clientSize = viewManager.getClientSize();
 		const canvasSize = viewManager.getCanvasSize();
 		this.#canvas.width = canvasSize.x; 
@@ -222,25 +222,32 @@ export class Engine extends Object {
 		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
 		const viewRect = viewManager.getViewRect();
 
-		// 스케일모드가 오토일때 공식.
-		// inputManager.position.x = ((clientX - viewRect.position.x) / viewRect.size.x) * referenceResolutionSize.x;
-		// inputManager.position.y = ((clientY - viewRect.position.y) / viewRect.size.y) * referenceResolutionSize.y;
-		
-		inputManager.position.x = ((clientX - viewRect.position.x) / viewRect.size.x) * viewRect.size.x;
-		inputManager.position.y = ((clientY - viewRect.position.y) / viewRect.size.y) * viewRect.size.y;
+		let nativeInputPosition = Vector2.create(clientX, clientY);
+		// inputManager.position.x = ((nativeInputPosition.x - viewRect.position.x) / viewRect.size.x) * referenceResolutionSize.x;
+		// inputManager.position.y = ((nativeInputPosition.x - viewRect.position.y) / viewRect.size.y) * referenceResolutionSize.y;
+		// let inputPosition = Vector2.create(((nativeInputPosition.x - viewRect.position.x) / viewRect.size.x) * referenceResolutionSize.x,
+		// 	((nativeInputPosition.y - viewRect.position.y) / viewRect.size.y) * referenceResolutionSize.y);
+		let inputPosition = Vector2.create(((nativeInputPosition.x - viewRect.position.x) / viewRect.size.x) * viewRect.size.x,
+			((nativeInputPosition.y - viewRect.position.y) / viewRect.size.y) * viewRect.size.y);
+
+		inputManager.setInputPosition(inputPosition);
 	}
 	
 	//==============================================================================
-	// 개발모드 출력.
+	// 개발 관련 정보 출력.
 	//==============================================================================
 	/**
-	 * @param { CanvasRenderingContext2D } canvasContext 
+	 * @param { Renderer } renderer 
 	 */
-	drawDevelopment(canvasContext) {
+	drawStatistics(renderer) {
 		if (!this.#isDevelopment)
 			return;
 	
-		const engine = this;
+		const canvasContext = renderer.getCanvasContext();
+		const timeManager = this.getTimeManager();
+		const viewManager = this.getViewManager();
+		const inputManager = this.getInputManager();
+
 		const SYSTEM_FONT_STRING = '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 
 
@@ -293,8 +300,11 @@ export class Engine extends Object {
 		};
 
 
+		// 배경 출력.
 		// 기본 위치인 화면 좌상단으로 이동.
 		canvasContext.setTransform(1, 0, 0, 1, 0, 0);
+		canvasContext.fillStyle = "rgba(0, 0, 0, 0.6)";
+		canvasContext.fillRect(10, 10, 480, 640);
 		// canvasContext.letterSpacing = "-1px";
 		canvasContext.font = `16px DOSGothic`;//${SYSTEM_FONT_STRING}`;
 		canvasContext.textBaseline = "top";
@@ -310,31 +320,50 @@ export class Engine extends Object {
 		// canvasContext.imageSmoothingEnabled = false;
 		canvasContext.scale(1.6, 1.6);
 
-		// 초당 프레임 체크.
-		drawOutlineText(`framePerSecond: ${engine.#timeManager.fps}`);
-
-		// 메모리 사용량 체크.
-		// 크로미움 기반 API. (비표준)
-		const memory = performance.memory;
-		if (memory)
-		{
-			const usedJSHeapSize = formatSizeString(memory.usedJSHeapSize);
-			const totalJSHeapSize = formatSizeString(memory.totalJSHeapSize);
-			const jsHeapSizeLimit = formatSizeString(memory.jsHeapSizeLimit);
-			drawOutlineText(`usedJSHeapSize: ${usedJSHeapSize}`);
-			drawOutlineText(`totalJSHeapSize: ${totalJSHeapSize}`);
-			drawOutlineText(`jsHeapSizeLimit: ${jsHeapSizeLimit}`);
-		}
-		else
-		{
-			drawOutlineText(`usedJSHeapSize: Not Supported`);
-			drawOutlineText(`totalJSHeapSize: Not Supported`);
-			drawOutlineText(`jsHeapSizeLimit: Not Supported`);
-		}
-
+		// 플랫폼 정보 출력.
 		this.#platform.getPlatformInfo();
 		drawOutlineText(`platformName: ${this.#platform.platformName}`);
 		drawOutlineText(`browserName: ${this.#platform.browserName}`);
+		drawOutlineText(``);
+
+		// 화면 정보 출력.
+		const canvasSize = viewManager.getCanvasSize();
+		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
+		const viewScaleMode = viewManager.getViewScaleMode();
+		const viewRect = viewManager.getViewRect();
+		const inputPosition = inputManager.getInputPosition();
+		inputPosition.x = Math.round(inputPosition.x);
+		inputPosition.y = Math.round(inputPosition.y);
+		drawOutlineText(`canvasSize: ${canvasSize.x}x${canvasSize.y}`);
+		drawOutlineText(`referenceResolutionSize: ${referenceResolutionSize.x}x${referenceResolutionSize.y}`);
+		drawOutlineText(`viewScaleMode: ${viewScaleMode}`);
+		drawOutlineText(`viewRectSize: ${viewRect.size.x}x${viewRect.size.y}`);
+		drawOutlineText(`inputPosition: ${inputPosition.x}x${inputPosition.y}`);
+		drawOutlineText(``);
+
+		// 초당 프레임 정보 출력.
+		const realtimeScinceStartup = timeManager.getRealtimeSinceStartup().toFixed(2);
+		const time = timeManager.getTime().toFixed(2);
+		const framePerSecond = timeManager.getFramePerSecond();
+		const timeDelta = timeManager.getTimeDelta().toFixed(3);
+		drawOutlineText(`realtimeScinceStartup: ${realtimeScinceStartup}`);
+		drawOutlineText(`time: ${time}`);
+		drawOutlineText(`framePerSecond: ${framePerSecond}`);
+		drawOutlineText(`timeDelta: ${timeDelta}`);
+		drawOutlineText(``);
+
+		// // 메모리 사용 정보 출력.
+		// // 크로미움 기반 API. (비표준)
+		// const memory = performance.memory;
+		// if (memory)
+		// {
+		// 	const usedJSHeapSize = formatSizeString(memory.usedJSHeapSize);
+		// 	const totalJSHeapSize = formatSizeString(memory.totalJSHeapSize);
+		// 	const jsHeapSizeLimit = formatSizeString(memory.jsHeapSizeLimit);
+		// 	drawOutlineText(`usedJSHeapSize: ${usedJSHeapSize}`);
+		// 	drawOutlineText(`totalJSHeapSize: ${totalJSHeapSize}`);
+		// 	drawOutlineText(`jsHeapSizeLimit: ${jsHeapSizeLimit}`);
+		// }
 
 		var resourceUsage = this.#platform.getResouceUsage();
 		const totalTransferSize = formatSizeString(resourceUsage.totalTransferSize);
@@ -379,10 +408,12 @@ export class Engine extends Object {
 	#updateEngine(timestamp) {
 
 		// 렌더러 갱신.
-		this.#renderer.update(this);
+		const renderer = this.getRenderer();
+		renderer.update(this);
 
 		// 시간 갱신.
-		this.#timeManager.update(timestamp);
+		const timeManager = this.getTimeManager();
+		timeManager.calculateTime(timestamp);
 
 		// // 화면 더 부드럽게.
 		// this.CanvasContext.scale(this.#view.devicePixelRatio, this.#view.devicePixelRatio);
@@ -390,32 +421,34 @@ export class Engine extends Object {
     	// this.CanvasContext.imageSmoothingQuality = 'high';
 		// this.canvasContext.canvas.style.textRendering = 'optimizeLegibility';
 
-		// 씬 처리.
+		// 씬 출력.
+		const timeDelta = timeManager.getTimeDelta();
 		for (let i = 0; i < this.#scenes.length; ++i) {
 			const scene = this.#scenes[i];
 			
 			try {
 				// 주기적 갱신.
-				scene.tick(this.#timeManager.timeDelta);
+				scene.tick(timeDelta);
 
 				// 출력.
-				scene.preDraw(this.#renderer);
-				scene.draw(this.#renderer);
-				scene.postDraw(this.#renderer);
+				scene.preDraw(renderer);
+				scene.draw(renderer);
+				scene.postDraw(renderer);
 			}
 			catch (error) {
 				console.error(error);
 			}
 		}
 
+		// 개발 정보 출력.
 		if (this.#isDevelopment) {
-			const canvasContext = this.#renderer.getCanvasContext();
-			this.drawDevelopment(canvasContext);
+			this.drawStatistics(renderer);
 		}
 		
 		// 입력 처리.
-		this.#inputManager.justPressed = false;
-		this.#inputManager.justReleased = false;
+		const inputManager = this.getInputManager();
+		inputManager.justPressed = false;
+		inputManager.justReleased = false;
 
 		// 다음 프레임 호출 요청.
 		window.requestAnimationFrame(this.#updateEngineCallback);

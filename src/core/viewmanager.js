@@ -13,11 +13,11 @@ import { Enum } from "../misc/identifier.js";
 // 뷰 스케일 모드.
 //==============================================================================
 export const ViewScaleMode = {
-	referenceResolution: Enum.begin(), // 기준 해상도를 사용하여 출력.
-	canvasResolution: Enum.auto(), // 화면 해상도를 사용하여 출력.
-	stretchWidth: Enum.auto(), // 기준 해상도의 가로축을 기준으로 양쪽 비율을 유지한채 화면에 해당 축을 늘여 붙임.
-	stretchHeight: Enum.auto(), // 기준 해상도의 세로축을 기준으로 양쪽 비율을 유지한채 화면에 해당 축을 늘여 붙임.
-	stretchAuto: Enum.auto(), // 기준 해상도에서 더 짧은쪽의 축을 기준으로 양쪽 비율을 유지한채 화면에 해당 축을 늘여 붙임.
+	referenceResolution: "referenceResolution", // Enum.begin(), // 기준 해상도를 사용하여 출력.
+	canvasResolution: "canvasResolution", // Enum.auto(), // 화면 해상도를 사용하여 출력.
+	stretchWidth: "stretchWidth", // Enum.auto(), // 기준 해상도의 가로축을 기준으로 양쪽 비율을 유지한채 화면에 해당 축을 늘여 붙임.
+	stretchHeight: "stretchHeight", // Enum.auto(), // 기준 해상도의 세로축을 기준으로 양쪽 비율을 유지한채 화면에 해당 축을 늘여 붙임.
+	stretchAuto: "stretchAuto", // Enum.auto(), // 기준 해상도에서 더 짧은쪽의 축을 기준으로 양쪽 비율을 유지한채 화면에 해당 축을 늘여 붙임.
 };
 
 //==============================================================================
@@ -54,13 +54,13 @@ export class ViewManager extends Object {
 		this.#referenceResolutionSize = referenceResolutionSize;
 		this.#viewRect = Rect.zero();
 
-		this.calculateViewScale();
+		this.calculateViewRect();
 	}
 	
 	//==============================================================================
 	// 뷰 영역 계산.
 	//==============================================================================
-	calculateViewScale() {
+	calculateViewRect() {
 		// 캔버스 크기 설정.
 		const devicePixelRatio = System.window.devicePixelRatio || 1;
 		const clientSize = Vector2.create(System.window.innerWidth, System.window.innerHeight);
@@ -216,7 +216,7 @@ export class ViewManager extends Object {
 			return;
 		}
 		this.#viewScaleMode = viewScaleMode;
-		this.calculateViewScale();
+		this.calculateViewRect();
 	}
 
 	//==============================================================================
