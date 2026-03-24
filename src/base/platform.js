@@ -1,14 +1,15 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "./object.js";
-import { VRect } from "./rect.js";
+const System = globalThis;
+import { Object } from "./object.js";
+import { Rect } from "./rect.js";
 
 
 //==============================================================================
 // 플랫폼 타입.
 //==============================================================================
-export const VPlatformType = { //Object.freeze({
+export const PlatformType = { //System.Object.freeze({
 	windows: "Windows",
 	macOS: "macOS",
 	android: "Android",
@@ -24,7 +25,7 @@ export const VPlatformType = { //Object.freeze({
 //==============================================================================
 // 브라우저 타입.
 //==============================================================================
-export const VBrowserType = { //Object.freeze({
+export const BrowserType = { //System.freeze({
 	chrome: "Chrome",
 	edge: "Edge",
 	firefox: "Firefox",
@@ -38,12 +39,12 @@ export const VBrowserType = { //Object.freeze({
 //==============================================================================
 // 플랫폼 정보.
 //==============================================================================
-export class VPlatform extends VObject {
+export class Platform extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { string } */ platformName = VPlatformType.unknown;
-	/** @type { string } */ browserName = VBrowserType.unknown;
+	/** @type { string } */ platformName = PlatformType.unknown;
+	/** @type { string } */ browserName = BrowserType.unknown;
 	/** @type { boolean } */ isMobile = false;
 
 
@@ -52,6 +53,9 @@ export class VPlatform extends VObject {
 	//==============================================================================
 	constructor() {
 		super();
+		this.platformName = PlatformType.unknown;
+		this.browserName = BrowserType.unknown;
+		this.isMobile = false;
 	}
 
 	//==============================================================================
@@ -61,11 +65,11 @@ export class VPlatform extends VObject {
 	 * @returns { { platformName: string, browserName: string } }
 	*/
 	getPlatformInfo() {
-		// if (navigator.userAgentData && !/Valve Steam GameOverlay|iPad/i.test(navigator.userAgent))
+		// if (System.navigator.userAgentData && !/Valve Steam GameOverlay|iPad/i.test(System.navigator.userAgent))
 		// {
 		// 	try
 		// 	{
-		// 		const userAgentData = navigator.userAgentData;
+		// 		const userAgentData = System.navigator.userAgentData;
 		// 		const mainBrand = userAgentData.brands.find(b => b.brand !== "Chromium") || userAgentData.brands[0];
 				
 		// 		const platform = userAgentData.platform;
@@ -76,8 +80,8 @@ export class VPlatform extends VObject {
 		// 		else if (platform.toLowerCase() === "ios") this.platformName = PlatformType.iOS;
 		// 		else this.platformName = PlatformType.Unknown;
 
-		// 		this.browserName = globalThis.Object.keys(BrowserType).map(b => b.toLowerCase() === mainBrand.brand.toLowerCase()) || BrowserType.Unknown;
-		// 		//this.browserName = Object.entries(BrowserType).map(key => BrowserType[key]).find(browserType => browserType.toLowerCase() === mainBrand.brand.toLowerCase()) || BrowserType.Unknown;
+		// 		this.browserName = System.Object.keys(BrowserType).map(b => b.toLowerCase() === mainBrand.brand.toLowerCase()) || BrowserType.Unknown;
+		// 		//this.browserName = System.Object.entries(BrowserType).map(key => BrowserType[key]).find(browserType => browserType.toLowerCase() === mainBrand.brand.toLowerCase()) || BrowserType.Unknown;
 		// 		this.IsMobile = userAgentData.mobile;
 		// 		return Promise.resolve();
 		// 	}
@@ -87,26 +91,26 @@ export class VPlatform extends VObject {
 		// 	}
 		// }
 
-		const userAgent = navigator.userAgent;
+		const userAgent = System.navigator.userAgent;
 		this.isMobile = /Mobi|Android|iPhone|iPad/i.test(userAgent);
 
 		// 플랫폼 감지.
-		if (/Windows/i.test(userAgent)) this.platformName = VPlatformType.windows;
-		else if (/Valve Steam GameOverlay/i.test(userAgent)) this.platformName = VPlatformType.steamDeck;
-		else if (/iPad/i.test(userAgent)) this.platformName = VPlatformType.iPadOS;
-		else if (/iPhone|iPod/i.test(userAgent)) this.platformName = VPlatformType.iOS;
-		else if (/Macintosh|Mac OS X/i.test(userAgent)) this.platformName = VPlatformType.macOS;
-		else if (/Android/i.test(userAgent)) this.platformName = VPlatformType.android;
-		else if (/Linux/i.test(userAgent)) this.platformName = VPlatformType.linux;
-		else this.platformName = VPlatformType.unknown;
+		if (/Windows/i.test(userAgent)) this.platformName = PlatformType.windows;
+		else if (/Valve Steam GameOverlay/i.test(userAgent)) this.platformName = PlatformType.steamDeck;
+		else if (/iPad/i.test(userAgent)) this.platformName = PlatformType.iPadOS;
+		else if (/iPhone|iPod/i.test(userAgent)) this.platformName = PlatformType.iOS;
+		else if (/Macintosh|Mac OS X/i.test(userAgent)) this.platformName = PlatformType.macOS;
+		else if (/Android/i.test(userAgent)) this.platformName = PlatformType.android;
+		else if (/Linux/i.test(userAgent)) this.platformName = PlatformType.linux;
+		else this.platformName = PlatformType.unknown;
 
 		// 브라우저 감지.
-		if (/Edg/i.test(userAgent)) this.browserName = VBrowserType.edge;
-		else if (/Chrome/i.test(userAgent) && !/Edg/i.test(userAgent)) this.browserName = VBrowserType.chrome;
-		else if (/Safari/i.test(userAgent) && !/Chrome/i.test(userAgent) && !/Edg/i.test(userAgent)) this.browserName = VBrowserType.safari;
-		else if (/Firefox/i.test(userAgent)) this.browserName = VBrowserType.firefox;
-		else if (/MSIE|Trident/i.test(userAgent)) this.browserName = VBrowserType.internetExplorer;
-		else this.browserName = VBrowserType.unknown;
+		if (/Edg/i.test(userAgent)) this.browserName = BrowserType.edge;
+		else if (/Chrome/i.test(userAgent) && !/Edg/i.test(userAgent)) this.browserName = BrowserType.chrome;
+		else if (/Safari/i.test(userAgent) && !/Chrome/i.test(userAgent) && !/Edg/i.test(userAgent)) this.browserName = BrowserType.safari;
+		else if (/Firefox/i.test(userAgent)) this.browserName = BrowserType.firefox;
+		else if (/MSIE|Trident/i.test(userAgent)) this.browserName = BrowserType.internetExplorer;
+		else this.browserName = BrowserType.unknown;
 
 		return {
 			platformName: this.platformName,
@@ -153,31 +157,31 @@ export class VPlatform extends VObject {
 	//==============================================================================
 	/**
      * @param @type { HTMLCanvasElement | null } canvas
-	 * @returns { VRect }
+	 * @returns { Rect }
 	*/
 	getSafeAreaRect(canvas) {
-		const div = document.createElement('div');
+		const div = System.document.createElement('div');
 		div.style.position = 'absolute';
 		div.style.visibility = 'hidden';
 		div.style.paddingTop = 'env(safe-area-inset-top)';
 		div.style.paddingRight = 'env(safe-area-inset-right)';
 		div.style.paddingBottom = 'env(safe-area-inset-bottom)';
 		div.style.paddingLeft = 'env(safe-area-inset-left)';
-		document.body.appendChild(div);
+		System.document.body.appendChild(div);
 
-		const style = getComputedStyle(div);
-		const top = parseInt(style.paddingTop) || 0;
-		const right = parseInt(style.paddingRight) || 0;
-		const bottom = parseInt(style.paddingBottom) || 0;
-		const left = parseInt(style.paddingLeft) || 0;
+		const style = Window.getComputedStyle(div);
+		const top = Number.parseInt(style.paddingTop) || 0;
+		const right = Number.parseInt(style.paddingRight) || 0;
+		const bottom = Number.parseInt(style.paddingBottom) || 0;
+		const left = Number.parseInt(style.paddingLeft) || 0;
 
-		document.body.removeChild(div);
+		System.document.body.removeChild(div);
 
 		if (canvas === null) {
-			return VRect.create(left, top, window.innerWidth - left - right, window.innerHeight - top - bottom);
+			return Rect.create(left, top, window.innerWidth - left - right, window.innerHeight - top - bottom);
 		}
 		else {
-			return VRect.create(left, top, canvas.width - left - right, canvas.height - top - bottom);
+			return Rect.create(left, top, canvas.width - left - right, canvas.height - top - bottom);
 		}
 	}
 }

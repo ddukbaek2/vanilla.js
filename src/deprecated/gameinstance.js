@@ -1,21 +1,21 @@
 // //==============================================================================
 // // 포함 모듈 목록.
 // //==============================================================================
-// import { VObject } from "../base/object.js";
-// import { VVector2 } from "../base/vector2.js";
-// import { VEngine } from "../core/engine.js";
-// import { VRenderer } from "../core/renderer.js";
+// import { Object } from "../base/object.js";
+// import { Vector2 } from "../base/vector2.js";
+// import { Engine } from "../core/engine.js";
+// import { Renderer } from "../core/renderer.js";
 
 
 // //==============================================================================
 // // 게임 인스턴스.
 // //==============================================================================
-// export class VGameInstance extends VObject
+// export class VGameInstance extends Object
 // {
 // 	//==============================================================================
 // 	// 멤버 변수 목록.
 // 	//==============================================================================
-// 	/** @type { VEngine } */ #engine = null;
+// 	/** @type { Engine } */ #engine = null;
 
 // 	//==============================================================================
 // 	// 생성.
@@ -28,7 +28,7 @@
 // 	// 초기화됨.
 // 	//==============================================================================
 // 	/**
-// 	 * @param { VEngine } engine 
+// 	 * @param { Engine } engine 
 // 	 */
 // 	initialize(engine) {
 // 		this.#engine = engine;
@@ -49,7 +49,7 @@
 // 	//==============================================================================
 // 	/**
 // 	 * @method
-// 	 * @param { VRenderer } renderer 
+// 	 * @param { Renderer } renderer 
 // 	 */
 // 	draw(renderer) {
 // 		this.#engine.viewIdentity();
@@ -60,7 +60,7 @@
 // 	// 사이즈 변경됨.
 // 	//==============================================================================
 // 	/**
-// 	 * @param { VEngine } engine 
+// 	 * @param { Engine } engine 
 // 	 */
 // 	resize(engine) {
 
@@ -70,7 +70,7 @@
 // 	// 엔진 반환.
 // 	//==============================================================================
 // 	/**
-// 	 * @returns { VEngine }
+// 	 * @returns { Engine }
 // 	 */
 // 	getEngine() {
 // 		return this.#engine;
@@ -80,12 +80,12 @@
 // 	// 이미지 크기 맞추기.
 // 	//==============================================================================
 // 	/**
-// 	 * @param { VVector2 } targetSize 
-// 	 * @param { VVector2 } viewSize
+// 	 * @param { Vector2 } targetSize 
+// 	 * @param { Vector2 } viewSize
 // 	 * @param { boolean } adjustWidth
 // 	 */
 // 	static adjustSizeFit(targetSize, viewSize, adjustWidth = true) {
-// 		let adjustSize = VVector2.create(viewSize.y, viewSize.y);
+// 		let adjustSize = Vector2.create(viewSize.y, viewSize.y);
 
 // 		// 대상이 가로가 더 길 경우.
 // 		if (adjustWidth) {
@@ -115,8 +115,8 @@
 // 	//==============================================================================
 // 	/**
 // 	 * 
-// 	 * @param { VVector2 } targetSize 
-// 	 * @param { VVector2 } viewSize 
+// 	 * @param { Vector2 } targetSize 
+// 	 * @param { Vector2 } viewSize 
 // 	 */
 // 	static adjustSizeFitByLong(targetSize, viewSize) {
 // 		const adjustWidth = (targetSize.x > targetSize.y);

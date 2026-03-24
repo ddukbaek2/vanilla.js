@@ -1,13 +1,13 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "../base/object.js";
+import { Object } from "../base/object.js";
 
 
 //==============================================================================
 // 식별자 생성기.
 //==============================================================================
-export class VIdentifier extends VObject {
+export class Identifier extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -57,11 +57,11 @@ export class VIdentifier extends VObject {
 //==============================================================================
 // 열거 식별자 생성기.q
 //==============================================================================
-export class VEnum extends VObject {
+export class Enum extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @static @type { VIdentifier } */ static #identifier = new VIdentifier(0, 1);
+	/** @private @static @type { Identifier } */ static #identifier = new Identifier(0, 1);
 
 	//==============================================================================
 	// 시작값으로 출발.
@@ -71,8 +71,8 @@ export class VEnum extends VObject {
 	 * @returns { number }
 	 */
 	static clear() {
-		VEnum.#identifier.reset();
-		return VEnum.auto();
+		Enum.#identifier.reset();
+		return Enum.auto();
 	}
 
 	//==============================================================================
@@ -83,6 +83,6 @@ export class VEnum extends VObject {
 	 * @returns { number }
 	 */
 	static auto() {
-		return VEnum.#identifier.auto();
+		return Enum.#identifier.auto();
 	}
 }

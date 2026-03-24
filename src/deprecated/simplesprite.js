@@ -1,13 +1,13 @@
 // //==============================================================================
 // // 포함 모듈 목록.
 // //==============================================================================
-// import { VObject } from "../base/object.js";
-// import { VVector2 } from "../base/vector2.js";
-// import { VRenderer } from "../core/renderer.js";
-// import * as VMath from "../base/math.js";
-// import { VRect } from "../base/rect.js";
-// import { VOBB } from "../base/obb.js";
-// import { VPivot } from "../base/pivot2d.js";
+// import { Object } from "../base/object.js";
+// import { Vector2 } from "../base/vector2.js";
+// import { Renderer } from "../core/renderer.js";
+// import * as Math from "../base/math.js";
+// import { Rect } from "../base/rect.js";
+// import { OBB } from "../base/obb.js";
+// import { Pivot } from "../base/pivot2d.js";
 
 
 // //==============================================================================
@@ -16,14 +16,14 @@
 // /**
 //  * @class
 //  */
-// export class VSimpleSprite extends VObject {
+// export class VSimpleSprite extends Object {
 // 	//==============================================================================
 // 	// 멤버 변수 목록.
 // 	//==============================================================================
-// 	/** @private @type { VVector2 } */ #position; // 위치.
-// 	/** @private @type { VVector2 } */ #pivot; // 출력 기준점.
-// 	/** @private @type { VVector2 } */ #contentSize; // 실제 크기.
-// 	/** @private @type { VVector2 } */ #scale; // 크기 배율.
+// 	/** @private @type { Vector2 } */ #position; // 위치.
+// 	/** @private @type { Vector2 } */ #pivot; // 출력 기준점.
+// 	/** @private @type { Vector2 } */ #contentSize; // 실제 크기.
+// 	/** @private @type { Vector2 } */ #scale; // 크기 배율.
 // 	/** @private @type { number } */ #degree; // 회전값.
 // 	/** @private @type { string } */ #color; // 컬러.
 // 	/** @private @type { number } */ #opacity; // 투명도.
@@ -36,10 +36,10 @@
 // 	 */
 // 	constructor() {
 // 		super();
-// 		this.#position = VVector2.zero();
-// 		this.#pivot = VPivot.middleCenter;
-// 		this.#contentSize = VVector2.zero();
-// 		this.#scale = VVector2.one();
+// 		this.#position = Vector2.zero();
+// 		this.#pivot = Pivot.middleCenter;
+// 		this.#contentSize = Vector2.zero();
+// 		this.#scale = Vector2.one();
 // 		this.#degree = 0.0;
 // 		this.#color = "#ffffff"; // rgba(255, 255, 255, 1.0);
 // 		this.#opacity = 1.0;
@@ -49,7 +49,7 @@
 // 	// 출력.
 // 	//==============================================================================
 // 	/**
-// 	 * @param { VRenderer } renderer 
+// 	 * @param { Renderer } renderer 
 // 	 */
 // 	draw(renderer) {
 // 		// 출력 상태 시작.
@@ -59,7 +59,7 @@
 // 		canvasContext.fillStyle = this.#color;
 // 		const position = this.getPosition();
 // 		const degree = this.getDegree();
-// 		let radian = VMath.degreeToRadian(degree);
+// 		let radian = Math.degreeToRadian(degree);
 // 		const transformScale = this.calculateTransformScale();
 // 		canvasContext.translate(position.x, position.y); // 위치.
 // 		canvasContext.rotate(radian); // 회전.
@@ -79,26 +79,26 @@
 // 	// // 기즈모 출력.
 // 	// //==============================================================================
 // 	// /**
-// 	//  * @param { VRenderer } renderer 
+// 	//  * @param { Renderer } renderer 
 // 	//  */
 // 	// drawGizmos(renderer) {
 // 	// 	const engine = renderer.getEngine();
 // 	// 	const canvasContext = renderer.getCanvasContext();
 // 	// 	const degree = this.getRotation();
-// 	// 	const radian = VMath.degreeToRadian(degree);
+// 	// 	const radian = Math.degreeToRadian(degree);
 
 // 	// 	// 이미지 회전이 반영된 기준점 출력.
 // 	// 	canvasContext.fillStyle = "#00ff00";
 // 	// 	const worldCorners = this.getWorldCorners();
-// 	// 	const pivots = [VPivot.topLeft, VPivot.topRight, VPivot.bottomRight, VPivot.bottomLeft];
+// 	// 	const pivots = [Pivot.topLeft, Pivot.topRight, Pivot.bottomRight, Pivot.bottomLeft];
 // 	// 	for (let i = 0; i < worldCorners.length; ++i) {
 // 	// 		const worldCorner = worldCorners[i];
 // 	// 		canvasContext.save();
 // 	// 		engine.gameViewIdentity(null);
 // 	// 		canvasContext.translate(worldCorner.x, worldCorner.y);
 // 	// 		canvasContext.rotate(radian);
-// 	// 		const contentSize = VVector2.create(4, 4);//.divide(this.getScale());
-// 	// 		const pivotPosition = VVector2.zero().subtract(contentSize.multiply(pivots[i]));
+// 	// 		const contentSize = Vector2.create(4, 4);//.divide(this.getScale());
+// 	// 		const pivotPosition = Vector2.zero().subtract(contentSize.multiply(pivots[i]));
 // 	// 		canvasContext.fillRect(pivotPosition.x, pivotPosition.y, contentSize.x, contentSize.y);
 // 	// 		canvasContext.restore();
 // 	// 	}
@@ -122,7 +122,7 @@
 // 	// 최종 크기 계산. (플립 기능으로 인해 뒤집어진 크기 계산)
 // 	//==============================================================================
 // 	/**
-// 	 * @returns { VVector2 }
+// 	 * @returns { Vector2 }
 // 	 */
 // 	calculateTransformScale() {
 // 		const scale = this.getScale();
@@ -133,12 +133,12 @@
 // 	// 최종 위치 계산. (피봇 기능으로 인해 스케일 반전되며 틀어진 출력 중심점 위치를 포함하여 중심점 위치 계산)
 // 	//==============================================================================
 // 	/**
-// 	 * @returns { VVector2 }
+// 	 * @returns { Vector2 }
 // 	 */
 // 	calculatePivotPosition() {
 // 		const contentSize = this.getContentSize();
 // 		const pivot = this.getPivot();
-// 		const pivotPosition = VVector2.zero().subtract(contentSize.multiply(pivot)); // (0,0) - (size * (0~1,0~1))
+// 		const pivotPosition = Vector2.zero().subtract(contentSize.multiply(pivot)); // (0,0) - (size * (0~1,0~1))
 // 		return pivotPosition;
 // 	}
 
@@ -146,7 +146,7 @@
 // 	// 위치 설정.
 // 	//==============================================================================
 // 	/**
-// 	 * @param { VVector2 } position 
+// 	 * @param { Vector2 } position 
 // 	 */
 // 	setPosition(position) {
 // 		this.#position = position;
@@ -156,7 +156,7 @@
 // 	// 위치 반환.
 // 	//==============================================================================
 // 	/**
-// 	 * @returns { VVector2 } 
+// 	 * @returns { Vector2 } 
 // 	 */
 // 	getPosition() {
 // 		return this.#position;
@@ -166,7 +166,7 @@
 // 	// 크기 설정.
 // 	//==============================================================================
 // 	/**
-// 	 * @param { VVector2 } size 
+// 	 * @param { Vector2 } size 
 // 	 */
 // 	setContentSize(size) {
 // 		this.#contentSize = size;
@@ -176,7 +176,7 @@
 // 	// 크기 반환.
 // 	//==============================================================================
 // 	/**
-// 	 * @returns { VVector2 } 
+// 	 * @returns { Vector2 } 
 // 	 */
 // 	getContentSize() {
 // 		return this.#contentSize;
@@ -186,7 +186,7 @@
 // 	// 크기 설정.
 // 	//==============================================================================
 // 	/**
-// 	 * @param { VVector2 } scale 
+// 	 * @param { Vector2 } scale 
 // 	 */
 // 	setScale(scale) {
 // 		this.#scale = scale;
@@ -196,7 +196,7 @@
 // 	// 크기 반환.
 // 	//==============================================================================
 // 	/**
-// 	 * @returns { VVector2 } 
+// 	 * @returns { Vector2 } 
 // 	 */
 // 	getScale() {
 // 		return this.#scale;
@@ -267,19 +267,19 @@
 // 	// 피봇 설정.
 // 	//==============================================================================
 // 	/**
-// 	 * @param { VVector2 } pivot
+// 	 * @param { Vector2 } pivot
 // 	 */
 // 	setPivot(pivot) {
 // 		this.#pivot = pivot;
-// 		this.#pivot.x = VMath.clamp(this.#pivot.x, 0, 1);
-// 		this.#pivot.y = VMath.clamp(this.#pivot.y, 0, 1);
+// 		this.#pivot.x = Math.clamp(this.#pivot.x, 0, 1);
+// 		this.#pivot.y = Math.clamp(this.#pivot.y, 0, 1);
 // 	}
 
 // 	//==============================================================================
 // 	// 피봇 반환.
 // 	//==============================================================================
 // 	/**
-// 	 * @returns { VVector2 }
+// 	 * @returns { Vector2 }
 // 	 */
 // 	getPivot() {
 // 		return this.#pivot;
@@ -289,7 +289,7 @@
 // 	// // 실제 화면에 그려지는 영역 반환. (회전 무시한 AABB)
 // 	// //==============================================================================
 // 	// /**
-// 	//  * @returns { VRect }
+// 	//  * @returns { Rect }
 // 	//  */
 // 	// getWorldRect() {
 // 	// 	const position = this.getPosition();
@@ -302,14 +302,14 @@
 // 	//     const x = position.x - (width * pivot.x);
 // 	//     const y = position.y - (height * pivot.y);
 
-// 	//     return VRect.create(x, y, width, height);
+// 	//     return Rect.create(x, y, width, height);
 // 	// }
 
 // 	// //==============================================================================
 // 	// // 실제 화면에 그려지는 영역 반환. (회전 반영된 AABB)
 // 	// //==============================================================================
 // 	// /**
-// 	//  * @returns { VRect }
+// 	//  * @returns { Rect }
 // 	//  */
 // 	// getWorldBounds() {
 // 	// 	const position = this.getPosition();
@@ -317,10 +317,10 @@
 // 	// 	const scale = this.getScale();
 // 	// 	const pivot = this.getPivot();
 // 	// 	const degree = this.getRotation();
-// 	// 	const radian = VMath.degreeToRadian(degree);
+// 	// 	const radian = Math.degreeToRadian(degree);
 
-// 	// 	const width = contentSize.x * VMath.abs(scale.x);
-// 	// 	const height = contentSize.y * VMath.abs(scale.y);
+// 	// 	const width = contentSize.x * Math.abs(scale.x);
+// 	// 	const height = contentSize.y * Math.abs(scale.y);
 
 // 	// 	const left = -(width * pivot.x);
 // 	// 	const right = width * (1 - pivot.x);
@@ -334,8 +334,8 @@
 // 	// 		{ x: left, y: bottom }
 // 	// 	];
 
-// 	// 	const cosR = VMath.cos(radian);
-// 	// 	const sinR = VMath.sin(radian);
+// 	// 	const cosR = Math.cos(radian);
+// 	// 	const sinR = Math.sin(radian);
 
 // 	// 	let minX = Infinity;
 // 	// 	let minY = Infinity;
@@ -355,14 +355,14 @@
 // 	// 		if (globalY > maxY) maxY = globalY;
 // 	// 	}
 
-// 	// 	return VRect.create(minX, minY, maxX - minX, maxY - minY);
+// 	// 	return Rect.create(minX, minY, maxX - minX, maxY - minY);
 // 	// }
 
 // 	//==============================================================================
 // 	// 실제 화면에 그려지는 영역 반환. (OBB)
 // 	//==============================================================================
 // 	/**
-// 	 * @returns { VVector2[] }
+// 	 * @returns { Vector2[] }
 // 	 */
 // 	getWorldCorners() {
 // 		const position = this.getPosition();
@@ -371,23 +371,23 @@
 // 		const pivot = this.getPivot();
 // 		const degree = this.getDegree();
 
-// 		const width = contentSize.x * VMath.abs(scale.x);
-// 		const height = contentSize.y * VMath.abs(scale.y);
+// 		const width = contentSize.x * Math.abs(scale.x);
+// 		const height = contentSize.y * Math.abs(scale.y);
 
 // 		const left = -(width * pivot.x);
 // 		const right = width * (1 - pivot.x);
 // 		const top = -(height * pivot.y);
 // 		const bottom = height * (1 - pivot.y);
 
-// 		const radR = VMath.degreeToRadian(degree);
-// 		const cosR = VMath.cos(radR);
-// 		const sinR = VMath.sin(radR);
+// 		const radR = Math.degreeToRadian(degree);
+// 		const cosR = Math.cos(radR);
+// 		const sinR = Math.sin(radR);
 
 // 		return [
-// 			VVector2.create(left * cosR - top * sinR + position.x, left * sinR + top * cosR + position.y),
-// 			VVector2.create(right * cosR - top * sinR + position.x, right * sinR + top * cosR + position.y),
-// 			VVector2.create(right * cosR - bottom * sinR + position.x, right * sinR + bottom * cosR + position.y),
-// 			VVector2.create(left * cosR - bottom * sinR + position.x, left * sinR + bottom * cosR + position.y)
+// 			Vector2.create(left * cosR - top * sinR + position.x, left * sinR + top * cosR + position.y),
+// 			Vector2.create(right * cosR - top * sinR + position.x, right * sinR + top * cosR + position.y),
+// 			Vector2.create(right * cosR - bottom * sinR + position.x, right * sinR + bottom * cosR + position.y),
+// 			Vector2.create(left * cosR - bottom * sinR + position.x, left * sinR + bottom * cosR + position.y)
 // 		];
 // 	}
 
@@ -395,28 +395,28 @@
 // 	// getWorldCorners()를 기반으로 최소, 최대위치를 만들어 바운딩박스를 형성.
 // 	//==============================================================================
 // 	/**
-// 	 * @returns { VRect }
+// 	 * @returns { Rect }
 // 	 */
 // 	getWorldBounds() {
 // 		const worldCorners = this.getWorldCorners();
-// 		let min = VVector2.positiveInfinity();
-// 		let max = VVector2.negativeInfinity();
+// 		let min = Vector2.positiveInfinity();
+// 		let max = Vector2.negativeInfinity();
 // 		for (let i = 1; i < worldCorners.length; ++i) {
 // 			const worldCorner = worldCorners[i];
-// 			min.x = VMath.min(min.x, worldCorner.x);
-// 			min.y = VMath.min(min.y, worldCorner.y);
-// 			max.x = VMath.max(max.x, worldCorner.x);
-// 			max.y = VMath.max(max.y, worldCorner.y);
+// 			min.x = Math.min(min.x, worldCorner.x);
+// 			min.y = Math.min(min.y, worldCorner.y);
+// 			max.x = Math.max(max.x, worldCorner.x);
+// 			max.y = Math.max(max.y, worldCorner.y);
 // 		}
 
-// 		return VRect.create(min.x, min.y, max.x - min.x, max.y - min.y);
+// 		return Rect.create(min.x, min.y, max.x - min.x, max.y - min.y);
 // 	}
 
 // 	//==============================================================================
 // 	// 충돌 검출.
 // 	//==============================================================================
 // 	/**
-// 	 * @param { VVector2 } position
+// 	 * @param { Vector2 } position
 // 	 * @returns { boolean }
 // 	 */
 // 	contains(position) {
@@ -424,7 +424,7 @@
 // 			return false;
 // 		}
 // 		const worldCorners = this.getWorldCorners();
-// 		const obb = new VOBB();
+// 		const obb = new OBB();
 // 		obb.setEdges(worldCorners);
 // 		const isInside = obb.contains(position);
 // 		return isInside;

@@ -1,57 +1,80 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "../base/object.js";
-import { VColors } from "../base/colors.js";
-import { VTime } from "./time.js";
-import { VView } from "./view.js";
-import { VInput } from "./input.js";
-import { VPlatform, VPlatformType, VBrowserType } from "../base/platform.js";
-import { VRenderer } from "./renderer.js";
-import { VScene } from "./scene.js";
+import { Object } from "../base/object.js";
+import { Colors } from "../base/colors.js";
+import { Vector2 } from "../base/vector2.js";
+import { TimeManager } from "./timemanager.js";
+import { ViewManager } from "./viewmanager.js";
+import { InputManager } from "./inputmanager.js";
+import { Platform, PlatformType, BrowserType } from "../base/platform.js";
+import { Renderer } from "./renderer.js";
+import { Scene } from "./scene.js";
 
+
+//==============================================================================
+// 엔진 설정.
+//==============================================================================
+export class EngineConfiguration extends Object {
+	/** @type { Scene } */ scene;
+	/** @type { Vector2 } */ referenceResolution;
+	/** @type { string } */ canvasId;
+	/** @type { boolean } */ isDevelopment;
+	constructor() {
+		super();
+		this.scene = null;
+		this.referenceResolution = Vector2.zero();
+		this.canvasId = "";
+		this.isDevelopment = false;
+	}
+}
 
 //==============================================================================
 // 엔진.
 //==============================================================================
-export class VEngine extends VObject {
+export class Engine extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
+	/** @private @type { EngineConfiguration } */ #engineConfiguration;
 	/** @private @type { HTMLCanvasElement } */ #canvas;
-	/** @private @type { VPlatform } */ #platform;
-	/** @private @type { VTime } */ #time;
-	/** @private @type { VView } */ #view;
-	/** @private @type { VInput } */ #input;
-	/** @private @type { VRenderer } */ #renderer;
+	/** @private @type { Platform } */ #platform;
+	/** @private @type { TimeManager } */ #timeManager;
+	/** @private @type { ViewManager } */ #viewManager;
+	/** @private @type { InputManager } */ #inputManager;
+	/** @private @type { Renderer } */ #renderer;
 	/** @private @type { () => void  } */ #resizeCallback;
 	/** @private @type { FrameRequestCallback } */ #updateEngineCallback;
-	/** @private @type { VScene[] } */ #scenes;
+	/** @private @type { Scene[] } */ #scenes;
 	/** @private @type { boolean } */ #isDevelopment;
-
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
-	constructor(width, height, canvasId, isDevelopment = true) {
+	/**
+	 * @constructor
+	 * @param { EngineConfiguration } engineConfiguration
+	 */
+	constructor(engineConfiguration) {
 		super();
-
-		this.#canvas = this.getOrAddCanvas(canvasId);
+		if (engineConfiguration === null || engineConfiguration instanceof EngineConfiguration === false) {
+			throw new System.Error(`engineConfiguration is invalid.`);
+		}
+		this.#engineConfiguration = engineConfiguration;
+		this.#canvas = this.getOrAddCanvas(engineConfiguration.canvasId);
 		const canvasContext = this.#canvas.getContext("2d", { alpha: false });
 
-		this.#platform = new VPlatform();
-		this.#time = new VTime(this);
-		this.#view = new VView(this);
-		this.#view.resolution.x = width;
-		this.#view.resolution.y = height;
-		this.#input = new VInput(this);
-		this.#renderer = new VRenderer(this, canvasContext);
+		this.#platform = new Platform();
+		this.#timeManager = new TimeManager(this);
+		this.#viewManager = new ViewManager(this);
+		this.#viewManager.resolution = engineConfiguration.resolution;
+		this.#inputManager = new InputManager(this);
+		this.#renderer = new Renderer(this, canvasContext);
 
 		this.#resizeCallback = this.#resize.bind(this);
 		this.#updateEngineCallback = this.#updateEngine.bind(this);
-		// this.#gameInstance = null;
 		this.#scenes = [];
-		this.#isDevelopment = isDevelopment;
+		this.#isDevelopment = engineConfiguration.isDevelopment;
 		
 		if (this.terminalFont !== null) {
 			// this.terminalFont = new FontFace(`VT323`, `url('https://fonts.gstatic.com/s/vt323/v17/pxiKyp0ihIEF2isfFJU.woff2')`);
@@ -86,33 +109,45 @@ export class VEngine extends VObject {
 	 */
 	#resize() {
 		const devicePixelRatio = window.devicePixelRatio || 1;
-		const clientWidth = window.innerWidth;
-		const clientHeight = window.innerHeight;
-		this.#canvas.width = Math.round(clientWidth * devicePixelRatio);
-		this.#canvas.height = Math.round(clientHeight * devicePixelRatio);
-		this.#canvas.style.width = `${clientWidth}px`;
-		this.#canvas.style.height = `${clientHeight}px`;
+		const clientSize = Vector2.create(window.innerWidth, window.innerHeight);
+		const canvasSize = Vector2.create(Math.round(clientSize.x * devicePixelRatio), Math.round(clientSize.y * devicePixelRatio));
+		this.#canvas.width = canvasSize.x; 
+		this.#canvas.height = canvasSize.y;
+		this.#canvas.style.width = `${clientSize.x}px`;
+		this.#canvas.style.height = `${clientSize.y}px`;
 
 		// 전체 화면 설정.
-		const scale = Math.min(clientWidth / this.#view.resolution.x, clientHeight / this.#view.resolution.y);
-		const viewWidth = Math.round(this.#view.resolution.x * scale);
-		const viewHeight = Math.round(this.#view.resolution.y * scale);
-		const viewX = Math.floor((clientWidth - viewWidth) * 0.5);
-		const viewY = Math.floor((clientHeight - viewHeight) * 0.5);
+		const scale = Math.min(clientSize.x / this.#viewManager.resolution.x, clientSize.y / this.#viewManager.resolution.y);
+		const viewWidth = Math.round(this.#viewManager.resolution.x * scale);
+		const viewHeight = Math.round(this.#viewManager.resolution.y * scale);
+		const viewX = Math.floor((clientSize.x - viewWidth) * 0.5);
+		const viewY = Math.floor((clientSize.y - viewHeight) * 0.5);
 
 		// 뷰 화면 설정.
-		this.#view.devicePixelRatio = devicePixelRatio;
-		this.#view.scale = scale;
-		this.#view.screen.x = clientWidth;
-		this.#view.screen.y = clientHeight;
-		this.#view.view.position.x = viewX;
-		this.#view.view.position.y = viewY;
-		this.#view.view.size.x = viewWidth;
-		this.#view.view.size.y = viewHeight;
+		this.#viewManager.devicePixelRatio = devicePixelRatio;
+		this.#viewManager.scale = scale;
+		this.#viewManager.screen.x = clientSize.x;
+		this.#viewManager.screen.y = clientSize.y;
+		this.#viewManager.view.position.x = viewX;
+		this.#viewManager.view.position.y = viewY;
+		this.#viewManager.view.size.x = viewWidth;
+		this.#viewManager.view.size.y = viewHeight;
 
 		// if (this.#gameInstance && typeof this.#gameInstance.resize === "function") {
 		// 	this.#gameInstance.resize(this);
 		// }
+		// 씬 리사이즈.
+		for (let i = 0; i < this.#scenes.length; ++i) {
+			const scene = this.#scenes[i];
+			
+			try {
+				// 주기적 갱신.
+				scene.resize(clientSize);
+			}
+			catch (error) {
+				console.error(error);
+			}
+		}
 	}
 
 	//==============================================================================
@@ -128,8 +163,8 @@ export class VEngine extends VObject {
 				// 	return;
 				// }
 
-				this.#input.justMoved = true;
-				this.#input.justPressed = true;
+				this.#inputManager.justMoved = true;
+				this.#inputManager.justPressed = true;
 				this.#updatePointer(touchEvent.clientX, touchEvent.clientY);
 			});
 
@@ -138,8 +173,8 @@ export class VEngine extends VObject {
 			});
 
 		window.addEventListener("mouseup", (touchEvent) => {
-				this.#input.justMoved = false;
-				this.#input.justReleased = true;
+				this.#inputManager.justMoved = false;
+				this.#inputManager.justReleased = true;
 				this.#updatePointer(touchEvent.clientX, touchEvent.clientY);
 			});
 
@@ -151,8 +186,8 @@ export class VEngine extends VObject {
 				// 	return;
 				// }
 
-				this.#input.justMoved = true;
-				this.#input.justPressed = true;
+				this.#inputManager.justMoved = true;
+				this.#inputManager.justPressed = true;
 				this.#updatePointer(touch.clientX, touch.clientY);
 				touchEvent.preventDefault();
 			}, { passive: false });
@@ -171,8 +206,8 @@ export class VEngine extends VObject {
 					this.#updatePointer(touch.clientX, touch.clientY);
 				}
 
-				this.#input.justMoved = false;
-				this.#input.justReleased = true;
+				this.#inputManager.justMoved = false;
+				this.#inputManager.justReleased = true;
 				touchEvent.preventDefault();
 			}, { passive: false });
 
@@ -196,8 +231,8 @@ export class VEngine extends VObject {
 	 * @param { number } clientY
 	 */
 	#updatePointer(clientX, clientY) {
-		this.#input.position.x = ((clientX - this.#view.view.position.x) / this.#view.view.size.x) * this.#view.resolution.x;
-		this.#input.position.y = ((clientY - this.#view.view.position.y) / this.#view.view.size.y) * this.#view.resolution.y;
+		this.#inputManager.position.x = ((clientX - this.#viewManager.view.position.x) / this.#viewManager.view.size.x) * this.#viewManager.resolution.x;
+		this.#inputManager.position.y = ((clientY - this.#viewManager.view.position.y) / this.#viewManager.view.size.y) * this.#viewManager.resolution.y;
 	}
 	
 	//==============================================================================
@@ -267,7 +302,7 @@ export class VEngine extends VObject {
 		// canvasContext.letterSpacing = "-1px";
 		canvasContext.font = `16px DOSGothic`;//${SYSTEM_FONT_STRING}`;
 		canvasContext.textBaseline = "top";
-		canvasContext.fillStyle = VColors.white; // Colors.lightVanilla
+		canvasContext.fillStyle = Colors.white; // Colors.lightVanilla
 		// canvasContext.fillStyle = Colors.white; // Colors.lightVanilla;
 		// canvasContext.lineWidth = 4;
 		// canvasContext.strokeStyle = Colors.black; // Colors.darkVanilla;
@@ -280,7 +315,7 @@ export class VEngine extends VObject {
 		canvasContext.scale(1.6, 1.6);
 
 		// 초당 프레임 체크.
-		drawOutlineText(`framePerSecond: ${engine.#time.fps}`);
+		drawOutlineText(`framePerSecond: ${engine.#timeManager.fps}`);
 
 		// 메모리 사용량 체크.
 		// 크로미움 기반 API. (비표준)
@@ -351,7 +386,7 @@ export class VEngine extends VObject {
 		this.#renderer.update(this);
 
 		// 시간 갱신.
-		this.#time.update(timestamp);
+		this.#timeManager.update(timestamp);
 
 		// // 화면 더 부드럽게.
 		// this.CanvasContext.scale(this.#view.devicePixelRatio, this.#view.devicePixelRatio);
@@ -365,7 +400,7 @@ export class VEngine extends VObject {
 			
 			try {
 				// 주기적 갱신.
-				scene.tick(this.#time.timeDelta);
+				scene.tick(this.#timeManager.timeDelta);
 
 				// 출력.
 				scene.preDraw(this.#renderer);
@@ -383,8 +418,8 @@ export class VEngine extends VObject {
 		}
 		
 		// 입력 처리.
-		this.#input.justPressed = false;
-		this.#input.justReleased = false;
+		this.#inputManager.justPressed = false;
+		this.#inputManager.justReleased = false;
 
 		// 다음 프레임 호출 요청.
 		window.requestAnimationFrame(this.#updateEngineCallback);
@@ -395,10 +430,10 @@ export class VEngine extends VObject {
 	//==============================================================================
 	/**
 	 * 
-	 * @param { VScene } scene 
+	 * @param { Scene } scene 
 	 */
 	async loadScene(scene) {
-		if (scene && scene instanceof VScene) {
+		if (scene && scene instanceof Scene) {
 			scene.initialize(this);
 			await scene.load(this);
 			this.#scenes.push(scene);
@@ -410,10 +445,10 @@ export class VEngine extends VObject {
 	//==============================================================================
 	/**
 	 * 
-	 * @param { VScene } scene 
+	 * @param { Scene } scene 
 	 */
 	async unloadScene(scene) {
-		if (scene && scene instanceof VScene) {
+		if (scene && scene instanceof Scene) {
 			await scene.unload(this);
 			scene.finalize();
 			this.#scenes.splice(this.#scenes.indexOf(scene), 1);
@@ -483,16 +518,16 @@ export class VEngine extends VObject {
 		const canvasContext = this.#renderer.getCanvasContext();
 
 		// 좌표계 초기화.
-		const devicePixelRatio = this.#view.devicePixelRatio;
-		const a = this.#view.scale * devicePixelRatio;
-		const e = this.#view.view.position.x * devicePixelRatio;
-		const f = this.#view.view.position.y * devicePixelRatio;
+		const devicePixelRatio = this.#viewManager.devicePixelRatio;
+		const a = this.#viewManager.scale * devicePixelRatio;
+		const e = this.#viewManager.view.position.x * devicePixelRatio;
+		const f = this.#viewManager.view.position.y * devicePixelRatio;
 		canvasContext.setTransform(a, 0, 0, a, e, f);
 
 		// 영역 전체 칠하기.
 		if (color !== null) {
 			canvasContext.fillStyle = color;
-			canvasContext.fillRect(0, 0, this.#view.resolution.x, this.#view.resolution.y);
+			canvasContext.fillRect(0, 0, this.#viewManager.resolution.x, this.#viewManager.resolution.y);
 		}
 	}
 
@@ -514,7 +549,7 @@ export class VEngine extends VObject {
 	/**
 	 * @public
 	 * @method
-	 * @returns { VPlatform }
+	 * @returns { Platform }
 	 */
 	getPlatform() {
 		return this.#platform;
@@ -526,10 +561,10 @@ export class VEngine extends VObject {
 	/**
 	 * @public
 	 * @method
-	 * @returns { VTime }
+	 * @returns { TimeManager }
 	 */
-	getTime() {
-		return this.#time;
+	getTimeManager() {
+		return this.#timeManager;
 	}
 	
 	//==============================================================================
@@ -538,10 +573,10 @@ export class VEngine extends VObject {
 	/**
 	 * @public
 	 * @method
-	 * @returns { VView }
+	 * @returns { ViewManager }
 	 */
-	getView() {
-		return this.#view;
+	getViewManager() {
+		return this.#viewManager;
 	}
 
 	//==============================================================================
@@ -550,10 +585,10 @@ export class VEngine extends VObject {
 	/**
 	 * @public
 	 * @method
-	 * @returns { VInput }
+	 * @returns { InputManager }
 	 */
-	getInput() {
-		return this.#input;
+	getInputManager() {
+		return this.#inputManager;
 	}
 
 	//==============================================================================
@@ -562,7 +597,7 @@ export class VEngine extends VObject {
 	/**
 	 * @public
 	 * @method
-	 * @returns { VRenderer }
+	 * @returns { Renderer }
 	 */
 	getRenderer() {
 		return this.#renderer;

@@ -1,24 +1,25 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "../base/object.js";
-import { VVector2 } from "../base/vector2.js";
-import { VNode } from "../core/node.js";
+import { Object } from "../base/object.js";
+import { Vector2 } from "../base/vector2.js";
+import * as Math from "../base/math.js";
+import { Node } from "../core/node.js";
 
 
 //==============================================================================
 // 터치 입자.
 //==============================================================================
-export class VTouchParticle extends VObject {
-	/** @type { VVector2 } */ position;
-	/** @type { VVector2 } */ velocity;
+export class TouchParticle extends Object {
+	/** @type { Vector2 } */ position;
+	/** @type { Vector2 } */ velocity;
 	/** @type { number } */ life;
 	/** @type { number } */ maxLife;
 	/** @type { number } */ radius;
 	constructor() {
 		super();
-		this.position = VVector2.zero();
-		this.velocity = VVector2.zero();
+		this.position = Vector2.zero();
+		this.velocity = Vector2.zero();
 		this.life = 1.0;
 		this.maxLife = 1.0;
 		this.radius = 0;
@@ -28,18 +29,18 @@ export class VTouchParticle extends VObject {
 //==============================================================================
 // 터치 효과.
 //==============================================================================
-export class VTouchEffect extends VNode {
+export class TouchEffect extends Node {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { VTouchParticle[] } */ touchParticles;
+	/** @type { TouchParticle[] } */ #touchParticles;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	constructor() {
 		super();
-		this.touchParticles = [];
+		this.#touchParticles = [];
 	}
 
 	//==============================================================================
@@ -59,7 +60,7 @@ export class VTouchEffect extends VNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	pushMatrix(renderer) {
 		super.pushMatrix(renderer);
@@ -72,11 +73,11 @@ export class VTouchEffect extends VNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	popMatrix(renderer) {
 		const canvasContext = renderer.getCanvasContext();
-		canvasContext.globalCompositeOperation = "source-over";
+		// canvasContext.globalCompositeOperation = "source-over";
 		super.popMatrix(renderer);
 	}
 
@@ -85,7 +86,7 @@ export class VTouchEffect extends VNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
 		super.draw(renderer);
@@ -96,13 +97,13 @@ export class VTouchEffect extends VNode {
 	// 터치 파티클 생성.
 	//==============================================================================
 	createTouchParticle(x, y) {
-		const particle = new VTouchParticle();
-		particle.position = VVector2.create(x + (Math.random() - 0.5) * 10, y + (Math.random() - 0.5) * 10);
-		particle.velocity = VVector2.create((Math.random() - 0.5) * 120, (Math.random() - 0.5) * 120);
+		const particle = new TouchParticle();
+		particle.position = Vector2.create(x + (Math.random() - 0.5) * 10, y + (Math.random() - 0.5) * 10);
+		particle.velocity = Vector2.create((Math.random() - 0.5) * 120, (Math.random() - 0.5) * 120);
 		particle.life = 1.0;
 		particle.maxLife = 1.0;
 		particle.radius = Math.random() * 25 + 10;
-		this.touchParticles.push(particle);
+		this.#touchParticles.push(particle);
 	}
 
 	//==============================================================================
@@ -112,13 +113,13 @@ export class VTouchEffect extends VNode {
 	 * @param { number } timeDelta 
 	 */
 	updateTouchParticles(timeDelta) {
-		for (let i = this.touchParticles.length - 1; i >= 0; --i) {
-			const particle = this.touchParticles[i];
+		for (let i = this.#touchParticles.length - 1; i >= 0; --i) {
+			const particle = this.#touchParticles[i];
 			particle.life -= timeDelta * 2.5;
 			particle.position.x += particle.velocity.x * timeDelta;
 			particle.position.y += particle.velocity.y * timeDelta;
 			if (particle.life <= 0.0) {
-				this.touchParticles.splice(i, 1);
+				this.#touchParticles.splice(i, 1);
 			}
 		}
 	}
@@ -127,16 +128,16 @@ export class VTouchEffect extends VNode {
 	// 터치 파티클 출력.
 	//==============================================================================
 	/**
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	drawTouchParticles(renderer) {
-		if (this.touchParticles.length === 0) {
+		if (this.#touchParticles.length === 0) {
 			return;
 		}
 
 		const canvasContext = renderer.getCanvasContext();
-		for (let i = 0; i < this.touchParticles.length; ++i) {
-			const particle = this.touchParticles[i];
+		for (let i = 0; i < this.#touchParticles.length; ++i) {
+			const particle = this.#touchParticles[i];
 			const opacity = Math.max(0, particle.life / particle.maxLife);
 
 			const radialGradient = canvasContext.createRadialGradient(

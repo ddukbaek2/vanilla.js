@@ -1,7 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import * as VReflection from "./reflection.js";
+import * as Reflection from "./reflection.js";
 
 
 //==============================================================================
@@ -10,7 +10,7 @@ import * as VReflection from "./reflection.js";
 /**
  * @class
  */
-export class VObject {
+export class Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -55,7 +55,7 @@ export class VObject {
 	 * @returns { this }
 	 */
 	clone() {
-		const obj = VReflection.clone(this);
+		const obj = Reflection.clone(this);
 		return obj;
 	}
 
@@ -68,7 +68,20 @@ export class VObject {
 	 * @returns { this }
 	 */
 	structuredClone() {
-		const obj = VReflection.structuredClone(this);
+		const obj = Reflection.structuredClone(this);
 		return obj;	
 	}
+
+	// //==============================================================================
+	// // 새 인스턴스 생성.
+	// //==============================================================================
+	// /**
+	//  * @static
+	//  * @method
+	//  * @public
+	//  * @returns { this }
+	//  */
+	// static create() {
+	// 	return new this();
+	// }
 }

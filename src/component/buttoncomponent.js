@@ -1,30 +1,31 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VVector2 } from "../base/vector2.js";
-import { VRect } from "../base/rect.js";
-import * as VMath from "../base/math.js";
-import { VOBB } from "../base/obb.js";
-import { VRenderer } from "../core/renderer.js";
-import { VBoundsComponent } from "./bounds.js";
+import { Vector2 } from "../base/vector2.js";
+import { Enum } from "../misc/identifier.js";
+import { Rect } from "../base/rect.js";
+import * as Math from "../base/math.js";
+import { OBB } from "../base/obb.js";
+import { Renderer } from "../core/renderer.js";
+import { BoundsComponent } from "./boundscomponent.js";
 
 
 //==============================================================================
 // 버튼 상태.
 //==============================================================================
 export const VButtonState = {
-	normal: VEnum.auto(),
-	hover: VEnum.auto(),
-	pressed: VEnum.auto(),
-	released: VEnum.auto(),
-	selected: VEnum.auto(),
-	disabled: VEnum.auto(),
+	normal: Enum.auto(),
+	hover: Enum.auto(),
+	pressed: Enum.auto(),
+	released: Enum.auto(),
+	selected: Enum.auto(),
+	disabled: Enum.auto(),
 }
 
 //==============================================================================
 // 버튼 컴포넌트.
 //==============================================================================
-export class VButtonComponent extends VBoundsComponent {
+export class ButtonComponent extends BoundsComponent {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -58,7 +59,7 @@ export class VButtonComponent extends VBoundsComponent {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
 		// super.draw(renderer);

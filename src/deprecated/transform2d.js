@@ -1,20 +1,20 @@
 // //==============================================================================
 // // 포함 모듈 목록.
 // //==============================================================================
-// import { VObject } from "../base/object.js";
-// import { VVector2 } from "../base/vector2.js";
+// import { Object } from "../base/object.js";
+// import { Vector2 } from "../base/vector2.js";
 
 
 // //==============================================================================
 // // 2D 월드 매트릭스.
 // //==============================================================================
-// export class VTransform2D extends VObject {
+// export class VTransform2D extends Object {
 // 	//==============================================================================
 // 	// 멤버 변수 목록.
 // 	//==============================================================================
-// 	/** @private @type { VVector2 } */ #translation; // 이동.
-// 	/** @private @type { VVector2 } */ #scale; // 크기.
-// 	/** @private @type { VVector2 } */ #skew; // 기울임.
+// 	/** @private @type { Vector2 } */ #translation; // 이동.
+// 	/** @private @type { Vector2 } */ #scale; // 크기.
+// 	/** @private @type { Vector2 } */ #skew; // 기울임.
 
 // 	//==============================================================================
 // 	// 생성.
@@ -24,9 +24,9 @@
 // 	 */
 // 	constructor() {
 // 		super();
-// 		this.#translation = VVector2.zero();
-// 		this.#scale = VVector2.one();
-// 		this.#skew = VVector2.zero();
+// 		this.#translation = Vector2.zero();
+// 		this.#scale = Vector2.one();
+// 		this.#skew = Vector2.zero();
 // 	}
 
 // 	//==============================================================================

@@ -1,15 +1,15 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VVector2 } from "../base/vector2.js";
-import { VRenderer } from "../core/renderer.js";
-import { VNode } from "../core/node.js";
+import { Vector2 } from "../base/vector2.js";
+import { Renderer } from "../core/renderer.js";
+import { Node } from "../core/node.js";
 
 
 //==============================================================================
 // UI 기반 뷰.
 //==============================================================================
-export class UINode extends VNode {
+export class UINode extends Node {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -21,8 +21,8 @@ export class UINode extends VNode {
 	//==============================================================================
 	constructor() {
 		super();
-		this.#anchorMin = VVector2.zero();
-		this.#anchorMax = VVector2.zero();
+		this.#anchorMin = Vector2.zero();
+		this.#anchorMax = Vector2.zero();
 	}
 
 	//==============================================================================
@@ -41,7 +41,7 @@ export class UINode extends VNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	pushMatrix(renderer) {
 		super.pushMatrix(renderer);
@@ -52,7 +52,7 @@ export class UINode extends VNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
 		super.draw(renderer);
@@ -63,7 +63,7 @@ export class UINode extends VNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	popMatrix(renderer) {
 		super.popMatrix(renderer);
@@ -73,7 +73,7 @@ export class UINode extends VNode {
 	// 앵커 설정.
 	//==============================================================================
 	/**
-	 * @param { VVector2 } anchorMin 
+	 * @param { Vector2 } anchorMin 
 	 */
 	setAnchorMin(anchorMin) {
 		this.#anchorMin = anchorMin;
@@ -83,7 +83,7 @@ export class UINode extends VNode {
 	// 앵커 설정.
 	//==============================================================================
 	/**
-	 * @param { VVector2 } anchorMax 
+	 * @param { Vector2 } anchorMax 
 	 */
 	setAnchorMax(anchorMax) {
 		this.#anchorMax = anchorMax;
@@ -93,7 +93,7 @@ export class UINode extends VNode {
 	// 앵커 반환.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	getAnchorMin() {
 		return this.#anchorMin;
@@ -103,7 +103,7 @@ export class UINode extends VNode {
 	// 앵커 반환.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	getAnchorMax() {
 		return this.#anchorMax;

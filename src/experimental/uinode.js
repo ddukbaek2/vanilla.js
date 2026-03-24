@@ -1,21 +1,21 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VVector2 } from "../base/vector2.js";
-import { VNode } from "./node.js";
+import { Vector2 as Vector2 } from "../base/vector2.js";
+import { Node } from "../core/node.js";
 
 
 //==============================================================================
 // UI에 특화된 노드.
 //==============================================================================
-export class VUINode extends VNode {
+export class VUINode extends Node {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { VVector2 } */ #pivot;
-	/** @private @type { VVector2 } */ #contentSize;
-	/** @private @type { VVector2 } */ #anchorMin;
-	/** @private @type { VVector2 } */ #anchorMax;
+	/** @private @type { Vector2 } */ #pivot;
+	/** @private @type { Vector2 } */ #contentSize;
+	/** @private @type { Vector2 } */ #anchorMin;
+	/** @private @type { Vector2 } */ #anchorMax;
 
 	//==============================================================================
 	// 생성.
@@ -23,9 +23,16 @@ export class VUINode extends VNode {
 	constructor() {
 		super();
 		
-		this.#pivot = VVector2.zero();
-		this.#contentSize = VVector2.zero();
-		this.#anchorMin = VVector2.zero();
-		this.#anchorMax = VVector2.zero();
+		this.#pivot = Vector2.zero();
+		this.#contentSize = Vector2.zero();
+		this.#anchorMin = Vector2.zero();
+		this.#anchorMax = Vector2.zero();
+	}
+
+	/**
+	 * @returns { Vector2 }
+	 */
+	getContentSize() {
+		return this.#contentSize;
 	}
 }

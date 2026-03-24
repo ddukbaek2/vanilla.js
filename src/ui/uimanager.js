@@ -1,14 +1,14 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "../base/object.js";
-import { VEngine } from "../core/engine.js";
+import { Object } from "../base/object.js";
+import { Engine } from "../core/engine.js";
 
 
 //==============================================================================
 // 이미지 매니저.
 //==============================================================================
-export class UIManager extends VObject {
+export class UIManager extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -35,11 +35,11 @@ export class UIManager extends VObject {
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @param { VEngine } engine 
+	 * @param { Engine } engine 
 	 */
 	update(engine) {
-		const input = engine.getInput();
-		if (input.justPressed) {
+		const inputManager = engine.getInputManager();
+		if (inputManager.justPressed) {
 			// input.position
 		}
 		else {

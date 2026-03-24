@@ -1,19 +1,19 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VColor } from "../base/color.js";
-import { VRenderer } from "../core/renderer.js";
-import { VBoundsComponent } from "./bounds.js";
+import { Color } from "../base/color.js";
+import { Renderer } from "../core/renderer.js";
+import { BoundsComponent } from "./boundscomponent.js";
 
 
 //==============================================================================
 // 내용의 색상과 투명도를 결정하는 컴포넌트.
 //==============================================================================
-export class VColorDrawerComponent extends VBoundsComponent {
+export class ColorComponent extends BoundsComponent {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { VColor } */ #color; // 컬러.
+	/** @private @type { Color } */ #color; // 컬러.
 
 	//==============================================================================
 	// 생성.
@@ -23,14 +23,14 @@ export class VColorDrawerComponent extends VBoundsComponent {
 	 */
 	constructor() {
 		super();
-		this.#color = VColor.white();
+		this.#color = Color.white();
 	}
 
 	//==============================================================================
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
 		// super.draw(renderer);
@@ -49,21 +49,21 @@ export class VColorDrawerComponent extends VBoundsComponent {
 	// 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { string | VColor } other
+	 * @param { string | Color } other
 	 */
 	setColor(other) {
 		if (other === null) {
-			this.#color = VColor.transparent();
+			this.#color = Color.transparent();
 		}
 		else if (typeof other === "string") {
 			if (other.startsWith("#")) {
-				this.#color = VColor.createFromHEX(colorString);
+				this.#color = Color.createFromHEX(colorString);
 			}
 			else if (other.startsWith("rgb")) {
-				this.#color = VColor.createFromRGBA(colorString);
+				this.#color = Color.createFromRGBA(colorString);
 			}
 		}
-		else if (other instanceof VColor) {
+		else if (other instanceof Color) {
 			this.#color = other;
 		}
 	}
@@ -72,7 +72,7 @@ export class VColorDrawerComponent extends VBoundsComponent {
 	// 색상 반환.
 	//==============================================================================
 	/**
-	 * @returns { VColor } 
+	 * @returns { Color } 
 	 */
 	getColor() {
 		return this.#color;

@@ -1,21 +1,21 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "../base/object.js";
-import { VNode } from "./node.js";
-import { VRect } from "../base/rect.js";
-import { VVector2 } from "../base/vector2.js";
-import { VEngine } from "./engine.js";
+import { Object } from "../base/object.js";
+import { Node } from "./node.js";
+import { Rect } from "../base/rect.js";
+import { Vector2 } from "../base/vector2.js";
+import { Engine } from "./engine.js";
 
 
 //==============================================================================
 // 렌더러.
 //==============================================================================
-export class VRenderer extends VObject {
+export class Renderer extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { VEngine } */ #engine;
+	/** @private @type { Engine } */ #engine;
 	/** @private @type { CanvasRenderingContext2D } */ #canvasContext;
 
 	//==============================================================================
@@ -23,7 +23,7 @@ export class VRenderer extends VObject {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { VEngine } engine
+	 * @param { Engine } engine
 	 * @param { CanvasRenderingContext2D } canvasContext
 	 */
 	constructor(engine, canvasContext) {
@@ -36,7 +36,7 @@ export class VRenderer extends VObject {
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @param { VEngine } engine
+	 * @param { Engine } engine
 	 */
 	update(engine) {
 		// 품질 갱신.
@@ -50,7 +50,7 @@ export class VRenderer extends VObject {
 	// 사각형 출력.
 	//==============================================================================
 	/**
-	 * @param { VRect } rect 
+	 * @param { Rect } rect 
 	 * @param { string } color 
 	 * @param { number } opacity 
 	 */
@@ -68,14 +68,14 @@ export class VRenderer extends VObject {
 	//==============================================================================
 	/**
 	 * @param { HTMLImageElement } image
-	 * @param { VVector2 } position
-	 * @param { VVector2 } size
-	 * @param { VRect } slices
+	 * @param { Vector2 } position
+	 * @param { Vector2 } size
+	 * @param { Rect } slices
 	 * @param { number } rotation
 	 * @param { string } color 
 	 * @param { number } opacity 
 	 */
-	drawImage(image, position = VVector2.zero(), size = VVector2.zero(), slices = null, rotation = 0.0, color = "#ffffff", opacity = 1.0) {
+	drawImage(image, position = Vector2.zero(), size = Vector2.zero(), slices = null, rotation = 0.0, color = "#ffffff", opacity = 1.0) {
 		if (image === null){
 			throw new Error("image is null");
 		}
@@ -85,17 +85,17 @@ export class VRenderer extends VObject {
 		canvasContext.globalAlpha = opacity;
 		canvasContext.fillStyle = color;
 		canvasContext.rotate(rotation);
-		// if (size === VVector2.zero()) {
+		// if (size === Vector2.zero()) {
 		// 	canvasContext.drawImage(image, position.x, position.y, image.width, image.height);
 		// }
-		// else if (slices === null || slices == VRect.zero()) {
+		// else if (slices === null || slices == Rect.zero()) {
 		// 	canvasContext.drawImage(image, position.x, position.y, size.x, size.y);
 		// }
 		// else {
 		// 	canvasContext.drawImage(image, slices.position.x, slices.position.y, slices.size.x, slices.size.y, position.x, position.y, size.x, size.y);
 		// }
-		if (slices === null || slices == VRect.zero()) {
-			slices = VRect.create(0, 0, image.width, image.height);
+		if (slices === null || slices == Rect.zero()) {
+			slices = Rect.create(0, 0, image.width, image.height);
 		}
 
 		canvasContext.drawImage(image, slices.position.x, slices.position.y, slices.size.x, slices.size.y, position.x, position.y, size.x, size.y);
@@ -108,9 +108,9 @@ export class VRenderer extends VObject {
 	/**
 	 * @static
 	 * @param { HTMLImageElement } image
-	 * @param { VVector2 } position
-	 * @param { VVector2 } size
-	 * @param { VRect } patch
+	 * @param { Vector2 } position
+	 * @param { Vector2 } size
+	 * @param { Rect } patch
 	 */
 	// drawImageNinePatch(image, position, size, patch) {
 	// 	const canvasContext = this.getCanvasContext();
@@ -181,18 +181,17 @@ export class VRenderer extends VObject {
 	// 노드 출력.
 	//==============================================================================
 	/**
-	 * @param { VNode } node
+	 * @param { Node } node
 	 */
 	drawNode(node) {
-		if (node === null) {
+		if (node === null || !node.isActive()) {
 			return;
 		}
-
-		const engine = this.getEngine();
 
 		try {
 			node.pushMatrix(this);
 			node.draw(this);
+			// node.drawGizmos(this);
 
 			// 자식 출력.
 			for (const child of node.getChildren()) {
@@ -204,17 +203,13 @@ export class VRenderer extends VObject {
 		catch (error) {
 			throw error;
 		}
-		
-		// if (engine.isDevelopment()) {
-		// 	node.drawGizmos(this);
-		// }
 	}
 
 	//==============================================================================
 	// 출력 영역 제한 시작.
 	//==============================================================================
 	/**
-	 * @type { VRect } rect
+	 * @type { Rect } rect
 	 */
 	beginClip(rect) {
 		const engine = this.#engine;
@@ -236,7 +231,7 @@ export class VRenderer extends VObject {
 	// 엔진 반환.
 	//==============================================================================
 	/**
-	 * @returns { VEngine }
+	 * @returns { Engine }
 	 */
 	getEngine() {
 		return this.#engine;

@@ -1,23 +1,23 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VVector2 } from "../base/vector2.js";
-import * as VMath from "../base/math.js";
-import { VRenderer } from "../core/renderer.js"
-import { VNode } from "../core/node.js";
-import { VRect } from "../base/rect.js";
-import { VImageAsset } from "../resource/imageasset.js";
+import { Vector2 } from "../base/vector2.js";
+import * as Math from "../base/math.js";
+import { Renderer } from "../core/renderer.js"
+import { Node } from "../core/node.js";
+import { Rect } from "../base/rect.js";
+import { ImageAsset } from "../resource/imageasset.js";
 
 
 //==============================================================================
 // 스프라이트.
 //==============================================================================
-export class VSprite extends VNode {
+export class Sprite extends Node {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { HTMLImageElement } */ #image;
-	/** @private @type { VRect } */ #slices;
+	/** @private @type { Rect } */ #slices;
 	/** @private @type { boolean } */ #isHorizontalFlip;
 	/** @private @type { boolean } */ #isVerticalFlip;
 
@@ -27,7 +27,7 @@ export class VSprite extends VNode {
 	constructor() {
 		super();
 		this.#image = null;
-		this.#slices = VRect.zero();
+		this.#slices = Rect.zero();
 		this.#isHorizontalFlip = false;
 		this.#isVerticalFlip = false;
 	}
@@ -52,7 +52,7 @@ export class VSprite extends VNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
 		const canvasContext = renderer.getCanvasContext();
@@ -64,8 +64,8 @@ export class VSprite extends VNode {
 
 		// 소스 조정.
 		let slices = this.getSlices();
-		if (slices === null || slices.equals(VRect.zero())) {
-			slices = VRect.create(0, 0, image.width, image.height);
+		if (slices === null || slices.equals(Rect.zero())) {
+			slices = Rect.create(0, 0, image.width, image.height);
 		}
 
 		const size = super.getContentSize();
@@ -80,13 +80,13 @@ export class VSprite extends VNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	calculateTransformScale() {
 		const scale = super.calculateTransformScale();
 		const isHorizontalFlip = this.isHorizontalFlip();
 		const isVerticalFlip = this.isVerticalFlip();
-		let flippedScale = VVector2.create(isHorizontalFlip ? -scale.x : scale.x, isVerticalFlip ? -scale.y : scale.y);
+		let flippedScale = Vector2.create(isHorizontalFlip ? -scale.x : scale.x, isVerticalFlip ? -scale.y : scale.y);
 		return flippedScale;
 	}
 
@@ -95,7 +95,7 @@ export class VSprite extends VNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	calculatePivotPosition() {
 		const pivotPosition = super.calculatePivotPosition();
@@ -115,7 +115,7 @@ export class VSprite extends VNode {
 	// 이미지 설정.
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement | VImageAsset } image 
+	 * @param { HTMLImageElement | ImageAsset } image 
 	 */
 	setImage(image) {
 		if (image === null) {
@@ -124,7 +124,7 @@ export class VSprite extends VNode {
 		else if (image instanceof HTMLImageElement) {
 			this.#image = image;
 		}
-		else if (image instanceof VImageAsset) {
+		else if (image instanceof ImageAsset) {
 			this.#image = image.image;
 		}
 	}
@@ -143,7 +143,7 @@ export class VSprite extends VNode {
 	// 이미지 부분 설정.
 	//==============================================================================
 	/**
-	 * @param { VRect } slices
+	 * @param { Rect } slices
 	 */
 	setSlices(slices) {
 		this.#slices = slices;
@@ -153,7 +153,7 @@ export class VSprite extends VNode {
 	// 이미지 부분 반환.
 	//==============================================================================
 	/**
-	 * @returns { VRect }
+	 * @returns { Rect }
 	 */
 	getSlices() {
 		return this.#slices;
@@ -183,7 +183,7 @@ export class VSprite extends VNode {
 	// 이미지 뒤집기 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	isHorizontalFlip() {
 		return this.#isHorizontalFlip;
@@ -193,7 +193,7 @@ export class VSprite extends VNode {
 	// 이미지 뒤집기 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	isVerticalFlip() {
 		return this.#isVerticalFlip;

@@ -1,10 +1,10 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VVector2 } from "../base/vector2.js";
-import { VRenderer } from "../core/renderer.js";
+import { Vector2 } from "../base/vector2.js";
+import { Renderer } from "../core/renderer.js";
 import { UINode } from "./uinode.js";
-import { VFontAsset } from "../resource/fontasset.js";
+import { FontAsset } from "../resource/fontasset.js";
 
 
 //==============================================================================
@@ -54,7 +54,7 @@ export class UILabel extends UINode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
 		// super.draw(renderer);
@@ -86,7 +86,7 @@ export class UILabel extends UINode {
 	// 폰트 설정.
 	//==============================================================================
 	/**
-	 * @param { FontFace | VFontAsset } font 
+	 * @param { FontFace | FontAsset } font 
 	 */
 	setFont(font) {
 		if (font === null) {
@@ -95,7 +95,7 @@ export class UILabel extends UINode {
 		else if (font instanceof FontFace) {
 			this.#fontFace = font;
 		}
-		else if (font instanceof VFontAsset) {
+		else if (font instanceof FontAsset) {
 			this.#fontFace = font.fontFace;
 		}
 	}

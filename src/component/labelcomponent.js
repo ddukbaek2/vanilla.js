@@ -1,17 +1,17 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VVector2 } from "../base/vector2.js";
-import { VRect } from "../base/rect.js";
-import { VRenderer } from "../core/renderer.js";
-import { VComponent } from "../core/component.js";
-import { VFontAsset } from "../resource/fontasset.js";
+import { Vector2 } from "../base/vector2.js";
+import { Rect } from "../base/rect.js";
+import { Renderer } from "../core/renderer.js";
+import { Component } from "../core/component.js";
+import { FontAsset } from "../resource/fontasset.js";
 
 
 //==============================================================================
 // 텍스트 출력자 컴포넌트.
 //==============================================================================
-export class VTextDrawerComponent extends VComponent {
+export class LabelComponent extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -56,7 +56,7 @@ export class VTextDrawerComponent extends VComponent {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
 		if (!this.#text) {
@@ -83,7 +83,7 @@ export class VTextDrawerComponent extends VComponent {
 	// 폰트 설정.
 	//==============================================================================
 	/**
-	 * @param { FontFace | VFontAsset } font 
+	 * @param { FontFace | FontAsset } font 
 	 */
 	setFont(font) {
 		if (font === null) {
@@ -92,7 +92,7 @@ export class VTextDrawerComponent extends VComponent {
 		else if (font instanceof FontFace) {
 			this.#fontFace = font;
 		}
-		else if (font instanceof VFontAsset) {
+		else if (font instanceof FontAsset) {
 			this.#fontFace = font.fontFace;
 		}
 	}
@@ -207,14 +207,14 @@ export class VTextDrawerComponent extends VComponent {
 	}
 
 	//==============================================================================
-	// 텍스트가 출력되는 영역을 VRect로 반환.
+	// 텍스트가 출력되는 영역을 Rect로 반환.
 	//==============================================================================
 	/**
-	 * @param { VRenderer } renderer
-	 * @param { VTextDrawerComponent } textDrawerComponent
+	 * @param { Renderer } renderer
+	 * @param { LabelComponent } textDrawerComponent
 	 * @param { string } text
 	 * @param { string } font
-	 * @returns { VRect }
+	 * @returns { Rect }
 	 */
 	static calculateTextBounds(renderer, textDrawerComponent) {
 		const fontFace = textDrawerComponent.getFontFace();
@@ -235,8 +235,8 @@ export class VTextDrawerComponent extends VComponent {
 		const scale = this.getScale();
 
 		// 피봇과 스케일이 적용된 크기 계산.
-		const scaledWidth = width * VMath.abs(scale.x);
-		const scaledHeight = height * VMath.abs(scale.y);
+		const scaledWidth = width * Math.abs(scale.x);
+		const scaledHeight = height * Math.abs(scale.y);
 
 		// 좌상단 좌표 계산.
 		// const x = position.x - (scaledWidth * pivot.x);
@@ -245,6 +245,6 @@ export class VTextDrawerComponent extends VComponent {
 		const y = position.y - scaledHeight;
 		canvasContext.restore();
 
-		return VRect.create(x, y, scaledWidth, scaledHeight);
+		return Rect.create(x, y, scaledWidth, scaledHeight);
 	}
 }

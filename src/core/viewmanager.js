@@ -1,24 +1,24 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "../base/object.js";
-import { VVector2 } from "../base/vector2.js";
-import { VRect } from "../base/rect.js";
-import { VEngine } from "./engine.js";
+import { Object } from "../base/object.js";
+import { Vector2 } from "../base/vector2.js";
+import { Rect } from "../base/rect.js";
+import { Engine } from "./engine.js";
 
 
 //==============================================================================
-// 뷰 인스턴스.
+// 뷰 매니저.
 //==============================================================================
-export class VView extends VObject {
+export class ViewManager extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @public @type { number } */ devicePixelRatio;
 	/** @public @type { number } */ scale;
-	/** @public @type { VVector2 } */ resolution; // 원하는 영역.
-	/** @public @type { VVector2 } */ screen; // 전체 화면 영역.
-	/** @public @type { VRect } */ view; // 보여지는 실제 영역.
+	/** @public @type { Vector2 } */ resolution; // 원하는 영역.
+	/** @public @type { Vector2 } */ screen; // 전체 화면 영역.
+	/** @public @type { Rect } */ view; // 보여지는 실제 영역.
 
 
 	//==============================================================================
@@ -26,15 +26,15 @@ export class VView extends VObject {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { VEngine } engine 
+	 * @param { Engine } engine 
 	 */
 	constructor(engine) {
 		super();
 		this.devicePixelRatio = 1;
 		this.scale = 1;
-		this.resolution = VVector2.zero();
-		this.screen = VVector2.zero();
-		this.view = VRect.zero();
+		this.resolution = Vector2.zero();
+		this.screen = Vector2.zero();
+		this.view = Rect.zero();
 	}
 	
 	//==============================================================================

@@ -1,21 +1,21 @@
 // //==============================================================================
 // // 포함 모듈 목록.
 // //==============================================================================
-// import { VObject } from "../base/object.js";
-// import { VVector2 } from "../base/vector2.js";
-// import { VRect } from "../base/rect.js";
-// import { VOBB } from "../base/obb.js";
+// import { Object } from "../base/object.js";
+// import { Vector2 } from "../base/vector2.js";
+// import { Rect } from "../base/rect.js";
+// import { OBB } from "../base/obb.js";
 
 
 // //==============================================================================
 // // 축 정렬된 바운딩 박스.
 // //==============================================================================
-// export class VAABB extends VObject {
+// export class VAABB extends Object {
 // 	//==============================================================================
 // 	// 멤버 변수 목록.
 // 	//==============================================================================
-// 	/** @private @type { VVector2 } */ #position;
-// 	/** @private @type { VVector2 } */ #size;
+// 	/** @private @type { Vector2 } */ #position;
+// 	/** @private @type { Vector2 } */ #size;
 
 // 	//==============================================================================
 // 	// 생성.
@@ -25,22 +25,22 @@
 // 	 */
 // 	constructor() {
 // 		super();
-// 		this.#position = VVector2.zero();
-// 		this.#size = VVector2.zero();
+// 		this.#position = Vector2.zero();
+// 		this.#size = Vector2.zero();
 // 	}
 
 // 	//==============================================================================
 // 	// 좌표와 충돌 검출.
 // 	//==============================================================================
 // 	/**
-// 	 * @param { VVector2 } other
+// 	 * @param { Vector2 } other
 // 	 * @returns { boolean }
 // 	 */
 // 	contains(other) {
 // 		if (other === null) {
 // 			return false;
 // 		}
-// 		else if (other instanceof VVector2) {
+// 		else if (other instanceof Vector2) {
 
 // 		}
 		
@@ -51,20 +51,20 @@
 // 	// 좌표와 충돌 검출.
 // 	//==============================================================================
 // 	/**
-// 	 * @param { VRect | VAABB | VOBB } other
+// 	 * @param { Rect | VAABB | OBB } other
 // 	 * @returns { boolean }
 // 	 */
 // 	overlaps(other) {
 // 		if (other === null) {
 // 			return false;
 // 		}
-// 		else if (other instanceof VRect) {
+// 		else if (other instanceof Rect) {
 
 // 		}
 // 		else if (other instanceof VAABB) {
 
 // 		}
-// 		else if (other instanceof VOBB) {
+// 		else if (other instanceof OBB) {
 
 // 		}
 // 		return false;

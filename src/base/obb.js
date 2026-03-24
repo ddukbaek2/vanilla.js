@@ -1,18 +1,19 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "./object.js";
-import { VVector2 } from "./vector2.js";
+const System = globalThis;
+import { Object } from "./object.js";
+import { Vector2 } from "./vector2.js";
 
 
 //==============================================================================
 // 회전된 바운딩 박스.
 //==============================================================================
-export class VOBB extends VObject {
+export class OBB extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { VVector2[] } */ #edges;
+	/** @type { Vector2[] } */ #edges;
 
 	//==============================================================================
 	// 생성.
@@ -22,21 +23,23 @@ export class VOBB extends VObject {
 	 */
 	constructor() {
 		super();
-		this.#edges = [VVector2.zero(), VVector2.zero(), VVector2.zero(), VVector2.zero()];
+		this.#edges = [
+			Vector2.zero(), Vector2.zero(), Vector2.zero(), Vector2.zero()
+		];
 	}
 
 	//==============================================================================
 	// 좌표와 충돌 검출.
 	//==============================================================================
 	/**
-	 * @param { VVector2 } point
+	 * @param { Vector2 } point
 	 * @returns { boolean }
 	 */
 	contains(other) {
 		if (other === null) {
 			return false;
 		}
-		else if (other instanceof VVector2) {
+		else if (other instanceof Vector2) {
 			const edges = this.getEdges();
 			let isInside = false;
 			for (let i = 0, j = edges.length - 1; i < edges.length; j = i++) {
@@ -60,7 +63,7 @@ export class VOBB extends VObject {
 	// 분리축 정리(SAT)를 이용한 다각형(OBB) 간의 충돌 검출.
 	//==============================================================================
 	/**
-	 * @param { VOBB } other
+	 * @param { OBB } other
 	 * @returns { boolean }
 	 */
 	overlaps(other) {
@@ -107,17 +110,17 @@ export class VOBB extends VObject {
 	// 모서리 목록 설정.
 	//==============================================================================
 	/**
-	 * @returns { VVector2[] }
+	 * @returns { Vector2[] }
 	 */
 	setEdges(edges) {
 		if (edges === null) {
-			throw new Error(`edges is null.`);
+			throw new System.Error(`edges is null.`);
 		}
-		if (!Array.isArray(edges)) {
-			throw new Error(`edges is not Array.`);
+		if (!System.Array.isArray(edges)) {
+			throw new System.Error(`edges is not Array.`);
 		}
 		if (this.#edges.length !== edges.length) {
-			throw new Error(`edges.length !== this.#edges.length.`);
+			throw new System.Error(`edges.length !== this.#edges.length.`);
 		}
 
 		for (let i = 0; i < this.#edges.length; ++i) {
@@ -129,7 +132,7 @@ export class VOBB extends VObject {
 	// 모서리 목록 반환.
 	//==============================================================================
 	/**
-	 * @returns { VVector2[] }
+	 * @returns { Vector2[] }
 	 */
 	getEdges() {
 		return this.#edges;

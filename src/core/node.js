@@ -1,30 +1,28 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "../base/object.js";
-import { VVector2 } from "../base/vector2.js";
-import { VRenderer } from "./renderer.js";
-import * as VMath from "../base/math.js";
-import { VComponent } from "./component.js";
+import { Object } from "../base/object.js";
+import { Vector2 } from "../base/vector2.js";
+import { Renderer } from "./renderer.js";
+import * as Math from "../base/math.js";
+import { Component } from "./component.js";
 
 
 //==============================================================================
 // 계층 및 영역 객체.
 //==============================================================================
-export class VNode extends VObject {
+export class Node extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { VComponent[] } */ #components; // 컴포넌트 목록.
-	/** @private @type { VNode | null } */ #parent; // 부모 노드.
-	/** @private @type { VNode[] } */ #children; // 자식 노드 목록.
-	/** @private @type { VVector2 } */ #position; // 위치.
-	/** @private @type { VVector2 } */ #scale; // 크기.
+	/** @private @type { Component[] } */ #components; // 컴포넌트 목록.
+	/** @private @type { Node | null } */ #parent; // 부모 노드.
+	/** @private @type { Node[] } */ #children; // 자식 노드 목록.
+	/** @private @type { Vector2 } */ #position; // 위치.
+	/** @private @type { Vector2 } */ #scale; // 크기.
 	/** @private @type { number } */ #rotation; // 회전값. (degree)
 	/** @private @type { boolean } */ #isActive; // 활성화 여부.
-	/** @private @type { boolean } */ #isVisible; // 렌더링 여부.
 	/** @private @type { number } */ #opacity; // 투명도.
-	/** @private @type { boolean } */ #isVisibleGizmos; // 기즈모 출력 여부.
 
 	//==============================================================================
 	// 생성.
@@ -37,13 +35,11 @@ export class VNode extends VObject {
 		this.#components = [];
 		this.#parent = null;
 		this.#children = [];
-		this.#position = VVector2.zero();
-		this.#scale = VVector2.one();
+		this.#position = Vector2.zero();
+		this.#scale = Vector2.one();
 		this.#rotation = 0.0;
 		this.#isActive = true;
-		this.#isVisible = true;
 		this.#opacity = 1.0;
-		this.#isVisibleGizmos = false;
 	}
 
 	//==============================================================================
@@ -54,6 +50,10 @@ export class VNode extends VObject {
 	 * @param { number } timeDelta 
 	 */
 	tick(timeDelta) {
+		if (!this.isActive()) {
+			return;
+		}
+
 		// 컴포넌트.
 		for (const component of this.getAllComponents()) {
 			component.tick(timeDelta);
@@ -61,9 +61,7 @@ export class VNode extends VObject {
 
 		// 자식.
 		for (const child of this.#children) {
-			if (child.isActive()) {
-				child.tick(timeDelta);
-			}
+			child.tick(timeDelta);
 		}
 	}
 
@@ -72,7 +70,7 @@ export class VNode extends VObject {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	pushMatrix(renderer) {
 		const canvasContext = renderer.getCanvasContext();
@@ -80,7 +78,7 @@ export class VNode extends VObject {
 
 		const position = this.getPosition();
 		const degree = this.getRotation();
-		let radian = VMath.degreeToRadian(degree);
+		let radian = Math.degreeToRadian(degree);
 		const scale = this.getScale();
 		const opacity = this.getOpacity();
 
@@ -96,7 +94,7 @@ export class VNode extends VObject {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
 		// 중심점 출력.
@@ -117,7 +115,7 @@ export class VNode extends VObject {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	popMatrix(renderer) {
 		const canvasContext = renderer.getCanvasContext();
@@ -129,7 +127,7 @@ export class VNode extends VObject {
 	// //==============================================================================
 	// /**
 	//  * @virtual
-	//  * @param { VRenderer } renderer 
+	//  * @param { Renderer } renderer 
 	//  */
 	// drawGizmos(renderer) {
 	// 	if (!this.isVisibleGizmos()) {
@@ -140,20 +138,20 @@ export class VNode extends VObject {
 	// 	const canvasContext = renderer.getCanvasContext();
 
 	// 	const degree = this.getRotation();
-	// 	const radian = VMath.degreeToRadian(degree);
+	// 	const radian = Math.degreeToRadian(degree);
 
 	// 	// 이미지 회전이 반영된 기준점 출력.
 	// 	canvasContext.fillStyle = "#00ff00";
 	// 	const worldCorners = this.getWorldCorners();
-	// 	const pivots = [VPiVPivotvot2D.topLeft, VPivot.topRight, VPivot.bottomRight, VPivot.bottomLeft];
+	// 	const pivots = [VPiVPivotvot2D.topLeft, Pivot.topRight, Pivot.bottomRight, Pivot.bottomLeft];
 	// 	for (let i = 0; i < worldCorners.length; ++i) {
 	// 		const worldCorner = worldCorners[i];
 	// 		canvasContext.save();
 	// 		engine.gameViewIdentity(null);
 	// 		canvasContext.translate(worldCorner.x, worldCorner.y);
 	// 		canvasContext.rotate(radian);
-	// 		const contentSize = VVector2.create(4, 4);//.divide(this.getScale());
-	// 		const pivotPosition = VVector2.zero().subtract(contentSize.multiply(pivots[i]));
+	// 		const contentSize = Vector2.create(4, 4);//.divide(this.getScale());
+	// 		const pivotPosition = Vector2.zero().subtract(contentSize.multiply(pivots[i]));
 	// 		canvasContext.fillRect(pivotPosition.x, pivotPosition.y, contentSize.x, contentSize.y);
 	// 		canvasContext.restore();
 	// 	}
@@ -193,7 +191,7 @@ export class VNode extends VObject {
 	// 객체로 컴포넌트 제거.
 	//==============================================================================
 	/**
-	 * @param { VComponent } component 
+	 * @param { Component } component 
 	 */
 	removeComponent(component) {
 		const index = this.#components.indexOf(component);
@@ -219,7 +217,7 @@ export class VNode extends VObject {
 	// 모든 컴포넌트 목록 반환.
 	//==============================================================================
 	/**
-	 * @returns { VComponent[] }
+	 * @returns { Component[] }
 	 */
 	getAllComponents() {
 		return this.#components;
@@ -230,7 +228,7 @@ export class VNode extends VObject {
 	//==============================================================================
 	/**
 	 * @param { Function } componentType 
-	 * @returns { VComponent | null }
+	 * @returns { Component | null }
 	 */
 	getComponent(componentType) {
 		const component = this.#components.find(component => component instanceof componentType);
@@ -245,7 +243,7 @@ export class VNode extends VObject {
 	//==============================================================================
 	/**
 	 * @param { Function } componentType 
-	 * @returns { VComponent[] }
+	 * @returns { Component[] }
 	 */
 	getComponents(componentType) {
 		const components = [];
@@ -261,7 +259,7 @@ export class VNode extends VObject {
 	// 부모 설정.
 	//==============================================================================
 	/**
-	 * @param { VNode } parent 
+	 * @param { Node } parent 
 	 */
 	setParent(parent) {
 		// 기존 부모가 존재 할 경우.
@@ -294,7 +292,7 @@ export class VNode extends VObject {
 	// 자식 추가.
 	//==============================================================================
 	/**
-	 * @param { VNode } child 
+	 * @param { Node } child 
 	 */
 	addChild(child) {
 		child.setParent(this);
@@ -304,7 +302,7 @@ export class VNode extends VObject {
 	// 자식 제거.
 	//==============================================================================
 	/**
-	 * @param { VNode } child 
+	 * @param { Node } child 
 	 */
 	removeChild(child) {
 		child.setParent(null);
@@ -349,7 +347,7 @@ export class VNode extends VObject {
 	// 부모 반환.
 	//==============================================================================
 	/**
-	 * @returns { VNode } 
+	 * @returns { Node } 
 	 */
 	getParent() {
 		return this.#parent;
@@ -359,7 +357,7 @@ export class VNode extends VObject {
 	// 자식 목록 반환.
 	//==============================================================================
 	/**
-	 * @returns { VNode[] } 
+	 * @returns { Node[] } 
 	 */
 	getChildren() {
 		return this.#children;
@@ -379,7 +377,7 @@ export class VNode extends VObject {
 	// 자식 반환.
 	//==============================================================================
 	/**
-	 * @returns { VNode } 
+	 * @returns { Node } 
 	 */
 	getChild(index) {
 		return this.#children[index];
@@ -389,7 +387,7 @@ export class VNode extends VObject {
 	// 위치 설정.
 	//==============================================================================
 	/**
-	 * @param { VVector2 } position 
+	 * @param { Vector2 } position 
 	 */
 	setPosition(position) {
 		this.#position = position;
@@ -399,7 +397,7 @@ export class VNode extends VObject {
 	// 위치 반환.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 } 
+	 * @returns { Vector2 } 
 	 */
 	getPosition() {
 		return this.#position;
@@ -409,7 +407,7 @@ export class VNode extends VObject {
 	// 크기 설정.
 	//==============================================================================
 	/**
-	 * @param { VVector2 } scale 
+	 * @param { Vector2 } scale 
 	 */
 	setScale(scale) {
 		this.#scale = scale;
@@ -419,7 +417,7 @@ export class VNode extends VObject {
 	// 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 } 
+	 * @returns { Vector2 } 
 	 */
 	getScale() {
 		return this.#scale;
@@ -489,16 +487,6 @@ export class VNode extends VObject {
 	}
 
 	//==============================================================================
-	// 가시 상태 설정.
-	//==============================================================================
-	/**
-	 * @param { boolean } visible 
-	 */
-	setVisible(visible) {
-		this.#isVisible = visible;
-	}
-
-	//==============================================================================
 	// 현재부터 루트까지 계층 전체의 가시 상태 반환. (루트까지 하나라도 비활성화상태면 false 반환)
 	//==============================================================================
 	/**
@@ -528,7 +516,9 @@ export class VNode extends VObject {
 	 * @returns { boolean } 
 	 */
 	isVisible() {
-		return this.#isVisible;
+		const opacity = this.getOpacity();
+		const isVisible = opacity > 0;
+		return isVisible;
 	}
 
 	//==============================================================================
@@ -538,7 +528,7 @@ export class VNode extends VObject {
 	 * @param { number } opacity 
 	 */
 	setOpacity(opacity) {
-		this.#opacity = VMath.clamp(opacity, 0, 1);
+		this.#opacity = Math.clamp(opacity, 0, 1);
 	}
 
 	//==============================================================================
@@ -552,33 +542,13 @@ export class VNode extends VObject {
 	}
 
 	//==============================================================================
-	// 기즈모 그리기 설정.
-	//==============================================================================
-	/**
-	 * @param { boolean }
-	 */
-	setVisibleGizmos(visible) {
-		this.#isVisibleGizmos = visible;
-	}
-
-	//==============================================================================
-	// 기즈모 그리기 여부 반환.
-	//==============================================================================
-	/**
-	 * @returns { boolean }
-	 */
-	isVisibleGizmos() {
-		return this.#isVisibleGizmos;
-	}
-
-	//==============================================================================
 	// 새로운 노드 생성.
 	//==============================================================================
 	/**
-	 * @returns { VNode }
+	 * @returns { Node }
 	 */
 	static create() {
-		var obj = new VNode();
+		var obj = new Node();
 		return obj;
 	}
 }

@@ -2,14 +2,14 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "./object.js";
-import * as VMath from "../base/math.js";
+import { Object } from "./object.js";
+import * as Math from "../base/math.js";
 
 
 //==============================================================================
 // 2차원 벡터.
 //==============================================================================
-export class VVector2 extends VObject
+export class Vector2 extends Object
 {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -46,7 +46,7 @@ export class VVector2 extends VObject
 		}
 		
 		if (other) {
-			if (other instanceof VVector2) {
+			if (other instanceof Vector2) {
 				if (this.x === other.x && this.y === other.y) {
 					return true;
 				}
@@ -95,7 +95,7 @@ export class VVector2 extends VObject
 	 * @returns { number }
 	 */
 	length() {
-		const length = VMath.sqrt(this.x * this.x + this.y * this.y);
+		const length = Math.sqrt(this.x * this.x + this.y * this.y);
 		return length;
 	}
 
@@ -103,10 +103,10 @@ export class VVector2 extends VObject
 	// 정규화.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	normalize() {
-		const origin = VVector2.create(this.x, this.y);
+		const origin = Vector2.create(this.x, this.y);
 		const length = this.length();		
 		if (length > 0)
 		{
@@ -121,8 +121,8 @@ export class VVector2 extends VObject
 	// 더하기.
 	//==============================================================================
 	/**
-	 * @param { VVector2 | number } other
-	 * @returns { VVector2 }
+	 * @param { Vector2 | number } other
+	 * @returns { Vector2 }
 	 */
 	add(other) {
 		const obj = this.clone();
@@ -131,21 +131,21 @@ export class VVector2 extends VObject
 			obj.y += other;
 			return obj;
 		}
-		else if (other instanceof VVector2) {
+		else if (other instanceof Vector2) {
 			obj.x += other.x;
 			obj.y += other.y;
 			return obj;
 		}
 		
-		throw new Error("Invalid type: 'other' must be a number or an instance of VVector2.");
+		throw new Error("Invalid type: 'other' must be a number or an instance of Vector2.");
 	}
 
 	//==============================================================================
 	// 빼기.
 	//==============================================================================
 	/**
-	 * @param { VVector2 | number } other
-	 * @returns { VVector2 }
+	 * @param { Vector2 | number } other
+	 * @returns { Vector2 }
 	 */
 	subtract(other) {
 		const obj = this.clone();
@@ -154,21 +154,21 @@ export class VVector2 extends VObject
 			obj.y -= other;
 			return obj;
 		}
-		else if (other instanceof VVector2) {
+		else if (other instanceof Vector2) {
 			obj.x -= other.x;
 			obj.y -= other.y;
 			return obj;
 		}
 		
-		throw new Error("Invalid type: 'other' must be a number or an instance of VVector2.");
+		throw new Error("Invalid type: 'other' must be a number or an instance of Vector2.");
 	}
 
 	//==============================================================================
 	// 곱하기.
 	//==============================================================================
 	/**
-	 * @param { VVector2 | number } other
-	 * @returns { VVector2 }
+	 * @param { Vector2 | number } other
+	 * @returns { Vector2 }
 	 */
 	multiply(other) {
 		const obj = this.clone();
@@ -177,21 +177,21 @@ export class VVector2 extends VObject
 			obj.y *= other;
 			return obj;
 		}
-		else if (other instanceof VVector2) {
+		else if (other instanceof Vector2) {
 			obj.x *= other.x;
 			obj.y *= other.y;
 			return obj;
 		}
 		
-		throw new Error("Invalid type: 'other' must be a number or an instance of VVector2.");
+		throw new Error("Invalid type: 'other' must be a number or an instance of Vector2.");
 	}
 
 	//==============================================================================
 	// 나누기.
 	//==============================================================================
 	/**
-	 * @param { VVector2 | number } other
-	 * @returns { VVector2 }
+	 * @param { Vector2 | number } other
+	 * @returns { Vector2 }
 	 */
 	divide(other) {
 		const obj = this.clone();
@@ -200,21 +200,21 @@ export class VVector2 extends VObject
 			obj.y /= other;
 			return obj;
 		}
-		else if (other instanceof VVector2) {
+		else if (other instanceof Vector2) {
 			obj.x /= other.x;
 			obj.y /= other.y;
 			return obj;
 		}
 		
-		throw new Error("Invalid type: 'other' must be a number or an instance of VVector2.");
+		throw new Error("Invalid type: 'other' must be a number or an instance of Vector2.");
 	}
 
 	//==============================================================================
 	// 나머지.
 	//==============================================================================
 	/**
-	 * @param { VVector2 | number } other
-	 * @returns { VVector2 }
+	 * @param { Vector2 | number } other
+	 * @returns { Vector2 }
 	 */
 	modulo(other) {
 		const obj = this.clone();
@@ -223,20 +223,20 @@ export class VVector2 extends VObject
 			obj.y /= other;
 			return obj;
 		}
-		else if (other instanceof VVector2) {
+		else if (other instanceof Vector2) {
 			obj.x /= other.x;
 			obj.y /= other.y;
 			return obj;
 		}
 		
-		throw new Error("Invalid type: 'other' must be a number or an instance of VVector2.");
+		throw new Error("Invalid type: 'other' must be a number or an instance of Vector2.");
 	}
 
 	//==============================================================================
 	// 절반.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	half() {
 		const obj = this.divide(0.5);
@@ -247,8 +247,8 @@ export class VVector2 extends VObject
 	// 빼기.
 	//==============================================================================
 	/**
-	 * @param { VVector2 | number } other
-	 * @returns { VVector2 }
+	 * @param { Vector2 | number } other
+	 * @returns { Vector2 }
 	 */
 	sub(other) {
 		return this.subtract(other);
@@ -258,8 +258,8 @@ export class VVector2 extends VObject
 	// 곱하기.
 	//==============================================================================
 	/**
-	 * @param { VVector2 | number } other
-	 * @returns { VVector2 }
+	 * @param { Vector2 | number } other
+	 * @returns { Vector2 }
 	 */
 	mul(other) {
 		return this.multiply(other);
@@ -269,8 +269,8 @@ export class VVector2 extends VObject
 	// 나누기.
 	//==============================================================================
 	/**
-	 * @param { VVector2 | number } other
-	 * @returns { VVector2 }
+	 * @param { Vector2 | number } other
+	 * @returns { Vector2 }
 	 */
 	div(other) {
 		return this.divide(other);
@@ -280,8 +280,8 @@ export class VVector2 extends VObject
 	// 나머지.
 	//==============================================================================
 	/**
-	 * @param { VVector2 | number } other
-	 * @returns { VVector2 }
+	 * @param { Vector2 | number } other
+	 * @returns { Vector2 }
 	 */
 	mod(other) {
 		return this.modulo(other);
@@ -306,10 +306,10 @@ export class VVector2 extends VObject
 	/**
 	 * @param { number } x
 	 * @param { number } y
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	static create(x, y) {
-		var obj = new VVector2();
+		var obj = new Vector2();
 		obj.x = x;
 		obj.y = y;
 		return obj;
@@ -319,54 +319,54 @@ export class VVector2 extends VObject
 	// 0의 값을 가진 벡터 생성.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	static zero() {
-		return VVector2.create(0, 0);
+		return Vector2.create(0, 0);
 	}
 
 	//==============================================================================
 	// 1의 값을 가진 벡터 생성.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	static one() {
-		return VVector2.create(1, 1);
+		return Vector2.create(1, 1);
 	}
 
 	//==============================================================================
 	// 최대값 벡터 생성.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	static positiveInfinity() {
-		return VVector2.create(Infinity, Infinity);
+		return Vector2.create(Infinity, Infinity);
 	}
 
 	//==============================================================================
 	// 최소값 벡터 생성.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	static negativeInfinity() {
-		return VVector2.create(-Infinity, -Infinity);
+		return Vector2.create(-Infinity, -Infinity);
 	}
 
 	//==============================================================================
 	// 선형 보간.
 	//==============================================================================
 	/**
-	 * @param { VVector2 } from
-	 * @param { VVector2 } to
+	 * @param { Vector2 } from
+	 * @param { Vector2 } to
 	 * @param { number } normalizedTime
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	static lerp(from, to, normalizedTime) {		
-		const x = VMath.lerp(from.x, to.x, normalizedTime);
-		const y = VMath.lerp(from.y, to.y, normalizedTime);
-		return VVector2.create(x, y);
+		const x = Math.lerp(from.x, to.x, normalizedTime);
+		const y = Math.lerp(from.y, to.y, normalizedTime);
+		return Vector2.create(x, y);
 	}
 }

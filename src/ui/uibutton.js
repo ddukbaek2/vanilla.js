@@ -1,25 +1,25 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VRect } from "../base/rect.js";
-import { VVector2 } from "../base/vector2.js";
-import { VRenderer } from "../core/renderer.js";
-import { VEnum } from "../misc/identifier.js";
+import { Rect } from "../base/rect.js";
+import { Vector2 } from "../base/vector2.js";
+import { Renderer } from "../core/renderer.js";
+import { Enum } from "../misc/identifier.js";
 import { UINode } from "./uinode.js";
-// import { VFontAsset } from "../core/fontasset.js";
-import { VSprite } from "../rendering/sprite.js";
+// import { FontAsset } from "../core/fontasset.js";
+import { Sprite } from "../rendering/sprite.js";
 
 
 //==============================================================================
 // 버튼 상태.
 //==============================================================================
 export const ButtonState = {
-	normal: VEnum.auto(),
-	hover: VEnum.auto(),
-	pressed: VEnum.auto(),
-	released: VEnum.auto(),
-	selected: VEnum.auto(),
-	disabled: VEnum.auto(),
+	normal: Enum.auto(),
+	hover: Enum.auto(),
+	pressed: Enum.auto(),
+	released: Enum.auto(),
+	selected: Enum.auto(),
+	disabled: Enum.auto(),
 }
 
 
@@ -32,7 +32,7 @@ export class UIButton extends UINode {
 	//==============================================================================
 	/** @private @type { ButtonState } */ #buttonState;
 	/** @private @type { Function } */ #clickEvent;
-	/** @private @type { VSprite } */ #sprite;
+	/** @private @type { Sprite } */ #sprite;
 
 	//==============================================================================
 	// 생성.
@@ -41,7 +41,7 @@ export class UIButton extends UINode {
 		super();
 		this.#buttonState = ButtonState.normal;
 		this.#clickEvent = null;
-		this.#sprite = new VSprite();
+		this.#sprite = new Sprite();
 		this.addChild(this.#sprite);
 	}
 
@@ -89,7 +89,7 @@ export class UIButton extends UINode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
 		// super.draw(renderer);
@@ -143,7 +143,7 @@ export class UIButton extends UINode {
 	 * @returns { boolean }
 	 */
 	contains(position) {
-		const rect = VRect.create(this.position.x, this.position.y, this.size.x, this.size.y);
+		const rect = Rect.create(this.position.x, this.position.y, this.size.x, this.size.y);
 		if (rect.overlaps(position)) {
 			return true;
 		}

@@ -1,33 +1,33 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "./object.js";
-import { VVector2 } from "./vector2.js";
+import { Object } from "./object.js";
+import { Vector2 } from "./vector2.js";
 
 
 //==============================================================================
 // 사각 영역.
 //==============================================================================
-export class VRect extends VObject {
+export class Rect extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @public @type { VVector2 } */ position; // left-top.
-	/** @public @type { VVector2 } */ size;
+	/** @public @type { Vector2 } */ position; // 좌상.
+	/** @public @type { Vector2 } */ size; // 좌상-우하.
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { VVector2 } position
-	 * @param { VVector2 } size
+	 * @param { Vector2 } position
+	 * @param { Vector2 } size
 	 */
 	constructor() {
 		super();
 
-		this.position = VVector2.zero();
-		this.size = VVector2.zero();
+		this.position = Vector2.zero();
+		this.size = Vector2.zero();
 	}
 
 	//==============================================================================
@@ -35,18 +35,18 @@ export class VRect extends VObject {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { VVector2 | VRect } other
+	 * @param { Vector2 | Rect } other
 	 * @returns { boolean }
 	 */
 	overlaps(other) {
-		if (other instanceof VVector2) {
+		if (other instanceof Vector2) {
 			if (other.x < this.position.x || other.x > this.position.x + this.size.x)
 				return false;
 			if (other.y < this.position.y || other.y > this.position.y + this.size.y)
 				return false;
 			return true;
 		}
-		else if (other instanceof VRect) {
+		else if (other instanceof Rect) {
 			if (this.position.x + this.size.x < other.position.x || this.position.x > other.position.x + other.size.x)
 				return false;
 			if (this.position.y + this.size.y < other.position.y || this.position.y > other.position.y + other.size.y)
@@ -54,14 +54,14 @@ export class VRect extends VObject {
 			return true;
 		}
 		
-		throw new Error("Invalid type: 'other' must be an instance of VVector2 or VRect.");
+		throw new Error("Invalid type: 'other' must be an instance of Vector2 or Rect.");
 	}
 
 	//==============================================================================
-	// 중앙 위치 설정.
+	// 가운데 설정 프로퍼티.
 	//==============================================================================
 	/**
-	 * @param { VVector2 } other
+	 * @param { Vector2 } other
 	 */
 	set center(value) {
 		this.position.x = value.x - this.width / 2;
@@ -69,10 +69,10 @@ export class VRect extends VObject {
 	}
 
 	//==============================================================================
-	// 가운데 반환.
+	// 가운데 반환 프로퍼티.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	get center() {
 		const origin = this.position.clone();
@@ -82,56 +82,56 @@ export class VRect extends VObject {
 	}
 
 	//==============================================================================
-	// 왼쪽 설정.
+	// 왼쪽 설정 프로퍼티.
 	//==============================================================================
 	set left(value) {
 		this.position.x = value;
 	}
 
 	//==============================================================================
-	// 왼쪽 반환.
+	// 왼쪽 반환 프로퍼티.
 	//==============================================================================
 	get left() {
 		return this.position.x;
 	}
 
 	//==============================================================================
-	// 위쪽 설정.
+	// 위쪽 설정 프로퍼티.
 	//==============================================================================
 	set top(value) {
 		this.position.y = value;
 	}
 
 	//==============================================================================
-	// 위쪽 반환.
+	// 위쪽 반환 프로퍼티.
 	//==============================================================================
 	get top() {
 		return this.position.y;
 	}
 
 	//==============================================================================
-	// 오른쪽 설정.
+	// 오른쪽 설정 프로퍼티.
 	//==============================================================================
 	set right(value) {
 		this.position.x = value - this.width;
 	}
 	
 	//==============================================================================
-	// 오른쪽 반환.
+	// 오른쪽 반환 프로퍼티.
 	//==============================================================================
 	get right() {
 		return this.position.x + this.width;
 	}
 
 	//==============================================================================
-	// 아래쪽 설정.
+	// 아래쪽 설정 프로퍼티.
 	//==============================================================================
 	set bottom(value) {
 		this.position.y = value - this.height;
 	}
 
 	//==============================================================================
-	// 아래쪽 반환.
+	// 아래쪽 반환 프로퍼티.
 	//==============================================================================
 	get bottom() {
 		return this.position.y + this.height;
@@ -153,7 +153,7 @@ export class VRect extends VObject {
 		}
 		
 		if (other) {
-			if (other instanceof VRect) {
+			if (other instanceof Rect) {
 				if (this.position.equals(other.position) && this.size.equals(other.size)) {
 					return true;
 				}
@@ -167,12 +167,12 @@ export class VRect extends VObject {
 	// // 새로운 사각 영역 생성.
 	// //==============================================================================
 	// /**
-	//  * @param { VVector2 } position
-	//  * @param { VVector2 } size
-	//  * @returns { VRect }
+	//  * @param { Vector2 } position
+	//  * @param { Vector2 } size
+	//  * @returns { Rect }
 	//  */
 	// static create(position, size) {
-	// 	var obj = new VRect();
+	// 	var obj = new Rect();
 	// 	obj.position = position;
 	// 	obj.size = size;
 	// 	return obj;
@@ -186,12 +186,12 @@ export class VRect extends VObject {
 	 * @param { number } y
 	 * @param { number } width
 	 * @param { number } height
-	 * @returns { VRect }
+	 * @returns { Rect }
 	 */
 	static create(x, y, width, height) {
-		var obj = new VRect();
-		obj.position = VVector2.create(x, y);
-		obj.size = VVector2.create(width, height);
+		var obj = new Rect();
+		obj.position = Vector2.create(x, y);
+		obj.size = Vector2.create(width, height);
 		return obj;
 	}
 
@@ -199,9 +199,9 @@ export class VRect extends VObject {
 	// 크기가 없는 빈 사각 영역 생성.
 	//==============================================================================
 	/**
-	 * @returns { VRect }
+	 * @returns { Rect }
 	 */
 	static zero() {
-		return VRect.create(0, 0, 0, 0);
+		return Rect.create(0, 0, 0, 0);
 	}
 }

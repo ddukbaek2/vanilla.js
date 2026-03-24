@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+const System = globalThis;
 // const WaitForSeconds = (seconds) => new Promise(resolve => setTimeout(resolve, seconds * 1000));
 
 
@@ -9,9 +10,9 @@
 //==============================================================================
 /**
  * @param { number } seconds
- * @returns { Promise<void> }
+ * @returns { System.Promise<void> }
  */
 export async function seconds(seconds) {
-	const promise = new Promise(resolve => setTimeout(resolve, seconds * 1000));
+	const promise = new System.Promise(resolve => System.setTimeout(resolve, seconds * 1000));
 	await promise;
 }

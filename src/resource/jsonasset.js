@@ -1,18 +1,19 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VTextAsset } from "../resource/textasset.js";
+const System = globalThis;
+import { TextAsset } from "../resource/textasset.js";
 
 
 //==============================================================================
 // JSON 데이터 애셋.
 //==============================================================================
-export class VJsonAsset extends VTextAsset
+export class JsonAsset extends TextAsset
 {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { Object | null } */ data;
+	/** @type { System.Object | null } */ data;
 
 	//==============================================================================
 	// 생성.
@@ -32,7 +33,7 @@ export class VJsonAsset extends VTextAsset
 	async load(assetPath) {
 		// 이미 로드 된 상태라면.
 		if (super.isLoaded) {
-			return Promise.resolve();
+			return System.Promise.resolve();
 		}
 
 		// 로드.

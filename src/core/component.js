@@ -1,19 +1,21 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "../base/object.js";
-import { VNode } from "./node.js";
-import { VRenderer } from "../core/renderer.js";
+import { Object } from "../base/object.js";
+import { Node } from "./node.js";
+import { Renderer } from "../core/renderer.js";
 
 
 //==============================================================================
 // 컴포넌트.
 //==============================================================================
-export class VComponent extends VObject {
+export class Component extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { VNode } */ #node;
+	/** @private @type { Node } */ #node; // 소유권자.
+	/** @private @type { boolean } */ #isEnable; // 활성화 여부.
+	/** @private @type { boolean } */ #isVisibleGizmos; // 기즈모 출력 여부.
 
 	//==============================================================================
 	// 생성.
@@ -24,6 +26,8 @@ export class VComponent extends VObject {
 	constructor() {
 		super();
 		this.#node = null;
+		this.#isEnable = true;
+		this.#isVisibleGizmos = false;
 	}
 
 	//==============================================================================
@@ -42,17 +46,28 @@ export class VComponent extends VObject {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
 		// 출력.
 	}
 
 	//==============================================================================
+	// 기즈모 출력.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { Renderer } renderer 
+	 */
+	drawGizmos(renderer) {
+
+	}
+
+	//==============================================================================
 	// 소유권자 설정.
 	//==============================================================================
 	/**
-	 * @param { VNode } node 
+	 * @param { Node } node 
 	 */
 	setNode(node) {
 		this.#node = node;
@@ -62,9 +77,29 @@ export class VComponent extends VObject {
 	// 소유권자 반환.
 	//==============================================================================
 	/**
-	 * @returns { VNode } 
+	 * @returns { Node } 
 	 */
 	getNode() {
 		return this.#node;
+	}
+
+	//==============================================================================
+	// 기즈모 그리기 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean }
+	 */
+	setVisibleGizmos(visible) {
+		this.#isVisibleGizmos = visible;
+	}
+
+	//==============================================================================
+	// 기즈모 그리기 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isVisibleGizmos() {
+		return this.#isVisibleGizmos;
 	}
 }

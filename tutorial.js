@@ -1,11 +1,11 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VEngine } from "./src/core/engine.js";
-import { VRenderer } from "./src/core/renderer.js";
-import { VGameInstance } from "./src/core/gameinstance.js";
-import { VRect } from "./src/base/rect.js";
-import { VVector2 } from "./src/base/vector2.js";
+import { Engine } from "./src/core/engine.js";
+import { Renderer } from "./src/core/renderer.js";
+import { Rect } from "./src/base/rect.js";
+import { Vector2 } from "./src/base/vector2.js";
+import { Scene } from "./import.js";
 
 
 //==============================================================================
@@ -19,19 +19,19 @@ const COLOR_VANILLA = "#f3e5ab";
 //==============================================================================
 // 게임 인스턴스.
 //==============================================================================
-class Tutorial extends VGameInstance {
+class Tutorial extends Scene {
 
 	//==============================================================================
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
-	onDraw(renderer) {
-		super.onDraw(renderer);
+	draw(renderer) {
+		super.draw(renderer);
 
 		const engine = super.getEngine();
-		const view = engine.getView();
+		const viewManager = engine.getViewManager();
 
 		// 전체 영역 초기화.
 		engine.viewIdentity(COLOR_VANILLA);
@@ -40,10 +40,10 @@ class Tutorial extends VGameInstance {
 		engine.gameViewIdentity(COLOR_LIGHTVANILLA);
 
 		// 사각형 그리기.
-		let boxPosition = VVector2.create(0, 0);
-		let boxSize = VVector2.create(100, 100);
-		boxPosition = boxPosition.add(view.resolution.divide(2)).subtract(boxSize.divide(2));
-		renderer.drawRect(VRect.create(boxPosition.x, boxPosition.y, boxSize.x, boxSize.y), COLOR_DARKVANILLA);
+		let boxPosition = Vector2.create(0, 0);
+		let boxSize = Vector2.create(100, 100);
+		boxPosition = boxPosition.add(viewManager.resolution.divide(2)).subtract(boxSize.divide(2));
+		renderer.drawRect(Rect.create(boxPosition.x, boxPosition.y, boxSize.x, boxSize.y), COLOR_DARKVANILLA);
 		// console.log(boxPosition);
 	}
 }
@@ -57,6 +57,6 @@ if (canvas === null) {
 }
 
 // 엔진 실행.
-const engine = new VEngine(800, 1280, "tutorial", true);
-document.title = "vanilla.js";
+const engine = new Engine(800, 1280, "tutorial", true);
+document.title = "vanilla.js - Tutorial";
 engine.run(new Tutorial());

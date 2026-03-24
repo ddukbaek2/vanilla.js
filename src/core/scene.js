@@ -1,26 +1,26 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "../base/object.js";
-import { VVector2 } from "../base/vector2.js";
-import { VEngine } from "./engine.js";
-import { VRenderer } from "./renderer.js";
-import { VNode } from "./node.js";
-import { VTween } from "./tween.js";
-import { VTouchEffect } from "../misc/toucheffect.js";
+import { Object } from "../base/object.js";
+import { Vector2 } from "../base/vector2.js";
+import { Engine } from "./engine.js";
+import { Renderer } from "./renderer.js";
+import { Node } from "./node.js";
+import { Tween } from "./tween.js";
+import { TouchEffect } from "../misc/toucheffect.js";
 
 
 //==============================================================================
 // 씬.
 //==============================================================================
-export class VScene extends VObject {
+export class Scene extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { VEngine } */ #engine;
-	/** @private @type { VNode } */ #root;
+	/** @private @type { Engine } */ #engine;
+	/** @private @type { Node } */ #root;
 	/** @private @type { VTweeneen[] } */ #tweens;
-	/** @private @type { VTouchEffect } */ #touchEffect;
+	/** @private @type { TouchEffect } */ #touchEffect;
 
 	//==============================================================================
 	// 생성.
@@ -37,7 +37,7 @@ export class VScene extends VObject {
 	 * @virtual
 	 */
 	create() {
-		this.#root = VNode.create();
+		this.#root = Node.create();
 		this.#tweens = [];
 	}
 
@@ -46,13 +46,13 @@ export class VScene extends VObject {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { VEngine } engine 
+	 * @param { Engine } engine 
 	 */
 	initialize(engine) {
 		this.#engine = engine;
 
 		// 터치 효과 초기화.
-		this.#touchEffect = new VTouchEffect(engine);
+		this.#touchEffect = new TouchEffect(engine);
 	}
 
 	//==============================================================================
@@ -70,7 +70,7 @@ export class VScene extends VObject {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { VEngine } engine 
+	 * @param { Engine } engine 
 	 */
 	async load(engine) {
 		await Promise.resolve();
@@ -81,10 +81,22 @@ export class VScene extends VObject {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { VEngine } engine 
+	 * @param { Engine } engine 
 	 */
 	async unload(engine) {
 		await Promise.resolve();
+	}
+
+	//==============================================================================
+	// 화면 크기 변경됨.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { Vector2 } screenSize
+	 */
+	resize(screenSize) {
+		console.log(`Scene.resize(${screenSize.x}, ${screenSize.y})`);
+		// this.#root.
 	}
 
 	//==============================================================================
@@ -95,7 +107,11 @@ export class VScene extends VObject {
 	 * @param { number } timeDelta 
 	 */
 	tick(timeDelta) {
-		this.#root.tick(timeDelta);		
+		if (this.#root.isActive()) {
+			this.#root.tick(timeDelta);
+		}
+
+		// 터치 갱신.
 		this.tickTouch(timeDelta);
 
 		// 트윈 목록 갱신.
@@ -117,17 +133,17 @@ export class VScene extends VObject {
 	 */
 	tickTouch(timeDelta) {
 		const engine = this.getEngine();
-		const input = engine.getInput();
+		const inputManager = engine.getInputManager();
 
 		// 터치 처리.
-		if (input.justPressed) {
-			this.touchPress(input.x, input.y);
+		if (inputManager.justPressed) {
+			this.touchPress(inputManager.x, inputManager.y);
 		}
-		else if (input.justReleased) {
-			this.touchRelease(input.x, input.y);
+		else if (inputManager.justReleased) {
+			this.touchRelease(inputManager.x, inputManager.y);
 		}
-		else if (input.justMoved) {
-			this.touchMove(input.position);
+		else if (inputManager.justMoved) {
+			this.touchMove(inputManager.position);
 		}
 
 		// 터치 효과 갱신.
@@ -139,7 +155,7 @@ export class VScene extends VObject {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { VVector2 } worldPosition
+	 * @param { Vector2 } worldPosition
 	 */
 	touchPress(worldPosition) {
 
@@ -150,7 +166,7 @@ export class VScene extends VObject {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { VVector2 } worldPosition
+	 * @param { Vector2 } worldPosition
 	 */
 	touchMove(worldPosition) {
 		// 터치 효과 처리.
@@ -162,7 +178,7 @@ export class VScene extends VObject {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { VVector2 } worldPosition
+	 * @param { Vector2 } worldPosition
 	 */
 	touchRelease(worldPosition) {
 
@@ -173,7 +189,7 @@ export class VScene extends VObject {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	preDraw(renderer) {
 		// // 노드 출력.
@@ -185,7 +201,7 @@ export class VScene extends VObject {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
 		// 노드 출력.
@@ -197,7 +213,7 @@ export class VScene extends VObject {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	postDraw(renderer) {
 		// 터치 효과 출력.
@@ -208,7 +224,7 @@ export class VScene extends VObject {
 	// 트윈 시작.
 	//==============================================================================
 	/**
-	 * @param { VTween } tween 
+	 * @param { Tween } tween 
 	 */
 	startTween(tween) {
 		const index = this.#tweens.indexOf(tween);
@@ -224,7 +240,7 @@ export class VScene extends VObject {
 	// 트윈 중단.
 	//==============================================================================
 	/**
-	 * @param { VTween } tween 
+	 * @param { Tween } tween 
 	 */
 	stopTween(tween) {
 		const index = this.#tweens.indexOf(tween);
@@ -251,7 +267,7 @@ export class VScene extends VObject {
 	// 엔진 반환.
 	//==============================================================================
 	/**
-	 * @returns { VEngine } 
+	 * @returns { Engine } 
 	 */
 	getEngine() {
 		return this.#engine;
@@ -261,9 +277,21 @@ export class VScene extends VObject {
 	// 루트 노드 반환.
 	//==============================================================================
 	/**
-	 * @returns { VRenderer } 
+	 * @returns { Renderer } 
 	 */
 	getRoot() {
 		return this.#root;
+	}
+
+	//==============================================================================
+	// 캔버스 렌더링 컨텍스트 반환.
+	//==============================================================================
+	/**
+	 * @returns { CanvasRenderingContext2D } 
+	 */
+	getCanvasContext() {
+		const engine = this.getEngine();
+		const renderer = engine.getRenderer();
+		return renderer.getCanvasContext();
 	}
 }

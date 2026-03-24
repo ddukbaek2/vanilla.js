@@ -1,14 +1,15 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "./object.js";
-import * as VMath from "../base/math.js";
+const System = globalThis;
+import { Object } from "./object.js";
+import * as Math from "../base/math.js";
 
 
 //==============================================================================
 // 색상.
 //==============================================================================
-export class VColor extends VObject {
+export class Color extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -42,7 +43,7 @@ export class VColor extends VObject {
 	 * @param { number } value
 	 */
 	set red(value) {
-		this.#red = VMath.clamp(value, 0.0, 1.0);
+		this.#red = Math.clamp(value, 0.0, 1.0);
 	}
 
 	//==============================================================================
@@ -62,7 +63,7 @@ export class VColor extends VObject {
 	 * @param { number } value
 	 */
 	set blue(value) {
-		this.#blue = VMath.clamp(value, 0.0, 1.0);
+		this.#blue = Math.clamp(value, 0.0, 1.0);
 	}
 
 	//==============================================================================
@@ -82,7 +83,7 @@ export class VColor extends VObject {
 	 * @param { number } value
 	 */
 	set green(value) {
-		this.#green = VMath.clamp(value, 0.0, 1.0);
+		this.#green = Math.clamp(value, 0.0, 1.0);
 	}
 
 	//==============================================================================
@@ -102,7 +103,7 @@ export class VColor extends VObject {
 	 * @param { number } value
 	 */
 	set alpha(value) {
-		this.#alpha = VMath.clamp(value, 0.0, 1.0);
+		this.#alpha = Math.clamp(value, 0.0, 1.0);
 	}
 
 	//==============================================================================
@@ -123,9 +124,9 @@ export class VColor extends VObject {
 	 * @returns { string }
 	 */
 	toRGBAString() {
-		const red = VMath.round(this.red * 255);
-		const green = VMath.round(this.green * 255);
-		const blue = VMath.round(this.blue * 255);
+		const red = Math.round(this.red * 255);
+		const green = Math.round(this.green * 255);
+		const blue = Math.round(this.blue * 255);
 		if (this.alpha < 1.0) {
 			const alpha = this.alpha;
 			return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
@@ -144,11 +145,11 @@ export class VColor extends VObject {
 	 * @returns { string }
 	 */
 	toHEXString() {
-		const red = VMath.round(this.red * 255).toString(16).padStart(2, "0");
-		const green = VMath.round(this.green * 255).toString(16).padStart(2, "0");
-		const blue = VMath.round(this.blue * 255).toString(16).padStart(2, "0");
+		const red = Math.round(this.red * 255).toString(16).padStart(2, "0");
+		const green = Math.round(this.green * 255).toString(16).padStart(2, "0");
+		const blue = Math.round(this.blue * 255).toString(16).padStart(2, "0");
 		if (this.alpha < 1.0) {
-			const alpha = VMath.round(this.alpha * 255).toString(16).padStart(2, "0");
+			const alpha = Math.round(this.alpha * 255).toString(16).padStart(2, "0");
 			return `#${red}${green}${blue}${alpha}`;
 		}
 		else {
@@ -161,10 +162,10 @@ export class VColor extends VObject {
 	// 하얀색 생성.
 	//==============================================================================
 	/**
-	 * @returns { VColor }
+	 * @returns { Color }
 	 */
 	static white() {
-		const color = new VColor(1, 1, 1, 1);
+		const color = new Color(1, 1, 1, 1);
 		return color;
 	}
 
@@ -172,10 +173,10 @@ export class VColor extends VObject {
 	// 검은색 생성.
 	//==============================================================================
 	/**
-	 * @returns { VColor }
+	 * @returns { Color }
 	 */
 	static black() {
-		const color = new VColor(0, 0, 0, 1);
+		const color = new Color(0, 0, 0, 1);
 		return color;
 	}
 
@@ -183,10 +184,10 @@ export class VColor extends VObject {
 	// 투명색 생성.
 	//==============================================================================
 	/**
-	 * @returns { VColor }
+	 * @returns { Color }
 	 */
 	static transparent() {
-		const color = new VColor(0, 0, 0, 0);
+		const color = new Color(0, 0, 0, 0);
 		return color;
 	}
 
@@ -199,24 +200,24 @@ export class VColor extends VObject {
 	//==============================================================================
 	/**
 	 * @param { string } colorString 
-	 * @returns { VColor }
+	 * @returns { Color }
 	 */
 	static createFromHEX(colorString) {
-		const color = new VColor(1.0, 1.0, 1.0, 1.0);
+		const color = new Color(1.0, 1.0, 1.0, 1.0);
 		colorString = colorString.trim().toLowerCase();
 		if (colorString.startsWith("#")) {
 			let hex = colorString.substring(1);
 
 			// 3자리나 4자리의 축약형 색상 코드 일 경우.
 			if (hex.length === 3 || hex.length === 4) {
-				hex = Array.from(hex).map(char => char + char).join("");
+				hex = System.Array.from(hex).map(char => char + char).join("");
 			}
 
-			color.red = Number.parseInt(hex.substring(0, 2), 16) / 255.0;
-			color.green = Number.parseInt(hex.substring(2, 4), 16) / 255.0;
-			color.blue = Number.parseInt(hex.substring(4, 6), 16) / 255.0;
+			color.red = System.Number.parseInt(hex.substring(0, 2), 16) / 255.0;
+			color.green = System.Number.parseInt(hex.substring(2, 4), 16) / 255.0;
+			color.blue = System.Number.parseInt(hex.substring(4, 6), 16) / 255.0;
 			if (hex.length === 8) {
-				color.alpha = Number.parseInt(hex.substring(6, 8), 16) / 255.0;
+				color.alpha = System.Number.parseInt(hex.substring(6, 8), 16) / 255.0;
 			}
 		}
 
@@ -230,19 +231,19 @@ export class VColor extends VObject {
     //==============================================================================
     /**
      * @param { string } colorString 
-     * @returns { VColor }
+     * @returns { Color }
      */
     static createFromRGBA(colorString) {
-        const color = new VColor(1.0, 1.0, 1.0, 1.0);
+        const color = new Color(1.0, 1.0, 1.0, 1.0);
         colorString = colorString.trim().toLowerCase();
         if (colorString.startsWith("rgb")) {
             const match = colorString.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/);
             if (match) {
-                color.red = Number.parseInt(match[1], 10) / 255.0;
-                color.green = Number.parseInt(match[2], 10) / 255.0;
-                color.blue = Number.parseInt(match[3], 10) / 255.0;
+                color.red = System.Number.parseInt(match[1], 10) / 255.0;
+                color.green = System.Number.parseInt(match[2], 10) / 255.0;
+                color.blue = System.Number.parseInt(match[3], 10) / 255.0;
                 if (match[4] !== undefined) {
-                    color.alpha = Number.parseFloat(match[4]);
+                    color.alpha = System.Number.parseFloat(match[4]);
                 }
             }
         }

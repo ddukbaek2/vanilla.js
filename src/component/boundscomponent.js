@@ -1,13 +1,13 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VVector2 } from "../base/vector2.js";
-import { VRect } from "../base/rect.js";
-import * as VMath from "../base/math.js";
-import { VComponent } from "../core/component.js";
-import { VPivot } from "../base/pivot.js";
-import { VOBB } from "../base/obb.js";
-import { VRenderer } from "../core/renderer.js";
+import { Vector2 } from "../base/vector2.js";
+import { Rect } from "../base/rect.js";
+import * as Math from "../base/math.js";
+import { Component } from "../core/component.js";
+import { Pivot } from "../base/pivot.js";
+import { OBB } from "../base/obb.js";
+import { Renderer } from "../core/renderer.js";
 
 
 
@@ -16,12 +16,12 @@ import { VRenderer } from "../core/renderer.js";
 // - 출력될 대상 크기와 크기를 기준으로한 피봇을 지정할 수 있다.
 // - 해당 값에 따라서 월드코너 값을 계산하여 반환한다.
 //==============================================================================
-export class VBoundsComponent extends VComponent {
+export class BoundsComponent extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { VVector2 } */ #pivot; // 기준점.
-	/** @private @type { VVector2 } */ #contentSize; // 크기.
+	/** @private @type { Vector2 } */ #pivot; // 기준점.
+	/** @private @type { Vector2 } */ #contentSize; // 크기.
 
 	//==============================================================================
 	// 생성.
@@ -31,8 +31,8 @@ export class VBoundsComponent extends VComponent {
 	 */
 	constructor() {
 		super();
-		this.#contentSize = VVector2.zero();
-		this.#pivot = VPivot.middleCenter;
+		this.#contentSize = Vector2.zero();
+		this.#pivot = Pivot.middleCenter;
 	}
 
 	//==============================================================================
@@ -49,7 +49,7 @@ export class VBoundsComponent extends VComponent {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
 		// super.draw(renderer);
@@ -73,7 +73,7 @@ export class VBoundsComponent extends VComponent {
 	// 크기 설정.
 	//==============================================================================
 	/**
-	 * @param { VVector2 } size 
+	 * @param { Vector2 } size 
 	 */
 	setContentSize(size) {
 		this.#contentSize = size;
@@ -83,7 +83,7 @@ export class VBoundsComponent extends VComponent {
 	// 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 } 
+	 * @returns { Vector2 } 
 	 */
 	getContentSize() {
 		return this.#contentSize;
@@ -93,19 +93,19 @@ export class VBoundsComponent extends VComponent {
 	// 피봇 설정.
 	//==============================================================================
 	/**
-	 * @param { VVector2 } pivot
+	 * @param { Vector2 } pivot
 	 */
 	setPivot(pivot) {
 		this.#pivot = pivot;
-		this.#pivot.x = VMath.clamp(this.#pivot.x, 0, 1);
-		this.#pivot.y = VMath.clamp(this.#pivot.y, 0, 1);
+		this.#pivot.x = Math.clamp(this.#pivot.x, 0, 1);
+		this.#pivot.y = Math.clamp(this.#pivot.y, 0, 1);
 	}
 
 	//==============================================================================
 	// 피봇 반환.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	getPivot() {
 		return this.#pivot;
@@ -115,20 +115,20 @@ export class VBoundsComponent extends VComponent {
 	// 피봇에 기반한 로컬 위치 반환.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	getPivotPosition() {
 		const node = this.getNode();
 		const contentSize = this.getContentSize();
 		const pivot = this.getPivot();
-		return VVector2.create(-(contentSize.x * pivot.x), -(contentSize.y * pivot.y));
+		return Vector2.create(-(contentSize.x * pivot.x), -(contentSize.y * pivot.y));
 	}
 
 	//==============================================================================
 	// 실제 화면에 그려지는 영역 반환. (OBB)
 	//==============================================================================
 	/**
-	 * @returns { VVector2[] }
+	 * @returns { Vector2[] }
 	 */
 	getWorldCorners() {
 		const node = this.getNode();
@@ -138,23 +138,23 @@ export class VBoundsComponent extends VComponent {
 		const contentSize = this.getContentSize();
 		const pivot = this.getPivot();
 
-		const width = contentSize.x * VMath.abs(scale.x);
-		const height = contentSize.y * VMath.abs(scale.y);
+		const width = contentSize.x * Math.abs(scale.x);
+		const height = contentSize.y * Math.abs(scale.y);
 
 		const left = -(width * pivot.x);
 		const right = width * (1 - pivot.x);
 		const top = -(height * pivot.y);
 		const bottom = height * (1 - pivot.y);
 
-		const radian = VMath.degreeToRadian(degree);
-		const cosR = VMath.cos(radian);
-		const sinR = VMath.sin(radian);
+		const radian = Math.degreeToRadian(degree);
+		const cosR = Math.cos(radian);
+		const sinR = Math.sin(radian);
 
 		return [
-			VVector2.create(left * cosR - top * sinR + position.x, left * sinR + top * cosR + position.y),
-			VVector2.create(right * cosR - top * sinR + position.x, right * sinR + top * cosR + position.y),
-			VVector2.create(right * cosR - bottom * sinR + position.x, right * sinR + bottom * cosR + position.y),
-			VVector2.create(left * cosR - bottom * sinR + position.x, left * sinR + bottom * cosR + position.y)
+			Vector2.create(left * cosR - top * sinR + position.x, left * sinR + top * cosR + position.y),
+			Vector2.create(right * cosR - top * sinR + position.x, right * sinR + top * cosR + position.y),
+			Vector2.create(right * cosR - bottom * sinR + position.x, right * sinR + bottom * cosR + position.y),
+			Vector2.create(left * cosR - bottom * sinR + position.x, left * sinR + bottom * cosR + position.y)
 		];
 	}
 
@@ -162,16 +162,16 @@ export class VBoundsComponent extends VComponent {
 	// getWorldCorners()를 기반으로 최소, 최대위치를 만들어 바운딩박스를 형성.
 	//==============================================================================
 	/**
-	 * @returns { VRect }
+	 * @returns { Rect }
 	 */
 	getWorldBounds() {
 		const worldCorners = this.getWorldCorners();
 		// const width = worldCorners[1].x - worldCorners[0].x; // rt - lt;
 		// const height = worldCorners[2].y - worldCorners[0].y; // rb - lt;
-		// return VRect.create(worldCorners[0].x, worldCorners[0].y, width, height);
+		// return Rect.create(worldCorners[0].x, worldCorners[0].y, width, height);
 
-		let min = VVector2.positiveInfinity();
-		let max = VVector2.negativeInfinity();
+		let min = Vector2.positiveInfinity();
+		let max = Vector2.negativeInfinity();
 		for (let i = 1; i < worldCorners.length; ++i) {
 			const worldCorner = worldCorners[i];
 			if (min.x > worldCorner.x) {
@@ -187,14 +187,14 @@ export class VBoundsComponent extends VComponent {
 				max.y = worldCorner.y;
 			}
 		}
-		return VRect.create(min.x, min.y, max.x - min.x, max.y - min.y);
+		return Rect.create(min.x, min.y, max.x - min.x, max.y - min.y);
 	}
 
 	//==============================================================================
 	// getWorldCorners() 를 통한 충돌 검출.
 	//==============================================================================
 	/**
-	 * @param { VVector2 } worldPosition
+	 * @param { Vector2 } worldPosition
 	 * @returns { boolean }
 	 */
 	contains(worldPosition) {
@@ -202,7 +202,7 @@ export class VBoundsComponent extends VComponent {
 			return false;
 		}
 		const worldCorners = this.getWorldCorners();
-		const obb = new VOBB();
+		const obb = new OBB();
 		obb.setEdges(worldCorners);
 		const isInside = obb.contains(worldPosition);
 		return isInside;

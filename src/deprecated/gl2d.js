@@ -1,9 +1,9 @@
 // //==============================================================================
 // // 포함 모듈 목록.
 // //==============================================================================
-// // import { VObject } from "../base/object.js";
-// // import { VVector2 } from "../base/vector2.js";
-// // import { VRect } from "../base/rect.js";
+// // import { Object } from "../base/object.js";
+// // import { Vector2 } from "../base/vector2.js";
+// // import { Rect } from "../base/rect.js";
 
 
 // //==============================================================================

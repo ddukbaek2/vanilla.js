@@ -1,7 +1,7 @@
 //==============================================================================
 // 색상 값.
 //==============================================================================
-export const VColors = {
+export const Colors = {
 	/** @public @type { string } */ black: "#000000",
 	/** @public @type { string } */ white: "#ffffff",
 	/** @public @type { string } */ vanilla: "#f3e5ab",

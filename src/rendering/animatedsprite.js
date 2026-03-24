@@ -1,30 +1,30 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "../base/object.js";
-import { VVector2 } from "../base/vector2.js";
-import { VRenderer } from "../core/renderer.js"
-import { VSprite } from "./sprite.js";
-import { VImageAsset } from "../resource/imageasset.js";
+import { Object } from "../base/object.js";
+import { Vector2 } from "../base/vector2.js";
+import { Renderer } from "../core/renderer.js"
+import { Sprite } from "./sprite.js";
+import { ImageAsset } from "../resource/imageasset.js";
 
 
 //==============================================================================
 // 애니메이션 객체.
 //==============================================================================
-export class VAnimation extends VObject {
+export class VAnimation extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { VVector2 } */ size;
+	/** @type { Vector2 } */ size;
 	/** @type { number } */ totalFrames;
-	/** @type { VImageAsset[] } */ images;
+	/** @type { ImageAsset[] } */ images;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	constructor() {
 		super();
-		this.size = VVector2.zero();
+		this.size = Vector2.zero();
 		this.totalFrames = 0;
 		this.images = [];
 	}
@@ -34,7 +34,7 @@ export class VAnimation extends VObject {
 //==============================================================================
 // 애니메이션 처리 기능이 추가된 스프라이트.
 //==============================================================================
-export class VAnimatedSprite extends VSprite {
+export class AnimatedSprite extends Sprite {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================

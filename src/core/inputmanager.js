@@ -1,19 +1,19 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VObject } from "../base/object.js";
-import { VVector2 } from "../base/vector2.js";
-import { VEngine } from "./engine.js";
+import { Object } from "../base/object.js";
+import { Vector2 } from "../base/vector2.js";
+import { Engine } from "./engine.js";
 
 
 //==============================================================================
-// 입력 클래스.
+// 입력 매니저.
 //==============================================================================
-export class VInput extends VObject {
+export class InputManager extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { VVector2 } */ position;
+	/** @type { Vector2 } */ position;
 	/** @type { boolean } */ justPressed; // 입력시 딱 한번 눌림.
 	/** @type { boolean } */ justReleased; // 입력시 딱 한번 뗌.
 	/** @type { boolean } */ justMoved; // 입력시 뗄 때가지 계속 눌림.
@@ -23,12 +23,12 @@ export class VInput extends VObject {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { VEngine } engine 
+	 * @param { Engine } engine 
 	 */
 	constructor(engine) {
 		super();
 
-		this.position = VVector2.zero();
+		this.position = Vector2.zero();
 		this.justMoved = false;
 		this.justPressed = false;
 		this.justReleased = false;	

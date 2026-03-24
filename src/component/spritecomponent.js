@@ -1,23 +1,23 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VVector2 } from "../base/vector2.js";
-import { VRect } from "../base/rect.js";
-import * as VMath from "../base/math.js";
-import { VImageAsset } from "../resource/imageasset.js";
-import { VRenderer } from "../core/renderer.js";
-import { VColorDrawerComponent } from "./colordrawer.js";
+import { Vector2 } from "../base/vector2.js";
+import { Rect } from "../base/rect.js";
+import * as Math from "../base/math.js";
+import { ImageAsset } from "../resource/imageasset.js";
+import { Renderer } from "../core/renderer.js";
+import { ColorComponent } from "./colorcomponent.js";
 
 
 //==============================================================================
 // 스프라이트 출력자 컴포넌트.
 //==============================================================================
-export class VSpriteDrawerComponent extends VColorDrawerComponent {
+export class SpriteComponent extends ColorComponent {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { HTMLImageElement } */ #image;
-	/** @private @type { VRect } */ #slices;
+	/** @private @type { Rect } */ #slices;
 	/** @private @type { boolean } */ #isHorizontalFlip;
 	/** @private @type { boolean } */ #isVerticalFlip;
 
@@ -30,7 +30,7 @@ export class VSpriteDrawerComponent extends VColorDrawerComponent {
 	constructor() {
 		super();
 		this.#image = null;
-		this.#slices = VRect.zero();
+		this.#slices = Rect.zero();
 		this.#isHorizontalFlip = false;
 		this.#isVerticalFlip = false;
 	}
@@ -49,7 +49,7 @@ export class VSpriteDrawerComponent extends VColorDrawerComponent {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { VRenderer } renderer
+	 * @param { Renderer } renderer
 	 */
 	draw(renderer) {
 		// super.draw(renderer);
@@ -70,8 +70,8 @@ export class VSpriteDrawerComponent extends VColorDrawerComponent {
 
 		// 이미지 소스 조정.
 		let slices = this.getSlices();
-		if (slices === null || slices.equals(VRect.zero())) {
-			slices = VRect.create(0, 0, image.width, image.height);
+		if (slices === null || slices.equals(Rect.zero())) {
+			slices = Rect.create(0, 0, image.width, image.height);
 		}
 
 		// 출력.
@@ -89,7 +89,7 @@ export class VSpriteDrawerComponent extends VColorDrawerComponent {
 	// 이미지 설정.
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement | VImageAsset } image 
+	 * @param { HTMLImageElement | ImageAsset } image 
 	 */
 	setImage(image) {
 		if (image === null) {
@@ -98,7 +98,7 @@ export class VSpriteDrawerComponent extends VColorDrawerComponent {
 		else if (image instanceof HTMLImageElement) {
 			this.#image = image;
 		}
-		else if (image instanceof VImageAsset) {
+		else if (image instanceof ImageAsset) {
 			this.#image = image.image;
 		}
 	}
@@ -117,7 +117,7 @@ export class VSpriteDrawerComponent extends VColorDrawerComponent {
 	// 이미지 부분 설정.
 	//==============================================================================
 	/**
-	 * @param { VRect } slices
+	 * @param { Rect } slices
 	 */
 	setSlices(slices) {
 		this.#slices = slices;
@@ -127,7 +127,7 @@ export class VSpriteDrawerComponent extends VColorDrawerComponent {
 	// 이미지 부분 반환.
 	//==============================================================================
 	/**
-	 * @returns { VRect }
+	 * @returns { Rect }
 	 */
 	getSlices() {
 		return this.#slices;
@@ -157,7 +157,7 @@ export class VSpriteDrawerComponent extends VColorDrawerComponent {
 	// 이미지 뒤집기 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	isHorizontalFlip() {
 		return this.#isHorizontalFlip;
@@ -167,7 +167,7 @@ export class VSpriteDrawerComponent extends VColorDrawerComponent {
 	// 이미지 뒤집기 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { VVector2 }
+	 * @returns { Vector2 }
 	 */
 	isVerticalFlip() {
 		return this.#isVerticalFlip;

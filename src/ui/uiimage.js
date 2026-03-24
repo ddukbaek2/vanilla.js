@@ -1,7 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { VRenderer } from "../core/renderer.js";
+import { Renderer } from "../core/renderer.js";
 import { UINode } from "./uinode.js";
 
 
@@ -13,8 +13,8 @@ export class UIImage extends UINode {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { HTMLImageElement } */ #image;
-	/** @private @type { VRect } */ #slices;
-	/** @private @type { VRect } */ #edges;
+	/** @private @type { Rect } */ #slices;
+	/** @private @type { Rect } */ #edges;
 
 	//==============================================================================
 	// 생성.
@@ -22,8 +22,8 @@ export class UIImage extends UINode {
 	constructor() {
 		super();
 		this.#image = null;
-		this.#edges = VRect.zero();
-		this.#slices = VRect.zero();
+		this.#edges = Rect.zero();
+		this.#slices = Rect.zero();
 	}
 
 	//==============================================================================
@@ -42,7 +42,7 @@ export class UIImage extends UINode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { VRenderer } renderer 
+	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
 		super.draw(renderer);
@@ -52,7 +52,7 @@ export class UIImage extends UINode {
 	// 이미지 나인패치 설정.
 	//==============================================================================
 	/**
-	 * @param { VRect } edges 
+	 * @param { Rect } edges 
 	 */
 	setEdges(edges) {
 		this.#edges = edges;
@@ -62,7 +62,7 @@ export class UIImage extends UINode {
 	// 이미지 나인패치 반환.
 	//==============================================================================
 	/**
-	 * @returns { VRect }
+	 * @returns { Rect }
 	 */
 	getEdges() {
 		return this.#edges;
