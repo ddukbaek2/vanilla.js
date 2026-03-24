@@ -138,6 +138,9 @@ export class Engine extends Object {
 		const viewManager = this.getViewManager();
 		const canvas = viewManager.getCanvas();
 
+		canvas.addEventListener("contextmenu", (touchEvent) => {
+				touchEvent.preventDefault();
+			});
 		canvas.addEventListener("mousedown", (touchEvent) => {
 				// if (!this.#view.isInsideView(touchEvent.clientX, touchEvent.clientY)) {
 				// 	return;
