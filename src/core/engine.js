@@ -109,7 +109,7 @@ export class Engine extends Object {
 	 */
 	#resize() {
 		const viewManager = this.getViewManager();
-		viewManager.update();
+		viewManager.calculateViewRect();
 		const clientSize = viewManager.getClientSize();
 		const canvasSize = viewManager.getCanvasSize();
 		this.#canvas.width = canvasSize.x; 

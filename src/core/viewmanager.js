@@ -39,12 +39,14 @@ export class ViewManager extends Object {
 		this.#canvasSize = Vector2.zero();
 		this.#referenceResolutionSize = referenceResolutionSize;
 		this.#viewRect = Rect.zero();
+
+		this.calculateViewRect();
 	}
 	
 	//==============================================================================
-	// 갱신.
+	// 뷰 영역 계산.
 	//==============================================================================
-	update() {
+	calculateViewRect() {
 		// 캔버스 요소 설정.
 		const devicePixelRatio = System.window.devicePixelRatio || 1;
 		const clientSize = Vector2.create(System.window.innerWidth, System.window.innerHeight);
