@@ -10,7 +10,7 @@ const System = globalThis;
 /**
  * @type { number }
  */
-const PI = 3.141592653589793; // System.Math.PI
+export const PI = 3.141592653589793;
 
 //==============================================================================
 // 더 낮은 수 반환.
@@ -114,7 +114,7 @@ export function round(value) {
 };
 
 //==============================================================================
-// 제곱근값 반환.
+// 2제곱근값 반환.
 //==============================================================================
 /**
  * @param { number } value
@@ -201,6 +201,55 @@ export function tan(value) {
 	const result = sin(value) / cos(value);
 	return result;
 };
+
+//==============================================================================
+// 아크사인 반환.
+//==============================================================================
+/**
+ * @param { number } value
+ * @returns { number }
+ */
+export function asin(value) {
+	if (value < -1 || value > 1) return NaN;
+	if (value === 1) return Math.PI / 2;
+	if (value === -1) return -Math.PI / 2;
+
+	let result = value;
+	let term = value;
+	for (let i = 1; i < 100; i++) {
+		term *= (value * value * (2 * i - 1) * (2 * i - 1)) / ((2 * i) * (2 * i + 1));
+		result += term;
+		if (Math.abs(term) < 1e-15) break;
+	}
+	return result;
+}
+
+//==============================================================================
+// 거듭제곱값 반환.
+//==============================================================================
+/**
+ * @param { number } base
+ * @param { number } exponent
+ * @returns { number }
+ */
+export function pow(base, exponent) {
+	if (exponent === 0) return 1;
+	if (exponent < 0) return 1 / pow(base, -exponent);
+
+	let result = 1;
+	let currentBase = base;
+	let currentExponent = exponent;
+
+	while (currentExponent > 0) {
+		if (currentExponent % 2 === 1) {
+			result *= currentBase;
+		}
+		currentBase *= currentBase;
+		currentExponent = Math.floor(currentExponent / 2);
+	}
+
+	return result;
+}
 
 //==============================================================================
 // 디그리를 라디안으로 변환하여 반환.
