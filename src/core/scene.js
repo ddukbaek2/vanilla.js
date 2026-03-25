@@ -107,10 +107,10 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } clientNativeSize
+	 * @param { Vector2 } screenSize
 	 */
-	resize(clientNativeSize) {
-		console.log(`Scene.resize(${clientNativeSize.x}, ${clientNativeSize.y})`);
+	resize(screenSize) {
+		console.log(`Scene.resize(${screenSize.x}, ${screenSize.y})`);
 		// this.#root.
 	}
 

@@ -42,7 +42,7 @@ class Tutorial extends Scene {
 		// 사각형 그리기.
 		let boxPosition = Vector2.create(0, 0);
 		let boxSize = Vector2.create(100, 100);
-		boxPosition = boxPosition.add(viewManager.resolution.divide(2)).subtract(boxSize.divide(2));
+		boxPosition = boxPosition.add(referenceResolutionSize.divide(2)).subtract(boxSize.divide(2));
 		renderer.drawRect(Rect.create(boxPosition.x, boxPosition.y, boxSize.x, boxSize.y), COLOR_DARKVANILLA);
 		// console.log(boxPosition);
 	}

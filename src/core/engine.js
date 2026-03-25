@@ -110,7 +110,8 @@ export class Engine extends Object {
 	 */
 	#resize() {
 		const viewManager = this.getViewManager();
-		viewManager.calculateViewRect();
+		// viewManager.calculateViewRect();
+		const screenSize = viewManager.getScreenSize();
 
 		// if (this.#gameInstance && typeof this.#gameInstance.resize === "function") {
 		// 	this.#gameInstance.resize(this);
@@ -119,7 +120,7 @@ export class Engine extends Object {
 		for (let i = 0; i < this.#scenes.length; ++i) {
 			const scene = this.#scenes[i];			
 			try {
-				scene.resize(clientNativeSize);
+				scene.resize(screenSize);
 			}
 			catch (error) {
 				console.error(error);
