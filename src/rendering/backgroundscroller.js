@@ -14,10 +14,10 @@ export class BackgroundScroller extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { HTMLImageElement } */ #image; // 대상 이미지.
-	/** @private @type { Rect } */ #viewRect; // 가시 영역.
-	/** @private @type { Vector2 } */ #scrollPosition; // 현재 스크롤 위치.
-	/** @private @type { Vector2 } */ #scrollSpeed; // 스크롤 초당 이동 속도.
+	/** @private @type { HTMLImageElement } */ #image;
+	/** @private @type { Rect } */ #viewRect;
+	/** @private @type { Vector2 } */ #scrollPosition;
+	/** @private @type { Vector2 } */ #scrollSpeed;
 
 	//==============================================================================
 	// 생성.
@@ -62,15 +62,27 @@ export class BackgroundScroller extends Object {
 			return;
 		}
 
-		const modX = ((this.#scrollPosition.x % imgW) + imgW) % imgW;
-		const modY = ((this.#scrollPosition.y % imgH) + imgH) % imgH;
+		// 부동소수점 오차로 인한 틈새 방지를 위해 좌표 정수화.
+		const modX = Math.floor(this.#scrollPosition.x % imgW);
+		const modY = Math.floor(this.#scrollPosition.y % imgH);
+
+		const startX = this.#viewRect.position.x + (modX <= 0 ? modX : modX - imgW);
+		const startY = this.#viewRect.position.y + (modY <= 0 ? modY : modY - imgH);
 
 		renderer.beginClip(this.#viewRect);
-		for (let x = this.#viewRect.position.x + modX - imgW; x < this.#viewRect.position.x + this.#viewRect.size.x; x += imgW) {
-			for (let y = this.#viewRect.position.y + modY - imgH; y < this.#viewRect.position.y + this.#viewRect.size.y; y += imgH) {
-				renderer.drawImage(this.#image, Vector2.create(x, y), Vector2.create(imgW, imgH));
+		
+		// 이미지 크기를 1.5픽셀정도 키워서 겹쳐 그려서 이미지 사이의 틈을 가리기.
+		const overlap = 1.5;
+		for (let x = startX; x < this.#viewRect.position.x + this.#viewRect.size.x; x += imgW) {
+			for (let y = startY; y < this.#viewRect.position.y + this.#viewRect.size.y; y += imgH) {
+				renderer.drawImage(
+					this.#image, 
+					Vector2.create(Math.floor(x), Math.floor(y)), 
+					Vector2.create(imgW + overlap, imgH + overlap)
+				);
 			}
 		}
+
 		renderer.endClip();
 	}
 
