@@ -14,9 +14,10 @@ export class BackgroundScroller extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { HTMLImageElement } */ #image;
-	/** @private @type { Rect } */ #viewRect;
-	/** @private @type { Vector2 } */ #scrollPosition;
+	/** @private @type { HTMLImageElement } */ #image; // 대상 이미지.
+	/** @private @type { Rect } */ #viewRect; // 가시 영역.
+	/** @private @type { Vector2 } */ #scrollPosition; // 현재 스크롤 위치.
+	/** @private @type { Vector2 } */ #scrollSpeed; // 스크롤 초당 이동 속도.
 
 	//==============================================================================
 	// 생성.
@@ -29,6 +30,18 @@ export class BackgroundScroller extends Object {
 		this.#image = null;
 		this.#viewRect = Rect.zero();
 		this.#scrollPosition = Vector2.zero();
+		this.#scrollSpeed = Vector2.zero();
+	}
+
+	//==============================================================================
+	// 갱신.
+	//==============================================================================
+	/**
+	 * @param { number } timeDelta 
+	 */
+	tick(timeDelta) {
+		this.#scrollPosition.x += this.#scrollSpeed.x * timeDelta;
+		this.#scrollPosition.y += this.#scrollSpeed.y * timeDelta;
 	}
 
 	//==============================================================================
@@ -89,12 +102,54 @@ export class BackgroundScroller extends Object {
 		return this.#image;
 	}
 
+	//==============================================================================
+	// 화면 가시 영역 설정.
+	//==============================================================================
+	/**
+	 * @param { Rect } rect 
+	 */
 	setViewRect(rect) {
 		this.#viewRect = rect;
 	}
 
+	//==============================================================================
+	// 화면 가시 영역 반환.
+	//==============================================================================
+	/**
+	 * @returns { Rect }
+	 */
 	getViewRect() {
 		return this.#viewRect;
+	}
+
+	//==============================================================================
+	// 수직 스크롤 설정.
+	//==============================================================================
+	/**
+	 * @param { number } speed 
+	 */
+	setVerticalScrollSpeed(speed) {
+		this.#scrollSpeed.y = speed;
+	}
+
+	//==============================================================================
+	// 수평 스크롤 설정.
+	//==============================================================================
+	/**
+	 * @param { number } speed 
+	 */
+	setHorizontalScrollSpeed(value) {
+		this.#scrollSpeed.x = value;
+	}
+
+	//==============================================================================
+	// 스크롤 속도 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 } 
+	 */
+	getScrollSpeed(speed) {
+		return this.#scrollSpeed;
 	}
 
 	//==============================================================================
@@ -115,13 +170,5 @@ export class BackgroundScroller extends Object {
 	 */
 	getScrollPosition() {
 		return this.#scrollPosition;
-	}
-
-	setVerticalScroll(value) {
-		this.#scrollPosition.y = value;
-	}
-
-	setHorizontalScroll(value) {
-		this.#scrollPosition.x = value;
 	}
 }
