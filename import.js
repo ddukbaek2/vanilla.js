@@ -55,6 +55,7 @@ export { ButtonComponent } from "./src/component/buttoncomponent.js";
 //==============================================================================
 export { Sprite } from "./src/rendering/sprite.js";
 export { AnimatedSprite } from "./src/rendering/animatedsprite.js";
+export { BackgroundScroller } from "./src/rendering/backgroundscroller.js";
 
 
 //==============================================================================
