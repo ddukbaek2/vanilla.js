@@ -8,11 +8,12 @@ import { Vector2 } from "../base/vector2.js";
 import { TimeManager } from "./timemanager.js";
 import { ViewManager } from "./viewmanager.js";
 import { InputManager } from "./inputmanager.js";
-import { Platform, PlatformType, BrowserType } from "../base/platform.js";
+import { Platform, PlatformType, BrowserType, SYSTEM_FONT_STRING } from "../base/platform.js";
 import { Renderer } from "./renderer.js";
 import { Scene } from "./scene.js";
 import { Rect } from "../base/rect.js";
 import { SceneManager } from "./scenemanager.js";
+import { FontAsset } from "../resource/fontasset.js"; 
 
 
 //==============================================================================
@@ -76,14 +77,6 @@ export class Engine extends Object {
 		this.#resizeCallback = this.#resize.bind(this);
 		this.#updateEngineCallback = this.#updateEngine.bind(this);
 
-		if (this.terminalFont !== null) {
-			// this.terminalFont = new FontFace(`VT323`, `url('https://fonts.gstatic.com/s/vt323/v17/pxiKyp0ihIEF2isfFJU.woff2')`);
-			this.terminalFont = new FontFace(`DOSGothic`, `url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff')`);
-			this.terminalFont.load().then((loadedFont) => {
-				document.fonts.add(loadedFont);
-			});
-		}
-
 		this.#setupAllDocumentEvents();
 		this.#resize();
 	}
@@ -95,10 +88,20 @@ export class Engine extends Object {
 	 * @param { Scene } scene
 	 */
 	run(scene) {
-		const sceneManager = this.getSceneManager();
-		sceneManager.loadScene(scene);
-		window.addEventListener("resize", this.#resizeCallback);
-		window.requestAnimationFrame(this.#updateEngineCallback);
+		// 기본 폰트 불러오기.
+		const internalFontFace = new FontFace(`DOSGothic`, `url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff')`);
+		internalFontFace.load().then((loadedFont) => {
+			document.fonts.add(loadedFont);
+			// 씬 불러오기.
+			const sceneManager = this.getSceneManager();
+			return sceneManager.loadScene(scene);
+		}).then(() => {
+			// 엔진 실행.
+			window.addEventListener("resize", this.#resizeCallback);
+			window.requestAnimationFrame(this.#updateEngineCallback);
+		}).catch((error) => {
+			console.error(error);
+		});
 	}
 
 	//==============================================================================
@@ -152,12 +155,12 @@ export class Engine extends Object {
 				const inputManager = this.getInputManager();
 				inputManager.setTouchPressed(true);
 				inputManager.setTouchMoved(true);
-				this.updateCanvasInputPosition(touchEvent.clientX, touchEvent.clientY);
+				this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
 		// 마우스 움직일 때.
 		canvas.addEventListener("mousemove", (touchEvent) => {
-				this.updateCanvasInputPosition(touchEvent.clientX, touchEvent.clientY);
+				this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
 		// 마우스 뗄 때.
@@ -165,7 +168,7 @@ export class Engine extends Object {
 				const inputManager = this.getInputManager();
 				inputManager.setTouchMoved(false);
 				inputManager.setTouchReleased(true);
-				this.updateCanvasInputPosition(touchEvent.clientX, touchEvent.clientY);
+				this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
 		// 터치 누를 때.
@@ -178,7 +181,7 @@ export class Engine extends Object {
 				const inputManager = this.getInputManager();
 				inputManager.setTouchMoved(true);
 				inputManager.setTouchPressed(true);
-				this.updateCanvasInputPosition(touch.clientX, touch.clientY);
+				this.updateCanvasNativeInputPosition(touch.clientX, touch.clientY);
 				touchEvent.preventDefault();
 			}, { passive: false });
 
@@ -189,7 +192,7 @@ export class Engine extends Object {
 					return;
 				}
 
-				this.updateCanvasInputPosition(touch.clientX, touch.clientY);
+				this.updateCanvasNativeInputPosition(touch.clientX, touch.clientY);
 				touchEvent.preventDefault();
 			}, { passive: false });
 
@@ -197,7 +200,7 @@ export class Engine extends Object {
 		canvas.addEventListener("touchend", (touchEvent) => {
 				const touch = touchEvent.changedTouches[0];
 				if (touch) {
-					this.updateCanvasInputPosition(touch.clientX, touch.clientY);
+					this.updateCanvasNativeInputPosition(touch.clientX, touch.clientY);
 				}
 
 				const inputManager = this.getInputManager();
@@ -225,7 +228,7 @@ export class Engine extends Object {
 	 * @param { number } x
 	 * @param { number } y
 	 */
-	updateCanvasInputPosition(x, y) {
+	updateCanvasNativeInputPosition(x, y) {
 		const inputManager = this.getInputManager();
 
 		// 캔버스 기준 기본 입력 위치 설정.
@@ -313,9 +316,10 @@ export class Engine extends Object {
 		canvasContext.fillStyle = "rgba(0, 0, 0, 0.6)";
 		canvasContext.fillRect(10, 10, 480, 640);
 		// canvasContext.letterSpacing = "-1px";
-		canvasContext.font = `16px DOSGothic`;//${SYSTEM_FONT_STRING}`;
+		canvasContext.font = `16px DOSGothic`;
+		canvasContext.textAlign = "left";
 		canvasContext.textBaseline = "top";
-		canvasContext.fillStyle = Colors.white; // Colors.lightVanilla
+		canvasContext.fillStyle = Colors.white;
 		// canvasContext.fillStyle = Colors.white; // Colors.lightVanilla;
 		// canvasContext.lineWidth = 4;
 		// canvasContext.strokeStyle = Colors.black; // Colors.darkVanilla;
@@ -323,7 +327,7 @@ export class Engine extends Object {
 		// canvasContext.shadowColor = Colors.white;
 		// canvasContext.shadowOffsetX = 0.5;
 		// canvasContext.shadowOffsetY = 0.5;
-		canvasContext.textAlign = "left";
+		
 		// canvasContext.imageSmoothingEnabled = false;
 		canvasContext.scale(1.4, 1.4);
 

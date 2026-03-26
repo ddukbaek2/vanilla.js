@@ -2,19 +2,25 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Vector2 } from "./src/base/vector2.js";
+import { Vector2 as Vec2 } from "./src/base/vector2.js";
 import { Rect } from "./src/base/rect.js";
 import { Colors } from "./src/base/colors.js";
 import { Engine, EngineConfiguration } from "./src/core/engine.js";
 import { Renderer } from "./src/core/renderer.js";
 import { Scene } from "./src/core/scene.js";
 import { ViewScaleMode } from "./src/core/viewmanager.js";
+import { Animation } from "./src/rendering/animation.js";
 
 
 //==============================================================================
 // 게임 인스턴스.
 //==============================================================================
 class Tutorial extends Scene {
+	//==============================================================================
+	// 멤버 변수 목록.
+	//==============================================================================
+	/** @private @type { Animation } */ #animation;
+
 	//==============================================================================
 	// 초기화.
 	//==============================================================================
@@ -30,6 +36,19 @@ class Tutorial extends Scene {
 		// viewManager.setViewScaleMode(ViewScaleMode.stretchWidth); // 기준해상도 + 가로로 늘려붙이기.
 		viewManager.setViewScaleMode(ViewScaleMode.stretchHeight);
 		viewManager.setViewScaleMode(ViewScaleMode.stretchAuto);
+
+		this.#animation = new Animation();
+	}
+
+	//==============================================================================
+	// 갱신.
+	//==============================================================================
+	/**
+	 * @param { number } timeDelta 
+	 */
+	tick(timeDelta) {
+		super.tick(timeDelta);
+		this.#animation.tick(timeDelta);
 	}
 
 	//==============================================================================
@@ -48,7 +67,7 @@ class Tutorial extends Scene {
 		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
 
 		// 전체 영역 칠하기. (좌표계: (0 ~ canvasPixelRect))
-		viewManager.applyCanvasPixelRect(canvasContext);
+		viewManager.applyCanvasNativeRect(canvasContext);
 		canvasContext.beginPath();
 		canvasContext.fillStyle = Colors.darkVanilla;
 		canvasContext.fillRect(0, 0, canvasPixelSize.x, canvasPixelSize.y);
@@ -58,12 +77,22 @@ class Tutorial extends Scene {
 		renderer.drawRect(Rect.create(0, 0, referenceResolutionSize.x, referenceResolutionSize.y), Colors.lightVanilla);
 
 		// 사각형 그리기.
-		let boxPosition = Vector2.create(0, 0);
-		let boxSize = Vector2.create(100, 100);
+		let boxPosition = Vec2.create(0, 0);
+		let boxSize = Vec2.create(100, 100);
 		boxPosition = boxPosition.add(referenceResolutionSize.divide(2)).subtract(boxSize.divide(2));
 		renderer.drawRect(Rect.create(boxPosition.x, boxPosition.y, boxSize.x, boxSize.y), "#ffff00");
 	}
+
+	touchPress(viewInputPosition) {
+		const engine = super.getEngine();
+		const viewManager = engine.getViewManager();
+
+		// this.#animation.setFramesFromImages();
+		this.#animation.setAnimationSpeed(10);
+		this.#animation.play();
+	}
 }
+
 
 // 캔버스 생성.
 let canvas = document.getElementById("tutorial");
@@ -75,7 +104,7 @@ if (canvas === null) {
 
 // 엔진 실행.
 const engineConfiguration = new EngineConfiguration();
-engineConfiguration.referenceResolutionSize = Vector2.create(800, 1280);
+engineConfiguration.referenceResolutionSize = Vec2.create(800, 1280);
 engineConfiguration.canvasId = "tutorial";
 engineConfiguration.isDevelopment = true;
 const engine = new Engine(engineConfiguration);

@@ -119,6 +119,9 @@ export class Animation extends Object {
 	 * @param { HTMLImageElement[] } images
 	 */
 	setFramesFromImages(images) {
+		if (images === null || images instanceof Array === false || images.length === 0) {
+			return;
+		}
 		this.#frames = images.map(image => new Frame(image));
 		this.stop();
 	}
@@ -131,18 +134,23 @@ export class Animation extends Object {
 	 * @param { Rect[] } rects
 	 */
 	setFramesFromRects(image, rects) {
+		if (image === null || image instanceof HTMLImageElement === false ||
+			rects === 0 || rects instanceof Array === false || rects.length === 0) {
+			return;
+		}
 		this.#frames = rects.map(rect => new Frame(image, rect));
 		this.stop();
 	}
 
 	//==============================================================================
 	// 초당 프레임 숫 설정.
+	// - 예) 60으로 지정시 초당 이미지 60회 변경됨.
 	//==============================================================================
 	/**
-	 * @param { number } framePerSecond 
+	 * @param { number } animationSpeed 
 	 */
-	setFramePerSecond(framePerSecond) {
-		this.#framePerSecond = framePerSecond;
+	setAnimationSpeed(animationSpeed) {
+		this.#framePerSecond = animationSpeed;
 	}
 
 	//==============================================================================
