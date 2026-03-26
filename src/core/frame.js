@@ -30,7 +30,8 @@ export class Frame extends Object {
 			this.#rect = Rect.create(0, 0, image.width, image.height);
 		}
 		else {
-			this.#rect = Rect.clamp(rect, Rect.zero(), Rect.create(0, 0, image.width, image.height));
+			// this.#rect = Rect.clamp(rect, Rect.zero(), Rect.create(0, 0, image.width, image.height));
+			this.#rect = rect;
 		}
 	}
 

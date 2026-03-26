@@ -18,7 +18,7 @@ export class Animation extends Object {
 	/** @private @type { boolean } */ #isPlaying; // 재생 중인지 여부.
 	/** @private @type { number } */ #currentFrameIndex; // 현재 프레임 번호.
 	/** @private @type { number } */ #frameTimeCounter;
-	/** @private @type { number } */ #framePerSecond; // 애니메이션 속도: 초당 프레임 수.
+	/** @private @type { number } */ #animationSpeed; // 애니메이션 속도: 초당 프레임 수.
 	/** @private @type { boolean } */ #isLoop;
 	/** @private @type { Function } */ #onComplete;
 
@@ -33,7 +33,7 @@ export class Animation extends Object {
 		this.#frames = [];
 		this.#currentFrameIndex = 0;
 		this.#frameTimeCounter = 0;
-		this.#framePerSecond = 10;
+		this.#animationSpeed = 10;
 		this.#isLoop = true;
 		this.#isPlaying = false;
 		this.#onComplete = null;
@@ -46,11 +46,11 @@ export class Animation extends Object {
 	 * @param { number } timeDelta 
 	 */
 	tick(timeDelta) {
-		if (!this.#isPlaying || this.#frames.length === 0 || this.#framePerSecond <= 0) {
+		if (!this.#isPlaying || this.#frames.length === 0 || this.#animationSpeed <= 0) {
 			return;
 		}
 
-		const frameDuration = 1.0 / this.#framePerSecond;
+		const frameDuration = 1.0 / this.#animationSpeed;
 		this.#frameTimeCounter += timeDelta;
 
 		if (this.#frameTimeCounter >= frameDuration) {
@@ -113,6 +113,21 @@ export class Animation extends Object {
 	}
 
 	//==============================================================================
+	// 프레임 설정.
+	//==============================================================================
+	/**
+	 * @param { Frame[] } frames
+	 */
+	setFrames(frames) {
+		if (frames === null || frames instanceof Array === false) {
+			return;
+		}
+
+		this.#frames = frames;
+		this.stop();
+	}
+
+	//==============================================================================
 	// 프레임 설정. (낱장의 스프라이트 이미지 목록)
 	//==============================================================================
 	/**
@@ -122,8 +137,8 @@ export class Animation extends Object {
 		if (images === null || images instanceof Array === false || images.length === 0) {
 			return;
 		}
-		this.#frames = images.map(image => new Frame(image));
-		this.stop();
+		const frames = images.map(image => new Frame(image));
+		this.setFrames(frames);
 	}
 
 	//==============================================================================
@@ -138,8 +153,9 @@ export class Animation extends Object {
 			rects === 0 || rects instanceof Array === false || rects.length === 0) {
 			return;
 		}
-		this.#frames = rects.map(rect => new Frame(image, rect));
-		this.stop();
+
+		const frames = rects.map(rect => new Frame(image, rect));
+		this.setFrames(frames);
 	}
 
 	//==============================================================================
@@ -150,7 +166,7 @@ export class Animation extends Object {
 	 * @param { number } animationSpeed 
 	 */
 	setAnimationSpeed(animationSpeed) {
-		this.#framePerSecond = animationSpeed;
+		this.#animationSpeed = animationSpeed;
 	}
 
 	//==============================================================================
