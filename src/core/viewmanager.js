@@ -14,7 +14,7 @@ import { Engine } from "./engine.js";
 //==============================================================================
 export const ViewScaleMode = {
 	referenceResolution: "referenceResolution", // Enum.begin(), // 기준 해상도를 사용하여 출력.
-	canvasResolution: "canvasResolution", // Enum.auto(), // 화면 해상도를 사용하여 출력.
+	none: "canvasResolution", // Enum.auto(), // 화면 해상도를 사용하여 출력.
 	stretchWidth: "stretchWidth", // Enum.auto(), // 기준 해상도의 가로축을 기준으로 양쪽 비율을 유지한채 화면에 해당 축을 늘여 붙임.
 	stretchHeight: "stretchHeight", // Enum.auto(), // 기준 해상도의 세로축을 기준으로 양쪽 비율을 유지한채 화면에 해당 축을 늘여 붙임.
 	stretchAuto: "stretchAuto", // Enum.auto(), // 기준 해상도에서 더 짧은쪽의 축을 기준으로 양쪽 비율을 유지한채 화면에 해당 축을 늘여 붙임.
@@ -95,8 +95,8 @@ export class ViewManager extends Object {
 					const targetResolutionScale = 1.0; // 늘이지 않음.
 					const viewWidth = Math.round(this.#referenceResolutionSize.x * targetResolutionScale);
 					const viewHeight = Math.round(this.#referenceResolutionSize.y * targetResolutionScale);
-					const viewX = (200 / devicePixelRatio); ;//Math.floor((canvasNativeSize.x * 0.5) - (viewWidth * 0.5));
-					const viewY = 0;//Math.floor((canvasNativeSize.y - viewHeight) * 0.5);
+					const viewX = Math.floor((canvasNativeSize.x - viewWidth) * 0.5);
+					const viewY = Math.floor((canvasNativeSize.y - viewHeight) * 0.5);
 					this.#targetResolutionScale = targetResolutionScale;
 					this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
 					this.#screenSize.x = Math.round(this.#screenSize.x);
@@ -105,7 +105,7 @@ export class ViewManager extends Object {
 					this.#viewRect.size.set(viewWidth, viewHeight);
 					break;
 				}
-			case ViewScaleMode.canvasResolution: {
+			case ViewScaleMode.none: {
 					const targetResolutionScale = 1.0; // 늘이지 않음.
 					const viewX = 0; // Math.floor(clientSize.x * 0.5);
 					const viewY = 0; // Math.floor(clientSize.y * 0.5);

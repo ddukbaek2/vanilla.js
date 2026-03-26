@@ -26,8 +26,9 @@ class Tutorial extends Scene {
 
 		const viewManager = engine.getViewManager();
 		viewManager.setViewScaleMode(ViewScaleMode.stretchWidth);
-		// viewManager.setViewScaleMode(ViewScaleMode.canvasResolution); // 화면 전체 해상도.
+		viewManager.setViewScaleMode(ViewScaleMode.none); // 화면 전체 해상도.
 		viewManager.setViewScaleMode(ViewScaleMode.referenceResolution); // 기준 해상도.
+		viewManager.setViewScaleMode(ViewScaleMode.stretchWidth);
 	}
 
 	//==============================================================================
@@ -56,7 +57,7 @@ class Tutorial extends Scene {
 		viewManager.applyViewRect(canvasContext);
 		canvasContext.beginPath();
 		canvasContext.fillStyle = Colors.lightVanilla;
-		canvasContext.fillRect(viewRect.position.x, viewRect.position.y, viewRect.size.x, viewRect.size.y);
+		canvasContext.fillRect(0, 0, viewRect.size.x, viewRect.size.y);
 
 		// 사각형 그리기.
 		let boxPosition = Vector2.create(0, 0);

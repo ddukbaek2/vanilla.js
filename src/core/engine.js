@@ -18,13 +18,13 @@ import { Scene } from "./scene.js";
 //==============================================================================
 export class EngineConfiguration extends Object {
 	// /** @type { Scene } */ scene;
-	/** @type { Vector2 } */ referenceResolution;
+	/** @type { Vector2 } */ referenceResolutionSize;
 	/** @type { string } */ canvasId;
 	/** @type { boolean } */ isDevelopment;
 	constructor() {
 		super();
 		// this.scene = null;
-		this.referenceResolution = Vector2.zero();
+		this.referenceResolutionSize = Vector2.zero();
 		this.canvasId = "";
 		this.isDevelopment = false;
 	}
@@ -336,7 +336,7 @@ export class Engine extends Object {
 		drawOutlineText(`viewScaleMode: ${viewScaleMode}`);
 		drawOutlineText(`referenceResolutionSize: ${referenceResolutionSize.x}x${referenceResolutionSize.y}`);
 		drawOutlineText(`screenSize: ${screenSize.x}x${screenSize.y}`);
-		drawOutlineText(`viewRectSize: ${viewRect.size.x}x${viewRect.size.y}`);
+		drawOutlineText(`viewRect: (${viewRect.position.x}x${viewRect.position.y}, ${viewRect.size.x}x${viewRect.size.y})`);
 		drawOutlineText(`inputPosition: ${inputPosition.x}x${inputPosition.y}`);
 		drawOutlineText(``);
 
