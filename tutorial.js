@@ -57,7 +57,7 @@ class Tutorial extends Scene {
 		viewManager.applyViewRect(canvasContext);
 		canvasContext.beginPath();
 		canvasContext.fillStyle = Colors.lightVanilla;
-		canvasContext.fillRect(0, 0, viewRect.size.x, viewRect.size.y);
+		renderer.drawRect(viewRect, Colors.lightVanilla);
 
 		// 사각형 그리기.
 		let boxPosition = Vector2.create(0, 0);
