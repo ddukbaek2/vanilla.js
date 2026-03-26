@@ -90,7 +90,8 @@ export class ViewManager extends Object {
 		this.#canvas.style.height = `${clientNativeSize.y}px`;
 
 		// 뷰 영역 설정.
-		switch (this.#viewScaleMode) {
+		const viewScaleMode = this.getViewScaleMode();
+		switch (viewScaleMode) {
 			case ViewScaleMode.referenceResolution: {
 					const targetResolutionScale = 1.0; // 늘이지 않음.
 					const viewWidth = Math.round(this.#referenceResolutionSize.x * targetResolutionScale);
@@ -395,8 +396,9 @@ export class ViewManager extends Object {
 	 * @returns { Vector2 }
 	 */
 	transformToViewPoint(clientPoint) {
-		const relativeX = clientPoint.x - this.#viewRect.position.x;
-		const relativeY = clientPoint.y - this.#viewRect.position.y;
+		const viewRect = this.getViewRect();
+		const relativeX = clientPoint.x - viewRect.position.x;
+		const relativeY = clientPoint.y - viewRect.position.y;
 
 		const scale = this.#targetResolutionScale;
 		if (scale === 0) {

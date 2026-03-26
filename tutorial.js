@@ -29,6 +29,7 @@ class Tutorial extends Scene {
 		// viewManager.setViewScaleMode(ViewScaleMode.referenceResolution); // 기준 해상도.
 		// viewManager.setViewScaleMode(ViewScaleMode.stretchWidth); // 기준해상도 + 가로로 늘려붙이기.
 		viewManager.setViewScaleMode(ViewScaleMode.stretchHeight);
+		viewManager.setViewScaleMode(ViewScaleMode.stretchAuto);
 	}
 
 	//==============================================================================
