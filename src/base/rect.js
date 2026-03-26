@@ -31,6 +31,32 @@ export class Rect extends Object {
 	}
 
 	//==============================================================================
+	// 동등성 비교.
+	//==============================================================================
+	/**
+	 * @override
+	 * @method
+	 * @public
+	 * @param { any } other
+	 * @returns { boolean }
+	 */
+	equals(other) {
+		if (super.equals(other)) {
+			return true;
+		}
+		
+		if (other) {
+			if (other instanceof Rect) {
+				if (this.position.equals(other.position) && this.size.equals(other.size)) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	//==============================================================================
 	// 겹치는지 여부.
 	//==============================================================================
 	/**
@@ -148,32 +174,6 @@ export class Rect extends Object {
 		return this.position.y + this.height;
 	}
 
-	//==============================================================================
-	// 비교.
-	//==============================================================================
-	/**
-	 * @override
-	 * @method
-	 * @public
-	 * @param { any } other
-	 * @returns { boolean }
-	 */
-	equals(other) {
-		if (super.equals(other)) {
-			return true;
-		}
-		
-		if (other) {
-			if (other instanceof Rect) {
-				if (this.position.equals(other.position) && this.size.equals(other.size)) {
-					return true;
-				}
-			}
-		}
-
-		return false;
-	}
-
 	// //==============================================================================
 	// // 새로운 사각 영역 생성.
 	// //==============================================================================
@@ -214,5 +214,20 @@ export class Rect extends Object {
 	 */
 	static zero() {
 		return Rect.create(0, 0, 0, 0);
+	}
+
+	//==============================================================================
+	// 범위 제한.
+	//==============================================================================
+	/**
+	 * @param { Rect } value
+	 * @param { Rect } min
+	 * @param { Rect } max
+	 * @returns { Rect }
+	 */
+	static clamp(value, min, max) {
+		const position = Vector2.clamp(value.position, min.position, max.position);
+		const size = Vector2.clamp(value.size, min.size, max.size);
+		return Rect.create(position.x, position.y, size.x, size.y);
 	}
 }
