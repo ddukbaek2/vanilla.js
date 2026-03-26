@@ -50,8 +50,8 @@ export class ViewManager extends Object {
 	constructor(engine, referenceResolutionSize) {
 		super();
 		this.#canvas = null;
-		this.#devicePixelRatio = 1;
-		this.#targetResolutionScale = 1;
+		this.#devicePixelRatio = 1.0;
+		this.#targetResolutionScale = 1.0;
 		this.#clientNativeSize = Vector2.zero();
 		this.#canvasNativeSize = Vector2.zero();
 		this.#canvasPixelSize = Vector2.zero();
@@ -95,8 +95,8 @@ export class ViewManager extends Object {
 					const targetResolutionScale = 1.0; // 늘이지 않음.
 					const viewWidth = Math.round(this.#referenceResolutionSize.x * targetResolutionScale);
 					const viewHeight = Math.round(this.#referenceResolutionSize.y * targetResolutionScale);
-					const viewX = Math.floor((canvasNativeSize.x - viewWidth) * 0.5);
-					const viewY = Math.floor((canvasNativeSize.y - viewHeight) * 0.5);
+					const viewX = (200 / devicePixelRatio); ;//Math.floor((canvasNativeSize.x * 0.5) - (viewWidth * 0.5));
+					const viewY = 0;//Math.floor((canvasNativeSize.y - viewHeight) * 0.5);
 					this.#targetResolutionScale = targetResolutionScale;
 					this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
 					this.#screenSize.x = Math.round(this.#screenSize.x);
@@ -211,7 +211,7 @@ export class ViewManager extends Object {
 	 * @param { CanvasRenderingContext2D } canvasContext
 	 */
 	applyViewRect(canvasContext) {
-		const devicePixelRatio = this.#devicePixelRatio;
+		const devicePixelRatio = this.getDevicePixelRatio();
 		const scaleX = this.#targetResolutionScale * devicePixelRatio;
 		const scaleY = this.#targetResolutionScale * devicePixelRatio;
 		const skewX = 0;
@@ -258,6 +258,16 @@ export class ViewManager extends Object {
 	 */
 	getCanvas() {
 		return this.#canvas;
+	}
+
+	//==============================================================================
+	// 디바이스의 실제 픽셀 개수 비율을 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getDevicePixelRatio() {
+		return this.#devicePixelRatio;
 	}
 
 	//==============================================================================

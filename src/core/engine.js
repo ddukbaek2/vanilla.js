@@ -67,7 +67,7 @@ export class Engine extends Object {
 
 		this.#platform = new Platform();
 		this.#timeManager = new TimeManager(this);
-		this.#viewManager = new ViewManager(this, engineConfiguration.resolution);
+		this.#viewManager = new ViewManager(this, engineConfiguration.referenceResolutionSize);
 		this.#viewManager.setCanvas(canvas);
 		this.#inputManager = new InputManager(this);
 		this.#renderer = new Renderer(this, canvasContext);

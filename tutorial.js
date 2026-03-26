@@ -1,25 +1,34 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { Engine } from "./src/core/engine.js";
-import { Renderer } from "./src/core/renderer.js";
-import { Rect } from "./src/base/rect.js";
+const System = globalThis;
 import { Vector2 } from "./src/base/vector2.js";
-import { Scene } from "./import.js";
-
-
-//==============================================================================
-// 전역 상수 목록.
-//==============================================================================
-const COLOR_DARKVANILLA = "#d1c1b2";
-const COLOR_LIGHTVANILLA = "#f1e9d8";
-const COLOR_VANILLA = "#f3e5ab";
+import { Rect } from "./src/base/rect.js";
+import { Colors } from "./src/base/colors.js";
+import { Engine, EngineConfiguration } from "./src/core/engine.js";
+import { Renderer } from "./src/core/renderer.js";
+import { Scene } from "./src/core/scene.js";
+import { ViewScaleMode } from "./src/core/viewmanager.js";
 
 
 //==============================================================================
 // 게임 인스턴스.
 //==============================================================================
 class Tutorial extends Scene {
+	//==============================================================================
+	// 초기화.
+	//==============================================================================
+	/**
+	 * @param { Engine } engine 
+	 */
+	initialize(engine) {
+		super.initialize(engine);
+
+		const viewManager = engine.getViewManager();
+		viewManager.setViewScaleMode(ViewScaleMode.stretchWidth);
+		// viewManager.setViewScaleMode(ViewScaleMode.canvasResolution); // 화면 전체 해상도.
+		viewManager.setViewScaleMode(ViewScaleMode.referenceResolution); // 기준 해상도.
+	}
 
 	//==============================================================================
 	// 출력.
@@ -31,19 +40,29 @@ class Tutorial extends Scene {
 		super.draw(renderer);
 
 		const engine = super.getEngine();
+		const canvasContext = renderer.getCanvasContext();
 		const viewManager = engine.getViewManager();
+		const canvasPixelSize = viewManager.getCanvasPixelSize();
+		const viewRect = viewManager.getViewRect();
+		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
 
-		// 전체 영역 초기화.
-		engine.clear(COLOR_VANILLA);
+		// 전체 영역 칠하기.
+		viewManager.applyCanvasPixelRect(canvasContext);
+		canvasContext.beginPath();
+		canvasContext.fillStyle = Colors.darkVanilla;
+		canvasContext.fillRect(0, 0, canvasPixelSize.x, canvasPixelSize.y);
 
-		// 게임 영역 초기화.
-		engine.gameViewIdentity(COLOR_LIGHTVANILLA);
+		// 게임 영역 칠하기.
+		viewManager.applyViewRect(canvasContext);
+		canvasContext.beginPath();
+		canvasContext.fillStyle = Colors.lightVanilla;
+		canvasContext.fillRect(viewRect.position.x, viewRect.position.y, viewRect.size.x, viewRect.size.y);
 
 		// 사각형 그리기.
 		let boxPosition = Vector2.create(0, 0);
 		let boxSize = Vector2.create(100, 100);
 		boxPosition = boxPosition.add(referenceResolutionSize.divide(2)).subtract(boxSize.divide(2));
-		renderer.drawRect(Rect.create(boxPosition.x, boxPosition.y, boxSize.x, boxSize.y), COLOR_DARKVANILLA);
+		renderer.drawRect(Rect.create(boxPosition.x, boxPosition.y, boxSize.x, boxSize.y), "#ffff00");
 		// console.log(boxPosition);
 	}
 }
@@ -57,6 +76,11 @@ if (canvas === null) {
 }
 
 // 엔진 실행.
-const engine = new Engine(800, 1280, "tutorial", true);
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.referenceResolutionSize = Vector2.create(1280, 800);
+engineConfiguration.canvasId = "tutorial";
+engineConfiguration.isDevelopment = true;
+const engine = new Engine(engineConfiguration);
 document.title = "vanilla.js - Tutorial";
-engine.run(new Tutorial());
+const tutorial = new Tutorial();
+engine.run(tutorial);
