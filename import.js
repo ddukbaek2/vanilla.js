@@ -53,10 +53,8 @@ export { ButtonComponent } from "./src/component/buttoncomponent.js";
 //==============================================================================
 // 렌더링 목록.
 //==============================================================================
-export { Sprite } from "./src/rendering/sprite.js";
-export { AnimatedSprite } from "./src/rendering/animatedsprite.js";
-export { BackgroundScroller } from "./src/misc/backgroundscroller.js";
-
+// export { Sprite } from "./src/rendering/sprite.js";
+// export { AnimatedSprite } from "./src/rendering/animatedsprite.js";
 
 //==============================================================================
 // 리소스 목록.
@@ -71,10 +69,10 @@ export { JsonAsset } from "./src/resource/jsonasset.js";
 //==============================================================================
 // UI 목록.
 //==============================================================================
-export { UINode } from "./src/ui/uinode.js";
-export { UIButton } from "./src/ui/uibutton.js";
-export { UILabel } from "./src/ui/uilabel.js";
-export { UIImage } from "./src/ui/uiimage.js";
+// export { UINode } from "./src/ui/uinode.js";
+// export { UIButton } from "./src/ui/uibutton.js";
+// export { UILabel } from "./src/ui/uilabel.js";
+// export { UIImage } from "./src/ui/uiimage.js";
 
 
 //==============================================================================
@@ -82,3 +80,4 @@ export { UIImage } from "./src/ui/uiimage.js";
 //==============================================================================
 export { Identifier, Enum } from "./src/misc/identifier.js";
 export { TouchParticle, TouchEffect } from "./src/misc/toucheffect.js";
+export { BackgroundScroller } from "./src/misc/backgroundscroller.js";
