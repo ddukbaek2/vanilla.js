@@ -31,7 +31,7 @@ export class ViewManager extends Object {
 	/** @private @type { number } */ #devicePixelRatio; // 장치의 화면 배율.
 	/** @private @type { number } */ #targetResolutionScale; // 기준 해상도와 화면 해상도 사이의 크기 배율.
 	/** @private @type { Vector2 } */ #clientNativeSize; // 웹페이지 전체 영역.
-	/** @private @type { Vector2 } */ #canvasNativeSize; // 캔버스의 전체 영역.
+	/** @private @type { Vector2 } */ #canvasNativeSize; // 캔버스의 전체 영역. (기본 좌표계 기준)
 	/** @private @type { Vector2 } */ #canvasPixelSize; // 캔버스 영역 내부의 픽셀 렌더링 기준 전체 화면 영역.
 	/** @private @type { ViewScaleMode } */ #viewScaleMode; // 스케일 모드.
 	/** @private @type { Vector2 } */ #referenceResolutionSize; // 기준 화면 영역.
@@ -122,10 +122,10 @@ export class ViewManager extends Object {
 				}
 			case ViewScaleMode.stretchWidth: {
 					const targetResolutionScale = canvasNativeSize.x / this.#referenceResolutionSize.x;
-					const viewWidth = canvasNativeSize.x;
-					const viewHeight = this.#referenceResolutionSize.y * targetResolutionScale;
+					const viewWidth = Math.round(canvasNativeSize.x);
+					const viewHeight = Math.round(this.#referenceResolutionSize.y * targetResolutionScale);
 					const viewX = 0;
-					const viewY = (canvasNativeSize.y - viewHeight) * 0.5;
+					const viewY = Math.round((canvasNativeSize.y - viewHeight) * 0.5);
 					this.#targetResolutionScale = targetResolutionScale;
 					this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
 					this.#screenSize.x = Math.round(this.#screenSize.x);
@@ -136,9 +136,9 @@ export class ViewManager extends Object {
 				}
 			case ViewScaleMode.stretchHeight: {
 					const targetResolutionScale = canvasNativeSize.y / this.#referenceResolutionSize.y;
-					const viewWidth = this.#referenceResolutionSize.x * targetResolutionScale;
-					const viewHeight = canvasNativeSize.y;
-					const viewX = (canvasNativeSize.x - viewWidth) * 0.5;
+					const viewWidth = Math.round(this.#referenceResolutionSize.x * targetResolutionScale);
+					const viewHeight = Math.round(canvasNativeSize.y);
+					const viewX = Math.round((canvasNativeSize.x - viewWidth) * 0.5);
 					const viewY = 0;
 					this.#targetResolutionScale = targetResolutionScale;
 					this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
@@ -150,10 +150,10 @@ export class ViewManager extends Object {
 				}
 			case ViewScaleMode.stretchAuto: {
 					const targetResolutionScale = Math.min(canvasNativeSize.x / this.#referenceResolutionSize.x, canvasNativeSize.y / this.#referenceResolutionSize.y);
-					const viewWidth = this.#referenceResolutionSize.x * targetResolutionScale;
-					const viewHeight = this.#referenceResolutionSize.y * targetResolutionScale;
-					const viewX = (canvasNativeSize.x - viewWidth) * 0.5;
-					const viewY = (canvasNativeSize.y - viewHeight) * 0.5;
+					const viewWidth = Math.round(this.#referenceResolutionSize.x * targetResolutionScale);
+					const viewHeight = Math.round(this.#referenceResolutionSize.y * targetResolutionScale);
+					const viewX = Math.round((canvasNativeSize.x - viewWidth) * 0.5);
+					const viewY = Math.round((canvasNativeSize.y - viewHeight) * 0.5);
 					this.#targetResolutionScale = targetResolutionScale;
 					this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
 					this.#screenSize.x = Math.round(this.#screenSize.x);
@@ -192,7 +192,7 @@ export class ViewManager extends Object {
 	 * @method
 	 * @param { CanvasRenderingContext2D } canvasContext
 	 */
-	applyCanvasPixelRect(canvasContext) {
+	applyCanvasNativeRect(canvasContext) {
 		const scaleX = 1; // a
 		const scaleY = 1; // d
 		const skewX = 0; // c
@@ -204,7 +204,7 @@ export class ViewManager extends Object {
 	}
 
 	//==============================================================================
-	// 실제 사용 영역 적용.
+	// 뷰 영역 적용.
 	//==============================================================================
 	/**
 	 * @public

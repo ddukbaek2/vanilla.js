@@ -11,6 +11,7 @@ import { InputManager } from "./inputmanager.js";
 import { Platform, PlatformType, BrowserType } from "../base/platform.js";
 import { Renderer } from "./renderer.js";
 import { Scene } from "./scene.js";
+import { Rect } from "../base/rect.js";
 
 
 //==============================================================================
@@ -110,14 +111,16 @@ export class Engine extends Object {
 	 */
 	#resize() {
 		const viewManager = this.getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		const canvasPixelSize = viewManager.getCanvasPixelSize();
+		const viewRect = viewManager.getViewRect();
 		viewManager.calculateViewRect();
-		const screenSize = viewManager.getScreenSize();
 
 		// 씬 리사이즈.
 		for (let i = 0; i < this.#scenes.length; ++i) {
 			const scene = this.#scenes[i];			
 			try {
-				scene.resize(screenSize);
+				scene.resize();
 			}
 			catch (error) {
 				console.error(error);
@@ -147,18 +150,18 @@ export class Engine extends Object {
 				const inputManager = this.getInputManager();
 				inputManager.justMoved = true;
 				inputManager.justPressed = true;
-				this.updateInputPosition(touchEvent.clientX, touchEvent.clientY);
+				this.updateCanvasInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
 		canvas.addEventListener("mousemove", (touchEvent) => {
-				this.updateInputPosition(touchEvent.clientX, touchEvent.clientY);
+				this.updateCanvasInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
 		canvas.addEventListener("mouseup", (touchEvent) => {
 				const inputManager = this.getInputManager();
 				inputManager.justMoved = false;
 				inputManager.justReleased = true;
-				this.updateInputPosition(touchEvent.clientX, touchEvent.clientY);
+				this.updateCanvasInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
 		canvas.addEventListener("touchstart", (touchEvent) => {
@@ -172,7 +175,7 @@ export class Engine extends Object {
 				const inputManager = this.getInputManager();
 				inputManager.justMoved = true;
 				inputManager.justPressed = true;
-				this.updateInputPosition(touch.clientX, touch.clientY);
+				this.updateCanvasInputPosition(touch.clientX, touch.clientY);
 				touchEvent.preventDefault();
 			}, { passive: false });
 
@@ -180,14 +183,14 @@ export class Engine extends Object {
 				const touch = touchEvent.changedTouches[0];
 				if (!touch) return;
 
-				this.updateInputPosition(touch.clientX, touch.clientY);
+				this.updateCanvasInputPosition(touch.clientX, touch.clientY);
 				touchEvent.preventDefault();
 			}, { passive: false });
 
 		canvas.addEventListener("touchend", (touchEvent) => {
 				const touch = touchEvent.changedTouches[0];
 				if (touch) {
-					this.updateInputPosition(touch.clientX, touch.clientY);
+					this.updateCanvasInputPosition(touch.clientX, touch.clientY);
 				}
 
 				const inputManager = this.getInputManager();
@@ -212,19 +215,22 @@ export class Engine extends Object {
 	/**
 	 * @private
 	 * @method
-	 * @param { number } clientX
-	 * @param { number } clientY
+	 * @param { number } x
+	 * @param { number } y
 	 */
-	updateInputPosition(clientX, clientY) {
-		const viewManager = this.getViewManager();
-		const canvas = viewManager.getCanvas();
-		const canvasRect = canvas.getBoundingClientRect();
+	updateCanvasInputPosition(x, y) {
 		const inputManager = this.getInputManager();
-		const clientPoint = Vector2.create(clientX - canvasRect.left, clientY - canvasRect.top);
-		const inputPosition = viewManager.transformToViewPoint(clientPoint);
-		inputPosition.x = Math.round(inputPosition.x);
-		inputPosition.y = Math.round(inputPosition.y);
-		inputManager.setInputPosition(inputPosition);
+
+		// 캔버스 기준 기본 입력 위치 설정.
+		const canvasNativeInputPosition = Vector2.create(x, y);
+		inputManager.setCanvasNativeInputPosition(canvasNativeInputPosition);
+
+		// 뷰 기준 입력 위치 설정.
+		const viewManager = this.getViewManager();
+		const viewInputPosition = viewManager.transformToViewPoint(canvasNativeInputPosition);
+		viewInputPosition.x = Math.round(viewInputPosition.x);
+		viewInputPosition.y = Math.round(viewInputPosition.y);
+		inputManager.setViewInputPosition(viewInputPosition);
 	}
 	
 	//==============================================================================
@@ -248,12 +254,13 @@ export class Engine extends Object {
 
 		let textOffsetX = 16;
 		let textOffsetY = 16;
+		let textPosition = Vector2.create(16, 16);
 		const drawOutlineText = (text) => {
-			canvasContext.fillText(text, textOffsetX, textOffsetY);
+			canvasContext.fillText(text, textPosition.x, textPosition.y);
 
 			// 자동 외곽선 출력.
-			// canvasContext.strokeText(text, textOffsetX, textOffsetY);
-			// canvasContext.fillText(text, textOffsetX, textOffsetY);
+			// canvasContext.strokeText(text, textPosition.x, textPosition.y);
+			// canvasContext.fillText(text, textPosition.x, textPosition.y);
 
 			// 수동 외곽선 출력.
 			// const offsets = [
@@ -263,19 +270,19 @@ export class Engine extends Object {
 
 			// canvasContext.fillStyle = Colors.black;
 			// for (let i = 0; i < offsets.length; ++i) {
-			// 	canvasContext.fillText(text, textOffsetX + offsets[i][0], textOffsetY + offsets[i][1]);
+			// 	canvasContext.fillText(text, textPosition.x + offsets[i][0], textPosition.y + offsets[i][1]);
 			// }
 
 			// canvasContext.fillStyle = Colors.white;
-			// canvasContext.fillText(text, textOffsetX, textOffsetY);
+			// canvasContext.fillText(text, textPosition.x, textPosition.y);
 
-			textOffsetY += 16;
+			textPosition.y += 16;
 
 			// 영역 출력.
 			const metrics = canvasContext.measureText(text);
 			const width = metrics.width; // metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight)
 			const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
-			return { width, height };
+			return Rect.create(textPosition.x, textPosition.y, width, height);
 		};
 
 		const formatSizeString = (bytes) => {
@@ -313,7 +320,7 @@ export class Engine extends Object {
 		// canvasContext.shadowOffsetY = 0.5;
 		canvasContext.textAlign = "left";
 		// canvasContext.imageSmoothingEnabled = false;
-		canvasContext.scale(1.6, 1.6);
+		canvasContext.scale(1.4, 1.4);
 
 		// 플랫폼 정보 출력.
 		this.#platform.getPlatformInfo();
@@ -327,17 +334,17 @@ export class Engine extends Object {
 		const canvasPixelSize = viewManager.getCanvasPixelSize();
 		const viewScaleMode = viewManager.getViewScaleMode();
 		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
-		const screenSize = viewManager.getScreenSize();
 		const viewRect = viewManager.getViewRect();
-		const inputPosition = inputManager.getInputPosition();
-		drawOutlineText(`clientNativeSize: ${clientNativeSize.x}x${clientNativeSize.y}`);
-		drawOutlineText(`canvasNativeSize: ${canvasNativeSize.x}x${canvasNativeSize.y}`);
-		drawOutlineText(`canvasPixelSize: ${canvasPixelSize.x}x${canvasPixelSize.y}`);
+		const canvasNativeInputPosition = inputManager.getCanvasNativeInputPosition();
+		const viewInputPosition = inputManager.getViewInputPosition();
+		drawOutlineText(`clientNativeSize: (${clientNativeSize.x}, ${clientNativeSize.y})`);
+		drawOutlineText(`canvasNativeSize: (${canvasNativeSize.x}, ${canvasNativeSize.y})`);
+		drawOutlineText(`canvasPixelSize: (${canvasPixelSize.x}, ${canvasPixelSize.y})`);
+		drawOutlineText(`referenceResolutionSize: (${referenceResolutionSize.x}, ${referenceResolutionSize.y})`);
 		drawOutlineText(`viewScaleMode: ${viewScaleMode}`);
-		drawOutlineText(`referenceResolutionSize: ${referenceResolutionSize.x}x${referenceResolutionSize.y}`);
-		drawOutlineText(`screenSize: ${screenSize.x}x${screenSize.y}`);
-		drawOutlineText(`viewRect: (${viewRect.position.x}x${viewRect.position.y}, ${viewRect.size.x}x${viewRect.size.y})`);
-		drawOutlineText(`inputPosition: ${inputPosition.x}x${inputPosition.y}`);
+		drawOutlineText(`viewRect: (${viewRect.position.x}, ${viewRect.position.y}) - (${viewRect.size.x}, ${viewRect.size.y})`);
+		drawOutlineText(`canvasNativeInputPosition: (${canvasNativeInputPosition.x}, ${canvasNativeInputPosition.y})`);
+		drawOutlineText(`viewInputPosition: (${viewInputPosition.x}, ${viewInputPosition.y})`);
 		drawOutlineText(``);
 
 		// 초당 프레임 정보 출력.
@@ -509,48 +516,6 @@ export class Engine extends Object {
 		else {
 			document.body.style.cursor = 'none';
 		}
-	}
-
-	//==============================================================================
-	// 화면 비우기.
-	//==============================================================================
-	/**
-	 * @public
-	 * @method
-	 * @param { string } color
-	 */
-	clear(color = "#000000") {
-		const renderer = this.getRenderer();
-		const canvasContext = renderer.getCanvasContext();
-		const viewManager = this.getViewManager();
-		const canvasPixelSize = viewManager.getCanvasPixelSize();
-		const screenSize = viewManager.getScreenSize();
-		viewManager.applyCanvasPixelRect(canvasContext);
-
-		// 영역 전체 칠하기.
-		canvasContext.beginPath();
-		canvasContext.fillStyle = color;
-		canvasContext.fillRect(0, 0, screenSize.x, screenSize.y);
-	}
-
-	//==============================================================================
-	// 게임 영역 좌표계 정리.
-	//==============================================================================
-	/**
-	 * @public
-	 * @method
-	 * @param { string } color
-	 */
-	gameViewIdentity(color = "#000000") {
-		const canvasContext = this.#renderer.getCanvasContext();
-		const viewManager = this.getViewManager();
-		const viewSize = viewManager.getViewRect();
-		viewManager.applyViewRect(canvasContext);
-
-		// 영역 전체 칠하기.
-		canvasContext.beginPath();
-		canvasContext.fillStyle = color;
-		canvasContext.fillRect(0, 0, viewSize.x, viewSize.y);
 	}
 
 	//==============================================================================

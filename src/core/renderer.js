@@ -57,6 +57,7 @@ export class Renderer extends Object {
 	drawRect(rect, color = "#ffffff", opacity = 1.0) {
 		const canvasContext = this.getCanvasContext();
 		const originalOpacity = canvasContext.globalAlpha;
+		canvasContext.beginPath();
 		canvasContext.globalAlpha = opacity;
 		canvasContext.fillStyle = color;
 		canvasContext.fillRect(rect.position.x, rect.position.y, rect.size.x, rect.size.y);
