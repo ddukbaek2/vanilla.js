@@ -13,10 +13,10 @@ import { Engine } from "./engine.js";
 // 뷰 스케일 모드.
 //==============================================================================
 export const ViewScaleMode = {
-	referenceResolution: "referenceResolution", // Enum.begin(), // 기준 해상도를 사용하여 출력.
-	none: "canvasResolution", // Enum.auto(), // 화면 해상도를 사용하여 출력.
-	stretchWidth: "stretchWidth", // Enum.auto(), // 기준 해상도의 가로축을 기준으로 양쪽 비율을 유지한채 화면에 해당 축을 늘여 붙임.
-	stretchHeight: "stretchHeight", // Enum.auto(), // 기준 해상도의 세로축을 기준으로 양쪽 비율을 유지한채 화면에 해당 축을 늘여 붙임.
+	none: "none", // 화면 해상도로 영역 정의.
+	referenceResolution: "referenceResolution", // 기준 해상도로 영역 정의.
+	stretchWidth: "stretchWidth", // 기준 해상도로 영역 정의하고, 기준 해상도의 가로축을 기준으로 늘여 붙임.
+	stretchHeight: "stretchHeight", // 기준 해상도로 영역 정의하고, 기준 해상도의 세로축을 기준으로 늘여 붙임.
 	stretchAuto: "stretchAuto", // Enum.auto(), // 기준 해상도에서 더 짧은쪽의 축을 기준으로 양쪽 비율을 유지한채 화면에 해당 축을 늘여 붙임.
 };
 

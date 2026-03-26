@@ -25,10 +25,10 @@ class Tutorial extends Scene {
 		super.initialize(engine);
 
 		const viewManager = engine.getViewManager();
-		viewManager.setViewScaleMode(ViewScaleMode.stretchWidth);
 		viewManager.setViewScaleMode(ViewScaleMode.none); // 화면 전체 해상도.
-		viewManager.setViewScaleMode(ViewScaleMode.referenceResolution); // 기준 해상도.
-		viewManager.setViewScaleMode(ViewScaleMode.stretchWidth);
+		// viewManager.setViewScaleMode(ViewScaleMode.referenceResolution); // 기준 해상도.
+		// viewManager.setViewScaleMode(ViewScaleMode.stretchWidth); // 기준해상도 + 가로로 늘려붙이기.
+		viewManager.setViewScaleMode(ViewScaleMode.stretchHeight);
 	}
 
 	//==============================================================================
@@ -44,25 +44,23 @@ class Tutorial extends Scene {
 		const canvasContext = renderer.getCanvasContext();
 		const viewManager = engine.getViewManager();
 		const canvasPixelSize = viewManager.getCanvasPixelSize();
-		const viewRect = viewManager.getViewRect();
 		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
 
-		// 전체 영역 칠하기.
+		// 전체 영역 칠하기. (좌표계: (0 ~ canvasPixelRect))
 		viewManager.applyCanvasPixelRect(canvasContext);
 		canvasContext.beginPath();
 		canvasContext.fillStyle = Colors.darkVanilla;
 		canvasContext.fillRect(0, 0, canvasPixelSize.x, canvasPixelSize.y);
 
-		// 게임 영역 칠하기.
+		// 게임 영역 칠하기. (좌표계: (0 ~ referenceResolutionSize))
 		viewManager.applyViewRect(canvasContext);
-		renderer.drawRect(Rect.create(Vector2.zero(), referenceResolutionSize), Colors.lightVanilla);
+		renderer.drawRect(Rect.create(0, 0, referenceResolutionSize.x, referenceResolutionSize.y), Colors.lightVanilla);
 
 		// 사각형 그리기.
 		let boxPosition = Vector2.create(0, 0);
 		let boxSize = Vector2.create(100, 100);
 		boxPosition = boxPosition.add(referenceResolutionSize.divide(2)).subtract(boxSize.divide(2));
 		renderer.drawRect(Rect.create(boxPosition.x, boxPosition.y, boxSize.x, boxSize.y), "#ffff00");
-		// console.log(boxPosition);
 	}
 }
 
@@ -76,7 +74,7 @@ if (canvas === null) {
 
 // 엔진 실행.
 const engineConfiguration = new EngineConfiguration();
-engineConfiguration.referenceResolutionSize = Vector2.create(1280, 800);
+engineConfiguration.referenceResolutionSize = Vector2.create(800, 1280);
 engineConfiguration.canvasId = "tutorial";
 engineConfiguration.isDevelopment = true;
 const engine = new Engine(engineConfiguration);
