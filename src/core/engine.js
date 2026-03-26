@@ -88,6 +88,10 @@ export class Engine extends Object {
 	 * @param { Scene } scene
 	 */
 	run(scene) {
+		if (scene === null || scene instanceof Scene === false) {
+			throw new System.Error(`scene is invalid.`);
+		}
+		
 		// 기본 폰트 불러오기.
 		const internalFontFace = new FontFace(`DOSGothic`, `url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff')`);
 		internalFontFace.load().then((loadedFont) => {
