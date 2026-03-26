@@ -39,7 +39,7 @@
 // 	 */
 // 	update(engine) {
 // 		const inputManager = engine.getInputManager();
-// 		if (inputManager.justPressed) {
+// 		if (inputManager.isTouchPressed()) {
 // 			// input.position
 // 		}
 // 		else {

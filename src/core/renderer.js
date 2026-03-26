@@ -15,7 +15,6 @@ export class Renderer extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { Engine } */ #engine;
 	/** @private @type { CanvasRenderingContext2D } */ #canvasContext;
 
 	//==============================================================================
@@ -28,7 +27,6 @@ export class Renderer extends Object {
 	 */
 	constructor(engine, canvasContext) {
 		super();
-		this.#engine = engine;
 		this.#canvasContext = canvasContext;
 	}
 
@@ -81,8 +79,7 @@ export class Renderer extends Object {
 			throw new Error("image is null");
 		}
 
-		const engine = this.getEngine();
-		const canvasContext = this.#canvasContext;
+		const canvasContext = this.getCanvasContext();
 		canvasContext.globalAlpha = opacity;
 		canvasContext.fillStyle = color;
 		canvasContext.rotate(rotation);
@@ -191,16 +188,6 @@ export class Renderer extends Object {
 	endClip() {
 		const canvasContext = this.getCanvasContext();
 		canvasContext.restore();
-	}
-	
-	//==============================================================================
-	// 엔진 반환.
-	//==============================================================================
-	/**
-	 * @returns { Engine }
-	 */
-	getEngine() {
-		return this.#engine;
 	}
 
 	//==============================================================================

@@ -32,14 +32,14 @@ export class OBB extends Object {
 	// 좌표와 충돌 검출.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } worldPosition
+	 * @param { Vector2 } viewPosition
 	 * @returns { boolean }
 	 */
-	contains(worldPosition) {
-		if (worldPosition === null) {
+	contains(viewPosition) {
+		if (viewPosition === null) {
 			return false;
 		}
-		else if (worldPosition instanceof Vector2) {
+		else if (viewPosition instanceof Vector2) {
 			const edges = this.getEdges();
 			let isInside = false;
 			for (let i = 0, j = edges.length - 1; i < edges.length; j = i++) {
@@ -47,7 +47,7 @@ export class OBB extends Object {
 				const yi = edges[i].y;
 				const xj = edges[j].x;
 				const yj = edges[j].y;
-				const intersect = ((yi > worldPosition.y) !== (yj > worldPosition.y)) && (worldPosition.x < (xj - xi) * (worldPosition.y - yi) / (yj - yi) + xi);
+				const intersect = ((yi > viewPosition.y) !== (yj > viewPosition.y)) && (viewPosition.x < (xj - xi) * (viewPosition.y - yi) / (yj - yi) + xi);
 				if (intersect) {
 					isInside = !isInside;
 				}

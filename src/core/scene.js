@@ -12,6 +12,13 @@ import { TouchEffect } from "../misc/toucheffect.js";
 
 //==============================================================================
 // 씬.
+// - new() ==> create() ==> async load(engine) ==> initialize(engine)
+// - finalize(engine) ==> async unload(engine) ==> destroy()
+// - resize(canvasNativeSize)
+// - tick(timeDelta)
+// - preDraw(renderer) ==> draw(renderer) ==> postDraw(renderer)
+// - touchPress(viewInputPosition) ==> touchMove(viewInputPosition) ==> touchRelease(viewInputPosition)
+// - reset()
 //==============================================================================
 export class Scene extends Object {
 	//==============================================================================
@@ -42,42 +49,12 @@ export class Scene extends Object {
 	}
 
 	//==============================================================================
-	// 초기화.
-	//==============================================================================
-	/**
-	 * @virtual
-	 * @param { Engine } engine 
-	 */
-	initialize(engine) {
-		this.#engine = engine;
-
-		// 터치 효과 초기화.
-		this.#touchEffect = new TouchEffect(engine);
-	}
-
-	
-	//==============================================================================
-	// 이후 초기화.
-	//==============================================================================
-	/**
-	 * @virtual
-	 * @param { Engine } engine 
-	 */
-	postInitialize(engine) {
-		this.#engine = engine;
-
-		// 터치 효과 초기화.
-		this.#touchEffect = new TouchEffect(engine);
-	}
-
-	//==============================================================================
 	// 파괴.
 	//==============================================================================
 	/**
 	 * @virtual
 	 */
-	finalize() {
-
+	destroy() {
 	}
 
 	//==============================================================================
@@ -88,7 +65,31 @@ export class Scene extends Object {
 	 * @param { Engine } engine 
 	 */
 	async load(engine) {
+		this.#engine = engine;
 		await Promise.resolve();
+	}
+
+	//==============================================================================
+	// 초기화.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { Engine } engine 
+	 */
+	initialize(engine) {
+		// 터치 효과 초기화.
+		this.#touchEffect = new TouchEffect(engine);
+	}
+
+	//==============================================================================
+	// 종료처리.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { Engine } engine 
+	 */
+	finalize(engine) {
+
 	}
 
 	//==============================================================================
@@ -107,11 +108,10 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } screenSize
+	 * @param { Vector2 } canvasNativeSize
 	 */
-	resize(screenSize) {
-		console.log(`Scene.resize(${screenSize.x}, ${screenSize.y})`);
-		// this.#root.
+	resize(canvasNativeSize) {
+		console.log(`Scene.resize(${canvasNativeSize.x}, ${canvasNativeSize.y})`);
 	}
 
 	//==============================================================================
@@ -122,82 +122,43 @@ export class Scene extends Object {
 	 * @param { number } timeDelta 
 	 */
 	tick(timeDelta) {
-		if (this.#root.isActive()) {
-			this.#root.tick(timeDelta);
+		// 노드 갱신.
+		try {
+			if (this.#root.isActive()) {
+				this.#root.tick(timeDelta);
+			}
+		}
+		catch (error) {
+			console.error(error);
 		}
 
 		// 터치 갱신.
-		this.tickTouch(timeDelta);
+		try {
+			this.tickTouch(timeDelta);
+		}
+		catch (error) {
+			console.error(error);
+		}
 
 		// 트윈 목록 갱신.
 		for (let i = this.#tweens.length - 1; i >= 0; --i) {
 			const tween = this.#tweens[i];
-			tween.tick(timeDelta);
-			if (tween.isFinished()) {
-				this.#tweens.splice(i, 1);
+			try {
+				if (tween) {
+					tween.tick(timeDelta);
+					if (tween.isFinished()) {
+						this.#tweens.splice(i, 1);
+					}
+				}
+				else {
+					this.#tweens.splice(i, 1);
+					continue;
+				}
+			}
+			catch (error) {
+				console.error(error);
 			}
 		}
-	}
-
-	//==============================================================================
-	// 터치 갱신.
-	//==============================================================================
-	/**
-	 * @virtual
-	 * @param { number } timeDelta 
-	 */
-	tickTouch(timeDelta) {
-		const engine = this.getEngine();
-		const inputManager = engine.getInputManager();
-		const inputPosition = inputManager.getViewInputPosition();
-
-		// 터치 처리.
-		if (inputManager.justPressed) {
-			this.touchPress(inputPosition);
-		}
-		else if (inputManager.justReleased) {
-			this.touchRelease(inputPosition);
-		}
-		else if (inputManager.justMoved) {
-			this.touchMove(inputPosition);
-		}
-
-		// 터치 효과 갱신.
-		this.#touchEffect.tick(timeDelta);
-	}
-
-	//==============================================================================
-	// 터치 누름.
-	//==============================================================================
-	/**
-	 * @virtual
-	 * @param { Vector2 } worldPosition
-	 */
-	touchPress(worldPosition) {
-
-	}
-
-	//==============================================================================
-	// 터치 이동.
-	//==============================================================================
-	/**
-	 * @virtual
-	 * @param { Vector2 } worldPosition
-	 */
-	touchMove(worldPosition) {
-		// 터치 효과 처리.
-		this.#touchEffect.createTouchParticle(worldPosition.x, worldPosition.y);
-	}
-
-	//==============================================================================
-	// 터치 뗌.
-	//==============================================================================
-	/**
-	 * @virtual
-	 * @param { Vector2 } worldPosition
-	 */
-	touchRelease(worldPosition) {
-
 	}
 
 	//==============================================================================
@@ -220,8 +181,8 @@ export class Scene extends Object {
 	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
-		// 노드 출력.
-		renderer.drawNode(this.#root);
+		// // 노드 출력.
+		// renderer.drawNode(this.#root);
 	}
 
 	//==============================================================================
@@ -234,6 +195,84 @@ export class Scene extends Object {
 	postDraw(renderer) {
 		// 터치 효과 출력.
 		renderer.drawNode(this.#touchEffect);
+	}
+
+	//==============================================================================
+	// 터치 갱신.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { number } timeDelta 
+	 */
+	tickTouch(timeDelta) {
+		const engine = this.getEngine();
+		const inputManager = engine.getInputManager();
+		const viewInputPosition = inputManager.getViewInputPosition();
+
+		// 누름.
+		if (inputManager.isTouchPressed()) {
+			try {
+				this.touchPress(viewInputPosition);
+			}
+			catch (error) {
+				console.error(error);
+			}
+		}
+		// 뗌.
+		else if (inputManager.isTouchReleased()) {
+			try {
+				this.touchRelease(viewInputPosition);
+			}
+			catch (error) {
+				console.error(error);
+			}
+		}
+		// 누르고 있음.
+		else if (inputManager.isTouchMoved()) {
+			try {
+				this.touchMove(viewInputPosition);
+			}
+			catch (error) {
+				console.error(error);
+			}
+		}
+
+		// 터치 효과 갱신.
+		this.#touchEffect.tick(timeDelta);
+	}
+
+	//==============================================================================
+	// 터치 누름.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { Vector2 } viewInputPosition
+	 */
+	touchPress(viewInputPosition) {
+
+	}
+
+	//==============================================================================
+	// 터치 이동.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { Vector2 } viewInputPosition
+	 */
+	touchMove(viewInputPosition) {
+		// 터치 효과 처리.
+		this.#touchEffect.createTouchParticle(viewInputPosition.x, viewInputPosition.y);
+	}
+
+	//==============================================================================
+	// 터치 뗌.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { Vector2 } viewInputPosition
+	 */
+	touchRelease(viewInputPosition) {
+
 	}
 
 	//==============================================================================

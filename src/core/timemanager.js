@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+const System = globalThis;
 import { Object } from "../base/object.js";
 import { Engine } from "./engine.js";
 
@@ -12,12 +13,12 @@ export class TimeManager extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { number } */ #realtimeSinceStartup;
-	/** @type { number } */ #time;
-	/** @type { number } */ #timeDelta;
-	/** @type { number } */ #fps;
-	/** @type { number } */ #framesThisSecond;
-	/** @type { number } */ #previousFrameCheckTime;
+	/** @private @type { number } */ #realtimeSinceStartup;
+	/** @private @type { number } */ #time;
+	/** @private @type { number } */ #timeDelta;
+	/** @private @type { number } */ #fps;
+	/** @private @type { number } */ #framesThisSecond;
+	/** @private @type { number } */ #previousFrameCheckTime;
 
 	//==============================================================================
 	// 생성.

@@ -194,17 +194,17 @@ export class BoundsComponent extends Component {
 	// getWorldCorners() 를 통한 충돌 검출.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } worldPosition
+	 * @param { Vector2 } viewPosition
 	 * @returns { boolean }
 	 */
-	contains(worldPosition) {
-		if (worldPosition === null) {
+	contains(viewPosition) {
+		if (viewPosition === null) {
 			return false;
 		}
 		const worldCorners = this.getWorldCorners();
 		const obb = new OBB();
 		obb.setEdges(worldCorners);
-		const isInside = obb.contains(worldPosition);
+		const isInside = obb.contains(viewPosition);
 		return isInside;
 	}
 }

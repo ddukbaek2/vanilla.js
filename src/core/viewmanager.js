@@ -223,25 +223,6 @@ export class ViewManager extends Object {
 	}
 
 	//==============================================================================
-	// 대상 좌표가 사용 영역 안에 존재하는지 여부.
-	//==============================================================================
-	/**
-	 * @public
-	 * @method
-	 * @param { Vector2 } worldPosition
-	 * @returns { boolean }
-	 */
-	containsViewRect(worldPosition) {
-		// return (
-		// 	worldPosition.x >= this.viewRect.position.x &&
-		// 	worldPosition.x <= this.viewRect.position.x + this.viewRect.size.x &&
-		// 	worldPosition.y >= this.viewRect.position.y &&
-		// 	worldPosition.y <= this.viewRect.position.y + this.viewRect.size.y
-		// );
-		return this.#viewRect.contains(worldPosition);
-	}
-
-	//==============================================================================
 	// 캔버스 설정.
 	//==============================================================================
 	/**
@@ -297,16 +278,6 @@ export class ViewManager extends Object {
 	}
 
 	//==============================================================================
-	// 웹페이지의 전체 크기 설정.
-	//==============================================================================
-	/**
-	 * @param { Vector2 } clientNativeSize
-	 */
-	setClientNativeSize(clientNativeSize) {
-		this.#clientNativeSize = clientNativeSize;
-	}
-
-	//==============================================================================
 	// 웹페이지의 전체 크기 반환.
 	//==============================================================================
 	/**
@@ -314,16 +285,6 @@ export class ViewManager extends Object {
 	 */
 	getClientNativeSize() {
 		return this.#clientNativeSize;
-	}
-
-	//==============================================================================
-	// 캔버스의 요소 크기 설정.
-	//==============================================================================
-	/**
-	 * @param { Vector2 } canvasNativeSize
-	 */
-	setCanvasNativeSize(canvasNativeSize) {
-		this.#canvasNativeSize = canvasNativeSize;
 	}
 
 	//==============================================================================
@@ -387,27 +348,23 @@ export class ViewManager extends Object {
 	}
 
 	//==============================================================================
-	// 클라이언트 좌표를 뷰 좌표로 변환.
+	// 캔버스 좌표를 뷰 좌표로 변환.
 	//==============================================================================
 	/**
 	 * @public
 	 * @method
-	 * @param { Vector2 } clientPoint
+	 * @param { Vector2 } canvasPosition
 	 * @returns { Vector2 }
 	 */
-	transformToViewPoint(clientPoint) {
-		const viewRect = this.getViewRect();
-		const relativeX = clientPoint.x - viewRect.position.x;
-		const relativeY = clientPoint.y - viewRect.position.y;
-
-		const scale = this.#targetResolutionScale;
-		if (scale === 0) {
+	calculateViewPosition(canvasPosition) {
+		const targetResolutionScale = this.getTargetResolutionScale();
+		if (targetResolutionScale === 0) {
 			return Vector2.zero();
 		}
 
-		const viewX = relativeX / scale;
-		const viewY = relativeY / scale;
-
+		const viewRect = this.getViewRect();
+		const viewX = Math.round((canvasPosition.x - viewRect.position.x) / targetResolutionScale);
+		const viewY = Math.round((canvasPosition.y - viewRect.position.y) / targetResolutionScale);
 		return Vector2.create(viewX, viewY);
 	}
 }

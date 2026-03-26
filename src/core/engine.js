@@ -12,6 +12,7 @@ import { Platform, PlatformType, BrowserType } from "../base/platform.js";
 import { Renderer } from "./renderer.js";
 import { Scene } from "./scene.js";
 import { Rect } from "../base/rect.js";
+import { SceneManager } from "./scenemanager.js";
 
 
 //==============================================================================
@@ -39,16 +40,14 @@ export class Engine extends Object {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { EngineConfiguration } */ #engineConfiguration;
-	/** @private @type { HTMLCanvasElement } */ #canvas;
 	/** @private @type { Platform } */ #platform;
+	/** @private @type { SceneManager } */ #sceneManager;
 	/** @private @type { TimeManager } */ #timeManager;
 	/** @private @type { ViewManager } */ #viewManager;
 	/** @private @type { InputManager } */ #inputManager;
 	/** @private @type { Renderer } */ #renderer;
 	/** @private @type { () => void  } */ #resizeCallback;
 	/** @private @type { FrameRequestCallback } */ #updateEngineCallback;
-	/** @private @type { Scene[] } */ #scenes;
-	/** @private @type { boolean } */ #isDevelopment;
 
 	//==============================================================================
 	// 생성.
@@ -67,6 +66,7 @@ export class Engine extends Object {
 		const canvasContext = canvas.getContext("2d", { alpha: false });
 
 		this.#platform = new Platform();
+		this.#sceneManager = new SceneManager(this);
 		this.#timeManager = new TimeManager(this);
 		this.#viewManager = new ViewManager(this, engineConfiguration.referenceResolutionSize);
 		this.#viewManager.setCanvas(canvas);
@@ -75,9 +75,7 @@ export class Engine extends Object {
 
 		this.#resizeCallback = this.#resize.bind(this);
 		this.#updateEngineCallback = this.#updateEngine.bind(this);
-		this.#scenes = [];
-		this.#isDevelopment = engineConfiguration.isDevelopment;
-		
+
 		if (this.terminalFont !== null) {
 			// this.terminalFont = new FontFace(`VT323`, `url('https://fonts.gstatic.com/s/vt323/v17/pxiKyp0ihIEF2isfFJU.woff2')`);
 			this.terminalFont = new FontFace(`DOSGothic`, `url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff')`);
@@ -86,7 +84,7 @@ export class Engine extends Object {
 			});
 		}
 
-		this.#setupAllEvents();
+		this.#setupAllDocumentEvents();
 		this.#resize();
 	}
 
@@ -97,7 +95,8 @@ export class Engine extends Object {
 	 * @param { Scene } scene
 	 */
 	run(scene) {
-		this.loadScene(scene);
+		const sceneManager = this.getSceneManager();
+		sceneManager.loadScene(scene);
 		window.addEventListener("resize", this.#resizeCallback);
 		window.requestAnimationFrame(this.#updateEngineCallback);
 	}
@@ -111,16 +110,20 @@ export class Engine extends Object {
 	 */
 	#resize() {
 		const viewManager = this.getViewManager();
-		const canvasNativeSize = viewManager.getCanvasNativeSize();
-		const canvasPixelSize = viewManager.getCanvasPixelSize();
-		const viewRect = viewManager.getViewRect();
+		// const originalCanvasNativeSize = viewManager.getCanvasNativeSize();
+		// const originalCanvasPixelSize = viewManager.getCanvasPixelSize();
+		// const originalViewRect = viewManager.getViewRect();
 		viewManager.calculateViewRect();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		// const canvasPixelSize = viewManager.getCanvasPixelSize();
+		// const viewRect = viewManager.getViewRect();
 
 		// 씬 리사이즈.
-		for (let i = 0; i < this.#scenes.length; ++i) {
-			const scene = this.#scenes[i];			
+		const sceneManager = this.getSceneManager();
+		const loadedScenes = sceneManager.getAllLoadedScenes();
+		for (const loadedScene of loadedScenes) {
 			try {
-				scene.resize();
+				loadedScene.resize(canvasNativeSize);
 			}
 			catch (error) {
 				console.error(error);
@@ -129,64 +132,68 @@ export class Engine extends Object {
 	}
 
 	//==============================================================================
-	// 이벤트 설정.
+	// 웹페이지에 기반하는 이벤트 설정.
 	//==============================================================================
 	/**
 	 * @private
 	 * @method
 	 */
-	#setupAllEvents() {
+	#setupAllDocumentEvents() {
 		const viewManager = this.getViewManager();
 		const canvas = viewManager.getCanvas();
 
+		// 마우스 우클릭시 컨텍스트 메뉴 출력 될 때.
 		canvas.addEventListener("contextmenu", (touchEvent) => {
 				touchEvent.preventDefault();
 			});
-		canvas.addEventListener("mousedown", (touchEvent) => {
-				// if (!this.#view.isInsideView(touchEvent.clientX, touchEvent.clientY)) {
-				// 	return;
-				// }
 
+		// 마우스 누를 때.
+		canvas.addEventListener("mousedown", (touchEvent) => {
 				const inputManager = this.getInputManager();
-				inputManager.justMoved = true;
-				inputManager.justPressed = true;
+				inputManager.setTouchPressed(true);
+				inputManager.setTouchMoved(true);
 				this.updateCanvasInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
+		// 마우스 움직일 때.
 		canvas.addEventListener("mousemove", (touchEvent) => {
 				this.updateCanvasInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
+		// 마우스 뗄 때.
 		canvas.addEventListener("mouseup", (touchEvent) => {
 				const inputManager = this.getInputManager();
-				inputManager.justMoved = false;
-				inputManager.justReleased = true;
+				inputManager.setTouchMoved(false);
+				inputManager.setTouchReleased(true);
 				this.updateCanvasInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
+		// 터치 누를 때.
 		canvas.addEventListener("touchstart", (touchEvent) => {
 				const touch = touchEvent.changedTouches[0];
-				if (!touch) return;
-
-				// if (!this.#view.isInsideView(touch.clientX, touch.clientY)) {
-				// 	return;
-				// }
+				if (!touch) {
+					return;
+				}
 
 				const inputManager = this.getInputManager();
-				inputManager.justMoved = true;
-				inputManager.justPressed = true;
+				inputManager.setTouchMoved(true);
+				inputManager.setTouchPressed(true);
 				this.updateCanvasInputPosition(touch.clientX, touch.clientY);
 				touchEvent.preventDefault();
 			}, { passive: false });
 
+		// 터치 움직일 때.
 		canvas.addEventListener("touchmove", (touchEvent) => {
 				const touch = touchEvent.changedTouches[0];
-				if (!touch) return;
+				if (!touch) {
+					return;
+				}
 
 				this.updateCanvasInputPosition(touch.clientX, touch.clientY);
 				touchEvent.preventDefault();
 			}, { passive: false });
 
+		// 터치 뗄 때.
 		canvas.addEventListener("touchend", (touchEvent) => {
 				const touch = touchEvent.changedTouches[0];
 				if (touch) {
@@ -194,12 +201,12 @@ export class Engine extends Object {
 				}
 
 				const inputManager = this.getInputManager();
-				inputManager.justMoved = false;
-				inputManager.justReleased = true;
+				inputManager.setTouchMoved(false);
+				inputManager.setTouchReleased(true);
 				touchEvent.preventDefault();
 			}, { passive: false });
 
-		// 커서 상태 변경 감지.
+		// 커서가 보이거나 감춰질 때.
 		document.addEventListener("pointerlockchange", () => {
 			if (document.pointerLockElement === canvas) {
 				// console.log('커서가 숨겨졌습니다.');
@@ -227,9 +234,7 @@ export class Engine extends Object {
 
 		// 뷰 기준 입력 위치 설정.
 		const viewManager = this.getViewManager();
-		const viewInputPosition = viewManager.transformToViewPoint(canvasNativeInputPosition);
-		viewInputPosition.x = Math.round(viewInputPosition.x);
-		viewInputPosition.y = Math.round(viewInputPosition.y);
+		const viewInputPosition = viewManager.calculateViewPosition(canvasNativeInputPosition);
 		inputManager.setViewInputPosition(viewInputPosition);
 	}
 	
@@ -240,42 +245,42 @@ export class Engine extends Object {
 	 * @param { Renderer } renderer 
 	 */
 	drawStatistics(renderer) {
-		if (!this.#isDevelopment) {
-			return;
-		}
+		// const isDevelopment = this.isDevelopment();
+		// if (!isDevelopment) {
+		// 	return;
+		// }
 	
 		const canvasContext = renderer.getCanvasContext();
 		const timeManager = this.getTimeManager();
 		const viewManager = this.getViewManager();
 		const inputManager = this.getInputManager();
 
-		const SYSTEM_FONT_STRING = '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-
-
-		let textOffsetX = 16;
-		let textOffsetY = 16;
-		let textPosition = Vector2.create(16, 16);
+		const textPosition = Vector2.create(16, 16);
 		const drawOutlineText = (text) => {
-			canvasContext.fillText(text, textPosition.x, textPosition.y);
+			if (text) {
+				// 출력.
+				canvasContext.fillText(text, textPosition.x, textPosition.y);
+				
+				// 자동 외곽선 출력.
+				// canvasContext.strokeText(text, textPosition.x, textPosition.y);
+				// canvasContext.fillText(text, textPosition.x, textPosition.y);
 
-			// 자동 외곽선 출력.
-			// canvasContext.strokeText(text, textPosition.x, textPosition.y);
-			// canvasContext.fillText(text, textPosition.x, textPosition.y);
+				// 수동 외곽선 두께 출력.
+				// const offsets = [
+				// 	[-2, -2], [2, -2], [-2, 2], [2, 2], 
+				// 	[-2, 0], [2, 0], [0, -2], [0, 2]
+				// ];
+				// canvasContext.fillStyle = Colors.black;
+				// for (let i = 0; i < offsets.length; ++i) {
+				// 	canvasContext.fillText(text, textPosition.x + offsets[i][0], textPosition.y + offsets[i][1]);
+				// }
 
-			// 수동 외곽선 출력.
-			// const offsets = [
-			// 	[-2, -2], [2, -2], [-2, 2], [2, 2], 
-			// 	[-2, 0], [2, 0], [0, -2], [0, 2]
-			// ];
+				// 수동 외곽선 안쪽 출력.
+				// canvasContext.fillStyle = Colors.white;
+				// canvasContext.fillText(text, textPosition.x, textPosition.y);
+			}
 
-			// canvasContext.fillStyle = Colors.black;
-			// for (let i = 0; i < offsets.length; ++i) {
-			// 	canvasContext.fillText(text, textPosition.x + offsets[i][0], textPosition.y + offsets[i][1]);
-			// }
-
-			// canvasContext.fillStyle = Colors.white;
-			// canvasContext.fillText(text, textPosition.x, textPosition.y);
-
+			// 위치 증가.
 			textPosition.y += 16;
 
 			// 영역 출력.
@@ -329,33 +334,33 @@ export class Engine extends Object {
 		drawOutlineText(``);
 
 		// 화면 정보 출력.
-		const clientNativeSize = viewManager.getClientNativeSize();
+		// const clientNativeSize = viewManager.getClientNativeSize();
 		const canvasNativeSize = viewManager.getCanvasNativeSize();
-		const canvasPixelSize = viewManager.getCanvasPixelSize();
+		// const canvasPixelSize = viewManager.getCanvasPixelSize();
 		const viewScaleMode = viewManager.getViewScaleMode();
 		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
-		const viewRect = viewManager.getViewRect();
-		const canvasNativeInputPosition = inputManager.getCanvasNativeInputPosition();
+		// const viewRect = viewManager.getViewRect();
+		// const canvasNativeInputPosition = inputManager.getCanvasNativeInputPosition();
 		const viewInputPosition = inputManager.getViewInputPosition();
-		drawOutlineText(`clientNativeSize: (${clientNativeSize.x}, ${clientNativeSize.y})`);
+		// drawOutlineText(`clientNativeSize: (${clientNativeSize.x}, ${clientNativeSize.y})`);
 		drawOutlineText(`canvasNativeSize: (${canvasNativeSize.x}, ${canvasNativeSize.y})`);
-		drawOutlineText(`canvasPixelSize: (${canvasPixelSize.x}, ${canvasPixelSize.y})`);
+		// drawOutlineText(`canvasPixelSize: (${canvasPixelSize.x}, ${canvasPixelSize.y})`);
 		drawOutlineText(`referenceResolutionSize: (${referenceResolutionSize.x}, ${referenceResolutionSize.y})`);
 		drawOutlineText(`viewScaleMode: ${viewScaleMode}`);
-		drawOutlineText(`viewRect: (${viewRect.position.x}, ${viewRect.position.y}) - (${viewRect.size.x}, ${viewRect.size.y})`);
-		drawOutlineText(`canvasNativeInputPosition: (${canvasNativeInputPosition.x}, ${canvasNativeInputPosition.y})`);
+		// drawOutlineText(`viewRect: (${viewRect.position.x}, ${viewRect.position.y}) - (${viewRect.size.x}, ${viewRect.size.y})`);
+		// drawOutlineText(`canvasNativeInputPosition: (${canvasNativeInputPosition.x}, ${canvasNativeInputPosition.y})`);
 		drawOutlineText(`viewInputPosition: (${viewInputPosition.x}, ${viewInputPosition.y})`);
 		drawOutlineText(``);
 
 		// 초당 프레임 정보 출력.
-		const realtimeScinceStartup = timeManager.getRealtimeSinceStartup().toFixed(2);
+		// const realtimeScinceStartup = timeManager.getRealtimeSinceStartup().toFixed(2);
 		const time = timeManager.getTime().toFixed(2);
 		const framePerSecond = timeManager.getFramePerSecond();
 		const timeDelta = timeManager.getTimeDelta().toFixed(3);
-		drawOutlineText(`realtimeScinceStartup: ${realtimeScinceStartup}`);
-		drawOutlineText(`time: ${time}`);
-		drawOutlineText(`framePerSecond: ${framePerSecond}`);
-		drawOutlineText(`timeDelta: ${timeDelta}`);
+		// drawOutlineText(`realtimeScinceStartup: ${realtimeScinceStartup}`);
+		drawOutlineText(`time: ${time}s`);
+		drawOutlineText(`framePerSecond: ${framePerSecond}s`);
+		drawOutlineText(`timeDelta: ${timeDelta}s`);
 		drawOutlineText(``);
 
 		// // 메모리 사용 정보 출력.
@@ -371,10 +376,10 @@ export class Engine extends Object {
 		// 	drawOutlineText(`jsHeapSizeLimit: ${jsHeapSizeLimit}`);
 		// }
 
-		var resourceUsage = this.#platform.getResouceUsage();
-		const totalTransferSize = formatSizeString(resourceUsage.totalTransferSize);
-		const totalDecodedSize = formatSizeString(resourceUsage.totalDecodedSize);
-		const loadedFiles = resourceUsage.loadedFiles;
+		// var resourceUsage = this.#platform.getResouceUsage();
+		// const totalTransferSize = formatSizeString(resourceUsage.totalTransferSize);
+		// const totalDecodedSize = formatSizeString(resourceUsage.totalDecodedSize);
+		// const loadedFiles = resourceUsage.loadedFiles;
 
 		// // 다운 로드된 리소스 목록.
 		// y += 26; drawOutlineText(`totalTransferSize: ${totalTransferSize}`, x, y);
@@ -389,8 +394,8 @@ export class Engine extends Object {
 		// 	y += 26; drawOutlineText(` - ${name} (${transferSizeString})`, x, y);
 		// }
 
-		// 로드된 리소스 목록.
-		drawOutlineText(`totalDecodedSize: ${totalDecodedSize}`);
+		// // 로드된 리소스 목록.
+		// drawOutlineText(`totalDecodedSize: ${totalDecodedSize}`);
 		// for (let i = 0; i < loadedFiles.length; ++i)
 		// {
 		// 	const loadedFile = loadedFiles[i];
@@ -413,13 +418,14 @@ export class Engine extends Object {
 	 */
 	#updateEngine(timestamp) {
 
-		// 렌더러 갱신.
+		// 렌더러 처리.
 		const renderer = this.getRenderer();
 		renderer.applySettings(this);
 
-		// 시간 갱신.
+		// 시간 처리.
 		const timeManager = this.getTimeManager();
 		timeManager.calculateTime(timestamp);
+		const timeDelta = timeManager.getTimeDelta();
 
 		// // 화면 더 부드럽게.
 		// this.CanvasContext.scale(this.#view.devicePixelRatio, this.#view.devicePixelRatio);
@@ -427,19 +433,18 @@ export class Engine extends Object {
     	// this.CanvasContext.imageSmoothingQuality = 'high';
 		// this.canvasContext.canvas.style.textRendering = 'optimizeLegibility';
 
-		// 씬 출력.
-		const timeDelta = timeManager.getTimeDelta();
-		for (let i = 0; i < this.#scenes.length; ++i) {
-			const scene = this.#scenes[i];
-			
+		// 씬 처리.
+		const sceneManager = this.getSceneManager();
+		const loadedScenes = sceneManager.getAllLoadedScenes();
+		for (const loadedScene of loadedScenes) {
 			try {
-				// 주기적 갱신.
-				scene.tick(timeDelta);
+				// 갱신.
+				loadedScene.tick(timeDelta);
 
 				// 출력.
-				scene.preDraw(renderer);
-				scene.draw(renderer);
-				scene.postDraw(renderer);
+				loadedScene.preDraw(renderer);
+				loadedScene.draw(renderer);
+				loadedScene.postDraw(renderer);
 			}
 			catch (error) {
 				console.error(error);
@@ -447,58 +452,19 @@ export class Engine extends Object {
 		}
 
 		// 개발 정보 출력.
-		if (this.#isDevelopment) {
+		const isDevelopment = this.isDevelopment();
+		if (isDevelopment) {
 			this.drawStatistics(renderer);
 		}
 		
 		// 입력 처리.
+		// 현재 프레임에서 필요한 만큼 처리하고 다음 프레임에서는 유지하지 않음.
 		const inputManager = this.getInputManager();
-		inputManager.justPressed = false;
-		inputManager.justReleased = false;
+		inputManager.setTouchPressed(false);
+		inputManager.setTouchReleased(false);
 
 		// 다음 프레임 호출 요청.
 		window.requestAnimationFrame(this.#updateEngineCallback);
-	}
-
-	//==============================================================================
-	// 씬 로드.
-	//==============================================================================
-	/**
-	 * 
-	 * @param { Scene } scene 
-	 */
-	async loadScene(scene) {
-		if (scene && scene instanceof Scene) {
-			scene.initialize(this);
-			await scene.load(this);
-			scene.postInitialize(this);
-			this.#scenes.push(scene);
-		}
-	}
-
-	//==============================================================================
-	// 씬 언로드.
-	//==============================================================================
-	/**
-	 * 
-	 * @param { Scene } scene 
-	 */
-	async unloadScene(scene) {
-		if (scene && scene instanceof Scene) {
-			await scene.unload(this);
-			scene.finalize();
-			this.#scenes.splice(this.#scenes.indexOf(scene), 1);
-		}
-	}
-
-	//==============================================================================
-	// 모든 씬 언로드.
-	//==============================================================================
-	async unloadAllScenes() {
-		while (this.#scenes.length > 0) {
-			const scene = this.#scenes[0];
-			await this.unloadScene(scene);
-		}
 	}
 
 	//==============================================================================
@@ -544,7 +510,19 @@ export class Engine extends Object {
 	}
 
 	//==============================================================================
-	// 시간 정보 반환.
+	// 씬 매니저 반환.
+	//==============================================================================
+	/**
+	 * @public
+	 * @method
+	 * @returns { SceneManager }
+	 */
+	getSceneManager() {
+		return this.#sceneManager;
+	}
+	
+	//==============================================================================
+	// 시간 매니저 반환.
 	//==============================================================================
 	/**
 	 * @public
@@ -556,7 +534,7 @@ export class Engine extends Object {
 	}
 	
 	//==============================================================================
-	// 뷰 정보 반환.
+	// 뷰 매니저 반환.
 	//==============================================================================
 	/**
 	 * @public
@@ -568,7 +546,7 @@ export class Engine extends Object {
 	}
 
 	//==============================================================================
-	// 입력 정보 반환.
+	// 입력 매니저 반환.
 	//==============================================================================
 	/**
 	 * @public
@@ -580,7 +558,7 @@ export class Engine extends Object {
 	}
 
 	//==============================================================================
-	// 렌더러 정보 반환.
+	// 렌더러 반환.
 	//==============================================================================
 	/**
 	 * @public
@@ -600,7 +578,7 @@ export class Engine extends Object {
 	 * @returns { boolean }
 	 */
 	isDevelopment() {
-		return this.#isDevelopment;
+		return this.#engineConfiguration.isDevelopment;
 	}
 
 	//==============================================================================
