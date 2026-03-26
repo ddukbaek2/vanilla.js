@@ -121,10 +121,10 @@ export class ViewManager extends Object {
 				}
 			case ViewScaleMode.stretchWidth: {
 					const targetResolutionScale = canvasNativeSize.x / this.#referenceResolutionSize.x;
-					const viewWidth = Math.round(this.#referenceResolutionSize.x * targetResolutionScale);
-					const viewHeight = Math.round(this.#referenceResolutionSize.y * targetResolutionScale);
-					const viewX = Math.floor((canvasNativeSize.x - viewWidth) * 0.5);
-					const viewY = Math.floor((canvasNativeSize.y - viewHeight) * 0.5);
+					const viewWidth = canvasNativeSize.x;
+					const viewHeight = this.#referenceResolutionSize.y * targetResolutionScale;
+					const viewX = 0;
+					const viewY = (canvasNativeSize.y - viewHeight) * 0.5;
 					this.#targetResolutionScale = targetResolutionScale;
 					this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
 					this.#screenSize.x = Math.round(this.#screenSize.x);
@@ -135,10 +135,10 @@ export class ViewManager extends Object {
 				}
 			case ViewScaleMode.stretchHeight: {
 					const targetResolutionScale = canvasNativeSize.y / this.#referenceResolutionSize.y;
-					const viewWidth = Math.round(this.#referenceResolutionSize.x * targetResolutionScale);
-					const viewHeight = Math.round(this.#referenceResolutionSize.y * targetResolutionScale);
-					const viewX = Math.floor((canvasNativeSize.x - viewWidth) * 0.5);
-					const viewY = Math.floor((canvasNativeSize.y - viewHeight) * 0.5);
+					const viewWidth = this.#referenceResolutionSize.x * targetResolutionScale;
+					const viewHeight = canvasNativeSize.y;
+					const viewX = (canvasNativeSize.x - viewWidth) * 0.5;
+					const viewY = 0;
 					this.#targetResolutionScale = targetResolutionScale;
 					this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
 					this.#screenSize.x = Math.round(this.#screenSize.x);
@@ -149,10 +149,10 @@ export class ViewManager extends Object {
 				}
 			case ViewScaleMode.stretchAuto: {
 					const targetResolutionScale = Math.min(canvasNativeSize.x / this.#referenceResolutionSize.x, canvasNativeSize.y / this.#referenceResolutionSize.y);
-					const viewWidth = Math.round(this.#referenceResolutionSize.x * targetResolutionScale);
-					const viewHeight = Math.round(this.#referenceResolutionSize.y * targetResolutionScale);
-					const viewX = Math.floor((canvasNativeSize.x - viewWidth) * 0.5);
-					const viewY = Math.floor((canvasNativeSize.y - viewHeight) * 0.5);
+					const viewWidth = this.#referenceResolutionSize.x * targetResolutionScale;
+					const viewHeight = this.#referenceResolutionSize.y * targetResolutionScale;
+					const viewX = (canvasNativeSize.x - viewWidth) * 0.5;
+					const viewY = (canvasNativeSize.y - viewHeight) * 0.5;
 					this.#targetResolutionScale = targetResolutionScale;
 					this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
 					this.#screenSize.x = Math.round(this.#screenSize.x);

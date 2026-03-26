@@ -72,7 +72,7 @@ export class Node extends Object {
 	 * @virtual
 	 * @param { Renderer } renderer 
 	 */
-	pushMatrix(renderer) {
+	beginCanvasState(renderer) {
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.save();
 
@@ -117,7 +117,7 @@ export class Node extends Object {
 	 * @virtual
 	 * @param { Renderer } renderer 
 	 */
-	popMatrix(renderer) {
+	endCanvasState(renderer) {
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.restore();
 	}

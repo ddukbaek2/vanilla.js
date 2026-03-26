@@ -55,9 +55,7 @@ class Tutorial extends Scene {
 
 		// 게임 영역 칠하기.
 		viewManager.applyViewRect(canvasContext);
-		canvasContext.beginPath();
-		canvasContext.fillStyle = Colors.lightVanilla;
-		renderer.drawRect(viewRect, Colors.lightVanilla);
+		renderer.drawRect(Rect.create(Vector2.zero(), referenceResolutionSize), Colors.lightVanilla);
 
 		// 사각형 그리기.
 		let boxPosition = Vector2.create(0, 0);

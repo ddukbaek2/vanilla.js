@@ -33,13 +33,15 @@ export class TouchEffect extends Node {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { TouchParticle[] } */ #touchParticles;
+	/** @private @type { string } */ #originalCompositeOperation;
+	/** @private @type { TouchParticle[] } */ #touchParticles;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	constructor() {
 		super();
+		this.#originalCompositeOperation = "";
 		this.#touchParticles = [];
 	}
 
@@ -62,9 +64,10 @@ export class TouchEffect extends Node {
 	 * @override
 	 * @param { Renderer } renderer 
 	 */
-	pushMatrix(renderer) {
-		super.pushMatrix(renderer);
+	beginCanvasState(renderer) {
+		super.beginCanvasState(renderer);
 		const canvasContext = renderer.getCanvasContext();
+		this.#originalCompositeOperation = canvasContext.globalCompositeOperation;
 		canvasContext.globalCompositeOperation = "lighter";
 	}
 
@@ -75,10 +78,11 @@ export class TouchEffect extends Node {
 	 * @override
 	 * @param { Renderer } renderer 
 	 */
-	popMatrix(renderer) {
+	endCanvasState(renderer) {
 		const canvasContext = renderer.getCanvasContext();
 		// canvasContext.globalCompositeOperation = "source-over";
-		super.popMatrix(renderer);
+		canvasContext.globalCompositeOperation = this.#originalCompositeOperation;
+		super.endCanvasState(renderer);
 	}
 
 	//==============================================================================

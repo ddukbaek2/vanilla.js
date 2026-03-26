@@ -33,12 +33,12 @@ export class Renderer extends Object {
 	}
 
 	//==============================================================================
-	// 갱신.
+	// 설정 반영.
 	//==============================================================================
 	/**
 	 * @param { Engine } engine
 	 */
-	update(engine) {
+	applySettings(engine) {
 		// 품질 갱신.
 		// 왜 매 렌더링마다 실시간 업데이트를 하지 않으면 반영되지 않는지는 모름.
 		const canvasContext = this.getCanvasContext();
@@ -55,12 +55,12 @@ export class Renderer extends Object {
 	 * @param { number } opacity 
 	 */
 	drawRect(rect, color = "#ffffff", opacity = 1.0) {
-		const engine = this.#engine;
-		const canvasContext = this.#canvasContext;
+		const canvasContext = this.getCanvasContext();
+		const originalOpacity = canvasContext.globalAlpha;
 		canvasContext.globalAlpha = opacity;
 		canvasContext.fillStyle = color;
 		canvasContext.fillRect(rect.position.x, rect.position.y, rect.size.x, rect.size.y);
-		canvasContext.globalAlpha = 1.0;
+		canvasContext.globalAlpha = originalOpacity;
 	}
 
 	//==============================================================================
@@ -70,17 +70,17 @@ export class Renderer extends Object {
 	 * @param { HTMLImageElement } image
 	 * @param { Vector2 } position
 	 * @param { Vector2 } size
-	 * @param { Rect } slices
+	 * @param { Rect } source
 	 * @param { number } rotation
 	 * @param { string } color 
 	 * @param { number } opacity 
 	 */
-	drawImage(image, position = Vector2.zero(), size = Vector2.zero(), slices = null, rotation = 0.0, color = "#ffffff", opacity = 1.0) {
+	drawImage(image, position = Vector2.zero(), size = Vector2.zero(), source = Rect.zero(), rotation = 0.0, color = "#ffffff", opacity = 1.0) {
 		if (image === null){
 			throw new Error("image is null");
 		}
 
-		const engine = this.#engine;
+		const engine = this.getEngine();
 		const canvasContext = this.#canvasContext;
 		canvasContext.globalAlpha = opacity;
 		canvasContext.fillStyle = color;
@@ -94,11 +94,11 @@ export class Renderer extends Object {
 		// else {
 		// 	canvasContext.drawImage(image, slices.position.x, slices.position.y, slices.size.x, slices.size.y, position.x, position.y, size.x, size.y);
 		// }
-		if (slices === null || slices == Rect.zero()) {
-			slices = Rect.create(0, 0, image.width, image.height);
+		if (source === null || source.equals(Rect.zero())) {
+			source = Rect.create(0, 0, image.width, image.height);
 		}
 
-		canvasContext.drawImage(image, slices.position.x, slices.position.y, slices.size.x, slices.size.y, position.x, position.y, size.x, size.y);
+		canvasContext.drawImage(image, source.position.x, source.position.y, source.size.x, source.size.y, position.x, position.y, size.x, size.y);
 		// this.#canvasContext.globalAlpha = 1.0;
 	}
 
@@ -112,38 +112,6 @@ export class Renderer extends Object {
 	 * @param { Vector2 } size
 	 * @param { Rect } patch
 	 */
-	// drawImageNinePatch(image, position, size, patch) {
-	// 	const canvasContext = this.getCanvasContext();
-	// 	const sw = image.width;
-	// 	const sh = image.height;
-	// 	const dx = position.x;
-	// 	const dy = position.y;
-	// 	const dw = size.x;
-	// 	const dh = size.y;
-	// 	const left = patch.position.x;
-	// 	const top = patch.position.y;
-	// 	const right = patch.size.x;
-	// 	const bottom = patch.size.y;
-	// 	const centerSrcW = sw - left - right;
-	// 	const centerSrcH = sh - top - bottom;
-	// 	const centerDstW = dw - left - right;
-	// 	const centerDstH = dh - top - bottom;
-
-	// 	// 위쪽.
-	// 	canvasContext.drawImage(image, 0, 0, left, top, dx, dy, left, top); // 왼쪽.
-	// 	canvasContext.drawImage(image, left, 0, centerSrcW, top, dx + left, dy, centerDstW, top); // 가운데쪽.
-	// 	canvasContext.drawImage(image, sw - right, 0, right, top, dx + dw - right, dy, right, top); // 오른쪽.
-
-	// 	// 가운데쪽.
-	// 	canvasContext.drawImage(image, 0, top, left, centerSrcH, dx, dy + top, left, centerDstH); // 왼쪽.
-	// 	canvasContext.drawImage(image, left, top, centerSrcW, centerSrcH, dx + left, dy + top, centerDstW, centerDstH); // 가운데쪽.
-	// 	canvasContext.drawImage(image, sw - right, top, right, centerSrcH, dx + dw - right, dy + top, right, centerDstH); // 오른쪽.
-
-	// 	// 아래쪽.
-	// 	canvasContext.drawImage(image, 0, sh - bottom, left, bottom, dx, dy + dh - bottom, left, bottom); // 왼쪽.
-	// 	canvasContext.drawImage(image, left, sh - bottom, centerSrcW, bottom, dx + left, dy + dh - bottom, centerDstW, bottom); // 가운데쪽.
-	// 	canvasContext.drawImage(image, sw - right, sh - bottom, right, bottom, dx + dw - right, dy + dh - bottom, right, bottom); // 오른쪽.
-	// }
 	drawImageNinePatch(image, position, size, patch) {
 		const canvasContext = this.getCanvasContext();
 		const sw = image.width;
@@ -189,16 +157,13 @@ export class Renderer extends Object {
 		}
 
 		try {
-			node.pushMatrix(this);
+			node.beginCanvasState(this);
 			node.draw(this);
 			// node.drawGizmos(this);
-
-			// 자식 출력.
 			for (const child of node.getChildren()) {
 				this.drawNode(child);
 			}
-
-			node.popMatrix(this);
+			node.endCanvasState(this);
 		}
 		catch (error) {
 			throw error;
@@ -212,8 +177,7 @@ export class Renderer extends Object {
 	 * @type { Rect } rect
 	 */
 	beginClip(rect) {
-		const engine = this.#engine;
-		const canvasContext = this.#canvasContext;
+		const canvasContext = this.getCanvasContext();
 		canvasContext.save();
 		canvasContext.beginPath();
 		canvasContext.rect(rect.position.x, rect.position.y, rect.size.x, rect.size.y); // left, top, width, height.
@@ -224,7 +188,8 @@ export class Renderer extends Object {
 	// 출력 영역 제한 종료.
 	//==============================================================================
 	endClip() {
-		this.#canvasContext.restore();
+		const canvasContext = this.getCanvasContext();
+		canvasContext.restore();
 	}
 	
 	//==============================================================================

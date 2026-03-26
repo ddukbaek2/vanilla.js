@@ -408,7 +408,7 @@ export class Engine extends Object {
 
 		// 렌더러 갱신.
 		const renderer = this.getRenderer();
-		renderer.update(this);
+		renderer.applySettings(this);
 
 		// 시간 갱신.
 		const timeManager = this.getTimeManager();
