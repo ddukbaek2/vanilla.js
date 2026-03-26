@@ -1,0 +1,245 @@
+//==============================================================================
+// 포함 모듈 목록.
+//==============================================================================
+const System = globalThis;
+import { Object } from "../base/object.js";
+import { Rect } from "../base/rect.js";
+import { Frame } from "../core/frame.js";
+
+
+//==============================================================================
+// 애니메이션 처리기.
+//==============================================================================
+export class Animation extends Object {
+	//==============================================================================
+	// 멤버 변수 목록.
+	//==============================================================================
+	/** @private @type { Frame[] } */ #frames; // 현재 프레임.
+	/** @private @type { boolean } */ #isPlaying; // 재생 중인지 여부.
+	/** @private @type { number } */ #currentFrameIndex; // 현재 프레임 번호.
+	/** @private @type { number } */ #frameTimeCounter;
+	/** @private @type { number } */ #framePerSecond; // 애니메이션 속도: 초당 프레임 수.
+	/** @private @type { boolean } */ #isLoop;
+	/** @private @type { Function } */ #onComplete;
+
+	//==============================================================================
+	// 생성.
+	//==============================================================================
+	/**
+	 * @constructor
+	 */
+	constructor() {
+		super();
+		this.#frames = [];
+		this.#currentFrameIndex = 0;
+		this.#frameTimeCounter = 0;
+		this.#framePerSecond = 10;
+		this.#isLoop = true;
+		this.#isPlaying = false;
+		this.#onComplete = null;
+	}
+
+	//==============================================================================
+	// 갱신.
+	//==============================================================================
+	/**
+	 * @param { number } timeDelta 
+	 */
+	tick(timeDelta) {
+		if (!this.#isPlaying || this.#frames.length === 0 || this.#framePerSecond <= 0) {
+			return;
+		}
+
+		const frameDuration = 1.0 / this.#framePerSecond;
+		this.#frameTimeCounter += timeDelta;
+
+		if (this.#frameTimeCounter >= frameDuration) {
+			const framesToAdvance = Math.floor(this.#frameTimeCounter / frameDuration);
+			this.#frameTimeCounter %= frameDuration;
+			this.#currentFrameIndex += framesToAdvance;
+
+			if (this.#currentFrameIndex >= this.#frames.length) {
+				if (this.#isLoop) {
+					this.#currentFrameIndex %= this.#frames.length;
+				} else {
+					this.#currentFrameIndex = this.#frames.length - 1;
+					this.#isPlaying = false;
+					if (this.#onComplete) {
+						this.#onComplete();
+					}
+				}
+			}
+		}
+	}
+
+	//==============================================================================
+	// 재생.
+	//==============================================================================
+	play() {
+		const isPlaying = this.isPlaying();
+		if (isPlaying) {
+			return;
+		}
+
+		this.#isPlaying = true;
+	}
+
+	//==============================================================================
+	// 일시정지.
+	//==============================================================================
+	pause() {
+
+	}
+
+	//==============================================================================
+	// 재개.
+	//==============================================================================
+	resume() {
+
+	}
+
+	//==============================================================================
+	// 정지.
+	//==============================================================================
+	stop() {
+		const isPlaying = this.isPlaying();
+		if (!isPlaying) {
+			return;
+		}
+
+		this.#isPlaying = false;
+		this.#currentFrameIndex = 0;
+		this.#frameTimeCounter = 0;
+	}
+
+	//==============================================================================
+	// 프레임 설정. (낱장의 스프라이트 이미지 목록)
+	//==============================================================================
+	/**
+	 * @param { HTMLImageElement[] } images
+	 */
+	setFramesFromImages(images) {
+		this.#frames = images.map(image => new Frame(image));
+		this.stop();
+	}
+
+	//==============================================================================
+	// 프레임 설정. (스프라이트 시트)
+	//==============================================================================
+	/**
+	 * @param { HTMLImageElement } image
+	 * @param { Rect[] } rects
+	 */
+	setFramesFromRects(image, rects) {
+		this.#frames = rects.map(rect => new Frame(image, rect));
+		this.stop();
+	}
+
+	//==============================================================================
+	// 초당 프레임 숫 설정.
+	//==============================================================================
+	/**
+	 * @param { number } framePerSecond 
+	 */
+	setFramePerSecond(framePerSecond) {
+		this.#framePerSecond = framePerSecond;
+	}
+
+	//==============================================================================
+	// 반복 여부 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } value 
+	 */
+	setLoop(value) {
+		this.#isLoop = value;
+	}
+
+	//==============================================================================
+	// 애니메이션 완료 콜백 설정.
+	//==============================================================================
+	/**
+	 * @param { Function } callback 
+	 */
+	setOnComplete(callback) {
+		this.#onComplete = callback;
+	}
+
+	/**
+	 * 특정 프레임으로 이동하여 재생합니다.
+	 * @param { number } index 
+	 */
+	gotoAndPlay(index) {
+		this.#currentFrameIndex = Math.max(0, Math.min(index, this.#frames.length - 1));
+		this.#frameTimeCounter = 0;
+		this.play();
+	}
+
+	/**
+	 * 특정 프레임으로 이동하여 정지합니다.
+	 * @param { number } index 
+	 */
+	gotoAndStop(index) {
+		this.#currentFrameIndex = Math.max(0, Math.min(index, this.#frames.length - 1));
+		this.#frameTimeCounter = 0;
+		this.pause();
+	}
+
+	//==============================================================================
+	// 재생 중인지 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isPlaying() {
+		return this.#isPlaying;
+	}
+	//==============================================================================
+	// 현재 프레임 반환.
+	//==============================================================================
+	/**
+	 * @returns { Frame }
+	 */
+	getCurrentFrame() {
+		return this.#frames[this.#currentFrameIndex] || null;
+	}
+
+	//==============================================================================
+	// 현재 이미지 반환.
+	//==============================================================================
+	/**
+	 * @returns { HTMLImageElement }
+	 */
+	getCurrentImage() {
+		const frame = this.getCurrentFrame();
+		return frame ? frame.getImage() : null;
+	}
+
+	//==============================================================================
+	// 현재 영역 반환.
+	//==============================================================================
+	getCurrentRect() {
+		const frame = this.getCurrentFrame();
+		return frame ? frame.getRect() : null;
+	}
+
+	//==============================================================================
+	// 현재 프레임 번호 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getCurrentFrameIndex() {
+		return this.#currentFrameIndex;
+	}
+
+	//==============================================================================
+	// 모든 프레임 수 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getTotalFrameCount() {
+		return this.#frames.length;
+	}
+}

@@ -23,6 +23,7 @@ export { OBB } from "./src/base/obb.js";
 export { Platform, PlatformType, BrowserType } from "./src/base/platform.js";
 export { Pivot } from "./src/base/pivot.js";
 export { Colors } from "./src/base/colors.js";
+export { Singleton } from "./src/base/singleton.js";
 
 
 //==============================================================================
@@ -30,6 +31,7 @@ export { Colors } from "./src/base/colors.js";
 //==============================================================================
 export { EngineConfiguration, Engine } from "./src/core/engine.js";
 export { Asset } from "./src/core/asset.js";
+export { SceneManager } from "./src/core/scenemanager.js";
 export { TimeManager } from "./src/core/timemanager.js";
 export { ViewScaleMode, ViewManager } from "./src/core/viewmanager.js";
 export { InputManager } from "./src/core/inputmanager.js";
@@ -38,6 +40,7 @@ export { Scene } from "./src/core/scene.js";
 export { Node } from "./src/core/node.js";
 export { Tween } from "./src/core/tween.js";
 export { Component } from "./src/core/component.js";
+export { Frame } from "./src/core/frame.js";
 
 
 //==============================================================================
@@ -53,8 +56,8 @@ export { ButtonComponent } from "./src/component/buttoncomponent.js";
 //==============================================================================
 // 렌더링 목록.
 //==============================================================================
-// export { Sprite } from "./src/rendering/sprite.js";
-// export { AnimatedSprite } from "./src/rendering/animatedsprite.js";
+export { Animation } from "./src/rendering/animation.js";
+
 
 //==============================================================================
 // 리소스 목록.
@@ -64,15 +67,6 @@ export { ImageAsset } from "./src/resource/imageasset.js";
 export { AudioAsset } from "./src/resource/audioasset.js";
 export { TextAsset } from "./src/resource/textasset.js";
 export { JsonAsset } from "./src/resource/jsonasset.js";
-
-
-//==============================================================================
-// UI 목록.
-//==============================================================================
-// export { UINode } from "./src/ui/uinode.js";
-// export { UIButton } from "./src/ui/uibutton.js";
-// export { UILabel } from "./src/ui/uilabel.js";
-// export { UIImage } from "./src/ui/uiimage.js";
 
 
 //==============================================================================
