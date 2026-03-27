@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+import { Vector2 } from "../base/vector2.js";
 import { Asset } from "../core/asset.js";
 
 
@@ -30,7 +31,7 @@ export class ImageAsset extends Asset {
 	 * @param { string } assetPath 
 	 */
 	async load(assetPath) {
-		// await super.load(assetPath);
+		await super.load(assetPath);
 
 		// 이미 로드 된 상태라면.
 		if (super.isLoaded) {
@@ -51,5 +52,15 @@ export class ImageAsset extends Asset {
 				reject(new Error(`Load fail: ${assetPath}`));
 			}
 		});
+	}
+
+	//==============================================================================
+	// 이미지 크기 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 }
+	 */
+	getImageSize() {
+		return Vector2.create(this.image.width, this.image.height);
 	}
 }

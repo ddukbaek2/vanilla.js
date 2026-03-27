@@ -5,6 +5,7 @@ const System = globalThis;
 import { Object } from "../base/object.js";
 import { Rect } from "../base/rect.js";
 import { Frame } from "../core/frame.js";
+// import { AnimationClip } from "./animationclip.js";
 
 
 //==============================================================================
@@ -14,7 +15,8 @@ export class Animation extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { Frame[] } */ #frames; // 현재 프레임.
+	// /** @private @type { AnimationClip[] } */ #clips; // 클립 목록.
+	/** @private @type { Frame[] } */ #frames; // 프레임 목록.
 	/** @private @type { boolean } */ #isPlaying; // 재생 중인지 여부.
 	/** @private @type { number } */ #currentFrameIndex; // 현재 프레임 번호.
 	/** @private @type { number } */ #frameTimeCounter;
@@ -30,6 +32,7 @@ export class Animation extends Object {
 	 */
 	constructor() {
 		super();
+		// this.#clips = [];
 		this.#frames = [];
 		this.#currentFrameIndex = 0;
 		this.#frameTimeCounter = 0;
@@ -59,9 +62,11 @@ export class Animation extends Object {
 			this.#currentFrameIndex += framesToAdvance;
 
 			if (this.#currentFrameIndex >= this.#frames.length) {
+				// 반복.
 				if (this.#isLoop) {
 					this.#currentFrameIndex %= this.#frames.length;
-				} else {
+				}
+				else {
 					this.#currentFrameIndex = this.#frames.length - 1;
 					this.#isPlaying = false;
 					if (this.#onComplete) {

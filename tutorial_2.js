@@ -47,11 +47,34 @@ export function createFramesFromRects(image, columns, rows, count) {
 	return frames;
 }
 
+export class AnimationClip extends Object {
+	/** @private @type { Frame[] } */ #frames;
+	/** @private @type { number } */ #duration;
+	/** @private @type { boolean } */ #loop;
+
+	constructor() {
+		super();
+		this.#frames = [];
+		this.#duration = 0;
+		this.#loop = false;
+	}
+}
+
+export class AnimationState extends Object {
+	constructor() {
+		super();
+	}
+
+	setState() {
+
+	}
+}
+
 
 //==============================================================================
 // 게임 인스턴스.
 //==============================================================================
-class Tutorial extends Scene {
+class Tutorial_2 extends Scene {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -74,8 +97,8 @@ class Tutorial extends Scene {
 		const frames = createFramesFromRects(imageAsset.image, 3, 3, 8);
 		this.#animation = new Animation();
 		this.#animation.setFrames(frames);
-		this.#animation.setAnimationSpeed(8);
-		this.#animation.setLoop(true);
+		this.#animation.setAnimationSpeed(4);
+		this.#animation.setLoop(false);
 	}
 
 	//==============================================================================
@@ -133,11 +156,11 @@ class Tutorial extends Scene {
 		viewManager.applyViewRect(canvasContext);
 		renderer.drawRect(Rect.create(0, 0, referenceResolutionSize.x, referenceResolutionSize.y), Colors.lightVanilla);
 
-		// // 사각형 그리기.
-		// let boxPosition = Vec2.create(0, 0);
-		// let boxSize = Vec2.create(100, 100);
-		// boxPosition = boxPosition.add(referenceResolutionSize.divide(2)).subtract(boxSize.divide(2));
-		// renderer.drawRect(Rect.create(boxPosition.x, boxPosition.y, boxSize.x, boxSize.y), "#ffff00");
+		// 사각형 그리기.
+		let boxPosition = Vec2.create(0, 0);
+		let boxSize = Vec2.create(100, 100);
+		boxPosition = boxPosition.add(referenceResolutionSize.divide(2)).subtract(boxSize.divide(2));
+		renderer.drawRect(Rect.create(boxPosition.x, boxPosition.y, boxSize.x, boxSize.y), "#ffff00");
 
 		// 애니메이션 그리기.
 		const frame = this.#animation.getCurrentFrame();
@@ -179,5 +202,5 @@ engineConfiguration.canvasId = "tutorial";
 engineConfiguration.isDevelopment = true;
 const engine = new Engine(engineConfiguration);
 document.title = "vanilla.js - Tutorial";
-const tutorial = new Tutorial();
+const tutorial = new Tutorial_2();
 engine.run(tutorial);
