@@ -24,8 +24,16 @@ export { Platform, PlatformType, BrowserType } from "./src/base/platform.js";
 export { Pivot } from "./src/base/pivot.js";
 export { Colors } from "./src/base/colors.js";
 export { Singleton } from "./src/base/singleton.js";
-export { List } from "./src/base/list.js";
-export { Dictionary } from "./src/base/dictionary.js";
+
+
+//==============================================================================
+// 자료구조 목록.
+//==============================================================================
+export { List } from "./src/collection/list.js";
+export { Dictionary } from "./src/collection/dictionary.js";
+export { Queue } from "./src/collection/queue.js";
+export { Stack } from "./src/collection/stack.js";
+export { Set } from "./src/collection/set.js";
 
 
 //==============================================================================
