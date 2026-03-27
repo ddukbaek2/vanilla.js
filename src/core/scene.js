@@ -181,8 +181,8 @@ export class Scene extends Object {
 	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
-		// // 노드 출력.
-		// renderer.drawNode(this.#root);
+		// 노드 출력.
+		renderer.drawNode(this.#root);
 	}
 
 	//==============================================================================
@@ -332,7 +332,7 @@ export class Scene extends Object {
 	// 루트 노드 반환.
 	//==============================================================================
 	/**
-	 * @returns { Renderer } 
+	 * @returns { Node } 
 	 */
 	getRoot() {
 		return this.#root;

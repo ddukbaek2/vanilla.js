@@ -6,6 +6,7 @@ import { Vector2 } from "../base/vector2.js";
 import { Renderer } from "./renderer.js";
 import * as Math from "../base/math.js";
 import { Component } from "./component.js";
+import { Pivot } from "../base/pivot.js";
 
 
 //==============================================================================
@@ -23,6 +24,10 @@ export class Node extends Object {
 	/** @private @type { number } */ #rotation; // 회전값. (degree)
 	/** @private @type { boolean } */ #isActive; // 활성화 여부.
 	/** @private @type { number } */ #opacity; // 투명도.
+	/** @private @type { Vector2 } */ #pivot; // 기준점.
+	/** @private @type { Vector2 } */ #contentSize; // 내용 크기.
+	/** @private @type { Vector2 } */ #anchorMin; // 앵커 최소값.
+	/** @private @type { Vector2 } */ #anchorMax; // 앵커 최대값.
 
 	//==============================================================================
 	// 생성.
@@ -40,6 +45,10 @@ export class Node extends Object {
 		this.#rotation = 0.0;
 		this.#isActive = true;
 		this.#opacity = 1.0;
+		this.#pivot = Pivot.middleCenter;
+		this.#contentSize = Vector2.zero();
+		this.#anchorMin = Vector2.create(0.5, 0.5);
+		this.#anchorMax = Vector2.create(0.5, 0.5);
 	}
 
 	//==============================================================================
@@ -76,16 +85,38 @@ export class Node extends Object {
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.save();
 
-		const position = this.getPosition();
+		let position = this.getPosition();
+		const parent = this.getParent();
+		if (parent) {
+			const parentSize = parent.getContentSize();
+			const parentPivot = parent.getPivot();
+			const anchorMin = this.getAnchorMin();
+			const anchorMax = this.getAnchorMax();
+			
+			// 앵커 위치 계산. (현재는 anchorMin을 기준으로 하는 포인트 앵커 방식)
+			const anchorPos = Vector2.create(
+				parentSize.x * (anchorMin.x - parentPivot.x),
+				parentSize.y * (anchorMin.y - parentPivot.y)
+			);
+			position = position.add(anchorPos);
+		}
+
 		const degree = this.getRotation();
 		let radian = Math.degreeToRadian(degree);
 		const scale = this.getScale();
 		const opacity = this.getOpacity();
 
+		const pivot = this.getPivot();
+		const contentSize = this.getContentSize();
+
 		// 트랜스폼 조정.
 		canvasContext.translate(position.x, position.y);
 		canvasContext.rotate(radian);
 		canvasContext.scale(scale.x, scale.y);
+		
+		// 피봇 반영.
+		canvasContext.translate(-(contentSize.x * pivot.x), -(contentSize.y * pivot.y));
+		
 		canvasContext.globalAlpha *= opacity;
 	}
 
@@ -120,6 +151,41 @@ export class Node extends Object {
 	endCanvasState(renderer) {
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.restore();
+	}
+
+	//==============================================================================
+	// 피봇에 기반한 로컬 위치 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 }
+	 */
+	getPivotPosition() {
+		const contentSize = this.getContentSize();
+		const pivot = this.getPivot();
+		return Vector2.create(-(contentSize.x * pivot.x), -(contentSize.y * pivot.y));
+	}
+
+	//==============================================================================
+	// 앵커가 반영된 로컬 위치 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 }
+	 */
+	getLocalPositionWithAnchor() {
+		let position = this.getPosition();
+		const parent = this.getParent();
+		if (parent) {
+			const parentSize = parent.getContentSize();
+			const parentPivot = parent.getPivot();
+			const anchorMin = this.getAnchorMin();
+			
+			const anchorPos = Vector2.create(
+				parentSize.x * (anchorMin.x - parentPivot.x),
+				parentSize.y * (anchorMin.y - parentPivot.y)
+			);
+			position = position.add(anchorPos);
+		}
+		return position;
 	}
 
 	// //==============================================================================
@@ -539,6 +605,86 @@ export class Node extends Object {
 	 */
 	getOpacity() {
 		return this.#opacity;
+	}
+
+	//==============================================================================
+	// 기준점 설정.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } pivot
+	 */
+	setPivot(pivot) {
+		this.#pivot = pivot;
+	}
+
+	//==============================================================================
+	// 기준점 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 }
+	 */
+	getPivot() {
+		return this.#pivot;
+	}
+
+	//==============================================================================
+	// 내용 크기 설정.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } contentSize 
+	 */
+	setContentSize(contentSize) {
+		this.#contentSize = contentSize;
+	}
+
+	//==============================================================================
+	// 내용 크기 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 } 
+	 */
+	getContentSize() {
+		return this.#contentSize;
+	}
+
+	//==============================================================================
+	// 앵커 최소값 설정.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } anchorMin 
+	 */
+	setAnchorMin(anchorMin) {
+		this.#anchorMin = anchorMin;
+	}
+
+	//==============================================================================
+	// 앵커 최소값 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 }
+	 */
+	getAnchorMin() {
+		return this.#anchorMin;
+	}
+
+	//==============================================================================
+	// 앵커 최대값 설정.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } anchorMax 
+	 */
+	setAnchorMax(anchorMax) {
+		this.#anchorMax = anchorMax;
+	}
+
+	//==============================================================================
+	// 앵커 최대값 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 }
+	 */
+	getAnchorMax() {
+		return this.#anchorMax;
 	}
 
 	//==============================================================================

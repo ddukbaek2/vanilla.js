@@ -18,12 +18,6 @@ import { Renderer } from "../core/renderer.js";
 //==============================================================================
 export class BoundsComponent extends Component {
 	//==============================================================================
-	// 멤버 변수 목록.
-	//==============================================================================
-	/** @private @type { Vector2 } */ #pivot; // 기준점.
-	/** @private @type { Vector2 } */ #contentSize; // 크기.
-
-	//==============================================================================
 	// 생성.
 	//==============================================================================
 	/**
@@ -31,8 +25,6 @@ export class BoundsComponent extends Component {
 	 */
 	constructor() {
 		super();
-		this.#contentSize = Vector2.zero();
-		this.#pivot = Pivot.middleCenter;
 	}
 
 	//==============================================================================
@@ -52,21 +44,6 @@ export class BoundsComponent extends Component {
 	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
-		// super.draw(renderer);
-
-		// const canvasContext = renderer.getCanvasContext();
-		// const contentSize = this.getContentSize();
-		// const pivot = this.getPivot();
-		// const pivotPosition = this.getPivotPosition();
-
-		// // 출력.
-		// // 피봇 위치 반영 - 기본 (0, 0) 에서 피봇만큼 좌상 방향으로 당겨준다. 
-		// // 이미지 플립 반영 - 이미지를 뒤집어서 출력한다.
-		// canvasContext.globalAlpha = 1.0; // this.#opacity;
-		// canvasContext.fillStyle = "#ffffff"; // this.#color;
-		// canvasContext.fillRect(pivotPosition.x, pivotPosition.y, contentSize.x, contentSize.y);
-		// // canvasContext.globalAlpha = 1.0;
-		// // canvasContext.fillStyle
 	}
 
 	//==============================================================================
@@ -76,7 +53,10 @@ export class BoundsComponent extends Component {
 	 * @param { Vector2 } size 
 	 */
 	setContentSize(size) {
-		this.#contentSize = size;
+		const node = this.getNode();
+		if (node) {
+			node.setContentSize(size);
+		}
 	}
 
 	//==============================================================================
@@ -86,7 +66,11 @@ export class BoundsComponent extends Component {
 	 * @returns { Vector2 } 
 	 */
 	getContentSize() {
-		return this.#contentSize;
+		const node = this.getNode();
+		if (node) {
+			return node.getContentSize();
+		}
+		return Vector2.zero();
 	}
 
 	//==============================================================================
@@ -96,9 +80,14 @@ export class BoundsComponent extends Component {
 	 * @param { Vector2 } pivot
 	 */
 	setPivot(pivot) {
-		this.#pivot = pivot;
-		this.#pivot.x = Math.clamp(this.#pivot.x, 0, 1);
-		this.#pivot.y = Math.clamp(this.#pivot.y, 0, 1);
+		const node = this.getNode();
+		if (node) {
+			const clampedPivot = Vector2.create(
+				Math.clamp(pivot.x, 0, 1),
+				Math.clamp(pivot.y, 0, 1)
+			);
+			node.setPivot(clampedPivot);
+		}
 	}
 
 	//==============================================================================
@@ -108,20 +97,22 @@ export class BoundsComponent extends Component {
 	 * @returns { Vector2 }
 	 */
 	getPivot() {
-		return this.#pivot;
+		const node = this.getNode();
+		if (node) {
+			return node.getPivot();
+		}
+		return Pivot.middleCenter;
 	}
 
 	//==============================================================================
 	// 피봇에 기반한 로컬 위치 반환.
+	// (Node.beginCanvasState에서 이미 피봇이 적용되었으므로 0, 0을 반환한다.)
 	//==============================================================================
 	/**
 	 * @returns { Vector2 }
 	 */
 	getPivotPosition() {
-		const node = this.getNode();
-		const contentSize = this.getContentSize();
-		const pivot = this.getPivot();
-		return Vector2.create(-(contentSize.x * pivot.x), -(contentSize.y * pivot.y));
+		return Vector2.zero();
 	}
 
 	//==============================================================================
@@ -132,7 +123,7 @@ export class BoundsComponent extends Component {
 	 */
 	getWorldCorners() {
 		const node = this.getNode();
-		const position = node.getPosition();
+		const position = node.getLocalPositionWithAnchor();
 		const scale = node.getScale();
 		const degree = node.getRotation();
 		const contentSize = this.getContentSize();

@@ -40,6 +40,7 @@ export class ColorComponent extends BoundsComponent {
 		// 출력.
 		// 피봇 위치 반영 - 기본 (0, 0) 에서 피봇만큼 좌상 방향으로 당겨준다. 
 		const pivotPosition = super.getPivotPosition();
+		const contentSize = this.getContentSize();
 		const color = this.getColor();
 		canvasContext.fillStyle = color.toHEXString();
 		canvasContext.fillRect(pivotPosition.x, pivotPosition.y, contentSize.x, contentSize.y);
@@ -57,10 +58,10 @@ export class ColorComponent extends BoundsComponent {
 		}
 		else if (typeof other === "string") {
 			if (other.startsWith("#")) {
-				this.#color = Color.createFromHEX(colorString);
+				this.#color = Color.createFromHEX(other);
 			}
 			else if (other.startsWith("rgb")) {
-				this.#color = Color.createFromRGBA(colorString);
+				this.#color = Color.createFromRGBA(other);
 			}
 		}
 		else if (other instanceof Color) {

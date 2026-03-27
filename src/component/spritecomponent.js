@@ -13,9 +13,9 @@ import { ColorComponent } from "./colorcomponent.js";
 // 스프라이트 모드.
 //==============================================================================
 export const SpriteMode = {
-	simple,
-	sliced,
-	tiled,
+	simple: "simple",
+	sliced: "sliced",
+	tiled: "tiled",
 }
 
 
@@ -23,11 +23,17 @@ export const SpriteMode = {
 // 스프라이트 블렌드 모드.
 //==============================================================================
 export const SpriteBlendMode = {
-	normal,
-	additive,
-	multiply,
-	screen,
-	overlay,
+	normal: "normal",
+	darken: "darken",
+	multiply: "multiply",
+	colorBurn: "colorBurn",
+	lighten: "lighten",
+	screen: "screen",
+	colorDodge: "colorDodge",
+	overlay: "overlay",
+	softLight: "softLight",
+	hardLight: "hardLight",
+	difference: "difference",
 }
 
 

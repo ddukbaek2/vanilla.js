@@ -9,66 +9,9 @@ import { Engine, EngineConfiguration } from "./src/core/engine.js";
 import { Renderer } from "./src/core/renderer.js";
 import { Scene } from "./src/core/scene.js";
 import { ViewScaleMode } from "./src/core/viewmanager.js";
-import { Animation } from "./src/rendering/animation.js";
-import { ImageAsset } from "./src/resource/imageasset.js";
-import { Frame } from "./src/core/frame.js";
-
-
-//==============================================================================
-// 한장의 이미지를 통해 애니메이션 프레임 목록을 만들어 반환.
-//==============================================================================
-/**
- * 
- * @param { HTMLImageElement } image
- * @param { number } columns
- * @param { number } rows
- * @param { number } count
- * @returns { Frame[] }
- */
-export function createFramesFromRects(image, columns, rows, count) {
-	const frameWidth = image.width / columns;
-	const frameHeight = image.height / rows;
-
-	// 모든 프레임 좌표 생성.
-	const frames = [];
-	for (let y = 0; y < rows; ++y) {
-		for (let x = 0; x < columns; ++x) {
-			const rect = Rect.create(x * frameWidth, y * frameHeight, frameWidth, frameHeight);
-			// console.table(rect);
-
-			const frame = new Frame(image, rect);
-			frames.push(frame);
-			if (frames.length === count) {
-				return frames;
-			}
-		}
-	}	
-
-	return frames;
-}
-
-export class AnimationClip extends Object {
-	/** @private @type { Frame[] } */ #frames;
-	/** @private @type { number } */ #duration;
-	/** @private @type { boolean } */ #loop;
-
-	constructor() {
-		super();
-		this.#frames = [];
-		this.#duration = 0;
-		this.#loop = false;
-	}
-}
-
-export class AnimationState extends Object {
-	constructor() {
-		super();
-	}
-
-	setState() {
-
-	}
-}
+import { Node } from "./src/core/node.js";
+import { SpriteComponent } from "./src/component/spritecomponent.js";
+import { ColorComponent, Pivot } from "./import.js";
 
 
 //==============================================================================
@@ -78,7 +21,7 @@ class Tutorial_2 extends Scene {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { Animation } */ #animation;
+	// /** @private @type { Node } */ #node;
 
 	//==============================================================================
 	// 불러오기.
@@ -88,17 +31,6 @@ class Tutorial_2 extends Scene {
 	 */
 	async load(engine) {
 		await super.load(engine);
-
-		// 이미지 불러오기.
-		const imageAsset = new ImageAsset();
-		await imageAsset.load("./assets/images/spritesheet.png");
-
-		// 모든 프레임 좌표 생성.
-		const frames = createFramesFromRects(imageAsset.image, 3, 3, 8);
-		this.#animation = new Animation();
-		this.#animation.setFrames(frames);
-		this.#animation.setAnimationSpeed(4);
-		this.#animation.setLoop(false);
 	}
 
 	//==============================================================================
@@ -110,12 +42,38 @@ class Tutorial_2 extends Scene {
 	initialize(engine) {
 		super.initialize(engine);
 
+		// 뷰 해상도 설정.
 		const viewManager = engine.getViewManager();
-		viewManager.setViewScaleMode(ViewScaleMode.none); // 화면 전체 해상도.
-		// viewManager.setViewScaleMode(ViewScaleMode.referenceResolution); // 기준 해상도.
-		// viewManager.setViewScaleMode(ViewScaleMode.matchWidthToScreen); // 기준해상도 + 가로축 맞춤.
 		viewManager.setViewScaleMode(ViewScaleMode.matchHeightToScreen); // 기준해상도 + 세로축 맞춤.
-		// viewManager.setViewScaleMode(ViewScaleMode.matchInsideToScreen); // 기준해상도 + 둘중에 긴축에 맞춤.
+		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
+
+		const root = this.getRoot();
+		root.setPivot(Pivot.topLeft);
+		root.setPosition(Vec2.zero());
+		root.setContentSize(Vec2.create(300, 300));
+		let color = root.addComponent(ColorComponent);
+		color.setColor("#000000");
+
+		// 노드 설정.
+		const node = new Node();
+		// node.setAnchorMin();
+		node.setPivot(Pivot.topLeft);
+		node.setPosition(Vec2.create(0, 0));
+		node.setContentSize(Vec2.create(200, 100));
+		root.addChild(node);
+		color = node.addComponent(ColorComponent);
+		color.setColor("#ff0000");
+
+		// 자식 노드 설정.
+		const child = new Node();	
+		node.addChild(child);
+		child.setPosition(Vec2.create(100, 100));
+		child.setContentSize(Vec2.create(200, 100));
+		child.setPivot(Pivot.topLeft);
+		child.setRotation(0.0);
+		child.setScale(Vec2.one());
+		color = child.addComponent(ColorComponent);
+		color.setColor("rgba(255, 255, 0, 0.5)");	
 	}
 
 	//==============================================================================
@@ -126,9 +84,6 @@ class Tutorial_2 extends Scene {
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
-		this.#animation.tick(timeDelta);
-		const currentFrameIndex = this.#animation.getCurrentFrameIndex();
-		// console.log(`currentFrameIndex: ${currentFrameIndex}`);
 	}
 
 	//==============================================================================
@@ -138,8 +93,6 @@ class Tutorial_2 extends Scene {
 	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
-		super.draw(renderer);
-
 		const engine = super.getEngine();
 		const canvasContext = renderer.getCanvasContext();
 		const viewManager = engine.getViewManager();
@@ -156,20 +109,7 @@ class Tutorial_2 extends Scene {
 		viewManager.applyViewRect(canvasContext);
 		renderer.drawRect(Rect.create(0, 0, referenceResolutionSize.x, referenceResolutionSize.y), Colors.lightVanilla);
 
-		// 사각형 그리기.
-		let boxPosition = Vec2.create(0, 0);
-		let boxSize = Vec2.create(100, 100);
-		boxPosition = boxPosition.add(referenceResolutionSize.divide(2)).subtract(boxSize.divide(2));
-		renderer.drawRect(Rect.create(boxPosition.x, boxPosition.y, boxSize.x, boxSize.y), "#ffff00");
-
-		// 애니메이션 그리기.
-		const frame = this.#animation.getCurrentFrame();
-		if (frame) {
-			const image = frame.getImage();
-			const rect = frame.getRect();
-			const position = referenceResolutionSize.divide(2).subtract(rect.size.divide(2));
-			renderer.drawImage(image, position, rect.size, rect);
-		}
+		super.draw(renderer);
 	}
 
 	//==============================================================================
@@ -180,9 +120,6 @@ class Tutorial_2 extends Scene {
 	 */
 	touchPress(viewInputPosition) {
 		super.touchPress(viewInputPosition);
-
-		// 애니메이션 실행.
-		this.#animation.gotoAndPlay(0);
 	}
 }
 
