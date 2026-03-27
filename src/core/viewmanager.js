@@ -6,19 +6,19 @@ import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
 import { Rect } from "../base/rect.js";
 import { Engine } from "./engine.js";
-// import { Enum } from "../misc/identifier.js";
 
 
 //==============================================================================
 // 뷰 스케일 모드.
 //==============================================================================
 export const ViewScaleMode = {
-	none: "none", // 화면 해상도로 영역 정의.
-	referenceResolution: "referenceResolution", // 기준 해상도로 영역 정의.
-	matchWidthToScreen: "matchWidthToScreen", // 기준 해상도의 가로를 화면 가로에 맞추고 종횡비를 유지함.
-	matchHeightToScreen: "matchHeightToScreen", // 기준 해상도의 세로를 화면 세로에 맞추고 종횡비를 유지함.
-	matchInsideToScreen: "matchInsideToScreen", // 기준 해상도가 화면 안에 모두 들어오도록 짧은 축에 맞추고 종횡비를 유지함.
+	none: "none",								// 사용안함 (웹브라우저 크기가 변경되면 뷰 영역도 변경됨)
+	referenceResolution: "referenceResolution", // 기준해상도로 뷰 영역 정의 (양쪽 축이 잘리거나 남을 수 있음)
+	matchWidthToScreen: "matchWidthToScreen",	// 기준해상도로 뷰 영역 정의 + 뷰의 비율을 유지한채 가로축으로 늘여붙임. (반대 축은 잘리거나 남을 수 있음)
+	matchHeightToScreen: "matchHeightToScreen", // 기준해상도로 뷰 영역 정의 + 뷰의 비율을 유지한채 세로축으로 늘여붙임. (반대 축은 잘리거나 남을 수 있음)
+	matchInsideToScreen: "matchInsideToScreen", // 기준해상도로 뷰 영역 정의 + 뷰의 비율을 유지한채 가로세로 중에서 짧은 축으로 늘여붙임. (반대 축은 남을 수 있음)
 };
+
 
 //==============================================================================
 // 뷰 매니저.

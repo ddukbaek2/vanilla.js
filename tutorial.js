@@ -93,8 +93,8 @@ class Tutorial extends Scene {
 		viewManager.setViewScaleMode(ViewScaleMode.none); // 화면 전체 해상도.
 		// viewManager.setViewScaleMode(ViewScaleMode.referenceResolution); // 기준 해상도.
 		// viewManager.setViewScaleMode(ViewScaleMode.matchWidthToScreen); // 기준해상도 + 가로축 맞춤.
-		viewManager.setViewScaleMode(ViewScaleMode.matchHeightToScreen);
-		// viewManager.setViewScaleMode(ViewScaleMode.matchInsideToScreen);
+		viewManager.setViewScaleMode(ViewScaleMode.matchHeightToScreen); // 기준해상도 + 세로축 맞춤.
+		// viewManager.setViewScaleMode(ViewScaleMode.matchInsideToScreen); // 기준해상도 + 둘중에 긴축에 맞춤.
 	}
 
 	//==============================================================================
