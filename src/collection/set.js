@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Object } from "../object.js";
+import { Object } from "../base/object.js";
 
 
 //==============================================================================
@@ -59,6 +59,80 @@ export class Set extends Object {
 	 */
 	contains(item) {
 		return this.#items.has(item);
+	}
+
+	//==============================================================================
+	// 합집합. (Union)
+	//==============================================================================
+	/**
+	 * @param { Set<T> } otherSet 
+	 * @returns { Set<T> }
+	 */
+	union(otherSet) {
+		const resultSet = new Set();
+		for (const item of this.#items) {
+			resultSet.add(item);
+		}
+		for (const item of otherSet.toArray()) {
+			resultSet.add(item);
+		}
+		return resultSet;
+	}
+
+	//==============================================================================
+	// 교집합. (Intersection)
+	//==============================================================================
+	/**
+	 * @param { Set<T> } otherSet 
+	 * @returns { Set<T> }
+	 */
+	intersection(otherSet) {
+		const resultSet = new Set();
+		for (const item of this.#items) {
+			if (otherSet.contains(item)) {
+				resultSet.add(item);
+			}
+		}
+		return resultSet;
+	}
+
+	//==============================================================================
+	// 차집합. (Difference)
+	//==============================================================================
+	/**
+	 * @param { Set<T> } otherSet 
+	 * @returns { Set<T> }
+	 */
+	difference(otherSet) {
+		const resultSet = new Set();
+		for (const item of this.#items) {
+			if (!otherSet.contains(item)) {
+				resultSet.add(item);
+			}
+		}
+		return resultSet;
+	}
+
+	//==============================================================================
+	// 대칭 차집합 (여집합). (Symmetric Difference)
+	//==============================================================================
+	/**
+	 * @param { Set<T> } otherSet 
+	 * @returns { Set<T> }
+	 */
+	symmetricDifference(otherSet) {
+		const resultSet = new Set();
+		for (const item of this.#items) {
+			if (!otherSet.contains(item)) {
+				resultSet.add(item);
+			}
+		}
+		for (const item of otherSet.toArray()) {
+			if (!this.contains(item)) {
+				resultSet.add(item);
+			}
+		}
+		return resultSet;
 	}
 
 	//==============================================================================
