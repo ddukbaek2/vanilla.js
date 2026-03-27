@@ -1,5 +1,4 @@
-html, body
-{
+html, body {
 	margin: 0;
 	padding: 0;
 	width: 100%;
@@ -9,14 +8,12 @@ html, body
 	touch-action: none;
 }
 
-body
-{
+body {
 	position: fixed;
 	inset: 0;
 }
 
-canvas
-{
+canvas {
 	display: block;
 	width: 100vw;
 	height: 100vh;

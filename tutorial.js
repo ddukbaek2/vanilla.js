@@ -68,11 +68,9 @@ class Tutorial extends Scene {
 
 		// 이미지 불러오기.
 		const imageAsset = new ImageAsset();
-		await imageAsset.load("./spritesheet.png");
-		// await imageAsset.load("./effect_3.png");
-		
+		await imageAsset.load("./assets/images/spritesheet.png");
+
 		// 모든 프레임 좌표 생성.
-		// const frames = createFramesFromRects(imageAsset.image, 1, 6, 6);
 		const frames = createFramesFromRects(imageAsset.image, 3, 3, 8);
 		this.#animation = new Animation();
 		this.#animation.setFrames(frames);

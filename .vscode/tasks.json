@@ -22,7 +22,30 @@
 			"label": "BUILD_LIBRARY_RELEASE",
 			"type": "shell",
 			"command": "esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --keep-names --minify",
-			"group": "build",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "BUILD_BUNDLE_DEBUG",
+			"type": "shell",
+			"command": "esbuild tutorial.js --bundle --outfile=build/bundle.js --format=iife --keep-names --sourcemap",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "BUILD_BUNDLE_RELEASE",
+			"type": "shell",
+			"command": "esbuild tutorial.js --bundle --outfile=build/bundle.min.js --format=iife --minify",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
 			"problemMatcher": []
 		}
 	]
