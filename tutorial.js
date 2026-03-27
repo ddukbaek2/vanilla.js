@@ -92,9 +92,9 @@ class Tutorial extends Scene {
 		const viewManager = engine.getViewManager();
 		viewManager.setViewScaleMode(ViewScaleMode.none); // 화면 전체 해상도.
 		// viewManager.setViewScaleMode(ViewScaleMode.referenceResolution); // 기준 해상도.
-		// viewManager.setViewScaleMode(ViewScaleMode.stretchWidth); // 기준해상도 + 가로로 늘려붙이기.
-		viewManager.setViewScaleMode(ViewScaleMode.stretchHeight);
-		// viewManager.setViewScaleMode(ViewScaleMode.stretchAuto);
+		// viewManager.setViewScaleMode(ViewScaleMode.matchWidthToScreen); // 기준해상도 + 가로축 맞춤.
+		viewManager.setViewScaleMode(ViewScaleMode.matchHeightToScreen);
+		// viewManager.setViewScaleMode(ViewScaleMode.matchInsideToScreen);
 	}
 
 	//==============================================================================

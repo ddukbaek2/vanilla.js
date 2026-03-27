@@ -15,9 +15,9 @@ import { Engine } from "./engine.js";
 export const ViewScaleMode = {
 	none: "none", // 화면 해상도로 영역 정의.
 	referenceResolution: "referenceResolution", // 기준 해상도로 영역 정의.
-	stretchWidth: "stretchWidth", // 기준 해상도로 영역 정의하고, 기준 해상도의 가로축을 기준으로 늘여 붙임.
-	stretchHeight: "stretchHeight", // 기준 해상도로 영역 정의하고, 기준 해상도의 세로축을 기준으로 늘여 붙임.
-	stretchAuto: "stretchAuto", // Enum.auto(), // 기준 해상도에서 더 짧은쪽의 축을 기준으로 양쪽 비율을 유지한채 화면에 해당 축을 늘여 붙임.
+	matchWidthToScreen: "matchWidthToScreen", // 기준 해상도의 가로를 화면 가로에 맞추고 종횡비를 유지함.
+	matchHeightToScreen: "matchHeightToScreen", // 기준 해상도의 세로를 화면 세로에 맞추고 종횡비를 유지함.
+	matchInsideToScreen: "matchInsideToScreen", // 기준 해상도가 화면 안에 모두 들어오도록 짧은 축에 맞추고 종횡비를 유지함.
 };
 
 //==============================================================================
@@ -120,7 +120,7 @@ export class ViewManager extends Object {
 					this.#viewRect.size.set(viewWidth, viewHeight);
 					break;
 				}
-			case ViewScaleMode.stretchWidth: {
+			case ViewScaleMode.matchWidthToScreen: {
 					const targetResolutionScale = canvasNativeSize.x / this.#referenceResolutionSize.x;
 					const viewWidth = Math.round(canvasNativeSize.x);
 					const viewHeight = Math.round(this.#referenceResolutionSize.y * targetResolutionScale);
@@ -134,7 +134,7 @@ export class ViewManager extends Object {
 					this.#viewRect.size.set(viewWidth, viewHeight);
 					break;
 				}
-			case ViewScaleMode.stretchHeight: {
+			case ViewScaleMode.matchHeightToScreen: {
 					const targetResolutionScale = canvasNativeSize.y / this.#referenceResolutionSize.y;
 					const viewWidth = Math.round(this.#referenceResolutionSize.x * targetResolutionScale);
 					const viewHeight = Math.round(canvasNativeSize.y);
@@ -148,7 +148,7 @@ export class ViewManager extends Object {
 					this.#viewRect.size.set(viewWidth, viewHeight);
 					break;
 				}
-			case ViewScaleMode.stretchAuto: {
+			case ViewScaleMode.matchInsideToScreen: {
 					const targetResolutionScale = Math.min(canvasNativeSize.x / this.#referenceResolutionSize.x, canvasNativeSize.y / this.#referenceResolutionSize.y);
 					const viewWidth = Math.round(this.#referenceResolutionSize.x * targetResolutionScale);
 					const viewHeight = Math.round(this.#referenceResolutionSize.y * targetResolutionScale);
