@@ -91,6 +91,9 @@ export class List extends Object {
 		return true;
 	}
 
+	//==============================================================================
+	// 요소 검색.
+	//==============================================================================
 	/**
 	 * @param { function(number, T): boolean } predicate
 	 * @returns { T | undefined }
@@ -105,7 +108,10 @@ export class List extends Object {
 		}
 		return undefined;
 	}
-
+	
+	//==============================================================================
+	// 요소 검색.
+	//==============================================================================
 	/**
 	 * @param { function(number, T): boolean } predicate
 	 * @returns { T[] }
@@ -114,7 +120,7 @@ export class List extends Object {
 		let index = 0;
 		const items = [];
 		for (const item of this.#items) {
-			if (predicate.CALL(index, item)) {
+			if (predicate.call(index, item)) {
 				items.push(item);
 			}
 			++index;

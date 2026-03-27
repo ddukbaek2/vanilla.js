@@ -24,6 +24,8 @@ export { Platform, PlatformType, BrowserType } from "./src/base/platform.js";
 export { Pivot } from "./src/base/pivot.js";
 export { Colors } from "./src/base/colors.js";
 export { Singleton } from "./src/base/singleton.js";
+export { List } from "./src/base/list.js";
+export { Dictionary } from "./src/base/dictionary.js";
 
 
 //==============================================================================

@@ -33,7 +33,7 @@ export class Dictionary extends Object {
 	// 전체 제거.
 	//==============================================================================
 	clear() {
-		this.#items.length = 0;
+		this.#items.clear();
 	}
 
 	//==============================================================================
@@ -58,9 +58,12 @@ export class Dictionary extends Object {
 		return this.#items.delete(key);
 	}
 
+	//==============================================================================
+	// 요소 검색.
+	//==============================================================================
 	/**
 	 * @param { function(K, V): boolean } predicate
-	 * @returns { { K, V } | undefined }
+	 * @returns { { key: K, value: V } | null }
 	 */
 	find(predicate) {
 		for (const [key, value] of this.#items) {
@@ -74,9 +77,12 @@ export class Dictionary extends Object {
 		return null;
 	}
 
+	//==============================================================================
+	// 요소 검색.
+	//==============================================================================
 	/**
 	 * @param { function(K, V): boolean } predicate
-	 * @returns { { K, V }[] }
+	 * @returns { { key: K, value: V }[] }
 	 */
 	findAll(predicate) {
 		const items = [];
@@ -90,14 +96,16 @@ export class Dictionary extends Object {
 		}
 		return items;
 	}
+
 	//==============================================================================
 	// 요소가 포함되어있는지 여부 반환.
 	//==============================================================================
 	/**
+	 * @param { K } key 
 	 * @returns { boolean } 
 	 */
-	contains(item) {
-		return this.#items.has(item);
+	contains(key) {
+		return this.#items.has(key);
 	}
 
 	//==============================================================================
@@ -118,7 +126,7 @@ export class Dictionary extends Object {
 	 * @returns { number }
 	 */
 	getCount() {
-		return this.#items.length;
+		return this.#items.size;
 	}
 
 	//==============================================================================
@@ -147,7 +155,7 @@ export class Dictionary extends Object {
 	/**
 	 * @returns { V[] } 
 	 */
-	getKeys() {
+	getValues() {
 		return Array.from(this.#items.values());
 	}
 }
