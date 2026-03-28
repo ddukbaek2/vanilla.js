@@ -24,7 +24,7 @@ class Tutorial_2 extends Scene {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	// /** @private @type { Node } */ #node;
+	/** @private @type { Node } */ #touchNode;
 
 	//==============================================================================
 	// 불러오기.
@@ -77,12 +77,12 @@ class Tutorial_2 extends Scene {
 		color.setColor("#00ffff");
 
 		// 자손 노드 설정.
-		const grandChild = new Node();
-		child.addChild(grandChild);
-		grandChild.setPivot(Pivot.middleCenter);
-		grandChild.setLocalPosition(Vec2.create(100, 100));
-		grandChild.setContentSize(Vec2.create(50, 50));
-		color = grandChild.addComponent(ColorComponent);
+		this.#touchNode = new Node();
+		child.addChild(this.#touchNode);
+		this.#touchNode.setPivot(Pivot.middleCenter);
+		this.#touchNode.setLocalPosition(Vec2.create(100, 100));
+		this.#touchNode.setContentSize(Vec2.create(50, 50));
+		color = this.#touchNode.addComponent(ColorComponent);
 		color.setColor("#ff00ff");
 
 		// UI 노드 설정.
@@ -105,6 +105,17 @@ class Tutorial_2 extends Scene {
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
+
+		const engine = this.getEngine();
+		const inputManager = engine.getInputManager();
+		const viewInputPosition = inputManager.getViewInputPosition();
+		const color = this.#touchNode.getComponent(ColorComponent);
+		if (this.#touchNode.contains(viewInputPosition)) {
+			color.setColor("#00ff00");
+		}
+		else {
+			color.setColor("#ff00ff");
+		}
 	}
 
 	//==============================================================================
@@ -131,16 +142,6 @@ class Tutorial_2 extends Scene {
 		renderer.drawRect(Rect.create(0, 0, referenceResolutionSize.x, referenceResolutionSize.y), Colors.lightVanilla);
 
 		super.draw(renderer);
-	}
-
-	//==============================================================================
-	// 터치 누름.
-	//==============================================================================
-	/**
-	 * @param { Vector2 } viewInputPosition
-	 */
-	touchPress(viewInputPosition) {
-		super.touchPress(viewInputPosition);
 	}
 }
 
