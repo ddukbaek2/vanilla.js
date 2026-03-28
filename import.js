@@ -25,6 +25,7 @@ export { Pivot } from "./src/base/pivot.js";
 export { Colors } from "./src/base/colors.js";
 export { Singleton } from "./src/base/singleton.js";
 export { Identifier, Enum } from "./src/base/identifier.js";
+export { Version } from "./src/base/version.js";
 
 
 //==============================================================================

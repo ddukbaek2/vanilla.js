@@ -3,6 +3,7 @@
 //==============================================================================
 const System = globalThis;
 import { Object } from "../base/object.js";
+import { Version } from "../base/version.js";
 import { Colors } from "../base/colors.js";
 import { Vector2 } from "../base/vector2.js";
 import { TimeManager } from "./timemanager.js";
@@ -14,6 +15,7 @@ import { Scene } from "./scene.js";
 import { Rect } from "../base/rect.js";
 import { SceneManager } from "./scenemanager.js";
 import { FontAsset } from "../resource/fontasset.js"; 
+
 
 
 //==============================================================================
@@ -49,6 +51,7 @@ export class Engine extends Object {
 	/** @private @type { Renderer } */ #renderer;
 	/** @private @type { () => void  } */ #resizeCallback;
 	/** @private @type { FrameRequestCallback } */ #updateEngineCallback;
+	/** @private @type { Version } */ #version;
 
 	//==============================================================================
 	// 생성.
@@ -76,7 +79,9 @@ export class Engine extends Object {
 
 		this.#resizeCallback = this.#resize.bind(this);
 		this.#updateEngineCallback = this.#updateEngine.bind(this);
+		this.#version = Version.create(0, 0, 6);
 
+		// 이벤트 설정.
 		this.#setupAllDocumentEvents();
 		this.#resize();
 	}
@@ -337,6 +342,8 @@ export class Engine extends Object {
 
 		// 플랫폼 정보 출력.
 		this.#platform.getPlatformInfo();
+		const versionString = this.getVersionString();
+		drawOutlineText(`engineVersion: ${versionString}`);
 		drawOutlineText(`platformName: ${this.#platform.platformName}`);
 		drawOutlineText(`browserName: ${this.#platform.browserName}`);
 		drawOutlineText(``);
@@ -607,5 +614,15 @@ export class Engine extends Object {
 		}
 
 		return canvas;
+	}
+
+	//==============================================================================
+	// 버전 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getVersionString() {
+		return this.#version.getVersionString();
 	}
 }
