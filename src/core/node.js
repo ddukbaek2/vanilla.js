@@ -79,26 +79,29 @@ export class Node extends Object {
 	 */
 	beginCanvasState(renderer) {
 		const canvasContext = renderer.getCanvasContext();
-		canvasContext.save();
+		if (canvasContext) {
+			canvasContext.save();
 
-		const localPosition = this.getLocalPosition();
-		const degree = this.getLocalRotation();
-		let radian = Math.degreeToRadian(degree);
-		const scale = this.getLocalScale();
-		const opacity = this.getOpacity();
+			const localPosition = this.getLocalPosition();
+			const degree = this.getLocalRotation();
+			let radian = Math.degreeToRadian(degree);
+			const scale = this.getLocalScale();
+			const opacity = this.getOpacity();
 
-		const pivot = this.getPivot();
-		const size = this.getSize();
+			const pivot = this.getPivot();
+			const size = this.getSize();
 
-		// 트랜스폼 조정.
-		canvasContext.translate(localPosition.x, localPosition.y);
-		canvasContext.rotate(radian);
-		canvasContext.scale(scale.x, scale.y);
-		
-		// 피봇 반영.
-		canvasContext.translate(-(size.x * pivot.x), -(size.y * pivot.y));
-		
-		canvasContext.globalAlpha *= opacity;
+			// 트랜스폼 조정.
+			canvasContext.translate(localPosition.x, localPosition.y);
+			canvasContext.rotate(radian);
+			canvasContext.scale(scale.x, scale.y);
+			
+			// 피봇 반영.
+			canvasContext.translate(-(size.x * pivot.x), -(size.y * pivot.y));
+
+			// 컬러 반영.
+			canvasContext.globalAlpha *= opacity;
+		}
 	}
 
 	//==============================================================================
@@ -109,16 +112,63 @@ export class Node extends Object {
 	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
-		// 중심점 출력.
-		// const canvasContext = renderer.getCanvasContext();
-		// canvasContext.fillStyle = "#00ff00";
-		// canvasContext.fillRect(0, 0, 8, 8);
-
-		// 컴포넌트 출력.
-		if (this.isVisible()) {
-			for (const component of this.getAllComponents()) {
+		const isVisible = this.isVisible();
+		if (isVisible) {
+			// 컴포넌트 목록 출력.
+			const components = this.getAllComponents();
+			for (const component of components) {
 				component.draw(renderer);
 			}
+
+			// 기즈모 출력.
+			this.drawGizmos(renderer);
+		}
+	}
+
+	//==============================================================================
+	// 출력.
+	//==============================================================================
+	/**
+	 * @param { Renderer } renderer 
+	 */
+	drawGizmos(renderer) {
+		// 영역 및 기준점 출력.
+		const canvasContext = renderer.getCanvasContext();
+		if (canvasContext) {
+			// 좌표.
+			const size = this.getSize();
+			const pivot = this.getPivot();
+			const origin = Vector2.create(size.x * pivot.x, size.y * pivot.y);
+			const left = 0;
+			const top = 0;
+			const right = left + size.x;
+			const bottom = top + size.y;
+
+			// 기존 투명도 무효화 및 색상 설정.
+			const originalAlpha = canvasContext.globalAlpha;
+			canvasContext.globalAlpha = 1.0;
+			canvasContext.fillStyle = "#000000";
+			canvasContext.strokeStyle = "#000000";
+
+			// 범위.
+			canvasContext.beginPath();
+			canvasContext.moveTo(left, top);
+			canvasContext.lineTo(right, top);
+			canvasContext.lineTo(right, bottom);
+			canvasContext.lineTo(left, bottom);
+			canvasContext.lineTo(left, top);
+			canvasContext.stroke();
+			// canvasContext.globalAlpha = originalAlpha;
+
+			// 기준점.
+			const pointSize = 4;
+			canvasContext.beginPath();
+			canvasContext.arc(origin.x, origin.y, pointSize, 0, Math.PI * 2);
+			canvasContext.fill();
+			// canvasContext.fillRect(left - (pointSize / 2), top - (pointSize / 2), pointSize, pointSize);
+
+			// 기존 투명도 복원.
+			canvasContext.globalAlpha = originalAlpha;
 		}
 	}
 
@@ -131,7 +181,9 @@ export class Node extends Object {
 	 */
 	endCanvasState(renderer) {
 		const canvasContext = renderer.getCanvasContext();
-		canvasContext.restore();
+		if (canvasContext) {
+			canvasContext.restore();
+		}
 	}
 
 	//==============================================================================
@@ -650,6 +702,9 @@ export class Node extends Object {
 	 */
 	setPivot(pivot) {
 		this.#pivot = pivot;
+		// this.#pivot.x = Math.clamp(pivot.x, 0, 1);
+		// this.#pivot.y = Math.clamp(pivot.y, 0, 1);
+		// console.log(this.#pivot);
 	}
 
 	//==============================================================================

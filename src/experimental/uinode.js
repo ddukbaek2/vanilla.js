@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+import { Pivot } from "../base/pivot.js";
 import { Vector2 as Vector2 } from "../base/vector2.js";
 import { Node } from "../core/node.js";
 
@@ -23,7 +24,9 @@ export class VUINode extends Node {
 	constructor() {
 		super();
 		
-		this.#pivot = Vector2.zero();
+		// this.#pivot = Pivot.topLeft;
+		this.#pivot = Pivot.middleCenter;
+		this.#contentSize = Vector2.zero();
 		this.#contentSize = Vector2.zero();
 		this.#anchorMin = Vector2.zero();
 		this.#anchorMax = Vector2.zero();

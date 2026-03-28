@@ -74,17 +74,27 @@ class Tutorial_2 extends Scene {
 		child.setLocalPosition(Vec2.create(100, 100));
 		child.setSize(Vec2.create(200, 200));
 		color = child.addComponent(ColorComponent);
-		color.setColor("#00ffff");	
+		color.setColor("#00ffff");
+
+		// 자손 노드 설정.
+		const grandChild = new Node();
+		child.addChild(grandChild);
+		grandChild.setPivot(Pivot.middleCenter);
+		grandChild.setLocalPosition(Vec2.create(100, 100));
+		grandChild.setSize(Vec2.create(50, 50));
+		color = grandChild.addComponent(ColorComponent);
+		color.setColor("#ff00ff");
 
 		// UI 노드 설정.
 		const uiRoot = new UINode();
-		uiRoot.setAnchorMin(Vec2.create(0, 0));
-		uiRoot.setAnchorMax(Vec2.create(0.5, 1));
-		uiRoot.setAnchoredPosition(Vec2.create(0.5, 0.5));
-		// uiRoot.setSize(Vec2.create(200, 200));
+		uiRoot.setPivot(Pivot.topLeft);
+		uiRoot.setAnchorMin(Vec2.create(0, 0.5));
+		uiRoot.setAnchorMax(Vec2.create(1, 0.5));
+		uiRoot.setAnchoredPosition(Vec2.create(0, 0));
+		uiRoot.setSizeDelta(Vec2.create(0, 100));
 		root.addChild(uiRoot);
 		color = uiRoot.addComponent(ColorComponent);
-		color.setColor("#ff00ff");	
+		color.setColor("#ffff00");	
 	}
 
 	//==============================================================================
