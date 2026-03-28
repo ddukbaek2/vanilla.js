@@ -52,10 +52,10 @@ export class BoundsComponent extends Component {
 	/**
 	 * @param { Vector2 } size 
 	 */
-	setSize(size) {
+	setContentSize(size) {
 		const node = this.getNode();
 		if (node) {
-			node.setSize(size);
+			node.setContentSize(size);
 		}
 	}
 
@@ -65,10 +65,10 @@ export class BoundsComponent extends Component {
 	/**
 	 * @returns { Vector2 } 
 	 */
-	getSize() {
+	getContentSize() {
 		const node = this.getNode();
 		if (node) {
-			return node.getSize();
+			return node.getContentSize();
 		}
 		return Vector2.zero();
 	}
@@ -126,7 +126,7 @@ export class BoundsComponent extends Component {
 		const position = node.getPosition();
 		const scale = node.getScale();
 		const degree = node.getRotation();
-		const size = this.getSize();
+		const size = this.getContentSize();
 		const pivot = this.getPivot();
 
 		const width = size.x * Math.abs(scale.x);

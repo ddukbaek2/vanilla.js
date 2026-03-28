@@ -54,7 +54,7 @@ class Tutorial_2 extends Scene {
 		const root = this.getRoot();
 		root.setPosition(Vec2.zero());
 		root.setPivot(Pivot.topLeft);
-		root.setSize(referenceResolutionSize);
+		root.setContentSize(referenceResolutionSize);
 		// let color = root.addComponent(ColorComponent);
 		// color.setColor("#000000");
 
@@ -62,7 +62,7 @@ class Tutorial_2 extends Scene {
 		const node = new Node();
 		node.setPivot(Pivot.topLeft);
 		node.setLocalPosition(Vec2.create(100, 100));
-		node.setSize(Vec2.create(200, 200));
+		node.setContentSize(Vec2.create(200, 200));
 		root.addChild(node);
 		let color = node.addComponent(ColorComponent);
 		color.setColor("#ff0000");
@@ -72,7 +72,7 @@ class Tutorial_2 extends Scene {
 		node.addChild(child);
 		child.setPivot(Pivot.topLeft);
 		child.setLocalPosition(Vec2.create(100, 100));
-		child.setSize(Vec2.create(200, 200));
+		child.setContentSize(Vec2.create(200, 200));
 		color = child.addComponent(ColorComponent);
 		color.setColor("#00ffff");
 
@@ -81,7 +81,7 @@ class Tutorial_2 extends Scene {
 		child.addChild(grandChild);
 		grandChild.setPivot(Pivot.middleCenter);
 		grandChild.setLocalPosition(Vec2.create(100, 100));
-		grandChild.setSize(Vec2.create(50, 50));
+		grandChild.setContentSize(Vec2.create(50, 50));
 		color = grandChild.addComponent(ColorComponent);
 		color.setColor("#ff00ff");
 
