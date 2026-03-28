@@ -95,6 +95,112 @@ export class Rect extends Object {
 	}
 
 	//==============================================================================
+	// 가로 크기 프로퍼티.
+	//==============================================================================
+	/**
+	 * @param { number } value
+	 */
+	set width(value) {
+		this.size.x = value;
+	}
+
+	/**
+	 * @returns { number }
+	 */
+	get width() {
+		return this.size.x;
+	}
+
+	//==============================================================================
+	// 세로 크기 프로퍼티.
+	//==============================================================================
+	/**
+	 * @param { number } value
+	 */
+	set height(value) {
+		this.size.y = value;
+	}
+
+	/**
+	 * @returns { number }
+	 */
+	get height() {
+		return this.size.y;
+	}
+
+	//==============================================================================
+	// 최소 좌표 프로퍼티 (좌상단).
+	//==============================================================================
+	/**
+	 * @param { Vector2 } value
+	 */
+	set min(value) {
+		const oldMax = this.max;
+		this.position.x = value.x;
+		this.position.y = value.y;
+		this.size.x = oldMax.x - this.position.x;
+		this.size.y = oldMax.y - this.position.y;
+	}
+
+	/**
+	 * @returns { Vector2 }
+	 */
+	get min() {
+		return Vector2.create(this.position.x, this.position.y);
+	}
+
+	//==============================================================================
+	// 최대 좌표 프로퍼티 (우하단).
+	//==============================================================================
+	/**
+	 * @param { Vector2 } value
+	 */
+	set max(value) {
+		this.size.x = value.x - this.position.x;
+		this.size.y = value.y - this.position.y;
+	}
+
+	/**
+	 * @returns { Vector2 }
+	 */
+	get max() {
+		return Vector2.create(this.position.x + this.size.x, this.position.y + this.size.y);
+	}
+
+	//==============================================================================
+	// 교집합 (두 사각형이 겹치는 영역 반환).
+	//==============================================================================
+	/**
+	 * @param { Rect } other
+	 * @returns { Rect }
+	 */
+	intersection(other) {
+		if (!this.overlaps(other)) {
+			return Rect.zero();
+		}
+		const x1 = Math.max(this.position.x, other.position.x);
+		const y1 = Math.max(this.position.y, other.position.y);
+		const x2 = Math.min(this.max.x, other.max.x);
+		const y2 = Math.min(this.max.y, other.max.y);
+		return Rect.create(x1, y1, x2 - x1, y2 - y1);
+	}
+
+	//==============================================================================
+	// 합집합 (두 사각형을 모두 포함하는 최소 사각형 반환).
+	//==============================================================================
+	/**
+	 * @param { Rect } other
+	 * @returns { Rect }
+	 */
+	union(other) {
+		const x1 = Math.min(this.position.x, other.position.x);
+		const y1 = Math.min(this.position.y, other.position.y);
+		const x2 = Math.max(this.max.x, other.max.x);
+		const y2 = Math.max(this.max.y, other.max.y);
+		return Rect.create(x1, y1, x2 - x1, y2 - y1);
+	}
+
+	//==============================================================================
 	// 가운데 설정 프로퍼티.
 	//==============================================================================
 	/**

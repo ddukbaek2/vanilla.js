@@ -227,17 +227,29 @@ export function tan(value) {
  */
 export function asin(value) {
 	if (value < -1 || value > 1) return NaN;
-	if (value === 1) return Math.PI / 2;
-	if (value === -1) return -Math.PI / 2;
+	if (value === 1) return PI / 2;
+	if (value === -1) return -PI / 2;
 
 	let result = value;
 	let term = value;
 	for (let i = 1; i < 100; i++) {
 		term *= (value * value * (2 * i - 1) * (2 * i - 1)) / ((2 * i) * (2 * i + 1));
 		result += term;
-		if (Math.abs(term) < 1e-15) break;
+		if (abs(term) < 1e-15) break;
 	}
 	return result;
+}
+
+//==============================================================================
+// 아크코사인 반환.
+//==============================================================================
+/**
+ * @param { number } value
+ * @returns { number }
+ */
+export function acos(value) {
+	if (value < -1 || value > 1) return NaN;
+	return PI / 2 - asin(value);
 }
 
 //==============================================================================
@@ -261,7 +273,7 @@ export function pow(base, exponent) {
 			result *= currentBase;
 		}
 		currentBase *= currentBase;
-		currentExponent = Math.floor(currentExponent / 2);
+		currentExponent = floor(currentExponent / 2);
 	}
 
 	return result;
