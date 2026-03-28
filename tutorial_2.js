@@ -47,33 +47,31 @@ class Tutorial_2 extends Scene {
 		viewManager.setViewScaleMode(ViewScaleMode.matchHeightToScreen); // 기준해상도 + 세로축 맞춤.
 		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
 
+		// 루트 설정.
 		const root = this.getRoot();
-		root.setPivot(Pivot.topLeft);
 		root.setPosition(Vec2.zero());
-		root.setContentSize(Vec2.create(300, 300));
-		let color = root.addComponent(ColorComponent);
-		color.setColor("#000000");
+		root.setPivot(Pivot.topLeft);
+		root.setSize(referenceResolutionSize);
+		// let color = root.addComponent(ColorComponent);
+		// color.setColor("#000000");
 
 		// 노드 설정.
 		const node = new Node();
-		// node.setAnchorMin();
 		node.setPivot(Pivot.topLeft);
-		node.setPosition(Vec2.create(0, 0));
-		node.setContentSize(Vec2.create(200, 100));
+		node.setLocalPosition(Vec2.create(100, 100));
+		node.setSize(Vec2.create(200, 200));
 		root.addChild(node);
-		color = node.addComponent(ColorComponent);
+		let color = node.addComponent(ColorComponent);
 		color.setColor("#ff0000");
 
 		// 자식 노드 설정.
 		const child = new Node();	
 		node.addChild(child);
-		child.setPosition(Vec2.create(100, 100));
-		child.setContentSize(Vec2.create(200, 100));
 		child.setPivot(Pivot.topLeft);
-		child.setRotation(0.0);
-		child.setScale(Vec2.one());
+		child.setLocalPosition(Vec2.create(100, 100));
+		child.setSize(Vec2.create(200, 200));
 		color = child.addComponent(ColorComponent);
-		color.setColor("rgba(255, 255, 0, 0.5)");	
+		color.setColor("#00ffff");	
 	}
 
 	//==============================================================================

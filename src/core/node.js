@@ -19,15 +19,13 @@ export class Node extends Object {
 	/** @private @type { Component[] } */ #components; // 컴포넌트 목록.
 	/** @private @type { Node | null } */ #parent; // 부모 노드.
 	/** @private @type { Node[] } */ #children; // 자식 노드 목록.
-	/** @private @type { Vector2 } */ #position; // 위치.
-	/** @private @type { Vector2 } */ #scale; // 크기.
-	/** @private @type { number } */ #rotation; // 회전값. (degree)
+	/** @private @type { Vector2 } */ #localPosition; // 로컬 위치.
+	/** @private @type { Vector2 } */ #localScale; // 로컬 크기.
+	/** @private @type { number } */ #localRotation; // 로컬 회전값. (degree)
 	/** @private @type { boolean } */ #isActive; // 활성화 여부.
 	/** @private @type { number } */ #opacity; // 투명도.
 	/** @private @type { Vector2 } */ #pivot; // 기준점.
-	/** @private @type { Vector2 } */ #contentSize; // 내용 크기.
-	/** @private @type { Vector2 } */ #anchorMin; // 앵커 최소값.
-	/** @private @type { Vector2 } */ #anchorMax; // 앵커 최대값.
+	/** @private @type { Vector2 } */ #size; // 크기.
 
 	//==============================================================================
 	// 생성.
@@ -40,15 +38,13 @@ export class Node extends Object {
 		this.#components = [];
 		this.#parent = null;
 		this.#children = [];
-		this.#position = Vector2.zero();
-		this.#scale = Vector2.one();
-		this.#rotation = 0.0;
+		this.#localPosition = Vector2.zero();
+		this.#localScale = Vector2.one();
+		this.#localRotation = 0.0;
 		this.#isActive = true;
 		this.#opacity = 1.0;
 		this.#pivot = Pivot.middleCenter;
-		this.#contentSize = Vector2.zero();
-		this.#anchorMin = Vector2.create(0.5, 0.5);
-		this.#anchorMax = Vector2.create(0.5, 0.5);
+		this.#size = Vector2.zero();
 	}
 
 	//==============================================================================
@@ -85,37 +81,22 @@ export class Node extends Object {
 		const canvasContext = renderer.getCanvasContext();
 		canvasContext.save();
 
-		let position = this.getPosition();
-		const parent = this.getParent();
-		if (parent) {
-			const parentSize = parent.getContentSize();
-			const parentPivot = parent.getPivot();
-			const anchorMin = this.getAnchorMin();
-			const anchorMax = this.getAnchorMax();
-			
-			// 앵커 위치 계산. (현재는 anchorMin을 기준으로 하는 포인트 앵커 방식)
-			const anchorPos = Vector2.create(
-				parentSize.x * (anchorMin.x - parentPivot.x),
-				parentSize.y * (anchorMin.y - parentPivot.y)
-			);
-			position = position.add(anchorPos);
-		}
-
-		const degree = this.getRotation();
+		const localPosition = this.getLocalPosition();
+		const degree = this.getLocalRotation();
 		let radian = Math.degreeToRadian(degree);
-		const scale = this.getScale();
+		const scale = this.getLocalScale();
 		const opacity = this.getOpacity();
 
 		const pivot = this.getPivot();
-		const contentSize = this.getContentSize();
+		const size = this.getSize();
 
 		// 트랜스폼 조정.
-		canvasContext.translate(position.x, position.y);
+		canvasContext.translate(localPosition.x, localPosition.y);
 		canvasContext.rotate(radian);
 		canvasContext.scale(scale.x, scale.y);
 		
 		// 피봇 반영.
-		canvasContext.translate(-(contentSize.x * pivot.x), -(contentSize.y * pivot.y));
+		canvasContext.translate(-(size.x * pivot.x), -(size.y * pivot.y));
 		
 		canvasContext.globalAlpha *= opacity;
 	}
@@ -160,82 +141,202 @@ export class Node extends Object {
 	 * @returns { Vector2 }
 	 */
 	getPivotPosition() {
-		const contentSize = this.getContentSize();
+		const size = this.getSize();
 		const pivot = this.getPivot();
-		return Vector2.create(-(contentSize.x * pivot.x), -(contentSize.y * pivot.y));
+		return Vector2.create(-(size.x * pivot.x), -(size.y * pivot.y));
 	}
 
 	//==============================================================================
-	// 앵커가 반영된 로컬 위치 반환.
+	// 로컬 위치 설정.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @param { Vector2 } position 
 	 */
-	getLocalPositionWithAnchor() {
-		let position = this.getPosition();
-		const parent = this.getParent();
-		if (parent) {
-			const parentSize = parent.getContentSize();
-			const parentPivot = parent.getPivot();
-			const anchorMin = this.getAnchorMin();
-			
-			const anchorPos = Vector2.create(
-				parentSize.x * (anchorMin.x - parentPivot.x),
-				parentSize.y * (anchorMin.y - parentPivot.y)
-			);
-			position = position.add(anchorPos);
-		}
-		return position;
+	setLocalPosition(position) {
+		this.#localPosition = position;
 	}
 
-	// //==============================================================================
-	// // 기즈모 출력.
-	// //==============================================================================
-	// /**
-	//  * @virtual
-	//  * @param { Renderer } renderer 
-	//  */
-	// drawGizmos(renderer) {
-	// 	if (!this.isVisibleGizmos()) {
-	// 		return;
-	// 	}
-		
-	// 	const engine = renderer.getEngine();
-	// 	const canvasContext = renderer.getCanvasContext();
+	//==============================================================================
+	// 로컬 위치 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 } 
+	 */
+	getLocalPosition() {
+		return this.#localPosition;
+	}
 
-	// 	const degree = this.getRotation();
-	// 	const radian = Math.degreeToRadian(degree);
+	//==============================================================================
+	// 글로벌 위치 설정.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } position 
+	 */
+	setPosition(position) {
+		const parent = this.getParent();
+		if (!parent) {
+			this.setLocalPosition(position);
+			return;
+		}
 
-	// 	// 이미지 회전이 반영된 기준점 출력.
-	// 	canvasContext.fillStyle = "#00ff00";
-	// 	const worldCorners = this.getWorldCorners();
-	// 	const pivots = [VPiVPivotvot2D.topLeft, Pivot.topRight, Pivot.bottomRight, Pivot.bottomLeft];
-	// 	for (let i = 0; i < worldCorners.length; ++i) {
-	// 		const worldCorner = worldCorners[i];
-	// 		canvasContext.save();
-	// 		engine.gameViewIdentity(null);
-	// 		canvasContext.translate(worldCorner.x, worldCorner.y);
-	// 		canvasContext.rotate(radian);
-	// 		const contentSize = Vector2.create(4, 4);//.divide(this.getScale());
-	// 		const pivotPosition = Vector2.zero().subtract(contentSize.multiply(pivots[i]));
-	// 		canvasContext.fillRect(pivotPosition.x, pivotPosition.y, contentSize.x, contentSize.y);
-	// 		canvasContext.restore();
-	// 	}
+		const parentPos = parent.getPosition();
+		const parentRot = parent.getRotation();
+		const parentScale = parent.getScale();
 
-	// 	// 월드 코너 출력.
-	// 	canvasContext.save();
-	// 	engine.gameViewIdentity(null);
-	// 	canvasContext.strokeStyle = "#00ff00";
-	// 	canvasContext.lineWidth = 2;
-	// 	canvasContext.beginPath();
-	// 	canvasContext.moveTo(worldCorners[0].x, worldCorners[0].y);
-	// 	for (let i = 1; i < worldCorners.length; ++i) {
-	// 		canvasContext.lineTo(worldCorners[i].x, worldCorners[i].y);
-	// 	}
-	// 	canvasContext.closePath();
-	// 	canvasContext.stroke();
-	// 	canvasContext.restore();
-	// }
+		// 부모 기준 위치 차이
+		const dx = position.x - parentPos.x;
+		const dy = position.y - parentPos.y;
+
+		// 역회전
+		const radian = Math.degreeToRadian(-parentRot);
+		const cosR = Math.cos(radian);
+		const sinR = Math.sin(radian);
+
+		const rx = dx * cosR - dy * sinR;
+		const ry = dx * sinR + dy * cosR;
+
+		// 역스케일
+		const sx = parentScale.x !== 0 ? rx / parentScale.x : 0;
+		const sy = parentScale.y !== 0 ? ry / parentScale.y : 0;
+
+		this.setLocalPosition(Vector2.create(sx, sy));
+	}
+
+	//==============================================================================
+	// 글로벌 위치 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 } 
+	 */
+	getPosition() {
+		const parent = this.getParent();
+		const localPos = this.getLocalPosition();
+		if (!parent) {
+			return localPos;
+		}
+
+		const parentPos = parent.getPosition();
+		const parentRot = parent.getRotation();
+		const parentScale = parent.getScale();
+
+		const radian = Math.degreeToRadian(parentRot);
+		const cosR = Math.cos(radian);
+		const sinR = Math.sin(radian);
+
+		// 스케일 및 회전 적용
+		const sx = localPos.x * parentScale.x;
+		const sy = localPos.y * parentScale.y;
+
+		const rx = sx * cosR - sy * sinR;
+		const ry = sx * sinR + sy * cosR;
+
+		return Vector2.create(parentPos.x + rx, parentPos.y + ry);
+	}
+
+	//==============================================================================
+	// 로컬 크기 설정.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } scale 
+	 */
+	setLocalScale(scale) {
+		this.#localScale = scale;
+	}
+
+	//==============================================================================
+	// 로컬 크기 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 } 
+	 */
+	getLocalScale() {
+		return this.#localScale;
+	}
+
+	//==============================================================================
+	// 글로벌 크기 설정.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } scale 
+	 */
+	setScale(scale) {
+		const parent = this.getParent();
+		if (!parent) {
+			this.setLocalScale(scale);
+		} else {
+			const pScale = parent.getScale();
+			this.setLocalScale(Vector2.create(
+				pScale.x !== 0 ? scale.x / pScale.x : 0,
+				pScale.y !== 0 ? scale.y / pScale.y : 0
+			));
+		}
+	}
+
+	//==============================================================================
+	// 글로벌 크기 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 } 
+	 */
+	getScale() {
+		const parent = this.getParent();
+		const localScale = this.getLocalScale();
+		if (!parent) {
+			return localScale;
+		}
+		const pScale = parent.getScale();
+		return Vector2.create(pScale.x * localScale.x, pScale.y * localScale.y);
+	}
+
+	//==============================================================================
+	// 로컬 회전 설정.
+	//==============================================================================
+	/**
+	 * @param { number } rotation 
+	 */
+	setLocalRotation(rotation) {
+		this.#localRotation = rotation;
+	}
+
+	//==============================================================================
+	// 로컬 회전 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 
+	 */
+	getLocalRotation() {
+		return this.#localRotation;
+	}
+
+	//==============================================================================
+	// 글로벌 회전 설정.
+	//==============================================================================
+	/**
+	 * @param { number } rotation 
+	 */
+	setRotation(rotation) {
+		const parent = this.getParent();
+		if (!parent) {
+			this.setLocalRotation(rotation);
+		} else {
+			this.setLocalRotation(rotation - parent.getRotation());
+		}
+	}
+
+	//==============================================================================
+	// 글로벌 회전 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 
+	 */
+	getRotation() {
+		const parent = this.getParent();
+		const localRot = this.getLocalRotation();
+		if (!parent) {
+			return localRot;
+		}
+		return parent.getRotation() + localRot;
+	}
 
 	//==============================================================================
 	// 타입으로 컴포넌트 추가.
@@ -348,7 +449,6 @@ export class Node extends Object {
 
 		// 새 부모가 존재 할 경우.
 		if (this.#parent) {
-
 			// 자식 추가.
 			parent.#children.push(this);
 		}
@@ -378,11 +478,6 @@ export class Node extends Object {
 	// 모든 자식 제거. (직계 자식 목록만 비우기 때문에 자식들이 소유한 계층 구조는 유지됨)
 	//==============================================================================
 	removeChildren() {
-		// for (let i = 0; i < this.#children.length; ++i) {
-		// 	const child = this.#children[i];
-		// 	this.removeChild(child);
-		// 	--i;
-		// }
 		while (this.#children.length > 0) {
 			const child = this.#children[0];
 			this.removeChild(child);
@@ -447,66 +542,6 @@ export class Node extends Object {
 	 */
 	getChild(index) {
 		return this.#children[index];
-	}
-
-	//==============================================================================
-	// 위치 설정.
-	//==============================================================================
-	/**
-	 * @param { Vector2 } position 
-	 */
-	setPosition(position) {
-		this.#position = position;
-	}
-
-	//==============================================================================
-	// 위치 반환.
-	//==============================================================================
-	/**
-	 * @returns { Vector2 } 
-	 */
-	getPosition() {
-		return this.#position;
-	}
-
-	//==============================================================================
-	// 크기 설정.
-	//==============================================================================
-	/**
-	 * @param { Vector2 } scale 
-	 */
-	setScale(scale) {
-		this.#scale = scale;
-	}
-
-	//==============================================================================
-	// 크기 반환.
-	//==============================================================================
-	/**
-	 * @returns { Vector2 } 
-	 */
-	getScale() {
-		return this.#scale;
-	}
-
-	//==============================================================================
-	// 회전 설정.
-	//==============================================================================
-	/**
-	 * @param { number } rotation 
-	 */
-	setRotation(rotation) {
-		this.#rotation = rotation;
-	}
-
-	//==============================================================================
-	// 회전 반환.
-	//==============================================================================
-	/**
-	 * @returns { number } 
-	 */
-	getRotation() {
-		return this.#rotation;
 	}
 
 	//==============================================================================
@@ -628,63 +663,23 @@ export class Node extends Object {
 	}
 
 	//==============================================================================
-	// 내용 크기 설정.
+	// 실제 크기 설정.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } contentSize 
+	 * @param { Vector2 } size 
 	 */
-	setContentSize(contentSize) {
-		this.#contentSize = contentSize;
+	setSize(size) {
+		this.#size = size;
 	}
 
 	//==============================================================================
-	// 내용 크기 반환.
+	// 실제 크기 반환.
 	//==============================================================================
 	/**
 	 * @returns { Vector2 } 
 	 */
-	getContentSize() {
-		return this.#contentSize;
-	}
-
-	//==============================================================================
-	// 앵커 최소값 설정.
-	//==============================================================================
-	/**
-	 * @param { Vector2 } anchorMin 
-	 */
-	setAnchorMin(anchorMin) {
-		this.#anchorMin = anchorMin;
-	}
-
-	//==============================================================================
-	// 앵커 최소값 반환.
-	//==============================================================================
-	/**
-	 * @returns { Vector2 }
-	 */
-	getAnchorMin() {
-		return this.#anchorMin;
-	}
-
-	//==============================================================================
-	// 앵커 최대값 설정.
-	//==============================================================================
-	/**
-	 * @param { Vector2 } anchorMax 
-	 */
-	setAnchorMax(anchorMax) {
-		this.#anchorMax = anchorMax;
-	}
-
-	//==============================================================================
-	// 앵커 최대값 반환.
-	//==============================================================================
-	/**
-	 * @returns { Vector2 }
-	 */
-	getAnchorMax() {
-		return this.#anchorMax;
+	getSize() {
+		return this.#size;
 	}
 
 	//==============================================================================

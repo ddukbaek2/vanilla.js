@@ -92,7 +92,7 @@ export class SpriteComponent extends ColorComponent {
 		}
 
 		const pivotPosition = super.getPivotPosition();
-		const contentSize = super.getContentSize();
+		const size = super.getSize();
 		const isHorizontalFlip = this.isHorizontalFlip();
 		const isVerticalFlip = this.isVerticalFlip();
 
@@ -109,7 +109,7 @@ export class SpriteComponent extends ColorComponent {
 		canvasContext.drawImage(image,
 			slices.position.x, slices.position.y, slices.size.x, slices.size.y,
 			pivotPosition.x, pivotPosition.y, 
-			isHorizontalFlip ? -contentSize.x : contentSize.x, isVerticalFlip ? -contentSize.y : contentSize.y
+			isHorizontalFlip ? -size.x : size.x, isVerticalFlip ? -size.y : size.y
 		);
 	}
 
