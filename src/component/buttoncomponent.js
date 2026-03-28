@@ -1,11 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { Vector2 } from "../base/vector2.js";
 import { Enum } from "../base/identifier.js";
-import { Rect } from "../base/rect.js";
-import * as Math from "../base/math.js";
-import { OBB } from "../base/obb.js";
 import { Renderer } from "../core/renderer.js";
 import { Component } from "../core/component.js";
 
@@ -47,6 +43,7 @@ export class ButtonComponent extends Component {
 	// 갱신.
 	//==============================================================================
 	/**
+	 * @override
 	 * @param { number } timeDelta 
 	 */
 	tick(timeDelta) {
@@ -58,6 +55,7 @@ export class ButtonComponent extends Component {
 	// 출력.
 	//==============================================================================
 	/**
+	 * @override
 	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
