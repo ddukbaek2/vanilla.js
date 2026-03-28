@@ -52,12 +52,13 @@ export class Renderer extends Object {
 	 * @param { string } color 
 	 * @param { number } opacity 
 	 */
-	drawLine(positions, color = "#ffffff", opacity = 1.0) {
+	drawLine(positions, size = 1, color = "#ffffff", opacity = 1.0) {
 		const canvasContext = this.getCanvasContext();
 		if (canvasContext) {
 			const originalOpacity = canvasContext.globalAlpha;
 			canvasContext.globalAlpha = opacity;
 			canvasContext.strokeStyle = color;
+			canvasContext.lineWidth = size;
 
 			canvasContext.beginPath();
 			canvasContext.moveTo(positions[0].x, positions[0].y);
