@@ -157,7 +157,7 @@ export class Renderer extends Object {
 		try {
 			node.beginCanvasState(this);
 			node.draw(this);
-			// node.drawGizmos(this);
+			node.drawGizmos(this);
 			for (const child of node.getChildren()) {
 				this.drawNode(child);
 			}

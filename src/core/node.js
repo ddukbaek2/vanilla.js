@@ -121,9 +121,6 @@ export class Node extends Object {
 			for (const component of components) {
 				component.draw(renderer);
 			}
-
-			// 기즈모 출력.
-			this.drawGizmos(renderer);
 		}
 	}
 
@@ -134,9 +131,20 @@ export class Node extends Object {
 	 * @param { Renderer } renderer 
 	 */
 	drawGizmos(renderer) {
+
 		// 영역 및 기준점 출력.
 		const canvasContext = renderer.getCanvasContext();
 		if (canvasContext) {
+			// 기존 투명도 무효화 및 색상 설정.
+			const originalAlpha = canvasContext.globalAlpha;
+			canvasContext.globalAlpha = 1.0;
+
+			// 컴포넌트 기즈모 출력.
+			const components = this.getAllComponents();
+			for (const component of components) {
+				component.drawGizmos(renderer);
+			}
+
 			// 좌표.
 			const contentSize = this.getContentSize();
 			const pivot = this.getPivot();
@@ -147,8 +155,6 @@ export class Node extends Object {
 			const bottom = top + contentSize.y;
 
 			// 기존 투명도 무효화 및 색상 설정.
-			const originalAlpha = canvasContext.globalAlpha;
-			canvasContext.globalAlpha = 1.0;
 			canvasContext.fillStyle = "#00ff00";
 			canvasContext.strokeStyle = "#00ff00";
 
@@ -160,7 +166,6 @@ export class Node extends Object {
 			canvasContext.lineTo(left, bottom);
 			canvasContext.lineTo(left, top);
 			canvasContext.stroke();
-			// canvasContext.globalAlpha = originalAlpha;
 
 			// 기준점.
 			const pointSize = 4;
@@ -168,7 +173,7 @@ export class Node extends Object {
 			canvasContext.arc(origin.x, origin.y, pointSize, 0, Math.PI * 2);
 			canvasContext.fill();
 			// canvasContext.fillRect(left - (pointSize / 2), top - (pointSize / 2), pointSize, pointSize);
-
+			
 			// 기존 투명도 복원.
 			canvasContext.globalAlpha = originalAlpha;
 		}
@@ -937,18 +942,18 @@ export class Node extends Object {
 		const worldCorners = this.getWorldCorners();
 		const obb = new OBB();
 		obb.setEdges(worldCorners);
-		const isInside = obb.contains(viewPosition);
-		return isInside;
+		const inside = obb.contains(viewPosition);
+		return inside;
 	}
 
-	//==============================================================================
-	// 새로운 노드 생성.
-	//==============================================================================
-	/**
-	 * @returns { Node }
-	 */
-	static create() {
-		var obj = new Node();
-		return obj;
-	}
+	// //==============================================================================
+	// // 새로운 노드 생성.
+	// //==============================================================================
+	// /**
+	//  * @returns { Node }
+	//  */
+	// static create() {
+	// 	var obj = new Node();
+	// 	return obj;
+	// }
 }
