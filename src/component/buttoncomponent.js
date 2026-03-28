@@ -13,8 +13,8 @@ import { Component } from "../core/component.js";
 //==============================================================================
 // 버튼 상태.
 //==============================================================================
-export const VButtonState = {
-	normal: Enum.auto(),
+export const ButtonState = {
+	normal: Enum.begin(),
 	hover: Enum.auto(),
 	pressed: Enum.auto(),
 	released: Enum.auto(),
@@ -29,7 +29,7 @@ export class ButtonComponent extends Component {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { ButtonState } */ #buttonState;
-	/** @private @type { Function } */ #clickEvent;
+	/** @private @type { function(ButtonComponent): boolean } */ #clickEvent;
 
 	//==============================================================================
 	// 생성.
@@ -39,7 +39,7 @@ export class ButtonComponent extends Component {
 	 */
 	constructor() {
 		super();
-		this.#buttonState = VButtonState.normal;
+		this.#buttonState = ButtonState.normal;
 		this.#clickEvent = null;
 	}
 
@@ -70,22 +70,22 @@ export class ButtonComponent extends Component {
 	updateButtonState() {
 		const buttonState = this.getButtonState();
 		switch (buttonState) {
-			case VButtonState.normal: {
+			case ButtonState.normal: {
 					break;
 				}
-			case VButtonState.hover: {
+			case ButtonState.hover: {
 					break;
 				}
-			case VButtonState.pressed: {
+			case ButtonState.pressed: {
 					break;
 				}
-			case VButtonState.released: {
+			case ButtonState.released: {
 					break;
 				}
-			case VButtonState.selected: {
+			case ButtonState.selected: {
 					break;
 				}
-			case VButtonState.disabled: {
+			case ButtonState.disabled: {
 					break;
 				}
 		}
@@ -98,6 +98,10 @@ export class ButtonComponent extends Component {
 	 * @param { ButtonState } buttonState
 	 */
 	setButtonState(buttonState) {
+		if (this.#buttonState === buttonState) {
+			return;
+		}
+		const previousButtonState = this.#buttonState;
 		this.#buttonState = buttonState;
 	}
 
@@ -115,17 +119,33 @@ export class ButtonComponent extends Component {
 	// 클릭 이벤트 설정.
 	//==============================================================================
 	/**
-	 * @param { Function } clickEvent
+	 * @param { function(ButtonComponent): boolean } callback
 	 */
-	setClickEvent(clickEvent) {
-		this.#clickEvent = clickEvent;
+	setClickEvent(callback) {
+		this.#clickEvent = callback;
+	}
+
+	
+	//==============================================================================
+	// 클릭 이벤트 설정.
+	//==============================================================================
+	/**
+	 * @param { function(ButtonComponent): boolean } callback
+	 */
+	setStateEvent(buttonState, callback) {
+		// this.#clickEvent = callback;
+		switch (buttonState) {
+			case ButtonState.normal: {
+					break;
+				}
+		}
 	}
 
 	//==============================================================================
 	// 클릭 이벤트 반환.
 	//==============================================================================
 	/**
-	 * @returns { Function }
+	 * @returns { function(ButtonComponent): boolean }
 	 */
 	getClickEvent() {
 		return this.#clickEvent;
