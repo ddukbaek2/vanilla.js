@@ -114,49 +114,63 @@ export class Node extends Object {
 	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
-		// 컴포넌트 출력.
 		const isVisible = this.isVisible();
 		if (isVisible) {
+			// 컴포넌트 목록 출력.
 			const components = this.getAllComponents();
 			for (const component of components) {
 				component.draw(renderer);
 			}
-		}
 
-		// 중심점 출력. (검은색 테두리의 하얀 원 + 검은 십자가, 크기 5px)
+			// 기즈모 출력.
+			this.drawGizmos(renderer);
+		}
+	}
+
+	//==============================================================================
+	// 출력.
+	//==============================================================================
+	/**
+	 * @param { Renderer } renderer 
+	 */
+	drawGizmos(renderer) {
+		// 영역 및 기준점 출력.
 		const canvasContext = renderer.getCanvasContext();
 		if (canvasContext) {
+			// 좌표.
 			const contentSize = this.getContentSize();
 			const pivot = this.getPivot();
-			
-			// beginCanvasState에서 피봇만큼 음수 이동(-contentSize*pivot)을 했으므로,
-			// 현재 좌표계의 (0, 0)은 노드 크기 영역의 "좌상단(Top-Left)"입니다.
-			// 따라서 실제 노드의 트랜스폼 기준점(Origin/Pivot)의 좌표는 (contentSize * pivot)이 됩니다.
-			const originX = contentSize.x * pivot.x;
-			const originY = contentSize.y * pivot.y;
+			const origin = Vector2.create(contentSize.x * pivot.x, contentSize.y * pivot.y);
+			const left = 0;
+			const top = 0;
+			const right = left + contentSize.x;
+			const bottom = top + contentSize.y;
 
-			// 사각형 영역 외곽선 그리기 (초록색)
+			// 기존 투명도 무효화 및 색상 설정.
+			const originalAlpha = canvasContext.globalAlpha;
+			canvasContext.globalAlpha = 1.0;
+			canvasContext.fillStyle = "#00ff00";
 			canvasContext.strokeStyle = "#00ff00";
-			canvasContext.lineWidth = 1;
-			canvasContext.strokeRect(0, 0, contentSize.x, contentSize.y);
 
-			// 기준점(Pivot) 마커 그리기 - 원 (지름 5px -> 반지름 2.5)
-			const radius = 2.5;
+			// 범위.
 			canvasContext.beginPath();
-			canvasContext.arc(originX, originY, radius, 0, Math.PI * 2);
-			canvasContext.fillStyle = "#ffffff";
+			canvasContext.moveTo(left, top);
+			canvasContext.lineTo(right, top);
+			canvasContext.lineTo(right, bottom);
+			canvasContext.lineTo(left, bottom);
+			canvasContext.lineTo(left, top);
+			canvasContext.stroke();
+			// canvasContext.globalAlpha = originalAlpha;
+
+			// 기준점.
+			const pointSize = 4;
+			canvasContext.beginPath();
+			canvasContext.arc(origin.x, origin.y, pointSize, 0, Math.PI * 2);
 			canvasContext.fill();
-			canvasContext.strokeStyle = "#000000";
-			canvasContext.lineWidth = 1;
-			canvasContext.stroke();
+			// canvasContext.fillRect(left - (pointSize / 2), top - (pointSize / 2), pointSize, pointSize);
 
-			// 기준점(Pivot) 마커 그리기 - 십자가
-			canvasContext.beginPath();
-			canvasContext.moveTo(originX - radius, originY);
-			canvasContext.lineTo(originX + radius, originY);
-			canvasContext.moveTo(originX, originY - radius);
-			canvasContext.lineTo(originX, originY + radius);
-			canvasContext.stroke();
+			// 기존 투명도 복원.
+			canvasContext.globalAlpha = originalAlpha;
 		}
 	}
 
@@ -174,17 +188,66 @@ export class Node extends Object {
 		}
 	}
 
-	//==============================================================================
-	// 피봇에 기반한 로컬 위치 반환.
-	//==============================================================================
-	/**
-	 * @returns { Vector2 }
-	 */
-	getPivotPosition() {
-		const contentSize = this.getContentSize();
-		const pivot = this.getPivot();
-		return Vector2.create(-(contentSize.x * pivot.x), -(contentSize.y * pivot.y));
-	}
+	// //==============================================================================
+	// // 기즈모 출력.
+	// //==============================================================================
+	// /**
+	//  * @virtual
+	//  * @param { Renderer } renderer 
+	//  */
+	// drawGizmos(renderer) {
+	// 	if (!this.isVisibleGizmos()) {
+	// 		return;
+	// 	}
+		
+	// 	const engine = renderer.getEngine();
+	// 	const canvasContext = renderer.getCanvasContext();
+
+	// 	const degree = this.getRotation();
+	// 	const radian = Math.degreeToRadian(degree);
+
+	// 	// 이미지 회전이 반영된 기준점 출력.
+	// 	canvasContext.fillStyle = "#00ff00";
+	// 	const worldCorners = this.getWorldCorners();
+	// 	const pivots = [Pivot.topLeft, Pivot.topRight, Pivot.bottomRight, Pivot.bottomLeft];
+	// 	for (let i = 0; i < worldCorners.length; ++i) {
+	// 		const worldCorner = worldCorners[i];
+	// 		canvasContext.save();
+	// 		engine.gameViewIdentity(null);
+	// 		canvasContext.translate(worldCorner.x, worldCorner.y);
+	// 		canvasContext.rotate(radian);
+	// 		const contentSize = Vector2.create(4, 4);//.divide(this.getScale());
+	// 		const pivotPosition = Vector2.zero().subtract(contentSize.multiply(pivots[i]));
+	// 		canvasContext.fillRect(pivotPosition.x, pivotPosition.y, contentSize.x, contentSize.y);
+	// 		canvasContext.restore();
+	// 	}
+
+	// 	// 월드 코너 출력.
+	// 	canvasContext.save();
+	// 	engine.gameViewIdentity(null);
+	// 	canvasContext.strokeStyle = "#00ff00";
+	// 	canvasContext.lineWidth = 2;
+	// 	canvasContext.beginPath();
+	// 	canvasContext.moveTo(worldCorners[0].x, worldCorners[0].y);
+	// 	for (let i = 1; i < worldCorners.length; ++i) {
+	// 		canvasContext.lineTo(worldCorners[i].x, worldCorners[i].y);
+	// 	}
+	// 	canvasContext.closePath();
+	// 	canvasContext.stroke();
+	// 	canvasContext.restore();
+	// }
+
+	// //==============================================================================
+	// // 피봇에 기반한 로컬 위치 반환.
+	// //==============================================================================
+	// /**
+	//  * @returns { Vector2 }
+	//  */
+	// getPivotPosition() {
+	// 	const contentSize = this.getContentSize();
+	// 	const pivot = this.getPivot();
+	// 	return Vector2.create(-(contentSize.x * pivot.x), -(contentSize.y * pivot.y));
+	// }
 
 	//==============================================================================
 	// 실제 화면에 그려지는 영역 반환. (OBB)
@@ -774,7 +837,7 @@ export class Node extends Object {
 	 * @param { Vector2 } pivot
 	 */
 	setPivot(pivot) {
-		// this.#pivot = pivot;
+		this.#pivot = pivot;
 		this.#pivot.x = Math.clamp(pivot.x, 0, 1);
 		this.#pivot.y = Math.clamp(pivot.y, 0, 1);
 	}
@@ -809,14 +872,95 @@ export class Node extends Object {
 		return this.#contentSize;
 	}
 
-	// //==============================================================================
-	// // 새로운 노드 생성.
-	// //==============================================================================
-	// /**
-	//  * @returns { Node }
-	//  */
-	// static create() {
-	// 	var obj = new Node();
-	// 	return obj;
-	// }
+	//==============================================================================
+	// 실제 화면에 그려지는 영역 반환. (OBB)
+	//==============================================================================
+	/**
+	 * @returns { Vector2[] }
+	 */
+	getWorldCorners() {
+		const position = this.getPosition();
+		const scale = this.getScale();
+		const degree = this.getRotation();
+		const contentSize = this.getContentSize();
+		const pivot = this.getPivot();
+
+		const width = contentSize.x * Math.abs(scale.x);
+		const height = contentSize.y * Math.abs(scale.y);
+
+		const left = -(width * pivot.x);
+		const right = width * (1 - pivot.x);
+		const top = -(height * pivot.y);
+		const bottom = height * (1 - pivot.y);
+
+		const radian = Math.degreeToRadian(degree);
+		const cosR = Math.cos(radian);
+		const sinR = Math.sin(radian);
+
+		return [
+			Vector2.create(left * cosR - top * sinR + position.x, left * sinR + top * cosR + position.y),
+			Vector2.create(right * cosR - top * sinR + position.x, right * sinR + top * cosR + position.y),
+			Vector2.create(right * cosR - bottom * sinR + position.x, right * sinR + bottom * cosR + position.y),
+			Vector2.create(left * cosR - bottom * sinR + position.x, left * sinR + bottom * cosR + position.y)
+		];
+	}
+
+	//==============================================================================
+	// getWorldCorners()를 기반으로 최소, 최대위치를 만들어 바운딩박스를 형성.
+	//==============================================================================
+	/**
+	 * @returns { Rect }
+	 */
+	getWorldBounds() {
+		const worldCorners = this.getWorldCorners();
+
+		let min = Vector2.positiveInfinity();
+		let max = Vector2.negativeInfinity();
+		for (let i = 1; i < worldCorners.length; ++i) {
+			const worldCorner = worldCorners[i];
+			if (min.x > worldCorner.x) {
+				min.x = worldCorner.x;
+			}
+			if (min.y > worldCorner.y) {
+				min.y = worldCorner.y;
+			}
+			if (max.x < worldCorner.x) {
+				max.x = worldCorner.x;
+			}
+			if (max.y < worldCorner.y) {
+				max.y = worldCorner.y;
+			}
+		}
+
+		return Rect.create(min.x, min.y, max.x - min.x, max.y - min.y);
+	}
+
+	//==============================================================================
+	// getWorldCorners() 를 통한 충돌 검출.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewPosition
+	 * @returns { boolean }
+	 */
+	contains(viewPosition) {
+		if (viewPosition === null) {
+			return false;
+		}
+		const worldCorners = this.getWorldCorners();
+		const obb = new OBB();
+		obb.setEdges(worldCorners);
+		const isInside = obb.contains(viewPosition);
+		return isInside;
+	}
+
+	//==============================================================================
+	// 새로운 노드 생성.
+	//==============================================================================
+	/**
+	 * @returns { Node }
+	 */
+	static create() {
+		var obj = new Node();
+		return obj;
+	}
 }

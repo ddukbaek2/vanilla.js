@@ -63,7 +63,7 @@ class Tutorial_2 extends Scene {
 		child.setLocalPosition(Vec2.create(100, 100));
 		child.setContentSize(Vec2.create(200, 200));
 		color = child.addComponent(ColorComponent);
-		color.setColor("#00ffff");
+		color.setColor("#0000ff");
 
 		// 자손 노드 설정.
 		this.#touchNode = new Node();
@@ -71,6 +71,7 @@ class Tutorial_2 extends Scene {
 		this.#touchNode.setPivot(Pivot.middleCenter);
 		this.#touchNode.setLocalPosition(Vec2.create(100, 100));
 		this.#touchNode.setContentSize(Vec2.create(50, 50));
+		this.#touchNode.setRotation(45);
 		color = this.#touchNode.addComponent(ColorComponent);
 		color.setColor("#ff00ff");
 

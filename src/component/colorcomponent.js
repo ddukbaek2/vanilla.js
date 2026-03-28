@@ -41,11 +41,11 @@ export class ColorComponent extends Component {
 
 		// 출력.
 		// 피봇 위치 반영 - 기본 (0, 0) 에서 피봇만큼 좌상 방향으로 당겨준다. 
-		const pivotPosition = node.getPivotPosition();
-		const size = node.getContentSize();
+		// const pivotPosition = node.getPivotPosition();
+		const contentSize = node.getContentSize();
 		const color = this.getColor();
 		canvasContext.fillStyle = color.toHEXString();
-		canvasContext.fillRect(pivotPosition.x, pivotPosition.y, size.x, size.y);
+		canvasContext.fillRect(0, 0, contentSize.x, contentSize.y);
 	}
 
 	//==============================================================================
