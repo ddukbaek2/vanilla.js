@@ -124,35 +124,58 @@ export class Renderer extends Object {
 	 * @param { HTMLImageElement } image
 	 * @param { Vector2 } position
 	 * @param { Vector2 } size
-	 * @param { Rect } source
-	 * @param { number } rotation
-	 * @param { string } color 
+	 * @param { string } color
 	 * @param { number } opacity 
 	 */
-	drawImage(image, position = Vector2.zero(), size = Vector2.zero(), source = Rect.zero(), rotation = 0.0, color = "#ffffff", opacity = 1.0) {
+	drawImage(image, position, size, color = "#ffffff", opacity = 1.0) {
 		if (image === null){
 			throw new Error("image is null");
 		}
 
 		const canvasContext = this.getCanvasContext();
-		canvasContext.globalAlpha = opacity;
-		canvasContext.fillStyle = color;
-		canvasContext.rotate(rotation);
-		// if (size === Vector2.zero()) {
-		// 	canvasContext.drawImage(image, position.x, position.y, image.width, image.height);
-		// }
-		// else if (slices === null || slices == Rect.zero()) {
-		// 	canvasContext.drawImage(image, position.x, position.y, size.x, size.y);
-		// }
-		// else {
-		// 	canvasContext.drawImage(image, slices.position.x, slices.position.y, slices.size.x, slices.size.y, position.x, position.y, size.x, size.y);
-		// }
-		if (source === null || source.equals(Rect.zero())) {
-			source = Rect.create(0, 0, image.width, image.height);
+		if (canvasContext) {
+			const originalOpacity = canvasContext.globalAlpha;
+			canvasContext.globalAlpha = opacity;
+			canvasContext.fillStyle = color;
+
+			canvasContext.beginPath();
+			canvasContext.drawImage(image, position.x, position.y, size.x, size.y);
+
+			canvasContext.globalAlpha = originalOpacity;
+		}
+	}
+
+	//==============================================================================
+	// 이미지 출력2.
+	//==============================================================================
+	/**
+	 * @param { HTMLImageElement } image
+	 * @param { Vector2 } position
+	 * @param { Vector2 } size
+	 * @param { Rect } source
+	 * @param { string } color 
+	 * @param { number } opacity 
+	 */
+	drawImage2(image, position, size, source, color = "#ffffff", opacity = 1.0) {
+		if (image === null){
+			throw new Error("image is null");
 		}
 
-		canvasContext.drawImage(image, source.position.x, source.position.y, source.size.x, source.size.y, position.x, position.y, size.x, size.y);
-		// this.#canvasContext.globalAlpha = 1.0;
+		const canvasContext = this.getCanvasContext();
+		if (canvasContext) {
+			const originalOpacity = canvasContext.globalAlpha;
+			canvasContext.globalAlpha = opacity;
+			canvasContext.fillStyle = color;
+
+			if (source === null || source.equals(Rect.zero())) {
+				source = Rect.create(0, 0, image.width, image.height);
+			}
+
+			canvasContext.beginPath();
+			canvasContext.drawImage(image, source.position.x, source.position.y, source.size.x, source.size.y, position.x, position.y, size.x, size.y);
+
+			canvasContext.globalAlpha = originalOpacity;
+		}
 	}
 
 	//==============================================================================
@@ -177,27 +200,55 @@ export class Renderer extends Object {
 		const top = patch.position.y;
 		const right = patch.size.x;
 		const bottom = patch.size.y;
-		const centerSrcW = sw - left - right;
-		const centerSrcH = sh - top - bottom;
-		const centerDstW = dw - left - right;
-		const centerDstH = dh - top - bottom;
 
-		// 위쪽.
-		canvasContext.drawImage(image, 0, 0, left, top, dx, dy, left + 1, top + 1); 
-		canvasContext.drawImage(image, left, 0, centerSrcW, top, dx + left, dy, centerDstW + 1, top + 1); 
-		canvasContext.drawImage(image, sw - right, 0, right, top, dx + dw - right, dy, right + 1, top + 1); 
+		const hasHorizontal = left > 0 || right > 0;
+		const hasVertical = top > 0 || bottom > 0;
 
-		// 가운데쪽.
-		canvasContext.drawImage(image, 0, top, left, centerSrcH, dx, dy + top, left + 1, centerDstH + 1); 
-		canvasContext.drawImage(image, left, top, centerSrcW, centerSrcH, dx + left, dy + top, centerDstW + 1, centerDstH + 1); 
-		canvasContext.drawImage(image, sw - right, top, right, centerSrcH, dx + dw - right, dy + top, right + 1, centerDstH + 1); 
+		if (hasHorizontal && hasVertical) {
+			// 가로세로 다 쪼개기.
+			const centerSrcW = sw - left - right;
+			const centerSrcH = sh - top - bottom;
+			const centerDstW = dw - left - right;
+			const centerDstH = dh - top - bottom;
 
-		// 아래쪽.
-		canvasContext.drawImage(image, 0, sh - bottom, left, bottom, dx, dy + dh - bottom, left + 1, bottom + 1); 
-		canvasContext.drawImage(image, left, sh - bottom, centerSrcW, bottom, dx + left, dy + dh - bottom, centerDstW + 1, bottom + 1); 
-		canvasContext.drawImage(image, sw - right, sh - bottom, right, bottom, dx + dw - right, dy + dh - bottom, right + 1, bottom + 1); 
-	}
-	
+			// 위쪽.
+			canvasContext.drawImage(image, 0, 0, left, top, dx, dy, left + 1, top + 1);
+			canvasContext.drawImage(image, left, 0, centerSrcW, top, dx + left, dy, centerDstW + 1, top + 1);
+			canvasContext.drawImage(image, sw - right, 0, right, top, dx + dw - right, dy, right, top + 1);
+
+			// 가운데쪽.
+			canvasContext.drawImage(image, 0, top, left, centerSrcH, dx, dy + top, left + 1, centerDstH + 1);
+			canvasContext.drawImage(image, left, top, centerSrcW, centerSrcH, dx + left, dy + top, centerDstW + 1, centerDstH + 1);
+			canvasContext.drawImage(image, sw - right, top, right, centerSrcH, dx + dw - right, dy + top, right, centerDstH + 1);
+
+			// 아래쪽.
+			canvasContext.drawImage(image, 0, sh - bottom, left, bottom, dx, dy + dh - bottom, left + 1, bottom);
+			canvasContext.drawImage(image, left, sh - bottom, centerSrcW, bottom, dx + left, dy + dh - bottom, centerDstW + 1, bottom);
+			canvasContext.drawImage(image, sw - right, sh - bottom, right, bottom, dx + dw - right, dy + dh - bottom, right, bottom);
+		}
+		else if (hasHorizontal) {
+			// 가로만 쪼개기.
+			const centerSrcW = sw - left - right;
+			const centerDstW = dw - left - right;
+
+			canvasContext.drawImage(image, 0, 0, left, sh, dx, dy, left + 1, dh);
+			canvasContext.drawImage(image, left, 0, centerSrcW, sh, dx + left, dy, centerDstW + 1, dh);
+			canvasContext.drawImage(image, sw - right, 0, right, sh, dx + dw - right, dy, right, dh);
+		}
+		else if (hasVertical) {
+			// 세로만 쪼개기.
+			const centerSrcH = sh - top - bottom;
+			const centerDstH = dh - top - bottom;
+
+			canvasContext.drawImage(image, 0, 0, sw, top, dx, dy, dw, top + 1);
+			canvasContext.drawImage(image, 0, top, sw, centerSrcH, dx, dy + top, dw, centerDstH + 1);
+			canvasContext.drawImage(image, 0, sh - bottom, sw, bottom, dx, dy + dh - bottom, dw, bottom);
+		}
+		else {
+			// 쪼개기 없음.
+			canvasContext.drawImage(image, 0, 0, sw, sh, dx, dy, dw, dh);
+		}
+	}	
 	//==============================================================================
 	// 노드 출력.
 	//==============================================================================
