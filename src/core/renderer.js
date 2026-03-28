@@ -45,6 +45,32 @@ export class Renderer extends Object {
 	}
 
 	//==============================================================================
+	// 선 출력.
+	//==============================================================================
+	/**
+	 * @param { Vector2[] } positions
+	 * @param { string } color 
+	 * @param { number } opacity 
+	 */
+	drawLine(positions, color = "#ffffff", opacity = 1.0) {
+		const canvasContext = this.getCanvasContext();
+		if (canvasContext) {
+			const originalOpacity = canvasContext.globalAlpha;
+			canvasContext.globalAlpha = opacity;
+			canvasContext.strokeStyle = color;
+
+			canvasContext.beginPath();
+			canvasContext.moveTo(positions[0].x, positions[0].y);
+			for (let i = 1; i < positions.length; ++i) {
+				canvasContext.lineTo(positions[i].x, positions[i].y);				
+			}
+			canvasContext.stroke();
+
+			canvasContext.globalAlpha = originalOpacity;
+		}		
+	}
+
+	//==============================================================================
 	// 사각형 출력.
 	//==============================================================================
 	/**
@@ -54,12 +80,40 @@ export class Renderer extends Object {
 	 */
 	drawRect(rect, color = "#ffffff", opacity = 1.0) {
 		const canvasContext = this.getCanvasContext();
-		const originalOpacity = canvasContext.globalAlpha;
-		canvasContext.globalAlpha = opacity;
-		canvasContext.fillStyle = color;
-		// canvasContext.beginPath();
-		canvasContext.fillRect(rect.position.x, rect.position.y, rect.size.x, rect.size.y);
-		canvasContext.globalAlpha = originalOpacity;
+		if (canvasContext) {
+			const originalOpacity = canvasContext.globalAlpha;
+			canvasContext.globalAlpha = opacity;
+			canvasContext.fillStyle = color;
+
+			canvasContext.beginPath();
+			canvasContext.fillRect(rect.position.x, rect.position.y, rect.size.x, rect.size.y);
+
+			canvasContext.globalAlpha = originalOpacity;
+		}
+	}
+
+	//==============================================================================
+	// 원 출력.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } center
+	 * @param { number } radius 
+	 * @param { string } color 
+	 * @param { number } opacity 
+	 */
+	drawCircle(center, radius, color = "#ffffff", opacity = 1.0) {
+		const canvasContext = this.getCanvasContext();
+		if (canvasContext) {
+			const originalOpacity = canvasContext.globalAlpha;
+			canvasContext.globalAlpha = opacity;
+			canvasContext.fillStyle = color;
+
+			canvasContext.beginPath();
+			canvasContext.arc(center.x, center.y, radius, 0, Math.PI * 2);
+			canvasContext.fill();
+
+			canvasContext.globalAlpha = originalOpacity;
+		}
 	}
 
 	//==============================================================================
