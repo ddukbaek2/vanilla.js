@@ -11,30 +11,19 @@ import { Scene } from "./src/core/scene.js";
 import { ViewScaleMode } from "./src/core/viewmanager.js";
 import { Node } from "./src/core/node.js";
 import { Pivot } from "./src/base/pivot.js";
-import { SpriteComponent } from "./src/component/spritecomponent.js";
 import { ColorComponent } from "./src/component/colorcomponent.js";
 import { UINode } from "./src/ui/uinode.js";
 
 
 
 //==============================================================================
-// 게임 인스턴스.
+// 튜토리얼2 : 화면 레이아웃 및 터치 충돌.
 //==============================================================================
 class Tutorial_2 extends Scene {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { Node } */ #touchNode;
-
-	//==============================================================================
-	// 불러오기.
-	//==============================================================================
-	/**
-	 * @param { Engine } engine 
-	 */
-	async load(engine) {
-		await super.load(engine);
-	}
 
 	//==============================================================================
 	// 초기화.
