@@ -44,7 +44,7 @@ export class Scene extends Object {
 	 * @virtual
 	 */
 	create() {
-		this.#root = Node.create();
+		this.#root = new Node();
 		this.#tweens = [];
 	}
 

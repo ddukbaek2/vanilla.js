@@ -25,7 +25,7 @@ export class Node extends Object {
 	/** @private @type { boolean } */ #isActive; // 활성화 여부.
 	/** @private @type { number } */ #opacity; // 투명도.
 	/** @private @type { Vector2 } */ #pivot; // 기준점.
-	/** @private @type { Vector2 } */ #size; // 크기.
+	/** @private @type { Vector2 } */ #contentSize; // 크기.
 
 	//==============================================================================
 	// 생성.
@@ -44,7 +44,7 @@ export class Node extends Object {
 		this.#isActive = true;
 		this.#opacity = 1.0;
 		this.#pivot = Pivot.middleCenter;
-		this.#size = Vector2.zero();
+		this.#contentSize = Vector2.zero();
 	}
 
 	//==============================================================================
@@ -89,7 +89,7 @@ export class Node extends Object {
 			const opacity = this.getOpacity();
 
 			const pivot = this.getPivot();
-			const size = this.getSize();
+			const contentSize = this.getContentSize();
 
 			// 트랜스폼 조정.
 			canvasContext.translate(localPosition.x, localPosition.y);
@@ -97,7 +97,7 @@ export class Node extends Object {
 			canvasContext.scale(scale.x, scale.y);
 			
 			// 피봇 반영.
-			canvasContext.translate(-(size.x * pivot.x), -(size.y * pivot.y));
+			canvasContext.translate(-(contentSize.x * pivot.x), -(contentSize.y * pivot.y));
 
 			// 컬러 반영.
 			canvasContext.globalAlpha *= opacity;
@@ -112,63 +112,49 @@ export class Node extends Object {
 	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
+		// 컴포넌트 출력.
 		const isVisible = this.isVisible();
 		if (isVisible) {
-			// 컴포넌트 목록 출력.
 			const components = this.getAllComponents();
 			for (const component of components) {
 				component.draw(renderer);
 			}
-
-			// 기즈모 출력.
-			this.drawGizmos(renderer);
 		}
-	}
 
-	//==============================================================================
-	// 출력.
-	//==============================================================================
-	/**
-	 * @param { Renderer } renderer 
-	 */
-	drawGizmos(renderer) {
-		// 영역 및 기준점 출력.
+		// 중심점 출력. (검은색 테두리의 하얀 원 + 검은 십자가, 크기 5px)
 		const canvasContext = renderer.getCanvasContext();
 		if (canvasContext) {
-			// 좌표.
-			const size = this.getSize();
+			const contentSize = this.getContentSize();
 			const pivot = this.getPivot();
-			const origin = Vector2.create(size.x * pivot.x, size.y * pivot.y);
-			const left = 0;
-			const top = 0;
-			const right = left + size.x;
-			const bottom = top + size.y;
+			
+			// beginCanvasState에서 피봇만큼 음수 이동(-contentSize*pivot)을 했으므로,
+			// 현재 좌표계의 (0, 0)은 노드 크기 영역의 "좌상단(Top-Left)"입니다.
+			// 따라서 실제 노드의 트랜스폼 기준점(Origin/Pivot)의 좌표는 (contentSize * pivot)이 됩니다.
+			const originX = contentSize.x * pivot.x;
+			const originY = contentSize.y * pivot.y;
 
-			// 기존 투명도 무효화 및 색상 설정.
-			const originalAlpha = canvasContext.globalAlpha;
-			canvasContext.globalAlpha = 1.0;
-			canvasContext.fillStyle = "#000000";
-			canvasContext.strokeStyle = "#000000";
+			// 사각형 영역 외곽선 그리기 (초록색)
+			canvasContext.strokeStyle = "#00ff00";
+			canvasContext.lineWidth = 1;
+			canvasContext.strokeRect(0, 0, contentSize.x, contentSize.y);
 
-			// 범위.
+			// 기준점(Pivot) 마커 그리기 - 원 (지름 5px -> 반지름 2.5)
+			const radius = 2.5;
 			canvasContext.beginPath();
-			canvasContext.moveTo(left, top);
-			canvasContext.lineTo(right, top);
-			canvasContext.lineTo(right, bottom);
-			canvasContext.lineTo(left, bottom);
-			canvasContext.lineTo(left, top);
-			canvasContext.stroke();
-			// canvasContext.globalAlpha = originalAlpha;
-
-			// 기준점.
-			const pointSize = 4;
-			canvasContext.beginPath();
-			canvasContext.arc(origin.x, origin.y, pointSize, 0, Math.PI * 2);
+			canvasContext.arc(originX, originY, radius, 0, Math.PI * 2);
+			canvasContext.fillStyle = "#ffffff";
 			canvasContext.fill();
-			// canvasContext.fillRect(left - (pointSize / 2), top - (pointSize / 2), pointSize, pointSize);
+			canvasContext.strokeStyle = "#000000";
+			canvasContext.lineWidth = 1;
+			canvasContext.stroke();
 
-			// 기존 투명도 복원.
-			canvasContext.globalAlpha = originalAlpha;
+			// 기준점(Pivot) 마커 그리기 - 십자가
+			canvasContext.beginPath();
+			canvasContext.moveTo(originX - radius, originY);
+			canvasContext.lineTo(originX + radius, originY);
+			canvasContext.moveTo(originX, originY - radius);
+			canvasContext.lineTo(originX, originY + radius);
+			canvasContext.stroke();
 		}
 	}
 
@@ -193,9 +179,9 @@ export class Node extends Object {
 	 * @returns { Vector2 }
 	 */
 	getPivotPosition() {
-		const size = this.getSize();
+		const contentSize = this.getContentSize();
 		const pivot = this.getPivot();
-		return Vector2.create(-(size.x * pivot.x), -(size.y * pivot.y));
+		return Vector2.create(-(contentSize.x * pivot.x), -(contentSize.y * pivot.y));
 	}
 
 	//==============================================================================
@@ -701,10 +687,9 @@ export class Node extends Object {
 	 * @param { Vector2 } pivot
 	 */
 	setPivot(pivot) {
-		this.#pivot = pivot;
-		// this.#pivot.x = Math.clamp(pivot.x, 0, 1);
-		// this.#pivot.y = Math.clamp(pivot.y, 0, 1);
-		// console.log(this.#pivot);
+		// this.#pivot = pivot;
+		this.#pivot.x = Math.clamp(pivot.x, 0, 1);
+		this.#pivot.y = Math.clamp(pivot.y, 0, 1);
 	}
 
 	//==============================================================================
@@ -718,33 +703,33 @@ export class Node extends Object {
 	}
 
 	//==============================================================================
-	// 실제 크기 설정.
+	// 실제 내용 크기 설정.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } size 
+	 * @param { Vector2 } contentSize 
 	 */
-	setSize(size) {
-		this.#size = size;
+	setContentSize(contentSize) {
+		this.#contentSize = contentSize;
 	}
 
 	//==============================================================================
-	// 실제 크기 반환.
+	// 실제 내용 크기 반환.
 	//==============================================================================
 	/**
 	 * @returns { Vector2 } 
 	 */
-	getSize() {
-		return this.#size;
+	getContentSize() {
+		return this.#contentSize;
 	}
 
-	//==============================================================================
-	// 새로운 노드 생성.
-	//==============================================================================
-	/**
-	 * @returns { Node }
-	 */
-	static create() {
-		var obj = new Node();
-		return obj;
-	}
+	// //==============================================================================
+	// // 새로운 노드 생성.
+	// //==============================================================================
+	// /**
+	//  * @returns { Node }
+	//  */
+	// static create() {
+	// 	var obj = new Node();
+	// 	return obj;
+	// }
 }
