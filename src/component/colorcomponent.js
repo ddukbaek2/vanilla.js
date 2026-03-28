@@ -3,13 +3,13 @@
 //==============================================================================
 import { Color } from "../base/color.js";
 import { Renderer } from "../core/renderer.js";
-import { BoundsComponent } from "./boundscomponent.js";
+import { Component } from "../core/component.js";
 
 
 //==============================================================================
 // 내용의 색상과 투명도를 결정하는 컴포넌트.
 //==============================================================================
-export class ColorComponent extends BoundsComponent {
+export class ColorComponent extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -36,11 +36,13 @@ export class ColorComponent extends BoundsComponent {
 		// super.draw(renderer);
 
 		const canvasContext = renderer.getCanvasContext();
+		const node = this.getNode();
+		if (!node) return;
 
 		// 출력.
 		// 피봇 위치 반영 - 기본 (0, 0) 에서 피봇만큼 좌상 방향으로 당겨준다. 
-		const pivotPosition = super.getPivotPosition();
-		const size = this.getContentSize();
+		const pivotPosition = node.getPivotPosition();
+		const size = node.getContentSize();
 		const color = this.getColor();
 		canvasContext.fillStyle = color.toHEXString();
 		canvasContext.fillRect(pivotPosition.x, pivotPosition.y, size.x, size.y);

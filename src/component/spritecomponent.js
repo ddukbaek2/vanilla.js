@@ -91,8 +91,11 @@ export class SpriteComponent extends ColorComponent {
 			return;
 		}
 
-		const pivotPosition = super.getPivotPosition();
-		const size = super.getContentSize();
+		const node = this.getNode();
+		if (!node) return;
+
+		const pivotPosition = node.getPivotPosition();
+		const size = node.getContentSize();
 		const isHorizontalFlip = this.isHorizontalFlip();
 		const isVerticalFlip = this.isVerticalFlip();
 

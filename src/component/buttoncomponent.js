@@ -7,7 +7,7 @@ import { Rect } from "../base/rect.js";
 import * as Math from "../base/math.js";
 import { OBB } from "../base/obb.js";
 import { Renderer } from "../core/renderer.js";
-import { BoundsComponent } from "./boundscomponent.js";
+import { Component } from "../core/component.js";
 
 
 //==============================================================================
@@ -18,14 +18,13 @@ export const VButtonState = {
 	hover: Enum.auto(),
 	pressed: Enum.auto(),
 	released: Enum.auto(),
-	selected: Enum.auto(),
-	disabled: Enum.auto(),
-}
+	disabled: Enum.auto()
+};
 
 //==============================================================================
-// 버튼 컴포넌트.
+// 버튼의 상태.
 //==============================================================================
-export class ButtonComponent extends BoundsComponent {
+export class ButtonComponent extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
