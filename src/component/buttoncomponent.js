@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { Vector2 } from "../base/vector2.js";
-import { Enum } from "../misc/identifier.js";
+import { Enum } from "../base/identifier.js";
 import { Rect } from "../base/rect.js";
 import * as Math from "../base/math.js";
 import { OBB } from "../base/obb.js";

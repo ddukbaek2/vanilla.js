@@ -12,7 +12,7 @@ import { ViewScaleMode } from "./src/core/viewmanager.js";
 import { Node } from "./src/core/node.js";
 import { Pivot } from "./src/base/pivot.js";
 import { ColorComponent } from "./src/component/colorcomponent.js";
-import { UINode } from "./src/ui/uinode.js";
+import { UINode } from "./src/core/uinode.js";
 
 
 

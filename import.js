@@ -24,6 +24,7 @@ export { Platform, PlatformType, BrowserType } from "./src/base/platform.js";
 export { Pivot } from "./src/base/pivot.js";
 export { Colors } from "./src/base/colors.js";
 export { Singleton } from "./src/base/singleton.js";
+export { Identifier, Enum } from "./src/base/identifier.js";
 
 
 //==============================================================================
@@ -48,25 +49,20 @@ export { InputManager } from "./src/core/inputmanager.js";
 export { Renderer } from "./src/core/renderer.js";
 export { Scene } from "./src/core/scene.js";
 export { Node } from "./src/core/node.js";
+export { UINode } from "./src/core/uinode.js";
 export { Tween } from "./src/core/tween.js";
 export { Component } from "./src/core/component.js";
 export { Frame } from "./src/core/frame.js";
+export { Animation } from "./src/core/animation.js";
 
 
 //==============================================================================
 // 컴포넌트 목록.
 //==============================================================================
-export { BoundsComponent } from "./src/component/boundscomponent.js";
 export { ColorComponent } from "./src/component/colorcomponent.js";
 export { SpriteComponent } from "./src/component/spritecomponent.js";
 export { LabelComponent } from "./src/component/labelcomponent.js";
 export { ButtonComponent } from "./src/component/buttoncomponent.js";
-
-
-//==============================================================================
-// 렌더링 목록.
-//==============================================================================
-export { Animation } from "./src/rendering/animation.js";
 
 
 //==============================================================================
@@ -77,11 +73,11 @@ export { ImageAsset } from "./src/resource/imageasset.js";
 export { AudioAsset } from "./src/resource/audioasset.js";
 export { TextAsset } from "./src/resource/textasset.js";
 export { JsonAsset } from "./src/resource/jsonasset.js";
+export { AnimationClip } from "./src/resource/animationclip.js";
 
 
 //==============================================================================
 // 그 외 목록.
 //==============================================================================
-export { Identifier, Enum } from "./src/misc/identifier.js";
+export { ImageScroller } from "./src/misc/imagescroller.js";
 export { TouchParticle, TouchEffect } from "./src/misc/toucheffect.js";
-export { BackgroundScroller } from "./src/misc/backgroundscroller.js";

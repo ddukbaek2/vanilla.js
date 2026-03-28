@@ -4,7 +4,7 @@
 const System = globalThis;
 import { Object } from "../base/object.js";
 import { Rect } from "../base/rect.js";
-import { Frame } from "../core/frame.js";
+import { Frame } from "./frame.js";
 // import { AnimationClip } from "./animationclip.js";
 
 
