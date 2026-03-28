@@ -88,10 +88,10 @@ class Tutorial_2 extends Scene {
 		// UI 노드 설정.
 		const uiRoot = new UINode();
 		uiRoot.setPivot(Pivot.topLeft);
-		uiRoot.setAnchorMin(Vec2.create(0, 0.5));
-		uiRoot.setAnchorMax(Vec2.create(1, 0.5));
+		uiRoot.setAnchorMin(Vec2.create(0.5, 0.5));
+		uiRoot.setAnchorMax(Vec2.create(0.5, 0.5));
 		uiRoot.setAnchoredPosition(Vec2.create(0, 0));
-		uiRoot.setSizeDelta(Vec2.create(0, 100));
+		uiRoot.setSizeDelta(Vec2.create(100, 100));
 		root.addChild(uiRoot);
 		color = uiRoot.addComponent(ColorComponent);
 		color.setColor("#ffff00");	

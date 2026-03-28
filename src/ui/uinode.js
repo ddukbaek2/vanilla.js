@@ -91,16 +91,6 @@ export class UINode extends Node {
 	}
 
 	//==============================================================================
-	// 앵커 기준 위치 오프셋 반환.
-	//==============================================================================
-	/**
-	 * @returns { Vector2 } 
-	 */
-	getAnchoredPosition() {
-		return this.#anchoredPosition;
-	}
-
-	//==============================================================================
 	// 앵커 기준 위치 오프셋 설정.
 	//==============================================================================
 	/**
@@ -112,13 +102,13 @@ export class UINode extends Node {
 	}
 
 	//==============================================================================
-	// 오프셋 크기 반환.
+	// 앵커 기준 위치 오프셋 반환.
 	//==============================================================================
 	/**
 	 * @returns { Vector2 } 
 	 */
-	getSizeDelta() {
-		return this.#sizeDelta;
+	getAnchoredPosition() {
+		return this.#anchoredPosition;
 	}
 
 	//==============================================================================
@@ -130,6 +120,16 @@ export class UINode extends Node {
 	setSizeDelta(sizeDelta) {
 		this.#sizeDelta = sizeDelta;
 		this.updateRect();
+	}
+
+	//==============================================================================
+	// 오프셋 크기 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 } 
+	 */
+	getSizeDelta() {
+		return this.#sizeDelta;
 	}
 
 	//==============================================================================
@@ -172,6 +172,69 @@ export class UINode extends Node {
 	 */
 	getAnchorMax() {
 		return this.#anchorMax;
+	}
+
+	//==============================================================================
+	// 로컬 위치 설정. (오버라이드: 외부에서 localPosition을 세팅할 경우, 앵커를 역계산하여 anchoredPosition에 반영)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Vector2 } localPosition 
+	 */
+	setLocalPosition(localPosition) {
+		const parent = this.getParent();
+
+		if (!parent) {
+			this.setAnchoredPosition(localPosition);
+			return;
+		}
+
+		const parentSize = parent.getContentSize();
+		const parentPivot = parent.getPivot();
+		const anchorMin = this.getAnchorMin();
+		const anchorMax = this.getAnchorMax();
+		const pivot = this.getPivot();
+
+		const parentLeft = -parentSize.x * parentPivot.x;
+		const parentTop = -parentSize.y * parentPivot.y;
+
+		const anchorMinLocalX = parentLeft + parentSize.x * anchorMin.x;
+		const anchorMinLocalY = parentTop + parentSize.y * anchorMin.y;
+		const anchorMaxLocalX = parentLeft + parentSize.x * anchorMax.x;
+		const anchorMaxLocalY = parentTop + parentSize.y * anchorMax.y;
+
+		const anchorRefX = Math.lerp(anchorMinLocalX, anchorMaxLocalX, pivot.x);
+		const anchorRefY = Math.lerp(anchorMinLocalY, anchorMaxLocalY, pivot.y);
+
+		this.setAnchoredPosition(Vector2.create(
+			localPosition.x - anchorRefX,
+			localPosition.y - anchorRefY
+		));
+	}
+
+	//==============================================================================
+	// 콘텐츠 크기 설정. (오버라이드: 외부에서 contentSize를 세팅할 경우, 앵커를 역계산하여 sizeDelta에 반영)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Vector2 } contentSize 
+	 */
+	setContentSize(contentSize) {
+		const parent = this.getParent();
+
+		if (!parent) {
+			this.setSizeDelta(contentSize);
+			return;
+		}
+
+		const parentSize = parent.getContentSize();
+		const anchorMin = this.getAnchorMin();
+		const anchorMax = this.getAnchorMax();
+
+		this.setSizeDelta(Vector2.create(
+			contentSize.x - parentSize.x * (anchorMax.x - anchorMin.x),
+			contentSize.y - parentSize.y * (anchorMax.y - anchorMin.y)
+		));
 	}
 
 	// //==============================================================================
