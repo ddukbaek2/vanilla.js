@@ -10,8 +10,11 @@ import { Renderer } from "./src/core/renderer.js";
 import { Scene } from "./src/core/scene.js";
 import { ViewScaleMode } from "./src/core/viewmanager.js";
 import { Node } from "./src/core/node.js";
+import { Pivot } from "./src/base/pivot.js";
 import { SpriteComponent } from "./src/component/spritecomponent.js";
-import { ColorComponent, Pivot } from "./import.js";
+import { ColorComponent } from "./src/component/colorcomponent.js";
+import { UINode } from "./src/ui/uinode.js";
+
 
 
 //==============================================================================
@@ -72,6 +75,16 @@ class Tutorial_2 extends Scene {
 		child.setSize(Vec2.create(200, 200));
 		color = child.addComponent(ColorComponent);
 		color.setColor("#00ffff");	
+
+		// UI 노드 설정.
+		const uiRoot = new UINode();
+		uiRoot.setAnchorMin(Vec2.create(0, 0));
+		uiRoot.setAnchorMax(Vec2.create(0.5, 1));
+		uiRoot.setAnchoredPosition(Vec2.create(0.5, 0.5));
+		// uiRoot.setSize(Vec2.create(200, 200));
+		root.addChild(uiRoot);
+		color = uiRoot.addComponent(ColorComponent);
+		color.setColor("#ff00ff");	
 	}
 
 	//==============================================================================
