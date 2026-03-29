@@ -69,7 +69,7 @@ export class ImageScroller extends Object {
 		const startX = this.#viewRect.position.x + (modX <= 0 ? modX : modX - imgW);
 		const startY = this.#viewRect.position.y + (modY <= 0 ? modY : modY - imgH);
 
-		renderer.beginClip(this.#viewRect);
+		renderer.beginClipRect(this.#viewRect);
 		
 		// 이미지 크기를 1.5픽셀정도 키워서 겹쳐 그려서 이미지 사이의 틈을 가리기.
 		const overlap = 1.5;
@@ -83,7 +83,7 @@ export class ImageScroller extends Object {
 			}
 		}
 
-		renderer.endClip();
+		renderer.endClipRect();
 	}
 
 	//==============================================================================

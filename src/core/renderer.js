@@ -6,6 +6,7 @@ import { Node } from "./node.js";
 import { Rect } from "../base/rect.js";
 import { Vector2 } from "../base/vector2.js";
 import { Engine } from "./engine.js";
+import { Color } from "../base/color.js";
 
 
 //==============================================================================
@@ -45,126 +46,137 @@ export class Renderer extends Object {
 	}
 
 	//==============================================================================
+	// 색상 설정.
+	//==============================================================================
+	/**
+	 * @param { Color | string | CanvasGradient | CanvasPattern } color
+	 */
+	setFillColor(color) {
+		const canvasContext = this.getCanvasContext();
+		if (canvasContext) {
+			if (color) {
+				if (color instanceof Color) {
+				const colorString = color.toHEXString();
+				canvasContext.fillStyle = colorString;
+				}
+				else {
+					canvasContext.fillStyle = color;
+				}
+			}
+		}		
+	}
+
+	//==============================================================================
+	// 색상 설정.
+	//==============================================================================
+	/**
+	 * @param { Color | string | CanvasGradient | CanvasPattern } color
+	 */
+	setStrokeColor(color) {
+		const canvasContext = this.getCanvasContext();
+		if (canvasContext) {
+			if (color) {
+				if (color instanceof Color) {
+					const colorString = color.toHEXString();
+					canvasContext.strokeStyle = colorString;
+				}
+				else {
+					canvasContext.strokeStyle = color;
+				}
+			}
+		}		
+	}
+
+	//==============================================================================
 	// 선 출력.
+	// - setStrokeColor()
 	//==============================================================================
 	/**
 	 * @param { Vector2[] } positions
-	 * @param { string } color 
-	 * @param { number } opacity 
 	 */
-	drawLine(positions, size = 1, color = "#ffffff", opacity = 1.0) {
+	drawLine(positions, size = 1) {
 		const canvasContext = this.getCanvasContext();
 		if (canvasContext) {
-			const originalOpacity = canvasContext.globalAlpha;
-			canvasContext.globalAlpha = opacity;
-			canvasContext.strokeStyle = color;
 			canvasContext.lineWidth = size;
-
 			canvasContext.beginPath();
 			canvasContext.moveTo(positions[0].x, positions[0].y);
 			for (let i = 1; i < positions.length; ++i) {
 				canvasContext.lineTo(positions[i].x, positions[i].y);				
 			}
 			canvasContext.stroke();
-
-			canvasContext.globalAlpha = originalOpacity;
 		}		
 	}
 
 	//==============================================================================
 	// 사각형 출력.
+	// - setFillColor()
 	//==============================================================================
 	/**
 	 * @param { Rect } rect 
 	//  * @param { string } color 
 	//  * @param { number } opacity 
 	 */
-	drawRect(rect) { //, color = "#ffffff", opacity = 1.0) {
+	drawRect(rect) {
 		const canvasContext = this.getCanvasContext();
 		if (canvasContext) {
-			// const originalOpacity = canvasContext.globalAlpha;
-			// canvasContext.globalAlpha = opacity;
-			// canvasContext.fillStyle = color;
-
 			canvasContext.fillRect(rect.position.x, rect.position.y, rect.size.x, rect.size.y);
-
-			// canvasContext.globalAlpha = originalOpacity;
 		}
 	}
 
 	//==============================================================================
 	// 원 출력.
+	// - setFillColor()
 	//==============================================================================
 	/**
 	 * @param { Vector2 } center
 	 * @param { number } radius 
-	 * @param { string } color 
-	 * @param { number } opacity 
 	 */
-	drawCircle(center, radius, color = "#ffffff", opacity = 1.0) {
+	drawCircle(center, radius) {
 		const canvasContext = this.getCanvasContext();
 		if (canvasContext) {
-			const originalOpacity = canvasContext.globalAlpha;
-			canvasContext.globalAlpha = opacity;
-			canvasContext.fillStyle = color;
-
 			canvasContext.beginPath();
 			canvasContext.arc(center.x, center.y, radius, 0, Math.PI * 2);
 			canvasContext.fill();
-
-			canvasContext.globalAlpha = originalOpacity;
 		}
 	}
 
 	//==============================================================================
 	// 이미지 출력.
+	// - setFillColor()
 	//==============================================================================
 	/**
 	 * @param { HTMLImageElement | HTMLCanvasElement } image
 	 * @param { Vector2 } position
 	 * @param { Vector2 } contentSize
-	//  * @param { string } color
-	//  * @param { number } opacity 
 	 */
-	drawImage(image, position, contentSize) { //, color = "#ffffff", opacity = 1.0) {
+	drawImage(image, position, contentSize) {
 		if (image === null){
 			throw new Error("image is null");
 		}
 
 		const canvasContext = this.getCanvasContext();
 		if (canvasContext) {
-			// const originalOpacity = canvasContext.globalAlpha;
-			// canvasContext.globalAlpha = opacity;
-			// canvasContext.fillStyle = color;
-
 			canvasContext.drawImage(image, position.x, position.y, contentSize.x, contentSize.y);
-
-			// canvasContext.globalAlpha = originalOpacity;
 		}
 	}
 
 	//==============================================================================
 	// 이미지 출력2.
+	// - setFillColor()
 	//==============================================================================
 	/**
 	 * @param { HTMLImageElement | HTMLCanvasElement } image
 	 * @param { Vector2 } position
 	 * @param { Vector2 } contentSize
 	 * @param { Rect } source
-	//  * @param { string } color 
-	//  * @param { number } opacity 
 	 */
-	drawImage2(image, position, contentSize, source) { //, color = "#ffffff", opacity = 1.0) {
+	drawImage2(image, position, contentSize, source) {
 		if (image === null){
 			throw new Error("image is null");
 		}
 
 		const canvasContext = this.getCanvasContext();
 		if (canvasContext) {
-			// const originalOpacity = canvasContext.globalAlpha;
-			// canvasContext.globalAlpha = opacity;
-			// canvasContext.fillStyle = color;
-
 			if (source === null || source.equals(Rect.zero())) {
 				source = Rect.create(0, 0, image.width, image.height);
 			}
@@ -172,8 +184,6 @@ export class Renderer extends Object {
 			canvasContext.drawImage(image, 
 				source.position.x, source.position.y, source.size.x, source.size.y,
 				position.x, position.y, contentSize.x, contentSize.y);
-
-			// canvasContext.globalAlpha = originalOpacity;
 		}
 	}
 
@@ -185,9 +195,9 @@ export class Renderer extends Object {
 	 * @param { HTMLImageElement | HTMLCanvasElement } image
 	 * @param { Vector2 } position
 	 * @param { Vector2 } size
-	 * @param { Rect } patch
+	 * @param { Rect } ninepatch
 	 */
-	drawImageNinePatch(image, position, size, patch) {
+	drawImageNinePatch(image, position, size, ninepatch) {
 		const canvasContext = this.getCanvasContext();
 		const sw = image.width;
 		const sh = image.height;
@@ -195,10 +205,10 @@ export class Renderer extends Object {
 		const dy = Math.floor(position.y);
 		const dw = Math.ceil(size.x);
 		const dh = Math.ceil(size.y);
-		const left = patch.position.x;
-		const top = patch.position.y;
-		const right = patch.size.x;
-		const bottom = patch.size.y;
+		const left = ninepatch.position.x;
+		const top = ninepatch.position.y;
+		const right = ninepatch.size.x;
+		const bottom = ninepatch.size.y;
 
 		const hasHorizontal = left > 0 || right > 0;
 		const hasVertical = top > 0 || bottom > 0;
@@ -279,7 +289,7 @@ export class Renderer extends Object {
 	/**
 	 * @type { Rect } rect
 	 */
-	beginClip(rect) {
+	beginClipRect(rect) {
 		const canvasContext = this.getCanvasContext();
 		canvasContext.save();
 		canvasContext.beginPath();
@@ -290,7 +300,7 @@ export class Renderer extends Object {
 	//==============================================================================
 	// 출력 영역 제한 종료.
 	//==============================================================================
-	endClip() {
+	endClipRect() {
 		const canvasContext = this.getCanvasContext();
 		canvasContext.restore();
 	}
