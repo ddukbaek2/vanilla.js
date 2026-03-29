@@ -96,8 +96,8 @@ export class ViewManager extends Object {
 		// 캔버스 렌더링 사이즈 조정.
 		this.#canvas.width = canvasPixelSize.x; 
 		this.#canvas.height = canvasPixelSize.y;
-		this.#canvas.style.width = `${clientNativeSize.x}px`;
-		this.#canvas.style.height = `${clientNativeSize.y}px`;
+		// this.#canvas.style.width = `${clientNativeSize.x}px`;
+		// this.#canvas.style.height = `${clientNativeSize.y}px`;
 
 		// 뷰 영역 설정.
 		const viewScaleMode = this.getViewScaleMode();
