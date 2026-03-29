@@ -1,0 +1,103 @@
+//==============================================================================
+// 포함 모듈 목록.
+//==============================================================================
+import { Vector2 } from "../base/vector2.js";
+import { Node } from "../core/node.js";
+
+
+//==============================================================================
+// 아지랑이 효과 노드.
+// - 이 노드가 그려지기 전까지의 캔버스 내용을 가져와서 일렁이는 효과를 줍니다.
+// - 따라서 씬의 가장 마지막(맨 위)에 추가되어야 효과가 보입니다.
+//==============================================================================
+export class HeatHazeEffect extends Node {
+	//==============================================================================
+	// 멤버 변수 목록.
+	//==============================================================================
+	/** @private @type { number } */ #timer;
+	/** @private @type { number } */ #speed;      // 흔들리는 속도.
+	/** @private @type { number } */ #amplitude;  // 흔들리는 폭 (강도).
+	/** @private @type { number } */ #frequency;  // 흔들리는 빈도 (물결의 촘촘함).
+	/** @private @type { Vector2 } */ #size;      // 효과가 적용될 영역 크기.
+
+	//==============================================================================
+	// 생성.
+	//==============================================================================
+	constructor() {
+		super();
+		
+		this.#timer = 0;
+		this.#speed = 2.0;
+		this.#amplitude = 3.0;
+		this.#frequency = 0.05;
+		this.#size = Vector2.create(300, 300);
+	}
+
+	//==============================================================================
+	// 갱신.
+	//==============================================================================
+	/**
+	 * @param { number } timeDelta 
+	 */
+	tick(timeDelta) {
+		super.tick(timeDelta);
+		this.#timer += timeDelta * this.#speed;
+	}
+
+	//==============================================================================
+	// 출력.
+	//==============================================================================
+	/**
+	 * @param { Renderer } renderer 
+	 */
+	draw(renderer) {
+		// 노드 자체가 활성화 상태가 아니면 그리지 않음.
+		if (!this.isActive()) {
+			return;
+		}
+
+		const canvasContext = renderer.getCanvasContext();
+		const position = this.getPosition();
+
+		// 현재까지 그려진 캔버스 자체를 소스로 사용.
+		const sourceCanvas = canvasContext.canvas;
+
+		// 성능을 위해 영역 내의 한 줄(1px)씩 잘라서 사인 곡선에 맞춰 좌우로 흔듭니다.
+		for (let y = 0; y < this.#size.y; y++) {
+			const offsetY = y;
+			const offsetX = Math.sin(this.#timer + (y * this.#frequency)) * this.#amplitude;
+
+			// drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
+			canvasContext.drawImage(
+				sourceCanvas,
+				position.x, position.y + offsetY, this.#size.x, 1, // 소스: 현재 캔버스의 특정 위치
+				position.x + offsetX, position.y + offsetY, this.#size.x, 1 // 대상: 흔들린 위치에 그리기
+			);
+		}
+
+		// 자식 노드가 있다면 마저 그립니다.
+		super.draw(renderer);
+	}
+
+	//==============================================================================
+	// 설정 및 반환.
+	//==============================================================================
+	setSpeed(value) { this.#speed = value; }
+	getSpeed() { return this.#speed; }
+
+	setAmplitude(value) { this.#amplitude = value; }
+	getAmplitude() { return this.#amplitude; }
+
+	setFrequency(value) { this.#frequency = value; }
+	getFrequency() { return this.#frequency; }
+
+	/**
+	 * @param { number } width 
+	 * @param { number } height 
+	 */
+	setSize(width, height) { 
+		this.#size.x = width; 
+		this.#size.y = height; 
+	}
+	getSize() { return this.#size.clone(); }
+}
