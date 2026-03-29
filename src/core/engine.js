@@ -80,7 +80,7 @@ export class Engine extends Object {
 
 		this.#resizeCallback = this.resize.bind(this);
 		this.#updateEngineCallback = this.updateEngine.bind(this);
-		this.#version = Version.create(0, 0, 8);
+		this.#version = Version.create(0, 0, 9);
 
 		// 이벤트 설정.
 		this.setupAllDocumentEvents();
