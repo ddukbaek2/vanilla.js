@@ -168,7 +168,7 @@ export class InputManager extends Object {
 	/** @private @type { boolean } */ #isTouchReleased; // 입력시 딱 한번 뗌.
 	/** @private @type { boolean } */ #isTouchMoved; // 입력시 뗄 때가지 계속 눌림.
 	/** @private @type { Vector2 } */ #canvasNativeInputPosition; // canvasNativeSize 기반 위치값.
-	/** @private @type { Vector2 } */ #inputPosition;
+	/** @private @type { Vector2 } */ #viewInputPosition;
 
 	//==============================================================================
 	// 생성.
@@ -186,7 +186,7 @@ export class InputManager extends Object {
 		this.#isTouchReleased = false;	
 		this.#isTouchMoved = false;
 		this.#canvasNativeInputPosition = Vector2.zero();
-		this.#inputPosition = Vector2.zero();
+		this.#viewInputPosition = Vector2.zero();
 	}
 
 	//==============================================================================
@@ -412,17 +412,19 @@ export class InputManager extends Object {
 	 * @param { Vector2 } position 
 	 */
 	setCanvasNativeInputPosition(position) {
+		position.x = Math.round(position.x);
+		position.y = Math.round(position.y);
 		this.#canvasNativeInputPosition = position;
 	}
 
 	//==============================================================================
-	// canvasNativeSize 기반 입력 위치 반환. (복사 후 반환)
+	// canvasNativeSize 기반 입력 위치 반환.
 	//==============================================================================
 	/**
 	 * @returns { Vector2 } 
 	 */
 	getCanvasNativeInputPosition() {
-		return this.#canvasNativeInputPosition.clone();
+		return this.#canvasNativeInputPosition;
 	}
 
 	//==============================================================================
@@ -432,17 +434,18 @@ export class InputManager extends Object {
 	 * @param { Vector2 } position 
 	 */
 	setViewInputPosition(position) {
-		this.#inputPosition = position;
+		position.x = Math.round(position.x);
+		position.y = Math.round(position.y);
+		this.#viewInputPosition = position;
 	}
 
 	//==============================================================================
-	// 뷰의 입력 위치 반환. (복사 후 반환)
+	// 뷰의 입력 위치 반환.
 	//==============================================================================
 	/**
 	 * @returns { Vector2 } 
 	 */
 	getViewInputPosition() {
-		// return this.#position;
-		return this.#inputPosition.clone();
+		return this.#viewInputPosition;
 	}
 }

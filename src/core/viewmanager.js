@@ -13,7 +13,6 @@ import { Engine } from "./engine.js";
 //==============================================================================
 export const ViewScaleMode = {
 	// 사용안함 (웹브라우저 크기가 변경되면 뷰 영역도 변경됨)
-	// 배율을 사용하지 않으므로 getCanvasNativeSize() 를 통해 전체 크기를 가져옴.
 	none: "none",
 
 	 // 기준해상도로 뷰 영역 정의 (양쪽 축이 잘리거나 남을 수 있음)
@@ -65,7 +64,7 @@ export class ViewManager extends Object {
 		this.#clientNativeSize = Vector2.zero();
 		this.#canvasNativeSize = Vector2.zero();
 		this.#canvasPixelSize = Vector2.zero();
-		this.#viewScaleMode = ViewScaleMode.referenceResolution;
+		this.#viewScaleMode = ViewScaleMode.none;
 		this.#referenceResolutionSize = referenceResolutionSize;
 		this.#screenSize = Vector2.zero();
 		this.#viewRect = Rect.zero();
@@ -105,8 +104,8 @@ export class ViewManager extends Object {
 		switch (viewScaleMode) {
 			case ViewScaleMode.none: {
 					const targetResolutionScale = 1.0; // 늘이지 않음.
-					const viewX = 0; // Math.floor(clientSize.x * 0.5);
-					const viewY = 0; // Math.floor(clientSize.y * 0.5);
+					const viewX = 0;
+					const viewY = 0;
 					const viewWidth = Math.round(canvasNativeSize.x * targetResolutionScale);
 					const viewHeight = Math.round(canvasNativeSize.y * targetResolutionScale);
 					this.#targetResolutionScale = targetResolutionScale;
@@ -197,6 +196,7 @@ export class ViewManager extends Object {
 
 	//==============================================================================
 	// 화면 전체 영역 적용.
+	// - ViewScaleMode.none 이 아닐 경우 출력 전 해당 화면 해상도를 처리하기 위한 초기화.
 	// - getCanvasNativeSize()
 	//==============================================================================
 	/**
@@ -218,7 +218,8 @@ export class ViewManager extends Object {
 
 	//==============================================================================
 	// 뷰 영역 적용.
-	// - getReferenceResolutionSize()
+	// - ViewScaleMode.none 이 아닐 경우 출력 전 해당 화면 해상도를 처리하기 위한 초기화.
+	// - ViewScaleMode.none은 getCanvasNativeSize()를 사용하고 그 외의 모드에서는 getReferenceResolutionSize()를 사용한다.
 	//==============================================================================
 	/**
 	 * @public
@@ -371,14 +372,16 @@ export class ViewManager extends Object {
 	 * @returns { Vector2 }
 	 */
 	calculateViewPosition(canvasPosition) {
+		const devicePixelRatio = this.getDevicePixelRatio();
 		const targetResolutionScale = this.getTargetResolutionScale();
-		if (targetResolutionScale === 0) {
+		const totalScale = targetResolutionScale * devicePixelRatio;
+		if (totalScale === 0) {
 			return Vector2.zero();
 		}
 
 		const viewRect = this.getViewRect();
-		const viewX = Math.round((canvasPosition.x - viewRect.position.x) / targetResolutionScale);
-		const viewY = Math.round((canvasPosition.y - viewRect.position.y) / targetResolutionScale);
+		const viewX = Math.round((canvasPosition.x * devicePixelRatio - viewRect.position.x * devicePixelRatio) / totalScale);
+		const viewY = Math.round((canvasPosition.y * devicePixelRatio - viewRect.position.y * devicePixelRatio) / totalScale);
 		return Vector2.create(viewX, viewY);
 	}
 }

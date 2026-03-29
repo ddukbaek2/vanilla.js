@@ -262,12 +262,16 @@ export class Engine extends Object {
 	updateCanvasNativeInputPosition(x, y) {
 		const inputManager = this.getInputManager();
 
+		// 캔버스 위치 가져오기.
+		const viewManager = this.getViewManager();
+		const canvas = viewManager.getCanvas();
+		const rect = canvas.getBoundingClientRect();
+
 		// 캔버스 기준 기본 입력 위치 설정.
-		const canvasNativeInputPosition = Vector2.create(x, y);
+		const canvasNativeInputPosition = Vector2.create(x - rect.left, y - rect.top);
 		inputManager.setCanvasNativeInputPosition(canvasNativeInputPosition);
 
 		// 뷰 기준 입력 위치 설정.
-		const viewManager = this.getViewManager();
 		const viewInputPosition = viewManager.calculateViewPosition(canvasNativeInputPosition);
 		inputManager.setViewInputPosition(viewInputPosition);
 	}
@@ -378,7 +382,7 @@ export class Engine extends Object {
 		const viewScaleMode = viewManager.getViewScaleMode();
 		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
 		// const viewRect = viewManager.getViewRect();
-		// const canvasNativeInputPosition = inputManager.getCanvasNativeInputPosition();
+		const canvasNativeInputPosition = inputManager.getCanvasNativeInputPosition();
 		const viewInputPosition = inputManager.getViewInputPosition();
 		// drawOutlineText(`clientNativeSize: (${clientNativeSize.x}, ${clientNativeSize.y})`);
 		drawOutlineText(`canvasNativeSize: (${canvasNativeSize.x}, ${canvasNativeSize.y})`);
@@ -386,7 +390,7 @@ export class Engine extends Object {
 		drawOutlineText(`referenceResolutionSize: (${referenceResolutionSize.x}, ${referenceResolutionSize.y})`);
 		drawOutlineText(`viewScaleMode: ${viewScaleMode}`);
 		// drawOutlineText(`viewRect: (${viewRect.position.x}, ${viewRect.position.y}) - (${viewRect.size.x}, ${viewRect.size.y})`);
-		// drawOutlineText(`canvasNativeInputPosition: (${canvasNativeInputPosition.x}, ${canvasNativeInputPosition.y})`);
+		drawOutlineText(`canvasNativeInputPosition: (${canvasNativeInputPosition.x}, ${canvasNativeInputPosition.y})`);
 		drawOutlineText(`viewInputPosition: (${viewInputPosition.x}, ${viewInputPosition.y})`);
 		drawOutlineText(``);
 

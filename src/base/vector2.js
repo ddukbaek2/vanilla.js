@@ -125,16 +125,16 @@ export class Vector2 extends Object
 	 * @returns { Vector2 }
 	 */
 	add(other) {
-		const obj = this.clone();
+		const origin = this.clone();
 		if (typeof other === "number") {
-			obj.x += other;
-			obj.y += other;
-			return obj;
+			origin.x += other;
+			origin.y += other;
+			return origin;
 		}
 		else if (other instanceof Vector2) {
-			obj.x += other.x;
-			obj.y += other.y;
-			return obj;
+			origin.x += other.x;
+			origin.y += other.y;
+			return origin;
 		}
 		
 		throw new Error("Invalid type: 'other' must be a number or an instance of Vector2.");
@@ -148,16 +148,16 @@ export class Vector2 extends Object
 	 * @returns { Vector2 }
 	 */
 	subtract(other) {
-		const obj = this.clone();
+		const origin = this.clone();
 		if (typeof other === "number") {
-			obj.x -= other;
-			obj.y -= other;
-			return obj;
+			origin.x -= other;
+			origin.y -= other;
+			return origin;
 		}
 		else if (other instanceof Vector2) {
-			obj.x -= other.x;
-			obj.y -= other.y;
-			return obj;
+			origin.x -= other.x;
+			origin.y -= other.y;
+			return origin;
 		}
 		
 		throw new Error("Invalid type: 'other' must be a number or an instance of Vector2.");
@@ -171,16 +171,16 @@ export class Vector2 extends Object
 	 * @returns { Vector2 }
 	 */
 	multiply(other) {
-		const obj = this.clone();
+		const origin = this.clone();
 		if (typeof other === "number") {
-			obj.x *= other;
-			obj.y *= other;
-			return obj;
+			origin.x *= other;
+			origin.y *= other;
+			return origin;
 		}
 		else if (other instanceof Vector2) {
-			obj.x *= other.x;
-			obj.y *= other.y;
-			return obj;
+			origin.x *= other.x;
+			origin.y *= other.y;
+			return origin;
 		}
 		
 		throw new Error("Invalid type: 'other' must be a number or an instance of Vector2.");
@@ -194,16 +194,16 @@ export class Vector2 extends Object
 	 * @returns { Vector2 }
 	 */
 	divide(other) {
-		const obj = this.clone();
+		const origin = this.clone();
 		if (typeof other === "number") {
-			obj.x /= other;
-			obj.y /= other;
-			return obj;
+			origin.x /= other;
+			origin.y /= other;
+			return origin;
 		}
 		else if (other instanceof Vector2) {
-			obj.x /= other.x;
-			obj.y /= other.y;
-			return obj;
+			origin.x /= other.x;
+			origin.y /= other.y;
+			return origin;
 		}
 		
 		throw new Error("Invalid type: 'other' must be a number or an instance of Vector2.");
@@ -217,16 +217,16 @@ export class Vector2 extends Object
 	 * @returns { Vector2 }
 	 */
 	modulo(other) {
-		const obj = this.clone();
+		const origin = this.clone();
 		if (typeof other === "number") {
-			obj.x /= other;
-			obj.y /= other;
-			return obj;
+			origin.x /= other;
+			origin.y /= other;
+			return origin;
 		}
 		else if (other instanceof Vector2) {
-			obj.x /= other.x;
-			obj.y /= other.y;
-			return obj;
+			origin.x /= other.x;
+			origin.y /= other.y;
+			return origin;
 		}
 		
 		throw new Error("Invalid type: 'other' must be a number or an instance of Vector2.");
