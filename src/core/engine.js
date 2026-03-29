@@ -152,12 +152,27 @@ export class Engine extends Object {
 	 */
 	#setupAllDocumentEvents() {
 		const viewManager = this.getViewManager();
+		const inputManager = this.getInputManager();
 		const canvas = viewManager.getCanvas();
+
+		// 키보드 누름.
+		System.document.addEventListener("keydown", (keyboardEvent) => {
+			const key = keyboardEvent.code;
+			inputManager.pushKey(key);
+			console.log(`keydown: ${key}`);
+		});
+
+		// 키보드 뗌.
+		System.document.addEventListener("keyup", (keyboardEvent) => {
+			const key = keyboardEvent.code;
+			inputManager.popKey(key);
+			console.log(`keyup: ${key}`);
+		});
 
 		// 마우스 우클릭시 컨텍스트 메뉴 출력 될 때.
 		canvas.addEventListener("contextmenu", (touchEvent) => {
-				touchEvent.preventDefault();
-			});
+			touchEvent.preventDefault();
+		});
 
 		// 마우스 누를 때.
 		canvas.addEventListener("mousedown", (touchEvent) => {
@@ -219,12 +234,22 @@ export class Engine extends Object {
 			}, { passive: false });
 
 		// 커서가 보이거나 감춰질 때.
-		document.addEventListener("pointerlockchange", () => {
+		System.document.addEventListener("pointerlockchange", () => {
 			if (document.pointerLockElement === canvas) {
 				// console.log('커서가 숨겨졌습니다.');
 			} else {
 				// console.log('커서가 다시 나타났습니다.');
 			}
+		});
+
+		// 게임패드 연결됨.
+		System.window.addEventListener("gamepadconnected", (e) ==> {
+			// e.gamepad
+		});
+
+		// 게임패드 연결해제됨.
+		System.window.addEventListener("gamepaddisconnected", (e) => {
+			// e.gamepad
 		});
 	}
 
