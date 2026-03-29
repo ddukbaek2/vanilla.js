@@ -12,11 +12,21 @@ import { Engine } from "./engine.js";
 // 뷰 스케일 모드.
 //==============================================================================
 export const ViewScaleMode = {
-	none: "none",								// 사용안함 (웹브라우저 크기가 변경되면 뷰 영역도 변경됨)
-	referenceResolution: "referenceResolution", // 기준해상도로 뷰 영역 정의 (양쪽 축이 잘리거나 남을 수 있음)
-	matchWidthToScreen: "matchWidthToScreen",	// 기준해상도로 뷰 영역 정의 + 뷰의 비율을 유지한채 가로축으로 늘여붙임. (반대 축은 잘리거나 남을 수 있음)
-	matchHeightToScreen: "matchHeightToScreen", // 기준해상도로 뷰 영역 정의 + 뷰의 비율을 유지한채 세로축으로 늘여붙임. (반대 축은 잘리거나 남을 수 있음)
-	matchInsideToScreen: "matchInsideToScreen", // 기준해상도로 뷰 영역 정의 + 뷰의 비율을 유지한채 가로세로 중에서 짧은 축으로 늘여붙임. (반대 축은 남을 수 있음)
+	// 사용안함 (웹브라우저 크기가 변경되면 뷰 영역도 변경됨)
+	// 배율을 사용하지 않으므로 getCanvasNativeSize() 를 통해 전체 크기를 가져옴.
+	none: "none",
+
+	 // 기준해상도로 뷰 영역 정의 (양쪽 축이 잘리거나 남을 수 있음)
+	referenceResolution: "referenceResolution",
+
+	// 기준해상도로 뷰 영역 정의 + 뷰의 비율을 유지한채 가로축으로 늘여붙임. (반대 축은 잘리거나 남을 수 있음)
+	matchWidthToScreen: "matchWidthToScreen",
+
+	// 기준해상도로 뷰 영역 정의 + 뷰의 비율을 유지한채 세로축으로 늘여붙임. (반대 축은 잘리거나 남을 수 있음)
+	matchHeightToScreen: "matchHeightToScreen",
+
+	 // 기준해상도로 뷰 영역 정의 + 뷰의 비율을 유지한채 가로세로 중에서 짧은 축으로 늘여붙임. (반대 축은 남을 수 있음)
+	matchInsideToScreen: "matchInsideToScreen",
 };
 
 
@@ -93,12 +103,12 @@ export class ViewManager extends Object {
 		// 뷰 영역 설정.
 		const viewScaleMode = this.getViewScaleMode();
 		switch (viewScaleMode) {
-			case ViewScaleMode.referenceResolution: {
+			case ViewScaleMode.none: {
 					const targetResolutionScale = 1.0; // 늘이지 않음.
-					const viewWidth = Math.round(this.#referenceResolutionSize.x * targetResolutionScale);
-					const viewHeight = Math.round(this.#referenceResolutionSize.y * targetResolutionScale);
-					const viewX = Math.floor((canvasNativeSize.x - viewWidth) * 0.5);
-					const viewY = Math.floor((canvasNativeSize.y - viewHeight) * 0.5);
+					const viewX = 0; // Math.floor(clientSize.x * 0.5);
+					const viewY = 0; // Math.floor(clientSize.y * 0.5);
+					const viewWidth = Math.round(canvasNativeSize.x * targetResolutionScale);
+					const viewHeight = Math.round(canvasNativeSize.y * targetResolutionScale);
 					this.#targetResolutionScale = targetResolutionScale;
 					this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
 					this.#screenSize.x = Math.round(this.#screenSize.x);
@@ -107,12 +117,12 @@ export class ViewManager extends Object {
 					this.#viewRect.size.set(viewWidth, viewHeight);
 					break;
 				}
-			case ViewScaleMode.none: {
+			case ViewScaleMode.referenceResolution: {
 					const targetResolutionScale = 1.0; // 늘이지 않음.
-					const viewX = 0; // Math.floor(clientSize.x * 0.5);
-					const viewY = 0; // Math.floor(clientSize.y * 0.5);
-					const viewWidth = Math.round(canvasNativeSize.x * targetResolutionScale);
-					const viewHeight = Math.round(canvasNativeSize.y * targetResolutionScale);
+					const viewWidth = Math.round(this.#referenceResolutionSize.x * targetResolutionScale);
+					const viewHeight = Math.round(this.#referenceResolutionSize.y * targetResolutionScale);
+					const viewX = Math.floor((canvasNativeSize.x - viewWidth) * 0.5);
+					const viewY = Math.floor((canvasNativeSize.y - viewHeight) * 0.5);
 					this.#targetResolutionScale = targetResolutionScale;
 					this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
 					this.#screenSize.x = Math.round(this.#screenSize.x);
@@ -187,6 +197,7 @@ export class ViewManager extends Object {
 
 	//==============================================================================
 	// 화면 전체 영역 적용.
+	// - getCanvasPixelSize()
 	//==============================================================================
 	/**
 	 * @public
@@ -206,6 +217,7 @@ export class ViewManager extends Object {
 
 	//==============================================================================
 	// 뷰 영역 적용.
+	// - getReferenceResolutionSize()
 	//==============================================================================
 	/**
 	 * @public
