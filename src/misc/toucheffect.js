@@ -164,6 +164,7 @@ export class TouchEffect extends Node {
 			radialGradient.addColorStop(0, `rgba(100, 200, 255, ${opacity * 0.8})`);
 			radialGradient.addColorStop(1, `rgba(100, 200, 255, 0)`);
 
+			// 원 출력.
 			canvasContext.beginPath();
 			canvasContext.arc(particle.position.x, particle.position.y, particle.radius, 0, Math.PI * 2);
 			canvasContext.fillStyle = radialGradient;

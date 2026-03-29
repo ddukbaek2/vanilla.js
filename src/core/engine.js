@@ -347,7 +347,8 @@ export class Engine extends Object {
 		// 기본 위치인 화면 좌상단으로 이동.
 		canvasContext.setTransform(1, 0, 0, 1, 0, 0);
 		canvasContext.fillStyle = "rgba(0, 0, 0, 0.6)";
-		canvasContext.fillRect(10, 10, 480, 320);
+		renderer.drawRect(Rect.create(10, 10, 480, 320));
+
 		// canvasContext.letterSpacing = "-1px";
 		canvasContext.font = `16px DOSGothic`;
 		canvasContext.textAlign = "left";

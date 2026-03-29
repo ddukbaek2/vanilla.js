@@ -76,20 +76,19 @@ export class Renderer extends Object {
 	//==============================================================================
 	/**
 	 * @param { Rect } rect 
-	 * @param { string } color 
-	 * @param { number } opacity 
+	//  * @param { string } color 
+	//  * @param { number } opacity 
 	 */
-	drawRect(rect, color = "#ffffff", opacity = 1.0) {
+	drawRect(rect) { //, color = "#ffffff", opacity = 1.0) {
 		const canvasContext = this.getCanvasContext();
 		if (canvasContext) {
-			const originalOpacity = canvasContext.globalAlpha;
-			canvasContext.globalAlpha = opacity;
-			canvasContext.fillStyle = color;
+			// const originalOpacity = canvasContext.globalAlpha;
+			// canvasContext.globalAlpha = opacity;
+			// canvasContext.fillStyle = color;
 
-			canvasContext.beginPath();
 			canvasContext.fillRect(rect.position.x, rect.position.y, rect.size.x, rect.size.y);
 
-			canvasContext.globalAlpha = originalOpacity;
+			// canvasContext.globalAlpha = originalOpacity;
 		}
 	}
 
@@ -123,25 +122,24 @@ export class Renderer extends Object {
 	/**
 	 * @param { HTMLImageElement | HTMLCanvasElement } image
 	 * @param { Vector2 } position
-	 * @param { Vector2 } size
-	 * @param { string } color
-	 * @param { number } opacity 
+	 * @param { Vector2 } contentSize
+	//  * @param { string } color
+	//  * @param { number } opacity 
 	 */
-	drawImage(image, position, size, color = "#ffffff", opacity = 1.0) {
+	drawImage(image, position, contentSize) { //, color = "#ffffff", opacity = 1.0) {
 		if (image === null){
 			throw new Error("image is null");
 		}
 
 		const canvasContext = this.getCanvasContext();
 		if (canvasContext) {
-			const originalOpacity = canvasContext.globalAlpha;
-			canvasContext.globalAlpha = opacity;
-			canvasContext.fillStyle = color;
+			// const originalOpacity = canvasContext.globalAlpha;
+			// canvasContext.globalAlpha = opacity;
+			// canvasContext.fillStyle = color;
 
-			canvasContext.beginPath();
-			canvasContext.drawImage(image, position.x, position.y, size.x, size.y);
+			canvasContext.drawImage(image, position.x, position.y, contentSize.x, contentSize.y);
 
-			canvasContext.globalAlpha = originalOpacity;
+			// canvasContext.globalAlpha = originalOpacity;
 		}
 	}
 
@@ -151,30 +149,31 @@ export class Renderer extends Object {
 	/**
 	 * @param { HTMLImageElement | HTMLCanvasElement } image
 	 * @param { Vector2 } position
-	 * @param { Vector2 } size
+	 * @param { Vector2 } contentSize
 	 * @param { Rect } source
-	 * @param { string } color 
-	 * @param { number } opacity 
+	//  * @param { string } color 
+	//  * @param { number } opacity 
 	 */
-	drawImage2(image, position, size, source, color = "#ffffff", opacity = 1.0) {
+	drawImage2(image, position, contentSize, source) { //, color = "#ffffff", opacity = 1.0) {
 		if (image === null){
 			throw new Error("image is null");
 		}
 
 		const canvasContext = this.getCanvasContext();
 		if (canvasContext) {
-			const originalOpacity = canvasContext.globalAlpha;
-			canvasContext.globalAlpha = opacity;
-			canvasContext.fillStyle = color;
+			// const originalOpacity = canvasContext.globalAlpha;
+			// canvasContext.globalAlpha = opacity;
+			// canvasContext.fillStyle = color;
 
 			if (source === null || source.equals(Rect.zero())) {
 				source = Rect.create(0, 0, image.width, image.height);
 			}
 
-			canvasContext.beginPath();
-			canvasContext.drawImage(image, source.position.x, source.position.y, source.size.x, source.size.y, position.x, position.y, size.x, size.y);
+			canvasContext.drawImage(image, 
+				source.position.x, source.position.y, source.size.x, source.size.y,
+				position.x, position.y, contentSize.x, contentSize.y);
 
-			canvasContext.globalAlpha = originalOpacity;
+			// canvasContext.globalAlpha = originalOpacity;
 		}
 	}
 

@@ -123,14 +123,15 @@ class Tutorial_2 extends Scene {
 
 		// 전체 영역 칠하기. (좌표계: (0 ~ canvasPixelRect))
 		viewManager.applyCanvasNativeRect(canvasContext);
-		canvasContext.beginPath();
 		canvasContext.fillStyle = Colors.darkVanilla;
-		canvasContext.fillRect(0, 0, canvasPixelSize.x, canvasPixelSize.y);
+		renderer.drawRect(Rect.create(0, 0, canvasPixelSize.x, canvasPixelSize.y));
 
 		// 게임 영역 칠하기. (좌표계: (0 ~ referenceResolutionSize))
 		viewManager.applyViewRect(canvasContext);
-		renderer.drawRect(Rect.create(0, 0, referenceResolutionSize.x, referenceResolutionSize.y), Colors.lightVanilla);
+		convasContext.fillStyle = Colors.lightVanilla;
+		renderer.drawRect(Rect.create(0, 0, referenceResolutionSize.x, referenceResolutionSize.y));
 
+		// 출력.
 		super.draw(renderer);
 	}
 }

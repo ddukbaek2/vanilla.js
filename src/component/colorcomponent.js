@@ -2,6 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { Color } from "../base/color.js";
+import { Rect } from "../base/rect.js";
 import { Renderer } from "../core/renderer.js";
 import { Component } from "../core/component.js";
 
@@ -42,8 +43,9 @@ export class ColorComponent extends Component {
 		// 출력.
 		const contentSize = node.getContentSize();
 		const color = this.getColor();
-		canvasContext.fillStyle = color.toHEXString();
-		canvasContext.fillRect(0, 0, contentSize.x, contentSize.y);
+		const colorString = color.toHEXString();
+		canvasContext.fillStyle = colorString;
+		renderer.drawRect(Rect.create(0, 0, contentSize.x, contentSize.y));
 	}
 
 	//==============================================================================

@@ -60,7 +60,6 @@ export class HeatHazeEffect extends Node {
 		}
 
 		const canvasContext = renderer.getCanvasContext();
-		const position = this.getPosition();
 		const contentSize = this.getContentSize();
 
 		// 영역 크기가 없다면 그리지 않음.
@@ -70,17 +69,27 @@ export class HeatHazeEffect extends Node {
 
 		// 현재까지 그려진 캔버스 자체를 소스로 사용.
 		const sourceCanvas = canvasContext.canvas;
+		
+		// 화면상의 절대 좌표 영역(바운딩 박스)을 가져와 캡처 범위로 사용합니다.
+		const worldBounds = this.getWorldBounds();
+		const scaleY = worldBounds.size.y / contentSize.y;
 
 		// 성능을 위해 영역 내의 한 줄(1px)씩 잘라서 사인 곡선에 맞춰 좌우로 흔듭니다.
 		for (let y = 0; y < contentSize.y; y++) {
-			const offsetY = y;
 			const offsetX = Math.sin(this.#timer + (y * this.#frequency)) * this.#amplitude;
 
-			// drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
-			renderer.drawImage2(
+			// 소스(sx, sy): 화면에 이미 그려진 글로벌 좌표 캡처 영역
+			const sx = worldBounds.position.x;
+			const sy = worldBounds.position.y + (y * scaleY);
+			const sw = worldBounds.size.x;
+			const sh = scaleY;
+
+			// 대상(dx, dy): 현재 노드의 로컬 공간. 
+			// SpriteComponent처럼 Context가 이미 변환(위치/회전/피봇)되어 있으므로 0부터 시작.
+			canvasContext.drawImage(
 				sourceCanvas,
-				position.x, position.y + offsetY, contentSize.x, 1, // 소스: 현재 캔버스의 특정 위치
-				position.x + offsetX, position.y + offsetY, contentSize.x, 1 // 대상: 흔들린 위치에 그리기
+				sx, sy, sw, sh,
+				offsetX, y, contentSize.x, 1
 			);
 		}
 

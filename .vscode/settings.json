@@ -5,6 +5,17 @@
 		"**/.DS_Store": true,
 		"**/.gitkeep": true
 	},
+
+	"search.exclude": {
+		"**/node_modules": true,
+		"**/bower_components": true,
+		"**/build": true,
+		"**/*.code-search": true
+	},
+
+	"editor.insertSpaces": true,
+	"editor.tabSize": 4,
+
 	"terminal.integrated.showExitAlert": false,
 	"terminal.integrated.defaultProfile.windows": "Command Prompt",
 	"terminal.integrated.profiles.windows": {
@@ -17,10 +28,9 @@
 	},
 	"terminal.integrated.defaultProfile.linux": "bash",
 	"terminal.integrated.defaultProfile.osx": "bash",
-	"geminicodeassist.updateChannel": "Insiders",
 
 	"liveServer.settings.host": "127.0.0.1",
 	"liveServer.settings.port": 5502
-	// "liveServer.settings.NoBrowser": false,
+	"liveServer.settings.NoBrowser": false
 	// "liveServer.settings.AdvanceCustomBrowserCmdLine": ""
 }

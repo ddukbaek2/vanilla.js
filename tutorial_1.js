@@ -115,6 +115,7 @@ class Tutorial_1 extends Scene {
 	 * @param { Renderer } renderer 
 	 */
 	draw(renderer) {
+		// 출력.
 		super.draw(renderer);
 
 		const engine = super.getEngine();
@@ -125,13 +126,13 @@ class Tutorial_1 extends Scene {
 
 		// 전체 영역 칠하기. (좌표계: (0 ~ canvasPixelRect))
 		viewManager.applyCanvasNativeRect(canvasContext);
-		canvasContext.beginPath();
 		canvasContext.fillStyle = Colors.darkVanilla;
-		canvasContext.fillRect(0, 0, canvasPixelSize.x, canvasPixelSize.y);
+		renderer.drawRect(Rect.create(0, 0, canvasPixelSize.x, canvasPixelSize.y));
 
 		// 게임 영역 칠하기. (좌표계: (0 ~ referenceResolutionSize))
 		viewManager.applyViewRect(canvasContext);
-		renderer.drawRect(Rect.create(0, 0, referenceResolutionSize.x, referenceResolutionSize.y), Colors.lightVanilla);
+		canvasContext.fillStyle = Colors.lightVanilla;
+		renderer.drawRect(Rect.create(0, 0, referenceResolutionSize.x, referenceResolutionSize.y));
 
 		// 사각형 그리기.
 		let boxPosition = Vec2.create(0, 0);

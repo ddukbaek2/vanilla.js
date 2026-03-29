@@ -172,7 +172,6 @@ export class Node extends Object {
 			canvasContext.beginPath();
 			canvasContext.arc(origin.x, origin.y, pointSize, 0, Math.PI * 2);
 			canvasContext.fill();
-			// canvasContext.fillRect(left - (pointSize / 2), top - (pointSize / 2), pointSize, pointSize);
 			
 			// 기존 투명도 복원.
 			canvasContext.globalAlpha = originalAlpha;

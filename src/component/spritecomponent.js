@@ -45,7 +45,7 @@ export class SpriteComponent extends ColorComponent {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { HTMLImageElement } */ #image;
-	/** @private @type { Rect } */ #slices;
+	/** @private @type { Rect } */ #imageRect;
 	/** @private @type { boolean } */ #isHorizontalFlip;
 	/** @private @type { boolean } */ #isVerticalFlip;
 
@@ -58,7 +58,7 @@ export class SpriteComponent extends ColorComponent {
 	constructor() {
 		super();
 		this.#image = null;
-		this.#slices = Rect.zero();
+		this.#imageRect = Rect.zero();
 		this.#isHorizontalFlip = false;
 		this.#isVerticalFlip = false;
 	}
@@ -85,8 +85,10 @@ export class SpriteComponent extends ColorComponent {
 		const canvasContext = renderer.getCanvasContext();
 		const image = this.getImage();
 		const color = super.getColor();
+		const colorString = color.toHEXString();
 		if (image === null) {
-			canvasContext.fillStyle = color.toHEXString();
+			// 출력.
+			canvasContext.fillStyle = colorString;
 			super.draw(renderer);
 			return;
 		}
@@ -94,25 +96,20 @@ export class SpriteComponent extends ColorComponent {
 		const node = this.getNode();
 		if (!node) return;
 
+		const position = Vector2.zero();
 		const contentSize = node.getContentSize();
-		const isHorizontalFlip = this.isHorizontalFlip();
-		const isVerticalFlip = this.isVerticalFlip();
+		const flip = this.getFlip();
+		const imageSize = contentSize.multiply(flip);
 
 		// 이미지 소스 조정.
-		let slices = this.getSlices();
-		if (slices === null || slices.equals(Rect.zero())) {
-			slices = Rect.create(0, 0, image.width, image.height);
+		let imageRect = this.getImageRect();
+		if (imageRect === null || imageRect.equals(Rect.zero())) {
+			imageRect = Rect.create(0, 0, image.width, image.height);
 		}
 
 		// 출력.
-		// 피봇 위치 반영 - 기본 (0, 0) 에서 피봇만큼 좌상 방향으로 당겨준다. 
-		// 이미지 플립 반영 - 이미지를 뒤집어서 출력한다.
-		canvasContext.fillStyle = color.toHEXString();
-		canvasContext.drawImage(image,
-			slices.position.x, slices.position.y, slices.size.x, slices.size.y,
-			0, 0,
-			isHorizontalFlip ? -contentSize.x : contentSize.x, isVerticalFlip ? -contentSize.y : contentSize.y
-		);
+		canvasContext.fillStyle = colorString;
+		renderer.drawImage2(image, position, imageSize, imageRect);
 	}
 
 	//==============================================================================
@@ -144,23 +141,23 @@ export class SpriteComponent extends ColorComponent {
 	}
 
 	//==============================================================================
-	// 이미지 부분 설정.
+	// 이미지 영역 설정.
 	//==============================================================================
 	/**
-	 * @param { Rect } slices
+	 * @param { Rect } imageRect
 	 */
-	setSlices(slices) {
-		this.#slices = slices;
+	setImageRect(imageRect) {
+		this.#imageRect = imageRect;
 	}
 
 	//==============================================================================
-	// 이미지 부분 반환.
+	// 이미지 영역 반환.
 	//==============================================================================
 	/**
 	 * @returns { Rect }
 	 */
-	getSlices() {
-		return this.#slices;
+	getImageRect() {
+		return this.#imageRect;
 	}
 
 	//==============================================================================
@@ -201,5 +198,33 @@ export class SpriteComponent extends ColorComponent {
 	 */
 	isVerticalFlip() {
 		return this.#isVerticalFlip;
+	}
+
+	//==============================================================================
+	// 이미지 뒤집히는 값 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 }
+	 */
+	getFlip() {
+		const isHorizontalFlip = this.isHorizontalFlip();
+		const isVerticalFlip = this.isVerticalFlip();
+
+		if (isHorizontalFlip) {
+			if (isVerticalFlip) {
+				return Vector2.create(-1, -1);
+			}
+			else {
+				return Vector2.create(-1, 1);
+			}
+		}
+		else {
+			if (isVerticalFlip) {
+				return Vector2.create(1, -1);
+			}
+			else {
+				return Vector2.create(1, 1);
+			}
+		}
 	}
 }
