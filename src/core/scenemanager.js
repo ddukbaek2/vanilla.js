@@ -40,6 +40,7 @@ export class SceneManager extends Object {
 	async loadScene(scene) {
         const engine = this.getEngine();
 		if (scene && scene instanceof Scene && !this.#loadedScenes.includes(scene)) {
+			scene.create();
 			await scene.load(engine);
 			scene.initialize(engine);
 			this.#loadedScenes.push(scene);

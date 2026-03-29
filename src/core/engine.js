@@ -240,13 +240,15 @@ export class Engine extends Object {
 		});
 
 		// 게임패드 연결됨.
-		System.window.addEventListener("gamepadconnected", (e) => {
-			// e.gamepad
+		System.window.addEventListener("gamepadconnected", (gamepadEvent) => {
+			const gamepad = gamepadEvent.gamepad;
+			console.log(`gamepadconnected: ${gamepad.id}`);
 		});
 
 		// 게임패드 연결해제됨.
-		System.window.addEventListener("gamepaddisconnected", (e) => {
-			// e.gamepad
+		System.window.addEventListener("gamepaddisconnected", (gamepadEvent) => {
+			const gamepad = gamepadEvent.gamepad;
+			console.log(`gamepaddisconnected: ${gamepad.id}`);
 		});
 	}
 
