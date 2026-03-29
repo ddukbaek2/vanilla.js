@@ -401,7 +401,7 @@ export class Engine extends Object {
 		const timeDelta = timeManager.getTimeDelta().toFixed(3);
 		// drawOutlineText(`realtimeScinceStartup: ${realtimeScinceStartup}`);
 		drawOutlineText(`time: ${time}s`);
-		drawOutlineText(`framePerSecond: ${framePerSecond}s`);
+		drawOutlineText(`framePerSecond: ${framePerSecond}`);
 		drawOutlineText(`timeDelta: ${timeDelta}s`);
 		drawOutlineText(``);
 
