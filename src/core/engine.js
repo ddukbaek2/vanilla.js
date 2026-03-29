@@ -464,6 +464,10 @@ export class Engine extends Object {
 		timeManager.calculateTime(timestamp);
 		const timeDelta = timeManager.getTimeDelta();
 
+		// 입력 처리.
+		const inputManager = this.getInputManager();
+		inputManager.updateAllGamepads();
+
 		// // 화면 더 부드럽게.
 		// this.CanvasContext.scale(this.#view.devicePixelRatio, this.#view.devicePixelRatio);
 		// this.CanvasContext.imageSmoothingEnabled = true;
@@ -496,7 +500,6 @@ export class Engine extends Object {
 		
 		// 입력 처리.
 		// 현재 프레임에서 필요한 만큼 처리하고 다음 프레임에서는 유지하지 않음.
-		const inputManager = this.getInputManager();
 		inputManager.setTouchPressed(false);
 		inputManager.setTouchReleased(false);
 

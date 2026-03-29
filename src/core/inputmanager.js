@@ -120,6 +120,40 @@ export const KeyCode = {
 	numpad9: "Numpad9",
 };
 
+const AnalogStick = {
+	L: -1,
+	R: -1,
+	L2: -1,
+	R2: -1,
+};
+
+const Button = {
+	UP: -1,
+	DOWN: 13,
+	LEFT: -1,
+	RIGHT: -1,
+
+	A: -1,
+	B: -1,
+	X: -1,
+	Y: -1,
+
+	Triangle: -1,
+	Square: -1,
+	Circle: -1,
+	Cross: -1,
+
+	L1: 4,
+	R1: 7,
+	L3: 10,
+	R3: 11,
+
+	TOUCHPAD: 17,
+	SHARE: 8,
+	OPTIONS: 9,
+	PS: 16,
+};
+
 
 //==============================================================================
 // 입력 매니저.
@@ -128,6 +162,7 @@ export class InputManager extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
+	/**@private @type { Gamepad[] } */ #gamepads; // 게임패드 목록.
 	/** @private @type { Set<string> } */ #keys; // 키 목록.
 	/** @private @type { boolean } */ #isTouchPressed; // 입력시 딱 한번 눌림.
 	/** @private @type { boolean } */ #isTouchReleased; // 입력시 딱 한번 뗌.
@@ -145,6 +180,7 @@ export class InputManager extends Object {
 	constructor(engine) {
 		super();
 
+		this.#gamepads = [];
 		this.#keys = new Set();
 		this.#isTouchPressed = false;
 		this.#isTouchReleased = false;	
@@ -154,17 +190,46 @@ export class InputManager extends Object {
 	}
 
 	//==============================================================================
-	// 누름 여부 설정.
+	// 갱신.
 	//==============================================================================
 	/**
 	 * @param { number } timeDelta
 	 */
 	tick(timeDelta) {
-		// const gamepads = System.navigator.getGamepads();
-		// if (gamepads && gamepads.length > 0) {
-		// 	const gamepad = gamepads[0];
-		// 	gamepad.
-		// }
+	}
+
+	//==============================================================================
+	// 모든 게임패드 갱신.
+	//==============================================================================
+	updateAllGamepads() {
+		const gamepads = System.navigator.getGamepads();
+		for (let gamepadIndex = 0; gamepadIndex < gamepads.length; ++gamepadIndex) {
+			const gamepad = gamepads[gamepadIndex];
+			if (gamepad === null) {
+				continue;
+			}
+
+			for (let buttonIndex = 0; buttonIndex < gamepad.buttons.length; ++buttonIndex) {
+				const button = gamepad.buttons[buttonIndex];
+				if (button === null) {
+					continue;
+				}
+
+				if (button.pressed) {
+					console.log(`[${gamepadIndex}][${buttonIndex}] pressed`);
+				}
+			}
+
+			// // 0~3
+			// for (let axisIndex = 0; axisIndex < gamepad.axes.length; ++axisIndex) {
+			// 	const axis = gamepad.axes[axisIndex];
+			// 	if (axis === null) {
+			// 		continue;
+			// 	}
+
+			// 	console.log(`[${gamepadIndex}][${axisIndex}] axis: ${axis}`);
+			// }
+		}
 	}
 
 	//==============================================================================
