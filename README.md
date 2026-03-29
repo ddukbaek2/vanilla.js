@@ -19,3 +19,4 @@
 
 ## 테스트 페이지
 - https://playable.ddukbaek2.com/vanilla.js/
+- https://playable.ddukbaek2.com/vanilla.js/visualeditor/
