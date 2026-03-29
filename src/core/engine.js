@@ -35,6 +35,7 @@ export class EngineConfiguration extends Object {
 	}
 }
 
+
 //==============================================================================
 // 엔진.
 //==============================================================================
@@ -77,13 +78,13 @@ export class Engine extends Object {
 		this.#inputManager = new InputManager(this);
 		this.#renderer = new Renderer(this, canvasContext);
 
-		this.#resizeCallback = this.#resize.bind(this);
-		this.#updateEngineCallback = this.#updateEngine.bind(this);
+		this.#resizeCallback = this.resize.bind(this);
+		this.#updateEngineCallback = this.updateEngine.bind(this);
 		this.#version = Version.create(0, 0, 6);
 
 		// 이벤트 설정.
-		this.#setupAllDocumentEvents();
-		this.#resize();
+		this.setupAllDocumentEvents();
+		this.resize();
 	}
 
 	//==============================================================================
@@ -116,11 +117,7 @@ export class Engine extends Object {
 	//==============================================================================
 	// 해상도 변경됨.
 	//==============================================================================
-	/**
-	 * @private
-	 * @method
-	 */
-	#resize() {
+	resize() {
 		const viewManager = this.getViewManager();
 		// const originalCanvasNativeSize = viewManager.getCanvasNativeSize();
 		// const originalCanvasPixelSize = viewManager.getCanvasPixelSize();
@@ -150,7 +147,7 @@ export class Engine extends Object {
 	 * @private
 	 * @method
 	 */
-	#setupAllDocumentEvents() {
+	setupAllDocumentEvents() {
 		const viewManager = this.getViewManager();
 		const inputManager = this.getInputManager();
 		const canvas = viewManager.getCanvas();
@@ -243,7 +240,7 @@ export class Engine extends Object {
 		});
 
 		// 게임패드 연결됨.
-		System.window.addEventListener("gamepadconnected", (e) ==> {
+		System.window.addEventListener("gamepadconnected", (e) => {
 			// e.gamepad
 		});
 
@@ -452,11 +449,9 @@ export class Engine extends Object {
 	// 엔진 갱신.
 	//==============================================================================
 	/**
-	 * @private
-	 * @method
 	 * @param { number } timestamp
 	 */
-	#updateEngine(timestamp) {
+	updateEngine(timestamp) {
 
 		// 렌더러 처리.
 		const renderer = this.getRenderer();
