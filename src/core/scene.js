@@ -7,7 +7,6 @@ import { Engine } from "./engine.js";
 import { Renderer } from "./renderer.js";
 import { Node } from "./node.js";
 import { Tween } from "./tween.js";
-import { TouchEffect } from "../misc/toucheffect.js";
 
 
 //==============================================================================
@@ -27,7 +26,6 @@ export class Scene extends Object {
 	/** @private @type { Engine } */ #engine;
 	/** @private @type { Node } */ #root;
 	/** @private @type { VTweeneen[] } */ #tweens;
-	/** @private @type { TouchEffect } */ #touchEffect;
 
 	//==============================================================================
 	// 생성.
@@ -76,8 +74,7 @@ export class Scene extends Object {
 	 * @param { Engine } engine 
 	 */
 	initialize(engine) {
-		// 터치 효과 초기화.
-		this.#touchEffect = new TouchEffect(engine);
+
 	}
 
 	//==============================================================================
@@ -110,7 +107,7 @@ export class Scene extends Object {
 	 * @param { Vector2 } canvasNativeSize
 	 */
 	resize(canvasNativeSize) {
-		console.log(`Scene.resize(${canvasNativeSize.x}, ${canvasNativeSize.y})`);
+		console.log(`Scene.resize: (${canvasNativeSize.x}, ${canvasNativeSize.y})`);
 	}
 
 	//==============================================================================
@@ -173,7 +170,7 @@ export class Scene extends Object {
 	}
 
 	//==============================================================================
-	// 출력.
+	// 이후 출력.
 	//==============================================================================
 	/**
 	 * @virtual
@@ -192,8 +189,7 @@ export class Scene extends Object {
 	 * @param { Renderer } renderer 
 	 */
 	postDraw(renderer) {
-		// 터치 효과 출력.
-		renderer.drawNode(this.#touchEffect);
+
 	}
 
 	//==============================================================================
@@ -235,9 +231,6 @@ export class Scene extends Object {
 				console.error(error);
 			}
 		}
-
-		// 터치 효과 갱신.
-		this.#touchEffect.tick(timeDelta);
 	}
 
 	//==============================================================================
@@ -259,8 +252,7 @@ export class Scene extends Object {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchMove(viewInputPosition) {
-		// 터치 효과 처리.
-		this.#touchEffect.createTouchParticle(viewInputPosition.x, viewInputPosition.y);
+
 	}
 
 	//==============================================================================
