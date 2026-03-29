@@ -2,6 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
+import * as Math from "../base/math.js";
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
 
@@ -32,17 +33,50 @@ export class Camera extends Object {
 	}
 
 	//==============================================================================
-	// 설정.
+	// 시작.
 	//==============================================================================
 	/**
-	 * 카메라의 위치를 설정합니다.
-	 * @param { number } x 
-	 * @param { number } y 
+	 * @param { CanvasRenderingContext2D } canvasContext 
 	 */
-	setPosition(x, y) {
-		this.#position.set(x, y);
+	begin(canvasContext) {
+		if (canvasContext) {
+			const zoom = this.getZoom();
+			const rotation = this.getRotation();
+			const radian = Math.degreeToRadian(rotation);
+
+			canvasContext.save();
+			// canvasContext.translate(viewportSize.x / 2, viewportSize.y / 2);
+			canvasContext.scale(zoom, zoom);
+			canvasContext.rotate(radian);
+			canvasContext.translate(-this.#position.x, -this.#position.y);
+		}
 	}
 
+	//==============================================================================
+	// 종료.
+	//==============================================================================
+	/**
+	 * @param { CanvasRenderingContext2D } canvasContext 
+	 */
+	end(canvasContext) {
+		if (canvasContext) {
+			canvasContext.restore();
+		}
+	}
+
+	//==============================================================================
+	// 이동 설정.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } position
+	 */
+	setPosition(position) {
+		this.#position = position;
+	}
+
+	//==============================================================================
+	// 이동 반환.
+	//==============================================================================
 	/**
 	 * @returns { Vector2 }
 	 */
@@ -50,14 +84,19 @@ export class Camera extends Object {
 		return this.#position;
 	}
 
+	//==============================================================================
+	// 줌 설정.
+	//==============================================================================
 	/**
-	 * 카메라의 줌 비율을 설정합니다.
-	 * @param { number } value 
+	 * @param { number } zoom 
 	 */
-	setZoom(value) {
-		this.#zoom = Math.max(0.01, value); // 0 이하 방지.
+	setZoom(zoom) {
+		this.#zoom = Math.clamp(0.001, zoom);
 	}
 
+	//==============================================================================
+	// 줌 반환.
+	//==============================================================================
 	/**
 	 * @returns { number }
 	 */
@@ -65,86 +104,23 @@ export class Camera extends Object {
 		return this.#zoom;
 	}
 
+	//==============================================================================
+	// 회전 설정.
+	//==============================================================================
 	/**
-	 * 카메라의 회전 각도를 설정합니다.
-	 * @param { number } radians 
+	 * @param { number } rotation 
 	 */
-	setRotation(radians) {
-		this.#rotation = radians;
+	setRotation(rotation) {
+		this.#rotation = rotation;
 	}
 
+	//==============================================================================
+	// 회전 반환.
+	//==============================================================================
 	/**
 	 * @returns { number }
 	 */
 	getRotation() {
 		return this.#rotation;
-	}
-
-	//==============================================================================
-	// 조작.
-	//==============================================================================
-	/**
-	 * 현재 위치에서 상대적으로 이동합니다.
-	 * @param { number } dx 
-	 * @param { number } dy 
-	 */
-	move(dx, dy) {
-		this.#position.x += dx;
-		this.#position.y += dy;
-	}
-
-	/**
-	 * 현재 줌에 값을 더합니다.
-	 * @param { number } delta 
-	 */
-	zoomBy(delta) {
-		this.setZoom(this.#zoom + delta);
-	}
-
-	/**
-	 * 현재 각도에 값을 더합니다.
-	 * @param { number } deltaRadians 
-	 */
-	rotate(deltaRadians) {
-		this.#rotation += deltaRadians;
-	}
-
-	//==============================================================================
-	// 카메라 시작.
-	//==============================================================================
-	/**
-	 * 카메라 변환을 시작하고 캔버스 상태를 저장합니다.
-	 * 이후 그려지는 오브젝트들은 카메라의 영향을 받습니다.
-	 * @param { CanvasRenderingContext2D } canvasContext 
-	 * @param { Vector2 } viewportSize 캔버스의 실제 해상도 (중점 정렬용)
-	 */
-	begin(canvasContext, viewportSize) {
-		// 1. 현재 캔버스 상태(Transform 등)를 안전하게 저장.
-		canvasContext.save();
-
-		// 2. 화면 중앙으로 원점 이동.
-		canvasContext.translate(viewportSize.x / 2, viewportSize.y / 2);
-
-		// 3. 줌 적용.
-		canvasContext.scale(this.#zoom, this.#zoom);
-
-		// 4. 회전 적용.
-		canvasContext.rotate(this.#rotation);
-
-		// 5. 카메라 위치(중심점)만큼 월드 좌표 역이동.
-		canvasContext.translate(-this.#position.x, -this.#position.y);
-	}
-
-	//==============================================================================
-	// 카메라 종료.
-	//==============================================================================
-	/**
-	 * 카메라 변환을 종료하고 캔버스 상태를 원래대로 복원합니다.
-	 * 이후 그려지는 오브젝트들(예: 고정 UI)은 카메라의 영향을 받지 않습니다.
-	 * @param { CanvasRenderingContext2D } canvasContext 
-	 */
-	end(canvasContext) {
-		// begin()에서 저장했던 상태로 캔버스를 롤백.
-		canvasContext.restore();
 	}
 }

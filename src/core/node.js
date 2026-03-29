@@ -85,8 +85,8 @@ export class Node extends Object {
 			canvasContext.save();
 
 			const localPosition = this.getLocalPosition();
-			const degree = this.getLocalRotation();
-			let radian = Math.degreeToRadian(degree);
+			const localRotation = this.getLocalRotation();
+			const radian = Math.degreeToRadian(localRotation);
 			const scale = this.getLocalScale();
 			const opacity = this.getOpacity();
 
@@ -242,6 +242,141 @@ export class Node extends Object {
 	// }
 
 	//==============================================================================
+	// 글로벌 위치 설정.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } position 
+	 */
+	setPosition(position) {
+		const parent = this.getParent();
+		if (!parent) {
+			this.setLocalPosition(position);
+			return;
+		}
+
+		const parentPosition = parent.getPosition();
+		const parentRotation = parent.getRotation();
+		const parentScale = parent.getScale();
+
+		// 부모 기준 위치 차이
+		const dx = position.x - parentPosition.x;
+		const dy = position.y - parentPosition.y;
+
+		// 역회전
+		const radian = Math.degreeToRadian(-parentRotation);
+		const cosRadian = Math.cos(radian);
+		const sinRadian = Math.sin(radian);
+
+		const rx = dx * cosRadian - dy * sinRadian;
+		const ry = dx * sinRadian + dy * cosRadian;
+
+		// 역스케일
+		const sx = parentScale.x !== 0 ? rx / parentScale.x : 0;
+		const sy = parentScale.y !== 0 ? ry / parentScale.y : 0;
+
+		this.setLocalPosition(Vector2.create(sx, sy));
+	}
+
+	//==============================================================================
+	// 글로벌 위치 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 } 
+	 */
+	getPosition() {
+		const parent = this.getParent();
+		const localPosition = this.getLocalPosition();
+		if (!parent) {
+			return localPosition;
+		}
+
+		const parentPosition = parent.getPosition();
+		const parentRotation = parent.getRotation();
+		const parentScale = parent.getScale();
+
+		const radian = Math.degreeToRadian(parentRotation);
+		const cosRadian = Math.cos(radian);
+		const sinRadian = Math.sin(radian);
+
+		// 스케일 및 회전 적용
+		const sx = localPosition.x * parentScale.x;
+		const sy = localPosition.y * parentScale.y;
+		const rx = sx * cosRadian - sy * sinRadian;
+		const ry = sx * sinRadian + sy * cosRadian;
+		return Vector2.create(parentPosition.x + rx, parentPosition.y + ry);
+	}
+
+	//==============================================================================
+	// 글로벌 크기 설정.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } scale 
+	 */
+	setScale(scale) {
+		const parent = this.getParent();
+		if (!parent) {
+			this.setLocalScale(scale);
+		}
+		else {
+			const parentScale = parent.getScale();
+			this.setLocalScale(Vector2.create(
+				parentScale.x !== 0 ? scale.x / parentScale.x : 0,
+				parentScale.y !== 0 ? scale.y / parentScale.y : 0
+			));
+		}
+	}
+
+	//==============================================================================
+	// 글로벌 크기 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 } 
+	 */
+	getScale() {
+		const parent = this.getParent();
+		const localScale = this.getLocalScale();
+		if (!parent) {
+			return localScale;
+		}
+		const parentScale = parent.getScale();
+		return Vector2.create(parentScale.x * localScale.x, parentScale.y * localScale.y);
+	}
+
+	//==============================================================================
+	// 글로벌 회전 설정.
+	//==============================================================================
+	/**
+	 * @param { number } rotation 
+	 */
+	setRotation(rotation) {
+		const parent = this.getParent();
+		if (!parent) {
+			this.setLocalRotation(rotation);
+		}
+		else {
+			const parentRotation = parent.getRotation();
+			this.setLocalRotation(rotation - parentRotation);
+		}
+	}
+
+	//==============================================================================
+	// 글로벌 회전 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 
+	 */
+	getRotation() {
+		const parent = this.getParent();
+		const localRotation = this.getLocalRotation();
+		if (!parent) {
+			return localRotation;
+		}
+
+		const parentRotation = parent.getRotation();
+		return parentRotation + localRotation;
+	}
+
+	//==============================================================================
 	// 로컬 위치 설정.
 	//==============================================================================
 	/**
@@ -259,73 +394,6 @@ export class Node extends Object {
 	 */
 	getLocalPosition() {
 		return this.#localPosition;
-	}
-
-	//==============================================================================
-	// 글로벌 위치 설정.
-	//==============================================================================
-	/**
-	 * @param { Vector2 } position 
-	 */
-	setPosition(position) {
-		const parent = this.getParent();
-		if (!parent) {
-			this.setLocalPosition(position);
-			return;
-		}
-
-		const parentPos = parent.getPosition();
-		const parentRot = parent.getRotation();
-		const parentScale = parent.getScale();
-
-		// 부모 기준 위치 차이
-		const dx = position.x - parentPos.x;
-		const dy = position.y - parentPos.y;
-
-		// 역회전
-		const radian = Math.degreeToRadian(-parentRot);
-		const cosR = Math.cos(radian);
-		const sinR = Math.sin(radian);
-
-		const rx = dx * cosR - dy * sinR;
-		const ry = dx * sinR + dy * cosR;
-
-		// 역스케일
-		const sx = parentScale.x !== 0 ? rx / parentScale.x : 0;
-		const sy = parentScale.y !== 0 ? ry / parentScale.y : 0;
-
-		this.setLocalPosition(Vector2.create(sx, sy));
-	}
-
-	//==============================================================================
-	// 글로벌 위치 반환.
-	//==============================================================================
-	/**
-	 * @returns { Vector2 } 
-	 */
-	getPosition() {
-		const parent = this.getParent();
-		const localPos = this.getLocalPosition();
-		if (!parent) {
-			return localPos;
-		}
-
-		const parentPos = parent.getPosition();
-		const parentRot = parent.getRotation();
-		const parentScale = parent.getScale();
-
-		const radian = Math.degreeToRadian(parentRot);
-		const cosR = Math.cos(radian);
-		const sinR = Math.sin(radian);
-
-		// 스케일 및 회전 적용
-		const sx = localPos.x * parentScale.x;
-		const sy = localPos.y * parentScale.y;
-
-		const rx = sx * cosR - sy * sinR;
-		const ry = sx * sinR + sy * cosR;
-
-		return Vector2.create(parentPos.x + rx, parentPos.y + ry);
 	}
 
 	//==============================================================================
@@ -349,41 +417,6 @@ export class Node extends Object {
 	}
 
 	//==============================================================================
-	// 글로벌 크기 설정.
-	//==============================================================================
-	/**
-	 * @param { Vector2 } scale 
-	 */
-	setScale(scale) {
-		const parent = this.getParent();
-		if (!parent) {
-			this.setLocalScale(scale);
-		} else {
-			const pScale = parent.getScale();
-			this.setLocalScale(Vector2.create(
-				pScale.x !== 0 ? scale.x / pScale.x : 0,
-				pScale.y !== 0 ? scale.y / pScale.y : 0
-			));
-		}
-	}
-
-	//==============================================================================
-	// 글로벌 크기 반환.
-	//==============================================================================
-	/**
-	 * @returns { Vector2 } 
-	 */
-	getScale() {
-		const parent = this.getParent();
-		const localScale = this.getLocalScale();
-		if (!parent) {
-			return localScale;
-		}
-		const pScale = parent.getScale();
-		return Vector2.create(pScale.x * localScale.x, pScale.y * localScale.y);
-	}
-
-	//==============================================================================
 	// 로컬 회전 설정.
 	//==============================================================================
 	/**
@@ -401,36 +434,6 @@ export class Node extends Object {
 	 */
 	getLocalRotation() {
 		return this.#localRotation;
-	}
-
-	//==============================================================================
-	// 글로벌 회전 설정.
-	//==============================================================================
-	/**
-	 * @param { number } rotation 
-	 */
-	setRotation(rotation) {
-		const parent = this.getParent();
-		if (!parent) {
-			this.setLocalRotation(rotation);
-		} else {
-			this.setLocalRotation(rotation - parent.getRotation());
-		}
-	}
-
-	//==============================================================================
-	// 글로벌 회전 반환.
-	//==============================================================================
-	/**
-	 * @returns { number } 
-	 */
-	getRotation() {
-		const parent = this.getParent();
-		const localRot = this.getLocalRotation();
-		if (!parent) {
-			return localRot;
-		}
-		return parent.getRotation() + localRot;
 	}
 
 	//==============================================================================
@@ -788,7 +791,7 @@ export class Node extends Object {
 	getWorldCorners() {
 		const position = this.getPosition();
 		const scale = this.getScale();
-		const degree = this.getRotation();
+		const rotation = this.getRotation();
 		const contentSize = this.getContentSize();
 		const pivot = this.getPivot();
 
@@ -800,7 +803,7 @@ export class Node extends Object {
 		const top = -(height * pivot.y);
 		const bottom = height * (1 - pivot.y);
 
-		const radian = Math.degreeToRadian(degree);
+		const radian = Math.degreeToRadian(rotation);
 		const cosR = Math.cos(radian);
 		const sinR = Math.sin(radian);
 
