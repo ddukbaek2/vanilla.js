@@ -110,24 +110,41 @@ export class Camera extends Object {
 	}
 
 	//==============================================================================
-	// 적용.
+	// 카메라 시작.
 	//==============================================================================
 	/**
-	 * 캔버스 컨텍스트에 카메라 변환을 적용합니다.
+	 * 카메라 변환을 시작하고 캔버스 상태를 저장합니다.
+	 * 이후 그려지는 오브젝트들은 카메라의 영향을 받습니다.
 	 * @param { CanvasRenderingContext2D } canvasContext 
 	 * @param { Vector2 } viewportSize 캔버스의 실제 해상도 (중점 정렬용)
 	 */
-	apply(canvasContext, viewportSize) {
-		// 1. 화면 중앙으로 원점 이동.
+	begin(canvasContext, viewportSize) {
+		// 1. 현재 캔버스 상태(Transform 등)를 안전하게 저장.
+		canvasContext.save();
+
+		// 2. 화면 중앙으로 원점 이동.
 		canvasContext.translate(viewportSize.x / 2, viewportSize.y / 2);
 
-		// 2. 줌 적용.
+		// 3. 줌 적용.
 		canvasContext.scale(this.#zoom, this.#zoom);
 
-		// 3. 회전 적용.
+		// 4. 회전 적용.
 		canvasContext.rotate(this.#rotation);
 
-		// 4. 카메라 위치(중심점)만큼 월드 좌표 역이동.
+		// 5. 카메라 위치(중심점)만큼 월드 좌표 역이동.
 		canvasContext.translate(-this.#position.x, -this.#position.y);
+	}
+
+	//==============================================================================
+	// 카메라 종료.
+	//==============================================================================
+	/**
+	 * 카메라 변환을 종료하고 캔버스 상태를 원래대로 복원합니다.
+	 * 이후 그려지는 오브젝트들(예: 고정 UI)은 카메라의 영향을 받지 않습니다.
+	 * @param { CanvasRenderingContext2D } canvasContext 
+	 */
+	end(canvasContext) {
+		// begin()에서 저장했던 상태로 캔버스를 롤백.
+		canvasContext.restore();
 	}
 }
