@@ -197,7 +197,7 @@ export class ViewManager extends Object {
 
 	//==============================================================================
 	// 화면 전체 영역 적용.
-	// - getCanvasPixelSize()
+	// - getCanvasNativeSize()
 	//==============================================================================
 	/**
 	 * @public
@@ -205,8 +205,9 @@ export class ViewManager extends Object {
 	 * @param { CanvasRenderingContext2D } canvasContext
 	 */
 	applyCanvasNativeRect(canvasContext) {
-		const scaleX = 1; // a
-		const scaleY = 1; // d
+		const devicePixelRatio = this.getDevicePixelRatio();
+		const scaleX = 1 * devicePixelRatio; // a
+		const scaleY = 1 * devicePixelRatio; // d
 		const skewX = 0; // c
 		const skewY = 0; // b
 		const translateX = 0; // e
@@ -311,7 +312,7 @@ export class ViewManager extends Object {
 	}
 
 	//==============================================================================
-	// 캔버스의 픽셀 렌더링용 화면 크기 반환.
+	// 캔버스의 픽셀 렌더링용 화면 크기 반환. (실제 캔버스 내부 해상도. 엔진, 컨텐츠 로직에서는 사용할 필요 없음)
 	//==============================================================================
 	/**
 	 * @returns { Vector2 }

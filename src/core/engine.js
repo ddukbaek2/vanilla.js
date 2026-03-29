@@ -119,20 +119,18 @@ export class Engine extends Object {
 	//==============================================================================
 	resize() {
 		const viewManager = this.getViewManager();
-		// const originalCanvasNativeSize = viewManager.getCanvasNativeSize();
-		// const originalCanvasPixelSize = viewManager.getCanvasPixelSize();
-		// const originalViewRect = viewManager.getViewRect();
+		const beforeCanvasNativeSize = viewManager.getCanvasNativeSize();
+		const beforeViewRect = viewManager.getViewRect();
 		viewManager.calculateViewRect();
-		const canvasNativeSize = viewManager.getCanvasNativeSize();
-		// const canvasPixelSize = viewManager.getCanvasPixelSize();
-		// const viewRect = viewManager.getViewRect();
+		const afterCanvasNativeSize = viewManager.getCanvasNativeSize();
+		const afterViewRect = viewManager.getViewRect();
 
 		// 씬 리사이즈.
 		const sceneManager = this.getSceneManager();
 		const loadedScenes = sceneManager.getAllLoadedScenes();
 		for (const loadedScene of loadedScenes) {
 			try {
-				loadedScene.resize(canvasNativeSize);
+				loadedScene.resize(afterCanvasNativeSize);
 			}
 			catch (error) {
 				console.error(error);
