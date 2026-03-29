@@ -124,12 +124,12 @@ class Tutorial_1 extends Scene {
 		const canvasPixelSize = viewManager.getCanvasPixelSize();
 		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
 
-		// 전체 영역 칠하기. (좌표계: (0 ~ canvasPixelRect))
+		// 전체 화면 칠하기.
 		viewManager.applyCanvasNativeRect(canvasContext);
 		canvasContext.fillStyle = Colors.darkVanilla;
 		renderer.drawRect(Rect.create(0, 0, canvasPixelSize.x, canvasPixelSize.y));
 
-		// 게임 영역 칠하기. (좌표계: (0 ~ referenceResolutionSize))
+		// 게임 영역 칠하기.
 		viewManager.applyViewRect(canvasContext);
 		canvasContext.fillStyle = Colors.lightVanilla;
 		renderer.drawRect(Rect.create(0, 0, referenceResolutionSize.x, referenceResolutionSize.y));
