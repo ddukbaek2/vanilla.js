@@ -121,7 +121,7 @@ export class Renderer extends Object {
 	// 이미지 출력.
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement } image
+	 * @param { HTMLImageElement | HTMLCanvasElement } image
 	 * @param { Vector2 } position
 	 * @param { Vector2 } size
 	 * @param { string } color
@@ -149,7 +149,7 @@ export class Renderer extends Object {
 	// 이미지 출력2.
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement } image
+	 * @param { HTMLImageElement | HTMLCanvasElement } image
 	 * @param { Vector2 } position
 	 * @param { Vector2 } size
 	 * @param { Rect } source
@@ -183,7 +183,7 @@ export class Renderer extends Object {
 	//==============================================================================
 	/**
 	 * @static
-	 * @param { HTMLImageElement } image
+	 * @param { HTMLImageElement | HTMLCanvasElement } image
 	 * @param { Vector2 } position
 	 * @param { Vector2 } size
 	 * @param { Rect } patch
