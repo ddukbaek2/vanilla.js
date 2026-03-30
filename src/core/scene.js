@@ -110,7 +110,7 @@ export class Scene extends Object {
 	 * @param { Vector2 } canvasNativeSize
 	 */
 	resize(canvasNativeSize) {
-		console.log(`Scene.resize: (${canvasNativeSize.x}, ${canvasNativeSize.y})`);
+		
 	}
 
 	//==============================================================================
