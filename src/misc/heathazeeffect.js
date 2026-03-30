@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+const System = globalThis;
 import { Vector2 } from "../base/vector2.js";
 import { Node } from "../core/node.js";
 import { Renderer } from "../core/renderer.js";

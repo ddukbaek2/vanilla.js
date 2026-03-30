@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+const System = globalThis;
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
 import * as Math from "../base/math.js";
@@ -35,6 +36,7 @@ export class TouchParticle extends Object {
 		this.radius = 0;
 	}
 }
+
 
 //==============================================================================
 // 터치 효과.

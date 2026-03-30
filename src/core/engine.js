@@ -154,14 +154,14 @@ export class Engine extends Object {
 		System.document.addEventListener("keydown", (keyboardEvent) => {
 			const key = keyboardEvent.code;
 			inputManager.pushKey(key);
-			console.log(`keydown: ${key}`);
+			// console.log(`keydown: ${key}`);
 		});
 
 		// 키보드 뗌.
 		System.document.addEventListener("keyup", (keyboardEvent) => {
 			const key = keyboardEvent.code;
 			inputManager.popKey(key);
-			console.log(`keyup: ${key}`);
+			// console.log(`keyup: ${key}`);
 		});
 
 		// 마우스 우클릭시 컨텍스트 메뉴 출력 될 때.
@@ -240,12 +240,16 @@ export class Engine extends Object {
 		// 게임패드 연결됨.
 		System.window.addEventListener("gamepadconnected", (gamepadEvent) => {
 			const gamepad = gamepadEvent.gamepad;
+			const inputManager = this.getInputManager();
+			inputManager.connectGamepad(gamepad);
 			console.log(`gamepadconnected: ${gamepad.id}`);
 		});
 
 		// 게임패드 연결해제됨.
 		System.window.addEventListener("gamepaddisconnected", (gamepadEvent) => {
 			const gamepad = gamepadEvent.gamepad;
+			const inputManager = this.getInputManager();
+			inputManager.disconnectGamepad(gamepad);
 			console.log(`gamepaddisconnected: ${gamepad.id}`);
 		});
 	}

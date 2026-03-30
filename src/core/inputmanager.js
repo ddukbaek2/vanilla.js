@@ -5,6 +5,7 @@ const System = globalThis;
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
 import { Engine } from "./engine.js";
+import { GamepadManager } from "./gamepadmanager.js";
 
 
 //==============================================================================
@@ -162,13 +163,13 @@ export class InputManager extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/**@private @type { Gamepad[] } */ #gamepads; // 게임패드 목록.
 	/** @private @type { Set<string> } */ #keys; // 키 목록.
 	/** @private @type { boolean } */ #isTouchPressed; // 입력시 딱 한번 눌림.
 	/** @private @type { boolean } */ #isTouchReleased; // 입력시 딱 한번 뗌.
 	/** @private @type { boolean } */ #isTouchMoved; // 입력시 뗄 때가지 계속 눌림.
 	/** @private @type { Vector2 } */ #canvasNativeInputPosition; // canvasNativeSize 기반 위치값.
-	/** @private @type { Vector2 } */ #viewInputPosition;
+	/** @private @type { Vector2 } */ #viewInputPosition; // referenceResolutionSize 기반 위치값.
+	/** @private @type { Vector2 } */ #gamepadManager;
 
 	//==============================================================================
 	// 생성.
@@ -179,14 +180,13 @@ export class InputManager extends Object {
 	 */
 	constructor(engine) {
 		super();
-
-		this.#gamepads = [];
 		this.#keys = new Set();
 		this.#isTouchPressed = false;
 		this.#isTouchReleased = false;	
 		this.#isTouchMoved = false;
 		this.#canvasNativeInputPosition = Vector2.zero();
 		this.#viewInputPosition = Vector2.zero();
+		this.#gamepadManager = new GamepadManager();
 	}
 
 	//==============================================================================
@@ -196,123 +196,10 @@ export class InputManager extends Object {
 	 * @param { number } timeDelta
 	 */
 	tick(timeDelta) {
-	}
-
-	//==============================================================================
-	// 모든 게임패드 갱신.
-	//==============================================================================
-	updateAllGamepads() {
-		const gamepads = System.navigator.getGamepads();
-		for (let gamepadIndex = 0; gamepadIndex < gamepads.length; ++gamepadIndex) {
-			const gamepad = gamepads[gamepadIndex];
-			if (gamepad === null) {
-				continue;
-			}
-
-			for (let buttonIndex = 0; buttonIndex < gamepad.buttons.length; ++buttonIndex) {
-				const button = gamepad.buttons[buttonIndex];
-				if (button === null) {
-					continue;
-				}
-
-				if (button.pressed) {
-					console.log(`[${gamepadIndex}][${buttonIndex}] pressed`);
-				}
-			}
-
-			// // 0~3
-			// for (let axisIndex = 0; axisIndex < gamepad.axes.length; ++axisIndex) {
-			// 	const axis = gamepad.axes[axisIndex];
-			// 	if (axis === null) {
-			// 		continue;
-			// 	}
-
-			// 	console.log(`[${gamepadIndex}][${axisIndex}] axis: ${axis}`);
-			// }
+		const gamepadManager = this.getGamepadManager();
+		if (gamepadManager) {
+			gamepadManager.tick(timeDelta);
 		}
-	}
-
-	//==============================================================================
-	// 연결된 게임패드 갯수 반환.
-	//==============================================================================
-	/**
-	 * @returns { number }
-	 */
-	getGamepadCount() {
-		const gamepads = System.navigator.getGamepads();
-		return gamepads.length;
-	}
-
-	//==============================================================================
-	// 게임패드 반환.
-	//==============================================================================
-	/**
-	 * @param { number } gamepadIndex
-	 * @returns { Gamepad }
-	 */
-	getGamepad(gamepadIndex) {
-		const gamepads = System.navigator.getGamepads();
-		if (gamepads === null) {
-			return null;
-		}
-		else if (gamepadIndex < 0 || gamepadIndex >= gamepads.length) {
-			return null;
-		}
-
-		// Gamepad
-		const gamepad = gamepads.at(gamepadIndex);
-		// gamepad.id // string
-		// gamepad.connected // boolean
-		// gamepad.index // number
-		// gamepad.mapping // GamepadMappingType
-		// gamepad.timestamp // DOMHighResTimeStamp
-		// gamepad.vibrationActuator // GamepadHapticActuator
-		return gamepad;
-	}
-
-	//==============================================================================
-	// 게임패드 버튼 눌림 상태 반환.
-	//==============================================================================
-	/**
-	 * @param { number } gamepadIndex 
-	 * @param { number } buttonIndex 
-	 * @returns { boolean }
-	 */
-	isGamepadButtonPressed(gamepadIndex, buttonIndex) {
-		const gamepad = this.getGamepad(gamepadIndex);
-		if (gamepad === null || buttonIndex < 0 || buttonIndex >= gamepad.buttons.length) {
-			return false;
-		}
-
-		// GamepadButton[]
-		const button = gamepad.buttons[buttonIndex];
-		if (button === null) {
-			return false;
-		}
-
-		return button.pressed;
-	}
-
-	//==============================================================================
-	// 게임패드 아날로그 스틱 축 값 반환. (-1.0 ~ 1.0)
-	//==============================================================================
-	/**
-	 * @param { number } gamepadIndex 
-	 * @param { number } axisIndex 
-	 * @returns { number }
-	 */
-	getGamepadAxis(gamepadIndex, axisIndex) {
-		const gamepad = this.getGamepad(gamepadIndex);
-		if (gamepad === null || axisIndex < 0 || axisIndex >= gamepad.axes.length) {
-			return false;
-		}
-
-		const axis = gamepad.axes[axisIndex];
-		if (axis === null) {
-			return false;
-		}
-
-		return axis;
 	}
 
 	//==============================================================================
@@ -447,5 +334,51 @@ export class InputManager extends Object {
 	 */
 	getViewInputPosition() {
 		return this.#viewInputPosition;
+	}
+
+    //==============================================================================
+    // 모든 게임패드 갱신.
+    //==============================================================================
+    updateAllGamepads() {
+		const gamepadManager = this.getGamepadManager();
+		if (gamepadManager) {
+			gamepadManager.updateAllGamepads();
+		}	
+	}
+
+	//==============================================================================
+	// 게임패드 연결.
+	//==============================================================================
+	/**
+	 * @param { Gamepad } gamepad
+	 */
+	connectGamepad(gamepad) {
+		const gamepadManager = this.getGamepadManager();
+		if (gamepadManager) {
+			gamepadManager.connect(gamepad);
+		}
+	}
+
+	//==============================================================================
+	// 게임패드 연결 해제.
+	//==============================================================================
+	/**
+	 * @param { Gamepad } gamepad
+	 */
+	disconnectGamepad(gamepad) {
+		const gamepadManager = this.getGamepadManager();
+		if (gamepadManager) {
+			gamepadManager.disconnect(gamepad);
+		}
+	}
+
+	//==============================================================================
+	// 게임패드 매니저 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 } 
+	 */
+	getGamepadManager() {
+		return this.#gamepadManager;
 	}
 }
