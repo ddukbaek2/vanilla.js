@@ -20,7 +20,7 @@ export class Camera extends Object {
 	//==============================================================================
 	/** @private @type { Vector2 } */ #position; // 카메라가 바라보는 중심 위치.
 	/** @private @type { number } */ #zoom; // 확대/축소 비율.
-	/** @private @type { number } */ #rotation; // 회전 각도 (라디안).
+	/** @private @type { number } */ #rotation; // 회전 각도.
 
 	//==============================================================================
 	// 생성.
@@ -40,6 +40,7 @@ export class Camera extends Object {
 	 */
 	begin(canvasContext) {
 		if (canvasContext) {
+			const position = this.getPosition();
 			const zoom = this.getZoom();
 			const rotation = this.getRotation();
 			const radian = Math.degreeToRadian(rotation);
@@ -48,7 +49,7 @@ export class Camera extends Object {
 			// canvasContext.translate(viewportSize.x / 2, viewportSize.y / 2);
 			canvasContext.scale(zoom, zoom);
 			canvasContext.rotate(radian);
-			canvasContext.translate(-this.#position.x, -this.#position.y);
+			canvasContext.translate(-position.x, -position.y);
 		}
 	}
 
