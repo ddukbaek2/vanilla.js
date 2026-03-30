@@ -169,7 +169,7 @@ export class InputManager extends Object {
 	/** @private @type { boolean } */ #isTouchMoved; // 입력시 뗄 때가지 계속 눌림.
 	/** @private @type { Vector2 } */ #canvasNativeInputPosition; // canvasNativeSize 기반 위치값.
 	/** @private @type { Vector2 } */ #viewInputPosition; // referenceResolutionSize 기반 위치값.
-	/** @private @type { Vector2 } */ #gamepadManager;
+	/** @private @type { GamepadManager } */ #gamepadManager;
 
 	//==============================================================================
 	// 생성.
@@ -186,7 +186,7 @@ export class InputManager extends Object {
 		this.#isTouchMoved = false;
 		this.#canvasNativeInputPosition = Vector2.zero();
 		this.#viewInputPosition = Vector2.zero();
-		this.#gamepadManager = new GamepadManager();
+		this.#gamepadManager = new GamepadManager(engine);
 	}
 
 	//==============================================================================
@@ -376,7 +376,7 @@ export class InputManager extends Object {
 	// 게임패드 매니저 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 } 
+	 * @returns { GamepadManager } 
 	 */
 	getGamepadManager() {
 		return this.#gamepadManager;
