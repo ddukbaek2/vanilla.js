@@ -473,7 +473,7 @@ export class Engine extends Object {
 
 		// 입력 처리.
 		const inputManager = this.getInputManager();
-		inputManager.updateAllGamepads();
+		inputManager.tick(timeDelta);
 
 		// // 화면 더 부드럽게.
 		// this.CanvasContext.scale(this.#view.devicePixelRatio, this.#view.devicePixelRatio);
