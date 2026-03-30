@@ -130,7 +130,7 @@ export class Engine extends Object {
 		const loadedScenes = sceneManager.getAllLoadedScenes();
 		for (const loadedScene of loadedScenes) {
 			try {
-				console.log(`[SceneManager] resize: (${afterCanvasNativeSize.x}, ${afterCanvasNativeSize.y})`);
+				// console.log(`[SceneManager] resize: (${afterCanvasNativeSize.x}, ${afterCanvasNativeSize.y})`);
 				loadedScene.resize(afterCanvasNativeSize);
 			}
 			catch (error) {
