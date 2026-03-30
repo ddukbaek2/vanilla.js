@@ -7,47 +7,57 @@ import { Vector2 } from "../base/vector2.js";
 import { Engine } from "./engine.js";
 
 
-// W3C Standard Gamepad API Axes (아날로그 스틱)
-const AnalogStick = {
-    LEFT_X: 0,  // -1.0(Left)  to 1.0(Right)
-    LEFT_Y: 1,  // -1.0(Up)    to 1.0(Down)
-    RIGHT_X: 2, // -1.0(Left)  to 1.0(Right)
-    RIGHT_Y: 3, // -1.0(Up)    to 1.0(Down)
+//==============================================================================
+// 게임패드 상수 (W3C Standard Gamepad 매핑 규격)
+//==============================================================================
+
+/** @enum { number } */
+export const GamepadAnalogStick = {
+    LEFT_X: 0,
+    LEFT_Y: 1,
+    RIGHT_X: 2,
+    RIGHT_Y: 3,
 };
 
-// W3C Standard Gamepad API Buttons
-const Button = {
+/** @enum { number } */
+export const GamepadTrigger = {
+    L2: 6,
+    R2: 7,
+};
+
+/** @enum { number } */
+export const GamepadButton = {
     // Face Buttons
-    A_CROSS: 0,       // Bottom face button (Xbox: A, PS: Cross)
-    B_CIRCLE: 1,      // Right face button  (Xbox: B, PS: Circle)
-    X_SQUARE: 2,      // Left face button   (Xbox: X, PS: Square)
-    Y_TRIANGLE: 3,    // Top face button    (Xbox: Y, PS: Triangle)
+    A_CROSS: 0,
+    B_CIRCLE: 1,
+    X_SQUARE: 2,
+    Y_TRIANGLE: 3,
 
-    // Bumpers / Shoulders
-    L1: 4,            // Left Bumper  (LB / L1)
-    R1: 5,            // Right Bumper (RB / R1)
+    // Bumpers
+    L1: 4,
+    R1: 5,
 
-    // Triggers (버튼으로도 쓰이고 아날로그 값도 가짐)
-    L2: 6,            // Left Trigger  (LT / L2)
-    R2: 7,            // Right Trigger (RT / R2)
+    // Triggers (버튼으로도 인식됨)
+    L2: 6,
+    R2: 7,
 
-    // System / Center Buttons
-    SHARE_VIEW: 8,    // Share / View / Select
-    OPTIONS_MENU: 9,  // Options / Menu / Start
+    // System
+    SHARE_VIEW: 8,
+    OPTIONS_MENU: 9,
 
     // Stick Clicks
-    L3: 10,           // Left Stick Click  (LS / L3)
-    R3: 11,           // Right Stick Click (RS / R3)
+    L3: 10,
+    R3: 11,
 
     // D-Pad
-    DPAD_UP: 12,      // Directional Pad Up
-    DPAD_DOWN: 13,    // Directional Pad Down
-    DPAD_LEFT: 14,    // Directional Pad Left
-    DPAD_RIGHT: 15,   // Directional Pad Right
+    DPAD_UP: 12,
+    DPAD_DOWN: 13,
+    DPAD_LEFT: 14,
+    DPAD_RIGHT: 15,
 
-    // Home / Touchpad (OS 및 브라우저에 따라 다름)
-    HOME_PS: 16,      // Xbox Button / PS Logo Button
-    TOUCHPAD: 17,     // PS4/5 Touchpad Click (비표준)
+    // Center
+    HOME_PS: 16,
+    TOUCHPAD: 17,
 };
 
 
@@ -112,7 +122,8 @@ export class GamepadManager extends Object {
                 // 눌림 상태 변화 감지.
                 if (lastButtonState.pressed !== currentButton.pressed) {
                     lastButtonState.pressed = currentButton.pressed;
-                    console.log(`[GamepadManager] Pad ${hardwareIndex} Button ${i} ${currentButton.pressed ? 'Pressed' : 'Released'}`);
+                    const label = (i === GamepadButton.L2 || i === GamepadButton.R2) ? 'Trigger' : 'Button';
+                    console.log(`[GamepadManager] Pad ${hardwareIndex} ${label} ${i} ${currentButton.pressed ? 'Pressed' : 'Released'}`);
                 }
 
                 // 아날로그 값(트리거 등) 변화 감지 (소수점 2자리까지).
@@ -121,7 +132,8 @@ export class GamepadManager extends Object {
                     lastButtonState.value = currentValue;
                     // 트리거 등 값이 유의미할 때만 로그 출력.
                     if (currentValue > 0) {
-                        console.log(`[GamepadManager] Pad ${hardwareIndex} Button ${i} Value: ${currentValue}`);
+                        const label = (i === GamepadButton.L2 || i === GamepadButton.R2) ? 'Trigger' : 'Button';
+                        console.log(`[GamepadManager] Pad ${hardwareIndex} ${label} ${i} Value: ${currentValue}`);
                     }
                 }
             }
@@ -138,6 +150,50 @@ export class GamepadManager extends Object {
                 }
             }
         }
+    }
+
+    //==============================================================================
+    // 버튼 눌림 상태 반환.
+    //==============================================================================
+    /**
+     * @param { number } gamepadIndex 
+     * @param { number } buttonIndex 
+     * @returns { boolean }
+     */
+    isButtonPressed(gamepadIndex, buttonIndex) {
+        const state = this.#connectedGamepadStates.get(gamepadIndex);
+        if (!state) return false;
+        const button = state.buttons.get(buttonIndex);
+        return button ? button.pressed : false;
+    }
+
+    //==============================================================================
+    // 버튼/트리거 아날로그 값 반환 (0.0 ~ 1.0).
+    //==============================================================================
+    /**
+     * @param { number } gamepadIndex 
+     * @param { number } buttonIndex 
+     * @returns { number }
+     */
+    getButtonValue(gamepadIndex, buttonIndex) {
+        const state = this.#connectedGamepadStates.get(gamepadIndex);
+        if (!state) return 0;
+        const button = state.buttons.get(buttonIndex);
+        return button ? button.value : 0;
+    }
+
+    //==============================================================================
+    // 아날로그 스틱 축 값 반환 (-1.0 ~ 1.0).
+    //==============================================================================
+    /**
+     * @param { number } gamepadIndex 
+     * @param { number } axisIndex 
+     * @returns { number }
+     */
+    getAxisValue(gamepadIndex, axisIndex) {
+        const state = this.#connectedGamepadStates.get(gamepadIndex);
+        if (!state) return 0;
+        return state.axes.get(axisIndex) || 0;
     }
 
     //==============================================================================
