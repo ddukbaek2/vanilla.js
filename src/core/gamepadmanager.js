@@ -7,32 +7,47 @@ import { Vector2 } from "../base/vector2.js";
 import { Engine } from "./engine.js";
 
 
+// W3C Standard Gamepad API Axes (아날로그 스틱)
 const AnalogStick = {
-    LeftX: 0,
-    LeftY: 1,
-    RightX: 2,
-    RightY: 3,
+    LEFT_X: 0,  // -1.0(Left)  to 1.0(Right)
+    LEFT_Y: 1,  // -1.0(Up)    to 1.0(Down)
+    RIGHT_X: 2, // -1.0(Left)  to 1.0(Right)
+    RIGHT_Y: 3, // -1.0(Up)    to 1.0(Down)
 };
 
+// W3C Standard Gamepad API Buttons
 const Button = {
-    A: 0, // Cross (PS)
-    B: 1, // Circle (PS)
-    X: 2, // Square (PS)
-    Y: 3, // Triangle (PS)
-    L1: 4,
-    R1: 5,
-    L2: 6, // Trigger
-    R2: 7, // Trigger
-    Select: 8, // Share (PS)
-    Start: 9, // Options (PS)
-    L3: 10, // Left Stick Click
-    R3: 11, // Right Stick Click
-    UP: 12,
-    DOWN: 13,
-    LEFT: 14,
-    RIGHT: 15,
-    PS: 16, // Home
-    TOUCHPAD: 17,
+    // Face Buttons
+    A_CROSS: 0,       // Bottom face button (Xbox: A, PS: Cross)
+    B_CIRCLE: 1,      // Right face button  (Xbox: B, PS: Circle)
+    X_SQUARE: 2,      // Left face button   (Xbox: X, PS: Square)
+    Y_TRIANGLE: 3,    // Top face button    (Xbox: Y, PS: Triangle)
+
+    // Bumpers / Shoulders
+    L1: 4,            // Left Bumper  (LB / L1)
+    R1: 5,            // Right Bumper (RB / R1)
+
+    // Triggers (버튼으로도 쓰이고 아날로그 값도 가짐)
+    L2: 6,            // Left Trigger  (LT / L2)
+    R2: 7,            // Right Trigger (RT / R2)
+
+    // System / Center Buttons
+    SHARE_VIEW: 8,    // Share / View / Select
+    OPTIONS_MENU: 9,  // Options / Menu / Start
+
+    // Stick Clicks
+    L3: 10,           // Left Stick Click  (LS / L3)
+    R3: 11,           // Right Stick Click (RS / R3)
+
+    // D-Pad
+    DPAD_UP: 12,      // Directional Pad Up
+    DPAD_DOWN: 13,    // Directional Pad Down
+    DPAD_LEFT: 14,    // Directional Pad Left
+    DPAD_RIGHT: 15,   // Directional Pad Right
+
+    // Home / Touchpad (OS 및 브라우저에 따라 다름)
+    HOME_PS: 16,      // Xbox Button / PS Logo Button
+    TOUCHPAD: 17,     // PS4/5 Touchpad Click (비표준)
 };
 
 
