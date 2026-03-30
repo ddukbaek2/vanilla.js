@@ -15,7 +15,7 @@ export class Component extends Object {
 	//==============================================================================
 	/** @private @type { Node } */ #node; // 소유권자.
 	/** @private @type { boolean } */ #isEnable; // 활성화 여부.
-	/** @private @type { boolean } */ #isVisibleGizmos; // 기즈모 출력 여부.
+	/** @private @type { boolean } */ #isGizmoVisible; // 기즈모 출력 여부.
 
 	//==============================================================================
 	// 생성.
@@ -27,7 +27,7 @@ export class Component extends Object {
 		super();
 		this.#node = null;
 		this.#isEnable = true;
-		this.#isVisibleGizmos = false;
+		this.#isGizmoVisible = true;
 	}
 
 	//==============================================================================
@@ -59,8 +59,13 @@ export class Component extends Object {
 	 * @virtual
 	 * @param { Renderer } renderer 
 	 */
-	drawGizmos(renderer) {
+	drawGizmo(renderer) {
+		const isGizmoVisible = this.isGizmoVisible();
+		if (!isGizmoVisible) {
+			return;
+		}
 
+		// 출력.
 	}
 
 	//==============================================================================
@@ -87,10 +92,10 @@ export class Component extends Object {
 	// 기즈모 그리기 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean }
+	 * @param { boolean } isVisible
 	 */
-	setVisibleGizmos(visible) {
-		this.#isVisibleGizmos = visible;
+	setGizmoVisible(isVisible) {
+		this.#isGizmoVisible = isVisible;
 	}
 
 	//==============================================================================
@@ -99,7 +104,7 @@ export class Component extends Object {
 	/**
 	 * @returns { boolean }
 	 */
-	isVisibleGizmos() {
-		return this.#isVisibleGizmos;
+	isGizmoVisible() {
+		return this.#isGizmoVisible;
 	}
 }

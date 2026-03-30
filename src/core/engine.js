@@ -489,6 +489,7 @@ export class Engine extends Object {
 				loadedScene.preDraw(renderer);
 				loadedScene.draw(renderer);
 				loadedScene.postDraw(renderer);
+				loadedScene.drawGizmo(renderer);
 			}
 			catch (error) {
 				console.error(error);

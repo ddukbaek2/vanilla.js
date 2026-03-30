@@ -28,6 +28,7 @@ export class Node extends Object {
 	/** @private @type { number } */ #opacity; // 투명도.
 	/** @private @type { Vector2 } */ #pivot; // 기준점.
 	/** @private @type { Vector2 } */ #contentSize; // 크기.
+	/** @private @type { boolean } */ #isGizmoVisible; // 기즈모 출력 여부.
 
 	//==============================================================================
 	// 생성.
@@ -44,6 +45,7 @@ export class Node extends Object {
 		this.#localScale = Vector2.one();
 		this.#localRotation = 0.0;
 		this.#isActive = true;
+		this.#isGizmoVisible = true;
 		this.#opacity = 1.0;
 		this.#pivot = Pivot.middleCenter;
 		this.#contentSize = Vector2.zero();
@@ -121,6 +123,12 @@ export class Node extends Object {
 			for (const component of components) {
 				component.draw(renderer);
 			}
+
+			// 자식 목록 출력.
+			const children = this.getChildren();
+			for (const child of children) {
+				renderer.drawNode(child);
+			}
 		}
 	}
 
@@ -130,7 +138,11 @@ export class Node extends Object {
 	/**
 	 * @param { Renderer } renderer 
 	 */
-	drawGizmos(renderer) {
+	drawGizmo(renderer) {
+		const isGizmoVisible = this.isGizmoVisible();
+		if (!isGizmoVisible) {
+			return;
+		}
 
 		// 영역 및 기준점 출력.
 		const canvasContext = renderer.getCanvasContext();
@@ -142,7 +154,7 @@ export class Node extends Object {
 			// 컴포넌트 기즈모 출력.
 			const components = this.getAllComponents();
 			for (const component of components) {
-				component.drawGizmos(renderer);
+				component.drawGizmo(renderer);
 			}
 
 			// 좌표.
@@ -199,7 +211,7 @@ export class Node extends Object {
 	//  * @virtual
 	//  * @param { Renderer } renderer 
 	//  */
-	// drawGizmos(renderer) {
+	// drawGizmo(renderer) {
 	// 	if (!this.isVisibleGizmos()) {
 	// 		return;
 	// 	}
@@ -653,6 +665,16 @@ export class Node extends Object {
 	}
 
 	//==============================================================================
+	// 활성화 상태 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 
+	 */
+	isActive() {
+		return this.#isActive;		
+	}
+
+	//==============================================================================
 	// 현재부터 루트까지 계층 전체의 활성화 상태 반환. (루트까지 하나라도 비활성화상태면 false 반환)
 	//==============================================================================
 	/**
@@ -673,16 +695,6 @@ export class Node extends Object {
 		} else {
 			return false;
 		}
-	}
-
-	//==============================================================================
-	// 활성화 상태 반환.
-	//==============================================================================
-	/**
-	 * @returns { boolean } 
-	 */
-	isActive() {
-		return this.#isActive;		
 	}
 
 	//==============================================================================
@@ -715,9 +727,15 @@ export class Node extends Object {
 	 * @returns { boolean } 
 	 */
 	isVisible() {
-		const opacity = this.getOpacity();
-		const isVisible = opacity > 0;
-		return isVisible;
+		const isActive = this.isActive();
+		if (isActive) {
+			const opacity = this.getOpacity();
+			if (opacity > 0) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	//==============================================================================
@@ -861,6 +879,26 @@ export class Node extends Object {
 		obb.setEdges(worldCorners);
 		const inside = obb.contains(viewPosition);
 		return inside;
+	}
+
+	//==============================================================================
+	// 기즈모 그리기 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } isVisible 
+	 */
+	setGizmoVisible(isVisible) {
+		this.#isGizmoVisible = isVisible;
+	}
+
+	//==============================================================================
+	// 기즈모 그리기 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isGizmoVisible() {
+		return this.#isGizmoVisible;
 	}
 
 	// //==============================================================================

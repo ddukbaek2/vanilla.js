@@ -26,6 +26,7 @@ export class Scene extends Object {
 	/** @private @type { Engine } */ #engine;
 	/** @private @type { Node } */ #root;
 	/** @private @type { VTweeneen[] } */ #tweens;
+	/** @private @type { boolean } */ #isGizmoVisible; // 기즈모 출력 여부.
 
 	//==============================================================================
 	// 생성.
@@ -43,6 +44,7 @@ export class Scene extends Object {
 	create() {
 		this.#root = new Node();
 		this.#tweens = [];
+		this.#isGizmoVisible = true;
 	}
 
 	//==============================================================================
@@ -193,6 +195,22 @@ export class Scene extends Object {
 	}
 
 	//==============================================================================
+	// 기즈모 출력.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { Renderer } renderer 
+	 */
+	drawGizmo(renderer) {
+		const isGizmoVisible = this.isGizmoVisible();
+		if (!isGizmoVisible) {
+			return;
+		}
+
+		// 출력.
+	}
+
+	//==============================================================================
 	// 터치 갱신.
 	//==============================================================================
 	/**
@@ -339,5 +357,25 @@ export class Scene extends Object {
 		const engine = this.getEngine();
 		const renderer = engine.getRenderer();
 		return renderer.getCanvasContext();
+	}
+
+	//==============================================================================
+	// 기즈모 그리기 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } isVisible 
+	 */
+	setGizmoVisible(isVisible) {
+		this.#isGizmoVisible = isVisible;
+	}
+
+	//==============================================================================
+	// 기즈모 그리기 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isGizmoVisible() {
+		return this.#isGizmoVisible;
 	}
 }
