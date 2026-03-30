@@ -8,37 +8,31 @@ import { Engine } from "./engine.js";
 
 
 const AnalogStick = {
-    L: -1,
-    R: -1,
-    L2: -1,
-    R2: -1,
+    LeftX: 0,
+    LeftY: 1,
+    RightX: 2,
+    RightY: 3,
 };
 
 const Button = {
-    UP: -1,
-    DOWN: 13,
-    LEFT: -1,
-    RIGHT: -1,
-
-    A: -1,
-    B: -1,
-    X: -1,
-    Y: -1,
-
-    Triangle: -1,
-    Square: -1,
-    Circle: -1,
-    Cross: -1,
-
+    A: 0, // Cross (PS)
+    B: 1, // Circle (PS)
+    X: 2, // Square (PS)
+    Y: 3, // Triangle (PS)
     L1: 4,
-    R1: 7,
-    L3: 10,
-    R3: 11,
-
+    R1: 5,
+    L2: 6, // Trigger
+    R2: 7, // Trigger
+    Select: 8, // Share (PS)
+    Start: 9, // Options (PS)
+    L3: 10, // Left Stick Click
+    R3: 11, // Right Stick Click
+    UP: 12,
+    DOWN: 13,
+    LEFT: 14,
+    RIGHT: 15,
+    PS: 16, // Home
     TOUCHPAD: 17,
-    SHARE: 8,
-    OPTIONS: 9,
-    PS: 16,
 };
 
 
@@ -49,8 +43,8 @@ export class GamepadManager extends Object {
     //==============================================================================
     // 멤버 변수 목록.
     //==============================================================================
-    /**@private @type { Gamepad[] } */ #connectedGamepads; // 연결된 게임패드 목록.
-    /**@private @type { Map } */ #conntectedGamepadButtonStates; // key: Gamepad.id, Value: { Key: GamepadButton.index, Value: boolean }
+    /**@private @type { number[] } */ #connectedGamepadIndices; // 연결된 게임패드 식별자(index) 목록.
+    /**@private @type { Map<number, Object> } */ #connectedGamepadStates; // key: index, value: { buttons: Map, axes: Map }
 
     //==============================================================================
     // 생성.
@@ -61,8 +55,8 @@ export class GamepadManager extends Object {
      */
     constructor(engine) {
         super();
-        this.#connectedGamepads = [];
-        this.#conntectedGamepadButtonStates = new Map();
+        this.#connectedGamepadIndices = [];
+        this.#connectedGamepadStates = new Map();
     }
 
     //==============================================================================
@@ -80,32 +74,52 @@ export class GamepadManager extends Object {
     //==============================================================================
     updateAllGamepads() {
         const gamepads = System.navigator.getGamepads();
-        const connectedGamepads = this.getAllConnectedGamepads();
-        for (const connectedGamepad of connectedGamepads) {
-            if (connectedGamepad === null) {
-                continue;
-            }
-
-            const gamepad = gamepads[connectedGamepad.index];
+        for (const hardwareIndex of this.#connectedGamepadIndices) {
+            const gamepad = gamepads[hardwareIndex];
             if (!gamepad) {
                 continue;
             }
 
-            const gamepadId = gamepad.id;
-            const buttonStates = this.#conntectedGamepadButtonStates.get(gamepadId);
-            if (!buttonStates || buttonStates.size === 0) {
+            const state = this.#connectedGamepadStates.get(hardwareIndex);
+            if (!state) {
                 continue;
             }
 
-            for (const [buttonIndex, buttonState] of buttonStates) {
-                const button = gamepad.buttons[buttonIndex];
-                if (!button) {
+            // 버튼 및 트리거 상태 확인.
+            for (let i = 0; i < gamepad.buttons.length; i++) {
+                const currentButton = gamepad.buttons[i];
+                const lastButtonState = state.buttons.get(i);
+
+                if (!lastButtonState) {
                     continue;
                 }
 
-                if (buttonState !== button.pressed) {
-                    buttonStates.set(buttonIndex, button.pressed);
-                    console.log(`[GamepadManager] ${gamepadId}: buttonIndex: ${buttonIndex}, pressed: ${button.pressed}`);
+                // 눌림 상태 변화 감지.
+                if (lastButtonState.pressed !== currentButton.pressed) {
+                    lastButtonState.pressed = currentButton.pressed;
+                    console.log(`[GamepadManager] Pad ${hardwareIndex} Button ${i} ${currentButton.pressed ? 'Pressed' : 'Released'}`);
+                }
+
+                // 아날로그 값(트리거 등) 변화 감지 (소수점 2자리까지).
+                const currentValue = parseFloat(currentButton.value.toFixed(2));
+                if (lastButtonState.value !== currentValue) {
+                    lastButtonState.value = currentValue;
+                    // 트리거 등 값이 유의미할 때만 로그 출력.
+                    if (currentValue > 0) {
+                        console.log(`[GamepadManager] Pad ${hardwareIndex} Button ${i} Value: ${currentValue}`);
+                    }
+                }
+            }
+
+            // 아날로그 스틱(축) 상태 확인.
+            for (let i = 0; i < gamepad.axes.length; i++) {
+                const currentAxisValue = parseFloat(gamepad.axes[i].toFixed(2));
+                const lastAxisValue = state.axes.get(i);
+
+                // 미세한 떨림(Deadzone) 고려하여 0.01 이상의 변화만 감지.
+                if (Math.abs(lastAxisValue - currentAxisValue) > 0.01) {
+                    state.axes.set(i, currentAxisValue);
+                    console.log(`[GamepadManager] Pad ${hardwareIndex} Axis ${i} Value: ${currentAxisValue}`);
                 }
             }
         }
@@ -118,23 +132,28 @@ export class GamepadManager extends Object {
      * @param { Gamepad } gamepad
      */
     connect(gamepad) {
-        if (gamepad === null || this.#connectedGamepads.indexOf(gamepad) !== -1) {
+        if (gamepad === null || this.#connectedGamepadIndices.indexOf(gamepad.index) !== -1) {
             return;
         }
-        const buttonStates = new Map();
-        this.#connectedGamepads.push(gamepad);
-        this.#conntectedGamepadButtonStates.set(gamepad.id, buttonStates);
 
-        // GamepadButton
-        // for (const button of gamepad.buttons) {
-        for (let buttonIndex = 0; buttonIndex < gamepad.buttons.length; ++buttonIndex) {
-            const button = gamepad.buttons[buttonIndex];
-            if (button === null) {
-                continue;
-            }
+        const state = {
+            buttons: new Map(), // key: index, value: { pressed: boolean, value: number }
+            axes: new Map(),    // key: index, value: number
+        };
 
-            buttonStates.set(buttonIndex, false);			
+        // 버튼 초기화.
+        for (let i = 0; i < gamepad.buttons.length; i++) {
+            state.buttons.set(i, { pressed: false, value: 0 });
         }
+
+        // 축 초기화.
+        for (let i = 0; i < gamepad.axes.length; i++) {
+            state.axes.set(i, 0);
+        }
+
+        this.#connectedGamepadIndices.push(gamepad.index);
+        this.#connectedGamepadStates.set(gamepad.index, state);
+        console.log(`[GamepadManager] Connected: ${gamepad.id} at index ${gamepad.index}`);
     }
 
     //==============================================================================
@@ -147,12 +166,14 @@ export class GamepadManager extends Object {
         if (gamepad === null) {
             return;
         }
-        const gamepadIndex = this.#connectedGamepads.indexOf(gamepad);
-        if (gamepadIndex === -1) {
+        const listIndex = this.#connectedGamepadIndices.indexOf(gamepad.index);
+        if (listIndex === -1) {
             return;
         }
 
-        this.#connectedGamepads.splice(gamepadIndex, 1);
+        this.#connectedGamepadIndices.splice(listIndex, 1);
+        this.#connectedGamepadStates.delete(gamepad.index);
+        console.log(`[GamepadManager] Disconnected: index ${gamepad.index}`);
     }
 
     //==============================================================================
@@ -162,7 +183,15 @@ export class GamepadManager extends Object {
      * @returns { Gamepad[] }
      */
     getAllConnectedGamepads() {
-        return this.#connectedGamepads;
+        const gamepads = System.navigator.getGamepads();
+        const connected = [];
+        for (const hardwareIndex of this.#connectedGamepadIndices) {
+            const gamepad = gamepads[hardwareIndex];
+            if (gamepad) {
+                connected.push(gamepad);
+            }
+        }
+        return connected;
     }
 
     //==============================================================================
@@ -172,7 +201,7 @@ export class GamepadManager extends Object {
      * @returns { number }
      */
     getConnectedGamepadCount() {
-        return this.#connectedGamepads.length;
+        return this.#connectedGamepadIndices.length;
     }
 
     //==============================================================================
@@ -181,12 +210,13 @@ export class GamepadManager extends Object {
     /**
      * @returns { Gamepad | undefined }
      */
-    getConnectedGamepad(gamepadIndex) {
-        if (gamepadIndex < 0 || gamepadIndex >= this.#connectedGamepads.length) {
+    getConnectedGamepad(listIndex) {
+        if (listIndex < 0 || listIndex >= this.#connectedGamepadIndices.length) {
             return undefined;
         }
 
-        const gamepad = this.#connectedGamepads.at(gamepadIndex);
-        return gamepad;
+        const hardwareIndex = this.#connectedGamepadIndices.at(listIndex);
+        const gamepads = System.navigator.getGamepads();
+        return gamepads[hardwareIndex];
     }
 }
