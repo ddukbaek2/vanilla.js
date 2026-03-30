@@ -42,7 +42,7 @@ export function structuredClone(target) {
 	const obj = System.Object.create(System.Object.getPrototypeOf(target));
 
 	// 깊은 복사 함수는 직렬화 불가능 객체를 만나면 예외 발생됨.
-	//System.Object.assign(obj, window.structuredClone(this));
+	//System.Object.assign(obj, System.window.structuredClone(this));
 
 	// 값 복사 재귀 함수.
 	const deepCopy = (destination, source) => {

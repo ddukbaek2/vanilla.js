@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+const System = globalThis;
 import { Vector2 } from "../base/vector2.js";
 import { Asset } from "../core/asset.js";
 
@@ -20,7 +21,7 @@ export class ImageAsset extends Asset {
 	//==============================================================================
 	constructor() {
 		super();
-		this.image = new window.Image();
+		this.image = new System.window.Image();
 	}
 
 	//==============================================================================
@@ -39,7 +40,7 @@ export class ImageAsset extends Asset {
 		}
 
 		super.assetPath = assetPath;
-		this.image = new window.Image();
+		this.image = new System.window.Image();
 		this.image.src = assetPath;
 
 		// 불러오기.

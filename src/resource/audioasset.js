@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+const System = globalThis;
 import { Asset } from "../core/asset.js";
 
 
@@ -24,7 +25,7 @@ export class AudioAsset extends Asset {
 	constructor() {
 		super();
 
-		const audioContextType = window.AudioContext || window.webkitAudioContext;
+		const audioContextType = System.window.AudioContext || System.window.webkitAudioContext;
 		if (audioContextType) {
 			this.#audioContext = new audioContextType();
 			this.#gainNode = this.#audioContext.createGain();

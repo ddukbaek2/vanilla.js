@@ -107,8 +107,8 @@ export class Engine extends Object {
 			return sceneManager.loadScene(scene);
 		}).then(() => {
 			// 엔진 실행.
-			window.addEventListener("resize", this.#resizeCallback);
-			window.requestAnimationFrame(this.#updateEngineCallback);
+			System.window.addEventListener("resize", this.#resizeCallback);
+			System.window.requestAnimationFrame(this.#updateEngineCallback);
 		}).catch((error) => {
 			console.error(error);
 		});
@@ -506,13 +506,12 @@ export class Engine extends Object {
 			this.drawStatistics(renderer);
 		}
 		
-		// 입력 처리.
-		// 현재 프레임에서 필요한 만큼 처리하고 다음 프레임에서는 유지하지 않음.
+		// 입력 관련해서 상태 유지가 아닌, 현재 프레임이 끝난 후에는 다음 프레임에서는 상태를 유지하지 않음. (1회성)
 		inputManager.setTouchPressed(false);
 		inputManager.setTouchReleased(false);
 
 		// 다음 프레임 호출 요청.
-		window.requestAnimationFrame(this.#updateEngineCallback);
+		System.window.requestAnimationFrame(this.#updateEngineCallback);
 	}
 
 	//==============================================================================
