@@ -15,10 +15,11 @@ export class TimeManager extends Object {
 	//==============================================================================
 	/** @private @type { number } */ #realtimeSinceStartup;
 	/** @private @type { number } */ #time;
-	/** @private @type { number } */ #timeDelta;
+	/** @private @type { number } */ #unscaledTimeDelta;
 	/** @private @type { number } */ #fps;
 	/** @private @type { number } */ #framesThisSecond;
 	/** @private @type { number } */ #previousFrameCheckTime;
+	/** @private @type { number } */ #timeScale;
 
 	//==============================================================================
 	// 생성.
@@ -31,10 +32,11 @@ export class TimeManager extends Object {
 		super();
 		this.#realtimeSinceStartup = 0;
 		this.#time = 0.0;
-		this.#timeDelta = 0.0;
+		this.#unscaledTimeDelta = 0.0;
 		this.#fps = 0;
 		this.#framesThisSecond = 0;
 		this.#previousFrameCheckTime = 0;
+		this.#timeScale = 1;
 	}
 
 	//==============================================================================
@@ -57,10 +59,10 @@ export class TimeManager extends Object {
 		}
 
 		// 시간 반영.
-		const timeDelta = (realtimeSinceStartup - this.#realtimeSinceStartup);
+		const unscaledTimeDelta = (realtimeSinceStartup - this.#realtimeSinceStartup);
 		this.#realtimeSinceStartup = realtimeSinceStartup;
-		this.#time += timeDelta;
-		this.#timeDelta = timeDelta;
+		this.#time += unscaledTimeDelta;
+		this.#unscaledTimeDelta = unscaledTimeDelta;
 
 		// 프레임 계산.
 		if (realtimeSinceStartup >= this.#previousFrameCheckTime + 1.0) {
@@ -99,8 +101,20 @@ export class TimeManager extends Object {
 	/**
 	 * @returns { number }
 	 */
+	getUnscaleDeltaTime() {
+		return this.#unscaledTimeDelta;
+	}
+
+	//==============================================================================
+	// 현재 프레임과 이전 프레임 사이의 경과 시간 반환. (초 단위)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
 	getTimeDelta() {
-		return this.#timeDelta;
+		const unscaledTimeDelta = this.getUnscaleDeltaTime();
+		const timeScale = this.getTimeScale();
+		return unscaledTimeDelta * timeScale;
 	}
 
 	//==============================================================================
@@ -111,5 +125,25 @@ export class TimeManager extends Object {
 	 */
 	getFramePerSecond() {
 		return this.#fps;
+	}
+
+	//==============================================================================
+	// 시간 배율 설정.
+	//==============================================================================
+	/**
+	 * @param { number } timeScale
+	 */
+	setTimeScale(timeScale) {
+		this.#timeScale = timeScale;
+	}
+
+	//==============================================================================
+	// 시간 배율 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getTimeScale() {
+		return this.#timeScale;
 	}
 }
