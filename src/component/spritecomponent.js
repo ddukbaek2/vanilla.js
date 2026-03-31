@@ -82,13 +82,13 @@ export class SpriteComponent extends ColorComponent {
 	draw(graphic) {
 		// super.draw(graphic);
 
-		const canvasContext = graphic.getCanvasContext();
+		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const image = this.getImage();
 		const color = super.getColor();
 		const colorString = color.toHEXString();
 		if (image === null) {
 			// 출력.
-			canvasContext.fillStyle = colorString;
+			canvasRenderingContext.fillStyle = colorString;
 			super.draw(graphic);
 			return;
 		}
@@ -108,7 +108,7 @@ export class SpriteComponent extends ColorComponent {
 		}
 
 		// 출력.
-		canvasContext.fillStyle = colorString;
+		canvasRenderingContext.fillStyle = colorString;
 		graphic.drawImage2(image, position, imageSize, imageRect);
 	}
 

@@ -36,20 +36,20 @@ export class Camera extends Object {
 	// 시작.
 	//==============================================================================
 	/**
-	 * @param { CanvasRenderingContext2D } canvasContext 
+	 * @param { CanvasRenderingContext2D } canvasRenderingContext 
 	 */
-	begin(canvasContext) {
-		if (canvasContext) {
+	begin(canvasRenderingContext) {
+		if (canvasRenderingContext) {
 			const position = this.getPosition();
 			const zoom = this.getZoom();
 			const rotation = this.getRotation();
 			const radian = Math.degreeToRadian(rotation);
 
-			canvasContext.save();
-			// canvasContext.translate(viewportSize.x / 2, viewportSize.y / 2);
-			canvasContext.scale(zoom, zoom);
-			canvasContext.rotate(radian);
-			canvasContext.translate(-position.x, -position.y);
+			canvasRenderingContext.save();
+			// canvasRenderingContext.translate(viewportSize.x / 2, viewportSize.y / 2);
+			canvasRenderingContext.scale(zoom, zoom);
+			canvasRenderingContext.rotate(radian);
+			canvasRenderingContext.translate(-position.x, -position.y);
 		}
 	}
 
@@ -57,11 +57,11 @@ export class Camera extends Object {
 	// 종료.
 	//==============================================================================
 	/**
-	 * @param { CanvasRenderingContext2D } canvasContext 
+	 * @param { CanvasRenderingContext2D } canvasRenderingContext 
 	 */
-	end(canvasContext) {
-		if (canvasContext) {
-			canvasContext.restore();
+	end(canvasRenderingContext) {
+		if (canvasRenderingContext) {
+			canvasRenderingContext.restore();
 		}
 	}
 

@@ -60,7 +60,7 @@ export class HeatHazeEffect extends Node {
 			return;
 		}
 
-		const canvasContext = graphic.getCanvasContext();
+		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const contentSize = this.getContentSize();
 
 		// 영역 크기가 없다면 그리지 않음.
@@ -69,7 +69,7 @@ export class HeatHazeEffect extends Node {
 		}
 
 		// 현재까지 그려진 캔버스 자체를 소스로 사용.
-		const sourceCanvas = canvasContext.canvas;
+		const sourceCanvas = canvasRenderingContext.canvas;
 		
 		// 화면상의 절대 좌표 영역(바운딩 박스)을 가져와 캡처 범위로 사용합니다.
 		const worldBounds = this.getWorldBounds();
@@ -87,7 +87,7 @@ export class HeatHazeEffect extends Node {
 
 			// 대상(dx, dy): 현재 노드의 로컬 공간. 
 			// SpriteComponent처럼 Context가 이미 변환(위치/회전/피봇)되어 있으므로 0부터 시작.
-			canvasContext.drawImage(
+			canvasRenderingContext.drawImage(
 				sourceCanvas,
 				sx, sy, sw, sh,
 				offsetX, y, contentSize.x, 1

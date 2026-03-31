@@ -35,8 +35,6 @@ export class Vector2 extends Object
 	//==============================================================================
 	/**
 	 * @override
-	 * @method
-	 * @public
 	 * @param { any } other
 	 * @returns { boolean }
 	 */

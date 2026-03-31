@@ -44,14 +44,14 @@
 // 	//==============================================================================
 // 	/**
 // 	 * @method
-// 	 * @param { CanvasRenderingContext2D } canvasContext
+// 	 * @param { CanvasRenderingContext2D } canvasRenderingContext
 // 	 */
-// 	applyWorldMatrix(canvasContext) {
-// 		if (canvasContext === null) {
+// 	applyWorldMatrix(canvasRenderingContext) {
+// 		if (canvasRenderingContext === null) {
 // 			return;
 // 		}
-// 		if (canvasContext instanceof CanvasRenderingContext2D) {
-// 			canvasContext.setTransform(this.#scale.x, this.#skew.y, this.#skew.x, this.#scale.y, this.#translation.x, this.#translation.y);
+// 		if (canvasRenderingContext instanceof CanvasRenderingContext2D) {
+// 			canvasRenderingContext.setTransform(this.#scale.x, this.#skew.y, this.#skew.x, this.#scale.y, this.#translation.x, this.#translation.y);
 // 		}
 // 	}
 

@@ -31,7 +31,6 @@ export class Asset extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @method
 	 * @param { string } assetPath 
 	 */
 	async load(assetPath) {
@@ -48,7 +47,6 @@ export class Asset extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @method
 	 */
 	unload() {
 		if (!this.isLoaded) {

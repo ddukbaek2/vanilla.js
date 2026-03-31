@@ -63,23 +63,23 @@
 // 			return;
 // 		}
 
-// 		const canvasContext = graphic.getCanvasContext();
+// 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 // 		const fontFamily = this.#fontFace ? this.#fontFace.family : '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-// 		canvasContext.font = `${this.#fontSize}px ${fontFamily}`;
-// 		canvasContext.textAlign = this.#textAlign;
-// 		canvasContext.textBaseline = this.#textBaseline;
+// 		canvasRenderingContext.font = `${this.#fontSize}px ${fontFamily}`;
+// 		canvasRenderingContext.textAlign = this.#textAlign;
+// 		canvasRenderingContext.textBaseline = this.#textBaseline;
 
 // 		// const contentSize = this.getContentSize();
 // 		const pivotPosition = this.calculatePivotPosition();
 
 // 		if (this.#strokeColor && this.#strokeWidth > 0) {
-// 			canvasContext.strokeStyle = this.#strokeColor;
-// 			canvasContext.lineWidth = this.#strokeWidth;
-// 			canvasContext.strokeText(this.#text, pivotPosition.x, pivotPosition.y);
+// 			canvasRenderingContext.strokeStyle = this.#strokeColor;
+// 			canvasRenderingContext.lineWidth = this.#strokeWidth;
+// 			canvasRenderingContext.strokeText(this.#text, pivotPosition.x, pivotPosition.y);
 // 		}
 
-// 		canvasContext.fillStyle = this.#textColor;
-// 		canvasContext.fillText(this.#text, pivotPosition.x, pivotPosition.y);
+// 		canvasRenderingContext.fillStyle = this.#textColor;
+// 		canvasRenderingContext.fillText(this.#text, pivotPosition.x, pivotPosition.y);
 // 	}
 
 // 	//==============================================================================

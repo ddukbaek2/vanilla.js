@@ -81,9 +81,9 @@ export class TouchEffect extends Node {
 	 */
 	beginCanvasState(graphic) {
 		super.beginCanvasState(graphic);
-		const canvasContext = graphic.getCanvasContext();
-		this.#originalCompositeOperation = canvasContext.globalCompositeOperation;
-		canvasContext.globalCompositeOperation = "lighter";
+		const canvasRenderingContext = graphic.getCanvasRenderingContext();
+		this.#originalCompositeOperation = canvasRenderingContext.globalCompositeOperation;
+		canvasRenderingContext.globalCompositeOperation = "lighter";
 	}
 
 	//==============================================================================
@@ -94,9 +94,9 @@ export class TouchEffect extends Node {
 	 * @param { Graphic } graphic 
 	 */
 	endCanvasState(graphic) {
-		const canvasContext = graphic.getCanvasContext();
-		// canvasContext.globalCompositeOperation = "source-over";
-		canvasContext.globalCompositeOperation = this.#originalCompositeOperation;
+		const canvasRenderingContext = graphic.getCanvasRenderingContext();
+		// canvasRenderingContext.globalCompositeOperation = "source-over";
+		canvasRenderingContext.globalCompositeOperation = this.#originalCompositeOperation;
 		super.endCanvasState(graphic);
 	}
 
@@ -154,12 +154,12 @@ export class TouchEffect extends Node {
 			return;
 		}
 
-		const canvasContext = graphic.getCanvasContext();
+		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		for (let i = 0; i < this.#touchParticles.length; ++i) {
 			const particle = this.#touchParticles[i];
 			const opacity = Math.max(0, particle.life / particle.maxLife);
 
-			const radialGradient = canvasContext.createRadialGradient(
+			const radialGradient = canvasRenderingContext.createRadialGradient(
 				particle.position.x, particle.position.y, 0, 
 				particle.position.x, particle.position.y, particle.radius);
 				
@@ -167,10 +167,10 @@ export class TouchEffect extends Node {
 			radialGradient.addColorStop(1, `rgba(100, 200, 255, 0)`);
 
 			// 원 출력.
-			canvasContext.beginPath();
-			canvasContext.arc(particle.position.x, particle.position.y, particle.radius, 0, Math.PI * 2);
-			canvasContext.fillStyle = radialGradient;
-			canvasContext.fill();
+			canvasRenderingContext.beginPath();
+			canvasRenderingContext.arc(particle.position.x, particle.position.y, particle.radius, 0, Math.PI * 2);
+			canvasRenderingContext.fillStyle = radialGradient;
+			canvasRenderingContext.fill();
 		}
 	}
 }

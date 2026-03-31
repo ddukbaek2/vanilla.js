@@ -10,25 +10,25 @@ import { Color } from "../base/color.js";
 
 
 //==============================================================================
-// 렌더러.
+// 그래픽.
+// - Canvas에서 가져와 사용 할 수 있는 렌더링컨텍스트.
 //==============================================================================
 export class Graphic extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { CanvasRenderingContext2D } */ #canvasContext;
+	/** @private @type { CanvasRenderingContext2D } */ #canvasRenderingContext;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { Engine } engine
-	 * @param { CanvasRenderingContext2D } canvasContext
+	 * @param { CanvasRenderingContext2D } canvasRenderingContext
 	 */
-	constructor(engine, canvasContext) {
+	constructor(canvasRenderingContext) {
 		super();
-		this.#canvasContext = canvasContext;
+		this.#canvasRenderingContext = canvasRenderingContext;
 	}
 
 	//==============================================================================
@@ -40,9 +40,9 @@ export class Graphic extends Object {
 	applySettings(engine) {
 		// 품질 갱신.
 		// 왜 매 렌더링마다 실시간 업데이트를 하지 않으면 반영되지 않는지는 모름.
-		const canvasContext = this.getCanvasContext();
-		canvasContext.imageSmoothingEnabled = true;
-		canvasContext.imageSmoothingQuality = "high";
+		const canvasRenderingContext = this.getCanvasRenderingContext();
+		canvasRenderingContext.imageSmoothingEnabled = true;
+		canvasRenderingContext.imageSmoothingQuality = "high";
 	}
 
 	//==============================================================================
@@ -52,15 +52,15 @@ export class Graphic extends Object {
 	 * @param { Color | string | CanvasGradient | CanvasPattern } color
 	 */
 	setFillColor(color) {
-		const canvasContext = this.getCanvasContext();
-		if (canvasContext) {
+		const canvasRenderingContext = this.getCanvasRenderingContext();
+		if (canvasRenderingContext) {
 			if (color) {
 				if (color instanceof Color) {
 				const colorString = color.toHEXString();
-				canvasContext.fillStyle = colorString;
+				canvasRenderingContext.fillStyle = colorString;
 				}
 				else {
-					canvasContext.fillStyle = color;
+					canvasRenderingContext.fillStyle = color;
 				}
 			}
 		}		
@@ -73,15 +73,15 @@ export class Graphic extends Object {
 	 * @param { Color | string | CanvasGradient | CanvasPattern } color
 	 */
 	setStrokeColor(color) {
-		const canvasContext = this.getCanvasContext();
-		if (canvasContext) {
+		const canvasRenderingContext = this.getCanvasRenderingContext();
+		if (canvasRenderingContext) {
 			if (color) {
 				if (color instanceof Color) {
 					const colorString = color.toHEXString();
-					canvasContext.strokeStyle = colorString;
+					canvasRenderingContext.strokeStyle = colorString;
 				}
 				else {
-					canvasContext.strokeStyle = color;
+					canvasRenderingContext.strokeStyle = color;
 				}
 			}
 		}		
@@ -95,15 +95,15 @@ export class Graphic extends Object {
 	 * @param { Vector2[] } positions
 	 */
 	drawLine(positions, size = 1) {
-		const canvasContext = this.getCanvasContext();
-		if (canvasContext) {
-			canvasContext.lineWidth = size;
-			canvasContext.beginPath();
-			canvasContext.moveTo(positions[0].x, positions[0].y);
+		const canvasRenderingContext = this.getCanvasRenderingContext();
+		if (canvasRenderingContext) {
+			canvasRenderingContext.lineWidth = size;
+			canvasRenderingContext.beginPath();
+			canvasRenderingContext.moveTo(positions[0].x, positions[0].y);
 			for (let i = 1; i < positions.length; ++i) {
-				canvasContext.lineTo(positions[i].x, positions[i].y);				
+				canvasRenderingContext.lineTo(positions[i].x, positions[i].y);				
 			}
-			canvasContext.stroke();
+			canvasRenderingContext.stroke();
 		}		
 	}
 
@@ -117,9 +117,9 @@ export class Graphic extends Object {
 	//  * @param { number } opacity 
 	 */
 	drawRect(rect) {
-		const canvasContext = this.getCanvasContext();
-		if (canvasContext) {
-			canvasContext.fillRect(rect.position.x, rect.position.y, rect.size.x, rect.size.y);
+		const canvasRenderingContext = this.getCanvasRenderingContext();
+		if (canvasRenderingContext) {
+			canvasRenderingContext.fillRect(rect.position.x, rect.position.y, rect.size.x, rect.size.y);
 		}
 	}
 
@@ -132,17 +132,17 @@ export class Graphic extends Object {
 	 * @param { number } radius 
 	 */
 	drawCircle(center, radius) {
-		const canvasContext = this.getCanvasContext();
-		if (canvasContext) {
-			canvasContext.beginPath();
-			canvasContext.arc(center.x, center.y, radius, 0, Math.PI * 2);
-			canvasContext.fill();
+		const canvasRenderingContext = this.getCanvasRenderingContext();
+		if (canvasRenderingContext) {
+			canvasRenderingContext.beginPath();
+			canvasRenderingContext.arc(center.x, center.y, radius, 0, Math.PI * 2);
+			canvasRenderingContext.fill();
 		}
 	}
 
 	//==============================================================================
 	// 이미지 출력.
-	// - setFillColor()
+	// - setFillColor() Not Supported.
 	//==============================================================================
 	/**
 	 * @param { HTMLImageElement | HTMLCanvasElement } image
@@ -154,61 +154,62 @@ export class Graphic extends Object {
 			throw new Error("image is null");
 		}
 
-		const canvasContext = this.getCanvasContext();
-		if (canvasContext) {
-			canvasContext.drawImage(image, position.x, position.y, contentSize.x, contentSize.y);
+		const canvasRenderingContext = this.getCanvasRenderingContext();
+		if (canvasRenderingContext) {
+			canvasRenderingContext.drawImage(image, position.x, position.y, contentSize.x, contentSize.y);
 		}
 	}
 
 	//==============================================================================
-	// 이미지 출력2.
-	// - setFillColor()
+	// 범위를 지정하는 이미지 출력.
+	// - setFillColor() Not Supported.
 	//==============================================================================
 	/**
 	 * @param { HTMLImageElement | HTMLCanvasElement } image
 	 * @param { Vector2 } position
 	 * @param { Vector2 } contentSize
-	 * @param { Rect } source
+	 * @param { Rect } sourceRect
 	 */
-	drawImage2(image, position, contentSize, source) {
+	drawImageWithSourceRect(image, position, contentSize, sourceRect) {
 		if (image === null){
 			throw new Error("image is null");
 		}
 
-		const canvasContext = this.getCanvasContext();
-		if (canvasContext) {
-			if (source === null || source.equals(Rect.zero())) {
-				source = Rect.create(0, 0, image.width, image.height);
+		const canvasRenderingContext = this.getCanvasRenderingContext();
+		if (canvasRenderingContext) {
+			if (sourceRect === null || sourceRect.equals(Rect.zero())) {
+				sourceRect = Rect.create(0, 0, image.width, image.height);
 			}
 
-			canvasContext.drawImage(image, 
-				source.position.x, source.position.y, source.size.x, source.size.y,
+			canvasRenderingContext.drawImage(image, 
+				sourceRect.position.x, sourceRect.position.y, sourceRect.size.x, sourceRect.size.y,
 				position.x, position.y, contentSize.x, contentSize.y);
 		}
 	}
 
 	//==============================================================================
 	// 이미지 나인패치 출력.
+	// - setFillColor() Not Supported.
 	//==============================================================================
 	/**
 	 * @static
 	 * @param { HTMLImageElement | HTMLCanvasElement } image
 	 * @param { Vector2 } position
 	 * @param { Vector2 } size
-	 * @param { Rect } ninepatch
+	 * @param { Rect } nineslice
 	 */
-	drawImageNinePatch(image, position, size, ninepatch) {
-		const canvasContext = this.getCanvasContext();
+	drawImageWithNineslice(image, position, size, nineslice) {
+		const canvasRenderingContext = this.getCanvasRenderingContext();
 		const sw = image.width;
 		const sh = image.height;
 		const dx = Math.floor(position.x);
 		const dy = Math.floor(position.y);
 		const dw = Math.ceil(size.x);
 		const dh = Math.ceil(size.y);
-		const left = ninepatch.position.x;
-		const top = ninepatch.position.y;
-		const right = ninepatch.size.x;
-		const bottom = ninepatch.size.y;
+		const left = nineslice.position.x;
+		const top = nineslice.position.y;
+		const right = nineslice.size.x;
+		const bottom = nineslice.size.y;
 
 		const hasHorizontal = left > 0 || right > 0;
 		const hasVertical = top > 0 || bottom > 0;
@@ -221,43 +222,44 @@ export class Graphic extends Object {
 			const centerDstH = dh - top - bottom;
 
 			// 위쪽.
-			canvasContext.drawImage(image, 0, 0, left, top, dx, dy, left + 1, top + 1);
-			canvasContext.drawImage(image, left, 0, centerSrcW, top, dx + left, dy, centerDstW + 1, top + 1);
-			canvasContext.drawImage(image, sw - right, 0, right, top, dx + dw - right, dy, right, top + 1);
+			canvasRenderingContext.drawImage(image, 0, 0, left, top, dx, dy, left + 1, top + 1);
+			canvasRenderingContext.drawImage(image, left, 0, centerSrcW, top, dx + left, dy, centerDstW + 1, top + 1);
+			canvasRenderingContext.drawImage(image, sw - right, 0, right, top, dx + dw - right, dy, right, top + 1);
 
 			// 가운데쪽.
-			canvasContext.drawImage(image, 0, top, left, centerSrcH, dx, dy + top, left + 1, centerDstH + 1);
-			canvasContext.drawImage(image, left, top, centerSrcW, centerSrcH, dx + left, dy + top, centerDstW + 1, centerDstH + 1);
-			canvasContext.drawImage(image, sw - right, top, right, centerSrcH, dx + dw - right, dy + top, right, centerDstH + 1);
+			canvasRenderingContext.drawImage(image, 0, top, left, centerSrcH, dx, dy + top, left + 1, centerDstH + 1);
+			canvasRenderingContext.drawImage(image, left, top, centerSrcW, centerSrcH, dx + left, dy + top, centerDstW + 1, centerDstH + 1);
+			canvasRenderingContext.drawImage(image, sw - right, top, right, centerSrcH, dx + dw - right, dy + top, right, centerDstH + 1);
 
 			// 아래쪽.
-			canvasContext.drawImage(image, 0, sh - bottom, left, bottom, dx, dy + dh - bottom, left + 1, bottom);
-			canvasContext.drawImage(image, left, sh - bottom, centerSrcW, bottom, dx + left, dy + dh - bottom, centerDstW + 1, bottom);
-			canvasContext.drawImage(image, sw - right, sh - bottom, right, bottom, dx + dw - right, dy + dh - bottom, right, bottom);
+			canvasRenderingContext.drawImage(image, 0, sh - bottom, left, bottom, dx, dy + dh - bottom, left + 1, bottom);
+			canvasRenderingContext.drawImage(image, left, sh - bottom, centerSrcW, bottom, dx + left, dy + dh - bottom, centerDstW + 1, bottom);
+			canvasRenderingContext.drawImage(image, sw - right, sh - bottom, right, bottom, dx + dw - right, dy + dh - bottom, right, bottom);
 		}
 		else if (hasHorizontal) {
 			// 가로만 쪼개기.
 			const centerSrcW = sw - left - right;
 			const centerDstW = dw - left - right;
 
-			canvasContext.drawImage(image, 0, 0, left, sh, dx, dy, left + 1, dh);
-			canvasContext.drawImage(image, left, 0, centerSrcW, sh, dx + left, dy, centerDstW + 1, dh);
-			canvasContext.drawImage(image, sw - right, 0, right, sh, dx + dw - right, dy, right, dh);
+			canvasRenderingContext.drawImage(image, 0, 0, left, sh, dx, dy, left + 1, dh);
+			canvasRenderingContext.drawImage(image, left, 0, centerSrcW, sh, dx + left, dy, centerDstW + 1, dh);
+			canvasRenderingContext.drawImage(image, sw - right, 0, right, sh, dx + dw - right, dy, right, dh);
 		}
 		else if (hasVertical) {
 			// 세로만 쪼개기.
 			const centerSrcH = sh - top - bottom;
 			const centerDstH = dh - top - bottom;
 
-			canvasContext.drawImage(image, 0, 0, sw, top, dx, dy, dw, top + 1);
-			canvasContext.drawImage(image, 0, top, sw, centerSrcH, dx, dy + top, dw, centerDstH + 1);
-			canvasContext.drawImage(image, 0, sh - bottom, sw, bottom, dx, dy + dh - bottom, dw, bottom);
+			canvasRenderingContext.drawImage(image, 0, 0, sw, top, dx, dy, dw, top + 1);
+			canvasRenderingContext.drawImage(image, 0, top, sw, centerSrcH, dx, dy + top, dw, centerDstH + 1);
+			canvasRenderingContext.drawImage(image, 0, sh - bottom, sw, bottom, dx, dy + dh - bottom, dw, bottom);
 		}
 		else {
 			// 쪼개기 없음.
-			canvasContext.drawImage(image, 0, 0, sw, sh, dx, dy, dw, dh);
+			canvasRenderingContext.drawImage(image, 0, 0, sw, sh, dx, dy, dw, dh);
 		}
-	}	
+	}
+
 	//==============================================================================
 	// 노드 출력.
 	//==============================================================================
@@ -287,19 +289,19 @@ export class Graphic extends Object {
 	 * @type { Rect } rect
 	 */
 	beginClipRect(rect) {
-		const canvasContext = this.getCanvasContext();
-		canvasContext.save();
-		canvasContext.beginPath();
-		canvasContext.rect(rect.position.x, rect.position.y, rect.size.x, rect.size.y); // left, top, width, height.
-		canvasContext.clip();
+		const canvasRenderingContext = this.getCanvasRenderingContext();
+		canvasRenderingContext.save();
+		canvasRenderingContext.beginPath();
+		canvasRenderingContext.rect(rect.position.x, rect.position.y, rect.size.x, rect.size.y); // left, top, width, height.
+		canvasRenderingContext.clip();
 	}
 
 	//==============================================================================
 	// 출력 영역 제한 종료.
 	//==============================================================================
 	endClipRect() {
-		const canvasContext = this.getCanvasContext();
-		canvasContext.restore();
+		const canvasRenderingContext = this.getCanvasRenderingContext();
+		canvasRenderingContext.restore();
 	}
 
 	//==============================================================================
@@ -308,7 +310,7 @@ export class Graphic extends Object {
 	/**
 	 * @returns { CanvasRenderingContext2D }
 	 */
-	getCanvasContext() {
-		return this.#canvasContext;
+	getCanvasRenderingContext() {
+		return this.#canvasRenderingContext;
 	}
 }

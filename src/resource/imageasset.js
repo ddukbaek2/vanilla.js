@@ -21,6 +21,7 @@ export class ImageAsset extends Asset {
 	//==============================================================================
 	constructor() {
 		super();
+		
 		this.image = new System.window.Image();
 	}
 
@@ -53,6 +54,16 @@ export class ImageAsset extends Asset {
 				reject(new Error(`Load fail: ${assetPath}`));
 			}
 		});
+	}
+
+	//==============================================================================
+	// 이미지 반환.
+	//==============================================================================
+	/**
+	 * @returns { HTMLImageElement }
+	 */
+	getImage() {
+		return this.image;
 	}
 
 	//==============================================================================

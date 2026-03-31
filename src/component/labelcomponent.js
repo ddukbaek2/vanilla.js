@@ -65,20 +65,20 @@ export class LabelComponent extends Component {
 			return;
 		}
 
-		const canvasContext = graphic.getCanvasContext();
+		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const fontFamily = this.#fontFace ? this.#fontFace.family : '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-		canvasContext.font = `${this.#fontSize}px ${fontFamily}`;
-		canvasContext.textAlign = this.#textAlign;
-		canvasContext.textBaseline = this.#textBaseline;
+		canvasRenderingContext.font = `${this.#fontSize}px ${fontFamily}`;
+		canvasRenderingContext.textAlign = this.#textAlign;
+		canvasRenderingContext.textBaseline = this.#textBaseline;
 
 		if (this.#strokeColor && this.#strokeWidth > 0) {
-			canvasContext.strokeStyle = this.#strokeColor;
-			canvasContext.lineWidth = this.#strokeWidth;
-			canvasContext.strokeText(this.#text, 0, 0);
+			canvasRenderingContext.strokeStyle = this.#strokeColor;
+			canvasRenderingContext.lineWidth = this.#strokeWidth;
+			canvasRenderingContext.strokeText(this.#text, 0, 0);
 		}
 
-		canvasContext.fillStyle = this.#textColor;
-		canvasContext.fillText(this.#text, 0, 0);
+		canvasRenderingContext.fillStyle = this.#textColor;
+		canvasRenderingContext.fillText(this.#text, 0, 0);
 	}
 
 	//==============================================================================
@@ -223,12 +223,12 @@ export class LabelComponent extends Component {
 		const fontSize = textDrawerComponent.getFontSize();
 		const text = textDrawerComponent.getText();
 
-		const canvasContext = graphic.getCanvasContext();
-		canvasContext.save();
+		const canvasRenderingContext = graphic.getCanvasRenderingContext();
+		canvasRenderingContext.save();
 		const fontFamily = fontFace ? fontFace.family : '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-		canvasContext.font = `${fontSize}px ${fontFamily}`;
+		canvasRenderingContext.font = `${fontSize}px ${fontFamily}`;
 
-		const metrics = canvasContext.measureText(text);
+		const metrics = canvasRenderingContext.measureText(text);
 		const width = metrics.width;
 		const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
 
@@ -245,7 +245,7 @@ export class LabelComponent extends Component {
 		// const y = position.y - (scaledHeight * pivot.y);
 		const x = position.x - scaledWidth;
 		const y = position.y - scaledHeight;
-		canvasContext.restore();
+		canvasRenderingContext.restore();
 
 		return Rect.create(x, y, scaledWidth, scaledHeight);
 	}

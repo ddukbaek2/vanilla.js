@@ -43,11 +43,9 @@ export class TimeManager extends Object {
 	// 시간 계산.
 	//==============================================================================
 	/**
-	 * @public
-	 * @method
 	 * @param { number } timestamp
 	 */
-	calculateTime(timestamp) {
+	update(timestamp) {
 		// timestamp: 현재 웹페이지의 생명주기가 시작된 후부터 경과된 시간. (밀리초)
 		// 이를 초 단위로 변환해서 사용함.
 		const realtimeSinceStartup = timestamp * 0.001;

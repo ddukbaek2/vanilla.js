@@ -14,116 +14,116 @@ class GL2D {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { CanvasRenderingContext2D } */ #canvasContext;
+	/** @private @type { CanvasRenderingContext2D } */ #canvasRenderingContext;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { CanvasRenderingContext2D } canvasContext 
+	 * @param { CanvasRenderingContext2D } canvasRenderingContext 
 	 */
-	constructor(canvasContext) {
-		this.#canvasContext = canvasContext;
+	constructor(canvasRenderingContext) {
+		this.#canvasRenderingContext = canvasRenderingContext;
 	}
 
 	//==============================================================================
 	// glIdentity.
 	//==============================================================================
 	glIdentity() {
-		if (this.#canvasContext === null || this.#canvasContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
-		// this.canvasContext.setTransform(1, 0, 0, 1, 0, 0);
-		this.#canvasContext.resetTransform();
+		// this.canvasRenderingContext.setTransform(1, 0, 0, 1, 0, 0);
+		this.#canvasRenderingContext.resetTransform();
 	}
 
 	//==============================================================================
 	// glTranslate.
 	//==============================================================================
 	glTranslate(x, y) {
-		if (this.#canvasContext === null || this.#canvasContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
-		this.#canvasContext.translate(x, y);	
+		this.#canvasRenderingContext.translate(x, y);	
 	}
 
 	//==============================================================================
 	// glScale.
 	//==============================================================================
 	glScale(x, y) {
-		if (this.#canvasContext === null || this.#canvasContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
-		this.#canvasContext.scale(x, y);
+		this.#canvasRenderingContext.scale(x, y);
 	}
 
 	//==============================================================================
 	// glRotate.
 	//==============================================================================
 	glRotate(radian) {
-		if (this.#canvasContext === null || this.#canvasContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
-		this.#canvasContext.rotate(radian);
+		this.#canvasRenderingContext.rotate(radian);
 	}
 
 	//==============================================================================
 	// glTransform.
 	//==============================================================================
 	glTransform(matrix) {
-		if (this.#canvasContext === null || this.#canvasContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
-		this.#canvasContext.transform(matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]);
+		this.#canvasRenderingContext.transform(matrix[0], matrix[1], matrix[2], matrix[3], matrix[4], matrix[5]);
 	}
 
 	//==============================================================================
 	// glViewport.
 	//==============================================================================
 	glViewport(x, y, width, height) {
-		if (this.#canvasContext === null || this.#canvasContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
-		this.#canvasContext.viewport(x, y, width, height);
+		this.#canvasRenderingContext.viewport(x, y, width, height);
 	}
 
 	//==============================================================================
 	// glClearColor.
 	//==============================================================================
 	glClearColor(r, g, b, a) {
-		if (this.#canvasContext === null || this.#canvasContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
-		this.#canvasContext.clearColor(r, g, b, a);
+		this.#canvasRenderingContext.clearColor(r, g, b, a);
 	}
 
 	//==============================================================================
 	// glPushMatrix.
 	//==============================================================================
 	glPushMatrix() {
-		if (this.#canvasContext === null || this.#canvasContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
-		this.#canvasContext.save();
+		this.#canvasRenderingContext.save();
 	}
 
 	//==============================================================================
 	// glPopMatrix.
 	//==============================================================================
 	glPopMatrix() {
-		if (this.#canvasContext === null || this.#canvasContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
-		this.#canvasContext.restore();
+		this.#canvasRenderingContext.restore();
 	}
 }

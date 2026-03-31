@@ -354,10 +354,10 @@ export class Scene extends Object {
 	/**
 	 * @returns { CanvasRenderingContext2D } 
 	 */
-	getCanvasContext() {
+	getCanvasRenderingContext() {
 		const engine = this.getEngine();
 		const graphic = engine.getGraphic();
-		return graphic.getCanvasContext();
+		return graphic.getCanvasRenderingContext();
 	}
 
 	//==============================================================================

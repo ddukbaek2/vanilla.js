@@ -82,9 +82,9 @@ export class Node extends Object {
 	 * @param { Graphic } graphic 
 	 */
 	beginCanvasState(graphic) {
-		const canvasContext = graphic.getCanvasContext();
-		if (canvasContext) {
-			canvasContext.save();
+		const canvasRenderingContext = graphic.getCanvasRenderingContext();
+		if (canvasRenderingContext) {
+			canvasRenderingContext.save();
 
 			const localPosition = this.getLocalPosition();
 			const localRotation = this.getLocalRotation();
@@ -96,15 +96,15 @@ export class Node extends Object {
 			const contentSize = this.getContentSize();
 
 			// 트랜스폼 조정.
-			canvasContext.translate(localPosition.x, localPosition.y);
-			canvasContext.rotate(radian);
-			canvasContext.scale(scale.x, scale.y);
+			canvasRenderingContext.translate(localPosition.x, localPosition.y);
+			canvasRenderingContext.rotate(radian);
+			canvasRenderingContext.scale(scale.x, scale.y);
 			
 			// 피봇 반영.
-			canvasContext.translate(-(contentSize.x * pivot.x), -(contentSize.y * pivot.y));
+			canvasRenderingContext.translate(-(contentSize.x * pivot.x), -(contentSize.y * pivot.y));
 
 			// 컬러 반영.
-			canvasContext.globalAlpha *= opacity;
+			canvasRenderingContext.globalAlpha *= opacity;
 		}
 	}
 
@@ -145,11 +145,11 @@ export class Node extends Object {
 		}
 
 		// 영역 및 기준점 출력.
-		const canvasContext = graphic.getCanvasContext();
-		if (canvasContext) {
+		const canvasRenderingContext = graphic.getCanvasRenderingContext();
+		if (canvasRenderingContext) {
 			// 기존 투명도 무효화 및 색상 설정.
-			const originalAlpha = canvasContext.globalAlpha;
-			canvasContext.globalAlpha = 1.0;
+			const originalAlpha = canvasRenderingContext.globalAlpha;
+			canvasRenderingContext.globalAlpha = 1.0;
 
 			// 컴포넌트 기즈모 출력.
 			const components = this.getAllComponents();
@@ -167,26 +167,26 @@ export class Node extends Object {
 			const bottom = top + contentSize.y;
 
 			// 기존 투명도 무효화 및 색상 설정.
-			canvasContext.fillStyle = "#00ff00";
-			canvasContext.strokeStyle = "#00ff00";
+			canvasRenderingContext.fillStyle = "#00ff00";
+			canvasRenderingContext.strokeStyle = "#00ff00";
 
 			// 범위.
-			canvasContext.beginPath();
-			canvasContext.moveTo(left, top);
-			canvasContext.lineTo(right, top);
-			canvasContext.lineTo(right, bottom);
-			canvasContext.lineTo(left, bottom);
-			canvasContext.lineTo(left, top);
-			canvasContext.stroke();
+			canvasRenderingContext.beginPath();
+			canvasRenderingContext.moveTo(left, top);
+			canvasRenderingContext.lineTo(right, top);
+			canvasRenderingContext.lineTo(right, bottom);
+			canvasRenderingContext.lineTo(left, bottom);
+			canvasRenderingContext.lineTo(left, top);
+			canvasRenderingContext.stroke();
 
 			// 기준점.
 			const pointSize = 4;
-			canvasContext.beginPath();
-			canvasContext.arc(origin.x, origin.y, pointSize, 0, Math.PI * 2);
-			canvasContext.fill();
+			canvasRenderingContext.beginPath();
+			canvasRenderingContext.arc(origin.x, origin.y, pointSize, 0, Math.PI * 2);
+			canvasRenderingContext.fill();
 			
 			// 기존 투명도 복원.
-			canvasContext.globalAlpha = originalAlpha;
+			canvasRenderingContext.globalAlpha = originalAlpha;
 		}
 	}
 
@@ -198,9 +198,9 @@ export class Node extends Object {
 	 * @param { Graphic } graphic 
 	 */
 	endCanvasState(graphic) {
-		const canvasContext = graphic.getCanvasContext();
-		if (canvasContext) {
-			canvasContext.restore();
+		const canvasRenderingContext = graphic.getCanvasRenderingContext();
+		if (canvasRenderingContext) {
+			canvasRenderingContext.restore();
 		}
 	}
 
@@ -217,40 +217,40 @@ export class Node extends Object {
 	// 	}
 		
 	// 	const engine = graphic.getEngine();
-	// 	const canvasContext = graphic.getCanvasContext();
+	// 	const canvasRenderingContext = graphic.getCanvasRenderingContext();
 
 	// 	const degree = this.getRotation();
 	// 	const radian = Math.degreeToRadian(degree);
 
 	// 	// 이미지 회전이 반영된 기준점 출력.
-	// 	canvasContext.fillStyle = "#00ff00";
+	// 	canvasRenderingContext.fillStyle = "#00ff00";
 	// 	const worldCorners = this.getWorldCorners();
 	// 	const pivots = [Pivot.topLeft, Pivot.topRight, Pivot.bottomRight, Pivot.bottomLeft];
 	// 	for (let i = 0; i < worldCorners.length; ++i) {
 	// 		const worldCorner = worldCorners[i];
-	// 		canvasContext.save();
+	// 		canvasRenderingContext.save();
 	// 		engine.gameViewIdentity(null);
-	// 		canvasContext.translate(worldCorner.x, worldCorner.y);
-	// 		canvasContext.rotate(radian);
+	// 		canvasRenderingContext.translate(worldCorner.x, worldCorner.y);
+	// 		canvasRenderingContext.rotate(radian);
 	// 		const contentSize = Vector2.create(4, 4);//.divide(this.getScale());
 	// 		const pivotPosition = Vector2.zero().subtract(contentSize.multiply(pivots[i]));
-	// 		canvasContext.fillRect(pivotPosition.x, pivotPosition.y, contentSize.x, contentSize.y);
-	// 		canvasContext.restore();
+	// 		canvasRenderingContext.fillRect(pivotPosition.x, pivotPosition.y, contentSize.x, contentSize.y);
+	// 		canvasRenderingContext.restore();
 	// 	}
 
 	// 	// 월드 코너 출력.
-	// 	canvasContext.save();
+	// 	canvasRenderingContext.save();
 	// 	engine.gameViewIdentity(null);
-	// 	canvasContext.strokeStyle = "#00ff00";
-	// 	canvasContext.lineWidth = 2;
-	// 	canvasContext.beginPath();
-	// 	canvasContext.moveTo(worldCorners[0].x, worldCorners[0].y);
+	// 	canvasRenderingContext.strokeStyle = "#00ff00";
+	// 	canvasRenderingContext.lineWidth = 2;
+	// 	canvasRenderingContext.beginPath();
+	// 	canvasRenderingContext.moveTo(worldCorners[0].x, worldCorners[0].y);
 	// 	for (let i = 1; i < worldCorners.length; ++i) {
-	// 		canvasContext.lineTo(worldCorners[i].x, worldCorners[i].y);
+	// 		canvasRenderingContext.lineTo(worldCorners[i].x, worldCorners[i].y);
 	// 	}
-	// 	canvasContext.closePath();
-	// 	canvasContext.stroke();
-	// 	canvasContext.restore();
+	// 	canvasRenderingContext.closePath();
+	// 	canvasRenderingContext.stroke();
+	// 	canvasRenderingContext.restore();
 	// }
 
 	//==============================================================================

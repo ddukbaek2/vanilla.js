@@ -34,9 +34,6 @@ export class Rect extends Object {
 	// 동등성 비교.
 	//==============================================================================
 	/**
-	 * @override
-	 * @method
-	 * @public
 	 * @param { any } other
 	 * @returns { boolean }
 	 */

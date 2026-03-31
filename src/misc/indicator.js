@@ -56,45 +56,45 @@ export class Indicator extends Object {
 	draw(graphic) {
 		if (!this.#isVisible) return;
 
-		const canvasContext = graphic.getCanvasContext();
+		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		
-		canvasContext.save();
+		canvasRenderingContext.save();
 		// 1. 지정된 위치로 이동 후 회전 적용
-		canvasContext.translate(this.#position.x, this.#position.y);
-		canvasContext.rotate(this.#rotation);
+		canvasRenderingContext.translate(this.#position.x, this.#position.y);
+		canvasRenderingContext.rotate(this.#rotation);
 
 		// 2. 그리기 설정
-		canvasContext.fillStyle = this.#color;
-		canvasContext.strokeStyle = this.#color;
-		canvasContext.lineWidth = this.#radius * 0.2;
-		canvasContext.lineCap = "round";
-		canvasContext.lineJoin = "round";
+		canvasRenderingContext.fillStyle = this.#color;
+		canvasRenderingContext.strokeStyle = this.#color;
+		canvasRenderingContext.lineWidth = this.#radius * 0.2;
+		canvasRenderingContext.lineCap = "round";
+		canvasRenderingContext.lineJoin = "round";
 
 		const teethCount = 8; // 톱니 개수
 		const innerRadius = this.#radius * 0.5; // 안쪽 구멍 크기
 		const outerRadius = this.#radius; // 바깥쪽 톱니 끝 크기
 
 		// 3. 톱니(Teeth) 그리기 (중심에서 바깥으로 뻗어나가는 선)
-		canvasContext.beginPath();
+		canvasRenderingContext.beginPath();
 		for (let i = 0; i < teethCount; i++) {
 			const angle = (i / teethCount) * Math.PI * 2;
 			const cosA = Math.cos(angle);
 			const sinA = Math.sin(angle);
 			
 			// 안쪽 링보다 살짝 안쪽에서 시작해서 바깥으로 뻗음
-			canvasContext.moveTo(cosA * (innerRadius * 0.8), sinA * (innerRadius * 0.8));
-			canvasContext.lineTo(cosA * outerRadius, sinA * outerRadius);
+			canvasRenderingContext.moveTo(cosA * (innerRadius * 0.8), sinA * (innerRadius * 0.8));
+			canvasRenderingContext.lineTo(cosA * outerRadius, sinA * outerRadius);
 		}
-		canvasContext.stroke();
+		canvasRenderingContext.stroke();
 
 		// 4. 안쪽 링(Ring) 그리기 (도넛 모양)
-		canvasContext.beginPath();
-		canvasContext.arc(0, 0, innerRadius, 0, Math.PI * 2);
+		canvasRenderingContext.beginPath();
+		canvasRenderingContext.arc(0, 0, innerRadius, 0, Math.PI * 2);
 		// 가운데 구멍 뚫기 위해 이전 방식 대신 stroke 두껍게 칠하기
-		canvasContext.lineWidth = this.#radius * 0.3;
-		canvasContext.stroke();
+		canvasRenderingContext.lineWidth = this.#radius * 0.3;
+		canvasRenderingContext.stroke();
 
-		canvasContext.restore();
+		canvasRenderingContext.restore();
 	}
 	
 	//==============================================================================

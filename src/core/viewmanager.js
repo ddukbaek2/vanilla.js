@@ -181,7 +181,7 @@ export class ViewManager extends Object {
 	/**
 	 * @public
 	 * @method
-	 * @param { CanvasRenderingContext2D } canvasContext
+	 * @param { CanvasRenderingContext2D } canvasRenderingContext
 	 * @param { number } scaleX
 	 * @param { number } scaleY
 	 * @param { number } skewX
@@ -190,8 +190,8 @@ export class ViewManager extends Object {
 	 * @param { number } translateY
 	* 
 	 */
-	applyTransform(canvasContext, scaleX, scaleY, skewX, skewY, translateX, translateY){
-		canvasContext.setTransform(scaleX, skewY, skewX, scaleY, translateX, translateY); // DOMMatrix2DInit
+	applyTransform(canvasRenderingContext, scaleX, scaleY, skewX, skewY, translateX, translateY){
+		canvasRenderingContext.setTransform(scaleX, skewY, skewX, scaleY, translateX, translateY); // DOMMatrix2DInit
 	}
 
 	//==============================================================================
@@ -202,9 +202,9 @@ export class ViewManager extends Object {
 	/**
 	 * @public
 	 * @method
-	 * @param { CanvasRenderingContext2D } canvasContext
+	 * @param { CanvasRenderingContext2D } canvasRenderingContext
 	 */
-	applyCanvasNativeRect(canvasContext) {
+	applyCanvasNativeRect(canvasRenderingContext) {
 		const devicePixelRatio = this.getDevicePixelRatio();
 		const scaleX = 1 * devicePixelRatio; // a
 		const scaleY = 1 * devicePixelRatio; // d
@@ -212,8 +212,8 @@ export class ViewManager extends Object {
 		const skewY = 0; // b
 		const translateX = 0; // e
 		const translateY = 0; // f
-		// canvasContext.setTransform(1, 0, 0, 1, 0, 0); // 기본.
-		this.applyTransform(canvasContext, scaleX, scaleY, skewX, skewY, translateX, translateY);
+		// canvasRenderingContext.setTransform(1, 0, 0, 1, 0, 0); // 기본.
+		this.applyTransform(canvasRenderingContext, scaleX, scaleY, skewX, skewY, translateX, translateY);
 	}
 
 	//==============================================================================
@@ -224,9 +224,9 @@ export class ViewManager extends Object {
 	/**
 	 * @public
 	 * @method
-	 * @param { CanvasRenderingContext2D } canvasContext
+	 * @param { CanvasRenderingContext2D } canvasRenderingContext
 	 */
-	applyViewRect(canvasContext) {
+	applyViewRect(canvasRenderingContext) {
 		const devicePixelRatio = this.getDevicePixelRatio();
 		const scaleX = this.#targetResolutionScale * devicePixelRatio;
 		const scaleY = this.#targetResolutionScale * devicePixelRatio;
@@ -234,7 +234,7 @@ export class ViewManager extends Object {
 		const skewY = 0;
 		const translateX = this.#viewRect.position.x * devicePixelRatio;
 		const translateY = this.#viewRect.position.y * devicePixelRatio;
-		this.applyTransform(canvasContext, scaleX, scaleY, skewX, skewY, translateX, translateY);
+		this.applyTransform(canvasRenderingContext, scaleX, scaleY, skewX, skewY, translateX, translateY);
 	}
 
 	//==============================================================================

@@ -36,7 +36,7 @@ export class ColorComponent extends Component {
 	draw(graphic) {
 		// super.draw(graphic);
 
-		const canvasContext = graphic.getCanvasContext();
+		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const node = this.getNode();
 		if (!node) return;
 
@@ -44,7 +44,7 @@ export class ColorComponent extends Component {
 		const contentSize = node.getContentSize();
 		const color = this.getColor();
 		const colorString = color.toHEXString();
-		canvasContext.fillStyle = colorString;
+		canvasRenderingContext.fillStyle = colorString;
 		graphic.drawRect(Rect.create(0, 0, contentSize.x, contentSize.y));
 	}
 

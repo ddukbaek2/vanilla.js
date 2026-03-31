@@ -68,7 +68,11 @@ export class Engine extends Object {
 		}
 		this.#engineConfiguration = engineConfiguration;
 		const canvas = this.getOrAddCanvas(engineConfiguration.canvasId);
-		const canvasContext = canvas.getContext("2d", { alpha: false });
+		const canvasRenderingContext = canvas.getContext("2d", { alpha: false }); // CanvasRenderingContext2D
+		// const canvasRenderingContext = canvas.getContext("bitmaprenderer"); // ImageBitmapRenderingContext
+		// const canvasRenderingContext = canvas.getContext("webgl"); // WebGLRenderingContext
+		// const canvasRenderingContext = canvas.getContext("webgl2"); // WebGL2RenderingContext
+		// const canvasRenderingContext = canvas.getContext("webgpu"); // GPUCanvasContext
 
 		this.#platform = new Platform();
 		this.#sceneManager = new SceneManager(this);
@@ -76,7 +80,7 @@ export class Engine extends Object {
 		this.#viewManager = new ViewManager(this, engineConfiguration.referenceResolutionSize);
 		this.#viewManager.setCanvas(canvas);
 		this.#inputManager = new InputManager(this);
-		this.#graphic = new Graphic(this, canvasContext);
+		this.#graphic = new Graphic(canvasRenderingContext);
 
 		this.#resizeCallback = this.resize.bind(this);
 		this.#updateEngineCallback = this.updateEngine.bind(this);
@@ -142,10 +146,6 @@ export class Engine extends Object {
 	//==============================================================================
 	// 웹페이지에 기반하는 이벤트 설정.
 	//==============================================================================
-	/**
-	 * @private
-	 * @method
-	 */
 	setupAllDocumentEvents() {
 		const viewManager = this.getViewManager();
 		const inputManager = this.getInputManager();
@@ -259,8 +259,6 @@ export class Engine extends Object {
 	// 입력 좌표 갱신.
 	//==============================================================================
 	/**
-	 * @private
-	 * @method
 	 * @param { number } x
 	 * @param { number } y
 	 */
@@ -293,7 +291,7 @@ export class Engine extends Object {
 		// 	return;
 		// }
 	
-		const canvasContext = graphic.getCanvasContext();
+		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const timeManager = this.getTimeManager();
 		const viewManager = this.getViewManager();
 		const inputManager = this.getInputManager();
@@ -302,32 +300,32 @@ export class Engine extends Object {
 		const drawOutlineText = (text) => {
 			if (text) {
 				// 출력.
-				canvasContext.fillText(text, textPosition.x, textPosition.y);
+				canvasRenderingContext.fillText(text, textPosition.x, textPosition.y);
 				
 				// 자동 외곽선 출력.
-				// canvasContext.strokeText(text, textPosition.x, textPosition.y);
-				// canvasContext.fillText(text, textPosition.x, textPosition.y);
+				// canvasRenderingContext.strokeText(text, textPosition.x, textPosition.y);
+				// canvasRenderingContext.fillText(text, textPosition.x, textPosition.y);
 
 				// 수동 외곽선 두께 출력.
 				// const offsets = [
 				// 	[-2, -2], [2, -2], [-2, 2], [2, 2], 
 				// 	[-2, 0], [2, 0], [0, -2], [0, 2]
 				// ];
-				// canvasContext.fillStyle = Colors.black;
+				// canvasRenderingContext.fillStyle = Colors.black;
 				// for (let i = 0; i < offsets.length; ++i) {
-				// 	canvasContext.fillText(text, textPosition.x + offsets[i][0], textPosition.y + offsets[i][1]);
+				// 	canvasRenderingContext.fillText(text, textPosition.x + offsets[i][0], textPosition.y + offsets[i][1]);
 				// }
 
 				// 수동 외곽선 안쪽 출력.
-				// canvasContext.fillStyle = Colors.white;
-				// canvasContext.fillText(text, textPosition.x, textPosition.y);
+				// canvasRenderingContext.fillStyle = Colors.white;
+				// canvasRenderingContext.fillText(text, textPosition.x, textPosition.y);
 			}
 
 			// 위치 증가.
 			textPosition.y += 16;
 
 			// 영역 출력.
-			const metrics = canvasContext.measureText(text);
+			const metrics = canvasRenderingContext.measureText(text);
 			const width = metrics.width; // metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight)
 			const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
 			return Rect.create(textPosition.x, textPosition.y, width, height);
@@ -352,25 +350,25 @@ export class Engine extends Object {
 
 		// 배경 출력.
 		// 기본 위치인 화면 좌상단으로 이동.
-		canvasContext.setTransform(1, 0, 0, 1, 0, 0);
-		canvasContext.fillStyle = "rgba(0, 0, 0, 0.6)";
+		canvasRenderingContext.setTransform(1, 0, 0, 1, 0, 0);
+		canvasRenderingContext.fillStyle = "rgba(0, 0, 0, 0.6)";
 		graphic.drawRect(Rect.create(10, 10, 480, 320));
 
-		// canvasContext.letterSpacing = "-1px";
-		canvasContext.font = `16px DOSGothic`;
-		canvasContext.textAlign = "left";
-		canvasContext.textBaseline = "top";
-		canvasContext.fillStyle = Colors.white;
-		// canvasContext.fillStyle = Colors.white; // Colors.lightVanilla;
-		// canvasContext.lineWidth = 4;
-		// canvasContext.strokeStyle = Colors.black; // Colors.darkVanilla;
-		// canvasContext.textRendering = "auto"; //optimizeLegibility"; //"geometricPrecision";
-		// canvasContext.shadowColor = Colors.white;
-		// canvasContext.shadowOffsetX = 0.5;
-		// canvasContext.shadowOffsetY = 0.5;
+		// canvasRenderingContext.letterSpacing = "-1px";
+		canvasRenderingContext.font = `16px DOSGothic`;
+		canvasRenderingContext.textAlign = "left";
+		canvasRenderingContext.textBaseline = "top";
+		canvasRenderingContext.fillStyle = Colors.white;
+		// canvasRenderingContext.fillStyle = Colors.white; // Colors.lightVanilla;
+		// canvasRenderingContext.lineWidth = 4;
+		// canvasRenderingContext.strokeStyle = Colors.black; // Colors.darkVanilla;
+		// canvasRenderingContext.textRendering = "auto"; //optimizeLegibility"; //"geometricPrecision";
+		// canvasRenderingContext.shadowColor = Colors.white;
+		// canvasRenderingContext.shadowOffsetX = 0.5;
+		// canvasRenderingContext.shadowOffsetY = 0.5;
 		
-		// canvasContext.imageSmoothingEnabled = false;
-		canvasContext.scale(1.4, 1.4);
+		// canvasRenderingContext.imageSmoothingEnabled = false;
+		canvasRenderingContext.scale(1.4, 1.4);
 
 		// 플랫폼 정보 출력.
 		this.#platform.getPlatformInfo();
@@ -469,7 +467,7 @@ export class Engine extends Object {
 
 		// 시간 처리.
 		const timeManager = this.getTimeManager();
-		timeManager.calculateTime(timestamp);
+		timeManager.update(timestamp);
 		const timeDelta = timeManager.getTimeDelta();
 
 		// 입력 처리.
@@ -480,7 +478,7 @@ export class Engine extends Object {
 		// this.CanvasContext.scale(this.#view.devicePixelRatio, this.#view.devicePixelRatio);
 		// this.CanvasContext.imageSmoothingEnabled = true;
     	// this.CanvasContext.imageSmoothingQuality = 'high';
-		// this.canvasContext.canvas.style.textRendering = 'optimizeLegibility';
+		// this.canvasRenderingContext.canvas.style.textRendering = 'optimizeLegibility';
 
 		// 씬 처리.
 		const sceneManager = this.getSceneManager();
@@ -519,8 +517,6 @@ export class Engine extends Object {
 	// 커서 보이기 설정.
 	//==============================================================================
 	/**
-	 * @public
-	 * @method
 	 * @param { boolean } visibled 
 	 */
 	setVisibleCursor(visibled) {
@@ -536,8 +532,6 @@ export class Engine extends Object {
 	// 캔버스 정보 반환.
 	//==============================================================================
 	/**
-	 * @public
-	 * @method
 	 * @returns { HTMLCanvasElement }
 	 */
 	getCanvas() {
@@ -549,8 +543,6 @@ export class Engine extends Object {
 	// 플랫폼 정보 반환.
 	//==============================================================================
 	/**
-	 * @public
-	 * @method
 	 * @returns { Platform }
 	 */
 	getPlatform() {
@@ -561,8 +553,6 @@ export class Engine extends Object {
 	// 씬 매니저 반환.
 	//==============================================================================
 	/**
-	 * @public
-	 * @method
 	 * @returns { SceneManager }
 	 */
 	getSceneManager() {
@@ -573,8 +563,6 @@ export class Engine extends Object {
 	// 시간 매니저 반환.
 	//==============================================================================
 	/**
-	 * @public
-	 * @method
 	 * @returns { TimeManager }
 	 */
 	getTimeManager() {
@@ -585,8 +573,6 @@ export class Engine extends Object {
 	// 뷰 매니저 반환.
 	//==============================================================================
 	/**
-	 * @public
-	 * @method
 	 * @returns { ViewManager }
 	 */
 	getViewManager() {
@@ -622,7 +608,7 @@ export class Engine extends Object {
 	getVersionString() {
 		return this.#version.getVersionString();
 	}
-	
+
 	//==============================================================================
 	// 개발 모드 여부 반환.
 	//==============================================================================

@@ -56,7 +56,6 @@ export class TextAsset extends Asset
 	//==============================================================================
 	/**
 	 * @override
-	 * @method
 	 */
 	unload() {
 		super.unload();
