@@ -2,7 +2,7 @@
 // // 포함 모듈 목록.
 // //==============================================================================
 // import { Vector2 } from "../base/vector2.js";
-// import { Renderer } from "../core/renderer.js";
+// import { Graphic } from "../core/graphic.js";
 // import { UINode } from "./uinode.js";
 // import { FontAsset } from "../resource/fontasset.js";
 
@@ -54,16 +54,16 @@
 // 	//==============================================================================
 // 	/**
 // 	 * @override
-// 	 * @param { Renderer } renderer 
+// 	 * @param { Graphic } graphic 
 // 	 */
-// 	draw(renderer) {
-// 		// super.draw(renderer);
+// 	draw(graphic) {
+// 		// super.draw(graphic);
 
 // 		if (!this.#text) {
 // 			return;
 // 		}
 
-// 		const canvasContext = renderer.getCanvasContext();
+// 		const canvasContext = graphic.getCanvasContext();
 // 		const fontFamily = this.#fontFace ? this.#fontFace.family : '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 // 		canvasContext.font = `${this.#fontSize}px ${fontFamily}`;
 // 		canvasContext.textAlign = this.#textAlign;

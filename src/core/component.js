@@ -3,7 +3,7 @@
 //==============================================================================
 import { Object } from "../base/object.js";
 import { Node } from "./node.js";
-import { Renderer } from "../core/renderer.js";
+import { Graphic } from "../core/graphic.js";
 
 
 //==============================================================================
@@ -46,9 +46,9 @@ export class Component extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	draw(renderer) {
+	draw(graphic) {
 		// 출력.
 	}
 
@@ -57,9 +57,9 @@ export class Component extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	drawGizmo(renderer) {
+	drawGizmo(graphic) {
 		const isGizmoVisible = this.isGizmoVisible();
 		if (!isGizmoVisible) {
 			return;

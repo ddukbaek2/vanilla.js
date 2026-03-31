@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { Enum } from "../base/identifier.js";
-import { Renderer } from "../core/renderer.js";
+import { Graphic } from "../core/graphic.js";
 import { Component } from "../core/component.js";
 
 
@@ -56,10 +56,10 @@ export class ButtonComponent extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	draw(renderer) {
-		// super.draw(renderer);
+	draw(graphic) {
+		// super.draw(graphic);
 	}
 
 	//==============================================================================

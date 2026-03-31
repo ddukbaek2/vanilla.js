@@ -4,7 +4,7 @@
 const System = globalThis;
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
-import { Renderer } from "./renderer.js";
+import { Graphic } from "./graphic.js";
 
 
 //==============================================================================
@@ -51,12 +51,12 @@ export class Indicator extends Object {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	draw(renderer) {
+	draw(graphic) {
 		if (!this.#isVisible) return;
 
-		const canvasContext = renderer.getCanvasContext();
+		const canvasContext = graphic.getCanvasContext();
 		
 		canvasContext.save();
 		// 1. 지정된 위치로 이동 후 회전 적용

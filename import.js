@@ -47,7 +47,7 @@ export { SceneManager } from "./src/core/scenemanager.js";
 export { TimeManager } from "./src/core/timemanager.js";
 export { ViewScaleMode, ViewManager } from "./src/core/viewmanager.js";
 export { InputManager } from "./src/core/inputmanager.js";
-export { Renderer } from "./src/core/renderer.js";
+export { Graphic } from "./src/core/graphic.js";
 export { Scene } from "./src/core/scene.js";
 export { Node } from "./src/core/node.js";
 export { UINode } from "./src/core/uinode.js";

@@ -6,7 +6,7 @@ import { Vector2 as Vec2 } from "./src/base/vector2.js";
 import { Rect } from "./src/base/rect.js";
 import { Colors } from "./src/base/colors.js";
 import { Engine, EngineConfiguration } from "./src/core/engine.js";
-import { Renderer } from "./src/core/renderer.js";
+import { Graphic } from "./src/core/graphic.js";
 import { Scene } from "./src/core/scene.js";
 import { ViewScaleMode } from "./src/core/viewmanager.js";
 import { Node } from "./src/core/node.js";
@@ -112,11 +112,11 @@ class Tutorial_2 extends Scene {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	draw(renderer) {
+	draw(graphic) {
 		const engine = super.getEngine();
-		const canvasContext = renderer.getCanvasContext();
+		const canvasContext = graphic.getCanvasContext();
 		const viewManager = engine.getViewManager();
 		const canvasNativeSize = viewManager.getCanvasNativeSize();
 		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
@@ -124,15 +124,15 @@ class Tutorial_2 extends Scene {
 		// 전체 화면 칠하기.
 		viewManager.applyCanvasNativeRect(canvasContext);
 		canvasContext.fillStyle = Colors.darkVanilla;
-		renderer.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
 
 		// 게임 영역 칠하기.
 		viewManager.applyViewRect(canvasContext);
 		canvasContext.fillStyle = Colors.lightVanilla;
-		renderer.drawRect(Rect.create(0, 0, referenceResolutionSize.x, referenceResolutionSize.y));
+		graphic.drawRect(Rect.create(0, 0, referenceResolutionSize.x, referenceResolutionSize.y));
 
 		// 출력.
-		super.draw(renderer);
+		super.draw(graphic);
 	}
 }
 

@@ -4,7 +4,7 @@
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
 import { Engine } from "./engine.js";
-import { Renderer } from "./renderer.js";
+import { Graphic } from "./graphic.js";
 import { Node } from "./node.js";
 import { Tween } from "./tween.js";
 
@@ -15,7 +15,7 @@ import { Tween } from "./tween.js";
 // - finalize(engine) ==> async unload(engine) ==> destroy()
 // - resize(canvasNativeSize)
 // - tick(timeDelta)
-// - preDraw(renderer) ==> draw(renderer) ==> postDraw(renderer)
+// - preDraw(graphic) ==> draw(graphic) ==> postDraw(graphic)
 // - touchPress(viewInputPosition) ==> touchMove(viewInputPosition) ==> touchRelease(viewInputPosition)
 // - reset()
 //==============================================================================
@@ -165,11 +165,11 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	preDraw(renderer) {
+	preDraw(graphic) {
 		// // 노드 출력.
-		// renderer.drawNode(this.#root);
+		// graphic.drawNode(this.#root);
 	}
 
 	//==============================================================================
@@ -177,11 +177,11 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	draw(renderer) {
+	draw(graphic) {
 		// 노드 출력.
-		renderer.drawNode(this.#root);
+		graphic.drawNode(this.#root);
 	}
 
 	//==============================================================================
@@ -189,9 +189,9 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	postDraw(renderer) {
+	postDraw(graphic) {
 
 	}
 
@@ -200,9 +200,9 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	drawGizmo(renderer) {
+	drawGizmo(graphic) {
 		const isGizmoVisible = this.isGizmoVisible();
 		if (!isGizmoVisible) {
 			return;
@@ -356,8 +356,8 @@ export class Scene extends Object {
 	 */
 	getCanvasContext() {
 		const engine = this.getEngine();
-		const renderer = engine.getRenderer();
-		return renderer.getCanvasContext();
+		const graphic = engine.getGraphic();
+		return graphic.getCanvasContext();
 	}
 
 	//==============================================================================

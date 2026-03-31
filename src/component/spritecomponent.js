@@ -5,7 +5,7 @@ import { Vector2 } from "../base/vector2.js";
 import { Rect } from "../base/rect.js";
 import * as Math from "../base/math.js";
 import { ImageAsset } from "../resource/imageasset.js";
-import { Renderer } from "../core/renderer.js";
+import { Graphic } from "../core/graphic.js";
 import { ColorComponent } from "./colorcomponent.js";
 
 
@@ -77,19 +77,19 @@ export class SpriteComponent extends ColorComponent {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Renderer } renderer
+	 * @param { Graphic } graphic
 	 */
-	draw(renderer) {
-		// super.draw(renderer);
+	draw(graphic) {
+		// super.draw(graphic);
 
-		const canvasContext = renderer.getCanvasContext();
+		const canvasContext = graphic.getCanvasContext();
 		const image = this.getImage();
 		const color = super.getColor();
 		const colorString = color.toHEXString();
 		if (image === null) {
 			// 출력.
 			canvasContext.fillStyle = colorString;
-			super.draw(renderer);
+			super.draw(graphic);
 			return;
 		}
 
@@ -109,7 +109,7 @@ export class SpriteComponent extends ColorComponent {
 
 		// 출력.
 		canvasContext.fillStyle = colorString;
-		renderer.drawImage2(image, position, imageSize, imageRect);
+		graphic.drawImage2(image, position, imageSize, imageRect);
 	}
 
 	//==============================================================================

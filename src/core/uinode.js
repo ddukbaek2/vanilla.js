@@ -3,7 +3,7 @@
 //==============================================================================
 import { Vector2 } from "../base/vector2.js";
 import * as Math from "../base/math.js";
-import { Renderer } from "../core/renderer.js";
+import { Graphic } from "../core/graphic.js";
 import { Node } from "../core/node.js";
 
 //==============================================================================

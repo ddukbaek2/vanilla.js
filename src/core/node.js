@@ -3,7 +3,7 @@
 //==============================================================================
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
-import { Renderer } from "./renderer.js";
+import { Graphic } from "./graphic.js";
 import * as Math from "../base/math.js";
 import { Component } from "./component.js";
 import { Pivot } from "../base/pivot.js";
@@ -79,10 +79,10 @@ export class Node extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	beginCanvasState(renderer) {
-		const canvasContext = renderer.getCanvasContext();
+	beginCanvasState(graphic) {
+		const canvasContext = graphic.getCanvasContext();
 		if (canvasContext) {
 			canvasContext.save();
 
@@ -113,21 +113,21 @@ export class Node extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	draw(renderer) {
+	draw(graphic) {
 		const isVisible = this.isVisible();
 		if (isVisible) {
 			// 컴포넌트 목록 출력.
 			const components = this.getAllComponents();
 			for (const component of components) {
-				component.draw(renderer);
+				component.draw(graphic);
 			}
 
 			// 자식 목록 출력.
 			const children = this.getChildren();
 			for (const child of children) {
-				renderer.drawNode(child);
+				graphic.drawNode(child);
 			}
 		}
 	}
@@ -136,16 +136,16 @@ export class Node extends Object {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	drawGizmo(renderer) {
+	drawGizmo(graphic) {
 		const isGizmoVisible = this.isGizmoVisible();
 		if (!isGizmoVisible) {
 			return;
 		}
 
 		// 영역 및 기준점 출력.
-		const canvasContext = renderer.getCanvasContext();
+		const canvasContext = graphic.getCanvasContext();
 		if (canvasContext) {
 			// 기존 투명도 무효화 및 색상 설정.
 			const originalAlpha = canvasContext.globalAlpha;
@@ -154,7 +154,7 @@ export class Node extends Object {
 			// 컴포넌트 기즈모 출력.
 			const components = this.getAllComponents();
 			for (const component of components) {
-				component.drawGizmo(renderer);
+				component.drawGizmo(graphic);
 			}
 
 			// 좌표.
@@ -195,10 +195,10 @@ export class Node extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	endCanvasState(renderer) {
-		const canvasContext = renderer.getCanvasContext();
+	endCanvasState(graphic) {
+		const canvasContext = graphic.getCanvasContext();
 		if (canvasContext) {
 			canvasContext.restore();
 		}
@@ -209,15 +209,15 @@ export class Node extends Object {
 	// //==============================================================================
 	// /**
 	//  * @virtual
-	//  * @param { Renderer } renderer 
+	//  * @param { Graphic } graphic 
 	//  */
-	// drawGizmo(renderer) {
+	// drawGizmo(graphic) {
 	// 	if (!this.isVisibleGizmos()) {
 	// 		return;
 	// 	}
 		
-	// 	const engine = renderer.getEngine();
-	// 	const canvasContext = renderer.getCanvasContext();
+	// 	const engine = graphic.getEngine();
+	// 	const canvasContext = graphic.getCanvasContext();
 
 	// 	const degree = this.getRotation();
 	// 	const radian = Math.degreeToRadian(degree);

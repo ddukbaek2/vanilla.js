@@ -48,9 +48,9 @@ export class ImageScroller extends Object {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	draw(renderer) {
+	draw(graphic) {
 		if (!this.#image) {
 			return;
 		}
@@ -69,13 +69,13 @@ export class ImageScroller extends Object {
 		const startX = this.#viewRect.position.x + (modX <= 0 ? modX : modX - imgW);
 		const startY = this.#viewRect.position.y + (modY <= 0 ? modY : modY - imgH);
 
-		renderer.beginClipRect(this.#viewRect);
+		graphic.beginClipRect(this.#viewRect);
 		
 		// 이미지 크기를 1.5픽셀정도 키워서 겹쳐 그려서 이미지 사이의 틈을 가리기.
 		const overlap = 1.5;
 		for (let x = startX; x < this.#viewRect.position.x + this.#viewRect.size.x; x += imgW) {
 			for (let y = startY; y < this.#viewRect.position.y + this.#viewRect.size.y; y += imgH) {
-				renderer.drawImage(
+				graphic.drawImage(
 					this.#image, 
 					Vector2.create(Math.floor(x), Math.floor(y)), 
 					Vector2.create(imgW + overlap, imgH + overlap)
@@ -83,7 +83,7 @@ export class ImageScroller extends Object {
 			}
 		}
 
-		renderer.endClipRect();
+		graphic.endClipRect();
 	}
 
 	//==============================================================================

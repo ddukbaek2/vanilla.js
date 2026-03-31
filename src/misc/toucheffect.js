@@ -77,11 +77,11 @@ export class TouchEffect extends Node {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	beginCanvasState(renderer) {
-		super.beginCanvasState(renderer);
-		const canvasContext = renderer.getCanvasContext();
+	beginCanvasState(graphic) {
+		super.beginCanvasState(graphic);
+		const canvasContext = graphic.getCanvasContext();
 		this.#originalCompositeOperation = canvasContext.globalCompositeOperation;
 		canvasContext.globalCompositeOperation = "lighter";
 	}
@@ -91,13 +91,13 @@ export class TouchEffect extends Node {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	endCanvasState(renderer) {
-		const canvasContext = renderer.getCanvasContext();
+	endCanvasState(graphic) {
+		const canvasContext = graphic.getCanvasContext();
 		// canvasContext.globalCompositeOperation = "source-over";
 		canvasContext.globalCompositeOperation = this.#originalCompositeOperation;
-		super.endCanvasState(renderer);
+		super.endCanvasState(graphic);
 	}
 
 	//==============================================================================
@@ -105,11 +105,11 @@ export class TouchEffect extends Node {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	draw(renderer) {
-		super.draw(renderer);
-		this.drawTouchParticles(renderer);
+	draw(graphic) {
+		super.draw(graphic);
+		this.drawTouchParticles(graphic);
 	}
 
 	//==============================================================================
@@ -147,14 +147,14 @@ export class TouchEffect extends Node {
 	// 터치 파티클 출력.
 	//==============================================================================
 	/**
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	drawTouchParticles(renderer) {
+	drawTouchParticles(graphic) {
 		if (this.#touchParticles.length === 0) {
 			return;
 		}
 
-		const canvasContext = renderer.getCanvasContext();
+		const canvasContext = graphic.getCanvasContext();
 		for (let i = 0; i < this.#touchParticles.length; ++i) {
 			const particle = this.#touchParticles[i];
 			const opacity = Math.max(0, particle.life / particle.maxLife);

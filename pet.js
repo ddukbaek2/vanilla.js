@@ -5,7 +5,7 @@ export class ParticleEffectTool extends Scene {
 	async load(engine) {
 		await super.load(engine);
 	}
-	draw(renderer) {
-		super.draw(renderer);
+	draw(graphic) {
+		super.draw(graphic);
 	}
 }

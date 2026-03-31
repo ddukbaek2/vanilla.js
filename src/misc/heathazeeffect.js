@@ -4,7 +4,7 @@
 const System = globalThis;
 import { Vector2 } from "../base/vector2.js";
 import { Node } from "../core/node.js";
-import { Renderer } from "../core/renderer.js";
+import { Graphic } from "../core/graphic.js";
 
 
 //==============================================================================
@@ -52,15 +52,15 @@ export class HeatHazeEffect extends Node {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	draw(renderer) {
+	draw(graphic) {
 		// 노드 자체가 활성화 상태가 아니면 그리지 않음.
 		if (!this.isActive()) {
 			return;
 		}
 
-		const canvasContext = renderer.getCanvasContext();
+		const canvasContext = graphic.getCanvasContext();
 		const contentSize = this.getContentSize();
 
 		// 영역 크기가 없다면 그리지 않음.
@@ -95,7 +95,7 @@ export class HeatHazeEffect extends Node {
 		}
 
 		// 자식 노드가 있다면 마저 그립니다.
-		super.draw(renderer);
+		super.draw(graphic);
 	}
 
 	//==============================================================================

@@ -3,7 +3,7 @@
 //==============================================================================
 import { Color } from "../base/color.js";
 import { Rect } from "../base/rect.js";
-import { Renderer } from "../core/renderer.js";
+import { Graphic } from "../core/graphic.js";
 import { Component } from "../core/component.js";
 
 
@@ -31,12 +31,12 @@ export class ColorComponent extends Component {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	draw(renderer) {
-		// super.draw(renderer);
+	draw(graphic) {
+		// super.draw(graphic);
 
-		const canvasContext = renderer.getCanvasContext();
+		const canvasContext = graphic.getCanvasContext();
 		const node = this.getNode();
 		if (!node) return;
 
@@ -45,7 +45,7 @@ export class ColorComponent extends Component {
 		const color = this.getColor();
 		const colorString = color.toHEXString();
 		canvasContext.fillStyle = colorString;
-		renderer.drawRect(Rect.create(0, 0, contentSize.x, contentSize.y));
+		graphic.drawRect(Rect.create(0, 0, contentSize.x, contentSize.y));
 	}
 
 	//==============================================================================

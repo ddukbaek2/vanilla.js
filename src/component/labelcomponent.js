@@ -3,7 +3,7 @@
 //==============================================================================
 import { Vector2 } from "../base/vector2.js";
 import { Rect } from "../base/rect.js";
-import { Renderer } from "../core/renderer.js";
+import { Graphic } from "../core/graphic.js";
 import { Component } from "../core/component.js";
 import { FontAsset } from "../resource/fontasset.js";
 
@@ -58,14 +58,14 @@ export class LabelComponent extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	draw(renderer) {
+	draw(graphic) {
 		if (!this.#text) {
 			return;
 		}
 
-		const canvasContext = renderer.getCanvasContext();
+		const canvasContext = graphic.getCanvasContext();
 		const fontFamily = this.#fontFace ? this.#fontFace.family : '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 		canvasContext.font = `${this.#fontSize}px ${fontFamily}`;
 		canvasContext.textAlign = this.#textAlign;
@@ -212,18 +212,18 @@ export class LabelComponent extends Component {
 	// 텍스트가 출력되는 영역을 Rect로 반환.
 	//==============================================================================
 	/**
-	 * @param { Renderer } renderer
+	 * @param { Graphic } graphic
 	 * @param { LabelComponent } textDrawerComponent
 	 * @param { string } text
 	 * @param { string } font
 	 * @returns { Rect }
 	 */
-	static calculateTextBounds(renderer, textDrawerComponent) {
+	static calculateTextBounds(graphic, textDrawerComponent) {
 		const fontFace = textDrawerComponent.getFontFace();
 		const fontSize = textDrawerComponent.getFontSize();
 		const text = textDrawerComponent.getText();
 
-		const canvasContext = renderer.getCanvasContext();
+		const canvasContext = graphic.getCanvasContext();
 		canvasContext.save();
 		const fontFamily = fontFace ? fontFace.family : '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 		canvasContext.font = `${fontSize}px ${fontFamily}`;

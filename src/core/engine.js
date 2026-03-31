@@ -10,7 +10,7 @@ import { TimeManager } from "./timemanager.js";
 import { ViewManager } from "./viewmanager.js";
 import { InputManager } from "./inputmanager.js";
 import { Platform, PlatformType, BrowserType, SYSTEM_FONT_STRING } from "../base/platform.js";
-import { Renderer } from "./renderer.js";
+import { Graphic } from "./graphic.js";
 import { Scene } from "./scene.js";
 import { Rect } from "../base/rect.js";
 import { SceneManager } from "./scenemanager.js";
@@ -49,7 +49,7 @@ export class Engine extends Object {
 	/** @private @type { TimeManager } */ #timeManager;
 	/** @private @type { ViewManager } */ #viewManager;
 	/** @private @type { InputManager } */ #inputManager;
-	/** @private @type { Renderer } */ #renderer;
+	/** @private @type { Graphic } */ #graphic;
 	/** @private @type { () => void  } */ #resizeCallback;
 	/** @private @type { FrameRequestCallback } */ #updateEngineCallback;
 	/** @private @type { Version } */ #version;
@@ -76,7 +76,7 @@ export class Engine extends Object {
 		this.#viewManager = new ViewManager(this, engineConfiguration.referenceResolutionSize);
 		this.#viewManager.setCanvas(canvas);
 		this.#inputManager = new InputManager(this);
-		this.#renderer = new Renderer(this, canvasContext);
+		this.#graphic = new Graphic(this, canvasContext);
 
 		this.#resizeCallback = this.resize.bind(this);
 		this.#updateEngineCallback = this.updateEngine.bind(this);
@@ -285,15 +285,15 @@ export class Engine extends Object {
 	// 개발 관련 정보 출력.
 	//==============================================================================
 	/**
-	 * @param { Renderer } renderer 
+	 * @param { Graphic } graphic 
 	 */
-	drawStatistics(renderer) {
+	drawStatistics(graphic) {
 		// const isDevelopment = this.isDevelopment();
 		// if (!isDevelopment) {
 		// 	return;
 		// }
 	
-		const canvasContext = renderer.getCanvasContext();
+		const canvasContext = graphic.getCanvasContext();
 		const timeManager = this.getTimeManager();
 		const viewManager = this.getViewManager();
 		const inputManager = this.getInputManager();
@@ -354,7 +354,7 @@ export class Engine extends Object {
 		// 기본 위치인 화면 좌상단으로 이동.
 		canvasContext.setTransform(1, 0, 0, 1, 0, 0);
 		canvasContext.fillStyle = "rgba(0, 0, 0, 0.6)";
-		renderer.drawRect(Rect.create(10, 10, 480, 320));
+		graphic.drawRect(Rect.create(10, 10, 480, 320));
 
 		// canvasContext.letterSpacing = "-1px";
 		canvasContext.font = `16px DOSGothic`;
@@ -464,8 +464,8 @@ export class Engine extends Object {
 	updateEngine(timestamp) {
 
 		// 렌더러 처리.
-		const renderer = this.getRenderer();
-		renderer.applySettings(this);
+		const graphic = this.getGraphic();
+		graphic.applySettings(this);
 
 		// 시간 처리.
 		const timeManager = this.getTimeManager();
@@ -491,10 +491,10 @@ export class Engine extends Object {
 				loadedScene.tick(timeDelta);
 
 				// 출력.
-				loadedScene.preDraw(renderer);
-				loadedScene.draw(renderer);
-				loadedScene.postDraw(renderer);
-				loadedScene.drawGizmo(renderer);
+				loadedScene.preDraw(graphic);
+				loadedScene.draw(graphic);
+				loadedScene.postDraw(graphic);
+				loadedScene.drawGizmo(graphic);
 			}
 			catch (error) {
 				console.error(error);
@@ -504,7 +504,7 @@ export class Engine extends Object {
 		// 개발 정보 출력.
 		const isDevelopment = this.isDevelopment();
 		if (isDevelopment) {
-			this.drawStatistics(renderer);
+			this.drawStatistics(graphic);
 		}
 		
 		// 입력 관련해서 상태 유지가 아닌, 현재 프레임이 끝난 후에는 다음 프레임에서는 상태를 유지하지 않음. (1회성)
@@ -597,8 +597,6 @@ export class Engine extends Object {
 	// 입력 매니저 반환.
 	//==============================================================================
 	/**
-	 * @public
-	 * @method
 	 * @returns { InputManager }
 	 */
 	getInputManager() {
@@ -609,20 +607,26 @@ export class Engine extends Object {
 	// 렌더러 반환.
 	//==============================================================================
 	/**
-	 * @public
-	 * @method
-	 * @returns { Renderer }
+	 * @returns { Graphic }
 	 */
-	getRenderer() {
-		return this.#renderer;
+	getGraphic() {
+		return this.#graphic;
 	}
 
+	//==============================================================================
+	// 버전 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getVersionString() {
+		return this.#version.getVersionString();
+	}
+	
 	//==============================================================================
 	// 개발 모드 여부 반환.
 	//==============================================================================
 	/**
-	 * @public
-	 * @method
 	 * @returns { boolean }
 	 */
 	isDevelopment() {
@@ -633,8 +637,6 @@ export class Engine extends Object {
 	// 캔버스 생성 or 반환.
 	//==============================================================================
 	/**
-	 * @public
-	 * @method
 	 * @param { string } canvasId
 	 * @returns { HTMLCanvasElement }
 	 */
@@ -647,15 +649,5 @@ export class Engine extends Object {
 		}
 
 		return canvas;
-	}
-
-	//==============================================================================
-	// 버전 반환.
-	//==============================================================================
-	/**
-	 * @returns { string }
-	 */
-	getVersionString() {
-		return this.#version.getVersionString();
 	}
 }
