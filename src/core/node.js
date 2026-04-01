@@ -79,14 +79,24 @@ export class Node extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic
 	 */
 	beginCanvasState(graphic) {
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		if (canvasRenderingContext) {
 			canvasRenderingContext.save();
 
-			const localPosition = this.getLocalPosition();
+			let localPosition = this.getLocalPosition();
+			const parent = this.getParent();
+			if (parent) {
+				const parentPivot = parent.getPivot();
+				const parentContentSize = parent.getContentSize();
+				localPosition = Vector2.create(
+					localPosition.x + (parentContentSize.x * parentPivot.x),
+					localPosition.y + (parentContentSize.y * parentPivot.y)
+				);
+			}
+
 			const localRotation = this.getLocalRotation();
 			const radian = Math.degreeToRadian(localRotation);
 			const scale = this.getLocalScale();
@@ -99,7 +109,7 @@ export class Node extends Object {
 			canvasRenderingContext.translate(localPosition.x, localPosition.y);
 			canvasRenderingContext.rotate(radian);
 			canvasRenderingContext.scale(scale.x, scale.y);
-			
+
 			// 피봇 반영.
 			canvasRenderingContext.translate(-(contentSize.x * pivot.x), -(contentSize.y * pivot.y));
 
@@ -184,12 +194,11 @@ export class Node extends Object {
 			canvasRenderingContext.beginPath();
 			canvasRenderingContext.arc(origin.x, origin.y, pointSize, 0, Math.PI * 2);
 			canvasRenderingContext.fill();
-			
+
 			// 기존 투명도 복원.
 			canvasRenderingContext.globalAlpha = originalAlpha;
 		}
 	}
-
 	//==============================================================================
 	// 출력 상태 종료.
 	//==============================================================================
