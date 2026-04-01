@@ -229,6 +229,41 @@ export class Engine extends Object {
 				touchEvent.preventDefault();
 			}, { passive: false });
 
+		// 터치 움직일 때.
+		System.window.addEventListener("touchmove", (touchEvent) => {
+				const touch = touchEvent.changedTouches[0];
+				if (!touch) {
+					return;
+				}
+				const x = touch.clientX;
+				const y = touch.clientY;
+				if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) {
+					inputManager.setTouchMoved(false);
+					inputManager.setTouchReleased(true);				
+				}
+			});
+
+		// // 터치 취소 될 때.
+		// System.window.addEventListener("touchcancel", (touchEvent) => {
+		// 	const touch = touchEvent.changedTouches[0];
+		// 	if (touch) {
+		// 		this.updateCanvasNativeInputPosition(touch.clientX, touch.clientY);
+		// 	}
+
+		// 	const inputManager = this.getInputManager();
+		// 	inputManager.setTouchMoved(false);
+		// 	inputManager.setTouchReleased(true);
+		// 	touchEvent.preventDefault();		
+		// }, { passive: false });
+
+		// 앱이나 창이 전환 될 때.
+		System.window.addEventListener("blur", (focusEvent) => {  
+			const inputManager = this.getInputManager();
+			inputManager.setTouchMoved(false);
+			inputManager.setTouchReleased(true);
+			focusEvent.preventDefault();		
+		}, { passive: false });
+
 		// 커서가 보이거나 감춰질 때.
 		System.document.addEventListener("pointerlockchange", () => {
 			if (document.pointerLockElement === canvas) {
