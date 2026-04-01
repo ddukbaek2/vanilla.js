@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+const System = globalThis;
 import { Object } from "./object.js";
 
 
@@ -84,5 +85,16 @@ export class Enum extends Object {
 	 */
 	static auto() {
 		return Enum.#identifier.auto();
+	}
+
+	//==============================================================================
+	// 고정 열거체 생성.
+	//==============================================================================
+	/**
+	 * @static
+	 * @returns { System.Object }
+	 */
+	static readonly(dictionary) {
+		System.Object.freeze(dictionary);
 	}
 }
