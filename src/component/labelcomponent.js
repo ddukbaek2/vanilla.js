@@ -116,7 +116,9 @@ export class LabelComponent extends Component {
 			canvasRenderingContext.strokeText(this.#text, drawX, drawY);
 		}
 
-		canvasRenderingContext.fillStyle = this.#textColor;
+		const textColor = this.getTextColor();
+		const textColorString = textColor.toHEXString();
+		canvasRenderingContext.fillStyle = textColorString;
 		canvasRenderingContext.fillText(this.#text, drawX, drawY);
 	}
 
@@ -192,16 +194,6 @@ export class LabelComponent extends Component {
 	// 텍스트 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { string } color
-	 */
-	setTextColor(color) {
-		this.#textColor = color;
-	}
-
-	//==============================================================================
-	// 텍스트 색상 설정.
-	//==============================================================================
-	/**
 	 * @param { Color | string | CanvasGradient | CanvasPattern } color
 	 */
 	setTextColor(color) {
@@ -260,7 +252,7 @@ export class LabelComponent extends Component {
 	/**
 	 * @returns { Color }
 	 */
-	getTextColor() {
+	getStrokeColor() {
 		return this.#strokeColor;
 	}
 
