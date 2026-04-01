@@ -12,7 +12,7 @@ import { ColorComponent } from "./colorcomponent.js";
 //==============================================================================
 // 스프라이트 모드.
 //==============================================================================
-export const SpriteMode = {
+export const SpriteDrawMode = {
 	simple: "simple",
 	sliced: "sliced",
 	tiled: "tiled",
@@ -48,7 +48,7 @@ export class SpriteComponent extends ColorComponent {
 	/** @private @type { Rect } */ #imageRect;
 	/** @private @type { boolean } */ #isHorizontalFlip;
 	/** @private @type { boolean } */ #isVerticalFlip;
-	/** @private @type { string } */ #spriteMode;
+	/** @private @type { string } */ #spriteDrawMode;
 	/** @private @type { Rect } */ #nineSlice;
 
 	//==============================================================================
@@ -63,7 +63,7 @@ export class SpriteComponent extends ColorComponent {
 		this.#imageRect = Rect.zero();
 		this.#isHorizontalFlip = false;
 		this.#isVerticalFlip = false;
-		this.#spriteMode = SpriteMode.simple;
+		this.#spriteDrawMode = SpriteDrawMode.simple;
 		this.#nineSlice = Rect.zero();
 	}
 
@@ -108,39 +108,55 @@ export class SpriteComponent extends ColorComponent {
 		// 출력.
 		canvasRenderingContext.fillStyle = colorString;
 
-		if (this.getSpriteMode() === SpriteMode.sliced) {
-			const nineSlice = this.getNineSlice();
-			graphic.drawImageWithNineSlice(image, position, imageSize, nineSlice);
-		}
-		else {
-			// 이미지 소스 조정.
-			let imageRect = this.getImageRect();
-			if (imageRect === null || imageRect.equals(Rect.zero())) {
-				imageRect = Rect.create(0, 0, image.width, image.height);
-			}
+		const spriteDrawMode = this.getSpriteDrawMode();
+		switch (spriteDrawMode) {
+			case SpriteDrawMode.simple: {
+					// 이미지 소스 조정.
+					let imageRect = this.getImageRect();
+					if (imageRect === null || imageRect.equals(Rect.zero())) {
+						imageRect = Rect.create(0, 0, image.width, image.height);
+					}
 
-			graphic.drawImageWithImageRect(image, position, imageSize, imageRect);
+					graphic.drawImageWithImageRect(image, position, imageSize, imageRect);
+					break;
+				}
+			case SpriteDrawMode.sliced: {
+					const nineSlice = this.getNineSlice();
+					graphic.drawImageWithNineSlice(image, position, imageSize, nineSlice);
+					break;
+				}
+
+			case SpriteDrawMode.tiled: {
+					// 이미지 소스 조정.
+					let imageRect = this.getImageRect();
+					if (imageRect === null || imageRect.equals(Rect.zero())) {
+						imageRect = Rect.create(0, 0, image.width, image.height);
+					}
+
+					graphic.drawImageWithImageRect(image, position, imageSize, imageRect);
+					break;
+				}
 		}
 	}
 
 	//==============================================================================
-	// 스프라이트 모드 설정.
+	// 스프라이트 출력 모드 설정.
 	//==============================================================================
 	/**
-	 * @param { string } mode
+	 * @param { string } spriteDrawMode
 	 */
-	setSpriteMode(mode) {
-		this.#spriteMode = mode;
+	setSpriteDrawMode(spriteDrawMode) {
+		this.#spriteDrawMode = spriteDrawMode;
 	}
 
 	//==============================================================================
-	// 스프라이트 모드 반환.
+	// 스프라이트 출력 모드 반환.
 	//==============================================================================
 	/**
 	 * @returns { string }
 	 */
-	getSpriteMode() {
-		return this.#spriteMode;
+	getSpriteDrawMode() {
+		return this.#spriteDrawMode;
 	}
 
 	//==============================================================================
