@@ -109,7 +109,7 @@ export class SpriteComponent extends ColorComponent {
 
 		// 출력.
 		canvasRenderingContext.fillStyle = colorString;
-		graphic.drawImage2(image, position, imageSize, imageRect);
+		graphic.drawImageWithSourceRect(image, position, imageSize, imageRect);
 	}
 
 	//==============================================================================
