@@ -161,28 +161,28 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
-	// 범위를 지정하는 이미지 출력.
+	// 이미지의 일부만 출력.
 	// - setFillColor() Not Supported.
 	//==============================================================================
 	/**
 	 * @param { HTMLImageElement | HTMLCanvasElement } image
 	 * @param { Vector2 } position
 	 * @param { Vector2 } contentSize
-	 * @param { Rect } sourceRect
+	 * @param { Rect } imageRect
 	 */
-	drawImageWithSourceRect(image, position, contentSize, sourceRect) {
+	drawImageWithImageRect(image, position, contentSize, imageRect) {
 		if (image === null){
 			throw new Error("image is null");
 		}
 
 		const canvasRenderingContext = this.getCanvasRenderingContext();
 		if (canvasRenderingContext) {
-			if (sourceRect === null || sourceRect.equals(Rect.zero())) {
-				sourceRect = Rect.create(0, 0, image.width, image.height);
+			if (imageRect === null || imageRect.equals(Rect.zero())) {
+				imageRect = Rect.create(0, 0, image.width, image.height);
 			}
 
 			canvasRenderingContext.drawImage(image, 
-				sourceRect.position.x, sourceRect.position.y, sourceRect.size.x, sourceRect.size.y,
+				imageRect.position.x, imageRect.position.y, imageRect.size.x, imageRect.size.y,
 				position.x, position.y, contentSize.x, contentSize.y);
 		}
 	}
@@ -196,9 +196,9 @@ export class Graphic extends Object {
 	 * @param { HTMLImageElement | HTMLCanvasElement } image
 	 * @param { Vector2 } position
 	 * @param { Vector2 } size
-	 * @param { Rect } nineslice
+	 * @param { Rect } nineSlice
 	 */
-	drawImageWithNineslice(image, position, size, nineslice) {
+	drawImageWithNineSlice(image, position, size, nineSlice) {
 		const canvasRenderingContext = this.getCanvasRenderingContext();
 		const sw = image.width;
 		const sh = image.height;
@@ -206,10 +206,10 @@ export class Graphic extends Object {
 		const dy = Math.floor(position.y);
 		const dw = Math.ceil(size.x);
 		const dh = Math.ceil(size.y);
-		const left = nineslice.position.x;
-		const top = nineslice.position.y;
-		const right = nineslice.size.x;
-		const bottom = nineslice.size.y;
+		const left = nineSlice.position.x;
+		const top = nineSlice.position.y;
+		const right = nineSlice.size.x;
+		const bottom = nineSlice.size.y;
 
 		const hasHorizontal = left > 0 || right > 0;
 		const hasVertical = top > 0 || bottom > 0;

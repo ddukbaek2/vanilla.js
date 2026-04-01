@@ -42,9 +42,10 @@ export class Scene extends Object {
 	 * @virtual
 	 */
 	create() {
-		this.#root = new Node();
 		this.#tweens = [];
 		this.#isGizmoVisible = true;
+		this.#root = new Node();
+		this.#root.setGizmoVisible(false);
 	}
 
 	//==============================================================================
