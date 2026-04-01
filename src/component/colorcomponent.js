@@ -15,6 +15,7 @@ export class ColorComponent extends Component {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { Color } */ #color; // 컬러.
+	/** @private @type { number } */ #roundSize; // 라운드 사이즈.
 
 	//==============================================================================
 	// 생성.
@@ -25,6 +26,7 @@ export class ColorComponent extends Component {
 	constructor() {
 		super();
 		this.#color = Color.white();
+		this.#roundSize = 0;
 	}
 
 	//==============================================================================
@@ -38,14 +40,16 @@ export class ColorComponent extends Component {
 
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const node = this.getNode();
-		if (!node) return;
-
-		// 출력.
 		const contentSize = node.getContentSize();
 		const color = this.getColor();
-		const colorString = color.toHEXString();
-		canvasRenderingContext.fillStyle = colorString;
-		graphic.drawRect(Rect.create(0, 0, contentSize.x, contentSize.y));
+
+		// 출력.
+		// graphic.setFillColor(color);
+		// graphic.drawRect(Rect.create(0, 0, contentSize.x, contentSize.y));
+		graphic.setFillColor(color);
+		canvasRenderingContext.beginPath();
+		canvasRenderingContext.roundRect(0, 0, contentSize.x, contentSize.y, this.#roundSize);
+		canvasRenderingContext.fill();
 	}
 
 	//==============================================================================

@@ -56,8 +56,8 @@ export class Graphic extends Object {
 		if (canvasRenderingContext) {
 			if (color) {
 				if (color instanceof Color) {
-				const colorString = color.toHEXString();
-				canvasRenderingContext.fillStyle = colorString;
+					const colorString = color.toHEXString();
+					canvasRenderingContext.fillStyle = colorString;
 				}
 				else {
 					canvasRenderingContext.fillStyle = color;
