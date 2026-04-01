@@ -1,7 +1,10 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+const System = globalThis;
+import * as Wait from "../base/wait.js";
 import { Asset } from "../core/asset.js";
+
 
 
 //==============================================================================
@@ -42,6 +45,7 @@ export class TextAsset extends Asset
 				const response = await fetch(assetPath);
 				this.text = await response.text();
 				super.isLoaded = true;
+				await Wait.nextFrame();
 			}
 			catch (error) {
 				// 예외.

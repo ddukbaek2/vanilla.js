@@ -249,7 +249,7 @@ export class Animation extends Object {
 	//==============================================================================
 	getCurrentRect() {
 		const frame = this.getCurrentFrame();
-		return frame ? frame.getRect() : null;
+		return frame ? frame.getImageRect() : null;
 	}
 
 	//==============================================================================

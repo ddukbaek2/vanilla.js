@@ -51,7 +51,7 @@ export class Frame extends Object {
 	/**
 	 * @returns { Rect }
 	 */
-	getRect() {
+	getImageRect() {
 		return this.#rect;
 	}
 }

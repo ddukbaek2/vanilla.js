@@ -39,7 +39,7 @@ export class JsonAsset extends TextAsset
 		// 로드.
 		await super.load(assetPath);
 
-		if (super.isLoaded) {
+		if (this.isLoaded) {
 			try {
 				this.data = JSON.parse(this.text);
 			}
