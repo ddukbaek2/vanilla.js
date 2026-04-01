@@ -1,7 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { Vector2 } from "../base/vector2.js";
+const System = globalThis;
 import { Rect } from "../base/rect.js";
 import { Graphic } from "../core/graphic.js";
 import { Component } from "../core/component.js";
@@ -9,7 +9,32 @@ import { FontAsset } from "../resource/fontasset.js";
 
 
 //==============================================================================
-// 텍스트 출력자 컴포넌트.
+// 텍스트 수평 설정. (CanvasTextAlign)
+//==============================================================================
+const TextAlign = {
+	left: "left",
+	center: "center",
+	right: "right",
+	start: "start",
+	end: "end",
+};
+
+
+//==============================================================================
+// 텍스트 수직 설정. (CanvasTextBaseline)
+//==============================================================================
+const TextBaseline = {
+	top: "top",
+	middle: "middle",
+	bottom: "bottom",
+	ideographic: "ideographic",
+	hanging: "hanging",
+	alphabetic: "alphabetic",
+};
+
+
+//==============================================================================
+// 텍스트 출력기 컴포넌트.
 //==============================================================================
 export class LabelComponent extends Component {
 	//==============================================================================
@@ -21,10 +46,9 @@ export class LabelComponent extends Component {
 	/** @private @type { string } */ #textColor;
 	/** @private @type { string } */ #strokeColor;
 	/** @private @type { number } */ #strokeWidth;
-	/** @private @type { "left" | "center" | "right" } */ #textAlign;
-	/** @private @type { "top" | "middle" | "bottom" } */ #textBaseline;
-	/** @private @type { boolean } */ #autoContentSize;
-
+	/** @private @type { "left" | "center" | "right" } */ #textAlign; // TextAlign
+	/** @private @type { "top" | "middle" | "bottom" } */ #textBaseline; // TextBaseline
+	// /** @private @type { boolean } */ #autoExpandContentSize;
 
 	//==============================================================================
 	// 생성.
@@ -39,7 +63,7 @@ export class LabelComponent extends Component {
 		this.#strokeWidth = 0;
 		this.#textAlign = "center";
 		this.#textBaseline = "middle";
-		this.#autoContentSize = true;
+		// this.#autoExpandContentSize = true;
 	}
 
 	//==============================================================================

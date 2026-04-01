@@ -351,8 +351,12 @@ export class Engine extends Object {
 		// 배경 출력.
 		// 기본 위치인 화면 좌상단으로 이동.
 		canvasRenderingContext.setTransform(1, 0, 0, 1, 0, 0);
+		// graphic.setFillColor("rgba(0, 0, 0, 0.6)");
+		// graphic.drawRect(Rect.create(10, 10, 480, 320));
 		canvasRenderingContext.fillStyle = "rgba(0, 0, 0, 0.6)";
-		graphic.drawRect(Rect.create(10, 10, 480, 320));
+		canvasRenderingContext.beginPath();
+		canvasRenderingContext.roundRect(10, 10, 480, 320, 12);
+		canvasRenderingContext.fill();
 
 		// canvasRenderingContext.letterSpacing = "-1px";
 		canvasRenderingContext.font = `16px DOSGothic`;
