@@ -56,7 +56,7 @@ export class ColorComponent extends Component {
 	// 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { string | Color } other
+	 * @param { Color | string | CanvasGradient | CanvasPattern } other
 	 */
 	setColor(other) {
 		if (other === null) {

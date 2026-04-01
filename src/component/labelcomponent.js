@@ -6,12 +6,14 @@ import { Rect } from "../base/rect.js";
 import { Graphic } from "../core/graphic.js";
 import { Component } from "../core/component.js";
 import { FontAsset } from "../resource/fontasset.js";
+import { Color } from "../base/color.js";
+import { SYSTEM_FONT_STRING } from "../base/platform.js";
 
 
 //==============================================================================
 // 텍스트 수평 설정. (CanvasTextAlign)
 //==============================================================================
-const TextAlign = {
+export const TextAlign = {
 	left: "left",
 	center: "center",
 	right: "right",
@@ -23,7 +25,7 @@ const TextAlign = {
 //==============================================================================
 // 텍스트 수직 설정. (CanvasTextBaseline)
 //==============================================================================
-const TextBaseline = {
+export const TextBaseline = {
 	top: "top",
 	middle: "middle",
 	bottom: "bottom",
@@ -43,8 +45,8 @@ export class LabelComponent extends Component {
 	/** @private @type { FontFace } */ #fontFace;
 	/** @private @type { string } */ #text;
 	/** @private @type { number } */ #fontSize;
-	/** @private @type { string } */ #textColor;
-	/** @private @type { string } */ #strokeColor;
+	/** @private @type { Color } */ #textColor;
+	/** @private @type { Color } */ #strokeColor;
 	/** @private @type { number } */ #strokeWidth;
 	/** @private @type { "left" | "center" | "right" } */ #textAlign; // TextAlign
 	/** @private @type { "top" | "middle" | "bottom" } */ #textBaseline; // TextBaseline
@@ -58,8 +60,8 @@ export class LabelComponent extends Component {
 		this.#fontFace = null;
 		this.#text = "";
 		this.#fontSize = 32;
-		this.#textColor = "#000000";
-		this.#strokeColor = null;
+		this.#textColor = Color.white();
+		this.#strokeColor = Color.white();
 		this.#strokeWidth = 0;
 		this.#textAlign = "center";
 		this.#textBaseline = "middle";
@@ -89,8 +91,21 @@ export class LabelComponent extends Component {
 			return;
 		}
 
+		const node = this.getNode();
+		const contentSize = node.getContentSize();
+
+		let drawX;
+		if (this.#textAlign === "left" || this.#textAlign === "start") drawX = 0;
+		else if (this.#textAlign === "right" || this.#textAlign === "end") drawX = contentSize.x;
+		else drawX = contentSize.x * 0.5;
+
+		let drawY;
+		if (this.#textBaseline === "top" || this.#textBaseline === "hanging") drawY = 0;
+		else if (this.#textBaseline === "bottom" || this.#textBaseline === "ideographic" || this.#textBaseline === "alphabetic") drawY = contentSize.y;
+		else drawY = contentSize.y * 0.5;
+
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
-		const fontFamily = this.#fontFace ? this.#fontFace.family : '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+		const fontFamily = this.#fontFace ? this.#fontFace.family : SYSTEM_FONT_STRING;
 		canvasRenderingContext.font = `${this.#fontSize}px ${fontFamily}`;
 		canvasRenderingContext.textAlign = this.#textAlign;
 		canvasRenderingContext.textBaseline = this.#textBaseline;
@@ -98,11 +113,11 @@ export class LabelComponent extends Component {
 		if (this.#strokeColor && this.#strokeWidth > 0) {
 			canvasRenderingContext.strokeStyle = this.#strokeColor;
 			canvasRenderingContext.lineWidth = this.#strokeWidth;
-			canvasRenderingContext.strokeText(this.#text, 0, 0);
+			canvasRenderingContext.strokeText(this.#text, drawX, drawY);
 		}
 
 		canvasRenderingContext.fillStyle = this.#textColor;
-		canvasRenderingContext.fillText(this.#text, 0, 0);
+		canvasRenderingContext.fillText(this.#text, drawX, drawY);
 	}
 
 	//==============================================================================
@@ -157,10 +172,10 @@ export class LabelComponent extends Component {
 	// 텍스트 크기 설정.
 	//==============================================================================
 	/**
-	 * @param { number } size
+	 * @param { number } fontSize
 	 */
-	setFontSize(size) {
-		this.#fontSize = size;
+	setFontSize(fontSize) {
+		this.#fontSize = fontSize;
 	}
 
 	//==============================================================================
@@ -182,12 +197,35 @@ export class LabelComponent extends Component {
 	setTextColor(color) {
 		this.#textColor = color;
 	}
+
+	//==============================================================================
+	// 텍스트 색상 설정.
+	//==============================================================================
+	/**
+	 * @param { Color | string | CanvasGradient | CanvasPattern } color
+	 */
+	setTextColor(color) {
+		if (color === null) {
+			this.#textColor = Color.transparent();
+		}
+		else if (typeof color === "string") {
+			if (color.startsWith("#")) {
+				this.#textColor = Color.createFromHEX(color);
+			}
+			else if (color.startsWith("rgb")) {
+				this.#textColor = Color.createFromRGBA(color);
+			}
+		}
+		else if (color instanceof Color) {
+			this.#textColor = color;
+		}
+	}
 	
 	//==============================================================================
 	// 텍스트 색상 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { Color }
 	 */
 	getTextColor() {
 		return this.#textColor;
@@ -197,10 +235,33 @@ export class LabelComponent extends Component {
 	// 텍스트 외곽선 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { string } color
+	 * @param { Color | string | CanvasGradient | CanvasPattern } color
 	 */
 	setStrokeColor(color) {
-		this.#strokeColor = color;
+		if (color === null) {
+			this.#strokeColor = Color.transparent();
+		}
+		else if (typeof color === "string") {
+			if (color.startsWith("#")) {
+				this.#strokeColor = Color.createFromHEX(color);
+			}
+			else if (color.startsWith("rgb")) {
+				this.#strokeColor = Color.createFromRGBA(color);
+			}
+		}
+		else if (color instanceof Color) {
+			this.#strokeColor = color;
+		}
+	}
+
+	//==============================================================================
+	// 텍스트 외곽선 색상 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color }
+	 */
+	getTextColor() {
+		return this.#strokeColor;
 	}
 
 	//==============================================================================
