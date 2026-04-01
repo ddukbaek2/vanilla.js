@@ -27,7 +27,7 @@ export class Component extends Object {
 		super();
 		this.#node = null;
 		this.#isEnable = true;
-		this.#isGizmoVisible = true;
+		this.#isGizmoVisible = false;
 	}
 
 	//==============================================================================

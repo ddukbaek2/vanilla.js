@@ -43,9 +43,8 @@ export class Scene extends Object {
 	 */
 	create() {
 		this.#tweens = [];
-		this.#isGizmoVisible = true;
+		this.#isGizmoVisible = false;
 		this.#root = new Node();
-		this.#root.setGizmoVisible(false);
 	}
 
 	//==============================================================================

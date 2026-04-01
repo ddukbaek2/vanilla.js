@@ -45,7 +45,7 @@ export class Node extends Object {
 		this.#localScale = Vector2.one();
 		this.#localRotation = 0.0;
 		this.#isActive = true;
-		this.#isGizmoVisible = true;
+		this.#isGizmoVisible = false;
 		this.#opacity = 1.0;
 		this.#pivot = Pivot.middleCenter;
 		this.#contentSize = Vector2.zero();
