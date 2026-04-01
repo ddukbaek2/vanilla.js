@@ -292,10 +292,15 @@ export class Graphic extends Object {
 	 */
 	beginClipRect(rect) {
 		const canvasRenderingContext = this.getCanvasRenderingContext();
-		canvasRenderingContext.save();
-		canvasRenderingContext.beginPath();
-		canvasRenderingContext.rect(rect.position.x, rect.position.y, rect.size.x, rect.size.y); // left, top, width, height.
-		canvasRenderingContext.clip();
+		if (canvasRenderingContext) {
+			// 상태 저장.
+			canvasRenderingContext.save();
+			
+			// 클리핑 시작.
+			canvasRenderingContext.beginPath();
+			canvasRenderingContext.rect(rect.position.x, rect.position.y, rect.size.x, rect.size.y); // left, top, width, height.
+			canvasRenderingContext.clip();
+		}
 	}
 
 	//==============================================================================
@@ -303,7 +308,10 @@ export class Graphic extends Object {
 	//==============================================================================
 	endClipRect() {
 		const canvasRenderingContext = this.getCanvasRenderingContext();
-		canvasRenderingContext.restore();
+		if (canvasRenderingContext) {
+			// 상태 복원.
+			canvasRenderingContext.restore();
+		}
 	}
 
 	//==============================================================================
