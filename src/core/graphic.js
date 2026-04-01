@@ -204,12 +204,14 @@ export class Graphic extends Object {
 		const sh = image.height;
 		const dx = Math.floor(position.x);
 		const dy = Math.floor(position.y);
-		const dw = Math.ceil(size.x);
-		const dh = Math.ceil(size.y);
 		const left = nineSlice.position.x;
 		const top = nineSlice.position.y;
 		const right = nineSlice.size.x;
 		const bottom = nineSlice.size.y;
+
+		// 최소 사이즈 제한 적용.
+		const dw = Math.max(Math.ceil(size.x), left + right);
+		const dh = Math.max(Math.ceil(size.y), top + bottom);
 
 		const hasHorizontal = left > 0 || right > 0;
 		const hasVertical = top > 0 || bottom > 0;

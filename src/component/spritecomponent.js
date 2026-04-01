@@ -48,6 +48,8 @@ export class SpriteComponent extends ColorComponent {
 	/** @private @type { Rect } */ #imageRect;
 	/** @private @type { boolean } */ #isHorizontalFlip;
 	/** @private @type { boolean } */ #isVerticalFlip;
+	/** @private @type { string } */ #spriteMode;
+	/** @private @type { Rect } */ #nineSlice;
 
 	//==============================================================================
 	// 생성.
@@ -61,6 +63,8 @@ export class SpriteComponent extends ColorComponent {
 		this.#imageRect = Rect.zero();
 		this.#isHorizontalFlip = false;
 		this.#isVerticalFlip = false;
+		this.#spriteMode = SpriteMode.simple;
+		this.#nineSlice = Rect.zero();
 	}
 
 	//==============================================================================
@@ -101,15 +105,62 @@ export class SpriteComponent extends ColorComponent {
 		const flip = this.getFlip();
 		const imageSize = contentSize.multiply(flip);
 
-		// 이미지 소스 조정.
-		let imageRect = this.getImageRect();
-		if (imageRect === null || imageRect.equals(Rect.zero())) {
-			imageRect = Rect.create(0, 0, image.width, image.height);
-		}
-
 		// 출력.
 		canvasRenderingContext.fillStyle = colorString;
-		graphic.drawImageWithImageRect(image, position, imageSize, imageRect);
+
+		if (this.getSpriteMode() === SpriteMode.sliced) {
+			const nineSlice = this.getNineSlice();
+			graphic.drawImageWithNineSlice(image, position, imageSize, nineSlice);
+		}
+		else {
+			// 이미지 소스 조정.
+			let imageRect = this.getImageRect();
+			if (imageRect === null || imageRect.equals(Rect.zero())) {
+				imageRect = Rect.create(0, 0, image.width, image.height);
+			}
+
+			graphic.drawImageWithImageRect(image, position, imageSize, imageRect);
+		}
+	}
+
+	//==============================================================================
+	// 스프라이트 모드 설정.
+	//==============================================================================
+	/**
+	 * @param { string } mode
+	 */
+	setSpriteMode(mode) {
+		this.#spriteMode = mode;
+	}
+
+	//==============================================================================
+	// 스프라이트 모드 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getSpriteMode() {
+		return this.#spriteMode;
+	}
+
+	//==============================================================================
+	// 나인슬라이스 영역 설정.
+	//==============================================================================
+	/**
+	 * @param { Rect } nineSlice
+	 */
+	setNineSlice(nineSlice) {
+		this.#nineSlice = nineSlice;
+	}
+
+	//==============================================================================
+	// 나인슬라이스 영역 반환.
+	//==============================================================================
+	/**
+	 * @returns { Rect }
+	 */
+	getNineSlice() {
+		return this.#nineSlice;
 	}
 
 	//==============================================================================
