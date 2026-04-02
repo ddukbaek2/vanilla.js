@@ -35,7 +35,7 @@ export class ButtonComponent extends Component {
 	/** @private @type { function(ButtonComponent): void } */ #clickedEvent;
 	/** @private @type { * } */ #engine;
 	/** @private @type { boolean } */ #isPressTracking;
-	/** @private @type { number } */ #tintFactor;
+	/** @private @type { Color } */ #pressedTintColor;
 	/** @private @type { number } */ #transitionDuration;
 	/** @private @type { number } */ #tintProgress;
 	/** @private @type { Array } */ #colorEntries;
@@ -55,7 +55,7 @@ export class ButtonComponent extends Component {
 		this.#clickedEvent = null;
 		this.#engine = null;
 		this.#isPressTracking = false;
-		this.#tintFactor = 0.6;
+		this.#pressedTintColor = new Color(0, 0, 0, 0.3);
 		this.#transitionDuration = 0.1;
 		this.#tintProgress = 0;
 		this.#colorEntries = [];
@@ -153,17 +153,19 @@ export class ButtonComponent extends Component {
 	//==============================================================================
 	/** @private */
 	#applyTintProgress(progress) {
+		const pressedTintColor = this.#pressedTintColor;
 		for (const colorEntry of this.#colorEntries) {
-			const originalColor = colorEntry.originalColor;
-			const tintMultiplier = Math.lerp(1, this.#tintFactor, progress);
-			const tintedRed = originalColor.red * tintMultiplier;
-			const tintedGreen = originalColor.green * tintMultiplier;
-			const tintedBlue = originalColor.blue * tintMultiplier;
-			const tintedColor = new Color(tintedRed, tintedGreen, tintedBlue, originalColor.alpha);
 			if (colorEntry.type === 'sprite') {
-				colorEntry.component.setColor(tintedColor);
+				const overlayAlpha = Math.lerp(0, pressedTintColor.alpha, progress);
+				const overlayColor = new Color(pressedTintColor.red, pressedTintColor.green, pressedTintColor.blue, overlayAlpha);
+				colorEntry.component.setOverlayColor(overlayColor);
 			}
 			else if (colorEntry.type === 'label') {
+				const originalColor = colorEntry.originalColor;
+				const tintedRed = Math.lerp(originalColor.red, pressedTintColor.red, pressedTintColor.alpha * progress);
+				const tintedGreen = Math.lerp(originalColor.green, pressedTintColor.green, pressedTintColor.alpha * progress);
+				const tintedBlue = Math.lerp(originalColor.blue, pressedTintColor.blue, pressedTintColor.alpha * progress);
+				const tintedColor = new Color(tintedRed, tintedGreen, tintedBlue, originalColor.alpha);
 				colorEntry.component.setTextColor(tintedColor);
 			}
 		}
@@ -189,9 +191,7 @@ export class ButtonComponent extends Component {
 	#collectFromNode(node) {
 		const spriteComponents = node.getComponents(SpriteComponent);
 		for (const spriteComponent of spriteComponents) {
-			const originalColor = spriteComponent.getColor();
-			const copiedColor = new Color(originalColor.red, originalColor.green, originalColor.blue, originalColor.alpha);
-			this.#colorEntries.push({ type: 'sprite', component: spriteComponent, originalColor: copiedColor });
+			this.#colorEntries.push({ type: 'sprite', component: spriteComponent });
 		}
 		const labelComponents = node.getComponents(LabelComponent);
 		for (const labelComponent of labelComponents) {
@@ -342,5 +342,25 @@ export class ButtonComponent extends Component {
 	 */
 	getEngine() {
 		return this.#engine;
+	}
+
+	//==============================================================================
+	// 눌림 틴트 색상 설정.
+	//==============================================================================
+	/**
+	 * @param { Color } color
+	 */
+	setPressedTintColor(color) {
+		this.#pressedTintColor = color;
+	}
+
+	//==============================================================================
+	// 눌림 틴트 색상 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color }
+	 */
+	getPressedTintColor() {
+		return this.#pressedTintColor;
 	}
 }

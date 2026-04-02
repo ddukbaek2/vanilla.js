@@ -7,6 +7,7 @@ import * as Math from "../base/math.js";
 import { ImageAsset } from "../resource/imageasset.js";
 import { Graphic } from "../core/graphic.js";
 import { ColorComponent } from "./colorcomponent.js";
+import { Color } from "../base/color.js";
 
 
 //==============================================================================
@@ -52,6 +53,7 @@ export class SpriteComponent extends ColorComponent {
 	/** @private @type { Rect } */ #nineSlice;
 	/** @private @type { OffscreenCanvas | null } */ #tintCanvas;
 	/** @private @type { OffscreenCanvasRenderingContext2D | null } */ #tintContext;
+	/** @private @type { Color } */ #overlayColor;
 
 	//==============================================================================
 	// 생성.
@@ -69,6 +71,7 @@ export class SpriteComponent extends ColorComponent {
 		this.#nineSlice = Rect.zero();
 		this.#tintCanvas = null;
 		this.#tintContext = null;
+		this.#overlayColor = Color.transparent();
 	}
 
 	//==============================================================================
@@ -142,8 +145,9 @@ export class SpriteComponent extends ColorComponent {
 				}
 		}
 
-		// 컬러 틴트 적용. (흰색인 경우 스킵, 투명 영역 제외)
-		if (color.red !== 1 || color.green !== 1 || color.blue !== 1) {
+		// 오버레이 컬러 적용. (alpha > 0인 경우에만, 투명 영역 제외)
+		const overlayColor = this.#overlayColor;
+		if (overlayColor.alpha > 0) {
 			const tintWidth = Math.ceil(contentSize.x);
 			const tintHeight = Math.ceil(contentSize.y);
 			if (tintWidth > 0 && tintHeight > 0) {
@@ -155,13 +159,10 @@ export class SpriteComponent extends ColorComponent {
 				tintContext.clearRect(0, 0, tintWidth, tintHeight);
 				tintContext.drawImage(image, 0, 0, tintWidth, tintHeight);
 				tintContext.globalCompositeOperation = 'source-atop';
-				tintContext.fillStyle = colorString;
+				tintContext.fillStyle = overlayColor.toRGBAString();
 				tintContext.fillRect(0, 0, tintWidth, tintHeight);
 				tintContext.globalCompositeOperation = 'source-over';
-				const originalCompositeOperation = canvasRenderingContext.globalCompositeOperation;
-				canvasRenderingContext.globalCompositeOperation = 'multiply';
 				canvasRenderingContext.drawImage(this.#tintCanvas, position.x, position.y, imageSize.x, imageSize.y);
-				canvasRenderingContext.globalCompositeOperation = originalCompositeOperation;
 			}
 		}
 	}
@@ -204,6 +205,26 @@ export class SpriteComponent extends ColorComponent {
 	 */
 	getNineSlice() {
 		return this.#nineSlice;
+	}
+
+	//==============================================================================
+	// 오버레이 컬러 설정.
+	//==============================================================================
+	/**
+	 * @param { Color } overlayColor
+	 */
+	setOverlayColor(overlayColor) {
+		this.#overlayColor = overlayColor;
+	}
+
+	//==============================================================================
+	// 오버레이 컬러 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color }
+	 */
+	getOverlayColor() {
+		return this.#overlayColor;
 	}
 
 	//==============================================================================
