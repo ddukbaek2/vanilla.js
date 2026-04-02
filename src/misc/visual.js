@@ -26,4 +26,12 @@ export class Visual extends Node {
 		super();
 		this.#location = Vector2.zero();
 	}
+
+	setLocation(location) {
+		this.#location = location;
+	}
+
+	getLocation(location) {
+		return this.#location;
+	}
 }
