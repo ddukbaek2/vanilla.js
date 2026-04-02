@@ -21,20 +21,35 @@ export const SpriteDrawMode = {
 
 
 //==============================================================================
-// 스프라이트 블렌드 모드.
+// 스프라이트 블렌드 모드. (Canvas2D globalCompositeOperation 대응)
 //==============================================================================
 export const SpriteBlendMode = {
-	normal: "normal",
-	darken: "darken",
-	multiply: "multiply",
-	colorBurn: "colorBurn",
-	lighten: "lighten",
-	screen: "screen",
-	colorDodge: "colorDodge",
-	overlay: "overlay",
-	softLight: "softLight",
-	hardLight: "hardLight",
-	difference: "difference",
+	normal:          "source-over",      // 기본 알파 합성.
+	sourceIn:        "source-in",        // 교차 영역만 출력 (배경 알파 마스크).
+	sourceOut:       "source-out",       // 교차 외 영역만 출력.
+	sourceAtop:      "source-atop",      // 배경 위에 교차 영역만 합성.
+	destinationOver: "destination-over", // 배경 아래에 합성.
+	destinationIn:   "destination-in",   // 배경에서 교차 영역만 유지.
+	destinationOut:  "destination-out",  // 배경에서 교차 외 영역만 유지.
+	destinationAtop: "destination-atop", // 배경 위에 교차 영역만 유지.
+	lighter:         "lighter",          // 색상 덧셈 (Add).
+	copy:            "copy",             // 소스만 출력 (배경 무시).
+	xor:             "xor",              // 교차 영역 제외.
+	multiply:        "multiply",         // 곱셈 합성 (어두워짐).
+	screen:          "screen",           // 스크린 합성 (밝아짐).
+	overlay:         "overlay",          // 오버레이 (명암 강조).
+	darken:          "darken",           // 어두운 픽셀 선택.
+	lighten:         "lighten",          // 밝은 픽셀 선택.
+	colorDodge:      "color-dodge",      // 컬러 닷지 (밝아짐).
+	colorBurn:       "color-burn",       // 컬러 번 (어두워짐).
+	hardLight:       "hard-light",       // 하드 라이트.
+	softLight:       "soft-light",       // 소프트 라이트.
+	difference:      "difference",       // 차이값 합성.
+	exclusion:       "exclusion",        // 차이값 합성 (낮은 대비).
+	hue:             "hue",              // 색조만 적용.
+	saturation:      "saturation",       // 채도만 적용.
+	color:           "color",            // 색조+채도 적용.
+	luminosity:      "luminosity",       // 밝기만 적용.
 }
 
 
@@ -50,6 +65,7 @@ export class SpriteComponent extends ColorComponent {
 	/** @private @type { boolean } */ #isHorizontalFlip;
 	/** @private @type { boolean } */ #isVerticalFlip;
 	/** @private @type { string } */ #spriteDrawMode;
+	/** @private @type { string } */ #spriteBlendMode;
 	/** @private @type { Rect } */ #nineSlice;
 	/** @private @type { OffscreenCanvas | null } */ #tintCanvas;
 	/** @private @type { OffscreenCanvasRenderingContext2D | null } */ #tintContext;
@@ -67,6 +83,7 @@ export class SpriteComponent extends ColorComponent {
 		this.#isHorizontalFlip = false;
 		this.#isVerticalFlip = false;
 		this.#spriteDrawMode = SpriteDrawMode.simple;
+		this.#spriteBlendMode = SpriteBlendMode.normal;
 		this.#nineSlice = Rect.zero();
 		this.#tintCanvas = null;
 		this.#tintContext = null;
@@ -107,39 +124,12 @@ export class SpriteComponent extends ColorComponent {
 		const contentSize = node.getContentSize();
 		const flip = this.getFlip();
 		const imageSize = contentSize.multiply(flip);
+		const spriteBlendMode = this.getSpriteBlendMode();
 
-		// 이미지 출력.
-		const spriteDrawMode = this.getSpriteDrawMode();
-		switch (spriteDrawMode) {
-			case SpriteDrawMode.simple: {
-					// 이미지 소스 조정.
-					let imageRect = this.getImageRect();
-					if (imageRect === null || imageRect === undefined || imageRect.equals(Rect.zero())) {
-						imageRect = Rect.create(0, 0, image.width, image.height);
-					}
+		// 블렌드 모드 설정.
+		canvasRenderingContext.globalCompositeOperation = spriteBlendMode;
 
-					graphic.drawImageWithImageRect(image, position, imageSize, imageRect);
-					break;
-				}
-			case SpriteDrawMode.sliced: {
-					const nineSlice = this.getNineSlice();
-					graphic.drawImageWithNineSlice(image, position, imageSize, nineSlice);
-					break;
-				}
-
-			case SpriteDrawMode.tiled: {
-					// 이미지 소스 조정.
-					let imageRect = this.getImageRect();
-					if (imageRect === null || imageRect === undefined || imageRect.equals(Rect.zero())) {
-						imageRect = Rect.create(0, 0, image.width, image.height);
-					}
-
-					graphic.drawImageWithImageRect(image, position, imageSize, imageRect);
-					break;
-				}
-		}
-
-		// 컬러 틴트 적용. (alpha > 0인 경우에만, 투명 영역 제외)
+		// 컬러 틴트 적용. (alpha > 0이면 tintCanvas로 블렌드, 아니면 이미지 직접 블렌드)
 		if (color.alpha > 0) {
 			const tintWidth = Math.ceil(contentSize.x);
 			const tintHeight = Math.ceil(contentSize.y);
@@ -157,6 +147,40 @@ export class SpriteComponent extends ColorComponent {
 				canvasRenderingContext.drawImage(this.#tintCanvas, position.x, position.y, imageSize.x, imageSize.y);
 			}
 		}
+		else {
+			// 이미지 출력.
+			const spriteDrawMode = this.getSpriteDrawMode();
+			switch (spriteDrawMode) {
+				case SpriteDrawMode.simple: {
+						// 이미지 소스 조정.
+						let imageRect = this.getImageRect();
+						if (imageRect === null || imageRect === undefined || imageRect.equals(Rect.zero())) {
+							imageRect = Rect.create(0, 0, image.width, image.height);
+						}
+
+						graphic.drawImageWithImageRect(image, position, imageSize, imageRect);
+						break;
+					}
+				case SpriteDrawMode.sliced: {
+						const nineSlice = this.getNineSlice();
+						graphic.drawImageWithNineSlice(image, position, imageSize, nineSlice);
+						break;
+					}
+				case SpriteDrawMode.tiled: {
+						// 이미지 소스 조정.
+						let imageRect = this.getImageRect();
+						if (imageRect === null || imageRect === undefined || imageRect.equals(Rect.zero())) {
+							imageRect = Rect.create(0, 0, image.width, image.height);
+						}
+
+						graphic.drawImageWithImageRect(image, position, imageSize, imageRect);
+						break;
+					}
+			}
+		}
+
+		// 블렌드 모드 복원.
+		canvasRenderingContext.globalCompositeOperation = 'source-over';
 	}
 
 	//==============================================================================
@@ -177,6 +201,26 @@ export class SpriteComponent extends ColorComponent {
 	 */
 	getSpriteDrawMode() {
 		return this.#spriteDrawMode;
+	}
+
+	//==============================================================================
+	// 스프라이트 블렌드 모드 설정.
+	//==============================================================================
+	/**
+	 * @param { string } spriteBlendMode
+	 */
+	setSpriteBlendMode(spriteBlendMode) {
+		this.#spriteBlendMode = spriteBlendMode;
+	}
+
+	//==============================================================================
+	// 스프라이트 블렌드 모드 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getSpriteBlendMode() {
+		return this.#spriteBlendMode;
 	}
 
 	//==============================================================================

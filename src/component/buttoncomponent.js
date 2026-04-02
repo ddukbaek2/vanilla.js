@@ -360,4 +360,24 @@ export class ButtonComponent extends Component {
 	getPressedTintColor() {
 		return this.#pressedTintColor;
 	}
+
+	//==============================================================================
+	// 트랜지션 지속 시간 설정.
+	//==============================================================================
+	/**
+	 * @param { number } duration
+	 */
+	setTransitionDuration(duration) {
+		this.#transitionDuration = duration;
+	}
+
+	//==============================================================================
+	// 트랜지션 지속 시간 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getTransitionDuration() {
+		return this.#transitionDuration;
+	}
 }
