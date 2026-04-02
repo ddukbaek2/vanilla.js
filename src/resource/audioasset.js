@@ -169,7 +169,7 @@ export class AudioAsset extends Asset {
 	 * @returns { number }
 	 */
 	getDuration() {
-		if (this.#audioBuffer !== null) {
+		if (this.#audioBuffer !== null && this.#audioBuffer !== undefined) {
 			return this.#audioBuffer.duration;
 		}
 		return 0.0;

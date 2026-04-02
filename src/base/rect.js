@@ -114,7 +114,7 @@ export class Rect extends Object {
 	 * @returns { boolean }
 	 */
 	contains(value) {
-		if (value !== null && value instanceof Vector2) {
+		if (value !== null && canvas !== undefined && value instanceof Vector2) {
 			if (value.x < this.position.x || value.x > this.position.x + this.size.x)
 				return false;
 			if (value.y < this.position.y || value.y > this.position.y + this.size.y)
@@ -133,7 +133,7 @@ export class Rect extends Object {
 	 * @returns { boolean }
 	 */
 	overlaps(value) {
-		if (value !== null && value instanceof Rect) {
+		if (value !== null && value !== undefined && value instanceof Rect) {
 			if (this.position.x + this.size.x < value.position.x || this.position.x > value.position.x + value.size.x)
 				return false;
 			if (this.position.y + this.size.y < value.position.y || this.position.y > value.position.y + value.size.y)

@@ -109,7 +109,7 @@ export class GamepadManager extends Object {
 	 * @param { Gamepad } gamepad
 	 */
 	connect(gamepad) {
-		if (gamepad === null || this.#connectedGamepadIndices.indexOf(gamepad.index) !== -1) {
+		if (gamepad === null || gamepad === undefined || this.#connectedGamepadIndices.indexOf(gamepad.index) !== -1) {
 			return;
 		}
 
@@ -140,7 +140,7 @@ export class GamepadManager extends Object {
 	 * @param { Gamepad } gamepad
 	 */
 	disconnect(gamepad) {
-		if (gamepad === null) {
+		if (gamepad === null || gamepad === undefined) {
 			return;
 		}
 		const listIndex = this.#connectedGamepadIndices.indexOf(gamepad.index);

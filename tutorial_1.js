@@ -177,7 +177,7 @@ if (canvas === null) {
 const engineConfiguration = new EngineConfiguration();
 engineConfiguration.referenceResolutionSize = Vec2.create(800, 1280);
 engineConfiguration.canvasId = "tutorial";
-engineConfiguration.isDevelopment = true;
+engineConfiguration.useStatistics = true;
 const engine = new Engine(engineConfiguration);
 document.title = "vanilla.js - Tutorial";
 const tutorial = new Tutorial_1();

@@ -124,7 +124,7 @@ export class Animation extends Object {
 	 * @param { Frame[] } frames
 	 */
 	setFrames(frames) {
-		if (frames === null || frames instanceof Array === false) {
+		if (frames === null || frames === undefined || frames instanceof Array === false) {
 			return;
 		}
 
@@ -139,7 +139,7 @@ export class Animation extends Object {
 	 * @param { HTMLImageElement[] } images
 	 */
 	setFramesFromImages(images) {
-		if (images === null || images instanceof Array === false || images.length === 0) {
+		if (images === null || images === undefined || images instanceof Array === false || images.length === 0) {
 			return;
 		}
 		const frames = images.map(image => new Frame(image));
@@ -154,8 +154,8 @@ export class Animation extends Object {
 	 * @param { Rect[] } rects
 	 */
 	setFramesFromRects(image, rects) {
-		if (image === null || image instanceof HTMLImageElement === false ||
-			rects === 0 || rects instanceof Array === false || rects.length === 0) {
+		if (image === null || image === undefined || image instanceof HTMLImageElement === false ||
+			rects === null || rects === undefined || rects instanceof Array === false || rects.length === 0) {
 			return;
 		}
 

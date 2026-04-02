@@ -93,7 +93,7 @@ export class ImageScroller extends Object {
 	 * @param { HTMLImageElement | ImageAsset } image 
 	 */
 	setImage(image) {
-		if (image === null) {
+		if (image === null || image === undefined) {
 			this.#image = null;
 		}
 		else if (image instanceof HTMLImageElement) {

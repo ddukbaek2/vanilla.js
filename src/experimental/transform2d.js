@@ -47,7 +47,7 @@
 // 	 * @param { CanvasRenderingContext2D } canvasRenderingContext
 // 	 */
 // 	applyWorldMatrix(canvasRenderingContext) {
-// 		if (canvasRenderingContext === null) {
+// 		if (canvasRenderingContext === null || canvasRenderingContext === undefined) {
 // 			return;
 // 		}
 // 		if (canvasRenderingContext instanceof CanvasRenderingContext2D) {
@@ -66,7 +66,7 @@
 // 	 * @returns { number[] }
 // 	 */
 // 	setWorldMatrix(worldMatrix) {
-// 		if (worldMatrix === null) {
+// 		if (worldMatrix === null || worldMatrix === undefined) {
 // 			return;
 // 		}
 // 		else if (worldMatrix instanceof Array) {

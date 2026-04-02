@@ -54,9 +54,8 @@ export class ViewManager extends Object {
 	/**
 	 * @constructor
 	 * @param { Engine } engine
-	 * @param { Vector2 } referenceResolutionSize
 	 */
-	constructor(engine, referenceResolutionSize) {
+	constructor(engine) {
 		super();
 		this.#canvas = null;
 		this.#devicePixelRatio = 1.0;
@@ -65,9 +64,12 @@ export class ViewManager extends Object {
 		this.#canvasNativeSize = Vector2.zero();
 		this.#canvasPixelSize = Vector2.zero();
 		this.#viewScaleMode = ViewScaleMode.none;
-		this.#referenceResolutionSize = referenceResolutionSize;
 		this.#screenSize = Vector2.zero();
 		this.#viewRect = Rect.zero();
+
+		// 설정: 기준 해상도.
+		const engineConfiguration = engine.getEngineConfiguration();
+		this.#referenceResolutionSize = engineConfiguration.referenceResolutionSize;
 
 		// 이시점에서 호출하면 캔버스가 없음.
 		// this.calculateViewRect();
@@ -77,16 +79,14 @@ export class ViewManager extends Object {
 	// 뷰 영역 계산.
 	//==============================================================================
 	calculateViewRect() {
-		// 캔버스 크기 설정.
 		const canvas = this.getCanvas();
+		if (canvas === null || canvas === undefined) {
+			return;
+		}
 		const devicePixelRatio = System.window.devicePixelRatio || 1;
 		const clientNativeSize = Vector2.create(System.window.innerWidth, System.window.innerHeight);
-
-		// 이슈: 실제 브라우저 리사이즈 후 바로 캔버스 크기를 가져왔을 때 실제 크기와 달라 오차가 발생되는 경우가 존재. (임시 방편으로 화면 전체 사이즈로 강제 처리)
 		const canvasNativeRect = canvas.getBoundingClientRect();
 		const canvasNativeSize = Vector2.create(Math.round(canvasNativeRect.width), Math.round(canvasNativeRect.height));
-		// const canvasNativeSize = Vector2.create(clientNativeSize.x, clientNativeSize.y);
-
 		const canvasPixelSize = Vector2.create(Math.round(canvasNativeSize.x * devicePixelRatio), Math.round(canvasNativeSize.y * devicePixelRatio));
 		this.#devicePixelRatio = devicePixelRatio;
 		this.#clientNativeSize = clientNativeSize;
@@ -96,8 +96,6 @@ export class ViewManager extends Object {
 		// 캔버스 렌더링 사이즈 조정.
 		this.#canvas.width = canvasPixelSize.x; 
 		this.#canvas.height = canvasPixelSize.y;
-		// this.#canvas.style.width = `${clientNativeSize.x}px`;
-		// this.#canvas.style.height = `${clientNativeSize.y}px`;
 
 		// 뷰 영역 설정.
 		const viewScaleMode = this.getViewScaleMode();
@@ -323,7 +321,18 @@ export class ViewManager extends Object {
 	}
 
 	//==============================================================================
-	// 기준 화면 크기 반환.
+	// 기준 해상도 크기 설정.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } referenceResolutionSize
+	 */
+	setReferenceResolutionSize(referenceResolutionSize) {
+		this.#referenceResolutionSize = referenceResolutionSize;
+		this.calculateViewRect();
+	}
+	
+	//==============================================================================
+	// 기준 해상도 크기 반환.
 	//==============================================================================
 	/**
 	 * @returns { Vector2 }
@@ -371,7 +380,7 @@ export class ViewManager extends Object {
 	 * @param { Vector2 } canvasPosition
 	 * @returns { Vector2 }
 	 */
-	calculateViewPosition(canvasPosition) {
+	canvasPositionToViewPosition(canvasPosition) {
 		const devicePixelRatio = this.getDevicePixelRatio();
 		const targetResolutionScale = this.getTargetResolutionScale();
 		const totalScale = targetResolutionScale * devicePixelRatio;

@@ -150,7 +150,7 @@ export class Graphic extends Object {
 	 * @param { Vector2 } contentSize
 	 */
 	drawImage(image, position, contentSize) {
-		if (image === null){
+		if (image === null || image === undefined){
 			throw new Error("image is null");
 		}
 
@@ -171,13 +171,13 @@ export class Graphic extends Object {
 	 * @param { Rect } imageRect
 	 */
 	drawImageWithImageRect(image, position, contentSize, imageRect) {
-		if (image === null){
+		if (image === null || image === undefined){
 			throw new Error("image is null");
 		}
 
 		const canvasRenderingContext = this.getCanvasRenderingContext();
 		if (canvasRenderingContext) {
-			if (imageRect === null || imageRect.equals(Rect.zero())) {
+			if (imageRect === null || imageRect === undefined || imageRect.equals(Rect.zero())) {
 				imageRect = Rect.create(0, 0, image.width, image.height);
 			}
 
@@ -269,7 +269,7 @@ export class Graphic extends Object {
 	 * @param { Node } node
 	 */
 	drawNode(node) {
-		if (node === null || !node.isActive()) {
+		if (node === null || node == undefined || !node.isActive()) {
 			return;
 		}
 

@@ -22,16 +22,24 @@ import { FontAsset } from "../resource/fontasset.js";
 // 엔진 설정.
 //==============================================================================
 export class EngineConfiguration extends Object {
-	// /** @type { Scene } */ scene;
-	/** @type { Vector2 } */ referenceResolutionSize;
-	/** @type { string } */ canvasId;
-	/** @type { boolean } */ isDevelopment;
+	//==============================================================================
+	// 멤버 변수 목록.
+	//==============================================================================
+	/** @type { Vector2 } */ referenceResolutionSize; // 기준 해상도.
+	/** @type { string } */ canvasId; // 캔버스 식별자.
+	/** @type { boolean } */ useStatistics; // 정보창 출력 여부.
+	/** @type { boolean } */ autoResizeOnWindowResize; // 윈도우가 리사이즈 될 때 캔버스 사이즈 자동 반영.
+
+	//==============================================================================
+	// 생성.
+	//==============================================================================
 	constructor() {
 		super();
 		// this.scene = null;
 		this.referenceResolutionSize = Vector2.zero();
 		this.canvasId = "";
-		this.isDevelopment = false;
+		this.useStatistics = false;
+		this.autoResizeOnWindowResize = false;
 	}
 }
 
@@ -63,7 +71,7 @@ export class Engine extends Object {
 	 */
 	constructor(engineConfiguration) {
 		super();
-		if (engineConfiguration === null || engineConfiguration instanceof EngineConfiguration === false) {
+		if (engineConfiguration === null || engineConfiguration === undefined || engineConfiguration instanceof EngineConfiguration === false) {
 			throw new System.Error(`engineConfiguration is invalid.`);
 		}
 		this.#engineConfiguration = engineConfiguration;
@@ -77,7 +85,7 @@ export class Engine extends Object {
 		this.#platform = new Platform();
 		this.#sceneManager = new SceneManager(this);
 		this.#timeManager = new TimeManager(this);
-		this.#viewManager = new ViewManager(this, engineConfiguration.referenceResolutionSize);
+		this.#viewManager = new ViewManager(this);
 		this.#viewManager.setCanvas(canvas);
 		this.#inputManager = new InputManager(this);
 		this.#graphic = new Graphic(canvasRenderingContext);
@@ -98,7 +106,7 @@ export class Engine extends Object {
 	 * @param { Scene } scene
 	 */
 	run(scene) {
-		if (scene === null || scene instanceof Scene === false) {
+		if (scene === null || scene === undefined || scene instanceof Scene === false) {
 			throw new System.Error(`scene is invalid.`);
 		}
 		
@@ -122,14 +130,27 @@ export class Engine extends Object {
 	// 해상도 변경됨.
 	//==============================================================================
 	resize() {
+		const autoResizeOnWindowResize = this.getEngineConfiguration();
 		const viewManager = this.getViewManager();
+
+		// 설정: 윈도우가 리사이즈 될 때 캔버스 사이즈 자동 반영.
+		if (autoResizeOnWindowResize) {
+			const clientNativeSize = Vector2.create(System.window.innerWidth, System.window.innerHeight);
+			const canvas = viewManager.getCanvas();
+
+			// 캔버스 크기 스타일 조정. (사파리에서 필수)
+			canvas.style.width = `${clientNativeSize.x}px`;
+			canvas.style.height = `${clientNativeSize.y}px`;			
+		}
+
+		// 뷰 영역 계산.
 		const beforeCanvasNativeSize = viewManager.getCanvasNativeSize();
 		const beforeViewRect = viewManager.getViewRect();
 		viewManager.calculateViewRect();
 		const afterCanvasNativeSize = viewManager.getCanvasNativeSize();
 		const afterViewRect = viewManager.getViewRect();
 
-		// 씬 리사이즈.
+		// 씬: 화면 영역 변경 이벤트.
 		const sceneManager = this.getSceneManager();
 		const loadedScenes = sceneManager.getAllLoadedScenes();
 		for (const loadedScene of loadedScenes) {
@@ -310,7 +331,7 @@ export class Engine extends Object {
 		inputManager.setCanvasNativeInputPosition(canvasNativeInputPosition);
 
 		// 뷰 기준 입력 위치 설정.
-		const viewInputPosition = viewManager.calculateViewPosition(canvasNativeInputPosition);
+		const viewInputPosition = viewManager.canvasPositionToViewPosition(canvasNativeInputPosition);
 		inputManager.setViewInputPosition(viewInputPosition);
 	}
 	
@@ -321,11 +342,6 @@ export class Engine extends Object {
 	 * @param { Graphic } graphic 
 	 */
 	drawStatistics(graphic) {
-		// const isDevelopment = this.isDevelopment();
-		// if (!isDevelopment) {
-		// 	return;
-		// }
-	
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const timeManager = this.getTimeManager();
 		const viewManager = this.getViewManager();
@@ -423,6 +439,7 @@ export class Engine extends Object {
 		// const canvasPixelSize = viewManager.getCanvasPixelSize();
 		const viewScaleMode = viewManager.getViewScaleMode();
 		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
+		// const screenSize = viewManager.getScreenSize();
 		// const viewRect = viewManager.getViewRect();
 		const canvasNativeInputPosition = inputManager.getCanvasNativeInputPosition();
 		const viewInputPosition = inputManager.getViewInputPosition();
@@ -430,6 +447,7 @@ export class Engine extends Object {
 		drawOutlineText(`canvasNativeSize: (${canvasNativeSize.x}, ${canvasNativeSize.y})`);
 		// drawOutlineText(`canvasPixelSize: (${canvasPixelSize.x}, ${canvasPixelSize.y})`);
 		drawOutlineText(`referenceResolutionSize: (${referenceResolutionSize.x}, ${referenceResolutionSize.y})`);
+		// drawOutlineText(`screenSize: (${screenSize.x}, ${screenSize.y})`);
 		drawOutlineText(`viewScaleMode: ${viewScaleMode}`);
 		// drawOutlineText(`viewRect: (${viewRect.position.x}, ${viewRect.position.y}) - (${viewRect.size.x}, ${viewRect.size.y})`);
 		drawOutlineText(`canvasNativeInputPosition: (${canvasNativeInputPosition.x}, ${canvasNativeInputPosition.y})`);
@@ -539,8 +557,8 @@ export class Engine extends Object {
 		}
 
 		// 개발 정보 출력.
-		const isDevelopment = this.isDevelopment();
-		if (isDevelopment) {
+		const engineConfiguration = this.getEngineConfiguration();
+		if (engineConfiguration.useStatistics) {
 			this.drawStatistics(graphic);
 		}
 		
@@ -649,13 +667,13 @@ export class Engine extends Object {
 	}
 
 	//==============================================================================
-	// 개발 모드 여부 반환.
+	// 엔진 설정 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { EngineConfiguration }
 	 */
-	isDevelopment() {
-		return this.#engineConfiguration.isDevelopment;
+	getEngineConfiguration() {
+		return this.#engineConfiguration;
 	}
 
 	//==============================================================================
@@ -667,7 +685,7 @@ export class Engine extends Object {
 	 */
 	getOrAddCanvas(canvasId) {
 		let canvas = document.getElementById(canvasId);
-		if (canvas === null) {
+		if (canvas === null || canvas === undefined) {
 			canvas = document.createElement("canvas");
 			canvas.id = canvasId;
 			document.body.appendChild(canvas);

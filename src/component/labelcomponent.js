@@ -129,7 +129,7 @@ export class LabelComponent extends Component {
 	 * @param { FontFace | FontAsset } font 
 	 */
 	setFont(font) {
-		if (font === null) {
+		if (font === null || font === undefined) {
 			this.#fontFace = null;
 		}
 		else if (font instanceof FontFace) {
@@ -197,7 +197,7 @@ export class LabelComponent extends Component {
 	 * @param { Color | string | CanvasGradient | CanvasPattern } color
 	 */
 	setTextColor(color) {
-		if (color === null) {
+		if (color === null || color === undefined) {
 			this.#textColor = Color.transparent();
 		}
 		else if (typeof color === "string") {
@@ -230,7 +230,7 @@ export class LabelComponent extends Component {
 	 * @param { Color | string | CanvasGradient | CanvasPattern } color
 	 */
 	setStrokeColor(color) {
-		if (color === null) {
+		if (color === null || color === undefined) {
 			this.#strokeColor = Color.transparent();
 		}
 		else if (typeof color === "string") {

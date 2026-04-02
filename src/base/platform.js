@@ -183,7 +183,7 @@ export class Platform extends Object {
 
 		System.document.body.removeChild(div);
 
-		if (canvas === null) {
+		if (canvas === null || canvas === undefined) {
 			return Rect.create(left, top, System.window.innerWidth - left - right, System.window.innerHeight - top - bottom);
 		}
 		else {

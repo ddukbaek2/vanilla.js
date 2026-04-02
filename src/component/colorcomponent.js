@@ -59,7 +59,7 @@ export class ColorComponent extends Component {
 	 * @param { Color | string | CanvasGradient | CanvasPattern } other
 	 */
 	setColor(other) {
-		if (other === null) {
+		if (other === null || other === undefined) {
 			this.#color = Color.transparent();
 		}
 		else if (typeof other === "string") {

@@ -464,7 +464,7 @@ export class Node extends Object {
 	 * @param { Function } componentType  
 	 */
 	addComponent(componentType) {
-		if (componentType === null) {
+		if (componentType === null || componentType === undefined) {
 			return null;
 		}
 		const component = new componentType();
@@ -496,7 +496,8 @@ export class Node extends Object {
 	 * @returns { boolean }
 	 */
 	hasComponent(componentType) {
-		return this.getComponent(componentType) !== null;
+		const component = this.getComponent(componentType);
+		return component !== null && component !== undefined;
 	}
 
 	//==============================================================================
@@ -518,7 +519,7 @@ export class Node extends Object {
 	 */
 	getComponent(componentType) {
 		const component = this.#components.find(component => component instanceof componentType);
-		if (component === null) {
+		if (component === null || component === undefined) {
 			return null;
 		}		
 		return component;
@@ -610,7 +611,7 @@ export class Node extends Object {
 	 * @returns { boolean } 
 	 */
 	isRoot() {
-		return this.#parent === null;
+		return this.#parent === null || this.#parent === undefined;
 	}
 
 	//==============================================================================
@@ -692,7 +693,7 @@ export class Node extends Object {
 	isActiveInHierarchy() {
 		if (this.isActive()) {
 			let current = this;
-			while (current !== null) {
+			while (current !== null && current !== undefined) {
 				if (current.isActive()) {
 					current = current.getParent();
 				}
@@ -715,7 +716,7 @@ export class Node extends Object {
 	isVisibleInHierarchy() {
 		if (this.isVisible()) {
 			let current = this;
-			while (current !== null) {
+			while (current !== null && current !== undefined) {
 				if (current.isVisible()) {
 					current = current.getParent();
 				}
@@ -880,7 +881,7 @@ export class Node extends Object {
 	 * @returns { boolean }
 	 */
 	contains(viewPosition) {
-		if (viewPosition === null) {
+		if (viewPosition === null || viewPosition === undefined) {
 			return false;
 		}
 		const worldCorners = this.getWorldCorners();

@@ -89,7 +89,7 @@
 // 	 * @param { FontFace | FontAsset } font 
 // 	 */
 // 	setFont(font) {
-// 		if (font === null) {
+// 		if (font === null || font === undefined) {
 // 			this.#fontFace = null;
 // 		}
 // 		else if (font instanceof FontFace) {

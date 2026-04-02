@@ -90,7 +90,7 @@ export class SpriteComponent extends ColorComponent {
 		const image = this.getImage();
 		const color = super.getColor();
 		const colorString = color.toHEXString();
-		if (image === null) {
+		if (image === null || image === undefined) {
 			// 출력.
 			canvasRenderingContext.fillStyle = colorString;
 			super.draw(graphic);
@@ -113,7 +113,7 @@ export class SpriteComponent extends ColorComponent {
 			case SpriteDrawMode.simple: {
 					// 이미지 소스 조정.
 					let imageRect = this.getImageRect();
-					if (imageRect === null || imageRect.equals(Rect.zero())) {
+					if (imageRect === null || imageRect === undefined || imageRect.equals(Rect.zero())) {
 						imageRect = Rect.create(0, 0, image.width, image.height);
 					}
 
@@ -129,7 +129,7 @@ export class SpriteComponent extends ColorComponent {
 			case SpriteDrawMode.tiled: {
 					// 이미지 소스 조정.
 					let imageRect = this.getImageRect();
-					if (imageRect === null || imageRect.equals(Rect.zero())) {
+					if (imageRect === null || imageRect === undefined || imageRect.equals(Rect.zero())) {
 						imageRect = Rect.create(0, 0, image.width, image.height);
 					}
 
@@ -186,7 +186,7 @@ export class SpriteComponent extends ColorComponent {
 	 * @param { HTMLImageElement | ImageAsset } image 
 	 */
 	setImage(image) {
-		if (image === null) {
+		if (image === null || image === undefined) {
 			this.#image = null;
 		}
 		else if (image instanceof HTMLImageElement) {

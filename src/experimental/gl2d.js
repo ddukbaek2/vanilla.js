@@ -31,7 +31,7 @@ class GL2D {
 	// glIdentity.
 	//==============================================================================
 	glIdentity() {
-		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext === undefined || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
@@ -43,7 +43,7 @@ class GL2D {
 	// glTranslate.
 	//==============================================================================
 	glTranslate(x, y) {
-		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext === undefined || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
@@ -54,7 +54,7 @@ class GL2D {
 	// glScale.
 	//==============================================================================
 	glScale(x, y) {
-		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext === undefined || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
@@ -65,7 +65,7 @@ class GL2D {
 	// glRotate.
 	//==============================================================================
 	glRotate(radian) {
-		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext === undefined || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
@@ -76,7 +76,7 @@ class GL2D {
 	// glTransform.
 	//==============================================================================
 	glTransform(matrix) {
-		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext === undefined || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
@@ -87,7 +87,7 @@ class GL2D {
 	// glViewport.
 	//==============================================================================
 	glViewport(x, y, width, height) {
-		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext === undefined || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
@@ -98,7 +98,7 @@ class GL2D {
 	// glClearColor.
 	//==============================================================================
 	glClearColor(r, g, b, a) {
-		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext === undefined || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
@@ -109,7 +109,7 @@ class GL2D {
 	// glPushMatrix.
 	//==============================================================================
 	glPushMatrix() {
-		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext === undefined || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 
@@ -120,7 +120,7 @@ class GL2D {
 	// glPopMatrix.
 	//==============================================================================
 	glPopMatrix() {
-		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
+		if (this.#canvasRenderingContext === null || this.#canvasRenderingContext === undefined || this.#canvasRenderingContext instanceof CanvasRenderingContext2D === false) {
 			return;
 		}
 

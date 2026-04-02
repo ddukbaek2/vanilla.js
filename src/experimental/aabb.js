@@ -37,7 +37,7 @@
 // 	 * @returns { boolean }
 // 	 */
 // 	contains(other) {
-// 		if (other === null) {
+// 		if (other === null || other === undefined) {
 // 			return false;
 // 		}
 // 		else if (other instanceof Vector2) {
@@ -55,7 +55,7 @@
 // 	 * @returns { boolean }
 // 	 */
 // 	overlaps(other) {
-// 		if (other === null) {
+// 		if (other === null || other === undefined) {
 // 			return false;
 // 		}
 // 		else if (other instanceof Rect) {

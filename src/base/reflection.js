@@ -14,7 +14,7 @@ const System = globalThis;
  */
 export function clone(target) {
 	// 오류 방어.
-	if (target === null || typeof target !== "object") {
+	if (target === null || target === undefined || typeof target !== "object") {
 		return target;
 	}
 
@@ -62,7 +62,7 @@ export function clone(target) {
 export function structuredClone(target) {
 
 	// 오류.
-	if (target === null || typeof target !== "object")
+	if (target === null || target === undefined || typeof target !== "object")
 		throw new System.Error();
 
 	// 생성자 호출을 통해 신규 객체 생성 (프라이빗 멤버 정상 할당).
