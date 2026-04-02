@@ -2,10 +2,10 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Object } from "../base/object.js";
+import { Object } from "../../base/object.js";
 import { List } from "../collection/list.js";
 import { Dictionary } from "../collection/dictionary.js";
-import { Frame } from "../core/frame.js";
+import { Frame } from "../../core/frame.js";
 import { AnimationClip, Animation } from "../rendering/animation.js";
 
 
