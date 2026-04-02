@@ -3,15 +3,16 @@
 //==============================================================================
 import { Vector2 } from "../base/vector2.js";
 import * as Math from "../base/math.js";
-import { Graphic } from "../core/graphic.js";
-import { Node } from "../core/node.js";
+import { Graphic } from "./graphic.js";
+import { TransformNode } from "./transformnode.js";
+
 
 //==============================================================================
 // UI 기반 뷰.
 // - 앵커 기반의 레이아웃(RectTransform)을 지원합니다.
 // - 내부의 앵커 세팅을 기반으로 최종 계산된 값을 Node의 로컬 위치와 크기에 반영합니다.
 //==============================================================================
-export class UINode extends Node {
+export class AnchoredTransformNode extends TransformNode {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -241,10 +242,10 @@ export class UINode extends Node {
 	// // 새로운 노드 생성.
 	// //==============================================================================
 	// /**
-	//  * @returns { UINode }
+	//  * @returns { AnchoredTransformNode }
 	//  */
 	// static create() {
-	// 	var obj = new UINode();
+	// 	var obj = new AnchoredTransformNode();
 	// 	return obj;
 	// }
 }

@@ -3,14 +3,14 @@
 // //==============================================================================
 // import { Vector2 } from "../base/vector2.js";
 // import { Graphic } from "../core/graphic.js";
-// import { UINode } from "./uinode.js";
+// import { AnchoredTransformNode } from "./anchoredtransformnode.js";
 // import { FontAsset } from "../resource/fontasset.js";
 
 
 // //==============================================================================
 // // UI 레이블.
 // //==============================================================================
-// export class UILabel extends UINode {
+// export class UILabel extends AnchoredTransformNode {
 // 	//==============================================================================
 // 	// 멤버 변수 목록.
 // 	//==============================================================================
