@@ -3,8 +3,8 @@
 //==============================================================================
 const System = globalThis;
 import { Vector2 } from "../base/vector2.js";
-import { Node } from "../core/node.js";
 import { Graphic } from "../core/graphic.js";
+import { TransformNode } from "../core/transformnode.js";
 
 
 //==============================================================================
@@ -12,7 +12,7 @@ import { Graphic } from "../core/graphic.js";
 // - 이 노드가 그려지기 전까지의 캔버스 내용을 가져와서 일렁이는 효과를 줍니다.
 // - 따라서 씬의 가장 마지막(맨 위)에 추가되어야 효과가 보입니다.
 //==============================================================================
-export class HeatHazeEffect extends Node {
+export class HeatHazeEffect extends TransformNode {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
