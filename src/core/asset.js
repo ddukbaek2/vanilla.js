@@ -12,8 +12,8 @@ export class Asset extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @public @readonly @type { string } */ assetPath = "";
-	/** @protected @type { boolean } */ isLoaded = false;
+	/** @private @type { string } */ #assetPath;
+	/** @private @type { boolean } */ #isLoaded;
 
 	
 	//==============================================================================
@@ -22,8 +22,8 @@ export class Asset extends Object {
 	constructor() {
 		super();
 
-		this.assetPath = "";
-		this.isLoaded = false;
+		this.#assetPath = "";
+		this.#isLoaded = false;
 	}
 
 	//==============================================================================
@@ -34,12 +34,13 @@ export class Asset extends Object {
 	 * @param { string } assetPath 
 	 */
 	async load(assetPath) {
-		this.assetPath = assetPath;
-		
-		// 이미 로드 된 상태라면.
-		if (this.isLoaded) {
-			return System.Promise.resolve();
+		const isLoaded = this.isLoaded();
+		if (isLoaded) {
+			return;
 		}
+
+		this.setAssetPath(assetPath);
+		System.Promise.resolve();
 	}
 
 	//==============================================================================
@@ -49,11 +50,52 @@ export class Asset extends Object {
 	 * @virtual
 	 */
 	unload() {
-		if (!this.isLoaded) {
-			return;
+		const isLoaded = this.isLoaded();
+		if (!isLoaded) {
+			return Promise.resolve();
 		}
 
-		this.assetPath = "";
-		this.isLoaded = false;
+		this.setAssetPath("");
+		this.setLoaded(false);
+	}
+
+	//==============================================================================
+	// 로드 경로 설정.
+	//==============================================================================
+	/**
+	 * @param { string } assetPath
+	 */
+	setAssetPath(assetPath) {
+		this.#assetPath = assetPath;
+	}
+
+	//==============================================================================
+	// 로드 경로 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getAssetPath() {
+		return this.#assetPath;
+	}
+
+	//==============================================================================
+	// 로드 되었는지 여부 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } isLoaded
+	 */
+	setLoaded(isLoaded) {
+		this.#isLoaded = isLoaded;
+	}
+
+	//==============================================================================
+	// 로드 되었는지 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isLoaded() {
+		return this.#isLoaded;
 	}
 }

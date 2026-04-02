@@ -20,8 +20,6 @@ export class FontAsset extends Asset
 	//==============================================================================
 	constructor() {
 		super();
-		// super.assetPath = "";
-		// super.isLoaded = false;
 		this.family = "";
 		this.fontFace = null;
 	}
@@ -37,7 +35,8 @@ export class FontAsset extends Asset
 		await super.load(assetPath);
 
 		// 이미 로드 된 상태라면.
-		if (super.isLoaded) {
+		const isLoaded = this.isLoaded();
+		if (isLoaded) {
 			return Promise.resolve();
 		}
 	}
@@ -50,21 +49,22 @@ export class FontAsset extends Asset
 	 * @param { string } assetPath 
 	 */
 	async loadFont(family, assetPath) {
-		await super.load(assetPath);
 
-		if (this.fontFace)
+		if (this.fontFace) {
 			return Promise.resolve();
-		
+		}
+
+		await super.load(assetPath);
 		this.family = family;
-		this.AssetPath = assetPath;
 
 		// this.FontFace = new FontFace(this.Family, `url(${this.AssetPath}) format("woff2")`);
-		this.fontFace = new FontFace(this.family, `url(${this.AssetPath})`);
+		// const assetPath = this.getAssetPath();
+		this.fontFace = new FontFace(this.family, `url(${assetPath})`);
 		await this.fontFace.load();
 
 		// 브라우저 폰트셋 등록.
 		document.fonts.add(this.fontFace);
-		super.IsLoaded = true;
+		this.setLoaded(true);
 	}
 
 	//==============================================================================
@@ -81,6 +81,6 @@ export class FontAsset extends Asset
 
 		document.fonts.delete(this.fontFace);
 		this.fontFace = null;
-		super.IsLoaded = false;
+		this.setLoaded(false);
 	}
 }

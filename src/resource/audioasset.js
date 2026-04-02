@@ -49,7 +49,8 @@ export class AudioAsset extends Asset {
 		// await super.load(assetPath);
 
 		// 이미 로드 된 상태라면.
-		if (super.isLoaded) {
+		const isLoaded = this.isLoaded();
+		if (isLoaded) {
 			return Promise.resolve();
 		}
 
@@ -59,14 +60,13 @@ export class AudioAsset extends Asset {
 		}
 
 		try {
-			super.assetPath = assetPath;
 			const response = await fetch(assetPath);
 			const arrayBuffer = await response.arrayBuffer();
 			this.#audioBuffer = await this.#audioContext.decodeAudioData(arrayBuffer);
-			super.isLoaded = true;
+			this.setLoaded(true);
 		}
 		catch (error) {
-			console.error(`Error loading sound: ${super.assetPath}`, error);
+			console.error(`Error loading sound: ${assetPath}`, error);
 			throw error;
 		}
 	}

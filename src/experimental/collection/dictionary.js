@@ -2,21 +2,21 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Object } from "../base/object.js";
+import { Object } from "../../base/object.js";
 
 
 //==============================================================================
-// 리스트.
+// 딕셔너리.
 //==============================================================================
 /**
- * @template T
+ * @template K, V
  * @class
  */
-export class List extends Object {
+export class Dictionary extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { T[] } */ #items;
+	/** @private @type { Map<K, V> } */ #items;
 
 	//==============================================================================
 	// 생성.
@@ -26,165 +26,136 @@ export class List extends Object {
 	 */
 	constructor() {
 		super();
-		this.#items = [];
+		this.#items = new Map();
 	}
 
 	//==============================================================================
 	// 전체 제거.
 	//==============================================================================
 	clear() {
-		this.#items.length = 0;
+		this.#items.clear();
 	}
 
 	//==============================================================================
 	// 추가.
 	//==============================================================================
 	/**
-	 * @param { T } item 
+	 * @param { K } key
+	 * @param { V } value 
 	 */
-	add(item) {
-		this.#items.push(item);
-	}
-
-	//==============================================================================
-	// 범위 추가.
-	//==============================================================================
-	/**
-	 * @param { T[] } items
-	 */
-	addRange(items) {
-		for (const item of items) {
-			this.#items.push(item);
-		}
+	add(key, value) {
+		this.#items.set(key, value);
 	}
 
 	//==============================================================================
 	// 제거.
 	//==============================================================================
 	/**
-	 * @param { T } item
+	 * @param { K } key
 	 * @returns { boolean }
 	 */
-	remove(item) {
-		const index = this.#items.indexOf(item);
-		if (index !== -1) {
-			this.#items.splice(index, 1);
-			return true;
-		}
-
-		return false;
-	}
-
-	//==============================================================================
-	// 제거.
-	//==============================================================================
-	/**
-	 * @param { number } index
-	 * @returns { boolean }
-	 */
-	removeAt(index) {
-		if (index < 0 || index >= this.#items.length) {
-			return false;
-		}
-
-		this.#items.splice(index, 1);
-		return true;
+	remove(key) {
+		return this.#items.delete(key);
 	}
 
 	//==============================================================================
 	// 요소 검색.
 	//==============================================================================
 	/**
-	 * @param { function(number, T): boolean } predicate
-	 * @returns { T | undefined }
+	 * @param { function(K, V): boolean } predicate
+	 * @returns { { key: K, value: V } | null }
 	 */
 	find(predicate) {
-		let index = 0;
-		for (const item of this.#items) {
-			if (predicate.call(index, item)) {
-				return item;
+		for (const [key, value] of this.#items) {
+			if (predicate.call(key, value)) {
+				return {
+					key,
+					value
+				};
 			}
-			++index;
 		}
-		return undefined;
+		return null;
 	}
 
 	//==============================================================================
 	// 요소 검색.
 	//==============================================================================
 	/**
-	 * @param { function(number, T): boolean } predicate
-	 * @returns { T[] }
+	 * @param { function(K, V): boolean } predicate
+	 * @returns { { key: K, value: V }[] }
 	 */
 	findAll(predicate) {
-		let index = 0;
 		const items = [];
-		for (const item of this.#items) {
-			if (predicate.call(index, item)) {
-				items.push(item);
+		for (const [key, value] of this.#items) {
+			if (predicate.call(key, value)) {
+				items.push({
+					key,
+					value
+				});
 			}
-			++index;
 		}
 		return items;
 	}
-	
+
 	//==============================================================================
 	// 요소가 포함되어있는지 여부 반환.
 	//==============================================================================
 	/**
+	 * @param { K } key 
 	 * @returns { boolean } 
 	 */
-	contains(item) {
-		return this.#items.includes(item);
-	}
-
-	//==============================================================================
-	// 색인 반환.
-	//==============================================================================
-	/**
-	 * @returns { number } 
-	 */
-	indexOf(item) {
-		return this.#items.indexOf(item);
+	contains(key) {
+		return this.#items.has(key);
 	}
 
 	//==============================================================================
 	// 요소 반환.
 	//==============================================================================
 	/**
-	 * @returns { T } 
+	 * @param { K } key
+	 * @returns { V } 
 	 */
-	getAt(index) {
-		return this.#items[index];
+	get(key) {
+		return this.#items.get(key);
 	}
 
 	//==============================================================================
-	// 리스트가 비어있는지 여부 반환.
-	//==============================================================================
-	/**
-	 * @returns { boolean } 
-	 */
-	isEmpty() {
-		return this.#items.length === 0;
-	}
-
-	//==============================================================================
-	// 리스트 요소 수 반환.
+	// 요소 수 반환.
 	//==============================================================================
 	/**
 	 * @returns { number }
 	 */
 	getCount() {
-		return this.#items.length;
+		return this.#items.size;
 	}
 
 	//==============================================================================
 	// 전체 요소 반환.
 	//==============================================================================
 	/**
-	 * @returns { T[] } 
+	 * @returns { Map<K, V> } 
 	 */
-	all() {
+	getItems() {
 		return this.#items;
+	}
+
+	//==============================================================================
+	// 전체 키 반환.
+	//==============================================================================
+	/**
+	 * @returns { K[] } 
+	 */
+	getKeys() {
+		return Array.from(this.#items.keys());
+	}
+
+	//==============================================================================
+	// 전체 값 반환.
+	//==============================================================================
+	/**
+	 * @returns { V[] } 
+	 */
+	getValues() {
+		return Array.from(this.#items.values());
 	}
 }

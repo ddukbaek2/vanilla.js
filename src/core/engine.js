@@ -112,11 +112,12 @@ export class Engine extends Object {
 		
 		// 기본 폰트 불러오기.
 		const internalFontFace = new FontFace(`DOSGothic`, `url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff')`);
+		// const internalFontFace = new FontFace(`DOSGothic`, `url('./assets/fonts/Consolas.woff2')`);
 		internalFontFace.load().then((loadedFont) => {
 			document.fonts.add(loadedFont);
 			// 씬 불러오기.
 			const sceneManager = this.getSceneManager();
-			return sceneManager.loadScene(scene);
+			return sceneManager.loadScene(scene); // 비동기 로드 처리됨.
 		}).then(() => {
 			// 엔진 실행.
 			System.window.addEventListener("resize", this.#resizeCallback);

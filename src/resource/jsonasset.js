@@ -32,21 +32,20 @@ export class JsonAsset extends TextAsset
 	 */
 	async load(assetPath) {
 		// 이미 로드 된 상태라면.
-		if (super.isLoaded) {
+		const isLoaded = this.isLoaded();
+		if (isLoaded) {
 			return System.Promise.resolve();
 		}
 
 		// 로드.
-		await super.load(assetPath);
-
-		if (this.isLoaded) {
-			try {
-				this.data = JSON.parse(this.text);
-			}
-			catch (error) {
-				console.error(`Error loading json: ${assetPath}`, error);
-				super.isLoaded = false;
-			}
+		try {
+			await super.load(assetPath);
+			this.setLoaded(false);
+			this.data = JSON.parse(this.text);
+			this.setLoaded(true);
+		}
+		catch (error) {
+			console.error(`Error loading json: ${assetPath}`, error);
 		}
 	}
 

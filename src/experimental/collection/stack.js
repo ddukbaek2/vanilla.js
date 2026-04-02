@@ -2,17 +2,17 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Object } from "../base/object.js";
+import { Object } from "../../base/object.js";
 
 
 //==============================================================================
-// 큐 (FIFO).
+// 스택 (LIFO).
 //==============================================================================
 /**
  * @template T
  * @class
  */
-export class Queue extends Object {
+export class Stack extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -35,7 +35,7 @@ export class Queue extends Object {
 	/**
 	 * @param { T } item 
 	 */
-	enqueue(item) {
+	push(item) {
 		this.#items.push(item);
 	}
 
@@ -45,8 +45,8 @@ export class Queue extends Object {
 	/**
 	 * @returns { T | undefined }
 	 */
-	dequeue() {
-		return this.#items.shift();
+	pop() {
+		return this.#items.pop();
 	}
 
 	//==============================================================================
@@ -56,7 +56,7 @@ export class Queue extends Object {
 	 * @returns { T | undefined }
 	 */
 	peek() {
-		return this.#items[0];
+		return this.#items[this.#items.length - 1];
 	}
 
 	//==============================================================================

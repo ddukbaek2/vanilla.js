@@ -33,21 +33,21 @@ export class ImageAsset extends Asset {
 	 * @param { string } assetPath 
 	 */
 	async load(assetPath) {
-		await super.load(assetPath);
 
 		// 이미 로드 된 상태라면.
-		if (super.isLoaded) {
+		const isLoaded = this.isLoaded();
+		if (isLoaded) {
 			return Promise.resolve();
 		}
 
-		super.assetPath = assetPath;
+		await super.load(assetPath);
 		this.image = new System.window.Image();
 		this.image.src = assetPath;
 
 		// 불러오기.
 		await new Promise((resolve, reject) => {
 			this.image.onload = () => {
-				super.isLoaded = true;
+				this.setLoaded(true);
 				resolve();
 			};
 			this.image.onerror = () => {

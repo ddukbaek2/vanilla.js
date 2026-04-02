@@ -2,21 +2,21 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Object } from "../base/object.js";
+import { Object } from "../../base/object.js";
 
 
 //==============================================================================
-// 딕셔너리.
+// 셋 (중복 불허 집합).
 //==============================================================================
 /**
- * @template K, V
+ * @template T
  * @class
  */
-export class Dictionary extends Object {
+export class Set extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { Map<K, V> } */ #items;
+	/** @private @type { Set<T> } */ #items;
 
 	//==============================================================================
 	// 생성.
@@ -26,7 +26,113 @@ export class Dictionary extends Object {
 	 */
 	constructor() {
 		super();
-		this.#items = new Map();
+		this.#items = new System.Set();
+	}
+
+	//==============================================================================
+	// 데이터 추가.
+	//==============================================================================
+	/**
+	 * @param { T } item 
+	 */
+	add(item) {
+		this.#items.add(item);
+	}
+
+	//==============================================================================
+	// 데이터 제거.
+	//==============================================================================
+	/**
+	 * @param { T } item 
+	 * @returns { boolean }
+	 */
+	remove(item) {
+		return this.#items.delete(item);
+	}
+
+	//==============================================================================
+	// 요소 포함 여부 반환.
+	//==============================================================================
+	/**
+	 * @param { T } item 
+	 * @returns { boolean }
+	 */
+	contains(item) {
+		return this.#items.has(item);
+	}
+
+	//==============================================================================
+	// 합집합. (Union)
+	//==============================================================================
+	/**
+	 * @param { Set<T> } otherSet 
+	 * @returns { Set<T> }
+	 */
+	union(otherSet) {
+		const resultSet = new Set();
+		for (const item of this.#items) {
+			resultSet.add(item);
+		}
+		for (const item of otherSet.toArray()) {
+			resultSet.add(item);
+		}
+		return resultSet;
+	}
+
+	//==============================================================================
+	// 교집합. (Intersection)
+	//==============================================================================
+	/**
+	 * @param { Set<T> } otherSet 
+	 * @returns { Set<T> }
+	 */
+	intersection(otherSet) {
+		const resultSet = new Set();
+		for (const item of this.#items) {
+			if (otherSet.contains(item)) {
+				resultSet.add(item);
+			}
+		}
+		return resultSet;
+	}
+
+	//==============================================================================
+	// 차집합. (Difference)
+	//==============================================================================
+	/**
+	 * @param { Set<T> } otherSet 
+	 * @returns { Set<T> }
+	 */
+	difference(otherSet) {
+		const resultSet = new Set();
+		for (const item of this.#items) {
+			if (!otherSet.contains(item)) {
+				resultSet.add(item);
+			}
+		}
+		return resultSet;
+	}
+
+	//==============================================================================
+	// 대칭 차집합 (여집합). (Symmetric Difference)
+	//==============================================================================
+	/**
+	 * @param { Set<T> } otherSet 
+	 * @returns { Set<T> }
+	 */
+	symmetricDifference(otherSet) {
+		const resultSet = new Set();
+		for (const item of this.#items) {
+			if (!otherSet.contains(item)) {
+				resultSet.add(item);
+			}
+		}
+		for (const item of otherSet.toArray()) {
+			if (!this.contains(item)) {
+				resultSet.add(item);
+			}
+		}
+		return resultSet;
 	}
 
 	//==============================================================================
@@ -34,89 +140,6 @@ export class Dictionary extends Object {
 	//==============================================================================
 	clear() {
 		this.#items.clear();
-	}
-
-	//==============================================================================
-	// 추가.
-	//==============================================================================
-	/**
-	 * @param { K } key
-	 * @param { V } value 
-	 */
-	add(key, value) {
-		this.#items.set(key, value);
-	}
-
-	//==============================================================================
-	// 제거.
-	//==============================================================================
-	/**
-	 * @param { K } key
-	 * @returns { boolean }
-	 */
-	remove(key) {
-		return this.#items.delete(key);
-	}
-
-	//==============================================================================
-	// 요소 검색.
-	//==============================================================================
-	/**
-	 * @param { function(K, V): boolean } predicate
-	 * @returns { { key: K, value: V } | null }
-	 */
-	find(predicate) {
-		for (const [key, value] of this.#items) {
-			if (predicate.call(key, value)) {
-				return {
-					key,
-					value
-				};
-			}
-		}
-		return null;
-	}
-
-	//==============================================================================
-	// 요소 검색.
-	//==============================================================================
-	/**
-	 * @param { function(K, V): boolean } predicate
-	 * @returns { { key: K, value: V }[] }
-	 */
-	findAll(predicate) {
-		const items = [];
-		for (const [key, value] of this.#items) {
-			if (predicate.call(key, value)) {
-				items.push({
-					key,
-					value
-				});
-			}
-		}
-		return items;
-	}
-
-	//==============================================================================
-	// 요소가 포함되어있는지 여부 반환.
-	//==============================================================================
-	/**
-	 * @param { K } key 
-	 * @returns { boolean } 
-	 */
-	contains(key) {
-		return this.#items.has(key);
-	}
-
-	//==============================================================================
-	// 요소 반환.
-	//==============================================================================
-	/**
-	 * @param { K } key
-	 * @returns { V } 
-	 */
-	get(key) {
-		return this.#items.get(key);
 	}
 
 	//==============================================================================
@@ -130,32 +153,12 @@ export class Dictionary extends Object {
 	}
 
 	//==============================================================================
-	// 전체 요소 반환.
+	// 전체 요소 배열 반환.
 	//==============================================================================
 	/**
-	 * @returns { Map<K, V> } 
+	 * @returns { T[] }
 	 */
-	getItems() {
-		return this.#items;
-	}
-
-	//==============================================================================
-	// 전체 키 반환.
-	//==============================================================================
-	/**
-	 * @returns { K[] } 
-	 */
-	getKeys() {
-		return Array.from(this.#items.keys());
-	}
-
-	//==============================================================================
-	// 전체 값 반환.
-	//==============================================================================
-	/**
-	 * @returns { V[] } 
-	 */
-	getValues() {
-		return Array.from(this.#items.values());
+	toArray() {
+		return Array.from(this.#items);
 	}
 }

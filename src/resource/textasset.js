@@ -33,25 +33,24 @@ export class TextAsset extends Asset
 	 * @param { string } assetPath 
 	 */
 	async load(assetPath) {
-		await super.load(assetPath);
-
 		// 이미 로드 된 상태라면.
-		if (super.isLoaded) {
-			return Promise.resolve();
+		const isLoaded = this.isLoaded();
+		if (isLoaded) {
+			return System.Promise.resolve();
 		}
-		else {
-			try {
-				// 로드.
-				const response = await fetch(assetPath);
-				this.text = await response.text();
-				super.isLoaded = true;
-				await Wait.nextFrame();
-			}
-			catch (error) {
-				// 예외.
-				console.error(`Error loading text: ${super.assetPath}`, error);
-				throw error;
-			}
+
+		try {
+			// 로드.
+			await super.load(assetPath);
+			const response = await fetch(assetPath);
+			this.text = await response.text();
+			this.setLoaded(true);
+			// await Wait.nextFrame();
+		}
+		catch (error) {
+			// 예외.
+			console.error(`Error loading text: ${assetPath}`, error);
+			throw error;
 		}
 	}
 
