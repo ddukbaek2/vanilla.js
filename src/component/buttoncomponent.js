@@ -56,7 +56,7 @@ export class ButtonComponent extends Component {
 		this.#engine = null;
 		this.#isPressTracking = false;
 		this.#pressedTintColor = new Color(0, 0, 0, 0.3);
-		this.#transitionDuration = 0.1;
+		this.#transitionDuration = 0.3;
 		this.#tintProgress = 0;
 		this.#colorEntries = [];
 	}
