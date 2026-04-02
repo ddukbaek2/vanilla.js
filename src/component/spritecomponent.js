@@ -50,6 +50,8 @@ export class SpriteComponent extends ColorComponent {
 	/** @private @type { boolean } */ #isVerticalFlip;
 	/** @private @type { string } */ #spriteDrawMode;
 	/** @private @type { Rect } */ #nineSlice;
+	/** @private @type { OffscreenCanvas | null } */ #tintCanvas;
+	/** @private @type { OffscreenCanvasRenderingContext2D | null } */ #tintContext;
 
 	//==============================================================================
 	// 생성.
@@ -65,6 +67,8 @@ export class SpriteComponent extends ColorComponent {
 		this.#isVerticalFlip = false;
 		this.#spriteDrawMode = SpriteDrawMode.simple;
 		this.#nineSlice = Rect.zero();
+		this.#tintCanvas = null;
+		this.#tintContext = null;
 	}
 
 	//==============================================================================
@@ -136,6 +140,29 @@ export class SpriteComponent extends ColorComponent {
 					graphic.drawImageWithImageRect(image, position, imageSize, imageRect);
 					break;
 				}
+		}
+
+		// 컬러 틴트 적용. (흰색인 경우 스킵, 투명 영역 제외)
+		if (color.red !== 1 || color.green !== 1 || color.blue !== 1) {
+			const tintWidth = Math.ceil(contentSize.x);
+			const tintHeight = Math.ceil(contentSize.y);
+			if (tintWidth > 0 && tintHeight > 0) {
+				if (!this.#tintCanvas || this.#tintCanvas.width !== tintWidth || this.#tintCanvas.height !== tintHeight) {
+					this.#tintCanvas = new OffscreenCanvas(tintWidth, tintHeight);
+					this.#tintContext = this.#tintCanvas.getContext('2d');
+				}
+				const tintContext = this.#tintContext;
+				tintContext.clearRect(0, 0, tintWidth, tintHeight);
+				tintContext.drawImage(image, 0, 0, tintWidth, tintHeight);
+				tintContext.globalCompositeOperation = 'source-atop';
+				tintContext.fillStyle = colorString;
+				tintContext.fillRect(0, 0, tintWidth, tintHeight);
+				tintContext.globalCompositeOperation = 'source-over';
+				const originalCompositeOperation = canvasRenderingContext.globalCompositeOperation;
+				canvasRenderingContext.globalCompositeOperation = 'multiply';
+				canvasRenderingContext.drawImage(this.#tintCanvas, position.x, position.y, imageSize.x, imageSize.y);
+				canvasRenderingContext.globalCompositeOperation = originalCompositeOperation;
+			}
 		}
 	}
 
