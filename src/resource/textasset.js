@@ -42,7 +42,7 @@ export class TextAsset extends Asset
 		try {
 			// 로드.
 			await super.load(assetPath);
-			const response = await fetch(assetPath);
+			const response = await System.fetch(assetPath);
 			this.text = await response.text();
 			this.setLoaded(true);
 			// await Wait.nextFrame();

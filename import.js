@@ -29,16 +29,6 @@ export { Version } from "./src/base/version.js";
 
 
 //==============================================================================
-// 자료구조 목록.
-//==============================================================================
-export { List } from "./src/collection/list.js";
-export { Dictionary } from "./src/collection/dictionary.js";
-export { Queue } from "./src/collection/queue.js";
-export { Stack } from "./src/collection/stack.js";
-export { Set } from "./src/collection/set.js";
-
-
-//==============================================================================
 // 코어 목록.
 //==============================================================================
 export { EngineConfiguration, Engine } from "./src/core/engine.js";
@@ -75,11 +65,28 @@ export { ImageAsset } from "./src/resource/imageasset.js";
 export { AudioAsset } from "./src/resource/audioasset.js";
 export { TextAsset } from "./src/resource/textasset.js";
 export { JsonAsset } from "./src/resource/jsonasset.js";
+export { BlobAsset } from "./src/resource/blobasset.js";
 export { AnimationClip } from "./src/resource/animationclip.js";
 
 
 //==============================================================================
-// 그 외 목록.
+// 기타 기능 목록.
 //==============================================================================
 export { ImageScroller } from "./src/misc/imagescroller.js";
 export { TouchParticle, TouchEffect } from "./src/misc/toucheffect.js";
+
+
+//==============================================================================
+// 실험적 기능 목록.
+//==============================================================================
+export { List } from "./src/experimental/collection/list.js";
+export { Dictionary } from "./src/experimental/collection/dictionary.js";
+export { Queue } from "./src/experimental/collection/queue.js";
+export { Stack } from "./src/experimental/collection/stack.js";
+export { Set } from "./src/experimental/collection/set.js";
+export { Animator, AnimationState, AnimationTransition } from "./src/experimental/animation/animator.js";
+export { Visual } from "./src/experimental/visual/visual.js";
+export { VisualAsset } from "./src/experimental/visual/visualasset.js";
+export { Camera } from "./src/experimental/camera.js";
+export { Action } from "./src/experimental/action.js";
+export { BunchAsset } from "./src/experimental/bunchasset.js";

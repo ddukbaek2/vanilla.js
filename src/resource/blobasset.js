@@ -3,19 +3,18 @@
 //==============================================================================
 const System = globalThis;
 import { Asset } from "../../core/asset.js";
-import { Visual } from "./visual.js";
 
 
 //==============================================================================
-// 비주얼 애셋.
+// 블롭 애셋. (바이너리)
 //==============================================================================
-export class VisualAsset extends Asset {
+export class BlobAsset extends Asset {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-    /** @private @type { Visual } */ #visual;
+	/** @private @type { Blob } */ #blob;
 
-    //==============================================================================
+   //==============================================================================
 	// 비동기 애셋 로드.
 	//==============================================================================
 	/**
@@ -31,19 +30,18 @@ export class VisualAsset extends Asset {
 		}
 
 		await super.load(assetPath);
-		// this.image = new System.window.Image();
-		// this.image.src = assetPath;
-
-		// 불러오기.
-		await new Promise((resolve, reject) => {
-			// this.image.onload = () => {
-			// 	this.setLoaded(true);
-			// 	resolve();
-			// };
-			// this.image.onerror = () => {
-			// 	reject(new Error(`Load fail: ${assetPath}`));
-			// }
-            resolve();
-		});
+		const response = await System.fetch(assetPath);
+		this.#blob = await response.blob();
+        this.setLoaded(true);
 	}
+
+	//==============================================================================
+	// 블롭 반환.
+	//==============================================================================
+	/**
+	 * @returns { Blob }
+	 */ 
+    getBlob() {
+        return this.#blob;
+    }
 }

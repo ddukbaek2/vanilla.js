@@ -60,7 +60,7 @@ export class AudioAsset extends Asset {
 		}
 
 		try {
-			const response = await fetch(assetPath);
+			const response = await System.fetch(assetPath);
 			const arrayBuffer = await response.arrayBuffer();
 			this.#audioBuffer = await this.#audioContext.decodeAudioData(arrayBuffer);
 			this.setLoaded(true);
