@@ -9,7 +9,7 @@
 			"problemMatcher": []
 		},
 		{
-			"label": "BUILD_LIBRARY_DEBUG",
+			"label": "Engine: Build (Debug)",
 			"type": "shell",
 			"command": "esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap",
 			"group": {
@@ -19,9 +19,9 @@
 			"problemMatcher": []
 		},
 		{
-			"label": "BUILD_LIBRARY_RELEASE",
+			"label": "Engine: Build (Release)",
 			"type": "shell",
-			"command": "esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --keep-names --minify",
+			"command": "esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --keep-names --minify --define:ESBUILD_DEBUG=false",
 			"group": {
 				"kind": "build",
 				"isDefault": true
@@ -29,7 +29,7 @@
 			"problemMatcher": []
 		},
 		{
-			"label": "BUILD_BUNDLE_DEBUG",
+			"label": "Tutorial: Build (Debug)",
 			"type": "shell",
 			"command": "esbuild tutorial.js --bundle --outfile=build/bundle.js --format=iife --keep-names --sourcemap",
 			"group": {
@@ -39,9 +39,9 @@
 			"problemMatcher": []
 		},
 		{
-			"label": "BUILD_BUNDLE_RELEASE",
+			"label": "Tutorial: Build (Release)",
 			"type": "shell",
-			"command": "esbuild tutorial.js --bundle --outfile=build/bundle.min.js --format=iife --minify",
+			"command": "esbuild tutorial.js --bundle --outfile=build/bundle.min.js --format=iife --minify --define:ESBUILD_DEBUG=false",
 			"group": {
 				"kind": "build",
 				"isDefault": true
