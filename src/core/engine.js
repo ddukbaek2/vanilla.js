@@ -130,11 +130,11 @@ export class Engine extends Object {
 	// 해상도 변경됨.
 	//==============================================================================
 	resize() {
-		const autoResizeOnWindowResize = this.getEngineConfiguration();
+		const engineConfiguration = this.getEngineConfiguration();
 		const viewManager = this.getViewManager();
 
 		// 설정: 윈도우가 리사이즈 될 때 캔버스 사이즈 자동 반영.
-		if (autoResizeOnWindowResize) {
+		if (engineConfiguration.autoResizeOnWindowResize) {
 			const clientNativeSize = Vector2.create(System.window.innerWidth, System.window.innerHeight);
 			const canvas = viewManager.getCanvas();
 
