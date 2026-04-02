@@ -614,7 +614,7 @@ export class TransformNode extends Node {
 	 * @param { Vector2 } viewPosition
 	 * @returns { boolean }
 	 */
-	contains(viewPosition) {
+	hasChild(viewPosition) {
 		if (viewPosition === null || viewPosition === undefined) {
 			return false;
 		}
