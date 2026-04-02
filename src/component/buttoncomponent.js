@@ -71,7 +71,7 @@ export class ButtonComponent extends Component {
 	tick(timeDelta) {
 		super.tick(timeDelta);
 		this.updateButtonState();
-		this.#updateTintTransition(timeDelta);
+		this.updateTintTransition(timeDelta);
 	}
 
 	//==============================================================================
@@ -104,7 +104,7 @@ export class ButtonComponent extends Component {
 			if (isInsideBounds) {
 				this.#isPressTracking = true;
 				this.setButtonState(ButtonState.pressed);
-				this.#collectColorTargets();
+				this.collectColorTargets();
 				if (this.#pressedEvent) {
 					this.#pressedEvent(this);
 				}
@@ -134,7 +134,7 @@ export class ButtonComponent extends Component {
 	// 틴트 트랜지션 갱신.
 	//==============================================================================
 	/** @private */
-	#updateTintTransition(timeDelta) {
+	updateTintTransition(timeDelta) {
 		const buttonState = this.getButtonState();
 		const isPressed = buttonState === ButtonState.pressed;
 
@@ -145,20 +145,19 @@ export class ButtonComponent extends Component {
 			this.#tintProgress = Math.max(this.#tintProgress - timeDelta / this.#transitionDuration, 0);
 		}
 
-		this.#applyTintProgress(this.#tintProgress);
+		this.applyTintProgress(this.#tintProgress);
 	}
 
 	//==============================================================================
 	// 틴트 적용.
 	//==============================================================================
-	/** @private */
-	#applyTintProgress(progress) {
+	applyTintProgress(progress) {
 		const pressedTintColor = this.#pressedTintColor;
 		for (const colorEntry of this.#colorEntries) {
 			if (colorEntry.type === 'sprite') {
 				const overlayAlpha = Math.lerp(0, pressedTintColor.alpha, progress);
 				const overlayColor = new Color(pressedTintColor.red, pressedTintColor.green, pressedTintColor.blue, overlayAlpha);
-				colorEntry.component.setOverlayColor(overlayColor);
+				colorEntry.component.setColor(overlayColor);
 			}
 			else if (colorEntry.type === 'label') {
 				const originalColor = colorEntry.originalColor;
@@ -174,21 +173,19 @@ export class ButtonComponent extends Component {
 	//==============================================================================
 	// 색상 대상 수집.
 	//==============================================================================
-	/** @private */
-	#collectColorTargets() {
+	collectColorTargets() {
 		this.#colorEntries = [];
 		const node = this.getNode();
 		if (!node) {
 			return;
 		}
-		this.#collectFromNode(node);
+		this.collectFromNode(node);
 	}
 
 	//==============================================================================
 	// 노드에서 색상 대상 재귀 수집.
 	//==============================================================================
-	/** @private */
-	#collectFromNode(node) {
+	collectFromNode(node) {
 		const spriteComponents = node.getComponents(SpriteComponent);
 		for (const spriteComponent of spriteComponents) {
 			this.#colorEntries.push({ type: 'sprite', component: spriteComponent });
@@ -201,7 +198,7 @@ export class ButtonComponent extends Component {
 		}
 		const children = node.getChildren();
 		for (const child of children) {
-			this.#collectFromNode(child);
+			this.collectFromNode(child);
 		}
 	}
 

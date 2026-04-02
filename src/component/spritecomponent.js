@@ -53,7 +53,6 @@ export class SpriteComponent extends ColorComponent {
 	/** @private @type { Rect } */ #nineSlice;
 	/** @private @type { OffscreenCanvas | null } */ #tintCanvas;
 	/** @private @type { OffscreenCanvasRenderingContext2D | null } */ #tintContext;
-	/** @private @type { Color } */ #overlayColor;
 
 	//==============================================================================
 	// 생성.
@@ -71,7 +70,7 @@ export class SpriteComponent extends ColorComponent {
 		this.#nineSlice = Rect.zero();
 		this.#tintCanvas = null;
 		this.#tintContext = null;
-		this.#overlayColor = Color.transparent();
+		super.setColor(Color.transparent());
 	}
 
 	//==============================================================================
@@ -91,15 +90,12 @@ export class SpriteComponent extends ColorComponent {
 	 * @param { Graphic } graphic
 	 */
 	draw(graphic) {
-		// super.draw(graphic);
-
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const image = this.getImage();
 		const color = super.getColor();
-		const colorString = color.toHEXString();
+
+		// 일반 사각형 출력.
 		if (image === null || image === undefined) {
-			// 출력.
-			canvasRenderingContext.fillStyle = colorString;
 			super.draw(graphic);
 			return;
 		}
@@ -112,9 +108,7 @@ export class SpriteComponent extends ColorComponent {
 		const flip = this.getFlip();
 		const imageSize = contentSize.multiply(flip);
 
-		// 출력.
-		canvasRenderingContext.fillStyle = colorString;
-
+		// 이미지 출력.
 		const spriteDrawMode = this.getSpriteDrawMode();
 		switch (spriteDrawMode) {
 			case SpriteDrawMode.simple: {
@@ -145,9 +139,8 @@ export class SpriteComponent extends ColorComponent {
 				}
 		}
 
-		// 오버레이 컬러 적용. (alpha > 0인 경우에만, 투명 영역 제외)
-		const overlayColor = this.#overlayColor;
-		if (overlayColor.alpha > 0) {
+		// 컬러 틴트 적용. (alpha > 0인 경우에만, 투명 영역 제외)
+		if (color.alpha > 0) {
 			const tintWidth = Math.ceil(contentSize.x);
 			const tintHeight = Math.ceil(contentSize.y);
 			if (tintWidth > 0 && tintHeight > 0) {
@@ -155,13 +148,12 @@ export class SpriteComponent extends ColorComponent {
 					this.#tintCanvas = new OffscreenCanvas(tintWidth, tintHeight);
 					this.#tintContext = this.#tintCanvas.getContext('2d');
 				}
-				const tintContext = this.#tintContext;
-				tintContext.clearRect(0, 0, tintWidth, tintHeight);
-				tintContext.drawImage(image, 0, 0, tintWidth, tintHeight);
-				tintContext.globalCompositeOperation = 'source-atop';
-				tintContext.fillStyle = overlayColor.toRGBAString();
-				tintContext.fillRect(0, 0, tintWidth, tintHeight);
-				tintContext.globalCompositeOperation = 'source-over';
+				this.#tintContext.clearRect(0, 0, tintWidth, tintHeight);
+				this.#tintContext.drawImage(image, 0, 0, tintWidth, tintHeight);
+				this.#tintContext.globalCompositeOperation = 'source-atop';
+				this.#tintContext.fillStyle = color.toRGBAString();
+				this.#tintContext.fillRect(0, 0, tintWidth, tintHeight);
+				this.#tintContext.globalCompositeOperation = 'source-over';
 				canvasRenderingContext.drawImage(this.#tintCanvas, position.x, position.y, imageSize.x, imageSize.y);
 			}
 		}
@@ -205,26 +197,6 @@ export class SpriteComponent extends ColorComponent {
 	 */
 	getNineSlice() {
 		return this.#nineSlice;
-	}
-
-	//==============================================================================
-	// 오버레이 컬러 설정.
-	//==============================================================================
-	/**
-	 * @param { Color } overlayColor
-	 */
-	setOverlayColor(overlayColor) {
-		this.#overlayColor = overlayColor;
-	}
-
-	//==============================================================================
-	// 오버레이 컬러 반환.
-	//==============================================================================
-	/**
-	 * @returns { Color }
-	 */
-	getOverlayColor() {
-		return this.#overlayColor;
 	}
 
 	//==============================================================================

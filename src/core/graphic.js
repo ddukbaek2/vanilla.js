@@ -113,13 +113,33 @@ export class Graphic extends Object {
 	//==============================================================================
 	/**
 	 * @param { Rect } rect 
-	//  * @param { string } color 
-	//  * @param { number } opacity 
 	 */
 	drawRect(rect) {
 		const canvasRenderingContext = this.getCanvasRenderingContext();
 		if (canvasRenderingContext) {
 			canvasRenderingContext.fillRect(rect.position.x, rect.position.y, rect.size.x, rect.size.y);
+		}
+	}
+
+	//==============================================================================
+	// 라운드 사각형 출력.
+	// - setFillColor()
+	//==============================================================================
+	/**
+	 * @param { Rect } rect 
+	 * @param { number } roundSize
+	 */
+	drawRoundRect(rect, roundSize) {
+		const canvasRenderingContext = this.getCanvasRenderingContext();
+		if (canvasRenderingContext) {
+			if (roundSize > 0) {
+				canvasRenderingContext.beginPath();
+				canvasRenderingContext.roundRect(rect.x, rect.y, rect.size.x, rect.size.y, roundSize);
+				canvasRenderingContext.fill();
+			}
+			else {
+				this.drawRect(rect);
+			}
 		}
 	}
 

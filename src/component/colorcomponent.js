@@ -42,14 +42,16 @@ export class ColorComponent extends Component {
 		const node = this.getNode();
 		const contentSize = node.getContentSize();
 		const color = this.getColor();
+		const rect = Rect.create(0, 0, contentSize.x, contentSize.y);
 
 		// 출력.
-		// graphic.setFillColor(color);
-		// graphic.drawRect(Rect.create(0, 0, contentSize.x, contentSize.y));
 		graphic.setFillColor(color);
-		canvasRenderingContext.beginPath();
-		canvasRenderingContext.roundRect(0, 0, contentSize.x, contentSize.y, this.#roundSize);
-		canvasRenderingContext.fill();
+		if (this.#roundSize > 0) {
+			graphic.drawRoundRect(rect, this.#roundSize);
+		}
+		else {
+			 graphic.drawRect(rect);
+		}
 	}
 
 	//==============================================================================
