@@ -2,6 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { Object } from "../base/object.js";
+import { Pivot } from "../base/pivot.js";
 import { Vector2 } from "../base/vector2.js";
 import { Engine } from "./engine.js";
 import { Graphic } from "./graphic.js";
@@ -111,7 +112,14 @@ export class Scene extends Object {
 	 * @param { Vector2 } canvasNativeSize
 	 */
 	resize(canvasNativeSize) {
-		
+
+		// 갱신.
+		const engine = this.getEngine();
+		const viewManager = engine.getViewManager();
+		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
+		this.#root.setPosition(Vector2.zero());
+		this.#root.setPivot(Pivot.topLeft);
+		this.#root.setContentSize(referenceResolutionSize);
 	}
 
 	//==============================================================================

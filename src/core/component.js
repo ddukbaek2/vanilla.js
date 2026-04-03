@@ -35,7 +35,7 @@ export class Component extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { number } timeDelta 
+	 * @param { number } timeDelta
 	 */
 	tick(timeDelta) {
 		// 갱신.
@@ -46,7 +46,7 @@ export class Component extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic
 	 */
 	draw(graphic) {
 		// 출력.
@@ -57,7 +57,7 @@ export class Component extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic
 	 */
 	drawGizmo(graphic) {
 		const isGizmoVisible = this.isGizmoVisible();
@@ -72,7 +72,7 @@ export class Component extends Object {
 	// 소유권자 설정.
 	//==============================================================================
 	/**
-	 * @param { Node } node 
+	 * @param { Node } node
 	 */
 	setNode(node) {
 		this.#node = node;
@@ -82,7 +82,7 @@ export class Component extends Object {
 	// 소유권자 반환.
 	//==============================================================================
 	/**
-	 * @returns { Node } 
+	 * @returns { Node }
 	 */
 	getNode() {
 		return this.#node;

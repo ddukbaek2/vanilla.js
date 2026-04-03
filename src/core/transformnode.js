@@ -165,6 +165,7 @@ export class TransformNode extends Node {
 			canvasRenderingContext.strokeStyle = "#00ff00";
 
 			// 범위.
+			canvasRenderingContext.lineWidth = 1;
 			canvasRenderingContext.beginPath();
 			canvasRenderingContext.moveTo(left, top);
 			canvasRenderingContext.lineTo(right, top);
