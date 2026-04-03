@@ -39,6 +39,8 @@ export class ButtonComponent extends UIComponent {
 	/** @private @type { number } */ #transitionDuration;
 	/** @private @type { number } */ #tintProgress;
 	/** @private @type { Array } */ #colorEntries;
+	/** @private @type { boolean } */ #isInteractable;
+	/** @private @type { Color } */ #disabledTintColor;
 
 	//==============================================================================
 	// 생성.
@@ -59,6 +61,8 @@ export class ButtonComponent extends UIComponent {
 		this.#transitionDuration = 0.3;
 		this.#tintProgress = 0;
 		this.#colorEntries = [];
+		this.#isInteractable = true;
+		this.#disabledTintColor = new Color(0, 0, 0, 0.5);
 	}
 
 	//==============================================================================
@@ -89,6 +93,9 @@ export class ButtonComponent extends UIComponent {
 	// 버튼 갱신.
 	//==============================================================================
 	updateButtonState() {
+		if (!this.#isInteractable) {
+			return;
+		}
 		if (this.isTouchBlocked()) {
 			return;
 		}
@@ -138,6 +145,10 @@ export class ButtonComponent extends UIComponent {
 	//==============================================================================
 	/** @private */
 	updateTintTransition(timeDelta) {
+		if (!this.#isInteractable) {
+			this.applyDisabledTint();
+			return;
+		}
 		const buttonState = this.getButtonState();
 		const isPressed = buttonState === ButtonState.pressed;
 
@@ -169,6 +180,20 @@ export class ButtonComponent extends UIComponent {
 				const tintedBlue = Math.lerp(originalColor.blue, pressedTintColor.blue, pressedTintColor.alpha * progress);
 				const tintedColor = new Color(tintedRed, tintedGreen, tintedBlue, originalColor.alpha);
 				colorEntry.component.setTextColor(tintedColor);
+			}
+		}
+	}
+
+	//==============================================================================
+	// 비활성화 틴트 적용.
+	//==============================================================================
+	/** @private */
+	applyDisabledTint() {
+		const disabledTintColor = this.#disabledTintColor;
+		for (const colorEntry of this.#colorEntries) {
+			if (colorEntry.type === 'sprite') {
+				const overlayColor = new Color(disabledTintColor.red, disabledTintColor.green, disabledTintColor.blue, disabledTintColor.alpha);
+				colorEntry.component.setColor(overlayColor);
 			}
 		}
 	}
@@ -382,5 +407,37 @@ export class ButtonComponent extends UIComponent {
 	 */
 	getTransitionDuration() {
 		return this.#transitionDuration;
+	}
+
+	//==============================================================================
+	// 활성화 여부 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } isInteractable
+	 */
+	setInteractable(isInteractable) {
+		if (this.#isInteractable === isInteractable) {
+			return;
+		}
+		this.#isInteractable = isInteractable;
+		if (!isInteractable) {
+			this.collectColorTargets();
+			this.setButtonState(ButtonState.disabled);
+		}
+		else {
+			this.#tintProgress = 0;
+			this.applyTintProgress(0);
+			this.setButtonState(ButtonState.normal);
+		}
+	}
+
+	//==============================================================================
+	// 활성화 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	getInteractable() {
+		return this.#isInteractable;
 	}
 }
