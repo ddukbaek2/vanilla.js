@@ -127,6 +127,18 @@ export class SpriteComponent extends ColorComponent {
 		const spriteBlendMode = this.getSpriteBlendMode();
 		const spriteDrawMode = this.getSpriteDrawMode();
 
+		// 슬라이스드 모드에서 컨텐츠 크기가 나인슬라이스 경계 합보다 작으면 출력 안 함.
+		if (spriteDrawMode === SpriteDrawMode.sliced) {
+			const nineSlice = this.getNineSlice();
+			const left = nineSlice.position.x;
+			const top = nineSlice.position.y;
+			const right = nineSlice.size.x;
+			const bottom = nineSlice.size.y;
+			if (contentSize.x < left + right || contentSize.y < top + bottom) {
+				return;
+			}
+		}
+
 		// 블렌드 모드 설정.
 		canvasRenderingContext.globalCompositeOperation = spriteBlendMode;
 
