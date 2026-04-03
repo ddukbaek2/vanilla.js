@@ -3,7 +3,7 @@
 //==============================================================================
 import { Enum } from "../base/identifier.js";
 import { Graphic } from "../core/graphic.js";
-import { Component } from "../core/component.js";
+import { UIComponent } from "./uicomponent.js";
 import { Color } from "../base/color.js";
 import * as Math from "../base/math.js";
 import { SpriteComponent } from "./spritecomponent.js";
@@ -24,7 +24,7 @@ export const ButtonState = {
 //==============================================================================
 // 버튼의 상태.
 //==============================================================================
-export class ButtonComponent extends Component {
+export class ButtonComponent extends UIComponent {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -89,6 +89,9 @@ export class ButtonComponent extends Component {
 	// 버튼 갱신.
 	//==============================================================================
 	updateButtonState() {
+		if (this.isTouchBlocked()) {
+			return;
+		}
 		if (!this.#engine) {
 			return;
 		}

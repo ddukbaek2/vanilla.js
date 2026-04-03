@@ -37,7 +37,7 @@ export class AnchoredTransformNode extends TransformNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta 
+	 * @param { number } timeDelta
 	 */
 	tick(timeDelta) {
 		// 매 프레임마다 부모 크기 변화 등에 대응하여 레이아웃 최종 반영
@@ -95,7 +95,7 @@ export class AnchoredTransformNode extends TransformNode {
 	// 앵커 기준 위치 오프셋 설정.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } anchoredPosition 
+	 * @param { Vector2 } anchoredPosition
 	 */
 	setAnchoredPosition(anchoredPosition) {
 		this.#anchoredPosition = anchoredPosition;
@@ -106,7 +106,7 @@ export class AnchoredTransformNode extends TransformNode {
 	// 앵커 기준 위치 오프셋 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 } 
+	 * @returns { Vector2 }
 	 */
 	getAnchoredPosition() {
 		return this.#anchoredPosition;
@@ -116,7 +116,7 @@ export class AnchoredTransformNode extends TransformNode {
 	// 오프셋 크기 설정.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } sizeDelta 
+	 * @param { Vector2 } sizeDelta
 	 */
 	setSizeDelta(sizeDelta) {
 		this.#sizeDelta = sizeDelta;
@@ -127,7 +127,7 @@ export class AnchoredTransformNode extends TransformNode {
 	// 오프셋 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 } 
+	 * @returns { Vector2 }
 	 */
 	getSizeDelta() {
 		return this.#sizeDelta;
@@ -137,7 +137,7 @@ export class AnchoredTransformNode extends TransformNode {
 	// 앵커 최소값 설정.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } anchorMin 
+	 * @param { Vector2 } anchorMin
 	 */
 	setAnchorMin(anchorMin) {
 		this.#anchorMin = anchorMin;
@@ -158,7 +158,7 @@ export class AnchoredTransformNode extends TransformNode {
 	// 앵커 최대값 설정.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } anchorMax 
+	 * @param { Vector2 } anchorMax
 	 */
 	setAnchorMax(anchorMax) {
 		this.#anchorMax = anchorMax;
@@ -180,7 +180,7 @@ export class AnchoredTransformNode extends TransformNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } localPosition 
+	 * @param { Vector2 } localPosition
 	 */
 	setLocalPosition(localPosition) {
 		const parent = this.getParent();
@@ -218,7 +218,7 @@ export class AnchoredTransformNode extends TransformNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } contentSize 
+	 * @param { Vector2 } contentSize
 	 */
 	setContentSize(contentSize) {
 		const parent = this.getParent();
