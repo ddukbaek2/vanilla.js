@@ -12,12 +12,7 @@ export class AudioAsset extends Asset {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { AudioContext | webkitAudioContext | null } */ #audioContext = null;
-	/** @private @type { AudioBuffer | null } */ #audioBuffer = null;
-	/** @private @type { AudioBufferSourceNode | null } */ #audioSource = null;
-	/** @private @type { GainNode | null } */ #gainNode = null;
-	/** @private @type { boolean } */ #isPlaying = false;
-	/** @private @type { boolean } */ #isMuted = false;
+	/** @private @type { AudioBuffer | null } */ #audioBuffer;
 
 	//==============================================================================
 	// 생성.
@@ -25,17 +20,7 @@ export class AudioAsset extends Asset {
 	constructor() {
 		super();
 
-		const audioContextType = System.window.AudioContext || System.window.webkitAudioContext;
-		if (audioContextType) {
-			this.#audioContext = new audioContextType();
-			this.#gainNode = this.#audioContext.createGain();
-			this.#gainNode.connect(this.#audioContext.destination);
-		}
-
 		this.#audioBuffer = null;
-		this.#audioSource = null;
-		this.#isMuted = false;
-		this.#isPlaying = false;
 	}
 
 	//==============================================================================
@@ -43,18 +28,17 @@ export class AudioAsset extends Asset {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { string } assetPath 
+	 * @param { string } assetPath
 	 */
 	async load(assetPath) {
-		// await super.load(assetPath);
-
 		// 이미 로드 된 상태라면.
 		const isLoaded = this.isLoaded();
 		if (isLoaded) {
 			return Promise.resolve();
 		}
 
-		if (!this.#audioContext) {
+		const audioContextType = System.window.AudioContext || System.window.webkitAudioContext;
+		if (!audioContextType) {
 			console.error(`AudioContext is not supported.`);
 			return;
 		}
@@ -62,7 +46,9 @@ export class AudioAsset extends Asset {
 		try {
 			const response = await System.fetch(assetPath);
 			const arrayBuffer = await response.arrayBuffer();
-			this.#audioBuffer = await this.#audioContext.decodeAudioData(arrayBuffer);
+			const tempAudioContext = new audioContextType();
+			this.#audioBuffer = await tempAudioContext.decodeAudioData(arrayBuffer);
+			await tempAudioContext.close();
 			this.setLoaded(true);
 		}
 		catch (error) {
@@ -72,94 +58,13 @@ export class AudioAsset extends Asset {
 	}
 
 	//==============================================================================
-	// 재생.
+	// 오디오 버퍼 반환.
 	//==============================================================================
 	/**
-	 * @param { boolean } loop 
+	 * @returns { AudioBuffer | null }
 	 */
-	play(loop = false) {
-		if (!this.#audioContext || !this.#audioBuffer)
-			return;
-
-		// 재생 중일 경우 정지.
-		if (this.#audioSource) {
-			this.#audioSource.onended = null;
-			this.#audioSource.stop();
-		}
-
-		// AudioBufferSourceNode.
-		this.#audioSource = this.#audioContext.createBufferSource();
-		this.#audioSource.buffer = this.#audioBuffer;
-		this.#audioSource.loop = loop;
-		this.#audioSource.connect(this.#gainNode);
-
-		// 재생 완료 이벤트.
-		this.#audioSource.onended = () => 
-		{
-			this.#isPlaying = false;
-			this.#audioSource = null;
-		};
-		
-		this.#audioSource.start(0);
-		this.#isPlaying = true;
-	}
-
-	//==============================================================================
-	// 정지.
-	//==============================================================================
-	stop() {
-		if (this.#audioSource) {
-			this.#audioSource.stop();
-		}
-	}
-
-	//==============================================================================
-	// 컨텍스트 재개.
-	//==============================================================================
-	resume() {
-		if (this.#audioContext && this.#audioContext.state === "suspended") {
-			this.#audioContext.resume();
-		}
-	}
-
-	//==============================================================================
-	// 음소거.
-	//==============================================================================
-	mute() {
-		if (this.#gainNode) {
-			this.#gainNode.gain.value = 0;
-			this.#isMuted = true;
-		}
-	}
-
-	//==============================================================================
-	// 음소거 해제.
-	//==============================================================================
-	unmute() {
-		if (this.#gainNode) {
-			this.#gainNode.gain.value = 1;
-			this.#isMuted = false;
-		}
-	}
-
-	//==============================================================================
-	// 재생 여부 반환.
-	//==============================================================================
-	/**
-	 * @returns { boolean }
-	 */
-	isPlaying() {
-		return this.#isPlaying;
-	}
-
-	//==============================================================================
-	// 음소거 여부 반환.
-	//==============================================================================
-	/**
-	 * @returns { boolean }
-	 */
-	isMuted() {
-		return this.#isMuted;
+	getAudioBuffer() {
+		return this.#audioBuffer;
 	}
 
 	//==============================================================================
