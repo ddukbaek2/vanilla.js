@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Asset } from "../core/asset.js";
+import { Asset, AssetType } from "../core/asset.js";
 
 
 //==============================================================================
@@ -19,7 +19,7 @@ export class AudioAsset extends Asset {
 	//==============================================================================
 	constructor() {
 		super();
-
+		this.setAssetType(AssetType.audio);
 		this.#audioBuffer = null;
 	}
 

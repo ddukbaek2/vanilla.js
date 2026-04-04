@@ -11,6 +11,7 @@ import { AudioAsset } from "../resource/audioasset.js";
 /** @type { AudioContext | null } */
 let sharedAudioContext = null;
 
+
 //==============================================================================
 // 공유 오디오 컨텍스트 반환.
 // 최초 호출 시 생성하며, 브라우저 정책으로 인한 일시정지(suspend) 자동 재개를 등록.
@@ -28,6 +29,7 @@ function getSharedAudioContext() {
 	return sharedAudioContext;
 }
 
+
 //==============================================================================
 // 브라우저 인터랙션 시 자동 재개 등록.
 // 브라우저 자동재생 정책으로 suspended 상태가 될 경우 사용자 입력에서 재개.
@@ -44,6 +46,12 @@ function setupAutoResume(audioContext) {
 	System.window.addEventListener("click", resumeContext);
 	System.window.addEventListener("touchstart", resumeContext);
 	System.window.addEventListener("keydown", resumeContext);
+	System.window.addEventListener("focus", resumeContext);
+	System.document.addEventListener("visibilitychange", () => {
+		if (System.document.visibilityState === "visible") {
+			resumeContext();
+		}
+	});
 }
 
 

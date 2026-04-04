@@ -6,6 +6,21 @@ import { Object } from "../base/object.js";
 
 
 //==============================================================================
+// 애셋 타입.
+//==============================================================================
+export const AssetType = System.Object.freeze({
+	none: 'none',
+	image: 'image',
+	audio: 'audio',
+	json: 'json',
+	text: 'text',
+	font: 'font',
+	blob: 'blob',
+	visual: 'visual',
+});
+
+
+//==============================================================================
 // 애셋.
 //==============================================================================
 export class Asset extends Object {
@@ -14,6 +29,7 @@ export class Asset extends Object {
 	//==============================================================================
 	/** @private @type { string } */ #assetPath;
 	/** @private @type { boolean } */ #isLoaded;
+	/** @private @type { string } */ #assetType;
 
 	
 	//==============================================================================
@@ -24,6 +40,7 @@ export class Asset extends Object {
 
 		this.#assetPath = "";
 		this.#isLoaded = false;
+		this.#assetType = AssetType.none;
 	}
 
 	//==============================================================================
@@ -57,6 +74,26 @@ export class Asset extends Object {
 
 		this.setAssetPath("");
 		this.setLoaded(false);
+	}
+
+	//==============================================================================
+	// 애셋 타입 설정.
+	//==============================================================================
+	/**
+	 * @param { string } assetType
+	 */
+	setAssetType(assetType) {
+		this.#assetType = assetType;
+	}
+
+	//==============================================================================
+	// 애셋 타입 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getAssetType() {
+		return this.#assetType;
 	}
 
 	//==============================================================================

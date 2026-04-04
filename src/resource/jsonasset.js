@@ -3,6 +3,7 @@
 //==============================================================================
 const System = globalThis;
 import { TextAsset } from "../resource/textasset.js";
+import { AssetType } from "../core/asset.js";
 
 
 //==============================================================================
@@ -20,6 +21,7 @@ export class JsonAsset extends TextAsset
 	//==============================================================================
 	constructor() {
 		super();
+		this.setAssetType(AssetType.json);
 		this.data = null;
 	}
 

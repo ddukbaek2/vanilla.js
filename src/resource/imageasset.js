@@ -3,7 +3,7 @@
 //==============================================================================
 const System = globalThis;
 import { Vector2 } from "../base/vector2.js";
-import { Asset } from "../core/asset.js";
+import { Asset, AssetType } from "../core/asset.js";
 
 
 //==============================================================================
@@ -21,7 +21,7 @@ export class ImageAsset extends Asset {
 	//==============================================================================
 	constructor() {
 		super();
-		
+		this.setAssetType(AssetType.image);
 		this.image = new System.window.Image();
 	}
 

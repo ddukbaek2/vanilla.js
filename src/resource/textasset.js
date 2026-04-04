@@ -3,7 +3,7 @@
 //==============================================================================
 const System = globalThis;
 import * as Wait from "../base/wait.js";
-import { Asset } from "../core/asset.js";
+import { Asset, AssetType } from "../core/asset.js";
 
 
 
@@ -22,6 +22,7 @@ export class TextAsset extends Asset
 	//==============================================================================
 	constructor() {
 		super();
+		this.setAssetType(AssetType.text);
 		this.text = "";
 	}
 
