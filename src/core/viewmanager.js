@@ -45,7 +45,7 @@ export class ViewManager extends Object {
 	/** @private @type { ViewScaleMode } */ #viewScaleMode; // 스케일 모드.
 	/** @private @type { Vector2 } */ #referenceResolutionSize; // 기준 화면 영역.
 	/** @private @type { Vector2 } */ #screenSize; // 스케일 모드가 반영된 전체 화면 영역.	
-	/** @private @type { Rect } */ #viewRect; // 스케일 모드가 반영된 실제 화면 영역.
+	/** @private @type { Rect } */ #viewRect; // 스케일 모드가 반영된 실제 화면 영역. (canvasNativeSize 내부의 실제 사각영역)
 
 
 	//==============================================================================
