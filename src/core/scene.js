@@ -116,7 +116,8 @@ export class Scene extends Object {
 		// 갱신.
 		const engine = this.getEngine();
 		const viewManager = engine.getViewManager();
-		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
+		// const referenceResolutionSize = viewManager.getReferenceResolutionSize();
+		const referenceResolutionSize = viewManager.getViewSize();
 		this.#root.setPosition(Vector2.zero());
 		this.#root.setPivot(Pivot.topLeft);
 		this.#root.setContentSize(referenceResolutionSize);
