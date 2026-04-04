@@ -14,7 +14,8 @@ import { Graphic } from "./graphic.js";
 import { Scene } from "./scene.js";
 import { Rect } from "../base/rect.js";
 import { SceneManager } from "./scenemanager.js";
-import { FontAsset } from "../resource/fontasset.js"; 
+import { AudioManager } from "./audiomanager.js";
+import { FontAsset } from "../resource/fontasset.js";
 
 
 
@@ -57,8 +58,10 @@ export class Engine extends Object {
 	/** @private @type { TimeManager } */ #timeManager;
 	/** @private @type { ViewManager } */ #viewManager;
 	/** @private @type { InputManager } */ #inputManager;
+	/** @private @type { AudioManager } */ #audioManager;
 	/** @private @type { Graphic } */ #graphic;
 	/** @private @type { () => void  } */ #resizeCallback;
+	/** @private @type { () => void  } */ #resumeCallback;
 	/** @private @type { FrameRequestCallback } */ #updateEngineCallback;
 	/** @private @type { Version } */ #version;
 
@@ -88,9 +91,11 @@ export class Engine extends Object {
 		this.#viewManager = new ViewManager(this);
 		this.#viewManager.setCanvas(canvas);
 		this.#inputManager = new InputManager(this);
+		this.#audioManager = new AudioManager(this);
 		this.#graphic = new Graphic(canvasRenderingContext);
 
 		this.#resizeCallback = this.resize.bind(this);
+		this.#resumeCallback = this.resume.bind(this);
 		this.#updateEngineCallback = this.updateEngine.bind(this);
 		this.#version = Version.create(0, 0, 10);
 
@@ -125,6 +130,14 @@ export class Engine extends Object {
 		}).catch((error) => {
 			console.error(error);
 		});
+	}
+
+	//==============================================================================
+	// 오디오 컨텍스트 재개.
+	//==============================================================================
+	resume() {
+		const audioManager = this.getAudioManager();
+		audioManager.resumeContext();
 	}
 
 	//==============================================================================
@@ -279,12 +292,23 @@ export class Engine extends Object {
 		// }, { passive: false });
 
 		// 앱이나 창이 전환 될 때.
-		System.window.addEventListener("blur", (focusEvent) => {  
+		System.window.addEventListener("blur", (focusEvent) => {
 			const inputManager = this.getInputManager();
 			inputManager.setTouchMoved(false);
 			inputManager.setTouchReleased(true);
-			focusEvent.preventDefault();		
+			focusEvent.preventDefault();
 		}, { passive: false });
+
+		// 오디오 컨텍스트 재개.
+		System.window.addEventListener("click", this.#resumeCallback);
+		System.window.addEventListener("touchstart", this.#resumeCallback);
+		System.window.addEventListener("keydown", this.#resumeCallback);
+		System.window.addEventListener("focus", this.#resumeCallback);
+		System.document.addEventListener("visibilitychange", () => {
+			if (System.document.visibilityState === "visible") {
+				this.resume();
+			}
+		});
 
 		// 커서가 보이거나 감춰질 때.
 		System.document.addEventListener("pointerlockchange", () => {
@@ -645,6 +669,16 @@ export class Engine extends Object {
 	 */
 	getInputManager() {
 		return this.#inputManager;
+	}
+
+	//==============================================================================
+	// 오디오 매니저 반환.
+	//==============================================================================
+	/**
+	 * @returns { AudioManager }
+	 */
+	getAudioManager() {
+		return this.#audioManager;
 	}
 
 	//==============================================================================

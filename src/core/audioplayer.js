@@ -6,56 +6,6 @@ import { AudioAsset } from "../resource/audioasset.js";
 
 
 //==============================================================================
-// 공유 오디오 컨텍스트.
-//==============================================================================
-/** @type { AudioContext | null } */
-let sharedAudioContext = null;
-
-
-//==============================================================================
-// 공유 오디오 컨텍스트 반환.
-// 최초 호출 시 생성하며, 브라우저 정책으로 인한 일시정지(suspend) 자동 재개를 등록.
-//==============================================================================
-function getSharedAudioContext() {
-	if (sharedAudioContext) {
-		return sharedAudioContext;
-	}
-	const audioContextType = System.window.AudioContext || System.window.webkitAudioContext;
-	if (!audioContextType) {
-		return null;
-	}
-	sharedAudioContext = new audioContextType();
-	setupAutoResume(sharedAudioContext);
-	return sharedAudioContext;
-}
-
-
-//==============================================================================
-// 브라우저 인터랙션 시 자동 재개 등록.
-// 브라우저 자동재생 정책으로 suspended 상태가 될 경우 사용자 입력에서 재개.
-//==============================================================================
-/**
- * @param { AudioContext } audioContext
- */
-function setupAutoResume(audioContext) {
-	const resumeContext = () => {
-		if (audioContext.state === "suspended") {
-			audioContext.resume();
-		}
-	};
-	System.window.addEventListener("click", resumeContext);
-	System.window.addEventListener("touchstart", resumeContext);
-	System.window.addEventListener("keydown", resumeContext);
-	System.window.addEventListener("focus", resumeContext);
-	System.document.addEventListener("visibilitychange", () => {
-		if (System.document.visibilityState === "visible") {
-			resumeContext();
-		}
-	});
-}
-
-
-//==============================================================================
 // 오디오 플레이어.
 // AudioAsset 에 로드된 오디오 버퍼를 재생한다.
 //==============================================================================
@@ -63,6 +13,7 @@ export class AudioPlayer {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
+	/** @private @type { AudioContext | null } */ #audioContext;
 	/** @private @type { AudioAsset | null } */ #audioAsset;
 	/** @private @type { AudioBufferSourceNode | null } */ #audioSource;
 	/** @private @type { GainNode | null } */ #gainNode;
@@ -72,38 +23,22 @@ export class AudioPlayer {
 	//==============================================================================
 	// 생성.
 	//==============================================================================
-	constructor() {
+	/**
+	 * @constructor
+	 * @param { AudioContext | null } audioContext
+	 */
+	constructor(audioContext) {
+		this.#audioContext = audioContext;
 		this.#audioAsset = null;
 		this.#audioSource = null;
 		this.#gainNode = null;
 		this.#isPlaying = false;
 		this.#isMuted = false;
 
-		const audioContext = getSharedAudioContext();
 		if (audioContext) {
 			this.#gainNode = audioContext.createGain();
 			this.#gainNode.connect(audioContext.destination);
 		}
-	}
-
-	//==============================================================================
-	// 오디오 애셋 설정.
-	//==============================================================================
-	/**
-	 * @param { AudioAsset } audioAsset
-	 */
-	setAudioAsset(audioAsset) {
-		this.#audioAsset = audioAsset;
-	}
-
-	//==============================================================================
-	// 오디오 애셋 반환.
-	//==============================================================================
-	/**
-	 * @returns { AudioAsset | null }
-	 */
-	getAudioAsset() {
-		return this.#audioAsset;
 	}
 
 	//==============================================================================
@@ -113,7 +48,7 @@ export class AudioPlayer {
 	 * @param { boolean } loop
 	 */
 	play(loop = false) {
-		const audioContext = getSharedAudioContext();
+		const audioContext = this.getAudioContext();
 		if (!audioContext || !this.#gainNode) {
 			return;
 		}
@@ -132,7 +67,7 @@ export class AudioPlayer {
 			this.#audioSource = null;
 		}
 
-		// 컨텍스트가 일시 중단된 경우 재개 시도.
+		// 오디오 컨텍스트가 일시 중단된 경우 다시 재생 시도시 컨텍스트 재개 시도.
 		if (audioContext.state === "suspended") {
 			audioContext.resume();
 		}
@@ -184,6 +119,26 @@ export class AudioPlayer {
 	}
 
 	//==============================================================================
+	// 오디오 애셋 설정.
+	//==============================================================================
+	/**
+	 * @param { AudioAsset } audioAsset
+	 */
+	setAudioAsset(audioAsset) {
+		this.#audioAsset = audioAsset;
+	}
+
+	//==============================================================================
+	// 오디오 애셋 반환.
+	//==============================================================================
+	/**
+	 * @returns { AudioAsset | null }
+	 */
+	getAudioAsset() {
+		return this.#audioAsset;
+	}
+
+	//==============================================================================
 	// 재생 여부 반환.
 	//==============================================================================
 	/**
@@ -214,5 +169,15 @@ export class AudioPlayer {
 			return 0.0;
 		}
 		return this.#audioAsset.getDuration();
+	}
+
+	//==============================================================================
+	// 오디오 컨텍스트 반환.
+	//==============================================================================
+	/**
+	 * @returns { AudioContext | null }
+	 */
+	getAudioContext() {
+		return this.#audioContext;
 	}
 }
