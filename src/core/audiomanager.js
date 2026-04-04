@@ -41,7 +41,12 @@ export class AudioManager extends Object {
 		const audioContext = this.getAudioContext();
 		if (audioContext) {
 			if (audioContext.state === "suspended") {
-				audioContext.resume();
+				try {
+					audioContext.resume();
+				}
+				catch (error) {
+					console.error(error);
+				}
 			}
 		}
 	}
