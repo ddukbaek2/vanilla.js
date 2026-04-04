@@ -6,7 +6,8 @@ import { Object } from "../../base/object.js";
 import { List } from "../collection/list.js";
 import { Dictionary } from "../collection/dictionary.js";
 import { Frame } from "../../core/frame.js";
-import { AnimationClip, Animation } from "../rendering/animation.js";
+import { Animation } from "../../core/animation.js";
+import { AnimationClip } from "../../resource/animationclip.js";
 
 
 //==============================================================================

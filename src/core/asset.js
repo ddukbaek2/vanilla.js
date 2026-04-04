@@ -16,6 +16,7 @@ export const AssetType = System.Object.freeze({
 	text: 'text',
 	font: 'font',
 	blob: 'blob',
+	bunch: 'bunch',
 	visual: 'visual',
 });
 

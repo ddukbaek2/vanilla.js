@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Asset, AssetType } from "../../core/asset.js";
+import { Asset, AssetType } from "../core/asset.js";
 
 
 //==============================================================================
