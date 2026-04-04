@@ -148,9 +148,9 @@ if (canvas === null) {
 // 엔진 실행.
 const engineConfiguration = new EngineConfiguration();
 engineConfiguration.referenceResolutionSize = Vec2.create(800, 1280);
-engineConfiguration.canvasId = "tutorial";
+engineConfiguration.canvasId = "tutorialCanvas";
 engineConfiguration.useStatistics = true;
 const engine = new Engine(engineConfiguration);
-document.title = "vanilla.js - Tutorial";
+document.title = "vanilla.js - Tutorial_2";
 const tutorial = new Tutorial_2();
 engine.run(tutorial);

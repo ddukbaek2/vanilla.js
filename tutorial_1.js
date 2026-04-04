@@ -68,7 +68,7 @@ class Tutorial_1 extends Scene {
 
 		// 이미지 불러오기.
 		const imageAsset = new ImageAsset();
-		await imageAsset.load("./assets/images/spritesheet.png");
+		await imageAsset.load("./assets/sprites/tutorial_1/spritesheet.png");
 
 		// 모든 프레임 좌표 생성.
 		const frames = createFramesFromRects(imageAsset.image, 3, 3, 8);
@@ -176,9 +176,9 @@ if (canvas === null) {
 // 엔진 실행.
 const engineConfiguration = new EngineConfiguration();
 engineConfiguration.referenceResolutionSize = Vec2.create(800, 1280);
-engineConfiguration.canvasId = "tutorial";
+engineConfiguration.canvasId = "tutorialCanvas";
 engineConfiguration.useStatistics = true;
 const engine = new Engine(engineConfiguration);
-document.title = "vanilla.js - Tutorial";
+document.title = "vanilla.js - Tutorial_1";
 const tutorial = new Tutorial_1();
 engine.run(tutorial);
