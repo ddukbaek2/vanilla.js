@@ -63,6 +63,7 @@ export class Engine extends Object {
 	/** @private @type { () => void  } */ #resizeCallback;
 	/** @private @type { () => void  } */ #resumeCallback;
 	/** @private @type { FrameRequestCallback } */ #updateEngineCallback;
+	/** @private @type { Rect } */ #statisticsTextRect;
 	/** @private @type { Version } */ #version;
 
 	//==============================================================================
@@ -97,6 +98,8 @@ export class Engine extends Object {
 		this.#resizeCallback = this.resize.bind(this);
 		this.#resumeCallback = this.resume.bind(this);
 		this.#updateEngineCallback = this.updateEngine.bind(this);
+
+		this.#statisticsTextRect = Rect.zero();
 		this.#version = Version.create(0, 0, 11);
 
 		// 이벤트 설정.
@@ -159,10 +162,10 @@ export class Engine extends Object {
 
 		// 뷰 영역 계산.
 		const beforeCanvasNativeSize = viewManager.getCanvasNativeSize();
-		const beforeViewRect = viewManager.getViewRect();
+		const beforeViewRect = viewManager.getViewNativeRect();
 		viewManager.calculateViewRect();
 		const afterCanvasNativeSize = viewManager.getCanvasNativeSize();
-		const afterViewRect = viewManager.getViewRect();
+		const afterViewRect = viewManager.getViewNativeRect();
 
 		// 씬: 화면 영역 변경 이벤트.
 		const sceneManager = this.getSceneManager();
@@ -373,7 +376,8 @@ export class Engine extends Object {
 		const inputManager = this.getInputManager();
 
 		const textPosition = Vector2.create(16, 16);
-		const drawOutlineText = (text) => {
+		this.#statisticsTextRect.position = textPosition.clone();
+		const drawStatisticsText = (text) => {
 			if (text) {
 				// 출력.
 				canvasRenderingContext.fillText(text, textPosition.x, textPosition.y);
@@ -404,7 +408,10 @@ export class Engine extends Object {
 			const metrics = canvasRenderingContext.measureText(text);
 			const width = metrics.width; // metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight)
 			const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
-			return Rect.create(textPosition.x, textPosition.y, width, height);
+			const textRect = Rect.create(textPosition.x, textPosition.y, width, height);
+
+			this.#statisticsTextRect.size.x = Math.max(this.#statisticsTextRect.size.x, width);
+			this.#statisticsTextRect.size.y += 16;
 		};
 
 		const formatSizeString = (bytes) => {
@@ -427,12 +434,15 @@ export class Engine extends Object {
 		// 배경 출력.
 		// 기본 위치인 화면 좌상단으로 이동.
 		canvasRenderingContext.setTransform(1, 0, 0, 1, 0, 0);
-		// graphic.setFillColor("rgba(0, 0, 0, 0.6)");
-		// graphic.drawRect(Rect.create(10, 10, 480, 320));
-		canvasRenderingContext.fillStyle = "rgba(0, 0, 0, 0.6)";
-		canvasRenderingContext.beginPath();
-		canvasRenderingContext.roundRect(10, 10, 480, 320, 12);
-		canvasRenderingContext.fill();
+		canvasRenderingContext.scale(1.4, 1.4);
+		graphic.setFillColor("rgba(0, 0, 0, 0.6)");
+		graphic.drawRoundRect(Rect.create(
+			this.#statisticsTextRect.position.x - 10,
+			this.#statisticsTextRect.position.y - 10,
+			this.#statisticsTextRect.size.x + 20,
+			this.#statisticsTextRect.size.y + 20,
+		), 12);
+		this.#statisticsTextRect.size.set(0, 0);
 
 		// canvasRenderingContext.letterSpacing = "-1px";
 		canvasRenderingContext.font = `16px DOSGothic`;
@@ -448,15 +458,15 @@ export class Engine extends Object {
 		// canvasRenderingContext.shadowOffsetY = 0.5;
 		
 		// canvasRenderingContext.imageSmoothingEnabled = false;
-		canvasRenderingContext.scale(1.4, 1.4);
+		// canvasRenderingContext.scale(1.4, 1.4);
 
 		// 플랫폼 정보 출력.
 		this.#platform.getPlatformInfo();
 		const versionString = this.getVersionString();
-		drawOutlineText(`engineVersion: ${versionString}`);
-		drawOutlineText(`platformName: ${this.#platform.platformName}`);
-		drawOutlineText(`browserName: ${this.#platform.browserName}`);
-		drawOutlineText(``);
+		drawStatisticsText(`engineVersion: ${versionString}`);
+		drawStatisticsText(`platformName: ${this.#platform.platformName}`);
+		drawStatisticsText(`browserName: ${this.#platform.browserName}`);
+		drawStatisticsText(``);
 
 		// 화면 정보 출력.
 		// const clientNativeSize = viewManager.getClientNativeSize();
@@ -465,19 +475,21 @@ export class Engine extends Object {
 		const viewScaleMode = viewManager.getViewScaleMode();
 		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
 		// const screenSize = viewManager.getScreenSize();
-		// const viewRect = viewManager.getViewRect();
+		const viewNativeRect = viewManager.getViewNativeRect();
+		const viewSize = viewManager.getViewSize();
 		const canvasNativeInputPosition = inputManager.getCanvasNativeInputPosition();
 		const viewInputPosition = inputManager.getViewInputPosition();
 		// drawOutlineText(`clientNativeSize: (${clientNativeSize.x}, ${clientNativeSize.y})`);
-		drawOutlineText(`canvasNativeSize: (${canvasNativeSize.x}, ${canvasNativeSize.y})`);
+		drawStatisticsText(`canvasNativeSize: (${canvasNativeSize.x}, ${canvasNativeSize.y})`);
 		// drawOutlineText(`canvasPixelSize: (${canvasPixelSize.x}, ${canvasPixelSize.y})`);
-		drawOutlineText(`referenceResolutionSize: (${referenceResolutionSize.x}, ${referenceResolutionSize.y})`);
+		drawStatisticsText(`referenceResolutionSize: (${referenceResolutionSize.x}, ${referenceResolutionSize.y})`);
 		// drawOutlineText(`screenSize: (${screenSize.x}, ${screenSize.y})`);
-		drawOutlineText(`viewScaleMode: ${viewScaleMode}`);
-		// drawOutlineText(`viewRect: (${viewRect.position.x}, ${viewRect.position.y}) - (${viewRect.size.x}, ${viewRect.size.y})`);
-		drawOutlineText(`canvasNativeInputPosition: (${canvasNativeInputPosition.x}, ${canvasNativeInputPosition.y})`);
-		drawOutlineText(`viewInputPosition: (${viewInputPosition.x}, ${viewInputPosition.y})`);
-		drawOutlineText(``);
+		drawStatisticsText(`viewScaleMode: ${viewScaleMode}`);
+		drawStatisticsText(`viewNativeRect: (${viewNativeRect.position.x}, ${viewNativeRect.position.y}) - (${viewNativeRect.size.x}, ${viewNativeRect.size.y})`);
+		drawStatisticsText(`viewSize: (${viewSize.x}, ${viewSize.y})`);
+		drawStatisticsText(`canvasNativeInputPosition: (${canvasNativeInputPosition.x}, ${canvasNativeInputPosition.y})`);
+		drawStatisticsText(`viewInputPosition: (${viewInputPosition.x}, ${viewInputPosition.y})`);
+		drawStatisticsText(``);
 
 		// 초당 프레임 정보 출력.
 		// const realtimeScinceStartup = timeManager.getRealtimeSinceStartup().toFixed(2);
@@ -485,10 +497,10 @@ export class Engine extends Object {
 		const framePerSecond = timeManager.getFramePerSecond();
 		const timeDelta = timeManager.getTimeDelta().toFixed(3);
 		// drawOutlineText(`realtimeScinceStartup: ${realtimeScinceStartup}`);
-		drawOutlineText(`time: ${time}s`);
-		drawOutlineText(`framePerSecond: ${framePerSecond}`);
-		drawOutlineText(`timeDelta: ${timeDelta}s`);
-		drawOutlineText(``);
+		drawStatisticsText(`time: ${time}s`);
+		drawStatisticsText(`framePerSecond: ${framePerSecond}`);
+		drawStatisticsText(`timeDelta: ${timeDelta}s`);
+		// drawOutlineText(``);
 
 		// // 메모리 사용 정보 출력.
 		// // 크로미움 기반 API. (비표준)

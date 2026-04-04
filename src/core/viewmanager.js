@@ -26,6 +26,9 @@ export const ViewScaleMode = {
 
 	 // 기준해상도로 뷰 영역 정의 + 뷰의 비율을 유지한채 가로세로 중에서 짧은 축으로 늘여붙임. (반대 축은 남을 수 있음)
 	matchInsideToScreen: "matchInsideToScreen",
+
+	// 가로를 화면 전체에 늘여붙임 (기준해상도 가로 = 항상 고정). 세로는 화면 비율에 따라 자동 산출. 양쪽 여백 없음.
+	expandWidth: "expandWidth",
 };
 
 
@@ -44,7 +47,7 @@ export class ViewManager extends Object {
 	/** @private @type { Vector2 } */ #canvasPixelSize; // 캔버스 영역 내부의 픽셀 렌더링 기준 전체 화면 영역.
 	/** @private @type { ViewScaleMode } */ #viewScaleMode; // 스케일 모드.
 	/** @private @type { Vector2 } */ #referenceResolutionSize; // 기준 화면 영역.
-	/** @private @type { Vector2 } */ #screenSize; // 스케일 모드가 반영된 전체 화면 영역.	
+	// /** @private @type { Vector2 } */ #screenSize; // 스케일 모드가 반영된 전체 화면 영역.	
 	/** @private @type { Rect } */ #viewRect; // 스케일 모드가 반영된 실제 화면 영역. (canvasNativeSize 내부의 실제 사각영역)
 
 
@@ -64,7 +67,7 @@ export class ViewManager extends Object {
 		this.#canvasNativeSize = Vector2.zero();
 		this.#canvasPixelSize = Vector2.zero();
 		this.#viewScaleMode = ViewScaleMode.none;
-		this.#screenSize = Vector2.zero();
+		// this.#screenSize = Vector2.zero();
 		this.#viewRect = Rect.zero();
 
 		// 설정: 기준 해상도.
@@ -107,9 +110,9 @@ export class ViewManager extends Object {
 					const viewWidth = Math.round(canvasNativeSize.x * targetResolutionScale);
 					const viewHeight = Math.round(canvasNativeSize.y * targetResolutionScale);
 					this.#targetResolutionScale = targetResolutionScale;
-					this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
-					this.#screenSize.x = Math.round(this.#screenSize.x);
-					this.#screenSize.y = Math.round(this.#screenSize.y);
+					// this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
+					// this.#screenSize.x = Math.round(this.#screenSize.x);
+					// this.#screenSize.y = Math.round(this.#screenSize.y);
 					this.#viewRect.position.set(viewX, viewY);
 					this.#viewRect.size.set(viewWidth, viewHeight);
 					break;
@@ -121,9 +124,9 @@ export class ViewManager extends Object {
 					const viewX = Math.floor((canvasNativeSize.x - viewWidth) * 0.5);
 					const viewY = Math.floor((canvasNativeSize.y - viewHeight) * 0.5);
 					this.#targetResolutionScale = targetResolutionScale;
-					this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
-					this.#screenSize.x = Math.round(this.#screenSize.x);
-					this.#screenSize.y = Math.round(this.#screenSize.y);
+					// this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
+					// this.#screenSize.x = Math.round(this.#screenSize.x);
+					// this.#screenSize.y = Math.round(this.#screenSize.y);
 					this.#viewRect.position.set(viewX, viewY);
 					this.#viewRect.size.set(viewWidth, viewHeight);
 					break;
@@ -135,9 +138,9 @@ export class ViewManager extends Object {
 					const viewX = 0;
 					const viewY = Math.round((canvasNativeSize.y - viewHeight) * 0.5);
 					this.#targetResolutionScale = targetResolutionScale;
-					this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
-					this.#screenSize.x = Math.round(this.#screenSize.x);
-					this.#screenSize.y = Math.round(this.#screenSize.y);
+					// this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
+					// this.#screenSize.x = Math.round(this.#screenSize.x);
+					// this.#screenSize.y = Math.round(this.#screenSize.y);
 					this.#viewRect.position.set(viewX, viewY);
 					this.#viewRect.size.set(viewWidth, viewHeight);
 					break;
@@ -149,9 +152,9 @@ export class ViewManager extends Object {
 					const viewX = Math.round((canvasNativeSize.x - viewWidth) * 0.5);
 					const viewY = 0;
 					this.#targetResolutionScale = targetResolutionScale;
-					this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
-					this.#screenSize.x = Math.round(this.#screenSize.x);
-					this.#screenSize.y = Math.round(this.#screenSize.y);
+					// this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
+					// this.#screenSize.x = Math.round(this.#screenSize.x);
+					// this.#screenSize.y = Math.round(this.#screenSize.y);
 					this.#viewRect.position.set(viewX, viewY);
 					this.#viewRect.size.set(viewWidth, viewHeight);
 					break;
@@ -163,9 +166,24 @@ export class ViewManager extends Object {
 					const viewX = Math.round((canvasNativeSize.x - viewWidth) * 0.5);
 					const viewY = Math.round((canvasNativeSize.y - viewHeight) * 0.5);
 					this.#targetResolutionScale = targetResolutionScale;
-					this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
-					this.#screenSize.x = Math.round(this.#screenSize.x);
-					this.#screenSize.y = Math.round(this.#screenSize.y);
+					// this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
+					// this.#screenSize.x = Math.round(this.#screenSize.x);
+					// this.#screenSize.y = Math.round(this.#screenSize.y);
+					this.#viewRect.position.set(viewX, viewY);
+					this.#viewRect.size.set(viewWidth, viewHeight);
+					break;
+				}
+			case ViewScaleMode.expandWidth: {
+					// 가로 스케일을 기준으로 고정, 세로는 화면 비율에 따라 자동 산출. 여백 없음.
+					const targetResolutionScale = canvasNativeSize.x / this.#referenceResolutionSize.x;
+					const viewWidth = Math.round(canvasNativeSize.x);
+					const viewHeight = Math.round(canvasNativeSize.y);
+					const viewX = 0;
+					const viewY = 0;
+					this.#targetResolutionScale = targetResolutionScale;
+					// this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
+					// this.#screenSize.x = Math.round(this.#screenSize.x);
+					// this.#screenSize.y = Math.round(this.#screenSize.y);
 					this.#viewRect.position.set(viewX, viewY);
 					this.#viewRect.size.set(viewWidth, viewHeight);
 					break;
@@ -342,22 +360,64 @@ export class ViewManager extends Object {
 	}
 
 	//==============================================================================
-	// 화면 전체 영역 반환.
+	// 실제 사용 해상도 크기 반환.
 	//==============================================================================
 	/**
 	 * @returns { Vector2 }
 	 */
-	getScreenSize() {
-		return this.#screenSize;
+	getViewSize() {
+		const viewScaleMode = this.getViewScaleMode();
+		switch (viewScaleMode) {
+			case ViewScaleMode.none: {
+				const canvasNativeSize = this.getCanvasNativeSize();
+				return canvasNativeSize;
+			}
+			case ViewScaleMode.referenceResolution: {
+				const referenceResolutionSize = this.getReferenceResolutionSize();
+				return referenceResolutionSize;
+			}
+			case ViewScaleMode.matchWidthToScreen: {
+				const referenceResolutionSize = this.getReferenceResolutionSize();
+				return referenceResolutionSize;
+			}
+			case ViewScaleMode.matchHeightToScreen: {
+				const referenceResolutionSize = this.getReferenceResolutionSize();
+				return referenceResolutionSize;
+			}
+			case ViewScaleMode.matchInsideToScreen: {
+				const referenceResolutionSize = this.getReferenceResolutionSize();
+				return referenceResolutionSize;
+			}
+			case ViewScaleMode.expandWidth: {
+				const targetResolutionScale = this.getTargetResolutionScale();
+				if (targetResolutionScale === 0) {
+					return Vector2.zero();
+				}
+				const viewNativeRect = this.getViewNativeRect();
+				const viewSizeX = Math.round(viewNativeRect.size.x / targetResolutionScale);
+				const viewSizeY = Math.round(viewNativeRect.size.y / targetResolutionScale);
+				return Vector2.create(viewSizeX, viewSizeY);
+			}
+		}
 	}
 
+	// //==============================================================================
+	// // 화면 전체 영역 반환.
+	// //==============================================================================
+	// /**
+	//  * @returns { Vector2 }
+	//  */
+	// getScreenSize() {
+	// 	return this.#screenSize;
+	// }
+
 	//==============================================================================
-	// 실제 사용 화면 영역 반환.
+	// 캔버스 안에서 뷰가 존재하는 실제 영역 반환. (값은 canvasNativeSize 기준)
 	//==============================================================================
 	/**
 	 * @returns { Rect }
 	 */
-	getViewRect() {
+	getViewNativeRect() { // getViewRect()
 		return this.#viewRect;
 	}
 
@@ -388,9 +448,9 @@ export class ViewManager extends Object {
 			return Vector2.zero();
 		}
 
-		const viewRect = this.getViewRect();
-		const viewX = Math.round((canvasPosition.x * devicePixelRatio - viewRect.position.x * devicePixelRatio) / totalScale);
-		const viewY = Math.round((canvasPosition.y * devicePixelRatio - viewRect.position.y * devicePixelRatio) / totalScale);
+		const viewNativeRect = this.getViewNativeRect();
+		const viewX = Math.round((canvasPosition.x * devicePixelRatio - viewNativeRect.position.x * devicePixelRatio) / totalScale);
+		const viewY = Math.round((canvasPosition.y * devicePixelRatio - viewNativeRect.position.y * devicePixelRatio) / totalScale);
 		return Vector2.create(viewX, viewY);
 	}
 }

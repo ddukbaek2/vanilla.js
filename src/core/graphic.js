@@ -134,7 +134,7 @@ export class Graphic extends Object {
 		if (canvasRenderingContext) {
 			if (roundSize > 0) {
 				canvasRenderingContext.beginPath();
-				canvasRenderingContext.roundRect(rect.x, rect.y, rect.size.x, rect.size.y, roundSize);
+				canvasRenderingContext.roundRect(rect.position.x, rect.position.y, rect.size.x, rect.size.y, roundSize);
 				canvasRenderingContext.fill();
 			}
 			else {
