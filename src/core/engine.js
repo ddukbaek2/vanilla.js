@@ -442,7 +442,8 @@ export class Engine extends Object {
 			this.#statisticsTextRect.size.x + 20,
 			this.#statisticsTextRect.size.y + 20,
 		), 12);
-		this.#statisticsTextRect.size.set(0, 0);
+		// this.#statisticsTextRect.size.set(0, 0);
+		this.#statisticsTextRect.size.y = 0;
 
 		// canvasRenderingContext.letterSpacing = "-1px";
 		canvasRenderingContext.font = `16px DOSGothic`;
