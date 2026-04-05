@@ -7,7 +7,7 @@ import { Version } from "../base/version.js";
 import { Colors } from "../base/colors.js";
 import { Vector2 } from "../base/vector2.js";
 import { TimeManager } from "./timemanager.js";
-import { ViewManager } from "./viewmanager.js";
+import { ViewManager, ViewScaleMode } from "./viewmanager.js";
 import { InputManager } from "./inputmanager.js";
 import { Platform, PlatformType, BrowserType, SYSTEM_FONT_STRING } from "../base/platform.js";
 import { Graphic } from "./graphic.js";
@@ -27,6 +27,7 @@ export class EngineConfiguration extends Object {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @type { Vector2 } */ referenceResolutionSize; // 기준 해상도.
+	// /** @type { ViewScaleMode } */ viewScaleMode; // 뷰 모드.
 	/** @type { string } */ canvasId; // 캔버스 식별자.
 	/** @type { boolean } */ useStatistics; // 정보창 출력 여부.
 	/** @type { boolean } */ autoResizeOnWindowResize; // 윈도우가 리사이즈 될 때 캔버스 사이즈 자동 반영.
@@ -38,6 +39,7 @@ export class EngineConfiguration extends Object {
 		super();
 		// this.scene = null;
 		this.referenceResolutionSize = Vector2.zero();
+		// this.viewScaleMode = ViewScaleMode.none;
 		this.canvasId = "";
 		this.useStatistics = false;
 		this.autoResizeOnWindowResize = false;
