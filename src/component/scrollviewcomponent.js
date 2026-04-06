@@ -7,6 +7,9 @@ import { AnchoredTransformNode } from "../core/anchoredtransformnode.js";
 import { Vector2 } from "../base/vector2.js";
 import { Pivot } from "../base/pivot.js";
 import * as Math from "../base/math.js";
+import { Color } from "../base/color.js";
+import { Rect } from "../base/rect.js";
+import { ColorComponent } from "./colorcomponent.js";
 
 
 //==============================================================================
@@ -41,6 +44,11 @@ export class ScrollViewComponent extends UIComponent {
 	/** @private @type { string } */ #scrollMode;
 	/** @private @type { Vector2 } */ #scrollVelocity;
 	/** @private @type { Vector2 } */ #prevViewInputPosition;
+	/** @private @type { Color | null } */ #backgroundColor;
+	/** @private @type { boolean } */ #horizontalEnabled;
+	/** @private @type { boolean } */ #verticalEnabled;
+	/** @private @type { Color | null } */ #contentBackgroundColor;
+	/** @private @type { ColorComponent | null } */ #contentColorComponent;
 
 	//==============================================================================
 	// 생성.
@@ -60,6 +68,11 @@ export class ScrollViewComponent extends UIComponent {
 		this.#scrollMode = ScrollMode.clamp;
 		this.#scrollVelocity = Vector2.zero();
 		this.#prevViewInputPosition = Vector2.zero();
+		this.#backgroundColor = null;
+		this.#horizontalEnabled = true;
+		this.#verticalEnabled = true;
+		this.#contentBackgroundColor = null;
+		this.#contentColorComponent = null;
 	}
 
 	//==============================================================================
@@ -77,6 +90,10 @@ export class ScrollViewComponent extends UIComponent {
 			this.#contentNode.setAnchorMax(Vector2.zero());
 			this.#contentNode.setPivot(Pivot.topLeft);
 			this.#contentNode.setAnchoredPosition(Vector2.zero());
+			const scrollViewContentColorComponent = this.#contentNode.addComponent(ColorComponent);
+			const initialContentColor = this.#contentBackgroundColor !== null ? this.#contentBackgroundColor : new Color(0, 0, 0, 0);
+			scrollViewContentColorComponent.setColor(initialContentColor);
+			this.#contentColorComponent = scrollViewContentColorComponent;
 			node.addChild(this.#contentNode);
 			if (node instanceof UINode) {
 				node.setMaskEnabled(true);
@@ -117,8 +134,10 @@ export class ScrollViewComponent extends UIComponent {
 		}
 		else if (inputManager.isTouchMoved()) {
 			if (this.#isDragging) {
-				const deltaX = viewInputPosition.x - this.#dragStartViewPosition.x;
-				const deltaY = viewInputPosition.y - this.#dragStartViewPosition.y;
+				const rawDeltaX = viewInputPosition.x - this.#dragStartViewPosition.x;
+				const rawDeltaY = viewInputPosition.y - this.#dragStartViewPosition.y;
+				const deltaX = this.#horizontalEnabled ? rawDeltaX : 0;
+				const deltaY = this.#verticalEnabled ? rawDeltaY : 0;
 				const proposedOffset = Vector2.create(
 					this.#dragStartOffset.x + deltaX,
 					this.#dragStartOffset.y + deltaY
@@ -149,8 +168,10 @@ export class ScrollViewComponent extends UIComponent {
 						this.#contentNode.setAnchoredPosition(this.#scrollOffset);
 					}
 					if (timeDelta > 0) {
-						const velocityX = (viewInputPosition.x - this.#prevViewInputPosition.x) / timeDelta;
-						const velocityY = (viewInputPosition.y - this.#prevViewInputPosition.y) / timeDelta;
+						const rawVelocityX = (viewInputPosition.x - this.#prevViewInputPosition.x) / timeDelta;
+						const rawVelocityY = (viewInputPosition.y - this.#prevViewInputPosition.y) / timeDelta;
+						const velocityX = this.#horizontalEnabled ? rawVelocityX : 0;
+						const velocityY = this.#verticalEnabled ? rawVelocityY : 0;
 						this.#scrollVelocity = Vector2.create(velocityX, velocityY);
 					}
 				}
@@ -167,9 +188,9 @@ export class ScrollViewComponent extends UIComponent {
 		if (this.#scrollMode === ScrollMode.elastic && !this.#isDragging) {
 			const contentSize = node.getContentSize();
 			const physicsBoundsMaxX = 0;
-			const physicsBoundsMinX = Math.min(0, contentSize.x - this.#scrollContentSize.x);
+			const physicsBoundsMinX = this.#horizontalEnabled ? Math.min(0, contentSize.x - this.#scrollContentSize.x) : 0;
 			const physicsBoundsMaxY = 0;
-			const physicsBoundsMinY = Math.min(0, contentSize.y - this.#scrollContentSize.y);
+			const physicsBoundsMinY = this.#verticalEnabled ? Math.min(0, contentSize.y - this.#scrollContentSize.y) : 0;
 			const springConstant = 1200;
 			const dampingCoefficient = 30;
 			const frictionCoefficient = 5;
@@ -217,6 +238,27 @@ export class ScrollViewComponent extends UIComponent {
 	}
 
 	//==============================================================================
+	// 출력. (배경색이 설정된 경우 스크롤뷰 영역에 배경을 그린다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { * } graphic
+	 */
+	draw(graphic) {
+		if (this.#backgroundColor === null) {
+			return;
+		}
+		const node = this.getNode();
+		if (!node) {
+			return;
+		}
+		const contentSize = node.getContentSize();
+		const backgroundRect = Rect.create(0, 0, contentSize.x, contentSize.y);
+		graphic.setFillColor(this.#backgroundColor);
+		graphic.drawRect(backgroundRect);
+	}
+
+	//==============================================================================
 	// 스크롤 오프셋 적용. (클램핑 포함)
 	//==============================================================================
 	/** @private */
@@ -226,9 +268,9 @@ export class ScrollViewComponent extends UIComponent {
 		const scrollContentSize = this.#scrollContentSize;
 
 		const maxX = 0;
-		const minX = Math.min(0, contentSize.x - scrollContentSize.x);
+		const minX = this.#horizontalEnabled ? Math.min(0, contentSize.x - scrollContentSize.x) : 0;
 		const maxY = 0;
-		const minY = Math.min(0, contentSize.y - scrollContentSize.y);
+		const minY = this.#verticalEnabled ? Math.min(0, contentSize.y - scrollContentSize.y) : 0;
 
 		this.#scrollOffset = Vector2.create(
 			Math.clamp(offset.x, minX, maxX),
@@ -258,6 +300,90 @@ export class ScrollViewComponent extends UIComponent {
 	 */
 	getScrollOffset() {
 		return this.#scrollOffset;
+	}
+
+	//==============================================================================
+	// 배경색 설정.
+	//==============================================================================
+	/**
+	 * @param { Color | null } color
+	 */
+	setBackgroundColor(color) {
+		this.#backgroundColor = color;
+	}
+
+	//==============================================================================
+	// 배경색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color | null }
+	 */
+	getBackgroundColor() {
+		return this.#backgroundColor;
+	}
+
+	//==============================================================================
+	// 가로 스크롤 활성 설정. (false = 가로 스크롤 비활성)
+	//==============================================================================
+	/**
+	 * @param { boolean } horizontal
+	 */
+	setHorizontal(horizontal) {
+		this.#horizontalEnabled = horizontal;
+	}
+
+	//==============================================================================
+	// 가로 스크롤 활성 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	getHorizontal() {
+		return this.#horizontalEnabled;
+	}
+
+	//==============================================================================
+	// 세로 스크롤 활성 설정. (false = 세로 스크롤 비활성)
+	//==============================================================================
+	/**
+	 * @param { boolean } vertical
+	 */
+	setVertical(vertical) {
+		this.#verticalEnabled = vertical;
+	}
+
+	//==============================================================================
+	// 세로 스크롤 활성 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	getVertical() {
+		return this.#verticalEnabled;
+	}
+
+	//==============================================================================
+	// 콘텐츠 배경색 설정. (스크롤과 함께 움직이는 스크롤 가능 영역의 배경)
+	//==============================================================================
+	/**
+	 * @param { Color | null } color
+	 */
+	setContentBackgroundColor(color) {
+		this.#contentBackgroundColor = color;
+		if (this.#contentColorComponent !== null) {
+			const appliedColor = color !== null ? color : new Color(0, 0, 0, 0);
+			this.#contentColorComponent.setColor(appliedColor);
+		}
+	}
+
+	//==============================================================================
+	// 콘텐츠 배경색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color | null }
+	 */
+	getContentBackgroundColor() {
+		return this.#contentBackgroundColor;
 	}
 
 	//==============================================================================
