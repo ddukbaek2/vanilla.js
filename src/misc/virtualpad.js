@@ -7,6 +7,8 @@ import { Color } from "../base/color.js";
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
 import { Graphic } from "../core/graphic.js";
+import { IDrawable } from "../interface/idrawable.js";
+import { ITouchable } from "../interface/itouchable.js";
 
 
 //==============================================================================
@@ -23,6 +25,11 @@ const VirtualPadState = {
 //==============================================================================
 // 가상 패드.
 //==============================================================================
+/**
+ * @class
+ * @implements { IDrawable }
+ * @implements { ITouchable }
+ */
 export class VirtualPad extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
