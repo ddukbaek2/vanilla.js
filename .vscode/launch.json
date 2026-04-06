@@ -7,7 +7,7 @@
 			"name": "Launch Live Server",
 			"type": "chrome",
 			"request": "launch",
-			"url": "http://127.0.0.1:5502/index.html",
+			"url": "http://127.0.0.1:5502/main.html",
 			"webRoot": "${workspaceFolder}"
 		},
 
@@ -16,7 +16,7 @@
 			"name": "Launch Chrome",
 			"type": "chrome",
 			"request": "launch",
-			"file": "${workspaceFolder}/index.html",
+			"file": "${workspaceFolder}/main.html",
 			"webRoot": "${workspaceFolder}"
 		}
 	]
