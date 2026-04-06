@@ -54,7 +54,7 @@ export { Animation } from "./src/core/animation.js";
 export { ColorComponent } from "./src/component/colorcomponent.js";
 export { SpriteComponent } from "./src/component/spritecomponent.js";
 export { LabelComponent } from "./src/component/labelcomponent.js";
-export { ButtonComponent } from "./src/component/buttoncomponent.js";
+export { ButtonComponent } from "./src/component/ui/buttoncomponent.js";
 
 
 //==============================================================================

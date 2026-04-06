@@ -2,14 +2,14 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { ViewComponent } from "./viewcomponent.js";
-import { UINode } from "../core/uinode.js";
-import { AnchoredTransformNode } from "../core/anchoredtransformnode.js";
-import { Vector2 } from "../base/vector2.js";
-import { Pivot } from "../base/pivot.js";
-import * as Math from "../base/math.js";
-import { Color } from "../base/color.js";
-import { Rect } from "../base/rect.js";
-import { ColorComponent } from "./colorcomponent.js";
+import { UINode } from "../../core/uinode.js";
+import { AnchoredTransformNode } from "../../core/anchoredtransformnode.js";
+import { Vector2 } from "../../base/vector2.js";
+import { Pivot } from "../../base/pivot.js";
+import * as Math from "../../base/math.js";
+import { Color } from "../../base/color.js";
+import { Rect } from "../../base/rect.js";
+import { ColorComponent } from "../colorcomponent.js";
 
 
 //==============================================================================

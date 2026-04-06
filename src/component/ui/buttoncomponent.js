@@ -1,13 +1,13 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { Enum } from "../base/identifier.js";
-import { Graphic } from "../core/graphic.js";
+import { Enum } from "../../base/identifier.js";
+import { Graphic } from "../../core/graphic.js";
 import { UIComponent } from "./uicomponent.js";
-import { Color } from "../base/color.js";
-import * as Math from "../base/math.js";
-import { SpriteComponent } from "./spritecomponent.js";
-import { LabelComponent } from "./labelcomponent.js";
+import { Color } from "../../base/color.js";
+import * as Math from "../../base/math.js";
+import { SpriteComponent } from "../spritecomponent.js";
+import { LabelComponent } from "../labelcomponent.js";
 
 
 //==============================================================================

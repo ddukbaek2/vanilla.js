@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { ButtonComponent } from "./buttoncomponent.js";
-import { Color } from "../base/color.js";
+import { Color } from "../../base/color.js";
 
 
 //==============================================================================

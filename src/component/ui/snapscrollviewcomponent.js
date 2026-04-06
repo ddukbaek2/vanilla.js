@@ -2,9 +2,9 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { ScrollViewComponent, ScrollMode } from "./scrollviewcomponent.js";
-import { Vector2 } from "../base/vector2.js";
-import * as Math from "../base/math.js";
-import { Tween } from "../core/tween.js";
+import { Vector2 } from "../../base/vector2.js";
+import * as Math from "../../base/math.js";
+import { Tween } from "../../core/tween.js";
 
 
 //==============================================================================
