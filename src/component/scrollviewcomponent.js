@@ -10,6 +10,17 @@ import * as Math from "../base/math.js";
 
 
 //==============================================================================
+// 스크롤 모드.
+// - clamp: 경계를 초과하지 않는 기본 모드.
+// - elastic: 경계를 초과하면 저항이 생기고 놓으면 스프링처럼 튕겨 돌아오는 모드.
+//==============================================================================
+export const ScrollMode = {
+	clamp: "clamp",
+	elastic: "elastic",
+};
+
+
+//==============================================================================
 // 스크롤뷰 컴포넌트.
 // - 소유 노드의 getContentSize()를 가시 영역으로 사용한다.
 // - 내부에 별도의 콘텐츠 노드를 생성하며, 드래그로 스크롤링할 수 있다.
@@ -27,6 +38,9 @@ export class ScrollViewComponent extends UIComponent {
 	/** @private @type { boolean } */ #isDragging;
 	/** @private @type { Vector2 } */ #dragStartViewPosition;
 	/** @private @type { Vector2 } */ #dragStartOffset;
+	/** @private @type { string } */ #scrollMode;
+	/** @private @type { Vector2 } */ #scrollVelocity;
+	/** @private @type { Vector2 } */ #prevViewInputPosition;
 
 	//==============================================================================
 	// 생성.
@@ -43,6 +57,9 @@ export class ScrollViewComponent extends UIComponent {
 		this.#isDragging = false;
 		this.#dragStartViewPosition = Vector2.zero();
 		this.#dragStartOffset = Vector2.zero();
+		this.#scrollMode = ScrollMode.clamp;
+		this.#scrollVelocity = Vector2.zero();
+		this.#prevViewInputPosition = Vector2.zero();
 	}
 
 	//==============================================================================
@@ -93,6 +110,8 @@ export class ScrollViewComponent extends UIComponent {
 					this.#isDragging = true;
 					this.#dragStartViewPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
 					this.#dragStartOffset = Vector2.create(this.#scrollOffset.x, this.#scrollOffset.y);
+					this.#scrollVelocity = Vector2.zero();
+					this.#prevViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
 				}
 			}
 		}
@@ -100,14 +119,100 @@ export class ScrollViewComponent extends UIComponent {
 			if (this.#isDragging) {
 				const deltaX = viewInputPosition.x - this.#dragStartViewPosition.x;
 				const deltaY = viewInputPosition.y - this.#dragStartViewPosition.y;
-				this.#applyScrollOffset(Vector2.create(
+				const proposedOffset = Vector2.create(
 					this.#dragStartOffset.x + deltaX,
 					this.#dragStartOffset.y + deltaY
-				));
+				);
+				if (this.#scrollMode === ScrollMode.elastic) {
+					const contentSize = node.getContentSize();
+					const elasticMaxX = 0;
+					const elasticMinX = Math.min(0, contentSize.x - this.#scrollContentSize.x);
+					const elasticMaxY = 0;
+					const elasticMinY = Math.min(0, contentSize.y - this.#scrollContentSize.y);
+					const elasticResistance = 0.3;
+					let elasticOffsetX = proposedOffset.x;
+					let elasticOffsetY = proposedOffset.y;
+					if (elasticOffsetX > elasticMaxX) {
+						elasticOffsetX = elasticMaxX + (elasticOffsetX - elasticMaxX) * elasticResistance;
+					}
+					else if (elasticOffsetX < elasticMinX) {
+						elasticOffsetX = elasticMinX + (elasticOffsetX - elasticMinX) * elasticResistance;
+					}
+					if (elasticOffsetY > elasticMaxY) {
+						elasticOffsetY = elasticMaxY + (elasticOffsetY - elasticMaxY) * elasticResistance;
+					}
+					else if (elasticOffsetY < elasticMinY) {
+						elasticOffsetY = elasticMinY + (elasticOffsetY - elasticMinY) * elasticResistance;
+					}
+					this.#scrollOffset = Vector2.create(elasticOffsetX, elasticOffsetY);
+					if (this.#contentNode) {
+						this.#contentNode.setAnchoredPosition(this.#scrollOffset);
+					}
+					if (timeDelta > 0) {
+						const velocityX = (viewInputPosition.x - this.#prevViewInputPosition.x) / timeDelta;
+						const velocityY = (viewInputPosition.y - this.#prevViewInputPosition.y) / timeDelta;
+						this.#scrollVelocity = Vector2.create(velocityX, velocityY);
+					}
+				}
+				else {
+					this.#applyScrollOffset(proposedOffset);
+				}
+				this.#prevViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
 			}
 		}
 		else if (inputManager.isTouchReleased()) {
 			this.#isDragging = false;
+		}
+
+		if (this.#scrollMode === ScrollMode.elastic && !this.#isDragging) {
+			const contentSize = node.getContentSize();
+			const physicsBoundsMaxX = 0;
+			const physicsBoundsMinX = Math.min(0, contentSize.x - this.#scrollContentSize.x);
+			const physicsBoundsMaxY = 0;
+			const physicsBoundsMinY = Math.min(0, contentSize.y - this.#scrollContentSize.y);
+			const springConstant = 1200;
+			const dampingCoefficient = 30;
+			const frictionCoefficient = 5;
+			let physicsVelocityX = this.#scrollVelocity.x;
+			let physicsVelocityY = this.#scrollVelocity.y;
+			let physicsOffsetX = this.#scrollOffset.x;
+			let physicsOffsetY = this.#scrollOffset.y;
+			const physicsClampedX = Math.clamp(physicsOffsetX, physicsBoundsMinX, physicsBoundsMaxX);
+			const physicsClampedY = Math.clamp(physicsOffsetY, physicsBoundsMinY, physicsBoundsMaxY);
+			const physicsDisplacementX = physicsOffsetX - physicsClampedX;
+			const physicsDisplacementY = physicsOffsetY - physicsClampedY;
+			const physicsIsOutOfBounds = physicsDisplacementX !== 0 || physicsDisplacementY !== 0;
+			if (physicsIsOutOfBounds) {
+				const physicsSpringForceX = -physicsDisplacementX * springConstant;
+				const physicsSpringForceY = -physicsDisplacementY * springConstant;
+				const physicsDampingForceX = -physicsVelocityX * dampingCoefficient;
+				const physicsDampingForceY = -physicsVelocityY * dampingCoefficient;
+				physicsVelocityX += (physicsSpringForceX + physicsDampingForceX) * timeDelta;
+				physicsVelocityY += (physicsSpringForceY + physicsDampingForceY) * timeDelta;
+			}
+			else {
+				const physicsFrictionFactor = Math.max(0, 1 - frictionCoefficient * timeDelta);
+				physicsVelocityX *= physicsFrictionFactor;
+				physicsVelocityY *= physicsFrictionFactor;
+			}
+			physicsOffsetX += physicsVelocityX * timeDelta;
+			physicsOffsetY += physicsVelocityY * timeDelta;
+			const physicsNewClampedX = Math.clamp(physicsOffsetX, physicsBoundsMinX, physicsBoundsMaxX);
+			const physicsNewClampedY = Math.clamp(physicsOffsetY, physicsBoundsMinY, physicsBoundsMaxY);
+			const physicsNewDispX = physicsOffsetX - physicsNewClampedX;
+			const physicsNewDispY = physicsOffsetY - physicsNewClampedY;
+			const physicsSpeedSq = physicsVelocityX * physicsVelocityX + physicsVelocityY * physicsVelocityY;
+			if (physicsSpeedSq < 1.0 && Math.abs(physicsNewDispX) < 0.5 && Math.abs(physicsNewDispY) < 0.5) {
+				physicsOffsetX = physicsNewClampedX;
+				physicsOffsetY = physicsNewClampedY;
+				physicsVelocityX = 0;
+				physicsVelocityY = 0;
+			}
+			this.#scrollOffset = Vector2.create(physicsOffsetX, physicsOffsetY);
+			if (this.#contentNode) {
+				this.#contentNode.setAnchoredPosition(this.#scrollOffset);
+			}
+			this.#scrollVelocity = Vector2.create(physicsVelocityX, physicsVelocityY);
 		}
 	}
 
@@ -153,6 +258,26 @@ export class ScrollViewComponent extends UIComponent {
 	 */
 	getScrollOffset() {
 		return this.#scrollOffset;
+	}
+
+	//==============================================================================
+	// 스크롤 모드 설정.
+	//==============================================================================
+	/**
+	 * @param { string } scrollMode
+	 */
+	setScrollMode(scrollMode) {
+		this.#scrollMode = scrollMode;
+	}
+
+	//==============================================================================
+	// 스크롤 모드 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getScrollMode() {
+		return this.#scrollMode;
 	}
 
 	//==============================================================================
