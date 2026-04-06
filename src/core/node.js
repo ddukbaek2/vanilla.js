@@ -26,6 +26,7 @@ export class Node extends Object {
 	/** @private @type { Node | null } */ #parent; // 부모 노드.
 	/** @private @type { Node[] } */ #children; // 자식 노드 목록.
 	/** @private @type { boolean } */ #isActive; // 활성화 여부.
+	/** @private @type { string } */ #name; // 노드 이름.
 
 	//==============================================================================
 	// 생성.
@@ -39,6 +40,7 @@ export class Node extends Object {
 		this.#parent = null;
 		this.#children = [];
 		this.#isActive = true;
+		this.#name = "";
 	}
 
 	//==============================================================================
@@ -338,6 +340,77 @@ export class Node extends Object {
 		}
 	}
 	
+	//==============================================================================
+	// 이름 설정.
+	//==============================================================================
+	/**
+	 * @param { string } name
+	 */
+	setName(name) {
+		this.#name = name;
+	}
+
+	//==============================================================================
+	// 이름 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getName() {
+		return this.#name;
+	}
+
+	//==============================================================================
+	// 이름으로 직계 자식 찾기.
+	//==============================================================================
+	/**
+	 * @param { string } name
+	 * @returns { Node | null }
+	 */
+	findChild(name) {
+		const children = this.getChildren();
+		for (const child of children) {
+			if (child.getName() === name) {
+				return child;
+			}
+		}
+		return null;
+	}
+
+	//==============================================================================
+	// 이름으로 하위 계층 전체에서 찾기. (깊이 우선)
+	//==============================================================================
+	/**
+	 * @param { string } name
+	 * @returns { Node | null }
+	 */
+	findChildRecursive(name) {
+		const children = this.getChildren();
+		for (const child of children) {
+			if (child.getName() === name) {
+				return child;
+			}
+			const found = child.findChildRecursive(name);
+			if (found !== null) {
+				return found;
+			}
+		}
+		return null;
+	}
+
+	//==============================================================================
+	// 이름으로 직계 자식 제거.
+	//==============================================================================
+	/**
+	 * @param { string } name
+	 */
+	removeChildByName(name) {
+		const child = this.findChild(name);
+		if (child !== null) {
+			this.removeChild(child);
+		}
+	}
+
 	// //==============================================================================
 	// // 새로운 노드 생성.
 	// //==============================================================================
