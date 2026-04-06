@@ -1,7 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { UIComponent } from "./uicomponent.js";
+import { ViewComponent } from "./viewcomponent.js";
 import { UINode } from "../core/uinode.js";
 import { AnchoredTransformNode } from "../core/anchoredtransformnode.js";
 import { Vector2 } from "../base/vector2.js";
@@ -30,7 +30,7 @@ export const ScrollMode = {
 // - AnchoredTransformNode에 추가하면 마스크(크롭)가 자동 활성화된다.
 // - 중첩 ScrollView를 지원한다. (이벤트 체이닝과 연동)
 //==============================================================================
-export class ScrollViewComponent extends UIComponent {
+export class ScrollViewComponent extends ViewComponent {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -148,7 +148,7 @@ export class ScrollViewComponent extends UIComponent {
 					const elasticMinX = Math.min(0, contentSize.x - this.#scrollContentSize.x);
 					const elasticMaxY = 0;
 					const elasticMinY = Math.min(0, contentSize.y - this.#scrollContentSize.y);
-					const elasticResistance = 0.3;
+					const elasticResistance = 0.5;
 					let elasticOffsetX = proposedOffset.x;
 					let elasticOffsetY = proposedOffset.y;
 					if (elasticOffsetX > elasticMaxX) {
@@ -477,5 +477,25 @@ export class ScrollViewComponent extends UIComponent {
 	 */
 	getEngine() {
 		return this.#engine;
+	}
+
+	//==============================================================================
+	// 드래그 중 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isDragging() {
+		return this.#isDragging;
+	}
+
+	//==============================================================================
+	// 현재 스크롤 속도 반환.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 }
+	 */
+	getScrollVelocity() {
+		return this.#scrollVelocity;
 	}
 }
