@@ -218,6 +218,25 @@ export class ScrollViewComponent extends UIComponent {
 			}
 			physicsOffsetX += physicsVelocityX * timeDelta;
 			physicsOffsetY += physicsVelocityY * timeDelta;
+
+			// 경계 밖에서 복귀 중 경계를 넘어 내부로 진입하면 경계에서 정지.
+			if (physicsDisplacementX > 0 && physicsOffsetX < physicsBoundsMaxX) {
+				physicsOffsetX = physicsBoundsMaxX;
+				physicsVelocityX = 0;
+			}
+			else if (physicsDisplacementX < 0 && physicsOffsetX > physicsBoundsMinX) {
+				physicsOffsetX = physicsBoundsMinX;
+				physicsVelocityX = 0;
+			}
+			if (physicsDisplacementY > 0 && physicsOffsetY < physicsBoundsMaxY) {
+				physicsOffsetY = physicsBoundsMaxY;
+				physicsVelocityY = 0;
+			}
+			else if (physicsDisplacementY < 0 && physicsOffsetY > physicsBoundsMinY) {
+				physicsOffsetY = physicsBoundsMinY;
+				physicsVelocityY = 0;
+			}
+
 			const physicsNewClampedX = Math.clamp(physicsOffsetX, physicsBoundsMinX, physicsBoundsMaxX);
 			const physicsNewClampedY = Math.clamp(physicsOffsetY, physicsBoundsMinY, physicsBoundsMaxY);
 			const physicsNewDispX = physicsOffsetX - physicsNewClampedX;
