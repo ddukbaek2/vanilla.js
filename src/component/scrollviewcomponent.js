@@ -271,6 +271,7 @@ export class ScrollViewComponent extends UIComponent {
 		if (!node) {
 			return;
 		}
+
 		const contentSize = node.getContentSize();
 		const backgroundRect = Rect.create(0, 0, contentSize.x, contentSize.y);
 		graphic.setFillColor(this.#backgroundColor);
