@@ -116,6 +116,9 @@ export class Dictionary extends Object {
 	 * @returns { V } 
 	 */
 	get(key) {
+		// if (typeof key !== "string") {
+		// 	key = `${key}`;
+		// }
 		return this.#items.get(key);
 	}
 
