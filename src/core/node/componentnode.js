@@ -45,7 +45,7 @@ export class ComponentNode extends Node {
 
 		// 컴포넌트.
 		const components = this.getAllComponents();
-		for (const component of this.getAllComponents()) {
+		for (const component of components) {
 			component.tick(timeDelta);
 		}
 
