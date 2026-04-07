@@ -34,7 +34,6 @@ export class ScrollViewComponent extends ViewComponent {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { AnchoredTransformNode | null } */ #content; // 컨텐트 노드.
 	/** @private @type { Vector2 } */	#scrollContentSize; // 스크롤 가능한 내부 컨텐트 영역.
 	/** @private @type { string } */	#scrollMode; // 스크롤 모드.
 	/** @private @type { Vector2 } */	#scrollVelocity; // 스크롤 속도.
@@ -54,7 +53,7 @@ export class ScrollViewComponent extends ViewComponent {
 	 */
 	constructor() {
 		super();
-		this.#content = null;
+
 		this.#scrollOffset = Vector2.zero();
 		this.#scrollContentSize = Vector2.zero();
 		this.#isDragging = false;
@@ -65,29 +64,6 @@ export class ScrollViewComponent extends ViewComponent {
 		this.#previousViewInputPosition = Vector2.zero();
 		this.#horizontalEnabled = true;
 		this.#verticalEnabled = true;
-	}
-
-	//==============================================================================
-	// 노드에 붙음.
-	//==============================================================================
-	/**
-	 * @override
-	 * @param { TransformNode } node
-	 */
-	attach(node) {
-		super.attach(node);
-
-		// 컨텐츠 노드 추가.
-		this.#content = new AnchoredTransformNode();
-		this.#content.setAnchorMin(Vector2.zero());
-		this.#content.setAnchorMax(Vector2.zero());
-		this.#content.setPivot(Pivot.topLeft);
-		this.#content.setAnchoredPosition(Vector2.zero());
-		node.addChild(this.#content);
-
-		if (node instanceof UINode) {
-			node.setMaskEnabled(true);
-		}
 	}
 
 	//==============================================================================
@@ -170,10 +146,12 @@ export class ScrollViewComponent extends ViewComponent {
 					}
 					this.#scrollOffset = Vector2.create(elasticOffsetX, elasticOffsetY);
 
+					// 컨텐트의 위치 수정.
 					const content = this.getContent();
 					if (content) {
 						content.setAnchoredPosition(this.#scrollOffset);
 					}
+
 					if (timeDelta > 0) {
 						const rawVelocityX = (viewInputPosition.x - this.#previousViewInputPosition.x) / timeDelta;
 						const rawVelocityY = (viewInputPosition.y - this.#previousViewInputPosition.y) / timeDelta;
@@ -258,6 +236,7 @@ export class ScrollViewComponent extends ViewComponent {
 			}
 			this.#scrollOffset = Vector2.create(physicsOffsetX, physicsOffsetY);
 
+			// 컨텐트의 위치 수정.
 			const content = this.getContent();
 			if (content) {
 				content.setAnchoredPosition(this.#scrollOffset);
@@ -287,6 +266,7 @@ export class ScrollViewComponent extends ViewComponent {
 			Math.clamp(offset.y, minY, maxY)
 		);
 
+		// 컨텐트의 위치 수정.
 		const content = this.getContent();
 		if (content) {
 			content.setAnchoredPosition(this.#scrollOffset);
@@ -383,6 +363,7 @@ export class ScrollViewComponent extends ViewComponent {
 		scrollContentSize = scrollContentSize.clone();
 		this.#scrollContentSize = scrollContentSize;
 
+		// 컨텐트의 크기 수정.
 		const content = this.getContent();
 		if (content) {
 			content.setSizeDelta(scrollContentSize);
@@ -399,15 +380,6 @@ export class ScrollViewComponent extends ViewComponent {
 		return this.#scrollContentSize;
 	}
 
-	//==============================================================================
-	// 콘텐츠 노드 반환. (자식 노드를 이 노드에 추가하면 스크롤 대상이 됨)
-	//==============================================================================
-	/**
-	 * @returns { AnchoredTransformNode }
-	 */
-	getContent() {
-		return this.#content;
-	}
 
 	//==============================================================================
 	// 드래그 중 여부 반환.

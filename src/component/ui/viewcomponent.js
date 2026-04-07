@@ -5,6 +5,8 @@ const System = globalThis;
 import { Color } from "../../base/color.js";
 import { Rect } from "../../base/rect.js";
 import { Graphic } from "../../core/graphic.js";
+import { AnchoredTransformNode } from "../../core/node/anchoredtransformnode.js";
+import { UINode } from "../../core/node/uinode.js";
 import { UIComponent } from "./uicomponent.js";
 
 
@@ -18,6 +20,7 @@ export class ViewComponent extends UIComponent {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
+	/** @private @type { AnchoredTransformNode | null } */ #content; // 컨텐트 노드.
 	/** @private @type { Color } */ #backgroundColor;
 
 	//==============================================================================
@@ -29,7 +32,42 @@ export class ViewComponent extends UIComponent {
 	constructor() {
 		super();
 
+		this.#content = null;
 		this.#backgroundColor = new Color(1, 1, 1, 1);
+	}
+
+	//==============================================================================
+	// 노드에 붙음.
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { ComponentNode } node
+	 */
+	attach(node) {
+		super.attach(node);
+
+		// 컨텐트 노드 추가.
+		this.#content = new AnchoredTransformNode();
+		this.#content.setAnchorMin(Vector2.zero());
+		this.#content.setAnchorMax(Vector2.zero());
+		this.#content.setPivot(Pivot.topLeft);
+		this.#content.setAnchoredPosition(Vector2.zero());
+		node.addChild(this.#content);
+
+		if (node instanceof UINode) {
+			node.setMaskEnabled(true);
+		}
+	}
+
+	//==============================================================================
+	// 노드에서 떨어짐.
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { ComponentNode } node
+	 */
+	detach(node) {
+		super.detach(node);
 	}
 
 	//==============================================================================
@@ -45,7 +83,7 @@ export class ViewComponent extends UIComponent {
 			return;
 		}
 
-		// 출력.
+		//  컨텐트 영역 출력.
 		const contentSize = node.getContentSize();
 		const backgroundColor = this.getBackgroundColor();
 		const backgroundRect = Rect.create(0, 0, contentSize.x, contentSize.y);
@@ -53,6 +91,15 @@ export class ViewComponent extends UIComponent {
 		graphic.drawRect(backgroundRect);
 	}
 
+	//==============================================================================
+	// 콘텐츠 노드 반환. (자식 노드를 이 노드에 추가하면 스크롤 대상이 됨)
+	//==============================================================================
+	/**
+	 * @returns { AnchoredTransformNode }
+	 */
+	getContent() {
+		return this.#content;
+	}
 
 	//==============================================================================
 	// 배경색 설정.

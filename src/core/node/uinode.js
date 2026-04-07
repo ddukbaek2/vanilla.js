@@ -2,6 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
+import { Rect } from "../../base/rect.js";
 import { Vector2 } from "../../base/vector2.js";
 import { Graphic } from "../graphic.js";
 import { AnchoredTransformNode } from "./anchoredtransformnode.js";
@@ -44,7 +45,7 @@ export class UINode extends AnchoredTransformNode {
 	 */
 	tick(timeDelta) {
 		if (this.#isEventChainEnabled && this.#engine) {
-			this.#processEventChain();
+			this.processEventChain();
 		}
 		super.tick(timeDelta);
 	}
@@ -63,24 +64,30 @@ export class UINode extends AnchoredTransformNode {
 		}
 
 		// 컴포넌트 출력.
-		const allComponents = this.getAllComponents();
-		for (const component of allComponents) {
+		const components = this.getAllComponents();
+		for (const component of components) {
 			component.draw(graphic);
 		}
 
-		if (this.#isMaskEnabled) {
+		const isMaskEnabled = this.isMaskEnabled();
+		if (isMaskEnabled) {
 			// 자신의 contentSize 기준으로 클리핑 후 자식 출력.
 			const canvasRenderingContext = graphic.getCanvasRenderingContext();
 			const contentSize = this.getContentSize();
 			canvasRenderingContext.save();
 			canvasRenderingContext.beginPath();
-			canvasRenderingContext.rect(0, 0, contentSize.x, contentSize.y);
+			canvasRenderingContext.rect();
 			canvasRenderingContext.clip();
+
+			const clipRect = Rect.create(0, 0, contentSize.x, contentSize.y);
+			graphic.beginClipRect(clipRect);
+
 			const children = this.getChildren();
 			for (const child of children) {
 				graphic.drawNode(child);
 			}
-			canvasRenderingContext.restore();
+			
+			graphic.endClipRect();
 		}
 		else {
 			// 마스크 없이 자식 출력.
@@ -97,11 +104,11 @@ export class UINode extends AnchoredTransformNode {
 	// bounds 안에 있는 가장 위의 노드 하나만 활성화하고 나머지를 차단한다.
 	//==============================================================================
 	/** @private */
-	#processEventChain() {
+	processEventChain() {
 		const inputManager = this.#engine.getInputManager();
 
 		// 모든 하위 UINode 차단 해제.
-		this.#setAllTouchBlocked(this, false);
+		this.setAllTouchBlocked(this, false);
 
 		// 터치 누름 시에만 체이닝으로 소비자를 결정.
 		if (!inputManager.isTouchPressed()) {
@@ -109,11 +116,11 @@ export class UINode extends AnchoredTransformNode {
 		}
 
 		// 모든 하위 UINode 차단.
-		this.#setAllTouchBlocked(this, true);
+		this.setAllTouchBlocked(this, true);
 
 		// 역순으로 순회하여 가장 위에 있는 노드를 찾아 차단 해제.
 		const viewInputPosition = inputManager.getViewInputPosition();
-		this.#findAndUnblockFirst(this, viewInputPosition);
+		this.findAndUnblockFirst(this, viewInputPosition);
 	}
 
 	//==============================================================================
@@ -124,13 +131,13 @@ export class UINode extends AnchoredTransformNode {
 	 * @param { * } node
 	 * @param { boolean } blocked
 	 */
-	#setAllTouchBlocked(node, blocked) {
+	setAllTouchBlocked(node, blocked) {
 		const children = node.getChildren();
 		for (const child of children) {
 			if (child instanceof UINode) {
 				child.setTouchBlocked(blocked);
 			}
-			this.#setAllTouchBlocked(child, blocked);
+			this.setAllTouchBlocked(child, blocked);
 		}
 	}
 
@@ -145,7 +152,7 @@ export class UINode extends AnchoredTransformNode {
 	 * @param { Vector2 } viewInputPosition
 	 * @returns { boolean }
 	 */
-	#findAndUnblockFirst(node, viewInputPosition) {
+	findAndUnblockFirst(node, viewInputPosition) {
 		const children = node.getChildren();
 		for (let i = children.length - 1; i >= 0; i--) {
 			const child = children[i];
@@ -157,7 +164,7 @@ export class UINode extends AnchoredTransformNode {
 			}
 
 			// 자식의 하위 계층을 먼저 탐색 (깊이 우선).
-			const isConsumedByDescendant = this.#findAndUnblockFirst(child, viewInputPosition);
+			const isConsumedByDescendant = this.findAndUnblockFirst(child, viewInputPosition);
 			if (isConsumedByDescendant) {
 				return true;
 			}
@@ -167,7 +174,7 @@ export class UINode extends AnchoredTransformNode {
 			if (isInsideBounds) {
 				child.setTouchBlocked(false);
 				// 이 자식의 하위 계층도 모두 차단 해제.
-				this.#setAllTouchBlocked(child, false);
+				this.setAllTouchBlocked(child, false);
 				return true;
 			}
 		}
