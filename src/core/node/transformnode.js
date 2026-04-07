@@ -14,7 +14,7 @@ import { ComponentNode } from "./componentnode.js";
 //==============================================================================
 // 계층적 영역 객체.
 // - Transform, Pivot, ConetentSize 기능.
-// - 렌더링 기능.
+// - 렌더링 기능. (컴포넌트 포함)
 //==============================================================================
 export class TransformNode extends ComponentNode {
 	//==============================================================================
@@ -70,8 +70,8 @@ export class TransformNode extends ComponentNode {
 
 			const localRotation = this.getLocalRotation();
 			const radian = Math.degreeToRadian(localRotation);
-			const scale = this.getLocalScale();
-			const opacity = this.getOpacity();
+			const localScale = this.getLocalScale();
+			const localOpacity = this.getLocalOpacity();
 
 			const pivot = this.getPivot();
 			const contentSize = this.getContentSize();
@@ -79,13 +79,13 @@ export class TransformNode extends ComponentNode {
 			// 트랜스폼 조정.
 			canvasRenderingContext.translate(localPosition.x, localPosition.y);
 			canvasRenderingContext.rotate(radian);
-			canvasRenderingContext.scale(scale.x, scale.y);
+			canvasRenderingContext.scale(localScale.x, localScale.y);
 
 			// 피봇 반영.
 			canvasRenderingContext.translate(-(contentSize.x * pivot.x), -(contentSize.y * pivot.y));
 
 			// 컬러 반영.
-			canvasRenderingContext.globalAlpha *= opacity;
+			canvasRenderingContext.globalAlpha *= localOpacity;
 		}
 	}
 
@@ -431,6 +431,24 @@ export class TransformNode extends ComponentNode {
 	}
 
 	//==============================================================================
+	// 가시 상태 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 
+	 */
+	isVisible() {
+		const isActive = this.isActive();
+		if (isActive) {
+			const opacity = this.getLocalOpacity();
+			if (opacity > 0) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	//==============================================================================
 	// 현재부터 루트까지 계층 전체의 가시 상태 반환. (루트까지 하나라도 비활성화상태면 false 반환)
 	//==============================================================================
 	/**
@@ -448,27 +466,10 @@ export class TransformNode extends ComponentNode {
 				}
 			}
 			return true;
-		} else {
+		}
+		else {
 			return false;
 		}
-	}
-
-	//==============================================================================
-	// 가시 상태 반환.
-	//==============================================================================
-	/**
-	 * @returns { boolean } 
-	 */
-	isVisible() {
-		const isActive = this.isActive();
-		if (isActive) {
-			const opacity = this.getOpacity();
-			if (opacity > 0) {
-				return true;
-			}
-		}
-
-		return false;
 	}
 
 	//==============================================================================
@@ -487,8 +488,30 @@ export class TransformNode extends ComponentNode {
 	/**
 	 * @returns { number } 
 	 */
-	getOpacity() {
+	getLocalOpacity() {
 		return this.#opacity;
+	}
+
+	//==============================================================================
+	// 전체 투명도 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 
+	 */
+	getOpacity() {
+		let globalOpacity = this.getLocalOpacity();
+		let current = this;
+		while (current !== null && current !== undefined) {
+			current = current.getParent();
+			if (current === null || current === undefined) {
+				continue;
+			}
+
+			opcacity *= current.getLocalOpacity();
+		}
+
+		globalOpacity = Math.clamp(globalOpacity, 0, 1);
+		return globalOpacity;
 	}
 
 	//==============================================================================
