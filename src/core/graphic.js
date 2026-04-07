@@ -296,7 +296,11 @@ export class Graphic extends Object {
 		try {
 			node.pushTransform(this);
 			node.draw(this);
-			node.drawGizmos(this);
+
+			const isGizmoVisible = node.isGizmoVisible();
+			if (isGizmoVisible) {
+				node.drawGizmos(this);
+			}
 			node.popTransform(this);
 		}
 		catch (error) {

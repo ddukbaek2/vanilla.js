@@ -589,7 +589,11 @@ export class Engine extends Object {
 				loadedScene.preDraw(graphic);
 				loadedScene.draw(graphic);
 				loadedScene.postDraw(graphic);
-				loadedScene.drawGizmos(graphic);
+
+				const isGizmoVisible = loadedScene.isGizmoVisible();
+				if (isGizmoVisible) {
+					loadedScene.drawGizmos(graphic);
+				}
 			}
 			catch (error) {
 				console.error(error);

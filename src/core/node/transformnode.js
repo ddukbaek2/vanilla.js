@@ -136,7 +136,10 @@ export class TransformNode extends ComponentNode {
 			// 컴포넌트 기즈모 출력.
 			const components = this.getAllComponents();
 			for (const component of components) {
-				component.drawGizmos(graphic);
+				const isGizmoVisible = component.isGizmoVisible();
+				if (isGizmoVisible) {
+					component.drawGizmos(graphic);
+				}
 			}
 
 			// 좌표.
