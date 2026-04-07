@@ -34,20 +34,17 @@ export class ScrollViewComponent extends ViewComponent {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { AnchoredTransformNode | null } */ #contentNode;
-	/** @private @type { Vector2 } */ #scrollOffset;
-	/** @private @type { Vector2 } */ #scrollContentSize;
-	/** @private @type { boolean } */ #isDragging;
-	/** @private @type { Vector2 } */ #dragStartViewPosition;
-	/** @private @type { Vector2 } */ #dragStartOffset;
-	/** @private @type { string } */ #scrollMode;
-	/** @private @type { Vector2 } */ #scrollVelocity;
-	/** @private @type { Vector2 } */ #prevViewInputPosition;
-	/** @private @type { Color | null } */ #backgroundColor;
-	/** @private @type { boolean } */ #horizontalEnabled;
-	/** @private @type { boolean } */ #verticalEnabled;
-	/** @private @type { Color | null } */ #contentBackgroundColor;
-	/** @private @type { ColorComponent | null } */ #contentColorComponent;
+	/** @private @type { AnchoredTransformNode | null } */ #content; // 컨텐트 노드.
+	/** @private @type { Vector2 } */	#scrollContentSize; // 스크롤 가능한 내부 컨텐트 영역.
+	/** @private @type { string } */	#scrollMode; // 스크롤 모드.
+	/** @private @type { Vector2 } */	#scrollVelocity; // 스크롤 속도.
+	/** @private @type { Vector2 } */	#previousViewInputPosition;
+	/** @private @type { boolean } */	#horizontalEnabled; // 수평 이동 여부.
+	/** @private @type { boolean } */	#verticalEnabled; // 수직 이동 여부.
+	/** @private @type { Vector2 } */	#scrollOffset; // 스크롤 오프셋.
+	/** @private @type { boolean } */	#isDragging; // 드래그 중인지 여부.
+	/** @private @type { Vector2 } */	#dragStartViewPosition;
+	/** @private @type { Vector2 } */	#dragStartOffset;
 
 	//==============================================================================
 	// 생성.
@@ -57,7 +54,7 @@ export class ScrollViewComponent extends ViewComponent {
 	 */
 	constructor() {
 		super();
-		this.#contentNode = null;
+		this.#content = null;
 		this.#scrollOffset = Vector2.zero();
 		this.#scrollContentSize = Vector2.zero();
 		this.#isDragging = false;
@@ -65,38 +62,43 @@ export class ScrollViewComponent extends ViewComponent {
 		this.#dragStartOffset = Vector2.zero();
 		this.#scrollMode = ScrollMode.clamp;
 		this.#scrollVelocity = Vector2.zero();
-		this.#prevViewInputPosition = Vector2.zero();
-		this.#backgroundColor = null;
+		this.#previousViewInputPosition = Vector2.zero();
 		this.#horizontalEnabled = true;
 		this.#verticalEnabled = true;
-		this.#contentBackgroundColor = null;
-		this.#contentColorComponent = null;
 	}
 
 	//==============================================================================
-	// 소유권자 설정. (오버라이드: 내부 콘텐츠 노드 생성 및 마스크 활성화)
+	// 노드에 붙음.
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { * } node
+	 * @param { TransformNode } node
 	 */
-	setNode(node) {
-		super.setNode(node);
-		if (node) {
-			this.#contentNode = new AnchoredTransformNode();
-			this.#contentNode.setAnchorMin(Vector2.zero());
-			this.#contentNode.setAnchorMax(Vector2.zero());
-			this.#contentNode.setPivot(Pivot.topLeft);
-			this.#contentNode.setAnchoredPosition(Vector2.zero());
-			const scrollViewContentColorComponent = this.#contentNode.addComponent(ColorComponent);
-			const initialContentColor = this.#contentBackgroundColor !== null ? this.#contentBackgroundColor : new Color(0, 0, 0, 0);
-			scrollViewContentColorComponent.setColor(initialContentColor);
-			this.#contentColorComponent = scrollViewContentColorComponent;
-			node.addChild(this.#contentNode);
-			if (node instanceof UINode) {
-				node.setMaskEnabled(true);
-			}
+	attach(node) {
+		super.attach(node);
+
+		// 컨텐츠 노드 추가.
+		this.#content = new AnchoredTransformNode();
+		this.#content.setAnchorMin(Vector2.zero());
+		this.#content.setAnchorMax(Vector2.zero());
+		this.#content.setPivot(Pivot.topLeft);
+		this.#content.setAnchoredPosition(Vector2.zero());
+		node.addChild(this.#content);
+
+		if (node instanceof UINode) {
+			node.setMaskEnabled(true);
 		}
+	}
+
+	//==============================================================================
+	// 노드에서 떨어짐.
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { TransformNode } node
+	 */
+	detach(node) {
+		super.detach(node);
 	}
 
 	//==============================================================================
@@ -120,18 +122,21 @@ export class ScrollViewComponent extends ViewComponent {
 		const inputManager = engine.getInputManager();
 		const viewInputPosition = inputManager.getViewInputPosition();
 
+		// 누름.
 		if (inputManager.isTouchPressed()) {
-			if (!this.isTouchBlocked()) {
+			const isTouchBlocked = this.isTouchBlocked();
+			if (!isTouchBlocked) {
 				const isInsideBounds = node.contains(viewInputPosition);
 				if (isInsideBounds) {
 					this.#isDragging = true;
 					this.#dragStartViewPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
 					this.#dragStartOffset = Vector2.create(this.#scrollOffset.x, this.#scrollOffset.y);
 					this.#scrollVelocity = Vector2.zero();
-					this.#prevViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
+					this.#previousViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
 				}
 			}
 		}
+		// 이동.
 		else if (inputManager.isTouchMoved()) {
 			if (this.#isDragging) {
 				const rawDeltaX = viewInputPosition.x - this.#dragStartViewPosition.x;
@@ -164,23 +169,26 @@ export class ScrollViewComponent extends ViewComponent {
 						elasticOffsetY = elasticMinY + (elasticOffsetY - elasticMinY) * elasticResistance;
 					}
 					this.#scrollOffset = Vector2.create(elasticOffsetX, elasticOffsetY);
-					if (this.#contentNode) {
-						this.#contentNode.setAnchoredPosition(this.#scrollOffset);
+
+					const content = this.getContent();
+					if (content) {
+						content.setAnchoredPosition(this.#scrollOffset);
 					}
 					if (timeDelta > 0) {
-						const rawVelocityX = (viewInputPosition.x - this.#prevViewInputPosition.x) / timeDelta;
-						const rawVelocityY = (viewInputPosition.y - this.#prevViewInputPosition.y) / timeDelta;
+						const rawVelocityX = (viewInputPosition.x - this.#previousViewInputPosition.x) / timeDelta;
+						const rawVelocityY = (viewInputPosition.y - this.#previousViewInputPosition.y) / timeDelta;
 						const velocityX = this.#horizontalEnabled ? rawVelocityX : 0;
 						const velocityY = this.#verticalEnabled ? rawVelocityY : 0;
 						this.#scrollVelocity = Vector2.create(velocityX, velocityY);
 					}
 				}
 				else {
-					this.#applyScrollOffset(proposedOffset);
+					this.applyScrollOffset(proposedOffset);
 				}
-				this.#prevViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
+				this.#previousViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
 			}
 		}
+		// 뗌.
 		else if (inputManager.isTouchReleased()) {
 			this.#isDragging = false;
 		}
@@ -249,40 +257,22 @@ export class ScrollViewComponent extends ViewComponent {
 				physicsVelocityY = 0;
 			}
 			this.#scrollOffset = Vector2.create(physicsOffsetX, physicsOffsetY);
-			if (this.#contentNode) {
-				this.#contentNode.setAnchoredPosition(this.#scrollOffset);
+
+			const content = this.getContent();
+			if (content) {
+				content.setAnchoredPosition(this.#scrollOffset);
 			}
 			this.#scrollVelocity = Vector2.create(physicsVelocityX, physicsVelocityY);
 		}
 	}
 
 	//==============================================================================
-	// 출력. (배경색이 설정된 경우 스크롤뷰 영역에 배경을 그린다)
-	//==============================================================================
-	/**
-	 * @override
-	 * @param { * } graphic
-	 */
-	draw(graphic) {
-		if (this.#backgroundColor === null) {
-			return;
-		}
-		const node = this.getNode();
-		if (!node) {
-			return;
-		}
-
-		const contentSize = node.getContentSize();
-		const backgroundRect = Rect.create(0, 0, contentSize.x, contentSize.y);
-		graphic.setFillColor(this.#backgroundColor);
-		graphic.drawRect(backgroundRect);
-	}
-
-	//==============================================================================
 	// 스크롤 오프셋 적용. (클램핑 포함)
 	//==============================================================================
-	/** @private */
-	#applyScrollOffset(offset) {
+	/**
+	 * @param { Vector2 } offset
+	 */
+	applyScrollOffset(offset) {
 		const node = this.getNode();
 		const contentSize = node.getContentSize();
 		const scrollContentSize = this.#scrollContentSize;
@@ -297,8 +287,9 @@ export class ScrollViewComponent extends ViewComponent {
 			Math.clamp(offset.y, minY, maxY)
 		);
 
-		if (this.#contentNode) {
-			this.#contentNode.setAnchoredPosition(this.#scrollOffset);
+		const content = this.getContent();
+		if (content) {
+			content.setAnchoredPosition(this.#scrollOffset);
 		}
 	}
 
@@ -309,7 +300,7 @@ export class ScrollViewComponent extends ViewComponent {
 	 * @param { Vector2 } offset
 	 */
 	setScrollOffset(offset) {
-		this.#applyScrollOffset(offset);
+		this.applyScrollOffset(offset);
 	}
 
 	//==============================================================================
@@ -320,26 +311,6 @@ export class ScrollViewComponent extends ViewComponent {
 	 */
 	getScrollOffset() {
 		return this.#scrollOffset;
-	}
-
-	//==============================================================================
-	// 배경색 설정.
-	//==============================================================================
-	/**
-	 * @param { Color | null } color
-	 */
-	setBackgroundColor(color) {
-		this.#backgroundColor = color;
-	}
-
-	//==============================================================================
-	// 배경색 반환.
-	//==============================================================================
-	/**
-	 * @returns { Color | null }
-	 */
-	getBackgroundColor() {
-		return this.#backgroundColor;
 	}
 
 	//==============================================================================
@@ -383,30 +354,6 @@ export class ScrollViewComponent extends ViewComponent {
 	}
 
 	//==============================================================================
-	// 콘텐츠 배경색 설정. (스크롤과 함께 움직이는 스크롤 가능 영역의 배경)
-	//==============================================================================
-	/**
-	 * @param { Color | null } color
-	 */
-	setContentBackgroundColor(color) {
-		this.#contentBackgroundColor = color;
-		if (this.#contentColorComponent !== null) {
-			const appliedColor = color !== null ? color : new Color(0, 0, 0, 0);
-			this.#contentColorComponent.setColor(appliedColor);
-		}
-	}
-
-	//==============================================================================
-	// 콘텐츠 배경색 반환.
-	//==============================================================================
-	/**
-	 * @returns { Color | null }
-	 */
-	getContentBackgroundColor() {
-		return this.#contentBackgroundColor;
-	}
-
-	//==============================================================================
 	// 스크롤 모드 설정.
 	//==============================================================================
 	/**
@@ -433,9 +380,12 @@ export class ScrollViewComponent extends ViewComponent {
 	 * @param { Vector2 } scrollContentSize
 	 */
 	setScrollContentSize(scrollContentSize) {
+		scrollContentSize = scrollContentSize.clone();
 		this.#scrollContentSize = scrollContentSize;
-		if (this.#contentNode) {
-			this.#contentNode.setSizeDelta(scrollContentSize);
+
+		const content = this.getContent();
+		if (content) {
+			content.setSizeDelta(scrollContentSize);
 		}
 	}
 
@@ -453,10 +403,10 @@ export class ScrollViewComponent extends ViewComponent {
 	// 콘텐츠 노드 반환. (자식 노드를 이 노드에 추가하면 스크롤 대상이 됨)
 	//==============================================================================
 	/**
-	 * @returns { AnchoredTransformNode | null }
+	 * @returns { AnchoredTransformNode }
 	 */
-	getContentNode() {
-		return this.#contentNode;
+	getContent() {
+		return this.#content;
 	}
 
 	//==============================================================================

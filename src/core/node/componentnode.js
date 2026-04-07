@@ -71,6 +71,10 @@ export class ComponentNode extends Node {
 
 		const components = this.getAllComponents();
 		components.push(component);
+
+		// 붙음.
+		component.attach(this);
+
 		return component;
 	}
 
@@ -89,6 +93,9 @@ export class ComponentNode extends Node {
 
 		component.setNode(null);
 		components.splice(index, 1);
+
+		// 떼어짐.
+		component.detach(this);
 	}
 
 	//==============================================================================

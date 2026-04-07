@@ -74,7 +74,7 @@ export class SnapScrollViewComponent extends ScrollViewComponent {
 		if (!node) {
 			return;
 		}
-		const contentNode = this.getContentNode();
+		const contentNode = this.getContent();
 		if (!contentNode) {
 			return;
 		}
@@ -130,7 +130,7 @@ export class SnapScrollViewComponent extends ScrollViewComponent {
 		if (!node) {
 			return;
 		}
-		const contentNode = this.getContentNode();
+		const contentNode = this.getContent();
 		if (!contentNode) {
 			return;
 		}

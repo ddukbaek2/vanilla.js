@@ -77,7 +77,7 @@ export class FontAsset extends Asset
 	 */
 	unload() {
 		super.unload();
-		if (this.fontFace == null || this.fontFace === undefined)
+		if (this.fontFace === null || this.fontFace === undefined)
 			return;
 
 		document.fonts.delete(this.fontFace);

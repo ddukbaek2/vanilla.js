@@ -26,6 +26,9 @@ export class Frame extends Object {
 	constructor(image, rect = null) {
 		super();
 		this.#image = image;
+		if (image === null || image === undefined) {
+			throw new System.Error("image is null.");
+		}
 		if (rect === null || rect === undefined) {
 			this.#rect = Rect.create(0, 0, image.width, image.height);
 		}
