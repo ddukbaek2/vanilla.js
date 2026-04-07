@@ -296,7 +296,7 @@ export class Graphic extends Object {
 		try {
 			node.pushTransform(this);
 			node.draw(this);
-			node.drawGizmo(this);
+			node.drawGizmos(this);
 			node.popTransform(this);
 		}
 		catch (error) {

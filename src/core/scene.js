@@ -178,8 +178,6 @@ export class Scene extends Object {
 	 * @param { Graphic } graphic 
 	 */
 	preDraw(graphic) {
-		// // 노드 출력.
-		// graphic.drawNode(this.#root);
 	}
 
 	//==============================================================================
@@ -202,7 +200,6 @@ export class Scene extends Object {
 	 * @param { Graphic } graphic 
 	 */
 	postDraw(graphic) {
-
 	}
 
 	//==============================================================================
@@ -212,7 +209,7 @@ export class Scene extends Object {
 	 * @virtual
 	 * @param { Graphic } graphic 
 	 */
-	drawGizmo(graphic) {
+	drawGizmos(graphic) {
 		const isGizmoVisible = this.isGizmoVisible();
 		if (!isGizmoVisible) {
 			return;

@@ -59,7 +59,7 @@ export class Component extends Object {
 	 * @virtual
 	 * @param { Graphic } graphic
 	 */
-	drawGizmo(graphic) {
+	drawGizmos(graphic) {
 		const isGizmoVisible = this.isGizmoVisible();
 		if (!isGizmoVisible) {
 			return;

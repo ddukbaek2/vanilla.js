@@ -120,7 +120,7 @@ export class TransformNode extends ComponentNode {
 	 * @virtual
 	 * @param { Graphic } graphic 
 	 */
-	drawGizmo(graphic) {
+	drawGizmos(graphic) {
 		const isGizmoVisible = this.isGizmoVisible();
 		if (!isGizmoVisible) {
 			return;
@@ -136,7 +136,7 @@ export class TransformNode extends ComponentNode {
 			// 컴포넌트 기즈모 출력.
 			const components = this.getAllComponents();
 			for (const component of components) {
-				component.drawGizmo(graphic);
+				component.drawGizmos(graphic);
 			}
 
 			// 좌표.
@@ -185,55 +185,6 @@ export class TransformNode extends ComponentNode {
 			canvasRenderingContext.restore();
 		}
 	}
-
-	// //==============================================================================
-	// // 기즈모 출력.
-	// //==============================================================================
-	// /**
-	//  * @virtual
-	//  * @param { Graphic } graphic 
-	//  */
-	// drawGizmo(graphic) {
-	// 	if (!this.isVisibleGizmos()) {
-	// 		return;
-	// 	}
-		
-	// 	const engine = graphic.getEngine();
-	// 	const canvasRenderingContext = graphic.getCanvasRenderingContext();
-
-	// 	const degree = this.getRotation();
-	// 	const radian = Math.degreeToRadian(degree);
-
-	// 	// 이미지 회전이 반영된 기준점 출력.
-	// 	canvasRenderingContext.fillStyle = "#00ff00";
-	// 	const worldCorners = this.getWorldCorners();
-	// 	const pivots = [Pivot.topLeft, Pivot.topRight, Pivot.bottomRight, Pivot.bottomLeft];
-	// 	for (let i = 0; i < worldCorners.length; ++i) {
-	// 		const worldCorner = worldCorners[i];
-	// 		canvasRenderingContext.save();
-	// 		engine.gameViewIdentity(null);
-	// 		canvasRenderingContext.translate(worldCorner.x, worldCorner.y);
-	// 		canvasRenderingContext.rotate(radian);
-	// 		const contentSize = Vector2.create(4, 4);//.divide(this.getScale());
-	// 		const pivotPosition = Vector2.zero().subtract(contentSize.multiply(pivots[i]));
-	// 		canvasRenderingContext.fillRect(pivotPosition.x, pivotPosition.y, contentSize.x, contentSize.y);
-	// 		canvasRenderingContext.restore();
-	// 	}
-
-	// 	// 월드 코너 출력.
-	// 	canvasRenderingContext.save();
-	// 	engine.gameViewIdentity(null);
-	// 	canvasRenderingContext.strokeStyle = "#00ff00";
-	// 	canvasRenderingContext.lineWidth = 2;
-	// 	canvasRenderingContext.beginPath();
-	// 	canvasRenderingContext.moveTo(worldCorners[0].x, worldCorners[0].y);
-	// 	for (let i = 1; i < worldCorners.length; ++i) {
-	// 		canvasRenderingContext.lineTo(worldCorners[i].x, worldCorners[i].y);
-	// 	}
-	// 	canvasRenderingContext.closePath();
-	// 	canvasRenderingContext.stroke();
-	// 	canvasRenderingContext.restore();
-	// }
 
 	//==============================================================================
 	// 글로벌 위치 설정.
