@@ -5,14 +5,14 @@ const System = globalThis;
 import { Vector2 } from "../../base/vector2.js";
 import * as Math from "../../base/math.js";
 import { Graphic } from "../graphic.js";
-import { TransformNode } from "./transformnode.js";
+import { WorldNode } from "./worldnode.js";
 
 
 //==============================================================================
 // UI 기반 뷰.
 // - 앵커, 앵커 포지션, 사이즈 델타 기능. (부모 기준으로 배치되고 늘려붙이는 것을 기준으로 한 확장 좌표계)
 //==============================================================================
-export class AnchoredTransformNode extends TransformNode {
+export class AnchoredWorldNode extends WorldNode {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -40,15 +40,15 @@ export class AnchoredTransformNode extends TransformNode {
 	 * @param { number } timeDelta
 	 */
 	tick(timeDelta) {
-		// 매 프레임마다 부모 크기 변화 등에 대응하여 레이아웃 최종 반영
-		this.updateRect();
+		// 매 프레임마다 부모 크기 변화 등에 대응하여 레이아웃 최종 반영.
+		this.calculateAnchoredRect();
 		super.tick(timeDelta);
 	}
 
 	//==============================================================================
 	// 앵커 기반 레이아웃 계산하여 최종 로컬 트랜스폼 및 크기 반영.
 	//==============================================================================
-	updateRect() {
+	calculateAnchoredRect() {
 		const parent = this.getParent();
 
 		// 부모가 없으면 앵커 오프셋과 델타가 곧 최종값이 됨
@@ -99,7 +99,7 @@ export class AnchoredTransformNode extends TransformNode {
 	 */
 	setAnchoredPosition(anchoredPosition) {
 		this.#anchoredPosition = anchoredPosition;
-		this.updateRect();
+		this.calculateAnchoredRect();
 	}
 
 	//==============================================================================
@@ -120,7 +120,7 @@ export class AnchoredTransformNode extends TransformNode {
 	 */
 	setSizeDelta(sizeDelta) {
 		this.#sizeDelta = sizeDelta;
-		this.updateRect();
+		this.calculateAnchoredRect();
 	}
 
 	//==============================================================================
@@ -141,7 +141,7 @@ export class AnchoredTransformNode extends TransformNode {
 	 */
 	setAnchorMin(anchorMin) {
 		this.#anchorMin = anchorMin;
-		this.updateRect();
+		this.calculateAnchoredRect();
 	}
 
 	//==============================================================================
@@ -162,7 +162,7 @@ export class AnchoredTransformNode extends TransformNode {
 	 */
 	setAnchorMax(anchorMax) {
 		this.#anchorMax = anchorMax;
-		this.updateRect();
+		this.calculateAnchoredRect();
 	}
 
 	//==============================================================================
@@ -237,15 +237,4 @@ export class AnchoredTransformNode extends TransformNode {
 			contentSize.y - parentSize.y * (anchorMax.y - anchorMin.y)
 		));
 	}
-
-	// //==============================================================================
-	// // 새로운 노드 생성.
-	// //==============================================================================
-	// /**
-	//  * @returns { AnchoredTransformNode }
-	//  */
-	// static create() {
-	// 	var obj = new AnchoredTransformNode();
-	// 	return obj;
-	// }
 }

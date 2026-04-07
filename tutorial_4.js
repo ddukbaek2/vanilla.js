@@ -16,7 +16,7 @@ import { ImageAsset } from "./src/resource/imageasset.js";
 import { AudioAsset } from "./src/resource/audioasset.js";
 import { FontAsset } from "./src/resource/fontasset.js";
 import { TransformNode } from "./src/core/node/transformnode.js";
-import { AnchoredTransformNode } from "./src/core/node/anchoredtransformnode.js";
+import { AnchoredWorldNode } from "./src/core/node/anchoredworldmnode.js";
 import { Scene } from "./src/core/scene.js";
 
 
@@ -28,9 +28,9 @@ class Tutorial_4 extends Scene {
 		await super.load(engine);
 
 		const root = this.getRoot();
-		root.setOpacity(1);
+		root.setLocalOpacity(1);
 
-		const node = new AnchoredTransformNode();
+		const node = new AnchoredWorldNode();
 		// 추가.
 		root.addChild(node);
 	}

@@ -2,14 +2,8 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { ViewComponent } from "./viewcomponent.js";
-import { UINode } from "../../core/node/uinode.js";
-import { AnchoredTransformNode } from "../../core/node/anchoredtransformnode.js";
 import { Vector2 } from "../../base/vector2.js";
-import { Pivot } from "../../base/pivot.js";
 import * as Math from "../../base/math.js";
-import { Color } from "../../base/color.js";
-import { Rect } from "../../base/rect.js";
-import { ColorComponent } from "../colorcomponent.js";
 
 
 //==============================================================================
@@ -27,7 +21,7 @@ export const ScrollMode = {
 // 스크롤뷰 컴포넌트.
 // - 소유 노드의 getContentSize()를 가시 영역으로 사용한다.
 // - 내부에 별도의 콘텐츠 노드를 생성하며, 드래그로 스크롤링할 수 있다.
-// - AnchoredTransformNode에 추가하면 마스크(크롭)가 자동 활성화된다.
+// - AnchoredWorldNode에 추가하면 마스크(크롭)가 자동 활성화된다.
 // - 중첩 ScrollView를 지원한다. (이벤트 체이닝과 연동)
 //==============================================================================
 export class ScrollViewComponent extends ViewComponent {
@@ -64,17 +58,6 @@ export class ScrollViewComponent extends ViewComponent {
 		this.#previousViewInputPosition = Vector2.zero();
 		this.#horizontalEnabled = true;
 		this.#verticalEnabled = true;
-	}
-
-	//==============================================================================
-	// 노드에서 떨어짐.
-	//==============================================================================
-	/**
-	 * @override
-	 * @param { TransformNode } node
-	 */
-	detach(node) {
-		super.detach(node);
 	}
 
 	//==============================================================================

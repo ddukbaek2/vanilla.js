@@ -3,9 +3,11 @@
 //==============================================================================
 const System = globalThis;
 import { Color } from "../../base/color.js";
+import { Pivot } from "../../base/pivot.js";
 import { Rect } from "../../base/rect.js";
+import { Vector2 } from "../../base/vector2.js";
 import { Graphic } from "../../core/graphic.js";
-import { AnchoredTransformNode } from "../../core/node/anchoredtransformnode.js";
+import { AnchoredWorldNode } from "../../core/node/anchoredworldmnode.js";
 import { UINode } from "../../core/node/uinode.js";
 import { UIComponent } from "./uicomponent.js";
 
@@ -20,7 +22,7 @@ export class ViewComponent extends UIComponent {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { AnchoredTransformNode | null } */ #content; // 컨텐트 노드.
+	/** @private @type { AnchoredWorldNode | null } */ #content; // 컨텐트 노드.
 	/** @private @type { Color } */ #backgroundColor;
 
 	//==============================================================================
@@ -47,7 +49,7 @@ export class ViewComponent extends UIComponent {
 		super.attach(node);
 
 		// 컨텐트 노드 추가.
-		this.#content = new AnchoredTransformNode();
+		this.#content = new AnchoredWorldNode();
 		this.#content.setAnchorMin(Vector2.zero());
 		this.#content.setAnchorMax(Vector2.zero());
 		this.#content.setPivot(Pivot.topLeft);
@@ -95,7 +97,7 @@ export class ViewComponent extends UIComponent {
 	// 콘텐츠 노드 반환. (자식 노드를 이 노드에 추가하면 스크롤 대상이 됨)
 	//==============================================================================
 	/**
-	 * @returns { AnchoredTransformNode }
+	 * @returns { AnchoredWorldNode }
 	 */
 	getContent() {
 		return this.#content;

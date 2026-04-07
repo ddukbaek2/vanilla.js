@@ -13,7 +13,7 @@ import { Object } from "../base/object.js";
 //     const action = new Action()
 //         .wait(1.0, {
 //             started:   (target) => { },
-//             updated:   (progress, target) => { target.setOpacity(progress); },
+//             updated:   (progress, target) => { target.setLocalOpacity(progress); },
 //             completed: (target) => { }
 //         })
 //         .condition(() => gameState.isReady())

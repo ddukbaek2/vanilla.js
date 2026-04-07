@@ -26,6 +26,7 @@ export { Platform, PlatformType, BrowserType } from "./src/base/platform.js";
 export { Singleton } from "./src/base/singleton.js";
 export { Identifier, Enum } from "./src/base/identifier.js";
 export { Version } from "./src/base/version.js";
+export { Node } from "./src/base/node.js";
 
 
 //==============================================================================
@@ -47,9 +48,11 @@ export { ViewScaleMode, ViewManager } from "./src/core/viewmanager.js";
 export { InputManager } from "./src/core/inputmanager.js";
 export { Graphic } from "./src/core/graphic.js";
 export { Scene } from "./src/core/scene.js";
-export { Node } from "./src/base/node.js";
+export { ComponentNode } from "./src/core/node/componentnode.js";
 export { TransformNode } from "./src/core/node/transformnode.js";
-export { AnchoredTransformNode } from "./src/core/node/anchoredtransformnode.js";
+export { WorldNode } from "./src/core/node/worldnode.js";
+export { AnchoredWorldNode } from "./src/core/node/anchoredworldmnode.js";
+export { UINode } from "./src/core/node/uinode.js";
 export { Tween } from "./src/core/tween.js";
 export { Component } from "./src/core/component.js";
 export { Frame } from "./src/core/frame.js";

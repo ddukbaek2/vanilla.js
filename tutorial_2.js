@@ -11,8 +11,7 @@ import { Scene } from "./src/core/scene.js";
 import { ViewScaleMode } from "./src/core/viewmanager.js";
 import { Pivot } from "./src/base/pivot.js";
 import { ColorComponent } from "./src/component/colorcomponent.js";
-import { AnchoredTransformNode } from "./src/core/node/anchoredtransformnode.js";
-import { TransformNode } from "./src/core/node/transformnode.js";
+import { WorldNode } from "./src/core/node/worldnode.js";
 
 
 
@@ -48,7 +47,7 @@ class Tutorial_2 extends Scene {
 		// color.setColor("#000000");
 
 		// 노드 설정.
-		const node = new TransformNode();
+		const node = new WorldNode();
 		node.setPivot(Pivot.topLeft);
 		node.setLocalPosition(Vec2.create(100, 100));
 		node.setContentSize(Vec2.create(200, 200));
@@ -57,7 +56,7 @@ class Tutorial_2 extends Scene {
 		color.setColor("#ff0000");
 
 		// 자식 노드 설정.
-		const child = new TransformNode();	
+		const child = new WorldNode();	
 		node.addChild(child);
 		child.setPivot(Pivot.topLeft);
 		child.setLocalPosition(Vec2.create(100, 100));
@@ -66,7 +65,7 @@ class Tutorial_2 extends Scene {
 		color.setColor("#0000ff");
 
 		// 자손 노드 설정.
-		this.#touchNode = new TransformNode();
+		this.#touchNode = new WorldNode();
 		child.addChild(this.#touchNode);
 		this.#touchNode.setPivot(Pivot.middleCenter);
 		this.#touchNode.setLocalPosition(Vec2.create(100, 100));

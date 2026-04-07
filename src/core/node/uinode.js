@@ -5,7 +5,7 @@ const System = globalThis;
 import { Rect } from "../../base/rect.js";
 import { Vector2 } from "../../base/vector2.js";
 import { Graphic } from "../graphic.js";
-import { AnchoredTransformNode } from "./anchoredtransformnode.js";
+import { AnchoredWorldNode } from "./anchoredworldmnode.js";
 
 
 //==============================================================================
@@ -14,7 +14,7 @@ import { AnchoredTransformNode } from "./anchoredtransformnode.js";
 // - 이벤트 체이닝 기능.
 // - 포커스 기능.
 //==============================================================================
-export class UINode extends AnchoredTransformNode {
+export class UINode extends AnchoredWorldNode {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -69,32 +69,24 @@ export class UINode extends AnchoredTransformNode {
 			component.draw(graphic);
 		}
 
+		// 마스크 처리.
 		const isMaskEnabled = this.isMaskEnabled();
 		if (isMaskEnabled) {
 			// 자신의 contentSize 기준으로 클리핑 후 자식 출력.
-			const canvasRenderingContext = graphic.getCanvasRenderingContext();
 			const contentSize = this.getContentSize();
-			canvasRenderingContext.save();
-			canvasRenderingContext.beginPath();
-			canvasRenderingContext.rect();
-			canvasRenderingContext.clip();
-
 			const clipRect = Rect.create(0, 0, contentSize.x, contentSize.y);
 			graphic.beginClipRect(clipRect);
-
-			const children = this.getChildren();
-			for (const child of children) {
-				graphic.drawNode(child);
-			}
-			
-			graphic.endClipRect();
 		}
-		else {
-			// 마스크 없이 자식 출력.
-			const children = this.getChildren();
-			for (const child of children) {
-				graphic.drawNode(child);
-			}
+
+		// 자식 출력.
+		const children = this.getChildren();
+		for (const child of children) {
+			graphic.drawNode(child);
+		}
+
+		// 마스크 처리.
+		if (isMaskEnabled) {
+			graphic.endClipRect();
 		}
 	}
 

@@ -5,7 +5,7 @@ const System = globalThis;
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
 import * as Math from "../base/math.js";
-import { TransformNode } from "../core/node/transformnode.js";
+import { WorldNode } from "../core/node/worldnode.js";
 
 
 //==============================================================================
@@ -41,7 +41,7 @@ export class TouchParticle extends Object {
 //==============================================================================
 // 터치 효과.
 //==============================================================================
-export class TouchEffect extends TransformNode {
+export class TouchEffect extends WorldNode {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================

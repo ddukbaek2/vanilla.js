@@ -6,7 +6,7 @@ import { Pivot } from "../base/pivot.js";
 import { Vector2 } from "../base/vector2.js";
 import { Engine } from "./engine.js";
 import { Graphic } from "./graphic.js";
-import { TransformNode } from "./node/transformnode.js";
+import { WorldNode } from "./node/worldnode.js";
 import { Tween } from "./tween.js";
 
 
@@ -25,7 +25,7 @@ export class Scene extends Object {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { Engine } */ #engine;
-	/** @private @type { TransformNode } */ #root;
+	/** @private @type { WorldNode } */ #root;
 	/** @private @type { VTweeneen[] } */ #tweens;
 	/** @private @type { boolean } */ #isGizmoVisible; // 기즈모 출력 여부.
 
@@ -34,7 +34,7 @@ export class Scene extends Object {
 	//==============================================================================
 	constructor() {
 		super();
-		// this.#root = new TransformNode();
+		// this.#root = new WorldNode();
 	}
 	
 	//==============================================================================
@@ -46,7 +46,7 @@ export class Scene extends Object {
 	create() {
 		this.#tweens = [];
 		this.#isGizmoVisible = false;
-		this.#root = new TransformNode();
+		this.#root = new WorldNode();
 	}
 
 	//==============================================================================
