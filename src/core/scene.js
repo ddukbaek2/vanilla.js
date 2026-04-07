@@ -178,6 +178,7 @@ export class Scene extends Object {
 	 * @param { Graphic } graphic 
 	 */
 	preDraw(graphic) {
+		// 코드.
 	}
 
 	//==============================================================================
@@ -200,6 +201,7 @@ export class Scene extends Object {
 	 * @param { Graphic } graphic 
 	 */
 	postDraw(graphic) {
+		// 코드.
 	}
 
 	//==============================================================================

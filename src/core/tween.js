@@ -48,6 +48,58 @@ export class Tween extends Object {
     }
 
 	//==============================================================================
+	// 갱신.
+	//==============================================================================
+	/**
+	 * @param { number } timeDelta 
+	 */
+	tick(timeDelta) {
+        if (!this.#isPlaying || this.#isFinished) {
+            return;
+        }
+
+        this.#elapsedTime += timeDelta;
+        if (this.#elapsedTime < this.#delay) {
+            return;
+        }
+
+        let progress = (this.#elapsedTime - this.#delay) / this.#duration;
+        progress = Math.clamp(progress, 0, 1);
+        
+        const easedProgress = this.#easingFunction(progress);
+
+        const newValues = {};
+        for (const key in this.#valuesEnd) {
+            const startValue = this.#valuesStart[key];
+            const endValue = this.#valuesEnd[key];
+
+            if (startValue === undefined) {
+                continue;
+            }
+
+            // 일반 숫자.
+            if (typeof startValue === "number" && typeof endValue === "number") {
+                newValues[key] = startValue + (endValue - startValue) * easedProgress;
+            }
+            // 2차원 벡터.
+            else if (startValue instanceof Vector2 && endValue instanceof Vector2) {
+                newValues[key] = Vector2.lerp(startValue, endValue, easedProgress);
+            }
+        }
+        
+        if (this.#tickCallback) {
+            this.#tickCallback(newValues);
+        }
+
+        if (progress >= 1) {
+            this.stop();
+            if (this.#completeCallback) {
+                this.#completeCallback();
+            }
+        }
+    }
+
+	//==============================================================================
 	// 목표값 설정.
 	//==============================================================================
 	/**
@@ -130,58 +182,6 @@ export class Tween extends Object {
     stop() {
         this.#isPlaying = false;
         this.#isFinished = true;
-    }
-
-	//==============================================================================
-	// 갱신.
-	//==============================================================================
-	/**
-	 * @param { number } timeDelta 
-	 */
-	tick(timeDelta) {
-        if (!this.#isPlaying || this.#isFinished) {
-            return;
-        }
-
-        this.#elapsedTime += timeDelta;
-        if (this.#elapsedTime < this.#delay) {
-            return;
-        }
-
-        let progress = (this.#elapsedTime - this.#delay) / this.#duration;
-        progress = Math.clamp(progress, 0, 1);
-        
-        const easedProgress = this.#easingFunction(progress);
-
-        const newValues = {};
-        for (const key in this.#valuesEnd) {
-            const startValue = this.#valuesStart[key];
-            const endValue = this.#valuesEnd[key];
-
-            if (startValue === undefined) {
-                continue;
-            }
-
-            // 일반 숫자.
-            if (typeof startValue === "number" && typeof endValue === "number") {
-                newValues[key] = startValue + (endValue - startValue) * easedProgress;
-            }
-            // 2차원 벡터.
-            else if (startValue instanceof Vector2 && endValue instanceof Vector2) {
-                newValues[key] = Vector2.lerp(startValue, endValue, easedProgress);
-            }
-        }
-        
-        if (this.#tickCallback) {
-            this.#tickCallback(newValues);
-        }
-
-        if (progress >= 1) {
-            this.stop();
-            if (this.#completeCallback) {
-                this.#completeCallback();
-            }
-        }
     }
     
 	//==============================================================================
