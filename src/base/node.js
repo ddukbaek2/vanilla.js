@@ -296,7 +296,7 @@ export class Node extends Object {
 	// 조건으로 직계 자식 찾기.
 	//==============================================================================
 	/**
-	 * @param { function(Node):boolean } predicate
+	 * @param { function(Node): boolean } predicate
 	 * @returns { Node | null }
 	 */
 	findChild(predicate) {
@@ -316,7 +316,7 @@ export class Node extends Object {
 	// 조건으로 직계 자식 찾기. (깊이 우선)
 	//==============================================================================
 	/**
-	 * @param { function(Node):boolean } predicate
+	 * @param { function(Node): boolean } predicate
 	 * @returns { Node | null }
 	 */
 	findChildRecursive(predicate) {

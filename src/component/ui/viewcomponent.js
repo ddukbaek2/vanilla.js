@@ -11,4 +11,5 @@ import { UIComponent } from "./uicomponent.js";
 //   예: node.getComponent(ViewComponent)
 //==============================================================================
 export class ViewComponent extends UIComponent {
+    
 }

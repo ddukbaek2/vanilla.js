@@ -34,7 +34,6 @@ export class ButtonComponent extends UIComponent {
 	/** @private @type { function(ButtonComponent): void } */ #pressedEvent;
 	/** @private @type { function(ButtonComponent): void } */ #releasedEvent;
 	/** @private @type { function(ButtonComponent): void } */ #clickedEvent;
-	/** @private @type { * } */ #engine;
 	/** @private @type { boolean } */ #isPressTracking;
 	/** @private @type { Color } */ #pressedTintColor;
 	/** @private @type { number } */ #transitionDuration;
@@ -56,7 +55,6 @@ export class ButtonComponent extends UIComponent {
 		this.#pressedEvent = null;
 		this.#releasedEvent = null;
 		this.#clickedEvent = null;
-		this.#engine = null;
 		this.#isPressTracking = false;
 		this.#pressedTintColor = new Color(0, 0, 0, 0.3);
 		this.#transitionDuration = 0.3;
@@ -100,14 +98,16 @@ export class ButtonComponent extends UIComponent {
 		if (this.isTouchBlocked()) {
 			return;
 		}
-		if (!this.#engine) {
+
+		const engine = this.getEngine();
+		if (!engine) {
 			return;
 		}
 		const node = this.getNode();
 		if (!node) {
 			return;
 		}
-		const inputManager = this.#engine.getInputManager();
+		const inputManager = engine.getInputManager();
 		const viewInputPosition = inputManager.getViewInputPosition();
 		const isInsideBounds = node.contains(viewInputPosition);
 
@@ -348,26 +348,6 @@ export class ButtonComponent extends UIComponent {
 	 */
 	getClickedEvent() {
 		return this.#clickedEvent;
-	}
-
-	//==============================================================================
-	// 엔진 설정.
-	//==============================================================================
-	/**
-	 * @param { * } engine
-	 */
-	setEngine(engine) {
-		this.#engine = engine;
-	}
-
-	//==============================================================================
-	// 엔진 반환.
-	//==============================================================================
-	/**
-	 * @returns { * }
-	 */
-	getEngine() {
-		return this.#engine;
 	}
 
 	//==============================================================================

@@ -37,7 +37,6 @@ export class ScrollViewComponent extends ViewComponent {
 	/** @private @type { AnchoredTransformNode | null } */ #contentNode;
 	/** @private @type { Vector2 } */ #scrollOffset;
 	/** @private @type { Vector2 } */ #scrollContentSize;
-	/** @private @type { * } */ #engine;
 	/** @private @type { boolean } */ #isDragging;
 	/** @private @type { Vector2 } */ #dragStartViewPosition;
 	/** @private @type { Vector2 } */ #dragStartOffset;
@@ -61,7 +60,6 @@ export class ScrollViewComponent extends ViewComponent {
 		this.#contentNode = null;
 		this.#scrollOffset = Vector2.zero();
 		this.#scrollContentSize = Vector2.zero();
-		this.#engine = null;
 		this.#isDragging = false;
 		this.#dragStartViewPosition = Vector2.zero();
 		this.#dragStartOffset = Vector2.zero();
@@ -109,15 +107,17 @@ export class ScrollViewComponent extends ViewComponent {
 	 * @param { number } timeDelta
 	 */
 	tick(timeDelta) {
-		if (!this.#engine) {
-			return;
-		}
 		const node = this.getNode();
 		if (!node) {
 			return;
 		}
 
-		const inputManager = this.#engine.getInputManager();
+		const engine = this.getEngine();
+		if (!engine) {
+			return;
+		}
+
+		const inputManager = engine.getInputManager();
 		const viewInputPosition = inputManager.getViewInputPosition();
 
 		if (inputManager.isTouchPressed()) {
@@ -457,26 +457,6 @@ export class ScrollViewComponent extends ViewComponent {
 	 */
 	getContentNode() {
 		return this.#contentNode;
-	}
-
-	//==============================================================================
-	// 엔진 설정.
-	//==============================================================================
-	/**
-	 * @param { * } engine
-	 */
-	setEngine(engine) {
-		this.#engine = engine;
-	}
-
-	//==============================================================================
-	// 엔진 반환.
-	//==============================================================================
-	/**
-	 * @returns { * }
-	 */
-	getEngine() {
-		return this.#engine;
 	}
 
 	//==============================================================================

@@ -28,9 +28,10 @@ export class SnapScrollViewComponent extends ScrollViewComponent {
 	//==============================================================================
 	constructor() {
 		super();
+
 		this.setScrollMode(ScrollMode.clamp);
 		this.setHorizontal(true);
-		this.setVertical(false);
+		this.setVertical(true);
 		this.#snapTween = null;
 		this.#snapCurrentIndex = 0;
 		this.#prevIsDragging = false;

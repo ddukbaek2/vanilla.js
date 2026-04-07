@@ -44,7 +44,7 @@ export class VirtualPad extends Object {
 	/** @private @type { number } */ #ballRadius;
 	/** @private @type { Color } */ #ballColor;
 	/** @private @type { number } */ #ballReturnSpeed;
-	/** @private @type { function(Vector2, number):void | null } */ #ballMoveEvent;
+	/** @private @type { function(Vector2, number): void | null } */ #ballMoveEvent;
 	
 	//==============================================================================
 	// 생성.

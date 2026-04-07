@@ -3,6 +3,8 @@
 //==============================================================================
 import { UINode } from "../core/node/uinode.js";
 import { Vector2 } from "../base/vector2.js";
+import { Engine } from "../core/engine.js";
+import { Object } from "../base/object.js";
 
 
 //==============================================================================
@@ -24,7 +26,7 @@ import { Vector2 } from "../base/vector2.js";
 //       )
 //       .build();
 //==============================================================================
-export class UIBuilder {
+export class UIBuilder extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -35,6 +37,8 @@ export class UIBuilder {
 	// 생성.
 	//==============================================================================
 	constructor() {
+		super();
+		
 		this.#node = new UINode();
 		this.#childBuilders = [];
 	}
@@ -250,7 +254,7 @@ export class UIBuilder {
 	// 엔진 설정.
 	//==============================================================================
 	/**
-	 * @param { * } engine
+	 * @param { Engine } engine
 	 * @returns { UIBuilder }
 	 */
 	engine(engine) {
