@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { Object } from "../base/object.js";
-import { Node } from "./node.js";
+import { Node } from "../base/node.js";
 import { Rect } from "../base/rect.js";
 import { Vector2 } from "../base/vector2.js";
 import { Engine } from "./engine.js";

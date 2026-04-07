@@ -11,8 +11,8 @@ import { Scene } from "./src/core/scene.js";
 import { ViewScaleMode } from "./src/core/viewmanager.js";
 import { Pivot } from "./src/base/pivot.js";
 import { ColorComponent } from "./src/component/colorcomponent.js";
-import { AnchoredTransformNode } from "./src/core/anchoredtransformnode.js";
-import { TransformNode } from "./src/core/transformnode.js";
+import { AnchoredTransformNode } from "./src/core/node/anchoredtransformnode.js";
+import { TransformNode } from "./src/core/node/transformnode.js";
 
 
 

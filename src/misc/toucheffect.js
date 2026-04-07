@@ -5,7 +5,7 @@ const System = globalThis;
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
 import * as Math from "../base/math.js";
-import { TransformNode } from "../core/transformnode.js";
+import { TransformNode } from "../core/node/transformnode.js";
 
 
 //==============================================================================
@@ -79,25 +79,14 @@ export class TouchEffect extends TransformNode {
 	 * @override
 	 * @param { Graphic } graphic 
 	 */
-	beginCanvasState(graphic) {
-		super.beginCanvasState(graphic);
+	pushTransform(graphic) {
+		super.pushTransform(graphic);
+		
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
-		this.#originalCompositeOperation = canvasRenderingContext.globalCompositeOperation;
-		canvasRenderingContext.globalCompositeOperation = "lighter";
-	}
-
-	//==============================================================================
-	// 출력 상태 종료.
-	//==============================================================================
-	/**
-	 * @override
-	 * @param { Graphic } graphic 
-	 */
-	endCanvasState(graphic) {
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
-		// canvasRenderingContext.globalCompositeOperation = "source-over";
-		canvasRenderingContext.globalCompositeOperation = this.#originalCompositeOperation;
-		super.endCanvasState(graphic);
+		if (canvasRenderingContext) {
+			this.#originalCompositeOperation = canvasRenderingContext.globalCompositeOperation;
+			canvasRenderingContext.globalCompositeOperation = "lighter";
+		}
 	}
 
 	//==============================================================================
@@ -110,6 +99,23 @@ export class TouchEffect extends TransformNode {
 	draw(graphic) {
 		super.draw(graphic);
 		this.drawTouchParticles(graphic);
+	}
+
+	//==============================================================================
+	// 출력 상태 종료.
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Graphic } graphic 
+	 */
+	popTransform(graphic) {
+		const canvasRenderingContext = graphic.getCanvasRenderingContext();
+		if (canvasRenderingContext) {
+			// canvasRenderingContext.globalCompositeOperation = "source-over";
+			canvasRenderingContext.globalCompositeOperation = this.#originalCompositeOperation;
+		}
+
+		super.popTransform(graphic);
 	}
 
 	//==============================================================================

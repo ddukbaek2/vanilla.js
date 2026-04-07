@@ -6,7 +6,7 @@ import { Pivot } from "../base/pivot.js";
 import { Vector2 } from "../base/vector2.js";
 import { Engine } from "./engine.js";
 import { Graphic } from "./graphic.js";
-import { TransformNode } from "./transformnode.js";
+import { TransformNode } from "./node/transformnode.js";
 import { Tween } from "./tween.js";
 
 

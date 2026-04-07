@@ -17,15 +17,23 @@ export * as Math from "./src/base/math.js";
 export * as Reflection from "./src/base/reflection.js";
 export { Object } from "./src/base/object.js";
 export { Color } from "./src/base/color.js";
+export { Colors } from "./src/base/colors.js";
 export { Vector2 } from "./src/base/vector2.js";
+export { Pivot } from "./src/base/pivot.js";
 export { Rect } from "./src/base/rect.js";
 export { OBB } from "./src/base/obb.js";
 export { Platform, PlatformType, BrowserType } from "./src/base/platform.js";
-export { Pivot } from "./src/base/pivot.js";
-export { Colors } from "./src/base/colors.js";
 export { Singleton } from "./src/base/singleton.js";
 export { Identifier, Enum } from "./src/base/identifier.js";
 export { Version } from "./src/base/version.js";
+
+
+//==============================================================================
+// 인터페이스 목록.
+//==============================================================================
+export { ITickable } from "./src/core/interface/itickable.js";
+export { IDrawable } from "./src/core/interface/idrawable.js";
+export { ITouchable } from "./src/core/interface/itouchable.js";
 
 
 //==============================================================================
@@ -39,9 +47,9 @@ export { ViewScaleMode, ViewManager } from "./src/core/viewmanager.js";
 export { InputManager } from "./src/core/inputmanager.js";
 export { Graphic } from "./src/core/graphic.js";
 export { Scene } from "./src/core/scene.js";
-export { Node } from "./src/core/node.js";
-export { TransformNode } from "./src/core/transformnode.js";
-export { AnchoredTransformNode } from "./src/core/anchoredtransformnode.js";
+export { Node } from "./src/base/node.js";
+export { TransformNode } from "./src/core/node/transformnode.js";
+export { AnchoredTransformNode } from "./src/core/node/anchoredtransformnode.js";
 export { Tween } from "./src/core/tween.js";
 export { Component } from "./src/core/component.js";
 export { Frame } from "./src/core/frame.js";
@@ -54,19 +62,29 @@ export { Animation } from "./src/core/animation.js";
 export { ColorComponent } from "./src/component/colorcomponent.js";
 export { SpriteComponent } from "./src/component/spritecomponent.js";
 export { LabelComponent } from "./src/component/labelcomponent.js";
+
+
+//==============================================================================
+// UI/컴포넌트 목록.
+//==============================================================================
+export { UIComponent } from "./src/component/ui/uicomponent.js";
 export { ButtonComponent } from "./src/component/ui/buttoncomponent.js";
+export { ToggleButtonComponent } from "./src/component/ui/togglebuttoncomponent.js";
+export { ViewComponent } from "./src/component/ui/viewcomponent.js";
+export { ScrollViewComponent } from "./src/component/ui/scrollviewcomponent.js";
+export { SnapScrollViewComponent } from "./src/component/ui/snapscrollviewcomponent.js";
 
 
 //==============================================================================
 // 리소스 목록.
 //==============================================================================
+export { AnimationClip } from "./src/resource/animationclip.js";
+export { AudioAsset } from "./src/resource/audioasset.js";
+export { BlobAsset } from "./src/resource/blobasset.js";
 export { FontAsset } from "./src/resource/fontasset.js";
 export { ImageAsset } from "./src/resource/imageasset.js";
-export { AudioAsset } from "./src/resource/audioasset.js";
-export { TextAsset } from "./src/resource/textasset.js";
 export { JsonAsset } from "./src/resource/jsonasset.js";
-export { BlobAsset } from "./src/resource/blobasset.js";
-export { AnimationClip } from "./src/resource/animationclip.js";
+export { TextAsset } from "./src/resource/textasset.js";
 
 
 //==============================================================================
@@ -74,6 +92,8 @@ export { AnimationClip } from "./src/resource/animationclip.js";
 //==============================================================================
 export { ImageScroller } from "./src/misc/imagescroller.js";
 export { TouchParticle, TouchEffect } from "./src/misc/toucheffect.js";
+export { VirtualPad } from "./src/misc/virtualpad.js";
+export { UIBuilder } from "./src/misc/uibuilder.js";
 
 
 //==============================================================================

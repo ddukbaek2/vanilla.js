@@ -1,32 +1,24 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { Object } from "../base/object.js";
-import { Vector2 } from "../base/vector2.js";
-import { Graphic } from "./graphic.js";
-import * as Math from "../base/math.js";
-import { Component } from "./component.js";
-import { Pivot } from "../base/pivot.js";
-import { Rect } from "../base/rect.js";
-import { OBB } from "../base/obb.js";
+const System = globalThis;
+import { Object } from "./object.js";
+import * as Math from "./math.js";
 
 
 //==============================================================================
 // 계층 객체.
-// - 부모와 자식을 가질 수 있다.
-// - 컴포넌트를 가질 수 있다.
-// - 활성화 여부를 지정할 수 있다.
-// - tick()을 처리 할 수 있다. (엔진에서 호출)
+// - 부모와 자식을 가질 수 있는 계층 구조 기능.
+// - 활성화 여부 지정 기능.
 //==============================================================================
 export class Node extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { Component[] } */ #components; // 컴포넌트 목록.
-	/** @private @type { Node | null } */ #parent; // 부모 노드.
-	/** @private @type { Node[] } */ #children; // 자식 노드 목록.
-	/** @private @type { boolean } */ #isActive; // 활성화 여부.
-	/** @private @type { string } */ #name; // 노드 이름.
+	/** @private @type { Node | null } */	#parent; // 부모 노드.
+	/** @private @type { Node[] } */		#children; // 자식 노드 목록.
+	/** @private @type { boolean } */		#isActive; // 활성화 여부.
+	/** @private @type { string } */		#name; // 노드 이름.
 
 	//==============================================================================
 	// 생성.
@@ -36,125 +28,10 @@ export class Node extends Object {
 	 */
 	constructor() {
 		super();
-		this.#components = [];
 		this.#parent = null;
 		this.#children = [];
 		this.#isActive = true;
 		this.#name = "";
-	}
-
-	//==============================================================================
-	// 갱신.
-	//==============================================================================
-	/**
-	 * @virtual
-	 * @param { number } timeDelta 
-	 */
-	tick(timeDelta) {
-		if (!this.isActive()) {
-			return;
-		}
-
-		// 컴포넌트.
-		const components = this.getAllComponents();
-		for (const component of this.getAllComponents()) {
-			component.tick(timeDelta);
-		}
-
-		// 자식.
-		const children = this.getChildren();
-		for (const child of children) {
-			child.tick(timeDelta);
-		}
-	}
-
-	//==============================================================================
-	// 타입으로 컴포넌트 추가.
-	//==============================================================================
-	/**
-	 * @param { Function } componentType  
-	 */
-	addComponent(componentType) {
-		if (componentType === null || componentType === undefined) {
-			return null;
-		}
-		const component = new componentType();
-		component.setNode(this);
-
-		const components = this.getAllComponents();
-		components.push(component);
-		return component;
-	}
-
-	//==============================================================================
-	// 객체로 컴포넌트 제거.
-	//==============================================================================
-	/**
-	 * @param { Component } component 
-	 */
-	removeComponent(component) {
-		const components = this.getAllComponents();
-		const index = components.indexOf(component);
-		if (index === -1) {
-			return;
-		}
-
-		component.setNode(null);
-		components.splice(index, 1);
-	}
-
-	//==============================================================================
-	// 컴포넌트 보유 여부..
-	//==============================================================================
-	/**
-	 * @returns { boolean }
-	 */
-	hasComponent(componentType) {
-		const component = this.getComponent(componentType);
-		return component !== null && component !== undefined;
-	}
-
-	//==============================================================================
-	// 모든 컴포넌트 목록 반환.
-	//==============================================================================
-	/**
-	 * @returns { Component[] }
-	 */
-	getAllComponents() {
-		return this.#components;
-	}
-
-	//==============================================================================
-	// 타입에 대한 컴포넌트 반환.
-	//==============================================================================
-	/**
-	 * @param { Function } componentType 
-	 * @returns { Component | null }
-	 */
-	getComponent(componentType) {
-		const component = this.#components.find(component => component instanceof componentType);
-		if (component === null || component === undefined) {
-			return null;
-		}		
-		return component;
-	}
-
-	//==============================================================================
-	// 타입에 대한 모든 컴포넌트 반환.
-	//==============================================================================
-	/**
-	 * @param { Function } componentType 
-	 * @returns { Component[] }
-	 */
-	getComponents(componentType) {
-		const result = [];
-		const components = this.getAllComponents();
-		for (const component of components) {
-			if (component instanceof componentType) {
-				result.push(component);
-			}
-		}
-		return result;
 	}
 
 	//==============================================================================
@@ -166,26 +43,22 @@ export class Node extends Object {
 	setParent(parent) {
 		// 기존 부모가 존재 할 경우.
 		if (this.#parent) {
-			// 동일 부모.
+			// 동일 부모 일 경우 무시.
 			if (this.#parent === parent) {
 				return;
 			}
 
-			// 자식 제거.
-			const index = this.#parent.#children.indexOf(this);
-			if (index !== -1) {
-				this.#parent.#children.splice(index, 1);
-			}
-
+			// 기존 부모의 자식 제거.
+			const childIndex = this.#parent.#children.indexOf(this);
+			this.#parent.#children.splice(childIndex, 1);
 			this.#parent = null;
 		}
 
-		this.#parent = parent;
-
 		// 새 부모가 존재 할 경우.
-		if (this.#parent) {
-			// 자식 추가.
-			parent.#children.push(this);
+		if (parent) {
+			// 새 부모의 자식 추가.
+			this.#parent = parent;
+			this.#parent.#children.push(this);
 		}
 	}
 
@@ -207,6 +80,21 @@ export class Node extends Object {
 	 */
 	removeChild(child) {
 		child.setParent(null);
+	}
+
+	//==============================================================================
+	// 자식 제거.
+	//==============================================================================
+	/**
+	 * @param { number } childIndex 
+	 */
+	removeChildAt(childIndex) {
+		if (childIndex !== -1) {
+			const child = this.getChild(childIndex);
+			if (child) {
+				this.removeChild(child);
+			}
+		}
 	}
 
 	//==============================================================================
@@ -242,6 +130,16 @@ export class Node extends Object {
 	}
 
 	//==============================================================================
+	// 부모 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 
+	 */
+	hasParent() {
+		return this.#parent !== null;
+	}
+
+	//==============================================================================
 	// 부모 반환.
 	//==============================================================================
 	/**
@@ -249,6 +147,22 @@ export class Node extends Object {
 	 */
 	getParent() {
 		return this.#parent;
+	}
+
+	//==============================================================================
+	// 형제 목록 반환.
+	//==============================================================================
+	/**
+	 * @returns { Node[] | null } 
+	 */
+	getSiblings() {
+		const parent = this.getParent();
+		if (!parent) {
+			return null;
+		}
+
+		const children = parent.getChildren();
+		return children;
 	}
 
 	//==============================================================================
@@ -267,29 +181,47 @@ export class Node extends Object {
 	/**
 	 * @returns { number } 
 	 */
-	getChildCount(index) {
-		return this.#children.length;
+	getChildCount() {
+		const children = this.getChildren();
+		return children.length;
 	}
 
 	//==============================================================================
 	// 자식 반환.
 	//==============================================================================
 	/**
-	 * @returns { Node } 
+	 * @returns { Node | null } 
 	 */
-	getChild(index) {
-		return this.#children[index];
+	getChild(childIndex) {
+		const children = this.getChildren();
+		if (childIndex < 0 || childIndex >= children.length) {
+			return null;
+		}
+
+		return children[childIndex];
+	}
+
+	//==============================================================================
+	// 자식의 위치 반환.
+	//==============================================================================
+	/**
+	 * @param { Node } child
+	 * @returns { number } 
+	 */
+	getChildIndex(child) {
+		const children = this.getChildren();
+		return children.indexOf(child);
 	}
 
 	//==============================================================================
 	// 자식 포함 여부 반환.
 	//==============================================================================
 	/**
-	 * @param { Node } node 
+	 * @param { Node } child 
 	 * @returns { boolean }
 	 */
-	hasChild(node) {
-		const childIndex = this.getChildIndex(node);
+	hasChild(child) {
+		const childIndex = this.getChildIndex(child);
 		if (childIndex !== -1) {
 			return true;
 		}
@@ -361,20 +293,58 @@ export class Node extends Object {
 	}
 
 	//==============================================================================
+	// 조건으로 직계 자식 찾기.
+	//==============================================================================
+	/**
+	 * @param { function(Node):boolean } predicate
+	 * @returns { Node | null }
+	 */
+	findChild(predicate) {
+		if (predicate) {
+			const children = this.getChildren();
+			for (const child of children) {
+				if (predicate(child)) {
+					return child;
+				}
+			}
+		}
+
+		return null;
+	}
+
+	//==============================================================================
+	// 조건으로 직계 자식 찾기. (깊이 우선)
+	//==============================================================================
+	/**
+	 * @param { function(Node):boolean } predicate
+	 * @returns { Node | null }
+	 */
+	findChildRecursive(predicate) {
+		const children = this.getChildren();
+		for (const child of children) {
+			if (predicate(child)) {
+				return child;
+			}
+			const found = child.findChildRecursive(predicate);
+			if (found !== null) {
+				return found;
+			}
+		}
+		return null;
+	}
+
+	
+	//==============================================================================
 	// 이름으로 직계 자식 찾기.
 	//==============================================================================
 	/**
 	 * @param { string } name
 	 * @returns { Node | null }
 	 */
-	findChild(name) {
-		const children = this.getChildren();
-		for (const child of children) {
-			if (child.getName() === name) {
-				return child;
-			}
-		}
-		return null;
+	findChildByName(name) {
+		return this.findChild((child) => {
+			return child.getName() === name;
+		});
 	}
 
 	//==============================================================================
@@ -384,18 +354,10 @@ export class Node extends Object {
 	 * @param { string } name
 	 * @returns { Node | null }
 	 */
-	findChildRecursive(name) {
-		const children = this.getChildren();
-		for (const child of children) {
-			if (child.getName() === name) {
-				return child;
-			}
-			const found = child.findChildRecursive(name);
-			if (found !== null) {
-				return found;
-			}
-		}
-		return null;
+	findChildRecursiveByName(name) {
+		return this.findChildRecursive((child) => {
+			return child.getName() === name;
+		});
 	}
 
 	//==============================================================================
@@ -405,10 +367,49 @@ export class Node extends Object {
 	 * @param { string } name
 	 */
 	removeChildByName(name) {
-		const child = this.findChild(name);
+		const child = this.findChildByName(name);
 		if (child !== null) {
 			this.removeChild(child);
 		}
+	}
+
+	//==============================================================================
+	// 형제간의 위치 설정.
+	//==============================================================================
+	/**
+	 * @param { number } childIndex
+	 */
+	setSiblingIndex(childIndex) {
+		if (!this.hasParent()) {
+			return;
+		}
+
+		const parent = this.getParent();
+		const children = parent.getChildren();
+		const oldChildIndex = children.indexOf(this);
+		const newChildIndex = Math.clamp(childIndex, 0, children.length - 1);
+		if (oldChildIndex === newChildIndex) {
+			return;
+		}		
+
+		children.splice(oldChildIndex, 1);
+        children.splice(newChildIndex, 0, this);
+	}
+
+	//==============================================================================
+	// 형제간의 위치 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getSiblingIndex() {
+		if (!this.hasParent()) {
+			return -1;
+		}
+
+		const parent = this.getParent();
+		const childIndex = parent.getChildIndex(this);
+		return childIndex;
 	}
 
 	// //==============================================================================

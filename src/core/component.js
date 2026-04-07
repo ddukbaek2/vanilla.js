@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { Object } from "../base/object.js";
-import { Node } from "./node.js";
+import { Node } from "../base/node.js";
 import { Graphic } from "../core/graphic.js";
 
 

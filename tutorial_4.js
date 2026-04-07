@@ -15,8 +15,8 @@ import { LabelComponent } from "./src/component/labelcomponent.js";
 import { ImageAsset } from "./src/resource/imageasset.js";
 import { AudioAsset } from "./src/resource/audioasset.js";
 import { FontAsset } from "./src/resource/fontasset.js";
-import { TransformNode } from "./src/core/transformnode.js";
-import { AnchoredTransformNode } from "./src/core/anchoredtransformnode";
+import { TransformNode } from "./src/core/node/transformnode.js";
+import { AnchoredTransformNode } from "./src/core/node/anchoredtransformnode.js";
 import { Scene } from "./src/core/scene.js";
 
 

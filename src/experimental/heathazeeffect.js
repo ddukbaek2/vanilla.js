@@ -4,7 +4,7 @@
 const System = globalThis;
 import { Vector2 } from "../base/vector2.js";
 import { Graphic } from "../core/graphic.js";
-import { TransformNode } from "../core/transformnode.js";
+import { TransformNode } from "../core/node/transformnode.js";
 
 
 //==============================================================================

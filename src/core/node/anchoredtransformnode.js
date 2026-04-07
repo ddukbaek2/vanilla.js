@@ -1,9 +1,10 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { Vector2 } from "../base/vector2.js";
-import * as Math from "../base/math.js";
-import { Graphic } from "./graphic.js";
+const System = globalThis;
+import { Vector2 } from "../../base/vector2.js";
+import * as Math from "../../base/math.js";
+import { Graphic } from "../graphic.js";
 import { TransformNode } from "./transformnode.js";
 
 

@@ -1,28 +1,28 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { Object } from "../base/object.js";
-import { Vector2 } from "../base/vector2.js";
-import { Graphic } from "./graphic.js";
-import * as Math from "../base/math.js";
-import { Component } from "./component.js";
-import { Pivot } from "../base/pivot.js";
-import { Rect } from "../base/rect.js";
-import { OBB } from "../base/obb.js";
-import { Node } from "./node.js"; 
+const System = globalThis;
+import { Vector2 } from "../../base/vector2.js";
+import { Graphic } from "../graphic.js";
+import * as Math from "../../base/math.js";
+import { Pivot } from "../../base/pivot.js";
+import { Rect } from "../../base/rect.js";
+import { OBB } from "../../base/obb.js";
+import { ComponentNode } from "./componentnode.js";
 
 
 //==============================================================================
-// 계층 및 영역 객체.
+// 계층적 영역 객체.
+// - Transform, Pivot, ConetentSize 기능.
+// - 렌더링 기능.
 //==============================================================================
-export class TransformNode extends Node {
+export class TransformNode extends ComponentNode {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { Vector2 } */ #localPosition; // 로컬 위치.
 	/** @private @type { Vector2 } */ #localScale; // 로컬 크기.
 	/** @private @type { number } */ #localRotation; // 로컬 회전값. (degree)
-	/** @private @type { boolean } */ #isActive; // 활성화 여부.
 	/** @private @type { number } */ #opacity; // 투명도.
 	/** @private @type { Vector2 } */ #pivot; // 기준점.
 	/** @private @type { Vector2 } */ #contentSize; // 크기.
@@ -39,22 +39,10 @@ export class TransformNode extends Node {
 		this.#localPosition = Vector2.zero();
 		this.#localScale = Vector2.one();
 		this.#localRotation = 0.0;
-		this.#isActive = true;
 		this.#isGizmoVisible = false;
 		this.#opacity = 1.0;
 		this.#pivot = Pivot.middleCenter;
 		this.#contentSize = Vector2.zero();
-	}
-
-	//==============================================================================
-	// 갱신.
-	//==============================================================================
-	/**
-	 * @override
-	 * @param { number } timeDelta 
-	 */
-	tick(timeDelta) {
-		super.tick(timeDelta);
 	}
 
 	//==============================================================================
@@ -64,7 +52,7 @@ export class TransformNode extends Node {
 	 * @virtual
 	 * @param { Graphic } graphic
 	 */
-	beginCanvasState(graphic) {
+	pushTransform(graphic) {
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		if (canvasRenderingContext) {
 			canvasRenderingContext.save();
@@ -191,7 +179,7 @@ export class TransformNode extends Node {
 	 * @virtual
 	 * @param { Graphic } graphic 
 	 */
-	endCanvasState(graphic) {
+	popTransform(graphic) {
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		if (canvasRenderingContext) {
 			canvasRenderingContext.restore();

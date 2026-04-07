@@ -4,13 +4,13 @@
 const System = globalThis;
 import { Object } from "../../base/object.js";
 import { Vector2 } from "../../base/vector2.js";
-import { Node } from "../../core/node.js";
+import { Component } from "../../core/component.js";
 
 
 //==============================================================================
 // 비주얼 객체.
 //==============================================================================
-export class Visual extends Node {
+export class Visual extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
