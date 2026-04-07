@@ -286,7 +286,7 @@ export class Graphic extends Object {
 	// 노드 출력.
 	//==============================================================================
 	/**
-	 * @param { Node } node
+	 * @param { TransformNode } node
 	 */
 	drawNode(node) {
 		if (node === null || node == undefined || !node.isActive()) {
@@ -294,10 +294,10 @@ export class Graphic extends Object {
 		}
 
 		try {
-			node.beginCanvasState(this);
+			node.pushTransform(this);
 			node.draw(this);
 			node.drawGizmo(this);
-			node.endCanvasState(this);
+			node.popTransform(this);
 		}
 		catch (error) {
 			throw error;

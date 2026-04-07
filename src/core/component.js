@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { Object } from "../base/object.js";
-import { Node } from "../base/node.js";
+import { ComponentNode } from "./node/componentnode.js";
 import { Graphic } from "../core/graphic.js";
 
 
@@ -13,9 +13,9 @@ export class Component extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { Node } */ #node; // 소유권자.
-	/** @private @type { boolean } */ #isEnable; // 활성화 여부.
-	/** @private @type { boolean } */ #isGizmoVisible; // 기즈모 출력 여부.
+	/** @private @type { ComponentNode } */	#node; // 소유권자.
+	/** @private @type { boolean } */		#isEnable; // 활성화 여부.
+	/** @private @type { boolean } */		#isGizmoVisible; // 기즈모 출력 여부.
 
 	//==============================================================================
 	// 생성.
@@ -72,7 +72,7 @@ export class Component extends Object {
 	// 소유권자 설정.
 	//==============================================================================
 	/**
-	 * @param { Node } node
+	 * @param { ComponentNode } node
 	 */
 	setNode(node) {
 		this.#node = node;
@@ -82,14 +82,14 @@ export class Component extends Object {
 	// 소유권자 반환.
 	//==============================================================================
 	/**
-	 * @returns { Node }
+	 * @returns { ComponentNode }
 	 */
 	getNode() {
 		return this.#node;
 	}
 
 	//==============================================================================
-	// 기즈모 그리기 설정.
+	// 기즈모 그리기 여부 설정.
 	//==============================================================================
 	/**
 	 * @param { boolean } isVisible
@@ -106,5 +106,25 @@ export class Component extends Object {
 	 */
 	isGizmoVisible() {
 		return this.#isGizmoVisible;
+	}
+
+	//==============================================================================
+	// 활성화 여부 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } isEnable
+	 */
+	setEnable(isEnable) {
+		this.#isEnable = isEnable;
+	}
+
+	//==============================================================================
+	// 활성화 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isEnable() {
+		return this.#isEnable;
 	}
 }

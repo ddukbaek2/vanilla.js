@@ -27,6 +27,8 @@ export class ComponentNode extends Node {
      */
     constructor() {
         super();
+
+		this.#components = [];
     }
 
 	//==============================================================================
