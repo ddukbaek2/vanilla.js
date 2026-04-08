@@ -35,14 +35,14 @@ class Tutorial_2 extends Scene {
 
 		// 뷰 해상도 설정.
 		const viewManager = engine.getViewManager();
-		viewManager.setViewScaleMode(ViewScaleMode.matchHeightToScreen); // 기준해상도 + 세로축 맞춤.
-		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
+		viewManager.setViewScaleMode(ViewScaleMode.stretchHeight); // 기준해상도 + 세로축 맞춤.
+		const viewSize = viewManager.getViewSize();
 
 		// 루트 설정.
 		const root = this.getRoot();
 		root.setPosition(Vec2.zero());
 		root.setPivot(Pivot.topLeft);
-		root.setContentSize(referenceResolutionSize);
+		root.setContentSize(viewSize);
 		// let color = root.addComponent(ColorComponent);
 		// color.setColor("#000000");
 
@@ -118,7 +118,7 @@ class Tutorial_2 extends Scene {
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const viewManager = engine.getViewManager();
 		const canvasNativeSize = viewManager.getCanvasNativeSize();
-		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
+		const viewSize = viewManager.getViewSize();
 
 		// 전체 화면 칠하기.
 		viewManager.applyCanvasNativeRect(canvasRenderingContext);
@@ -128,7 +128,7 @@ class Tutorial_2 extends Scene {
 		// 게임 영역 칠하기.
 		viewManager.applyViewRect(canvasRenderingContext);
 		canvasRenderingContext.fillStyle = Colors.lightVanilla;
-		graphic.drawRect(Rect.create(0, 0, referenceResolutionSize.x, referenceResolutionSize.y));
+		graphic.drawRect(Rect.create(0, 0, viewSize.x, viewSize.y));
 
 		// 출력.
 		super.draw(graphic);

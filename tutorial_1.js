@@ -88,11 +88,8 @@ class Tutorial_1 extends Scene {
 		super.initialize(engine);
 
 		const viewManager = engine.getViewManager();
-		viewManager.setViewScaleMode(ViewScaleMode.none); // 화면 전체 해상도.
-		// viewManager.setViewScaleMode(ViewScaleMode.referenceResolution); // 기준 해상도.
-		// viewManager.setViewScaleMode(ViewScaleMode.matchWidthToScreen); // 기준해상도 + 가로축 맞춤.
-		viewManager.setViewScaleMode(ViewScaleMode.matchHeightToScreen); // 기준해상도 + 세로축 맞춤.
-		// viewManager.setViewScaleMode(ViewScaleMode.matchInsideToScreen); // 기준해상도 + 둘중에 긴축에 맞춤.
+		// viewManager.setViewScaleMode(ViewScaleMode.none); // 화면 전체 해상도.
+		viewManager.setViewScaleMode(ViewScaleMode.stretchHeight); // 기준해상도 + 세로축 맞춤.
 	}
 
 	//==============================================================================
@@ -122,7 +119,7 @@ class Tutorial_1 extends Scene {
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const viewManager = engine.getViewManager();
 		const canvasNativeSize = viewManager.getCanvasNativeSize();
-		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
+		const viewSize = viewManager.getViewSize();
 
 		// 전체 화면 칠하기.
 		viewManager.applyCanvasNativeRect(canvasRenderingContext);
@@ -132,12 +129,12 @@ class Tutorial_1 extends Scene {
 		// 게임 영역 칠하기.
 		viewManager.applyViewRect(canvasRenderingContext);
 		canvasRenderingContext.fillStyle = Colors.lightVanilla;
-		graphic.drawRect(Rect.create(0, 0, referenceResolutionSize.x, referenceResolutionSize.y));
+		graphic.drawRect(Rect.create(0, 0, viewSize.x, viewSize.y));
 
 		// 사각형 그리기.
 		let boxPosition = Vec2.create(0, 0);
 		let boxSize = Vec2.create(100, 100);
-		boxPosition = boxPosition.add(referenceResolutionSize.divide(2)).subtract(boxSize.divide(2));
+		boxPosition = boxPosition.add(viewSize.divide(2)).subtract(boxSize.divide(2));
 		graphic.drawRect(Rect.create(boxPosition.x, boxPosition.y, boxSize.x, boxSize.y), "#ffff00");
 
 		// 애니메이션 그리기.
@@ -145,7 +142,7 @@ class Tutorial_1 extends Scene {
 		if (frame) {
 			const image = frame.getImage();
 			const rect = frame.getRect();
-			const position = referenceResolutionSize.divide(2).subtract(rect.size.divide(2));
+			const position = viewSize.divide(2).subtract(rect.size.divide(2));
 			graphic.drawImage(image, position, rect.size, rect);
 		}
 	}

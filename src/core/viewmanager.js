@@ -27,14 +27,14 @@ export const ViewScaleMode = {
 	 // 기준해상도로 뷰 영역 정의 + 뷰의 비율을 유지한채 가로세로 중에서 짧은 축으로 늘여붙임. (반대 축은 남을 수 있음)
 	stretchShort: "stretchShort",
 
-	// 짧은 축 기준 스케일. 긴 축도 화면 전체에 늘여붙임. 양쪽 여백 없음. (대신 긴 축 해상도는 디스플레이에 따라 바뀜)
-	stretchShortExpandLong: "stretchShortExpandLong",
-
 	// 가로를 화면 전체에 늘여붙임 (기준해상도 가로 = 항상 고정). 세로는 화면 비율에 따라 자동 산출. 양쪽 여백 없음. (대신 세로 해상도는 디스플레이에 따라 바뀜)
 	stretchWidthExpandHeight: "stretchWidthExpandHeight",
 
 	// 세로를 화면 전체에 늘여붙임 (기준해상도 세로 = 항상 고정). 가로는 화면 비율에 따라 자동 산출. 양쪽 여백 없음. (대신 가로 해상도는 디스플레이에 따라 바뀜)
 	stretchHeightExpandWidth: "stretchHeightExpandWidth",
+
+	// 짧은 축 기준 스케일. 긴 축도 화면 전체에 늘여붙임. 양쪽 여백 없음. (대신 긴 축 해상도는 디스플레이에 따라 바뀜)
+	stretchShortExpandLong: "stretchShortExpandLong",
 };
 
 
@@ -193,24 +193,6 @@ export class ViewManager extends Object {
 					this.#viewSize.set(referenceResolutionSize.x, referenceResolutionSize.y);
 					break;
 				}
-			case ViewScaleMode.stretchShortExpandLong: {
-					// 짧은 축 스케일을 기준으로 고정, 긴 축도 화면 전체에 늘여붙임. 여백 없음.
-					const targetResolutionScale = Math.min(canvasNativeSize.x / referenceResolutionSize.x, canvasNativeSize.y / referenceResolutionSize.y);
-					const viewWidth = Math.round(canvasNativeSize.x);
-					const viewHeight = Math.round(canvasNativeSize.y);
-					const viewX = 0;
-					const viewY = 0;
-					this.#targetResolutionScale = targetResolutionScale;
-					// this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
-					// this.#screenSize.x = Math.round(this.#screenSize.x);
-					// this.#screenSize.y = Math.round(this.#screenSize.y);
-					this.#viewNativeRect.position.set(viewX, viewY);
-					this.#viewNativeRect.size.set(viewWidth, viewHeight);
-					const viewSizeX = Math.round(this.#viewNativeRect.size.x / targetResolutionScale);
-					const viewSizeY = Math.round(this.#viewNativeRect.size.y / targetResolutionScale);
-					this.#viewSize.set(viewSizeX, viewSizeY);
-					break;
-				}
 			case ViewScaleMode.stretchWidthExpandHeight: {
 					// 가로 스케일을 기준으로 고정, 세로는 화면 비율에 따라 자동 산출. 여백 없음.
 					const targetResolutionScale = canvasNativeSize.x / referenceResolutionSize.x;
@@ -232,6 +214,24 @@ export class ViewManager extends Object {
 			case ViewScaleMode.stretchHeightExpandWidth: {
 					// 세로 스케일을 기준으로 고정, 가로는 화면 비율에 따라 자동 산출. 여백 없음.
 					const targetResolutionScale = canvasNativeSize.y / referenceResolutionSize.y;
+					const viewWidth = Math.round(canvasNativeSize.x);
+					const viewHeight = Math.round(canvasNativeSize.y);
+					const viewX = 0;
+					const viewY = 0;
+					this.#targetResolutionScale = targetResolutionScale;
+					// this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
+					// this.#screenSize.x = Math.round(this.#screenSize.x);
+					// this.#screenSize.y = Math.round(this.#screenSize.y);
+					this.#viewNativeRect.position.set(viewX, viewY);
+					this.#viewNativeRect.size.set(viewWidth, viewHeight);
+					const viewSizeX = Math.round(this.#viewNativeRect.size.x / targetResolutionScale);
+					const viewSizeY = Math.round(this.#viewNativeRect.size.y / targetResolutionScale);
+					this.#viewSize.set(viewSizeX, viewSizeY);
+					break;
+				}
+			case ViewScaleMode.stretchShortExpandLong: {
+					// 짧은 축 스케일을 기준으로 고정, 긴 축도 화면 전체에 늘여붙임. 여백 없음.
+					const targetResolutionScale = Math.min(canvasNativeSize.x / referenceResolutionSize.x, canvasNativeSize.y / referenceResolutionSize.y);
 					const viewWidth = Math.round(canvasNativeSize.x);
 					const viewHeight = Math.round(canvasNativeSize.y);
 					const viewX = 0;
@@ -295,6 +295,7 @@ export class ViewManager extends Object {
 	// 뷰 영역 적용.
 	// - ViewScaleMode.none 이 아닐 경우 출력 전 해당 화면 해상도를 처리하기 위한 초기화.
 	// - ViewScaleMode.none은 getCanvasNativeSize()를 사용하고 그 외의 모드에서는 getReferenceResolutionSize()를 사용한다.
+	// - getViewSize()를 사용하면 모드를 구분하지 않아도 자동으로 항상 모드에 적합한 뷰포트 해상도를 얻을 수 있다.
 	//==============================================================================
 	/**
 	 * @public
