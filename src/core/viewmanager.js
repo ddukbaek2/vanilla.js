@@ -27,8 +27,11 @@ export const ViewScaleMode = {
 	 // 기준해상도로 뷰 영역 정의 + 뷰의 비율을 유지한채 가로세로 중에서 짧은 축으로 늘여붙임. (반대 축은 남을 수 있음)
 	matchInsideToScreen: "matchInsideToScreen",
 
-	// 가로를 화면 전체에 늘여붙임 (기준해상도 가로 = 항상 고정). 세로는 화면 비율에 따라 자동 산출. 양쪽 여백 없음.
+	// 가로를 화면 전체에 늘여붙임 (기준해상도 가로 = 항상 고정). 세로는 화면 비율에 따라 자동 산출. 양쪽 여백 없음. (대신 세로 해상도는 디스플레이에 따라 바뀜)
 	expandWidth: "expandWidth",
+
+	// 세로를 화면 전체에 늘여붙임 (기준해상도 세로 = 항상 고정). 가로는 화면 비율에 따라 자동 산출. 양쪽 여백 없음. (대신 가로 해상도는 디스플레이에 따라 바뀜)
+	expandHeight: "expandHeight",
 };
 
 
@@ -190,6 +193,24 @@ export class ViewManager extends Object {
 			case ViewScaleMode.expandWidth: {
 					// 가로 스케일을 기준으로 고정, 세로는 화면 비율에 따라 자동 산출. 여백 없음.
 					const targetResolutionScale = canvasNativeSize.x / referenceResolutionSize.x;
+					const viewWidth = Math.round(canvasNativeSize.x);
+					const viewHeight = Math.round(canvasNativeSize.y);
+					const viewX = 0;
+					const viewY = 0;
+					this.#targetResolutionScale = targetResolutionScale;
+					// this.#screenSize = this.#canvasNativeSize.divide(targetResolutionScale);
+					// this.#screenSize.x = Math.round(this.#screenSize.x);
+					// this.#screenSize.y = Math.round(this.#screenSize.y);
+					this.#viewNativeRect.position.set(viewX, viewY);
+					this.#viewNativeRect.size.set(viewWidth, viewHeight);
+					const viewSizeX = Math.round(this.#viewNativeRect.size.x / targetResolutionScale);
+					const viewSizeY = Math.round(this.#viewNativeRect.size.y / targetResolutionScale);
+					this.#viewSize.set(viewSizeX, viewSizeY);
+					break;
+				}
+			case ViewScaleMode.expandHeight: {
+					// 세로 스케일을 기준으로 고정, 가로는 화면 비율에 따라 자동 산출. 여백 없음.
+					const targetResolutionScale = canvasNativeSize.y / referenceResolutionSize.y;
 					const viewWidth = Math.round(canvasNativeSize.x);
 					const viewHeight = Math.round(canvasNativeSize.y);
 					const viewX = 0;
