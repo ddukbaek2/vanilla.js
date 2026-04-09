@@ -139,7 +139,7 @@ export class SnapScrollViewComponent extends ScrollViewComponent {
 			return [];
 		}
 		const viewportSize = node.getContentSize();
-		const isHorizontal = this.getHorizontal();
+		const isHorizontal = this.isHorizontal();
 		const snapOffsets = [];
 		for (let snapOffsetIndex = 0; snapOffsetIndex < children.length; ++snapOffsetIndex) {
 			const child = children[snapOffsetIndex];
@@ -172,7 +172,7 @@ export class SnapScrollViewComponent extends ScrollViewComponent {
 		const snapOffsets = this.computeSnapOffsets();
 		const currentOffset = this.getScrollOffset();
 		const scrollVelocity = this.getScrollVelocity();
-		const isHorizontal = this.getHorizontal();
+		const isHorizontal = this.isHorizontal();
 		const currentAxisOffset = isHorizontal ? currentOffset.x : currentOffset.y;
 		const axisVelocity = isHorizontal ? scrollVelocity.x : scrollVelocity.y;
 
@@ -234,7 +234,7 @@ export class SnapScrollViewComponent extends ScrollViewComponent {
 			this.#snapCurrentIndex = clampedIndex;
 			this.#snapTween = null;
 			const snapOffsets = this.computeSnapOffsets();
-			const isHorizontal = this.getHorizontal();
+			const isHorizontal = this.isHorizontal();
 			const currentOffset = this.getScrollOffset();
 			const targetSnapOffset = snapOffsets[this.#snapCurrentIndex];
 			let targetOffsetX;
@@ -268,7 +268,7 @@ export class SnapScrollViewComponent extends ScrollViewComponent {
 		}
 		this.#snapCurrentIndex = Math.clamp(index, 0, children.length - 1);
 		const snapOffsets = this.computeSnapOffsets();
-		const isHorizontal = this.getHorizontal();
+		const isHorizontal = this.isHorizontal();
 		const currentOffset = this.getScrollOffset();
 		const targetSnapOffset = snapOffsets[this.#snapCurrentIndex];
 		let targetOffsetX;

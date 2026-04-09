@@ -292,7 +292,7 @@ export class ScrollViewComponent extends ViewComponent {
 	/**
 	 * @returns { boolean }
 	 */
-	getHorizontal() {
+	isHorizontal() {
 		return this.#horizontalEnabled;
 	}
 
@@ -312,7 +312,7 @@ export class ScrollViewComponent extends ViewComponent {
 	/**
 	 * @returns { boolean }
 	 */
-	getVertical() {
+	isVertical() {
 		return this.#verticalEnabled;
 	}
 
