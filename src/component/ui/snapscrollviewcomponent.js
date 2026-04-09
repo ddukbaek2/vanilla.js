@@ -11,15 +11,17 @@ import { Tween } from "../../core/tween.js";
 //==============================================================================
 // 스냅 스크롤뷰 컴포넌트.
 // - ScrollViewComponent를 상속하며, 드래그 해제 시 지정한 아이템 중앙으로 스냅된다.
-// - 아이템 크기가 각각 달라도 각 아이템 중앙이 뷰포트 중앙에 오도록 스냅한다.
+// - 아이템 크기가 각각 달라도 각 아이템 중앙이 뷰포트 중앙에 오도록 스냅된다.
 // - 가로 스냅: setHorizontal(true), setVertical(false) (기본값)
 // - 세로 스냅: setHorizontal(false), setVertical(true)
 //
 // [스냅 동작 설정]
-// - setMaxPagesPerSwipe(1)      : 1회 스와이프 시 현재 위치에서 최대 1칸 이동. (기본값)
-// - setMaxPagesPerSwipe(n)      : 1회 스와이프 시 최대 n칸 이동.
-// - setMaxPagesPerSwipe(Infinity): 1회 스와이프 시 현재 위치에서 가장 가까운 아이템으로 스냅.
-// - setVelocityThreshold(px/s)  : 방향성 스냅을 발동할 최소 속도. (기본값: 200)
+// - setSnapToNearest(false) : 1회 스와이프 시 1칸만 이동. (기본값)
+// - setSnapToNearest(true)  : 드래그한 위치에서 가장 가까운 아이템으로 스냅.
+// - setVelocityThreshold(px/s): 1칸 모드에서 방향을 결정할 최소 속도. (기본값: 200)
+//
+// [페이지 이동]
+// - pageTo(index, smooth): 지정 인덱스로 이동. smooth=true이면 트윈, false이면 즉시 이동.
 //==============================================================================
 export class SnapScrollViewComponent extends ScrollViewComponent {
 	//==============================================================================
@@ -28,7 +30,7 @@ export class SnapScrollViewComponent extends ScrollViewComponent {
 	/** @private @type { Tween | null } */ #snapTween;
 	/** @private @type { number } */ #snapCurrentIndex;
 	/** @private @type { boolean } */ #prevIsDragging;
-	/** @private @type { number } */ #maxPagesPerSwipe;
+	/** @private @type { boolean } */ #isSnapToNearest;
 	/** @private @type { number } */ #velocityThreshold;
 
 	//==============================================================================
@@ -43,35 +45,34 @@ export class SnapScrollViewComponent extends ScrollViewComponent {
 		this.#snapTween = null;
 		this.#snapCurrentIndex = 0;
 		this.#prevIsDragging = false;
-		this.#maxPagesPerSwipe = 1;
+		this.#isSnapToNearest = false;
 		this.#velocityThreshold = 200;
 	}
 
 	//==============================================================================
-	// 1회 스와이프당 최대 이동 가능 페이지 수 설정.
-	// - 1        : 항상 1칸만 이동 (기본값)
-	// - n        : 최대 n칸 이동
-	// - Infinity : 현재 위치에서 가장 가까운 아이템으로 스냅 (제한 없음)
+	// 스냅 모드 설정.
+	// - false: 1회 스와이프 시 1칸만 이동. (기본값)
+	// - true : 드래그 위치에서 가장 가까운 아이템으로 스냅.
 	//==============================================================================
 	/**
-	 * @param { number } maxPagesPerSwipe
+	 * @param { boolean } isSnapToNearest
 	 */
-	setMaxPagesPerSwipe(maxPagesPerSwipe) {
-		this.#maxPagesPerSwipe = maxPagesPerSwipe;
+	setSnapToNearest(isSnapToNearest) {
+		this.#isSnapToNearest = isSnapToNearest;
 	}
 
 	//==============================================================================
-	// 1회 스와이프당 최대 이동 가능 페이지 수 반환.
+	// 스냅 모드 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { boolean }
 	 */
-	getMaxPagesPerSwipe() {
-		return this.#maxPagesPerSwipe;
+	getSnapToNearest() {
+		return this.#isSnapToNearest;
 	}
 
 	//==============================================================================
-	// 방향성 스냅 발동 최소 속도 설정. (px/s)
+	// 방향성 스냅 발동 최소 속도 설정. (px/s, 1칸 모드에서만 사용)
 	//==============================================================================
 	/**
 	 * @param { number } velocityThreshold
@@ -188,21 +189,66 @@ export class SnapScrollViewComponent extends ScrollViewComponent {
 
 		// 목표 인덱스 결정.
 		let targetIndex;
-		if (this.#maxPagesPerSwipe === Infinity) {
-			// 제한 없음: 현재 위치에서 가장 가까운 아이템으로 스냅.
+		if (this.#isSnapToNearest) {
+			// nearest 모드: 드래그 위치에서 가장 가까운 아이템으로 스냅.
 			targetIndex = closestIndex;
 		}
-		else if (System.Math.abs(axisVelocity) > this.#velocityThreshold) {
-			// 빠른 스와이프: 속도 방향으로 최대 maxPagesPerSwipe칸 이동.
-			const direction = axisVelocity < 0 ? 1 : -1;
-			targetIndex = Math.clamp(this.#snapCurrentIndex + direction * this.#maxPagesPerSwipe, 0, children.length - 1);
-		}
 		else {
-			// 느린 스와이프: 가장 가까운 아이템으로 이동하되 최대 maxPagesPerSwipe칸 제한.
-			targetIndex = Math.clamp(closestIndex, this.#snapCurrentIndex - this.#maxPagesPerSwipe, this.#snapCurrentIndex + this.#maxPagesPerSwipe);
+			// 1칸 모드: 속도에 따라 방향 결정, 항상 현재에서 1칸 이동.
+			if (System.Math.abs(axisVelocity) > this.#velocityThreshold) {
+				// 빠른 스와이프: 속도 방향으로 1칸.
+				const direction = axisVelocity < 0 ? 1 : -1;
+				targetIndex = Math.clamp(this.#snapCurrentIndex + direction, 0, children.length - 1);
+			}
+			else {
+				// 느린 스와이프: 현재 기준 ±1 범위 내에서 가장 가까운 아이템.
+				targetIndex = Math.clamp(closestIndex, this.#snapCurrentIndex - 1, this.#snapCurrentIndex + 1);
+			}
 		}
 
 		this.setSnapCurrentIndex(targetIndex);
+	}
+
+	//==============================================================================
+	// 지정 인덱스로 이동.
+	// - smooth: true이면 트윈으로 부드럽게, false이면 즉시 이동.
+	//==============================================================================
+	/**
+	 * @param { number } index
+	 * @param { boolean } smooth
+	 */
+	pageTo(index, smooth) {
+		const contentNode = this.getContent();
+		if (!contentNode) {
+			return;
+		}
+		const children = contentNode.getChildren();
+		if (children.length === 0) {
+			return;
+		}
+		const clampedIndex = Math.clamp(index, 0, children.length - 1);
+		if (smooth) {
+			this.setSnapCurrentIndex(clampedIndex);
+		}
+		else {
+			this.#snapCurrentIndex = clampedIndex;
+			this.#snapTween = null;
+			const snapOffsets = this.computeSnapOffsets();
+			const isHorizontal = this.getHorizontal();
+			const currentOffset = this.getScrollOffset();
+			const targetSnapOffset = snapOffsets[this.#snapCurrentIndex];
+			let targetOffsetX;
+			let targetOffsetY;
+			if (isHorizontal) {
+				targetOffsetX = targetSnapOffset;
+				targetOffsetY = currentOffset.y;
+			}
+			else {
+				targetOffsetX = currentOffset.x;
+				targetOffsetY = targetSnapOffset;
+			}
+			this.setScrollOffset(Vector2.create(targetOffsetX, targetOffsetY));
+		}
 	}
 
 	//==============================================================================
