@@ -50,6 +50,7 @@ export class ViewComponent extends UIComponent {
 
 		// 컨텐트 노드 추가.
 		this.#content = new AnchoredWorldNode();
+		this.#content.setName("content");
 		this.#content.setAnchorMin(Vector2.zero());
 		this.#content.setAnchorMax(Vector2.zero());
 		this.#content.setPivot(Pivot.topLeft);

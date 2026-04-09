@@ -47,6 +47,7 @@ export class Scene extends Object {
 		this.#tweens = [];
 		this.#isGizmoVisible = false;
 		this.#root = new WorldNode();
+		this.#root.setName("root");
 	}
 
 	//==============================================================================
