@@ -5,6 +5,7 @@ import { Color } from "../base/color.js";
 import { Rect } from "../base/rect.js";
 import { Graphic } from "../core/graphic.js";
 import { Component } from "../core/component.js";
+import { TransformNode } from "../core/node/transformnode.js";
 
 
 //==============================================================================
@@ -37,9 +38,10 @@ export class ColorComponent extends Component {
 	 */
 	draw(graphic) {
 		// super.draw(graphic);
-
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const node = this.getNode();
+
+		// Component.draw()를 호출하는 쪽은 TransformNode이므로 신뢰하고 사용.
+		// if (node instanceof TransformNode)
 		const contentSize = node.getContentSize();
 		const color = this.getColor();
 		const rect = Rect.create(0, 0, contentSize.x, contentSize.y);
@@ -50,7 +52,7 @@ export class ColorComponent extends Component {
 			graphic.drawRoundRect(rect, this.#roundSize);
 		}
 		else {
-			 graphic.drawRect(rect);
+			graphic.drawRect(rect);
 		}
 	}
 
