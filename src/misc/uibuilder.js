@@ -139,12 +139,11 @@ export class UIBuilder extends Object {
 	// 피벗 설정.
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
+	 * @param { Vector2 } pivot
 	 * @returns { UIBuilder }
 	 */
-	pivot(x, y) {
-		this.#node.setPivot(Vector2.create(x, y));
+	pivot(pivot) {
+		this.#node.setPivot(pivot);
 		return this;
 	}
 

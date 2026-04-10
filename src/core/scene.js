@@ -70,6 +70,12 @@ export class Scene extends Object {
 	async load(engine) {
 		this.#engine = engine;
 		await Promise.resolve();
+
+		const viewManager = engine.getViewManager();
+		const viewSize = viewManager.getViewSize();
+		this.#root.setPosition(Vector2.zero());
+		this.#root.setPivot(Pivot.topLeft);
+		this.#root.setContentSize(viewSize);
 	}
 
 	//==============================================================================
