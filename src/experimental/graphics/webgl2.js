@@ -222,11 +222,11 @@ export class WebGL2 extends Object {
 			const fragmentShader = this.createFragmentShader(EXAMPLE_FRAGMENTSHADER);
 			const program = this.createProgram(vertexShader, fragmentShader);
 
-			// 버텍스 어레이 설정. (출력 설정)
+			// 버텍스 어레이 설정. (렌더링 데이터 처리 설정)
 			const vertexArray = this.createVertexArray();
 			canvasRanderingContext.bindVertexArray(vertexArray);
 
-			// 버텍스 버퍼 설정. (실제 출력 데이터)
+			// 버텍스 버퍼 설정. (렌더링 데이터)
 			const vertices = new Float32Array([
 				0.0, 0.5,
 				-0.5, -0.5,
@@ -244,10 +244,12 @@ export class WebGL2 extends Object {
 			const draw = () => {
 				const viewManager = engine.getViewManager();
 				const canvasNativeSize = viewManager.getCanvasNativeSize();
+
+				// 화면 비우기.
 				this.viewport(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
 				this.clear(Color.white());
 
-				// 프로그램 설정.
+				// 출력.
 				canvasRanderingContext.useProgram(program);
 				canvasRanderingContext.bindVertexArray(vertexArray);
 				canvasRanderingContext.drawArrays(canvasRanderingContext.TRIANGLES, 0, 3);
