@@ -100,7 +100,8 @@ export class List extends Object {
 	 */
 	find(predicate) {
 		let index = 0;
-		for (const item of this.#items) {
+		const items = this.all();
+		for (const item of items) {
 			if (predicate.call(index, item)) {
 				return item;
 			}
@@ -118,14 +119,15 @@ export class List extends Object {
 	 */
 	findAll(predicate) {
 		let index = 0;
-		const items = [];
-		for (const item of this.#items) {
+		const result = [];
+		const allItems = this.all();
+		for (const item of allItems) {
 			if (predicate.call(index, item)) {
-				items.push(item);
+				result.push(item);
 			}
 			++index;
 		}
-		return items;
+		return result;
 	}
 	
 	//==============================================================================

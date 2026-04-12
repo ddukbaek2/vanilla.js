@@ -41,7 +41,7 @@ export class Indicator extends Object {
 	 * @param { number } timeDelta 
 	 */
 	tick(timeDelta) {
-		if (!this.#isVisible) return;
+		if (!this.isVisible()) return;
 		
 		// 시간에 따라 회전 각도 누적
 		this.#rotation += this.#speed * timeDelta;
@@ -54,13 +54,14 @@ export class Indicator extends Object {
 	 * @param { Graphic } graphic 
 	 */
 	draw(graphic) {
-		if (!this.#isVisible) return;
+		if (!this.isVisible()) return;
 
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		
 		canvasRenderingContext.save();
 		// 1. 지정된 위치로 이동 후 회전 적용
-		canvasRenderingContext.translate(this.#position.x, this.#position.y);
+		const position = this.getPosition();
+		canvasRenderingContext.translate(position.x, position.y);
 		canvasRenderingContext.rotate(this.#rotation);
 
 		// 2. 그리기 설정

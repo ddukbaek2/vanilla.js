@@ -84,7 +84,8 @@ export class VirtualPad extends Object {
 
 		const padPosition = this.getPadPosition();
 		const padRadius = this.getPadRadius();
-		const moveDelta = this.#ballPosition.subtract(padPosition); // 패드중점 기준에서 터치위치.
+		const ballPosition = this.getBallPosition();
+		const moveDelta = ballPosition.subtract(padPosition); // 패드중점 기준에서 터치위치.
 		const distance = moveDelta.length();
 		const direction = moveDelta.normalize();
 
@@ -110,10 +111,12 @@ export class VirtualPad extends Object {
 			const returnSpeedDelta = this.#ballReturnSpeed * timeDelta;
 			if (distance > returnSpeedDelta) {
 				const returnMoveDelta = direction.multiply(returnSpeedDelta);
-				this.#ballPosition = this.#ballPosition.subtract(returnMoveDelta);
+				const currentBallPosition = this.getBallPosition();
+				this.#ballPosition = currentBallPosition.subtract(returnMoveDelta);
 
 				if (this.#ballMoveEvent !== null) {
-					const returnedMoveDelta = this.#ballPosition.subtract(padPosition);
+					const updatedBallPosition = this.getBallPosition();
+					const returnedMoveDelta = updatedBallPosition.subtract(padPosition);
 					const returnedDistance = returnedMoveDelta.length();
 					const pullStrength = Math.clamp01(returnedDistance / padRadius);
 					const normalizedDirectionX = (direction.x + 1) / 2;

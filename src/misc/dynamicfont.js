@@ -245,23 +245,25 @@ export class DynamicFont extends Object {
 	 * @param { Graphic } graphic
 	 */
 	drawText(text, position, graphic) {
-		if (!this.#atlasCanvas) {
+		const atlasCanvas = this.getAtlasCanvas();
+		if (!atlasCanvas) {
 			return;
 		}
 
 		let cursorX = position.x;
 		const baselineY = position.y;
+		const fontSize = this.getFontSize();
 
 		for (const char of text) {
 			const glyphInfo = this.#glyphMap.get(char);
 			if (!glyphInfo) {
-				cursorX += this.#fontSize * 0.5;
+				cursorX += fontSize * 0.5;
 				continue;
 			}
 
 			const destPosition = Vector2.create(cursorX - glyphInfo.bearingX, baselineY - glyphInfo.bearingY);
 			const destSize = Vector2.create(glyphInfo.uvRect.size.x, glyphInfo.uvRect.size.y);
-			graphic.drawImageWithImageRect(this.#atlasCanvas, destPosition, destSize, glyphInfo.uvRect);
+			graphic.drawImageWithImageRect(atlasCanvas, destPosition, destSize, glyphInfo.uvRect);
 			cursorX += glyphInfo.advance;
 		}
 	}

@@ -45,7 +45,8 @@ export class HeatHazeEffect extends TransformNode {
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
-		this.#timer += timeDelta * this.#speed;
+		const speed = this.getSpeed();
+		this.#timer += timeDelta * speed;
 	}
 
 	//==============================================================================
@@ -77,7 +78,9 @@ export class HeatHazeEffect extends TransformNode {
 
 		// 성능을 위해 영역 내의 한 줄(1px)씩 잘라서 사인 곡선에 맞춰 좌우로 흔듭니다.
 		for (let y = 0; y < contentSize.y; y++) {
-			const offsetX = Math.sin(this.#timer + (y * this.#frequency)) * this.#amplitude;
+			const amplitude = this.getAmplitude();
+			const frequency = this.getFrequency();
+			const offsetX = Math.sin(this.#timer + (y * frequency)) * amplitude;
 
 			// 소스(sx, sy): 화면에 이미 그려진 글로벌 좌표 캡처 영역
 			const sx = worldBounds.position.x;

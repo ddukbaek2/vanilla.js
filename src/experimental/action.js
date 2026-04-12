@@ -65,27 +65,28 @@ export class Action extends Object {
 		const step = this.#steps[this.#currentStepIndex];
 		this.#currentStepElapsed = 0;
 		this.#currentStepState = {};
+		const target = this.getTarget();
 		if (step.type === 'call') {
-			step.fn(this.#target);
+			step.fn(target);
 			this.#advanceStep();
 			return;
 		}
 		if (step.callbacks && step.callbacks.started) {
-			step.callbacks.started(this.#target);
+			step.callbacks.started(target);
 		}
 		if (step.type === 'repeat') {
 			this.#currentStepState.completedCount = 0;
-			step.innerAction.start(this.#target);
+			step.innerAction.start(target);
 		}
 		else if (step.type === 'forever') {
-			step.innerAction.start(this.#target);
+			step.innerAction.start(target);
 		}
 		else if (step.type === 'loop') {
 			if (!step.conditionFn()) {
 				this.#advanceStep();
 				return;
 			}
-			step.innerAction.start(this.#target);
+			step.innerAction.start(target);
 		}
 	}
 
@@ -188,7 +189,8 @@ export class Action extends Object {
 	 * @returns { Action }
 	 */
 	start(target) {
-		this.#target = target !== undefined ? target : this.#target;
+		const currentTarget = this.getTarget();
+		this.#target = target !== undefined ? target : currentTarget;
 		this.#currentStepIndex = 0;
 		this.#currentStepElapsed = 0;
 		this.#currentStepState = null;
@@ -213,7 +215,7 @@ export class Action extends Object {
 	 * @param { number } timeDelta
 	 */
 	step(timeDelta) {
-		if (!this.#isRunning || this.#isDone) {
+		if (!this.isRunning() || this.isDone()) {
 			return;
 		}
 		if (this.#currentStepIndex >= this.#steps.length) {
@@ -222,16 +224,17 @@ export class Action extends Object {
 			return;
 		}
 		const step = this.#steps[this.#currentStepIndex];
+		const target = this.getTarget();
 		switch (step.type) {
 			case 'wait': {
 				this.#currentStepElapsed += timeDelta;
 				const progress = Math.clamp(this.#currentStepElapsed / step.duration, 0, 1);
 				if (step.callbacks && step.callbacks.updated) {
-					step.callbacks.updated(progress, this.#target);
+					step.callbacks.updated(progress, target);
 				}
 				if (this.#currentStepElapsed >= step.duration) {
 					if (step.callbacks && step.callbacks.completed) {
-						step.callbacks.completed(this.#target);
+						step.callbacks.completed(target);
 					}
 					this.#advanceStep();
 				}
@@ -239,11 +242,11 @@ export class Action extends Object {
 			}
 			case 'condition': {
 				if (step.callbacks && step.callbacks.updated) {
-					step.callbacks.updated(this.#target);
+					step.callbacks.updated(target);
 				}
 				if (step.conditionFn()) {
 					if (step.callbacks && step.callbacks.completed) {
-						step.callbacks.completed(this.#target);
+						step.callbacks.completed(target);
 					}
 					this.#advanceStep();
 				}
@@ -258,7 +261,7 @@ export class Action extends Object {
 						this.#advanceStep();
 					}
 					else {
-						repeatAction.start(this.#target);
+						repeatAction.start(target);
 					}
 				}
 				break;
@@ -267,7 +270,7 @@ export class Action extends Object {
 				const foreverAction = step.innerAction;
 				foreverAction.step(timeDelta);
 				if (foreverAction.isDone()) {
-					foreverAction.start(this.#target);
+					foreverAction.start(target);
 				}
 				break;
 			}
@@ -276,7 +279,7 @@ export class Action extends Object {
 				loopAction.step(timeDelta);
 				if (loopAction.isDone()) {
 					if (step.conditionFn()) {
-						loopAction.start(this.#target);
+						loopAction.start(target);
 					}
 					else {
 						this.#advanceStep();

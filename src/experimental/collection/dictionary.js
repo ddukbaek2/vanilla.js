@@ -66,7 +66,8 @@ export class Dictionary extends Object {
 	 * @returns { { key: K, value: V } | null }
 	 */
 	find(predicate) {
-		for (const [key, value] of this.#items) {
+		const items = this.getItems();
+		for (const [key, value] of items) {
 			if (predicate.call(key, value)) {
 				return {
 					key,
@@ -85,16 +86,17 @@ export class Dictionary extends Object {
 	 * @returns { { key: K, value: V }[] }
 	 */
 	findAll(predicate) {
-		const items = [];
-		for (const [key, value] of this.#items) {
+		const result = [];
+		const allItems = this.getItems();
+		for (const [key, value] of allItems) {
 			if (predicate.call(key, value)) {
-				items.push({
+				result.push({
 					key,
 					value
 				});
 			}
 		}
-		return items;
+		return result;
 	}
 
 	//==============================================================================
@@ -149,7 +151,8 @@ export class Dictionary extends Object {
 	 * @returns { K[] } 
 	 */
 	getKeys() {
-		return Array.from(this.#items.keys());
+		const items = this.getItems();
+		return Array.from(items.keys());
 	}
 
 	//==============================================================================
@@ -159,6 +162,7 @@ export class Dictionary extends Object {
 	 * @returns { V[] } 
 	 */
 	getValues() {
-		return Array.from(this.#items.values());
+		const items = this.getItems();
+		return Array.from(items.values());
 	}
 }
