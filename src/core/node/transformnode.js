@@ -50,18 +50,17 @@ export class TransformNode extends ComponentNode {
 		if (canvasRenderingContext) {
 			canvasRenderingContext.save();
 
+			// 트랜스폼 반영.
 			const localPosition = this.getLocalPosition();
 			const localRotation = this.getLocalRotation();
 			const radian = Math.degreeToRadian(localRotation);
 			const localScale = this.getLocalScale();
-			const localOpacity = this.getLocalOpacity();
-
-			// 트랜스폼 반영.
 			canvasRenderingContext.translate(localPosition.x, localPosition.y);
 			canvasRenderingContext.rotate(radian);
 			canvasRenderingContext.scale(localScale.x, localScale.y);
 
 			// 투명도 반영.
+			const localOpacity = this.getLocalOpacity();
 			canvasRenderingContext.globalAlpha *= localOpacity;
 		}
 	}

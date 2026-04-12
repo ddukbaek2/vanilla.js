@@ -51,34 +51,34 @@ export class WorldNode extends TransformNode {
         if (canvasRenderingContext) {
             canvasRenderingContext.save();
 
-            let localPosition = this.getLocalPosition();
+            // 부모 노드의 피봇 반영 되돌리기.
             const parent = this.getParent();
-            if (parent) {
+            if (parent && parent instanceof WorldNode) {
                 const parentPivot = parent.getPivot();
                 const parentContentSize = parent.getContentSize();
-                localPosition = Vector2.create(
-                    localPosition.x + (parentContentSize.x * parentPivot.x),
-                    localPosition.y + (parentContentSize.y * parentPivot.y)
-                );
+                const parentPivotPosition = Vector2.create(parentContentSize.x * parentPivot.x, parentContentSize.y * parentPivot.y);
+                canvasRenderingContext.translate(parentPivotPosition.x, parentPivotPosition.y);
             }
 
+            // 트랜스폼 반영.
+            const localPosition = this.getLocalPosition();
             const localRotation = this.getLocalRotation();
             const radian = Math.degreeToRadian(localRotation);
             const localScale = this.getLocalScale();
-            const localOpacity = this.getLocalOpacity();
-
-            const pivot = this.getPivot();
-            const contentSize = this.getContentSize();
-
-            // 트랜스폼 반영.
             canvasRenderingContext.translate(localPosition.x, localPosition.y);
             canvasRenderingContext.rotate(radian);
             canvasRenderingContext.scale(localScale.x, localScale.y);
 
-            // 피봇 반영.
-            canvasRenderingContext.translate(-(contentSize.x * pivot.x), -(contentSize.y * pivot.y));
+            // 현재 노드의 피봇 반영.
+            // 캔버스2D는 기준점을 좌상으로 여기고 우하방향으로 그림을 그리므로.
+            // 마지막 원점에서 현재 컨텐트사이즈 크기를 기준으로한 피봇만큼 상대적으로 당김.
+            const pivot = this.getPivot();
+            const contentSize = this.getContentSize();
+            const pivotPosition = Vector2.create(contentSize.x * pivot.x, contentSize.y * pivot.y);
+            canvasRenderingContext.translate(-pivotPosition.x, -pivotPosition.y);
 
             // 투명도 반영.
+            const localOpacity = this.getLocalOpacity();
             canvasRenderingContext.globalAlpha *= localOpacity;
         }
     }
