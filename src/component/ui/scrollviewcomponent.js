@@ -83,16 +83,13 @@ export class ScrollViewComponent extends ViewComponent {
 
 		// 누름.
 		if (inputManager.isTouchPressed()) {
-			const isTouchBlocked = this.isTouchBlocked();
-			if (!isTouchBlocked) {
-				const isInsideBounds = node.contains(viewInputPosition);
-				if (isInsideBounds) {
-					this.#isDragging = true;
-					this.#dragStartViewPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
-					this.#dragStartOffset = Vector2.create(this.#scrollOffset.x, this.#scrollOffset.y);
-					this.#scrollVelocity = Vector2.zero();
-					this.#previousViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
-				}
+			const isInsideBounds = node.contains(viewInputPosition);
+			if (isInsideBounds) {
+				this.#isDragging = true;
+				this.#dragStartViewPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
+				this.#dragStartOffset = Vector2.create(this.#scrollOffset.x, this.#scrollOffset.y);
+				this.#scrollVelocity = Vector2.zero();
+				this.#previousViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
 			}
 		}
 		// 이동.

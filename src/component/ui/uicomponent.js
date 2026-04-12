@@ -4,13 +4,11 @@
 const System = globalThis;
 import { Component } from "../../core/component.js";
 import { Engine } from "../../core/engine.js";
-import { UINode } from "../../core/node/uinode.js";
 
 
 //==============================================================================
 // UI 컴포넌트.
-// - UINode의 이벤트 체이닝에 참여하는 컴포넌트의 기반 클래스.
-// - 소유 노드가 UINode이고 터치 차단 상태이면 터치 입력을 무시해야 한다.
+// - UINode에 부착되는 컴포넌트의 기반 클래스.
 //==============================================================================
 export class UIComponent extends Component {
 	//==============================================================================
@@ -27,21 +25,6 @@ export class UIComponent extends Component {
 	constructor() {
 		super();
 		this.#engine = null;
-	}
-
-	//==============================================================================
-	// 터치 차단 여부 반환.
-	// 소유 노드가 UINode이고 이벤트 체이닝에 의해 차단된 상태이면 true를 반환한다.
-	//==============================================================================
-	/**
-	 * @returns { boolean }
-	 */
-	isTouchBlocked() {
-		const node = this.getNode();
-		if (node instanceof UINode) {
-			return node.isTouchBlocked();
-		}
-		return false;
 	}
 
 	//==============================================================================

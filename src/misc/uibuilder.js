@@ -3,7 +3,6 @@
 //==============================================================================
 import { UINode } from "../core/node/uinode.js";
 import { Vector2 } from "../base/vector2.js";
-import { Engine } from "../core/engine.js";
 import { Object } from "../base/object.js";
 
 
@@ -234,30 +233,6 @@ export class UIBuilder extends Object {
 	 */
 	maskEnabled(enabled) {
 		this.#node.setMaskEnabled(enabled);
-		return this;
-	}
-
-	//==============================================================================
-	// 이벤트 체이닝 활성화 설정.
-	//==============================================================================
-	/**
-	 * @param { boolean } enabled
-	 * @returns { UIBuilder }
-	 */
-	eventChainEnabled(enabled) {
-		this.#node.setEventChainEnabled(enabled);
-		return this;
-	}
-
-	//==============================================================================
-	// 엔진 설정.
-	//==============================================================================
-	/**
-	 * @param { Engine } engine
-	 * @returns { UIBuilder }
-	 */
-	engine(engine) {
-		this.#node.setEngine(engine);
 		return this;
 	}
 

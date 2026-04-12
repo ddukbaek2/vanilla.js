@@ -96,11 +96,6 @@ export class ButtonComponent extends UIComponent {
 			return;
 		}
 
-		const isTouchBlocked = this.isTouchBlocked();
-		if (isTouchBlocked) {
-			return;
-		}
-
 		const engine = this.getEngine();
 		if (!engine) {
 			return;

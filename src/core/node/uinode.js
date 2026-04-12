@@ -11,7 +11,7 @@ import { AnchoredWorldNode } from "./anchoredworldmnode.js";
 //==============================================================================
 // UI 노드.
 // - 마스크 기능.
-// - 이벤트 체이닝 기능.
+// - 터치 인터랙션 기능.
 // - 포커스 기능.
 //==============================================================================
 export class UINode extends AnchoredWorldNode {
@@ -19,10 +19,8 @@ export class UINode extends AnchoredWorldNode {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { boolean } */ #isMaskEnabled;
-	/** @private @type { boolean } */ #isEventChainEnabled;
-	/** @private @type { boolean } */ #isTouchBlocked;
+	/** @private @type { boolean } */ #isInteractable;
 	/** @private @type { boolean } */ #isFocused;
-	/** @private @type { * } */ #engine;
 
 	//==============================================================================
 	// 생성.
@@ -30,24 +28,8 @@ export class UINode extends AnchoredWorldNode {
 	constructor() {
 		super();
 		this.#isMaskEnabled = false;
-		this.#isEventChainEnabled = false;
-		this.#isTouchBlocked = false;
+		this.#isInteractable = false;
 		this.#isFocused = false;
-		this.#engine = null;
-	}
-
-	//==============================================================================
-	// 갱신.
-	//==============================================================================
-	/**
-	 * @override
-	 * @param { number } timeDelta
-	 */
-	tick(timeDelta) {
-		if (this.#isEventChainEnabled && this.#engine) {
-			this.processEventChain();
-		}
-		super.tick(timeDelta);
 	}
 
 	//==============================================================================
@@ -91,106 +73,63 @@ export class UINode extends AnchoredWorldNode {
 	}
 
 	//==============================================================================
-	// 이벤트 체이닝 처리.
-	// 터치 누름 시, 하위 UINode를 역순으로 순회하여
-	// bounds 안에 있는 가장 위의 노드 하나만 활성화하고 나머지를 차단한다.
-	//==============================================================================
-	/** @private */
-	processEventChain() {
-		const inputManager = this.#engine.getInputManager();
-
-		// 모든 하위 UINode 차단 해제.
-		this.setAllTouchBlocked(this, false);
-
-		// 터치 누름 시에만 체이닝으로 소비자를 결정.
-		if (!inputManager.isTouchPressed()) {
-			return;
-		}
-
-		// 모든 하위 UINode 차단.
-		this.setAllTouchBlocked(this, true);
-
-		// 역순으로 순회하여 가장 위에 있는 노드를 찾아 차단 해제.
-		const viewInputPosition = inputManager.getViewInputPosition();
-		this.findAndUnblockFirst(this, viewInputPosition);
-	}
-
-	//==============================================================================
-	// 하위 계층 전체의 UINode 터치 차단 여부 일괄 설정.
+	// 터치 인터랙션 활성화 설정.
 	//==============================================================================
 	/**
-	 * @private
-	 * @param { * } node
-	 * @param { boolean } blocked
+	 * @param { boolean } isInteractable
 	 */
-	setAllTouchBlocked(node, blocked) {
-		const children = node.getChildren();
-		for (const child of children) {
-			if (child instanceof UINode) {
-				child.setTouchBlocked(blocked);
-			}
-			this.setAllTouchBlocked(child, blocked);
-		}
+	setInteractable(isInteractable) {
+		this.#isInteractable = isInteractable;
 	}
 
 	//==============================================================================
-	// 역순으로 순회하여 bounds 안에 있는 첫 번째 UINode를 차단 해제.
-	// 해당 노드의 하위 계층도 함께 차단 해제한다.
-	// 반환값: 소비 여부.
+	// 터치 인터랙션 활성화 여부 반환.
 	//==============================================================================
 	/**
-	 * @private
-	 * @param { * } node
+	 * @returns { boolean }
+	 */
+	isInteractable() {
+		return this.#isInteractable;
+	}
+
+	//==============================================================================
+	// 터치 누름. (TouchRaycaster에 의해 호출)
+	//==============================================================================
+	/**
+	 * @virtual
 	 * @param { Vector2 } viewInputPosition
-	 * @returns { boolean }
 	 */
-	findAndUnblockFirst(node, viewInputPosition) {
-		const children = node.getChildren();
-		for (let i = children.length - 1; i >= 0; i--) {
-			const child = children[i];
-			if (!child.isActive()) {
-				continue;
-			}
-			if (!(child instanceof UINode)) {
-				continue;
-			}
-
-			// 자식의 하위 계층을 먼저 탐색 (깊이 우선).
-			const isConsumedByDescendant = this.findAndUnblockFirst(child, viewInputPosition);
-			if (isConsumedByDescendant) {
-				return true;
-			}
-
-			// 이 자식이 bounds 안에 있으면 소비.
-			const isInsideBounds = child.contains(viewInputPosition);
-			if (isInsideBounds) {
-				child.setTouchBlocked(false);
-				// 이 자식의 하위 계층도 모두 차단 해제.
-				this.setAllTouchBlocked(child, false);
-				return true;
-			}
-		}
-		return false;
+	touchPress(viewInputPosition) {
 	}
 
 	//==============================================================================
-	// 터치 차단 여부 설정. (이벤트 체이닝에 의해 제어됨)
+	// 터치 이동. (TouchRaycaster에 의해 호출)
 	//==============================================================================
 	/**
-	 * @param { boolean } blocked
+	 * @virtual
+	 * @param { Vector2 } viewInputPosition
 	 */
-	setTouchBlocked(blocked) {
-		this.#isTouchBlocked = blocked;
+	touchMove(viewInputPosition) {
 	}
 
 	//==============================================================================
-	// 터치 차단 여부 반환.
+	// 터치 뗌. (TouchRaycaster에 의해 호출)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @virtual
+	 * @param { Vector2 } viewInputPosition
 	 */
-	isTouchBlocked() {
-		return this.#isTouchBlocked;
+	touchRelease(viewInputPosition) {
+	}
+
+	//==============================================================================
+	// 터치 취소. (TouchRaycaster에 의해 호출)
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { Vector2 } viewInputPosition
+	 */
+	touchCancel(viewInputPosition) {
 	}
 
 	//==============================================================================
@@ -211,26 +150,6 @@ export class UINode extends AnchoredWorldNode {
 	 */
 	isMaskEnabled() {
 		return this.#isMaskEnabled;
-	}
-
-	//==============================================================================
-	// 이벤트 체이닝 활성화 설정.
-	//==============================================================================
-	/**
-	 * @param { boolean } enabled
-	 */
-	setEventChainEnabled(enabled) {
-		this.#isEventChainEnabled = enabled;
-	}
-
-	//==============================================================================
-	// 이벤트 체이닝 활성화 여부 반환.
-	//==============================================================================
-	/**
-	 * @returns { boolean }
-	 */
-	isEventChainEnabled() {
-		return this.#isEventChainEnabled;
 	}
 
 	//==============================================================================
