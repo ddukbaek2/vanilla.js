@@ -86,7 +86,9 @@ export class LocalStorage extends Object {
 		const value = System.window.localStorage.getItem(key);
 		if (value === null || value === undefined) {
 			LocalStorage.setString(key, defaultStringValue);
+			return defaultStringValue;
 		}
+		
 		return value;
 	}
 
