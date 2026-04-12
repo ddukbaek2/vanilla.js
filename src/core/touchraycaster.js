@@ -83,7 +83,7 @@ export class TouchRaycaster extends Object {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchMove(viewInputPosition) {
-		const currentTarget = this.#currentTarget;
+		const currentTarget = this.getCurrentTarget();
 		if (currentTarget) {
 			currentTarget.touchMove(viewInputPosition);
 		}
@@ -97,7 +97,7 @@ export class TouchRaycaster extends Object {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchRelease(viewInputPosition) {
-		const currentTarget = this.#currentTarget;
+		const currentTarget = this.getCurrentTarget();
 		if (currentTarget) {
 			currentTarget.touchRelease(viewInputPosition);
 		}
@@ -112,7 +112,7 @@ export class TouchRaycaster extends Object {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchCancel(viewInputPosition) {
-		const currentTarget = this.#currentTarget;
+		const currentTarget = this.getCurrentTarget();
 		if (currentTarget) {
 			currentTarget.touchCancel(viewInputPosition);
 		}
@@ -130,7 +130,7 @@ export class TouchRaycaster extends Object {
 	 * @returns { UINode | null }
 	 */
 	raycast(viewInputPosition) {
-		const rootNode = this.#rootNode;
+		const rootNode = this.getRootNode();
 		if (!rootNode) {
 			return null;
 		}
