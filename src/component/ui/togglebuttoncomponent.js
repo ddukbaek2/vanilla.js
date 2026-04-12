@@ -41,7 +41,8 @@ export class ToggleButtonComponent extends ButtonComponent {
 	 * @param { number } timeDelta
 	 */
 	updateTintTransition(timeDelta) {
-		if (this.#isOn) {
+		const isOn = this.getIsOn();
+		if (isOn) {
 			super.applyTintProgress(1);
 			return;
 		}
@@ -64,11 +65,13 @@ export class ToggleButtonComponent extends ButtonComponent {
 	//==============================================================================
 	/** @private */
 	#onClicked() {
-		this.#isOn = !this.#isOn;
+		this.#isOn = !this.getIsOn();
 		super.collectColorTargets();
-		super.applyTintProgress(this.#isOn ? 1 : 0);
-		if (this.#toggledEvent) {
-			this.#toggledEvent(this);
+		const isOn = this.getIsOn();
+		super.applyTintProgress(isOn ? 1 : 0);
+		const toggledEvent = this.getToggledEvent();
+		if (toggledEvent) {
+			toggledEvent(this);
 		}
 		if (this.#externalClickedEvent) {
 			this.#externalClickedEvent(this);
@@ -82,12 +85,13 @@ export class ToggleButtonComponent extends ButtonComponent {
 	 * @param { boolean } isOn
 	 */
 	setIsOn(isOn) {
-		if (this.#isOn === isOn) {
+		if (this.getIsOn() === isOn) {
 			return;
 		}
 		this.#isOn = isOn;
 		super.collectColorTargets();
-		super.applyTintProgress(this.#isOn ? 1 : 0);
+		const currentIsOn = this.getIsOn();
+		super.applyTintProgress(currentIsOn ? 1 : 0);
 	}
 
 	//==============================================================================

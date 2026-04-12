@@ -39,11 +39,12 @@ export class SceneManager extends Object {
 	 */
 	async loadScene(scene) {
         const engine = this.getEngine();
-		if (scene && scene instanceof Scene && !this.#loadedScenes.includes(scene)) {
+		const loadedScenes = this.getAllLoadedScenes();
+		if (scene && scene instanceof Scene && !loadedScenes.includes(scene)) {
 			scene.create();
 			await scene.load(engine);
 			scene.initialize(engine);
-			this.#loadedScenes.push(scene);
+			loadedScenes.push(scene);
 		}
 	}
 
@@ -56,11 +57,13 @@ export class SceneManager extends Object {
 	 */
 	async unloadScene(scene) {
         const engine = this.getEngine();
-		if (scene && scene instanceof Scene && this.#loadedScenes.includes(scene)) {
+		const loadedScenes = this.getAllLoadedScenes();
+		if (scene && scene instanceof Scene && loadedScenes.includes(scene)) {
 			scene.finalize(engine);
 			await scene.unload(engine);
 			// scene.destroy();
-			this.#loadedScenes.splice(this.#loadedScenes.indexOf(scene), 1);
+			const loadedSceneIndex = loadedScenes.indexOf(scene);
+			loadedScenes.splice(loadedSceneIndex, 1);
 		}
 	}
 
@@ -68,8 +71,9 @@ export class SceneManager extends Object {
 	// 모든 로드된 씬 언로드.
 	//==============================================================================
 	async unloadAllScenes() {
-		while (this.#loadedScenes.length > 0) {
-			const loadedScene = this.#loadedScenes[0];
+		const loadedScenes = this.getAllLoadedScenes();
+		while (loadedScenes.length > 0) {
+			const loadedScene = loadedScenes[0];
 			await this.unloadScene(loadedScene);
 		}
 	}

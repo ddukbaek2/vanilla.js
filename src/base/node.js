@@ -42,15 +42,17 @@ export class Node extends Object {
 	 */
 	setParent(parent) {
 		// 기존 부모가 존재 할 경우.
-		if (this.#parent) {
+		const currentParent = this.getParent();
+		if (currentParent) {
 			// 동일 부모 일 경우 무시.
-			if (this.#parent === parent) {
+			if (currentParent === parent) {
 				return;
 			}
 
 			// 기존 부모의 자식 제거.
-			const childIndex = this.#parent.#children.indexOf(this);
-			this.#parent.#children.splice(childIndex, 1);
+			const currentParentChildren = currentParent.getChildren();
+			const childIndex = currentParentChildren.indexOf(this);
+			currentParentChildren.splice(childIndex, 1);
 			this.#parent = null;
 		}
 
@@ -58,7 +60,8 @@ export class Node extends Object {
 		if (parent) {
 			// 새 부모의 자식 추가.
 			this.#parent = parent;
-			this.#parent.#children.push(this);
+			const newParentChildren = parent.getChildren();
+			newParentChildren.push(this);
 		}
 	}
 
@@ -115,7 +118,8 @@ export class Node extends Object {
 	 * @returns { boolean } 
 	 */
 	isRoot() {
-		return this.#parent === null || this.#parent === undefined;
+		const parent = this.getParent();
+		return parent === null || parent === undefined;
 	}
 
 	//==============================================================================
@@ -136,7 +140,8 @@ export class Node extends Object {
 	 * @returns { boolean } 
 	 */
 	hasParent() {
-		return this.#parent !== null;
+		const parent = this.getParent();
+		return parent !== null;
 	}
 
 	//==============================================================================

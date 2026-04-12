@@ -53,14 +53,16 @@ export class AnchoredWorldNode extends WorldNode {
 
 		// 부모가 없으면 앵커 오프셋과 델타가 곧 최종값이 됨
 		if (!parent) {
-			super.setLocalPosition(this.#anchoredPosition);
-			super.setContentSize(this.#sizeDelta);
+			const anchoredPosition = this.getAnchoredPosition();
+			super.setLocalPosition(anchoredPosition);
+			const sizeDelta = this.getSizeDelta();
+			super.setContentSize(sizeDelta);
 			return;
 		}
 
 		const parentSize = parent.getContentSize();
-		const anchorMin = this.#anchorMin;
-		const anchorMax = this.#anchorMax;
+		const anchorMin = this.getAnchorMin();
+		const anchorMax = this.getAnchorMax();
 		const pivot = this.getPivot();
 
 		// 앵커 영역 계산 (부모 좌상단 기준).
@@ -74,15 +76,17 @@ export class AnchoredWorldNode extends WorldNode {
 		const anchorRefY = Math.lerp(anchorMinLocalY, anchorMaxLocalY, pivot.y);
 
 		// 최종 로컬 위치를 Node에 반영 (엔진이 렌더링에 사용)
+		const anchoredPosition = this.getAnchoredPosition();
 		super.setLocalPosition(Vector2.create(
-			anchorRefX + this.#anchoredPosition.x,
-			anchorRefY + this.#anchoredPosition.y
+			anchorRefX + anchoredPosition.x,
+			anchorRefY + anchoredPosition.y
 		));
 
 		// 최종 크기를 Node에 반영 (엔진이 충돌 및 렌더링에 사용)
+		const sizeDelta = this.getSizeDelta();
 		super.setContentSize(Vector2.create(
-			parentSize.x * (anchorMax.x - anchorMin.x) + this.#sizeDelta.x,
-			parentSize.y * (anchorMax.y - anchorMin.y) + this.#sizeDelta.y
+			parentSize.x * (anchorMax.x - anchorMin.x) + sizeDelta.x,
+			parentSize.y * (anchorMax.y - anchorMin.y) + sizeDelta.y
 		));
 	}
 

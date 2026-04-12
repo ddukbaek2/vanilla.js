@@ -47,7 +47,8 @@ export class Scene extends Object {
 		this.#tweens = [];
 		this.#isGizmoVisible = false;
 		this.#root = new WorldNode();
-		this.#root.setName("root");
+		const root = this.getRoot();
+		root.setName("root");
 	}
 
 	//==============================================================================
@@ -73,9 +74,10 @@ export class Scene extends Object {
 
 		const viewManager = engine.getViewManager();
 		const viewSize = viewManager.getViewSize();
-		this.#root.setPosition(Vector2.zero());
-		this.#root.setPivot(Pivot.topLeft);
-		this.#root.setContentSize(viewSize);
+		const root = this.getRoot();
+		root.setPosition(Vector2.zero());
+		root.setPivot(Pivot.topLeft);
+		root.setContentSize(viewSize);
 	}
 
 	//==============================================================================
@@ -124,9 +126,10 @@ export class Scene extends Object {
 		const engine = this.getEngine();
 		const viewManager = engine.getViewManager();
 		const viewSize = viewManager.getViewSize();
-		this.#root.setPosition(Vector2.zero());
-		this.#root.setPivot(Pivot.topLeft);
-		this.#root.setContentSize(viewSize);
+		const root = this.getRoot();
+		root.setPosition(Vector2.zero());
+		root.setPivot(Pivot.topLeft);
+		root.setContentSize(viewSize);
 	}
 
 	//==============================================================================
@@ -139,8 +142,9 @@ export class Scene extends Object {
 	tick(timeDelta) {
 		// 노드 갱신.
 		try {
-			if (this.#root.isActive()) {
-				this.#root.tick(timeDelta);
+			const root = this.getRoot();
+			if (root.isActive()) {
+				root.tick(timeDelta);
 			}
 		}
 		catch (error) {
@@ -196,7 +200,8 @@ export class Scene extends Object {
 	 */
 	draw(graphic) {
 		// 노드 출력.
-		graphic.drawNode(this.#root);
+		const root = this.getRoot();
+		graphic.drawNode(root);
 	}
 
 	//==============================================================================
@@ -265,6 +270,10 @@ export class Scene extends Object {
 				console.error(error);
 			}
 		}
+		// 취소됨.
+		else if (false) {
+			this.touchCancel();
+		}
 	}
 
 	//==============================================================================
@@ -297,6 +306,16 @@ export class Scene extends Object {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchRelease(viewInputPosition) {
+
+	}
+
+	//==============================================================================
+	// 터치 취소됨.
+	//==============================================================================
+	/**
+	 * @virtual
+	 */
+	touchCancel() {
 
 	}
 

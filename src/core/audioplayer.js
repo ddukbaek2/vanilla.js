@@ -52,10 +52,11 @@ export class AudioPlayer {
 		if (!audioContext || !this.#gainNode) {
 			return;
 		}
-		if (!this.#audioAsset) {
+		const audioAsset = this.getAudioAsset();
+		if (!audioAsset) {
 			return;
 		}
-		const audioBuffer = this.#audioAsset.getAudioBuffer();
+		const audioBuffer = audioAsset.getAudioBuffer();
 		if (!audioBuffer) {
 			return;
 		}
@@ -165,10 +166,11 @@ export class AudioPlayer {
 	 * @returns { number }
 	 */
 	getDuration() {
-		if (!this.#audioAsset) {
+		const audioAsset = this.getAudioAsset();
+		if (!audioAsset) {
 			return 0.0;
 		}
-		return this.#audioAsset.getDuration();
+		return audioAsset.getDuration();
 	}
 
 	//==============================================================================

@@ -86,7 +86,8 @@ export class ScrollViewComponent extends ViewComponent {
 	touchPress(viewInputPosition) {
 		this.#isDragging = true;
 		this.#dragStartViewPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
-		this.#dragStartOffset = Vector2.create(this.#scrollOffset.x, this.#scrollOffset.y);
+		const scrollOffset = this.getScrollOffset();
+		this.#dragStartOffset = Vector2.create(scrollOffset.x, scrollOffset.y);
 		this.#scrollVelocity = Vector2.zero();
 		this.#previousViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
 		this.#currentViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
@@ -99,7 +100,7 @@ export class ScrollViewComponent extends ViewComponent {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchMove(viewInputPosition) {
-		if (this.#isDragging) {
+		if (this.isDragging()) {
 			this.#currentViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
 		}
 	}
@@ -138,22 +139,24 @@ export class ScrollViewComponent extends ViewComponent {
 		}
 
 		// 드래그 중 오프셋 및 속도 계산.
-		if (this.#isDragging) {
+		if (this.isDragging()) {
 			const viewInputPosition = this.#currentViewInputPosition;
 			const rawDeltaX = viewInputPosition.x - this.#dragStartViewPosition.x;
 			const rawDeltaY = viewInputPosition.y - this.#dragStartViewPosition.y;
-			const deltaX = this.#horizontalEnabled ? rawDeltaX : 0;
-			const deltaY = this.#verticalEnabled ? rawDeltaY : 0;
+			const deltaX = this.isHorizontal() ? rawDeltaX : 0;
+			const deltaY = this.isVertical() ? rawDeltaY : 0;
 			const proposedOffset = Vector2.create(
 				this.#dragStartOffset.x + deltaX,
 				this.#dragStartOffset.y + deltaY
 			);
-			if (this.#scrollMode === ScrollMode.elastic) {
+			const scrollMode = this.getScrollMode();
+			if (scrollMode === ScrollMode.elastic) {
 				const contentSize = node.getContentSize();
 				const elasticMaxX = 0;
-				const elasticMinX = Math.min(0, contentSize.x - this.#scrollContentSize.x);
+				const scrollContentSize = this.getScrollContentSize();
+				const elasticMinX = Math.min(0, contentSize.x - scrollContentSize.x);
 				const elasticMaxY = 0;
-				const elasticMinY = Math.min(0, contentSize.y - this.#scrollContentSize.y);
+				const elasticMinY = Math.min(0, contentSize.y - scrollContentSize.y);
 				const elasticResistance = 0.5;
 				let elasticOffsetX = proposedOffset.x;
 				let elasticOffsetY = proposedOffset.y;
@@ -174,14 +177,15 @@ export class ScrollViewComponent extends ViewComponent {
 				// 컨텐트의 위치 수정.
 				const content = this.getContent();
 				if (content) {
-					content.setAnchoredPosition(this.#scrollOffset);
+					const currentScrollOffset = this.getScrollOffset();
+					content.setAnchoredPosition(currentScrollOffset);
 				}
 
 				if (timeDelta > 0) {
 					const rawVelocityX = (viewInputPosition.x - this.#previousViewInputPosition.x) / timeDelta;
 					const rawVelocityY = (viewInputPosition.y - this.#previousViewInputPosition.y) / timeDelta;
-					const velocityX = this.#horizontalEnabled ? rawVelocityX : 0;
-					const velocityY = this.#verticalEnabled ? rawVelocityY : 0;
+					const velocityX = this.isHorizontal() ? rawVelocityX : 0;
+					const velocityY = this.isVertical() ? rawVelocityY : 0;
 					this.#scrollVelocity = Vector2.create(velocityX, velocityY);
 				}
 			}
@@ -191,19 +195,23 @@ export class ScrollViewComponent extends ViewComponent {
 			this.#previousViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
 		}
 
-		if (this.#scrollMode === ScrollMode.elastic && !this.#isDragging) {
+		const scrollMode = this.getScrollMode();
+		if (scrollMode === ScrollMode.elastic && !this.isDragging()) {
 			const contentSize = node.getContentSize();
 			const physicsBoundsMaxX = 0;
-			const physicsBoundsMinX = this.#horizontalEnabled ? Math.min(0, contentSize.x - this.#scrollContentSize.x) : 0;
+			const scrollContentSize = this.getScrollContentSize();
+			const physicsBoundsMinX = this.isHorizontal() ? Math.min(0, contentSize.x - scrollContentSize.x) : 0;
 			const physicsBoundsMaxY = 0;
-			const physicsBoundsMinY = this.#verticalEnabled ? Math.min(0, contentSize.y - this.#scrollContentSize.y) : 0;
+			const physicsBoundsMinY = this.isVertical() ? Math.min(0, contentSize.y - scrollContentSize.y) : 0;
 			const springConstant = 1200;
 			const dampingCoefficient = 30;
 			const frictionCoefficient = 5;
-			let physicsVelocityX = this.#scrollVelocity.x;
-			let physicsVelocityY = this.#scrollVelocity.y;
-			let physicsOffsetX = this.#scrollOffset.x;
-			let physicsOffsetY = this.#scrollOffset.y;
+			const scrollVelocity = this.getScrollVelocity();
+			let physicsVelocityX = scrollVelocity.x;
+			let physicsVelocityY = scrollVelocity.y;
+			const currentScrollOffset = this.getScrollOffset();
+			let physicsOffsetX = currentScrollOffset.x;
+			let physicsOffsetY = currentScrollOffset.y;
 			const physicsClampedX = Math.clamp(physicsOffsetX, physicsBoundsMinX, physicsBoundsMaxX);
 			const physicsClampedY = Math.clamp(physicsOffsetY, physicsBoundsMinY, physicsBoundsMaxY);
 			const physicsDisplacementX = physicsOffsetX - physicsClampedX;
@@ -259,7 +267,8 @@ export class ScrollViewComponent extends ViewComponent {
 			// 컨텐트의 위치 수정.
 			const content = this.getContent();
 			if (content) {
-				content.setAnchoredPosition(this.#scrollOffset);
+				const updatedScrollOffset = this.getScrollOffset();
+				content.setAnchoredPosition(updatedScrollOffset);
 			}
 			this.#scrollVelocity = Vector2.create(physicsVelocityX, physicsVelocityY);
 		}
@@ -274,12 +283,12 @@ export class ScrollViewComponent extends ViewComponent {
 	applyScrollOffset(offset) {
 		const node = this.getNode();
 		const contentSize = node.getContentSize();
-		const scrollContentSize = this.#scrollContentSize;
+		const scrollContentSize = this.getScrollContentSize();
 
 		const maxX = 0;
-		const minX = this.#horizontalEnabled ? Math.min(0, contentSize.x - scrollContentSize.x) : 0;
+		const minX = this.isHorizontal() ? Math.min(0, contentSize.x - scrollContentSize.x) : 0;
 		const maxY = 0;
-		const minY = this.#verticalEnabled ? Math.min(0, contentSize.y - scrollContentSize.y) : 0;
+		const minY = this.isVertical() ? Math.min(0, contentSize.y - scrollContentSize.y) : 0;
 
 		this.#scrollOffset = Vector2.create(
 			Math.clamp(offset.x, minX, maxX),
@@ -289,7 +298,8 @@ export class ScrollViewComponent extends ViewComponent {
 		// 컨텐트의 위치 수정.
 		const content = this.getContent();
 		if (content) {
-			content.setAnchoredPosition(this.#scrollOffset);
+			const scrollOffset = this.getScrollOffset();
+			content.setAnchoredPosition(scrollOffset);
 		}
 	}
 

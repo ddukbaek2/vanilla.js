@@ -40,8 +40,10 @@ export class ImageScroller extends Object {
 	 * @param { number } timeDelta 
 	 */
 	tick(timeDelta) {
-		this.#scrollPosition.x += this.#scrollSpeed.x * timeDelta;
-		this.#scrollPosition.y += this.#scrollSpeed.y * timeDelta;
+		const scrollPosition = this.getScrollPosition();
+		const scrollSpeed = this.getScrollSpeed();
+		scrollPosition.x += scrollSpeed.x * timeDelta;
+		scrollPosition.y += scrollSpeed.y * timeDelta;
 	}
 
 	//==============================================================================
@@ -51,33 +53,36 @@ export class ImageScroller extends Object {
 	 * @param { Graphic } graphic 
 	 */
 	draw(graphic) {
-		if (!this.#image) {
+		const image = this.getImage();
+		if (!image) {
 			return;
 		}
 
-		const imgW = this.#image.width;
-		const imgH = this.#image.height;
+		const imgW = image.width;
+		const imgH = image.height;
 
 		if (imgW === 0 || imgH === 0) {
 			return;
 		}
 
 		// 부동소수점 오차로 인한 틈새 방지를 위해 좌표 정수화.
-		const modX = Math.floor(this.#scrollPosition.x % imgW);
-		const modY = Math.floor(this.#scrollPosition.y % imgH);
+		const scrollPosition = this.getScrollPosition();
+		const modX = Math.floor(scrollPosition.x % imgW);
+		const modY = Math.floor(scrollPosition.y % imgH);
 
-		const startX = this.#viewRect.position.x + (modX <= 0 ? modX : modX - imgW);
-		const startY = this.#viewRect.position.y + (modY <= 0 ? modY : modY - imgH);
+		const viewRect = this.getViewRect();
+		const startX = viewRect.position.x + (modX <= 0 ? modX : modX - imgW);
+		const startY = viewRect.position.y + (modY <= 0 ? modY : modY - imgH);
 
-		graphic.beginClipRect(this.#viewRect);
-		
+		graphic.beginClipRect(viewRect);
+
 		// 이미지 크기를 1.5픽셀정도 키워서 겹쳐 그려서 이미지 사이의 틈을 가리기.
 		const overlap = 1.5;
-		for (let x = startX; x < this.#viewRect.position.x + this.#viewRect.size.x; x += imgW) {
-			for (let y = startY; y < this.#viewRect.position.y + this.#viewRect.size.y; y += imgH) {
+		for (let x = startX; x < viewRect.position.x + viewRect.size.x; x += imgW) {
+			for (let y = startY; y < viewRect.position.y + viewRect.size.y; y += imgH) {
 				graphic.drawImage(
-					this.#image, 
-					Vector2.create(Math.floor(x), Math.floor(y)), 
+					image,
+					Vector2.create(Math.floor(x), Math.floor(y)),
 					Vector2.create(imgW + overlap, imgH + overlap)
 				);
 			}

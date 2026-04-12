@@ -109,14 +109,15 @@ export class ButtonComponent extends UIComponent {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchPress(viewInputPosition) {
-		if (!this.#isInteractable) {
+		if (!this.getInteractable()) {
 			return;
 		}
 		this.#isPressTracking = true;
 		this.setButtonState(ButtonState.pressed);
 		this.collectColorTargets();
-		if (this.#pressedEvent) {
-			this.#pressedEvent(this);
+		const pressedEvent = this.getPressedEvent();
+		if (pressedEvent) {
+			pressedEvent(this);
 		}
 	}
 
@@ -127,7 +128,7 @@ export class ButtonComponent extends UIComponent {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchRelease(viewInputPosition) {
-		if (!this.#isInteractable) {
+		if (!this.getInteractable()) {
 			return;
 		}
 		if (!this.#isPressTracking) {
@@ -135,17 +136,20 @@ export class ButtonComponent extends UIComponent {
 		}
 		this.#isPressTracking = false;
 		this.setButtonState(ButtonState.released);
-		if (this.#releasedEvent) {
-			this.#releasedEvent(this);
+		const releasedEvent = this.getReleasedEvent();
+		if (releasedEvent) {
+			releasedEvent(this);
 		}
 		const node = this.getNode();
 		const isInsideBounds = node.contains(viewInputPosition);
 		if (isInsideBounds) {
-			if (this.#clickedEvent) {
-				this.#clickedEvent(this);
+			const clickedEvent = this.getClickedEvent();
+			if (clickedEvent) {
+				clickedEvent(this);
 			}
-			if (this.#clickEvent) {
-				this.#clickEvent(this);
+			const clickEvent = this.getClickEvent();
+			if (clickEvent) {
+				clickEvent(this);
 			}
 		}
 		this.setButtonState(ButtonState.normal);
@@ -156,18 +160,19 @@ export class ButtonComponent extends UIComponent {
 	//==============================================================================
 	/** @private */
 	updateTintTransition(timeDelta) {
-		if (!this.#isInteractable) {
+		if (!this.getInteractable()) {
 			this.applyDisabledTint();
 			return;
 		}
 		const buttonState = this.getButtonState();
 		const isPressed = buttonState === ButtonState.pressed;
+		const transitionDuration = this.getTransitionDuration();
 
 		if (isPressed) {
-			this.#tintProgress = Math.min(this.#tintProgress + timeDelta / this.#transitionDuration, 1);
+			this.#tintProgress = Math.min(this.#tintProgress + timeDelta / transitionDuration, 1);
 		}
 		else {
-			this.#tintProgress = Math.max(this.#tintProgress - timeDelta / this.#transitionDuration, 0);
+			this.#tintProgress = Math.max(this.#tintProgress - timeDelta / transitionDuration, 0);
 		}
 
 		this.applyTintProgress(this.#tintProgress);
@@ -177,7 +182,7 @@ export class ButtonComponent extends UIComponent {
 	// 틴트 적용.
 	//==============================================================================
 	applyTintProgress(progress) {
-		const pressedTintColor = this.#pressedTintColor;
+		const pressedTintColor = this.getPressedTintColor();
 		for (const colorEntry of this.#colorEntries) {
 			if (colorEntry.type === 'sprite') {
 				const overlayAlpha = Math.lerp(0, pressedTintColor.alpha, progress);
@@ -248,10 +253,10 @@ export class ButtonComponent extends UIComponent {
 	 * @param { ButtonState } buttonState
 	 */
 	setButtonState(buttonState) {
-		if (this.#buttonState === buttonState) {
+		if (this.getButtonState() === buttonState) {
 			return;
 		}
-		const previousButtonState = this.#buttonState;
+		const previousButtonState = this.getButtonState();
 		this.#buttonState = buttonState;
 	}
 
@@ -407,7 +412,7 @@ export class ButtonComponent extends UIComponent {
 	 * @param { boolean } isInteractable
 	 */
 	setInteractable(isInteractable) {
-		if (this.#isInteractable === isInteractable) {
+		if (this.getInteractable() === isInteractable) {
 			return;
 		}
 		this.#isInteractable = isInteractable;

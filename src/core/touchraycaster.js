@@ -19,7 +19,7 @@ export class TouchRaycaster extends Object {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { * } */ #rootNode;
-	/** @private @type { UINode | null } */ #currentTarget;
+	/** @private @type { UINode | null } */ #touchTarget;
 
 	//==============================================================================
 	// 생성.
@@ -27,37 +27,7 @@ export class TouchRaycaster extends Object {
 	constructor() {
 		super();
 		this.#rootNode = null;
-		this.#currentTarget = null;
-	}
-
-	//==============================================================================
-	// 루트 노드 설정.
-	//==============================================================================
-	/**
-	 * @param { * } rootNode
-	 */
-	setRootNode(rootNode) {
-		this.#rootNode = rootNode;
-	}
-
-	//==============================================================================
-	// 루트 노드 반환.
-	//==============================================================================
-	/**
-	 * @returns { * }
-	 */
-	getRootNode() {
-		return this.#rootNode;
-	}
-
-	//==============================================================================
-	// 현재 터치 대상 반환.
-	//==============================================================================
-	/**
-	 * @returns { UINode | null }
-	 */
-	getCurrentTarget() {
-		return this.#currentTarget;
+		this.#touchTarget = null;
 	}
 
 	//==============================================================================
@@ -69,7 +39,7 @@ export class TouchRaycaster extends Object {
 	 */
 	touchPress(viewInputPosition) {
 		const hitNode = this.raycast(viewInputPosition);
-		this.#currentTarget = hitNode;
+		this.#touchTarget = hitNode;
 		if (hitNode) {
 			hitNode.touchPress(viewInputPosition);
 		}
@@ -83,9 +53,9 @@ export class TouchRaycaster extends Object {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchMove(viewInputPosition) {
-		const currentTarget = this.getCurrentTarget();
-		if (currentTarget) {
-			currentTarget.touchMove(viewInputPosition);
+		const touchTarget = this.getTouchTarget();
+		if (touchTarget) {
+			touchTarget.touchMove(viewInputPosition);
 		}
 	}
 
@@ -97,11 +67,11 @@ export class TouchRaycaster extends Object {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchRelease(viewInputPosition) {
-		const currentTarget = this.getCurrentTarget();
+		const currentTarget = this.getTouchTarget();
 		if (currentTarget) {
 			currentTarget.touchRelease(viewInputPosition);
 		}
-		this.#currentTarget = null;
+		this.#touchTarget = null;
 	}
 
 	//==============================================================================
@@ -112,11 +82,11 @@ export class TouchRaycaster extends Object {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchCancel(viewInputPosition) {
-		const currentTarget = this.getCurrentTarget();
+		const currentTarget = this.getTouchTarget();
 		if (currentTarget) {
 			currentTarget.touchCancel(viewInputPosition);
 		}
-		this.#currentTarget = null;
+		this.#touchTarget = null;
 	}
 
 	//==============================================================================
@@ -175,5 +145,35 @@ export class TouchRaycaster extends Object {
 		traverse(rootNode);
 
 		return hitNode;
+	}
+
+	//==============================================================================
+	// 루트 노드 설정.
+	//==============================================================================
+	/**
+	 * @param { * } rootNode
+	 */
+	setRootNode(rootNode) {
+		this.#rootNode = rootNode;
+	}
+
+	//==============================================================================
+	// 루트 노드 반환.
+	//==============================================================================
+	/**
+	 * @returns { * }
+	 */
+	getRootNode() {
+		return this.#rootNode;
+	}
+
+	//==============================================================================
+	// 현재 터치 대상 반환.
+	//==============================================================================
+	/**
+	 * @returns { UINode | null }
+	 */
+	getTouchTarget() {
+		return this.#touchTarget;
 	}
 }

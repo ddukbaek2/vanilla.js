@@ -189,20 +189,24 @@ export class SnapScrollViewComponent extends ScrollViewComponent {
 
 		// 목표 인덱스 결정.
 		let targetIndex;
-		if (this.#isSnapToNearest) {
+		const isSnapToNearest = this.getSnapToNearest();
+		if (isSnapToNearest) {
 			// nearest 모드: 드래그 위치에서 가장 가까운 아이템으로 스냅.
 			targetIndex = closestIndex;
 		}
 		else {
 			// 1칸 모드: 속도에 따라 방향 결정, 항상 현재에서 1칸 이동.
-			if (System.Math.abs(axisVelocity) > this.#velocityThreshold) {
+			const velocityThreshold = this.getVelocityThreshold();
+			if (System.Math.abs(axisVelocity) > velocityThreshold) {
 				// 빠른 스와이프: 속도 방향으로 1칸.
 				const direction = axisVelocity < 0 ? 1 : -1;
-				targetIndex = Math.clamp(this.#snapCurrentIndex + direction, 0, children.length - 1);
+				const snapCurrentIndex = this.getSnapCurrentIndex();
+				targetIndex = Math.clamp(snapCurrentIndex + direction, 0, children.length - 1);
 			}
 			else {
 				// 느린 스와이프: 현재 기준 ±1 범위 내에서 가장 가까운 아이템.
-				targetIndex = Math.clamp(closestIndex, this.#snapCurrentIndex - 1, this.#snapCurrentIndex + 1);
+				const snapCurrentIndex = this.getSnapCurrentIndex();
+				targetIndex = Math.clamp(closestIndex, snapCurrentIndex - 1, snapCurrentIndex + 1);
 			}
 		}
 
@@ -236,7 +240,8 @@ export class SnapScrollViewComponent extends ScrollViewComponent {
 			const snapOffsets = this.computeSnapOffsets();
 			const isHorizontal = this.isHorizontal();
 			const currentOffset = this.getScrollOffset();
-			const targetSnapOffset = snapOffsets[this.#snapCurrentIndex];
+			const snapCurrentIndex = this.getSnapCurrentIndex();
+			const targetSnapOffset = snapOffsets[snapCurrentIndex];
 			let targetOffsetX;
 			let targetOffsetY;
 			if (isHorizontal) {
@@ -270,7 +275,8 @@ export class SnapScrollViewComponent extends ScrollViewComponent {
 		const snapOffsets = this.computeSnapOffsets();
 		const isHorizontal = this.isHorizontal();
 		const currentOffset = this.getScrollOffset();
-		const targetSnapOffset = snapOffsets[this.#snapCurrentIndex];
+		const snapCurrentIndex = this.getSnapCurrentIndex();
+		const targetSnapOffset = snapOffsets[snapCurrentIndex];
 		let targetOffsetX;
 		let targetOffsetY;
 		if (isHorizontal) {

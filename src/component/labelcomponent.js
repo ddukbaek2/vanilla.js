@@ -87,7 +87,8 @@ export class LabelComponent extends Component {
 	 * @param { Graphic } graphic 
 	 */
 	draw(graphic) {
-		if (!this.#text) {
+		const text = this.getText();
+		if (!text) {
 			return;
 		}
 
@@ -105,21 +106,24 @@ export class LabelComponent extends Component {
 		else drawY = contentSize.y * 0.5;
 
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
-		const fontFamily = this.#fontFace ? this.#fontFace.family : SYSTEM_FONT_STRING;
-		canvasRenderingContext.font = `${this.#fontSize}px ${fontFamily}`;
+		const fontFace = this.getFontFace();
+		const fontSize = this.getFontSize();
+		const fontFamily = fontFace ? fontFace.family : SYSTEM_FONT_STRING;
+		canvasRenderingContext.font = `${fontSize}px ${fontFamily}`;
 		canvasRenderingContext.textAlign = this.#textAlign;
 		canvasRenderingContext.textBaseline = this.#textBaseline;
 
-		if (this.#strokeColor && this.#strokeWidth > 0) {
-			canvasRenderingContext.strokeStyle = this.#strokeColor;
+		const strokeColor = this.getStrokeColor();
+		if (strokeColor && this.#strokeWidth > 0) {
+			canvasRenderingContext.strokeStyle = strokeColor;
 			canvasRenderingContext.lineWidth = this.#strokeWidth;
-			canvasRenderingContext.strokeText(this.#text, drawX, drawY);
+			canvasRenderingContext.strokeText(text, drawX, drawY);
 		}
 
 		const textColor = this.getTextColor();
 		const textColorString = textColor.toHEXString();
 		canvasRenderingContext.fillStyle = textColorString;
-		canvasRenderingContext.fillText(this.#text, drawX, drawY);
+		canvasRenderingContext.fillText(text, drawX, drawY);
 	}
 
 	//==============================================================================

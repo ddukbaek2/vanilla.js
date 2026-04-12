@@ -55,7 +55,8 @@ export class ViewComponent extends UIComponent {
 		this.#content.setAnchorMax(Vector2.zero());
 		this.#content.setPivot(Pivot.topLeft);
 		this.#content.setAnchoredPosition(Vector2.zero());
-		node.addChild(this.#content);
+		const content = this.getContent();
+		node.addChild(content);
 
 		if (node instanceof UINode) {
 			node.setMaskEnabled(true);

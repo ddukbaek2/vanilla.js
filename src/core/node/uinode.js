@@ -180,7 +180,7 @@ export class UINode extends AnchoredWorldNode {
 	// 포커스 설정. (자신부터 가장 상위의 UINode까지 전파)
 	//==============================================================================
 	setFocus() {
-		if (this.#isFocused) {
+		if (this.isFocus()) {
 			return;
 		}
 		this.#isFocused = true;
