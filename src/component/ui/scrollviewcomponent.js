@@ -2,6 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { ViewComponent } from "./viewcomponent.js";
+import { UINode } from "../../core/node/uinode.js";
 import { Vector2 } from "../../base/vector2.js";
 import * as Math from "../../base/math.js";
 
@@ -22,7 +23,7 @@ export const ScrollMode = {
 // - 소유 노드의 getContentSize()를 가시 영역으로 사용한다.
 // - 내부에 별도의 콘텐츠 노드를 생성하며, 드래그로 스크롤링할 수 있다.
 // - AnchoredWorldNode에 추가하면 마스크(크롭)가 자동 활성화된다.
-// - 중첩 ScrollView를 지원한다. (이벤트 체이닝과 연동)
+// - 중첩 ScrollView를 지원한다. (TouchRaycaster와 연동)
 //==============================================================================
 export class ScrollViewComponent extends ViewComponent {
 	//==============================================================================
@@ -32,6 +33,7 @@ export class ScrollViewComponent extends ViewComponent {
 	/** @private @type { string } */	#scrollMode; // 스크롤 모드.
 	/** @private @type { Vector2 } */	#scrollVelocity; // 스크롤 속도.
 	/** @private @type { Vector2 } */	#previousViewInputPosition;
+	/** @private @type { Vector2 } */	#currentViewInputPosition;
 	/** @private @type { boolean } */	#horizontalEnabled; // 수평 이동 여부.
 	/** @private @type { boolean } */	#verticalEnabled; // 수직 이동 여부.
 	/** @private @type { Vector2 } */	#scrollOffset; // 스크롤 오프셋.
@@ -56,8 +58,70 @@ export class ScrollViewComponent extends ViewComponent {
 		this.#scrollMode = ScrollMode.clamp;
 		this.#scrollVelocity = Vector2.zero();
 		this.#previousViewInputPosition = Vector2.zero();
+		this.#currentViewInputPosition = Vector2.zero();
 		this.#horizontalEnabled = true;
 		this.#verticalEnabled = true;
+	}
+
+	//==============================================================================
+	// 노드에 붙음. (UINode의 isInteractable을 자동 활성화)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { ComponentNode } node
+	 */
+	attach(node) {
+		super.attach(node);
+		if (node instanceof UINode) {
+			node.setInteractable(true);
+		}
+	}
+
+	//==============================================================================
+	// 터치 누름. (TouchRaycaster → UINode → ScrollViewComponent)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition
+	 */
+	touchPress(viewInputPosition) {
+		this.#isDragging = true;
+		this.#dragStartViewPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
+		this.#dragStartOffset = Vector2.create(this.#scrollOffset.x, this.#scrollOffset.y);
+		this.#scrollVelocity = Vector2.zero();
+		this.#previousViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
+		this.#currentViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
+	}
+
+	//==============================================================================
+	// 터치 이동. (TouchRaycaster → UINode → ScrollViewComponent)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition
+	 */
+	touchMove(viewInputPosition) {
+		if (this.#isDragging) {
+			this.#currentViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
+		}
+	}
+
+	//==============================================================================
+	// 터치 뗌. (TouchRaycaster → UINode → ScrollViewComponent)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition
+	 */
+	touchRelease(viewInputPosition) {
+		this.#isDragging = false;
+	}
+
+	//==============================================================================
+	// 터치 취소. (TouchRaycaster → UINode → ScrollViewComponent)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition
+	 */
+	touchCancel(viewInputPosition) {
+		this.#isDragging = false;
 	}
 
 	//==============================================================================
@@ -73,82 +137,58 @@ export class ScrollViewComponent extends ViewComponent {
 			return;
 		}
 
-		const engine = this.getEngine();
-		if (!engine) {
-			return;
-		}
-
-		const inputManager = engine.getInputManager();
-		const viewInputPosition = inputManager.getViewInputPosition();
-
-		// 누름.
-		if (inputManager.isTouchPressed()) {
-			const isInsideBounds = node.contains(viewInputPosition);
-			if (isInsideBounds) {
-				this.#isDragging = true;
-				this.#dragStartViewPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
-				this.#dragStartOffset = Vector2.create(this.#scrollOffset.x, this.#scrollOffset.y);
-				this.#scrollVelocity = Vector2.zero();
-				this.#previousViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
-			}
-		}
-		// 이동.
-		else if (inputManager.isTouchMoved()) {
-			if (this.#isDragging) {
-				const rawDeltaX = viewInputPosition.x - this.#dragStartViewPosition.x;
-				const rawDeltaY = viewInputPosition.y - this.#dragStartViewPosition.y;
-				const deltaX = this.#horizontalEnabled ? rawDeltaX : 0;
-				const deltaY = this.#verticalEnabled ? rawDeltaY : 0;
-				const proposedOffset = Vector2.create(
-					this.#dragStartOffset.x + deltaX,
-					this.#dragStartOffset.y + deltaY
-				);
-				if (this.#scrollMode === ScrollMode.elastic) {
-					const contentSize = node.getContentSize();
-					const elasticMaxX = 0;
-					const elasticMinX = Math.min(0, contentSize.x - this.#scrollContentSize.x);
-					const elasticMaxY = 0;
-					const elasticMinY = Math.min(0, contentSize.y - this.#scrollContentSize.y);
-					const elasticResistance = 0.5;
-					let elasticOffsetX = proposedOffset.x;
-					let elasticOffsetY = proposedOffset.y;
-					if (elasticOffsetX > elasticMaxX) {
-						elasticOffsetX = elasticMaxX + (elasticOffsetX - elasticMaxX) * elasticResistance;
-					}
-					else if (elasticOffsetX < elasticMinX) {
-						elasticOffsetX = elasticMinX + (elasticOffsetX - elasticMinX) * elasticResistance;
-					}
-					if (elasticOffsetY > elasticMaxY) {
-						elasticOffsetY = elasticMaxY + (elasticOffsetY - elasticMaxY) * elasticResistance;
-					}
-					else if (elasticOffsetY < elasticMinY) {
-						elasticOffsetY = elasticMinY + (elasticOffsetY - elasticMinY) * elasticResistance;
-					}
-					this.#scrollOffset = Vector2.create(elasticOffsetX, elasticOffsetY);
-
-					// 컨텐트의 위치 수정.
-					const content = this.getContent();
-					if (content) {
-						content.setAnchoredPosition(this.#scrollOffset);
-					}
-
-					if (timeDelta > 0) {
-						const rawVelocityX = (viewInputPosition.x - this.#previousViewInputPosition.x) / timeDelta;
-						const rawVelocityY = (viewInputPosition.y - this.#previousViewInputPosition.y) / timeDelta;
-						const velocityX = this.#horizontalEnabled ? rawVelocityX : 0;
-						const velocityY = this.#verticalEnabled ? rawVelocityY : 0;
-						this.#scrollVelocity = Vector2.create(velocityX, velocityY);
-					}
+		// 드래그 중 오프셋 및 속도 계산.
+		if (this.#isDragging) {
+			const viewInputPosition = this.#currentViewInputPosition;
+			const rawDeltaX = viewInputPosition.x - this.#dragStartViewPosition.x;
+			const rawDeltaY = viewInputPosition.y - this.#dragStartViewPosition.y;
+			const deltaX = this.#horizontalEnabled ? rawDeltaX : 0;
+			const deltaY = this.#verticalEnabled ? rawDeltaY : 0;
+			const proposedOffset = Vector2.create(
+				this.#dragStartOffset.x + deltaX,
+				this.#dragStartOffset.y + deltaY
+			);
+			if (this.#scrollMode === ScrollMode.elastic) {
+				const contentSize = node.getContentSize();
+				const elasticMaxX = 0;
+				const elasticMinX = Math.min(0, contentSize.x - this.#scrollContentSize.x);
+				const elasticMaxY = 0;
+				const elasticMinY = Math.min(0, contentSize.y - this.#scrollContentSize.y);
+				const elasticResistance = 0.5;
+				let elasticOffsetX = proposedOffset.x;
+				let elasticOffsetY = proposedOffset.y;
+				if (elasticOffsetX > elasticMaxX) {
+					elasticOffsetX = elasticMaxX + (elasticOffsetX - elasticMaxX) * elasticResistance;
 				}
-				else {
-					this.applyScrollOffset(proposedOffset);
+				else if (elasticOffsetX < elasticMinX) {
+					elasticOffsetX = elasticMinX + (elasticOffsetX - elasticMinX) * elasticResistance;
 				}
-				this.#previousViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
+				if (elasticOffsetY > elasticMaxY) {
+					elasticOffsetY = elasticMaxY + (elasticOffsetY - elasticMaxY) * elasticResistance;
+				}
+				else if (elasticOffsetY < elasticMinY) {
+					elasticOffsetY = elasticMinY + (elasticOffsetY - elasticMinY) * elasticResistance;
+				}
+				this.#scrollOffset = Vector2.create(elasticOffsetX, elasticOffsetY);
+
+				// 컨텐트의 위치 수정.
+				const content = this.getContent();
+				if (content) {
+					content.setAnchoredPosition(this.#scrollOffset);
+				}
+
+				if (timeDelta > 0) {
+					const rawVelocityX = (viewInputPosition.x - this.#previousViewInputPosition.x) / timeDelta;
+					const rawVelocityY = (viewInputPosition.y - this.#previousViewInputPosition.y) / timeDelta;
+					const velocityX = this.#horizontalEnabled ? rawVelocityX : 0;
+					const velocityY = this.#verticalEnabled ? rawVelocityY : 0;
+					this.#scrollVelocity = Vector2.create(velocityX, velocityY);
+				}
 			}
-		}
-		// 뗌.
-		else if (inputManager.isTouchReleased()) {
-			this.#isDragging = false;
+			else {
+				this.applyScrollOffset(proposedOffset);
+			}
+			this.#previousViewInputPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
 		}
 
 		if (this.#scrollMode === ScrollMode.elastic && !this.#isDragging) {

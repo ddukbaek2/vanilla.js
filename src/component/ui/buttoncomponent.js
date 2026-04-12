@@ -4,6 +4,7 @@
 import { Enum } from "../../base/identifier.js";
 import { Graphic } from "../../core/graphic.js";
 import { UIComponent } from "./uicomponent.js";
+import { UINode } from "../../core/node/uinode.js";
 import { Color } from "../../base/color.js";
 import * as Math from "../../base/math.js";
 import { SpriteComponent } from "../spritecomponent.js";
@@ -65,6 +66,20 @@ export class ButtonComponent extends UIComponent {
 	}
 
 	//==============================================================================
+	// 노드에 붙음. (UINode의 isInteractable을 자동 활성화)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { ComponentNode } node
+	 */
+	attach(node) {
+		super.attach(node);
+		if (node instanceof UINode) {
+			node.setInteractable(true);
+		}
+	}
+
+	//==============================================================================
 	// 갱신.
 	//==============================================================================
 	/**
@@ -73,7 +88,6 @@ export class ButtonComponent extends UIComponent {
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
-		this.updateButtonState();
 		this.updateTintTransition(timeDelta);
 	}
 
@@ -89,53 +103,52 @@ export class ButtonComponent extends UIComponent {
 	}
 
 	//==============================================================================
-	// 버튼 갱신.
+	// 터치 누름. (TouchRaycaster → UINode → ButtonComponent)
 	//==============================================================================
-	updateButtonState() {
+	/**
+	 * @param { Vector2 } viewInputPosition
+	 */
+	touchPress(viewInputPosition) {
 		if (!this.#isInteractable) {
 			return;
 		}
+		this.#isPressTracking = true;
+		this.setButtonState(ButtonState.pressed);
+		this.collectColorTargets();
+		if (this.#pressedEvent) {
+			this.#pressedEvent(this);
+		}
+	}
 
-		const engine = this.getEngine();
-		if (!engine) {
+	//==============================================================================
+	// 터치 뗌. (TouchRaycaster → UINode → ButtonComponent)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition
+	 */
+	touchRelease(viewInputPosition) {
+		if (!this.#isInteractable) {
 			return;
+		}
+		if (!this.#isPressTracking) {
+			return;
+		}
+		this.#isPressTracking = false;
+		this.setButtonState(ButtonState.released);
+		if (this.#releasedEvent) {
+			this.#releasedEvent(this);
 		}
 		const node = this.getNode();
-		if (!node) {
-			return;
-		}
-		const inputManager = engine.getInputManager();
-		const viewInputPosition = inputManager.getViewInputPosition();
 		const isInsideBounds = node.contains(viewInputPosition);
-
-		if (inputManager.isTouchPressed()) {
-			if (isInsideBounds) {
-				this.#isPressTracking = true;
-				this.setButtonState(ButtonState.pressed);
-				this.collectColorTargets();
-				if (this.#pressedEvent) {
-					this.#pressedEvent(this);
-				}
+		if (isInsideBounds) {
+			if (this.#clickedEvent) {
+				this.#clickedEvent(this);
+			}
+			if (this.#clickEvent) {
+				this.#clickEvent(this);
 			}
 		}
-		else if (inputManager.isTouchReleased()) {
-			if (this.#isPressTracking) {
-				this.#isPressTracking = false;
-				this.setButtonState(ButtonState.released);
-				if (this.#releasedEvent) {
-					this.#releasedEvent(this);
-				}
-				if (isInsideBounds) {
-					if (this.#clickedEvent) {
-						this.#clickedEvent(this);
-					}
-					if (this.#clickEvent) {
-						this.#clickEvent(this);
-					}
-				}
-				this.setButtonState(ButtonState.normal);
-			}
-		}
+		this.setButtonState(ButtonState.normal);
 	}
 
 	//==============================================================================
