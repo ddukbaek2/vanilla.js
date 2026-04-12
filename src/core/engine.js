@@ -102,7 +102,7 @@ export class Engine extends Object {
 		this.#updateEngineCallback = this.updateEngine.bind(this);
 
 		this.#statisticsTextRect = Rect.zero();
-		this.#version = Version.create(0, 1, 0);
+		this.#version = Version.create(0, 2, 0);
 
 		// 이벤트 설정.
 		this.setupAllDocumentEvents();
