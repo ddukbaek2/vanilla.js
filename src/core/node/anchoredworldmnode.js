@@ -59,20 +59,15 @@ export class AnchoredWorldNode extends WorldNode {
 		}
 
 		const parentSize = parent.getContentSize();
-		const parentPivot = parent.getPivot();
 		const anchorMin = this.#anchorMin;
 		const anchorMax = this.#anchorMax;
 		const pivot = this.getPivot();
 
-		// 부모의 피봇 위치를 (0,0)으로 했을 때의 부모 좌상단 좌표
-		const parentLeft = -parentSize.x * parentPivot.x;
-		const parentTop = -parentSize.y * parentPivot.y;
-
-		// 앵커 영역 계산
-		const anchorMinLocalX = parentLeft + parentSize.x * anchorMin.x;
-		const anchorMinLocalY = parentTop + parentSize.y * anchorMin.y;
-		const anchorMaxLocalX = parentLeft + parentSize.x * anchorMax.x;
-		const anchorMaxLocalY = parentTop + parentSize.y * anchorMax.y;
+		// 앵커 영역 계산 (부모 좌상단 기준).
+		const anchorMinLocalX = parentSize.x * anchorMin.x;
+		const anchorMinLocalY = parentSize.y * anchorMin.y;
+		const anchorMaxLocalX = parentSize.x * anchorMax.x;
+		const anchorMaxLocalY = parentSize.y * anchorMax.y;
 
 		// 앵커 기준점 (자신의 피봇 비율에 따라 결정)
 		const anchorRefX = Math.lerp(anchorMinLocalX, anchorMaxLocalX, pivot.x);
@@ -191,18 +186,14 @@ export class AnchoredWorldNode extends WorldNode {
 		}
 
 		const parentSize = parent.getContentSize();
-		const parentPivot = parent.getPivot();
 		const anchorMin = this.getAnchorMin();
 		const anchorMax = this.getAnchorMax();
 		const pivot = this.getPivot();
 
-		const parentLeft = -parentSize.x * parentPivot.x;
-		const parentTop = -parentSize.y * parentPivot.y;
-
-		const anchorMinLocalX = parentLeft + parentSize.x * anchorMin.x;
-		const anchorMinLocalY = parentTop + parentSize.y * anchorMin.y;
-		const anchorMaxLocalX = parentLeft + parentSize.x * anchorMax.x;
-		const anchorMaxLocalY = parentTop + parentSize.y * anchorMax.y;
+		const anchorMinLocalX = parentSize.x * anchorMin.x;
+		const anchorMinLocalY = parentSize.y * anchorMin.y;
+		const anchorMaxLocalX = parentSize.x * anchorMax.x;
+		const anchorMaxLocalY = parentSize.y * anchorMax.y;
 
 		const anchorRefX = Math.lerp(anchorMinLocalX, anchorMaxLocalX, pivot.x);
 		const anchorRefY = Math.lerp(anchorMinLocalY, anchorMaxLocalY, pivot.y);

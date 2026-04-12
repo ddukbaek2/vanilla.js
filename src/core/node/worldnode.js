@@ -13,7 +13,7 @@ import { TransformNode } from "./transformnode.js";
 
 //==============================================================================
 // 계층적 영역 객체.
-// - Pivot, ConetentSize 기능.
+// - Anchor, Pivot, ConetentSize 기능.
 //==============================================================================
 export class WorldNode extends TransformNode {
     //==============================================================================
@@ -21,6 +21,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /** @private @type { Vector2 } */ #pivot; // 기준점.
     /** @private @type { Vector2 } */ #contentSize; // 크기.
+    /** @private @type { Vector2 } */ #anchor; // 앵커 (부모 영역 내 기준점).
 
     //==============================================================================
     // 생성.
@@ -33,6 +34,7 @@ export class WorldNode extends TransformNode {
 
         this.#pivot = Pivot.middleCenter;
         this.#contentSize = Vector2.zero();
+        this.#anchor = Vector2.zero();
     }
 
     //==============================================================================
@@ -51,13 +53,13 @@ export class WorldNode extends TransformNode {
         if (canvasRenderingContext) {
             canvasRenderingContext.save();
 
-            // 부모 노드의 피봇 반영 되돌리기.
+            // 자신의 앵커를 통해 부모 영역 내 기준점 반영.
             const parent = this.getParent();
             if (parent && parent instanceof WorldNode) {
-                const parentPivot = parent.getPivot();
                 const parentContentSize = parent.getContentSize();
-                const parentPivotPosition = Vector2.create(parentContentSize.x * parentPivot.x, parentContentSize.y * parentPivot.y);
-                canvasRenderingContext.translate(parentPivotPosition.x, parentPivotPosition.y);
+                const anchor = this.getAnchor();
+                const anchorPosition = Vector2.create(parentContentSize.x * anchor.x, parentContentSize.y * anchor.y);
+                canvasRenderingContext.translate(anchorPosition.x, anchorPosition.y);
             }
 
             // 트랜스폼 반영.
@@ -175,10 +177,71 @@ export class WorldNode extends TransformNode {
     // 실제 내용 크기 반환.
     //==============================================================================
     /**
-     * @returns { Vector2 } 
+     * @returns { Vector2 }
      */
     getContentSize() {
         return this.#contentSize;
+    }
+
+    //==============================================================================
+    // 앵커 설정.
+    //==============================================================================
+    /**
+     * @param { Vector2 } anchor
+     */
+    setAnchor(anchor) {
+        this.#anchor = anchor;
+        this.#anchor.x = Math.clamp(anchor.x, 0, 1);
+        this.#anchor.y = Math.clamp(anchor.y, 0, 1);
+    }
+
+    //==============================================================================
+    // 앵커 반환.
+    //==============================================================================
+    /**
+     * @returns { Vector2 }
+     */
+    getAnchor() {
+        return this.#anchor;
+    }
+
+    //==============================================================================
+    // 글로벌 위치 반환. (앵커 오프셋 반영)
+    //==============================================================================
+    /**
+     * @override
+     * @returns { Vector2 }
+     */
+    getPosition() {
+        const parent = this.getParent();
+        if (!(parent instanceof WorldNode)) {
+            return super.getPosition();
+        }
+
+        const localPosition = this.getLocalPosition();
+        const parentPosition = parent.getPosition();
+        const parentContentSize = parent.getContentSize();
+        const parentPivot = parent.getPivot();
+        const parentRotation = parent.getRotation();
+        const parentScale = parent.getScale();
+        const anchor = this.getAnchor();
+
+        // 앵커 기준점과 부모 피봇의 차이 (부모 로컬 공간).
+        const anchorOffsetX = parentContentSize.x * (anchor.x - parentPivot.x);
+        const anchorOffsetY = parentContentSize.y * (anchor.y - parentPivot.y);
+
+        // 앵커 오프셋과 로컬 포지션의 합산.
+        const totalLocalX = anchorOffsetX + localPosition.x;
+        const totalLocalY = anchorOffsetY + localPosition.y;
+
+        const radian = Math.degreeToRadian(parentRotation);
+        const cosRadian = Math.cos(radian);
+        const sinRadian = Math.sin(radian);
+        const sx = totalLocalX * parentScale.x;
+        const sy = totalLocalY * parentScale.y;
+        const rx = sx * cosRadian - sy * sinRadian;
+        const ry = sx * sinRadian + sy * cosRadian;
+        return Vector2.create(parentPosition.x + rx, parentPosition.y + ry);
     }
 
     //==============================================================================
