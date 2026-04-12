@@ -157,12 +157,13 @@ export class DynamicFont extends Object {
 	 */
 	buildAtlas(charset) {
 		const fontFamily = this.#fontAsset ? this.#fontAsset.fontFace.family : '-apple-system, sans-serif';
-		const fontString = `${this.#fontSize}px ${fontFamily}`;
+		const fontSize = this.getFontSize();
+		const fontString = `${fontSize}px ${fontFamily}`;
 
 		// 글리프 메트릭스 측정용 임시 캔버스.
 		const measureCanvas = document.createElement('canvas');
 		measureCanvas.width = ATLAS_MAX_WIDTH;
-		measureCanvas.height = this.#fontSize * 2;
+		measureCanvas.height = fontSize * 2;
 		const measureContext = measureCanvas.getContext('2d');
 		measureContext.font = fontString;
 
@@ -205,9 +206,10 @@ export class DynamicFont extends Object {
 
 		// 아틀라스 캔버스 생성.
 		this.#atlasCanvas = document.createElement('canvas');
-		this.#atlasCanvas.width = ATLAS_MAX_WIDTH;
-		this.#atlasCanvas.height = atlasHeight;
-		const atlasContext = this.#atlasCanvas.getContext('2d');
+		const atlasCanvas = this.getAtlasCanvas();
+		atlasCanvas.width = ATLAS_MAX_WIDTH;
+		atlasCanvas.height = atlasHeight;
+		const atlasContext = atlasCanvas.getContext('2d');
 		atlasContext.font = fontString;
 		atlasContext.fillStyle = '#ffffff';
 		atlasContext.textBaseline = 'alphabetic';
@@ -226,7 +228,8 @@ export class DynamicFont extends Object {
 				entry.glyphPixelWidth,
 				entry.glyphPixelHeight
 			);
-			glyphInfo.advance = entry.metrics.width + this.#letterSpacing;
+			const letterSpacing = this.getLetterSpacing();
+			glyphInfo.advance = entry.metrics.width + letterSpacing;
 			glyphInfo.bearingX = entry.metrics.actualBoundingBoxLeft;
 			glyphInfo.bearingY = entry.metrics.actualBoundingBoxAscent;
 			this.#glyphMap.set(entry.char, glyphInfo);
