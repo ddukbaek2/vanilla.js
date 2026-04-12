@@ -83,9 +83,19 @@ export class ColorComponent extends Component {
 	// 색상 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color } 
+	 * @returns { Color }
 	 */
 	getColor() {
 		return this.#color;
+	}
+
+	//==============================================================================
+	// 라운드 크기 설정.
+	//==============================================================================
+	/**
+	 * @param { number } roundSize
+	 */
+	setRoundSize(roundSize) {
+		this.#roundSize = roundSize;
 	}
 }
