@@ -3,12 +3,12 @@
 //==============================================================================
 import { Enum } from "../../base/identifier.js";
 import { Graphic } from "../../core/graphic.js";
-import { UIComponent } from "./uicomponent.js";
+import { UI } from "./ui.js";
 import { UINode } from "../../core/node/uinode.js";
 import { Color } from "../../base/color.js";
 import * as Math from "../../base/math.js";
-import { SpriteComponent } from "../spritecomponent.js";
-import { LabelComponent } from "../labelcomponent.js";
+import { Sprite } from "../sprite.js";
+import { Label } from "../label.js";
 
 
 //==============================================================================
@@ -26,15 +26,15 @@ export const ButtonState = {
 //==============================================================================
 // 버튼.
 //==============================================================================
-export class ButtonComponent extends UIComponent {
+export class Button extends UI {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { ButtonState } */ #buttonState;
-	/** @private @type { function(ButtonComponent): boolean } */ #clickEvent;
-	/** @private @type { function(ButtonComponent): void } */ #pressedEvent;
-	/** @private @type { function(ButtonComponent): void } */ #releasedEvent;
-	/** @private @type { function(ButtonComponent): void } */ #clickedEvent;
+	/** @private @type { function(Button): boolean } */ #clickEvent;
+	/** @private @type { function(Button): void } */ #pressedEvent;
+	/** @private @type { function(Button): void } */ #releasedEvent;
+	/** @private @type { function(Button): void } */ #clickedEvent;
 	/** @private @type { boolean } */ #isPressTracking;
 	/** @private @type { Color } */ #pressedTintColor;
 	/** @private @type { number } */ #transitionDuration;
@@ -51,6 +51,7 @@ export class ButtonComponent extends UIComponent {
 	 */
 	constructor() {
 		super();
+		this.componentType = 'Button';
 		this.#buttonState = ButtonState.normal;
 		this.#clickEvent = null;
 		this.#pressedEvent = null;
@@ -103,7 +104,7 @@ export class ButtonComponent extends UIComponent {
 	}
 
 	//==============================================================================
-	// 터치 누름. (TouchRaycaster → UINode → ButtonComponent)
+	// 터치 누름. (TouchRaycaster → UINode → Button)
 	//==============================================================================
 	/**
 	 * @param { Vector2 } viewInputPosition
@@ -122,7 +123,7 @@ export class ButtonComponent extends UIComponent {
 	}
 
 	//==============================================================================
-	// 터치 뗌. (TouchRaycaster → UINode → ButtonComponent)
+	// 터치 뗌. (TouchRaycaster → UINode → Button)
 	//==============================================================================
 	/**
 	 * @param { Vector2 } viewInputPosition
@@ -136,6 +137,8 @@ export class ButtonComponent extends UIComponent {
 		}
 		this.#isPressTracking = false;
 		this.setButtonState(ButtonState.released);
+		this.#tintProgress = 0;
+		this.applyTintProgress(0);
 		const releasedEvent = this.getReleasedEvent();
 		if (releasedEvent) {
 			releasedEvent(this);
@@ -230,11 +233,11 @@ export class ButtonComponent extends UIComponent {
 	// 노드에서 색상 대상 재귀 수집.
 	//==============================================================================
 	collectFromNode(node) {
-		const spriteComponents = node.getComponents(SpriteComponent);
+		const spriteComponents = node.getComponents(Sprite);
 		for (const spriteComponent of spriteComponents) {
 			this.#colorEntries.push({ type: 'sprite', component: spriteComponent });
 		}
-		const labelComponents = node.getComponents(LabelComponent);
+		const labelComponents = node.getComponents(Label);
 		for (const labelComponent of labelComponents) {
 			const originalColor = labelComponent.getTextColor();
 			const copiedColor = new Color(originalColor.red, originalColor.green, originalColor.blue, originalColor.alpha);
@@ -274,7 +277,7 @@ export class ButtonComponent extends UIComponent {
 	// 클릭 이벤트 설정.
 	//==============================================================================
 	/**
-	 * @param { function(ButtonComponent): boolean } callback
+	 * @param { function(Button): boolean } callback
 	 */
 	setClickEvent(callback) {
 		this.#clickEvent = callback;
@@ -284,7 +287,7 @@ export class ButtonComponent extends UIComponent {
 	// 클릭 이벤트 설정.
 	//==============================================================================
 	/**
-	 * @param { function(ButtonComponent): boolean } callback
+	 * @param { function(Button): boolean } callback
 	 */
 	setStateEvent(buttonState, callback) {
 		// this.#clickEvent = callback;
@@ -299,7 +302,7 @@ export class ButtonComponent extends UIComponent {
 	// 클릭 이벤트 반환.
 	//==============================================================================
 	/**
-	 * @returns { function(ButtonComponent): boolean }
+	 * @returns { function(Button): boolean }
 	 */
 	getClickEvent() {
 		return this.#clickEvent;
@@ -309,7 +312,7 @@ export class ButtonComponent extends UIComponent {
 	// 누름 이벤트 설정.
 	//==============================================================================
 	/**
-	 * @param { function(ButtonComponent): void } callback
+	 * @param { function(Button): void } callback
 	 */
 	setPressedEvent(callback) {
 		this.#pressedEvent = callback;
@@ -319,7 +322,7 @@ export class ButtonComponent extends UIComponent {
 	// 누름 이벤트 반환.
 	//==============================================================================
 	/**
-	 * @returns { function(ButtonComponent): void }
+	 * @returns { function(Button): void }
 	 */
 	getPressedEvent() {
 		return this.#pressedEvent;
@@ -329,7 +332,7 @@ export class ButtonComponent extends UIComponent {
 	// 뗌 이벤트 설정.
 	//==============================================================================
 	/**
-	 * @param { function(ButtonComponent): void } callback
+	 * @param { function(Button): void } callback
 	 */
 	setReleasedEvent(callback) {
 		this.#releasedEvent = callback;
@@ -339,7 +342,7 @@ export class ButtonComponent extends UIComponent {
 	// 뗌 이벤트 반환.
 	//==============================================================================
 	/**
-	 * @returns { function(ButtonComponent): void }
+	 * @returns { function(Button): void }
 	 */
 	getReleasedEvent() {
 		return this.#releasedEvent;
@@ -349,7 +352,7 @@ export class ButtonComponent extends UIComponent {
 	// 클릭됨 이벤트 설정.
 	//==============================================================================
 	/**
-	 * @param { function(ButtonComponent): void } callback
+	 * @param { function(Button): void } callback
 	 */
 	setClickedEvent(callback) {
 		this.#clickedEvent = callback;
@@ -359,7 +362,7 @@ export class ButtonComponent extends UIComponent {
 	// 클릭됨 이벤트 반환.
 	//==============================================================================
 	/**
-	 * @returns { function(ButtonComponent): void }
+	 * @returns { function(Button): void }
 	 */
 	getClickedEvent() {
 		return this.#clickedEvent;

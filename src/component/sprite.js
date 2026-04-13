@@ -6,8 +6,8 @@ import { Rect } from "../base/rect.js";
 import * as Math from "../base/math.js";
 import { ImageAsset } from "../resource/imageasset.js";
 import { Graphic } from "../core/graphic.js";
-import { ColorComponent } from "./colorcomponent.js";
-import { Color } from "../base/color.js";
+import { Color } from "./color.js";
+import { Color as ColorValue } from "../base/color.js";
 
 
 //==============================================================================
@@ -56,7 +56,7 @@ export const SpriteBlendMode = {
 //==============================================================================
 // 스프라이트 출력자 컴포넌트.
 //==============================================================================
-export class SpriteComponent extends ColorComponent {
+export class Sprite extends Color {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -78,6 +78,7 @@ export class SpriteComponent extends ColorComponent {
 	 */
 	constructor() {
 		super();
+		this.componentType = 'Sprite';
 		this.#image = null;
 		this.#imageRect = Rect.zero();
 		this.#isHorizontalFlip = false;
@@ -87,14 +88,14 @@ export class SpriteComponent extends ColorComponent {
 		this.#nineSlice = Rect.zero();
 		this.#tintCanvas = null;
 		this.#tintContext = null;
-		super.setColor(Color.transparent());
+		super.setColor(ColorValue.transparent());
 	}
 
 	//==============================================================================
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta 
+	 * @param { number } timeDelta
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
@@ -365,7 +366,7 @@ export class SpriteComponent extends ColorComponent {
 	// 이미지 설정.
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement | ImageAsset } image 
+	 * @param { HTMLImageElement | ImageAsset } image
 	 */
 	setImage(image) {
 		if (image === null || image === undefined) {
@@ -438,7 +439,7 @@ export class SpriteComponent extends ColorComponent {
 	isHorizontalFlip() {
 		return this.#isHorizontalFlip;
 	}
-	
+
 	//==============================================================================
 	// 이미지 뒤집기 여부 반환.
 	//==============================================================================

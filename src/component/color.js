@@ -1,7 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { Color } from "../base/color.js";
+import { Color as ColorValue } from "../base/color.js";
 import { Rect } from "../base/rect.js";
 import { Graphic } from "../core/graphic.js";
 import { Component } from "../core/component.js";
@@ -11,11 +11,11 @@ import { TransformNode } from "../core/node/transformnode.js";
 //==============================================================================
 // 내용의 색상과 투명도를 결정하는 컴포넌트.
 //==============================================================================
-export class ColorComponent extends Component {
+export class Color extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { Color } */ #color; // 컬러.
+	/** @private @type { ColorValue } */ #color; // 컬러.
 	/** @private @type { number } */ #roundSize; // 라운드 사이즈.
 
 	//==============================================================================
@@ -26,7 +26,8 @@ export class ColorComponent extends Component {
 	 */
 	constructor() {
 		super();
-		this.#color = Color.white();
+		this.componentType = 'Color';
+		this.#color = ColorValue.white();
 		this.#roundSize = 0;
 	}
 
@@ -34,7 +35,7 @@ export class ColorComponent extends Component {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic
 	 */
 	draw(graphic) {
 		// super.draw(graphic);
@@ -60,21 +61,21 @@ export class ColorComponent extends Component {
 	// 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { Color | string | CanvasGradient | CanvasPattern } other
+	 * @param { ColorValue | string | CanvasGradient | CanvasPattern } other
 	 */
 	setColor(other) {
 		if (other === null || other === undefined) {
-			this.#color = Color.transparent();
+			this.#color = ColorValue.transparent();
 		}
 		else if (typeof other === "string") {
 			if (other.startsWith("#")) {
-				this.#color = Color.createFromHEX(other);
+				this.#color = ColorValue.createFromHEX(other);
 			}
 			else if (other.startsWith("rgb")) {
-				this.#color = Color.createFromRGBA(other);
+				this.#color = ColorValue.createFromRGBA(other);
 			}
 		}
-		else if (other instanceof Color) {
+		else if (other instanceof ColorValue) {
 			this.#color = other;
 		}
 	}
@@ -83,7 +84,7 @@ export class ColorComponent extends Component {
 	// 색상 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { ColorValue }
 	 */
 	getColor() {
 		return this.#color;

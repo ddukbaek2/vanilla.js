@@ -38,7 +38,7 @@ export const TextBaseline = {
 //==============================================================================
 // 텍스트 출력기 컴포넌트.
 //==============================================================================
-export class LabelComponent extends Component {
+export class Label extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -57,6 +57,7 @@ export class LabelComponent extends Component {
 	//==============================================================================
 	constructor() {
 		super();
+		this.componentType = 'Label';
 		this.#fontFace = null;
 		this.#text = "";
 		this.#fontSize = 32;
@@ -73,7 +74,7 @@ export class LabelComponent extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta 
+	 * @param { number } timeDelta
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
@@ -84,7 +85,7 @@ export class LabelComponent extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic
 	 */
 	draw(graphic) {
 		const text = this.getText();
@@ -130,7 +131,7 @@ export class LabelComponent extends Component {
 	// 폰트 설정.
 	//==============================================================================
 	/**
-	 * @param { FontFace | FontAsset } font 
+	 * @param { FontFace | FontAsset } font
 	 */
 	setFont(font) {
 		if (font === null || font === undefined) {
@@ -148,7 +149,7 @@ export class LabelComponent extends Component {
 	// 폰트 반환.
 	//==============================================================================
 	/**
-	 * @returns { FontFace } 
+	 * @returns { FontFace }
 	 */
 	getFontFace() {
 		return this.#fontFace;
@@ -216,7 +217,7 @@ export class LabelComponent extends Component {
 			this.#textColor = color;
 		}
 	}
-	
+
 	//==============================================================================
 	// 텍스트 색상 반환.
 	//==============================================================================
@@ -294,7 +295,7 @@ export class LabelComponent extends Component {
 	//==============================================================================
 	/**
 	 * @param { Graphic } graphic
-	 * @param { LabelComponent } textDrawerComponent
+	 * @param { Label } textDrawerComponent
 	 * @param { string } text
 	 * @param { string } font
 	 * @returns { Rect }

@@ -1,21 +1,21 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { ButtonComponent } from "./buttoncomponent.js";
+import { Button } from "./button.js";
 import { Color } from "../../base/color.js";
 
 
 //==============================================================================
 // 토글 버튼 컴포넌트.
 //==============================================================================
-export class ToggleButtonComponent extends ButtonComponent {
+export class ToggleButton extends Button {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { boolean } */ #isOn;
 	/** @private @type { Color } */ #onTintColor;
-	/** @private @type { function(ToggleButtonComponent): void } */ #toggledEvent;
-	/** @private @type { function(ToggleButtonComponent): void } */ #externalClickedEvent;
+	/** @private @type { function(ToggleButton): void } */ #toggledEvent;
+	/** @private @type { function(ToggleButton): void } */ #externalClickedEvent;
 
 	//==============================================================================
 	// 생성.
@@ -25,6 +25,7 @@ export class ToggleButtonComponent extends ButtonComponent {
 	 */
 	constructor() {
 		super();
+		this.componentType = 'ToggleButton';
 		this.#isOn = false;
 		this.#onTintColor = new Color(0, 0, 0, 0.3);
 		this.#toggledEvent = null;
@@ -54,7 +55,7 @@ export class ToggleButtonComponent extends ButtonComponent {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { function(ToggleButtonComponent): void } callback
+	 * @param { function(ToggleButton): void } callback
 	 */
 	setClickedEvent(callback) {
 		this.#externalClickedEvent = callback;
@@ -129,7 +130,7 @@ export class ToggleButtonComponent extends ButtonComponent {
 	// 토글 이벤트 설정.
 	//==============================================================================
 	/**
-	 * @param { function(ToggleButtonComponent): void } callback
+	 * @param { function(ToggleButton): void } callback
 	 */
 	setToggledEvent(callback) {
 		this.#toggledEvent = callback;
@@ -139,7 +140,7 @@ export class ToggleButtonComponent extends ButtonComponent {
 	// 토글 이벤트 반환.
 	//==============================================================================
 	/**
-	 * @returns { function(ToggleButtonComponent): void }
+	 * @returns { function(ToggleButton): void }
 	 */
 	getToggledEvent() {
 		return this.#toggledEvent;

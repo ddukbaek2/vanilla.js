@@ -10,7 +10,7 @@ import { Graphic } from "./src/core/graphic.js";
 import { Scene } from "./src/core/scene.js";
 import { ViewScaleMode } from "./src/core/viewmanager.js";
 import { Pivot } from "./src/base/pivot.js";
-import { ColorComponent } from "./src/component/colorcomponent.js";
+import { Color as ColorComponent } from "./src/component/color.js";
 import { WorldNode } from "./src/core/node/worldnode.js";
 
 

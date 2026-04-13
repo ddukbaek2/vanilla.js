@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { ScrollViewComponent, ScrollMode } from "./scrollviewcomponent.js";
+import { ScrollView, ScrollMode } from "./scrollview.js";
 import { Vector2 } from "../../base/vector2.js";
 import * as Math from "../../base/math.js";
 import { Tween } from "../../core/tween.js";
@@ -10,7 +10,7 @@ import { Tween } from "../../core/tween.js";
 
 //==============================================================================
 // 스냅 스크롤뷰 컴포넌트.
-// - ScrollViewComponent를 상속하며, 드래그 해제 시 지정한 아이템 중앙으로 스냅된다.
+// - ScrollView를 상속하며, 드래그 해제 시 지정한 아이템 중앙으로 스냅된다.
 // - 아이템 크기가 각각 달라도 각 아이템 중앙이 뷰포트 중앙에 오도록 스냅된다.
 // - 가로 스냅: setHorizontal(true), setVertical(false) (기본값)
 // - 세로 스냅: setHorizontal(false), setVertical(true)
@@ -23,7 +23,7 @@ import { Tween } from "../../core/tween.js";
 // [페이지 이동]
 // - pageTo(index, smooth): 지정 인덱스로 이동. smooth=true이면 트윈, false이면 즉시 이동.
 //==============================================================================
-export class SnapScrollViewComponent extends ScrollViewComponent {
+export class SnapScrollView extends ScrollView {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -38,7 +38,7 @@ export class SnapScrollViewComponent extends ScrollViewComponent {
 	//==============================================================================
 	constructor() {
 		super();
-
+		this.componentType = 'SnapScrollView';
 		this.setScrollMode(ScrollMode.clamp);
 		this.setHorizontal(true);
 		this.setVertical(false);

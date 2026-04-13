@@ -31,7 +31,7 @@ export class WorldNode extends TransformNode {
      */
     constructor() {
         super();
-
+		this.nodeType = 'WorldNode';
         this.#pivot = Pivot.middleCenter;
         this.#contentSize = Vector2.zero();
         this.#anchor = Vector2.zero();

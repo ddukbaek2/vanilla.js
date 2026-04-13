@@ -63,20 +63,20 @@ export { Animation } from "./src/core/animation.js";
 //==============================================================================
 // 컴포넌트 목록.
 //==============================================================================
-export { ColorComponent } from "./src/component/colorcomponent.js";
-export { SpriteComponent } from "./src/component/spritecomponent.js";
-export { LabelComponent } from "./src/component/labelcomponent.js";
+export { Color as ColorComponent } from "./src/component/color.js";
+export { Sprite as SpriteComponent } from "./src/component/sprite.js";
+export { Label as LabelComponent } from "./src/component/label.js";
 
 
 //==============================================================================
 // UI/컴포넌트 목록.
 //==============================================================================
-export { UIComponent } from "./src/component/ui/uicomponent.js";
-export { ButtonComponent } from "./src/component/ui/buttoncomponent.js";
-export { ToggleButtonComponent } from "./src/component/ui/togglebuttoncomponent.js";
-export { ViewComponent } from "./src/component/ui/viewcomponent.js";
-export { ScrollViewComponent } from "./src/component/ui/scrollviewcomponent.js";
-export { SnapScrollViewComponent } from "./src/component/ui/snapscrollviewcomponent.js";
+export { UI as UIComponent } from "./src/component/ui/ui.js";
+export { Button as ButtonComponent } from "./src/component/ui/button.js";
+export { ToggleButton as ToggleButtonComponent } from "./src/component/ui/togglebutton.js";
+export { View as ViewComponent } from "./src/component/ui/view.js";
+export { ScrollView as ScrollViewComponent } from "./src/component/ui/scrollview.js";
+export { SnapScrollView as SnapScrollViewComponent } from "./src/component/ui/snapscrollview.js";
 
 
 //==============================================================================

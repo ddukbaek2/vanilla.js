@@ -26,6 +26,7 @@ export class AnchoredWorldNode extends WorldNode {
 	//==============================================================================
 	constructor() {
 		super();
+		this.nodeType = 'AnchoredWorldNode';
 		this.#anchoredPosition = Vector2.zero();
 		this.#sizeDelta = Vector2.zero();
 		this.#anchorMin = Vector2.create(0.5, 0.5);

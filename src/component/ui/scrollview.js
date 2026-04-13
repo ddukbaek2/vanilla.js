@@ -1,7 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { ViewComponent } from "./viewcomponent.js";
+import { View } from "./view.js";
 import { UINode } from "../../core/node/uinode.js";
 import { Vector2 } from "../../base/vector2.js";
 import * as Math from "../../base/math.js";
@@ -25,7 +25,7 @@ export const ScrollMode = {
 // - AnchoredWorldNode에 추가하면 마스크(크롭)가 자동 활성화된다.
 // - 중첩 ScrollView를 지원한다. (TouchRaycaster와 연동)
 //==============================================================================
-export class ScrollViewComponent extends ViewComponent {
+export class ScrollView extends View {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -49,7 +49,7 @@ export class ScrollViewComponent extends ViewComponent {
 	 */
 	constructor() {
 		super();
-
+		this.componentType = 'ScrollView';
 		this.#scrollOffset = Vector2.zero();
 		this.#scrollContentSize = Vector2.zero();
 		this.#isDragging = false;
@@ -78,7 +78,7 @@ export class ScrollViewComponent extends ViewComponent {
 	}
 
 	//==============================================================================
-	// 터치 누름. (TouchRaycaster → UINode → ScrollViewComponent)
+	// 터치 누름. (TouchRaycaster → UINode → ScrollView)
 	//==============================================================================
 	/**
 	 * @param { Vector2 } viewInputPosition
@@ -94,7 +94,7 @@ export class ScrollViewComponent extends ViewComponent {
 	}
 
 	//==============================================================================
-	// 터치 이동. (TouchRaycaster → UINode → ScrollViewComponent)
+	// 터치 이동. (TouchRaycaster → UINode → ScrollView)
 	//==============================================================================
 	/**
 	 * @param { Vector2 } viewInputPosition
@@ -106,7 +106,7 @@ export class ScrollViewComponent extends ViewComponent {
 	}
 
 	//==============================================================================
-	// 터치 뗌. (TouchRaycaster → UINode → ScrollViewComponent)
+	// 터치 뗌. (TouchRaycaster → UINode → ScrollView)
 	//==============================================================================
 	/**
 	 * @param { Vector2 } viewInputPosition
@@ -116,7 +116,7 @@ export class ScrollViewComponent extends ViewComponent {
 	}
 
 	//==============================================================================
-	// 터치 취소. (TouchRaycaster → UINode → ScrollViewComponent)
+	// 터치 취소. (TouchRaycaster → UINode → ScrollView)
 	//==============================================================================
 	/**
 	 * @param { Vector2 } viewInputPosition

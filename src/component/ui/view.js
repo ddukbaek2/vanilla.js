@@ -9,16 +9,16 @@ import { Vector2 } from "../../base/vector2.js";
 import { Graphic } from "../../core/graphic.js";
 import { AnchoredWorldNode } from "../../core/node/anchoredworldmnode.js";
 import { UINode } from "../../core/node/uinode.js";
-import { UIComponent } from "./uicomponent.js";
+import { UI } from "./ui.js";
 
 
 //==============================================================================
 // 뷰 컴포넌트.
-// - ScrollViewComponent, SnapScrollViewComponent 등 모든 뷰 컴포넌트의 기반 클래스.
+// - ScrollView, SnapScrollView 등 모든 뷰 컴포넌트의 기반 클래스.
 // - 타입으로 하위 뷰 컴포넌트를 한번에 조회할 수 있다.
-//   예: node.getComponent(ViewComponent)
+//   예: node.getComponent(View)
 //==============================================================================
-export class ViewComponent extends UIComponent {
+export class View extends UI {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -33,7 +33,7 @@ export class ViewComponent extends UIComponent {
 	 */
 	constructor() {
 		super();
-
+		this.componentType = 'View';
 		this.#content = null;
 		this.#backgroundColor = new Color(1, 1, 1, 1);
 	}

@@ -27,6 +27,7 @@ export class UINode extends AnchoredWorldNode {
 	//==============================================================================
 	constructor() {
 		super();
+		this.nodeType = 'UINode';
 		this.#isMaskEnabled = false;
 		this.#isInteractable = false;
 		this.#isFocused = false;
