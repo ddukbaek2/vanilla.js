@@ -81,6 +81,7 @@ export class UIScrollView extends UIView {
 	// 터치 누름. (TouchRaycaster → UINode → ScrollView)
 	//==============================================================================
 	/**
+	 * @override
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchPress(viewInputPosition) {
@@ -97,6 +98,7 @@ export class UIScrollView extends UIView {
 	// 터치 이동. (TouchRaycaster → UINode → ScrollView)
 	//==============================================================================
 	/**
+	 * @override
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchMove(viewInputPosition) {
@@ -109,6 +111,7 @@ export class UIScrollView extends UIView {
 	// 터치 뗌. (TouchRaycaster → UINode → ScrollView)
 	//==============================================================================
 	/**
+	 * @override
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchRelease(viewInputPosition) {
@@ -119,6 +122,7 @@ export class UIScrollView extends UIView {
 	// 터치 취소. (TouchRaycaster → UINode → ScrollView)
 	//==============================================================================
 	/**
+	 * @override
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchCancel(viewInputPosition) {

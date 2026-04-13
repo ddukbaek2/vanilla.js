@@ -97,7 +97,7 @@ export { TextAsset } from "./src/resource/textasset.js";
 export { ImageScroller } from "./src/misc/imagescroller.js";
 export { TouchParticle, TouchEffect } from "./src/misc/toucheffect.js";
 export { VirtualPad } from "./src/misc/virtualpad.js";
-export { UIBuilder } from "./src/misc/uibuilder.js";
+export { NodeLayout } from "./src/misc/nodelayout.js";
 
 
 //==============================================================================

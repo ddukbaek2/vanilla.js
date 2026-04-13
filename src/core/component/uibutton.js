@@ -159,6 +159,22 @@ export class UIButton extends UIComponent {
 	}
 
 	//==============================================================================
+	// 터치 취소. (TouchRaycaster → UINode → Button)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition
+	 */
+	touchCancel(viewInputPosition) {
+		if (!this.#isPressTracking) {
+			return;
+		}
+		this.#isPressTracking = false;
+		this.#tintProgress = 0;
+		this.applyTintProgress(0);
+		this.setButtonState(ButtonState.normal);
+	}
+
+	//==============================================================================
 	// 틴트 트랜지션 갱신.
 	//==============================================================================
 	/** @private */

@@ -273,7 +273,7 @@ export class Scene extends Object {
 		// 취소됨.
 		else if (inputManager.isTouchCancelled()) {
 			try {
-				this.touchCancel();
+				this.touchCancel(viewInputPosition);
 			}
 			catch (error) {
 				console.error(error);
@@ -319,8 +319,9 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
+	 * @param { Vector2 } viewInputPosition
 	 */
-	touchCancel() {
+	touchCancel(viewInputPosition) {
 
 	}
 
