@@ -65,6 +65,7 @@ export class Engine extends Object {
 	/** @private @type { () => void  } */ #resizeCallback;
 	/** @private @type { () => void  } */ #resumeCallback;
 	/** @private @type { FrameRequestCallback } */ #updateEngineCallback;
+	/** @private @type { number } */ #frameNumber;
 	/** @private @type { Rect } */ #statisticsTextRect;
 	/** @private @type { Version } */ #version;
 
@@ -100,6 +101,7 @@ export class Engine extends Object {
 		this.#resizeCallback = this.resize.bind(this);
 		this.#resumeCallback = this.resume.bind(this);
 		this.#updateEngineCallback = this.updateEngine.bind(this);
+		this.#frameNumber = 0;
 
 		this.#statisticsTextRect = Rect.zero();
 		this.#version = Version.create(0, 2, 0);
@@ -131,6 +133,8 @@ export class Engine extends Object {
 		}).then(() => {
 			// 엔진 실행.
 			System.window.addEventListener("resize", this.#resizeCallback);
+
+			++this.#frameNumber;
 			System.window.requestAnimationFrame(this.#updateEngineCallback);
 		}).catch((error) => {
 			console.error(error);
@@ -611,6 +615,7 @@ export class Engine extends Object {
 		inputManager.setTouchReleased(false);
 
 		// 다음 프레임 호출 요청.
+		++this.#frameNumber;
 		System.window.requestAnimationFrame(this.#updateEngineCallback);
 	}
 
@@ -728,6 +733,16 @@ export class Engine extends Object {
 	 */
 	getEngineConfiguration() {
 		return this.#engineConfiguration;
+	}
+
+	//==============================================================================
+	// 현재 프레임 번호 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getFrameNumber() {
+		return this.#frameNumber;
 	}
 
 	//==============================================================================
