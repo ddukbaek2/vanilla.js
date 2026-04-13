@@ -19,6 +19,8 @@ export class AudioPlayer {
 	/** @private @type { GainNode | null } */ #gainNode;
 	/** @private @type { boolean } */ #isPlaying;
 	/** @private @type { boolean } */ #isMuted;
+	/** @private @type { boolean } */ #isLoop; // 루프 여부.
+	/** @private @type { number } */ #time; // 재생 위치 (초). play() 호출 시 이 위치부터 재생.
 
 	//==============================================================================
 	// 생성.
@@ -34,6 +36,8 @@ export class AudioPlayer {
 		this.#gainNode = null;
 		this.#isPlaying = false;
 		this.#isMuted = false;
+		this.#isLoop = false;
+		this.#time = 0;
 
 		if (audioContext) {
 			this.#gainNode = audioContext.createGain();
@@ -73,6 +77,7 @@ export class AudioPlayer {
 			audioContext.resume();
 		}
 
+		this.#isLoop = loop;
 		this.#audioSource = audioContext.createBufferSource();
 		this.#audioSource.buffer = audioBuffer;
 		this.#audioSource.loop = loop;
@@ -83,7 +88,7 @@ export class AudioPlayer {
 			this.#audioSource = null;
 		};
 
-		this.#audioSource.start(0);
+		this.#audioSource.start(0, this.#time);
 		this.#isPlaying = true;
 	}
 
@@ -116,6 +121,20 @@ export class AudioPlayer {
 		if (this.#gainNode) {
 			this.#gainNode.gain.value = 1;
 			this.#isMuted = false;
+		}
+	}
+
+	//==============================================================================
+	// 재생 위치 설정.
+	// 재생 중이면 해당 위치부터 즉시 다시 재생.
+	//==============================================================================
+	/**
+	 * @param { number } time 재생 위치 (초).
+	 */
+	setTime(time) {
+		this.#time = time;
+		if (this.#isPlaying) {
+			this.play(this.#isLoop);
 		}
 	}
 
@@ -157,6 +176,16 @@ export class AudioPlayer {
 	 */
 	isMuted() {
 		return this.#isMuted;
+	}
+
+	//==============================================================================
+	// 현재 시간 반환. (0~duration)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getTime() {
+		return this.#time;
 	}
 
 	//==============================================================================
