@@ -232,6 +232,17 @@ export class Engine extends Object {
 				this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
+		// 마우스 뗄 때 (캔버스 밖에서 뗄 때 처리).
+		System.window.addEventListener("mouseup", (touchEvent) => {
+				const inputManager = this.getInputManager();
+				if (!inputManager.isTouchMoved()) {
+					return;
+				}
+				inputManager.setTouchMoved(false);
+				inputManager.setTouchReleased(true);
+				this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
+			});
+
 		// 터치 누를 때.
 		canvas.addEventListener("touchstart", (touchEvent) => {
 				const touch = touchEvent.changedTouches[0];

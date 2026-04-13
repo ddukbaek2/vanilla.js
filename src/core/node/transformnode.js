@@ -98,10 +98,10 @@ export class TransformNode extends ComponentNode {
 	 * @param { Graphic } graphic 
 	 */
 	drawGizmos(graphic) {
-		const isGizmoVisible = this.isGizmoVisible();
-		if (!isGizmoVisible) {
-			return;
-		}
+		// const isGizmoVisible = this.isGizmoVisible();
+		// if (!isGizmoVisible) {
+		// 	return;
+		// }
 
 		// 영역 및 기준점 출력.
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();

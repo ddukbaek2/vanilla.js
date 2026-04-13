@@ -2,13 +2,14 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Object } from "../libs/vanilla.js/src/base/object.js";
-import { Engine } from "../libs/vanilla.js/src/core/engine.js";
-import { Graphic } from "../libs/vanilla.js/src/core/graphic.js";
-import { TransformNode } from "../libs/vanilla.js/src/core/node/transformnode.js";
-import { KeyCode } from "../libs/vanilla.js/src/core/inputmanager.js";
-import { Component } from "../libs/vanilla.js/src/core/component.js";
-import { LocalStorage } from "../libs/vanilla.js/src/misc/localstorage.js";
+import { Object } from "../base/object.js";
+import { Engine } from "../core/engine.js";
+import { Graphic } from "../core/graphic.js";
+import { TransformNode } from "../core/node/transformnode.js";
+import { KeyCode } from "../core/inputmanager.js";
+import { Component } from "../core/component.js";
+import { LocalStorage } from "./localstorage.js";
+import { ViewScaleMode } from "../core/viewmanager.js";
 
 
 //==============================================================================
@@ -189,6 +190,9 @@ export class DEVTools extends Object {
 	/** @private @type { number } */ #localStorageScrollDragStartScrollY;
 	/** @private @type { string | null } */ #selectedLocalStorageKey;
 	/** @private @type { boolean } */ #isDimEnabled;
+	/** @private @type { boolean } */ #isAllGizmosVisible;
+	/** @private @type { boolean } */ #isHeightAspectGuideVisible;
+	/** @private @type { boolean } */ #isWidthAspectGuideVisible;
 	/** @private @type { { x: number, y: number, width: number, height: number }[] } */ #ctxButtonRects;
 	/** @private @type { string | null } */ #selectedStatisticsKey;
 	/** @private @type { number } */ #statisticsScrollY;
@@ -243,7 +247,10 @@ export class DEVTools extends Object {
 		this.#localStorageScrollDragStartMouseY = 0;
 		this.#localStorageScrollDragStartScrollY = 0;
 		this.#selectedLocalStorageKey = null;
-		this.#isDimEnabled = true;
+		this.#isDimEnabled = false;
+		this.#isAllGizmosVisible = true;
+		this.#isHeightAspectGuideVisible = false;
+		this.#isWidthAspectGuideVisible = false;
 		this.#ctxButtonRects = [];
 		this.loadSettings();
 		this.#selectedStatisticsKey = null;
@@ -261,6 +268,8 @@ export class DEVTools extends Object {
 	 */
 	setEngine(engine) {
 		this.#engine = engine;
+		const graphic = this.#engine.getGraphic();
+		graphic.setForceGizmosVisible(false);
 	}
 
 	//==============================================================================
@@ -322,6 +331,9 @@ export class DEVTools extends Object {
 		// F2 just-pressed 감지.
 		if (isKeyF2 && !this.#prevIsKeyF2) {
 			this.#isVisible = !this.#isVisible;
+			const graphic = this.#engine.getGraphic();
+			const isForceGizmosVisible = this.#isVisible && this.#isAllGizmosVisible;
+			graphic.setForceGizmosVisible(isForceGizmosVisible);
 		}
 		this.#prevIsKeyF2 = isKeyF2;
 
@@ -437,6 +449,8 @@ export class DEVTools extends Object {
 			// 닫기 버튼.
 			if (inCloseButton) {
 				this.#isVisible = false;
+				const graphic = this.#engine.getGraphic();
+				graphic.setForceGizmosVisible(false);
 				return;
 			}
 			// 패널 드래그 시작.
@@ -1114,6 +1128,9 @@ export class DEVTools extends Object {
 			canvasRenderingContext.restore();
 		}
 
+		// 화면 비율 가이드라인 출력.
+		this.drawAspectGuide(graphic);
+
 		// 배경.
 		canvasRenderingContext.fillStyle = COLOR_BACKGROUND;
 		canvasRenderingContext.fillRect(panelX, panelY, panelWidth, panelHeight);
@@ -1720,6 +1737,66 @@ export class DEVTools extends Object {
 	}
 
 	//==============================================================================
+	// 화면 비율 가이드라인 출력.
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic
+	 */
+	drawAspectGuide(graphic) {
+		if (!this.#isHeightAspectGuideVisible && !this.#isWidthAspectGuideVisible) {
+			return;
+		}
+		if (!this.#engine) {
+			return;
+		}
+		const viewManager = this.#engine.getViewManager();
+		const viewScaleMode = viewManager.getViewScaleMode();
+		const isStretchMode = viewScaleMode === ViewScaleMode.stretchWidth ||
+		                      viewScaleMode === ViewScaleMode.stretchHeight ||
+		                      viewScaleMode === ViewScaleMode.stretchShort ||
+		                      viewScaleMode === ViewScaleMode.stretchWidthExpandHeight ||
+		                      viewScaleMode === ViewScaleMode.stretchHeightExpandWidth ||
+		                      viewScaleMode === ViewScaleMode.stretchShortExpandLong;
+		if (!isStretchMode) {
+			return;
+		}
+		const viewSize = viewManager.getViewSize();
+		const viewWidth = viewSize.x;
+		const viewHeight = viewSize.y;
+		const centerX = viewWidth * 0.5;
+		const centerY = viewHeight * 0.5;
+		const canvasRenderingContext = graphic.getCanvasRenderingContext();
+		canvasRenderingContext.save();
+		canvasRenderingContext.lineWidth = 2;
+
+		// 세로 기준 (height 고정 100%, width = height * 비율).
+		if (this.#isHeightAspectGuideVisible) {
+			const heightFixed = viewHeight;
+			const heightBasedWidth100 = viewHeight * 1.0;
+			const heightBasedWidth75 = viewHeight * 0.75;
+			const heightBasedWidth50 = viewHeight * 0.5;
+			canvasRenderingContext.strokeStyle = "rgba(80, 200, 240, 1)";
+			canvasRenderingContext.strokeRect(centerX - heightBasedWidth100 * 0.5, centerY - heightFixed * 0.5, heightBasedWidth100, heightFixed);
+			canvasRenderingContext.strokeRect(centerX - heightBasedWidth75 * 0.5, centerY - heightFixed * 0.5, heightBasedWidth75, heightFixed);
+			canvasRenderingContext.strokeRect(centerX - heightBasedWidth50 * 0.5, centerY - heightFixed * 0.5, heightBasedWidth50, heightFixed);
+		}
+
+		// 가로 기준 (width 고정 100%, height = width * 비율).
+		if (this.#isWidthAspectGuideVisible) {
+			const widthFixed = viewWidth;
+			const widthBasedHeight100 = viewWidth * 1.0;
+			const widthBasedHeight75 = viewWidth * 0.75;
+			const widthBasedHeight50 = viewWidth * 0.5;
+			canvasRenderingContext.strokeStyle = "rgba(240, 180, 80, 1)";
+			canvasRenderingContext.strokeRect(centerX - widthFixed * 0.5, centerY - widthBasedHeight100 * 0.5, widthFixed, widthBasedHeight100);
+			canvasRenderingContext.strokeRect(centerX - widthFixed * 0.5, centerY - widthBasedHeight75 * 0.5, widthFixed, widthBasedHeight75);
+			canvasRenderingContext.strokeRect(centerX - widthFixed * 0.5, centerY - widthBasedHeight50 * 0.5, widthFixed, widthBasedHeight50);
+		}
+
+		canvasRenderingContext.restore();
+	}
+
+	//==============================================================================
 	// 세팅 패널 출력.
 	//==============================================================================
 	/**
@@ -1764,6 +1841,60 @@ export class DEVTools extends Object {
 			canvasRenderingContext.fillRect(dimCheckboxX + 2, dimCheckboxY + 2, GIZMO_CHECKBOX_SIZE - 4, GIZMO_CHECKBOX_SIZE - 4);
 		}
 
+		// Show All Gizmos 항목.
+		const gizmosRowY = panelY + ITEM_HEIGHT * 2;
+		const gizmosRowMidY = gizmosRowY + ITEM_HEIGHT * 0.5;
+		canvasRenderingContext.fillStyle = COLOR_TEXT;
+		canvasRenderingContext.font = `${FONT_SIZE}px monospace`;
+		canvasRenderingContext.textAlign = "left";
+		canvasRenderingContext.textBaseline = "middle";
+		canvasRenderingContext.fillText("Show All Gizmos", panelX + PADDING, gizmosRowMidY);
+
+		const gizmosCheckboxX = panelX + PADDING + 120;
+		const gizmosCheckboxY = System.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+		canvasRenderingContext.fillStyle = this.#isAllGizmosVisible ? COLOR_TRUE : COLOR_ACCENT;
+		canvasRenderingContext.fillRect(gizmosCheckboxX, gizmosCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE);
+		if (!this.#isAllGizmosVisible) {
+			canvasRenderingContext.fillStyle = "#16120a";
+			canvasRenderingContext.fillRect(gizmosCheckboxX + 2, gizmosCheckboxY + 2, GIZMO_CHECKBOX_SIZE - 4, GIZMO_CHECKBOX_SIZE - 4);
+		}
+
+		// Show Height Aspect Guide 항목.
+		const heightAspectGuideRowY = panelY + ITEM_HEIGHT * 3;
+		const heightAspectGuideRowMidY = heightAspectGuideRowY + ITEM_HEIGHT * 0.5;
+		canvasRenderingContext.fillStyle = COLOR_TEXT;
+		canvasRenderingContext.font = `${FONT_SIZE}px monospace`;
+		canvasRenderingContext.textAlign = "left";
+		canvasRenderingContext.textBaseline = "middle";
+		canvasRenderingContext.fillText("Show Height Aspect Guide", panelX + PADDING, heightAspectGuideRowMidY);
+
+		const heightAspectGuideCheckboxX = panelX + PADDING + 168;
+		const heightAspectGuideCheckboxY = System.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+		canvasRenderingContext.fillStyle = this.#isHeightAspectGuideVisible ? COLOR_TRUE : COLOR_ACCENT;
+		canvasRenderingContext.fillRect(heightAspectGuideCheckboxX, heightAspectGuideCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE);
+		if (!this.#isHeightAspectGuideVisible) {
+			canvasRenderingContext.fillStyle = "#16120a";
+			canvasRenderingContext.fillRect(heightAspectGuideCheckboxX + 2, heightAspectGuideCheckboxY + 2, GIZMO_CHECKBOX_SIZE - 4, GIZMO_CHECKBOX_SIZE - 4);
+		}
+
+		// Show Width Aspect Guide 항목.
+		const widthAspectGuideRowY = panelY + ITEM_HEIGHT * 4;
+		const widthAspectGuideRowMidY = widthAspectGuideRowY + ITEM_HEIGHT * 0.5;
+		canvasRenderingContext.fillStyle = COLOR_TEXT;
+		canvasRenderingContext.font = `${FONT_SIZE}px monospace`;
+		canvasRenderingContext.textAlign = "left";
+		canvasRenderingContext.textBaseline = "middle";
+		canvasRenderingContext.fillText("Show Width Aspect Guide", panelX + PADDING, widthAspectGuideRowMidY);
+
+		const widthAspectGuideCheckboxX = panelX + PADDING + 168;
+		const widthAspectGuideCheckboxY = System.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+		canvasRenderingContext.fillStyle = this.#isWidthAspectGuideVisible ? COLOR_TRUE : COLOR_ACCENT;
+		canvasRenderingContext.fillRect(widthAspectGuideCheckboxX, widthAspectGuideCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE);
+		if (!this.#isWidthAspectGuideVisible) {
+			canvasRenderingContext.fillStyle = "#16120a";
+			canvasRenderingContext.fillRect(widthAspectGuideCheckboxX + 2, widthAspectGuideCheckboxY + 2, GIZMO_CHECKBOX_SIZE - 4, GIZMO_CHECKBOX_SIZE - 4);
+		}
+
 		canvasRenderingContext.restore();
 	}
 
@@ -1788,6 +1919,44 @@ export class DEVTools extends Object {
 		if (isDimCheckboxHit) {
 			this.#isDimEnabled = !this.#isDimEnabled;
 			this.saveSettings();
+			return;
+		}
+
+		const gizmosRowY = panelY + ITEM_HEIGHT * 2;
+		const gizmosRowMidY = gizmosRowY + ITEM_HEIGHT * 0.5;
+		const gizmosCheckboxX = panelX + PADDING + 120;
+		const gizmosCheckboxY = System.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+		const isGizmosCheckboxHit = touchX >= gizmosCheckboxX && touchX <= gizmosCheckboxX + GIZMO_CHECKBOX_SIZE &&
+		                            touchY >= gizmosCheckboxY && touchY <= gizmosCheckboxY + GIZMO_CHECKBOX_SIZE;
+		if (isGizmosCheckboxHit) {
+			this.#isAllGizmosVisible = !this.#isAllGizmosVisible;
+			const graphic = this.#engine.getGraphic();
+			graphic.setForceGizmosVisible(this.#isAllGizmosVisible);
+			this.saveSettings();
+			return;
+		}
+
+		const heightAspectGuideRowY = panelY + ITEM_HEIGHT * 3;
+		const heightAspectGuideRowMidY = heightAspectGuideRowY + ITEM_HEIGHT * 0.5;
+		const heightAspectGuideCheckboxX = panelX + PADDING + 168;
+		const heightAspectGuideCheckboxY = System.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+		const isHeightAspectGuideCheckboxHit = touchX >= heightAspectGuideCheckboxX && touchX <= heightAspectGuideCheckboxX + GIZMO_CHECKBOX_SIZE &&
+		                                       touchY >= heightAspectGuideCheckboxY && touchY <= heightAspectGuideCheckboxY + GIZMO_CHECKBOX_SIZE;
+		if (isHeightAspectGuideCheckboxHit) {
+			this.#isHeightAspectGuideVisible = !this.#isHeightAspectGuideVisible;
+			this.saveSettings();
+			return;
+		}
+
+		const widthAspectGuideRowY = panelY + ITEM_HEIGHT * 4;
+		const widthAspectGuideRowMidY = widthAspectGuideRowY + ITEM_HEIGHT * 0.5;
+		const widthAspectGuideCheckboxX = panelX + PADDING + 168;
+		const widthAspectGuideCheckboxY = System.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+		const isWidthAspectGuideCheckboxHit = touchX >= widthAspectGuideCheckboxX && touchX <= widthAspectGuideCheckboxX + GIZMO_CHECKBOX_SIZE &&
+		                                      touchY >= widthAspectGuideCheckboxY && touchY <= widthAspectGuideCheckboxY + GIZMO_CHECKBOX_SIZE;
+		if (isWidthAspectGuideCheckboxHit) {
+			this.#isWidthAspectGuideVisible = !this.#isWidthAspectGuideVisible;
+			this.saveSettings();
 		}
 	}
 
@@ -1804,6 +1973,15 @@ export class DEVTools extends Object {
 			if (typeof settingsObject.dimEnabled === "boolean") {
 				this.#isDimEnabled = settingsObject.dimEnabled;
 			}
+			if (typeof settingsObject.allGizmosVisible === "boolean") {
+				this.#isAllGizmosVisible = settingsObject.allGizmosVisible;
+			}
+			if (typeof settingsObject.heightAspectGuideVisible === "boolean") {
+				this.#isHeightAspectGuideVisible = settingsObject.heightAspectGuideVisible;
+			}
+			if (typeof settingsObject.widthAspectGuideVisible === "boolean") {
+				this.#isWidthAspectGuideVisible = settingsObject.widthAspectGuideVisible;
+			}
 		}
 		catch (error) {
 			// 파싱 실패 시 기본값 유지.
@@ -1814,7 +1992,7 @@ export class DEVTools extends Object {
 	// 설정 저장.
 	//==============================================================================
 	saveSettings() {
-		const settingsObject = { dimEnabled: this.#isDimEnabled };
+		const settingsObject = { dimEnabled: this.#isDimEnabled, allGizmosVisible: this.#isAllGizmosVisible, heightAspectGuideVisible: this.#isHeightAspectGuideVisible, widthAspectGuideVisible: this.#isWidthAspectGuideVisible };
 		const settingsJson = System.JSON.stringify(settingsObject);
 		LocalStorage.setString(SETTINGS_STORAGE_KEY, settingsJson);
 	}

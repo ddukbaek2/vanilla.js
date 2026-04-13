@@ -7,6 +7,7 @@ import { Rect } from "../base/rect.js";
 import { Vector2 } from "../base/vector2.js";
 import { Engine } from "./engine.js";
 import { Color } from "../base/color.js";
+import { TransformNode } from "./node/transformnode.js";
 
 
 //==============================================================================
@@ -18,6 +19,7 @@ export class Graphic extends Object {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { CanvasRenderingContext2D } */ #canvasRenderingContext;
+	/** @private @type { boolean } */ #isForceGizmosVisible;
 
 	//==============================================================================
 	// 생성.
@@ -35,6 +37,7 @@ export class Graphic extends Object {
 		// const canvasRenderingContext = canvas.getContext("webgl2"); // WebGL2RenderingContext
 		// const canvasRenderingContext = canvas.getContext("webgpu"); // GPUCanvasContext
 		this.#canvasRenderingContext = canvasRenderingContext;
+		this.#isForceGizmosVisible = false;
 	}
 
 	//==============================================================================
@@ -49,6 +52,26 @@ export class Graphic extends Object {
 		const canvasRenderingContext = this.getCanvasRenderingContext();
 		canvasRenderingContext.imageSmoothingEnabled = true;
 		canvasRenderingContext.imageSmoothingQuality = "high";
+	}
+
+	//==============================================================================
+	// 모든 기즈모 강제 표시 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } isForceGizmosVisible
+	 */
+	setForceGizmosVisible(isForceGizmosVisible) {
+		this.#isForceGizmosVisible = isForceGizmosVisible;
+	}
+
+	//==============================================================================
+	// 모든 기즈모 강제 표시 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isForceGizmosVisible() {
+		return this.#isForceGizmosVisible;
 	}
 
 	//==============================================================================
@@ -303,7 +326,8 @@ export class Graphic extends Object {
 			node.pushTransform(this);
 			node.draw(this);
 
-			const isGizmoVisible = node.isGizmoVisible();
+			const isForceGizmosVisible = this.isForceGizmosVisible();
+			const isGizmoVisible = isForceGizmosVisible || node.isGizmoVisible();
 			if (isGizmoVisible) {
 				node.drawGizmos(this);
 			}

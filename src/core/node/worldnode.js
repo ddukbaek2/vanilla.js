@@ -95,10 +95,10 @@ export class WorldNode extends TransformNode {
      * @param { Graphic } graphic 
      */
     drawGizmos(graphic) {
-        const isGizmoVisible = this.isGizmoVisible();
-        if (!isGizmoVisible) {
-            return;
-        }
+        // const isGizmoVisible = this.isGizmoVisible();
+        // if (!isGizmoVisible) {
+        //     return;
+        // }
 
         super.drawGizmos(graphic);
 
