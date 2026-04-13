@@ -22,6 +22,7 @@ export class WorldNode extends TransformNode {
     /** @private @type { Vector2 } */ #pivot; // 기준점.
     /** @private @type { Vector2 } */ #contentSize; // 크기.
     /** @private @type { Vector2 } */ #anchor; // 앵커 (부모 영역 내 기준점).
+    /** @private @type { boolean } */ #isInteractable; // 터치 인터랙션 활성화 여부.
 
     //==============================================================================
     // 생성.
@@ -35,6 +36,7 @@ export class WorldNode extends TransformNode {
         this.#pivot = Pivot.middleCenter;
         this.#contentSize = Vector2.zero();
         this.#anchor = Vector2.zero();
+        this.#isInteractable = false;
     }
 
     //==============================================================================
@@ -323,5 +325,89 @@ export class WorldNode extends TransformNode {
         obb.setEdges(worldCorners);
         const inside = obb.contains(viewPosition);
         return inside;
+    }
+
+    //==============================================================================
+    // 터치 인터랙션 활성화 설정.
+    //==============================================================================
+    /**
+     * @param { boolean } isInteractable
+     */
+    setInteractable(isInteractable) {
+        this.#isInteractable = isInteractable;
+    }
+
+    //==============================================================================
+    // 터치 인터랙션 활성화 여부 반환.
+    //==============================================================================
+    /**
+     * @returns { boolean }
+     */
+    isInteractable() {
+        return this.#isInteractable;
+    }
+
+    //==============================================================================
+    // 터치 누름. (TouchRaycaster에 의해 호출, 컴포넌트에 전달)
+    //==============================================================================
+    /**
+     * @virtual
+     * @param { Vector2 } viewInputPosition
+     */
+    touchPress(viewInputPosition) {
+        const components = this.getAllComponents();
+        for (const component of components) {
+            if (typeof component.touchPress === 'function') {
+                component.touchPress(viewInputPosition);
+            }
+        }
+    }
+
+    //==============================================================================
+    // 터치 이동. (TouchRaycaster에 의해 호출, 컴포넌트에 전달)
+    //==============================================================================
+    /**
+     * @virtual
+     * @param { Vector2 } viewInputPosition
+     */
+    touchMove(viewInputPosition) {
+        const components = this.getAllComponents();
+        for (const component of components) {
+            if (typeof component.touchMove === 'function') {
+                component.touchMove(viewInputPosition);
+            }
+        }
+    }
+
+    //==============================================================================
+    // 터치 뗌. (TouchRaycaster에 의해 호출, 컴포넌트에 전달)
+    //==============================================================================
+    /**
+     * @virtual
+     * @param { Vector2 } viewInputPosition
+     */
+    touchRelease(viewInputPosition) {
+        const components = this.getAllComponents();
+        for (const component of components) {
+            if (typeof component.touchRelease === 'function') {
+                component.touchRelease(viewInputPosition);
+            }
+        }
+    }
+
+    //==============================================================================
+    // 터치 취소. (TouchRaycaster에 의해 호출, 컴포넌트에 전달)
+    //==============================================================================
+    /**
+     * @virtual
+     * @param { Vector2 } viewInputPosition
+     */
+    touchCancel(viewInputPosition) {
+        const components = this.getAllComponents();
+        for (const component of components) {
+            if (typeof component.touchCancel === 'function') {
+                component.touchCancel(viewInputPosition);
+            }
+        }
     }
 }

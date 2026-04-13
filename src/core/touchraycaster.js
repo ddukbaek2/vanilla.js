@@ -4,7 +4,7 @@
 const System = globalThis;
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
-import { UINode } from "./node/uinode.js";
+import { WorldNode } from "./node/worldnode.js";
 
 
 //==============================================================================
@@ -19,7 +19,7 @@ export class TouchRaycaster extends Object {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { * } */ #rootNode;
-	/** @private @type { UINode | null } */ #touchTarget;
+	/** @private @type { WorldNode | null } */ #touchTarget;
 
 	//==============================================================================
 	// 생성.
@@ -97,7 +97,7 @@ export class TouchRaycaster extends Object {
 	//==============================================================================
 	/**
 	 * @param { Vector2 } viewInputPosition
-	 * @returns { UINode | null }
+	 * @returns { WorldNode | null }
 	 */
 	raycast(viewInputPosition) {
 		const rootNode = this.getRootNode();
@@ -122,7 +122,7 @@ export class TouchRaycaster extends Object {
 			const currentDrawOrder = drawOrderCounter;
 			++drawOrderCounter;
 
-			if (node instanceof UINode) {
+			if (node instanceof WorldNode) {
 				const isInteractable = node.isInteractable();
 				if (isInteractable) {
 					const isInside = node.contains(viewInputPosition);
@@ -171,7 +171,7 @@ export class TouchRaycaster extends Object {
 	// 현재 터치 대상 반환.
 	//==============================================================================
 	/**
-	 * @returns { UINode | null }
+	 * @returns { WorldNode | null }
 	 */
 	getTouchTarget() {
 		return this.#touchTarget;
