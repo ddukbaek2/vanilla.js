@@ -1,11 +1,11 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { Color } from "../base/color.js";
-import { Rect } from "../base/rect.js";
-import { Graphic } from "../core/graphic.js";
-import { Component } from "../core/component.js";
-import { TransformNode } from "../core/node/transformnode.js";
+import { Color } from "../../base/color.js";
+import { Rect } from "../../base/rect.js";
+import { Graphic } from "../graphic.js";
+import { Component } from "../component.js";
+import { TransformNode } from "../node/transformnode.js";
 
 
 //==============================================================================

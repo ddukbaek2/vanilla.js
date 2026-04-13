@@ -1,13 +1,13 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { Vector2 } from "../base/vector2.js";
-import { Rect } from "../base/rect.js";
-import * as Math from "../base/math.js";
-import { ImageAsset } from "../resource/imageasset.js";
-import { Graphic } from "../core/graphic.js";
+import { Vector2 } from "../../base/vector2.js";
+import { Rect } from "../../base/rect.js";
+import * as Math from "../../base/math.js";
+import { ImageAsset } from "../../resource/imageasset.js";
+import { Graphic } from "../graphic.js";
 import { Paint } from "./paint.js";
-import { Color } from "../base/color.js";
+import { Color } from "../../base/color.js";
 
 
 //==============================================================================

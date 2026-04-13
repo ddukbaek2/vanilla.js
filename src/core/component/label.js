@@ -2,12 +2,12 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Rect } from "../base/rect.js";
-import { Graphic } from "../core/graphic.js";
-import { Component } from "../core/component.js";
-import { FontAsset } from "../resource/fontasset.js";
-import { Color } from "../base/color.js";
-import { SYSTEM_FONT_STRING } from "../base/platform.js";
+import { Rect } from "../../base/rect.js";
+import { Graphic } from "../graphic.js";
+import { Component } from "../component.js";
+import { FontAsset } from "../../resource/fontasset.js";
+import { Color } from "../../base/color.js";
+import { SYSTEM_FONT_STRING } from "../../base/platform.js";
 
 
 //==============================================================================

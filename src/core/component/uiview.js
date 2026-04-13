@@ -2,13 +2,13 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Color } from "../base/color.js";
-import { Pivot } from "../base/pivot.js";
-import { Rect } from "../base/rect.js";
-import { Vector2 } from "../base/vector2.js";
-import { Graphic } from "../core/graphic.js";
-import { AnchoredWorldNode } from "../core/node/anchoredworldmnode.js";
-import { UINode } from "../core/node/uinode.js";
+import { Color } from "../../base/color.js";
+import { Pivot } from "../../base/pivot.js";
+import { Rect } from "../../base/rect.js";
+import { Vector2 } from "../../base/vector2.js";
+import { Graphic } from "../graphic.js";
+import { AnchoredWorldNode } from "../node/anchoredworldmnode.js";
+import { UINode } from "../node/uinode.js";
 import { UIComponent } from "./uicomponent.js";
 
 
