@@ -284,18 +284,17 @@ export class Engine extends Object {
 				}
 			});
 
-		// // 터치 취소 될 때.
-		// System.window.addEventListener("touchcancel", (touchEvent) => {
-		// 	const touch = touchEvent.changedTouches[0];
-		// 	if (touch) {
-		// 		this.updateCanvasNativeInputPosition(touch.clientX, touch.clientY);
-		// 	}
+		// 터치 취소 될 때.
+		canvas.addEventListener("touchcancel", (touchEvent) => {
+				const touch = touchEvent.changedTouches[0];
+				if (touch) {
+					this.updateCanvasNativeInputPosition(touch.clientX, touch.clientY);
+				}
 
-		// 	const inputManager = this.getInputManager();
-		// 	inputManager.setTouchMoved(false);
-		// 	inputManager.setTouchReleased(true);
-		// 	touchEvent.preventDefault();		
-		// }, { passive: false });
+				const inputManager = this.getInputManager();
+				inputManager.setTouchMoved(false);
+				inputManager.setTouchCancelled(true);
+			});
 
 		// 앱이나 창이 전환 될 때.
 		System.window.addEventListener("blur", (focusEvent) => {
@@ -610,6 +609,7 @@ export class Engine extends Object {
 		// 입력 관련해서 상태 유지가 아닌, 현재 프레임이 끝난 후에는 다음 프레임에서는 상태를 유지하지 않음. (1회성)
 		inputManager.setTouchPressed(false);
 		inputManager.setTouchReleased(false);
+		inputManager.setTouchCancelled(false);
 
 		// 다음 프레임 호출 요청.
 		++this.#frameNumber;

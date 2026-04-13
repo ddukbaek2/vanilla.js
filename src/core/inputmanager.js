@@ -166,6 +166,7 @@ export class InputManager extends Object {
 	/** @private @type { Set<string> } */ #keys; // 키 목록.
 	/** @private @type { boolean } */ #isTouchPressed; // 입력시 딱 한번 눌림.
 	/** @private @type { boolean } */ #isTouchReleased; // 입력시 딱 한번 뗌.
+	/** @private @type { boolean } */ #isTouchCancelled; // 입력시 딱 한번 취소됨.
 	/** @private @type { boolean } */ #isTouchMoved; // 입력시 뗄 때가지 계속 눌림.
 	/** @private @type { Vector2 } */ #canvasNativeInputPosition; // canvasNativeSize 기반 위치값.
 	/** @private @type { Vector2 } */ #viewInputPosition; // referenceResolutionSize 기반 위치값.
@@ -182,7 +183,8 @@ export class InputManager extends Object {
 		super();
 		this.#keys = new Set();
 		this.#isTouchPressed = false;
-		this.#isTouchReleased = false;	
+		this.#isTouchReleased = false;
+		this.#isTouchCancelled = false;
 		this.#isTouchMoved = false;
 		this.#canvasNativeInputPosition = Vector2.zero();
 		this.#viewInputPosition = Vector2.zero();
@@ -253,6 +255,16 @@ export class InputManager extends Object {
 	}
 
 	//==============================================================================
+	// 취소 여부 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } value
+	 */
+	setTouchCancelled(value) {
+		this.#isTouchCancelled = value;
+	}
+
+	//==============================================================================
 	// 누르고 있는 중인지 여부 설정.
 	//==============================================================================
 	/**
@@ -276,10 +288,20 @@ export class InputManager extends Object {
 	// 뗌 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean } 
+	 * @returns { boolean }
 	 */
 	isTouchReleased() {
 		return this.#isTouchReleased;
+	}
+
+	//==============================================================================
+	// 취소 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isTouchCancelled() {
+		return this.#isTouchCancelled;
 	}
 
 	//==============================================================================

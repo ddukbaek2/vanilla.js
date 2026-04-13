@@ -271,8 +271,13 @@ export class Scene extends Object {
 			}
 		}
 		// 취소됨.
-		else if (false) {
-			this.touchCancel();
+		else if (inputManager.isTouchCancelled()) {
+			try {
+				this.touchCancel();
+			}
+			catch (error) {
+				console.error(error);
+			}
 		}
 	}
 
