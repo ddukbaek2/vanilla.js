@@ -6,8 +6,8 @@ import { Rect } from "../base/rect.js";
 import * as Math from "../base/math.js";
 import { ImageAsset } from "../resource/imageasset.js";
 import { Graphic } from "../core/graphic.js";
-import { Color } from "./color.js";
-import { Color as ColorValue } from "../base/color.js";
+import { Paint } from "./paint.js";
+import { Color } from "../base/color.js";
 
 
 //==============================================================================
@@ -56,7 +56,7 @@ export const SpriteBlendMode = {
 //==============================================================================
 // 스프라이트 출력자 컴포넌트.
 //==============================================================================
-export class Sprite extends Color {
+export class Sprite extends Paint {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -78,7 +78,7 @@ export class Sprite extends Color {
 	 */
 	constructor() {
 		super();
-		this.componentType = 'Sprite';
+		this.setComponentType('Sprite');
 		this.#image = null;
 		this.#imageRect = Rect.zero();
 		this.#isHorizontalFlip = false;
@@ -88,7 +88,7 @@ export class Sprite extends Color {
 		this.#nineSlice = Rect.zero();
 		this.#tintCanvas = null;
 		this.#tintContext = null;
-		super.setColor(ColorValue.transparent());
+		super.setColor(Color.transparent());
 	}
 
 	//==============================================================================

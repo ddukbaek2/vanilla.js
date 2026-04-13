@@ -2,14 +2,14 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Color } from "../../base/color.js";
-import { Pivot } from "../../base/pivot.js";
-import { Rect } from "../../base/rect.js";
-import { Vector2 } from "../../base/vector2.js";
-import { Graphic } from "../../core/graphic.js";
-import { AnchoredWorldNode } from "../../core/node/anchoredworldmnode.js";
-import { UINode } from "../../core/node/uinode.js";
-import { UI } from "./ui.js";
+import { Color } from "../base/color.js";
+import { Pivot } from "../base/pivot.js";
+import { Rect } from "../base/rect.js";
+import { Vector2 } from "../base/vector2.js";
+import { Graphic } from "../core/graphic.js";
+import { AnchoredWorldNode } from "../core/node/anchoredworldmnode.js";
+import { UINode } from "../core/node/uinode.js";
+import { UIComponent } from "./uicomponent.js";
 
 
 //==============================================================================
@@ -18,7 +18,7 @@ import { UI } from "./ui.js";
 // - 타입으로 하위 뷰 컴포넌트를 한번에 조회할 수 있다.
 //   예: node.getComponent(View)
 //==============================================================================
-export class View extends UI {
+export class UIView extends UIComponent {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -33,7 +33,7 @@ export class View extends UI {
 	 */
 	constructor() {
 		super();
-		this.componentType = 'View';
+		this.setComponentType('View');
 		this.#content = null;
 		this.#backgroundColor = new Color(1, 1, 1, 1);
 	}

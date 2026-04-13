@@ -89,7 +89,7 @@ export class HeatHazeEffect extends TransformNode {
 			const sh = scaleY;
 
 			// 대상(dx, dy): 현재 노드의 로컬 공간. 
-			// SpriteComponent처럼 Context가 이미 변환(위치/회전/피봇)되어 있으므로 0부터 시작.
+			// Sprite처럼 Context가 이미 변환(위치/회전/피봇)되어 있으므로 0부터 시작.
 			canvasRenderingContext.drawImage(
 				sourceCanvas,
 				sx, sy, sw, sh,

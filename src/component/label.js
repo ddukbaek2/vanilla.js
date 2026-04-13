@@ -57,7 +57,7 @@ export class Label extends Component {
 	//==============================================================================
 	constructor() {
 		super();
-		this.componentType = 'Label';
+		this.setComponentType('Label');
 		this.#fontFace = null;
 		this.#text = "";
 		this.#fontSize = 32;

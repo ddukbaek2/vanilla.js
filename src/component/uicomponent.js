@@ -2,15 +2,15 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Component } from "../../core/component.js";
-import { Engine } from "../../core/engine.js";
+import { Component } from "../core/component.js";
+import { Engine } from "../core/engine.js";
 
 
 //==============================================================================
 // UI 컴포넌트.
 // - UINode에 부착되는 컴포넌트의 기반 클래스.
 //==============================================================================
-export class UI extends Component {
+export class UIComponent extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -24,7 +24,7 @@ export class UI extends Component {
 	 */
 	constructor() {
 		super();
-		this.componentType = 'UI';
+		this.setComponentType('UI');
 		this.#engine = null;
 	}
 

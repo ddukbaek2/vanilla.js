@@ -10,7 +10,7 @@ import { Graphic } from "./src/core/graphic.js";
 import { Scene } from "./src/core/scene.js";
 import { ViewScaleMode } from "./src/core/viewmanager.js";
 import { Pivot } from "./src/base/pivot.js";
-import { Color as ColorComponent } from "./src/component/color.js";
+import { Color as Paint } from "./src/component/paint.js";
 import { WorldNode } from "./src/core/node/worldnode.js";
 
 
@@ -43,7 +43,7 @@ class Tutorial_2 extends Scene {
 		root.setPosition(Vec2.zero());
 		root.setPivot(Pivot.topLeft);
 		root.setContentSize(viewSize);
-		// let color = root.addComponent(ColorComponent);
+		// let color = root.addComponent(Paint);
 		// color.setColor("#000000");
 
 		// 노드 설정.
@@ -52,7 +52,7 @@ class Tutorial_2 extends Scene {
 		node.setLocalPosition(Vec2.create(100, 100));
 		node.setContentSize(Vec2.create(200, 200));
 		root.addChild(node);
-		let color = node.addComponent(ColorComponent);
+		let color = node.addComponent(Paint);
 		color.setColor("#ff0000");
 
 		// 자식 노드 설정.
@@ -61,7 +61,7 @@ class Tutorial_2 extends Scene {
 		child.setPivot(Pivot.topLeft);
 		child.setLocalPosition(Vec2.create(100, 100));
 		child.setContentSize(Vec2.create(200, 200));
-		color = child.addComponent(ColorComponent);
+		color = child.addComponent(Paint);
 		color.setColor("#0000ff");
 
 		// 자손 노드 설정.
@@ -71,7 +71,7 @@ class Tutorial_2 extends Scene {
 		this.#touchNode.setLocalPosition(Vec2.create(100, 100));
 		this.#touchNode.setContentSize(Vec2.create(50, 50));
 		this.#touchNode.setRotation(45);
-		color = this.#touchNode.addComponent(ColorComponent);
+		color = this.#touchNode.addComponent(Paint);
 		color.setColor("#ff00ff");
 
 		// UI 노드 설정.
@@ -82,7 +82,7 @@ class Tutorial_2 extends Scene {
 		uiRoot.setAnchoredPosition(Vec2.create(0, 0));
 		uiRoot.setSizeDelta(Vec2.create(100, 100));
 		root.addChild(uiRoot);
-		color = uiRoot.addComponent(ColorComponent);
+		color = uiRoot.addComponent(Paint);
 		color.setColor("#ffff00");	
 	}
 
@@ -98,7 +98,7 @@ class Tutorial_2 extends Scene {
 		const engine = this.getEngine();
 		const inputManager = engine.getInputManager();
 		const viewInputPosition = inputManager.getViewInputPosition();
-		const color = this.#touchNode.getComponent(ColorComponent);
+		const color = this.#touchNode.getComponent(Paint);
 		if (this.#touchNode.contains(viewInputPosition)) {
 			color.setColor("#00ff00");
 		}

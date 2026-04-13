@@ -13,6 +13,7 @@ export class Component extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
+	/** @private @type { string } */		#componentType; // 컴포넌트 타입.
 	/** @private @type { ComponentNode } */	#node; // 소유권자.
 	/** @private @type { boolean } */		#isEnable; // 활성화 여부.
 	/** @private @type { boolean } */		#isGizmoVisible; // 기즈모 출력 여부.
@@ -25,7 +26,7 @@ export class Component extends Object {
 	 */
 	constructor() {
 		super();
-		this.componentType = 'Component';
+		this.#componentType = 'Component';
 		this.#node = null;
 		this.#isEnable = true;
 		this.#isGizmoVisible = false;
@@ -149,5 +150,25 @@ export class Component extends Object {
 	 */
 	isEnable() {
 		return this.#isEnable;
+	}
+
+	//==============================================================================
+	// 컴포넌트 타입 설정.
+	//==============================================================================
+	/**
+	 * @param { string } componentType
+	 */
+	setComponentType(componentType) {
+		this.#componentType = componentType;
+	}
+
+	//==============================================================================
+	// 컴포넌트 타입 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getComponentType() {
+		return this.#componentType;
 	}
 }

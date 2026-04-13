@@ -1,10 +1,10 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { View } from "./view.js";
-import { UINode } from "../../core/node/uinode.js";
-import { Vector2 } from "../../base/vector2.js";
-import * as Math from "../../base/math.js";
+import { UIView } from "./uiview.js";
+import { UINode } from "../core/node/uinode.js";
+import { Vector2 } from "../base/vector2.js";
+import * as Math from "../base/math.js";
 
 
 //==============================================================================
@@ -25,7 +25,7 @@ export const ScrollMode = {
 // - AnchoredWorldNode에 추가하면 마스크(크롭)가 자동 활성화된다.
 // - 중첩 ScrollView를 지원한다. (TouchRaycaster와 연동)
 //==============================================================================
-export class ScrollView extends View {
+export class UIScrollView extends UIView {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -49,7 +49,7 @@ export class ScrollView extends View {
 	 */
 	constructor() {
 		super();
-		this.componentType = 'ScrollView';
+		this.setComponentType('ScrollView');
 		this.#scrollOffset = Vector2.zero();
 		this.#scrollContentSize = Vector2.zero();
 		this.#isDragging = false;

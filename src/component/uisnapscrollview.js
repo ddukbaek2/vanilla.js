@@ -2,10 +2,10 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { ScrollView, ScrollMode } from "./scrollview.js";
-import { Vector2 } from "../../base/vector2.js";
-import * as Math from "../../base/math.js";
-import { Tween } from "../../core/tween.js";
+import { UIScrollView, ScrollMode } from "./uiscrollview.js";
+import { Vector2 } from "../base/vector2.js";
+import * as Math from "../base/math.js";
+import { Tween } from "../core/tween.js";
 
 
 //==============================================================================
@@ -23,7 +23,7 @@ import { Tween } from "../../core/tween.js";
 // [페이지 이동]
 // - pageTo(index, smooth): 지정 인덱스로 이동. smooth=true이면 트윈, false이면 즉시 이동.
 //==============================================================================
-export class SnapScrollView extends ScrollView {
+export class UISnapScrollView extends UIScrollView {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -38,7 +38,7 @@ export class SnapScrollView extends ScrollView {
 	//==============================================================================
 	constructor() {
 		super();
-		this.componentType = 'SnapScrollView';
+		this.setComponentType('SnapScrollView');
 		this.setScrollMode(ScrollMode.clamp);
 		this.setHorizontal(true);
 		this.setVertical(false);

@@ -17,11 +17,11 @@ import { Object } from "../base/object.js";
 //       .anchorMin(0.5, 0.5)
 //       .anchorMax(0.5, 0.5)
 //       .sizeDelta(680, 900)
-//       .component(ColorComponent, (c) => { c.setColor(new Color(0.1, 0.1, 0.1, 1)); })
+//       .component(Paint, (c) => { c.setColor(new Color(0.1, 0.1, 0.1, 1)); })
 //       .children(
 //           UIBuilder.create()
 //               .sizeDelta(120, 70)
-//               .component(LabelComponent, (c) => { c.setText("확인"); })
+//               .component(Label, (c) => { c.setText("확인"); })
 //       )
 //       .build();
 //==============================================================================
