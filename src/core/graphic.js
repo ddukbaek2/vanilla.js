@@ -24,10 +24,16 @@ export class Graphic extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { CanvasRenderingContext2D } canvasRenderingContext
+	 * @param { HTMLCanvasElement } canvas
 	 */
-	constructor(canvasRenderingContext) {
+	constructor(canvas) {
 		super();
+
+		const canvasRenderingContext = canvas.getContext("2d", { alpha: false }); // CanvasRenderingContext2D
+		// const canvasRenderingContext = canvas.getContext("bitmaprenderer"); // ImageBitmapRenderingContext
+		// const canvasRenderingContext = canvas.getContext("webgl"); // WebGLRenderingContext
+		// const canvasRenderingContext = canvas.getContext("webgl2"); // WebGL2RenderingContext
+		// const canvasRenderingContext = canvas.getContext("webgpu"); // GPUCanvasContext
 		this.#canvasRenderingContext = canvasRenderingContext;
 	}
 

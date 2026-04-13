@@ -56,12 +56,12 @@ export class Engine extends Object {
 	//==============================================================================
 	/** @private @type { EngineConfiguration } */ #engineConfiguration;
 	/** @private @type { Platform } */ #platform;
+	/** @private @type { Graphic } */ #graphic;
 	/** @private @type { SceneManager } */ #sceneManager;
 	/** @private @type { TimeManager } */ #timeManager;
 	/** @private @type { ViewManager } */ #viewManager;
 	/** @private @type { InputManager } */ #inputManager;
 	/** @private @type { AudioManager } */ #audioManager;
-	/** @private @type { Graphic } */ #graphic;
 	/** @private @type { () => void  } */ #resizeCallback;
 	/** @private @type { () => void  } */ #resumeCallback;
 	/** @private @type { FrameRequestCallback } */ #updateEngineCallback;
@@ -82,21 +82,18 @@ export class Engine extends Object {
 			throw new System.Error(`engineConfiguration is invalid.`);
 		}
 		this.#engineConfiguration = engineConfiguration;
-		const canvas = this.getOrAddCanvas(engineConfiguration.canvasId);
-		const canvasRenderingContext = canvas.getContext("2d", { alpha: false }); // CanvasRenderingContext2D
-		// const canvasRenderingContext = canvas.getContext("bitmaprenderer"); // ImageBitmapRenderingContext
-		// const canvasRenderingContext = canvas.getContext("webgl"); // WebGLRenderingContext
-		// const canvasRenderingContext = canvas.getContext("webgl2"); // WebGL2RenderingContext
-		// const canvasRenderingContext = canvas.getContext("webgpu"); // GPUCanvasContext
-
 		this.#platform = new Platform();
+		const canvasId = this.#engineConfiguration.canvasId;
+		const canvas = this.#platform.getOrAddCanvas(canvasId);
+		
+
+		this.#graphic = new Graphic(canvas);
 		this.#sceneManager = new SceneManager(this);
 		this.#timeManager = new TimeManager(this);
 		this.#viewManager = new ViewManager(this);
 		this.#viewManager.setCanvas(canvas);
 		this.#inputManager = new InputManager(this);
 		this.#audioManager = new AudioManager(this);
-		this.#graphic = new Graphic(canvasRenderingContext);
 
 		this.#resizeCallback = this.resize.bind(this);
 		this.#resumeCallback = this.resume.bind(this);
@@ -743,23 +740,5 @@ export class Engine extends Object {
 	 */
 	getFrameNumber() {
 		return this.#frameNumber;
-	}
-
-	//==============================================================================
-	// 캔버스 생성 or 반환.
-	//==============================================================================
-	/**
-	 * @param { string } canvasId
-	 * @returns { HTMLCanvasElement }
-	 */
-	getOrAddCanvas(canvasId) {
-		let canvas = document.getElementById(canvasId);
-		if (canvas === null || canvas === undefined) {
-			canvas = document.createElement("canvas");
-			canvas.id = canvasId;
-			document.body.appendChild(canvas);
-		}
-
-		return canvas;
 	}
 }

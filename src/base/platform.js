@@ -65,6 +65,24 @@ export class Platform extends Object {
 	}
 
 	//==============================================================================
+	// 캔버스 생성 or 반환.
+	//==============================================================================
+	/**
+	 * @param { string } canvasId
+	 * @returns { HTMLCanvasElement }
+	 */
+	getOrAddCanvas(canvasId) {
+		let canvas = document.getElementById(canvasId);
+		if (canvas === null || canvas === undefined) {
+			canvas = document.createElement("canvas");
+			canvas.id = canvasId;
+			System.document.body.appendChild(canvas);
+		}
+
+		return canvas;
+	}
+
+	//==============================================================================
 	// 플랫폼 정보 탐지 및 적용.
 	//==============================================================================
 	/**
