@@ -32,6 +32,7 @@ export class UISnapScrollView extends UIScrollView {
 	/** @private @type { boolean } */ #prevIsDragging;
 	/** @private @type { boolean } */ #isSnapToNearest;
 	/** @private @type { number } */ #velocityThreshold;
+	/** @private @type { number } */ #pageChangeThreshold; // 느린 스와이프 시 페이지 전환 임계값 (아이템 크기 대비 비율).
 
 	//==============================================================================
 	// 생성.
@@ -47,6 +48,7 @@ export class UISnapScrollView extends UIScrollView {
 		this.#prevIsDragging = false;
 		this.#isSnapToNearest = false;
 		this.#velocityThreshold = 200;
+		this.#pageChangeThreshold = 0.35;
 	}
 
 	//==============================================================================
@@ -89,6 +91,26 @@ export class UISnapScrollView extends UIScrollView {
 	 */
 	getVelocityThreshold() {
 		return this.#velocityThreshold;
+	}
+
+	//==============================================================================
+	// 느린 스와이프 시 페이지 전환 임계값 설정. (아이템 크기 대비 비율, 기본값: 0.35)
+	//==============================================================================
+	/**
+	 * @param { number } pageChangeThreshold
+	 */
+	setPageChangeThreshold(pageChangeThreshold) {
+		this.#pageChangeThreshold = pageChangeThreshold;
+	}
+
+	//==============================================================================
+	// 느린 스와이프 시 페이지 전환 임계값 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getPageChangeThreshold() {
+		return this.#pageChangeThreshold;
 	}
 
 	//==============================================================================
@@ -171,43 +193,30 @@ export class UISnapScrollView extends UIScrollView {
 		}
 		const snapOffsets = this.computeSnapOffsets();
 		const currentOffset = this.getScrollOffset();
-		const scrollVelocity = this.getScrollVelocity();
 		const isHorizontal = this.isHorizontal();
 		const currentAxisOffset = isHorizontal ? currentOffset.x : currentOffset.y;
-		const axisVelocity = isHorizontal ? scrollVelocity.x : scrollVelocity.y;
 
-		// 현재 위치에서 가장 가까운 스냅 인덱스 탐색.
-		let closestIndex = 0;
-		let closestDistance = System.Math.abs(snapOffsets[0] - currentAxisOffset);
-		for (let snapSearchIndex = 1; snapSearchIndex < snapOffsets.length; ++snapSearchIndex) {
-			const distance = System.Math.abs(snapOffsets[snapSearchIndex] - currentAxisOffset);
-			if (distance < closestDistance) {
-				closestDistance = distance;
-				closestIndex = snapSearchIndex;
-			}
-		}
-
-		// 목표 인덱스 결정.
+		// 목표 인덱스 결정: 드래그 방향으로 최대 1칸, 목표 페이지 35% 이상 노출 시 전환.
+		const snapCurrentIndex = this.getSnapCurrentIndex();
+		const currentSnapOffset = snapOffsets[snapCurrentIndex];
+		const dragAmount = currentAxisOffset - currentSnapOffset;
+		const direction = dragAmount < 0 ? 1 : -1;
+		const candidateIndex = Math.clamp(snapCurrentIndex + direction, 0, children.length - 1);
 		let targetIndex;
-		const isSnapToNearest = this.getSnapToNearest();
-		if (isSnapToNearest) {
-			// nearest 모드: 드래그 위치에서 가장 가까운 아이템으로 스냅.
-			targetIndex = closestIndex;
-		}
-		else {
-			// 1칸 모드: 속도에 따라 방향 결정, 항상 현재에서 1칸 이동.
-			const velocityThreshold = this.getVelocityThreshold();
-			if (System.Math.abs(axisVelocity) > velocityThreshold) {
-				// 빠른 스와이프: 속도 방향으로 1칸.
-				const direction = axisVelocity < 0 ? 1 : -1;
-				const snapCurrentIndex = this.getSnapCurrentIndex();
-				targetIndex = Math.clamp(snapCurrentIndex + direction, 0, children.length - 1);
+		if (candidateIndex !== snapCurrentIndex) {
+			const candidateChild = children[candidateIndex];
+			const candidateChildContentSize = candidateChild.getContentSize();
+			const targetItemSize = isHorizontal ? candidateChildContentSize.x : candidateChildContentSize.y;
+			const pageChangeThreshold = this.getPageChangeThreshold();
+			if (System.Math.abs(dragAmount) >= targetItemSize * pageChangeThreshold) {
+				targetIndex = candidateIndex;
 			}
 			else {
-				// 느린 스와이프: 현재 기준 ±1 범위 내에서 가장 가까운 아이템.
-				const snapCurrentIndex = this.getSnapCurrentIndex();
-				targetIndex = Math.clamp(closestIndex, snapCurrentIndex - 1, snapCurrentIndex + 1);
+				targetIndex = snapCurrentIndex;
 			}
+		}
+		else {
+			targetIndex = snapCurrentIndex;
 		}
 
 		this.setSnapCurrentIndex(targetIndex);

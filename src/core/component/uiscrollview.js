@@ -40,6 +40,7 @@ export class UIScrollView extends UIView {
 	/** @private @type { boolean } */	#isDragging; // 드래그 중인지 여부.
 	/** @private @type { Vector2 } */	#dragStartViewPosition;
 	/** @private @type { Vector2 } */	#dragStartOffset;
+	/** @private @type { number } */	#dragSensitivity; // 드래그 반영량 배율.
 
 	//==============================================================================
 	// 생성.
@@ -61,6 +62,7 @@ export class UIScrollView extends UIView {
 		this.#currentViewInputPosition = Vector2.zero();
 		this.#horizontalEnabled = true;
 		this.#verticalEnabled = true;
+		this.#dragSensitivity = 1.0;
 	}
 
 	//==============================================================================
@@ -145,8 +147,9 @@ export class UIScrollView extends UIView {
 		// 드래그 중 오프셋 및 속도 계산.
 		if (this.isDragging()) {
 			const viewInputPosition = this.#currentViewInputPosition;
-			const rawDeltaX = viewInputPosition.x - this.#dragStartViewPosition.x;
-			const rawDeltaY = viewInputPosition.y - this.#dragStartViewPosition.y;
+			const dragSensitivity = this.getDragSensitivity();
+			const rawDeltaX = (viewInputPosition.x - this.#dragStartViewPosition.x) * dragSensitivity;
+			const rawDeltaY = (viewInputPosition.y - this.#dragStartViewPosition.y) * dragSensitivity;
 			const deltaX = this.isHorizontal() ? rawDeltaX : 0;
 			const deltaY = this.isVertical() ? rawDeltaY : 0;
 			const proposedOffset = Vector2.create(
@@ -365,6 +368,26 @@ export class UIScrollView extends UIView {
 	 */
 	isVertical() {
 		return this.#verticalEnabled;
+	}
+
+	//==============================================================================
+	// 드래그 반영량 배율 설정. (1.0 = 기본, 2.0 = 두 배 빠르게)
+	//==============================================================================
+	/**
+	 * @param { number } dragSensitivity
+	 */
+	setDragSensitivity(dragSensitivity) {
+		this.#dragSensitivity = dragSensitivity;
+	}
+
+	//==============================================================================
+	// 드래그 반영량 배율 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getDragSensitivity() {
+		return this.#dragSensitivity;
 	}
 
 	//==============================================================================
