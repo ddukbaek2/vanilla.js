@@ -131,6 +131,11 @@ export class UISnapScrollView extends UIScrollView {
 			this.#snapTween = null;
 		}
 
+		// 드래그 중 스크롤 오프셋을 현재 페이지 ±1 범위로 제한.
+		if (currentIsDragging) {
+			this.clampScrollOffsetToAdjacentPages();
+		}
+
 		// 드래그 종료 시 스냅 타겟 계산 및 트윈 시작.
 		if (prevIsDragging && !currentIsDragging) {
 			this.playSnapTween();
@@ -139,6 +144,44 @@ export class UISnapScrollView extends UIScrollView {
 		// 스냅 트윈 갱신.
 		if (this.#snapTween !== null) {
 			this.#snapTween.tick(timeDelta);
+		}
+	}
+
+	//==============================================================================
+	// 드래그 중 스크롤 오프셋을 현재 페이지의 인접 페이지 범위로 제한.
+	//==============================================================================
+	clampScrollOffsetToAdjacentPages() {
+		const contentNode = this.getContent();
+		if (!contentNode) {
+			return;
+		}
+		const children = contentNode.getChildren();
+		if (children.length === 0) {
+			return;
+		}
+		const snapOffsets = this.computeSnapOffsets();
+		const snapCurrentIndex = this.getSnapCurrentIndex();
+		const maxIndex = children.length - 1;
+		const prevIndex = System.Math.max(0, snapCurrentIndex - 1);
+		const nextIndex = System.Math.min(maxIndex, snapCurrentIndex + 1);
+		const isHorizontal = this.isHorizontal();
+		const currentOffset = this.getScrollOffset();
+
+		if (isHorizontal) {
+			const maxOffset = snapOffsets[prevIndex];
+			const minOffset = snapOffsets[nextIndex];
+			const clampedX = Math.clamp(currentOffset.x, minOffset, maxOffset);
+			if (clampedX !== currentOffset.x) {
+				this.setScrollOffset(Vector2.create(clampedX, currentOffset.y));
+			}
+		}
+		else {
+			const maxOffset = snapOffsets[prevIndex];
+			const minOffset = snapOffsets[nextIndex];
+			const clampedY = Math.clamp(currentOffset.y, minOffset, maxOffset);
+			if (clampedY !== currentOffset.y) {
+				this.setScrollOffset(Vector2.create(currentOffset.x, clampedY));
+			}
 		}
 	}
 

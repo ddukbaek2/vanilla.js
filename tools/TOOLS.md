@@ -4,7 +4,7 @@
 node tools/atlas.cjs <폴더경로>
 
 ## 정해진 규약에 따라서 프로젝트 안의 파일들을 최종 출력 폴더로 복사해주는 도구. 
-node tools/build.cjs <폴더경로>
+node tools/build.cjs --source <폴더경로> --target <대상>
 
 ## 여러 종류의 음원을 webm 형식으로 변환해주는 도구.
 node tools/convertwebm.cjs <폴더경로>  
