@@ -31,7 +31,7 @@ const MIN_PANEL_WIDTH = 300;
 const MIN_PANEL_HEIGHT = 200;
 const MIN_LEFT_WIDTH = 80;
 const TABS = ["Statistics", "Node Hierarchy", "Local Storage", "Settings"];
-const DEFAULT_PANEL_WIDTH = 1215;
+const DEFAULT_PANEL_WIDTH = 810;
 const DEFAULT_PANEL_HEIGHT = 520;
 const DEFAULT_LEFT_WIDTH = 405;
 const SETTINGS_STORAGE_KEY = "hierarchy.settings";
@@ -334,6 +334,13 @@ export class DEVTools extends Object {
 			const graphic = this.#engine.getGraphic();
 			const isForceGizmosVisible = this.#isVisible && this.#isAllGizmosVisible;
 			graphic.setForceGizmosVisible(isForceGizmosVisible);
+			if (this.#isVisible) {
+				const viewManager = this.#engine.getViewManager();
+				const canvasNativeSize = viewManager.getCanvasNativeSize();
+				const canvasBottomRight = viewManager.canvasPositionToViewPosition(canvasNativeSize);
+				this.#panelX = canvasBottomRight.x - this.#panelWidth;
+				this.#panelY = canvasBottomRight.y - this.#panelHeight;
+			}
 		}
 		this.#prevIsKeyF2 = isKeyF2;
 

@@ -153,6 +153,7 @@ export class LocalStorage extends Object {
 			const key = System.window.localStorage.key(i);
 			keys.push(key);
 		}
+		keys.sort();
 		return keys;
 	}
 }

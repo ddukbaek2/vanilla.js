@@ -41,6 +41,10 @@ export class Node extends Object {
 	 * @param { Node } parent 
 	 */
 	setParent(parent) {
+		if (this === parent) {
+			throw new Error("");
+		}
+
 		// 기존 부모가 존재 할 경우.
 		const currentParent = this.getParent();
 		if (currentParent) {
