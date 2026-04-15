@@ -31,6 +31,7 @@ export class EngineConfiguration extends Object {
 	/** @type { string } */ canvasId; // 캔버스 식별자.
 	/** @type { boolean } */ useStatistics; // 정보창 출력 여부.
 	/** @type { boolean } */ autoResizeOnWindowResize; // 윈도우가 리사이즈 될 때 캔버스 사이즈 자동 반영.
+	/** @type { string } */ title; // 이름.
 
 	//==============================================================================
 	// 생성.
@@ -43,6 +44,7 @@ export class EngineConfiguration extends Object {
 		this.canvasId = "";
 		this.useStatistics = false;
 		this.autoResizeOnWindowResize = false;
+		this.title = "";
 	}
 }
 
@@ -83,6 +85,13 @@ export class Engine extends Object {
 		}
 		this.#engineConfiguration = engineConfiguration;
 		this.#platform = new Platform();
+
+		// 이름 설정.
+		if (engineConfiguration.title !== "") {
+			System.document.title = engineConfiguration.title;
+		}
+
+		// 캔버스 설정.
 		const canvasId = this.#engineConfiguration.canvasId;
 		const canvas = this.#platform.getOrAddCanvas(canvasId);
 		
