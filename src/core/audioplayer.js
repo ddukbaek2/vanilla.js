@@ -72,9 +72,28 @@ export class AudioPlayer {
 			this.#audioSource = null;
 		}
 
-		// 오디오 컨텍스트가 일시 중단된 경우 다시 재생 시도시 컨텍스트 재개 시도.
+		// 오디오 컨텍스트가 일시 중단된 경우 재개 후 재생.
 		if (audioContext.state === "suspended") {
-			audioContext.resume();
+			audioContext.resume().then(() => {
+				this.startPlayback(audioBuffer, loop);
+			});
+			return;
+		}
+
+		this.startPlayback(audioBuffer, loop);
+	}
+
+	//==============================================================================
+	// 내부 재생 시작.
+	//==============================================================================
+	/**
+	 * @param { AudioBuffer } audioBuffer
+	 * @param { boolean } loop
+	 */
+	startPlayback(audioBuffer, loop) {
+		const audioContext = this.getAudioContext();
+		if (!audioContext || !this.#gainNode) {
+			return;
 		}
 
 		this.#isLoop = loop;
