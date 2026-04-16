@@ -20,6 +20,8 @@ export class TouchRaycaster extends Object {
 	//==============================================================================
 	/** @private @type { * } */ #rootNode;
 	/** @private @type { WorldNode | null } */ #touchTarget;
+	/** @private @type { boolean } */ #hasEverTouched;
+	/** @private @type { Function | null } */ #firstTouchCallback;
 
 	//==============================================================================
 	// 생성.
@@ -28,6 +30,8 @@ export class TouchRaycaster extends Object {
 		super();
 		this.#rootNode = null;
 		this.#touchTarget = null;
+		this.#hasEverTouched = false;
+		this.#firstTouchCallback = null;
 	}
 
 	//==============================================================================
@@ -38,6 +42,12 @@ export class TouchRaycaster extends Object {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchPress(viewInputPosition) {
+		if (!this.#hasEverTouched) {
+			this.#hasEverTouched = true;
+			if (this.#firstTouchCallback) {
+				this.#firstTouchCallback();
+			}
+		}
 		const hitNode = this.raycast(viewInputPosition);
 		this.#touchTarget = hitNode;
 		if (hitNode) {
@@ -175,5 +185,25 @@ export class TouchRaycaster extends Object {
 	 */
 	getTouchTarget() {
 		return this.#touchTarget;
+	}
+
+	//==============================================================================
+	// 한 번이라도 터치된 적 있는지 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	hasEverTouched() {
+		return this.#hasEverTouched;
+	}
+
+	//==============================================================================
+	// 첫 터치 콜백 설정.
+	//==============================================================================
+	/**
+	 * @param { Function } callback
+	 */
+	setFirstTouchCallback(callback) {
+		this.#firstTouchCallback = callback;
 	}
 }
