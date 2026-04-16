@@ -206,8 +206,8 @@ export class ViewManager extends Object {
 					// this.#screenSize.y = Math.round(this.#screenSize.y);
 					this.#viewNativeRect.position.set(viewX, viewY);
 					this.#viewNativeRect.size.set(viewWidth, viewHeight);
-					const viewSizeX = Math.round(this.#viewNativeRect.size.x / targetResolutionScale);
-					const viewSizeY = Math.round(this.#viewNativeRect.size.y / targetResolutionScale);
+					const viewSizeX = Math.ceil(this.#viewNativeRect.size.x / targetResolutionScale);
+					const viewSizeY = Math.ceil(this.#viewNativeRect.size.y / targetResolutionScale);
 					this.#viewSize.set(viewSizeX, viewSizeY);
 					break;
 				}
@@ -224,8 +224,8 @@ export class ViewManager extends Object {
 					// this.#screenSize.y = Math.round(this.#screenSize.y);
 					this.#viewNativeRect.position.set(viewX, viewY);
 					this.#viewNativeRect.size.set(viewWidth, viewHeight);
-					const viewSizeX = Math.round(this.#viewNativeRect.size.x / targetResolutionScale);
-					const viewSizeY = Math.round(this.#viewNativeRect.size.y / targetResolutionScale);
+					const viewSizeX = Math.ceil(this.#viewNativeRect.size.x / targetResolutionScale);
+					const viewSizeY = Math.ceil(this.#viewNativeRect.size.y / targetResolutionScale);
 					this.#viewSize.set(viewSizeX, viewSizeY);
 					break;
 				}
@@ -242,8 +242,8 @@ export class ViewManager extends Object {
 					// this.#screenSize.y = Math.round(this.#screenSize.y);
 					this.#viewNativeRect.position.set(viewX, viewY);
 					this.#viewNativeRect.size.set(viewWidth, viewHeight);
-					const viewSizeX = Math.round(this.#viewNativeRect.size.x / targetResolutionScale);
-					const viewSizeY = Math.round(this.#viewNativeRect.size.y / targetResolutionScale);
+					const viewSizeX = Math.ceil(this.#viewNativeRect.size.x / targetResolutionScale);
+					const viewSizeY = Math.ceil(this.#viewNativeRect.size.y / targetResolutionScale);
 					this.#viewSize.set(viewSizeX, viewSizeY);
 					break;
 				}

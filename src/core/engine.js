@@ -133,13 +133,15 @@ export class Engine extends Object {
 		// const internalFontFace = new FontFace(`DOSGothic`, `url('./assets/fonts/Consolas.woff2')`);
 		internalFontFace.load().then((loadedFont) => {
 			document.fonts.add(loadedFont);
-			// 씬 불러오기.
-			const sceneManager = this.getSceneManager();
-			return sceneManager.loadScene(scene); // 비동기 로드 처리됨.
-		}).then(() => {
-			// 엔진 실행.
-			System.window.addEventListener("resize", this.#resizeCallback);
 
+			// 씬 로드는 백그라운드로 시작. (렌더 루프가 drawOnLoad로 로딩 화면 출력)
+			const sceneManager = this.getSceneManager();
+			sceneManager.loadScene(scene).catch((error) => {
+				console.error(error);
+			});
+
+			// 렌더 루프 즉시 시작.
+			System.window.addEventListener("resize", this.#resizeCallback);
 			++this.#frameNumber;
 			System.window.requestAnimationFrame(this.#updateEngineCallback);
 		}).catch((error) => {
@@ -602,6 +604,12 @@ export class Engine extends Object {
 		const loadedScenes = sceneManager.getAllLoadedScenes();
 		for (const loadedScene of loadedScenes) {
 			try {
+				if (!loadedScene.isLoaded()) {
+					// 로딩 중: 로딩 전용 출력만 호출. 씬의 tick/draw는 호출하지 않음.
+					loadedScene.drawOnLoad(graphic);
+					continue;
+				}
+
 				// 갱신.
 				loadedScene.tick(timeDelta);
 

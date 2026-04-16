@@ -28,6 +28,7 @@ export class Scene extends Object {
 	/** @private @type { WorldNode } */ #root;
 	/** @private @type { VTweeneen[] } */ #tweens;
 	/** @private @type { boolean } */ #isGizmoVisible; // 기즈모 출력 여부.
+	/** @private @type { boolean } */ #isLoaded; // 비동기 로딩 완료 여부.
 
 	//==============================================================================
 	// 생성.
@@ -46,9 +47,51 @@ export class Scene extends Object {
 	create() {
 		this.#tweens = [];
 		this.#isGizmoVisible = false;
+		this.#isLoaded = false;
 		this.#root = new WorldNode();
 		const root = this.getRoot();
 		root.setName("root");
+	}
+
+	//==============================================================================
+	// 엔진 설정. (SceneManager가 load() 이전에 호출하여 drawOnLoad에서 접근 가능하게 함)
+	//==============================================================================
+	/**
+	 * @param { Engine } engine
+	 */
+	setEngine(engine) {
+		this.#engine = engine;
+	}
+
+	//==============================================================================
+	// 로딩 완료 여부 설정. (SceneManager가 load+initialize 이후 true로 전환)
+	//==============================================================================
+	/**
+	 * @param { boolean } isLoaded
+	 */
+	setLoaded(isLoaded) {
+		this.#isLoaded = isLoaded;
+	}
+
+	//==============================================================================
+	// 로딩 완료 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isLoaded() {
+		return this.#isLoaded;
+	}
+
+	//==============================================================================
+	// 로딩 중 출력. (비동기 load() 진행 중에만 호출되며, 씬의 일반 tick/draw는 호출되지 않음)
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { Graphic } graphic
+	 */
+	drawOnLoad(graphic) {
+
 	}
 
 	//==============================================================================
