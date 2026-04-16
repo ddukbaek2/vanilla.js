@@ -45,6 +45,10 @@ export class SceneManager extends Object {
 			scene.setEngine(engine);
 			loadedScenes.push(scene);
 			await scene.load(engine);
+			// 로딩 완료 후 추가 대기. (로딩 화면을 최소 0.3초 더 노출)
+			await new System.Promise((resolve) => {
+				System.setTimeout(resolve, 300);
+			});
 			scene.setLoaded(true);
 			scene.initialize(engine);
 		}
