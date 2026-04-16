@@ -147,7 +147,7 @@ class TutorialMerge extends Scene {
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
-		const engine = super.getEngine();
+		const engine = this.getEngine();
 		const inputManager = engine.getInputManager();
 		const viewInputPosition = inputManager.getViewInputPosition();
 
@@ -284,7 +284,7 @@ class TutorialMerge extends Scene {
 	draw(graphic) {
 		super.draw(graphic);
 
-		const engine = super.getEngine();
+		const engine = this.getEngine();
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const viewManager = engine.getViewManager();
 		const canvasNativeSize = viewManager.getCanvasNativeSize();

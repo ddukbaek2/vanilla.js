@@ -114,7 +114,7 @@ class Tutorial_2 extends Scene {
 	 * @param { Graphic } graphic 
 	 */
 	draw(graphic) {
-		const engine = super.getEngine();
+		const engine = this.getEngine();
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const viewManager = engine.getViewManager();
 		const canvasNativeSize = viewManager.getCanvasNativeSize();

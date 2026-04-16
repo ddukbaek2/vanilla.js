@@ -143,7 +143,7 @@ export class Tutorial_3 extends Scene {
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
-		const engine = super.getEngine();
+		const engine = this.getEngine();
 		const inputManager = engine.getInputManager();
 		const viewInputPosition = inputManager.getViewInputPosition();
 
@@ -278,7 +278,7 @@ export class Tutorial_3 extends Scene {
 	draw(graphic) {
 		super.draw(graphic);
 
-		const engine = super.getEngine();
+		const engine = this.getEngine();
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const viewManager = engine.getViewManager();
 		const viewSize = viewManager.getViewSize();
