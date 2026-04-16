@@ -2067,7 +2067,7 @@ export class DEVTools extends Object {
 		const timeDeltaText = `${timeDelta.toFixed(3)}s`;
 		items.push({ key: "timeDelta", value: timeDeltaText, isSeparator: false, isSectionHeader: false });
 
-		items.push({ key: "Memory", value: "", isSeparator: false, isSectionHeader: true });
+		items.push({ key: "Memory (Chrome Only)", value: "", isSeparator: false, isSectionHeader: true });
 		const performanceMemory = System.window.performance ? System.window.performance.memory : null;
 		if (performanceMemory) {
 			const usedHeapMegabytes = (performanceMemory.usedJSHeapSize / (1024 * 1024)).toFixed(2);
