@@ -114,7 +114,7 @@ export class Rect extends Object {
 	 * @returns { boolean }
 	 */
 	contains(value) {
-		if (value !== null && canvas !== undefined && value instanceof Vector2) {
+		if (value !== null && value !== undefined && value instanceof Vector2) {
 			if (value.x < this.position.x || value.x > this.position.x + this.size.x)
 				return false;
 			if (value.y < this.position.y || value.y > this.position.y + this.size.y)

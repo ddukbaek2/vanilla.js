@@ -1,0 +1,29 @@
+{
+	"name": "atlas-packer",
+	"displayName": "Atlas Packer",
+	"description": "폴더 우클릭으로 아틀라스 패킹",
+	"version": "1.0.0",
+	"engines": {
+		"vscode": "^1.80.0"
+	},
+	"categories": ["Other"],
+	"activationEvents": [],
+	"main": "./extension.js",
+	"contributes": {
+		"commands": [
+			{
+				"command": "atlasPacker.packFolder",
+				"title": "아틀라스 패킹"
+			}
+		],
+		"menus": {
+			"explorer/context": [
+				{
+					"when": "explorerResourceIsFolder && atlasPacker.available",
+					"command": "atlasPacker.packFolder",
+					"group": "7_modification"
+				}
+			]
+		}
+	}
+}
