@@ -130,3 +130,26 @@ export function structuredClone(target) {
 	deepCopy(obj, target);
 	return obj;
 }
+
+
+//==============================================================================
+// 고유식별자 생성.
+// - "0192a3f2-b1c4-4d8e-8f1a-0e5d4c3b2a19"
+//==============================================================================
+/**
+ * @returns { string }
+ */
+export function createGUID() {
+
+	// 높은 고유성과 빠른 속도를 지녔지만 HTTPS 접속시만 유효한 함수.
+	// return System.crypto.randomUUID();
+
+	// 48비트 타임스탬프 (ms) - 약 8900년치
+	const ts = Date.now().toString(16).padStart(12, '0');
+
+	const r = () => (Math.random() * 16 | 0).toString(16);
+	const y = () => (Math.random() * 4 | 8).toString(16);
+
+	// 앞 12자리는 타임스탬프, 나머지는 랜덤 (74비트 엔트로피)
+	return `${ts.slice(0,8)}-${ts.slice(8,12)}-4${r()}${r()}${r()}-${y()}${r()}${r()}${r()}-${r()}${r()}${r()}${r()}${r()}${r()}${r()}${r()}${r()}${r()}${r()}${r()}`;
+};

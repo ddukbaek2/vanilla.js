@@ -25,7 +25,7 @@ export class Object {
 	 * @constant
 	 */
 	constructor() {
-		this.#instanceId = System.crypto.randomUUID();
+		this.#instanceId = Reflection.createGUID();
 		this.#isDestroyed = false;
 	}
 
