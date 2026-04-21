@@ -9,6 +9,16 @@
 			"problemMatcher": []
 		},
 		{
+			"label": "BUILD_WOFF2",
+			"type": "shell",
+			"command": "ttf2woff2 < assets/fonts/BMJUA_ttf.ttf > assets/fonts/BMJUA.woff2",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": []
+		},
+		{
 			"label": "Engine: Build (Debug)",
 			"type": "shell",
 			"command": "esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap",

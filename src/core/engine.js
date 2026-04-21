@@ -203,6 +203,50 @@ export class Engine extends Object {
 		const inputManager = this.getInputManager();
 		const canvas = viewManager.getCanvas();
 
+		// 엔진 레벨 복구: 페이지가 백그라운드/파기 상태에서 돌아올 때 누적된 stuck 상태 리셋.
+		// - 오디오 컨텍스트 suspended 상태면 재개 (액티비티 전환으로 AudioContext 가 자동 suspend 됨).
+		// - 입력 상태(눌린 키, 터치)를 초기화하여 stuck 입력 방지.
+		const recoverEngineState = () => {
+			const audioManager = this.getAudioManager();
+			if (audioManager) {
+				audioManager.resumeContext();
+			}
+			const inputManager = this.getInputManager();
+			if (inputManager) {
+				inputManager.clearAllInputState();
+			}
+		};
+
+		// 페이지 프로세스 파기 후 복원 (Chromium freeze/resume, bfcache 등).
+		// 엔진 레벨 복구 후 로드된 모든 씬의 onPageProcessRestored 가상 메서드 호출.
+		const dispatchPageProcessRestored = () => {
+			recoverEngineState();
+			const sceneManager = this.getSceneManager();
+			const loadedScenes = sceneManager.getAllLoadedScenes();
+			for (const loadedScene of loadedScenes) {
+				loadedScene.onPageProcessRestored();
+			}
+		};
+		System.document.addEventListener("resume", dispatchPageProcessRestored);
+		System.window.addEventListener("pageshow", (pageTransitionEvent) => {
+			if (pageTransitionEvent.persisted) {
+				dispatchPageProcessRestored();
+			}
+		});
+
+		// 페이지 가시성 복원 (백그라운드 → 포어그라운드).
+		// 엔진 레벨 복구 후 로드된 모든 씬의 onPageVisibilityRestored 가상 메서드 호출.
+		System.document.addEventListener("visibilitychange", () => {
+			if (System.document.visibilityState === "visible") {
+				recoverEngineState();
+				const sceneManager = this.getSceneManager();
+				const loadedScenes = sceneManager.getAllLoadedScenes();
+				for (const loadedScene of loadedScenes) {
+					loadedScene.onPageVisibilityRestored();
+				}
+			}
+		});
+
 		// 키보드 누름.
 		System.document.addEventListener("keydown", (keyboardEvent) => {
 			const key = keyboardEvent.code;
