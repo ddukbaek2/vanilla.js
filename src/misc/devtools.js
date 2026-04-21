@@ -193,6 +193,7 @@ export class DEVTools extends Object {
 	/** @private @type { boolean } */ #isAllGizmosVisible;
 	/** @private @type { boolean } */ #isHeightAspectGuideVisible;
 	/** @private @type { boolean } */ #isWidthAspectGuideVisible;
+	/** @private @type { boolean } */ #isFramePerSecondVisible;
 	/** @private @type { { x: number, y: number, width: number, height: number }[] } */ #ctxButtonRects;
 	/** @private @type { string | null } */ #selectedStatisticsKey;
 	/** @private @type { number } */ #statisticsScrollY;
@@ -251,6 +252,7 @@ export class DEVTools extends Object {
 		this.#isAllGizmosVisible = true;
 		this.#isHeightAspectGuideVisible = false;
 		this.#isWidthAspectGuideVisible = false;
+		this.#isFramePerSecondVisible = false;
 		this.#ctxButtonRects = [];
 		this.loadSettings();
 		this.#selectedStatisticsKey = null;
@@ -1902,6 +1904,24 @@ export class DEVTools extends Object {
 			canvasRenderingContext.fillRect(widthAspectGuideCheckboxX + 2, widthAspectGuideCheckboxY + 2, GIZMO_CHECKBOX_SIZE - 4, GIZMO_CHECKBOX_SIZE - 4);
 		}
 
+		// Show FPS 항목.
+		const framePerSecondRowY = panelY + ITEM_HEIGHT * 5;
+		const framePerSecondRowMidY = framePerSecondRowY + ITEM_HEIGHT * 0.5;
+		canvasRenderingContext.fillStyle = COLOR_TEXT;
+		canvasRenderingContext.font = `${FONT_SIZE}px monospace`;
+		canvasRenderingContext.textAlign = "left";
+		canvasRenderingContext.textBaseline = "middle";
+		canvasRenderingContext.fillText("Show FPS", panelX + PADDING, framePerSecondRowMidY);
+
+		const framePerSecondCheckboxX = panelX + PADDING + 120;
+		const framePerSecondCheckboxY = System.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+		canvasRenderingContext.fillStyle = this.#isFramePerSecondVisible ? COLOR_TRUE : COLOR_ACCENT;
+		canvasRenderingContext.fillRect(framePerSecondCheckboxX, framePerSecondCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE);
+		if (!this.#isFramePerSecondVisible) {
+			canvasRenderingContext.fillStyle = "#16120a";
+			canvasRenderingContext.fillRect(framePerSecondCheckboxX + 2, framePerSecondCheckboxY + 2, GIZMO_CHECKBOX_SIZE - 4, GIZMO_CHECKBOX_SIZE - 4);
+		}
+
 		canvasRenderingContext.restore();
 	}
 
@@ -1964,6 +1984,18 @@ export class DEVTools extends Object {
 		if (isWidthAspectGuideCheckboxHit) {
 			this.#isWidthAspectGuideVisible = !this.#isWidthAspectGuideVisible;
 			this.saveSettings();
+			return;
+		}
+
+		const framePerSecondRowY = panelY + ITEM_HEIGHT * 5;
+		const framePerSecondRowMidY = framePerSecondRowY + ITEM_HEIGHT * 0.5;
+		const framePerSecondCheckboxX = panelX + PADDING + 120;
+		const framePerSecondCheckboxY = System.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+		const isFramePerSecondCheckboxHit = touchX >= framePerSecondCheckboxX && touchX <= framePerSecondCheckboxX + GIZMO_CHECKBOX_SIZE &&
+		                                    touchY >= framePerSecondCheckboxY && touchY <= framePerSecondCheckboxY + GIZMO_CHECKBOX_SIZE;
+		if (isFramePerSecondCheckboxHit) {
+			this.#isFramePerSecondVisible = !this.#isFramePerSecondVisible;
+			this.saveSettings();
 		}
 	}
 
@@ -1989,6 +2021,9 @@ export class DEVTools extends Object {
 			if (typeof settingsObject.widthAspectGuideVisible === "boolean") {
 				this.#isWidthAspectGuideVisible = settingsObject.widthAspectGuideVisible;
 			}
+			if (typeof settingsObject.framePerSecondVisible === "boolean") {
+				this.#isFramePerSecondVisible = settingsObject.framePerSecondVisible;
+			}
 		}
 		catch (error) {
 			// 파싱 실패 시 기본값 유지.
@@ -1999,9 +2034,19 @@ export class DEVTools extends Object {
 	// 설정 저장.
 	//==============================================================================
 	saveSettings() {
-		const settingsObject = { dimEnabled: this.#isDimEnabled, allGizmosVisible: this.#isAllGizmosVisible, heightAspectGuideVisible: this.#isHeightAspectGuideVisible, widthAspectGuideVisible: this.#isWidthAspectGuideVisible };
+		const settingsObject = { dimEnabled: this.#isDimEnabled, allGizmosVisible: this.#isAllGizmosVisible, heightAspectGuideVisible: this.#isHeightAspectGuideVisible, widthAspectGuideVisible: this.#isWidthAspectGuideVisible, framePerSecondVisible: this.#isFramePerSecondVisible };
 		const settingsJson = System.JSON.stringify(settingsObject);
 		LocalStorage.setString(SETTINGS_STORAGE_KEY, settingsJson);
+	}
+
+	//==============================================================================
+	// FPS 표시 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isFramePerSecondVisible() {
+		return this.#isFramePerSecondVisible;
 	}
 
 	//==============================================================================
