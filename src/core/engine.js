@@ -207,29 +207,36 @@ export class Engine extends Object {
 		// - 오디오 컨텍스트 suspended 상태면 재개 (액티비티 전환으로 AudioContext 가 자동 suspend 됨).
 		// - 입력 상태(눌린 키, 터치)를 초기화하여 stuck 입력 방지.
 		const recoverEngineState = () => {
+
+			// 오디오 컨텍스트 복원.
 			const audioManager = this.getAudioManager();
 			if (audioManager) {
 				audioManager.resumeContext();
 			}
+
+			// 입력 컨텍스트 초기화.
 			const inputManager = this.getInputManager();
 			if (inputManager) {
-				inputManager.clearAllInputState();
+				inputManager.clear();
 			}
 		};
 
 		// 페이지 프로세스 파기 후 복원 (Chromium freeze/resume, bfcache 등).
 		// 엔진 레벨 복구 후 로드된 모든 씬의 onPageProcessRestored 가상 메서드 호출.
-		const dispatchPageProcessRestored = () => {
+		System.document.addEventListener("resume", () => {
+			console.log(`[Engine] resume: persisted`);
+
 			recoverEngineState();
 			const sceneManager = this.getSceneManager();
 			const loadedScenes = sceneManager.getAllLoadedScenes();
 			for (const loadedScene of loadedScenes) {
 				loadedScene.onPageProcessRestored();
 			}
-		};
-		System.document.addEventListener("resume", dispatchPageProcessRestored);
+		});
 		System.window.addEventListener("pageshow", (pageTransitionEvent) => {
 			if (pageTransitionEvent.persisted) {
+				console.log(`[Engine] pageshow: persisted`);
+
 				dispatchPageProcessRestored();
 			}
 		});
@@ -238,6 +245,8 @@ export class Engine extends Object {
 		// 엔진 레벨 복구 후 로드된 모든 씬의 onPageVisibilityRestored 가상 메서드 호출.
 		System.document.addEventListener("visibilitychange", () => {
 			if (System.document.visibilityState === "visible") {
+				console.log(`[Engine] visibilitychange: visible`);
+
 				recoverEngineState();
 				const sceneManager = this.getSceneManager();
 				const loadedScenes = sceneManager.getAllLoadedScenes();

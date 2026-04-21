@@ -207,7 +207,7 @@ export class InputManager extends Object {
 	//==============================================================================
 	// 모든 입력 상태를 초기 상태로 되돌림. (페이지 프로세스 복원 시 stuck touch/key 방지용)
 	//==============================================================================
-	clearAllInputState() {
+	clear() {
 		this.#keys.clear();
 		this.#isTouchPressed = false;
 		this.#isTouchReleased = false;
