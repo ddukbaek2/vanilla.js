@@ -108,14 +108,24 @@ function copyFilesByExtension(src, dest, ext) {
 //==============================================================================
 // 메인 빌드.
 //==============================================================================
-async function build(script, input, output) {
+/**
+ * @param {string} script
+ * @param {string} input
+ * @param {string} output
+ * @param {string | null} [template] - buildtemplate 디렉토리 경로 override. 미지정 시 본 project.cjs 와 동일 디렉토리의 buildtemplate 을 사용.
+ */
+async function build(script, input, output, template) {
 	const inputDir = path.resolve(input);
 	const outputDir = path.resolve(output);
+	const templateSrc = template
+		? path.resolve(template)
+		: path.join(__dirname, 'buildtemplate');
 
 	console.log(`빌드 시작`);
 	console.log(`진입 파일: ${script}`);
 	console.log(`입력 디렉토리: ${inputDir}`);
-	console.log(`출력 디렉토리: ${outputDir}\n`);
+	console.log(`출력 디렉토리: ${outputDir}`);
+	console.log(`빌드 템플릿: ${templateSrc}\n`);
 
 	// 출력 디렉토리 초기화 (기존 내용 제거 후 재생성).
 	if (fs.existsSync(outputDir)) {
@@ -123,8 +133,7 @@ async function build(script, input, output) {
 	}
 	fs.mkdirSync(outputDir, { recursive: true });
 
-	// 1. <입력>/tools/buildtemplate 복사.
-	const templateSrc = path.join(inputDir, 'tools', 'buildtemplate');
+	// 1. buildtemplate 복사.
 	if (fs.existsSync(templateSrc)) {
 		copyDir(templateSrc, outputDir);
 		console.log(`[1] 템플릿 복사 완료: ${templateSrc} -> ${outputDir}`);
@@ -540,6 +549,7 @@ function parseArgs(argv) {
 	let script = null;
 	let input = null;
 	let output = null;
+	let template = null;
 	let source = null;
 	let destination = null;
 	let skip = null;
@@ -554,6 +564,9 @@ function parseArgs(argv) {
 		else if (args[i] === '--output') {
 			output = args[++i];
 		}
+		else if (args[i] === '-t' || args[i] === '--template') {
+			template = args[++i];
+		}
 		else if (args[i] === '--source') {
 			source = args[++i];
 		}
@@ -565,7 +578,7 @@ function parseArgs(argv) {
 		}
 	}
 
-	return { subcommand, script, input, output, source, destination, skip };
+	return { subcommand, script, input, output, template, source, destination, skip };
 }
 
 //==============================================================================
@@ -573,7 +586,7 @@ function parseArgs(argv) {
 //==============================================================================
 function printUsage() {
 	console.log('사용법:');
-	console.log('  node tools/project build --script <진입파일> --input <입력디렉토리> --output <출력디렉토리>');
+	console.log('  node tools/project build --script <진입파일> --input <입력디렉토리> --output <출력디렉토리> [-t|--template <빌드템플릿경로>]');
 	console.log('  node tools/project check --input <입력디렉토리>');
 	console.log('  node tools/project stage --source <소스디렉토리> --destination <대상디렉토리> [--skip <파일1,파일2,...>]');
 }
@@ -587,14 +600,14 @@ module.exports = { waitUntilUnlocked, removeReadOnlyRecursive, copyDir, copyFile
 // CLI 진입점.
 //==============================================================================
 if (require.main === module) {
-	const { subcommand, script, input, output, source, destination, skip } = parseArgs(process.argv);
+	const { subcommand, script, input, output, template, source, destination, skip } = parseArgs(process.argv);
 
 	if (subcommand === 'build') {
 		if (!script || !input || !output) {
 			printUsage();
 			process.exit(1);
 		}
-		build(script, input, output);
+		build(script, input, output, template);
 	}
 	else if (subcommand === 'check') {
 		if (!input) {
