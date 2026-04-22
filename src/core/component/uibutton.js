@@ -4,7 +4,7 @@
 import { Enum } from "../../base/identifier.js";
 import { Graphic } from "../graphic.js";
 import { UIComponent } from "./uicomponent.js";
-import { UINode } from "../node/uinode.js";
+import { AnchoredWorldNode } from "../node/anchoredworldmnode.js";
 import { Color } from "../../base/color.js";
 import * as Math from "../../base/math.js";
 import { Sprite } from "./sprite.js";
@@ -75,7 +75,7 @@ export class UIButton extends UIComponent {
 	 */
 	attach(node) {
 		super.attach(node);
-		if (node instanceof UINode) {
+		if (node instanceof AnchoredWorldNode) {
 			node.setInteractable(true);
 		}
 	}

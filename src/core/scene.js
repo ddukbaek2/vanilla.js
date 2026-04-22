@@ -447,7 +447,7 @@ export class Scene extends Object {
 	// 루트 노드 반환.
 	//==============================================================================
 	/**
-	 * @returns { Node } 
+	 * @returns { WorldNode } 
 	 */
 	getRoot() {
 		return this.#root;

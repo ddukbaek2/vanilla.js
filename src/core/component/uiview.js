@@ -8,7 +8,6 @@ import { Rect } from "../../base/rect.js";
 import { Vector2 } from "../../base/vector2.js";
 import { Graphic } from "../graphic.js";
 import { AnchoredWorldNode } from "../node/anchoredworldmnode.js";
-import { UINode } from "../node/uinode.js";
 import { UIComponent } from "./uicomponent.js";
 
 
@@ -58,7 +57,7 @@ export class UIView extends UIComponent {
 		const content = this.getContent();
 		node.addChild(content);
 
-		if (node instanceof UINode) {
+		if (node instanceof AnchoredWorldNode) {
 			node.setMaskEnabled(true);
 		}
 	}

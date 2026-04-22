@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 import { UIView } from "./uiview.js";
-import { UINode } from "../node/uinode.js";
+import { AnchoredWorldNode } from "../node/anchoredworldmnode.js";
 import { Vector2 } from "../../base/vector2.js";
 import * as Math from "../../base/math.js";
 
@@ -74,7 +74,7 @@ export class UIScrollView extends UIView {
 	 */
 	attach(node) {
 		super.attach(node);
-		if (node instanceof UINode) {
+		if (node instanceof AnchoredWorldNode) {
 			node.setInteractable(true);
 		}
 	}

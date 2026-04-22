@@ -9,6 +9,7 @@ import { Pivot } from "../../base/pivot.js";
 import { Rect } from "../../base/rect.js";
 import { OBB } from "../../base/obb.js";
 import { TransformNode } from "./transformnode.js";
+import { Engine } from "../engine.js";
 
 
 //==============================================================================
@@ -33,9 +34,9 @@ export class WorldNode extends TransformNode {
     constructor() {
         super();
 		this.nodeType = 'WorldNode';
-        this.#pivot = Pivot.middleCenter;
+        this.#pivot = Pivot.middleCenter.clone();
         this.#contentSize = Vector2.zero();
-        this.#anchor = Vector2.zero();
+        this.#anchor = Pivot.topLeft.clone();
         this.#isInteractable = false;
     }
 
@@ -169,7 +170,7 @@ export class WorldNode extends TransformNode {
     // 실제 내용 크기 설정.
     //==============================================================================
     /**
-     * @param { Vector2 } contentSize 
+     * @param { Vector2 } contentSize
      */
     setContentSize(contentSize) {
         this.#contentSize = contentSize;
@@ -177,6 +178,7 @@ export class WorldNode extends TransformNode {
 
     //==============================================================================
     // 실제 내용 크기 반환.
+    // - 부모가 없고(루트 노드) 명시적으로 설정된 적 없으면 현재 뷰 크기를 반환한다.
     //==============================================================================
     /**
      * @returns { Vector2 }
@@ -205,6 +207,30 @@ export class WorldNode extends TransformNode {
      */
     getAnchor() {
         return this.#anchor;
+    }
+
+    //==============================================================================
+    // 앵커 기준 위치 설정.
+    // - 별도 변수를 보관하지 않고, 현재 anchor 상태에 맞춰 localPosition을 조작한다.
+    // - WorldNode의 anchor는 부모 영역 내 비율 위치이며, localPosition은 그 anchor 지점에서의 추가 오프셋이다.
+    //   따라서 anchoredPosition === localPosition.
+    //==============================================================================
+    /**
+     * @param { Vector2 } anchoredPosition
+     */
+    setAnchoredPosition(anchoredPosition) {
+        this.setLocalPosition(anchoredPosition);
+    }
+
+    //==============================================================================
+    // 앵커 기준 위치 반환.
+    // - 별도 변수를 보관하지 않고, 현재 anchor 상태에 맞춰 계산된 localPosition을 반환한다.
+    //==============================================================================
+    /**
+     * @returns { Vector2 }
+     */
+    getAnchoredPosition() {
+        return this.getLocalPosition();
     }
 
     //==============================================================================

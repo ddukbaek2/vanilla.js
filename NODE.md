@@ -5,4 +5,4 @@
 ## TransformNode (extends ComponentNode)
 ## WorldNode (extnds TransformNode)
 ## AnchoredWorldNode (extends WorldNode)
-## UINode (extends AnchoredWorldNode)
+## UINode (extends TransformNode)

@@ -1,7 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { UINode } from "../core/node/uinode.js";
+import { AnchoredWorldNode } from "../core/node/anchoredworldmnode.js";
 import { Vector2 } from "../base/vector2.js";
 import { Object } from "../base/object.js";
 
@@ -11,16 +11,16 @@ import { Object } from "../base/object.js";
 // - 지역 변수 없이 노드 계층 구조를 선언적으로 구성하는 플루언트 빌더.
 // - Unreal Slate / Flutter 위젯과 유사한 구조.
 // - Vector2 없이 숫자쌍(x, y)으로 모든 위치/크기를 지정한다.
-// - create(nodeClass)로 노드 타입을 지정한다. (기본값: UINode)
+// - create(nodeClass)로 노드 타입을 지정한다. (기본값: AnchoredWorldNode)
 //
 // 사용 예:
-//   const panel = NodeLayout.create(UINode)
+//   const panel = NodeLayout.create(AnchoredWorldNode)
 //       .anchorMin(0.5, 0.5)
 //       .anchorMax(0.5, 0.5)
 //       .sizeDelta(680, 900)
 //       .component(Paint, (c) => { c.setColor(new Color(0.1, 0.1, 0.1, 1)); })
 //       .children(
-//           NodeLayout.create(UINode)
+//           NodeLayout.create(AnchoredWorldNode)
 //               .sizeDelta(120, 70)
 //               .component(Label, (c) => { c.setText("확인"); })
 //       )
@@ -32,6 +32,7 @@ export class NodeLayout extends Object {
 	//==============================================================================
 	/** @private @type { * } */ #node;
 	/** @private @type { NodeLayout[] } */ #childLayouts;
+	/** @private @type { * } */ #parentNode;
 
 	//==============================================================================
 	// 생성.
@@ -41,9 +42,10 @@ export class NodeLayout extends Object {
 	 */
 	constructor(nodeClass) {
 		super();
-		const NodeClass = nodeClass ?? UINode;
+		const NodeClass = nodeClass ?? AnchoredWorldNode;
 		this.#node = new NodeClass();
 		this.#childLayouts = [];
+		this.#parentNode = null;
 	}
 
 	//==============================================================================
@@ -178,6 +180,31 @@ export class NodeLayout extends Object {
 	}
 
 	//==============================================================================
+	// 부모 노드 설정. (build()에 인자 없이 호출 시 이 부모에 자식으로 추가된다.)
+	//==============================================================================
+	/**
+	 * @param { * } parentNode
+	 * @returns { NodeLayout }
+	 */
+	parent(parentNode) {
+		this.#parentNode = parentNode;
+		return this;
+	}
+
+	//==============================================================================
+	// 단일 앵커 설정. (WorldNode.setAnchor)
+	//==============================================================================
+	/**
+	 * @param { number } x
+	 * @param { number } y
+	 * @returns { NodeLayout }
+	 */
+	anchor(x, y) {
+		this.#node.setAnchor(Vector2.create(x, y));
+		return this;
+	}
+
+	//==============================================================================
 	// 앵커 최소값 설정.
 	//==============================================================================
 	/**
@@ -244,7 +271,8 @@ export class NodeLayout extends Object {
 	//==============================================================================
 	// 빌드.
 	// - 자식 레이아웃을 모두 재귀적으로 빌드한다.
-	// - parent가 제공된 경우 자신을 parent에 자식으로 추가한다.
+	// - parent 인자가 제공되면 그 부모에 자식으로 추가한다.
+	// - parent 인자가 없고 parent() 메서드로 지정된 부모가 있으면 그 부모에 자식으로 추가한다.
 	// - 완성된 노드를 반환한다.
 	//==============================================================================
 	/**
@@ -255,8 +283,9 @@ export class NodeLayout extends Object {
 		for (const childLayout of this.#childLayouts) {
 			childLayout.build(this.#node);
 		}
-		if (parent) {
-			parent.addChild(this.#node);
+		const targetParent = parent ?? this.#parentNode;
+		if (targetParent) {
+			targetParent.addChild(this.#node);
 		}
 		return this.#node;
 	}

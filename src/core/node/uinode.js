@@ -2,123 +2,21 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Rect } from "../../base/rect.js";
-import { Vector2 } from "../../base/vector2.js";
-import { Graphic } from "../graphic.js";
-import { AnchoredWorldNode } from "./anchoredworldmnode.js";
+import { TransformNode } from "./transformnode.js";
 
 
 //==============================================================================
 // UI 노드.
-// - 마스크 기능.
-// - 터치 인터랙션 기능.
-// - 포커스 기능.
+// - 기존 WorldNode 계열과 다른 별도 노선의 UI 노드.
+// - 추후 정리 시 독자적인 UI 좌표계/이벤트 체계를 가질 예정.
+// - 현재는 TransformNode 위에 빈 껍데기로 존재한다.
 //==============================================================================
-export class UINode extends AnchoredWorldNode {
-	//==============================================================================
-	// 멤버 변수 목록.
-	//==============================================================================
-	/** @private @type { boolean } */ #isMaskEnabled;
-	/** @private @type { boolean } */ #isFocused;
-
+export class UINode extends TransformNode {
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	constructor() {
 		super();
 		this.nodeType = 'UINode';
-		this.#isMaskEnabled = false;
-		this.#isFocused = false;
-	}
-
-	//==============================================================================
-	// 출력. (오버라이드: 마스크 활성화 시 자식을 자신의 영역으로 크롭)
-	//==============================================================================
-	/**
-	 * @override
-	 * @param { Graphic } graphic
-	 */
-	draw(graphic) {
-		const isVisible = this.isVisible();
-		if (!isVisible) {
-			return;
-		}
-
-		// 컴포넌트 출력.
-		const components = this.getAllComponents();
-		for (const component of components) {
-			component.draw(graphic);
-		}
-
-		// 마스크 처리.
-		const isMaskEnabled = this.isMaskEnabled();
-		if (isMaskEnabled) {
-			// 자신의 contentSize 기준으로 클리핑 후 자식 출력.
-			const contentSize = this.getContentSize();
-			const clipRect = Rect.create(0, 0, contentSize.x, contentSize.y);
-			graphic.beginClipRect(clipRect);
-		}
-
-		// 자식 출력.
-		const children = this.getChildren();
-		for (const child of children) {
-			graphic.drawNode(child);
-		}
-
-		// 마스크 처리.
-		if (isMaskEnabled) {
-			graphic.endClipRect();
-		}
-	}
-
-	//==============================================================================
-	// 마스크 활성화 설정. (자식이 자신의 contentSize 영역 밖으로 나가면 크롭)
-	//==============================================================================
-	/**
-	 * @param { boolean } enabled
-	 */
-	setMaskEnabled(enabled) {
-		this.#isMaskEnabled = enabled;
-	}
-
-	//==============================================================================
-	// 마스크 활성화 여부 반환.
-	//==============================================================================
-	/**
-	 * @returns { boolean }
-	 */
-	isMaskEnabled() {
-		return this.#isMaskEnabled;
-	}
-
-	//==============================================================================
-	// 포커스 설정. (자신부터 가장 상위의 UINode까지 전파)
-	//==============================================================================
-	setFocus() {
-		if (this.isFocus()) {
-			return;
-		}
-		this.#isFocused = true;
-		const parent = this.getParent();
-		if (parent && parent instanceof UINode) {
-			parent.setFocus();
-		}
-	}
-
-	//==============================================================================
-	// 포커스 여부 반환.
-	//==============================================================================
-	/**
-	 * @returns { boolean }
-	 */
-	isFocus() {
-		return this.#isFocused;
-	}
-
-	//==============================================================================
-	// 포커스 해제.
-	//==============================================================================
-	clearFocus() {
-		this.#isFocused = false;
 	}
 }
