@@ -112,6 +112,9 @@ export class Engine extends Object {
 		this.#statisticsTextRect = Rect.zero();
 		this.#version = Version.create(0, 2, 0);
 
+		// 현재 엔진 인스턴스 글로벌 등록. (루트 노드 등 컨텍스트 없는 객체에서 ViewManager 등 접근용)
+		System.vanillaEngine = this;
+
 		// 이벤트 설정.
 		this.setupAllDocumentEvents();
 		this.resize();
@@ -821,5 +824,15 @@ export class Engine extends Object {
 	 */
 	getFrameNumber() {
 		return this.#frameNumber;
+	}
+
+	//==============================================================================
+	// 전역 인스턴스 반환.
+	//==============================================================================
+	/**
+	 * @returns { Engine }
+	 */
+	static getEngine() {
+		return System.vanillaEngine;
 	}
 }
