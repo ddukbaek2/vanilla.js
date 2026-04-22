@@ -165,6 +165,52 @@ async function build(script, input, output) {
 
 
 //==============================================================================
+// 스테이지. 소스 디렉토리 전체를 대상 디렉토리로 복사한다.
+// - 대상 디렉토리가 이미 존재하면 삭제 후 재생성한다.
+// - skipTopLevel 로 지정된 최상위 항목은 건너뛴다.
+//==============================================================================
+/**
+ * @param {string} source
+ * @param {string} destination
+ * @param {string[] | null} skipTopLevel
+ */
+function stage(source, destination, skipTopLevel) {
+	const sourceDir = path.resolve(source);
+	const destinationDir = path.resolve(destination);
+
+	if (!fs.existsSync(sourceDir)) {
+		console.error(`[stage] 소스 디렉토리가 없습니다: ${sourceDir}`);
+		process.exit(1);
+	}
+
+	// 대상 디렉토리 초기화.
+	if (fs.existsSync(destinationDir)) {
+		fs.rmSync(destinationDir, { recursive: true, force: true });
+	}
+	fs.mkdirSync(destinationDir, { recursive: true });
+
+	// skipTopLevel 목록에 없는 항목만 복사.
+	const skipSet = skipTopLevel && skipTopLevel.length > 0 ? new Set(skipTopLevel) : null;
+	const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
+	for (const entry of entries) {
+		if (skipSet && skipSet.has(entry.name)) {
+			continue;
+		}
+		const srcPath = path.join(sourceDir, entry.name);
+		const destPath = path.join(destinationDir, entry.name);
+		if (entry.isDirectory()) {
+			copyDir(srcPath, destPath);
+		}
+		else {
+			fs.copyFileSync(srcPath, destPath);
+		}
+	}
+
+	console.log(`[stage] 복사 완료: ${sourceDir} -> ${destinationDir}`);
+}
+
+
+//==============================================================================
 // 자산 현황 체크 상수.
 //==============================================================================
 const LARGE_TEXTURE_THRESHOLD = 512; // 이 픽셀 초과 시 경고 표시
@@ -494,6 +540,9 @@ function parseArgs(argv) {
 	let script = null;
 	let input = null;
 	let output = null;
+	let source = null;
+	let destination = null;
+	let skip = null;
 
 	for (let i = 1; i < args.length; i++) {
 		if (args[i] === '--script') {
@@ -505,9 +554,18 @@ function parseArgs(argv) {
 		else if (args[i] === '--output') {
 			output = args[++i];
 		}
+		else if (args[i] === '--source') {
+			source = args[++i];
+		}
+		else if (args[i] === '--destination') {
+			destination = args[++i];
+		}
+		else if (args[i] === '--skip') {
+			skip = args[++i];
+		}
 	}
 
-	return { subcommand, script, input, output };
+	return { subcommand, script, input, output, source, destination, skip };
 }
 
 //==============================================================================
@@ -517,18 +575,19 @@ function printUsage() {
 	console.log('사용법:');
 	console.log('  node tools/project build --script <진입파일> --input <입력디렉토리> --output <출력디렉토리>');
 	console.log('  node tools/project check --input <입력디렉토리>');
+	console.log('  node tools/project stage --source <소스디렉토리> --destination <대상디렉토리> [--skip <파일1,파일2,...>]');
 }
 
 //==============================================================================
 // 모듈 export. (상위 프로젝트의 특수화 도구에서 재사용)
 //==============================================================================
-module.exports = { waitUntilUnlocked, removeReadOnlyRecursive, copyDir, copyFilesByExtension, build, check };
+module.exports = { waitUntilUnlocked, removeReadOnlyRecursive, copyDir, copyFilesByExtension, build, stage, check };
 
 //==============================================================================
 // CLI 진입점.
 //==============================================================================
 if (require.main === module) {
-	const { subcommand, script, input, output } = parseArgs(process.argv);
+	const { subcommand, script, input, output, source, destination, skip } = parseArgs(process.argv);
 
 	if (subcommand === 'build') {
 		if (!script || !input || !output) {
@@ -545,6 +604,14 @@ if (require.main === module) {
 		check(input).catch(error => {
 			console.error('[ProjectChecker] 오류: 작업 중 예기치 않은 오류가 발생했습니다:', error);
 		});
+	}
+	else if (subcommand === 'stage') {
+		if (!source || !destination) {
+			printUsage();
+			process.exit(1);
+		}
+		const skipTopLevel = skip ? skip.split(',').map(value => value.trim()).filter(value => value.length > 0) : null;
+		stage(source, destination, skipTopLevel);
 	}
 	else {
 		printUsage();
