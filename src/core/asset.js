@@ -9,15 +9,15 @@ import { Object } from "../base/object.js";
 // 애셋 타입.
 //==============================================================================
 export const AssetType = System.Object.freeze({
-	none: 'none',
-	image: 'image',
-	audio: 'audio',
-	json: 'json',
-	text: 'text',
-	font: 'font',
-	blob: 'blob',
-	bunch: 'bunch',
-	visual: 'visual',
+	none: "none",
+	image: "image",
+	audio: "audio",
+	json: "json",
+	text: "text",
+	font: "font",
+	blob: "blob",
+	bunch: "bunch",
+	visual: "visual",
 });
 
 

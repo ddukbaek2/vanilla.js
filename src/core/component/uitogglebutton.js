@@ -25,7 +25,7 @@ export class UIToggleButton extends UIButton {
 	 */
 	constructor() {
 		super();
-		this.setComponentType('ToggleButton');
+		this.setComponentType("ToggleButton");
 		this.#isOn = false;
 		this.#onTintColor = new Color(0, 0, 0, 0.3);
 		this.#toggledEvent = null;

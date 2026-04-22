@@ -31,7 +31,7 @@ export class TransformNode extends ComponentNode {
 	 */
 	constructor() {
 		super();
-		this.nodeType = 'TransformNode';
+		this.nodeType = "TransformNode";
 		this.#localPosition = Vector2.zero();
 		this.#localScale = Vector2.one();
 		this.#localRotation = 0.0;

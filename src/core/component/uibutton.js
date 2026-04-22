@@ -51,7 +51,7 @@ export class UIButton extends UIComponent {
 	 */
 	constructor() {
 		super();
-		this.setComponentType('Button');
+		this.setComponentType("Button");
 		this.#buttonState = ButtonState.normal;
 		this.#clickEvent = null;
 		this.#pressedEvent = null;
@@ -67,7 +67,7 @@ export class UIButton extends UIComponent {
 	}
 
 	//==============================================================================
-	// 노드에 붙음. (UINode의 isInteractable을 자동 활성화)
+	// 노드에 붙음. (AnchoredWorldNode의 isInteractable을 자동 활성화)
 	//==============================================================================
 	/**
 	 * @override
@@ -104,7 +104,7 @@ export class UIButton extends UIComponent {
 	}
 
 	//==============================================================================
-	// 터치 누름. (TouchRaycaster → UINode → Button)
+	// 터치 누름. (TouchRaycaster → AnchoredWorldNode → Button)
 	//==============================================================================
 	/**
 	 * @param { Vector2 } viewInputPosition
@@ -123,7 +123,7 @@ export class UIButton extends UIComponent {
 	}
 
 	//==============================================================================
-	// 터치 뗌. (TouchRaycaster → UINode → Button)
+	// 터치 뗌. (TouchRaycaster → AnchoredWorldNode → Button)
 	//==============================================================================
 	/**
 	 * @param { Vector2 } viewInputPosition
@@ -159,7 +159,7 @@ export class UIButton extends UIComponent {
 	}
 
 	//==============================================================================
-	// 터치 취소. (TouchRaycaster → UINode → Button)
+	// 터치 취소. (TouchRaycaster → AnchoredWorldNode → Button)
 	//==============================================================================
 	/**
 	 * @param { Vector2 } viewInputPosition
@@ -203,12 +203,12 @@ export class UIButton extends UIComponent {
 	applyTintProgress(progress) {
 		const pressedTintColor = this.getPressedTintColor();
 		for (const colorEntry of this.#colorEntries) {
-			if (colorEntry.type === 'sprite') {
+			if (colorEntry.type === "sprite") {
 				const overlayAlpha = Math.lerp(0, pressedTintColor.alpha, progress);
 				const overlayColor = new Color(pressedTintColor.red, pressedTintColor.green, pressedTintColor.blue, overlayAlpha);
 				colorEntry.component.setColor(overlayColor);
 			}
-			else if (colorEntry.type === 'label') {
+			else if (colorEntry.type === "label") {
 				const originalColor = colorEntry.originalColor;
 				const tintedRed = Math.lerp(originalColor.red, pressedTintColor.red, pressedTintColor.alpha * progress);
 				const tintedGreen = Math.lerp(originalColor.green, pressedTintColor.green, pressedTintColor.alpha * progress);
@@ -226,7 +226,7 @@ export class UIButton extends UIComponent {
 	applyDisabledTint() {
 		const disabledTintColor = this.#disabledTintColor;
 		for (const colorEntry of this.#colorEntries) {
-			if (colorEntry.type === 'sprite') {
+			if (colorEntry.type === "sprite") {
 				const overlayColor = new Color(disabledTintColor.red, disabledTintColor.green, disabledTintColor.blue, disabledTintColor.alpha);
 				colorEntry.component.setColor(overlayColor);
 			}
@@ -251,13 +251,13 @@ export class UIButton extends UIComponent {
 	collectFromNode(node) {
 		const sprites = node.getComponents(Sprite);
 		for (const sprite of sprites) {
-			this.#colorEntries.push({ type: 'sprite', component: sprite });
+			this.#colorEntries.push({ type: "sprite", component: sprite });
 		}
 		const labelComponents = node.getComponents(Label);
 		for (const labelComponent of labelComponents) {
 			const originalColor = labelComponent.getTextColor();
 			const copiedColor = new Color(originalColor.red, originalColor.green, originalColor.blue, originalColor.alpha);
-			this.#colorEntries.push({ type: 'label', component: labelComponent, originalColor: copiedColor });
+			this.#colorEntries.push({ type: "label", component: labelComponent, originalColor: copiedColor });
 		}
 		const children = node.getChildren();
 		for (const child of children) {

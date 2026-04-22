@@ -145,7 +145,7 @@ export function createGUID() {
 	// return System.crypto.randomUUID();
 
 	// 48비트 타임스탬프 (ms) - 약 8900년치
-	const ts = Date.now().toString(16).padStart(12, '0');
+	const ts = Date.now().toString(16).padStart(12, "0");
 
 	const r = () => (Math.random() * 16 | 0).toString(16);
 	const y = () => (Math.random() * 4 | 8).toString(16);

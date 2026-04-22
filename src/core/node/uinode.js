@@ -17,6 +17,6 @@ export class UINode extends TransformNode {
 	//==============================================================================
 	constructor() {
 		super();
-		this.nodeType = 'UINode';
+		this.nodeType = "UINode";
 	}
 }

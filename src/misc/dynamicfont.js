@@ -156,15 +156,15 @@ export class DynamicFont extends Object {
 	 * @param { string } charset
 	 */
 	buildAtlas(charset) {
-		const fontFamily = this.#fontAsset ? this.#fontAsset.fontFace.family : '-apple-system, sans-serif';
+		const fontFamily = this.#fontAsset ? this.#fontAsset.fontFace.family : "-apple-system, sans-serif";
 		const fontSize = this.getFontSize();
 		const fontString = `${fontSize}px ${fontFamily}`;
 
 		// 글리프 메트릭스 측정용 임시 캔버스.
-		const measureCanvas = document.createElement('canvas');
+		const measureCanvas = document.createElement("canvas");
 		measureCanvas.width = ATLAS_MAX_WIDTH;
 		measureCanvas.height = fontSize * 2;
-		const measureContext = measureCanvas.getContext('2d');
+		const measureContext = measureCanvas.getContext("2d");
 		measureContext.font = fontString;
 
 		// 각 문자 메트릭스 측정.
@@ -205,14 +205,14 @@ export class DynamicFont extends Object {
 		const atlasHeight = cursorY + rowHeight;
 
 		// 아틀라스 캔버스 생성.
-		this.#atlasCanvas = document.createElement('canvas');
+		this.#atlasCanvas = document.createElement("canvas");
 		const atlasCanvas = this.getAtlasCanvas();
 		atlasCanvas.width = ATLAS_MAX_WIDTH;
 		atlasCanvas.height = atlasHeight;
-		const atlasContext = atlasCanvas.getContext('2d');
+		const atlasContext = atlasCanvas.getContext("2d");
 		atlasContext.font = fontString;
-		atlasContext.fillStyle = '#ffffff';
-		atlasContext.textBaseline = 'alphabetic';
+		atlasContext.fillStyle = "#ffffff";
+		atlasContext.textBaseline = "alphabetic";
 
 		// 글리프 렌더링 및 GlyphInfo 기록.
 		for (const entry of entries) {

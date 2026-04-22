@@ -26,7 +26,7 @@ export class Paint extends Component {
 	 */
 	constructor() {
 		super();
-		this.setComponentType('Paint');
+		this.setComponentType("Paint");
 		this.#color = Color.white();
 		this.#roundSize = 0;
 	}

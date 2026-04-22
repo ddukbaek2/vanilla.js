@@ -57,7 +57,7 @@ export class Label extends Component {
 	//==============================================================================
 	constructor() {
 		super();
-		this.setComponentType('Label');
+		this.setComponentType("Label");
 		this.#fontFace = null;
 		this.#text = "";
 		this.#fontSize = 32;
@@ -307,7 +307,7 @@ export class Label extends Component {
 
 		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		canvasRenderingContext.save();
-		const fontFamily = fontFace ? fontFace.family : '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+		const fontFamily = fontFace ? fontFace.family : "-apple-system, \"Segoe UI\", Roboto, \"Apple SD Gothic Neo\", \"Malgun Gothic\", sans-serif";
 		canvasRenderingContext.font = `${fontSize}px ${fontFamily}`;
 
 		const metrics = canvasRenderingContext.measureText(text);

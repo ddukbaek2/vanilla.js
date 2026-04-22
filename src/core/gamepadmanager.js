@@ -157,7 +157,7 @@ export class GamepadManager extends Object {
 	// 콜백 설정.
 	//==============================================================================
 	/**
-	 * @param { (gamepadIndex: number, inputType: 'button' | 'value' | 'axis', inputIndex: number, value: any) => void } callback
+	 * @param { (gamepadIndex: number, inputType: "button" | "value" | "axis", inputIndex: number, value: any) => void } callback
 	 */
 	setCallback(callback) {
 		this.#inputEventCallback = callback;
@@ -191,14 +191,14 @@ export class GamepadManager extends Object {
 				// 눌림 상태 변화 감지.
 				if (lastButtonState.pressed !== currentButton.pressed) {
 					lastButtonState.pressed = currentButton.pressed;
-					const label = (i === GamepadButtonCode.L2 || i === GamepadButtonCode.R2) ? 'Trigger' : 'Button';
+					const label = (i === GamepadButtonCode.L2 || i === GamepadButtonCode.R2) ? "Trigger" : "Button";
 					
 					// 로그 출력.
-					console.log(`[GamepadManager] Pad ${hardwareIndex} ${label} ${i} ${currentButton.pressed ? 'Pressed' : 'Released'}`);
+					console.log(`[GamepadManager] Pad ${hardwareIndex} ${label} ${i} ${currentButton.pressed ? "Pressed" : "Released"}`);
 					
 					// 콜백 호출.
 					if (this.#inputEventCallback) {
-						this.#inputEventCallback(hardwareIndex, 'button', i, currentButton.pressed);
+						this.#inputEventCallback(hardwareIndex, "button", i, currentButton.pressed);
 					}
 				}
 
@@ -209,14 +209,14 @@ export class GamepadManager extends Object {
 					
 					// 트리거 등 값이 유의미할 때만 처리.
 					if (currentValue > 0) {
-						const label = (i === GamepadButtonCode.L2 || i === GamepadButtonCode.R2) ? 'Trigger' : 'Button';
+						const label = (i === GamepadButtonCode.L2 || i === GamepadButtonCode.R2) ? "Trigger" : "Button";
 						
 						// 로그 출력.
 						console.log(`[GamepadManager] Pad ${hardwareIndex} ${label} ${i} Value: ${currentValue}`);
 						
 						// 콜백 호출.
 						if (this.#inputEventCallback) {
-							this.#inputEventCallback(hardwareIndex, 'value', i, currentValue);
+							this.#inputEventCallback(hardwareIndex, "value", i, currentValue);
 						}
 					}
 				}
@@ -236,7 +236,7 @@ export class GamepadManager extends Object {
 					
 					// 콜백 호출.
 					if (this.#inputEventCallback) {
-						this.#inputEventCallback(hardwareIndex, 'axis', i, currentAxisValue);
+						this.#inputEventCallback(hardwareIndex, "axis", i, currentAxisValue);
 					}
 				}
 			}

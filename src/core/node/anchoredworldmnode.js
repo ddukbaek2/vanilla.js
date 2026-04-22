@@ -12,7 +12,7 @@ import { WorldNode } from "./worldnode.js";
 //==============================================================================
 // UI 기반 뷰.
 // - 앵커, 앵커 포지션, 사이즈 델타 기능. (부모 기준으로 배치되고 늘려붙이는 것을 기준으로 한 확장 좌표계)
-// - 마스크, 포커스 기능. (기존 UINode 통합)
+// - 마스크, 포커스 기능. (기존 AnchoredWorldNode 통합)
 //==============================================================================
 export class AnchoredWorldNode extends WorldNode {
 	//==============================================================================
@@ -30,7 +30,7 @@ export class AnchoredWorldNode extends WorldNode {
 	//==============================================================================
 	constructor() {
 		super();
-		this.nodeType = 'AnchoredWorldNode';
+		this.nodeType = "AnchoredWorldNode";
 		this.#anchoredPosition = Vector2.zero();
 		this.#sizeDelta = Vector2.zero();
 		this.#anchorMin = Vector2.create(0.5, 0.5);

@@ -235,7 +235,7 @@ export class WebGL2 extends Object {
 			const vertexBuffer = this.createVertexBuffer();
 			canvasRanderingContext.bindBuffer(canvasRanderingContext.ARRAY_BUFFER, vertexBuffer);
 			canvasRanderingContext.bufferData(canvasRanderingContext.ARRAY_BUFFER, vertices, canvasRanderingContext.STATIC_DRAW);
-			const attributeLocation = canvasRanderingContext.getAttribLocation(program, 'a_position');
+			const attributeLocation = canvasRanderingContext.getAttribLocation(program, "a_position");
 			canvasRanderingContext.enableVertexAttribArray(attributeLocation);
 			canvasRanderingContext.vertexAttribPointer(attributeLocation, 2, canvasRanderingContext.FLOAT, false, 0, 0);
 			canvasRanderingContext.bindVertexArray(null);

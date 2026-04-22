@@ -187,7 +187,7 @@ export class Vector2 extends Object {
 			return origin;
 		}
 		
-		throw new Error("Invalid type: 'other' must be a number or an instance of Vector2.");
+		throw new Error("Invalid type: \"other\" must be a number or an instance of Vector2.");
 	}
 
 	//==============================================================================
@@ -210,7 +210,7 @@ export class Vector2 extends Object {
 			return origin;
 		}
 		
-		throw new Error("Invalid type: 'other' must be a number or an instance of Vector2.");
+		throw new Error("Invalid type: \"other\" must be a number or an instance of Vector2.");
 	}
 
 	//==============================================================================
@@ -233,7 +233,7 @@ export class Vector2 extends Object {
 			return origin;
 		}
 		
-		throw new Error("Invalid type: 'other' must be a number or an instance of Vector2.");
+		throw new Error("Invalid type: \"other\" must be a number or an instance of Vector2.");
 	}
 
 	//==============================================================================
@@ -256,7 +256,7 @@ export class Vector2 extends Object {
 			return origin;
 		}
 		
-		throw new Error("Invalid type: 'other' must be a number or an instance of Vector2.");
+		throw new Error("Invalid type: \"other\" must be a number or an instance of Vector2.");
 	}
 
 	//==============================================================================
@@ -279,7 +279,7 @@ export class Vector2 extends Object {
 			return origin;
 		}
 		
-		throw new Error("Invalid type: 'other' must be a number or an instance of Vector2.");
+		throw new Error("Invalid type: \"other\" must be a number or an instance of Vector2.");
 	}
 
 	//==============================================================================

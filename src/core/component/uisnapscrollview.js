@@ -39,7 +39,7 @@ export class UISnapScrollView extends UIScrollView {
 	//==============================================================================
 	constructor() {
 		super();
-		this.setComponentType('SnapScrollView');
+		this.setComponentType("SnapScrollView");
 		this.setScrollMode(ScrollMode.clamp);
 		this.setHorizontal(true);
 		this.setVertical(false);

@@ -50,7 +50,7 @@ export class UIScrollView extends UIView {
 	 */
 	constructor() {
 		super();
-		this.setComponentType('ScrollView');
+		this.setComponentType("ScrollView");
 		this.#scrollOffset = Vector2.zero();
 		this.#scrollContentSize = Vector2.zero();
 		this.#isDragging = false;
@@ -66,7 +66,7 @@ export class UIScrollView extends UIView {
 	}
 
 	//==============================================================================
-	// 노드에 붙음. (UINode의 isInteractable을 자동 활성화)
+	// 노드에 붙음. (AnchoredWorldNode의 isInteractable을 자동 활성화)
 	//==============================================================================
 	/**
 	 * @override
@@ -80,7 +80,7 @@ export class UIScrollView extends UIView {
 	}
 
 	//==============================================================================
-	// 터치 누름. (TouchRaycaster → UINode → ScrollView)
+	// 터치 누름. (TouchRaycaster → AnchoredWorldNode → ScrollView)
 	//==============================================================================
 	/**
 	 * @override
@@ -97,7 +97,7 @@ export class UIScrollView extends UIView {
 	}
 
 	//==============================================================================
-	// 터치 이동. (TouchRaycaster → UINode → ScrollView)
+	// 터치 이동. (TouchRaycaster → AnchoredWorldNode → ScrollView)
 	//==============================================================================
 	/**
 	 * @override
@@ -110,7 +110,7 @@ export class UIScrollView extends UIView {
 	}
 
 	//==============================================================================
-	// 터치 뗌. (TouchRaycaster → UINode → ScrollView)
+	// 터치 뗌. (TouchRaycaster → AnchoredWorldNode → ScrollView)
 	//==============================================================================
 	/**
 	 * @override
@@ -121,7 +121,7 @@ export class UIScrollView extends UIView {
 	}
 
 	//==============================================================================
-	// 터치 취소. (TouchRaycaster → UINode → ScrollView)
+	// 터치 취소. (TouchRaycaster → AnchoredWorldNode → ScrollView)
 	//==============================================================================
 	/**
 	 * @override

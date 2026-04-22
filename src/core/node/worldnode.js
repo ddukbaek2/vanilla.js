@@ -33,7 +33,7 @@ export class WorldNode extends TransformNode {
      */
     constructor() {
         super();
-		this.nodeType = 'WorldNode';
+		this.nodeType = "WorldNode";
         this.#pivot = Pivot.middleCenter.clone();
         this.#contentSize = Vector2.zero();
         this.#anchor = Pivot.topLeft.clone();
@@ -383,7 +383,7 @@ export class WorldNode extends TransformNode {
     touchPress(viewInputPosition) {
         const components = this.getAllComponents();
         for (const component of components) {
-            if (typeof component.touchPress === 'function') {
+            if (typeof component.touchPress === "function") {
                 component.touchPress(viewInputPosition);
             }
         }
@@ -399,7 +399,7 @@ export class WorldNode extends TransformNode {
     touchMove(viewInputPosition) {
         const components = this.getAllComponents();
         for (const component of components) {
-            if (typeof component.touchMove === 'function') {
+            if (typeof component.touchMove === "function") {
                 component.touchMove(viewInputPosition);
             }
         }
@@ -415,7 +415,7 @@ export class WorldNode extends TransformNode {
     touchRelease(viewInputPosition) {
         const components = this.getAllComponents();
         for (const component of components) {
-            if (typeof component.touchRelease === 'function') {
+            if (typeof component.touchRelease === "function") {
                 component.touchRelease(viewInputPosition);
             }
         }
@@ -431,7 +431,7 @@ export class WorldNode extends TransformNode {
     touchCancel(viewInputPosition) {
         const components = this.getAllComponents();
         for (const component of components) {
-            if (typeof component.touchCancel === 'function') {
+            if (typeof component.touchCancel === "function") {
                 component.touchCancel(viewInputPosition);
             }
         }

@@ -26,7 +26,7 @@ export class Component extends Object {
 	 */
 	constructor() {
 		super();
-		this.#componentType = 'Component';
+		this.#componentType = "Component";
 		this.#node = null;
 		this.#isEnable = true;
 		this.#isGizmoVisible = false;

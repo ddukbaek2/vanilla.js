@@ -24,7 +24,7 @@ export class UIComponent extends Component {
 	 */
 	constructor() {
 		super();
-		this.setComponentType('UI');
+		this.setComponentType("UI");
 		this.#engine = null;
 	}
 

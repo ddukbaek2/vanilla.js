@@ -16,10 +16,10 @@ import { ITouchable } from "../core/interface/itouchable.js";
 // 가상 패드 상태.
 //==============================================================================
 const VirtualPadState = {
-	none: 'wait',
-	pressed: 'pressed',
-	move: 'move',
-	released: 'released',
+	none: "wait",
+	pressed: "pressed",
+	move: "move",
+	released: "released",
 }
 
 

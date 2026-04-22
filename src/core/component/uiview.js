@@ -32,7 +32,7 @@ export class UIView extends UIComponent {
 	 */
 	constructor() {
 		super();
-		this.setComponentType('View');
+		this.setComponentType("View");
 		this.#content = null;
 		this.#backgroundColor = new Color(1, 1, 1, 1);
 	}
@@ -95,7 +95,7 @@ export class UIView extends UIComponent {
 	}
 
 	//==============================================================================
-	// 터치 누름. (TouchRaycaster → UINode)
+	// 터치 누름. (TouchRaycaster → AnchoredWorldNode)
 	//==============================================================================
 	/**
 	 * @virtual
@@ -105,7 +105,7 @@ export class UIView extends UIComponent {
 	}
 
 	//==============================================================================
-	// 터치 이동. (TouchRaycaster → UINode)
+	// 터치 이동. (TouchRaycaster → AnchoredWorldNode)
 	//==============================================================================
 	/**
 	 * @virtual
@@ -118,7 +118,7 @@ export class UIView extends UIComponent {
 	}
 
 	//==============================================================================
-	// 터치 뗌. (TouchRaycaster → UINode)
+	// 터치 뗌. (TouchRaycaster → AnchoredWorldNode)
 	//==============================================================================
 	/**
 	 * @virtual
@@ -128,7 +128,7 @@ export class UIView extends UIComponent {
 	}
 
 	//==============================================================================
-	// 터치 취소. (TouchRaycaster → UINode)
+	// 터치 취소. (TouchRaycaster → AnchoredWorldNode)
 	//==============================================================================
 	/**
 	 * @virtual

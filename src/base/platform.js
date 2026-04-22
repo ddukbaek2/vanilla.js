@@ -9,7 +9,7 @@ import { Rect } from "./rect.js";
 //==============================================================================
 // 공통 시스템 폰트 목록.
 //==============================================================================
-export const SYSTEM_FONT_STRING = '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+export const SYSTEM_FONT_STRING = "-apple-system, \"Segoe UI\", Roboto, \"Apple SD Gothic Neo\", \"Malgun Gothic\", sans-serif";
 
 
 //==============================================================================
@@ -149,7 +149,7 @@ export class Platform extends Object {
 	 * @returns { { totalTransferSize: number, totalDecodedSize: number, loadedFiles: array } }
 	*/
 	getResouceUsage() {
-		const resources = performance.getEntriesByType('resource');		
+		const resources = performance.getEntriesByType("resource");		
 		let totalTransferSize = 0; // 네트워크 전송량 (압축된 크기)
 		let totalDecodedSize = 0;  // 실제 압축 해제된 크기
 		let loadedFiles = [];
@@ -159,7 +159,7 @@ export class Platform extends Object {
 			totalDecodedSize += resource.decodedBodySize;
 			loadedFiles.push({
 				path: resource.name,
-				name: resource.name.split('/').pop(), 
+				name: resource.name.split("/").pop(), 
 				type: resource.initiatorType,
 				transferSize: resource.transferSize,
 				decodedSize: resource.decodedBodySize,
@@ -184,13 +184,13 @@ export class Platform extends Object {
 	 * @returns { Rect }
 	*/
 	getSafeAreaRect(canvas) {
-		const div = System.document.createElement('div');
-		div.style.position = 'absolute';
-		div.style.visibility = 'hidden';
-		div.style.paddingTop = 'env(safe-area-inset-top)';
-		div.style.paddingRight = 'env(safe-area-inset-right)';
-		div.style.paddingBottom = 'env(safe-area-inset-bottom)';
-		div.style.paddingLeft = 'env(safe-area-inset-left)';
+		const div = System.document.createElement("div");
+		div.style.position = "absolute";
+		div.style.visibility = "hidden";
+		div.style.paddingTop = "env(safe-area-inset-top)";
+		div.style.paddingRight = "env(safe-area-inset-right)";
+		div.style.paddingBottom = "env(safe-area-inset-bottom)";
+		div.style.paddingLeft = "env(safe-area-inset-left)";
 		System.document.body.appendChild(div);
 
 		const style = Window.getComputedStyle(div);

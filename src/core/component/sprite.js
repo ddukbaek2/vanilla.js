@@ -78,7 +78,7 @@ export class Sprite extends Paint {
 	 */
 	constructor() {
 		super();
-		this.setComponentType('Sprite');
+		this.setComponentType("Sprite");
 		this.#image = null;
 		this.#imageRect = Rect.zero();
 		this.#isHorizontalFlip = false;
@@ -200,7 +200,7 @@ export class Sprite extends Paint {
 			if (tintWidth > 0 && tintHeight > 0) {
 				if (!this.#tintCanvas || this.#tintCanvas.width !== tintWidth || this.#tintCanvas.height !== tintHeight) {
 					this.#tintCanvas = new OffscreenCanvas(tintWidth, tintHeight);
-					this.#tintContext = this.#tintCanvas.getContext('2d');
+					this.#tintContext = this.#tintCanvas.getContext("2d");
 				}
 				this.#tintContext.clearRect(0, 0, tintWidth, tintHeight);
 
@@ -287,19 +287,19 @@ export class Sprite extends Paint {
 				}
 
 				// source-atop으로 투명 영역 제외하여 틴트 적용.
-				this.#tintContext.globalCompositeOperation = 'source-atop';
+				this.#tintContext.globalCompositeOperation = "source-atop";
 				this.#tintContext.fillStyle = color.toRGBAString();
 				this.#tintContext.fillRect(0, 0, tintWidth, tintHeight);
-				this.#tintContext.globalCompositeOperation = 'source-over';
+				this.#tintContext.globalCompositeOperation = "source-over";
 
 				// 틴트 오버레이를 source-over로 main canvas에 합성.
-				canvasRenderingContext.globalCompositeOperation = 'source-over';
+				canvasRenderingContext.globalCompositeOperation = "source-over";
 				canvasRenderingContext.drawImage(this.#tintCanvas, position.x, position.y, imageSize.x, imageSize.y);
 			}
 		}
 
 		// 블렌드 모드 복원.
-		canvasRenderingContext.globalCompositeOperation = 'source-over';
+		canvasRenderingContext.globalCompositeOperation = "source-over";
 	}
 
 	//==============================================================================

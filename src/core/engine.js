@@ -132,8 +132,8 @@ export class Engine extends Object {
 		}
 		
 		// 기본 폰트 불러오기.
-		const internalFontFace = new FontFace(`DOSGothic`, `url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff')`);
-		// const internalFontFace = new FontFace(`DOSGothic`, `url('./assets/fonts/Consolas.woff2')`);
+		const internalFontFace = new FontFace(`DOSGothic`, `url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff")`);
+		// const internalFontFace = new FontFace(`DOSGothic`, `url("./assets/fonts/Consolas.woff2")`);
 		internalFontFace.load().then((loadedFont) => {
 			document.fonts.add(loadedFont);
 
@@ -396,9 +396,9 @@ export class Engine extends Object {
 		// 커서가 보이거나 감춰질 때.
 		System.document.addEventListener("pointerlockchange", () => {
 			if (document.pointerLockElement === canvas) {
-				// console.log('커서가 숨겨졌습니다.');
+				// console.log("커서가 숨겨졌습니다.");
 			} else {
-				// console.log('커서가 다시 나타났습니다.');
+				// console.log("커서가 다시 나타났습니다.");
 			}
 		});
 
@@ -652,8 +652,8 @@ export class Engine extends Object {
 		// // 화면 더 부드럽게.
 		// this.CanvasContext.scale(this.#view.devicePixelRatio, this.#view.devicePixelRatio);
 		// this.CanvasContext.imageSmoothingEnabled = true;
-    	// this.CanvasContext.imageSmoothingQuality = 'high';
-		// this.canvasRenderingContext.canvas.style.textRendering = 'optimizeLegibility';
+    	// this.CanvasContext.imageSmoothingQuality = "high";
+		// this.canvasRenderingContext.canvas.style.textRendering = "optimizeLegibility";
 
 		// 씬 처리.
 		const sceneManager = this.getSceneManager();
@@ -708,10 +708,10 @@ export class Engine extends Object {
 	 */
 	setVisibleCursor(visibled) {
 		if (visibled) {
-			document.body.style.cursor = 'default';
+			document.body.style.cursor = "default";
 		}
 		else {
-			document.body.style.cursor = 'none';
+			document.body.style.cursor = "none";
 		}
 	}
 

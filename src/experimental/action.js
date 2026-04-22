@@ -66,7 +66,7 @@ export class Action extends Object {
 		this.#currentStepElapsed = 0;
 		this.#currentStepState = {};
 		const target = this.getTarget();
-		if (step.type === 'call') {
+		if (step.type === "call") {
 			step.fn(target);
 			this.#advanceStep();
 			return;
@@ -74,14 +74,14 @@ export class Action extends Object {
 		if (step.callbacks && step.callbacks.started) {
 			step.callbacks.started(target);
 		}
-		if (step.type === 'repeat') {
+		if (step.type === "repeat") {
 			this.#currentStepState.completedCount = 0;
 			step.innerAction.start(target);
 		}
-		else if (step.type === 'forever') {
+		else if (step.type === "forever") {
 			step.innerAction.start(target);
 		}
-		else if (step.type === 'loop') {
+		else if (step.type === "loop") {
 			if (!step.conditionFn()) {
 				this.#advanceStep();
 				return;
@@ -111,7 +111,7 @@ export class Action extends Object {
 	 * @returns { Action }
 	 */
 	wait(duration, callbacks = {}) {
-		this.#steps.push({ type: 'wait', duration: duration, callbacks: callbacks });
+		this.#steps.push({ type: "wait", duration: duration, callbacks: callbacks });
 		return this;
 	}
 
@@ -127,7 +127,7 @@ export class Action extends Object {
 	 * @returns { Action }
 	 */
 	condition(conditionFn, callbacks = {}) {
-		this.#steps.push({ type: 'condition', conditionFn: conditionFn, callbacks: callbacks });
+		this.#steps.push({ type: "condition", conditionFn: conditionFn, callbacks: callbacks });
 		return this;
 	}
 
@@ -139,7 +139,7 @@ export class Action extends Object {
 	 * @returns { Action }
 	 */
 	call(fn) {
-		this.#steps.push({ type: 'call', fn: fn });
+		this.#steps.push({ type: "call", fn: fn });
 		return this;
 	}
 
@@ -152,7 +152,7 @@ export class Action extends Object {
 	 * @returns { Action }
 	 */
 	repeat(times, innerAction) {
-		this.#steps.push({ type: 'repeat', times: times, innerAction: innerAction });
+		this.#steps.push({ type: "repeat", times: times, innerAction: innerAction });
 		return this;
 	}
 
@@ -164,7 +164,7 @@ export class Action extends Object {
 	 * @returns { Action }
 	 */
 	forever(innerAction) {
-		this.#steps.push({ type: 'forever', innerAction: innerAction });
+		this.#steps.push({ type: "forever", innerAction: innerAction });
 		return this;
 	}
 
@@ -177,7 +177,7 @@ export class Action extends Object {
 	 * @returns { Action }
 	 */
 	loop(conditionFn, innerAction) {
-		this.#steps.push({ type: 'loop', conditionFn: conditionFn, innerAction: innerAction });
+		this.#steps.push({ type: "loop", conditionFn: conditionFn, innerAction: innerAction });
 		return this;
 	}
 
@@ -226,7 +226,7 @@ export class Action extends Object {
 		const step = this.#steps[this.#currentStepIndex];
 		const target = this.getTarget();
 		switch (step.type) {
-			case 'wait': {
+			case "wait": {
 				this.#currentStepElapsed += timeDelta;
 				const progress = Math.clamp(this.#currentStepElapsed / step.duration, 0, 1);
 				if (step.callbacks && step.callbacks.updated) {
@@ -240,7 +240,7 @@ export class Action extends Object {
 				}
 				break;
 			}
-			case 'condition': {
+			case "condition": {
 				if (step.callbacks && step.callbacks.updated) {
 					step.callbacks.updated(target);
 				}
@@ -252,7 +252,7 @@ export class Action extends Object {
 				}
 				break;
 			}
-			case 'repeat': {
+			case "repeat": {
 				const repeatAction = step.innerAction;
 				repeatAction.step(timeDelta);
 				if (repeatAction.isDone()) {
@@ -266,7 +266,7 @@ export class Action extends Object {
 				}
 				break;
 			}
-			case 'forever': {
+			case "forever": {
 				const foreverAction = step.innerAction;
 				foreverAction.step(timeDelta);
 				if (foreverAction.isDone()) {
@@ -274,7 +274,7 @@ export class Action extends Object {
 				}
 				break;
 			}
-			case 'loop': {
+			case "loop": {
 				const loopAction = step.innerAction;
 				loopAction.step(timeDelta);
 				if (loopAction.isDone()) {
