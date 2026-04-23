@@ -110,7 +110,7 @@ export class Engine extends Object {
 		this.#frameNumber = 0;
 
 		this.#statisticsTextRect = Rect.zero();
-		this.#version = Version.create(0, 2, 0);
+		this.#version = Version.create(0, 2, 1);
 
 		// 현재 엔진 인스턴스 글로벌 등록. (루트 노드 등 컨텍스트 없는 객체에서 ViewManager 등 접근용)
 		System.vanillaEngine = this;
