@@ -281,7 +281,7 @@ export class TransformNode extends ComponentNode {
 	 * @param { Vector2 } position 
 	 */
 	setLocalPosition(position) {
-		this.#localPosition = position;
+		this.#localPosition = position.clone();
 	}
 
 	//==============================================================================
@@ -291,7 +291,7 @@ export class TransformNode extends ComponentNode {
 	 * @returns { Vector2 } 
 	 */
 	getLocalPosition() {
-		return this.#localPosition;
+		return this.#localPosition.clone();
 	}
 
 	//==============================================================================
@@ -301,7 +301,7 @@ export class TransformNode extends ComponentNode {
 	 * @param { Vector2 } scale 
 	 */
 	setLocalScale(scale) {
-		this.#localScale = scale;
+		this.#localScale = scale.clone();
 	}
 
 	//==============================================================================
@@ -311,7 +311,7 @@ export class TransformNode extends ComponentNode {
 	 * @returns { Vector2 } 
 	 */
 	getLocalScale() {
-		return this.#localScale;
+		return this.#localScale.clone();
 	}
 
 	//==============================================================================
@@ -359,10 +359,12 @@ export class TransformNode extends ComponentNode {
 	 * @returns { boolean } 
 	 */
 	isVisibleInHierarchy() {
-		if (this.isVisible()) {
+		const isVisible = this.isVisible();
+		if (isVisible) {
 			let current = this;
 			while (current !== null && current !== undefined) {
-				if (current.isVisible()) {
+				const isCurrentVisible = current.isVisible();
+				if (isCurrentVisible) {
 					current = current.getParent();
 				}
 				else {
@@ -377,27 +379,7 @@ export class TransformNode extends ComponentNode {
 	}
 
 	//==============================================================================
-	// 투명도 설정.
-	//==============================================================================
-	/**
-	 * @param { number } opacity 
-	 */
-	setLocalOpacity(opacity) {
-		this.#localOpacity = Math.clamp(opacity, 0, 1);
-	}
-
-	//==============================================================================
-	// 투명도 반환.
-	//==============================================================================
-	/**
-	 * @returns { number } 
-	 */
-	getLocalOpacity() {
-		return this.#localOpacity;
-	}
-
-	//==============================================================================
-	// 전체 투명도 반환.
+	// 글로벌 투명도 반환.
 	//==============================================================================
 	/**
 	 * @returns { number } 
@@ -419,7 +401,27 @@ export class TransformNode extends ComponentNode {
 	}
 
 	//==============================================================================
-	// 기즈모 그리기 설정.
+	// 로컬 투명도 설정.
+	//==============================================================================
+	/**
+	 * @param { number } opacity 
+	 */
+	setLocalOpacity(opacity) {
+		this.#localOpacity = Math.clamp(opacity, 0, 1);
+	}
+
+	//==============================================================================
+	// 로컬 투명도 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 
+	 */
+	getLocalOpacity() {
+		return this.#localOpacity;
+	}
+
+	//==============================================================================
+	// 기즈모 그리기 여부 설정.
 	//==============================================================================
 	/**
 	 * @param { boolean } isVisible 
