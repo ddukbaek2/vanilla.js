@@ -5,6 +5,23 @@ const System = globalThis;
 
 
 //==============================================================================
+// 유효한 객체인지 여부 반환.
+//==============================================================================
+/**
+ * @template T
+ * @param { T } target
+ * @returns { boolean }
+ */
+export function isValidate(target) {
+	if (target === undefined || target === null) {
+		return false;
+	}
+
+	return true;
+};
+
+
+//==============================================================================
 // 인스턴스 얕은 복제.
 //==============================================================================
 /**
@@ -14,8 +31,8 @@ const System = globalThis;
  */
 export function clone(target) {
 	// 오류 방어.
-	if (target === null || target === undefined || typeof target !== "object") {
-		return target;
+	if (!isValidate(target) || typeof target !== "object") {
+		throw new System.Error();
 	}
 
 	// 생성자로 신규 객체 생성 후, 보유한 멤버를 원시 타입은 덮어씌우고 참조 타입은 얕은 복사.
@@ -62,7 +79,7 @@ export function clone(target) {
 export function structuredClone(target) {
 
 	// 오류.
-	if (target === null || target === undefined || typeof target !== "object")
+	if (!isValidate(target) || typeof target !== "object")
 		throw new System.Error();
 
 	// 생성자 호출을 통해 신규 객체 생성 (프라이빗 멤버 정상 할당).
