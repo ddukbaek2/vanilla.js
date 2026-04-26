@@ -85,7 +85,7 @@ export class Rect extends Object {
 	 * @returns { Vector2 }
 	 */
 	get position() {
-		return this.#position.clone();
+		return this.#position;
 	}
 
 	//==============================================================================
@@ -107,7 +107,7 @@ export class Rect extends Object {
 	 * @returns { Vector2 }
 	 */
 	get size() {
-		return this.#size.clone();
+		return this.#size;
 	}
 
 	//==============================================================================
