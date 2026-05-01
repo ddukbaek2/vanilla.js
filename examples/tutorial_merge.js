@@ -2,19 +2,19 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import * as Math from "./src/base/math.js";
-import { Object } from "./src/base/object.js";
-import { Vector2 as Vec2 } from "./src/base/vector2.js";
-import { Rect } from "./src/base/rect.js";
-import { Colors } from "./src/base/colors.js";
-import { Pivot } from "./src/base/pivot.js";
-import { Engine, EngineConfiguration } from "./src/core/engine.js";
-import { Graphic } from "./src/core/graphic.js";
-import { Scene } from "./src/core/scene.js";
-import { Tween } from "./src/core/tween.js";
-import { Enum } from "./src/base/identifier.js";
-import { ViewScaleMode } from "./src/core/viewmanager.js";
-import { WorldNode } from "./src/core/node/worldnode.js";
+import * as Math from "../src/base/math.js";
+import { Object } from "../src/base/object.js";
+import { Vector2 as Vec2 } from "../src/base/vector2.js";
+import { Rect } from "../src/base/rect.js";
+import { Colors } from "../src/base/colors.js";
+import { Pivot } from "../src/base/pivot.js";
+import { Engine, EngineConfiguration } from "../src/core/engine.js";
+import { Graphic } from "../src/core/graphic.js";
+import { Scene } from "../src/core/scene.js";
+import { Tween } from "../src/core/tween.js";
+import { Enum } from "../src/base/identifier.js";
+import { ViewScaleMode } from "../src/core/viewmanager.js";
+import { WorldNode } from "../src/core/node/worldnode.js";
 
 
 //==============================================================================

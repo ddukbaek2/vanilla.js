@@ -4,10 +4,10 @@
 
 		// 라이브 서버 확장을 통한 서버베이스의 실행. (라이브 서버 수동 실행 필요)
 		{
-			"name": "Launch Live Server",
+			"name": "Launch (based on Live Server)",
 			"type": "chrome",
 			"request": "launch",
-			"url": "http://127.0.0.1:5502/main.html",
+			"url": "http://127.0.0.1:5500/launcher.html",
 			"webRoot": "${workspaceFolder}"
 		},
 
@@ -16,7 +16,7 @@
 			"name": "Launch Chrome",
 			"type": "chrome",
 			"request": "launch",
-			"file": "${workspaceFolder}/main.html",
+			"file": "${workspaceFolder}/launcher.html",
 			"webRoot": "${workspaceFolder}"
 		}
 	]

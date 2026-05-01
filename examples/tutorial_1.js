@@ -2,16 +2,16 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Vector2 as Vec2 } from "./src/base/vector2.js";
-import { Rect } from "./src/base/rect.js";
-import { Colors } from "./src/base/colors.js";
-import { Engine, EngineConfiguration } from "./src/core/engine.js";
-import { Graphic } from "./src/core/graphic.js";
-import { Scene } from "./src/core/scene.js";
-import { ViewScaleMode } from "./src/core/viewmanager.js";
+import { Vector2 as Vec2 } from "../src/base/vector2.js";
+import { Rect } from "../src/base/rect.js";
+import { Colors } from "../src/base/colors.js";
+import { Engine, EngineConfiguration } from "../src/core/engine.js";
+import { Graphic } from "../src/core/graphic.js";
+import { Scene } from "../src/core/scene.js";
+import { ViewScaleMode } from "../src/core/viewmanager.js";
 import { Animation } from "./src/rendering/animation.js";
-import { ImageAsset } from "./src/resource/imageasset.js";
-import { Frame } from "./src/core/frame.js";
+import { ImageAsset } from "../src/resource/imageasset.js";
+import { Frame } from "../src/core/frame.js";
 
 
 //==============================================================================

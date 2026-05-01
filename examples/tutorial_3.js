@@ -2,14 +2,14 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import * as Math from "./src/base/math.js";
-import { Object } from "./src/base/object.js";
-import { Vector2 } from "./src/base/vector2.js";
-import { Engine } from "./src/core/engine.js";
-import { Graphic } from "./src/core/graphic.js";
-import { Tween } from "./src/core/tween.js";
-import { Enum } from "./src/base/identifier.js";
-import { WorldNode } from "./src/core/node/worldnode.js";
+import * as Math from "../src/base/math.js";
+import { Object } from "../src/base/object.js";
+import { Vector2 } from "../src/base/vector2.js";
+import { Engine } from "../src/core/engine.js";
+import { Graphic } from "../src/core/graphic.js";
+import { Tween } from "../src/core/tween.js";
+import { Enum } from "../src/base/identifier.js";
+import { WorldNode } from "../src/core/node/worldnode.js";
 
 
 //==============================================================================

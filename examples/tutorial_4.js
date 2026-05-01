@@ -2,22 +2,22 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import * as Math from "./src/base/math.js";
-import { Object } from "./src/base/object.js";
-import { Vector2 } from "./src/base/vector2.js";
-import { Pivot } from "./src/base/pivot.js";
-import { Engine } from "./src/core/engine.js";
-import { Graphic } from "./src/core/graphic.js";
-import { Tween } from "./src/core/tween.js";
-import { Enum } from "./src/base/identifier.js";
-import { Sprite } from "./src/core/component/sprite.js";
-import { Label } from "./src/core/component/label.js";
-import { ImageAsset } from "./src/resource/imageasset.js";
-import { AudioAsset } from "./src/resource/audioasset.js";
-import { FontAsset } from "./src/resource/fontasset.js";
-import { TransformNode } from "./src/core/node/transformnode.js";
-import { AnchoredWorldNode } from "./src/core/node/anchoredworldmnode.js";
-import { Scene } from "./src/core/scene.js";
+import * as Math from "../src/base/math.js";
+import { Object } from "../src/base/object.js";
+import { Vector2 } from "../src/base/vector2.js";
+import { Pivot } from "../src/base/pivot.js";
+import { Engine } from "../src/core/engine.js";
+import { Graphic } from "../src/core/graphic.js";
+import { Tween } from "../src/core/tween.js";
+import { Enum } from "../src/base/identifier.js";
+import { Sprite } from "../src/core/component/sprite.js";
+import { Label } from "../src/core/component/label.js";
+import { ImageAsset } from "../src/resource/imageasset.js";
+import { AudioAsset } from "../src/resource/audioasset.js";
+import { FontAsset } from "../src/resource/fontasset.js";
+import { TransformNode } from "../src/core/node/transformnode.js";
+import { AnchoredWorldNode } from "../src/core/node/anchoredworldmnode.js";
+import { Scene } from "../src/core/scene.js";
 
 
 //==============================================================================
