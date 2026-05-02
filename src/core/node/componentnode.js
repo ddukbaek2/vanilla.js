@@ -39,20 +39,22 @@ export class ComponentNode extends Node {
 	 * @param { number } timeDelta 
 	 */
 	tick(timeDelta) {
-		if (!this.isActive()) {
-			return;
-		}
+		const isActive = this.isActive();
+		if (isActive) {
+			// 컴포넌트.
+			const components = this.getAllComponents();
+			for (const component of components) {
+				component.tick(timeDelta);
+			}
 
-		// 컴포넌트.
-		const components = this.getAllComponents();
-		for (const component of components) {
-			component.tick(timeDelta);
-		}
-
-		// 자식.
-		const children = this.getChildren();
-		for (const child of children) {
-			child.tick(timeDelta);
+			// 자식.
+			const children = this.getChildren();
+			for (const child of children) {
+				const isActive = child.isActive();
+				if (isActive) {
+					child.tick(timeDelta);
+				}
+			}
 		}
 	}
 
