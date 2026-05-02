@@ -3,9 +3,9 @@
 //==============================================================================
 const System = globalThis;
 import { UIScrollView, ScrollMode } from "./uiscrollview.js";
-import { Vector2 } from "../../base/vector2.js";
-import * as Math from "../../base/math.js";
-import { Tween } from "../tween.js";
+import { Vector2 } from "../base/vector2.js";
+import * as Math from "../base/math.js";
+import { Tween } from "../core/tween.js";
 
 
 //==============================================================================

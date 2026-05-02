@@ -1,14 +1,14 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { Enum } from "../../base/identifier.js";
-import { Graphic } from "../graphic.js";
+import { Enum } from "../base/identifier.js";
+import { Graphic } from "../core/graphic.js";
 import { UIComponent } from "./uicomponent.js";
-import { AnchoredWorldNode } from "../node/anchoredworldmnode.js";
-import { Color } from "../../base/color.js";
-import * as Math from "../../base/math.js";
-import { Sprite } from "./sprite.js";
-import { Label } from "./label.js";
+import { AnchoredWorldNode } from "../core/node/anchoredworldmnode.js";
+import { Color } from "../base/color.js";
+import * as Math from "../base/math.js";
+import { Sprite } from "../core/component/sprite.js";
+import { Label } from "../core/component/label.js";
 
 
 //==============================================================================

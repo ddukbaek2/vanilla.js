@@ -2,8 +2,8 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Component } from "../component.js";
-import { Engine } from "../engine.js";
+import { Component } from "../core/component.js";
+import { Engine } from "../core/engine.js";
 
 
 //==============================================================================

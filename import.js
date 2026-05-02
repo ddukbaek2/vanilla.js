@@ -71,12 +71,12 @@ export { Label } from "./src/core/component/label.js";
 //==============================================================================
 // UI/컴포넌트 목록.
 //==============================================================================
-export { UIComponent } from "./src/core/component/uicomponent.js";
+export { UIComponent } from "./src/ui/uicomponent.js";
 export { UIButton } from "./src/core/component/uibutton.js";
-export { UIToggleButton } from "./src/core/component/uitogglebutton.js";
-export { UIView } from "./src/core/component/uiview.js";
-export { UIScrollView } from "./src/core/component/uiscrollview.js";
-export { UISnapScrollView } from "./src/core/component/uisnapscrollview.js";
+export { UIToggleButton } from "./src/ui/uitogglebutton.js";
+export { UIView } from "./src/ui/uiview.js";
+export { UIScrollView } from "./src/ui/uiscrollview.js";
+export { UISnapScrollView } from "./src/ui/uisnapscrollview.js";
 
 
 //==============================================================================
