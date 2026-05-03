@@ -105,6 +105,8 @@ export class Engine extends Object {
 		this.#audioManager = new AudioManager(this);
 
 		this.#resizeCallback = this.resize.bind(this);
+		// 일반 resume (visibilitychange/focus 등) — user gesture 가 아닐 수 있으므로
+		// AudioManager 가 hasUserGesture 체크 후 silently skip.
 		this.#resumeCallback = this.resume.bind(this);
 		this.#updateEngineCallback = this.updateEngine.bind(this);
 		this.#frameNumber = 0;
@@ -158,6 +160,18 @@ export class Engine extends Object {
 	resume() {
 		const audioManager = this.getAudioManager();
 		audioManager.resumeContext();
+	}
+
+	//==============================================================================
+	// 첫 user gesture (click/touch/keydown) 핸들러.
+	// AudioManager 에 user gesture 발생을 알리고 컨텍스트 재개를 시도한다.
+	//==============================================================================
+	resumeOnUserGesture() {
+		const audioManager = this.getAudioManager();
+		if (audioManager) {
+			audioManager.markUserGesture();
+			audioManager.resumeContext();
+		}
 	}
 
 	//==============================================================================
@@ -383,9 +397,12 @@ export class Engine extends Object {
 		}, { passive: false });
 
 		// 오디오 컨텍스트 재개.
-		System.window.addEventListener("click", this.#resumeCallback);
-		System.window.addEventListener("touchstart", this.#resumeCallback);
-		System.window.addEventListener("keydown", this.#resumeCallback);
+		// click/touchstart/keydown 은 진짜 user gesture → markUserGesture + resume.
+		// focus 는 user gesture 가 아니므로 일반 resume 만 (gesture 전이면 silently skip).
+		const userGestureHandler = this.resumeOnUserGesture.bind(this);
+		System.window.addEventListener("click", userGestureHandler);
+		System.window.addEventListener("touchstart", userGestureHandler);
+		System.window.addEventListener("keydown", userGestureHandler);
 		System.window.addEventListener("focus", this.#resumeCallback);
 		System.document.addEventListener("visibilitychange", () => {
 			if (System.document.visibilityState === "visible") {
