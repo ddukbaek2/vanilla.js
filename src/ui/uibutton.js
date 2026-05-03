@@ -1,14 +1,17 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+const System = globalThis;
 import { Enum } from "../base/identifier.js";
 import { Graphic } from "../core/graphic.js";
-import { UIComponent } from "./uicomponent.js";
+import { UIControl } from "./uicontrol.js";
 import { AnchoredWorldNode } from "../core/node/anchoredworldmnode.js";
 import { Color } from "../base/color.js";
 import * as Math from "../base/math.js";
 import { Sprite } from "../core/component/sprite.js";
 import { Label } from "../core/component/label.js";
+import { UIImageView } from "./uiimageview.js";
+import { UILabel } from "./uilabel.js";
 
 
 //==============================================================================
@@ -26,7 +29,7 @@ export const ButtonState = {
 //==============================================================================
 // 버튼.
 //==============================================================================
-export class UIButton extends UIComponent {
+export class UIButton extends UIControl {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -203,12 +206,12 @@ export class UIButton extends UIComponent {
 	applyTintProgress(progress) {
 		const pressedTintColor = this.getPressedTintColor();
 		for (const colorEntry of this.#colorEntries) {
-			if (colorEntry.type === "sprite") {
+			if (colorEntry.type === "sprite" || colorEntry.type === "imageview") {
 				const overlayAlpha = Math.lerp(0, pressedTintColor.alpha, progress);
 				const overlayColor = new Color(pressedTintColor.red, pressedTintColor.green, pressedTintColor.blue, overlayAlpha);
 				colorEntry.component.setColor(overlayColor);
 			}
-			else if (colorEntry.type === "label") {
+			else if (colorEntry.type === "label" || colorEntry.type === "uilabel") {
 				const originalColor = colorEntry.originalColor;
 				const tintedRed = Math.lerp(originalColor.red, pressedTintColor.red, pressedTintColor.alpha * progress);
 				const tintedGreen = Math.lerp(originalColor.green, pressedTintColor.green, pressedTintColor.alpha * progress);
@@ -226,7 +229,7 @@ export class UIButton extends UIComponent {
 	applyDisabledTint() {
 		const disabledTintColor = this.#disabledTintColor;
 		for (const colorEntry of this.#colorEntries) {
-			if (colorEntry.type === "sprite") {
+			if (colorEntry.type === "sprite" || colorEntry.type === "imageview") {
 				const overlayColor = new Color(disabledTintColor.red, disabledTintColor.green, disabledTintColor.blue, disabledTintColor.alpha);
 				colorEntry.component.setColor(overlayColor);
 			}
@@ -249,16 +252,40 @@ export class UIButton extends UIComponent {
 	// 노드에서 색상 대상 재귀 수집.
 	//==============================================================================
 	collectFromNode(node) {
-		const sprites = node.getComponents(Sprite);
-		for (const sprite of sprites) {
-			this.#colorEntries.push({ type: "sprite", component: sprite });
+		// 노드에 UIImageView 가 있으면 wrapper 를 통해 색을 제어한다.
+		// (UIImageView 는 attach 시 내부 Sprite 를 자동 부착하므로
+		//  wrapper 가 있는 경우 raw Sprite 를 별도로 잡지 않고 wrapper 만 다룬다)
+		const imageViews = node.getComponents(UIImageView);
+		if (imageViews.length > 0) {
+			for (const imageView of imageViews) {
+				this.#colorEntries.push({ type: "imageview", component: imageView });
+			}
 		}
-		const labelComponents = node.getComponents(Label);
-		for (const labelComponent of labelComponents) {
-			const originalColor = labelComponent.getTextColor();
-			const copiedColor = new Color(originalColor.red, originalColor.green, originalColor.blue, originalColor.alpha);
-			this.#colorEntries.push({ type: "label", component: labelComponent, originalColor: copiedColor });
+		else {
+			const sprites = node.getComponents(Sprite);
+			for (const sprite of sprites) {
+				this.#colorEntries.push({ type: "sprite", component: sprite });
+			}
 		}
+
+		// 라벨도 동일. UILabel wrapper 가 있으면 wrapper 만, 없으면 raw Label 처리.
+		const uiLabels = node.getComponents(UILabel);
+		if (uiLabels.length > 0) {
+			for (const uiLabel of uiLabels) {
+				const originalColor = uiLabel.getTextColor();
+				const copiedColor = new Color(originalColor.red, originalColor.green, originalColor.blue, originalColor.alpha);
+				this.#colorEntries.push({ type: "uilabel", component: uiLabel, originalColor: copiedColor });
+			}
+		}
+		else {
+			const labelComponents = node.getComponents(Label);
+			for (const labelComponent of labelComponents) {
+				const originalColor = labelComponent.getTextColor();
+				const copiedColor = new Color(originalColor.red, originalColor.green, originalColor.blue, originalColor.alpha);
+				this.#colorEntries.push({ type: "label", component: labelComponent, originalColor: copiedColor });
+			}
+		}
+
 		const children = node.getChildren();
 		for (const child of children) {
 			this.collectFromNode(child);

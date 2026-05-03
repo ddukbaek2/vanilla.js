@@ -3,35 +3,36 @@
 //==============================================================================
 const System = globalThis;
 import { Color } from "../base/color.js";
+import { Rect } from "../base/rect.js";
 import { ComponentNode } from "../core/node/componentnode.js";
-import { Label } from "../core/component/label.js";
-import { FontAsset } from "../resource/fontasset.js";
+import { Sprite, SpriteDrawMode, SpriteBlendMode } from "../core/component/sprite.js";
+import { ImageAsset } from "../resource/imageasset.js";
 import { UIView } from "./uiview.js";
 
 
 //==============================================================================
-// UI 라벨.
+// UI 이미지 뷰.
 // - 표시 전용. 입력을 받지 않으므로 UIView 를 상속한다.
-// - 노드에 부착되면 내부적으로 Label 컴포넌트를 자동 생성/관리한다.
-// - Label 의 텍스트/폰트/크기/정렬/색 등 자주 쓰는 속성을 노출한다.
+// - 노드에 부착되면 내부적으로 Sprite 컴포넌트를 자동 생성/관리한다.
+// - Sprite 의 이미지/색/플립/드로우모드/블렌드 등 자주 쓰는 속성을 노출한다.
 //==============================================================================
-export class UILabel extends UIView {
+export class UIImageView extends UIView {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { Label | null } */ #label;
+	/** @private @type { Sprite | null } */ #sprite;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
 	constructor() {
 		super();
-		this.setComponentType("UILabel");
-		this.#label = null;
+		this.setComponentType("UIImageView");
+		this.#sprite = null;
 	}
 
 	//==============================================================================
-	// 노드에 붙음. (내부 Label 컴포넌트 부착)
+	// 노드에 붙음. (내부 Sprite 컴포넌트 부착)
 	//==============================================================================
 	/**
 	 * @override
@@ -39,157 +40,149 @@ export class UILabel extends UIView {
 	 */
 	attach(node) {
 		super.attach(node);
-		this.#label = node.getOraddComponent(Label);
+		this.#sprite = node.getOraddComponent(Sprite);
 	}
 
 	//==============================================================================
-	// 노드에서 떨어짐. (내부 Label 컴포넌트 제거)
+	// 노드에서 떨어짐. (내부 Sprite 컴포넌트 제거)
 	//==============================================================================
 	/**
 	 * @override
 	 * @param { ComponentNode } node
 	 */
 	detach(node) {
-		if (this.#label) {
-			// node.removeComponent(this.#label);
-			this.#label = null;
+		if (this.#sprite) {
+			// node.removeComponent(this.#sprite);
+			this.#sprite = null;
 		}
 		super.detach(node);
 	}
 
 	//==============================================================================
-	// 내부 Label 컴포넌트 반환. (디테일 제어가 필요할 때 직접 접근)
+	// 내부 Sprite 컴포넌트 반환. (디테일 제어가 필요할 때 직접 접근)
 	//==============================================================================
 	/**
-	 * @returns { Label | null }
+	 * @returns { Sprite | null }
 	 */
-	getLabel() {
-		return this.#label;
+	getSprite() {
+		return this.#sprite;
 	}
 
 	//==============================================================================
-	// 텍스트 설정.
+	// 이미지 설정. (HTMLImageElement / OffscreenCanvas / ImageAsset 모두 허용)
 	//==============================================================================
 	/**
-	 * @param { string } text
+	 * @param { HTMLImageElement | OffscreenCanvas | ImageAsset | null } image
 	 */
-	setText(text) {
-		if (this.#label) {
-			this.#label.setText(text);
+	setImage(image) {
+		if (!this.#sprite) {
+			return;
+		}
+		if (image instanceof ImageAsset) {
+			this.#sprite.setImage(image.image);
+		}
+		else {
+			this.#sprite.setImage(image);
 		}
 	}
 
 	//==============================================================================
-	// 텍스트 반환.
+	// 이미지 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { HTMLImageElement | OffscreenCanvas | null }
 	 */
-	getText() {
-		return this.#label ? this.#label.getText() : "";
+	getImage() {
+		return this.#sprite ? this.#sprite.getImage() : null;
 	}
 
 	//==============================================================================
-	// 폰트 크기 설정.
+	// 이미지 부분 영역(소스 사각형) 설정.
 	//==============================================================================
 	/**
-	 * @param { number } fontSize
+	 * @param { Rect } imageRect
 	 */
-	setFontSize(fontSize) {
-		if (this.#label) {
-			this.#label.setFontSize(fontSize);
+	setImageRect(imageRect) {
+		if (this.#sprite) {
+			this.#sprite.setImageRect(imageRect);
 		}
 	}
 
 	//==============================================================================
-	// 폰트 크기 반환.
-	//==============================================================================
-	/**
-	 * @returns { number }
-	 */
-	getFontSize() {
-		return this.#label ? this.#label.getFontSize() : 0;
-	}
-
-	//==============================================================================
-	// 폰트 설정.
-	//==============================================================================
-	/**
-	 * @param { FontFace | FontAsset | null } font
-	 */
-	setFont(font) {
-		if (this.#label) {
-			this.#label.setFont(font);
-		}
-	}
-
-	//==============================================================================
-	// 텍스트 색 설정.
+	// 색상 설정. (스프라이트 틴트)
 	//==============================================================================
 	/**
 	 * @param { Color | string } color
 	 */
-	setTextColor(color) {
-		if (this.#label) {
-			this.#label.setTextColor(color);
+	setColor(color) {
+		if (this.#sprite) {
+			this.#sprite.setColor(color);
 		}
 	}
 
 	//==============================================================================
-	// 텍스트 색 반환.
+	// 가로 플립 설정.
 	//==============================================================================
 	/**
-	 * @returns { Color | null }
+	 * @param { boolean } isHorizontalFlip
 	 */
-	getTextColor() {
-		return this.#label ? this.#label.getTextColor() : null;
-	}
-
-	//==============================================================================
-	// 텍스트 외곽선 색 설정.
-	//==============================================================================
-	/**
-	 * @param { Color | string } color
-	 */
-	setStrokeColor(color) {
-		if (this.#label) {
-			this.#label.setStrokeColor(color);
+	setHorizontalFlip(isHorizontalFlip) {
+		if (this.#sprite && typeof this.#sprite.setHorizontalFlip === "function") {
+			this.#sprite.setHorizontalFlip(isHorizontalFlip);
 		}
 	}
 
 	//==============================================================================
-	// 텍스트 외곽선 두께 설정.
+	// 세로 플립 설정.
 	//==============================================================================
 	/**
-	 * @param { number } width
+	 * @param { boolean } isVerticalFlip
 	 */
-	setStrokeWidth(width) {
-		if (this.#label) {
-			this.#label.setStrokeWidth(width);
+	setVerticalFlip(isVerticalFlip) {
+		if (this.#sprite && typeof this.#sprite.setVerticalFlip === "function") {
+			this.#sprite.setVerticalFlip(isVerticalFlip);
 		}
 	}
 
 	//==============================================================================
-	// 가로 정렬 설정.
+	// 드로우 모드 설정. (simple / sliced / tiled)
 	//==============================================================================
 	/**
-	 * @param { "left" | "center" | "right" | "start" | "end" } align
+	 * @param { string } mode
 	 */
-	setTextAlign(align) {
-		if (this.#label) {
-			this.#label.setTextAlign(align);
+	setDrawMode(mode) {
+		if (this.#sprite && typeof this.#sprite.setSpriteDrawMode === "function") {
+			this.#sprite.setSpriteDrawMode(mode);
 		}
 	}
 
 	//==============================================================================
-	// 세로 정렬 설정.
+	// 블렌드 모드 설정.
 	//==============================================================================
 	/**
-	 * @param { "top" | "middle" | "bottom" | "alphabetic" | "hanging" | "ideographic" } baseline
+	 * @param { string } mode
 	 */
-	setTextBaseline(baseline) {
-		if (this.#label) {
-			this.#label.setTextBaseline(baseline);
+	setBlendMode(mode) {
+		if (this.#sprite && typeof this.#sprite.setSpriteBlendMode === "function") {
+			this.#sprite.setSpriteBlendMode(mode);
+		}
+	}
+
+	//==============================================================================
+	// 나인패치 영역 설정.
+	//==============================================================================
+	/**
+	 * @param { Rect } nineSlice
+	 */
+	setNineSlice(nineSlice) {
+		if (this.#sprite && typeof this.#sprite.setNineSlice === "function") {
+			this.#sprite.setNineSlice(nineSlice);
 		}
 	}
 }
+
+
+//==============================================================================
+// SpriteDrawMode / SpriteBlendMode 재노출 (UIImageView 사용자가 한 번에 import).
+//==============================================================================
+export { SpriteDrawMode, SpriteBlendMode };

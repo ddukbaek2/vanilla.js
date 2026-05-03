@@ -64,6 +64,26 @@ export class ComponentNode extends Node {
 	/**
 	 * @param { Function } componentType  
 	 */
+	getOraddComponent(componentType) {
+		if (componentType === null || componentType === undefined) {
+			return null;
+		}
+		
+		const hasComponent = this.hasComponent(componentType);
+		if (hasComponent) {
+			return this.getComponent(componentType);
+		}
+		else {
+			return this.addComponent(componentType);
+		}
+	}
+
+	//==============================================================================
+	// 타입으로 컴포넌트 추가.
+	//==============================================================================
+	/**
+	 * @param { Function } componentType  
+	 */
 	addComponent(componentType) {
 		if (componentType === null || componentType === undefined) {
 			return null;

@@ -6,9 +6,10 @@ import { Color } from "../base/color.js";
 import { Pivot } from "../base/pivot.js";
 import { Rect } from "../base/rect.js";
 import { Vector2 } from "../base/vector2.js";
+import { Component } from "../core/component.js";
+import { Engine } from "../core/engine.js";
 import { Graphic } from "../core/graphic.js";
 import { AnchoredWorldNode } from "../core/node/anchoredworldmnode.js";
-import { UIComponent } from "./uicomponent.js";
 
 
 //==============================================================================
@@ -16,11 +17,14 @@ import { UIComponent } from "./uicomponent.js";
 // - ScrollView, SnapScrollView 등 모든 뷰 컴포넌트의 기반 클래스.
 // - 타입으로 하위 뷰 컴포넌트를 한번에 조회할 수 있다.
 //   예: node.getComponent(View)
+// - 컨테이너 역할을 하므로 UIControl 을 상속하지 않고 Component 직접 상속.
+//   대신 UIControl 이 갖던 setEngine/getEngine 를 자체적으로 보유한다.
 //==============================================================================
-export class UIView extends UIComponent {
+export class UIView extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
+	/** @private @type { Engine } */ #engine;
 	/** @private @type { AnchoredWorldNode | null } */ #content; // 컨텐트 노드.
 	/** @private @type { Color } */ #backgroundColor;
 
@@ -33,8 +37,29 @@ export class UIView extends UIComponent {
 	constructor() {
 		super();
 		this.setComponentType("View");
+		this.#engine = null;
 		this.#content = null;
 		this.#backgroundColor = new Color(1, 1, 1, 1);
+	}
+
+	//==============================================================================
+	// 엔진 설정. (구 UIComponent 에서 이관)
+	//==============================================================================
+	/**
+	 * @param { Engine } engine
+	 */
+	setEngine(engine) {
+		this.#engine = engine;
+	}
+
+	//==============================================================================
+	// 엔진 반환. (구 UIComponent 에서 이관)
+	//==============================================================================
+	/**
+	 * @returns { Engine | null }
+	 */
+	getEngine() {
+		return this.#engine;
 	}
 
 	//==============================================================================
@@ -112,9 +137,9 @@ export class UIView extends UIComponent {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchMove(viewInputPosition) {
-		if (this.isDragging()) {
-			//
-		}
+		// if (this.isDragging()) {
+		// 	//
+		// }
 	}
 
 	//==============================================================================

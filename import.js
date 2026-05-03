@@ -61,7 +61,7 @@ export { Animation } from "./src/core/animation.js";
 
 
 //==============================================================================
-// 컴포넌트 목록.
+// 기본 컴포넌트 목록.
 //==============================================================================
 export { Paint } from "./src/core/component/paint.js";
 export { Sprite } from "./src/core/component/sprite.js";
@@ -71,11 +71,14 @@ export { Label } from "./src/core/component/label.js";
 //==============================================================================
 // UI/컴포넌트 목록.
 //==============================================================================
-export { UIComponent } from "./src/ui/uicomponent.js";
-export { UIButton } from "./src/core/component/uibutton.js";
-export { UIToggleButton } from "./src/ui/uitogglebutton.js";
 export { UIView } from "./src/ui/uiview.js";
+export { UIImageView } from "./src/ui/uiimageview.js";
+export { UILabel } from "./src/ui/uilabel.js";
+export { UIControl } from "./src/ui/uicontrol.js";
+export { UIButton } from "./src/ui/uibutton.js";
+export { UIToggleButton } from "./src/ui/uitogglebutton.js";
 export { UIScrollView } from "./src/ui/uiscrollview.js";
+export { UISlider } from "./src/ui/uislider.js";
 export { UISnapScrollView } from "./src/ui/uisnapscrollview.js";
 
 

@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+const System = globalThis;
 import { UIView } from "./uiview.js";
 import { AnchoredWorldNode } from "../core/node/anchoredworldmnode.js";
 import { Vector2 } from "../base/vector2.js";
