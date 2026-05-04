@@ -10,6 +10,7 @@ import { Color } from "../base/color.js";
 import * as Math from "../base/math.js";
 import { Sprite } from "../core/component/sprite.js";
 import { Label } from "../core/component/label.js";
+import { Paint } from "../core/component/paint.js";
 import { UIImageView } from "./uiimageview.js";
 import { UILabel } from "./uilabel.js";
 
@@ -45,6 +46,8 @@ export class UIButton extends UIControl {
 	/** @private @type { Array } */ #colorEntries;
 	/** @private @type { boolean } */ #isInteractable;
 	/** @private @type { Color } */ #disabledTintColor;
+	/** @private @type { Set } */ #tintExcludedNodes;       // 이 Set 에 든 노드는 자신과 모든 자손 노드까지 트랜지션에서 제외.
+	/** @private @type { Set } */ #tintExcludedComponents;  // 이 Set 에 든 컴포넌트만 개별 제외.
 
 	//==============================================================================
 	// 생성.
@@ -67,6 +70,31 @@ export class UIButton extends UIControl {
 		this.#colorEntries = [];
 		this.#isInteractable = true;
 		this.#disabledTintColor = new Color(0, 0, 0, 0.5);
+		this.#tintExcludedNodes = new Set();
+		this.#tintExcludedComponents = new Set();
+	}
+
+	//==============================================================================
+	// 트랜지션 대상에서 노드를 제외. 해당 노드 자신과 모든 자손 노드의 컴포넌트가
+	// 색상 수집에서 제외된다.
+	//==============================================================================
+	excludeNodeFromTint(node) {
+		this.#tintExcludedNodes.add(node);
+	}
+
+	//==============================================================================
+	// 트랜지션 대상에서 특정 컴포넌트만 제외.
+	//==============================================================================
+	excludeComponentFromTint(component) {
+		this.#tintExcludedComponents.add(component);
+	}
+
+	//==============================================================================
+	// 제외 목록 초기화.
+	//==============================================================================
+	clearTintExclusions() {
+		this.#tintExcludedNodes.clear();
+		this.#tintExcludedComponents.clear();
 	}
 
 	//==============================================================================
@@ -219,6 +247,14 @@ export class UIButton extends UIControl {
 				const tintedColor = new Color(tintedRed, tintedGreen, tintedBlue, originalColor.alpha);
 				colorEntry.component.setTextColor(tintedColor);
 			}
+			else if (colorEntry.type === "paint") {
+				const originalColor = colorEntry.originalColor;
+				const tintedRed = Math.lerp(originalColor.red, pressedTintColor.red, pressedTintColor.alpha * progress);
+				const tintedGreen = Math.lerp(originalColor.green, pressedTintColor.green, pressedTintColor.alpha * progress);
+				const tintedBlue = Math.lerp(originalColor.blue, pressedTintColor.blue, pressedTintColor.alpha * progress);
+				const tintedColor = new Color(tintedRed, tintedGreen, tintedBlue, originalColor.alpha);
+				colorEntry.component.setColor(tintedColor);
+			}
 		}
 	}
 
@@ -250,28 +286,46 @@ export class UIButton extends UIControl {
 
 	//==============================================================================
 	// 노드에서 색상 대상 재귀 수집.
+	// - excludeNodeFromTint 로 등록된 노드는 자신과 자손까지 통째로 건너뛴다.
+	// - excludeComponentFromTint 로 등록된 컴포넌트는 개별적으로 제외한다.
 	//==============================================================================
 	collectFromNode(node) {
+		if (this.#tintExcludedNodes.has(node)) {
+			return;
+		}
+
 		// 노드에 UIImageView 가 있으면 wrapper 를 통해 색을 제어한다.
 		// (UIImageView 는 attach 시 내부 Sprite 를 자동 부착하므로
 		//  wrapper 가 있는 경우 raw Sprite 를 별도로 잡지 않고 wrapper 만 다룬다)
 		const imageViews = node.getComponents(UIImageView);
 		if (imageViews.length > 0) {
 			for (const imageView of imageViews) {
+				if (this.#tintExcludedComponents.has(imageView)) continue;
 				this.#colorEntries.push({ type: "imageview", component: imageView });
 			}
 		}
 		else {
 			const sprites = node.getComponents(Sprite);
 			for (const sprite of sprites) {
+				if (this.#tintExcludedComponents.has(sprite)) continue;
 				this.#colorEntries.push({ type: "sprite", component: sprite });
 			}
+		}
+
+		// Paint (단색 배경) 도 라벨처럼 originalColor 를 보관해두고 lerp 한다.
+		const paints = node.getComponents(Paint);
+		for (const paint of paints) {
+			if (this.#tintExcludedComponents.has(paint)) continue;
+			const originalColor = paint.getColor();
+			const copiedColor = new Color(originalColor.red, originalColor.green, originalColor.blue, originalColor.alpha);
+			this.#colorEntries.push({ type: "paint", component: paint, originalColor: copiedColor });
 		}
 
 		// 라벨도 동일. UILabel wrapper 가 있으면 wrapper 만, 없으면 raw Label 처리.
 		const uiLabels = node.getComponents(UILabel);
 		if (uiLabels.length > 0) {
 			for (const uiLabel of uiLabels) {
+				if (this.#tintExcludedComponents.has(uiLabel)) continue;
 				const originalColor = uiLabel.getTextColor();
 				const copiedColor = new Color(originalColor.red, originalColor.green, originalColor.blue, originalColor.alpha);
 				this.#colorEntries.push({ type: "uilabel", component: uiLabel, originalColor: copiedColor });
@@ -280,6 +334,7 @@ export class UIButton extends UIControl {
 		else {
 			const labelComponents = node.getComponents(Label);
 			for (const labelComponent of labelComponents) {
+				if (this.#tintExcludedComponents.has(labelComponent)) continue;
 				const originalColor = labelComponent.getTextColor();
 				const copiedColor = new Color(originalColor.red, originalColor.green, originalColor.blue, originalColor.alpha);
 				this.#colorEntries.push({ type: "label", component: labelComponent, originalColor: copiedColor });
