@@ -313,6 +313,14 @@ export class Engine extends Object {
 				this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
+		// 마우스 휠. (DOM WheelEvent 의 deltaX/deltaY 를 그대로 누적)
+		canvas.addEventListener("wheel", (wheelEvent) => {
+				const inputManager = this.getInputManager();
+				inputManager.addWheelDelta(wheelEvent.deltaX, wheelEvent.deltaY);
+				this.updateCanvasNativeInputPosition(wheelEvent.clientX, wheelEvent.clientY);
+				wheelEvent.preventDefault();
+			}, { passive: false });
+
 		// 마우스 뗄 때 (캔버스 밖에서 뗄 때 처리).
 		System.window.addEventListener("mouseup", (touchEvent) => {
 				const inputManager = this.getInputManager();
@@ -711,6 +719,7 @@ export class Engine extends Object {
 		inputManager.setTouchPressed(false);
 		inputManager.setTouchReleased(false);
 		inputManager.setTouchCancelled(false);
+		inputManager.clearWheelDelta();
 
 		// 다음 프레임 호출 요청.
 		++this.#frameNumber;

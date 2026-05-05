@@ -79,6 +79,7 @@ export { UIControl } from "./src/ui/uicontrol.js";
 export { UIButton } from "./src/ui/uibutton.js";
 export { UIToggleButton } from "./src/ui/uitogglebutton.js";
 export { UIScrollView } from "./src/ui/uiscrollview.js";
+export { UIScrollBar, ScrollBarAxis } from "./src/ui/uiscrollbar.js";
 export { UISlider } from "./src/ui/uislider.js";
 export { UISnapScrollView } from "./src/ui/uisnapscrollview.js";
 

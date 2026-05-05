@@ -217,6 +217,9 @@ export class TouchRecognizer extends TouchRaycaster {
 	//==============================================================================
 	// 노드의 부모 체인에서 UIScrollView 컴포넌트를 가진 가장 가까운 노드의
 	// ScrollView 컴포넌트를 반환한다. 없으면 null.
+	// - 단, target 이 자신이 컨트롤하는 ScrollView 의 위젯(getScrollView 보유)이면
+	//   그 ScrollView 는 검색에서 제외한다. (스크롤바 자신은 자기 부모 ScrollView 의
+	//   드래그 핸들러로 인계되면 안 되기 때문.)
 	//==============================================================================
 	/**
 	 * @param { * } target
@@ -224,11 +227,12 @@ export class TouchRecognizer extends TouchRaycaster {
 	 */
 	findAncestorScrollView(target) {
 		if (!target) return null;
+		const ownedScrollView = (typeof target.getScrollView === "function") ? target.getScrollView() : null;
 		let node = typeof target.getParent === "function" ? target.getParent() : null;
 		while (node) {
 			if (typeof node.getComponent === "function") {
 				const sv = node.getComponent(UIScrollView);
-				if (sv) return sv;
+				if (sv && sv !== ownedScrollView) return sv;
 			}
 			node = typeof node.getParent === "function" ? node.getParent() : null;
 		}

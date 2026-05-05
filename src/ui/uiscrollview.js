@@ -6,6 +6,15 @@ import { UIView } from "./uiview.js";
 import { AnchoredWorldNode } from "../core/node/anchoredworldmnode.js";
 import { Vector2 } from "../base/vector2.js";
 import * as Math from "../base/math.js";
+import { UIScrollBar, ScrollBarAxis } from "./uiscrollbar.js";
+
+
+//==============================================================================
+// 스크롤바 기본 두께 / 마진 (UIKit indicator 스타일).
+//==============================================================================
+const SCROLLBAR_THICKNESS = 12;
+const SCROLLBAR_MARGIN = 6;
+const WHEEL_SCROLL_SCALE = 1.0;
 
 
 //==============================================================================
@@ -42,6 +51,11 @@ export class UIScrollView extends UIView {
 	/** @private @type { Vector2 } */	#dragStartViewPosition;
 	/** @private @type { Vector2 } */	#dragStartOffset;
 	/** @private @type { number } */	#dragSensitivity; // 드래그 반영량 배율.
+	/** @private @type { UIScrollBar | null } */ #verticalScrollBar;
+	/** @private @type { UIScrollBar | null } */ #horizontalScrollBar;
+	/** @private @type { boolean } */ #showsVerticalScrollBar;
+	/** @private @type { boolean } */ #showsHorizontalScrollBar;
+	/** @private @type { number } */ #wheelScrollScale;
 
 	//==============================================================================
 	// 생성.
@@ -64,6 +78,11 @@ export class UIScrollView extends UIView {
 		this.#horizontalEnabled = true;
 		this.#verticalEnabled = true;
 		this.#dragSensitivity = 1.0;
+		this.#verticalScrollBar = null;
+		this.#horizontalScrollBar = null;
+		this.#showsVerticalScrollBar = false;
+		this.#showsHorizontalScrollBar = false;
+		this.#wheelScrollScale = WHEEL_SCROLL_SCALE;
 	}
 
 	//==============================================================================
@@ -144,6 +163,9 @@ export class UIScrollView extends UIView {
 		if (!node) {
 			return;
 		}
+
+		// 스크롤바 자동 레이아웃.
+		this.layoutScrollBars();
 
 		// 드래그 중 오프셋 및 속도 계산.
 		if (this.isDragging()) {
@@ -457,5 +479,150 @@ export class UIScrollView extends UIView {
 	 */
 	getScrollVelocity() {
 		return this.#scrollVelocity;
+	}
+
+	//==============================================================================
+	// 세로 스크롤바 노출 여부 설정. true 면 자동 생성하여 호스트 노드의 자식으로 추가.
+	//==============================================================================
+	/**
+	 * @param { boolean } shows
+	 */
+	setShowsVerticalScrollBar(shows) {
+		this.#showsVerticalScrollBar = !!shows;
+		const node = this.getNode();
+		if (this.#showsVerticalScrollBar) {
+			if (!this.#verticalScrollBar && node) {
+				const bar = new UIScrollBar();
+				bar.setName("verticalScrollBar");
+				bar.setAxis(ScrollBarAxis.vertical);
+				bar.setScrollView(this);
+				node.addChild(bar);
+				this.#verticalScrollBar = bar;
+			}
+			if (this.#verticalScrollBar) this.#verticalScrollBar.setActive(true);
+		}
+		else {
+			if (this.#verticalScrollBar) this.#verticalScrollBar.setActive(false);
+		}
+	}
+
+	//==============================================================================
+	// 가로 스크롤바 노출 여부 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } shows
+	 */
+	setShowsHorizontalScrollBar(shows) {
+		this.#showsHorizontalScrollBar = !!shows;
+		const node = this.getNode();
+		if (this.#showsHorizontalScrollBar) {
+			if (!this.#horizontalScrollBar && node) {
+				const bar = new UIScrollBar();
+				bar.setName("horizontalScrollBar");
+				bar.setAxis(ScrollBarAxis.horizontal);
+				bar.setScrollView(this);
+				node.addChild(bar);
+				this.#horizontalScrollBar = bar;
+			}
+			if (this.#horizontalScrollBar) this.#horizontalScrollBar.setActive(true);
+		}
+		else {
+			if (this.#horizontalScrollBar) this.#horizontalScrollBar.setActive(false);
+		}
+	}
+
+	//==============================================================================
+	// 세로 / 가로 스크롤바 인스턴스 반환. (커스터마이즈 용)
+	//==============================================================================
+	getVerticalScrollBar() {
+		return this.#verticalScrollBar;
+	}
+	getHorizontalScrollBar() {
+		return this.#horizontalScrollBar;
+	}
+
+	//==============================================================================
+	// 스크롤바가 차지하는(reserved) 영역의 두께. (스크롤바가 활성/표시 중일 때만)
+	//==============================================================================
+	getVerticalScrollBarReservedWidth() {
+		return (this.#showsVerticalScrollBar && this.#verticalScrollBar)
+			? SCROLLBAR_THICKNESS + SCROLLBAR_MARGIN * 2
+			: 0;
+	}
+	getHorizontalScrollBarReservedHeight() {
+		return (this.#showsHorizontalScrollBar && this.#horizontalScrollBar)
+			? SCROLLBAR_THICKNESS + SCROLLBAR_MARGIN * 2
+			: 0;
+	}
+
+	//==============================================================================
+	// 스크롤바를 제외한 실제 콘텐트가 그려질 수 있는 가시 영역 크기.
+	// - 가로 스크롤바가 있으면 그 만큼 세로가 줄고, 세로 스크롤바가 있으면 가로가 준다.
+	//==============================================================================
+	/**
+	 * @returns { Vector2 }
+	 */
+	getInnerContentSize() {
+		const node = this.getNode();
+		if (!node) return Vector2.zero();
+		const viewportSize = node.getContentSize();
+		const reservedX = this.getVerticalScrollBarReservedWidth();
+		const reservedY = this.getHorizontalScrollBarReservedHeight();
+		return Vector2.create(
+			Math.max(0, viewportSize.x - reservedX),
+			Math.max(0, viewportSize.y - reservedY),
+		);
+	}
+
+	//==============================================================================
+	// 매 tick 마다 스크롤바 위치 / 크기 갱신.
+	//==============================================================================
+	layoutScrollBars() {
+		const node = this.getNode();
+		if (!node) return;
+		const viewportSize = node.getContentSize();
+		const reservedX = this.getVerticalScrollBarReservedWidth();
+		const reservedY = this.getHorizontalScrollBarReservedHeight();
+
+		if (this.#verticalScrollBar && this.#showsVerticalScrollBar) {
+			const x = viewportSize.x - SCROLLBAR_THICKNESS - SCROLLBAR_MARGIN;
+			const y = SCROLLBAR_MARGIN;
+			const w = SCROLLBAR_THICKNESS;
+			const h = Math.max(0, viewportSize.y - SCROLLBAR_MARGIN * 2 - reservedY);
+			this.#verticalScrollBar.setLocalPosition(Vector2.create(x, y));
+			this.#verticalScrollBar.setContentSize(Vector2.create(w, h));
+		}
+		if (this.#horizontalScrollBar && this.#showsHorizontalScrollBar) {
+			const x = SCROLLBAR_MARGIN;
+			const y = viewportSize.y - SCROLLBAR_THICKNESS - SCROLLBAR_MARGIN;
+			const w = Math.max(0, viewportSize.x - SCROLLBAR_MARGIN * 2 - reservedX);
+			const h = SCROLLBAR_THICKNESS;
+			this.#horizontalScrollBar.setLocalPosition(Vector2.create(x, y));
+			this.#horizontalScrollBar.setContentSize(Vector2.create(w, h));
+		}
+	}
+
+	//==============================================================================
+	// 휠 입력 처리. (TouchRaycaster → UIScrollView)
+	// - delta: 마우스 휠 누적값 (DOM WheelEvent 의 deltaX/deltaY 와 동일 부호. 아래 = +y)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } delta
+	 */
+	wheel(delta) {
+		if (!delta) return;
+		const offset = this.getScrollOffset();
+		const dx = this.isHorizontal() ? delta.x * this.#wheelScrollScale : 0;
+		const dy = this.isVertical() ? delta.y * this.#wheelScrollScale : 0;
+		this.applyScrollOffset(Vector2.create(offset.x - dx, offset.y - dy));
+		// 휠 입력 후엔 elastic 의 잔여 속도를 정리해 튕김을 방지.
+		this.#scrollVelocity = Vector2.zero();
+	}
+
+	//==============================================================================
+	// 휠 스크롤 배율 설정.
+	//==============================================================================
+	setWheelScrollScale(scale) {
+		this.#wheelScrollScale = scale;
 	}
 }
