@@ -80,6 +80,7 @@ export { UIButton } from "./src/ui/uibutton.js";
 export { UIToggleButton } from "./src/ui/uitogglebutton.js";
 export { UIScrollView } from "./src/ui/uiscrollview.js";
 export { UIScrollBar, ScrollBarAxis } from "./src/ui/uiscrollbar.js";
+export { UIInputField } from "./src/ui/uiinputfield.js";
 export { UISlider } from "./src/ui/uislider.js";
 export { UISnapScrollView } from "./src/ui/uisnapscrollview.js";
 
