@@ -135,7 +135,7 @@ export class UIButton extends UIControl {
 	}
 
 	//==============================================================================
-	// 터치 누름. (TouchRaycaster → AnchoredWorldNode → Button)
+	// 터치 누름. (TouchRaycaster → WorldNode → Button)
 	//==============================================================================
 	/**
 	 * @param { Vector2 } viewInputPosition
@@ -154,7 +154,7 @@ export class UIButton extends UIControl {
 	}
 
 	//==============================================================================
-	// 터치 뗌. (TouchRaycaster → AnchoredWorldNode → Button)
+	// 터치 뗌. (TouchRaycaster → WorldNode → Button)
 	//==============================================================================
 	/**
 	 * @param { Vector2 } viewInputPosition
@@ -190,7 +190,7 @@ export class UIButton extends UIControl {
 	}
 
 	//==============================================================================
-	// 터치 취소. (TouchRaycaster → AnchoredWorldNode → Button)
+	// 터치 취소. (TouchRaycaster → WorldNode → Button)
 	//==============================================================================
 	/**
 	 * @param { Vector2 } viewInputPosition

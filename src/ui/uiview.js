@@ -115,7 +115,7 @@ export class UIView extends Component {
 	}
 
 	//==============================================================================
-	// 터치 누름. (TouchRaycaster → AnchoredWorldNode)
+	// 터치 누름. (TouchRaycaster → WorldNode)
 	//==============================================================================
 	/**
 	 * @virtual
@@ -125,7 +125,7 @@ export class UIView extends Component {
 	}
 
 	//==============================================================================
-	// 터치 이동. (TouchRaycaster → AnchoredWorldNode)
+	// 터치 이동. (TouchRaycaster → WorldNode)
 	//==============================================================================
 	/**
 	 * @virtual
@@ -138,7 +138,7 @@ export class UIView extends Component {
 	}
 
 	//==============================================================================
-	// 터치 뗌. (TouchRaycaster → AnchoredWorldNode)
+	// 터치 뗌. (TouchRaycaster → WorldNode)
 	//==============================================================================
 	/**
 	 * @virtual
@@ -148,7 +148,7 @@ export class UIView extends Component {
 	}
 
 	//==============================================================================
-	// 터치 취소. (TouchRaycaster → AnchoredWorldNode)
+	// 터치 취소. (TouchRaycaster → WorldNode)
 	//==============================================================================
 	/**
 	 * @virtual

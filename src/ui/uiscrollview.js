@@ -113,7 +113,7 @@ export class UIScrollView extends UIView {
 	}
 
 	//==============================================================================
-	// 터치 누름. (TouchRaycaster → AnchoredWorldNode → ScrollView)
+	// 터치 누름. (TouchRaycaster → WorldNode → ScrollView)
 	//==============================================================================
 	/**
 	 * @override
@@ -130,7 +130,7 @@ export class UIScrollView extends UIView {
 	}
 
 	//==============================================================================
-	// 터치 이동. (TouchRaycaster → AnchoredWorldNode → ScrollView)
+	// 터치 이동. (TouchRaycaster → WorldNode → ScrollView)
 	//==============================================================================
 	/**
 	 * @override
@@ -143,7 +143,7 @@ export class UIScrollView extends UIView {
 	}
 
 	//==============================================================================
-	// 터치 뗌. (TouchRaycaster → AnchoredWorldNode → ScrollView)
+	// 터치 뗌. (TouchRaycaster → WorldNode → ScrollView)
 	//==============================================================================
 	/**
 	 * @override
@@ -154,7 +154,7 @@ export class UIScrollView extends UIView {
 	}
 
 	//==============================================================================
-	// 터치 취소. (TouchRaycaster → AnchoredWorldNode → ScrollView)
+	// 터치 취소. (TouchRaycaster → WorldNode → ScrollView)
 	//==============================================================================
 	/**
 	 * @override
