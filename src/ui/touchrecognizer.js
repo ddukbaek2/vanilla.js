@@ -3,8 +3,8 @@
 //==============================================================================
 const System = globalThis;
 import { Vector2 } from "../base/vector2.js";
-import { TouchRaycaster } from "./touchraycaster.js";
-import { UIScrollView } from "../ui/uiscrollview.js";
+import { TouchRaycaster } from "../core/touchraycaster.js";
+import { UIScrollView } from "./uiscrollview.js";
 
 
 //==============================================================================

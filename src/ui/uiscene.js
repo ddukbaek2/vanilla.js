@@ -6,7 +6,7 @@ import { Vector2 } from "../base/vector2.js";
 import { Engine } from "../core/engine.js";
 import { Scene } from "../core/scene.js";
 import { TransformNode } from "../core/node/transformnode.js";
-import { UINode } from "../core/node/uinode.js";
+import { UINode } from "./uinode.js";
 import { LayoutSolver } from "./autolayout/layoutsolver.js";
 import { LayoutStrength } from "./autolayout/layoutstrength.js";
 import { LayoutConstraint } from "./autolayout/layoutconstraint.js";

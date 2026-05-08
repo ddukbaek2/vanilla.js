@@ -4,5 +4,5 @@
 ## ComponentNode (extends Node)
 ## TransformNode (extends ComponentNode)
 ## WorldNode (extnds TransformNode)
-## AnchoredWorldNode (extends WorldNode)
+## AnchoredWorldNode (extends WorldNode) (Legacy)
 ## UINode (extends TransformNode)

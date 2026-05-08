@@ -2,17 +2,17 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import * as Math from "../../base/math.js";
-import { Vector2 } from "../../base/vector2.js";
-import { Graphic } from "../graphic.js";
-import { TransformNode } from "./transformnode.js";
-import { LayoutVariable } from "../../ui/autolayout/layoutvariable.js";
-import { LayoutExpression } from "../../ui/autolayout/layoutexpression.js";
-import { LayoutConstraint } from "../../ui/autolayout/layoutconstraint.js";
-import { LayoutSolver } from "../../ui/autolayout/layoutsolver.js";
-import { LayoutStrength } from "../../ui/autolayout/layoutstrength.js";
-import { LayoutPriority } from "../../ui/autolayout/layoutpriority.js";
-import { LayoutConstraintAxis } from "../../ui/autolayout/layoutconstraintaxis.js";
+import * as Math from "../base/math.js";
+import { Vector2 } from "../base/vector2.js";
+import { Graphic } from "../core/graphic.js";
+import { TransformNode } from "../core/node/transformnode.js";
+import { LayoutVariable } from "./autolayout/layoutvariable.js";
+import { LayoutExpression } from "./autolayout/layoutexpression.js";
+import { LayoutConstraint } from "./autolayout/layoutconstraint.js";
+import { LayoutSolver } from "./autolayout/layoutsolver.js";
+import { LayoutStrength } from "./autolayout/layoutstrength.js";
+import { LayoutPriority } from "./autolayout/layoutpriority.js";
+import { LayoutConstraintAxis } from "./autolayout/layoutconstraintaxis.js";
 
 
 //==============================================================================
