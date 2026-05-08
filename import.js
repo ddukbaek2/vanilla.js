@@ -30,14 +30,6 @@ export { Node } from "./src/base/node.js";
 
 
 //==============================================================================
-// 인터페이스 목록.
-//==============================================================================
-export { ITickable } from "./src/core/interface/itickable.js";
-export { IDrawable } from "./src/core/interface/idrawable.js";
-export { ITouchable } from "./src/core/interface/itouchable.js";
-
-
-//==============================================================================
 // 코어 목록.
 //==============================================================================
 export { EngineConfiguration, Engine } from "./src/core/engine.js";

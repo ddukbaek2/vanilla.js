@@ -7,9 +7,6 @@ import { Color } from "../base/color.js";
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
 import { Graphic } from "../core/graphic.js";
-import { ITickable } from "../core/interface/itickable.js";
-import { IDrawable } from "../core/interface/idrawable.js";
-import { ITouchable } from "../core/interface/itouchable.js";
 
 
 //==============================================================================
@@ -28,9 +25,6 @@ const VirtualPadState = {
 //==============================================================================
 /**
  * @class
- * @implements { IDrawable }
- * @implements { ITickable }
- * @implements { ITouchable }
  */
 export class VirtualPad extends Object {
 	//==============================================================================
