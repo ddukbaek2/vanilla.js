@@ -139,9 +139,11 @@ export class UIScene extends Scene {
 		this.#screenNode.setSolver(this.#solver);
 
 		// 좌상단 (0, 0) 고정.
-		const screenLeftConstraint = this.#screenNode.leftAnchor.equalTo(0);
-		const screenTopConstraint = this.#screenNode.topAnchor.equalTo(0);
+		const screenLeftAnchor = this.#screenNode.leftAnchor;
+		const screenLeftConstraint = screenLeftAnchor.equalTo(0);
 		this.#screenNode.addConstraint(screenLeftConstraint);
+		const screenTopAnchor = this.#screenNode.topAnchor;
+		const screenTopConstraint = screenTopAnchor.equalTo(0);
 		this.#screenNode.addConstraint(screenTopConstraint);
 
 		// 너비/높이는 편집 변수로 등록 (resize 마다 suggestValue 로 갱신).
@@ -493,10 +495,27 @@ export class UIScene extends Scene {
 			}
 		}
 		const insets = this.#safeAreaInsets;
-		const guideLeftConstraint = guide.leftAnchor.equalTo(screen.leftAnchor.add(insets.left));
-		const guideTopConstraint = guide.topAnchor.equalTo(screen.topAnchor.add(insets.top));
-		const guideRightConstraint = guide.rightAnchor.equalTo(screen.rightAnchor.subtract(insets.right));
-		const guideBottomConstraint = guide.bottomAnchor.equalTo(screen.bottomAnchor.subtract(insets.bottom));
+
+		const screenLeftAnchor = screen.leftAnchor;
+		const leftOffsetExpression = screenLeftAnchor.add(insets.left);
+		const guideLeftAnchor = guide.leftAnchor;
+		const guideLeftConstraint = guideLeftAnchor.equalTo(leftOffsetExpression);
+
+		const screenTopAnchor = screen.topAnchor;
+		const topOffsetExpression = screenTopAnchor.add(insets.top);
+		const guideTopAnchor = guide.topAnchor;
+		const guideTopConstraint = guideTopAnchor.equalTo(topOffsetExpression);
+
+		const screenRightAnchor = screen.rightAnchor;
+		const rightOffsetExpression = screenRightAnchor.subtract(insets.right);
+		const guideRightAnchor = guide.rightAnchor;
+		const guideRightConstraint = guideRightAnchor.equalTo(rightOffsetExpression);
+
+		const screenBottomAnchor = screen.bottomAnchor;
+		const bottomOffsetExpression = screenBottomAnchor.subtract(insets.bottom);
+		const guideBottomAnchor = guide.bottomAnchor;
+		const guideBottomConstraint = guideBottomAnchor.equalTo(bottomOffsetExpression);
+
 		this.#safeAreaLayoutGuideConstraints = [guideLeftConstraint, guideTopConstraint, guideRightConstraint, guideBottomConstraint];
 		for (const constraint of this.#safeAreaLayoutGuideConstraints) {
 			solver.addConstraint(constraint);
