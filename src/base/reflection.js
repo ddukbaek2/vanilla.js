@@ -292,21 +292,21 @@ export function isClassInstance(target, type) {
 // target 클래스가 type 클래스의 부모(상위) 클래스인지 여부 반환.
 // - type 이 target 을 (직간접적으로) 상속하면 true.
 // - target === type 인 경우는 false.
-// - 예) isParent(WorldNode, AnchoredWorldNode) → true
+// - 예) isParent(TransformNode, WorldNode) → true
 //==============================================================================
 /**
- * @param { Function } target
- * @param { Function } type
+ * @param { Function } parentType
+ * @param { Function } targetType
  * @returns { boolean }
  */
-export function isParent(target, type) {
-	if (!isType(target) || !isType(type)) {
+export function isParent(parentType, targetType) {
+	if (!isType(parentType) || !isType(targetType)) {
 		return false;
 	}
-	if (target === type) {
+	if (parentType === targetType) {
 		return false;
 	}
-	return type.prototype instanceof target;
+	return targetType.prototype instanceof parentType;
 }
 
 
@@ -314,19 +314,19 @@ export function isParent(target, type) {
 // target 클래스가 type 클래스의 자식(하위) 클래스인지 여부 반환.
 // - target 이 type 을 (직간접적으로) 상속하면 true.
 // - target === type 인 경우는 false.
-// - 예) isChildren(AnchoredWorldNode, WorldNode) → true
+// - 예) isChildren(WorldNode, TransformNode) → true
 //==============================================================================
 /**
- * @param { Function } target
- * @param { Function } type
+ * @param { Function } targetType
+ * @param { Function } parentType
  * @returns { boolean }
  */
-export function isChildren(target, type) {
-	if (!isType(target) || !isType(type)) {
+export function isChildren(targetType, parentType) {
+	if (!isType(targetType) || !isType(parentType)) {
 		return false;
 	}
-	if (target === type) {
+	if (targetType === parentType) {
 		return false;
 	}
-	return target.prototype instanceof type;
+	return targetType.prototype instanceof parentType;
 }

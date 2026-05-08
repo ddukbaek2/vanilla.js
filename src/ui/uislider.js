@@ -7,7 +7,7 @@ import { Rect } from "../base/rect.js";
 import { Vector2 } from "../base/vector2.js";
 import * as Math from "../base/math.js";
 import { Graphic } from "../core/graphic.js";
-import { AnchoredWorldNode } from "../core/node/anchoredworldmnode.js";
+import { WorldNode } from "../core/node/worldnode.js";
 import { UIControl } from "./uicontrol.js";
 import { ProgressDirection } from "./uiprogressview.js";
 
@@ -57,7 +57,7 @@ export class UISlider extends UIControl {
 	}
 
 	//==============================================================================
-	// 노드에 붙음. (AnchoredWorldNode 의 isInteractable 을 자동 활성화)
+	// 노드에 붙음. (WorldNode 의 isInteractable 을 자동 활성화)
 	//==============================================================================
 	/**
 	 * @override
@@ -65,7 +65,7 @@ export class UISlider extends UIControl {
 	 */
 	attach(node) {
 		super.attach(node);
-		if (node instanceof AnchoredWorldNode) {
+		if (node instanceof WorldNode) {
 			node.setInteractable(true);
 		}
 	}

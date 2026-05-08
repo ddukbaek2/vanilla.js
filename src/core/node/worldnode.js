@@ -10,6 +10,7 @@ import { Rect } from "../../base/rect.js";
 import { OBB } from "../../base/obb.js";
 import { TransformNode } from "./transformnode.js";
 import { Engine } from "../engine.js";
+import { Mask } from "../component/mask.js";
 
 
 //==============================================================================
@@ -82,11 +83,51 @@ export class WorldNode extends TransformNode {
     }
 
     //==============================================================================
+    // 출력. (오버라이드: Mask 컴포넌트가 부착돼 있으면 자식을 그 영역으로 크롭)
+    //==============================================================================
+    /**
+     * @override
+     * @param { Graphic } graphic
+     */
+    draw(graphic) {
+        const isVisible = this.isVisible();
+        if (!isVisible) {
+            return;
+        }
+
+        // 컴포넌트 출력. 동시에 Mask 컴포넌트가 있는지 확인.
+        const components = this.getAllComponents();
+        let maskComponent = null;
+        for (const component of components) {
+            component.draw(graphic);
+            if (component instanceof Mask) {
+                maskComponent = component;
+            }
+        }
+
+        // 마스크가 있으면 자식 출력 전에 클리핑 시작.
+        if (maskComponent) {
+            maskComponent.beginClip(graphic);
+        }
+
+        // 자식 출력.
+        const children = this.getChildren();
+        for (const child of children) {
+            graphic.drawNode(child);
+        }
+
+        // 마스크가 있으면 클리핑 종료.
+        if (maskComponent) {
+            maskComponent.endClip(graphic);
+        }
+    }
+
+    //==============================================================================
     // 출력.
     //==============================================================================
     /**
      * @override
-     * @param { Graphic } graphic 
+     * @param { Graphic } graphic
      */
     drawGizmos(graphic) {
         // const isGizmoVisible = this.isGizmoVisible();

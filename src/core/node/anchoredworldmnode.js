@@ -2,17 +2,16 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Rect } from "../../base/rect.js";
 import { Vector2 } from "../../base/vector2.js";
 import * as Math from "../../base/math.js";
-import { Graphic } from "../graphic.js";
 import { WorldNode } from "./worldnode.js";
 
 
 //==============================================================================
 // UI 기반 뷰.
 // - 앵커, 앵커 포지션, 사이즈 델타 기능. (부모 기준으로 배치되고 늘려붙이는 것을 기준으로 한 확장 좌표계)
-// - 마스크, 포커스 기능. (기존 AnchoredWorldNode 통합)
+// - 클리핑이 필요하면 Mask 컴포넌트를 부착한다. (실제 처리는 WorldNode.draw 가 담당)
+// - 포커스 기능.
 //==============================================================================
 export class AnchoredWorldNode extends WorldNode {
 	//==============================================================================
@@ -22,7 +21,6 @@ export class AnchoredWorldNode extends WorldNode {
 	/** @private @type { Vector2 } */ #sizeDelta;
 	/** @private @type { Vector2 } */ #anchorMin;
 	/** @private @type { Vector2 } */ #anchorMax;
-	/** @private @type { boolean } */ #isMaskEnabled;
 	/** @private @type { boolean } */ #isFocused;
 
 	//==============================================================================
@@ -35,68 +33,7 @@ export class AnchoredWorldNode extends WorldNode {
 		this.#sizeDelta = Vector2.zero();
 		this.#anchorMin = Vector2.create(0.5, 0.5);
 		this.#anchorMax = Vector2.create(0.5, 0.5);
-		this.#isMaskEnabled = false;
 		this.#isFocused = false;
-	}
-
-	//==============================================================================
-	// 출력. (오버라이드: 마스크 활성화 시 자식을 자신의 영역으로 크롭)
-	//==============================================================================
-	/**
-	 * @override
-	 * @param { Graphic } graphic
-	 */
-	draw(graphic) {
-		const isVisible = this.isVisible();
-		if (!isVisible) {
-			return;
-		}
-
-		// 컴포넌트 출력.
-		const components = this.getAllComponents();
-		for (const component of components) {
-			component.draw(graphic);
-		}
-
-		// 마스크 처리.
-		const isMaskEnabled = this.isMaskEnabled();
-		if (isMaskEnabled) {
-			// 자신의 contentSize 기준으로 클리핑 후 자식 출력.
-			const contentSize = this.getContentSize();
-			const clipRect = Rect.create(0, 0, contentSize.x, contentSize.y);
-			graphic.beginClipRect(clipRect);
-		}
-
-		// 자식 출력.
-		const children = this.getChildren();
-		for (const child of children) {
-			graphic.drawNode(child);
-		}
-
-		// 마스크 처리.
-		if (isMaskEnabled) {
-			graphic.endClipRect();
-		}
-	}
-
-	//==============================================================================
-	// 마스크 활성화 설정. (자식이 자신의 contentSize 영역 밖으로 나가면 크롭)
-	//==============================================================================
-	/**
-	 * @param { boolean } enabled
-	 */
-	setMaskEnabled(enabled) {
-		this.#isMaskEnabled = enabled;
-	}
-
-	//==============================================================================
-	// 마스크 활성화 여부 반환.
-	//==============================================================================
-	/**
-	 * @returns { boolean }
-	 */
-	isMaskEnabled() {
-		return this.#isMaskEnabled;
 	}
 
 	//==============================================================================

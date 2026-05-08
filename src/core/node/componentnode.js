@@ -64,7 +64,7 @@ export class ComponentNode extends Node {
 	/**
 	 * @param { Function } componentType  
 	 */
-	getOraddComponent(componentType) {
+	getOrAddComponent(componentType) {
 		if (componentType === null || componentType === undefined) {
 			return null;
 		}
@@ -93,6 +93,15 @@ export class ComponentNode extends Node {
 
 		const components = this.getAllComponents();
 		components.push(component);
+
+		// 의존 컴포넌트(require) 자동 추가. attach 직전에 처리해 attach 본문이
+		// 의존 컴포넌트의 존재를 가정할 수 있다.
+		const requiredTypes = component.require();
+		if (Array.isArray(requiredTypes)) {
+			for (const requiredType of requiredTypes) {
+				this.getOrAddComponent(requiredType);
+			}
+		}
 
 		// 붙음.
 		component.attach(this);

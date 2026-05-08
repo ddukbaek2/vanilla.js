@@ -40,7 +40,7 @@ export class UIImageView extends UIView {
 	 */
 	attach(node) {
 		super.attach(node);
-		this.#sprite = node.getOraddComponent(Sprite);
+		this.#sprite = node.getOrAddComponent(Sprite);
 	}
 
 	//==============================================================================

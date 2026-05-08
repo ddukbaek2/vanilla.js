@@ -9,7 +9,7 @@ import { Vector2 } from "../base/vector2.js";
 import { Component } from "../core/component.js";
 import { Engine } from "../core/engine.js";
 import { Graphic } from "../core/graphic.js";
-import { AnchoredWorldNode } from "../core/node/anchoredworldmnode.js";
+import { WorldNode } from "../core/node/worldnode.js";
 
 
 //==============================================================================
@@ -25,7 +25,7 @@ export class UIView extends Component {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { Engine } */ #engine;
-	/** @private @type { AnchoredWorldNode | null } */ #content; // 컨텐트 노드.
+	/** @private @type { WorldNode | null } */ #content; // 컨텐트 노드.
 	/** @private @type { Color } */ #backgroundColor;
 
 	//==============================================================================
@@ -72,19 +72,14 @@ export class UIView extends Component {
 	attach(node) {
 		super.attach(node);
 
-		// 컨텐트 노드 추가.
-		this.#content = new AnchoredWorldNode();
+		// 컨텐트 노드 추가. 부모 좌상단에 anchor (0,0) 으로 정렬.
+		this.#content = new WorldNode();
 		this.#content.setName("content");
-		this.#content.setAnchorMin(Vector2.zero());
-		this.#content.setAnchorMax(Vector2.zero());
 		this.#content.setPivot(Pivot.topLeft);
+		this.#content.setAnchor(Vector2.zero());
 		this.#content.setAnchoredPosition(Vector2.zero());
 		const content = this.getContent();
 		node.addChild(content);
-
-		if (node instanceof AnchoredWorldNode) {
-			node.setMaskEnabled(true);
-		}
 	}
 
 	//==============================================================================
@@ -166,7 +161,7 @@ export class UIView extends Component {
 	// 콘텐츠 노드 반환. (자식 노드를 이 노드에 추가하면 스크롤 대상이 됨)
 	//==============================================================================
 	/**
-	 * @returns { AnchoredWorldNode }
+	 * @returns { WorldNode }
 	 */
 	getContent() {
 		return this.#content;

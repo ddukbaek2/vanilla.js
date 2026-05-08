@@ -67,6 +67,7 @@ export { Animation } from "./src/core/animation.js";
 export { Paint } from "./src/core/component/paint.js";
 export { Sprite } from "./src/core/component/sprite.js";
 export { Label } from "./src/core/component/label.js";
+export { Mask } from "./src/core/component/mask.js";
 
 
 //==============================================================================

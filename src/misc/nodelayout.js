@@ -1,9 +1,10 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
-import { AnchoredWorldNode } from "../core/node/anchoredworldmnode.js";
+import { WorldNode } from "../core/node/worldnode.js";
 import { Vector2 } from "../base/vector2.js";
 import { Object } from "../base/object.js";
+import { Mask } from "../core/component/mask.js";
 
 
 //==============================================================================
@@ -11,17 +12,16 @@ import { Object } from "../base/object.js";
 // - 지역 변수 없이 노드 계층 구조를 선언적으로 구성하는 플루언트 빌더.
 // - Unreal Slate / Flutter 위젯과 유사한 구조.
 // - Vector2 없이 숫자쌍(x, y)으로 모든 위치/크기를 지정한다.
-// - create(nodeClass)로 노드 타입을 지정한다. (기본값: AnchoredWorldNode)
+// - create(nodeClass)로 노드 타입을 지정한다. (기본값: WorldNode)
 //
 // 사용 예:
-//   const panel = NodeLayout.create(AnchoredWorldNode)
-//       .anchorMin(0.5, 0.5)
-//       .anchorMax(0.5, 0.5)
-//       .sizeDelta(680, 900)
+//   const panel = NodeLayout.create(WorldNode)
+//       .pivot(Pivot.middleCenter)
+//       .contentSize(680, 900)
 //       .component(Paint, (c) => { c.setColor(new Color(0.1, 0.1, 0.1, 1)); })
 //       .children(
-//           NodeLayout.create(AnchoredWorldNode)
-//               .sizeDelta(120, 70)
+//           NodeLayout.create(WorldNode)
+//               .contentSize(120, 70)
 //               .component(Label, (c) => { c.setText("확인"); })
 //       )
 //       .build();
@@ -42,7 +42,7 @@ export class NodeLayout extends Object {
 	 */
 	constructor(nodeClass) {
 		super();
-		const NodeClass = nodeClass ?? AnchoredWorldNode;
+		const NodeClass = nodeClass ?? WorldNode;
 		this.#node = new NodeClass();
 		this.#childLayouts = [];
 		this.#parentNode = null;
@@ -205,32 +205,6 @@ export class NodeLayout extends Object {
 	}
 
 	//==============================================================================
-	// 앵커 최소값 설정.
-	//==============================================================================
-	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @returns { NodeLayout }
-	 */
-	anchorMin(x, y) {
-		this.#node.setAnchorMin(Vector2.create(x, y));
-		return this;
-	}
-
-	//==============================================================================
-	// 앵커 최대값 설정.
-	//==============================================================================
-	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @returns { NodeLayout }
-	 */
-	anchorMax(x, y) {
-		this.#node.setAnchorMax(Vector2.create(x, y));
-		return this;
-	}
-
-	//==============================================================================
 	// 앵커 기준 위치 오프셋 설정.
 	//==============================================================================
 	/**
@@ -244,19 +218,6 @@ export class NodeLayout extends Object {
 	}
 
 	//==============================================================================
-	// 오프셋 크기 설정.
-	//==============================================================================
-	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @returns { NodeLayout }
-	 */
-	sizeDelta(x, y) {
-		this.#node.setSizeDelta(Vector2.create(x, y));
-		return this;
-	}
-
-	//==============================================================================
 	// 마스크 활성화 설정.
 	//==============================================================================
 	/**
@@ -264,7 +225,15 @@ export class NodeLayout extends Object {
 	 * @returns { NodeLayout }
 	 */
 	maskEnabled(enabled) {
-		this.#node.setMaskEnabled(enabled);
+		if (enabled) {
+			this.#node.getOrAddComponent(Mask);
+		}
+		else {
+			const maskComponent = this.#node.getComponent(Mask);
+			if (maskComponent) {
+				this.#node.removeComponent(maskComponent);
+			}
+		}
 		return this;
 	}
 

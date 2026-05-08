@@ -39,7 +39,7 @@ export class UILabel extends UIView {
 	 */
 	attach(node) {
 		super.attach(node);
-		this.#label = node.getOraddComponent(Label);
+		this.#label = node.getOrAddComponent(Label);
 	}
 
 	//==============================================================================

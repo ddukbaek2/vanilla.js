@@ -3,10 +3,11 @@
 //==============================================================================
 const System = globalThis;
 import { UIView } from "./uiview.js";
-import { AnchoredWorldNode } from "../core/node/anchoredworldmnode.js";
+import { WorldNode } from "../core/node/worldnode.js";
 import { Vector2 } from "../base/vector2.js";
 import * as Math from "../base/math.js";
 import { UIScrollBar, ScrollBarAxis } from "./uiscrollbar.js";
+import { Mask } from "../core/component/mask.js";
 
 
 //==============================================================================
@@ -32,7 +33,8 @@ export const ScrollMode = {
 // 스크롤뷰 컴포넌트.
 // - 소유 노드의 getContentSize()를 가시 영역으로 사용한다.
 // - 내부에 별도의 콘텐츠 노드를 생성하며, 드래그로 스크롤링할 수 있다.
-// - AnchoredWorldNode에 추가하면 마스크(크롭)가 자동 활성화된다.
+// - require() 로 Mask 를 의존 선언하므로 부착되는 노드(WorldNode 계열)에 자동으로
+//   Mask 가 추가되어 자식 클리핑이 동작한다.
 // - 중첩 ScrollView를 지원한다. (TouchRaycaster와 연동)
 //==============================================================================
 export class UIScrollView extends UIView {
@@ -86,7 +88,18 @@ export class UIScrollView extends UIView {
 	}
 
 	//==============================================================================
-	// 노드에 붙음. (AnchoredWorldNode의 isInteractable을 자동 활성화)
+	// 의존 컴포넌트 — 자식 클리핑을 위해 Mask 가 필요.
+	//==============================================================================
+	/**
+	 * @override
+	 * @returns { Function[] }
+	 */
+	require() {
+		return [Mask];
+	}
+
+	//==============================================================================
+	// 노드에 붙음. (WorldNode 계열의 isInteractable 을 자동 활성화)
 	//==============================================================================
 	/**
 	 * @override
@@ -94,7 +107,7 @@ export class UIScrollView extends UIView {
 	 */
 	attach(node) {
 		super.attach(node);
-		if (node instanceof AnchoredWorldNode) {
+		if (node instanceof WorldNode) {
 			node.setInteractable(true);
 		}
 	}
@@ -446,7 +459,7 @@ export class UIScrollView extends UIView {
 		// 컨텐트의 크기 수정.
 		const content = this.getContent();
 		if (content) {
-			content.setSizeDelta(scrollContentSize);
+			content.setContentSize(scrollContentSize);
 		}
 	}
 
