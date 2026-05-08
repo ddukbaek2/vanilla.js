@@ -147,6 +147,15 @@ export class Engine extends Object {
 
 			// 렌더 루프 즉시 시작.
 			System.window.addEventListener("resize", this.#resizeCallback);
+
+			// visualViewport 변경도 리사이즈로 처리. (iOS Safari URL 바 슬라이딩이 일반
+			//  resize 이벤트로는 안정적으로 발화하지 않아서 visualViewport 의
+			//  resize / scroll 이벤트로 보강.)
+			if (System.window.visualViewport) {
+				System.window.visualViewport.addEventListener("resize", this.#resizeCallback);
+				System.window.visualViewport.addEventListener("scroll", this.#resizeCallback);
+			}
+
 			++this.#frameNumber;
 			System.window.requestAnimationFrame(this.#updateEngineCallback);
 		}).catch((error) => {
@@ -183,12 +192,17 @@ export class Engine extends Object {
 
 		// 설정: 윈도우가 리사이즈 될 때 캔버스 사이즈 자동 반영.
 		if (engineConfiguration.autoResizeOnWindowResize) {
-			const clientNativeSize = Vector2.create(System.window.innerWidth, System.window.innerHeight);
+			// visualViewport 가 있으면 그것을 우선 사용. (모바일 URL 바 / 키보드 등으로
+			//  layout viewport 와 visual viewport 가 다를 때 후자가 실제 보이는 영역)
+			const visualViewport = System.window.visualViewport;
+			const clientWidth = visualViewport ? visualViewport.width : System.window.innerWidth;
+			const clientHeight = visualViewport ? visualViewport.height : System.window.innerHeight;
+			const clientNativeSize = Vector2.create(clientWidth, clientHeight);
 			const canvas = viewManager.getCanvas();
 
 			// 캔버스 크기 스타일 조정. (사파리에서 필수)
 			canvas.style.width = `${clientNativeSize.x}px`;
-			canvas.style.height = `${clientNativeSize.y}px`;			
+			canvas.style.height = `${clientNativeSize.y}px`;
 		}
 
 		// 뷰 영역 계산.

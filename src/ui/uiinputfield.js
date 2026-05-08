@@ -28,6 +28,7 @@ export class UIInputField extends WorldNode {
 	/** @private @type { boolean } */ #useDOMInput;
 	/** @private @type { HTMLInputElement | null } */ #domInput;
 	/** @private @type { Function | null } */ #canvasKeydownHandler;
+	/** @private @type { Function | null } */ #canvasFocusHandler;
 	/** @private @type { Function | null } */ #contextMenuHandler;
 	/** @private @type { HTMLElement | null } */ #contextMenuElement;
 	/** @private @type { Function | null } */ #contextMenuDismissHandler;
@@ -80,6 +81,7 @@ export class UIInputField extends WorldNode {
 		this.#useDOMInput = false;
 		this.#domInput = null;
 		this.#canvasKeydownHandler = null;
+		this.#canvasFocusHandler = null;
 		this.#contextMenuHandler = null;
 		this.#contextMenuElement = null;
 		this.#contextMenuDismissHandler = null;
@@ -489,9 +491,17 @@ export class UIInputField extends WorldNode {
 		doc.body.appendChild(input);
 		this.#domInput = input;
 		this.layoutDOMInput();
+
+		// iOS Safari 의 모바일 키보드 정책: input.focus() 호출이 사용자 제스처
+		// (touchstart / click) 의 콜스택 안에서 발생해야 키보드가 뜬다. 엔진의
+		// touchPress 는 rAF 루프에서 dispatch 되어 gesture context 가 끊기므로,
+		// 캔버스 touchstart 에 직접 동기 핸들러를 달아 hit-test 통과 시 즉시
+		// focus 를 호출한다.
+		this.attachCanvasFocusHandler();
 	}
 
 	detachDOMInput() {
+		this.detachCanvasFocusHandler();
 		if (!this.#domInput) return;
 		try {
 			if (this.#domInput.parentNode) this.#domInput.parentNode.removeChild(this.#domInput);
@@ -501,6 +511,72 @@ export class UIInputField extends WorldNode {
 		this.#focused = false;
 		this.#composition = "";
 		this.#isComposing = false;
+	}
+
+	//==============================================================================
+	// 캔버스 touchstart 동기 focus 핸들러 등록.
+	// - 엔진의 touchPress 가 rAF 에서 dispatch 되어 iOS 가 gesture 만료로 키보드
+	//   호출을 막는 문제를 우회한다.
+	// - hit-test 통과 시: 동기 focus → 키보드 표시.
+	// - hit-test 실패 (필드 바깥 터치) 시: 현재 focus 상태면 blur → 키보드 숨김.
+	//==============================================================================
+	attachCanvasFocusHandler() {
+		if (this.#canvasFocusHandler) return;
+		const engine = this.#engine;
+		if (!engine) return;
+		const viewManager = engine.getViewManager();
+		if (!viewManager) return;
+		const canvas = viewManager.getCanvas();
+		if (!canvas) return;
+		this.#canvasFocusHandler = (pointerEvent) => {
+			let clientX;
+			let clientY;
+			const changedTouches = pointerEvent.changedTouches;
+			if (changedTouches && changedTouches.length > 0) {
+				clientX = changedTouches[0].clientX;
+				clientY = changedTouches[0].clientY;
+			}
+			else if (typeof pointerEvent.clientX === "number" && typeof pointerEvent.clientY === "number") {
+				clientX = pointerEvent.clientX;
+				clientY = pointerEvent.clientY;
+			}
+			else {
+				return;
+			}
+			if (!this.#domInput) return;
+			const canvasRect = canvas.getBoundingClientRect();
+			const canvasPosition = Vector2.create(clientX - canvasRect.left, clientY - canvasRect.top);
+			const viewInputPosition = viewManager.canvasPositionToViewPosition(canvasPosition);
+			const isVisibleInHierarchy = (typeof this.isVisibleInHierarchy === "function") ? this.isVisibleInHierarchy() : true;
+			const isInside = isVisibleInHierarchy && this.contains(viewInputPosition);
+			if (isInside) {
+				this.#domInput.focus();
+			}
+			else if (this.#focused) {
+				this.#domInput.blur();
+			}
+		};
+		canvas.addEventListener("touchstart", this.#canvasFocusHandler, { passive: true });
+		canvas.addEventListener("mousedown", this.#canvasFocusHandler, { passive: true });
+	}
+
+	//==============================================================================
+	// 캔버스 touchstart 동기 focus 핸들러 해제.
+	//==============================================================================
+	detachCanvasFocusHandler() {
+		if (!this.#canvasFocusHandler) return;
+		const engine = this.#engine;
+		if (engine) {
+			const viewManager = engine.getViewManager();
+			if (viewManager) {
+				const canvas = viewManager.getCanvas();
+				if (canvas) {
+					canvas.removeEventListener("touchstart", this.#canvasFocusHandler);
+					canvas.removeEventListener("mousedown", this.#canvasFocusHandler);
+				}
+			}
+		}
+		this.#canvasFocusHandler = null;
 	}
 
 	layoutDOMInput() {
