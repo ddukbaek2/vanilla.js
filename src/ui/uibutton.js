@@ -239,7 +239,7 @@ export class UIButton extends UIControl {
 				const overlayColor = new Color(pressedTintColor.red, pressedTintColor.green, pressedTintColor.blue, overlayAlpha);
 				colorEntry.component.setColor(overlayColor);
 			}
-			else if (colorEntry.type === "text" || colorEntiry.type == "richtext" || colorEntry.type === "uilabel") {
+			else if (colorEntry.type === "text" || colorEntry.type === "richtext" || colorEntry.type === "uilabel") {
 				const originalColor = colorEntry.originalColor;
 				const tintedRed = Math.lerp(originalColor.red, pressedTintColor.red, pressedTintColor.alpha * progress);
 				const tintedGreen = Math.lerp(originalColor.green, pressedTintColor.green, pressedTintColor.alpha * progress);
