@@ -8,6 +8,7 @@ import { Color } from "../base/color.js";
 import { Engine } from "../core/engine.js";
 import { Graphic } from "../core/graphic.js";
 import { Scene } from "../core/scene.js";
+import { ViewScaleMode } from "../core/viewmanager.js";
 import { TransformNode } from "../core/node/transformnode.js";
 import { TouchRecognizer } from "./touchrecognizer.js";
 import { UINode } from "./uinode.js";
@@ -16,7 +17,6 @@ import { LayoutStrength } from "./autolayout/layoutstrength.js";
 import { LayoutConstraint } from "./autolayout/layoutconstraint.js";
 import { DEVTools } from "../misc/devtools.js";
 import { ImageAsset } from "../resource/imageasset.js";
-
 
 //==============================================================================
 // UI 씬.
@@ -46,12 +46,12 @@ export class UIScene extends Scene {
 	/** @private @type { number } */ #loadMinDurationMs;
 	/** @private @type { boolean } */ #loadTouchedToSkip;
 	/** @private @type { Color } */ #sceneBackgroundColor;
+	/** @private @type { string } */ #viewScaleMode;
 	/** @private @type { LayoutSolver } */ #solver;
 	/** @private @type { UINode } */ #screenNode;
 	/** @private @type { UINode } */ #safeAreaLayoutGuide;
 	/** @private @type { { top: number, left: number, bottom: number, right: number } } */ #safeAreaInsets;
 	/** @private @type { LayoutConstraint[] } */ #safeAreaLayoutGuideConstraints;
-
 
 	//==============================================================================
 	// 생성자.
@@ -64,8 +64,35 @@ export class UIScene extends Scene {
 		this.#loadMinDurationMs = 3000;
 		this.#loadTouchedToSkip = false;
 		this.#sceneBackgroundColor = Color.black();
+		this.#viewScaleMode = ViewScaleMode.none;
 	}
 
+	//==============================================================================
+	// ViewScaleMode 설정. 프로젝트별로 자유롭게 지정 가능.
+	// - 디폴트는 ViewScaleMode.none. 엔진 기동 전 / 후 어디서든 호출 가능.
+	// - 호출 시점에 엔진이 이미 attach 되어 있으면 즉시 viewManager 에 반영하고,
+	//   아니면 initialize() 에서 일괄 적용된다.
+	//==============================================================================
+	/**
+	 * @param { string } viewScaleMode
+	 */
+	setViewScaleMode(viewScaleMode) {
+		this.#viewScaleMode = viewScaleMode;
+		const engine = this.getEngine();
+		if (engine) {
+			engine.getViewManager().setViewScaleMode(viewScaleMode);
+		}
+	}
+
+	//==============================================================================
+	// 현재 ViewScaleMode 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getViewScaleMode() {
+		return this.#viewScaleMode;
+	}
 
 	//==============================================================================
 	// 로딩 화면 중앙 이미지 URL 설정. (빈 문자열이면 이미지 없이 게이지만 노출)
@@ -77,7 +104,6 @@ export class UIScene extends Scene {
 		this.#loadingImageUrl = url || "";
 	}
 
-
 	//==============================================================================
 	// 로딩 화면 최소 노출 시간 (ms) 설정.
 	//==============================================================================
@@ -88,7 +114,6 @@ export class UIScene extends Scene {
 		this.#loadMinDurationMs = milliseconds;
 	}
 
-
 	//==============================================================================
 	// 캔버스 배경색 설정. (preDraw 단계에서 캔버스 전체에 적용)
 	//==============================================================================
@@ -98,7 +123,6 @@ export class UIScene extends Scene {
 	setSceneBackgroundColor(color) {
 		this.#sceneBackgroundColor = color;
 	}
-
 
 	//==============================================================================
 	// 생성. 솔버 / screenNode / safeAreaLayoutGuide 셋업.
@@ -115,8 +139,8 @@ export class UIScene extends Scene {
 		this.#screenNode.setSolver(this.#solver);
 
 		// 좌상단 (0, 0) 고정.
-		const screenLeftConstraint = this.#screenNode.leftAnchor().equalTo(0);
-		const screenTopConstraint = this.#screenNode.topAnchor().equalTo(0);
+		const screenLeftConstraint = this.#screenNode.leftAnchor.equalTo(0);
+		const screenTopConstraint = this.#screenNode.topAnchor.equalTo(0);
 		this.#screenNode.addConstraint(screenLeftConstraint);
 		this.#screenNode.addConstraint(screenTopConstraint);
 
@@ -134,7 +158,6 @@ export class UIScene extends Scene {
 		this.#safeAreaLayoutGuideConstraints = [];
 		this.rebuildSafeAreaLayoutGuideConstraints();
 	}
-
 
 	//==============================================================================
 	// 비동기 로드.
@@ -174,7 +197,6 @@ export class UIScene extends Scene {
 		this.#solver.updateVariables();
 	}
 
-
 	//==============================================================================
 	// 자산 로드 hook.
 	// - 서브클래스가 오버라이드해서 자체 자산을 비동기 로드한다. super 호출 필수.
@@ -191,7 +213,6 @@ export class UIScene extends Scene {
 			}
 		}
 	}
-
 
 	//==============================================================================
 	// 로딩 화면 출력. (엔진이 isLoaded() === false 인 동안 매 프레임 호출)
@@ -248,7 +269,6 @@ export class UIScene extends Scene {
 		canvasRenderingContext.fillRect(barX, barY, barWidth * progress, barHeight);
 	}
 
-
 	//==============================================================================
 	// 초기화. 개발자 도구 + 터치 레이캐스터 셋업.
 	//==============================================================================
@@ -258,6 +278,9 @@ export class UIScene extends Scene {
 	 */
 	initialize(engine) {
 		super.initialize(engine);
+
+		// ViewScaleMode 적용.
+		engine.getViewManager().setViewScaleMode(this.#viewScaleMode);
 
 		this.#devtools = new DEVTools();
 		this.#devtools.setEngine(engine);
@@ -270,7 +293,6 @@ export class UIScene extends Scene {
 		this.#lastViewSizeY = 0;
 	}
 
-
 	//==============================================================================
 	// 화면 크기 변경됨.
 	//==============================================================================
@@ -282,7 +304,6 @@ export class UIScene extends Scene {
 		super.resize(canvasNativeSize);
 		this.layout();
 	}
-
 
 	//==============================================================================
 	// 레이아웃.
@@ -314,7 +335,6 @@ export class UIScene extends Scene {
 		}
 		this.#solver.updateVariables();
 	}
-
 
 	//==============================================================================
 	// env(safe-area-inset-*) 기준 영역 계산. (뷰 좌표계)
@@ -358,7 +378,6 @@ export class UIScene extends Scene {
 		return Rect.create(x, y, width, height);
 	}
 
-
 	//==============================================================================
 	// 주기적 갱신.
 	// - viewSize 변화 감지 → layout 자동 호출.
@@ -392,7 +411,6 @@ export class UIScene extends Scene {
 		this.#devtools.tick(unscaledTimeDelta);
 	}
 
-
 	//==============================================================================
 	// 트리를 순회하며 솔버가 부착되지 않은 UINode 들을 본 씬의 솔버에 부착.
 	//==============================================================================
@@ -415,7 +433,6 @@ export class UIScene extends Scene {
 		}
 	}
 
-
 	//==============================================================================
 	// 화면 가이드 UINode 의 너비/높이 값 제안.
 	//==============================================================================
@@ -428,7 +445,6 @@ export class UIScene extends Scene {
 		this.#solver.suggestValue(screenWidthVariable, size.x);
 		this.#solver.suggestValue(screenHeightVariable, size.y);
 	}
-
 
 	//==============================================================================
 	// safeAreaInsets 반환. (UIKit 의 UIView.safeAreaInsets)
@@ -445,7 +461,6 @@ export class UIScene extends Scene {
 			right: safeAreaInsets.right,
 		};
 	}
-
 
 	//==============================================================================
 	// safeAreaInsets 설정. (모바일 노치 / 홈 인디케이터 회피용 영역 정의)
@@ -464,7 +479,6 @@ export class UIScene extends Scene {
 		this.rebuildSafeAreaLayoutGuideConstraints();
 	}
 
-
 	//==============================================================================
 	// safeAreaLayoutGuide 의 4 개 제약 재구축.
 	// - 기존 제약을 솔버에서 제거하고 현재 #safeAreaInsets 로 다시 구축 후 재등록.
@@ -479,16 +493,15 @@ export class UIScene extends Scene {
 			}
 		}
 		const insets = this.#safeAreaInsets;
-		const guideLeftConstraint = guide.leftAnchor().equalTo(screen.leftAnchor().add(insets.left));
-		const guideTopConstraint = guide.topAnchor().equalTo(screen.topAnchor().add(insets.top));
-		const guideRightConstraint = guide.rightAnchor().equalTo(screen.rightAnchor().subtract(insets.right));
-		const guideBottomConstraint = guide.bottomAnchor().equalTo(screen.bottomAnchor().subtract(insets.bottom));
+		const guideLeftConstraint = guide.leftAnchor.equalTo(screen.leftAnchor.add(insets.left));
+		const guideTopConstraint = guide.topAnchor.equalTo(screen.topAnchor.add(insets.top));
+		const guideRightConstraint = guide.rightAnchor.equalTo(screen.rightAnchor.subtract(insets.right));
+		const guideBottomConstraint = guide.bottomAnchor.equalTo(screen.bottomAnchor.subtract(insets.bottom));
 		this.#safeAreaLayoutGuideConstraints = [guideLeftConstraint, guideTopConstraint, guideRightConstraint, guideBottomConstraint];
 		for (const constraint of this.#safeAreaLayoutGuideConstraints) {
 			solver.addConstraint(constraint);
 		}
 	}
-
 
 	//==============================================================================
 	// 디브툴이 입력을 가져가는 중인지 여부.
@@ -499,7 +512,6 @@ export class UIScene extends Scene {
 	isDevToolsCapturingInput() {
 		return this.#devtools.isVisible() && this.#devtools.isPointerInsidePanel();
 	}
-
 
 	//==============================================================================
 	// touchPress.
@@ -515,7 +527,6 @@ export class UIScene extends Scene {
 		this.#touchRaycaster.touchPress(viewInputPosition);
 	}
 
-
 	//==============================================================================
 	// touchMove.
 	//==============================================================================
@@ -529,7 +540,6 @@ export class UIScene extends Scene {
 		}
 		this.#touchRaycaster.touchMove(viewInputPosition);
 	}
-
 
 	//==============================================================================
 	// touchRelease.
@@ -545,7 +555,6 @@ export class UIScene extends Scene {
 		this.#touchRaycaster.touchRelease(viewInputPosition);
 	}
 
-
 	//==============================================================================
 	// touchCancel.
 	//==============================================================================
@@ -559,7 +568,6 @@ export class UIScene extends Scene {
 		}
 		this.#touchRaycaster.touchCancel(viewInputPosition);
 	}
-
 
 	//==============================================================================
 	// touchWheel.
@@ -575,7 +583,6 @@ export class UIScene extends Scene {
 		}
 		this.#touchRaycaster.touchWheel(viewInputPosition, wheelDelta);
 	}
-
 
 	//==============================================================================
 	// preDraw. 캔버스 전체를 sceneBackgroundColor 로 칠한다 (세이프 에어리어 바깥 영역 포함).
@@ -599,7 +606,6 @@ export class UIScene extends Scene {
 		viewManager.applyViewRect(canvasRenderingContext);
 	}
 
-
 	//==============================================================================
 	// postDraw. DEVTools 를 화면 위에 그린다.
 	//==============================================================================
@@ -612,7 +618,6 @@ export class UIScene extends Scene {
 		this.#devtools.draw(graphic);
 	}
 
-
 	//==============================================================================
 	// 솔버 반환.
 	//==============================================================================
@@ -622,7 +627,6 @@ export class UIScene extends Scene {
 	getSolver() {
 		return this.#solver;
 	}
-
 
 	//==============================================================================
 	// 화면 가이드 UINode 반환.
@@ -636,7 +640,6 @@ export class UIScene extends Scene {
 	getScreenNode() {
 		return this.#screenNode;
 	}
-
 
 	//==============================================================================
 	// safeAreaLayoutGuide 반환. (UIKit 의 UIView.safeAreaLayoutGuide 와 동일 사상)

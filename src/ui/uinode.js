@@ -158,14 +158,14 @@ export class UINode extends TransformNode {
 	 * @returns { LayoutConstraint[] }
 	 */
 	buildIntrinsicConstraints() {
-		const leftExpression = this.leftAnchor();
-		const rightExpression = this.rightAnchor();
-		const topExpression = this.topAnchor();
-		const bottomExpression = this.bottomAnchor();
-		const widthExpression = this.widthAnchor();
-		const heightExpression = this.heightAnchor();
-		const centerXExpression = this.centerXAnchor();
-		const centerYExpression = this.centerYAnchor();
+		const leftExpression = this.leftAnchor;
+		const rightExpression = this.rightAnchor;
+		const topExpression = this.topAnchor;
+		const bottomExpression = this.bottomAnchor;
+		const widthExpression = this.widthAnchor;
+		const heightExpression = this.heightAnchor;
+		const centerXExpression = this.centerXAnchor;
+		const centerYExpression = this.centerYAnchor;
 
 		const rightConstraint = rightExpression.equalTo(leftExpression.add(widthExpression));
 		const bottomConstraint = bottomExpression.equalTo(topExpression.add(heightExpression));
@@ -189,16 +189,16 @@ export class UINode extends TransformNode {
 		if (intrinsicSize.x !== NO_INTRINSIC_METRIC) {
 			const horizontalHuggingStrength = LayoutStrength.fromPriority(this.#horizontalHuggingPriority);
 			const horizontalCompressionStrength = LayoutStrength.fromPriority(this.#horizontalCompressionResistancePriority);
-			const widthHugConstraint = this.widthAnchor().lessThanOrEqualTo(intrinsicSize.x).withStrength(horizontalHuggingStrength);
-			const widthCompressionConstraint = this.widthAnchor().greaterThanOrEqualTo(intrinsicSize.x).withStrength(horizontalCompressionStrength);
+			const widthHugConstraint = this.widthAnchor.lessThanOrEqualTo(intrinsicSize.x).withStrength(horizontalHuggingStrength);
+			const widthCompressionConstraint = this.widthAnchor.greaterThanOrEqualTo(intrinsicSize.x).withStrength(horizontalCompressionStrength);
 			result.push(widthHugConstraint);
 			result.push(widthCompressionConstraint);
 		}
 		if (intrinsicSize.y !== NO_INTRINSIC_METRIC) {
 			const verticalHuggingStrength = LayoutStrength.fromPriority(this.#verticalHuggingPriority);
 			const verticalCompressionStrength = LayoutStrength.fromPriority(this.#verticalCompressionResistancePriority);
-			const heightHugConstraint = this.heightAnchor().lessThanOrEqualTo(intrinsicSize.y).withStrength(verticalHuggingStrength);
-			const heightCompressionConstraint = this.heightAnchor().greaterThanOrEqualTo(intrinsicSize.y).withStrength(verticalCompressionStrength);
+			const heightHugConstraint = this.heightAnchor.lessThanOrEqualTo(intrinsicSize.y).withStrength(verticalHuggingStrength);
+			const heightCompressionConstraint = this.heightAnchor.greaterThanOrEqualTo(intrinsicSize.y).withStrength(verticalCompressionStrength);
 			result.push(heightHugConstraint);
 			result.push(heightCompressionConstraint);
 		}
@@ -407,10 +407,10 @@ export class UINode extends TransformNode {
 			}
 		}
 		const margins = this.#layoutMargins;
-		const guideLeftConstraint = guide.leftAnchor().equalTo(this.leftAnchor().add(margins.left));
-		const guideTopConstraint = guide.topAnchor().equalTo(this.topAnchor().add(margins.top));
-		const guideRightConstraint = guide.rightAnchor().equalTo(this.rightAnchor().subtract(margins.right));
-		const guideBottomConstraint = guide.bottomAnchor().equalTo(this.bottomAnchor().subtract(margins.bottom));
+		const guideLeftConstraint = guide.leftAnchor.equalTo(this.leftAnchor.add(margins.left));
+		const guideTopConstraint = guide.topAnchor.equalTo(this.topAnchor.add(margins.top));
+		const guideRightConstraint = guide.rightAnchor.equalTo(this.rightAnchor.subtract(margins.right));
+		const guideBottomConstraint = guide.bottomAnchor.equalTo(this.bottomAnchor.subtract(margins.bottom));
 		this.#layoutMarginsGuideConstraints = [guideLeftConstraint, guideTopConstraint, guideRightConstraint, guideBottomConstraint];
 		if (solver !== null) {
 			for (const constraint of this.#layoutMarginsGuideConstraints) {
@@ -611,7 +611,7 @@ export class UINode extends TransformNode {
 	/**
 	 * @returns { LayoutExpression }
 	 */
-	leftAnchor() {
+	get leftAnchor() {
 		return LayoutExpression.fromVariable(this.#leftVariable);
 	}
 
@@ -621,7 +621,7 @@ export class UINode extends TransformNode {
 	/**
 	 * @returns { LayoutExpression }
 	 */
-	rightAnchor() {
+	get rightAnchor() {
 		return LayoutExpression.fromVariable(this.#rightVariable);
 	}
 
@@ -631,7 +631,7 @@ export class UINode extends TransformNode {
 	/**
 	 * @returns { LayoutExpression }
 	 */
-	topAnchor() {
+	get topAnchor() {
 		return LayoutExpression.fromVariable(this.#topVariable);
 	}
 
@@ -641,7 +641,7 @@ export class UINode extends TransformNode {
 	/**
 	 * @returns { LayoutExpression }
 	 */
-	bottomAnchor() {
+	get bottomAnchor() {
 		return LayoutExpression.fromVariable(this.#bottomVariable);
 	}
 
@@ -651,7 +651,7 @@ export class UINode extends TransformNode {
 	/**
 	 * @returns { LayoutExpression }
 	 */
-	widthAnchor() {
+	get widthAnchor() {
 		return LayoutExpression.fromVariable(this.#widthVariable);
 	}
 
@@ -661,7 +661,7 @@ export class UINode extends TransformNode {
 	/**
 	 * @returns { LayoutExpression }
 	 */
-	heightAnchor() {
+	get heightAnchor() {
 		return LayoutExpression.fromVariable(this.#heightVariable);
 	}
 
@@ -671,7 +671,7 @@ export class UINode extends TransformNode {
 	/**
 	 * @returns { LayoutExpression }
 	 */
-	centerXAnchor() {
+	get centerXAnchor() {
 		return LayoutExpression.fromVariable(this.#centerXVariable);
 	}
 
@@ -681,7 +681,7 @@ export class UINode extends TransformNode {
 	/**
 	 * @returns { LayoutExpression }
 	 */
-	centerYAnchor() {
+	get centerYAnchor() {
 		return LayoutExpression.fromVariable(this.#centerYVariable);
 	}
 
@@ -692,8 +692,8 @@ export class UINode extends TransformNode {
 	/**
 	 * @returns { LayoutExpression }
 	 */
-	leadingAnchor() {
-		return this.leftAnchor();
+	get leadingAnchor() {
+		return this.leftAnchor;
 	}
 
 	//==============================================================================
@@ -703,8 +703,8 @@ export class UINode extends TransformNode {
 	/**
 	 * @returns { LayoutExpression }
 	 */
-	trailingAnchor() {
-		return this.rightAnchor();
+	get trailingAnchor() {
+		return this.rightAnchor;
 	}
 
 	//==============================================================================
@@ -716,8 +716,8 @@ export class UINode extends TransformNode {
 	 * @virtual
 	 * @returns { LayoutExpression }
 	 */
-	firstBaselineAnchor() {
-		return this.topAnchor();
+	get firstBaselineAnchor() {
+		return this.topAnchor;
 	}
 
 	//==============================================================================
@@ -729,8 +729,8 @@ export class UINode extends TransformNode {
 	 * @virtual
 	 * @returns { LayoutExpression }
 	 */
-	lastBaselineAnchor() {
-		return this.bottomAnchor();
+	get lastBaselineAnchor() {
+		return this.bottomAnchor;
 	}
 
 	//==============================================================================

@@ -9,11 +9,11 @@ import { Color } from "../base/color.js";
 import { Engine } from "../core/engine.js";
 import { Graphic } from "../core/graphic.js";
 import { Scene } from "../core/scene.js";
+import { ViewScaleMode } from "../core/viewmanager.js";
 import { TouchRecognizer } from "../ui/touchrecognizer.js";
 import { WorldNode } from "../core/node/worldnode.js";
 import { DEVTools } from "../misc/devtools.js";
 import { ImageAsset } from "../resource/imageasset.js";
-
 
 //==============================================================================
 // 게임 공통 베이스 씬.
@@ -44,7 +44,7 @@ export class GameScene extends Scene {
 	/** @private @type { number } */ #loadMinDurationMs;
 	/** @private @type { boolean } */ #loadTouchedToSkip;
 	/** @private @type { Color } */ #sceneBackgroundColor;
-
+	/** @private @type { string } */ #viewScaleMode;
 
 	//==============================================================================
 	// 생성자.
@@ -57,8 +57,35 @@ export class GameScene extends Scene {
 		this.#loadMinDurationMs = 3000;
 		this.#loadTouchedToSkip = false;
 		this.#sceneBackgroundColor = Color.black();
+		this.#viewScaleMode = ViewScaleMode.none;
 	}
 
+	//==============================================================================
+	// ViewScaleMode 설정. 프로젝트별로 자유롭게 지정 가능.
+	// - 디폴트는 ViewScaleMode.none. 엔진 기동 전 / 후 어디서든 호출 가능.
+	// - 호출 시점에 엔진이 이미 attach 되어 있으면 즉시 viewManager 에 반영하고,
+	//   아니면 initialize() 에서 일괄 적용된다.
+	//==============================================================================
+	/**
+	 * @param { string } viewScaleMode
+	 */
+	setViewScaleMode(viewScaleMode) {
+		this.#viewScaleMode = viewScaleMode;
+		const engine = this.getEngine();
+		if (engine) {
+			engine.getViewManager().setViewScaleMode(viewScaleMode);
+		}
+	}
+
+	//==============================================================================
+	// 현재 ViewScaleMode 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getViewScaleMode() {
+		return this.#viewScaleMode;
+	}
 
 	//==============================================================================
 	// 로딩 화면 중앙 이미지 URL 설정. (빈 문자열이면 이미지 없이 게이지만 노출)
@@ -70,7 +97,6 @@ export class GameScene extends Scene {
 		this.#loadingImageUrl = url || "";
 	}
 
-
 	//==============================================================================
 	// 로딩 화면 최소 노출 시간 (ms) 설정.
 	//==============================================================================
@@ -80,7 +106,6 @@ export class GameScene extends Scene {
 	setLoadingMinDurationMs(milliseconds) {
 		this.#loadMinDurationMs = milliseconds;
 	}
-
 
 	//==============================================================================
 	// 캔버스 배경색 설정. (preDraw 단계에서 캔버스 전체에 적용)
@@ -92,7 +117,6 @@ export class GameScene extends Scene {
 		this.#sceneBackgroundColor = color;
 	}
 
-
 	//==============================================================================
 	// 세이프 에어리어 노드 반환. (서브클래스가 자식 콘텐츠를 여기에 붙인다)
 	//==============================================================================
@@ -103,7 +127,6 @@ export class GameScene extends Scene {
 		return this.#safeAreaNode;
 	}
 
-
 	//==============================================================================
 	// 마지막으로 계산된 세이프 에어리어 영역 반환.
 	//==============================================================================
@@ -113,7 +136,6 @@ export class GameScene extends Scene {
 	getSafeAreaRect() {
 		return this.#lastSafeAreaRect;
 	}
-
 
 	//==============================================================================
 	// 비동기 로드.
@@ -147,7 +169,6 @@ export class GameScene extends Scene {
 		}
 	}
 
-
 	//==============================================================================
 	// 자산 로드 hook.
 	// - 서브클래스가 오버라이드해서 자체 자산을 비동기 로드한다. super 호출 필수.
@@ -164,7 +185,6 @@ export class GameScene extends Scene {
 			}
 		}
 	}
-
 
 	//==============================================================================
 	// 로딩 화면 출력. (엔진이 isLoaded() === false 인 동안 매 프레임 호출)
@@ -221,7 +241,6 @@ export class GameScene extends Scene {
 		canvasRenderingContext.fillRect(barX, barY, barWidth * progress, barHeight);
 	}
 
-
 	//==============================================================================
 	// 초기화.
 	//==============================================================================
@@ -231,6 +250,9 @@ export class GameScene extends Scene {
 	 */
 	initialize(engine) {
 		super.initialize(engine);
+
+		// ViewScaleMode 적용.
+		engine.getViewManager().setViewScaleMode(this.#viewScaleMode);
 
 		// 개발자 도구.
 		this.#devtools = new DEVTools();
@@ -253,7 +275,6 @@ export class GameScene extends Scene {
 		this.#lastViewSizeY = 0;
 	}
 
-
 	//==============================================================================
 	// 화면 크기 변경됨.
 	//==============================================================================
@@ -266,7 +287,6 @@ export class GameScene extends Scene {
 		this.layout();
 	}
 
-
 	//==============================================================================
 	// 레이아웃.
 	// - 서브클래스는 super.layout() 호출 후 자체 콘텐츠 레이아웃을 갱신한다.
@@ -277,7 +297,6 @@ export class GameScene extends Scene {
 		this.#safeAreaNode.setLocalPosition(Vector2.create(safeAreaRect.position.x, safeAreaRect.position.y));
 		this.#safeAreaNode.setContentSize(safeAreaRect.size);
 	}
-
 
 	//==============================================================================
 	// 세이프 에어리어 계산. (뷰 좌표계 기준)
@@ -321,7 +340,6 @@ export class GameScene extends Scene {
 		return Rect.create(x, y, width, height);
 	}
 
-
 	//==============================================================================
 	// 갱신.
 	// - viewSize 변화 감지 → 자동 layout 재호출.
@@ -350,7 +368,6 @@ export class GameScene extends Scene {
 		this.#devtools.tick(unscaledTimeDelta);
 	}
 
-
 	//==============================================================================
 	// 디브툴이 입력을 가져가는 중인지 여부.
 	//==============================================================================
@@ -360,7 +377,6 @@ export class GameScene extends Scene {
 	isDevToolsCapturingInput() {
 		return this.#devtools.isVisible() && this.#devtools.isPointerInsidePanel();
 	}
-
 
 	//==============================================================================
 	// touchPress.
@@ -376,7 +392,6 @@ export class GameScene extends Scene {
 		this.#touchRaycaster.touchPress(viewInputPosition);
 	}
 
-
 	//==============================================================================
 	// touchMove.
 	//==============================================================================
@@ -390,7 +405,6 @@ export class GameScene extends Scene {
 		}
 		this.#touchRaycaster.touchMove(viewInputPosition);
 	}
-
 
 	//==============================================================================
 	// touchRelease.
@@ -406,7 +420,6 @@ export class GameScene extends Scene {
 		this.#touchRaycaster.touchRelease(viewInputPosition);
 	}
 
-
 	//==============================================================================
 	// touchCancel.
 	//==============================================================================
@@ -420,7 +433,6 @@ export class GameScene extends Scene {
 		}
 		this.#touchRaycaster.touchCancel(viewInputPosition);
 	}
-
 
 	//==============================================================================
 	// touchWheel.
@@ -436,7 +448,6 @@ export class GameScene extends Scene {
 		}
 		this.#touchRaycaster.touchWheel(viewInputPosition, wheelDelta);
 	}
-
 
 	//==============================================================================
 	// preDraw. 캔버스 전체를 sceneBackgroundColor 로 칠한다 (세이프 에어리어 바깥 영역 포함).
@@ -459,7 +470,6 @@ export class GameScene extends Scene {
 
 		viewManager.applyViewRect(canvasRenderingContext);
 	}
-
 
 	//==============================================================================
 	// postDraw. DEVTools 를 화면 위에 그린다.
