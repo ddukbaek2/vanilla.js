@@ -103,7 +103,7 @@ class DEVToolsFlatItem {
 // 인스펙터 라인.
 //==============================================================================
 class InspectorLine {
-	/** @type { string | null } */ label;
+	/** @type { string | null } */ text;
 	/** @type { string } */ value;
 	/** @type { string } */ color;
 	/** @type { boolean } */ isSeparator;
@@ -113,7 +113,7 @@ class InspectorLine {
 	/** @type { boolean } */ isComponentProperty;
 
 	/**
-	 * @param { string | null } label
+	 * @param { string | null } text
 	 * @param { string } value
 	 * @param { string } color
 	 * @param { boolean } isSeparator
@@ -122,8 +122,8 @@ class InspectorLine {
 	 * @param { Component | null } componentRef
 	 * @param { boolean } isComponentProperty
 	 */
-	constructor(label, value, color, isSeparator, isSectionHeader, isComponentHeader, componentRef, isComponentProperty) {
-		this.label = label;
+	constructor(text, value, color, isSeparator, isSectionHeader, isComponentHeader, componentRef, isComponentProperty) {
+		this.text = text;
 		this.value = value;
 		this.color = color || COLOR_TEXT;
 		this.isSeparator = isSeparator || false;
@@ -1468,7 +1468,7 @@ export class DEVTools extends Object {
 				canvasRenderingContext.font = `bold ${FONT_SIZE}px monospace`;
 				canvasRenderingContext.textBaseline = "middle";
 				canvasRenderingContext.textAlign = "left";
-				canvasRenderingContext.fillText(line.label, panelX + PADDING, lineMidY);
+				canvasRenderingContext.fillText(line.text, panelX + PADDING, lineMidY);
 				continue;
 			}
 
@@ -1496,17 +1496,17 @@ export class DEVTools extends Object {
 			if (line.isComponentProperty) {
 				canvasRenderingContext.fillStyle = COLOR_TEXT_DIM;
 				canvasRenderingContext.textAlign = "left";
-				canvasRenderingContext.fillText(line.label, panelX + PADDING, lineMidY);
+				canvasRenderingContext.fillText(line.text, panelX + PADDING, lineMidY);
 				canvasRenderingContext.fillStyle = line.color;
 				canvasRenderingContext.fillText(line.value, panelX + PADDING + LABEL_COLUMN_WIDTH, lineMidY);
 				continue;
 			}
 
 			// 일반 레이블 + 값 (노드 프로퍼티).
-			if (line.label) {
+			if (line.text) {
 				canvasRenderingContext.fillStyle = COLOR_TEXT_DIM;
 				canvasRenderingContext.textAlign = "left";
-				canvasRenderingContext.fillText(line.label, panelX + PADDING, lineMidY);
+				canvasRenderingContext.fillText(line.text, panelX + PADDING, lineMidY);
 				canvasRenderingContext.fillStyle = line.color;
 				canvasRenderingContext.fillText(line.value, panelX + PADDING + LABEL_COLUMN_WIDTH, lineMidY);
 				continue;
@@ -1706,10 +1706,10 @@ export class DEVTools extends Object {
 			canvasRenderingContext.lineTo(panelX + panelWidth, contextMenuY + 0.5);
 			canvasRenderingContext.stroke();
 
-			const contextButtonLabels = ["Edit Key", "Edit Value", "Duplicate", "Remove"];
+			const contextButtonTexts = ["Edit Key", "Edit Value", "Duplicate", "Remove"];
 			const contextButtonColors = ["rgba(50,80,50,0.9)", "rgba(40,60,90,0.9)", "rgba(40,70,100,0.9)", "rgba(100,40,30,0.9)"];
 			const contextButtonTextColors = ["#8cc878", "#a8c8e8", "#78b4c8", "#c87878"];
-			const contextButtonCount = contextButtonLabels.length;
+			const contextButtonCount = contextButtonTexts.length;
 			const contextButtonGap = 4;
 			const contextButtonHeight = contextMenuHeight - 8;
 			const contextButtonTextPadding = 10;
@@ -1717,7 +1717,7 @@ export class DEVTools extends Object {
 			// 텍스트 크기 기반으로 각 버튼 너비 계산.
 			const contextButtonWidths = [];
 			for (let labelIndex = 0; labelIndex < contextButtonCount; ++labelIndex) {
-				const measuredTextWidth = canvasRenderingContext.measureText(contextButtonLabels[labelIndex]).width;
+				const measuredTextWidth = canvasRenderingContext.measureText(contextButtonTexts[labelIndex]).width;
 				contextButtonWidths.push(System.Math.ceil(measuredTextWidth) + contextButtonTextPadding * 2);
 			}
 			let totalContextButtonWidth = contextButtonGap * (contextButtonCount - 1);
@@ -1737,7 +1737,7 @@ export class DEVTools extends Object {
 				canvasRenderingContext.fillStyle = contextButtonColors[buttonIndex];
 				canvasRenderingContext.fillRect(contextButtonX, contextButtonY, contextButtonWidth, contextButtonHeight);
 				canvasRenderingContext.fillStyle = contextButtonTextColors[buttonIndex];
-				canvasRenderingContext.fillText(contextButtonLabels[buttonIndex], contextButtonX + contextButtonWidth * 0.5, contextMenuY + contextMenuHeight * 0.5);
+				canvasRenderingContext.fillText(contextButtonTexts[buttonIndex], contextButtonX + contextButtonWidth * 0.5, contextMenuY + contextMenuHeight * 0.5);
 				currentContextButtonX += contextButtonWidth + contextButtonGap;
 			}
 		}

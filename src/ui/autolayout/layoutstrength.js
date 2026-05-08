@@ -54,4 +54,24 @@ export class LayoutStrength {
 	static clipStrength(strength) {
 		return Math.clamp(strength, 0, LayoutStrength.required);
 	}
+
+	//==============================================================================
+	// UIKit 의 UILayoutPriority (1 ~ 1000) 를 LayoutStrength 으로 변환.
+	// - priority >= 1000 (required) 은 LayoutStrength.required 로 매핑.
+	// - 1 ~ 999 는 medium tier 의 weight 로 매핑 (priority 750 → 750000).
+	// - 0 이하는 0 으로 매핑.
+	//==============================================================================
+	/**
+	 * @param { number } priority
+	 * @returns { number }
+	 */
+	static fromPriority(priority) {
+		if (priority >= 1000) {
+			return LayoutStrength.required;
+		}
+		if (priority <= 0) {
+			return 0;
+		}
+		return LayoutStrength.createStrength(0, priority, 0);
+	}
 }

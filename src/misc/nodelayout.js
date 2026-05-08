@@ -22,7 +22,7 @@ import { Mask } from "../core/component/mask.js";
 //       .children(
 //           NodeLayout.create(WorldNode)
 //               .contentSize(120, 70)
-//               .component(Label, (c) => { c.setText("확인"); })
+//               .component(Text, (c) => { c.setText("확인"); })
 //       )
 //       .build();
 //==============================================================================

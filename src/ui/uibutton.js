@@ -9,7 +9,7 @@ import { WorldNode } from "../core/node/worldnode.js";
 import { Color } from "../base/color.js";
 import * as Math from "../base/math.js";
 import { Sprite } from "../core/component/sprite.js";
-import { Label } from "../core/component/label.js";
+import { Text } from "../core/component/text.js";
 import { Paint } from "../core/component/paint.js";
 import { UIImageView } from "./uiimageview.js";
 import { UILabel } from "./uilabel.js";
@@ -239,7 +239,7 @@ export class UIButton extends UIControl {
 				const overlayColor = new Color(pressedTintColor.red, pressedTintColor.green, pressedTintColor.blue, overlayAlpha);
 				colorEntry.component.setColor(overlayColor);
 			}
-			else if (colorEntry.type === "label" || colorEntry.type === "uilabel") {
+			else if (colorEntry.type === "text" || colorEntiry.type == "richtext" || colorEntry.type === "uilabel") {
 				const originalColor = colorEntry.originalColor;
 				const tintedRed = Math.lerp(originalColor.red, pressedTintColor.red, pressedTintColor.alpha * progress);
 				const tintedGreen = Math.lerp(originalColor.green, pressedTintColor.green, pressedTintColor.alpha * progress);
@@ -321,23 +321,23 @@ export class UIButton extends UIControl {
 			this.#colorEntries.push({ type: "paint", component: paint, originalColor: copiedColor });
 		}
 
-		// 라벨도 동일. UILabel wrapper 가 있으면 wrapper 만, 없으면 raw Label 처리.
-		const uiLabels = node.getComponents(UILabel);
-		if (uiLabels.length > 0) {
-			for (const uiLabel of uiLabels) {
-				if (this.#tintExcludedComponents.has(uiLabel)) continue;
-				const originalColor = uiLabel.getTextColor();
+		// 라벨도 동일. UILabel wrapper 가 있으면 wrapper 만, 없으면 raw Text 처리.
+		const uiTexts = node.getComponents(UILabel);
+		if (uiTexts.length > 0) {
+			for (const uiText of uiTexts) {
+				if (this.#tintExcludedComponents.has(uiText)) continue;
+				const originalColor = uiText.getTextColor();
 				const copiedColor = new Color(originalColor.red, originalColor.green, originalColor.blue, originalColor.alpha);
-				this.#colorEntries.push({ type: "uilabel", component: uiLabel, originalColor: copiedColor });
+				this.#colorEntries.push({ type: "uilabel", component: uiText, originalColor: copiedColor });
 			}
 		}
 		else {
-			const labelComponents = node.getComponents(Label);
+			const labelComponents = node.getComponents(Text);
 			for (const labelComponent of labelComponents) {
 				if (this.#tintExcludedComponents.has(labelComponent)) continue;
 				const originalColor = labelComponent.getTextColor();
 				const copiedColor = new Color(originalColor.red, originalColor.green, originalColor.blue, originalColor.alpha);
-				this.#colorEntries.push({ type: "label", component: labelComponent, originalColor: copiedColor });
+				this.#colorEntries.push({ type: "text", component: labelComponent, originalColor: copiedColor });
 			}
 		}
 

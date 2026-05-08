@@ -51,7 +51,7 @@ export class PaneStyle {
     /**
      * 스타일 프리셋이 적용된 엘리먼트를 생성합니다.
      * @param { string } tagName 
-     * @param { string } preset - "panel" | "toolbar" | "button" | "input" | "textarea" | "label"
+     * @param { string } preset - "panel" | "toolbar" | "button" | "input" | "textarea" | "text"
      * @param { Object } options - { id, text, style, type, placeholder, accent, warning }
      */
     static create(tagName, preset = "", options = {}) {
@@ -135,7 +135,7 @@ export class PaneStyle {
                     tabSize: "4"
                 });
                 break;
-            case "label":
+            case "text":
                 this.apply(el, {
                     position: "relative",
                     width: "auto",

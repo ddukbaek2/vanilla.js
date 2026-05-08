@@ -11,7 +11,7 @@ import { Graphic } from "../src/core/graphic.js";
 import { Tween } from "../src/core/tween.js";
 import { Enum } from "../src/base/identifier.js";
 import { Sprite } from "../src/core/component/sprite.js";
-import { Label } from "../src/core/component/label.js";
+import { Text } from "../src/core/component/text.js";
 import { ImageAsset } from "../src/resource/imageasset.js";
 import { AudioAsset } from "../src/resource/audioasset.js";
 import { FontAsset } from "../src/resource/fontasset.js";

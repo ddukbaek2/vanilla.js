@@ -66,13 +66,15 @@ export { Animation } from "./src/core/animation.js";
 //==============================================================================
 export { Paint } from "./src/core/component/paint.js";
 export { Sprite } from "./src/core/component/sprite.js";
-export { Label } from "./src/core/component/label.js";
+export { Text, TextAlign, TextBaseline } from "./src/core/component/text.js";
+export { RichText } from "./src/core/component/richtext.js";
 export { Mask } from "./src/core/component/mask.js";
 
 
 //==============================================================================
 // UI/컴포넌트 목록.
 //==============================================================================
+export { UIScene } from "./src/ui/uiscene.js";
 export { UIView } from "./src/ui/uiview.js";
 export { UIImageView } from "./src/ui/uiimageview.js";
 export { UILabel } from "./src/ui/uilabel.js";
@@ -82,8 +84,9 @@ export { UIToggleButton } from "./src/ui/uitogglebutton.js";
 export { UIScrollView } from "./src/ui/uiscrollview.js";
 export { UIScrollBar, ScrollBarAxis } from "./src/ui/uiscrollbar.js";
 export { UIInputField } from "./src/ui/uiinputfield.js";
-
 export { LayoutStrength } from "./src/ui/autolayout/layoutstrength.js";
+export { LayoutPriority } from "./src/ui/autolayout/layoutpriority.js";
+export { LayoutConstraintAxis } from "./src/ui/autolayout/layoutconstraintaxis.js";
 export { LayoutVariable } from "./src/ui/autolayout/layoutvariable.js";
 export { LayoutTerm } from "./src/ui/autolayout/layoutterm.js";
 export { LayoutExpression } from "./src/ui/autolayout/layoutexpression.js";

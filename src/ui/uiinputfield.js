@@ -61,9 +61,9 @@ export class UIInputField extends WorldNode {
 	/** @private @type { number } */ #focusBorderWidth;
 	/** @private @type { Color } */ #selectionColor;
 
-	/** @private @type { WorldNode } */ #textLabelNode;
+	/** @private @type { WorldNode } */ #textTextNode;
 	/** @private @type { UILabel } */ #textUILabel;
-	/** @private @type { WorldNode } */ #placeholderLabelNode;
+	/** @private @type { WorldNode } */ #placeholderTextNode;
 	/** @private @type { UILabel } */ #placeholderUILabel;
 	/** @private @type { WorldNode } */ #overlayNode;
 
@@ -122,30 +122,30 @@ export class UIInputField extends WorldNode {
 
 		// 3) 플레이스홀더 라벨 (자식 노드). 배경은 투명 — 안 그러면 UIView.draw 가
 		//    contentSize 전체를 흰색으로 채워서 그 아래 깔린 selection 하이라이트가 가려진다.
-		this.#placeholderLabelNode = new WorldNode();
-		this.#placeholderLabelNode.setPivot(Pivot.topLeft);
-		this.#placeholderLabelNode.setAnchor(Pivot.topLeft);
-		this.#placeholderUILabel = this.#placeholderLabelNode.addComponent(UILabel);
+		this.#placeholderTextNode = new WorldNode();
+		this.#placeholderTextNode.setPivot(Pivot.topLeft);
+		this.#placeholderTextNode.setAnchor(Pivot.topLeft);
+		this.#placeholderUILabel = this.#placeholderTextNode.addComponent(UILabel);
 		this.#placeholderUILabel.setBackgroundColor(Color.transparent());
 		this.#placeholderUILabel.setText("");
 		this.#placeholderUILabel.setFontSize(this.#fontSize);
 		this.#placeholderUILabel.setTextAlign("left");
 		this.#placeholderUILabel.setTextBaseline("middle");
 		this.#placeholderUILabel.setTextColor(this.#placeholderColor);
-		this.addChild(this.#placeholderLabelNode);
+		this.addChild(this.#placeholderTextNode);
 
 		// 4) 값 라벨 (자식 노드). 배경 투명 (위 동일 이유).
-		this.#textLabelNode = new WorldNode();
-		this.#textLabelNode.setPivot(Pivot.topLeft);
-		this.#textLabelNode.setAnchor(Pivot.topLeft);
-		this.#textUILabel = this.#textLabelNode.addComponent(UILabel);
+		this.#textTextNode = new WorldNode();
+		this.#textTextNode.setPivot(Pivot.topLeft);
+		this.#textTextNode.setAnchor(Pivot.topLeft);
+		this.#textUILabel = this.#textTextNode.addComponent(UILabel);
 		this.#textUILabel.setBackgroundColor(Color.transparent());
 		this.#textUILabel.setText("");
 		this.#textUILabel.setFontSize(this.#fontSize);
 		this.#textUILabel.setTextAlign("left");
 		this.#textUILabel.setTextBaseline("middle");
 		this.#textUILabel.setTextColor(this.#textColor);
-		this.addChild(this.#textLabelNode);
+		this.addChild(this.#textTextNode);
 
 		// 5) 오버레이 (커서 + 조합문자 밑줄 + 포커스 테두리). 자식이라 텍스트 위에 그려진다.
 		this.#overlayNode = new WorldNode();
@@ -154,7 +154,7 @@ export class UIInputField extends WorldNode {
 		this.#overlayNode.addComponent(OverlayLayerRenderer);
 		this.addChild(this.#overlayNode);
 
-		this.refreshLabels();
+		this.refreshTexts();
 	}
 
 	//==============================================================================
@@ -172,13 +172,13 @@ export class UIInputField extends WorldNode {
 		this.#cursorIndex = this.#value.length;
 		this.#selectionStart = this.#cursorIndex;
 		if (this.#domInput) this.#domInput.value = this.#value;
-		this.refreshLabels();
+		this.refreshTexts();
 	}
 	getText() { return this.#value; }
 
 	setPlaceholder(text) {
 		this.#placeholder = String(text || "");
-		this.refreshLabels();
+		this.refreshTexts();
 	}
 	setMaxLength(n) {
 		this.#maxLength = n | 0;
@@ -290,7 +290,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	tick(timeDelta) {
 		super.tick(timeDelta);
-		this.refreshLabelPositions();
+		this.refreshTextPositions();
 		if (this.#domInput) {
 			this.layoutDOMInput();
 			// 키보드 네비게이션 (화살표/Home/End/Shift+...) 은 input 이벤트가 안 뜨므로 polling.
@@ -401,13 +401,13 @@ export class UIInputField extends WorldNode {
 
 	//==============================================================================
 	// 라벨(UILabel) 갱신.
-	// - 값이 비어있으면 textLabel 숨김 + placeholder 표시.
-	// - 조합 중이면 (value + composition) 을 textLabel 에 합성 표시.
+	// - 값이 비어있으면 textText 숨김 + placeholder 표시.
+	// - 조합 중이면 (value + composition) 을 textText 에 합성 표시.
 	//==============================================================================
-	refreshLabels() {
+	refreshTexts() {
 		const hasValue = this.#value.length > 0 || this.#composition.length > 0;
-		this.#placeholderLabelNode.setActive(!hasValue);
-		this.#textLabelNode.setActive(hasValue);
+		this.#placeholderTextNode.setActive(!hasValue);
+		this.#textTextNode.setActive(hasValue);
 		if (hasValue) {
 			const before = this.#value.slice(0, this.#cursorIndex);
 			const after = this.#value.slice(this.#cursorIndex);
@@ -416,14 +416,14 @@ export class UIInputField extends WorldNode {
 		this.#placeholderUILabel.setText(this.#placeholder);
 	}
 
-	refreshLabelPositions() {
+	refreshTextPositions() {
 		const size = this.getContentSize();
 		if (size.x <= 0 || size.y <= 0) return;
 		const inner = Vector2.create(System.Math.max(0, size.x - this.#padding * 2), size.y);
-		this.#textLabelNode.setLocalPosition(Vector2.create(this.#padding, 0));
-		this.#textLabelNode.setContentSize(inner);
-		this.#placeholderLabelNode.setLocalPosition(Vector2.create(this.#padding, 0));
-		this.#placeholderLabelNode.setContentSize(inner);
+		this.#textTextNode.setLocalPosition(Vector2.create(this.#padding, 0));
+		this.#textTextNode.setContentSize(inner);
+		this.#placeholderTextNode.setLocalPosition(Vector2.create(this.#padding, 0));
+		this.#placeholderTextNode.setContentSize(inner);
 		this.#overlayNode.setLocalPosition(Vector2.zero());
 		this.#overlayNode.setContentSize(size);
 	}
@@ -472,7 +472,7 @@ export class UIInputField extends WorldNode {
 		input.addEventListener("compositionstart", () => { this.#isComposing = true; });
 		input.addEventListener("compositionupdate", (event) => {
 			this.#composition = (event && event.data) ? event.data : "";
-			this.refreshLabels();
+			this.refreshTexts();
 		});
 		input.addEventListener("compositionend", () => {
 			this.#isComposing = false;
@@ -530,7 +530,7 @@ export class UIInputField extends WorldNode {
 		this.#selectionStart = this.#cursorIndex;
 		this.#blinkTimer = 0;
 		this.#cursorVisible = true;
-		this.refreshLabels();
+		this.refreshTexts();
 		if (this.#onChangeCallback) this.#onChangeCallback(this.#value);
 	}
 
@@ -601,13 +601,13 @@ export class UIInputField extends WorldNode {
 		const clamped = System.Math.max(0, System.Math.min(this.#value.length, newIndex));
 		this.#cursorIndex = clamped;
 		if (!extendSelection) this.#selectionStart = clamped;
-		this.refreshLabels();
+		this.refreshTexts();
 	}
 	deleteCharAt(index) {
 		this.#value = this.#value.slice(0, index) + this.#value.slice(index + 1);
 		if (this.#cursorIndex > index) this.#cursorIndex -= 1;
 		this.#selectionStart = this.#cursorIndex;
-		this.refreshLabels();
+		this.refreshTexts();
 		if (this.#onChangeCallback) this.#onChangeCallback(this.#value);
 	}
 
@@ -651,7 +651,7 @@ export class UIInputField extends WorldNode {
 			this.#domInput.value = this.#value;
 			this.#domInput.setSelectionRange(this.#cursorIndex, this.#cursorIndex);
 		}
-		this.refreshLabels();
+		this.refreshTexts();
 		if (this.#onChangeCallback) this.#onChangeCallback(this.#value);
 	}
 
@@ -741,13 +741,13 @@ export class UIInputField extends WorldNode {
 
 		const hasSel = this.hasSelection();
 		const items = [
-			{ label: "잘라내기", enabled: hasSel,  action: () => this.cut() },
-			{ label: "복사",     enabled: hasSel,  action: () => this.copy() },
-			{ label: "붙여넣기", enabled: true,    action: () => this.paste() },
+			{ text: "잘라내기", enabled: hasSel,  action: () => this.cut() },
+			{ text: "복사",     enabled: hasSel,  action: () => this.copy() },
+			{ text: "붙여넣기", enabled: true,    action: () => this.paste() },
 		];
 		for (const item of items) {
 			const button = doc.createElement("div");
-			button.textContent = item.label;
+			button.textContent = item.text;
 			button.style.padding = "8px 16px";
 			button.style.cursor = item.enabled ? "pointer" : "default";
 			button.style.color = item.enabled ? "#222222" : "#aaaaaa";
