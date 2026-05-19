@@ -308,7 +308,7 @@ export class DEVTools extends Object {
 			return false;
 		}
 		const inputManager = this.#engine.getInputManager();
-		const touchPosition = inputManager.getViewInputPosition();
+		const touchPosition = inputManager.getCanvasNativeInputPosition();
 		const touchX = touchPosition.x;
 		const touchY = touchPosition.y;
 		const isInsideX = touchX >= this.#panelX && touchX <= this.#panelX + this.#panelWidth;
@@ -337,11 +337,11 @@ export class DEVTools extends Object {
 			const isForceGizmosVisible = this.#isVisible && this.#isAllGizmosVisible;
 			graphic.setForceGizmosVisible(isForceGizmosVisible);
 			if (this.#isVisible) {
+				// 패널 좌표는 canvas-native 픽셀 기준 — ViewScaleMode 와 무관하게 항상 동일한 사이즈로 우측하단에 고정.
 				const viewManager = this.#engine.getViewManager();
 				const canvasNativeSize = viewManager.getCanvasNativeSize();
-				const canvasBottomRight = viewManager.canvasPositionToViewPosition(canvasNativeSize);
-				this.#panelX = canvasBottomRight.x - this.#panelWidth;
-				this.#panelY = canvasBottomRight.y - this.#panelHeight;
+				this.#panelX = canvasNativeSize.x - this.#panelWidth;
+				this.#panelY = canvasNativeSize.y - this.#panelHeight;
 			}
 		}
 		this.#prevIsKeyF2 = isKeyF2;
@@ -356,7 +356,8 @@ export class DEVTools extends Object {
 		const isTouchPressed = inputManager.isTouchPressed();
 		const isTouchReleased = inputManager.isTouchReleased();
 		const isTouchMoved = inputManager.isTouchMoved();
-		const touchPosition = inputManager.getViewInputPosition();
+		// canvas-native 좌표로 입력 처리 (패널 좌표계와 동일).
+		const touchPosition = inputManager.getCanvasNativeInputPosition();
 		const touchX = touchPosition.x;
 		const touchY = touchPosition.y;
 
@@ -1137,8 +1138,12 @@ export class DEVTools extends Object {
 			canvasRenderingContext.restore();
 		}
 
-		// 화면 비율 가이드라인 출력.
+		// 화면 비율 가이드라인 출력. (view 좌표계에서 그려야 의미가 있음)
 		this.drawAspectGuide(graphic);
+
+		// 패널 렌더링은 ViewScaleMode 와 무관하게 canvas-native 좌표계에서.
+		const viewManager = this.#engine.getViewManager();
+		viewManager.applyCanvasNativeRect(canvasRenderingContext);
 
 		// 배경.
 		canvasRenderingContext.fillStyle = COLOR_BACKGROUND;
