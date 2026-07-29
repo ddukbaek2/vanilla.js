@@ -36,13 +36,14 @@ export class AudioManager extends Object {
 	//==============================================================================
 	// 오디오 컨텍스트 재개.
 	// 브라우저 자동재생 정책 및 창 전환으로 인한 suspend 상태를 복구한다.
-	// iOS WebKit 은 표준 "suspended" 외에 비표준 "interrupted" 상태를 쓰므로
-	// (앱 전환·시스템 팝업·오디오 세션 경합 등) "running" 이 아니면 모두 재개를 시도한다.
+	// iOS WebKit 은 표준 "suspended" 외에 비표준 "interrupted" 상태를 쓴다.
+	// (앱 전환·시스템 팝업·오디오 세션 경합 등) 두 상태만 명시적으로 재개를 시도한다 —
+	// "interrupted" 는 iOS 에만 존재하는 값이라 다른 플랫폼 동작은 기존과 완전히 동일하다.
 	//==============================================================================
 	resumeContext() {
 		const audioContext = this.getAudioContext();
 		if (audioContext) {
-			if (audioContext.state !== "running") {
+			if (audioContext.state === "suspended" || audioContext.state === "interrupted") {
 				try {
 					const resumePromise = audioContext.resume();
 					if (resumePromise && typeof resumePromise.catch === "function") {
