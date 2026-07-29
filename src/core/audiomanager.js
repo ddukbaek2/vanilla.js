@@ -88,9 +88,10 @@ export class AudioManager extends Object {
 		if (!audioContext) {
 			return;
 		}
-		// iOS WebKit 은 표준 "suspended" 외에 비표준 "interrupted" 상태를 쓰므로
-		// (앱 전환·시스템 팝업·오디오 세션 경합 등) "running" 이 아니면 모두 재개를 시도한다.
-		if (audioContext.state === "running") {
+		// iOS WebKit 은 표준 "suspended" 외에 비표준 "interrupted" 상태를 쓴다.
+		// (앱 전환·시스템 팝업·오디오 세션 경합 등) 두 상태만 명시적으로 재개를 시도한다 —
+		// "interrupted" 는 iOS 에만 존재하는 값이라 다른 플랫폼 동작은 기존과 완전히 동일하다.
+		if (audioContext.state !== "suspended" && audioContext.state !== "interrupted") {
 			return;
 		}
 		try {
