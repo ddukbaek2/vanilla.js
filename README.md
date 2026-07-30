@@ -17,7 +17,9 @@
 - 경량 게임 프레임워크.   
 - JSDoc 기반의 타입 힌팅 및 문서화.   
 
-## 테스트 페이지
+## 테스트 링크
 - https://ddukbaek2.com/vanilla.js
 - https://ddukbaek2.com/portfolio/visualeditor
-- https://ddukbaek2.com/portfolio (js 아이콘인 항목 전체)
+- https://ddukbaek2.com/portfolio/talesofcultivation
+- https://ddukbaek2.com/portfolio/pipemania
+- https://ddukbaek2.com/portfolio/scramble-heroes
