@@ -18,6 +18,6 @@
 - JSDoc 기반의 타입 힌팅 및 문서화.   
 
 ## 테스트 페이지
-- https://playable.ddukbaek2.com/vanilla.js/
-- https://playable.ddukbaek2.com/vanilla.js/visualeditor/
-- https://playable.ddukbaek2.com/vanilla.js/rpggame/
+- https://ddukbaek2.com/vanilla.js
+- https://ddukbaek2.com/portfolio/visualeditor
+- https://ddukbaek2.com/portfolio (js 아이콘인 항목 전체)
