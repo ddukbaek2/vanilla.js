@@ -30,14 +30,6 @@ export { Node } from "./src/base/node.js";
 
 
 //==============================================================================
-// 인터페이스 목록.
-//==============================================================================
-export { ITickable } from "./src/core/interface/itickable.js";
-export { IDrawable } from "./src/core/interface/idrawable.js";
-export { ITouchable } from "./src/core/interface/itouchable.js";
-
-
-//==============================================================================
 // 코어 목록.
 //==============================================================================
 export { EngineConfiguration, Engine } from "./src/core/engine.js";
@@ -47,13 +39,14 @@ export { TimeManager } from "./src/core/timemanager.js";
 export { ViewScaleMode, ViewManager } from "./src/core/viewmanager.js";
 export { InputManager } from "./src/core/inputmanager.js";
 export { TouchRaycaster } from "./src/core/touchraycaster.js";
+export { TouchRecognizer } from "./src/ui/touchrecognizer.js";
 export { Graphic } from "./src/core/graphic.js";
 export { Scene } from "./src/core/scene.js";
 export { ComponentNode } from "./src/core/node/componentnode.js";
 export { TransformNode } from "./src/core/node/transformnode.js";
 export { WorldNode } from "./src/core/node/worldnode.js";
-export { AnchoredWorldNode } from "./src/core/node/anchoredworldmnode.js";
-export { UINode } from "./src/core/node/uinode.js";
+// export { AnchoredWorldNode } from "./src/core/node/anchoredworldmnode.js";
+export { UINode } from "./src/ui/uinode.js";
 export { Tween } from "./src/core/tween.js";
 export { Component } from "./src/core/component.js";
 export { Frame } from "./src/core/frame.js";
@@ -61,22 +54,39 @@ export { Animation } from "./src/core/animation.js";
 
 
 //==============================================================================
-// 컴포넌트 목록.
+// 기본 컴포넌트 목록.
 //==============================================================================
 export { Paint } from "./src/core/component/paint.js";
 export { Sprite } from "./src/core/component/sprite.js";
-export { Label } from "./src/core/component/label.js";
+export { Text, TextAlign, TextBaseline } from "./src/core/component/text.js";
+export { RichText } from "./src/core/component/richtext.js";
+export { Mask } from "./src/core/component/mask.js";
 
 
 //==============================================================================
 // UI/컴포넌트 목록.
 //==============================================================================
-export { UIComponent } from "./src/core/component/uicomponent.js";
-export { UIButton } from "./src/core/component/uibutton.js";
-export { UIToggleButton } from "./src/core/component/uitogglebutton.js";
-export { UIView } from "./src/core/component/uiview.js";
-export { UIScrollView } from "./src/core/component/uiscrollview.js";
-export { UISnapScrollView } from "./src/core/component/uisnapscrollview.js";
+export { UIScene } from "./src/ui/uiscene.js";
+export { UIView } from "./src/ui/uiview.js";
+export { UIImageView } from "./src/ui/uiimageview.js";
+export { UILabel } from "./src/ui/uilabel.js";
+export { UIControl } from "./src/ui/uicontrol.js";
+export { UIButton } from "./src/ui/uibutton.js";
+export { UIToggleButton } from "./src/ui/uitogglebutton.js";
+export { UIScrollView } from "./src/ui/uiscrollview.js";
+export { UIScrollBar, ScrollBarAxis } from "./src/ui/uiscrollbar.js";
+export { UIInputField } from "./src/ui/uiinputfield.js";
+export { LayoutStrength } from "./src/ui/autolayout/layoutstrength.js";
+export { LayoutPriority } from "./src/ui/autolayout/layoutpriority.js";
+export { LayoutConstraintAxis } from "./src/ui/autolayout/layoutconstraintaxis.js";
+export { LayoutVariable } from "./src/ui/autolayout/layoutvariable.js";
+export { LayoutTerm } from "./src/ui/autolayout/layoutterm.js";
+export { LayoutExpression } from "./src/ui/autolayout/layoutexpression.js";
+export { LayoutRelation } from "./src/ui/autolayout/layoutrelation.js";
+export { LayoutConstraint } from "./src/ui/autolayout/layoutconstraint.js";
+export { LayoutSolver } from "./src/ui/autolayout/layoutsolver.js";
+export { UISlider } from "./src/ui/uislider.js";
+export { UISnapScrollView } from "./src/ui/uisnapscrollview.js";
 
 
 //==============================================================================

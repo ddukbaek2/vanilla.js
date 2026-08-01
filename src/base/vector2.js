@@ -70,6 +70,7 @@ export class Vector2 extends Object {
 	// X 좌표 설정 프로퍼티.
 	//==============================================================================
 	/**
+	 * @property
 	 * @param { number } value
 	 */
 	set x(value) {
@@ -80,6 +81,7 @@ export class Vector2 extends Object {
 	// X 좌표 반환 프로퍼티.
 	//==============================================================================
 	/**
+	 * @property
 	 * @returns { number }
 	 */
 	get x() {
@@ -90,6 +92,7 @@ export class Vector2 extends Object {
 	// Y 좌표 설정 프로퍼티.
 	//==============================================================================
 	/**
+	 * @property
 	 * @param { number } value
 	 */
 	set y(value) {
@@ -100,6 +103,7 @@ export class Vector2 extends Object {
 	// Y 좌표 반환 프로퍼티.
 	//==============================================================================
 	/**
+	 * @property
 	 * @returns { number }
 	 */
 	get y() {

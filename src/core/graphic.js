@@ -20,6 +20,8 @@ export class Graphic extends Object {
 	//==============================================================================
 	/** @private @type { CanvasRenderingContext2D } */ #canvasRenderingContext;
 	/** @private @type { boolean } */ #isForceGizmosVisible;
+	/** @private @type { boolean } */ #isImageSmoothingEnabled;
+	/** @private @type { string } */ #imageSmoothingQuality;
 
 	//==============================================================================
 	// 생성.
@@ -38,6 +40,8 @@ export class Graphic extends Object {
 		// const canvasRenderingContext = canvas.getContext("webgpu"); // GPUCanvasContext
 		this.#canvasRenderingContext = canvasRenderingContext;
 		this.#isForceGizmosVisible = false;
+		this.#isImageSmoothingEnabled = true;
+		this.#imageSmoothingQuality = "high";
 	}
 
 	//==============================================================================
@@ -50,8 +54,39 @@ export class Graphic extends Object {
 		// 품질 갱신.
 		// 왜 매 렌더링마다 실시간 업데이트를 하지 않으면 반영되지 않는지는 모름.
 		const canvasRenderingContext = this.getCanvasRenderingContext();
-		canvasRenderingContext.imageSmoothingEnabled = true;
-		canvasRenderingContext.imageSmoothingQuality = "high";
+		canvasRenderingContext.imageSmoothingEnabled = this.#isImageSmoothingEnabled;
+		canvasRenderingContext.imageSmoothingQuality = this.#imageSmoothingQuality;
+	}
+
+	//==============================================================================
+	// 이미지 스무딩 활성화 여부 설정.
+	// - 도트(픽셀) 스프라이트 게임은 false 로 설정해 선명하게 렌더링.
+	//==============================================================================
+	/**
+	 * @param { boolean } value
+	 */
+	setImageSmoothingEnabled(value) {
+		this.#isImageSmoothingEnabled = value;
+	}
+
+	//==============================================================================
+	// 이미지 스무딩 활성화 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isImageSmoothingEnabled() {
+		return this.#isImageSmoothingEnabled;
+	}
+
+	//==============================================================================
+	// 이미지 스무딩 퀄리티 설정. ("low", "medium", "high")
+	//==============================================================================
+	/**
+	 * @param { string } value
+	 */
+	setImageSmoothingQuality(value) {
+		this.#imageSmoothingQuality = value;
 	}
 
 	//==============================================================================

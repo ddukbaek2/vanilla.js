@@ -39,20 +39,42 @@ export class ComponentNode extends Node {
 	 * @param { number } timeDelta 
 	 */
 	tick(timeDelta) {
-		if (!this.isActive()) {
-			return;
-		}
+		const isActive = this.isActive();
+		if (isActive) {
+			// 컴포넌트.
+			const components = this.getAllComponents();
+			for (const component of components) {
+				component.tick(timeDelta);
+			}
 
-		// 컴포넌트.
-		const components = this.getAllComponents();
-		for (const component of components) {
-			component.tick(timeDelta);
+			// 자식.
+			const children = this.getChildren();
+			for (const child of children) {
+				const isActive = child.isActive();
+				if (isActive) {
+					child.tick(timeDelta);
+				}
+			}
 		}
+	}
 
-		// 자식.
-		const children = this.getChildren();
-		for (const child of children) {
-			child.tick(timeDelta);
+	//==============================================================================
+	// 타입으로 컴포넌트 추가.
+	//==============================================================================
+	/**
+	 * @param { Function } componentType  
+	 */
+	getOrAddComponent(componentType) {
+		if (componentType === null || componentType === undefined) {
+			return null;
+		}
+		
+		const hasComponent = this.hasComponent(componentType);
+		if (hasComponent) {
+			return this.getComponent(componentType);
+		}
+		else {
+			return this.addComponent(componentType);
 		}
 	}
 
@@ -71,6 +93,15 @@ export class ComponentNode extends Node {
 
 		const components = this.getAllComponents();
 		components.push(component);
+
+		// 의존 컴포넌트(require) 자동 추가. attach 직전에 처리해 attach 본문이
+		// 의존 컴포넌트의 존재를 가정할 수 있다.
+		const requiredTypes = component.require();
+		if (Array.isArray(requiredTypes)) {
+			for (const requiredType of requiredTypes) {
+				this.getOrAddComponent(requiredType);
+			}
+		}
 
 		// 붙음.
 		component.attach(this);

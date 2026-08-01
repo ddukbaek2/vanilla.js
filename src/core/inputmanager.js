@@ -171,6 +171,8 @@ export class InputManager extends Object {
 	/** @private @type { Vector2 } */ #canvasNativeInputPosition; // canvasNativeSize 기반 위치값.
 	/** @private @type { Vector2 } */ #viewInputPosition; // referenceResolutionSize 기반 위치값.
 	/** @private @type { GamepadManager } */ #gamepadManager;
+	/** @private @type { number } */ #wheelDeltaX; // 이번 프레임에 누적된 휠 가로.
+	/** @private @type { number } */ #wheelDeltaY; // 이번 프레임에 누적된 휠 세로.
 
 	//==============================================================================
 	// 생성.
@@ -189,6 +191,8 @@ export class InputManager extends Object {
 		this.#canvasNativeInputPosition = Vector2.zero();
 		this.#viewInputPosition = Vector2.zero();
 		this.#gamepadManager = new GamepadManager(engine);
+		this.#wheelDeltaX = 0;
+		this.#wheelDeltaY = 0;
 	}
 
 	//==============================================================================
@@ -213,6 +217,35 @@ export class InputManager extends Object {
 		this.#isTouchReleased = false;
 		this.#isTouchCancelled = false;
 		this.#isTouchMoved = false;
+		this.#wheelDeltaX = 0;
+		this.#wheelDeltaY = 0;
+	}
+
+	//==============================================================================
+	// 마우스 휠 누적값.
+	// - addWheelDelta 로 들어온 값을 한 프레임 누적해서 들고 있다가, 프레임 종료 시
+	//   엔진이 clearWheelDelta() 로 비운다.
+	//==============================================================================
+	addWheelDelta(deltaX, deltaY) {
+		this.#wheelDeltaX += deltaX;
+		this.#wheelDeltaY += deltaY;
+	}
+
+	getWheelDeltaX() {
+		return this.#wheelDeltaX;
+	}
+
+	getWheelDeltaY() {
+		return this.#wheelDeltaY;
+	}
+
+	hasWheelDelta() {
+		return this.#wheelDeltaX !== 0 || this.#wheelDeltaY !== 0;
+	}
+
+	clearWheelDelta() {
+		this.#wheelDeltaX = 0;
+		this.#wheelDeltaY = 0;
 	}
 
 	//==============================================================================

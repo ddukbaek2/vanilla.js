@@ -10,12 +10,21 @@ import { AudioPlayer } from "./audioplayer.js";
 //==============================================================================
 // 오디오 매니저.
 // 공유 AudioContext를 소유하며 AudioPlayer 생성을 담당한다.
+//
+// 브라우저 자동재생 정책 대응:
+//  - 첫 user gesture (click/touch/keydown) 전에 AudioContext 를 만들면
+//    브라우저가 console 경고("AudioContext was not allowed to start ...")를 띄운다.
+//  - 그래서 AudioContext 는 lazy 생성 + user gesture 가 발생한 뒤에만 만든다.
+//  - resumeContext() 도 user gesture 이전에는 silently no-op 한다.
+//  - createAudioPlayer() 가 user gesture 전에 호출될 수 있는 경우를 위해
+//    플레이어 생성 시점에는 (마지못해) AudioContext 를 만든다 — 이때만 경고가 날 수 있음.
 //==============================================================================
 export class AudioManager extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { AudioContext | null } */ #audioContext;
+	/** @private @type { boolean } */ #hasUserGesture;
 
 	//==============================================================================
 	// 생성.
@@ -27,35 +36,74 @@ export class AudioManager extends Object {
 	constructor(engine) {
 		super();
 		this.#audioContext = null;
+		this.#hasUserGesture = false;
+		// AudioContext 는 user gesture 후에 lazy 생성 (브라우저 자동재생 정책).
+	}
+
+	//==============================================================================
+	// 첫 user gesture 가 발생했음을 알린다. (Engine 의 click/touchstart/keydown 핸들러에서 호출)
+	//==============================================================================
+	markUserGesture() {
+		this.#hasUserGesture = true;
+	}
+
+	//==============================================================================
+	// user gesture 이후인지 여부.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	hasUserGesture() {
+		return this.#hasUserGesture;
+	}
+
+	//==============================================================================
+	// AudioContext 를 보장 (없으면 생성).
+	//==============================================================================
+	/**
+	 * @private
+	 * @returns { AudioContext | null }
+	 */
+	ensureAudioContext() {
+		if (this.#audioContext) {
+			return this.#audioContext;
+		}
 		const audioContextType = System.window.AudioContext || System.window.webkitAudioContext;
 		if (audioContextType) {
 			this.#audioContext = new audioContextType();
 		}
+		return this.#audioContext;
 	}
 
 	//==============================================================================
 	// 오디오 컨텍스트 재개.
-	// 브라우저 자동재생 정책 및 창 전환으로 인한 suspend 상태를 복구한다.
-	// iOS WebKit 은 표준 "suspended" 외에 비표준 "interrupted" 상태를 쓴다.
-	// (앱 전환·시스템 팝업·오디오 세션 경합 등) 두 상태만 명시적으로 재개를 시도한다 —
-	// "interrupted" 는 iOS 에만 존재하는 값이라 다른 플랫폼 동작은 기존과 완전히 동일하다.
+	// - user gesture 전에는 silently no-op (브라우저 경고 회피).
+	// - resume() 의 promise rejection 도 silently 처리.
 	//==============================================================================
 	resumeContext() {
-		const audioContext = this.getAudioContext();
-		if (audioContext) {
-			if (audioContext.state === "suspended" || audioContext.state === "interrupted") {
-				try {
-					const resumePromise = audioContext.resume();
-					if (resumePromise && typeof resumePromise.catch === "function") {
-						resumePromise.catch(() => {
-							// 제스처 제약 등으로 일시적으로 거부될 수 있다. 다음 재생 시도에서 재시도된다.
-						});
-					}
-				}
-				catch (error) {
-					console.error(error);
-				}
+		if (!this.#hasUserGesture) {
+			return;
+		}
+		const audioContext = this.ensureAudioContext();
+		if (!audioContext) {
+			return;
+		}
+		// iOS WebKit 은 표준 "suspended" 외에 비표준 "interrupted" 상태를 쓴다.
+		// (앱 전환·시스템 팝업·오디오 세션 경합 등) 두 상태만 명시적으로 재개를 시도한다 —
+		// "interrupted" 는 iOS 에만 존재하는 값이라 다른 플랫폼 동작은 기존과 완전히 동일하다.
+		if (audioContext.state !== "suspended" && audioContext.state !== "interrupted") {
+			return;
+		}
+		try {
+			const result = audioContext.resume();
+			if (result && typeof result.catch === "function") {
+				result.catch(() => {
+					// user gesture 직후라도 일시적으로 거부될 수 있음. 다음 호출에서 재시도되므로 무시.
+				});
 			}
+		}
+		catch (error) {
+			// 동기 예외도 무시.
 		}
 	}
 
@@ -66,12 +114,12 @@ export class AudioManager extends Object {
 	 * @returns { AudioPlayer }
 	 */
 	createAudioPlayer() {
-		const audioContext = this.getAudioContext();
+		const audioContext = this.ensureAudioContext();
 		return new AudioPlayer(audioContext);
 	}
 
 	//==============================================================================
-	// 오디오 컨텍스트 반환.
+	// 오디오 컨텍스트 반환. (없으면 null)
 	//==============================================================================
 	/**
 	 * @returns { AudioContext | null }

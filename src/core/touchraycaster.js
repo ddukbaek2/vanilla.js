@@ -100,6 +100,44 @@ export class TouchRaycaster extends Object {
 	}
 
 	//==============================================================================
+	// 마우스 휠. (touchPress 와 무관하게 매번 viewInputPosition 으로 raycast 후
+	//  부모 체인에서 첫 ScrollView 를 찾아 wheel 을 전달.)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } wheelDelta
+	 */
+	touchWheel(viewInputPosition, wheelDelta) {
+		const hitNode = this.raycast(viewInputPosition);
+		if (!hitNode) return;
+		const scrollView = this.findAncestorScrollViewForWheel(hitNode);
+		if (scrollView && typeof scrollView.wheel === "function") {
+			scrollView.wheel(wheelDelta);
+		}
+	}
+
+	//==============================================================================
+	// hitNode 자기 자신을 포함해 부모 체인에서 가장 가까운 UIScrollView 를 찾는다.
+	// (TouchRecognizer 의 findAncestorScrollView 와 다른 점: target 자신도 후보)
+	// - UIScrollView import 를 피하기 위해 컴포넌트 타입은 닥 타이핑으로 검사한다.
+	//==============================================================================
+	findAncestorScrollViewForWheel(target) {
+		let node = target;
+		while (node) {
+			if (typeof node.getAllComponents === "function") {
+				const components = node.getAllComponents();
+				for (const component of components) {
+					if (component && typeof component.wheel === "function" && typeof component.getScrollContentSize === "function") {
+						return component;
+					}
+				}
+			}
+			node = typeof node.getParent === "function" ? node.getParent() : null;
+		}
+		return null;
+	}
+
+	//==============================================================================
 	// 레이캐스트.
 	// - 루트 노드로부터 draw() 호출 순서대로 번호를 매기며 순회한다.
 	// - 활성화 상태이고 isInteractable()이 참이며 터치 좌표를 포함하는

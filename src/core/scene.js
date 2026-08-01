@@ -246,7 +246,7 @@ export class Scene extends Object {
 	}
 
 	//==============================================================================
-	// 출력.
+	// 이전 출력.
 	//==============================================================================
 	/**
 	 * @virtual
@@ -257,7 +257,7 @@ export class Scene extends Object {
 	}
 
 	//==============================================================================
-	// 이후 출력.
+	// 출력.
 	//==============================================================================
 	/**
 	 * @virtual
@@ -270,7 +270,7 @@ export class Scene extends Object {
 	}
 
 	//==============================================================================
-	// 출력.
+	// 이후 출력.
 	//==============================================================================
 	/**
 	 * @virtual
@@ -344,6 +344,17 @@ export class Scene extends Object {
 				console.error(error);
 			}
 		}
+
+		// 마우스 휠. (이번 프레임에 누적된 휠 값이 있으면 dispatch)
+		if (typeof inputManager.hasWheelDelta === "function" && inputManager.hasWheelDelta()) {
+			try {
+				const wheelDelta = Vector2.create(inputManager.getWheelDeltaX(), inputManager.getWheelDeltaY());
+				this.touchWheel(viewInputPosition, wheelDelta);
+			}
+			catch (error) {
+				console.error(error);
+			}
+		}
 	}
 
 	//==============================================================================
@@ -387,6 +398,18 @@ export class Scene extends Object {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchCancel(viewInputPosition) {
+
+	}
+
+	//==============================================================================
+	// 마우스 휠.
+	//==============================================================================
+	/**
+	 * @virtual
+	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } wheelDelta
+	 */
+	touchWheel(viewInputPosition, wheelDelta) {
 
 	}
 

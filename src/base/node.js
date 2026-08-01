@@ -123,7 +123,7 @@ export class Node extends Object {
 	 */
 	isRoot() {
 		const parent = this.getParent();
-		return parent === null || parent === undefined;
+		return !Node.isValidate(parent);
 	}
 
 	//==============================================================================

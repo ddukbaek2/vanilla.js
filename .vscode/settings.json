@@ -1,7 +1,6 @@
 {
 	"files.exclude": {
 		"**/.git": true,
-		"**/.backup": true,
 		"**/.DS_Store": true,
 		"**/.gitkeep": true
 	},
@@ -13,7 +12,7 @@
 		"**/*.code-search": true
 	},
 
-	"editor.insertSpaces": true,
+	"editor.insertSpaces": false,
 	"editor.tabSize": 4,
 
 	"terminal.integrated.showExitAlert": false,
@@ -30,6 +29,7 @@
 	"terminal.integrated.defaultProfile.osx": "bash",
 
 	"liveServer.settings.host": "127.0.0.1",
-	"liveServer.settings.port": 5502,
-	"liveServer.settings.NoBrowser": false
+	"liveServer.settings.port": 5500,
+	"liveServer.settings.NoBrowser": false,
+	"liveServer.settings.useLocalIp": true
 }

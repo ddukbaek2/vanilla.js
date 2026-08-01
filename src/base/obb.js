@@ -36,7 +36,7 @@ export class OBB extends Object {
 	 * @returns { boolean }
 	 */
 	contains(viewPosition) {
-		if (viewPosition === null || viewPosition === undefined) {
+		if (!OBB.isValidate(viewPosition)) {
 			return false;
 		}
 		else if (viewPosition instanceof Vector2) {
@@ -113,7 +113,7 @@ export class OBB extends Object {
 	 * @returns { Vector2[] }
 	 */
 	setEdges(edges) {
-		if (edges === null || edges === undefined) {
+		if (!OBB.isValidate(edges)) {
 			throw new System.Error(`edges is null.`);
 		}
 		if (!System.Array.isArray(edges)) {

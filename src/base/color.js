@@ -40,6 +40,7 @@ export class Color extends Object {
 	// 적색 설정 프로퍼티.
 	//==============================================================================
 	/**
+	 * @property
 	 * @param { number } value
 	 */
 	set red(value) {
@@ -50,6 +51,7 @@ export class Color extends Object {
 	// 적색 반환 프로퍼티.
 	//==============================================================================
 	/**
+	 * @property
 	 * @returns { number }
 	 */
 	get red() {
@@ -60,6 +62,7 @@ export class Color extends Object {
 	// 청색 설정 프로퍼티.
 	//==============================================================================
 	/**
+	 * @property
 	 * @param { number } value
 	 */
 	set blue(value) {
@@ -70,6 +73,7 @@ export class Color extends Object {
 	// 청색 반환 프로퍼티.
 	//==============================================================================
 	/**
+	 * @property
 	 * @returns { number }
 	 */
 	get blue() {
@@ -80,6 +84,7 @@ export class Color extends Object {
 	// 녹색 설정 프로퍼티.
 	//==============================================================================
 	/**
+	 * @property
 	 * @param { number } value
 	 */
 	set green(value) {
@@ -90,6 +95,7 @@ export class Color extends Object {
 	// 녹색 반환 프로퍼티.
 	//==============================================================================
 	/**
+	 * @property
 	 * @returns { number }
 	 */
 	get green() {
@@ -100,6 +106,7 @@ export class Color extends Object {
 	// 투명색 설정 프로퍼티.
 	//==============================================================================
 	/**
+	 * @property
 	 * @param { number } value
 	 */
 	set alpha(value) {
@@ -110,6 +117,7 @@ export class Color extends Object {
 	// 투명색 반환 프로퍼티.
 	//==============================================================================
 	/**
+	 * @property
 	 * @returns { number }
 	 */
 	get alpha() {
@@ -155,6 +163,17 @@ export class Color extends Object {
 		else {
 			return `#${red}${green}${blue}`;
 		}
+	}
+	//==============================================================================
+	// 복제.
+	//==============================================================================
+	/**
+	 * @override
+	 * @returns { this }
+	 */
+	clone() {
+		const obj = super.clone();
+		return obj;
 	}
 
 	//==============================================================================

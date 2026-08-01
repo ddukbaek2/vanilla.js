@@ -191,10 +191,10 @@ export class GamepadManager extends Object {
 				// 눌림 상태 변화 감지.
 				if (lastButtonState.pressed !== currentButton.pressed) {
 					lastButtonState.pressed = currentButton.pressed;
-					const label = (i === GamepadButtonCode.L2 || i === GamepadButtonCode.R2) ? "Trigger" : "Button";
+					const text = (i === GamepadButtonCode.L2 || i === GamepadButtonCode.R2) ? "Trigger" : "Button";
 					
 					// 로그 출력.
-					console.log(`[GamepadManager] Pad ${hardwareIndex} ${label} ${i} ${currentButton.pressed ? "Pressed" : "Released"}`);
+					console.log(`[GamepadManager] Pad ${hardwareIndex} ${text} ${i} ${currentButton.pressed ? "Pressed" : "Released"}`);
 					
 					// 콜백 호출.
 					if (this.#inputEventCallback) {
@@ -209,10 +209,10 @@ export class GamepadManager extends Object {
 					
 					// 트리거 등 값이 유의미할 때만 처리.
 					if (currentValue > 0) {
-						const label = (i === GamepadButtonCode.L2 || i === GamepadButtonCode.R2) ? "Trigger" : "Button";
+						const text = (i === GamepadButtonCode.L2 || i === GamepadButtonCode.R2) ? "Trigger" : "Button";
 						
 						// 로그 출력.
-						console.log(`[GamepadManager] Pad ${hardwareIndex} ${label} ${i} Value: ${currentValue}`);
+						console.log(`[GamepadManager] Pad ${hardwareIndex} ${text} ${i} Value: ${currentValue}`);
 						
 						// 콜백 호출.
 						if (this.#inputEventCallback) {

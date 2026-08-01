@@ -105,12 +105,14 @@ export class Engine extends Object {
 		this.#audioManager = new AudioManager(this);
 
 		this.#resizeCallback = this.resize.bind(this);
+		// 일반 resume (visibilitychange/focus 등) — user gesture 가 아닐 수 있으므로
+		// AudioManager 가 hasUserGesture 체크 후 silently skip.
 		this.#resumeCallback = this.resume.bind(this);
 		this.#updateEngineCallback = this.updateEngine.bind(this);
 		this.#frameNumber = 0;
 
 		this.#statisticsTextRect = Rect.zero();
-		this.#version = Version.create(0, 2, 0);
+		this.#version = Version.create(0, 2, 1);
 
 		// 현재 엔진 인스턴스 글로벌 등록. (루트 노드 등 컨텍스트 없는 객체에서 ViewManager 등 접근용)
 		System.vanillaEngine = this;
@@ -145,6 +147,15 @@ export class Engine extends Object {
 
 			// 렌더 루프 즉시 시작.
 			System.window.addEventListener("resize", this.#resizeCallback);
+
+			// visualViewport 변경도 리사이즈로 처리. (iOS Safari URL 바 슬라이딩이 일반
+			//  resize 이벤트로는 안정적으로 발화하지 않아서 visualViewport 의
+			//  resize / scroll 이벤트로 보강.)
+			if (System.window.visualViewport) {
+				System.window.visualViewport.addEventListener("resize", this.#resizeCallback);
+				System.window.visualViewport.addEventListener("scroll", this.#resizeCallback);
+			}
+
 			++this.#frameNumber;
 			System.window.requestAnimationFrame(this.#updateEngineCallback);
 		}).catch((error) => {
@@ -161,6 +172,18 @@ export class Engine extends Object {
 	}
 
 	//==============================================================================
+	// 첫 user gesture (click/touch/keydown) 핸들러.
+	// AudioManager 에 user gesture 발생을 알리고 컨텍스트 재개를 시도한다.
+	//==============================================================================
+	resumeOnUserGesture() {
+		const audioManager = this.getAudioManager();
+		if (audioManager) {
+			audioManager.markUserGesture();
+			audioManager.resumeContext();
+		}
+	}
+
+	//==============================================================================
 	// 해상도 변경됨.
 	//==============================================================================
 	resize() {
@@ -169,12 +192,17 @@ export class Engine extends Object {
 
 		// 설정: 윈도우가 리사이즈 될 때 캔버스 사이즈 자동 반영.
 		if (engineConfiguration.autoResizeOnWindowResize) {
-			const clientNativeSize = Vector2.create(System.window.innerWidth, System.window.innerHeight);
+			// visualViewport 가 있으면 그것을 우선 사용. (모바일 URL 바 / 키보드 등으로
+			//  layout viewport 와 visual viewport 가 다를 때 후자가 실제 보이는 영역)
+			const visualViewport = System.window.visualViewport;
+			const clientWidth = visualViewport ? visualViewport.width : System.window.innerWidth;
+			const clientHeight = visualViewport ? visualViewport.height : System.window.innerHeight;
+			const clientNativeSize = Vector2.create(clientWidth, clientHeight);
 			const canvas = viewManager.getCanvas();
 
 			// 캔버스 크기 스타일 조정. (사파리에서 필수)
 			canvas.style.width = `${clientNativeSize.x}px`;
-			canvas.style.height = `${clientNativeSize.y}px`;			
+			canvas.style.height = `${clientNativeSize.y}px`;
 		}
 
 		// 뷰 영역 계산.
@@ -299,6 +327,14 @@ export class Engine extends Object {
 				this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
+		// 마우스 휠. (DOM WheelEvent 의 deltaX/deltaY 를 그대로 누적)
+		canvas.addEventListener("wheel", (wheelEvent) => {
+				const inputManager = this.getInputManager();
+				inputManager.addWheelDelta(wheelEvent.deltaX, wheelEvent.deltaY);
+				this.updateCanvasNativeInputPosition(wheelEvent.clientX, wheelEvent.clientY);
+				wheelEvent.preventDefault();
+			}, { passive: false });
+
 		// 마우스 뗄 때 (캔버스 밖에서 뗄 때 처리).
 		System.window.addEventListener("mouseup", (touchEvent) => {
 				const inputManager = this.getInputManager();
@@ -383,9 +419,12 @@ export class Engine extends Object {
 		}, { passive: false });
 
 		// 오디오 컨텍스트 재개.
-		System.window.addEventListener("click", this.#resumeCallback);
-		System.window.addEventListener("touchstart", this.#resumeCallback);
-		System.window.addEventListener("keydown", this.#resumeCallback);
+		// click/touchstart/keydown 은 진짜 user gesture → markUserGesture + resume.
+		// focus 는 user gesture 가 아니므로 일반 resume 만 (gesture 전이면 silently skip).
+		const userGestureHandler = this.resumeOnUserGesture.bind(this);
+		System.window.addEventListener("click", userGestureHandler);
+		System.window.addEventListener("touchstart", userGestureHandler);
+		System.window.addEventListener("keydown", userGestureHandler);
 		System.window.addEventListener("focus", this.#resumeCallback);
 		System.document.addEventListener("visibilitychange", () => {
 			if (System.document.visibilityState === "visible") {
@@ -694,6 +733,7 @@ export class Engine extends Object {
 		inputManager.setTouchPressed(false);
 		inputManager.setTouchReleased(false);
 		inputManager.setTouchCancelled(false);
+		inputManager.clearWheelDelta();
 
 		// 다음 프레임 호출 요청.
 		++this.#frameNumber;

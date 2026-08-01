@@ -5,6 +5,23 @@ const System = globalThis;
 
 
 //==============================================================================
+// 유효한 객체인지 여부 반환.
+//==============================================================================
+/**
+ * @template T
+ * @param { T } target
+ * @returns { boolean }
+ */
+export function isValidate(target) {
+	if (target === undefined || target === null) {
+		return false;
+	}
+
+	return true;
+};
+
+
+//==============================================================================
 // 인스턴스 얕은 복제.
 //==============================================================================
 /**
@@ -14,8 +31,8 @@ const System = globalThis;
  */
 export function clone(target) {
 	// 오류 방어.
-	if (target === null || target === undefined || typeof target !== "object") {
-		return target;
+	if (!isValidate(target) || typeof target !== "object") {
+		throw new System.Error();
 	}
 
 	// 생성자로 신규 객체 생성 후, 보유한 멤버를 원시 타입은 덮어씌우고 참조 타입은 얕은 복사.
@@ -62,7 +79,7 @@ export function clone(target) {
 export function structuredClone(target) {
 
 	// 오류.
-	if (target === null || target === undefined || typeof target !== "object")
+	if (!isValidate(target) || typeof target !== "object")
 		throw new System.Error();
 
 	// 생성자 호출을 통해 신규 객체 생성 (프라이빗 멤버 정상 할당).
@@ -153,3 +170,163 @@ export function createGUID() {
 	// 앞 12자리는 타임스탬프, 나머지는 랜덤 (74비트 엔트로피)
 	return `${ts.slice(0,8)}-${ts.slice(8,12)}-4${r()}${r()}${r()}-${y()}${r()}${r()}${r()}-${r()}${r()}${r()}${r()}${r()}${r()}${r()}${r()}${r()}${r()}${r()}${r()}`;
 };
+
+
+//==============================================================================
+// 원시 타입 여부 반환.
+// - undefined / null / boolean / number / bigint / string / symbol 이면 true.
+// - 예) isPrimitiveType(123) → true, isPrimitiveType({}) → false
+//==============================================================================
+/**
+ * @template T
+ * @param { T } target
+ * @returns { boolean }
+ */
+export function isPrimitiveType(target) {
+	if (target === null) {
+		return true;
+	}
+	const typeText = typeof target;
+	if (typeText === "object" || typeText === "function") {
+		return false;
+	}
+	return true;
+}
+
+
+//==============================================================================
+// 참조 타입 여부 반환.
+// - object / array / function 등 (null 제외).
+// - 예) isReferenceType({}) → true, isReferenceType(null) → false
+//==============================================================================
+/**
+ * @template T
+ * @param { T } target
+ * @returns { boolean }
+ */
+export function isReferenceType(target) {
+	if (target === null) {
+		return false;
+	}
+	const typeText = typeof target;
+	if (typeText === "object" || typeText === "function") {
+		return true;
+	}
+	return false;
+}
+
+
+//==============================================================================
+// 배열 타입 여부 반환.
+// - 예) isArrayType([1, 2, 3]) → true, isArrayType("abc") → false
+//==============================================================================
+/**
+ * @template T
+ * @param { T } target
+ * @returns { boolean }
+ */
+export function isArrayType(target) {
+	return System.Array.isArray(target);
+}
+
+
+//==============================================================================
+// 함수 타입 여부 반환.
+// - 일반 함수 / 화살표 함수 / 클래스 모두 typeof 가 "function" 이므로 true.
+// - 예) isFunctionType(() => {}) → true, isFunctionType(123) → false
+//==============================================================================
+/**
+ * @template T
+ * @param { T } target
+ * @returns { boolean }
+ */
+export function isFunctionType(target) {
+	return typeof target === "function";
+}
+
+
+//==============================================================================
+// 클래스/생성자 함수 여부 반환.
+// - typeof 가 "function" 이고 prototype 을 가진 경우 true (화살표 함수 제외).
+// - 예) isType(WorldNode) → true, isType(() => {}) → false
+//==============================================================================
+/**
+ * @template T
+ * @param { T } target
+ * @returns { boolean }
+ */
+export function isType(target) {
+	if (typeof target !== "function") {
+		return false;
+	}
+	if (target.prototype === undefined || target.prototype === null) {
+		return false;
+	}
+	return true;
+}
+
+
+//==============================================================================
+// 특정 클래스의 인스턴스 여부 반환.
+// - target 이 type 또는 그 하위 타입의 인스턴스이면 true.
+// - 예) isClassInstance(new Vector2(), Vector2) → true
+//==============================================================================
+/**
+ * @template T
+ * @param { T } target
+ * @param { Function } type
+ * @returns { boolean }
+ */
+export function isClassInstance(target, type) {
+	if (!isReferenceType(target)) {
+		return false;
+	}
+	if (!isType(type)) {
+		return false;
+	}
+	return target instanceof type;
+}
+
+
+//==============================================================================
+// target 클래스가 type 클래스의 부모(상위) 클래스인지 여부 반환.
+// - type 이 target 을 (직간접적으로) 상속하면 true.
+// - target === type 인 경우는 false.
+// - 예) isParent(TransformNode, WorldNode) → true
+//==============================================================================
+/**
+ * @param { Function } parentType
+ * @param { Function } targetType
+ * @returns { boolean }
+ */
+export function isParent(parentType, targetType) {
+	if (!isType(parentType) || !isType(targetType)) {
+		return false;
+	}
+	if (parentType === targetType) {
+		return false;
+	}
+	return targetType.prototype instanceof parentType;
+}
+
+
+//==============================================================================
+// target 클래스가 type 클래스의 자식(하위) 클래스인지 여부 반환.
+// - target 이 type 을 (직간접적으로) 상속하면 true.
+// - target === type 인 경우는 false.
+// - 예) isChildren(WorldNode, TransformNode) → true
+//==============================================================================
+/**
+ * @param { Function } targetType
+ * @param { Function } parentType
+ * @returns { boolean }
+ */
+export function isChildren(targetType, parentType) {
+	if (!isType(targetType) || !isType(parentType)) {
+		return false;
+	}
+	if (targetType === parentType) {
+		return false;
+	}
+	return targetType.prototype instanceof parentType;
+}

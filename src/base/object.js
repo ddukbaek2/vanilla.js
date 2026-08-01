@@ -116,4 +116,16 @@ export class Object {
 	// static create() {
 	// 	return new this();
 	// }
+
+
+	//==============================================================================
+	// 유효한 객체인지 여부 반환.
+	//==============================================================================
+	/**
+	 * @static
+	 * @returns { boolean }
+	 */
+	static isValidate(target) {
+		return Reflection.isValidate(target);
+	}
 }
