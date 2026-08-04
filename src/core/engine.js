@@ -489,7 +489,6 @@ export class Engine extends Object {
 	 * @param { Graphic } graphic 
 	 */
 	drawStatistics(graphic) {
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const timeManager = this.getTimeManager();
 		const viewManager = this.getViewManager();
 		const inputManager = this.getInputManager();
@@ -499,7 +498,7 @@ export class Engine extends Object {
 		const drawStatisticsText = (text) => {
 			if (text) {
 				// 출력.
-				canvasRenderingContext.fillText(text, textPosition.x, textPosition.y);
+				graphic.drawFillText(text, textPosition.x, textPosition.y);
 				
 				// 자동 외곽선 출력.
 				// canvasRenderingContext.strokeText(text, textPosition.x, textPosition.y);
@@ -524,7 +523,7 @@ export class Engine extends Object {
 			textPosition.y += 16;
 
 			// 영역 출력.
-			const metrics = canvasRenderingContext.measureText(text);
+			const metrics = graphic.measureText(text);
 			const width = metrics.width; // metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight)
 			const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
 			const textRect = Rect.create(textPosition.x, textPosition.y, width, height);
@@ -552,8 +551,8 @@ export class Engine extends Object {
 
 		// 배경 출력.
 		// 기본 위치인 화면 좌상단으로 이동.
-		canvasRenderingContext.setTransform(1, 0, 0, 1, 0, 0);
-		canvasRenderingContext.scale(1.4, 1.4);
+		graphic.setTransform(1, 0, 0, 1, 0, 0);
+		graphic.scale(1.4, 1.4);
 		graphic.setFillColor("rgba(0, 0, 0, 0.6)");
 		graphic.drawRoundRect(Rect.create(
 			this.#statisticsTextRect.position.x - 10,
@@ -565,10 +564,10 @@ export class Engine extends Object {
 		this.#statisticsTextRect.size.y = 0;
 
 		// canvasRenderingContext.letterSpacing = "-1px";
-		canvasRenderingContext.font = `16px DOSGothic`;
-		canvasRenderingContext.textAlign = "left";
-		canvasRenderingContext.textBaseline = "top";
-		canvasRenderingContext.fillStyle = Colors.white;
+		graphic.setFontString(`16px DOSGothic`);
+		graphic.setTextAlign("left");
+		graphic.setTextBaseline("top");
+		graphic.setFillColor(Colors.white);
 		// canvasRenderingContext.fillStyle = Colors.white; // Colors.lightVanilla;
 		// canvasRenderingContext.lineWidth = 4;
 		// canvasRenderingContext.strokeStyle = Colors.black; // Colors.darkVanilla;

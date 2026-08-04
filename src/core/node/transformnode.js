@@ -47,22 +47,21 @@ export class TransformNode extends ComponentNode {
 	 * @param { Graphic } graphic
 	 */
 	pushTransform(graphic) {
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
-		if (canvasRenderingContext) {
-			canvasRenderingContext.save();
+		if (graphic) {
+			graphic.pushState();
 
 			// 트랜스폼 반영.
 			const localPosition = this.getLocalPosition();
 			const localRotation = this.getLocalRotation();
 			const radian = Math.degreeToRadian(localRotation);
 			const localScale = this.getLocalScale();
-			canvasRenderingContext.translate(localPosition.x, localPosition.y);
-			canvasRenderingContext.rotate(radian);
-			canvasRenderingContext.scale(localScale.x, localScale.y);
+			graphic.translate(localPosition.x, localPosition.y);
+			graphic.rotate(radian);
+			graphic.scale(localScale.x, localScale.y);
 
 			// 투명도 반영.
 			const localOpacity = this.getLocalOpacity();
-			canvasRenderingContext.globalAlpha *= localOpacity;
+			graphic.multiplyGlobalAlpha(localOpacity);
 		}
 	}
 
@@ -104,12 +103,11 @@ export class TransformNode extends ComponentNode {
 		// }
 
 		// 영역 및 기준점 출력.
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
-		if (canvasRenderingContext) {
+		if (graphic) {
 
 			// 기존 투명도 무효화 및 색상 설정.
-			const originalAlpha = canvasRenderingContext.globalAlpha;
-			canvasRenderingContext.globalAlpha = 1.0;
+			const originalAlpha = graphic.getGlobalAlpha();
+			graphic.setGlobalAlpha(1.0);
 
 			// 컴포넌트 기즈모 출력.
 			const components = this.getAllComponents();
@@ -121,7 +119,7 @@ export class TransformNode extends ComponentNode {
 			}
 
 			// 기존 투명도 복원.
-			canvasRenderingContext.globalAlpha = originalAlpha;
+			graphic.setGlobalAlpha(originalAlpha);
 		}
 	}
 
@@ -133,9 +131,8 @@ export class TransformNode extends ComponentNode {
 	 * @param { Graphic } graphic 
 	 */
 	popTransform(graphic) {
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
-		if (canvasRenderingContext) {
-			canvasRenderingContext.restore();
+		if (graphic) {
+			graphic.popState();
 		}
 	}
 

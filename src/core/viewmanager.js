@@ -6,6 +6,7 @@ import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
 import { Rect } from "../base/rect.js";
 import { Engine } from "./engine.js";
+import { Graphic } from "./graphic.js";
 
 
 //==============================================================================
@@ -256,17 +257,17 @@ export class ViewManager extends Object {
 	/**
 	 * @public
 	 * @method
-	 * @param { CanvasRenderingContext2D } canvasRenderingContext
+	 * @param { Graphic } graphic
 	 * @param { number } scaleX
 	 * @param { number } scaleY
 	 * @param { number } skewX
 	 * @param { number } skewY
 	 * @param { number } translateX
 	 * @param { number } translateY
-	* 
+	*
 	 */
-	applyTransform(canvasRenderingContext, scaleX, scaleY, skewX, skewY, translateX, translateY){
-		canvasRenderingContext.setTransform(scaleX, skewY, skewX, scaleY, translateX, translateY); // DOMMatrix2DInit
+	applyTransform(graphic, scaleX, scaleY, skewX, skewY, translateX, translateY){
+		graphic.setTransform(scaleX, skewY, skewX, scaleY, translateX, translateY); // DOMMatrix2DInit
 	}
 
 	//==============================================================================
@@ -277,9 +278,9 @@ export class ViewManager extends Object {
 	/**
 	 * @public
 	 * @method
-	 * @param { CanvasRenderingContext2D } canvasRenderingContext
+	 * @param { Graphic } graphic
 	 */
-	applyCanvasNativeRect(canvasRenderingContext) {
+	applyCanvasNativeRect(graphic) {
 		const devicePixelRatio = this.getDevicePixelRatio();
 		const scaleX = 1 * devicePixelRatio; // a
 		const scaleY = 1 * devicePixelRatio; // d
@@ -287,8 +288,8 @@ export class ViewManager extends Object {
 		const skewY = 0; // b
 		const translateX = 0; // e
 		const translateY = 0; // f
-		// canvasRenderingContext.setTransform(1, 0, 0, 1, 0, 0); // 기본.
-		this.applyTransform(canvasRenderingContext, scaleX, scaleY, skewX, skewY, translateX, translateY);
+		// graphic.setTransform(1, 0, 0, 1, 0, 0); // 기본.
+		this.applyTransform(graphic, scaleX, scaleY, skewX, skewY, translateX, translateY);
 	}
 
 	//==============================================================================
@@ -300,9 +301,9 @@ export class ViewManager extends Object {
 	/**
 	 * @public
 	 * @method
-	 * @param { CanvasRenderingContext2D } canvasRenderingContext
+	 * @param { Graphic } graphic
 	 */
-	applyViewRect(canvasRenderingContext) {
+	applyViewRect(graphic) {
 		const devicePixelRatio = this.getDevicePixelRatio();
 		const targetResolutionScale = this.getTargetResolutionScale();
 		const viewNativeRect = this.getViewNativeRect();
@@ -312,7 +313,7 @@ export class ViewManager extends Object {
 		const skewY = 0;
 		const translateX = viewNativeRect.position.x * devicePixelRatio;
 		const translateY = viewNativeRect.position.y * devicePixelRatio;
-		this.applyTransform(canvasRenderingContext, scaleX, scaleY, skewX, skewY, translateX, translateY);
+		this.applyTransform(graphic, scaleX, scaleY, skewX, skewY, translateX, translateY);
 	}
 
 	//==============================================================================

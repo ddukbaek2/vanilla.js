@@ -107,9 +107,8 @@ export class UINode extends TransformNode {
 	 * @param { Graphic } graphic
 	 */
 	pushTransform(graphic) {
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
-		if (canvasRenderingContext) {
-			canvasRenderingContext.save();
+		if (graphic) {
+			graphic.pushState();
 
 			const left = this.getLeft();
 			const top = this.getTop();
@@ -125,12 +124,12 @@ export class UINode extends TransformNode {
 			const localRotation = this.getLocalRotation();
 			const radian = Math.degreeToRadian(localRotation);
 			const localScale = this.getLocalScale();
-			canvasRenderingContext.translate(translateX, translateY);
-			canvasRenderingContext.rotate(radian);
-			canvasRenderingContext.scale(localScale.x, localScale.y);
+			graphic.translate(translateX, translateY);
+			graphic.rotate(radian);
+			graphic.scale(localScale.x, localScale.y);
 
 			const localOpacity = this.getLocalOpacity();
-			canvasRenderingContext.globalAlpha *= localOpacity;
+			graphic.multiplyGlobalAlpha(localOpacity);
 		}
 	}
 

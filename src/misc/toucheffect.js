@@ -4,8 +4,40 @@
 const System = globalThis;
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
+import { Color } from "../base/color.js";
 import * as Math from "../base/math.js";
 import { WorldNode } from "../core/node/worldnode.js";
+
+
+//==============================================================================
+// 파티클용 방사형 그라디언트 텍스처. (흰색으로 구워 셰이더 틴트로 착색)
+// - WebGL2 에는 그라디언트 API 가 없으므로 오프스크린 2D 캔버스에 1회만 굽는다.
+//==============================================================================
+const PARTICLE_GRADIENT_CANVAS_SIZE = 64;
+let particleGradientCanvas = null;
+
+//==============================================================================
+// 방사형 그라디언트 캔버스 반환. (없으면 1회 생성)
+//==============================================================================
+/**
+ * @returns { HTMLCanvasElement }
+ */
+function getParticleGradientCanvas() {
+	if (particleGradientCanvas === null) {
+		const canvas = System.document.createElement("canvas");
+		canvas.width = PARTICLE_GRADIENT_CANVAS_SIZE;
+		canvas.height = PARTICLE_GRADIENT_CANVAS_SIZE;
+		const canvasRenderingContext = canvas.getContext("2d");
+		const halfSize = PARTICLE_GRADIENT_CANVAS_SIZE * 0.5;
+		const radialGradient = canvasRenderingContext.createRadialGradient(halfSize, halfSize, 0, halfSize, halfSize, halfSize);
+		radialGradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+		radialGradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+		canvasRenderingContext.fillStyle = radialGradient;
+		canvasRenderingContext.fillRect(0, 0, PARTICLE_GRADIENT_CANVAS_SIZE, PARTICLE_GRADIENT_CANVAS_SIZE);
+		particleGradientCanvas = canvas;
+	}
+	return particleGradientCanvas;
+}
 
 
 //==============================================================================
@@ -81,11 +113,10 @@ export class TouchEffect extends WorldNode {
 	 */
 	pushTransform(graphic) {
 		super.pushTransform(graphic);
-		
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
-		if (canvasRenderingContext) {
-			this.#originalCompositeOperation = canvasRenderingContext.globalCompositeOperation;
-			canvasRenderingContext.globalCompositeOperation = "lighter";
+
+		if (graphic) {
+			this.#originalCompositeOperation = graphic.getBlendMode();
+			graphic.setBlendMode("lighter");
 		}
 	}
 
@@ -109,10 +140,9 @@ export class TouchEffect extends WorldNode {
 	 * @param { Graphic } graphic 
 	 */
 	popTransform(graphic) {
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
-		if (canvasRenderingContext) {
-			// canvasRenderingContext.globalCompositeOperation = "source-over";
-			canvasRenderingContext.globalCompositeOperation = this.#originalCompositeOperation;
+		if (graphic) {
+			// graphic.setBlendMode("source-over");
+			graphic.setBlendMode(this.#originalCompositeOperation);
 		}
 
 		super.popTransform(graphic);
@@ -160,23 +190,22 @@ export class TouchEffect extends WorldNode {
 			return;
 		}
 
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
+		// 흰색 그라디언트 텍스처를 파티클 색으로 틴트해 출력.
+		const gradientCanvas = getParticleGradientCanvas();
+		const particleColor = Color.createFromRGBA("rgb(100, 200, 255)");
+		const originalAlpha = graphic.getGlobalAlpha();
+		graphic.setImageTintColor(particleColor);
 		for (let i = 0; i < this.#touchParticles.length; ++i) {
 			const particle = this.#touchParticles[i];
 			const opacity = Math.max(0, particle.life / particle.maxLife);
 
-			const radialGradient = canvasRenderingContext.createRadialGradient(
-				particle.position.x, particle.position.y, 0, 
-				particle.position.x, particle.position.y, particle.radius);
-				
-			radialGradient.addColorStop(0, `rgba(100, 200, 255, ${opacity * 0.8})`);
-			radialGradient.addColorStop(1, `rgba(100, 200, 255, 0)`);
-
 			// 원 출력.
-			canvasRenderingContext.beginPath();
-			canvasRenderingContext.arc(particle.position.x, particle.position.y, particle.radius, 0, Math.PI * 2);
-			canvasRenderingContext.fillStyle = radialGradient;
-			canvasRenderingContext.fill();
+			graphic.setGlobalAlpha(originalAlpha * opacity * 0.8);
+			const drawPosition = Vector2.create(particle.position.x - particle.radius, particle.position.y - particle.radius);
+			const drawSize = Vector2.create(particle.radius * 2, particle.radius * 2);
+			graphic.drawImage(gradientCanvas, drawPosition, drawSize);
 		}
+		graphic.setImageTintColor(null);
+		graphic.setGlobalAlpha(originalAlpha);
 	}
 }

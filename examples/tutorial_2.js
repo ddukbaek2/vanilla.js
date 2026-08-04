@@ -115,19 +115,18 @@ class Tutorial_2 extends Scene {
 	 */
 	draw(graphic) {
 		const engine = this.getEngine();
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const viewManager = engine.getViewManager();
 		const canvasNativeSize = viewManager.getCanvasNativeSize();
 		const viewSize = viewManager.getViewSize();
 
 		// 전체 화면 칠하기.
-		viewManager.applyCanvasNativeRect(canvasRenderingContext);
-		canvasRenderingContext.fillStyle = Colors.darkVanilla;
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(Colors.darkVanilla);
 		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
 
 		// 게임 영역 칠하기.
-		viewManager.applyViewRect(canvasRenderingContext);
-		canvasRenderingContext.fillStyle = Colors.lightVanilla;
+		viewManager.applyViewRect(graphic);
+		graphic.setFillColor(Colors.lightVanilla);
 		graphic.drawRect(Rect.create(0, 0, viewSize.x, viewSize.y));
 
 		// 출력.

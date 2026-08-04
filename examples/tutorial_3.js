@@ -5,6 +5,7 @@ const System = globalThis;
 import * as Math from "../src/base/math.js";
 import { Object } from "../src/base/object.js";
 import { Vector2 } from "../src/base/vector2.js";
+import { Rect } from "../src/base/rect.js";
 import { Engine } from "../src/core/engine.js";
 import { Graphic } from "../src/core/graphic.js";
 import { Tween } from "../src/core/tween.js";
@@ -279,68 +280,66 @@ export class Tutorial_3 extends Scene {
 		super.draw(graphic);
 
 		const engine = this.getEngine();
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const viewManager = engine.getViewManager();
 		const viewSize = viewManager.getViewSize();
 
 		// 게임 영역 칠하기.
-		viewManager.applyViewRect(canvasRenderingContext);
-		canvasRenderingContext.fillStyle = "#2a2a3a";
-		canvasRenderingContext.fillRect(0, 0, viewSize.x, viewSize.y);
+		viewManager.applyViewRect(graphic);
+		graphic.setFillColor("#2a2a3a");
+		graphic.drawRect(Rect.create(0, 0, viewSize.x, viewSize.y));
 
 		// 보드판 출력.
 		const boardWidth = GRID_COLUMNS * CELL_SIZE;
 		const boardHeight = GRID_ROWS * CELL_SIZE;
-		canvasRenderingContext.fillStyle = "#3a3a5a";
-		canvasRenderingContext.fillRect(BOARD_X, BOARD_Y, boardWidth, boardHeight);
+		graphic.setFillColor("#3a3a5a");
+		graphic.drawRect(Rect.create(BOARD_X, BOARD_Y, boardWidth, boardHeight));
 
 		// 보드판 각 칸 출력.
-		canvasRenderingContext.strokeStyle = "#555577";
-		canvasRenderingContext.lineWidth = 2;
+		graphic.setStrokeColor("#555577");
 		for (let y = 0; y < GRID_ROWS; ++y) {
 			for (let x = 0; x < GRID_COLUMNS; ++x) {
 				const rectX = BOARD_X + x * CELL_SIZE;
 				const rectY = BOARD_Y + y * CELL_SIZE;
-				canvasRenderingContext.strokeRect(rectX, rectY, CELL_SIZE, CELL_SIZE);
+				graphic.drawStrokeRect(Rect.create(rectX, rectY, CELL_SIZE, CELL_SIZE), 2);
 			}
 		}
 
 		// 젤리 목록.
 		for (const jelly of this.#jellies) {
 			if (jelly !== this.#draggedJelly) {
-				this.drawJelly(canvasRenderingContext, jelly);
+				this.drawJelly(graphic, jelly);
 			}
 		}
 
 		// 드래그 중인 젤리 출력.
 		if (this.#draggedJelly) {
-			this.drawJelly(canvasRenderingContext, this.#draggedJelly);
+			this.drawJelly(graphic, this.#draggedJelly);
 		}
 
 		// 점수 출력.
-		canvasRenderingContext.fillStyle = "#ffffff";
-		canvasRenderingContext.font = "bold 36px sans-serif";
-		canvasRenderingContext.textAlign = "left";
-		canvasRenderingContext.textBaseline = "top";
-		canvasRenderingContext.fillText("Score: " + this.#score, 20, 20);
+		graphic.setFillColor("#ffffff");
+		graphic.setFontString("bold 36px sans-serif");
+		graphic.setTextAlign("left");
+		graphic.setTextBaseline("top");
+		graphic.drawFillText("Score: " + this.#score, 20, 20);
 
 		// 상태 출력.
 		switch (this.#gameState) {
 			case GameState.ready: {
 					// 딤드 출력.
-					canvasRenderingContext.fillStyle = "rgba(0, 0, 0, 0.5)";
-					canvasRenderingContext.fillRect(0, 0, viewSize.x, viewSize.y);
+					graphic.setFillColor("rgba(0, 0, 0, 0.5)");
+					graphic.drawRect(Rect.create(0, 0, viewSize.x, viewSize.y));
 
 					// 시작 버튼 출력.
 					const buttonX = this.#startButtonPosition.x - this.#startButtonSize.x * 0.5;
 					const buttonY = this.#startButtonPosition.y - this.#startButtonSize.y * 0.5;
-					canvasRenderingContext.fillStyle = "#5588ff";
-					canvasRenderingContext.fillRect(buttonX, buttonY, this.#startButtonSize.x, this.#startButtonSize.y);
-					canvasRenderingContext.fillStyle = "#ffffff";
-					canvasRenderingContext.font = "bold 40px sans-serif";
-					canvasRenderingContext.textAlign = "center";
-					canvasRenderingContext.textBaseline = "middle";
-					canvasRenderingContext.fillText("START", this.#startButtonPosition.x, this.#startButtonPosition.y);
+					graphic.setFillColor("#5588ff");
+					graphic.drawRect(Rect.create(buttonX, buttonY, this.#startButtonSize.x, this.#startButtonSize.y));
+					graphic.setFillColor("#ffffff");
+					graphic.setFontString("bold 40px sans-serif");
+					graphic.setTextAlign("center");
+					graphic.setTextBaseline("middle");
+					graphic.drawFillText("START", this.#startButtonPosition.x, this.#startButtonPosition.y);
 					break;
 				}
 		}
@@ -350,22 +349,22 @@ export class Tutorial_3 extends Scene {
 	// 젤리 출력.
 	//==============================================================================
 	/**
-	 * @param { CanvasRenderingContext2D } canvasRenderingContext
+	 * @param { Graphic } graphic
 	 * @param { Jelly } jelly
 	 */
-	drawJelly(canvasRenderingContext, jelly) {
+	drawJelly(graphic, jelly) {
 		const jellyPosition = jelly.node.getPosition();
 		const jellyScale = jelly.node.getScale();
 		const jellySize = this.#cellSize * jellyScale.x;
 		const jellyX = jellyPosition.x - jellySize * 0.5;
 		const jellyY = jellyPosition.y - jellySize * 0.5;
-		canvasRenderingContext.fillStyle = JellyColors[jelly.type];
-		canvasRenderingContext.fillRect(jellyX, jellyY, jellySize, jellySize);
-		canvasRenderingContext.fillStyle = "#ffffff";
-		canvasRenderingContext.font = "bold " + System.Math.round(30 * jellyScale.x) + "px sans-serif";
-		canvasRenderingContext.textAlign = "center";
-		canvasRenderingContext.textBaseline = "middle";
-		canvasRenderingContext.fillText(jelly.level.toString(), jellyPosition.x, jellyPosition.y);
+		graphic.setFillColor(JellyColors[jelly.type]);
+		graphic.drawRect(Rect.create(jellyX, jellyY, jellySize, jellySize));
+		graphic.setFillColor("#ffffff");
+		graphic.setFontString("bold " + System.Math.round(30 * jellyScale.x) + "px sans-serif");
+		graphic.setTextAlign("center");
+		graphic.setTextBaseline("middle");
+		graphic.drawFillText(jelly.level.toString(), jellyPosition.x, jellyPosition.y);
 	}
 
 	//==============================================================================

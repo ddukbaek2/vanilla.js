@@ -53,9 +53,8 @@ export class WorldNode extends TransformNode {
         // 피봇과 컨텐트사이즈에 의한 로컬 포지션 변동으로 사용 안함.
         // super.pushTransform(graphic);
 
-        const canvasRenderingContext = graphic.getCanvasRenderingContext();
-        if (canvasRenderingContext) {
-            canvasRenderingContext.save();
+        if (graphic) {
+            graphic.pushState();
 
             // 트랜스폼 반영.
             // localPosition 은 부모 영역 내 자기 객체의 중심점 좌표 (anchor / pivot 영향 없음).
@@ -64,9 +63,9 @@ export class WorldNode extends TransformNode {
             const localRotation = this.getLocalRotation();
             const radian = Math.degreeToRadian(localRotation);
             const localScale = this.getLocalScale();
-            canvasRenderingContext.translate(localPosition.x, localPosition.y);
-            canvasRenderingContext.rotate(radian);
-            canvasRenderingContext.scale(localScale.x, localScale.y);
+            graphic.translate(localPosition.x, localPosition.y);
+            graphic.rotate(radian);
+            graphic.scale(localScale.x, localScale.y);
 
             // 현재 노드의 피봇 반영.
             // 캔버스2D는 기준점을 좌상으로 여기고 우하방향으로 그림을 그리므로.
@@ -74,11 +73,11 @@ export class WorldNode extends TransformNode {
             const pivot = this.getPivot();
             const contentSize = this.getContentSize();
             const pivotPosition = Vector2.create(contentSize.x * pivot.x, contentSize.y * pivot.y);
-            canvasRenderingContext.translate(-pivotPosition.x, -pivotPosition.y);
+            graphic.translate(-pivotPosition.x, -pivotPosition.y);
 
             // 투명도 반영.
             const localOpacity = this.getLocalOpacity();
-            canvasRenderingContext.globalAlpha *= localOpacity;
+            graphic.multiplyGlobalAlpha(localOpacity);
         }
     }
 
@@ -138,11 +137,10 @@ export class WorldNode extends TransformNode {
         super.drawGizmos(graphic);
 
         // 영역 및 기준점 출력.
-        const canvasRenderingContext = graphic.getCanvasRenderingContext();
-        if (canvasRenderingContext) {
+        if (graphic) {
             // 기존 투명도 무효화 및 색상 설정.
-            const originalAlpha = canvasRenderingContext.globalAlpha;
-            canvasRenderingContext.globalAlpha = 1.0;
+            const originalAlpha = graphic.getGlobalAlpha();
+            graphic.setGlobalAlpha(1.0);
 
             // 좌표.
             const contentSize = this.getContentSize();
@@ -154,27 +152,24 @@ export class WorldNode extends TransformNode {
             const bottom = top + contentSize.y;
 
             // 기존 투명도 무효화 및 색상 설정.
-            canvasRenderingContext.fillStyle = "#00ff00";
-            canvasRenderingContext.strokeStyle = "#00ff00";
+            graphic.setFillColor("#00ff00");
+            graphic.setStrokeColor("#00ff00");
 
             // 범위.
-            canvasRenderingContext.lineWidth = 1;
-            canvasRenderingContext.beginPath();
-            canvasRenderingContext.moveTo(left, top);
-            canvasRenderingContext.lineTo(right, top);
-            canvasRenderingContext.lineTo(right, bottom);
-            canvasRenderingContext.lineTo(left, bottom);
-            canvasRenderingContext.lineTo(left, top);
-            canvasRenderingContext.stroke();
+            graphic.drawLine([
+                Vector2.create(left, top),
+                Vector2.create(right, top),
+                Vector2.create(right, bottom),
+                Vector2.create(left, bottom),
+                Vector2.create(left, top),
+            ], 1);
 
             // 기준점.
             const pointSize = 4;
-            canvasRenderingContext.beginPath();
-            canvasRenderingContext.arc(origin.x, origin.y, pointSize, 0, Math.PI * 2);
-            canvasRenderingContext.fill();
+            graphic.drawCircle(origin, pointSize);
 
             // 기존 투명도 복원.
-            canvasRenderingContext.globalAlpha = originalAlpha;
+            graphic.setGlobalAlpha(originalAlpha);
         }
     }
 

@@ -326,7 +326,6 @@ export class RichText extends Text {
 	 * @param { Vector2 } contentSize
 	 */
 	drawSegments(graphic, contentSize) {
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const segments = this.#segments;
 
 		const fallbackFontFace = this.getFontFace();
@@ -353,10 +352,8 @@ export class RichText extends Text {
 			const segmentFontFace = this.resolveSegmentFontFace(segment.attributes.fontFace, fallbackFontFace);
 			const segmentBold = (segment.attributes.bold === true) || fallbackBold;
 			const segmentItalic = (segment.attributes.italic === true) || fallbackItalic;
-			canvasRenderingContext.save();
-			canvasRenderingContext.font = buildFontString(segmentFontFace, segmentFontSize, segmentBold, segmentItalic);
-			totalWidth += canvasRenderingContext.measureText(segmentText).width;
-			canvasRenderingContext.restore();
+			graphic.setFontString(buildFontString(segmentFontFace, segmentFontSize, segmentBold, segmentItalic));
+			totalWidth += graphic.measureText(segmentText).width;
 			if (segmentFontSize > maxFontSize) {
 				maxFontSize = segmentFontSize;
 			}
@@ -387,8 +384,8 @@ export class RichText extends Text {
 		}
 
 		// segment 별 렌더링.
-		canvasRenderingContext.textAlign = "left";
-		canvasRenderingContext.textBaseline = textBaseline;
+		graphic.setTextAlign("left");
+		graphic.setTextBaseline(textBaseline);
 		for (const segment of segments) {
 			const segmentText = segment.text;
 			if (!segmentText || segmentText.length === 0) {
@@ -404,27 +401,25 @@ export class RichText extends Text {
 			const segmentUnderline = (segment.attributes.underline === true) || fallbackUnderline;
 			const segmentStrikethrough = (segment.attributes.strikethrough === true) || fallbackStrikethrough;
 
-			canvasRenderingContext.font = buildFontString(segmentFontFace, segmentFontSize, segmentBold, segmentItalic);
+			graphic.setFontString(buildFontString(segmentFontFace, segmentFontSize, segmentBold, segmentItalic));
 			if (segmentStrokeColor && segmentStrokeWidth > 0) {
-				canvasRenderingContext.strokeStyle = segmentStrokeColor.toHEXString();
-				canvasRenderingContext.lineWidth = segmentStrokeWidth;
-				canvasRenderingContext.strokeText(segmentText, cursorX, baselineY);
+				graphic.setStrokeColor(segmentStrokeColor.toHEXString());
+				graphic.drawStrokeText(segmentText, cursorX, baselineY, segmentStrokeWidth);
 			}
-			canvasRenderingContext.fillStyle = segmentTextColor.toHEXString();
-			canvasRenderingContext.fillText(segmentText, cursorX, baselineY);
+			graphic.setFillColor(segmentTextColor.toHEXString());
+			graphic.drawFillText(segmentText, cursorX, baselineY);
 
-			const segmentWidth = canvasRenderingContext.measureText(segmentText).width;
+			const segmentWidth = graphic.measureText(segmentText).width;
+			const segmentLineWidth = System.Math.max(1, segmentFontSize / 16);
 			if (segmentUnderline) {
 				const underlineY = baselineY + this.computeUnderlineOffsetY(segmentFontSize);
-				canvasRenderingContext.strokeStyle = segmentTextColor.toHEXString();
-				canvasRenderingContext.lineWidth = System.Math.max(1, segmentFontSize / 16);
-				this.strokeHorizontalLine(canvasRenderingContext, cursorX, underlineY, segmentWidth);
+				graphic.setStrokeColor(segmentTextColor.toHEXString());
+				this.strokeHorizontalLine(graphic, cursorX, underlineY, segmentWidth, segmentLineWidth);
 			}
 			if (segmentStrikethrough) {
 				const strikeY = baselineY + this.computeStrikethroughOffsetY(segmentFontSize);
-				canvasRenderingContext.strokeStyle = segmentTextColor.toHEXString();
-				canvasRenderingContext.lineWidth = System.Math.max(1, segmentFontSize / 16);
-				this.strokeHorizontalLine(canvasRenderingContext, cursorX, strikeY, segmentWidth);
+				graphic.setStrokeColor(segmentTextColor.toHEXString());
+				this.strokeHorizontalLine(graphic, cursorX, strikeY, segmentWidth, segmentLineWidth);
 			}
 			cursorX += segmentWidth;
 		}

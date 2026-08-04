@@ -192,35 +192,33 @@ export class Text extends Component {
 			drawY = contentSize.y * 0.5;
 		}
 
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
-		canvasRenderingContext.font = buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic);
-		canvasRenderingContext.textAlign = this.#textAlign;
-		canvasRenderingContext.textBaseline = this.#textBaseline;
+		graphic.setFontString(buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic));
+		graphic.setTextAlign(this.#textAlign);
+		graphic.setTextBaseline(this.#textBaseline);
 
 		const strokeColor = this.getStrokeColor();
 		if (strokeColor && this.#strokeWidth > 0) {
-			canvasRenderingContext.strokeStyle = strokeColor.toHEXString();
-			canvasRenderingContext.lineWidth = this.#strokeWidth;
-			canvasRenderingContext.strokeText(text, drawX, drawY);
+			graphic.setStrokeColor(strokeColor.toHEXString());
+			graphic.drawStrokeText(text, drawX, drawY, this.#strokeWidth);
 		}
 
 		const textColor = this.getTextColor();
-		canvasRenderingContext.fillStyle = textColor.toHEXString();
-		canvasRenderingContext.fillText(text, drawX, drawY);
+		graphic.setFillColor(textColor.toHEXString());
+		graphic.drawFillText(text, drawX, drawY);
 
 		if (this.#underline || this.#strikethrough) {
 			const textWidth = this.measurePlainTextWidth(text);
 			const startX = this.computeUnderlineStartX(drawX, textWidth);
 			const fontSize = this.#fontSize;
-			canvasRenderingContext.strokeStyle = textColor.toHEXString();
-			canvasRenderingContext.lineWidth = System.Math.max(1, fontSize / 16);
+			graphic.setStrokeColor(textColor.toHEXString());
+			const lineWidth = System.Math.max(1, fontSize / 16);
 			if (this.#underline) {
 				const underlineY = drawY + this.computeUnderlineOffsetY(fontSize);
-				this.strokeHorizontalLine(canvasRenderingContext, startX, underlineY, textWidth);
+				this.strokeHorizontalLine(graphic, startX, underlineY, textWidth, lineWidth);
 			}
 			if (this.#strikethrough) {
 				const strikeY = drawY + this.computeStrikethroughOffsetY(fontSize);
-				this.strokeHorizontalLine(canvasRenderingContext, startX, strikeY, textWidth);
+				this.strokeHorizontalLine(graphic, startX, strikeY, textWidth, lineWidth);
 			}
 		}
 	}
@@ -300,16 +298,17 @@ export class Text extends Component {
 	// 가로 라인 stroke.
 	//==============================================================================
 	/**
-	 * @param { CanvasRenderingContext2D } canvasRenderingContext
+	 * @param { Graphic } graphic
 	 * @param { number } x
 	 * @param { number } y
 	 * @param { number } width
+	 * @param { number } lineWidth
 	 */
-	strokeHorizontalLine(canvasRenderingContext, x, y, width) {
-		canvasRenderingContext.beginPath();
-		canvasRenderingContext.moveTo(x, y);
-		canvasRenderingContext.lineTo(x + width, y);
-		canvasRenderingContext.stroke();
+	strokeHorizontalLine(graphic, x, y, width, lineWidth = 1) {
+		graphic.drawLine([
+			Vector2.create(x, y),
+			Vector2.create(x + width, y),
+		], lineWidth);
 	}
 
 	//==============================================================================
@@ -626,15 +625,18 @@ export class Text extends Component {
 		const fontSize = textComponent.getFontSize();
 		const text = textComponent.getText();
 
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
-		canvasRenderingContext.save();
-		canvasRenderingContext.font = buildFontString(fontFace, fontSize, false, false);
+		const measurementContext = getMeasurementCanvasRenderingContext();
+		if (measurementContext === null) {
+			return Rect.create(0, 0, 0, 0);
+		}
+		measurementContext.save();
+		measurementContext.font = buildFontString(fontFace, fontSize, false, false);
 
-		const metrics = canvasRenderingContext.measureText(text);
+		const metrics = measurementContext.measureText(text);
 		const width = metrics.width;
 		const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
 
-		canvasRenderingContext.restore();
+		measurementContext.restore();
 
 		return Rect.create(0, 0, width, height);
 	}
