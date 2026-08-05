@@ -1108,7 +1108,7 @@
 	const PANEL_MARGIN_RIGHT = 18;
 	function calculatePanelLayout() {
 		const panelX = System.window.innerWidth - PANEL_MARGIN_RIGHT - PANEL_WIDTH;
-		const panelY = System.window.innerHeight * 0.08;
+		const panelY = 18;
 		const listHeight = (optionDefinitions.length * PANEL_ROW_HEIGHT + 10) * panelCollapseBlend;
 		const panelHeight = PANEL_HEADER_HEIGHT + listHeight;
 		return { panelX: panelX, panelY: panelY, panelHeight: panelHeight, listHeight: listHeight };
@@ -1179,7 +1179,7 @@
 	//==============================================================================
 	// 옵션 패널 렌더링. (매 프레임, 포스트 프로세싱이 끝난 화면 위에)
 	//==============================================================================
-	function renderOptionPanel(introFade, fpsDisplayText) {
+	function renderOptionPanel(introFade) {
 		if (!uiGraphic) {
 			return;
 		}
@@ -1189,13 +1189,6 @@
 		uiGraphic.applySettings(null);
 		uiGraphic.scale(devicePixelRatio, devicePixelRatio);
 		uiGraphic.setGlobalAlpha(introFade);
-
-		// FPS. (패널보다 위쪽, 숫자만)
-		uiGraphic.setFontString(`300 12px "Segoe UI", sans-serif`);
-		uiGraphic.setTextAlign("right");
-		uiGraphic.setTextBaseline("bottom");
-		uiGraphic.setFillColor("rgba(243, 229, 171, 0.75)");
-		uiGraphic.drawFillText(fpsDisplayText, panelLayout.panelX + PANEL_WIDTH, panelLayout.panelY - 8);
 
 		// 패널 배경 + 테두리.
 		const panelRect = engineRect.create(panelLayout.panelX, panelLayout.panelY, PANEL_WIDTH, panelLayout.panelHeight);
@@ -1357,9 +1350,6 @@
 	let streakScroll = 0;
 	let playerCurrentX = 0;
 	let runBobPhase = 0;
-	let fpsAverage = 60;
-	let fpsUpdateAccumulator = 0;
-	let fpsDisplayText = "60";
 	function renderFrame() {
 		resizeCanvas();
 		const currentTimestamp = System.performance.now();
@@ -1384,15 +1374,6 @@
 		const collapseTarget = isPanelCollapsed ? 0 : 1;
 		panelCollapseBlend += (collapseTarget - panelCollapseBlend) * System.Math.min(8 * deltaTime, 1);
 
-		// FPS 집계. (0.25초마다 표시 텍스트 갱신 — 문자열 텍스처 캐시 부담 최소화)
-		if (deltaTime > 0) {
-			fpsAverage += (1 / deltaTime - fpsAverage) * System.Math.min(3 * deltaTime, 1);
-		}
-		fpsUpdateAccumulator += deltaTime;
-		if (fpsUpdateAccumulator > 0.25) {
-			fpsUpdateAccumulator = 0;
-			fpsDisplayText = String(System.Math.round(fpsAverage));
-		}
 
 		// 전진 거리 적분. (지형 스크롤 / 빛살 이동 — SPEED 슬라이더 반영)
 		scrollDistance += (4.2 + boostFactor * 16) * sliderValues.speed * deltaTime;
@@ -1536,7 +1517,7 @@
 
 		// === 5. 옵션 패널 (vanilla.js 엔진 Graphic 으로 캔버스 안에 렌더링) ===
 		const introFade = System.Math.max(0, System.Math.min(1, (elapsedTime - 0.2) / 2.4));
-		renderOptionPanel(introFade, fpsDisplayText);
+		renderOptionPanel(introFade);
 
 		System.window.requestAnimationFrame(renderFrame);
 	}
