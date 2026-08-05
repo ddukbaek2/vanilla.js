@@ -142,6 +142,66 @@
 		return length(startToPoint - startToEnd * projection);
 	}
 
+	float axisMask(float value, float minValue, float maxValue) {
+		float edge = 0.0015;
+		return smoothstep(minValue - edge, minValue + edge, value) * (1.0 - smoothstep(maxValue - edge, maxValue + edge, value));
+	}
+
+	float boxMask(vec2 point, vec2 minCorner, vec2 maxCorner) {
+		return axisMask(point.x, minCorner.x, maxCorner.x) * axisMask(point.y, minCorner.y, maxCorner.y);
+	}
+
+	// 전투순양함 1척을 그린다. (스타크래프트풍 각진 블록 실루엣 — 곡선/테이퍼 없음)
+	// facingSign: +1 = 프로우가 오른쪽, -1 = 왼쪽. shipFade: 원거리 대기 흐림.
+	vec3 applyBattlecruiser(vec3 color, vec2 screenPoint, vec2 shipCenter, float shipScale, float facingSign, float tiltRadian, float shipFade, float shipTime) {
+		vec2 shipLocal = screenPoint - shipCenter;
+		float cosTilt = cos(tiltRadian);
+		float sinTilt = sin(tiltRadian);
+		shipLocal = vec2(shipLocal.x * cosTilt - shipLocal.y * sinTilt, shipLocal.x * sinTilt + shipLocal.y * cosTilt);
+		shipLocal.x *= facingSign;
+		shipLocal /= shipScale;
+
+		// 각진 블록 조합.
+		float rearHullMask = boxMask(shipLocal, vec2(-0.5, -0.06), vec2(-0.05, 0.06)); // 후방 본체 블록.
+		float neckMask = boxMask(shipLocal, vec2(-0.08, -0.022), vec2(0.26, 0.022)); // 중앙 넥.
+		float prowMask = boxMask(shipLocal, vec2(0.24, -0.055), vec2(0.46, 0.055)); // 해머헤드 프로우.
+		float prowLipMask = boxMask(shipLocal, vec2(0.42, -0.075), vec2(0.46, 0.075)); // 프로우 전면 립.
+		float bridgeMask = boxMask(shipLocal, vec2(-0.4, 0.06), vec2(-0.18, 0.105)); // 상부 구조물.
+		float towerMask = boxMask(shipLocal, vec2(-0.33, 0.105), vec2(-0.25, 0.135)); // 함교 타워.
+		float finMask = boxMask(shipLocal, vec2(-0.38, -0.1), vec2(-0.22, -0.06)); // 하부 핀.
+		float shipMask = max(rearHullMask, max(neckMask, max(prowMask, max(prowLipMask, max(bridgeMask, max(towerMask, finMask))))));
+		shipMask *= shipFade;
+
+		if (shipMask > 0.001) {
+			// 실루엣: 하늘보다 짙은 함체 + 태양 방향(하부) 캐러멜 림 라이트.
+			vec3 shipColor = vec3(0.045, 0.03, 0.02);
+			float rimLight = smoothstep(0.02, -0.09, shipLocal.y);
+			shipColor += vec3(0.85, 0.5, 0.2) * rimLight * 0.45;
+
+			// 패널 라인. (선체를 가로지르는 어두운 분할선 — 각진 디테일)
+			float panelLine = step(0.94, fract(shipLocal.x * 22.0));
+			shipColor *= 1.0 - panelLine * 0.35;
+
+			// 창문 불빛. (드문드문, 느리게 깜빡임)
+			vec2 windowCell = floor(shipLocal * vec2(180.0, 320.0));
+			float windowRandom = hash21(windowCell);
+			float windowLight = step(0.955, windowRandom) * (0.6 + 0.4 * sin(shipTime * (1.0 + windowRandom * 2.0) + windowRandom * 60.0));
+			shipColor += vec3(1.0, 0.9, 0.65) * windowLight * 0.55;
+			color = mix(color, shipColor, shipMask);
+		}
+
+		// 선미 엔진 글로우 4기. (맥동하는 골드 추진광)
+		float enginePulse = 0.75 + 0.25 * sin(shipTime * 3.1);
+		for (int engineIndex = 0; engineIndex < 4; ++engineIndex) {
+			float engineOffsetY = (float(engineIndex) - 1.5) * 0.026;
+			float engineDistance = length((shipLocal - vec2(-0.505, engineOffsetY)) * vec2(1.0, 1.5)) * shipScale;
+			color += vec3(1.0, 0.72, 0.32) * exp(-engineDistance * 240.0 / shipScale) * enginePulse * 0.9 * shipFade;
+			color += vec3(1.0, 0.6, 0.25) * exp(-engineDistance * 55.0 / shipScale) * enginePulse * 0.25 * shipFade;
+		}
+
+		return color;
+	}
+
 	void main() {
 		vec2 screenPoint = vec2(fragmentCoordinate.x * aspectRatio, fragmentCoordinate.y);
 		float horizonY = -0.08;
@@ -168,46 +228,47 @@
 			}
 		}
 
-		// 전투순양함. (저 멀리 우주에 정박한 거대 함선 실루엣)
+		// 전투순양함 함대.
 		{
-			// 함선 로컬 좌표. (좌측 상공, 미세 표류 + 살짝 기울어진 자세)
-			vec2 shipCenter = vec2(-0.45 * aspectRatio + sin(elapsedTime * 0.05) * 0.015, 0.55 + sin(elapsedTime * 0.08) * 0.01);
-			vec2 shipLocal = screenPoint - shipCenter;
-			float tiltRadian = -0.07;
-			float cosTilt = cos(tiltRadian);
-			float sinTilt = sin(tiltRadian);
-			shipLocal = vec2(shipLocal.x * cosTilt - shipLocal.y * sinTilt, shipLocal.x * sinTilt + shipLocal.y * cosTilt);
+			// 기함. (좌측 상공, 크게 — 미세 표류 + 살짝 기울어진 자세)
+			float flagshipTilt = -0.05;
+			vec2 flagshipCenter = vec2(-0.42 * aspectRatio + sin(elapsedTime * 0.05) * 0.015, 0.58 + sin(elapsedTime * 0.08) * 0.01);
+			color = applyBattlecruiser(color, screenPoint, flagshipCenter, 1.0, 1.0, flagshipTilt, 1.0, elapsedTime);
 
-			// 선체: 길쭉한 몸통 + 앞으로 갈수록 좁아지는 프로우.
-			float hullHalfHeight = 0.02 * (1.0 - smoothstep(0.1, 0.34, shipLocal.x));
-			float hullMask = step(-0.3, shipLocal.x) * step(shipLocal.x, 0.34) * smoothstep(0.004, -0.002, abs(shipLocal.y) - hullHalfHeight);
+			// 맞은편 원거리 함선들. (반대 방향, 대기 흐림으로 멀리 있는 느낌)
+			vec2 escortCenter1 = vec2(0.52 * aspectRatio + sin(elapsedTime * 0.04 + 2.0) * 0.01, 0.66 + sin(elapsedTime * 0.06 + 1.0) * 0.008);
+			color = applyBattlecruiser(color, screenPoint, escortCenter1, 0.42, -1.0, 0.04, 0.75, elapsedTime + 13.0);
+			vec2 escortCenter2 = vec2(0.3 * aspectRatio + sin(elapsedTime * 0.045 + 4.0) * 0.008, 0.78 + sin(elapsedTime * 0.07 + 3.0) * 0.006);
+			color = applyBattlecruiser(color, screenPoint, escortCenter2, 0.26, -1.0, 0.08, 0.55, elapsedTime + 31.0);
+			vec2 escortCenter3 = vec2(0.68 * aspectRatio + sin(elapsedTime * 0.035 + 5.5) * 0.008, 0.42 + sin(elapsedTime * 0.055 + 2.5) * 0.006);
+			color = applyBattlecruiser(color, screenPoint, escortCenter3, 0.18, -1.0, -0.03, 0.45, elapsedTime + 47.0);
 
-			// 상부 구조물 + 함교.
-			float superstructureMask = step(-0.16, shipLocal.x) * step(shipLocal.x, 0.02) * smoothstep(0.003, -0.002, abs(shipLocal.y - 0.026) - 0.014);
-			float bridgeMask = step(-0.09, shipLocal.x) * step(shipLocal.x, -0.03) * smoothstep(0.003, -0.002, abs(shipLocal.y - 0.052) - 0.012);
-			float shipMask = max(hullMask, max(superstructureMask, bridgeMask));
+			// 기함 주포. (45초 주기 — 차지 후 초거대 광선 발사)
+			float fireCycle = 45.0;
+			float firePhase = fract(elapsedTime / fireCycle);
+			vec2 prowTipLocal = vec2(0.47, 0.0);
+			float cosFlagTilt = cos(-flagshipTilt);
+			float sinFlagTilt = sin(-flagshipTilt);
+			vec2 beamOrigin = flagshipCenter + vec2(prowTipLocal.x * cosFlagTilt - prowTipLocal.y * sinFlagTilt, prowTipLocal.x * sinFlagTilt + prowTipLocal.y * cosFlagTilt);
+			vec2 beamDirection = vec2(cosFlagTilt, sinFlagTilt);
 
-			if (shipMask > 0.001) {
-				// 실루엣: 하늘보다 짙은 함체 + 태양 방향(하부) 캐러멜 림 라이트.
-				vec3 shipColor = vec3(0.045, 0.03, 0.02);
-				float rimLight = smoothstep(0.2, 1.0, -shipLocal.y / max(hullHalfHeight, 0.001)) * hullMask;
-				shipColor += vec3(0.85, 0.5, 0.2) * rimLight * 0.5;
+			// 차지: 프로우에 에너지가 모임.
+			float chargeAmount = smoothstep(0.05, 0.1, firePhase) * (1.0 - smoothstep(0.1, 0.115, firePhase));
+			float chargeDistance = length(screenPoint - beamOrigin);
+			color += vec3(1.0, 0.85, 0.5) * exp(-chargeDistance * 90.0) * chargeAmount * 2.2;
+			color += vec3(1.0, 0.7, 0.35) * exp(-chargeDistance * 22.0) * chargeAmount * 0.5;
 
-				// 창문 불빛. (드문드문, 느리게 깜빡임)
-				vec2 windowCell = floor(shipLocal * vec2(220.0, 400.0));
-				float windowRandom = hash21(windowCell);
-				float windowLight = step(0.965, windowRandom) * (0.6 + 0.4 * sin(elapsedTime * (1.0 + windowRandom * 2.0) + windowRandom * 60.0));
-				shipColor += vec3(1.0, 0.9, 0.65) * windowLight * 0.5;
-				color = mix(color, shipColor, shipMask);
-			}
+			// 발사: 화면을 가로지르는 초거대 광선.
+			float beamStrength = smoothstep(0.1, 0.108, firePhase) * (1.0 - smoothstep(0.15, 0.17, firePhase));
+			if (beamStrength > 0.001) {
+				float beamFlicker = 0.85 + 0.15 * sin(elapsedTime * 47.0);
+				float beamDistance = segmentDistance(screenPoint, beamOrigin, beamOrigin + beamDirection * 5.0);
+				color += vec3(1.0, 0.97, 0.85) * exp(-beamDistance * 220.0) * beamStrength * beamFlicker * 3.0;
+				color += vec3(1.0, 0.8, 0.45) * exp(-beamDistance * 40.0) * beamStrength * beamFlicker * 0.9;
+				color += vec3(1.0, 0.6, 0.3) * exp(-beamDistance * 9.0) * beamStrength * 0.25;
 
-			// 선미 엔진 글로우 3기. (맥동하는 골드 추진광)
-			float enginePulse = 0.75 + 0.25 * sin(elapsedTime * 3.1);
-			for (int engineIndex = 0; engineIndex < 3; ++engineIndex) {
-				float engineOffsetY = (float(engineIndex) - 1.0) * 0.012;
-				float engineDistance = length((shipLocal - vec2(-0.305, engineOffsetY)) * vec2(1.0, 1.6));
-				color += vec3(1.0, 0.72, 0.32) * exp(-engineDistance * 260.0) * enginePulse * 0.9;
-				color += vec3(1.0, 0.6, 0.25) * exp(-engineDistance * 60.0) * enginePulse * 0.25;
+				// 발사 순간 프로우 섬광.
+				color += vec3(1.0, 0.95, 0.8) * exp(-chargeDistance * 30.0) * beamStrength * 1.2;
 			}
 		}
 
@@ -265,10 +326,9 @@
 	out float fragmentHeight;
 
 	float riverDistanceAt(vec2 worldXZ) {
-		// 도로 좌우를 따라 굽이치며 끝없이 이어지는 강줄기 2개까지의 거리.
-		float riverCenter1 = 6.5 + sin(worldXZ.y * 0.09 + 1.7) * 2.4 + sin(worldXZ.y * 0.045) * 1.8;
-		float riverCenter2 = -6.0 - sin(worldXZ.y * 0.075 + 4.1) * 2.6 - sin(worldXZ.y * 0.05 + 2.3) * 1.6;
-		return min(abs(worldXZ.x - riverCenter1), abs(worldXZ.x - riverCenter2));
+		// 바닥을 가로/대각선으로 크게 왕복하며 한 방향으로 이어지는 사행천까지의 거리.
+		float riverCenter = sin(worldXZ.y * 0.05 + 1.3) * 8.5 + sin(worldXZ.y * 0.021 + 4.2) * 4.5;
+		return abs(worldXZ.x - riverCenter);
 	}
 
 	float terrainHeight(vec2 worldXZ) {
@@ -281,7 +341,7 @@
 		height = max(height, 0.0) * sideFactor * 2.6;
 
 		// 강이 지나는 자리는 지형을 깎아 계곡을 만든다. (강이 언덕에서 끊기지 않도록)
-		float riverCarve = 1.0 - smoothstep(1.6, 3.6, riverDistanceAt(worldXZ));
+		float riverCarve = 1.0 - smoothstep(2.4, 4.6, riverDistanceAt(worldXZ));
 		return height * (1.0 - riverCarve);
 	}
 
@@ -354,11 +414,10 @@
 		float streamFlow = 0.55 + 0.3 * flowShimmer;
 		color += vec3(1.0, 0.88, 0.55) * (lateralGlow * 0.3 + coreGlow * 0.45) * streamFlow;
 
-		// 강. (도로 좌우를 따라 끝없이 이어지는 물길 — terrainHeight 의 계곡과 동일 경로)
-		float riverCenter1 = 6.5 + sin(fragmentWorldPosition.z * 0.09 + 1.7) * 2.4 + sin(fragmentWorldPosition.z * 0.045) * 1.8;
-		float riverCenter2 = -6.0 - sin(fragmentWorldPosition.z * 0.075 + 4.1) * 2.6 - sin(fragmentWorldPosition.z * 0.05 + 2.3) * 1.6;
-		float riverDistance = min(abs(fragmentWorldPosition.x - riverCenter1), abs(fragmentWorldPosition.x - riverCenter2));
-		float puddleMask = (1.0 - smoothstep(1.5, 2.4, riverDistance)) * (1.0 - smoothstep(0.05, 0.4, fragmentHeight));
+		// 강. (바닥을 가로/대각선으로 크게 왕복하는 사행천 — terrainHeight 의 계곡과 동일 경로)
+		float riverCenter = sin(fragmentWorldPosition.z * 0.05 + 1.3) * 8.5 + sin(fragmentWorldPosition.z * 0.021 + 4.2) * 4.5;
+		float riverDistance = abs(fragmentWorldPosition.x - riverCenter);
+		float puddleMask = (1.0 - smoothstep(2.2, 3.2, riverDistance)) * (1.0 - smoothstep(0.05, 0.4, fragmentHeight));
 		if (puddleMask > 0.001) {
 			// 물 표면: 다중 옥타브 물결 높이장을 해석적으로 미분해 노멀을 만든다.
 			// 물결 좌표가 물길 방향(z)으로 계속 밀려 내려와 흐르는 느낌을 만든다.
@@ -400,10 +459,10 @@
 			float glitterSparkle = smoothstep(0.035, 0.085, length(waveGradient));
 			float sunGlitter = glitterColumn * glitterSparkle;
 
-			// 합성: 물에 젖은 바닥(굴절 그리드) 위에 밝은 반사가 뜨는 수면.
-			vec3 waterBedColor = vec3(0.16, 0.1, 0.05) + vec3(0.85, 0.52, 0.16) * refractedLine * 0.9;
-			vec3 waterColor = waterBedColor;
-			waterColor += reflectedSkyColor * (0.45 + 0.45 * fresnel);
+			// 합성: 전체적으로 밝은 수면 + 물속에 떠다니는 무늬는 물보다 더 밝게.
+			vec3 waterColor = vec3(0.55, 0.38, 0.18);
+			waterColor += reflectedSkyColor * (0.4 + 0.4 * fresnel);
+			waterColor += vec3(1.0, 0.92, 0.7) * refractedLine * 0.5;
 			waterColor += vec3(1.0, 0.85, 0.55) * sunHalo * 0.55;
 			waterColor += vec3(1.0, 0.95, 0.75) * sunGlitter * 0.9;
 			waterColor += vec3(1.0, 0.93, 0.7) * sunSpecular * 2.0;
@@ -1162,10 +1221,9 @@
 		height = System.Math.max(height, 0) * sideFactor * 2.6;
 
 		// 강이 지나는 자리는 지형을 깎아 계곡을 만든다. (셰이더 terrainHeight 와 동일)
-		const riverCenter1 = 6.5 + System.Math.sin(worldZ * 0.09 + 1.7) * 2.4 + System.Math.sin(worldZ * 0.045) * 1.8;
-		const riverCenter2 = -6.0 - System.Math.sin(worldZ * 0.075 + 4.1) * 2.6 - System.Math.sin(worldZ * 0.05 + 2.3) * 1.6;
-		const riverDistance = System.Math.min(System.Math.abs(worldX - riverCenter1), System.Math.abs(worldX - riverCenter2));
-		const riverCarve = 1 - smoothstepValue(1.6, 3.6, riverDistance);
+		const riverCenter = System.Math.sin(worldZ * 0.05 + 1.3) * 8.5 + System.Math.sin(worldZ * 0.021 + 4.2) * 4.5;
+		const riverDistance = System.Math.abs(worldX - riverCenter);
+		const riverCarve = 1 - smoothstepValue(2.4, 4.6, riverDistance);
 		return height * (1 - riverCarve);
 	}
 
