@@ -379,21 +379,6 @@
 		return mix(valueX0, valueX1, weight.y);
 	}
 
-	float riverExcessAt(vec2 worldXZ) {
-		// 가로지르는 개울: 24 유닛 간격으로 바닥을 가로/대각선으로 관통하는 물길.
-		// 개울마다 굴곡/기울기/폭 패턴이 달라지고, 폭은 x 를 따라 웅덩이처럼 부풀었다 좁아진다.
-		// 반환값은 (물길 중심까지의 거리 - 폭). 음수면 물속.
-		float streamIndex = floor(worldXZ.y / 24.0);
-		float streamLocalZ = worldXZ.y - streamIndex * 24.0 - 12.0;
-		float streamPhase = streamIndex * 2.399;
-		float streamSlope = sin(streamIndex * 1.7) * 0.08;
-		float streamPathZ = sin(worldXZ.x * 0.11 + streamPhase) * 2.2 + worldXZ.x * streamSlope;
-		float streamAcross = streamLocalZ - streamPathZ;
-		float streamWidthBase = 0.5 + 0.5 * sin(worldXZ.x * 0.13 + streamIndex * 3.1);
-		float streamWidth = 1.3 + streamWidthBase * streamWidthBase * 2.1;
-		return abs(streamAcross) - streamWidth;
-	}
-
 	float terrainHeight(vec2 worldXZ) {
 		// 중앙(도로)은 평평하고 좌우로 갈수록 산이 솟는 구조.
 		// 다중 옥타브 밸류 노이즈라 같은 지형이 반복되지 않는다.
@@ -402,11 +387,7 @@
 		float noiseMedium = valueNoise(worldXZ * 0.15 + 37.0);
 		float noiseSmall = valueNoise(worldXZ * 0.37 + 91.0);
 		float combined = noiseLarge * 1.4 + noiseMedium * 0.65 + noiseSmall * 0.25;
-		float height = pow(max(combined - 0.7, 0.0), 1.5) * 4.6 * sideFactor;
-
-		// 개울이 지나는 자리는 지형을 깎아 물길을 만든다. (언덕에서 끊기지 않도록)
-		float riverCarve = 1.0 - smoothstep(0.0, 2.0, riverExcessAt(worldXZ));
-		return height * (1.0 - riverCarve);
+		return pow(max(combined - 0.7, 0.0), 1.5) * 4.6 * sideFactor;
 	}
 
 	void main() {
@@ -440,6 +421,38 @@
 	uniform vec3 cameraPosition;
 	uniform float waterStrength;
 	out vec4 outputColor;
+
+	// 정수 격자 해시. (정점 셰이더와 동일 — 수맥 특징점용 결정적 난수)
+	float latticeRandom(int cellX, int cellZ) {
+		uint hashValue = uint(cellX) * 374761393u + uint(cellZ) * 668265263u;
+		hashValue = (hashValue ^ (hashValue >> 13u)) * 1274126177u;
+		hashValue = hashValue ^ (hashValue >> 16u);
+		return float(hashValue & 65535u) / 65535.0;
+	}
+
+	// 보로노이 경계까지의 근사 거리. (F2 - F1 — 경계망이 Y자로 갈라지는 뿌리/번개 구조)
+	float voronoiEdgeDistance(vec2 point) {
+		vec2 baseCell = floor(point);
+		float nearestDistance = 1e9;
+		float secondDistance = 1e9;
+		for (int offsetZ = -1; offsetZ <= 1; ++offsetZ) {
+			for (int offsetX = -1; offsetX <= 1; ++offsetX) {
+				vec2 cell = baseCell + vec2(float(offsetX), float(offsetZ));
+				float jitterX = latticeRandom(int(cell.x), int(cell.y));
+				float jitterZ = latticeRandom(int(cell.x) + 913, int(cell.y) - 471);
+				vec2 featurePoint = cell + vec2(jitterX, jitterZ) * 0.8 + 0.1;
+				float featureDistance = length(point - featurePoint);
+				if (featureDistance < nearestDistance) {
+					secondDistance = nearestDistance;
+					nearestDistance = featureDistance;
+				}
+				else if (featureDistance < secondDistance) {
+					secondDistance = featureDistance;
+				}
+			}
+		}
+		return secondDistance - nearestDistance;
+	}
 
 	void main() {
 		// 셀 경계까지의 거리 기반 안티앨리어싱 그리드 라인. (월드 좌표 고정 → 지형과 함께 흐름)
@@ -479,19 +492,17 @@
 		float streamFlow = 0.55 + 0.3 * flowShimmer;
 		color += vec3(1.0, 0.88, 0.55) * (lateralGlow * 0.3 + coreGlow * 0.45) * streamFlow;
 
-		// 가로지르는 개울. (terrainHeight 의 물길 카빙과 동일 수식)
-		float streamIndex = floor(fragmentWorldPosition.z / 24.0);
-		float streamLocalZ = fragmentWorldPosition.z - streamIndex * 24.0 - 12.0;
-		float streamPhase = streamIndex * 2.399;
-		float streamSlope = sin(streamIndex * 1.7) * 0.08;
-		float streamPathZ = sin(fragmentWorldPosition.x * 0.11 + streamPhase) * 2.2 + fragmentWorldPosition.x * streamSlope;
-		float streamAcross = streamLocalZ - streamPathZ;
-		float streamWidthBase = 0.5 + 0.5 * sin(fragmentWorldPosition.x * 0.13 + streamIndex * 3.1);
-		float streamWidth = 1.3 + streamWidthBase * streamWidthBase * 2.1;
-		float riverExcess = abs(streamAcross) - streamWidth;
-		float puddleMask = (1.0 - smoothstep(-0.15, 0.15, riverExcess)) * (1.0 - smoothstep(0.05, 0.4, fragmentHeight)) * waterStrength;
+		// 수맥. (보로노이 경계망 — 나무 뿌리/번개처럼 여러 갈래로 갈라지는 가는 발광 물길)
+		// 큰 수맥 + 가는 잔가지 2계층. 언덕 위까지 그대로 타고 오른다.
+		vec2 mainVeinCoordinate = fragmentWorldPosition.xz / 16.0;
+		float mainVeinEdge = voronoiEdgeDistance(mainVeinCoordinate) * 16.0;
+		float mainVeinMask = 1.0 - smoothstep(0.3, 0.7, mainVeinEdge);
+		vec2 fineVeinCoordinate = fragmentWorldPosition.xz / 7.0 + 53.7;
+		float fineVeinEdge = voronoiEdgeDistance(fineVeinCoordinate) * 7.0;
+		float fineVeinMask = (1.0 - smoothstep(0.14, 0.36, fineVeinEdge)) * 0.55;
+		float puddleMask = max(mainVeinMask, fineVeinMask) * waterStrength;
 		if (puddleMask > 0.001) {
-			// 네온 물: 그라디언트도 없는 단일 색 순수 발광, 최대 밝기.
+			// 네온 물: 무늬/그라디언트 없는 단일 색 순수 발광, 최대 밝기.
 			vec3 waterColor = vec3(1.0, 0.95, 0.72);
 			color = mix(color, waterColor, puddleMask);
 		}
@@ -1346,20 +1357,7 @@
 		const noiseMedium = valueNoiseAt(worldX * 0.15 + 37.0, worldZ * 0.15 + 37.0);
 		const noiseSmall = valueNoiseAt(worldX * 0.37 + 91.0, worldZ * 0.37 + 91.0);
 		const combined = noiseLarge * 1.4 + noiseMedium * 0.65 + noiseSmall * 0.25;
-		const height = System.Math.pow(System.Math.max(combined - 0.7, 0), 1.5) * 4.6 * sideFactor;
-
-		// 개울이 지나는 자리는 지형을 깎아 물길을 만든다. (셰이더 riverExcessAt 와 동일)
-		const streamIndex = System.Math.floor(worldZ / 24.0);
-		const streamLocalZ = worldZ - streamIndex * 24.0 - 12.0;
-		const streamPhase = streamIndex * 2.399;
-		const streamSlope = System.Math.sin(streamIndex * 1.7) * 0.08;
-		const streamPathZ = System.Math.sin(worldX * 0.11 + streamPhase) * 2.2 + worldX * streamSlope;
-		const streamAcross = streamLocalZ - streamPathZ;
-		const streamWidthBase = 0.5 + 0.5 * System.Math.sin(worldX * 0.13 + streamIndex * 3.1);
-		const streamWidth = 1.3 + streamWidthBase * streamWidthBase * 2.1;
-		const riverExcess = System.Math.abs(streamAcross) - streamWidth;
-		const riverCarve = 1 - smoothstepValue(0.0, 2.0, riverExcess);
-		return height * (1 - riverCarve);
+		return System.Math.pow(System.Math.max(combined - 0.7, 0), 1.5) * 4.6 * sideFactor;
 	}
 
 	//==============================================================================
