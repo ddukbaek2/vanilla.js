@@ -1,24 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
 	<defs>
 		<linearGradient id="skyGradient" x1="0" y1="0" x2="0" y2="1">
-			<stop offset="0" stop-color="#0a0218"/>
-			<stop offset="1" stop-color="#3a0d45"/>
+			<stop offset="0" stop-color="#0d0704"/>
+			<stop offset="1" stop-color="#5a3410"/>
 		</linearGradient>
 		<linearGradient id="sunGradient" x1="0" y1="0" x2="0" y2="1">
-			<stop offset="0" stop-color="#ffd75e"/>
-			<stop offset="1" stop-color="#ff2f9e"/>
+			<stop offset="0" stop-color="#fff3c8"/>
+			<stop offset="1" stop-color="#e07a20"/>
 		</linearGradient>
-		<clipPath id="sunClip">
-			<path d="M8 8 H56 V38 H8 Z M8 40.5 H56 V43.5 H8 Z M8 46 H56 V48 H8 Z"/>
-		</clipPath>
 	</defs>
 	<rect width="64" height="64" rx="12" fill="url(#skyGradient)"/>
-	<circle cx="32" cy="30" r="16" fill="url(#sunGradient)" clip-path="url(#sunClip)"/>
-	<g stroke="#ff3fd8" stroke-width="1.4" fill="none" opacity="0.9">
+	<circle cx="32" cy="28" r="15" fill="url(#sunGradient)"/>
+	<g stroke="#e8a23c" stroke-width="1.4" fill="none" opacity="0.9">
 		<path d="M2 62 L26 40 M62 62 L38 40 M32 64 L32 40"/>
 		<path d="M6 46 H58 M2 54 H62"/>
 	</g>
-	<g stroke="#50dcff" stroke-width="1" fill="none" opacity="0.8">
+	<g stroke="#f3e5ab" stroke-width="1" fill="none" opacity="0.85">
 		<path d="M8 40 H56"/>
 	</g>
 </svg>

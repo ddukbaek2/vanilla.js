@@ -12,7 +12,7 @@
 			width: 100%;
 			height: 100%;
 			overflow: hidden;
-			background: #05010d;
+			background: #0d0704;
 		}
 		#mainCanvas {
 			position: absolute;
@@ -25,63 +25,59 @@
 		#titleOverlay {
 			position: absolute;
 			left: 50%;
-			top: 12%;
+			top: 13%;
 			transform: translateX(-50%);
 			text-align: center;
 			pointer-events: none;
 			user-select: none;
-			font-family: "Segoe UI", "Malgun Gothic", sans-serif;
-			animation: titleEntrance 2.4s cubic-bezier(0.16, 1, 0.3, 1) both, titleFlicker 6s linear 2.4s infinite;
+			font-family: "Segoe UI Light", "Segoe UI", "Malgun Gothic", sans-serif;
+			animation: titleEntrance 3.2s cubic-bezier(0.16, 1, 0.3, 1) both;
 		}
 		#titleMain {
-			font-size: clamp(40px, 9vw, 110px);
-			font-weight: 900;
-			font-style: italic;
-			letter-spacing: 0.08em;
-			color: #ffffff;
-			background: linear-gradient(180deg, #9ef7ff 0%, #ffffff 42%, #ff3fd8 58%, #7a1fa0 100%);
-			-webkit-background-clip: text;
-			background-clip: text;
-			-webkit-text-fill-color: transparent;
-			filter: drop-shadow(0 0 18px rgba(255, 63, 216, 0.55)) drop-shadow(0 0 42px rgba(80, 220, 255, 0.35));
+			font-size: clamp(28px, 5.6vw, 68px);
+			font-weight: 200;
+			letter-spacing: 0.5em;
+			text-indent: 0.5em;
+			color: #f1e9d8;
+			text-shadow: 0 0 28px rgba(243, 229, 171, 0.4), 0 0 64px rgba(255, 180, 90, 0.2);
+		}
+		#titleDivider {
+			width: min(240px, 40vw);
+			height: 1px;
+			margin: 16px auto 14px;
+			background: linear-gradient(90deg, transparent, rgba(243, 229, 171, 0.7), transparent);
 		}
 		#titleSub {
-			margin-top: 0.4em;
-			font-size: clamp(11px, 1.8vw, 18px);
-			font-weight: 400;
-			letter-spacing: 0.62em;
-			text-indent: 0.62em;
-			color: rgba(158, 247, 255, 0.85);
-			text-shadow: 0 0 12px rgba(80, 220, 255, 0.8);
+			font-size: clamp(9px, 1.2vw, 12px);
+			font-weight: 300;
+			letter-spacing: 0.85em;
+			text-indent: 0.85em;
+			color: rgba(209, 193, 178, 0.75);
+			text-shadow: 0 0 10px rgba(243, 229, 171, 0.4);
 		}
 		#hintOverlay {
 			position: absolute;
 			left: 50%;
-			bottom: 4%;
+			bottom: 6.5%;
 			transform: translateX(-50%);
 			pointer-events: none;
 			user-select: none;
 			font-family: "Segoe UI", "Malgun Gothic", sans-serif;
-			font-size: clamp(10px, 1.4vw, 13px);
-			letter-spacing: 0.3em;
-			text-indent: 0.3em;
-			color: rgba(255, 255, 255, 0.35);
-			text-shadow: 0 0 8px rgba(255, 63, 216, 0.5);
+			font-size: clamp(9px, 1.2vw, 12px);
+			font-weight: 300;
+			letter-spacing: 0.4em;
+			text-indent: 0.4em;
+			color: rgba(241, 233, 216, 0.4);
+			text-shadow: 0 0 8px rgba(243, 229, 171, 0.35);
 			animation: hintPulse 3s ease-in-out infinite;
 		}
 		@keyframes titleEntrance {
-			0% { opacity: 0; transform: translateX(-50%) translateY(-30px) scale(1.06); filter: blur(14px); }
-			100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); filter: blur(0); }
-		}
-		@keyframes titleFlicker {
-			0%, 91%, 94%, 100% { opacity: 1; }
-			92% { opacity: 0.55; }
-			93% { opacity: 0.9; }
-			93.5% { opacity: 0.65; }
+			0% { opacity: 0; transform: translateX(-50%) translateY(-14px); filter: blur(8px); }
+			100% { opacity: 1; transform: translateX(-50%) translateY(0); filter: blur(0); }
 		}
 		@keyframes hintPulse {
-			0%, 100% { opacity: 0.3; }
-			50% { opacity: 0.75; }
+			0%, 100% { opacity: 0.35; }
+			50% { opacity: 0.8; }
 		}
 	</style>
 </head>
@@ -89,9 +85,10 @@
 	<canvas id="mainCanvas"></canvas>
 	<div id="titleOverlay">
 		<div id="titleMain">NEON HORIZON</div>
+		<div id="titleDivider"></div>
 		<div id="titleSub">VANILLA.JS &middot; 3D EXAMPLE</div>
 	</div>
-	<div id="hintOverlay">MOVE MOUSE / TOUCH TO LOOK AROUND</div>
+	<div id="hintOverlay">MOVE TO LOOK &middot; HOLD TO BOOST</div>
 	<script>
 	"use strict";
 	const System = globalThis;
@@ -112,7 +109,7 @@
 	}
 	`;
 
-	// 배경. (하늘 그라디언트 + 줄무늬 태양 + 별 + 유성 + 지평선 글로우)
+	// 배경. (초콜릿 하늘 + 줄무늬 바닐라 태양 + 별 + 유성 + 지평선 글로우)
 	const BACKGROUND_FRAGMENTSHADER_SOURCE = `#version 300 es
 	precision highp float;
 	in vec2 fragmentCoordinate;
@@ -137,49 +134,25 @@
 		vec2 screenPoint = vec2(fragmentCoordinate.x * aspectRatio, fragmentCoordinate.y);
 		float horizonY = -0.08;
 
-		// 하늘 그라디언트. (위: 짙은 남보라, 지평선: 붉은 보라)
-		vec3 skyTopColor = vec3(0.015, 0.005, 0.06);
-		vec3 skyHorizonColor = vec3(0.38, 0.05, 0.42);
+		// 하늘 그라디언트. (위: 짙은 초콜릿, 지평선: 따뜻한 캐러멜)
+		vec3 skyTopColor = vec3(0.045, 0.028, 0.014);
+		vec3 skyHorizonColor = vec3(0.46, 0.26, 0.1);
 		float skyGradient = smoothstep(1.1, horizonY, fragmentCoordinate.y);
 		vec3 color = mix(skyTopColor, skyHorizonColor, skyGradient * skyGradient);
-
-		// 오로라 커튼. (지평선 위 은은한 색 물결)
-		if (fragmentCoordinate.y > horizonY) {
-			float auroraWave = sin(screenPoint.x * 2.1 + elapsedTime * 0.35) * 0.5 + sin(screenPoint.x * 4.7 - elapsedTime * 0.22) * 0.25;
-			float auroraBand = exp(-abs(fragmentCoordinate.y - 0.55 - auroraWave * 0.12) * 5.5);
-			vec3 auroraColor = mix(vec3(0.05, 0.5, 0.55), vec3(0.35, 0.1, 0.6), 0.5 + 0.5 * sin(screenPoint.x * 1.3 + elapsedTime * 0.4));
-			color += auroraColor * auroraBand * 0.16;
-		}
-
-		// 지평선 광기둥. (도시의 불빛처럼 은은히 솟는 세로 빔)
-		if (fragmentCoordinate.y > horizonY - 0.02) {
-			float pillarCoordinate = screenPoint.x * 4.0 + 40.0;
-			float pillarCell = floor(pillarCoordinate);
-			float pillarRandom = hash21(vec2(pillarCell, 3.7));
-			if (pillarRandom > 0.45) {
-				float pillarCenterOffset = abs(fract(pillarCoordinate) - 0.5 - (pillarRandom - 0.5) * 0.6);
-				float pillarHeight = 0.1 + fract(pillarRandom * 17.3) * 0.3;
-				float pillarEnvelope = exp(-max(fragmentCoordinate.y - horizonY, 0.0) / pillarHeight);
-				float pillarBeam = exp(-pillarCenterOffset * 34.0) * pillarEnvelope;
-				vec3 pillarColor = mix(vec3(1.0, 0.3, 0.8), vec3(0.3, 0.9, 1.0), fract(pillarRandom * 7.7));
-				float pillarFlicker = 0.7 + 0.3 * sin(elapsedTime * (1.0 + pillarRandom * 3.0) + pillarRandom * 30.0);
-				color += pillarColor * pillarBeam * pillarFlicker * 0.4;
-			}
-		}
 
 		// 별. (지평선 위에서만, 셀 내 원형 스프라이트 + 반짝임)
 		if (fragmentCoordinate.y > horizonY) {
 			vec2 starGrid = screenPoint * 60.0;
 			vec2 starCell = floor(starGrid);
 			float starRandom = hash21(starCell);
-			if (starRandom > 0.92) {
+			if (starRandom > 0.93) {
 				vec2 starLocalPoint = fract(starGrid) - vec2(fract(starRandom * 13.7), fract(starRandom * 71.3));
 				float starDistance = length(starLocalPoint);
-				float starSize = 0.04 + fract(starRandom * 93.1) * 0.1;
+				float starSize = 0.04 + fract(starRandom * 93.1) * 0.08;
 				float starIntensity = smoothstep(starSize, 0.0, starDistance);
 				float twinkle = 0.45 + 0.55 * sin(elapsedTime * (2.0 + starRandom * 6.0) + starRandom * 40.0);
 				float starFade = smoothstep(horizonY, horizonY + 0.35, fragmentCoordinate.y);
-				color += vec3(0.9, 0.95, 1.0) * starIntensity * twinkle * starFade;
+				color += vec3(1.0, 0.95, 0.84) * starIntensity * twinkle * starFade * 0.8;
 			}
 		}
 
@@ -197,37 +170,36 @@
 				vec2 tailPoint = headPoint - velocity * 0.16;
 				float streakDistance = segmentDistance(screenPoint, tailPoint, headPoint);
 				float streakFade = (1.0 - travel) * smoothstep(horizonY + 0.1, horizonY + 0.3, fragmentCoordinate.y);
-				color += vec3(0.85, 0.9, 1.0) * exp(-streakDistance * 220.0) * streakFade * 1.6;
-				color += vec3(0.5, 0.7, 1.0) * exp(-streakDistance * 40.0) * streakFade * 0.35;
+				color += vec3(1.0, 0.94, 0.8) * exp(-streakDistance * 220.0) * streakFade * 1.6;
+				color += vec3(0.9, 0.68, 0.38) * exp(-streakDistance * 40.0) * streakFade * 0.35;
 			}
 		}
 
-		// 태양. (지평선에 걸친 줄무늬 디스크)
+		// 태양. (지평선에 걸친 그라디언트 디스크, 하단은 대기 헤이즈에 녹아듦)
 		vec2 sunCenter = vec2(0.0, horizonY + 0.18);
 		float sunDistance = length(vec2(screenPoint.x, (fragmentCoordinate.y - sunCenter.y) * 1.0) - vec2(sunCenter.x, 0.0));
 		float sunRadius = 0.34;
-		float sunDisc = smoothstep(sunRadius, sunRadius - 0.008, sunDistance);
+		float sunDisc = smoothstep(sunRadius, sunRadius - 0.012, sunDistance);
 
-		// 아래로 갈수록 두꺼워지는 가로 줄무늬로 태양을 자름.
+		// 하단 대기 용해. (수평선 근처에서 부드럽게 사라짐)
 		float sunLocalY = (fragmentCoordinate.y - (sunCenter.y - sunRadius)) / (sunRadius * 2.0);
-		float stripe = smoothstep(0.0, 0.08, abs(fract(sunLocalY * 14.0 - elapsedTime * 0.6) - 0.5) - (0.5 - sunLocalY) * 0.42);
-		sunDisc *= clamp(stripe + step(0.62, sunLocalY), 0.0, 1.0);
+		sunDisc *= smoothstep(-0.08, 0.3, sunLocalY);
 
-		// 태양 색상 그라디언트. (위: 노랑, 아래: 마젠타)
-		vec3 sunColor = mix(vec3(1.0, 0.16, 0.62), vec3(1.0, 0.86, 0.35), clamp(sunLocalY, 0.0, 1.0));
+		// 태양 색상 그라디언트. (위: 크림 바닐라, 아래: 구운 캐러멜)
+		vec3 sunColor = mix(vec3(0.95, 0.42, 0.12), vec3(1.0, 0.93, 0.66), clamp(sunLocalY, 0.0, 1.0));
 		color = mix(color, sunColor, sunDisc);
 
 		// 태양 주변 글로우 + 지평선 글로우.
 		float sunGlow = exp(-sunDistance * 4.2) * 0.38;
-		color += vec3(1.0, 0.25, 0.65) * sunGlow;
+		color += vec3(1.0, 0.62, 0.24) * sunGlow;
 		float horizonGlow = exp(-abs(fragmentCoordinate.y - horizonY) * 9.0) * 0.5;
-		color += vec3(0.9, 0.2, 0.75) * horizonGlow;
+		color += vec3(0.95, 0.55, 0.2) * horizonGlow;
 
 		outputColor = vec4(color, 1.0);
 	}
 	`;
 
-	// 지형. (정점에서 높이 변위, 프래그먼트에서 네온 그리드 라인 + 도로 에너지 스트림)
+	// 지형. (정점에서 높이 변위 + 등장 페이드, 프래그먼트에서 네온 그리드 + 유광 물웅덩이)
 	const TERRAIN_VERTEXSHADER_SOURCE = `#version 300 es
 	in vec2 vertexGridPosition;
 	uniform mat4 projectionMatrix;
@@ -256,6 +228,10 @@
 		float height = terrainHeight(worldXZ);
 		float viewDistance = vertexGridPosition.y - residualOffset;
 
+		// 등장 페이드: 먼 곳의 언덕이 잘려 나타나지 않고 지평선에서 서서히 솟아오르도록.
+		float emergenceFade = 1.0 - smoothstep(34.0, 44.0, viewDistance);
+		height *= emergenceFade;
+
 		// 카메라는 -z 방향을 바라보므로 렌더 좌표의 z 는 부호를 뒤집는다.
 		vec3 renderPosition = vec3(vertexGridPosition.x, height, -viewDistance);
 		fragmentWorldPosition = vec3(worldXZ.x, height, worldXZ.y);
@@ -280,11 +256,11 @@
 		float lineDistance = min(gridDistance.x, gridDistance.y);
 		float lineIntensity = 1.0 - smoothstep(0.0, 1.6, lineDistance);
 
-		// 높이에 따른 네온 색상. (핑크 → 시안)
+		// 높이에 따른 네온 색상. (캐러멜 → 크림 바닐라)
 		float heightRatio = clamp(fragmentHeight * 0.22, 0.0, 1.0);
-		vec3 lineColor = mix(vec3(1.0, 0.18, 0.75), vec3(0.25, 0.95, 1.0), heightRatio);
+		vec3 lineColor = mix(vec3(0.95, 0.58, 0.14), vec3(1.0, 0.95, 0.75), heightRatio);
 
-		// 면 단위(플랫 셰이딩) 네온 라이팅. (태양의 마젠타 필 + 하늘의 시안 필)
+		// 면 단위(플랫 셰이딩) 라이팅. (태양의 캐러멜 필 + 하늘의 아이보리 필)
 		vec3 surfacePosition = vec3(fragmentWorldPosition.x, fragmentHeight, fragmentViewDistance);
 		vec3 surfaceNormal = normalize(cross(dFdx(surfacePosition), dFdy(surfacePosition)));
 		if (surfaceNormal.y < 0.0) {
@@ -295,63 +271,74 @@
 		float skyLight = max(surfaceNormal.y, 0.0);
 
 		// 바닥 면 색상. (라이팅 반영된 로우폴리 패싯)
-		vec3 floorColor = vec3(0.03, 0.0, 0.07);
-		floorColor += vec3(0.45, 0.06, 0.3) * sunLight * smoothstep(0.2, 2.5, fragmentHeight);
-		floorColor += vec3(0.05, 0.1, 0.16) * skyLight * 0.35;
+		vec3 floorColor = vec3(0.05, 0.032, 0.016);
+		floorColor += vec3(0.42, 0.24, 0.09) * sunLight * smoothstep(0.2, 2.5, fragmentHeight);
+		floorColor += vec3(0.12, 0.1, 0.07) * skyLight * 0.35;
 
 		float lineGlow = 1.0 - smoothstep(0.0, 6.0, lineDistance);
 		vec3 color = floorColor + lineColor * lineIntensity * 1.35 + lineColor * lineGlow * 0.22;
 
-		// 도로 중앙 에너지 스트림. (시안 광선이 맥동하며 흐름)
-		float roadPulse = 0.55 + 0.45 * sin(scrollOffset * 2.4 - fragmentViewDistance * 0.9);
-		float roadGlow = exp(-abs(fragmentWorldPosition.x) * 1.6);
-		color += vec3(0.2, 0.9, 1.0) * roadGlow * roadPulse * 0.5;
+		// 도로 중앙 에너지 스트림. (꼬리가 길게 빠지는 빛줄기가 연속적으로 흘러오는 형태)
+		float lateralGlow = exp(-abs(fragmentWorldPosition.x) * 1.6);
+		float streamPhase = fract(fragmentViewDistance * 0.12 + scrollOffset * 0.25);
+		float streamFlow = 0.2 + 0.8 * pow(streamPhase, 3.0);
+		color += vec3(1.0, 0.88, 0.55) * lateralGlow * streamFlow * 0.55;
 
-		// 물웅덩이. (평지 곳곳에 월드 좌표로 고정 배치, 물에서만 꿀렁이는 리플)
+		// 물웅덩이. (평지 곳곳에 월드 좌표로 고정 배치)
 		float puddleNoise = sin(fragmentWorldPosition.x * 0.33 + fragmentWorldPosition.z * 0.19 + 1.3)
 		                  + sin(fragmentWorldPosition.x * 0.17 - fragmentWorldPosition.z * 0.29 + 4.2);
 		float flatFactor = 1.0 - smoothstep(0.02, 0.3, fragmentHeight);
 		float sideBand = smoothstep(1.7, 3.0, abs(fragmentWorldPosition.x)) * (1.0 - smoothstep(13.0, 19.0, abs(fragmentWorldPosition.x)));
 		float puddleMask = smoothstep(0.85, 1.3, puddleNoise) * flatFactor * sideBand;
 		if (puddleMask > 0.001) {
-			// 물결 리플.
-			vec2 rippleCoordinate = fragmentWorldPosition.xz * 2.0;
-			float ripple = sin(rippleCoordinate.x * 1.7 + elapsedTime * 2.6 + sin(rippleCoordinate.y * 1.3 + elapsedTime * 1.9))
-			             + sin(rippleCoordinate.y * 2.1 - elapsedTime * 2.2 + sin(rippleCoordinate.x * 1.1 - elapsedTime * 1.4));
-			float rippleHighlight = smoothstep(1.1, 1.9, ripple);
-			vec3 waterColor = vec3(0.02, 0.06, 0.16);
+			// 유광 유체 셰이딩: 흐르는 물결 높이장을 해석적으로 미분해 노멀을 만들고
+			// 스페큘러 + 프레넬 반사로 광택 나는 액체처럼 표현.
+			vec2 flowCoordinate = fragmentWorldPosition.xz;
+			float wavePhase1 = dot(flowCoordinate, vec2(1.9, 1.2)) + elapsedTime * 2.1;
+			float wavePhase2 = dot(flowCoordinate, vec2(-1.3, 2.3)) - elapsedTime * 1.6;
+			float wavePhase3 = dot(flowCoordinate, vec2(2.7, -0.8)) + elapsedTime * 2.8;
+			vec2 waveGradient = vec2(1.9, 1.2) * cos(wavePhase1) * 0.045
+			                  + vec2(-1.3, 2.3) * cos(wavePhase2) * 0.03
+			                  + vec2(2.7, -0.8) * cos(wavePhase3) * 0.02;
+			vec3 waterNormal = normalize(vec3(-waveGradient.x, 1.0, -waveGradient.y));
 
-			// 태양 반사 스트릭. (태양 방향에서 마젠타 일렁임)
-			float sunReflection = exp(-abs(fragmentWorldPosition.x) * 0.28) * (0.6 + 0.4 * sin(elapsedTime * 3.1 + fragmentWorldPosition.z * 2.3 + ripple));
-			waterColor += vec3(1.0, 0.25, 0.6) * sunReflection * 0.55;
-			waterColor += vec3(0.45, 0.9, 1.0) * rippleHighlight * 0.85;
+			// 시선 / 광원 방향. (카메라는 위쪽 뒤, 태양은 지평선 정면)
+			vec3 viewDirection = normalize(vec3(-fragmentWorldPosition.x * 0.04, 0.5, -1.0));
+			vec3 lightDirection = normalize(vec3(-fragmentWorldPosition.x * 0.03, 0.35, 1.0));
+			vec3 halfVector = normalize(viewDirection + lightDirection);
+			float specular = pow(max(dot(waterNormal, halfVector), 0.0), 90.0);
+			float fresnel = pow(1.0 - max(dot(waterNormal, viewDirection), 0.0), 3.0);
+
+			// 짙은 모카 심연 + 프레넬 하늘 반사 + 크림 스페큘러 하이라이트.
+			vec3 waterColor = mix(vec3(0.06, 0.04, 0.022), vec3(0.5, 0.3, 0.12), fresnel);
+			waterColor += vec3(1.0, 0.93, 0.7) * specular * 1.6;
+
+			// 태양 반사 스트릭. (태양 방향의 일렁이는 광택)
+			float sunReflection = exp(-abs(fragmentWorldPosition.x) * 0.28);
+			waterColor += vec3(1.0, 0.62, 0.24) * sunReflection * (0.22 + 0.4 * specular + 0.25 * fresnel);
 
 			float waterBlend = smoothstep(0.0, 0.5, puddleMask);
 			color = mix(color, waterColor, waterBlend);
 
-			// 웅덩이 가장자리 네온 테두리.
+			// 웅덩이 가장자리 크림 테두리.
 			float puddleEdge = smoothstep(0.0, 0.2, puddleMask) * (1.0 - smoothstep(0.2, 0.55, puddleMask));
-			color += vec3(0.3, 0.95, 1.0) * puddleEdge * 0.8;
+			color += vec3(1.0, 0.9, 0.6) * puddleEdge * 0.8;
 		}
 
-		// 스캔 파동. (지평선에서 카메라 쪽으로 밀려오는 빛의 링)
-		float scanWave = exp(-abs(fract(fragmentViewDistance * 0.02 + elapsedTime * 0.24) - 0.5) * 26.0);
-		color += lineColor * scanWave * lineIntensity * 1.2;
-
 		// 맥동. (라인이 은은하게 숨쉬듯)
-		color *= 0.92 + 0.08 * sin(elapsedTime * 2.2 + fragmentViewDistance * 0.35);
+		color *= 0.94 + 0.06 * sin(elapsedTime * 2.2 + fragmentViewDistance * 0.35);
 
 		// 거리 안개. (지평선 색으로 흡수)
 		float fogFactor = smoothstep(18.0, 46.0, fragmentViewDistance);
-		vec3 fogColor = vec3(0.36, 0.05, 0.4);
+		vec3 fogColor = vec3(0.42, 0.24, 0.1);
 		color = mix(color, fogColor, fogFactor);
 
 		outputColor = vec4(color, 1.0);
 	}
 	`;
 
-	// 와이어프레임 오벨리스크. (인스턴싱, 가산 합성)
-	const OBELISK_VERTEXSHADER_SOURCE = `#version 300 es
+	// 모노리스. (지평선 중앙에 떠 있는 거대한 와이어프레임 팔면체, 가산 합성)
+	const MONOLITH_VERTEXSHADER_SOURCE = `#version 300 es
 	in vec3 vertexPosition;
 	in vec4 instanceData; // x, y, z, seed
 	uniform mat4 projectionMatrix;
@@ -363,29 +350,28 @@
 	void main() {
 		float seed = instanceData.w;
 
-		// 인스턴스별 회전 / 부유 / 크기.
-		float spinRadian = elapsedTime * (0.5 + seed * 1.2) + seed * 40.0;
+		// 인스턴스별 느린 회전 / 부유 / 크기.
+		float spinRadian = elapsedTime * (0.1 + seed * 0.12) + seed * 40.0;
 		float cosSpin = cos(spinRadian);
 		float sinSpin = sin(spinRadian);
-		float scale = 0.8 + seed * 1.6;
+		float scale = 1.0 + seed * 5.5;
 		vec3 localPosition = vertexPosition * scale;
 		vec3 spunPosition = vec3(
 			localPosition.x * cosSpin - localPosition.z * sinSpin,
 			localPosition.y,
 			localPosition.x * sinSpin + localPosition.z * cosSpin);
 
-		float floatOffset = sin(elapsedTime * (0.7 + seed) + seed * 20.0) * 0.5;
-		float loopZ = mod(instanceData.z + elapsedTime * 4.2, 44.0) + 2.0;
-		vec3 worldPosition = vec3(instanceData.x, instanceData.y + floatOffset, loopZ) + spunPosition;
+		float floatOffset = sin(elapsedTime * (0.4 + seed * 0.3) + seed * 20.0) * 0.4;
+		vec3 worldPosition = vec3(instanceData.x, instanceData.y + floatOffset, instanceData.z) + spunPosition;
 
 		// 카메라는 -z 방향을 바라보므로 렌더 좌표의 z 는 부호를 뒤집는다.
 		vec3 renderPosition = vec3(worldPosition.x, worldPosition.y, -worldPosition.z);
 		gl_Position = projectionMatrix * viewMatrix * vec4(renderPosition, 1.0);
 		fragmentSeed = seed;
-		fragmentDepthFade = 1.0 - smoothstep(20.0, 44.0, loopZ);
+		fragmentDepthFade = 1.0 - smoothstep(30.0, 52.0, instanceData.z);
 	}
 	`;
-	const OBELISK_FRAGMENTSHADER_SOURCE = `#version 300 es
+	const MONOLITH_FRAGMENTSHADER_SOURCE = `#version 300 es
 	precision highp float;
 	in float fragmentSeed;
 	in float fragmentDepthFade;
@@ -393,31 +379,32 @@
 	out vec4 outputColor;
 
 	void main() {
-		vec3 pinkColor = vec3(1.0, 0.3, 0.85);
-		vec3 cyanColor = vec3(0.3, 0.95, 1.0);
-		vec3 color = mix(pinkColor, cyanColor, fract(fragmentSeed * 5.13));
-		float pulse = 0.6 + 0.4 * sin(elapsedTime * (2.0 + fragmentSeed * 2.0) + fragmentSeed * 30.0);
-		outputColor = vec4(color * pulse * fragmentDepthFade * 0.9, 0.0);
+		vec3 goldColor = vec3(1.0, 0.72, 0.3);
+		vec3 creamColor = vec3(0.98, 0.92, 0.7);
+		vec3 color = mix(goldColor, creamColor, fract(fragmentSeed * 5.13));
+		float pulse = 0.7 + 0.3 * sin(elapsedTime * (0.8 + fragmentSeed) + fragmentSeed * 30.0);
+		outputColor = vec4(color * pulse * fragmentDepthFade * 0.85, 0.0);
 	}
 	`;
 
-	// 워프 스트릭. (카메라를 향해 날아오는 빛줄기, 가산 합성 라인)
+	// 부스트 빛살. (꾹 누르면 가속하며 카메라를 스쳐 지나가는 먼지빛살)
 	const STREAK_VERTEXSHADER_SOURCE = `#version 300 es
 	in vec4 streakData; // x, y, z, seed
 	in float streakEndFlag; // 0 = 머리, 1 = 꼬리
 	uniform mat4 projectionMatrix;
 	uniform mat4 viewMatrix;
-	uniform float elapsedTime;
+	uniform float streakScroll;
+	uniform float boostFactor;
 	out float fragmentSeed;
 	out float fragmentTailRatio;
 
 	void main() {
 		float seed = streakData.w;
 
-		// 먼 곳에서 카메라 쪽으로 고속 접근. (되감기는 안개 속이라 티 안 남)
-		float speed = 16.0 + seed * 14.0;
-		float loopZ = 46.0 - mod(streakData.z + elapsedTime * speed, 46.0);
-		float streakLength = 1.2 + seed * 1.8;
+		// 먼 곳에서 카메라 쪽으로 접근. (개체별 속도 편차, 부스트 시 꼬리가 길어짐)
+		float speedFactor = 0.7 + seed * 0.6;
+		float loopZ = 46.0 - mod(streakData.z + streakScroll * speedFactor, 46.0);
+		float streakLength = (0.6 + seed * 1.0) * (0.35 + boostFactor * 2.2);
 		vec3 worldPosition = vec3(streakData.x, streakData.y, loopZ + streakEndFlag * streakLength);
 
 		// 카메라는 -z 방향을 바라보므로 렌더 좌표의 z 는 부호를 뒤집는다.
@@ -431,24 +418,29 @@
 	precision highp float;
 	in float fragmentSeed;
 	in float fragmentTailRatio;
+	uniform float boostFactor;
 	out vec4 outputColor;
 
 	void main() {
-		vec3 pinkColor = vec3(1.0, 0.35, 0.85);
-		vec3 cyanColor = vec3(0.35, 0.95, 1.0);
-		vec3 color = mix(pinkColor, cyanColor, fract(fragmentSeed * 3.77));
+		vec3 goldColor = vec3(1.0, 0.72, 0.35);
+		vec3 creamColor = vec3(0.97, 0.9, 0.68);
+		vec3 color = mix(goldColor, creamColor, fract(fragmentSeed * 3.77));
 		float headFade = 1.0 - fragmentTailRatio;
-		outputColor = vec4(color * headFade * 0.8, 0.0);
+
+		// 부스트 중에만 선명해짐. (평상시엔 거의 보이지 않음)
+		float boostAlpha = 0.04 + boostFactor * 0.9;
+		outputColor = vec4(color * headFade * boostAlpha, 0.0);
 	}
 	`;
 
-	// 부유 파티클. (가산 합성 포인트 스프라이트)
+	// 부유 먼지 파티클. (가산 합성 포인트 스프라이트, 지형 깊이에 가려짐)
 	const PARTICLE_VERTEXSHADER_SOURCE = `#version 300 es
 	in vec4 vertexParticle; // x, y, z, seed
 	uniform mat4 projectionMatrix;
 	uniform mat4 viewMatrix;
 	uniform float elapsedTime;
 	out float fragmentSeed;
+	out float fragmentProximityFade;
 
 	void main() {
 		float seed = vertexParticle.w;
@@ -463,13 +455,18 @@
 
 		vec4 viewPosition = viewMatrix * vec4(renderPosition, 1.0);
 		gl_Position = projectionMatrix * viewPosition;
-		gl_PointSize = clamp(90.0 / max(-viewPosition.z, 0.1), 1.5, 26.0);
+		float viewDepth = max(-viewPosition.z, 0.1);
+		gl_PointSize = clamp(70.0 / viewDepth, 1.5, 14.0);
+
+		// 카메라에 너무 가까운 파티클은 페이드. (거대한 원이 화면을 가리지 않도록)
+		fragmentProximityFade = smoothstep(1.2, 5.0, viewDepth);
 		fragmentSeed = seed;
 	}
 	`;
 	const PARTICLE_FRAGMENTSHADER_SOURCE = `#version 300 es
 	precision highp float;
 	in float fragmentSeed;
+	in float fragmentProximityFade;
 	uniform float elapsedTime;
 	out vec4 outputColor;
 
@@ -480,12 +477,12 @@
 		float alpha = smoothstep(0.5, 0.05, pointDistance);
 
 		// 파티클마다 색상과 반짝임 위상 차이.
-		vec3 pinkColor = vec3(1.0, 0.35, 0.8);
-		vec3 cyanColor = vec3(0.4, 0.95, 1.0);
-		vec3 color = mix(pinkColor, cyanColor, fract(fragmentSeed * 7.31));
+		vec3 goldColor = vec3(1.0, 0.72, 0.35);
+		vec3 creamColor = vec3(0.97, 0.9, 0.68);
+		vec3 color = mix(goldColor, creamColor, fract(fragmentSeed * 7.31));
 		float twinkle = 0.55 + 0.45 * sin(elapsedTime * (1.5 + fragmentSeed * 3.0) + fragmentSeed * 50.0);
 
-		outputColor = vec4(color * alpha * twinkle * 0.55, 0.0);
+		outputColor = vec4(color * alpha * twinkle * fragmentProximityFade * 0.45, 0.0);
 	}
 	`;
 
@@ -524,7 +521,7 @@
 	}
 	`;
 
-	// 최종 합성: 씬 + 블룸 + 색수차 + 스캔라인 + 그레인 + 비네트.
+	// 최종 합성: 씬 + 블룸 + 색수차 + 필믹 톤맵 + 비네트 + 레터박스.
 	const COMPOSITE_FRAGMENTSHADER_SOURCE = `#version 300 es
 	precision highp float;
 	in vec2 fragmentCoordinate;
@@ -532,6 +529,7 @@
 	uniform sampler2D sceneTexture;
 	uniform sampler2D bloomTexture;
 	uniform float elapsedTime;
+	uniform float boostFactor;
 	uniform vec2 resolution;
 	out vec4 outputColor;
 
@@ -542,9 +540,9 @@
 	}
 
 	void main() {
-		// 색수차. (화면 가장자리로 갈수록 RGB 채널 분리)
+		// 색수차. (가장자리로 갈수록 RGB 채널 분리, 부스트 시 강화되어 가속감)
 		vec2 centerOffset = fragmentTextureCoordinate - 0.5;
-		float aberrationAmount = dot(centerOffset, centerOffset) * 0.012;
+		float aberrationAmount = dot(centerOffset, centerOffset) * (0.012 + boostFactor * 0.02);
 		vec2 aberrationOffset = centerOffset * aberrationAmount;
 		float channelRed = texture(sceneTexture, fragmentTextureCoordinate + aberrationOffset).r;
 		float channelGreen = texture(sceneTexture, fragmentTextureCoordinate).g;
@@ -555,20 +553,25 @@
 		vec3 bloomColor = texture(bloomTexture, fragmentTextureCoordinate).rgb;
 		color += bloomColor * 0.95;
 
-		// 스캔라인. (은은한 CRT 감성)
+		// 은은한 스캔라인.
 		float scanline = sin(fragmentTextureCoordinate.y * resolution.y * 1.6) * 0.5 + 0.5;
-		color *= 0.94 + scanline * 0.06;
+		color *= 0.97 + scanline * 0.03;
 
 		// 필름 그레인.
 		float grain = hash21(fragmentTextureCoordinate * resolution.xy + fract(elapsedTime) * 371.0);
-		color += (grain - 0.5) * 0.028;
+		color += (grain - 0.5) * 0.012;
 
 		// 비네트.
-		float vignette = 1.0 - dot(fragmentCoordinate * 0.52, fragmentCoordinate * 0.52);
+		float vignette = 1.0 - dot(fragmentCoordinate * 0.5, fragmentCoordinate * 0.5);
 		color *= clamp(vignette, 0.0, 1.0);
 
-		// 톤 정리. (살짝 눌러서 하이라이트 보존)
-		color = color / (color + 0.55) * 1.55;
+		// ACES 근사 필믹 톤 매핑.
+		color = clamp((color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14), 0.0, 1.0);
+
+		// 시네마틱 레터박스.
+		float letterbox = smoothstep(0.0, 0.01, fragmentTextureCoordinate.y - 0.045)
+		                * smoothstep(0.0, 0.01, 0.955 - fragmentTextureCoordinate.y);
+		color *= letterbox;
 
 		outputColor = vec4(color, 1.0);
 	}
@@ -748,85 +751,59 @@
 	webGL2RenderingContext.bindVertexArray(null);
 	const terrainIndexCount = terrainIndices.length;
 
-	// 오벨리스크 프로그램 + 와이어프레임 메시 + 인스턴스 버퍼.
-	const obeliskProgram = createShaderProgram(webGL2RenderingContext, OBELISK_VERTEXSHADER_SOURCE, OBELISK_FRAGMENTSHADER_SOURCE);
-	const obeliskProjectionMatrixLocation = webGL2RenderingContext.getUniformLocation(obeliskProgram, "projectionMatrix");
-	const obeliskViewMatrixLocation = webGL2RenderingContext.getUniformLocation(obeliskProgram, "viewMatrix");
-	const obeliskElapsedTimeLocation = webGL2RenderingContext.getUniformLocation(obeliskProgram, "elapsedTime");
+	// 모노리스 프로그램 + 와이어프레임 메시 + 인스턴스 버퍼. (중앙 1 + 측면 2)
+	const monolithProgram = createShaderProgram(webGL2RenderingContext, MONOLITH_VERTEXSHADER_SOURCE, MONOLITH_FRAGMENTSHADER_SOURCE);
+	const monolithProjectionMatrixLocation = webGL2RenderingContext.getUniformLocation(monolithProgram, "projectionMatrix");
+	const monolithViewMatrixLocation = webGL2RenderingContext.getUniformLocation(monolithProgram, "viewMatrix");
+	const monolithElapsedTimeLocation = webGL2RenderingContext.getUniformLocation(monolithProgram, "elapsedTime");
 
 	// 팔면체(다이아몬드) 와이어프레임 라인 정점 목록.
-	const obeliskTopVertex = [0, 1.5, 0];
-	const obeliskBottomVertex = [0, -1.5, 0];
-	const obeliskRingVertices = [
+	const monolithTopVertex = [0, 1.5, 0];
+	const monolithBottomVertex = [0, -1.5, 0];
+	const monolithRingVertices = [
 		[0.55, 0, 0],
 		[0, 0, 0.55],
 		[-0.55, 0, 0],
 		[0, 0, -0.55],
 	];
-	const obeliskLinePositions = [];
+	const monolithLinePositions = [];
 	for (let ringIndex = 0; ringIndex < 4; ++ringIndex) {
-		const ringVertex = obeliskRingVertices[ringIndex];
-		const nextRingVertex = obeliskRingVertices[(ringIndex + 1) % 4];
-		obeliskLinePositions.push(...obeliskTopVertex, ...ringVertex);
-		obeliskLinePositions.push(...obeliskBottomVertex, ...ringVertex);
-		obeliskLinePositions.push(...ringVertex, ...nextRingVertex);
+		const ringVertex = monolithRingVertices[ringIndex];
+		const nextRingVertex = monolithRingVertices[(ringIndex + 1) % 4];
+		monolithLinePositions.push(...monolithTopVertex, ...ringVertex);
+		monolithLinePositions.push(...monolithBottomVertex, ...ringVertex);
+		monolithLinePositions.push(...ringVertex, ...nextRingVertex);
 	}
-	const OBELISK_INSTANCE_COUNT = 26;
-	const obeliskInstanceData = new Float32Array(OBELISK_INSTANCE_COUNT * 4);
-	for (let instanceIndex = 0; instanceIndex < OBELISK_INSTANCE_COUNT; ++instanceIndex) {
-		const sideSign = instanceIndex % 2 === 0 ? 1 : -1;
-		obeliskInstanceData[instanceIndex * 4 + 0] = sideSign * (6.5 + System.Math.random() * 10);
-		obeliskInstanceData[instanceIndex * 4 + 1] = 2.5 + System.Math.random() * 4.5;
-		obeliskInstanceData[instanceIndex * 4 + 2] = System.Math.random() * 44;
-		obeliskInstanceData[instanceIndex * 4 + 3] = System.Math.random();
-	}
-	const obeliskVertexArray = webGL2RenderingContext.createVertexArray();
-	webGL2RenderingContext.bindVertexArray(obeliskVertexArray);
-	const obeliskVertexBuffer = webGL2RenderingContext.createBuffer();
-	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, obeliskVertexBuffer);
-	webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, new Float32Array(obeliskLinePositions), webGL2RenderingContext.STATIC_DRAW);
-	const obeliskPositionLocation = webGL2RenderingContext.getAttribLocation(obeliskProgram, "vertexPosition");
-	webGL2RenderingContext.enableVertexAttribArray(obeliskPositionLocation);
-	webGL2RenderingContext.vertexAttribPointer(obeliskPositionLocation, 3, webGL2RenderingContext.FLOAT, false, 0, 0);
-	const obeliskInstanceBuffer = webGL2RenderingContext.createBuffer();
-	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, obeliskInstanceBuffer);
-	webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, obeliskInstanceData, webGL2RenderingContext.STATIC_DRAW);
-	const obeliskInstanceLocation = webGL2RenderingContext.getAttribLocation(obeliskProgram, "instanceData");
-	webGL2RenderingContext.enableVertexAttribArray(obeliskInstanceLocation);
-	webGL2RenderingContext.vertexAttribPointer(obeliskInstanceLocation, 4, webGL2RenderingContext.FLOAT, false, 0, 0);
-	webGL2RenderingContext.vertexAttribDivisor(obeliskInstanceLocation, 1);
+	const MONOLITH_INSTANCE_COUNT = 2;
+	const monolithInstanceData = new Float32Array([
+		-12, 3.8, 30, 0.5, // 좌측. (태양을 액자처럼 감싸는 구도)
+		12, 4.0, 31, 0.65, // 우측.
+	]);
+	const monolithVertexArray = webGL2RenderingContext.createVertexArray();
+	webGL2RenderingContext.bindVertexArray(monolithVertexArray);
+	const monolithVertexBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, monolithVertexBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, new Float32Array(monolithLinePositions), webGL2RenderingContext.STATIC_DRAW);
+	const monolithPositionLocation = webGL2RenderingContext.getAttribLocation(monolithProgram, "vertexPosition");
+	webGL2RenderingContext.enableVertexAttribArray(monolithPositionLocation);
+	webGL2RenderingContext.vertexAttribPointer(monolithPositionLocation, 3, webGL2RenderingContext.FLOAT, false, 0, 0);
+	const monolithInstanceBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, monolithInstanceBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, monolithInstanceData, webGL2RenderingContext.STATIC_DRAW);
+	const monolithInstanceLocation = webGL2RenderingContext.getAttribLocation(monolithProgram, "instanceData");
+	webGL2RenderingContext.enableVertexAttribArray(monolithInstanceLocation);
+	webGL2RenderingContext.vertexAttribPointer(monolithInstanceLocation, 4, webGL2RenderingContext.FLOAT, false, 0, 0);
+	webGL2RenderingContext.vertexAttribDivisor(monolithInstanceLocation, 1);
 	webGL2RenderingContext.bindVertexArray(null);
-	const obeliskLineVertexCount = obeliskLinePositions.length / 3;
+	const monolithLineVertexCount = monolithLinePositions.length / 3;
 
-	// 파티클 프로그램 + 정적 시드 버퍼.
-	const particleProgram = createShaderProgram(webGL2RenderingContext, PARTICLE_VERTEXSHADER_SOURCE, PARTICLE_FRAGMENTSHADER_SOURCE);
-	const particleProjectionMatrixLocation = webGL2RenderingContext.getUniformLocation(particleProgram, "projectionMatrix");
-	const particleViewMatrixLocation = webGL2RenderingContext.getUniformLocation(particleProgram, "viewMatrix");
-	const particleElapsedTimeLocation = webGL2RenderingContext.getUniformLocation(particleProgram, "elapsedTime");
-	const PARTICLE_COUNT = 1400;
-	const particleData = new Float32Array(PARTICLE_COUNT * 4);
-	for (let particleIndex = 0; particleIndex < PARTICLE_COUNT; ++particleIndex) {
-		particleData[particleIndex * 4 + 0] = (System.Math.random() - 0.5) * 34;
-		particleData[particleIndex * 4 + 1] = System.Math.random() * 7;
-		particleData[particleIndex * 4 + 2] = System.Math.random() * 38;
-		particleData[particleIndex * 4 + 3] = System.Math.random();
-	}
-	const particleVertexArray = webGL2RenderingContext.createVertexArray();
-	webGL2RenderingContext.bindVertexArray(particleVertexArray);
-	const particleVertexBuffer = webGL2RenderingContext.createBuffer();
-	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, particleVertexBuffer);
-	webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, particleData, webGL2RenderingContext.STATIC_DRAW);
-	const particleAttributeLocation = webGL2RenderingContext.getAttribLocation(particleProgram, "vertexParticle");
-	webGL2RenderingContext.enableVertexAttribArray(particleAttributeLocation);
-	webGL2RenderingContext.vertexAttribPointer(particleAttributeLocation, 4, webGL2RenderingContext.FLOAT, false, 0, 0);
-	webGL2RenderingContext.bindVertexArray(null);
-
-	// 워프 스트릭 프로그램 + 라인 버퍼. (스트릭당 머리/꼬리 2정점 인터리브)
+	// 부스트 빛살 프로그램 + 라인 버퍼. (빛살당 머리/꼬리 2정점 인터리브)
 	const streakProgram = createShaderProgram(webGL2RenderingContext, STREAK_VERTEXSHADER_SOURCE, STREAK_FRAGMENTSHADER_SOURCE);
 	const streakProjectionMatrixLocation = webGL2RenderingContext.getUniformLocation(streakProgram, "projectionMatrix");
 	const streakViewMatrixLocation = webGL2RenderingContext.getUniformLocation(streakProgram, "viewMatrix");
-	const streakElapsedTimeLocation = webGL2RenderingContext.getUniformLocation(streakProgram, "elapsedTime");
-	const STREAK_COUNT = 420;
+	const streakScrollLocation = webGL2RenderingContext.getUniformLocation(streakProgram, "streakScroll");
+	const streakBoostFactorLocation = webGL2RenderingContext.getUniformLocation(streakProgram, "boostFactor");
+	const STREAK_COUNT = 300;
 	const STREAK_FLOATS_PER_VERTEX = 5;
 	const streakVertexData = new Float32Array(STREAK_COUNT * 2 * STREAK_FLOATS_PER_VERTEX);
 	for (let streakIndex = 0; streakIndex < STREAK_COUNT; ++streakIndex) {
@@ -858,6 +835,29 @@
 	webGL2RenderingContext.vertexAttribPointer(streakEndFlagLocation, 1, webGL2RenderingContext.FLOAT, false, streakStrideBytes, 16);
 	webGL2RenderingContext.bindVertexArray(null);
 
+	// 파티클 프로그램 + 정적 시드 버퍼.
+	const particleProgram = createShaderProgram(webGL2RenderingContext, PARTICLE_VERTEXSHADER_SOURCE, PARTICLE_FRAGMENTSHADER_SOURCE);
+	const particleProjectionMatrixLocation = webGL2RenderingContext.getUniformLocation(particleProgram, "projectionMatrix");
+	const particleViewMatrixLocation = webGL2RenderingContext.getUniformLocation(particleProgram, "viewMatrix");
+	const particleElapsedTimeLocation = webGL2RenderingContext.getUniformLocation(particleProgram, "elapsedTime");
+	const PARTICLE_COUNT = 500;
+	const particleData = new Float32Array(PARTICLE_COUNT * 4);
+	for (let particleIndex = 0; particleIndex < PARTICLE_COUNT; ++particleIndex) {
+		particleData[particleIndex * 4 + 0] = (System.Math.random() - 0.5) * 34;
+		particleData[particleIndex * 4 + 1] = System.Math.random() * 7;
+		particleData[particleIndex * 4 + 2] = System.Math.random() * 38;
+		particleData[particleIndex * 4 + 3] = System.Math.random();
+	}
+	const particleVertexArray = webGL2RenderingContext.createVertexArray();
+	webGL2RenderingContext.bindVertexArray(particleVertexArray);
+	const particleVertexBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, particleVertexBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, particleData, webGL2RenderingContext.STATIC_DRAW);
+	const particleAttributeLocation = webGL2RenderingContext.getAttribLocation(particleProgram, "vertexParticle");
+	webGL2RenderingContext.enableVertexAttribArray(particleAttributeLocation);
+	webGL2RenderingContext.vertexAttribPointer(particleAttributeLocation, 4, webGL2RenderingContext.FLOAT, false, 0, 0);
+	webGL2RenderingContext.bindVertexArray(null);
+
 	// 포스트 프로세싱 프로그램 목록.
 	const brightPassProgram = createShaderProgram(webGL2RenderingContext, FULLSCREEN_VERTEXSHADER_SOURCE, BRIGHTPASS_FRAGMENTSHADER_SOURCE);
 	const brightPassSceneTextureLocation = webGL2RenderingContext.getUniformLocation(brightPassProgram, "sceneTexture");
@@ -868,6 +868,7 @@
 	const compositeSceneTextureLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "sceneTexture");
 	const compositeBloomTextureLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "bloomTexture");
 	const compositeElapsedTimeLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "elapsedTime");
+	const compositeBoostFactorLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "boostFactor");
 	const compositeResolutionLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "resolution");
 
 	// 렌더 타겟. (리사이즈 시 재생성)
@@ -876,12 +877,13 @@
 	let bloomRenderTargetB = null;
 
 	//==============================================================================
-	// 입력. (마우스 / 터치 시차)
+	// 입력. (마우스 / 터치 시차 + 꾹 누르면 부스트)
 	//==============================================================================
 	let pointerTargetX = 0;
 	let pointerTargetY = 0;
 	let pointerCurrentX = 0;
 	let pointerCurrentY = 0;
+	let isBoostPressed = false;
 	function updatePointerTarget(clientX, clientY) {
 		pointerTargetX = (clientX / System.window.innerWidth) * 2 - 1;
 		pointerTargetY = (clientY / System.window.innerHeight) * 2 - 1;
@@ -889,11 +891,29 @@
 	System.window.addEventListener("mousemove", (event) => {
 		updatePointerTarget(event.clientX, event.clientY);
 	});
+	System.window.addEventListener("mousedown", () => {
+		isBoostPressed = true;
+	});
+	System.window.addEventListener("mouseup", () => {
+		isBoostPressed = false;
+	});
+	System.window.addEventListener("touchstart", (event) => {
+		isBoostPressed = true;
+		if (event.touches.length > 0) {
+			updatePointerTarget(event.touches[0].clientX, event.touches[0].clientY);
+		}
+	}, { passive: true });
 	System.window.addEventListener("touchmove", (event) => {
 		if (event.touches.length > 0) {
 			updatePointerTarget(event.touches[0].clientX, event.touches[0].clientY);
 		}
 	}, { passive: true });
+	System.window.addEventListener("touchend", () => {
+		isBoostPressed = false;
+	});
+	System.window.addEventListener("touchcancel", () => {
+		isBoostPressed = false;
+	});
 
 	//==============================================================================
 	// 리사이즈. (캔버스 크기 + 렌더 타겟 재생성)
@@ -921,27 +941,44 @@
 	// 메인 루프.
 	//==============================================================================
 	const startTimestamp = System.performance.now();
+	let previousTimestamp = startTimestamp;
+	let boostFactor = 0;
+	let scrollDistance = 0;
+	let streakScroll = 0;
 	function renderFrame() {
 		resizeCanvas();
-		const elapsedTime = (System.performance.now() - startTimestamp) / 1000;
+		const currentTimestamp = System.performance.now();
+		const elapsedTime = (currentTimestamp - startTimestamp) / 1000;
+		const deltaTime = System.Math.min((currentTimestamp - previousTimestamp) / 1000, 0.1);
+		previousTimestamp = currentTimestamp;
 		const aspectRatio = canvas.width / canvas.height;
+
+		// 부스트 가감속. (누르면 서서히 가속, 떼면 서서히 감속)
+		const boostTarget = isBoostPressed ? 1 : 0;
+		const boostBlend = isBoostPressed ? 2.2 : 1.2;
+		boostFactor += (boostTarget - boostFactor) * System.Math.min(boostBlend * deltaTime, 1);
+
+		// 전진 거리 적분. (지형 스크롤 / 빛살 이동)
+		scrollDistance += (4.2 + boostFactor * 16) * deltaTime;
+		streakScroll += (10 + boostFactor * 34) * deltaTime;
 
 		// 포인터 지연 추적. (부드러운 시차)
 		pointerCurrentX += (pointerTargetX - pointerCurrentX) * 0.04;
 		pointerCurrentY += (pointerTargetY - pointerCurrentY) * 0.04;
 
-		// 카메라. (은은한 바운스 + 포인터 시차)
+		// 카메라. (은은한 바운스 + 포인터 시차 + 부스트 시 화각 확장)
 		const cameraBounce = System.Math.sin(elapsedTime * 1.1) * 0.12;
 		const cameraPosition = [pointerCurrentX * 1.6, 2.1 + cameraBounce + pointerCurrentY * -0.5, 0.5];
 		const cameraPitch = -0.06 + pointerCurrentY * 0.08;
 		const cameraYaw = pointerCurrentX * 0.12;
-		const projectionMatrix = createPerspectiveMatrix(System.Math.PI / 3, aspectRatio, 0.1, 100);
+		const fieldOfViewRadian = (System.Math.PI / 3) * (1 + boostFactor * 0.1);
+		const projectionMatrix = createPerspectiveMatrix(fieldOfViewRadian, aspectRatio, 0.1, 100);
 		const viewMatrix = createViewMatrix(cameraPosition, cameraPitch, cameraYaw);
 
 		// === 1. 씬 → 오프스크린 렌더 타겟 ===
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, sceneRenderTarget.framebuffer);
 		webGL2RenderingContext.viewport(0, 0, sceneRenderTarget.width, sceneRenderTarget.height);
-		webGL2RenderingContext.clearColor(0.02, 0.0, 0.05, 1.0);
+		webGL2RenderingContext.clearColor(0.04, 0.025, 0.012, 1.0);
 		webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
 
 		// 1-1. 배경.
@@ -959,30 +996,31 @@
 		webGL2RenderingContext.bindVertexArray(terrainVertexArray);
 		webGL2RenderingContext.uniformMatrix4fv(terrainProjectionMatrixLocation, false, projectionMatrix);
 		webGL2RenderingContext.uniformMatrix4fv(terrainViewMatrixLocation, false, viewMatrix);
-		webGL2RenderingContext.uniform1f(terrainScrollOffsetLocation, elapsedTime * 4.2);
+		webGL2RenderingContext.uniform1f(terrainScrollOffsetLocation, scrollDistance);
 		webGL2RenderingContext.uniform1f(terrainElapsedTimeLocation, elapsedTime);
 		webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, terrainIndexCount, webGL2RenderingContext.UNSIGNED_SHORT, 0);
 
-		// 1-3. 오벨리스크. (인스턴싱, 가산 합성, 깊이 기록 없이 테스트만)
+		// 1-3. 모노리스. (인스턴싱, 가산 합성, 깊이 기록 없이 테스트만 → 지형에 가려짐)
 		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
 		webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE);
 		webGL2RenderingContext.depthMask(false);
-		webGL2RenderingContext.useProgram(obeliskProgram);
-		webGL2RenderingContext.bindVertexArray(obeliskVertexArray);
-		webGL2RenderingContext.uniformMatrix4fv(obeliskProjectionMatrixLocation, false, projectionMatrix);
-		webGL2RenderingContext.uniformMatrix4fv(obeliskViewMatrixLocation, false, viewMatrix);
-		webGL2RenderingContext.uniform1f(obeliskElapsedTimeLocation, elapsedTime);
-		webGL2RenderingContext.drawArraysInstanced(webGL2RenderingContext.LINES, 0, obeliskLineVertexCount, OBELISK_INSTANCE_COUNT);
+		webGL2RenderingContext.useProgram(monolithProgram);
+		webGL2RenderingContext.bindVertexArray(monolithVertexArray);
+		webGL2RenderingContext.uniformMatrix4fv(monolithProjectionMatrixLocation, false, projectionMatrix);
+		webGL2RenderingContext.uniformMatrix4fv(monolithViewMatrixLocation, false, viewMatrix);
+		webGL2RenderingContext.uniform1f(monolithElapsedTimeLocation, elapsedTime);
+		webGL2RenderingContext.drawArraysInstanced(webGL2RenderingContext.LINES, 0, monolithLineVertexCount, MONOLITH_INSTANCE_COUNT);
 
-		// 1-4. 워프 스트릭. (가산 합성)
+		// 1-4. 부스트 빛살. (가산 합성)
 		webGL2RenderingContext.useProgram(streakProgram);
 		webGL2RenderingContext.bindVertexArray(streakVertexArray);
 		webGL2RenderingContext.uniformMatrix4fv(streakProjectionMatrixLocation, false, projectionMatrix);
 		webGL2RenderingContext.uniformMatrix4fv(streakViewMatrixLocation, false, viewMatrix);
-		webGL2RenderingContext.uniform1f(streakElapsedTimeLocation, elapsedTime);
+		webGL2RenderingContext.uniform1f(streakScrollLocation, streakScroll);
+		webGL2RenderingContext.uniform1f(streakBoostFactorLocation, boostFactor);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.LINES, 0, STREAK_COUNT * 2);
 
-		// 1-5. 파티클. (가산 합성)
+		// 1-5. 파티클. (가산 합성, 깊이 테스트로 지형에 가려짐)
 		webGL2RenderingContext.useProgram(particleProgram);
 		webGL2RenderingContext.bindVertexArray(particleVertexArray);
 		webGL2RenderingContext.uniformMatrix4fv(particleProjectionMatrixLocation, false, projectionMatrix);
@@ -1028,6 +1066,7 @@
 		webGL2RenderingContext.uniform1i(compositeSceneTextureLocation, 0);
 		webGL2RenderingContext.uniform1i(compositeBloomTextureLocation, 1);
 		webGL2RenderingContext.uniform1f(compositeElapsedTimeLocation, elapsedTime);
+		webGL2RenderingContext.uniform1f(compositeBoostFactorLocation, boostFactor);
 		webGL2RenderingContext.uniform2f(compositeResolutionLocation, canvas.width, canvas.height);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sceneRenderTarget.colorTexture);
