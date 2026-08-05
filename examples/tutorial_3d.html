@@ -88,8 +88,8 @@
 		<div id="titleDivider"></div>
 		<div id="titleSub">VANILLA.JS &middot; 3D EXAMPLE</div>
 	</div>
-	<div id="hintOverlay">MOVE TO LOOK &middot; HOLD TO BOOST</div>
-	<script>
+	<div id="hintOverlay">DRAG TO MOVE &middot; HOLD TO BOOST</div>
+	<script type="module">
 	"use strict";
 	const System = globalThis;
 
@@ -247,6 +247,7 @@
 	in float fragmentHeight;
 	uniform float elapsedTime;
 	uniform float scrollOffset;
+	uniform vec3 cameraPosition;
 	out vec4 outputColor;
 
 	void main() {
@@ -278,51 +279,63 @@
 		float lineGlow = 1.0 - smoothstep(0.0, 6.0, lineDistance);
 		vec3 color = floorColor + lineColor * lineIntensity * 1.35 + lineColor * lineGlow * 0.22;
 
-		// 도로 중앙 에너지 스트림. (꼬리가 길게 빠지는 빛줄기가 연속적으로 흘러오는 형태)
+		// 도로 중앙 에너지 스트림. (주기가 티 나지 않는 다층 파동이 매끄럽게 흘러오는 형태)
 		float lateralGlow = exp(-abs(fragmentWorldPosition.x) * 1.6);
-		float streamPhase = fract(fragmentViewDistance * 0.12 + scrollOffset * 0.25);
-		float streamFlow = 0.2 + 0.8 * pow(streamPhase, 3.0);
-		color += vec3(1.0, 0.88, 0.55) * lateralGlow * streamFlow * 0.55;
+		float coreGlow = exp(-abs(fragmentWorldPosition.x) * 5.0);
+		float flowShimmer = sin(fragmentViewDistance * 0.55 + scrollOffset * 1.4) * 0.5
+		                  + sin(fragmentViewDistance * 0.23 + scrollOffset * 0.8 + 1.7) * 0.35
+		                  + sin(fragmentViewDistance * 0.91 + scrollOffset * 2.3 + 3.9) * 0.15;
+		float streamFlow = 0.55 + 0.3 * flowShimmer;
+		color += vec3(1.0, 0.88, 0.55) * (lateralGlow * 0.3 + coreGlow * 0.45) * streamFlow;
 
-		// 물웅덩이. (평지 곳곳에 월드 좌표로 고정 배치)
-		float puddleNoise = sin(fragmentWorldPosition.x * 0.33 + fragmentWorldPosition.z * 0.19 + 1.3)
-		                  + sin(fragmentWorldPosition.x * 0.17 - fragmentWorldPosition.z * 0.29 + 4.2);
+		// 물웅덩이. (평지 곳곳에 월드 좌표로 고정 배치, 작고 또렷한 형태)
+		float puddleNoise = sin(fragmentWorldPosition.x * 0.52 + fragmentWorldPosition.z * 0.31 + 1.3)
+		                  + sin(fragmentWorldPosition.x * 0.27 - fragmentWorldPosition.z * 0.47 + 4.2);
 		float flatFactor = 1.0 - smoothstep(0.02, 0.3, fragmentHeight);
 		float sideBand = smoothstep(1.7, 3.0, abs(fragmentWorldPosition.x)) * (1.0 - smoothstep(13.0, 19.0, abs(fragmentWorldPosition.x)));
-		float puddleMask = smoothstep(0.85, 1.3, puddleNoise) * flatFactor * sideBand;
+		float puddleMask = smoothstep(1.0, 1.4, puddleNoise) * flatFactor * sideBand;
 		if (puddleMask > 0.001) {
-			// 유광 유체 셰이딩: 흐르는 물결 높이장을 해석적으로 미분해 노멀을 만들고
-			// 스페큘러 + 프레넬 반사로 광택 나는 액체처럼 표현.
+			// 물 표면: 물결 높이장을 해석적으로 미분한 노멀로 실제 시선 벡터를 반사시켜
+			// 하늘과 태양이 거울처럼 비치게 한다. (진짜 수면처럼)
 			vec2 flowCoordinate = fragmentWorldPosition.xz;
-			float wavePhase1 = dot(flowCoordinate, vec2(1.9, 1.2)) + elapsedTime * 2.1;
-			float wavePhase2 = dot(flowCoordinate, vec2(-1.3, 2.3)) - elapsedTime * 1.6;
-			float wavePhase3 = dot(flowCoordinate, vec2(2.7, -0.8)) + elapsedTime * 2.8;
-			vec2 waveGradient = vec2(1.9, 1.2) * cos(wavePhase1) * 0.045
-			                  + vec2(-1.3, 2.3) * cos(wavePhase2) * 0.03
-			                  + vec2(2.7, -0.8) * cos(wavePhase3) * 0.02;
+			float wavePhase1 = dot(flowCoordinate, vec2(1.9, 1.2)) + elapsedTime * 1.7;
+			float wavePhase2 = dot(flowCoordinate, vec2(-1.3, 2.3)) - elapsedTime * 1.3;
+			float wavePhase3 = dot(flowCoordinate, vec2(3.1, -0.8)) + elapsedTime * 2.2;
+			vec2 waveGradient = vec2(1.9, 1.2) * cos(wavePhase1) * 0.05
+			                  + vec2(-1.3, 2.3) * cos(wavePhase2) * 0.035
+			                  + vec2(3.1, -0.8) * cos(wavePhase3) * 0.02;
 			vec3 waterNormal = normalize(vec3(-waveGradient.x, 1.0, -waveGradient.y));
 
-			// 시선 / 광원 방향. (카메라는 위쪽 뒤, 태양은 지평선 정면)
-			vec3 viewDirection = normalize(vec3(-fragmentWorldPosition.x * 0.04, 0.5, -1.0));
-			vec3 lightDirection = normalize(vec3(-fragmentWorldPosition.x * 0.03, 0.35, 1.0));
-			vec3 halfVector = normalize(viewDirection + lightDirection);
-			float specular = pow(max(dot(waterNormal, halfVector), 0.0), 90.0);
+			// 실제 시선 벡터와 반사 벡터. (렌더 공간)
+			vec3 surfaceRenderPosition = vec3(fragmentWorldPosition.x, fragmentHeight, -fragmentViewDistance);
+			vec3 viewDirection = normalize(cameraPosition - surfaceRenderPosition);
+			vec3 reflectDirection = reflect(-viewDirection, waterNormal);
+
+			// 반사된 하늘. (지평선 캐러멜 → 상공 초콜릿)
+			float reflectUp = clamp(reflectDirection.y, 0.0, 1.0);
+			vec3 reflectedSkyColor = mix(vec3(0.5, 0.28, 0.11), vec3(0.06, 0.04, 0.02), pow(reflectUp, 0.6));
+
+			// 반사된 태양. (-z 지평선 위의 크림 디스크)
+			vec3 reflectedSunDirection = normalize(vec3(0.0, 0.09, -1.0));
+			float sunAlignment = max(dot(reflectDirection, reflectedSunDirection), 0.0);
+			float sunSpecular = pow(sunAlignment, 240.0);
+			float sunHalo = pow(sunAlignment, 24.0);
+
+			// 전체적으로 밝은 수면 + 그 위에 더 밝은 일렁임.
 			float fresnel = pow(1.0 - max(dot(waterNormal, viewDirection), 0.0), 3.0);
-
-			// 짙은 모카 심연 + 프레넬 하늘 반사 + 크림 스페큘러 하이라이트.
-			vec3 waterColor = mix(vec3(0.06, 0.04, 0.022), vec3(0.5, 0.3, 0.12), fresnel);
-			waterColor += vec3(1.0, 0.93, 0.7) * specular * 1.6;
-
-			// 태양 반사 스트릭. (태양 방향의 일렁이는 광택)
-			float sunReflection = exp(-abs(fragmentWorldPosition.x) * 0.28);
-			waterColor += vec3(1.0, 0.62, 0.24) * sunReflection * (0.22 + 0.4 * specular + 0.25 * fresnel);
+			float rippleShimmer = smoothstep(0.03, 0.09, length(waveGradient));
+			vec3 waterColor = vec3(0.6, 0.42, 0.2);
+			waterColor += reflectedSkyColor * (0.25 + 0.35 * fresnel);
+			waterColor += vec3(1.0, 0.95, 0.75) * rippleShimmer * 0.4;
+			waterColor += vec3(1.0, 0.85, 0.55) * sunHalo * 0.6;
+			waterColor += vec3(1.0, 0.93, 0.7) * sunSpecular * 1.8;
 
 			float waterBlend = smoothstep(0.0, 0.5, puddleMask);
 			color = mix(color, waterColor, waterBlend);
 
-			// 웅덩이 가장자리 크림 테두리.
+			// 웅덩이 가장자리 크림 테두리. (은은하게)
 			float puddleEdge = smoothstep(0.0, 0.2, puddleMask) * (1.0 - smoothstep(0.2, 0.55, puddleMask));
-			color += vec3(1.0, 0.9, 0.6) * puddleEdge * 0.8;
+			color += vec3(1.0, 0.9, 0.6) * puddleEdge * 0.35;
 		}
 
 		// 맥동. (라인이 은은하게 숨쉬듯)
@@ -468,6 +481,7 @@
 	in float fragmentSeed;
 	in float fragmentProximityFade;
 	uniform float elapsedTime;
+	uniform float fadeFactor;
 	out vec4 outputColor;
 
 	void main() {
@@ -482,7 +496,7 @@
 		vec3 color = mix(goldColor, creamColor, fract(fragmentSeed * 7.31));
 		float twinkle = 0.55 + 0.45 * sin(elapsedTime * (1.5 + fragmentSeed * 3.0) + fragmentSeed * 50.0);
 
-		outputColor = vec4(color * alpha * twinkle * fragmentProximityFade * 0.45, 0.0);
+		outputColor = vec4(color * alpha * twinkle * fragmentProximityFade * fadeFactor * 0.45, 0.0);
 	}
 	`;
 
@@ -531,6 +545,10 @@
 	uniform float elapsedTime;
 	uniform float boostFactor;
 	uniform vec2 resolution;
+	uniform float bloomStrength;
+	uniform float aberrationStrength;
+	uniform float filmStrength;
+	uniform float letterboxStrength;
 	out vec4 outputColor;
 
 	float hash21(vec2 point) {
@@ -542,7 +560,7 @@
 	void main() {
 		// 색수차. (가장자리로 갈수록 RGB 채널 분리, 부스트 시 강화되어 가속감)
 		vec2 centerOffset = fragmentTextureCoordinate - 0.5;
-		float aberrationAmount = dot(centerOffset, centerOffset) * (0.012 + boostFactor * 0.02);
+		float aberrationAmount = dot(centerOffset, centerOffset) * (0.012 + boostFactor * 0.02) * aberrationStrength;
 		vec2 aberrationOffset = centerOffset * aberrationAmount;
 		float channelRed = texture(sceneTexture, fragmentTextureCoordinate + aberrationOffset).r;
 		float channelGreen = texture(sceneTexture, fragmentTextureCoordinate).g;
@@ -551,15 +569,15 @@
 
 		// 블룸 가산.
 		vec3 bloomColor = texture(bloomTexture, fragmentTextureCoordinate).rgb;
-		color += bloomColor * 0.95;
+		color += bloomColor * 0.95 * bloomStrength;
 
 		// 은은한 스캔라인.
 		float scanline = sin(fragmentTextureCoordinate.y * resolution.y * 1.6) * 0.5 + 0.5;
-		color *= 0.97 + scanline * 0.03;
+		color *= mix(1.0, 0.97 + scanline * 0.03, filmStrength);
 
 		// 필름 그레인.
 		float grain = hash21(fragmentTextureCoordinate * resolution.xy + fract(elapsedTime) * 371.0);
-		color += (grain - 0.5) * 0.012;
+		color += (grain - 0.5) * 0.012 * filmStrength;
 
 		// 비네트.
 		float vignette = 1.0 - dot(fragmentCoordinate * 0.5, fragmentCoordinate * 0.5);
@@ -569,9 +587,13 @@
 		color = clamp((color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14), 0.0, 1.0);
 
 		// 시네마틱 레터박스.
-		float letterbox = smoothstep(0.0, 0.01, fragmentTextureCoordinate.y - 0.045)
-		                * smoothstep(0.0, 0.01, 0.955 - fragmentTextureCoordinate.y);
-		color *= letterbox;
+		float letterboxCurve = smoothstep(0.0, 0.01, fragmentTextureCoordinate.y - 0.045)
+		                     * smoothstep(0.0, 0.01, 0.955 - fragmentTextureCoordinate.y);
+		color *= mix(1.0, letterboxCurve, letterboxStrength);
+
+		// 인트로 페이드인. (검은 화면에서 서서히 등장)
+		float introFade = smoothstep(0.2, 2.6, elapsedTime);
+		color *= introFade;
 
 		outputColor = vec4(color, 1.0);
 	}
@@ -711,6 +733,7 @@
 	const terrainViewMatrixLocation = webGL2RenderingContext.getUniformLocation(terrainProgram, "viewMatrix");
 	const terrainScrollOffsetLocation = webGL2RenderingContext.getUniformLocation(terrainProgram, "scrollOffset");
 	const terrainElapsedTimeLocation = webGL2RenderingContext.getUniformLocation(terrainProgram, "elapsedTime");
+	const terrainCameraPositionLocation = webGL2RenderingContext.getUniformLocation(terrainProgram, "cameraPosition");
 
 	// 그리드 정점 목록. (x: -24..24, z: 0..48, 셀 크기 2)
 	const GRID_HALF_WIDTH = 24;
@@ -840,6 +863,7 @@
 	const particleProjectionMatrixLocation = webGL2RenderingContext.getUniformLocation(particleProgram, "projectionMatrix");
 	const particleViewMatrixLocation = webGL2RenderingContext.getUniformLocation(particleProgram, "viewMatrix");
 	const particleElapsedTimeLocation = webGL2RenderingContext.getUniformLocation(particleProgram, "elapsedTime");
+	const particleFadeFactorLocation = webGL2RenderingContext.getUniformLocation(particleProgram, "fadeFactor");
 	const PARTICLE_COUNT = 500;
 	const particleData = new Float32Array(PARTICLE_COUNT * 4);
 	for (let particleIndex = 0; particleIndex < PARTICLE_COUNT; ++particleIndex) {
@@ -870,6 +894,10 @@
 	const compositeElapsedTimeLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "elapsedTime");
 	const compositeBoostFactorLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "boostFactor");
 	const compositeResolutionLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "resolution");
+	const compositeBloomStrengthLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "bloomStrength");
+	const compositeAberrationStrengthLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "aberrationStrength");
+	const compositeFilmStrengthLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "filmStrength");
+	const compositeLetterboxStrengthLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "letterboxStrength");
 
 	// 렌더 타겟. (리사이즈 시 재생성)
 	let sceneRenderTarget = null;
@@ -877,43 +905,263 @@
 	let bloomRenderTargetB = null;
 
 	//==============================================================================
-	// 입력. (마우스 / 터치 시차 + 꾹 누르면 부스트)
+	// 입력. (마우스 / 터치: 시선 시차 + 드래그 좌우 이동 + 꾹 누르면 부스트)
 	//==============================================================================
+	const PLAYER_MOVE_LIMIT = 14;
 	let pointerTargetX = 0;
 	let pointerTargetY = 0;
 	let pointerCurrentX = 0;
 	let pointerCurrentY = 0;
 	let isBoostPressed = false;
+	let dragLastClientX = null;
+	let playerTargetX = 0;
 	function updatePointerTarget(clientX, clientY) {
 		pointerTargetX = (clientX / System.window.innerWidth) * 2 - 1;
 		pointerTargetY = (clientY / System.window.innerHeight) * 2 - 1;
 	}
+	function updateDragMove(clientX) {
+		if (dragLastClientX !== null) {
+			const dragDelta = clientX - dragLastClientX;
+			playerTargetX += dragDelta * (26 / System.window.innerWidth);
+			playerTargetX = System.Math.max(-PLAYER_MOVE_LIMIT, System.Math.min(PLAYER_MOVE_LIMIT, playerTargetX));
+		}
+		dragLastClientX = clientX;
+	}
 	System.window.addEventListener("mousemove", (event) => {
 		updatePointerTarget(event.clientX, event.clientY);
+		if (isBoostPressed) {
+			updateDragMove(event.clientX);
+		}
 	});
-	System.window.addEventListener("mousedown", () => {
+	System.window.addEventListener("mousedown", (event) => {
+		if (handlePanelPress(event.clientX, event.clientY)) {
+			return;
+		}
 		isBoostPressed = true;
+		dragLastClientX = event.clientX;
 	});
 	System.window.addEventListener("mouseup", () => {
 		isBoostPressed = false;
+		dragLastClientX = null;
 	});
 	System.window.addEventListener("touchstart", (event) => {
-		isBoostPressed = true;
 		if (event.touches.length > 0) {
+			if (handlePanelPress(event.touches[0].clientX, event.touches[0].clientY)) {
+				return;
+			}
 			updatePointerTarget(event.touches[0].clientX, event.touches[0].clientY);
+			dragLastClientX = event.touches[0].clientX;
 		}
+		isBoostPressed = true;
 	}, { passive: true });
 	System.window.addEventListener("touchmove", (event) => {
 		if (event.touches.length > 0) {
 			updatePointerTarget(event.touches[0].clientX, event.touches[0].clientY);
+			updateDragMove(event.touches[0].clientX);
 		}
 	}, { passive: true });
 	System.window.addEventListener("touchend", () => {
 		isBoostPressed = false;
+		dragLastClientX = null;
 	});
 	System.window.addEventListener("touchcancel", () => {
 		isBoostPressed = false;
+		dragLastClientX = null;
 	});
+
+	//==============================================================================
+	// 옵션 패널. (vanilla.js 엔진의 Graphic 으로 캔버스 안에서 직접 렌더링)
+	// - 같은 캔버스의 WebGL2 컨텍스트를 공유한다. (getContext 는 동일 컨텍스트 반환)
+	//==============================================================================
+	const optionDefinitions = [
+		{ name: "bloom", label: "BLOOM" },
+		{ name: "aberration", label: "CHROMATIC" },
+		{ name: "film", label: "FILM GRAIN" },
+		{ name: "letterbox", label: "LETTERBOX" },
+		{ name: "particles", label: "PARTICLES" },
+	];
+	const optionStates = {
+		bloom: true,
+		aberration: true,
+		film: true,
+		letterbox: true,
+		particles: true,
+	};
+	const optionBlendValues = {
+		bloom: 1,
+		aberration: 1,
+		film: 1,
+		letterbox: 1,
+		particles: 1,
+	};
+	let isPanelCollapsed = false;
+	let panelCollapseBlend = 1;
+
+	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../build/vanilla.js)
+	let uiGraphic = null;
+	let engineRect = null;
+	let engineVector2 = null;
+	try {
+		let engineModule = null;
+		try {
+			engineModule = await import("./vanilla.js");
+		}
+		catch (importError) {
+			engineModule = await import("../build/vanilla.js");
+		}
+		uiGraphic = new engineModule.Graphic(canvas);
+		engineRect = engineModule.Rect;
+		engineVector2 = engineModule.Vector2;
+	}
+	catch (engineError) {
+		console.warn("vanilla.js 엔진 모듈을 불러오지 못해 옵션 패널을 표시하지 않습니다.", engineError);
+	}
+
+	// 패널 레이아웃. (CSS 픽셀 기준, 우측 상단 고정)
+	const PANEL_WIDTH = 236;
+	const PANEL_HEADER_HEIGHT = 40;
+	const PANEL_ROW_HEIGHT = 30;
+	const PANEL_MARGIN_RIGHT = 18;
+	function calculatePanelLayout() {
+		const panelX = System.window.innerWidth - PANEL_MARGIN_RIGHT - PANEL_WIDTH;
+		const panelY = System.window.innerHeight * 0.08;
+		const listHeight = (optionDefinitions.length * PANEL_ROW_HEIGHT + 10) * panelCollapseBlend;
+		const panelHeight = PANEL_HEADER_HEIGHT + listHeight;
+		return { panelX: panelX, panelY: panelY, panelHeight: panelHeight, listHeight: listHeight };
+	}
+
+	// 패널 히트 테스트. (true 반환 시 부스트/드래그 입력으로 전달하지 않음)
+	function handlePanelPress(clientX, clientY) {
+		if (!uiGraphic) {
+			return false;
+		}
+		const panelLayout = calculatePanelLayout();
+		if (clientX < panelLayout.panelX || clientX > panelLayout.panelX + PANEL_WIDTH) {
+			return false;
+		}
+		if (clientY < panelLayout.panelY || clientY > panelLayout.panelY + panelLayout.panelHeight) {
+			return false;
+		}
+
+		// 헤더: 접기/펴기.
+		if (clientY < panelLayout.panelY + PANEL_HEADER_HEIGHT) {
+			isPanelCollapsed = !isPanelCollapsed;
+			return true;
+		}
+
+		// 목록: 행 토글.
+		if (panelCollapseBlend > 0.9) {
+			const rowIndex = System.Math.floor((clientY - panelLayout.panelY - PANEL_HEADER_HEIGHT - 4) / PANEL_ROW_HEIGHT);
+			if (rowIndex >= 0 && rowIndex < optionDefinitions.length) {
+				const optionName = optionDefinitions[rowIndex].name;
+				optionStates[optionName] = !optionStates[optionName];
+			}
+		}
+		return true;
+	}
+
+	//==============================================================================
+	// 옵션 패널 렌더링. (매 프레임, 포스트 프로세싱이 끝난 화면 위에)
+	//==============================================================================
+	function renderOptionPanel(introFade) {
+		if (!uiGraphic) {
+			return;
+		}
+		const devicePixelRatio = System.Math.min(System.window.devicePixelRatio || 1, 2);
+		const panelLayout = calculatePanelLayout();
+
+		uiGraphic.applySettings(null);
+		uiGraphic.scale(devicePixelRatio, devicePixelRatio);
+		uiGraphic.setGlobalAlpha(introFade);
+
+		// 패널 배경 + 테두리.
+		const panelRect = engineRect.create(panelLayout.panelX, panelLayout.panelY, PANEL_WIDTH, panelLayout.panelHeight);
+		uiGraphic.setFillColor("rgba(13, 7, 4, 0.6)");
+		uiGraphic.drawRoundRect(panelRect, 14);
+		uiGraphic.setStrokeColor("rgba(243, 229, 171, 0.25)");
+		uiGraphic.drawStrokeRoundRect(panelRect, 14, 1);
+
+		// 헤더.
+		uiGraphic.setFontString(`300 11px "Segoe UI", sans-serif`);
+		uiGraphic.setTextAlign("left");
+		uiGraphic.setTextBaseline("middle");
+		uiGraphic.setFillColor("rgba(243, 229, 171, 0.9)");
+		uiGraphic.drawFillText("O P T I O N S", panelLayout.panelX + 16, panelLayout.panelY + PANEL_HEADER_HEIGHT * 0.5 + 1);
+		uiGraphic.setTextAlign("right");
+		uiGraphic.setFillColor("rgba(243, 229, 171, 0.6)");
+		const arrowText = isPanelCollapsed ? "▸" : "▾";
+		uiGraphic.drawFillText(arrowText, panelLayout.panelX + PANEL_WIDTH - 16, panelLayout.panelY + PANEL_HEADER_HEIGHT * 0.5 + 1);
+
+		// 목록. (접힘 애니메이션에 따라 알파 페이드)
+		if (panelCollapseBlend > 0.05) {
+			const listAlpha = introFade * panelCollapseBlend;
+			for (let rowIndex = 0; rowIndex < optionDefinitions.length; ++rowIndex) {
+				const optionDefinition = optionDefinitions[rowIndex];
+				const rowY = panelLayout.panelY + PANEL_HEADER_HEIGHT + 4 + rowIndex * PANEL_ROW_HEIGHT;
+				if (rowY + PANEL_ROW_HEIGHT > panelLayout.panelY + panelLayout.panelHeight) {
+					break;
+				}
+				const rowMiddleY = rowY + PANEL_ROW_HEIGHT * 0.5;
+				uiGraphic.setGlobalAlpha(listAlpha);
+
+				// 레이블.
+				uiGraphic.setTextAlign("left");
+				uiGraphic.setFontString(`300 11px "Segoe UI", sans-serif`);
+				uiGraphic.setFillColor("rgba(241, 233, 216, 0.8)");
+				uiGraphic.drawFillText(optionDefinition.label, panelLayout.panelX + 16, rowMiddleY + 1);
+
+				// 토글 스위치. (트랙 + 이동 노브, 상태 전환은 매 프레임 보간)
+				const toggleBlend = optionBlendValues[optionDefinition.name];
+				const switchX = panelLayout.panelX + PANEL_WIDTH - 16 - 36;
+				const switchY = rowMiddleY - 9.5;
+				const trackRect = engineRect.create(switchX, switchY, 36, 19);
+				const trackRed = 0.16 + (0.85 - 0.16) * toggleBlend;
+				const trackGreen = 0.14 + (0.72 - 0.14) * toggleBlend;
+				const trackBlue = 0.1 + (0.35 - 0.1) * toggleBlend;
+				uiGraphic.setFillColor(`rgba(${System.Math.round(trackRed * 255)}, ${System.Math.round(trackGreen * 255)}, ${System.Math.round(trackBlue * 255)}, 0.85)`);
+				uiGraphic.drawRoundRect(trackRect, 9.5);
+				uiGraphic.setStrokeColor(`rgba(243, 229, 171, ${0.25 + toggleBlend * 0.45})`);
+				uiGraphic.drawStrokeRoundRect(trackRect, 9.5, 1);
+				const knobX = switchX + 9.5 + toggleBlend * 17;
+				const knobCenter = engineVector2.create(knobX, rowMiddleY);
+				uiGraphic.setFillColor(toggleBlend > 0.5 ? "#fffaf0" : "rgba(241, 233, 216, 0.75)");
+				uiGraphic.drawCircle(knobCenter, 6.5);
+			}
+		}
+	}
+
+	//==============================================================================
+	// 지형 높이. (셰이더의 terrainHeight 와 동일한 수식 — 플레이어 발밑 계산용)
+	//==============================================================================
+	function smoothstepValue(edgeStart, edgeEnd, value) {
+		const normalized = System.Math.max(0, System.Math.min(1, (value - edgeStart) / (edgeEnd - edgeStart)));
+		return normalized * normalized * (3 - 2 * normalized);
+	}
+	function terrainHeightAt(worldX, worldZ) {
+		const sideFactor = smoothstepValue(2.2, 9.0, System.Math.abs(worldX));
+		const wave1 = System.Math.sin(worldX * 0.42 + worldZ * 0.31);
+		const wave2 = System.Math.sin(worldX * 0.19 - worldZ * 0.23 + 1.7);
+		const wave3 = System.Math.sin(worldX * 0.83 + worldZ * 0.57 + 4.1);
+		const height = wave1 * 0.9 + wave2 * 1.15 + wave3 * 0.35;
+		return System.Math.max(height, 0) * sideFactor * 2.6;
+	}
+
+	//==============================================================================
+	// 지형 표면 높이. (메시와 동일하게 셀 코너 높이를 쌍선형 보간 — 표면 관통 방지)
+	//==============================================================================
+	function terrainSurfaceHeightAt(worldX, worldZ) {
+		const cellStartX = System.Math.floor(worldX / GRID_CELL_SIZE) * GRID_CELL_SIZE;
+		const cellStartZ = System.Math.floor(worldZ / GRID_CELL_SIZE) * GRID_CELL_SIZE;
+		const normalizedX = (worldX - cellStartX) / GRID_CELL_SIZE;
+		const normalizedZ = (worldZ - cellStartZ) / GRID_CELL_SIZE;
+		const cornerHeight00 = terrainHeightAt(cellStartX, cellStartZ);
+		const cornerHeight10 = terrainHeightAt(cellStartX + GRID_CELL_SIZE, cellStartZ);
+		const cornerHeight01 = terrainHeightAt(cellStartX, cellStartZ + GRID_CELL_SIZE);
+		const cornerHeight11 = terrainHeightAt(cellStartX + GRID_CELL_SIZE, cellStartZ + GRID_CELL_SIZE);
+		const nearHeight = cornerHeight00 + (cornerHeight10 - cornerHeight00) * normalizedX;
+		const farHeight = cornerHeight01 + (cornerHeight11 - cornerHeight01) * normalizedX;
+		return nearHeight + (farHeight - nearHeight) * normalizedZ;
+	}
 
 	//==============================================================================
 	// 리사이즈. (캔버스 크기 + 렌더 타겟 재생성)
@@ -945,6 +1193,8 @@
 	let boostFactor = 0;
 	let scrollDistance = 0;
 	let streakScroll = 0;
+	let playerCurrentX = 0;
+	let runBobPhase = 0;
 	function renderFrame() {
 		resizeCanvas();
 		const currentTimestamp = System.performance.now();
@@ -958,6 +1208,14 @@
 		const boostBlend = isBoostPressed ? 2.2 : 1.2;
 		boostFactor += (boostTarget - boostFactor) * System.Math.min(boostBlend * deltaTime, 1);
 
+		// 옵션 토글 / 패널 접힘 보간. (부드러운 트랜지션)
+		for (const optionDefinition of optionDefinitions) {
+			const optionTarget = optionStates[optionDefinition.name] ? 1 : 0;
+			optionBlendValues[optionDefinition.name] += (optionTarget - optionBlendValues[optionDefinition.name]) * System.Math.min(7 * deltaTime, 1);
+		}
+		const collapseTarget = isPanelCollapsed ? 0 : 1;
+		panelCollapseBlend += (collapseTarget - panelCollapseBlend) * System.Math.min(8 * deltaTime, 1);
+
 		// 전진 거리 적분. (지형 스크롤 / 빛살 이동)
 		scrollDistance += (4.2 + boostFactor * 16) * deltaTime;
 		streakScroll += (10 + boostFactor * 34) * deltaTime;
@@ -966,9 +1224,24 @@
 		pointerCurrentX += (pointerTargetX - pointerCurrentX) * 0.04;
 		pointerCurrentY += (pointerTargetY - pointerCurrentY) * 0.04;
 
-		// 카메라. (은은한 바운스 + 포인터 시차 + 부스트 시 화각 확장)
-		const cameraBounce = System.Math.sin(elapsedTime * 1.1) * 0.12;
-		const cameraPosition = [pointerCurrentX * 1.6, 2.1 + cameraBounce + pointerCurrentY * -0.5, 0.5];
+		// 플레이어 좌우 이동. (드래그 목표를 부드럽게 추적)
+		playerCurrentX += (playerTargetX - playerCurrentX) * System.Math.min(5 * deltaTime, 1);
+
+		// 플레이어 발밑 지형 높이. (메시와 동일한 보간 → 언덕을 오르내리고 관통하지 않음)
+		const playerWorldZ = scrollDistance - 0.5;
+		const surfaceHeight = terrainSurfaceHeightAt(playerCurrentX, playerWorldZ);
+
+		// 달리기 보행 바운스. (속도에 비례한 발걸음 리듬)
+		runBobPhase += (4.2 + boostFactor * 16) * deltaTime * 0.55;
+		const runBobY = System.Math.sin(runBobPhase * 2) * 0.05 * (1 + boostFactor * 0.6);
+		const runSwayX = System.Math.sin(runBobPhase) * 0.05;
+
+		// 카메라. (지면 + 눈높이 + 보행 바운스 + 포인터 시차 + 부스트 시 화각 확장)
+		const cameraPosition = [
+			playerCurrentX + runSwayX + pointerCurrentX * 0.4,
+			surfaceHeight + 1.9 + runBobY + pointerCurrentY * -0.3,
+			0.5,
+		];
 		const cameraPitch = -0.06 + pointerCurrentY * 0.08;
 		const cameraYaw = pointerCurrentX * 0.12;
 		const fieldOfViewRadian = (System.Math.PI / 3) * (1 + boostFactor * 0.1);
@@ -998,6 +1271,7 @@
 		webGL2RenderingContext.uniformMatrix4fv(terrainViewMatrixLocation, false, viewMatrix);
 		webGL2RenderingContext.uniform1f(terrainScrollOffsetLocation, scrollDistance);
 		webGL2RenderingContext.uniform1f(terrainElapsedTimeLocation, elapsedTime);
+		webGL2RenderingContext.uniform3f(terrainCameraPositionLocation, cameraPosition[0], cameraPosition[1], cameraPosition[2]);
 		webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, terrainIndexCount, webGL2RenderingContext.UNSIGNED_SHORT, 0);
 
 		// 1-3. 모노리스. (인스턴싱, 가산 합성, 깊이 기록 없이 테스트만 → 지형에 가려짐)
@@ -1020,13 +1294,16 @@
 		webGL2RenderingContext.uniform1f(streakBoostFactorLocation, boostFactor);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.LINES, 0, STREAK_COUNT * 2);
 
-		// 1-5. 파티클. (가산 합성, 깊이 테스트로 지형에 가려짐)
-		webGL2RenderingContext.useProgram(particleProgram);
-		webGL2RenderingContext.bindVertexArray(particleVertexArray);
-		webGL2RenderingContext.uniformMatrix4fv(particleProjectionMatrixLocation, false, projectionMatrix);
-		webGL2RenderingContext.uniformMatrix4fv(particleViewMatrixLocation, false, viewMatrix);
-		webGL2RenderingContext.uniform1f(particleElapsedTimeLocation, elapsedTime);
-		webGL2RenderingContext.drawArrays(webGL2RenderingContext.POINTS, 0, PARTICLE_COUNT);
+		// 1-5. 파티클. (가산 합성, 깊이 테스트로 지형에 가려짐, 옵션 페이드)
+		if (optionBlendValues.particles > 0.01) {
+			webGL2RenderingContext.useProgram(particleProgram);
+			webGL2RenderingContext.bindVertexArray(particleVertexArray);
+			webGL2RenderingContext.uniformMatrix4fv(particleProjectionMatrixLocation, false, projectionMatrix);
+			webGL2RenderingContext.uniformMatrix4fv(particleViewMatrixLocation, false, viewMatrix);
+			webGL2RenderingContext.uniform1f(particleElapsedTimeLocation, elapsedTime);
+			webGL2RenderingContext.uniform1f(particleFadeFactorLocation, optionBlendValues.particles);
+			webGL2RenderingContext.drawArrays(webGL2RenderingContext.POINTS, 0, PARTICLE_COUNT);
+		}
 		webGL2RenderingContext.depthMask(true);
 		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
@@ -1068,12 +1345,20 @@
 		webGL2RenderingContext.uniform1f(compositeElapsedTimeLocation, elapsedTime);
 		webGL2RenderingContext.uniform1f(compositeBoostFactorLocation, boostFactor);
 		webGL2RenderingContext.uniform2f(compositeResolutionLocation, canvas.width, canvas.height);
+		webGL2RenderingContext.uniform1f(compositeBloomStrengthLocation, optionBlendValues.bloom);
+		webGL2RenderingContext.uniform1f(compositeAberrationStrengthLocation, optionBlendValues.aberration);
+		webGL2RenderingContext.uniform1f(compositeFilmStrengthLocation, optionBlendValues.film);
+		webGL2RenderingContext.uniform1f(compositeLetterboxStrengthLocation, optionBlendValues.letterbox);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sceneRenderTarget.colorTexture);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, bloomRenderTargetA.colorTexture);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+
+		// === 5. 옵션 패널 (vanilla.js 엔진 Graphic 으로 캔버스 안에 렌더링) ===
+		const introFade = System.Math.max(0, System.Math.min(1, (elapsedTime - 0.2) / 2.4));
+		renderOptionPanel(introFade);
 
 		System.window.requestAnimationFrame(renderFrame);
 	}
