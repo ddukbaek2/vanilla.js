@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-	<title>NEON HORIZON - vanilla.js 3D Example</title>
+	<title>NEON HORIZON</title>
 	<link rel="icon" href="./favicon.svg">
 	<style>
 		html, body {
@@ -127,6 +127,7 @@
 	in vec2 fragmentCoordinate;
 	uniform float elapsedTime;
 	uniform float aspectRatio;
+	uniform float shipStrength;
 	out vec4 outputColor;
 
 	float hash21(vec2 point) {
@@ -151,7 +152,19 @@
 		return axisMask(point.x, minCorner.x, maxCorner.x) * axisMask(point.y, minCorner.y, maxCorner.y);
 	}
 
-	// 전투순양함 1척을 그린다. (스타크래프트풍 각진 블록 실루엣 — 곡선/테이퍼 없음)
+	// 전투순양함 실루엣 마스크. (스타크래프트풍 각진 블록 조합 — 곡선/테이퍼 없음)
+	float battlecruiserMask(vec2 shipLocal) {
+		float rearHullMask = boxMask(shipLocal, vec2(-0.5, -0.06), vec2(-0.05, 0.06)); // 후방 본체 블록.
+		float neckMask = boxMask(shipLocal, vec2(-0.08, -0.022), vec2(0.26, 0.022)); // 중앙 넥.
+		float prowMask = boxMask(shipLocal, vec2(0.24, -0.055), vec2(0.46, 0.055)); // 해머헤드 프로우.
+		float prowLipMask = boxMask(shipLocal, vec2(0.42, -0.075), vec2(0.46, 0.075)); // 프로우 전면 립.
+		float bridgeMask = boxMask(shipLocal, vec2(-0.4, 0.06), vec2(-0.18, 0.105)); // 상부 구조물.
+		float towerMask = boxMask(shipLocal, vec2(-0.33, 0.105), vec2(-0.25, 0.135)); // 함교 타워.
+		float finMask = boxMask(shipLocal, vec2(-0.38, -0.1), vec2(-0.22, -0.06)); // 하부 핀.
+		return max(rearHullMask, max(neckMask, max(prowMask, max(prowLipMask, max(bridgeMask, max(towerMask, finMask))))));
+	}
+
+	// 전투순양함 1척을 그린다.
 	// facingSign: +1 = 프로우가 오른쪽, -1 = 왼쪽. shipFade: 원거리 대기 흐림.
 	vec3 applyBattlecruiser(vec3 color, vec2 screenPoint, vec2 shipCenter, float shipScale, float facingSign, float tiltRadian, float shipFade, float shipTime) {
 		vec2 shipLocal = screenPoint - shipCenter;
@@ -161,22 +174,24 @@
 		shipLocal.x *= facingSign;
 		shipLocal /= shipScale;
 
-		// 각진 블록 조합.
-		float rearHullMask = boxMask(shipLocal, vec2(-0.5, -0.06), vec2(-0.05, 0.06)); // 후방 본체 블록.
-		float neckMask = boxMask(shipLocal, vec2(-0.08, -0.022), vec2(0.26, 0.022)); // 중앙 넥.
-		float prowMask = boxMask(shipLocal, vec2(0.24, -0.055), vec2(0.46, 0.055)); // 해머헤드 프로우.
-		float prowLipMask = boxMask(shipLocal, vec2(0.42, -0.075), vec2(0.46, 0.075)); // 프로우 전면 립.
-		float bridgeMask = boxMask(shipLocal, vec2(-0.4, 0.06), vec2(-0.18, 0.105)); // 상부 구조물.
-		float towerMask = boxMask(shipLocal, vec2(-0.33, 0.105), vec2(-0.25, 0.135)); // 함교 타워.
-		float finMask = boxMask(shipLocal, vec2(-0.38, -0.1), vec2(-0.22, -0.06)); // 하부 핀.
-		float shipMask = max(rearHullMask, max(neckMask, max(prowMask, max(prowLipMask, max(bridgeMask, max(towerMask, finMask))))));
-		shipMask *= shipFade;
+		float silhouetteMask = battlecruiserMask(shipLocal);
+		float shipMask = silhouetteMask * shipFade;
+
+		// 상판 돌출: 실루엣을 우상단으로 민 사본과의 차집합 = 빛 받는 윗면/측면. (종이가 아닌 두께감)
+		float extrudedMask = battlecruiserMask(shipLocal - vec2(0.028, 0.022)) * shipFade;
+		float topFaceMask = clamp(extrudedMask - silhouetteMask, 0.0, 1.0);
+		vec3 topFaceColor = vec3(0.2, 0.13, 0.07);
+		color = mix(color, topFaceColor, topFaceMask);
 
 		if (shipMask > 0.001) {
 			// 실루엣: 하늘보다 짙은 함체 + 태양 방향(하부) 캐러멜 림 라이트.
 			vec3 shipColor = vec3(0.045, 0.03, 0.02);
 			float rimLight = smoothstep(0.02, -0.09, shipLocal.y);
 			shipColor += vec3(0.85, 0.5, 0.2) * rimLight * 0.45;
+
+			// 프로우 방향 그라디언트. (태양을 향한 면이 미세하게 밝음 — 입체감)
+			float bowLight = smoothstep(-0.5, 0.46, shipLocal.x);
+			shipColor += vec3(0.3, 0.18, 0.08) * bowLight * 0.35;
 
 			// 패널 라인. (선체를 가로지르는 어두운 분할선 — 각진 디테일)
 			float panelLine = step(0.94, fract(shipLocal.x * 22.0));
@@ -185,8 +200,8 @@
 			// 창문 불빛. (드문드문, 느리게 깜빡임)
 			vec2 windowCell = floor(shipLocal * vec2(180.0, 320.0));
 			float windowRandom = hash21(windowCell);
-			float windowLight = step(0.955, windowRandom) * (0.6 + 0.4 * sin(shipTime * (1.0 + windowRandom * 2.0) + windowRandom * 60.0));
-			shipColor += vec3(1.0, 0.9, 0.65) * windowLight * 0.55;
+			float windowLight = step(0.985, windowRandom) * (0.6 + 0.4 * sin(shipTime * (1.0 + windowRandom * 2.0) + windowRandom * 60.0));
+			shipColor += vec3(1.0, 0.9, 0.65) * windowLight * 0.5;
 			color = mix(color, shipColor, shipMask);
 		}
 
@@ -228,20 +243,20 @@
 			}
 		}
 
-		// 전투순양함 함대.
-		{
+		// 전투순양함 함대. (SHIPS 옵션으로 페이드)
+		if (shipStrength > 0.001) {
 			// 기함. (좌측 상공, 크게 — 미세 표류 + 살짝 기울어진 자세)
 			float flagshipTilt = -0.05;
 			vec2 flagshipCenter = vec2(-0.42 * aspectRatio + sin(elapsedTime * 0.05) * 0.015, 0.58 + sin(elapsedTime * 0.08) * 0.01);
-			color = applyBattlecruiser(color, screenPoint, flagshipCenter, 1.0, 1.0, flagshipTilt, 1.0, elapsedTime);
+			color = applyBattlecruiser(color, screenPoint, flagshipCenter, 1.0, 1.0, flagshipTilt, 1.0 * shipStrength, elapsedTime);
 
 			// 맞은편 원거리 함선들. (반대 방향, 대기 흐림으로 멀리 있는 느낌)
 			vec2 escortCenter1 = vec2(0.52 * aspectRatio + sin(elapsedTime * 0.04 + 2.0) * 0.01, 0.66 + sin(elapsedTime * 0.06 + 1.0) * 0.008);
-			color = applyBattlecruiser(color, screenPoint, escortCenter1, 0.42, -1.0, 0.04, 0.75, elapsedTime + 13.0);
+			color = applyBattlecruiser(color, screenPoint, escortCenter1, 0.42, -1.0, 0.04, 0.75 * shipStrength, elapsedTime + 13.0);
 			vec2 escortCenter2 = vec2(0.3 * aspectRatio + sin(elapsedTime * 0.045 + 4.0) * 0.008, 0.78 + sin(elapsedTime * 0.07 + 3.0) * 0.006);
-			color = applyBattlecruiser(color, screenPoint, escortCenter2, 0.26, -1.0, 0.08, 0.55, elapsedTime + 31.0);
+			color = applyBattlecruiser(color, screenPoint, escortCenter2, 0.26, -1.0, 0.08, 0.55 * shipStrength, elapsedTime + 31.0);
 			vec2 escortCenter3 = vec2(0.68 * aspectRatio + sin(elapsedTime * 0.035 + 5.5) * 0.008, 0.42 + sin(elapsedTime * 0.055 + 2.5) * 0.006);
-			color = applyBattlecruiser(color, screenPoint, escortCenter3, 0.18, -1.0, -0.03, 0.45, elapsedTime + 47.0);
+			color = applyBattlecruiser(color, screenPoint, escortCenter3, 0.18, -1.0, -0.03, 0.45 * shipStrength, elapsedTime + 47.0);
 
 			// 기함 주포. (45초 주기 — 차지 후 초거대 광선 발사)
 			float fireCycle = 45.0;
@@ -253,13 +268,13 @@
 			vec2 beamDirection = vec2(cosFlagTilt, sinFlagTilt);
 
 			// 차지: 프로우에 에너지가 모임.
-			float chargeAmount = smoothstep(0.05, 0.1, firePhase) * (1.0 - smoothstep(0.1, 0.115, firePhase));
+			float chargeAmount = smoothstep(0.05, 0.1, firePhase) * (1.0 - smoothstep(0.1, 0.115, firePhase)) * shipStrength;
 			float chargeDistance = length(screenPoint - beamOrigin);
 			color += vec3(1.0, 0.85, 0.5) * exp(-chargeDistance * 90.0) * chargeAmount * 2.2;
 			color += vec3(1.0, 0.7, 0.35) * exp(-chargeDistance * 22.0) * chargeAmount * 0.5;
 
 			// 발사: 화면을 가로지르는 초거대 광선.
-			float beamStrength = smoothstep(0.1, 0.108, firePhase) * (1.0 - smoothstep(0.15, 0.17, firePhase));
+			float beamStrength = smoothstep(0.1, 0.108, firePhase) * (1.0 - smoothstep(0.15, 0.17, firePhase)) * shipStrength;
 			if (beamStrength > 0.001) {
 				float beamFlicker = 0.85 + 0.15 * sin(elapsedTime * 47.0);
 				float beamDistance = segmentDistance(screenPoint, beamOrigin, beamOrigin + beamDirection * 5.0);
@@ -325,23 +340,52 @@
 	out float fragmentViewDistance;
 	out float fragmentHeight;
 
-	float riverDistanceAt(vec2 worldXZ) {
-		// 바닥을 가로/대각선으로 크게 왕복하며 한 방향으로 이어지는 사행천까지의 거리.
-		float riverCenter = sin(worldXZ.y * 0.05 + 1.3) * 8.5 + sin(worldXZ.y * 0.021 + 4.2) * 4.5;
-		return abs(worldXZ.x - riverCenter);
+	// 정수 격자 해시. (JS 쪽 플레이어 충돌 계산과 비트 단위로 동일한 결정적 난수)
+	float latticeRandom(int cellX, int cellZ) {
+		uint hashValue = uint(cellX) * 374761393u + uint(cellZ) * 668265263u;
+		hashValue = (hashValue ^ (hashValue >> 13u)) * 1274126177u;
+		hashValue = hashValue ^ (hashValue >> 16u);
+		return float(hashValue & 65535u) / 65535.0;
+	}
+
+	// 밸류 노이즈. (격자 난수의 쌍선형 보간 — 반복 없는 절차적 지형의 기반)
+	float valueNoise(vec2 point) {
+		vec2 cellOrigin = floor(point);
+		vec2 cellFraction = point - cellOrigin;
+		vec2 weight = cellFraction * cellFraction * (3.0 - 2.0 * cellFraction);
+		int cellX = int(cellOrigin.x);
+		int cellZ = int(cellOrigin.y);
+		float value00 = latticeRandom(cellX, cellZ);
+		float value10 = latticeRandom(cellX + 1, cellZ);
+		float value01 = latticeRandom(cellX, cellZ + 1);
+		float value11 = latticeRandom(cellX + 1, cellZ + 1);
+		float valueX0 = mix(value00, value10, weight.x);
+		float valueX1 = mix(value01, value11, weight.x);
+		return mix(valueX0, valueX1, weight.y);
+	}
+
+	float riverExcessAt(vec2 worldXZ) {
+		// 도메인 워프 사행천: 바닥을 가로/대각선으로 왕복하며 폭도 넓어졌다 좁아진다.
+		// 반환값은 (강 중심까지의 거리 - 강 폭). 음수면 물속.
+		float riverMeander = sin(worldXZ.y * 0.045 + sin(worldXZ.y * 0.013) * 2.2 + 1.3) * 9.0
+		                   + sin(worldXZ.y * 0.021 + 4.2) * 4.0
+		                   + sin(worldXZ.y * 0.11) * 1.2;
+		float riverWidth = 2.2 + sin(worldXZ.y * 0.037 + 2.0) * 1.0 + sin(worldXZ.y * 0.093 + 0.7) * 0.6;
+		return abs(worldXZ.x - riverMeander) - riverWidth;
 	}
 
 	float terrainHeight(vec2 worldXZ) {
 		// 중앙(도로)은 평평하고 좌우로 갈수록 산이 솟는 구조.
+		// 다중 옥타브 밸류 노이즈라 같은 지형이 반복되지 않는다.
 		float sideFactor = smoothstep(2.2, 9.0, abs(worldXZ.x));
-		float wave1 = sin(worldXZ.x * 0.42 + worldXZ.y * 0.31);
-		float wave2 = sin(worldXZ.x * 0.19 - worldXZ.y * 0.23 + 1.7);
-		float wave3 = sin(worldXZ.x * 0.83 + worldXZ.y * 0.57 + 4.1);
-		float height = (wave1 * 0.9 + wave2 * 1.15 + wave3 * 0.35);
-		height = max(height, 0.0) * sideFactor * 2.6;
+		float noiseLarge = valueNoise(worldXZ * 0.06);
+		float noiseMedium = valueNoise(worldXZ * 0.15 + 37.0);
+		float noiseSmall = valueNoise(worldXZ * 0.37 + 91.0);
+		float combined = noiseLarge * 1.4 + noiseMedium * 0.65 + noiseSmall * 0.25;
+		float height = pow(max(combined - 0.7, 0.0), 1.5) * 4.6 * sideFactor;
 
 		// 강이 지나는 자리는 지형을 깎아 계곡을 만든다. (강이 언덕에서 끊기지 않도록)
-		float riverCarve = 1.0 - smoothstep(2.4, 4.6, riverDistanceAt(worldXZ));
+		float riverCarve = 1.0 - smoothstep(0.0, 2.2, riverExcessAt(worldXZ));
 		return height * (1.0 - riverCarve);
 	}
 
@@ -374,6 +418,7 @@
 	uniform float elapsedTime;
 	uniform float scrollOffset;
 	uniform vec3 cameraPosition;
+	uniform float waterStrength;
 	out vec4 outputColor;
 
 	void main() {
@@ -414,19 +459,22 @@
 		float streamFlow = 0.55 + 0.3 * flowShimmer;
 		color += vec3(1.0, 0.88, 0.55) * (lateralGlow * 0.3 + coreGlow * 0.45) * streamFlow;
 
-		// 강. (바닥을 가로/대각선으로 크게 왕복하는 사행천 — terrainHeight 의 계곡과 동일 경로)
-		float riverCenter = sin(fragmentWorldPosition.z * 0.05 + 1.3) * 8.5 + sin(fragmentWorldPosition.z * 0.021 + 4.2) * 4.5;
-		float riverDistance = abs(fragmentWorldPosition.x - riverCenter);
-		float puddleMask = (1.0 - smoothstep(2.2, 3.2, riverDistance)) * (1.0 - smoothstep(0.05, 0.4, fragmentHeight));
+		// 강. (도메인 워프 사행천 + 폭 변화 — terrainHeight 의 계곡과 동일 수식)
+		float riverMeander = sin(fragmentWorldPosition.z * 0.045 + sin(fragmentWorldPosition.z * 0.013) * 2.2 + 1.3) * 9.0
+		                   + sin(fragmentWorldPosition.z * 0.021 + 4.2) * 4.0
+		                   + sin(fragmentWorldPosition.z * 0.11) * 1.2;
+		float riverWidth = 2.2 + sin(fragmentWorldPosition.z * 0.037 + 2.0) * 1.0 + sin(fragmentWorldPosition.z * 0.093 + 0.7) * 0.6;
+		float riverAcross = fragmentWorldPosition.x - riverMeander;
+		float riverExcess = abs(riverAcross) - riverWidth;
+		float puddleMask = (1.0 - smoothstep(-0.5, 0.5, riverExcess)) * (1.0 - smoothstep(0.05, 0.4, fragmentHeight)) * waterStrength;
 		if (puddleMask > 0.001) {
-			// 물 표면: 다중 옥타브 물결 높이장을 해석적으로 미분해 노멀을 만든다.
-			// 물결 좌표가 물길 방향(z)으로 계속 밀려 내려와 흐르는 느낌을 만든다.
-			// 굴절(수면 아래 그리드가 일렁이며 비침) + 반사(하늘/태양) + 태양 글리터.
-			vec2 flowCoordinate = vec2(fragmentWorldPosition.x * 1.5, fragmentWorldPosition.z - elapsedTime * 3.2);
-			float wavePhase1 = dot(flowCoordinate, vec2(1.9, 1.2)) + elapsedTime * 0.7;
-			float wavePhase2 = dot(flowCoordinate, vec2(-1.3, 2.3)) - elapsedTime * 0.5;
-			float wavePhase3 = dot(flowCoordinate, vec2(3.1, -0.8)) + elapsedTime * 0.9;
-			float wavePhase4 = dot(flowCoordinate, vec2(5.7, 4.3)) + elapsedTime * 1.2;
+			// 물결은 강의 채널 좌표계(가로 u, 물길 방향 v)에서 계산한다.
+			// 플레이어 이동 경로가 아니라 강줄기 자신의 방향을 따라 흘러내려간다.
+			vec2 channelCoordinate = vec2(riverAcross * 1.6, fragmentWorldPosition.z - elapsedTime * 3.0);
+			float wavePhase1 = dot(channelCoordinate, vec2(1.9, 1.2)) + elapsedTime * 0.7;
+			float wavePhase2 = dot(channelCoordinate, vec2(-1.3, 2.3)) - elapsedTime * 0.5;
+			float wavePhase3 = dot(channelCoordinate, vec2(3.1, -0.8)) + elapsedTime * 0.9;
+			float wavePhase4 = dot(channelCoordinate, vec2(5.7, 4.3)) + elapsedTime * 1.2;
 			vec2 waveGradient = vec2(1.9, 1.2) * cos(wavePhase1) * 0.05
 			                  + vec2(-1.3, 2.3) * cos(wavePhase2) * 0.035
 			                  + vec2(3.1, -0.8) * cos(wavePhase3) * 0.02
@@ -439,11 +487,6 @@
 			vec3 reflectDirection = reflect(-viewDirection, waterNormal);
 			float fresnel = pow(1.0 - max(dot(waterNormal, viewDirection), 0.0), 3.0);
 
-			// 굴절: 수면 아래의 그리드 라인이 리플에 왜곡되어 일렁이며 비친다.
-			vec2 refractedCoordinate = (fragmentWorldPosition.xz + waveGradient * 5.0) * 0.5;
-			vec2 refractedGridDistance = abs(fract(refractedCoordinate - 0.5) - 0.5) / fwidth(gridCoordinate);
-			float refractedLine = 1.0 - smoothstep(0.0, 2.2, min(refractedGridDistance.x, refractedGridDistance.y));
-
 			// 반사된 하늘. (지평선 캐러멜 → 상공 초콜릿)
 			float reflectUp = clamp(reflectDirection.y, 0.0, 1.0);
 			vec3 reflectedSkyColor = mix(vec3(0.52, 0.3, 0.12), vec3(0.08, 0.055, 0.03), pow(reflectUp, 0.6));
@@ -454,23 +497,16 @@
 			float sunSpecular = pow(sunAlignment, 240.0);
 			float sunHalo = pow(sunAlignment, 24.0);
 
-			// 태양 글리터. (물길을 따라 반짝이며 흘러 내려오는 잔반짝임)
-			float glitterColumn = exp(-riverDistance * 0.5);
-			float glitterSparkle = smoothstep(0.035, 0.085, length(waveGradient));
-			float sunGlitter = glitterColumn * glitterSparkle;
-
-			// 합성: 전체적으로 밝은 수면 + 물속에 떠다니는 무늬는 물보다 더 밝게.
-			vec3 waterColor = vec3(0.55, 0.38, 0.18);
-			waterColor += reflectedSkyColor * (0.4 + 0.4 * fresnel);
-			waterColor += vec3(1.0, 0.92, 0.7) * refractedLine * 0.5;
-			waterColor += vec3(1.0, 0.85, 0.55) * sunHalo * 0.55;
-			waterColor += vec3(1.0, 0.95, 0.75) * sunGlitter * 0.9;
-			waterColor += vec3(1.0, 0.93, 0.7) * sunSpecular * 2.0;
+			// 합성: 어두운 수면 위에 좁은 반사 하이라이트만. (면적 무늬 없음)
+			vec3 waterColor = vec3(0.07, 0.05, 0.028);
+			waterColor += reflectedSkyColor * (0.15 + 0.25 * fresnel);
+			waterColor += vec3(1.0, 0.85, 0.55) * sunHalo * 0.3;
+			waterColor += vec3(1.0, 0.93, 0.7) * sunSpecular * 2.6;
 
 			float waterBlend = smoothstep(0.0, 0.5, puddleMask);
 			color = mix(color, waterColor, waterBlend);
 
-			// 웅덩이 가장자리: 바깥은 젖은 바닥(어둡게), 안쪽은 얇은 크림 하이라이트.
+			// 물가: 바깥은 젖은 바닥(어둡게), 안쪽은 얇은 크림 하이라이트.
 			float wetRim = smoothstep(0.0, 0.12, puddleMask) * (1.0 - smoothstep(0.12, 0.3, puddleMask));
 			color *= 1.0 - wetRim * 0.25;
 			float puddleEdge = smoothstep(0.12, 0.22, puddleMask) * (1.0 - smoothstep(0.22, 0.45, puddleMask));
@@ -525,6 +561,7 @@
 	in float fragmentSeed;
 	in float fragmentTailRatio;
 	uniform float boostFactor;
+	uniform float fadeFactor;
 	out vec4 outputColor;
 
 	void main() {
@@ -535,7 +572,7 @@
 
 		// 부스트 중에만 선명해짐. (평상시엔 거의 보이지 않음)
 		float boostAlpha = 0.04 + boostFactor * 0.9;
-		outputColor = vec4(color * headFade * boostAlpha, 0.0);
+		outputColor = vec4(color * headFade * boostAlpha * fadeFactor, 0.0);
 	}
 	`;
 
@@ -822,6 +859,7 @@
 	const backgroundProgram = createShaderProgram(webGL2RenderingContext, FULLSCREEN_VERTEXSHADER_SOURCE, BACKGROUND_FRAGMENTSHADER_SOURCE);
 	const backgroundElapsedTimeLocation = webGL2RenderingContext.getUniformLocation(backgroundProgram, "elapsedTime");
 	const backgroundAspectRatioLocation = webGL2RenderingContext.getUniformLocation(backgroundProgram, "aspectRatio");
+	const backgroundShipStrengthLocation = webGL2RenderingContext.getUniformLocation(backgroundProgram, "shipStrength");
 
 	// 지형 프로그램 + 그리드 메시.
 	const terrainProgram = createShaderProgram(webGL2RenderingContext, TERRAIN_VERTEXSHADER_SOURCE, TERRAIN_FRAGMENTSHADER_SOURCE);
@@ -830,6 +868,7 @@
 	const terrainScrollOffsetLocation = webGL2RenderingContext.getUniformLocation(terrainProgram, "scrollOffset");
 	const terrainElapsedTimeLocation = webGL2RenderingContext.getUniformLocation(terrainProgram, "elapsedTime");
 	const terrainCameraPositionLocation = webGL2RenderingContext.getUniformLocation(terrainProgram, "cameraPosition");
+	const terrainWaterStrengthLocation = webGL2RenderingContext.getUniformLocation(terrainProgram, "waterStrength");
 
 	// 그리드 정점 목록. (x: -40..40, z: 0..48, 셀 크기 2 — 좌우 이동 한계에서도 끝이 안 보이게 넓게)
 	const GRID_HALF_WIDTH = 40;
@@ -878,6 +917,7 @@
 	const streakBoostFactorLocation = webGL2RenderingContext.getUniformLocation(streakProgram, "boostFactor");
 	const streakHeightOffsetLocation = webGL2RenderingContext.getUniformLocation(streakProgram, "heightOffset");
 	const streakLateralOffsetLocation = webGL2RenderingContext.getUniformLocation(streakProgram, "lateralOffset");
+	const streakFadeFactorLocation = webGL2RenderingContext.getUniformLocation(streakProgram, "fadeFactor");
 	const STREAK_COUNT = 300;
 	const STREAK_FLOATS_PER_VERTEX = 5;
 	const streakVertexData = new Float32Array(STREAK_COUNT * 2 * STREAK_FLOATS_PER_VERTEX);
@@ -983,6 +1023,10 @@
 	}
 	System.window.addEventListener("mousemove", (event) => {
 		updatePointerTarget(event.clientX, event.clientY);
+		if (activeSliderName !== null) {
+			updateSliderFromClientX(event.clientX);
+			return;
+		}
 		if (isBoostPressed) {
 			updateDragMove(event.clientX);
 		}
@@ -1003,6 +1047,7 @@
 	System.window.addEventListener("mouseup", () => {
 		isBoostPressed = false;
 		dragLastClientX = null;
+		activeSliderName = null;
 	});
 
 	// 우클릭 컨텍스트 메뉴 차단.
@@ -1032,16 +1077,22 @@
 		event.preventDefault();
 		if (event.touches.length > 0) {
 			updatePointerTarget(event.touches[0].clientX, event.touches[0].clientY);
+			if (activeSliderName !== null) {
+				updateSliderFromClientX(event.touches[0].clientX);
+				return;
+			}
 			updateDragMove(event.touches[0].clientX);
 		}
 	}, { passive: false });
 	System.window.addEventListener("touchend", () => {
 		isBoostPressed = false;
 		dragLastClientX = null;
+		activeSliderName = null;
 	});
 	System.window.addEventListener("touchcancel", () => {
 		isBoostPressed = false;
 		dragLastClientX = null;
+		activeSliderName = null;
 	});
 
 	//==============================================================================
@@ -1049,11 +1100,16 @@
 	// - 같은 캔버스의 WebGL2 컨텍스트를 공유한다. (getContext 는 동일 컨텍스트 반환)
 	//==============================================================================
 	const optionDefinitions = [
-		{ name: "bloom", label: "BLOOM" },
-		{ name: "aberration", label: "CHROMATIC" },
-		{ name: "film", label: "FILM GRAIN" },
-		{ name: "letterbox", label: "LETTERBOX" },
-		{ name: "particles", label: "PARTICLES" },
+		{ name: "bloom", label: "BLOOM", type: "toggle" },
+		{ name: "aberration", label: "CHROMATIC", type: "toggle" },
+		{ name: "film", label: "FILM GRAIN", type: "toggle" },
+		{ name: "letterbox", label: "LETTERBOX", type: "toggle" },
+		{ name: "particles", label: "PARTICLES", type: "toggle" },
+		{ name: "streaks", label: "STREAKS", type: "toggle" },
+		{ name: "water", label: "WATER", type: "toggle" },
+		{ name: "ships", label: "SHIPS", type: "toggle" },
+		{ name: "glow", label: "GLOW", type: "slider", minimumValue: 0, maximumValue: 1.5, defaultValue: 1 },
+		{ name: "speed", label: "SPEED", type: "slider", minimumValue: 0.4, maximumValue: 2, defaultValue: 1 },
 	];
 	const optionStates = {
 		bloom: true,
@@ -1061,6 +1117,9 @@
 		film: true,
 		letterbox: true,
 		particles: true,
+		streaks: true,
+		water: true,
+		ships: true,
 	};
 	const optionBlendValues = {
 		bloom: 1,
@@ -1068,7 +1127,15 @@
 		film: 1,
 		letterbox: 1,
 		particles: 1,
+		streaks: 1,
+		water: 1,
+		ships: 1,
 	};
+	const sliderValues = {
+		glow: 1,
+		speed: 1,
+	};
+	let activeSliderName = null;
 	let isPanelCollapsed = true;
 	let panelCollapseBlend = 0;
 
@@ -1124,21 +1191,53 @@
 			return true;
 		}
 
-		// 목록: 행 토글.
+		// 목록: 행 토글 / 슬라이더 드래그 시작.
 		if (panelCollapseBlend > 0.9) {
 			const rowIndex = System.Math.floor((clientY - panelLayout.panelY - PANEL_HEADER_HEIGHT - 4) / PANEL_ROW_HEIGHT);
 			if (rowIndex >= 0 && rowIndex < optionDefinitions.length) {
-				const optionName = optionDefinitions[rowIndex].name;
-				optionStates[optionName] = !optionStates[optionName];
+				const optionDefinition = optionDefinitions[rowIndex];
+				if (optionDefinition.type === "slider") {
+					activeSliderName = optionDefinition.name;
+					updateSliderFromClientX(clientX);
+				}
+				else {
+					optionStates[optionDefinition.name] = !optionStates[optionDefinition.name];
+				}
 			}
 		}
 		return true;
 	}
 
+	// 슬라이더 트랙의 화면 X 범위. (렌더링과 히트 테스트가 공유)
+	const SLIDER_TRACK_WIDTH = 90;
+	function calculateSliderTrackX(panelX) {
+		return panelX + PANEL_WIDTH - 16 - SLIDER_TRACK_WIDTH;
+	}
+
+	// 드래그 중인 슬라이더 값 갱신.
+	function updateSliderFromClientX(clientX) {
+		if (activeSliderName === null) {
+			return;
+		}
+		let sliderDefinition = null;
+		for (const optionDefinition of optionDefinitions) {
+			if (optionDefinition.name === activeSliderName) {
+				sliderDefinition = optionDefinition;
+			}
+		}
+		if (!sliderDefinition) {
+			return;
+		}
+		const panelLayout = calculatePanelLayout();
+		const trackX = calculateSliderTrackX(panelLayout.panelX);
+		const normalized = System.Math.max(0, System.Math.min(1, (clientX - trackX) / SLIDER_TRACK_WIDTH));
+		sliderValues[activeSliderName] = sliderDefinition.minimumValue + (sliderDefinition.maximumValue - sliderDefinition.minimumValue) * normalized;
+	}
+
 	//==============================================================================
 	// 옵션 패널 렌더링. (매 프레임, 포스트 프로세싱이 끝난 화면 위에)
 	//==============================================================================
-	function renderOptionPanel(introFade) {
+	function renderOptionPanel(introFade, fpsDisplayText) {
 		if (!uiGraphic) {
 			return;
 		}
@@ -1148,6 +1247,13 @@
 		uiGraphic.applySettings(null);
 		uiGraphic.scale(devicePixelRatio, devicePixelRatio);
 		uiGraphic.setGlobalAlpha(introFade);
+
+		// FPS. (패널보다 위쪽, 숫자만)
+		uiGraphic.setFontString(`300 12px "Segoe UI", sans-serif`);
+		uiGraphic.setTextAlign("right");
+		uiGraphic.setTextBaseline("bottom");
+		uiGraphic.setFillColor("rgba(243, 229, 171, 0.75)");
+		uiGraphic.drawFillText(fpsDisplayText, panelLayout.panelX + PANEL_WIDTH, panelLayout.panelY - 8);
 
 		// 패널 배경 + 테두리.
 		const panelRect = engineRect.create(panelLayout.panelX, panelLayout.panelY, PANEL_WIDTH, panelLayout.panelHeight);
@@ -1185,22 +1291,39 @@
 				uiGraphic.setFillColor("rgba(241, 233, 216, 0.8)");
 				uiGraphic.drawFillText(optionDefinition.label, panelLayout.panelX + 16, rowMiddleY + 1);
 
-				// 토글 스위치. (트랙 + 이동 노브, 상태 전환은 매 프레임 보간)
-				const toggleBlend = optionBlendValues[optionDefinition.name];
-				const switchX = panelLayout.panelX + PANEL_WIDTH - 16 - 36;
-				const switchY = rowMiddleY - 9.5;
-				const trackRect = engineRect.create(switchX, switchY, 36, 19);
-				const trackRed = 0.16 + (0.85 - 0.16) * toggleBlend;
-				const trackGreen = 0.14 + (0.72 - 0.14) * toggleBlend;
-				const trackBlue = 0.1 + (0.35 - 0.1) * toggleBlend;
-				uiGraphic.setFillColor(`rgba(${System.Math.round(trackRed * 255)}, ${System.Math.round(trackGreen * 255)}, ${System.Math.round(trackBlue * 255)}, 0.85)`);
-				uiGraphic.drawRoundRect(trackRect, 9.5);
-				uiGraphic.setStrokeColor(`rgba(243, 229, 171, ${0.25 + toggleBlend * 0.45})`);
-				uiGraphic.drawStrokeRoundRect(trackRect, 9.5, 1);
-				const knobX = switchX + 9.5 + toggleBlend * 17;
-				const knobCenter = engineVector2.create(knobX, rowMiddleY);
-				uiGraphic.setFillColor(toggleBlend > 0.5 ? "#fffaf0" : "rgba(241, 233, 216, 0.75)");
-				uiGraphic.drawCircle(knobCenter, 6.5);
+				if (optionDefinition.type === "slider") {
+					// 슬라이더. (트랙 + 채움 + 노브)
+					const sliderRange = optionDefinition.maximumValue - optionDefinition.minimumValue;
+					const sliderNormalized = (sliderValues[optionDefinition.name] - optionDefinition.minimumValue) / sliderRange;
+					const trackX = calculateSliderTrackX(panelLayout.panelX);
+					const trackRect = engineRect.create(trackX, rowMiddleY - 2, SLIDER_TRACK_WIDTH, 4);
+					uiGraphic.setFillColor("rgba(241, 233, 216, 0.18)");
+					uiGraphic.drawRoundRect(trackRect, 2);
+					const filledRect = engineRect.create(trackX, rowMiddleY - 2, SLIDER_TRACK_WIDTH * sliderNormalized, 4);
+					uiGraphic.setFillColor("rgba(232, 162, 60, 0.9)");
+					uiGraphic.drawRoundRect(filledRect, 2);
+					const sliderKnobCenter = engineVector2.create(trackX + SLIDER_TRACK_WIDTH * sliderNormalized, rowMiddleY);
+					uiGraphic.setFillColor("#fffaf0");
+					uiGraphic.drawCircle(sliderKnobCenter, 6);
+				}
+				else {
+					// 토글 스위치. (트랙 + 이동 노브, 상태 전환은 매 프레임 보간)
+					const toggleBlend = optionBlendValues[optionDefinition.name];
+					const switchX = panelLayout.panelX + PANEL_WIDTH - 16 - 36;
+					const switchY = rowMiddleY - 9.5;
+					const trackRect = engineRect.create(switchX, switchY, 36, 19);
+					const trackRed = 0.16 + (0.85 - 0.16) * toggleBlend;
+					const trackGreen = 0.14 + (0.72 - 0.14) * toggleBlend;
+					const trackBlue = 0.1 + (0.35 - 0.1) * toggleBlend;
+					uiGraphic.setFillColor(`rgba(${System.Math.round(trackRed * 255)}, ${System.Math.round(trackGreen * 255)}, ${System.Math.round(trackBlue * 255)}, 0.85)`);
+					uiGraphic.drawRoundRect(trackRect, 9.5);
+					uiGraphic.setStrokeColor(`rgba(243, 229, 171, ${0.25 + toggleBlend * 0.45})`);
+					uiGraphic.drawStrokeRoundRect(trackRect, 9.5, 1);
+					const knobX = switchX + 9.5 + toggleBlend * 17;
+					const knobCenter = engineVector2.create(knobX, rowMiddleY);
+					uiGraphic.setFillColor(toggleBlend > 0.5 ? "#fffaf0" : "rgba(241, 233, 216, 0.75)");
+					uiGraphic.drawCircle(knobCenter, 6.5);
+				}
 			}
 		}
 	}
@@ -1212,18 +1335,43 @@
 		const normalized = System.Math.max(0, System.Math.min(1, (value - edgeStart) / (edgeEnd - edgeStart)));
 		return normalized * normalized * (3 - 2 * normalized);
 	}
+	function latticeRandomAt(cellX, cellZ) {
+		// 셰이더 latticeRandom 과 비트 단위로 동일한 32비트 정수 해시.
+		let hashValue = (Math.imul(cellX, 374761393) + Math.imul(cellZ, 668265263)) >>> 0;
+		hashValue = Math.imul(hashValue ^ (hashValue >>> 13), 1274126177) >>> 0;
+		hashValue = (hashValue ^ (hashValue >>> 16)) >>> 0;
+		return (hashValue & 65535) / 65535;
+	}
+	function valueNoiseAt(pointX, pointZ) {
+		const cellOriginX = System.Math.floor(pointX);
+		const cellOriginZ = System.Math.floor(pointZ);
+		const fractionX = pointX - cellOriginX;
+		const fractionZ = pointZ - cellOriginZ;
+		const weightX = fractionX * fractionX * (3 - 2 * fractionX);
+		const weightZ = fractionZ * fractionZ * (3 - 2 * fractionZ);
+		const value00 = latticeRandomAt(cellOriginX, cellOriginZ);
+		const value10 = latticeRandomAt(cellOriginX + 1, cellOriginZ);
+		const value01 = latticeRandomAt(cellOriginX, cellOriginZ + 1);
+		const value11 = latticeRandomAt(cellOriginX + 1, cellOriginZ + 1);
+		const valueX0 = value00 + (value10 - value00) * weightX;
+		const valueX1 = value01 + (value11 - value01) * weightX;
+		return valueX0 + (valueX1 - valueX0) * weightZ;
+	}
 	function terrainHeightAt(worldX, worldZ) {
 		const sideFactor = smoothstepValue(2.2, 9.0, System.Math.abs(worldX));
-		const wave1 = System.Math.sin(worldX * 0.42 + worldZ * 0.31);
-		const wave2 = System.Math.sin(worldX * 0.19 - worldZ * 0.23 + 1.7);
-		const wave3 = System.Math.sin(worldX * 0.83 + worldZ * 0.57 + 4.1);
-		let height = wave1 * 0.9 + wave2 * 1.15 + wave3 * 0.35;
-		height = System.Math.max(height, 0) * sideFactor * 2.6;
+		const noiseLarge = valueNoiseAt(worldX * 0.06, worldZ * 0.06);
+		const noiseMedium = valueNoiseAt(worldX * 0.15 + 37.0, worldZ * 0.15 + 37.0);
+		const noiseSmall = valueNoiseAt(worldX * 0.37 + 91.0, worldZ * 0.37 + 91.0);
+		const combined = noiseLarge * 1.4 + noiseMedium * 0.65 + noiseSmall * 0.25;
+		const height = System.Math.pow(System.Math.max(combined - 0.7, 0), 1.5) * 4.6 * sideFactor;
 
-		// 강이 지나는 자리는 지형을 깎아 계곡을 만든다. (셰이더 terrainHeight 와 동일)
-		const riverCenter = System.Math.sin(worldZ * 0.05 + 1.3) * 8.5 + System.Math.sin(worldZ * 0.021 + 4.2) * 4.5;
-		const riverDistance = System.Math.abs(worldX - riverCenter);
-		const riverCarve = 1 - smoothstepValue(2.4, 4.6, riverDistance);
+		// 강이 지나는 자리는 지형을 깎아 계곡을 만든다. (셰이더 riverExcessAt 와 동일)
+		const riverMeander = System.Math.sin(worldZ * 0.045 + System.Math.sin(worldZ * 0.013) * 2.2 + 1.3) * 9.0
+		                   + System.Math.sin(worldZ * 0.021 + 4.2) * 4.0
+		                   + System.Math.sin(worldZ * 0.11) * 1.2;
+		const riverWidth = 2.2 + System.Math.sin(worldZ * 0.037 + 2.0) * 1.0 + System.Math.sin(worldZ * 0.093 + 0.7) * 0.6;
+		const riverExcess = System.Math.abs(worldX - riverMeander) - riverWidth;
+		const riverCarve = 1 - smoothstepValue(0.0, 2.2, riverExcess);
 		return height * (1 - riverCarve);
 	}
 
@@ -1276,6 +1424,9 @@
 	let streakScroll = 0;
 	let playerCurrentX = 0;
 	let runBobPhase = 0;
+	let fpsAverage = 60;
+	let fpsUpdateAccumulator = 0;
+	let fpsDisplayText = "60";
 	function renderFrame() {
 		resizeCanvas();
 		const currentTimestamp = System.performance.now();
@@ -1291,15 +1442,28 @@
 
 		// 옵션 토글 / 패널 접힘 보간. (부드러운 트랜지션)
 		for (const optionDefinition of optionDefinitions) {
+			if (optionDefinition.type !== "toggle") {
+				continue;
+			}
 			const optionTarget = optionStates[optionDefinition.name] ? 1 : 0;
 			optionBlendValues[optionDefinition.name] += (optionTarget - optionBlendValues[optionDefinition.name]) * System.Math.min(7 * deltaTime, 1);
 		}
 		const collapseTarget = isPanelCollapsed ? 0 : 1;
 		panelCollapseBlend += (collapseTarget - panelCollapseBlend) * System.Math.min(8 * deltaTime, 1);
 
-		// 전진 거리 적분. (지형 스크롤 / 빛살 이동)
-		scrollDistance += (4.2 + boostFactor * 16) * deltaTime;
-		streakScroll += (10 + boostFactor * 34) * deltaTime;
+		// FPS 집계. (0.25초마다 표시 텍스트 갱신 — 문자열 텍스처 캐시 부담 최소화)
+		if (deltaTime > 0) {
+			fpsAverage += (1 / deltaTime - fpsAverage) * System.Math.min(3 * deltaTime, 1);
+		}
+		fpsUpdateAccumulator += deltaTime;
+		if (fpsUpdateAccumulator > 0.25) {
+			fpsUpdateAccumulator = 0;
+			fpsDisplayText = String(System.Math.round(fpsAverage));
+		}
+
+		// 전진 거리 적분. (지형 스크롤 / 빛살 이동 — SPEED 슬라이더 반영)
+		scrollDistance += (4.2 + boostFactor * 16) * sliderValues.speed * deltaTime;
+		streakScroll += (10 + boostFactor * 34) * sliderValues.speed * deltaTime;
 
 		// 포인터 지연 추적. (부드러운 시차)
 		pointerCurrentX += (pointerTargetX - pointerCurrentX) * 0.04;
@@ -1313,7 +1477,7 @@
 		const surfaceHeight = terrainSurfaceHeightAt(playerCurrentX, playerWorldZ);
 
 		// 달리기 보행 바운스. (속도에 비례한 발걸음 리듬)
-		runBobPhase += (4.2 + boostFactor * 16) * deltaTime * 0.55;
+		runBobPhase += (4.2 + boostFactor * 16) * sliderValues.speed * deltaTime * 0.55;
 		const runBobY = System.Math.sin(runBobPhase * 2) * 0.05 * (1 + boostFactor * 0.6);
 		const runSwayX = System.Math.sin(runBobPhase) * 0.05;
 
@@ -1342,6 +1506,7 @@
 		webGL2RenderingContext.bindVertexArray(fullscreenVertexArray);
 		webGL2RenderingContext.uniform1f(backgroundElapsedTimeLocation, elapsedTime);
 		webGL2RenderingContext.uniform1f(backgroundAspectRatioLocation, aspectRatio);
+		webGL2RenderingContext.uniform1f(backgroundShipStrengthLocation, optionBlendValues.ships);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
 
 		// 1-2. 지형.
@@ -1353,21 +1518,25 @@
 		webGL2RenderingContext.uniform1f(terrainScrollOffsetLocation, scrollDistance);
 		webGL2RenderingContext.uniform1f(terrainElapsedTimeLocation, elapsedTime);
 		webGL2RenderingContext.uniform3f(terrainCameraPositionLocation, cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+		webGL2RenderingContext.uniform1f(terrainWaterStrengthLocation, optionBlendValues.water);
 		webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, terrainIndexCount, webGL2RenderingContext.UNSIGNED_SHORT, 0);
 
-		// 1-3. 부스트 빛살. (가산 합성, 깊이 기록 없이 테스트만)
+		// 1-3. 부스트 빛살. (가산 합성, 깊이 기록 없이 테스트만, 옵션 페이드)
 		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
 		webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE);
 		webGL2RenderingContext.depthMask(false);
-		webGL2RenderingContext.useProgram(streakProgram);
-		webGL2RenderingContext.bindVertexArray(streakVertexArray);
-		webGL2RenderingContext.uniformMatrix4fv(streakProjectionMatrixLocation, false, projectionMatrix);
-		webGL2RenderingContext.uniformMatrix4fv(streakViewMatrixLocation, false, viewMatrix);
-		webGL2RenderingContext.uniform1f(streakScrollLocation, streakScroll);
-		webGL2RenderingContext.uniform1f(streakBoostFactorLocation, boostFactor);
-		webGL2RenderingContext.uniform1f(streakHeightOffsetLocation, cameraPosition[1] - 2.1);
-		webGL2RenderingContext.uniform1f(streakLateralOffsetLocation, playerCurrentX);
-		webGL2RenderingContext.drawArrays(webGL2RenderingContext.LINES, 0, STREAK_COUNT * 2);
+		if (optionBlendValues.streaks > 0.01) {
+			webGL2RenderingContext.useProgram(streakProgram);
+			webGL2RenderingContext.bindVertexArray(streakVertexArray);
+			webGL2RenderingContext.uniformMatrix4fv(streakProjectionMatrixLocation, false, projectionMatrix);
+			webGL2RenderingContext.uniformMatrix4fv(streakViewMatrixLocation, false, viewMatrix);
+			webGL2RenderingContext.uniform1f(streakScrollLocation, streakScroll);
+			webGL2RenderingContext.uniform1f(streakBoostFactorLocation, boostFactor);
+			webGL2RenderingContext.uniform1f(streakHeightOffsetLocation, cameraPosition[1] - 2.1);
+			webGL2RenderingContext.uniform1f(streakLateralOffsetLocation, playerCurrentX);
+			webGL2RenderingContext.uniform1f(streakFadeFactorLocation, optionBlendValues.streaks);
+			webGL2RenderingContext.drawArrays(webGL2RenderingContext.LINES, 0, STREAK_COUNT * 2);
+		}
 
 		// 1-5. 파티클. (가산 합성, 깊이 테스트로 지형에 가려짐, 옵션 페이드)
 		if (optionBlendValues.particles > 0.01) {
@@ -1422,7 +1591,7 @@
 		webGL2RenderingContext.uniform1f(compositeElapsedTimeLocation, elapsedTime);
 		webGL2RenderingContext.uniform1f(compositeBoostFactorLocation, boostFactor);
 		webGL2RenderingContext.uniform2f(compositeResolutionLocation, canvas.width, canvas.height);
-		webGL2RenderingContext.uniform1f(compositeBloomStrengthLocation, optionBlendValues.bloom);
+		webGL2RenderingContext.uniform1f(compositeBloomStrengthLocation, optionBlendValues.bloom * sliderValues.glow);
 		webGL2RenderingContext.uniform1f(compositeAberrationStrengthLocation, optionBlendValues.aberration);
 		webGL2RenderingContext.uniform1f(compositeFilmStrengthLocation, optionBlendValues.film);
 		webGL2RenderingContext.uniform1f(compositeLetterboxStrengthLocation, optionBlendValues.letterbox);
@@ -1435,7 +1604,7 @@
 
 		// === 5. 옵션 패널 (vanilla.js 엔진 Graphic 으로 캔버스 안에 렌더링) ===
 		const introFade = System.Math.max(0, System.Math.min(1, (elapsedTime - 0.2) / 2.4));
-		renderOptionPanel(introFade);
+		renderOptionPanel(introFade, fpsDisplayText);
 
 		System.window.requestAnimationFrame(renderFrame);
 	}
