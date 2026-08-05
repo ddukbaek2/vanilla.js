@@ -491,43 +491,26 @@
 		float riverExcess = abs(streamAcross) - streamWidth;
 		float puddleMask = (1.0 - smoothstep(-0.5, 0.5, riverExcess)) * (1.0 - smoothstep(0.05, 0.4, fragmentHeight)) * waterStrength;
 		if (puddleMask > 0.001) {
-			// 물결은 개울의 채널 좌표계(u = 물길 가로, v = 물길 진행 = x 축)에서 계산한다.
-			// 흐름은 좌→우(+x) 한 방향 — 플레이어 이동축(z)과 직교하므로 정면으로 흐르지 않는다.
-			vec2 channelCoordinate = vec2(streamAcross * 1.6, fragmentWorldPosition.x - elapsedTime * 5.0);
-			float wavePhase1 = dot(channelCoordinate, vec2(0.6, 2.4)) + elapsedTime * 0.7;
-			float wavePhase2 = dot(channelCoordinate, vec2(-0.9, 1.9)) - elapsedTime * 0.5;
-			float wavePhase3 = dot(channelCoordinate, vec2(3.1, -0.8)) + elapsedTime * 0.9;
-			float wavePhase4 = dot(channelCoordinate, vec2(5.7, 4.3)) + elapsedTime * 1.2;
+			// 네온 물: 어두운 반사 수면이 아니라 그리드와 같은 계열의 발광 액체.
+			// 흐르지 않고 제자리에서 은은하게 일렁이는 반짝임만 가진다.
+			vec2 channelCoordinate = vec2(streamAcross * 1.6, fragmentWorldPosition.x);
+			float wavePhase1 = dot(channelCoordinate, vec2(0.6, 2.4)) + elapsedTime * 0.6;
+			float wavePhase2 = dot(channelCoordinate, vec2(-0.9, 1.9)) - elapsedTime * 0.45;
+			float wavePhase3 = dot(channelCoordinate, vec2(3.1, -0.8)) + elapsedTime * 0.8;
+			float wavePhase4 = dot(channelCoordinate, vec2(5.7, 4.3)) + elapsedTime * 1.1;
 			vec2 waveGradient = vec2(0.6, 2.4) * cos(wavePhase1) * 0.05
 			                  + vec2(-0.9, 1.9) * cos(wavePhase2) * 0.035
 			                  + vec2(3.1, -0.8) * cos(wavePhase3) * 0.02
 			                  + vec2(5.7, 4.3) * cos(wavePhase4) * 0.008;
-			vec3 waterNormal = normalize(vec3(-waveGradient.x, 1.0, -waveGradient.y));
 
-			// 실제 시선 벡터. (렌더 공간)
-			vec3 surfaceRenderPosition = vec3(fragmentWorldPosition.x, fragmentHeight, -fragmentViewDistance);
-			vec3 viewDirection = normalize(cameraPosition - surfaceRenderPosition);
+			// 물길 중심일수록 밝은 크림 코어, 가장자리는 캐러멜.
+			float centerRatio = clamp(1.0 - abs(streamAcross) / max(streamWidth, 0.001), 0.0, 1.0);
+			vec3 waterColor = mix(vec3(0.85, 0.5, 0.16), vec3(1.0, 0.92, 0.6), centerRatio * centerRatio);
+			waterColor *= 0.5 + 0.12 * sin(elapsedTime * 1.8 + streamIndex * 2.1);
 
-			// 베이스는 평평한 노멀 기준. (파동에 따라 밝기가 얼룩지지 않는 매끈한 다크 미러)
-			vec3 flatNormal = vec3(0.0, 1.0, 0.0);
-			vec3 flatReflectDirection = reflect(-viewDirection, flatNormal);
-			float flatFresnel = pow(1.0 - max(dot(flatNormal, viewDirection), 0.0), 3.0);
-			float flatReflectUp = clamp(flatReflectDirection.y, 0.0, 1.0);
-			vec3 reflectedSkyColor = mix(vec3(0.52, 0.3, 0.12), vec3(0.08, 0.055, 0.03), pow(flatReflectUp, 0.6));
-
-			// 반짝임만 파동 노멀 사용. (좁은 스페큘러 글린트가 물결을 따라 흘러감)
-			vec3 waveReflectDirection = reflect(-viewDirection, waterNormal);
-			vec3 reflectedSunDirection = normalize(vec3(0.0, 0.09, -1.0));
-			float sunAlignment = max(dot(waveReflectDirection, reflectedSunDirection), 0.0);
-			float sunSpecular = pow(sunAlignment, 240.0);
-			float flatSunAlignment = max(dot(flatReflectDirection, reflectedSunDirection), 0.0);
-			float sunHalo = pow(flatSunAlignment, 24.0);
-
-			// 합성: 매끈한 어두운 수면 + 태양 글린트.
-			vec3 waterColor = vec3(0.07, 0.05, 0.028);
-			waterColor += reflectedSkyColor * (0.15 + 0.25 * flatFresnel);
-			waterColor += vec3(1.0, 0.85, 0.55) * sunHalo * 0.3;
-			waterColor += vec3(1.0, 0.93, 0.7) * sunSpecular * 2.6;
+			// 제자리 반짝임. (파동 간섭이 겹치는 지점만 밝게)
+			float sparkle = smoothstep(0.12, 0.16, length(waveGradient));
+			waterColor += vec3(1.0, 0.97, 0.8) * sparkle * 0.5;
 
 			float waterBlend = smoothstep(0.0, 0.5, puddleMask);
 			color = mix(color, waterColor, waterBlend);
