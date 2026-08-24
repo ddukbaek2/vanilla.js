@@ -1149,6 +1149,1098 @@ var Vector2 = class _Vector2 extends Object2 {
   }
 };
 
+// src/base/vector3.js
+var Vector3 = class _Vector3 extends Object2 {
+  static {
+    __name(this, "Vector3");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { number } */
+  #x;
+  /** @private @type { number } */
+  #y;
+  /** @private @type { number } */
+  #z;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   */
+  constructor() {
+    super();
+    this.x = 0;
+    this.y = 0;
+    this.z = 0;
+  }
+  //==============================================================================
+  // 비교.
+  //==============================================================================
+  /**
+   * @override
+   * @param { any } other
+   * @returns { boolean }
+   */
+  equals(other) {
+    if (super.equals(other)) {
+      return true;
+    }
+    if (other) {
+      if (other instanceof _Vector3) {
+        if (this.x === other.x && this.y === other.y && this.z === other.z) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  //==============================================================================
+  // 복제.
+  //==============================================================================
+  /**
+   * @override
+   * @returns { this }
+   */
+  clone() {
+    const obj = (
+      /** @type { this } */
+      _Vector3.create(this.x, this.y, this.z)
+    );
+    return obj;
+  }
+  //==============================================================================
+  // X 좌표 설정 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @param { number } value
+   */
+  set x(value) {
+    this.#x = value;
+  }
+  //==============================================================================
+  // X 좌표 반환 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @returns { number }
+   */
+  get x() {
+    return this.#x;
+  }
+  //==============================================================================
+  // Y 좌표 설정 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @param { number } value
+   */
+  set y(value) {
+    this.#y = value;
+  }
+  //==============================================================================
+  // Y 좌표 반환 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @returns { number }
+   */
+  get y() {
+    return this.#y;
+  }
+  //==============================================================================
+  // Z 좌표 설정 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @param { number } value
+   */
+  set z(value) {
+    this.#z = value;
+  }
+  //==============================================================================
+  // Z 좌표 반환 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @returns { number }
+   */
+  get z() {
+    return this.#z;
+  }
+  //==============================================================================
+  // 대입.
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   * @param { number } z
+   */
+  set(x, y, z) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+  }
+  //==============================================================================
+  // 가로축 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getX() {
+    return this.x;
+  }
+  //==============================================================================
+  // 세로축 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getY() {
+    return this.y;
+  }
+  //==============================================================================
+  // 깊이축 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getZ() {
+    return this.z;
+  }
+  //==============================================================================
+  // 길이.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  length() {
+    const length = sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+    return length;
+  }
+  //==============================================================================
+  // 길이 제곱.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  lengthSquared() {
+    const lengthSquared = this.x * this.x + this.y * this.y + this.z * this.z;
+    return lengthSquared;
+  }
+  //==============================================================================
+  // 정규화.
+  //==============================================================================
+  /**
+   * @returns { Vector3 }
+   */
+  normalize() {
+    const origin = _Vector3.create(this.x, this.y, this.z);
+    const length = this.length();
+    if (length > 0) {
+      origin.x /= length;
+      origin.y /= length;
+      origin.z /= length;
+    }
+    return origin;
+  }
+  //==============================================================================
+  // 더하기.
+  //==============================================================================
+  /**
+   * @param { Vector3 | number } other
+   * @returns { Vector3 }
+   */
+  add(other) {
+    const origin = this.clone();
+    if (typeof other === "number") {
+      origin.x += other;
+      origin.y += other;
+      origin.z += other;
+      return origin;
+    } else if (other instanceof _Vector3) {
+      origin.x += other.x;
+      origin.y += other.y;
+      origin.z += other.z;
+      return origin;
+    }
+    throw new Error('Invalid type: "other" must be a number or an instance of Vector3.');
+  }
+  //==============================================================================
+  // 빼기.
+  //==============================================================================
+  /**
+   * @param { Vector3 | number } other
+   * @returns { Vector3 }
+   */
+  subtract(other) {
+    const origin = this.clone();
+    if (typeof other === "number") {
+      origin.x -= other;
+      origin.y -= other;
+      origin.z -= other;
+      return origin;
+    } else if (other instanceof _Vector3) {
+      origin.x -= other.x;
+      origin.y -= other.y;
+      origin.z -= other.z;
+      return origin;
+    }
+    throw new Error('Invalid type: "other" must be a number or an instance of Vector3.');
+  }
+  //==============================================================================
+  // 곱하기.
+  //==============================================================================
+  /**
+   * @param { Vector3 | number } other
+   * @returns { Vector3 }
+   */
+  multiply(other) {
+    const origin = this.clone();
+    if (typeof other === "number") {
+      origin.x *= other;
+      origin.y *= other;
+      origin.z *= other;
+      return origin;
+    } else if (other instanceof _Vector3) {
+      origin.x *= other.x;
+      origin.y *= other.y;
+      origin.z *= other.z;
+      return origin;
+    }
+    throw new Error('Invalid type: "other" must be a number or an instance of Vector3.');
+  }
+  //==============================================================================
+  // 나누기.
+  //==============================================================================
+  /**
+   * @param { Vector3 | number } other
+   * @returns { Vector3 }
+   */
+  divide(other) {
+    const origin = this.clone();
+    if (typeof other === "number") {
+      origin.x /= other;
+      origin.y /= other;
+      origin.z /= other;
+      return origin;
+    } else if (other instanceof _Vector3) {
+      origin.x /= other.x;
+      origin.y /= other.y;
+      origin.z /= other.z;
+      return origin;
+    }
+    throw new Error('Invalid type: "other" must be a number or an instance of Vector3.');
+  }
+  //==============================================================================
+  // 내적.
+  //==============================================================================
+  /**
+   * @param { Vector3 } other
+   * @returns { number }
+   */
+  dot(other) {
+    const dot = this.x * other.x + this.y * other.y + this.z * other.z;
+    return dot;
+  }
+  //==============================================================================
+  // 외적.
+  //==============================================================================
+  /**
+   * @param { Vector3 } other
+   * @returns { Vector3 }
+   */
+  cross(other) {
+    const crossX = this.y * other.z - this.z * other.y;
+    const crossY = this.z * other.x - this.x * other.z;
+    const crossZ = this.x * other.y - this.y * other.x;
+    const cross = _Vector3.create(crossX, crossY, crossZ);
+    return cross;
+  }
+  //==============================================================================
+  // 거리.
+  //==============================================================================
+  /**
+   * @param { Vector3 } other
+   * @returns { number }
+   */
+  distance(other) {
+    const difference = this.subtract(other);
+    const distance = difference.length();
+    return distance;
+  }
+  //==============================================================================
+  // 생성. (정적)
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   * @param { number } z
+   * @returns { Vector3 }
+   */
+  static create(x, y, z) {
+    const vector = new _Vector3();
+    vector.set(x, y, z);
+    return vector;
+  }
+  //==============================================================================
+  // 영벡터 생성. (정적)
+  //==============================================================================
+  /**
+   * @returns { Vector3 }
+   */
+  static zero() {
+    const vector = _Vector3.create(0, 0, 0);
+    return vector;
+  }
+  //==============================================================================
+  // 일벡터 생성. (정적)
+  //==============================================================================
+  /**
+   * @returns { Vector3 }
+   */
+  static one() {
+    const vector = _Vector3.create(1, 1, 1);
+    return vector;
+  }
+  //==============================================================================
+  // 위쪽 단위벡터 생성. (정적)
+  //==============================================================================
+  /**
+   * @returns { Vector3 }
+   */
+  static up() {
+    const vector = _Vector3.create(0, 1, 0);
+    return vector;
+  }
+  //==============================================================================
+  // 선형 보간. (정적)
+  //==============================================================================
+  /**
+   * @param { Vector3 } from
+   * @param { Vector3 } to
+   * @param { number } normalizedTime
+   * @returns { Vector3 }
+   */
+  static lerp(from, to, normalizedTime) {
+    const lerpX = lerp(from.x, to.x, normalizedTime);
+    const lerpY = lerp(from.y, to.y, normalizedTime);
+    const lerpZ = lerp(from.z, to.z, normalizedTime);
+    const vector = _Vector3.create(lerpX, lerpY, lerpZ);
+    return vector;
+  }
+};
+
+// src/base/matrix4.js
+var System5 = globalThis;
+var Matrix4 = class _Matrix4 extends Object2 {
+  static {
+    __name(this, "Matrix4");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { Float32Array } */
+  #elements;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   */
+  constructor() {
+    super();
+    this.#elements = new System5.Float32Array(16);
+    this.setIdentity();
+  }
+  //==============================================================================
+  // 단위 행렬로 초기화.
+  //==============================================================================
+  setIdentity() {
+    const elements = this.getElements();
+    elements.fill(0);
+    elements[0] = 1;
+    elements[5] = 1;
+    elements[10] = 1;
+    elements[15] = 1;
+  }
+  //==============================================================================
+  // 다른 행렬로부터 복사.
+  //==============================================================================
+  /**
+   * @param { Matrix4 } other
+   */
+  copyFrom(other) {
+    const elements = this.getElements();
+    const otherElements = other.getElements();
+    elements.set(otherElements);
+  }
+  //==============================================================================
+  // 복제.
+  //==============================================================================
+  /**
+   * @override
+   * @returns { this }
+   */
+  clone() {
+    const matrix = (
+      /** @type { this } */
+      new _Matrix4()
+    );
+    matrix.copyFrom(this);
+    return matrix;
+  }
+  //==============================================================================
+  // 다른 행렬을 우측에 곱해 누적. (this = this x other)
+  //==============================================================================
+  /**
+   * @param { Matrix4 } other
+   */
+  multiply(other) {
+    const elements = this.getElements();
+    const otherElements = other.getElements();
+    const resultElements = new System5.Float32Array(16);
+    for (let columnIndex = 0; columnIndex < 4; ++columnIndex) {
+      for (let rowIndex = 0; rowIndex < 4; ++rowIndex) {
+        let sum = 0;
+        for (let termIndex = 0; termIndex < 4; ++termIndex) {
+          sum += elements[termIndex * 4 + rowIndex] * otherElements[columnIndex * 4 + termIndex];
+        }
+        resultElements[columnIndex * 4 + rowIndex] = sum;
+      }
+    }
+    elements.set(resultElements);
+  }
+  //==============================================================================
+  // 이동 변환 누적. (로컬 공간 우측 곱)
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   * @param { number } z
+   */
+  translate(x, y, z) {
+    const translationMatrix = _Matrix4.createTranslation(x, y, z);
+    this.multiply(translationMatrix);
+  }
+  //==============================================================================
+  // X축 회전 변환 누적. (로컬 공간 우측 곱)
+  //==============================================================================
+  /**
+   * @param { number } radian
+   */
+  rotateX(radian) {
+    const rotationMatrix = _Matrix4.createRotationX(radian);
+    this.multiply(rotationMatrix);
+  }
+  //==============================================================================
+  // Y축 회전 변환 누적. (로컬 공간 우측 곱)
+  //==============================================================================
+  /**
+   * @param { number } radian
+   */
+  rotateY(radian) {
+    const rotationMatrix = _Matrix4.createRotationY(radian);
+    this.multiply(rotationMatrix);
+  }
+  //==============================================================================
+  // Z축 회전 변환 누적. (로컬 공간 우측 곱)
+  //==============================================================================
+  /**
+   * @param { number } radian
+   */
+  rotateZ(radian) {
+    const rotationMatrix = _Matrix4.createRotationZ(radian);
+    this.multiply(rotationMatrix);
+  }
+  //==============================================================================
+  // 크기 변환 누적. (로컬 공간 우측 곱)
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   * @param { number } z
+   */
+  scale(x, y, z) {
+    const scaleMatrix = _Matrix4.createScale(x, y, z);
+    this.multiply(scaleMatrix);
+  }
+  //==============================================================================
+  // 점 변환. (w 성분 포함 — 원근 분할은 호출자가 수행)
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   * @param { number } z
+   * @returns { { x: number, y: number, z: number, w: number } }
+   */
+  transformPoint(x, y, z) {
+    const elements = this.getElements();
+    const transformedX = elements[0] * x + elements[4] * y + elements[8] * z + elements[12];
+    const transformedY = elements[1] * x + elements[5] * y + elements[9] * z + elements[13];
+    const transformedZ = elements[2] * x + elements[6] * y + elements[10] * z + elements[14];
+    const transformedW = elements[3] * x + elements[7] * y + elements[11] * z + elements[15];
+    return { x: transformedX, y: transformedY, z: transformedZ, w: transformedW };
+  }
+  //==============================================================================
+  // 방향 변환. (이동 성분 무시 — 회전/크기만 적용)
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   * @param { number } z
+   * @returns { { x: number, y: number, z: number } }
+   */
+  transformDirection(x, y, z) {
+    const elements = this.getElements();
+    const transformedX = elements[0] * x + elements[4] * y + elements[8] * z;
+    const transformedY = elements[1] * x + elements[5] * y + elements[9] * z;
+    const transformedZ = elements[2] * x + elements[6] * y + elements[10] * z;
+    return { x: transformedX, y: transformedY, z: transformedZ };
+  }
+  //==============================================================================
+  // 열우선 요소 배열 반환.
+  //==============================================================================
+  /**
+   * @returns { Float32Array }
+   */
+  getElements() {
+    return this.#elements;
+  }
+  //==============================================================================
+  // 단위 행렬 생성. (정적)
+  //==============================================================================
+  /**
+   * @returns { Matrix4 }
+   */
+  static createIdentity() {
+    const matrix = new _Matrix4();
+    return matrix;
+  }
+  //==============================================================================
+  // 이동 행렬 생성. (정적)
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   * @param { number } z
+   * @returns { Matrix4 }
+   */
+  static createTranslation(x, y, z) {
+    const matrix = new _Matrix4();
+    const elements = matrix.getElements();
+    elements[12] = x;
+    elements[13] = y;
+    elements[14] = z;
+    return matrix;
+  }
+  //==============================================================================
+  // X축 회전 행렬 생성. (정적)
+  //==============================================================================
+  /**
+   * @param { number } radian
+   * @returns { Matrix4 }
+   */
+  static createRotationX(radian) {
+    const cosRadian = cos(radian);
+    const sinRadian = sin(radian);
+    const matrix = new _Matrix4();
+    const elements = matrix.getElements();
+    elements[5] = cosRadian;
+    elements[6] = sinRadian;
+    elements[9] = -sinRadian;
+    elements[10] = cosRadian;
+    return matrix;
+  }
+  //==============================================================================
+  // Y축 회전 행렬 생성. (정적)
+  //==============================================================================
+  /**
+   * @param { number } radian
+   * @returns { Matrix4 }
+   */
+  static createRotationY(radian) {
+    const cosRadian = cos(radian);
+    const sinRadian = sin(radian);
+    const matrix = new _Matrix4();
+    const elements = matrix.getElements();
+    elements[0] = cosRadian;
+    elements[2] = -sinRadian;
+    elements[8] = sinRadian;
+    elements[10] = cosRadian;
+    return matrix;
+  }
+  //==============================================================================
+  // Z축 회전 행렬 생성. (정적)
+  //==============================================================================
+  /**
+   * @param { number } radian
+   * @returns { Matrix4 }
+   */
+  static createRotationZ(radian) {
+    const cosRadian = cos(radian);
+    const sinRadian = sin(radian);
+    const matrix = new _Matrix4();
+    const elements = matrix.getElements();
+    elements[0] = cosRadian;
+    elements[1] = sinRadian;
+    elements[4] = -sinRadian;
+    elements[5] = cosRadian;
+    return matrix;
+  }
+  //==============================================================================
+  // 쿼터니언 회전 행렬 생성. (정적)
+  //==============================================================================
+  /**
+   * @param { { x: number, y: number, z: number, w: number } } quaternion
+   * @returns { Matrix4 }
+   */
+  static createRotationFromQuaternion(quaternion) {
+    const x = quaternion.x;
+    const y = quaternion.y;
+    const z = quaternion.z;
+    const w = quaternion.w;
+    const matrix = new _Matrix4();
+    const elements = matrix.getElements();
+    elements[0] = 1 - 2 * (y * y + z * z);
+    elements[1] = 2 * (x * y + z * w);
+    elements[2] = 2 * (x * z - y * w);
+    elements[4] = 2 * (x * y - z * w);
+    elements[5] = 1 - 2 * (x * x + z * z);
+    elements[6] = 2 * (y * z + x * w);
+    elements[8] = 2 * (x * z + y * w);
+    elements[9] = 2 * (y * z - x * w);
+    elements[10] = 1 - 2 * (x * x + y * y);
+    return matrix;
+  }
+  //==============================================================================
+  // 크기 행렬 생성. (정적)
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   * @param { number } z
+   * @returns { Matrix4 }
+   */
+  static createScale(x, y, z) {
+    const matrix = new _Matrix4();
+    const elements = matrix.getElements();
+    elements[0] = x;
+    elements[5] = y;
+    elements[10] = z;
+    return matrix;
+  }
+  //==============================================================================
+  // 원근 투영 행렬 생성. (정적)
+  //==============================================================================
+  /**
+   * @param { number } fieldOfViewRadian
+   * @param { number } aspectRatio
+   * @param { number } nearDistance
+   * @param { number } farDistance
+   * @returns { Matrix4 }
+   */
+  static createPerspective(fieldOfViewRadian, aspectRatio, nearDistance, farDistance) {
+    const focalLength = 1 / tan(fieldOfViewRadian / 2);
+    const rangeInverse = 1 / (nearDistance - farDistance);
+    const matrix = new _Matrix4();
+    const elements = matrix.getElements();
+    elements.fill(0);
+    elements[0] = focalLength / aspectRatio;
+    elements[5] = focalLength;
+    elements[10] = (nearDistance + farDistance) * rangeInverse;
+    elements[11] = -1;
+    elements[14] = nearDistance * farDistance * rangeInverse * 2;
+    return matrix;
+  }
+  //==============================================================================
+  // 직교 투영 행렬 생성. (정적)
+  //==============================================================================
+  /**
+   * @param { number } left
+   * @param { number } right
+   * @param { number } bottom
+   * @param { number } top
+   * @param { number } nearDistance
+   * @param { number } farDistance
+   * @returns { Matrix4 }
+   */
+  static createOrthographic(left, right, bottom, top, nearDistance, farDistance) {
+    const matrix = new _Matrix4();
+    const elements = matrix.getElements();
+    elements.fill(0);
+    elements[0] = 2 / (right - left);
+    elements[5] = 2 / (top - bottom);
+    elements[10] = -2 / (farDistance - nearDistance);
+    elements[12] = -(right + left) / (right - left);
+    elements[13] = -(top + bottom) / (top - bottom);
+    elements[14] = -(farDistance + nearDistance) / (farDistance - nearDistance);
+    elements[15] = 1;
+    return matrix;
+  }
+  //==============================================================================
+  // 시점 행렬 생성. (정적 — 지정 위치에서 대상을 바라보는 뷰 행렬)
+  //==============================================================================
+  /**
+   * @param { Vector3 } eyePosition
+   * @param { Vector3 } targetPosition
+   * @param { Vector3 } upDirection
+   * @returns { Matrix4 }
+   */
+  static createLookAt(eyePosition, targetPosition, upDirection) {
+    const eyeToTarget = eyePosition.subtract(targetPosition);
+    const backAxis = eyeToTarget.normalize();
+    const upCrossBack = upDirection.cross(backAxis);
+    const rightAxis = upCrossBack.normalize();
+    const upAxis = backAxis.cross(rightAxis);
+    const matrix = new _Matrix4();
+    const elements = matrix.getElements();
+    elements[0] = rightAxis.x;
+    elements[1] = upAxis.x;
+    elements[2] = backAxis.x;
+    elements[3] = 0;
+    elements[4] = rightAxis.y;
+    elements[5] = upAxis.y;
+    elements[6] = backAxis.y;
+    elements[7] = 0;
+    elements[8] = rightAxis.z;
+    elements[9] = upAxis.z;
+    elements[10] = backAxis.z;
+    elements[11] = 0;
+    elements[12] = -rightAxis.dot(eyePosition);
+    elements[13] = -upAxis.dot(eyePosition);
+    elements[14] = -backAxis.dot(eyePosition);
+    elements[15] = 1;
+    return matrix;
+  }
+  //==============================================================================
+  // 역행렬 생성. (정적 — 일반 4x4 여인수 전개, 비가역 시 단위 행렬)
+  //==============================================================================
+  /**
+   * @param { Matrix4 } matrix
+   * @returns { Matrix4 }
+   */
+  static createInverse(matrix) {
+    const sourceElements = matrix.getElements();
+    const m00 = sourceElements[0];
+    const m01 = sourceElements[1];
+    const m02 = sourceElements[2];
+    const m03 = sourceElements[3];
+    const m04 = sourceElements[4];
+    const m05 = sourceElements[5];
+    const m06 = sourceElements[6];
+    const m07 = sourceElements[7];
+    const m08 = sourceElements[8];
+    const m09 = sourceElements[9];
+    const m10 = sourceElements[10];
+    const m11 = sourceElements[11];
+    const m12 = sourceElements[12];
+    const m13 = sourceElements[13];
+    const m14 = sourceElements[14];
+    const m15 = sourceElements[15];
+    const cofactor00 = m00 * m05 - m01 * m04;
+    const cofactor01 = m00 * m06 - m02 * m04;
+    const cofactor02 = m00 * m07 - m03 * m04;
+    const cofactor03 = m01 * m06 - m02 * m05;
+    const cofactor04 = m01 * m07 - m03 * m05;
+    const cofactor05 = m02 * m07 - m03 * m06;
+    const cofactor06 = m08 * m13 - m09 * m12;
+    const cofactor07 = m08 * m14 - m10 * m12;
+    const cofactor08 = m08 * m15 - m11 * m12;
+    const cofactor09 = m09 * m14 - m10 * m13;
+    const cofactor10 = m09 * m15 - m11 * m13;
+    const cofactor11 = m10 * m15 - m11 * m14;
+    const determinant = cofactor00 * cofactor11 - cofactor01 * cofactor10 + cofactor02 * cofactor09 + cofactor03 * cofactor08 - cofactor04 * cofactor07 + cofactor05 * cofactor06;
+    if (determinant === 0) {
+      const identityMatrix = _Matrix4.createIdentity();
+      return identityMatrix;
+    }
+    const inverseDeterminant = 1 / determinant;
+    const resultMatrix = new _Matrix4();
+    const resultElements = resultMatrix.getElements();
+    resultElements[0] = (m05 * cofactor11 - m06 * cofactor10 + m07 * cofactor09) * inverseDeterminant;
+    resultElements[1] = (m02 * cofactor10 - m01 * cofactor11 - m03 * cofactor09) * inverseDeterminant;
+    resultElements[2] = (m13 * cofactor05 - m14 * cofactor04 + m15 * cofactor03) * inverseDeterminant;
+    resultElements[3] = (m10 * cofactor04 - m09 * cofactor05 - m11 * cofactor03) * inverseDeterminant;
+    resultElements[4] = (m06 * cofactor08 - m04 * cofactor11 - m07 * cofactor07) * inverseDeterminant;
+    resultElements[5] = (m00 * cofactor11 - m02 * cofactor08 + m03 * cofactor07) * inverseDeterminant;
+    resultElements[6] = (m14 * cofactor02 - m12 * cofactor05 - m15 * cofactor01) * inverseDeterminant;
+    resultElements[7] = (m08 * cofactor05 - m10 * cofactor02 + m11 * cofactor01) * inverseDeterminant;
+    resultElements[8] = (m04 * cofactor10 - m05 * cofactor08 + m07 * cofactor06) * inverseDeterminant;
+    resultElements[9] = (m01 * cofactor08 - m00 * cofactor10 - m03 * cofactor06) * inverseDeterminant;
+    resultElements[10] = (m12 * cofactor04 - m13 * cofactor02 + m15 * cofactor00) * inverseDeterminant;
+    resultElements[11] = (m09 * cofactor02 - m08 * cofactor04 - m11 * cofactor00) * inverseDeterminant;
+    resultElements[12] = (m05 * cofactor07 - m04 * cofactor09 - m06 * cofactor06) * inverseDeterminant;
+    resultElements[13] = (m00 * cofactor09 - m01 * cofactor07 + m02 * cofactor06) * inverseDeterminant;
+    resultElements[14] = (m13 * cofactor01 - m12 * cofactor03 - m14 * cofactor00) * inverseDeterminant;
+    resultElements[15] = (m08 * cofactor03 - m09 * cofactor01 + m10 * cofactor00) * inverseDeterminant;
+    return resultMatrix;
+  }
+};
+
+// src/base/quaternion.js
+var Quaternion = class _Quaternion extends Object2 {
+  static {
+    __name(this, "Quaternion");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { number } */
+  #x;
+  /** @private @type { number } */
+  #y;
+  /** @private @type { number } */
+  #z;
+  /** @private @type { number } */
+  #w;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   */
+  constructor() {
+    super();
+    this.x = 0;
+    this.y = 0;
+    this.z = 0;
+    this.w = 1;
+  }
+  //==============================================================================
+  // 복제.
+  //==============================================================================
+  /**
+   * @override
+   * @returns { this }
+   */
+  clone() {
+    const obj = (
+      /** @type { this } */
+      _Quaternion.create(this.x, this.y, this.z, this.w)
+    );
+    return obj;
+  }
+  //==============================================================================
+  // X 성분 설정 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @param { number } value
+   */
+  set x(value) {
+    this.#x = value;
+  }
+  //==============================================================================
+  // X 성분 반환 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @returns { number }
+   */
+  get x() {
+    return this.#x;
+  }
+  //==============================================================================
+  // Y 성분 설정 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @param { number } value
+   */
+  set y(value) {
+    this.#y = value;
+  }
+  //==============================================================================
+  // Y 성분 반환 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @returns { number }
+   */
+  get y() {
+    return this.#y;
+  }
+  //==============================================================================
+  // Z 성분 설정 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @param { number } value
+   */
+  set z(value) {
+    this.#z = value;
+  }
+  //==============================================================================
+  // Z 성분 반환 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @returns { number }
+   */
+  get z() {
+    return this.#z;
+  }
+  //==============================================================================
+  // W 성분 설정 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @param { number } value
+   */
+  set w(value) {
+    this.#w = value;
+  }
+  //==============================================================================
+  // W 성분 반환 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @returns { number }
+   */
+  get w() {
+    return this.#w;
+  }
+  //==============================================================================
+  // 대입.
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   * @param { number } z
+   * @param { number } w
+   */
+  set(x, y, z, w) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.w = w;
+  }
+  //==============================================================================
+  // 정규화.
+  //==============================================================================
+  /**
+   * @returns { Quaternion }
+   */
+  normalize() {
+    const length = sqrt(this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w);
+    if (length > 0) {
+      const quaternion = _Quaternion.create(this.x / length, this.y / length, this.z / length, this.w / length);
+      return quaternion;
+    }
+    const identity = _Quaternion.identity();
+    return identity;
+  }
+  //==============================================================================
+  // 곱하기. (this 회전 뒤에 other 회전을 로컬로 누적)
+  //==============================================================================
+  /**
+   * @param { Quaternion } other
+   * @returns { Quaternion }
+   */
+  multiply(other) {
+    const resultX = this.w * other.x + this.x * other.w + this.y * other.z - this.z * other.y;
+    const resultY = this.w * other.y - this.x * other.z + this.y * other.w + this.z * other.x;
+    const resultZ = this.w * other.z + this.x * other.y - this.y * other.x + this.z * other.w;
+    const resultW = this.w * other.w - this.x * other.x - this.y * other.y - this.z * other.z;
+    const result = _Quaternion.create(resultX, resultY, resultZ, resultW);
+    return result;
+  }
+  //==============================================================================
+  // 생성. (정적)
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   * @param { number } z
+   * @param { number } w
+   * @returns { Quaternion }
+   */
+  static create(x, y, z, w) {
+    const quaternion = new _Quaternion();
+    quaternion.set(x, y, z, w);
+    return quaternion;
+  }
+  //==============================================================================
+  // 단위 쿼터니언 생성. (정적)
+  //==============================================================================
+  /**
+   * @returns { Quaternion }
+   */
+  static identity() {
+    const quaternion = _Quaternion.create(0, 0, 0, 1);
+    return quaternion;
+  }
+  //==============================================================================
+  // 오일러 각으로 생성. (정적 — XYZ 순서 라디안)
+  //==============================================================================
+  /**
+   * @param { number } xRadian
+   * @param { number } yRadian
+   * @param { number } zRadian
+   * @returns { Quaternion }
+   */
+  static createFromEuler(xRadian, yRadian, zRadian) {
+    const halfX = xRadian * 0.5;
+    const halfY = yRadian * 0.5;
+    const halfZ = zRadian * 0.5;
+    const cosX = cos(halfX);
+    const sinX = sin(halfX);
+    const cosY = cos(halfY);
+    const sinY = sin(halfY);
+    const cosZ = cos(halfZ);
+    const sinZ = sin(halfZ);
+    const quaternion = _Quaternion.create(
+      sinX * cosY * cosZ + cosX * sinY * sinZ,
+      cosX * sinY * cosZ - sinX * cosY * sinZ,
+      cosX * cosY * sinZ + sinX * sinY * cosZ,
+      cosX * cosY * cosZ - sinX * sinY * sinZ
+    );
+    return quaternion;
+  }
+  //==============================================================================
+  // 구면 선형 보간. (정적 — 최단 경로)
+  //==============================================================================
+  /**
+   * @param { Quaternion } from
+   * @param { Quaternion } to
+   * @param { number } normalizedTime
+   * @returns { Quaternion }
+   */
+  static slerp(from, to, normalizedTime) {
+    let dotProduct = from.x * to.x + from.y * to.y + from.z * to.z + from.w * to.w;
+    let toX = to.x;
+    let toY = to.y;
+    let toZ = to.z;
+    let toW = to.w;
+    if (dotProduct < 0) {
+      dotProduct = -dotProduct;
+      toX = -toX;
+      toY = -toY;
+      toZ = -toZ;
+      toW = -toW;
+    }
+    let fromWeight = 1 - normalizedTime;
+    let toWeight = normalizedTime;
+    if (dotProduct < 0.9995) {
+      const angle = acos(clamp(dotProduct, -1, 1));
+      const sinAngle = sin(angle);
+      fromWeight = sin((1 - normalizedTime) * angle) / sinAngle;
+      toWeight = sin(normalizedTime * angle) / sinAngle;
+    }
+    const blended = _Quaternion.create(
+      from.x * fromWeight + toX * toWeight,
+      from.y * fromWeight + toY * toWeight,
+      from.z * fromWeight + toZ * toWeight,
+      from.w * fromWeight + toW * toWeight
+    );
+    const normalized = blended.normalize();
+    return normalized;
+  }
+};
+
 // src/base/pivot.js
 var Pivot = {
   topLeft: Vector2.create(0, 0),
@@ -1573,7 +2665,7 @@ var Rect = class _Rect extends Object2 {
 };
 
 // src/base/obb.js
-var System5 = globalThis;
+var System6 = globalThis;
 var OBB = class _OBB extends Object2 {
   static {
     __name(this, "OBB");
@@ -1674,13 +2766,13 @@ var OBB = class _OBB extends Object2 {
    */
   setEdges(edges) {
     if (!_OBB.isValidate(edges)) {
-      throw new System5.Error(`edges is null.`);
+      throw new System6.Error(`edges is null.`);
     }
-    if (!System5.Array.isArray(edges)) {
-      throw new System5.Error(`edges is not Array.`);
+    if (!System6.Array.isArray(edges)) {
+      throw new System6.Error(`edges is not Array.`);
     }
     if (this.#edges.length !== edges.length) {
-      throw new System5.Error(`edges.length !== this.#edges.length.`);
+      throw new System6.Error(`edges.length !== this.#edges.length.`);
     }
     for (let i = 0; i < this.#edges.length; ++i) {
       this.#edges[i] = edges[i];
@@ -1698,7 +2790,7 @@ var OBB = class _OBB extends Object2 {
 };
 
 // src/base/platform.js
-var System6 = globalThis;
+var System7 = globalThis;
 var SYSTEM_FONT_STRING = '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 var PlatformType = {
   //System.Object.freeze({
@@ -1756,7 +2848,7 @@ var Platform = class extends Object2 {
     if (canvas === null || canvas === void 0) {
       canvas = document.createElement("canvas");
       canvas.id = canvasId;
-      System6.document.body.appendChild(canvas);
+      System7.document.body.appendChild(canvas);
     }
     return canvas;
   }
@@ -1767,7 +2859,7 @@ var Platform = class extends Object2 {
    * @returns { { platformName: string, browserName: string } }
   */
   getPlatformInfo() {
-    const userAgent = System6.navigator.userAgent;
+    const userAgent = System7.navigator.userAgent;
     this.isMobile = /Mobi|Android|iPhone|iPad/i.test(userAgent);
     if (/Windows/i.test(userAgent)) this.platformName = PlatformType.windows;
     else if (/Valve Steam GameOverlay/i.test(userAgent)) this.platformName = PlatformType.steamDeck;
@@ -1824,22 +2916,22 @@ var Platform = class extends Object2 {
    * @returns { Rect }
   */
   getSafeAreaRect(canvas) {
-    const div = System6.document.createElement("div");
+    const div = System7.document.createElement("div");
     div.style.position = "absolute";
     div.style.visibility = "hidden";
     div.style.paddingTop = "env(safe-area-inset-top)";
     div.style.paddingRight = "env(safe-area-inset-right)";
     div.style.paddingBottom = "env(safe-area-inset-bottom)";
     div.style.paddingLeft = "env(safe-area-inset-left)";
-    System6.document.body.appendChild(div);
+    System7.document.body.appendChild(div);
     const style = Window.getComputedStyle(div);
     const top = Number.parseInt(style.paddingTop) || 0;
     const right = Number.parseInt(style.paddingRight) || 0;
     const bottom = Number.parseInt(style.paddingBottom) || 0;
     const left = Number.parseInt(style.paddingLeft) || 0;
-    System6.document.body.removeChild(div);
+    System7.document.body.removeChild(div);
     if (canvas === null || canvas === void 0) {
-      return Rect.create(left, top, System6.window.innerWidth - left - right, System6.window.innerHeight - top - bottom);
+      return Rect.create(left, top, System7.window.innerWidth - left - right, System7.window.innerHeight - top - bottom);
     } else {
       return Rect.create(left, top, canvas.width - left - right, canvas.height - top - bottom);
     }
@@ -1886,7 +2978,7 @@ var Singleton = class _Singleton extends Object2 {
 };
 
 // src/base/identifier.js
-var System7 = globalThis;
+var System8 = globalThis;
 var Identifier = class extends Object2 {
   static {
     __name(this, "Identifier");
@@ -1973,7 +3065,7 @@ var Enum = class _Enum extends Object2 {
    * @returns { System.Object }
    */
   static readonly(dictionary) {
-    System7.Object.freeze(dictionary);
+    System8.Object.freeze(dictionary);
   }
 };
 
@@ -3788,7 +4880,7 @@ var ImageTextureCache = class extends Object2 {
 };
 
 // src/core/graphic/textstringtexturecache.js
-var System8 = globalThis;
+var System9 = globalThis;
 var MAXIMUM_ENTRY_COUNT = 512;
 var TextStringTextureCache = class extends Object2 {
   static {
@@ -3818,10 +4910,10 @@ var TextStringTextureCache = class extends Object2 {
     super();
     this.#webGL2RenderingContext = webGL2RenderingContext;
     this.#entries = /* @__PURE__ */ new Map();
-    const bakeCanvas = System8.document.createElement("canvas");
+    const bakeCanvas = System9.document.createElement("canvas");
     this.#bakeCanvas = bakeCanvas;
     this.#bakeCanvasRenderingContext = bakeCanvas.getContext("2d", { willReadFrequently: false });
-    const measurementCanvas = System8.document.createElement("canvas");
+    const measurementCanvas = System9.document.createElement("canvas");
     this.#measurementCanvasRenderingContext = measurementCanvas.getContext("2d");
   }
   //==============================================================================
@@ -3851,7 +4943,7 @@ var TextStringTextureCache = class extends Object2 {
       return fontString;
     }
     return fontString.replace(/(\d+(?:\.\d+)?)px/, (matched, sizeText) => {
-      const scaledSize = System8.Number.parseFloat(sizeText) * scale;
+      const scaledSize = System9.Number.parseFloat(sizeText) * scale;
       return `${scaledSize}px`;
     });
   }
@@ -5369,7 +6461,7 @@ var Graphic = class extends Object2 {
 };
 
 // src/core/viewmanager.js
-var System9 = globalThis;
+var System10 = globalThis;
 var ViewScaleMode = {
   // 사용안함 (웹브라우저 크기가 변경되면 뷰 영역도 변경됨)
   none: "none",
@@ -5455,8 +6547,8 @@ var ViewManager = class extends Object2 {
     if (canvas === null || canvas === void 0) {
       return;
     }
-    const devicePixelRatio = System9.window.devicePixelRatio || 1;
-    const clientNativeSize = Vector2.create(System9.window.innerWidth, System9.window.innerHeight);
+    const devicePixelRatio = System10.window.devicePixelRatio || 1;
+    const clientNativeSize = Vector2.create(System10.window.innerWidth, System10.window.innerHeight);
     const canvasNativeRect = canvas.getBoundingClientRect();
     const canvasNativeSize = Vector2.create(Math.round(canvasNativeRect.width), Math.round(canvasNativeRect.height));
     const canvasPixelSize = Vector2.create(Math.round(canvasNativeSize.x * devicePixelRatio), Math.round(canvasNativeSize.y * devicePixelRatio));
@@ -5789,7 +6881,7 @@ var ViewManager = class extends Object2 {
 };
 
 // src/core/gamepadmanager.js
-var System10 = globalThis;
+var System11 = globalThis;
 var GamepadButtonCode = {
   // Face Buttons
   A_CROSS: 0,
@@ -5912,7 +7004,7 @@ var GamepadManager = class extends Object2 {
   // 모든 게임패드 갱신.
   //==============================================================================
   updateAllGamepads() {
-    const gamepads = System10.navigator.getGamepads();
+    const gamepads = System11.navigator.getGamepads();
     for (const hardwareIndex of this.#connectedGamepadIndices) {
       const gamepad = gamepads[hardwareIndex];
       if (!gamepad) {
@@ -6009,7 +7101,7 @@ var GamepadManager = class extends Object2 {
    * @returns { Gamepad[] }
    */
   getAllConnectedGamepads() {
-    const gamepads = System10.navigator.getGamepads();
+    const gamepads = System11.navigator.getGamepads();
     const connected = [];
     for (const hardwareIndex of this.#connectedGamepadIndices) {
       const gamepad = gamepads[hardwareIndex];
@@ -6039,7 +7131,7 @@ var GamepadManager = class extends Object2 {
       return void 0;
     }
     const hardwareIndex = this.#connectedGamepadIndices.at(gamepadIndex);
-    const gamepads = System10.navigator.getGamepads();
+    const gamepads = System11.navigator.getGamepads();
     return gamepads[hardwareIndex];
   }
 };
@@ -7645,7 +8737,7 @@ var Scene = class extends Object2 {
 };
 
 // src/core/scenemanager.js
-var System11 = globalThis;
+var System12 = globalThis;
 var SceneManager = class extends Object2 {
   static {
     __name(this, "SceneManager");
@@ -7684,8 +8776,8 @@ var SceneManager = class extends Object2 {
       scene.setEngine(engine);
       loadedScenes.push(scene);
       await scene.load(engine);
-      await new System11.Promise((resolve) => {
-        System11.setTimeout(resolve, 300);
+      await new System12.Promise((resolve) => {
+        System12.setTimeout(resolve, 300);
       });
       scene.setLoaded(true);
       scene.initialize(engine);
@@ -7739,8 +8831,8 @@ var SceneManager = class extends Object2 {
 };
 
 // src/core/asset.js
-var System12 = globalThis;
-var AssetType = System12.Object.freeze({
+var System13 = globalThis;
+var AssetType = System13.Object.freeze({
   none: "none",
   image: "image",
   audio: "audio",
@@ -7786,7 +8878,7 @@ var Asset = class extends Object2 {
       return;
     }
     this.setAssetPath(assetPath);
-    System12.Promise.resolve();
+    System13.Promise.resolve();
   }
   //==============================================================================
   // 애셋 언로드.
@@ -7859,7 +8951,7 @@ var Asset = class extends Object2 {
 };
 
 // src/resource/audioasset.js
-var System13 = globalThis;
+var System14 = globalThis;
 var AudioAsset = class extends Asset {
   static {
     __name(this, "AudioAsset");
@@ -7889,13 +8981,13 @@ var AudioAsset = class extends Asset {
     if (isLoaded) {
       return Promise.resolve();
     }
-    const audioContextType = System13.window.AudioContext || System13.window.webkitAudioContext;
+    const audioContextType = System14.window.AudioContext || System14.window.webkitAudioContext;
     if (!audioContextType) {
       console.error(`AudioContext is not supported.`);
       return;
     }
     try {
-      const response = await System13.fetch(assetPath);
+      const response = await System14.fetch(assetPath);
       const arrayBuffer = await response.arrayBuffer();
       const tempAudioContext = new audioContextType();
       this.#audioBuffer = await tempAudioContext.decodeAudioData(arrayBuffer);
@@ -8144,7 +9236,7 @@ var AudioPlayer = class {
 };
 
 // src/core/audiomanager.js
-var System14 = globalThis;
+var System15 = globalThis;
 var AudioManager = class extends Object2 {
   static {
     __name(this, "AudioManager");
@@ -8194,7 +9286,7 @@ var AudioManager = class extends Object2 {
     if (this.#audioContext) {
       return this.#audioContext;
     }
-    const audioContextType = System14.window.AudioContext || System14.window.webkitAudioContext;
+    const audioContextType = System15.window.AudioContext || System15.window.webkitAudioContext;
     if (audioContextType) {
       this.#audioContext = new audioContextType();
     }
@@ -8317,7 +9409,7 @@ var FontAsset = class extends Asset {
 };
 
 // src/core/engine.js
-var System15 = globalThis;
+var System16 = globalThis;
 var EngineConfiguration = class extends Object2 {
   static {
     __name(this, "EngineConfiguration");
@@ -8398,12 +9490,12 @@ var Engine = class extends Object2 {
   constructor(engineConfiguration) {
     super();
     if (engineConfiguration === null || engineConfiguration === void 0 || engineConfiguration instanceof EngineConfiguration === false) {
-      throw new System15.Error(`engineConfiguration is invalid.`);
+      throw new System16.Error(`engineConfiguration is invalid.`);
     }
     this.#engineConfiguration = engineConfiguration;
     this.#platform = new Platform();
     if (engineConfiguration.title !== "") {
-      System15.document.title = engineConfiguration.title;
+      System16.document.title = engineConfiguration.title;
     }
     const canvasId = this.#engineConfiguration.canvasId;
     const canvas = this.#platform.getOrAddCanvas(canvasId);
@@ -8420,7 +9512,7 @@ var Engine = class extends Object2 {
     this.#frameNumber = 0;
     this.#statisticsTextRect = Rect.zero();
     this.#version = Version.create(0, 2, 1);
-    System15.vanillaEngine = this;
+    System16.vanillaEngine = this;
     this.setupAllDocumentEvents();
     this.resize();
   }
@@ -8432,7 +9524,7 @@ var Engine = class extends Object2 {
    */
   run(scene) {
     if (scene === null || scene === void 0 || scene instanceof Scene === false) {
-      throw new System15.Error(`scene is invalid.`);
+      throw new System16.Error(`scene is invalid.`);
     }
     const internalFontFace = new FontFace(`DOSGothic`, `url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff")`);
     internalFontFace.load().then((loadedFont) => {
@@ -8441,13 +9533,13 @@ var Engine = class extends Object2 {
       sceneManager.loadScene(scene).catch((error) => {
         console.error(error);
       });
-      System15.window.addEventListener("resize", this.#resizeCallback);
-      if (System15.window.visualViewport) {
-        System15.window.visualViewport.addEventListener("resize", this.#resizeCallback);
-        System15.window.visualViewport.addEventListener("scroll", this.#resizeCallback);
+      System16.window.addEventListener("resize", this.#resizeCallback);
+      if (System16.window.visualViewport) {
+        System16.window.visualViewport.addEventListener("resize", this.#resizeCallback);
+        System16.window.visualViewport.addEventListener("scroll", this.#resizeCallback);
       }
       ++this.#frameNumber;
-      System15.window.requestAnimationFrame(this.#updateEngineCallback);
+      System16.window.requestAnimationFrame(this.#updateEngineCallback);
     }).catch((error) => {
       console.error(error);
     });
@@ -8477,9 +9569,9 @@ var Engine = class extends Object2 {
     const engineConfiguration = this.getEngineConfiguration();
     const viewManager = this.getViewManager();
     if (engineConfiguration.autoResizeOnWindowResize) {
-      const visualViewport = System15.window.visualViewport;
-      const clientWidth = visualViewport ? visualViewport.width : System15.window.innerWidth;
-      const clientHeight = visualViewport ? visualViewport.height : System15.window.innerHeight;
+      const visualViewport = System16.window.visualViewport;
+      const clientWidth = visualViewport ? visualViewport.width : System16.window.innerWidth;
+      const clientHeight = visualViewport ? visualViewport.height : System16.window.innerHeight;
       const clientNativeSize = Vector2.create(clientWidth, clientHeight);
       const canvas = viewManager.getCanvas();
       canvas.style.width = `${clientNativeSize.x}px`;
@@ -8517,7 +9609,7 @@ var Engine = class extends Object2 {
         inputManager2.clear();
       }
     }, "recoverEngineState");
-    System15.document.addEventListener("resume", () => {
+    System16.document.addEventListener("resume", () => {
       console.log(`[Engine] resume: persisted`);
       recoverEngineState();
       const sceneManager = this.getSceneManager();
@@ -8526,14 +9618,14 @@ var Engine = class extends Object2 {
         loadedScene.onPageProcessRestored();
       }
     });
-    System15.window.addEventListener("pageshow", (pageTransitionEvent) => {
+    System16.window.addEventListener("pageshow", (pageTransitionEvent) => {
       if (pageTransitionEvent.persisted) {
         console.log(`[Engine] pageshow: persisted`);
         dispatchPageProcessRestored();
       }
     });
-    System15.document.addEventListener("visibilitychange", () => {
-      if (System15.document.visibilityState === "visible") {
+    System16.document.addEventListener("visibilitychange", () => {
+      if (System16.document.visibilityState === "visible") {
         console.log(`[Engine] visibilitychange: visible`);
         recoverEngineState();
         const sceneManager = this.getSceneManager();
@@ -8543,11 +9635,11 @@ var Engine = class extends Object2 {
         }
       }
     });
-    System15.document.addEventListener("keydown", (keyboardEvent) => {
+    System16.document.addEventListener("keydown", (keyboardEvent) => {
       const key = keyboardEvent.code;
       inputManager.pushKey(key);
     });
-    System15.document.addEventListener("keyup", (keyboardEvent) => {
+    System16.document.addEventListener("keyup", (keyboardEvent) => {
       const key = keyboardEvent.code;
       inputManager.popKey(key);
     });
@@ -8575,7 +9667,7 @@ var Engine = class extends Object2 {
       this.updateCanvasNativeInputPosition(wheelEvent.clientX, wheelEvent.clientY);
       wheelEvent.preventDefault();
     }, { passive: false });
-    System15.window.addEventListener("mouseup", (touchEvent) => {
+    System16.window.addEventListener("mouseup", (touchEvent) => {
       const inputManager2 = this.getInputManager();
       if (!inputManager2.isTouchMoved()) {
         return;
@@ -8613,7 +9705,7 @@ var Engine = class extends Object2 {
       inputManager2.setTouchReleased(true);
       touchEvent.preventDefault();
     }, { passive: false });
-    System15.window.addEventListener("touchmove", (touchEvent) => {
+    System16.window.addEventListener("touchmove", (touchEvent) => {
       const touch = touchEvent.changedTouches[0];
       if (!touch) {
         return;
@@ -8634,34 +9726,34 @@ var Engine = class extends Object2 {
       inputManager2.setTouchMoved(false);
       inputManager2.setTouchCancelled(true);
     });
-    System15.window.addEventListener("blur", (focusEvent) => {
+    System16.window.addEventListener("blur", (focusEvent) => {
       const inputManager2 = this.getInputManager();
       inputManager2.setTouchMoved(false);
       inputManager2.setTouchReleased(true);
       focusEvent.preventDefault();
     }, { passive: false });
     const userGestureHandler = this.resumeOnUserGesture.bind(this);
-    System15.window.addEventListener("click", userGestureHandler);
-    System15.window.addEventListener("touchstart", userGestureHandler);
-    System15.window.addEventListener("keydown", userGestureHandler);
-    System15.window.addEventListener("focus", this.#resumeCallback);
-    System15.document.addEventListener("visibilitychange", () => {
-      if (System15.document.visibilityState === "visible") {
+    System16.window.addEventListener("click", userGestureHandler);
+    System16.window.addEventListener("touchstart", userGestureHandler);
+    System16.window.addEventListener("keydown", userGestureHandler);
+    System16.window.addEventListener("focus", this.#resumeCallback);
+    System16.document.addEventListener("visibilitychange", () => {
+      if (System16.document.visibilityState === "visible") {
         this.resume();
       }
     });
-    System15.document.addEventListener("pointerlockchange", () => {
+    System16.document.addEventListener("pointerlockchange", () => {
       if (document.pointerLockElement === canvas) {
       } else {
       }
     });
-    System15.window.addEventListener("gamepadconnected", (gamepadEvent) => {
+    System16.window.addEventListener("gamepadconnected", (gamepadEvent) => {
       const gamepad = gamepadEvent.gamepad;
       const inputManager2 = this.getInputManager();
       inputManager2.connectGamepad(gamepad);
       console.log(`gamepadconnected: ${gamepad.id}`);
     });
-    System15.window.addEventListener("gamepaddisconnected", (gamepadEvent) => {
+    System16.window.addEventListener("gamepaddisconnected", (gamepadEvent) => {
       const gamepad = gamepadEvent.gamepad;
       const inputManager2 = this.getInputManager();
       inputManager2.disconnectGamepad(gamepad);
@@ -8800,7 +9892,7 @@ var Engine = class extends Object2 {
     inputManager.setTouchCancelled(false);
     inputManager.clearWheelDelta();
     ++this.#frameNumber;
-    System15.window.requestAnimationFrame(this.#updateEngineCallback);
+    System16.window.requestAnimationFrame(this.#updateEngineCallback);
   }
   //==============================================================================
   // 커서 보이기 설정.
@@ -8922,7 +10014,7 @@ var Engine = class extends Object2 {
    * @returns { Engine }
    */
   static getEngine() {
-    return System15.vanillaEngine;
+    return System16.vanillaEngine;
   }
 };
 
@@ -10211,7 +11303,7 @@ var UIScrollView = class extends UIView {
 };
 
 // src/ui/touchrecognizer.js
-var System16 = globalThis;
+var System17 = globalThis;
 var DRAG_THRESHOLD = 10;
 var DELAY_PRESS_MS = 150;
 var TouchRecognizer = class extends TouchRaycaster {
@@ -10273,7 +11365,7 @@ var TouchRecognizer = class extends TouchRaycaster {
     }
     if (this.#scrollView) {
       const pressPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
-      this.#pressTimerId = System16.setTimeout(() => {
+      this.#pressTimerId = System17.setTimeout(() => {
         this.#pressTimerId = null;
         if (this.#isDragging) return;
         if (this.#target !== target) return;
@@ -10309,10 +11401,10 @@ var TouchRecognizer = class extends TouchRaycaster {
     if (this.#scrollView && this.#pressPosition) {
       const dx = viewInputPosition.x - this.#pressPosition.x;
       const dy = viewInputPosition.y - this.#pressPosition.y;
-      if (System16.Math.abs(dx) > DRAG_THRESHOLD || System16.Math.abs(dy) > DRAG_THRESHOLD) {
+      if (System17.Math.abs(dx) > DRAG_THRESHOLD || System17.Math.abs(dy) > DRAG_THRESHOLD) {
         this.#isDragging = true;
         if (this.#pressTimerId !== null) {
-          System16.clearTimeout(this.#pressTimerId);
+          System17.clearTimeout(this.#pressTimerId);
           this.#pressTimerId = null;
         } else if (this.#pressDelivered && this.#target) {
           this.#target.touchCancel(viewInputPosition);
@@ -10346,7 +11438,7 @@ var TouchRecognizer = class extends TouchRaycaster {
       }
     } else if (this.#target) {
       if (this.#pressTimerId !== null) {
-        System16.clearTimeout(this.#pressTimerId);
+        System17.clearTimeout(this.#pressTimerId);
         this.#pressTimerId = null;
         this.#target.touchPress(this.#pressPosition || viewInputPosition);
         this.#pressDelivered = true;
@@ -10379,7 +11471,7 @@ var TouchRecognizer = class extends TouchRaycaster {
   //==============================================================================
   reset() {
     if (this.#pressTimerId !== null) {
-      System16.clearTimeout(this.#pressTimerId);
+      System17.clearTimeout(this.#pressTimerId);
       this.#pressTimerId = null;
     }
     this.#target = null;
@@ -10612,7 +11704,7 @@ var LayoutStrength = class _LayoutStrength {
 };
 
 // src/ui/autolayout/layoutconstraint.js
-var System17 = globalThis;
+var System18 = globalThis;
 var LayoutConstraint = class _LayoutConstraint {
   static {
     __name(this, "LayoutConstraint");
@@ -10637,7 +11729,7 @@ var LayoutConstraint = class _LayoutConstraint {
    */
   constructor(expression, relation, strength) {
     if (!(expression instanceof LayoutExpression)) {
-      throw new System17.Error("[LayoutConstraint] expression \uC740 LayoutExpression \uC774\uC5B4\uC57C \uD568.");
+      throw new System18.Error("[LayoutConstraint] expression \uC740 LayoutExpression \uC774\uC5B4\uC57C \uD568.");
     }
     this.#expression = expression;
     this.#relation = relation;
@@ -10687,7 +11779,7 @@ var LayoutConstraint = class _LayoutConstraint {
 };
 
 // src/ui/autolayout/layoutexpression.js
-var System18 = globalThis;
+var System19 = globalThis;
 var LayoutExpression = class _LayoutExpression {
   static {
     __name(this, "LayoutExpression");
@@ -10710,7 +11802,7 @@ var LayoutExpression = class _LayoutExpression {
    * @param { number } [constant]
    */
   constructor(terms, constant) {
-    this.#terms = System18.Array.isArray(terms) ? terms.slice() : [];
+    this.#terms = System19.Array.isArray(terms) ? terms.slice() : [];
     this.#constant = typeof constant === "number" ? constant : 0;
   }
   //==============================================================================
@@ -10757,7 +11849,7 @@ var LayoutExpression = class _LayoutExpression {
     if (typeof input === "number") {
       return _LayoutExpression.fromConstant(input);
     }
-    throw new System18.Error("[LayoutExpression] toExpression: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uC785\uB825 \uD0C0\uC785.");
+    throw new System19.Error("[LayoutExpression] toExpression: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uC785\uB825 \uD0C0\uC785.");
   }
   //==============================================================================
   // 항 배열 반환.
@@ -10844,7 +11936,7 @@ var LayoutExpression = class _LayoutExpression {
    */
   multiply(coefficient) {
     if (typeof coefficient !== "number") {
-      throw new System18.Error("[LayoutExpression] multiply: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
+      throw new System19.Error("[LayoutExpression] multiply: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
     }
     const ownTerms = this.getTerms();
     const newTerms = [];
@@ -10867,10 +11959,10 @@ var LayoutExpression = class _LayoutExpression {
    */
   divide(denominator) {
     if (typeof denominator !== "number") {
-      throw new System18.Error("[LayoutExpression] divide: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
+      throw new System19.Error("[LayoutExpression] divide: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
     }
     if (denominator === 0) {
-      throw new System18.Error("[LayoutExpression] divide: 0 \uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC74C.");
+      throw new System19.Error("[LayoutExpression] divide: 0 \uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC74C.");
     }
     const result = this.multiply(1 / denominator);
     return result;
@@ -11018,7 +12110,7 @@ var LayoutSymbol = class _LayoutSymbol {
 };
 
 // src/ui/autolayout/layoutrow.js
-var System19 = globalThis;
+var System20 = globalThis;
 var LayoutRow = class _LayoutRow {
   static {
     __name(this, "LayoutRow");
@@ -11038,7 +12130,7 @@ var LayoutRow = class _LayoutRow {
    * @param { number } [constant]
    */
   constructor(constant) {
-    this.#cells = new System19.Map();
+    this.#cells = new System20.Map();
     this.#constant = typeof constant === "number" ? constant : 0;
   }
   //==============================================================================
@@ -11164,7 +12256,7 @@ var LayoutRow = class _LayoutRow {
     const inverse = -1 / subjectCoefficient;
     cells.delete(subject);
     this.setConstant(this.getConstant() * inverse);
-    const updatedCells = new System19.Map();
+    const updatedCells = new System20.Map();
     for (const [symbol, value] of cells) {
       updatedCells.set(symbol, value * inverse);
     }
@@ -11224,7 +12316,7 @@ function nearZero(value) {
 __name(nearZero, "nearZero");
 
 // src/ui/autolayout/layoutsolver.js
-var System20 = globalThis;
+var System21 = globalThis;
 var LayoutSolver = class {
   static {
     __name(this, "LayoutSolver");
@@ -11253,10 +12345,10 @@ var LayoutSolver = class {
    * @constructor
    */
   constructor() {
-    this.#constraintTags = new System20.Map();
-    this.#rows = new System20.Map();
-    this.#variableSymbols = new System20.Map();
-    this.#editInfos = new System20.Map();
+    this.#constraintTags = new System21.Map();
+    this.#rows = new System21.Map();
+    this.#variableSymbols = new System21.Map();
+    this.#editInfos = new System21.Map();
     this.#infeasibleRows = [];
     this.#objective = new LayoutRow(0);
     this.#artificial = null;
@@ -11269,21 +12361,21 @@ var LayoutSolver = class {
    */
   addConstraint(constraint) {
     if (this.#constraintTags.has(constraint)) {
-      throw new System20.Error("[LayoutSolver] \uC774\uBBF8 \uCD94\uAC00\uB41C \uC81C\uC57D.");
+      throw new System21.Error("[LayoutSolver] \uC774\uBBF8 \uCD94\uAC00\uB41C \uC81C\uC57D.");
     }
     const tag = new LayoutTag();
     const row = this.createRow(constraint, tag);
     let subject = this.chooseSubject(row, tag);
     if (subject.isInvalid() && allDummies(row)) {
       if (!nearZero2(row.getConstant())) {
-        throw new System20.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
+        throw new System21.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
       }
       subject = tag.getMarker();
     }
     if (subject.isInvalid()) {
       const success = this.addWithArtificialVariable(row);
       if (!success) {
-        throw new System20.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
+        throw new System21.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
       }
     } else {
       row.solveFor(subject);
@@ -11302,7 +12394,7 @@ var LayoutSolver = class {
   removeConstraint(constraint) {
     const tag = this.#constraintTags.get(constraint);
     if (tag === void 0) {
-      throw new System20.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uC81C\uC57D.");
+      throw new System21.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uC81C\uC57D.");
     }
     this.#constraintTags.delete(constraint);
     this.removeConstraintEffects(constraint, tag);
@@ -11312,7 +12404,7 @@ var LayoutSolver = class {
     } else {
       const leavingSymbol = this.getMarkerLeavingSymbol(marker);
       if (leavingSymbol.isInvalid()) {
-        throw new System20.Error("[LayoutSolver] \uC81C\uC57D \uC81C\uAC70 \uC2E4\uD328 \u2014 leaving row \uC5C6\uC74C.");
+        throw new System21.Error("[LayoutSolver] \uC81C\uC57D \uC81C\uAC70 \uC2E4\uD328 \u2014 leaving row \uC5C6\uC74C.");
       }
       const leavingRow = this.#rows.get(leavingSymbol);
       this.#rows.delete(leavingSymbol);
@@ -11340,11 +12432,11 @@ var LayoutSolver = class {
    */
   addEditVariable(variable, strength) {
     if (this.#editInfos.has(variable)) {
-      throw new System20.Error("[LayoutSolver] \uC774\uBBF8 \uD3B8\uC9D1 \uBCC0\uC218\uB85C \uB4F1\uB85D\uB428.");
+      throw new System21.Error("[LayoutSolver] \uC774\uBBF8 \uD3B8\uC9D1 \uBCC0\uC218\uB85C \uB4F1\uB85D\uB428.");
     }
     const clipped = LayoutStrength.clipStrength(strength);
     if (clipped >= LayoutStrength.required) {
-      throw new System20.Error("[LayoutSolver] \uD3B8\uC9D1 \uBCC0\uC218\uC5D0\uB294 required \uAC15\uB3C4\uB97C \uC4F8 \uC218 \uC5C6\uC74C.");
+      throw new System21.Error("[LayoutSolver] \uD3B8\uC9D1 \uBCC0\uC218\uC5D0\uB294 required \uAC15\uB3C4\uB97C \uC4F8 \uC218 \uC5C6\uC74C.");
     }
     const expression = LayoutExpression.fromVariable(variable);
     const constraint = new LayoutConstraint(expression, LayoutRelation.equal, clipped);
@@ -11362,7 +12454,7 @@ var LayoutSolver = class {
   removeEditVariable(variable) {
     const editInfo = this.#editInfos.get(variable);
     if (editInfo === void 0) {
-      throw new System20.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
+      throw new System21.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
     }
     this.removeConstraint(editInfo.getConstraint());
     this.#editInfos.delete(variable);
@@ -11388,7 +12480,7 @@ var LayoutSolver = class {
   suggestValue(variable, value) {
     const editInfo = this.#editInfos.get(variable);
     if (editInfo === void 0) {
-      throw new System20.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
+      throw new System21.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
     }
     const delta = value - editInfo.getConstant();
     editInfo.setConstant(value);
@@ -11608,7 +12700,7 @@ var LayoutSolver = class {
       }
       const leavingSymbol = this.getLeavingSymbol(enteringSymbol);
       if (leavingSymbol.isInvalid()) {
-        throw new System20.Error("[LayoutSolver] \uBAA9\uC801\uD568\uC218\uAC00 \uBB34\uD55C\uB300 \u2014 bound \uAC00 \uBD80\uC871\uD568.");
+        throw new System21.Error("[LayoutSolver] \uBAA9\uC801\uD568\uC218\uAC00 \uBB34\uD55C\uB300 \u2014 bound \uAC00 \uBD80\uC871\uD568.");
       }
       const leavingRow = this.#rows.get(leavingSymbol);
       this.#rows.delete(leavingSymbol);
@@ -11616,7 +12708,7 @@ var LayoutSolver = class {
       this.substitute(enteringSymbol, leavingRow);
       this.#rows.set(enteringSymbol, leavingRow);
     }
-    throw new System20.Error("[LayoutSolver] optimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
+    throw new System21.Error("[LayoutSolver] optimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
   }
   //==============================================================================
   // 내부: dual simplex 최적화. infeasible 행을 처리.
@@ -11637,14 +12729,14 @@ var LayoutSolver = class {
       }
       const enteringSymbol = this.getDualEnteringSymbol(row);
       if (enteringSymbol.isInvalid()) {
-        throw new System20.Error("[LayoutSolver] dual optimize \uC2E4\uD328 \u2014 entering \uC5C6\uC74C.");
+        throw new System21.Error("[LayoutSolver] dual optimize \uC2E4\uD328 \u2014 entering \uC5C6\uC74C.");
       }
       this.#rows.delete(leavingSymbol);
       row.solveForPair(leavingSymbol, enteringSymbol);
       this.substitute(enteringSymbol, row);
       this.#rows.set(enteringSymbol, row);
     }
-    throw new System20.Error("[LayoutSolver] dualOptimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
+    throw new System21.Error("[LayoutSolver] dualOptimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
   }
   //==============================================================================
   // 내부: leaving symbol 결정. (Bland's rule 변형 + 비율 테스트)
@@ -11654,7 +12746,7 @@ var LayoutSolver = class {
    * @returns { LayoutSymbol }
    */
   getLeavingSymbol(enteringSymbol) {
-    let ratio = System20.Number.POSITIVE_INFINITY;
+    let ratio = System21.Number.POSITIVE_INFINITY;
     let result = LayoutSymbol.invalid();
     for (const [symbol, row] of this.#rows) {
       if (symbol.getType() === LayoutSymbolType.external) {
@@ -11679,7 +12771,7 @@ var LayoutSolver = class {
    * @returns { LayoutSymbol }
    */
   getDualEnteringSymbol(row) {
-    let ratio = System20.Number.POSITIVE_INFINITY;
+    let ratio = System21.Number.POSITIVE_INFINITY;
     let result = LayoutSymbol.invalid();
     const cells = row.getCells();
     for (const [symbol, value] of cells) {
@@ -11702,8 +12794,8 @@ var LayoutSolver = class {
    * @returns { LayoutSymbol }
    */
   getMarkerLeavingSymbol(marker) {
-    let ratio1 = System20.Number.POSITIVE_INFINITY;
-    let ratio2 = System20.Number.POSITIVE_INFINITY;
+    let ratio1 = System21.Number.POSITIVE_INFINITY;
+    let ratio2 = System21.Number.POSITIVE_INFINITY;
     let result1 = LayoutSymbol.invalid();
     let result2 = LayoutSymbol.invalid();
     let result3 = LayoutSymbol.invalid();
@@ -11874,14 +12966,14 @@ var LayoutPriority = class {
 };
 
 // src/ui/autolayout/layoutconstraintaxis.js
-var System21 = globalThis;
-var LayoutConstraintAxis = System21.Object.freeze({
+var System22 = globalThis;
+var LayoutConstraintAxis = System22.Object.freeze({
   horizontal: "horizontal",
   vertical: "vertical"
 });
 
 // src/ui/uinode.js
-var System22 = globalThis;
+var System23 = globalThis;
 var NO_INTRINSIC_METRIC = -1;
 var UINode = class _UINode extends TransformNode {
   static {
@@ -12124,7 +13216,7 @@ var UINode = class _UINode extends TransformNode {
     if (axis === LayoutConstraintAxis.vertical) {
       return this.#verticalHuggingPriority;
     }
-    throw new System22.Error("[UINode] getContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+    throw new System23.Error("[UINode] getContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
   }
   //==============================================================================
   // content hugging 우선순위 설정. (UIKit 의 setContentHuggingPriority(_:for:))
@@ -12140,7 +13232,7 @@ var UINode = class _UINode extends TransformNode {
     } else if (axis === LayoutConstraintAxis.vertical) {
       this.#verticalHuggingPriority = priority;
     } else {
-      throw new System22.Error("[UINode] setContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+      throw new System23.Error("[UINode] setContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
     }
     this.invalidateIntrinsicContentSize();
   }
@@ -12159,7 +13251,7 @@ var UINode = class _UINode extends TransformNode {
     if (axis === LayoutConstraintAxis.vertical) {
       return this.#verticalCompressionResistancePriority;
     }
-    throw new System22.Error("[UINode] getContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+    throw new System23.Error("[UINode] getContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
   }
   //==============================================================================
   // content compression resistance 우선순위 설정.
@@ -12176,7 +13268,7 @@ var UINode = class _UINode extends TransformNode {
     } else if (axis === LayoutConstraintAxis.vertical) {
       this.#verticalCompressionResistancePriority = priority;
     } else {
-      throw new System22.Error("[UINode] setContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+      throw new System23.Error("[UINode] setContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
     }
     this.invalidateIntrinsicContentSize();
   }
@@ -12626,7 +13718,7 @@ var UINode = class _UINode extends TransformNode {
 UINode.noIntrinsicMetric = NO_INTRINSIC_METRIC;
 
 // src/core/frame.js
-var System23 = globalThis;
+var System24 = globalThis;
 var Frame = class extends Object2 {
   static {
     __name(this, "Frame");
@@ -12651,7 +13743,7 @@ var Frame = class extends Object2 {
     super();
     this.#image = image;
     if (image === null || image === void 0) {
-      throw new System23.Error("image is null.");
+      throw new System24.Error("image is null.");
     }
     if (rect === null || rect === void 0) {
       this.#rect = Rect.create(0, 0, image.width, image.height);
@@ -12925,7 +14017,7 @@ var Animation = class extends Object2 {
 };
 
 // src/resource/imageasset.js
-var System24 = globalThis;
+var System25 = globalThis;
 var ImageAsset2 = class extends Asset {
   static {
     __name(this, "ImageAsset");
@@ -12941,7 +14033,7 @@ var ImageAsset2 = class extends Asset {
   constructor() {
     super();
     this.setAssetType(AssetType.image);
-    this.image = new System24.window.Image();
+    this.image = new System25.window.Image();
   }
   //==============================================================================
   // 비동기 애셋 로드.
@@ -12956,7 +14048,7 @@ var ImageAsset2 = class extends Asset {
       return Promise.resolve();
     }
     await super.load(assetPath);
-    this.image = new System24.window.Image();
+    this.image = new System25.window.Image();
     this.image.src = assetPath;
     await new Promise((resolve, reject) => {
       this.image.onload = () => {
@@ -13340,7 +14432,7 @@ var Sprite = class extends Paint {
 };
 
 // src/core/component/text.js
-var System25 = globalThis;
+var System26 = globalThis;
 var TextAlign = {
   left: "left",
   center: "center",
@@ -13359,7 +14451,7 @@ var TextBaseline = {
 var measurementCanvasRenderingContext = null;
 function getMeasurementCanvasRenderingContext() {
   if (measurementCanvasRenderingContext === null) {
-    const document2 = System25.document;
+    const document2 = System26.document;
     if (document2 === null || document2 === void 0) {
       return null;
     }
@@ -13503,7 +14595,7 @@ var Text = class extends Component {
       const startX = this.computeUnderlineStartX(drawX, textWidth);
       const fontSize = this.#fontSize;
       graphic.setStrokeColor(textColor.toHEXString());
-      const lineWidth = System25.Math.max(1, fontSize / 16);
+      const lineWidth = System26.Math.max(1, fontSize / 16);
       if (this.#underline) {
         const underlineY = drawY + this.computeUnderlineOffsetY(fontSize);
         this.strokeHorizontalLine(graphic, startX, underlineY, textWidth, lineWidth);
@@ -13892,7 +14984,7 @@ var Text = class extends Component {
 };
 
 // src/core/component/richtext.js
-var System26 = globalThis;
+var System27 = globalThis;
 var NAMED_COLORS = {
   red: "#ff0000",
   green: "#00ff00",
@@ -13947,8 +15039,8 @@ function buildAttributesForTag(tagName, value) {
     }
     case "size": {
       const trimmed = value !== void 0 && value !== null ? value.trim() : "";
-      const fontSize = System26.parseInt(trimmed, 10);
-      if (System26.Number.isFinite(fontSize) === false || fontSize <= 0) {
+      const fontSize = System27.parseInt(trimmed, 10);
+      if (System27.Number.isFinite(fontSize) === false || fontSize <= 0) {
         return null;
       }
       return { fontSize };
@@ -13974,7 +15066,7 @@ __name(buildAttributesForTag, "buildAttributesForTag");
 function mergeAttributeStack(stack) {
   const result = {};
   for (const attributes of stack) {
-    for (const key of System26.Object.keys(attributes)) {
+    for (const key of System27.Object.keys(attributes)) {
       if (key === "__tagName") {
         continue;
       }
@@ -14213,7 +15305,7 @@ var RichText = class extends Text {
       graphic.setFillColor(segmentTextColor.toHEXString());
       graphic.drawFillText(segmentText, cursorX, baselineY);
       const segmentWidth = graphic.measureText(segmentText).width;
-      const segmentLineWidth = System26.Math.max(1, segmentFontSize / 16);
+      const segmentLineWidth = System27.Math.max(1, segmentFontSize / 16);
       if (segmentUnderline) {
         const underlineY = baselineY + this.computeUnderlineOffsetY(segmentFontSize);
         graphic.setStrokeColor(segmentTextColor.toHEXString());
@@ -14295,7 +15387,7 @@ var RichText = class extends Text {
 };
 
 // src/misc/localstorage.js
-var System27 = globalThis;
+var System28 = globalThis;
 var LocalStorage = class _LocalStorage extends Object2 {
   static {
     __name(this, "LocalStorage");
@@ -14316,7 +15408,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
   // 전체 제거.
   //==============================================================================
   static clear() {
-    System27.window.localStorage.clear();
+    System28.window.localStorage.clear();
   }
   //==============================================================================
   // 문자열 값 설정.
@@ -14326,7 +15418,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
    * @param { string } stringValue
    */
   static setString(key, stringValue) {
-    System27.window.localStorage.setItem(key, stringValue);
+    System28.window.localStorage.setItem(key, stringValue);
   }
   //==============================================================================
   // 논리 값 설정.
@@ -14355,7 +15447,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
    * @param { string } key 
    */
   static remove(key) {
-    System27.window.localStorage.removeItem(key);
+    System28.window.localStorage.removeItem(key);
   }
   //==============================================================================
   // 문자열 값 반환.
@@ -14366,7 +15458,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
    * @returns { string }
    */
   static getString(key, defaultStringValue = "") {
-    const value = System27.window.localStorage.getItem(key);
+    const value = System28.window.localStorage.getItem(key);
     if (value === null || value === void 0) {
       _LocalStorage.setString(key, defaultStringValue);
       return defaultStringValue;
@@ -14415,7 +15507,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
    * @returns { boolean }
    */
   static containsKey(key) {
-    return System27.window.localStorage.getItem(key) !== null;
+    return System28.window.localStorage.getItem(key) !== null;
   }
   //==============================================================================
   // 모든 키 반환.
@@ -14425,8 +15517,8 @@ var LocalStorage = class _LocalStorage extends Object2 {
    */
   static getKeys() {
     const keys = [];
-    for (let i = 0; i < System27.window.localStorage.length; ++i) {
-      const key = System27.window.localStorage.key(i);
+    for (let i = 0; i < System28.window.localStorage.length; ++i) {
+      const key = System28.window.localStorage.key(i);
       keys.push(key);
     }
     keys.sort();
@@ -14435,7 +15527,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
 };
 
 // src/misc/devtools.js
-var System28 = globalThis;
+var System29 = globalThis;
 var TITLE_HEIGHT = 28;
 var TAB_HEIGHT = 24;
 var ITEM_HEIGHT = 20;
@@ -14896,7 +15988,7 @@ var DEVTools = class extends Object2 {
     }
     if (touchY <= panelY + TITLE_HEIGHT + TAB_HEIGHT) {
       const tabWidth = panelWidth / TABS.length;
-      const tabIndex = System28.Math.floor((touchX - panelX) / tabWidth);
+      const tabIndex = System29.Math.floor((touchX - panelX) / tabWidth);
       if (tabIndex >= 0 && tabIndex < TABS.length) {
         this.#activeTab = tabIndex;
       }
@@ -14928,7 +16020,7 @@ var DEVTools = class extends Object2 {
     if (touchX < panelX + leftWidth) {
       const treeItemsY = contentY + ITEM_HEIGHT * 2;
       const localY2 = touchY - treeItemsY + this.#treeScrollY;
-      const clickedIndex = System28.Math.floor(localY2 / ITEM_HEIGHT);
+      const clickedIndex = System29.Math.floor(localY2 / ITEM_HEIGHT);
       if (clickedIndex >= 0 && clickedIndex < this.#flatList.length) {
         const clickedItem = this.#flatList[clickedIndex];
         const clickedNode = clickedItem.node;
@@ -14966,7 +16058,7 @@ var DEVTools = class extends Object2 {
       return;
     }
     const localY = touchY - contentY + this.#inspectorScrollY;
-    const clickedLineIndex = System28.Math.floor(localY / ITEM_HEIGHT);
+    const clickedLineIndex = System29.Math.floor(localY / ITEM_HEIGHT);
     if (clickedLineIndex >= 0 && clickedLineIndex < this.#cachedInspectorLines.length) {
       const clickedLine = this.#cachedInspectorLines[clickedLineIndex];
       if (clickedLine.isComponentHeader && clickedLine.componentRef) {
@@ -15003,7 +16095,7 @@ var DEVTools = class extends Object2 {
       const isRightMode = this.#resizeMode === ResizeMode.right || this.#resizeMode === ResizeMode.bottomRight;
       if (isRightMode) {
         const newWidth = this.#resizeDragStartPanelWidth + deltaX;
-        this.#panelWidth = System28.Math.max(MIN_PANEL_WIDTH, newWidth);
+        this.#panelWidth = System29.Math.max(MIN_PANEL_WIDTH, newWidth);
       }
       const isLeftMode = this.#resizeMode === ResizeMode.left || this.#resizeMode === ResizeMode.topLeft || this.#resizeMode === ResizeMode.bottomLeft;
       if (isLeftMode) {
@@ -15016,7 +16108,7 @@ var DEVTools = class extends Object2 {
       const isBottomMode = this.#resizeMode === ResizeMode.bottom || this.#resizeMode === ResizeMode.bottomRight || this.#resizeMode === ResizeMode.bottomLeft;
       if (isBottomMode) {
         const newHeight = this.#resizeDragStartPanelHeight + deltaY;
-        this.#panelHeight = System28.Math.max(MIN_PANEL_HEIGHT, newHeight);
+        this.#panelHeight = System29.Math.max(MIN_PANEL_HEIGHT, newHeight);
       }
       const isTopMode = this.#resizeMode === ResizeMode.top || this.#resizeMode === ResizeMode.topLeft;
       if (isTopMode) {
@@ -15029,28 +16121,28 @@ var DEVTools = class extends Object2 {
       if (this.#resizeMode === ResizeMode.splitter) {
         const newLeftWidth = this.#resizeDragStartLeftWidth + deltaX;
         const maxLeftWidth = this.#panelWidth - MIN_LEFT_WIDTH;
-        this.#leftWidth = System28.Math.max(MIN_LEFT_WIDTH, System28.Math.min(maxLeftWidth, newLeftWidth));
+        this.#leftWidth = System29.Math.max(MIN_LEFT_WIDTH, System29.Math.min(maxLeftWidth, newLeftWidth));
       }
     }
     if (this.#isTreeScrollDragging) {
       const deltaY = touchY - this.#treeScrollDragStartMouseY;
       const newScrollY = this.#treeScrollDragStartScrollY - deltaY;
-      this.#treeScrollY = System28.Math.max(0, newScrollY);
+      this.#treeScrollY = System29.Math.max(0, newScrollY);
     }
     if (this.#isInspectorScrollDragging) {
       const deltaY = touchY - this.#inspectorScrollDragStartMouseY;
       const newScrollY = this.#inspectorScrollDragStartScrollY - deltaY;
-      this.#inspectorScrollY = System28.Math.max(0, newScrollY);
+      this.#inspectorScrollY = System29.Math.max(0, newScrollY);
     }
     if (this.#isLocalStorageScrollDragging) {
       const deltaY = touchY - this.#localStorageScrollDragStartMouseY;
       const newScrollY = this.#localStorageScrollDragStartScrollY - deltaY;
-      this.#localStorageScrollY = System28.Math.max(0, newScrollY);
+      this.#localStorageScrollY = System29.Math.max(0, newScrollY);
     }
     if (this.#isStatisticsScrollDragging) {
       const deltaY = touchY - this.#statisticsScrollDragStartMouseY;
       const newScrollY = this.#statisticsScrollDragStartScrollY - deltaY;
-      this.#statisticsScrollY = System28.Math.max(0, newScrollY);
+      this.#statisticsScrollY = System29.Math.max(0, newScrollY);
     }
   }
   //==============================================================================
@@ -15087,15 +16179,15 @@ var DEVTools = class extends Object2 {
     const clearBtnX = panelX + panelWidth - PADDING - clearBtnWidth;
     const addBtnX = clearBtnX - PADDING - addBtnWidth;
     if (touchX >= addBtnX && touchX <= addBtnX + addBtnWidth && touchY >= btnY && touchY <= btnY + btnHeight) {
-      const newKey = System28.window.prompt("\uD0A4 \uC785\uB825:");
+      const newKey = System29.window.prompt("\uD0A4 \uC785\uB825:");
       if (newKey !== null && newKey.trim() !== "") {
-        const newValue = System28.window.prompt("\uAC12 \uC785\uB825:") || "";
+        const newValue = System29.window.prompt("\uAC12 \uC785\uB825:") || "";
         LocalStorage.setString(newKey.trim(), newValue);
       }
       return;
     }
     if (touchX >= clearBtnX && touchX <= clearBtnX + clearBtnWidth && touchY >= btnY && touchY <= btnY + btnHeight) {
-      if (System28.window.confirm("\uBAA8\uB4E0 \uB85C\uCEEC \uC2A4\uD1A0\uB9AC\uC9C0 \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?")) {
+      if (System29.window.confirm("\uBAA8\uB4E0 \uB85C\uCEEC \uC2A4\uD1A0\uB9AC\uC9C0 \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?")) {
         LocalStorage.clear();
         this.#selectedLocalStorageKey = null;
       }
@@ -15120,7 +16212,7 @@ var DEVTools = class extends Object2 {
         if (buttonIndex >= 0) {
           switch (buttonIndex) {
             case 0: {
-              const newKey = System28.window.prompt("\uD0A4 \uC774\uB984 \uC218\uC815:", selectedKey);
+              const newKey = System29.window.prompt("\uD0A4 \uC774\uB984 \uC218\uC815:", selectedKey);
               if (newKey !== null && newKey.trim() !== "" && newKey.trim() !== selectedKey) {
                 const existingValue = LocalStorage.getString(selectedKey) || "";
                 LocalStorage.remove(selectedKey);
@@ -15131,7 +16223,7 @@ var DEVTools = class extends Object2 {
             }
             case 1: {
               const currentValue = LocalStorage.getString(selectedKey) || "";
-              const newValue = System28.window.prompt(`"${selectedKey}" \uAC12 \uC218\uC815:`, currentValue);
+              const newValue = System29.window.prompt(`"${selectedKey}" \uAC12 \uC218\uC815:`, currentValue);
               if (newValue !== null) {
                 LocalStorage.setString(selectedKey, newValue);
               }
@@ -15145,7 +16237,7 @@ var DEVTools = class extends Object2 {
               break;
             }
             case 3: {
-              if (System28.window.confirm(`"${selectedKey}" \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) {
+              if (System29.window.confirm(`"${selectedKey}" \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) {
                 LocalStorage.remove(selectedKey);
                 this.#selectedLocalStorageKey = null;
               }
@@ -15160,12 +16252,12 @@ var DEVTools = class extends Object2 {
     const keys = LocalStorage.getKeys();
     const delColWidth = 24;
     const localY = touchY - itemsY + this.#localStorageScrollY;
-    const clickedIndex = System28.Math.floor(localY / ITEM_HEIGHT);
+    const clickedIndex = System29.Math.floor(localY / ITEM_HEIGHT);
     if (touchY >= itemsY && clickedIndex >= 0 && clickedIndex < keys.length) {
       const clickedKey = keys[clickedIndex];
       const delBtnX = panelX + panelWidth - SCROLL_BAR_WIDTH - delColWidth;
       if (touchX >= delBtnX) {
-        if (System28.window.confirm(`"${clickedKey}" \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) {
+        if (System29.window.confirm(`"${clickedKey}" \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) {
           LocalStorage.remove(clickedKey);
           if (this.#selectedLocalStorageKey === clickedKey) {
             this.#selectedLocalStorageKey = null;
@@ -15229,9 +16321,9 @@ var DEVTools = class extends Object2 {
   getComponentProperties(component) {
     const properties = [];
     const seenNames = /* @__PURE__ */ new Set();
-    let proto = System28.Object.getPrototypeOf(component);
-    while (proto && proto.constructor && proto.constructor !== Component && proto !== System28.Object.prototype) {
-      const methodNames = System28.Object.getOwnPropertyNames(proto);
+    let proto = System29.Object.getPrototypeOf(component);
+    while (proto && proto.constructor && proto.constructor !== Component && proto !== System29.Object.prototype) {
+      const methodNames = System29.Object.getOwnPropertyNames(proto);
       for (let i = 0; i < methodNames.length; ++i) {
         const methodName = methodNames[i];
         if (seenNames.has(methodName)) {
@@ -15257,7 +16349,7 @@ var DEVTools = class extends Object2 {
         } catch (error) {
         }
       }
-      proto = System28.Object.getPrototypeOf(proto);
+      proto = System29.Object.getPrototypeOf(proto);
     }
     return properties;
   }
@@ -15317,9 +16409,9 @@ var DEVTools = class extends Object2 {
         return `(${rectX}, ${rectY}, ${value.width.toFixed(1)}, ${value.height.toFixed(1)})`;
       }
       if (typeof value.red === "number" && typeof value.green === "number" && typeof value.blue === "number") {
-        const r = System28.Math.round(value.red * 255);
-        const g = System28.Math.round(value.green * 255);
-        const b = System28.Math.round(value.blue * 255);
+        const r = System29.Math.round(value.red * 255);
+        const g = System29.Math.round(value.green * 255);
+        const b = System29.Math.round(value.blue * 255);
         const a = typeof value.alpha === "number" ? value.alpha.toFixed(2) : "1";
         return `rgba(${r}, ${g}, ${b}, ${a})`;
       }
@@ -15542,7 +16634,7 @@ var DEVTools = class extends Object2 {
     const totalItemsHeight = this.#flatList.length * ITEM_HEIGHT;
     if (totalItemsHeight > itemsHeight) {
       const maxTreeScrollY = totalItemsHeight - itemsHeight;
-      this.#treeScrollY = System28.Math.min(this.#treeScrollY, maxTreeScrollY);
+      this.#treeScrollY = System29.Math.min(this.#treeScrollY, maxTreeScrollY);
     } else {
       this.#treeScrollY = 0;
     }
@@ -15587,7 +16679,7 @@ var DEVTools = class extends Object2 {
         graphic.setTextAlign("right");
         const checkboxRightX = panelX + panelWidth - SCROLL_BAR_WIDTH - GIZMO_CHECKBOX_MARGIN;
         const checkboxX = checkboxRightX - GIZMO_CHECKBOX_SIZE;
-        const checkboxY = System28.Math.floor(itemMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+        const checkboxY = System29.Math.floor(itemMidY - GIZMO_CHECKBOX_SIZE * 0.5);
         const isGizmoVisible = typeof node.isGizmoVisible === "function" ? node.isGizmoVisible() : false;
         graphic.setFillColor(COLOR_ACCENT);
         graphic.drawRect(Rect.create(checkboxX, checkboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
@@ -15612,7 +16704,7 @@ var DEVTools = class extends Object2 {
     if (totalItemsHeight > itemsHeight) {
       const maxTreeScrollY = totalItemsHeight - itemsHeight;
       const scrollRatio = this.#treeScrollY / maxTreeScrollY;
-      const barHeight = System28.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
+      const barHeight = System29.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
       const barY = itemsY + scrollRatio * (itemsHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -15644,7 +16736,7 @@ var DEVTools = class extends Object2 {
     const totalContentHeight = inspectorLines.length * ITEM_HEIGHT;
     if (totalContentHeight > panelHeight) {
       const maxInspectorScrollY = totalContentHeight - panelHeight;
-      this.#inspectorScrollY = System28.Math.min(this.#inspectorScrollY, maxInspectorScrollY);
+      this.#inspectorScrollY = System29.Math.min(this.#inspectorScrollY, maxInspectorScrollY);
     } else {
       this.#inspectorScrollY = 0;
     }
@@ -15716,7 +16808,7 @@ var DEVTools = class extends Object2 {
     if (totalContentHeight > panelHeight) {
       const maxInspectorScrollY = totalContentHeight - panelHeight;
       const scrollRatio = this.#inspectorScrollY / maxInspectorScrollY;
-      const barHeight = System28.Math.max(20, panelHeight * panelHeight / totalContentHeight);
+      const barHeight = System29.Math.max(20, panelHeight * panelHeight / totalContentHeight);
       const barY = panelY + scrollRatio * (panelHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -15764,7 +16856,7 @@ var DEVTools = class extends Object2 {
     graphic.drawRect(Rect.create(panelX, columnHeaderY, panelWidth, ITEM_HEIGHT));
     const delColWidth = 24;
     const availableWidth = panelWidth - delColWidth - SCROLL_BAR_WIDTH;
-    const keyColWidth = System28.Math.floor(availableWidth * 0.4);
+    const keyColWidth = System29.Math.floor(availableWidth * 0.4);
     const valueColWidth = availableWidth - keyColWidth;
     graphic.setFillColor(COLOR_TEXT_DIM);
     graphic.setFontString(`${FONT_SIZE - 1}px monospace`);
@@ -15782,7 +16874,7 @@ var DEVTools = class extends Object2 {
     const totalItemsHeight = keys.length * ITEM_HEIGHT;
     if (totalItemsHeight > itemsHeight) {
       const maxScrollY = totalItemsHeight - itemsHeight;
-      this.#localStorageScrollY = System28.Math.min(this.#localStorageScrollY, maxScrollY);
+      this.#localStorageScrollY = System29.Math.min(this.#localStorageScrollY, maxScrollY);
     } else {
       this.#localStorageScrollY = 0;
     }
@@ -15809,12 +16901,12 @@ var DEVTools = class extends Object2 {
       graphic.setFontString(`${FONT_SIZE}px monospace`);
       graphic.setTextAlign("left");
       graphic.setTextBaseline("middle");
-      const maxKeyChars = System28.Math.floor(keyColWidth / 7);
+      const maxKeyChars = System29.Math.floor(keyColWidth / 7);
       const keyText = key.length > maxKeyChars ? key.slice(0, maxKeyChars - 3) + "..." : key;
       graphic.drawFillText(keyText, panelX + PADDING, itemMidY);
       graphic.setFillColor(COLOR_PROPERTY_VALUE);
       const valueStr = rawValue !== null ? rawValue : "(null)";
-      const maxValueChars = System28.Math.floor(valueColWidth / 7);
+      const maxValueChars = System29.Math.floor(valueColWidth / 7);
       const valueText = valueStr.length > maxValueChars ? valueStr.slice(0, maxValueChars - 3) + "..." : valueStr;
       graphic.drawFillText(valueText, panelX + keyColWidth + PADDING, itemMidY);
       const delBtnX = panelX + panelWidth - SCROLL_BAR_WIDTH - delColWidth;
@@ -15836,7 +16928,7 @@ var DEVTools = class extends Object2 {
     if (totalItemsHeight > itemsHeight) {
       const maxScrollY = totalItemsHeight - itemsHeight;
       const scrollRatio = this.#localStorageScrollY / maxScrollY;
-      const barHeight = System28.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
+      const barHeight = System29.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
       const barY = itemsY + scrollRatio * (itemsHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -15861,7 +16953,7 @@ var DEVTools = class extends Object2 {
       const contextButtonWidths = [];
       for (let labelIndex = 0; labelIndex < contextButtonCount; ++labelIndex) {
         const measuredTextWidth = graphic.measureText(contextButtonTexts[labelIndex]).width;
-        contextButtonWidths.push(System28.Math.ceil(measuredTextWidth) + contextButtonTextPadding * 2);
+        contextButtonWidths.push(System29.Math.ceil(measuredTextWidth) + contextButtonTextPadding * 2);
       }
       let totalContextButtonWidth = contextButtonGap * (contextButtonCount - 1);
       for (let widthIndex = 0; widthIndex < contextButtonWidths.length; ++widthIndex) {
@@ -15960,7 +17052,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Dim Background", panelX + PADDING, dimRowMidY);
     const dimCheckboxX = panelX + PADDING + 120;
-    const dimCheckboxY = System28.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const dimCheckboxY = System29.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isDimEnabled ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(dimCheckboxX, dimCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isDimEnabled) {
@@ -15975,7 +17067,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show All Gizmos", panelX + PADDING, gizmosRowMidY);
     const gizmosCheckboxX = panelX + PADDING + 120;
-    const gizmosCheckboxY = System28.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const gizmosCheckboxY = System29.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isAllGizmosVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(gizmosCheckboxX, gizmosCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isAllGizmosVisible) {
@@ -15990,7 +17082,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show Height Aspect Guide", panelX + PADDING, heightAspectGuideRowMidY);
     const heightAspectGuideCheckboxX = panelX + PADDING + 168;
-    const heightAspectGuideCheckboxY = System28.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const heightAspectGuideCheckboxY = System29.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isHeightAspectGuideVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(heightAspectGuideCheckboxX, heightAspectGuideCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isHeightAspectGuideVisible) {
@@ -16005,7 +17097,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show Width Aspect Guide", panelX + PADDING, widthAspectGuideRowMidY);
     const widthAspectGuideCheckboxX = panelX + PADDING + 168;
-    const widthAspectGuideCheckboxY = System28.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const widthAspectGuideCheckboxY = System29.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isWidthAspectGuideVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(widthAspectGuideCheckboxX, widthAspectGuideCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isWidthAspectGuideVisible) {
@@ -16020,7 +17112,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show FPS", panelX + PADDING, framePerSecondRowMidY);
     const framePerSecondCheckboxX = panelX + PADDING + 120;
-    const framePerSecondCheckboxY = System28.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const framePerSecondCheckboxY = System29.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isFramePerSecondVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(framePerSecondCheckboxX, framePerSecondCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isFramePerSecondVisible) {
@@ -16044,7 +17136,7 @@ var DEVTools = class extends Object2 {
     const dimRowY = panelY + ITEM_HEIGHT;
     const dimRowMidY = dimRowY + ITEM_HEIGHT * 0.5;
     const dimCheckboxX = panelX + PADDING + 120;
-    const dimCheckboxY = System28.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const dimCheckboxY = System29.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isDimCheckboxHit = touchX >= dimCheckboxX && touchX <= dimCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= dimCheckboxY && touchY <= dimCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isDimCheckboxHit) {
       this.#isDimEnabled = !this.#isDimEnabled;
@@ -16054,7 +17146,7 @@ var DEVTools = class extends Object2 {
     const gizmosRowY = panelY + ITEM_HEIGHT * 2;
     const gizmosRowMidY = gizmosRowY + ITEM_HEIGHT * 0.5;
     const gizmosCheckboxX = panelX + PADDING + 120;
-    const gizmosCheckboxY = System28.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const gizmosCheckboxY = System29.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isGizmosCheckboxHit = touchX >= gizmosCheckboxX && touchX <= gizmosCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= gizmosCheckboxY && touchY <= gizmosCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isGizmosCheckboxHit) {
       this.#isAllGizmosVisible = !this.#isAllGizmosVisible;
@@ -16066,7 +17158,7 @@ var DEVTools = class extends Object2 {
     const heightAspectGuideRowY = panelY + ITEM_HEIGHT * 3;
     const heightAspectGuideRowMidY = heightAspectGuideRowY + ITEM_HEIGHT * 0.5;
     const heightAspectGuideCheckboxX = panelX + PADDING + 168;
-    const heightAspectGuideCheckboxY = System28.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const heightAspectGuideCheckboxY = System29.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isHeightAspectGuideCheckboxHit = touchX >= heightAspectGuideCheckboxX && touchX <= heightAspectGuideCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= heightAspectGuideCheckboxY && touchY <= heightAspectGuideCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isHeightAspectGuideCheckboxHit) {
       this.#isHeightAspectGuideVisible = !this.#isHeightAspectGuideVisible;
@@ -16076,7 +17168,7 @@ var DEVTools = class extends Object2 {
     const widthAspectGuideRowY = panelY + ITEM_HEIGHT * 4;
     const widthAspectGuideRowMidY = widthAspectGuideRowY + ITEM_HEIGHT * 0.5;
     const widthAspectGuideCheckboxX = panelX + PADDING + 168;
-    const widthAspectGuideCheckboxY = System28.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const widthAspectGuideCheckboxY = System29.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isWidthAspectGuideCheckboxHit = touchX >= widthAspectGuideCheckboxX && touchX <= widthAspectGuideCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= widthAspectGuideCheckboxY && touchY <= widthAspectGuideCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isWidthAspectGuideCheckboxHit) {
       this.#isWidthAspectGuideVisible = !this.#isWidthAspectGuideVisible;
@@ -16086,7 +17178,7 @@ var DEVTools = class extends Object2 {
     const framePerSecondRowY = panelY + ITEM_HEIGHT * 5;
     const framePerSecondRowMidY = framePerSecondRowY + ITEM_HEIGHT * 0.5;
     const framePerSecondCheckboxX = panelX + PADDING + 120;
-    const framePerSecondCheckboxY = System28.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const framePerSecondCheckboxY = System29.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isFramePerSecondCheckboxHit = touchX >= framePerSecondCheckboxX && touchX <= framePerSecondCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= framePerSecondCheckboxY && touchY <= framePerSecondCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isFramePerSecondCheckboxHit) {
       this.#isFramePerSecondVisible = !this.#isFramePerSecondVisible;
@@ -16102,7 +17194,7 @@ var DEVTools = class extends Object2 {
     }
     const settingsJson = LocalStorage.getString(SETTINGS_STORAGE_KEY);
     try {
-      const settingsObject = System28.JSON.parse(settingsJson);
+      const settingsObject = System29.JSON.parse(settingsJson);
       if (typeof settingsObject.dimEnabled === "boolean") {
         this.#isDimEnabled = settingsObject.dimEnabled;
       }
@@ -16126,7 +17218,7 @@ var DEVTools = class extends Object2 {
   //==============================================================================
   saveSettings() {
     const settingsObject = { dimEnabled: this.#isDimEnabled, allGizmosVisible: this.#isAllGizmosVisible, heightAspectGuideVisible: this.#isHeightAspectGuideVisible, widthAspectGuideVisible: this.#isWidthAspectGuideVisible, framePerSecondVisible: this.#isFramePerSecondVisible };
-    const settingsJson = System28.JSON.stringify(settingsObject);
+    const settingsJson = System29.JSON.stringify(settingsObject);
     LocalStorage.setString(SETTINGS_STORAGE_KEY, settingsJson);
   }
   //==============================================================================
@@ -16197,7 +17289,7 @@ var DEVTools = class extends Object2 {
     const timeDeltaText = `${timeDelta.toFixed(3)}s`;
     items.push({ key: "timeDelta", value: timeDeltaText, isSeparator: false, isSectionHeader: false });
     items.push({ key: "Memory (Chrome Only)", value: "", isSeparator: false, isSectionHeader: true });
-    const performanceMemory = System28.window.performance ? System28.window.performance.memory : null;
+    const performanceMemory = System29.window.performance ? System29.window.performance.memory : null;
     if (performanceMemory) {
       const usedHeapMegabytes = (performanceMemory.usedJSHeapSize / (1024 * 1024)).toFixed(2);
       items.push({ key: "usedJSHeapSize", value: `${usedHeapMegabytes} MB`, isSeparator: false, isSectionHeader: false });
@@ -16232,20 +17324,20 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Statistics", panelX + PADDING, panelY + ITEM_HEIGHT * 0.5);
     const availableWidth = panelWidth - SCROLL_BAR_WIDTH;
-    const keyColumnWidth = System28.Math.floor(availableWidth * 0.4);
+    const keyColumnWidth = System29.Math.floor(availableWidth * 0.4);
     const statisticsItems = this.gatherStatisticsItems();
     const itemsY = panelY + ITEM_HEIGHT;
     const itemsHeight = panelHeight - ITEM_HEIGHT;
     const totalItemsHeight = statisticsItems.length * ITEM_HEIGHT;
     if (totalItemsHeight > itemsHeight) {
       const maxStatisticsScrollY = totalItemsHeight - itemsHeight;
-      this.#statisticsScrollY = System28.Math.min(this.#statisticsScrollY, maxStatisticsScrollY);
+      this.#statisticsScrollY = System29.Math.min(this.#statisticsScrollY, maxStatisticsScrollY);
     } else {
       this.#statisticsScrollY = 0;
     }
     const valueColumnWidth = availableWidth - keyColumnWidth;
-    const maxKeyCharacters = System28.Math.floor(keyColumnWidth / 7);
-    const maxValueCharacters = System28.Math.floor(valueColumnWidth / 7);
+    const maxKeyCharacters = System29.Math.floor(keyColumnWidth / 7);
+    const maxValueCharacters = System29.Math.floor(valueColumnWidth / 7);
     graphic.beginClipRect(Rect.create(panelX, itemsY, panelWidth, itemsHeight));
     for (let itemIndex = 0; itemIndex < statisticsItems.length; ++itemIndex) {
       const statisticsItem = statisticsItems[itemIndex];
@@ -16298,7 +17390,7 @@ var DEVTools = class extends Object2 {
     if (totalItemsHeight > itemsHeight) {
       const maxStatisticsScrollY = totalItemsHeight - itemsHeight;
       const scrollRatio = this.#statisticsScrollY / maxStatisticsScrollY;
-      const barHeight = System28.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
+      const barHeight = System29.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
       const barY = itemsY + scrollRatio * (itemsHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -16320,7 +17412,7 @@ var DEVTools = class extends Object2 {
     const statisticsItems = this.gatherStatisticsItems();
     const itemsY = panelY + ITEM_HEIGHT;
     const localY = touchY - itemsY + this.#statisticsScrollY;
-    const clickedIndex = System28.Math.floor(localY / ITEM_HEIGHT);
+    const clickedIndex = System29.Math.floor(localY / ITEM_HEIGHT);
     if (touchY >= itemsY && clickedIndex >= 0 && clickedIndex < statisticsItems.length) {
       const clickedItem = statisticsItems[clickedIndex];
       if (!clickedItem.isSeparator && !clickedItem.isSectionHeader) {
@@ -16342,7 +17434,7 @@ var DEVTools = class extends Object2 {
 };
 
 // src/ui/uiscene.js
-var System29 = globalThis;
+var System30 = globalThis;
 var UIScene = class extends Scene {
   static {
     __name(this, "UIScene");
@@ -16489,19 +17581,19 @@ var UIScene = class extends Scene {
    */
   async load(engine) {
     await super.load(engine);
-    this.#loadStartTime = System29.Date.now();
+    this.#loadStartTime = System30.Date.now();
     this.#loadTouchedToSkip = false;
     const skipHandler = /* @__PURE__ */ __name(() => {
       this.#loadTouchedToSkip = true;
     }, "skipHandler");
-    System29.window.addEventListener("pointerdown", skipHandler, { once: true });
+    System30.window.addEventListener("pointerdown", skipHandler, { once: true });
     try {
       await this.loadAssets();
-      while (System29.Date.now() - this.#loadStartTime < this.#loadMinDurationMs && !this.#loadTouchedToSkip) {
-        await new Promise((resolve) => System29.setTimeout(resolve, 50));
+      while (System30.Date.now() - this.#loadStartTime < this.#loadMinDurationMs && !this.#loadTouchedToSkip) {
+        await new Promise((resolve) => System30.setTimeout(resolve, 50));
       }
     } finally {
-      System29.window.removeEventListener("pointerdown", skipHandler);
+      System30.window.removeEventListener("pointerdown", skipHandler);
     }
     const viewManager = engine.getViewManager();
     const viewSize = viewManager.getViewSize();
@@ -16556,8 +17648,8 @@ var UIScene = class extends Scene {
       const positionY = (viewSize.y - targetHeight) * 0.5;
       graphic.drawImage(image, Vector2.create(positionX, positionY), Vector2.create(targetWidth, targetHeight));
     }
-    const elapsed = System29.Date.now() - this.#loadStartTime;
-    const progress = System29.Math.min(1, System29.Math.max(0, elapsed / this.#loadMinDurationMs));
+    const elapsed = System30.Date.now() - this.#loadStartTime;
+    const progress = System30.Math.min(1, System30.Math.max(0, elapsed / this.#loadMinDurationMs));
     const barWidth = viewSize.x * 0.6;
     const barHeight = 24;
     const barX = (viewSize.x - barWidth) * 0.5;
@@ -16612,8 +17704,8 @@ var UIScene = class extends Scene {
     const safeAreaRect = this.computeSafeAreaRect();
     const insetTop = safeAreaRect.position.y;
     const insetLeft = safeAreaRect.position.x;
-    const insetRight = System29.Math.max(viewSize.x - (safeAreaRect.position.x + safeAreaRect.size.x), 0);
-    const insetBottom = System29.Math.max(viewSize.y - (safeAreaRect.position.y + safeAreaRect.size.y), 0);
+    const insetRight = System30.Math.max(viewSize.x - (safeAreaRect.position.x + safeAreaRect.size.x), 0);
+    const insetBottom = System30.Math.max(viewSize.y - (safeAreaRect.position.y + safeAreaRect.size.y), 0);
     const previousInsets = this.#safeAreaInsets;
     if (previousInsets.top !== insetTop || previousInsets.left !== insetLeft || previousInsets.right !== insetRight || previousInsets.bottom !== insetBottom) {
       this.setSafeAreaInsets({
@@ -16636,20 +17728,20 @@ var UIScene = class extends Scene {
     const viewManager = engine.getViewManager();
     const viewSize = viewManager.getViewSize();
     const targetScale = viewManager.getTargetResolutionScale();
-    const div = System29.document.createElement("div");
+    const div = System30.document.createElement("div");
     div.style.position = "absolute";
     div.style.visibility = "hidden";
     div.style.paddingTop = "env(safe-area-inset-top)";
     div.style.paddingRight = "env(safe-area-inset-right)";
     div.style.paddingBottom = "env(safe-area-inset-bottom)";
     div.style.paddingLeft = "env(safe-area-inset-left)";
-    System29.document.body.appendChild(div);
-    const computedStyle = System29.window.getComputedStyle(div);
-    const insetTopCss = System29.Number.parseInt(computedStyle.paddingTop) || 0;
-    const insetRightCss = System29.Number.parseInt(computedStyle.paddingRight) || 0;
-    const insetBottomCss = System29.Number.parseInt(computedStyle.paddingBottom) || 0;
-    const insetLeftCss = System29.Number.parseInt(computedStyle.paddingLeft) || 0;
-    System29.document.body.removeChild(div);
+    System30.document.body.appendChild(div);
+    const computedStyle = System30.window.getComputedStyle(div);
+    const insetTopCss = System30.Number.parseInt(computedStyle.paddingTop) || 0;
+    const insetRightCss = System30.Number.parseInt(computedStyle.paddingRight) || 0;
+    const insetBottomCss = System30.Number.parseInt(computedStyle.paddingBottom) || 0;
+    const insetLeftCss = System30.Number.parseInt(computedStyle.paddingLeft) || 0;
+    System30.document.body.removeChild(div);
     const scale = targetScale > 0 ? targetScale : 1;
     const insetTop = insetTopCss / scale;
     const insetRight = insetRightCss / scale;
@@ -16657,8 +17749,8 @@ var UIScene = class extends Scene {
     const insetLeft = insetLeftCss / scale;
     const x = insetLeft;
     const y = insetTop;
-    const width = System29.Math.max(viewSize.x - insetLeft - insetRight, 0);
-    const height = System29.Math.max(viewSize.y - insetTop - insetBottom, 0);
+    const width = System30.Math.max(viewSize.x - insetLeft - insetRight, 0);
+    const height = System30.Math.max(viewSize.y - insetTop - insetBottom, 0);
     return Rect.create(x, y, width, height);
   }
   //==============================================================================
@@ -18107,7 +19199,7 @@ var UIToggleButton = class extends UIButton {
 };
 
 // src/ui/uiinputfield.js
-var System30 = globalThis;
+var System31 = globalThis;
 var UIInputField = class extends WorldNode {
   static {
     __name(this, "UIInputField");
@@ -18417,8 +19509,8 @@ var UIInputField = class extends WorldNode {
         const selEnd = this.#domInput.selectionEnd;
         const selStart = this.#domInput.selectionStart;
         if (typeof selEnd === "number" && typeof selStart === "number") {
-          const ourMin = System30.Math.min(this.#cursorIndex, this.#selectionStart);
-          const ourMax = System30.Math.max(this.#cursorIndex, this.#selectionStart);
+          const ourMin = System31.Math.min(this.#cursorIndex, this.#selectionStart);
+          const ourMax = System31.Math.max(this.#cursorIndex, this.#selectionStart);
           if (selStart !== ourMin || selEnd !== ourMax) {
             this.#cursorIndex = selEnd;
             this.#selectionStart = selStart;
@@ -18461,8 +19553,8 @@ var UIInputField = class extends WorldNode {
     this.#selectionStart = this.#dragStartIndex;
     this.#cursorIndex = index;
     if (this.#domInput) {
-      const selStart = System30.Math.min(this.#dragStartIndex, index);
-      const selEnd = System30.Math.max(this.#dragStartIndex, index);
+      const selStart = System31.Math.min(this.#dragStartIndex, index);
+      const selEnd = System31.Math.max(this.#dragStartIndex, index);
       this.#domInput.setSelectionRange(selStart, selEnd);
     }
     this.#blinkTimer = 0;
@@ -18526,7 +19618,7 @@ var UIInputField = class extends WorldNode {
   refreshTextPositions() {
     const size = this.getContentSize();
     if (size.x <= 0 || size.y <= 0) return;
-    const inner = Vector2.create(System30.Math.max(0, size.x - this.#padding * 2), size.y);
+    const inner = Vector2.create(System31.Math.max(0, size.x - this.#padding * 2), size.y);
     this.#textTextNode.setLocalPosition(Vector2.create(this.#padding, 0));
     this.#textTextNode.setContentSize(inner);
     this.#placeholderTextNode.setLocalPosition(Vector2.create(this.#padding, 0));
@@ -18539,7 +19631,7 @@ var UIInputField = class extends WorldNode {
   //==============================================================================
   attachDOMInput() {
     if (this.#domInput) return;
-    const doc = System30.document;
+    const doc = System31.document;
     ensureGlobalHiddenInputStyle(doc);
     const input = doc.createElement("input");
     input.type = "text";
@@ -18702,11 +19794,11 @@ var UIInputField = class extends WorldNode {
   attachCanvasKeyboard() {
     if (this.#canvasKeydownHandler) return;
     this.#canvasKeydownHandler = (event) => this.handleCanvasKeydown(event);
-    System30.document.addEventListener("keydown", this.#canvasKeydownHandler);
+    System31.document.addEventListener("keydown", this.#canvasKeydownHandler);
   }
   detachCanvasKeyboard() {
     if (!this.#canvasKeydownHandler) return;
-    System30.document.removeEventListener("keydown", this.#canvasKeydownHandler);
+    System31.document.removeEventListener("keydown", this.#canvasKeydownHandler);
     this.#canvasKeydownHandler = null;
   }
   handleCanvasKeydown(event) {
@@ -18767,7 +19859,7 @@ var UIInputField = class extends WorldNode {
     this.#cursorVisible = true;
   }
   moveCursor(newIndex, extendSelection) {
-    const clamped = System30.Math.max(0, System30.Math.min(this.#value.length, newIndex));
+    const clamped = System31.Math.max(0, System31.Math.min(this.#value.length, newIndex));
     this.#cursorIndex = clamped;
     if (!extendSelection) this.#selectionStart = clamped;
     this.refreshTexts();
@@ -18800,8 +19892,8 @@ var UIInputField = class extends WorldNode {
   getSelectionRange() {
     if (!this.hasSelection()) return null;
     return {
-      start: System30.Math.min(this.#cursorIndex, this.#selectionStart),
-      end: System30.Math.max(this.#cursorIndex, this.#selectionStart)
+      start: System31.Math.min(this.#cursorIndex, this.#selectionStart),
+      end: System31.Math.max(this.#cursorIndex, this.#selectionStart)
     };
   }
   getSelectionText() {
@@ -18843,8 +19935,8 @@ var UIInputField = class extends WorldNode {
   }
   writeClipboard(text) {
     try {
-      if (System30.navigator && System30.navigator.clipboard) {
-        System30.navigator.clipboard.writeText(text).catch(() => {
+      if (System31.navigator && System31.navigator.clipboard) {
+        System31.navigator.clipboard.writeText(text).catch(() => {
         });
       }
     } catch (error) {
@@ -18852,12 +19944,12 @@ var UIInputField = class extends WorldNode {
   }
   readClipboard() {
     try {
-      if (System30.navigator && System30.navigator.clipboard) {
-        return System30.navigator.clipboard.readText();
+      if (System31.navigator && System31.navigator.clipboard) {
+        return System31.navigator.clipboard.readText();
       }
     } catch (error) {
     }
-    return System30.Promise.resolve("");
+    return System31.Promise.resolve("");
   }
   //==============================================================================
   // 컨텍스트 메뉴 (우클릭).
@@ -18891,7 +19983,7 @@ var UIInputField = class extends WorldNode {
   }
   showContextMenu(clientX, clientY) {
     this.hideContextMenu();
-    const doc = System30.document;
+    const doc = System31.document;
     const menu = doc.createElement("div");
     menu.style.position = "absolute";
     menu.style.left = `${clientX}px`;
@@ -18941,7 +20033,7 @@ var UIInputField = class extends WorldNode {
     }
     doc.body.appendChild(menu);
     this.#contextMenuElement = menu;
-    System30.setTimeout(() => {
+    System31.setTimeout(() => {
       const dismissHandler = /* @__PURE__ */ __name((event) => {
         if (this.#contextMenuElement && !this.#contextMenuElement.contains(event.target)) {
           this.hideContextMenu();
@@ -18962,7 +20054,7 @@ var UIInputField = class extends WorldNode {
       this.#contextMenuElement = null;
     }
     if (this.#contextMenuDismissHandler) {
-      System30.document.removeEventListener("pointerdown", this.#contextMenuDismissHandler, true);
+      System31.document.removeEventListener("pointerdown", this.#contextMenuDismissHandler, true);
       this.#contextMenuDismissHandler = null;
     }
   }
@@ -18985,8 +20077,8 @@ var BackgroundLayerRenderer = class extends Component {
       graphic.pushState();
       const fontFamily = state.fontFace ? state.fontFace.family : SYSTEM_FONT_STRING;
       graphic.setFontString(`${state.fontSize}px ${fontFamily}`);
-      const selStart = System30.Math.min(state.selectionStart, state.cursorIndex);
-      const selEnd = System30.Math.max(state.selectionStart, state.cursorIndex);
+      const selStart = System31.Math.min(state.selectionStart, state.cursorIndex);
+      const selEnd = System31.Math.max(state.selectionStart, state.cursorIndex);
       const startX = state.padding + graphic.measureText(state.value.slice(0, selStart)).width;
       const endX = state.padding + graphic.measureText(state.value.slice(0, selEnd)).width;
       const halfH = state.fontSize * 0.65;
@@ -19047,7 +20139,7 @@ var OverlayLayerRenderer = class extends Component {
       const y = inset;
       const rectW = contentSize.x - w;
       const rectH = contentSize.y - w;
-      const radius = System30.Math.max(0, state.bgRoundSize - inset);
+      const radius = System31.Math.max(0, state.bgRoundSize - inset);
       graphic.drawStrokeRoundRect(Rect.create(x, y, rectW, rectH), radius, w);
     }
     graphic.popState();
@@ -19057,7 +20149,7 @@ var offscreenMeasureCanvas = null;
 function getOffscreenMeasureContext() {
   if (!offscreenMeasureCanvas) {
     try {
-      offscreenMeasureCanvas = System30.document.createElement("canvas");
+      offscreenMeasureCanvas = System31.document.createElement("canvas");
     } catch (error) {
       return null;
     }
@@ -19407,7 +20499,7 @@ var UISlider = class extends UIControl {
 };
 
 // src/ui/uisnapscrollview.js
-var System31 = globalThis;
+var System32 = globalThis;
 var UISnapScrollView = class extends UIScrollView {
   static {
     __name(this, "UISnapScrollView");
@@ -19540,8 +20632,8 @@ var UISnapScrollView = class extends UIScrollView {
     const snapOffsets = this.computeSnapOffsets();
     const snapCurrentIndex = this.getSnapCurrentIndex();
     const maxIndex = children.length - 1;
-    const prevIndex = System31.Math.max(0, snapCurrentIndex - 1);
-    const nextIndex = System31.Math.min(maxIndex, snapCurrentIndex + 1);
+    const prevIndex = System32.Math.max(0, snapCurrentIndex - 1);
+    const nextIndex = System32.Math.min(maxIndex, snapCurrentIndex + 1);
     const isHorizontal = this.isHorizontal();
     const currentOffset = this.getScrollOffset();
     if (isHorizontal) {
@@ -19622,7 +20714,7 @@ var UISnapScrollView = class extends UIScrollView {
       const candidateChildContentSize = candidateChild.getContentSize();
       const targetItemSize = isHorizontal ? candidateChildContentSize.x : candidateChildContentSize.y;
       const pageChangeThreshold = this.getPageChangeThreshold();
-      if (System31.Math.abs(dragAmount) >= targetItemSize * pageChangeThreshold) {
+      if (System32.Math.abs(dragAmount) >= targetItemSize * pageChangeThreshold) {
         targetIndex = candidateIndex;
       } else {
         targetIndex = snapCurrentIndex;
@@ -19828,7 +20920,7 @@ var AnimationClip = class extends Object2 {
 };
 
 // src/resource/blobasset.js
-var System32 = globalThis;
+var System33 = globalThis;
 var BlobAsset = class extends Asset {
   static {
     __name(this, "BlobAsset");
@@ -19859,7 +20951,7 @@ var BlobAsset = class extends Asset {
       return Promise.resolve();
     }
     await super.load(assetPath);
-    const response = await System32.fetch(assetPath);
+    const response = await System33.fetch(assetPath);
     this.#blob = await response.blob();
     this.setLoaded(true);
   }
@@ -19875,7 +20967,7 @@ var BlobAsset = class extends Asset {
 };
 
 // src/resource/textasset.js
-var System33 = globalThis;
+var System34 = globalThis;
 var TextAsset = class extends Asset {
   static {
     __name(this, "TextAsset");
@@ -19903,11 +20995,11 @@ var TextAsset = class extends Asset {
   async load(assetPath) {
     const isLoaded = this.isLoaded();
     if (isLoaded) {
-      return System33.Promise.resolve();
+      return System34.Promise.resolve();
     }
     try {
       await super.load(assetPath);
-      const response = await System33.fetch(assetPath);
+      const response = await System34.fetch(assetPath);
       this.text = await response.text();
       this.setLoaded(true);
     } catch (error) {
@@ -19928,7 +21020,7 @@ var TextAsset = class extends Asset {
 };
 
 // src/resource/jsonasset.js
-var System34 = globalThis;
+var System35 = globalThis;
 var JsonAsset = class extends TextAsset {
   static {
     __name(this, "JsonAsset");
@@ -19956,7 +21048,7 @@ var JsonAsset = class extends TextAsset {
   async load(assetPath) {
     const isLoaded = this.isLoaded();
     if (isLoaded) {
-      return System34.Promise.resolve();
+      return System35.Promise.resolve();
     }
     try {
       await super.load(assetPath);
@@ -20146,12 +21238,12 @@ var ImageScroller = class extends Object2 {
 };
 
 // src/misc/toucheffect.js
-var System35 = globalThis;
+var System36 = globalThis;
 var PARTICLE_GRADIENT_CANVAS_SIZE = 64;
 var particleGradientCanvas = null;
 function getParticleGradientCanvas() {
   if (particleGradientCanvas === null) {
-    const canvas = System35.document.createElement("canvas");
+    const canvas = System36.document.createElement("canvas");
     canvas.width = PARTICLE_GRADIENT_CANVAS_SIZE;
     canvas.height = PARTICLE_GRADIENT_CANVAS_SIZE;
     const canvasRenderingContext = canvas.getContext("2d");
@@ -21307,7 +22399,7 @@ var Stack = class extends Object2 {
 };
 
 // src/experimental/collection/set.js
-var System36 = globalThis;
+var System37 = globalThis;
 var Set2 = class _Set extends Object2 {
   static {
     __name(this, "Set");
@@ -21325,7 +22417,7 @@ var Set2 = class _Set extends Object2 {
    */
   constructor() {
     super();
-    this.#items = new System36.Set();
+    this.#items = new System37.Set();
   }
   //==============================================================================
   // 데이터 추가.
@@ -21743,6 +22835,3194 @@ var Camera = class extends Object2 {
   }
 };
 
+// src/experimental/graphics/rendertarget.js
+var RenderTarget = class extends Object2 {
+  static {
+    __name(this, "RenderTarget");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WebGL2RenderingContext } */
+  #webGL2RenderingContext;
+  /** @private @type { WebGLFramebuffer | null } */
+  #framebuffer;
+  /** @private @type { WebGLTexture | null } */
+  #colorTexture;
+  /** @private @type { WebGLRenderbuffer | null } */
+  #depthRenderbuffer;
+  /** @private @type { number } */
+  #width;
+  /** @private @type { number } */
+  #height;
+  /** @private @type { boolean } */
+  #useDepth;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { WebGL2RenderingContext } webGL2RenderingContext
+   * @param { number } width
+   * @param { number } height
+   * @param { boolean } useDepth
+   */
+  constructor(webGL2RenderingContext, width, height, useDepth) {
+    super();
+    this.#webGL2RenderingContext = webGL2RenderingContext;
+    this.#framebuffer = null;
+    this.#colorTexture = null;
+    this.#depthRenderbuffer = null;
+    this.#width = 0;
+    this.#height = 0;
+    this.#useDepth = useDepth;
+    this.resize(width, height);
+  }
+  //==============================================================================
+  // 크기 변경. (같은 크기면 무시, 다르면 리소스 재생성)
+  //==============================================================================
+  /**
+   * @param { number } width
+   * @param { number } height
+   */
+  resize(width, height) {
+    const currentWidth = this.getWidth();
+    const currentHeight = this.getHeight();
+    if (width === currentWidth && height === currentHeight) {
+      return;
+    }
+    this.destroy();
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const colorTexture = webGL2RenderingContext.createTexture();
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, colorTexture);
+    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, width, height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, null);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.LINEAR);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+    const framebuffer = webGL2RenderingContext.createFramebuffer();
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
+    webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, colorTexture, 0);
+    let depthRenderbuffer = null;
+    if (this.#useDepth) {
+      depthRenderbuffer = webGL2RenderingContext.createRenderbuffer();
+      webGL2RenderingContext.bindRenderbuffer(webGL2RenderingContext.RENDERBUFFER, depthRenderbuffer);
+      webGL2RenderingContext.renderbufferStorage(webGL2RenderingContext.RENDERBUFFER, webGL2RenderingContext.DEPTH_COMPONENT16, width, height);
+      webGL2RenderingContext.framebufferRenderbuffer(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.DEPTH_ATTACHMENT, webGL2RenderingContext.RENDERBUFFER, depthRenderbuffer);
+    }
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+    this.#framebuffer = framebuffer;
+    this.#colorTexture = colorTexture;
+    this.#depthRenderbuffer = depthRenderbuffer;
+    this.#width = width;
+    this.#height = height;
+  }
+  //==============================================================================
+  // 렌더링 대상으로 바인드. (프레임버퍼 + 뷰포트)
+  //==============================================================================
+  bind() {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const framebuffer = this.getFramebuffer();
+    const width = this.getWidth();
+    const height = this.getHeight();
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
+    webGL2RenderingContext.viewport(0, 0, width, height);
+  }
+  //==============================================================================
+  // 파괴. (GL 리소스 해제)
+  //==============================================================================
+  /**
+   * @override
+   */
+  destroy() {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    if (this.#framebuffer) {
+      webGL2RenderingContext.deleteFramebuffer(this.#framebuffer);
+      this.#framebuffer = null;
+    }
+    if (this.#colorTexture) {
+      webGL2RenderingContext.deleteTexture(this.#colorTexture);
+      this.#colorTexture = null;
+    }
+    if (this.#depthRenderbuffer) {
+      webGL2RenderingContext.deleteRenderbuffer(this.#depthRenderbuffer);
+      this.#depthRenderbuffer = null;
+    }
+    this.#width = 0;
+    this.#height = 0;
+  }
+  //==============================================================================
+  // 렌더링 컨텍스트 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGL2RenderingContext }
+   */
+  getWebGL2RenderingContext() {
+    return this.#webGL2RenderingContext;
+  }
+  //==============================================================================
+  // 프레임버퍼 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGLFramebuffer | null }
+   */
+  getFramebuffer() {
+    return this.#framebuffer;
+  }
+  //==============================================================================
+  // 컬러 텍스처 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGLTexture | null }
+   */
+  getColorTexture() {
+    return this.#colorTexture;
+  }
+  //==============================================================================
+  // 가로 크기 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getWidth() {
+    return this.#width;
+  }
+  //==============================================================================
+  // 세로 크기 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getHeight() {
+    return this.#height;
+  }
+};
+
+// src/experimental/graphics/fullscreenpass.js
+var FULLSCREEN_VERTEXSHADER_SOURCE = `#version 300 es
+out vec2 fragmentCoordinate;
+out vec2 fragmentTextureCoordinate;
+void main() {
+	vec2 positions[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
+	vec2 position = positions[gl_VertexID];
+	fragmentCoordinate = position;
+	fragmentTextureCoordinate = position * 0.5 + 0.5;
+	gl_Position = vec4(position, 0.999, 1.0);
+}
+`;
+var FullscreenPass = class extends Object2 {
+  static {
+    __name(this, "FullscreenPass");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WebGL2RenderingContext } */
+  #webGL2RenderingContext;
+  /** @private @type { ShaderProgram } */
+  #shaderProgram;
+  /** @private @type { WebGLVertexArrayObject } */
+  #vertexArray;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { WebGL2RenderingContext } webGL2RenderingContext
+   * @param { string } fragmentShaderSource
+   */
+  constructor(webGL2RenderingContext, fragmentShaderSource) {
+    super();
+    this.#webGL2RenderingContext = webGL2RenderingContext;
+    this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, FULLSCREEN_VERTEXSHADER_SOURCE.trim(), fragmentShaderSource.trim());
+    this.#vertexArray = webGL2RenderingContext.createVertexArray();
+  }
+  //==============================================================================
+  // 패스 사용 시작. (프로그램 + 빈 버텍스 어레이 바인드)
+  //==============================================================================
+  use() {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const shaderProgram = this.getShaderProgram();
+    shaderProgram.use();
+    const vertexArray = this.getVertexArray();
+    webGL2RenderingContext.bindVertexArray(vertexArray);
+  }
+  //==============================================================================
+  // 출력. (use() 와 유니폼 설정 이후 호출)
+  //==============================================================================
+  draw() {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
+  }
+  //==============================================================================
+  // 유니폼 로케이션 반환. (캐시)
+  //==============================================================================
+  /**
+   * @param { string } uniformName
+   * @returns { WebGLUniformLocation }
+   */
+  getUniformLocation(uniformName) {
+    const shaderProgram = this.getShaderProgram();
+    const uniformLocation = shaderProgram.getUniformLocation(uniformName);
+    return uniformLocation;
+  }
+  //==============================================================================
+  // 렌더링 컨텍스트 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGL2RenderingContext }
+   */
+  getWebGL2RenderingContext() {
+    return this.#webGL2RenderingContext;
+  }
+  //==============================================================================
+  // 셰이더 프로그램 반환.
+  //==============================================================================
+  /**
+   * @returns { ShaderProgram }
+   */
+  getShaderProgram() {
+    return this.#shaderProgram;
+  }
+  //==============================================================================
+  // 버텍스 어레이 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGLVertexArrayObject }
+   */
+  getVertexArray() {
+    return this.#vertexArray;
+  }
+};
+
+// src/experimental/graphics/bloomeffect.js
+var System38 = globalThis;
+var BRIGHTPASS_FRAGMENTSHADER_SOURCE = `#version 300 es
+precision highp float;
+in vec2 fragmentTextureCoordinate;
+uniform sampler2D sceneTexture;
+uniform vec2 thresholdRange;
+out vec4 outputColor;
+void main() {
+	vec3 sceneColor = texture(sceneTexture, fragmentTextureCoordinate).rgb;
+	float brightness = max(max(sceneColor.r, sceneColor.g), sceneColor.b);
+	float extractFactor = smoothstep(thresholdRange.x, thresholdRange.y, brightness);
+	outputColor = vec4(sceneColor * extractFactor, 1.0);
+}
+`;
+var BLUR_FRAGMENTSHADER_SOURCE = `#version 300 es
+precision highp float;
+in vec2 fragmentTextureCoordinate;
+uniform sampler2D sourceTexture;
+uniform vec2 blurDirection; // (1/width, 0) \uB610\uB294 (0, 1/height)
+out vec4 outputColor;
+void main() {
+	float weights[5] = float[5](0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
+	vec3 color = texture(sourceTexture, fragmentTextureCoordinate).rgb * weights[0];
+	for (int tapIndex = 1; tapIndex < 5; ++tapIndex) {
+		vec2 tapOffset = blurDirection * float(tapIndex) * 1.6;
+		color += texture(sourceTexture, fragmentTextureCoordinate + tapOffset).rgb * weights[tapIndex];
+		color += texture(sourceTexture, fragmentTextureCoordinate - tapOffset).rgb * weights[tapIndex];
+	}
+	outputColor = vec4(color, 1.0);
+}
+`;
+var BloomEffect = class extends Object2 {
+  static {
+    __name(this, "BloomEffect");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WebGL2RenderingContext } */
+  #webGL2RenderingContext;
+  /** @private @type { FullscreenPass } */
+  #brightPass;
+  /** @private @type { FullscreenPass } */
+  #blurPass;
+  /** @private @type { RenderTarget } */
+  #pingRenderTarget;
+  /** @private @type { RenderTarget } */
+  #pongRenderTarget;
+  /** @private @type { number } */
+  #thresholdStart;
+  /** @private @type { number } */
+  #thresholdEnd;
+  /** @private @type { number } */
+  #iterationCount;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { WebGL2RenderingContext } webGL2RenderingContext
+   */
+  constructor(webGL2RenderingContext) {
+    super();
+    this.#webGL2RenderingContext = webGL2RenderingContext;
+    this.#brightPass = new FullscreenPass(webGL2RenderingContext, BRIGHTPASS_FRAGMENTSHADER_SOURCE);
+    this.#blurPass = new FullscreenPass(webGL2RenderingContext, BLUR_FRAGMENTSHADER_SOURCE);
+    this.#pingRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, false);
+    this.#pongRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, false);
+    this.#thresholdStart = 0.5;
+    this.#thresholdEnd = 0.95;
+    this.#iterationCount = 2;
+  }
+  //==============================================================================
+  // 크기 변경. (씬 해상도 기준 — 내부는 하프 해상도)
+  //==============================================================================
+  /**
+   * @param { number } sceneWidth
+   * @param { number } sceneHeight
+   */
+  resize(sceneWidth, sceneHeight) {
+    const halfWidth = System38.Math.max(1, sceneWidth >> 1);
+    const halfHeight = System38.Math.max(1, sceneHeight >> 1);
+    this.#pingRenderTarget.resize(halfWidth, halfHeight);
+    this.#pongRenderTarget.resize(halfWidth, halfHeight);
+  }
+  //==============================================================================
+  // 블룸 렌더링. (호출 후 결과는 getResultTexture())
+  // - 부수 효과: 깊이/블렌드 비활성, TEXTURE0 활성, 프레임버퍼 바인드가 변경된다.
+  //==============================================================================
+  /**
+   * @param { WebGLTexture } sceneColorTexture
+   */
+  render(sceneColorTexture) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+    webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+    const pingRenderTarget = this.getPingRenderTarget();
+    const pongRenderTarget = this.getPongRenderTarget();
+    pingRenderTarget.bind();
+    const brightPass = this.getBrightPass();
+    brightPass.use();
+    const brightSceneTextureLocation = brightPass.getUniformLocation("sceneTexture");
+    webGL2RenderingContext.uniform1i(brightSceneTextureLocation, 0);
+    const brightThresholdRangeLocation = brightPass.getUniformLocation("thresholdRange");
+    webGL2RenderingContext.uniform2f(brightThresholdRangeLocation, this.#thresholdStart, this.#thresholdEnd);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sceneColorTexture);
+    brightPass.draw();
+    const blurPass = this.getBlurPass();
+    blurPass.use();
+    const blurSourceTextureLocation = blurPass.getUniformLocation("sourceTexture");
+    webGL2RenderingContext.uniform1i(blurSourceTextureLocation, 0);
+    const blurDirectionLocation = blurPass.getUniformLocation("blurDirection");
+    const iterationCount = this.getIterationCount();
+    for (let blurIndex = 0; blurIndex < iterationCount; ++blurIndex) {
+      pongRenderTarget.bind();
+      const pingWidth = pingRenderTarget.getWidth();
+      webGL2RenderingContext.uniform2f(blurDirectionLocation, 1 / pingWidth, 0);
+      const pingColorTexture = pingRenderTarget.getColorTexture();
+      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, pingColorTexture);
+      blurPass.draw();
+      pingRenderTarget.bind();
+      const pongHeight = pongRenderTarget.getHeight();
+      webGL2RenderingContext.uniform2f(blurDirectionLocation, 0, 1 / pongHeight);
+      const pongColorTexture = pongRenderTarget.getColorTexture();
+      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, pongColorTexture);
+      blurPass.draw();
+    }
+  }
+  //==============================================================================
+  // 결과 텍스처 반환. (render() 이후)
+  //==============================================================================
+  /**
+   * @returns { WebGLTexture | null }
+   */
+  getResultTexture() {
+    const pingRenderTarget = this.getPingRenderTarget();
+    const resultTexture = pingRenderTarget.getColorTexture();
+    return resultTexture;
+  }
+  //==============================================================================
+  // 추출 임계값 설정. (씬 밝기 특성에 맞게 조정)
+  //==============================================================================
+  /**
+   * @param { number } thresholdStart
+   * @param { number } thresholdEnd
+   */
+  setThreshold(thresholdStart, thresholdEnd) {
+    this.#thresholdStart = thresholdStart;
+    this.#thresholdEnd = thresholdEnd;
+  }
+  //==============================================================================
+  // 블러 반복 횟수 설정.
+  //==============================================================================
+  /**
+   * @param { number } iterationCount
+   */
+  setIterationCount(iterationCount) {
+    this.#iterationCount = iterationCount;
+  }
+  //==============================================================================
+  // 블러 반복 횟수 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getIterationCount() {
+    return this.#iterationCount;
+  }
+  //==============================================================================
+  // 파괴. (GL 리소스 해제)
+  //==============================================================================
+  /**
+   * @override
+   */
+  destroy() {
+    this.#pingRenderTarget.destroy();
+    this.#pongRenderTarget.destroy();
+  }
+  //==============================================================================
+  // 렌더링 컨텍스트 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGL2RenderingContext }
+   */
+  getWebGL2RenderingContext() {
+    return this.#webGL2RenderingContext;
+  }
+  //==============================================================================
+  // 밝은 영역 추출 패스 반환.
+  //==============================================================================
+  /**
+   * @returns { FullscreenPass }
+   */
+  getBrightPass() {
+    return this.#brightPass;
+  }
+  //==============================================================================
+  // 블러 패스 반환.
+  //==============================================================================
+  /**
+   * @returns { FullscreenPass }
+   */
+  getBlurPass() {
+    return this.#blurPass;
+  }
+  //==============================================================================
+  // 핑 렌더 타겟 반환. (최종 결과 보관)
+  //==============================================================================
+  /**
+   * @returns { RenderTarget }
+   */
+  getPingRenderTarget() {
+    return this.#pingRenderTarget;
+  }
+  //==============================================================================
+  // 퐁 렌더 타겟 반환.
+  //==============================================================================
+  /**
+   * @returns { RenderTarget }
+   */
+  getPongRenderTarget() {
+    return this.#pongRenderTarget;
+  }
+};
+
+// src/experimental/graphics/fbxloader.js
+var System39 = globalThis;
+var FBX_TIME_UNIT = 46186158e3;
+var FbxLoader = class _FbxLoader extends Object2 {
+  static {
+    __name(this, "FbxLoader");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { DataView } */
+  #dataView;
+  /** @private @type { Uint8Array } */
+  #fileBytes;
+  /** @private @type { TextDecoder } */
+  #textDecoder;
+  /** @private @type { number } */
+  #readCursor;
+  /** @private @type { boolean } */
+  #useWideOffsets;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   */
+  constructor() {
+    super();
+    this.#dataView = null;
+    this.#fileBytes = null;
+    this.#textDecoder = new System39.TextDecoder();
+    this.#readCursor = 0;
+    this.#useWideOffsets = false;
+  }
+  //==============================================================================
+  // URL 로부터 파싱. (정적)
+  //==============================================================================
+  /**
+   * @param { string } url
+   * @returns { Promise<object> }
+   */
+  static async loadFromUrl(url) {
+    const response = await System39.fetch(url);
+    if (!response.ok) {
+      throw new Error(`FbxLoader load failed: ${url}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    const fbxLoader = new _FbxLoader();
+    const sceneData = await fbxLoader.parse(arrayBuffer);
+    return sceneData;
+  }
+  //==============================================================================
+  // 파싱. (바이너리 → 중간 표현)
+  //==============================================================================
+  /**
+   * @param { ArrayBuffer } arrayBuffer
+   * @returns { Promise<object> }
+   */
+  async parse(arrayBuffer) {
+    this.#fileBytes = new System39.Uint8Array(arrayBuffer);
+    this.#dataView = new System39.DataView(arrayBuffer);
+    const magicText = this.#textDecoder.decode(this.#fileBytes.subarray(0, 20));
+    if (!magicText.startsWith("Kaydara FBX Binary")) {
+      throw new Error("FbxLoader: not a binary FBX file.");
+    }
+    const fbxVersion = this.#dataView.getUint32(23, true);
+    this.#useWideOffsets = fbxVersion >= 7500;
+    this.#readCursor = 27;
+    const topNodeList = [];
+    while (this.#readCursor < arrayBuffer.byteLength - 160) {
+      const topNode = await this.readNodeRecord();
+      if (topNode === null) {
+        break;
+      }
+      topNodeList.push(topNode);
+    }
+    const sceneData = await this.interpret(topNodeList);
+    return sceneData;
+  }
+  //==============================================================================
+  // 오프셋 값 읽기. (버전에 따라 32/64비트)
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  readOffsetValue() {
+    const dataView = this.getDataView();
+    if (this.#useWideOffsets) {
+      const value2 = System39.Number(dataView.getBigUint64(this.#readCursor, true));
+      this.#readCursor += 8;
+      return value2;
+    }
+    const value = dataView.getUint32(this.#readCursor, true);
+    this.#readCursor += 4;
+    return value;
+  }
+  //==============================================================================
+  // 노드 레코드 읽기. (재귀 — 프로퍼티 + 자식)
+  //==============================================================================
+  /**
+   * @returns { Promise<object | null> }
+   */
+  async readNodeRecord() {
+    const dataView = this.getDataView();
+    const fileBytes = this.getFileBytes();
+    const textDecoder = this.getTextDecoder();
+    const endOffset = this.readOffsetValue();
+    const propertyCount = this.readOffsetValue();
+    this.readOffsetValue();
+    const nameLength = dataView.getUint8(this.#readCursor);
+    this.#readCursor += 1;
+    if (endOffset === 0) {
+      return null;
+    }
+    const nodeName = textDecoder.decode(fileBytes.subarray(this.#readCursor, this.#readCursor + nameLength));
+    this.#readCursor += nameLength;
+    const propertyList = [];
+    for (let propertyIndex = 0; propertyIndex < propertyCount; ++propertyIndex) {
+      const property = await this.readProperty();
+      propertyList.push(property);
+    }
+    const childNodeList = [];
+    while (this.#readCursor < endOffset) {
+      const childNode = await this.readNodeRecord();
+      if (childNode === null) {
+        break;
+      }
+      childNodeList.push(childNode);
+    }
+    this.#readCursor = endOffset;
+    return { name: nodeName, properties: propertyList, children: childNodeList };
+  }
+  //==============================================================================
+  // 배열 프로퍼티 읽기. (raw / deflate 인코딩)
+  //==============================================================================
+  /**
+   * @param { number } elementByteSize
+   * @param { function(DataView, number): number } readElement
+   * @returns { Promise<number[]> }
+   */
+  async readArrayProperty(elementByteSize, readElement) {
+    const dataView = this.getDataView();
+    const fileBytes = this.getFileBytes();
+    const arrayLength = dataView.getUint32(this.#readCursor, true);
+    const encoding = dataView.getUint32(this.#readCursor + 4, true);
+    const compressedLength = dataView.getUint32(this.#readCursor + 8, true);
+    this.#readCursor += 12;
+    let sourceBytes = null;
+    if (encoding === 1) {
+      const compressedBytes = fileBytes.subarray(this.#readCursor, this.#readCursor + compressedLength);
+      sourceBytes = await this.inflate(compressedBytes);
+      this.#readCursor += compressedLength;
+    } else {
+      const rawByteLength = arrayLength * elementByteSize;
+      sourceBytes = fileBytes.subarray(this.#readCursor, this.#readCursor + rawByteLength);
+      this.#readCursor += rawByteLength;
+    }
+    const elementView = new System39.DataView(sourceBytes.buffer, sourceBytes.byteOffset, sourceBytes.byteLength);
+    const resultArray = new System39.Array(arrayLength);
+    for (let elementIndex = 0; elementIndex < arrayLength; ++elementIndex) {
+      resultArray[elementIndex] = readElement(elementView, elementIndex * elementByteSize);
+    }
+    return resultArray;
+  }
+  //==============================================================================
+  // deflate 압축 해제. (브라우저/Node 표준 DecompressionStream)
+  //==============================================================================
+  /**
+   * @param { Uint8Array } compressedBytes
+   * @returns { Promise<Uint8Array> }
+   */
+  async inflate(compressedBytes) {
+    const decompressionStream = new System39.DecompressionStream("deflate");
+    const sourceResponse = new System39.Response(compressedBytes);
+    const decompressedStream = sourceResponse.body.pipeThrough(decompressionStream);
+    const decompressedResponse = new System39.Response(decompressedStream);
+    const decompressedArrayBuffer = await decompressedResponse.arrayBuffer();
+    const decompressedBytes = new System39.Uint8Array(decompressedArrayBuffer);
+    return decompressedBytes;
+  }
+  //==============================================================================
+  // 단일 프로퍼티 읽기.
+  //==============================================================================
+  /**
+   * @returns { Promise<object> }
+   */
+  async readProperty() {
+    const dataView = this.getDataView();
+    const fileBytes = this.getFileBytes();
+    const textDecoder = this.getTextDecoder();
+    const typeCode = System39.String.fromCharCode(dataView.getUint8(this.#readCursor));
+    this.#readCursor += 1;
+    switch (typeCode) {
+      case "Y": {
+        const value = dataView.getInt16(this.#readCursor, true);
+        this.#readCursor += 2;
+        return { type: typeCode, value };
+      }
+      case "C": {
+        const value = dataView.getUint8(this.#readCursor);
+        this.#readCursor += 1;
+        return { type: typeCode, value: value !== 0 };
+      }
+      case "I": {
+        const value = dataView.getInt32(this.#readCursor, true);
+        this.#readCursor += 4;
+        return { type: typeCode, value };
+      }
+      case "F": {
+        const value = dataView.getFloat32(this.#readCursor, true);
+        this.#readCursor += 4;
+        return { type: typeCode, value };
+      }
+      case "D": {
+        const value = dataView.getFloat64(this.#readCursor, true);
+        this.#readCursor += 8;
+        return { type: typeCode, value };
+      }
+      case "L": {
+        const value = System39.Number(dataView.getBigInt64(this.#readCursor, true));
+        this.#readCursor += 8;
+        return { type: typeCode, value };
+      }
+      case "f": {
+        const value = await this.readArrayProperty(4, (view, offset) => view.getFloat32(offset, true));
+        return { type: typeCode, value };
+      }
+      case "d": {
+        const value = await this.readArrayProperty(8, (view, offset) => view.getFloat64(offset, true));
+        return { type: typeCode, value };
+      }
+      case "l": {
+        const value = await this.readArrayProperty(8, (view, offset) => System39.Number(view.getBigInt64(offset, true)));
+        return { type: typeCode, value };
+      }
+      case "i": {
+        const value = await this.readArrayProperty(4, (view, offset) => view.getInt32(offset, true));
+        return { type: typeCode, value };
+      }
+      case "b": {
+        const value = await this.readArrayProperty(1, (view, offset) => view.getUint8(offset));
+        return { type: typeCode, value };
+      }
+      case "S": {
+        const stringLength = dataView.getUint32(this.#readCursor, true);
+        this.#readCursor += 4;
+        const value = textDecoder.decode(fileBytes.subarray(this.#readCursor, this.#readCursor + stringLength));
+        this.#readCursor += stringLength;
+        return { type: typeCode, value };
+      }
+      case "R": {
+        const rawLength = dataView.getUint32(this.#readCursor, true);
+        this.#readCursor += 4;
+        const value = fileBytes.slice(this.#readCursor, this.#readCursor + rawLength);
+        this.#readCursor += rawLength;
+        return { type: typeCode, value };
+      }
+      default: {
+        throw new Error("FbxLoader: unknown property type: " + typeCode);
+      }
+    }
+  }
+  //==============================================================================
+  // 오브젝트/커넥션 그래프 해석. (중간 표현 구성)
+  //==============================================================================
+  /**
+   * @param { object[] } topNodeList
+   * @returns { Promise<object> }
+   */
+  async interpret(topNodeList) {
+    const objectsNode = topNodeList.find((node) => node.name === "Objects");
+    const connectionsNode = topNodeList.find((node) => node.name === "Connections");
+    const objectConnectionList = [];
+    const propertyConnectionList = [];
+    for (const connection of connectionsNode.children) {
+      const connectionType = connection.properties[0].value;
+      const sourceId = connection.properties[1].value;
+      const destinationId = connection.properties[2].value;
+      if (connectionType === "OO") {
+        objectConnectionList.push({ sourceId, destinationId });
+      } else if (connectionType === "OP") {
+        const propertyName = connection.properties[3].value;
+        propertyConnectionList.push({ sourceId, destinationId, propertyName });
+      }
+    }
+    const objectById = new System39.Map();
+    for (const objectNode of objectsNode.children) {
+      const objectId = objectNode.properties[0].value;
+      objectById.set(objectId, objectNode);
+    }
+    const geometryById = this.interpretGeometries(objectsNode);
+    const skinResult = this.interpretSkins(objectsNode, objectConnectionList);
+    const videoById = this.interpretVideos(objectsNode);
+    const textureById = this.interpretTextures(objectsNode, objectConnectionList);
+    const materialById = this.interpretMaterials(objectsNode, propertyConnectionList, textureById);
+    const nodeResult = this.interpretModels(objectsNode, objectConnectionList, geometryById, skinResult.skinDeformerById, materialById);
+    const animationList = this.interpretAnimations(objectsNode, objectConnectionList, propertyConnectionList, nodeResult.nodeIdToIndex);
+    const sceneData = {
+      nodeList: nodeResult.nodeList,
+      nodeIdToIndex: nodeResult.nodeIdToIndex,
+      rootNodeIndices: nodeResult.rootNodeIndices,
+      geometryById,
+      skinDeformerById: skinResult.skinDeformerById,
+      clusterById: skinResult.clusterById,
+      materialById,
+      textureById,
+      videoById,
+      animationList
+    };
+    return sceneData;
+  }
+  //==============================================================================
+  // 지오메트리 해석. (삼각화 + 노멀/UV 레이어 펼침 + 원본 정점 매핑)
+  //==============================================================================
+  /**
+   * @param { object } objectsNode
+   * @returns { Map<number, object> }
+   */
+  interpretGeometries(objectsNode) {
+    const geometryById = new System39.Map();
+    for (const objectNode of objectsNode.children) {
+      if (objectNode.name !== "Geometry") {
+        continue;
+      }
+      const geometryId = objectNode.properties[0].value;
+      const geometry = this.interpretSingleGeometry(objectNode);
+      geometryById.set(geometryId, geometry);
+    }
+    return geometryById;
+  }
+  //==============================================================================
+  // 단일 지오메트리 해석.
+  //==============================================================================
+  /**
+   * @param { object } geometryNode
+   * @returns { object }
+   */
+  interpretSingleGeometry(geometryNode) {
+    const verticesNode = geometryNode.children.find((child) => child.name === "Vertices");
+    const polygonIndexNode = geometryNode.children.find((child) => child.name === "PolygonVertexIndex");
+    const positions = verticesNode.properties[0].value;
+    const polygonVertexIndices = polygonIndexNode.properties[0].value;
+    const cornerVertexIndices = [];
+    const cornerPolygonVertexPositions = [];
+    let polygonStart = 0;
+    for (let polygonVertexPosition = 0; polygonVertexPosition < polygonVertexIndices.length; ++polygonVertexPosition) {
+      let vertexIndex = polygonVertexIndices[polygonVertexPosition];
+      let isPolygonEnd = false;
+      if (vertexIndex < 0) {
+        vertexIndex = -vertexIndex - 1;
+        isPolygonEnd = true;
+      }
+      if (isPolygonEnd) {
+        const polygonEnd = polygonVertexPosition;
+        for (let triangleCorner = polygonStart + 1; triangleCorner < polygonEnd; ++triangleCorner) {
+          const firstVertexIndex = polygonVertexIndices[polygonStart] < 0 ? -polygonVertexIndices[polygonStart] - 1 : polygonVertexIndices[polygonStart];
+          const secondVertexIndex = polygonVertexIndices[triangleCorner];
+          const thirdRawIndex = polygonVertexIndices[triangleCorner + 1];
+          const thirdVertexIndex = thirdRawIndex < 0 ? -thirdRawIndex - 1 : thirdRawIndex;
+          cornerVertexIndices.push(firstVertexIndex);
+          cornerPolygonVertexPositions.push(polygonStart);
+          cornerVertexIndices.push(secondVertexIndex);
+          cornerPolygonVertexPositions.push(triangleCorner);
+          cornerVertexIndices.push(thirdVertexIndex);
+          cornerPolygonVertexPositions.push(triangleCorner + 1);
+        }
+        polygonStart = polygonVertexPosition + 1;
+      }
+    }
+    const normalReader = this.buildLayerReader(geometryNode, "LayerElementNormal", "Normals", 3);
+    const uvReader = this.buildLayerReader(geometryNode, "LayerElementUV", "UV", 2);
+    const materialLayer = this.buildMaterialLayer(geometryNode);
+    const triangleCount = cornerVertexIndices.length / 3;
+    const outputPositions = new System39.Float32Array(cornerVertexIndices.length * 3);
+    const outputNormals = new System39.Float32Array(cornerVertexIndices.length * 3);
+    const outputTextureCoordinates = new System39.Float32Array(cornerVertexIndices.length * 2);
+    const outputOriginalVertexIndices = new System39.Int32Array(cornerVertexIndices.length);
+    const materialIndexPerTriangle = new System39.Int32Array(triangleCount);
+    for (let cornerIndex = 0; cornerIndex < cornerVertexIndices.length; ++cornerIndex) {
+      const originalVertexIndex = cornerVertexIndices[cornerIndex];
+      const polygonVertexPosition = cornerPolygonVertexPositions[cornerIndex];
+      outputOriginalVertexIndices[cornerIndex] = originalVertexIndex;
+      outputPositions[cornerIndex * 3] = positions[originalVertexIndex * 3];
+      outputPositions[cornerIndex * 3 + 1] = positions[originalVertexIndex * 3 + 1];
+      outputPositions[cornerIndex * 3 + 2] = positions[originalVertexIndex * 3 + 2];
+      const normal = normalReader(originalVertexIndex, polygonVertexPosition);
+      outputNormals[cornerIndex * 3] = normal[0];
+      outputNormals[cornerIndex * 3 + 1] = normal[1];
+      outputNormals[cornerIndex * 3 + 2] = normal[2];
+      const textureCoordinate = uvReader(originalVertexIndex, polygonVertexPosition);
+      outputTextureCoordinates[cornerIndex * 2] = textureCoordinate[0];
+      outputTextureCoordinates[cornerIndex * 2 + 1] = textureCoordinate[1];
+    }
+    for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
+      const firstCornerPolygonVertexPosition = cornerPolygonVertexPositions[triangleIndex * 3];
+      materialIndexPerTriangle[triangleIndex] = materialLayer(firstCornerPolygonVertexPosition);
+    }
+    const geometry = {
+      positions: outputPositions,
+      normals: outputNormals,
+      textureCoordinates: outputTextureCoordinates,
+      originalVertexIndices: outputOriginalVertexIndices,
+      materialIndexPerTriangle,
+      cornerCount: cornerVertexIndices.length,
+      originalVertexCount: positions.length / 3
+    };
+    return geometry;
+  }
+  //==============================================================================
+  // 레이어 리더 구성. (노멀/UV — 매핑/참조 방식별 조회 함수 반환)
+  //==============================================================================
+  /**
+   * @param { object } geometryNode
+   * @param { string } layerElementName
+   * @param { string } dataArrayName
+   * @param { number } componentCount
+   * @returns { function(number, number): number[] }
+   */
+  buildLayerReader(geometryNode, layerElementName, dataArrayName, componentCount) {
+    const layerNode = geometryNode.children.find((child) => child.name === layerElementName);
+    if (!layerNode) {
+      return () => {
+        const zeroVector = new System39.Array(componentCount).fill(0);
+        return zeroVector;
+      };
+    }
+    const dataNode = layerNode.children.find((child) => child.name === dataArrayName);
+    const mappingNode = layerNode.children.find((child) => child.name === "MappingInformationType");
+    const referenceNode = layerNode.children.find((child) => child.name === "ReferenceInformationType");
+    const indexNode = layerNode.children.find((child) => child.name === (dataArrayName === "UV" ? "UVIndex" : dataArrayName + "Index"));
+    const dataArray = dataNode.properties[0].value;
+    const mappingType = mappingNode.properties[0].value;
+    const referenceType = referenceNode.properties[0].value;
+    const indexArray = indexNode ? indexNode.properties[0].value : null;
+    return (originalVertexIndex, polygonVertexPosition) => {
+      let mappedIndex = 0;
+      if (mappingType === "ByVertice" || mappingType === "ByVertex") {
+        mappedIndex = originalVertexIndex;
+      } else if (mappingType === "ByPolygonVertex") {
+        mappedIndex = polygonVertexPosition;
+      } else if (mappingType === "AllSame") {
+        mappedIndex = 0;
+      }
+      let dataIndex = mappedIndex;
+      if (referenceType === "IndexToDirect" && indexArray) {
+        dataIndex = indexArray[mappedIndex];
+      }
+      const componentValues = new System39.Array(componentCount);
+      for (let componentIndex = 0; componentIndex < componentCount; ++componentIndex) {
+        componentValues[componentIndex] = dataArray[dataIndex * componentCount + componentIndex];
+      }
+      return componentValues;
+    };
+  }
+  //==============================================================================
+  // 머티리얼 레이어 구성. (폴리곤 정점 순번 → 머티리얼 인덱스)
+  //==============================================================================
+  /**
+   * @param { object } geometryNode
+   * @returns { function(number): number }
+   */
+  buildMaterialLayer(geometryNode) {
+    const layerNode = geometryNode.children.find((child) => child.name === "LayerElementMaterial");
+    if (!layerNode) {
+      return () => {
+        return 0;
+      };
+    }
+    const mappingNode = layerNode.children.find((child) => child.name === "MappingInformationType");
+    const materialsNode = layerNode.children.find((child) => child.name === "Materials");
+    const mappingType = mappingNode.properties[0].value;
+    const materialArray = materialsNode.properties[0].value;
+    return (polygonVertexPosition) => {
+      if (mappingType === "AllSame") {
+        return materialArray[0];
+      }
+      return materialArray[polygonVertexPosition];
+    };
+  }
+  //==============================================================================
+  // 스킨/클러스터 해석. (본별 정점 가중치 + 바인드 역행렬용 링크 변환)
+  //==============================================================================
+  /**
+   * @param { object } objectsNode
+   * @param { object[] } objectConnectionList
+   * @returns { object }
+   */
+  interpretSkins(objectsNode, objectConnectionList) {
+    const skinDeformerById = new System39.Map();
+    const clusterById = new System39.Map();
+    for (const objectNode of objectsNode.children) {
+      if (objectNode.name !== "Deformer") {
+        continue;
+      }
+      const deformerId = objectNode.properties[0].value;
+      const deformerSubType = objectNode.properties[2].value;
+      if (deformerSubType === "Skin") {
+        skinDeformerById.set(deformerId, { clusterIds: [] });
+      } else if (deformerSubType === "Cluster") {
+        const indexesNode = objectNode.children.find((child) => child.name === "Indexes");
+        const weightsNode = objectNode.children.find((child) => child.name === "Weights");
+        const transformNode = objectNode.children.find((child) => child.name === "Transform");
+        const transformLinkNode = objectNode.children.find((child) => child.name === "TransformLink");
+        const cluster = {
+          vertexIndices: indexesNode ? indexesNode.properties[0].value : [],
+          weights: weightsNode ? weightsNode.properties[0].value : [],
+          transform: transformNode ? transformNode.properties[0].value : null,
+          transformLink: transformLinkNode ? transformLinkNode.properties[0].value : null,
+          boneNodeId: null
+        };
+        clusterById.set(deformerId, cluster);
+      }
+    }
+    for (const connection of objectConnectionList) {
+      if (skinDeformerById.has(connection.destinationId) && clusterById.has(connection.sourceId)) {
+        const skinDeformer = skinDeformerById.get(connection.destinationId);
+        skinDeformer.clusterIds.push(connection.sourceId);
+      } else if (clusterById.has(connection.destinationId)) {
+        const cluster = clusterById.get(connection.destinationId);
+        cluster.boneNodeId = connection.sourceId;
+      }
+    }
+    const skinResult = { skinDeformerById, clusterById };
+    return skinResult;
+  }
+  //==============================================================================
+  // 비디오 해석. (임베디드 이미지 바이트)
+  //==============================================================================
+  /**
+   * @param { object } objectsNode
+   * @returns { Map<number, object> }
+   */
+  interpretVideos(objectsNode) {
+    const videoById = new System39.Map();
+    for (const objectNode of objectsNode.children) {
+      if (objectNode.name !== "Video") {
+        continue;
+      }
+      const videoId = objectNode.properties[0].value;
+      const contentNode = objectNode.children.find((child) => child.name === "Content");
+      const filenameNode = objectNode.children.find((child) => child.name === "RelativeFilename" || child.name === "Filename");
+      const video = {
+        contentBytes: contentNode && contentNode.properties.length > 0 ? contentNode.properties[0].value : null,
+        filename: filenameNode ? filenameNode.properties[0].value : ""
+      };
+      videoById.set(videoId, video);
+    }
+    const contentByFileName = new System39.Map();
+    for (const video of videoById.values()) {
+      if (!video.contentBytes || video.contentBytes.length === 0) {
+        continue;
+      }
+      const fileName = this.extractFileName(video.filename);
+      if (!contentByFileName.has(fileName)) {
+        contentByFileName.set(fileName, video.contentBytes);
+      }
+    }
+    for (const video of videoById.values()) {
+      if (video.contentBytes && video.contentBytes.length > 0) {
+        continue;
+      }
+      const fileName = this.extractFileName(video.filename);
+      const sharedContentBytes = contentByFileName.get(fileName);
+      if (sharedContentBytes) {
+        video.contentBytes = sharedContentBytes;
+      }
+    }
+    return videoById;
+  }
+  //==============================================================================
+  // 파일 경로에서 파일명 추출. (윈도우/유닉스 구분자 모두 대응)
+  //==============================================================================
+  /**
+   * @param { string } filePath
+   * @returns { string }
+   */
+  extractFileName(filePath) {
+    const normalizedPath = filePath.replace(/\\/g, "/");
+    const lastSeparatorIndex = normalizedPath.lastIndexOf("/");
+    const fileName = lastSeparatorIndex >= 0 ? normalizedPath.substring(lastSeparatorIndex + 1) : normalizedPath;
+    return fileName;
+  }
+  //==============================================================================
+  // 텍스처 해석. (비디오 연결)
+  //==============================================================================
+  /**
+   * @param { object } objectsNode
+   * @param { object[] } objectConnectionList
+   * @returns { Map<number, object> }
+   */
+  interpretTextures(objectsNode, objectConnectionList) {
+    const textureById = new System39.Map();
+    for (const objectNode of objectsNode.children) {
+      if (objectNode.name !== "Texture") {
+        continue;
+      }
+      const textureId = objectNode.properties[0].value;
+      const filenameNode = objectNode.children.find((child) => child.name === "RelativeFilename" || child.name === "FileName");
+      const texture = {
+        videoId: null,
+        filename: filenameNode ? filenameNode.properties[0].value : ""
+      };
+      textureById.set(textureId, texture);
+    }
+    for (const connection of objectConnectionList) {
+      if (textureById.has(connection.destinationId)) {
+        const texture = textureById.get(connection.destinationId);
+        texture.videoId = connection.sourceId;
+      }
+    }
+    return textureById;
+  }
+  //==============================================================================
+  // 머티리얼 해석. (phong 색상/광택 + 슬롯별 텍스처 연결)
+  //==============================================================================
+  /**
+   * @param { object } objectsNode
+   * @param { object[] } propertyConnectionList
+   * @param { Map<number, object> } textureById
+   * @returns { Map<number, object> }
+   */
+  interpretMaterials(objectsNode, propertyConnectionList, textureById) {
+    const materialById = new System39.Map();
+    for (const objectNode of objectsNode.children) {
+      if (objectNode.name !== "Material") {
+        continue;
+      }
+      const materialId = objectNode.properties[0].value;
+      const properties70Node = objectNode.children.find((child) => child.name === "Properties70");
+      const material = {
+        diffuseColor: [1, 1, 1],
+        specularColor: [0.5, 0.5, 0.5],
+        shininess: 20,
+        diffuseTextureId: null,
+        normalTextureId: null,
+        specularTextureId: null,
+        glossTextureId: null,
+        opacityTextureId: null
+      };
+      if (properties70Node) {
+        for (const propertyRecord of properties70Node.children) {
+          const propertyKey = propertyRecord.properties[0].value;
+          if (propertyKey === "DiffuseColor" || propertyKey === "Diffuse") {
+            material.diffuseColor = [propertyRecord.properties[4].value, propertyRecord.properties[5].value, propertyRecord.properties[6].value];
+          } else if (propertyKey === "SpecularColor" || propertyKey === "Specular") {
+            material.specularColor = [propertyRecord.properties[4].value, propertyRecord.properties[5].value, propertyRecord.properties[6].value];
+          } else if (propertyKey === "Shininess" || propertyKey === "ShininessExponent") {
+            material.shininess = propertyRecord.properties[4].value;
+          }
+        }
+      }
+      materialById.set(materialId, material);
+    }
+    for (const connection of propertyConnectionList) {
+      if (!materialById.has(connection.destinationId) || !textureById.has(connection.sourceId)) {
+        continue;
+      }
+      const material = materialById.get(connection.destinationId);
+      const propertyName = connection.propertyName;
+      if (propertyName === "DiffuseColor") {
+        material.diffuseTextureId = connection.sourceId;
+      } else if (propertyName === "NormalMap" || propertyName === "Bump") {
+        material.normalTextureId = connection.sourceId;
+      } else if (propertyName === "SpecularColor" || propertyName === "SpecularFactor") {
+        material.specularTextureId = connection.sourceId;
+      } else if (propertyName === "Shininess" || propertyName === "ShininessExponent") {
+        material.glossTextureId = connection.sourceId;
+      } else if (propertyName === "TransparentColor" || propertyName === "TransparencyFactor") {
+        material.opacityTextureId = connection.sourceId;
+      }
+    }
+    return materialById;
+  }
+  //==============================================================================
+  // 모델(노드) 해석. (계층 + 로컬 변환 + 지오메트리/스킨/머티리얼 소속)
+  //==============================================================================
+  /**
+   * @param { object } objectsNode
+   * @param { object[] } objectConnectionList
+   * @param { Map<number, object> } geometryById
+   * @param { Map<number, object> } skinDeformerById
+   * @param { Map<number, object> } materialById
+   * @returns { object }
+   */
+  interpretModels(objectsNode, objectConnectionList, geometryById, skinDeformerById, materialById) {
+    const nodeList = [];
+    const nodeIdToIndex = new System39.Map();
+    for (const objectNode of objectsNode.children) {
+      if (objectNode.name !== "Model") {
+        continue;
+      }
+      const modelId = objectNode.properties[0].value;
+      const modelName = objectNode.properties[1].value;
+      const modelSubType = objectNode.properties[2].value;
+      const node = {
+        id: modelId,
+        name: modelName,
+        isBone: modelSubType === "LimbNode",
+        translation: [0, 0, 0],
+        rotationEulerDegrees: [0, 0, 0],
+        preRotationDegrees: [0, 0, 0],
+        scale: [1, 1, 1],
+        geometryId: null,
+        skinId: null,
+        materialIds: [],
+        childIndices: [],
+        parentId: null
+      };
+      const properties70Node = objectNode.children.find((child) => child.name === "Properties70");
+      if (properties70Node) {
+        for (const propertyRecord of properties70Node.children) {
+          const propertyKey = propertyRecord.properties[0].value;
+          if (propertyKey === "Lcl Translation") {
+            node.translation = [propertyRecord.properties[4].value, propertyRecord.properties[5].value, propertyRecord.properties[6].value];
+          } else if (propertyKey === "Lcl Rotation") {
+            node.rotationEulerDegrees = [propertyRecord.properties[4].value, propertyRecord.properties[5].value, propertyRecord.properties[6].value];
+          } else if (propertyKey === "Lcl Scaling") {
+            node.scale = [propertyRecord.properties[4].value, propertyRecord.properties[5].value, propertyRecord.properties[6].value];
+          } else if (propertyKey === "PreRotation") {
+            node.preRotationDegrees = [propertyRecord.properties[4].value, propertyRecord.properties[5].value, propertyRecord.properties[6].value];
+          }
+        }
+      }
+      nodeIdToIndex.set(modelId, nodeList.length);
+      nodeList.push(node);
+    }
+    const rootNodeIndices = [];
+    for (const connection of objectConnectionList) {
+      const sourceIsNode = nodeIdToIndex.has(connection.sourceId);
+      if (sourceIsNode && connection.destinationId === 0) {
+        rootNodeIndices.push(nodeIdToIndex.get(connection.sourceId));
+      } else if (sourceIsNode && nodeIdToIndex.has(connection.destinationId)) {
+        const parentIndex = nodeIdToIndex.get(connection.destinationId);
+        const childIndex = nodeIdToIndex.get(connection.sourceId);
+        nodeList[parentIndex].childIndices.push(childIndex);
+        nodeList[childIndex].parentId = connection.destinationId;
+      } else if (geometryById.has(connection.sourceId) && nodeIdToIndex.has(connection.destinationId)) {
+        const ownerNode = nodeList[nodeIdToIndex.get(connection.destinationId)];
+        ownerNode.geometryId = connection.sourceId;
+      } else if (skinDeformerById.has(connection.sourceId) && geometryById.has(connection.destinationId)) {
+        const skinDeformer = skinDeformerById.get(connection.sourceId);
+        skinDeformer.geometryId = connection.destinationId;
+      } else if (materialById.has(connection.sourceId) && nodeIdToIndex.has(connection.destinationId)) {
+        const ownerNode = nodeList[nodeIdToIndex.get(connection.destinationId)];
+        ownerNode.materialIds.push(connection.sourceId);
+      }
+    }
+    for (const [skinId, skinDeformer] of skinDeformerById) {
+      if (skinDeformer.geometryId === void 0) {
+        continue;
+      }
+      for (const node of nodeList) {
+        if (node.geometryId === skinDeformer.geometryId) {
+          node.skinId = skinId;
+        }
+      }
+    }
+    const nodeResult = { nodeList, nodeIdToIndex, rootNodeIndices };
+    return nodeResult;
+  }
+  //==============================================================================
+  // 애니메이션 해석. (스택 → 레이어 → 커브노드(T/R/S) → 커브(X/Y/Z))
+  //==============================================================================
+  /**
+   * @param { object } objectsNode
+   * @param { object[] } objectConnectionList
+   * @param { object[] } propertyConnectionList
+   * @param { Map<number, number> } nodeIdToIndex
+   * @returns { object[] }
+   */
+  interpretAnimations(objectsNode, objectConnectionList, propertyConnectionList, nodeIdToIndex) {
+    const curveById = new System39.Map();
+    const curveNodeById = new System39.Map();
+    const layerIds = [];
+    const stackById = new System39.Map();
+    for (const objectNode of objectsNode.children) {
+      const objectId = objectNode.properties[0].value;
+      if (objectNode.name === "AnimationCurve") {
+        const keyTimeNode = objectNode.children.find((child) => child.name === "KeyTime");
+        const keyValueNode = objectNode.children.find((child) => child.name === "KeyValueFloat");
+        curveById.set(objectId, {
+          keyTimes: keyTimeNode ? keyTimeNode.properties[0].value : [],
+          keyValues: keyValueNode ? keyValueNode.properties[0].value : []
+        });
+      } else if (objectNode.name === "AnimationCurveNode") {
+        curveNodeById.set(objectId, { targetNodeId: null, targetProperty: null, curveByChannel: {} });
+      } else if (objectNode.name === "AnimationLayer") {
+        layerIds.push(objectId);
+      } else if (objectNode.name === "AnimationStack") {
+        stackById.set(objectId, { name: objectNode.properties[1].value, layerIds: [] });
+      }
+    }
+    for (const connection of propertyConnectionList) {
+      if (curveById.has(connection.sourceId) && curveNodeById.has(connection.destinationId)) {
+        const curveNode = curveNodeById.get(connection.destinationId);
+        const channelName = connection.propertyName.replace("d|", "");
+        curveNode.curveByChannel[channelName] = connection.sourceId;
+      } else if (curveNodeById.has(connection.sourceId) && nodeIdToIndex.has(connection.destinationId)) {
+        const curveNode = curveNodeById.get(connection.sourceId);
+        curveNode.targetNodeId = connection.destinationId;
+        curveNode.targetProperty = connection.propertyName;
+      }
+    }
+    const layerIdByCurveNodeId = new System39.Map();
+    for (const connection of objectConnectionList) {
+      if (layerIds.includes(connection.sourceId) && stackById.has(connection.destinationId)) {
+        const stack = stackById.get(connection.destinationId);
+        stack.layerIds.push(connection.sourceId);
+      } else if (curveNodeById.has(connection.sourceId) && layerIds.includes(connection.destinationId)) {
+        layerIdByCurveNodeId.set(connection.sourceId, connection.destinationId);
+      }
+    }
+    const animationList = [];
+    for (const [stackId, stack] of stackById) {
+      const channelList = [];
+      let duration = 0;
+      for (const [curveNodeId, curveNode] of curveNodeById) {
+        if (curveNode.targetNodeId === null || !nodeIdToIndex.has(curveNode.targetNodeId)) {
+          continue;
+        }
+        const owningLayerId = layerIdByCurveNodeId.get(curveNodeId);
+        if (!stack.layerIds.includes(owningLayerId)) {
+          continue;
+        }
+        const channelResult = this.buildAnimationChannel(curveNode, curveById, nodeIdToIndex);
+        if (channelResult) {
+          channelList.push(channelResult.channel);
+          duration = System39.Math.max(duration, channelResult.duration);
+        }
+      }
+      animationList.push({ name: stack.name, duration, channels: channelList });
+    }
+    return animationList;
+  }
+  //==============================================================================
+  // 애니메이션 채널 구성. (커브노드 → 노드 인덱스 + 경로 + 키타임/값)
+  //==============================================================================
+  /**
+   * @param { object } curveNode
+   * @param { Map<number, object> } curveById
+   * @param { Map<number, number> } nodeIdToIndex
+   * @returns { object | null }
+   */
+  buildAnimationChannel(curveNode, curveById, nodeIdToIndex) {
+    let path = null;
+    if (curveNode.targetProperty === "Lcl Translation") {
+      path = "translation";
+    } else if (curveNode.targetProperty === "Lcl Rotation") {
+      path = "rotation";
+    } else if (curveNode.targetProperty === "Lcl Scaling") {
+      path = "scale";
+    }
+    if (path === null) {
+      return null;
+    }
+    const channelNames = ["X", "Y", "Z"];
+    const timeSet = new System39.Set();
+    for (const channelName of channelNames) {
+      const curveId = curveNode.curveByChannel[channelName];
+      if (curveId === void 0) {
+        continue;
+      }
+      const curve = curveById.get(curveId);
+      for (const keyTime of curve.keyTimes) {
+        timeSet.add(keyTime);
+      }
+    }
+    const sortedTimes = System39.Array.from(timeSet).sort((left, right) => left - right);
+    if (sortedTimes.length === 0) {
+      return null;
+    }
+    const componentCount = path === "rotation" ? 3 : 3;
+    const times = new System39.Float32Array(sortedTimes.length);
+    const values = new System39.Float32Array(sortedTimes.length * componentCount);
+    for (let timeIndex = 0; timeIndex < sortedTimes.length; ++timeIndex) {
+      times[timeIndex] = sortedTimes[timeIndex] / FBX_TIME_UNIT;
+      for (let channelIndex = 0; channelIndex < 3; ++channelIndex) {
+        const curveId = curveNode.curveByChannel[channelNames[channelIndex]];
+        const sampledValue = this.sampleCurveAtTime(curveId, curveById, sortedTimes[timeIndex]);
+        values[timeIndex * componentCount + channelIndex] = sampledValue;
+      }
+    }
+    const channel = {
+      nodeIndex: nodeIdToIndex.get(curveNode.targetNodeId),
+      path,
+      times,
+      values
+    };
+    const duration = times.length > 0 ? times[times.length - 1] : 0;
+    const channelResult = { channel, duration };
+    return channelResult;
+  }
+  //==============================================================================
+  // 커브 시간 샘플링. (선형 보간 — 키 사이)
+  //==============================================================================
+  /**
+   * @param { number | undefined } curveId
+   * @param { Map<number, object> } curveById
+   * @param { number } keyTime
+   * @returns { number }
+   */
+  sampleCurveAtTime(curveId, curveById, keyTime) {
+    if (curveId === void 0) {
+      return 0;
+    }
+    const curve = curveById.get(curveId);
+    const keyTimes = curve.keyTimes;
+    const keyValues = curve.keyValues;
+    if (keyTimes.length === 0) {
+      return 0;
+    }
+    if (keyTime <= keyTimes[0]) {
+      return keyValues[0];
+    }
+    if (keyTime >= keyTimes[keyTimes.length - 1]) {
+      return keyValues[keyValues.length - 1];
+    }
+    let keyIndex = 0;
+    while (keyIndex < keyTimes.length - 1 && keyTimes[keyIndex + 1] < keyTime) {
+      keyIndex += 1;
+    }
+    const spanDuration = keyTimes[keyIndex + 1] - keyTimes[keyIndex];
+    const factor = spanDuration > 0 ? (keyTime - keyTimes[keyIndex]) / spanDuration : 0;
+    const interpolatedValue = keyValues[keyIndex] + (keyValues[keyIndex + 1] - keyValues[keyIndex]) * factor;
+    return interpolatedValue;
+  }
+  //==============================================================================
+  // 렌더링 데이터뷰 반환.
+  //==============================================================================
+  /**
+   * @returns { DataView }
+   */
+  getDataView() {
+    return this.#dataView;
+  }
+  //==============================================================================
+  // 파일 바이트 반환.
+  //==============================================================================
+  /**
+   * @returns { Uint8Array }
+   */
+  getFileBytes() {
+    return this.#fileBytes;
+  }
+  //==============================================================================
+  // 텍스트 디코더 반환.
+  //==============================================================================
+  /**
+   * @returns { TextDecoder }
+   */
+  getTextDecoder() {
+    return this.#textDecoder;
+  }
+};
+
+// src/experimental/graphics/material.js
+var System40 = globalThis;
+var TEXTURE_UNIT_BASECOLOR = 0;
+var TEXTURE_UNIT_NORMAL = 2;
+var TEXTURE_UNIT_METALLICROUGHNESS = 3;
+var TEXTURE_UNIT_GLOSSINESS = 4;
+var TEXTURE_UNIT_OCCLUSION = 5;
+var TEXTURE_UNIT_EMISSIVE = 6;
+var TEXTURE_UNIT_SPECULAR = 7;
+var TEXTURE_UNIT_OPACITY = 8;
+var Material = class _Material extends Object2 {
+  static {
+    __name(this, "Material");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WebGL2RenderingContext } */
+  #webGL2RenderingContext;
+  /** @private @type { ShaderProgram } */
+  #shaderProgram;
+  /** @private @type { number[] } */
+  #baseColorFactor;
+  /** @private @type { number } */
+  #metallicFactor;
+  /** @private @type { number } */
+  #roughnessFactor;
+  /** @private @type { number[] } */
+  #emissiveFactor;
+  /** @private @type { boolean } */
+  #useGlossiness;
+  /** @private @type { boolean } */
+  #useAlphaCutout;
+  /** @private @type { WebGLTexture } */
+  #baseColorTexture;
+  /** @private @type { WebGLTexture } */
+  #normalTexture;
+  /** @private @type { WebGLTexture } */
+  #metallicRoughnessTexture;
+  /** @private @type { WebGLTexture } */
+  #glossinessTexture;
+  /** @private @type { WebGLTexture } */
+  #occlusionTexture;
+  /** @private @type { WebGLTexture } */
+  #emissiveTexture;
+  /** @private @type { WebGLTexture } */
+  #specularTexture;
+  /** @private @type { WebGLTexture } */
+  #opacityTexture;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { WebGL2RenderingContext } webGL2RenderingContext
+   * @param { ShaderProgram } shaderProgram
+   */
+  constructor(webGL2RenderingContext, shaderProgram) {
+    super();
+    this.#webGL2RenderingContext = webGL2RenderingContext;
+    this.#shaderProgram = shaderProgram;
+    this.#baseColorFactor = [1, 1, 1];
+    this.#metallicFactor = 1;
+    this.#roughnessFactor = 1;
+    this.#emissiveFactor = [0, 0, 0];
+    this.#useGlossiness = false;
+    this.#useAlphaCutout = false;
+    this.#baseColorTexture = null;
+    this.#normalTexture = null;
+    this.#metallicRoughnessTexture = null;
+    this.#glossinessTexture = null;
+    this.#occlusionTexture = null;
+    this.#emissiveTexture = null;
+    this.#specularTexture = null;
+    this.#opacityTexture = null;
+  }
+  //==============================================================================
+  // 기본 머티리얼 서술 생성. (정적 — 흰색 무광 비금속)
+  //==============================================================================
+  /**
+   * @returns { object }
+   */
+  static createDefaultDescription() {
+    const description = {
+      baseColorFactor: [1, 1, 1],
+      metallicFactor: 0,
+      roughnessFactor: 1,
+      emissiveFactor: [0, 0, 0],
+      baseColorImage: null,
+      normalImage: null,
+      metallicRoughnessImage: null,
+      glossinessImage: null,
+      occlusionImage: null,
+      emissiveImage: null,
+      specularImage: null,
+      opacityImage: null
+    };
+    return description;
+  }
+  //==============================================================================
+  // 중립 머티리얼 서술로부터 생성. (정적 — 이미지 바이트 → GL 텍스처)
+  //==============================================================================
+  /**
+   * @param { WebGL2RenderingContext } webGL2RenderingContext
+   * @param { ShaderProgram } shaderProgram
+   * @param { object } description
+   * @returns { Promise<Material> }
+   */
+  static async createFromDescription(webGL2RenderingContext, shaderProgram, description) {
+    const material = new _Material(webGL2RenderingContext, shaderProgram);
+    material.#baseColorFactor = description.baseColorFactor.slice();
+    material.#metallicFactor = description.metallicFactor;
+    material.#roughnessFactor = description.roughnessFactor;
+    material.#emissiveFactor = description.emissiveFactor.slice();
+    material.#useGlossiness = description.glossinessImage !== null;
+    material.#useAlphaCutout = description.opacityImage !== null;
+    material.#baseColorTexture = await material.createTexture(description.baseColorImage, [255, 255, 255, 255]);
+    material.#normalTexture = await material.createTexture(description.normalImage, [128, 128, 255, 255]);
+    material.#metallicRoughnessTexture = await material.createTexture(description.metallicRoughnessImage, [255, 255, 255, 255]);
+    material.#glossinessTexture = await material.createTexture(description.glossinessImage, [255, 255, 255, 255]);
+    material.#occlusionTexture = await material.createTexture(description.occlusionImage, [255, 255, 255, 255]);
+    material.#emissiveTexture = await material.createTexture(description.emissiveImage, [255, 255, 255, 255]);
+    material.#specularTexture = await material.createTexture(description.specularImage, [255, 255, 255, 255]);
+    material.#opacityTexture = await material.createTexture(description.opacityImage, [255, 255, 255, 255]);
+    return material;
+  }
+  //==============================================================================
+  // 텍스처 생성. (이미지 서술 → GL 텍스처, 없으면 1x1 단색 대체)
+  //==============================================================================
+  /**
+   * @param { object | null } imageDescription
+   * @param { number[] } fallbackColor
+   * @returns { Promise<WebGLTexture> }
+   */
+  async createTexture(imageDescription, fallbackColor) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const glTexture = webGL2RenderingContext.createTexture();
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, glTexture);
+    if (!imageDescription || !imageDescription.bytes || imageDescription.bytes.length === 0) {
+      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System40.Uint8Array(fallbackColor));
+      return glTexture;
+    }
+    const blobOptions = imageDescription.mimeType ? { type: imageDescription.mimeType } : {};
+    const imageBlob = new System40.Blob([imageDescription.bytes], blobOptions);
+    const bitmapOptions = imageDescription.flipY ? { imageOrientation: "flipY" } : {};
+    const imageBitmap = await System40.createImageBitmap(imageBlob, bitmapOptions);
+    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, imageBitmap);
+    webGL2RenderingContext.generateMipmap(webGL2RenderingContext.TEXTURE_2D);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR_MIPMAP_LINEAR);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.LINEAR);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.REPEAT);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.REPEAT);
+    return glTexture;
+  }
+  //==============================================================================
+  // 적용. (참조 셰이더에 유니폼 설정 + 텍스처 유닛 바인드)
+  //==============================================================================
+  apply() {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const shaderProgram = this.getShaderProgram();
+    const baseColorFactor = this.getBaseColorFactor();
+    const baseColorFactorLocation = shaderProgram.getUniformLocation("baseColorFactor");
+    webGL2RenderingContext.uniform3f(baseColorFactorLocation, baseColorFactor[0], baseColorFactor[1], baseColorFactor[2]);
+    const metallicFactor = this.getMetallicFactor();
+    const metallicFactorLocation = shaderProgram.getUniformLocation("metallicFactor");
+    webGL2RenderingContext.uniform1f(metallicFactorLocation, metallicFactor);
+    const roughnessFactor = this.getRoughnessFactor();
+    const roughnessFactorLocation = shaderProgram.getUniformLocation("roughnessFactor");
+    webGL2RenderingContext.uniform1f(roughnessFactorLocation, roughnessFactor);
+    const emissiveFactor = this.getEmissiveFactor();
+    const emissiveFactorLocation = shaderProgram.getUniformLocation("emissiveFactor");
+    webGL2RenderingContext.uniform3f(emissiveFactorLocation, emissiveFactor[0], emissiveFactor[1], emissiveFactor[2]);
+    const useGlossiness = this.getUseGlossiness();
+    const useGlossinessLocation = shaderProgram.getUniformLocation("useGlossiness");
+    webGL2RenderingContext.uniform1i(useGlossinessLocation, useGlossiness ? 1 : 0);
+    const useAlphaCutout = this.getUseAlphaCutout();
+    const useAlphaCutoutLocation = shaderProgram.getUniformLocation("useAlphaCutout");
+    webGL2RenderingContext.uniform1i(useAlphaCutoutLocation, useAlphaCutout ? 1 : 0);
+    const textureBindings = this.getTextureBindings();
+    for (const binding of textureBindings) {
+      const uniformLocation = shaderProgram.getUniformLocation(binding[0]);
+      webGL2RenderingContext.uniform1i(uniformLocation, binding[1]);
+      webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + binding[1]);
+      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, binding[2]);
+    }
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+  }
+  //==============================================================================
+  // 참조 셰이더 프로그램 반환. (머티리얼 템플릿의 셰이더)
+  //==============================================================================
+  /**
+   * @returns { ShaderProgram }
+   */
+  getShaderProgram() {
+    return this.#shaderProgram;
+  }
+  //==============================================================================
+  // 베이스 컬러 팩터 반환.
+  //==============================================================================
+  /**
+   * @returns { number[] }
+   */
+  getBaseColorFactor() {
+    return this.#baseColorFactor;
+  }
+  //==============================================================================
+  // 메탈릭 팩터 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getMetallicFactor() {
+    return this.#metallicFactor;
+  }
+  //==============================================================================
+  // 러프니스 팩터 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getRoughnessFactor() {
+    return this.#roughnessFactor;
+  }
+  //==============================================================================
+  // 이미시브 팩터 반환.
+  //==============================================================================
+  /**
+   * @returns { number[] }
+   */
+  getEmissiveFactor() {
+    return this.#emissiveFactor;
+  }
+  //==============================================================================
+  // 글로시니스 경로 사용 여부 반환.
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  getUseGlossiness() {
+    return this.#useGlossiness;
+  }
+  //==============================================================================
+  // 알파 컷아웃 사용 여부 반환. (오파시티 맵 보유 시 — 머리카락/속눈썹 등)
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  getUseAlphaCutout() {
+    return this.#useAlphaCutout;
+  }
+  //==============================================================================
+  // 텍스처 바인딩 목록 반환. (유니폼 이름 / 텍스처 유닛 / GL 텍스처)
+  //==============================================================================
+  /**
+   * @returns { Array<[string, number, WebGLTexture]> }
+   */
+  getTextureBindings() {
+    const textureBindings = [
+      ["baseColorTexture", TEXTURE_UNIT_BASECOLOR, this.#baseColorTexture],
+      ["normalTexture", TEXTURE_UNIT_NORMAL, this.#normalTexture],
+      ["metallicRoughnessTexture", TEXTURE_UNIT_METALLICROUGHNESS, this.#metallicRoughnessTexture],
+      ["glossinessTexture", TEXTURE_UNIT_GLOSSINESS, this.#glossinessTexture],
+      ["occlusionTexture", TEXTURE_UNIT_OCCLUSION, this.#occlusionTexture],
+      ["emissiveTexture", TEXTURE_UNIT_EMISSIVE, this.#emissiveTexture],
+      ["specularTexture", TEXTURE_UNIT_SPECULAR, this.#specularTexture],
+      ["opacityTexture", TEXTURE_UNIT_OPACITY, this.#opacityTexture]
+    ];
+    return textureBindings;
+  }
+  //==============================================================================
+  // 렌더링 컨텍스트 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGL2RenderingContext }
+   */
+  getWebGL2RenderingContext() {
+    return this.#webGL2RenderingContext;
+  }
+};
+
+// src/experimental/graphics/skinnedmodel.js
+var System41 = globalThis;
+var GLB_CHUNKTYPE_JSON = 1313821514;
+var GLB_CHUNKTYPE_BINARY = 5130562;
+var COMPONENT_ARRAY_TABLE = {
+  5121: System41.Uint8Array,
+  5123: System41.Uint16Array,
+  5125: System41.Uint32Array,
+  5126: System41.Float32Array
+};
+var TYPE_COMPONENT_COUNT_TABLE = {
+  SCALAR: 1,
+  VEC2: 2,
+  VEC3: 3,
+  VEC4: 4,
+  MAT4: 16
+};
+function createQuaternionFromFbxEuler(xDegree, yDegree, zDegree) {
+  const degreeToRadian2 = System41.Math.PI / 180;
+  const rotationX = Quaternion.createFromEuler(xDegree * degreeToRadian2, 0, 0);
+  const rotationY = Quaternion.createFromEuler(0, yDegree * degreeToRadian2, 0);
+  const rotationZ = Quaternion.createFromEuler(0, 0, zDegree * degreeToRadian2);
+  const rotationZY = rotationZ.multiply(rotationY);
+  const combinedRotation = rotationZY.multiply(rotationX);
+  return combinedRotation;
+}
+__name(createQuaternionFromFbxEuler, "createQuaternionFromFbxEuler");
+function convertFbxAnimationChannels(sceneData, fbxAnimation, resolveNodeIndex) {
+  const channels = [];
+  for (const fbxChannel of fbxAnimation.channels) {
+    const targetNodeIndex = resolveNodeIndex(fbxChannel.nodeIndex);
+    if (targetNodeIndex === void 0) {
+      continue;
+    }
+    if (fbxChannel.path === "rotation") {
+      const sourceFbxNode = sceneData.nodeList[fbxChannel.nodeIndex];
+      const preRotationQuaternion = createQuaternionFromFbxEuler(sourceFbxNode.preRotationDegrees[0], sourceFbxNode.preRotationDegrees[1], sourceFbxNode.preRotationDegrees[2]);
+      const keyCount = fbxChannel.times.length;
+      const quaternionValues = new System41.Float32Array(keyCount * 4);
+      for (let keyIndex = 0; keyIndex < keyCount; ++keyIndex) {
+        const eulerQuaternion = createQuaternionFromFbxEuler(fbxChannel.values[keyIndex * 3], fbxChannel.values[keyIndex * 3 + 1], fbxChannel.values[keyIndex * 3 + 2]);
+        const rotationQuaternion = preRotationQuaternion.multiply(eulerQuaternion);
+        quaternionValues[keyIndex * 4] = rotationQuaternion.x;
+        quaternionValues[keyIndex * 4 + 1] = rotationQuaternion.y;
+        quaternionValues[keyIndex * 4 + 2] = rotationQuaternion.z;
+        quaternionValues[keyIndex * 4 + 3] = rotationQuaternion.w;
+      }
+      channels.push({ nodeIndex: targetNodeIndex, path: fbxChannel.path, times: fbxChannel.times, values: quaternionValues, cursor: 0 });
+    } else {
+      channels.push({ nodeIndex: targetNodeIndex, path: fbxChannel.path, times: fbxChannel.times, values: fbxChannel.values, cursor: 0 });
+    }
+  }
+  return channels;
+}
+__name(convertFbxAnimationChannels, "convertFbxAnimationChannels");
+var SkinnedModel = class _SkinnedModel extends Object2 {
+  static {
+    __name(this, "SkinnedModel");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WebGL2RenderingContext } */
+  #webGL2RenderingContext;
+  /** @private @type { ShaderProgram } */
+  #shaderProgram;
+  /** @private @type { object[] } */
+  #nodeList;
+  /** @private @type { number[] } */
+  #rootNodeIndices;
+  /** @private @type { object[] } */
+  #skinList;
+  /** @private @type { object[] } */
+  #drawableList;
+  /** @private @type { object[] } */
+  #animationList;
+  /** @private @type { object | null } */
+  #currentAnimation;
+  /** @private @type { object | null } */
+  #previousAnimation;
+  /** @private @type { number } */
+  #currentTime;
+  /** @private @type { number } */
+  #previousTime;
+  /** @private @type { number } */
+  #fadeDuration;
+  /** @private @type { number } */
+  #fadeElapsed;
+  /** @private @type { number } */
+  #timeScale;
+  /** @private @type { Map<number, Quaternion> } */
+  #jointRotationOffsets;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { WebGL2RenderingContext } webGL2RenderingContext
+   * @param { ShaderProgram } shaderProgram
+   */
+  constructor(webGL2RenderingContext, shaderProgram) {
+    super();
+    this.#webGL2RenderingContext = webGL2RenderingContext;
+    this.#shaderProgram = shaderProgram;
+    this.#nodeList = [];
+    this.#rootNodeIndices = [];
+    this.#skinList = [];
+    this.#drawableList = [];
+    this.#animationList = [];
+    this.#currentAnimation = null;
+    this.#previousAnimation = null;
+    this.#currentTime = 0;
+    this.#previousTime = 0;
+    this.#fadeDuration = 0;
+    this.#fadeElapsed = 0;
+    this.#timeScale = 1;
+    this.#jointRotationOffsets = new System41.Map();
+  }
+  //==============================================================================
+  // URL 로부터 로드. (정적 — GLB 바이너리 glTF)
+  //==============================================================================
+  /**
+   * @param { WebGL2RenderingContext } webGL2RenderingContext
+   * @param { string } url
+   * @param { SkinnedModelRenderer } skinnedModelRenderer
+   * @returns { Promise<SkinnedModel> }
+   */
+  static async loadFromUrl(webGL2RenderingContext, url, skinnedModelRenderer) {
+    const response = await System41.fetch(url);
+    if (!response.ok) {
+      throw new Error(`SkinnedModel load failed: ${url}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    const shaderProgram = skinnedModelRenderer.getShaderProgram();
+    const model = new _SkinnedModel(webGL2RenderingContext, shaderProgram);
+    await model.parseBinary(arrayBuffer);
+    return model;
+  }
+  //==============================================================================
+  // URL 로부터 로드. (정적 — 바이너리 FBX)
+  //==============================================================================
+  /**
+   * @param { WebGL2RenderingContext } webGL2RenderingContext
+   * @param { string } url
+   * @param { SkinnedModelRenderer } skinnedModelRenderer
+   * @returns { Promise<SkinnedModel> }
+   */
+  static async loadFromFbxUrl(webGL2RenderingContext, url, skinnedModelRenderer) {
+    const sceneData = await FbxLoader.loadFromUrl(url);
+    const shaderProgram = skinnedModelRenderer.getShaderProgram();
+    const model = new _SkinnedModel(webGL2RenderingContext, shaderProgram);
+    await model.parseFbxContent(sceneData);
+    return model;
+  }
+  //==============================================================================
+  // GLB 바이너리 해석.
+  //==============================================================================
+  /**
+   * @param { ArrayBuffer } arrayBuffer
+   */
+  async parseBinary(arrayBuffer) {
+    const dataView = new System41.DataView(arrayBuffer);
+    if (dataView.getUint32(0, true) !== 1179937895) {
+      throw new Error("SkinnedModel: not a GLB file.");
+    }
+    let json = null;
+    let binaryBuffer = null;
+    let chunkOffset = 12;
+    while (chunkOffset < arrayBuffer.byteLength) {
+      const chunkLength = dataView.getUint32(chunkOffset, true);
+      const chunkType = dataView.getUint32(chunkOffset + 4, true);
+      const chunkStart = chunkOffset + 8;
+      if (chunkType === GLB_CHUNKTYPE_JSON) {
+        const jsonBytes = new System41.Uint8Array(arrayBuffer, chunkStart, chunkLength);
+        const jsonText = new System41.TextDecoder().decode(jsonBytes);
+        json = System41.JSON.parse(jsonText);
+      } else if (chunkType === GLB_CHUNKTYPE_BINARY) {
+        binaryBuffer = arrayBuffer.slice(chunkStart, chunkStart + chunkLength);
+      }
+      chunkOffset = chunkStart + chunkLength;
+    }
+    if (!json || !binaryBuffer) {
+      throw new Error("SkinnedModel: invalid GLB chunks.");
+    }
+    await this.parseContent(json, binaryBuffer);
+  }
+  //==============================================================================
+  // glTF 내용 해석. (노드 / 스킨 / 메시 / 애니메이션 / 텍스처)
+  //==============================================================================
+  /**
+   * @param { object } json
+   * @param { ArrayBuffer } binaryBuffer
+   */
+  async parseContent(json, binaryBuffer) {
+    function readAccessorArray(accessorIndex) {
+      const accessor = json.accessors[accessorIndex];
+      const bufferView = json.bufferViews[accessor.bufferView];
+      const componentCount = TYPE_COMPONENT_COUNT_TABLE[accessor.type];
+      const ArrayConstructor = COMPONENT_ARRAY_TABLE[accessor.componentType];
+      const elementOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
+      const tightByteSize = componentCount * ArrayConstructor.BYTES_PER_ELEMENT;
+      const byteStride = bufferView.byteStride || 0;
+      if (byteStride === 0 || byteStride === tightByteSize) {
+        const sourceArray = new ArrayConstructor(binaryBuffer, elementOffset, accessor.count * componentCount);
+        const copiedArray = new ArrayConstructor(sourceArray);
+        return copiedArray;
+      }
+      const resultArray = new ArrayConstructor(accessor.count * componentCount);
+      for (let elementIndex = 0; elementIndex < accessor.count; ++elementIndex) {
+        const sourceArray = new ArrayConstructor(binaryBuffer, elementOffset + elementIndex * byteStride, componentCount);
+        resultArray.set(sourceArray, elementIndex * componentCount);
+      }
+      return resultArray;
+    }
+    __name(readAccessorArray, "readAccessorArray");
+    this.#nodeList = json.nodes.map((node) => {
+      const rotation = node.rotation ? Quaternion.create(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]) : Quaternion.identity();
+      return {
+        name: node.name || "",
+        childIndices: node.children || [],
+        meshIndex: node.mesh,
+        skinIndex: node.skin,
+        baseTranslation: node.translation ? node.translation.slice() : [0, 0, 0],
+        baseRotation: rotation,
+        baseScale: node.scale ? node.scale.slice() : [1, 1, 1],
+        currentTranslation: [0, 0, 0],
+        currentRotation: Quaternion.identity(),
+        currentScale: [1, 1, 1],
+        worldMatrix: Matrix4.createIdentity()
+      };
+    });
+    const scene = json.scenes[json.scene || 0];
+    this.#rootNodeIndices = scene.nodes.slice();
+    this.#skinList = (json.skins || []).map((skin) => {
+      const inverseBindArray = readAccessorArray(skin.inverseBindMatrices);
+      const inverseBindMatrices = [];
+      for (let jointIndex = 0; jointIndex < skin.joints.length; ++jointIndex) {
+        const matrix = Matrix4.createIdentity();
+        const elements = matrix.getElements();
+        elements.set(inverseBindArray.subarray(jointIndex * 16, jointIndex * 16 + 16));
+        inverseBindMatrices.push(matrix);
+      }
+      return {
+        jointNodeIndices: skin.joints.slice(),
+        inverseBindMatrices,
+        jointMatrixArray: new System41.Float32Array(skin.joints.length * 16)
+      };
+    });
+    function createImageDescription(textureInfo) {
+      if (!textureInfo) {
+        return null;
+      }
+      const texture = json.textures[textureInfo.index];
+      const image = json.images[texture.source];
+      const bufferView = json.bufferViews[image.bufferView];
+      const imageBytes = new System41.Uint8Array(binaryBuffer, bufferView.byteOffset || 0, bufferView.byteLength);
+      return { bytes: imageBytes, mimeType: image.mimeType, flipY: false };
+    }
+    __name(createImageDescription, "createImageDescription");
+    const materialDescriptionList = (json.materials || []).map((material) => {
+      const description = Material.createDefaultDescription();
+      const pbrMetallicRoughness = material.pbrMetallicRoughness;
+      if (pbrMetallicRoughness) {
+        if (pbrMetallicRoughness.baseColorFactor) {
+          description.baseColorFactor = pbrMetallicRoughness.baseColorFactor.slice(0, 3);
+        }
+        description.metallicFactor = pbrMetallicRoughness.metallicFactor !== void 0 ? pbrMetallicRoughness.metallicFactor : 1;
+        description.roughnessFactor = pbrMetallicRoughness.roughnessFactor !== void 0 ? pbrMetallicRoughness.roughnessFactor : 1;
+        description.baseColorImage = createImageDescription(pbrMetallicRoughness.baseColorTexture);
+        description.metallicRoughnessImage = createImageDescription(pbrMetallicRoughness.metallicRoughnessTexture);
+      }
+      description.normalImage = createImageDescription(material.normalTexture);
+      description.occlusionImage = createImageDescription(material.occlusionTexture);
+      description.emissiveImage = createImageDescription(material.emissiveTexture);
+      if (material.emissiveFactor) {
+        description.emissiveFactor = material.emissiveFactor.slice(0, 3);
+      }
+      return description;
+    });
+    const meshDescriptionList = [];
+    for (const node of this.#nodeList) {
+      if (node.meshIndex === void 0 || node.skinIndex === void 0) {
+        continue;
+      }
+      const mesh = json.meshes[node.meshIndex];
+      for (const primitive of mesh.primitives) {
+        const positions = new System41.Float32Array(readAccessorArray(primitive.attributes.POSITION));
+        const normals = primitive.attributes.NORMAL !== void 0 ? new System41.Float32Array(readAccessorArray(primitive.attributes.NORMAL)) : null;
+        const textureCoordinates = primitive.attributes.TEXCOORD_0 !== void 0 ? new System41.Float32Array(readAccessorArray(primitive.attributes.TEXCOORD_0)) : null;
+        const joints = new System41.Uint16Array(readAccessorArray(primitive.attributes.JOINTS_0));
+        const weightAccessor = json.accessors[primitive.attributes.WEIGHTS_0];
+        const weightSource = readAccessorArray(primitive.attributes.WEIGHTS_0);
+        const weights = new System41.Float32Array(weightSource.length);
+        if (weightAccessor.componentType === 5126) {
+          weights.set(weightSource);
+        } else {
+          const normalizeDivisor = weightAccessor.componentType === 5121 ? 255 : 65535;
+          for (let weightIndex = 0; weightIndex < weightSource.length; ++weightIndex) {
+            weights[weightIndex] = weightSource[weightIndex] / normalizeDivisor;
+          }
+        }
+        let indices = null;
+        if (primitive.indices !== void 0) {
+          const indexSource = readAccessorArray(primitive.indices);
+          indices = indexSource instanceof System41.Uint8Array ? new System41.Uint16Array(indexSource) : indexSource;
+        }
+        meshDescriptionList.push({
+          positions,
+          normals,
+          textureCoordinates,
+          joints,
+          weights,
+          indices,
+          skinIndex: node.skinIndex,
+          materialIndex: primitive.material !== void 0 ? primitive.material : -1
+        });
+      }
+    }
+    await this.uploadMeshesAndMaterials(meshDescriptionList, materialDescriptionList);
+    this.#animationList = (json.animations || []).map((animation) => {
+      let duration = 0;
+      const channels = animation.channels.map((channel) => {
+        const sampler = animation.samplers[channel.sampler];
+        const times = readAccessorArray(sampler.input);
+        const values = readAccessorArray(sampler.output);
+        if (times.length > 0) {
+          duration = System41.Math.max(duration, times[times.length - 1]);
+        }
+        return {
+          nodeIndex: channel.target.node,
+          path: channel.target.path,
+          times,
+          values,
+          cursor: 0
+        };
+      });
+      return { name: animation.name || "", duration, channels };
+    });
+    if (this.#animationList.length > 0) {
+      this.#currentAnimation = this.#animationList[0];
+    }
+  }
+  //==============================================================================
+  // FBX 중간 표현 해석. (노드/스킨/메시/텍스처/애니메이션 → 기존 스키닝 파이프라인)
+  //==============================================================================
+  /**
+   * @param { object } sceneData
+   */
+  async parseFbxContent(sceneData) {
+    this.#nodeList = sceneData.nodeList.map((fbxNode) => {
+      const rotationQuaternion = createQuaternionFromFbxEuler(fbxNode.rotationEulerDegrees[0], fbxNode.rotationEulerDegrees[1], fbxNode.rotationEulerDegrees[2]);
+      const preRotationQuaternion = createQuaternionFromFbxEuler(fbxNode.preRotationDegrees[0], fbxNode.preRotationDegrees[1], fbxNode.preRotationDegrees[2]);
+      const baseRotation = preRotationQuaternion.multiply(rotationQuaternion);
+      return {
+        name: fbxNode.name,
+        childIndices: fbxNode.childIndices,
+        meshIndex: void 0,
+        skinIndex: void 0,
+        baseTranslation: fbxNode.translation.slice(),
+        baseRotation,
+        baseScale: fbxNode.scale.slice(),
+        currentTranslation: [0, 0, 0],
+        currentRotation: Quaternion.identity(),
+        currentScale: [1, 1, 1],
+        worldMatrix: Matrix4.createIdentity()
+      };
+    });
+    this.#rootNodeIndices = sceneData.rootNodeIndices.slice();
+    const skinIdList = System41.Array.from(sceneData.skinDeformerById.keys());
+    this.#skinList = skinIdList.map((skinId) => {
+      const skinDeformer = sceneData.skinDeformerById.get(skinId);
+      const jointNodeIndices = [];
+      const inverseBindMatrices = [];
+      for (const clusterId of skinDeformer.clusterIds) {
+        const cluster = sceneData.clusterById.get(clusterId);
+        const boneNodeIndex = sceneData.nodeIdToIndex.get(cluster.boneNodeId);
+        jointNodeIndices.push(boneNodeIndex);
+        let inverseBindMatrix = null;
+        if (cluster.transform) {
+          inverseBindMatrix = Matrix4.createIdentity();
+          const bindElements = inverseBindMatrix.getElements();
+          bindElements.set(cluster.transform);
+        } else {
+          const linkMatrix = Matrix4.createIdentity();
+          const linkElements = linkMatrix.getElements();
+          linkElements.set(cluster.transformLink);
+          inverseBindMatrix = Matrix4.createInverse(linkMatrix);
+        }
+        inverseBindMatrices.push(inverseBindMatrix);
+      }
+      return {
+        jointNodeIndices,
+        inverseBindMatrices,
+        jointMatrixArray: new System41.Float32Array(jointNodeIndices.length * 16)
+      };
+    });
+    function createFbxImageDescription(textureId) {
+      if (textureId === null) {
+        return null;
+      }
+      const texture = sceneData.textureById.get(textureId);
+      if (!texture || texture.videoId === null) {
+        return null;
+      }
+      const video = sceneData.videoById.get(texture.videoId);
+      if (!video || !video.contentBytes || video.contentBytes.length === 0) {
+        return null;
+      }
+      return { bytes: video.contentBytes, mimeType: null, flipY: true };
+    }
+    __name(createFbxImageDescription, "createFbxImageDescription");
+    const materialIdList = System41.Array.from(sceneData.materialById.keys());
+    const materialDescriptionList = materialIdList.map((materialId) => {
+      const fbxMaterial = sceneData.materialById.get(materialId);
+      const description = Material.createDefaultDescription();
+      description.baseColorFactor = fbxMaterial.diffuseColor.slice(0, 3);
+      description.baseColorImage = createFbxImageDescription(fbxMaterial.diffuseTextureId);
+      description.normalImage = createFbxImageDescription(fbxMaterial.normalTextureId);
+      description.specularImage = createFbxImageDescription(fbxMaterial.specularTextureId);
+      description.glossinessImage = createFbxImageDescription(fbxMaterial.glossTextureId);
+      return description;
+    });
+    function findNodeByGeometryId(geometryId) {
+      for (const fbxNode of sceneData.nodeList) {
+        if (fbxNode.geometryId === geometryId) {
+          return fbxNode;
+        }
+      }
+      return null;
+    }
+    __name(findNodeByGeometryId, "findNodeByGeometryId");
+    const meshDescriptionList = [];
+    for (let skinListIndex = 0; skinListIndex < skinIdList.length; ++skinListIndex) {
+      const skinId = skinIdList[skinListIndex];
+      const skinDeformer = sceneData.skinDeformerById.get(skinId);
+      const geometry = sceneData.geometryById.get(skinDeformer.geometryId);
+      if (!geometry) {
+        continue;
+      }
+      const influencesPerVertex = new System41.Array(geometry.originalVertexCount);
+      for (let vertexIndex = 0; vertexIndex < geometry.originalVertexCount; ++vertexIndex) {
+        influencesPerVertex[vertexIndex] = [];
+      }
+      for (let clusterLocalIndex = 0; clusterLocalIndex < skinDeformer.clusterIds.length; ++clusterLocalIndex) {
+        const cluster = sceneData.clusterById.get(skinDeformer.clusterIds[clusterLocalIndex]);
+        for (let influenceIndex = 0; influenceIndex < cluster.vertexIndices.length; ++influenceIndex) {
+          const vertexIndex = cluster.vertexIndices[influenceIndex];
+          const weight = cluster.weights[influenceIndex];
+          influencesPerVertex[vertexIndex].push({ jointIndex: clusterLocalIndex, weight });
+        }
+      }
+      const vertexJointArray = new System41.Uint16Array(geometry.originalVertexCount * 4);
+      const vertexWeightArray = new System41.Float32Array(geometry.originalVertexCount * 4);
+      for (let vertexIndex = 0; vertexIndex < geometry.originalVertexCount; ++vertexIndex) {
+        const influenceList = influencesPerVertex[vertexIndex];
+        influenceList.sort((left, right) => right.weight - left.weight);
+        let weightSum = 0;
+        const usedCount = System41.Math.min(4, influenceList.length);
+        for (let slotIndex = 0; slotIndex < usedCount; ++slotIndex) {
+          weightSum += influenceList[slotIndex].weight;
+        }
+        if (weightSum <= 0) {
+          weightSum = 1;
+        }
+        for (let slotIndex = 0; slotIndex < usedCount; ++slotIndex) {
+          vertexJointArray[vertexIndex * 4 + slotIndex] = influenceList[slotIndex].jointIndex;
+          vertexWeightArray[vertexIndex * 4 + slotIndex] = influenceList[slotIndex].weight / weightSum;
+        }
+      }
+      const cornerCount = geometry.cornerCount;
+      const cornerJointArray = new System41.Uint16Array(cornerCount * 4);
+      const cornerWeightArray = new System41.Float32Array(cornerCount * 4);
+      for (let cornerIndex = 0; cornerIndex < cornerCount; ++cornerIndex) {
+        const originalVertexIndex = geometry.originalVertexIndices[cornerIndex];
+        for (let slotIndex = 0; slotIndex < 4; ++slotIndex) {
+          cornerJointArray[cornerIndex * 4 + slotIndex] = vertexJointArray[originalVertexIndex * 4 + slotIndex];
+          cornerWeightArray[cornerIndex * 4 + slotIndex] = vertexWeightArray[originalVertexIndex * 4 + slotIndex];
+        }
+      }
+      const ownerNode = findNodeByGeometryId(skinDeformer.geometryId);
+      let materialIndex = -1;
+      if (ownerNode && ownerNode.materialIds.length > 0) {
+        materialIndex = materialIdList.indexOf(ownerNode.materialIds[0]);
+      }
+      meshDescriptionList.push({
+        positions: geometry.positions,
+        normals: geometry.normals,
+        textureCoordinates: geometry.textureCoordinates,
+        joints: cornerJointArray,
+        weights: cornerWeightArray,
+        indices: null,
+        skinIndex: skinListIndex,
+        materialIndex
+      });
+    }
+    await this.uploadMeshesAndMaterials(meshDescriptionList, materialDescriptionList);
+    this.#animationList = sceneData.animationList.map((fbxAnimation) => {
+      const channels = convertFbxAnimationChannels(sceneData, fbxAnimation, (nodeIndex) => nodeIndex);
+      return { name: fbxAnimation.name, duration: fbxAnimation.duration, channels };
+    });
+    if (this.#animationList.length > 0) {
+      this.#currentAnimation = this.#animationList[0];
+    }
+  }
+  //==============================================================================
+  // 애니메이션 FBX 추가 로드. (본 이름 매칭 리타게팅 — Mixamo 애니메이션 전용 FBX)
+  // - 동일 스켈레톤을 전제로, 채널을 현재 모델의 노드 인덱스로 재지정해 클립을 추가한다.
+  // - ignoreTranslation: 루트 모션이 박힌 클립에서 이동 채널을 버린다. (게임 로직이 위치를 제어할 때)
+  //==============================================================================
+  /**
+   * @param { string } url
+   * @param { string } clipName
+   * @param { boolean } ignoreTranslation
+   */
+  async addAnimationsFromFbxUrl(url, clipName, ignoreTranslation = false) {
+    const sceneData = await FbxLoader.loadFromUrl(url);
+    const nodeList = this.getNodeList();
+    const nodeIndexByName = new System41.Map();
+    for (let nodeIndex = 0; nodeIndex < nodeList.length; ++nodeIndex) {
+      nodeIndexByName.set(nodeList[nodeIndex].name, nodeIndex);
+    }
+    for (const fbxAnimation of sceneData.animationList) {
+      if (fbxAnimation.channels.length === 0) {
+        continue;
+      }
+      let channels = convertFbxAnimationChannels(sceneData, fbxAnimation, (nodeIndex) => {
+        const sourceName = sceneData.nodeList[nodeIndex].name;
+        return nodeIndexByName.get(sourceName);
+      });
+      if (ignoreTranslation) {
+        channels = channels.filter((channel) => channel.path !== "translation");
+      }
+      this.#animationList.push({ name: clipName, duration: fbxAnimation.duration, channels });
+    }
+  }
+  //==============================================================================
+  // 중립 메시/머티리얼 서술 업로드. (공용 — Material 생성 + VAO/드로어블 구성)
+  //==============================================================================
+  /**
+   * @param { object[] } meshDescriptionList
+   * @param { object[] } materialDescriptionList
+   */
+  async uploadMeshesAndMaterials(meshDescriptionList, materialDescriptionList) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const shaderProgram = this.getShaderProgram();
+    const materialList = [];
+    for (const materialDescription of materialDescriptionList) {
+      const material = await Material.createFromDescription(webGL2RenderingContext, shaderProgram, materialDescription);
+      materialList.push(material);
+    }
+    const defaultDescription = Material.createDefaultDescription();
+    const defaultMaterial = await Material.createFromDescription(webGL2RenderingContext, shaderProgram, defaultDescription);
+    this.#drawableList = [];
+    for (const meshDescription of meshDescriptionList) {
+      let normals = meshDescription.normals;
+      if (!normals) {
+        normals = this.generateSmoothNormals(meshDescription.positions, meshDescription.indices);
+      }
+      const vertexArray = webGL2RenderingContext.createVertexArray();
+      webGL2RenderingContext.bindVertexArray(vertexArray);
+      this.bindFloatAttribute(shaderProgram, "vertexPosition", meshDescription.positions, 3);
+      this.bindFloatAttribute(shaderProgram, "vertexNormal", normals, 3);
+      if (meshDescription.textureCoordinates) {
+        this.bindFloatAttribute(shaderProgram, "vertexTextureCoordinate", meshDescription.textureCoordinates, 2);
+      }
+      this.bindIntegerAttribute(shaderProgram, "vertexJoints", meshDescription.joints, 4);
+      this.bindFloatAttribute(shaderProgram, "vertexWeights", meshDescription.weights, 4);
+      let indexCount = 0;
+      let indexComponentType = 0;
+      const isIndexed = meshDescription.indices !== null;
+      if (isIndexed) {
+        const indexBuffer = webGL2RenderingContext.createBuffer();
+        webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
+        webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, meshDescription.indices, webGL2RenderingContext.STATIC_DRAW);
+        indexCount = meshDescription.indices.length;
+        indexComponentType = meshDescription.indices instanceof System41.Uint32Array ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
+      }
+      webGL2RenderingContext.bindVertexArray(null);
+      const material = meshDescription.materialIndex >= 0 && materialList[meshDescription.materialIndex] ? materialList[meshDescription.materialIndex] : defaultMaterial;
+      this.#drawableList.push({
+        vertexArray,
+        isIndexed,
+        indexCount,
+        indexComponentType,
+        indexByteOffset: 0,
+        vertexCount: meshDescription.positions.length / 3,
+        material,
+        skinIndex: meshDescription.skinIndex
+      });
+    }
+  }
+  //==============================================================================
+  // 스무스 노멀 생성. (노멀 미보유 메시 — 바인드 포즈 기준, 스키닝 회전은 셰이더에서 적용)
+  //==============================================================================
+  /**
+   * @param { Float32Array } positions
+   * @param { Uint16Array | Uint32Array | null } indices
+   * @returns { Float32Array }
+   */
+  generateSmoothNormals(positions, indices) {
+    const normals = new System41.Float32Array(positions.length);
+    const triangleCount = indices ? indices.length / 3 : positions.length / 9;
+    for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
+      const indexA = (indices ? indices[triangleIndex * 3] : triangleIndex * 3) * 3;
+      const indexB = (indices ? indices[triangleIndex * 3 + 1] : triangleIndex * 3 + 1) * 3;
+      const indexC = (indices ? indices[triangleIndex * 3 + 2] : triangleIndex * 3 + 2) * 3;
+      const edgeABX = positions[indexB] - positions[indexA];
+      const edgeABY = positions[indexB + 1] - positions[indexA + 1];
+      const edgeABZ = positions[indexB + 2] - positions[indexA + 2];
+      const edgeACX = positions[indexC] - positions[indexA];
+      const edgeACY = positions[indexC + 1] - positions[indexA + 1];
+      const edgeACZ = positions[indexC + 2] - positions[indexA + 2];
+      const faceNormalX = edgeABY * edgeACZ - edgeABZ * edgeACY;
+      const faceNormalY = edgeABZ * edgeACX - edgeABX * edgeACZ;
+      const faceNormalZ = edgeABX * edgeACY - edgeABY * edgeACX;
+      normals[indexA] += faceNormalX;
+      normals[indexA + 1] += faceNormalY;
+      normals[indexA + 2] += faceNormalZ;
+      normals[indexB] += faceNormalX;
+      normals[indexB + 1] += faceNormalY;
+      normals[indexB + 2] += faceNormalZ;
+      normals[indexC] += faceNormalX;
+      normals[indexC + 1] += faceNormalY;
+      normals[indexC + 2] += faceNormalZ;
+    }
+    for (let vertexIndex = 0; vertexIndex < normals.length; vertexIndex += 3) {
+      const normalLength = System41.Math.sqrt(normals[vertexIndex] * normals[vertexIndex] + normals[vertexIndex + 1] * normals[vertexIndex + 1] + normals[vertexIndex + 2] * normals[vertexIndex + 2]);
+      if (normalLength > 0) {
+        normals[vertexIndex] /= normalLength;
+        normals[vertexIndex + 1] /= normalLength;
+        normals[vertexIndex + 2] /= normalLength;
+      }
+    }
+    return normals;
+  }
+  //==============================================================================
+  // 실수형 어트리뷰트 바인드. (신규 버퍼 생성 + 포인터 설정)
+  //==============================================================================
+  /**
+   * @param { ShaderProgram } shaderProgram
+   * @param { string } attributeName
+   * @param { Float32Array } dataArray
+   * @param { number } componentCount
+   */
+  bindFloatAttribute(shaderProgram, attributeName, dataArray, componentCount) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const attributeLocation = shaderProgram.getAttributeLocation(attributeName);
+    if (attributeLocation < 0) {
+      return;
+    }
+    const glBuffer = webGL2RenderingContext.createBuffer();
+    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, glBuffer);
+    webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, dataArray, webGL2RenderingContext.STATIC_DRAW);
+    webGL2RenderingContext.enableVertexAttribArray(attributeLocation);
+    webGL2RenderingContext.vertexAttribPointer(attributeLocation, componentCount, webGL2RenderingContext.FLOAT, false, 0, 0);
+  }
+  //==============================================================================
+  // 정수형 어트리뷰트 바인드. (조인트 인덱스)
+  //==============================================================================
+  /**
+   * @param { ShaderProgram } shaderProgram
+   * @param { string } attributeName
+   * @param { Uint16Array } dataArray
+   * @param { number } componentCount
+   */
+  bindIntegerAttribute(shaderProgram, attributeName, dataArray, componentCount) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const attributeLocation = shaderProgram.getAttributeLocation(attributeName);
+    if (attributeLocation < 0) {
+      return;
+    }
+    const glBuffer = webGL2RenderingContext.createBuffer();
+    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, glBuffer);
+    webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, dataArray, webGL2RenderingContext.STATIC_DRAW);
+    webGL2RenderingContext.enableVertexAttribArray(attributeLocation);
+    webGL2RenderingContext.vertexAttribIPointer(attributeLocation, componentCount, webGL2RenderingContext.UNSIGNED_SHORT, 0, 0);
+  }
+  //==============================================================================
+  // 애니메이션 재생. (크로스페이드)
+  //==============================================================================
+  /**
+   * @param { string } animationName
+   * @param { number } fadeDuration
+   */
+  playAnimation(animationName, fadeDuration = 0.25) {
+    if (this.#currentAnimation && this.#currentAnimation.name === animationName) {
+      return;
+    }
+    let foundAnimation = null;
+    for (const animation of this.#animationList) {
+      if (animation.name === animationName) {
+        foundAnimation = animation;
+      }
+    }
+    if (!foundAnimation) {
+      return;
+    }
+    this.#previousAnimation = this.#currentAnimation;
+    this.#previousTime = this.#currentTime;
+    this.#currentAnimation = foundAnimation;
+    this.#currentTime = 0;
+    this.#fadeDuration = fadeDuration;
+    this.#fadeElapsed = 0;
+  }
+  //==============================================================================
+  // 애니메이션 샘플링. (현재 노드 포즈에 가중 블렌딩)
+  //==============================================================================
+  /**
+   * @param { object } animation
+   * @param { number } time
+   * @param { number } blendWeight
+   */
+  sampleAnimation(animation, time, blendWeight) {
+    const nodeList = this.getNodeList();
+    const loopedTime = animation.duration > 0 ? time % animation.duration : 0;
+    for (const channel of animation.channels) {
+      const node = nodeList[channel.nodeIndex];
+      if (!node) {
+        continue;
+      }
+      const times = channel.times;
+      const keyCount = times.length;
+      if (channel.cursor >= keyCount - 1 || times[channel.cursor] > loopedTime) {
+        channel.cursor = 0;
+      }
+      while (channel.cursor < keyCount - 2 && times[channel.cursor + 1] < loopedTime) {
+        channel.cursor += 1;
+      }
+      const frameIndex = channel.cursor;
+      const nextIndex = System41.Math.min(frameIndex + 1, keyCount - 1);
+      const spanDuration = times[nextIndex] - times[frameIndex];
+      const factor = spanDuration > 0 ? System41.Math.max(0, System41.Math.min(1, (loopedTime - times[frameIndex]) / spanDuration)) : 0;
+      if (channel.path === "rotation") {
+        const baseOffset = frameIndex * 4;
+        const nextOffset = nextIndex * 4;
+        const fromRotation = Quaternion.create(channel.values[baseOffset], channel.values[baseOffset + 1], channel.values[baseOffset + 2], channel.values[baseOffset + 3]);
+        const toRotation = Quaternion.create(channel.values[nextOffset], channel.values[nextOffset + 1], channel.values[nextOffset + 2], channel.values[nextOffset + 3]);
+        const sampledRotation = Quaternion.slerp(fromRotation, toRotation, factor);
+        if (blendWeight >= 1) {
+          node.currentRotation = sampledRotation;
+        } else {
+          node.currentRotation = Quaternion.slerp(node.currentRotation, sampledRotation, blendWeight);
+        }
+      } else if (channel.path === "translation" || channel.path === "scale") {
+        const targetArray = channel.path === "translation" ? node.currentTranslation : node.currentScale;
+        const baseOffset = frameIndex * 3;
+        const nextOffset = nextIndex * 3;
+        for (let componentIndex = 0; componentIndex < 3; ++componentIndex) {
+          const fromValue = channel.values[baseOffset + componentIndex];
+          const toValue = channel.values[nextOffset + componentIndex];
+          const sampledValue = fromValue + (toValue - fromValue) * factor;
+          targetArray[componentIndex] = targetArray[componentIndex] + (sampledValue - targetArray[componentIndex]) * blendWeight;
+        }
+      }
+    }
+  }
+  //==============================================================================
+  // 갱신. (시간 전진 → 포즈 샘플링 → 월드/조인트 행렬 계산)
+  //==============================================================================
+  /**
+   * @param { number } deltaTime
+   */
+  update(deltaTime) {
+    const currentAnimation = this.#currentAnimation;
+    if (!currentAnimation) {
+      return;
+    }
+    this.#currentTime += deltaTime * this.#timeScale;
+    if (this.#previousAnimation) {
+      this.#previousTime += deltaTime * this.#timeScale;
+      this.#fadeElapsed += deltaTime;
+      if (this.#fadeElapsed >= this.#fadeDuration) {
+        this.#previousAnimation = null;
+      }
+    }
+    const nodeList = this.getNodeList();
+    for (const node of nodeList) {
+      node.currentTranslation[0] = node.baseTranslation[0];
+      node.currentTranslation[1] = node.baseTranslation[1];
+      node.currentTranslation[2] = node.baseTranslation[2];
+      node.currentScale[0] = node.baseScale[0];
+      node.currentScale[1] = node.baseScale[1];
+      node.currentScale[2] = node.baseScale[2];
+      node.currentRotation = node.baseRotation;
+    }
+    if (this.#previousAnimation) {
+      this.sampleAnimation(this.#previousAnimation, this.#previousTime, 1);
+      const blendWeight = System41.Math.min(this.#fadeElapsed / System41.Math.max(this.#fadeDuration, 1e-4), 1);
+      this.sampleAnimation(currentAnimation, this.#currentTime, blendWeight);
+    } else {
+      this.sampleAnimation(currentAnimation, this.#currentTime, 1);
+    }
+    for (const [nodeIndex, offsetRotation] of this.#jointRotationOffsets) {
+      const node = nodeList[nodeIndex];
+      if (node) {
+        node.currentRotation = node.currentRotation.multiply(offsetRotation);
+      }
+    }
+    const traversalStack = [];
+    for (const rootIndex of this.getRootNodeIndices()) {
+      traversalStack.push({ nodeIndex: rootIndex, parentIndex: -1 });
+    }
+    while (traversalStack.length > 0) {
+      const entry = traversalStack.pop();
+      const node = nodeList[entry.nodeIndex];
+      const localMatrix = Matrix4.createTranslation(node.currentTranslation[0], node.currentTranslation[1], node.currentTranslation[2]);
+      const rotationMatrix = Matrix4.createRotationFromQuaternion(node.currentRotation);
+      localMatrix.multiply(rotationMatrix);
+      localMatrix.scale(node.currentScale[0], node.currentScale[1], node.currentScale[2]);
+      if (entry.parentIndex >= 0) {
+        const parentNode = nodeList[entry.parentIndex];
+        const worldMatrix = parentNode.worldMatrix.clone();
+        worldMatrix.multiply(localMatrix);
+        node.worldMatrix = worldMatrix;
+      } else {
+        node.worldMatrix = localMatrix;
+      }
+      for (const childIndex of node.childIndices) {
+        traversalStack.push({ nodeIndex: childIndex, parentIndex: entry.nodeIndex });
+      }
+    }
+    for (const skin of this.getSkinList()) {
+      for (let jointIndex = 0; jointIndex < skin.jointNodeIndices.length; ++jointIndex) {
+        const jointNode = nodeList[skin.jointNodeIndices[jointIndex]];
+        const jointMatrix = jointNode.worldMatrix.clone();
+        jointMatrix.multiply(skin.inverseBindMatrices[jointIndex]);
+        const jointElements = jointMatrix.getElements();
+        skin.jointMatrixArray.set(jointElements, jointIndex * 16);
+      }
+    }
+  }
+  //==============================================================================
+  // 조인트 회전 오프셋 설정. (이름 부분 일치 노드에 로컬 회전 누적)
+  //==============================================================================
+  /**
+   * @param { string } jointNamePart
+   * @param { Quaternion } offsetRotation
+   */
+  setJointRotationOffset(jointNamePart, offsetRotation) {
+    const nodeList = this.getNodeList();
+    for (let nodeIndex = 0; nodeIndex < nodeList.length; ++nodeIndex) {
+      if (nodeList[nodeIndex].name.includes(jointNamePart)) {
+        this.#jointRotationOffsets.set(nodeIndex, offsetRotation);
+      }
+    }
+  }
+  //==============================================================================
+  // 조인트 회전 오프셋 전체 해제.
+  //==============================================================================
+  clearJointRotationOffsets() {
+    this.#jointRotationOffsets.clear();
+  }
+  //==============================================================================
+  // 애니메이션 이름 목록 반환.
+  //==============================================================================
+  /**
+   * @returns { string[] }
+   */
+  getAnimationNameList() {
+    const nameList = this.#animationList.map((animation) => animation.name);
+    return nameList;
+  }
+  //==============================================================================
+  // 재생 속도 설정.
+  //==============================================================================
+  /**
+   * @param { number } timeScale
+   */
+  setTimeScale(timeScale) {
+    this.#timeScale = timeScale;
+  }
+  //==============================================================================
+  // 렌더링 컨텍스트 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGL2RenderingContext }
+   */
+  getWebGL2RenderingContext() {
+    return this.#webGL2RenderingContext;
+  }
+  //==============================================================================
+  // 셰이더 프로그램 반환.
+  //==============================================================================
+  /**
+   * @returns { ShaderProgram }
+   */
+  getShaderProgram() {
+    return this.#shaderProgram;
+  }
+  //==============================================================================
+  // 노드 목록 반환.
+  //==============================================================================
+  /**
+   * @returns { object[] }
+   */
+  getNodeList() {
+    return this.#nodeList;
+  }
+  //==============================================================================
+  // 루트 노드 인덱스 목록 반환.
+  //==============================================================================
+  /**
+   * @returns { number[] }
+   */
+  getRootNodeIndices() {
+    return this.#rootNodeIndices;
+  }
+  //==============================================================================
+  // 스킨 목록 반환.
+  //==============================================================================
+  /**
+   * @returns { object[] }
+   */
+  getSkinList() {
+    return this.#skinList;
+  }
+  //==============================================================================
+  // 드로어블 목록 반환.
+  //==============================================================================
+  /**
+   * @returns { object[] }
+   */
+  getDrawableList() {
+    return this.#drawableList;
+  }
+};
+
+// src/experimental/graphics/skinnedmodelrenderer.js
+var SKINNED_VERTEXSHADER_SOURCE = `#version 300 es
+layout(location = 0) in vec3 vertexPosition;
+layout(location = 1) in vec3 vertexNormal;
+layout(location = 2) in vec2 vertexTextureCoordinate;
+layout(location = 3) in uvec4 vertexJoints;
+layout(location = 4) in vec4 vertexWeights;
+uniform mat4 modelMatrix;
+uniform mat4 viewProjectionMatrix;
+uniform mat4 lightViewProjectionMatrix;
+uniform mat4 jointMatrices[96];
+out vec3 worldPosition;
+out vec3 worldNormal;
+out vec2 fragmentTextureCoordinate;
+out vec4 lightSpacePosition;
+void main() {
+	mat4 skinMatrix = vertexWeights.x * jointMatrices[vertexJoints.x]
+		+ vertexWeights.y * jointMatrices[vertexJoints.y]
+		+ vertexWeights.z * jointMatrices[vertexJoints.z]
+		+ vertexWeights.w * jointMatrices[vertexJoints.w];
+	vec4 skinnedPosition = modelMatrix * skinMatrix * vec4(vertexPosition, 1.0);
+	worldPosition = skinnedPosition.xyz;
+
+	// \uB178\uBA40 \uBBF8\uBCF4\uC720 \uBAA8\uB378 \uAC00\uB4DC. (\uBE44\uD65C\uC131 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8\uB294 \uC601\uBCA1\uD130 \u2014 \uC704\uCABD\uC73C\uB85C \uB300\uCCB4)
+	vec3 safeNormal = dot(vertexNormal, vertexNormal) < 0.0001 ? vec3(0.0, 1.0, 0.0) : vertexNormal;
+	worldNormal = normalize(mat3(modelMatrix) * mat3(skinMatrix) * safeNormal);
+	fragmentTextureCoordinate = vertexTextureCoordinate;
+	lightSpacePosition = lightViewProjectionMatrix * skinnedPosition;
+	gl_Position = viewProjectionMatrix * skinnedPosition;
+}
+`;
+var SKINNED_FRAGMENTSHADER_SOURCE = `#version 300 es
+precision highp float;
+in vec3 worldPosition;
+in vec3 worldNormal;
+in vec2 fragmentTextureCoordinate;
+in vec4 lightSpacePosition;
+uniform sampler2D baseColorTexture;
+uniform sampler2D normalTexture;
+uniform sampler2D metallicRoughnessTexture;
+uniform sampler2D glossinessTexture;
+uniform sampler2D occlusionTexture;
+uniform sampler2D emissiveTexture;
+uniform sampler2D specularTexture;
+uniform sampler2D opacityTexture;
+uniform vec3 baseColorFactor;
+uniform float metallicFactor;
+uniform float roughnessFactor;
+uniform vec3 emissiveFactor;
+uniform int useGlossiness;
+uniform int useAlphaCutout;
+uniform highp sampler2DShadow shadowMapTexture;
+uniform float shadowStrength;
+uniform float shadowTexelSize;
+uniform vec3 sunDirection;
+uniform vec3 cameraPosition;
+uniform vec3 fogColor;
+uniform vec2 fogRange;
+out vec4 outputColor;
+
+float sampleShadowFactor() {
+	vec3 projected = lightSpacePosition.xyz / lightSpacePosition.w;
+	projected = projected * 0.5 + 0.5;
+	if (projected.x < 0.0 || projected.x > 1.0 || projected.y < 0.0 || projected.y > 1.0 || projected.z > 1.0) {
+		return 1.0;
+	}
+	float shadowSum = 0.0;
+	for (int offsetY = -1; offsetY <= 1; ++offsetY) {
+		for (int offsetX = -1; offsetX <= 1; ++offsetX) {
+			vec2 tapOffset = vec2(float(offsetX), float(offsetY)) * shadowTexelSize;
+			shadowSum += texture(shadowMapTexture, vec3(projected.xy + tapOffset, projected.z - 0.0018));
+		}
+	}
+	return shadowSum / 9.0;
+}
+
+vec3 applyNormalMap(vec3 geometryNormal) {
+	vec3 tangentNormal = texture(normalTexture, fragmentTextureCoordinate).xyz * 2.0 - 1.0;
+	vec3 positionDx = dFdx(worldPosition);
+	vec3 positionDy = dFdy(worldPosition);
+	vec2 textureDx = dFdx(fragmentTextureCoordinate);
+	vec2 textureDy = dFdy(fragmentTextureCoordinate);
+	vec3 perpendicularX = cross(positionDy, geometryNormal);
+	vec3 perpendicularY = cross(geometryNormal, positionDx);
+	vec3 tangent = perpendicularX * textureDx.x + perpendicularY * textureDy.x;
+	vec3 bitangent = perpendicularX * textureDx.y + perpendicularY * textureDy.y;
+	float maxLengthSquared = max(dot(tangent, tangent), dot(bitangent, bitangent));
+	if (maxLengthSquared < 1e-16) {
+		return geometryNormal;
+	}
+	float inverseLength = inversesqrt(maxLengthSquared);
+	mat3 tangentFrame = mat3(tangent * inverseLength, bitangent * inverseLength, geometryNormal);
+	return normalize(tangentFrame * tangentNormal);
+}
+
+void main() {
+	// \uC54C\uD30C \uCEF7\uC544\uC6C3. (\uC624\uD30C\uC2DC\uD2F0 \uB9F5 \uBCF4\uC720 \uC7AC\uC9C8 \u2014 \uBA38\uB9AC\uCE74\uB77D/\uC18D\uB208\uC379\uC758 \uD22C\uBA85 \uC601\uC5ED \uC81C\uAC70)
+	if (useAlphaCutout == 1) {
+		float opacity = texture(opacityTexture, fragmentTextureCoordinate).r;
+		if (opacity < 0.5) {
+			discard;
+		}
+	}
+
+	vec3 albedo = texture(baseColorTexture, fragmentTextureCoordinate).rgb * baseColorFactor;
+	float metallic = metallicFactor;
+	float roughness = roughnessFactor;
+	if (useGlossiness == 1) {
+		float glossiness = texture(glossinessTexture, fragmentTextureCoordinate).r;
+		roughness = clamp(roughnessFactor * (1.0 - glossiness), 0.045, 1.0);
+	}
+	else {
+		vec4 metallicRoughnessSample = texture(metallicRoughnessTexture, fragmentTextureCoordinate);
+		roughness = clamp(roughnessFactor * metallicRoughnessSample.g, 0.045, 1.0);
+		metallic = metallicFactor * metallicRoughnessSample.b;
+	}
+	float occlusion = texture(occlusionTexture, fragmentTextureCoordinate).r;
+	vec3 emissive = texture(emissiveTexture, fragmentTextureCoordinate).rgb * emissiveFactor;
+	vec3 specularTint = texture(specularTexture, fragmentTextureCoordinate).rgb;
+
+	vec3 geometryNormal = normalize(worldNormal);
+	vec3 viewDirection = normalize(cameraPosition - worldPosition);
+	if (dot(geometryNormal, viewDirection) < 0.0) {
+		geometryNormal = -geometryNormal;
+	}
+	vec3 surfaceNormal = applyNormalMap(geometryNormal);
+
+	float shadowFactor = 1.0;
+	if (shadowStrength > 0.001) {
+		shadowFactor = mix(1.0, sampleShadowFactor(), shadowStrength);
+	}
+
+	// \uCFE1-\uD1A0\uB7F0\uC2A4 GGX \uC9C1\uC811\uAD11. (\uD0DC\uC591)
+	vec3 lightDirection = normalize(sunDirection);
+	vec3 halfVector = normalize(viewDirection + lightDirection);
+	float normalDotLight = max(dot(surfaceNormal, lightDirection), 0.0);
+	float normalDotView = max(dot(surfaceNormal, viewDirection), 0.0001);
+	float normalDotHalf = max(dot(surfaceNormal, halfVector), 0.0);
+	float viewDotHalf = max(dot(viewDirection, halfVector), 0.0);
+	float alpha = roughness * roughness;
+	float alphaSquared = alpha * alpha;
+	float distributionDenominator = normalDotHalf * normalDotHalf * (alphaSquared - 1.0) + 1.0;
+	float distribution = alphaSquared / (3.14159265 * distributionDenominator * distributionDenominator);
+	float geometryK = alpha * 0.5;
+	float geometryTerm = (normalDotLight / (normalDotLight * (1.0 - geometryK) + geometryK)) * (normalDotView / (normalDotView * (1.0 - geometryK) + geometryK));
+	vec3 fresnelBase = mix(vec3(0.04) * specularTint, albedo, metallic);
+	vec3 fresnel = fresnelBase + (vec3(1.0) - fresnelBase) * pow(1.0 - viewDotHalf, 5.0);
+	vec3 specular = fresnel * (distribution * geometryTerm / max(4.0 * normalDotView * normalDotLight, 0.0001));
+	vec3 diffuse = albedo * (1.0 - metallic) * (vec3(1.0) - fresnel) / 3.14159265;
+	vec3 sunColor = vec3(1.15, 1.05, 0.9) * 3.14159265;
+	vec3 directLight = (diffuse + specular) * sunColor * normalDotLight * shadowFactor;
+
+	// \uBC18\uAD6C \uC570\uBE44\uC5B8\uD2B8 + \uC774\uBBF8\uC2DC\uBE0C.
+	vec3 skyAmbient = mix(vec3(0.3, 0.33, 0.36), vec3(0.52, 0.58, 0.66), surfaceNormal.y * 0.5 + 0.5);
+	vec3 ambientLight = albedo * skyAmbient * (0.6 + 0.4 * shadowFactor) * occlusion;
+	vec3 color = directLight + ambientLight + emissive;
+	float viewDistance = distance(cameraPosition, worldPosition);
+	float fogBlend = smoothstep(fogRange.x, fogRange.y, viewDistance);
+	color = mix(color, fogColor, fogBlend);
+	outputColor = vec4(color, 1.0);
+}
+`;
+var SKINNED_DEPTH_VERTEXSHADER_SOURCE = `#version 300 es
+layout(location = 0) in vec3 vertexPosition;
+layout(location = 3) in uvec4 vertexJoints;
+layout(location = 4) in vec4 vertexWeights;
+uniform mat4 modelMatrix;
+uniform mat4 lightViewProjectionMatrix;
+uniform mat4 jointMatrices[96];
+void main() {
+	mat4 skinMatrix = vertexWeights.x * jointMatrices[vertexJoints.x]
+		+ vertexWeights.y * jointMatrices[vertexJoints.y]
+		+ vertexWeights.z * jointMatrices[vertexJoints.z]
+		+ vertexWeights.w * jointMatrices[vertexJoints.w];
+	gl_Position = lightViewProjectionMatrix * modelMatrix * skinMatrix * vec4(vertexPosition, 1.0);
+}
+`;
+var SKINNED_DEPTH_FRAGMENTSHADER_SOURCE = `#version 300 es
+precision highp float;
+void main() {
+}
+`;
+var SkinnedModelRenderer = class extends Object2 {
+  static {
+    __name(this, "SkinnedModelRenderer");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WebGL2RenderingContext } */
+  #webGL2RenderingContext;
+  /** @private @type { ShaderProgram } */
+  #shaderProgram;
+  /** @private @type { ShaderProgram } */
+  #depthShaderProgram;
+  /** @private @type { WebGLTexture | null } */
+  #shadowMapTexture;
+  /** @private @type { Float32Array | null } */
+  #lightViewProjectionElements;
+  /** @private @type { number } */
+  #shadowStrength;
+  /** @private @type { number } */
+  #shadowTexelSize;
+  /** @private @type { number[] } */
+  #sunDirection;
+  /** @private @type { number[] } */
+  #fogColor;
+  /** @private @type { number[] } */
+  #fogRange;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { WebGL2RenderingContext } webGL2RenderingContext
+   */
+  constructor(webGL2RenderingContext) {
+    super();
+    this.#webGL2RenderingContext = webGL2RenderingContext;
+    this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_VERTEXSHADER_SOURCE.trim(), SKINNED_FRAGMENTSHADER_SOURCE.trim());
+    this.#depthShaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_DEPTH_VERTEXSHADER_SOURCE.trim(), SKINNED_DEPTH_FRAGMENTSHADER_SOURCE.trim());
+    this.#shadowMapTexture = null;
+    this.#lightViewProjectionElements = null;
+    this.#shadowStrength = 0;
+    this.#shadowTexelSize = 1 / 2048;
+    this.#sunDirection = [0, 1, 0];
+    this.#fogColor = [0.8, 0.85, 0.92];
+    this.#fogRange = [55, 250];
+  }
+  //==============================================================================
+  // 출력. (모델 인스턴스의 드로어블 순회 — 머티리얼 적용 + 조인트 행렬 업로드)
+  //==============================================================================
+  /**
+   * @param { SkinnedModel } skinnedModel
+   * @param { Float32Array } viewProjectionElements
+   * @param { Float32Array } modelMatrixElements
+   * @param { number } cameraX
+   * @param { number } cameraY
+   * @param { number } cameraZ
+   */
+  draw(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const shaderProgram = this.getShaderProgram();
+    shaderProgram.use();
+    const viewProjectionLocation = shaderProgram.getUniformLocation("viewProjectionMatrix");
+    webGL2RenderingContext.uniformMatrix4fv(viewProjectionLocation, false, viewProjectionElements);
+    const modelMatrixLocation = shaderProgram.getUniformLocation("modelMatrix");
+    webGL2RenderingContext.uniformMatrix4fv(modelMatrixLocation, false, modelMatrixElements);
+    const sunDirectionLocation = shaderProgram.getUniformLocation("sunDirection");
+    webGL2RenderingContext.uniform3f(sunDirectionLocation, this.#sunDirection[0], this.#sunDirection[1], this.#sunDirection[2]);
+    const cameraPositionLocation = shaderProgram.getUniformLocation("cameraPosition");
+    webGL2RenderingContext.uniform3f(cameraPositionLocation, cameraX, cameraY, cameraZ);
+    const fogColorLocation = shaderProgram.getUniformLocation("fogColor");
+    webGL2RenderingContext.uniform3f(fogColorLocation, this.#fogColor[0], this.#fogColor[1], this.#fogColor[2]);
+    const fogRangeLocation = shaderProgram.getUniformLocation("fogRange");
+    webGL2RenderingContext.uniform2f(fogRangeLocation, this.#fogRange[0], this.#fogRange[1]);
+    const shadowStrengthLocation = shaderProgram.getUniformLocation("shadowStrength");
+    if (this.#shadowMapTexture && this.#lightViewProjectionElements) {
+      const lightViewProjectionLocation = shaderProgram.getUniformLocation("lightViewProjectionMatrix");
+      webGL2RenderingContext.uniformMatrix4fv(lightViewProjectionLocation, false, this.#lightViewProjectionElements);
+      const shadowMapTextureLocation = shaderProgram.getUniformLocation("shadowMapTexture");
+      webGL2RenderingContext.uniform1i(shadowMapTextureLocation, 1);
+      const shadowTexelSizeLocation = shaderProgram.getUniformLocation("shadowTexelSize");
+      webGL2RenderingContext.uniform1f(shadowTexelSizeLocation, this.#shadowTexelSize);
+      webGL2RenderingContext.uniform1f(shadowStrengthLocation, this.#shadowStrength);
+      webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#shadowMapTexture);
+      webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+    } else {
+      const shadowMapTextureLocation = shaderProgram.getUniformLocation("shadowMapTexture");
+      webGL2RenderingContext.uniform1i(shadowMapTextureLocation, 1);
+      webGL2RenderingContext.uniform1f(shadowStrengthLocation, 0);
+    }
+    const jointMatricesLocation = shaderProgram.getUniformLocation("jointMatrices[0]");
+    const skinList = skinnedModel.getSkinList();
+    const drawableList = skinnedModel.getDrawableList();
+    for (const drawable of drawableList) {
+      const skin = skinList[drawable.skinIndex];
+      webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skin.jointMatrixArray);
+      drawable.material.apply();
+      webGL2RenderingContext.bindVertexArray(drawable.vertexArray);
+      if (drawable.isIndexed) {
+        webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, drawable.indexCount, drawable.indexComponentType, drawable.indexByteOffset);
+      } else {
+        webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, drawable.vertexCount);
+      }
+    }
+    webGL2RenderingContext.bindVertexArray(null);
+  }
+  //==============================================================================
+  // 깊이 패스 출력. (섀도우 맵 캐스팅 — ShadowMap.beginRender() 이후 호출)
+  //==============================================================================
+  /**
+   * @param { SkinnedModel } skinnedModel
+   * @param { Float32Array } lightViewProjectionElements
+   * @param { Float32Array } modelMatrixElements
+   */
+  drawDepth(skinnedModel, lightViewProjectionElements, modelMatrixElements) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const depthShaderProgram = this.getDepthShaderProgram();
+    depthShaderProgram.use();
+    const lightViewProjectionLocation = depthShaderProgram.getUniformLocation("lightViewProjectionMatrix");
+    webGL2RenderingContext.uniformMatrix4fv(lightViewProjectionLocation, false, lightViewProjectionElements);
+    const modelMatrixLocation = depthShaderProgram.getUniformLocation("modelMatrix");
+    webGL2RenderingContext.uniformMatrix4fv(modelMatrixLocation, false, modelMatrixElements);
+    const jointMatricesLocation = depthShaderProgram.getUniformLocation("jointMatrices[0]");
+    const skinList = skinnedModel.getSkinList();
+    const drawableList = skinnedModel.getDrawableList();
+    for (const drawable of drawableList) {
+      const skin = skinList[drawable.skinIndex];
+      webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skin.jointMatrixArray);
+      webGL2RenderingContext.bindVertexArray(drawable.vertexArray);
+      if (drawable.isIndexed) {
+        webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, drawable.indexCount, drawable.indexComponentType, drawable.indexByteOffset);
+      } else {
+        webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, drawable.vertexCount);
+      }
+    }
+    webGL2RenderingContext.bindVertexArray(null);
+  }
+  //==============================================================================
+  // 섀도우 맵 설정. (본 패스에서 그림자 수신)
+  //==============================================================================
+  /**
+   * @param { WebGLTexture | null } shadowMapTexture
+   * @param { Float32Array | null } lightViewProjectionElements
+   * @param { number } texelSize
+   */
+  setShadowMap(shadowMapTexture, lightViewProjectionElements, texelSize) {
+    this.#shadowMapTexture = shadowMapTexture;
+    this.#lightViewProjectionElements = lightViewProjectionElements;
+    this.#shadowTexelSize = texelSize;
+  }
+  //==============================================================================
+  // 그림자 강도 설정. (0 = 수신 안 함)
+  //==============================================================================
+  /**
+   * @param { number } shadowStrength
+   */
+  setShadowStrength(shadowStrength) {
+    this.#shadowStrength = shadowStrength;
+  }
+  //==============================================================================
+  // 태양 방향 설정.
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   * @param { number } z
+   */
+  setSunDirection(x, y, z) {
+    this.#sunDirection = [x, y, z];
+  }
+  //==============================================================================
+  // 안개 색 설정.
+  //==============================================================================
+  /**
+   * @param { number } red
+   * @param { number } green
+   * @param { number } blue
+   */
+  setFogColor(red, green, blue) {
+    this.#fogColor = [red, green, blue];
+  }
+  //==============================================================================
+  // 안개 거리 범위 설정.
+  //==============================================================================
+  /**
+   * @param { number } startDistance
+   * @param { number } endDistance
+   */
+  setFogRange(startDistance, endDistance) {
+    this.#fogRange = [startDistance, endDistance];
+  }
+  //==============================================================================
+  // 셰이더 프로그램 반환. (스키닝 PBR 템플릿)
+  //==============================================================================
+  /**
+   * @returns { ShaderProgram }
+   */
+  getShaderProgram() {
+    return this.#shaderProgram;
+  }
+  //==============================================================================
+  // 깊이 셰이더 프로그램 반환.
+  //==============================================================================
+  /**
+   * @returns { ShaderProgram }
+   */
+  getDepthShaderProgram() {
+    return this.#depthShaderProgram;
+  }
+  //==============================================================================
+  // 렌더링 컨텍스트 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGL2RenderingContext }
+   */
+  getWebGL2RenderingContext() {
+    return this.#webGL2RenderingContext;
+  }
+};
+
+// src/experimental/graphics/shadowmap.js
+var System42 = globalThis;
+var ShadowMap = class extends Object2 {
+  static {
+    __name(this, "ShadowMap");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WebGL2RenderingContext } */
+  #webGL2RenderingContext;
+  /** @private @type { WebGLFramebuffer } */
+  #framebuffer;
+  /** @private @type { WebGLTexture } */
+  #depthTexture;
+  /** @private @type { number } */
+  #resolution;
+  /** @private @type { Matrix4 } */
+  #lightViewProjectionMatrix;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { WebGL2RenderingContext } webGL2RenderingContext
+   * @param { number } resolution
+   */
+  constructor(webGL2RenderingContext, resolution = 2048) {
+    super();
+    this.#webGL2RenderingContext = webGL2RenderingContext;
+    this.#resolution = resolution;
+    this.#lightViewProjectionMatrix = Matrix4.createIdentity();
+    const depthTexture = webGL2RenderingContext.createTexture();
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, depthTexture);
+    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.DEPTH_COMPONENT24, resolution, resolution, 0, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, null);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.LINEAR);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_COMPARE_MODE, webGL2RenderingContext.COMPARE_REF_TO_TEXTURE);
+    webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_COMPARE_FUNC, webGL2RenderingContext.LEQUAL);
+    const framebuffer = webGL2RenderingContext.createFramebuffer();
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
+    webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.DEPTH_ATTACHMENT, webGL2RenderingContext.TEXTURE_2D, depthTexture, 0);
+    webGL2RenderingContext.drawBuffers([webGL2RenderingContext.NONE]);
+    webGL2RenderingContext.readBuffer(webGL2RenderingContext.NONE);
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+    this.#framebuffer = framebuffer;
+    this.#depthTexture = depthTexture;
+  }
+  //==============================================================================
+  // 광원 행렬 갱신. (초점 주변을 덮는 직교 투영 — 텍셀 스냅)
+  //==============================================================================
+  /**
+   * @param { Vector3 } focusPosition
+   * @param { Vector3 } lightDirection 빛이 나아가는 방향.
+   * @param { number } extent 초점 기준 절반 커버 범위.
+   * @param { number } nearDistance
+   * @param { number } farDistance
+   */
+  updateLightMatrix(focusPosition, lightDirection, extent, nearDistance, farDistance) {
+    const normalizedDirection = lightDirection.normalize();
+    const eyeDistance = (nearDistance + farDistance) * 0.5;
+    const eyeOffset = normalizedDirection.multiply(-eyeDistance);
+    const eyePosition = focusPosition.add(eyeOffset);
+    const upDirection = Vector3.up();
+    const viewMatrix = Matrix4.createLookAt(eyePosition, focusPosition, upDirection);
+    const worldUnitsPerTexel = extent * 2 / this.getResolution();
+    const viewElements = viewMatrix.getElements();
+    viewElements[12] = System42.Math.round(viewElements[12] / worldUnitsPerTexel) * worldUnitsPerTexel;
+    viewElements[13] = System42.Math.round(viewElements[13] / worldUnitsPerTexel) * worldUnitsPerTexel;
+    const orthographicMatrix = Matrix4.createOrthographic(-extent, extent, -extent, extent, nearDistance, farDistance);
+    const lightViewProjectionMatrix = orthographicMatrix.clone();
+    lightViewProjectionMatrix.multiply(viewMatrix);
+    this.#lightViewProjectionMatrix = lightViewProjectionMatrix;
+  }
+  //==============================================================================
+  // 깊이 패스 시작. (프레임버퍼 바인드 + 뷰포트 + 깊이 클리어)
+  //==============================================================================
+  beginRender() {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const framebuffer = this.getFramebuffer();
+    const resolution = this.getResolution();
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
+    webGL2RenderingContext.viewport(0, 0, resolution, resolution);
+    webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+    webGL2RenderingContext.depthMask(true);
+    webGL2RenderingContext.clear(webGL2RenderingContext.DEPTH_BUFFER_BIT);
+  }
+  //==============================================================================
+  // 렌더링 컨텍스트 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGL2RenderingContext }
+   */
+  getWebGL2RenderingContext() {
+    return this.#webGL2RenderingContext;
+  }
+  //==============================================================================
+  // 프레임버퍼 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGLFramebuffer }
+   */
+  getFramebuffer() {
+    return this.#framebuffer;
+  }
+  //==============================================================================
+  // 깊이 텍스처 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGLTexture }
+   */
+  getDepthTexture() {
+    return this.#depthTexture;
+  }
+  //==============================================================================
+  // 해상도 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getResolution() {
+    return this.#resolution;
+  }
+  //==============================================================================
+  // 광원 뷰 투영 행렬 반환.
+  //==============================================================================
+  /**
+   * @returns { Matrix4 }
+   */
+  getLightViewProjectionMatrix() {
+    return this.#lightViewProjectionMatrix;
+  }
+};
+
 // src/experimental/action.js
 var Action = class extends Object2 {
   static {
@@ -22062,7 +26342,7 @@ var BunchAsset = class extends BlobAsset {
 };
 
 // import.js
-var System37 = globalThis;
+var System43 = globalThis;
 export {
   Action,
   Animation,
@@ -22073,6 +26353,7 @@ export {
   Asset,
   AudioAsset,
   BlobAsset,
+  BloomEffect,
   BrowserType,
   BunchAsset,
   Camera,
@@ -22086,6 +26367,7 @@ export {
   Enum,
   FontAsset,
   Frame,
+  FullscreenPass,
   Graphic,
   Identifier,
   ImageAsset2 as ImageAsset,
@@ -22103,7 +26385,9 @@ export {
   LayoutVariable,
   List,
   Mask,
+  Material,
   math_exports as Math,
+  Matrix4,
   Node,
   NodeLayout,
   OBB,
@@ -22112,18 +26396,24 @@ export {
   Pivot,
   Platform,
   PlatformType,
+  Quaternion,
   Queue,
   Rect,
   reflection_exports as Reflection,
+  RenderTarget,
   RichText,
   Scene,
   SceneManager,
   ScrollBarAxis,
   Set2 as Set,
+  ShaderProgram,
+  ShadowMap,
   Singleton,
+  SkinnedModel,
+  SkinnedModelRenderer,
   Sprite,
   Stack,
-  System37 as System,
+  System43 as System,
   Text,
   TextAlign,
   TextAsset,
@@ -22149,6 +26439,7 @@ export {
   UIToggleButton,
   UIView,
   Vector2,
+  Vector3,
   Version,
   ViewManager,
   ViewScaleMode,
@@ -22158,3 +26449,4 @@ export {
   wait_exports as Wait,
   WorldNode
 };
+//# sourceMappingURL=vanilla.js.map

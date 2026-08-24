@@ -1,2 +1,4 @@
 .backup
 *.bkp
+.env
+.assets-inbox/

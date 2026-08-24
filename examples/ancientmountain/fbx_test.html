@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>FBX TEST</title>
+</head>
+<body style="margin:0">
+	<canvas id="testCanvas" width="800" height="600"></canvas>
+	<script type="module">
+		const System = globalThis;
+
+		async function report(text) {
+			await System.fetch("/__report?text=" + encodeURIComponent(text));
+		}
+
+		(async () => {
+			try {
+				await report("STAGE import");
+				const engineModule = await import("../../build/vanilla.js");
+				const SkinnedModel = engineModule.SkinnedModel;
+				const SkinnedModelRenderer = engineModule.SkinnedModelRenderer;
+				const Matrix4 = engineModule.Matrix4;
+				const Vector3 = engineModule.Vector3;
+				const canvas = document.getElementById("testCanvas");
+				const webGL2RenderingContext = canvas.getContext("webgl2");
+				webGL2RenderingContext.viewport(0, 0, 800, 600);
+				webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+				webGL2RenderingContext.enable(webGL2RenderingContext.CULL_FACE);
+				webGL2RenderingContext.clearColor(0.16, 0.2, 0.26, 1);
+
+				await report("STAGE load");
+				const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+				const model = await SkinnedModel.loadFromFbxUrl(webGL2RenderingContext, "./assets/Remy.fbx", skinnedModelRenderer);
+				await report("STAGE loaded anims=" + model.getAnimationNameList().join("|"));
+				const drawableList = model.getDrawableList();
+				const distinctMaterials = new System.Set(drawableList.map((drawable) => drawable.material));
+				await report("MATERIALS drawables=" + drawableList.length + " distinct=" + distinctMaterials.size);
+				skinnedModelRenderer.setSunDirection(0.45, 0.76, 0.47);
+				skinnedModelRenderer.setFogRange(3000, 8000);
+				await model.addAnimationsFromFbxUrl("./assets/anims/idle.fbx", "Idle");
+				await model.addAnimationsFromFbxUrl("./assets/anims/walk.fbx", "Walk");
+				await model.addAnimationsFromFbxUrl("./assets/anims/run.fbx", "Run");
+				await model.addAnimationsFromFbxUrl("./assets/anims/land.fbx", "Land");
+				await report("ANIMS " + model.getAnimationNameList().join("|"));
+				model.playAnimation("Idle", 0);
+				model.update(0.6);
+
+				async function drawAndCapture(shotName, cameraX, cameraY, cameraZ, targetY, modelScale) {
+					webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+					const cameraPosition = Vector3.create(cameraX, cameraY, cameraZ);
+					const cameraTarget = Vector3.create(0, targetY, 0);
+					const cameraUp = Vector3.up();
+					const viewMatrix = Matrix4.createLookAt(cameraPosition, cameraTarget, cameraUp);
+					const projectionMatrix = Matrix4.createPerspective(System.Math.PI / 3, 800 / 600, 0.1, 5000);
+					const viewProjectionMatrix = projectionMatrix.clone();
+					viewProjectionMatrix.multiply(viewMatrix);
+					const modelMatrix = Matrix4.createScale(modelScale, modelScale, modelScale);
+					const viewProjectionElements = viewProjectionMatrix.getElements();
+					const modelMatrixElements = modelMatrix.getElements();
+					skinnedModelRenderer.draw(model, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ);
+					const drawError = webGL2RenderingContext.getError();
+					const pixelBuffer = new System.Uint8Array(4);
+					const sampleTexts = [];
+					for (const samplePoint of [[400, 300], [400, 420], [400, 100], [250, 380]]) {
+						webGL2RenderingContext.readPixels(samplePoint[0], samplePoint[1], 1, 1, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, pixelBuffer);
+						sampleTexts.push(`(${samplePoint[0]},${samplePoint[1]})=${pixelBuffer[0]},${pixelBuffer[1]},${pixelBuffer[2]}`);
+					}
+					const dataUrl = canvas.toDataURL("image/png");
+					await System.fetch("/__screenshot?name=" + shotName, { method: "POST", body: dataUrl });
+					await report(`SHOT ${shotName} drawError=${drawError} pixels ${sampleTexts.join(" ")}`);
+				}
+
+				// Mixamo FBX 는 cm 단위(Hips Y=209, 전신 ~350). 전신/상반신 뷰.
+				await drawAndCapture("fbx_face", 0, 352, 78, 350, 1.0);
+				await drawAndCapture("fbx_idle", 0, 175, 560, 175, 1.0);
+				model.playAnimation("Walk", 0);
+				model.update(0.45);
+				await drawAndCapture("fbx_walk", 0, 175, 560, 175, 1.0);
+				model.playAnimation("Run", 0);
+				model.update(0.3);
+				await drawAndCapture("fbx_run", 0, 175, 560, 175, 1.0);
+
+				// 착지 클립 구간 확인. (도입부를 잘라낸 애셋 — 시작/중간 포즈)
+				model.playAnimation("Land", 0);
+				model.update(0);
+				await drawAndCapture("fbx_land_start", 0, 175, 560, 175, 1.0);
+				model.update(0.2);
+				await drawAndCapture("fbx_land_crouch", 0, 175, 560, 175, 1.0);
+
+				await report("OK");
+			}
+			catch (error) {
+				await report(`FAIL ${error.message} ${error.stack}`);
+			}
+		})();
+	</script>
+</body>
+</html>

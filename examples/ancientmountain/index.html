@@ -1,0 +1,3041 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<title>ANCIENT MOUNTAIN</title>
+	<link rel="icon" href="./favicon.svg">
+	<style>
+		html, body {
+			margin: 0;
+			padding: 0;
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+			background: #ced6c8;
+			touch-action: none;
+			-webkit-user-select: none;
+			user-select: none;
+			-webkit-touch-callout: none;
+		}
+		#mainCanvas {
+			position: absolute;
+			left: 0;
+			top: 0;
+			width: 100%;
+			height: 100%;
+			display: block;
+		}
+		#titleOverlay {
+			position: absolute;
+			left: 50%;
+			top: 9%;
+			transform: translateX(-50%);
+			text-align: center;
+			pointer-events: none;
+			user-select: none;
+			font-family: "Segoe UI Light", "Segoe UI", "Malgun Gothic", sans-serif;
+			animation: titleEntrance 3.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+		}
+		#titleMain {
+			font-size: clamp(26px, 5vw, 58px);
+			font-weight: 200;
+			letter-spacing: 0.5em;
+			text-indent: 0.5em;
+			color: #f7f3e8;
+			text-shadow: 0 2px 18px rgba(20, 34, 52, 0.85), 0 0 42px rgba(255, 226, 150, 0.25);
+		}
+		#titleDivider {
+			width: min(240px, 40vw);
+			height: 1px;
+			margin: 14px auto 12px;
+			background: linear-gradient(90deg, transparent, rgba(247, 243, 232, 0.75), transparent);
+		}
+		#titleSub {
+			font-size: clamp(9px, 1.2vw, 12px);
+			font-weight: 300;
+			letter-spacing: 0.85em;
+			text-indent: 0.85em;
+			color: rgba(233, 236, 240, 0.8);
+			text-shadow: 0 1px 8px rgba(20, 34, 52, 0.8);
+		}
+		#homeLink {
+			position: absolute;
+			left: 50%;
+			bottom: 5.5%;
+			transform: translateX(-50%);
+			font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+			font-size: clamp(9px, 1.2vw, 12px);
+			font-weight: 300;
+			letter-spacing: 0.45em;
+			text-indent: 0.45em;
+			text-decoration: none;
+			color: rgba(247, 243, 232, 0.8);
+			padding: 10px 22px;
+			border: 1px solid rgba(247, 243, 232, 0.32);
+			border-radius: 999px;
+			background: rgba(16, 26, 38, 0.4);
+			backdrop-filter: blur(8px);
+			-webkit-backdrop-filter: blur(8px);
+			text-shadow: 0 1px 8px rgba(20, 34, 52, 0.8);
+			transition: color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+			animation: titleEntrance 3.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+		}
+		#homeLink:hover {
+			color: #ffffff;
+			border-color: rgba(255, 236, 180, 0.85);
+			background: rgba(38, 52, 70, 0.55);
+			box-shadow: 0 0 22px rgba(255, 236, 180, 0.3);
+		}
+		@keyframes titleEntrance {
+			0% { opacity: 0; transform: translateX(-50%) translateY(-14px); filter: blur(8px); }
+			100% { opacity: 1; transform: translateX(-50%) translateY(0); filter: blur(0); }
+		}
+	</style>
+</head>
+<body>
+	<canvas id="mainCanvas"></canvas>
+	<div id="titleOverlay">
+		<div id="titleMain">ANCIENT MOUNTAIN</div>
+		<div id="titleDivider"></div>
+		<div id="titleSub">VANILLA.JS</div>
+	</div>
+	<a id="homeLink" href="https://ddukbaek2.com" target="_blank" rel="noopener">DDUKBAEK2.COM</a>
+	<script type="module">
+	"use strict";
+	const System = globalThis;
+
+	//==============================================================================
+	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../build/vanilla.js)
+	// - 3D 수학(Vector3 / Matrix4)과 인캔버스 UI(Graphic / VirtualPad)를 엔진에서 가져온다.
+	//==============================================================================
+	let engineModule = null;
+	try {
+		try {
+			engineModule = await import("./vanilla.js");
+		}
+		catch (importError) {
+			engineModule = await import("../../build/vanilla.js");
+		}
+	}
+	catch (engineError) {
+		System.document.body.innerHTML = "<p style=\"color:#fff;font-family:sans-serif;padding:2em\">vanilla.js 엔진 모듈을 불러오지 못했습니다.</p>";
+		throw engineError;
+	}
+	const Graphic = engineModule.Graphic;
+	const Rect = engineModule.Rect;
+	const Vector2 = engineModule.Vector2;
+	const Vector3 = engineModule.Vector3;
+	const Matrix4 = engineModule.Matrix4;
+	const VirtualPad = engineModule.VirtualPad;
+	const Color = engineModule.Color;
+	const ShaderProgram = engineModule.ShaderProgram;
+	const RenderTarget = engineModule.RenderTarget;
+	const FullscreenPass = engineModule.FullscreenPass;
+	const BloomEffect = engineModule.BloomEffect;
+	const SkinnedModel = engineModule.SkinnedModel;
+	const SkinnedModelRenderer = engineModule.SkinnedModelRenderer;
+	const ShadowMap = engineModule.ShadowMap;
+
+	//==============================================================================
+	// 셰이더 소스 목록.
+	//==============================================================================
+	// 하늘. (그라디언트 + 태양 + 절차적 구름 + 지평선 헤이즈 — 엔진 FullscreenPass 로 출력)
+	const SKY_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec2 fragmentCoordinate;
+	uniform vec3 cameraRightDirection;
+	uniform vec3 cameraUpDirection;
+	uniform vec3 cameraForwardDirection;
+	uniform vec3 sunDirection;
+	uniform float tangentHalfFieldOfView;
+	uniform float aspectRatio;
+	uniform float elapsedTime;
+	out vec4 outputColor;
+
+	float hash21(vec2 point) {
+		point = fract(point * vec2(234.34, 435.345));
+		point += dot(point, point + 34.23);
+		return fract(point.x * point.y);
+	}
+
+	float valueNoise(vec2 point) {
+		vec2 cellOrigin = floor(point);
+		vec2 cellFraction = point - cellOrigin;
+		vec2 weight = cellFraction * cellFraction * (3.0 - 2.0 * cellFraction);
+		float value00 = hash21(cellOrigin);
+		float value10 = hash21(cellOrigin + vec2(1.0, 0.0));
+		float value01 = hash21(cellOrigin + vec2(0.0, 1.0));
+		float value11 = hash21(cellOrigin + vec2(1.0, 1.0));
+		float valueX0 = mix(value00, value10, weight.x);
+		float valueX1 = mix(value01, value11, weight.x);
+		return mix(valueX0, valueX1, weight.y);
+	}
+
+	float fractalNoise(vec2 point) {
+		float total = valueNoise(point) * 0.5;
+		total += valueNoise(point * 2.13 + 17.0) * 0.28;
+		total += valueNoise(point * 4.41 + 47.0) * 0.22;
+		return total;
+	}
+
+	void main() {
+		vec3 rayDirection = normalize(cameraForwardDirection
+			+ cameraRightDirection * fragmentCoordinate.x * tangentHalfFieldOfView * aspectRatio
+			+ cameraUpDirection * fragmentCoordinate.y * tangentHalfFieldOfView);
+
+		// 하늘 그라디언트. (지평선: 밝은 헤이즈, 천정: 깊은 파랑)
+		float horizonBlend = clamp(rayDirection.y, 0.0, 1.0);
+		vec3 zenithColor = vec3(0.2, 0.44, 0.82);
+		vec3 horizonColor = vec3(0.78, 0.85, 0.93);
+		vec3 color = mix(horizonColor, zenithColor, pow(horizonBlend, 0.55));
+
+		// 지평선 아래는 안개색으로 침잠. (지형이 대부분 가리지만 틈새 대비)
+		color = mix(vec3(0.8, 0.85, 0.92), color, smoothstep(-0.06, 0.02, rayDirection.y));
+
+		// 태양 디스크 + 글로우.
+		float sunAmount = max(dot(rayDirection, sunDirection), 0.0);
+		color += vec3(1.0, 0.93, 0.78) * (pow(sunAmount, 900.0) * 4.0 + pow(sunAmount, 64.0) * 0.35 + pow(sunAmount, 8.0) * 0.12);
+
+		// 구름. (하늘 평면에 투영한 fbm 노이즈, 천천히 흐름)
+		if (rayDirection.y > 0.015) {
+			vec2 cloudPoint = rayDirection.xz / (rayDirection.y + 0.12) * 1.7;
+			cloudPoint += vec2(elapsedTime * 0.012, elapsedTime * 0.004);
+			float cloudNoise = fractalNoise(cloudPoint * 0.6);
+			float cloudAmount = smoothstep(0.52, 0.78, cloudNoise) * smoothstep(0.015, 0.12, rayDirection.y);
+			color = mix(color, vec3(0.98, 0.985, 1.0), cloudAmount * 0.85);
+		}
+
+		outputColor = vec4(color, 1.0);
+	}
+	`;
+
+	// 섀도우 맵 샘플링 공용 GLSL. (PCF 9탭 — 프래그먼트 셰이더에 삽입)
+	const SHADOW_SAMPLING_GLSL = `
+	uniform highp sampler2DShadow shadowMapTexture;
+	uniform float shadowStrength;
+	uniform float shadowTexelSize;
+
+	float sampleShadowFactor(vec4 lightSpacePosition) {
+		if (shadowStrength < 0.001) {
+			return 1.0;
+		}
+		vec3 projected = lightSpacePosition.xyz / lightSpacePosition.w;
+		projected = projected * 0.5 + 0.5;
+		if (projected.x < 0.0 || projected.x > 1.0 || projected.y < 0.0 || projected.y > 1.0 || projected.z > 1.0) {
+			return 1.0;
+		}
+		float shadowSum = 0.0;
+		for (int offsetY = -1; offsetY <= 1; ++offsetY) {
+			for (int offsetX = -1; offsetX <= 1; ++offsetX) {
+				vec2 tapOffset = vec2(float(offsetX), float(offsetY)) * shadowTexelSize;
+				shadowSum += texture(shadowMapTexture, vec3(projected.xy + tapOffset, projected.z - 0.0018));
+			}
+		}
+		return mix(1.0, shadowSum / 9.0, shadowStrength);
+	}
+	`;
+
+	// 지형 버텍스 셰이더. (JS 에서 구운 정점/노멀을 그대로 출력)
+	const TERRAIN_VERTEXSHADER_SOURCE = `#version 300 es
+	layout(location = 0) in vec3 vertexPosition;
+	layout(location = 1) in vec3 vertexNormal;
+	uniform mat4 viewProjectionMatrix;
+	uniform mat4 lightViewProjectionMatrix;
+	out vec3 worldPosition;
+	out vec3 worldNormal;
+	out vec4 lightSpacePosition;
+	void main() {
+		worldPosition = vertexPosition;
+		worldNormal = vertexNormal;
+		lightSpacePosition = lightViewProjectionMatrix * vec4(vertexPosition, 1.0);
+		gl_Position = viewProjectionMatrix * vec4(vertexPosition, 1.0);
+	}
+	`;
+
+	// 지형 프래그먼트 셰이더. (경사/고도/순환로 기반 3중 텍스처 블렌딩 + 라이팅 + 안개)
+	const TERRAIN_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec3 worldPosition;
+	in vec3 worldNormal;
+	in vec4 lightSpacePosition;
+	uniform sampler2D grassTexture;
+	uniform sampler2D rockTexture;
+	uniform sampler2D dirtTexture;
+	uniform vec3 sunDirection;
+	uniform vec3 cameraPosition;
+	uniform float pathRadius;
+	out vec4 outputColor;
+	${SHADOW_SAMPLING_GLSL}
+	float hash21(vec2 point) {
+		point = fract(point * vec2(234.34, 435.345));
+		point += dot(point, point + 34.23);
+		return fract(point.x * point.y);
+	}
+
+	float valueNoise(vec2 point) {
+		vec2 cellOrigin = floor(point);
+		vec2 cellFraction = point - cellOrigin;
+		vec2 weight = cellFraction * cellFraction * (3.0 - 2.0 * cellFraction);
+		float value00 = hash21(cellOrigin);
+		float value10 = hash21(cellOrigin + vec2(1.0, 0.0));
+		float value01 = hash21(cellOrigin + vec2(0.0, 1.0));
+		float value11 = hash21(cellOrigin + vec2(1.0, 1.0));
+		float valueX0 = mix(value00, value10, weight.x);
+		float valueX1 = mix(value01, value11, weight.x);
+		return mix(valueX0, valueX1, weight.y);
+	}
+
+	// 정수 격자 해시. (JS 쪽 지형 기복 완화 계산과 비트 단위로 동일한 결정적 난수)
+	float latticeRandom(int cellX, int cellZ) {
+		uint hashValue = uint(cellX) * 374761393u + uint(cellZ) * 668265263u;
+		hashValue = (hashValue ^ (hashValue >> 13u)) * 1274126177u;
+		hashValue = hashValue ^ (hashValue >> 16u);
+		return float(hashValue & 65535u) / 65535.0;
+	}
+
+	float latticeValueNoise(vec2 point) {
+		vec2 cellOrigin = floor(point);
+		vec2 cellFraction = point - cellOrigin;
+		vec2 weight = cellFraction * cellFraction * (3.0 - 2.0 * cellFraction);
+		int cellX = int(cellOrigin.x);
+		int cellZ = int(cellOrigin.y);
+		float value00 = latticeRandom(cellX, cellZ);
+		float value10 = latticeRandom(cellX + 1, cellZ);
+		float value01 = latticeRandom(cellX, cellZ + 1);
+		float value11 = latticeRandom(cellX + 1, cellZ + 1);
+		float valueX0 = mix(value00, value10, weight.x);
+		float valueX1 = mix(value01, value11, weight.x);
+		return mix(valueX0, valueX1, weight.y);
+	}
+
+	void main() {
+		vec3 surfaceNormal = normalize(worldNormal);
+
+		// 평지: 풀 / 흙길, 급경사: 절벽 바위. (절벽은 트라이플래너 매핑 — 늘어짐 방지)
+		vec3 grassColor = texture(grassTexture, worldPosition.xz * 0.22).rgb;
+
+		// 길 정렬 UV. (호 길이 x 반경 방향 — 굽이치는 길 방향을 따라 타일링)
+		float pathAngleForUV = atan(worldPosition.z, worldPosition.x);
+		float pathArcLength = pathAngleForUV * pathRadius;
+		float pathRadialOffset = length(worldPosition.xz) - pathRadius;
+		vec2 pathAlignedUV = vec2(pathArcLength * 0.16, pathRadialOffset * 0.2);
+		vec3 dirtColor = texture(dirtTexture, pathAlignedUV).rgb;
+		vec3 normalWeight = abs(surfaceNormal);
+		normalWeight = normalWeight / (normalWeight.x + normalWeight.y + normalWeight.z);
+		vec3 rockColorX = texture(rockTexture, worldPosition.zy * 0.12).rgb;
+		vec3 rockColorY = texture(rockTexture, worldPosition.xz * 0.12).rgb;
+		vec3 rockColorZ = texture(rockTexture, worldPosition.xy * 0.12).rgb;
+		vec3 rockColor = rockColorX * normalWeight.x + rockColorY * normalWeight.y + rockColorZ * normalWeight.z;
+
+		float slopeAmount = 1.0 - surfaceNormal.y;
+		float rockBlend = smoothstep(0.28, 0.5, slopeAmount);
+		rockBlend = max(rockBlend, smoothstep(20.0, 32.0, worldPosition.y));
+
+		// 산 사이를 잇는 순환 흙길. (JS 기복 완화와 동일한 격자 노이즈 굽이침, 폭도 변주)
+		float pathAngle = atan(worldPosition.z, worldPosition.x);
+		float pathWobble = (latticeValueNoise(vec2(cos(pathAngle) * 3.0 + 7.0, sin(pathAngle) * 3.0 + 7.0)) - 0.5) * 16.0;
+		float pathWidth = 3.2 + valueNoise(vec2(pathAngle * 2.0 + 31.0, 5.0)) * 2.4;
+		float pathDistance = abs(length(worldPosition.xz) - (pathRadius + pathWobble));
+		float pathBlend = (1.0 - smoothstep(pathWidth, pathWidth + 3.4, pathDistance)) * (1.0 - rockBlend) * (1.0 - smoothstep(2.5, 4.5, worldPosition.y));
+
+		vec3 albedo = mix(grassColor, dirtColor, pathBlend);
+		albedo = mix(albedo, rockColor, rockBlend);
+
+		// 광역 명암 변주. (타일 반복감 완화)
+		float macroVariation = 0.9 + 0.2 * valueNoise(worldPosition.xz * 0.035);
+		albedo *= macroVariation;
+
+		// 태양 확산광 + 하늘 반구광. (섀도우 맵 수신)
+		float sunDiffuse = max(dot(surfaceNormal, sunDirection), 0.0);
+		float shadowFactor = sampleShadowFactor(lightSpacePosition);
+		vec3 skyAmbient = mix(vec3(0.3, 0.33, 0.36), vec3(0.52, 0.58, 0.66), surfaceNormal.y * 0.5 + 0.5);
+		vec3 color = albedo * (vec3(1.15, 1.05, 0.9) * sunDiffuse * shadowFactor + skyAmbient * (0.6 + 0.4 * shadowFactor));
+
+		// 거리 안개. (대기 원근 — 경계 산맥이 부드럽게 하늘로 녹아들도록)
+		float viewDistance = distance(cameraPosition, worldPosition);
+		float fogBlend = smoothstep(55.0, 250.0, viewDistance);
+		color = mix(color, vec3(0.8, 0.85, 0.92), fogBlend);
+
+		outputColor = vec4(color, 1.0);
+	}
+	`;
+
+	// 오브젝트 버텍스 셰이더. (바위 / 깃발 — 모델 행렬 적용)
+	const OBJECT_VERTEXSHADER_SOURCE = `#version 300 es
+	layout(location = 0) in vec3 vertexPosition;
+	layout(location = 1) in vec3 vertexNormal;
+	uniform mat4 modelMatrix;
+	uniform mat4 viewProjectionMatrix;
+	uniform mat4 lightViewProjectionMatrix;
+	out vec3 worldPosition;
+	out vec3 worldNormal;
+	out vec4 lightSpacePosition;
+	void main() {
+		vec4 transformedPosition = modelMatrix * vec4(vertexPosition, 1.0);
+		worldPosition = transformedPosition.xyz;
+		worldNormal = normalize(mat3(modelMatrix) * vertexNormal);
+		lightSpacePosition = lightViewProjectionMatrix * transformedPosition;
+		gl_Position = viewProjectionMatrix * transformedPosition;
+	}
+	`;
+
+	// 오브젝트 프래그먼트 셰이더. (단색 + 라이팅 + 섀도우 + 안개)
+	const OBJECT_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec3 worldPosition;
+	in vec3 worldNormal;
+	in vec4 lightSpacePosition;
+	uniform vec3 objectColor;
+	uniform vec3 sunDirection;
+	uniform vec3 cameraPosition;
+	out vec4 outputColor;
+	${SHADOW_SAMPLING_GLSL}
+	void main() {
+		vec3 surfaceNormal = normalize(worldNormal);
+		float sunDiffuse = max(dot(surfaceNormal, sunDirection), 0.0);
+		float shadowFactor = sampleShadowFactor(lightSpacePosition);
+		vec3 skyAmbient = mix(vec3(0.3, 0.33, 0.36), vec3(0.52, 0.58, 0.66), surfaceNormal.y * 0.5 + 0.5);
+		vec3 color = objectColor * (vec3(1.15, 1.05, 0.9) * sunDiffuse * shadowFactor + skyAmbient * (0.6 + 0.4 * shadowFactor));
+
+		float viewDistance = distance(cameraPosition, worldPosition);
+		float fogBlend = smoothstep(55.0, 250.0, viewDistance);
+		color = mix(color, vec3(0.8, 0.85, 0.92), fogBlend);
+
+		outputColor = vec4(color, 1.0);
+	}
+	`;
+
+	// 바위 프래그먼트 셰이더. (트라이플래너 볼더 텍스처 + 틴트 + 라이팅 + 안개)
+	// - 버텍스 셰이더는 오브젝트용을 공유한다.
+	const ROCK_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec3 worldPosition;
+	in vec3 worldNormal;
+	in vec4 lightSpacePosition;
+	uniform sampler2D boulderTexture;
+	uniform vec3 tintColor;
+	uniform vec3 sunDirection;
+	uniform vec3 cameraPosition;
+	out vec4 outputColor;
+	${SHADOW_SAMPLING_GLSL}
+	void main() {
+		vec3 surfaceNormal = normalize(worldNormal);
+		vec3 normalWeight = abs(surfaceNormal);
+		normalWeight = normalWeight / (normalWeight.x + normalWeight.y + normalWeight.z);
+		vec3 rockColorX = texture(boulderTexture, worldPosition.zy * 0.32).rgb;
+		vec3 rockColorY = texture(boulderTexture, worldPosition.xz * 0.32).rgb;
+		vec3 rockColorZ = texture(boulderTexture, worldPosition.xy * 0.32).rgb;
+		vec3 albedo = (rockColorX * normalWeight.x + rockColorY * normalWeight.y + rockColorZ * normalWeight.z) * tintColor;
+
+		float sunDiffuse = max(dot(surfaceNormal, sunDirection), 0.0);
+		float shadowFactor = sampleShadowFactor(lightSpacePosition);
+		vec3 skyAmbient = mix(vec3(0.3, 0.33, 0.36), vec3(0.52, 0.58, 0.66), surfaceNormal.y * 0.5 + 0.5);
+		vec3 color = albedo * (vec3(1.15, 1.05, 0.9) * sunDiffuse * shadowFactor + skyAmbient * (0.6 + 0.4 * shadowFactor));
+
+		float viewDistance = distance(cameraPosition, worldPosition);
+		float fogBlend = smoothstep(55.0, 250.0, viewDistance);
+		color = mix(color, vec3(0.8, 0.85, 0.92), fogBlend);
+
+		outputColor = vec4(color, 1.0);
+	}
+	`;
+
+	// 깊이 전용 셰이더. (섀도우 맵 캐스팅 — 지형 / 바위 / 깃발 공용)
+	const DEPTH_VERTEXSHADER_SOURCE = `#version 300 es
+	layout(location = 0) in vec3 vertexPosition;
+	uniform mat4 modelMatrix;
+	uniform mat4 lightViewProjectionMatrix;
+	void main() {
+		gl_Position = lightViewProjectionMatrix * modelMatrix * vec4(vertexPosition, 1.0);
+	}
+	`;
+	const DEPTH_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	void main() {
+	}
+	`;
+
+	// 최종 합성. (블룸 가산 + 방사형 모션 블러 + 비네트 + 필름 그레인 + ACES 톤맵)
+	const COMPOSITE_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec2 fragmentCoordinate;
+	in vec2 fragmentTextureCoordinate;
+	uniform sampler2D sceneTexture;
+	uniform sampler2D bloomTexture;
+	uniform vec2 resolution;
+	uniform float elapsedTime;
+	uniform float bloomStrength;
+	uniform float motionBlurStrength;
+	uniform vec2 motionBlurCenter;
+	uniform float vignetteStrength;
+	uniform float filmStrength;
+	out vec4 outputColor;
+
+	float hash21(vec2 point) {
+		point = fract(point * vec2(234.34, 435.345));
+		point += dot(point, point + 34.23);
+		return fract(point.x * point.y);
+	}
+
+	void main() {
+		// 방사형 모션 블러. (캐릭터 투영 지점을 중심으로 바깥이 흐르는 잔상)
+		vec3 color;
+		if (motionBlurStrength > 0.001) {
+			vec2 blurVector = (motionBlurCenter - fragmentTextureCoordinate) * motionBlurStrength;
+			color = texture(sceneTexture, fragmentTextureCoordinate).rgb;
+			for (int sampleIndex = 1; sampleIndex < 8; ++sampleIndex) {
+				vec2 sampleOffset = blurVector * (float(sampleIndex) / 7.0);
+				color += texture(sceneTexture, fragmentTextureCoordinate + sampleOffset).rgb;
+			}
+			color /= 8.0;
+		}
+		else {
+			color = texture(sceneTexture, fragmentTextureCoordinate).rgb;
+		}
+
+		// 블룸 가산.
+		vec3 bloomColor = texture(bloomTexture, fragmentTextureCoordinate).rgb;
+		color += bloomColor * bloomStrength;
+
+		// 필름 그레인.
+		float grain = hash21(fragmentTextureCoordinate * resolution + fract(elapsedTime) * 371.0);
+		color += (grain - 0.5) * 0.02 * filmStrength;
+
+		// 비네트.
+		float vignette = 1.0 - dot(fragmentCoordinate * 0.5, fragmentCoordinate * 0.5) * 0.62 * vignetteStrength;
+		color *= clamp(vignette, 0.0, 1.0);
+
+		// ACES 근사 필믹 톤 매핑.
+		color = clamp((color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14), 0.0, 1.0);
+
+		outputColor = vec4(color, 1.0);
+	}
+	`;
+
+	// 블롭 그림자 버텍스 셰이더. (JS 에서 지형에 맞춰 갱신하는 원반 메시)
+	const SHADOW_VERTEXSHADER_SOURCE = `#version 300 es
+	in vec4 vertexShadow; // x, y, z, alpha
+	uniform mat4 viewProjectionMatrix;
+	out float fragmentAlpha;
+	void main() {
+		fragmentAlpha = vertexShadow.w;
+		gl_Position = viewProjectionMatrix * vec4(vertexShadow.xyz, 1.0);
+	}
+	`;
+	const SHADOW_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in float fragmentAlpha;
+	uniform float shadowStrength;
+	out vec4 outputColor;
+	void main() {
+		outputColor = vec4(0.05, 0.07, 0.05, fragmentAlpha * shadowStrength);
+	}
+	`;
+
+	//==============================================================================
+	// 초기화.
+	//==============================================================================
+	const canvas = System.document.getElementById("mainCanvas");
+	const webGL2RenderingContext = canvas.getContext("webgl2", { antialias: true, depth: true, alpha: false });
+	if (!webGL2RenderingContext) {
+		System.document.body.innerHTML = "<p style=\"color:#fff;font-family:sans-serif;padding:2em\">WebGL2 를 지원하지 않는 브라우저입니다.</p>";
+		throw new Error("WebGL2 Not Supported.");
+	}
+
+	//==============================================================================
+	// 지형 정의. (넓은 순환형 맵 — 원형 순환로를 따라 등반 가능한 언덕이 늘어선 구조)
+	//==============================================================================
+	const PATH_RADIUS = 115; // 순환로 기준 반지름. (셰이더에서 각도 노이즈로 굽이침)
+	const WORLD_HALF_SIZE = 192; // 지형 절반 크기.
+	const GRID_CELL_SIZE = 1.5; // 지형 격자 셀 크기.
+	// 산 목록. (로브 조합 + 가장자리 노이즈 — 이단 봉우리 / 능선 / 외딴 봉 / 넓은 구릉 / 쌍둥이 봉)
+	const HILL_LIST = [
+		{ angleDegree: 0, ringRadius: 112, edgeSeed: 11, edgeAmplitude: 0.2, cleared: false,
+			lobes: [{ offsetX: 0, offsetZ: 0, radius: 34, height: 10 }, { offsetX: 5, offsetZ: 2, radius: 17, height: 17 }] },
+		{ angleDegree: 55, ringRadius: 121, edgeSeed: 23, edgeAmplitude: 0.16, cleared: false,
+			lobes: [{ offsetX: 0, offsetZ: 0, radius: 26, height: 13 }, { offsetX: -17, offsetZ: 10, radius: 21, height: 12 }] },
+		{ angleDegree: 118, ringRadius: 116, edgeSeed: 37, edgeAmplitude: 0.26, cleared: false,
+			lobes: [{ offsetX: 0, offsetZ: 0, radius: 22, height: 15 }] },
+		{ angleDegree: 175, ringRadius: 110, edgeSeed: 41, edgeAmplitude: 0.22, cleared: false,
+			lobes: [{ offsetX: 0, offsetZ: 0, radius: 38, height: 8.5 }] },
+		{ angleDegree: 242, ringRadius: 122, edgeSeed: 53, edgeAmplitude: 0.18, cleared: false,
+			lobes: [{ offsetX: 0, offsetZ: 0, radius: 32, height: 11 }, { offsetX: -8, offsetZ: -10, radius: 16, height: 18 }] },
+		{ angleDegree: 300, ringRadius: 115, edgeSeed: 67, edgeAmplitude: 0.24, cleared: false,
+			lobes: [{ offsetX: 0, offsetZ: 0, radius: 24, height: 12 }, { offsetX: 20, offsetZ: -12, radius: 18, height: 10 }] },
+	];
+	// 보조 봉우리 목록. (깃발 없는 산 — 주 봉우리 사이를 메워 산맥을 이룬다)
+	const EXTRA_PEAK_LIST = [
+		{ angleDegree: 27, ringRadius: 138, edgeSeed: 71, edgeAmplitude: 0.24,
+			lobes: [{ offsetX: 0, offsetZ: 0, radius: 26, height: 11 }, { offsetX: -14, offsetZ: 6, radius: 18, height: 9 }] },
+		{ angleDegree: 88, ringRadius: 142, edgeSeed: 79, edgeAmplitude: 0.2,
+			lobes: [{ offsetX: 0, offsetZ: 0, radius: 30, height: 13 }] },
+		{ angleDegree: 147, ringRadius: 136, edgeSeed: 83, edgeAmplitude: 0.26,
+			lobes: [{ offsetX: 0, offsetZ: 0, radius: 24, height: 9 }, { offsetX: 16, offsetZ: -8, radius: 17, height: 12 }] },
+		{ angleDegree: 210, ringRadius: 144, edgeSeed: 89, edgeAmplitude: 0.22,
+			lobes: [{ offsetX: 0, offsetZ: 0, radius: 28, height: 12 }] },
+		{ angleDegree: 272, ringRadius: 138, edgeSeed: 97, edgeAmplitude: 0.18,
+			lobes: [{ offsetX: 0, offsetZ: 0, radius: 32, height: 10 }, { offsetX: -10, offsetZ: -12, radius: 16, height: 14 }] },
+		{ angleDegree: 330, ringRadius: 140, edgeSeed: 101, edgeAmplitude: 0.24,
+			lobes: [{ offsetX: 0, offsetZ: 0, radius: 25, height: 11 }] },
+	];
+	for (const extraPeak of EXTRA_PEAK_LIST) {
+		const angleRadian = (extraPeak.angleDegree * System.Math.PI) / 180;
+		extraPeak.centerX = System.Math.cos(angleRadian) * extraPeak.ringRadius;
+		extraPeak.centerZ = System.Math.sin(angleRadian) * extraPeak.ringRadius;
+		let boundRadius = 0;
+		for (const lobe of extraPeak.lobes) {
+			const lobeReach = System.Math.sqrt(lobe.offsetX * lobe.offsetX + lobe.offsetZ * lobe.offsetZ) + lobe.radius * (1 + extraPeak.edgeAmplitude) + 2;
+			boundRadius = System.Math.max(boundRadius, lobeReach);
+		}
+		extraPeak.boundRadius = boundRadius;
+	}
+
+	for (const hill of HILL_LIST) {
+		const angleRadian = (hill.angleDegree * System.Math.PI) / 180;
+		hill.centerX = System.Math.cos(angleRadian) * hill.ringRadius;
+		hill.centerZ = System.Math.sin(angleRadian) * hill.ringRadius;
+		hill.clearedPulseTime = -100;
+
+		// 정상 로브. (가장 높은 로브 — 깃발 위치 / 정복 판정 기준)
+		let summitLobe = hill.lobes[0];
+		for (const lobe of hill.lobes) {
+			if (lobe.height > summitLobe.height) {
+				summitLobe = lobe;
+			}
+		}
+		hill.summitX = hill.centerX + summitLobe.offsetX;
+		hill.summitZ = hill.centerZ + summitLobe.offsetZ;
+		hill.summitRadius = summitLobe.radius;
+		hill.summitHeight = summitLobe.height;
+
+		// 경계 반지름. (지형 계산 조기 탈출 / 바위 배치 회피용)
+		let boundRadius = 0;
+		for (const lobe of hill.lobes) {
+			const lobeReach = System.Math.sqrt(lobe.offsetX * lobe.offsetX + lobe.offsetZ * lobe.offsetZ) + lobe.radius * (1 + hill.edgeAmplitude) + 2;
+			boundRadius = System.Math.max(boundRadius, lobeReach);
+		}
+		hill.boundRadius = boundRadius;
+	}
+
+	// 지형 계산용 전체 산 목록. (주 봉우리 + 보조 봉우리)
+	const MOUNTAIN_LIST = HILL_LIST.concat(EXTRA_PEAK_LIST);
+
+	// 정수 격자 해시. (결정적 난수 — 배치/노이즈 공용)
+	function latticeRandomAt(cellX, cellZ) {
+		let hashValue = (System.Math.imul(cellX, 374761393) + System.Math.imul(cellZ, 668265263)) >>> 0;
+		hashValue = System.Math.imul(hashValue ^ (hashValue >>> 13), 1274126177) >>> 0;
+		hashValue = (hashValue ^ (hashValue >>> 16)) >>> 0;
+		return (hashValue & 65535) / 65535;
+	}
+
+	function smoothstepValue(edgeStart, edgeEnd, value) {
+		const normalized = System.Math.max(0, System.Math.min(1, (value - edgeStart) / (edgeEnd - edgeStart)));
+		return normalized * normalized * (3 - 2 * normalized);
+	}
+
+	function valueNoiseAt(pointX, pointZ) {
+		const cellOriginX = System.Math.floor(pointX);
+		const cellOriginZ = System.Math.floor(pointZ);
+		const fractionX = pointX - cellOriginX;
+		const fractionZ = pointZ - cellOriginZ;
+		const weightX = fractionX * fractionX * (3 - 2 * fractionX);
+		const weightZ = fractionZ * fractionZ * (3 - 2 * fractionZ);
+		const value00 = latticeRandomAt(cellOriginX, cellOriginZ);
+		const value10 = latticeRandomAt(cellOriginX + 1, cellOriginZ);
+		const value01 = latticeRandomAt(cellOriginX, cellOriginZ + 1);
+		const value11 = latticeRandomAt(cellOriginX + 1, cellOriginZ + 1);
+		const valueX0 = value00 + (value10 - value00) * weightX;
+		const valueX1 = value01 + (value11 - value01) * weightX;
+		return valueX0 + (valueX1 - valueX0) * weightZ;
+	}
+
+	// 지형 높이. (길 주변만 완만한 기복 평야 + 중턱 절벽 밴드를 두른 자연 산 + 외곽 경계 산맥)
+	function terrainHeightAt(worldX, worldZ) {
+		const centerDistance = System.Math.sqrt(worldX * worldX + worldZ * worldZ);
+
+		// 순환로까지의 거리. (셰이더 흙길과 동일한 격자 노이즈 굽이침 — 길 주변은 기복 완화)
+		const pathAngle = System.Math.atan2(worldZ, worldX);
+		const pathWobble = (valueNoiseAt(System.Math.cos(pathAngle) * 3 + 7, System.Math.sin(pathAngle) * 3 + 7) - 0.5) * 16;
+		const pathDistance = System.Math.abs(centerDistance - (PATH_RADIUS + pathWobble));
+		const reliefFactor = 0.3 + 0.7 * smoothstepValue(4, 18, pathDistance);
+
+		// 기복 평야. (다중 옥타브 — 길에서 멀수록 굴곡이 커진다)
+		const rollingLarge = valueNoiseAt(worldX * 0.014, worldZ * 0.014);
+		const rollingMedium = valueNoiseAt(worldX * 0.04 + 17, worldZ * 0.04 + 17);
+		const rollingSmall = valueNoiseAt(worldX * 0.09 + 41, worldZ * 0.09 + 41);
+		let height = (rollingLarge * 4.2 + rollingMedium * 1.8 + rollingSmall * 0.6) * reliefFactor;
+
+		// 산맥 능선 밴드. (봉우리 사이를 잇는 연결 능선 — 산이 섬처럼 고립되지 않게)
+		const ridgeAngleNoise = valueNoiseAt(System.Math.cos(pathAngle) * 2.4 + 13, System.Math.sin(pathAngle) * 2.4 + 13);
+		const ridgeCenterRadius = 132 + (ridgeAngleNoise - 0.5) * 22;
+		const ridgeDistance = System.Math.abs(centerDistance - ridgeCenterRadius);
+		const ridgeProfile = System.Math.max(0, 1 - ridgeDistance / 26);
+		const ridgeHeightNoise = valueNoiseAt(System.Math.cos(pathAngle) * 4.2 + 57, System.Math.sin(pathAngle) * 4.2 + 57);
+		height += ridgeProfile * ridgeProfile * (5.5 + ridgeHeightNoise * 4) * (0.4 + 0.6 * reliefFactor);
+
+		// 산. (하부 완만한 산자락 → 중턱 절벽 밴드 → 상부 완만한 능선과 둥근 정상 — 로브 결합)
+		for (const hill of MOUNTAIN_LIST) {
+			const roughDeltaX = worldX - hill.centerX;
+			const roughDeltaZ = worldZ - hill.centerZ;
+			if (roughDeltaX * roughDeltaX + roughDeltaZ * roughDeltaZ > hill.boundRadius * hill.boundRadius) {
+				continue;
+			}
+			let hillContribution = 0;
+			for (const lobe of hill.lobes) {
+				const deltaX = worldX - (hill.centerX + lobe.offsetX);
+				const deltaZ = worldZ - (hill.centerZ + lobe.offsetZ);
+				const lobeDistance = System.Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
+
+				// 가장자리 노이즈. (각도에 따라 산자락 반경이 출렁여 실루엣이 불규칙해진다)
+				const edgeAngle = System.Math.atan2(deltaZ, deltaX);
+				const edgeNoise = valueNoiseAt(System.Math.cos(edgeAngle) * 2.6 + hill.edgeSeed, System.Math.sin(edgeAngle) * 2.6 + hill.edgeSeed);
+				const modulatedRadius = lobe.radius * (1 + (edgeNoise * 2 - 1) * hill.edgeAmplitude);
+				const falloffRatio = System.Math.max(0, System.Math.min(1, 1 - lobeDistance / modulatedRadius));
+				if (falloffRatio > 0) {
+					const baseShape = falloffRatio * falloffRatio;
+					const bandHalfRatio = 1.6 / lobe.radius;
+					const cliffShape = smoothstepValue(0.5 - bandHalfRatio, 0.5 + bandHalfRatio, falloffRatio);
+					const surfaceDetail = valueNoiseAt(worldX * 0.1 + 71, worldZ * 0.1 + 71) * 0.8 * falloffRatio;
+					const lobeHeight = lobe.height * (baseShape * 0.55 + cliffShape * 0.45) + surfaceDetail;
+					hillContribution = System.Math.max(hillContribution, lobeHeight);
+				}
+			}
+			height += hillContribution;
+		}
+
+		// 외곽 경계 산맥. (맵 밖으로 나갈 수 없는 자연 장벽 — 초입은 완만, 바깥으로 급경사)
+		if (centerDistance > 158) {
+			const boundaryFactor = (centerDistance - 158) / 34;
+			const ridgeAngle = System.Math.atan2(worldZ, worldX);
+			const ridgeVariation = 0.7 + 0.6 * valueNoiseAt(System.Math.cos(ridgeAngle) * 6 + 9, System.Math.sin(ridgeAngle) * 6 + 9);
+			height += System.Math.pow(boundaryFactor, 2.4) * 55 * ridgeVariation;
+		}
+
+		return height;
+	}
+
+	// 지형 표면 높이. (메시와 동일하게 셀 코너 높이를 쌍선형 보간 — 발밑/카메라용)
+	function terrainSurfaceHeightAt(worldX, worldZ) {
+		const cellStartX = System.Math.floor(worldX / GRID_CELL_SIZE) * GRID_CELL_SIZE;
+		const cellStartZ = System.Math.floor(worldZ / GRID_CELL_SIZE) * GRID_CELL_SIZE;
+		const normalizedX = (worldX - cellStartX) / GRID_CELL_SIZE;
+		const normalizedZ = (worldZ - cellStartZ) / GRID_CELL_SIZE;
+		const cornerHeight00 = terrainHeightAt(cellStartX, cellStartZ);
+		const cornerHeight10 = terrainHeightAt(cellStartX + GRID_CELL_SIZE, cellStartZ);
+		const cornerHeight01 = terrainHeightAt(cellStartX, cellStartZ + GRID_CELL_SIZE);
+		const cornerHeight11 = terrainHeightAt(cellStartX + GRID_CELL_SIZE, cellStartZ + GRID_CELL_SIZE);
+		const nearHeight = cornerHeight00 + (cornerHeight10 - cornerHeight00) * normalizedX;
+		const farHeight = cornerHeight01 + (cornerHeight11 - cornerHeight01) * normalizedX;
+		return nearHeight + (farHeight - nearHeight) * normalizedZ;
+	}
+
+	//==============================================================================
+	// 지형 메시 생성. (높이 그리드 → 정점/노멀/인덱스)
+	//==============================================================================
+	const gridSideCellCount = System.Math.round((WORLD_HALF_SIZE * 2) / GRID_CELL_SIZE);
+	const gridSideVertexCount = gridSideCellCount + 1;
+	const terrainHeightGrid = new System.Float32Array(gridSideVertexCount * gridSideVertexCount);
+	for (let rowIndex = 0; rowIndex < gridSideVertexCount; ++rowIndex) {
+		for (let columnIndex = 0; columnIndex < gridSideVertexCount; ++columnIndex) {
+			const worldX = -WORLD_HALF_SIZE + columnIndex * GRID_CELL_SIZE;
+			const worldZ = -WORLD_HALF_SIZE + rowIndex * GRID_CELL_SIZE;
+			terrainHeightGrid[rowIndex * gridSideVertexCount + columnIndex] = terrainHeightAt(worldX, worldZ);
+		}
+	}
+	const terrainPositionArray = new System.Float32Array(gridSideVertexCount * gridSideVertexCount * 3);
+	const terrainNormalArray = new System.Float32Array(gridSideVertexCount * gridSideVertexCount * 3);
+	for (let rowIndex = 0; rowIndex < gridSideVertexCount; ++rowIndex) {
+		for (let columnIndex = 0; columnIndex < gridSideVertexCount; ++columnIndex) {
+			const vertexIndex = rowIndex * gridSideVertexCount + columnIndex;
+			const worldX = -WORLD_HALF_SIZE + columnIndex * GRID_CELL_SIZE;
+			const worldZ = -WORLD_HALF_SIZE + rowIndex * GRID_CELL_SIZE;
+			const height = terrainHeightGrid[vertexIndex];
+			terrainPositionArray[vertexIndex * 3 + 0] = worldX;
+			terrainPositionArray[vertexIndex * 3 + 1] = height;
+			terrainPositionArray[vertexIndex * 3 + 2] = worldZ;
+
+			// 중앙 차분 노멀. (그리드 경계는 자신으로 클램프)
+			const leftColumnIndex = System.Math.max(columnIndex - 1, 0);
+			const rightColumnIndex = System.Math.min(columnIndex + 1, gridSideVertexCount - 1);
+			const nearRowIndex = System.Math.max(rowIndex - 1, 0);
+			const farRowIndex = System.Math.min(rowIndex + 1, gridSideVertexCount - 1);
+			const heightLeft = terrainHeightGrid[rowIndex * gridSideVertexCount + leftColumnIndex];
+			const heightRight = terrainHeightGrid[rowIndex * gridSideVertexCount + rightColumnIndex];
+			const heightNear = terrainHeightGrid[nearRowIndex * gridSideVertexCount + columnIndex];
+			const heightFar = terrainHeightGrid[farRowIndex * gridSideVertexCount + columnIndex];
+			const slopeX = (heightRight - heightLeft) / ((rightColumnIndex - leftColumnIndex) * GRID_CELL_SIZE);
+			const slopeZ = (heightFar - heightNear) / ((farRowIndex - nearRowIndex) * GRID_CELL_SIZE);
+			const normalLength = System.Math.sqrt(slopeX * slopeX + 1 + slopeZ * slopeZ);
+			terrainNormalArray[vertexIndex * 3 + 0] = -slopeX / normalLength;
+			terrainNormalArray[vertexIndex * 3 + 1] = 1 / normalLength;
+			terrainNormalArray[vertexIndex * 3 + 2] = -slopeZ / normalLength;
+		}
+	}
+	const terrainIndexArray = new System.Uint32Array(gridSideCellCount * gridSideCellCount * 6);
+	let terrainIndexOffset = 0;
+	for (let rowIndex = 0; rowIndex < gridSideCellCount; ++rowIndex) {
+		for (let columnIndex = 0; columnIndex < gridSideCellCount; ++columnIndex) {
+			const topLeft = rowIndex * gridSideVertexCount + columnIndex;
+			const topRight = topLeft + 1;
+			const bottomLeft = topLeft + gridSideVertexCount;
+			const bottomRight = bottomLeft + 1;
+			terrainIndexArray[terrainIndexOffset++] = topLeft;
+			terrainIndexArray[terrainIndexOffset++] = bottomLeft;
+			terrainIndexArray[terrainIndexOffset++] = topRight;
+			terrainIndexArray[terrainIndexOffset++] = topRight;
+			terrainIndexArray[terrainIndexOffset++] = bottomLeft;
+			terrainIndexArray[terrainIndexOffset++] = bottomRight;
+		}
+	}
+
+	const terrainShaderProgram = new ShaderProgram(webGL2RenderingContext, TERRAIN_VERTEXSHADER_SOURCE, TERRAIN_FRAGMENTSHADER_SOURCE);
+	const terrainViewProjectionLocation = terrainShaderProgram.getUniformLocation("viewProjectionMatrix");
+	const terrainGrassTextureLocation = terrainShaderProgram.getUniformLocation("grassTexture");
+	const terrainRockTextureLocation = terrainShaderProgram.getUniformLocation("rockTexture");
+	const terrainDirtTextureLocation = terrainShaderProgram.getUniformLocation("dirtTexture");
+	const terrainSunDirectionLocation = terrainShaderProgram.getUniformLocation("sunDirection");
+	const terrainCameraPositionLocation = terrainShaderProgram.getUniformLocation("cameraPosition");
+	const terrainPathRadiusLocation = terrainShaderProgram.getUniformLocation("pathRadius");
+	const terrainLightViewProjectionLocation = terrainShaderProgram.getUniformLocation("lightViewProjectionMatrix");
+	const terrainShadowMapTextureLocation = terrainShaderProgram.getUniformLocation("shadowMapTexture");
+	const terrainShadowStrengthLocation = terrainShaderProgram.getUniformLocation("shadowStrength");
+	const terrainShadowTexelSizeLocation = terrainShaderProgram.getUniformLocation("shadowTexelSize");
+
+	const terrainVertexArray = webGL2RenderingContext.createVertexArray();
+	webGL2RenderingContext.bindVertexArray(terrainVertexArray);
+	const terrainPositionBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, terrainPositionBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, terrainPositionArray, webGL2RenderingContext.STATIC_DRAW);
+	const terrainPositionLocation = terrainShaderProgram.getAttributeLocation("vertexPosition");
+	webGL2RenderingContext.enableVertexAttribArray(terrainPositionLocation);
+	webGL2RenderingContext.vertexAttribPointer(terrainPositionLocation, 3, webGL2RenderingContext.FLOAT, false, 0, 0);
+	const terrainNormalBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, terrainNormalBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, terrainNormalArray, webGL2RenderingContext.STATIC_DRAW);
+	const terrainNormalLocation = terrainShaderProgram.getAttributeLocation("vertexNormal");
+	webGL2RenderingContext.enableVertexAttribArray(terrainNormalLocation);
+	webGL2RenderingContext.vertexAttribPointer(terrainNormalLocation, 3, webGL2RenderingContext.FLOAT, false, 0, 0);
+	const terrainIndexBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, terrainIndexBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, terrainIndexArray, webGL2RenderingContext.STATIC_DRAW);
+	webGL2RenderingContext.bindVertexArray(null);
+
+	//==============================================================================
+	// 하늘 패스. (엔진 FullscreenPass)
+	//==============================================================================
+	const skyPass = new FullscreenPass(webGL2RenderingContext, SKY_FRAGMENTSHADER_SOURCE);
+	const skyCameraRightLocation = skyPass.getUniformLocation("cameraRightDirection");
+	const skyCameraUpLocation = skyPass.getUniformLocation("cameraUpDirection");
+	const skyCameraForwardLocation = skyPass.getUniformLocation("cameraForwardDirection");
+	const skySunDirectionLocation = skyPass.getUniformLocation("sunDirection");
+	const skyTangentHalfFieldOfViewLocation = skyPass.getUniformLocation("tangentHalfFieldOfView");
+	const skyAspectRatioLocation = skyPass.getUniformLocation("aspectRatio");
+	const skyElapsedTimeLocation = skyPass.getUniformLocation("elapsedTime");
+
+	//==============================================================================
+	// 포스트 프로세싱. (엔진 RenderTarget + BloomEffect + 합성 FullscreenPass)
+	//==============================================================================
+	const sceneRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, true);
+	const bloomEffect = new BloomEffect(webGL2RenderingContext);
+	bloomEffect.setThreshold(0.74, 0.97);
+	const compositePass = new FullscreenPass(webGL2RenderingContext, COMPOSITE_FRAGMENTSHADER_SOURCE);
+	const compositeSceneTextureLocation = compositePass.getUniformLocation("sceneTexture");
+	const compositeBloomTextureLocation = compositePass.getUniformLocation("bloomTexture");
+	const compositeResolutionLocation = compositePass.getUniformLocation("resolution");
+	const compositeElapsedTimeLocation = compositePass.getUniformLocation("elapsedTime");
+	const compositeBloomStrengthLocation = compositePass.getUniformLocation("bloomStrength");
+	const compositeMotionBlurStrengthLocation = compositePass.getUniformLocation("motionBlurStrength");
+	const compositeMotionBlurCenterLocation = compositePass.getUniformLocation("motionBlurCenter");
+	const compositeVignetteStrengthLocation = compositePass.getUniformLocation("vignetteStrength");
+	const compositeFilmStrengthLocation = compositePass.getUniformLocation("filmStrength");
+
+	//==============================================================================
+	// 섀도우 맵. (엔진 ShadowMap + 깊이 전용 프로그램 — 실시간 그림자)
+	//==============================================================================
+	const SHADOWMAP_RESOLUTION = 2048;
+	const shadowMap = new ShadowMap(webGL2RenderingContext, SHADOWMAP_RESOLUTION);
+	const depthShaderProgram = new ShaderProgram(webGL2RenderingContext, DEPTH_VERTEXSHADER_SOURCE, DEPTH_FRAGMENTSHADER_SOURCE);
+	const depthModelMatrixLocation = depthShaderProgram.getUniformLocation("modelMatrix");
+	const depthLightViewProjectionLocation = depthShaderProgram.getUniformLocation("lightViewProjectionMatrix");
+	const identityModelMatrix = Matrix4.createIdentity();
+
+	//==============================================================================
+	// 큐브 메시. (캐릭터 파츠 / 바위 / 깃발 공용 — 중심 원점, 한 변 1)
+	//==============================================================================
+	const cubeFaceDefinitions = [
+		{ normal: [0, 0, 1], corners: [[-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [0.5, 0.5, 0.5], [-0.5, 0.5, 0.5]] },
+		{ normal: [0, 0, -1], corners: [[0.5, -0.5, -0.5], [-0.5, -0.5, -0.5], [-0.5, 0.5, -0.5], [0.5, 0.5, -0.5]] },
+		{ normal: [1, 0, 0], corners: [[0.5, -0.5, 0.5], [0.5, -0.5, -0.5], [0.5, 0.5, -0.5], [0.5, 0.5, 0.5]] },
+		{ normal: [-1, 0, 0], corners: [[-0.5, -0.5, -0.5], [-0.5, -0.5, 0.5], [-0.5, 0.5, 0.5], [-0.5, 0.5, -0.5]] },
+		{ normal: [0, 1, 0], corners: [[-0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [0.5, 0.5, -0.5], [-0.5, 0.5, -0.5]] },
+		{ normal: [0, -1, 0], corners: [[-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, -0.5, 0.5], [-0.5, -0.5, 0.5]] },
+	];
+	const cubePositionList = [];
+	const cubeNormalList = [];
+	const cubeIndexList = [];
+	for (let faceIndex = 0; faceIndex < cubeFaceDefinitions.length; ++faceIndex) {
+		const faceDefinition = cubeFaceDefinitions[faceIndex];
+		const baseVertexIndex = faceIndex * 4;
+		for (const corner of faceDefinition.corners) {
+			cubePositionList.push(corner[0], corner[1], corner[2]);
+			cubeNormalList.push(faceDefinition.normal[0], faceDefinition.normal[1], faceDefinition.normal[2]);
+		}
+		cubeIndexList.push(baseVertexIndex, baseVertexIndex + 1, baseVertexIndex + 2, baseVertexIndex, baseVertexIndex + 2, baseVertexIndex + 3);
+	}
+
+	const objectShaderProgram = new ShaderProgram(webGL2RenderingContext, OBJECT_VERTEXSHADER_SOURCE, OBJECT_FRAGMENTSHADER_SOURCE);
+	const objectModelMatrixLocation = objectShaderProgram.getUniformLocation("modelMatrix");
+	const objectViewProjectionLocation = objectShaderProgram.getUniformLocation("viewProjectionMatrix");
+	const objectColorLocation = objectShaderProgram.getUniformLocation("objectColor");
+	const objectSunDirectionLocation = objectShaderProgram.getUniformLocation("sunDirection");
+	const objectCameraPositionLocation = objectShaderProgram.getUniformLocation("cameraPosition");
+	const objectLightViewProjectionLocation = objectShaderProgram.getUniformLocation("lightViewProjectionMatrix");
+	const objectShadowMapTextureLocation = objectShaderProgram.getUniformLocation("shadowMapTexture");
+	const objectShadowStrengthLocation = objectShaderProgram.getUniformLocation("shadowStrength");
+	const objectShadowTexelSizeLocation = objectShaderProgram.getUniformLocation("shadowTexelSize");
+
+	// 바위 프로그램. (버텍스는 오브젝트용 공유, 프래그먼트는 트라이플래너 볼더 텍스처)
+	const rockShaderProgram = new ShaderProgram(webGL2RenderingContext, OBJECT_VERTEXSHADER_SOURCE, ROCK_FRAGMENTSHADER_SOURCE);
+	const rockModelMatrixLocation = rockShaderProgram.getUniformLocation("modelMatrix");
+	const rockViewProjectionLocation = rockShaderProgram.getUniformLocation("viewProjectionMatrix");
+	const rockBoulderTextureLocation = rockShaderProgram.getUniformLocation("boulderTexture");
+	const rockTintColorLocation = rockShaderProgram.getUniformLocation("tintColor");
+	const rockSunDirectionLocation = rockShaderProgram.getUniformLocation("sunDirection");
+	const rockCameraPositionLocation = rockShaderProgram.getUniformLocation("cameraPosition");
+	const rockLightViewProjectionLocation = rockShaderProgram.getUniformLocation("lightViewProjectionMatrix");
+	const rockShadowMapTextureLocation = rockShaderProgram.getUniformLocation("shadowMapTexture");
+	const rockShadowStrengthLocation = rockShaderProgram.getUniformLocation("shadowStrength");
+	const rockShadowTexelSizeLocation = rockShaderProgram.getUniformLocation("shadowTexelSize");
+
+	const cubeVertexArray = webGL2RenderingContext.createVertexArray();
+	webGL2RenderingContext.bindVertexArray(cubeVertexArray);
+	const cubePositionBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, cubePositionBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, new System.Float32Array(cubePositionList), webGL2RenderingContext.STATIC_DRAW);
+	const cubePositionLocation = objectShaderProgram.getAttributeLocation("vertexPosition");
+	webGL2RenderingContext.enableVertexAttribArray(cubePositionLocation);
+	webGL2RenderingContext.vertexAttribPointer(cubePositionLocation, 3, webGL2RenderingContext.FLOAT, false, 0, 0);
+	const cubeNormalBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, cubeNormalBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, new System.Float32Array(cubeNormalList), webGL2RenderingContext.STATIC_DRAW);
+	const cubeNormalLocation = objectShaderProgram.getAttributeLocation("vertexNormal");
+	webGL2RenderingContext.enableVertexAttribArray(cubeNormalLocation);
+	webGL2RenderingContext.vertexAttribPointer(cubeNormalLocation, 3, webGL2RenderingContext.FLOAT, false, 0, 0);
+	const cubeIndexBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, cubeIndexBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, new System.Uint16Array(cubeIndexList), webGL2RenderingContext.STATIC_DRAW);
+	webGL2RenderingContext.bindVertexArray(null);
+	const cubeIndexCount = cubeIndexList.length;
+
+	//==============================================================================
+	// 블롭 그림자 메시. (중심 + 원둘레 정점, 매 프레임 지형에 맞춰 갱신)
+	//==============================================================================
+	const SHADOW_SEGMENT_COUNT = 16;
+	const SHADOW_RADIUS = 0.55;
+	const shadowVertexArraySize = (SHADOW_SEGMENT_COUNT + 1) * 4;
+	const shadowVertexData = new System.Float32Array(shadowVertexArraySize);
+	const shadowIndexList = [];
+	for (let segmentIndex = 0; segmentIndex < SHADOW_SEGMENT_COUNT; ++segmentIndex) {
+		shadowIndexList.push(0, 1 + segmentIndex, 1 + ((segmentIndex + 1) % SHADOW_SEGMENT_COUNT));
+	}
+	const shadowShaderProgram = new ShaderProgram(webGL2RenderingContext, SHADOW_VERTEXSHADER_SOURCE, SHADOW_FRAGMENTSHADER_SOURCE);
+	const shadowViewProjectionLocation = shadowShaderProgram.getUniformLocation("viewProjectionMatrix");
+	const shadowStrengthLocation = shadowShaderProgram.getUniformLocation("shadowStrength");
+	const shadowVertexArray = webGL2RenderingContext.createVertexArray();
+	webGL2RenderingContext.bindVertexArray(shadowVertexArray);
+	const shadowVertexBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, shadowVertexBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, shadowVertexData.byteLength, webGL2RenderingContext.DYNAMIC_DRAW);
+	const shadowVertexLocation = shadowShaderProgram.getAttributeLocation("vertexShadow");
+	webGL2RenderingContext.enableVertexAttribArray(shadowVertexLocation);
+	webGL2RenderingContext.vertexAttribPointer(shadowVertexLocation, 4, webGL2RenderingContext.FLOAT, false, 0, 0);
+	const shadowIndexBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, shadowIndexBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, new System.Uint16Array(shadowIndexList), webGL2RenderingContext.STATIC_DRAW);
+	webGL2RenderingContext.bindVertexArray(null);
+	const shadowIndexCount = shadowIndexList.length;
+
+	//==============================================================================
+	// 텍스처 로드. (미러 반복 랩 모드 — 어떤 이미지든 이음매 없이 타일링)
+	//==============================================================================
+	function loadTexture(imagePath) {
+		return new System.Promise((resolve, reject) => {
+			const image = new System.Image();
+			image.onload = () => {
+				const texture = webGL2RenderingContext.createTexture();
+				webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+				webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, image);
+				webGL2RenderingContext.generateMipmap(webGL2RenderingContext.TEXTURE_2D);
+				webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR_MIPMAP_LINEAR);
+				webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.LINEAR);
+				webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.MIRRORED_REPEAT);
+				webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.MIRRORED_REPEAT);
+				const anisotropicExtension = webGL2RenderingContext.getExtension("EXT_texture_filter_anisotropic");
+				if (anisotropicExtension) {
+					const maximumAnisotropy = webGL2RenderingContext.getParameter(anisotropicExtension.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+					const appliedAnisotropy = System.Math.min(8, maximumAnisotropy);
+					webGL2RenderingContext.texParameterf(webGL2RenderingContext.TEXTURE_2D, anisotropicExtension.TEXTURE_MAX_ANISOTROPY_EXT, appliedAnisotropy);
+				}
+				resolve(texture);
+			};
+			image.onerror = () => {
+				reject(new Error(`텍스처 로드 실패: ${imagePath}`));
+			};
+			image.src = imagePath;
+		});
+	}
+	const [grassTexture, rockTexture, dirtTexture, boulderTexture] = await System.Promise.all([
+		loadTexture("./assets/grass.jpg"),
+		loadTexture("./assets/rock.jpg"),
+		loadTexture("./assets/dirt.jpg"),
+		loadTexture("./assets/boulder.jpg"),
+	]);
+
+	// 스킨드 모델 렌더러. (스키닝 PBR 셰이더 템플릿 + 환경 상태 소유 — 씬당 하나)
+	const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+
+	// 캐릭터 스킨드 모델. (Mixamo Remy — 네이티브 FBX + PBR 풀맵, 애니메이션은 전용 FBX 클립으로 추가)
+	const characterModel = await SkinnedModel.loadFromFbxUrl(webGL2RenderingContext, "./assets/Remy.fbx", skinnedModelRenderer);
+	await characterModel.addAnimationsFromFbxUrl("./assets/anims/idle.fbx", "Idle");
+	await characterModel.addAnimationsFromFbxUrl("./assets/anims/walk.fbx", "Walk");
+	await characterModel.addAnimationsFromFbxUrl("./assets/anims/run.fbx", "Run");
+	await characterModel.addAnimationsFromFbxUrl("./assets/anims/fall.fbx", "Fall");
+	await characterModel.addAnimationsFromFbxUrl("./assets/anims/land.fbx", "Land");
+	await characterModel.addAnimationsFromFbxUrl("./assets/anims/climb.fbx", "Climb", true);
+	characterModel.playAnimation("Idle", 0);
+
+	// Mixamo cm 단위(전신 약 370) → 월드 유닛(약 1.8) 축소 배율.
+	const CHARACTER_MODEL_SCALE = 0.0048;
+
+	// 야생 여우. (Khronos 공식 샘플 Fox — CC0, 초원을 배회하는 환경 동물)
+	const foxModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "./assets/fox.glb", skinnedModelRenderer);
+	foxModel.playAnimation("Walk", 0);
+	const FOX_LIST = [
+		{ orbitRadius: 62, orbitSpeed: 0.02, anglePhase: 0.8, bodyScale: 0.007 },
+		{ orbitRadius: 78, orbitSpeed: -0.016, anglePhase: 3.6, bodyScale: 0.0062 },
+		{ orbitRadius: 46, orbitSpeed: 0.024, anglePhase: 2.1, bodyScale: 0.0075 },
+		{ orbitRadius: 88, orbitSpeed: 0.014, anglePhase: 5.2, bodyScale: 0.0066 },
+		{ orbitRadius: 55, orbitSpeed: -0.021, anglePhase: 4.4, bodyScale: 0.0058 },
+		{ orbitRadius: 70, orbitSpeed: -0.018, anglePhase: 1.5, bodyScale: 0.0071 },
+	];
+
+	// 여우 위치 갱신. (이동 충돌 판정보다 먼저 — 동물도 장애물로 취급)
+	function updateFoxPositions(elapsedTime) {
+		for (const fox of FOX_LIST) {
+			const orbitAngle = fox.anglePhase + elapsedTime * fox.orbitSpeed;
+			fox.currentX = System.Math.cos(orbitAngle) * fox.orbitRadius;
+			fox.currentZ = System.Math.sin(orbitAngle) * fox.orbitRadius;
+			fox.currentY = terrainSurfaceHeightAt(fox.currentX, fox.currentZ);
+			const tangentSign = fox.orbitSpeed >= 0 ? 1 : -1;
+			const velocityX = -System.Math.sin(orbitAngle) * tangentSign;
+			const velocityZ = System.Math.cos(orbitAngle) * tangentSign;
+			fox.currentYaw = System.Math.atan2(velocityX, -velocityZ);
+			fox.blockRadius = fox.bodyScale * 70;
+			fox.topHeight = fox.currentY + fox.bodyScale * 85;
+		}
+	}
+
+	// 클립 이름 해석. (애셋마다 다른 표기 대응 — 키워드 부분 일치)
+	function resolveAnimationName(nameKeyword, fallbackName) {
+		const animationNameList = characterModel.getAnimationNameList();
+		for (const animationName of animationNameList) {
+			if (animationName.toLowerCase().includes(nameKeyword)) {
+				return animationName;
+			}
+		}
+		return fallbackName;
+	}
+	const idleClipName = resolveAnimationName("idle", "Idle");
+	const walkClipName = resolveAnimationName("walk", "Walk");
+	const runClipName = resolveAnimationName("run", walkClipName);
+	const isRunClipShared = runClipName === walkClipName;
+	const fallClipName = resolveAnimationName("fall", idleClipName);
+	const landClipName = resolveAnimationName("land", idleClipName);
+	const climbClipName = resolveAnimationName("climb", idleClipName);
+
+	//==============================================================================
+	// 바위 메시 생성. (정이십면체 1회 세분 + 노이즈 변형 — 플랫 셰이딩 로우폴리 바위)
+	//==============================================================================
+	function createRockGeometry(shapeSeed) {
+		const goldenRatio = (1 + System.Math.sqrt(5)) / 2;
+		const baseVertexList = [
+			[-1, goldenRatio, 0], [1, goldenRatio, 0], [-1, -goldenRatio, 0], [1, -goldenRatio, 0],
+			[0, -1, goldenRatio], [0, 1, goldenRatio], [0, -1, -goldenRatio], [0, 1, -goldenRatio],
+			[goldenRatio, 0, -1], [goldenRatio, 0, 1], [-goldenRatio, 0, -1], [-goldenRatio, 0, 1],
+		];
+		const baseFaceList = [
+			[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
+			[1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+			[3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+			[4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1],
+		];
+		const vertexList = [];
+		for (const baseVertex of baseVertexList) {
+			const baseLength = System.Math.sqrt(baseVertex[0] * baseVertex[0] + baseVertex[1] * baseVertex[1] + baseVertex[2] * baseVertex[2]);
+			vertexList.push([baseVertex[0] / baseLength, baseVertex[1] / baseLength, baseVertex[2] / baseLength]);
+		}
+
+		// 1회 세분. (모서리 중점 캐시로 정점 공유 — 변형 후에도 이음매 없음)
+		const middleVertexCache = new System.Map();
+		function getMiddleVertexIndex(indexA, indexB) {
+			const cacheKey = indexA < indexB ? `${indexA}_${indexB}` : `${indexB}_${indexA}`;
+			if (middleVertexCache.has(cacheKey)) {
+				return middleVertexCache.get(cacheKey);
+			}
+			const vertexA = vertexList[indexA];
+			const vertexB = vertexList[indexB];
+			const middleX = (vertexA[0] + vertexB[0]) / 2;
+			const middleY = (vertexA[1] + vertexB[1]) / 2;
+			const middleZ = (vertexA[2] + vertexB[2]) / 2;
+			const middleLength = System.Math.sqrt(middleX * middleX + middleY * middleY + middleZ * middleZ);
+			vertexList.push([middleX / middleLength, middleY / middleLength, middleZ / middleLength]);
+			const middleIndex = vertexList.length - 1;
+			middleVertexCache.set(cacheKey, middleIndex);
+			return middleIndex;
+		}
+		const faceList = [];
+		for (const baseFace of baseFaceList) {
+			const middleAB = getMiddleVertexIndex(baseFace[0], baseFace[1]);
+			const middleBC = getMiddleVertexIndex(baseFace[1], baseFace[2]);
+			const middleCA = getMiddleVertexIndex(baseFace[2], baseFace[0]);
+			faceList.push([baseFace[0], middleAB, middleCA]);
+			faceList.push([baseFace[1], middleBC, middleAB]);
+			faceList.push([baseFace[2], middleCA, middleBC]);
+			faceList.push([middleAB, middleBC, middleCA]);
+		}
+
+		// 노이즈 변형. (구면 방향 기반 반지름 요동 + 상하 눌림 → 시드마다 다른 바위 형태)
+		const deformedVertexList = [];
+		for (const vertex of vertexList) {
+			const noiseValue = (
+				valueNoiseAt(vertex[0] * 1.8 + shapeSeed, vertex[1] * 1.8 + shapeSeed * 1.7)
+				+ valueNoiseAt(vertex[1] * 1.8 + shapeSeed * 2.3, vertex[2] * 1.8 + shapeSeed * 3.1)
+				+ valueNoiseAt(vertex[2] * 1.8 + shapeSeed * 4.7, vertex[0] * 1.8 + shapeSeed * 5.9)
+			) / 3;
+			const radialScale = 1 + (noiseValue * 2 - 1) * 0.45;
+			deformedVertexList.push([vertex[0] * radialScale, vertex[1] * radialScale * 0.82, vertex[2] * radialScale]);
+		}
+
+		// 플랫 셰이딩 배열. (면마다 정점 복제 + 바깥 방향 면 노멀)
+		const positionList = [];
+		const normalList = [];
+		for (const face of faceList) {
+			const vertexA = deformedVertexList[face[0]];
+			const vertexB = deformedVertexList[face[1]];
+			const vertexC = deformedVertexList[face[2]];
+			const edgeABX = vertexB[0] - vertexA[0];
+			const edgeABY = vertexB[1] - vertexA[1];
+			const edgeABZ = vertexB[2] - vertexA[2];
+			const edgeACX = vertexC[0] - vertexA[0];
+			const edgeACY = vertexC[1] - vertexA[1];
+			const edgeACZ = vertexC[2] - vertexA[2];
+			let normalX = edgeABY * edgeACZ - edgeABZ * edgeACY;
+			let normalY = edgeABZ * edgeACX - edgeABX * edgeACZ;
+			let normalZ = edgeABX * edgeACY - edgeABY * edgeACX;
+			const normalLength = System.Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
+			normalX /= normalLength;
+			normalY /= normalLength;
+			normalZ /= normalLength;
+			const centroidX = (vertexA[0] + vertexB[0] + vertexC[0]) / 3;
+			const centroidY = (vertexA[1] + vertexB[1] + vertexC[1]) / 3;
+			const centroidZ = (vertexA[2] + vertexB[2] + vertexC[2]) / 3;
+			if (normalX * centroidX + normalY * centroidY + normalZ * centroidZ < 0) {
+				normalX = -normalX;
+				normalY = -normalY;
+				normalZ = -normalZ;
+			}
+			positionList.push(vertexA[0], vertexA[1], vertexA[2], vertexB[0], vertexB[1], vertexB[2], vertexC[0], vertexC[1], vertexC[2]);
+			normalList.push(normalX, normalY, normalZ, normalX, normalY, normalZ, normalX, normalY, normalZ);
+		}
+		return { positionArray: new System.Float32Array(positionList), normalArray: new System.Float32Array(normalList), vertexCount: faceList.length * 3 };
+	}
+
+	//==============================================================================
+	// 바위 버텍스 어레이. (형태 시드가 다른 4종 변형)
+	//==============================================================================
+	const rockVariantList = [];
+	const ROCK_SHAPE_SEED_LIST = [3.1, 17.7, 42.3, 88.9];
+	for (const shapeSeed of ROCK_SHAPE_SEED_LIST) {
+		const rockGeometry = createRockGeometry(shapeSeed);
+		const rockVertexArray = webGL2RenderingContext.createVertexArray();
+		webGL2RenderingContext.bindVertexArray(rockVertexArray);
+		const rockPositionBuffer = webGL2RenderingContext.createBuffer();
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, rockPositionBuffer);
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, rockGeometry.positionArray, webGL2RenderingContext.STATIC_DRAW);
+		const rockPositionLocation = rockShaderProgram.getAttributeLocation("vertexPosition");
+		webGL2RenderingContext.enableVertexAttribArray(rockPositionLocation);
+		webGL2RenderingContext.vertexAttribPointer(rockPositionLocation, 3, webGL2RenderingContext.FLOAT, false, 0, 0);
+		const rockNormalBuffer = webGL2RenderingContext.createBuffer();
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, rockNormalBuffer);
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, rockGeometry.normalArray, webGL2RenderingContext.STATIC_DRAW);
+		const rockNormalLocation = rockShaderProgram.getAttributeLocation("vertexNormal");
+		webGL2RenderingContext.enableVertexAttribArray(rockNormalLocation);
+		webGL2RenderingContext.vertexAttribPointer(rockNormalLocation, 3, webGL2RenderingContext.FLOAT, false, 0, 0);
+		webGL2RenderingContext.bindVertexArray(null);
+		rockVariantList.push({ vertexArray: rockVertexArray, vertexCount: rockGeometry.vertexCount });
+	}
+
+	//==============================================================================
+	// 바위 배치. (결정적 난수 — 크기 분포는 작은 돌 위주 + 가끔 거석, 이동 장애물)
+	//==============================================================================
+	const rockList = [];
+	for (let rockIndex = 0; rockIndex < 220 && rockList.length < 64; ++rockIndex) {
+		const randomAngle = latticeRandomAt(rockIndex * 7 + 3, rockIndex * 13 + 5) * System.Math.PI * 2;
+		const randomRadius = 12 + latticeRandomAt(rockIndex * 11 + 1, rockIndex * 3 + 8) * 138;
+		const rockX = System.Math.cos(randomAngle) * randomRadius;
+		const rockZ = System.Math.sin(randomAngle) * randomRadius;
+		if (System.Math.abs(randomRadius - PATH_RADIUS) < 10) {
+			continue;
+		}
+		let isInsideHill = false;
+		for (const hill of HILL_LIST) {
+			const deltaX = rockX - hill.centerX;
+			const deltaZ = rockZ - hill.centerZ;
+			const hillDistance = System.Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
+			if (hillDistance < hill.boundRadius + 3) {
+				isInsideHill = true;
+			}
+		}
+		if (isInsideHill) {
+			continue;
+		}
+		const sizeRandom = latticeRandomAt(rockIndex * 5 + 2, rockIndex * 17 + 6);
+		const rockScale = 0.45 + sizeRandom * sizeRandom * 3.0;
+		const rockYaw = latticeRandomAt(rockIndex * 19 + 4, rockIndex * 23 + 9) * System.Math.PI * 2;
+		const rockTilt = (latticeRandomAt(rockIndex * 31 + 8, rockIndex * 37 + 2) - 0.5) * 0.3;
+		const tintTone = 0.82 + latticeRandomAt(rockIndex * 29 + 7, rockIndex * 31 + 11) * 0.36;
+		const variantIndex = System.Math.floor(latticeRandomAt(rockIndex * 41 + 13, rockIndex * 43 + 17) * rockVariantList.length) % rockVariantList.length;
+		const rockHeight = terrainSurfaceHeightAt(rockX, rockZ);
+		const rockMatrix = Matrix4.createTranslation(rockX, rockHeight + rockScale * 0.28, rockZ);
+		rockMatrix.rotateY(rockYaw);
+		rockMatrix.rotateZ(rockTilt);
+		rockMatrix.scale(rockScale, rockScale * (0.75 + sizeRandom * 0.3), rockScale);
+		rockList.push({
+			matrix: rockMatrix,
+			tint: [tintTone, tintTone, tintTone * 0.98],
+			variantIndex: variantIndex,
+			centerX: rockX,
+			centerZ: rockZ,
+			blockRadius: rockScale * 0.95 + 0.3,
+			topHeight: rockHeight + rockScale * 1.15,
+		});
+	}
+
+	//==============================================================================
+	// 정상 깃발. (기둥은 정적, 깃발천은 매 프레임 물결 회전)
+	//==============================================================================
+	const FLAG_POLE_HEIGHT = 3.2;
+	for (const hill of HILL_LIST) {
+		hill.flagBaseHeight = terrainSurfaceHeightAt(hill.summitX, hill.summitZ);
+		const poleMatrix = Matrix4.createTranslation(hill.summitX, hill.flagBaseHeight + FLAG_POLE_HEIGHT * 0.5, hill.summitZ);
+		poleMatrix.scale(0.1, FLAG_POLE_HEIGHT, 0.1);
+		hill.poleMatrix = poleMatrix;
+	}
+
+	//==============================================================================
+	// 정적 블롭 그림자 메시. (바위/깃발 아래 — 초기화 때 지형 표면에 맞춰 굽는다)
+	//==============================================================================
+	const STATIC_SHADOW_SEGMENT_COUNT = 12;
+	const staticShadowPositionList = [];
+	const staticShadowIndexList = [];
+	function appendStaticShadowDisc(centerX, centerZ, discRadius, centerAlpha) {
+		const baseVertexIndex = staticShadowPositionList.length / 4;
+		const centerHeight = terrainSurfaceHeightAt(centerX, centerZ);
+		staticShadowPositionList.push(centerX, centerHeight + 0.14, centerZ, centerAlpha);
+		for (let segmentIndex = 0; segmentIndex < STATIC_SHADOW_SEGMENT_COUNT; ++segmentIndex) {
+			const segmentAngle = (segmentIndex / STATIC_SHADOW_SEGMENT_COUNT) * System.Math.PI * 2;
+			const segmentX = centerX + System.Math.cos(segmentAngle) * discRadius;
+			const segmentZ = centerZ + System.Math.sin(segmentAngle) * discRadius;
+			const segmentHeight = terrainSurfaceHeightAt(segmentX, segmentZ);
+			staticShadowPositionList.push(segmentX, segmentHeight + 0.14, segmentZ, 0);
+			staticShadowIndexList.push(baseVertexIndex, baseVertexIndex + 1 + segmentIndex, baseVertexIndex + 1 + ((segmentIndex + 1) % STATIC_SHADOW_SEGMENT_COUNT));
+		}
+	}
+	for (const rock of rockList) {
+		appendStaticShadowDisc(rock.centerX, rock.centerZ, rock.blockRadius * 1.05, 0.4);
+	}
+	for (const hill of HILL_LIST) {
+		appendStaticShadowDisc(hill.summitX, hill.summitZ, 0.6, 0.3);
+	}
+	const staticShadowVertexArray = webGL2RenderingContext.createVertexArray();
+	webGL2RenderingContext.bindVertexArray(staticShadowVertexArray);
+	const staticShadowVertexBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, staticShadowVertexBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, new System.Float32Array(staticShadowPositionList), webGL2RenderingContext.STATIC_DRAW);
+	const staticShadowAttributeLocation = shadowShaderProgram.getAttributeLocation("vertexShadow");
+	webGL2RenderingContext.enableVertexAttribArray(staticShadowAttributeLocation);
+	webGL2RenderingContext.vertexAttribPointer(staticShadowAttributeLocation, 4, webGL2RenderingContext.FLOAT, false, 0, 0);
+	const staticShadowIndexBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, staticShadowIndexBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, new System.Uint16Array(staticShadowIndexList), webGL2RenderingContext.STATIC_DRAW);
+	webGL2RenderingContext.bindVertexArray(null);
+	const staticShadowIndexCount = staticShadowIndexList.length;
+
+	//==============================================================================
+	// 입력 상태.
+	//==============================================================================
+	const keyStateSet = new System.Set();
+	let jumpPressed = false; // X(확인) — 이번 프레임 눌림.
+	let interactPressed = false; // O(취소) — 이번 프레임 눌림.
+	let padInputX = 0;
+	let padInputY = 0;
+	let gamepadMoveX = 0;
+	let gamepadMoveY = 0;
+	let gamepadCameraX = 0;
+	let gamepadCameraY = 0;
+	let gamepadSprintHeld = false;
+	let previousGamepadJump = false;
+	let previousGamepadInteract = false;
+	let isTouchDevice = ("ontouchstart" in System.window) || System.navigator.maxTouchPoints > 0;
+	let hasAnyInputHappened = false;
+
+	System.window.addEventListener("keydown", (event) => {
+		if (event.code === "Space" || event.code.startsWith("Arrow")) {
+			event.preventDefault();
+		}
+		if (!keyStateSet.has(event.code)) {
+			if (event.code === "Space" || event.code === "Enter" || event.code === "KeyX") {
+				jumpPressed = true;
+			}
+			if (event.code === "Escape" || event.code === "KeyO") {
+				interactPressed = true;
+			}
+		}
+		keyStateSet.add(event.code);
+		hasAnyInputHappened = true;
+	});
+	System.window.addEventListener("keyup", (event) => {
+		keyStateSet.delete(event.code);
+	});
+
+	// 가상 조이스틱. (터치 좌측 영역 — 엔진 VirtualPad)
+	const virtualPad = new VirtualPad();
+	virtualPad.setPadRadius(62);
+	virtualPad.setBallRadius(26);
+	virtualPad.setPadColor(new Color(0.06, 0.09, 0.13, 0.32));
+	virtualPad.setBallColor(new Color(1, 1, 1, 0.5));
+	const initialPadPosition = Vector2.create(120, System.window.innerHeight - 140);
+	virtualPad.setPadPosition(initialPadPosition);
+	virtualPad.setBallMoveEvent((normalizedDirection, pullStrength) => {
+		padInputX = (normalizedDirection.x * 2 - 1) * pullStrength;
+		padInputY = (normalizedDirection.y * 2 - 1) * pullStrength;
+	});
+
+	// 화면 버튼 배치. (CSS 픽셀 기준, 우하단 — X 아래 / O 우상)
+	const BUTTON_RADIUS = 34;
+	function calculateJumpButtonCenter() {
+		return Vector2.create(System.window.innerWidth - 128, System.window.innerHeight - 96);
+	}
+	function calculateInteractButtonCenter() {
+		return Vector2.create(System.window.innerWidth - 62, System.window.innerHeight - 160);
+	}
+	let isJumpButtonHeld = false;
+	let isInteractButtonHeld = false;
+
+	// 터치 라우팅. (터치 식별자별 담당 영역 기억)
+	const touchRouteMap = new System.Map();
+	let promptScreenPosition = null; // 등반 프롬프트 아이콘의 화면 좌표. (매 프레임 HUD 에서 갱신)
+	let cameraDragLastX = null;
+	let cameraDragLastY = null;
+	let cameraYawVelocityFromDrag = 0;
+	let cameraPitchVelocityFromDrag = 0;
+	let pendingDragYawDelta = 0;
+	let pendingDragPitchDelta = 0;
+
+	function hitTestCircle(clientX, clientY, center, radius) {
+		const deltaX = clientX - center.x;
+		const deltaY = clientY - center.y;
+		const distanceSquared = deltaX * deltaX + deltaY * deltaY;
+		return distanceSquared <= radius * radius;
+	}
+
+	System.window.addEventListener("touchstart", (event) => {
+		event.preventDefault();
+		isTouchDevice = true;
+		hasAnyInputHappened = true;
+		for (const touch of event.changedTouches) {
+			const jumpButtonCenter = calculateJumpButtonCenter();
+			const interactButtonCenter = calculateInteractButtonCenter();
+			if (handlePanelPress(touch.clientX, touch.clientY)) {
+				touchRouteMap.set(touch.identifier, "panel");
+			}
+			else if (hitTestCircle(touch.clientX, touch.clientY, jumpButtonCenter, BUTTON_RADIUS + 10)) {
+				touchRouteMap.set(touch.identifier, "confirmButton");
+				isJumpButtonHeld = true;
+				jumpPressed = true;
+			}
+			else if (hitTestCircle(touch.clientX, touch.clientY, interactButtonCenter, BUTTON_RADIUS + 10)) {
+				touchRouteMap.set(touch.identifier, "cancelButton");
+				isInteractButtonHeld = true;
+				interactPressed = true;
+			}
+			else if (promptScreenPosition && hitTestCircle(touch.clientX, touch.clientY, promptScreenPosition, 32)) {
+				touchRouteMap.set(touch.identifier, "promptIcon");
+				interactPressed = true;
+			}
+			else if (touch.clientX < System.window.innerWidth * 0.42) {
+				touchRouteMap.set(touch.identifier, "virtualPad");
+				const padTouchPosition = Vector2.create(touch.clientX, touch.clientY);
+				virtualPad.setPadPosition(padTouchPosition);
+				virtualPad.touchPress(padTouchPosition);
+			}
+			else {
+				touchRouteMap.set(touch.identifier, "cameraDrag");
+				cameraDragLastX = touch.clientX;
+				cameraDragLastY = touch.clientY;
+			}
+		}
+	}, { passive: false });
+	System.window.addEventListener("touchmove", (event) => {
+		event.preventDefault();
+		for (const touch of event.changedTouches) {
+			const touchRoute = touchRouteMap.get(touch.identifier);
+			if (touchRoute === "panel") {
+				if (activeSliderName !== null) {
+					updateSliderFromClientX(touch.clientX);
+				}
+			}
+			else if (touchRoute === "virtualPad") {
+				const padTouchPosition = Vector2.create(touch.clientX, touch.clientY);
+				virtualPad.touchMove(padTouchPosition);
+			}
+			else if (touchRoute === "cameraDrag") {
+				if (cameraDragLastX !== null) {
+					pendingDragYawDelta += (touch.clientX - cameraDragLastX) * 0.0052;
+					pendingDragPitchDelta -= (touch.clientY - cameraDragLastY) * 0.0038;
+				}
+				cameraDragLastX = touch.clientX;
+				cameraDragLastY = touch.clientY;
+			}
+		}
+	}, { passive: false });
+	function handleTouchFinish(event) {
+		for (const touch of event.changedTouches) {
+			const touchRoute = touchRouteMap.get(touch.identifier);
+			if (touchRoute === "panel") {
+				activeSliderName = null;
+			}
+			else if (touchRoute === "virtualPad") {
+				const padTouchPosition = Vector2.create(touch.clientX, touch.clientY);
+				virtualPad.touchRelease(padTouchPosition);
+			}
+			else if (touchRoute === "confirmButton") {
+				isJumpButtonHeld = false;
+			}
+			else if (touchRoute === "cancelButton") {
+				isInteractButtonHeld = false;
+			}
+			else if (touchRoute === "cameraDrag") {
+				cameraDragLastX = null;
+				cameraDragLastY = null;
+			}
+			touchRouteMap.delete(touch.identifier);
+		}
+	}
+	System.window.addEventListener("touchend", handleTouchFinish);
+	System.window.addEventListener("touchcancel", handleTouchFinish);
+
+	// 마우스. (좌클릭 = 점프 / 우클릭 = 등반·하산·취소 / 좌드래그 = 시점 회전)
+	let isMouseDragging = false;
+	let hasMouseDragMoved = false;
+	System.window.addEventListener("contextmenu", (event) => {
+		event.preventDefault();
+	});
+	System.window.addEventListener("mousedown", (event) => {
+		hasAnyInputHappened = true;
+		if (event.button === 2) {
+			interactPressed = true;
+			return;
+		}
+		if (event.button !== 0) {
+			return;
+		}
+		if (handlePanelPress(event.clientX, event.clientY)) {
+			return;
+		}
+		const jumpButtonCenter = calculateJumpButtonCenter();
+		const interactButtonCenter = calculateInteractButtonCenter();
+		if (hitTestCircle(event.clientX, event.clientY, jumpButtonCenter, BUTTON_RADIUS + 6)) {
+			isJumpButtonHeld = true;
+			jumpPressed = true;
+			return;
+		}
+		if (hitTestCircle(event.clientX, event.clientY, interactButtonCenter, BUTTON_RADIUS + 6)) {
+			isInteractButtonHeld = true;
+			interactPressed = true;
+			return;
+		}
+		if (promptScreenPosition && hitTestCircle(event.clientX, event.clientY, promptScreenPosition, 32)) {
+			interactPressed = true;
+			return;
+		}
+		isMouseDragging = true;
+		hasMouseDragMoved = false;
+		cameraDragLastX = event.clientX;
+		cameraDragLastY = event.clientY;
+	});
+	System.window.addEventListener("mousemove", (event) => {
+		if (activeSliderName !== null) {
+			updateSliderFromClientX(event.clientX);
+			return;
+		}
+		if (isMouseDragging && cameraDragLastX !== null) {
+			const dragDeltaX = event.clientX - cameraDragLastX;
+			const dragDeltaY = event.clientY - cameraDragLastY;
+			if (System.Math.abs(dragDeltaX) + System.Math.abs(dragDeltaY) > 3) {
+				hasMouseDragMoved = true;
+			}
+			pendingDragYawDelta += dragDeltaX * 0.0052;
+			pendingDragPitchDelta -= dragDeltaY * 0.0038;
+			cameraDragLastX = event.clientX;
+			cameraDragLastY = event.clientY;
+		}
+	});
+	System.window.addEventListener("mouseup", (event) => {
+		if (event.button === 0 && isMouseDragging && !hasMouseDragMoved) {
+			// 이동 없는 좌클릭 = 점프.
+			jumpPressed = true;
+		}
+		isMouseDragging = false;
+		isJumpButtonHeld = false;
+		isInteractButtonHeld = false;
+		activeSliderName = null;
+		cameraDragLastX = null;
+		cameraDragLastY = null;
+	});
+
+	// 게임패드 폴링. (왼스틱 이동, 오른스틱 시점, A=X 확인, B=O 취소)
+	function pollGamepad() {
+		gamepadMoveX = 0;
+		gamepadMoveY = 0;
+		gamepadCameraX = 0;
+		gamepadCameraY = 0;
+		const gamepadArray = System.navigator.getGamepads ? System.navigator.getGamepads() : [];
+		let activeGamepad = null;
+		for (const gamepad of gamepadArray) {
+			if (gamepad && gamepad.connected) {
+				activeGamepad = gamepad;
+			}
+		}
+		if (!activeGamepad) {
+			return;
+		}
+		const DEADZONE = 0.16;
+		function applyDeadzone(value) {
+			if (System.Math.abs(value) < DEADZONE) {
+				return 0;
+			}
+			return value;
+		}
+		gamepadMoveX = applyDeadzone(activeGamepad.axes[0] || 0);
+		gamepadMoveY = applyDeadzone(activeGamepad.axes[1] || 0);
+		gamepadCameraX = applyDeadzone(activeGamepad.axes[2] || 0);
+		gamepadCameraY = applyDeadzone(activeGamepad.axes[3] || 0);
+		const confirmButtonState = activeGamepad.buttons[0] ? activeGamepad.buttons[0].pressed : false;
+		const cancelButtonState = activeGamepad.buttons[1] ? activeGamepad.buttons[1].pressed : false;
+		const gamepadStickPressed = activeGamepad.buttons[10] ? activeGamepad.buttons[10].pressed : false;
+		const gamepadTriggerPressed = activeGamepad.buttons[7] ? activeGamepad.buttons[7].pressed : false;
+		gamepadSprintHeld = gamepadStickPressed || gamepadTriggerPressed;
+		if (confirmButtonState && !previousGamepadJump) {
+			jumpPressed = true;
+			hasAnyInputHappened = true;
+		}
+		if (cancelButtonState && !previousGamepadInteract) {
+			interactPressed = true;
+		}
+		previousGamepadJump = confirmButtonState;
+		previousGamepadInteract = cancelButtonState;
+	}
+
+	//==============================================================================
+	// 캐릭터 상태.
+	//==============================================================================
+	const CharacterState = {
+		ground: "ground",
+		climbAttach: "climbAttach",
+		climbing: "climbing",
+		climbCancel: "climbCancel",
+		vault: "vault",
+		jumpDown: "jumpDown",
+		landRecover: "landRecover",
+	};
+	const RUN_SPEED = 4.8;
+	const SPRINT_SPEED = 7.4;
+	const JUMP_VELOCITY = 5.4;
+	const CLIMB_ASCEND_SPEED = 2.6;
+	const CLIMB_DESCEND_SPEED = 3.6;
+	const VAULT_DURATION = 0.55;
+	const CLIMB_ATTACH_DURATION = 0.24;
+	const BODY_BOX_HALF_WIDTH = 0.3; // 캐릭터 바디 박스 반폭. (어깨 기준)
+	const BODY_BOX_HALF_DEPTH = 0.24; // 캐릭터 바디 박스 반깊이. (가슴~등 기준)
+
+	const spawnAngleRadian = (30 * System.Math.PI) / 180;
+	let playerX = System.Math.cos(spawnAngleRadian) * PATH_RADIUS;
+	let playerZ = System.Math.sin(spawnAngleRadian) * PATH_RADIUS;
+	let playerY = terrainSurfaceHeightAt(playerX, playerZ);
+	let characterYaw = spawnAngleRadian; // 순환로 접선 방향. (forward = (sin, 0, -cos) 규약 기준)
+	let characterState = CharacterState.ground;
+	let currentMoveSpeed = 0;
+	let climbPhase = 0;
+	let climbData = null; // { baseX, baseZ, baseY, topX, topZ, topY, wallDirectionX, wallDirectionZ, attachFromX, attachFromZ, attachTime, vaultTime, vaultFromX, vaultFromZ, vaultFromY }
+	let climbAvailableTarget = null; // { wallX, wallZ, promptY, topX, topZ, topY }
+	let descendAvailableTarget = null; // { edgeX, edgeZ, promptY, forwardX, forwardZ }
+	let jumpVelocityY = 0;
+	let jumpDirectionX = 0;
+	let jumpDirectionZ = 0;
+	let jumpHorizontalSpeed = 0;
+	let landRecoverTime = 0;
+	let landingImpulse = 0;
+	let currentMoveInputX = 0;
+	let currentMoveInputZ = 0;
+	let currentMoveDirectionX = 0;
+	let currentMoveDirectionZ = -1;
+	let clearedSummitCount = 0;
+	let allClearedTime = -100;
+
+	let cameraYaw = characterYaw;
+	let cameraPitch = -0.08;
+	let cameraYawTarget = characterYaw;
+	let cameraPitchTarget = -0.08;
+	let smoothedPivotY = playerY + 1.55;
+	let smoothedCameraDistanceFactor = 1;
+	let smoothedCameraDistance = 3.6;
+
+	//==============================================================================
+	// 등반 대상 탐지. (시야 방향 전방의 절벽을 지형 데이터에서 직접 검출)
+	//==============================================================================
+	function detectClimbTarget() {
+		const forwardX = System.Math.sin(cameraYaw);
+		const forwardZ = -System.Math.cos(cameraYaw);
+		for (let reachDistance = 0.9; reachDistance <= 2.5; reachDistance += 0.4) {
+			const wallX = playerX + forwardX * reachDistance;
+			const wallZ = playerZ + forwardZ * reachDistance;
+			const wallHeight = terrainHeightAt(wallX, wallZ);
+			if (wallHeight - playerY > 2.0) {
+				// 절벽 상단 확인. (절벽 폭 너머의 고원 높이)
+				const topDistance = reachDistance + 6.0;
+				const topX = playerX + forwardX * topDistance;
+				const topZ = playerZ + forwardZ * topDistance;
+				const topHeight = terrainHeightAt(topX, topZ);
+				const riseAmount = topHeight - playerY;
+
+				// 상단 평탄성 확인. (고원만 등반 허용 — 끝없이 이어지는 경계 산맥 사면 배제)
+				const beyondX = topX + forwardX * 2.2;
+				const beyondZ = topZ + forwardZ * 2.2;
+				const beyondHeight = terrainHeightAt(beyondX, beyondZ);
+				const isTopFlat = System.Math.abs(beyondHeight - topHeight) < 1.6;
+				if (riseAmount > 2.0 && riseAmount < 18 && isTopFlat) {
+					return {
+						wallX: wallX,
+						wallZ: wallZ,
+						promptY: System.Math.min((playerY + topHeight) * 0.5, playerY + 2.2),
+						reachDistance: reachDistance,
+						forwardX: forwardX,
+						forwardZ: forwardZ,
+						topX: topX,
+						topZ: topZ,
+						topY: topHeight,
+					};
+				}
+			}
+		}
+		return null;
+	}
+
+	//==============================================================================
+	// 뛰어내리기 대상 탐지. (시야 전방의 낙하 가장자리를 지형 데이터에서 검출)
+	//==============================================================================
+	function detectDescendTarget() {
+		const forwardX = System.Math.sin(cameraYaw);
+		const forwardZ = -System.Math.cos(cameraYaw);
+		for (let edgeDistance = 1.0; edgeDistance <= 4.0; edgeDistance += 0.5) {
+			const edgeX = playerX + forwardX * edgeDistance;
+			const edgeZ = playerZ + forwardZ * edgeDistance;
+			const edgeHeight = terrainHeightAt(edgeX, edgeZ);
+			const dropAmount = playerY - edgeHeight;
+			if (dropAmount > 2.2 && dropAmount < 30) {
+				const landingX = playerX + forwardX * (edgeDistance + 2.2);
+				const landingZ = playerZ + forwardZ * (edgeDistance + 2.2);
+				const landingHeight = terrainHeightAt(landingX, landingZ);
+				if (playerY - landingHeight > 2.0) {
+					return {
+						edgeX: edgeX,
+						edgeZ: edgeZ,
+						promptY: playerY - 0.4,
+						forwardX: forwardX,
+						forwardZ: forwardZ,
+					};
+				}
+			}
+		}
+		return null;
+	}
+
+	//==============================================================================
+	// 보행 가능 판정. (지점 자체의 지형 기울기 — 경로 방향과 무관하게 절벽 진입 차단)
+	//==============================================================================
+	function isWalkableAt(worldX, worldZ) {
+		const sampleDelta = 0.6;
+		const heightRight = terrainSurfaceHeightAt(worldX + sampleDelta, worldZ);
+		const heightLeft = terrainSurfaceHeightAt(worldX - sampleDelta, worldZ);
+		const heightFar = terrainSurfaceHeightAt(worldX, worldZ + sampleDelta);
+		const heightNear = terrainSurfaceHeightAt(worldX, worldZ - sampleDelta);
+		const gradientX = (heightRight - heightLeft) / (sampleDelta * 2);
+		const gradientZ = (heightFar - heightNear) / (sampleDelta * 2);
+		const gradientSquared = gradientX * gradientX + gradientZ * gradientZ;
+		return gradientSquared < 1.15 * 1.15;
+	}
+
+	//==============================================================================
+	// 캐릭터 바디 박스가 덮는 지형의 최고 높이. (진행 방향으로 회전한 사각형 — OBB 의 바닥면)
+	// - 높이맵 지형은 지면 위가 항상 빈 공간이므로, 박스 바닥과 지형 높이만 비교하면
+	//   박스 전체의 겹침 여부를 판정할 수 있다.
+	//==============================================================================
+	function sampleBodyBoxTerrainHeight(centerX, centerZ, forwardX, forwardZ) {
+		const rightX = -forwardZ;
+		const rightZ = forwardX;
+		let maxTerrainHeight = -Infinity;
+		for (let depthIndex = -1; depthIndex <= 1; ++depthIndex) {
+			for (let widthIndex = -1; widthIndex <= 1; ++widthIndex) {
+				const offsetDepth = BODY_BOX_HALF_DEPTH * depthIndex;
+				const offsetWidth = BODY_BOX_HALF_WIDTH * widthIndex;
+				const sampleX = centerX + forwardX * offsetDepth + rightX * offsetWidth;
+				const sampleZ = centerZ + forwardZ * offsetDepth + rightZ * offsetWidth;
+				const sampleHeight = terrainSurfaceHeightAt(sampleX, sampleZ);
+				if (sampleHeight > maxTerrainHeight) {
+					maxTerrainHeight = sampleHeight;
+				}
+			}
+		}
+		return maxTerrainHeight;
+	}
+
+	//==============================================================================
+	// 등반 벽면 밀착 보정. (등반 중 캐릭터 박스가 절벽/경사면과 겹치지 않게)
+	// - 직선 보간 경로는 지형 굴곡을 따르지 못하므로, 매 프레임 실제 지형으로 재배치한다.
+	// - 수직 절벽은 뒤로 밀어 해결하고, 완만한 경사면은 밀어도 겹침이 남으므로 표면 위로 올린다.
+	//==============================================================================
+	function resolveClimbWallContact(wallDirectionX, wallDirectionZ) {
+		const STEP_DISTANCE = 0.12;
+		const MAX_RETREAT_STEP_COUNT = 14;
+		const MAX_ADVANCE_STEP_COUNT = 10;
+
+		// 1. 박스가 지형과 겹치면 벽 바깥으로 후진. (수직 절벽 대응)
+		for (let stepIndex = 0; stepIndex < MAX_RETREAT_STEP_COUNT; ++stepIndex) {
+			const boxTerrainHeight = sampleBodyBoxTerrainHeight(playerX, playerZ, wallDirectionX, wallDirectionZ);
+			if (boxTerrainHeight <= playerY) {
+				break;
+			}
+			playerX -= wallDirectionX * STEP_DISTANCE;
+			playerZ -= wallDirectionZ * STEP_DISTANCE;
+		}
+
+		// 2. 벽에서 떨어져 있으면 손이 닿는 거리까지 전진. (허공 등반 방지)
+		for (let stepIndex = 0; stepIndex < MAX_ADVANCE_STEP_COUNT; ++stepIndex) {
+			const aheadX = playerX + wallDirectionX * STEP_DISTANCE;
+			const aheadZ = playerZ + wallDirectionZ * STEP_DISTANCE;
+			const aheadBoxHeight = sampleBodyBoxTerrainHeight(aheadX, aheadZ, wallDirectionX, wallDirectionZ);
+			if (aheadBoxHeight > playerY) {
+				break;
+			}
+			playerX = aheadX;
+			playerZ = aheadZ;
+		}
+
+		// 3. 후진으로 해소되지 않은 겹침은 표면 위로 올려 해결. (완만한 경사면 등반)
+		const remainingTerrainHeight = sampleBodyBoxTerrainHeight(playerX, playerZ, wallDirectionX, wallDirectionZ);
+		if (remainingTerrainHeight > playerY) {
+			playerY = remainingTerrainHeight;
+		}
+	}
+
+	//==============================================================================
+	// 캐릭터 갱신.
+	//==============================================================================
+	function updateCharacter(deltaTime, elapsedTime) {
+		currentMoveInputX = 0;
+		currentMoveInputZ = 0;
+		if (characterState === CharacterState.ground) {
+			// 이동 입력 통합. (키보드 + 가상 패드 + 게임패드, 카메라 기준)
+			let moveInputX = 0;
+			let moveInputZ = 0;
+			if (keyStateSet.has("KeyD")) {
+				moveInputX += 1;
+			}
+			if (keyStateSet.has("KeyA")) {
+				moveInputX -= 1;
+			}
+			if (keyStateSet.has("KeyW")) {
+				moveInputZ += 1;
+			}
+			if (keyStateSet.has("KeyS")) {
+				moveInputZ -= 1;
+			}
+			moveInputX += padInputX + gamepadMoveX;
+			moveInputZ += -padInputY - gamepadMoveY;
+			const inputLength = System.Math.sqrt(moveInputX * moveInputX + moveInputZ * moveInputZ);
+			let inputStrength = System.Math.min(inputLength, 1);
+			currentMoveInputX = System.Math.max(-1, System.Math.min(1, moveInputX));
+			currentMoveInputZ = System.Math.max(-1, System.Math.min(1, moveInputZ));
+
+			if (inputStrength > 0.05) {
+				const cameraForwardX = System.Math.sin(cameraYaw);
+				const cameraForwardZ = -System.Math.cos(cameraYaw);
+				const cameraRightX = System.Math.cos(cameraYaw);
+				const cameraRightZ = System.Math.sin(cameraYaw);
+				const moveDirectionX = (cameraForwardX * moveInputZ + cameraRightX * moveInputX) / inputLength;
+				const moveDirectionZ = (cameraForwardZ * moveInputZ + cameraRightZ * moveInputX) / inputLength;
+				currentMoveDirectionX = moveDirectionX;
+				currentMoveDirectionZ = moveDirectionZ;
+
+				// 캐릭터 시각 회전은 부드럽게. (이동 자체는 입력 방향으로 즉시 진행)
+				const targetYaw = System.Math.atan2(moveDirectionX, -moveDirectionZ);
+				let yawDifference = targetYaw - characterYaw;
+				while (yawDifference > System.Math.PI) {
+					yawDifference -= System.Math.PI * 2;
+				}
+				while (yawDifference < -System.Math.PI) {
+					yawDifference += System.Math.PI * 2;
+				}
+				characterYaw += yawDifference * System.Math.min(6.5 * deltaTime, 1);
+			}
+
+			// 질주. (Shift / 게임패드 L3 / 스틱·패드 풀 틸트)
+			const padStrength = System.Math.sqrt(padInputX * padInputX + padInputY * padInputY);
+			const gamepadStrength = System.Math.sqrt(gamepadMoveX * gamepadMoveX + gamepadMoveY * gamepadMoveY);
+			const isSprinting = keyStateSet.has("ShiftLeft") || keyStateSet.has("ShiftRight") || gamepadSprintHeld || padStrength > 0.97 || gamepadStrength > 0.97;
+
+			// 가감속 관성. (입력 시 서서히 가속, 놓으면 몇 걸음 미끄러지듯 감속)
+			const targetMoveSpeed = (isSprinting ? SPRINT_SPEED : RUN_SPEED) * inputStrength;
+			const accelerationRate = targetMoveSpeed > currentMoveSpeed ? 5.5 : 7.5;
+			currentMoveSpeed += (targetMoveSpeed - currentMoveSpeed) * System.Math.min(accelerationRate * deltaTime, 1);
+
+			if (currentMoveSpeed > 0.05) {
+				// 입력 방향으로 즉시 전진. (입력이 없으면 마지막 방향으로 관성 감속)
+				const headingX = currentMoveDirectionX;
+				const headingZ = currentMoveDirectionZ;
+				const stepLength = currentMoveSpeed * deltaTime;
+				const currentHeight = terrainSurfaceHeightAt(playerX, playerZ);
+				let candidateX = playerX + headingX * stepLength;
+				let candidateZ = playerZ + headingZ * stepLength;
+				let candidateHeight = terrainSurfaceHeightAt(candidateX, candidateZ);
+				// 대칭 경사 차단. (오르막/내리막 모두 — 비대칭이면 중간 경사 구간에 갇힌다)
+				const riseRate = (candidateHeight - currentHeight) / System.Math.max(stepLength, 0.0001);
+				if (System.Math.abs(riseRate) > 1.15) {
+					candidateX = playerX + headingX * stepLength;
+					candidateZ = playerZ;
+					candidateHeight = terrainSurfaceHeightAt(candidateX, candidateZ);
+					const riseRateAxisX = (candidateHeight - currentHeight) / System.Math.max(stepLength, 0.0001);
+					if (System.Math.abs(riseRateAxisX) > 1.15) {
+						candidateX = playerX;
+						candidateZ = playerZ + headingZ * stepLength;
+						candidateHeight = terrainSurfaceHeightAt(candidateX, candidateZ);
+						const riseRateAxisZ = (candidateHeight - currentHeight) / System.Math.max(stepLength, 0.0001);
+						if (System.Math.abs(riseRateAxisZ) > 1.15) {
+							candidateX = playerX;
+							candidateZ = playerZ;
+							currentMoveSpeed *= 0.5;
+						}
+					}
+				}
+
+				// 바위 밀어내기. (겹치면 경계선까지 밀림 — 장애물)
+				for (const rock of rockList) {
+					const rockDeltaX = candidateX - rock.centerX;
+					const rockDeltaZ = candidateZ - rock.centerZ;
+					const rockDistance = System.Math.sqrt(rockDeltaX * rockDeltaX + rockDeltaZ * rockDeltaZ);
+					if (rockDistance > 0.001 && rockDistance < rock.blockRadius) {
+						candidateX = rock.centerX + (rockDeltaX / rockDistance) * rock.blockRadius;
+						candidateZ = rock.centerZ + (rockDeltaZ / rockDistance) * rock.blockRadius;
+					}
+				}
+
+				// 여우 밀어내기. (동물도 장애물)
+				for (const fox of FOX_LIST) {
+					const foxDeltaX = candidateX - fox.currentX;
+					const foxDeltaZ = candidateZ - fox.currentZ;
+					const foxDistance = System.Math.sqrt(foxDeltaX * foxDeltaX + foxDeltaZ * foxDeltaZ);
+					if (foxDistance > 0.001 && foxDistance < fox.blockRadius) {
+						candidateX = fox.currentX + (foxDeltaX / foxDistance) * fox.blockRadius;
+						candidateZ = fox.currentZ + (foxDeltaZ / foxDistance) * fox.blockRadius;
+					}
+				}
+
+				// 맵 밖 이탈 방지.
+				const candidateCenterDistance = System.Math.sqrt(candidateX * candidateX + candidateZ * candidateZ);
+				if (candidateCenterDistance > 175) {
+					candidateX *= 175 / candidateCenterDistance;
+					candidateZ *= 175 / candidateCenterDistance;
+				}
+
+				playerX = candidateX;
+				playerZ = candidateZ;
+			}
+			playerY = terrainSurfaceHeightAt(playerX, playerZ);
+
+			// 정상 도달 판정.
+			for (const hill of HILL_LIST) {
+				if (!hill.cleared) {
+					const summitDeltaX = playerX - hill.summitX;
+					const summitDeltaZ = playerZ - hill.summitZ;
+					const summitDistance = System.Math.sqrt(summitDeltaX * summitDeltaX + summitDeltaZ * summitDeltaZ);
+					if (summitDistance < System.Math.max(hill.summitRadius * 0.2, 4) && playerY > hill.summitHeight * 0.78) {
+						hill.cleared = true;
+						hill.clearedPulseTime = elapsedTime;
+						clearedSummitCount += 1;
+						if (clearedSummitCount === HILL_LIST.length) {
+							allClearedTime = elapsedTime;
+						}
+					}
+				}
+			}
+
+			// 등반 시작. (O — 상호작용)
+			climbAvailableTarget = detectClimbTarget();
+			if (climbAvailableTarget && interactPressed) {
+				const wallDirectionX = climbAvailableTarget.forwardX;
+				const wallDirectionZ = climbAvailableTarget.forwardZ;
+				climbData = {
+					wallDirectionX: wallDirectionX,
+					wallDirectionZ: wallDirectionZ,
+					baseX: climbAvailableTarget.wallX - wallDirectionX * 0.95,
+					baseZ: climbAvailableTarget.wallZ - wallDirectionZ * 0.95,
+					baseY: playerY,
+					topX: climbAvailableTarget.topX + wallDirectionX * 0.3,
+					topZ: climbAvailableTarget.topZ + wallDirectionZ * 0.3,
+					topY: climbAvailableTarget.topY,
+					attachFromX: playerX,
+					attachFromZ: playerZ,
+					attachTime: 0,
+				};
+				characterYaw = System.Math.atan2(wallDirectionX, -wallDirectionZ);
+				characterState = CharacterState.climbAttach;
+				climbAvailableTarget = null;
+				climbPhase = 0;
+			}
+
+			// 뛰어내리기. (등반 대상이 없고 아래를 내려보는 시야일 때)
+			descendAvailableTarget = null;
+			if (characterState === CharacterState.ground && !climbAvailableTarget && cameraPitch < -0.08) {
+				descendAvailableTarget = detectDescendTarget();
+			}
+			if (descendAvailableTarget && interactPressed) {
+				jumpDirectionX = descendAvailableTarget.forwardX;
+				jumpDirectionZ = descendAvailableTarget.forwardZ;
+				jumpHorizontalSpeed = 5.4;
+				jumpVelocityY = 3.0;
+				characterYaw = System.Math.atan2(jumpDirectionX, -jumpDirectionZ);
+				characterState = CharacterState.jumpDown;
+				descendAvailableTarget = null;
+			}
+
+			// 점프. (X / 좌클릭 — 달리던 관성을 유지한 채 도약)
+			if (jumpPressed && characterState === CharacterState.ground) {
+				jumpDirectionX = currentMoveDirectionX;
+				jumpDirectionZ = currentMoveDirectionZ;
+				jumpHorizontalSpeed = currentMoveSpeed;
+				jumpVelocityY = JUMP_VELOCITY;
+				characterState = CharacterState.jumpDown;
+			}
+		}
+		else if (characterState === CharacterState.climbAttach) {
+			// 벽면에 붙기. (짧은 보간 이동)
+			climbData.attachTime += deltaTime;
+			const attachProgress = System.Math.min(climbData.attachTime / CLIMB_ATTACH_DURATION, 1);
+			playerX = climbData.attachFromX + (climbData.baseX - climbData.attachFromX) * attachProgress;
+			playerZ = climbData.attachFromZ + (climbData.baseZ - climbData.attachFromZ) * attachProgress;
+			playerY = climbData.baseY;
+			resolveClimbWallContact(climbData.wallDirectionX, climbData.wallDirectionZ);
+			if (attachProgress >= 1) {
+				characterState = CharacterState.climbing;
+			}
+		}
+		else if (characterState === CharacterState.climbing) {
+			// 상승. (절벽면을 따라 상단 가장자리 아래 지점까지)
+			climbPhase += deltaTime * 3.4;
+			playerY += CLIMB_ASCEND_SPEED * deltaTime;
+			const climbSpan = System.Math.max(climbData.topY - climbData.baseY, 0.001);
+			const climbProgress = System.Math.min((playerY - climbData.baseY) / climbSpan, 1);
+			const rimBaseX = climbData.topX - climbData.wallDirectionX * 1.5;
+			const rimBaseZ = climbData.topZ - climbData.wallDirectionZ * 1.5;
+			playerX = climbData.baseX + (rimBaseX - climbData.baseX) * climbProgress;
+			playerZ = climbData.baseZ + (rimBaseZ - climbData.baseZ) * climbProgress;
+			resolveClimbWallContact(climbData.wallDirectionX, climbData.wallDirectionZ);
+			if (interactPressed) {
+				characterState = CharacterState.climbCancel;
+			}
+			else if (playerY >= climbData.topY - 0.9) {
+				climbData.vaultTime = 0;
+				climbData.vaultFromX = playerX;
+				climbData.vaultFromZ = playerZ;
+				climbData.vaultFromY = playerY;
+				characterState = CharacterState.vault;
+			}
+		}
+		else if (characterState === CharacterState.climbCancel) {
+			// 하강 복귀.
+			climbPhase -= deltaTime * 3.0;
+			playerY -= CLIMB_DESCEND_SPEED * deltaTime;
+			const climbSpan = System.Math.max(climbData.topY - climbData.baseY, 0.001);
+			const climbProgress = System.Math.max((playerY - climbData.baseY) / climbSpan, 0);
+			const rimBaseX = climbData.topX - climbData.wallDirectionX * 1.5;
+			const rimBaseZ = climbData.topZ - climbData.wallDirectionZ * 1.5;
+			playerX = climbData.baseX + (rimBaseX - climbData.baseX) * climbProgress;
+			playerZ = climbData.baseZ + (rimBaseZ - climbData.baseZ) * climbProgress;
+			resolveClimbWallContact(climbData.wallDirectionX, climbData.wallDirectionZ);
+			if (playerY <= climbData.baseY) {
+				playerY = climbData.baseY;
+				characterState = CharacterState.ground;
+				climbData = null;
+			}
+		}
+		else if (characterState === CharacterState.vault) {
+			// 상단 가장자리 넘어가기.
+			climbData.vaultTime += deltaTime;
+			const vaultProgress = System.Math.min(climbData.vaultTime / VAULT_DURATION, 1);
+			const easedProgress = vaultProgress * vaultProgress * (3 - 2 * vaultProgress);
+			playerX = climbData.vaultFromX + (climbData.topX - climbData.vaultFromX) * easedProgress;
+			playerZ = climbData.vaultFromZ + (climbData.topZ - climbData.vaultFromZ) * easedProgress;
+			const vaultTargetY = terrainSurfaceHeightAt(climbData.topX, climbData.topZ);
+			const vaultArc = System.Math.sin(vaultProgress * System.Math.PI) * 0.35;
+			playerY = climbData.vaultFromY + (vaultTargetY - climbData.vaultFromY) * easedProgress + vaultArc;
+			if (vaultProgress >= 1) {
+				playerY = vaultTargetY;
+				characterState = CharacterState.ground;
+				climbData = null;
+			}
+		}
+		else if (characterState === CharacterState.jumpDown) {
+			// 도약/낙하. (전방 관성 + 중력 — 바위/벽에 막히고, 착지 시 충격량 기록)
+			const horizontalStep = jumpHorizontalSpeed * deltaTime;
+			const aheadX = playerX + jumpDirectionX * horizontalStep;
+			const aheadZ = playerZ + jumpDirectionZ * horizontalStep;
+			const aheadHeight = terrainSurfaceHeightAt(aheadX, aheadZ);
+			let isBlockedByRock = false;
+			for (const rock of rockList) {
+				const rockDeltaX = aheadX - rock.centerX;
+				const rockDeltaZ = aheadZ - rock.centerZ;
+				const rockDistance = System.Math.sqrt(rockDeltaX * rockDeltaX + rockDeltaZ * rockDeltaZ);
+				if (rockDistance < rock.blockRadius && playerY < rock.topHeight) {
+					isBlockedByRock = true;
+				}
+			}
+			for (const fox of FOX_LIST) {
+				const foxDeltaX = aheadX - fox.currentX;
+				const foxDeltaZ = aheadZ - fox.currentZ;
+				const foxDistance = System.Math.sqrt(foxDeltaX * foxDeltaX + foxDeltaZ * foxDeltaZ);
+				if (foxDistance < fox.blockRadius && playerY < fox.topHeight) {
+					isBlockedByRock = true;
+				}
+			}
+			if (!isBlockedByRock && aheadHeight < playerY + 0.4) {
+				playerX = aheadX;
+				playerZ = aheadZ;
+			}
+			jumpVelocityY -= 16 * deltaTime;
+			jumpVelocityY = System.Math.max(jumpVelocityY, -26);
+			playerY += jumpVelocityY * deltaTime;
+			const groundHeight = terrainSurfaceHeightAt(playerX, playerZ);
+			if (playerY <= groundHeight) {
+				playerY = groundHeight;
+				landingImpulse = System.Math.min(-jumpVelocityY / 16, 1);
+
+				// 낙하 → 착지 → 대기/이동 순서를 항상 거친다. (낙하 높이와 무관)
+				landRecoverTime = 0;
+				characterState = CharacterState.landRecover;
+			}
+		}
+		else if (characterState === CharacterState.landRecover) {
+			// 착지 웅크림 회복.
+			landRecoverTime += deltaTime;
+			playerY = terrainSurfaceHeightAt(playerX, playerZ);
+			if (landRecoverTime >= 0.42) {
+				characterState = CharacterState.ground;
+			}
+		}
+	}
+
+	//==============================================================================
+	// 캐릭터 애니메이션. (상태 → 스킨드 모델 클립)
+	//==============================================================================
+	function updateCharacterAnimation(deltaTime) {
+		if (characterState === CharacterState.ground) {
+			if (currentMoveSpeed < 0.15) {
+				characterModel.playAnimation(idleClipName, 0.25);
+				characterModel.setTimeScale(1);
+			}
+			else if (currentMoveSpeed < 3) {
+				characterModel.playAnimation(walkClipName, 0.2);
+				characterModel.setTimeScale(System.Math.max(currentMoveSpeed / 1.7, 0.6));
+			}
+			else {
+				characterModel.playAnimation(runClipName, 0.2);
+				characterModel.setTimeScale(currentMoveSpeed / (isRunClipShared ? 2.0 : 5));
+			}
+		}
+		else if (characterState === CharacterState.climbAttach || characterState === CharacterState.climbing || characterState === CharacterState.climbCancel) {
+			// 등반: 벽 오르기 클립. (루트 모션은 로드 시 제거 — 위치는 게임 로직이 제어)
+			characterModel.playAnimation(climbClipName, 0.2);
+			characterModel.setTimeScale(characterState === CharacterState.climbing ? 1 : 0.5);
+		}
+		else if (characterState === CharacterState.jumpDown) {
+			// 도약/낙하: 공중 낙하 클립. (지상 클립과 자세 차이가 커 짧게 전환)
+			characterModel.playAnimation(fallClipName, 0.08);
+			characterModel.setTimeScale(1);
+		}
+		else if (characterState === CharacterState.landRecover) {
+			// 착지: 착지 클립. (도입부를 잘라낸 애셋이라 접지 자세부터 시작 — 낙하 자세가 섞이지 않게 즉시 전환)
+			characterModel.playAnimation(landClipName, 0);
+			characterModel.setTimeScale(1.8);
+		}
+		else {
+			characterModel.playAnimation(idleClipName, 0.2);
+			characterModel.setTimeScale(1);
+		}
+		characterModel.update(deltaTime);
+	}
+
+	//==============================================================================
+	// HUD. (엔진 Graphic 으로 캔버스 안에 직접 렌더링)
+	//==============================================================================
+	const uiGraphic = new Graphic(canvas);
+
+	//==============================================================================
+	// 화면 효과 옵션. (우측 상단 패널 — 토글은 매 프레임 부드럽게 보간)
+	//==============================================================================
+	const optionDefinitions = [
+		{ name: "shadow", label: "SHADOW", type: "cycle", stateLabels: ["OFF", "SIMPLE", "REALTIME"] },
+		{ name: "bloom", label: "BLOOM", type: "toggle" },
+		{ name: "vignette", label: "VIGNETTE", type: "toggle" },
+		{ name: "film", label: "FILM GRAIN", type: "toggle" },
+		{ name: "collision", label: "COLLISION", type: "toggle" },
+		{ name: "glow", label: "GLOW", type: "slider", minimumValue: 0, maximumValue: 1.5, defaultValue: 1 },
+		{ name: "motionBlur", label: "MOTION BLUR", type: "slider", minimumValue: 0, maximumValue: 1, defaultValue: 0.35 },
+	];
+	const optionStates = {
+		shadow: 2,
+		bloom: true,
+		vignette: true,
+		film: true,
+		collision: false,
+	};
+	const optionBlendValues = {
+		bloom: 1,
+		vignette: 1,
+		film: 1,
+		collision: 0,
+	};
+	const sliderValues = {
+		glow: 1,
+		motionBlur: 0.35,
+	};
+	let activeSliderName = null;
+	let isPanelCollapsed = true;
+	let panelCollapseBlend = 0;
+	let motionBlurCurrentStrength = 0;
+	let shadowRealtimeBlend = 1;
+
+	// 패널 레이아웃. (CSS 픽셀 기준, 우측 상단 고정)
+	const PANEL_WIDTH = 236;
+	const PANEL_HEADER_HEIGHT = 40;
+	const PANEL_ROW_HEIGHT = 30;
+	const PANEL_MARGIN_RIGHT = 18;
+	function calculatePanelLayout() {
+		const panelX = System.window.innerWidth - PANEL_MARGIN_RIGHT - PANEL_WIDTH;
+		const panelY = 18;
+		const listHeight = (optionDefinitions.length * PANEL_ROW_HEIGHT + 10) * panelCollapseBlend;
+		const panelHeight = PANEL_HEADER_HEIGHT + listHeight;
+		return { panelX: panelX, panelY: panelY, panelHeight: panelHeight, listHeight: listHeight };
+	}
+
+	// 슬라이더 트랙의 화면 X 범위. (렌더링과 히트 테스트가 공유)
+	const SLIDER_TRACK_WIDTH = 90;
+	function calculateSliderTrackX(panelX) {
+		return panelX + PANEL_WIDTH - 16 - SLIDER_TRACK_WIDTH;
+	}
+
+	// 드래그 중인 슬라이더 값 갱신.
+	function updateSliderFromClientX(clientX) {
+		if (activeSliderName === null) {
+			return;
+		}
+		let sliderDefinition = null;
+		for (const optionDefinition of optionDefinitions) {
+			if (optionDefinition.name === activeSliderName) {
+				sliderDefinition = optionDefinition;
+			}
+		}
+		if (!sliderDefinition) {
+			return;
+		}
+		const panelLayout = calculatePanelLayout();
+		const trackX = calculateSliderTrackX(panelLayout.panelX);
+		const normalized = System.Math.max(0, System.Math.min(1, (clientX - trackX) / SLIDER_TRACK_WIDTH));
+		sliderValues[activeSliderName] = sliderDefinition.minimumValue + (sliderDefinition.maximumValue - sliderDefinition.minimumValue) * normalized;
+	}
+
+	// 패널 히트 테스트. (true 반환 시 다른 입력으로 전달하지 않음)
+	function handlePanelPress(clientX, clientY) {
+		const panelLayout = calculatePanelLayout();
+		if (clientX < panelLayout.panelX || clientX > panelLayout.panelX + PANEL_WIDTH) {
+			return false;
+		}
+		if (clientY < panelLayout.panelY || clientY > panelLayout.panelY + panelLayout.panelHeight) {
+			return false;
+		}
+
+		// 헤더: 접기/펴기.
+		if (clientY < panelLayout.panelY + PANEL_HEADER_HEIGHT) {
+			isPanelCollapsed = !isPanelCollapsed;
+			return true;
+		}
+
+		// 목록: 행 토글 / 슬라이더 드래그 시작.
+		if (panelCollapseBlend > 0.9) {
+			const rowIndex = System.Math.floor((clientY - panelLayout.panelY - PANEL_HEADER_HEIGHT - 4) / PANEL_ROW_HEIGHT);
+			if (rowIndex >= 0 && rowIndex < optionDefinitions.length) {
+				const optionDefinition = optionDefinitions[rowIndex];
+				if (optionDefinition.type === "slider") {
+					activeSliderName = optionDefinition.name;
+					updateSliderFromClientX(clientX);
+				}
+				else if (optionDefinition.type === "cycle") {
+					optionStates[optionDefinition.name] = (optionStates[optionDefinition.name] + 1) % optionDefinition.stateLabels.length;
+				}
+				else {
+					optionStates[optionDefinition.name] = !optionStates[optionDefinition.name];
+				}
+			}
+		}
+		return true;
+	}
+
+	// 옵션 패널 렌더링. (우측 상단 글래스 패널 — 골드 액센트)
+	function renderOptionPanel() {
+		const panelLayout = calculatePanelLayout();
+
+		// 패널 배경 + 테두리.
+		const panelRect = Rect.create(panelLayout.panelX, panelLayout.panelY, PANEL_WIDTH, panelLayout.panelHeight);
+		uiGraphic.setFillColor("rgba(12, 20, 32, 0.62)");
+		uiGraphic.drawRoundRect(panelRect, 14);
+		uiGraphic.setStrokeColor("rgba(255, 226, 150, 0.28)");
+		uiGraphic.drawStrokeRoundRect(panelRect, 14, 1);
+
+		// 헤더.
+		uiGraphic.setFontString(`300 11px "Segoe UI", sans-serif`);
+		uiGraphic.setTextAlign("left");
+		uiGraphic.setTextBaseline("middle");
+		uiGraphic.setFillColor("rgba(255, 236, 180, 0.92)");
+		uiGraphic.drawFillText("O P T I O N S", panelLayout.panelX + 16, panelLayout.panelY + PANEL_HEADER_HEIGHT * 0.5 + 1);
+		uiGraphic.setTextAlign("right");
+		uiGraphic.setFillColor("rgba(255, 236, 180, 0.6)");
+		const arrowText = isPanelCollapsed ? "▸" : "▾";
+		uiGraphic.drawFillText(arrowText, panelLayout.panelX + PANEL_WIDTH - 16, panelLayout.panelY + PANEL_HEADER_HEIGHT * 0.5 + 1);
+
+		// 목록. (접힘 애니메이션에 따라 알파 페이드)
+		if (panelCollapseBlend > 0.05) {
+			for (let rowIndex = 0; rowIndex < optionDefinitions.length; ++rowIndex) {
+				const optionDefinition = optionDefinitions[rowIndex];
+				const rowY = panelLayout.panelY + PANEL_HEADER_HEIGHT + 4 + rowIndex * PANEL_ROW_HEIGHT;
+				if (rowY + PANEL_ROW_HEIGHT > panelLayout.panelY + panelLayout.panelHeight) {
+					break;
+				}
+				const rowMiddleY = rowY + PANEL_ROW_HEIGHT * 0.5;
+				uiGraphic.setGlobalAlpha(panelCollapseBlend);
+
+				// 레이블.
+				uiGraphic.setTextAlign("left");
+				uiGraphic.setFontString(`300 11px "Segoe UI", sans-serif`);
+				uiGraphic.setFillColor("rgba(238, 240, 244, 0.85)");
+				uiGraphic.drawFillText(optionDefinition.label, panelLayout.panelX + 16, rowMiddleY + 1);
+
+				if (optionDefinition.type === "cycle") {
+					// 상태 순환 칩. (클릭할 때마다 다음 단계)
+					const stateLabel = optionDefinition.stateLabels[optionStates[optionDefinition.name]];
+					const cycleChipWidth = 78;
+					const cycleChipRect = Rect.create(panelLayout.panelX + PANEL_WIDTH - 16 - cycleChipWidth, rowMiddleY - 9.5, cycleChipWidth, 19);
+					uiGraphic.setFillColor("rgba(232, 186, 90, 0.2)");
+					uiGraphic.drawRoundRect(cycleChipRect, 9.5);
+					uiGraphic.setStrokeColor("rgba(255, 226, 150, 0.5)");
+					uiGraphic.drawStrokeRoundRect(cycleChipRect, 9.5, 1);
+					uiGraphic.setTextAlign("center");
+					uiGraphic.setFontString(`600 10px "Segoe UI", sans-serif`);
+					uiGraphic.setFillColor("rgba(255, 236, 180, 0.95)");
+					uiGraphic.drawFillText(stateLabel, panelLayout.panelX + PANEL_WIDTH - 16 - cycleChipWidth * 0.5, rowMiddleY + 1);
+				}
+				else if (optionDefinition.type === "slider") {
+					// 슬라이더. (트랙 + 채움 + 노브)
+					const sliderRange = optionDefinition.maximumValue - optionDefinition.minimumValue;
+					const sliderNormalized = (sliderValues[optionDefinition.name] - optionDefinition.minimumValue) / sliderRange;
+					const trackX = calculateSliderTrackX(panelLayout.panelX);
+					const trackRect = Rect.create(trackX, rowMiddleY - 2, SLIDER_TRACK_WIDTH, 4);
+					uiGraphic.setFillColor("rgba(238, 240, 244, 0.18)");
+					uiGraphic.drawRoundRect(trackRect, 2);
+					const filledRect = Rect.create(trackX, rowMiddleY - 2, SLIDER_TRACK_WIDTH * sliderNormalized, 4);
+					uiGraphic.setFillColor("rgba(232, 186, 90, 0.92)");
+					uiGraphic.drawRoundRect(filledRect, 2);
+					const sliderKnobCenter = Vector2.create(trackX + SLIDER_TRACK_WIDTH * sliderNormalized, rowMiddleY);
+					uiGraphic.setFillColor("#fffaf0");
+					uiGraphic.drawCircle(sliderKnobCenter, 6);
+				}
+				else {
+					// 토글 스위치. (트랙 + 이동 노브, 상태 전환은 매 프레임 보간)
+					const toggleBlend = optionBlendValues[optionDefinition.name];
+					const switchX = panelLayout.panelX + PANEL_WIDTH - 16 - 36;
+					const switchY = rowMiddleY - 9.5;
+					const trackRect = Rect.create(switchX, switchY, 36, 19);
+					const trackRed = 0.14 + (0.85 - 0.14) * toggleBlend;
+					const trackGreen = 0.17 + (0.68 - 0.17) * toggleBlend;
+					const trackBlue = 0.22 + (0.3 - 0.22) * toggleBlend;
+					uiGraphic.setFillColor(`rgba(${System.Math.round(trackRed * 255)}, ${System.Math.round(trackGreen * 255)}, ${System.Math.round(trackBlue * 255)}, 0.85)`);
+					uiGraphic.drawRoundRect(trackRect, 9.5);
+					uiGraphic.setStrokeColor(`rgba(255, 226, 150, ${0.25 + toggleBlend * 0.45})`);
+					uiGraphic.drawStrokeRoundRect(trackRect, 9.5, 1);
+					const knobX = switchX + 9.5 + toggleBlend * 17;
+					const knobCenter = Vector2.create(knobX, rowMiddleY);
+					uiGraphic.setFillColor(toggleBlend > 0.5 ? "#fffaf0" : "rgba(238, 240, 244, 0.75)");
+					uiGraphic.drawCircle(knobCenter, 6.5);
+				}
+			}
+			uiGraphic.setGlobalAlpha(1);
+		}
+	}
+
+	// PS 스타일 버튼 아이콘. (X = 크로스, O = 서클)
+	function drawCrossIcon(centerX, centerY, iconRadius, iconColorString, lineWidth) {
+		uiGraphic.setStrokeColor(iconColorString);
+		const crossOffset = iconRadius * 0.72;
+		const crossLineA = [Vector2.create(centerX - crossOffset, centerY - crossOffset), Vector2.create(centerX + crossOffset, centerY + crossOffset)];
+		uiGraphic.drawLine(crossLineA, lineWidth);
+		const crossLineB = [Vector2.create(centerX + crossOffset, centerY - crossOffset), Vector2.create(centerX - crossOffset, centerY + crossOffset)];
+		uiGraphic.drawLine(crossLineB, lineWidth);
+	}
+	function drawCircleIcon(centerX, centerY, iconRadius, iconColorString, lineWidth) {
+		uiGraphic.setStrokeColor(iconColorString);
+		const iconCenter = Vector2.create(centerX, centerY);
+		uiGraphic.drawStrokeCircle(iconCenter, iconRadius * 0.78, lineWidth);
+	}
+
+	// 그림자 곁들인 텍스트.
+	function drawShadowedText(text, x, y) {
+		const shadowFillColor = "rgba(10, 16, 24, 0.75)";
+		uiGraphic.setFillColor(shadowFillColor);
+		uiGraphic.drawFillText(text, x + 1.2, y + 1.4);
+		uiGraphic.setFillColor("rgba(250, 250, 248, 0.95)");
+		uiGraphic.drawFillText(text, x, y);
+	}
+
+	// 월드 좌표 → CSS 픽셀 화면 좌표.
+	function projectWorldToScreen(viewProjectionMatrix, worldX, worldY, worldZ, cssWidth, cssHeight) {
+		const clipPosition = viewProjectionMatrix.transformPoint(worldX, worldY, worldZ);
+		if (clipPosition.w <= 0.001) {
+			return null;
+		}
+		const normalizedX = clipPosition.x / clipPosition.w;
+		const normalizedY = clipPosition.y / clipPosition.w;
+		return {
+			x: (normalizedX * 0.5 + 0.5) * cssWidth,
+			y: (1 - (normalizedY * 0.5 + 0.5)) * cssHeight,
+		};
+	}
+
+	function renderHud(viewProjectionMatrix, elapsedTime, deltaTime) {
+		const devicePixelRatio = System.Math.min(System.window.devicePixelRatio || 1, 2);
+		const cssWidth = System.window.innerWidth;
+		const cssHeight = System.window.innerHeight;
+
+		uiGraphic.applySettings(null);
+		uiGraphic.scale(devicePixelRatio, devicePixelRatio);
+		uiGraphic.setGlobalAlpha(1);
+
+		// 등반 프롬프트. (절벽의 손 닿는 높이에 O 아이콘 + 레이블 — 아이콘 탭/클릭도 등반 시작)
+		promptScreenPosition = null;
+		if (characterState === CharacterState.ground && climbAvailableTarget) {
+			const promptScreen = projectWorldToScreen(viewProjectionMatrix, climbAvailableTarget.wallX, climbAvailableTarget.promptY, climbAvailableTarget.wallZ, cssWidth, cssHeight);
+			if (promptScreen) {
+				promptScreenPosition = promptScreen;
+				const pulseScale = 1 + System.Math.sin(elapsedTime * 5.5) * 0.06;
+				const promptRadius = 21 * pulseScale;
+				const promptCenter = Vector2.create(promptScreen.x, promptScreen.y);
+				uiGraphic.setFillColor("rgba(0, 0, 0, 0.82)");
+				uiGraphic.drawCircle(promptCenter, promptRadius);
+				uiGraphic.setStrokeColor("rgba(255, 255, 255, 0.4)");
+				uiGraphic.drawStrokeCircle(promptCenter, promptRadius, 1.6);
+				drawCircleIcon(promptScreen.x, promptScreen.y, promptRadius * 0.62, "rgba(255, 255, 255, 0.98)", 3);
+				uiGraphic.setFontString(`600 15px "Segoe UI", "Malgun Gothic", sans-serif`);
+				uiGraphic.setTextAlign("left");
+				uiGraphic.setTextBaseline("middle");
+				drawShadowedText("등반", promptScreen.x + promptRadius + 10, promptScreen.y);
+			}
+		}
+
+		// 뛰어내리기 프롬프트. (낙하 가장자리에 X 아이콘 + 레이블)
+		if (characterState === CharacterState.ground && !climbAvailableTarget && descendAvailableTarget) {
+			const promptScreen = projectWorldToScreen(viewProjectionMatrix, descendAvailableTarget.edgeX, descendAvailableTarget.promptY, descendAvailableTarget.edgeZ, cssWidth, cssHeight);
+			if (promptScreen) {
+				promptScreenPosition = promptScreen;
+				const pulseScale = 1 + System.Math.sin(elapsedTime * 5.5) * 0.06;
+				const promptRadius = 21 * pulseScale;
+				const promptCenter = Vector2.create(promptScreen.x, promptScreen.y);
+				uiGraphic.setFillColor("rgba(0, 0, 0, 0.82)");
+				uiGraphic.drawCircle(promptCenter, promptRadius);
+				uiGraphic.setStrokeColor("rgba(255, 255, 255, 0.4)");
+				uiGraphic.drawStrokeCircle(promptCenter, promptRadius, 1.6);
+				drawCircleIcon(promptScreen.x, promptScreen.y, promptRadius * 0.62, "rgba(255, 255, 255, 0.98)", 3);
+				uiGraphic.setFontString(`600 15px "Segoe UI", "Malgun Gothic", sans-serif`);
+				uiGraphic.setTextAlign("left");
+				uiGraphic.setTextBaseline("middle");
+				drawShadowedText("뛰어내리기", promptScreen.x + promptRadius + 10, promptScreen.y);
+			}
+		}
+
+		// 등반 중 취소 안내.
+		if (characterState === CharacterState.climbing) {
+			const cancelScreen = projectWorldToScreen(viewProjectionMatrix, playerX, playerY + 2.3, playerZ, cssWidth, cssHeight);
+			if (cancelScreen) {
+				const cancelCenter = Vector2.create(cancelScreen.x, cancelScreen.y);
+				uiGraphic.setFillColor("rgba(0, 0, 0, 0.78)");
+				uiGraphic.drawCircle(cancelCenter, 15);
+				uiGraphic.setStrokeColor("rgba(255, 255, 255, 0.4)");
+				uiGraphic.drawStrokeCircle(cancelCenter, 15, 1.6);
+				drawCircleIcon(cancelScreen.x, cancelScreen.y, 10, "rgba(255, 255, 255, 0.95)", 2.4);
+				uiGraphic.setFontString(`600 13px "Segoe UI", "Malgun Gothic", sans-serif`);
+				uiGraphic.setTextAlign("left");
+				uiGraphic.setTextBaseline("middle");
+				drawShadowedText("취소", cancelScreen.x + 24, cancelScreen.y);
+			}
+		}
+
+		// 정상 카운터 칩. (좌상단 글래스 칩 + 골드 아이콘)
+		const counterRect = Rect.create(14, 14, 132, 30);
+		uiGraphic.setFillColor("rgba(12, 20, 32, 0.55)");
+		uiGraphic.drawRoundRect(counterRect, 15);
+		uiGraphic.setStrokeColor("rgba(255, 226, 150, 0.28)");
+		uiGraphic.drawStrokeRoundRect(counterRect, 15, 1);
+		uiGraphic.setFontString(`500 14px "Segoe UI", "Malgun Gothic", sans-serif`);
+		uiGraphic.setTextAlign("left");
+		uiGraphic.setTextBaseline("middle");
+		uiGraphic.setFillColor("rgba(255, 205, 90, 0.95)");
+		uiGraphic.drawFillText("▲", 28, 30);
+		drawShadowedText(`정상 ${clearedSummitCount} / ${HILL_LIST.length}`, 46, 30);
+
+		// 전체 클리어 배너.
+		const allClearedElapsed = elapsedTime - allClearedTime;
+		if (allClearedElapsed > 0 && allClearedElapsed < 7) {
+			const bannerAlpha = System.Math.min(allClearedElapsed / 0.8, 1) * (1 - smoothstepValue(5.5, 7, allClearedElapsed));
+			uiGraphic.setGlobalAlpha(bannerAlpha);
+			uiGraphic.setFontString(`300 34px "Segoe UI Light", "Segoe UI", "Malgun Gothic", sans-serif`);
+			uiGraphic.setTextAlign("center");
+			drawShadowedText("모든 정상을 정복했습니다", cssWidth * 0.5, cssHeight * 0.36);
+			uiGraphic.setFontString(`300 14px "Segoe UI", "Malgun Gothic", sans-serif`);
+			drawShadowedText("잃어버린 순환로의 여섯 봉우리를 모두 올랐습니다", cssWidth * 0.5, cssHeight * 0.36 + 34);
+			uiGraphic.setGlobalAlpha(1);
+		}
+
+		// 가상 조이스틱. (터치 디바이스)
+		if (isTouchDevice) {
+			virtualPad.tick(deltaTime);
+			virtualPad.draw(uiGraphic);
+		}
+
+		// X / O 버튼. (우하단)
+		const jumpButtonCenter = calculateJumpButtonCenter();
+		const interactButtonCenter = calculateInteractButtonCenter();
+		const isActionReady = characterState === CharacterState.ground && (climbAvailableTarget !== null || descendAvailableTarget !== null);
+		const isInteractReady = isActionReady || characterState === CharacterState.climbing;
+		uiGraphic.setFillColor(isJumpButtonHeld ? "rgba(45, 45, 45, 0.75)" : "rgba(0, 0, 0, 0.6)");
+		uiGraphic.drawCircle(jumpButtonCenter, BUTTON_RADIUS);
+		uiGraphic.setStrokeColor("rgba(255, 255, 255, 0.35)");
+		uiGraphic.drawStrokeCircle(jumpButtonCenter, BUTTON_RADIUS, 1.6);
+		drawCrossIcon(jumpButtonCenter.x, jumpButtonCenter.y, BUTTON_RADIUS * 0.44, "rgba(255, 255, 255, 0.95)", 3.4);
+		const interactGlowRadius = BUTTON_RADIUS * 0.82 + (isInteractReady ? 3 + System.Math.sin(elapsedTime * 6) * 2 : 0);
+		uiGraphic.setFillColor(isInteractButtonHeld ? "rgba(45, 45, 45, 0.75)" : "rgba(0, 0, 0, 0.6)");
+		uiGraphic.drawCircle(interactButtonCenter, interactGlowRadius);
+		uiGraphic.setStrokeColor(isInteractReady ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.35)");
+		uiGraphic.drawStrokeCircle(interactButtonCenter, interactGlowRadius, isInteractReady ? 2.6 : 1.6);
+		drawCircleIcon(interactButtonCenter.x, interactButtonCenter.y, interactGlowRadius * 0.52, isInteractReady ? "rgba(255, 255, 255, 0.98)" : "rgba(255, 255, 255, 0.8)", 3);
+
+		// 조작 안내. (입력 시작 후 서서히 사라짐)
+		const hintAlpha = hasAnyInputHappened ? System.Math.max(0, 1 - (elapsedTime - hintFadeStartTime) / 3) : 1;
+		if (hintAlpha > 0.01) {
+			uiGraphic.setGlobalAlpha(hintAlpha);
+			uiGraphic.setFontString(`400 12px "Segoe UI", "Malgun Gothic", sans-serif`);
+			uiGraphic.setTextAlign("left");
+			uiGraphic.setTextBaseline("middle");
+			const hintBaseY = cssHeight - 148;
+			const hintCardRect = isTouchDevice ? Rect.create(10, hintBaseY - 16, 252, 72) : Rect.create(10, hintBaseY - 36, 366, 116);
+			uiGraphic.setFillColor("rgba(12, 20, 32, 0.5)");
+			uiGraphic.drawRoundRect(hintCardRect, 12);
+			uiGraphic.setStrokeColor("rgba(255, 226, 150, 0.2)");
+			uiGraphic.drawStrokeRoundRect(hintCardRect, 12, 1);
+			if (isTouchDevice) {
+				drawShadowedText("왼쪽 드래그 — 이동 (끝까지 밀면 질주)", 18, hintBaseY);
+				drawShadowedText("오른쪽 드래그 — 시점", 18, hintBaseY + 20);
+				drawShadowedText("✕ 점프 · ○ 등반 / 뛰어내리기", 18, hintBaseY + 40);
+			}
+			else {
+				drawShadowedText("W A S D — 이동  ·  SHIFT / R2 — 질주", 18, hintBaseY - 20);
+				drawShadowedText("방향키 / 마우스 드래그 — 시점", 18, hintBaseY);
+				drawShadowedText("SPACE / 좌클릭 — 점프 (✕)", 18, hintBaseY + 20);
+				drawShadowedText("O / 우클릭 — 등반 · 뛰어내리기 · 취소 (○)", 18, hintBaseY + 40);
+				drawShadowedText("절벽을 바라보면 등반 · 가장자리에서 아래를 보면 뛰어내리기", 18, hintBaseY + 60);
+			}
+			uiGraphic.setGlobalAlpha(1);
+		}
+
+		// 충돌 영역 표시. (COLLISION 옵션 — 바위/여우/캐릭터 충돌 반경 링)
+		function drawCollisionRing(centerX, centerZ, ringRadius, colorString) {
+			const ringPositions = [];
+			for (let segmentIndex = 0; segmentIndex < 16; ++segmentIndex) {
+				const segmentAngle = (segmentIndex / 16) * System.Math.PI * 2;
+				const ringWorldX = centerX + System.Math.cos(segmentAngle) * ringRadius;
+				const ringWorldZ = centerZ + System.Math.sin(segmentAngle) * ringRadius;
+				const ringWorldY = terrainSurfaceHeightAt(ringWorldX, ringWorldZ) + 0.15;
+				const ringScreen = projectWorldToScreen(viewProjectionMatrix, ringWorldX, ringWorldY, ringWorldZ, cssWidth, cssHeight);
+				if (!ringScreen) {
+					return;
+				}
+				ringPositions.push(Vector2.create(ringScreen.x, ringScreen.y));
+			}
+			uiGraphic.setStrokeColor(colorString);
+			uiGraphic.drawLineLoop(ringPositions, 2);
+		}
+		if (optionStates.collision) {
+			for (const rock of rockList) {
+				const rockDeltaX = rock.centerX - playerX;
+				const rockDeltaZ = rock.centerZ - playerZ;
+				if (rockDeltaX * rockDeltaX + rockDeltaZ * rockDeltaZ < 45 * 45) {
+					drawCollisionRing(rock.centerX, rock.centerZ, rock.blockRadius, "rgba(120, 220, 255, 0.85)");
+				}
+			}
+			for (const fox of FOX_LIST) {
+				drawCollisionRing(fox.currentX, fox.currentZ, fox.blockRadius, "rgba(255, 180, 90, 0.9)");
+			}
+			drawCollisionRing(playerX, playerZ, 0.38, "rgba(255, 120, 200, 0.9)");
+		}
+
+		// 입력 상태 표시. (좌하단 — 이동 벡터 + 질주/점프/상호작용 눌림)
+		const indicatorSprintHeld = keyStateSet.has("ShiftLeft") || keyStateSet.has("ShiftRight") || gamepadSprintHeld;
+		const indicatorJumpHeld = keyStateSet.has("Space") || keyStateSet.has("KeyX") || previousGamepadJump || isJumpButtonHeld;
+		const indicatorInteractHeld = keyStateSet.has("KeyO") || keyStateSet.has("Escape") || previousGamepadInteract || isInteractButtonHeld;
+		const indicatorCenterX = 46;
+		const indicatorCenterY = cssHeight - (isTouchDevice ? 258 : 40);
+		const indicatorCenter = Vector2.create(indicatorCenterX, indicatorCenterY);
+		uiGraphic.setFillColor("rgba(12, 20, 32, 0.5)");
+		uiGraphic.drawCircle(indicatorCenter, 26);
+		uiGraphic.setStrokeColor("rgba(255, 226, 150, 0.25)");
+		uiGraphic.drawStrokeCircle(indicatorCenter, 26, 1);
+		const moveMagnitude = System.Math.sqrt(currentMoveInputX * currentMoveInputX + currentMoveInputZ * currentMoveInputZ);
+		const moveDotCenter = Vector2.create(indicatorCenterX + currentMoveInputX * 15, indicatorCenterY - currentMoveInputZ * 15);
+		uiGraphic.setFillColor(moveMagnitude > 0.05 ? "rgba(255, 236, 180, 0.95)" : "rgba(238, 240, 244, 0.35)");
+		uiGraphic.drawCircle(moveDotCenter, 6);
+		const indicatorHeldList = [
+			{ label: "질주", isHeld: indicatorSprintHeld },
+			{ label: "점프", isHeld: indicatorJumpHeld },
+			{ label: "상호작용", isHeld: indicatorInteractHeld },
+		];
+		uiGraphic.setFontString(`500 11px "Segoe UI", "Malgun Gothic", sans-serif`);
+		uiGraphic.setTextAlign("center");
+		uiGraphic.setTextBaseline("middle");
+		let indicatorChipX = indicatorCenterX + 38;
+		for (const indicatorItem of indicatorHeldList) {
+			const chipWidth = indicatorItem.label.length > 2 ? 66 : 46;
+			const chipRect = Rect.create(indicatorChipX, indicatorCenterY - 11, chipWidth, 22);
+			uiGraphic.setFillColor(indicatorItem.isHeld ? "rgba(232, 186, 90, 0.85)" : "rgba(12, 20, 32, 0.5)");
+			uiGraphic.drawRoundRect(chipRect, 11);
+			uiGraphic.setStrokeColor(indicatorItem.isHeld ? "rgba(255, 236, 180, 0.9)" : "rgba(238, 240, 244, 0.2)");
+			uiGraphic.drawStrokeRoundRect(chipRect, 11, 1);
+			uiGraphic.setFillColor(indicatorItem.isHeld ? "rgba(20, 16, 8, 0.95)" : "rgba(238, 240, 244, 0.6)");
+			uiGraphic.drawFillText(indicatorItem.label, indicatorChipX + chipWidth * 0.5, indicatorCenterY + 1);
+			indicatorChipX += chipWidth + 8;
+		}
+
+		// 옵션 패널. (우측 상단)
+		renderOptionPanel();
+
+		// 인트로 페이드인. (자연 지형에 어울리는 아침 안개 톤)
+		const introAlpha = 1 - System.Math.min(elapsedTime / 1.6, 1);
+		if (introAlpha > 0.001) {
+			const introRect = Rect.create(0, 0, cssWidth, cssHeight);
+			uiGraphic.setFillColor(`rgba(206, 214, 200, ${introAlpha})`);
+			uiGraphic.drawRect(introRect);
+		}
+	}
+	let hintFadeStartTime = 8;
+
+	//==============================================================================
+	// 리사이즈.
+	//==============================================================================
+	function resizeCanvas() {
+		const devicePixelRatio = System.Math.min(System.window.devicePixelRatio || 1, 2);
+		const displayWidth = System.Math.floor(canvas.clientWidth * devicePixelRatio);
+		const displayHeight = System.Math.floor(canvas.clientHeight * devicePixelRatio);
+		if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+			canvas.width = displayWidth;
+			canvas.height = displayHeight;
+			sceneRenderTarget.resize(displayWidth, displayHeight);
+			bloomEffect.resize(displayWidth, displayHeight);
+		}
+	}
+
+	//==============================================================================
+	// 메인 루프.
+	//==============================================================================
+	const sunDirectionVector = Vector3.create(-0.42, 0.62, -0.35).normalize();
+	skinnedModelRenderer.setSunDirection(sunDirectionVector.x, sunDirectionVector.y, sunDirectionVector.z);
+	skinnedModelRenderer.setFogColor(0.8, 0.85, 0.92);
+	skinnedModelRenderer.setFogRange(55, 250);
+	const startTimestamp = System.performance.now();
+	let previousTimestamp = startTimestamp;
+	let hintFadeStarted = false;
+
+	function renderFrame() {
+		resizeCanvas();
+		const currentTimestamp = System.performance.now();
+		const elapsedTime = (currentTimestamp - startTimestamp) / 1000;
+		const deltaTime = System.Math.min((currentTimestamp - previousTimestamp) / 1000, 0.1);
+		previousTimestamp = currentTimestamp;
+		const aspectRatio = canvas.width / canvas.height;
+
+		// 입력 갱신.
+		pollGamepad();
+		if (hasAnyInputHappened && !hintFadeStarted) {
+			hintFadeStarted = true;
+			hintFadeStartTime = elapsedTime + 4;
+		}
+
+		// 카메라 회전 입력. (방향키 + 드래그 + 게임패드 오른스틱 — 목표값에 누적)
+		let cameraYawVelocity = 0;
+		let cameraPitchVelocity = 0;
+		if (keyStateSet.has("ArrowRight")) {
+			cameraYawVelocity += 1.3;
+		}
+		if (keyStateSet.has("ArrowLeft")) {
+			cameraYawVelocity -= 1.3;
+		}
+		if (keyStateSet.has("ArrowUp")) {
+			cameraPitchVelocity += 0.9;
+		}
+		if (keyStateSet.has("ArrowDown")) {
+			cameraPitchVelocity -= 0.9;
+		}
+		cameraYawVelocity += gamepadCameraX * 1.8;
+		cameraPitchVelocity -= gamepadCameraY * 1.3;
+		cameraYawTarget += cameraYawVelocity * deltaTime + pendingDragYawDelta * 0.72;
+		cameraPitchTarget += cameraPitchVelocity * deltaTime + pendingDragPitchDelta * 0.72;
+		pendingDragYawDelta = 0;
+		pendingDragPitchDelta = 0;
+		cameraPitchTarget = System.Math.max(-0.78, System.Math.min(0.55, cameraPitchTarget));
+
+		// 이동 중 카메라 소프트 팔로우. (달리는 방향 뒤로 천천히 따라붙되 수동 드래그가 우선)
+		if (characterState === CharacterState.ground && currentMoveSpeed > 0.5 && cameraDragLastX === null) {
+			let followYawDifference = characterYaw - cameraYawTarget;
+			while (followYawDifference > System.Math.PI) {
+				followYawDifference -= System.Math.PI * 2;
+			}
+			while (followYawDifference < -System.Math.PI) {
+				followYawDifference += System.Math.PI * 2;
+			}
+			const followRate = 2.2 * System.Math.min(currentMoveSpeed / RUN_SPEED, 1);
+			cameraYawTarget += followYawDifference * System.Math.min(followRate * deltaTime, 1);
+		}
+
+		// 등반 중 카메라 재정렬. (벽 정면을 바라보도록 부드럽게 복귀)
+		if (characterState === CharacterState.climbAttach || characterState === CharacterState.climbing) {
+			const recenterRate = characterState === CharacterState.climbAttach ? 10 : 2.2;
+			let recenterYawDifference = characterYaw - cameraYawTarget;
+			while (recenterYawDifference > System.Math.PI) {
+				recenterYawDifference -= System.Math.PI * 2;
+			}
+			while (recenterYawDifference < -System.Math.PI) {
+				recenterYawDifference += System.Math.PI * 2;
+			}
+			cameraYawTarget += recenterYawDifference * System.Math.min(recenterRate * deltaTime, 1);
+			cameraPitchTarget += (0.28 - cameraPitchTarget) * System.Math.min(recenterRate * 0.8 * deltaTime, 1);
+		}
+
+		// 카메라 관성 추적. (실제 카메라가 목표를 묵직하게 뒤따르는 시네마틱 감)
+		let cameraYawFollowDifference = cameraYawTarget - cameraYaw;
+		while (cameraYawFollowDifference > System.Math.PI) {
+			cameraYawFollowDifference -= System.Math.PI * 2;
+		}
+		while (cameraYawFollowDifference < -System.Math.PI) {
+			cameraYawFollowDifference += System.Math.PI * 2;
+		}
+		cameraYaw += cameraYawFollowDifference * System.Math.min(7.5 * deltaTime, 1);
+		cameraPitch += (cameraPitchTarget - cameraPitch) * System.Math.min(7.5 * deltaTime, 1);
+
+		// 여우 위치 갱신. (충돌 판정에 앞서)
+		updateFoxPositions(elapsedTime);
+
+		// 캐릭터 갱신.
+		updateCharacter(deltaTime, elapsedTime);
+
+		// 모션 블러 강도 / 착지 충격 감쇠. (은은하게 켜지고 빠르게 꺼진다 — 왜곡 꼬리 방지 스냅 종료)
+		let motionBlurTargetStrength = 0;
+		if (characterState === CharacterState.jumpDown) {
+			motionBlurTargetStrength = System.Math.min(System.Math.max(-jumpVelocityY, 0) / 26, 0.28);
+		}
+		motionBlurTargetStrength += landingImpulse * 0.2;
+		motionBlurTargetStrength += System.Math.max(0, currentMoveSpeed - RUN_SPEED) / (SPRINT_SPEED - RUN_SPEED) * 0.03;
+		const blurSmoothingRate = motionBlurTargetStrength > motionBlurCurrentStrength ? 10 : 16;
+		motionBlurCurrentStrength += (motionBlurTargetStrength - motionBlurCurrentStrength) * System.Math.min(blurSmoothingRate * deltaTime, 1);
+		if (motionBlurCurrentStrength < 0.02 && motionBlurTargetStrength < 0.01) {
+			motionBlurCurrentStrength = 0;
+		}
+		landingImpulse -= landingImpulse * 5.5 * deltaTime;
+
+		// 캐릭터 애니메이션 갱신. (클립 선택 + 조인트 오프셋 + 골격 계산)
+		updateCharacterAnimation(deltaTime);
+
+		// 여우 행렬 구성. (updateFoxPositions 에서 계산한 위치/방향 사용 — 같은 포즈를 여러 위치에 출력)
+		foxModel.update(deltaTime);
+		const foxMatrixList = [];
+		for (const fox of FOX_LIST) {
+			const foxMatrix = Matrix4.createTranslation(fox.currentX, fox.currentY, fox.currentZ);
+			foxMatrix.rotateY(System.Math.PI - fox.currentYaw);
+			foxMatrix.scale(fox.bodyScale, fox.bodyScale, fox.bodyScale);
+			foxMatrixList.push(foxMatrix);
+		}
+
+		// 옵션 토글 / 패널 접힘 / 실시간 그림자 보간. (부드러운 트랜지션)
+		for (const optionDefinition of optionDefinitions) {
+			if (optionDefinition.type !== "toggle") {
+				continue;
+			}
+			const optionTarget = optionStates[optionDefinition.name] ? 1 : 0;
+			optionBlendValues[optionDefinition.name] += (optionTarget - optionBlendValues[optionDefinition.name]) * System.Math.min(7 * deltaTime, 1);
+		}
+		const collapseTarget = isPanelCollapsed ? 0 : 1;
+		panelCollapseBlend += (collapseTarget - panelCollapseBlend) * System.Math.min(8 * deltaTime, 1);
+		const shadowRealtimeTarget = optionStates.shadow === 2 ? 1 : 0;
+		shadowRealtimeBlend += (shadowRealtimeTarget - shadowRealtimeBlend) * System.Math.min(7 * deltaTime, 1);
+
+		// 숄더뷰 카메라. (어깨 오프셋 피벗 + 지형 차폐 회피)
+		const cameraForwardX = System.Math.sin(cameraYaw) * System.Math.cos(cameraPitch);
+		const cameraForwardY = System.Math.sin(cameraPitch);
+		const cameraForwardZ = -System.Math.cos(cameraYaw) * System.Math.cos(cameraPitch);
+		const cameraRightX = System.Math.cos(cameraYaw);
+		const cameraRightZ = System.Math.sin(cameraYaw);
+		const isClimbingState = characterState === CharacterState.climbAttach || characterState === CharacterState.climbing || characterState === CharacterState.climbCancel;
+		const isAirState = characterState === CharacterState.jumpDown || characterState === CharacterState.landRecover;
+		const pivotTargetY = playerY + (isClimbingState ? 2.0 : 1.55);
+		const pivotFollowRate = isAirState ? 3.5 : 10;
+		smoothedPivotY += (pivotTargetY - smoothedPivotY) * System.Math.min(pivotFollowRate * deltaTime, 1);
+		const shoulderSideOffset = isClimbingState ? 0.15 : 0.55;
+		const shoulderPivotX = playerX + cameraRightX * shoulderSideOffset;
+		const cameraShakeOffset = System.Math.sin(elapsedTime * 55) * landingImpulse * 0.035;
+		const shoulderPivotY = smoothedPivotY + cameraShakeOffset;
+		const shoulderPivotZ = playerZ + cameraRightZ * shoulderSideOffset;
+		let cameraDistanceTarget = 3.6;
+		if (isClimbingState) {
+			cameraDistanceTarget = 5.4;
+		}
+		else if (isAirState) {
+			cameraDistanceTarget = 4.6;
+		}
+
+		// 상태별 카메라 거리 전환 스무딩. (착지/등반 종료 시 순간 줌 방지)
+		smoothedCameraDistance += (cameraDistanceTarget - smoothedCameraDistance) * System.Math.min(3.2 * deltaTime, 1);
+		const cameraDistance = smoothedCameraDistance;
+		let cameraDistanceFactor = 1;
+		for (let sampleIndex = 1; sampleIndex <= 24; ++sampleIndex) {
+			const sampleFactor = sampleIndex / 24;
+			const sampleX = shoulderPivotX - cameraForwardX * cameraDistance * sampleFactor;
+			const sampleY = shoulderPivotY - cameraForwardY * cameraDistance * sampleFactor;
+			const sampleZ = shoulderPivotZ - cameraForwardZ * cameraDistance * sampleFactor;
+			const sampleGroundY = terrainSurfaceHeightAt(sampleX, sampleZ) + 0.26;
+			if (sampleY < sampleGroundY) {
+				cameraDistanceFactor = System.Math.max(sampleFactor - 0.05, 0.2);
+				break;
+			}
+		}
+
+		// 카메라 거리 스무딩. (막히면 빠르게 당겨지고, 풀리면 천천히 복귀 — 틱틱 끊김 방지)
+		const distanceSmoothingRate = cameraDistanceFactor < smoothedCameraDistanceFactor ? 9 : 3;
+		smoothedCameraDistanceFactor += (cameraDistanceFactor - smoothedCameraDistanceFactor) * System.Math.min(distanceSmoothingRate * deltaTime, 1);
+		const cameraPositionX = shoulderPivotX - cameraForwardX * cameraDistance * smoothedCameraDistanceFactor;
+		let cameraPositionY = shoulderPivotY - cameraForwardY * cameraDistance * smoothedCameraDistanceFactor;
+		const cameraPositionZ = shoulderPivotZ - cameraForwardZ * cameraDistance * smoothedCameraDistanceFactor;
+		const cameraGroundY = terrainSurfaceHeightAt(cameraPositionX, cameraPositionZ) + 0.3;
+		cameraPositionY = System.Math.max(cameraPositionY, cameraGroundY);
+
+		// 뷰 / 투영 행렬. (엔진 Matrix4 — 질주 시 화각 확장)
+		const speedFactor = System.Math.min(currentMoveSpeed / RUN_SPEED, 1.6);
+		const fieldOfViewRadian = ((55 + speedFactor * 4) * System.Math.PI) / 180;
+		const cameraPosition = Vector3.create(cameraPositionX, cameraPositionY, cameraPositionZ);
+		const cameraTarget = Vector3.create(cameraPositionX + cameraForwardX, cameraPositionY + cameraForwardY, cameraPositionZ + cameraForwardZ);
+		const cameraUp = Vector3.up();
+		const viewMatrix = Matrix4.createLookAt(cameraPosition, cameraTarget, cameraUp);
+		const projectionMatrix = Matrix4.createPerspective(fieldOfViewRadian, aspectRatio, 0.1, 520);
+		const viewProjectionMatrix = projectionMatrix.clone();
+		viewProjectionMatrix.multiply(viewMatrix);
+		const viewProjectionElements = viewProjectionMatrix.getElements();
+
+		// 캐릭터 모델 행렬. (본 패스와 깊이 패스 공용 — Remy 는 로컬 +z 정면이라 -yaw + 180도, cm 스케일 축소)
+		const characterModelMatrix = Matrix4.createTranslation(playerX, playerY, playerZ);
+		characterModelMatrix.rotateY(-characterYaw + System.Math.PI);
+		characterModelMatrix.scale(CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE);
+		const characterModelElements = characterModelMatrix.getElements();
+
+		// 깃발천 행렬 목록. (본 패스와 깊이 패스 공용)
+		const flagBannerList = [];
+		for (let hillIndex = 0; hillIndex < HILL_LIST.length; ++hillIndex) {
+			const hill = HILL_LIST[hillIndex];
+			const bannerWave = System.Math.sin(elapsedTime * 2.6 + hillIndex * 1.7) * 0.24;
+			const clearedPulse = System.Math.max(0, 1 - (elapsedTime - hill.clearedPulseTime) * 1.2);
+			const bannerScale = 1 + clearedPulse * 0.6;
+			const bannerMatrix = Matrix4.createTranslation(hill.summitX, hill.flagBaseHeight + FLAG_POLE_HEIGHT - 0.42, hill.summitZ);
+			bannerMatrix.rotateY(bannerWave + hillIndex * 0.9);
+			bannerMatrix.translate(0.62 * bannerScale, 0, 0);
+			bannerMatrix.scale(1.15 * bannerScale, 0.6 * bannerScale, 0.05);
+			const bannerColor = hill.cleared ? [1.0, 0.78, 0.2] : [0.78, 0.2, 0.16];
+			flagBannerList.push({ matrix: bannerMatrix, color: bannerColor });
+		}
+
+		// === 0. 섀도우 맵 깊이 패스 (REALTIME 모드) ===
+		const shadowDepthTexture = shadowMap.getDepthTexture();
+		let lightViewProjectionElements = identityModelMatrix.getElements();
+		if (shadowRealtimeBlend > 0.01) {
+			const lightFocusPosition = Vector3.create(playerX + cameraForwardX * 12, playerY, playerZ + cameraForwardZ * 12);
+			const lightTravelDirection = Vector3.create(-sunDirectionVector.x, -sunDirectionVector.y, -sunDirectionVector.z);
+			shadowMap.updateLightMatrix(lightFocusPosition, lightTravelDirection, 48, 5, 260);
+			const lightViewProjectionMatrix = shadowMap.getLightViewProjectionMatrix();
+			lightViewProjectionElements = lightViewProjectionMatrix.getElements();
+			shadowMap.beginRender();
+			depthShaderProgram.use();
+			webGL2RenderingContext.uniformMatrix4fv(depthLightViewProjectionLocation, false, lightViewProjectionElements);
+			const identityElements = identityModelMatrix.getElements();
+
+			// 지형.
+			webGL2RenderingContext.uniformMatrix4fv(depthModelMatrixLocation, false, identityElements);
+			webGL2RenderingContext.bindVertexArray(terrainVertexArray);
+			webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, terrainIndexArray.length, webGL2RenderingContext.UNSIGNED_INT, 0);
+
+			// 바위.
+			for (const rock of rockList) {
+				const rockModelElements = rock.matrix.getElements();
+				webGL2RenderingContext.uniformMatrix4fv(depthModelMatrixLocation, false, rockModelElements);
+				const rockVariant = rockVariantList[rock.variantIndex];
+				webGL2RenderingContext.bindVertexArray(rockVariant.vertexArray);
+				webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, rockVariant.vertexCount);
+			}
+
+			// 깃발.
+			webGL2RenderingContext.bindVertexArray(cubeVertexArray);
+			for (const hill of HILL_LIST) {
+				const poleElements = hill.poleMatrix.getElements();
+				webGL2RenderingContext.uniformMatrix4fv(depthModelMatrixLocation, false, poleElements);
+				webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, cubeIndexCount, webGL2RenderingContext.UNSIGNED_SHORT, 0);
+			}
+			for (const flagBanner of flagBannerList) {
+				const bannerElements = flagBanner.matrix.getElements();
+				webGL2RenderingContext.uniformMatrix4fv(depthModelMatrixLocation, false, bannerElements);
+				webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, cubeIndexCount, webGL2RenderingContext.UNSIGNED_SHORT, 0);
+			}
+
+			// 캐릭터 / 여우.
+			skinnedModelRenderer.drawDepth(characterModel, lightViewProjectionElements, characterModelElements);
+			for (const foxMatrix of foxMatrixList) {
+				const foxElements = foxMatrix.getElements();
+				skinnedModelRenderer.drawDepth(foxModel, lightViewProjectionElements, foxElements);
+			}
+			webGL2RenderingContext.bindVertexArray(null);
+		}
+
+		// 섀도우 맵 텍스처 바인드. (본 패스 공용 — 유닛 3)
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE3);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, shadowDepthTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		skinnedModelRenderer.setShadowMap(shadowDepthTexture, lightViewProjectionElements, 1 / SHADOWMAP_RESOLUTION);
+		skinnedModelRenderer.setShadowStrength(shadowRealtimeBlend);
+
+		// === 1. 씬 렌더 타겟 클리어 ===
+		sceneRenderTarget.bind();
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.clearColor(0.8, 0.85, 0.92, 1);
+		webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+
+		// === 2. 하늘 (엔진 FullscreenPass) ===
+		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+		skyPass.use();
+		const upBasisX = -System.Math.sin(cameraPitch) * System.Math.sin(cameraYaw);
+		const upBasisY = System.Math.cos(cameraPitch);
+		const upBasisZ = System.Math.sin(cameraPitch) * System.Math.cos(cameraYaw);
+		webGL2RenderingContext.uniform3f(skyCameraRightLocation, cameraRightX, 0, cameraRightZ);
+		webGL2RenderingContext.uniform3f(skyCameraUpLocation, upBasisX, upBasisY, upBasisZ);
+		webGL2RenderingContext.uniform3f(skyCameraForwardLocation, cameraForwardX, cameraForwardY, cameraForwardZ);
+		webGL2RenderingContext.uniform3f(skySunDirectionLocation, sunDirectionVector.x, sunDirectionVector.y, sunDirectionVector.z);
+		const tangentHalfFieldOfView = System.Math.tan(fieldOfViewRadian / 2);
+		webGL2RenderingContext.uniform1f(skyTangentHalfFieldOfViewLocation, tangentHalfFieldOfView);
+		webGL2RenderingContext.uniform1f(skyAspectRatioLocation, aspectRatio);
+		webGL2RenderingContext.uniform1f(skyElapsedTimeLocation, elapsedTime);
+		skyPass.draw();
+
+		// === 3. 지형 ===
+		webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+		terrainShaderProgram.use();
+		webGL2RenderingContext.bindVertexArray(terrainVertexArray);
+		webGL2RenderingContext.uniformMatrix4fv(terrainViewProjectionLocation, false, viewProjectionElements);
+		webGL2RenderingContext.uniform1i(terrainGrassTextureLocation, 0);
+		webGL2RenderingContext.uniform1i(terrainRockTextureLocation, 1);
+		webGL2RenderingContext.uniform1i(terrainDirtTextureLocation, 2);
+		webGL2RenderingContext.uniform3f(terrainSunDirectionLocation, sunDirectionVector.x, sunDirectionVector.y, sunDirectionVector.z);
+		webGL2RenderingContext.uniform3f(terrainCameraPositionLocation, cameraPositionX, cameraPositionY, cameraPositionZ);
+		webGL2RenderingContext.uniform1f(terrainPathRadiusLocation, PATH_RADIUS);
+		webGL2RenderingContext.uniformMatrix4fv(terrainLightViewProjectionLocation, false, lightViewProjectionElements);
+		webGL2RenderingContext.uniform1i(terrainShadowMapTextureLocation, 3);
+		webGL2RenderingContext.uniform1f(terrainShadowStrengthLocation, shadowRealtimeBlend);
+		webGL2RenderingContext.uniform1f(terrainShadowTexelSizeLocation, 1 / SHADOWMAP_RESOLUTION);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, grassTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, rockTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE2);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, dirtTexture);
+		webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, terrainIndexArray.length, webGL2RenderingContext.UNSIGNED_INT, 0);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+
+		// === 4. 바위 (트라이플래너 볼더 텍스처) ===
+		rockShaderProgram.use();
+		webGL2RenderingContext.uniformMatrix4fv(rockViewProjectionLocation, false, viewProjectionElements);
+		webGL2RenderingContext.uniform3f(rockSunDirectionLocation, sunDirectionVector.x, sunDirectionVector.y, sunDirectionVector.z);
+		webGL2RenderingContext.uniform3f(rockCameraPositionLocation, cameraPositionX, cameraPositionY, cameraPositionZ);
+		webGL2RenderingContext.uniform1i(rockBoulderTextureLocation, 0);
+		webGL2RenderingContext.uniformMatrix4fv(rockLightViewProjectionLocation, false, lightViewProjectionElements);
+		webGL2RenderingContext.uniform1i(rockShadowMapTextureLocation, 3);
+		webGL2RenderingContext.uniform1f(rockShadowStrengthLocation, shadowRealtimeBlend);
+		webGL2RenderingContext.uniform1f(rockShadowTexelSizeLocation, 1 / SHADOWMAP_RESOLUTION);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, boulderTexture);
+		for (const rock of rockList) {
+			const rockVariant = rockVariantList[rock.variantIndex];
+			webGL2RenderingContext.bindVertexArray(rockVariant.vertexArray);
+			const rockModelElements = rock.matrix.getElements();
+			webGL2RenderingContext.uniformMatrix4fv(rockModelMatrixLocation, false, rockModelElements);
+			webGL2RenderingContext.uniform3f(rockTintColorLocation, rock.tint[0], rock.tint[1], rock.tint[2]);
+			webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, rockVariant.vertexCount);
+		}
+
+		// === 5. 오브젝트 (캐릭터 / 깃발) ===
+		objectShaderProgram.use();
+		webGL2RenderingContext.bindVertexArray(cubeVertexArray);
+		webGL2RenderingContext.uniformMatrix4fv(objectViewProjectionLocation, false, viewProjectionElements);
+		webGL2RenderingContext.uniform3f(objectSunDirectionLocation, sunDirectionVector.x, sunDirectionVector.y, sunDirectionVector.z);
+		webGL2RenderingContext.uniform3f(objectCameraPositionLocation, cameraPositionX, cameraPositionY, cameraPositionZ);
+		webGL2RenderingContext.uniformMatrix4fv(objectLightViewProjectionLocation, false, lightViewProjectionElements);
+		webGL2RenderingContext.uniform1i(objectShadowMapTextureLocation, 3);
+		webGL2RenderingContext.uniform1f(objectShadowStrengthLocation, shadowRealtimeBlend);
+		webGL2RenderingContext.uniform1f(objectShadowTexelSizeLocation, 1 / SHADOWMAP_RESOLUTION);
+
+		function drawCubeObject(modelMatrix, colorArray) {
+			const modelElements = modelMatrix.getElements();
+			webGL2RenderingContext.uniformMatrix4fv(objectModelMatrixLocation, false, modelElements);
+			webGL2RenderingContext.uniform3f(objectColorLocation, colorArray[0], colorArray[1], colorArray[2]);
+			webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, cubeIndexCount, webGL2RenderingContext.UNSIGNED_SHORT, 0);
+		}
+
+		// 깃발. (기둥 + 물결치는 깃발천, 정복 시 금색 + 펄스)
+		for (const hill of HILL_LIST) {
+			drawCubeObject(hill.poleMatrix, [0.82, 0.8, 0.74]);
+		}
+		for (const flagBanner of flagBannerList) {
+			drawCubeObject(flagBanner.matrix, flagBanner.color);
+		}
+
+		// 캐릭터. (스킨드 모델)
+		skinnedModelRenderer.draw(characterModel, viewProjectionElements, characterModelElements, cameraPositionX, cameraPositionY, cameraPositionZ);
+
+		// 여우.
+		for (const foxMatrix of foxMatrixList) {
+			const foxElements = foxMatrix.getElements();
+			skinnedModelRenderer.draw(foxModel, viewProjectionElements, foxElements, cameraPositionX, cameraPositionY, cameraPositionZ);
+		}
+
+		// === 6. 블롭 그림자 (SIMPLE 모드 — 정적: 바위/깃발 + 동적: 캐릭터) ===
+		if (optionStates.shadow === 1) {
+		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.blendFunc(webGL2RenderingContext.SRC_ALPHA, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
+		webGL2RenderingContext.depthMask(false);
+		shadowShaderProgram.use();
+		webGL2RenderingContext.uniformMatrix4fv(shadowViewProjectionLocation, false, viewProjectionElements);
+		webGL2RenderingContext.uniform1f(shadowStrengthLocation, 1);
+		webGL2RenderingContext.bindVertexArray(staticShadowVertexArray);
+		webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, staticShadowIndexCount, webGL2RenderingContext.UNSIGNED_SHORT, 0);
+		const groundHeightUnderPlayer = terrainSurfaceHeightAt(playerX, playerZ);
+		const heightAboveGround = playerY - groundHeightUnderPlayer;
+		const shadowStrength = System.Math.max(0, 1 - heightAboveGround * 0.6);
+		if (shadowStrength > 0.01) {
+			shadowVertexData[0] = playerX;
+			shadowVertexData[1] = terrainSurfaceHeightAt(playerX, playerZ) + 0.12;
+			shadowVertexData[2] = playerZ;
+			shadowVertexData[3] = 0.42;
+			for (let segmentIndex = 0; segmentIndex < SHADOW_SEGMENT_COUNT; ++segmentIndex) {
+				const segmentAngle = (segmentIndex / SHADOW_SEGMENT_COUNT) * System.Math.PI * 2;
+				const segmentX = playerX + System.Math.cos(segmentAngle) * SHADOW_RADIUS;
+				const segmentZ = playerZ + System.Math.sin(segmentAngle) * SHADOW_RADIUS;
+				const segmentOffset = (segmentIndex + 1) * 4;
+				shadowVertexData[segmentOffset + 0] = segmentX;
+				shadowVertexData[segmentOffset + 1] = terrainSurfaceHeightAt(segmentX, segmentZ) + 0.12;
+				shadowVertexData[segmentOffset + 2] = segmentZ;
+				shadowVertexData[segmentOffset + 3] = 0;
+			}
+			webGL2RenderingContext.bindVertexArray(shadowVertexArray);
+			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, shadowVertexBuffer);
+			webGL2RenderingContext.bufferSubData(webGL2RenderingContext.ARRAY_BUFFER, 0, shadowVertexData);
+			webGL2RenderingContext.uniform1f(shadowStrengthLocation, shadowStrength);
+			webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, shadowIndexCount, webGL2RenderingContext.UNSIGNED_SHORT, 0);
+		}
+		webGL2RenderingContext.depthMask(true);
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		}
+
+		// === 7. 블룸 (엔진 BloomEffect) ===
+		const sceneColorTexture = sceneRenderTarget.getColorTexture();
+		bloomEffect.render(sceneColorTexture);
+
+		// === 8. 최종 합성 → 화면 (블룸 가산 + 모션 블러 + 비네트 + 그레인 + ACES) ===
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+		webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
+		compositePass.use();
+		webGL2RenderingContext.uniform1i(compositeSceneTextureLocation, 0);
+		webGL2RenderingContext.uniform1i(compositeBloomTextureLocation, 1);
+		webGL2RenderingContext.uniform2f(compositeResolutionLocation, canvas.width, canvas.height);
+		webGL2RenderingContext.uniform1f(compositeElapsedTimeLocation, elapsedTime);
+		webGL2RenderingContext.uniform1f(compositeBloomStrengthLocation, optionBlendValues.bloom * sliderValues.glow * 0.9);
+		webGL2RenderingContext.uniform1f(compositeMotionBlurStrengthLocation, motionBlurCurrentStrength * sliderValues.motionBlur * 1.2);
+		let motionBlurCenterX = 0.5;
+		let motionBlurCenterY = 0.5;
+		const motionBlurClip = viewProjectionMatrix.transformPoint(playerX, playerY + 1.0, playerZ);
+		if (motionBlurClip.w > 0.001) {
+			motionBlurCenterX = (motionBlurClip.x / motionBlurClip.w) * 0.5 + 0.5;
+			motionBlurCenterY = (motionBlurClip.y / motionBlurClip.w) * 0.5 + 0.5;
+		}
+		webGL2RenderingContext.uniform2f(compositeMotionBlurCenterLocation, motionBlurCenterX, motionBlurCenterY);
+		webGL2RenderingContext.uniform1f(compositeVignetteStrengthLocation, optionBlendValues.vignette);
+		webGL2RenderingContext.uniform1f(compositeFilmStrengthLocation, optionBlendValues.film);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sceneColorTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+		const bloomResultTexture = bloomEffect.getResultTexture();
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, bloomResultTexture);
+		compositePass.draw();
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+
+		// === 9. HUD (엔진 Graphic — 프리멀티플라이드 알파 블렌딩 보장) ===
+		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
+		renderHud(viewProjectionMatrix, elapsedTime, deltaTime);
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+
+		// 프레임 눌림 플래그 초기화.
+		jumpPressed = false;
+		interactPressed = false;
+
+		System.window.requestAnimationFrame(renderFrame);
+	}
+
+	System.window.requestAnimationFrame(renderFrame);
+	</script>
+</body>
+</html>

@@ -1081,7 +1081,7 @@
 	let isPanelCollapsed = true;
 	let panelCollapseBlend = 0;
 
-	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../build/vanilla.js)
+	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../../build/vanilla.js)
 	let uiGraphic = null;
 	let engineRect = null;
 	let engineVector2 = null;
@@ -1091,7 +1091,7 @@
 			engineModule = await import("./vanilla.js");
 		}
 		catch (importError) {
-			engineModule = await import("../build/vanilla.js");
+			engineModule = await import("../../build/vanilla.js");
 		}
 		uiGraphic = new engineModule.Graphic(canvas);
 		engineRect = engineModule.Rect;
