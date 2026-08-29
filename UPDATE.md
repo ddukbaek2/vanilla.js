@@ -19,6 +19,7 @@
 - Paint: getRoundSize 추가
 - WorldNode.getWorldBounds 가 첫 모서리를 빠뜨리던 것 수정
 - Pane: 구분선 두께를 PaneTheme.size.resizer 로 정할 수 있게 추가
+- Pane: 구분선을 잡은 지점 기준으로 끌고, 누를 때 브라우저 기본 끌기를 막아 첫 드래그가 죽던 문제 수정
 - UI 편집기: 뿌리도 다른 노드와 같게 다룬다. 뿌리 크기가 곧 문서 크기다.
 
 # 0.2.1 (2026-08-02)

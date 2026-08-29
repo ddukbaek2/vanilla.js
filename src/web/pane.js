@@ -169,7 +169,8 @@ export class Pane {
     /** @private @type { HTMLElement[] } */ #resizers;
     
     /** @private @type { number } */ #initialSize; 
-    /** @private @type { number } */ #fixedSize;   
+    /** @private @type { number } */ #fixedSize;
+    /** @private @type { number } */ #resizeGrabOffset;
     /** @private @type { number } */ #minSize;
     /** @private @type { number } */ #maxSize;
     
@@ -197,6 +198,7 @@ export class Pane {
         this.#initialSize = typeof size === "string" && size.endsWith("%") ? parseFloat(size) / 100 : parseFloat(size);
         
         this.#fixedSize = (this.#initialSize > 1) ? this.#initialSize : 0;
+        this.#resizeGrabOffset = 0;
         this.#minSize = options.minSize !== undefined ? options.minSize : 50;
         this.#maxSize = options.maxSize !== undefined ? options.maxSize : Number.MAX_VALUE;
         
@@ -273,9 +275,17 @@ export class Pane {
             resizer.addEventListener("mouseleave", () => { if(!this.#isResizing) resizer.style.backgroundColor = PaneTheme.color.resizer; });
             
             resizer.addEventListener("mousedown", (e) => {
+                // 첫 이동에서 레이아웃이 바뀌며 누른 자리에 draggable 요소가 오면
+                // 브라우저가 그 요소의 끌기를 시작해 mousemove/mouseup 을 삼킨다. 기본 동작을 막는다.
+                e.preventDefault();
                 this.#isResizing = true;
                 this.#activePrevPane = prev;
                 this.#activeNextPane = next;
+
+                // 잡은 지점과 경계 사이 간격을 기억해 두어야 처음 끌 때 크기가 튀지 않는다.
+                const grabRect = resizer.getBoundingClientRect();
+                this.#resizeGrabOffset = (this.#direction === "horizontal")
+                    ? (e.clientX - grabRect.left) : (e.clientY - grabRect.top);
                 resizer.style.backgroundColor = PaneTheme.color.resizerHover;
                 System.document.body.style.cursor = resizer.style.cursor;
                 System.document.body.style.userSelect = "none";
@@ -305,7 +315,7 @@ export class Pane {
             (nextRect.right - prevRect.left) - thick : (nextRect.bottom - prevRect.top) - thick;
 
         let newPrevSize = (this.#direction === "horizontal") ? 
-            e.clientX - prevRect.left : e.clientY - prevRect.top;
+            (e.clientX - this.#resizeGrabOffset) - prevRect.left : (e.clientY - this.#resizeGrabOffset) - prevRect.top;
 
         newPrevSize = Math.max(this.#activePrevPane.getMinSize(), Math.min(newPrevSize, totalAvail - this.#activeNextPane.getMinSize()));
 

@@ -34,37 +34,38 @@ import { Mask } from "../../src/core/component/mask.js";
 // 편집 화면에 놓을 수 있는 요소 목록.
 // 목록에 쓰는 그림 아이콘. (14x14 기준, 색은 글자색을 따른다)
 const ICON_SHAPES = {
-	empty: "<rect x='2.5' y='3.5' width='9' height='7' rx='1' fill='none' stroke='currentColor' stroke-dasharray='2 1.6'/>",
-	panel: "<rect x='2' y='3' width='10' height='8' rx='1.5' fill='currentColor' opacity='0.75'/>",
-	divider: "<rect x='2' y='6.5' width='10' height='1.4' rx='0.7' fill='currentColor'/>",
-	text: "<path d='M3 4h8M7 4v6' stroke='currentColor' stroke-width='1.4' stroke-linecap='round' fill='none'/>",
-	richText: "<path d='M2.5 4h6M5.5 4v6' stroke='currentColor' stroke-width='1.3' stroke-linecap='round' fill='none'/>"
-		+ "<circle cx='10.5' cy='9' r='1.8' fill='currentColor'/>",
-	image: "<rect x='2' y='3' width='10' height='8' rx='1.2' fill='none' stroke='currentColor' stroke-width='1.2'/>"
-		+ "<path d='M3.4 9.6l2.4-2.6 1.8 1.9 1.5-1.4 1.5 2.1z' fill='currentColor'/>"
-		+ "<circle cx='5' cy='5.4' r='0.9' fill='currentColor'/>",
-	button: "<rect x='1.8' y='4' width='10.4' height='6' rx='2' fill='currentColor' opacity='0.75'/>"
-		+ "<rect x='4' y='6.4' width='6' height='1.2' rx='0.6' fill='#ffffff' opacity='0.85'/>",
-	toggleButton: "<rect x='2' y='3.5' width='9' height='7' rx='1.4' fill='none' stroke='currentColor' stroke-width='1.2'/>"
-		+ "<path d='M4.2 7.2l1.8 1.8 3.4-3.8' stroke='currentColor' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/>",
-	inputField: "<rect x='1.8' y='4' width='10.4' height='6' rx='1.2' fill='none' stroke='currentColor' stroke-width='1.2'/>"
-		+ "<path d='M4.4 5.6v2.8' stroke='currentColor' stroke-width='1.2' stroke-linecap='round'/>",
-	progress: "<rect x='1.8' y='5.6' width='10.4' height='2.8' rx='1.4' fill='none' stroke='currentColor' stroke-width='1.1'/>"
-		+ "<rect x='2.8' y='6.4' width='4.4' height='1.2' rx='0.6' fill='currentColor'/>",
-	slider: "<path d='M2 7h10' stroke='currentColor' stroke-width='1.2' stroke-linecap='round'/>"
-		+ "<circle cx='8.4' cy='7' r='2.4' fill='currentColor'/>",
-	scrollView: "<rect x='2' y='3' width='10' height='8' rx='1.2' fill='none' stroke='currentColor' stroke-width='1.2'/>"
-		+ "<rect x='9.4' y='4.2' width='1.4' height='3.4' rx='0.7' fill='currentColor'/>",
-	snapScrollView: "<rect x='1.4' y='4' width='3.6' height='6' rx='1' fill='currentColor' opacity='0.45'/>"
-		+ "<rect x='5.6' y='3.2' width='4.4' height='7.6' rx='1' fill='currentColor'/>"
-		+ "<rect x='10.6' y='4' width='2.4' height='6' rx='1' fill='currentColor' opacity='0.45'/>",
-	scrollBar: "<rect x='5.4' y='1.8' width='3.2' height='10.4' rx='1.6' fill='none' stroke='currentColor' stroke-width='1.1'/>"
-		+ "<rect x='6.2' y='3.4' width='1.6' height='4' rx='0.8' fill='currentColor'/>",
-	editMode: "<path d='M2.5 11.5l1-2.6 5.4-5.4a1.2 1.2 0 0 1 1.7 0l0.9 0.9a1.2 1.2 0 0 1 0 1.7l-5.4 5.4z'"
-		+ " fill='currentColor'/>",
-	renderMode: "<path d='M4.4 2.8l7 4.2-7 4.2z' fill='currentColor'/>",
-	mask: "<rect x='1.8' y='3.4' width='7' height='7' rx='1.2' fill='none' stroke='currentColor' stroke-width='1.2'/>"
-		+ "<path d='M5.2 3.4h6a1.2 1.2 0 0 1 1.2 1.2v6a1.2 1.2 0 0 1-1.2 1.2h-6z' fill='currentColor' opacity='0.8'/>",
+	empty: "<rect x='2' y='2.5' width='10' height='9' rx='2' fill='none' stroke='currentColor' stroke-width='1.6' stroke-dasharray='2.2 1.8'/>",
+	panel: "<rect x='1.5' y='2.5' width='11' height='9' rx='2' fill='currentColor'/>",
+	divider: "<path d='M2 7h10' stroke='currentColor' stroke-width='2' stroke-linecap='round'/>",
+	text: "<path d='M2.5 3.5h9M7 3.5v7.5' stroke='currentColor' stroke-width='1.9' stroke-linecap='round' fill='none'/>",
+	richText: "<path d='M2 3.5h7M5.5 3.5v7.5' stroke='currentColor' stroke-width='1.9' stroke-linecap='round' fill='none'/>"
+		+ "<circle cx='11' cy='9.5' r='2' fill='currentColor'/>",
+	image: "<rect x='1.5' y='2.5' width='11' height='9' rx='2' fill='none' stroke='currentColor' stroke-width='1.6'/>"
+		+ "<path d='M3 10l2.6-3 2 2.2 1.6-1.6 1.8 2.4z' fill='currentColor'/>"
+		+ "<circle cx='5' cy='5.3' r='1.1' fill='currentColor'/>",
+	button: "<rect x='1.5' y='3.5' width='11' height='7' rx='3' fill='currentColor'/>"
+		+ "<path d='M4.5 7h5' stroke='#ffffff' stroke-width='1.4' stroke-linecap='round' opacity='0.9'/>",
+	toggleButton: "<rect x='1.8' y='2.8' width='10.4' height='8.4' rx='2.2' fill='none' stroke='currentColor' stroke-width='1.6'/>"
+		+ "<path d='M4.3 7.2l1.9 1.9 3.6-4' stroke='currentColor' stroke-width='1.9' fill='none' stroke-linecap='round' stroke-linejoin='round'/>",
+	inputField: "<rect x='1.5' y='3.5' width='11' height='7' rx='2' fill='none' stroke='currentColor' stroke-width='1.6'/>"
+		+ "<path d='M4.5 5.5v3' stroke='currentColor' stroke-width='1.7' stroke-linecap='round'/>",
+	progress: "<rect x='1.5' y='5' width='11' height='4' rx='2' fill='none' stroke='currentColor' stroke-width='1.5'/>"
+		+ "<rect x='1.5' y='5' width='6.5' height='4' rx='2' fill='currentColor'/>",
+	slider: "<path d='M2 7h10' stroke='currentColor' stroke-width='1.8' stroke-linecap='round'/>"
+		+ "<circle cx='8.5' cy='7' r='2.6' fill='currentColor'/>",
+	scrollView: "<rect x='1.5' y='2.5' width='11' height='9' rx='2' fill='none' stroke='currentColor' stroke-width='1.6'/>"
+		+ "<rect x='9.4' y='4.2' width='1.8' height='3.6' rx='0.9' fill='currentColor'/>",
+	snapScrollView: "<rect x='0.8' y='3.8' width='3.2' height='6.4' rx='1.2' fill='currentColor' opacity='0.45'/>"
+		+ "<rect x='4.9' y='2.8' width='4.2' height='8.4' rx='1.4' fill='currentColor'/>"
+		+ "<rect x='10' y='3.8' width='3.2' height='6.4' rx='1.2' fill='currentColor' opacity='0.45'/>",
+	scrollBar: "<rect x='5' y='1.5' width='4' height='11' rx='2' fill='none' stroke='currentColor' stroke-width='1.5'/>"
+		+ "<rect x='6.1' y='3.2' width='1.8' height='4.2' rx='0.9' fill='currentColor'/>",
+	mask: "<rect x='1.5' y='3' width='7.5' height='7.5' rx='1.8' fill='none' stroke='currentColor' stroke-width='1.6'/>"
+		+ "<rect x='5' y='3' width='7.5' height='7.5' rx='1.8' fill='currentColor' opacity='0.85'/>",
+	grid: "<path d='M2 5.3h10M2 8.7h10M5.3 2v10M8.7 2v10' stroke='currentColor' stroke-width='1.3' fill='none'/>"
+		+ "<rect x='2' y='2' width='10' height='10' rx='1.5' fill='none' stroke='currentColor' stroke-width='1.5'/>",
+	editMode: "<path d='M2.5 11.5l1.1-3 5.6-5.6a1.4 1.4 0 0 1 2 0l0.9 0.9a1.4 1.4 0 0 1 0 2l-5.6 5.6z' fill='currentColor'/>",
+	renderMode: "<path d='M4 2.6l7.4 4.4-7.4 4.4z' fill='currentColor' stroke='currentColor' stroke-width='1.2' stroke-linejoin='round'/>",
 };
 
 // 편집 화면에 놓을 수 있는 요소 목록.
@@ -138,47 +139,47 @@ const NODE_KIND_LOOKUP = [
 
 // 편집 화면 표시 색.
 // 편집기 글꼴. 애플 계열을 앞에 두고 없는 환경은 뒤로 물린다.
-const EDITOR_FONT_FAMILY = "-apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"SF Pro Display\","
-	+ " \"Helvetica Neue\", Pretendard, \"Apple SD Gothic Neo\", \"Segoe UI Variable Text\", \"Segoe UI\","
-	+ " \"Malgun Gothic\", sans-serif";
+const EDITOR_FONT_FAMILY = "Inter, -apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"SF Pro Display\","
+	+ " \"Segoe UI Variable Text\", \"Segoe UI\", Pretendard, \"Apple SD Gothic Neo\", \"Malgun Gothic\", Roboto, sans-serif";
 
-const LIGHT_VANILLA_COLOR = "#f3e5ab";
-const DARK_VANILLA_COLOR = "#d1bea8";
-const CREAM_COLOR = "#fcf5d8";
-const DEEP_GOLD_COLOR = "#d4be6b";
-const INK_COLOR = "#332f26";
+const ACCENT_COLOR = "#0078d4";
+const ACCENT_SOFT_COLOR = "#04395e";
+const INK_COLOR = "#cccccc";
+const INK_DIM_COLOR = "#9d9d9d";
+const ICON_COLOR = "#85b6ea";
 
-const SELECTION_COLOR = "#8b6914";
-const SNAP_GUIDE_COLOR = "rgba(139, 105, 20, 0.9)";
-const HOVER_COLOR = CREAM_COLOR;
-const MENU_HOVER_COLOR = CREAM_COLOR;
-const SELECTED_ROW_TEXT_COLOR = INK_COLOR;
-const CANVAS_BACKGROUND_COLOR = DARK_VANILLA_COLOR;
-const PREVIEW_LETTERBOX_COLOR = DARK_VANILLA_COLOR;
-const PIVOT_COLOR = "#0091b8";
-const PIVOT_SHADOW_COLOR = "#ffffff";
+const BORDER_COLOR = "#2b2b2b";
+const BORDER_SOFT_COLOR = "rgba(255, 255, 255, 0.045)";
+const ROW_HEIGHT = "26px";
+
+const SELECTION_COLOR = ACCENT_COLOR;
+const SNAP_GUIDE_COLOR = "rgba(0, 120, 212, 0.9)";
+const HOVER_COLOR = "#2a2d2e";
+const MENU_HOVER_COLOR = ACCENT_SOFT_COLOR;
+const SELECTED_ROW_TEXT_COLOR = "#ffffff";
+const CANVAS_BACKGROUND_COLOR = "#1f1f1f";
+const PREVIEW_LETTERBOX_COLOR = "#111111";
+const PIVOT_COLOR = "#00c2ff";
+const PIVOT_SHADOW_COLOR = "#0b1b26";
 const PIVOT_MARK_SIZE = 9;
-const ANCHOR_COLOR = "#1f8f24";
+const ANCHOR_COLOR = "#3ddc84";
 const ANCHOR_MARK_SIZE = 6;
-const GRID_MINOR_COLOR = "rgba(74, 63, 42, 0.14)";
-const GRID_MAJOR_COLOR = "rgba(74, 63, 42, 0.28)";
+const GRID_MINOR_COLOR = "rgba(255, 255, 255, 0.045)";
+const GRID_MAJOR_COLOR = "rgba(255, 255, 255, 0.10)";
 
-// 편집기 색 테마. 색상표의 바닐라 색을 그대로 쓴다.
-//   제목 / 메뉴 영역 : Dark Vanilla #D1BEA8
-//   내용 영역        : Vanilla #F3E5AB
-//   입력칸           : 흰색
+// 편집기 색 테마. (VSCode Dark Modern 계열)
 const VANILLA_THEME_COLORS = {
-	background: DARK_VANILLA_COLOR,
-	panel: LIGHT_VANILLA_COLOR,
-	toolbar: DARK_VANILLA_COLOR,
-	border: DARK_VANILLA_COLOR,
+	background: "#1f1f1f",
+	panel: "#181818",
+	toolbar: "#181818",
+	border: BORDER_COLOR,
 	text: INK_COLOR,
-	textDim: "#6b6455",
-	accent: DEEP_GOLD_COLOR,
-	accentHover: CREAM_COLOR,
-	inputBg: "#ffffff",
-	resizer: DARK_VANILLA_COLOR,
-	resizerHover: DEEP_GOLD_COLOR,
+	textDim: INK_DIM_COLOR,
+	accent: ACCENT_SOFT_COLOR,
+	accentHover: ACCENT_COLOR,
+	inputBg: "#313131",
+	resizer: BORDER_COLOR,
+	resizerHover: ACCENT_COLOR,
 };
 
 // 크기 조절 손잡이 8방향.
@@ -208,7 +209,7 @@ const MENU_DEFINITIONS = [
 	{
 		title: "File",
 		items: [
-			{ id: "newDocument", label: "New", shortcut: "Ctrl+N" },
+			{ id: "newDocument", label: "New", shortcut: "Ctrl+Alt+N" },
 			{ id: "load", label: "Open...", shortcut: "Ctrl+O" },
 			{ id: "save", label: "Save", shortcut: "Ctrl+S" },
 			{ id: "saveAs", label: "Save As...", shortcut: "Ctrl+Shift+S" },
@@ -230,13 +231,13 @@ const MENU_DEFINITIONS = [
 	{
 		title: "View",
 		items: [
-			{ id: "showEditView", label: "Edit View", shortcut: "Ctrl+1" },
-			{ id: "showRenderView", label: "Render View", shortcut: "Ctrl+2" },
+			{ id: "showEditView", label: "Edit View", shortcut: "F4" },
+			{ id: "showRenderView", label: "Render View", shortcut: "F4" },
 			{ separator: true },
 			{ id: "zoomIn", label: "Zoom In", shortcut: "Ctrl+=" },
 			{ id: "zoomOut", label: "Zoom Out", shortcut: "Ctrl+-" },
 			{ id: "zoomToFit", label: "Zoom to Fit", shortcut: "Ctrl+0" },
-			{ id: "zoomActualSize", label: "Actual Size", shortcut: "Ctrl+9" },
+			{ id: "zoomActualSize", label: "Actual Size", shortcut: "Ctrl+Shift+0" },
 			{ separator: true },
 			{ id: "toggleGrid", label: "Show Grid", shortcut: "Ctrl+G" },
 		],
@@ -327,6 +328,28 @@ function collectEditableProperties(targetObject) {
 
 
 //==============================================================================
+// 입력칸 꾸미기. (모든 입력칸이 같은 모양을 갖도록 한 곳에서 다룬다)
+//==============================================================================
+/**
+ * @param { HTMLInputElement } inputElement
+ */
+function decorateInputElement(inputElement) {
+	inputElement.style.cssText = "flex:1;min-width:0;height:24px;box-sizing:border-box;padding:0 7px;"
+		+ "font-family:" + EDITOR_FONT_FAMILY + ";font-size:13px;border-radius:3px;outline:none;"
+		+ "background:" + PaneTheme.color.inputBg + ";color:" + PaneTheme.color.text + ";"
+		+ "border:1px solid " + BORDER_COLOR + ";";
+	inputElement.addEventListener("focus", () => {
+		inputElement.style.borderColor = SELECTION_COLOR;
+		inputElement.style.boxShadow = "0 0 0 1px " + ACCENT_COLOR + " inset";
+	});
+	inputElement.addEventListener("blur", () => {
+		inputElement.style.borderColor = BORDER_COLOR;
+		inputElement.style.boxShadow = "none";
+	});
+}
+
+
+//==============================================================================
 // 종류 이름에 맞는 아이콘 그림 반환.
 //==============================================================================
 /**
@@ -335,7 +358,7 @@ function collectEditableProperties(targetObject) {
  */
 function createIconMarkup(iconName) {
 	const shapeMarkup = ICON_SHAPES[iconName] ? ICON_SHAPES[iconName] : ICON_SHAPES.empty;
-	return "<svg width='16' height='16' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'>" + shapeMarkup + "</svg>";
+	return "<svg width='18' height='18' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'>" + shapeMarkup + "</svg>";
 }
 
 
@@ -389,6 +412,8 @@ export class UIEditor {
 	/** @private @type { HTMLElement } */ #previewHolderElement;
 	/** @private @type { HTMLElement } */ #viewTitleElement;
 	/** @private @type { HTMLElement } */ #viewToggleElement;
+	/** @private @type { HTMLElement } */ #zoomReadoutElement;
+	/** @private @type { HTMLElement } */ #gridToggleElement;
 	/** @private @type { HTMLElement[] } */ #menuTitleElementList;
 	/** @private @type { number } */ #openMenuIndex;
 	/** @private @type { string } */ #renderScaleMode;
@@ -427,6 +452,8 @@ export class UIEditor {
 		this.#previewHolderElement = null;
 		this.#viewTitleElement = null;
 		this.#viewToggleElement = null;
+		this.#zoomReadoutElement = null;
+		this.#gridToggleElement = null;
 		this.#menuTitleElementList = [];
 		this.#openMenuIndex = -1;
 		this.#renderScaleMode = "fit";
@@ -468,7 +495,7 @@ export class UIEditor {
 		const rootPane = new Pane({ direction: "vertical" });
 
 		// --- 메뉴 막대 ---
-		const menuBarPane = new Pane({ size: 28, minSize: 28, maxSize: 28, isResizable: false });
+		const menuBarPane = new Pane({ size: 30, minSize: 30, maxSize: 30, isResizable: false });
 		const menuBarElement = this.createMenuBarElement();
 		menuBarPane.getContainer().appendChild(menuBarElement);
 
@@ -477,7 +504,7 @@ export class UIEditor {
 
 		// 좌측: 컴포넌트 + 계층.
 		const leftPane = new Pane({ direction: "vertical", size: 240, minSize: 170 });
-		const componentsPane = new Pane({ size: 232, minSize: 120 });
+		const componentsPane = new Pane({ size: 320, minSize: 120 });
 		const componentsElement = this.createSectionElement("COMPONENTS", () => {
 			const menuItems = [];
 			for (const definition of PALETTE_DEFINITIONS) {
@@ -541,13 +568,13 @@ export class UIEditor {
 			style: {
 				position: "relative",
 				width: "100%",
-				height: "26px",
-				flex: "0 0 26px",
-				backgroundColor: PaneTheme.color.panel,
+				height: "30px",
+				flex: "0 0 30px",
+				backgroundColor: PaneTheme.color.toolbar,
 				borderBottom: "1px solid " + PaneTheme.color.border,
 				display: "flex",
 				alignItems: "center",
-				padding: "0 6px 0 10px",
+				padding: "0 8px 0 12px",
 			},
 		});
 		this.#viewTitleElement = PaneStyle.create("span", "", {
@@ -557,10 +584,10 @@ export class UIEditor {
 				width: "auto",
 				height: "auto",
 				flex: "1",
-				fontSize: "12px",
-				fontWeight: "bold",
-				letterSpacing: "0.4px",
-				color: PaneTheme.color.textDim,
+				fontSize: "11px",
+				fontWeight: "600",
+				letterSpacing: "0.8px",
+				color: "#bbbbbb",
 			},
 		});
 		const viewMoreElement = PaneStyle.create("div", "", {
@@ -591,8 +618,8 @@ export class UIEditor {
 			mouseEvent.stopPropagation();
 			const buttonRect = viewMoreElement.getBoundingClientRect();
 			this.openMenuPanelAt(buttonRect.right - 200, buttonRect.bottom + 2, [
-				{ id: "showEditView", label: "Edit View", shortcut: "Ctrl+1" },
-				{ id: "showRenderView", label: "Render View", shortcut: "Ctrl+2" },
+				{ id: "showEditView", label: "Edit View", shortcut: "F4" },
+				{ id: "showRenderView", label: "Render View", shortcut: "F4" },
 				{ separator: true },
 				{ id: "renderScaleActual", label: "Actual Size (1:1)" },
 				{ id: "renderScaleFit", label: "Fit to View" },
@@ -625,7 +652,53 @@ export class UIEditor {
 			this.setActiveView(this.#activeViewName === "edit" ? "render" : "edit");
 		});
 
+		// 배율 표시. (누르면 문서 전체가 들어오도록 맞춘다)
+		this.#zoomReadoutElement = PaneStyle.create("div", "", {
+			text: "100%",
+			style: {
+				position: "relative", width: "auto", height: "18px", minWidth: "40px",
+				display: "flex", alignItems: "center", justifyContent: "center",
+				padding: "0 6px", marginRight: "2px", fontSize: "11px",
+				color: PaneTheme.color.textDim, cursor: "pointer", borderRadius: "4px", userSelect: "none",
+			},
+		});
+		this.#zoomReadoutElement.title = "문서 전체 보기 (Ctrl+0)";
+		this.#zoomReadoutElement.addEventListener("mouseenter", () => {
+			this.#zoomReadoutElement.style.backgroundColor = HOVER_COLOR;
+		});
+		this.#zoomReadoutElement.addEventListener("mouseleave", () => {
+			this.#zoomReadoutElement.style.backgroundColor = "transparent";
+		});
+		this.#zoomReadoutElement.addEventListener("click", (mouseEvent) => {
+			mouseEvent.stopPropagation();
+			this.executeCommand("zoomToFit");
+		});
+
+		// 격자 토글.
+		this.#gridToggleElement = PaneStyle.create("div", "", {
+			style: {
+				position: "relative", width: "22px", height: "20px",
+				display: "flex", alignItems: "center", justifyContent: "center",
+				marginRight: "2px", cursor: "pointer", borderRadius: "4px", userSelect: "none",
+			},
+		});
+		this.#gridToggleElement.innerHTML = createIconMarkup("grid");
+		this.#gridToggleElement.title = "격자 보기 (Ctrl+G)";
+		this.#gridToggleElement.addEventListener("mouseenter", () => {
+			this.#gridToggleElement.style.backgroundColor = HOVER_COLOR;
+		});
+		this.#gridToggleElement.addEventListener("mouseleave", () => {
+			this.#gridToggleElement.style.backgroundColor = "transparent";
+		});
+		this.#gridToggleElement.addEventListener("click", (mouseEvent) => {
+			mouseEvent.stopPropagation();
+			this.executeCommand("toggleGrid");
+			this.refreshStatus();
+		});
+
 		viewHeaderElement.appendChild(this.#viewTitleElement);
+		viewHeaderElement.appendChild(this.#zoomReadoutElement);
+		viewHeaderElement.appendChild(this.#gridToggleElement);
 		viewHeaderElement.appendChild(this.#viewToggleElement);
 		viewHeaderElement.appendChild(viewMoreElement);
 
@@ -739,11 +812,13 @@ export class UIEditor {
 				style: {
 					position: "relative",
 					width: "auto",
-					height: "100%",
+					height: "22px",
+					margin: "auto 2px",
 					display: "flex",
 					alignItems: "center",
 					padding: "0 10px",
 					fontSize: "13px",
+					borderRadius: "4px",
 					color: PaneTheme.color.text,
 					cursor: "default",
 					userSelect: "none",
@@ -936,14 +1011,16 @@ export class UIEditor {
 			style: {
 				position: "relative",
 				width: "auto",
-				height: "26px",
-				lineHeight: "26px",
-				padding: "0 10px",
-				fontSize: "12px",
-				fontWeight: "bold",
-				color: PaneTheme.color.textDim,
+				height: "30px",
+				lineHeight: "30px",
+				padding: "0 12px",
+				fontSize: "11px",
+				fontWeight: "600",
+				letterSpacing: "0.8px",
+				color: "#bbbbbb",
 				backgroundColor: PaneTheme.color.toolbar,
 				borderBottom: "1px solid " + PaneTheme.color.border,
+				flexShrink: "0",
 			},
 		});
 		sectionElement.appendChild(titleElement);
@@ -993,27 +1070,34 @@ export class UIEditor {
 			style: {
 				position: "relative",
 				width: "auto",
-				height: "auto",
+				height: ROW_HEIGHT,
+				flexShrink: "0",
 				display: "flex",
 				alignItems: "center",
-				gap: "6px",
-				padding: "4px 10px",
-				fontSize: "14px",
+				gap: "8px",
+				padding: "0 12px",
+				fontSize: "13px",
 				color: PaneTheme.color.text,
 				cursor: "pointer",
 				userSelect: "none",
+				borderLeft: "3px solid transparent",
+				whiteSpace: "nowrap",
+				overflow: "hidden",
 			},
 		});
 		const glyphElement = PaneStyle.create("span", "", {
 			style: {
-				position: "relative", width: "16px", height: "16px", flexShrink: "0",
-				display: "flex", alignItems: "center", justifyContent: "center", color: SELECTION_COLOR,
+				position: "relative", width: "18px", height: "18px", flexShrink: "0",
+				display: "flex", alignItems: "center", justifyContent: "center", color: ICON_COLOR,
 			},
 		});
 		glyphElement.innerHTML = createIconMarkup(glyphText);
 		const labelElement = PaneStyle.create("span", "", {
 			text: labelText,
-			style: { position: "relative", width: "auto", height: "auto" },
+			style: {
+				position: "relative", width: "auto", height: "auto",
+				overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+			},
 		});
 		rowElement.appendChild(glyphElement);
 		rowElement.appendChild(labelElement);
@@ -1294,9 +1378,9 @@ export class UIEditor {
 		for (const handleDefinition of RESIZE_HANDLE_DEFINITIONS) {
 			const handleX = boundsLeft + boundsWidth * handleDefinition.ratioX - HANDLE_SIZE * 0.5;
 			const handleY = boundsTop + boundsHeight * handleDefinition.ratioY - HANDLE_SIZE * 0.5;
-			graphic.setFillColor("#1e1e1e");
-			graphic.drawRect(Rect.create(handleX, handleY, HANDLE_SIZE, HANDLE_SIZE));
 			graphic.setFillColor(SELECTION_COLOR);
+			graphic.drawRect(Rect.create(handleX, handleY, HANDLE_SIZE, HANDLE_SIZE));
+			graphic.setFillColor("#ffffff");
 			graphic.drawRect(Rect.create(handleX + 1, handleY + 1, HANDLE_SIZE - 2, HANDLE_SIZE - 2));
 		}
 
@@ -1308,9 +1392,9 @@ export class UIEditor {
 		graphic.setTextAlign("left");
 		graphic.setTextBaseline("middle");
 		const badgeWidth = badgeText.length * 6.2 + 12;
-		graphic.setFillColor("rgba(30, 30, 30, 0.94)");
-		graphic.drawRect(Rect.create(boundsLeft, boundsTop - 20, badgeWidth, 17));
 		graphic.setFillColor(SELECTION_COLOR);
+		graphic.drawRect(Rect.create(boundsLeft, boundsTop - 20, badgeWidth, 17));
+		graphic.setFillColor("#ffffff");
 		graphic.drawFillText(badgeText, boundsLeft + 6, boundsTop - 12);
 	}
 
@@ -1771,6 +1855,46 @@ export class UIEditor {
 				keyboardEvent.preventDefault();
 				return;
 			}
+			if (isCommandKey && loweredKey === "s") {
+				this.executeCommand("save");
+				keyboardEvent.preventDefault();
+				return;
+			}
+			if (isCommandKey && loweredKey === "o") {
+				this.executeCommand("load");
+				keyboardEvent.preventDefault();
+				return;
+			}
+			if (isCommandKey && keyboardEvent.altKey && loweredKey === "n") {
+				this.executeCommand("newDocument");
+				keyboardEvent.preventDefault();
+				return;
+			}
+			if (isCommandKey && loweredKey === "g") {
+				this.executeCommand("toggleGrid");
+				keyboardEvent.preventDefault();
+				return;
+			}
+			if (isCommandKey && (loweredKey === "=" || loweredKey === "+")) {
+				this.executeCommand("zoomIn");
+				keyboardEvent.preventDefault();
+				return;
+			}
+			if (isCommandKey && loweredKey === "-") {
+				this.executeCommand("zoomOut");
+				keyboardEvent.preventDefault();
+				return;
+			}
+			if (isCommandKey && loweredKey === "0") {
+				this.executeCommand(keyboardEvent.shiftKey ? "zoomActualSize" : "zoomToFit");
+				keyboardEvent.preventDefault();
+				return;
+			}
+			if (keyboardEvent.key === "F4") {
+				this.setActiveView(this.#activeViewName === "edit" ? "render" : "edit");
+				keyboardEvent.preventDefault();
+				return;
+			}
 			if (keyboardEvent.key === "F2" && this.#selectedNode) {
 				const rowElement = this.findHierarchyRowElement(this.#selectedNode);
 				if (rowElement) {
@@ -1888,6 +2012,7 @@ export class UIEditor {
 		}
 		else if (commandId === "toggleGrid") {
 			this.#isGridVisible = !this.#isGridVisible;
+			this.refreshStatus();
 		}
 		else if (commandId === "renderScaleActual") {
 			this.#renderScaleMode = "actual";
@@ -1963,27 +2088,27 @@ export class UIEditor {
 			const label = newNode.addComponent(UILabel);
 			label.setText("Label");
 			label.setFontSize(20);
-			label.setTextColor(new Color(0.231, 0.208, 0.141, 1));
+			label.setTextColor(new Color(0.15, 0.15, 0.15, 1));
 		}
 		else if (widgetKind === "button") {
 			newNode.setName("Button" + this.#nodeSerialNumber);
 			newNode.setContentSize(Vector2.create(180, 52));
 			newNode.setInteractable(true);
 			const paint = newNode.addComponent(Paint);
-			paint.setColor(new Color(0.831, 0.745, 0.420, 1));
+			paint.setColor(new Color(0.000, 0.471, 0.831, 1));
 			paint.setRoundSize(6);
 			newNode.addComponent(UIButton);
 			const label = newNode.addComponent(UILabel);
 			label.setText("Button");
 			label.setFontSize(18);
-			label.setTextColor(new Color(0.231, 0.208, 0.141, 1));
+			label.setTextColor(new Color(1, 1, 1, 1));
 		}
 		else if (widgetKind === "scrollView") {
 			newNode.setName("ScrollView" + this.#nodeSerialNumber);
 			newNode.setContentSize(Vector2.create(320, 220));
 			newNode.setInteractable(true);
 			const paint = newNode.addComponent(Paint);
-			paint.setColor(new Color(0.988, 0.961, 0.847, 1));
+			paint.setColor(new Color(0.965, 0.965, 0.965, 1));
 			paint.setRoundSize(4);
 			const scrollView = newNode.addComponent(UIScrollView);
 			scrollView.setScrollContentSize(Vector2.create(320, 660));
@@ -2005,7 +2130,7 @@ export class UIEditor {
 			newNode.setName("Divider" + this.#nodeSerialNumber);
 			newNode.setContentSize(Vector2.create(260, 1));
 			const paint = newNode.addComponent(Paint);
-			paint.setColor(new Color(0.820, 0.745, 0.659, 1));
+			paint.setColor(new Color(0.812, 0.812, 0.812, 1));
 		}
 		else if (widgetKind === "richText") {
 			newNode.setName("RichText" + this.#nodeSerialNumber);
@@ -2018,7 +2143,7 @@ export class UIEditor {
 			newNode.setName("Image" + this.#nodeSerialNumber);
 			newNode.setContentSize(Vector2.create(160, 160));
 			const paint = newNode.addComponent(Paint);
-			paint.setColor(new Color(0.953, 0.898, 0.671, 1));
+			paint.setColor(new Color(0.910, 0.910, 0.910, 1));
 			newNode.addComponent(UIImageView);
 		}
 		else if (widgetKind === "toggleButton") {
@@ -2026,13 +2151,13 @@ export class UIEditor {
 			newNode.setContentSize(Vector2.create(180, 52));
 			newNode.setInteractable(true);
 			const paint = newNode.addComponent(Paint);
-			paint.setColor(new Color(0.831, 0.745, 0.420, 1));
+			paint.setColor(new Color(0.000, 0.471, 0.831, 1));
 			paint.setRoundSize(6);
 			newNode.addComponent(UIToggleButton);
 			const label = newNode.addComponent(UILabel);
 			label.setText("Toggle");
 			label.setFontSize(18);
-			label.setTextColor(new Color(0.231, 0.208, 0.141, 1));
+			label.setTextColor(new Color(1, 1, 1, 1));
 		}
 		else if (widgetKind === "inputField") {
 			newNode.setName("InputField" + this.#nodeSerialNumber);
@@ -2044,7 +2169,7 @@ export class UIEditor {
 			newNode.setContentSize(Vector2.create(320, 220));
 			newNode.setInteractable(true);
 			const paint = newNode.addComponent(Paint);
-			paint.setColor(new Color(0.988, 0.961, 0.847, 1));
+			paint.setColor(new Color(0.965, 0.965, 0.965, 1));
 			paint.setRoundSize(4);
 			const snapScrollView = newNode.addComponent(UISnapScrollView);
 			snapScrollView.setScrollContentSize(Vector2.create(960, 220));
@@ -2067,7 +2192,7 @@ export class UIEditor {
 			newNode.setName("Panel" + this.#nodeSerialNumber);
 			newNode.setContentSize(Vector2.create(220, 140));
 			const paint = newNode.addComponent(Paint);
-			paint.setColor(new Color(0.953, 0.898, 0.671, 1));
+			paint.setColor(new Color(0.910, 0.910, 0.910, 1));
 			paint.setRoundSize(4);
 		}
 
@@ -2143,9 +2268,10 @@ export class UIEditor {
 			const isSelectedRow = (mappedNode === this.#selectedNode);
 			rowElement.dataset.selected = isSelectedRow ? "true" : "false";
 			rowElement.style.backgroundColor = isSelectedRow ? PaneTheme.color.accent : "transparent";
+			rowElement.style.borderLeftColor = isSelectedRow ? ACCENT_COLOR : "transparent";
 			const rowTextColor = isSelectedRow ? SELECTED_ROW_TEXT_COLOR : PaneTheme.color.text;
 			rowElement.style.color = rowTextColor;
-			rowElement.children[0].style.color = isSelectedRow ? SELECTED_ROW_TEXT_COLOR : SELECTION_COLOR;
+			rowElement.children[0].style.color = isSelectedRow ? SELECTED_ROW_TEXT_COLOR : ICON_COLOR;
 			rowElement.children[1].style.color = rowTextColor;
 		}
 	}
@@ -2164,10 +2290,11 @@ export class UIEditor {
 		this.collectHierarchyRows(this.#documentRootNode, 0, flatList);
 		for (const entry of flatList) {
 			const rowElement = this.createListRowElement(this.findNodeGlyph(entry.node), entry.node.getName());
-			rowElement.style.paddingLeft = (10 + entry.depth * 16) + "px";
+			rowElement.style.paddingLeft = (12 + entry.depth * 18) + "px";
 			if (entry.node === this.#selectedNode) {
 				rowElement.dataset.selected = "true";
 				rowElement.style.backgroundColor = PaneTheme.color.accent;
+				rowElement.style.borderLeftColor = SELECTION_COLOR;
 				rowElement.style.color = SELECTED_ROW_TEXT_COLOR;
 				for (const childElement of rowElement.children) {
 					childElement.style.color = SELECTED_ROW_TEXT_COLOR;
@@ -2271,9 +2398,8 @@ export class UIEditor {
 		const inputElement = System.document.createElement("input");
 		inputElement.type = "text";
 		inputElement.value = node.getName();
-		inputElement.style.cssText = "flex:1;min-width:0;background:" + PaneTheme.color.inputBg
-			+ ";border:1px solid " + SELECTION_COLOR + ";color:" + PaneTheme.color.text
-			+ ";font-size:14px;padding:1px 4px;border-radius:2px;outline:none;";
+		decorateInputElement(inputElement);
+		inputElement.style.borderColor = SELECTION_COLOR;
 		labelElement.style.display = "none";
 		rowElement.insertBefore(inputElement, labelElement);
 		rowElement.draggable = false;
@@ -2672,8 +2798,7 @@ export class UIEditor {
 			return;
 		}
 
-		// 노드 자체의 공개 속성.
-		bodyElement.appendChild(this.createInspectorGroupElement(selectedNode.constructor.name, null));
+		// 노드 자체의 공개 속성. (인스펙터는 노드 하나를 다루므로 소제목을 두지 않는다)
 		this.appendTextRow(bodyElement, "Name", selectedNode.getName(), (inputText) => {
 			selectedNode.setName(inputText);
 			this.rebuildHierarchy();
@@ -2689,8 +2814,12 @@ export class UIEditor {
 			if (generatedTypeSet.has(componentTypeName)) {
 				continue;
 			}
-			bodyElement.appendChild(this.createInspectorGroupElement(componentTypeName, component));
-			this.appendReflectedProperties(bodyElement, component);
+			const groupBodyElement = PaneStyle.create("div", "", {
+				style: { position: "relative", width: "auto", height: "auto" },
+			});
+			bodyElement.appendChild(this.createInspectorGroupElement(componentTypeName, component, groupBodyElement));
+			bodyElement.appendChild(groupBodyElement);
+			this.appendReflectedProperties(groupBodyElement, component);
 		}
 
 		bodyElement.appendChild(this.createAddComponentElement());
@@ -2845,8 +2974,7 @@ export class UIEditor {
 			const inputElement = System.document.createElement("input");
 			inputElement.type = "text";
 			inputElement.value = this.composeNumberText((axisIndex === 0) ? currentValue.x : currentValue.y);
-			inputElement.style.cssText = "flex:1;min-width:0;background:" + PaneTheme.color.inputBg + ";border:1px solid "
-				+ PaneTheme.color.border + ";color:" + PaneTheme.color.text + ";font-size:13px;padding:3px 6px;border-radius:2px;";
+			decorateInputElement(inputElement);
 			inputElement.addEventListener("change", () => {
 				const parsedX = System.parseFloat(inputElementList[0].value);
 				const parsedY = System.parseFloat(inputElementList[1].value);
@@ -2949,31 +3077,50 @@ export class UIEditor {
 	 * @param { string } titleText
 	 * @returns { HTMLElement }
 	 */
-	createInspectorGroupElement(titleText, component) {
+	createInspectorGroupElement(titleText, component, groupBodyElement) {
 		const groupElement = PaneStyle.create("div", "", {
 			style: {
-				position: "relative", width: "auto", height: "auto",
+				position: "relative", width: "auto", height: "30px", flexShrink: "0",
 				display: "flex", alignItems: "center",
-				padding: "6px 6px 6px 10px", marginTop: "2px",
-				backgroundColor: PaneTheme.color.toolbar,
-				borderTop: "1px solid " + PaneTheme.color.border,
-				borderBottom: "1px solid " + PaneTheme.color.border,
+				padding: "0 8px 0 8px", marginTop: "8px",
+				backgroundColor: "#202020",
+				borderTop: "1px solid " + BORDER_COLOR,
+				borderBottom: "1px solid " + BORDER_SOFT_COLOR,
+				cursor: "pointer", userSelect: "none",
 			},
 		});
+
+		const foldElement = PaneStyle.create("span", "", {
+			text: "\u25BE",
+			style: {
+				position: "relative", width: "14px", height: "auto", flexShrink: "0",
+				fontSize: "12px", color: PaneTheme.color.textDim, textAlign: "center",
+			},
+		});
+		groupElement.appendChild(foldElement);
+
 		const titleElement = PaneStyle.create("span", "", {
 			text: titleText,
 			style: {
 				position: "relative", width: "auto", height: "auto", flex: "1",
-				fontSize: "12px", fontWeight: "bold", color: SELECTION_COLOR,
+				fontSize: "13px", fontWeight: "600", color: INK_COLOR,
 			},
 		});
 		groupElement.appendChild(titleElement);
+
+		if (groupBodyElement) {
+			groupElement.addEventListener("click", () => {
+				const isFolded = (groupBodyElement.style.display === "none");
+				groupBodyElement.style.display = isFolded ? "" : "none";
+				foldElement.innerText = isFolded ? "\u25BE" : "\u25B8";
+			});
+		}
 
 		if (component) {
 			const moreElement = PaneStyle.create("div", "", {
 				text: "\u22EF",
 				style: {
-					position: "relative", width: "20px", height: "16px",
+					position: "relative", width: "20px", height: "18px", flexShrink: "0",
 					display: "flex", alignItems: "center", justifyContent: "center",
 					fontSize: "14px", color: PaneTheme.color.textDim,
 					cursor: "pointer", borderRadius: "3px", userSelect: "none",
@@ -3015,12 +3162,16 @@ export class UIEditor {
 		const rowElement = PaneStyle.create("div", "", {
 			style: {
 				position: "relative", width: "auto", height: "auto",
-				display: "flex", alignItems: "center", gap: "8px", padding: "4px 10px",
+				display: "flex", alignItems: "center", gap: "8px", padding: "6px 12px",
+				borderBottom: "1px solid " + BORDER_SOFT_COLOR,
 			},
 		});
 		const labelElement = PaneStyle.create("span", "", {
 			text: labelText,
-			style: { position: "relative", width: "88px", height: "auto", fontSize: "13px", color: PaneTheme.color.text, flexShrink: "0" },
+			style: {
+				position: "relative", width: "104px", height: "auto", flexShrink: "0",
+				fontSize: "13px", color: PaneTheme.color.textDim, lineHeight: "1.3",
+			},
 		});
 		rowElement.appendChild(labelElement);
 		parentElement.appendChild(rowElement);
@@ -3201,6 +3352,15 @@ export class UIEditor {
 			statusText += "    결과 화면 " + renderModeText;
 		}
 		this.#statusTextElement.innerText = statusText;
+
+		// 머리말의 배율 표시와 격자 단추 상태를 맞춘다.
+		if (this.#zoomReadoutElement && this.#editorCanvas) {
+			const headerTransform = this.getEditorTransform();
+			this.#zoomReadoutElement.innerText = System.Math.round(headerTransform.scale * 100) + "%";
+		}
+		if (this.#gridToggleElement) {
+			this.#gridToggleElement.style.color = this.#isGridVisible ? ACCENT_COLOR : PaneTheme.color.textDim;
+		}
 	}
 
 	//==============================================================================
@@ -3517,17 +3677,18 @@ for (const colorName of System.Object.keys(VANILLA_THEME_COLORS)) {
 }
 PaneTheme.size.resizer = 3;
 PaneTheme.font.family = EDITOR_FONT_FAMILY;
-PaneTheme.font.size = "14px";
+PaneTheme.font.size = "13px";
 
 // 스크롤 막대 모양을 편집기 하나로 맞춘다.
 const editorStyleElement = System.document.createElement("style");
-editorStyleElement.innerText = "* { scrollbar-width: thin; scrollbar-color: " + VANILLA_THEME_COLORS.border + " transparent; }"
+editorStyleElement.innerText = "* { scrollbar-width: thin; scrollbar-color: rgba(121, 121, 121, 0.4) transparent; }"
 	+ "::-webkit-scrollbar { width: 10px; height: 10px; }"
 	+ "::-webkit-scrollbar-track { background: transparent; }"
-	+ "::-webkit-scrollbar-thumb { background: " + VANILLA_THEME_COLORS.border + "; border-radius: 5px;"
-	+ " border: 2px solid transparent; background-clip: padding-box; }"
-	+ "::-webkit-scrollbar-thumb:hover { background: " + VANILLA_THEME_COLORS.accentHover + "; background-clip: padding-box; }"
-	+ "::-webkit-scrollbar-corner { background: transparent; }";
+	+ "::-webkit-scrollbar-thumb { background: rgba(121, 121, 121, 0.4); }"
+	+ "::-webkit-scrollbar-thumb:hover { background: rgba(121, 121, 121, 0.7); }"
+	+ "::-webkit-scrollbar-corner { background: transparent; }"
+	+ "input[type=checkbox] { accent-color: " + ACCENT_COLOR + "; }"
+	+ "body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }";
 System.document.head.appendChild(editorStyleElement);
 
 // 엔진이 내보내는 노드와 컴포넌트를 문서 형식에 등록한다.
