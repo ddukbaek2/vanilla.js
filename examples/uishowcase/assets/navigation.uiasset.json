@@ -1,0 +1,646 @@
+{
+	"version": 1,
+	"root": {
+		"type": "WorldNode",
+		"name": "Navigation",
+		"active": true,
+		"position": [
+			0,
+			576
+		],
+		"scale": [
+			1,
+			1
+		],
+		"rotation": 0,
+		"opacity": 1,
+		"pivot": [
+			0,
+			0
+		],
+		"anchor": [
+			0,
+			0
+		],
+		"contentSize": [
+			960,
+			64
+		],
+		"interactable": false,
+		"components": [
+			{
+				"type": "Paint",
+				"color": [
+					0.078,
+					0.102,
+					0.165,
+					1
+				],
+				"roundSize": 0
+			}
+		],
+		"children": [
+			{
+				"type": "WorldNode",
+				"name": "NavigationLine",
+				"active": true,
+				"position": [
+					0,
+					0
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					960,
+					1
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.165,
+							0.204,
+							0.314,
+							1
+						],
+						"roundSize": 0
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "NavHOME",
+				"active": true,
+				"position": [
+					35,
+					12
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					200,
+					40
+				],
+				"interactable": true,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.133,
+							0.2,
+							1
+						],
+						"roundSize": 12
+					},
+					{
+						"type": "UIButton",
+						"pressedTintColor": [
+							0,
+							0,
+							0,
+							0.28
+						]
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "NavActiveHOME",
+						"active": true,
+						"position": [
+							0,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							200,
+							40
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.357,
+									0.424,
+									1,
+									1
+								],
+								"roundSize": 12
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "NavLabelHOME",
+						"active": true,
+						"position": [
+							0,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							200,
+							40
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "HOME",
+								"fontSize": 14,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "NavSHOP",
+				"active": true,
+				"position": [
+					265,
+					12
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					200,
+					40
+				],
+				"interactable": true,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.133,
+							0.2,
+							1
+						],
+						"roundSize": 12
+					},
+					{
+						"type": "UIButton",
+						"pressedTintColor": [
+							0,
+							0,
+							0,
+							0.28
+						]
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "NavActiveSHOP",
+						"active": false,
+						"position": [
+							0,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							200,
+							40
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.357,
+									0.424,
+									1,
+									1
+								],
+								"roundSize": 12
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "NavLabelSHOP",
+						"active": true,
+						"position": [
+							0,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							200,
+							40
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "SHOP",
+								"fontSize": 14,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "NavSETTINGS",
+				"active": true,
+				"position": [
+					495,
+					12
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					200,
+					40
+				],
+				"interactable": true,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.133,
+							0.2,
+							1
+						],
+						"roundSize": 12
+					},
+					{
+						"type": "UIButton",
+						"pressedTintColor": [
+							0,
+							0,
+							0,
+							0.28
+						]
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "NavActiveSETTINGS",
+						"active": false,
+						"position": [
+							0,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							200,
+							40
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.357,
+									0.424,
+									1,
+									1
+								],
+								"roundSize": 12
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "NavLabelSETTINGS",
+						"active": true,
+						"position": [
+							0,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							200,
+							40
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "SETTINGS",
+								"fontSize": 14,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "NavPROFILE",
+				"active": true,
+				"position": [
+					725,
+					12
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					200,
+					40
+				],
+				"interactable": true,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.133,
+							0.2,
+							1
+						],
+						"roundSize": 12
+					},
+					{
+						"type": "UIButton",
+						"pressedTintColor": [
+							0,
+							0,
+							0,
+							0.28
+						]
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "NavActivePROFILE",
+						"active": false,
+						"position": [
+							0,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							200,
+							40
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.357,
+									0.424,
+									1,
+									1
+								],
+								"roundSize": 12
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "NavLabelPROFILE",
+						"active": true,
+						"position": [
+							0,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							200,
+							40
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "PROFILE",
+								"fontSize": 14,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					}
+				]
+			}
+		]
+	}
+}

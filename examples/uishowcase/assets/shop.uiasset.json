@@ -1,0 +1,3165 @@
+{
+	"version": 1,
+	"root": {
+		"type": "WorldNode",
+		"name": "Shop",
+		"active": true,
+		"position": [
+			0,
+			0
+		],
+		"scale": [
+			1,
+			1
+		],
+		"rotation": 0,
+		"opacity": 1,
+		"pivot": [
+			0,
+			0
+		],
+		"anchor": [
+			0,
+			0
+		],
+		"contentSize": [
+			960,
+			640
+		],
+		"interactable": false,
+		"components": [
+			{
+				"type": "Paint",
+				"color": [
+					0.059,
+					0.075,
+					0.125,
+					1
+				],
+				"roundSize": 0
+			}
+		],
+		"children": [
+			{
+				"type": "WorldNode",
+				"name": "Header",
+				"active": true,
+				"position": [
+					0,
+					0
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					960,
+					72
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.078,
+							0.102,
+							0.165,
+							1
+						],
+						"roundSize": 0
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "Title",
+						"active": true,
+						"position": [
+							24,
+							18
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							160,
+							36
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "SHOP",
+								"fontSize": 22,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "Subtitle",
+						"active": true,
+						"position": [
+							184,
+							24
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							300,
+							24
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Featured deals refresh daily",
+								"fontSize": 13,
+								"textColor": [
+									0.541,
+									0.58,
+									0.659,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CoinChip",
+						"active": true,
+						"position": [
+							700,
+							20
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							112,
+							32
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.125,
+									0.165,
+									0.251,
+									1
+								],
+								"roundSize": 16
+							}
+						],
+						"children": [
+							{
+								"type": "WorldNode",
+								"name": "CoinChipLabel",
+								"active": true,
+								"position": [
+									0,
+									0
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									112,
+									32
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "◆ 12,480",
+										"fontSize": 15,
+										"textColor": [
+											1,
+											0.702,
+											0.278,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							}
+						]
+					},
+					{
+						"type": "WorldNode",
+						"name": "GemChip",
+						"active": true,
+						"position": [
+							822,
+							20
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							114,
+							32
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.125,
+									0.165,
+									0.251,
+									1
+								],
+								"roundSize": 16
+							}
+						],
+						"children": [
+							{
+								"type": "WorldNode",
+								"name": "GemChipLabel",
+								"active": true,
+								"position": [
+									0,
+									0
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									114,
+									32
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "● 1,250",
+										"fontSize": 15,
+										"textColor": [
+											0.2,
+											0.82,
+											1,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							}
+						]
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "FeaturedLabel",
+				"active": true,
+				"position": [
+					24,
+					88
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					200,
+					22
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "UILabel",
+						"text": "FEATURED",
+						"fontSize": 13,
+						"textColor": [
+							0.541,
+							0.58,
+							0.659,
+							1
+						],
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						]
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "FeaturedList",
+				"active": true,
+				"position": [
+					24,
+					112
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					912,
+					136
+				],
+				"interactable": true,
+				"components": [
+					{
+						"type": "UIScrollView",
+						"scrollContentSize": [
+							1560,
+							136
+						],
+						"scrollMode": "elastic",
+						"dragSensitivity": 1,
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						]
+					}
+				],
+				"children": [],
+				"contentChildren": [
+					{
+						"type": "WorldNode",
+						"name": "Featured0",
+						"active": true,
+						"position": [
+							0,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							250,
+							136
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.357,
+									0.424,
+									1,
+									1
+								],
+								"roundSize": 16
+							}
+						],
+						"children": [
+							{
+								"type": "WorldNode",
+								"name": "FeaturedTitle0",
+								"active": true,
+								"position": [
+									18,
+									18
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									214,
+									28
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "Starter Pack",
+										"fontSize": 19,
+										"textColor": [
+											0.059,
+											0.075,
+											0.125,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "FeaturedCaption0",
+								"active": true,
+								"position": [
+									18,
+									50
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									214,
+									22
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "Limited  ·  2d 14h left",
+										"fontSize": 13,
+										"textColor": [
+											0.059,
+											0.075,
+											0.125,
+											0.75
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "FeaturedBuy0",
+								"active": true,
+								"position": [
+									18,
+									84
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									110,
+									36
+								],
+								"interactable": true,
+								"components": [
+									{
+										"type": "Paint",
+										"color": [
+											0.059,
+											0.075,
+											0.125,
+											0.85
+										],
+										"roundSize": 10
+									},
+									{
+										"type": "UIButton",
+										"pressedTintColor": [
+											0,
+											0,
+											0,
+											0.28
+										]
+									},
+									{
+										"type": "UILabel",
+										"text": "◆ 240",
+										"fontSize": 14,
+										"textColor": [
+											0.949,
+											0.961,
+											0.98,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							}
+						]
+					},
+					{
+						"type": "WorldNode",
+						"name": "Featured1",
+						"active": true,
+						"position": [
+							262,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							250,
+							136
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									1,
+									0.361,
+									0.541,
+									1
+								],
+								"roundSize": 16
+							}
+						],
+						"children": [
+							{
+								"type": "WorldNode",
+								"name": "FeaturedTitle1",
+								"active": true,
+								"position": [
+									18,
+									18
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									214,
+									28
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "Weekend Boost",
+										"fontSize": 19,
+										"textColor": [
+											0.059,
+											0.075,
+											0.125,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "FeaturedCaption1",
+								"active": true,
+								"position": [
+									18,
+									50
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									214,
+									22
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "Limited  ·  2d 14h left",
+										"fontSize": 13,
+										"textColor": [
+											0.059,
+											0.075,
+											0.125,
+											0.75
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "FeaturedBuy1",
+								"active": true,
+								"position": [
+									18,
+									84
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									110,
+									36
+								],
+								"interactable": true,
+								"components": [
+									{
+										"type": "Paint",
+										"color": [
+											0.059,
+											0.075,
+											0.125,
+											0.85
+										],
+										"roundSize": 10
+									},
+									{
+										"type": "UIButton",
+										"pressedTintColor": [
+											0,
+											0,
+											0,
+											0.28
+										]
+									},
+									{
+										"type": "UILabel",
+										"text": "◆ 120",
+										"fontSize": 14,
+										"textColor": [
+											0.949,
+											0.961,
+											0.98,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							}
+						]
+					},
+					{
+						"type": "WorldNode",
+						"name": "Featured2",
+						"active": true,
+						"position": [
+							524,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							250,
+							136
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.2,
+									0.82,
+									1,
+									1
+								],
+								"roundSize": 16
+							}
+						],
+						"children": [
+							{
+								"type": "WorldNode",
+								"name": "FeaturedTitle2",
+								"active": true,
+								"position": [
+									18,
+									18
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									214,
+									28
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "Gem Bundle",
+										"fontSize": 19,
+										"textColor": [
+											0.059,
+											0.075,
+											0.125,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "FeaturedCaption2",
+								"active": true,
+								"position": [
+									18,
+									50
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									214,
+									22
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "Limited  ·  2d 14h left",
+										"fontSize": 13,
+										"textColor": [
+											0.059,
+											0.075,
+											0.125,
+											0.75
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "FeaturedBuy2",
+								"active": true,
+								"position": [
+									18,
+									84
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									110,
+									36
+								],
+								"interactable": true,
+								"components": [
+									{
+										"type": "Paint",
+										"color": [
+											0.059,
+											0.075,
+											0.125,
+											0.85
+										],
+										"roundSize": 10
+									},
+									{
+										"type": "UIButton",
+										"pressedTintColor": [
+											0,
+											0,
+											0,
+											0.28
+										]
+									},
+									{
+										"type": "UILabel",
+										"text": "● 90",
+										"fontSize": 14,
+										"textColor": [
+											0.949,
+											0.961,
+											0.98,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							}
+						]
+					},
+					{
+						"type": "WorldNode",
+						"name": "Featured3",
+						"active": true,
+						"position": [
+							786,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							250,
+							136
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.71,
+									0.482,
+									1,
+									1
+								],
+								"roundSize": 16
+							}
+						],
+						"children": [
+							{
+								"type": "WorldNode",
+								"name": "FeaturedTitle3",
+								"active": true,
+								"position": [
+									18,
+									18
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									214,
+									28
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "Legend Skin",
+										"fontSize": 19,
+										"textColor": [
+											0.059,
+											0.075,
+											0.125,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "FeaturedCaption3",
+								"active": true,
+								"position": [
+									18,
+									50
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									214,
+									22
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "Limited  ·  2d 14h left",
+										"fontSize": 13,
+										"textColor": [
+											0.059,
+											0.075,
+											0.125,
+											0.75
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "FeaturedBuy3",
+								"active": true,
+								"position": [
+									18,
+									84
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									110,
+									36
+								],
+								"interactable": true,
+								"components": [
+									{
+										"type": "Paint",
+										"color": [
+											0.059,
+											0.075,
+											0.125,
+											0.85
+										],
+										"roundSize": 10
+									},
+									{
+										"type": "UIButton",
+										"pressedTintColor": [
+											0,
+											0,
+											0,
+											0.28
+										]
+									},
+									{
+										"type": "UILabel",
+										"text": "● 480",
+										"fontSize": 14,
+										"textColor": [
+											0.949,
+											0.961,
+											0.98,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							}
+						]
+					},
+					{
+						"type": "WorldNode",
+						"name": "Featured4",
+						"active": true,
+						"position": [
+							1048,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							250,
+							136
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.239,
+									0.863,
+									0.518,
+									1
+								],
+								"roundSize": 16
+							}
+						],
+						"children": [
+							{
+								"type": "WorldNode",
+								"name": "FeaturedTitle4",
+								"active": true,
+								"position": [
+									18,
+									18
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									214,
+									28
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "Energy Refill",
+										"fontSize": 19,
+										"textColor": [
+											0.059,
+											0.075,
+											0.125,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "FeaturedCaption4",
+								"active": true,
+								"position": [
+									18,
+									50
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									214,
+									22
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "Limited  ·  2d 14h left",
+										"fontSize": 13,
+										"textColor": [
+											0.059,
+											0.075,
+											0.125,
+											0.75
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "FeaturedBuy4",
+								"active": true,
+								"position": [
+									18,
+									84
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									110,
+									36
+								],
+								"interactable": true,
+								"components": [
+									{
+										"type": "Paint",
+										"color": [
+											0.059,
+											0.075,
+											0.125,
+											0.85
+										],
+										"roundSize": 10
+									},
+									{
+										"type": "UIButton",
+										"pressedTintColor": [
+											0,
+											0,
+											0,
+											0.28
+										]
+									},
+									{
+										"type": "UILabel",
+										"text": "◆ 60",
+										"fontSize": 14,
+										"textColor": [
+											0.949,
+											0.961,
+											0.98,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							}
+						]
+					},
+					{
+						"type": "WorldNode",
+						"name": "Featured5",
+						"active": true,
+						"position": [
+							1310,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							250,
+							136
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									1,
+									0.702,
+									0.278,
+									1
+								],
+								"roundSize": 16
+							}
+						],
+						"children": [
+							{
+								"type": "WorldNode",
+								"name": "FeaturedTitle5",
+								"active": true,
+								"position": [
+									18,
+									18
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									214,
+									28
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "Season Ticket",
+										"fontSize": 19,
+										"textColor": [
+											0.059,
+											0.075,
+											0.125,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "FeaturedCaption5",
+								"active": true,
+								"position": [
+									18,
+									50
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									214,
+									22
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "Limited  ·  2d 14h left",
+										"fontSize": 13,
+										"textColor": [
+											0.059,
+											0.075,
+											0.125,
+											0.75
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "FeaturedBuy5",
+								"active": true,
+								"position": [
+									18,
+									84
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									110,
+									36
+								],
+								"interactable": true,
+								"components": [
+									{
+										"type": "Paint",
+										"color": [
+											0.059,
+											0.075,
+											0.125,
+											0.85
+										],
+										"roundSize": 10
+									},
+									{
+										"type": "UIButton",
+										"pressedTintColor": [
+											0,
+											0,
+											0,
+											0.28
+										]
+									},
+									{
+										"type": "UILabel",
+										"text": "● 320",
+										"fontSize": 14,
+										"textColor": [
+											0.949,
+											0.961,
+											0.98,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							}
+						]
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "Item0",
+				"active": true,
+				"position": [
+					24,
+					262
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					290,
+					140
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.133,
+							0.2,
+							1
+						],
+						"roundSize": 14
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "ItemIcon0",
+						"active": true,
+						"position": [
+							18,
+							18
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							56,
+							56
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									1,
+									0.361,
+									0.541,
+									1
+								],
+								"roundSize": 14
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ItemTitle0",
+						"active": true,
+						"position": [
+							90,
+							20
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							184,
+							26
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Health Potion",
+								"fontSize": 17,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ItemCaption0",
+						"active": true,
+						"position": [
+							90,
+							48
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							184,
+							22
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Restores 50 HP",
+								"fontSize": 13,
+								"textColor": [
+									0.541,
+									0.58,
+									0.659,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "BuyButton0",
+						"active": true,
+						"position": [
+							18,
+							90
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							254,
+							36
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.137,
+									0.173,
+									0.259,
+									1
+								],
+								"roundSize": 10
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.28
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "BUY  ◆ 120",
+								"fontSize": 14,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "Item1",
+				"active": true,
+				"position": [
+					335,
+					262
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					290,
+					140
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.133,
+							0.2,
+							1
+						],
+						"roundSize": 14
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "ItemIcon1",
+						"active": true,
+						"position": [
+							18,
+							18
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							56,
+							56
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.2,
+									0.82,
+									1,
+									1
+								],
+								"roundSize": 14
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ItemTitle1",
+						"active": true,
+						"position": [
+							90,
+							20
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							184,
+							26
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Mana Crystal",
+								"fontSize": 17,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ItemCaption1",
+						"active": true,
+						"position": [
+							90,
+							48
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							184,
+							22
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Restores 30 MP",
+								"fontSize": 13,
+								"textColor": [
+									0.541,
+									0.58,
+									0.659,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "BuyButton1",
+						"active": true,
+						"position": [
+							18,
+							90
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							254,
+							36
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.137,
+									0.173,
+									0.259,
+									1
+								],
+								"roundSize": 10
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.28
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "BUY  ◆ 150",
+								"fontSize": 14,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "Item2",
+				"active": true,
+				"position": [
+					646,
+					262
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					290,
+					140
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.133,
+							0.2,
+							1
+						],
+						"roundSize": 14
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "ItemIcon2",
+						"active": true,
+						"position": [
+							18,
+							18
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							56,
+							56
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									1,
+									0.702,
+									0.278,
+									1
+								],
+								"roundSize": 14
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ItemTitle2",
+						"active": true,
+						"position": [
+							90,
+							20
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							184,
+							26
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Lucky Charm",
+								"fontSize": 17,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ItemCaption2",
+						"active": true,
+						"position": [
+							90,
+							48
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							184,
+							22
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "+10% drop rate",
+								"fontSize": 13,
+								"textColor": [
+									0.541,
+									0.58,
+									0.659,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "BuyButton2",
+						"active": true,
+						"position": [
+							18,
+							90
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							254,
+							36
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.137,
+									0.173,
+									0.259,
+									1
+								],
+								"roundSize": 10
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.28
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "BUY  ◆ 300",
+								"fontSize": 14,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "Item3",
+				"active": true,
+				"position": [
+					24,
+					414
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					290,
+					140
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.133,
+							0.2,
+							1
+						],
+						"roundSize": 14
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "ItemIcon3",
+						"active": true,
+						"position": [
+							18,
+							18
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							56,
+							56
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.357,
+									0.424,
+									1,
+									1
+								],
+								"roundSize": 14
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ItemTitle3",
+						"active": true,
+						"position": [
+							90,
+							20
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							184,
+							26
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Iron Shield",
+								"fontSize": 17,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ItemCaption3",
+						"active": true,
+						"position": [
+							90,
+							48
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							184,
+							22
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "+12 defense",
+								"fontSize": 13,
+								"textColor": [
+									0.541,
+									0.58,
+									0.659,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "BuyButton3",
+						"active": true,
+						"position": [
+							18,
+							90
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							254,
+							36
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.137,
+									0.173,
+									0.259,
+									1
+								],
+								"roundSize": 10
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.28
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "BUY  ◆ 420",
+								"fontSize": 14,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "Item4",
+				"active": true,
+				"position": [
+					335,
+					414
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					290,
+					140
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.133,
+							0.2,
+							1
+						],
+						"roundSize": 14
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "ItemIcon4",
+						"active": true,
+						"position": [
+							18,
+							18
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							56,
+							56
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.239,
+									0.863,
+									0.518,
+									1
+								],
+								"roundSize": 14
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ItemTitle4",
+						"active": true,
+						"position": [
+							90,
+							20
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							184,
+							26
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Swift Boots",
+								"fontSize": 17,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ItemCaption4",
+						"active": true,
+						"position": [
+							90,
+							48
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							184,
+							22
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "+8% speed",
+								"fontSize": 13,
+								"textColor": [
+									0.541,
+									0.58,
+									0.659,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "BuyButton4",
+						"active": true,
+						"position": [
+							18,
+							90
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							254,
+							36
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.137,
+									0.173,
+									0.259,
+									1
+								],
+								"roundSize": 10
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.28
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "BUY  ◆ 380",
+								"fontSize": 14,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "Item5",
+				"active": true,
+				"position": [
+					646,
+					414
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					290,
+					140
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.133,
+							0.2,
+							1
+						],
+						"roundSize": 14
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "ItemIcon5",
+						"active": true,
+						"position": [
+							18,
+							18
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							56,
+							56
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.71,
+									0.482,
+									1,
+									1
+								],
+								"roundSize": 14
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ItemTitle5",
+						"active": true,
+						"position": [
+							90,
+							20
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							184,
+							26
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Mystery Box",
+								"fontSize": 17,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ItemCaption5",
+						"active": true,
+						"position": [
+							90,
+							48
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							184,
+							22
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Random reward",
+								"fontSize": 13,
+								"textColor": [
+									0.541,
+									0.58,
+									0.659,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "BuyButton5",
+						"active": true,
+						"position": [
+							18,
+							90
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							254,
+							36
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.137,
+									0.173,
+									0.259,
+									1
+								],
+								"roundSize": 10
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.28
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "BUY  ◆ 999",
+								"fontSize": 14,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					}
+				]
+			}
+		]
+	}
+}

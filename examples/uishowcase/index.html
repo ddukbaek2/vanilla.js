@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>vanilla.js - UI Showcase</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<style>
+	html, body {
+		margin: 0;
+		padding: 0;
+		width: 100%;
+		height: 100%;
+		overflow: hidden;
+		background: #0f1320;
+		touch-action: none;
+		user-select: none;
+	}
+	#mainCanvas {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+	"use strict";
+	const System = globalThis;
+
+	//==============================================================================
+	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../../build/vanilla.js)
+	//==============================================================================
+	let engineModule = null;
+	try {
+		try {
+			engineModule = await import("./vanilla.js");
+		}
+		catch (importError) {
+			engineModule = await import("../../build/vanilla.js");
+		}
+	}
+	catch (engineError) {
+		System.document.body.innerHTML = "<p style=\"color:#fff;font-family:sans-serif;padding:2em\">vanilla.js 엔진 모듈을 불러오지 못했습니다.</p>";
+		throw engineError;
+	}
+
+	const Engine = engineModule.Engine;
+	const EngineConfiguration = engineModule.EngineConfiguration;
+	const Scene = engineModule.Scene;
+	const WorldNode = engineModule.WorldNode;
+	const Vector2 = engineModule.Vector2;
+	const Color = engineModule.Color;
+	const Pivot = engineModule.Pivot;
+	const Rect = engineModule.Rect;
+	const Paint = engineModule.Paint;
+	const Tween = engineModule.Tween;
+	const UILabel = engineModule.UILabel;
+	const UIButton = engineModule.UIButton;
+	const UIToggleButton = engineModule.UIToggleButton;
+	const UISlider = engineModule.UISlider;
+	const UIProgressView = engineModule.UIProgressView;
+	const UIDocument = engineModule.UIDocument;
+	const TouchRecognizer = engineModule.TouchRecognizer;
+	const ViewScaleMode = engineModule.ViewScaleMode;
+
+	//==============================================================================
+	// 전역 상수 목록.
+	//==============================================================================
+	const ASSET_FILE_NAMES = ["home", "shop", "settings", "navigation", "popup", "toast"];
+	const SCREEN_NAMES = ["home", "shop", "settings"];
+	const TOAST_REST_Y = 548;
+	const TOAST_HOLD_SECONDS = 1.8;
+	const BAR_TRACK_COLOR = new Color(0.16, 0.2, 0.29, 1);
+	const BAR_COLORS = {
+		Energy: new Color(0.239, 0.863, 0.518, 1),
+		Quest: new Color(0.2, 0.82, 1, 1),
+		SeasonPass: new Color(1, 0.702, 0.278, 1),
+		Storage: new Color(0.357, 0.424, 1, 1),
+	};
+
+	//==============================================================================
+	// UI 쇼케이스 씬.
+	// - UIEditor 형식의 uiasset 여섯 벌을 읽어 화면을 조립한다.
+	//   home / shop / settings 는 서로 바꿔 보이는 화면, navigation 은 항상 보이는 아래 막대,
+	//   popup 과 toast 는 필요할 때 위에 띄운다.
+	// - 문서에는 배치만 있고 동작은 이름으로 노드를 찾아 여기에서 붙인다.
+	//==============================================================================
+	class ShowcaseScene extends Scene {
+		//==============================================================================
+		// 멤버 변수 목록.
+		//==============================================================================
+		/** @private @type { TouchRecognizer | null } */ #touchRecognizer;
+		/** @private @type { System.Map } */ #screenRootMap;
+		/** @private @type { WorldNode | null } */ #navigationRootNode;
+		/** @private @type { WorldNode | null } */ #popupRootNode;
+		/** @private @type { WorldNode | null } */ #toastRootNode;
+		/** @private @type { string } */ #activeScreenName;
+		/** @private @type { number } */ #coinCount;
+		/** @private @type { Function | null } */ #popupConfirmHandler;
+		/** @private @type { string[] } */ #toastQueue;
+		/** @private @type { number } */ #toastRemainSeconds;
+		/** @private @type { boolean } */ #isToastShowing;
+		/** @private @type { number } */ #elapsedSeconds;
+
+		//==============================================================================
+		// 생성.
+		//==============================================================================
+		constructor() {
+			super();
+
+			this.#touchRecognizer = null;
+			this.#screenRootMap = new System.Map();
+			this.#navigationRootNode = null;
+			this.#popupRootNode = null;
+			this.#toastRootNode = null;
+			this.#activeScreenName = "home";
+			this.#coinCount = 12480;
+			this.#popupConfirmHandler = null;
+			this.#toastQueue = [];
+			this.#toastRemainSeconds = 0;
+			this.#isToastShowing = false;
+			this.#elapsedSeconds = 0;
+		}
+
+		//==============================================================================
+		// 씬 구성.
+		//==============================================================================
+		create() {
+			super.create();
+
+			const root = this.getRoot();
+			root.setPivot(Pivot.topLeft.clone());
+			root.setAnchor(Pivot.topLeft.clone());
+			this.#touchRecognizer = new TouchRecognizer();
+			this.#touchRecognizer.setRootNode(root);
+		}
+
+		//==============================================================================
+		// 비동기 로드. (여섯 문서를 한꺼번에 읽는다)
+		//==============================================================================
+		/**
+		 * @param { Engine } engine
+		 */
+		async load(engine) {
+			// 기준 해상도(960x640)를 비율 그대로 창 안에 맞춘다.
+			const viewManager = engine.getViewManager();
+			viewManager.setViewScaleMode(ViewScaleMode.stretchShort);
+
+			const documentMap = new System.Map();
+			const fetchPromises = ASSET_FILE_NAMES.map(async (fileName) => {
+				const response = await System.fetch("./assets/" + fileName + ".uiasset.json", { cache: "no-cache" });
+				const jsonText = await response.text();
+				documentMap.set(fileName, UIDocument.fromJsonText(jsonText));
+			});
+			await System.Promise.all(fetchPromises);
+
+			const root = this.getRoot();
+			for (const screenName of SCREEN_NAMES) {
+				const screenRootNode = documentMap.get(screenName);
+				this.#screenRootMap.set(screenName, screenRootNode);
+				root.addChild(screenRootNode);
+				screenRootNode.setActive(screenName === this.#activeScreenName);
+			}
+			this.#navigationRootNode = documentMap.get("navigation");
+			root.addChild(this.#navigationRootNode);
+
+			this.#popupRootNode = documentMap.get("popup");
+			this.#popupRootNode.setActive(false);
+			root.addChild(this.#popupRootNode);
+
+			this.#toastRootNode = documentMap.get("toast");
+			this.#toastRootNode.setActive(false);
+			root.addChild(this.#toastRootNode);
+
+			this.bindHome();
+			this.bindShop();
+			this.bindSettings();
+			this.bindNavigation();
+			this.bindPopup();
+			this.applyHeadingStyles();
+		}
+
+		//==============================================================================
+		// 홈 화면 동작.
+		//==============================================================================
+		bindHome() {
+			const homeRootNode = this.#screenRootMap.get("home");
+			for (let cardIndex = 0; cardIndex < 6; ++cardIndex) {
+				const titleLabel = this.findLabel(homeRootNode, "CardTitle" + cardIndex);
+				const cardTitle = titleLabel ? titleLabel.getText() : ("Card " + cardIndex);
+				this.bindButton(homeRootNode, "OpenButton" + cardIndex, () => {
+					this.openPopup("Open " + cardTitle + "?", "It will use 10 energy. Rewards are doubled today.", () => {
+						this.showToast(cardTitle + " opened.  −10 energy");
+					});
+				});
+			}
+			this.bindButton(homeRootNode, "ClaimButton", () => {
+				this.#coinCount += 250;
+				this.refreshCoinChips();
+				this.showToast("Daily reward claimed.  +250 ◆");
+			});
+			this.styleProgressBar(homeRootNode, "DailyEnergyBar", BAR_COLORS.Energy);
+			this.styleProgressBar(homeRootNode, "DailyQuestBar", BAR_COLORS.Quest);
+			this.styleProgressBar(homeRootNode, "DailySeasonPassBar", BAR_COLORS.SeasonPass);
+		}
+
+		//==============================================================================
+		// 상점 화면 동작.
+		//==============================================================================
+		bindShop() {
+			const shopRootNode = this.#screenRootMap.get("shop");
+			for (let featuredIndex = 0; featuredIndex < 6; ++featuredIndex) {
+				const featuredTitle = this.findLabel(shopRootNode, "FeaturedTitle" + featuredIndex);
+				const titleText = featuredTitle ? featuredTitle.getText() : "Featured";
+				this.bindButton(shopRootNode, "FeaturedBuy" + featuredIndex, () => {
+					this.openPopup("Buy " + titleText + "?", "This offer disappears when the timer runs out.", () => {
+						this.showToast(titleText + " purchased.");
+					});
+				});
+			}
+			const itemPrices = [120, 150, 300, 420, 380, 999];
+			for (let itemIndex = 0; itemIndex < itemPrices.length; ++itemIndex) {
+				const itemTitle = this.findLabel(shopRootNode, "ItemTitle" + itemIndex);
+				const titleText = itemTitle ? itemTitle.getText() : "Item";
+				const price = itemPrices[itemIndex];
+				this.bindButton(shopRootNode, "BuyButton" + itemIndex, () => {
+					if (this.#coinCount < price) {
+						this.openPopup("Not enough coins", "You need ◆ " + price + " but have ◆ " + this.formatNumber(this.#coinCount) + ".", null);
+						return;
+					}
+					this.#coinCount -= price;
+					this.refreshCoinChips();
+					this.showToast(titleText + " purchased.  −" + price + " ◆");
+				});
+			}
+		}
+
+		//==============================================================================
+		// 설정 화면 동작.
+		//==============================================================================
+		bindSettings() {
+			const settingsRootNode = this.#screenRootMap.get("settings");
+			for (const rowName of ["Music", "Sound"]) {
+				const sliderNode = this.findNodeByName(settingsRootNode, rowName + "Slider");
+				const captionLabel = this.findLabel(settingsRootNode, rowName + "Caption");
+				if (!sliderNode) {
+					continue;
+				}
+				const sliderComponents = sliderNode.getComponents(UISlider);
+				if (sliderComponents.length === 0) {
+					continue;
+				}
+				const sliderComponent = sliderComponents[0];
+				sliderComponent.setThumbColor(new Color(1, 1, 1, 1));
+				sliderComponent.setValueChangedEvent((value) => {
+					if (captionLabel) {
+						captionLabel.setText(System.Math.round(value * 100) + "%");
+					}
+				});
+			}
+			for (const rowName of ["Vibration", "Notifications"]) {
+				const toggleNode = this.findNodeByName(settingsRootNode, rowName + "Toggle");
+				if (!toggleNode) {
+					continue;
+				}
+				const toggleComponents = toggleNode.getComponents(UIToggleButton);
+				const paintComponents = toggleNode.getComponents(Paint);
+				const labelComponents = toggleNode.getComponents(UILabel);
+				if (toggleComponents.length === 0) {
+					continue;
+				}
+				const toggleComponent = toggleComponents[0];
+				const isInitiallyOn = (rowName === "Vibration");
+				toggleComponent.setIsOn(isInitiallyOn);
+				toggleComponent.setToggledEvent((isOn) => {
+					if (paintComponents.length > 0) {
+						paintComponents[0].setColor(isOn ? BAR_COLORS.Energy : new Color(0.227, 0.271, 0.376, 1));
+					}
+					if (labelComponents.length > 0) {
+						labelComponents[0].setText(isOn ? "ON" : "OFF");
+					}
+					this.showToast(rowName + (isOn ? " enabled." : " disabled."));
+				});
+			}
+			this.styleProgressBar(settingsRootNode, "StorageBar", BAR_COLORS.Storage);
+			this.bindButton(settingsRootNode, "ResetButton", () => {
+				this.openPopup("Reset settings?", "All preferences go back to their defaults.", () => {
+					this.showToast("Settings restored.");
+				});
+			});
+		}
+
+		//==============================================================================
+		// 아래 탐색 막대 동작.
+		//==============================================================================
+		bindNavigation() {
+			const navigationRootNode = this.#navigationRootNode;
+			const navigationTargets = [
+				{ buttonName: "NavHOME", screenName: "home" },
+				{ buttonName: "NavSHOP", screenName: "shop" },
+				{ buttonName: "NavSETTINGS", screenName: "settings" },
+			];
+			for (const target of navigationTargets) {
+				this.bindButton(navigationRootNode, target.buttonName, () => {
+					this.switchScreen(target.screenName);
+				});
+			}
+
+			// 강조 자식은 단추의 눌림 색 처리에서 뺀다. (단추가 색을 되돌리며 강조를 지우지 않도록)
+			for (const title of ["HOME", "SHOP", "SETTINGS", "PROFILE"]) {
+				const buttonNode = this.findNodeByName(navigationRootNode, "Nav" + title);
+				const highlightNode = this.findNodeByName(navigationRootNode, "NavActive" + title);
+				if (!buttonNode || !highlightNode) {
+					continue;
+				}
+				const buttonComponents = buttonNode.getComponents(UIButton);
+				if (buttonComponents.length > 0) {
+					buttonComponents[0].excludeNodeFromTint(highlightNode);
+				}
+			}
+			this.bindButton(navigationRootNode, "NavPROFILE", () => {
+				this.showToast("Profile is coming soon.");
+			});
+		}
+
+		//==============================================================================
+		// 팝업 동작. (막을 누르거나 취소하면 닫고, 확인이면 등록한 처리를 부른다)
+		//==============================================================================
+		bindPopup() {
+			const popupRootNode = this.#popupRootNode;
+			this.bindButton(popupRootNode, "Overlay", () => {
+				this.closePopup();
+			});
+			this.bindButton(popupRootNode, "CancelButton", () => {
+				this.closePopup();
+			});
+			this.bindButton(popupRootNode, "ConfirmButton", () => {
+				const confirmHandler = this.#popupConfirmHandler;
+				this.closePopup();
+				if (confirmHandler) {
+					confirmHandler();
+				}
+			});
+		}
+
+		//==============================================================================
+		// 제목 글자는 굵게. (문서에는 굵기가 없으므로 코드에서 준다)
+		//==============================================================================
+		applyHeadingStyles() {
+			for (const screenRootNode of this.#screenRootMap.values()) {
+				const titleLabel = this.findLabel(screenRootNode, "Title");
+				if (titleLabel) {
+					titleLabel.setBold(true);
+				}
+				for (let cardIndex = 0; cardIndex < 6; ++cardIndex) {
+					const cardTitle = this.findLabel(screenRootNode, "CardTitle" + cardIndex);
+					if (cardTitle) {
+						cardTitle.setBold(true);
+					}
+					const featuredTitle = this.findLabel(screenRootNode, "FeaturedTitle" + cardIndex);
+					if (featuredTitle) {
+						featuredTitle.setBold(true);
+					}
+					const iconGlyph = this.findLabel(screenRootNode, "IconGlyph" + cardIndex);
+					if (iconGlyph) {
+						iconGlyph.setBold(true);
+					}
+				}
+			}
+			const dialogTitle = this.findLabel(this.#popupRootNode, "DialogTitle");
+			if (dialogTitle) {
+				dialogTitle.setBold(true);
+			}
+		}
+
+		//==============================================================================
+		// 화면 전환. (새 화면을 살짝 아래에서 떠오르며 밝힌다)
+		//==============================================================================
+		/**
+		 * @param { string } screenName
+		 */
+		switchScreen(screenName) {
+			if (screenName === this.#activeScreenName) {
+				return;
+			}
+			const previousRootNode = this.#screenRootMap.get(this.#activeScreenName);
+			const nextRootNode = this.#screenRootMap.get(screenName);
+			this.#activeScreenName = screenName;
+			previousRootNode.setActive(false);
+			nextRootNode.setActive(true);
+			nextRootNode.setLocalOpacity(0);
+			nextRootNode.setLocalPosition(Vector2.create(0, 18));
+
+			const tween = new Tween({ progress: 0 })
+				.to({ progress: 1 }, 0.28)
+				.easing(Tween.easingFunction.quadratic.out)
+				.setUpdate((values) => {
+					nextRootNode.setLocalOpacity(values.progress);
+					nextRootNode.setLocalPosition(Vector2.create(0, 18 * (1 - values.progress)));
+				})
+				.setComplete(() => {
+					nextRootNode.setLocalOpacity(1);
+					nextRootNode.setLocalPosition(Vector2.create(0, 0));
+				});
+			this.startTween(tween);
+
+			const navigationNames = { home: "NavActiveHOME", shop: "NavActiveSHOP", settings: "NavActiveSETTINGS" };
+			for (const key of System.Object.keys(navigationNames)) {
+				const highlightNode = this.findNodeByName(this.#navigationRootNode, navigationNames[key]);
+				if (highlightNode) {
+					highlightNode.setActive(key === screenName);
+				}
+			}
+		}
+
+		//==============================================================================
+		// 팝업 열기. (막은 서서히, 대화 상자는 살짝 커지며 튀어 나온다)
+		//==============================================================================
+		/**
+		 * @param { string } titleText
+		 * @param { string } messageText
+		 * @param { Function | null } confirmHandler
+		 */
+		openPopup(titleText, messageText, confirmHandler) {
+			const popupRootNode = this.#popupRootNode;
+			const dialogNode = this.findNodeByName(popupRootNode, "Dialog");
+			const cancelNode = this.findNodeByName(popupRootNode, "CancelButton");
+			const confirmNode = this.findNodeByName(popupRootNode, "ConfirmButton");
+			const titleLabel = this.findLabel(popupRootNode, "DialogTitle");
+			const messageLabel = this.findLabel(popupRootNode, "DialogMessage");
+			if (titleLabel) {
+				titleLabel.setText(titleText);
+			}
+			if (messageLabel) {
+				messageLabel.setText(messageText);
+			}
+			this.#popupConfirmHandler = confirmHandler;
+
+			// 확인만 있는 알림이면 취소를 감추고 확인을 가운데로 넓힌다.
+			const hasConfirm = (confirmHandler !== null);
+			if (cancelNode && confirmNode) {
+				cancelNode.setActive(hasConfirm);
+				confirmNode.setLocalPosition(hasConfirm ? Vector2.create(218, 168) : Vector2.create(28, 168));
+				confirmNode.setContentSize(hasConfirm ? Vector2.create(174, 52) : Vector2.create(364, 52));
+				const confirmLabel = this.findLabel(confirmNode, "ConfirmButton");
+				if (confirmLabel) {
+					confirmLabel.setText(hasConfirm ? "CONFIRM" : "OK");
+				}
+			}
+
+			popupRootNode.setActive(true);
+			popupRootNode.setLocalOpacity(0);
+			if (dialogNode) {
+				dialogNode.setScale(Vector2.one().multiply(0.86));
+			}
+			const tween = new Tween({ progress: 0 })
+				.to({ progress: 1 }, 0.26)
+				.easing(Tween.easingFunction.back.out)
+				.setUpdate((values) => {
+					popupRootNode.setLocalOpacity(System.Math.min(1, values.progress));
+					if (dialogNode) {
+						dialogNode.setScale(Vector2.one().multiply(0.86 + 0.14 * values.progress));
+					}
+				})
+				.setComplete(() => {
+					popupRootNode.setLocalOpacity(1);
+					if (dialogNode) {
+						dialogNode.setScale(Vector2.one());
+					}
+				});
+			this.startTween(tween);
+		}
+
+		//==============================================================================
+		// 팝업 닫기.
+		//==============================================================================
+		closePopup() {
+			const popupRootNode = this.#popupRootNode;
+			if (!popupRootNode.isActive()) {
+				return;
+			}
+			this.#popupConfirmHandler = null;
+			const tween = new Tween({ progress: 1 })
+				.to({ progress: 0 }, 0.16)
+				.easing(Tween.easingFunction.quadratic.out)
+				.setUpdate((values) => {
+					popupRootNode.setLocalOpacity(values.progress);
+				})
+				.setComplete(() => {
+					popupRootNode.setActive(false);
+				});
+			this.startTween(tween);
+		}
+
+		//==============================================================================
+		// 토스트. (줄을 세워 하나씩 아래에서 떠오르고, 잠시 머문 뒤 사라진다)
+		//==============================================================================
+		/**
+		 * @param { string } messageText
+		 */
+		showToast(messageText) {
+			this.#toastQueue.push(messageText);
+			if (!this.#isToastShowing) {
+				this.presentNextToast();
+			}
+		}
+
+		presentNextToast() {
+			if (this.#toastQueue.length === 0) {
+				this.#isToastShowing = false;
+				return;
+			}
+			this.#isToastShowing = true;
+			const messageText = this.#toastQueue.shift();
+			const toastRootNode = this.#toastRootNode;
+			const toastLabel = this.findLabel(toastRootNode, "ToastLabel");
+			if (toastLabel) {
+				toastLabel.setText(messageText);
+			}
+			toastRootNode.setActive(true);
+			toastRootNode.setLocalOpacity(0);
+			const tween = new Tween({ progress: 0 })
+				.to({ progress: 1 }, 0.24)
+				.easing(Tween.easingFunction.quadratic.out)
+				.setUpdate((values) => {
+					toastRootNode.setLocalOpacity(values.progress);
+					toastRootNode.setLocalPosition(Vector2.create(480, TOAST_REST_Y + 28 * (1 - values.progress)));
+				})
+				.setComplete(() => {
+					this.#toastRemainSeconds = TOAST_HOLD_SECONDS;
+				});
+			this.startTween(tween);
+		}
+
+		dismissToast() {
+			const toastRootNode = this.#toastRootNode;
+			const tween = new Tween({ progress: 1 })
+				.to({ progress: 0 }, 0.2)
+				.easing(Tween.easingFunction.quadratic.out)
+				.setUpdate((values) => {
+					toastRootNode.setLocalOpacity(values.progress);
+				})
+				.setComplete(() => {
+					toastRootNode.setActive(false);
+					this.presentNextToast();
+				});
+			this.startTween(tween);
+		}
+
+		//==============================================================================
+		// 갱신. (토스트 머무는 시간 / 헤더 칩 반짝임)
+		//==============================================================================
+		/**
+		 * @param { number } deltaTime
+		 */
+		tick(deltaTime) {
+			super.tick(deltaTime);
+
+			this.#elapsedSeconds += deltaTime;
+			if (this.#toastRemainSeconds > 0) {
+				this.#toastRemainSeconds -= deltaTime;
+				if (this.#toastRemainSeconds <= 0) {
+					this.#toastRemainSeconds = 0;
+					this.dismissToast();
+				}
+			}
+		}
+
+		//==============================================================================
+		// 출력 전 처리. (뷰 좌표계 적용 + 배경 채움)
+		//==============================================================================
+		/**
+		 * @param { Graphic } graphic
+		 */
+		preDraw(graphic) {
+			super.preDraw(graphic);
+
+			const engine = this.getEngine();
+			const viewManager = engine.getViewManager();
+			const canvasNativeSize = viewManager.getCanvasNativeSize();
+
+			viewManager.applyCanvasNativeRect(graphic);
+			graphic.setFillColor("rgb(15, 19, 32)");
+			graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+
+			viewManager.applyViewRect(graphic);
+		}
+
+		//==============================================================================
+		// 터치 전달. (TouchRecognizer 로 위젯에 넘긴다)
+		//==============================================================================
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 */
+		touchPress(viewInputPosition) {
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchPress(viewInputPosition);
+			}
+		}
+
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 */
+		touchMove(viewInputPosition) {
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchMove(viewInputPosition);
+			}
+		}
+
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 */
+		touchRelease(viewInputPosition) {
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchRelease(viewInputPosition);
+			}
+		}
+
+		//==============================================================================
+		// 보조: 이름으로 단추를 찾아 눌림 처리를 붙인다.
+		//==============================================================================
+		/**
+		 * @param { WorldNode } rootNode
+		 * @param { string } nodeName
+		 * @param { Function } clickHandler
+		 */
+		bindButton(rootNode, nodeName, clickHandler) {
+			const buttonNode = this.findNodeByName(rootNode, nodeName);
+			if (!buttonNode) {
+				return;
+			}
+			const buttonComponents = buttonNode.getComponents(UIButton);
+			if (buttonComponents.length === 0) {
+				return;
+			}
+			buttonComponents[0].setClickedEvent(clickHandler);
+		}
+
+		//==============================================================================
+		// 보조: 이름으로 라벨 컴포넌트를 찾는다.
+		//==============================================================================
+		/**
+		 * @param { WorldNode } rootNode
+		 * @param { string } nodeName
+		 * @returns { UILabel | null }
+		 */
+		findLabel(rootNode, nodeName) {
+			const labelNode = this.findNodeByName(rootNode, nodeName);
+			if (!labelNode) {
+				return null;
+			}
+			const labelComponents = labelNode.getComponents(UILabel);
+			return (labelComponents.length > 0) ? labelComponents[0] : null;
+		}
+
+		//==============================================================================
+		// 보조: 진행바 색을 맞춘다.
+		//==============================================================================
+		/**
+		 * @param { WorldNode } rootNode
+		 * @param { string } nodeName
+		 * @param { Color } fillColor
+		 */
+		styleProgressBar(rootNode, nodeName, fillColor) {
+			const barNode = this.findNodeByName(rootNode, nodeName);
+			if (!barNode) {
+				return;
+			}
+			const progressComponents = barNode.getComponents(UIProgressView);
+			if (progressComponents.length === 0) {
+				return;
+			}
+			const progressComponent = progressComponents[0];
+			progressComponent.setTrackColor(BAR_TRACK_COLOR);
+			progressComponent.setFillColor(fillColor);
+			progressComponent.setCornerRadius(6);
+		}
+
+		//==============================================================================
+		// 보조: 코인 칩 갱신. (홈과 상점 두 화면에 있다)
+		//==============================================================================
+		refreshCoinChips() {
+			for (const screenRootNode of this.#screenRootMap.values()) {
+				const chipLabel = this.findLabel(screenRootNode, "CoinChipLabel");
+				if (chipLabel) {
+					chipLabel.setText("◆ " + this.formatNumber(this.#coinCount));
+				}
+			}
+		}
+
+		/**
+		 * @param { number } value
+		 * @returns { string }
+		 */
+		formatNumber(value) {
+			return value.toLocaleString("en-US");
+		}
+
+		//==============================================================================
+		// 보조: 이름으로 노드 검색. (재귀 — 위젯 content 안쪽까지 훑는다)
+		//==============================================================================
+		/**
+		 * @param { WorldNode } node
+		 * @param { string } targetName
+		 * @returns { WorldNode | null }
+		 */
+		findNodeByName(node, targetName) {
+			if (node.getName() === targetName) {
+				return node;
+			}
+			const childNodeList = node.getChildren();
+			for (const childNode of childNodeList) {
+				const foundNode = this.findNodeByName(childNode, targetName);
+				if (foundNode) {
+					return foundNode;
+				}
+			}
+			return null;
+		}
+	}
+
+	//==============================================================================
+	// 엔진 실행.
+	//==============================================================================
+	const engineConfiguration = new EngineConfiguration();
+	engineConfiguration.referenceResolutionSize = Vector2.create(960, 640);
+	engineConfiguration.canvasId = "mainCanvas";
+	engineConfiguration.autoResizeOnWindowResize = true;
+	const engine = new Engine(engineConfiguration);
+	engine.run(new ShowcaseScene());
+	System.showcaseEngine = engine;
+</script>
+</body>
+</html>

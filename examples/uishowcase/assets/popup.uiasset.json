@@ -1,0 +1,397 @@
+{
+	"version": 1,
+	"root": {
+		"type": "WorldNode",
+		"name": "Popup",
+		"active": true,
+		"position": [
+			0,
+			0
+		],
+		"scale": [
+			1,
+			1
+		],
+		"rotation": 0,
+		"opacity": 1,
+		"pivot": [
+			0,
+			0
+		],
+		"anchor": [
+			0,
+			0
+		],
+		"contentSize": [
+			960,
+			640
+		],
+		"interactable": false,
+		"components": [],
+		"children": [
+			{
+				"type": "WorldNode",
+				"name": "Overlay",
+				"active": true,
+				"position": [
+					0,
+					0
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					960,
+					640
+				],
+				"interactable": true,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.02,
+							0.027,
+							0.047,
+							0.62
+						],
+						"roundSize": 0
+					},
+					{
+						"type": "UIButton",
+						"pressedTintColor": [
+							0,
+							0,
+							0,
+							0
+						]
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "Dialog",
+				"active": true,
+				"position": [
+					480,
+					310
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0.5,
+					0.5
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					420,
+					250
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.133,
+							0.2,
+							1
+						],
+						"roundSize": 20
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "DialogAccent",
+						"active": true,
+						"position": [
+							0,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							420,
+							6
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.357,
+									0.424,
+									1,
+									1
+								],
+								"roundSize": 3
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "DialogTitle",
+						"active": true,
+						"position": [
+							28,
+							30
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							364,
+							32
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Open this content?",
+								"fontSize": 22,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "DialogMessage",
+						"active": true,
+						"position": [
+							28,
+							74
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							364,
+							60
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "It will use 10 energy.",
+								"fontSize": 15,
+								"textColor": [
+									0.541,
+									0.58,
+									0.659,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CancelButton",
+						"active": true,
+						"position": [
+							28,
+							168
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							174,
+							52
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.137,
+									0.173,
+									0.259,
+									1
+								],
+								"roundSize": 14
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.28
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "CANCEL",
+								"fontSize": 15,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ConfirmButton",
+						"active": true,
+						"position": [
+							218,
+							168
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							174,
+							52
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.357,
+									0.424,
+									1,
+									1
+								],
+								"roundSize": 14
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.28
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "CONFIRM",
+								"fontSize": 15,
+								"textColor": [
+									0.949,
+									0.961,
+									0.98,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					}
+				]
+			}
+		]
+	}
+}

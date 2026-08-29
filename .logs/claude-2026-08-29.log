@@ -212,3 +212,24 @@
 - 아이콘: 18px, 굵은 선(1.5~2.0) 으로 다시 그렸다. 색은 #85b6ea, 고른 줄에서는 흰색.
 - 뷰 머리말에 배율 표시(누르면 전체 보기), 격자 토글, 편집/결과 전환 아이콘을 넣었다.
 - 인스펙터 라벨 폭 104px. 컴포넌트 묶음 머리말 30px.
+
+## UI 쇼케이스 샘플 추가 및 배포
+[20:0x 요청 → 20:4x 응답]
+- examples/uishowcase: uiasset 여섯 벌(home / shop / settings / navigation / popup / toast)을 읽어 화면을 조립하는 샘플.
+  · generate.mjs 가 UIEditor 저장 형식 그대로 애셋을 만든다. (스크롤뷰 항목은 contentChildren)
+  · 홈: 헤더 + 세로 스크롤 카드 6장 + 일일 패널(진행바 3개, CLAIM 단추)
+  · 상점: 가로 스크롤 추천 띠 + 3x2 상품 격자(구매 단추, 코인 부족 시 확인 전용 팝업)
+  · 설정: 슬라이더 2 / 토글 2 / 진행바 1 / 초기화 단추
+  · 팝업: 막(누르면 닫힘) + 대화 상자(back.out 으로 커지며 등장), 확인 전용 모드 지원
+  · 토스트: 줄을 세워 아래에서 떠올라 1.8초 머물고 사라짐
+  · 화면 전환은 아래 탐색 막대, 새 화면이 살짝 떠오르며 밝아진다.
+- 부딪힌 것
+  · create() 에서 getEngine() 이 아직 없어 뷰 스케일 모드 설정은 load(engine) 으로 옮겼다. stretchShort 로 비율 유지 맞춤.
+  · 탐색 강조를 단추의 Paint 색으로 바꾸면 UIButton 이 눌림 색을 되돌리며 지워 버린다.
+    (UIButton 은 자손 Paint 까지 originalColor 를 잡아 두고 매 틱 다시 칠한다)
+    → 강조를 별도 자식 노드로 두고 excludeNodeFromTint 로 제외, setActive 로 켜고 끈다.
+  · 토스트가 설정 화면 RESET 단추를 덮어 줄 간격을 60 으로 줄이고 패널을 424 로 낮췄다.
+- 검증(헤드리스 Chrome + CDP, 문서 좌표 → 뷰 사각형 환산): 카드 OPEN → 팝업 열림, CONFIRM → 토스트, 목록 끌어 스크롤,
+  SHOP 전환(활성 화면 Shop,Navigation), SETTINGS 전환 + 토글, 콘솔 오류 없음.
+- 배포: \DS216PLUSII\web\ddukbaek2\portfolio\uishowcase (index.html / favicon.svg / vanilla.js / assets 6개), 라이브 200 확인.
+- README 에 링크 추가.
