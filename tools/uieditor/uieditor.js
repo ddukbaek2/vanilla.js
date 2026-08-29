@@ -146,38 +146,39 @@ const LIGHT_VANILLA_COLOR = "#f3e5ab";
 const DARK_VANILLA_COLOR = "#d1bea8";
 const CREAM_COLOR = "#fcf5d8";
 const DEEP_GOLD_COLOR = "#d4be6b";
-const DEEP_BROWN_COLOR = "#3b3524";
+const INK_COLOR = "#332f26";
 
 const SELECTION_COLOR = "#8b6914";
 const SNAP_GUIDE_COLOR = "rgba(139, 105, 20, 0.9)";
-const HOVER_COLOR = "#dccbb4";
-const MENU_HOVER_COLOR = "#e6d8bf";
-const SELECTED_ROW_TEXT_COLOR = DEEP_BROWN_COLOR;
-const CANVAS_BACKGROUND_COLOR = "#b8a58a";
-const PREVIEW_LETTERBOX_COLOR = "#8a7a63";
-const DOCUMENT_BACKGROUND_COLOR = "#fcf5d8";
+const HOVER_COLOR = CREAM_COLOR;
+const MENU_HOVER_COLOR = CREAM_COLOR;
+const SELECTED_ROW_TEXT_COLOR = INK_COLOR;
+const CANVAS_BACKGROUND_COLOR = DARK_VANILLA_COLOR;
+const PREVIEW_LETTERBOX_COLOR = DARK_VANILLA_COLOR;
 const PIVOT_COLOR = "#0091b8";
-const PIVOT_SHADOW_COLOR = "#f7f0da";
+const PIVOT_SHADOW_COLOR = "#ffffff";
 const PIVOT_MARK_SIZE = 9;
 const ANCHOR_COLOR = "#1f8f24";
 const ANCHOR_MARK_SIZE = 6;
-const GRID_MINOR_COLOR = "rgba(90, 74, 34, 0.12)";
-const GRID_MAJOR_COLOR = "rgba(90, 74, 34, 0.26)";
+const GRID_MINOR_COLOR = "rgba(74, 63, 42, 0.14)";
+const GRID_MAJOR_COLOR = "rgba(74, 63, 42, 0.28)";
 
-// 편집기 색 테마. 바탕 표면을 Dark Vanilla 로 깔고 Vanilla 를 강조에 쓴다.
-//   Light Vanilla #F3E5AB (강조) / Dark Vanilla #D1BEA8 (바탕) / 크림 #FCF5D8 / 짙은 금색 #D4BE6B
+// 편집기 색 테마. 색상표의 바닐라 색을 그대로 쓴다.
+//   제목 / 메뉴 영역 : Dark Vanilla #D1BEA8
+//   내용 영역        : Vanilla #F3E5AB
+//   입력칸           : 흰색
 const VANILLA_THEME_COLORS = {
-	background: "#c4b096",
-	panel: DARK_VANILLA_COLOR,
-	toolbar: "#c9b599",
-	border: "#a89579",
-	text: DEEP_BROWN_COLOR,
-	textDim: "#6f6349",
-	accent: LIGHT_VANILLA_COLOR,
+	background: DARK_VANILLA_COLOR,
+	panel: LIGHT_VANILLA_COLOR,
+	toolbar: DARK_VANILLA_COLOR,
+	border: DARK_VANILLA_COLOR,
+	text: INK_COLOR,
+	textDim: "#6b6455",
+	accent: DEEP_GOLD_COLOR,
 	accentHover: CREAM_COLOR,
-	inputBg: "#ece0c8",
-	resizer: "#b9a689",
-	resizerHover: "#8b6914",
+	inputBg: "#ffffff",
+	resizer: DARK_VANILLA_COLOR,
+	resizerHover: DEEP_GOLD_COLOR,
 };
 
 // 크기 조절 손잡이 8방향.
@@ -455,7 +456,7 @@ export class UIEditor {
 		rootNode.setAnchor(Pivot.topLeft.clone());
 		rootNode.setContentSize(Vector2.create(DEFAULT_DOCUMENT_WIDTH, DEFAULT_DOCUMENT_HEIGHT));
 		const backgroundPaint = rootNode.addComponent(Paint);
-		backgroundPaint.setColor(new Color(0.988, 0.961, 0.847, 1));
+		backgroundPaint.setColor(new Color(1, 1, 1, 1));
 		this.#documentRootNode = rootNode;
 		this.#selectedNode = null;
 	}
@@ -1982,7 +1983,7 @@ export class UIEditor {
 			newNode.setContentSize(Vector2.create(320, 220));
 			newNode.setInteractable(true);
 			const paint = newNode.addComponent(Paint);
-			paint.setColor(new Color(0.949, 0.918, 0.800, 1));
+			paint.setColor(new Color(0.988, 0.961, 0.847, 1));
 			paint.setRoundSize(4);
 			const scrollView = newNode.addComponent(UIScrollView);
 			scrollView.setScrollContentSize(Vector2.create(320, 660));
@@ -2004,7 +2005,7 @@ export class UIEditor {
 			newNode.setName("Divider" + this.#nodeSerialNumber);
 			newNode.setContentSize(Vector2.create(260, 1));
 			const paint = newNode.addComponent(Paint);
-			paint.setColor(new Color(0.788, 0.706, 0.549, 1));
+			paint.setColor(new Color(0.820, 0.745, 0.659, 1));
 		}
 		else if (widgetKind === "richText") {
 			newNode.setName("RichText" + this.#nodeSerialNumber);
@@ -2017,7 +2018,7 @@ export class UIEditor {
 			newNode.setName("Image" + this.#nodeSerialNumber);
 			newNode.setContentSize(Vector2.create(160, 160));
 			const paint = newNode.addComponent(Paint);
-			paint.setColor(new Color(0.902, 0.855, 0.694, 1));
+			paint.setColor(new Color(0.953, 0.898, 0.671, 1));
 			newNode.addComponent(UIImageView);
 		}
 		else if (widgetKind === "toggleButton") {
@@ -2043,7 +2044,7 @@ export class UIEditor {
 			newNode.setContentSize(Vector2.create(320, 220));
 			newNode.setInteractable(true);
 			const paint = newNode.addComponent(Paint);
-			paint.setColor(new Color(0.949, 0.918, 0.800, 1));
+			paint.setColor(new Color(0.988, 0.961, 0.847, 1));
 			paint.setRoundSize(4);
 			const snapScrollView = newNode.addComponent(UISnapScrollView);
 			snapScrollView.setScrollContentSize(Vector2.create(960, 220));
@@ -2066,7 +2067,7 @@ export class UIEditor {
 			newNode.setName("Panel" + this.#nodeSerialNumber);
 			newNode.setContentSize(Vector2.create(220, 140));
 			const paint = newNode.addComponent(Paint);
-			paint.setColor(new Color(0.902, 0.855, 0.694, 1));
+			paint.setColor(new Color(0.953, 0.898, 0.671, 1));
 			paint.setRoundSize(4);
 		}
 
