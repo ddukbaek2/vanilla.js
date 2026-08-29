@@ -25,6 +25,9 @@ export const PaneTheme = {
         resizer: "#333",
         resizerHover: "#007acc"
     },
+    size: {
+        resizer: 5
+    },
     font: {
         family: "sans-serif",
         mono: "\"Consolas\", monospace",
@@ -255,7 +258,7 @@ export class Pane {
             if (!prev.getResizableEdges().bottom || !next.getResizableEdges().top) canResize = false;
         }
 
-        const thickness = canResize ? 5 : 1;
+        const thickness = canResize ? PaneTheme.size.resizer : 1;
 
         if (this.#direction === "horizontal") {
             resizer.style.width = `${thickness}px`;

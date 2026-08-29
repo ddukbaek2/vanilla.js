@@ -1,0 +1,150 @@
+# 2026-08-19 작업 로그 (Claude)
+
+## Mixamo Remy.fbx 애니메이션 반영 방법 안내 [02:04 요청 → 02:04 응답]
+- 요청: examples/ancientmountain/assets/Remy.fbx 를 받아뒀는데 애니메이션을 fbx 에 어떻게 반영하는지 질문.
+- 답변: 엔진의 SkinnedModel 은 GLB(바이너리 glTF) 전용 로더라 FBX 를 직접 읽지 못함.
+  Mixamo 에서 애니메이션별 FBX(Without Skin) 다운로드 → Blender 에서 캐릭터 FBX 와 병합,
+  액션 이름 지정 후 glTF 2.0(.glb) 로 내보내 soldier.glb 와 동일하게 로드하는 파이프라인 안내.
+- 비고: 스키닝 셰이더의 jointMatrices[64] 제한 관련, Mixamo 풀 스켈레톤(손가락 포함)이 64 조인트를
+  초과할 수 있어 상수 확대 또는 본 정리가 필요할 수 있음을 함께 안내. 코드 수정은 없음.
+
+## Mixamo 자동화 파이프라인 구축 1단계: FBX → GLB 변환 + 렌더링 검증 [02:07 요청 → 02:31 응답]
+- 요청: FBX 렌더링은 알아서 해결하고, Mixamo 에서 모델/애니메이션을 자동으로 가져다 쓰는 것이 목표.
+- 변환 파이프라인: Blender 5.1 헤드리스 스크립트(스크래치패드 convert_fbx_to_glb.py) 구축.
+  캐릭터 FBX + 애니메이션 FBX 목록 → 액션 병합/이름 지정 → GLB(ACTIONS 모드) 익스포트.
+  베이스 컬러 외 텍스처 노드 제거(21장→5장, 34.5MB→10MB), 미가중 본 디폼 해제(HeadTop_End 제거, 67→66 조인트).
+- 엔진 수정 (src/experimental/graphics/skinnedmodel.js):
+  1) jointMatrices[64] → [96] (본 패스/깊이 패스 셰이더 모두) — Mixamo 리그 66 조인트 수용.
+  2) draw() 에서 섀도우 맵 미설정 시 sampler2DShadow(shadowMapTexture) 유니폼이 기본 0번 유닛에 남아
+     sampler2D(baseColorTexture) 와 유닛 충돌 → INVALID_OPERATION 으로 드로우 전체 무효화되는 버그 수정.
+     (else 분기에서 섀도우 샘플러를 1번 유닛으로 지정) esbuild 로 build/vanilla.js 재빌드.
+- 검증: Remy.fbx → examples/ancientmountain/assets/remy.glb 변환 후, 임시 테스트 페이지 + 로컬 정적 서버 +
+  헤드리스 크롬으로 로드/드로우 확인. glError=0, 텍스처/스키닝 포즈 정상 렌더링 스크린샷 확보. 임시 파일 정리 완료.
+- 다음 단계: Mixamo 비공식 API 자동 다운로드 — 사용자 Adobe 로그인 토큰(localStorage.access_token) 필요.
+
+## FBX 네이티브 로더 구현 + PBR/Material 아키텍처 합의 [02:07 요청 → 09:34 응답]
+- 방향 전환: GLB 변환 폐기(remy.glb 삭제, 이전 skinnedmodel 섀도우/jointMatrices 변경은 유지).
+  사용자 요구 = 네이티브 FBX 로더 + 기존 스키닝 파이프라인 재사용 + 노멀맵/스펙큘러 포함.
+- 신규: src/experimental/graphics/fbxloader.js (FbxLoader) — 바이너리 FBX 저수준 파서(헤더/노드/프로퍼티,
+  deflate=DecompressionStream) + 고수준 해석(오브젝트/커넥션 그래프 → 노드계층/삼각화 지오메트리/스킨클러스터/
+  머티리얼/임베디드 텍스처/애니메이션 커브). Node 단독 검증 통과.
+  - Remy.fbx 구조: 본 67 + 메시 7, 스킨 7·클러스터 114, 머티리얼 6(각 Diffuse/Normal/Specular/Gloss),
+    임베디드 PNG 22장. 발견: AnimStack 2개가 모두 1키프레임 = T-pose only(실제 애니 없음).
+    → 애니메이션은 Mixamo 애니 FBX 별도 조달 필요.
+- 엔진 추가: src/base/matrix4.js 에 static createInverse(4x4 여인수, 스킨 바인드 역행렬용) 추가·검증(오차 1e-7).
+  import.js 는 이미 SkinnedModel/Matrix4 내보냄. skinnedmodel.js 에 loadFromFbxUrl/parseFbxContent +
+  bindFloat/IntegerAttribute 추가(정점별 스킨가중치 재구성, 코너 비인덱스 펼침, 임베디드 텍스처 업로드).
+  esbuild 재빌드. 헤드리스 크롬 렌더 = GL오류 0으로 연결됐으나 스키닝 bind pose 어긋나 형체 뭉개짐(미해결).
+- Mixamo 토큰 확보: 사용자가 준 AMCV 값은 방문자 식별자라 반려, 진짜 JWT access_token 재수령 →
+  ~/.claude/secrets/mixamo_token.txt 저장(24h). 자동 다운로드는 로더 완성 후.
+- 설계 합의(사용자 명시): 임포터는 파싱만, SkinnedModel은 포맷 중립 Shader–Material–Model 계층(유니티/언리얼식).
+  결정 = 풀셋 metallic-roughness PBR(albedo/metallic/roughness/normal/AO/emissive) + 기존 GLB 경로도 완전 중립화 통합.
+- 다음 단계(미착수): (1)스키닝 bind pose 버그 수정 (2)Material 클래스 + PBR 스키닝 셰이더 (3)FBX/GLB 임포터가
+  공통 중립 스키마 반환 (4)SkinnedModel이 Material 기반 드로어블로 전환 (5)FBX+기존 GLB(soldier/fox) 재검증.
+- 임시 파일: examples/ancientmountain/fbx_test.html(검증용, 다음 작업까지 유지). 스크래치패드에 파서/서버 스크립트.
+
+## FBX 스키닝 bind pose 버그 수정 완료 — Remy 정상 렌더링 [10:20 요청 → 11:01 응답]
+- 요청: 작업 이어서 진행.
+- 수정한 버그 4건:
+  1) 오일러 회전 순서 (skinnedmodel.js): FBX eEulerXYZ 는 열벡터 기준 Rz x Ry x Rx 인데
+     Quaternion.createFromEuler(three.js XYZ = Rx x Ry x Rz)를 그대로 사용 → 축별 쿼터니언을
+     역순 합성하는 createQuaternionFromFbxEuler 헬퍼 추가(FBX 경로 전용, 기존 함수 무변경).
+  2) 애니메이션 회전 채널 PreRotation 소실 (skinnedmodel.js): 채널 변환 시 사전회전을
+     쿼터니언에 합성(preRotation x euler). 로드 직후 자동 재생되는 T-pose 스택이 포즈를 망가뜨리던 원인.
+  3) 클러스터 Transform 미사용 (fbxloader.js + skinnedmodel.js): 파일의 Transform 노드가
+     곧 역바인드 행렬(TransformLink^-1 x 메시 바인드 전역). 있으면 직접 사용, 없으면 TransformLink 역행렬.
+     (주의: TransformLink^-1 x Transform 으로 곱하면 역행렬 이중 적용 — 지오메트리가 원점으로 붕괴)
+  4) 팬 삼각화 (fbxloader.js): 쿼드 [a,b,c,d]를 (a,b,d),(a,c,d)로 잘못 분할 → (start, corner, corner+1)
+     정상 팬으로 수정. 쿼드마다 삼각형 구멍이 뚫리던 원인.
+- 추가 수정: interpretAnimations 스택별 커브노드 필터링(fbxloader.js) — 커브노드→레이어→스택 소속을
+  추적해 해당 스택 채널만 포함. (기존엔 모든 스택이 전체 채널 공유 — 실제 애니 FBX 추가 시 섞임)
+- 검증 방법: Node 로 바인드 포즈 불변식(본 월드행렬 == TransformLink, maxDiff 0.0000) + CPU 스키닝
+  바운딩 박스(원본 지오메트리와 일치) + 헤드리스 크롬 렌더(텍스처 6종/음영/구멍 없음, glError 0).
+- 진단 소득: 기본 fogRange [55,250]은 미터 스케일 — cm 단위 Mixamo 모델은 안개에 완전히 묻힘.
+  테스트에서 setFogRange(3000, 8000) 지정. 샘플 통합 시 스케일 정합 필요.
+- 다음 단계(합의된 설계): (1)Material 클래스 + PBR 스키닝 셰이더 (2)FBX/GLB 임포터 공통 중립 스키마
+  (3)SkinnedModel Material 기반 드로어블 전환 (4)FBX + 기존 GLB(soldier/fox) 재검증.
+
+## Material + PBR 셰이더 + 중립 스키마 통합 완료 [10:20 요청 → 11:20 응답]
+- 신규: src/experimental/graphics/material.js (Material) — metallic-roughness PBR 팩터 + 7종 텍스처
+  (baseColor/normal/metallicRoughness/glossiness/occlusion/emissive/specular, 없으면 1x1 대체),
+  apply(shaderProgram) 로 유니폼/텍스처 유닛 일괄 바인드. 유닛 1번은 섀도우 맵 전용으로 회피.
+  import.js 에 Material 내보내기 추가.
+- skinnedmodel.js 재구성:
+  - 프래그먼트 셰이더 → 쿡-토런스 GGX PBR (노멀맵은 화면공간 미분 코탄젠트 프레임 — 탄젠트 어트리뷰트 불필요,
+    FBX 글로스 경로 useGlossiness=1 이면 러프니스 = 1 - 글로스, 스펙큘러 맵은 F0 변조). 반구 앰비언트/섀도우/안개 유지.
+  - parseContent(GLB)/parseFbxContent(FBX)가 각각 중립 메시/머티리얼 서술(순수 CPU 배열 + 이미지 바이트)을
+    만들고 공용 uploadMeshesAndMaterials() 가 Material 생성 + VAO/드로어블 구성. GL 직접 업로드 코드 제거.
+  - readAccessorArray 인터리브(byteStride) 대응, JOINTS_0 u8→u16 / WEIGHTS_0 정규화 정수→float 변환,
+    스무스 노멀 생성 CPU 버전(generateSmoothNormals)으로 이동.
+- fbxloader.js: 머티리얼 gloss 텍스처 슬롯(Shininess/ShininessExponent OP 연결) 추가.
+- 검증(헤드리스 크롬): Remy.fbx PBR 렌더(노멀맵 원단 디테일 확인), soldier.glb Idle/fox.glb Walk 정상,
+  ancientmountain 샘플 전체(CDP 실시간 캡처 — 지형/그림자/캐릭터/UI) 회귀 없음. glError 0.
+- 임시 파일: examples/ancientmountain/glb_test.html 추가(fbx_test.html 과 함께 다음 작업까지 유지).
+  스크래치패드: verify_bindpose/verify_skinning/inspect_* 검증 스크립트, capture_sample.mjs(CDP 캡처).
+- 남은 항목: Mixamo 애니메이션 FBX 자동 다운로드(토큰 ~/.claude/secrets/mixamo_token.txt) 및
+  별도 애니 FBX 병합 로드 경로, 샘플에 Remy 통합(cm 스케일 정합 필요 — fogRange 주의).
+
+## Mixamo 애니 자동 다운로드 + 샘플 Remy 통합 + PS 스타일 버튼 [11:32 요청 → 11:44 응답]
+- Mixamo 비공식 API 자동화(스크래치패드 mixamo_api.mjs / download_anims.mjs):
+  검색 → 상세(gms_hash) → export(fbx7_2019, 스킨 제외, 30fps) → monitor 폴링 → 다운로드.
+  Remy 캐릭터 id 037852b5-74da-44aa-878b-eccda13e5139. 토큰은 2026-08-20 01:55 만료.
+- 다운로드 클립 6종 → examples/ancientmountain/assets/anims/:
+  idle(Breathing Idle) / walk(Walking, in-place) / run(Running, in-place) /
+  fall(Falling Idle) / land(Falling To Landing) / climb(Climbing Up Wall).
+- 엔진(skinnedmodel.js): addAnimationsFromFbxUrl(url, clipName, ignoreTranslation) 추가 —
+  본 이름 매칭 리타게팅으로 애니 전용 FBX 클립을 기존 모델에 추가. climb 처럼 루트 모션이
+  박힌 클립은 ignoreTranslation=true 로 이동 채널 제거(위치는 게임 로직이 제어).
+  FBX 오일러→쿼터니언/채널 변환을 모듈 레벨 함수(createQuaternionFromFbxEuler /
+  convertFbxAnimationChannels)로 승격해 parseFbxContent 와 공유.
+- 샘플(examples/ancientmountain/index.html):
+  - soldier.glb → Remy.fbx + 애니 클립 6종 로드로 교체. CHARACTER_MODEL_SCALE=0.0048(cm→월드).
+  - 모델 행렬: Remy 는 +z 정면이라 rotateY(-yaw + PI) + 스케일 곱.
+  - 상태 연결: 등반 = Climb 클립(붙기/취소 0.5배속), 도약 = Fall, 착지 = Land(1.6배속).
+    기존 절차적 조인트 오프셋 제거(clearJointRotationOffsets 호출 포함).
+  - 인터랙션 버튼 PS 스타일: 등반/뛰어내리기/취소 프롬프트와 X/O 버튼을 검은 배경 + 흰 아이콘
+    + 흰 테두리로 변경(기존 남색 배경/적청 스트로크 제거). 준비 상태는 흰 테두리 강조 유지.
+- 검증(CDP 실시간 캡처): 대기 상태 Remy 정상(스케일/방향/PBR/버튼), W 키 홀드 보행 캡처로
+  걷기 클립 + 그림자 + 진행 방향 확인. 엔진 테스트(fbx_test.html)로 Idle/Walk/Run 클립 재생 확인.
+- 비고: soldier.glb / fox.glb 는 유지(여우는 계속 사용). NAS 배포 시 assets/anims/ 6개 파일과
+  build/vanilla.js 갱신본이 함께 올라가야 함.
+
+## NAS 배포 [11:50 요청 → 11:53 응답]
+- \\DS216PLUSII\web\ddukbaek2\portfolio\ancientmountain 에 배포:
+  index.html / favicon.svg / vanilla.js(빌드 번들, 루트 평탄화) / assets/Remy.fbx / assets/anims/ 6종.
+  (index.html 은 ./vanilla.js 우선 로드라 수정 불필요 — 기존 배포 레이아웃 그대로)
+- 실서비스 검증: http://ddukbaek2.com/portfolio/ancientmountain/ CDP 캡처 — Remy PBR 보행/그림자/
+  PS 스타일 버튼 정상 확인.
+
+## Material–Shader(템플릿) 연결 [22:30 요청 → 22:45 응답]
+- 설계 합의 재확인: 머티리얼은 셰이더 템플릿을 참조하는 인스턴스(유니티의 Shader–Material 관계).
+  다중 템플릿 시스템은 두 번째 템플릿이 실제로 생길 때 확장하기로 하고, 참조 관계만 정립.
+- material.js: 생성자/createFromDescription 에 shaderProgram 주입, getShaderProgram() 추가,
+  apply() 는 인자 없이 자신이 참조한 셰이더에 유니폼/텍스처 바인드.
+- skinnedmodel.js: 머티리얼 생성 시 스키닝 PBR 셰이더 전달, draw 루프는 material.apply() 호출.
+- 검증: fbx_test(픽셀 값까지 리팩토링 전과 동일) + glb_test(soldier/fox) 통과. NAS vanilla.js 갱신.
+
+## SkinnedModel / SkinnedModelRenderer 분리 [22:47 요청 → 22:56 응답]
+- 방향(사용자 명시): 모델 인스턴스는 데이터(메시/본/스킨/머티리얼/애니)와 포즈 상태만.
+  렌더링은 별도 객체 — 모델과 렌더 기능을 한 클래스에 합치지 않는다.
+- 신규: src/experimental/graphics/skinnedmodelrenderer.js (SkinnedModelRenderer, 씬당 하나)
+  - 스키닝 PBR 셰이더 템플릿 + 깊이 패스 셰이더 소유. (사용자 선택: 렌더러 소유안)
+  - 환경 상태 소유: setShadowMap/setShadowStrength/setSunDirection/setFogColor/setFogRange.
+    (기존엔 모델마다 중복 설정 — 씬당 1회로 정리)
+  - draw(model, ...) / drawDepth(model, ...) 가 모델의 스킨/드로어블을 받아 출력.
+- skinnedmodel.js: 셰이더 소스/환경 상태/draw/drawDepth 제거. 생성자는 (context, shaderProgram)
+  주입식. loadFromUrl/loadFromFbxUrl 에 skinnedModelRenderer 인자 추가(셰이더 템플릿 획득).
+- import.js: SkinnedModelRenderer 내보내기 추가.
+- 샘플/테스트 호출부 갱신: index.html(로드/환경/그림자/드로우), fbx_test.html, glb_test.html.
+- 검증: fbx_test 픽셀 동일, glb_test 통과, 샘플 CDP 보행 캡처 정상. NAS index.html + vanilla.js 재배포.
+
+## 엔진 구조 설계 문서 작성 [22:52 요청 → 23:10 응답]
+- 신규: ARCHITECTURE.md (저장소 루트) — 코드/SDK 문서가 아닌 구조 설계 문서.
+- 내용: 디렉토리 배치와 레이어 의존 방향, 설계 원칙 7항(System 전역 규약, 단일 Object 루트,
+  임포터=파싱만, Shader–Material–Model, 모델/렌더 분리, 2D/3D 단일 GL 컨텍스트 공유 등),
+  상속 계층 트리(WorldNode/UINode 분기·UI 위젯=Component 주의점 포함), 소유 구조
+  (Engine 루트/씬-노드 트리/UI 솔버/애셋/3D 스택 + 텍스처 유닛 규약), 프레임 루프 흐름,
+  2D Graphic(WebGL2) 와 3D 임포트 파이프라인(중립 스키마), 공개 API 표면(import.js 배럴),
+  알려진 공백·레거시 표(빈 resources.js, Layer 스텁, destroy no-op, 데드 코드 등).
+- 조사 방법: base/core/ui/resource/misc/web/game 은 탐사 에이전트로 전수 조사(생성자·멤버
+  근거 소유 관계), experimental/graphics 는 금일 작업에서 직접 파악한 내용 반영.

@@ -41,6 +41,8 @@ export class UIButton extends UIControl {
 	/** @private @type { function(UIButton): void } */ #clickedEvent;
 	/** @private @type { boolean } */ #isPressTracking;
 	/** @private @type { Color } */ #pressedTintColor;
+	/** @private @type { Color } */ #hoverTintColor;
+	/** @private @type { function(UIButton): void } */ #hoverEvent;
 	/** @private @type { number } */ #transitionDuration;
 	/** @private @type { number } */ #tintProgress;
 	/** @private @type { Array } */ #colorEntries;
@@ -65,6 +67,8 @@ export class UIButton extends UIControl {
 		this.#clickedEvent = null;
 		this.#isPressTracking = false;
 		this.#pressedTintColor = new Color(0, 0, 0, 0.3);
+		this.#hoverTintColor = new Color(1, 1, 1, 0.12);
+		this.#hoverEvent = null;
 		this.#transitionDuration = 0.3;
 		this.#tintProgress = 0;
 		this.#colorEntries = [];
@@ -120,7 +124,48 @@ export class UIButton extends UIControl {
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
+		this.updateHoverState();
 		this.updateTintTransition(timeDelta);
+	}
+
+	//==============================================================================
+	// 마우스 오버 상태 갱신.
+	// - 누르고 있는 중이거나 사용 불가일 때는 건드리지 않는다.
+	// - 엔진 인스턴스는 전역 접근자로 얻어 순환 참조를 만들지 않는다.
+	//==============================================================================
+	updateHoverState() {
+		if (!this.getInteractable()) {
+			return;
+		}
+		const currentButtonState = this.getButtonState();
+		if (currentButtonState === ButtonState.pressed || currentButtonState === ButtonState.disabled) {
+			return;
+		}
+		const engine = System.vanillaEngine;
+		if (!engine) {
+			return;
+		}
+		const node = this.getNode();
+		if (!node) {
+			return;
+		}
+		const inputManager = engine.getInputManager();
+		const viewInputPosition = inputManager.getViewInputPosition();
+		const isHovering = node.contains(viewInputPosition);
+		if (isHovering && currentButtonState !== ButtonState.hover) {
+			this.setButtonState(ButtonState.hover);
+			this.collectColorTargets();
+			this.#tintProgress = 0;
+			const hoverEvent = this.getHoverEvent();
+			if (hoverEvent) {
+				hoverEvent(this);
+			}
+		}
+		else if (!isHovering && currentButtonState === ButtonState.hover) {
+			this.setButtonState(ButtonState.normal);
+			this.collectColorTargets();
+			this.#tintProgress = 0;
+		}
 	}
 
 	//==============================================================================
@@ -216,9 +261,10 @@ export class UIButton extends UIControl {
 		}
 		const buttonState = this.getButtonState();
 		const isPressed = buttonState === ButtonState.pressed;
+		const isHovering = buttonState === ButtonState.hover;
 		const transitionDuration = this.getTransitionDuration();
 
-		if (isPressed) {
+		if (isPressed || isHovering) {
 			this.#tintProgress = Math.min(this.#tintProgress + timeDelta / transitionDuration, 1);
 		}
 		else {
@@ -232,7 +278,7 @@ export class UIButton extends UIControl {
 	// 틴트 적용.
 	//==============================================================================
 	applyTintProgress(progress) {
-		const pressedTintColor = this.getPressedTintColor();
+		const pressedTintColor = this.getButtonState() === ButtonState.hover ? this.getHoverTintColor() : this.getPressedTintColor();
 		for (const colorEntry of this.#colorEntries) {
 			if (colorEntry.type === "sprite" || colorEntry.type === "imageview") {
 				const overlayAlpha = Math.lerp(0, pressedTintColor.alpha, progress);
@@ -464,6 +510,46 @@ export class UIButton extends UIControl {
 	 */
 	getClickedEvent() {
 		return this.#clickedEvent;
+	}
+
+	//==============================================================================
+	// 눌림 틴트 색상 설정.
+	//==============================================================================
+	/**
+	 * @param { Color } color
+	 */
+	setHoverTintColor(color) {
+		this.#hoverTintColor = color.clone();
+	}
+
+	//==============================================================================
+	// 오버 틴트 색상 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color }
+	 */
+	getHoverTintColor() {
+		return this.#hoverTintColor;
+	}
+
+	//==============================================================================
+	// 오버 진입 이벤트 설정.
+	//==============================================================================
+	/**
+	 * @param { function(UIButton): void } callback
+	 */
+	setHoverEvent(callback) {
+		this.#hoverEvent = callback;
+	}
+
+	//==============================================================================
+	// 오버 진입 이벤트 반환.
+	//==============================================================================
+	/**
+	 * @returns { function(UIButton): void }
+	 */
+	getHoverEvent() {
+		return this.#hoverEvent;
 	}
 
 	//==============================================================================

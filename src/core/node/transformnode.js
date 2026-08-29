@@ -78,6 +78,9 @@ export class TransformNode extends ComponentNode {
 			// 컴포넌트 목록 출력.
 			const components = this.getAllComponents();
 			for (const component of components) {
+				if (!component.isEnable()) {
+					continue;
+				}
 				component.draw(graphic);
 			}
 

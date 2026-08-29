@@ -99,4 +99,14 @@ export class Paint extends Component {
 	setRoundSize(roundSize) {
 		this.#roundSize = roundSize;
 	}
+
+	//==============================================================================
+	// 라운드 사이즈 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getRoundSize() {
+		return this.#roundSize;
+	}
 }

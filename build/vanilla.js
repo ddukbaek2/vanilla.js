@@ -4115,6 +4115,9 @@ var TransformNode = class extends ComponentNode {
     if (isVisible) {
       const components = this.getAllComponents();
       for (const component of components) {
+        if (!component.isEnable()) {
+          continue;
+        }
         component.draw(graphic);
       }
       const children = this.getChildren();
@@ -7651,6 +7654,9 @@ var WorldNode = class _WorldNode extends TransformNode {
     const components = this.getAllComponents();
     let maskComponent = null;
     for (const component of components) {
+      if (!component.isEnable()) {
+        continue;
+      }
       component.draw(graphic);
       if (component instanceof Mask) {
         maskComponent = component;
@@ -7875,7 +7881,7 @@ var WorldNode = class _WorldNode extends TransformNode {
     const worldCorners = this.getWorldCorners();
     let min2 = Vector2.positiveInfinity();
     let max2 = Vector2.negativeInfinity();
-    for (let i = 1; i < worldCorners.length; ++i) {
+    for (let i = 0; i < worldCorners.length; ++i) {
       const worldCorner = worldCorners[i];
       if (min2.x > worldCorner.x) {
         min2.x = worldCorner.x;
@@ -9511,7 +9517,7 @@ var Engine = class extends Object2 {
     this.#updateEngineCallback = this.updateEngine.bind(this);
     this.#frameNumber = 0;
     this.#statisticsTextRect = Rect.zero();
-    this.#version = Version.create(0, 2, 1);
+    this.#version = Version.create(0, 3, 0);
     System16.vanillaEngine = this;
     this.setupAllDocumentEvents();
     this.resize();
@@ -10262,7 +10268,7 @@ var UIView = class extends Component {
     this.setComponentType("View");
     this.#engine = null;
     this.#content = null;
-    this.#backgroundColor = new Color(1, 1, 1, 1);
+    this.#backgroundColor = new Color(1, 1, 1, 0);
   }
   //==============================================================================
   // 엔진 설정. (구 UIComponent 에서 이관)
@@ -10472,6 +10478,15 @@ var Paint = class extends Component {
    */
   setRoundSize(roundSize) {
     this.#roundSize = roundSize;
+  }
+  //==============================================================================
+  // 라운드 사이즈 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getRoundSize() {
+    return this.#roundSize;
   }
 };
 
@@ -18578,6 +18593,7 @@ var UIControl = class extends UIView {
 };
 
 // src/ui/uibutton.js
+var System31 = globalThis;
 var ButtonState = {
   normal: Enum.begin(),
   hover: Enum.auto(),
@@ -18606,6 +18622,10 @@ var UIButton = class extends UIControl {
   #isPressTracking;
   /** @private @type { Color } */
   #pressedTintColor;
+  /** @private @type { Color } */
+  #hoverTintColor;
+  /** @private @type { function(UIButton): void } */
+  #hoverEvent;
   /** @private @type { number } */
   #transitionDuration;
   /** @private @type { number } */
@@ -18638,6 +18658,8 @@ var UIButton = class extends UIControl {
     this.#clickedEvent = null;
     this.#isPressTracking = false;
     this.#pressedTintColor = new Color(0, 0, 0, 0.3);
+    this.#hoverTintColor = new Color(1, 1, 1, 0.12);
+    this.#hoverEvent = null;
     this.#transitionDuration = 0.3;
     this.#tintProgress = 0;
     this.#colorEntries = [];
@@ -18688,7 +18710,46 @@ var UIButton = class extends UIControl {
    */
   tick(timeDelta) {
     super.tick(timeDelta);
+    this.updateHoverState();
     this.updateTintTransition(timeDelta);
+  }
+  //==============================================================================
+  // 마우스 오버 상태 갱신.
+  // - 누르고 있는 중이거나 사용 불가일 때는 건드리지 않는다.
+  // - 엔진 인스턴스는 전역 접근자로 얻어 순환 참조를 만들지 않는다.
+  //==============================================================================
+  updateHoverState() {
+    if (!this.getInteractable()) {
+      return;
+    }
+    const currentButtonState = this.getButtonState();
+    if (currentButtonState === ButtonState.pressed || currentButtonState === ButtonState.disabled) {
+      return;
+    }
+    const engine = System31.vanillaEngine;
+    if (!engine) {
+      return;
+    }
+    const node = this.getNode();
+    if (!node) {
+      return;
+    }
+    const inputManager = engine.getInputManager();
+    const viewInputPosition = inputManager.getViewInputPosition();
+    const isHovering = node.contains(viewInputPosition);
+    if (isHovering && currentButtonState !== ButtonState.hover) {
+      this.setButtonState(ButtonState.hover);
+      this.collectColorTargets();
+      this.#tintProgress = 0;
+      const hoverEvent = this.getHoverEvent();
+      if (hoverEvent) {
+        hoverEvent(this);
+      }
+    } else if (!isHovering && currentButtonState === ButtonState.hover) {
+      this.setButtonState(ButtonState.normal);
+      this.collectColorTargets();
+      this.#tintProgress = 0;
+    }
   }
   //==============================================================================
   // 출력.
@@ -18778,8 +18839,9 @@ var UIButton = class extends UIControl {
     }
     const buttonState = this.getButtonState();
     const isPressed = buttonState === ButtonState.pressed;
+    const isHovering = buttonState === ButtonState.hover;
     const transitionDuration = this.getTransitionDuration();
-    if (isPressed) {
+    if (isPressed || isHovering) {
       this.#tintProgress = min(this.#tintProgress + timeDelta / transitionDuration, 1);
     } else {
       this.#tintProgress = max(this.#tintProgress - timeDelta / transitionDuration, 0);
@@ -18790,7 +18852,7 @@ var UIButton = class extends UIControl {
   // 틴트 적용.
   //==============================================================================
   applyTintProgress(progress) {
-    const pressedTintColor = this.getPressedTintColor();
+    const pressedTintColor = this.getButtonState() === ButtonState.hover ? this.getHoverTintColor() : this.getPressedTintColor();
     for (const colorEntry of this.#colorEntries) {
       if (colorEntry.type === "sprite" || colorEntry.type === "imageview") {
         const overlayAlpha = lerp(0, pressedTintColor.alpha, progress);
@@ -19001,6 +19063,42 @@ var UIButton = class extends UIControl {
   /**
    * @param { Color } color
    */
+  setHoverTintColor(color) {
+    this.#hoverTintColor = color.clone();
+  }
+  //==============================================================================
+  // 오버 틴트 색상 반환.
+  //==============================================================================
+  /**
+   * @returns { Color }
+   */
+  getHoverTintColor() {
+    return this.#hoverTintColor;
+  }
+  //==============================================================================
+  // 오버 진입 이벤트 설정.
+  //==============================================================================
+  /**
+   * @param { function(UIButton): void } callback
+   */
+  setHoverEvent(callback) {
+    this.#hoverEvent = callback;
+  }
+  //==============================================================================
+  // 오버 진입 이벤트 반환.
+  //==============================================================================
+  /**
+   * @returns { function(UIButton): void }
+   */
+  getHoverEvent() {
+    return this.#hoverEvent;
+  }
+  //==============================================================================
+  // 눌림 틴트 색상 설정.
+  //==============================================================================
+  /**
+   * @param { Color } color
+   */
   setPressedTintColor(color) {
     this.#pressedTintColor = color;
   }
@@ -19198,8 +19296,191 @@ var UIToggleButton = class extends UIButton {
   }
 };
 
+// src/ui/uiprogressview.js
+var ProgressDirection = {
+  horizontal: "horizontal",
+  // 좌→우 채움
+  vertical: "vertical"
+  // 하→상 채움
+};
+var UIProgressView = class extends UIView {
+  static {
+    __name(this, "UIProgressView");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { number } */
+  #value;
+  /** @private @type { number } */
+  #minValue;
+  /** @private @type { number } */
+  #maxValue;
+  /** @private @type { Color } */
+  #fillColor;
+  /** @private @type { number } */
+  #cornerRadius;
+  /** @private @type { string } */
+  #direction;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  constructor() {
+    super();
+    this.setComponentType("UIProgressView");
+    this.#value = 0;
+    this.#minValue = 0;
+    this.#maxValue = 1;
+    this.#fillColor = new Color(0.23, 0.51, 0.96, 1);
+    this.#cornerRadius = 0;
+    this.#direction = ProgressDirection.horizontal;
+    super.setBackgroundColor(new Color(0.7, 0.7, 0.7, 1));
+  }
+  //==============================================================================
+  // 출력. (트랙 + 채움. 트랙은 UIView.backgroundColor 사용)
+  // - cornerRadius 처리를 위해 super.draw 를 호출하지 않고 직접 그린다.
+  //==============================================================================
+  /**
+   * @override
+   * @param { Graphic } graphic
+   */
+  draw(graphic) {
+    const node = this.getNode();
+    if (!node) {
+      return;
+    }
+    const contentSize = node.getContentSize();
+    if (contentSize.x <= 0 || contentSize.y <= 0) {
+      return;
+    }
+    const trackRect = Rect.create(0, 0, contentSize.x, contentSize.y);
+    graphic.setFillColor(this.getBackgroundColor());
+    if (this.#cornerRadius > 0) {
+      graphic.drawRoundRect(trackRect, this.#cornerRadius);
+    } else {
+      graphic.drawRect(trackRect);
+    }
+    const ratio = this.getRatio();
+    if (ratio <= 0) {
+      return;
+    }
+    let fillRect;
+    if (this.#direction === ProgressDirection.vertical) {
+      const fillHeight = contentSize.y * ratio;
+      fillRect = Rect.create(0, contentSize.y - fillHeight, contentSize.x, fillHeight);
+    } else {
+      const fillWidth = contentSize.x * ratio;
+      fillRect = Rect.create(0, 0, fillWidth, contentSize.y);
+    }
+    graphic.setFillColor(this.#fillColor);
+    if (this.#cornerRadius > 0) {
+      graphic.drawRoundRect(fillRect, this.#cornerRadius);
+    } else {
+      graphic.drawRect(fillRect);
+    }
+  }
+  //==============================================================================
+  // 0~1 비율 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getRatio() {
+    const range = this.#maxValue - this.#minValue;
+    if (range <= 0) {
+      return 0;
+    }
+    const r = (this.#value - this.#minValue) / range;
+    return clamp(r, 0, 1);
+  }
+  //==============================================================================
+  // 값 설정.
+  //==============================================================================
+  /**
+   * @param { number } value
+   */
+  setValue(value) {
+    this.#value = clamp(value, this.#minValue, this.#maxValue);
+  }
+  //==============================================================================
+  // 값 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getValue() {
+    return this.#value;
+  }
+  //==============================================================================
+  // 최소~최대 값 범위 설정.
+  //==============================================================================
+  /**
+   * @param { number } minValue
+   * @param { number } maxValue
+   */
+  setRange(minValue, maxValue) {
+    this.#minValue = minValue;
+    this.#maxValue = maxValue;
+    this.setValue(this.#value);
+  }
+  getMinValue() {
+    return this.#minValue;
+  }
+  getMaxValue() {
+    return this.#maxValue;
+  }
+  //==============================================================================
+  // 트랙 색. (UIView.backgroundColor 의 alias)
+  //==============================================================================
+  /**
+   * @param { Color } color
+   */
+  setTrackColor(color) {
+    this.setBackgroundColor(color);
+  }
+  getTrackColor() {
+    return this.getBackgroundColor();
+  }
+  //==============================================================================
+  // 채움 색.
+  //==============================================================================
+  /**
+   * @param { Color } color
+   */
+  setFillColor(color) {
+    this.#fillColor = color;
+  }
+  getFillColor() {
+    return this.#fillColor;
+  }
+  //==============================================================================
+  // 라운드 코너 반지름.
+  //==============================================================================
+  /**
+   * @param { number } radius
+   */
+  setCornerRadius(radius) {
+    this.#cornerRadius = radius;
+  }
+  getCornerRadius() {
+    return this.#cornerRadius;
+  }
+  //==============================================================================
+  // 방향. (ProgressDirection.horizontal / vertical)
+  //==============================================================================
+  /**
+   * @param { string } direction
+   */
+  setDirection(direction) {
+    this.#direction = direction;
+  }
+  getDirection() {
+    return this.#direction;
+  }
+};
+
 // src/ui/uiinputfield.js
-var System31 = globalThis;
+var System32 = globalThis;
 var UIInputField = class extends WorldNode {
   static {
     __name(this, "UIInputField");
@@ -19509,8 +19790,8 @@ var UIInputField = class extends WorldNode {
         const selEnd = this.#domInput.selectionEnd;
         const selStart = this.#domInput.selectionStart;
         if (typeof selEnd === "number" && typeof selStart === "number") {
-          const ourMin = System31.Math.min(this.#cursorIndex, this.#selectionStart);
-          const ourMax = System31.Math.max(this.#cursorIndex, this.#selectionStart);
+          const ourMin = System32.Math.min(this.#cursorIndex, this.#selectionStart);
+          const ourMax = System32.Math.max(this.#cursorIndex, this.#selectionStart);
           if (selStart !== ourMin || selEnd !== ourMax) {
             this.#cursorIndex = selEnd;
             this.#selectionStart = selStart;
@@ -19553,8 +19834,8 @@ var UIInputField = class extends WorldNode {
     this.#selectionStart = this.#dragStartIndex;
     this.#cursorIndex = index;
     if (this.#domInput) {
-      const selStart = System31.Math.min(this.#dragStartIndex, index);
-      const selEnd = System31.Math.max(this.#dragStartIndex, index);
+      const selStart = System32.Math.min(this.#dragStartIndex, index);
+      const selEnd = System32.Math.max(this.#dragStartIndex, index);
       this.#domInput.setSelectionRange(selStart, selEnd);
     }
     this.#blinkTimer = 0;
@@ -19618,7 +19899,7 @@ var UIInputField = class extends WorldNode {
   refreshTextPositions() {
     const size = this.getContentSize();
     if (size.x <= 0 || size.y <= 0) return;
-    const inner = Vector2.create(System31.Math.max(0, size.x - this.#padding * 2), size.y);
+    const inner = Vector2.create(System32.Math.max(0, size.x - this.#padding * 2), size.y);
     this.#textTextNode.setLocalPosition(Vector2.create(this.#padding, 0));
     this.#textTextNode.setContentSize(inner);
     this.#placeholderTextNode.setLocalPosition(Vector2.create(this.#padding, 0));
@@ -19631,7 +19912,7 @@ var UIInputField = class extends WorldNode {
   //==============================================================================
   attachDOMInput() {
     if (this.#domInput) return;
-    const doc = System31.document;
+    const doc = System32.document;
     ensureGlobalHiddenInputStyle(doc);
     const input = doc.createElement("input");
     input.type = "text";
@@ -19794,11 +20075,11 @@ var UIInputField = class extends WorldNode {
   attachCanvasKeyboard() {
     if (this.#canvasKeydownHandler) return;
     this.#canvasKeydownHandler = (event) => this.handleCanvasKeydown(event);
-    System31.document.addEventListener("keydown", this.#canvasKeydownHandler);
+    System32.document.addEventListener("keydown", this.#canvasKeydownHandler);
   }
   detachCanvasKeyboard() {
     if (!this.#canvasKeydownHandler) return;
-    System31.document.removeEventListener("keydown", this.#canvasKeydownHandler);
+    System32.document.removeEventListener("keydown", this.#canvasKeydownHandler);
     this.#canvasKeydownHandler = null;
   }
   handleCanvasKeydown(event) {
@@ -19859,7 +20140,7 @@ var UIInputField = class extends WorldNode {
     this.#cursorVisible = true;
   }
   moveCursor(newIndex, extendSelection) {
-    const clamped = System31.Math.max(0, System31.Math.min(this.#value.length, newIndex));
+    const clamped = System32.Math.max(0, System32.Math.min(this.#value.length, newIndex));
     this.#cursorIndex = clamped;
     if (!extendSelection) this.#selectionStart = clamped;
     this.refreshTexts();
@@ -19892,8 +20173,8 @@ var UIInputField = class extends WorldNode {
   getSelectionRange() {
     if (!this.hasSelection()) return null;
     return {
-      start: System31.Math.min(this.#cursorIndex, this.#selectionStart),
-      end: System31.Math.max(this.#cursorIndex, this.#selectionStart)
+      start: System32.Math.min(this.#cursorIndex, this.#selectionStart),
+      end: System32.Math.max(this.#cursorIndex, this.#selectionStart)
     };
   }
   getSelectionText() {
@@ -19935,8 +20216,8 @@ var UIInputField = class extends WorldNode {
   }
   writeClipboard(text) {
     try {
-      if (System31.navigator && System31.navigator.clipboard) {
-        System31.navigator.clipboard.writeText(text).catch(() => {
+      if (System32.navigator && System32.navigator.clipboard) {
+        System32.navigator.clipboard.writeText(text).catch(() => {
         });
       }
     } catch (error) {
@@ -19944,12 +20225,12 @@ var UIInputField = class extends WorldNode {
   }
   readClipboard() {
     try {
-      if (System31.navigator && System31.navigator.clipboard) {
-        return System31.navigator.clipboard.readText();
+      if (System32.navigator && System32.navigator.clipboard) {
+        return System32.navigator.clipboard.readText();
       }
     } catch (error) {
     }
-    return System31.Promise.resolve("");
+    return System32.Promise.resolve("");
   }
   //==============================================================================
   // 컨텍스트 메뉴 (우클릭).
@@ -19983,7 +20264,7 @@ var UIInputField = class extends WorldNode {
   }
   showContextMenu(clientX, clientY) {
     this.hideContextMenu();
-    const doc = System31.document;
+    const doc = System32.document;
     const menu = doc.createElement("div");
     menu.style.position = "absolute";
     menu.style.left = `${clientX}px`;
@@ -20033,7 +20314,7 @@ var UIInputField = class extends WorldNode {
     }
     doc.body.appendChild(menu);
     this.#contextMenuElement = menu;
-    System31.setTimeout(() => {
+    System32.setTimeout(() => {
       const dismissHandler = /* @__PURE__ */ __name((event) => {
         if (this.#contextMenuElement && !this.#contextMenuElement.contains(event.target)) {
           this.hideContextMenu();
@@ -20054,7 +20335,7 @@ var UIInputField = class extends WorldNode {
       this.#contextMenuElement = null;
     }
     if (this.#contextMenuDismissHandler) {
-      System31.document.removeEventListener("pointerdown", this.#contextMenuDismissHandler, true);
+      System32.document.removeEventListener("pointerdown", this.#contextMenuDismissHandler, true);
       this.#contextMenuDismissHandler = null;
     }
   }
@@ -20077,8 +20358,8 @@ var BackgroundLayerRenderer = class extends Component {
       graphic.pushState();
       const fontFamily = state.fontFace ? state.fontFace.family : SYSTEM_FONT_STRING;
       graphic.setFontString(`${state.fontSize}px ${fontFamily}`);
-      const selStart = System31.Math.min(state.selectionStart, state.cursorIndex);
-      const selEnd = System31.Math.max(state.selectionStart, state.cursorIndex);
+      const selStart = System32.Math.min(state.selectionStart, state.cursorIndex);
+      const selEnd = System32.Math.max(state.selectionStart, state.cursorIndex);
       const startX = state.padding + graphic.measureText(state.value.slice(0, selStart)).width;
       const endX = state.padding + graphic.measureText(state.value.slice(0, selEnd)).width;
       const halfH = state.fontSize * 0.65;
@@ -20139,7 +20420,7 @@ var OverlayLayerRenderer = class extends Component {
       const y = inset;
       const rectW = contentSize.x - w;
       const rectH = contentSize.y - w;
-      const radius = System31.Math.max(0, state.bgRoundSize - inset);
+      const radius = System32.Math.max(0, state.bgRoundSize - inset);
       graphic.drawStrokeRoundRect(Rect.create(x, y, rectW, rectH), radius, w);
     }
     graphic.popState();
@@ -20149,7 +20430,7 @@ var offscreenMeasureCanvas = null;
 function getOffscreenMeasureContext() {
   if (!offscreenMeasureCanvas) {
     try {
-      offscreenMeasureCanvas = System31.document.createElement("canvas");
+      offscreenMeasureCanvas = System32.document.createElement("canvas");
     } catch (error) {
       return null;
     }
@@ -20178,14 +20459,6 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
 }
 __name(ensureGlobalHiddenInputStyle, "ensureGlobalHiddenInputStyle");
 
-// src/ui/uiprogressview.js
-var ProgressDirection = {
-  horizontal: "horizontal",
-  // 좌→우 채움
-  vertical: "vertical"
-  // 하→상 채움
-};
-
 // src/ui/uislider.js
 var UISlider = class extends UIControl {
   static {
@@ -20208,6 +20481,8 @@ var UISlider = class extends UIControl {
   #thumbColor;
   /** @private @type { number } */
   #thumbRadius;
+  /** @private @type { WorldNode } */
+  #thumbNode;
   /** @private @type { number } */
   #cornerRadius;
   /** @private @type { string } */
@@ -20231,6 +20506,7 @@ var UISlider = class extends UIControl {
     this.#fillColor = new Color(0.23, 0.51, 0.96, 1);
     this.#thumbColor = new Color(1, 1, 1, 1);
     this.#thumbRadius = 16;
+    this.#thumbNode = null;
     this.#cornerRadius = 0;
     this.#direction = ProgressDirection.horizontal;
     this.#isDragging = false;
@@ -20298,6 +20574,11 @@ var UISlider = class extends UIControl {
     } else {
       thumbX = contentSize.x * ratio;
       thumbY = contentSize.y * 0.5;
+    }
+    if (this.#thumbNode) {
+      const thumbSize = this.#thumbNode.getContentSize();
+      this.#thumbNode.setLocalPosition(Vector2.create(thumbX - thumbSize.x * 0.5, thumbY - thumbSize.y * 0.5));
+      return;
     }
     graphic.setFillColor(this.#thumbColor);
     graphic.drawCircle(Vector2.create(thumbX, thumbY), this.#thumbRadius);
@@ -20461,6 +20742,13 @@ var UISlider = class extends UIControl {
   getThumbRadius() {
     return this.#thumbRadius;
   }
+  /** @param { WorldNode } node */
+  setThumbNode(node) {
+    this.#thumbNode = node;
+  }
+  getThumbNode() {
+    return this.#thumbNode;
+  }
   /** @param { number } radius */
   setCornerRadius(radius) {
     this.#cornerRadius = radius;
@@ -20498,8 +20786,761 @@ var UISlider = class extends UIControl {
   }
 };
 
+// src/ui/uidocument.js
+var System33 = globalThis;
+var UIDOCUMENT_VERSION = 1;
+var NODE_TYPE_TABLE = {
+  WorldNode
+};
+var NODE_REFERENCE_KEY = "$nodeRef";
+var REFLECTED_PROPERTY_EXCLUDE_NAMES = new System33.Set([
+  "Parent",
+  "Node",
+  "Owner",
+  "Scene",
+  "Content",
+  "Children",
+  "AllComponents",
+  "Component",
+  "Components",
+  "Root",
+  "Graphic",
+  "Camera",
+  "Target"
+]);
+var COMPONENT_TYPE_TABLE = {
+  Paint,
+  Sprite,
+  Text,
+  RichText,
+  Mask,
+  UILabel,
+  UIImageView,
+  UIButton,
+  UIToggleButton,
+  UIProgressView,
+  UISlider,
+  UIScrollView
+};
+var deserializeRootNode = null;
+var pendingNodeReferenceList = [];
+function collectReflectedProperties(targetObject) {
+  const propertyList = [];
+  const visitedNameSet = new System33.Set();
+  let prototypeObject = System33.Object.getPrototypeOf(targetObject);
+  while (prototypeObject && prototypeObject !== System33.Object.prototype) {
+    for (const memberName of System33.Object.getOwnPropertyNames(prototypeObject)) {
+      let baseName = "";
+      if (memberName.indexOf("get") === 0) {
+        baseName = memberName.substring(3);
+      } else if (memberName.indexOf("is") === 0) {
+        baseName = memberName.substring(2);
+      } else {
+        continue;
+      }
+      if (baseName.length === 0 || visitedNameSet.has(baseName) || REFLECTED_PROPERTY_EXCLUDE_NAMES.has(baseName)) {
+        continue;
+      }
+      if (typeof targetObject["set" + baseName] !== "function") {
+        continue;
+      }
+      const getterFunction = prototypeObject[memberName];
+      if (typeof getterFunction !== "function" || getterFunction.length !== 0) {
+        continue;
+      }
+      visitedNameSet.add(baseName);
+      propertyList.push({ name: baseName, getterName: memberName, setterName: "set" + baseName });
+    }
+    prototypeObject = System33.Object.getPrototypeOf(prototypeObject);
+  }
+  return propertyList;
+}
+__name(collectReflectedProperties, "collectReflectedProperties");
+function colorToArray(color) {
+  return [color.red, color.green, color.blue, color.alpha];
+}
+__name(colorToArray, "colorToArray");
+function arrayToColor(values) {
+  return new Color(values[0], values[1], values[2], values[3]);
+}
+__name(arrayToColor, "arrayToColor");
+function saveTextProperties(component) {
+  const textColor = component.getTextColor();
+  const strokeColor = component.getStrokeColor();
+  return {
+    text: component.getText(),
+    fontSize: component.getFontSize(),
+    textColor: colorToArray(textColor),
+    strokeColor: colorToArray(strokeColor),
+    strokeWidth: component.getStrokeWidth(),
+    textAlign: component.getTextAlign(),
+    textBaseline: component.getTextBaseline()
+  };
+}
+__name(saveTextProperties, "saveTextProperties");
+function loadTextProperties(component, data) {
+  if (data.text !== void 0) {
+    component.setText(data.text);
+  }
+  if (data.fontSize !== void 0) {
+    component.setFontSize(data.fontSize);
+  }
+  if (data.textColor) {
+    component.setTextColor(arrayToColor(data.textColor));
+  }
+  if (data.strokeColor) {
+    component.setStrokeColor(arrayToColor(data.strokeColor));
+  }
+  if (data.strokeWidth !== void 0) {
+    component.setStrokeWidth(data.strokeWidth);
+  }
+  if (data.textAlign !== void 0) {
+    component.setTextAlign(data.textAlign);
+  }
+  if (data.textBaseline !== void 0) {
+    component.setTextBaseline(data.textBaseline);
+  }
+}
+__name(loadTextProperties, "loadTextProperties");
+var COMPONENT_PROPERTY_TABLE = {
+  Paint: {
+    save(component) {
+      return { color: colorToArray(component.getColor()), roundSize: component.getRoundSize() };
+    },
+    load(component, data) {
+      if (data.color) {
+        component.setColor(arrayToColor(data.color));
+      }
+      if (data.roundSize !== void 0) {
+        component.setRoundSize(data.roundSize);
+      }
+    }
+  },
+  Sprite: {
+    save(component) {
+      const nineSlice = component.getNineSlice();
+      return {
+        color: colorToArray(component.getColor()),
+        roundSize: component.getRoundSize(),
+        imagePath: component.imagePath || "",
+        nineSlice: nineSlice ? [nineSlice.left, nineSlice.top, nineSlice.right, nineSlice.bottom] : null,
+        spriteDrawMode: component.getSpriteDrawMode(),
+        spriteBlendMode: component.getSpriteBlendMode()
+      };
+    },
+    load(component, data) {
+      if (data.color) {
+        component.setColor(arrayToColor(data.color));
+      }
+      if (data.roundSize !== void 0) {
+        component.setRoundSize(data.roundSize);
+      }
+      if (data.imagePath) {
+        component.imagePath = data.imagePath;
+        const resolvedImage = UIDocument.resolveImage(data.imagePath);
+        if (resolvedImage) {
+          component.setImage(resolvedImage);
+        }
+      }
+      if (data.spriteDrawMode !== void 0) {
+        component.setSpriteDrawMode(data.spriteDrawMode);
+      }
+      if (data.spriteBlendMode !== void 0) {
+        component.setSpriteBlendMode(data.spriteBlendMode);
+      }
+    }
+  },
+  Text: {
+    save(component) {
+      return saveTextProperties(component);
+    },
+    load(component, data) {
+      loadTextProperties(component, data);
+    }
+  },
+  RichText: {
+    save(component) {
+      return saveTextProperties(component);
+    },
+    load(component, data) {
+      loadTextProperties(component, data);
+    }
+  },
+  Mask: {
+    save() {
+      return {};
+    },
+    load() {
+    }
+  },
+  UILabel: {
+    save(component) {
+      return {
+        text: component.getText(),
+        fontSize: component.getFontSize(),
+        textColor: colorToArray(component.getTextColor()),
+        backgroundColor: colorToArray(component.getBackgroundColor())
+      };
+    },
+    load(component, data) {
+      if (data.text !== void 0) {
+        component.setText(data.text);
+      }
+      if (data.fontSize !== void 0) {
+        component.setFontSize(data.fontSize);
+      }
+      if (data.textColor) {
+        component.setTextColor(arrayToColor(data.textColor));
+      }
+      if (data.backgroundColor) {
+        component.setBackgroundColor(arrayToColor(data.backgroundColor));
+      }
+    }
+  },
+  UIImageView: {
+    save(component) {
+      return { imagePath: component.imagePath || "" };
+    },
+    load(component, data) {
+      if (data.imagePath) {
+        component.imagePath = data.imagePath;
+        const resolvedImage = UIDocument.resolveImage(data.imagePath);
+        if (resolvedImage) {
+          component.setImage(resolvedImage);
+        }
+      }
+    }
+  },
+  UIButton: {
+    save(component) {
+      return { pressedTintColor: colorToArray(component.getPressedTintColor()) };
+    },
+    load(component, data) {
+      if (data.pressedTintColor) {
+        component.setPressedTintColor(arrayToColor(data.pressedTintColor));
+      }
+    }
+  },
+  UIToggleButton: {
+    save(component) {
+      return { pressedTintColor: colorToArray(component.getPressedTintColor()) };
+    },
+    load(component, data) {
+      if (data.pressedTintColor) {
+        component.setPressedTintColor(arrayToColor(data.pressedTintColor));
+      }
+    }
+  },
+  UIProgressView: {
+    save(component) {
+      return {
+        value: component.getValue(),
+        minValue: component.getMinValue(),
+        maxValue: component.getMaxValue()
+      };
+    },
+    load(component, data) {
+      if (data.minValue !== void 0 && data.maxValue !== void 0) {
+        component.setRange(data.minValue, data.maxValue);
+      }
+      if (data.value !== void 0) {
+        component.setValue(data.value);
+      }
+    }
+  },
+  UISlider: {
+    save(component) {
+      return { value: component.getValue() };
+    },
+    load(component, data) {
+      if (data.value !== void 0) {
+        component.setValue(data.value);
+      }
+    }
+  },
+  UIScrollView: {
+    save(component) {
+      const scrollContentSize = component.getScrollContentSize();
+      return {
+        scrollContentSize: [scrollContentSize.x, scrollContentSize.y],
+        scrollMode: component.getScrollMode(),
+        dragSensitivity: component.getDragSensitivity(),
+        backgroundColor: colorToArray(component.getBackgroundColor())
+      };
+    },
+    load(component, data) {
+      if (data.scrollContentSize) {
+        component.setScrollContentSize(Vector2.create(data.scrollContentSize[0], data.scrollContentSize[1]));
+      }
+      if (data.scrollMode !== void 0) {
+        component.setScrollMode(data.scrollMode);
+      }
+      if (data.dragSensitivity !== void 0) {
+        component.setDragSensitivity(data.dragSensitivity);
+      }
+      if (data.backgroundColor) {
+        component.setBackgroundColor(arrayToColor(data.backgroundColor));
+      }
+    }
+  }
+};
+var imageResolver = null;
+var UIDocument = class _UIDocument extends Object2 {
+  static {
+    __name(this, "UIDocument");
+  }
+  //==============================================================================
+  // 이미지 경로 해석기 등록. (정적 — 경로 → HTMLImageElement)
+  //==============================================================================
+  /**
+   * @param { function(string): HTMLImageElement | null } resolver
+   */
+  static setImageResolver(resolver) {
+    imageResolver = resolver;
+  }
+  //==============================================================================
+  // 이미지 경로 해석. (정적)
+  //==============================================================================
+  /**
+   * @param { string } imagePath
+   * @returns { HTMLImageElement | null }
+   */
+  static resolveImage(imagePath) {
+    if (!imageResolver) {
+      return null;
+    }
+    const resolvedImage = imageResolver(imagePath);
+    return resolvedImage;
+  }
+  //==============================================================================
+  // 노드 트리 → 문서 데이터. (정적 — 재귀)
+  //==============================================================================
+  /**
+   * @param { WorldNode } node
+   * @returns { object }
+   */
+  static serializeNode(node) {
+    const pivot = node.getPivot();
+    const anchor = node.getAnchor();
+    const contentSize = node.getContentSize();
+    const localPosition = node.getLocalPosition();
+    const localScale = node.getLocalScale();
+    const nodeData = {
+      type: node.constructor.name,
+      name: node.getName(),
+      active: node.isActive(),
+      position: [localPosition.x, localPosition.y],
+      scale: [localScale.x, localScale.y],
+      rotation: node.getLocalRotation(),
+      opacity: node.getLocalOpacity(),
+      pivot: [pivot.x, pivot.y],
+      anchor: [anchor.x, anchor.y],
+      contentSize: [contentSize.x, contentSize.y],
+      interactable: node.isInteractable(),
+      components: [],
+      children: []
+    };
+    const componentList = node.getAllComponents();
+    const generatedTypeSet = _UIDocument.collectGeneratedComponentTypes(componentList);
+    const widgetContentNodeSet = new System33.Set();
+    for (const component of componentList) {
+      const componentTypeName = component.constructor.name;
+      const propertyHandler = COMPONENT_PROPERTY_TABLE[componentTypeName];
+      if (component instanceof UIView) {
+        const contentNode = component.getContent();
+        if (contentNode) {
+          widgetContentNodeSet.add(contentNode);
+        }
+      }
+      if (generatedTypeSet.has(componentTypeName)) {
+        continue;
+      }
+      const componentData = propertyHandler ? propertyHandler.save(component) : _UIDocument.saveByReflection(component);
+      if (propertyHandler) {
+        _UIDocument.saveNodeReferences(component, componentData);
+      }
+      componentData.type = componentTypeName;
+      nodeData.components.push(componentData);
+    }
+    const childNodeList = node.getChildren();
+    for (const childNode of childNodeList) {
+      if (widgetContentNodeSet.has(childNode)) {
+        const grandChildNodeList = childNode.getChildren();
+        if (grandChildNodeList.length > 0) {
+          nodeData.contentChildren = grandChildNodeList.map((grandChildNode) => _UIDocument.serializeNode(grandChildNode));
+        }
+        continue;
+      }
+      nodeData.children.push(_UIDocument.serializeNode(childNode));
+    }
+    return nodeData;
+  }
+  //==============================================================================
+  // 위젯이 생성한 컴포넌트 타입 수집. (정적 — UIView 계열의 require 목록)
+  //==============================================================================
+  /**
+   * @param { object[] } componentList
+   * @returns { Set<string> }
+   */
+  static collectGeneratedComponentTypes(componentList) {
+    const generatedTypeSet = new System33.Set();
+    for (const component of componentList) {
+      if (!(component instanceof UIView)) {
+        continue;
+      }
+      const requiredTypes = component.require();
+      if (!requiredTypes) {
+        continue;
+      }
+      for (const requiredType of requiredTypes) {
+        generatedTypeSet.add(requiredType.name);
+      }
+    }
+    return generatedTypeSet;
+  }
+  //==============================================================================
+  // 문서 데이터 → 노드 트리. (정적 — 재귀)
+  //==============================================================================
+  /**
+   * @param { object } nodeData
+   * @returns { WorldNode }
+   */
+  static deserializeNode(nodeData) {
+    const nodeType = NODE_TYPE_TABLE[nodeData.type] || WorldNode;
+    const node = new nodeType();
+    node.setName(nodeData.name || "");
+    if (nodeData.active !== void 0) {
+      node.setActive(nodeData.active);
+    }
+    if (nodeData.position) {
+      node.setLocalPosition(Vector2.create(nodeData.position[0], nodeData.position[1]));
+    }
+    if (nodeData.scale) {
+      node.setLocalScale(Vector2.create(nodeData.scale[0], nodeData.scale[1]));
+    }
+    if (nodeData.rotation !== void 0) {
+      node.setLocalRotation(nodeData.rotation);
+    }
+    if (nodeData.opacity !== void 0) {
+      node.setLocalOpacity(nodeData.opacity);
+    }
+    if (nodeData.pivot) {
+      node.setPivot(Vector2.create(nodeData.pivot[0], nodeData.pivot[1]));
+    }
+    if (nodeData.anchor) {
+      node.setAnchor(Vector2.create(nodeData.anchor[0], nodeData.anchor[1]));
+    }
+    if (nodeData.contentSize) {
+      node.setContentSize(Vector2.create(nodeData.contentSize[0], nodeData.contentSize[1]));
+    }
+    if (nodeData.interactable !== void 0) {
+      node.setInteractable(nodeData.interactable);
+    }
+    const componentDataList = nodeData.components || [];
+    let widgetComponent = null;
+    for (const componentData of componentDataList) {
+      const componentType = COMPONENT_TYPE_TABLE[componentData.type];
+      const propertyHandler = COMPONENT_PROPERTY_TABLE[componentData.type];
+      if (!componentType) {
+        continue;
+      }
+      const component = node.addComponent(componentType);
+      if (propertyHandler) {
+        propertyHandler.load(component, componentData);
+        _UIDocument.loadNodeReferences(component, componentData);
+      } else {
+        _UIDocument.loadByReflection(component, componentData);
+      }
+      if (component instanceof UIView) {
+        widgetComponent = component;
+      }
+    }
+    const childDataList = nodeData.children || [];
+    for (const childData of childDataList) {
+      node.addChild(_UIDocument.deserializeNode(childData));
+    }
+    const contentChildDataList = nodeData.contentChildren || [];
+    if (widgetComponent && contentChildDataList.length > 0) {
+      const contentNode = widgetComponent.getContent();
+      if (contentNode) {
+        for (const contentChildData of contentChildDataList) {
+          contentNode.addChild(_UIDocument.deserializeNode(contentChildData));
+        }
+      }
+    }
+    return node;
+  }
+  //==============================================================================
+  // 노드 트리 → JSON 문자열. (정적)
+  //==============================================================================
+  /**
+   * @param { WorldNode } rootNode
+   * @param { boolean } isPretty
+   * @returns { string }
+   */
+  static toJsonText(rootNode, isPretty = true) {
+    deserializeRootNode = rootNode;
+    const documentData = {
+      version: UIDOCUMENT_VERSION,
+      root: _UIDocument.serializeNode(rootNode)
+    };
+    deserializeRootNode = null;
+    const jsonText = isPretty ? System33.JSON.stringify(documentData, null, "	") : System33.JSON.stringify(documentData);
+    return jsonText;
+  }
+  //==============================================================================
+  // JSON 문자열 → 노드 트리. (정적)
+  //==============================================================================
+  /**
+   * @param { string } jsonText
+   * @returns { WorldNode }
+   */
+  static fromJsonText(jsonText) {
+    const documentData = System33.JSON.parse(jsonText);
+    if (!documentData || !documentData.root) {
+      throw new Error("UIDocument: invalid document.");
+    }
+    pendingNodeReferenceList.length = 0;
+    const rootNode = _UIDocument.deserializeNode(documentData.root);
+    for (const pendingReference of pendingNodeReferenceList) {
+      const referencedNode = _UIDocument.findNodeByPath(rootNode, pendingReference.path);
+      if (referencedNode) {
+        pendingReference.target[pendingReference.setterName](referencedNode);
+      }
+    }
+    pendingNodeReferenceList.length = 0;
+    return rootNode;
+  }
+  //==============================================================================
+  // 지원 컴포넌트 타입 이름 목록 반환. (정적 — 편집 도구의 컴포넌트 추가 메뉴용)
+  //==============================================================================
+  /**
+   * @returns { string[] }
+   */
+  static getComponentTypeNames() {
+    const typeNames = System33.Object.keys(COMPONENT_TYPE_TABLE);
+    return typeNames;
+  }
+  //==============================================================================
+  // 컴포넌트 타입 이름으로 생성자 반환. (정적)
+  //==============================================================================
+  /**
+   * @param { string } typeName
+   * @returns { * }
+   */
+  static getComponentType(typeName) {
+    const componentType = COMPONENT_TYPE_TABLE[typeName];
+    return componentType;
+  }
+  //==============================================================================
+  // 노드를 가리키는 속성만 따로 적는다.
+  //==============================================================================
+  /**
+   * @param { Component } component
+   * @param { object } componentData
+   */
+  static saveNodeReferences(component, componentData) {
+    for (const property of collectReflectedProperties(component)) {
+      let currentValue = null;
+      try {
+        currentValue = component[property.getterName]();
+      } catch (exception) {
+        continue;
+      }
+      if (!(currentValue instanceof WorldNode)) {
+        continue;
+      }
+      const referencePath = _UIDocument.findNodePath(_UIDocument.getSerializeRootNode(), currentValue);
+      if (referencePath !== null) {
+        componentData[property.name] = { [NODE_REFERENCE_KEY]: referencePath };
+      }
+    }
+  }
+  //==============================================================================
+  // 노드를 가리키는 속성만 따로 잇는다.
+  //==============================================================================
+  /**
+   * @param { Component } component
+   * @param { object } componentData
+   */
+  static loadNodeReferences(component, componentData) {
+    for (const propertyName of System33.Object.keys(componentData)) {
+      const storedValue = componentData[propertyName];
+      if (!storedValue || typeof storedValue !== "object" || storedValue[NODE_REFERENCE_KEY] === void 0) {
+        continue;
+      }
+      const setterName = "set" + propertyName;
+      if (typeof component[setterName] !== "function") {
+        continue;
+      }
+      pendingNodeReferenceList.push({
+        target: component,
+        setterName,
+        path: storedValue[NODE_REFERENCE_KEY]
+      });
+    }
+  }
+  //==============================================================================
+  // UI 뿌리 기준 절대 경로 계산. (노드 참조를 문서에 적을 때 쓴다)
+  //==============================================================================
+  /**
+   * @param { WorldNode } rootNode
+   * @param { WorldNode } node
+   * @returns { string | null }
+   */
+  static findNodePath(rootNode, node) {
+    if (!rootNode || !node) {
+      return null;
+    }
+    const nameList = [];
+    let currentNode = node;
+    while (currentNode && currentNode !== rootNode) {
+      nameList.unshift(currentNode.getName());
+      currentNode = currentNode.getParent();
+    }
+    if (currentNode !== rootNode) {
+      return null;
+    }
+    return "/" + nameList.join("/");
+  }
+  //==============================================================================
+  // UI 뿌리 기준 절대 경로로 노드 찾기.
+  //==============================================================================
+  /**
+   * @param { WorldNode } rootNode
+   * @param { string } pathText
+   * @returns { WorldNode | null }
+   */
+  static findNodeByPath(rootNode, pathText) {
+    if (!rootNode || typeof pathText !== "string") {
+      return null;
+    }
+    const trimmedPath = pathText.replace(/^\//, "");
+    if (trimmedPath.length === 0) {
+      return rootNode;
+    }
+    let currentNode = rootNode;
+    for (const nodeName of trimmedPath.split("/")) {
+      let foundNode = null;
+      for (const childNode of currentNode.getChildren()) {
+        if (childNode.getName() === nodeName) {
+          foundNode = childNode;
+          break;
+        }
+      }
+      if (!foundNode) {
+        return null;
+      }
+      currentNode = foundNode;
+    }
+    return currentNode;
+  }
+  //==============================================================================
+  // 경로 계산 기준이 되는 뿌리 반환.
+  //==============================================================================
+  /**
+   * @returns { WorldNode }
+   */
+  static getSerializeRootNode() {
+    return deserializeRootNode;
+  }
+  //==============================================================================
+  // 노드 종류 등록.
+  // - 엔진에 노드가 늘어나면 등록만으로 문서가 그 종류를 다룬다.
+  //==============================================================================
+  /**
+   * @param { string } typeName
+   * @param { * } nodeType
+   */
+  static registerNodeType(typeName, nodeType) {
+    NODE_TYPE_TABLE[typeName] = nodeType;
+  }
+  //==============================================================================
+  // 컴포넌트 종류 등록.
+  //==============================================================================
+  /**
+   * @param { string } typeName
+   * @param { * } componentType
+   */
+  static registerComponentType(typeName, componentType) {
+    COMPONENT_TYPE_TABLE[typeName] = componentType;
+  }
+  //==============================================================================
+  // 짝이 맞는 get/set 속성으로 컴포넌트 저장.
+  // - 전용 핸들러가 없는 컴포넌트에 쓴다. 옮길 수 있는 값만 담는다.
+  //==============================================================================
+  /**
+   * @param { Component } component
+   * @returns { object }
+   */
+  static saveByReflection(component) {
+    const componentData = {};
+    for (const property of collectReflectedProperties(component)) {
+      let currentValue = null;
+      try {
+        currentValue = component[property.getterName]();
+      } catch (exception) {
+        continue;
+      }
+      if (typeof currentValue === "number" || typeof currentValue === "string" || typeof currentValue === "boolean") {
+        componentData[property.name] = currentValue;
+      } else if (currentValue instanceof Color) {
+        componentData[property.name] = colorToArray(currentValue);
+      } else if (currentValue instanceof Vector2) {
+        componentData[property.name] = [currentValue.x, currentValue.y];
+      } else if (currentValue instanceof WorldNode) {
+        const referencePath = _UIDocument.findNodePath(_UIDocument.getSerializeRootNode(), currentValue);
+        if (referencePath !== null) {
+          componentData[property.name] = { [NODE_REFERENCE_KEY]: referencePath };
+        }
+      }
+    }
+    return componentData;
+  }
+  //==============================================================================
+  // 짝이 맞는 get/set 속성으로 컴포넌트 복원.
+  //==============================================================================
+  /**
+   * @param { Component } component
+   * @param { object } componentData
+   */
+  static loadByReflection(component, componentData) {
+    for (const property of collectReflectedProperties(component)) {
+      const storedValue = componentData[property.name];
+      if (storedValue === void 0) {
+        continue;
+      }
+      let currentValue = null;
+      try {
+        currentValue = component[property.getterName]();
+      } catch (exception) {
+        continue;
+      }
+      if (storedValue && typeof storedValue === "object" && storedValue[NODE_REFERENCE_KEY] !== void 0) {
+        pendingNodeReferenceList.push({
+          target: component,
+          setterName: property.setterName,
+          path: storedValue[NODE_REFERENCE_KEY]
+        });
+        continue;
+      }
+      if (System33.Array.isArray(storedValue)) {
+        if (currentValue instanceof Color && storedValue.length === 4) {
+          component[property.setterName](arrayToColor(storedValue));
+        } else if (currentValue instanceof Vector2 && storedValue.length === 2) {
+          component[property.setterName](Vector2.create(storedValue[0], storedValue[1]));
+        }
+        continue;
+      }
+      if (typeof storedValue === typeof currentValue) {
+        component[property.setterName](storedValue);
+      }
+    }
+  }
+};
+
 // src/ui/uisnapscrollview.js
-var System32 = globalThis;
+var System34 = globalThis;
 var UISnapScrollView = class extends UIScrollView {
   static {
     __name(this, "UISnapScrollView");
@@ -20632,8 +21673,8 @@ var UISnapScrollView = class extends UIScrollView {
     const snapOffsets = this.computeSnapOffsets();
     const snapCurrentIndex = this.getSnapCurrentIndex();
     const maxIndex = children.length - 1;
-    const prevIndex = System32.Math.max(0, snapCurrentIndex - 1);
-    const nextIndex = System32.Math.min(maxIndex, snapCurrentIndex + 1);
+    const prevIndex = System34.Math.max(0, snapCurrentIndex - 1);
+    const nextIndex = System34.Math.min(maxIndex, snapCurrentIndex + 1);
     const isHorizontal = this.isHorizontal();
     const currentOffset = this.getScrollOffset();
     if (isHorizontal) {
@@ -20714,7 +21755,7 @@ var UISnapScrollView = class extends UIScrollView {
       const candidateChildContentSize = candidateChild.getContentSize();
       const targetItemSize = isHorizontal ? candidateChildContentSize.x : candidateChildContentSize.y;
       const pageChangeThreshold = this.getPageChangeThreshold();
-      if (System32.Math.abs(dragAmount) >= targetItemSize * pageChangeThreshold) {
+      if (System34.Math.abs(dragAmount) >= targetItemSize * pageChangeThreshold) {
         targetIndex = candidateIndex;
       } else {
         targetIndex = snapCurrentIndex;
@@ -20920,7 +21961,7 @@ var AnimationClip = class extends Object2 {
 };
 
 // src/resource/blobasset.js
-var System33 = globalThis;
+var System35 = globalThis;
 var BlobAsset = class extends Asset {
   static {
     __name(this, "BlobAsset");
@@ -20951,7 +21992,7 @@ var BlobAsset = class extends Asset {
       return Promise.resolve();
     }
     await super.load(assetPath);
-    const response = await System33.fetch(assetPath);
+    const response = await System35.fetch(assetPath);
     this.#blob = await response.blob();
     this.setLoaded(true);
   }
@@ -20967,7 +22008,7 @@ var BlobAsset = class extends Asset {
 };
 
 // src/resource/textasset.js
-var System34 = globalThis;
+var System36 = globalThis;
 var TextAsset = class extends Asset {
   static {
     __name(this, "TextAsset");
@@ -20995,11 +22036,11 @@ var TextAsset = class extends Asset {
   async load(assetPath) {
     const isLoaded = this.isLoaded();
     if (isLoaded) {
-      return System34.Promise.resolve();
+      return System36.Promise.resolve();
     }
     try {
       await super.load(assetPath);
-      const response = await System34.fetch(assetPath);
+      const response = await System36.fetch(assetPath);
       this.text = await response.text();
       this.setLoaded(true);
     } catch (error) {
@@ -21020,7 +22061,7 @@ var TextAsset = class extends Asset {
 };
 
 // src/resource/jsonasset.js
-var System35 = globalThis;
+var System37 = globalThis;
 var JsonAsset = class extends TextAsset {
   static {
     __name(this, "JsonAsset");
@@ -21048,7 +22089,7 @@ var JsonAsset = class extends TextAsset {
   async load(assetPath) {
     const isLoaded = this.isLoaded();
     if (isLoaded) {
-      return System35.Promise.resolve();
+      return System37.Promise.resolve();
     }
     try {
       await super.load(assetPath);
@@ -21238,12 +22279,12 @@ var ImageScroller = class extends Object2 {
 };
 
 // src/misc/toucheffect.js
-var System36 = globalThis;
+var System38 = globalThis;
 var PARTICLE_GRADIENT_CANVAS_SIZE = 64;
 var particleGradientCanvas = null;
 function getParticleGradientCanvas() {
   if (particleGradientCanvas === null) {
-    const canvas = System36.document.createElement("canvas");
+    const canvas = System38.document.createElement("canvas");
     canvas.width = PARTICLE_GRADIENT_CANVAS_SIZE;
     canvas.height = PARTICLE_GRADIENT_CANVAS_SIZE;
     const canvasRenderingContext = canvas.getContext("2d");
@@ -22399,7 +23440,7 @@ var Stack = class extends Object2 {
 };
 
 // src/experimental/collection/set.js
-var System37 = globalThis;
+var System39 = globalThis;
 var Set2 = class _Set extends Object2 {
   static {
     __name(this, "Set");
@@ -22417,7 +23458,7 @@ var Set2 = class _Set extends Object2 {
    */
   constructor() {
     super();
-    this.#items = new System37.Set();
+    this.#items = new System39.Set();
   }
   //==============================================================================
   // 데이터 추가.
@@ -23096,7 +24137,7 @@ var FullscreenPass = class extends Object2 {
 };
 
 // src/experimental/graphics/bloomeffect.js
-var System38 = globalThis;
+var System40 = globalThis;
 var BRIGHTPASS_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -23176,8 +24217,8 @@ var BloomEffect = class extends Object2 {
    * @param { number } sceneHeight
    */
   resize(sceneWidth, sceneHeight) {
-    const halfWidth = System38.Math.max(1, sceneWidth >> 1);
-    const halfHeight = System38.Math.max(1, sceneHeight >> 1);
+    const halfWidth = System40.Math.max(1, sceneWidth >> 1);
+    const halfHeight = System40.Math.max(1, sceneHeight >> 1);
     this.#pingRenderTarget.resize(halfWidth, halfHeight);
     this.#pongRenderTarget.resize(halfWidth, halfHeight);
   }
@@ -23323,7 +24364,7 @@ var BloomEffect = class extends Object2 {
 };
 
 // src/experimental/graphics/fbxloader.js
-var System39 = globalThis;
+var System41 = globalThis;
 var FBX_TIME_UNIT = 46186158e3;
 var FbxLoader = class _FbxLoader extends Object2 {
   static {
@@ -23352,7 +24393,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     super();
     this.#dataView = null;
     this.#fileBytes = null;
-    this.#textDecoder = new System39.TextDecoder();
+    this.#textDecoder = new System41.TextDecoder();
     this.#readCursor = 0;
     this.#useWideOffsets = false;
   }
@@ -23364,7 +24405,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Promise<object> }
    */
   static async loadFromUrl(url) {
-    const response = await System39.fetch(url);
+    const response = await System41.fetch(url);
     if (!response.ok) {
       throw new Error(`FbxLoader load failed: ${url}`);
     }
@@ -23381,8 +24422,8 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Promise<object> }
    */
   async parse(arrayBuffer) {
-    this.#fileBytes = new System39.Uint8Array(arrayBuffer);
-    this.#dataView = new System39.DataView(arrayBuffer);
+    this.#fileBytes = new System41.Uint8Array(arrayBuffer);
+    this.#dataView = new System41.DataView(arrayBuffer);
     const magicText = this.#textDecoder.decode(this.#fileBytes.subarray(0, 20));
     if (!magicText.startsWith("Kaydara FBX Binary")) {
       throw new Error("FbxLoader: not a binary FBX file.");
@@ -23410,7 +24451,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
   readOffsetValue() {
     const dataView = this.getDataView();
     if (this.#useWideOffsets) {
-      const value2 = System39.Number(dataView.getBigUint64(this.#readCursor, true));
+      const value2 = System41.Number(dataView.getBigUint64(this.#readCursor, true));
       this.#readCursor += 8;
       return value2;
     }
@@ -23479,8 +24520,8 @@ var FbxLoader = class _FbxLoader extends Object2 {
       sourceBytes = fileBytes.subarray(this.#readCursor, this.#readCursor + rawByteLength);
       this.#readCursor += rawByteLength;
     }
-    const elementView = new System39.DataView(sourceBytes.buffer, sourceBytes.byteOffset, sourceBytes.byteLength);
-    const resultArray = new System39.Array(arrayLength);
+    const elementView = new System41.DataView(sourceBytes.buffer, sourceBytes.byteOffset, sourceBytes.byteLength);
+    const resultArray = new System41.Array(arrayLength);
     for (let elementIndex = 0; elementIndex < arrayLength; ++elementIndex) {
       resultArray[elementIndex] = readElement(elementView, elementIndex * elementByteSize);
     }
@@ -23494,12 +24535,12 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Promise<Uint8Array> }
    */
   async inflate(compressedBytes) {
-    const decompressionStream = new System39.DecompressionStream("deflate");
-    const sourceResponse = new System39.Response(compressedBytes);
+    const decompressionStream = new System41.DecompressionStream("deflate");
+    const sourceResponse = new System41.Response(compressedBytes);
     const decompressedStream = sourceResponse.body.pipeThrough(decompressionStream);
-    const decompressedResponse = new System39.Response(decompressedStream);
+    const decompressedResponse = new System41.Response(decompressedStream);
     const decompressedArrayBuffer = await decompressedResponse.arrayBuffer();
-    const decompressedBytes = new System39.Uint8Array(decompressedArrayBuffer);
+    const decompressedBytes = new System41.Uint8Array(decompressedArrayBuffer);
     return decompressedBytes;
   }
   //==============================================================================
@@ -23512,7 +24553,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     const dataView = this.getDataView();
     const fileBytes = this.getFileBytes();
     const textDecoder = this.getTextDecoder();
-    const typeCode = System39.String.fromCharCode(dataView.getUint8(this.#readCursor));
+    const typeCode = System41.String.fromCharCode(dataView.getUint8(this.#readCursor));
     this.#readCursor += 1;
     switch (typeCode) {
       case "Y": {
@@ -23541,7 +24582,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         return { type: typeCode, value };
       }
       case "L": {
-        const value = System39.Number(dataView.getBigInt64(this.#readCursor, true));
+        const value = System41.Number(dataView.getBigInt64(this.#readCursor, true));
         this.#readCursor += 8;
         return { type: typeCode, value };
       }
@@ -23554,7 +24595,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         return { type: typeCode, value };
       }
       case "l": {
-        const value = await this.readArrayProperty(8, (view, offset) => System39.Number(view.getBigInt64(offset, true)));
+        const value = await this.readArrayProperty(8, (view, offset) => System41.Number(view.getBigInt64(offset, true)));
         return { type: typeCode, value };
       }
       case "i": {
@@ -23607,7 +24648,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         propertyConnectionList.push({ sourceId, destinationId, propertyName });
       }
     }
-    const objectById = new System39.Map();
+    const objectById = new System41.Map();
     for (const objectNode of objectsNode.children) {
       const objectId = objectNode.properties[0].value;
       objectById.set(objectId, objectNode);
@@ -23641,7 +24682,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Map<number, object> }
    */
   interpretGeometries(objectsNode) {
-    const geometryById = new System39.Map();
+    const geometryById = new System41.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Geometry") {
         continue;
@@ -23695,11 +24736,11 @@ var FbxLoader = class _FbxLoader extends Object2 {
     const uvReader = this.buildLayerReader(geometryNode, "LayerElementUV", "UV", 2);
     const materialLayer = this.buildMaterialLayer(geometryNode);
     const triangleCount = cornerVertexIndices.length / 3;
-    const outputPositions = new System39.Float32Array(cornerVertexIndices.length * 3);
-    const outputNormals = new System39.Float32Array(cornerVertexIndices.length * 3);
-    const outputTextureCoordinates = new System39.Float32Array(cornerVertexIndices.length * 2);
-    const outputOriginalVertexIndices = new System39.Int32Array(cornerVertexIndices.length);
-    const materialIndexPerTriangle = new System39.Int32Array(triangleCount);
+    const outputPositions = new System41.Float32Array(cornerVertexIndices.length * 3);
+    const outputNormals = new System41.Float32Array(cornerVertexIndices.length * 3);
+    const outputTextureCoordinates = new System41.Float32Array(cornerVertexIndices.length * 2);
+    const outputOriginalVertexIndices = new System41.Int32Array(cornerVertexIndices.length);
+    const materialIndexPerTriangle = new System41.Int32Array(triangleCount);
     for (let cornerIndex = 0; cornerIndex < cornerVertexIndices.length; ++cornerIndex) {
       const originalVertexIndex = cornerVertexIndices[cornerIndex];
       const polygonVertexPosition = cornerPolygonVertexPositions[cornerIndex];
@@ -23744,7 +24785,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     const layerNode = geometryNode.children.find((child) => child.name === layerElementName);
     if (!layerNode) {
       return () => {
-        const zeroVector = new System39.Array(componentCount).fill(0);
+        const zeroVector = new System41.Array(componentCount).fill(0);
         return zeroVector;
       };
     }
@@ -23769,7 +24810,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
       if (referenceType === "IndexToDirect" && indexArray) {
         dataIndex = indexArray[mappedIndex];
       }
-      const componentValues = new System39.Array(componentCount);
+      const componentValues = new System41.Array(componentCount);
       for (let componentIndex = 0; componentIndex < componentCount; ++componentIndex) {
         componentValues[componentIndex] = dataArray[dataIndex * componentCount + componentIndex];
       }
@@ -23810,8 +24851,8 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { object }
    */
   interpretSkins(objectsNode, objectConnectionList) {
-    const skinDeformerById = new System39.Map();
-    const clusterById = new System39.Map();
+    const skinDeformerById = new System41.Map();
+    const clusterById = new System41.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Deformer") {
         continue;
@@ -23855,7 +24896,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Map<number, object> }
    */
   interpretVideos(objectsNode) {
-    const videoById = new System39.Map();
+    const videoById = new System41.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Video") {
         continue;
@@ -23869,7 +24910,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
       };
       videoById.set(videoId, video);
     }
-    const contentByFileName = new System39.Map();
+    const contentByFileName = new System41.Map();
     for (const video of videoById.values()) {
       if (!video.contentBytes || video.contentBytes.length === 0) {
         continue;
@@ -23913,7 +24954,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Map<number, object> }
    */
   interpretTextures(objectsNode, objectConnectionList) {
-    const textureById = new System39.Map();
+    const textureById = new System41.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Texture") {
         continue;
@@ -23944,7 +24985,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Map<number, object> }
    */
   interpretMaterials(objectsNode, propertyConnectionList, textureById) {
-    const materialById = new System39.Map();
+    const materialById = new System41.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Material") {
         continue;
@@ -24008,7 +25049,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    */
   interpretModels(objectsNode, objectConnectionList, geometryById, skinDeformerById, materialById) {
     const nodeList = [];
-    const nodeIdToIndex = new System39.Map();
+    const nodeIdToIndex = new System41.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Model") {
         continue;
@@ -24093,10 +25134,10 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { object[] }
    */
   interpretAnimations(objectsNode, objectConnectionList, propertyConnectionList, nodeIdToIndex) {
-    const curveById = new System39.Map();
-    const curveNodeById = new System39.Map();
+    const curveById = new System41.Map();
+    const curveNodeById = new System41.Map();
     const layerIds = [];
-    const stackById = new System39.Map();
+    const stackById = new System41.Map();
     for (const objectNode of objectsNode.children) {
       const objectId = objectNode.properties[0].value;
       if (objectNode.name === "AnimationCurve") {
@@ -24125,7 +25166,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         curveNode.targetProperty = connection.propertyName;
       }
     }
-    const layerIdByCurveNodeId = new System39.Map();
+    const layerIdByCurveNodeId = new System41.Map();
     for (const connection of objectConnectionList) {
       if (layerIds.includes(connection.sourceId) && stackById.has(connection.destinationId)) {
         const stack = stackById.get(connection.destinationId);
@@ -24149,7 +25190,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         const channelResult = this.buildAnimationChannel(curveNode, curveById, nodeIdToIndex);
         if (channelResult) {
           channelList.push(channelResult.channel);
-          duration = System39.Math.max(duration, channelResult.duration);
+          duration = System41.Math.max(duration, channelResult.duration);
         }
       }
       animationList.push({ name: stack.name, duration, channels: channelList });
@@ -24178,7 +25219,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
       return null;
     }
     const channelNames = ["X", "Y", "Z"];
-    const timeSet = new System39.Set();
+    const timeSet = new System41.Set();
     for (const channelName of channelNames) {
       const curveId = curveNode.curveByChannel[channelName];
       if (curveId === void 0) {
@@ -24189,13 +25230,13 @@ var FbxLoader = class _FbxLoader extends Object2 {
         timeSet.add(keyTime);
       }
     }
-    const sortedTimes = System39.Array.from(timeSet).sort((left, right) => left - right);
+    const sortedTimes = System41.Array.from(timeSet).sort((left, right) => left - right);
     if (sortedTimes.length === 0) {
       return null;
     }
     const componentCount = path === "rotation" ? 3 : 3;
-    const times = new System39.Float32Array(sortedTimes.length);
-    const values = new System39.Float32Array(sortedTimes.length * componentCount);
+    const times = new System41.Float32Array(sortedTimes.length);
+    const values = new System41.Float32Array(sortedTimes.length * componentCount);
     for (let timeIndex = 0; timeIndex < sortedTimes.length; ++timeIndex) {
       times[timeIndex] = sortedTimes[timeIndex] / FBX_TIME_UNIT;
       for (let channelIndex = 0; channelIndex < 3; ++channelIndex) {
@@ -24278,7 +25319,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
 };
 
 // src/experimental/graphics/material.js
-var System40 = globalThis;
+var System42 = globalThis;
 var TEXTURE_UNIT_BASECOLOR = 0;
 var TEXTURE_UNIT_NORMAL = 2;
 var TEXTURE_UNIT_METALLICROUGHNESS = 3;
@@ -24416,13 +25457,13 @@ var Material = class _Material extends Object2 {
     const glTexture = webGL2RenderingContext.createTexture();
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, glTexture);
     if (!imageDescription || !imageDescription.bytes || imageDescription.bytes.length === 0) {
-      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System40.Uint8Array(fallbackColor));
+      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System42.Uint8Array(fallbackColor));
       return glTexture;
     }
     const blobOptions = imageDescription.mimeType ? { type: imageDescription.mimeType } : {};
-    const imageBlob = new System40.Blob([imageDescription.bytes], blobOptions);
+    const imageBlob = new System42.Blob([imageDescription.bytes], blobOptions);
     const bitmapOptions = imageDescription.flipY ? { imageOrientation: "flipY" } : {};
-    const imageBitmap = await System40.createImageBitmap(imageBlob, bitmapOptions);
+    const imageBitmap = await System42.createImageBitmap(imageBlob, bitmapOptions);
     webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, imageBitmap);
     webGL2RenderingContext.generateMipmap(webGL2RenderingContext.TEXTURE_2D);
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR_MIPMAP_LINEAR);
@@ -24558,14 +25599,14 @@ var Material = class _Material extends Object2 {
 };
 
 // src/experimental/graphics/skinnedmodel.js
-var System41 = globalThis;
+var System43 = globalThis;
 var GLB_CHUNKTYPE_JSON = 1313821514;
 var GLB_CHUNKTYPE_BINARY = 5130562;
 var COMPONENT_ARRAY_TABLE = {
-  5121: System41.Uint8Array,
-  5123: System41.Uint16Array,
-  5125: System41.Uint32Array,
-  5126: System41.Float32Array
+  5121: System43.Uint8Array,
+  5123: System43.Uint16Array,
+  5125: System43.Uint32Array,
+  5126: System43.Float32Array
 };
 var TYPE_COMPONENT_COUNT_TABLE = {
   SCALAR: 1,
@@ -24575,7 +25616,7 @@ var TYPE_COMPONENT_COUNT_TABLE = {
   MAT4: 16
 };
 function createQuaternionFromFbxEuler(xDegree, yDegree, zDegree) {
-  const degreeToRadian2 = System41.Math.PI / 180;
+  const degreeToRadian2 = System43.Math.PI / 180;
   const rotationX = Quaternion.createFromEuler(xDegree * degreeToRadian2, 0, 0);
   const rotationY = Quaternion.createFromEuler(0, yDegree * degreeToRadian2, 0);
   const rotationZ = Quaternion.createFromEuler(0, 0, zDegree * degreeToRadian2);
@@ -24595,7 +25636,7 @@ function convertFbxAnimationChannels(sceneData, fbxAnimation, resolveNodeIndex) 
       const sourceFbxNode = sceneData.nodeList[fbxChannel.nodeIndex];
       const preRotationQuaternion = createQuaternionFromFbxEuler(sourceFbxNode.preRotationDegrees[0], sourceFbxNode.preRotationDegrees[1], sourceFbxNode.preRotationDegrees[2]);
       const keyCount = fbxChannel.times.length;
-      const quaternionValues = new System41.Float32Array(keyCount * 4);
+      const quaternionValues = new System43.Float32Array(keyCount * 4);
       for (let keyIndex = 0; keyIndex < keyCount; ++keyIndex) {
         const eulerQuaternion = createQuaternionFromFbxEuler(fbxChannel.values[keyIndex * 3], fbxChannel.values[keyIndex * 3 + 1], fbxChannel.values[keyIndex * 3 + 2]);
         const rotationQuaternion = preRotationQuaternion.multiply(eulerQuaternion);
@@ -24673,7 +25714,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     this.#fadeDuration = 0;
     this.#fadeElapsed = 0;
     this.#timeScale = 1;
-    this.#jointRotationOffsets = new System41.Map();
+    this.#jointRotationOffsets = new System43.Map();
   }
   //==============================================================================
   // URL 로부터 로드. (정적 — GLB 바이너리 glTF)
@@ -24685,7 +25726,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    * @returns { Promise<SkinnedModel> }
    */
   static async loadFromUrl(webGL2RenderingContext, url, skinnedModelRenderer) {
-    const response = await System41.fetch(url);
+    const response = await System43.fetch(url);
     if (!response.ok) {
       throw new Error(`SkinnedModel load failed: ${url}`);
     }
@@ -24718,7 +25759,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    * @param { ArrayBuffer } arrayBuffer
    */
   async parseBinary(arrayBuffer) {
-    const dataView = new System41.DataView(arrayBuffer);
+    const dataView = new System43.DataView(arrayBuffer);
     if (dataView.getUint32(0, true) !== 1179937895) {
       throw new Error("SkinnedModel: not a GLB file.");
     }
@@ -24730,9 +25771,9 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       const chunkType = dataView.getUint32(chunkOffset + 4, true);
       const chunkStart = chunkOffset + 8;
       if (chunkType === GLB_CHUNKTYPE_JSON) {
-        const jsonBytes = new System41.Uint8Array(arrayBuffer, chunkStart, chunkLength);
-        const jsonText = new System41.TextDecoder().decode(jsonBytes);
-        json = System41.JSON.parse(jsonText);
+        const jsonBytes = new System43.Uint8Array(arrayBuffer, chunkStart, chunkLength);
+        const jsonText = new System43.TextDecoder().decode(jsonBytes);
+        json = System43.JSON.parse(jsonText);
       } else if (chunkType === GLB_CHUNKTYPE_BINARY) {
         binaryBuffer = arrayBuffer.slice(chunkStart, chunkStart + chunkLength);
       }
@@ -24802,7 +25843,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return {
         jointNodeIndices: skin.joints.slice(),
         inverseBindMatrices,
-        jointMatrixArray: new System41.Float32Array(skin.joints.length * 16)
+        jointMatrixArray: new System43.Float32Array(skin.joints.length * 16)
       };
     });
     function createImageDescription(textureInfo) {
@@ -24812,7 +25853,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       const texture = json.textures[textureInfo.index];
       const image = json.images[texture.source];
       const bufferView = json.bufferViews[image.bufferView];
-      const imageBytes = new System41.Uint8Array(binaryBuffer, bufferView.byteOffset || 0, bufferView.byteLength);
+      const imageBytes = new System43.Uint8Array(binaryBuffer, bufferView.byteOffset || 0, bufferView.byteLength);
       return { bytes: imageBytes, mimeType: image.mimeType, flipY: false };
     }
     __name(createImageDescription, "createImageDescription");
@@ -24843,13 +25884,13 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       }
       const mesh = json.meshes[node.meshIndex];
       for (const primitive of mesh.primitives) {
-        const positions = new System41.Float32Array(readAccessorArray(primitive.attributes.POSITION));
-        const normals = primitive.attributes.NORMAL !== void 0 ? new System41.Float32Array(readAccessorArray(primitive.attributes.NORMAL)) : null;
-        const textureCoordinates = primitive.attributes.TEXCOORD_0 !== void 0 ? new System41.Float32Array(readAccessorArray(primitive.attributes.TEXCOORD_0)) : null;
-        const joints = new System41.Uint16Array(readAccessorArray(primitive.attributes.JOINTS_0));
+        const positions = new System43.Float32Array(readAccessorArray(primitive.attributes.POSITION));
+        const normals = primitive.attributes.NORMAL !== void 0 ? new System43.Float32Array(readAccessorArray(primitive.attributes.NORMAL)) : null;
+        const textureCoordinates = primitive.attributes.TEXCOORD_0 !== void 0 ? new System43.Float32Array(readAccessorArray(primitive.attributes.TEXCOORD_0)) : null;
+        const joints = new System43.Uint16Array(readAccessorArray(primitive.attributes.JOINTS_0));
         const weightAccessor = json.accessors[primitive.attributes.WEIGHTS_0];
         const weightSource = readAccessorArray(primitive.attributes.WEIGHTS_0);
-        const weights = new System41.Float32Array(weightSource.length);
+        const weights = new System43.Float32Array(weightSource.length);
         if (weightAccessor.componentType === 5126) {
           weights.set(weightSource);
         } else {
@@ -24861,7 +25902,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         let indices = null;
         if (primitive.indices !== void 0) {
           const indexSource = readAccessorArray(primitive.indices);
-          indices = indexSource instanceof System41.Uint8Array ? new System41.Uint16Array(indexSource) : indexSource;
+          indices = indexSource instanceof System43.Uint8Array ? new System43.Uint16Array(indexSource) : indexSource;
         }
         meshDescriptionList.push({
           positions,
@@ -24883,7 +25924,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         const times = readAccessorArray(sampler.input);
         const values = readAccessorArray(sampler.output);
         if (times.length > 0) {
-          duration = System41.Math.max(duration, times[times.length - 1]);
+          duration = System43.Math.max(duration, times[times.length - 1]);
         }
         return {
           nodeIndex: channel.target.node,
@@ -24925,7 +25966,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       };
     });
     this.#rootNodeIndices = sceneData.rootNodeIndices.slice();
-    const skinIdList = System41.Array.from(sceneData.skinDeformerById.keys());
+    const skinIdList = System43.Array.from(sceneData.skinDeformerById.keys());
     this.#skinList = skinIdList.map((skinId) => {
       const skinDeformer = sceneData.skinDeformerById.get(skinId);
       const jointNodeIndices = [];
@@ -24950,7 +25991,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return {
         jointNodeIndices,
         inverseBindMatrices,
-        jointMatrixArray: new System41.Float32Array(jointNodeIndices.length * 16)
+        jointMatrixArray: new System43.Float32Array(jointNodeIndices.length * 16)
       };
     });
     function createFbxImageDescription(textureId) {
@@ -24968,7 +26009,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return { bytes: video.contentBytes, mimeType: null, flipY: true };
     }
     __name(createFbxImageDescription, "createFbxImageDescription");
-    const materialIdList = System41.Array.from(sceneData.materialById.keys());
+    const materialIdList = System43.Array.from(sceneData.materialById.keys());
     const materialDescriptionList = materialIdList.map((materialId) => {
       const fbxMaterial = sceneData.materialById.get(materialId);
       const description = Material.createDefaultDescription();
@@ -24996,7 +26037,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       if (!geometry) {
         continue;
       }
-      const influencesPerVertex = new System41.Array(geometry.originalVertexCount);
+      const influencesPerVertex = new System43.Array(geometry.originalVertexCount);
       for (let vertexIndex = 0; vertexIndex < geometry.originalVertexCount; ++vertexIndex) {
         influencesPerVertex[vertexIndex] = [];
       }
@@ -25008,13 +26049,13 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
           influencesPerVertex[vertexIndex].push({ jointIndex: clusterLocalIndex, weight });
         }
       }
-      const vertexJointArray = new System41.Uint16Array(geometry.originalVertexCount * 4);
-      const vertexWeightArray = new System41.Float32Array(geometry.originalVertexCount * 4);
+      const vertexJointArray = new System43.Uint16Array(geometry.originalVertexCount * 4);
+      const vertexWeightArray = new System43.Float32Array(geometry.originalVertexCount * 4);
       for (let vertexIndex = 0; vertexIndex < geometry.originalVertexCount; ++vertexIndex) {
         const influenceList = influencesPerVertex[vertexIndex];
         influenceList.sort((left, right) => right.weight - left.weight);
         let weightSum = 0;
-        const usedCount = System41.Math.min(4, influenceList.length);
+        const usedCount = System43.Math.min(4, influenceList.length);
         for (let slotIndex = 0; slotIndex < usedCount; ++slotIndex) {
           weightSum += influenceList[slotIndex].weight;
         }
@@ -25027,8 +26068,8 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         }
       }
       const cornerCount = geometry.cornerCount;
-      const cornerJointArray = new System41.Uint16Array(cornerCount * 4);
-      const cornerWeightArray = new System41.Float32Array(cornerCount * 4);
+      const cornerJointArray = new System43.Uint16Array(cornerCount * 4);
+      const cornerWeightArray = new System43.Float32Array(cornerCount * 4);
       for (let cornerIndex = 0; cornerIndex < cornerCount; ++cornerIndex) {
         const originalVertexIndex = geometry.originalVertexIndices[cornerIndex];
         for (let slotIndex = 0; slotIndex < 4; ++slotIndex) {
@@ -25074,7 +26115,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
   async addAnimationsFromFbxUrl(url, clipName, ignoreTranslation = false) {
     const sceneData = await FbxLoader.loadFromUrl(url);
     const nodeList = this.getNodeList();
-    const nodeIndexByName = new System41.Map();
+    const nodeIndexByName = new System43.Map();
     for (let nodeIndex = 0; nodeIndex < nodeList.length; ++nodeIndex) {
       nodeIndexByName.set(nodeList[nodeIndex].name, nodeIndex);
     }
@@ -25132,7 +26173,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
         webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, meshDescription.indices, webGL2RenderingContext.STATIC_DRAW);
         indexCount = meshDescription.indices.length;
-        indexComponentType = meshDescription.indices instanceof System41.Uint32Array ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
+        indexComponentType = meshDescription.indices instanceof System43.Uint32Array ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
       }
       webGL2RenderingContext.bindVertexArray(null);
       const material = meshDescription.materialIndex >= 0 && materialList[meshDescription.materialIndex] ? materialList[meshDescription.materialIndex] : defaultMaterial;
@@ -25157,7 +26198,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    * @returns { Float32Array }
    */
   generateSmoothNormals(positions, indices) {
-    const normals = new System41.Float32Array(positions.length);
+    const normals = new System43.Float32Array(positions.length);
     const triangleCount = indices ? indices.length / 3 : positions.length / 9;
     for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
       const indexA = (indices ? indices[triangleIndex * 3] : triangleIndex * 3) * 3;
@@ -25183,7 +26224,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       normals[indexC + 2] += faceNormalZ;
     }
     for (let vertexIndex = 0; vertexIndex < normals.length; vertexIndex += 3) {
-      const normalLength = System41.Math.sqrt(normals[vertexIndex] * normals[vertexIndex] + normals[vertexIndex + 1] * normals[vertexIndex + 1] + normals[vertexIndex + 2] * normals[vertexIndex + 2]);
+      const normalLength = System43.Math.sqrt(normals[vertexIndex] * normals[vertexIndex] + normals[vertexIndex + 1] * normals[vertexIndex + 1] + normals[vertexIndex + 2] * normals[vertexIndex + 2]);
       if (normalLength > 0) {
         normals[vertexIndex] /= normalLength;
         normals[vertexIndex + 1] /= normalLength;
@@ -25286,9 +26327,9 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         channel.cursor += 1;
       }
       const frameIndex = channel.cursor;
-      const nextIndex = System41.Math.min(frameIndex + 1, keyCount - 1);
+      const nextIndex = System43.Math.min(frameIndex + 1, keyCount - 1);
       const spanDuration = times[nextIndex] - times[frameIndex];
-      const factor = spanDuration > 0 ? System41.Math.max(0, System41.Math.min(1, (loopedTime - times[frameIndex]) / spanDuration)) : 0;
+      const factor = spanDuration > 0 ? System43.Math.max(0, System43.Math.min(1, (loopedTime - times[frameIndex]) / spanDuration)) : 0;
       if (channel.path === "rotation") {
         const baseOffset = frameIndex * 4;
         const nextOffset = nextIndex * 4;
@@ -25344,7 +26385,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     }
     if (this.#previousAnimation) {
       this.sampleAnimation(this.#previousAnimation, this.#previousTime, 1);
-      const blendWeight = System41.Math.min(this.#fadeElapsed / System41.Math.max(this.#fadeDuration, 1e-4), 1);
+      const blendWeight = System43.Math.min(this.#fadeElapsed / System43.Math.max(this.#fadeDuration, 1e-4), 1);
       this.sampleAnimation(currentAnimation, this.#currentTime, blendWeight);
     } else {
       this.sampleAnimation(currentAnimation, this.#currentTime, 1);
@@ -25888,7 +26929,7 @@ var SkinnedModelRenderer = class extends Object2 {
 };
 
 // src/experimental/graphics/shadowmap.js
-var System42 = globalThis;
+var System44 = globalThis;
 var ShadowMap = class extends Object2 {
   static {
     __name(this, "ShadowMap");
@@ -25956,8 +26997,8 @@ var ShadowMap = class extends Object2 {
     const viewMatrix = Matrix4.createLookAt(eyePosition, focusPosition, upDirection);
     const worldUnitsPerTexel = extent * 2 / this.getResolution();
     const viewElements = viewMatrix.getElements();
-    viewElements[12] = System42.Math.round(viewElements[12] / worldUnitsPerTexel) * worldUnitsPerTexel;
-    viewElements[13] = System42.Math.round(viewElements[13] / worldUnitsPerTexel) * worldUnitsPerTexel;
+    viewElements[12] = System44.Math.round(viewElements[12] / worldUnitsPerTexel) * worldUnitsPerTexel;
+    viewElements[13] = System44.Math.round(viewElements[13] / worldUnitsPerTexel) * worldUnitsPerTexel;
     const orthographicMatrix = Matrix4.createOrthographic(-extent, extent, -extent, extent, nearDistance, farDistance);
     const lightViewProjectionMatrix = orthographicMatrix.clone();
     lightViewProjectionMatrix.multiply(viewMatrix);
@@ -26342,7 +27383,7 @@ var BunchAsset = class extends BlobAsset {
 };
 
 // import.js
-var System43 = globalThis;
+var System45 = globalThis;
 export {
   Action,
   Animation,
@@ -26413,7 +27454,7 @@ export {
   SkinnedModelRenderer,
   Sprite,
   Stack,
-  System43 as System,
+  System45 as System,
   Text,
   TextAlign,
   TextAsset,
@@ -26427,10 +27468,12 @@ export {
   Tween,
   UIButton,
   UIControl,
+  UIDocument,
   UIImageView,
   UIInputField,
   UILabel,
   UINode,
+  UIProgressView,
   UIScene,
   UIScrollBar,
   UIScrollView,

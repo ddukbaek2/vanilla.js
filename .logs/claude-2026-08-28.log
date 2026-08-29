@@ -1,0 +1,72 @@
+# 2026-08-28 작업 로그 (Claude)
+
+## UI 편집 도구 1차 구축 — UIDocument + 엔진 UI 기반 에디터 [22:00 요청 → 22:30 응답]
+- 요청: CocoStudio 처럼 엔진의 UI 파일을 만들어내는 도구가 필요. 서버 없이 엔진만 받아
+  곧바로 실행 가능해야 하고, GUI 에서 마우스 조작으로 편집. "가능할까".
+
+### 실현 가능성 검증 (선행)
+- 핵심 제약은 file:// 에서 ES 모듈 import 가 CORS 로 차단되는 점.
+  → esbuild IIFE 번들을 HTML 에 인라인하면 해소됨을 실측 확인.
+     헤드리스 크롬으로 file:// 단독 실행: 엔진 부팅/UIScene/WebGL2 컨텍스트/패널 렌더 모두 정상.
+- 조사 결과 엔진에 직렬화 코드가 전무했다. (grep: toJSON/serialize/deserialize 전무)
+  → UI 파일 포맷과 런타임 로더를 신설해야 하는 작업임을 확인.
+
+### 사용자 결정 사항
+- 대상 UI 노선: WorldNode + UIView (수동 배치 — 게임 샘플이 쓰는 주력 노선)
+- 에디터 화면: 전부 엔진 UI 로 구현 (도그푸딩 — 엔진 UI 의 부족한 점을 드러내는 목적)
+- 저장 포맷: JSON + 런타임 로더 (CocoStudio 방식)
+
+### 엔진 추가: src/ui/uidocument.js (UIDocument)
+- WorldNode 트리 ↔ JSON 상호 변환. import.js 에 내보내기 추가.
+- 노드 속성: type/name/active/position(local)/scale/rotation/opacity/pivot/anchor/
+  contentSize/interactable + components + children(재귀).
+- 컴포넌트 속성 입출력 테이블(COMPONENT_PROPERTY_TABLE)로 타입별 save/load 분리:
+  Paint(color) / Sprite(color) / Text(text,fontSize,textColor,align,baseline) / RichText / Mask.
+  이미지처럼 런타임 리소스가 필요한 속성은 문서에 담지 않는다.
+- 검증: Node 로 왕복 변환 — 계층/크기/위치가 정확히 복원됨(747 bytes).
+
+### 도구 추가: tools/uieditor/
+- uieditor.js: 엔진 UI(WorldNode + Paint/Text)로 구성한 편집기 씬.
+  상단 툴바(+노드/+텍스트/삭제/저장/불러오기), 좌측 계층 트리, 중앙 편집 캔버스, 우측 속성 패널.
+  편집 대상 문서 트리는 캔버스 노드의 실제 자식이라 편집 화면 = 런타임 결과.
+  노드 클릭 선택, 드래그 이동, 우하단 손잡이로 크기 조절, 속성 숫자 칸 좌우 드래그로 값 조절.
+  저장은 Blob + <a download>, 불러오기는 <input type="file"> + FileReader — 서버 불필요.
+- build.mjs: esbuild IIFE 번들을 HTML 에 인라인해 단일 파일(uieditor.html, 0.38MB) 생성.
+
+### 발견한 엔진 이슈 (도그푸딩 성과)
+- WorldNode.getWorldBounds() 는 Rect 를 반환하는데 Rect 에는 x/y 접근자가 없다.
+  (position/size/width/height/left/top/right/bottom/min/max/center 만 존재)
+  편집기가 worldBounds.x 를 읽어 NaN → 히트 판정 전멸. left/top 으로 수정해 해결.
+  ※ 엔진 자체 버그는 아니나 Rect API 가 관례(x/y)와 어긋나 오용을 부르는 지점.
+- getWorldBounds() 의 코너 순회가 `i = 1` 부터 시작해 첫 코너를 빠뜨린다. (미수정 — 별건)
+- Scene.resize() 가 root.setPivot(Pivot.topLeft) 를 clone 없이 대입해 전역 상수를 공유한다. (미수정 — 별건)
+
+### 검증 (헤드리스 크롬 + CDP 마우스 이벤트, 전부 file:// 로 실행)
+- 부팅: 4분할 레이아웃 정상 렌더.
+- "+ 노드" 클릭 → 노드 생성(선택 노드의 자식으로 추가), 계층 트리에 반영.
+- 캔버스 드래그(160,130) → 노드 위치 (40,40) → (200,170) 로 정확히 이동, 속성 패널 즉시 갱신.
+- 선택 표시(주황 테두리 + 리사이즈 손잡이) 정상.
+- 저장: saveDocument() 가 1632 bytes JSON 생성, version 1, 총 3노드, 트리 Root→Node1(Paint)→Text2, 재파싱 정상.
+  ※ 헤드리스에서는 blob 다운로드가 차단되어 파일 저장 자체는 미검증(실브라우저 표준 동작).
+
+### 남은 작업
+- 텍스트 레이블의 세로 정렬이 미세하게 어긋남. (Text 컴포넌트의 baseline 기준 확인 필요)
+- 불러오기 실동작 검증(파일 선택 다이얼로그라 헤드리스 검증 불가).
+- UIView 계열 위젯(UIButton/UILabel 등) 직렬화 지원, 이미지(Sprite) 리소스 처리 방식 결정.
+- 되돌리기(undo), 다중 선택, 정렬/스냅 등 편집 편의 기능.
+
+## UI 편집기 좌표계/정렬 수정 [22:35 요청 → 22:45 응답]
+- 피드백: 파이어폭스로 띄웠더니 영역이 하나도 안 맞음.
+- 원인 2가지 (둘 다 엔진 사용법을 내가 틀린 것):
+  1) 뷰 좌표계 미적용: UIScene/GameScene 은 preDraw 에서 viewManager.applyViewRect(graphic) 로
+     devicePixelRatio 와 뷰 오프셋을 좌표계에 반영하는데, Scene 을 직접 상속한 편집기 씬이
+     이를 호출하지 않았다. 고DPI 화면에서 배치가 통째로 어긋난 원인.
+     → preDraw 오버라이드 추가(applyCanvasNativeRect → 배경 → applyViewRect).
+        autoResizeOnWindowResize = true 설정, CSS 도 100vw/100vh → position:absolute + 100% 로 교체.
+  2) 텍스트 이중 오프셋: Text.drawPlainText 는 노드 영역(contentSize) 안에서 정렬한다.
+     (textAlign left → x=0, textBaseline middle → y=contentSize.y*0.5)
+     그런데 레이블 노드 위치에 중앙 오프셋을 또 더해 두 번 밀렸다. (버튼 y+14 + 영역중앙 14 = 버튼 바닥)
+     → 레이블 노드를 담을 영역 크기로 두고 위치는 영역 좌상단에 맞추도록 9곳 수정.
+        규칙을 createLabel 주석에 명시.
+- 검증: 고DPI(1.5배) 헤드리스 렌더에서 화면 full 채움 + 텍스트가 버튼 안에 정렬됨 확인.
+  기능 회귀 없음(노드 추가 1개, 드래그 (40,40)→(200,170) 동일).

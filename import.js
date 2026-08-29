@@ -77,6 +77,7 @@ export { UIControl } from "./src/ui/uicontrol.js";
 export { UIButton } from "./src/ui/uibutton.js";
 export { UIToggleButton } from "./src/ui/uitogglebutton.js";
 export { UIScrollView } from "./src/ui/uiscrollview.js";
+export { UIProgressView } from "./src/ui/uiprogressview.js";
 export { UIScrollBar, ScrollBarAxis } from "./src/ui/uiscrollbar.js";
 export { UIInputField } from "./src/ui/uiinputfield.js";
 export { LayoutStrength } from "./src/ui/autolayout/layoutstrength.js";
@@ -89,6 +90,7 @@ export { LayoutRelation } from "./src/ui/autolayout/layoutrelation.js";
 export { LayoutConstraint } from "./src/ui/autolayout/layoutconstraint.js";
 export { LayoutSolver } from "./src/ui/autolayout/layoutsolver.js";
 export { UISlider } from "./src/ui/uislider.js";
+export { UIDocument } from "./src/ui/uidocument.js";
 export { UISnapScrollView } from "./src/ui/uisnapscrollview.js";
 
 

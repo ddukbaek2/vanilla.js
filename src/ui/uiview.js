@@ -39,7 +39,7 @@ export class UIView extends Component {
 		this.setComponentType("View");
 		this.#engine = null;
 		this.#content = null;
-		this.#backgroundColor = new Color(1, 1, 1, 1);
+		this.#backgroundColor = new Color(1, 1, 1, 0);
 	}
 
 	//==============================================================================

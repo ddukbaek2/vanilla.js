@@ -98,6 +98,9 @@ export class WorldNode extends TransformNode {
         const components = this.getAllComponents();
         let maskComponent = null;
         for (const component of components) {
+            if (!component.isEnable()) {
+                continue;
+            }
             component.draw(graphic);
             if (component instanceof Mask) {
                 maskComponent = component;
@@ -368,7 +371,7 @@ export class WorldNode extends TransformNode {
 
         let min = Vector2.positiveInfinity();
         let max = Vector2.negativeInfinity();
-        for (let i = 1; i < worldCorners.length; ++i) {
+        for (let i = 0; i < worldCorners.length; ++i) {
             const worldCorner = worldCorners[i];
             if (min.x > worldCorner.x) {
                 min.x = worldCorner.x;
