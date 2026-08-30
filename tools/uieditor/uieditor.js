@@ -195,6 +195,7 @@ const RESIZE_HANDLE_DEFINITIONS = [
 ];
 
 const HANDLE_SIZE = 8;
+const DEFAULT_ROUND_SIZE = 16;
 const SNAP_DISTANCE = 6;
 const UNDO_LIMIT = 64;
 const DEFAULT_DOCUMENT_WIDTH = 960;
@@ -419,6 +420,7 @@ export class UIEditor {
 	/** @private @type { string } */ #renderScaleMode;
 	/** @private @type { string } */ #documentFileName;
 	/** @private @type { Map } */ #hierarchyRowNodeMap;
+
 
 	//==============================================================================
 	// 생성.
@@ -1584,12 +1586,23 @@ export class UIEditor {
 			}
 		}
 
+		// 아무것도 고르지 않았거나 고른 것이 이 자리에 없으면 맨 앞 것을 고른다.
+		// 고른 것이 이 자리에 겹쳐 있으면 그대로 두어, 두 번 누르기가 계속 그 뒤의 것으로 옮겨 갈 수 있게 한다.
 		const hitNode = this.findTopmostNodeAt(this.#documentRootNode, pointerPosition);
-		this.selectNode(hitNode);
-		if (hitNode) {
+		let nextSelectedNode = hitNode;
+		if (this.#selectedNode && this.#selectedNode !== hitNode) {
+			const overlappedList = [];
+			this.collectNodesAt(this.#documentRootNode, pointerPosition, overlappedList);
+			if (overlappedList.indexOf(this.#selectedNode) >= 0) {
+				nextSelectedNode = this.#selectedNode;
+			}
+		}
+
+		this.selectNode(nextSelectedNode);
+		if (nextSelectedNode) {
 			this.pushUndoSnapshot();
 			this.#dragMode = "move";
-			const localPosition = hitNode.getLocalPosition();
+			const localPosition = nextSelectedNode.getLocalPosition();
 			this.#dragStartPosition = Vector2.create(localPosition.x, localPosition.y);
 		}
 	}
@@ -1703,7 +1716,7 @@ export class UIEditor {
 			return;
 		}
 		const currentIndex = overlappedList.indexOf(this.#selectedNode);
-		const nextIndex = (currentIndex + 1) % overlappedList.length;
+		const nextIndex = System.Math.min(currentIndex + 1, overlappedList.length - 1);
 		this.selectNode(overlappedList[nextIndex]);
 	}
 
@@ -2110,7 +2123,7 @@ export class UIEditor {
 			newNode.setInteractable(true);
 			const paint = newNode.addComponent(Paint);
 			paint.setColor(new Color(0.000, 0.471, 0.831, 1));
-			paint.setRoundSize(6);
+			paint.setRoundSize(DEFAULT_ROUND_SIZE);
 			newNode.addComponent(UIButton);
 			const label = newNode.addComponent(UILabel);
 			label.setText("Button");
@@ -2123,7 +2136,7 @@ export class UIEditor {
 			newNode.setInteractable(true);
 			const paint = newNode.addComponent(Paint);
 			paint.setColor(new Color(0.965, 0.965, 0.965, 1));
-			paint.setRoundSize(4);
+			paint.setRoundSize(DEFAULT_ROUND_SIZE);
 			const scrollView = newNode.addComponent(UIScrollView);
 			scrollView.setScrollContentSize(Vector2.create(320, 660));
 		}
@@ -2136,9 +2149,11 @@ export class UIEditor {
 		}
 		else if (widgetKind === "slider") {
 			newNode.setName("Slider" + this.#nodeSerialNumber);
-			newNode.setContentSize(Vector2.create(260, 28));
+			newNode.setContentSize(Vector2.create(260, 24));
 			newNode.setInteractable(true);
-			newNode.addComponent(UISlider);
+			const sliderComponent = newNode.addComponent(UISlider);
+			sliderComponent.setThumbRadius(9);
+			sliderComponent.setTrackThickness(6);
 		}
 		else if (widgetKind === "divider") {
 			newNode.setName("Divider" + this.#nodeSerialNumber);
@@ -2166,7 +2181,7 @@ export class UIEditor {
 			newNode.setInteractable(true);
 			const paint = newNode.addComponent(Paint);
 			paint.setColor(new Color(0.000, 0.471, 0.831, 1));
-			paint.setRoundSize(6);
+			paint.setRoundSize(DEFAULT_ROUND_SIZE);
 			newNode.addComponent(UIToggleButton);
 			const label = newNode.addComponent(UILabel);
 			label.setText("Toggle");
@@ -2184,7 +2199,7 @@ export class UIEditor {
 			newNode.setInteractable(true);
 			const paint = newNode.addComponent(Paint);
 			paint.setColor(new Color(0.965, 0.965, 0.965, 1));
-			paint.setRoundSize(4);
+			paint.setRoundSize(DEFAULT_ROUND_SIZE);
 			const snapScrollView = newNode.addComponent(UISnapScrollView);
 			snapScrollView.setScrollContentSize(Vector2.create(960, 220));
 		}
@@ -2207,7 +2222,7 @@ export class UIEditor {
 			newNode.setContentSize(Vector2.create(220, 140));
 			const paint = newNode.addComponent(Paint);
 			paint.setColor(new Color(0.910, 0.910, 0.910, 1));
-			paint.setRoundSize(4);
+			paint.setRoundSize(DEFAULT_ROUND_SIZE);
 		}
 
 		let parentNode = this.findContainerNodeFor(this.#selectedNode);
@@ -2904,50 +2919,202 @@ export class UIEditor {
 	 */
 	appendNodeReferenceRow(parentElement, labelText, currentNode, changeHandler) {
 		const rowElement = this.createPropertyRowElement(parentElement, labelText);
-		const buttonElement = PaneStyle.create("div", "", {
-			text: currentNode ? UIDocument.findNodePath(this.#documentRootNode, currentNode) : "(none)",
-			style: {
-				position: "relative", width: "auto", height: "auto", flex: "1",
-				padding: "3px 6px", fontSize: "13px",
-				color: currentNode ? PaneTheme.color.text : PaneTheme.color.textDim,
-				backgroundColor: PaneTheme.color.inputBg,
-				border: "1px solid " + PaneTheme.color.border,
-				borderRadius: "2px", cursor: "pointer",
-				overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-			},
-		});
-		buttonElement.addEventListener("click", (mouseEvent) => {
-			mouseEvent.stopPropagation();
-			const buttonRect = buttonElement.getBoundingClientRect();
-			const menuItems = [];
-			menuItems.push({
-				id: "clearNodeReference",
-				label: "(none)",
-				action: () => {
+		const currentPath = currentNode ? UIDocument.findNodePath(this.#documentRootNode, currentNode) : "";
+
+		// 경로를 직접 적어 넣을 수 있는 칸.
+		const inputElement = System.document.createElement("input");
+		inputElement.type = "text";
+		inputElement.value = currentPath ? currentPath : "";
+		inputElement.placeholder = "(none)";
+		decorateInputElement(inputElement);
+		const commitPath = () => {
+			const pathText = inputElement.value.trim();
+			if (pathText.length === 0) {
+				if (currentNode) {
 					this.pushUndoSnapshot();
 					changeHandler(null);
 					this.rebuildInspector();
-				},
+				}
+				return;
+			}
+			const foundNode = UIDocument.findNodeByPath(this.#documentRootNode, pathText);
+			if (!foundNode) {
+				inputElement.value = currentPath ? currentPath : "";
+				return;
+			}
+			if (foundNode === currentNode) {
+				return;
+			}
+			this.pushUndoSnapshot();
+			changeHandler(foundNode);
+			this.rebuildInspector();
+		};
+		inputElement.addEventListener("keydown", (keyboardEvent) => {
+			keyboardEvent.stopPropagation();
+			if (keyboardEvent.key === "Enter") {
+				commitPath();
+			}
+			else if (keyboardEvent.key === "Escape") {
+				inputElement.value = currentPath ? currentPath : "";
+				inputElement.blur();
+			}
+		});
+		inputElement.addEventListener("blur", commitPath);
+		rowElement.appendChild(inputElement);
+
+		// 목록에서 고르는 단추.
+		const pickElement = PaneStyle.create("div", "", {
+			text: "\u22EF",
+			style: {
+				position: "relative", width: "24px", height: "24px", flexShrink: "0",
+				display: "flex", alignItems: "center", justifyContent: "center",
+				fontSize: "14px", color: PaneTheme.color.textDim,
+				backgroundColor: PaneTheme.color.inputBg, border: "1px solid " + BORDER_COLOR,
+				borderRadius: "3px", cursor: "pointer", userSelect: "none",
+			},
+		});
+		pickElement.title = "노드 목록에서 고르기";
+		pickElement.addEventListener("mouseenter", () => {
+			pickElement.style.backgroundColor = HOVER_COLOR;
+		});
+		pickElement.addEventListener("mouseleave", () => {
+			pickElement.style.backgroundColor = PaneTheme.color.inputBg;
+		});
+		pickElement.addEventListener("click", (mouseEvent) => {
+			mouseEvent.stopPropagation();
+			this.openNodePickerDialog(currentNode, (pickedNode) => {
+				if (pickedNode === currentNode) {
+					return;
+				}
+				this.pushUndoSnapshot();
+				changeHandler(pickedNode);
+				this.rebuildInspector();
 			});
-			const flatList = [];
-			this.collectHierarchyRows(this.#documentRootNode, 0, flatList);
-			for (const entry of flatList) {
-				if (entry.node === this.#documentRootNode) {
+		});
+		rowElement.appendChild(pickElement);
+	}
+
+	//==============================================================================
+	// 노드 고르기 대화 상자. (검색 칸 + 스크롤 목록)
+	//==============================================================================
+	/**
+	 * @param { WorldNode | null } currentNode
+	 * @param { Function } acceptHandler
+	 */
+	openNodePickerDialog(currentNode, acceptHandler) {
+		const existingDialog = System.document.getElementById("uieditorDialog");
+		if (existingDialog) {
+			existingDialog.remove();
+		}
+		const backdropElement = System.document.createElement("div");
+		backdropElement.id = "uieditorDialog";
+		backdropElement.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;z-index:10000;"
+			+ "background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;"
+			+ "font-family:" + PaneTheme.font.family + ";";
+
+		const panelElement = System.document.createElement("div");
+		panelElement.style.cssText = "width:440px;max-height:80vh;display:flex;flex-direction:column;padding:16px 18px 14px 18px;border-radius:6px;"
+			+ "background:" + PaneTheme.color.panel + ";border:1px solid " + PaneTheme.color.border + ";"
+			+ "box-shadow:0 10px 30px rgba(0,0,0,0.55);color:" + PaneTheme.color.text + ";";
+
+		const titleElement = System.document.createElement("div");
+		titleElement.innerText = "노드 선택";
+		titleElement.style.cssText = "font-size:13px;font-weight:600;color:" + PaneTheme.color.text + ";margin-bottom:10px;";
+		panelElement.appendChild(titleElement);
+
+		const searchElement = System.document.createElement("input");
+		searchElement.type = "text";
+		searchElement.placeholder = "이름 또는 경로로 검색";
+		decorateInputElement(searchElement);
+		searchElement.style.flex = "0 0 auto";
+		searchElement.style.width = "100%";
+		searchElement.style.marginBottom = "8px";
+		panelElement.appendChild(searchElement);
+
+		const listElement = System.document.createElement("div");
+		listElement.style.cssText = "flex:1;min-height:200px;max-height:360px;overflow-y:auto;"
+			+ "border:1px solid " + BORDER_COLOR + ";border-radius:3px;background:" + PaneTheme.color.background + ";";
+		panelElement.appendChild(listElement);
+
+		const buttonRowElement = System.document.createElement("div");
+		buttonRowElement.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:12px;";
+		const cancelElement = this.createDialogButtonElement("취소", false);
+		buttonRowElement.appendChild(cancelElement);
+		panelElement.appendChild(buttonRowElement);
+
+		backdropElement.appendChild(panelElement);
+		System.document.body.appendChild(backdropElement);
+
+		const closeDialog = () => {
+			backdropElement.remove();
+		};
+		const chooseNode = (node) => {
+			closeDialog();
+			acceptHandler(node);
+		};
+
+		// 목록 항목: (none) + 모든 노드. 검색어가 있으면 경로로 보여 준다.
+		const entryList = [];
+		this.collectHierarchyRows(this.#documentRootNode, 0, entryList);
+		const rebuildList = () => {
+			listElement.innerHTML = "";
+			const keyword = searchElement.value.trim().toLowerCase();
+			const appendRow = (labelText, node, depth) => {
+				const rowElement = System.document.createElement("div");
+				rowElement.innerText = labelText;
+				const isCurrent = (node === currentNode);
+				rowElement.style.cssText = "height:" + ROW_HEIGHT + ";line-height:" + ROW_HEIGHT + ";padding:0 10px 0 " + (10 + depth * 14) + "px;"
+					+ "font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;"
+					+ "color:" + (isCurrent ? SELECTED_ROW_TEXT_COLOR : PaneTheme.color.text) + ";"
+					+ "background:" + (isCurrent ? PaneTheme.color.accent : "transparent") + ";";
+				rowElement.addEventListener("mouseenter", () => {
+					if (!isCurrent) {
+						rowElement.style.background = HOVER_COLOR;
+					}
+				});
+				rowElement.addEventListener("mouseleave", () => {
+					if (!isCurrent) {
+						rowElement.style.background = "transparent";
+					}
+				});
+				rowElement.addEventListener("click", () => {
+					chooseNode(node);
+				});
+				listElement.appendChild(rowElement);
+			};
+			if (keyword.length === 0 || "(none)".indexOf(keyword) >= 0) {
+				appendRow("(none)", null, 0);
+			}
+			for (const entry of entryList) {
+				const pathText = UIDocument.findNodePath(this.#documentRootNode, entry.node);
+				const nameText = entry.node.getName();
+				if (keyword.length > 0 && nameText.toLowerCase().indexOf(keyword) < 0 && pathText.toLowerCase().indexOf(keyword) < 0) {
 					continue;
 				}
-				menuItems.push({
-					id: "pickNode." + entry.node.getName(),
-					label: UIDocument.findNodePath(this.#documentRootNode, entry.node),
-					action: () => {
-						this.pushUndoSnapshot();
-						changeHandler(entry.node);
-						this.rebuildInspector();
-					},
-				});
+				appendRow(keyword.length > 0 ? pathText : nameText, entry.node, keyword.length > 0 ? 0 : entry.depth);
 			}
-			this.openMenuPanelAt(buttonRect.left, buttonRect.bottom + 2, menuItems);
+		};
+		rebuildList();
+		searchElement.addEventListener("input", rebuildList);
+		searchElement.addEventListener("keydown", (keyboardEvent) => {
+			keyboardEvent.stopPropagation();
+			if (keyboardEvent.key === "Escape") {
+				closeDialog();
+			}
+			else if (keyboardEvent.key === "Enter") {
+				const firstRow = listElement.children[0];
+				if (firstRow) {
+					firstRow.click();
+				}
+			}
 		});
-		rowElement.appendChild(buttonElement);
+		cancelElement.addEventListener("click", closeDialog);
+		backdropElement.addEventListener("mousedown", (mouseEvent) => {
+			if (mouseEvent.target === backdropElement) {
+				closeDialog();
+			}
+		});
+		searchElement.focus();
 	}
 
 	//==============================================================================

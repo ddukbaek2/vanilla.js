@@ -233,3 +233,20 @@
   SHOP 전환(활성 화면 Shop,Navigation), SETTINGS 전환 + 토글, 콘솔 오류 없음.
 - 배포: \DS216PLUSII\web\ddukbaek2\portfolio\uishowcase (index.html / favicon.svg / vanilla.js / assets 6개), 라이브 200 확인.
 - README 에 링크 추가.
+
+## UI 편집기 보완 / 샘플 다듬기 / 포트폴리오 제목
+[21:0x 요청 → 21:3x 응답]
+- 겹침 순환: 더블클릭의 첫 클릭이 매번 맨 앞을 다시 골라 2중첩 초과에서 끊기던 것.
+  → 고른 것이 그 자리에 겹쳐 있으면 누름에서 유지, 더 뒤로 갈 것이 없으면 그 자리에 머문다(되돌지 않음).
+  검증: Panel3 → Panel2 → Panel1 → Root 에서 정지.
+- 결과 화면 늘려 맞춤을 Stretch Width / Stretch Height 로 분리. (엔진 ViewScaleMode 와 같은 기준, 비율 유지)
+- 노드 참조 속성: 경로를 직접 적는 입력칸 + 검색 칸이 달린 스크롤 목록 팝업(⋯). Enter 로 첫 항목 선택, (none) 으로 해제.
+- 새 위젯 기본 라운드 4~14 → 16 (DEFAULT_ROUND_SIZE).
+- 엔진: UISlider 에 setTrackThickness / getTrackThickness 추가(0 이면 예전처럼 노드 높이 전체).
+  UIDocument 가 슬라이더 thumbRadius / trackThickness, 스크롤뷰 horizontal / vertical 을 함께 저장·복원.
+- 샘플: 홈 목록 세로만, 추천 띠 가로만, elastic. 슬라이더 얇게(트랙 6 / 손잡이 9).
+  서체는 FontFace("ShowcaseSans", local SF Pro / Segoe UI Variable / Inter …) 를 잡아 모든 라벨에 적용하고
+  제목·단추·칩 라벨은 굵게. (없으면 엔진 기본 서체)
+- 포트폴리오 제목: NEON HORIZON / ANCIENT MOUNTAIN 에 "vanilla.js - " 접두 (저장소와 NAS 둘 다).
+  포트폴리오 목록에 uishowcase 는 이미 올라와 있었다. (index.php 가 폴더를 훑어 <title> 로 카드를 만든다)
+- 배포: uishowcase index.html / assets / vanilla.js 갱신, 라이브에서 팝업·토스트·전환·스크롤 축·서체 로드 확인.

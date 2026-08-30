@@ -20604,6 +20604,8 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
     #thumbColor;
     /** @private @type { number } */
     #thumbRadius;
+    /** @private @type { number } */
+    #trackThickness;
     /** @private @type { WorldNode } */
     #thumbNode;
     /** @private @type { number } */
@@ -20629,6 +20631,7 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
       this.#fillColor = new Color(0.23, 0.51, 0.96, 1);
       this.#thumbColor = new Color(1, 1, 1, 1);
       this.#thumbRadius = 16;
+      this.#trackThickness = 0;
       this.#thumbNode = null;
       this.#cornerRadius = 0;
       this.#direction = ProgressDirection.horizontal;
@@ -20665,7 +20668,15 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
       if (contentSize.x <= 0 || contentSize.y <= 0) {
         return;
       }
-      const trackRect = Rect.create(0, 0, contentSize.x, contentSize.y);
+      const trackThickness = this.#trackThickness;
+      let trackRect = Rect.create(0, 0, contentSize.x, contentSize.y);
+      if (trackThickness > 0) {
+        if (this.#direction === ProgressDirection.vertical) {
+          trackRect = Rect.create((contentSize.x - trackThickness) * 0.5, 0, trackThickness, contentSize.y);
+        } else {
+          trackRect = Rect.create(0, (contentSize.y - trackThickness) * 0.5, contentSize.x, trackThickness);
+        }
+      }
       graphic.setFillColor(this.#trackColor);
       if (this.#cornerRadius > 0) {
         graphic.drawRoundRect(trackRect, this.#cornerRadius);
@@ -20677,10 +20688,10 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
         let fillRect;
         if (this.#direction === ProgressDirection.vertical) {
           const fillHeight = contentSize.y * ratio;
-          fillRect = Rect.create(0, contentSize.y - fillHeight, contentSize.x, fillHeight);
+          fillRect = Rect.create(trackRect.position.x, contentSize.y - fillHeight, trackRect.size.x, fillHeight);
         } else {
           const fillWidth = contentSize.x * ratio;
-          fillRect = Rect.create(0, 0, fillWidth, contentSize.y);
+          fillRect = Rect.create(0, trackRect.position.y, fillWidth, trackRect.size.y);
         }
         graphic.setFillColor(this.#fillColor);
         if (this.#cornerRadius > 0) {
@@ -20864,6 +20875,13 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
     }
     getThumbRadius() {
       return this.#thumbRadius;
+    }
+    /** @param { number } thickness */
+    setTrackThickness(thickness) {
+      this.#trackThickness = thickness;
+    }
+    getTrackThickness() {
+      return this.#trackThickness;
     }
     /** @param { WorldNode } node */
     setThumbNode(node) {
@@ -21173,11 +21191,21 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
     },
     UISlider: {
       save(component) {
-        return { value: component.getValue() };
+        return {
+          value: component.getValue(),
+          thumbRadius: component.getThumbRadius(),
+          trackThickness: component.getTrackThickness()
+        };
       },
       load(component, data) {
         if (data.value !== void 0) {
           component.setValue(data.value);
+        }
+        if (data.thumbRadius !== void 0) {
+          component.setThumbRadius(data.thumbRadius);
+        }
+        if (data.trackThickness !== void 0) {
+          component.setTrackThickness(data.trackThickness);
         }
       }
     },
@@ -21188,12 +21216,20 @@ input.uiinputfield-hidden:-webkit-autofill:focus { -webkit-text-fill-color: tran
           scrollContentSize: [scrollContentSize.x, scrollContentSize.y],
           scrollMode: component.getScrollMode(),
           dragSensitivity: component.getDragSensitivity(),
+          horizontal: component.isHorizontal(),
+          vertical: component.isVertical(),
           backgroundColor: colorToArray(component.getBackgroundColor())
         };
       },
       load(component, data) {
         if (data.scrollContentSize) {
           component.setScrollContentSize(Vector2.create(data.scrollContentSize[0], data.scrollContentSize[1]));
+        }
+        if (data.horizontal !== void 0) {
+          component.setHorizontal(data.horizontal);
+        }
+        if (data.vertical !== void 0) {
+          component.setVertical(data.vertical);
         }
         if (data.scrollMode !== void 0) {
           component.setScrollMode(data.scrollMode);
@@ -28027,6 +28063,7 @@ void main() {
     { id: "bottomRight", ratioX: 1, ratioY: 1, moveLeft: false, moveTop: false, sizeX: 1, sizeY: 1, cursor: "nwse-resize" }
   ];
   var HANDLE_SIZE = 8;
+  var DEFAULT_ROUND_SIZE = 16;
   var SNAP_DISTANCE = 6;
   var UNDO_LIMIT = 64;
   var DEFAULT_DOCUMENT_WIDTH = 960;
@@ -29357,11 +29394,19 @@ void main() {
         }
       }
       const hitNode = this.findTopmostNodeAt(this.#documentRootNode, pointerPosition);
-      this.selectNode(hitNode);
-      if (hitNode) {
+      let nextSelectedNode = hitNode;
+      if (this.#selectedNode && this.#selectedNode !== hitNode) {
+        const overlappedList = [];
+        this.collectNodesAt(this.#documentRootNode, pointerPosition, overlappedList);
+        if (overlappedList.indexOf(this.#selectedNode) >= 0) {
+          nextSelectedNode = this.#selectedNode;
+        }
+      }
+      this.selectNode(nextSelectedNode);
+      if (nextSelectedNode) {
         this.pushUndoSnapshot();
         this.#dragMode = "move";
-        const localPosition = hitNode.getLocalPosition();
+        const localPosition = nextSelectedNode.getLocalPosition();
         this.#dragStartPosition = Vector2.create(localPosition.x, localPosition.y);
       }
     }
@@ -29466,7 +29511,7 @@ void main() {
         return;
       }
       const currentIndex = overlappedList.indexOf(this.#selectedNode);
-      const nextIndex = (currentIndex + 1) % overlappedList.length;
+      const nextIndex = System47.Math.min(currentIndex + 1, overlappedList.length - 1);
       this.selectNode(overlappedList[nextIndex]);
     }
     //==============================================================================
@@ -29832,7 +29877,7 @@ void main() {
         newNode.setInteractable(true);
         const paint = newNode.addComponent(Paint);
         paint.setColor(new Color(0, 0.471, 0.831, 1));
-        paint.setRoundSize(6);
+        paint.setRoundSize(DEFAULT_ROUND_SIZE);
         newNode.addComponent(UIButton);
         const label = newNode.addComponent(UILabel);
         label.setText("Button");
@@ -29844,7 +29889,7 @@ void main() {
         newNode.setInteractable(true);
         const paint = newNode.addComponent(Paint);
         paint.setColor(new Color(0.965, 0.965, 0.965, 1));
-        paint.setRoundSize(4);
+        paint.setRoundSize(DEFAULT_ROUND_SIZE);
         const scrollView = newNode.addComponent(UIScrollView);
         scrollView.setScrollContentSize(Vector2.create(320, 660));
       } else if (widgetKind === "progress") {
@@ -29855,9 +29900,11 @@ void main() {
         progressView.setValue(0.6);
       } else if (widgetKind === "slider") {
         newNode.setName("Slider" + this.#nodeSerialNumber);
-        newNode.setContentSize(Vector2.create(260, 28));
+        newNode.setContentSize(Vector2.create(260, 24));
         newNode.setInteractable(true);
-        newNode.addComponent(UISlider);
+        const sliderComponent = newNode.addComponent(UISlider);
+        sliderComponent.setThumbRadius(9);
+        sliderComponent.setTrackThickness(6);
       } else if (widgetKind === "divider") {
         newNode.setName("Divider" + this.#nodeSerialNumber);
         newNode.setContentSize(Vector2.create(260, 1));
@@ -29881,7 +29928,7 @@ void main() {
         newNode.setInteractable(true);
         const paint = newNode.addComponent(Paint);
         paint.setColor(new Color(0, 0.471, 0.831, 1));
-        paint.setRoundSize(6);
+        paint.setRoundSize(DEFAULT_ROUND_SIZE);
         newNode.addComponent(UIToggleButton);
         const label = newNode.addComponent(UILabel);
         label.setText("Toggle");
@@ -29897,7 +29944,7 @@ void main() {
         newNode.setInteractable(true);
         const paint = newNode.addComponent(Paint);
         paint.setColor(new Color(0.965, 0.965, 0.965, 1));
-        paint.setRoundSize(4);
+        paint.setRoundSize(DEFAULT_ROUND_SIZE);
         const snapScrollView = newNode.addComponent(UISnapScrollView);
         snapScrollView.setScrollContentSize(Vector2.create(960, 220));
       } else if (widgetKind === "scrollBar") {
@@ -29916,7 +29963,7 @@ void main() {
         newNode.setContentSize(Vector2.create(220, 140));
         const paint = newNode.addComponent(Paint);
         paint.setColor(new Color(0.91, 0.91, 0.91, 1));
-        paint.setRoundSize(4);
+        paint.setRoundSize(DEFAULT_ROUND_SIZE);
       }
       let parentNode = this.findContainerNodeFor(this.#selectedNode);
       if (dropPosition) {
@@ -30564,57 +30611,187 @@ void main() {
      */
     appendNodeReferenceRow(parentElement, labelText, currentNode, changeHandler) {
       const rowElement = this.createPropertyRowElement(parentElement, labelText);
-      const buttonElement = PaneStyle.create("div", "", {
-        text: currentNode ? UIDocument.findNodePath(this.#documentRootNode, currentNode) : "(none)",
-        style: {
-          position: "relative",
-          width: "auto",
-          height: "auto",
-          flex: "1",
-          padding: "3px 6px",
-          fontSize: "13px",
-          color: currentNode ? PaneTheme.color.text : PaneTheme.color.textDim,
-          backgroundColor: PaneTheme.color.inputBg,
-          border: "1px solid " + PaneTheme.color.border,
-          borderRadius: "2px",
-          cursor: "pointer",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap"
-        }
-      });
-      buttonElement.addEventListener("click", (mouseEvent) => {
-        mouseEvent.stopPropagation();
-        const buttonRect = buttonElement.getBoundingClientRect();
-        const menuItems = [];
-        menuItems.push({
-          id: "clearNodeReference",
-          label: "(none)",
-          action: /* @__PURE__ */ __name(() => {
+      const currentPath = currentNode ? UIDocument.findNodePath(this.#documentRootNode, currentNode) : "";
+      const inputElement = System47.document.createElement("input");
+      inputElement.type = "text";
+      inputElement.value = currentPath ? currentPath : "";
+      inputElement.placeholder = "(none)";
+      decorateInputElement(inputElement);
+      const commitPath = /* @__PURE__ */ __name(() => {
+        const pathText = inputElement.value.trim();
+        if (pathText.length === 0) {
+          if (currentNode) {
             this.pushUndoSnapshot();
             changeHandler(null);
             this.rebuildInspector();
-          }, "action")
+          }
+          return;
+        }
+        const foundNode = UIDocument.findNodeByPath(this.#documentRootNode, pathText);
+        if (!foundNode) {
+          inputElement.value = currentPath ? currentPath : "";
+          return;
+        }
+        if (foundNode === currentNode) {
+          return;
+        }
+        this.pushUndoSnapshot();
+        changeHandler(foundNode);
+        this.rebuildInspector();
+      }, "commitPath");
+      inputElement.addEventListener("keydown", (keyboardEvent) => {
+        keyboardEvent.stopPropagation();
+        if (keyboardEvent.key === "Enter") {
+          commitPath();
+        } else if (keyboardEvent.key === "Escape") {
+          inputElement.value = currentPath ? currentPath : "";
+          inputElement.blur();
+        }
+      });
+      inputElement.addEventListener("blur", commitPath);
+      rowElement.appendChild(inputElement);
+      const pickElement = PaneStyle.create("div", "", {
+        text: "\u22EF",
+        style: {
+          position: "relative",
+          width: "24px",
+          height: "24px",
+          flexShrink: "0",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "14px",
+          color: PaneTheme.color.textDim,
+          backgroundColor: PaneTheme.color.inputBg,
+          border: "1px solid " + BORDER_COLOR,
+          borderRadius: "3px",
+          cursor: "pointer",
+          userSelect: "none"
+        }
+      });
+      pickElement.title = "\uB178\uB4DC \uBAA9\uB85D\uC5D0\uC11C \uACE0\uB974\uAE30";
+      pickElement.addEventListener("mouseenter", () => {
+        pickElement.style.backgroundColor = HOVER_COLOR;
+      });
+      pickElement.addEventListener("mouseleave", () => {
+        pickElement.style.backgroundColor = PaneTheme.color.inputBg;
+      });
+      pickElement.addEventListener("click", (mouseEvent) => {
+        mouseEvent.stopPropagation();
+        this.openNodePickerDialog(currentNode, (pickedNode) => {
+          if (pickedNode === currentNode) {
+            return;
+          }
+          this.pushUndoSnapshot();
+          changeHandler(pickedNode);
+          this.rebuildInspector();
         });
-        const flatList = [];
-        this.collectHierarchyRows(this.#documentRootNode, 0, flatList);
-        for (const entry of flatList) {
-          if (entry.node === this.#documentRootNode) {
+      });
+      rowElement.appendChild(pickElement);
+    }
+    //==============================================================================
+    // 노드 고르기 대화 상자. (검색 칸 + 스크롤 목록)
+    //==============================================================================
+    /**
+     * @param { WorldNode | null } currentNode
+     * @param { Function } acceptHandler
+     */
+    openNodePickerDialog(currentNode, acceptHandler) {
+      const existingDialog = System47.document.getElementById("uieditorDialog");
+      if (existingDialog) {
+        existingDialog.remove();
+      }
+      const backdropElement = System47.document.createElement("div");
+      backdropElement.id = "uieditorDialog";
+      backdropElement.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;z-index:10000;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;font-family:" + PaneTheme.font.family + ";";
+      const panelElement = System47.document.createElement("div");
+      panelElement.style.cssText = "width:440px;max-height:80vh;display:flex;flex-direction:column;padding:16px 18px 14px 18px;border-radius:6px;background:" + PaneTheme.color.panel + ";border:1px solid " + PaneTheme.color.border + ";box-shadow:0 10px 30px rgba(0,0,0,0.55);color:" + PaneTheme.color.text + ";";
+      const titleElement = System47.document.createElement("div");
+      titleElement.innerText = "\uB178\uB4DC \uC120\uD0DD";
+      titleElement.style.cssText = "font-size:13px;font-weight:600;color:" + PaneTheme.color.text + ";margin-bottom:10px;";
+      panelElement.appendChild(titleElement);
+      const searchElement = System47.document.createElement("input");
+      searchElement.type = "text";
+      searchElement.placeholder = "\uC774\uB984 \uB610\uB294 \uACBD\uB85C\uB85C \uAC80\uC0C9";
+      decorateInputElement(searchElement);
+      searchElement.style.flex = "0 0 auto";
+      searchElement.style.width = "100%";
+      searchElement.style.marginBottom = "8px";
+      panelElement.appendChild(searchElement);
+      const listElement = System47.document.createElement("div");
+      listElement.style.cssText = "flex:1;min-height:200px;max-height:360px;overflow-y:auto;border:1px solid " + BORDER_COLOR + ";border-radius:3px;background:" + PaneTheme.color.background + ";";
+      panelElement.appendChild(listElement);
+      const buttonRowElement = System47.document.createElement("div");
+      buttonRowElement.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:12px;";
+      const cancelElement = this.createDialogButtonElement("\uCDE8\uC18C", false);
+      buttonRowElement.appendChild(cancelElement);
+      panelElement.appendChild(buttonRowElement);
+      backdropElement.appendChild(panelElement);
+      System47.document.body.appendChild(backdropElement);
+      const closeDialog = /* @__PURE__ */ __name(() => {
+        backdropElement.remove();
+      }, "closeDialog");
+      const chooseNode = /* @__PURE__ */ __name((node) => {
+        closeDialog();
+        acceptHandler(node);
+      }, "chooseNode");
+      const entryList = [];
+      this.collectHierarchyRows(this.#documentRootNode, 0, entryList);
+      const rebuildList = /* @__PURE__ */ __name(() => {
+        listElement.innerHTML = "";
+        const keyword = searchElement.value.trim().toLowerCase();
+        const appendRow = /* @__PURE__ */ __name((labelText, node, depth) => {
+          const rowElement = System47.document.createElement("div");
+          rowElement.innerText = labelText;
+          const isCurrent = node === currentNode;
+          rowElement.style.cssText = "height:" + ROW_HEIGHT + ";line-height:" + ROW_HEIGHT + ";padding:0 10px 0 " + (10 + depth * 14) + "px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;color:" + (isCurrent ? SELECTED_ROW_TEXT_COLOR : PaneTheme.color.text) + ";background:" + (isCurrent ? PaneTheme.color.accent : "transparent") + ";";
+          rowElement.addEventListener("mouseenter", () => {
+            if (!isCurrent) {
+              rowElement.style.background = HOVER_COLOR;
+            }
+          });
+          rowElement.addEventListener("mouseleave", () => {
+            if (!isCurrent) {
+              rowElement.style.background = "transparent";
+            }
+          });
+          rowElement.addEventListener("click", () => {
+            chooseNode(node);
+          });
+          listElement.appendChild(rowElement);
+        }, "appendRow");
+        if (keyword.length === 0 || "(none)".indexOf(keyword) >= 0) {
+          appendRow("(none)", null, 0);
+        }
+        for (const entry of entryList) {
+          const pathText = UIDocument.findNodePath(this.#documentRootNode, entry.node);
+          const nameText = entry.node.getName();
+          if (keyword.length > 0 && nameText.toLowerCase().indexOf(keyword) < 0 && pathText.toLowerCase().indexOf(keyword) < 0) {
             continue;
           }
-          menuItems.push({
-            id: "pickNode." + entry.node.getName(),
-            label: UIDocument.findNodePath(this.#documentRootNode, entry.node),
-            action: /* @__PURE__ */ __name(() => {
-              this.pushUndoSnapshot();
-              changeHandler(entry.node);
-              this.rebuildInspector();
-            }, "action")
-          });
+          appendRow(keyword.length > 0 ? pathText : nameText, entry.node, keyword.length > 0 ? 0 : entry.depth);
         }
-        this.openMenuPanelAt(buttonRect.left, buttonRect.bottom + 2, menuItems);
+      }, "rebuildList");
+      rebuildList();
+      searchElement.addEventListener("input", rebuildList);
+      searchElement.addEventListener("keydown", (keyboardEvent) => {
+        keyboardEvent.stopPropagation();
+        if (keyboardEvent.key === "Escape") {
+          closeDialog();
+        } else if (keyboardEvent.key === "Enter") {
+          const firstRow = listElement.children[0];
+          if (firstRow) {
+            firstRow.click();
+          }
+        }
       });
-      rowElement.appendChild(buttonElement);
+      cancelElement.addEventListener("click", closeDialog);
+      backdropElement.addEventListener("mousedown", (mouseEvent) => {
+        if (mouseEvent.target === backdropElement) {
+          closeDialog();
+        }
+      });
+      searchElement.focus();
     }
     //==============================================================================
     // 참 / 거짓 속성 줄.

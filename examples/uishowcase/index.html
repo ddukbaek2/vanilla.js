@@ -72,6 +72,11 @@
 	// 전역 상수 목록.
 	//==============================================================================
 	const ASSET_FILE_NAMES = ["home", "shop", "settings", "navigation", "popup", "toast"];
+	const SHOWCASE_FONT_SOURCE = "local(\"SF Pro Display\"), local(\"SF Pro Text\"), local(\"Segoe UI Variable Display\"),"
+		+ " local(\"Segoe UI Variable\"), local(\"Inter\"), local(\"Segoe UI\"), local(\"Apple SD Gothic Neo\"), local(\"Malgun Gothic\")";
+	const BOLD_LABEL_NAME_PREFIXES = ["Title", "CardTitle", "FeaturedTitle", "ItemTitle", "IconGlyph", "DialogTitle",
+		"OpenButton", "ClaimButton", "BuyButton", "FeaturedBuy", "ResetButton", "CancelButton", "ConfirmButton",
+		"NavLabel", "CoinChipLabel", "GemChipLabel", "ToastLabel"];
 	const SCREEN_NAMES = ["home", "shop", "settings"];
 	const TOAST_REST_Y = 548;
 	const TOAST_HOLD_SECONDS = 1.8;
@@ -106,12 +111,15 @@
 		/** @private @type { number } */ #toastRemainSeconds;
 		/** @private @type { boolean } */ #isToastShowing;
 		/** @private @type { number } */ #elapsedSeconds;
+		/** @private @type { FontFace | null } */ #fontFace;
 
 		//==============================================================================
 		// 생성.
 		//==============================================================================
 		constructor() {
 			super();
+
+			this.#fontFace = null;
 
 			this.#touchRecognizer = null;
 			this.#screenRootMap = new System.Map();
@@ -150,6 +158,17 @@
 			// 기준 해상도(960x640)를 비율 그대로 창 안에 맞춘다.
 			const viewManager = engine.getViewManager();
 			viewManager.setViewScaleMode(ViewScaleMode.stretchShort);
+
+			// 시스템에 깔린 서체 가운데 애플 / 세고이 계열을 찾아 쓴다. 없으면 엔진 기본 서체 그대로.
+			try {
+				const fontFace = new System.FontFace("ShowcaseSans", SHOWCASE_FONT_SOURCE);
+				await fontFace.load();
+				System.document.fonts.add(fontFace);
+				this.#fontFace = fontFace;
+			}
+			catch (fontError) {
+				this.#fontFace = null;
+			}
 
 			const documentMap = new System.Map();
 			const fetchPromises = ASSET_FILE_NAMES.map(async (fileName) => {
@@ -352,29 +371,35 @@
 		// 제목 글자는 굵게. (문서에는 굵기가 없으므로 코드에서 준다)
 		//==============================================================================
 		applyHeadingStyles() {
-			for (const screenRootNode of this.#screenRootMap.values()) {
-				const titleLabel = this.findLabel(screenRootNode, "Title");
-				if (titleLabel) {
-					titleLabel.setBold(true);
+			const root = this.getRoot();
+			this.visitLabels(root, (labelComponent, labelNode) => {
+				if (this.#fontFace) {
+					labelComponent.setFont(this.#fontFace);
 				}
-				for (let cardIndex = 0; cardIndex < 6; ++cardIndex) {
-					const cardTitle = this.findLabel(screenRootNode, "CardTitle" + cardIndex);
-					if (cardTitle) {
-						cardTitle.setBold(true);
-					}
-					const featuredTitle = this.findLabel(screenRootNode, "FeaturedTitle" + cardIndex);
-					if (featuredTitle) {
-						featuredTitle.setBold(true);
-					}
-					const iconGlyph = this.findLabel(screenRootNode, "IconGlyph" + cardIndex);
-					if (iconGlyph) {
-						iconGlyph.setBold(true);
+				const nodeName = labelNode.getName();
+				for (const prefix of BOLD_LABEL_NAME_PREFIXES) {
+					if (nodeName.indexOf(prefix) === 0) {
+						labelComponent.setBold(true);
+						break;
 					}
 				}
+			});
+		}
+
+		//==============================================================================
+		// 보조: 모든 라벨을 찾아 처리한다.
+		//==============================================================================
+		/**
+		 * @param { WorldNode } node
+		 * @param { Function } visitHandler
+		 */
+		visitLabels(node, visitHandler) {
+			const labelComponents = node.getComponents(UILabel);
+			for (const labelComponent of labelComponents) {
+				visitHandler(labelComponent, node);
 			}
-			const dialogTitle = this.findLabel(this.#popupRootNode, "DialogTitle");
-			if (dialogTitle) {
-				dialogTitle.setBold(true);
+			for (const childNode of node.getChildren()) {
+				this.visitLabels(childNode, visitHandler);
 			}
 		}
 

@@ -336,11 +336,21 @@ const COMPONENT_PROPERTY_TABLE = {
 	},
 	UISlider: {
 		save(component) {
-			return { value: component.getValue() };
+			return {
+				value: component.getValue(),
+				thumbRadius: component.getThumbRadius(),
+				trackThickness: component.getTrackThickness(),
+			};
 		},
 		load(component, data) {
 			if (data.value !== undefined) {
 				component.setValue(data.value);
+			}
+			if (data.thumbRadius !== undefined) {
+				component.setThumbRadius(data.thumbRadius);
+			}
+			if (data.trackThickness !== undefined) {
+				component.setTrackThickness(data.trackThickness);
 			}
 		},
 	},
@@ -351,12 +361,20 @@ const COMPONENT_PROPERTY_TABLE = {
 				scrollContentSize: [scrollContentSize.x, scrollContentSize.y],
 				scrollMode: component.getScrollMode(),
 				dragSensitivity: component.getDragSensitivity(),
+				horizontal: component.isHorizontal(),
+				vertical: component.isVertical(),
 				backgroundColor: colorToArray(component.getBackgroundColor()),
 			};
 		},
 		load(component, data) {
 			if (data.scrollContentSize) {
 				component.setScrollContentSize(Vector2.create(data.scrollContentSize[0], data.scrollContentSize[1]));
+			}
+			if (data.horizontal !== undefined) {
+				component.setHorizontal(data.horizontal);
+			}
+			if (data.vertical !== undefined) {
+				component.setVertical(data.vertical);
 			}
 			if (data.scrollMode !== undefined) {
 				component.setScrollMode(data.scrollMode);

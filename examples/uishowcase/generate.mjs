@@ -93,12 +93,14 @@ function toggle() {
 	return { type: "UIToggleButton", pressedTintColor: [0, 0, 0, 0.25] };
 }
 
-function scrollView(contentWidth, contentHeight) {
+function scrollView(contentWidth, contentHeight, isHorizontal, isVertical) {
 	return {
 		type: "UIScrollView",
 		scrollContentSize: [contentWidth, contentHeight],
 		scrollMode: "elastic",
 		dragSensitivity: 1,
+		horizontal: isHorizontal,
+		vertical: isVertical,
 		backgroundColor: COLOR_TRANSPARENT,
 	};
 }
@@ -108,7 +110,7 @@ function progress(value) {
 }
 
 function slider(value) {
-	return { type: "UISlider", value: value };
+	return { type: "UISlider", value: value, thumbRadius: 9, trackThickness: 6 };
 }
 
 //==============================================================================
@@ -201,7 +203,7 @@ function buildHome() {
 			}),
 			makeNode("CardList", 24, 92, listWidth, 468, {
 				interactable: true,
-				components: [scrollView(listWidth, listContentHeight)],
+				components: [scrollView(listWidth, listContentHeight, false, true)],
 				contentChildren: cardNodes,
 			}),
 			makeNode("DailyPanel", 680, 92, 256, 468, {
@@ -283,7 +285,7 @@ function buildShop() {
 			textNode("FeaturedLabel", 24, 88, 200, 22, "FEATURED", 13, color(COLOR_TEXT_DIM)),
 			makeNode("FeaturedList", 24, 112, 912, 136, {
 				interactable: true,
-				components: [scrollView(featuredContentWidth, 136)],
+				components: [scrollView(featuredContentWidth, 136, true, false)],
 				contentChildren: featuredNodes,
 			}),
 			...itemNodes,

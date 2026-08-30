@@ -20481,6 +20481,8 @@ var UISlider = class extends UIControl {
   #thumbColor;
   /** @private @type { number } */
   #thumbRadius;
+  /** @private @type { number } */
+  #trackThickness;
   /** @private @type { WorldNode } */
   #thumbNode;
   /** @private @type { number } */
@@ -20506,6 +20508,7 @@ var UISlider = class extends UIControl {
     this.#fillColor = new Color(0.23, 0.51, 0.96, 1);
     this.#thumbColor = new Color(1, 1, 1, 1);
     this.#thumbRadius = 16;
+    this.#trackThickness = 0;
     this.#thumbNode = null;
     this.#cornerRadius = 0;
     this.#direction = ProgressDirection.horizontal;
@@ -20542,7 +20545,15 @@ var UISlider = class extends UIControl {
     if (contentSize.x <= 0 || contentSize.y <= 0) {
       return;
     }
-    const trackRect = Rect.create(0, 0, contentSize.x, contentSize.y);
+    const trackThickness = this.#trackThickness;
+    let trackRect = Rect.create(0, 0, contentSize.x, contentSize.y);
+    if (trackThickness > 0) {
+      if (this.#direction === ProgressDirection.vertical) {
+        trackRect = Rect.create((contentSize.x - trackThickness) * 0.5, 0, trackThickness, contentSize.y);
+      } else {
+        trackRect = Rect.create(0, (contentSize.y - trackThickness) * 0.5, contentSize.x, trackThickness);
+      }
+    }
     graphic.setFillColor(this.#trackColor);
     if (this.#cornerRadius > 0) {
       graphic.drawRoundRect(trackRect, this.#cornerRadius);
@@ -20554,10 +20565,10 @@ var UISlider = class extends UIControl {
       let fillRect;
       if (this.#direction === ProgressDirection.vertical) {
         const fillHeight = contentSize.y * ratio;
-        fillRect = Rect.create(0, contentSize.y - fillHeight, contentSize.x, fillHeight);
+        fillRect = Rect.create(trackRect.position.x, contentSize.y - fillHeight, trackRect.size.x, fillHeight);
       } else {
         const fillWidth = contentSize.x * ratio;
-        fillRect = Rect.create(0, 0, fillWidth, contentSize.y);
+        fillRect = Rect.create(0, trackRect.position.y, fillWidth, trackRect.size.y);
       }
       graphic.setFillColor(this.#fillColor);
       if (this.#cornerRadius > 0) {
@@ -20741,6 +20752,13 @@ var UISlider = class extends UIControl {
   }
   getThumbRadius() {
     return this.#thumbRadius;
+  }
+  /** @param { number } thickness */
+  setTrackThickness(thickness) {
+    this.#trackThickness = thickness;
+  }
+  getTrackThickness() {
+    return this.#trackThickness;
   }
   /** @param { WorldNode } node */
   setThumbNode(node) {
@@ -21050,11 +21068,21 @@ var COMPONENT_PROPERTY_TABLE = {
   },
   UISlider: {
     save(component) {
-      return { value: component.getValue() };
+      return {
+        value: component.getValue(),
+        thumbRadius: component.getThumbRadius(),
+        trackThickness: component.getTrackThickness()
+      };
     },
     load(component, data) {
       if (data.value !== void 0) {
         component.setValue(data.value);
+      }
+      if (data.thumbRadius !== void 0) {
+        component.setThumbRadius(data.thumbRadius);
+      }
+      if (data.trackThickness !== void 0) {
+        component.setTrackThickness(data.trackThickness);
       }
     }
   },
@@ -21065,12 +21093,20 @@ var COMPONENT_PROPERTY_TABLE = {
         scrollContentSize: [scrollContentSize.x, scrollContentSize.y],
         scrollMode: component.getScrollMode(),
         dragSensitivity: component.getDragSensitivity(),
+        horizontal: component.isHorizontal(),
+        vertical: component.isVertical(),
         backgroundColor: colorToArray(component.getBackgroundColor())
       };
     },
     load(component, data) {
       if (data.scrollContentSize) {
         component.setScrollContentSize(Vector2.create(data.scrollContentSize[0], data.scrollContentSize[1]));
+      }
+      if (data.horizontal !== void 0) {
+        component.setHorizontal(data.horizontal);
+      }
+      if (data.vertical !== void 0) {
+        component.setVertical(data.vertical);
       }
       if (data.scrollMode !== void 0) {
         component.setScrollMode(data.scrollMode);

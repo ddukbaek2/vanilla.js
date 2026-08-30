@@ -442,6 +442,8 @@
 						],
 						"scrollMode": "elastic",
 						"dragSensitivity": 1,
+						"horizontal": true,
+						"vertical": false,
 						"backgroundColor": [
 							1,
 							1,

@@ -432,7 +432,9 @@
 								"components": [
 									{
 										"type": "UISlider",
-										"value": 0.7
+										"value": 0.7,
+										"thumbRadius": 9,
+										"trackThickness": 6
 									}
 								],
 								"children": []
@@ -605,7 +607,9 @@
 								"components": [
 									{
 										"type": "UISlider",
-										"value": 0.85
+										"value": 0.85,
+										"thumbRadius": 9,
+										"trackThickness": 6
 									}
 								],
 								"children": []
