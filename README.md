@@ -28,6 +28,11 @@
 
 ## 테스트 링크
 
+### 저장소
+- https://github.com/ddukbaek2/vanilla.js
+- https://github.com/ddukbaek2/playablegames-template
+- https://ddukbaek2.com/vanilla.js
+
 ### 도구
 - UI 편집기: https://ddukbaek2.com/portfolio/uieditor/
 - 비주얼 에디터: https://ddukbaek2.com/portfolio/visualeditor
@@ -38,9 +43,6 @@
 - https://ddukbaek2.com/portfolio/uishowcase
 
 ### 게임
-- https://github.com/ddukbaek2/vanilla.js
-- https://github.com/ddukbaek2/playablegames-template
-- https://ddukbaek2.com/vanilla.js
 - https://ddukbaek2.com/portfolio/talesofcultivation
 - https://ddukbaek2.com/portfolio/pipemania
 - https://ddukbaek2.com/portfolio/scramble-heroes
