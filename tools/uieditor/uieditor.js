@@ -623,7 +623,8 @@ export class UIEditor {
 				{ separator: true },
 				{ id: "renderScaleActual", label: "Actual Size (1:1)" },
 				{ id: "renderScaleFit", label: "Fit to View" },
-				{ id: "renderScaleStretch", label: "Stretch to View" },
+				{ id: "renderScaleStretchWidth", label: "Stretch Width" },
+				{ id: "renderScaleStretchHeight", label: "Stretch Height" },
 			]);
 		});
 		this.#viewToggleElement = PaneStyle.create("div", "", {
@@ -990,7 +991,7 @@ export class UIEditor {
 		const isEditorActive = (viewName === "edit");
 		this.#editorHolderElement.style.display = isEditorActive ? "block" : "none";
 		this.#previewHolderElement.style.display = isEditorActive ? "none" : "block";
-		const renderModeLabel = { actual: "1:1", fit: "FIT", stretch: "STRETCH" }[this.#renderScaleMode];
+		const renderModeLabel = { actual: "1:1", fit: "FIT", stretchWidth: "STRETCH W", stretchHeight: "STRETCH H" }[this.#renderScaleMode];
 		this.#viewTitleElement.innerText = isEditorActive ? "VIEW" : ("VIEW - " + renderModeLabel);
 		this.#viewToggleElement.innerHTML = createIconMarkup(isEditorActive ? "renderMode" : "editMode");
 		this.#viewToggleElement.title = isEditorActive ? "결과 화면 보기" : "편집 화면으로";
@@ -1207,9 +1208,15 @@ export class UIEditor {
 			scaleX = fitRatio;
 			scaleY = fitRatio;
 		}
-		else if (this.#renderScaleMode === "stretch") {
+		else if (this.#renderScaleMode === "stretchWidth") {
+			// 가로를 화면에 맞추고 비율을 지킨다. 세로는 잘리거나 남는다.
 			scaleX = viewWidth / documentSize.x;
+			scaleY = scaleX;
+		}
+		else if (this.#renderScaleMode === "stretchHeight") {
+			// 세로를 화면에 맞추고 비율을 지킨다. 가로는 잘리거나 남는다.
 			scaleY = viewHeight / documentSize.y;
+			scaleX = scaleY;
 		}
 		const offsetX = System.Math.round((viewWidth - documentSize.x * scaleX) * 0.5);
 		const offsetY = System.Math.round((viewHeight - documentSize.y * scaleY) * 0.5);
@@ -2022,8 +2029,12 @@ export class UIEditor {
 			this.#renderScaleMode = "fit";
 			this.setActiveView("render");
 		}
-		else if (commandId === "renderScaleStretch") {
-			this.#renderScaleMode = "stretch";
+		else if (commandId === "renderScaleStretchWidth") {
+			this.#renderScaleMode = "stretchWidth";
+			this.setActiveView("render");
+		}
+		else if (commandId === "renderScaleStretchHeight") {
+			this.#renderScaleMode = "stretchHeight";
 			this.setActiveView("render");
 		}
 	}
@@ -2051,8 +2062,11 @@ export class UIEditor {
 		if (commandId === "renderScaleFit") {
 			return this.#renderScaleMode === "fit";
 		}
-		if (commandId === "renderScaleStretch") {
-			return this.#renderScaleMode === "stretch";
+		if (commandId === "renderScaleStretchWidth") {
+			return this.#renderScaleMode === "stretchWidth";
+		}
+		if (commandId === "renderScaleStretchHeight") {
+			return this.#renderScaleMode === "stretchHeight";
 		}
 		return false;
 	}
@@ -3348,7 +3362,7 @@ export class UIEditor {
 			statusText += "    배율 " + System.Math.round(editorTransform.scale * 100) + "%";
 		}
 		else {
-			const renderModeText = { actual: "1:1 실제 크기", fit: "비율 맞춤", stretch: "늘려 채움" }[this.#renderScaleMode];
+			const renderModeText = { actual: "1:1 실제 크기", fit: "비율 맞춤", stretchWidth: "가로 맞춤", stretchHeight: "세로 맞춤" }[this.#renderScaleMode];
 			statusText += "    결과 화면 " + renderModeText;
 		}
 		this.#statusTextElement.innerText = statusText;

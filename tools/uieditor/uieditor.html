@@ -28434,7 +28434,8 @@ void main() {
           { separator: true },
           { id: "renderScaleActual", label: "Actual Size (1:1)" },
           { id: "renderScaleFit", label: "Fit to View" },
-          { id: "renderScaleStretch", label: "Stretch to View" }
+          { id: "renderScaleStretchWidth", label: "Stretch Width" },
+          { id: "renderScaleStretchHeight", label: "Stretch Height" }
         ]);
       });
       this.#viewToggleElement = PaneStyle.create("div", "", {
@@ -28786,7 +28787,7 @@ void main() {
       const isEditorActive = viewName === "edit";
       this.#editorHolderElement.style.display = isEditorActive ? "block" : "none";
       this.#previewHolderElement.style.display = isEditorActive ? "none" : "block";
-      const renderModeLabel = { actual: "1:1", fit: "FIT", stretch: "STRETCH" }[this.#renderScaleMode];
+      const renderModeLabel = { actual: "1:1", fit: "FIT", stretchWidth: "STRETCH W", stretchHeight: "STRETCH H" }[this.#renderScaleMode];
       this.#viewTitleElement.innerText = isEditorActive ? "VIEW" : "VIEW - " + renderModeLabel;
       this.#viewToggleElement.innerHTML = createIconMarkup(isEditorActive ? "renderMode" : "editMode");
       this.#viewToggleElement.title = isEditorActive ? "\uACB0\uACFC \uD654\uBA74 \uBCF4\uAE30" : "\uD3B8\uC9D1 \uD654\uBA74\uC73C\uB85C";
@@ -29004,9 +29005,12 @@ void main() {
         const fitRatio = System47.Math.min(viewWidth / documentSize.x, viewHeight / documentSize.y);
         scaleX = fitRatio;
         scaleY = fitRatio;
-      } else if (this.#renderScaleMode === "stretch") {
+      } else if (this.#renderScaleMode === "stretchWidth") {
         scaleX = viewWidth / documentSize.x;
+        scaleY = scaleX;
+      } else if (this.#renderScaleMode === "stretchHeight") {
         scaleY = viewHeight / documentSize.y;
+        scaleX = scaleY;
       }
       const offsetX = System47.Math.round((viewWidth - documentSize.x * scaleX) * 0.5);
       const offsetY = System47.Math.round((viewHeight - documentSize.y * scaleY) * 0.5);
@@ -29756,8 +29760,11 @@ void main() {
       } else if (commandId === "renderScaleFit") {
         this.#renderScaleMode = "fit";
         this.setActiveView("render");
-      } else if (commandId === "renderScaleStretch") {
-        this.#renderScaleMode = "stretch";
+      } else if (commandId === "renderScaleStretchWidth") {
+        this.#renderScaleMode = "stretchWidth";
+        this.setActiveView("render");
+      } else if (commandId === "renderScaleStretchHeight") {
+        this.#renderScaleMode = "stretchHeight";
         this.setActiveView("render");
       }
     }
@@ -29784,8 +29791,11 @@ void main() {
       if (commandId === "renderScaleFit") {
         return this.#renderScaleMode === "fit";
       }
-      if (commandId === "renderScaleStretch") {
-        return this.#renderScaleMode === "stretch";
+      if (commandId === "renderScaleStretchWidth") {
+        return this.#renderScaleMode === "stretchWidth";
+      }
+      if (commandId === "renderScaleStretchHeight") {
+        return this.#renderScaleMode === "stretchHeight";
       }
       return false;
     }
@@ -31032,7 +31042,7 @@ void main() {
         const editorTransform = this.#editorCanvas ? this.getEditorTransform() : { scale: 1 };
         statusText += "    \uBC30\uC728 " + System47.Math.round(editorTransform.scale * 100) + "%";
       } else {
-        const renderModeText = { actual: "1:1 \uC2E4\uC81C \uD06C\uAE30", fit: "\uBE44\uC728 \uB9DE\uCDA4", stretch: "\uB298\uB824 \uCC44\uC6C0" }[this.#renderScaleMode];
+        const renderModeText = { actual: "1:1 \uC2E4\uC81C \uD06C\uAE30", fit: "\uBE44\uC728 \uB9DE\uCDA4", stretchWidth: "\uAC00\uB85C \uB9DE\uCDA4", stretchHeight: "\uC138\uB85C \uB9DE\uCDA4" }[this.#renderScaleMode];
         statusText += "    \uACB0\uACFC \uD654\uBA74 " + renderModeText;
       }
       this.#statusTextElement.innerText = statusText;
