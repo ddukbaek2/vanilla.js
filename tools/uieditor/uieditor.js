@@ -625,7 +625,7 @@ export class UIEditor {
 				{ id: "showRenderView", label: "Render View", shortcut: "F4" },
 				{ separator: true },
 				{ id: "renderScaleActual", label: "Actual Size (1:1)" },
-				{ id: "renderScaleFit", label: "Fit to View" },
+				{ id: "renderScaleFit", label: "Stretch Short" },
 				{ id: "renderScaleStretchWidth", label: "Stretch Width" },
 				{ id: "renderScaleStretchHeight", label: "Stretch Height" },
 			]);
@@ -994,7 +994,7 @@ export class UIEditor {
 		const isEditorActive = (viewName === "edit");
 		this.#editorHolderElement.style.display = isEditorActive ? "block" : "none";
 		this.#previewHolderElement.style.display = isEditorActive ? "none" : "block";
-		const renderModeLabel = { actual: "1:1", fit: "FIT", stretchWidth: "STRETCH W", stretchHeight: "STRETCH H" }[this.#renderScaleMode];
+		const renderModeLabel = { actual: "1:1", fit: "STRETCH S", stretchWidth: "STRETCH W", stretchHeight: "STRETCH H" }[this.#renderScaleMode];
 		this.#viewTitleElement.innerText = isEditorActive ? "VIEW" : ("VIEW - " + renderModeLabel);
 		this.#viewToggleElement.innerHTML = createIconMarkup(isEditorActive ? "previewMode" : "editMode");
 		this.#viewToggleElement.title = isEditorActive ? "결과 화면 보기" : "편집 화면으로";
@@ -1207,6 +1207,7 @@ export class UIEditor {
 		let scaleX = 1;
 		let scaleY = 1;
 		if (this.#renderScaleMode === "fit") {
+			// 짧은 축에 맞추고 비율을 지킨다. (엔진 ViewScaleMode.stretchShort 와 같다) 긴 축은 남는다.
 			const fitRatio = System.Math.min(viewWidth / documentSize.x, viewHeight / documentSize.y);
 			scaleX = fitRatio;
 			scaleY = fitRatio;
@@ -3530,7 +3531,7 @@ export class UIEditor {
 			statusText += "    배율 " + System.Math.round(editorTransform.scale * 100) + "%";
 		}
 		else {
-			const renderModeText = { actual: "1:1 실제 크기", fit: "비율 맞춤", stretchWidth: "가로 맞춤", stretchHeight: "세로 맞춤" }[this.#renderScaleMode];
+			const renderModeText = { actual: "1:1 실제 크기", fit: "짧은 축 맞춤", stretchWidth: "가로 맞춤", stretchHeight: "세로 맞춤" }[this.#renderScaleMode];
 			statusText += "    결과 화면 " + renderModeText;
 		}
 		this.#statusTextElement.innerText = statusText;

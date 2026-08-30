@@ -28470,7 +28470,7 @@ void main() {
           { id: "showRenderView", label: "Render View", shortcut: "F4" },
           { separator: true },
           { id: "renderScaleActual", label: "Actual Size (1:1)" },
-          { id: "renderScaleFit", label: "Fit to View" },
+          { id: "renderScaleFit", label: "Stretch Short" },
           { id: "renderScaleStretchWidth", label: "Stretch Width" },
           { id: "renderScaleStretchHeight", label: "Stretch Height" }
         ]);
@@ -28824,7 +28824,7 @@ void main() {
       const isEditorActive = viewName === "edit";
       this.#editorHolderElement.style.display = isEditorActive ? "block" : "none";
       this.#previewHolderElement.style.display = isEditorActive ? "none" : "block";
-      const renderModeLabel = { actual: "1:1", fit: "FIT", stretchWidth: "STRETCH W", stretchHeight: "STRETCH H" }[this.#renderScaleMode];
+      const renderModeLabel = { actual: "1:1", fit: "STRETCH S", stretchWidth: "STRETCH W", stretchHeight: "STRETCH H" }[this.#renderScaleMode];
       this.#viewTitleElement.innerText = isEditorActive ? "VIEW" : "VIEW - " + renderModeLabel;
       this.#viewToggleElement.innerHTML = createIconMarkup(isEditorActive ? "previewMode" : "editMode");
       this.#viewToggleElement.title = isEditorActive ? "\uACB0\uACFC \uD654\uBA74 \uBCF4\uAE30" : "\uD3B8\uC9D1 \uD654\uBA74\uC73C\uB85C";
@@ -31219,7 +31219,7 @@ void main() {
         const editorTransform = this.#editorCanvas ? this.getEditorTransform() : { scale: 1 };
         statusText += "    \uBC30\uC728 " + System47.Math.round(editorTransform.scale * 100) + "%";
       } else {
-        const renderModeText = { actual: "1:1 \uC2E4\uC81C \uD06C\uAE30", fit: "\uBE44\uC728 \uB9DE\uCDA4", stretchWidth: "\uAC00\uB85C \uB9DE\uCDA4", stretchHeight: "\uC138\uB85C \uB9DE\uCDA4" }[this.#renderScaleMode];
+        const renderModeText = { actual: "1:1 \uC2E4\uC81C \uD06C\uAE30", fit: "\uC9E7\uC740 \uCD95 \uB9DE\uCDA4", stretchWidth: "\uAC00\uB85C \uB9DE\uCDA4", stretchHeight: "\uC138\uB85C \uB9DE\uCDA4" }[this.#renderScaleMode];
         statusText += "    \uACB0\uACFC \uD654\uBA74 " + renderModeText;
       }
       this.#statusTextElement.innerText = statusText;
