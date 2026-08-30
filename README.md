@@ -27,13 +27,20 @@
 - Common JS 기반의 여러 보조 도구
 
 ## 테스트 링크
+
+### 도구
+- UI 편집기: https://ddukbaek2.com/portfolio/uieditor/
+- 비주얼 에디터: https://ddukbaek2.com/portfolio/visualeditor
+
+### 샘플
+- https://ddukbaek2.com/portfolio/neonhorizon
+- https://ddukbaek2.com/portfolio/ancientmountain
+- https://ddukbaek2.com/portfolio/uishowcase
+
+### 게임
 - https://github.com/ddukbaek2/vanilla.js
 - https://github.com/ddukbaek2/playablegames-template
 - https://ddukbaek2.com/vanilla.js
-- https://ddukbaek2.com/portfolio/visualeditor
 - https://ddukbaek2.com/portfolio/talesofcultivation
 - https://ddukbaek2.com/portfolio/pipemania
 - https://ddukbaek2.com/portfolio/scramble-heroes
-- https://ddukbaek2.com/portfolio/neonhorizon (3D Example)
-- https://ddukbaek2.com/portfolio/ancientmountain (3D Example — 3인칭 등반 어드벤처, 실시간 그림자/스킨드 애니메이션)
-- https://ddukbaek2.com/portfolio/uishowcase (UI Example — uiasset 여섯 벌로 조립한 홈/상점/설정 화면, 팝업·토스트·스크롤뷰)
