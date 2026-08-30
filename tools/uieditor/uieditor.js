@@ -196,6 +196,8 @@ const RESIZE_HANDLE_DEFINITIONS = [
 ];
 
 const HANDLE_SIZE = 8;
+const DOUBLE_CLICK_INTERVAL = 350;
+const PRESS_MOVE_TOLERANCE = 3;
 const DEFAULT_ROUND_SIZE = 16;
 const SNAP_DISTANCE = 6;
 const UNDO_LIMIT = 64;
@@ -421,6 +423,9 @@ export class UIEditor {
 	/** @private @type { string } */ #renderScaleMode;
 	/** @private @type { string } */ #documentFileName;
 	/** @private @type { Map } */ #hierarchyRowNodeMap;
+	/** @private @type { number } */ #frontSelectTimer;
+	/** @private @type { WorldNode | null } */ #frontSelectNode;
+	/** @private @type { boolean } */ #isPressMoved;
 
 
 	//==============================================================================
@@ -462,6 +467,9 @@ export class UIEditor {
 		this.#renderScaleMode = "fit";
 		this.#documentFileName = "ui.uiasset.json";
 		this.#hierarchyRowNodeMap = new System.Map();
+		this.#frontSelectTimer = 0;
+		this.#frontSelectNode = null;
+		this.#isPressMoved = false;
 	}
 
 	//==============================================================================
@@ -1589,7 +1597,10 @@ export class UIEditor {
 		}
 
 		// 아무것도 고르지 않았거나 고른 것이 이 자리에 없으면 맨 앞 것을 고른다.
-		// 고른 것이 이 자리에 겹쳐 있으면 그대로 두어, 두 번 누르기가 계속 그 뒤의 것으로 옮겨 갈 수 있게 한다.
+		// 고른 것이 이 자리에 겹쳐 있으면 일단 그대로 두어 두 번 누르기가 그 뒤의 것으로 옮겨 갈 수 있게 하고,
+		// 두 번 누르기가 이어지지 않는 보통 누르기였으면(놓은 뒤 잠시 뒤) 맨 앞 것으로 바꾼다.
+		this.cancelFrontSelect();
+		this.#isPressMoved = false;
 		const hitNode = this.findTopmostNodeAt(this.#documentRootNode, pointerPosition);
 		let nextSelectedNode = hitNode;
 		if (this.#selectedNode && this.#selectedNode !== hitNode) {
@@ -1597,6 +1608,7 @@ export class UIEditor {
 			this.collectNodesAt(this.#documentRootNode, pointerPosition, overlappedList);
 			if (overlappedList.indexOf(this.#selectedNode) >= 0) {
 				nextSelectedNode = this.#selectedNode;
+				this.#frontSelectNode = hitNode;
 			}
 		}
 
@@ -1626,6 +1638,9 @@ export class UIEditor {
 		}
 		const deltaX = pointerPosition.x - this.#dragStartPointer.x;
 		const deltaY = pointerPosition.y - this.#dragStartPointer.y;
+		if (System.Math.abs(deltaX) > PRESS_MOVE_TOLERANCE || System.Math.abs(deltaY) > PRESS_MOVE_TOLERANCE) {
+			this.#isPressMoved = true;
+		}
 
 		if (this.#dragMode === "move") {
 			const movedPosition = Vector2.create(this.#dragStartPosition.x + deltaX, this.#dragStartPosition.y + deltaY);
@@ -1657,6 +1672,30 @@ export class UIEditor {
 		this.#dragMode = "none";
 		this.#activeHandle = null;
 		this.#snapGuideList = [];
+
+		// 고른 것을 유지한 채 놓았고 끌지도 않았으면, 두 번 누르기가 안 이어질 때 맨 앞 것으로 바꾼다.
+		if (this.#frontSelectNode && !this.#isPressMoved) {
+			const frontNode = this.#frontSelectNode;
+			this.#frontSelectTimer = System.setTimeout(() => {
+				this.#frontSelectTimer = 0;
+				this.#frontSelectNode = null;
+				this.selectNode(frontNode);
+			}, DOUBLE_CLICK_INTERVAL);
+		}
+		else {
+			this.#frontSelectNode = null;
+		}
+	}
+
+	//==============================================================================
+	// 맨 앞 것으로 바꾸려던 예약을 취소한다. (두 번 누르기가 이어지거나 새로 누를 때)
+	//==============================================================================
+	cancelFrontSelect() {
+		if (this.#frontSelectTimer) {
+			System.clearTimeout(this.#frontSelectTimer);
+			this.#frontSelectTimer = 0;
+		}
+		this.#frontSelectNode = null;
 	}
 
 	//==============================================================================
@@ -1711,6 +1750,7 @@ export class UIEditor {
 	 * @param { Vector2 } pointerPosition
 	 */
 	selectNextOverlappedNode(pointerPosition) {
+		this.cancelFrontSelect();
 		const overlappedList = [];
 		this.collectNodesAt(this.#documentRootNode, pointerPosition, overlappedList);
 		if (overlappedList.length === 0) {

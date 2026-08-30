@@ -28063,6 +28063,8 @@ void main() {
     { id: "bottomRight", ratioX: 1, ratioY: 1, moveLeft: false, moveTop: false, sizeX: 1, sizeY: 1, cursor: "nwse-resize" }
   ];
   var HANDLE_SIZE = 8;
+  var DOUBLE_CLICK_INTERVAL = 350;
+  var PRESS_MOVE_TOLERANCE = 3;
   var DEFAULT_ROUND_SIZE = 16;
   var SNAP_DISTANCE = 6;
   var UNDO_LIMIT = 64;
@@ -28281,6 +28283,12 @@ void main() {
     #documentFileName;
     /** @private @type { Map } */
     #hierarchyRowNodeMap;
+    /** @private @type { number } */
+    #frontSelectTimer;
+    /** @private @type { WorldNode | null } */
+    #frontSelectNode;
+    /** @private @type { boolean } */
+    #isPressMoved;
     //==============================================================================
     // 생성.
     //==============================================================================
@@ -28320,6 +28328,9 @@ void main() {
       this.#renderScaleMode = "fit";
       this.#documentFileName = "ui.uiasset.json";
       this.#hierarchyRowNodeMap = new System47.Map();
+      this.#frontSelectTimer = 0;
+      this.#frontSelectNode = null;
+      this.#isPressMoved = false;
     }
     //==============================================================================
     // 실행.
@@ -29393,6 +29404,8 @@ void main() {
           return;
         }
       }
+      this.cancelFrontSelect();
+      this.#isPressMoved = false;
       const hitNode = this.findTopmostNodeAt(this.#documentRootNode, pointerPosition);
       let nextSelectedNode = hitNode;
       if (this.#selectedNode && this.#selectedNode !== hitNode) {
@@ -29400,6 +29413,7 @@ void main() {
         this.collectNodesAt(this.#documentRootNode, pointerPosition, overlappedList);
         if (overlappedList.indexOf(this.#selectedNode) >= 0) {
           nextSelectedNode = this.#selectedNode;
+          this.#frontSelectNode = hitNode;
         }
       }
       this.selectNode(nextSelectedNode);
@@ -29427,6 +29441,9 @@ void main() {
       }
       const deltaX = pointerPosition.x - this.#dragStartPointer.x;
       const deltaY = pointerPosition.y - this.#dragStartPointer.y;
+      if (System47.Math.abs(deltaX) > PRESS_MOVE_TOLERANCE || System47.Math.abs(deltaY) > PRESS_MOVE_TOLERANCE) {
+        this.#isPressMoved = true;
+      }
       if (this.#dragMode === "move") {
         const movedPosition = Vector2.create(this.#dragStartPosition.x + deltaX, this.#dragStartPosition.y + deltaY);
         selectedNode.setLocalPosition(this.applySnap(selectedNode, movedPosition));
@@ -29455,6 +29472,26 @@ void main() {
       this.#dragMode = "none";
       this.#activeHandle = null;
       this.#snapGuideList = [];
+      if (this.#frontSelectNode && !this.#isPressMoved) {
+        const frontNode = this.#frontSelectNode;
+        this.#frontSelectTimer = System47.setTimeout(() => {
+          this.#frontSelectTimer = 0;
+          this.#frontSelectNode = null;
+          this.selectNode(frontNode);
+        }, DOUBLE_CLICK_INTERVAL);
+      } else {
+        this.#frontSelectNode = null;
+      }
+    }
+    //==============================================================================
+    // 맨 앞 것으로 바꾸려던 예약을 취소한다. (두 번 누르기가 이어지거나 새로 누를 때)
+    //==============================================================================
+    cancelFrontSelect() {
+      if (this.#frontSelectTimer) {
+        System47.clearTimeout(this.#frontSelectTimer);
+        this.#frontSelectTimer = 0;
+      }
+      this.#frontSelectNode = null;
     }
     //==============================================================================
     // 커서 모양 적용.
@@ -29504,6 +29541,7 @@ void main() {
      * @param { Vector2 } pointerPosition
      */
     selectNextOverlappedNode(pointerPosition) {
+      this.cancelFrontSelect();
       const overlappedList = [];
       this.collectNodesAt(this.#documentRootNode, pointerPosition, overlappedList);
       if (overlappedList.length === 0) {
