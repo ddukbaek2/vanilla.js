@@ -276,9 +276,10 @@
 				}
 				const sliderComponent = sliderComponents[0];
 				sliderComponent.setThumbColor(new Color(1, 1, 1, 1));
-				sliderComponent.setValueChangedEvent((value) => {
+				// 엔진은 값이 아니라 슬라이더 자신을 넘겨준다. 값은 슬라이더에서 읽는다.
+				sliderComponent.setValueChangedEvent(() => {
 					if (captionLabel) {
-						captionLabel.setText(System.Math.round(value * 100) + "%");
+						captionLabel.setText(System.Math.round(sliderComponent.getValue() * 100) + "%");
 					}
 				});
 			}
@@ -296,7 +297,9 @@
 				const toggleComponent = toggleComponents[0];
 				const isInitiallyOn = (rowName === "Vibration");
 				toggleComponent.setIsOn(isInitiallyOn);
-				toggleComponent.setToggledEvent((isOn) => {
+				// 엔진은 켜짐 여부가 아니라 토글 자신을 넘겨준다. 상태는 토글에서 읽는다.
+				toggleComponent.setToggledEvent(() => {
+					const isOn = toggleComponent.getIsOn();
 					if (paintComponents.length > 0) {
 						paintComponents[0].setColor(isOn ? BAR_COLORS.Energy : new Color(0.227, 0.271, 0.376, 1));
 					}
