@@ -65,7 +65,8 @@ const ICON_SHAPES = {
 	grid: "<path d='M2 5.3h10M2 8.7h10M5.3 2v10M8.7 2v10' stroke='currentColor' stroke-width='1.3' fill='none'/>"
 		+ "<rect x='2' y='2' width='10' height='10' rx='1.5' fill='none' stroke='currentColor' stroke-width='1.5'/>",
 	editMode: "<path d='M2.5 11.5l1.1-3 5.6-5.6a1.4 1.4 0 0 1 2 0l0.9 0.9a1.4 1.4 0 0 1 0 2l-5.6 5.6z' fill='currentColor'/>",
-	renderMode: "<path d='M4 2.6l7.4 4.4-7.4 4.4z' fill='currentColor' stroke='currentColor' stroke-width='1.2' stroke-linejoin='round'/>",
+	previewMode: "<path d='M1.5 7c1.6-2.8 3.4-4.2 5.5-4.2s3.9 1.4 5.5 4.2c-1.6 2.8-3.4 4.2-5.5 4.2S3.1 9.8 1.5 7z' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linejoin='round'/>"
+		+ "<circle cx='7' cy='7' r='2' fill='currentColor'/>",
 };
 
 // 편집 화면에 놓을 수 있는 요소 목록.
@@ -995,7 +996,7 @@ export class UIEditor {
 		this.#previewHolderElement.style.display = isEditorActive ? "none" : "block";
 		const renderModeLabel = { actual: "1:1", fit: "FIT", stretchWidth: "STRETCH W", stretchHeight: "STRETCH H" }[this.#renderScaleMode];
 		this.#viewTitleElement.innerText = isEditorActive ? "VIEW" : ("VIEW - " + renderModeLabel);
-		this.#viewToggleElement.innerHTML = createIconMarkup(isEditorActive ? "renderMode" : "editMode");
+		this.#viewToggleElement.innerHTML = createIconMarkup(isEditorActive ? "previewMode" : "editMode");
 		this.#viewToggleElement.title = isEditorActive ? "결과 화면 보기" : "편집 화면으로";
 		this.refreshStatus();
 	}
