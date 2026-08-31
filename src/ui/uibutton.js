@@ -40,6 +40,9 @@ export class UIButton extends UIControl {
 	/** @private @type { function(UIButton): void } */ #releasedEvent;
 	/** @private @type { function(UIButton): void } */ #clickedEvent;
 	/** @private @type { boolean } */ #isPressTracking;
+	/** @private @type { number } */ #minimumPressedSeconds; // 눌린 그림을 보여 줄 최소 시간. (0 이면 즉시)
+	/** @private @type { number } */ #pressedElapsedSeconds; // 이번 누름이 이어진 시간.
+	/** @private @type { object | null } */ #pendingRelease; // 최소 시간을 채우려고 미뤄 둔 뗌 처리.
 	/** @private @type { Color } */ #pressedTintColor;
 	/** @private @type { Color } */ #hoverTintColor;
 	/** @private @type { function(UIButton): void } */ #hoverEvent;
@@ -66,6 +69,9 @@ export class UIButton extends UIControl {
 		this.#releasedEvent = null;
 		this.#clickedEvent = null;
 		this.#isPressTracking = false;
+		this.#minimumPressedSeconds = 0;
+		this.#pressedElapsedSeconds = 0;
+		this.#pendingRelease = null;
 		this.#pressedTintColor = new Color(0, 0, 0, 0.3);
 		this.#hoverTintColor = new Color(1, 1, 1, 0.12);
 		this.#hoverEvent = null;
@@ -124,6 +130,19 @@ export class UIButton extends UIControl {
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
+		if (this.#isPressTracking) {
+			this.#pressedElapsedSeconds += timeDelta;
+		}
+
+		// 최소 눌림 표시 시간을 채우려고 미뤄 둔 뗌 처리를 마저 한다.
+		if (this.#pendingRelease) {
+			this.#pendingRelease.remainSeconds -= timeDelta;
+			if (this.#pendingRelease.remainSeconds <= 0) {
+				const releasePosition = this.#pendingRelease.viewInputPosition;
+				this.#pendingRelease = null;
+				this.performRelease(releasePosition);
+			}
+		}
 		this.updateHoverState();
 		this.updateTintTransition(timeDelta);
 	}
@@ -190,6 +209,8 @@ export class UIButton extends UIControl {
 			return;
 		}
 		this.#isPressTracking = true;
+		this.#pressedElapsedSeconds = 0;
+		this.#pendingRelease = null;
 		this.setButtonState(ButtonState.pressed);
 		this.collectColorTargets();
 		const pressedEvent = this.getPressedEvent();
@@ -212,6 +233,25 @@ export class UIButton extends UIControl {
 			return;
 		}
 		this.#isPressTracking = false;
+
+		// 최소 눌림 표시 시간을 아직 못 채웠으면, 그만큼 눌린 모습을 유지한 뒤 처리한다.
+		if (this.#minimumPressedSeconds > 0 && this.#pressedElapsedSeconds < this.#minimumPressedSeconds) {
+			this.#pendingRelease = {
+				viewInputPosition: viewInputPosition,
+				remainSeconds: this.#minimumPressedSeconds - this.#pressedElapsedSeconds,
+			};
+			return;
+		}
+		this.performRelease(viewInputPosition);
+	}
+
+	//==============================================================================
+	// 뗌 처리 본문.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition
+	 */
+	performRelease(viewInputPosition) {
 		this.setButtonState(ButtonState.released);
 		this.#tintProgress = 0;
 		this.applyTintProgress(0);
@@ -241,6 +281,7 @@ export class UIButton extends UIControl {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchCancel(viewInputPosition) {
+		this.#pendingRelease = null;
 		if (!this.#isPressTracking) {
 			return;
 		}
@@ -423,6 +464,27 @@ export class UIButton extends UIControl {
 	/**
 	 * @param { function(UIButton): boolean } callback
 	 */
+	//==============================================================================
+	// 최소 눌림 표시 시간 설정.
+	// - 짧게 톡 눌러도 이 시간만큼 눌린 모습이 보인 뒤 클릭이 실행된다. (기본 0 = 즉시)
+	//==============================================================================
+	/**
+	 * @param { number } minimumPressedSeconds
+	 */
+	setMinimumPressedSeconds(minimumPressedSeconds) {
+		this.#minimumPressedSeconds = System.Math.max(0, minimumPressedSeconds);
+	}
+
+	//==============================================================================
+	// 최소 눌림 표시 시간 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getMinimumPressedSeconds() {
+		return this.#minimumPressedSeconds;
+	}
+
 	setClickEvent(callback) {
 		this.#clickEvent = callback;
 	}

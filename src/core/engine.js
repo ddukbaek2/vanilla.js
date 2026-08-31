@@ -733,6 +733,7 @@ export class Engine extends Object {
 		inputManager.setTouchReleased(false);
 		inputManager.setTouchCancelled(false);
 		inputManager.clearWheelDelta();
+		inputManager.updateFrameSnapshot();
 
 		// 다음 프레임 호출 요청.
 		++this.#frameNumber;
@@ -861,6 +862,30 @@ export class Engine extends Object {
 	/**
 	 * @returns { number }
 	 */
+	//==============================================================================
+	// 응용 프로그램 종료.
+	// - Capacitor 네이티브면 App 플러그인으로 끝내고, 웹이면 창 닫기를 시도한다.
+	//   (둘 다 환경에 따라 거부될 수 있으며 실패해도 예외를 내지 않는다)
+	//==============================================================================
+	exitApplication() {
+		try {
+			const capacitor = System.Capacitor;
+			if (capacitor && capacitor.Plugins && capacitor.Plugins.App && typeof capacitor.Plugins.App.exitApp === "function") {
+				capacitor.Plugins.App.exitApp();
+				return;
+			}
+		}
+		catch (nativeError) {
+			// 네이티브 종료 실패는 무시하고 웹 방식을 시도한다.
+		}
+		try {
+			System.window.close();
+		}
+		catch (closeError) {
+			// 브라우저가 거부하면 할 수 있는 것이 없다.
+		}
+	}
+
 	getFrameNumber() {
 		return this.#frameNumber;
 	}

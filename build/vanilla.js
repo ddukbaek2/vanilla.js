@@ -11,14 +11,14 @@ __export(wait_exports, {
   nextFrame: () => nextFrame,
   seconds: () => seconds
 });
-var System = globalThis;
+var System2 = globalThis;
 async function seconds(seconds2) {
-  const promise = new System.Promise((resolve) => System.setTimeout(resolve, seconds2 * 1e3));
+  const promise = new System2.Promise((resolve) => System2.setTimeout(resolve, seconds2 * 1e3));
   await promise;
 }
 __name(seconds, "seconds");
 async function nextFrame() {
-  new Promise((resolve) => System.window.requestAnimationFrame(resolve));
+  new Promise((resolve) => System2.window.requestAnimationFrame(resolve));
 }
 __name(nextFrame, "nextFrame");
 
@@ -30,6 +30,7 @@ __export(math_exports, {
   PositiveInfinity: () => PositiveInfinity,
   abs: () => abs,
   acos: () => acos,
+  approach: () => approach,
   asin: () => asin,
   ceil: () => ceil,
   clamp: () => clamp,
@@ -40,15 +41,20 @@ __export(math_exports, {
   lerp: () => lerp,
   max: () => max,
   min: () => min,
+  moveTowards: () => moveTowards,
+  pickRandom: () => pickRandom,
   pow: () => pow,
   radianToDegree: () => radianToDegree,
   random: () => random,
+  randomInt: () => randomInt,
+  randomRange: () => randomRange,
   round: () => round,
+  shuffle: () => shuffle,
   sin: () => sin,
   sqrt: () => sqrt,
   tan: () => tan
 });
-var System2 = globalThis;
+var System3 = globalThis;
 var PI = 3.141592653589793;
 var PositiveInfinity = Infinity;
 var NegativeInfinity = -Infinity;
@@ -73,7 +79,7 @@ function lerp(source, destination, normalizedTime) {
 }
 __name(lerp, "lerp");
 function random() {
-  return System2.Math.random();
+  return System3.Math.random();
 }
 __name(random, "random");
 function floor(value) {
@@ -192,6 +198,47 @@ function radianToDegree(radian) {
   return degree;
 }
 __name(radianToDegree, "radianToDegree");
+function randomRange(minValue, maxValue) {
+  const value = minValue + (maxValue - minValue) * random();
+  return value;
+}
+__name(randomRange, "randomRange");
+function randomInt(minValue, maxValue) {
+  const value = minValue + floor(random() * (maxValue - minValue + 1));
+  return value;
+}
+__name(randomInt, "randomInt");
+function pickRandom(array) {
+  if (!array || array.length === 0) {
+    return void 0;
+  }
+  const index = randomInt(0, array.length - 1);
+  return array[index];
+}
+__name(pickRandom, "pickRandom");
+function shuffle(array, randomFunction = random) {
+  for (let index = array.length - 1; index > 0; --index) {
+    const swapIndex = floor(randomFunction() * (index + 1));
+    const temporary = array[index];
+    array[index] = array[swapIndex];
+    array[swapIndex] = temporary;
+  }
+  return array;
+}
+__name(shuffle, "shuffle");
+function approach(currentValue, targetValue, rate, timeDelta) {
+  const blendRatio = 1 - System3.Math.exp(-rate * timeDelta);
+  return currentValue + (targetValue - currentValue) * blendRatio;
+}
+__name(approach, "approach");
+function moveTowards(currentValue, targetValue, maxDelta) {
+  const difference = targetValue - currentValue;
+  if (abs(difference) <= maxDelta) {
+    return targetValue;
+  }
+  return currentValue + (difference > 0 ? maxDelta : -maxDelta);
+}
+__name(moveTowards, "moveTowards");
 
 // src/base/reflection.js
 var reflection_exports = {};
@@ -209,7 +256,7 @@ __export(reflection_exports, {
   isValidate: () => isValidate,
   structuredClone: () => structuredClone
 });
-var System3 = globalThis;
+var System4 = globalThis;
 function isValidate(target) {
   if (target === void 0 || target === null) {
     return false;
@@ -219,57 +266,57 @@ function isValidate(target) {
 __name(isValidate, "isValidate");
 function clone(target) {
   if (!isValidate(target) || typeof target !== "object") {
-    throw new System3.Error();
+    throw new System4.Error();
   }
   const obj = new target.constructor();
-  System3.Object.assign(obj, target);
-  let currentProto = System3.Object.getPrototypeOf(target);
-  while (currentProto && currentProto !== System3.Object.prototype) {
-    const props = System3.Object.getOwnPropertyNames(currentProto);
+  System4.Object.assign(obj, target);
+  let currentProto = System4.Object.getPrototypeOf(target);
+  while (currentProto && currentProto !== System4.Object.prototype) {
+    const props = System4.Object.getOwnPropertyNames(currentProto);
     for (const prop of props) {
       if (prop !== "constructor") {
-        const descriptor = System3.Object.getOwnPropertyDescriptor(currentProto, prop);
+        const descriptor = System4.Object.getOwnPropertyDescriptor(currentProto, prop);
         if (descriptor && descriptor.get && descriptor.set) {
           obj[prop] = target[prop];
         }
       }
     }
-    currentProto = System3.Object.getPrototypeOf(currentProto);
+    currentProto = System4.Object.getPrototypeOf(currentProto);
   }
   return obj;
 }
 __name(clone, "clone");
 function structuredClone(target) {
   if (!isValidate(target) || typeof target !== "object")
-    throw new System3.Error();
+    throw new System4.Error();
   const obj = new target.constructor();
   const deepCopy = /* @__PURE__ */ __name((destination, source) => {
     for (const name in source) {
-      if (!System3.Object.prototype.hasOwnProperty.call(source, name))
+      if (!System4.Object.prototype.hasOwnProperty.call(source, name))
         continue;
       const value = source[name];
-      if (System3.Array.isArray(value)) {
+      if (System4.Array.isArray(value)) {
         destination[name] = [];
         deepCopy(destination[name], value);
-      } else if (value !== null && typeof value === "object" && value.constructor === System3.Object) {
+      } else if (value !== null && typeof value === "object" && value.constructor === System4.Object) {
         destination[name] = {};
         deepCopy(destination[name], value);
       } else {
         destination[name] = value;
       }
     }
-    let currentProto = System3.Object.getPrototypeOf(source);
-    while (currentProto && currentProto !== System3.Object.prototype) {
-      const props = System3.Object.getOwnPropertyNames(currentProto);
+    let currentProto = System4.Object.getPrototypeOf(source);
+    while (currentProto && currentProto !== System4.Object.prototype) {
+      const props = System4.Object.getOwnPropertyNames(currentProto);
       for (const prop of props) {
         if (prop !== "constructor") {
-          const descriptor = System3.Object.getOwnPropertyDescriptor(currentProto, prop);
+          const descriptor = System4.Object.getOwnPropertyDescriptor(currentProto, prop);
           if (descriptor && descriptor.get && descriptor.set) {
             const value = source[prop];
-            if (System3.Array.isArray(value)) {
+            if (System4.Array.isArray(value)) {
               destination[prop] = [];
               deepCopy(destination[prop], value);
-            } else if (value !== null && typeof value === "object" && value.constructor === System3.Object) {
+            } else if (value !== null && typeof value === "object" && value.constructor === System4.Object) {
               destination[prop] = {};
               deepCopy(destination[prop], value);
             } else {
@@ -278,7 +325,7 @@ function structuredClone(target) {
           }
         }
       }
-      currentProto = System3.Object.getPrototypeOf(currentProto);
+      currentProto = System4.Object.getPrototypeOf(currentProto);
     }
   }, "deepCopy");
   deepCopy(obj, target);
@@ -315,7 +362,7 @@ function isReferenceType(target) {
 }
 __name(isReferenceType, "isReferenceType");
 function isArrayType(target) {
-  return System3.Array.isArray(target);
+  return System4.Array.isArray(target);
 }
 __name(isArrayType, "isArrayType");
 function isFunctionType(target) {
@@ -477,7 +524,7 @@ var Object2 = class {
 };
 
 // src/base/color.js
-var System4 = globalThis;
+var System5 = globalThis;
 var Color = class _Color extends Object2 {
   static {
     __name(this, "Color");
@@ -679,19 +726,43 @@ var Color = class _Color extends Object2 {
    * @param { string } colorString 
    * @returns { Color }
    */
+  //==============================================================================
+  // 캐시를 거치는 HEX 색 생성. (정적)
+  // - 매 프레임 같은 문자열로 Color 를 새로 만들며 생기는 GC 압박을 줄인다.
+  // - 반환된 인스턴스는 공유되므로 절대 고쳐 쓰지 않는다. 고칠 거면 clone() 한다.
+  // - 알파는 0.01 단위로 양자화해 캐시가 불어나는 것을 막는다.
+  //==============================================================================
+  /**
+   * @param { string } colorString
+   * @param { number } alpha
+   * @returns { Color }
+   */
+  static fromHEXCached(colorString, alpha = 1) {
+    const quantizedAlpha = System5.Math.round(alpha * 100) / 100;
+    const cacheKey = colorString + "@" + quantizedAlpha;
+    let cachedColor = _Color.#hexCache.get(cacheKey);
+    if (!cachedColor) {
+      cachedColor = _Color.createFromHEX(colorString);
+      cachedColor.alpha = quantizedAlpha;
+      _Color.#hexCache.set(cacheKey, cachedColor);
+    }
+    return cachedColor;
+  }
+  /** @private @type { Map } */
+  static #hexCache = new System5.Map();
   static createFromHEX(colorString) {
     const color = new _Color(1, 1, 1, 1);
     colorString = colorString.trim().toLowerCase();
     if (colorString.startsWith("#")) {
       let hex = colorString.substring(1);
       if (hex.length === 3 || hex.length === 4) {
-        hex = System4.Array.from(hex).map((char) => char + char).join("");
+        hex = System5.Array.from(hex).map((char) => char + char).join("");
       }
-      color.red = System4.Number.parseInt(hex.substring(0, 2), 16) / 255;
-      color.green = System4.Number.parseInt(hex.substring(2, 4), 16) / 255;
-      color.blue = System4.Number.parseInt(hex.substring(4, 6), 16) / 255;
+      color.red = System5.Number.parseInt(hex.substring(0, 2), 16) / 255;
+      color.green = System5.Number.parseInt(hex.substring(2, 4), 16) / 255;
+      color.blue = System5.Number.parseInt(hex.substring(4, 6), 16) / 255;
       if (hex.length === 8) {
-        color.alpha = System4.Number.parseInt(hex.substring(6, 8), 16) / 255;
+        color.alpha = System5.Number.parseInt(hex.substring(6, 8), 16) / 255;
       }
     }
     return color;
@@ -721,11 +792,11 @@ var Color = class _Color extends Object2 {
     if (colorString.startsWith("rgb")) {
       const match = colorString.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/);
       if (match) {
-        color.red = System4.Number.parseInt(match[1], 10) / 255;
-        color.green = System4.Number.parseInt(match[2], 10) / 255;
-        color.blue = System4.Number.parseInt(match[3], 10) / 255;
+        color.red = System5.Number.parseInt(match[1], 10) / 255;
+        color.green = System5.Number.parseInt(match[2], 10) / 255;
+        color.blue = System5.Number.parseInt(match[3], 10) / 255;
         if (match[4] !== void 0) {
-          color.alpha = System4.Number.parseFloat(match[4]);
+          color.alpha = System5.Number.parseFloat(match[4]);
         }
       }
     }
@@ -1534,7 +1605,7 @@ var Vector3 = class _Vector3 extends Object2 {
 };
 
 // src/base/matrix4.js
-var System5 = globalThis;
+var System6 = globalThis;
 var Matrix4 = class _Matrix4 extends Object2 {
   static {
     __name(this, "Matrix4");
@@ -1552,7 +1623,7 @@ var Matrix4 = class _Matrix4 extends Object2 {
    */
   constructor() {
     super();
-    this.#elements = new System5.Float32Array(16);
+    this.#elements = new System6.Float32Array(16);
     this.setIdentity();
   }
   //==============================================================================
@@ -1601,7 +1672,7 @@ var Matrix4 = class _Matrix4 extends Object2 {
   multiply(other) {
     const elements = this.getElements();
     const otherElements = other.getElements();
-    const resultElements = new System5.Float32Array(16);
+    const resultElements = new System6.Float32Array(16);
     for (let columnIndex = 0; columnIndex < 4; ++columnIndex) {
       for (let rowIndex = 0; rowIndex < 4; ++rowIndex) {
         let sum = 0;
@@ -2665,7 +2736,7 @@ var Rect = class _Rect extends Object2 {
 };
 
 // src/base/obb.js
-var System6 = globalThis;
+var System7 = globalThis;
 var OBB = class _OBB extends Object2 {
   static {
     __name(this, "OBB");
@@ -2766,13 +2837,13 @@ var OBB = class _OBB extends Object2 {
    */
   setEdges(edges) {
     if (!_OBB.isValidate(edges)) {
-      throw new System6.Error(`edges is null.`);
+      throw new System7.Error(`edges is null.`);
     }
-    if (!System6.Array.isArray(edges)) {
-      throw new System6.Error(`edges is not Array.`);
+    if (!System7.Array.isArray(edges)) {
+      throw new System7.Error(`edges is not Array.`);
     }
     if (this.#edges.length !== edges.length) {
-      throw new System6.Error(`edges.length !== this.#edges.length.`);
+      throw new System7.Error(`edges.length !== this.#edges.length.`);
     }
     for (let i = 0; i < this.#edges.length; ++i) {
       this.#edges[i] = edges[i];
@@ -2790,7 +2861,7 @@ var OBB = class _OBB extends Object2 {
 };
 
 // src/base/platform.js
-var System7 = globalThis;
+var System8 = globalThis;
 var SYSTEM_FONT_STRING = '-apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
 var PlatformType = {
   //System.Object.freeze({
@@ -2848,7 +2919,7 @@ var Platform = class extends Object2 {
     if (canvas === null || canvas === void 0) {
       canvas = document.createElement("canvas");
       canvas.id = canvasId;
-      System7.document.body.appendChild(canvas);
+      System8.document.body.appendChild(canvas);
     }
     return canvas;
   }
@@ -2859,7 +2930,7 @@ var Platform = class extends Object2 {
    * @returns { { platformName: string, browserName: string } }
   */
   getPlatformInfo() {
-    const userAgent = System7.navigator.userAgent;
+    const userAgent = System8.navigator.userAgent;
     this.isMobile = /Mobi|Android|iPhone|iPad/i.test(userAgent);
     if (/Windows/i.test(userAgent)) this.platformName = PlatformType.windows;
     else if (/Valve Steam GameOverlay/i.test(userAgent)) this.platformName = PlatformType.steamDeck;
@@ -2916,22 +2987,22 @@ var Platform = class extends Object2 {
    * @returns { Rect }
   */
   getSafeAreaRect(canvas) {
-    const div = System7.document.createElement("div");
+    const div = System8.document.createElement("div");
     div.style.position = "absolute";
     div.style.visibility = "hidden";
     div.style.paddingTop = "env(safe-area-inset-top)";
     div.style.paddingRight = "env(safe-area-inset-right)";
     div.style.paddingBottom = "env(safe-area-inset-bottom)";
     div.style.paddingLeft = "env(safe-area-inset-left)";
-    System7.document.body.appendChild(div);
+    System8.document.body.appendChild(div);
     const style = Window.getComputedStyle(div);
     const top = Number.parseInt(style.paddingTop) || 0;
     const right = Number.parseInt(style.paddingRight) || 0;
     const bottom = Number.parseInt(style.paddingBottom) || 0;
     const left = Number.parseInt(style.paddingLeft) || 0;
-    System7.document.body.removeChild(div);
+    System8.document.body.removeChild(div);
     if (canvas === null || canvas === void 0) {
-      return Rect.create(left, top, System7.window.innerWidth - left - right, System7.window.innerHeight - top - bottom);
+      return Rect.create(left, top, System8.window.innerWidth - left - right, System8.window.innerHeight - top - bottom);
     } else {
       return Rect.create(left, top, canvas.width - left - right, canvas.height - top - bottom);
     }
@@ -2978,7 +3049,7 @@ var Singleton = class _Singleton extends Object2 {
 };
 
 // src/base/identifier.js
-var System8 = globalThis;
+var System9 = globalThis;
 var Identifier = class extends Object2 {
   static {
     __name(this, "Identifier");
@@ -3065,7 +3136,7 @@ var Enum = class _Enum extends Object2 {
    * @returns { System.Object }
    */
   static readonly(dictionary) {
-    System8.Object.freeze(dictionary);
+    System9.Object.freeze(dictionary);
   }
 };
 
@@ -4883,7 +4954,7 @@ var ImageTextureCache = class extends Object2 {
 };
 
 // src/core/graphic/textstringtexturecache.js
-var System9 = globalThis;
+var System10 = globalThis;
 var MAXIMUM_ENTRY_COUNT = 512;
 var TextStringTextureCache = class extends Object2 {
   static {
@@ -4913,10 +4984,10 @@ var TextStringTextureCache = class extends Object2 {
     super();
     this.#webGL2RenderingContext = webGL2RenderingContext;
     this.#entries = /* @__PURE__ */ new Map();
-    const bakeCanvas = System9.document.createElement("canvas");
+    const bakeCanvas = System10.document.createElement("canvas");
     this.#bakeCanvas = bakeCanvas;
     this.#bakeCanvasRenderingContext = bakeCanvas.getContext("2d", { willReadFrequently: false });
-    const measurementCanvas = System9.document.createElement("canvas");
+    const measurementCanvas = System10.document.createElement("canvas");
     this.#measurementCanvasRenderingContext = measurementCanvas.getContext("2d");
   }
   //==============================================================================
@@ -4946,7 +5017,7 @@ var TextStringTextureCache = class extends Object2 {
       return fontString;
     }
     return fontString.replace(/(\d+(?:\.\d+)?)px/, (matched, sizeText) => {
-      const scaledSize = System9.Number.parseFloat(sizeText) * scale;
+      const scaledSize = System10.Number.parseFloat(sizeText) * scale;
       return `${scaledSize}px`;
     });
   }
@@ -6464,7 +6535,7 @@ var Graphic = class extends Object2 {
 };
 
 // src/core/viewmanager.js
-var System10 = globalThis;
+var System11 = globalThis;
 var ViewScaleMode = {
   // 사용안함 (웹브라우저 크기가 변경되면 뷰 영역도 변경됨)
   none: "none",
@@ -6499,6 +6570,15 @@ var ViewManager = class extends Object2 {
   /** @private @type { number } */
   #targetResolutionScale;
   // 기준 해상도와 화면 해상도 사이의 크기 배율.
+  /** @private @type { number } */
+  #maxRenderPixelRatio;
+  // 렌더에 쓸 devicePixelRatio 상한. (0 이면 제한 없음)
+  /** @private @type { object | null } */
+  #safeAreaOverride;
+  // 세이프에어리어 강제값. (CSS px)
+  /** @private @type { HTMLElement | null } */
+  #safeAreaProbeElement;
+  // env() 측정용 숨은 요소.
   /** @private @type { Vector2 } */
   #clientNativeSize;
   // 웹페이지 전체 영역.
@@ -6533,6 +6613,9 @@ var ViewManager = class extends Object2 {
     this.#canvas = null;
     this.#devicePixelRatio = 1;
     this.#targetResolutionScale = 1;
+    this.#maxRenderPixelRatio = 0;
+    this.#safeAreaOverride = null;
+    this.#safeAreaProbeElement = null;
     this.#clientNativeSize = Vector2.zero();
     this.#canvasNativeSize = Vector2.zero();
     this.#canvasPixelSize = Vector2.zero();
@@ -6550,8 +6633,11 @@ var ViewManager = class extends Object2 {
     if (canvas === null || canvas === void 0) {
       return;
     }
-    const devicePixelRatio = System10.window.devicePixelRatio || 1;
-    const clientNativeSize = Vector2.create(System10.window.innerWidth, System10.window.innerHeight);
+    let devicePixelRatio = System11.window.devicePixelRatio || 1;
+    if (this.#maxRenderPixelRatio > 0 && devicePixelRatio > this.#maxRenderPixelRatio) {
+      devicePixelRatio = this.#maxRenderPixelRatio;
+    }
+    const clientNativeSize = Vector2.create(System11.window.innerWidth, System11.window.innerHeight);
     const canvasNativeRect = canvas.getBoundingClientRect();
     const canvasNativeSize = Vector2.create(Math.round(canvasNativeRect.width), Math.round(canvasNativeRect.height));
     const canvasPixelSize = Vector2.create(Math.round(canvasNativeSize.x * devicePixelRatio), Math.round(canvasNativeSize.y * devicePixelRatio));
@@ -6881,10 +6967,135 @@ var ViewManager = class extends Object2 {
     const viewY = Math.round((canvasPosition.y * devicePixelRatio - viewNativeRect.position.y * devicePixelRatio) / totalScale);
     return Vector2.create(viewX, viewY);
   }
+  //==============================================================================
+  // 렌더 배율 상한 설정.
+  // - 고DPI 기기에서 캔버스가 과대해지는 것을 막는다. 0 이면 제한하지 않는다.
+  //==============================================================================
+  /**
+   * @param { number } maxRenderPixelRatio
+   */
+  setMaxRenderPixelRatio(maxRenderPixelRatio) {
+    this.#maxRenderPixelRatio = Math.max(0, maxRenderPixelRatio);
+    this.calculateViewRect();
+  }
+  //==============================================================================
+  // 렌더 배율 상한 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getMaxRenderPixelRatio() {
+    return this.#maxRenderPixelRatio;
+  }
+  //==============================================================================
+  // 종횡비에 맞는 뷰 스케일 모드 자동 선택.
+  // - 화면이 기준 해상도보다 세로로 길면 가로를 고정하고 세로를 늘리고,
+  //   가로로 길면 세로를 고정하고 가로를 늘린다. (여러 게임이 복붙하던 로직)
+  //==============================================================================
+  applyAspectViewScaleMode() {
+    const referenceResolutionSize = this.getReferenceResolutionSize();
+    const canvas = this.getCanvas();
+    let screenWidth = System11.window.innerWidth;
+    let screenHeight = System11.window.innerHeight;
+    if (canvas) {
+      const canvasNativeRect = canvas.getBoundingClientRect();
+      if (canvasNativeRect.width > 0 && canvasNativeRect.height > 0) {
+        screenWidth = canvasNativeRect.width;
+        screenHeight = canvasNativeRect.height;
+      }
+    }
+    const screenAspect = screenWidth / screenHeight;
+    const referenceAspect = referenceResolutionSize.x / referenceResolutionSize.y;
+    if (screenAspect < referenceAspect) {
+      this.setViewScaleMode(ViewScaleMode.stretchWidthExpandHeight);
+    } else {
+      this.setViewScaleMode(ViewScaleMode.stretchHeightExpandWidth);
+    }
+  }
+  //==============================================================================
+  // 세이프에어리어 강제값 설정. (CSS px — 데스크톱에서 노치를 흉내 낼 때)
+  //==============================================================================
+  /**
+   * @param { object | null } insets { top, right, bottom, left }
+   */
+  setSafeAreaOverride(insets) {
+    this.#safeAreaOverride = insets;
+  }
+  //==============================================================================
+  // 세이프에어리어 인셋 반환. (뷰 좌표)
+  // - env(safe-area-inset-*) 를 숨은 요소의 padding 으로 실측해 뷰 좌표로 환산한다.
+  // - 우선순위: setSafeAreaOverride() > URL ?safeArea=top,right,bottom,left > env() 실측.
+  //==============================================================================
+  /**
+   * @returns { object } { top, right, bottom, left }
+   */
+  getSafeAreaInsets() {
+    let cssInsets = this.#safeAreaOverride;
+    if (!cssInsets) {
+      cssInsets = this.readSafeAreaFromUrl();
+    }
+    if (!cssInsets) {
+      cssInsets = this.readSafeAreaFromEnvironment();
+    }
+    const targetResolutionScale = this.getTargetResolutionScale();
+    const scale = targetResolutionScale > 0 ? 1 / targetResolutionScale : 1;
+    return {
+      top: cssInsets.top * scale,
+      right: cssInsets.right * scale,
+      bottom: cssInsets.bottom * scale,
+      left: cssInsets.left * scale
+    };
+  }
+  //==============================================================================
+  // URL 쿼리에서 세이프에어리어 읽기. (?safeArea=44,0,34,0)
+  //==============================================================================
+  /**
+   * @private
+   * @returns { object | null }
+   */
+  readSafeAreaFromUrl() {
+    try {
+      const parameters = new System11.URLSearchParams(System11.window.location.search);
+      const safeAreaText = parameters.get("safeArea");
+      if (!safeAreaText) {
+        return null;
+      }
+      const parts = safeAreaText.split(",").map((part) => System11.parseFloat(part) || 0);
+      return { top: parts[0] || 0, right: parts[1] || 0, bottom: parts[2] || 0, left: parts[3] || 0 };
+    } catch (parseError) {
+      return null;
+    }
+  }
+  //==============================================================================
+  // env(safe-area-inset-*) 실측.
+  //==============================================================================
+  /**
+   * @private
+   * @returns { object }
+   */
+  readSafeAreaFromEnvironment() {
+    const documentObject = System11.document;
+    if (!documentObject || !documentObject.body) {
+      return { top: 0, right: 0, bottom: 0, left: 0 };
+    }
+    if (!this.#safeAreaProbeElement) {
+      const probeElement = documentObject.createElement("div");
+      probeElement.style.cssText = "position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top);padding-right:env(safe-area-inset-right);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);";
+      documentObject.body.appendChild(probeElement);
+      this.#safeAreaProbeElement = probeElement;
+    }
+    const computedStyle = System11.getComputedStyle(this.#safeAreaProbeElement);
+    return {
+      top: System11.parseFloat(computedStyle.paddingTop) || 0,
+      right: System11.parseFloat(computedStyle.paddingRight) || 0,
+      bottom: System11.parseFloat(computedStyle.paddingBottom) || 0,
+      left: System11.parseFloat(computedStyle.paddingLeft) || 0
+    };
+  }
 };
 
 // src/core/gamepadmanager.js
-var System11 = globalThis;
+var System12 = globalThis;
 var GamepadButtonCode = {
   // Face Buttons
   A_CROSS: 0,
@@ -7007,7 +7218,7 @@ var GamepadManager = class extends Object2 {
   // 모든 게임패드 갱신.
   //==============================================================================
   updateAllGamepads() {
-    const gamepads = System11.navigator.getGamepads();
+    const gamepads = System12.navigator.getGamepads();
     for (const hardwareIndex of this.#connectedGamepadIndices) {
       const gamepad = gamepads[hardwareIndex];
       if (!gamepad) {
@@ -7104,7 +7315,7 @@ var GamepadManager = class extends Object2 {
    * @returns { Gamepad[] }
    */
   getAllConnectedGamepads() {
-    const gamepads = System11.navigator.getGamepads();
+    const gamepads = System12.navigator.getGamepads();
     const connected = [];
     for (const hardwareIndex of this.#connectedGamepadIndices) {
       const gamepad = gamepads[hardwareIndex];
@@ -7134,7 +7345,7 @@ var GamepadManager = class extends Object2 {
       return void 0;
     }
     const hardwareIndex = this.#connectedGamepadIndices.at(gamepadIndex);
-    const gamepads = System11.navigator.getGamepads();
+    const gamepads = System12.navigator.getGamepads();
     return gamepads[hardwareIndex];
   }
 };
@@ -7264,6 +7475,9 @@ var InputManager = class extends Object2 {
   /** @private @type { Set<string> } */
   #keys;
   // 키 목록.
+  /** @private @type { Set<string> } */
+  #previousKeys;
+  // 이전 프레임 키 목록. (엣지 감지용)
   /** @private @type { boolean } */
   #isTouchPressed;
   // 입력시 딱 한번 눌림.
@@ -7300,6 +7514,7 @@ var InputManager = class extends Object2 {
   constructor(engine) {
     super();
     this.#keys = /* @__PURE__ */ new Set();
+    this.#previousKeys = /* @__PURE__ */ new Set();
     this.#isTouchPressed = false;
     this.#isTouchReleased = false;
     this.#isTouchCancelled = false;
@@ -7327,6 +7542,7 @@ var InputManager = class extends Object2 {
   //==============================================================================
   clear() {
     this.#keys.clear();
+    this.#previousKeys.clear();
     this.#isTouchPressed = false;
     this.#isTouchReleased = false;
     this.#isTouchCancelled = false;
@@ -7382,6 +7598,37 @@ var InputManager = class extends Object2 {
    */
   isKeyPressed(key) {
     return this.#keys.has(key);
+  }
+  //==============================================================================
+  // 이번 프레임에 방금 눌린 키인지 여부.
+  // - 게임마다 wasPressed 변수를 손으로 들고 다니던 것을 대신한다.
+  //==============================================================================
+  /**
+   * @param { string } key
+   * @returns { boolean }
+   */
+  isKeyJustPressed(key) {
+    return this.#keys.has(key) && !this.#previousKeys.has(key);
+  }
+  //==============================================================================
+  // 이번 프레임에 방금 떼어진 키인지 여부.
+  //==============================================================================
+  /**
+   * @param { string } key
+   * @returns { boolean }
+   */
+  isKeyJustReleased(key) {
+    return !this.#keys.has(key) && this.#previousKeys.has(key);
+  }
+  //==============================================================================
+  // 프레임 스냅샷 갱신.
+  // - 엔진이 프레임 끝에서 부른다. 현재 키 상태를 이전 프레임 상태로 복사한다.
+  //==============================================================================
+  updateFrameSnapshot() {
+    this.#previousKeys.clear();
+    for (const key of this.#keys) {
+      this.#previousKeys.add(key);
+    }
   }
   //==============================================================================
   // 누름 여부 설정.
@@ -8743,7 +8990,7 @@ var Scene = class extends Object2 {
 };
 
 // src/core/scenemanager.js
-var System12 = globalThis;
+var System13 = globalThis;
 var SceneManager = class extends Object2 {
   static {
     __name(this, "SceneManager");
@@ -8782,8 +9029,8 @@ var SceneManager = class extends Object2 {
       scene.setEngine(engine);
       loadedScenes.push(scene);
       await scene.load(engine);
-      await new System12.Promise((resolve) => {
-        System12.setTimeout(resolve, 300);
+      await new System13.Promise((resolve) => {
+        System13.setTimeout(resolve, 300);
       });
       scene.setLoaded(true);
       scene.initialize(engine);
@@ -8837,8 +9084,8 @@ var SceneManager = class extends Object2 {
 };
 
 // src/core/asset.js
-var System13 = globalThis;
-var AssetType = System13.Object.freeze({
+var System14 = globalThis;
+var AssetType = System14.Object.freeze({
   none: "none",
   image: "image",
   audio: "audio",
@@ -8884,7 +9131,7 @@ var Asset = class extends Object2 {
       return;
     }
     this.setAssetPath(assetPath);
-    System13.Promise.resolve();
+    System14.Promise.resolve();
   }
   //==============================================================================
   // 애셋 언로드.
@@ -8957,7 +9204,7 @@ var Asset = class extends Object2 {
 };
 
 // src/resource/audioasset.js
-var System14 = globalThis;
+var System15 = globalThis;
 var AudioAsset = class extends Asset {
   static {
     __name(this, "AudioAsset");
@@ -8987,13 +9234,13 @@ var AudioAsset = class extends Asset {
     if (isLoaded) {
       return Promise.resolve();
     }
-    const audioContextType = System14.window.AudioContext || System14.window.webkitAudioContext;
+    const audioContextType = System15.window.AudioContext || System15.window.webkitAudioContext;
     if (!audioContextType) {
       console.error(`AudioContext is not supported.`);
       return;
     }
     try {
-      const response = await System14.fetch(assetPath);
+      const response = await System15.fetch(assetPath);
       const arrayBuffer = await response.arrayBuffer();
       const tempAudioContext = new audioContextType();
       this.#audioBuffer = await tempAudioContext.decodeAudioData(arrayBuffer);
@@ -9242,7 +9489,7 @@ var AudioPlayer = class {
 };
 
 // src/core/audiomanager.js
-var System15 = globalThis;
+var System16 = globalThis;
 var AudioManager = class extends Object2 {
   static {
     __name(this, "AudioManager");
@@ -9292,7 +9539,7 @@ var AudioManager = class extends Object2 {
     if (this.#audioContext) {
       return this.#audioContext;
     }
-    const audioContextType = System15.window.AudioContext || System15.window.webkitAudioContext;
+    const audioContextType = System16.window.AudioContext || System16.window.webkitAudioContext;
     if (audioContextType) {
       this.#audioContext = new audioContextType();
     }
@@ -9415,7 +9662,7 @@ var FontAsset = class extends Asset {
 };
 
 // src/core/engine.js
-var System16 = globalThis;
+var System17 = globalThis;
 var EngineConfiguration = class extends Object2 {
   static {
     __name(this, "EngineConfiguration");
@@ -9496,12 +9743,12 @@ var Engine = class extends Object2 {
   constructor(engineConfiguration) {
     super();
     if (engineConfiguration === null || engineConfiguration === void 0 || engineConfiguration instanceof EngineConfiguration === false) {
-      throw new System16.Error(`engineConfiguration is invalid.`);
+      throw new System17.Error(`engineConfiguration is invalid.`);
     }
     this.#engineConfiguration = engineConfiguration;
     this.#platform = new Platform();
     if (engineConfiguration.title !== "") {
-      System16.document.title = engineConfiguration.title;
+      System17.document.title = engineConfiguration.title;
     }
     const canvasId = this.#engineConfiguration.canvasId;
     const canvas = this.#platform.getOrAddCanvas(canvasId);
@@ -9518,7 +9765,7 @@ var Engine = class extends Object2 {
     this.#frameNumber = 0;
     this.#statisticsTextRect = Rect.zero();
     this.#version = Version.create(0, 3, 0);
-    System16.vanillaEngine = this;
+    System17.vanillaEngine = this;
     this.setupAllDocumentEvents();
     this.resize();
   }
@@ -9530,7 +9777,7 @@ var Engine = class extends Object2 {
    */
   run(scene) {
     if (scene === null || scene === void 0 || scene instanceof Scene === false) {
-      throw new System16.Error(`scene is invalid.`);
+      throw new System17.Error(`scene is invalid.`);
     }
     const internalFontFace = new FontFace(`DOSGothic`, `url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff")`);
     internalFontFace.load().then((loadedFont) => {
@@ -9539,13 +9786,13 @@ var Engine = class extends Object2 {
       sceneManager.loadScene(scene).catch((error) => {
         console.error(error);
       });
-      System16.window.addEventListener("resize", this.#resizeCallback);
-      if (System16.window.visualViewport) {
-        System16.window.visualViewport.addEventListener("resize", this.#resizeCallback);
-        System16.window.visualViewport.addEventListener("scroll", this.#resizeCallback);
+      System17.window.addEventListener("resize", this.#resizeCallback);
+      if (System17.window.visualViewport) {
+        System17.window.visualViewport.addEventListener("resize", this.#resizeCallback);
+        System17.window.visualViewport.addEventListener("scroll", this.#resizeCallback);
       }
       ++this.#frameNumber;
-      System16.window.requestAnimationFrame(this.#updateEngineCallback);
+      System17.window.requestAnimationFrame(this.#updateEngineCallback);
     }).catch((error) => {
       console.error(error);
     });
@@ -9575,9 +9822,9 @@ var Engine = class extends Object2 {
     const engineConfiguration = this.getEngineConfiguration();
     const viewManager = this.getViewManager();
     if (engineConfiguration.autoResizeOnWindowResize) {
-      const visualViewport = System16.window.visualViewport;
-      const clientWidth = visualViewport ? visualViewport.width : System16.window.innerWidth;
-      const clientHeight = visualViewport ? visualViewport.height : System16.window.innerHeight;
+      const visualViewport = System17.window.visualViewport;
+      const clientWidth = visualViewport ? visualViewport.width : System17.window.innerWidth;
+      const clientHeight = visualViewport ? visualViewport.height : System17.window.innerHeight;
       const clientNativeSize = Vector2.create(clientWidth, clientHeight);
       const canvas = viewManager.getCanvas();
       canvas.style.width = `${clientNativeSize.x}px`;
@@ -9615,7 +9862,7 @@ var Engine = class extends Object2 {
         inputManager2.clear();
       }
     }, "recoverEngineState");
-    System16.document.addEventListener("resume", () => {
+    System17.document.addEventListener("resume", () => {
       console.log(`[Engine] resume: persisted`);
       recoverEngineState();
       const sceneManager = this.getSceneManager();
@@ -9624,14 +9871,14 @@ var Engine = class extends Object2 {
         loadedScene.onPageProcessRestored();
       }
     });
-    System16.window.addEventListener("pageshow", (pageTransitionEvent) => {
+    System17.window.addEventListener("pageshow", (pageTransitionEvent) => {
       if (pageTransitionEvent.persisted) {
         console.log(`[Engine] pageshow: persisted`);
         dispatchPageProcessRestored();
       }
     });
-    System16.document.addEventListener("visibilitychange", () => {
-      if (System16.document.visibilityState === "visible") {
+    System17.document.addEventListener("visibilitychange", () => {
+      if (System17.document.visibilityState === "visible") {
         console.log(`[Engine] visibilitychange: visible`);
         recoverEngineState();
         const sceneManager = this.getSceneManager();
@@ -9641,11 +9888,11 @@ var Engine = class extends Object2 {
         }
       }
     });
-    System16.document.addEventListener("keydown", (keyboardEvent) => {
+    System17.document.addEventListener("keydown", (keyboardEvent) => {
       const key = keyboardEvent.code;
       inputManager.pushKey(key);
     });
-    System16.document.addEventListener("keyup", (keyboardEvent) => {
+    System17.document.addEventListener("keyup", (keyboardEvent) => {
       const key = keyboardEvent.code;
       inputManager.popKey(key);
     });
@@ -9673,7 +9920,7 @@ var Engine = class extends Object2 {
       this.updateCanvasNativeInputPosition(wheelEvent.clientX, wheelEvent.clientY);
       wheelEvent.preventDefault();
     }, { passive: false });
-    System16.window.addEventListener("mouseup", (touchEvent) => {
+    System17.window.addEventListener("mouseup", (touchEvent) => {
       const inputManager2 = this.getInputManager();
       if (!inputManager2.isTouchMoved()) {
         return;
@@ -9711,7 +9958,7 @@ var Engine = class extends Object2 {
       inputManager2.setTouchReleased(true);
       touchEvent.preventDefault();
     }, { passive: false });
-    System16.window.addEventListener("touchmove", (touchEvent) => {
+    System17.window.addEventListener("touchmove", (touchEvent) => {
       const touch = touchEvent.changedTouches[0];
       if (!touch) {
         return;
@@ -9732,34 +9979,34 @@ var Engine = class extends Object2 {
       inputManager2.setTouchMoved(false);
       inputManager2.setTouchCancelled(true);
     });
-    System16.window.addEventListener("blur", (focusEvent) => {
+    System17.window.addEventListener("blur", (focusEvent) => {
       const inputManager2 = this.getInputManager();
       inputManager2.setTouchMoved(false);
       inputManager2.setTouchReleased(true);
       focusEvent.preventDefault();
     }, { passive: false });
     const userGestureHandler = this.resumeOnUserGesture.bind(this);
-    System16.window.addEventListener("click", userGestureHandler);
-    System16.window.addEventListener("touchstart", userGestureHandler);
-    System16.window.addEventListener("keydown", userGestureHandler);
-    System16.window.addEventListener("focus", this.#resumeCallback);
-    System16.document.addEventListener("visibilitychange", () => {
-      if (System16.document.visibilityState === "visible") {
+    System17.window.addEventListener("click", userGestureHandler);
+    System17.window.addEventListener("touchstart", userGestureHandler);
+    System17.window.addEventListener("keydown", userGestureHandler);
+    System17.window.addEventListener("focus", this.#resumeCallback);
+    System17.document.addEventListener("visibilitychange", () => {
+      if (System17.document.visibilityState === "visible") {
         this.resume();
       }
     });
-    System16.document.addEventListener("pointerlockchange", () => {
+    System17.document.addEventListener("pointerlockchange", () => {
       if (document.pointerLockElement === canvas) {
       } else {
       }
     });
-    System16.window.addEventListener("gamepadconnected", (gamepadEvent) => {
+    System17.window.addEventListener("gamepadconnected", (gamepadEvent) => {
       const gamepad = gamepadEvent.gamepad;
       const inputManager2 = this.getInputManager();
       inputManager2.connectGamepad(gamepad);
       console.log(`gamepadconnected: ${gamepad.id}`);
     });
-    System16.window.addEventListener("gamepaddisconnected", (gamepadEvent) => {
+    System17.window.addEventListener("gamepaddisconnected", (gamepadEvent) => {
       const gamepad = gamepadEvent.gamepad;
       const inputManager2 = this.getInputManager();
       inputManager2.disconnectGamepad(gamepad);
@@ -9897,8 +10144,9 @@ var Engine = class extends Object2 {
     inputManager.setTouchReleased(false);
     inputManager.setTouchCancelled(false);
     inputManager.clearWheelDelta();
+    inputManager.updateFrameSnapshot();
     ++this.#frameNumber;
-    System16.window.requestAnimationFrame(this.#updateEngineCallback);
+    System17.window.requestAnimationFrame(this.#updateEngineCallback);
   }
   //==============================================================================
   // 커서 보이기 설정.
@@ -10010,6 +10258,25 @@ var Engine = class extends Object2 {
   /**
    * @returns { number }
    */
+  //==============================================================================
+  // 응용 프로그램 종료.
+  // - Capacitor 네이티브면 App 플러그인으로 끝내고, 웹이면 창 닫기를 시도한다.
+  //   (둘 다 환경에 따라 거부될 수 있으며 실패해도 예외를 내지 않는다)
+  //==============================================================================
+  exitApplication() {
+    try {
+      const capacitor = System17.Capacitor;
+      if (capacitor && capacitor.Plugins && capacitor.Plugins.App && typeof capacitor.Plugins.App.exitApp === "function") {
+        capacitor.Plugins.App.exitApp();
+        return;
+      }
+    } catch (nativeError) {
+    }
+    try {
+      System17.window.close();
+    } catch (closeError) {
+    }
+  }
   getFrameNumber() {
     return this.#frameNumber;
   }
@@ -10020,7 +10287,7 @@ var Engine = class extends Object2 {
    * @returns { Engine }
    */
   static getEngine() {
-    return System16.vanillaEngine;
+    return System17.vanillaEngine;
   }
 };
 
@@ -11318,7 +11585,7 @@ var UIScrollView = class extends UIView {
 };
 
 // src/ui/touchrecognizer.js
-var System17 = globalThis;
+var System18 = globalThis;
 var DRAG_THRESHOLD = 10;
 var DELAY_PRESS_MS = 150;
 var TouchRecognizer = class extends TouchRaycaster {
@@ -11380,7 +11647,7 @@ var TouchRecognizer = class extends TouchRaycaster {
     }
     if (this.#scrollView) {
       const pressPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
-      this.#pressTimerId = System17.setTimeout(() => {
+      this.#pressTimerId = System18.setTimeout(() => {
         this.#pressTimerId = null;
         if (this.#isDragging) return;
         if (this.#target !== target) return;
@@ -11416,10 +11683,10 @@ var TouchRecognizer = class extends TouchRaycaster {
     if (this.#scrollView && this.#pressPosition) {
       const dx = viewInputPosition.x - this.#pressPosition.x;
       const dy = viewInputPosition.y - this.#pressPosition.y;
-      if (System17.Math.abs(dx) > DRAG_THRESHOLD || System17.Math.abs(dy) > DRAG_THRESHOLD) {
+      if (System18.Math.abs(dx) > DRAG_THRESHOLD || System18.Math.abs(dy) > DRAG_THRESHOLD) {
         this.#isDragging = true;
         if (this.#pressTimerId !== null) {
-          System17.clearTimeout(this.#pressTimerId);
+          System18.clearTimeout(this.#pressTimerId);
           this.#pressTimerId = null;
         } else if (this.#pressDelivered && this.#target) {
           this.#target.touchCancel(viewInputPosition);
@@ -11453,7 +11720,7 @@ var TouchRecognizer = class extends TouchRaycaster {
       }
     } else if (this.#target) {
       if (this.#pressTimerId !== null) {
-        System17.clearTimeout(this.#pressTimerId);
+        System18.clearTimeout(this.#pressTimerId);
         this.#pressTimerId = null;
         this.#target.touchPress(this.#pressPosition || viewInputPosition);
         this.#pressDelivered = true;
@@ -11486,7 +11753,7 @@ var TouchRecognizer = class extends TouchRaycaster {
   //==============================================================================
   reset() {
     if (this.#pressTimerId !== null) {
-      System17.clearTimeout(this.#pressTimerId);
+      System18.clearTimeout(this.#pressTimerId);
       this.#pressTimerId = null;
     }
     this.#target = null;
@@ -11719,7 +11986,7 @@ var LayoutStrength = class _LayoutStrength {
 };
 
 // src/ui/autolayout/layoutconstraint.js
-var System18 = globalThis;
+var System19 = globalThis;
 var LayoutConstraint = class _LayoutConstraint {
   static {
     __name(this, "LayoutConstraint");
@@ -11744,7 +12011,7 @@ var LayoutConstraint = class _LayoutConstraint {
    */
   constructor(expression, relation, strength) {
     if (!(expression instanceof LayoutExpression)) {
-      throw new System18.Error("[LayoutConstraint] expression \uC740 LayoutExpression \uC774\uC5B4\uC57C \uD568.");
+      throw new System19.Error("[LayoutConstraint] expression \uC740 LayoutExpression \uC774\uC5B4\uC57C \uD568.");
     }
     this.#expression = expression;
     this.#relation = relation;
@@ -11794,7 +12061,7 @@ var LayoutConstraint = class _LayoutConstraint {
 };
 
 // src/ui/autolayout/layoutexpression.js
-var System19 = globalThis;
+var System20 = globalThis;
 var LayoutExpression = class _LayoutExpression {
   static {
     __name(this, "LayoutExpression");
@@ -11817,7 +12084,7 @@ var LayoutExpression = class _LayoutExpression {
    * @param { number } [constant]
    */
   constructor(terms, constant) {
-    this.#terms = System19.Array.isArray(terms) ? terms.slice() : [];
+    this.#terms = System20.Array.isArray(terms) ? terms.slice() : [];
     this.#constant = typeof constant === "number" ? constant : 0;
   }
   //==============================================================================
@@ -11864,7 +12131,7 @@ var LayoutExpression = class _LayoutExpression {
     if (typeof input === "number") {
       return _LayoutExpression.fromConstant(input);
     }
-    throw new System19.Error("[LayoutExpression] toExpression: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uC785\uB825 \uD0C0\uC785.");
+    throw new System20.Error("[LayoutExpression] toExpression: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uC785\uB825 \uD0C0\uC785.");
   }
   //==============================================================================
   // 항 배열 반환.
@@ -11951,7 +12218,7 @@ var LayoutExpression = class _LayoutExpression {
    */
   multiply(coefficient) {
     if (typeof coefficient !== "number") {
-      throw new System19.Error("[LayoutExpression] multiply: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
+      throw new System20.Error("[LayoutExpression] multiply: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
     }
     const ownTerms = this.getTerms();
     const newTerms = [];
@@ -11974,10 +12241,10 @@ var LayoutExpression = class _LayoutExpression {
    */
   divide(denominator) {
     if (typeof denominator !== "number") {
-      throw new System19.Error("[LayoutExpression] divide: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
+      throw new System20.Error("[LayoutExpression] divide: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
     }
     if (denominator === 0) {
-      throw new System19.Error("[LayoutExpression] divide: 0 \uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC74C.");
+      throw new System20.Error("[LayoutExpression] divide: 0 \uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC74C.");
     }
     const result = this.multiply(1 / denominator);
     return result;
@@ -12125,7 +12392,7 @@ var LayoutSymbol = class _LayoutSymbol {
 };
 
 // src/ui/autolayout/layoutrow.js
-var System20 = globalThis;
+var System21 = globalThis;
 var LayoutRow = class _LayoutRow {
   static {
     __name(this, "LayoutRow");
@@ -12145,7 +12412,7 @@ var LayoutRow = class _LayoutRow {
    * @param { number } [constant]
    */
   constructor(constant) {
-    this.#cells = new System20.Map();
+    this.#cells = new System21.Map();
     this.#constant = typeof constant === "number" ? constant : 0;
   }
   //==============================================================================
@@ -12271,7 +12538,7 @@ var LayoutRow = class _LayoutRow {
     const inverse = -1 / subjectCoefficient;
     cells.delete(subject);
     this.setConstant(this.getConstant() * inverse);
-    const updatedCells = new System20.Map();
+    const updatedCells = new System21.Map();
     for (const [symbol, value] of cells) {
       updatedCells.set(symbol, value * inverse);
     }
@@ -12331,7 +12598,7 @@ function nearZero(value) {
 __name(nearZero, "nearZero");
 
 // src/ui/autolayout/layoutsolver.js
-var System21 = globalThis;
+var System22 = globalThis;
 var LayoutSolver = class {
   static {
     __name(this, "LayoutSolver");
@@ -12360,10 +12627,10 @@ var LayoutSolver = class {
    * @constructor
    */
   constructor() {
-    this.#constraintTags = new System21.Map();
-    this.#rows = new System21.Map();
-    this.#variableSymbols = new System21.Map();
-    this.#editInfos = new System21.Map();
+    this.#constraintTags = new System22.Map();
+    this.#rows = new System22.Map();
+    this.#variableSymbols = new System22.Map();
+    this.#editInfos = new System22.Map();
     this.#infeasibleRows = [];
     this.#objective = new LayoutRow(0);
     this.#artificial = null;
@@ -12376,21 +12643,21 @@ var LayoutSolver = class {
    */
   addConstraint(constraint) {
     if (this.#constraintTags.has(constraint)) {
-      throw new System21.Error("[LayoutSolver] \uC774\uBBF8 \uCD94\uAC00\uB41C \uC81C\uC57D.");
+      throw new System22.Error("[LayoutSolver] \uC774\uBBF8 \uCD94\uAC00\uB41C \uC81C\uC57D.");
     }
     const tag = new LayoutTag();
     const row = this.createRow(constraint, tag);
     let subject = this.chooseSubject(row, tag);
     if (subject.isInvalid() && allDummies(row)) {
       if (!nearZero2(row.getConstant())) {
-        throw new System21.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
+        throw new System22.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
       }
       subject = tag.getMarker();
     }
     if (subject.isInvalid()) {
       const success = this.addWithArtificialVariable(row);
       if (!success) {
-        throw new System21.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
+        throw new System22.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
       }
     } else {
       row.solveFor(subject);
@@ -12409,7 +12676,7 @@ var LayoutSolver = class {
   removeConstraint(constraint) {
     const tag = this.#constraintTags.get(constraint);
     if (tag === void 0) {
-      throw new System21.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uC81C\uC57D.");
+      throw new System22.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uC81C\uC57D.");
     }
     this.#constraintTags.delete(constraint);
     this.removeConstraintEffects(constraint, tag);
@@ -12419,7 +12686,7 @@ var LayoutSolver = class {
     } else {
       const leavingSymbol = this.getMarkerLeavingSymbol(marker);
       if (leavingSymbol.isInvalid()) {
-        throw new System21.Error("[LayoutSolver] \uC81C\uC57D \uC81C\uAC70 \uC2E4\uD328 \u2014 leaving row \uC5C6\uC74C.");
+        throw new System22.Error("[LayoutSolver] \uC81C\uC57D \uC81C\uAC70 \uC2E4\uD328 \u2014 leaving row \uC5C6\uC74C.");
       }
       const leavingRow = this.#rows.get(leavingSymbol);
       this.#rows.delete(leavingSymbol);
@@ -12447,11 +12714,11 @@ var LayoutSolver = class {
    */
   addEditVariable(variable, strength) {
     if (this.#editInfos.has(variable)) {
-      throw new System21.Error("[LayoutSolver] \uC774\uBBF8 \uD3B8\uC9D1 \uBCC0\uC218\uB85C \uB4F1\uB85D\uB428.");
+      throw new System22.Error("[LayoutSolver] \uC774\uBBF8 \uD3B8\uC9D1 \uBCC0\uC218\uB85C \uB4F1\uB85D\uB428.");
     }
     const clipped = LayoutStrength.clipStrength(strength);
     if (clipped >= LayoutStrength.required) {
-      throw new System21.Error("[LayoutSolver] \uD3B8\uC9D1 \uBCC0\uC218\uC5D0\uB294 required \uAC15\uB3C4\uB97C \uC4F8 \uC218 \uC5C6\uC74C.");
+      throw new System22.Error("[LayoutSolver] \uD3B8\uC9D1 \uBCC0\uC218\uC5D0\uB294 required \uAC15\uB3C4\uB97C \uC4F8 \uC218 \uC5C6\uC74C.");
     }
     const expression = LayoutExpression.fromVariable(variable);
     const constraint = new LayoutConstraint(expression, LayoutRelation.equal, clipped);
@@ -12469,7 +12736,7 @@ var LayoutSolver = class {
   removeEditVariable(variable) {
     const editInfo = this.#editInfos.get(variable);
     if (editInfo === void 0) {
-      throw new System21.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
+      throw new System22.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
     }
     this.removeConstraint(editInfo.getConstraint());
     this.#editInfos.delete(variable);
@@ -12495,7 +12762,7 @@ var LayoutSolver = class {
   suggestValue(variable, value) {
     const editInfo = this.#editInfos.get(variable);
     if (editInfo === void 0) {
-      throw new System21.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
+      throw new System22.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
     }
     const delta = value - editInfo.getConstant();
     editInfo.setConstant(value);
@@ -12715,7 +12982,7 @@ var LayoutSolver = class {
       }
       const leavingSymbol = this.getLeavingSymbol(enteringSymbol);
       if (leavingSymbol.isInvalid()) {
-        throw new System21.Error("[LayoutSolver] \uBAA9\uC801\uD568\uC218\uAC00 \uBB34\uD55C\uB300 \u2014 bound \uAC00 \uBD80\uC871\uD568.");
+        throw new System22.Error("[LayoutSolver] \uBAA9\uC801\uD568\uC218\uAC00 \uBB34\uD55C\uB300 \u2014 bound \uAC00 \uBD80\uC871\uD568.");
       }
       const leavingRow = this.#rows.get(leavingSymbol);
       this.#rows.delete(leavingSymbol);
@@ -12723,7 +12990,7 @@ var LayoutSolver = class {
       this.substitute(enteringSymbol, leavingRow);
       this.#rows.set(enteringSymbol, leavingRow);
     }
-    throw new System21.Error("[LayoutSolver] optimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
+    throw new System22.Error("[LayoutSolver] optimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
   }
   //==============================================================================
   // 내부: dual simplex 최적화. infeasible 행을 처리.
@@ -12744,14 +13011,14 @@ var LayoutSolver = class {
       }
       const enteringSymbol = this.getDualEnteringSymbol(row);
       if (enteringSymbol.isInvalid()) {
-        throw new System21.Error("[LayoutSolver] dual optimize \uC2E4\uD328 \u2014 entering \uC5C6\uC74C.");
+        throw new System22.Error("[LayoutSolver] dual optimize \uC2E4\uD328 \u2014 entering \uC5C6\uC74C.");
       }
       this.#rows.delete(leavingSymbol);
       row.solveForPair(leavingSymbol, enteringSymbol);
       this.substitute(enteringSymbol, row);
       this.#rows.set(enteringSymbol, row);
     }
-    throw new System21.Error("[LayoutSolver] dualOptimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
+    throw new System22.Error("[LayoutSolver] dualOptimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
   }
   //==============================================================================
   // 내부: leaving symbol 결정. (Bland's rule 변형 + 비율 테스트)
@@ -12761,7 +13028,7 @@ var LayoutSolver = class {
    * @returns { LayoutSymbol }
    */
   getLeavingSymbol(enteringSymbol) {
-    let ratio = System21.Number.POSITIVE_INFINITY;
+    let ratio = System22.Number.POSITIVE_INFINITY;
     let result = LayoutSymbol.invalid();
     for (const [symbol, row] of this.#rows) {
       if (symbol.getType() === LayoutSymbolType.external) {
@@ -12786,7 +13053,7 @@ var LayoutSolver = class {
    * @returns { LayoutSymbol }
    */
   getDualEnteringSymbol(row) {
-    let ratio = System21.Number.POSITIVE_INFINITY;
+    let ratio = System22.Number.POSITIVE_INFINITY;
     let result = LayoutSymbol.invalid();
     const cells = row.getCells();
     for (const [symbol, value] of cells) {
@@ -12809,8 +13076,8 @@ var LayoutSolver = class {
    * @returns { LayoutSymbol }
    */
   getMarkerLeavingSymbol(marker) {
-    let ratio1 = System21.Number.POSITIVE_INFINITY;
-    let ratio2 = System21.Number.POSITIVE_INFINITY;
+    let ratio1 = System22.Number.POSITIVE_INFINITY;
+    let ratio2 = System22.Number.POSITIVE_INFINITY;
     let result1 = LayoutSymbol.invalid();
     let result2 = LayoutSymbol.invalid();
     let result3 = LayoutSymbol.invalid();
@@ -12981,14 +13248,14 @@ var LayoutPriority = class {
 };
 
 // src/ui/autolayout/layoutconstraintaxis.js
-var System22 = globalThis;
-var LayoutConstraintAxis = System22.Object.freeze({
+var System23 = globalThis;
+var LayoutConstraintAxis = System23.Object.freeze({
   horizontal: "horizontal",
   vertical: "vertical"
 });
 
 // src/ui/uinode.js
-var System23 = globalThis;
+var System24 = globalThis;
 var NO_INTRINSIC_METRIC = -1;
 var UINode = class _UINode extends TransformNode {
   static {
@@ -13231,7 +13498,7 @@ var UINode = class _UINode extends TransformNode {
     if (axis === LayoutConstraintAxis.vertical) {
       return this.#verticalHuggingPriority;
     }
-    throw new System23.Error("[UINode] getContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+    throw new System24.Error("[UINode] getContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
   }
   //==============================================================================
   // content hugging 우선순위 설정. (UIKit 의 setContentHuggingPriority(_:for:))
@@ -13247,7 +13514,7 @@ var UINode = class _UINode extends TransformNode {
     } else if (axis === LayoutConstraintAxis.vertical) {
       this.#verticalHuggingPriority = priority;
     } else {
-      throw new System23.Error("[UINode] setContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+      throw new System24.Error("[UINode] setContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
     }
     this.invalidateIntrinsicContentSize();
   }
@@ -13266,7 +13533,7 @@ var UINode = class _UINode extends TransformNode {
     if (axis === LayoutConstraintAxis.vertical) {
       return this.#verticalCompressionResistancePriority;
     }
-    throw new System23.Error("[UINode] getContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+    throw new System24.Error("[UINode] getContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
   }
   //==============================================================================
   // content compression resistance 우선순위 설정.
@@ -13283,7 +13550,7 @@ var UINode = class _UINode extends TransformNode {
     } else if (axis === LayoutConstraintAxis.vertical) {
       this.#verticalCompressionResistancePriority = priority;
     } else {
-      throw new System23.Error("[UINode] setContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+      throw new System24.Error("[UINode] setContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
     }
     this.invalidateIntrinsicContentSize();
   }
@@ -13733,7 +14000,7 @@ var UINode = class _UINode extends TransformNode {
 UINode.noIntrinsicMetric = NO_INTRINSIC_METRIC;
 
 // src/core/frame.js
-var System24 = globalThis;
+var System25 = globalThis;
 var Frame = class extends Object2 {
   static {
     __name(this, "Frame");
@@ -13758,7 +14025,7 @@ var Frame = class extends Object2 {
     super();
     this.#image = image;
     if (image === null || image === void 0) {
-      throw new System24.Error("image is null.");
+      throw new System25.Error("image is null.");
     }
     if (rect === null || rect === void 0) {
       this.#rect = Rect.create(0, 0, image.width, image.height);
@@ -14032,7 +14299,7 @@ var Animation = class extends Object2 {
 };
 
 // src/resource/imageasset.js
-var System25 = globalThis;
+var System26 = globalThis;
 var ImageAsset2 = class extends Asset {
   static {
     __name(this, "ImageAsset");
@@ -14048,7 +14315,7 @@ var ImageAsset2 = class extends Asset {
   constructor() {
     super();
     this.setAssetType(AssetType.image);
-    this.image = new System25.window.Image();
+    this.image = new System26.window.Image();
   }
   //==============================================================================
   // 비동기 애셋 로드.
@@ -14063,7 +14330,7 @@ var ImageAsset2 = class extends Asset {
       return Promise.resolve();
     }
     await super.load(assetPath);
-    this.image = new System25.window.Image();
+    this.image = new System26.window.Image();
     this.image.src = assetPath;
     await new Promise((resolve, reject) => {
       this.image.onload = () => {
@@ -14447,7 +14714,7 @@ var Sprite = class extends Paint {
 };
 
 // src/core/component/text.js
-var System26 = globalThis;
+var System27 = globalThis;
 var TextAlign = {
   left: "left",
   center: "center",
@@ -14466,7 +14733,7 @@ var TextBaseline = {
 var measurementCanvasRenderingContext = null;
 function getMeasurementCanvasRenderingContext() {
   if (measurementCanvasRenderingContext === null) {
-    const document2 = System26.document;
+    const document2 = System27.document;
     if (document2 === null || document2 === void 0) {
       return null;
     }
@@ -14521,6 +14788,18 @@ var Text = class extends Component {
   #textAlign;
   /** @private @type { string } */
   #textBaseline;
+  /** @private @type { number } */
+  #wordWrapWidth;
+  // 0 이면 한 줄. 넘으면 이 폭에서 줄을 바꾼다.
+  /** @private @type { string } */
+  #wrapMode;
+  // "word": 공백 단위(넘치는 단어는 글자 분할) | "char": 글자 단위.
+  /** @private @type { number } */
+  #lineSpacing;
+  // 줄 간격 배율.
+  /** @private @type { number } */
+  #visibleCharacterCount;
+  // 표시 글자 수. -1 이면 전체.
   //==============================================================================
   // 생성.
   //==============================================================================
@@ -14539,6 +14818,10 @@ var Text = class extends Component {
     this.#strikethrough = false;
     this.#textAlign = "center";
     this.#textBaseline = "middle";
+    this.#wordWrapWidth = 0;
+    this.#wrapMode = "word";
+    this.#lineSpacing = 1.25;
+    this.#visibleCharacterCount = -1;
   }
   //==============================================================================
   // 갱신.
@@ -14567,7 +14850,189 @@ var Text = class extends Component {
     }
     const node = this.getNode();
     const contentSize = node.getContentSize();
-    this.drawPlainText(graphic, contentSize, text);
+    if (this.#wordWrapWidth > 0 || text.indexOf("\n") >= 0) {
+      this.drawWrappedText(graphic, contentSize, text);
+      return;
+    }
+    const visibleText = this.applyVisibleCharacterCount(text);
+    if (!visibleText) {
+      return;
+    }
+    this.drawPlainText(graphic, contentSize, visibleText);
+  }
+  //==============================================================================
+  // 표시 글자 수만큼 앞에서 자르기.
+  //==============================================================================
+  /**
+   * @param { string } text
+   * @returns { string }
+   */
+  applyVisibleCharacterCount(text) {
+    if (this.#visibleCharacterCount < 0) {
+      return text;
+    }
+    return text.slice(0, this.#visibleCharacterCount);
+  }
+  //==============================================================================
+  // 여러 줄 텍스트 그리기. (자동 줄바꿈 + 명시적 개행 + 표시 글자 수)
+  // - textBaseline 은 줄 묶음의 세로 정렬로 쓴다. (top / middle / bottom)
+  //==============================================================================
+  /**
+   * @param { Graphic } graphic
+   * @param { Vector2 } contentSize
+   * @param { string } fullText
+   */
+  drawWrappedText(graphic, contentSize, fullText) {
+    const wrapWidth = this.#wordWrapWidth > 0 ? this.#wordWrapWidth : contentSize.x;
+    const lineList = this.wrapTextToLines(fullText, wrapWidth);
+    const lineHeight = this.#fontSize * this.#lineSpacing;
+    const blockHeight = lineList.length * lineHeight;
+    let blockTop;
+    if (this.#textBaseline === "top" || this.#textBaseline === "hanging") {
+      blockTop = 0;
+    } else if (this.#textBaseline === "bottom" || this.#textBaseline === "ideographic" || this.#textBaseline === "alphabetic") {
+      blockTop = contentSize.y - blockHeight;
+    } else {
+      blockTop = (contentSize.y - blockHeight) * 0.5;
+    }
+    let drawX;
+    if (this.#textAlign === "left" || this.#textAlign === "start") {
+      drawX = 0;
+    } else if (this.#textAlign === "right" || this.#textAlign === "end") {
+      drawX = contentSize.x;
+    } else {
+      drawX = contentSize.x * 0.5;
+    }
+    graphic.setFontString(buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic));
+    graphic.setTextAlign(this.#textAlign);
+    graphic.setTextBaseline("middle");
+    const strokeColor = this.getStrokeColor();
+    const textColor = this.getTextColor();
+    const decorationLineWidth = System27.Math.max(1, this.#fontSize / 16);
+    let remainCount = this.#visibleCharacterCount;
+    for (let lineIndex = 0; lineIndex < lineList.length; ++lineIndex) {
+      let lineText = lineList[lineIndex];
+      if (remainCount >= 0) {
+        if (remainCount <= 0) {
+          break;
+        }
+        if (lineText.length > remainCount) {
+          lineText = lineText.slice(0, remainCount);
+        }
+        remainCount -= lineList[lineIndex].length;
+      }
+      if (lineText.length === 0) {
+        continue;
+      }
+      const lineY = blockTop + (lineIndex + 0.5) * lineHeight;
+      if (strokeColor && this.#strokeWidth > 0) {
+        graphic.setStrokeColor(strokeColor.toHEXString());
+        graphic.drawStrokeText(lineText, drawX, lineY, this.#strokeWidth);
+      }
+      graphic.setFillColor(textColor.toHEXString());
+      graphic.drawFillText(lineText, drawX, lineY);
+      if (this.#underline || this.#strikethrough) {
+        const lineWidth = this.measurePlainTextWidth(lineText);
+        const startX = this.computeUnderlineStartX(drawX, lineWidth);
+        graphic.setStrokeColor(textColor.toHEXString());
+        if (this.#underline) {
+          this.strokeHorizontalLine(graphic, startX, lineY + this.#fontSize * 0.5 + decorationLineWidth, lineWidth, decorationLineWidth);
+        }
+        if (this.#strikethrough) {
+          this.strokeHorizontalLine(graphic, startX, lineY, lineWidth, decorationLineWidth);
+        }
+      }
+    }
+  }
+  //==============================================================================
+  // 텍스트를 폭에 맞춰 줄 배열로 나누기.
+  // - "word": 공백 단위로 채우고, 한 단어가 폭을 넘으면 글자 단위로 강제 분할.
+  //   (공백 없는 CJK 문장은 통째로 한 단어이므로 자연히 글자 단위가 된다)
+  // - "char": 처음부터 글자 단위.
+  // - 명시적 개행(\n)은 항상 지켜진다.
+  //==============================================================================
+  /**
+   * @param { string } text
+   * @param { number } maxWidth
+   * @returns { string[] }
+   */
+  wrapTextToLines(text, maxWidth) {
+    const measurementContext = getMeasurementCanvasRenderingContext();
+    if (measurementContext === null || maxWidth <= 0) {
+      return text.split("\n");
+    }
+    measurementContext.save();
+    measurementContext.font = buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic);
+    const measureWidth = /* @__PURE__ */ __name((candidateText) => {
+      return measurementContext.measureText(candidateText).width;
+    }, "measureWidth");
+    const lineList = [];
+    const appendByCharacter = /* @__PURE__ */ __name((chunkText, seedText) => {
+      let currentLine = seedText;
+      for (const character of chunkText) {
+        const candidate = currentLine + character;
+        if (currentLine.length > 0 && measureWidth(candidate) > maxWidth) {
+          lineList.push(currentLine);
+          currentLine = character;
+        } else {
+          currentLine = candidate;
+        }
+      }
+      return currentLine;
+    }, "appendByCharacter");
+    for (const paragraphText of text.split("\n")) {
+      if (paragraphText.length === 0) {
+        lineList.push("");
+        continue;
+      }
+      if (this.#wrapMode === "char") {
+        const lastLine = appendByCharacter(paragraphText, "");
+        lineList.push(lastLine);
+        continue;
+      }
+      let currentLine = "";
+      for (const wordText of paragraphText.split(" ")) {
+        const candidate = currentLine.length > 0 ? currentLine + " " + wordText : wordText;
+        if (measureWidth(candidate) <= maxWidth) {
+          currentLine = candidate;
+          continue;
+        }
+        if (currentLine.length > 0) {
+          lineList.push(currentLine);
+          currentLine = "";
+        }
+        if (measureWidth(wordText) <= maxWidth) {
+          currentLine = wordText;
+        } else {
+          currentLine = appendByCharacter(wordText, "");
+        }
+      }
+      lineList.push(currentLine);
+    }
+    measurementContext.restore();
+    return lineList;
+  }
+  //==============================================================================
+  // 줄바꿈 반영 크기 측정. (레이아웃 용)
+  //==============================================================================
+  /**
+   * @returns { object } { width, height, lineCount }
+   */
+  measureWrappedSize() {
+    const text = this.getText();
+    if (!text) {
+      return { width: 0, height: 0, lineCount: 0 };
+    }
+    if (this.#wordWrapWidth <= 0 && text.indexOf("\n") < 0) {
+      return { width: this.measurePlainTextWidth(text), height: this.#fontSize * this.#lineSpacing, lineCount: 1 };
+    }
+    const wrapWidth = this.#wordWrapWidth > 0 ? this.#wordWrapWidth : System27.Number.POSITIVE_INFINITY;
+    const lineList = this.wrapTextToLines(text, wrapWidth);
+    let maxLineWidth = 0;
+    for (const lineText of lineList) {
+      maxLineWidth = System27.Math.max(maxLineWidth, this.measurePlainTextWidth(lineText));
+    }
+    return { width: maxLineWidth, height: lineList.length * this.#fontSize * this.#lineSpacing, lineCount: lineList.length };
   }
   //==============================================================================
   // 일반 텍스트 그리기.
@@ -14610,7 +15075,7 @@ var Text = class extends Component {
       const startX = this.computeUnderlineStartX(drawX, textWidth);
       const fontSize = this.#fontSize;
       graphic.setStrokeColor(textColor.toHEXString());
-      const lineWidth = System26.Math.max(1, fontSize / 16);
+      const lineWidth = System27.Math.max(1, fontSize / 16);
       if (this.#underline) {
         const underlineY = drawY + this.computeUnderlineOffsetY(fontSize);
         this.strokeHorizontalLine(graphic, startX, underlineY, textWidth, lineWidth);
@@ -14760,6 +15225,78 @@ var Text = class extends Component {
   /**
    * @param { string } text
    */
+  //==============================================================================
+  // 자동 줄바꿈 폭 설정. (0 이면 한 줄)
+  //==============================================================================
+  /**
+   * @param { number } wordWrapWidth
+   */
+  setWordWrapWidth(wordWrapWidth) {
+    this.#wordWrapWidth = System27.Math.max(0, wordWrapWidth);
+  }
+  //==============================================================================
+  // 자동 줄바꿈 폭 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getWordWrapWidth() {
+    return this.#wordWrapWidth;
+  }
+  //==============================================================================
+  // 줄바꿈 방식 설정. ("word" | "char")
+  //==============================================================================
+  /**
+   * @param { string } wrapMode
+   */
+  setWrapMode(wrapMode) {
+    this.#wrapMode = wrapMode;
+  }
+  //==============================================================================
+  // 줄바꿈 방식 반환.
+  //==============================================================================
+  /**
+   * @returns { string }
+   */
+  getWrapMode() {
+    return this.#wrapMode;
+  }
+  //==============================================================================
+  // 줄 간격 배율 설정.
+  //==============================================================================
+  /**
+   * @param { number } lineSpacing
+   */
+  setLineSpacing(lineSpacing) {
+    this.#lineSpacing = System27.Math.max(0.1, lineSpacing);
+  }
+  //==============================================================================
+  // 줄 간격 배율 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getLineSpacing() {
+    return this.#lineSpacing;
+  }
+  //==============================================================================
+  // 표시 글자 수 설정. (-1 이면 전체 — 타자기 연출용)
+  //==============================================================================
+  /**
+   * @param { number } visibleCharacterCount
+   */
+  setVisibleCharacterCount(visibleCharacterCount) {
+    this.#visibleCharacterCount = System27.Math.max(-1, System27.Math.floor(visibleCharacterCount));
+  }
+  //==============================================================================
+  // 표시 글자 수 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getVisibleCharacterCount() {
+    return this.#visibleCharacterCount;
+  }
   setText(text) {
     this.#text = text;
   }
@@ -14999,7 +15536,7 @@ var Text = class extends Component {
 };
 
 // src/core/component/richtext.js
-var System27 = globalThis;
+var System28 = globalThis;
 var NAMED_COLORS = {
   red: "#ff0000",
   green: "#00ff00",
@@ -15054,8 +15591,8 @@ function buildAttributesForTag(tagName, value) {
     }
     case "size": {
       const trimmed = value !== void 0 && value !== null ? value.trim() : "";
-      const fontSize = System27.parseInt(trimmed, 10);
-      if (System27.Number.isFinite(fontSize) === false || fontSize <= 0) {
+      const fontSize = System28.parseInt(trimmed, 10);
+      if (System28.Number.isFinite(fontSize) === false || fontSize <= 0) {
         return null;
       }
       return { fontSize };
@@ -15081,7 +15618,7 @@ __name(buildAttributesForTag, "buildAttributesForTag");
 function mergeAttributeStack(stack) {
   const result = {};
   for (const attributes of stack) {
-    for (const key of System27.Object.keys(attributes)) {
+    for (const key of System28.Object.keys(attributes)) {
       if (key === "__tagName") {
         continue;
       }
@@ -15320,7 +15857,7 @@ var RichText = class extends Text {
       graphic.setFillColor(segmentTextColor.toHEXString());
       graphic.drawFillText(segmentText, cursorX, baselineY);
       const segmentWidth = graphic.measureText(segmentText).width;
-      const segmentLineWidth = System27.Math.max(1, segmentFontSize / 16);
+      const segmentLineWidth = System28.Math.max(1, segmentFontSize / 16);
       if (segmentUnderline) {
         const underlineY = baselineY + this.computeUnderlineOffsetY(segmentFontSize);
         graphic.setStrokeColor(segmentTextColor.toHEXString());
@@ -15402,7 +15939,7 @@ var RichText = class extends Text {
 };
 
 // src/misc/localstorage.js
-var System28 = globalThis;
+var System29 = globalThis;
 var LocalStorage = class _LocalStorage extends Object2 {
   static {
     __name(this, "LocalStorage");
@@ -15423,7 +15960,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
   // 전체 제거.
   //==============================================================================
   static clear() {
-    System28.window.localStorage.clear();
+    System29.window.localStorage.clear();
   }
   //==============================================================================
   // 문자열 값 설정.
@@ -15433,7 +15970,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
    * @param { string } stringValue
    */
   static setString(key, stringValue) {
-    System28.window.localStorage.setItem(key, stringValue);
+    System29.window.localStorage.setItem(key, stringValue);
   }
   //==============================================================================
   // 논리 값 설정.
@@ -15462,7 +15999,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
    * @param { string } key 
    */
   static remove(key) {
-    System28.window.localStorage.removeItem(key);
+    System29.window.localStorage.removeItem(key);
   }
   //==============================================================================
   // 문자열 값 반환.
@@ -15473,7 +16010,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
    * @returns { string }
    */
   static getString(key, defaultStringValue = "") {
-    const value = System28.window.localStorage.getItem(key);
+    const value = System29.window.localStorage.getItem(key);
     if (value === null || value === void 0) {
       _LocalStorage.setString(key, defaultStringValue);
       return defaultStringValue;
@@ -15521,8 +16058,33 @@ var LocalStorage = class _LocalStorage extends Object2 {
    * @param { string } key 
    * @returns { boolean }
    */
+  //==============================================================================
+  // 접두사로 시작하는 키 일괄 삭제. (정적)
+  // - 게임 네임스페이스의 저장 데이터를 통째로 지울 때 쓴다.
+  //==============================================================================
+  /**
+   * @param { string } prefix
+   * @returns { number } 지운 키 수.
+   */
+  static clearByPrefix(prefix) {
+    const storage = System29.localStorage;
+    if (!storage || !prefix) {
+      return 0;
+    }
+    const removeKeyList = [];
+    for (let index = 0; index < storage.length; ++index) {
+      const key = storage.key(index);
+      if (key && key.indexOf(prefix) === 0) {
+        removeKeyList.push(key);
+      }
+    }
+    for (const key of removeKeyList) {
+      storage.removeItem(key);
+    }
+    return removeKeyList.length;
+  }
   static containsKey(key) {
-    return System28.window.localStorage.getItem(key) !== null;
+    return System29.window.localStorage.getItem(key) !== null;
   }
   //==============================================================================
   // 모든 키 반환.
@@ -15532,8 +16094,8 @@ var LocalStorage = class _LocalStorage extends Object2 {
    */
   static getKeys() {
     const keys = [];
-    for (let i = 0; i < System28.window.localStorage.length; ++i) {
-      const key = System28.window.localStorage.key(i);
+    for (let i = 0; i < System29.window.localStorage.length; ++i) {
+      const key = System29.window.localStorage.key(i);
       keys.push(key);
     }
     keys.sort();
@@ -15542,7 +16104,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
 };
 
 // src/misc/devtools.js
-var System29 = globalThis;
+var System30 = globalThis;
 var TITLE_HEIGHT = 28;
 var TAB_HEIGHT = 24;
 var ITEM_HEIGHT = 20;
@@ -16003,7 +16565,7 @@ var DEVTools = class extends Object2 {
     }
     if (touchY <= panelY + TITLE_HEIGHT + TAB_HEIGHT) {
       const tabWidth = panelWidth / TABS.length;
-      const tabIndex = System29.Math.floor((touchX - panelX) / tabWidth);
+      const tabIndex = System30.Math.floor((touchX - panelX) / tabWidth);
       if (tabIndex >= 0 && tabIndex < TABS.length) {
         this.#activeTab = tabIndex;
       }
@@ -16035,7 +16597,7 @@ var DEVTools = class extends Object2 {
     if (touchX < panelX + leftWidth) {
       const treeItemsY = contentY + ITEM_HEIGHT * 2;
       const localY2 = touchY - treeItemsY + this.#treeScrollY;
-      const clickedIndex = System29.Math.floor(localY2 / ITEM_HEIGHT);
+      const clickedIndex = System30.Math.floor(localY2 / ITEM_HEIGHT);
       if (clickedIndex >= 0 && clickedIndex < this.#flatList.length) {
         const clickedItem = this.#flatList[clickedIndex];
         const clickedNode = clickedItem.node;
@@ -16073,7 +16635,7 @@ var DEVTools = class extends Object2 {
       return;
     }
     const localY = touchY - contentY + this.#inspectorScrollY;
-    const clickedLineIndex = System29.Math.floor(localY / ITEM_HEIGHT);
+    const clickedLineIndex = System30.Math.floor(localY / ITEM_HEIGHT);
     if (clickedLineIndex >= 0 && clickedLineIndex < this.#cachedInspectorLines.length) {
       const clickedLine = this.#cachedInspectorLines[clickedLineIndex];
       if (clickedLine.isComponentHeader && clickedLine.componentRef) {
@@ -16110,7 +16672,7 @@ var DEVTools = class extends Object2 {
       const isRightMode = this.#resizeMode === ResizeMode.right || this.#resizeMode === ResizeMode.bottomRight;
       if (isRightMode) {
         const newWidth = this.#resizeDragStartPanelWidth + deltaX;
-        this.#panelWidth = System29.Math.max(MIN_PANEL_WIDTH, newWidth);
+        this.#panelWidth = System30.Math.max(MIN_PANEL_WIDTH, newWidth);
       }
       const isLeftMode = this.#resizeMode === ResizeMode.left || this.#resizeMode === ResizeMode.topLeft || this.#resizeMode === ResizeMode.bottomLeft;
       if (isLeftMode) {
@@ -16123,7 +16685,7 @@ var DEVTools = class extends Object2 {
       const isBottomMode = this.#resizeMode === ResizeMode.bottom || this.#resizeMode === ResizeMode.bottomRight || this.#resizeMode === ResizeMode.bottomLeft;
       if (isBottomMode) {
         const newHeight = this.#resizeDragStartPanelHeight + deltaY;
-        this.#panelHeight = System29.Math.max(MIN_PANEL_HEIGHT, newHeight);
+        this.#panelHeight = System30.Math.max(MIN_PANEL_HEIGHT, newHeight);
       }
       const isTopMode = this.#resizeMode === ResizeMode.top || this.#resizeMode === ResizeMode.topLeft;
       if (isTopMode) {
@@ -16136,28 +16698,28 @@ var DEVTools = class extends Object2 {
       if (this.#resizeMode === ResizeMode.splitter) {
         const newLeftWidth = this.#resizeDragStartLeftWidth + deltaX;
         const maxLeftWidth = this.#panelWidth - MIN_LEFT_WIDTH;
-        this.#leftWidth = System29.Math.max(MIN_LEFT_WIDTH, System29.Math.min(maxLeftWidth, newLeftWidth));
+        this.#leftWidth = System30.Math.max(MIN_LEFT_WIDTH, System30.Math.min(maxLeftWidth, newLeftWidth));
       }
     }
     if (this.#isTreeScrollDragging) {
       const deltaY = touchY - this.#treeScrollDragStartMouseY;
       const newScrollY = this.#treeScrollDragStartScrollY - deltaY;
-      this.#treeScrollY = System29.Math.max(0, newScrollY);
+      this.#treeScrollY = System30.Math.max(0, newScrollY);
     }
     if (this.#isInspectorScrollDragging) {
       const deltaY = touchY - this.#inspectorScrollDragStartMouseY;
       const newScrollY = this.#inspectorScrollDragStartScrollY - deltaY;
-      this.#inspectorScrollY = System29.Math.max(0, newScrollY);
+      this.#inspectorScrollY = System30.Math.max(0, newScrollY);
     }
     if (this.#isLocalStorageScrollDragging) {
       const deltaY = touchY - this.#localStorageScrollDragStartMouseY;
       const newScrollY = this.#localStorageScrollDragStartScrollY - deltaY;
-      this.#localStorageScrollY = System29.Math.max(0, newScrollY);
+      this.#localStorageScrollY = System30.Math.max(0, newScrollY);
     }
     if (this.#isStatisticsScrollDragging) {
       const deltaY = touchY - this.#statisticsScrollDragStartMouseY;
       const newScrollY = this.#statisticsScrollDragStartScrollY - deltaY;
-      this.#statisticsScrollY = System29.Math.max(0, newScrollY);
+      this.#statisticsScrollY = System30.Math.max(0, newScrollY);
     }
   }
   //==============================================================================
@@ -16194,15 +16756,15 @@ var DEVTools = class extends Object2 {
     const clearBtnX = panelX + panelWidth - PADDING - clearBtnWidth;
     const addBtnX = clearBtnX - PADDING - addBtnWidth;
     if (touchX >= addBtnX && touchX <= addBtnX + addBtnWidth && touchY >= btnY && touchY <= btnY + btnHeight) {
-      const newKey = System29.window.prompt("\uD0A4 \uC785\uB825:");
+      const newKey = System30.window.prompt("\uD0A4 \uC785\uB825:");
       if (newKey !== null && newKey.trim() !== "") {
-        const newValue = System29.window.prompt("\uAC12 \uC785\uB825:") || "";
+        const newValue = System30.window.prompt("\uAC12 \uC785\uB825:") || "";
         LocalStorage.setString(newKey.trim(), newValue);
       }
       return;
     }
     if (touchX >= clearBtnX && touchX <= clearBtnX + clearBtnWidth && touchY >= btnY && touchY <= btnY + btnHeight) {
-      if (System29.window.confirm("\uBAA8\uB4E0 \uB85C\uCEEC \uC2A4\uD1A0\uB9AC\uC9C0 \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?")) {
+      if (System30.window.confirm("\uBAA8\uB4E0 \uB85C\uCEEC \uC2A4\uD1A0\uB9AC\uC9C0 \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?")) {
         LocalStorage.clear();
         this.#selectedLocalStorageKey = null;
       }
@@ -16227,7 +16789,7 @@ var DEVTools = class extends Object2 {
         if (buttonIndex >= 0) {
           switch (buttonIndex) {
             case 0: {
-              const newKey = System29.window.prompt("\uD0A4 \uC774\uB984 \uC218\uC815:", selectedKey);
+              const newKey = System30.window.prompt("\uD0A4 \uC774\uB984 \uC218\uC815:", selectedKey);
               if (newKey !== null && newKey.trim() !== "" && newKey.trim() !== selectedKey) {
                 const existingValue = LocalStorage.getString(selectedKey) || "";
                 LocalStorage.remove(selectedKey);
@@ -16238,7 +16800,7 @@ var DEVTools = class extends Object2 {
             }
             case 1: {
               const currentValue = LocalStorage.getString(selectedKey) || "";
-              const newValue = System29.window.prompt(`"${selectedKey}" \uAC12 \uC218\uC815:`, currentValue);
+              const newValue = System30.window.prompt(`"${selectedKey}" \uAC12 \uC218\uC815:`, currentValue);
               if (newValue !== null) {
                 LocalStorage.setString(selectedKey, newValue);
               }
@@ -16252,7 +16814,7 @@ var DEVTools = class extends Object2 {
               break;
             }
             case 3: {
-              if (System29.window.confirm(`"${selectedKey}" \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) {
+              if (System30.window.confirm(`"${selectedKey}" \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) {
                 LocalStorage.remove(selectedKey);
                 this.#selectedLocalStorageKey = null;
               }
@@ -16267,12 +16829,12 @@ var DEVTools = class extends Object2 {
     const keys = LocalStorage.getKeys();
     const delColWidth = 24;
     const localY = touchY - itemsY + this.#localStorageScrollY;
-    const clickedIndex = System29.Math.floor(localY / ITEM_HEIGHT);
+    const clickedIndex = System30.Math.floor(localY / ITEM_HEIGHT);
     if (touchY >= itemsY && clickedIndex >= 0 && clickedIndex < keys.length) {
       const clickedKey = keys[clickedIndex];
       const delBtnX = panelX + panelWidth - SCROLL_BAR_WIDTH - delColWidth;
       if (touchX >= delBtnX) {
-        if (System29.window.confirm(`"${clickedKey}" \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) {
+        if (System30.window.confirm(`"${clickedKey}" \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) {
           LocalStorage.remove(clickedKey);
           if (this.#selectedLocalStorageKey === clickedKey) {
             this.#selectedLocalStorageKey = null;
@@ -16336,9 +16898,9 @@ var DEVTools = class extends Object2 {
   getComponentProperties(component) {
     const properties = [];
     const seenNames = /* @__PURE__ */ new Set();
-    let proto = System29.Object.getPrototypeOf(component);
-    while (proto && proto.constructor && proto.constructor !== Component && proto !== System29.Object.prototype) {
-      const methodNames = System29.Object.getOwnPropertyNames(proto);
+    let proto = System30.Object.getPrototypeOf(component);
+    while (proto && proto.constructor && proto.constructor !== Component && proto !== System30.Object.prototype) {
+      const methodNames = System30.Object.getOwnPropertyNames(proto);
       for (let i = 0; i < methodNames.length; ++i) {
         const methodName = methodNames[i];
         if (seenNames.has(methodName)) {
@@ -16364,7 +16926,7 @@ var DEVTools = class extends Object2 {
         } catch (error) {
         }
       }
-      proto = System29.Object.getPrototypeOf(proto);
+      proto = System30.Object.getPrototypeOf(proto);
     }
     return properties;
   }
@@ -16424,9 +16986,9 @@ var DEVTools = class extends Object2 {
         return `(${rectX}, ${rectY}, ${value.width.toFixed(1)}, ${value.height.toFixed(1)})`;
       }
       if (typeof value.red === "number" && typeof value.green === "number" && typeof value.blue === "number") {
-        const r = System29.Math.round(value.red * 255);
-        const g = System29.Math.round(value.green * 255);
-        const b = System29.Math.round(value.blue * 255);
+        const r = System30.Math.round(value.red * 255);
+        const g = System30.Math.round(value.green * 255);
+        const b = System30.Math.round(value.blue * 255);
         const a = typeof value.alpha === "number" ? value.alpha.toFixed(2) : "1";
         return `rgba(${r}, ${g}, ${b}, ${a})`;
       }
@@ -16649,7 +17211,7 @@ var DEVTools = class extends Object2 {
     const totalItemsHeight = this.#flatList.length * ITEM_HEIGHT;
     if (totalItemsHeight > itemsHeight) {
       const maxTreeScrollY = totalItemsHeight - itemsHeight;
-      this.#treeScrollY = System29.Math.min(this.#treeScrollY, maxTreeScrollY);
+      this.#treeScrollY = System30.Math.min(this.#treeScrollY, maxTreeScrollY);
     } else {
       this.#treeScrollY = 0;
     }
@@ -16694,7 +17256,7 @@ var DEVTools = class extends Object2 {
         graphic.setTextAlign("right");
         const checkboxRightX = panelX + panelWidth - SCROLL_BAR_WIDTH - GIZMO_CHECKBOX_MARGIN;
         const checkboxX = checkboxRightX - GIZMO_CHECKBOX_SIZE;
-        const checkboxY = System29.Math.floor(itemMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+        const checkboxY = System30.Math.floor(itemMidY - GIZMO_CHECKBOX_SIZE * 0.5);
         const isGizmoVisible = typeof node.isGizmoVisible === "function" ? node.isGizmoVisible() : false;
         graphic.setFillColor(COLOR_ACCENT);
         graphic.drawRect(Rect.create(checkboxX, checkboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
@@ -16719,7 +17281,7 @@ var DEVTools = class extends Object2 {
     if (totalItemsHeight > itemsHeight) {
       const maxTreeScrollY = totalItemsHeight - itemsHeight;
       const scrollRatio = this.#treeScrollY / maxTreeScrollY;
-      const barHeight = System29.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
+      const barHeight = System30.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
       const barY = itemsY + scrollRatio * (itemsHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -16751,7 +17313,7 @@ var DEVTools = class extends Object2 {
     const totalContentHeight = inspectorLines.length * ITEM_HEIGHT;
     if (totalContentHeight > panelHeight) {
       const maxInspectorScrollY = totalContentHeight - panelHeight;
-      this.#inspectorScrollY = System29.Math.min(this.#inspectorScrollY, maxInspectorScrollY);
+      this.#inspectorScrollY = System30.Math.min(this.#inspectorScrollY, maxInspectorScrollY);
     } else {
       this.#inspectorScrollY = 0;
     }
@@ -16823,7 +17385,7 @@ var DEVTools = class extends Object2 {
     if (totalContentHeight > panelHeight) {
       const maxInspectorScrollY = totalContentHeight - panelHeight;
       const scrollRatio = this.#inspectorScrollY / maxInspectorScrollY;
-      const barHeight = System29.Math.max(20, panelHeight * panelHeight / totalContentHeight);
+      const barHeight = System30.Math.max(20, panelHeight * panelHeight / totalContentHeight);
       const barY = panelY + scrollRatio * (panelHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -16871,7 +17433,7 @@ var DEVTools = class extends Object2 {
     graphic.drawRect(Rect.create(panelX, columnHeaderY, panelWidth, ITEM_HEIGHT));
     const delColWidth = 24;
     const availableWidth = panelWidth - delColWidth - SCROLL_BAR_WIDTH;
-    const keyColWidth = System29.Math.floor(availableWidth * 0.4);
+    const keyColWidth = System30.Math.floor(availableWidth * 0.4);
     const valueColWidth = availableWidth - keyColWidth;
     graphic.setFillColor(COLOR_TEXT_DIM);
     graphic.setFontString(`${FONT_SIZE - 1}px monospace`);
@@ -16889,7 +17451,7 @@ var DEVTools = class extends Object2 {
     const totalItemsHeight = keys.length * ITEM_HEIGHT;
     if (totalItemsHeight > itemsHeight) {
       const maxScrollY = totalItemsHeight - itemsHeight;
-      this.#localStorageScrollY = System29.Math.min(this.#localStorageScrollY, maxScrollY);
+      this.#localStorageScrollY = System30.Math.min(this.#localStorageScrollY, maxScrollY);
     } else {
       this.#localStorageScrollY = 0;
     }
@@ -16916,12 +17478,12 @@ var DEVTools = class extends Object2 {
       graphic.setFontString(`${FONT_SIZE}px monospace`);
       graphic.setTextAlign("left");
       graphic.setTextBaseline("middle");
-      const maxKeyChars = System29.Math.floor(keyColWidth / 7);
+      const maxKeyChars = System30.Math.floor(keyColWidth / 7);
       const keyText = key.length > maxKeyChars ? key.slice(0, maxKeyChars - 3) + "..." : key;
       graphic.drawFillText(keyText, panelX + PADDING, itemMidY);
       graphic.setFillColor(COLOR_PROPERTY_VALUE);
       const valueStr = rawValue !== null ? rawValue : "(null)";
-      const maxValueChars = System29.Math.floor(valueColWidth / 7);
+      const maxValueChars = System30.Math.floor(valueColWidth / 7);
       const valueText = valueStr.length > maxValueChars ? valueStr.slice(0, maxValueChars - 3) + "..." : valueStr;
       graphic.drawFillText(valueText, panelX + keyColWidth + PADDING, itemMidY);
       const delBtnX = panelX + panelWidth - SCROLL_BAR_WIDTH - delColWidth;
@@ -16943,7 +17505,7 @@ var DEVTools = class extends Object2 {
     if (totalItemsHeight > itemsHeight) {
       const maxScrollY = totalItemsHeight - itemsHeight;
       const scrollRatio = this.#localStorageScrollY / maxScrollY;
-      const barHeight = System29.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
+      const barHeight = System30.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
       const barY = itemsY + scrollRatio * (itemsHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -16968,7 +17530,7 @@ var DEVTools = class extends Object2 {
       const contextButtonWidths = [];
       for (let labelIndex = 0; labelIndex < contextButtonCount; ++labelIndex) {
         const measuredTextWidth = graphic.measureText(contextButtonTexts[labelIndex]).width;
-        contextButtonWidths.push(System29.Math.ceil(measuredTextWidth) + contextButtonTextPadding * 2);
+        contextButtonWidths.push(System30.Math.ceil(measuredTextWidth) + contextButtonTextPadding * 2);
       }
       let totalContextButtonWidth = contextButtonGap * (contextButtonCount - 1);
       for (let widthIndex = 0; widthIndex < contextButtonWidths.length; ++widthIndex) {
@@ -17067,7 +17629,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Dim Background", panelX + PADDING, dimRowMidY);
     const dimCheckboxX = panelX + PADDING + 120;
-    const dimCheckboxY = System29.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const dimCheckboxY = System30.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isDimEnabled ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(dimCheckboxX, dimCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isDimEnabled) {
@@ -17082,7 +17644,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show All Gizmos", panelX + PADDING, gizmosRowMidY);
     const gizmosCheckboxX = panelX + PADDING + 120;
-    const gizmosCheckboxY = System29.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const gizmosCheckboxY = System30.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isAllGizmosVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(gizmosCheckboxX, gizmosCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isAllGizmosVisible) {
@@ -17097,7 +17659,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show Height Aspect Guide", panelX + PADDING, heightAspectGuideRowMidY);
     const heightAspectGuideCheckboxX = panelX + PADDING + 168;
-    const heightAspectGuideCheckboxY = System29.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const heightAspectGuideCheckboxY = System30.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isHeightAspectGuideVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(heightAspectGuideCheckboxX, heightAspectGuideCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isHeightAspectGuideVisible) {
@@ -17112,7 +17674,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show Width Aspect Guide", panelX + PADDING, widthAspectGuideRowMidY);
     const widthAspectGuideCheckboxX = panelX + PADDING + 168;
-    const widthAspectGuideCheckboxY = System29.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const widthAspectGuideCheckboxY = System30.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isWidthAspectGuideVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(widthAspectGuideCheckboxX, widthAspectGuideCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isWidthAspectGuideVisible) {
@@ -17127,7 +17689,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show FPS", panelX + PADDING, framePerSecondRowMidY);
     const framePerSecondCheckboxX = panelX + PADDING + 120;
-    const framePerSecondCheckboxY = System29.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const framePerSecondCheckboxY = System30.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isFramePerSecondVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(framePerSecondCheckboxX, framePerSecondCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isFramePerSecondVisible) {
@@ -17151,7 +17713,7 @@ var DEVTools = class extends Object2 {
     const dimRowY = panelY + ITEM_HEIGHT;
     const dimRowMidY = dimRowY + ITEM_HEIGHT * 0.5;
     const dimCheckboxX = panelX + PADDING + 120;
-    const dimCheckboxY = System29.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const dimCheckboxY = System30.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isDimCheckboxHit = touchX >= dimCheckboxX && touchX <= dimCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= dimCheckboxY && touchY <= dimCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isDimCheckboxHit) {
       this.#isDimEnabled = !this.#isDimEnabled;
@@ -17161,7 +17723,7 @@ var DEVTools = class extends Object2 {
     const gizmosRowY = panelY + ITEM_HEIGHT * 2;
     const gizmosRowMidY = gizmosRowY + ITEM_HEIGHT * 0.5;
     const gizmosCheckboxX = panelX + PADDING + 120;
-    const gizmosCheckboxY = System29.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const gizmosCheckboxY = System30.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isGizmosCheckboxHit = touchX >= gizmosCheckboxX && touchX <= gizmosCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= gizmosCheckboxY && touchY <= gizmosCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isGizmosCheckboxHit) {
       this.#isAllGizmosVisible = !this.#isAllGizmosVisible;
@@ -17173,7 +17735,7 @@ var DEVTools = class extends Object2 {
     const heightAspectGuideRowY = panelY + ITEM_HEIGHT * 3;
     const heightAspectGuideRowMidY = heightAspectGuideRowY + ITEM_HEIGHT * 0.5;
     const heightAspectGuideCheckboxX = panelX + PADDING + 168;
-    const heightAspectGuideCheckboxY = System29.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const heightAspectGuideCheckboxY = System30.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isHeightAspectGuideCheckboxHit = touchX >= heightAspectGuideCheckboxX && touchX <= heightAspectGuideCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= heightAspectGuideCheckboxY && touchY <= heightAspectGuideCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isHeightAspectGuideCheckboxHit) {
       this.#isHeightAspectGuideVisible = !this.#isHeightAspectGuideVisible;
@@ -17183,7 +17745,7 @@ var DEVTools = class extends Object2 {
     const widthAspectGuideRowY = panelY + ITEM_HEIGHT * 4;
     const widthAspectGuideRowMidY = widthAspectGuideRowY + ITEM_HEIGHT * 0.5;
     const widthAspectGuideCheckboxX = panelX + PADDING + 168;
-    const widthAspectGuideCheckboxY = System29.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const widthAspectGuideCheckboxY = System30.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isWidthAspectGuideCheckboxHit = touchX >= widthAspectGuideCheckboxX && touchX <= widthAspectGuideCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= widthAspectGuideCheckboxY && touchY <= widthAspectGuideCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isWidthAspectGuideCheckboxHit) {
       this.#isWidthAspectGuideVisible = !this.#isWidthAspectGuideVisible;
@@ -17193,7 +17755,7 @@ var DEVTools = class extends Object2 {
     const framePerSecondRowY = panelY + ITEM_HEIGHT * 5;
     const framePerSecondRowMidY = framePerSecondRowY + ITEM_HEIGHT * 0.5;
     const framePerSecondCheckboxX = panelX + PADDING + 120;
-    const framePerSecondCheckboxY = System29.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const framePerSecondCheckboxY = System30.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isFramePerSecondCheckboxHit = touchX >= framePerSecondCheckboxX && touchX <= framePerSecondCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= framePerSecondCheckboxY && touchY <= framePerSecondCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isFramePerSecondCheckboxHit) {
       this.#isFramePerSecondVisible = !this.#isFramePerSecondVisible;
@@ -17209,7 +17771,7 @@ var DEVTools = class extends Object2 {
     }
     const settingsJson = LocalStorage.getString(SETTINGS_STORAGE_KEY);
     try {
-      const settingsObject = System29.JSON.parse(settingsJson);
+      const settingsObject = System30.JSON.parse(settingsJson);
       if (typeof settingsObject.dimEnabled === "boolean") {
         this.#isDimEnabled = settingsObject.dimEnabled;
       }
@@ -17233,7 +17795,7 @@ var DEVTools = class extends Object2 {
   //==============================================================================
   saveSettings() {
     const settingsObject = { dimEnabled: this.#isDimEnabled, allGizmosVisible: this.#isAllGizmosVisible, heightAspectGuideVisible: this.#isHeightAspectGuideVisible, widthAspectGuideVisible: this.#isWidthAspectGuideVisible, framePerSecondVisible: this.#isFramePerSecondVisible };
-    const settingsJson = System29.JSON.stringify(settingsObject);
+    const settingsJson = System30.JSON.stringify(settingsObject);
     LocalStorage.setString(SETTINGS_STORAGE_KEY, settingsJson);
   }
   //==============================================================================
@@ -17304,7 +17866,7 @@ var DEVTools = class extends Object2 {
     const timeDeltaText = `${timeDelta.toFixed(3)}s`;
     items.push({ key: "timeDelta", value: timeDeltaText, isSeparator: false, isSectionHeader: false });
     items.push({ key: "Memory (Chrome Only)", value: "", isSeparator: false, isSectionHeader: true });
-    const performanceMemory = System29.window.performance ? System29.window.performance.memory : null;
+    const performanceMemory = System30.window.performance ? System30.window.performance.memory : null;
     if (performanceMemory) {
       const usedHeapMegabytes = (performanceMemory.usedJSHeapSize / (1024 * 1024)).toFixed(2);
       items.push({ key: "usedJSHeapSize", value: `${usedHeapMegabytes} MB`, isSeparator: false, isSectionHeader: false });
@@ -17339,20 +17901,20 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Statistics", panelX + PADDING, panelY + ITEM_HEIGHT * 0.5);
     const availableWidth = panelWidth - SCROLL_BAR_WIDTH;
-    const keyColumnWidth = System29.Math.floor(availableWidth * 0.4);
+    const keyColumnWidth = System30.Math.floor(availableWidth * 0.4);
     const statisticsItems = this.gatherStatisticsItems();
     const itemsY = panelY + ITEM_HEIGHT;
     const itemsHeight = panelHeight - ITEM_HEIGHT;
     const totalItemsHeight = statisticsItems.length * ITEM_HEIGHT;
     if (totalItemsHeight > itemsHeight) {
       const maxStatisticsScrollY = totalItemsHeight - itemsHeight;
-      this.#statisticsScrollY = System29.Math.min(this.#statisticsScrollY, maxStatisticsScrollY);
+      this.#statisticsScrollY = System30.Math.min(this.#statisticsScrollY, maxStatisticsScrollY);
     } else {
       this.#statisticsScrollY = 0;
     }
     const valueColumnWidth = availableWidth - keyColumnWidth;
-    const maxKeyCharacters = System29.Math.floor(keyColumnWidth / 7);
-    const maxValueCharacters = System29.Math.floor(valueColumnWidth / 7);
+    const maxKeyCharacters = System30.Math.floor(keyColumnWidth / 7);
+    const maxValueCharacters = System30.Math.floor(valueColumnWidth / 7);
     graphic.beginClipRect(Rect.create(panelX, itemsY, panelWidth, itemsHeight));
     for (let itemIndex = 0; itemIndex < statisticsItems.length; ++itemIndex) {
       const statisticsItem = statisticsItems[itemIndex];
@@ -17405,7 +17967,7 @@ var DEVTools = class extends Object2 {
     if (totalItemsHeight > itemsHeight) {
       const maxStatisticsScrollY = totalItemsHeight - itemsHeight;
       const scrollRatio = this.#statisticsScrollY / maxStatisticsScrollY;
-      const barHeight = System29.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
+      const barHeight = System30.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
       const barY = itemsY + scrollRatio * (itemsHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -17427,7 +17989,7 @@ var DEVTools = class extends Object2 {
     const statisticsItems = this.gatherStatisticsItems();
     const itemsY = panelY + ITEM_HEIGHT;
     const localY = touchY - itemsY + this.#statisticsScrollY;
-    const clickedIndex = System29.Math.floor(localY / ITEM_HEIGHT);
+    const clickedIndex = System30.Math.floor(localY / ITEM_HEIGHT);
     if (touchY >= itemsY && clickedIndex >= 0 && clickedIndex < statisticsItems.length) {
       const clickedItem = statisticsItems[clickedIndex];
       if (!clickedItem.isSeparator && !clickedItem.isSectionHeader) {
@@ -17449,7 +18011,7 @@ var DEVTools = class extends Object2 {
 };
 
 // src/ui/uiscene.js
-var System30 = globalThis;
+var System31 = globalThis;
 var UIScene = class extends Scene {
   static {
     __name(this, "UIScene");
@@ -17596,19 +18158,19 @@ var UIScene = class extends Scene {
    */
   async load(engine) {
     await super.load(engine);
-    this.#loadStartTime = System30.Date.now();
+    this.#loadStartTime = System31.Date.now();
     this.#loadTouchedToSkip = false;
     const skipHandler = /* @__PURE__ */ __name(() => {
       this.#loadTouchedToSkip = true;
     }, "skipHandler");
-    System30.window.addEventListener("pointerdown", skipHandler, { once: true });
+    System31.window.addEventListener("pointerdown", skipHandler, { once: true });
     try {
       await this.loadAssets();
-      while (System30.Date.now() - this.#loadStartTime < this.#loadMinDurationMs && !this.#loadTouchedToSkip) {
-        await new Promise((resolve) => System30.setTimeout(resolve, 50));
+      while (System31.Date.now() - this.#loadStartTime < this.#loadMinDurationMs && !this.#loadTouchedToSkip) {
+        await new Promise((resolve) => System31.setTimeout(resolve, 50));
       }
     } finally {
-      System30.window.removeEventListener("pointerdown", skipHandler);
+      System31.window.removeEventListener("pointerdown", skipHandler);
     }
     const viewManager = engine.getViewManager();
     const viewSize = viewManager.getViewSize();
@@ -17663,8 +18225,8 @@ var UIScene = class extends Scene {
       const positionY = (viewSize.y - targetHeight) * 0.5;
       graphic.drawImage(image, Vector2.create(positionX, positionY), Vector2.create(targetWidth, targetHeight));
     }
-    const elapsed = System30.Date.now() - this.#loadStartTime;
-    const progress = System30.Math.min(1, System30.Math.max(0, elapsed / this.#loadMinDurationMs));
+    const elapsed = System31.Date.now() - this.#loadStartTime;
+    const progress = System31.Math.min(1, System31.Math.max(0, elapsed / this.#loadMinDurationMs));
     const barWidth = viewSize.x * 0.6;
     const barHeight = 24;
     const barX = (viewSize.x - barWidth) * 0.5;
@@ -17719,8 +18281,8 @@ var UIScene = class extends Scene {
     const safeAreaRect = this.computeSafeAreaRect();
     const insetTop = safeAreaRect.position.y;
     const insetLeft = safeAreaRect.position.x;
-    const insetRight = System30.Math.max(viewSize.x - (safeAreaRect.position.x + safeAreaRect.size.x), 0);
-    const insetBottom = System30.Math.max(viewSize.y - (safeAreaRect.position.y + safeAreaRect.size.y), 0);
+    const insetRight = System31.Math.max(viewSize.x - (safeAreaRect.position.x + safeAreaRect.size.x), 0);
+    const insetBottom = System31.Math.max(viewSize.y - (safeAreaRect.position.y + safeAreaRect.size.y), 0);
     const previousInsets = this.#safeAreaInsets;
     if (previousInsets.top !== insetTop || previousInsets.left !== insetLeft || previousInsets.right !== insetRight || previousInsets.bottom !== insetBottom) {
       this.setSafeAreaInsets({
@@ -17743,20 +18305,20 @@ var UIScene = class extends Scene {
     const viewManager = engine.getViewManager();
     const viewSize = viewManager.getViewSize();
     const targetScale = viewManager.getTargetResolutionScale();
-    const div = System30.document.createElement("div");
+    const div = System31.document.createElement("div");
     div.style.position = "absolute";
     div.style.visibility = "hidden";
     div.style.paddingTop = "env(safe-area-inset-top)";
     div.style.paddingRight = "env(safe-area-inset-right)";
     div.style.paddingBottom = "env(safe-area-inset-bottom)";
     div.style.paddingLeft = "env(safe-area-inset-left)";
-    System30.document.body.appendChild(div);
-    const computedStyle = System30.window.getComputedStyle(div);
-    const insetTopCss = System30.Number.parseInt(computedStyle.paddingTop) || 0;
-    const insetRightCss = System30.Number.parseInt(computedStyle.paddingRight) || 0;
-    const insetBottomCss = System30.Number.parseInt(computedStyle.paddingBottom) || 0;
-    const insetLeftCss = System30.Number.parseInt(computedStyle.paddingLeft) || 0;
-    System30.document.body.removeChild(div);
+    System31.document.body.appendChild(div);
+    const computedStyle = System31.window.getComputedStyle(div);
+    const insetTopCss = System31.Number.parseInt(computedStyle.paddingTop) || 0;
+    const insetRightCss = System31.Number.parseInt(computedStyle.paddingRight) || 0;
+    const insetBottomCss = System31.Number.parseInt(computedStyle.paddingBottom) || 0;
+    const insetLeftCss = System31.Number.parseInt(computedStyle.paddingLeft) || 0;
+    System31.document.body.removeChild(div);
     const scale = targetScale > 0 ? targetScale : 1;
     const insetTop = insetTopCss / scale;
     const insetRight = insetRightCss / scale;
@@ -17764,8 +18326,8 @@ var UIScene = class extends Scene {
     const insetLeft = insetLeftCss / scale;
     const x = insetLeft;
     const y = insetTop;
-    const width = System30.Math.max(viewSize.x - insetLeft - insetRight, 0);
-    const height = System30.Math.max(viewSize.y - insetTop - insetBottom, 0);
+    const width = System31.Math.max(viewSize.x - insetLeft - insetRight, 0);
+    const height = System31.Math.max(viewSize.y - insetTop - insetBottom, 0);
     return Rect.create(x, y, width, height);
   }
   //==============================================================================
@@ -18376,6 +18938,52 @@ var UILabel = class extends UIView {
   /**
    * @param { FontFace | FontAsset | null } font
    */
+  //==============================================================================
+  // 자동 줄바꿈 폭 설정. (일반 텍스트 모드 전용 — 0 이면 한 줄)
+  //==============================================================================
+  /**
+   * @param { number } wordWrapWidth
+   */
+  setWordWrapWidth(wordWrapWidth) {
+    if (this.#text) {
+      this.#text.setWordWrapWidth(wordWrapWidth);
+    }
+    this.invalidateIntrinsicContentSize();
+  }
+  //==============================================================================
+  // 줄바꿈 방식 설정. ("word" | "char")
+  //==============================================================================
+  /**
+   * @param { string } wrapMode
+   */
+  setWrapMode(wrapMode) {
+    if (this.#text) {
+      this.#text.setWrapMode(wrapMode);
+    }
+  }
+  //==============================================================================
+  // 줄 간격 배율 설정.
+  //==============================================================================
+  /**
+   * @param { number } lineSpacing
+   */
+  setLineSpacing(lineSpacing) {
+    if (this.#text) {
+      this.#text.setLineSpacing(lineSpacing);
+    }
+    this.invalidateIntrinsicContentSize();
+  }
+  //==============================================================================
+  // 표시 글자 수 설정. (-1 이면 전체 — 타자기 연출용, 일반 텍스트 모드 전용)
+  //==============================================================================
+  /**
+   * @param { number } visibleCharacterCount
+   */
+  setVisibleCharacterCount(visibleCharacterCount) {
+    if (this.#text) {
+      this.#text.setVisibleCharacterCount(visibleCharacterCount);
+    }
+  }
   setFont(font) {
     if (this.#text) {
       this.#text.setFont(font);
@@ -18593,7 +19201,7 @@ var UIControl = class extends UIView {
 };
 
 // src/ui/uibutton.js
-var System31 = globalThis;
+var System32 = globalThis;
 var ButtonState = {
   normal: Enum.begin(),
   hover: Enum.auto(),
@@ -18620,6 +19228,15 @@ var UIButton = class extends UIControl {
   #clickedEvent;
   /** @private @type { boolean } */
   #isPressTracking;
+  /** @private @type { number } */
+  #minimumPressedSeconds;
+  // 눌린 그림을 보여 줄 최소 시간. (0 이면 즉시)
+  /** @private @type { number } */
+  #pressedElapsedSeconds;
+  // 이번 누름이 이어진 시간.
+  /** @private @type { object | null } */
+  #pendingRelease;
+  // 최소 시간을 채우려고 미뤄 둔 뗌 처리.
   /** @private @type { Color } */
   #pressedTintColor;
   /** @private @type { Color } */
@@ -18657,6 +19274,9 @@ var UIButton = class extends UIControl {
     this.#releasedEvent = null;
     this.#clickedEvent = null;
     this.#isPressTracking = false;
+    this.#minimumPressedSeconds = 0;
+    this.#pressedElapsedSeconds = 0;
+    this.#pendingRelease = null;
     this.#pressedTintColor = new Color(0, 0, 0, 0.3);
     this.#hoverTintColor = new Color(1, 1, 1, 0.12);
     this.#hoverEvent = null;
@@ -18710,6 +19330,17 @@ var UIButton = class extends UIControl {
    */
   tick(timeDelta) {
     super.tick(timeDelta);
+    if (this.#isPressTracking) {
+      this.#pressedElapsedSeconds += timeDelta;
+    }
+    if (this.#pendingRelease) {
+      this.#pendingRelease.remainSeconds -= timeDelta;
+      if (this.#pendingRelease.remainSeconds <= 0) {
+        const releasePosition = this.#pendingRelease.viewInputPosition;
+        this.#pendingRelease = null;
+        this.performRelease(releasePosition);
+      }
+    }
     this.updateHoverState();
     this.updateTintTransition(timeDelta);
   }
@@ -18726,7 +19357,7 @@ var UIButton = class extends UIControl {
     if (currentButtonState === ButtonState.pressed || currentButtonState === ButtonState.disabled) {
       return;
     }
-    const engine = System31.vanillaEngine;
+    const engine = System32.vanillaEngine;
     if (!engine) {
       return;
     }
@@ -18771,6 +19402,8 @@ var UIButton = class extends UIControl {
       return;
     }
     this.#isPressTracking = true;
+    this.#pressedElapsedSeconds = 0;
+    this.#pendingRelease = null;
     this.setButtonState(ButtonState.pressed);
     this.collectColorTargets();
     const pressedEvent = this.getPressedEvent();
@@ -18792,6 +19425,22 @@ var UIButton = class extends UIControl {
       return;
     }
     this.#isPressTracking = false;
+    if (this.#minimumPressedSeconds > 0 && this.#pressedElapsedSeconds < this.#minimumPressedSeconds) {
+      this.#pendingRelease = {
+        viewInputPosition,
+        remainSeconds: this.#minimumPressedSeconds - this.#pressedElapsedSeconds
+      };
+      return;
+    }
+    this.performRelease(viewInputPosition);
+  }
+  //==============================================================================
+  // 뗌 처리 본문.
+  //==============================================================================
+  /**
+   * @param { Vector2 } viewInputPosition
+   */
+  performRelease(viewInputPosition) {
     this.setButtonState(ButtonState.released);
     this.#tintProgress = 0;
     this.applyTintProgress(0);
@@ -18820,6 +19469,7 @@ var UIButton = class extends UIControl {
    * @param { Vector2 } viewInputPosition
    */
   touchCancel(viewInputPosition) {
+    this.#pendingRelease = null;
     if (!this.#isPressTracking) {
       return;
     }
@@ -18978,6 +19628,25 @@ var UIButton = class extends UIControl {
   /**
    * @param { function(UIButton): boolean } callback
    */
+  //==============================================================================
+  // 최소 눌림 표시 시간 설정.
+  // - 짧게 톡 눌러도 이 시간만큼 눌린 모습이 보인 뒤 클릭이 실행된다. (기본 0 = 즉시)
+  //==============================================================================
+  /**
+   * @param { number } minimumPressedSeconds
+   */
+  setMinimumPressedSeconds(minimumPressedSeconds) {
+    this.#minimumPressedSeconds = System32.Math.max(0, minimumPressedSeconds);
+  }
+  //==============================================================================
+  // 최소 눌림 표시 시간 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getMinimumPressedSeconds() {
+    return this.#minimumPressedSeconds;
+  }
   setClickEvent(callback) {
     this.#clickEvent = callback;
   }
@@ -19318,6 +19987,11 @@ var UIProgressView = class extends UIView {
   #maxValue;
   /** @private @type { Color } */
   #fillColor;
+  /** @private @type { number | null } */
+  #secondaryValue;
+  // 반대편에서 차오르는 값. (null 이면 안 씀)
+  /** @private @type { Color } */
+  #secondaryFillColor;
   /** @private @type { number } */
   #cornerRadius;
   /** @private @type { string } */
@@ -19332,6 +20006,8 @@ var UIProgressView = class extends UIView {
     this.#minValue = 0;
     this.#maxValue = 1;
     this.#fillColor = new Color(0.23, 0.51, 0.96, 1);
+    this.#secondaryValue = null;
+    this.#secondaryFillColor = new Color(0.94, 0.33, 0.31, 1);
     this.#cornerRadius = 0;
     this.#direction = ProgressDirection.horizontal;
     super.setBackgroundColor(new Color(0.7, 0.7, 0.7, 1));
@@ -19377,6 +20053,28 @@ var UIProgressView = class extends UIView {
       graphic.drawRoundRect(fillRect, this.#cornerRadius);
     } else {
       graphic.drawRect(fillRect);
+    }
+    if (this.#secondaryValue !== null) {
+      const range = this.#maxValue - this.#minValue;
+      if (range > 0) {
+        const secondaryRatio = clamp((this.#secondaryValue - this.#minValue) / range, 0, 1);
+        if (secondaryRatio > 0) {
+          let secondaryRect;
+          if (this.#direction === ProgressDirection.vertical) {
+            const secondaryHeight = contentSize.y * secondaryRatio;
+            secondaryRect = Rect.create(0, 0, contentSize.x, secondaryHeight);
+          } else {
+            const secondaryWidth = contentSize.x * secondaryRatio;
+            secondaryRect = Rect.create(contentSize.x - secondaryWidth, 0, secondaryWidth, contentSize.y);
+          }
+          graphic.setFillColor(this.#secondaryFillColor);
+          if (this.#cornerRadius > 0) {
+            graphic.drawRoundRect(secondaryRect, this.#cornerRadius);
+          } else {
+            graphic.drawRect(secondaryRect);
+          }
+        }
+      }
     }
   }
   //==============================================================================
@@ -19435,6 +20133,42 @@ var UIProgressView = class extends UIView {
   /**
    * @param { Color } color
    */
+  //==============================================================================
+  // 반대편 값 설정. (null 이면 끔 — 진행 방향의 반대쪽 끝에서 차오른다)
+  //==============================================================================
+  /**
+   * @param { number | null } secondaryValue
+   */
+  setSecondaryValue(secondaryValue) {
+    this.#secondaryValue = secondaryValue === null ? null : clamp(secondaryValue, this.#minValue, this.#maxValue);
+  }
+  //==============================================================================
+  // 반대편 값 반환.
+  //==============================================================================
+  /**
+   * @returns { number | null }
+   */
+  getSecondaryValue() {
+    return this.#secondaryValue;
+  }
+  //==============================================================================
+  // 반대편 채움 색 설정.
+  //==============================================================================
+  /**
+   * @param { Color } color
+   */
+  setSecondaryFillColor(color) {
+    this.#secondaryFillColor = color;
+  }
+  //==============================================================================
+  // 반대편 채움 색 반환.
+  //==============================================================================
+  /**
+   * @returns { Color }
+   */
+  getSecondaryFillColor() {
+    return this.#secondaryFillColor;
+  }
   setTrackColor(color) {
     this.setBackgroundColor(color);
   }
@@ -19480,7 +20214,7 @@ var UIProgressView = class extends UIView {
 };
 
 // src/ui/uiinputfield.js
-var System32 = globalThis;
+var System33 = globalThis;
 var UIInputField = class extends WorldNode {
   static {
     __name(this, "UIInputField");
@@ -19790,8 +20524,8 @@ var UIInputField = class extends WorldNode {
         const selEnd = this.#domInput.selectionEnd;
         const selStart = this.#domInput.selectionStart;
         if (typeof selEnd === "number" && typeof selStart === "number") {
-          const ourMin = System32.Math.min(this.#cursorIndex, this.#selectionStart);
-          const ourMax = System32.Math.max(this.#cursorIndex, this.#selectionStart);
+          const ourMin = System33.Math.min(this.#cursorIndex, this.#selectionStart);
+          const ourMax = System33.Math.max(this.#cursorIndex, this.#selectionStart);
           if (selStart !== ourMin || selEnd !== ourMax) {
             this.#cursorIndex = selEnd;
             this.#selectionStart = selStart;
@@ -19834,8 +20568,8 @@ var UIInputField = class extends WorldNode {
     this.#selectionStart = this.#dragStartIndex;
     this.#cursorIndex = index;
     if (this.#domInput) {
-      const selStart = System32.Math.min(this.#dragStartIndex, index);
-      const selEnd = System32.Math.max(this.#dragStartIndex, index);
+      const selStart = System33.Math.min(this.#dragStartIndex, index);
+      const selEnd = System33.Math.max(this.#dragStartIndex, index);
       this.#domInput.setSelectionRange(selStart, selEnd);
     }
     this.#blinkTimer = 0;
@@ -19899,7 +20633,7 @@ var UIInputField = class extends WorldNode {
   refreshTextPositions() {
     const size = this.getContentSize();
     if (size.x <= 0 || size.y <= 0) return;
-    const inner = Vector2.create(System32.Math.max(0, size.x - this.#padding * 2), size.y);
+    const inner = Vector2.create(System33.Math.max(0, size.x - this.#padding * 2), size.y);
     this.#textTextNode.setLocalPosition(Vector2.create(this.#padding, 0));
     this.#textTextNode.setContentSize(inner);
     this.#placeholderTextNode.setLocalPosition(Vector2.create(this.#padding, 0));
@@ -19912,7 +20646,7 @@ var UIInputField = class extends WorldNode {
   //==============================================================================
   attachDOMInput() {
     if (this.#domInput) return;
-    const doc = System32.document;
+    const doc = System33.document;
     ensureGlobalHiddenInputStyle(doc);
     const input = doc.createElement("input");
     input.type = "text";
@@ -20075,11 +20809,11 @@ var UIInputField = class extends WorldNode {
   attachCanvasKeyboard() {
     if (this.#canvasKeydownHandler) return;
     this.#canvasKeydownHandler = (event) => this.handleCanvasKeydown(event);
-    System32.document.addEventListener("keydown", this.#canvasKeydownHandler);
+    System33.document.addEventListener("keydown", this.#canvasKeydownHandler);
   }
   detachCanvasKeyboard() {
     if (!this.#canvasKeydownHandler) return;
-    System32.document.removeEventListener("keydown", this.#canvasKeydownHandler);
+    System33.document.removeEventListener("keydown", this.#canvasKeydownHandler);
     this.#canvasKeydownHandler = null;
   }
   handleCanvasKeydown(event) {
@@ -20140,7 +20874,7 @@ var UIInputField = class extends WorldNode {
     this.#cursorVisible = true;
   }
   moveCursor(newIndex, extendSelection) {
-    const clamped = System32.Math.max(0, System32.Math.min(this.#value.length, newIndex));
+    const clamped = System33.Math.max(0, System33.Math.min(this.#value.length, newIndex));
     this.#cursorIndex = clamped;
     if (!extendSelection) this.#selectionStart = clamped;
     this.refreshTexts();
@@ -20173,8 +20907,8 @@ var UIInputField = class extends WorldNode {
   getSelectionRange() {
     if (!this.hasSelection()) return null;
     return {
-      start: System32.Math.min(this.#cursorIndex, this.#selectionStart),
-      end: System32.Math.max(this.#cursorIndex, this.#selectionStart)
+      start: System33.Math.min(this.#cursorIndex, this.#selectionStart),
+      end: System33.Math.max(this.#cursorIndex, this.#selectionStart)
     };
   }
   getSelectionText() {
@@ -20216,8 +20950,8 @@ var UIInputField = class extends WorldNode {
   }
   writeClipboard(text) {
     try {
-      if (System32.navigator && System32.navigator.clipboard) {
-        System32.navigator.clipboard.writeText(text).catch(() => {
+      if (System33.navigator && System33.navigator.clipboard) {
+        System33.navigator.clipboard.writeText(text).catch(() => {
         });
       }
     } catch (error) {
@@ -20225,12 +20959,12 @@ var UIInputField = class extends WorldNode {
   }
   readClipboard() {
     try {
-      if (System32.navigator && System32.navigator.clipboard) {
-        return System32.navigator.clipboard.readText();
+      if (System33.navigator && System33.navigator.clipboard) {
+        return System33.navigator.clipboard.readText();
       }
     } catch (error) {
     }
-    return System32.Promise.resolve("");
+    return System33.Promise.resolve("");
   }
   //==============================================================================
   // 컨텍스트 메뉴 (우클릭).
@@ -20264,7 +20998,7 @@ var UIInputField = class extends WorldNode {
   }
   showContextMenu(clientX, clientY) {
     this.hideContextMenu();
-    const doc = System32.document;
+    const doc = System33.document;
     const menu = doc.createElement("div");
     menu.style.position = "absolute";
     menu.style.left = `${clientX}px`;
@@ -20314,7 +21048,7 @@ var UIInputField = class extends WorldNode {
     }
     doc.body.appendChild(menu);
     this.#contextMenuElement = menu;
-    System32.setTimeout(() => {
+    System33.setTimeout(() => {
       const dismissHandler = /* @__PURE__ */ __name((event) => {
         if (this.#contextMenuElement && !this.#contextMenuElement.contains(event.target)) {
           this.hideContextMenu();
@@ -20335,7 +21069,7 @@ var UIInputField = class extends WorldNode {
       this.#contextMenuElement = null;
     }
     if (this.#contextMenuDismissHandler) {
-      System32.document.removeEventListener("pointerdown", this.#contextMenuDismissHandler, true);
+      System33.document.removeEventListener("pointerdown", this.#contextMenuDismissHandler, true);
       this.#contextMenuDismissHandler = null;
     }
   }
@@ -20358,8 +21092,8 @@ var BackgroundLayerRenderer = class extends Component {
       graphic.pushState();
       const fontFamily = state.fontFace ? state.fontFace.family : SYSTEM_FONT_STRING;
       graphic.setFontString(`${state.fontSize}px ${fontFamily}`);
-      const selStart = System32.Math.min(state.selectionStart, state.cursorIndex);
-      const selEnd = System32.Math.max(state.selectionStart, state.cursorIndex);
+      const selStart = System33.Math.min(state.selectionStart, state.cursorIndex);
+      const selEnd = System33.Math.max(state.selectionStart, state.cursorIndex);
       const startX = state.padding + graphic.measureText(state.value.slice(0, selStart)).width;
       const endX = state.padding + graphic.measureText(state.value.slice(0, selEnd)).width;
       const halfH = state.fontSize * 0.65;
@@ -20420,7 +21154,7 @@ var OverlayLayerRenderer = class extends Component {
       const y = inset;
       const rectW = contentSize.x - w;
       const rectH = contentSize.y - w;
-      const radius = System32.Math.max(0, state.bgRoundSize - inset);
+      const radius = System33.Math.max(0, state.bgRoundSize - inset);
       graphic.drawStrokeRoundRect(Rect.create(x, y, rectW, rectH), radius, w);
     }
     graphic.popState();
@@ -20430,7 +21164,7 @@ var offscreenMeasureCanvas = null;
 function getOffscreenMeasureContext() {
   if (!offscreenMeasureCanvas) {
     try {
-      offscreenMeasureCanvas = System32.document.createElement("canvas");
+      offscreenMeasureCanvas = System33.document.createElement("canvas");
     } catch (error) {
       return null;
     }
@@ -20805,13 +21539,13 @@ var UISlider = class extends UIControl {
 };
 
 // src/ui/uidocument.js
-var System33 = globalThis;
+var System34 = globalThis;
 var UIDOCUMENT_VERSION = 1;
 var NODE_TYPE_TABLE = {
   WorldNode
 };
 var NODE_REFERENCE_KEY = "$nodeRef";
-var REFLECTED_PROPERTY_EXCLUDE_NAMES = new System33.Set([
+var REFLECTED_PROPERTY_EXCLUDE_NAMES = new System34.Set([
   "Parent",
   "Node",
   "Owner",
@@ -20844,10 +21578,10 @@ var deserializeRootNode = null;
 var pendingNodeReferenceList = [];
 function collectReflectedProperties(targetObject) {
   const propertyList = [];
-  const visitedNameSet = new System33.Set();
-  let prototypeObject = System33.Object.getPrototypeOf(targetObject);
-  while (prototypeObject && prototypeObject !== System33.Object.prototype) {
-    for (const memberName of System33.Object.getOwnPropertyNames(prototypeObject)) {
+  const visitedNameSet = new System34.Set();
+  let prototypeObject = System34.Object.getPrototypeOf(targetObject);
+  while (prototypeObject && prototypeObject !== System34.Object.prototype) {
+    for (const memberName of System34.Object.getOwnPropertyNames(prototypeObject)) {
       let baseName = "";
       if (memberName.indexOf("get") === 0) {
         baseName = memberName.substring(3);
@@ -20869,7 +21603,7 @@ function collectReflectedProperties(targetObject) {
       visitedNameSet.add(baseName);
       propertyList.push({ name: baseName, getterName: memberName, setterName: "set" + baseName });
     }
-    prototypeObject = System33.Object.getPrototypeOf(prototypeObject);
+    prototypeObject = System34.Object.getPrototypeOf(prototypeObject);
   }
   return propertyList;
 }
@@ -21178,7 +21912,7 @@ var UIDocument = class _UIDocument extends Object2 {
     };
     const componentList = node.getAllComponents();
     const generatedTypeSet = _UIDocument.collectGeneratedComponentTypes(componentList);
-    const widgetContentNodeSet = new System33.Set();
+    const widgetContentNodeSet = new System34.Set();
     for (const component of componentList) {
       const componentTypeName = component.constructor.name;
       const propertyHandler = COMPONENT_PROPERTY_TABLE[componentTypeName];
@@ -21219,7 +21953,7 @@ var UIDocument = class _UIDocument extends Object2 {
    * @returns { Set<string> }
    */
   static collectGeneratedComponentTypes(componentList) {
-    const generatedTypeSet = new System33.Set();
+    const generatedTypeSet = new System34.Set();
     for (const component of componentList) {
       if (!(component instanceof UIView)) {
         continue;
@@ -21321,7 +22055,7 @@ var UIDocument = class _UIDocument extends Object2 {
       root: _UIDocument.serializeNode(rootNode)
     };
     deserializeRootNode = null;
-    const jsonText = isPretty ? System33.JSON.stringify(documentData, null, "	") : System33.JSON.stringify(documentData);
+    const jsonText = isPretty ? System34.JSON.stringify(documentData, null, "	") : System34.JSON.stringify(documentData);
     return jsonText;
   }
   //==============================================================================
@@ -21332,7 +22066,7 @@ var UIDocument = class _UIDocument extends Object2 {
    * @returns { WorldNode }
    */
   static fromJsonText(jsonText) {
-    const documentData = System33.JSON.parse(jsonText);
+    const documentData = System34.JSON.parse(jsonText);
     if (!documentData || !documentData.root) {
       throw new Error("UIDocument: invalid document.");
     }
@@ -21354,7 +22088,7 @@ var UIDocument = class _UIDocument extends Object2 {
    * @returns { string[] }
    */
   static getComponentTypeNames() {
-    const typeNames = System33.Object.keys(COMPONENT_TYPE_TABLE);
+    const typeNames = System34.Object.keys(COMPONENT_TYPE_TABLE);
     return typeNames;
   }
   //==============================================================================
@@ -21400,7 +22134,7 @@ var UIDocument = class _UIDocument extends Object2 {
    * @param { object } componentData
    */
   static loadNodeReferences(component, componentData) {
-    for (const propertyName of System33.Object.keys(componentData)) {
+    for (const propertyName of System34.Object.keys(componentData)) {
       const storedValue = componentData[propertyName];
       if (!storedValue || typeof storedValue !== "object" || storedValue[NODE_REFERENCE_KEY] === void 0) {
         continue;
@@ -21560,7 +22294,7 @@ var UIDocument = class _UIDocument extends Object2 {
         });
         continue;
       }
-      if (System33.Array.isArray(storedValue)) {
+      if (System34.Array.isArray(storedValue)) {
         if (currentValue instanceof Color && storedValue.length === 4) {
           component[property.setterName](arrayToColor(storedValue));
         } else if (currentValue instanceof Vector2 && storedValue.length === 2) {
@@ -21576,7 +22310,7 @@ var UIDocument = class _UIDocument extends Object2 {
 };
 
 // src/ui/uisnapscrollview.js
-var System34 = globalThis;
+var System35 = globalThis;
 var UISnapScrollView = class extends UIScrollView {
   static {
     __name(this, "UISnapScrollView");
@@ -21709,8 +22443,8 @@ var UISnapScrollView = class extends UIScrollView {
     const snapOffsets = this.computeSnapOffsets();
     const snapCurrentIndex = this.getSnapCurrentIndex();
     const maxIndex = children.length - 1;
-    const prevIndex = System34.Math.max(0, snapCurrentIndex - 1);
-    const nextIndex = System34.Math.min(maxIndex, snapCurrentIndex + 1);
+    const prevIndex = System35.Math.max(0, snapCurrentIndex - 1);
+    const nextIndex = System35.Math.min(maxIndex, snapCurrentIndex + 1);
     const isHorizontal = this.isHorizontal();
     const currentOffset = this.getScrollOffset();
     if (isHorizontal) {
@@ -21791,7 +22525,7 @@ var UISnapScrollView = class extends UIScrollView {
       const candidateChildContentSize = candidateChild.getContentSize();
       const targetItemSize = isHorizontal ? candidateChildContentSize.x : candidateChildContentSize.y;
       const pageChangeThreshold = this.getPageChangeThreshold();
-      if (System34.Math.abs(dragAmount) >= targetItemSize * pageChangeThreshold) {
+      if (System35.Math.abs(dragAmount) >= targetItemSize * pageChangeThreshold) {
         targetIndex = candidateIndex;
       } else {
         targetIndex = snapCurrentIndex;
@@ -21896,7 +22630,8 @@ var UISnapScrollView = class extends UIScrollView {
 };
 
 // src/resource/animationclip.js
-var AnimationClip = class extends Object2 {
+var System36 = globalThis;
+var AnimationClip = class _AnimationClip extends Object2 {
   static {
     __name(this, "AnimationClip");
   }
@@ -21927,6 +22662,42 @@ var AnimationClip = class extends Object2 {
   /**
    * @param { Frame[] } frames
    */
+  //==============================================================================
+  // 아틀라스 JSON 으로 클립 생성. (정적)
+  // - TexturePacker 형식({ frames: { 이름: { frame: {x,y,w,h} } } })과
+  //   배열 형식([{x,y,w,h}, ...]) 둘 다 받는다.
+  // - frameIds 순서대로 프레임을 뽑아 duration = frameCount / fps 로 만든다.
+  //==============================================================================
+  /**
+   * @param { object } atlasJson
+   * @param { string[] | number[] } frameIds
+   * @param { number } fps
+   * @param { boolean } isLoop
+   * @returns { AnimationClip }
+   */
+  static fromAtlas(atlasJson, frameIds, fps = 10, isLoop = true) {
+    const clip = new _AnimationClip();
+    const frameRects = [];
+    for (const frameId of frameIds) {
+      let frameData = null;
+      if (System36.Array.isArray(atlasJson)) {
+        frameData = atlasJson[frameId];
+      } else if (atlasJson && atlasJson.frames) {
+        frameData = atlasJson.frames[frameId];
+      }
+      if (!frameData) {
+        continue;
+      }
+      const rectData = frameData.frame ? frameData.frame : frameData;
+      const width = rectData.w !== void 0 ? rectData.w : rectData.width;
+      const height = rectData.h !== void 0 ? rectData.h : rectData.height;
+      frameRects.push(Rect.create(rectData.x, rectData.y, width, height));
+    }
+    clip.setFrames(frameRects);
+    clip.setLoop(isLoop);
+    clip.setDuration(fps > 0 ? frameRects.length / fps : 0);
+    return clip;
+  }
   setFrames(frames) {
     this.#frames = frames;
   }
@@ -21997,7 +22768,7 @@ var AnimationClip = class extends Object2 {
 };
 
 // src/resource/blobasset.js
-var System35 = globalThis;
+var System37 = globalThis;
 var BlobAsset = class extends Asset {
   static {
     __name(this, "BlobAsset");
@@ -22028,7 +22799,7 @@ var BlobAsset = class extends Asset {
       return Promise.resolve();
     }
     await super.load(assetPath);
-    const response = await System35.fetch(assetPath);
+    const response = await System37.fetch(assetPath);
     this.#blob = await response.blob();
     this.setLoaded(true);
   }
@@ -22044,7 +22815,7 @@ var BlobAsset = class extends Asset {
 };
 
 // src/resource/textasset.js
-var System36 = globalThis;
+var System38 = globalThis;
 var TextAsset = class extends Asset {
   static {
     __name(this, "TextAsset");
@@ -22063,6 +22834,26 @@ var TextAsset = class extends Asset {
     this.text = "";
   }
   //==============================================================================
+  // 캐시 무효화 로드 여부 설정.
+  // - 참이면 fetch 에 cache: "no-cache" 를 붙여, 배포 뒤 브라우저가 옛 데이터를
+  //   계속 쓰는 문제를 막는다. (데이터 테이블 JSON 등)
+  //==============================================================================
+  /**
+   * @param { boolean } isNoCache
+   */
+  setNoCache(isNoCache) {
+    this.__isNoCache = isNoCache;
+  }
+  //==============================================================================
+  // 캐시 무효화 로드 여부 반환.
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  isNoCache() {
+    return this.__isNoCache === true;
+  }
+  //==============================================================================
   // 비동기 애셋 로드.
   //==============================================================================
   /**
@@ -22072,11 +22863,11 @@ var TextAsset = class extends Asset {
   async load(assetPath) {
     const isLoaded = this.isLoaded();
     if (isLoaded) {
-      return System36.Promise.resolve();
+      return System38.Promise.resolve();
     }
     try {
       await super.load(assetPath);
-      const response = await System36.fetch(assetPath);
+      const response = await System38.fetch(assetPath, this.isNoCache() ? { cache: "no-cache" } : void 0);
       this.text = await response.text();
       this.setLoaded(true);
     } catch (error) {
@@ -22097,7 +22888,7 @@ var TextAsset = class extends Asset {
 };
 
 // src/resource/jsonasset.js
-var System37 = globalThis;
+var System39 = globalThis;
 var JsonAsset = class extends TextAsset {
   static {
     __name(this, "JsonAsset");
@@ -22125,7 +22916,7 @@ var JsonAsset = class extends TextAsset {
   async load(assetPath) {
     const isLoaded = this.isLoaded();
     if (isLoaded) {
-      return System37.Promise.resolve();
+      return System39.Promise.resolve();
     }
     try {
       await super.load(assetPath);
@@ -22315,12 +23106,12 @@ var ImageScroller = class extends Object2 {
 };
 
 // src/misc/toucheffect.js
-var System38 = globalThis;
+var System40 = globalThis;
 var PARTICLE_GRADIENT_CANVAS_SIZE = 64;
 var particleGradientCanvas = null;
 function getParticleGradientCanvas() {
   if (particleGradientCanvas === null) {
-    const canvas = System38.document.createElement("canvas");
+    const canvas = System40.document.createElement("canvas");
     canvas.width = PARTICLE_GRADIENT_CANVAS_SIZE;
     canvas.height = PARTICLE_GRADIENT_CANVAS_SIZE;
     const canvasRenderingContext = canvas.getContext("2d");
@@ -22808,6 +23599,35 @@ var NodeLayout = class _NodeLayout extends Object2 {
    * @param { Function } [nodeClass]
    * @returns { NodeLayout }
    */
+  //==============================================================================
+  // 부채꼴 배치. (정적 — 손패 카드처럼 노드들을 호 위에 펼친다)
+  // - 가운데 항목이 baseAngleRadian 방향(기본 위쪽)을 보도록 좌우 대칭으로 벌린다.
+  // - rotateNodes 가 참이면 각 노드의 회전도 호의 접선에 맞춘다.
+  //==============================================================================
+  /**
+   * @param { WorldNode[] } nodeList
+   * @param { object } options { centerX, centerY, radius, angleStepRadian = 0.12, baseAngleRadian = -PI/2, rotateNodes = true }
+   */
+  static arrangeFan(nodeList, options) {
+    const count = nodeList.length;
+    if (count === 0) {
+      return;
+    }
+    const angleStepRadian = options.angleStepRadian !== void 0 ? options.angleStepRadian : 0.12;
+    const baseAngleRadian = options.baseAngleRadian !== void 0 ? options.baseAngleRadian : -System.Math.PI / 2;
+    const rotateNodes = options.rotateNodes !== void 0 ? options.rotateNodes : true;
+    const middleIndex = (count - 1) / 2;
+    for (let index = 0; index < count; ++index) {
+      const node = nodeList[index];
+      const angleRadian = baseAngleRadian + (index - middleIndex) * angleStepRadian;
+      const positionX = options.centerX + System.Math.cos(angleRadian) * options.radius;
+      const positionY = options.centerY + System.Math.sin(angleRadian) * options.radius;
+      node.setLocalPosition(Vector2.create(positionX, positionY));
+      if (rotateNodes) {
+        node.setLocalRotation(angleRadian - baseAngleRadian);
+      }
+    }
+  }
   static create(nodeClass) {
     const nodeLayout = new _NodeLayout(nodeClass);
     return nodeLayout;
@@ -23476,7 +24296,7 @@ var Stack = class extends Object2 {
 };
 
 // src/experimental/collection/set.js
-var System39 = globalThis;
+var System41 = globalThis;
 var Set2 = class _Set extends Object2 {
   static {
     __name(this, "Set");
@@ -23494,7 +24314,7 @@ var Set2 = class _Set extends Object2 {
    */
   constructor() {
     super();
-    this.#items = new System39.Set();
+    this.#items = new System41.Set();
   }
   //==============================================================================
   // 데이터 추가.
@@ -24173,7 +24993,7 @@ var FullscreenPass = class extends Object2 {
 };
 
 // src/experimental/graphics/bloomeffect.js
-var System40 = globalThis;
+var System42 = globalThis;
 var BRIGHTPASS_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -24253,8 +25073,8 @@ var BloomEffect = class extends Object2 {
    * @param { number } sceneHeight
    */
   resize(sceneWidth, sceneHeight) {
-    const halfWidth = System40.Math.max(1, sceneWidth >> 1);
-    const halfHeight = System40.Math.max(1, sceneHeight >> 1);
+    const halfWidth = System42.Math.max(1, sceneWidth >> 1);
+    const halfHeight = System42.Math.max(1, sceneHeight >> 1);
     this.#pingRenderTarget.resize(halfWidth, halfHeight);
     this.#pongRenderTarget.resize(halfWidth, halfHeight);
   }
@@ -24400,7 +25220,7 @@ var BloomEffect = class extends Object2 {
 };
 
 // src/experimental/graphics/fbxloader.js
-var System41 = globalThis;
+var System43 = globalThis;
 var FBX_TIME_UNIT = 46186158e3;
 var FbxLoader = class _FbxLoader extends Object2 {
   static {
@@ -24429,7 +25249,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     super();
     this.#dataView = null;
     this.#fileBytes = null;
-    this.#textDecoder = new System41.TextDecoder();
+    this.#textDecoder = new System43.TextDecoder();
     this.#readCursor = 0;
     this.#useWideOffsets = false;
   }
@@ -24441,7 +25261,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Promise<object> }
    */
   static async loadFromUrl(url) {
-    const response = await System41.fetch(url);
+    const response = await System43.fetch(url);
     if (!response.ok) {
       throw new Error(`FbxLoader load failed: ${url}`);
     }
@@ -24458,8 +25278,8 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Promise<object> }
    */
   async parse(arrayBuffer) {
-    this.#fileBytes = new System41.Uint8Array(arrayBuffer);
-    this.#dataView = new System41.DataView(arrayBuffer);
+    this.#fileBytes = new System43.Uint8Array(arrayBuffer);
+    this.#dataView = new System43.DataView(arrayBuffer);
     const magicText = this.#textDecoder.decode(this.#fileBytes.subarray(0, 20));
     if (!magicText.startsWith("Kaydara FBX Binary")) {
       throw new Error("FbxLoader: not a binary FBX file.");
@@ -24487,7 +25307,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
   readOffsetValue() {
     const dataView = this.getDataView();
     if (this.#useWideOffsets) {
-      const value2 = System41.Number(dataView.getBigUint64(this.#readCursor, true));
+      const value2 = System43.Number(dataView.getBigUint64(this.#readCursor, true));
       this.#readCursor += 8;
       return value2;
     }
@@ -24556,8 +25376,8 @@ var FbxLoader = class _FbxLoader extends Object2 {
       sourceBytes = fileBytes.subarray(this.#readCursor, this.#readCursor + rawByteLength);
       this.#readCursor += rawByteLength;
     }
-    const elementView = new System41.DataView(sourceBytes.buffer, sourceBytes.byteOffset, sourceBytes.byteLength);
-    const resultArray = new System41.Array(arrayLength);
+    const elementView = new System43.DataView(sourceBytes.buffer, sourceBytes.byteOffset, sourceBytes.byteLength);
+    const resultArray = new System43.Array(arrayLength);
     for (let elementIndex = 0; elementIndex < arrayLength; ++elementIndex) {
       resultArray[elementIndex] = readElement(elementView, elementIndex * elementByteSize);
     }
@@ -24571,12 +25391,12 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Promise<Uint8Array> }
    */
   async inflate(compressedBytes) {
-    const decompressionStream = new System41.DecompressionStream("deflate");
-    const sourceResponse = new System41.Response(compressedBytes);
+    const decompressionStream = new System43.DecompressionStream("deflate");
+    const sourceResponse = new System43.Response(compressedBytes);
     const decompressedStream = sourceResponse.body.pipeThrough(decompressionStream);
-    const decompressedResponse = new System41.Response(decompressedStream);
+    const decompressedResponse = new System43.Response(decompressedStream);
     const decompressedArrayBuffer = await decompressedResponse.arrayBuffer();
-    const decompressedBytes = new System41.Uint8Array(decompressedArrayBuffer);
+    const decompressedBytes = new System43.Uint8Array(decompressedArrayBuffer);
     return decompressedBytes;
   }
   //==============================================================================
@@ -24589,7 +25409,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     const dataView = this.getDataView();
     const fileBytes = this.getFileBytes();
     const textDecoder = this.getTextDecoder();
-    const typeCode = System41.String.fromCharCode(dataView.getUint8(this.#readCursor));
+    const typeCode = System43.String.fromCharCode(dataView.getUint8(this.#readCursor));
     this.#readCursor += 1;
     switch (typeCode) {
       case "Y": {
@@ -24618,7 +25438,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         return { type: typeCode, value };
       }
       case "L": {
-        const value = System41.Number(dataView.getBigInt64(this.#readCursor, true));
+        const value = System43.Number(dataView.getBigInt64(this.#readCursor, true));
         this.#readCursor += 8;
         return { type: typeCode, value };
       }
@@ -24631,7 +25451,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         return { type: typeCode, value };
       }
       case "l": {
-        const value = await this.readArrayProperty(8, (view, offset) => System41.Number(view.getBigInt64(offset, true)));
+        const value = await this.readArrayProperty(8, (view, offset) => System43.Number(view.getBigInt64(offset, true)));
         return { type: typeCode, value };
       }
       case "i": {
@@ -24684,7 +25504,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         propertyConnectionList.push({ sourceId, destinationId, propertyName });
       }
     }
-    const objectById = new System41.Map();
+    const objectById = new System43.Map();
     for (const objectNode of objectsNode.children) {
       const objectId = objectNode.properties[0].value;
       objectById.set(objectId, objectNode);
@@ -24718,7 +25538,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Map<number, object> }
    */
   interpretGeometries(objectsNode) {
-    const geometryById = new System41.Map();
+    const geometryById = new System43.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Geometry") {
         continue;
@@ -24772,11 +25592,11 @@ var FbxLoader = class _FbxLoader extends Object2 {
     const uvReader = this.buildLayerReader(geometryNode, "LayerElementUV", "UV", 2);
     const materialLayer = this.buildMaterialLayer(geometryNode);
     const triangleCount = cornerVertexIndices.length / 3;
-    const outputPositions = new System41.Float32Array(cornerVertexIndices.length * 3);
-    const outputNormals = new System41.Float32Array(cornerVertexIndices.length * 3);
-    const outputTextureCoordinates = new System41.Float32Array(cornerVertexIndices.length * 2);
-    const outputOriginalVertexIndices = new System41.Int32Array(cornerVertexIndices.length);
-    const materialIndexPerTriangle = new System41.Int32Array(triangleCount);
+    const outputPositions = new System43.Float32Array(cornerVertexIndices.length * 3);
+    const outputNormals = new System43.Float32Array(cornerVertexIndices.length * 3);
+    const outputTextureCoordinates = new System43.Float32Array(cornerVertexIndices.length * 2);
+    const outputOriginalVertexIndices = new System43.Int32Array(cornerVertexIndices.length);
+    const materialIndexPerTriangle = new System43.Int32Array(triangleCount);
     for (let cornerIndex = 0; cornerIndex < cornerVertexIndices.length; ++cornerIndex) {
       const originalVertexIndex = cornerVertexIndices[cornerIndex];
       const polygonVertexPosition = cornerPolygonVertexPositions[cornerIndex];
@@ -24821,7 +25641,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     const layerNode = geometryNode.children.find((child) => child.name === layerElementName);
     if (!layerNode) {
       return () => {
-        const zeroVector = new System41.Array(componentCount).fill(0);
+        const zeroVector = new System43.Array(componentCount).fill(0);
         return zeroVector;
       };
     }
@@ -24846,7 +25666,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
       if (referenceType === "IndexToDirect" && indexArray) {
         dataIndex = indexArray[mappedIndex];
       }
-      const componentValues = new System41.Array(componentCount);
+      const componentValues = new System43.Array(componentCount);
       for (let componentIndex = 0; componentIndex < componentCount; ++componentIndex) {
         componentValues[componentIndex] = dataArray[dataIndex * componentCount + componentIndex];
       }
@@ -24887,8 +25707,8 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { object }
    */
   interpretSkins(objectsNode, objectConnectionList) {
-    const skinDeformerById = new System41.Map();
-    const clusterById = new System41.Map();
+    const skinDeformerById = new System43.Map();
+    const clusterById = new System43.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Deformer") {
         continue;
@@ -24932,7 +25752,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Map<number, object> }
    */
   interpretVideos(objectsNode) {
-    const videoById = new System41.Map();
+    const videoById = new System43.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Video") {
         continue;
@@ -24946,7 +25766,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
       };
       videoById.set(videoId, video);
     }
-    const contentByFileName = new System41.Map();
+    const contentByFileName = new System43.Map();
     for (const video of videoById.values()) {
       if (!video.contentBytes || video.contentBytes.length === 0) {
         continue;
@@ -24990,7 +25810,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Map<number, object> }
    */
   interpretTextures(objectsNode, objectConnectionList) {
-    const textureById = new System41.Map();
+    const textureById = new System43.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Texture") {
         continue;
@@ -25021,7 +25841,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Map<number, object> }
    */
   interpretMaterials(objectsNode, propertyConnectionList, textureById) {
-    const materialById = new System41.Map();
+    const materialById = new System43.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Material") {
         continue;
@@ -25085,7 +25905,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    */
   interpretModels(objectsNode, objectConnectionList, geometryById, skinDeformerById, materialById) {
     const nodeList = [];
-    const nodeIdToIndex = new System41.Map();
+    const nodeIdToIndex = new System43.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Model") {
         continue;
@@ -25170,10 +25990,10 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { object[] }
    */
   interpretAnimations(objectsNode, objectConnectionList, propertyConnectionList, nodeIdToIndex) {
-    const curveById = new System41.Map();
-    const curveNodeById = new System41.Map();
+    const curveById = new System43.Map();
+    const curveNodeById = new System43.Map();
     const layerIds = [];
-    const stackById = new System41.Map();
+    const stackById = new System43.Map();
     for (const objectNode of objectsNode.children) {
       const objectId = objectNode.properties[0].value;
       if (objectNode.name === "AnimationCurve") {
@@ -25202,7 +26022,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         curveNode.targetProperty = connection.propertyName;
       }
     }
-    const layerIdByCurveNodeId = new System41.Map();
+    const layerIdByCurveNodeId = new System43.Map();
     for (const connection of objectConnectionList) {
       if (layerIds.includes(connection.sourceId) && stackById.has(connection.destinationId)) {
         const stack = stackById.get(connection.destinationId);
@@ -25226,7 +26046,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         const channelResult = this.buildAnimationChannel(curveNode, curveById, nodeIdToIndex);
         if (channelResult) {
           channelList.push(channelResult.channel);
-          duration = System41.Math.max(duration, channelResult.duration);
+          duration = System43.Math.max(duration, channelResult.duration);
         }
       }
       animationList.push({ name: stack.name, duration, channels: channelList });
@@ -25255,7 +26075,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
       return null;
     }
     const channelNames = ["X", "Y", "Z"];
-    const timeSet = new System41.Set();
+    const timeSet = new System43.Set();
     for (const channelName of channelNames) {
       const curveId = curveNode.curveByChannel[channelName];
       if (curveId === void 0) {
@@ -25266,13 +26086,13 @@ var FbxLoader = class _FbxLoader extends Object2 {
         timeSet.add(keyTime);
       }
     }
-    const sortedTimes = System41.Array.from(timeSet).sort((left, right) => left - right);
+    const sortedTimes = System43.Array.from(timeSet).sort((left, right) => left - right);
     if (sortedTimes.length === 0) {
       return null;
     }
     const componentCount = path === "rotation" ? 3 : 3;
-    const times = new System41.Float32Array(sortedTimes.length);
-    const values = new System41.Float32Array(sortedTimes.length * componentCount);
+    const times = new System43.Float32Array(sortedTimes.length);
+    const values = new System43.Float32Array(sortedTimes.length * componentCount);
     for (let timeIndex = 0; timeIndex < sortedTimes.length; ++timeIndex) {
       times[timeIndex] = sortedTimes[timeIndex] / FBX_TIME_UNIT;
       for (let channelIndex = 0; channelIndex < 3; ++channelIndex) {
@@ -25355,7 +26175,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
 };
 
 // src/experimental/graphics/material.js
-var System42 = globalThis;
+var System44 = globalThis;
 var TEXTURE_UNIT_BASECOLOR = 0;
 var TEXTURE_UNIT_NORMAL = 2;
 var TEXTURE_UNIT_METALLICROUGHNESS = 3;
@@ -25493,13 +26313,13 @@ var Material = class _Material extends Object2 {
     const glTexture = webGL2RenderingContext.createTexture();
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, glTexture);
     if (!imageDescription || !imageDescription.bytes || imageDescription.bytes.length === 0) {
-      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System42.Uint8Array(fallbackColor));
+      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System44.Uint8Array(fallbackColor));
       return glTexture;
     }
     const blobOptions = imageDescription.mimeType ? { type: imageDescription.mimeType } : {};
-    const imageBlob = new System42.Blob([imageDescription.bytes], blobOptions);
+    const imageBlob = new System44.Blob([imageDescription.bytes], blobOptions);
     const bitmapOptions = imageDescription.flipY ? { imageOrientation: "flipY" } : {};
-    const imageBitmap = await System42.createImageBitmap(imageBlob, bitmapOptions);
+    const imageBitmap = await System44.createImageBitmap(imageBlob, bitmapOptions);
     webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, imageBitmap);
     webGL2RenderingContext.generateMipmap(webGL2RenderingContext.TEXTURE_2D);
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR_MIPMAP_LINEAR);
@@ -25635,14 +26455,14 @@ var Material = class _Material extends Object2 {
 };
 
 // src/experimental/graphics/skinnedmodel.js
-var System43 = globalThis;
+var System45 = globalThis;
 var GLB_CHUNKTYPE_JSON = 1313821514;
 var GLB_CHUNKTYPE_BINARY = 5130562;
 var COMPONENT_ARRAY_TABLE = {
-  5121: System43.Uint8Array,
-  5123: System43.Uint16Array,
-  5125: System43.Uint32Array,
-  5126: System43.Float32Array
+  5121: System45.Uint8Array,
+  5123: System45.Uint16Array,
+  5125: System45.Uint32Array,
+  5126: System45.Float32Array
 };
 var TYPE_COMPONENT_COUNT_TABLE = {
   SCALAR: 1,
@@ -25652,7 +26472,7 @@ var TYPE_COMPONENT_COUNT_TABLE = {
   MAT4: 16
 };
 function createQuaternionFromFbxEuler(xDegree, yDegree, zDegree) {
-  const degreeToRadian2 = System43.Math.PI / 180;
+  const degreeToRadian2 = System45.Math.PI / 180;
   const rotationX = Quaternion.createFromEuler(xDegree * degreeToRadian2, 0, 0);
   const rotationY = Quaternion.createFromEuler(0, yDegree * degreeToRadian2, 0);
   const rotationZ = Quaternion.createFromEuler(0, 0, zDegree * degreeToRadian2);
@@ -25672,7 +26492,7 @@ function convertFbxAnimationChannels(sceneData, fbxAnimation, resolveNodeIndex) 
       const sourceFbxNode = sceneData.nodeList[fbxChannel.nodeIndex];
       const preRotationQuaternion = createQuaternionFromFbxEuler(sourceFbxNode.preRotationDegrees[0], sourceFbxNode.preRotationDegrees[1], sourceFbxNode.preRotationDegrees[2]);
       const keyCount = fbxChannel.times.length;
-      const quaternionValues = new System43.Float32Array(keyCount * 4);
+      const quaternionValues = new System45.Float32Array(keyCount * 4);
       for (let keyIndex = 0; keyIndex < keyCount; ++keyIndex) {
         const eulerQuaternion = createQuaternionFromFbxEuler(fbxChannel.values[keyIndex * 3], fbxChannel.values[keyIndex * 3 + 1], fbxChannel.values[keyIndex * 3 + 2]);
         const rotationQuaternion = preRotationQuaternion.multiply(eulerQuaternion);
@@ -25750,7 +26570,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     this.#fadeDuration = 0;
     this.#fadeElapsed = 0;
     this.#timeScale = 1;
-    this.#jointRotationOffsets = new System43.Map();
+    this.#jointRotationOffsets = new System45.Map();
   }
   //==============================================================================
   // URL 로부터 로드. (정적 — GLB 바이너리 glTF)
@@ -25762,7 +26582,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    * @returns { Promise<SkinnedModel> }
    */
   static async loadFromUrl(webGL2RenderingContext, url, skinnedModelRenderer) {
-    const response = await System43.fetch(url);
+    const response = await System45.fetch(url);
     if (!response.ok) {
       throw new Error(`SkinnedModel load failed: ${url}`);
     }
@@ -25795,7 +26615,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    * @param { ArrayBuffer } arrayBuffer
    */
   async parseBinary(arrayBuffer) {
-    const dataView = new System43.DataView(arrayBuffer);
+    const dataView = new System45.DataView(arrayBuffer);
     if (dataView.getUint32(0, true) !== 1179937895) {
       throw new Error("SkinnedModel: not a GLB file.");
     }
@@ -25807,9 +26627,9 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       const chunkType = dataView.getUint32(chunkOffset + 4, true);
       const chunkStart = chunkOffset + 8;
       if (chunkType === GLB_CHUNKTYPE_JSON) {
-        const jsonBytes = new System43.Uint8Array(arrayBuffer, chunkStart, chunkLength);
-        const jsonText = new System43.TextDecoder().decode(jsonBytes);
-        json = System43.JSON.parse(jsonText);
+        const jsonBytes = new System45.Uint8Array(arrayBuffer, chunkStart, chunkLength);
+        const jsonText = new System45.TextDecoder().decode(jsonBytes);
+        json = System45.JSON.parse(jsonText);
       } else if (chunkType === GLB_CHUNKTYPE_BINARY) {
         binaryBuffer = arrayBuffer.slice(chunkStart, chunkStart + chunkLength);
       }
@@ -25879,7 +26699,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return {
         jointNodeIndices: skin.joints.slice(),
         inverseBindMatrices,
-        jointMatrixArray: new System43.Float32Array(skin.joints.length * 16)
+        jointMatrixArray: new System45.Float32Array(skin.joints.length * 16)
       };
     });
     function createImageDescription(textureInfo) {
@@ -25889,7 +26709,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       const texture = json.textures[textureInfo.index];
       const image = json.images[texture.source];
       const bufferView = json.bufferViews[image.bufferView];
-      const imageBytes = new System43.Uint8Array(binaryBuffer, bufferView.byteOffset || 0, bufferView.byteLength);
+      const imageBytes = new System45.Uint8Array(binaryBuffer, bufferView.byteOffset || 0, bufferView.byteLength);
       return { bytes: imageBytes, mimeType: image.mimeType, flipY: false };
     }
     __name(createImageDescription, "createImageDescription");
@@ -25920,13 +26740,13 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       }
       const mesh = json.meshes[node.meshIndex];
       for (const primitive of mesh.primitives) {
-        const positions = new System43.Float32Array(readAccessorArray(primitive.attributes.POSITION));
-        const normals = primitive.attributes.NORMAL !== void 0 ? new System43.Float32Array(readAccessorArray(primitive.attributes.NORMAL)) : null;
-        const textureCoordinates = primitive.attributes.TEXCOORD_0 !== void 0 ? new System43.Float32Array(readAccessorArray(primitive.attributes.TEXCOORD_0)) : null;
-        const joints = new System43.Uint16Array(readAccessorArray(primitive.attributes.JOINTS_0));
+        const positions = new System45.Float32Array(readAccessorArray(primitive.attributes.POSITION));
+        const normals = primitive.attributes.NORMAL !== void 0 ? new System45.Float32Array(readAccessorArray(primitive.attributes.NORMAL)) : null;
+        const textureCoordinates = primitive.attributes.TEXCOORD_0 !== void 0 ? new System45.Float32Array(readAccessorArray(primitive.attributes.TEXCOORD_0)) : null;
+        const joints = new System45.Uint16Array(readAccessorArray(primitive.attributes.JOINTS_0));
         const weightAccessor = json.accessors[primitive.attributes.WEIGHTS_0];
         const weightSource = readAccessorArray(primitive.attributes.WEIGHTS_0);
-        const weights = new System43.Float32Array(weightSource.length);
+        const weights = new System45.Float32Array(weightSource.length);
         if (weightAccessor.componentType === 5126) {
           weights.set(weightSource);
         } else {
@@ -25938,7 +26758,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         let indices = null;
         if (primitive.indices !== void 0) {
           const indexSource = readAccessorArray(primitive.indices);
-          indices = indexSource instanceof System43.Uint8Array ? new System43.Uint16Array(indexSource) : indexSource;
+          indices = indexSource instanceof System45.Uint8Array ? new System45.Uint16Array(indexSource) : indexSource;
         }
         meshDescriptionList.push({
           positions,
@@ -25960,7 +26780,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         const times = readAccessorArray(sampler.input);
         const values = readAccessorArray(sampler.output);
         if (times.length > 0) {
-          duration = System43.Math.max(duration, times[times.length - 1]);
+          duration = System45.Math.max(duration, times[times.length - 1]);
         }
         return {
           nodeIndex: channel.target.node,
@@ -26002,7 +26822,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       };
     });
     this.#rootNodeIndices = sceneData.rootNodeIndices.slice();
-    const skinIdList = System43.Array.from(sceneData.skinDeformerById.keys());
+    const skinIdList = System45.Array.from(sceneData.skinDeformerById.keys());
     this.#skinList = skinIdList.map((skinId) => {
       const skinDeformer = sceneData.skinDeformerById.get(skinId);
       const jointNodeIndices = [];
@@ -26027,7 +26847,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return {
         jointNodeIndices,
         inverseBindMatrices,
-        jointMatrixArray: new System43.Float32Array(jointNodeIndices.length * 16)
+        jointMatrixArray: new System45.Float32Array(jointNodeIndices.length * 16)
       };
     });
     function createFbxImageDescription(textureId) {
@@ -26045,7 +26865,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return { bytes: video.contentBytes, mimeType: null, flipY: true };
     }
     __name(createFbxImageDescription, "createFbxImageDescription");
-    const materialIdList = System43.Array.from(sceneData.materialById.keys());
+    const materialIdList = System45.Array.from(sceneData.materialById.keys());
     const materialDescriptionList = materialIdList.map((materialId) => {
       const fbxMaterial = sceneData.materialById.get(materialId);
       const description = Material.createDefaultDescription();
@@ -26073,7 +26893,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       if (!geometry) {
         continue;
       }
-      const influencesPerVertex = new System43.Array(geometry.originalVertexCount);
+      const influencesPerVertex = new System45.Array(geometry.originalVertexCount);
       for (let vertexIndex = 0; vertexIndex < geometry.originalVertexCount; ++vertexIndex) {
         influencesPerVertex[vertexIndex] = [];
       }
@@ -26085,13 +26905,13 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
           influencesPerVertex[vertexIndex].push({ jointIndex: clusterLocalIndex, weight });
         }
       }
-      const vertexJointArray = new System43.Uint16Array(geometry.originalVertexCount * 4);
-      const vertexWeightArray = new System43.Float32Array(geometry.originalVertexCount * 4);
+      const vertexJointArray = new System45.Uint16Array(geometry.originalVertexCount * 4);
+      const vertexWeightArray = new System45.Float32Array(geometry.originalVertexCount * 4);
       for (let vertexIndex = 0; vertexIndex < geometry.originalVertexCount; ++vertexIndex) {
         const influenceList = influencesPerVertex[vertexIndex];
         influenceList.sort((left, right) => right.weight - left.weight);
         let weightSum = 0;
-        const usedCount = System43.Math.min(4, influenceList.length);
+        const usedCount = System45.Math.min(4, influenceList.length);
         for (let slotIndex = 0; slotIndex < usedCount; ++slotIndex) {
           weightSum += influenceList[slotIndex].weight;
         }
@@ -26104,8 +26924,8 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         }
       }
       const cornerCount = geometry.cornerCount;
-      const cornerJointArray = new System43.Uint16Array(cornerCount * 4);
-      const cornerWeightArray = new System43.Float32Array(cornerCount * 4);
+      const cornerJointArray = new System45.Uint16Array(cornerCount * 4);
+      const cornerWeightArray = new System45.Float32Array(cornerCount * 4);
       for (let cornerIndex = 0; cornerIndex < cornerCount; ++cornerIndex) {
         const originalVertexIndex = geometry.originalVertexIndices[cornerIndex];
         for (let slotIndex = 0; slotIndex < 4; ++slotIndex) {
@@ -26151,7 +26971,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
   async addAnimationsFromFbxUrl(url, clipName, ignoreTranslation = false) {
     const sceneData = await FbxLoader.loadFromUrl(url);
     const nodeList = this.getNodeList();
-    const nodeIndexByName = new System43.Map();
+    const nodeIndexByName = new System45.Map();
     for (let nodeIndex = 0; nodeIndex < nodeList.length; ++nodeIndex) {
       nodeIndexByName.set(nodeList[nodeIndex].name, nodeIndex);
     }
@@ -26209,7 +27029,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
         webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, meshDescription.indices, webGL2RenderingContext.STATIC_DRAW);
         indexCount = meshDescription.indices.length;
-        indexComponentType = meshDescription.indices instanceof System43.Uint32Array ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
+        indexComponentType = meshDescription.indices instanceof System45.Uint32Array ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
       }
       webGL2RenderingContext.bindVertexArray(null);
       const material = meshDescription.materialIndex >= 0 && materialList[meshDescription.materialIndex] ? materialList[meshDescription.materialIndex] : defaultMaterial;
@@ -26234,7 +27054,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    * @returns { Float32Array }
    */
   generateSmoothNormals(positions, indices) {
-    const normals = new System43.Float32Array(positions.length);
+    const normals = new System45.Float32Array(positions.length);
     const triangleCount = indices ? indices.length / 3 : positions.length / 9;
     for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
       const indexA = (indices ? indices[triangleIndex * 3] : triangleIndex * 3) * 3;
@@ -26260,7 +27080,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       normals[indexC + 2] += faceNormalZ;
     }
     for (let vertexIndex = 0; vertexIndex < normals.length; vertexIndex += 3) {
-      const normalLength = System43.Math.sqrt(normals[vertexIndex] * normals[vertexIndex] + normals[vertexIndex + 1] * normals[vertexIndex + 1] + normals[vertexIndex + 2] * normals[vertexIndex + 2]);
+      const normalLength = System45.Math.sqrt(normals[vertexIndex] * normals[vertexIndex] + normals[vertexIndex + 1] * normals[vertexIndex + 1] + normals[vertexIndex + 2] * normals[vertexIndex + 2]);
       if (normalLength > 0) {
         normals[vertexIndex] /= normalLength;
         normals[vertexIndex + 1] /= normalLength;
@@ -26363,9 +27183,9 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         channel.cursor += 1;
       }
       const frameIndex = channel.cursor;
-      const nextIndex = System43.Math.min(frameIndex + 1, keyCount - 1);
+      const nextIndex = System45.Math.min(frameIndex + 1, keyCount - 1);
       const spanDuration = times[nextIndex] - times[frameIndex];
-      const factor = spanDuration > 0 ? System43.Math.max(0, System43.Math.min(1, (loopedTime - times[frameIndex]) / spanDuration)) : 0;
+      const factor = spanDuration > 0 ? System45.Math.max(0, System45.Math.min(1, (loopedTime - times[frameIndex]) / spanDuration)) : 0;
       if (channel.path === "rotation") {
         const baseOffset = frameIndex * 4;
         const nextOffset = nextIndex * 4;
@@ -26421,7 +27241,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     }
     if (this.#previousAnimation) {
       this.sampleAnimation(this.#previousAnimation, this.#previousTime, 1);
-      const blendWeight = System43.Math.min(this.#fadeElapsed / System43.Math.max(this.#fadeDuration, 1e-4), 1);
+      const blendWeight = System45.Math.min(this.#fadeElapsed / System45.Math.max(this.#fadeDuration, 1e-4), 1);
       this.sampleAnimation(currentAnimation, this.#currentTime, blendWeight);
     } else {
       this.sampleAnimation(currentAnimation, this.#currentTime, 1);
@@ -26965,7 +27785,7 @@ var SkinnedModelRenderer = class extends Object2 {
 };
 
 // src/experimental/graphics/shadowmap.js
-var System44 = globalThis;
+var System46 = globalThis;
 var ShadowMap = class extends Object2 {
   static {
     __name(this, "ShadowMap");
@@ -27033,8 +27853,8 @@ var ShadowMap = class extends Object2 {
     const viewMatrix = Matrix4.createLookAt(eyePosition, focusPosition, upDirection);
     const worldUnitsPerTexel = extent * 2 / this.getResolution();
     const viewElements = viewMatrix.getElements();
-    viewElements[12] = System44.Math.round(viewElements[12] / worldUnitsPerTexel) * worldUnitsPerTexel;
-    viewElements[13] = System44.Math.round(viewElements[13] / worldUnitsPerTexel) * worldUnitsPerTexel;
+    viewElements[12] = System46.Math.round(viewElements[12] / worldUnitsPerTexel) * worldUnitsPerTexel;
+    viewElements[13] = System46.Math.round(viewElements[13] / worldUnitsPerTexel) * worldUnitsPerTexel;
     const orthographicMatrix = Matrix4.createOrthographic(-extent, extent, -extent, extent, nearDistance, farDistance);
     const lightViewProjectionMatrix = orthographicMatrix.clone();
     lightViewProjectionMatrix.multiply(viewMatrix);
@@ -27418,8 +28238,3837 @@ var BunchAsset = class extends BlobAsset {
   }
 };
 
+// src/base/seededrandom.js
+var System47 = globalThis;
+var SeededRandom = class _SeededRandom extends Object2 {
+  static {
+    __name(this, "SeededRandom");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { number } */
+  #state;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { number } seed
+   */
+  constructor(seed = 1) {
+    super();
+    this.#state = seed >>> 0 || 1;
+  }
+  //==============================================================================
+  // 시드 재설정.
+  //==============================================================================
+  /**
+   * @param { number } seed
+   */
+  setSeed(seed) {
+    this.#state = seed >>> 0 || 1;
+  }
+  //==============================================================================
+  // 현재 내부 상태 반환. (저장 / 복원용)
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getState() {
+    return this.#state;
+  }
+  //==============================================================================
+  // 내부 상태 복원.
+  //==============================================================================
+  /**
+   * @param { number } state
+   */
+  setState(state) {
+    this.#state = state >>> 0;
+  }
+  //==============================================================================
+  // 0 이상 1 미만의 난수 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  nextValue() {
+    this.#state = this.#state + 1831565813 >>> 0;
+    let mixed = this.#state;
+    mixed = System47.Math.imul(mixed ^ mixed >>> 15, mixed | 1);
+    mixed ^= mixed + System47.Math.imul(mixed ^ mixed >>> 7, mixed | 61);
+    const value = ((mixed ^ mixed >>> 14) >>> 0) / 4294967296;
+    return value;
+  }
+  //==============================================================================
+  // min 이상 max 미만의 실수 난수 반환.
+  //==============================================================================
+  /**
+   * @param { number } minValue
+   * @param { number } maxValue
+   * @returns { number }
+   */
+  nextRange(minValue, maxValue) {
+    const value = minValue + (maxValue - minValue) * this.nextValue();
+    return value;
+  }
+  //==============================================================================
+  // min 이상 max 이하의 정수 난수 반환.
+  //==============================================================================
+  /**
+   * @param { number } minValue
+   * @param { number } maxValue
+   * @returns { number }
+   */
+  nextInt(minValue, maxValue) {
+    const value = minValue + System47.Math.floor(this.nextValue() * (maxValue - minValue + 1));
+    return value;
+  }
+  //==============================================================================
+  // 배열에서 하나 뽑기.
+  //==============================================================================
+  /**
+   * @template T
+   * @param { T[] } array
+   * @returns { T | undefined }
+   */
+  pick(array) {
+    if (!array || array.length === 0) {
+      return void 0;
+    }
+    const index = this.nextInt(0, array.length - 1);
+    return array[index];
+  }
+  //==============================================================================
+  // 배열 제자리 셔플. (Fisher-Yates)
+  //==============================================================================
+  /**
+   * @template T
+   * @param { T[] } array
+   * @returns { T[] }
+   */
+  shuffle(array) {
+    for (let index = array.length - 1; index > 0; --index) {
+      const swapIndex = this.nextInt(0, index);
+      const temporary = array[index];
+      array[index] = array[swapIndex];
+      array[swapIndex] = temporary;
+    }
+    return array;
+  }
+  //==============================================================================
+  // 날짜 기반 시드 생성. (정적)
+  // - 20260831 같은 YYYYMMDD 정수를 섞어, 같은 날짜면 어디서나 같은 시드가 나온다.
+  //   데일리 챌린지 보드 생성 등에 쓴다.
+  //==============================================================================
+  /**
+   * @param { number } dateNumber
+   * @param { number } baseSeed
+   * @returns { number }
+   */
+  static createDailySeed(dateNumber, baseSeed = 2654435761) {
+    const mixed = (baseSeed ^ System47.Math.imul(dateNumber >>> 0, 2654435761)) >>> 0;
+    return mixed || 1;
+  }
+  //==============================================================================
+  // 오늘 날짜의 시드 난수 생성. (정적)
+  //==============================================================================
+  /**
+   * @param { Date } date
+   * @param { number } baseSeed
+   * @returns { SeededRandom }
+   */
+  static fromDate(date = new System47.Date(), baseSeed = 2654435761) {
+    const dateNumber = date.getFullYear() * 1e4 + (date.getMonth() + 1) * 100 + date.getDate();
+    return new _SeededRandom(_SeededRandom.createDailySeed(dateNumber, baseSeed));
+  }
+};
+
+// src/base/timer.js
+var System48 = globalThis;
+var Cooldown = class extends Object2 {
+  static {
+    __name(this, "Cooldown");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { number } */
+  #duration;
+  /** @private @type { number } */
+  #remainSeconds;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { number } duration 쿨다운 시간. (초)
+   */
+  constructor(duration = 1) {
+    super();
+    this.#duration = System48.Math.max(0, duration);
+    this.#remainSeconds = 0;
+  }
+  //==============================================================================
+  // 갱신.
+  //==============================================================================
+  /**
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    if (this.#remainSeconds > 0) {
+      this.#remainSeconds = System48.Math.max(0, this.#remainSeconds - timeDelta);
+    }
+  }
+  //==============================================================================
+  // 발동 가능 여부.
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  isReady() {
+    return this.#remainSeconds <= 0;
+  }
+  //==============================================================================
+  // 발동. (준비되어 있으면 쿨다운을 시작하고 참을 반환)
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  use() {
+    if (!this.isReady()) {
+      return false;
+    }
+    this.#remainSeconds = this.#duration;
+    return true;
+  }
+  //==============================================================================
+  // 곧바로 준비 상태로 되돌리기.
+  //==============================================================================
+  reset() {
+    this.#remainSeconds = 0;
+  }
+  //==============================================================================
+  // 쿨다운 시간 설정.
+  //==============================================================================
+  /**
+   * @param { number } duration
+   */
+  setDuration(duration) {
+    this.#duration = System48.Math.max(0, duration);
+  }
+  //==============================================================================
+  // 쿨다운 시간 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getDuration() {
+    return this.#duration;
+  }
+  //==============================================================================
+  // 남은 시간 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getRemainSeconds() {
+    return this.#remainSeconds;
+  }
+  //==============================================================================
+  // 진행 비율 반환. (0 = 방금 발동, 1 = 준비 완료)
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getProgress() {
+    if (this.#duration <= 0) {
+      return 1;
+    }
+    return 1 - this.#remainSeconds / this.#duration;
+  }
+};
+var RepeatTimer = class extends Object2 {
+  static {
+    __name(this, "RepeatTimer");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { number } */
+  #interval;
+  /** @private @type { number } */
+  #elapsedSeconds;
+  /** @private @type { Function | null } */
+  #elapsedEvent;
+  /** @private @type { boolean } */
+  #isRunning;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { number } interval 간격. (초)
+   * @param { Function } elapsedEvent 간격마다 부르는 콜백.
+   */
+  constructor(interval = 1, elapsedEvent = null) {
+    super();
+    this.#interval = System48.Math.max(1e-6, interval);
+    this.#elapsedSeconds = 0;
+    this.#elapsedEvent = elapsedEvent;
+    this.#isRunning = true;
+  }
+  //==============================================================================
+  // 갱신.
+  //==============================================================================
+  /**
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    if (!this.#isRunning) {
+      return;
+    }
+    this.#elapsedSeconds += timeDelta;
+    while (this.#elapsedSeconds >= this.#interval) {
+      this.#elapsedSeconds -= this.#interval;
+      if (this.#elapsedEvent) {
+        this.#elapsedEvent();
+      }
+    }
+  }
+  //==============================================================================
+  // 시작.
+  //==============================================================================
+  start() {
+    this.#isRunning = true;
+  }
+  //==============================================================================
+  // 정지. (누적 시간도 비운다)
+  //==============================================================================
+  stop() {
+    this.#isRunning = false;
+    this.#elapsedSeconds = 0;
+  }
+  //==============================================================================
+  // 일시 정지.
+  //==============================================================================
+  pause() {
+    this.#isRunning = false;
+  }
+  //==============================================================================
+  // 간격 설정.
+  //==============================================================================
+  /**
+   * @param { number } interval
+   */
+  setInterval(interval) {
+    this.#interval = System48.Math.max(1e-6, interval);
+  }
+  //==============================================================================
+  // 간격 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getInterval() {
+    return this.#interval;
+  }
+  //==============================================================================
+  // 콜백 설정.
+  //==============================================================================
+  /**
+   * @param { Function } elapsedEvent
+   */
+  setElapsedEvent(elapsedEvent) {
+    this.#elapsedEvent = elapsedEvent;
+  }
+  //==============================================================================
+  // 동작 중 여부.
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  isRunning() {
+    return this.#isRunning;
+  }
+};
+
+// src/base/objectpool.js
+var ObjectPool = class extends Object2 {
+  static {
+    __name(this, "ObjectPool");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { Function } */
+  #createHandler;
+  /** @private @type { Function | null } */
+  #resetHandler;
+  /** @private @type { object[] } */
+  #freeList;
+  /** @private @type { number } */
+  #totalCount;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { Function } createHandler 새 객체를 만드는 함수.
+   * @param { Function | null } resetHandler 되돌릴 때 상태를 비우는 함수. (객체를 인자로 받는다)
+   * @param { number } preloadCount 미리 만들어 둘 개수.
+   */
+  constructor(createHandler, resetHandler = null, preloadCount = 0) {
+    super();
+    this.#createHandler = createHandler;
+    this.#resetHandler = resetHandler;
+    this.#freeList = [];
+    this.#totalCount = 0;
+    for (let index = 0; index < preloadCount; ++index) {
+      this.#freeList.push(this.#createHandler());
+      this.#totalCount += 1;
+    }
+  }
+  //==============================================================================
+  // 빌리기. (없으면 새로 만든다)
+  //==============================================================================
+  /**
+   * @returns { object }
+   */
+  acquire() {
+    if (this.#freeList.length > 0) {
+      return this.#freeList.pop();
+    }
+    this.#totalCount += 1;
+    return this.#createHandler();
+  }
+  //==============================================================================
+  // 되돌리기.
+  //==============================================================================
+  /**
+   * @param { object } instance
+   */
+  release(instance) {
+    if (instance === null || instance === void 0) {
+      return;
+    }
+    if (this.#resetHandler) {
+      this.#resetHandler(instance);
+    }
+    this.#freeList.push(instance);
+  }
+  //==============================================================================
+  // 놀고 있는 객체 수 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getFreeCount() {
+    return this.#freeList.length;
+  }
+  //==============================================================================
+  // 지금까지 만든 전체 객체 수 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getTotalCount() {
+    return this.#totalCount;
+  }
+  //==============================================================================
+  // 풀 비우기.
+  //==============================================================================
+  clear() {
+    this.#freeList.length = 0;
+  }
+};
+
+// src/base/fsm.js
+var System49 = globalThis;
+var FiniteStateMachine = class extends Object2 {
+  static {
+    __name(this, "FiniteStateMachine");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { Map } */
+  #stateTable;
+  /** @private @type { string | null } */
+  #stateName;
+  /** @private @type { number } */
+  #stateSeconds;
+  /** @private @type { Function | null } */
+  #transitionGuard;
+  /** @private @type { Function | null } */
+  #transitionEvent;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   */
+  constructor() {
+    super();
+    this.#stateTable = new System49.Map();
+    this.#stateName = null;
+    this.#stateSeconds = 0;
+    this.#transitionGuard = null;
+    this.#transitionEvent = null;
+  }
+  //==============================================================================
+  // 상태 등록.
+  // - handlers: { enter?, tick?, exit? }
+  //   enter(previousStateName), tick(timeDelta, stateSeconds), exit(nextStateName)
+  //==============================================================================
+  /**
+   * @param { string } stateName
+   * @param { object } handlers
+   */
+  addState(stateName, handlers = {}) {
+    this.#stateTable.set(stateName, {
+      enter: handlers.enter ? handlers.enter : null,
+      tick: handlers.tick ? handlers.tick : null,
+      exit: handlers.exit ? handlers.exit : null
+    });
+  }
+  //==============================================================================
+  // 상태 전이.
+  // - 같은 상태로의 전이는 기본적으로 무시한다. (isForced 가 참이면 exit / enter 를 다시 부른다)
+  // - 전이 가드가 거짓을 반환하면 전이하지 않는다.
+  //==============================================================================
+  /**
+   * @param { string } nextStateName
+   * @param { boolean } isForced
+   * @returns { boolean } 전이 성공 여부.
+   */
+  changeState(nextStateName, isForced = false) {
+    if (!this.#stateTable.has(nextStateName)) {
+      return false;
+    }
+    const previousStateName = this.#stateName;
+    if (previousStateName === nextStateName && !isForced) {
+      return false;
+    }
+    if (this.#transitionGuard && !this.#transitionGuard(previousStateName, nextStateName)) {
+      return false;
+    }
+    if (previousStateName !== null) {
+      const previousState = this.#stateTable.get(previousStateName);
+      if (previousState && previousState.exit) {
+        previousState.exit(nextStateName);
+      }
+    }
+    this.#stateName = nextStateName;
+    this.#stateSeconds = 0;
+    if (this.#transitionEvent) {
+      this.#transitionEvent(previousStateName, nextStateName);
+    }
+    const nextState = this.#stateTable.get(nextStateName);
+    if (nextState.enter) {
+      nextState.enter(previousStateName);
+    }
+    return true;
+  }
+  //==============================================================================
+  // 갱신.
+  //==============================================================================
+  /**
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    if (this.#stateName === null) {
+      return;
+    }
+    this.#stateSeconds += timeDelta;
+    const currentState = this.#stateTable.get(this.#stateName);
+    if (currentState && currentState.tick) {
+      currentState.tick(timeDelta, this.#stateSeconds);
+    }
+  }
+  //==============================================================================
+  // 현재 상태 이름 반환.
+  //==============================================================================
+  /**
+   * @returns { string | null }
+   */
+  getStateName() {
+    return this.#stateName;
+  }
+  //==============================================================================
+  // 현재 상태에 머문 시간 반환. (초)
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getStateSeconds() {
+    return this.#stateSeconds;
+  }
+  //==============================================================================
+  // 상태 존재 여부.
+  //==============================================================================
+  /**
+   * @param { string } stateName
+   * @returns { boolean }
+   */
+  hasState(stateName) {
+    return this.#stateTable.has(stateName);
+  }
+  //==============================================================================
+  // 전이 가드 설정. (previous, next) => boolean
+  //==============================================================================
+  /**
+   * @param { Function } transitionGuard
+   */
+  setTransitionGuard(transitionGuard) {
+    this.#transitionGuard = transitionGuard;
+  }
+  //==============================================================================
+  // 전이 알림 설정. (previous, next) => void — exit 뒤, enter 앞에 불린다.
+  //==============================================================================
+  /**
+   * @param { Function } transitionEvent
+   */
+  setTransitionEvent(transitionEvent) {
+    this.#transitionEvent = transitionEvent;
+  }
+};
+
+// src/base/format.js
+var format_exports = {};
+__export(format_exports, {
+  formatCompactNumber: () => formatCompactNumber,
+  formatMinutesSeconds: () => formatMinutesSeconds,
+  formatNumber: () => formatNumber,
+  formatNumberWithUnit: () => formatNumberWithUnit,
+  formatPaddedNumber: () => formatPaddedNumber
+});
+var System50 = globalThis;
+function formatNumber(value, locale = "en-US") {
+  return value.toLocaleString(locale);
+}
+__name(formatNumber, "formatNumber");
+function formatNumberWithUnit(value, unitSuffix, locale = "ko-KR") {
+  return value.toLocaleString(locale) + unitSuffix;
+}
+__name(formatNumberWithUnit, "formatNumberWithUnit");
+function formatCompactNumber(value, fractionDigits = 1) {
+  const absoluteValue = System50.Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (absoluteValue >= 1e9) {
+    return sign + trimTrailingZero((absoluteValue / 1e9).toFixed(fractionDigits)) + "B";
+  }
+  if (absoluteValue >= 1e6) {
+    return sign + trimTrailingZero((absoluteValue / 1e6).toFixed(fractionDigits)) + "M";
+  }
+  if (absoluteValue >= 1e3) {
+    return sign + trimTrailingZero((absoluteValue / 1e3).toFixed(fractionDigits)) + "K";
+  }
+  return sign + String(absoluteValue);
+}
+__name(formatCompactNumber, "formatCompactNumber");
+function formatPaddedNumber(value, digitCount, minValue = -Infinity, maxValue = Infinity) {
+  const clampedValue = System50.Math.min(maxValue, System50.Math.max(minValue, value));
+  if (clampedValue < 0) {
+    const digitText = String(-clampedValue).padStart(digitCount - 1, "0");
+    return "-" + digitText;
+  }
+  return String(clampedValue).padStart(digitCount, "0");
+}
+__name(formatPaddedNumber, "formatPaddedNumber");
+function formatMinutesSeconds(totalSeconds) {
+  const flooredSeconds = System50.Math.max(0, System50.Math.floor(totalSeconds));
+  const minutes = System50.Math.floor(flooredSeconds / 60);
+  const seconds2 = flooredSeconds % 60;
+  return minutes + ":" + String(seconds2).padStart(2, "0");
+}
+__name(formatMinutesSeconds, "formatMinutesSeconds");
+function trimTrailingZero(numberText) {
+  if (numberText.indexOf(".") < 0) {
+    return numberText;
+  }
+  let trimmedText = numberText;
+  while (trimmedText.endsWith("0")) {
+    trimmedText = trimmedText.substring(0, trimmedText.length - 1);
+  }
+  if (trimmedText.endsWith(".")) {
+    trimmedText = trimmedText.substring(0, trimmedText.length - 1);
+  }
+  return trimmedText;
+}
+__name(trimTrailingZero, "trimTrailingZero");
+
+// src/misc/persistedstore.js
+var System51 = globalThis;
+var PersistedStore = class extends Object2 {
+  static {
+    __name(this, "PersistedStore");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { string } */
+  #storageKey;
+  /** @private @type { number } */
+  #version;
+  /** @private @type { object } */
+  #defaultState;
+  /** @private @type { object } */
+  #state;
+  /** @private @type { Set } */
+  #subscriberSet;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { string } storageKey
+   * @param { object } defaultState
+   * @param { number } version
+   */
+  constructor(storageKey, defaultState = {}, version = 1) {
+    super();
+    this.#storageKey = storageKey;
+    this.#version = version;
+    this.#defaultState = defaultState;
+    this.#state = this.readFromStorage();
+    this.#subscriberSet = new System51.Set();
+  }
+  //==============================================================================
+  // 상태 반환. (복사본이 아니므로 직접 고치지 말고 set() 을 쓴다)
+  //==============================================================================
+  /**
+   * @returns { object }
+   */
+  get() {
+    return this.#state;
+  }
+  //==============================================================================
+  // 상태 일부 갱신. (얕은 병합 후 저장하고 구독자에게 알린다)
+  //==============================================================================
+  /**
+   * @param { object } partialState
+   */
+  set(partialState) {
+    this.#state = System51.Object.assign({}, this.#state, partialState);
+    this.writeToStorage();
+    this.notify();
+  }
+  //==============================================================================
+  // 상태 전체 교체.
+  //==============================================================================
+  /**
+   * @param { object } nextState
+   */
+  replace(nextState) {
+    this.#state = System51.Object.assign({}, nextState);
+    this.writeToStorage();
+    this.notify();
+  }
+  //==============================================================================
+  // 기본값으로 초기화.
+  //==============================================================================
+  reset() {
+    this.replace(this.#defaultState);
+  }
+  //==============================================================================
+  // 구독. (해지 함수를 반환)
+  //==============================================================================
+  /**
+   * @param { Function } subscriber (state) => void
+   * @returns { Function }
+   */
+  subscribe(subscriber) {
+    this.#subscriberSet.add(subscriber);
+    return () => {
+      this.#subscriberSet.delete(subscriber);
+    };
+  }
+  //==============================================================================
+  // 구독자 알림.
+  //==============================================================================
+  notify() {
+    for (const subscriber of this.#subscriberSet) {
+      subscriber(this.#state);
+    }
+  }
+  //==============================================================================
+  // 저장소에서 읽기.
+  //==============================================================================
+  /**
+   * @returns { object }
+   */
+  readFromStorage() {
+    const storedText = LocalStorage.getString(this.#storageKey, "");
+    if (storedText.length === 0) {
+      return System51.Object.assign({}, this.#defaultState);
+    }
+    try {
+      const parsed = System51.JSON.parse(storedText);
+      if (!parsed || parsed.version !== this.#version || typeof parsed.state !== "object" || parsed.state === null) {
+        return System51.Object.assign({}, this.#defaultState);
+      }
+      return System51.Object.assign({}, this.#defaultState, parsed.state);
+    } catch (parseError) {
+      return System51.Object.assign({}, this.#defaultState);
+    }
+  }
+  //==============================================================================
+  // 저장소에 쓰기.
+  //==============================================================================
+  writeToStorage() {
+    const payload = { version: this.#version, state: this.#state };
+    LocalStorage.setString(this.#storageKey, System51.JSON.stringify(payload));
+  }
+  //==============================================================================
+  // 저장 키 반환.
+  //==============================================================================
+  /**
+   * @returns { string }
+   */
+  getStorageKey() {
+    return this.#storageKey;
+  }
+};
+
+// src/misc/localization.js
+var System52 = globalThis;
+var Localization = class _Localization extends Object2 {
+  static {
+    __name(this, "Localization");
+  }
+  /** @private @type { Map } */
+  static #tableByLanguage = new System52.Map();
+  /** @private @type { string } */
+  static #languageCode = "ko";
+  /** @private @type { string } */
+  static #fallbackLanguageCode = "ko";
+  //==============================================================================
+  // 브라우저 언어 감지. (정적)
+  // - navigator.languages 우선순위를 훑어 지원 목록에 있는 첫 언어를 고른다.
+  //   "zh-TW" 같은 지역 표기는 "zh-tw" → "zh" 순으로 대조한다.
+  //==============================================================================
+  /**
+   * @param { string[] } supportedLanguageCodes
+   * @param { string } defaultLanguageCode
+   * @returns { string }
+   */
+  static detectLanguage(supportedLanguageCodes, defaultLanguageCode = "ko") {
+    const navigatorObject = System52.navigator;
+    const candidateList = [];
+    if (navigatorObject) {
+      if (navigatorObject.languages) {
+        for (const languageTag of navigatorObject.languages) {
+          candidateList.push(languageTag);
+        }
+      } else if (navigatorObject.language) {
+        candidateList.push(navigatorObject.language);
+      }
+    }
+    const supportedSet = new System52.Set(supportedLanguageCodes.map((code) => code.toLowerCase()));
+    for (const languageTag of candidateList) {
+      const loweredTag = languageTag.toLowerCase();
+      if (supportedSet.has(loweredTag)) {
+        return loweredTag;
+      }
+      const primaryCode = loweredTag.split("-")[0];
+      if (supportedSet.has(primaryCode)) {
+        return primaryCode;
+      }
+    }
+    return defaultLanguageCode;
+  }
+  //==============================================================================
+  // 번역 테이블 설정. (정적)
+  //==============================================================================
+  /**
+   * @param { string } languageCode
+   * @param { object } table 키(원문) → 번역문. 값은 문자열 또는 문자열 배열.
+   */
+  static setTable(languageCode, table) {
+    _Localization.#tableByLanguage.set(languageCode.toLowerCase(), table);
+  }
+  //==============================================================================
+  // 현재 언어 설정. (정적)
+  //==============================================================================
+  /**
+   * @param { string } languageCode
+   */
+  static setLanguage(languageCode) {
+    _Localization.#languageCode = languageCode.toLowerCase();
+  }
+  //==============================================================================
+  // 현재 언어 반환. (정적)
+  //==============================================================================
+  /**
+   * @returns { string }
+   */
+  static getLanguage() {
+    return _Localization.#languageCode;
+  }
+  //==============================================================================
+  // 폴백 언어 설정. (정적 — 현재 언어 표에 없으면 이 언어 표를 본다)
+  //==============================================================================
+  /**
+   * @param { string } languageCode
+   */
+  static setFallbackLanguage(languageCode) {
+    _Localization.#fallbackLanguageCode = languageCode.toLowerCase();
+  }
+  //==============================================================================
+  // 번역문 조회. (정적)
+  // - 현재 언어 → 폴백 언어 → 키 원문 순으로 찾는다.
+  // - {0} {1} … 자리 표시자를 인자로 치환한다.
+  //==============================================================================
+  /**
+   * @param { string } key
+   * @param { ...* } substitutions
+   * @returns { string }
+   */
+  static text(key, ...substitutions) {
+    let resolvedText = _Localization.lookup(key);
+    if (typeof resolvedText !== "string") {
+      resolvedText = key;
+    }
+    for (let index = 0; index < substitutions.length; ++index) {
+      resolvedText = resolvedText.split("{" + index + "}").join(String(substitutions[index]));
+    }
+    return resolvedText;
+  }
+  //==============================================================================
+  // 배열형 번역 조회. (정적 — 대사 목록처럼 여러 줄인 항목)
+  //==============================================================================
+  /**
+   * @param { string } key
+   * @returns { string[] }
+   */
+  static textList(key) {
+    const resolvedValue = _Localization.lookup(key);
+    if (System52.Array.isArray(resolvedValue)) {
+      return resolvedValue;
+    }
+    if (typeof resolvedValue === "string") {
+      return [resolvedValue];
+    }
+    return [key];
+  }
+  //==============================================================================
+  // 원시 조회. (정적)
+  //==============================================================================
+  /**
+   * @param { string } key
+   * @returns { string | string[] | undefined }
+   */
+  static lookup(key) {
+    const currentTable = _Localization.#tableByLanguage.get(_Localization.#languageCode);
+    if (currentTable && currentTable[key] !== void 0) {
+      return currentTable[key];
+    }
+    const fallbackTable = _Localization.#tableByLanguage.get(_Localization.#fallbackLanguageCode);
+    if (fallbackTable && fallbackTable[key] !== void 0) {
+      return fallbackTable[key];
+    }
+    return void 0;
+  }
+  //==============================================================================
+  // 모든 테이블 비우기. (정적 — 테스트용)
+  //==============================================================================
+  static clear() {
+    _Localization.#tableByLanguage.clear();
+  }
+};
+
+// src/misc/pathfinder.js
+var System53 = globalThis;
+var PathFinder = class extends Object2 {
+  static {
+    __name(this, "PathFinder");
+  }
+  //==============================================================================
+  // 경로 탐색. (정적)
+  //==============================================================================
+  /**
+   * @param { number } columnCount
+   * @param { number } rowCount
+   * @param { object } start { column, row }
+   * @param { object } goal { column, row }
+   * @param { Function } isBlockedHandler (column, row) => boolean
+   * @returns { object[] | null }
+   */
+  static findPath(columnCount, rowCount, start, goal, isBlockedHandler) {
+    const isInside = /* @__PURE__ */ __name((column, row) => {
+      return column >= 0 && column < columnCount && row >= 0 && row < rowCount;
+    }, "isInside");
+    if (!isInside(start.column, start.row) || !isInside(goal.column, goal.row)) {
+      return null;
+    }
+    if (isBlockedHandler(goal.column, goal.row)) {
+      return null;
+    }
+    if (start.column === goal.column && start.row === goal.row) {
+      return [];
+    }
+    const cellCount = columnCount * rowCount;
+    const toIndex = /* @__PURE__ */ __name((column, row) => {
+      return row * columnCount + column;
+    }, "toIndex");
+    const costFromStart = new System53.Float64Array(cellCount).fill(System53.Number.POSITIVE_INFINITY);
+    const cameFrom = new System53.Int32Array(cellCount).fill(-1);
+    const isClosed = new System53.Uint8Array(cellCount);
+    const heuristic = /* @__PURE__ */ __name((column, row) => {
+      return System53.Math.abs(column - goal.column) + System53.Math.abs(row - goal.row);
+    }, "heuristic");
+    const heapScores = [];
+    const heapIndices = [];
+    const heapPush = /* @__PURE__ */ __name((score, index) => {
+      heapScores.push(score);
+      heapIndices.push(index);
+      let childPosition = heapScores.length - 1;
+      while (childPosition > 0) {
+        const parentPosition = childPosition - 1 >> 1;
+        if (heapScores[parentPosition] <= heapScores[childPosition]) {
+          break;
+        }
+        const scoreTemporary = heapScores[parentPosition];
+        heapScores[parentPosition] = heapScores[childPosition];
+        heapScores[childPosition] = scoreTemporary;
+        const indexTemporary = heapIndices[parentPosition];
+        heapIndices[parentPosition] = heapIndices[childPosition];
+        heapIndices[childPosition] = indexTemporary;
+        childPosition = parentPosition;
+      }
+    }, "heapPush");
+    const heapPop = /* @__PURE__ */ __name(() => {
+      const topIndex = heapIndices[0];
+      const lastScore = heapScores.pop();
+      const lastIndex = heapIndices.pop();
+      if (heapScores.length > 0) {
+        heapScores[0] = lastScore;
+        heapIndices[0] = lastIndex;
+        let parentPosition = 0;
+        while (true) {
+          const leftPosition = parentPosition * 2 + 1;
+          const rightPosition = leftPosition + 1;
+          let smallestPosition = parentPosition;
+          if (leftPosition < heapScores.length && heapScores[leftPosition] < heapScores[smallestPosition]) {
+            smallestPosition = leftPosition;
+          }
+          if (rightPosition < heapScores.length && heapScores[rightPosition] < heapScores[smallestPosition]) {
+            smallestPosition = rightPosition;
+          }
+          if (smallestPosition === parentPosition) {
+            break;
+          }
+          const scoreTemporary = heapScores[parentPosition];
+          heapScores[parentPosition] = heapScores[smallestPosition];
+          heapScores[smallestPosition] = scoreTemporary;
+          const indexTemporary = heapIndices[parentPosition];
+          heapIndices[parentPosition] = heapIndices[smallestPosition];
+          heapIndices[smallestPosition] = indexTemporary;
+          parentPosition = smallestPosition;
+        }
+      }
+      return topIndex;
+    }, "heapPop");
+    const startIndex = toIndex(start.column, start.row);
+    const goalIndex = toIndex(goal.column, goal.row);
+    costFromStart[startIndex] = 0;
+    heapPush(heuristic(start.column, start.row), startIndex);
+    const neighborOffsets = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    while (heapScores.length > 0) {
+      const currentIndex = heapPop();
+      if (currentIndex === goalIndex) {
+        const path = [];
+        let traceIndex = goalIndex;
+        while (traceIndex !== startIndex) {
+          path.push({ column: traceIndex % columnCount, row: System53.Math.floor(traceIndex / columnCount) });
+          traceIndex = cameFrom[traceIndex];
+        }
+        path.reverse();
+        return path;
+      }
+      if (isClosed[currentIndex]) {
+        continue;
+      }
+      isClosed[currentIndex] = 1;
+      const currentColumn = currentIndex % columnCount;
+      const currentRow = System53.Math.floor(currentIndex / columnCount);
+      for (const offset of neighborOffsets) {
+        const nextColumn = currentColumn + offset[0];
+        const nextRow = currentRow + offset[1];
+        if (!isInside(nextColumn, nextRow)) {
+          continue;
+        }
+        if (isBlockedHandler(nextColumn, nextRow)) {
+          continue;
+        }
+        const nextIndex = toIndex(nextColumn, nextRow);
+        if (isClosed[nextIndex]) {
+          continue;
+        }
+        const nextCost = costFromStart[currentIndex] + 1;
+        if (nextCost < costFromStart[nextIndex]) {
+          costFromStart[nextIndex] = nextCost;
+          cameFrom[nextIndex] = currentIndex;
+          heapPush(nextCost + heuristic(nextColumn, nextRow), nextIndex);
+        }
+      }
+    }
+    return null;
+  }
+};
+
+// src/misc/grid.js
+var System54 = globalThis;
+var Grid = class _Grid extends Object2 {
+  static {
+    __name(this, "Grid");
+  }
+  //==============================================================================
+  // 플러드필. (정적)
+  // - 시작 칸에서 상하좌우로 이어지는 통과 가능한 칸들을 모두 방문해 배열로 반환한다.
+  //==============================================================================
+  /**
+   * @param { number } columnCount
+   * @param { number } rowCount
+   * @param { object } start { column, row }
+   * @param { Function } isPassableHandler (column, row) => boolean
+   * @returns { object[] } 방문한 칸들의 { column, row } 배열.
+   */
+  static floodFill(columnCount, rowCount, start, isPassableHandler) {
+    const visitedList = [];
+    if (start.column < 0 || start.column >= columnCount || start.row < 0 || start.row >= rowCount) {
+      return visitedList;
+    }
+    if (!isPassableHandler(start.column, start.row)) {
+      return visitedList;
+    }
+    const isVisited = new System54.Uint8Array(columnCount * rowCount);
+    const pendingStack = [start.column, start.row];
+    isVisited[start.row * columnCount + start.column] = 1;
+    while (pendingStack.length > 0) {
+      const row = pendingStack.pop();
+      const column = pendingStack.pop();
+      visitedList.push({ column, row });
+      const neighborOffsets = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      for (const offset of neighborOffsets) {
+        const nextColumn = column + offset[0];
+        const nextRow = row + offset[1];
+        if (nextColumn < 0 || nextColumn >= columnCount || nextRow < 0 || nextRow >= rowCount) {
+          continue;
+        }
+        const nextIndex = nextRow * columnCount + nextColumn;
+        if (isVisited[nextIndex]) {
+          continue;
+        }
+        if (!isPassableHandler(nextColumn, nextRow)) {
+          continue;
+        }
+        isVisited[nextIndex] = 1;
+        pendingStack.push(nextColumn);
+        pendingStack.push(nextRow);
+      }
+    }
+    return visitedList;
+  }
+  //==============================================================================
+  // 연결성 검사. (정적)
+  // - 시작 칸에서 도달할 수 있는 칸 수가 expectedCount 와 같은지 판정한다.
+  //   (예: 조립형 게임에서 모든 부품이 코어와 붙어 있는지)
+  //==============================================================================
+  /**
+   * @param { number } columnCount
+   * @param { number } rowCount
+   * @param { object } start { column, row }
+   * @param { Function } isPassableHandler (column, row) => boolean
+   * @param { number } expectedCount
+   * @returns { boolean }
+   */
+  static isAllConnected(columnCount, rowCount, start, isPassableHandler, expectedCount) {
+    const visitedList = _Grid.floodFill(columnCount, rowCount, start, isPassableHandler);
+    return visitedList.length === expectedCount;
+  }
+  //==============================================================================
+  // 사각형-타일 충돌 검사. (정적)
+  // - 월드 사각형이 걸치는 타일 범위를 순회하며 막힌 타일과 겹치는지 판정한다.
+  // - 이동 판정에서 "이동 후 위치가 장애물과 겹치면 취소" 용도로 쓴다.
+  //==============================================================================
+  /**
+   * @param { Rect } worldRect
+   * @param { number } tileSize
+   * @param { Function } isBlockedHandler (column, row) => boolean
+   * @returns { boolean } 막힌 타일과 겹치면 참.
+   */
+  static testRectOverlap(worldRect, tileSize, isBlockedHandler) {
+    const startColumn = System54.Math.floor(worldRect.position.x / tileSize);
+    const endColumn = System54.Math.floor((worldRect.position.x + worldRect.size.x - 1e-6) / tileSize);
+    const startRow = System54.Math.floor(worldRect.position.y / tileSize);
+    const endRow = System54.Math.floor((worldRect.position.y + worldRect.size.y - 1e-6) / tileSize);
+    for (let row = startRow; row <= endRow; ++row) {
+      for (let column = startColumn; column <= endColumn; ++column) {
+        if (isBlockedHandler(column, row)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  //==============================================================================
+  // 월드 좌표 → 타일 좌표. (정적)
+  //==============================================================================
+  /**
+   * @param { number } worldX
+   * @param { number } worldY
+   * @param { number } tileSize
+   * @returns { object } { column, row }
+   */
+  static toCell(worldX, worldY, tileSize) {
+    return { column: System54.Math.floor(worldX / tileSize), row: System54.Math.floor(worldY / tileSize) };
+  }
+  //==============================================================================
+  // 타일 좌표 → 타일 중심 월드 좌표. (정적)
+  //==============================================================================
+  /**
+   * @param { number } column
+   * @param { number } row
+   * @param { number } tileSize
+   * @returns { object } { x, y }
+   */
+  static toWorldCenter(column, row, tileSize) {
+    return { x: (column + 0.5) * tileSize, y: (row + 0.5) * tileSize };
+  }
+};
+
+// src/misc/collision2d.js
+var System55 = globalThis;
+var Collision2D = class extends Object2 {
+  static {
+    __name(this, "Collision2D");
+  }
+  //==============================================================================
+  // 원-원 겹침 검사. (정적)
+  //==============================================================================
+  /**
+   * @param { Vector2 } positionA
+   * @param { number } radiusA
+   * @param { Vector2 } positionB
+   * @param { number } radiusB
+   * @returns { boolean }
+   */
+  static testCircleOverlap(positionA, radiusA, positionB, radiusB) {
+    const differenceX = positionB.x - positionA.x;
+    const differenceY = positionB.y - positionA.y;
+    const radiusSum = radiusA + radiusB;
+    return differenceX * differenceX + differenceY * differenceY < radiusSum * radiusSum;
+  }
+  //==============================================================================
+  // 원-원 겹침 분리. (정적)
+  // - 겹쳐 있으면 서로 절반씩 밀어낼 이동량을 반환한다. 안 겹치면 null.
+  // - isStaticB 가 참이면 B 는 고정물로 보고 A 만 전체 거리를 밀린다.
+  // - 두 중심이 정확히 같으면 임의의 축(x)으로 밀어낸다.
+  //==============================================================================
+  /**
+   * @param { Vector2 } positionA
+   * @param { number } radiusA
+   * @param { Vector2 } positionB
+   * @param { number } radiusB
+   * @param { boolean } isStaticB
+   * @returns { object | null } { pushA: Vector2, pushB: Vector2 }
+   */
+  static resolveCircleOverlap(positionA, radiusA, positionB, radiusB, isStaticB = false) {
+    const differenceX = positionB.x - positionA.x;
+    const differenceY = positionB.y - positionA.y;
+    const radiusSum = radiusA + radiusB;
+    const distanceSquared = differenceX * differenceX + differenceY * differenceY;
+    if (distanceSquared >= radiusSum * radiusSum) {
+      return null;
+    }
+    const distance = System55.Math.sqrt(distanceSquared);
+    let directionX = 1;
+    let directionY = 0;
+    if (distance > 1e-6) {
+      directionX = differenceX / distance;
+      directionY = differenceY / distance;
+    }
+    const overlapDepth = radiusSum - distance;
+    if (isStaticB) {
+      return {
+        pushA: Vector2.create(-directionX * overlapDepth, -directionY * overlapDepth),
+        pushB: Vector2.create(0, 0)
+      };
+    }
+    const halfDepth = overlapDepth * 0.5;
+    return {
+      pushA: Vector2.create(-directionX * halfDepth, -directionY * halfDepth),
+      pushB: Vector2.create(directionX * halfDepth, directionY * halfDepth)
+    };
+  }
+  //==============================================================================
+  // 반경 안 최근접 대상 찾기. (정적)
+  // - 투사체 명중 판정처럼 "중심에서 radius 안에 있는 것 중 가장 가까운 것" 을 찾는다.
+  //==============================================================================
+  /**
+   * @template T
+   * @param { T[] } targetList
+   * @param { Function } getPositionHandler (target) => Vector2
+   * @param { Vector2 } center
+   * @param { number } radius
+   * @returns { T | null }
+   */
+  static findNearestInRadius(targetList, getPositionHandler, center, radius) {
+    let nearestTarget = null;
+    let nearestDistanceSquared = radius * radius;
+    for (const target of targetList) {
+      const targetPosition = getPositionHandler(target);
+      const differenceX = targetPosition.x - center.x;
+      const differenceY = targetPosition.y - center.y;
+      const distanceSquared = differenceX * differenceX + differenceY * differenceY;
+      if (distanceSquared <= nearestDistanceSquared) {
+        nearestDistanceSquared = distanceSquared;
+        nearestTarget = target;
+      }
+    }
+    return nearestTarget;
+  }
+  //==============================================================================
+  // 점-원 포함 검사. (정적)
+  //==============================================================================
+  /**
+   * @param { Vector2 } point
+   * @param { Vector2 } center
+   * @param { number } radius
+   * @returns { boolean }
+   */
+  static testPointInCircle(point, center, radius) {
+    const differenceX = point.x - center.x;
+    const differenceY = point.y - center.y;
+    return differenceX * differenceX + differenceY * differenceY <= radius * radius;
+  }
+};
+
+// src/misc/steering2d.js
+var System56 = globalThis;
+var Steering2D = class extends Object2 {
+  static {
+    __name(this, "Steering2D");
+  }
+  //==============================================================================
+  // 목표를 향해 다가가는 속도 반환. (정적)
+  //==============================================================================
+  /**
+   * @param { Vector2 } position
+   * @param { Vector2 } targetPosition
+   * @param { number } speed
+   * @returns { Vector2 }
+   */
+  static seek(position, targetPosition, speed) {
+    const differenceX = targetPosition.x - position.x;
+    const differenceY = targetPosition.y - position.y;
+    const distance = System56.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
+    if (distance < 1e-6) {
+      return Vector2.zero();
+    }
+    return Vector2.create(differenceX / distance * speed, differenceY / distance * speed);
+  }
+  //==============================================================================
+  // 사거리를 유지하며 선회하는 속도 반환. (정적)
+  // - 사거리보다 멀면 접근, 가까우면 후퇴 성분을 섞고,
+  //   접선 방향으로 sin 파형 좌우 선회(strafe)를 더해 살아 있는 움직임을 만든다.
+  //==============================================================================
+  /**
+   * @param { Vector2 } position
+   * @param { Vector2 } targetPosition
+   * @param { number } preferredRange 유지하려는 거리.
+   * @param { number } speed
+   * @param { number } elapsedSeconds 선회 위상에 쓰는 누적 시간.
+   * @param { number } strafeRate 선회 파형 각속도. (기본 1.7)
+   * @returns { Vector2 }
+   */
+  static orbitAtRange(position, targetPosition, preferredRange, speed, elapsedSeconds, strafeRate = 1.7) {
+    const differenceX = targetPosition.x - position.x;
+    const differenceY = targetPosition.y - position.y;
+    const distance = System56.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
+    if (distance < 1e-6) {
+      return Vector2.create(speed, 0);
+    }
+    const forwardX = differenceX / distance;
+    const forwardY = differenceY / distance;
+    const sideX = -forwardY;
+    const sideY = forwardX;
+    const rangeError = System56.Math.max(-1, System56.Math.min(1, (distance - preferredRange) / preferredRange));
+    const strafeAmount = System56.Math.sin(elapsedSeconds * strafeRate);
+    const desiredX = forwardX * rangeError + sideX * strafeAmount;
+    const desiredY = forwardY * rangeError + sideY * strafeAmount;
+    const desiredLength = System56.Math.sqrt(desiredX * desiredX + desiredY * desiredY);
+    if (desiredLength < 1e-6) {
+      return Vector2.zero();
+    }
+    return Vector2.create(desiredX / desiredLength * speed, desiredY / desiredLength * speed);
+  }
+};
+
+// src/misc/pointergesture.js
+var System57 = globalThis;
+var PointerGesture = class extends Object2 {
+  static {
+    __name(this, "PointerGesture");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { boolean } */
+  #isPressed;
+  /** @private @type { boolean } */
+  #isDragging;
+  /** @private @type { boolean } */
+  #isLongPressed;
+  /** @private @type { Vector2 } */
+  #pressPosition;
+  /** @private @type { Vector2 } */
+  #currentPosition;
+  /** @private @type { number } */
+  #pressedSeconds;
+  /** @private @type { number } */
+  #dragThreshold;
+  /** @private @type { number } */
+  #longPressSeconds;
+  /** @private @type { Function | null } */
+  #tapEvent;
+  /** @private @type { Function | null } */
+  #dragEvent;
+  /** @private @type { Function | null } */
+  #dragEndEvent;
+  /** @private @type { Function | null } */
+  #longPressEvent;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { object } options { dragThreshold = 12, longPressSeconds = 0.6 }
+   */
+  constructor(options = {}) {
+    super();
+    this.#isPressed = false;
+    this.#isDragging = false;
+    this.#isLongPressed = false;
+    this.#pressPosition = Vector2.zero();
+    this.#currentPosition = Vector2.zero();
+    this.#pressedSeconds = 0;
+    this.#dragThreshold = options.dragThreshold !== void 0 ? options.dragThreshold : 12;
+    this.#longPressSeconds = options.longPressSeconds !== void 0 ? options.longPressSeconds : 0.6;
+    this.#tapEvent = null;
+    this.#dragEvent = null;
+    this.#dragEndEvent = null;
+    this.#longPressEvent = null;
+  }
+  //==============================================================================
+  // 누름.
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   */
+  press(x, y) {
+    this.#isPressed = true;
+    this.#isDragging = false;
+    this.#isLongPressed = false;
+    this.#pressedSeconds = 0;
+    this.#pressPosition = Vector2.create(x, y);
+    this.#currentPosition = Vector2.create(x, y);
+  }
+  //==============================================================================
+  // 이동.
+  // - 누른 지점에서 임계값을 넘으면 드래그로 확정하고 이후 매 이동마다 dragEvent 를 부른다.
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   */
+  move(x, y) {
+    if (!this.#isPressed) {
+      return;
+    }
+    this.#currentPosition = Vector2.create(x, y);
+    if (!this.#isDragging) {
+      const movedX = x - this.#pressPosition.x;
+      const movedY = y - this.#pressPosition.y;
+      if (movedX * movedX + movedY * movedY >= this.#dragThreshold * this.#dragThreshold) {
+        this.#isDragging = true;
+      }
+    }
+    if (this.#isDragging && this.#dragEvent) {
+      this.#dragEvent(this.#currentPosition, this.#pressPosition);
+    }
+  }
+  //==============================================================================
+  // 갱신. (롱프레스 시간 누적)
+  // - 드래그로 확정되지 않은 채 longPressSeconds 를 넘기면 롱프레스를 한 번 알린다.
+  //==============================================================================
+  /**
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    if (!this.#isPressed || this.#isDragging || this.#isLongPressed) {
+      return;
+    }
+    this.#pressedSeconds += timeDelta;
+    if (this.#pressedSeconds >= this.#longPressSeconds) {
+      this.#isLongPressed = true;
+      if (this.#longPressEvent) {
+        this.#longPressEvent(this.#pressPosition);
+      }
+    }
+  }
+  //==============================================================================
+  // 뗌.
+  // - 드래그도 롱프레스도 아니었으면 탭으로 알린다.
+  //==============================================================================
+  release() {
+    if (!this.#isPressed) {
+      return;
+    }
+    const wasDragging = this.#isDragging;
+    const wasLongPressed = this.#isLongPressed;
+    this.#isPressed = false;
+    this.#isDragging = false;
+    this.#isLongPressed = false;
+    if (wasDragging) {
+      if (this.#dragEndEvent) {
+        this.#dragEndEvent(this.#currentPosition, this.#pressPosition);
+      }
+      return;
+    }
+    if (wasLongPressed) {
+      return;
+    }
+    if (this.#tapEvent) {
+      this.#tapEvent(this.#currentPosition);
+    }
+  }
+  //==============================================================================
+  // 취소. (아무것도 알리지 않고 상태만 되돌린다)
+  //==============================================================================
+  cancel() {
+    this.#isPressed = false;
+    this.#isDragging = false;
+    this.#isLongPressed = false;
+  }
+  //==============================================================================
+  // 롱프레스 진행 비율 반환. (게이지 표시용, 0~1)
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getLongPressRatio() {
+    if (!this.#isPressed || this.#isDragging || this.#longPressSeconds <= 0) {
+      return 0;
+    }
+    return System57.Math.min(1, this.#pressedSeconds / this.#longPressSeconds);
+  }
+  //==============================================================================
+  // 상태 조회.
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  isPressed() {
+    return this.#isPressed;
+  }
+  /**
+   * @returns { boolean }
+   */
+  isDragging() {
+    return this.#isDragging;
+  }
+  //==============================================================================
+  // 콜백 설정.
+  //==============================================================================
+  /** @param { Function } tapEvent (position) => void */
+  setTapEvent(tapEvent) {
+    this.#tapEvent = tapEvent;
+  }
+  /** @param { Function } dragEvent (currentPosition, pressPosition) => void */
+  setDragEvent(dragEvent) {
+    this.#dragEvent = dragEvent;
+  }
+  /** @param { Function } dragEndEvent (currentPosition, pressPosition) => void */
+  setDragEndEvent(dragEndEvent) {
+    this.#dragEndEvent = dragEndEvent;
+  }
+  /** @param { Function } longPressEvent (pressPosition) => void */
+  setLongPressEvent(longPressEvent) {
+    this.#longPressEvent = longPressEvent;
+  }
+  //==============================================================================
+  // 임계값 설정.
+  //==============================================================================
+  /** @param { number } dragThreshold */
+  setDragThreshold(dragThreshold) {
+    this.#dragThreshold = dragThreshold;
+  }
+  /** @param { number } longPressSeconds */
+  setLongPressSeconds(longPressSeconds) {
+    this.#longPressSeconds = longPressSeconds;
+  }
+};
+
+// src/misc/focusnavigator.js
+var System58 = globalThis;
+var FocusNavigator = class extends Object2 {
+  static {
+    __name(this, "FocusNavigator");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { object[] } */
+  #itemList;
+  /** @private @type { string | null } */
+  #focusedId;
+  /** @private @type { number } */
+  #crossAxisPenalty;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { object } options { crossAxisPenalty = 2.5 }
+   */
+  constructor(options = {}) {
+    super();
+    this.#itemList = [];
+    this.#focusedId = null;
+    this.#crossAxisPenalty = options.crossAxisPenalty !== void 0 ? options.crossAxisPenalty : 2.5;
+  }
+  //==============================================================================
+  // 항목 등록.
+  //==============================================================================
+  /**
+   * @param { string } id
+   * @param { Rect } rect
+   */
+  addItem(id, rect) {
+    this.#itemList.push({ id, rect });
+  }
+  //==============================================================================
+  // 항목 전부 제거.
+  //==============================================================================
+  clear() {
+    this.#itemList.length = 0;
+    this.#focusedId = null;
+  }
+  //==============================================================================
+  // 포커스 지정.
+  //==============================================================================
+  /**
+   * @param { string | null } id
+   */
+  setFocusedId(id) {
+    this.#focusedId = id;
+  }
+  //==============================================================================
+  // 현재 포커스 반환.
+  //==============================================================================
+  /**
+   * @returns { string | null }
+   */
+  getFocusedId() {
+    return this.#focusedId;
+  }
+  //==============================================================================
+  // 방향 이동.
+  // - directionX / directionY 는 -1, 0, 1. (예: 오른쪽 = (1, 0))
+  // - 포커스가 없으면 방향과 무관하게 가장 왼쪽 위 항목을 고른다.
+  // - 이동할 곳이 없으면 포커스를 그대로 두고 null 을 반환한다.
+  //==============================================================================
+  /**
+   * @param { number } directionX
+   * @param { number } directionY
+   * @returns { string | null } 새로 포커스된 항목 id.
+   */
+  moveFocus(directionX, directionY) {
+    if (this.#itemList.length === 0) {
+      return null;
+    }
+    if (this.#focusedId === null) {
+      let firstItem = this.#itemList[0];
+      for (const item of this.#itemList) {
+        const itemScore = item.rect.position.y * 1e4 + item.rect.position.x;
+        const firstScore = firstItem.rect.position.y * 1e4 + firstItem.rect.position.x;
+        if (itemScore < firstScore) {
+          firstItem = item;
+        }
+      }
+      this.#focusedId = firstItem.id;
+      return this.#focusedId;
+    }
+    const currentItem = this.#itemList.find((item) => item.id === this.#focusedId);
+    if (!currentItem) {
+      this.#focusedId = this.#itemList[0].id;
+      return this.#focusedId;
+    }
+    const currentCenterX = currentItem.rect.position.x + currentItem.rect.size.x * 0.5;
+    const currentCenterY = currentItem.rect.position.y + currentItem.rect.size.y * 0.5;
+    let bestItem = null;
+    let bestScore = System58.Number.POSITIVE_INFINITY;
+    for (const item of this.#itemList) {
+      if (item.id === this.#focusedId) {
+        continue;
+      }
+      const itemCenterX = item.rect.position.x + item.rect.size.x * 0.5;
+      const itemCenterY = item.rect.position.y + item.rect.size.y * 0.5;
+      const deltaX = itemCenterX - currentCenterX;
+      const deltaY = itemCenterY - currentCenterY;
+      const forwardDistance = deltaX * directionX + deltaY * directionY;
+      if (forwardDistance <= 0) {
+        continue;
+      }
+      const crossDistance = System58.Math.abs(deltaX * directionY) + System58.Math.abs(deltaY * directionX);
+      const score = forwardDistance + crossDistance * this.#crossAxisPenalty;
+      if (score < bestScore) {
+        bestScore = score;
+        bestItem = item;
+      }
+    }
+    if (!bestItem) {
+      return null;
+    }
+    this.#focusedId = bestItem.id;
+    return this.#focusedId;
+  }
+};
+
+// src/misc/shaker.js
+var System59 = globalThis;
+var Shaker = class extends Object2 {
+  static {
+    __name(this, "Shaker");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { number } */
+  #strength;
+  /** @private @type { number } */
+  #elapsedSeconds;
+  /** @private @type { number } */
+  #decayRate;
+  /** @private @type { number } */
+  #frequency;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { object } options { decayRate = 9, frequency = 42 }
+   */
+  constructor(options = {}) {
+    super();
+    this.#strength = 0;
+    this.#elapsedSeconds = 0;
+    this.#decayRate = options.decayRate !== void 0 ? options.decayRate : 9;
+    this.#frequency = options.frequency !== void 0 ? options.frequency : 42;
+  }
+  //==============================================================================
+  // 흔들림 더하기.
+  // - 이미 흔들리는 중이면 더 센 쪽을 따른다.
+  //==============================================================================
+  /**
+   * @param { number } strength 최대 오프셋. (픽셀)
+   */
+  addShake(strength) {
+    this.#strength = System59.Math.max(this.#strength, strength);
+  }
+  //==============================================================================
+  // 갱신.
+  //==============================================================================
+  /**
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    this.#elapsedSeconds += timeDelta;
+    if (this.#strength > 0) {
+      this.#strength *= System59.Math.exp(-this.#decayRate * timeDelta);
+      if (this.#strength < 0.05) {
+        this.#strength = 0;
+      }
+    }
+  }
+  //==============================================================================
+  // 현재 오프셋 반환.
+  // - 두 축의 주파수 비를 다르게 두어(1 : 1.37) 궤적이 단조롭지 않게 한다.
+  //==============================================================================
+  /**
+   * @returns { Vector2 }
+   */
+  getOffset() {
+    if (this.#strength <= 0) {
+      return Vector2.zero();
+    }
+    const time = this.#elapsedSeconds;
+    const offsetX = System59.Math.sin(time * this.#frequency) * this.#strength;
+    const offsetY = System59.Math.cos(time * this.#frequency * 1.37) * this.#strength;
+    return Vector2.create(offsetX, offsetY);
+  }
+  //==============================================================================
+  // 흔들리는 중인지 여부.
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  isShaking() {
+    return this.#strength > 0;
+  }
+  //==============================================================================
+  // 곧바로 멈추기.
+  //==============================================================================
+  stop() {
+    this.#strength = 0;
+  }
+  //==============================================================================
+  // 감쇠율 설정. (클수록 빨리 잦아든다)
+  //==============================================================================
+  /**
+   * @param { number } decayRate
+   */
+  setDecayRate(decayRate) {
+    this.#decayRate = decayRate;
+  }
+  //==============================================================================
+  // 진동 주파수 설정.
+  //==============================================================================
+  /**
+   * @param { number } frequency
+   */
+  setFrequency(frequency) {
+    this.#frequency = frequency;
+  }
+};
+
+// src/misc/camera2d.js
+var System60 = globalThis;
+var Camera2D = class extends Object2 {
+  static {
+    __name(this, "Camera2D");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { Vector2 } */
+  #position;
+  /** @private @type { number } */
+  #zoom;
+  /** @private @type { Vector2 } */
+  #viewSize;
+  /** @private @type { Rect | null } */
+  #worldBounds;
+  /** @private @type { Vector2 } */
+  #velocity;
+  /** @private @type { number } */
+  #inertiaDamping;
+  /** @private @type { number } */
+  #minZoom;
+  /** @private @type { number } */
+  #maxZoom;
+  /** @private @type { object | null } */
+  #tweenState;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   */
+  constructor() {
+    super();
+    this.#position = Vector2.zero();
+    this.#zoom = 1;
+    this.#viewSize = Vector2.create(960, 640);
+    this.#worldBounds = null;
+    this.#velocity = Vector2.zero();
+    this.#inertiaDamping = 6;
+    this.#minZoom = 0.1;
+    this.#maxZoom = 8;
+    this.#tweenState = null;
+  }
+  //==============================================================================
+  // 갱신. (관성 이동 + 이동 트윈 + 경계 클램프)
+  //==============================================================================
+  /**
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    if (this.#velocity.x !== 0 || this.#velocity.y !== 0) {
+      this.#position = Vector2.create(
+        this.#position.x + this.#velocity.x * timeDelta,
+        this.#position.y + this.#velocity.y * timeDelta
+      );
+      const damping = System60.Math.exp(-this.#inertiaDamping * timeDelta);
+      this.#velocity = Vector2.create(this.#velocity.x * damping, this.#velocity.y * damping);
+      if (System60.Math.abs(this.#velocity.x) < 1 && System60.Math.abs(this.#velocity.y) < 1) {
+        this.#velocity = Vector2.zero();
+      }
+    }
+    if (this.#tweenState) {
+      const tween = this.#tweenState;
+      tween.elapsedSeconds += timeDelta;
+      const linearRatio = System60.Math.min(1, tween.elapsedSeconds / tween.duration);
+      const easedRatio = 1 - System60.Math.pow(1 - linearRatio, 3);
+      this.#zoom = tween.fromZoom * System60.Math.pow(tween.toZoom / tween.fromZoom, easedRatio);
+      this.#position = Vector2.create(
+        lerp(tween.fromPosition.x, tween.toPosition.x, easedRatio),
+        lerp(tween.fromPosition.y, tween.toPosition.y, easedRatio)
+      );
+      if (linearRatio >= 1) {
+        this.#tweenState = null;
+      }
+    }
+    this.clampToBounds();
+  }
+  //==============================================================================
+  // 대상 추적. (여러 대상이면 중점을 따라간다 — 프레임 독립 지수 감쇠)
+  //==============================================================================
+  /**
+   * @param { Vector2[] } targetPositions
+   * @param { number } rate 추적 속도. (클수록 빨리 붙는다)
+   * @param { number } timeDelta
+   */
+  follow(targetPositions, rate, timeDelta) {
+    if (!targetPositions || targetPositions.length === 0) {
+      return;
+    }
+    let centerX = 0;
+    let centerY = 0;
+    for (const targetPosition of targetPositions) {
+      centerX += targetPosition.x;
+      centerY += targetPosition.y;
+    }
+    centerX /= targetPositions.length;
+    centerY /= targetPositions.length;
+    this.#position = Vector2.create(
+      approach(this.#position.x, centerX, rate, timeDelta),
+      approach(this.#position.y, centerY, rate, timeDelta)
+    );
+  }
+  //==============================================================================
+  // 화면 픽셀 단위 팬. (드래그 팬 — 줌을 반영해 월드 이동량으로 환산)
+  //==============================================================================
+  /**
+   * @param { number } screenDeltaX
+   * @param { number } screenDeltaY
+   */
+  panByScreen(screenDeltaX, screenDeltaY) {
+    this.#position = Vector2.create(
+      this.#position.x - screenDeltaX / this.#zoom,
+      this.#position.y - screenDeltaY / this.#zoom
+    );
+    this.clampToBounds();
+  }
+  //==============================================================================
+  // 관성 던지기. (드래그를 놓을 때 화면 픽셀 속도를 넘긴다)
+  //==============================================================================
+  /**
+   * @param { number } screenVelocityX
+   * @param { number } screenVelocityY
+   */
+  fling(screenVelocityX, screenVelocityY) {
+    this.#velocity = Vector2.create(-screenVelocityX / this.#zoom, -screenVelocityY / this.#zoom);
+  }
+  //==============================================================================
+  // 화면 기준점을 고정한 줌. (휠 / 핀치 — anchorScreen 아래의 월드 지점이 움직이지 않는다)
+  //==============================================================================
+  /**
+   * @param { Vector2 } anchorScreen 화면 좌표. (뷰 좌상단 기준)
+   * @param { number } zoomFactor 곱할 배율. (1.1 = 10% 확대)
+   */
+  zoomAt(anchorScreen, zoomFactor) {
+    const previousZoom = this.#zoom;
+    const nextZoom = clamp(previousZoom * zoomFactor, this.#minZoom, this.#maxZoom);
+    if (nextZoom === previousZoom) {
+      return;
+    }
+    const anchorWorld = this.screenToWorld(anchorScreen);
+    this.#zoom = nextZoom;
+    const anchorWorldAfter = this.screenToWorld(anchorScreen);
+    this.#position = Vector2.create(
+      this.#position.x + (anchorWorld.x - anchorWorldAfter.x),
+      this.#position.y + (anchorWorld.y - anchorWorldAfter.y)
+    );
+    this.clampToBounds();
+  }
+  //==============================================================================
+  // 위치 / 줌으로 이동 트윈 시작.
+  //==============================================================================
+  /**
+   * @param { Vector2 } targetPosition
+   * @param { number } targetZoom
+   * @param { number } duration
+   */
+  tweenTo(targetPosition, targetZoom, duration = 0.4) {
+    this.#velocity = Vector2.zero();
+    this.#tweenState = {
+      fromPosition: Vector2.create(this.#position.x, this.#position.y),
+      toPosition: Vector2.create(targetPosition.x, targetPosition.y),
+      fromZoom: this.#zoom,
+      toZoom: clamp(targetZoom, this.#minZoom, this.#maxZoom),
+      duration: System60.Math.max(1e-4, duration),
+      elapsedSeconds: 0
+    };
+  }
+  //==============================================================================
+  // 그리기 변환 적용. (호출한 쪽에서 pushState / popState 로 감싼다)
+  //==============================================================================
+  /**
+   * @param { Graphic } graphic
+   */
+  applyTransform(graphic) {
+    graphic.translate(this.#viewSize.x * 0.5, this.#viewSize.y * 0.5);
+    graphic.scale(this.#zoom, this.#zoom);
+    graphic.translate(-this.#position.x, -this.#position.y);
+  }
+  //==============================================================================
+  // 화면 좌표 → 월드 좌표.
+  //==============================================================================
+  /**
+   * @param { Vector2 } screenPosition
+   * @returns { Vector2 }
+   */
+  screenToWorld(screenPosition) {
+    return Vector2.create(
+      (screenPosition.x - this.#viewSize.x * 0.5) / this.#zoom + this.#position.x,
+      (screenPosition.y - this.#viewSize.y * 0.5) / this.#zoom + this.#position.y
+    );
+  }
+  //==============================================================================
+  // 월드 좌표 → 화면 좌표.
+  //==============================================================================
+  /**
+   * @param { Vector2 } worldPosition
+   * @returns { Vector2 }
+   */
+  worldToScreen(worldPosition) {
+    return Vector2.create(
+      (worldPosition.x - this.#position.x) * this.#zoom + this.#viewSize.x * 0.5,
+      (worldPosition.y - this.#position.y) * this.#zoom + this.#viewSize.y * 0.5
+    );
+  }
+  //==============================================================================
+  // 월드 경계로 클램프.
+  // - 뷰가 경계보다 크면(줌아웃) 축 가운데에 맞춘다.
+  //==============================================================================
+  clampToBounds() {
+    if (!this.#worldBounds) {
+      return;
+    }
+    const halfViewWidth = this.#viewSize.x * 0.5 / this.#zoom;
+    const halfViewHeight = this.#viewSize.y * 0.5 / this.#zoom;
+    const bounds = this.#worldBounds;
+    let clampedX;
+    if (halfViewWidth * 2 >= bounds.size.x) {
+      clampedX = bounds.position.x + bounds.size.x * 0.5;
+    } else {
+      clampedX = clamp(this.#position.x, bounds.position.x + halfViewWidth, bounds.position.x + bounds.size.x - halfViewWidth);
+    }
+    let clampedY;
+    if (halfViewHeight * 2 >= bounds.size.y) {
+      clampedY = bounds.position.y + bounds.size.y * 0.5;
+    } else {
+      clampedY = clamp(this.#position.y, bounds.position.y + halfViewHeight, bounds.position.y + bounds.size.y - halfViewHeight);
+    }
+    this.#position = Vector2.create(clampedX, clampedY);
+  }
+  //==============================================================================
+  // 접근자.
+  //==============================================================================
+  /** @param { Vector2 } position */
+  setPosition(position) {
+    this.#position = Vector2.create(position.x, position.y);
+    this.clampToBounds();
+  }
+  /** @returns { Vector2 } */
+  getPosition() {
+    return this.#position;
+  }
+  /** @param { number } zoom */
+  setZoom(zoom) {
+    this.#zoom = clamp(zoom, this.#minZoom, this.#maxZoom);
+    this.clampToBounds();
+  }
+  /** @returns { number } */
+  getZoom() {
+    return this.#zoom;
+  }
+  /** @param { Vector2 } viewSize */
+  setViewSize(viewSize) {
+    this.#viewSize = Vector2.create(viewSize.x, viewSize.y);
+  }
+  /** @returns { Vector2 } */
+  getViewSize() {
+    return this.#viewSize;
+  }
+  /** @param { Rect | null } worldBounds */
+  setWorldBounds(worldBounds) {
+    this.#worldBounds = worldBounds;
+    this.clampToBounds();
+  }
+  /** @returns { Rect | null } */
+  getWorldBounds() {
+    return this.#worldBounds;
+  }
+  /** @param { number } minZoom @param { number } maxZoom */
+  setZoomRange(minZoom, maxZoom) {
+    this.#minZoom = minZoom;
+    this.#maxZoom = maxZoom;
+    this.setZoom(this.#zoom);
+  }
+  /** @param { number } inertiaDamping */
+  setInertiaDamping(inertiaDamping) {
+    this.#inertiaDamping = inertiaDamping;
+  }
+  /** @returns { boolean } */
+  isTweening() {
+    return this.#tweenState !== null;
+  }
+  //==============================================================================
+  // 관성 정지.
+  //==============================================================================
+  stopInertia() {
+    this.#velocity = Vector2.zero();
+  }
+};
+
+// src/misc/typewriter.js
+var System61 = globalThis;
+var Typewriter = class extends Object2 {
+  static {
+    __name(this, "Typewriter");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { object } */
+  #target;
+  /** @private @type { string } */
+  #fullText;
+  /** @private @type { number } */
+  #revealedCount;
+  /** @private @type { number } */
+  #charactersPerSecond;
+  /** @private @type { number } */
+  #fastForwardMultiplier;
+  /** @private @type { boolean } */
+  #isFastForward;
+  /** @private @type { boolean } */
+  #isFinished;
+  /** @private @type { Function | null } */
+  #characterRevealedEvent;
+  /** @private @type { Function | null } */
+  #completeEvent;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { object } target setVisibleCharacterCount() 를 가진 대상. (Text / UILabel)
+   * @param { object } options { charactersPerSecond = 30, fastForwardMultiplier = 8 }
+   */
+  constructor(target, options = {}) {
+    super();
+    this.#target = target;
+    this.#fullText = "";
+    this.#revealedCount = 0;
+    this.#charactersPerSecond = options.charactersPerSecond !== void 0 ? options.charactersPerSecond : 30;
+    this.#fastForwardMultiplier = options.fastForwardMultiplier !== void 0 ? options.fastForwardMultiplier : 8;
+    this.#isFastForward = false;
+    this.#isFinished = true;
+    this.#characterRevealedEvent = null;
+    this.#completeEvent = null;
+  }
+  //==============================================================================
+  // 시작.
+  // - text 를 넘기면 대상의 setText 도 함께 부른다. 안 넘기면 대상의 현재 글을 쓴다.
+  //==============================================================================
+  /**
+   * @param { string | null } text
+   */
+  start(text = null) {
+    if (text !== null && typeof this.#target.setText === "function") {
+      this.#target.setText(text);
+    }
+    this.#fullText = typeof this.#target.getText === "function" ? this.#target.getText() : text ? text : "";
+    this.#revealedCount = 0;
+    this.#isFinished = this.#fullText.length === 0;
+    this.#isFastForward = false;
+    this.#target.setVisibleCharacterCount(0);
+    if (this.#isFinished) {
+      this.#target.setVisibleCharacterCount(-1);
+    }
+  }
+  //==============================================================================
+  // 갱신.
+  //==============================================================================
+  /**
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    if (this.#isFinished) {
+      return;
+    }
+    const speed = this.#charactersPerSecond * (this.#isFastForward ? this.#fastForwardMultiplier : 1);
+    const previousWholeCount = System61.Math.floor(this.#revealedCount);
+    this.#revealedCount = System61.Math.min(this.#fullText.length, this.#revealedCount + speed * timeDelta);
+    const currentWholeCount = System61.Math.floor(this.#revealedCount);
+    if (currentWholeCount !== previousWholeCount) {
+      this.#target.setVisibleCharacterCount(currentWholeCount);
+      if (this.#characterRevealedEvent) {
+        for (let index = previousWholeCount; index < currentWholeCount; ++index) {
+          this.#characterRevealedEvent(this.#fullText[index], index);
+        }
+      }
+    }
+    if (this.#revealedCount >= this.#fullText.length) {
+      this.finish();
+    }
+  }
+  //==============================================================================
+  // 곧바로 끝까지 드러내기.
+  //==============================================================================
+  skipToEnd() {
+    if (this.#isFinished) {
+      return;
+    }
+    this.#revealedCount = this.#fullText.length;
+    this.finish();
+  }
+  //==============================================================================
+  // 완료 처리.
+  //==============================================================================
+  /**
+   * @private
+   */
+  finish() {
+    this.#isFinished = true;
+    this.#target.setVisibleCharacterCount(-1);
+    if (this.#completeEvent) {
+      this.#completeEvent();
+    }
+  }
+  //==============================================================================
+  // 완료 여부.
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  isFinished() {
+    return this.#isFinished;
+  }
+  //==============================================================================
+  // 빨리 감기 설정. (누르고 있는 동안 등)
+  //==============================================================================
+  /**
+   * @param { boolean } isFastForward
+   */
+  setFastForward(isFastForward) {
+    this.#isFastForward = isFastForward;
+  }
+  //==============================================================================
+  // 속도 설정. (초당 글자 수)
+  //==============================================================================
+  /**
+   * @param { number } charactersPerSecond
+   */
+  setCharactersPerSecond(charactersPerSecond) {
+    this.#charactersPerSecond = charactersPerSecond;
+  }
+  //==============================================================================
+  // 글자 공개 알림 설정. (character, index) => void
+  //==============================================================================
+  /**
+   * @param { Function } characterRevealedEvent
+   */
+  setCharacterRevealedEvent(characterRevealedEvent) {
+    this.#characterRevealedEvent = characterRevealedEvent;
+  }
+  //==============================================================================
+  // 완료 알림 설정.
+  //==============================================================================
+  /**
+   * @param { Function } completeEvent
+   */
+  setCompleteEvent(completeEvent) {
+    this.#completeEvent = completeEvent;
+  }
+};
+
+// src/misc/dialogue.js
+var System62 = globalThis;
+var DialogueRunner = class extends Object2 {
+  static {
+    __name(this, "DialogueRunner");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { object[] } */
+  #entryList;
+  /** @private @type { Map } */
+  #labelTable;
+  /** @private @type { number } */
+  #cursor;
+  /** @private @type { boolean } */
+  #isFinished;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  constructor() {
+    super();
+    this.#entryList = [];
+    this.#labelTable = new System62.Map();
+    this.#cursor = 0;
+    this.#isFinished = true;
+  }
+  //==============================================================================
+  // 대본 설정.
+  //==============================================================================
+  /**
+   * @param { object[] } entryList
+   */
+  setScript(entryList) {
+    this.#entryList = entryList ? entryList : [];
+    this.#labelTable.clear();
+    for (let index = 0; index < this.#entryList.length; ++index) {
+      const entry = this.#entryList[index];
+      if (entry.label !== void 0) {
+        this.#labelTable.set(entry.label, index);
+      }
+    }
+    this.#cursor = 0;
+    this.#isFinished = true;
+  }
+  //==============================================================================
+  // 시작. (라벨을 넘기면 그 지점부터)
+  //==============================================================================
+  /**
+   * @param { string | null } labelName
+   */
+  start(labelName = null) {
+    this.#isFinished = this.#entryList.length === 0;
+    this.#cursor = 0;
+    if (labelName !== null && this.#labelTable.has(labelName)) {
+      this.#cursor = this.#labelTable.get(labelName);
+    }
+    this.skipToPresentable();
+  }
+  //==============================================================================
+  // 현재 항목 반환.
+  // - { kind: "line", speaker, text } | { kind: "choice", options: [{text}] } | { kind: "finished" }
+  //==============================================================================
+  /**
+   * @returns { object }
+   */
+  getCurrent() {
+    if (this.#isFinished) {
+      return { kind: "finished" };
+    }
+    const entry = this.#entryList[this.#cursor];
+    if (entry.choice !== void 0) {
+      return { kind: "choice", options: entry.choice.map((option) => ({ text: option.text })) };
+    }
+    return { kind: "line", speaker: entry.speaker !== void 0 ? entry.speaker : "", text: entry.text !== void 0 ? entry.text : "" };
+  }
+  //==============================================================================
+  // 다음으로. (대사 항목에서 부른다 — 선택지 위에서는 무시)
+  //==============================================================================
+  advance() {
+    if (this.#isFinished) {
+      return;
+    }
+    const entry = this.#entryList[this.#cursor];
+    if (entry.choice !== void 0) {
+      return;
+    }
+    this.#cursor += 1;
+    this.skipToPresentable();
+  }
+  //==============================================================================
+  // 선택. (선택지 항목에서 부른다)
+  //==============================================================================
+  /**
+   * @param { number } optionIndex
+   */
+  choose(optionIndex) {
+    if (this.#isFinished) {
+      return;
+    }
+    const entry = this.#entryList[this.#cursor];
+    if (entry.choice === void 0) {
+      return;
+    }
+    const option = entry.choice[optionIndex];
+    if (!option) {
+      return;
+    }
+    if (option.jump !== void 0 && this.#labelTable.has(option.jump)) {
+      this.#cursor = this.#labelTable.get(option.jump);
+    } else {
+      this.#cursor += 1;
+    }
+    this.skipToPresentable();
+  }
+  //==============================================================================
+  // 보여 줄 수 있는 항목까지 이동. (라벨 / 점프 / 끝 처리 — 무한 루프 가드 포함)
+  //==============================================================================
+  /**
+   * @private
+   */
+  skipToPresentable() {
+    let guardCount = this.#entryList.length + 8;
+    while (guardCount > 0) {
+      guardCount -= 1;
+      if (this.#cursor >= this.#entryList.length) {
+        this.#isFinished = true;
+        return;
+      }
+      const entry = this.#entryList[this.#cursor];
+      if (entry.end === true) {
+        this.#isFinished = true;
+        return;
+      }
+      if (entry.label !== void 0) {
+        this.#cursor += 1;
+        continue;
+      }
+      if (entry.jump !== void 0) {
+        if (this.#labelTable.has(entry.jump)) {
+          this.#cursor = this.#labelTable.get(entry.jump) + 1;
+        } else {
+          this.#cursor += 1;
+        }
+        continue;
+      }
+      this.#isFinished = false;
+      return;
+    }
+    this.#isFinished = true;
+  }
+  //==============================================================================
+  // 종료 여부.
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  isFinished() {
+    return this.#isFinished;
+  }
+};
+var DialogueScriptParser = class extends Object2 {
+  static {
+    __name(this, "DialogueScriptParser");
+  }
+  //==============================================================================
+  // 파싱. (정적)
+  //==============================================================================
+  /**
+   * @param { string } scriptText
+   * @returns { object[] } DialogueRunner 대본.
+   */
+  static parse(scriptText) {
+    const entryList = [];
+    let currentSpeaker = "";
+    let pendingChoice = null;
+    const flushChoice = /* @__PURE__ */ __name(() => {
+      if (pendingChoice) {
+        entryList.push({ choice: pendingChoice });
+        pendingChoice = null;
+      }
+    }, "flushChoice");
+    for (const rawLine of scriptText.split("\n")) {
+      const line = rawLine.trim();
+      if (line.length === 0 || line.indexOf("//") === 0) {
+        continue;
+      }
+      if (line.indexOf("/option ") === 0) {
+        const body = line.substring("/option ".length);
+        const arrowIndex = body.indexOf("->");
+        let optionText = body;
+        let jumpLabel = void 0;
+        if (arrowIndex >= 0) {
+          optionText = body.substring(0, arrowIndex).trim();
+          jumpLabel = body.substring(arrowIndex + 2).trim();
+        }
+        if (!pendingChoice) {
+          pendingChoice = [];
+        }
+        pendingChoice.push(jumpLabel !== void 0 ? { text: optionText, jump: jumpLabel } : { text: optionText });
+        continue;
+      }
+      flushChoice();
+      if (line.indexOf("/label ") === 0) {
+        entryList.push({ label: line.substring("/label ".length).trim() });
+      } else if (line.indexOf("/jump ") === 0) {
+        entryList.push({ jump: line.substring("/jump ".length).trim() });
+      } else if (line.indexOf("/speaker ") === 0) {
+        currentSpeaker = line.substring("/speaker ".length).trim();
+      } else if (line.indexOf("/say ") === 0) {
+        entryList.push({ speaker: currentSpeaker, text: line.substring("/say ".length) });
+      } else if (line === "/end") {
+        entryList.push({ end: true });
+      } else if (line.indexOf("/") === 0) {
+        continue;
+      } else {
+        entryList.push({ speaker: currentSpeaker, text: line });
+      }
+    }
+    flushChoice();
+    return entryList;
+  }
+};
+
+// src/misc/spriteanimator.js
+var System63 = globalThis;
+var SpriteAnimator = class extends Component {
+  static {
+    __name(this, "SpriteAnimator");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { Map } */
+  #clipTable;
+  /** @private @type { string | null } */
+  #clipName;
+  /** @private @type { Animation } */
+  #animation;
+  /** @private @type { Sprite | null } */
+  #sprite;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  constructor() {
+    super();
+    this.setComponentType("SpriteAnimator");
+    this.#clipTable = new System63.Map();
+    this.#clipName = null;
+    this.#animation = new Animation();
+    this.#sprite = null;
+  }
+  //==============================================================================
+  // 클립 등록.
+  //==============================================================================
+  /**
+   * @param { string } clipName
+   * @param { HTMLImageElement } image
+   * @param { Rect[] } frameRects
+   * @param { number } fps
+   * @param { boolean } isLoop
+   */
+  addClip(clipName, image, frameRects, fps = 10, isLoop = true) {
+    this.#clipTable.set(clipName, { image, frameRects, fps, isLoop });
+  }
+  //==============================================================================
+  // 아틀라스 JSON 으로 클립 등록.
+  // - TexturePacker 형식({ frames: { 이름: { frame: {x,y,w,h} } } })을 받는다.
+  //==============================================================================
+  /**
+   * @param { string } clipName
+   * @param { HTMLImageElement } image
+   * @param { object } atlasJson
+   * @param { string[] } frameIds
+   * @param { number } fps
+   * @param { boolean } isLoop
+   */
+  addClipFromAtlas(clipName, image, atlasJson, frameIds, fps = 10, isLoop = true) {
+    const frameRects = [];
+    for (const frameId of frameIds) {
+      const frameData = atlasJson && atlasJson.frames ? atlasJson.frames[frameId] : null;
+      if (!frameData) {
+        continue;
+      }
+      const rectData = frameData.frame ? frameData.frame : frameData;
+      const width = rectData.w !== void 0 ? rectData.w : rectData.width;
+      const height = rectData.h !== void 0 ? rectData.h : rectData.height;
+      frameRects.push(Rect.create(rectData.x, rectData.y, width, height));
+    }
+    this.addClip(clipName, image, frameRects, fps, isLoop);
+  }
+  //==============================================================================
+  // 재생.
+  // - 같은 클립이 이미 도는 중이면 다시 시작하지 않는다. (restartIfSame 이 참이면 재시작)
+  //==============================================================================
+  /**
+   * @param { string } clipName
+   * @param { object } options { onComplete?, restartIfSame = false }
+   * @returns { boolean } 재생 시작 여부.
+   */
+  play(clipName, options = {}) {
+    const clip = this.#clipTable.get(clipName);
+    if (!clip) {
+      return false;
+    }
+    const restartIfSame = options.restartIfSame ? true : false;
+    if (this.#clipName === clipName && this.#animation.isPlaying() && !restartIfSame) {
+      this.#animation.setOnComplete(options.onComplete ? options.onComplete : null);
+      return false;
+    }
+    this.#clipName = clipName;
+    this.#animation.stop();
+    this.#animation.setFramesFromRects(clip.image, clip.frameRects);
+    this.#animation.setAnimationSpeed(clip.fps);
+    this.#animation.setLoop(clip.isLoop);
+    this.#animation.setOnComplete(options.onComplete ? options.onComplete : null);
+    this.#animation.gotoAndPlay(0);
+    this.applyCurrentFrame();
+    return true;
+  }
+  //==============================================================================
+  // 정지.
+  //==============================================================================
+  stop() {
+    this.#animation.stop();
+  }
+  //==============================================================================
+  // 갱신.
+  //==============================================================================
+  /**
+   * @override
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    super.tick(timeDelta);
+    this.#animation.tick(timeDelta);
+    this.applyCurrentFrame();
+  }
+  //==============================================================================
+  // 현재 프레임을 스프라이트에 반영.
+  //==============================================================================
+  applyCurrentFrame() {
+    const currentFrame = this.#animation.getCurrentFrame();
+    if (!currentFrame) {
+      return;
+    }
+    const sprite = this.findSprite();
+    if (!sprite) {
+      return;
+    }
+    sprite.setImage(currentFrame.getImage());
+    const frameRect = currentFrame.getImageRect();
+    if (frameRect) {
+      sprite.setImageRect(frameRect);
+    }
+  }
+  //==============================================================================
+  // 같은 노드의 스프라이트 찾기. (한 번 찾으면 캐시)
+  //==============================================================================
+  /**
+   * @returns { Sprite | null }
+   */
+  findSprite() {
+    if (this.#sprite) {
+      return this.#sprite;
+    }
+    const node = this.getNode();
+    if (!node) {
+      return null;
+    }
+    const spriteComponents = node.getComponents(Sprite);
+    if (spriteComponents.length > 0) {
+      this.#sprite = spriteComponents[0];
+    }
+    return this.#sprite;
+  }
+  //==============================================================================
+  // 현재 클립 이름 반환.
+  //==============================================================================
+  /**
+   * @returns { string | null }
+   */
+  getClipName() {
+    return this.#clipName;
+  }
+  //==============================================================================
+  // 재생 중 여부.
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  isPlaying() {
+    return this.#animation.isPlaying();
+  }
+  //==============================================================================
+  // 클립 존재 여부.
+  //==============================================================================
+  /**
+   * @param { string } clipName
+   * @returns { boolean }
+   */
+  hasClip(clipName) {
+    return this.#clipTable.has(clipName);
+  }
+};
+
+// src/misc/platformerbody.js
+var PlatformerBody = class extends Component {
+  static {
+    __name(this, "PlatformerBody");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { Vector2 } */
+  #velocity;
+  /** @private @type { number } */
+  #gravity;
+  /** @private @type { number } */
+  #groundY;
+  /** @private @type { number | null } */
+  #leftBound;
+  /** @private @type { number | null } */
+  #rightBound;
+  /** @private @type { boolean } */
+  #isGrounded;
+  /** @private @type { Function | null } */
+  #landedEvent;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  constructor() {
+    super();
+    this.setComponentType("PlatformerBody");
+    this.#velocity = Vector2.zero();
+    this.#gravity = 2e3;
+    this.#groundY = 0;
+    this.#leftBound = null;
+    this.#rightBound = null;
+    this.#isGrounded = false;
+    this.#landedEvent = null;
+  }
+  //==============================================================================
+  // 갱신. (속도 적분 → 중력 → 접지 → 경계)
+  //==============================================================================
+  /**
+   * @override
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    super.tick(timeDelta);
+    const node = this.getNode();
+    if (!node) {
+      return;
+    }
+    this.#velocity = Vector2.create(this.#velocity.x, this.#velocity.y + this.#gravity * timeDelta);
+    const currentPosition = node.getLocalPosition();
+    let nextX = currentPosition.x + this.#velocity.x * timeDelta;
+    let nextY = currentPosition.y + this.#velocity.y * timeDelta;
+    const wasGrounded = this.#isGrounded;
+    if (nextY >= this.#groundY) {
+      nextY = this.#groundY;
+      this.#velocity = Vector2.create(this.#velocity.x, 0);
+      this.#isGrounded = true;
+      if (!wasGrounded && this.#landedEvent) {
+        this.#landedEvent();
+      }
+    } else {
+      this.#isGrounded = false;
+    }
+    if (this.#leftBound !== null && nextX < this.#leftBound) {
+      nextX = this.#leftBound;
+    }
+    if (this.#rightBound !== null && nextX > this.#rightBound) {
+      nextX = this.#rightBound;
+    }
+    node.setLocalPosition(Vector2.create(nextX, nextY));
+  }
+  //==============================================================================
+  // 도약. (접지 중일 때만 — 위쪽이 음수 속도)
+  //==============================================================================
+  /**
+   * @param { number } jumpSpeed 음수면 위로.
+   * @returns { boolean } 도약 성공 여부.
+   */
+  jump(jumpSpeed) {
+    if (!this.#isGrounded) {
+      return false;
+    }
+    this.#velocity = Vector2.create(this.#velocity.x, jumpSpeed);
+    this.#isGrounded = false;
+    return true;
+  }
+  //==============================================================================
+  // 접근자.
+  //==============================================================================
+  /** @param { number } velocityX */
+  setVelocityX(velocityX) {
+    this.#velocity = Vector2.create(velocityX, this.#velocity.y);
+  }
+  /** @param { number } velocityY */
+  setVelocityY(velocityY) {
+    this.#velocity = Vector2.create(this.#velocity.x, velocityY);
+  }
+  /** @returns { Vector2 } */
+  getVelocity() {
+    return this.#velocity;
+  }
+  /** @param { number } gravity */
+  setGravity(gravity) {
+    this.#gravity = gravity;
+  }
+  /** @returns { number } */
+  getGravity() {
+    return this.#gravity;
+  }
+  /** @param { number } groundY */
+  setGroundY(groundY) {
+    this.#groundY = groundY;
+  }
+  /** @returns { number } */
+  getGroundY() {
+    return this.#groundY;
+  }
+  //==============================================================================
+  // 좌우 이동 경계 설정. (null 이면 해당 방향 제한 없음)
+  //==============================================================================
+  /**
+   * @param { number | null } leftBound
+   * @param { number | null } rightBound
+   */
+  setHorizontalBounds(leftBound, rightBound) {
+    this.#leftBound = leftBound;
+    this.#rightBound = rightBound;
+  }
+  /** @returns { boolean } */
+  isGrounded() {
+    return this.#isGrounded;
+  }
+  //==============================================================================
+  // 착지 알림 설정. (공중에서 바닥에 닿는 순간)
+  //==============================================================================
+  /**
+   * @param { Function } landedEvent
+   */
+  setLandedEvent(landedEvent) {
+    this.#landedEvent = landedEvent;
+  }
+};
+
+// src/misc/floatingtext.js
+var System64 = globalThis;
+var FloatingText = class extends WorldNode {
+  static {
+    __name(this, "FloatingText");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { object[] } */
+  #activeList;
+  /** @private @type { WorldNode[] } */
+  #freeList;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  constructor() {
+    super();
+    this.setName("FloatingText");
+    this.setPivot(Pivot.topLeft.clone());
+    this.setAnchor(Pivot.topLeft.clone());
+    this.#activeList = [];
+    this.#freeList = [];
+  }
+  //==============================================================================
+  // 텍스트 띄우기.
+  //==============================================================================
+  /**
+   * @param { string } text
+   * @param { Vector2 } worldPosition
+   * @param { object } options { color?, fontSize = 22, rise = 46, duration = 0.8, jitter = 10, bold = true }
+   */
+  spawn(text, worldPosition, options = {}) {
+    const fontSize = options.fontSize !== void 0 ? options.fontSize : 22;
+    const rise = options.rise !== void 0 ? options.rise : 46;
+    const duration = options.duration !== void 0 ? options.duration : 0.8;
+    const jitter = options.jitter !== void 0 ? options.jitter : 10;
+    const textColor = options.color ? options.color : new Color(1, 1, 1, 1);
+    let labelNode = this.#freeList.pop();
+    if (!labelNode) {
+      labelNode = new WorldNode();
+      labelNode.setName("FloatingTextItem");
+      labelNode.setPivot(Pivot.middleCenter.clone());
+      labelNode.setAnchor(Pivot.topLeft.clone());
+      labelNode.setContentSize(Vector2.create(240, 40));
+      labelNode.addComponent(UILabel);
+      this.addChild(labelNode);
+    }
+    labelNode.setActive(true);
+    labelNode.setLocalOpacity(1);
+    const labelComponents = labelNode.getComponents(UILabel);
+    const labelComponent = labelComponents[0];
+    labelComponent.setText(text);
+    labelComponent.setFontSize(fontSize);
+    labelComponent.setTextColor(textColor);
+    labelComponent.setBold(options.bold !== void 0 ? options.bold : true);
+    const jitterX = randomRange(-jitter, jitter);
+    const startPosition = Vector2.create(worldPosition.x + jitterX, worldPosition.y);
+    labelNode.setLocalPosition(startPosition);
+    this.#activeList.push({
+      node: labelNode,
+      startPosition,
+      rise,
+      duration,
+      elapsedSeconds: 0
+    });
+  }
+  //==============================================================================
+  // 갱신. (떠오름 + 사라짐 + 회수)
+  //==============================================================================
+  /**
+   * @override
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    super.tick(timeDelta);
+    for (let index = this.#activeList.length - 1; index >= 0; --index) {
+      const item = this.#activeList[index];
+      item.elapsedSeconds += timeDelta;
+      const linearRatio = System64.Math.min(1, item.elapsedSeconds / item.duration);
+      const easedRatio = 1 - (1 - linearRatio) * (1 - linearRatio);
+      item.node.setLocalPosition(Vector2.create(item.startPosition.x, item.startPosition.y - item.rise * easedRatio));
+      item.node.setLocalOpacity(1 - linearRatio * linearRatio);
+      if (linearRatio >= 1) {
+        item.node.setActive(false);
+        this.#freeList.push(item.node);
+        this.#activeList.splice(index, 1);
+      }
+    }
+  }
+  //==============================================================================
+  // 떠 있는 항목 수 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getActiveCount() {
+    return this.#activeList.length;
+  }
+  //==============================================================================
+  // 모두 지우기.
+  //==============================================================================
+  clear() {
+    for (const item of this.#activeList) {
+      item.node.setActive(false);
+      this.#freeList.push(item.node);
+    }
+    this.#activeList.length = 0;
+  }
+};
+
+// src/misc/beepplayer.js
+var System65 = globalThis;
+var BeepPlayer = class extends Object2 {
+  static {
+    __name(this, "BeepPlayer");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { AudioManager } */
+  #audioManager;
+  /** @private @type { number } */
+  #volume;
+  /** @private @type { boolean } */
+  #isMuted;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { AudioManager } audioManager
+   * @param { number } volume 0 ~ 1.
+   */
+  constructor(audioManager, volume = 0.35) {
+    super();
+    this.#audioManager = audioManager;
+    this.#volume = volume;
+    this.#isMuted = false;
+  }
+  //==============================================================================
+  // 단일 톤 재생.
+  //==============================================================================
+  /**
+   * @param { number } frequency 주파수. (Hz)
+   * @param { number } durationSeconds 길이. (초)
+   * @param { string } waveform "sine" | "square" | "sawtooth" | "triangle"
+   * @param { number } delaySeconds 시작 지연. (초)
+   * @param { number } volumeScale 이 톤만의 음량 배율.
+   */
+  playTone(frequency, durationSeconds = 0.08, waveform = "sine", delaySeconds = 0, volumeScale = 1) {
+    if (this.#isMuted) {
+      return;
+    }
+    this.#audioManager.resumeContext();
+    const audioContext = this.#audioManager.getAudioContext();
+    if (!audioContext || audioContext.state !== "running") {
+      return;
+    }
+    const startTime = audioContext.currentTime + delaySeconds;
+    const endTime = startTime + durationSeconds;
+    const attackSeconds = System65.Math.min(5e-3, durationSeconds * 0.25);
+    const releaseSeconds = System65.Math.min(0.02, durationSeconds * 0.5);
+    const peakVolume = System65.Math.max(1e-4, this.#volume * volumeScale);
+    const oscillatorNode = audioContext.createOscillator();
+    oscillatorNode.type = waveform;
+    oscillatorNode.frequency.setValueAtTime(frequency, startTime);
+    const gainNode = audioContext.createGain();
+    gainNode.gain.setValueAtTime(1e-4, startTime);
+    gainNode.gain.linearRampToValueAtTime(peakVolume, startTime + attackSeconds);
+    gainNode.gain.setValueAtTime(peakVolume, System65.Math.max(startTime + attackSeconds, endTime - releaseSeconds));
+    gainNode.gain.exponentialRampToValueAtTime(1e-4, endTime);
+    oscillatorNode.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillatorNode.start(startTime);
+    oscillatorNode.stop(endTime + 0.01);
+    oscillatorNode.onended = () => {
+      oscillatorNode.disconnect();
+      gainNode.disconnect();
+    };
+  }
+  //==============================================================================
+  // 톤 시퀀스 재생.
+  // - [{ frequency, duration, waveform?, volumeScale? }, ...] 를 차례로 이어 튼다.
+  //==============================================================================
+  /**
+   * @param { object[] } toneList
+   */
+  playSequence(toneList) {
+    let delaySeconds = 0;
+    for (const tone of toneList) {
+      this.playTone(
+        tone.frequency,
+        tone.duration,
+        tone.waveform ? tone.waveform : "sine",
+        delaySeconds,
+        tone.volumeScale !== void 0 ? tone.volumeScale : 1
+      );
+      delaySeconds += tone.duration;
+    }
+  }
+  //==============================================================================
+  // 프리셋 재생.
+  //==============================================================================
+  /**
+   * @param { string } presetName "click" | "confirm" | "cancel" | "error" | "success" | "warning" | "notification"
+   */
+  playPreset(presetName) {
+    switch (presetName) {
+      case "click": {
+        this.playTone(880, 0.045, "sine");
+        break;
+      }
+      case "confirm": {
+        this.playSequence([
+          { frequency: 660, duration: 0.06 },
+          { frequency: 990, duration: 0.09 }
+        ]);
+        break;
+      }
+      case "cancel": {
+        this.playSequence([
+          { frequency: 520, duration: 0.06 },
+          { frequency: 360, duration: 0.09 }
+        ]);
+        break;
+      }
+      case "error": {
+        this.playSequence([
+          { frequency: 220, duration: 0.1, waveform: "square", volumeScale: 0.7 },
+          { frequency: 180, duration: 0.14, waveform: "square", volumeScale: 0.7 }
+        ]);
+        break;
+      }
+      case "success": {
+        this.playSequence([
+          { frequency: 523, duration: 0.07 },
+          { frequency: 659, duration: 0.07 },
+          { frequency: 784, duration: 0.12 }
+        ]);
+        break;
+      }
+      case "warning": {
+        this.playSequence([
+          { frequency: 740, duration: 0.08, waveform: "triangle" },
+          { frequency: 740, duration: 0.08, waveform: "triangle" }
+        ]);
+        break;
+      }
+      case "notification": {
+        this.playSequence([
+          { frequency: 1047, duration: 0.06 },
+          { frequency: 1319, duration: 0.1 }
+        ]);
+        break;
+      }
+      default: {
+        this.playTone(880, 0.045, "sine");
+        break;
+      }
+    }
+  }
+  //==============================================================================
+  // 기본 음량 설정.
+  //==============================================================================
+  /**
+   * @param { number } volume 0 ~ 1.
+   */
+  setVolume(volume) {
+    this.#volume = System65.Math.max(0, System65.Math.min(1, volume));
+  }
+  //==============================================================================
+  // 기본 음량 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getVolume() {
+    return this.#volume;
+  }
+  //==============================================================================
+  // 음소거 설정.
+  //==============================================================================
+  /**
+   * @param { boolean } isMuted
+   */
+  setMuted(isMuted) {
+    this.#isMuted = isMuted;
+  }
+  //==============================================================================
+  // 음소거 여부.
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  isMuted() {
+    return this.#isMuted;
+  }
+};
+
+// src/core/soundeffectpool.js
+var SoundEffectPool = class extends Object2 {
+  static {
+    __name(this, "SoundEffectPool");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { AudioPlayer[] } */
+  #playerList;
+  /** @private @type { number } */
+  #nextIndex;
+  /** @private @type { boolean } */
+  #isMuted;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { AudioManager } audioManager
+   * @param { number } voiceCount 동시에 겹칠 수 있는 최대 재생 수.
+   */
+  constructor(audioManager, voiceCount = 6) {
+    super();
+    this.#playerList = [];
+    this.#nextIndex = 0;
+    this.#isMuted = false;
+    for (let index = 0; index < voiceCount; ++index) {
+      this.#playerList.push(audioManager.createAudioPlayer());
+    }
+  }
+  //==============================================================================
+  // 효과음 재생.
+  // - 다음 차례의 플레이어에 애셋을 실어 재생한다. 그 플레이어가 재생 중이었다면 끊고 새로 튼다.
+  //==============================================================================
+  /**
+   * @param { AudioAsset } audioAsset
+   */
+  play(audioAsset) {
+    if (this.#isMuted || !audioAsset) {
+      return;
+    }
+    const player = this.#playerList[this.#nextIndex];
+    this.#nextIndex = (this.#nextIndex + 1) % this.#playerList.length;
+    if (player.isPlaying()) {
+      player.stop();
+    }
+    player.setAudioAsset(audioAsset);
+    player.play(false);
+  }
+  //==============================================================================
+  // 모두 정지.
+  //==============================================================================
+  stopAll() {
+    for (const player of this.#playerList) {
+      if (player.isPlaying()) {
+        player.stop();
+      }
+    }
+  }
+  //==============================================================================
+  // 음소거 설정.
+  //==============================================================================
+  /**
+   * @param { boolean } isMuted
+   */
+  setMuted(isMuted) {
+    this.#isMuted = isMuted;
+    for (const player of this.#playerList) {
+      if (isMuted) {
+        player.mute();
+      } else {
+        player.unmute();
+      }
+    }
+  }
+  //==============================================================================
+  // 음소거 여부.
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  isMuted() {
+    return this.#isMuted;
+  }
+  //==============================================================================
+  // 보이스 수 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getVoiceCount() {
+    return this.#playerList.length;
+  }
+};
+
+// src/ui/popupmotion.js
+var System66 = globalThis;
+var PopupMotionState = {
+  closed: "closed",
+  opening: "opening",
+  open: "open",
+  closing: "closing"
+};
+var PopupMotion = class extends Object2 {
+  static {
+    __name(this, "PopupMotion");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { string } */
+  #state;
+  /** @private @type { number } */
+  #elapsedSeconds;
+  /** @private @type { number } */
+  #openDuration;
+  /** @private @type { number } */
+  #closeDuration;
+  /** @private @type { boolean } */
+  #isInstantEnabled;
+  /** @private @type { Function | null } */
+  #openedEvent;
+  /** @private @type { Function | null } */
+  #closedEvent;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { object } options { openDuration = 0.32, closeDuration = 0.22 }
+   */
+  constructor(options = {}) {
+    super();
+    this.#state = PopupMotionState.closed;
+    this.#elapsedSeconds = 0;
+    this.#openDuration = options.openDuration !== void 0 ? options.openDuration : 0.32;
+    this.#closeDuration = options.closeDuration !== void 0 ? options.closeDuration : 0.22;
+    this.#isInstantEnabled = false;
+    this.#openedEvent = null;
+    this.#closedEvent = null;
+  }
+  //==============================================================================
+  // 열기.
+  //==============================================================================
+  open() {
+    if (this.#state === PopupMotionState.open || this.#state === PopupMotionState.opening) {
+      return;
+    }
+    if (this.#isInstantEnabled) {
+      this.#state = PopupMotionState.open;
+      if (this.#openedEvent) {
+        this.#openedEvent();
+      }
+      return;
+    }
+    this.#state = PopupMotionState.opening;
+    this.#elapsedSeconds = 0;
+  }
+  //==============================================================================
+  // 닫기.
+  //==============================================================================
+  close() {
+    if (this.#state === PopupMotionState.closed || this.#state === PopupMotionState.closing) {
+      return;
+    }
+    if (this.#isInstantEnabled) {
+      this.#state = PopupMotionState.closed;
+      if (this.#closedEvent) {
+        this.#closedEvent();
+      }
+      return;
+    }
+    this.#state = PopupMotionState.closing;
+    this.#elapsedSeconds = 0;
+  }
+  //==============================================================================
+  // 갱신.
+  //==============================================================================
+  /**
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    if (this.#state === PopupMotionState.opening) {
+      this.#elapsedSeconds += timeDelta;
+      if (this.#elapsedSeconds >= this.#openDuration) {
+        this.#state = PopupMotionState.open;
+        if (this.#openedEvent) {
+          this.#openedEvent();
+        }
+      }
+    } else if (this.#state === PopupMotionState.closing) {
+      this.#elapsedSeconds += timeDelta;
+      if (this.#elapsedSeconds >= this.#closeDuration) {
+        this.#state = PopupMotionState.closed;
+        if (this.#closedEvent) {
+          this.#closedEvent();
+        }
+      }
+    }
+  }
+  //==============================================================================
+  // 현재 배율 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getScale() {
+    if (this.#state === PopupMotionState.open) {
+      return 1;
+    }
+    if (this.#state === PopupMotionState.closed) {
+      return 0;
+    }
+    if (this.#state === PopupMotionState.opening) {
+      const ratio2 = System66.Math.min(1, this.#elapsedSeconds / this.#openDuration);
+      const smooth = ratio2 * ratio2 * (3 - 2 * ratio2);
+      if (smooth < 0.72) {
+        return 0.45 + (1.18 - 0.45) * (smooth / 0.72);
+      }
+      return 1.18 - (1.18 - 1) * ((smooth - 0.72) / 0.28);
+    }
+    const ratio = System66.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
+    if (ratio < 0.25) {
+      return 1 + (1.08 - 1) * (ratio / 0.25);
+    }
+    const shrinkRatio = (ratio - 0.25) / 0.75;
+    const eased = shrinkRatio * shrinkRatio * shrinkRatio;
+    return 1.08 - (1.08 - 0.08) * eased;
+  }
+  //==============================================================================
+  // 어둡게 가리는 비율 반환. (0 ~ 1)
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getDimRatio() {
+    if (this.#state === PopupMotionState.open) {
+      return 1;
+    }
+    if (this.#state === PopupMotionState.closed) {
+      return 0;
+    }
+    if (this.#state === PopupMotionState.opening) {
+      return System66.Math.min(1, this.#elapsedSeconds / this.#openDuration);
+    }
+    return 1 - System66.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
+  }
+  //==============================================================================
+  // 조작 가능 여부. (완전히 열린 뒤에만 참)
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  isInteractive() {
+    return this.#state === PopupMotionState.open;
+  }
+  //==============================================================================
+  // 상태 조회.
+  //==============================================================================
+  /** @returns { string } */
+  getState() {
+    return this.#state;
+  }
+  /** @returns { boolean } */
+  isVisible() {
+    return this.#state !== PopupMotionState.closed;
+  }
+  //==============================================================================
+  // 즉시 전환 여부 설정. (연출 없는 UI 톤)
+  //==============================================================================
+  /**
+   * @param { boolean } isInstantEnabled
+   */
+  setInstantEnabled(isInstantEnabled) {
+    this.#isInstantEnabled = isInstantEnabled;
+  }
+  //==============================================================================
+  // 알림 설정.
+  //==============================================================================
+  /** @param { Function } openedEvent */
+  setOpenedEvent(openedEvent) {
+    this.#openedEvent = openedEvent;
+  }
+  /** @param { Function } closedEvent */
+  setClosedEvent(closedEvent) {
+    this.#closedEvent = closedEvent;
+  }
+};
+
+// src/ui/uitoast.js
+var System67 = globalThis;
+var UIToast = class extends WorldNode {
+  static {
+    __name(this, "UIToast");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { string[] } */
+  #messageQueue;
+  /** @private @type { string } */
+  #phase;
+  // "hidden" | "enter" | "hold" | "exit"
+  /** @private @type { number } */
+  #phaseSeconds;
+  /** @private @type { number } */
+  #holdSeconds;
+  /** @private @type { number } */
+  #restY;
+  /** @private @type { number } */
+  #riseDistance;
+  /** @private @type { UILabel } */
+  #label;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { object } options { width = 400, height = 48, restY = 560, holdSeconds = 1.8, backgroundColor?, textColor? }
+   */
+  constructor(options = {}) {
+    super();
+    const width = options.width !== void 0 ? options.width : 400;
+    const height = options.height !== void 0 ? options.height : 48;
+    this.#restY = options.restY !== void 0 ? options.restY : 560;
+    this.#holdSeconds = options.holdSeconds !== void 0 ? options.holdSeconds : 1.8;
+    this.#riseDistance = 28;
+    this.#messageQueue = [];
+    this.#phase = "hidden";
+    this.#phaseSeconds = 0;
+    this.setName("UIToast");
+    this.setPivot(Pivot.middleCenter.clone());
+    this.setAnchor(Pivot.topLeft.clone());
+    this.setContentSize(Vector2.create(width, height));
+    this.setActive(false);
+    const paint = this.addComponent(Paint);
+    paint.setColor(options.backgroundColor ? options.backgroundColor : new Color(0.09, 0.1, 0.13, 0.92));
+    paint.setRoundSize(height * 0.5);
+    this.#label = this.addComponent(UILabel);
+    this.#label.setText("");
+    this.#label.setFontSize(15);
+    this.#label.setTextColor(options.textColor ? options.textColor : new Color(0.96, 0.97, 1, 1));
+  }
+  //==============================================================================
+  // 토스트 표시. (표시 중이면 줄을 선다)
+  //==============================================================================
+  /**
+   * @param { string } messageText
+   */
+  show(messageText) {
+    this.#messageQueue.push(messageText);
+    if (this.#phase === "hidden") {
+      this.presentNext();
+    }
+  }
+  //==============================================================================
+  // 다음 메시지 표시.
+  //==============================================================================
+  /**
+   * @private
+   */
+  presentNext() {
+    if (this.#messageQueue.length === 0) {
+      this.#phase = "hidden";
+      this.setActive(false);
+      return;
+    }
+    const messageText = this.#messageQueue.shift();
+    this.#label.setText(messageText);
+    this.#phase = "enter";
+    this.#phaseSeconds = 0;
+    this.setActive(true);
+    this.setLocalOpacity(0);
+    this.updatePosition(0);
+  }
+  //==============================================================================
+  // 갱신.
+  //==============================================================================
+  /**
+   * @override
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    super.tick(timeDelta);
+    if (this.#phase === "hidden") {
+      return;
+    }
+    this.#phaseSeconds += timeDelta;
+    if (this.#phase === "enter") {
+      const ratio = System67.Math.min(1, this.#phaseSeconds / 0.24);
+      const eased = 1 - (1 - ratio) * (1 - ratio);
+      this.setLocalOpacity(eased);
+      this.updatePosition(eased);
+      if (ratio >= 1) {
+        this.#phase = "hold";
+        this.#phaseSeconds = 0;
+      }
+    } else if (this.#phase === "hold") {
+      if (this.#phaseSeconds >= this.#holdSeconds) {
+        this.#phase = "exit";
+        this.#phaseSeconds = 0;
+      }
+    } else if (this.#phase === "exit") {
+      const ratio = System67.Math.min(1, this.#phaseSeconds / 0.2);
+      this.setLocalOpacity(1 - ratio);
+      this.updatePosition(1 + ratio * 0.4);
+      if (ratio >= 1) {
+        this.presentNext();
+      }
+    }
+  }
+  //==============================================================================
+  // 진행 비율에 따른 자리 갱신. (0 = 아래에서 출발, 1 = 제자리)
+  //==============================================================================
+  /**
+   * @private
+   * @param { number } progressRatio
+   */
+  updatePosition(progressRatio) {
+    const parentNode = this.getParent();
+    let centerX = 480;
+    if (parentNode) {
+      const parentSize = parentNode.getContentSize();
+      if (parentSize.x > 0) {
+        centerX = parentSize.x * 0.5;
+      }
+    }
+    this.setLocalPosition(Vector2.create(centerX, this.#restY + this.#riseDistance * (1 - progressRatio)));
+  }
+  //==============================================================================
+  // 표시 자리(가운데 세로 좌표) 설정.
+  //==============================================================================
+  /**
+   * @param { number } restY
+   */
+  setRestY(restY) {
+    this.#restY = restY;
+  }
+  //==============================================================================
+  // 머무는 시간 설정.
+  //==============================================================================
+  /**
+   * @param { number } holdSeconds
+   */
+  setHoldSeconds(holdSeconds) {
+    this.#holdSeconds = holdSeconds;
+  }
+  //==============================================================================
+  // 표시 중 여부.
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  isShowing() {
+    return this.#phase !== "hidden";
+  }
+};
+
+// src/ui/uidialog.js
+var UIDialog = class extends WorldNode {
+  static {
+    __name(this, "UIDialog");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { PopupMotion } */
+  #popupMotion;
+  /** @private @type { WorldNode } */
+  #overlayNode;
+  /** @private @type { WorldNode } */
+  #panelNode;
+  /** @private @type { UILabel } */
+  #messageLabel;
+  /** @private @type { WorldNode } */
+  #confirmNode;
+  /** @private @type { WorldNode } */
+  #cancelNode;
+  /** @private @type { Function | null } */
+  #confirmHandler;
+  /** @private @type { Function | null } */
+  #cancelHandler;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { object } options { width = 420, height = 240, confirmText = "확인", cancelText = "취소",
+   *                             panelColor?, accentColor?, textColor? }
+   */
+  constructor(options = {}) {
+    super();
+    const panelWidth = options.width !== void 0 ? options.width : 420;
+    const panelHeight = options.height !== void 0 ? options.height : 240;
+    const panelColor = options.panelColor ? options.panelColor : new Color(0.13, 0.15, 0.2, 1);
+    const accentColor = options.accentColor ? options.accentColor : new Color(0.23, 0.51, 0.96, 1);
+    const textColor = options.textColor ? options.textColor : new Color(0.96, 0.97, 1, 1);
+    this.setName("UIDialog");
+    this.setPivot(Pivot.topLeft.clone());
+    this.setAnchor(Pivot.topLeft.clone());
+    this.setActive(false);
+    this.#confirmHandler = null;
+    this.#cancelHandler = null;
+    this.#overlayNode = new WorldNode();
+    this.#overlayNode.setName("DialogOverlay");
+    this.#overlayNode.setPivot(Pivot.topLeft.clone());
+    this.#overlayNode.setAnchor(Pivot.topLeft.clone());
+    this.#overlayNode.setInteractable(true);
+    const overlayPaint = this.#overlayNode.addComponent(Paint);
+    overlayPaint.setColor(new Color(0, 0, 0, 0.55));
+    const overlayButton = this.#overlayNode.addComponent(UIButton);
+    overlayButton.setPressedTintColor(new Color(0, 0, 0, 0));
+    overlayButton.setClickedEvent(() => {
+      this.dismiss(false);
+    });
+    this.addChild(this.#overlayNode);
+    this.#panelNode = new WorldNode();
+    this.#panelNode.setName("DialogPanel");
+    this.#panelNode.setPivot(Pivot.middleCenter.clone());
+    this.#panelNode.setAnchor(Pivot.topLeft.clone());
+    this.#panelNode.setContentSize(Vector2.create(panelWidth, panelHeight));
+    const panelPaint = this.#panelNode.addComponent(Paint);
+    panelPaint.setColor(panelColor);
+    panelPaint.setRoundSize(18);
+    this.addChild(this.#panelNode);
+    const messageNode = new WorldNode();
+    messageNode.setName("DialogMessage");
+    messageNode.setPivot(Pivot.topLeft.clone());
+    messageNode.setAnchor(Pivot.topLeft.clone());
+    messageNode.setContentSize(Vector2.create(panelWidth - 56, panelHeight - 120));
+    messageNode.setLocalPosition(Vector2.create(28, 24));
+    this.#messageLabel = messageNode.addComponent(UILabel);
+    this.#messageLabel.setText("");
+    this.#messageLabel.setFontSize(17);
+    this.#messageLabel.setTextColor(textColor);
+    this.#messageLabel.setWordWrapWidth(panelWidth - 56);
+    this.#panelNode.addChild(messageNode);
+    const buttonWidth = (panelWidth - 56 - 16) * 0.5;
+    this.#cancelNode = this.createButtonNode(
+      "DialogCancel",
+      options.cancelText ? options.cancelText : "\uCDE8\uC18C",
+      new Color(0.22, 0.25, 0.32, 1),
+      textColor,
+      buttonWidth
+    );
+    this.#cancelNode.setLocalPosition(Vector2.create(28, panelHeight - 76));
+    this.#panelNode.addChild(this.#cancelNode);
+    this.#confirmNode = this.createButtonNode(
+      "DialogConfirm",
+      options.confirmText ? options.confirmText : "\uD655\uC778",
+      accentColor,
+      textColor,
+      buttonWidth
+    );
+    this.#confirmNode.setLocalPosition(Vector2.create(28 + buttonWidth + 16, panelHeight - 76));
+    this.#panelNode.addChild(this.#confirmNode);
+    const cancelButton = this.#cancelNode.getComponents(UIButton)[0];
+    cancelButton.setClickedEvent(() => {
+      this.dismiss(false);
+    });
+    const confirmButton = this.#confirmNode.getComponents(UIButton)[0];
+    confirmButton.setClickedEvent(() => {
+      this.dismiss(true);
+    });
+    this.#popupMotion = new PopupMotion();
+    this.#popupMotion.setClosedEvent(() => {
+      this.setActive(false);
+    });
+  }
+  //==============================================================================
+  // 단추 노드 생성.
+  //==============================================================================
+  /**
+   * @private
+   * @param { string } nodeName
+   * @param { string } labelText
+   * @param { Color } fillColor
+   * @param { Color } textColor
+   * @param { number } buttonWidth
+   * @returns { WorldNode }
+   */
+  createButtonNode(nodeName, labelText, fillColor, textColor, buttonWidth) {
+    const buttonNode = new WorldNode();
+    buttonNode.setName(nodeName);
+    buttonNode.setPivot(Pivot.topLeft.clone());
+    buttonNode.setAnchor(Pivot.topLeft.clone());
+    buttonNode.setContentSize(Vector2.create(buttonWidth, 52));
+    buttonNode.setInteractable(true);
+    const paint = buttonNode.addComponent(Paint);
+    paint.setColor(fillColor);
+    paint.setRoundSize(14);
+    buttonNode.addComponent(UIButton);
+    const label = buttonNode.addComponent(UILabel);
+    label.setText(labelText);
+    label.setFontSize(16);
+    label.setTextColor(textColor);
+    return buttonNode;
+  }
+  //==============================================================================
+  // 대화 상자 열기.
+  // - onCancel 을 넘기지 않으면 취소 단추를 감추고 확인 단추를 가운데로 넓힌다.
+  //==============================================================================
+  /**
+   * @param { string } messageText
+   * @param { object } options { onConfirm?, onCancel?, confirmText?, cancelText? }
+   */
+  show(messageText, options = {}) {
+    this.#messageLabel.setText(messageText);
+    this.#confirmHandler = options.onConfirm ? options.onConfirm : null;
+    this.#cancelHandler = options.onCancel ? options.onCancel : null;
+    if (options.confirmText) {
+      this.#confirmNode.getComponents(UILabel)[0].setText(options.confirmText);
+    }
+    if (options.cancelText) {
+      this.#cancelNode.getComponents(UILabel)[0].setText(options.cancelText);
+    }
+    const panelSize = this.#panelNode.getContentSize();
+    const hasCancel = options.onCancel !== void 0 && options.onCancel !== null;
+    const buttonWidth = (panelSize.x - 56 - 16) * 0.5;
+    this.#cancelNode.setActive(hasCancel);
+    if (hasCancel) {
+      this.#confirmNode.setContentSize(Vector2.create(buttonWidth, 52));
+      this.#confirmNode.setLocalPosition(Vector2.create(28 + buttonWidth + 16, panelSize.y - 76));
+    } else {
+      this.#confirmNode.setContentSize(Vector2.create(panelSize.x - 56, 52));
+      this.#confirmNode.setLocalPosition(Vector2.create(28, panelSize.y - 76));
+    }
+    this.setActive(true);
+    this.updateLayoutToParent();
+    this.#popupMotion.open();
+    this.applyMotion();
+  }
+  //==============================================================================
+  // 닫기. (isConfirmed 에 따라 확인 / 취소 처리를 부른다)
+  //==============================================================================
+  /**
+   * @param { boolean } isConfirmed
+   */
+  dismiss(isConfirmed) {
+    if (!this.#popupMotion.isInteractive()) {
+      return;
+    }
+    const handler = isConfirmed ? this.#confirmHandler : this.#cancelHandler;
+    this.#confirmHandler = null;
+    this.#cancelHandler = null;
+    this.#popupMotion.close();
+    if (handler) {
+      handler();
+    }
+  }
+  //==============================================================================
+  // 갱신.
+  //==============================================================================
+  /**
+   * @override
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    super.tick(timeDelta);
+    this.#popupMotion.tick(timeDelta);
+    this.applyMotion();
+  }
+  //==============================================================================
+  // 전환기 산출값을 노드에 반영.
+  //==============================================================================
+  /**
+   * @private
+   */
+  applyMotion() {
+    this.#overlayNode.setLocalOpacity(this.#popupMotion.getDimRatio());
+    const panelScale = this.#popupMotion.getScale();
+    this.#panelNode.setLocalScale(Vector2.create(panelScale, panelScale));
+  }
+  //==============================================================================
+  // 부모 크기에 맞춰 막과 카드 자리를 갱신.
+  //==============================================================================
+  /**
+   * @private
+   */
+  updateLayoutToParent() {
+    const parentNode = this.getParent();
+    let areaWidth = 960;
+    let areaHeight = 640;
+    if (parentNode) {
+      const parentSize = parentNode.getContentSize();
+      if (parentSize.x > 0 && parentSize.y > 0) {
+        areaWidth = parentSize.x;
+        areaHeight = parentSize.y;
+      }
+    }
+    this.setContentSize(Vector2.create(areaWidth, areaHeight));
+    this.#overlayNode.setContentSize(Vector2.create(areaWidth, areaHeight));
+    this.#overlayNode.setLocalPosition(Vector2.create(0, 0));
+    this.#panelNode.setLocalPosition(Vector2.create(areaWidth * 0.5, areaHeight * 0.5));
+  }
+  //==============================================================================
+  // 표시 중 여부.
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  isShowing() {
+    return this.#popupMotion.isVisible();
+  }
+  //==============================================================================
+  // 즉시 전환 여부 설정. (연출 없는 UI 톤)
+  //==============================================================================
+  /**
+   * @param { boolean } isInstantEnabled
+   */
+  setInstantEnabled(isInstantEnabled) {
+    this.#popupMotion.setInstantEnabled(isInstantEnabled);
+  }
+};
+
 // import.js
-var System45 = globalThis;
+var System68 = globalThis;
 export {
   Action,
   Animation,
@@ -27429,23 +32078,36 @@ export {
   Animator,
   Asset,
   AudioAsset,
+  AudioPlayer,
+  BeepPlayer,
   BlobAsset,
   BloomEffect,
   BrowserType,
   BunchAsset,
   Camera,
+  Camera2D,
+  Collision2D,
   Color,
   Colors,
   Component,
   ComponentNode,
+  Cooldown,
+  DialogueRunner,
+  DialogueScriptParser,
   Dictionary,
   Engine,
   EngineConfiguration,
   Enum,
+  FiniteStateMachine,
+  FloatingText,
+  FocusNavigator,
   FontAsset,
+  format_exports as Format,
   Frame,
   FullscreenPass,
+  GamepadManager,
   Graphic,
+  Grid,
   Identifier,
   ImageAsset2 as ImageAsset,
   ImageScroller,
@@ -27461,6 +32123,8 @@ export {
   LayoutTerm,
   LayoutVariable,
   List,
+  LocalStorage,
+  Localization,
   Mask,
   Material,
   math_exports as Math,
@@ -27469,28 +32133,41 @@ export {
   NodeLayout,
   OBB,
   Object2 as Object,
+  ObjectPool,
   Paint,
+  PathFinder,
+  PersistedStore,
   Pivot,
   Platform,
   PlatformType,
+  PlatformerBody,
+  PointerGesture,
+  PopupMotion,
+  PopupMotionState,
   Quaternion,
   Queue,
   Rect,
   reflection_exports as Reflection,
   RenderTarget,
+  RepeatTimer,
   RichText,
   Scene,
   SceneManager,
   ScrollBarAxis,
+  SeededRandom,
   Set2 as Set,
   ShaderProgram,
   ShadowMap,
+  Shaker,
   Singleton,
   SkinnedModel,
   SkinnedModelRenderer,
+  SoundEffectPool,
   Sprite,
+  SpriteAnimator,
   Stack,
-  System45 as System,
+  Steering2D,
+  System68 as System,
   Text,
   TextAlign,
   TextAsset,
@@ -27502,8 +32179,10 @@ export {
   TouchRecognizer,
   TransformNode,
   Tween,
+  Typewriter,
   UIButton,
   UIControl,
+  UIDialog,
   UIDocument,
   UIImageView,
   UIInputField,
@@ -27515,6 +32194,7 @@ export {
   UIScrollView,
   UISlider,
   UISnapScrollView,
+  UIToast,
   UIToggleButton,
   UIView,
   Vector2,

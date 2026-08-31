@@ -55,6 +55,36 @@ export class NodeLayout extends Object {
 	 * @param { Function } [nodeClass]
 	 * @returns { NodeLayout }
 	 */
+	//==============================================================================
+	// 부채꼴 배치. (정적 — 손패 카드처럼 노드들을 호 위에 펼친다)
+	// - 가운데 항목이 baseAngleRadian 방향(기본 위쪽)을 보도록 좌우 대칭으로 벌린다.
+	// - rotateNodes 가 참이면 각 노드의 회전도 호의 접선에 맞춘다.
+	//==============================================================================
+	/**
+	 * @param { WorldNode[] } nodeList
+	 * @param { object } options { centerX, centerY, radius, angleStepRadian = 0.12, baseAngleRadian = -PI/2, rotateNodes = true }
+	 */
+	static arrangeFan(nodeList, options) {
+		const count = nodeList.length;
+		if (count === 0) {
+			return;
+		}
+		const angleStepRadian = (options.angleStepRadian !== undefined) ? options.angleStepRadian : 0.12;
+		const baseAngleRadian = (options.baseAngleRadian !== undefined) ? options.baseAngleRadian : -System.Math.PI / 2;
+		const rotateNodes = (options.rotateNodes !== undefined) ? options.rotateNodes : true;
+		const middleIndex = (count - 1) / 2;
+		for (let index = 0; index < count; ++index) {
+			const node = nodeList[index];
+			const angleRadian = baseAngleRadian + (index - middleIndex) * angleStepRadian;
+			const positionX = options.centerX + System.Math.cos(angleRadian) * options.radius;
+			const positionY = options.centerY + System.Math.sin(angleRadian) * options.radius;
+			node.setLocalPosition(Vector2.create(positionX, positionY));
+			if (rotateNodes) {
+				node.setLocalRotation(angleRadian - baseAngleRadian);
+			}
+		}
+	}
+
 	static create(nodeClass) {
 		const nodeLayout = new NodeLayout(nodeClass);
 		return nodeLayout;

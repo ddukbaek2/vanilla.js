@@ -217,6 +217,56 @@ export class UILabel extends UIView {
 	/**
 	 * @param { FontFace | FontAsset | null } font
 	 */
+	//==============================================================================
+	// 자동 줄바꿈 폭 설정. (일반 텍스트 모드 전용 — 0 이면 한 줄)
+	//==============================================================================
+	/**
+	 * @param { number } wordWrapWidth
+	 */
+	setWordWrapWidth(wordWrapWidth) {
+		if (this.#text) {
+			this.#text.setWordWrapWidth(wordWrapWidth);
+		}
+		this.invalidateIntrinsicContentSize();
+	}
+
+	//==============================================================================
+	// 줄바꿈 방식 설정. ("word" | "char")
+	//==============================================================================
+	/**
+	 * @param { string } wrapMode
+	 */
+	setWrapMode(wrapMode) {
+		if (this.#text) {
+			this.#text.setWrapMode(wrapMode);
+		}
+	}
+
+	//==============================================================================
+	// 줄 간격 배율 설정.
+	//==============================================================================
+	/**
+	 * @param { number } lineSpacing
+	 */
+	setLineSpacing(lineSpacing) {
+		if (this.#text) {
+			this.#text.setLineSpacing(lineSpacing);
+		}
+		this.invalidateIntrinsicContentSize();
+	}
+
+	//==============================================================================
+	// 표시 글자 수 설정. (-1 이면 전체 — 타자기 연출용, 일반 텍스트 모드 전용)
+	//==============================================================================
+	/**
+	 * @param { number } visibleCharacterCount
+	 */
+	setVisibleCharacterCount(visibleCharacterCount) {
+		if (this.#text) {
+			this.#text.setVisibleCharacterCount(visibleCharacterCount);
+		}
+	}
+
 	setFont(font) {
 		if (this.#text) {
 			this.#text.setFont(font);

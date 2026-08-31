@@ -1,0 +1,12 @@
+# 2026-08-31 작업 로그
+
+## 엔진 기능 흡수 (실험적 브랜치) [08-30 요청 → 13:06 응답]
+- 요청: 루트와 동일 계층의 vanilla.js 사용 프로젝트(샘플 / 도구 제외)를 전수 조사해, 프로젝트에는 있는데 엔진에 없는 범용 기능을 전부 실험적 브랜치에 추가. 질문 없이 전체 추가하되 품질 최상, 버그 없음.
+- 조사: Explore 서브에이전트 6개로 16개 프로젝트 조사, 결과를 feature_survey.md 로 통합. 반복 구현 패턴(지수 감쇠 접근, 안전 영역, 시드 난수, 팝업 전환, 토스트, 제스처, FSM 등) 우선.
+- 추가 (base): math 난수 / 보간 유틸, SeededRandom, Cooldown / RepeatTimer, ObjectPool, FiniteStateMachine 재작성, Format, Color.fromHEXCached.
+- 추가 (core): InputManager 키 엣지 검출, ViewManager 안전 영역 / 화면비 자동 스케일 / 픽셀 배율 상한, Engine.exitApplication, TextAsset noCache, SoundEffectPool, Text 자동 줄바꿈 / 글자 수 노출, AnimationClip.fromAtlas.
+- 추가 (ui): UILabel 줄바꿈 전달, UIButton 최소 눌림 시간, UIProgressView 보조 게이지, PopupMotion, UIToast, UIDialog.
+- 추가 (misc): PathFinder, Grid, Collision2D, Steering2D, Camera2D, PointerGesture, Shaker, FocusNavigator, PersistedStore, Localization, LocalStorage.clearByPrefix, Typewriter, DialogueRunner / Parser, SpriteAnimator, PlatformerBody, FloatingText, BeepPlayer.
+- import.js 에 신규 모듈과 기존 미공개 모듈(FiniteStateMachine / LocalStorage / GamepadManager / AudioPlayer) 노출, build/vanilla.js / vanilla.min.js 재빌드.
+- 검증: 순수 로직 Node 테스트 41 + 42건 통과, 헤드리스 크롬 실엔진 스모크 26건 통과 (줄바꿈 측정 / 타자기 / 토스트 / 대화 상자 / 떠오르는 텍스트 / 플랫포머 착지 / 입력 엣지 / 안전 영역).
+- 보류 (사유와 함께 feature_survey.md 에 기록): 전역 색 리맵, NoticeCenter, GamepadCursor, borrow 풀, Scene 모달 스택, 원격 config.

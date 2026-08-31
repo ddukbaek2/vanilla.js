@@ -1,5 +1,38 @@
 # 업데이트 기록
 
+# 0.4.0-experimental (2026-08-31)
+- 형제 게임 프로젝트들에서 반복 구현되던 범용 기능을 엔진으로 흡수 (실험적 브랜치)
+- base
+  - math: randomRange / randomInt / pickRandom / shuffle / approach / moveTowards 추가
+  - SeededRandom 추가 (mulberry32, 일일 시드 생성 포함)
+  - Cooldown / RepeatTimer 추가
+  - ObjectPool 추가
+  - FiniteStateMachine 재작성 (enter / tick / exit, 전이 가드 / 알림)
+  - Format 추가 (천 단위 / 한국어 단위 / K·M·B 축약 / 자릿수 채움 / 분:초)
+  - Color.fromHEXCached 추가 (공유 인스턴스 캐시)
+- core
+  - InputManager: isKeyJustPressed / isKeyJustReleased (프레임 엣지 검출) 추가
+  - ViewManager: 안전 영역 조회(getSafeAreaInsets), 화면비 기반 자동 스케일 모드(applyAspectViewScaleMode), 렌더 픽셀 배율 상한(setMaxRenderPixelRatio) 추가
+  - Engine.exitApplication 추가 (Capacitor 앱 종료 지원)
+  - TextAsset: 캐시 무시 로드(setNoCache) 추가
+  - SoundEffectPool 추가 (다중 보이스 효과음 재생)
+  - Text: 자동 줄바꿈(단어 / 글자 단위), 줄 간격, 글자 수 노출(타자기용) 추가
+  - AnimationClip.fromAtlas 추가 (TexturePacker json / 사각형 배열)
+- ui
+  - UILabel: 줄바꿈 / 노출 글자 수 전달 메서드 추가
+  - UIButton: 최소 눌림 시간(setMinimumPressedSeconds) 추가
+  - UIProgressView: 보조 게이지(setSecondaryValue) 추가
+  - PopupMotion 추가 (팝업 등장 / 퇴장 배율·딤 전환기)
+  - UIToast 추가 (줄 세워 보여 주는 알약 알림)
+  - UIDialog 추가 (딤 + 카드 + 확인 / 취소 대화 상자)
+- misc
+  - PathFinder(A*), Grid(플러드필 / 연결 검사 / 사각형 겹침), Collision2D, Steering2D 추가
+  - Camera2D 추가 (팬 / 줌 / 관성 / 추적 / 경계 / 트윈, 앵커 보존 줌)
+  - PointerGesture(탭 / 드래그 / 길게 누름), Shaker(화면 흔들림), FocusNavigator(방향키 포커스 이동) 추가
+  - PersistedStore(버전 붙은 저장소), Localization(다국어 표), LocalStorage.clearByPrefix 추가
+  - Typewriter, DialogueRunner / DialogueScriptParser(대화 스크립트), SpriteAnimator, PlatformerBody, FloatingText, BeepPlayer 추가
+- 검증: 순수 로직 Node 테스트 83건(41 + 42) 통과, 헤드리스 크롬 스모크 26건 통과
+
 # 0.3.0 (2026-08-30)
 - 렌더러 교체: Canvas 2D -> WebGL2
 - WebGL2 3D 샘플 추가 (NEON HORIZON / ancientmountain) — 절차적 지형, 블룸, 파티클, 함대 연출

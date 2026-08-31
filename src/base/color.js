@@ -220,6 +220,31 @@ export class Color extends Object {
 	 * @param { string } colorString 
 	 * @returns { Color }
 	 */
+	//==============================================================================
+	// 캐시를 거치는 HEX 색 생성. (정적)
+	// - 매 프레임 같은 문자열로 Color 를 새로 만들며 생기는 GC 압박을 줄인다.
+	// - 반환된 인스턴스는 공유되므로 절대 고쳐 쓰지 않는다. 고칠 거면 clone() 한다.
+	// - 알파는 0.01 단위로 양자화해 캐시가 불어나는 것을 막는다.
+	//==============================================================================
+	/**
+	 * @param { string } colorString
+	 * @param { number } alpha
+	 * @returns { Color }
+	 */
+	static fromHEXCached(colorString, alpha = 1) {
+		const quantizedAlpha = System.Math.round(alpha * 100) / 100;
+		const cacheKey = colorString + "@" + quantizedAlpha;
+		let cachedColor = Color.#hexCache.get(cacheKey);
+		if (!cachedColor) {
+			cachedColor = Color.createFromHEX(colorString);
+			cachedColor.alpha = quantizedAlpha;
+			Color.#hexCache.set(cacheKey, cachedColor);
+		}
+		return cachedColor;
+	}
+
+	/** @private @type { Map } */ static #hexCache = new System.Map();
+
 	static createFromHEX(colorString) {
 		const color = new Color(1.0, 1.0, 1.0, 1.0);
 		colorString = colorString.trim().toLowerCase();

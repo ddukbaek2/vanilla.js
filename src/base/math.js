@@ -315,3 +315,99 @@ export function radianToDegree(radian) {
 	const degree = radian / (PI / 180);
 	return degree;
 }
+
+//==============================================================================
+// min 이상 max 미만의 실수 난수 반환.
+//==============================================================================
+/**
+ * @param { number } minValue
+ * @param { number } maxValue
+ * @returns { number }
+ */
+export function randomRange(minValue, maxValue) {
+	const value = minValue + (maxValue - minValue) * random();
+	return value;
+}
+
+//==============================================================================
+// min 이상 max 이하의 정수 난수 반환.
+//==============================================================================
+/**
+ * @param { number } minValue
+ * @param { number } maxValue
+ * @returns { number }
+ */
+export function randomInt(minValue, maxValue) {
+	const value = minValue + floor(random() * (maxValue - minValue + 1));
+	return value;
+}
+
+//==============================================================================
+// 배열에서 무작위로 하나 뽑아 반환.
+//==============================================================================
+/**
+ * @template T
+ * @param { T[] } array
+ * @returns { T | undefined }
+ */
+export function pickRandom(array) {
+	if (!array || array.length === 0) {
+		return undefined;
+	}
+	const index = randomInt(0, array.length - 1);
+	return array[index];
+}
+
+//==============================================================================
+// 배열 제자리 셔플. (Fisher-Yates)
+// - randomFunction 을 넘기면 그 난수를 쓴다. (SeededRandom 의 nextValue 등)
+//==============================================================================
+/**
+ * @template T
+ * @param { T[] } array
+ * @param { Function } randomFunction 0 이상 1 미만을 반환하는 함수.
+ * @returns { T[] }
+ */
+export function shuffle(array, randomFunction = random) {
+	for (let index = array.length - 1; index > 0; --index) {
+		const swapIndex = floor(randomFunction() * (index + 1));
+		const temporary = array[index];
+		array[index] = array[swapIndex];
+		array[swapIndex] = temporary;
+	}
+	return array;
+}
+
+//==============================================================================
+// 프레임률 독립 지수 감쇠 추종.
+// - 목표가 도중에 바뀌어도 튀지 않고 부드럽게 따라간다. (여러 게임이 재발명하던 공식)
+// - rate 가 클수록 빨리 붙는다. current + (target - current) * (1 - e^(-rate * dt))
+//==============================================================================
+/**
+ * @param { number } currentValue
+ * @param { number } targetValue
+ * @param { number } rate
+ * @param { number } timeDelta
+ * @returns { number }
+ */
+export function approach(currentValue, targetValue, rate, timeDelta) {
+	const blendRatio = 1 - System.Math.exp(-rate * timeDelta);
+	return currentValue + (targetValue - currentValue) * blendRatio;
+}
+
+//==============================================================================
+// 값을 일정 속도로 목표까지 이동. (지나치지 않는다)
+//==============================================================================
+/**
+ * @param { number } currentValue
+ * @param { number } targetValue
+ * @param { number } maxDelta
+ * @returns { number }
+ */
+export function moveTowards(currentValue, targetValue, maxDelta) {
+	const difference = targetValue - currentValue;
+	if (abs(difference) <= maxDelta) {
+		return targetValue;
+	}
+	return currentValue + (difference > 0 ? maxDelta : -maxDelta);
+}
