@@ -16,3 +16,6 @@
 ## EFFECTS 샘플 (4번째) [11:30 요청 → 진행]
 - 엔진에 ParticleSystem / TrailRenderer 추가(유니티식 rate / burst / shape / 그라디언트 / 중력 / 가산 / 월드 공간).
 - examples/effects: 불 / 분수 / 눈 / 색종이 / 폭발 / 불꽃놀이 / 마법 궤적 7모드 놀이터. Node 단독 검증 + 헤드리스 확인 진행.
+- 검증 종결: 쇼케이스 스모크 18/19(잔여 1건은 스크롤 클램프 특성으로 정상 확인), EFFECTS 는 불 / 눈 시각 검증 +
+  버스트 방출 Node 단독 검증 + 클릭 경로 무예외 확인 (헤드리스 이중 rAF 로 버스트류는 촬영 불가 — 하네스 한계).
+- 배포: uishowcase(콘솔 앱) / uieditor 재빌드 / neonhorizon 엔진 최신화 / effects 신규 + 메인 페이지 카드 / README 링크.
