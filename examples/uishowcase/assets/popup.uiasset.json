@@ -23,8 +23,8 @@
 			0
 		],
 		"contentSize": [
-			1440,
-			900
+			1680,
+			1000
 		],
 		"interactable": false,
 		"components": [],
@@ -52,8 +52,8 @@
 					0
 				],
 				"contentSize": [
-					1440,
-					900
+					1680,
+					1000
 				],
 				"interactable": true,
 				"components": [
@@ -62,8 +62,8 @@
 						"color": [
 							0.016,
 							0.024,
-							0.043,
-							0.66
+							0.039,
+							0.62
 						],
 						"roundSize": 0
 					},
@@ -84,8 +84,8 @@
 				"name": "Dialog",
 				"active": true,
 				"position": [
-					720,
-					440
+					840,
+					490
 				],
 				"scale": [
 					1,
@@ -102,71 +102,30 @@
 					0
 				],
 				"contentSize": [
-					400,
-					216
+					380,
+					196
 				],
 				"interactable": false,
 				"components": [
 					{
 						"type": "Paint",
 						"color": [
-							0.086,
+							0.09,
 							0.106,
-							0.161,
+							0.141,
 							1
 						],
-						"roundSize": 14
+						"roundSize": 12
 					}
 				],
 				"children": [
 					{
 						"type": "WorldNode",
-						"name": "DialogAccent",
-						"active": true,
-						"position": [
-							0,
-							0
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							400,
-							3
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "Paint",
-								"color": [
-									0.424,
-									0.482,
-									1,
-									1
-								],
-								"roundSize": 1.5
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
 						"name": "DialogTitle",
 						"active": true,
 						"position": [
-							24,
-							24
+							22,
+							20
 						],
 						"scale": [
 							1,
@@ -183,19 +142,19 @@
 							0
 						],
 						"contentSize": [
-							352,
-							26
+							336,
+							22
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
-								"text": "Open this content?",
-								"fontSize": 17,
+								"text": "",
+								"fontSize": 15,
 								"textColor": [
-									0.91,
-									0.925,
-									0.957,
+									0.902,
+									0.914,
+									0.937,
 									1
 								],
 								"backgroundColor": [
@@ -215,8 +174,8 @@
 						"name": "DialogMessage",
 						"active": true,
 						"position": [
-							24,
-							60
+							22,
+							52
 						],
 						"scale": [
 							1,
@@ -233,19 +192,19 @@
 							0
 						],
 						"contentSize": [
-							352,
-							56
+							336,
+							54
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
-								"text": "It will use 10 energy.",
-								"fontSize": 13,
+								"text": "",
+								"fontSize": 11.5,
 								"textColor": [
-									0.486,
-									0.522,
-									0.596,
+									0.541,
+									0.569,
+									0.627,
 									1
 								],
 								"backgroundColor": [
@@ -265,8 +224,8 @@
 						"name": "CancelButton",
 						"active": true,
 						"position": [
-							24,
-							148
+							22,
+							134
 						],
 						"scale": [
 							1,
@@ -283,20 +242,20 @@
 							0
 						],
 						"contentSize": [
-							170,
-							44
+							162,
+							40
 						],
 						"interactable": true,
 						"components": [
 							{
 								"type": "Paint",
 								"color": [
-									0.114,
+									0.118,
 									0.141,
-									0.212,
+									0.188,
 									1
 								],
-								"roundSize": 10
+								"roundSize": 9
 							},
 							{
 								"type": "UIButton",
@@ -304,17 +263,17 @@
 									0,
 									0,
 									0,
-									0.3
+									0.25
 								]
 							},
 							{
 								"type": "UILabel",
 								"text": "CANCEL",
-								"fontSize": 13,
+								"fontSize": 11.5,
 								"textColor": [
-									0.91,
-									0.925,
-									0.957,
+									0.902,
+									0.914,
+									0.937,
 									1
 								],
 								"backgroundColor": [
@@ -334,8 +293,8 @@
 						"name": "ConfirmButton",
 						"active": true,
 						"position": [
-							206,
-							148
+							196,
+							134
 						],
 						"scale": [
 							1,
@@ -352,20 +311,20 @@
 							0
 						],
 						"contentSize": [
-							170,
-							44
+							162,
+							40
 						],
 						"interactable": true,
 						"components": [
 							{
 								"type": "Paint",
 								"color": [
+									0.357,
 									0.424,
-									0.482,
 									1,
 									1
 								],
-								"roundSize": 10
+								"roundSize": 9
 							},
 							{
 								"type": "UIButton",
@@ -373,17 +332,17 @@
 									0,
 									0,
 									0,
-									0.3
+									0.25
 								]
 							},
 							{
 								"type": "UILabel",
 								"text": "CONFIRM",
-								"fontSize": 13,
+								"fontSize": 11.5,
 								"textColor": [
-									0.91,
-									0.925,
-									0.957,
+									0.902,
+									0.914,
+									0.937,
 									1
 								],
 								"backgroundColor": [

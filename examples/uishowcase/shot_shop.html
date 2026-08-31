@@ -1564,8 +1564,17 @@
 	engineConfiguration.canvasId = "mainCanvas";
 	engineConfiguration.autoResizeOnWindowResize = true;
 	const engine = new Engine(engineConfiguration);
-	engine.run(new ShowcaseScene());
+	const showcaseScene = new ShowcaseScene();
+	engine.run(showcaseScene);
 	System.showcaseEngine = engine;
+	const switchTimer = setInterval(() => {
+		try {
+			showcaseScene.switchScreen("shop", 1);
+			clearInterval(switchTimer);
+		}
+		catch (switchError) {
+		}
+	}, 500);
 </script>
 </body>
 </html>

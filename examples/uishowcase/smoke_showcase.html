@@ -1226,6 +1226,7 @@
 			super.tick(deltaTime);
 
 			this.#elapsedSeconds += deltaTime;
+			System.debugTick = { elapsed: this.#elapsedSeconds };
 			this.applyResponsiveLayout();
 
 			if (this.#popupTypewriter) {
@@ -1564,8 +1565,184 @@
 	engineConfiguration.canvasId = "mainCanvas";
 	engineConfiguration.autoResizeOnWindowResize = true;
 	const engine = new Engine(engineConfiguration);
-	engine.run(new ShowcaseScene());
+	const showcaseScene = new ShowcaseScene();
+	engine.run(showcaseScene);
 	System.showcaseEngine = engine;
+
+	// ---------------- 헤드리스 검증 드라이버 ----------------
+	const resultLines = [];
+	let passCount = 0;
+	let failCount = 0;
+	const originalConsoleError = console.error;
+	console.error = function (...args) {
+		resultLines.push("CONSOLE-ERROR " + args.map((a) => (a && a.stack) ? a.stack : String(a)).join(" "));
+		originalConsoleError.apply(console, args);
+	};
+	function check(name, condition) {
+		if (condition) {
+			passCount += 1;
+			resultLines.push("PASS " + name);
+		}
+		else {
+			failCount += 1;
+			resultLines.push("FAIL " + name);
+		}
+	}
+	function finish() {
+		resultLines.push("TOTAL " + passCount + " / " + (passCount + failCount));
+		const marker = System.document.createElement("pre");
+		marker.id = "results";
+		marker.textContent = resultLines.join("\n");
+		System.document.body.appendChild(marker);
+		System.document.title = (failCount === 0) ? "SMOKE-PASS" : "SMOKE-FAIL";
+	}
+	function countListRows(listNode) {
+		let rowCount = 0;
+		function visit(node) {
+			for (const childNode of node.getChildren()) {
+				if (childNode.isActive() && /^Item\d+$/.test(childNode.getName())) {
+					rowCount += 1;
+				}
+				visit(childNode);
+			}
+		}
+		visit(listNode);
+		return rowCount;
+	}
+	function clickButtonByName(root, name) {
+		const node = showcaseScene.findNodeByName(root, name);
+		const buttonComponent = node.getComponents(engineModule.UIButton)[0];
+		const clickedEvent = buttonComponent.getClickedEvent();
+		clickedEvent(buttonComponent);
+	}
+
+	let syntheticTimestamp = performance.now();
+	let baseElapsed = -1;
+	let testStage = 0;
+	let stepCount = 0;
+	function stepFrame() {
+		syntheticTimestamp += 33.34;
+		stepCount += 1;
+		try {
+			engine.updateEngine(syntheticTimestamp);
+		}
+		catch (stepError) {
+			resultLines.push("STEP-ERROR " + stepError.stack);
+			finish();
+			return;
+		}
+		const root = showcaseScene.getRoot();
+		if (System.debugTick !== undefined && baseElapsed < 0) {
+			baseElapsed = System.debugTick.elapsed;
+		}
+		const sceneTime = (baseElapsed >= 0) ? (System.debugTick.elapsed - baseElapsed) : -1;
+		try {
+			if (testStage === 0 && sceneTime >= 0.2) {
+				testStage = 1;
+				check("load: root children", root.getChildren().length >= 7);
+				const chartValueLabel = showcaseScene.findLabel(root, "ChartValue");
+				check("dashboard: chart value", chartValueLabel.getText().indexOf("rps") > 0);
+				const eventRows = countListRows(showcaseScene.findNodeByName(root, "EventList"));
+				resultLines.push("INFO event rows = " + eventRows);
+				check("dashboard: event rows bounded", eventRows >= 8 && eventRows <= 16);
+				showcaseScene.switchScreen("shop", 1);
+			}
+			else if (testStage === 1 && sceneTime > 0.8) {
+				testStage = 2;
+				const itemRows = countListRows(showcaseScene.findNodeByName(root, "ItemList"));
+				resultLines.push("INFO catalog rows = " + itemRows);
+				check("store: rows materialized", itemRows >= 8 && itemRows <= 20);
+				const initialCaption = showcaseScene.findLabel(root, "ItemsCountCaption").getText();
+				resultLines.push("INFO initial caption = " + initialCaption);
+				check("store: caption format", initialCaption.indexOf("/ 500 loaded") > 0);
+
+				// 카트: 첫 줄 ADD → 합계 갱신.
+				const firstRow = showcaseScene.findNodeByName(showcaseScene.findNodeByName(root, "ItemList"), "Item0");
+				clickButtonByName(firstRow, "ItemAddButton");
+				check("store: cart total updated", showcaseScene.findLabel(root, "CartTotalValue").getText() !== "$0.00");
+				clickButtonByName(root, "CartCheckoutButton");
+			}
+			else if (testStage === 2 && sceneTime > 1.6) {
+				testStage = 3;
+				const popupNode = showcaseScene.findNodeByName(root, "Popup");
+				check("store: checkout popup", popupNode.isActive());
+				clickButtonByName(popupNode, "ConfirmButton");
+			}
+			else if (testStage === 3 && sceneTime > 2.4) {
+				testStage = 4;
+				check("store: order recorded", showcaseScene.findLabel(root, "OrderRow0").getText().indexOf("$") >= 0);
+				check("store: cart cleared", showcaseScene.findLabel(root, "CartTotalValue").getText() === "$0.00");
+
+				// 무한 스크롤: 끝으로 스크롤.
+				const itemListNode = showcaseScene.findNodeByName(root, "ItemList");
+				const scrollComponents = itemListNode.getComponents(engineModule.UIScrollView);
+				scrollComponents[0].setScrollOffset(Vector2.create(0, -2000));
+			}
+			else if (testStage === 4 && sceneTime > 4.0) {
+				testStage = 5;
+				resultLines.push("INFO caption after scroll = " + showcaseScene.findLabel(root, "ItemsCountCaption").getText());
+				check("store: next page loaded", parseInt(showcaseScene.findLabel(root, "ItemsCountCaption").getText()) >= 52);
+				showcaseScene.switchScreen("settings", 2);
+			}
+			else if (testStage === 5 && sceneTime > 4.6) {
+				testStage = 6;
+
+				// 드롭다운: 머리를 눌러 펼치고 두 번째 선택지를 고른다.
+				const themeSlot = showcaseScene.findNodeByName(root, "ThemeDropdownSlot");
+				const dropdownNode = themeSlot.getChildren()[0];
+				const headerButton = dropdownNode.getComponents(engineModule.UIButton)[0];
+				headerButton.getClickedEvent()(headerButton);
+				const popupListNode = showcaseScene.findNodeByName(dropdownNode, "DropdownPopup");
+				check("settings: dropdown opens", popupListNode.isActive());
+				clickButtonByName(popupListNode, "DropdownOption1");
+				check("settings: dropdown selects", dropdownNode.getSelectedText() === "Light");
+				check("settings: dropdown closes", popupListNode.isActive() === false);
+				showcaseScene.switchScreen("components", 3);
+			}
+			else if (testStage === 6 && sceneTime > 5.2) {
+				testStage = 7;
+
+				// 길게 누름: touchPress 후 1.2초 유지.
+				const longPressNode = showcaseScene.findNodeByName(root, "LongPressButton");
+				const longPressButton = longPressNode.getComponents(engineModule.UIButton)[0];
+				longPressButton.touchPress(Vector2.create(0, 0));
+			}
+			else if (testStage === 7 && sceneTime > 6.6) {
+				testStage = 8;
+				const resultText = showcaseScene.findLabel(root, "ButtonsResult").getText();
+				resultLines.push("INFO long press result = " + resultText);
+				check("components: long press fired", resultText.indexOf("Long press fired") === 0);
+
+				// 컨텍스트 메뉴.
+				showcaseScene.openZoneContextMenu();
+				const contextMenuNode = showcaseScene.findNodeByName(root, "UIContextMenu");
+				check("components: context menu shown", contextMenuNode.isActive());
+				clickButtonByName(contextMenuNode, "ContextMenuItem0");
+				check("components: context menu action", showcaseScene.findLabel(root, "MenuResult").getText() === "Duplicate selected.");
+				check("components: context menu closed", contextMenuNode.isActive() === false);
+
+				// 타자기 / 스피너 존재.
+				check("components: typewriter text", showcaseScene.findLabel(root, "TypeBody").getText().length > 0);
+				const spinnerNode = showcaseScene.findNodeByName(root, "UISpinner");
+				check("components: spinner exists", spinnerNode !== null);
+				finish();
+				return;
+			}
+		}
+		catch (testError) {
+			resultLines.push("TEST-ERROR " + testError.stack);
+			finish();
+			return;
+		}
+		if (stepCount < 900) {
+			setTimeout(stepFrame, 1);
+		}
+		else {
+			resultLines.push("TIMEOUT at stage " + testStage + " sceneTime " + sceneTime);
+			finish();
+		}
+	}
+	setTimeout(stepFrame, 50);
 </script>
 </body>
 </html>

@@ -45,6 +45,7 @@
     DialogueRunner: () => DialogueRunner,
     DialogueScriptParser: () => DialogueScriptParser,
     Dictionary: () => Dictionary,
+    EmitterShape: () => EmitterShape,
     Engine: () => Engine,
     EngineConfiguration: () => EngineConfiguration,
     Enum: () => Enum,
@@ -85,6 +86,7 @@
     Object: () => Object2,
     ObjectPool: () => ObjectPool,
     Paint: () => Paint,
+    ParticleSystem: () => ParticleSystem,
     PathFinder: () => PathFinder,
     PersistedStore: () => PersistedStore,
     Pivot: () => Pivot,
@@ -117,7 +119,7 @@
     SpriteAnimator: () => SpriteAnimator,
     Stack: () => Stack,
     Steering2D: () => Steering2D,
-    System: () => System70,
+    System: () => System77,
     Text: () => Text,
     TextAlign: () => TextAlign,
     TextAsset: () => TextAsset,
@@ -127,16 +129,22 @@
     TouchParticle: () => TouchParticle,
     TouchRaycaster: () => TouchRaycaster,
     TouchRecognizer: () => TouchRecognizer,
+    TrailRenderer: () => TrailRenderer,
     TransformNode: () => TransformNode,
     Tween: () => Tween,
     Typewriter: () => Typewriter,
+    UIBarChart: () => UIBarChart,
     UIButton: () => UIButton,
+    UIContextMenu: () => UIContextMenu,
     UIControl: () => UIControl,
     UIDialog: () => UIDialog,
     UIDocument: () => UIDocument,
+    UIDraggable: () => UIDraggable,
+    UIDropdown: () => UIDropdown,
     UIImageView: () => UIImageView,
     UIInputField: () => UIInputField,
     UILabel: () => UILabel,
+    UILineChart: () => UILineChart,
     UIListView: () => UIListView,
     UINode: () => UINode,
     UIProgressView: () => UIProgressView,
@@ -145,6 +153,7 @@
     UIScrollView: () => UIScrollView,
     UISlider: () => UISlider,
     UISnapScrollView: () => UISnapScrollView,
+    UISpinner: () => UISpinner,
     UIToast: () => UIToast,
     UIToggleButton: () => UIToggleButton,
     UIView: () => UIView,
@@ -19418,6 +19427,15 @@ void main() {
     /** @private @type { object | null } */
     #pendingRelease;
     // 최소 시간을 채우려고 미뤄 둔 뗌 처리.
+    /** @private @type { function(UIButton): void } */
+    #longPressedEvent;
+    // 길게 누름 알림. (한 번만)
+    /** @private @type { number } */
+    #longPressSeconds;
+    // 길게 누름 판정 시간.
+    /** @private @type { boolean } */
+    #hasLongPressFired;
+    // 이번 누름에서 길게 누름이 발화했는지.
     /** @private @type { Color } */
     #pressedTintColor;
     /** @private @type { Color } */
@@ -19458,6 +19476,9 @@ void main() {
       this.#minimumPressedSeconds = 0;
       this.#pressedElapsedSeconds = 0;
       this.#pendingRelease = null;
+      this.#longPressedEvent = null;
+      this.#longPressSeconds = 0.5;
+      this.#hasLongPressFired = false;
       this.#pressedTintColor = new Color(0, 0, 0, 0.3);
       this.#hoverTintColor = new Color(1, 1, 1, 0.12);
       this.#hoverEvent = null;
@@ -19513,6 +19534,10 @@ void main() {
       super.tick(timeDelta);
       if (this.#isPressTracking) {
         this.#pressedElapsedSeconds += timeDelta;
+        if (this.#longPressedEvent && !this.#hasLongPressFired && this.#pressedElapsedSeconds >= this.#longPressSeconds) {
+          this.#hasLongPressFired = true;
+          this.#longPressedEvent(this);
+        }
       }
       if (this.#pendingRelease) {
         this.#pendingRelease.remainSeconds -= timeDelta;
@@ -19585,6 +19610,7 @@ void main() {
       this.#isPressTracking = true;
       this.#pressedElapsedSeconds = 0;
       this.#pendingRelease = null;
+      this.#hasLongPressFired = false;
       this.setButtonState(ButtonState.pressed);
       this.collectColorTargets();
       const pressedEvent = this.getPressedEvent();
@@ -19631,7 +19657,7 @@ void main() {
       }
       const node = this.getNode();
       const isInsideBounds = node.contains(viewInputPosition);
-      if (isInsideBounds) {
+      if (isInsideBounds && !this.#hasLongPressFired) {
         const clickedEvent = this.getClickedEvent();
         if (clickedEvent) {
           clickedEvent(this);
@@ -19812,6 +19838,42 @@ void main() {
     //==============================================================================
     // 최소 눌림 표시 시간 설정.
     // - 짧게 톡 눌러도 이 시간만큼 눌린 모습이 보인 뒤 클릭이 실행된다. (기본 0 = 즉시)
+    //==============================================================================
+    // 길게 누름 알림 설정. (임계 시간을 넘기면 한 번 알리고, 그 누름의 클릭은 삼킨다)
+    //==============================================================================
+    /**
+     * @param { function(UIButton): void } longPressedEvent
+     */
+    setLongPressedEvent(longPressedEvent) {
+      this.#longPressedEvent = longPressedEvent;
+    }
+    //==============================================================================
+    // 길게 누름 판정 시간 설정. (초)
+    //==============================================================================
+    /**
+     * @param { number } longPressSeconds
+     */
+    setLongPressSeconds(longPressSeconds) {
+      this.#longPressSeconds = longPressSeconds;
+    }
+    //==============================================================================
+    // 이번 누름이 이어진 시간 반환. (게이지 연출용)
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    getPressedElapsedSeconds() {
+      return this.#isPressTracking ? this.#pressedElapsedSeconds : 0;
+    }
+    //==============================================================================
+    // 길게 누름 판정 시간 반환.
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    getLongPressSeconds() {
+      return this.#longPressSeconds;
+    }
     //==============================================================================
     /**
      * @param { number } minimumPressedSeconds
@@ -31831,8 +31893,690 @@ void main() {
     }
   };
 
-  // src/ui/uilistview.js
+  // src/effect/particlesystem.js
   var System68 = globalThis;
+  var EmitterShape = {
+    point: "point",
+    circle: "circle",
+    cone: "cone",
+    box: "box",
+    edge: "edge"
+  };
+  var ParticleSystem = class extends Component {
+    static {
+      __name(this, "ParticleSystem");
+    }
+    //==============================================================================
+    // 멤버 변수 목록.
+    //==============================================================================
+    /** @private @type { object[] } */
+    #particleList;
+    /** @private @type { object[] } */
+    #freeList;
+    /** @private @type { boolean } */
+    #isPlaying;
+    /** @private @type { boolean } */
+    #isLooping;
+    /** @private @type { number } */
+    #duration;
+    // 루프 꺼짐일 때 방출이 이어지는 시간.
+    /** @private @type { number } */
+    #playElapsedSeconds;
+    /** @private @type { number } */
+    #maxParticleCount;
+    // 방출.
+    /** @private @type { number } */
+    #emissionRate;
+    // 초당 방출 수.
+    /** @private @type { number } */
+    #emissionAccumulator;
+    /** @private @type { object[] } */
+    #burstList;
+    // { time, count, fired }
+    /** @private @type { string } */
+    #emitterShape;
+    /** @private @type { number } */
+    #shapeRadius;
+    /** @private @type { number } */
+    #coneAngleRadian;
+    // cone 전용 반각.
+    /** @private @type { Vector2 } */
+    #boxSize;
+    /** @private @type { number } */
+    #edgeWidth;
+    // 시작 범위.
+    /** @private @type { number } */
+    #startLifetimeMin;
+    /** @private @type { number } */
+    #startLifetimeMax;
+    /** @private @type { number } */
+    #startSpeedMin;
+    /** @private @type { number } */
+    #startSpeedMax;
+    /** @private @type { number } */
+    #startSizeMin;
+    /** @private @type { number } */
+    #startSizeMax;
+    /** @private @type { number } */
+    #startRotationMin;
+    // 라디안.
+    /** @private @type { number } */
+    #startRotationMax;
+    /** @private @type { Color } */
+    #startColorA;
+    /** @private @type { Color } */
+    #startColorB;
+    // A~B 사이 무작위.
+    // 수명 동안 변화.
+    /** @private @type { object[] | null } */
+    #colorOverLifetime;
+    // [{ time, color }]
+    /** @private @type { number } */
+    #sizeOverLifetimeStart;
+    // 곱 계수.
+    /** @private @type { number } */
+    #sizeOverLifetimeEnd;
+    /** @private @type { number } */
+    #angularVelocityMin;
+    // 초당 라디안.
+    /** @private @type { number } */
+    #angularVelocityMax;
+    // 물리.
+    /** @private @type { Vector2 } */
+    #gravity;
+    /** @private @type { number } */
+    #damping;
+    // 초당 속도 감쇠 비율 계수.
+    // 렌더.
+    /** @private @type { string } */
+    #renderShape;
+    // "circle" | "rect" | "image"
+    /** @private @type { * } */
+    #image;
+    /** @private @type { boolean } */
+    #isAdditive;
+    /** @private @type { boolean } */
+    #isWorldSpace;
+    // 참이면 방출 후 노드 이동의 영향을 받지 않는다.
+    //==============================================================================
+    // 생성.
+    //==============================================================================
+    /**
+     * @constructor
+     */
+    constructor() {
+      super();
+      this.setComponentType("ParticleSystem");
+      this.#particleList = [];
+      this.#freeList = [];
+      this.#isPlaying = true;
+      this.#isLooping = true;
+      this.#duration = 1;
+      this.#playElapsedSeconds = 0;
+      this.#maxParticleCount = 512;
+      this.#emissionRate = 20;
+      this.#emissionAccumulator = 0;
+      this.#burstList = [];
+      this.#emitterShape = EmitterShape.point;
+      this.#shapeRadius = 0;
+      this.#coneAngleRadian = 0.5;
+      this.#boxSize = Vector2.create(0, 0);
+      this.#edgeWidth = 0;
+      this.#startLifetimeMin = 1;
+      this.#startLifetimeMax = 1;
+      this.#startSpeedMin = 60;
+      this.#startSpeedMax = 60;
+      this.#startSizeMin = 6;
+      this.#startSizeMax = 6;
+      this.#startRotationMin = 0;
+      this.#startRotationMax = 0;
+      this.#startColorA = new Color(1, 1, 1, 1);
+      this.#startColorB = new Color(1, 1, 1, 1);
+      this.#colorOverLifetime = null;
+      this.#sizeOverLifetimeStart = 1;
+      this.#sizeOverLifetimeEnd = 1;
+      this.#angularVelocityMin = 0;
+      this.#angularVelocityMax = 0;
+      this.#gravity = Vector2.create(0, 0);
+      this.#damping = 0;
+      this.#renderShape = "circle";
+      this.#image = null;
+      this.#isAdditive = false;
+      this.#isWorldSpace = false;
+    }
+    //==============================================================================
+    // 재생 / 정지.
+    //==============================================================================
+    play() {
+      this.#isPlaying = true;
+      this.#playElapsedSeconds = 0;
+      for (const burst of this.#burstList) {
+        burst.fired = false;
+      }
+    }
+    /**
+     * @param { boolean } isClearing 참이면 살아 있는 파티클도 지운다.
+     */
+    stop(isClearing = false) {
+      this.#isPlaying = false;
+      if (isClearing) {
+        this.#particleList.length = 0;
+      }
+    }
+    //==============================================================================
+    // 한 번에 여러 개 방출. (버튼 클릭 등 이벤트성 연출)
+    //==============================================================================
+    /**
+     * @param { number } count
+     * @param { Vector2 | null } worldOffset 방출 원점 보정. (노드 로컬 기준)
+     */
+    emit(count, worldOffset = null) {
+      for (let emitIndex = 0; emitIndex < count; ++emitIndex) {
+        this.spawnParticle(worldOffset);
+      }
+    }
+    //==============================================================================
+    // 갱신. (방출 + 적분)
+    //==============================================================================
+    /**
+     * @override
+     * @param { number } timeDelta
+     */
+    tick(timeDelta) {
+      if (this.#isPlaying) {
+        const previousElapsed = this.#playElapsedSeconds;
+        this.#playElapsedSeconds += timeDelta;
+        const isEmitWindow = this.#isLooping || this.#playElapsedSeconds <= this.#duration;
+        if (isEmitWindow && this.#emissionRate > 0) {
+          this.#emissionAccumulator += this.#emissionRate * timeDelta;
+          while (this.#emissionAccumulator >= 1) {
+            this.#emissionAccumulator -= 1;
+            this.spawnParticle(null);
+          }
+        }
+        for (const burst of this.#burstList) {
+          let burstTime = burst.time;
+          let currentTime = this.#playElapsedSeconds;
+          let previousTime = previousElapsed;
+          if (this.#isLooping && this.#duration > 0) {
+            currentTime = this.#playElapsedSeconds % this.#duration;
+            previousTime = previousElapsed % this.#duration;
+            if (currentTime < previousTime) {
+              burst.fired = false;
+            }
+          }
+          if (!burst.fired && previousTime <= burstTime && currentTime >= burstTime) {
+            burst.fired = this.#isLooping ? false : true;
+            if (this.#isLooping && currentTime >= burstTime) {
+              burst.fired = true;
+            }
+            this.emit(burst.count);
+          }
+        }
+      }
+      for (let particleIndex = this.#particleList.length - 1; particleIndex >= 0; --particleIndex) {
+        const particle = this.#particleList[particleIndex];
+        particle.age += timeDelta;
+        if (particle.age >= particle.lifetime) {
+          this.#freeList.push(particle);
+          this.#particleList.splice(particleIndex, 1);
+          continue;
+        }
+        particle.velocityX += this.#gravity.x * timeDelta;
+        particle.velocityY += this.#gravity.y * timeDelta;
+        if (this.#damping > 0) {
+          const dampingBlend = System68.Math.max(0, 1 - this.#damping * timeDelta);
+          particle.velocityX *= dampingBlend;
+          particle.velocityY *= dampingBlend;
+        }
+        particle.x += particle.velocityX * timeDelta;
+        particle.y += particle.velocityY * timeDelta;
+        particle.rotation += particle.angularVelocity * timeDelta;
+      }
+    }
+    //==============================================================================
+    // 파티클 하나 생성.
+    //==============================================================================
+    /**
+     * @private
+     * @param { Vector2 | null } originOffset
+     */
+    spawnParticle(originOffset) {
+      if (this.#particleList.length >= this.#maxParticleCount) {
+        return;
+      }
+      let spawnX = 0;
+      let spawnY = 0;
+      let directionX = 0;
+      let directionY = -1;
+      const shape = this.#emitterShape;
+      if (shape === EmitterShape.circle) {
+        const angle = randomRange(0, System68.Math.PI * 2);
+        const radius = this.#shapeRadius * System68.Math.sqrt(randomRange(0, 1));
+        spawnX = System68.Math.cos(angle) * radius;
+        spawnY = System68.Math.sin(angle) * radius;
+        directionX = System68.Math.cos(angle);
+        directionY = System68.Math.sin(angle);
+      } else if (shape === EmitterShape.cone) {
+        const angle = -System68.Math.PI * 0.5 + randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
+        const radius = randomRange(0, this.#shapeRadius);
+        spawnX = System68.Math.cos(angle) * radius;
+        spawnY = System68.Math.sin(angle) * radius;
+        directionX = System68.Math.cos(angle);
+        directionY = System68.Math.sin(angle);
+      } else if (shape === EmitterShape.box) {
+        spawnX = randomRange(-this.#boxSize.x * 0.5, this.#boxSize.x * 0.5);
+        spawnY = randomRange(-this.#boxSize.y * 0.5, this.#boxSize.y * 0.5);
+      } else if (shape === EmitterShape.edge) {
+        spawnX = randomRange(-this.#edgeWidth * 0.5, this.#edgeWidth * 0.5);
+        directionY = 1;
+      } else {
+        const angle = randomRange(0, System68.Math.PI * 2);
+        directionX = System68.Math.cos(angle);
+        directionY = System68.Math.sin(angle);
+      }
+      if (originOffset) {
+        spawnX += originOffset.x;
+        spawnY += originOffset.y;
+      }
+      if (this.#isWorldSpace) {
+        const node = this.getNode();
+        const nodePosition = node.getLocalPosition();
+        spawnX += nodePosition.x;
+        spawnY += nodePosition.y;
+      }
+      const speed = randomRange(this.#startSpeedMin, this.#startSpeedMax);
+      const colorBlend = randomRange(0, 1);
+      const particle = this.#freeList.pop() || {};
+      particle.x = spawnX;
+      particle.y = spawnY;
+      particle.velocityX = directionX * speed;
+      particle.velocityY = directionY * speed;
+      particle.age = 0;
+      particle.lifetime = randomRange(this.#startLifetimeMin, this.#startLifetimeMax);
+      particle.size = randomRange(this.#startSizeMin, this.#startSizeMax);
+      particle.rotation = randomRange(this.#startRotationMin, this.#startRotationMax);
+      particle.angularVelocity = randomRange(this.#angularVelocityMin, this.#angularVelocityMax);
+      particle.red = this.#startColorA.red + (this.#startColorB.red - this.#startColorA.red) * colorBlend;
+      particle.green = this.#startColorA.green + (this.#startColorB.green - this.#startColorA.green) * colorBlend;
+      particle.blue = this.#startColorA.blue + (this.#startColorB.blue - this.#startColorA.blue) * colorBlend;
+      particle.alpha = this.#startColorA.alpha + (this.#startColorB.alpha - this.#startColorA.alpha) * colorBlend;
+      this.#particleList.push(particle);
+    }
+    //==============================================================================
+    // 수명 비율에 따른 색 계산.
+    //==============================================================================
+    /**
+     * @private
+     * @param { object } particle
+     * @param { number } lifeRatio
+     * @returns { string } rgba 문자열.
+     */
+    evaluateColor(particle, lifeRatio) {
+      let red = particle.red;
+      let green = particle.green;
+      let blue = particle.blue;
+      let alpha = particle.alpha;
+      const gradient = this.#colorOverLifetime;
+      if (gradient && gradient.length > 0) {
+        let previousKey = gradient[0];
+        let nextKey = gradient[gradient.length - 1];
+        for (let keyIndex = 0; keyIndex < gradient.length; ++keyIndex) {
+          if (gradient[keyIndex].time <= lifeRatio) {
+            previousKey = gradient[keyIndex];
+          } else {
+            nextKey = gradient[keyIndex];
+            break;
+          }
+        }
+        const keySpan = System68.Math.max(nextKey.time - previousKey.time, 1e-4);
+        const keyBlend = System68.Math.max(0, System68.Math.min(1, (lifeRatio - previousKey.time) / keySpan));
+        red *= previousKey.color.red + (nextKey.color.red - previousKey.color.red) * keyBlend;
+        green *= previousKey.color.green + (nextKey.color.green - previousKey.color.green) * keyBlend;
+        blue *= previousKey.color.blue + (nextKey.color.blue - previousKey.color.blue) * keyBlend;
+        alpha *= previousKey.color.alpha + (nextKey.color.alpha - previousKey.color.alpha) * keyBlend;
+      }
+      const redByte = System68.Math.round(System68.Math.max(0, System68.Math.min(1, red)) * 255);
+      const greenByte = System68.Math.round(System68.Math.max(0, System68.Math.min(1, green)) * 255);
+      const blueByte = System68.Math.round(System68.Math.max(0, System68.Math.min(1, blue)) * 255);
+      return `rgba(${redByte}, ${greenByte}, ${blueByte}, ${System68.Math.max(0, System68.Math.min(1, alpha))})`;
+    }
+    //==============================================================================
+    // 출력.
+    //==============================================================================
+    /**
+     * @override
+     * @param { Graphic } graphic
+     */
+    draw(graphic) {
+      if (this.#particleList.length === 0) {
+        return;
+      }
+      if (this.#isAdditive) {
+        graphic.setBlendMode("lighter");
+      }
+      let baseOffsetX = 0;
+      let baseOffsetY = 0;
+      if (this.#isWorldSpace) {
+        const node = this.getNode();
+        const nodePosition = node.getLocalPosition();
+        baseOffsetX = -nodePosition.x;
+        baseOffsetY = -nodePosition.y;
+      }
+      for (const particle of this.#particleList) {
+        const lifeRatio = particle.age / particle.lifetime;
+        const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
+        const drawSize = System68.Math.max(0.1, particle.size * sizeScale);
+        const colorText = this.evaluateColor(particle, lifeRatio);
+        const drawX = particle.x + baseOffsetX;
+        const drawY = particle.y + baseOffsetY;
+        if (this.#renderShape === "circle") {
+          graphic.setFillColor(colorText);
+          graphic.drawCircle(Vector2.create(drawX, drawY), drawSize * 0.5);
+        } else if (this.#renderShape === "image" && this.#image) {
+          graphic.pushState();
+          graphic.translate(drawX, drawY);
+          graphic.rotate(particle.rotation);
+          graphic.multiplyGlobalAlpha(System68.Math.max(0, System68.Math.min(1, particle.alpha * (1 - lifeRatio))));
+          graphic.drawImage(this.#image, Vector2.create(-drawSize * 0.5, -drawSize * 0.5), Vector2.create(drawSize, drawSize));
+          graphic.popState();
+        } else {
+          graphic.pushState();
+          graphic.translate(drawX, drawY);
+          graphic.rotate(particle.rotation);
+          graphic.setFillColor(colorText);
+          graphic.drawRect(Rect.create(-drawSize * 0.5, -drawSize * 0.5, drawSize, drawSize));
+          graphic.popState();
+        }
+      }
+      if (this.#isAdditive) {
+        graphic.setBlendMode("source-over");
+      }
+    }
+    //==============================================================================
+    // 설정 메서드 목록. (유니티 모듈 대응)
+    //==============================================================================
+    /** @param { number } emissionRate 초당 방출 수. */
+    setEmissionRate(emissionRate) {
+      this.#emissionRate = emissionRate;
+    }
+    /** @param { object[] } burstList [{ time, count }] */
+    setBurstList(burstList) {
+      this.#burstList = burstList.map((burst) => {
+        return { time: burst.time, count: burst.count, fired: false };
+      });
+    }
+    /** @param { string } emitterShape EmitterShape 값. */
+    setEmitterShape(emitterShape) {
+      this.#emitterShape = emitterShape;
+    }
+    /** @param { number } shapeRadius circle / cone 반지름. */
+    setShapeRadius(shapeRadius) {
+      this.#shapeRadius = shapeRadius;
+    }
+    /** @param { number } coneAngleRadian cone 반각. (라디안) */
+    setConeAngle(coneAngleRadian) {
+      this.#coneAngleRadian = coneAngleRadian;
+    }
+    /** @param { number } width @param { number } height box 크기. */
+    setBoxSize(width, height) {
+      this.#boxSize = Vector2.create(width, height);
+    }
+    /** @param { number } edgeWidth edge 가로 길이. */
+    setEdgeWidth(edgeWidth) {
+      this.#edgeWidth = edgeWidth;
+    }
+    /** @param { number } minSeconds @param { number } maxSeconds */
+    setStartLifetime(minSeconds, maxSeconds = minSeconds) {
+      this.#startLifetimeMin = minSeconds;
+      this.#startLifetimeMax = maxSeconds;
+    }
+    /** @param { number } minSpeed @param { number } maxSpeed */
+    setStartSpeed(minSpeed, maxSpeed = minSpeed) {
+      this.#startSpeedMin = minSpeed;
+      this.#startSpeedMax = maxSpeed;
+    }
+    /** @param { number } minSize @param { number } maxSize */
+    setStartSize(minSize, maxSize = minSize) {
+      this.#startSizeMin = minSize;
+      this.#startSizeMax = maxSize;
+    }
+    /** @param { number } minRadian @param { number } maxRadian */
+    setStartRotation(minRadian, maxRadian = minRadian) {
+      this.#startRotationMin = minRadian;
+      this.#startRotationMax = maxRadian;
+    }
+    /** @param { Color } colorA @param { Color } colorB 둘 사이 무작위. */
+    setStartColor(colorA, colorB = colorA) {
+      this.#startColorA = colorA.clone();
+      this.#startColorB = colorB.clone();
+    }
+    /** @param { object[] } gradient [{ time: 0~1, color }] */
+    setColorOverLifetime(gradient) {
+      this.#colorOverLifetime = gradient.map((key) => {
+        return { time: key.time, color: key.color.clone() };
+      });
+    }
+    /** @param { number } startScale @param { number } endScale */
+    setSizeOverLifetime(startScale, endScale) {
+      this.#sizeOverLifetimeStart = startScale;
+      this.#sizeOverLifetimeEnd = endScale;
+    }
+    /** @param { number } minRadianPerSecond @param { number } maxRadianPerSecond */
+    setAngularVelocity(minRadianPerSecond, maxRadianPerSecond = minRadianPerSecond) {
+      this.#angularVelocityMin = minRadianPerSecond;
+      this.#angularVelocityMax = maxRadianPerSecond;
+    }
+    /** @param { number } gravityX @param { number } gravityY */
+    setGravity(gravityX, gravityY) {
+      this.#gravity = Vector2.create(gravityX, gravityY);
+    }
+    /** @param { number } damping 초당 감쇠 계수. (0 = 없음) */
+    setDamping(damping) {
+      this.#damping = damping;
+    }
+    /** @param { string } renderShape "circle" | "rect" | "image" */
+    setRenderShape(renderShape) {
+      this.#renderShape = renderShape;
+    }
+    /** @param { * } image 엔진 이미지. (renderShape "image" 전용) */
+    setImage(image) {
+      this.#image = image;
+    }
+    /** @param { boolean } isAdditive 가산 합성 여부. */
+    setAdditive(isAdditive) {
+      this.#isAdditive = isAdditive;
+    }
+    /** @param { boolean } isWorldSpace 참이면 방출 뒤 노드 이동의 영향을 받지 않는다. */
+    setWorldSpace(isWorldSpace) {
+      this.#isWorldSpace = isWorldSpace;
+    }
+    /** @param { boolean } isLooping */
+    setLooping(isLooping) {
+      this.#isLooping = isLooping;
+    }
+    /** @param { number } duration 루프 꺼짐일 때 방출 시간. (버스트 반복 주기) */
+    setDuration(duration) {
+      this.#duration = duration;
+    }
+    /** @param { number } maxParticleCount */
+    setMaxParticleCount(maxParticleCount) {
+      this.#maxParticleCount = maxParticleCount;
+    }
+    //==============================================================================
+    // 조회 메서드 목록.
+    //==============================================================================
+    /** @returns { number } */
+    getParticleCount() {
+      return this.#particleList.length;
+    }
+    /** @returns { boolean } */
+    isPlaying() {
+      return this.#isPlaying;
+    }
+  };
+
+  // src/effect/trailrenderer.js
+  var System69 = globalThis;
+  var TrailRenderer = class extends Component {
+    static {
+      __name(this, "TrailRenderer");
+    }
+    //==============================================================================
+    // 멤버 변수 목록.
+    //==============================================================================
+    /** @private @type { object[] } */
+    #pointList;
+    // { x, y, age }
+    /** @private @type { number } */
+    #pointLifetime;
+    // 점이 남는 시간. (초)
+    /** @private @type { number } */
+    #minVertexDistance;
+    // 이보다 가까우면 점을 추가하지 않는다.
+    /** @private @type { number } */
+    #startWidth;
+    /** @private @type { number } */
+    #endWidth;
+    /** @private @type { Color } */
+    #startColor;
+    /** @private @type { Color } */
+    #endColor;
+    /** @private @type { boolean } */
+    #isAdditive;
+    /** @private @type { boolean } */
+    #isEmitting;
+    //==============================================================================
+    // 생성.
+    //==============================================================================
+    /**
+     * @constructor
+     */
+    constructor() {
+      super();
+      this.setComponentType("TrailRenderer");
+      this.#pointList = [];
+      this.#pointLifetime = 0.5;
+      this.#minVertexDistance = 3;
+      this.#startWidth = 10;
+      this.#endWidth = 0;
+      this.#startColor = new Color(1, 1, 1, 0.9);
+      this.#endColor = new Color(1, 1, 1, 0);
+      this.#isAdditive = false;
+      this.#isEmitting = true;
+    }
+    //==============================================================================
+    // 갱신. (점 기록 + 노화)
+    //==============================================================================
+    /**
+     * @override
+     * @param { number } timeDelta
+     */
+    tick(timeDelta) {
+      const node = this.getNode();
+      const localPosition = node.getLocalPosition();
+      for (let pointIndex = this.#pointList.length - 1; pointIndex >= 0; --pointIndex) {
+        const point = this.#pointList[pointIndex];
+        point.age += timeDelta;
+        if (point.age >= this.#pointLifetime) {
+          this.#pointList.splice(pointIndex, 1);
+        }
+      }
+      if (!this.#isEmitting) {
+        return;
+      }
+      const lastPoint = this.#pointList[this.#pointList.length - 1];
+      if (lastPoint) {
+        const deltaX = localPosition.x - lastPoint.x;
+        const deltaY = localPosition.y - lastPoint.y;
+        if (deltaX * deltaX + deltaY * deltaY < this.#minVertexDistance * this.#minVertexDistance) {
+          return;
+        }
+      }
+      this.#pointList.push({ x: localPosition.x, y: localPosition.y, age: 0 });
+    }
+    //==============================================================================
+    // 출력. (세그먼트마다 굵기 / 색 보간 — 노드 원점 기준 상대 좌표로 그린다)
+    //==============================================================================
+    /**
+     * @override
+     * @param { Graphic } graphic
+     */
+    draw(graphic) {
+      if (this.#pointList.length < 2) {
+        return;
+      }
+      if (this.#isAdditive) {
+        graphic.setBlendMode("lighter");
+      }
+      const node = this.getNode();
+      const nodePosition = node.getLocalPosition();
+      for (let pointIndex = 0; pointIndex < this.#pointList.length - 1; ++pointIndex) {
+        const point = this.#pointList[pointIndex];
+        const nextPoint = this.#pointList[pointIndex + 1];
+        const ageRatio = point.age / this.#pointLifetime;
+        const freshRatio = 1 - ageRatio;
+        const segmentWidth = System69.Math.max(0.1, this.#endWidth + (this.#startWidth - this.#endWidth) * freshRatio);
+        const red = System69.Math.round((this.#endColor.red + (this.#startColor.red - this.#endColor.red) * freshRatio) * 255);
+        const green = System69.Math.round((this.#endColor.green + (this.#startColor.green - this.#endColor.green) * freshRatio) * 255);
+        const blue = System69.Math.round((this.#endColor.blue + (this.#startColor.blue - this.#endColor.blue) * freshRatio) * 255);
+        const alpha = this.#endColor.alpha + (this.#startColor.alpha - this.#endColor.alpha) * freshRatio;
+        graphic.setStrokeColor(`rgba(${red}, ${green}, ${blue}, ${alpha})`);
+        graphic.drawLine([
+          Vector2.create(point.x - nodePosition.x, point.y - nodePosition.y),
+          Vector2.create(nextPoint.x - nodePosition.x, nextPoint.y - nodePosition.y)
+        ], segmentWidth);
+      }
+      if (this.#isAdditive) {
+        graphic.setBlendMode("source-over");
+      }
+    }
+    //==============================================================================
+    // 흔적 지우기.
+    //==============================================================================
+    clear() {
+      this.#pointList.length = 0;
+    }
+    //==============================================================================
+    // 설정 메서드 목록.
+    //==============================================================================
+    /** @param { number } pointLifetime 점이 남는 시간. (초) */
+    setTime(pointLifetime) {
+      this.#pointLifetime = pointLifetime;
+    }
+    /** @param { number } minVertexDistance */
+    setMinVertexDistance(minVertexDistance) {
+      this.#minVertexDistance = minVertexDistance;
+    }
+    /** @param { number } startWidth @param { number } endWidth */
+    setWidth(startWidth, endWidth) {
+      this.#startWidth = startWidth;
+      this.#endWidth = endWidth;
+    }
+    /** @param { Color } startColor @param { Color } endColor */
+    setColors(startColor, endColor) {
+      this.#startColor = startColor.clone();
+      this.#endColor = endColor.clone();
+    }
+    /** @param { boolean } isAdditive */
+    setAdditive(isAdditive) {
+      this.#isAdditive = isAdditive;
+    }
+    /** @param { boolean } isEmitting 거짓이면 새 점을 만들지 않는다. (남은 띠는 잦아든다) */
+    setEmitting(isEmitting) {
+      this.#isEmitting = isEmitting;
+    }
+    //==============================================================================
+    // 조회 메서드 목록.
+    //==============================================================================
+    /** @returns { number } */
+    getPointCount() {
+      return this.#pointList.length;
+    }
+  };
+
+  // src/ui/uilistview.js
+  var System70 = globalThis;
   var UIListView = class extends Component {
     static {
       __name(this, "UIListView");
@@ -31888,7 +32632,7 @@ void main() {
       this.#reachEndEvent = null;
       this.#reachEndThreshold = 120;
       this.#isReachEndArmed = true;
-      this.#activeItemMap = new System68.Map();
+      this.#activeItemMap = new System70.Map();
       this.#freeItemList = [];
     }
     //==============================================================================
@@ -31926,7 +32670,7 @@ void main() {
      */
     setItemCount(itemCount) {
       const previousItemCount = this.#itemCount;
-      this.#itemCount = System68.Math.max(0, itemCount);
+      this.#itemCount = System70.Math.max(0, itemCount);
       if (this.#itemCount > previousItemCount) {
         this.#isReachEndArmed = true;
       }
@@ -31957,10 +32701,10 @@ void main() {
       if (pitch <= 0) {
         return;
       }
-      let firstIndex = System68.Math.floor(scrolled / pitch) - this.#bufferItemCount;
-      let lastIndex = System68.Math.ceil((scrolled + viewLength) / pitch) + this.#bufferItemCount - 1;
-      firstIndex = System68.Math.max(0, firstIndex);
-      lastIndex = System68.Math.min(this.#itemCount - 1, lastIndex);
+      let firstIndex = System70.Math.floor(scrolled / pitch) - this.#bufferItemCount;
+      let lastIndex = System70.Math.ceil((scrolled + viewLength) / pitch) + this.#bufferItemCount - 1;
+      firstIndex = System70.Math.max(0, firstIndex);
+      lastIndex = System70.Math.min(this.#itemCount - 1, lastIndex);
       for (const [itemIndex, itemNode] of [...this.#activeItemMap]) {
         if (itemIndex < firstIndex || itemIndex > lastIndex) {
           itemNode.setActive(false);
@@ -32102,7 +32846,7 @@ void main() {
     }
     /** @param { number } bufferItemCount 화면 밖 여유 항목 수. */
     setBufferItemCount(bufferItemCount) {
-      this.#bufferItemCount = System68.Math.max(0, bufferItemCount);
+      this.#bufferItemCount = System70.Math.max(0, bufferItemCount);
     }
     //==============================================================================
     // 조회 메서드 목록.
@@ -32125,8 +32869,921 @@ void main() {
     }
   };
 
+  // src/ui/uichart.js
+  var System71 = globalThis;
+  var UILineChart = class extends Component {
+    static {
+      __name(this, "UILineChart");
+    }
+    //==============================================================================
+    // 멤버 변수 목록.
+    //==============================================================================
+    /** @private @type { number[] } */
+    #valueList;
+    /** @private @type { number } */
+    #maxSampleCount;
+    /** @private @type { number | null } */
+    #minValue;
+    // null 이면 자동.
+    /** @private @type { number | null } */
+    #maxValue;
+    // null 이면 자동.
+    /** @private @type { Color } */
+    #lineColor;
+    /** @private @type { Color } */
+    #gridColor;
+    /** @private @type { number } */
+    #lineWidth;
+    /** @private @type { number } */
+    #gridLineCount;
+    //==============================================================================
+    // 생성.
+    //==============================================================================
+    /**
+     * @constructor
+     */
+    constructor() {
+      super();
+      this.setComponentType("UILineChart");
+      this.#valueList = [];
+      this.#maxSampleCount = 60;
+      this.#minValue = null;
+      this.#maxValue = null;
+      this.#lineColor = new Color(0.42, 0.48, 1, 1);
+      this.#gridColor = new Color(1, 1, 1, 0.07);
+      this.#lineWidth = 1.5;
+      this.#gridLineCount = 3;
+    }
+    //==============================================================================
+    // 값 하나 추가. (표본 수를 넘기면 앞에서 밀려난다)
+    //==============================================================================
+    /**
+     * @param { number } value
+     */
+    pushValue(value) {
+      this.#valueList.push(value);
+      while (this.#valueList.length > this.#maxSampleCount) {
+        this.#valueList.shift();
+      }
+    }
+    //==============================================================================
+    // 출력.
+    //==============================================================================
+    /**
+     * @override
+     * @param { Graphic } graphic
+     */
+    draw(graphic) {
+      const node = this.getNode();
+      const contentSize = node.getContentSize();
+      const width = contentSize.x;
+      const height = contentSize.y;
+      graphic.setStrokeColor(this.#gridColor.toRGBAString());
+      for (let gridIndex = 1; gridIndex <= this.#gridLineCount; ++gridIndex) {
+        const gridY = height * gridIndex / (this.#gridLineCount + 1);
+        graphic.drawLine([Vector2.create(0, gridY), Vector2.create(width, gridY)], 1);
+      }
+      const sampleCount = this.#valueList.length;
+      if (sampleCount < 2) {
+        return;
+      }
+      let lowValue = this.#minValue;
+      let highValue = this.#maxValue;
+      if (lowValue === null || highValue === null) {
+        let autoLow = this.#valueList[0];
+        let autoHigh = this.#valueList[0];
+        for (const value of this.#valueList) {
+          autoLow = System71.Math.min(autoLow, value);
+          autoHigh = System71.Math.max(autoHigh, value);
+        }
+        if (lowValue === null) {
+          lowValue = autoLow;
+        }
+        if (highValue === null) {
+          highValue = autoHigh;
+        }
+      }
+      const valueRange = System71.Math.max(highValue - lowValue, 1e-4);
+      const points = [];
+      for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
+        const ratio = sampleIndex / (this.#maxSampleCount - 1);
+        const valueRatio = (this.#valueList[sampleIndex] - lowValue) / valueRange;
+        points.push(Vector2.create(ratio * width, height - valueRatio * (height - 4) - 2));
+      }
+      graphic.setStrokeColor(this.#lineColor.toRGBAString());
+      graphic.drawLine(points, this.#lineWidth);
+    }
+    //==============================================================================
+    // 설정 / 조회 메서드 목록.
+    //==============================================================================
+    /** @param { number } maxSampleCount */
+    setMaxSampleCount(maxSampleCount) {
+      this.#maxSampleCount = System71.Math.max(2, maxSampleCount);
+    }
+    /** @returns { number } */
+    getMaxSampleCount() {
+      return this.#maxSampleCount;
+    }
+    /** @param { number | null } minValue @param { number | null } maxValue */
+    setValueRange(minValue, maxValue) {
+      this.#minValue = minValue;
+      this.#maxValue = maxValue;
+    }
+    /** @param { number[] } valueList */
+    setValueList(valueList) {
+      this.#valueList = valueList.slice(-this.#maxSampleCount);
+    }
+    /** @returns { number[] } */
+    getValueList() {
+      return this.#valueList.slice();
+    }
+    /** @param { Color } lineColor */
+    setLineColor(lineColor) {
+      this.#lineColor = lineColor.clone();
+    }
+    /** @param { Color } gridColor */
+    setGridColor(gridColor) {
+      this.#gridColor = gridColor.clone();
+    }
+    /** @param { number } lineWidth */
+    setLineWidth(lineWidth) {
+      this.#lineWidth = lineWidth;
+    }
+  };
+  var UIBarChart = class extends Component {
+    static {
+      __name(this, "UIBarChart");
+    }
+    //==============================================================================
+    // 멤버 변수 목록.
+    //==============================================================================
+    /** @private @type { number[] } */
+    #valueList;
+    /** @private @type { number | null } */
+    #maxValue;
+    // null 이면 자동.
+    /** @private @type { Color } */
+    #barColor;
+    /** @private @type { Color } */
+    #highlightColor;
+    /** @private @type { number } */
+    #highlightIndex;
+    // -1 이면 없음.
+    /** @private @type { number } */
+    #barGap;
+    //==============================================================================
+    // 생성.
+    //==============================================================================
+    /**
+     * @constructor
+     */
+    constructor() {
+      super();
+      this.setComponentType("UIBarChart");
+      this.#valueList = [];
+      this.#maxValue = null;
+      this.#barColor = new Color(0.42, 0.48, 1, 0.85);
+      this.#highlightColor = new Color(0.22, 0.84, 1, 1);
+      this.#highlightIndex = -1;
+      this.#barGap = 4;
+    }
+    //==============================================================================
+    // 출력.
+    //==============================================================================
+    /**
+     * @override
+     * @param { Graphic } graphic
+     */
+    draw(graphic) {
+      const barCount = this.#valueList.length;
+      if (barCount === 0) {
+        return;
+      }
+      const node = this.getNode();
+      const contentSize = node.getContentSize();
+      const width = contentSize.x;
+      const height = contentSize.y;
+      let highValue = this.#maxValue;
+      if (highValue === null) {
+        highValue = 1e-4;
+        for (const value of this.#valueList) {
+          highValue = System71.Math.max(highValue, value);
+        }
+      }
+      const barWidth = (width - this.#barGap * (barCount - 1)) / barCount;
+      for (let barIndex = 0; barIndex < barCount; ++barIndex) {
+        const valueRatio = System71.Math.max(0, System71.Math.min(1, this.#valueList[barIndex] / highValue));
+        const barHeight = System71.Math.max(1, valueRatio * height);
+        const barX = barIndex * (barWidth + this.#barGap);
+        const barColor = barIndex === this.#highlightIndex ? this.#highlightColor : this.#barColor;
+        graphic.setFillColor(barColor.toRGBAString());
+        graphic.drawRect(Rect.create(barX, height - barHeight, barWidth, barHeight));
+      }
+    }
+    //==============================================================================
+    // 설정 / 조회 메서드 목록.
+    //==============================================================================
+    /** @param { number[] } valueList */
+    setValueList(valueList) {
+      this.#valueList = valueList.slice();
+    }
+    /** @returns { number[] } */
+    getValueList() {
+      return this.#valueList.slice();
+    }
+    /** @param { number | null } maxValue */
+    setMaxValue(maxValue) {
+      this.#maxValue = maxValue;
+    }
+    /** @param { Color } barColor */
+    setBarColor(barColor) {
+      this.#barColor = barColor.clone();
+    }
+    /** @param { Color } highlightColor */
+    setHighlightColor(highlightColor) {
+      this.#highlightColor = highlightColor.clone();
+    }
+    /** @param { number } highlightIndex -1 이면 강조 없음. */
+    setHighlightIndex(highlightIndex) {
+      this.#highlightIndex = highlightIndex;
+    }
+    /** @param { number } barGap */
+    setBarGap(barGap) {
+      this.#barGap = barGap;
+    }
+  };
+
+  // src/ui/uidropdown.js
+  var System72 = globalThis;
+  var UIDropdown = class extends WorldNode {
+    static {
+      __name(this, "UIDropdown");
+    }
+    //==============================================================================
+    // 멤버 변수 목록.
+    //==============================================================================
+    /** @private @type { string[] } */
+    #optionList;
+    /** @private @type { number } */
+    #selectedIndex;
+    /** @private @type { boolean } */
+    #isOpen;
+    /** @private @type { Function | null } */
+    #changedEvent;
+    /** @private @type { UILabel } */
+    #headerLabel;
+    /** @private @type { UILabel } */
+    #arrowLabel;
+    /** @private @type { WorldNode } */
+    #popupNode;
+    /** @private @type { number } */
+    #optionHeight;
+    /** @private @type { Color } */
+    #popupColor;
+    /** @private @type { Color } */
+    #textColor;
+    /** @private @type { Color } */
+    #highlightColor;
+    //==============================================================================
+    // 생성.
+    //==============================================================================
+    /**
+     * @constructor
+     * @param { object } options { width = 180, height = 30, optionHeight = 28, fontSize = 12,
+     *                             baseColor?, popupColor?, highlightColor?, textColor? }
+     */
+    constructor(options = {}) {
+      super();
+      const width = options.width !== void 0 ? options.width : 180;
+      const height = options.height !== void 0 ? options.height : 30;
+      this.#optionHeight = options.optionHeight !== void 0 ? options.optionHeight : 28;
+      const fontSize = options.fontSize !== void 0 ? options.fontSize : 12;
+      const baseColor = options.baseColor ? options.baseColor : new Color(0.114, 0.141, 0.212, 1);
+      this.#popupColor = options.popupColor ? options.popupColor : new Color(0.086, 0.106, 0.165, 1);
+      this.#highlightColor = options.highlightColor ? options.highlightColor : new Color(0.424, 0.482, 1, 0.25);
+      this.#textColor = options.textColor ? options.textColor : new Color(0.91, 0.925, 0.957, 1);
+      this.#optionList = [];
+      this.#selectedIndex = 0;
+      this.#isOpen = false;
+      this.#changedEvent = null;
+      this.setName("UIDropdown");
+      this.setPivot(Pivot.topLeft.clone());
+      this.setAnchor(Pivot.topLeft.clone());
+      this.setContentSize(Vector2.create(width, height));
+      this.setInteractable(true);
+      const headerPaint = this.addComponent(Paint);
+      headerPaint.setColor(baseColor);
+      headerPaint.setRoundSize(8);
+      const headerButton = this.addComponent(UIButton);
+      headerButton.setClickedEvent(() => {
+        this.setOpen(!this.#isOpen);
+      });
+      this.#headerLabel = this.addComponent(UILabel);
+      this.#headerLabel.setText("");
+      this.#headerLabel.setFontSize(fontSize);
+      this.#headerLabel.setTextColor(this.#textColor);
+      const arrowNode = new WorldNode();
+      arrowNode.setName("DropdownArrow");
+      arrowNode.setPivot(Pivot.topLeft.clone());
+      arrowNode.setAnchor(Pivot.topLeft.clone());
+      arrowNode.setContentSize(Vector2.create(20, height));
+      arrowNode.setLocalPosition(Vector2.create(width - 22, 0));
+      this.#arrowLabel = arrowNode.addComponent(UILabel);
+      this.#arrowLabel.setText("\u25BE");
+      this.#arrowLabel.setFontSize(fontSize);
+      this.#arrowLabel.setTextColor(this.#textColor);
+      this.addChild(arrowNode);
+      this.#popupNode = new WorldNode();
+      this.#popupNode.setName("DropdownPopup");
+      this.#popupNode.setPivot(Pivot.topLeft.clone());
+      this.#popupNode.setAnchor(Pivot.topLeft.clone());
+      this.#popupNode.setLocalPosition(Vector2.create(0, height + 4));
+      this.#popupNode.setActive(false);
+      const popupPaint = this.#popupNode.addComponent(Paint);
+      popupPaint.setColor(this.#popupColor);
+      popupPaint.setRoundSize(8);
+      this.addChild(this.#popupNode);
+    }
+    //==============================================================================
+    // 선택지 목록 설정. (펼침 목록 행을 다시 만든다)
+    //==============================================================================
+    /**
+     * @param { string[] } optionList
+     */
+    setOptionList(optionList) {
+      this.#optionList = optionList.slice();
+      this.#selectedIndex = System72.Math.min(this.#selectedIndex, System72.Math.max(0, this.#optionList.length - 1));
+      const childList = this.#popupNode.getChildren().slice();
+      for (const childNode of childList) {
+        this.#popupNode.removeChild(childNode);
+      }
+      const contentSize = this.getContentSize();
+      this.#popupNode.setContentSize(Vector2.create(contentSize.x, this.#optionList.length * this.#optionHeight + 8));
+      for (let optionIndex = 0; optionIndex < this.#optionList.length; ++optionIndex) {
+        const rowNode = new WorldNode();
+        rowNode.setName("DropdownOption" + optionIndex);
+        rowNode.setPivot(Pivot.topLeft.clone());
+        rowNode.setAnchor(Pivot.topLeft.clone());
+        rowNode.setContentSize(Vector2.create(contentSize.x - 8, this.#optionHeight));
+        rowNode.setLocalPosition(Vector2.create(4, 4 + optionIndex * this.#optionHeight));
+        rowNode.setInteractable(true);
+        const rowPaint = rowNode.addComponent(Paint);
+        rowPaint.setColor(new Color(0, 0, 0, 0));
+        rowPaint.setRoundSize(6);
+        const rowButton = rowNode.addComponent(UIButton);
+        rowButton.setPressedTintColor(new Color(1, 1, 1, 0.08));
+        rowButton.setClickedEvent(() => {
+          this.selectIndex(optionIndex);
+        });
+        const rowLabel = rowNode.addComponent(UILabel);
+        rowLabel.setText(this.#optionList[optionIndex]);
+        rowLabel.setFontSize(this.#headerLabel.getFontSize ? this.#headerLabel.getFontSize() : 12);
+        rowLabel.setTextColor(this.#textColor);
+        this.#popupNode.addChild(rowNode);
+      }
+      this.refreshHeader();
+      this.refreshHighlight();
+    }
+    //==============================================================================
+    // 선택 처리.
+    //==============================================================================
+    /**
+     * @param { number } optionIndex
+     */
+    selectIndex(optionIndex) {
+      if (optionIndex < 0 || optionIndex >= this.#optionList.length) {
+        return;
+      }
+      const isChanged = this.#selectedIndex !== optionIndex;
+      this.#selectedIndex = optionIndex;
+      this.setOpen(false);
+      this.refreshHeader();
+      this.refreshHighlight();
+      if (isChanged && this.#changedEvent) {
+        this.#changedEvent(this);
+      }
+    }
+    //==============================================================================
+    // 펼침 / 접힘.
+    //==============================================================================
+    /**
+     * @param { boolean } isOpen
+     */
+    setOpen(isOpen) {
+      this.#isOpen = isOpen;
+      this.#popupNode.setActive(isOpen);
+      this.#arrowLabel.setText(isOpen ? "\u25B4" : "\u25BE");
+    }
+    //==============================================================================
+    // 머리 글 갱신.
+    //==============================================================================
+    /**
+     * @private
+     */
+    refreshHeader() {
+      const selectedText = this.#optionList[this.#selectedIndex];
+      this.#headerLabel.setText(selectedText !== void 0 ? selectedText : "");
+    }
+    //==============================================================================
+    // 선택 행 강조 갱신.
+    //==============================================================================
+    /**
+     * @private
+     */
+    refreshHighlight() {
+      const rowList = this.#popupNode.getChildren();
+      for (let rowIndex = 0; rowIndex < rowList.length; ++rowIndex) {
+        const paintComponents = rowList[rowIndex].getComponents(Paint);
+        if (paintComponents.length > 0) {
+          paintComponents[0].setColor(rowIndex === this.#selectedIndex ? this.#highlightColor.clone() : new Color(0, 0, 0, 0));
+        }
+      }
+    }
+    //==============================================================================
+    // 설정 / 조회 메서드 목록.
+    //==============================================================================
+    /** @param { Function } changedEvent (self) */
+    setChangedEvent(changedEvent) {
+      this.#changedEvent = changedEvent;
+    }
+    /** @param { number } selectedIndex */
+    setSelectedIndex(selectedIndex) {
+      this.#selectedIndex = System72.Math.max(0, System72.Math.min(selectedIndex, this.#optionList.length - 1));
+      this.refreshHeader();
+      this.refreshHighlight();
+    }
+    /** @returns { number } */
+    getSelectedIndex() {
+      return this.#selectedIndex;
+    }
+    /** @returns { string } */
+    getSelectedText() {
+      const selectedText = this.#optionList[this.#selectedIndex];
+      return selectedText !== void 0 ? selectedText : "";
+    }
+    /** @returns { boolean } */
+    isOpen() {
+      return this.#isOpen;
+    }
+  };
+
+  // src/ui/uicontextmenu.js
+  var System73 = globalThis;
+  var UIContextMenu = class extends WorldNode {
+    static {
+      __name(this, "UIContextMenu");
+    }
+    //==============================================================================
+    // 멤버 변수 목록.
+    //==============================================================================
+    /** @private @type { WorldNode } */
+    #overlayNode;
+    /** @private @type { WorldNode } */
+    #panelNode;
+    /** @private @type { number } */
+    #menuWidth;
+    /** @private @type { number } */
+    #itemHeight;
+    /** @private @type { number } */
+    #fontSize;
+    /** @private @type { Color } */
+    #panelColor;
+    /** @private @type { Color } */
+    #textColor;
+    //==============================================================================
+    // 생성.
+    //==============================================================================
+    /**
+     * @constructor
+     * @param { object } options { menuWidth = 168, itemHeight = 28, fontSize = 12, panelColor?, textColor? }
+     */
+    constructor(options = {}) {
+      super();
+      this.#menuWidth = options.menuWidth !== void 0 ? options.menuWidth : 168;
+      this.#itemHeight = options.itemHeight !== void 0 ? options.itemHeight : 28;
+      this.#fontSize = options.fontSize !== void 0 ? options.fontSize : 12;
+      this.#panelColor = options.panelColor ? options.panelColor : new Color(0.086, 0.106, 0.165, 1);
+      this.#textColor = options.textColor ? options.textColor : new Color(0.91, 0.925, 0.957, 1);
+      this.setName("UIContextMenu");
+      this.setPivot(Pivot.topLeft.clone());
+      this.setAnchor(Pivot.topLeft.clone());
+      this.setActive(false);
+      this.#overlayNode = new WorldNode();
+      this.#overlayNode.setName("ContextMenuOverlay");
+      this.#overlayNode.setPivot(Pivot.topLeft.clone());
+      this.#overlayNode.setAnchor(Pivot.topLeft.clone());
+      this.#overlayNode.setInteractable(true);
+      const overlayButton = this.#overlayNode.addComponent(UIButton);
+      overlayButton.setPressedTintColor(new Color(0, 0, 0, 0));
+      overlayButton.setClickedEvent(() => {
+        this.close();
+      });
+      this.addChild(this.#overlayNode);
+      this.#panelNode = new WorldNode();
+      this.#panelNode.setName("ContextMenuPanel");
+      this.#panelNode.setPivot(Pivot.topLeft.clone());
+      this.#panelNode.setAnchor(Pivot.topLeft.clone());
+      const panelPaint = this.#panelNode.addComponent(Paint);
+      panelPaint.setColor(this.#panelColor);
+      panelPaint.setRoundSize(8);
+      this.addChild(this.#panelNode);
+    }
+    //==============================================================================
+    // 메뉴 열기.
+    // - itemList: [{ text, handler?, isDisabled? }]
+    //==============================================================================
+    /**
+     * @param { Vector2 } position 뷰 좌표. (메뉴 좌상단)
+     * @param { object[] } itemList
+     */
+    show(position, itemList) {
+      const childList = this.#panelNode.getChildren().slice();
+      for (const childNode of childList) {
+        this.#panelNode.removeChild(childNode);
+      }
+      const panelHeight = itemList.length * this.#itemHeight + 8;
+      this.#panelNode.setContentSize(Vector2.create(this.#menuWidth, panelHeight));
+      for (let itemIndex = 0; itemIndex < itemList.length; ++itemIndex) {
+        const itemData = itemList[itemIndex];
+        const rowNode = new WorldNode();
+        rowNode.setName("ContextMenuItem" + itemIndex);
+        rowNode.setPivot(Pivot.topLeft.clone());
+        rowNode.setAnchor(Pivot.topLeft.clone());
+        rowNode.setContentSize(Vector2.create(this.#menuWidth - 8, this.#itemHeight));
+        rowNode.setLocalPosition(Vector2.create(4, 4 + itemIndex * this.#itemHeight));
+        rowNode.setInteractable(true);
+        const rowPaint = rowNode.addComponent(Paint);
+        rowPaint.setColor(new Color(0, 0, 0, 0));
+        rowPaint.setRoundSize(6);
+        const rowButton = rowNode.addComponent(UIButton);
+        rowButton.setPressedTintColor(new Color(1, 1, 1, 0.08));
+        if (itemData.isDisabled) {
+          rowButton.setInteractable(false);
+        } else {
+          rowButton.setClickedEvent(() => {
+            this.close();
+            if (itemData.handler) {
+              itemData.handler();
+            }
+          });
+        }
+        const rowLabel = rowNode.addComponent(UILabel);
+        rowLabel.setText(itemData.text);
+        rowLabel.setFontSize(this.#fontSize);
+        rowLabel.setTextAlign("left");
+        rowLabel.setTextColor(itemData.isDisabled ? new Color(0.4, 0.43, 0.5, 1) : this.#textColor);
+        this.#panelNode.addChild(rowNode);
+      }
+      const parentNode = this.getParent();
+      let areaWidth = 960;
+      let areaHeight = 640;
+      if (parentNode) {
+        const parentSize = parentNode.getContentSize();
+        if (parentSize.x > 0 && parentSize.y > 0) {
+          areaWidth = parentSize.x;
+          areaHeight = parentSize.y;
+        }
+      }
+      this.setContentSize(Vector2.create(areaWidth, areaHeight));
+      this.#overlayNode.setContentSize(Vector2.create(areaWidth, areaHeight));
+      const menuX = System73.Math.min(position.x, areaWidth - this.#menuWidth - 4);
+      const menuY = System73.Math.min(position.y, areaHeight - panelHeight - 4);
+      this.#panelNode.setLocalPosition(Vector2.create(menuX, menuY));
+      this.setActive(true);
+    }
+    //==============================================================================
+    // 닫기.
+    //==============================================================================
+    close() {
+      this.setActive(false);
+    }
+    //==============================================================================
+    // 표시 중 여부.
+    //==============================================================================
+    /**
+     * @returns { boolean }
+     */
+    isShowing() {
+      return this.isActive();
+    }
+  };
+
+  // src/ui/uidraggable.js
+  var System74 = globalThis;
+  var UIDraggable = class extends UIControl {
+    static {
+      __name(this, "UIDraggable");
+    }
+    //==============================================================================
+    // 멤버 변수 목록.
+    //==============================================================================
+    /** @private @type { boolean } */
+    #isDragging;
+    /** @private @type { Vector2 | null } */
+    #previousViewPosition;
+    /** @private @type { Vector2 | null } */
+    #homePosition;
+    // 잡기 전 로컬 자리.
+    /** @private @type { boolean } */
+    #isSnapBackEnabled;
+    /** @private @type { boolean } */
+    #isReturning;
+    /** @private @type { number } */
+    #snapBackSpeed;
+    // 초당 되돌아가는 비율 계수.
+    /** @private @type { Function | null } */
+    #dragStartEvent;
+    // (self)
+    /** @private @type { Function | null } */
+    #dragMoveEvent;
+    // (self, viewPosition)
+    /** @private @type { Function | null } */
+    #dragEndEvent;
+    // (self, viewPosition)
+    //==============================================================================
+    // 생성.
+    //==============================================================================
+    /**
+     * @constructor
+     */
+    constructor() {
+      super();
+      this.setComponentType("Draggable");
+      this.#isDragging = false;
+      this.#previousViewPosition = null;
+      this.#homePosition = null;
+      this.#isSnapBackEnabled = false;
+      this.#isReturning = false;
+      this.#snapBackSpeed = 14;
+      this.#dragStartEvent = null;
+      this.#dragMoveEvent = null;
+      this.#dragEndEvent = null;
+    }
+    //==============================================================================
+    // 노드에 붙음. (터치를 받도록 인터랙션 활성화)
+    //==============================================================================
+    /**
+     * @override
+     * @param { import("../core/node/componentnode.js").ComponentNode } node
+     */
+    attach(node) {
+      super.attach(node);
+      if (node instanceof WorldNode) {
+        node.setInteractable(true);
+      }
+    }
+    //==============================================================================
+    // 터치 눌림.
+    //==============================================================================
+    /**
+     * @override
+     * @param { Vector2 } viewInputPosition
+     */
+    touchPress(viewInputPosition) {
+      const node = this.getNode();
+      this.#isDragging = true;
+      this.#isReturning = false;
+      this.#previousViewPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
+      const localPosition = node.getLocalPosition();
+      this.#homePosition = Vector2.create(localPosition.x, localPosition.y);
+      if (this.#dragStartEvent) {
+        this.#dragStartEvent(this);
+      }
+    }
+    //==============================================================================
+    // 터치 이동.
+    //==============================================================================
+    /**
+     * @override
+     * @param { Vector2 } viewInputPosition
+     */
+    touchMove(viewInputPosition) {
+      if (!this.#isDragging) {
+        return;
+      }
+      const node = this.getNode();
+      const deltaX = viewInputPosition.x - this.#previousViewPosition.x;
+      const deltaY = viewInputPosition.y - this.#previousViewPosition.y;
+      this.#previousViewPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
+      const localPosition = node.getLocalPosition();
+      node.setLocalPosition(Vector2.create(localPosition.x + deltaX, localPosition.y + deltaY));
+      if (this.#dragMoveEvent) {
+        this.#dragMoveEvent(this, viewInputPosition);
+      }
+    }
+    //==============================================================================
+    // 터치 뗌.
+    //==============================================================================
+    /**
+     * @override
+     * @param { Vector2 } viewInputPosition
+     */
+    touchRelease(viewInputPosition) {
+      if (!this.#isDragging) {
+        return;
+      }
+      this.#isDragging = false;
+      if (this.#isSnapBackEnabled) {
+        this.#isReturning = true;
+      }
+      if (this.#dragEndEvent) {
+        this.#dragEndEvent(this, viewInputPosition);
+      }
+    }
+    //==============================================================================
+    // 터치 취소.
+    //==============================================================================
+    /**
+     * @override
+     * @param { Vector2 } viewInputPosition
+     */
+    touchCancel(viewInputPosition) {
+      this.touchRelease(viewInputPosition);
+    }
+    //==============================================================================
+    // 갱신. (제자리 복귀 미끄러짐)
+    //==============================================================================
+    /**
+     * @override
+     * @param { number } timeDelta
+     */
+    tick(timeDelta) {
+      super.tick(timeDelta);
+      if (!this.#isReturning || !this.#homePosition) {
+        return;
+      }
+      const node = this.getNode();
+      const localPosition = node.getLocalPosition();
+      const blend = System74.Math.min(this.#snapBackSpeed * timeDelta, 1);
+      const nextX = localPosition.x + (this.#homePosition.x - localPosition.x) * blend;
+      const nextY = localPosition.y + (this.#homePosition.y - localPosition.y) * blend;
+      node.setLocalPosition(Vector2.create(nextX, nextY));
+      const remainX = this.#homePosition.x - nextX;
+      const remainY = this.#homePosition.y - nextY;
+      if (remainX * remainX + remainY * remainY < 0.25) {
+        node.setLocalPosition(Vector2.create(this.#homePosition.x, this.#homePosition.y));
+        this.#isReturning = false;
+      }
+    }
+    //==============================================================================
+    // 지금 자리에 눌러앉기. (dragEnd 처리기에서 드롭 성공 시 호출 — 복귀를 멈춘다)
+    //==============================================================================
+    settleHere() {
+      const node = this.getNode();
+      const localPosition = node.getLocalPosition();
+      this.#homePosition = Vector2.create(localPosition.x, localPosition.y);
+      this.#isReturning = false;
+    }
+    //==============================================================================
+    // 제자리로 즉시 되돌리기.
+    //==============================================================================
+    snapHome() {
+      if (this.#homePosition) {
+        const node = this.getNode();
+        node.setLocalPosition(Vector2.create(this.#homePosition.x, this.#homePosition.y));
+      }
+      this.#isReturning = false;
+    }
+    //==============================================================================
+    // 설정 / 조회 메서드 목록.
+    //==============================================================================
+    /** @param { boolean } isSnapBackEnabled */
+    setSnapBackEnabled(isSnapBackEnabled) {
+      this.#isSnapBackEnabled = isSnapBackEnabled;
+    }
+    /** @param { number } snapBackSpeed */
+    setSnapBackSpeed(snapBackSpeed) {
+      this.#snapBackSpeed = snapBackSpeed;
+    }
+    /** @param { Function } dragStartEvent (self) */
+    setDragStartEvent(dragStartEvent) {
+      this.#dragStartEvent = dragStartEvent;
+    }
+    /** @param { Function } dragMoveEvent (self, viewPosition) */
+    setDragMoveEvent(dragMoveEvent) {
+      this.#dragMoveEvent = dragMoveEvent;
+    }
+    /** @param { Function } dragEndEvent (self, viewPosition) */
+    setDragEndEvent(dragEndEvent) {
+      this.#dragEndEvent = dragEndEvent;
+    }
+    /** @returns { boolean } */
+    isDragging() {
+      return this.#isDragging;
+    }
+    /** @returns { Vector2 | null } */
+    getHomePosition() {
+      return this.#homePosition ? Vector2.create(this.#homePosition.x, this.#homePosition.y) : null;
+    }
+  };
+
+  // src/ui/uispinner.js
+  var System75 = globalThis;
+  var UISpinner = class extends WorldNode {
+    static {
+      __name(this, "UISpinner");
+    }
+    //==============================================================================
+    // 멤버 변수 목록.
+    //==============================================================================
+    /** @private @type { WorldNode[] } */
+    #dotNodeList;
+    /** @private @type { number } */
+    #dotCount;
+    /** @private @type { number } */
+    #rotationSpeed;
+    // 초당 바퀴 수.
+    /** @private @type { number } */
+    #phase;
+    /** @private @type { Color } */
+    #dotColor;
+    //==============================================================================
+    // 생성.
+    //==============================================================================
+    /**
+     * @constructor
+     * @param { object } options { radius = 9, dotCount = 10, dotRadius = 2, color?, rotationSpeed = 1 }
+     */
+    constructor(options = {}) {
+      super();
+      const radius = options.radius !== void 0 ? options.radius : 9;
+      this.#dotCount = options.dotCount !== void 0 ? options.dotCount : 10;
+      const dotRadius = options.dotRadius !== void 0 ? options.dotRadius : 2;
+      this.#dotColor = options.color ? options.color : new Color(1, 1, 1, 1);
+      this.#rotationSpeed = options.rotationSpeed !== void 0 ? options.rotationSpeed : 1;
+      this.#phase = 0;
+      this.#dotNodeList = [];
+      this.setName("UISpinner");
+      this.setPivot(Pivot.middleCenter.clone());
+      this.setAnchor(Pivot.topLeft.clone());
+      this.setContentSize(Vector2.create((radius + dotRadius) * 2, (radius + dotRadius) * 2));
+      const center = radius + dotRadius;
+      for (let dotIndex = 0; dotIndex < this.#dotCount; ++dotIndex) {
+        const angle = dotIndex / this.#dotCount * System75.Math.PI * 2;
+        const dotNode = new WorldNode();
+        dotNode.setName("SpinnerDot" + dotIndex);
+        dotNode.setPivot(Pivot.middleCenter.clone());
+        dotNode.setAnchor(Pivot.topLeft.clone());
+        dotNode.setContentSize(Vector2.create(dotRadius * 2, dotRadius * 2));
+        dotNode.setLocalPosition(Vector2.create(
+          center + System75.Math.cos(angle) * radius,
+          center + System75.Math.sin(angle) * radius
+        ));
+        const paint = dotNode.addComponent(Paint);
+        paint.setColor(this.#dotColor.clone());
+        paint.setRoundSize(dotRadius);
+        this.addChild(dotNode);
+        this.#dotNodeList.push(dotNode);
+      }
+    }
+    //==============================================================================
+    // 갱신. (밝기 꼬리 회전)
+    //==============================================================================
+    /**
+     * @override
+     * @param { number } timeDelta
+     */
+    tick(timeDelta) {
+      super.tick(timeDelta);
+      this.#phase += timeDelta * this.#rotationSpeed;
+      for (let dotIndex = 0; dotIndex < this.#dotNodeList.length; ++dotIndex) {
+        const orderRatio = dotIndex / this.#dotCount;
+        let tailRatio = (orderRatio - this.#phase) % 1;
+        if (tailRatio < 0) {
+          tailRatio += 1;
+        }
+        const dotOpacity = 0.15 + 0.85 * (1 - tailRatio);
+        this.#dotNodeList[dotIndex].setLocalOpacity(dotOpacity);
+      }
+    }
+    //==============================================================================
+    // 점 색 설정.
+    //==============================================================================
+    /**
+     * @param { Color } dotColor
+     */
+    setDotColor(dotColor) {
+      this.#dotColor = dotColor.clone();
+      for (const dotNode of this.#dotNodeList) {
+        const paintComponents = dotNode.getComponents(Paint);
+        if (paintComponents.length > 0) {
+          paintComponents[0].setColor(this.#dotColor.clone());
+        }
+      }
+    }
+    //==============================================================================
+    // 회전 속도 설정. (초당 바퀴 수)
+    //==============================================================================
+    /**
+     * @param { number } rotationSpeed
+     */
+    setRotationSpeed(rotationSpeed) {
+      this.#rotationSpeed = rotationSpeed;
+    }
+  };
+
   // src/ui/uitoast.js
-  var System69 = globalThis;
+  var System76 = globalThis;
   var UIToast = class extends WorldNode {
     static {
       __name(this, "UIToast");
@@ -32145,6 +33802,9 @@ void main() {
     #holdSeconds;
     /** @private @type { number } */
     #restY;
+    /** @private @type { number | null } */
+    #restX;
+    // null 이면 부모 가로 중앙.
     /** @private @type { number } */
     #riseDistance;
     /** @private @type { UILabel } */
@@ -32161,6 +33821,7 @@ void main() {
       const width = options.width !== void 0 ? options.width : 400;
       const height = options.height !== void 0 ? options.height : 48;
       this.#restY = options.restY !== void 0 ? options.restY : 560;
+      this.#restX = options.restX !== void 0 ? options.restX : null;
       this.#holdSeconds = options.holdSeconds !== void 0 ? options.holdSeconds : 1.8;
       this.#riseDistance = 28;
       this.#messageQueue = [];
@@ -32176,7 +33837,7 @@ void main() {
       paint.setRoundSize(height * 0.5);
       this.#label = this.addComponent(UILabel);
       this.#label.setText("");
-      this.#label.setFontSize(15);
+      this.#label.setFontSize(options.fontSize !== void 0 ? options.fontSize : 15);
       this.#label.setTextColor(options.textColor ? options.textColor : new Color(0.96, 0.97, 1, 1));
     }
     //==============================================================================
@@ -32225,7 +33886,7 @@ void main() {
       }
       this.#phaseSeconds += timeDelta;
       if (this.#phase === "enter") {
-        const ratio = System69.Math.min(1, this.#phaseSeconds / 0.24);
+        const ratio = System76.Math.min(1, this.#phaseSeconds / 0.24);
         const eased = 1 - (1 - ratio) * (1 - ratio);
         this.setLocalOpacity(eased);
         this.updatePosition(eased);
@@ -32239,7 +33900,7 @@ void main() {
           this.#phaseSeconds = 0;
         }
       } else if (this.#phase === "exit") {
-        const ratio = System69.Math.min(1, this.#phaseSeconds / 0.2);
+        const ratio = System76.Math.min(1, this.#phaseSeconds / 0.2);
         this.setLocalOpacity(1 - ratio);
         this.updatePosition(1 + ratio * 0.4);
         if (ratio >= 1) {
@@ -32255,12 +33916,15 @@ void main() {
      * @param { number } progressRatio
      */
     updatePosition(progressRatio) {
-      const parentNode = this.getParent();
-      let centerX = 480;
-      if (parentNode) {
-        const parentSize = parentNode.getContentSize();
-        if (parentSize.x > 0) {
-          centerX = parentSize.x * 0.5;
+      let centerX = this.#restX;
+      if (centerX === null) {
+        centerX = 480;
+        const parentNode = this.getParent();
+        if (parentNode) {
+          const parentSize = parentNode.getContentSize();
+          if (parentSize.x > 0) {
+            centerX = parentSize.x * 0.5;
+          }
         }
       }
       this.setLocalPosition(Vector2.create(centerX, this.#restY + this.#riseDistance * (1 - progressRatio)));
@@ -32273,6 +33937,15 @@ void main() {
      */
     setRestY(restY) {
       this.#restY = restY;
+    }
+    //==============================================================================
+    // 표시 자리(가운데 가로 좌표) 설정. (null 이면 부모 가로 중앙)
+    //==============================================================================
+    /**
+     * @param { number | null } restX
+     */
+    setRestX(restX) {
+      this.#restX = restX;
     }
     //==============================================================================
     // 머무는 시간 설정.
@@ -32552,10 +34225,10 @@ void main() {
   };
 
   // import.js
-  var System70 = globalThis;
+  var System77 = globalThis;
 
   // src/web/pane.js
-  var System71 = globalThis;
+  var System78 = globalThis;
   var PaneTheme = {
     color: {
       background: "#1e1e1e",
@@ -32605,7 +34278,7 @@ void main() {
      * @param { Object } options - { id, text, style, type, placeholder, accent, warning }
      */
     static create(tagName, preset = "", options = {}) {
-      const el = System71.document.createElement(tagName);
+      const el = System78.document.createElement(tagName);
       if (options.id) el.id = options.id;
       if (options.text) el.innerText = options.text;
       if (options.type) el.type = options.type;
@@ -32762,7 +34435,7 @@ void main() {
     }
     /** @private */
     #createContainer() {
-      this.#container = System71.document.createElement("div");
+      this.#container = System78.document.createElement("div");
       this.#container.style.position = "absolute";
       this.#container.style.overflow = "hidden";
       this.#container.style.boxSizing = "border-box";
@@ -32785,7 +34458,7 @@ void main() {
     }
     /** @private */
     #createResizer(prev, next) {
-      const resizer = System71.document.createElement("div");
+      const resizer = System78.document.createElement("div");
       resizer.style.position = "absolute";
       resizer.style.backgroundColor = PaneTheme.color.resizer;
       resizer.style.zIndex = "1000";
@@ -32816,10 +34489,10 @@ void main() {
           const grabRect = resizer.getBoundingClientRect();
           this.#resizeGrabOffset = this.#direction === "horizontal" ? e.clientX - grabRect.left : e.clientY - grabRect.top;
           resizer.style.backgroundColor = PaneTheme.color.resizerHover;
-          System71.document.body.style.cursor = resizer.style.cursor;
-          System71.document.body.style.userSelect = "none";
-          System71.document.addEventListener("mousemove", this.#onMouseMoveBind);
-          System71.document.addEventListener("mouseup", this.#onMouseUpBind);
+          System78.document.body.style.cursor = resizer.style.cursor;
+          System78.document.body.style.userSelect = "none";
+          System78.document.addEventListener("mousemove", this.#onMouseMoveBind);
+          System78.document.addEventListener("mouseup", this.#onMouseUpBind);
         });
       }
       resizer.dataset.thickness = thickness;
@@ -32850,10 +34523,10 @@ void main() {
     /** @private */
     #onMouseUp() {
       this.#isResizing = false;
-      System71.document.body.style.cursor = "default";
-      System71.document.body.style.userSelect = "auto";
-      System71.document.removeEventListener("mousemove", this.#onMouseMoveBind);
-      System71.document.removeEventListener("mouseup", this.#onMouseUpBind);
+      System78.document.body.style.cursor = "default";
+      System78.document.body.style.userSelect = "auto";
+      System78.document.removeEventListener("mousemove", this.#onMouseMoveBind);
+      System78.document.removeEventListener("mouseup", this.#onMouseUpBind);
       for (const r of this.#resizers) r.style.backgroundColor = PaneTheme.color.resizer;
     }
     //==============================================================================
@@ -32929,14 +34602,14 @@ void main() {
     refresh() {
       const p = this.#container.parentElement;
       if (!p) return;
-      this.updateLayout(0, 0, p.clientWidth || System71.window.innerWidth, p.clientHeight || System71.window.innerHeight);
+      this.updateLayout(0, 0, p.clientWidth || System78.window.innerWidth, p.clientHeight || System78.window.innerHeight);
     }
     attachTo(p) {
       p.appendChild(this.#container);
       const run = /* @__PURE__ */ __name(() => this.refresh(), "run");
-      System71.window.addEventListener("resize", run);
+      System78.window.addEventListener("resize", run);
       run();
-      System71.requestAnimationFrame(run);
+      System78.requestAnimationFrame(run);
     }
     isFlex() {
       return this.#initialSize === 0;
@@ -32971,7 +34644,7 @@ void main() {
   };
 
   // tools/uieditor/uieditor.js
-  var System72 = globalThis;
+  var System79 = globalThis;
   var ICON_SHAPES = {
     empty: "<rect x='2' y='2.5' width='10' height='9' rx='2' fill='none' stroke='currentColor' stroke-width='1.6' stroke-dasharray='2.2 1.8'/>",
     panel: "<rect x='1.5' y='2.5' width='11' height='9' rx='2' fill='currentColor'/>",
@@ -33123,7 +34796,7 @@ void main() {
       ]
     }
   ];
-  var PROPERTY_EXCLUDE_NAMES = new System72.Set([
+  var PROPERTY_EXCLUDE_NAMES = new System79.Set([
     "Parent",
     "Node",
     "Owner",
@@ -33143,7 +34816,7 @@ void main() {
   ]);
   function collectComponentClassList() {
     const classList = [];
-    for (const exportName of System72.Object.keys(import_exports)) {
+    for (const exportName of System79.Object.keys(import_exports)) {
       const candidateClass = import_exports[exportName];
       if (typeof candidateClass !== "function" || !candidateClass.prototype) {
         continue;
@@ -33161,10 +34834,10 @@ void main() {
   __name(collectComponentClassList, "collectComponentClassList");
   function collectEditableProperties(targetObject) {
     const propertyList = [];
-    const visitedNameSet = new System72.Set();
-    let prototypeObject = System72.Object.getPrototypeOf(targetObject);
-    while (prototypeObject && prototypeObject !== System72.Object.prototype) {
-      const memberNameList = System72.Object.getOwnPropertyNames(prototypeObject);
+    const visitedNameSet = new System79.Set();
+    let prototypeObject = System79.Object.getPrototypeOf(targetObject);
+    while (prototypeObject && prototypeObject !== System79.Object.prototype) {
+      const memberNameList = System79.Object.getOwnPropertyNames(prototypeObject);
       const currentLevelList = [];
       for (const memberName of memberNameList) {
         let baseName = "";
@@ -33190,7 +34863,7 @@ void main() {
         currentLevelList.push({ name: baseName, getterName: memberName, setterName });
       }
       propertyList.unshift(...currentLevelList);
-      prototypeObject = System72.Object.getPrototypeOf(prototypeObject);
+      prototypeObject = System79.Object.getPrototypeOf(prototypeObject);
     }
     return propertyList;
   }
@@ -33337,7 +35010,7 @@ void main() {
       this.#openMenuIndex = -1;
       this.#renderScaleMode = "fit";
       this.#documentFileName = "ui.uiasset.json";
-      this.#hierarchyRowNodeMap = new System72.Map();
+      this.#hierarchyRowNodeMap = new System79.Map();
       this.#frontSelectTimer = 0;
       this.#frontSelectNode = null;
       this.#isPressMoved = false;
@@ -33640,17 +35313,17 @@ void main() {
       rootPane.addPane(menuBarPane);
       rootPane.addPane(mainPane);
       rootPane.addPane(statusPane);
-      rootPane.attachTo(System72.document.body);
+      rootPane.attachTo(System79.document.body);
       this.#editorGraphic = new Graphic(this.#editorCanvas);
       this.#previewGraphic = new Graphic(this.#previewCanvas);
       this.setActiveView("edit");
       this.bindEditorPointerEvents();
       this.bindKeyboardEvents();
-      System72.document.addEventListener("contextmenu", (mouseEvent) => {
+      System79.document.addEventListener("contextmenu", (mouseEvent) => {
         mouseEvent.preventDefault();
       });
-      System72.window.addEventListener("mousedown", () => {
-        const openedPanel = System72.document.getElementById("uieditorMenuPanel");
+      System79.window.addEventListener("mousedown", () => {
+        const openedPanel = System79.document.getElementById("uieditorMenuPanel");
         if (openedPanel || this.#openMenuIndex >= 0) {
           this.closeMenuDropdown();
         }
@@ -33729,7 +35402,7 @@ void main() {
      * @returns { HTMLElement }
      */
     createMenuPanelElement(menuItems) {
-      const panelElement = System72.document.createElement("div");
+      const panelElement = System79.document.createElement("div");
       panelElement.id = "uieditorMenuPanel";
       panelElement.style.cssText = "position:fixed;z-index:9999;min-width:196px;padding:4px 0;background:" + PaneTheme.color.toolbar + ";border:1px solid " + PaneTheme.color.border + ";border-radius:4px;box-shadow:0 6px 18px rgba(0,0,0,0.5);font-size:13px;color:" + PaneTheme.color.text + ";font-family:" + PaneTheme.font.family + ";";
       panelElement.addEventListener("mousedown", (mouseEvent) => {
@@ -33737,23 +35410,23 @@ void main() {
       });
       for (const menuItem of menuItems) {
         if (menuItem.separator) {
-          const separatorElement = System72.document.createElement("div");
+          const separatorElement = System79.document.createElement("div");
           separatorElement.style.cssText = "height:1px;margin:4px 8px;background:" + PaneTheme.color.border + ";";
           panelElement.appendChild(separatorElement);
           continue;
         }
-        const itemElement = System72.document.createElement("div");
+        const itemElement = System79.document.createElement("div");
         itemElement.style.cssText = "display:flex;align-items:center;padding:5px 12px 5px 8px;cursor:pointer;white-space:nowrap;";
-        const checkElement = System72.document.createElement("span");
+        const checkElement = System79.document.createElement("span");
         checkElement.style.cssText = "width:16px;flex:0 0 16px;color:" + SELECTION_COLOR + ";";
         checkElement.innerText = this.isCommandChecked(menuItem.id) ? "\u2713" : "";
         itemElement.appendChild(checkElement);
-        const labelElement = System72.document.createElement("span");
+        const labelElement = System79.document.createElement("span");
         labelElement.style.cssText = "flex:1;";
         labelElement.innerText = menuItem.label;
         itemElement.appendChild(labelElement);
         if (menuItem.shortcut) {
-          const shortcutElement = System72.document.createElement("span");
+          const shortcutElement = System79.document.createElement("span");
           shortcutElement.style.cssText = "margin-left:24px;color:" + PaneTheme.color.textDim + ";font-size:12px;";
           shortcutElement.innerText = menuItem.shortcut;
           itemElement.appendChild(shortcutElement);
@@ -33787,9 +35460,9 @@ void main() {
       const titleElement = this.#menuTitleElementList[menuIndex];
       const titleRect = titleElement.getBoundingClientRect();
       const panelElement = this.createMenuPanelElement(MENU_DEFINITIONS[menuIndex].items);
-      panelElement.style.left = System72.Math.round(titleRect.left) + "px";
-      panelElement.style.top = System72.Math.round(titleRect.bottom) + "px";
-      System72.document.body.appendChild(panelElement);
+      panelElement.style.left = System79.Math.round(titleRect.left) + "px";
+      panelElement.style.top = System79.Math.round(titleRect.bottom) + "px";
+      System79.document.body.appendChild(panelElement);
       titleElement.style.backgroundColor = MENU_HOVER_COLOR;
       this.#openMenuIndex = menuIndex;
     }
@@ -33804,15 +35477,15 @@ void main() {
     openMenuPanelAt(clientX, clientY, menuItems) {
       this.closeMenuDropdown();
       const panelElement = this.createMenuPanelElement(menuItems);
-      panelElement.style.left = System72.Math.round(clientX) + "px";
-      panelElement.style.top = System72.Math.round(clientY) + "px";
-      System72.document.body.appendChild(panelElement);
+      panelElement.style.left = System79.Math.round(clientX) + "px";
+      panelElement.style.top = System79.Math.round(clientY) + "px";
+      System79.document.body.appendChild(panelElement);
     }
     //==============================================================================
     // 메뉴 접기.
     //==============================================================================
     closeMenuDropdown() {
-      const existingPanel = System72.document.getElementById("uieditorMenuPanel");
+      const existingPanel = System79.document.getElementById("uieditorMenuPanel");
       if (existingPanel) {
         existingPanel.remove();
       }
@@ -33993,9 +35666,9 @@ void main() {
         } else {
           this.renderPreviewView();
         }
-        System72.requestAnimationFrame(renderFrame);
+        System79.requestAnimationFrame(renderFrame);
       }, "renderFrame");
-      System72.requestAnimationFrame(renderFrame);
+      System79.requestAnimationFrame(renderFrame);
     }
     //==============================================================================
     // 캔버스 크기 맞추기. (표시 크기에 맞춰 그리기 버퍼를 갱신)
@@ -34005,9 +35678,9 @@ void main() {
      * @returns { boolean }
      */
     resizeCanvasToDisplay(canvasElement) {
-      const devicePixelRatio = System72.Math.min(System72.window.devicePixelRatio || 1, 2);
-      const displayWidth = System72.Math.floor(canvasElement.clientWidth * devicePixelRatio);
-      const displayHeight = System72.Math.floor(canvasElement.clientHeight * devicePixelRatio);
+      const devicePixelRatio = System79.Math.min(System79.window.devicePixelRatio || 1, 2);
+      const displayWidth = System79.Math.floor(canvasElement.clientWidth * devicePixelRatio);
+      const displayHeight = System79.Math.floor(canvasElement.clientHeight * devicePixelRatio);
       if (displayWidth <= 0 || displayHeight <= 0) {
         return false;
       }
@@ -34025,7 +35698,7 @@ void main() {
         return;
       }
       const graphic = this.#editorGraphic;
-      const devicePixelRatio = System72.Math.min(System72.window.devicePixelRatio || 1, 2);
+      const devicePixelRatio = System79.Math.min(System79.window.devicePixelRatio || 1, 2);
       graphic.applySettings(null);
       graphic.scale(devicePixelRatio, devicePixelRatio);
       const viewSize = this.getEditorViewSize();
@@ -34050,7 +35723,7 @@ void main() {
       }
       const graphic = this.#previewGraphic;
       const documentSize = this.getDocumentSize();
-      const devicePixelRatio = System72.Math.min(System72.window.devicePixelRatio || 1, 2);
+      const devicePixelRatio = System79.Math.min(System79.window.devicePixelRatio || 1, 2);
       graphic.applySettings(null);
       graphic.scale(devicePixelRatio, devicePixelRatio);
       const viewWidth = this.#previewCanvas.clientWidth;
@@ -34060,7 +35733,7 @@ void main() {
       let scaleX = 1;
       let scaleY = 1;
       if (this.#renderScaleMode === "fit") {
-        const fitRatio = System72.Math.min(viewWidth / documentSize.x, viewHeight / documentSize.y);
+        const fitRatio = System79.Math.min(viewWidth / documentSize.x, viewHeight / documentSize.y);
         scaleX = fitRatio;
         scaleY = fitRatio;
       } else if (this.#renderScaleMode === "stretchWidth") {
@@ -34070,8 +35743,8 @@ void main() {
         scaleY = viewHeight / documentSize.y;
         scaleX = scaleY;
       }
-      const offsetX = System72.Math.round((viewWidth - documentSize.x * scaleX) * 0.5);
-      const offsetY = System72.Math.round((viewHeight - documentSize.y * scaleY) * 0.5);
+      const offsetX = System79.Math.round((viewWidth - documentSize.x * scaleX) * 0.5);
+      const offsetY = System79.Math.round((viewHeight - documentSize.y * scaleY) * 0.5);
       graphic.pushState();
       graphic.translate(offsetX, offsetY);
       graphic.scale(scaleX, scaleY);
@@ -34097,8 +35770,8 @@ void main() {
       const viewSize = this.getEditorViewSize();
       const documentSize = this.getDocumentSize();
       const scaleRatio = this.#zoomScale !== null ? this.#zoomScale : this.getFitScale();
-      const originX = System72.Math.round((viewSize.x - documentSize.x * scaleRatio) * 0.5 + this.#panOffset.x);
-      const originY = System72.Math.round((viewSize.y - documentSize.y * scaleRatio) * 0.5 + this.#panOffset.y);
+      const originX = System79.Math.round((viewSize.x - documentSize.x * scaleRatio) * 0.5 + this.#panOffset.x);
+      const originY = System79.Math.round((viewSize.y - documentSize.y * scaleRatio) * 0.5 + this.#panOffset.y);
       return { scale: scaleRatio, originX, originY };
     }
     //==============================================================================
@@ -34125,7 +35798,7 @@ void main() {
       const marginSize = 48;
       const widthRatio = (viewSize.x - marginSize) / documentSize.x;
       const heightRatio = (viewSize.y - marginSize) / documentSize.y;
-      return System72.Math.max(ZOOM_MINIMUM, System72.Math.min(1, System72.Math.min(widthRatio, heightRatio)));
+      return System79.Math.max(ZOOM_MINIMUM, System79.Math.min(1, System79.Math.min(widthRatio, heightRatio)));
     }
     //==============================================================================
     // 배율 지정. (화면상 기준점의 문서 좌표를 유지한다)
@@ -34142,7 +35815,7 @@ void main() {
       const focusY = focusClientY - canvasRect.top;
       const documentX = (focusX - currentTransform.originX) / currentTransform.scale;
       const documentY = (focusY - currentTransform.originY) / currentTransform.scale;
-      const clampedScale = System72.Math.max(ZOOM_MINIMUM, System72.Math.min(ZOOM_MAXIMUM, nextScale));
+      const clampedScale = System79.Math.max(ZOOM_MINIMUM, System79.Math.min(ZOOM_MAXIMUM, nextScale));
       const viewSize = this.getEditorViewSize();
       const documentSize = this.getDocumentSize();
       this.#zoomScale = clampedScale;
@@ -34201,8 +35874,8 @@ void main() {
       if (parentNode) {
         const parentBounds = parentNode.getWorldBounds();
         const anchor = selectedNode.getAnchor();
-        const anchorX = System72.Math.round(editorTransform.originX + (parentBounds.left + parentBounds.width * anchor.x) * editorTransform.scale);
-        const anchorY = System72.Math.round(editorTransform.originY + (parentBounds.top + parentBounds.height * anchor.y) * editorTransform.scale);
+        const anchorX = System79.Math.round(editorTransform.originX + (parentBounds.left + parentBounds.width * anchor.x) * editorTransform.scale);
+        const anchorY = System79.Math.round(editorTransform.originY + (parentBounds.top + parentBounds.height * anchor.y) * editorTransform.scale);
         graphic.setFillColor(PIVOT_SHADOW_COLOR);
         graphic.drawRect(Rect.create(anchorX - ANCHOR_MARK_SIZE - 1, anchorY - 2, ANCHOR_MARK_SIZE * 2 + 3, 5));
         graphic.drawRect(Rect.create(anchorX - 2, anchorY - ANCHOR_MARK_SIZE - 1, 5, ANCHOR_MARK_SIZE * 2 + 3));
@@ -34211,8 +35884,8 @@ void main() {
         graphic.drawRect(Rect.create(anchorX, anchorY - ANCHOR_MARK_SIZE, 1, ANCHOR_MARK_SIZE * 2 + 1));
       }
       const pivot = selectedNode.getPivot();
-      const pivotX = System72.Math.round(boundsLeft + boundsWidth * pivot.x);
-      const pivotY = System72.Math.round(boundsTop + boundsHeight * pivot.y);
+      const pivotX = System79.Math.round(boundsLeft + boundsWidth * pivot.x);
+      const pivotY = System79.Math.round(boundsTop + boundsHeight * pivot.y);
       graphic.setFillColor(PIVOT_SHADOW_COLOR);
       graphic.drawRect(Rect.create(pivotX - PIVOT_MARK_SIZE, pivotY - 2, PIVOT_MARK_SIZE * 2 + 1, 5));
       graphic.drawRect(Rect.create(pivotX - 2, pivotY - PIVOT_MARK_SIZE, 5, PIVOT_MARK_SIZE * 2 + 1));
@@ -34230,7 +35903,7 @@ void main() {
       }
       const localPosition = selectedNode.getLocalPosition();
       const contentSize = selectedNode.getContentSize();
-      const badgeText = System72.Math.round(localPosition.x) + ", " + System72.Math.round(localPosition.y) + "   " + System72.Math.round(contentSize.x) + " x " + System72.Math.round(contentSize.y);
+      const badgeText = System79.Math.round(localPosition.x) + ", " + System79.Math.round(localPosition.y) + "   " + System79.Math.round(contentSize.x) + " x " + System79.Math.round(contentSize.y);
       graphic.setFontString("11px sans-serif");
       graphic.setTextAlign("left");
       graphic.setTextBaseline("middle");
@@ -34258,20 +35931,20 @@ void main() {
       }
       const screenStep = gridStep * editorTransform.scale;
       const viewSize = this.getEditorViewSize();
-      const firstColumnIndex = System72.Math.ceil(-editorTransform.originX / screenStep);
-      const lastColumnIndex = System72.Math.floor((viewSize.x - editorTransform.originX) / screenStep);
+      const firstColumnIndex = System79.Math.ceil(-editorTransform.originX / screenStep);
+      const lastColumnIndex = System79.Math.floor((viewSize.x - editorTransform.originX) / screenStep);
       for (let columnIndex = firstColumnIndex; columnIndex <= lastColumnIndex; ++columnIndex) {
         const isMajorLine = columnIndex % 5 === 0;
         graphic.setFillColor(isMajorLine ? GRID_MAJOR_COLOR : GRID_MINOR_COLOR);
-        const screenX = System72.Math.round(editorTransform.originX + columnIndex * screenStep);
+        const screenX = System79.Math.round(editorTransform.originX + columnIndex * screenStep);
         graphic.drawRect(Rect.create(screenX, 0, 1, viewSize.y));
       }
-      const firstRowIndex = System72.Math.ceil(-editorTransform.originY / screenStep);
-      const lastRowIndex = System72.Math.floor((viewSize.y - editorTransform.originY) / screenStep);
+      const firstRowIndex = System79.Math.ceil(-editorTransform.originY / screenStep);
+      const lastRowIndex = System79.Math.floor((viewSize.y - editorTransform.originY) / screenStep);
       for (let rowIndex = firstRowIndex; rowIndex <= lastRowIndex; ++rowIndex) {
         const isMajorLine = rowIndex % 5 === 0;
         graphic.setFillColor(isMajorLine ? GRID_MAJOR_COLOR : GRID_MINOR_COLOR);
-        const screenY = System72.Math.round(editorTransform.originY + rowIndex * screenStep);
+        const screenY = System79.Math.round(editorTransform.originY + rowIndex * screenStep);
         graphic.drawRect(Rect.create(0, screenY, viewSize.x, 1));
       }
     }
@@ -34340,14 +36013,14 @@ void main() {
         const stepRatio = wheelEvent.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
         this.setZoomScale(currentTransform.scale * stepRatio, wheelEvent.clientX, wheelEvent.clientY);
       }, { passive: false });
-      System72.window.addEventListener("mousemove", (mouseEvent) => {
+      System79.window.addEventListener("mousemove", (mouseEvent) => {
         if (this.#dragMode === "pan") {
           this.updatePan(mouseEvent);
           return;
         }
         this.handlePointerMove(this.readCanvasPointer(mouseEvent));
       });
-      System72.window.addEventListener("mouseup", () => {
+      System79.window.addEventListener("mouseup", () => {
         this.handlePointerUp();
       });
       canvasElement.addEventListener("contextmenu", (mouseEvent) => {
@@ -34451,7 +36124,7 @@ void main() {
       }
       const deltaX = pointerPosition.x - this.#dragStartPointer.x;
       const deltaY = pointerPosition.y - this.#dragStartPointer.y;
-      if (System72.Math.abs(deltaX) > PRESS_MOVE_TOLERANCE || System72.Math.abs(deltaY) > PRESS_MOVE_TOLERANCE) {
+      if (System79.Math.abs(deltaX) > PRESS_MOVE_TOLERANCE || System79.Math.abs(deltaY) > PRESS_MOVE_TOLERANCE) {
         this.#isPressMoved = true;
       }
       if (this.#dragMode === "move") {
@@ -34459,8 +36132,8 @@ void main() {
         selectedNode.setLocalPosition(this.applySnap(selectedNode, movedPosition));
       } else if (this.#dragMode === "resize" && this.#activeHandle) {
         const handleDefinition = this.#activeHandle;
-        const nextWidth = System72.Math.max(8, this.#dragStartSize.x + deltaX * handleDefinition.sizeX);
-        const nextHeight = System72.Math.max(8, this.#dragStartSize.y + deltaY * handleDefinition.sizeY);
+        const nextWidth = System79.Math.max(8, this.#dragStartSize.x + deltaX * handleDefinition.sizeX);
+        const nextHeight = System79.Math.max(8, this.#dragStartSize.y + deltaY * handleDefinition.sizeY);
         let nextX = this.#dragStartPosition.x;
         let nextY = this.#dragStartPosition.y;
         if (handleDefinition.moveLeft) {
@@ -34484,7 +36157,7 @@ void main() {
       this.#snapGuideList = [];
       if (this.#frontSelectNode && !this.#isPressMoved) {
         const frontNode = this.#frontSelectNode;
-        this.#frontSelectTimer = System72.setTimeout(() => {
+        this.#frontSelectTimer = System79.setTimeout(() => {
           this.#frontSelectTimer = 0;
           this.#frontSelectNode = null;
           this.selectNode(frontNode);
@@ -34498,7 +36171,7 @@ void main() {
     //==============================================================================
     cancelFrontSelect() {
       if (this.#frontSelectTimer) {
-        System72.clearTimeout(this.#frontSelectTimer);
+        System79.clearTimeout(this.#frontSelectTimer);
         this.#frontSelectTimer = 0;
       }
       this.#frontSelectNode = null;
@@ -34533,12 +36206,12 @@ void main() {
       const worldBounds = node.getWorldBounds();
       const editorTransform = this.getEditorTransform();
       const screenGrabDistance = HANDLE_SIZE / editorTransform.scale;
-      const grabDistanceX = System72.Math.max(2, System72.Math.min(screenGrabDistance, worldBounds.width / 3));
-      const grabDistanceY = System72.Math.max(2, System72.Math.min(screenGrabDistance, worldBounds.height / 3));
+      const grabDistanceX = System79.Math.max(2, System79.Math.min(screenGrabDistance, worldBounds.width / 3));
+      const grabDistanceY = System79.Math.max(2, System79.Math.min(screenGrabDistance, worldBounds.height / 3));
       for (const handleDefinition of RESIZE_HANDLE_DEFINITIONS) {
         const handleX = worldBounds.left + worldBounds.width * handleDefinition.ratioX;
         const handleY = worldBounds.top + worldBounds.height * handleDefinition.ratioY;
-        if (System72.Math.abs(pointerPosition.x - handleX) <= grabDistanceX && System72.Math.abs(pointerPosition.y - handleY) <= grabDistanceY) {
+        if (System79.Math.abs(pointerPosition.x - handleX) <= grabDistanceX && System79.Math.abs(pointerPosition.y - handleY) <= grabDistanceY) {
           return handleDefinition;
         }
       }
@@ -34559,7 +36232,7 @@ void main() {
         return;
       }
       const currentIndex = overlappedList.indexOf(this.#selectedNode);
-      const nextIndex = System72.Math.min(currentIndex + 1, overlappedList.length - 1);
+      const nextIndex = System79.Math.min(currentIndex + 1, overlappedList.length - 1);
       this.selectNode(overlappedList[nextIndex]);
     }
     //==============================================================================
@@ -34675,7 +36348,7 @@ void main() {
       let bestGuide = -1;
       for (const edgeOffset of edgeOffsets) {
         for (const candidateValue of candidateList) {
-          const distance = System72.Math.abs(originValue + edgeOffset - candidateValue);
+          const distance = System79.Math.abs(originValue + edgeOffset - candidateValue);
           if (distance < bestDistance) {
             bestDistance = distance;
             bestValue = candidateValue - edgeOffset;
@@ -34692,7 +36365,7 @@ void main() {
     // 단축키 연결.
     //==============================================================================
     bindKeyboardEvents() {
-      System72.window.addEventListener("keydown", (keyboardEvent) => {
+      System79.window.addEventListener("keydown", (keyboardEvent) => {
         const isCommandKey = keyboardEvent.ctrlKey || keyboardEvent.metaKey;
         const loweredKey = keyboardEvent.key.toLowerCase();
         if (isCommandKey && loweredKey === "z") {
@@ -35093,7 +36766,7 @@ void main() {
         return;
       }
       treeElement.innerHTML = "";
-      this.#hierarchyRowNodeMap = new System72.Map();
+      this.#hierarchyRowNodeMap = new System79.Map();
       const flatList = [];
       this.collectHierarchyRows(this.#documentRootNode, 0, flatList);
       for (const entry of flatList) {
@@ -35194,7 +36867,7 @@ void main() {
       if (!labelElement) {
         return;
       }
-      const inputElement = System72.document.createElement("input");
+      const inputElement = System79.document.createElement("input");
       inputElement.type = "text";
       inputElement.value = node.getName();
       decorateInputElement(inputElement);
@@ -35341,7 +37014,7 @@ void main() {
         const siblingList = parentNode.getChildren();
         const targetIndex = siblingList.indexOf(targetNode);
         const nextIndex = dropKind === "before" ? targetIndex : targetIndex + 1;
-        movedNode.setSiblingIndex(System72.Math.max(0, nextIndex));
+        movedNode.setSiblingIndex(System79.Math.max(0, nextIndex));
       }
       this.rebuildHierarchy();
       this.rebuildInspector();
@@ -35399,7 +37072,7 @@ void main() {
       let currentNode = this.#documentRootNode;
       for (const indexText of pathText.split(".")) {
         const childList = currentNode.getChildren();
-        const childIndex = System72.Number(indexText);
+        const childIndex = System79.Number(indexText);
         if (!childList[childIndex]) {
           return null;
         }
@@ -35504,7 +37177,7 @@ void main() {
      */
     collectHierarchyRows(node, depth, outputList) {
       outputList.push({ node, depth });
-      const contentNodeSet = new System72.Set();
+      const contentNodeSet = new System79.Set();
       for (const component of node.getAllComponents()) {
         if (typeof component.getContent === "function") {
           const contentNode = component.getContent();
@@ -35550,7 +37223,7 @@ void main() {
           return lookupItem.paletteId;
         }
       }
-      const componentNameSet = new System72.Set();
+      const componentNameSet = new System79.Set();
       for (const component of node.getAllComponents()) {
         componentNameSet.add(component.constructor.name);
       }
@@ -35660,7 +37333,7 @@ void main() {
     appendNodeReferenceRow(parentElement, labelText, currentNode, changeHandler) {
       const rowElement = this.createPropertyRowElement(parentElement, labelText);
       const currentPath = currentNode ? UIDocument.findNodePath(this.#documentRootNode, currentNode) : "";
-      const inputElement = System72.document.createElement("input");
+      const inputElement = System79.document.createElement("input");
       inputElement.type = "text";
       inputElement.value = currentPath ? currentPath : "";
       inputElement.placeholder = "(none)";
@@ -35745,20 +37418,20 @@ void main() {
      * @param { Function } acceptHandler
      */
     openNodePickerDialog(currentNode, acceptHandler) {
-      const existingDialog = System72.document.getElementById("uieditorDialog");
+      const existingDialog = System79.document.getElementById("uieditorDialog");
       if (existingDialog) {
         existingDialog.remove();
       }
-      const backdropElement = System72.document.createElement("div");
+      const backdropElement = System79.document.createElement("div");
       backdropElement.id = "uieditorDialog";
       backdropElement.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;z-index:10000;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;font-family:" + PaneTheme.font.family + ";";
-      const panelElement = System72.document.createElement("div");
+      const panelElement = System79.document.createElement("div");
       panelElement.style.cssText = "width:440px;max-height:80vh;display:flex;flex-direction:column;padding:16px 18px 14px 18px;border-radius:6px;background:" + PaneTheme.color.panel + ";border:1px solid " + PaneTheme.color.border + ";box-shadow:0 10px 30px rgba(0,0,0,0.55);color:" + PaneTheme.color.text + ";";
-      const titleElement = System72.document.createElement("div");
+      const titleElement = System79.document.createElement("div");
       titleElement.innerText = "\uB178\uB4DC \uC120\uD0DD";
       titleElement.style.cssText = "font-size:13px;font-weight:600;color:" + PaneTheme.color.text + ";margin-bottom:10px;";
       panelElement.appendChild(titleElement);
-      const searchElement = System72.document.createElement("input");
+      const searchElement = System79.document.createElement("input");
       searchElement.type = "text";
       searchElement.placeholder = "\uC774\uB984 \uB610\uB294 \uACBD\uB85C\uB85C \uAC80\uC0C9";
       decorateInputElement(searchElement);
@@ -35766,16 +37439,16 @@ void main() {
       searchElement.style.width = "100%";
       searchElement.style.marginBottom = "8px";
       panelElement.appendChild(searchElement);
-      const listElement = System72.document.createElement("div");
+      const listElement = System79.document.createElement("div");
       listElement.style.cssText = "flex:1;min-height:200px;max-height:360px;overflow-y:auto;border:1px solid " + BORDER_COLOR + ";border-radius:3px;background:" + PaneTheme.color.background + ";";
       panelElement.appendChild(listElement);
-      const buttonRowElement = System72.document.createElement("div");
+      const buttonRowElement = System79.document.createElement("div");
       buttonRowElement.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:12px;";
       const cancelElement = this.createDialogButtonElement("\uCDE8\uC18C", false);
       buttonRowElement.appendChild(cancelElement);
       panelElement.appendChild(buttonRowElement);
       backdropElement.appendChild(panelElement);
-      System72.document.body.appendChild(backdropElement);
+      System79.document.body.appendChild(backdropElement);
       const closeDialog = /* @__PURE__ */ __name(() => {
         backdropElement.remove();
       }, "closeDialog");
@@ -35789,7 +37462,7 @@ void main() {
         listElement.innerHTML = "";
         const keyword = searchElement.value.trim().toLowerCase();
         const appendRow = /* @__PURE__ */ __name((labelText, node, depth) => {
-          const rowElement = System72.document.createElement("div");
+          const rowElement = System79.document.createElement("div");
           rowElement.innerText = labelText;
           const isCurrent = node === currentNode;
           rowElement.style.cssText = "height:" + ROW_HEIGHT + ";line-height:" + ROW_HEIGHT + ";padding:0 10px 0 " + (10 + depth * 14) + "px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;color:" + (isCurrent ? SELECTED_ROW_TEXT_COLOR : PaneTheme.color.text) + ";background:" + (isCurrent ? PaneTheme.color.accent : "transparent") + ";";
@@ -35852,7 +37525,7 @@ void main() {
      */
     appendBooleanRow(parentElement, labelText, currentValue, changeHandler) {
       const rowElement = this.createPropertyRowElement(parentElement, labelText);
-      const checkElement = System72.document.createElement("input");
+      const checkElement = System79.document.createElement("input");
       checkElement.type = "checkbox";
       checkElement.checked = currentValue;
       checkElement.style.cssText = "width:14px;height:14px;accent-color:" + SELECTION_COLOR + ";cursor:pointer;";
@@ -35875,14 +37548,14 @@ void main() {
       const rowElement = this.createPropertyRowElement(parentElement, labelText);
       const inputElementList = [];
       for (let axisIndex = 0; axisIndex < 2; ++axisIndex) {
-        const inputElement = System72.document.createElement("input");
+        const inputElement = System79.document.createElement("input");
         inputElement.type = "text";
         inputElement.value = this.composeNumberText(axisIndex === 0 ? currentValue.x : currentValue.y);
         decorateInputElement(inputElement);
         inputElement.addEventListener("change", () => {
-          const parsedX = System72.parseFloat(inputElementList[0].value);
-          const parsedY = System72.parseFloat(inputElementList[1].value);
-          if (System72.isNaN(parsedX) || System72.isNaN(parsedY)) {
+          const parsedX = System79.parseFloat(inputElementList[0].value);
+          const parsedY = System79.parseFloat(inputElementList[1].value);
+          if (System79.isNaN(parsedX) || System79.isNaN(parsedY)) {
             return;
           }
           this.pushUndoSnapshot();
@@ -36129,8 +37802,8 @@ void main() {
       inputElement.style.width = "100%";
       inputElement.value = this.composeNumberText(currentValue);
       const commitValue = /* @__PURE__ */ __name(() => {
-        const parsedValue = System72.Number(inputElement.value);
-        if (System72.Number.isFinite(parsedValue)) {
+        const parsedValue = System79.Number(inputElement.value);
+        if (System79.Number.isFinite(parsedValue)) {
           this.pushUndoSnapshot();
           applyCallback(parsedValue);
           this.refreshStatus();
@@ -36150,23 +37823,23 @@ void main() {
       labelElement.addEventListener("mousedown", (mouseEvent) => {
         mouseEvent.preventDefault();
         const startX = mouseEvent.clientX;
-        const startValue = System72.Number(inputElement.value) || 0;
+        const startValue = System79.Number(inputElement.value) || 0;
         this.pushUndoSnapshot();
         const onMouseMove = /* @__PURE__ */ __name((moveEvent) => {
           let nextValue = startValue + (moveEvent.clientX - startX) * stepAmount;
           if (stepAmount >= 1) {
-            nextValue = System72.Math.round(nextValue);
+            nextValue = System79.Math.round(nextValue);
           }
           inputElement.value = this.composeNumberText(nextValue);
           applyCallback(nextValue);
           this.refreshStatus();
         }, "onMouseMove");
         const onMouseUp = /* @__PURE__ */ __name(() => {
-          System72.window.removeEventListener("mousemove", onMouseMove);
-          System72.window.removeEventListener("mouseup", onMouseUp);
+          System79.window.removeEventListener("mousemove", onMouseMove);
+          System79.window.removeEventListener("mouseup", onMouseUp);
         }, "onMouseUp");
-        System72.window.addEventListener("mousemove", onMouseMove);
-        System72.window.addEventListener("mouseup", onMouseUp);
+        System79.window.addEventListener("mousemove", onMouseMove);
+        System79.window.addEventListener("mouseup", onMouseUp);
       });
       rowElement.appendChild(inputElement);
     }
@@ -36217,9 +37890,9 @@ void main() {
       alphaInputElement.value = currentColor.alpha.toFixed(2);
       const commitColor = /* @__PURE__ */ __name(() => {
         const parsedColor = Color.createFromHEX(colorInputElement.value);
-        const parsedAlpha = System72.Number(alphaInputElement.value);
+        const parsedAlpha = System79.Number(alphaInputElement.value);
         if (parsedColor) {
-          parsedColor.alpha = System72.Number.isFinite(parsedAlpha) ? System72.Math.max(0, System72.Math.min(1, parsedAlpha)) : currentColor.alpha;
+          parsedColor.alpha = System79.Number.isFinite(parsedAlpha) ? System79.Math.max(0, System79.Math.min(1, parsedAlpha)) : currentColor.alpha;
           this.pushUndoSnapshot();
           applyCallback(parsedColor);
         }
@@ -36240,8 +37913,8 @@ void main() {
      * @returns { string }
      */
     composeNumberText(value) {
-      const isInteger = System72.Math.abs(value - System72.Math.round(value)) < 1e-4;
-      return isInteger ? String(System72.Math.round(value)) : value.toFixed(2);
+      const isInteger = System79.Math.abs(value - System79.Math.round(value)) < 1e-4;
+      return isInteger ? String(System79.Math.round(value)) : value.toFixed(2);
     }
     //==============================================================================
     // 상태줄 갱신.
@@ -36256,16 +37929,16 @@ void main() {
         const localPosition = selectedNode.getLocalPosition();
         const contentSize = selectedNode.getContentSize();
         const componentNameList = selectedNode.getAllComponents().map((component) => component.constructor.name);
-        statusText = selectedNode.getName() + "    X " + System72.Math.round(localPosition.x) + "  Y " + System72.Math.round(localPosition.y) + "    W " + System72.Math.round(contentSize.x) + "  H " + System72.Math.round(contentSize.y);
+        statusText = selectedNode.getName() + "    X " + System79.Math.round(localPosition.x) + "  Y " + System79.Math.round(localPosition.y) + "    W " + System79.Math.round(contentSize.x) + "  H " + System79.Math.round(contentSize.y);
         if (componentNameList.length > 0) {
           statusText += "    [" + componentNameList.join(", ") + "]";
         }
       }
       const documentSize = this.getDocumentSize();
-      statusText += "        \uBB38\uC11C " + System72.Math.round(documentSize.x) + " x " + System72.Math.round(documentSize.y);
+      statusText += "        \uBB38\uC11C " + System79.Math.round(documentSize.x) + " x " + System79.Math.round(documentSize.y);
       if (this.#activeViewName === "edit") {
         const editorTransform = this.#editorCanvas ? this.getEditorTransform() : { scale: 1 };
-        statusText += "    \uBC30\uC728 " + System72.Math.round(editorTransform.scale * 100) + "%";
+        statusText += "    \uBC30\uC728 " + System79.Math.round(editorTransform.scale * 100) + "%";
       } else {
         const renderModeText = { actual: "1:1 \uC2E4\uC81C \uD06C\uAE30", fit: "\uC9E7\uC740 \uCD95 \uB9DE\uCDA4", stretchWidth: "\uAC00\uB85C \uB9DE\uCDA4", stretchHeight: "\uC138\uB85C \uB9DE\uCDA4" }[this.#renderScaleMode];
         statusText += "    \uACB0\uACFC \uD654\uBA74 " + renderModeText;
@@ -36273,7 +37946,7 @@ void main() {
       this.#statusTextElement.innerText = statusText;
       if (this.#zoomReadoutElement && this.#editorCanvas) {
         const headerTransform = this.getEditorTransform();
-        this.#zoomReadoutElement.innerText = System72.Math.round(headerTransform.scale * 100) + "%";
+        this.#zoomReadoutElement.innerText = System79.Math.round(headerTransform.scale * 100) + "%";
       }
       if (this.#gridToggleElement) {
         this.#gridToggleElement.style.color = this.#isGridVisible ? ACCENT_COLOR : PaneTheme.color.textDim;
@@ -36401,15 +38074,15 @@ void main() {
      */
     saveDocument(fileName) {
       const jsonText = UIDocument.toJsonText(this.#documentRootNode);
-      const blob = new System72.Blob([jsonText], { type: "application/json" });
-      const objectUrl = System72.URL.createObjectURL(blob);
-      const anchorElement = System72.document.createElement("a");
+      const blob = new System79.Blob([jsonText], { type: "application/json" });
+      const objectUrl = System79.URL.createObjectURL(blob);
+      const anchorElement = System79.document.createElement("a");
       anchorElement.href = objectUrl;
       anchorElement.download = fileName ? fileName : this.#documentFileName;
-      System72.document.body.appendChild(anchorElement);
+      System79.document.body.appendChild(anchorElement);
       anchorElement.click();
-      System72.document.body.removeChild(anchorElement);
-      System72.URL.revokeObjectURL(objectUrl);
+      System79.document.body.removeChild(anchorElement);
+      System79.URL.revokeObjectURL(objectUrl);
       return jsonText;
     }
     //==============================================================================
@@ -36439,29 +38112,29 @@ void main() {
      * @param { Function } acceptHandler
      */
     openInputDialog(titleText, labelText, currentText, acceptHandler) {
-      const existingDialog = System72.document.getElementById("uieditorDialog");
+      const existingDialog = System79.document.getElementById("uieditorDialog");
       if (existingDialog) {
         existingDialog.remove();
       }
-      const backdropElement = System72.document.createElement("div");
+      const backdropElement = System79.document.createElement("div");
       backdropElement.id = "uieditorDialog";
       backdropElement.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;z-index:10000;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;font-family:" + PaneTheme.font.family + ";";
-      const panelElement = System72.document.createElement("div");
+      const panelElement = System79.document.createElement("div");
       panelElement.style.cssText = "min-width:340px;padding:16px 18px 14px 18px;border-radius:6px;background:" + PaneTheme.color.panel + ";border:1px solid " + PaneTheme.color.border + ";box-shadow:0 10px 30px rgba(0,0,0,0.55);color:" + PaneTheme.color.text + ";";
-      const titleElement = System72.document.createElement("div");
+      const titleElement = System79.document.createElement("div");
       titleElement.innerText = titleText;
       titleElement.style.cssText = "font-size:14px;font-weight:bold;color:" + SELECTION_COLOR + ";margin-bottom:12px;";
       panelElement.appendChild(titleElement);
-      const fieldLabelElement = System72.document.createElement("div");
+      const fieldLabelElement = System79.document.createElement("div");
       fieldLabelElement.innerText = labelText;
       fieldLabelElement.style.cssText = "font-size:12px;color:" + PaneTheme.color.textDim + ";margin-bottom:4px;";
       panelElement.appendChild(fieldLabelElement);
-      const inputElement = System72.document.createElement("input");
+      const inputElement = System79.document.createElement("input");
       inputElement.type = "text";
       inputElement.value = currentText;
       inputElement.style.cssText = "width:100%;box-sizing:border-box;padding:6px 8px;font-size:14px;border-radius:3px;background:" + PaneTheme.color.inputBg + ";border:1px solid " + PaneTheme.color.border + ";color:" + PaneTheme.color.text + ";outline:none;";
       panelElement.appendChild(inputElement);
-      const buttonRowElement = System72.document.createElement("div");
+      const buttonRowElement = System79.document.createElement("div");
       buttonRowElement.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:14px;";
       const cancelElement = this.createDialogButtonElement("\uCDE8\uC18C", false);
       const acceptElement = this.createDialogButtonElement("\uC800\uC7A5", true);
@@ -36469,7 +38142,7 @@ void main() {
       buttonRowElement.appendChild(acceptElement);
       panelElement.appendChild(buttonRowElement);
       backdropElement.appendChild(panelElement);
-      System72.document.body.appendChild(backdropElement);
+      System79.document.body.appendChild(backdropElement);
       inputElement.focus();
       inputElement.select();
       const closeDialog = /* @__PURE__ */ __name(() => {
@@ -36506,7 +38179,7 @@ void main() {
      * @returns { HTMLElement }
      */
     createDialogButtonElement(labelText, isPrimary) {
-      const buttonElement = System72.document.createElement("div");
+      const buttonElement = System79.document.createElement("div");
       buttonElement.innerText = labelText;
       buttonElement.style.cssText = "padding:6px 16px;font-size:13px;border-radius:3px;cursor:pointer;user-select:none;border:1px solid " + PaneTheme.color.border + ";" + (isPrimary ? "background:" + SELECTION_COLOR + ";color:" + SELECTED_ROW_TEXT_COLOR + ";border-color:" + SELECTION_COLOR + ";" : "background:" + PaneTheme.color.inputBg + ";color:" + PaneTheme.color.text + ";");
       return buttonElement;
@@ -36515,7 +38188,7 @@ void main() {
     // 열기.
     //==============================================================================
     loadDocument() {
-      const inputElement = System72.document.createElement("input");
+      const inputElement = System79.document.createElement("input");
       inputElement.type = "file";
       inputElement.accept = ".json,application/json";
       inputElement.addEventListener("change", () => {
@@ -36523,7 +38196,7 @@ void main() {
         if (!selectedFile) {
           return;
         }
-        const fileReader = new System72.FileReader();
+        const fileReader = new System79.FileReader();
         fileReader.onload = () => {
           this.pushUndoSnapshot();
           this.replaceDocument(fileReader.result);
@@ -36551,16 +38224,16 @@ void main() {
       return this.#selectedNode;
     }
   };
-  for (const colorName of System72.Object.keys(VANILLA_THEME_COLORS)) {
+  for (const colorName of System79.Object.keys(VANILLA_THEME_COLORS)) {
     PaneTheme.color[colorName] = VANILLA_THEME_COLORS[colorName];
   }
   PaneTheme.size.resizer = 3;
   PaneTheme.font.family = EDITOR_FONT_FAMILY;
   PaneTheme.font.size = "13px";
-  var editorStyleElement = System72.document.createElement("style");
+  var editorStyleElement = System79.document.createElement("style");
   editorStyleElement.innerText = "* { scrollbar-width: thin; scrollbar-color: rgba(121, 121, 121, 0.4) transparent; }::-webkit-scrollbar { width: 10px; height: 10px; }::-webkit-scrollbar-track { background: transparent; }::-webkit-scrollbar-thumb { background: rgba(121, 121, 121, 0.4); }::-webkit-scrollbar-thumb:hover { background: rgba(121, 121, 121, 0.7); }::-webkit-scrollbar-corner { background: transparent; }input[type=checkbox] { accent-color: " + ACCENT_COLOR + "; }body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }";
-  System72.document.head.appendChild(editorStyleElement);
-  for (const exportName of System72.Object.keys(import_exports)) {
+  System79.document.head.appendChild(editorStyleElement);
+  for (const exportName of System79.Object.keys(import_exports)) {
     const candidateType = import_exports[exportName];
     if (typeof candidateType !== "function" || !candidateType.prototype) {
       continue;
@@ -36572,8 +38245,8 @@ void main() {
     }
   }
   var uiEditor = new UIEditor();
-  System72.uiEditor = uiEditor;
-  System72.document.title = "vanilla.js - UI Editor";
+  System79.uiEditor = uiEditor;
+  System79.document.title = "vanilla.js - UI Editor";
   uiEditor.run();
 })();
 

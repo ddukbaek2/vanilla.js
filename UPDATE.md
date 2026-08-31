@@ -40,6 +40,16 @@
 - NEON HORIZON: 셰이더 실루엣 전투순양함을 실제 3D 모델로 교체 (Quaternius 'Ultimate Spaceships' Executioner, CC0)
   — 엔진 SkinnedModel GLB 경로 사용, 선미 엔진 글로우 / 기함 주포는 투영 앵커로 유지
 - UILabel: getTextAlign / getTextBaseline 추가, UIDocument 가 라벨 정렬을 저장 / 복원하도록 보강
+- 위젯 대량 추가: UIDropdown(콤보박스), UIContextMenu(우클릭 메뉴), UISpinner(회전 인디케이터),
+  UILineChart / UIBarChart(실시간 차트), UIDraggable(드래그 앤 드롭, 스냅백 / settleHere)
+- UIButton: 길게 누름(setLongPressedEvent / setLongPressSeconds, 발화 시 클릭 삼킴), 눌림 경과 시간 조회 추가
+- UIToast: 가로 표시 자리(setRestX) / 글자 크기 옵션 추가
+- ParticleSystem / TrailRenderer 추가 (유니티식 2D 파티클 — rate / burst / shape(point·circle·cone·box·edge) /
+  수명·속도·크기·회전·색 시작 범위 / 수명 그라디언트 / 중력·감쇠 / 가산 합성 / 월드 공간, 트레일 띠)
+- UI 쇼케이스를 "VANILLA CONSOLE" 앱으로 전면 재구성: 실시간 대시보드(라인 / 바 차트, KPI, 이벤트 피드),
+  스토어(카트 선택 / 해제 / 클리어 / 체크아웃, 스피너 로딩 줄), 설정(드롭다운 포함), 컴포넌트 플레이그라운드
+  (버튼 상태 / 롱프레스 / 컨텍스트 메뉴 / 드래그 / 스피너 / 타자기 / 차트) — 화면 좌우 여백 제거(stretchShortExpandLong + 우측 앵커)
+- EFFECTS 샘플 추가 (파티클 놀이터 — 불 / 분수 / 눈 / 색종이 / 폭발 / 불꽃놀이 / 마법 궤적)
 
 # 0.3.0 (2026-08-30)
 - 렌더러 교체: Canvas 2D -> WebGL2

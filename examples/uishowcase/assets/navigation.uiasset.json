@@ -23,17 +23,17 @@
 			0
 		],
 		"contentSize": [
-			216,
-			900
+			200,
+			1000
 		],
 		"interactable": false,
 		"components": [
 			{
 				"type": "Paint",
 				"color": [
-					0.063,
-					0.078,
-					0.122,
+					0.071,
+					0.082,
+					0.11,
 					1
 				],
 				"roundSize": 0
@@ -45,7 +45,7 @@
 				"name": "RailHairline",
 				"active": true,
 				"position": [
-					215,
+					199,
 					0
 				],
 				"scale": [
@@ -64,16 +64,16 @@
 				],
 				"contentSize": [
 					1,
-					900
+					1000
 				],
 				"interactable": false,
 				"components": [
 					{
 						"type": "Paint",
 						"color": [
-							0.137,
-							0.169,
-							0.239,
+							0.149,
+							0.173,
+							0.22,
 							1
 						],
 						"roundSize": 0
@@ -86,8 +86,8 @@
 				"name": "Brand",
 				"active": true,
 				"position": [
-					24,
-					30
+					22,
+					26
 				],
 				"scale": [
 					1,
@@ -104,19 +104,19 @@
 					0
 				],
 				"contentSize": [
-					168,
-					26
+					156,
+					22
 				],
 				"interactable": false,
 				"components": [
 					{
 						"type": "UILabel",
 						"text": "VANILLA",
-						"fontSize": 19,
+						"fontSize": 16,
 						"textColor": [
-							0.91,
-							0.925,
-							0.957,
+							0.902,
+							0.914,
+							0.937,
 							1
 						],
 						"backgroundColor": [
@@ -136,8 +136,8 @@
 				"name": "BrandCaption",
 				"active": true,
 				"position": [
-					25,
-					58
+					23,
+					50
 				],
 				"scale": [
 					1,
@@ -154,19 +154,19 @@
 					0
 				],
 				"contentSize": [
-					168,
-					16
+					156,
+					14
 				],
 				"interactable": false,
 				"components": [
 					{
 						"type": "UILabel",
-						"text": "UI SHOWCASE",
-						"fontSize": 10,
+						"text": "CONSOLE",
+						"fontSize": 9,
 						"textColor": [
-							0.29,
 							0.329,
-							0.408,
+							0.357,
+							0.412,
 							1
 						],
 						"backgroundColor": [
@@ -186,8 +186,8 @@
 				"name": "BrandHairline",
 				"active": true,
 				"position": [
-					16,
-					104
+					14,
+					86
 				],
 				"scale": [
 					1,
@@ -204,7 +204,7 @@
 					0
 				],
 				"contentSize": [
-					184,
+					172,
 					1
 				],
 				"interactable": false,
@@ -212,9 +212,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.137,
-							0.169,
-							0.239,
+							0.149,
+							0.173,
+							0.22,
 							1
 						],
 						"roundSize": 0
@@ -224,11 +224,11 @@
 			},
 			{
 				"type": "WorldNode",
-				"name": "NavHOME",
+				"name": "NavDASHBOARD",
 				"active": true,
 				"position": [
-					16,
-					128
+					14,
+					108
 				],
 				"scale": [
 					1,
@@ -245,8 +245,8 @@
 					0
 				],
 				"contentSize": [
-					184,
-					40
+					172,
+					36
 				],
 				"interactable": true,
 				"components": [
@@ -258,7 +258,7 @@
 							1,
 							0
 						],
-						"roundSize": 10
+						"roundSize": 9
 					},
 					{
 						"type": "UIButton",
@@ -266,14 +266,14 @@
 							0,
 							0,
 							0,
-							0.2
+							0.15
 						]
 					}
 				],
 				"children": [
 					{
 						"type": "WorldNode",
-						"name": "NavActiveHOME",
+						"name": "NavActiveDASHBOARD",
 						"active": true,
 						"position": [
 							0,
@@ -294,27 +294,27 @@
 							0
 						],
 						"contentSize": [
-							184,
-							40
+							172,
+							36
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "Paint",
 								"color": [
+									0.357,
 									0.424,
-									0.482,
 									1,
 									1
 								],
-								"roundSize": 10
+								"roundSize": 9
 							}
 						],
 						"children": []
 					},
 					{
 						"type": "WorldNode",
-						"name": "NavLabelHOME",
+						"name": "NavLabelDASHBOARD",
 						"active": true,
 						"position": [
 							0,
@@ -335,19 +335,19 @@
 							0
 						],
 						"contentSize": [
-							184,
-							40
+							172,
+							36
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
-								"text": "HOME",
-								"fontSize": 12,
+								"text": "DASHBOARD",
+								"fontSize": 10.5,
 								"textColor": [
-									0.91,
-									0.925,
-									0.957,
+									0.902,
+									0.914,
+									0.937,
 									1
 								],
 								"backgroundColor": [
@@ -366,11 +366,11 @@
 			},
 			{
 				"type": "WorldNode",
-				"name": "NavSHOP",
+				"name": "NavSTORE",
 				"active": true,
 				"position": [
-					16,
-					176
+					14,
+					150
 				],
 				"scale": [
 					1,
@@ -387,8 +387,8 @@
 					0
 				],
 				"contentSize": [
-					184,
-					40
+					172,
+					36
 				],
 				"interactable": true,
 				"components": [
@@ -400,7 +400,7 @@
 							1,
 							0
 						],
-						"roundSize": 10
+						"roundSize": 9
 					},
 					{
 						"type": "UIButton",
@@ -408,14 +408,14 @@
 							0,
 							0,
 							0,
-							0.2
+							0.15
 						]
 					}
 				],
 				"children": [
 					{
 						"type": "WorldNode",
-						"name": "NavActiveSHOP",
+						"name": "NavActiveSTORE",
 						"active": false,
 						"position": [
 							0,
@@ -436,27 +436,27 @@
 							0
 						],
 						"contentSize": [
-							184,
-							40
+							172,
+							36
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "Paint",
 								"color": [
+									0.357,
 									0.424,
-									0.482,
 									1,
 									1
 								],
-								"roundSize": 10
+								"roundSize": 9
 							}
 						],
 						"children": []
 					},
 					{
 						"type": "WorldNode",
-						"name": "NavLabelSHOP",
+						"name": "NavLabelSTORE",
 						"active": true,
 						"position": [
 							0,
@@ -477,19 +477,19 @@
 							0
 						],
 						"contentSize": [
-							184,
-							40
+							172,
+							36
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
-								"text": "SHOP",
-								"fontSize": 12,
+								"text": "STORE",
+								"fontSize": 10.5,
 								"textColor": [
-									0.91,
-									0.925,
-									0.957,
+									0.902,
+									0.914,
+									0.937,
 									1
 								],
 								"backgroundColor": [
@@ -511,8 +511,8 @@
 				"name": "NavSETTINGS",
 				"active": true,
 				"position": [
-					16,
-					224
+					14,
+					192
 				],
 				"scale": [
 					1,
@@ -529,8 +529,8 @@
 					0
 				],
 				"contentSize": [
-					184,
-					40
+					172,
+					36
 				],
 				"interactable": true,
 				"components": [
@@ -542,7 +542,7 @@
 							1,
 							0
 						],
-						"roundSize": 10
+						"roundSize": 9
 					},
 					{
 						"type": "UIButton",
@@ -550,7 +550,7 @@
 							0,
 							0,
 							0,
-							0.2
+							0.15
 						]
 					}
 				],
@@ -578,20 +578,20 @@
 							0
 						],
 						"contentSize": [
-							184,
-							40
+							172,
+							36
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "Paint",
 								"color": [
+									0.357,
 									0.424,
-									0.482,
 									1,
 									1
 								],
-								"roundSize": 10
+								"roundSize": 9
 							}
 						],
 						"children": []
@@ -619,19 +619,19 @@
 							0
 						],
 						"contentSize": [
-							184,
-							40
+							172,
+							36
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
 								"text": "SETTINGS",
-								"fontSize": 12,
+								"fontSize": 10.5,
 								"textColor": [
-									0.91,
-									0.925,
-									0.957,
+									0.902,
+									0.914,
+									0.937,
 									1
 								],
 								"backgroundColor": [
@@ -650,11 +650,11 @@
 			},
 			{
 				"type": "WorldNode",
-				"name": "NavPROFILE",
+				"name": "NavCOMPONENTS",
 				"active": true,
 				"position": [
-					16,
-					272
+					14,
+					234
 				],
 				"scale": [
 					1,
@@ -671,8 +671,8 @@
 					0
 				],
 				"contentSize": [
-					184,
-					40
+					172,
+					36
 				],
 				"interactable": true,
 				"components": [
@@ -684,7 +684,7 @@
 							1,
 							0
 						],
-						"roundSize": 10
+						"roundSize": 9
 					},
 					{
 						"type": "UIButton",
@@ -692,14 +692,14 @@
 							0,
 							0,
 							0,
-							0.2
+							0.15
 						]
 					}
 				],
 				"children": [
 					{
 						"type": "WorldNode",
-						"name": "NavActivePROFILE",
+						"name": "NavActiveCOMPONENTS",
 						"active": false,
 						"position": [
 							0,
@@ -720,27 +720,27 @@
 							0
 						],
 						"contentSize": [
-							184,
-							40
+							172,
+							36
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "Paint",
 								"color": [
+									0.357,
 									0.424,
-									0.482,
 									1,
 									1
 								],
-								"roundSize": 10
+								"roundSize": 9
 							}
 						],
 						"children": []
 					},
 					{
 						"type": "WorldNode",
-						"name": "NavLabelPROFILE",
+						"name": "NavLabelCOMPONENTS",
 						"active": true,
 						"position": [
 							0,
@@ -761,19 +761,19 @@
 							0
 						],
 						"contentSize": [
-							184,
-							40
+							172,
+							36
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
-								"text": "PROFILE",
-								"fontSize": 12,
+								"text": "COMPONENTS",
+								"fontSize": 10.5,
 								"textColor": [
-									0.91,
-									0.925,
-									0.957,
+									0.902,
+									0.914,
+									0.937,
 									1
 								],
 								"backgroundColor": [
@@ -795,8 +795,8 @@
 				"name": "RailVersion",
 				"active": true,
 				"position": [
-					24,
-					860
+					22,
+					964
 				],
 				"scale": [
 					1,
@@ -813,19 +813,19 @@
 					0
 				],
 				"contentSize": [
-					168,
-					16
+					156,
+					14
 				],
 				"interactable": false,
 				"components": [
 					{
 						"type": "UILabel",
 						"text": "vanilla.js  ·  0.4.0",
-						"fontSize": 10,
+						"fontSize": 9,
 						"textColor": [
-							0.29,
 							0.329,
-							0.408,
+							0.357,
+							0.412,
 							1
 						],
 						"backgroundColor": [

@@ -194,7 +194,7 @@
 			}
 
 			// 기함 주포. (45초 주기 — 차지 후 초거대 광선 발사)
-			float fireCycle = 45.0;
+			float fireCycle = 22.0;
 			float firePhase = fract(elapsedTime / fireCycle);
 			vec2 beamOrigin = beamAnchor.xy;
 			vec2 beamDirection = normalize(beamAnchor.zw);
@@ -1053,16 +1053,17 @@
 	let uiGraphic = null;
 	let battlecruiserRenderer = null;
 	let battlecruiserModel = null;
+	let escortModel = null;
 
-	// 함대 배치. (월드 좌표 — 카메라는 -z 를 바라본다. 기함이 크고 가까우며 호위함이 멀리 있다)
+	// 함대 배치. (월드 좌표 — 카메라는 -z 를 바라본다. 기함 1척 + 호위함 3척이 원거리 상공에 떠 있다)
 	const shipDefinitions = [
-		{ basePosition: [-24, 15, -44], yawRadian: 1.25, pitchRadian: -0.04, scale: 2.4, driftSeed: 0, fade: 0.95 },
-		{ basePosition: [26, 19, -66], yawRadian: -1.35, pitchRadian: 0.03, scale: 1.7, driftSeed: 13, fade: 0.8 },
-		{ basePosition: [10, 25, -88], yawRadian: -1.15, pitchRadian: 0.06, scale: 1.25, driftSeed: 31, fade: 0.62 },
-		{ basePosition: [42, 9, -104], yawRadian: -1.5, pitchRadian: -0.02, scale: 1.0, driftSeed: 47, fade: 0.5 },
+		{ isFlagship: true, basePosition: [-34, 21, -78], yawRadian: 1.35, pitchRadian: -0.04, scale: 34, driftSeed: 0, fade: 0.95 },
+		{ isFlagship: false, basePosition: [34, 25, -105], yawRadian: -1.35, pitchRadian: 0.03, scale: 20, driftSeed: 13, fade: 0.8 },
+		{ isFlagship: false, basePosition: [14, 32, -135], yawRadian: -1.2, pitchRadian: 0.05, scale: 13, driftSeed: 31, fade: 0.62 },
+		{ isFlagship: false, basePosition: [55, 13, -150], yawRadian: -1.5, pitchRadian: -0.02, scale: 10, driftSeed: 47, fade: 0.5 },
 	];
-	const SHIP_STERN_LOCAL = [0, 0.2, -3.5]; // 모델 로컬 선미. (엔진 글로우 앵커 — 프로우는 +z 쪽)
-	const SHIP_PROW_LOCAL = [0, 0.2, 5.8]; // 모델 로컬 프로우. (기함 주포 앵커)
+	const SHIP_STERN_LOCAL = [0, 0, -0.56]; // 모델 로컬 선미. (엔진 글로우 앵커 — 프로우는 +z 쪽)
+	const SHIP_PROW_LOCAL = [0, 0, 0.47]; // 모델 로컬 프로우. (기함 주포 앵커)
 	let engineRect = null;
 	let engineVector2 = null;
 	try {
@@ -1077,14 +1078,17 @@
 		engineRect = engineModule.Rect;
 		engineVector2 = engineModule.Vector2;
 
-		// 전투순양함 3D 모델. (Quaternius 'Ultimate Spaceships' Executioner — CC0)
+		// 전투순양함 3D 모델. (옛 SDF 블록 배치를 그대로 세운 절차 생성 GLB — 창문 / 엔진은 자발광)
 		try {
 			battlecruiserRenderer = new engineModule.SkinnedModelRenderer(webGL2RenderingContext);
-			battlecruiserRenderer.setSunDirection(0.0, 0.16, -0.99);
-			battlecruiserRenderer.setFogColor(0.3, 0.17, 0.07);
-			battlecruiserRenderer.setFogRange(40, 150);
-			engineModule.SkinnedModel.loadFromUrl(webGL2RenderingContext, "./assets/battlecruiser.glb", battlecruiserRenderer).then((loadedModel) => {
-				battlecruiserModel = loadedModel;
+			battlecruiserRenderer.setSunDirection(0.32, 0.38, 0.87);
+			battlecruiserRenderer.setFogColor(0.24, 0.14, 0.06);
+			battlecruiserRenderer.setFogRange(60, 190);
+			const flagshipPromise = engineModule.SkinnedModel.loadFromUrl(webGL2RenderingContext, "./assets/battlecruiser.glb", battlecruiserRenderer);
+			const escortPromise = engineModule.SkinnedModel.loadFromUrl(webGL2RenderingContext, "./assets/escort.glb", battlecruiserRenderer);
+			System.Promise.all([flagshipPromise, escortPromise]).then(([loadedFlagship, loadedEscort]) => {
+				battlecruiserModel = loadedFlagship;
+				escortModel = loadedEscort;
 			}).catch((modelError) => {
 				console.warn("전투순양함 모델을 불러오지 못했습니다.", modelError);
 			});
@@ -1414,8 +1418,8 @@
 				const shipDefinition = shipDefinitions[shipIndex];
 				const driftTime = elapsedTime + shipDefinition.driftSeed;
 				const shipPosition = [
-					shipDefinition.basePosition[0] + System.Math.sin(driftTime * 0.05) * 0.9,
-					shipDefinition.basePosition[1] + System.Math.sin(driftTime * 0.08) * 0.5,
+					shipDefinition.basePosition[0] + System.Math.sin(driftTime * 0.05) * 1.4,
+					shipDefinition.basePosition[1] + System.Math.sin(driftTime * 0.08) * 0.8,
 					shipDefinition.basePosition[2],
 				];
 
@@ -1434,7 +1438,7 @@
 				if (sternScreen) {
 					shipAnchorValues[shipIndex * 4] = sternScreen[0];
 					shipAnchorValues[shipIndex * 4 + 1] = sternScreen[1];
-					shipAnchorValues[shipIndex * 4 + 2] = shipScale * 24 / -shipPosition[2];
+					shipAnchorValues[shipIndex * 4 + 2] = shipScale * 2.4 / -shipPosition[2];
 					shipAnchorValues[shipIndex * 4 + 3] = shipDefinition.fade * shipStrengthValue;
 				}
 
@@ -1486,16 +1490,20 @@
 		webGL2RenderingContext.uniform3f(terrainCameraPositionLocation, cameraPosition[0], cameraPosition[1], cameraPosition[2]);
 		webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, terrainIndexCount, webGL2RenderingContext.UNSIGNED_SHORT, 0);
 
-		// 1-2b. 전투순양함 함대. (Quaternius 'Executioner' 3D 모델 — 엔진 SkinnedModelRenderer)
+		// 1-2b. 전투순양함 함대. (절차 생성 배틀크루저 — 엔진 SkinnedModelRenderer)
 		if (battlecruiserModel && shipModelMatrices.length > 0) {
 			battlecruiserModel.update(deltaTime);
+			if (escortModel) {
+				escortModel.update(deltaTime);
+			}
 
 			// 이전 프레임 후처리가 유닛1에 걸어 둔 씬 텍스처를 풀어 준다. (씬 타깃에 그리는 중이라 피드백 금지)
 			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
 			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
 			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
-			for (const shipModelMatrix of shipModelMatrices) {
-				battlecruiserRenderer.draw(battlecruiserModel, viewProjectionMatrix, shipModelMatrix, cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+			for (let shipIndex = 0; shipIndex < shipModelMatrices.length; ++shipIndex) {
+				const shipModel = (shipDefinitions[shipIndex].isFlagship || !escortModel) ? battlecruiserModel : escortModel;
+				battlecruiserRenderer.draw(shipModel, viewProjectionMatrix, shipModelMatrices[shipIndex], cameraPosition[0], cameraPosition[1], cameraPosition[2]);
 			}
 		}
 

@@ -2,7 +2,7 @@
 	"version": 1,
 	"root": {
 		"type": "WorldNode",
-		"name": "Home",
+		"name": "Dashboard",
 		"active": true,
 		"position": [
 			0,
@@ -23,8 +23,8 @@
 			0
 		],
 		"contentSize": [
-			1440,
-			900
+			1680,
+			1000
 		],
 		"interactable": false,
 		"components": [
@@ -32,8 +32,8 @@
 				"type": "Paint",
 				"color": [
 					0.043,
-					0.055,
-					0.09,
+					0.051,
+					0.071,
 					1
 				],
 				"roundSize": 0
@@ -45,8 +45,8 @@
 				"name": "Title",
 				"active": true,
 				"position": [
-					240,
-					26
+					224,
+					22
 				],
 				"scale": [
 					1,
@@ -63,19 +63,19 @@
 					0
 				],
 				"contentSize": [
-					320,
-					30
+					360,
+					26
 				],
 				"interactable": false,
 				"components": [
 					{
 						"type": "UILabel",
-						"text": "HOME",
-						"fontSize": 21,
+						"text": "DASHBOARD",
+						"fontSize": 18,
 						"textColor": [
-							0.91,
-							0.925,
-							0.957,
+							0.902,
+							0.914,
+							0.937,
 							1
 						],
 						"backgroundColor": [
@@ -95,8 +95,8 @@
 				"name": "Subtitle",
 				"active": true,
 				"position": [
-					244,
-					58
+					226,
+					50
 				],
 				"scale": [
 					1,
@@ -113,253 +113,19 @@
 					0
 				],
 				"contentSize": [
-					400,
-					16
+					480,
+					14
 				],
 				"interactable": false,
 				"components": [
 					{
 						"type": "UILabel",
-						"text": "Everything below the fold is data-driven.",
-						"fontSize": 12,
-						"textColor": [
-							0.486,
-							0.522,
-							0.596,
-							1
-						],
-						"backgroundColor": [
-							1,
-							1,
-							1,
-							0
-						],
-						"textAlign": "left",
-						"textBaseline": "middle"
-					}
-				],
-				"children": []
-			},
-			{
-				"type": "WorldNode",
-				"name": "CoinChip",
-				"active": true,
-				"position": [
-					1186,
-					28
-				],
-				"scale": [
-					1,
-					1
-				],
-				"rotation": 0,
-				"opacity": 1,
-				"pivot": [
-					0,
-					0
-				],
-				"anchor": [
-					0,
-					0
-				],
-				"contentSize": [
-					110,
-					28
-				],
-				"interactable": false,
-				"components": [
-					{
-						"type": "Paint",
-						"color": [
-							0.114,
-							0.141,
-							0.212,
-							1
-						],
-						"roundSize": 14
-					}
-				],
-				"children": [
-					{
-						"type": "WorldNode",
-						"name": "CoinChipLabel",
-						"active": true,
-						"position": [
-							0,
-							0
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							110,
-							28
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UILabel",
-								"text": "◆ 12,480",
-								"fontSize": 12,
-								"textColor": [
-									0.941,
-									0.702,
-									0.361,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "center",
-								"textBaseline": "middle"
-							}
-						],
-						"children": []
-					}
-				]
-			},
-			{
-				"type": "WorldNode",
-				"name": "GemChip",
-				"active": true,
-				"position": [
-					1306,
-					28
-				],
-				"scale": [
-					1,
-					1
-				],
-				"rotation": 0,
-				"opacity": 1,
-				"pivot": [
-					0,
-					0
-				],
-				"anchor": [
-					0,
-					0
-				],
-				"contentSize": [
-					104,
-					28
-				],
-				"interactable": false,
-				"components": [
-					{
-						"type": "Paint",
-						"color": [
-							0.114,
-							0.141,
-							0.212,
-							1
-						],
-						"roundSize": 14
-					}
-				],
-				"children": [
-					{
-						"type": "WorldNode",
-						"name": "GemChipLabel",
-						"active": true,
-						"position": [
-							0,
-							0
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							104,
-							28
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UILabel",
-								"text": "● 1,250",
-								"fontSize": 12,
-								"textColor": [
-									0.22,
-									0.839,
-									1,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "center",
-								"textBaseline": "middle"
-							}
-						],
-						"children": []
-					}
-				]
-			},
-			{
-				"type": "WorldNode",
-				"name": "CardListLabel",
-				"active": true,
-				"position": [
-					240,
-					92
-				],
-				"scale": [
-					1,
-					1
-				],
-				"rotation": 0,
-				"opacity": 1,
-				"pivot": [
-					0,
-					0
-				],
-				"anchor": [
-					0,
-					0
-				],
-				"contentSize": [
-					300,
-					18
-				],
-				"interactable": false,
-				"components": [
-					{
-						"type": "UILabel",
-						"text": "GAME MODES",
+						"text": "Live metrics — charts update every second.",
 						"fontSize": 11,
 						"textColor": [
-							0.29,
-							0.329,
-							0.408,
+							0.541,
+							0.569,
+							0.627,
 							1
 						],
 						"backgroundColor": [
@@ -376,11 +142,11 @@
 			},
 			{
 				"type": "WorldNode",
-				"name": "CardList",
+				"name": "StatusChip",
 				"active": true,
 				"position": [
-					240,
-					114
+					1420,
+					26
 				],
 				"scale": [
 					1,
@@ -397,474 +163,30 @@
 					0
 				],
 				"contentSize": [
-					792,
-					762
-				],
-				"interactable": true,
-				"components": [
-					{
-						"type": "UIScrollView",
-						"scrollContentSize": [
-							792,
-							762
-						],
-						"scrollMode": "elastic",
-						"dragSensitivity": 1,
-						"horizontal": false,
-						"vertical": true,
-						"backgroundColor": [
-							1,
-							1,
-							1,
-							0
-						]
-					}
-				],
-				"children": [],
-				"contentChildren": [
-					{
-						"type": "WorldNode",
-						"name": "CardTemplate",
-						"active": true,
-						"position": [
-							0,
-							0
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							792,
-							84
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "Paint",
-								"color": [
-									0.086,
-									0.106,
-									0.161,
-									1
-								],
-								"roundSize": 10
-							}
-						],
-						"children": [
-							{
-								"type": "WorldNode",
-								"name": "CardStripe",
-								"active": true,
-								"position": [
-									0,
-									0
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									3,
-									84
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											0.424,
-											0.482,
-											1,
-											1
-										],
-										"roundSize": 1.5
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "CardIcon",
-								"active": true,
-								"position": [
-									16,
-									14
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									56,
-									56
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											0.424,
-											0.482,
-											1,
-											1
-										],
-										"roundSize": 12
-									}
-								],
-								"children": [
-									{
-										"type": "WorldNode",
-										"name": "CardGlyph",
-										"active": true,
-										"position": [
-											0,
-											0
-										],
-										"scale": [
-											1,
-											1
-										],
-										"rotation": 0,
-										"opacity": 1,
-										"pivot": [
-											0,
-											0
-										],
-										"anchor": [
-											0,
-											0
-										],
-										"contentSize": [
-											56,
-											56
-										],
-										"interactable": false,
-										"components": [
-											{
-												"type": "UILabel",
-												"text": "S",
-												"fontSize": 24,
-												"textColor": [
-													0.043,
-													0.055,
-													0.09,
-													1
-												],
-												"backgroundColor": [
-													1,
-													1,
-													1,
-													0
-												],
-												"textAlign": "center",
-												"textBaseline": "middle"
-											}
-										],
-										"children": []
-									}
-								]
-							},
-							{
-								"type": "WorldNode",
-								"name": "CardTitle",
-								"active": true,
-								"position": [
-									88,
-									16
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									360,
-									22
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "UILabel",
-										"text": "Title",
-										"fontSize": 15,
-										"textColor": [
-											0.91,
-											0.925,
-											0.957,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										],
-										"textAlign": "left",
-										"textBaseline": "middle"
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "CardSubtitle",
-								"active": true,
-								"position": [
-									88,
-									44
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									420,
-									18
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "UILabel",
-										"text": "Subtitle",
-										"fontSize": 12,
-										"textColor": [
-											0.486,
-											0.522,
-											0.596,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										],
-										"textAlign": "left",
-										"textBaseline": "middle"
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "CardMeta",
-								"active": true,
-								"position": [
-									560,
-									16
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									120,
-									18
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "UILabel",
-										"text": "",
-										"fontSize": 11,
-										"textColor": [
-											0.29,
-											0.329,
-											0.408,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										],
-										"textAlign": "right",
-										"textBaseline": "middle"
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "CardOpenButton",
-								"active": true,
-								"position": [
-									692,
-									26
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									84,
-									32
-								],
-								"interactable": true,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											0.114,
-											0.141,
-											0.212,
-											1
-										],
-										"roundSize": 8
-									},
-									{
-										"type": "UIButton",
-										"pressedTintColor": [
-											0,
-											0,
-											0,
-											0.3
-										]
-									},
-									{
-										"type": "UILabel",
-										"text": "OPEN",
-										"fontSize": 12,
-										"textColor": [
-											0.91,
-											0.925,
-											0.957,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										],
-										"textAlign": "center",
-										"textBaseline": "middle"
-									}
-								],
-								"children": []
-							}
-						]
-					}
-				]
-			},
-			{
-				"type": "WorldNode",
-				"name": "DailyPanel",
-				"active": true,
-				"position": [
-					1050,
-					114
-				],
-				"scale": [
-					1,
-					1
-				],
-				"rotation": 0,
-				"opacity": 1,
-				"pivot": [
-					0,
-					0
-				],
-				"anchor": [
-					0,
-					0
-				],
-				"contentSize": [
-					366,
-					268
+					244,
+					26
 				],
 				"interactable": false,
 				"components": [
 					{
 						"type": "Paint",
 						"color": [
-							0.063,
-							0.078,
-							0.122,
+							0.118,
+							0.141,
+							0.188,
 							1
 						],
-						"roundSize": 12
+						"roundSize": 13
 					}
 				],
 				"children": [
 					{
 						"type": "WorldNode",
-						"name": "DailyTitle",
+						"name": "StatusChipLabel",
 						"active": true,
 						"position": [
-							18,
-							14
+							0,
+							0
 						],
 						"scale": [
 							1,
@@ -881,499 +203,19 @@
 							0
 						],
 						"contentSize": [
-							300,
-							18
+							244,
+							26
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
-								"text": "DAILY",
-								"fontSize": 11,
+								"text": "●  All systems normal",
+								"fontSize": 10.5,
 								"textColor": [
-									0.29,
-									0.329,
-									0.408,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "left",
-								"textBaseline": "middle"
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "DailyEnergyLabel",
-						"active": true,
-						"position": [
-							18,
-							44
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							140,
-							16
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UILabel",
-								"text": "Energy",
-								"fontSize": 12,
-								"textColor": [
-									0.91,
-									0.925,
-									0.957,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "left",
-								"textBaseline": "middle"
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "DailyEnergyCaption",
-						"active": true,
-						"position": [
-							158,
-							44
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							190,
-							16
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UILabel",
-								"text": "72 / 100",
-								"fontSize": 11,
-								"textColor": [
-									0.486,
-									0.522,
-									0.596,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "right",
-								"textBaseline": "middle"
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "DailyEnergyBar",
-						"active": true,
-						"position": [
-							18,
-							68
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							330,
-							8
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UIProgressView",
-								"value": 0.72,
-								"minValue": 0,
-								"maxValue": 1
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "DailyQuestLabel",
-						"active": true,
-						"position": [
-							18,
-							102
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							140,
-							16
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UILabel",
-								"text": "Quest",
-								"fontSize": 12,
-								"textColor": [
-									0.91,
-									0.925,
-									0.957,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "left",
-								"textBaseline": "middle"
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "DailyQuestCaption",
-						"active": true,
-						"position": [
-							158,
-							102
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							190,
-							16
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UILabel",
-								"text": "2 / 5",
-								"fontSize": 11,
-								"textColor": [
-									0.486,
-									0.522,
-									0.596,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "right",
-								"textBaseline": "middle"
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "DailyQuestBar",
-						"active": true,
-						"position": [
-							18,
-							126
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							330,
-							8
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UIProgressView",
-								"value": 0.4,
-								"minValue": 0,
-								"maxValue": 1
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "DailySeasonPassLabel",
-						"active": true,
-						"position": [
-							18,
-							160
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							140,
-							16
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UILabel",
-								"text": "Season Pass",
-								"fontSize": 12,
-								"textColor": [
-									0.91,
-									0.925,
-									0.957,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "left",
-								"textBaseline": "middle"
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "DailySeasonPassCaption",
-						"active": true,
-						"position": [
-							158,
-							160
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							190,
-							16
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UILabel",
-								"text": "Lv. 44",
-								"fontSize": 11,
-								"textColor": [
-									0.486,
-									0.522,
-									0.596,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "right",
-								"textBaseline": "middle"
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "DailySeasonPassBar",
-						"active": true,
-						"position": [
-							18,
-							184
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							330,
-							8
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UIProgressView",
-								"value": 0.88,
-								"minValue": 0,
-								"maxValue": 1
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "ClaimButton",
-						"active": true,
-						"position": [
-							18,
-							218
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							330,
-							34
-						],
-						"interactable": true,
-						"components": [
-							{
-								"type": "Paint",
-								"color": [
-									0.424,
-									0.482,
-									1,
-									1
-								],
-								"roundSize": 8
-							},
-							{
-								"type": "UIButton",
-								"pressedTintColor": [
-									0,
-									0,
-									0,
-									0.3
-								]
-							},
-							{
-								"type": "UILabel",
-								"text": "CLAIM REWARD",
-								"fontSize": 12,
-								"textColor": [
-									0.91,
-									0.925,
-									0.957,
+									0.247,
+									0.698,
+									0.498,
 									1
 								],
 								"backgroundColor": [
@@ -1392,11 +234,11 @@
 			},
 			{
 				"type": "WorldNode",
-				"name": "SeasonPanel",
+				"name": "StatRevenue",
 				"active": true,
 				"position": [
-					1050,
-					394
+					224,
+					82
 				],
 				"scale": [
 					1,
@@ -1413,30 +255,798 @@
 					0
 				],
 				"contentSize": [
-					366,
-					232
+					212,
+					78
 				],
 				"interactable": false,
 				"components": [
 					{
 						"type": "Paint",
 						"color": [
-							0.063,
-							0.078,
-							0.122,
+							0.071,
+							0.082,
+							0.11,
 							1
 						],
-						"roundSize": 12
+						"roundSize": 10
 					}
 				],
 				"children": [
 					{
 						"type": "WorldNode",
-						"name": "SeasonTitle",
+						"name": "StatRevenueTitle",
 						"active": true,
 						"position": [
-							18,
+							16,
+							12
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							180,
 							14
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "REVENUE (MTD)",
+								"fontSize": 9.5,
+								"textColor": [
+									0.329,
+									0.357,
+									0.412,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "StatRevenueValue",
+						"active": true,
+						"position": [
+							16,
+							30
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							180,
+							24
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 19,
+								"textColor": [
+									0.902,
+									0.914,
+									0.937,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "StatRevenueDelta",
+						"active": true,
+						"position": [
+							16,
+							56
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							180,
+							14
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10,
+								"textColor": [
+									0.541,
+									0.569,
+									0.627,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "StatUsers",
+				"active": true,
+				"position": [
+					452,
+					82
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					212,
+					78
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.071,
+							0.082,
+							0.11,
+							1
+						],
+						"roundSize": 10
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "StatUsersTitle",
+						"active": true,
+						"position": [
+							16,
+							12
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							180,
+							14
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "ACTIVE USERS",
+								"fontSize": 9.5,
+								"textColor": [
+									0.329,
+									0.357,
+									0.412,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "StatUsersValue",
+						"active": true,
+						"position": [
+							16,
+							30
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							180,
+							24
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 19,
+								"textColor": [
+									0.902,
+									0.914,
+									0.937,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "StatUsersDelta",
+						"active": true,
+						"position": [
+							16,
+							56
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							180,
+							14
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10,
+								"textColor": [
+									0.541,
+									0.569,
+									0.627,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "StatRequests",
+				"active": true,
+				"position": [
+					680,
+					82
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					212,
+					78
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.071,
+							0.082,
+							0.11,
+							1
+						],
+						"roundSize": 10
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "StatRequestsTitle",
+						"active": true,
+						"position": [
+							16,
+							12
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							180,
+							14
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "REQUESTS / MIN",
+								"fontSize": 9.5,
+								"textColor": [
+									0.329,
+									0.357,
+									0.412,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "StatRequestsValue",
+						"active": true,
+						"position": [
+							16,
+							30
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							180,
+							24
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 19,
+								"textColor": [
+									0.902,
+									0.914,
+									0.937,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "StatRequestsDelta",
+						"active": true,
+						"position": [
+							16,
+							56
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							180,
+							14
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10,
+								"textColor": [
+									0.541,
+									0.569,
+									0.627,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "StatUptime",
+				"active": true,
+				"position": [
+					908,
+					82
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					212,
+					78
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.071,
+							0.082,
+							0.11,
+							1
+						],
+						"roundSize": 10
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "StatUptimeTitle",
+						"active": true,
+						"position": [
+							16,
+							12
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							180,
+							14
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "UPTIME (90D)",
+								"fontSize": 9.5,
+								"textColor": [
+									0.329,
+									0.357,
+									0.412,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "StatUptimeValue",
+						"active": true,
+						"position": [
+							16,
+							30
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							180,
+							24
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 19,
+								"textColor": [
+									0.902,
+									0.914,
+									0.937,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "StatUptimeDelta",
+						"active": true,
+						"position": [
+							16,
+							56
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							180,
+							14
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10,
+								"textColor": [
+									0.541,
+									0.569,
+									0.627,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "ChartPanel",
+				"active": true,
+				"position": [
+					224,
+					176
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					884,
+					300
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.071,
+							0.082,
+							0.11,
+							1
+						],
+						"roundSize": 10
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "ChartTitle",
+						"active": true,
+						"position": [
+							16,
+							12
 						],
 						"scale": [
 							1,
@@ -1454,18 +1064,18 @@
 						],
 						"contentSize": [
 							300,
-							18
+							16
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
-								"text": "ARENA SEASON",
-								"fontSize": 11,
+								"text": "REQUESTS PER SECOND",
+								"fontSize": 10,
 								"textColor": [
-									0.29,
 									0.329,
-									0.408,
+									0.357,
+									0.412,
 									1
 								],
 								"backgroundColor": [
@@ -1482,10 +1092,60 @@
 					},
 					{
 						"type": "WorldNode",
-						"name": "ArenaRating",
+						"name": "ChartValue",
 						"active": true,
 						"position": [
-							18,
+							728,
+							8
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							140,
+							22
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 15,
+								"textColor": [
+									0.902,
+									0.914,
+									0.937,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "right",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "LiveChart",
+						"active": true,
+						"position": [
+							16,
 							40
 						],
 						"scale": [
@@ -1503,420 +1163,22 @@
 							0
 						],
 						"contentSize": [
-							160,
-							30
+							852,
+							244
 						],
 						"interactable": false,
-						"components": [
-							{
-								"type": "UILabel",
-								"text": "2,148",
-								"fontSize": 24,
-								"textColor": [
-									0.91,
-									0.925,
-									0.957,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "left",
-								"textBaseline": "middle"
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "ArenaRatingCaption",
-						"active": true,
-						"position": [
-							18,
-							74
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							200,
-							16
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UILabel",
-								"text": "Rating  ·  Diamond II",
-								"fontSize": 11,
-								"textColor": [
-									0.486,
-									0.522,
-									0.596,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "left",
-								"textBaseline": "middle"
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "ArenaWinLabel",
-						"active": true,
-						"position": [
-							18,
-							108
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							160,
-							16
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UILabel",
-								"text": "Win rate vs season",
-								"fontSize": 11,
-								"textColor": [
-									0.29,
-									0.329,
-									0.408,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "left",
-								"textBaseline": "middle"
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "ArenaVersusBar",
-						"active": true,
-						"position": [
-							18,
-							130
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							330,
-							10
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UIProgressView",
-								"value": 0.63,
-								"minValue": 0,
-								"maxValue": 1
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "ArenaWinCaption",
-						"active": true,
-						"position": [
-							18,
-							148
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							120,
-							16
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UILabel",
-								"text": "W 63%",
-								"fontSize": 11,
-								"textColor": [
-									0.263,
-									0.867,
-									0.561,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "left",
-								"textBaseline": "middle"
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "ArenaLossCaption",
-						"active": true,
-						"position": [
-							268,
-							148
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							80,
-							16
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UILabel",
-								"text": "L 37%",
-								"fontSize": 11,
-								"textColor": [
-									0.937,
-									0.325,
-									0.314,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "right",
-								"textBaseline": "middle"
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "SeasonHairline",
-						"active": true,
-						"position": [
-							18,
-							178
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							330,
-							1
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "Paint",
-								"color": [
-									0.137,
-									0.169,
-									0.239,
-									1
-								],
-								"roundSize": 0
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "SeasonEndsLabel",
-						"active": true,
-						"position": [
-							18,
-							190
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							200,
-							16
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UILabel",
-								"text": "Season ends in",
-								"fontSize": 11,
-								"textColor": [
-									0.29,
-									0.329,
-									0.408,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "left",
-								"textBaseline": "middle"
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "SeasonEndsValue",
-						"active": true,
-						"position": [
-							218,
-							188
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							130,
-							18
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UILabel",
-								"text": "12d 06:41",
-								"fontSize": 12,
-								"textColor": [
-									0.91,
-									0.925,
-									0.957,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "right",
-								"textBaseline": "middle"
-							}
-						],
+						"components": [],
 						"children": []
 					}
 				]
 			},
 			{
 				"type": "WorldNode",
-				"name": "TipPanel",
+				"name": "BarPanel",
 				"active": true,
 				"position": [
-					1050,
-					638
+					1124,
+					176
 				],
 				"scale": [
 					1,
@@ -1933,30 +1195,30 @@
 					0
 				],
 				"contentSize": [
-					366,
-					238
+					340,
+					300
 				],
 				"interactable": false,
 				"components": [
 					{
 						"type": "Paint",
 						"color": [
-							0.063,
-							0.078,
-							0.122,
+							0.071,
+							0.082,
+							0.11,
 							1
 						],
-						"roundSize": 12
+						"roundSize": 10
 					}
 				],
 				"children": [
 					{
 						"type": "WorldNode",
-						"name": "TipTitle",
+						"name": "BarTitle",
 						"active": true,
 						"position": [
-							18,
-							14
+							16,
+							12
 						],
 						"scale": [
 							1,
@@ -1974,18 +1236,18 @@
 						],
 						"contentSize": [
 							300,
-							18
+							16
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
-								"text": "DIALOGUE",
-								"fontSize": 11,
+								"text": "REVENUE · LAST 14 DAYS",
+								"fontSize": 10,
 								"textColor": [
-									0.29,
 									0.329,
-									0.408,
+									0.357,
+									0.412,
 									1
 								],
 								"backgroundColor": [
@@ -2002,11 +1264,11 @@
 					},
 					{
 						"type": "WorldNode",
-						"name": "TipBody",
+						"name": "RevenueBars",
 						"active": true,
 						"position": [
-							18,
-							38
+							16,
+							40
 						],
 						"scale": [
 							1,
@@ -2023,19 +1285,1176 @@
 							0
 						],
 						"contentSize": [
-							330,
-							150
+							308,
+							220
+						],
+						"interactable": false,
+						"components": [],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "BarCaption",
+						"active": true,
+						"position": [
+							16,
+							268
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							14
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
 								"text": "",
-								"fontSize": 12,
+								"fontSize": 9.5,
 								"textColor": [
-									0.486,
-									0.522,
-									0.596,
+									0.329,
+									0.357,
+									0.412,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "EventsLabel",
+				"active": true,
+				"position": [
+					224,
+					496
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					300,
+					16
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "UILabel",
+						"text": "RECENT EVENTS",
+						"fontSize": 10,
+						"textColor": [
+							0.329,
+							0.357,
+							0.412,
+							1
+						],
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						],
+						"textAlign": "left",
+						"textBaseline": "middle"
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "EventList",
+				"active": true,
+				"position": [
+					224,
+					518
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					884,
+					458
+				],
+				"interactable": true,
+				"components": [
+					{
+						"type": "UIScrollView",
+						"scrollContentSize": [
+							884,
+							458
+						],
+						"scrollMode": "elastic",
+						"dragSensitivity": 1,
+						"horizontal": false,
+						"vertical": true,
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						]
+					}
+				],
+				"children": [],
+				"contentChildren": [
+					{
+						"type": "WorldNode",
+						"name": "EventTemplate",
+						"active": true,
+						"position": [
+							0,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							852,
+							40
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.09,
+									0.106,
+									0.141,
+									1
+								],
+								"roundSize": 8
+							}
+						],
+						"children": [
+							{
+								"type": "WorldNode",
+								"name": "EventTime",
+								"active": true,
+								"position": [
+									14,
+									0
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									64,
+									40
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "",
+										"fontSize": 10,
+										"textColor": [
+											0.329,
+											0.357,
+											0.412,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										],
+										"textAlign": "left",
+										"textBaseline": "middle"
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "EventText",
+								"active": true,
+								"position": [
+									88,
+									0
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									560,
+									40
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "",
+										"fontSize": 11.5,
+										"textColor": [
+											0.902,
+											0.914,
+											0.937,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										],
+										"textAlign": "left",
+										"textBaseline": "middle"
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "EventTag",
+								"active": true,
+								"position": [
+									752,
+									0
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									86,
+									40
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "",
+										"fontSize": 9.5,
+										"textColor": [
+											0.541,
+											0.569,
+											0.627,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										],
+										"textAlign": "right",
+										"textBaseline": "middle"
+									}
+								],
+								"children": []
+							}
+						]
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "SystemPanel",
+				"active": true,
+				"position": [
+					1124,
+					518
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					340,
+					458
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.071,
+							0.082,
+							0.11,
+							1
+						],
+						"roundSize": 10
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "SystemTitle",
+						"active": true,
+						"position": [
+							16,
+							12
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							300,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "SYSTEM",
+								"fontSize": 10,
+								"textColor": [
+									0.329,
+									0.357,
+									0.412,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "SystemCpuLabel",
+						"active": true,
+						"position": [
+							16,
+							34
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							120,
+							14
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "CPU",
+								"fontSize": 11,
+								"textColor": [
+									0.902,
+									0.914,
+									0.937,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "SystemCpuCaption",
+						"active": true,
+						"position": [
+							136,
+							34
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							188,
+							14
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "8 cores",
+								"fontSize": 9.5,
+								"textColor": [
+									0.329,
+									0.357,
+									0.412,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "right",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "SystemCpuBar",
+						"active": true,
+						"position": [
+							16,
+							54
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							6
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UIProgressView",
+								"value": 0.3,
+								"minValue": 0,
+								"maxValue": 1
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "SystemMemoryLabel",
+						"active": true,
+						"position": [
+							16,
+							80
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							120,
+							14
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Memory",
+								"fontSize": 11,
+								"textColor": [
+									0.902,
+									0.914,
+									0.937,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "SystemMemoryCaption",
+						"active": true,
+						"position": [
+							136,
+							80
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							188,
+							14
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "32 GB",
+								"fontSize": 9.5,
+								"textColor": [
+									0.329,
+									0.357,
+									0.412,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "right",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "SystemMemoryBar",
+						"active": true,
+						"position": [
+							16,
+							100
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							6
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UIProgressView",
+								"value": 0.3,
+								"minValue": 0,
+								"maxValue": 1
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "SystemDiskLabel",
+						"active": true,
+						"position": [
+							16,
+							126
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							120,
+							14
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Disk",
+								"fontSize": 11,
+								"textColor": [
+									0.902,
+									0.914,
+									0.937,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "SystemDiskCaption",
+						"active": true,
+						"position": [
+							136,
+							126
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							188,
+							14
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "2 TB NVMe",
+								"fontSize": 9.5,
+								"textColor": [
+									0.329,
+									0.357,
+									0.412,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "right",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "SystemDiskBar",
+						"active": true,
+						"position": [
+							16,
+							146
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							6
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UIProgressView",
+								"value": 0.3,
+								"minValue": 0,
+								"maxValue": 1
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "SystemHairline",
+						"active": true,
+						"position": [
+							16,
+							182
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							1
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.149,
+									0.173,
+									0.22,
+									1
+								],
+								"roundSize": 0
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "IncidentTitle",
+						"active": true,
+						"position": [
+							16,
+							196
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							300,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "OPEN INCIDENTS",
+								"fontSize": 10,
+								"textColor": [
+									0.329,
+									0.357,
+									0.412,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "IncidentValue",
+						"active": true,
+						"position": [
+							16,
+							216
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							20
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "0",
+								"fontSize": 16,
+								"textColor": [
+									0.902,
+									0.914,
+									0.937,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "IncidentCaption",
+						"active": true,
+						"position": [
+							16,
+							240
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							14
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "No incidents in the last 30 days.",
+								"fontSize": 10,
+								"textColor": [
+									0.541,
+									0.569,
+									0.627,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "NoticeHairline",
+						"active": true,
+						"position": [
+							16,
+							268
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							1
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.149,
+									0.173,
+									0.22,
+									1
+								],
+								"roundSize": 0
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "NoticeTitle",
+						"active": true,
+						"position": [
+							16,
+							282
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							300,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "NOTES",
+								"fontSize": 10,
+								"textColor": [
+									0.329,
+									0.357,
+									0.412,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "NoticeBody",
+						"active": true,
+						"position": [
+							16,
+							304
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							120
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Every panel on this screen is drawn by the\nvanilla.js engine - charts, lists and gauges\nare all engine components.",
+								"fontSize": 10.5,
+								"textColor": [
+									0.541,
+									0.569,
+									0.627,
 									1
 								],
 								"backgroundColor": [
@@ -2046,75 +2465,6 @@
 								],
 								"textAlign": "left",
 								"textBaseline": "top"
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "TipNextButton",
-						"active": true,
-						"position": [
-							18,
-							190
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							330,
-							32
-						],
-						"interactable": true,
-						"components": [
-							{
-								"type": "Paint",
-								"color": [
-									0.114,
-									0.141,
-									0.212,
-									1
-								],
-								"roundSize": 8
-							},
-							{
-								"type": "UIButton",
-								"pressedTintColor": [
-									0,
-									0,
-									0,
-									0.3
-								]
-							},
-							{
-								"type": "UILabel",
-								"text": "NEXT",
-								"fontSize": 12,
-								"textColor": [
-									0.91,
-									0.925,
-									0.957,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								],
-								"textAlign": "center",
-								"textBaseline": "middle"
 							}
 						],
 						"children": []

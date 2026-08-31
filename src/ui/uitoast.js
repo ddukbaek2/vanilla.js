@@ -29,6 +29,7 @@ export class UIToast extends WorldNode {
 	/** @private @type { number } */ #phaseSeconds;
 	/** @private @type { number } */ #holdSeconds;
 	/** @private @type { number } */ #restY;
+	/** @private @type { number | null } */ #restX; // null 이면 부모 가로 중앙.
 	/** @private @type { number } */ #riseDistance;
 	/** @private @type { UILabel } */ #label;
 
@@ -45,6 +46,7 @@ export class UIToast extends WorldNode {
 		const width = (options.width !== undefined) ? options.width : 400;
 		const height = (options.height !== undefined) ? options.height : 48;
 		this.#restY = (options.restY !== undefined) ? options.restY : 560;
+		this.#restX = (options.restX !== undefined) ? options.restX : null;
 		this.#holdSeconds = (options.holdSeconds !== undefined) ? options.holdSeconds : 1.8;
 		this.#riseDistance = 28;
 		this.#messageQueue = [];
@@ -63,7 +65,7 @@ export class UIToast extends WorldNode {
 
 		this.#label = this.addComponent(UILabel);
 		this.#label.setText("");
-		this.#label.setFontSize(15);
+		this.#label.setFontSize((options.fontSize !== undefined) ? options.fontSize : 15);
 		this.#label.setTextColor(options.textColor ? options.textColor : new Color(0.96, 0.97, 1, 1));
 	}
 
@@ -148,12 +150,15 @@ export class UIToast extends WorldNode {
 	 * @param { number } progressRatio
 	 */
 	updatePosition(progressRatio) {
-		const parentNode = this.getParent();
-		let centerX = 480;
-		if (parentNode) {
-			const parentSize = parentNode.getContentSize();
-			if (parentSize.x > 0) {
-				centerX = parentSize.x * 0.5;
+		let centerX = this.#restX;
+		if (centerX === null) {
+			centerX = 480;
+			const parentNode = this.getParent();
+			if (parentNode) {
+				const parentSize = parentNode.getContentSize();
+				if (parentSize.x > 0) {
+					centerX = parentSize.x * 0.5;
+				}
 			}
 		}
 		this.setLocalPosition(Vector2.create(centerX, this.#restY + this.#riseDistance * (1 - progressRatio)));
@@ -167,6 +172,16 @@ export class UIToast extends WorldNode {
 	 */
 	setRestY(restY) {
 		this.#restY = restY;
+	}
+
+	//==============================================================================
+	// 표시 자리(가운데 가로 좌표) 설정. (null 이면 부모 가로 중앙)
+	//==============================================================================
+	/**
+	 * @param { number | null } restX
+	 */
+	setRestX(restX) {
+		this.#restX = restX;
 	}
 
 	//==============================================================================

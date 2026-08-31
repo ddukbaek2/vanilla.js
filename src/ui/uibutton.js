@@ -43,6 +43,9 @@ export class UIButton extends UIControl {
 	/** @private @type { number } */ #minimumPressedSeconds; // 눌린 그림을 보여 줄 최소 시간. (0 이면 즉시)
 	/** @private @type { number } */ #pressedElapsedSeconds; // 이번 누름이 이어진 시간.
 	/** @private @type { object | null } */ #pendingRelease; // 최소 시간을 채우려고 미뤄 둔 뗌 처리.
+	/** @private @type { function(UIButton): void } */ #longPressedEvent; // 길게 누름 알림. (한 번만)
+	/** @private @type { number } */ #longPressSeconds; // 길게 누름 판정 시간.
+	/** @private @type { boolean } */ #hasLongPressFired; // 이번 누름에서 길게 누름이 발화했는지.
 	/** @private @type { Color } */ #pressedTintColor;
 	/** @private @type { Color } */ #hoverTintColor;
 	/** @private @type { function(UIButton): void } */ #hoverEvent;
@@ -72,6 +75,9 @@ export class UIButton extends UIControl {
 		this.#minimumPressedSeconds = 0;
 		this.#pressedElapsedSeconds = 0;
 		this.#pendingRelease = null;
+		this.#longPressedEvent = null;
+		this.#longPressSeconds = 0.5;
+		this.#hasLongPressFired = false;
 		this.#pressedTintColor = new Color(0, 0, 0, 0.3);
 		this.#hoverTintColor = new Color(1, 1, 1, 0.12);
 		this.#hoverEvent = null;
@@ -132,6 +138,12 @@ export class UIButton extends UIControl {
 		super.tick(timeDelta);
 		if (this.#isPressTracking) {
 			this.#pressedElapsedSeconds += timeDelta;
+
+			// 길게 누름. (임계 시간을 넘기는 순간 한 번만 알린다)
+			if (this.#longPressedEvent && !this.#hasLongPressFired && this.#pressedElapsedSeconds >= this.#longPressSeconds) {
+				this.#hasLongPressFired = true;
+				this.#longPressedEvent(this);
+			}
 		}
 
 		// 최소 눌림 표시 시간을 채우려고 미뤄 둔 뗌 처리를 마저 한다.
@@ -211,6 +223,7 @@ export class UIButton extends UIControl {
 		this.#isPressTracking = true;
 		this.#pressedElapsedSeconds = 0;
 		this.#pendingRelease = null;
+		this.#hasLongPressFired = false;
 		this.setButtonState(ButtonState.pressed);
 		this.collectColorTargets();
 		const pressedEvent = this.getPressedEvent();
@@ -261,7 +274,7 @@ export class UIButton extends UIControl {
 		}
 		const node = this.getNode();
 		const isInsideBounds = node.contains(viewInputPosition);
-		if (isInsideBounds) {
+		if (isInsideBounds && !this.#hasLongPressFired) {
 			const clickedEvent = this.getClickedEvent();
 			if (clickedEvent) {
 				clickedEvent(this);
@@ -467,6 +480,46 @@ export class UIButton extends UIControl {
 	//==============================================================================
 	// 최소 눌림 표시 시간 설정.
 	// - 짧게 톡 눌러도 이 시간만큼 눌린 모습이 보인 뒤 클릭이 실행된다. (기본 0 = 즉시)
+	//==============================================================================
+	// 길게 누름 알림 설정. (임계 시간을 넘기면 한 번 알리고, 그 누름의 클릭은 삼킨다)
+	//==============================================================================
+	/**
+	 * @param { function(UIButton): void } longPressedEvent
+	 */
+	setLongPressedEvent(longPressedEvent) {
+		this.#longPressedEvent = longPressedEvent;
+	}
+
+	//==============================================================================
+	// 길게 누름 판정 시간 설정. (초)
+	//==============================================================================
+	/**
+	 * @param { number } longPressSeconds
+	 */
+	setLongPressSeconds(longPressSeconds) {
+		this.#longPressSeconds = longPressSeconds;
+	}
+
+	//==============================================================================
+	// 이번 누름이 이어진 시간 반환. (게이지 연출용)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getPressedElapsedSeconds() {
+		return this.#isPressTracking ? this.#pressedElapsedSeconds : 0;
+	}
+
+	//==============================================================================
+	// 길게 누름 판정 시간 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getLongPressSeconds() {
+		return this.#longPressSeconds;
+	}
+
 	//==============================================================================
 	/**
 	 * @param { number } minimumPressedSeconds

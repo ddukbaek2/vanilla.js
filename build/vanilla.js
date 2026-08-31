@@ -19263,6 +19263,15 @@ var UIButton = class extends UIControl {
   /** @private @type { object | null } */
   #pendingRelease;
   // 최소 시간을 채우려고 미뤄 둔 뗌 처리.
+  /** @private @type { function(UIButton): void } */
+  #longPressedEvent;
+  // 길게 누름 알림. (한 번만)
+  /** @private @type { number } */
+  #longPressSeconds;
+  // 길게 누름 판정 시간.
+  /** @private @type { boolean } */
+  #hasLongPressFired;
+  // 이번 누름에서 길게 누름이 발화했는지.
   /** @private @type { Color } */
   #pressedTintColor;
   /** @private @type { Color } */
@@ -19303,6 +19312,9 @@ var UIButton = class extends UIControl {
     this.#minimumPressedSeconds = 0;
     this.#pressedElapsedSeconds = 0;
     this.#pendingRelease = null;
+    this.#longPressedEvent = null;
+    this.#longPressSeconds = 0.5;
+    this.#hasLongPressFired = false;
     this.#pressedTintColor = new Color(0, 0, 0, 0.3);
     this.#hoverTintColor = new Color(1, 1, 1, 0.12);
     this.#hoverEvent = null;
@@ -19358,6 +19370,10 @@ var UIButton = class extends UIControl {
     super.tick(timeDelta);
     if (this.#isPressTracking) {
       this.#pressedElapsedSeconds += timeDelta;
+      if (this.#longPressedEvent && !this.#hasLongPressFired && this.#pressedElapsedSeconds >= this.#longPressSeconds) {
+        this.#hasLongPressFired = true;
+        this.#longPressedEvent(this);
+      }
     }
     if (this.#pendingRelease) {
       this.#pendingRelease.remainSeconds -= timeDelta;
@@ -19430,6 +19446,7 @@ var UIButton = class extends UIControl {
     this.#isPressTracking = true;
     this.#pressedElapsedSeconds = 0;
     this.#pendingRelease = null;
+    this.#hasLongPressFired = false;
     this.setButtonState(ButtonState.pressed);
     this.collectColorTargets();
     const pressedEvent = this.getPressedEvent();
@@ -19476,7 +19493,7 @@ var UIButton = class extends UIControl {
     }
     const node = this.getNode();
     const isInsideBounds = node.contains(viewInputPosition);
-    if (isInsideBounds) {
+    if (isInsideBounds && !this.#hasLongPressFired) {
       const clickedEvent = this.getClickedEvent();
       if (clickedEvent) {
         clickedEvent(this);
@@ -19657,6 +19674,42 @@ var UIButton = class extends UIControl {
   //==============================================================================
   // 최소 눌림 표시 시간 설정.
   // - 짧게 톡 눌러도 이 시간만큼 눌린 모습이 보인 뒤 클릭이 실행된다. (기본 0 = 즉시)
+  //==============================================================================
+  // 길게 누름 알림 설정. (임계 시간을 넘기면 한 번 알리고, 그 누름의 클릭은 삼킨다)
+  //==============================================================================
+  /**
+   * @param { function(UIButton): void } longPressedEvent
+   */
+  setLongPressedEvent(longPressedEvent) {
+    this.#longPressedEvent = longPressedEvent;
+  }
+  //==============================================================================
+  // 길게 누름 판정 시간 설정. (초)
+  //==============================================================================
+  /**
+   * @param { number } longPressSeconds
+   */
+  setLongPressSeconds(longPressSeconds) {
+    this.#longPressSeconds = longPressSeconds;
+  }
+  //==============================================================================
+  // 이번 누름이 이어진 시간 반환. (게이지 연출용)
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getPressedElapsedSeconds() {
+    return this.#isPressTracking ? this.#pressedElapsedSeconds : 0;
+  }
+  //==============================================================================
+  // 길게 누름 판정 시간 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getLongPressSeconds() {
+    return this.#longPressSeconds;
+  }
   //==============================================================================
   /**
    * @param { number } minimumPressedSeconds
@@ -31676,8 +31729,690 @@ var PopupMotion = class extends Object2 {
   }
 };
 
-// src/ui/uilistview.js
+// src/effect/particlesystem.js
 var System68 = globalThis;
+var EmitterShape = {
+  point: "point",
+  circle: "circle",
+  cone: "cone",
+  box: "box",
+  edge: "edge"
+};
+var ParticleSystem = class extends Component {
+  static {
+    __name(this, "ParticleSystem");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { object[] } */
+  #particleList;
+  /** @private @type { object[] } */
+  #freeList;
+  /** @private @type { boolean } */
+  #isPlaying;
+  /** @private @type { boolean } */
+  #isLooping;
+  /** @private @type { number } */
+  #duration;
+  // 루프 꺼짐일 때 방출이 이어지는 시간.
+  /** @private @type { number } */
+  #playElapsedSeconds;
+  /** @private @type { number } */
+  #maxParticleCount;
+  // 방출.
+  /** @private @type { number } */
+  #emissionRate;
+  // 초당 방출 수.
+  /** @private @type { number } */
+  #emissionAccumulator;
+  /** @private @type { object[] } */
+  #burstList;
+  // { time, count, fired }
+  /** @private @type { string } */
+  #emitterShape;
+  /** @private @type { number } */
+  #shapeRadius;
+  /** @private @type { number } */
+  #coneAngleRadian;
+  // cone 전용 반각.
+  /** @private @type { Vector2 } */
+  #boxSize;
+  /** @private @type { number } */
+  #edgeWidth;
+  // 시작 범위.
+  /** @private @type { number } */
+  #startLifetimeMin;
+  /** @private @type { number } */
+  #startLifetimeMax;
+  /** @private @type { number } */
+  #startSpeedMin;
+  /** @private @type { number } */
+  #startSpeedMax;
+  /** @private @type { number } */
+  #startSizeMin;
+  /** @private @type { number } */
+  #startSizeMax;
+  /** @private @type { number } */
+  #startRotationMin;
+  // 라디안.
+  /** @private @type { number } */
+  #startRotationMax;
+  /** @private @type { Color } */
+  #startColorA;
+  /** @private @type { Color } */
+  #startColorB;
+  // A~B 사이 무작위.
+  // 수명 동안 변화.
+  /** @private @type { object[] | null } */
+  #colorOverLifetime;
+  // [{ time, color }]
+  /** @private @type { number } */
+  #sizeOverLifetimeStart;
+  // 곱 계수.
+  /** @private @type { number } */
+  #sizeOverLifetimeEnd;
+  /** @private @type { number } */
+  #angularVelocityMin;
+  // 초당 라디안.
+  /** @private @type { number } */
+  #angularVelocityMax;
+  // 물리.
+  /** @private @type { Vector2 } */
+  #gravity;
+  /** @private @type { number } */
+  #damping;
+  // 초당 속도 감쇠 비율 계수.
+  // 렌더.
+  /** @private @type { string } */
+  #renderShape;
+  // "circle" | "rect" | "image"
+  /** @private @type { * } */
+  #image;
+  /** @private @type { boolean } */
+  #isAdditive;
+  /** @private @type { boolean } */
+  #isWorldSpace;
+  // 참이면 방출 후 노드 이동의 영향을 받지 않는다.
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   */
+  constructor() {
+    super();
+    this.setComponentType("ParticleSystem");
+    this.#particleList = [];
+    this.#freeList = [];
+    this.#isPlaying = true;
+    this.#isLooping = true;
+    this.#duration = 1;
+    this.#playElapsedSeconds = 0;
+    this.#maxParticleCount = 512;
+    this.#emissionRate = 20;
+    this.#emissionAccumulator = 0;
+    this.#burstList = [];
+    this.#emitterShape = EmitterShape.point;
+    this.#shapeRadius = 0;
+    this.#coneAngleRadian = 0.5;
+    this.#boxSize = Vector2.create(0, 0);
+    this.#edgeWidth = 0;
+    this.#startLifetimeMin = 1;
+    this.#startLifetimeMax = 1;
+    this.#startSpeedMin = 60;
+    this.#startSpeedMax = 60;
+    this.#startSizeMin = 6;
+    this.#startSizeMax = 6;
+    this.#startRotationMin = 0;
+    this.#startRotationMax = 0;
+    this.#startColorA = new Color(1, 1, 1, 1);
+    this.#startColorB = new Color(1, 1, 1, 1);
+    this.#colorOverLifetime = null;
+    this.#sizeOverLifetimeStart = 1;
+    this.#sizeOverLifetimeEnd = 1;
+    this.#angularVelocityMin = 0;
+    this.#angularVelocityMax = 0;
+    this.#gravity = Vector2.create(0, 0);
+    this.#damping = 0;
+    this.#renderShape = "circle";
+    this.#image = null;
+    this.#isAdditive = false;
+    this.#isWorldSpace = false;
+  }
+  //==============================================================================
+  // 재생 / 정지.
+  //==============================================================================
+  play() {
+    this.#isPlaying = true;
+    this.#playElapsedSeconds = 0;
+    for (const burst of this.#burstList) {
+      burst.fired = false;
+    }
+  }
+  /**
+   * @param { boolean } isClearing 참이면 살아 있는 파티클도 지운다.
+   */
+  stop(isClearing = false) {
+    this.#isPlaying = false;
+    if (isClearing) {
+      this.#particleList.length = 0;
+    }
+  }
+  //==============================================================================
+  // 한 번에 여러 개 방출. (버튼 클릭 등 이벤트성 연출)
+  //==============================================================================
+  /**
+   * @param { number } count
+   * @param { Vector2 | null } worldOffset 방출 원점 보정. (노드 로컬 기준)
+   */
+  emit(count, worldOffset = null) {
+    for (let emitIndex = 0; emitIndex < count; ++emitIndex) {
+      this.spawnParticle(worldOffset);
+    }
+  }
+  //==============================================================================
+  // 갱신. (방출 + 적분)
+  //==============================================================================
+  /**
+   * @override
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    if (this.#isPlaying) {
+      const previousElapsed = this.#playElapsedSeconds;
+      this.#playElapsedSeconds += timeDelta;
+      const isEmitWindow = this.#isLooping || this.#playElapsedSeconds <= this.#duration;
+      if (isEmitWindow && this.#emissionRate > 0) {
+        this.#emissionAccumulator += this.#emissionRate * timeDelta;
+        while (this.#emissionAccumulator >= 1) {
+          this.#emissionAccumulator -= 1;
+          this.spawnParticle(null);
+        }
+      }
+      for (const burst of this.#burstList) {
+        let burstTime = burst.time;
+        let currentTime = this.#playElapsedSeconds;
+        let previousTime = previousElapsed;
+        if (this.#isLooping && this.#duration > 0) {
+          currentTime = this.#playElapsedSeconds % this.#duration;
+          previousTime = previousElapsed % this.#duration;
+          if (currentTime < previousTime) {
+            burst.fired = false;
+          }
+        }
+        if (!burst.fired && previousTime <= burstTime && currentTime >= burstTime) {
+          burst.fired = this.#isLooping ? false : true;
+          if (this.#isLooping && currentTime >= burstTime) {
+            burst.fired = true;
+          }
+          this.emit(burst.count);
+        }
+      }
+    }
+    for (let particleIndex = this.#particleList.length - 1; particleIndex >= 0; --particleIndex) {
+      const particle = this.#particleList[particleIndex];
+      particle.age += timeDelta;
+      if (particle.age >= particle.lifetime) {
+        this.#freeList.push(particle);
+        this.#particleList.splice(particleIndex, 1);
+        continue;
+      }
+      particle.velocityX += this.#gravity.x * timeDelta;
+      particle.velocityY += this.#gravity.y * timeDelta;
+      if (this.#damping > 0) {
+        const dampingBlend = System68.Math.max(0, 1 - this.#damping * timeDelta);
+        particle.velocityX *= dampingBlend;
+        particle.velocityY *= dampingBlend;
+      }
+      particle.x += particle.velocityX * timeDelta;
+      particle.y += particle.velocityY * timeDelta;
+      particle.rotation += particle.angularVelocity * timeDelta;
+    }
+  }
+  //==============================================================================
+  // 파티클 하나 생성.
+  //==============================================================================
+  /**
+   * @private
+   * @param { Vector2 | null } originOffset
+   */
+  spawnParticle(originOffset) {
+    if (this.#particleList.length >= this.#maxParticleCount) {
+      return;
+    }
+    let spawnX = 0;
+    let spawnY = 0;
+    let directionX = 0;
+    let directionY = -1;
+    const shape = this.#emitterShape;
+    if (shape === EmitterShape.circle) {
+      const angle = randomRange(0, System68.Math.PI * 2);
+      const radius = this.#shapeRadius * System68.Math.sqrt(randomRange(0, 1));
+      spawnX = System68.Math.cos(angle) * radius;
+      spawnY = System68.Math.sin(angle) * radius;
+      directionX = System68.Math.cos(angle);
+      directionY = System68.Math.sin(angle);
+    } else if (shape === EmitterShape.cone) {
+      const angle = -System68.Math.PI * 0.5 + randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
+      const radius = randomRange(0, this.#shapeRadius);
+      spawnX = System68.Math.cos(angle) * radius;
+      spawnY = System68.Math.sin(angle) * radius;
+      directionX = System68.Math.cos(angle);
+      directionY = System68.Math.sin(angle);
+    } else if (shape === EmitterShape.box) {
+      spawnX = randomRange(-this.#boxSize.x * 0.5, this.#boxSize.x * 0.5);
+      spawnY = randomRange(-this.#boxSize.y * 0.5, this.#boxSize.y * 0.5);
+    } else if (shape === EmitterShape.edge) {
+      spawnX = randomRange(-this.#edgeWidth * 0.5, this.#edgeWidth * 0.5);
+      directionY = 1;
+    } else {
+      const angle = randomRange(0, System68.Math.PI * 2);
+      directionX = System68.Math.cos(angle);
+      directionY = System68.Math.sin(angle);
+    }
+    if (originOffset) {
+      spawnX += originOffset.x;
+      spawnY += originOffset.y;
+    }
+    if (this.#isWorldSpace) {
+      const node = this.getNode();
+      const nodePosition = node.getLocalPosition();
+      spawnX += nodePosition.x;
+      spawnY += nodePosition.y;
+    }
+    const speed = randomRange(this.#startSpeedMin, this.#startSpeedMax);
+    const colorBlend = randomRange(0, 1);
+    const particle = this.#freeList.pop() || {};
+    particle.x = spawnX;
+    particle.y = spawnY;
+    particle.velocityX = directionX * speed;
+    particle.velocityY = directionY * speed;
+    particle.age = 0;
+    particle.lifetime = randomRange(this.#startLifetimeMin, this.#startLifetimeMax);
+    particle.size = randomRange(this.#startSizeMin, this.#startSizeMax);
+    particle.rotation = randomRange(this.#startRotationMin, this.#startRotationMax);
+    particle.angularVelocity = randomRange(this.#angularVelocityMin, this.#angularVelocityMax);
+    particle.red = this.#startColorA.red + (this.#startColorB.red - this.#startColorA.red) * colorBlend;
+    particle.green = this.#startColorA.green + (this.#startColorB.green - this.#startColorA.green) * colorBlend;
+    particle.blue = this.#startColorA.blue + (this.#startColorB.blue - this.#startColorA.blue) * colorBlend;
+    particle.alpha = this.#startColorA.alpha + (this.#startColorB.alpha - this.#startColorA.alpha) * colorBlend;
+    this.#particleList.push(particle);
+  }
+  //==============================================================================
+  // 수명 비율에 따른 색 계산.
+  //==============================================================================
+  /**
+   * @private
+   * @param { object } particle
+   * @param { number } lifeRatio
+   * @returns { string } rgba 문자열.
+   */
+  evaluateColor(particle, lifeRatio) {
+    let red = particle.red;
+    let green = particle.green;
+    let blue = particle.blue;
+    let alpha = particle.alpha;
+    const gradient = this.#colorOverLifetime;
+    if (gradient && gradient.length > 0) {
+      let previousKey = gradient[0];
+      let nextKey = gradient[gradient.length - 1];
+      for (let keyIndex = 0; keyIndex < gradient.length; ++keyIndex) {
+        if (gradient[keyIndex].time <= lifeRatio) {
+          previousKey = gradient[keyIndex];
+        } else {
+          nextKey = gradient[keyIndex];
+          break;
+        }
+      }
+      const keySpan = System68.Math.max(nextKey.time - previousKey.time, 1e-4);
+      const keyBlend = System68.Math.max(0, System68.Math.min(1, (lifeRatio - previousKey.time) / keySpan));
+      red *= previousKey.color.red + (nextKey.color.red - previousKey.color.red) * keyBlend;
+      green *= previousKey.color.green + (nextKey.color.green - previousKey.color.green) * keyBlend;
+      blue *= previousKey.color.blue + (nextKey.color.blue - previousKey.color.blue) * keyBlend;
+      alpha *= previousKey.color.alpha + (nextKey.color.alpha - previousKey.color.alpha) * keyBlend;
+    }
+    const redByte = System68.Math.round(System68.Math.max(0, System68.Math.min(1, red)) * 255);
+    const greenByte = System68.Math.round(System68.Math.max(0, System68.Math.min(1, green)) * 255);
+    const blueByte = System68.Math.round(System68.Math.max(0, System68.Math.min(1, blue)) * 255);
+    return `rgba(${redByte}, ${greenByte}, ${blueByte}, ${System68.Math.max(0, System68.Math.min(1, alpha))})`;
+  }
+  //==============================================================================
+  // 출력.
+  //==============================================================================
+  /**
+   * @override
+   * @param { Graphic } graphic
+   */
+  draw(graphic) {
+    if (this.#particleList.length === 0) {
+      return;
+    }
+    if (this.#isAdditive) {
+      graphic.setBlendMode("lighter");
+    }
+    let baseOffsetX = 0;
+    let baseOffsetY = 0;
+    if (this.#isWorldSpace) {
+      const node = this.getNode();
+      const nodePosition = node.getLocalPosition();
+      baseOffsetX = -nodePosition.x;
+      baseOffsetY = -nodePosition.y;
+    }
+    for (const particle of this.#particleList) {
+      const lifeRatio = particle.age / particle.lifetime;
+      const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
+      const drawSize = System68.Math.max(0.1, particle.size * sizeScale);
+      const colorText = this.evaluateColor(particle, lifeRatio);
+      const drawX = particle.x + baseOffsetX;
+      const drawY = particle.y + baseOffsetY;
+      if (this.#renderShape === "circle") {
+        graphic.setFillColor(colorText);
+        graphic.drawCircle(Vector2.create(drawX, drawY), drawSize * 0.5);
+      } else if (this.#renderShape === "image" && this.#image) {
+        graphic.pushState();
+        graphic.translate(drawX, drawY);
+        graphic.rotate(particle.rotation);
+        graphic.multiplyGlobalAlpha(System68.Math.max(0, System68.Math.min(1, particle.alpha * (1 - lifeRatio))));
+        graphic.drawImage(this.#image, Vector2.create(-drawSize * 0.5, -drawSize * 0.5), Vector2.create(drawSize, drawSize));
+        graphic.popState();
+      } else {
+        graphic.pushState();
+        graphic.translate(drawX, drawY);
+        graphic.rotate(particle.rotation);
+        graphic.setFillColor(colorText);
+        graphic.drawRect(Rect.create(-drawSize * 0.5, -drawSize * 0.5, drawSize, drawSize));
+        graphic.popState();
+      }
+    }
+    if (this.#isAdditive) {
+      graphic.setBlendMode("source-over");
+    }
+  }
+  //==============================================================================
+  // 설정 메서드 목록. (유니티 모듈 대응)
+  //==============================================================================
+  /** @param { number } emissionRate 초당 방출 수. */
+  setEmissionRate(emissionRate) {
+    this.#emissionRate = emissionRate;
+  }
+  /** @param { object[] } burstList [{ time, count }] */
+  setBurstList(burstList) {
+    this.#burstList = burstList.map((burst) => {
+      return { time: burst.time, count: burst.count, fired: false };
+    });
+  }
+  /** @param { string } emitterShape EmitterShape 값. */
+  setEmitterShape(emitterShape) {
+    this.#emitterShape = emitterShape;
+  }
+  /** @param { number } shapeRadius circle / cone 반지름. */
+  setShapeRadius(shapeRadius) {
+    this.#shapeRadius = shapeRadius;
+  }
+  /** @param { number } coneAngleRadian cone 반각. (라디안) */
+  setConeAngle(coneAngleRadian) {
+    this.#coneAngleRadian = coneAngleRadian;
+  }
+  /** @param { number } width @param { number } height box 크기. */
+  setBoxSize(width, height) {
+    this.#boxSize = Vector2.create(width, height);
+  }
+  /** @param { number } edgeWidth edge 가로 길이. */
+  setEdgeWidth(edgeWidth) {
+    this.#edgeWidth = edgeWidth;
+  }
+  /** @param { number } minSeconds @param { number } maxSeconds */
+  setStartLifetime(minSeconds, maxSeconds = minSeconds) {
+    this.#startLifetimeMin = minSeconds;
+    this.#startLifetimeMax = maxSeconds;
+  }
+  /** @param { number } minSpeed @param { number } maxSpeed */
+  setStartSpeed(minSpeed, maxSpeed = minSpeed) {
+    this.#startSpeedMin = minSpeed;
+    this.#startSpeedMax = maxSpeed;
+  }
+  /** @param { number } minSize @param { number } maxSize */
+  setStartSize(minSize, maxSize = minSize) {
+    this.#startSizeMin = minSize;
+    this.#startSizeMax = maxSize;
+  }
+  /** @param { number } minRadian @param { number } maxRadian */
+  setStartRotation(minRadian, maxRadian = minRadian) {
+    this.#startRotationMin = minRadian;
+    this.#startRotationMax = maxRadian;
+  }
+  /** @param { Color } colorA @param { Color } colorB 둘 사이 무작위. */
+  setStartColor(colorA, colorB = colorA) {
+    this.#startColorA = colorA.clone();
+    this.#startColorB = colorB.clone();
+  }
+  /** @param { object[] } gradient [{ time: 0~1, color }] */
+  setColorOverLifetime(gradient) {
+    this.#colorOverLifetime = gradient.map((key) => {
+      return { time: key.time, color: key.color.clone() };
+    });
+  }
+  /** @param { number } startScale @param { number } endScale */
+  setSizeOverLifetime(startScale, endScale) {
+    this.#sizeOverLifetimeStart = startScale;
+    this.#sizeOverLifetimeEnd = endScale;
+  }
+  /** @param { number } minRadianPerSecond @param { number } maxRadianPerSecond */
+  setAngularVelocity(minRadianPerSecond, maxRadianPerSecond = minRadianPerSecond) {
+    this.#angularVelocityMin = minRadianPerSecond;
+    this.#angularVelocityMax = maxRadianPerSecond;
+  }
+  /** @param { number } gravityX @param { number } gravityY */
+  setGravity(gravityX, gravityY) {
+    this.#gravity = Vector2.create(gravityX, gravityY);
+  }
+  /** @param { number } damping 초당 감쇠 계수. (0 = 없음) */
+  setDamping(damping) {
+    this.#damping = damping;
+  }
+  /** @param { string } renderShape "circle" | "rect" | "image" */
+  setRenderShape(renderShape) {
+    this.#renderShape = renderShape;
+  }
+  /** @param { * } image 엔진 이미지. (renderShape "image" 전용) */
+  setImage(image) {
+    this.#image = image;
+  }
+  /** @param { boolean } isAdditive 가산 합성 여부. */
+  setAdditive(isAdditive) {
+    this.#isAdditive = isAdditive;
+  }
+  /** @param { boolean } isWorldSpace 참이면 방출 뒤 노드 이동의 영향을 받지 않는다. */
+  setWorldSpace(isWorldSpace) {
+    this.#isWorldSpace = isWorldSpace;
+  }
+  /** @param { boolean } isLooping */
+  setLooping(isLooping) {
+    this.#isLooping = isLooping;
+  }
+  /** @param { number } duration 루프 꺼짐일 때 방출 시간. (버스트 반복 주기) */
+  setDuration(duration) {
+    this.#duration = duration;
+  }
+  /** @param { number } maxParticleCount */
+  setMaxParticleCount(maxParticleCount) {
+    this.#maxParticleCount = maxParticleCount;
+  }
+  //==============================================================================
+  // 조회 메서드 목록.
+  //==============================================================================
+  /** @returns { number } */
+  getParticleCount() {
+    return this.#particleList.length;
+  }
+  /** @returns { boolean } */
+  isPlaying() {
+    return this.#isPlaying;
+  }
+};
+
+// src/effect/trailrenderer.js
+var System69 = globalThis;
+var TrailRenderer = class extends Component {
+  static {
+    __name(this, "TrailRenderer");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { object[] } */
+  #pointList;
+  // { x, y, age }
+  /** @private @type { number } */
+  #pointLifetime;
+  // 점이 남는 시간. (초)
+  /** @private @type { number } */
+  #minVertexDistance;
+  // 이보다 가까우면 점을 추가하지 않는다.
+  /** @private @type { number } */
+  #startWidth;
+  /** @private @type { number } */
+  #endWidth;
+  /** @private @type { Color } */
+  #startColor;
+  /** @private @type { Color } */
+  #endColor;
+  /** @private @type { boolean } */
+  #isAdditive;
+  /** @private @type { boolean } */
+  #isEmitting;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   */
+  constructor() {
+    super();
+    this.setComponentType("TrailRenderer");
+    this.#pointList = [];
+    this.#pointLifetime = 0.5;
+    this.#minVertexDistance = 3;
+    this.#startWidth = 10;
+    this.#endWidth = 0;
+    this.#startColor = new Color(1, 1, 1, 0.9);
+    this.#endColor = new Color(1, 1, 1, 0);
+    this.#isAdditive = false;
+    this.#isEmitting = true;
+  }
+  //==============================================================================
+  // 갱신. (점 기록 + 노화)
+  //==============================================================================
+  /**
+   * @override
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    const node = this.getNode();
+    const localPosition = node.getLocalPosition();
+    for (let pointIndex = this.#pointList.length - 1; pointIndex >= 0; --pointIndex) {
+      const point = this.#pointList[pointIndex];
+      point.age += timeDelta;
+      if (point.age >= this.#pointLifetime) {
+        this.#pointList.splice(pointIndex, 1);
+      }
+    }
+    if (!this.#isEmitting) {
+      return;
+    }
+    const lastPoint = this.#pointList[this.#pointList.length - 1];
+    if (lastPoint) {
+      const deltaX = localPosition.x - lastPoint.x;
+      const deltaY = localPosition.y - lastPoint.y;
+      if (deltaX * deltaX + deltaY * deltaY < this.#minVertexDistance * this.#minVertexDistance) {
+        return;
+      }
+    }
+    this.#pointList.push({ x: localPosition.x, y: localPosition.y, age: 0 });
+  }
+  //==============================================================================
+  // 출력. (세그먼트마다 굵기 / 색 보간 — 노드 원점 기준 상대 좌표로 그린다)
+  //==============================================================================
+  /**
+   * @override
+   * @param { Graphic } graphic
+   */
+  draw(graphic) {
+    if (this.#pointList.length < 2) {
+      return;
+    }
+    if (this.#isAdditive) {
+      graphic.setBlendMode("lighter");
+    }
+    const node = this.getNode();
+    const nodePosition = node.getLocalPosition();
+    for (let pointIndex = 0; pointIndex < this.#pointList.length - 1; ++pointIndex) {
+      const point = this.#pointList[pointIndex];
+      const nextPoint = this.#pointList[pointIndex + 1];
+      const ageRatio = point.age / this.#pointLifetime;
+      const freshRatio = 1 - ageRatio;
+      const segmentWidth = System69.Math.max(0.1, this.#endWidth + (this.#startWidth - this.#endWidth) * freshRatio);
+      const red = System69.Math.round((this.#endColor.red + (this.#startColor.red - this.#endColor.red) * freshRatio) * 255);
+      const green = System69.Math.round((this.#endColor.green + (this.#startColor.green - this.#endColor.green) * freshRatio) * 255);
+      const blue = System69.Math.round((this.#endColor.blue + (this.#startColor.blue - this.#endColor.blue) * freshRatio) * 255);
+      const alpha = this.#endColor.alpha + (this.#startColor.alpha - this.#endColor.alpha) * freshRatio;
+      graphic.setStrokeColor(`rgba(${red}, ${green}, ${blue}, ${alpha})`);
+      graphic.drawLine([
+        Vector2.create(point.x - nodePosition.x, point.y - nodePosition.y),
+        Vector2.create(nextPoint.x - nodePosition.x, nextPoint.y - nodePosition.y)
+      ], segmentWidth);
+    }
+    if (this.#isAdditive) {
+      graphic.setBlendMode("source-over");
+    }
+  }
+  //==============================================================================
+  // 흔적 지우기.
+  //==============================================================================
+  clear() {
+    this.#pointList.length = 0;
+  }
+  //==============================================================================
+  // 설정 메서드 목록.
+  //==============================================================================
+  /** @param { number } pointLifetime 점이 남는 시간. (초) */
+  setTime(pointLifetime) {
+    this.#pointLifetime = pointLifetime;
+  }
+  /** @param { number } minVertexDistance */
+  setMinVertexDistance(minVertexDistance) {
+    this.#minVertexDistance = minVertexDistance;
+  }
+  /** @param { number } startWidth @param { number } endWidth */
+  setWidth(startWidth, endWidth) {
+    this.#startWidth = startWidth;
+    this.#endWidth = endWidth;
+  }
+  /** @param { Color } startColor @param { Color } endColor */
+  setColors(startColor, endColor) {
+    this.#startColor = startColor.clone();
+    this.#endColor = endColor.clone();
+  }
+  /** @param { boolean } isAdditive */
+  setAdditive(isAdditive) {
+    this.#isAdditive = isAdditive;
+  }
+  /** @param { boolean } isEmitting 거짓이면 새 점을 만들지 않는다. (남은 띠는 잦아든다) */
+  setEmitting(isEmitting) {
+    this.#isEmitting = isEmitting;
+  }
+  //==============================================================================
+  // 조회 메서드 목록.
+  //==============================================================================
+  /** @returns { number } */
+  getPointCount() {
+    return this.#pointList.length;
+  }
+};
+
+// src/ui/uilistview.js
+var System70 = globalThis;
 var UIListView = class extends Component {
   static {
     __name(this, "UIListView");
@@ -31733,7 +32468,7 @@ var UIListView = class extends Component {
     this.#reachEndEvent = null;
     this.#reachEndThreshold = 120;
     this.#isReachEndArmed = true;
-    this.#activeItemMap = new System68.Map();
+    this.#activeItemMap = new System70.Map();
     this.#freeItemList = [];
   }
   //==============================================================================
@@ -31771,7 +32506,7 @@ var UIListView = class extends Component {
    */
   setItemCount(itemCount) {
     const previousItemCount = this.#itemCount;
-    this.#itemCount = System68.Math.max(0, itemCount);
+    this.#itemCount = System70.Math.max(0, itemCount);
     if (this.#itemCount > previousItemCount) {
       this.#isReachEndArmed = true;
     }
@@ -31802,10 +32537,10 @@ var UIListView = class extends Component {
     if (pitch <= 0) {
       return;
     }
-    let firstIndex = System68.Math.floor(scrolled / pitch) - this.#bufferItemCount;
-    let lastIndex = System68.Math.ceil((scrolled + viewLength) / pitch) + this.#bufferItemCount - 1;
-    firstIndex = System68.Math.max(0, firstIndex);
-    lastIndex = System68.Math.min(this.#itemCount - 1, lastIndex);
+    let firstIndex = System70.Math.floor(scrolled / pitch) - this.#bufferItemCount;
+    let lastIndex = System70.Math.ceil((scrolled + viewLength) / pitch) + this.#bufferItemCount - 1;
+    firstIndex = System70.Math.max(0, firstIndex);
+    lastIndex = System70.Math.min(this.#itemCount - 1, lastIndex);
     for (const [itemIndex, itemNode] of [...this.#activeItemMap]) {
       if (itemIndex < firstIndex || itemIndex > lastIndex) {
         itemNode.setActive(false);
@@ -31947,7 +32682,7 @@ var UIListView = class extends Component {
   }
   /** @param { number } bufferItemCount 화면 밖 여유 항목 수. */
   setBufferItemCount(bufferItemCount) {
-    this.#bufferItemCount = System68.Math.max(0, bufferItemCount);
+    this.#bufferItemCount = System70.Math.max(0, bufferItemCount);
   }
   //==============================================================================
   // 조회 메서드 목록.
@@ -31970,8 +32705,921 @@ var UIListView = class extends Component {
   }
 };
 
+// src/ui/uichart.js
+var System71 = globalThis;
+var UILineChart = class extends Component {
+  static {
+    __name(this, "UILineChart");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { number[] } */
+  #valueList;
+  /** @private @type { number } */
+  #maxSampleCount;
+  /** @private @type { number | null } */
+  #minValue;
+  // null 이면 자동.
+  /** @private @type { number | null } */
+  #maxValue;
+  // null 이면 자동.
+  /** @private @type { Color } */
+  #lineColor;
+  /** @private @type { Color } */
+  #gridColor;
+  /** @private @type { number } */
+  #lineWidth;
+  /** @private @type { number } */
+  #gridLineCount;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   */
+  constructor() {
+    super();
+    this.setComponentType("UILineChart");
+    this.#valueList = [];
+    this.#maxSampleCount = 60;
+    this.#minValue = null;
+    this.#maxValue = null;
+    this.#lineColor = new Color(0.42, 0.48, 1, 1);
+    this.#gridColor = new Color(1, 1, 1, 0.07);
+    this.#lineWidth = 1.5;
+    this.#gridLineCount = 3;
+  }
+  //==============================================================================
+  // 값 하나 추가. (표본 수를 넘기면 앞에서 밀려난다)
+  //==============================================================================
+  /**
+   * @param { number } value
+   */
+  pushValue(value) {
+    this.#valueList.push(value);
+    while (this.#valueList.length > this.#maxSampleCount) {
+      this.#valueList.shift();
+    }
+  }
+  //==============================================================================
+  // 출력.
+  //==============================================================================
+  /**
+   * @override
+   * @param { Graphic } graphic
+   */
+  draw(graphic) {
+    const node = this.getNode();
+    const contentSize = node.getContentSize();
+    const width = contentSize.x;
+    const height = contentSize.y;
+    graphic.setStrokeColor(this.#gridColor.toRGBAString());
+    for (let gridIndex = 1; gridIndex <= this.#gridLineCount; ++gridIndex) {
+      const gridY = height * gridIndex / (this.#gridLineCount + 1);
+      graphic.drawLine([Vector2.create(0, gridY), Vector2.create(width, gridY)], 1);
+    }
+    const sampleCount = this.#valueList.length;
+    if (sampleCount < 2) {
+      return;
+    }
+    let lowValue = this.#minValue;
+    let highValue = this.#maxValue;
+    if (lowValue === null || highValue === null) {
+      let autoLow = this.#valueList[0];
+      let autoHigh = this.#valueList[0];
+      for (const value of this.#valueList) {
+        autoLow = System71.Math.min(autoLow, value);
+        autoHigh = System71.Math.max(autoHigh, value);
+      }
+      if (lowValue === null) {
+        lowValue = autoLow;
+      }
+      if (highValue === null) {
+        highValue = autoHigh;
+      }
+    }
+    const valueRange = System71.Math.max(highValue - lowValue, 1e-4);
+    const points = [];
+    for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
+      const ratio = sampleIndex / (this.#maxSampleCount - 1);
+      const valueRatio = (this.#valueList[sampleIndex] - lowValue) / valueRange;
+      points.push(Vector2.create(ratio * width, height - valueRatio * (height - 4) - 2));
+    }
+    graphic.setStrokeColor(this.#lineColor.toRGBAString());
+    graphic.drawLine(points, this.#lineWidth);
+  }
+  //==============================================================================
+  // 설정 / 조회 메서드 목록.
+  //==============================================================================
+  /** @param { number } maxSampleCount */
+  setMaxSampleCount(maxSampleCount) {
+    this.#maxSampleCount = System71.Math.max(2, maxSampleCount);
+  }
+  /** @returns { number } */
+  getMaxSampleCount() {
+    return this.#maxSampleCount;
+  }
+  /** @param { number | null } minValue @param { number | null } maxValue */
+  setValueRange(minValue, maxValue) {
+    this.#minValue = minValue;
+    this.#maxValue = maxValue;
+  }
+  /** @param { number[] } valueList */
+  setValueList(valueList) {
+    this.#valueList = valueList.slice(-this.#maxSampleCount);
+  }
+  /** @returns { number[] } */
+  getValueList() {
+    return this.#valueList.slice();
+  }
+  /** @param { Color } lineColor */
+  setLineColor(lineColor) {
+    this.#lineColor = lineColor.clone();
+  }
+  /** @param { Color } gridColor */
+  setGridColor(gridColor) {
+    this.#gridColor = gridColor.clone();
+  }
+  /** @param { number } lineWidth */
+  setLineWidth(lineWidth) {
+    this.#lineWidth = lineWidth;
+  }
+};
+var UIBarChart = class extends Component {
+  static {
+    __name(this, "UIBarChart");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { number[] } */
+  #valueList;
+  /** @private @type { number | null } */
+  #maxValue;
+  // null 이면 자동.
+  /** @private @type { Color } */
+  #barColor;
+  /** @private @type { Color } */
+  #highlightColor;
+  /** @private @type { number } */
+  #highlightIndex;
+  // -1 이면 없음.
+  /** @private @type { number } */
+  #barGap;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   */
+  constructor() {
+    super();
+    this.setComponentType("UIBarChart");
+    this.#valueList = [];
+    this.#maxValue = null;
+    this.#barColor = new Color(0.42, 0.48, 1, 0.85);
+    this.#highlightColor = new Color(0.22, 0.84, 1, 1);
+    this.#highlightIndex = -1;
+    this.#barGap = 4;
+  }
+  //==============================================================================
+  // 출력.
+  //==============================================================================
+  /**
+   * @override
+   * @param { Graphic } graphic
+   */
+  draw(graphic) {
+    const barCount = this.#valueList.length;
+    if (barCount === 0) {
+      return;
+    }
+    const node = this.getNode();
+    const contentSize = node.getContentSize();
+    const width = contentSize.x;
+    const height = contentSize.y;
+    let highValue = this.#maxValue;
+    if (highValue === null) {
+      highValue = 1e-4;
+      for (const value of this.#valueList) {
+        highValue = System71.Math.max(highValue, value);
+      }
+    }
+    const barWidth = (width - this.#barGap * (barCount - 1)) / barCount;
+    for (let barIndex = 0; barIndex < barCount; ++barIndex) {
+      const valueRatio = System71.Math.max(0, System71.Math.min(1, this.#valueList[barIndex] / highValue));
+      const barHeight = System71.Math.max(1, valueRatio * height);
+      const barX = barIndex * (barWidth + this.#barGap);
+      const barColor = barIndex === this.#highlightIndex ? this.#highlightColor : this.#barColor;
+      graphic.setFillColor(barColor.toRGBAString());
+      graphic.drawRect(Rect.create(barX, height - barHeight, barWidth, barHeight));
+    }
+  }
+  //==============================================================================
+  // 설정 / 조회 메서드 목록.
+  //==============================================================================
+  /** @param { number[] } valueList */
+  setValueList(valueList) {
+    this.#valueList = valueList.slice();
+  }
+  /** @returns { number[] } */
+  getValueList() {
+    return this.#valueList.slice();
+  }
+  /** @param { number | null } maxValue */
+  setMaxValue(maxValue) {
+    this.#maxValue = maxValue;
+  }
+  /** @param { Color } barColor */
+  setBarColor(barColor) {
+    this.#barColor = barColor.clone();
+  }
+  /** @param { Color } highlightColor */
+  setHighlightColor(highlightColor) {
+    this.#highlightColor = highlightColor.clone();
+  }
+  /** @param { number } highlightIndex -1 이면 강조 없음. */
+  setHighlightIndex(highlightIndex) {
+    this.#highlightIndex = highlightIndex;
+  }
+  /** @param { number } barGap */
+  setBarGap(barGap) {
+    this.#barGap = barGap;
+  }
+};
+
+// src/ui/uidropdown.js
+var System72 = globalThis;
+var UIDropdown = class extends WorldNode {
+  static {
+    __name(this, "UIDropdown");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { string[] } */
+  #optionList;
+  /** @private @type { number } */
+  #selectedIndex;
+  /** @private @type { boolean } */
+  #isOpen;
+  /** @private @type { Function | null } */
+  #changedEvent;
+  /** @private @type { UILabel } */
+  #headerLabel;
+  /** @private @type { UILabel } */
+  #arrowLabel;
+  /** @private @type { WorldNode } */
+  #popupNode;
+  /** @private @type { number } */
+  #optionHeight;
+  /** @private @type { Color } */
+  #popupColor;
+  /** @private @type { Color } */
+  #textColor;
+  /** @private @type { Color } */
+  #highlightColor;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { object } options { width = 180, height = 30, optionHeight = 28, fontSize = 12,
+   *                             baseColor?, popupColor?, highlightColor?, textColor? }
+   */
+  constructor(options = {}) {
+    super();
+    const width = options.width !== void 0 ? options.width : 180;
+    const height = options.height !== void 0 ? options.height : 30;
+    this.#optionHeight = options.optionHeight !== void 0 ? options.optionHeight : 28;
+    const fontSize = options.fontSize !== void 0 ? options.fontSize : 12;
+    const baseColor = options.baseColor ? options.baseColor : new Color(0.114, 0.141, 0.212, 1);
+    this.#popupColor = options.popupColor ? options.popupColor : new Color(0.086, 0.106, 0.165, 1);
+    this.#highlightColor = options.highlightColor ? options.highlightColor : new Color(0.424, 0.482, 1, 0.25);
+    this.#textColor = options.textColor ? options.textColor : new Color(0.91, 0.925, 0.957, 1);
+    this.#optionList = [];
+    this.#selectedIndex = 0;
+    this.#isOpen = false;
+    this.#changedEvent = null;
+    this.setName("UIDropdown");
+    this.setPivot(Pivot.topLeft.clone());
+    this.setAnchor(Pivot.topLeft.clone());
+    this.setContentSize(Vector2.create(width, height));
+    this.setInteractable(true);
+    const headerPaint = this.addComponent(Paint);
+    headerPaint.setColor(baseColor);
+    headerPaint.setRoundSize(8);
+    const headerButton = this.addComponent(UIButton);
+    headerButton.setClickedEvent(() => {
+      this.setOpen(!this.#isOpen);
+    });
+    this.#headerLabel = this.addComponent(UILabel);
+    this.#headerLabel.setText("");
+    this.#headerLabel.setFontSize(fontSize);
+    this.#headerLabel.setTextColor(this.#textColor);
+    const arrowNode = new WorldNode();
+    arrowNode.setName("DropdownArrow");
+    arrowNode.setPivot(Pivot.topLeft.clone());
+    arrowNode.setAnchor(Pivot.topLeft.clone());
+    arrowNode.setContentSize(Vector2.create(20, height));
+    arrowNode.setLocalPosition(Vector2.create(width - 22, 0));
+    this.#arrowLabel = arrowNode.addComponent(UILabel);
+    this.#arrowLabel.setText("\u25BE");
+    this.#arrowLabel.setFontSize(fontSize);
+    this.#arrowLabel.setTextColor(this.#textColor);
+    this.addChild(arrowNode);
+    this.#popupNode = new WorldNode();
+    this.#popupNode.setName("DropdownPopup");
+    this.#popupNode.setPivot(Pivot.topLeft.clone());
+    this.#popupNode.setAnchor(Pivot.topLeft.clone());
+    this.#popupNode.setLocalPosition(Vector2.create(0, height + 4));
+    this.#popupNode.setActive(false);
+    const popupPaint = this.#popupNode.addComponent(Paint);
+    popupPaint.setColor(this.#popupColor);
+    popupPaint.setRoundSize(8);
+    this.addChild(this.#popupNode);
+  }
+  //==============================================================================
+  // 선택지 목록 설정. (펼침 목록 행을 다시 만든다)
+  //==============================================================================
+  /**
+   * @param { string[] } optionList
+   */
+  setOptionList(optionList) {
+    this.#optionList = optionList.slice();
+    this.#selectedIndex = System72.Math.min(this.#selectedIndex, System72.Math.max(0, this.#optionList.length - 1));
+    const childList = this.#popupNode.getChildren().slice();
+    for (const childNode of childList) {
+      this.#popupNode.removeChild(childNode);
+    }
+    const contentSize = this.getContentSize();
+    this.#popupNode.setContentSize(Vector2.create(contentSize.x, this.#optionList.length * this.#optionHeight + 8));
+    for (let optionIndex = 0; optionIndex < this.#optionList.length; ++optionIndex) {
+      const rowNode = new WorldNode();
+      rowNode.setName("DropdownOption" + optionIndex);
+      rowNode.setPivot(Pivot.topLeft.clone());
+      rowNode.setAnchor(Pivot.topLeft.clone());
+      rowNode.setContentSize(Vector2.create(contentSize.x - 8, this.#optionHeight));
+      rowNode.setLocalPosition(Vector2.create(4, 4 + optionIndex * this.#optionHeight));
+      rowNode.setInteractable(true);
+      const rowPaint = rowNode.addComponent(Paint);
+      rowPaint.setColor(new Color(0, 0, 0, 0));
+      rowPaint.setRoundSize(6);
+      const rowButton = rowNode.addComponent(UIButton);
+      rowButton.setPressedTintColor(new Color(1, 1, 1, 0.08));
+      rowButton.setClickedEvent(() => {
+        this.selectIndex(optionIndex);
+      });
+      const rowLabel = rowNode.addComponent(UILabel);
+      rowLabel.setText(this.#optionList[optionIndex]);
+      rowLabel.setFontSize(this.#headerLabel.getFontSize ? this.#headerLabel.getFontSize() : 12);
+      rowLabel.setTextColor(this.#textColor);
+      this.#popupNode.addChild(rowNode);
+    }
+    this.refreshHeader();
+    this.refreshHighlight();
+  }
+  //==============================================================================
+  // 선택 처리.
+  //==============================================================================
+  /**
+   * @param { number } optionIndex
+   */
+  selectIndex(optionIndex) {
+    if (optionIndex < 0 || optionIndex >= this.#optionList.length) {
+      return;
+    }
+    const isChanged = this.#selectedIndex !== optionIndex;
+    this.#selectedIndex = optionIndex;
+    this.setOpen(false);
+    this.refreshHeader();
+    this.refreshHighlight();
+    if (isChanged && this.#changedEvent) {
+      this.#changedEvent(this);
+    }
+  }
+  //==============================================================================
+  // 펼침 / 접힘.
+  //==============================================================================
+  /**
+   * @param { boolean } isOpen
+   */
+  setOpen(isOpen) {
+    this.#isOpen = isOpen;
+    this.#popupNode.setActive(isOpen);
+    this.#arrowLabel.setText(isOpen ? "\u25B4" : "\u25BE");
+  }
+  //==============================================================================
+  // 머리 글 갱신.
+  //==============================================================================
+  /**
+   * @private
+   */
+  refreshHeader() {
+    const selectedText = this.#optionList[this.#selectedIndex];
+    this.#headerLabel.setText(selectedText !== void 0 ? selectedText : "");
+  }
+  //==============================================================================
+  // 선택 행 강조 갱신.
+  //==============================================================================
+  /**
+   * @private
+   */
+  refreshHighlight() {
+    const rowList = this.#popupNode.getChildren();
+    for (let rowIndex = 0; rowIndex < rowList.length; ++rowIndex) {
+      const paintComponents = rowList[rowIndex].getComponents(Paint);
+      if (paintComponents.length > 0) {
+        paintComponents[0].setColor(rowIndex === this.#selectedIndex ? this.#highlightColor.clone() : new Color(0, 0, 0, 0));
+      }
+    }
+  }
+  //==============================================================================
+  // 설정 / 조회 메서드 목록.
+  //==============================================================================
+  /** @param { Function } changedEvent (self) */
+  setChangedEvent(changedEvent) {
+    this.#changedEvent = changedEvent;
+  }
+  /** @param { number } selectedIndex */
+  setSelectedIndex(selectedIndex) {
+    this.#selectedIndex = System72.Math.max(0, System72.Math.min(selectedIndex, this.#optionList.length - 1));
+    this.refreshHeader();
+    this.refreshHighlight();
+  }
+  /** @returns { number } */
+  getSelectedIndex() {
+    return this.#selectedIndex;
+  }
+  /** @returns { string } */
+  getSelectedText() {
+    const selectedText = this.#optionList[this.#selectedIndex];
+    return selectedText !== void 0 ? selectedText : "";
+  }
+  /** @returns { boolean } */
+  isOpen() {
+    return this.#isOpen;
+  }
+};
+
+// src/ui/uicontextmenu.js
+var System73 = globalThis;
+var UIContextMenu = class extends WorldNode {
+  static {
+    __name(this, "UIContextMenu");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WorldNode } */
+  #overlayNode;
+  /** @private @type { WorldNode } */
+  #panelNode;
+  /** @private @type { number } */
+  #menuWidth;
+  /** @private @type { number } */
+  #itemHeight;
+  /** @private @type { number } */
+  #fontSize;
+  /** @private @type { Color } */
+  #panelColor;
+  /** @private @type { Color } */
+  #textColor;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { object } options { menuWidth = 168, itemHeight = 28, fontSize = 12, panelColor?, textColor? }
+   */
+  constructor(options = {}) {
+    super();
+    this.#menuWidth = options.menuWidth !== void 0 ? options.menuWidth : 168;
+    this.#itemHeight = options.itemHeight !== void 0 ? options.itemHeight : 28;
+    this.#fontSize = options.fontSize !== void 0 ? options.fontSize : 12;
+    this.#panelColor = options.panelColor ? options.panelColor : new Color(0.086, 0.106, 0.165, 1);
+    this.#textColor = options.textColor ? options.textColor : new Color(0.91, 0.925, 0.957, 1);
+    this.setName("UIContextMenu");
+    this.setPivot(Pivot.topLeft.clone());
+    this.setAnchor(Pivot.topLeft.clone());
+    this.setActive(false);
+    this.#overlayNode = new WorldNode();
+    this.#overlayNode.setName("ContextMenuOverlay");
+    this.#overlayNode.setPivot(Pivot.topLeft.clone());
+    this.#overlayNode.setAnchor(Pivot.topLeft.clone());
+    this.#overlayNode.setInteractable(true);
+    const overlayButton = this.#overlayNode.addComponent(UIButton);
+    overlayButton.setPressedTintColor(new Color(0, 0, 0, 0));
+    overlayButton.setClickedEvent(() => {
+      this.close();
+    });
+    this.addChild(this.#overlayNode);
+    this.#panelNode = new WorldNode();
+    this.#panelNode.setName("ContextMenuPanel");
+    this.#panelNode.setPivot(Pivot.topLeft.clone());
+    this.#panelNode.setAnchor(Pivot.topLeft.clone());
+    const panelPaint = this.#panelNode.addComponent(Paint);
+    panelPaint.setColor(this.#panelColor);
+    panelPaint.setRoundSize(8);
+    this.addChild(this.#panelNode);
+  }
+  //==============================================================================
+  // 메뉴 열기.
+  // - itemList: [{ text, handler?, isDisabled? }]
+  //==============================================================================
+  /**
+   * @param { Vector2 } position 뷰 좌표. (메뉴 좌상단)
+   * @param { object[] } itemList
+   */
+  show(position, itemList) {
+    const childList = this.#panelNode.getChildren().slice();
+    for (const childNode of childList) {
+      this.#panelNode.removeChild(childNode);
+    }
+    const panelHeight = itemList.length * this.#itemHeight + 8;
+    this.#panelNode.setContentSize(Vector2.create(this.#menuWidth, panelHeight));
+    for (let itemIndex = 0; itemIndex < itemList.length; ++itemIndex) {
+      const itemData = itemList[itemIndex];
+      const rowNode = new WorldNode();
+      rowNode.setName("ContextMenuItem" + itemIndex);
+      rowNode.setPivot(Pivot.topLeft.clone());
+      rowNode.setAnchor(Pivot.topLeft.clone());
+      rowNode.setContentSize(Vector2.create(this.#menuWidth - 8, this.#itemHeight));
+      rowNode.setLocalPosition(Vector2.create(4, 4 + itemIndex * this.#itemHeight));
+      rowNode.setInteractable(true);
+      const rowPaint = rowNode.addComponent(Paint);
+      rowPaint.setColor(new Color(0, 0, 0, 0));
+      rowPaint.setRoundSize(6);
+      const rowButton = rowNode.addComponent(UIButton);
+      rowButton.setPressedTintColor(new Color(1, 1, 1, 0.08));
+      if (itemData.isDisabled) {
+        rowButton.setInteractable(false);
+      } else {
+        rowButton.setClickedEvent(() => {
+          this.close();
+          if (itemData.handler) {
+            itemData.handler();
+          }
+        });
+      }
+      const rowLabel = rowNode.addComponent(UILabel);
+      rowLabel.setText(itemData.text);
+      rowLabel.setFontSize(this.#fontSize);
+      rowLabel.setTextAlign("left");
+      rowLabel.setTextColor(itemData.isDisabled ? new Color(0.4, 0.43, 0.5, 1) : this.#textColor);
+      this.#panelNode.addChild(rowNode);
+    }
+    const parentNode = this.getParent();
+    let areaWidth = 960;
+    let areaHeight = 640;
+    if (parentNode) {
+      const parentSize = parentNode.getContentSize();
+      if (parentSize.x > 0 && parentSize.y > 0) {
+        areaWidth = parentSize.x;
+        areaHeight = parentSize.y;
+      }
+    }
+    this.setContentSize(Vector2.create(areaWidth, areaHeight));
+    this.#overlayNode.setContentSize(Vector2.create(areaWidth, areaHeight));
+    const menuX = System73.Math.min(position.x, areaWidth - this.#menuWidth - 4);
+    const menuY = System73.Math.min(position.y, areaHeight - panelHeight - 4);
+    this.#panelNode.setLocalPosition(Vector2.create(menuX, menuY));
+    this.setActive(true);
+  }
+  //==============================================================================
+  // 닫기.
+  //==============================================================================
+  close() {
+    this.setActive(false);
+  }
+  //==============================================================================
+  // 표시 중 여부.
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  isShowing() {
+    return this.isActive();
+  }
+};
+
+// src/ui/uidraggable.js
+var System74 = globalThis;
+var UIDraggable = class extends UIControl {
+  static {
+    __name(this, "UIDraggable");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { boolean } */
+  #isDragging;
+  /** @private @type { Vector2 | null } */
+  #previousViewPosition;
+  /** @private @type { Vector2 | null } */
+  #homePosition;
+  // 잡기 전 로컬 자리.
+  /** @private @type { boolean } */
+  #isSnapBackEnabled;
+  /** @private @type { boolean } */
+  #isReturning;
+  /** @private @type { number } */
+  #snapBackSpeed;
+  // 초당 되돌아가는 비율 계수.
+  /** @private @type { Function | null } */
+  #dragStartEvent;
+  // (self)
+  /** @private @type { Function | null } */
+  #dragMoveEvent;
+  // (self, viewPosition)
+  /** @private @type { Function | null } */
+  #dragEndEvent;
+  // (self, viewPosition)
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   */
+  constructor() {
+    super();
+    this.setComponentType("Draggable");
+    this.#isDragging = false;
+    this.#previousViewPosition = null;
+    this.#homePosition = null;
+    this.#isSnapBackEnabled = false;
+    this.#isReturning = false;
+    this.#snapBackSpeed = 14;
+    this.#dragStartEvent = null;
+    this.#dragMoveEvent = null;
+    this.#dragEndEvent = null;
+  }
+  //==============================================================================
+  // 노드에 붙음. (터치를 받도록 인터랙션 활성화)
+  //==============================================================================
+  /**
+   * @override
+   * @param { import("../core/node/componentnode.js").ComponentNode } node
+   */
+  attach(node) {
+    super.attach(node);
+    if (node instanceof WorldNode) {
+      node.setInteractable(true);
+    }
+  }
+  //==============================================================================
+  // 터치 눌림.
+  //==============================================================================
+  /**
+   * @override
+   * @param { Vector2 } viewInputPosition
+   */
+  touchPress(viewInputPosition) {
+    const node = this.getNode();
+    this.#isDragging = true;
+    this.#isReturning = false;
+    this.#previousViewPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
+    const localPosition = node.getLocalPosition();
+    this.#homePosition = Vector2.create(localPosition.x, localPosition.y);
+    if (this.#dragStartEvent) {
+      this.#dragStartEvent(this);
+    }
+  }
+  //==============================================================================
+  // 터치 이동.
+  //==============================================================================
+  /**
+   * @override
+   * @param { Vector2 } viewInputPosition
+   */
+  touchMove(viewInputPosition) {
+    if (!this.#isDragging) {
+      return;
+    }
+    const node = this.getNode();
+    const deltaX = viewInputPosition.x - this.#previousViewPosition.x;
+    const deltaY = viewInputPosition.y - this.#previousViewPosition.y;
+    this.#previousViewPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
+    const localPosition = node.getLocalPosition();
+    node.setLocalPosition(Vector2.create(localPosition.x + deltaX, localPosition.y + deltaY));
+    if (this.#dragMoveEvent) {
+      this.#dragMoveEvent(this, viewInputPosition);
+    }
+  }
+  //==============================================================================
+  // 터치 뗌.
+  //==============================================================================
+  /**
+   * @override
+   * @param { Vector2 } viewInputPosition
+   */
+  touchRelease(viewInputPosition) {
+    if (!this.#isDragging) {
+      return;
+    }
+    this.#isDragging = false;
+    if (this.#isSnapBackEnabled) {
+      this.#isReturning = true;
+    }
+    if (this.#dragEndEvent) {
+      this.#dragEndEvent(this, viewInputPosition);
+    }
+  }
+  //==============================================================================
+  // 터치 취소.
+  //==============================================================================
+  /**
+   * @override
+   * @param { Vector2 } viewInputPosition
+   */
+  touchCancel(viewInputPosition) {
+    this.touchRelease(viewInputPosition);
+  }
+  //==============================================================================
+  // 갱신. (제자리 복귀 미끄러짐)
+  //==============================================================================
+  /**
+   * @override
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    super.tick(timeDelta);
+    if (!this.#isReturning || !this.#homePosition) {
+      return;
+    }
+    const node = this.getNode();
+    const localPosition = node.getLocalPosition();
+    const blend = System74.Math.min(this.#snapBackSpeed * timeDelta, 1);
+    const nextX = localPosition.x + (this.#homePosition.x - localPosition.x) * blend;
+    const nextY = localPosition.y + (this.#homePosition.y - localPosition.y) * blend;
+    node.setLocalPosition(Vector2.create(nextX, nextY));
+    const remainX = this.#homePosition.x - nextX;
+    const remainY = this.#homePosition.y - nextY;
+    if (remainX * remainX + remainY * remainY < 0.25) {
+      node.setLocalPosition(Vector2.create(this.#homePosition.x, this.#homePosition.y));
+      this.#isReturning = false;
+    }
+  }
+  //==============================================================================
+  // 지금 자리에 눌러앉기. (dragEnd 처리기에서 드롭 성공 시 호출 — 복귀를 멈춘다)
+  //==============================================================================
+  settleHere() {
+    const node = this.getNode();
+    const localPosition = node.getLocalPosition();
+    this.#homePosition = Vector2.create(localPosition.x, localPosition.y);
+    this.#isReturning = false;
+  }
+  //==============================================================================
+  // 제자리로 즉시 되돌리기.
+  //==============================================================================
+  snapHome() {
+    if (this.#homePosition) {
+      const node = this.getNode();
+      node.setLocalPosition(Vector2.create(this.#homePosition.x, this.#homePosition.y));
+    }
+    this.#isReturning = false;
+  }
+  //==============================================================================
+  // 설정 / 조회 메서드 목록.
+  //==============================================================================
+  /** @param { boolean } isSnapBackEnabled */
+  setSnapBackEnabled(isSnapBackEnabled) {
+    this.#isSnapBackEnabled = isSnapBackEnabled;
+  }
+  /** @param { number } snapBackSpeed */
+  setSnapBackSpeed(snapBackSpeed) {
+    this.#snapBackSpeed = snapBackSpeed;
+  }
+  /** @param { Function } dragStartEvent (self) */
+  setDragStartEvent(dragStartEvent) {
+    this.#dragStartEvent = dragStartEvent;
+  }
+  /** @param { Function } dragMoveEvent (self, viewPosition) */
+  setDragMoveEvent(dragMoveEvent) {
+    this.#dragMoveEvent = dragMoveEvent;
+  }
+  /** @param { Function } dragEndEvent (self, viewPosition) */
+  setDragEndEvent(dragEndEvent) {
+    this.#dragEndEvent = dragEndEvent;
+  }
+  /** @returns { boolean } */
+  isDragging() {
+    return this.#isDragging;
+  }
+  /** @returns { Vector2 | null } */
+  getHomePosition() {
+    return this.#homePosition ? Vector2.create(this.#homePosition.x, this.#homePosition.y) : null;
+  }
+};
+
+// src/ui/uispinner.js
+var System75 = globalThis;
+var UISpinner = class extends WorldNode {
+  static {
+    __name(this, "UISpinner");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WorldNode[] } */
+  #dotNodeList;
+  /** @private @type { number } */
+  #dotCount;
+  /** @private @type { number } */
+  #rotationSpeed;
+  // 초당 바퀴 수.
+  /** @private @type { number } */
+  #phase;
+  /** @private @type { Color } */
+  #dotColor;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { object } options { radius = 9, dotCount = 10, dotRadius = 2, color?, rotationSpeed = 1 }
+   */
+  constructor(options = {}) {
+    super();
+    const radius = options.radius !== void 0 ? options.radius : 9;
+    this.#dotCount = options.dotCount !== void 0 ? options.dotCount : 10;
+    const dotRadius = options.dotRadius !== void 0 ? options.dotRadius : 2;
+    this.#dotColor = options.color ? options.color : new Color(1, 1, 1, 1);
+    this.#rotationSpeed = options.rotationSpeed !== void 0 ? options.rotationSpeed : 1;
+    this.#phase = 0;
+    this.#dotNodeList = [];
+    this.setName("UISpinner");
+    this.setPivot(Pivot.middleCenter.clone());
+    this.setAnchor(Pivot.topLeft.clone());
+    this.setContentSize(Vector2.create((radius + dotRadius) * 2, (radius + dotRadius) * 2));
+    const center = radius + dotRadius;
+    for (let dotIndex = 0; dotIndex < this.#dotCount; ++dotIndex) {
+      const angle = dotIndex / this.#dotCount * System75.Math.PI * 2;
+      const dotNode = new WorldNode();
+      dotNode.setName("SpinnerDot" + dotIndex);
+      dotNode.setPivot(Pivot.middleCenter.clone());
+      dotNode.setAnchor(Pivot.topLeft.clone());
+      dotNode.setContentSize(Vector2.create(dotRadius * 2, dotRadius * 2));
+      dotNode.setLocalPosition(Vector2.create(
+        center + System75.Math.cos(angle) * radius,
+        center + System75.Math.sin(angle) * radius
+      ));
+      const paint = dotNode.addComponent(Paint);
+      paint.setColor(this.#dotColor.clone());
+      paint.setRoundSize(dotRadius);
+      this.addChild(dotNode);
+      this.#dotNodeList.push(dotNode);
+    }
+  }
+  //==============================================================================
+  // 갱신. (밝기 꼬리 회전)
+  //==============================================================================
+  /**
+   * @override
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    super.tick(timeDelta);
+    this.#phase += timeDelta * this.#rotationSpeed;
+    for (let dotIndex = 0; dotIndex < this.#dotNodeList.length; ++dotIndex) {
+      const orderRatio = dotIndex / this.#dotCount;
+      let tailRatio = (orderRatio - this.#phase) % 1;
+      if (tailRatio < 0) {
+        tailRatio += 1;
+      }
+      const dotOpacity = 0.15 + 0.85 * (1 - tailRatio);
+      this.#dotNodeList[dotIndex].setLocalOpacity(dotOpacity);
+    }
+  }
+  //==============================================================================
+  // 점 색 설정.
+  //==============================================================================
+  /**
+   * @param { Color } dotColor
+   */
+  setDotColor(dotColor) {
+    this.#dotColor = dotColor.clone();
+    for (const dotNode of this.#dotNodeList) {
+      const paintComponents = dotNode.getComponents(Paint);
+      if (paintComponents.length > 0) {
+        paintComponents[0].setColor(this.#dotColor.clone());
+      }
+    }
+  }
+  //==============================================================================
+  // 회전 속도 설정. (초당 바퀴 수)
+  //==============================================================================
+  /**
+   * @param { number } rotationSpeed
+   */
+  setRotationSpeed(rotationSpeed) {
+    this.#rotationSpeed = rotationSpeed;
+  }
+};
+
 // src/ui/uitoast.js
-var System69 = globalThis;
+var System76 = globalThis;
 var UIToast = class extends WorldNode {
   static {
     __name(this, "UIToast");
@@ -31990,6 +33638,9 @@ var UIToast = class extends WorldNode {
   #holdSeconds;
   /** @private @type { number } */
   #restY;
+  /** @private @type { number | null } */
+  #restX;
+  // null 이면 부모 가로 중앙.
   /** @private @type { number } */
   #riseDistance;
   /** @private @type { UILabel } */
@@ -32006,6 +33657,7 @@ var UIToast = class extends WorldNode {
     const width = options.width !== void 0 ? options.width : 400;
     const height = options.height !== void 0 ? options.height : 48;
     this.#restY = options.restY !== void 0 ? options.restY : 560;
+    this.#restX = options.restX !== void 0 ? options.restX : null;
     this.#holdSeconds = options.holdSeconds !== void 0 ? options.holdSeconds : 1.8;
     this.#riseDistance = 28;
     this.#messageQueue = [];
@@ -32021,7 +33673,7 @@ var UIToast = class extends WorldNode {
     paint.setRoundSize(height * 0.5);
     this.#label = this.addComponent(UILabel);
     this.#label.setText("");
-    this.#label.setFontSize(15);
+    this.#label.setFontSize(options.fontSize !== void 0 ? options.fontSize : 15);
     this.#label.setTextColor(options.textColor ? options.textColor : new Color(0.96, 0.97, 1, 1));
   }
   //==============================================================================
@@ -32070,7 +33722,7 @@ var UIToast = class extends WorldNode {
     }
     this.#phaseSeconds += timeDelta;
     if (this.#phase === "enter") {
-      const ratio = System69.Math.min(1, this.#phaseSeconds / 0.24);
+      const ratio = System76.Math.min(1, this.#phaseSeconds / 0.24);
       const eased = 1 - (1 - ratio) * (1 - ratio);
       this.setLocalOpacity(eased);
       this.updatePosition(eased);
@@ -32084,7 +33736,7 @@ var UIToast = class extends WorldNode {
         this.#phaseSeconds = 0;
       }
     } else if (this.#phase === "exit") {
-      const ratio = System69.Math.min(1, this.#phaseSeconds / 0.2);
+      const ratio = System76.Math.min(1, this.#phaseSeconds / 0.2);
       this.setLocalOpacity(1 - ratio);
       this.updatePosition(1 + ratio * 0.4);
       if (ratio >= 1) {
@@ -32100,12 +33752,15 @@ var UIToast = class extends WorldNode {
    * @param { number } progressRatio
    */
   updatePosition(progressRatio) {
-    const parentNode = this.getParent();
-    let centerX = 480;
-    if (parentNode) {
-      const parentSize = parentNode.getContentSize();
-      if (parentSize.x > 0) {
-        centerX = parentSize.x * 0.5;
+    let centerX = this.#restX;
+    if (centerX === null) {
+      centerX = 480;
+      const parentNode = this.getParent();
+      if (parentNode) {
+        const parentSize = parentNode.getContentSize();
+        if (parentSize.x > 0) {
+          centerX = parentSize.x * 0.5;
+        }
       }
     }
     this.setLocalPosition(Vector2.create(centerX, this.#restY + this.#riseDistance * (1 - progressRatio)));
@@ -32118,6 +33773,15 @@ var UIToast = class extends WorldNode {
    */
   setRestY(restY) {
     this.#restY = restY;
+  }
+  //==============================================================================
+  // 표시 자리(가운데 가로 좌표) 설정. (null 이면 부모 가로 중앙)
+  //==============================================================================
+  /**
+   * @param { number | null } restX
+   */
+  setRestX(restX) {
+    this.#restX = restX;
   }
   //==============================================================================
   // 머무는 시간 설정.
@@ -32397,7 +34061,7 @@ var UIDialog = class extends WorldNode {
 };
 
 // import.js
-var System70 = globalThis;
+var System77 = globalThis;
 export {
   Action,
   Animation,
@@ -32424,6 +34088,7 @@ export {
   DialogueRunner,
   DialogueScriptParser,
   Dictionary,
+  EmitterShape,
   Engine,
   EngineConfiguration,
   Enum,
@@ -32464,6 +34129,7 @@ export {
   Object2 as Object,
   ObjectPool,
   Paint,
+  ParticleSystem,
   PathFinder,
   PersistedStore,
   Pivot,
@@ -32496,7 +34162,7 @@ export {
   SpriteAnimator,
   Stack,
   Steering2D,
-  System70 as System,
+  System77 as System,
   Text,
   TextAlign,
   TextAsset,
@@ -32506,16 +34172,22 @@ export {
   TouchParticle,
   TouchRaycaster,
   TouchRecognizer,
+  TrailRenderer,
   TransformNode,
   Tween,
   Typewriter,
+  UIBarChart,
   UIButton,
+  UIContextMenu,
   UIControl,
   UIDialog,
   UIDocument,
+  UIDraggable,
+  UIDropdown,
   UIImageView,
   UIInputField,
   UILabel,
+  UILineChart,
   UIListView,
   UINode,
   UIProgressView,
@@ -32524,6 +34196,7 @@ export {
   UIScrollView,
   UISlider,
   UISnapScrollView,
+  UISpinner,
   UIToast,
   UIToggleButton,
   UIView,

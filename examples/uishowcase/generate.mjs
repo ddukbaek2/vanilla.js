@@ -1,5 +1,5 @@
 //==============================================================================
-// UI 쇼케이스 애셋 생성기.
+// UI 쇼케이스 애셋 생성기. — "VANILLA CONSOLE" (서비스 관리 대시보드 앱)
 // - UIEditor 가 저장하는 uiasset(json) 과 같은 형식으로 화면 다섯 벌을 만든다.
 // - 목록 항목은 여기에 굽지 않는다. 각 목록에는 템플릿 한 줄만 두고,
 //   실제 항목은 index.html 이 데이터로 UIListView 에 동적 생성한다.
@@ -14,25 +14,27 @@ import { fileURLToPath } from "node:url";
 // 전역 상수 목록.
 //==============================================================================
 const OUTPUT_DIRECTORY = join(dirname(fileURLToPath(import.meta.url)), "assets");
-const DOCUMENT_WIDTH = 1440;
-const DOCUMENT_HEIGHT = 900;
-const RAIL_WIDTH = 216;
-const CONTENT_X = 240;
+const DOCUMENT_WIDTH = 1680;
+const DOCUMENT_HEIGHT = 1000;
+const RAIL_WIDTH = 200;
+const CONTENT_X = 224;
+const MAIN_WIDTH = 884;
+const SIDE_X = 1124;
+const SIDE_WIDTH = 340;
 
-const COLOR_BACKGROUND = "#0b0e17";
-const COLOR_SURFACE = "#10141f";
-const COLOR_CARD = "#161b29";
-const COLOR_CARD_RAISED = "#1d2436";
-const COLOR_HAIRLINE = "#232b3d";
-const COLOR_TEXT = "#e8ecf4";
-const COLOR_TEXT_DIM = "#7c8598";
-const COLOR_TEXT_FAINT = "#4a5468";
-const COLOR_INDIGO = "#6c7bff";
-const COLOR_CYAN = "#38d6ff";
-const COLOR_AMBER = "#f0b35c";
-const COLOR_MINT = "#43dd8f";
-const COLOR_RED = "#ef5350";
-const COLOR_INK = "#0b0e17";
+// 절제된 앱 팔레트. (단일 인디고 액센트 + 중립 톤, 상태색은 의미가 있을 때만)
+const COLOR_BACKGROUND = "#0b0d12";
+const COLOR_SURFACE = "#12151c";
+const COLOR_CARD = "#171b24";
+const COLOR_CARD_RAISED = "#1e2430";
+const COLOR_HAIRLINE = "#262c38";
+const COLOR_TEXT = "#e6e9ef";
+const COLOR_TEXT_DIM = "#8a91a0";
+const COLOR_TEXT_FAINT = "#545b69";
+const COLOR_ACCENT = "#5b6cff";
+const COLOR_POSITIVE = "#3fb27f";
+const COLOR_NEGATIVE = "#d9564f";
+const COLOR_INK = "#0b0d12";
 const COLOR_TRANSPARENT = [1, 1, 1, 0];
 
 
@@ -90,12 +92,12 @@ function label(text, fontSize, textColor, textAlign = "center", textBaseline = "
 		textAlign: textAlign, textBaseline: textBaseline };
 }
 
-function button(pressedAlpha = 0.3) {
+function button(pressedAlpha = 0.25) {
 	return { type: "UIButton", pressedTintColor: [0, 0, 0, pressedAlpha] };
 }
 
 function toggle() {
-	return { type: "UIToggleButton", pressedTintColor: [0, 0, 0, 0.25] };
+	return { type: "UIToggleButton", pressedTintColor: [0, 0, 0, 0.2] };
 }
 
 function scrollView(contentWidth, contentHeight, isHorizontal, isVertical) {
@@ -115,7 +117,7 @@ function progress(value) {
 }
 
 function slider(value) {
-	return { type: "UISlider", value: value, thumbRadius: 7, trackThickness: 4 };
+	return { type: "UISlider", value: value, thumbRadius: 6, trackThickness: 4 };
 }
 
 //==============================================================================
@@ -125,17 +127,10 @@ function textNode(name, x, y, width, height, text, fontSize, textColor, textAlig
 	return makeNode(name, x, y, width, height, { components: [label(text, fontSize, textColor, textAlign, textBaseline)] });
 }
 
-function buttonNode(name, x, y, width, height, text, fillColor, roundSize, fontSize = 13, textColor = color(COLOR_TEXT)) {
+function buttonNode(name, x, y, width, height, text, fillColor, roundSize, fontSize = 12, textColor = color(COLOR_TEXT)) {
 	return makeNode(name, x, y, width, height, {
 		interactable: true,
 		components: [paint(fillColor, roundSize), button(), label(text, fontSize, textColor)],
-	});
-}
-
-function chipNode(name, x, y, width, text, textColor) {
-	return makeNode(name, x, y, width, 28, {
-		components: [paint(color(COLOR_CARD_RAISED), 14)],
-		children: [textNode(name + "Label", 0, 0, width, 28, text, 12, textColor, "center")],
 	});
 }
 
@@ -144,18 +139,27 @@ function hairline(name, x, y, width, height) {
 }
 
 function sectionLabel(name, x, y, text) {
-	return textNode(name, x, y, 300, 18, text, 11, color(COLOR_TEXT_FAINT));
+	return textNode(name, x, y, 300, 16, text, 10, color(COLOR_TEXT_FAINT));
+}
+
+function panelNode(name, x, y, width, height, children) {
+	return makeNode(name, x, y, width, height, {
+		components: [paint(color(COLOR_SURFACE), 10)],
+		children: children,
+	});
 }
 
 //==============================================================================
-// 화면 헤더. (제목 + 부제 + 우측 재화 칩)
+// 화면 헤더. (제목 + 부제 + 우측 상태 칩)
 //==============================================================================
 function headerNodes(titleText, subtitleText) {
 	return [
-		textNode("Title", CONTENT_X, 26, 320, 30, titleText, 21, color(COLOR_TEXT)),
-		textNode("Subtitle", CONTENT_X + 4, 58, 400, 16, subtitleText, 12, color(COLOR_TEXT_DIM)),
-		chipNode("CoinChip", 1186, 28, 110, "◆ 12,480", color(COLOR_AMBER)),
-		chipNode("GemChip", 1306, 28, 104, "● 1,250", color(COLOR_CYAN)),
+		textNode("Title", CONTENT_X, 22, 360, 26, titleText, 18, color(COLOR_TEXT)),
+		textNode("Subtitle", CONTENT_X + 2, 50, 480, 14, subtitleText, 11, color(COLOR_TEXT_DIM)),
+		makeNode("StatusChip", 1420, 26, 244, 26, {
+			components: [paint(color(COLOR_CARD_RAISED), 13)],
+			children: [textNode("StatusChipLabel", 0, 0, 244, 26, "●  All systems normal", 10.5, color(COLOR_POSITIVE), "center")],
+		}),
 	];
 }
 
@@ -167,83 +171,82 @@ function writeDocument(fileName, rootNode) {
 
 
 //==============================================================================
-// 홈 화면. (카드 목록 템플릿 + 오른쪽 일일 / 시즌 패널)
+// 대시보드 화면. (KPI + 실시간 차트 + 이벤트 목록 + 시스템 패널)
 //==============================================================================
-function buildHome() {
+function buildDashboard() {
+	const statNames = [
+		{ key: "Revenue", title: "REVENUE (MTD)" },
+		{ key: "Users", title: "ACTIVE USERS" },
+		{ key: "Requests", title: "REQUESTS / MIN" },
+		{ key: "Uptime", title: "UPTIME (90D)" },
+	];
+	const statCardNodes = statNames.map((definition, index) => {
+		return makeNode("Stat" + definition.key, CONTENT_X + index * 228, 82, 212, 78, {
+			components: [paint(color(COLOR_SURFACE), 10)],
+			children: [
+				textNode("Stat" + definition.key + "Title", 16, 12, 180, 14, definition.title, 9.5, color(COLOR_TEXT_FAINT)),
+				textNode("Stat" + definition.key + "Value", 16, 30, 180, 24, "", 19, color(COLOR_TEXT)),
+				textNode("Stat" + definition.key + "Delta", 16, 56, 180, 14, "", 10, color(COLOR_TEXT_DIM)),
+			],
+		});
+	});
 
-	// 카드 목록 템플릿. 실제 항목은 코드가 데이터로 채운다.
-	const cardTemplate = makeNode("CardTemplate", 0, 0, 792, 84, {
-		components: [paint(color(COLOR_CARD), 10)],
+	// 이벤트 목록 템플릿. 실제 항목은 코드가 데이터로 채운다.
+	const eventTemplate = makeNode("EventTemplate", 0, 0, MAIN_WIDTH - 32, 40, {
+		components: [paint(color(COLOR_CARD), 8)],
 		children: [
-			makeNode("CardStripe", 0, 0, 3, 84, { components: [paint(color(COLOR_INDIGO), 1.5)] }),
-			makeNode("CardIcon", 16, 14, 56, 56, {
-				components: [paint(color(COLOR_INDIGO), 12)],
-				children: [textNode("CardGlyph", 0, 0, 56, 56, "S", 24, color(COLOR_INK), "center")],
-			}),
-			textNode("CardTitle", 88, 16, 360, 22, "Title", 15, color(COLOR_TEXT)),
-			textNode("CardSubtitle", 88, 44, 420, 18, "Subtitle", 12, color(COLOR_TEXT_DIM)),
-			textNode("CardMeta", 560, 16, 120, 18, "", 11, color(COLOR_TEXT_FAINT), "right"),
-			buttonNode("CardOpenButton", 692, 26, 84, 32, "OPEN", color(COLOR_CARD_RAISED), 8, 12),
+			textNode("EventTime", 14, 0, 64, 40, "", 10, color(COLOR_TEXT_FAINT)),
+			textNode("EventText", 88, 0, 560, 40, "", 11.5, color(COLOR_TEXT)),
+			textNode("EventTag", MAIN_WIDTH - 132, 0, 86, 40, "", 9.5, color(COLOR_TEXT_DIM), "right"),
 		],
 	});
 
-	const dailyRows = [
-		{ name: "Energy", value: 0.72, caption: "72 / 100" },
-		{ name: "Quest", value: 0.4, caption: "2 / 5" },
-		{ name: "SeasonPass", label: "Season Pass", value: 0.88, caption: "Lv. 44" },
+	const systemRows = [
+		{ name: "Cpu", title: "CPU", caption: "8 cores" },
+		{ name: "Memory", title: "Memory", caption: "32 GB" },
+		{ name: "Disk", title: "Disk", caption: "2 TB NVMe" },
 	];
-	const dailyRowNodes = [];
-	dailyRows.forEach((row, index) => {
-		const rowY = 44 + index * 58;
-		const rowLabel = row.label ? row.label : row.name;
-		dailyRowNodes.push(textNode("Daily" + row.name + "Label", 18, rowY, 140, 16, rowLabel, 12, color(COLOR_TEXT)));
-		dailyRowNodes.push(textNode("Daily" + row.name + "Caption", 158, rowY, 190, 16, row.caption, 11, color(COLOR_TEXT_DIM), "right"));
-		dailyRowNodes.push(makeNode("Daily" + row.name + "Bar", 18, rowY + 24, 330, 8, {
-			components: [progress(row.value)],
-		}));
+	const systemRowNodes = [];
+	systemRows.forEach((row, index) => {
+		const rowY = 34 + index * 46;
+		systemRowNodes.push(textNode("System" + row.name + "Label", 16, rowY, 120, 14, row.title, 11, color(COLOR_TEXT)));
+		systemRowNodes.push(textNode("System" + row.name + "Caption", 136, rowY, 188, 14, row.caption, 9.5, color(COLOR_TEXT_FAINT), "right"));
+		systemRowNodes.push(makeNode("System" + row.name + "Bar", 16, rowY + 20, 308, 6, { components: [progress(0.3)] }));
 	});
 
-	const rootNode = makeNode("Home", 0, 0, DOCUMENT_WIDTH, DOCUMENT_HEIGHT, {
+	const rootNode = makeNode("Dashboard", 0, 0, DOCUMENT_WIDTH, DOCUMENT_HEIGHT, {
 		components: [paint(color(COLOR_BACKGROUND))],
 		children: [
-			...headerNodes("HOME", "Everything below the fold is data-driven."),
-			sectionLabel("CardListLabel", CONTENT_X, 92, "GAME MODES"),
-			makeNode("CardList", CONTENT_X, 114, 792, 762, {
+			...headerNodes("DASHBOARD", "Live metrics — charts update every second."),
+			...statCardNodes,
+			panelNode("ChartPanel", CONTENT_X, 176, MAIN_WIDTH, 300, [
+				sectionLabel("ChartTitle", 16, 12, "REQUESTS PER SECOND"),
+				textNode("ChartValue", MAIN_WIDTH - 156, 8, 140, 22, "", 15, color(COLOR_TEXT), "right"),
+				makeNode("LiveChart", 16, 40, MAIN_WIDTH - 32, 244, {}),
+			]),
+			panelNode("BarPanel", SIDE_X, 176, SIDE_WIDTH, 300, [
+				sectionLabel("BarTitle", 16, 12, "REVENUE · LAST 14 DAYS"),
+				makeNode("RevenueBars", 16, 40, SIDE_WIDTH - 32, 220, {}),
+				textNode("BarCaption", 16, 268, SIDE_WIDTH - 32, 14, "", 9.5, color(COLOR_TEXT_FAINT)),
+			]),
+			sectionLabel("EventsLabel", CONTENT_X, 496, "RECENT EVENTS"),
+			makeNode("EventList", CONTENT_X, 518, MAIN_WIDTH, 458, {
 				interactable: true,
-				components: [scrollView(792, 762, false, true)],
-				contentChildren: [cardTemplate],
+				components: [scrollView(MAIN_WIDTH, 458, false, true)],
+				contentChildren: [eventTemplate],
 			}),
-			makeNode("DailyPanel", 1050, 114, 366, 268, {
-				components: [paint(color(COLOR_SURFACE), 12)],
-				children: [
-					sectionLabel("DailyTitle", 18, 14, "DAILY"),
-					...dailyRowNodes,
-					buttonNode("ClaimButton", 18, 218, 330, 34, "CLAIM REWARD", color(COLOR_INDIGO), 8, 12),
-				],
-			}),
-			makeNode("SeasonPanel", 1050, 394, 366, 232, {
-				components: [paint(color(COLOR_SURFACE), 12)],
-				children: [
-					sectionLabel("SeasonTitle", 18, 14, "ARENA SEASON"),
-					textNode("ArenaRating", 18, 40, 160, 30, "2,148", 24, color(COLOR_TEXT)),
-					textNode("ArenaRatingCaption", 18, 74, 200, 16, "Rating  ·  Diamond II", 11, color(COLOR_TEXT_DIM)),
-					textNode("ArenaWinLabel", 18, 108, 160, 16, "Win rate vs season", 11, color(COLOR_TEXT_FAINT)),
-					makeNode("ArenaVersusBar", 18, 130, 330, 10, { components: [progress(0.63)] }),
-					textNode("ArenaWinCaption", 18, 148, 120, 16, "W 63%", 11, color(COLOR_MINT)),
-					textNode("ArenaLossCaption", 268, 148, 80, 16, "L 37%", 11, color(COLOR_RED), "right"),
-					hairline("SeasonHairline", 18, 178, 330, 1),
-					textNode("SeasonEndsLabel", 18, 190, 200, 16, "Season ends in", 11, color(COLOR_TEXT_FAINT)),
-					textNode("SeasonEndsValue", 218, 188, 130, 18, "12d 06:41", 12, color(COLOR_TEXT), "right"),
-				],
-			}),
-			makeNode("TipPanel", 1050, 638, 366, 238, {
-				components: [paint(color(COLOR_SURFACE), 12)],
-				children: [
-					sectionLabel("TipTitle", 18, 14, "DIALOGUE"),
-					textNode("TipBody", 18, 38, 330, 150, "", 12, color(COLOR_TEXT_DIM), "left", "top"),
-					buttonNode("TipNextButton", 18, 190, 330, 32, "NEXT", color(COLOR_CARD_RAISED), 8, 12),
-				],
-			}),
+			panelNode("SystemPanel", SIDE_X, 518, SIDE_WIDTH, 458, [
+				sectionLabel("SystemTitle", 16, 12, "SYSTEM"),
+				...systemRowNodes,
+				hairline("SystemHairline", 16, 182, SIDE_WIDTH - 32, 1),
+				sectionLabel("IncidentTitle", 16, 196, "OPEN INCIDENTS"),
+				textNode("IncidentValue", 16, 216, SIDE_WIDTH - 32, 20, "0", 16, color(COLOR_TEXT)),
+				textNode("IncidentCaption", 16, 240, SIDE_WIDTH - 32, 14, "No incidents in the last 30 days.", 10, color(COLOR_TEXT_DIM)),
+				hairline("NoticeHairline", 16, 268, SIDE_WIDTH - 32, 1),
+				sectionLabel("NoticeTitle", 16, 282, "NOTES"),
+				textNode("NoticeBody", 16, 304, SIDE_WIDTH - 32, 120,
+					"Every panel on this screen is drawn by the\nvanilla.js engine - charts, lists and gauges\nare all engine components.", 10.5, color(COLOR_TEXT_DIM), "left", "top"),
+			]),
 		],
 	});
 	writeDocument("home.uiasset.json", rootNode);
@@ -251,72 +254,76 @@ function buildHome() {
 
 
 //==============================================================================
-// 상점 화면. (가로 추천 띠 템플릿 + 세로 상품 목록 템플릿 + 구매 기록 패널)
+// 스토어 화면. (추천 띠 + 카탈로그 목록 + 카트 + 최근 주문)
 //==============================================================================
-function buildShop() {
+function buildStore() {
 
 	// 추천 띠 템플릿.
-	const featuredTemplate = makeNode("FeaturedTemplate", 0, 0, 208, 118, {
-		components: [paint(color(COLOR_CARD_RAISED), 12)],
+	const featuredTemplate = makeNode("FeaturedTemplate", 0, 0, 196, 96, {
+		components: [paint(color(COLOR_SURFACE), 10)],
 		children: [
-			makeNode("FeaturedStripe", 0, 0, 208, 3, { components: [paint(color(COLOR_INDIGO), 1.5)] }),
-			textNode("FeaturedTitle", 14, 14, 180, 20, "Pack", 14, color(COLOR_TEXT)),
-			textNode("FeaturedCaption", 14, 38, 180, 16, "Limited", 11, color(COLOR_TEXT_DIM)),
-			buttonNode("FeaturedBuy", 14, 74, 96, 30, "◆ 240", color(COLOR_INDIGO), 8, 12),
+			textNode("FeaturedTitle", 14, 12, 168, 18, "", 12.5, color(COLOR_TEXT)),
+			textNode("FeaturedCaption", 14, 34, 168, 14, "", 9.5, color(COLOR_TEXT_DIM)),
+			textNode("FeaturedPrice", 14, 64, 100, 18, "", 12, color(COLOR_ACCENT)),
 		],
 	});
 
-	// 상품 목록 템플릿. (수백 건이 이 한 줄을 재활용한다)
-	const itemTemplate = makeNode("ItemTemplate", 0, 0, 792, 56, {
+	// 카탈로그 목록 템플릿. (수백 건이 이 한 줄을 재활용한다)
+	const itemTemplate = makeNode("ItemTemplate", 0, 0, MAIN_WIDTH - 32, 44, {
 		components: [paint(color(COLOR_CARD), 8)],
 		children: [
-			makeNode("ItemIcon", 12, 10, 36, 36, { components: [paint(color(COLOR_INDIGO), 9)] }),
-			textNode("ItemTitle", 62, 8, 380, 20, "Item", 13, color(COLOR_TEXT)),
-			textNode("ItemCaption", 62, 30, 420, 16, "Caption", 11, color(COLOR_TEXT_DIM)),
-			buttonNode("ItemBuyButton", 676, 13, 104, 30, "◆ 120", color(COLOR_CARD_RAISED), 8, 12),
+			makeNode("ItemIcon", 10, 8, 28, 28, {
+				components: [paint(color(COLOR_CARD_RAISED), 7)],
+				children: [textNode("ItemGlyph", 0, 0, 28, 28, "", 12, color(COLOR_TEXT_DIM), "center")],
+			}),
+			textNode("ItemTitle", 52, 4, 420, 20, "", 12, color(COLOR_TEXT)),
+			textNode("ItemCaption", 52, 24, 480, 14, "", 9.5, color(COLOR_TEXT_FAINT)),
+			textNode("ItemPrice", MAIN_WIDTH - 226, 0, 90, 44, "", 11.5, color(COLOR_TEXT_DIM), "right"),
+			buttonNode("ItemAddButton", MAIN_WIDTH - 118, 9, 86, 26, "ADD", color(COLOR_CARD_RAISED), 7, 10.5),
 		],
 	});
 
-	const purchaseRowNodes = [];
-	for (let rowIndex = 0; rowIndex < 9; ++rowIndex) {
-		purchaseRowNodes.push(textNode("PurchaseRow" + rowIndex, 18, 40 + rowIndex * 24, 330, 18, "", 11, color(COLOR_TEXT_DIM)));
+	const cartRowNodes = [];
+	for (let rowIndex = 0; rowIndex < 8; ++rowIndex) {
+		cartRowNodes.push(textNode("CartRowName" + rowIndex, 16, 32 + rowIndex * 22, 220, 18, "", 10.5, color(COLOR_TEXT_DIM)));
+		cartRowNodes.push(textNode("CartRowPrice" + rowIndex, 216, 32 + rowIndex * 22, 108, 18, "", 10.5, color(COLOR_TEXT_DIM), "right"));
+	}
+	const orderRowNodes = [];
+	for (let rowIndex = 0; rowIndex < 8; ++rowIndex) {
+		orderRowNodes.push(textNode("OrderRow" + rowIndex, 16, 32 + rowIndex * 22, SIDE_WIDTH - 32, 18, "", 10.5, color(COLOR_TEXT_DIM)));
 	}
 
-	const rootNode = makeNode("Shop", 0, 0, DOCUMENT_WIDTH, DOCUMENT_HEIGHT, {
+	const rootNode = makeNode("Store", 0, 0, DOCUMENT_WIDTH, DOCUMENT_HEIGHT, {
 		components: [paint(color(COLOR_BACKGROUND))],
 		children: [
-			...headerNodes("SHOP", "500 items, one template, recycled nodes."),
-			sectionLabel("FeaturedLabel", CONTENT_X, 92, "FEATURED"),
-			makeNode("FeaturedList", CONTENT_X, 114, 1176, 118, {
+			...headerNodes("STORE", "Add-ons for your workspace - one template, hundreds of rows."),
+			sectionLabel("FeaturedLabel", CONTENT_X, 82, "FEATURED"),
+			makeNode("FeaturedList", CONTENT_X, 102, 1192, 96, {
 				interactable: true,
-				components: [scrollView(1176, 118, true, false)],
+				components: [scrollView(1192, 96, true, false)],
 				contentChildren: [featuredTemplate],
 			}),
-			sectionLabel("ItemsLabel", CONTENT_X, 254, "ALL ITEMS"),
-			textNode("ItemsCountCaption", CONTENT_X + 90, 252, 240, 18, "", 11, color(COLOR_TEXT_DIM)),
-			makeNode("ItemList", CONTENT_X, 276, 792, 600, {
+			sectionLabel("ItemsLabel", CONTENT_X, 222, "CATALOG"),
+			textNode("ItemsCountCaption", CONTENT_X + 76, 220, 240, 18, "", 10, color(COLOR_TEXT_DIM)),
+			makeNode("ItemList", CONTENT_X, 244, MAIN_WIDTH, 732, {
 				interactable: true,
-				components: [scrollView(792, 600, false, true)],
+				components: [scrollView(MAIN_WIDTH, 732, false, true)],
 				contentChildren: [itemTemplate],
 			}),
-			makeNode("PurchasePanel", 1050, 276, 366, 320, {
-				components: [paint(color(COLOR_SURFACE), 12)],
-				children: [
-					sectionLabel("PurchaseTitle", 18, 14, "RECENT PURCHASES"),
-					...purchaseRowNodes,
-					hairline("PurchaseHairline", 18, 262, 330, 1),
-					textNode("PurchaseTotalLabel", 18, 276, 160, 18, "Total spent", 11, color(COLOR_TEXT_FAINT)),
-					textNode("PurchaseTotalValue", 178, 274, 170, 20, "◆ 0", 13, color(COLOR_AMBER), "right"),
-				],
-			}),
-			makeNode("HintPanel", 1050, 608, 366, 268, {
-				components: [paint(color(COLOR_SURFACE), 12)],
-				children: [
-					sectionLabel("HintTitle", 18, 14, "HOW IT WORKS"),
-					textNode("HintBody", 18, 38, 330, 210,
-						"The item list holds one template node.\nRows are created only for the visible range\nand recycled while scrolling.\nReaching the end loads the next page.", 12, color(COLOR_TEXT_DIM), "left", "top"),
-				],
-			}),
+			panelNode("CartPanel", SIDE_X, 244, SIDE_WIDTH, 348, [
+				sectionLabel("CartTitle", 16, 12, "CART"),
+				...cartRowNodes,
+				hairline("CartHairline", 16, 240, SIDE_WIDTH - 32, 1),
+				textNode("CartTotalLabel", 16, 252, 120, 18, "Total", 10.5, color(COLOR_TEXT_FAINT)),
+				textNode("CartTotalValue", 176, 250, 148, 20, "$0.00", 13, color(COLOR_TEXT), "right"),
+				buttonNode("CartClearButton", 16, 284, 148, 30, "CLEAR", color(COLOR_CARD_RAISED), 8, 10.5),
+				buttonNode("CartCheckoutButton", 176, 284, 148, 30, "CHECKOUT", color(COLOR_ACCENT), 8, 10.5),
+			]),
+			panelNode("OrderPanel", SIDE_X, 608, SIDE_WIDTH, 368, [
+				sectionLabel("OrderTitle", 16, 12, "RECENT ORDERS"),
+				...orderRowNodes,
+				textNode("OrderEmptyCaption", 16, 32, SIDE_WIDTH - 32, 18, "No orders yet.", 10.5, color(COLOR_TEXT_FAINT)),
+			]),
 		],
 	});
 	writeDocument("shop.uiasset.json", rootNode);
@@ -324,42 +331,47 @@ function buildShop() {
 
 
 //==============================================================================
-// 설정 화면. (슬라이더 / 토글 / 진행바 / 초기화 + 정보 패널)
+// 설정 화면. (슬라이더 / 토글 / 드롭다운 / 게이지 / 초기화 + 정보 패널)
 //==============================================================================
 function buildSettings() {
 	const rowNodes = [];
 	const rowDefinitions = [
-		{ kind: "slider", name: "Music", caption: "70%", value: 0.7 },
-		{ kind: "slider", name: "Sound", caption: "85%", value: 0.85 },
-		{ kind: "toggle", name: "Vibration", on: true },
-		{ kind: "toggle", name: "Notifications", on: false },
-		{ kind: "progress", name: "Storage", caption: "3.2 GB / 8 GB", value: 0.4 },
+		{ kind: "slider", name: "Scale", title: "Interface scale", caption: "100%", value: 0.5 },
+		{ kind: "slider", name: "Sound", title: "Notification sound", caption: "60%", value: 0.6 },
+		{ kind: "toggle", name: "Autosave", title: "Autosave", on: true },
+		{ kind: "toggle", name: "Telemetry", title: "Usage telemetry", on: false },
+		{ kind: "slot", name: "Theme", title: "Theme" },
+		{ kind: "slot", name: "Region", title: "Region" },
+		{ kind: "progress", name: "Storage", title: "Storage", caption: "3.2 GB / 8 GB", value: 0.4 },
 	];
 	rowDefinitions.forEach((definition, index) => {
-		const rowY = 40 + index * 50;
-		rowNodes.push(makeNode("Row" + definition.name, 18, rowY, 720, 44, {
+		const rowY = 34 + index * 46;
+		rowNodes.push(makeNode("Row" + definition.name, 16, rowY, 768, 40, {
 			components: [paint(color(COLOR_CARD), 8)],
 			children: [
-				textNode(definition.name + "Label", 16, 0, 180, 44, definition.name, 13, color(COLOR_TEXT)),
+				textNode(definition.name + "Label", 16, 0, 220, 40, definition.title, 11.5, color(COLOR_TEXT)),
 			],
 		}));
 		const rowNode = rowNodes[rowNodes.length - 1];
 		if (definition.kind === "slider") {
-			rowNode.children.push(textNode(definition.name + "Caption", 200, 0, 60, 44, definition.caption, 11, color(COLOR_TEXT_DIM)));
-			rowNode.children.push(makeNode(definition.name + "Slider", 420, 10, 280, 24, {
+			rowNode.children.push(textNode(definition.name + "Caption", 240, 0, 60, 40, definition.caption, 10, color(COLOR_TEXT_DIM)));
+			rowNode.children.push(makeNode(definition.name + "Slider", 480, 9, 264, 22, {
 				interactable: true,
 				components: [slider(definition.value)],
 			}));
 		}
 		else if (definition.kind === "toggle") {
-			rowNode.children.push(makeNode(definition.name + "Toggle", 646, 9, 58, 26, {
+			rowNode.children.push(makeNode(definition.name + "Toggle", 696, 9, 52, 22, {
 				interactable: true,
-				components: [paint(color(definition.on ? COLOR_MINT : "#333d54"), 13), toggle(), label(definition.on ? "ON" : "OFF", 10, color(COLOR_INK))],
+				components: [paint(color(definition.on ? COLOR_ACCENT : "#2c3442"), 11), toggle(), label(definition.on ? "ON" : "OFF", 8.5, color(COLOR_INK))],
 			}));
 		}
+		else if (definition.kind === "slot") {
+			rowNode.children.push(makeNode(definition.name + "DropdownSlot", 568, 6, 176, 28, {}));
+		}
 		else {
-			rowNode.children.push(textNode(definition.name + "Caption", 200, 0, 130, 44, definition.caption, 11, color(COLOR_TEXT_DIM)));
-			rowNode.children.push(makeNode(definition.name + "Bar", 420, 17, 280, 10, { components: [progress(definition.value)] }));
+			rowNode.children.push(textNode(definition.name + "Caption", 240, 0, 140, 40, definition.caption, 10, color(COLOR_TEXT_DIM)));
+			rowNode.children.push(makeNode(definition.name + "Bar", 480, 16, 264, 8, { components: [progress(definition.value)] }));
 		}
 	});
 
@@ -371,30 +383,24 @@ function buildSettings() {
 	];
 	const aboutRowNodes = [];
 	aboutRows.forEach((row, index) => {
-		const rowY = 40 + index * 30;
-		aboutRowNodes.push(textNode("About" + row.name + "Label", 18, rowY, 110, 18, row.name, 11, color(COLOR_TEXT_FAINT)));
-		aboutRowNodes.push(textNode("About" + row.name + "Value", 128, rowY - 1, 220, 20, row.value, 12, color(COLOR_TEXT)));
+		const rowY = 34 + index * 26;
+		aboutRowNodes.push(textNode("About" + row.name + "Label", 16, rowY, 100, 16, row.name, 10, color(COLOR_TEXT_FAINT)));
+		aboutRowNodes.push(textNode("About" + row.name + "Value", 116, rowY - 1, 208, 18, row.value, 11, color(COLOR_TEXT)));
 	});
 
 	const rootNode = makeNode("Settings", 0, 0, DOCUMENT_WIDTH, DOCUMENT_HEIGHT, {
 		components: [paint(color(COLOR_BACKGROUND))],
 		children: [
 			...headerNodes("SETTINGS", "Changes apply immediately."),
-			makeNode("SettingsPanel", CONTENT_X, 114, 756, 360, {
-				components: [paint(color(COLOR_SURFACE), 12)],
-				children: [
-					sectionLabel("PanelTitle", 18, 14, "PREFERENCES"),
-					...rowNodes,
-					buttonNode("ResetButton", 18, 300, 720, 36, "RESET TO DEFAULTS", color(COLOR_CARD_RAISED), 8, 12),
-				],
-			}),
-			makeNode("AboutPanel", 1050, 114, 366, 180, {
-				components: [paint(color(COLOR_SURFACE), 12)],
-				children: [
-					sectionLabel("AboutTitle", 18, 14, "ABOUT"),
-					...aboutRowNodes,
-				],
-			}),
+			panelNode("SettingsPanel", CONTENT_X, 82, 800, 420, [
+				sectionLabel("PanelTitle", 16, 12, "PREFERENCES"),
+				...rowNodes,
+				buttonNode("ResetButton", 16, 366, 768, 32, "RESET TO DEFAULTS", color(COLOR_CARD_RAISED), 8, 11),
+			]),
+			panelNode("AboutPanel", SIDE_X, 82, SIDE_WIDTH, 160, [
+				sectionLabel("AboutTitle", 16, 12, "ABOUT"),
+				...aboutRowNodes,
+			]),
 		],
 	});
 	writeDocument("settings.uiasset.json", rootNode);
@@ -402,17 +408,86 @@ function buildSettings() {
 
 
 //==============================================================================
+// 컴포넌트 화면. (버튼 상태 / 컨텍스트 메뉴 / 드래그 / 진행 표시 / 타자기 / 피드백)
+//==============================================================================
+function buildComponents() {
+	const rootNode = makeNode("Components", 0, 0, DOCUMENT_WIDTH, DOCUMENT_HEIGHT, {
+		components: [paint(color(COLOR_BACKGROUND))],
+		children: [
+			...headerNodes("COMPONENTS", "Every widget below is rendered by the engine."),
+			panelNode("ButtonsPanel", CONTENT_X, 82, 430, 262, [
+				sectionLabel("ButtonsTitle", 16, 12, "BUTTONS"),
+				buttonNode("NormalButton", 16, 40, 190, 32, "DEFAULT", color(COLOR_ACCENT), 8, 11),
+				textNode("NormalCaption", 222, 40, 190, 32, "hover / press tint", 9.5, color(COLOR_TEXT_FAINT)),
+				buttonNode("DisabledButton", 16, 84, 190, 32, "DISABLED", color(COLOR_CARD_RAISED), 8, 11),
+				textNode("DisabledCaption", 222, 84, 190, 32, "setInteractable(false)", 9.5, color(COLOR_TEXT_FAINT)),
+				buttonNode("LongPressButton", 16, 128, 190, 32, "HOLD 1s", color(COLOR_CARD_RAISED), 8, 11),
+				textNode("LongPressCaption", 222, 128, 190, 32, "long press event", 9.5, color(COLOR_TEXT_FAINT)),
+				makeNode("LongPressBar", 16, 168, 190, 5, { components: [progress(0)] }),
+				textNode("ButtonsResult", 16, 196, 398, 40, "", 10.5, color(COLOR_TEXT_DIM)),
+			]),
+			panelNode("MenuPanel", 674, 82, 430, 262, [
+				sectionLabel("MenuTitle", 16, 12, "CONTEXT MENU"),
+				makeNode("RightClickZone", 16, 40, 398, 150, {
+					interactable: true,
+					components: [paint(color(COLOR_CARD), 8)],
+					children: [
+						textNode("RightClickHint", 0, 0, 398, 150, "Right click here\n(or long press)", 11, color(COLOR_TEXT_FAINT), "center"),
+					],
+				}),
+				textNode("MenuResult", 16, 204, 398, 32, "", 10.5, color(COLOR_TEXT_DIM)),
+			]),
+			panelNode("DragPanel", SIDE_X, 82, SIDE_WIDTH, 262, [
+				sectionLabel("DragTitle", 16, 12, "DRAG & DROP"),
+				makeNode("DragSlotA", 16, 150, 92, 66, { components: [paint(color(COLOR_CARD), 8)] }),
+				makeNode("DragSlotB", 124, 150, 92, 66, { components: [paint(color(COLOR_CARD), 8)] }),
+				makeNode("DragSlotC", 232, 150, 92, 66, { components: [paint(color(COLOR_CARD), 8)] }),
+				textNode("DragResult", 16, 228, SIDE_WIDTH - 32, 20, "Drag chips into slots.", 10, color(COLOR_TEXT_FAINT)),
+			]),
+			panelNode("ProgressPanel", CONTENT_X, 360, 430, 220, [
+				sectionLabel("ProgressTitle", 16, 12, "PROGRESS"),
+				textNode("SpinnerCaption", 16, 40, 120, 60, "UISpinner", 10, color(COLOR_TEXT_FAINT)),
+				textNode("ProgressCaption", 16, 124, 120, 20, "UIProgressView", 10, color(COLOR_TEXT_FAINT)),
+				makeNode("LoopProgressBar", 16, 152, 398, 7, { components: [progress(0)] }),
+				textNode("LoopProgressValue", 16, 172, 398, 18, "", 10, color(COLOR_TEXT_DIM)),
+			]),
+			panelNode("TypePanel", 674, 360, 430, 220, [
+				sectionLabel("TypeTitle", 16, 12, "TYPEWRITER"),
+				textNode("TypeBody", 16, 40, 398, 110, "", 11.5, color(COLOR_TEXT), "left", "top"),
+				buttonNode("TypeReplayButton", 16, 168, 120, 30, "REPLAY", color(COLOR_CARD_RAISED), 8, 10.5),
+			]),
+			panelNode("FeedbackPanel", SIDE_X, 360, SIDE_WIDTH, 220, [
+				sectionLabel("FeedbackTitle", 16, 12, "FEEDBACK"),
+				buttonNode("ToastButton", 16, 40, SIDE_WIDTH - 32, 32, "SHOW TOAST", color(COLOR_CARD_RAISED), 8, 11),
+				buttonNode("DialogButton", 16, 84, SIDE_WIDTH - 32, 32, "SHOW DIALOG", color(COLOR_CARD_RAISED), 8, 11),
+				buttonNode("QueueToastButton", 16, 128, SIDE_WIDTH - 32, 32, "QUEUE 3 TOASTS", color(COLOR_CARD_RAISED), 8, 11),
+				textNode("FeedbackCaption", 16, 172, SIDE_WIDTH - 32, 32, "Toast queueing / popup motion are\nengine widgets.", 9.5, color(COLOR_TEXT_FAINT), "left", "top"),
+			]),
+			panelNode("ChartsPanel", CONTENT_X, 596, 1240, 380, [
+				sectionLabel("ChartsTitle", 16, 12, "CHARTS"),
+				textNode("MiniLineCaption", 16, 36, 200, 16, "UILineChart", 10, color(COLOR_TEXT_FAINT)),
+				makeNode("MiniLineChart", 16, 58, 592, 290, {}),
+				textNode("MiniBarCaption", 632, 36, 200, 16, "UIBarChart", 10, color(COLOR_TEXT_FAINT)),
+				makeNode("MiniBarChart", 632, 58, 592, 290, {}),
+			]),
+		],
+	});
+	writeDocument("components.uiasset.json", rootNode);
+}
+
+
+//==============================================================================
 // 왼쪽 레일. (모든 화면 위에 항상 보인다)
 //==============================================================================
 function buildNavigation() {
-	const navigationDefinitions = ["HOME", "SHOP", "SETTINGS", "PROFILE"];
+	const navigationDefinitions = ["DASHBOARD", "STORE", "SETTINGS", "COMPONENTS"];
 	const navigationNodes = navigationDefinitions.map((title, index) => {
-		return makeNode("Nav" + title, 16, 128 + index * 48, RAIL_WIDTH - 32, 40, {
+		return makeNode("Nav" + title, 14, 108 + index * 42, RAIL_WIDTH - 28, 36, {
 			interactable: true,
-			components: [paint(COLOR_TRANSPARENT, 10), button(0.2)],
+			components: [paint(COLOR_TRANSPARENT, 9), button(0.15)],
 			children: [
-				makeNode("NavActive" + title, 0, 0, RAIL_WIDTH - 32, 40, { active: index === 0, components: [paint(color(COLOR_INDIGO), 10)] }),
-				textNode("NavLabel" + title, 0, 0, RAIL_WIDTH - 32, 40, title, 12, color(COLOR_TEXT), "center"),
+				makeNode("NavActive" + title, 0, 0, RAIL_WIDTH - 28, 36, { active: index === 0, components: [paint(color(COLOR_ACCENT), 9)] }),
+				textNode("NavLabel" + title, 0, 0, RAIL_WIDTH - 28, 36, title, 10.5, color(COLOR_TEXT), "center"),
 			],
 		});
 	});
@@ -420,11 +495,11 @@ function buildNavigation() {
 		components: [paint(color(COLOR_SURFACE))],
 		children: [
 			hairline("RailHairline", RAIL_WIDTH - 1, 0, 1, DOCUMENT_HEIGHT),
-			textNode("Brand", 24, 30, 168, 26, "VANILLA", 19, color(COLOR_TEXT)),
-			textNode("BrandCaption", 25, 58, 168, 16, "UI SHOWCASE", 10, color(COLOR_TEXT_FAINT)),
-			hairline("BrandHairline", 16, 104, RAIL_WIDTH - 32, 1),
+			textNode("Brand", 22, 26, 156, 22, "VANILLA", 16, color(COLOR_TEXT)),
+			textNode("BrandCaption", 23, 50, 156, 14, "CONSOLE", 9, color(COLOR_TEXT_FAINT)),
+			hairline("BrandHairline", 14, 86, RAIL_WIDTH - 28, 1),
 			...navigationNodes,
-			textNode("RailVersion", 24, DOCUMENT_HEIGHT - 40, 168, 16, "vanilla.js  ·  0.4.0", 10, color(COLOR_TEXT_FAINT)),
+			textNode("RailVersion", 22, DOCUMENT_HEIGHT - 36, 156, 14, "vanilla.js  ·  0.4.0", 9, color(COLOR_TEXT_FAINT)),
 		],
 	});
 	writeDocument("navigation.uiasset.json", rootNode);
@@ -439,17 +514,16 @@ function buildPopup() {
 		children: [
 			makeNode("Overlay", 0, 0, DOCUMENT_WIDTH, DOCUMENT_HEIGHT, {
 				interactable: true,
-				components: [paint(color("#04060b", 0.66)), button(0)],
+				components: [paint(color("#04060a", 0.62)), button(0)],
 			}),
-			makeNode("Dialog", DOCUMENT_WIDTH * 0.5, DOCUMENT_HEIGHT * 0.5 - 10, 400, 216, {
+			makeNode("Dialog", DOCUMENT_WIDTH * 0.5, DOCUMENT_HEIGHT * 0.5 - 10, 380, 196, {
 				pivot: [0.5, 0.5],
-				components: [paint(color(COLOR_CARD), 14)],
+				components: [paint(color(COLOR_CARD), 12)],
 				children: [
-					makeNode("DialogAccent", 0, 0, 400, 3, { components: [paint(color(COLOR_INDIGO), 1.5)] }),
-					textNode("DialogTitle", 24, 24, 352, 26, "Open this content?", 17, color(COLOR_TEXT)),
-					textNode("DialogMessage", 24, 60, 352, 56, "It will use 10 energy.", 13, color(COLOR_TEXT_DIM), "left", "top"),
-					buttonNode("CancelButton", 24, 148, 170, 44, "CANCEL", color(COLOR_CARD_RAISED), 10, 13),
-					buttonNode("ConfirmButton", 206, 148, 170, 44, "CONFIRM", color(COLOR_INDIGO), 10, 13),
+					textNode("DialogTitle", 22, 20, 336, 22, "", 15, color(COLOR_TEXT)),
+					textNode("DialogMessage", 22, 52, 336, 54, "", 11.5, color(COLOR_TEXT_DIM), "left", "top"),
+					buttonNode("CancelButton", 22, 134, 162, 40, "CANCEL", color(COLOR_CARD_RAISED), 9, 11.5),
+					buttonNode("ConfirmButton", 196, 134, 162, 40, "CONFIRM", color(COLOR_ACCENT), 9, 11.5),
 				],
 			}),
 		],
@@ -461,8 +535,9 @@ function buildPopup() {
 //==============================================================================
 // 실행.
 //==============================================================================
-buildHome();
-buildShop();
+buildDashboard();
+buildStore();
 buildSettings();
+buildComponents();
 buildNavigation();
 buildPopup();
