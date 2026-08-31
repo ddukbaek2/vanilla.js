@@ -728,7 +728,8 @@
 	engineConfiguration.canvasId = "mainCanvas";
 	engineConfiguration.autoResizeOnWindowResize = true;
 	const engine = new Engine(engineConfiguration);
-	engine.run(new EffectsScene());
+	const effectsScene = new EffectsScene();
+	engine.run(effectsScene);
 	System.effectsEngine = engine;
 
 	// 헤드리스 검증용 수동 스테퍼. (고정 16.67ms 프레임을 몰아서 돌린다)
@@ -743,6 +744,15 @@
 		catch (stepError) {
 			document.title = "STEP-ERROR";
 			return;
+		}
+		if (stepCount === 80 || stepCount === 150) {
+			try {
+				effectsScene.touchPress(Vector2.create(640, 380));
+				effectsScene.touchRelease(Vector2.create(640, 380));
+			}
+			catch (pressError) {
+				document.title = "PRESS-ERROR " + pressError.message;
+			}
 		}
 		if (stepCount < 200) {
 			setTimeout(stepFrame, 1);
