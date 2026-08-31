@@ -41,6 +41,7 @@
 - https://ddukbaek2.com/portfolio/neonhorizon
 - https://ddukbaek2.com/portfolio/ancientmountain
 - https://ddukbaek2.com/portfolio/uishowcase
+- https://ddukbaek2.com/portfolio/effects
 
 ### 게임
 - https://ddukbaek2.com/portfolio/talesofcultivation
