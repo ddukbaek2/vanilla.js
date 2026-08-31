@@ -478,4 +478,30 @@ export class UILabel extends UIView {
 			this.#richText.setTextBaseline(baseline);
 		}
 	}
+
+	//==============================================================================
+	// 가로 정렬 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getTextAlign() {
+		if (this.#text) {
+			return this.#text.getTextAlign();
+		}
+		return "center";
+	}
+
+	//==============================================================================
+	// 세로 정렬 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getTextBaseline() {
+		if (this.#text) {
+			return this.#text.getTextBaseline();
+		}
+		return "middle";
+	}
 }

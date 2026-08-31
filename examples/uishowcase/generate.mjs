@@ -85,8 +85,9 @@ function paint(fillColor, roundSize = 0) {
 	return { type: "Paint", color: fillColor, roundSize: roundSize };
 }
 
-function label(text, fontSize, textColor) {
-	return { type: "UILabel", text: text, fontSize: fontSize, textColor: textColor, backgroundColor: COLOR_TRANSPARENT };
+function label(text, fontSize, textColor, textAlign = "center", textBaseline = "middle") {
+	return { type: "UILabel", text: text, fontSize: fontSize, textColor: textColor, backgroundColor: COLOR_TRANSPARENT,
+		textAlign: textAlign, textBaseline: textBaseline };
 }
 
 function button(pressedAlpha = 0.3) {
@@ -120,8 +121,8 @@ function slider(value) {
 //==============================================================================
 // 자주 쓰는 조합.
 //==============================================================================
-function textNode(name, x, y, width, height, text, fontSize, textColor) {
-	return makeNode(name, x, y, width, height, { components: [label(text, fontSize, textColor)] });
+function textNode(name, x, y, width, height, text, fontSize, textColor, textAlign = "left", textBaseline = "middle") {
+	return makeNode(name, x, y, width, height, { components: [label(text, fontSize, textColor, textAlign, textBaseline)] });
 }
 
 function buttonNode(name, x, y, width, height, text, fillColor, roundSize, fontSize = 13, textColor = color(COLOR_TEXT)) {
@@ -134,7 +135,7 @@ function buttonNode(name, x, y, width, height, text, fillColor, roundSize, fontS
 function chipNode(name, x, y, width, text, textColor) {
 	return makeNode(name, x, y, width, 28, {
 		components: [paint(color(COLOR_CARD_RAISED), 14)],
-		children: [textNode(name + "Label", 0, 0, width, 28, text, 12, textColor)],
+		children: [textNode(name + "Label", 0, 0, width, 28, text, 12, textColor, "center")],
 	});
 }
 
@@ -177,11 +178,11 @@ function buildHome() {
 			makeNode("CardStripe", 0, 0, 3, 84, { components: [paint(color(COLOR_INDIGO), 1.5)] }),
 			makeNode("CardIcon", 16, 14, 56, 56, {
 				components: [paint(color(COLOR_INDIGO), 12)],
-				children: [textNode("CardGlyph", 0, 0, 56, 56, "S", 24, color(COLOR_INK))],
+				children: [textNode("CardGlyph", 0, 0, 56, 56, "S", 24, color(COLOR_INK), "center")],
 			}),
 			textNode("CardTitle", 88, 16, 360, 22, "Title", 15, color(COLOR_TEXT)),
 			textNode("CardSubtitle", 88, 44, 420, 18, "Subtitle", 12, color(COLOR_TEXT_DIM)),
-			textNode("CardMeta", 560, 16, 120, 18, "", 11, color(COLOR_TEXT_FAINT)),
+			textNode("CardMeta", 560, 16, 120, 18, "", 11, color(COLOR_TEXT_FAINT), "right"),
 			buttonNode("CardOpenButton", 692, 26, 84, 32, "OPEN", color(COLOR_CARD_RAISED), 8, 12),
 		],
 	});
@@ -196,7 +197,7 @@ function buildHome() {
 		const rowY = 44 + index * 58;
 		const rowLabel = row.label ? row.label : row.name;
 		dailyRowNodes.push(textNode("Daily" + row.name + "Label", 18, rowY, 140, 16, rowLabel, 12, color(COLOR_TEXT)));
-		dailyRowNodes.push(textNode("Daily" + row.name + "Caption", 158, rowY, 190, 16, row.caption, 11, color(COLOR_TEXT_DIM)));
+		dailyRowNodes.push(textNode("Daily" + row.name + "Caption", 158, rowY, 190, 16, row.caption, 11, color(COLOR_TEXT_DIM), "right"));
 		dailyRowNodes.push(makeNode("Daily" + row.name + "Bar", 18, rowY + 24, 330, 8, {
 			components: [progress(row.value)],
 		}));
@@ -229,17 +230,17 @@ function buildHome() {
 					textNode("ArenaWinLabel", 18, 108, 160, 16, "Win rate vs season", 11, color(COLOR_TEXT_FAINT)),
 					makeNode("ArenaVersusBar", 18, 130, 330, 10, { components: [progress(0.63)] }),
 					textNode("ArenaWinCaption", 18, 148, 120, 16, "W 63%", 11, color(COLOR_MINT)),
-					textNode("ArenaLossCaption", 268, 148, 80, 16, "L 37%", 11, color(COLOR_RED)),
+					textNode("ArenaLossCaption", 268, 148, 80, 16, "L 37%", 11, color(COLOR_RED), "right"),
 					hairline("SeasonHairline", 18, 178, 330, 1),
 					textNode("SeasonEndsLabel", 18, 190, 200, 16, "Season ends in", 11, color(COLOR_TEXT_FAINT)),
-					textNode("SeasonEndsValue", 218, 188, 130, 18, "12d 06:41", 12, color(COLOR_TEXT)),
+					textNode("SeasonEndsValue", 218, 188, 130, 18, "12d 06:41", 12, color(COLOR_TEXT), "right"),
 				],
 			}),
 			makeNode("TipPanel", 1050, 638, 366, 238, {
 				components: [paint(color(COLOR_SURFACE), 12)],
 				children: [
 					sectionLabel("TipTitle", 18, 14, "DIALOGUE"),
-					textNode("TipBody", 18, 38, 330, 150, "", 12, color(COLOR_TEXT_DIM)),
+					textNode("TipBody", 18, 38, 330, 150, "", 12, color(COLOR_TEXT_DIM), "left", "top"),
 					buttonNode("TipNextButton", 18, 190, 330, 32, "NEXT", color(COLOR_CARD_RAISED), 8, 12),
 				],
 			}),
@@ -305,7 +306,7 @@ function buildShop() {
 					...purchaseRowNodes,
 					hairline("PurchaseHairline", 18, 262, 330, 1),
 					textNode("PurchaseTotalLabel", 18, 276, 160, 18, "Total spent", 11, color(COLOR_TEXT_FAINT)),
-					textNode("PurchaseTotalValue", 178, 274, 170, 20, "◆ 0", 13, color(COLOR_AMBER)),
+					textNode("PurchaseTotalValue", 178, 274, 170, 20, "◆ 0", 13, color(COLOR_AMBER), "right"),
 				],
 			}),
 			makeNode("HintPanel", 1050, 608, 366, 268, {
@@ -313,7 +314,7 @@ function buildShop() {
 				children: [
 					sectionLabel("HintTitle", 18, 14, "HOW IT WORKS"),
 					textNode("HintBody", 18, 38, 330, 210,
-						"The item list holds one template node.\nRows are created only for the visible range\nand recycled while scrolling.\nReaching the end loads the next page.", 12, color(COLOR_TEXT_DIM)),
+						"The item list holds one template node.\nRows are created only for the visible range\nand recycled while scrolling.\nReaching the end loads the next page.", 12, color(COLOR_TEXT_DIM), "left", "top"),
 				],
 			}),
 		],
@@ -411,7 +412,7 @@ function buildNavigation() {
 			components: [paint(COLOR_TRANSPARENT, 10), button(0.2)],
 			children: [
 				makeNode("NavActive" + title, 0, 0, RAIL_WIDTH - 32, 40, { active: index === 0, components: [paint(color(COLOR_INDIGO), 10)] }),
-				textNode("NavLabel" + title, 0, 0, RAIL_WIDTH - 32, 40, title, 12, color(COLOR_TEXT)),
+				textNode("NavLabel" + title, 0, 0, RAIL_WIDTH - 32, 40, title, 12, color(COLOR_TEXT), "center"),
 			],
 		});
 	});
@@ -446,7 +447,7 @@ function buildPopup() {
 				children: [
 					makeNode("DialogAccent", 0, 0, 400, 3, { components: [paint(color(COLOR_INDIGO), 1.5)] }),
 					textNode("DialogTitle", 24, 24, 352, 26, "Open this content?", 17, color(COLOR_TEXT)),
-					textNode("DialogMessage", 24, 60, 352, 56, "It will use 10 energy.", 13, color(COLOR_TEXT_DIM)),
+					textNode("DialogMessage", 24, 60, 352, 56, "It will use 10 energy.", 13, color(COLOR_TEXT_DIM), "left", "top"),
 					buttonNode("CancelButton", 24, 148, 170, 44, "CANCEL", color(COLOR_CARD_RAISED), 10, 13),
 					buttonNode("ConfirmButton", 206, 148, 170, 44, "CONFIRM", color(COLOR_INDIGO), 10, 13),
 				],

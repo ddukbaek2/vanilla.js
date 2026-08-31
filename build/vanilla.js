@@ -19183,6 +19183,30 @@ var UILabel = class extends UIView {
       this.#richText.setTextBaseline(baseline);
     }
   }
+  //==============================================================================
+  // 가로 정렬 반환.
+  //==============================================================================
+  /**
+   * @returns { string }
+   */
+  getTextAlign() {
+    if (this.#text) {
+      return this.#text.getTextAlign();
+    }
+    return "center";
+  }
+  //==============================================================================
+  // 세로 정렬 반환.
+  //==============================================================================
+  /**
+   * @returns { string }
+   */
+  getTextBaseline() {
+    if (this.#text) {
+      return this.#text.getTextBaseline();
+    }
+    return "middle";
+  }
 };
 
 // src/ui/uicontrol.js
@@ -21733,7 +21757,9 @@ var COMPONENT_PROPERTY_TABLE = {
         text: component.getText(),
         fontSize: component.getFontSize(),
         textColor: colorToArray(component.getTextColor()),
-        backgroundColor: colorToArray(component.getBackgroundColor())
+        backgroundColor: colorToArray(component.getBackgroundColor()),
+        textAlign: component.getTextAlign(),
+        textBaseline: component.getTextBaseline()
       };
     },
     load(component, data) {
@@ -21748,6 +21774,12 @@ var COMPONENT_PROPERTY_TABLE = {
       }
       if (data.backgroundColor) {
         component.setBackgroundColor(arrayToColor(data.backgroundColor));
+      }
+      if (data.textAlign !== void 0) {
+        component.setTextAlign(data.textAlign);
+      }
+      if (data.textBaseline !== void 0) {
+        component.setTextBaseline(data.textBaseline);
       }
     }
   },

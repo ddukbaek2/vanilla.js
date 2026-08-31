@@ -266,6 +266,8 @@ const COMPONENT_PROPERTY_TABLE = {
 				fontSize: component.getFontSize(),
 				textColor: colorToArray(component.getTextColor()),
 				backgroundColor: colorToArray(component.getBackgroundColor()),
+				textAlign: component.getTextAlign(),
+				textBaseline: component.getTextBaseline(),
 			};
 		},
 		load(component, data) {
@@ -280,6 +282,12 @@ const COMPONENT_PROPERTY_TABLE = {
 			}
 			if (data.backgroundColor) {
 				component.setBackgroundColor(arrayToColor(data.backgroundColor));
+			}
+			if (data.textAlign !== undefined) {
+				component.setTextAlign(data.textAlign);
+			}
+			if (data.textBaseline !== undefined) {
+				component.setTextBaseline(data.textBaseline);
 			}
 		},
 	},

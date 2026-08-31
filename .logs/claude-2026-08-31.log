@@ -18,3 +18,4 @@
 - 편집기: 리플렉션 인스펙터가 새 get/set 프로퍼티를 자동 노출하므로 코드 수정 불요, 헤드리스 로드 확인.
 - 네온호라이즌: SDF 함선 제거 → Quaternius Executioner(CC0, OpenGameArt 팩) OBJ 를 자체 변환기로 GLB화(뼈 1개 트리비얼 스킨), 같은 컨텍스트에서 SkinnedModelRenderer 로 4척 렌더. 이슈 2건 해결 — 무애니메이션 모델의 관절 행렬 미계산(엔진 수정), 후처리 텍스처 피드백 루프로 인한 INVALID_OPERATION(유닛1 언바인드). 스크린샷으로 구도 / 역광 / 안개 확인.
 - 미배포: dev 병합 / 사이트 배포는 요청 대기.
+- 후속: 라벨 정렬이 문서에서 복원되지 않는 문제 발견 — UILabel 정렬 게터 추가 + UIDocument UILabel 핸들러에 textAlign/textBaseline 저장/복원 보강, generate.mjs 에 정렬 지정(제목 좌측/캡션 우측). 스크린샷 확인, 스모크 16/16 재통과.

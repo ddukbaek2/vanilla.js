@@ -124,7 +124,9 @@
 							1,
 							1,
 							0
-						]
+						],
+						"textAlign": "left",
+						"textBaseline": "middle"
 					}
 				],
 				"children": []
@@ -172,7 +174,9 @@
 							1,
 							1,
 							0
-						]
+						],
+						"textAlign": "left",
+						"textBaseline": "middle"
 					}
 				],
 				"children": []
@@ -351,7 +355,9 @@
 									1,
 									1,
 									0
-								]
+								],
+								"textAlign": "center",
+								"textBaseline": "middle"
 							}
 						],
 						"children": []
@@ -491,7 +497,9 @@
 									1,
 									1,
 									0
-								]
+								],
+								"textAlign": "center",
+								"textBaseline": "middle"
 							}
 						],
 						"children": []
@@ -631,7 +639,9 @@
 									1,
 									1,
 									0
-								]
+								],
+								"textAlign": "center",
+								"textBaseline": "middle"
 							}
 						],
 						"children": []
@@ -771,7 +781,9 @@
 									1,
 									1,
 									0
-								]
+								],
+								"textAlign": "center",
+								"textBaseline": "middle"
 							}
 						],
 						"children": []
@@ -821,7 +833,9 @@
 							1,
 							1,
 							0
-						]
+						],
+						"textAlign": "left",
+						"textBaseline": "middle"
 					}
 				],
 				"children": []
