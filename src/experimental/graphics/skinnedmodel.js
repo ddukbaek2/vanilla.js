@@ -860,16 +860,16 @@ export class SkinnedModel extends Object {
 	 * @param { number } deltaTime
 	 */
 	update(deltaTime) {
+		// 애니메이션이 없어도 기본 포즈로 월드/조인트 행렬은 계산한다. (정적 모델 지원)
 		const currentAnimation = this.#currentAnimation;
-		if (!currentAnimation) {
-			return;
-		}
-		this.#currentTime += deltaTime * this.#timeScale;
-		if (this.#previousAnimation) {
-			this.#previousTime += deltaTime * this.#timeScale;
-			this.#fadeElapsed += deltaTime;
-			if (this.#fadeElapsed >= this.#fadeDuration) {
-				this.#previousAnimation = null;
+		if (currentAnimation) {
+			this.#currentTime += deltaTime * this.#timeScale;
+			if (this.#previousAnimation) {
+				this.#previousTime += deltaTime * this.#timeScale;
+				this.#fadeElapsed += deltaTime;
+				if (this.#fadeElapsed >= this.#fadeDuration) {
+					this.#previousAnimation = null;
+				}
 			}
 		}
 
@@ -886,13 +886,15 @@ export class SkinnedModel extends Object {
 		}
 
 		// 2. 이전/현재 클립 샘플링. (크로스페이드)
-		if (this.#previousAnimation) {
-			this.sampleAnimation(this.#previousAnimation, this.#previousTime, 1);
-			const blendWeight = System.Math.min(this.#fadeElapsed / System.Math.max(this.#fadeDuration, 0.0001), 1);
-			this.sampleAnimation(currentAnimation, this.#currentTime, blendWeight);
-		}
-		else {
-			this.sampleAnimation(currentAnimation, this.#currentTime, 1);
+		if (currentAnimation) {
+			if (this.#previousAnimation) {
+				this.sampleAnimation(this.#previousAnimation, this.#previousTime, 1);
+				const blendWeight = System.Math.min(this.#fadeElapsed / System.Math.max(this.#fadeDuration, 0.0001), 1);
+				this.sampleAnimation(currentAnimation, this.#currentTime, blendWeight);
+			}
+			else {
+				this.sampleAnimation(currentAnimation, this.#currentTime, 1);
+			}
 		}
 
 		// 3. 조인트 회전 오프셋. (절차 포즈 가공)

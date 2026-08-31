@@ -6,7 +6,7 @@
 		"active": true,
 		"position": [
 			0,
-			576
+			0
 		],
 		"scale": [
 			1,
@@ -23,17 +23,17 @@
 			0
 		],
 		"contentSize": [
-			960,
-			64
+			216,
+			900
 		],
 		"interactable": false,
 		"components": [
 			{
 				"type": "Paint",
 				"color": [
+					0.063,
 					0.078,
-					0.102,
-					0.165,
+					0.122,
 					1
 				],
 				"roundSize": 0
@@ -42,10 +42,10 @@
 		"children": [
 			{
 				"type": "WorldNode",
-				"name": "NavigationLine",
+				"name": "RailHairline",
 				"active": true,
 				"position": [
-					0,
+					215,
 					0
 				],
 				"scale": [
@@ -63,7 +63,144 @@
 					0
 				],
 				"contentSize": [
-					960,
+					1,
+					900
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.137,
+							0.169,
+							0.239,
+							1
+						],
+						"roundSize": 0
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "Brand",
+				"active": true,
+				"position": [
+					24,
+					30
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					168,
+					26
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "UILabel",
+						"text": "VANILLA",
+						"fontSize": 19,
+						"textColor": [
+							0.91,
+							0.925,
+							0.957,
+							1
+						],
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						]
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "BrandCaption",
+				"active": true,
+				"position": [
+					25,
+					58
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					168,
+					16
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "UILabel",
+						"text": "UI SHOWCASE",
+						"fontSize": 10,
+						"textColor": [
+							0.29,
+							0.329,
+							0.408,
+							1
+						],
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						]
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "BrandHairline",
+				"active": true,
+				"position": [
+					16,
+					104
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					184,
 					1
 				],
 				"interactable": false,
@@ -71,9 +208,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.165,
-							0.204,
-							0.314,
+							0.137,
+							0.169,
+							0.239,
 							1
 						],
 						"roundSize": 0
@@ -86,8 +223,8 @@
 				"name": "NavHOME",
 				"active": true,
 				"position": [
-					35,
-					12
+					16,
+					128
 				],
 				"scale": [
 					1,
@@ -104,7 +241,7 @@
 					0
 				],
 				"contentSize": [
-					200,
+					184,
 					40
 				],
 				"interactable": true,
@@ -112,12 +249,12 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.106,
-							0.133,
-							0.2,
-							1
+							1,
+							1,
+							1,
+							0
 						],
-						"roundSize": 12
+						"roundSize": 10
 					},
 					{
 						"type": "UIButton",
@@ -125,7 +262,7 @@
 							0,
 							0,
 							0,
-							0.28
+							0.2
 						]
 					}
 				],
@@ -153,7 +290,7 @@
 							0
 						],
 						"contentSize": [
-							200,
+							184,
 							40
 						],
 						"interactable": false,
@@ -161,12 +298,12 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.357,
 									0.424,
+									0.482,
 									1,
 									1
 								],
-								"roundSize": 12
+								"roundSize": 10
 							}
 						],
 						"children": []
@@ -194,7 +331,7 @@
 							0
 						],
 						"contentSize": [
-							200,
+							184,
 							40
 						],
 						"interactable": false,
@@ -202,11 +339,11 @@
 							{
 								"type": "UILabel",
 								"text": "HOME",
-								"fontSize": 14,
+								"fontSize": 12,
 								"textColor": [
-									0.949,
-									0.961,
-									0.98,
+									0.91,
+									0.925,
+									0.957,
 									1
 								],
 								"backgroundColor": [
@@ -226,8 +363,8 @@
 				"name": "NavSHOP",
 				"active": true,
 				"position": [
-					265,
-					12
+					16,
+					176
 				],
 				"scale": [
 					1,
@@ -244,7 +381,7 @@
 					0
 				],
 				"contentSize": [
-					200,
+					184,
 					40
 				],
 				"interactable": true,
@@ -252,12 +389,12 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.106,
-							0.133,
-							0.2,
-							1
+							1,
+							1,
+							1,
+							0
 						],
-						"roundSize": 12
+						"roundSize": 10
 					},
 					{
 						"type": "UIButton",
@@ -265,7 +402,7 @@
 							0,
 							0,
 							0,
-							0.28
+							0.2
 						]
 					}
 				],
@@ -293,7 +430,7 @@
 							0
 						],
 						"contentSize": [
-							200,
+							184,
 							40
 						],
 						"interactable": false,
@@ -301,12 +438,12 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.357,
 									0.424,
+									0.482,
 									1,
 									1
 								],
-								"roundSize": 12
+								"roundSize": 10
 							}
 						],
 						"children": []
@@ -334,7 +471,7 @@
 							0
 						],
 						"contentSize": [
-							200,
+							184,
 							40
 						],
 						"interactable": false,
@@ -342,11 +479,11 @@
 							{
 								"type": "UILabel",
 								"text": "SHOP",
-								"fontSize": 14,
+								"fontSize": 12,
 								"textColor": [
-									0.949,
-									0.961,
-									0.98,
+									0.91,
+									0.925,
+									0.957,
 									1
 								],
 								"backgroundColor": [
@@ -366,8 +503,8 @@
 				"name": "NavSETTINGS",
 				"active": true,
 				"position": [
-					495,
-					12
+					16,
+					224
 				],
 				"scale": [
 					1,
@@ -384,7 +521,7 @@
 					0
 				],
 				"contentSize": [
-					200,
+					184,
 					40
 				],
 				"interactable": true,
@@ -392,12 +529,12 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.106,
-							0.133,
-							0.2,
-							1
+							1,
+							1,
+							1,
+							0
 						],
-						"roundSize": 12
+						"roundSize": 10
 					},
 					{
 						"type": "UIButton",
@@ -405,7 +542,7 @@
 							0,
 							0,
 							0,
-							0.28
+							0.2
 						]
 					}
 				],
@@ -433,7 +570,7 @@
 							0
 						],
 						"contentSize": [
-							200,
+							184,
 							40
 						],
 						"interactable": false,
@@ -441,12 +578,12 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.357,
 									0.424,
+									0.482,
 									1,
 									1
 								],
-								"roundSize": 12
+								"roundSize": 10
 							}
 						],
 						"children": []
@@ -474,7 +611,7 @@
 							0
 						],
 						"contentSize": [
-							200,
+							184,
 							40
 						],
 						"interactable": false,
@@ -482,11 +619,11 @@
 							{
 								"type": "UILabel",
 								"text": "SETTINGS",
-								"fontSize": 14,
+								"fontSize": 12,
 								"textColor": [
-									0.949,
-									0.961,
-									0.98,
+									0.91,
+									0.925,
+									0.957,
 									1
 								],
 								"backgroundColor": [
@@ -506,8 +643,8 @@
 				"name": "NavPROFILE",
 				"active": true,
 				"position": [
-					725,
-					12
+					16,
+					272
 				],
 				"scale": [
 					1,
@@ -524,7 +661,7 @@
 					0
 				],
 				"contentSize": [
-					200,
+					184,
 					40
 				],
 				"interactable": true,
@@ -532,12 +669,12 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.106,
-							0.133,
-							0.2,
-							1
+							1,
+							1,
+							1,
+							0
 						],
-						"roundSize": 12
+						"roundSize": 10
 					},
 					{
 						"type": "UIButton",
@@ -545,7 +682,7 @@
 							0,
 							0,
 							0,
-							0.28
+							0.2
 						]
 					}
 				],
@@ -573,7 +710,7 @@
 							0
 						],
 						"contentSize": [
-							200,
+							184,
 							40
 						],
 						"interactable": false,
@@ -581,12 +718,12 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.357,
 									0.424,
+									0.482,
 									1,
 									1
 								],
-								"roundSize": 12
+								"roundSize": 10
 							}
 						],
 						"children": []
@@ -614,7 +751,7 @@
 							0
 						],
 						"contentSize": [
-							200,
+							184,
 							40
 						],
 						"interactable": false,
@@ -622,11 +759,11 @@
 							{
 								"type": "UILabel",
 								"text": "PROFILE",
-								"fontSize": 14,
+								"fontSize": 12,
 								"textColor": [
-									0.949,
-									0.961,
-									0.98,
+									0.91,
+									0.925,
+									0.957,
 									1
 								],
 								"backgroundColor": [
@@ -640,6 +777,54 @@
 						"children": []
 					}
 				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "RailVersion",
+				"active": true,
+				"position": [
+					24,
+					860
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					168,
+					16
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "UILabel",
+						"text": "vanilla.js  ·  0.4.0",
+						"fontSize": 10,
+						"textColor": [
+							0.29,
+							0.329,
+							0.408,
+							1
+						],
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						]
+					}
+				],
+				"children": []
 			}
 		]
 	}

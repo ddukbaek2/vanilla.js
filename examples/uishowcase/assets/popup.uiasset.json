@@ -23,8 +23,8 @@
 			0
 		],
 		"contentSize": [
-			960,
-			640
+			1440,
+			900
 		],
 		"interactable": false,
 		"components": [],
@@ -52,18 +52,18 @@
 					0
 				],
 				"contentSize": [
-					960,
-					640
+					1440,
+					900
 				],
 				"interactable": true,
 				"components": [
 					{
 						"type": "Paint",
 						"color": [
-							0.02,
-							0.027,
-							0.047,
-							0.62
+							0.016,
+							0.024,
+							0.043,
+							0.66
 						],
 						"roundSize": 0
 					},
@@ -84,8 +84,8 @@
 				"name": "Dialog",
 				"active": true,
 				"position": [
-					480,
-					310
+					720,
+					440
 				],
 				"scale": [
 					1,
@@ -102,20 +102,20 @@
 					0
 				],
 				"contentSize": [
-					420,
-					250
+					400,
+					216
 				],
 				"interactable": false,
 				"components": [
 					{
 						"type": "Paint",
 						"color": [
+							0.086,
 							0.106,
-							0.133,
-							0.2,
+							0.161,
 							1
 						],
-						"roundSize": 20
+						"roundSize": 14
 					}
 				],
 				"children": [
@@ -142,20 +142,20 @@
 							0
 						],
 						"contentSize": [
-							420,
-							6
+							400,
+							3
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "Paint",
 								"color": [
-									0.357,
 									0.424,
+									0.482,
 									1,
 									1
 								],
-								"roundSize": 3
+								"roundSize": 1.5
 							}
 						],
 						"children": []
@@ -165,8 +165,8 @@
 						"name": "DialogTitle",
 						"active": true,
 						"position": [
-							28,
-							30
+							24,
+							24
 						],
 						"scale": [
 							1,
@@ -183,19 +183,19 @@
 							0
 						],
 						"contentSize": [
-							364,
-							32
+							352,
+							26
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
 								"text": "Open this content?",
-								"fontSize": 22,
+								"fontSize": 17,
 								"textColor": [
-									0.949,
-									0.961,
-									0.98,
+									0.91,
+									0.925,
+									0.957,
 									1
 								],
 								"backgroundColor": [
@@ -213,8 +213,8 @@
 						"name": "DialogMessage",
 						"active": true,
 						"position": [
-							28,
-							74
+							24,
+							60
 						],
 						"scale": [
 							1,
@@ -231,19 +231,19 @@
 							0
 						],
 						"contentSize": [
-							364,
-							60
+							352,
+							56
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
 								"text": "It will use 10 energy.",
-								"fontSize": 15,
+								"fontSize": 13,
 								"textColor": [
-									0.541,
-									0.58,
-									0.659,
+									0.486,
+									0.522,
+									0.596,
 									1
 								],
 								"backgroundColor": [
@@ -261,8 +261,8 @@
 						"name": "CancelButton",
 						"active": true,
 						"position": [
-							28,
-							168
+							24,
+							148
 						],
 						"scale": [
 							1,
@@ -279,20 +279,20 @@
 							0
 						],
 						"contentSize": [
-							174,
-							52
+							170,
+							44
 						],
 						"interactable": true,
 						"components": [
 							{
 								"type": "Paint",
 								"color": [
-									0.137,
-									0.173,
-									0.259,
+									0.114,
+									0.141,
+									0.212,
 									1
 								],
-								"roundSize": 14
+								"roundSize": 10
 							},
 							{
 								"type": "UIButton",
@@ -300,17 +300,17 @@
 									0,
 									0,
 									0,
-									0.28
+									0.3
 								]
 							},
 							{
 								"type": "UILabel",
 								"text": "CANCEL",
-								"fontSize": 15,
+								"fontSize": 13,
 								"textColor": [
-									0.949,
-									0.961,
-									0.98,
+									0.91,
+									0.925,
+									0.957,
 									1
 								],
 								"backgroundColor": [
@@ -328,8 +328,8 @@
 						"name": "ConfirmButton",
 						"active": true,
 						"position": [
-							218,
-							168
+							206,
+							148
 						],
 						"scale": [
 							1,
@@ -346,20 +346,20 @@
 							0
 						],
 						"contentSize": [
-							174,
-							52
+							170,
+							44
 						],
 						"interactable": true,
 						"components": [
 							{
 								"type": "Paint",
 								"color": [
-									0.357,
 									0.424,
+									0.482,
 									1,
 									1
 								],
-								"roundSize": 14
+								"roundSize": 10
 							},
 							{
 								"type": "UIButton",
@@ -367,17 +367,17 @@
 									0,
 									0,
 									0,
-									0.28
+									0.3
 								]
 							},
 							{
 								"type": "UILabel",
 								"text": "CONFIRM",
-								"fontSize": 15,
+								"fontSize": 13,
 								"textColor": [
-									0.949,
-									0.961,
-									0.98,
+									0.91,
+									0.925,
+									0.957,
 									1
 								],
 								"backgroundColor": [

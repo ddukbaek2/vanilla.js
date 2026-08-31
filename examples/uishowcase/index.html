@@ -12,7 +12,7 @@
 		width: 100%;
 		height: 100%;
 		overflow: hidden;
-		background: #0f1320;
+		background: #0b0e17;
 		touch-action: none;
 		user-select: none;
 	}
@@ -64,36 +64,122 @@
 	const UIToggleButton = engineModule.UIToggleButton;
 	const UISlider = engineModule.UISlider;
 	const UIProgressView = engineModule.UIProgressView;
+	const UIListView = engineModule.UIListView;
 	const UIDocument = engineModule.UIDocument;
 	const TouchRecognizer = engineModule.TouchRecognizer;
 	const ViewScaleMode = engineModule.ViewScaleMode;
+	const PopupMotion = engineModule.PopupMotion;
+	const UIToast = engineModule.UIToast;
+	const Typewriter = engineModule.Typewriter;
+	const FloatingText = engineModule.FloatingText;
+	const BeepPlayer = engineModule.BeepPlayer;
+	const Format = engineModule.Format;
+	const SeededRandom = engineModule.SeededRandom;
+	const DialogueRunner = engineModule.DialogueRunner;
+	const DialogueScriptParser = engineModule.DialogueScriptParser;
 
 	//==============================================================================
 	// 전역 상수 목록.
 	//==============================================================================
-	const ASSET_FILE_NAMES = ["home", "shop", "settings", "navigation", "popup", "toast"];
+	const ASSET_FILE_NAMES = ["home", "shop", "settings", "navigation", "popup"];
 	const SHOWCASE_FONT_SOURCE = "local(\"SF Pro Display\"), local(\"SF Pro Text\"), local(\"Segoe UI Variable Display\"),"
 		+ " local(\"Segoe UI Variable\"), local(\"Inter\"), local(\"Segoe UI\"), local(\"Apple SD Gothic Neo\"), local(\"Malgun Gothic\")";
-	const BOLD_LABEL_NAME_PREFIXES = ["Title", "CardTitle", "FeaturedTitle", "ItemTitle", "IconGlyph", "DialogTitle",
-		"OpenButton", "ClaimButton", "BuyButton", "FeaturedBuy", "ResetButton", "CancelButton", "ConfirmButton",
-		"NavLabel", "CoinChipLabel", "GemChipLabel", "ToastLabel"];
+	const BOLD_LABEL_NAME_PREFIXES = ["Title", "Brand", "CardTitle", "FeaturedTitle", "ItemTitle", "CardGlyph", "DialogTitle",
+		"CardOpenButton", "ClaimButton", "ItemBuyButton", "FeaturedBuy", "ResetButton", "CancelButton", "ConfirmButton", "TipNextButton",
+		"NavLabel", "CoinChipLabel", "GemChipLabel", "ArenaRating", "PurchaseTotalValue"];
 	const SCREEN_NAMES = ["home", "shop", "settings"];
-	const TOAST_REST_Y = 548;
+	const TOAST_REST_Y = 840;
 	const TOAST_HOLD_SECONDS = 1.8;
-	const BAR_TRACK_COLOR = new Color(0.16, 0.2, 0.29, 1);
-	const BAR_COLORS = {
-		Energy: new Color(0.239, 0.863, 0.518, 1),
-		Quest: new Color(0.2, 0.82, 1, 1),
-		SeasonPass: new Color(1, 0.702, 0.278, 1),
-		Storage: new Color(0.357, 0.424, 1, 1),
+	const COIN_CHIP_CENTER = Vector2.create(1241, 42);
+	const SHOP_ITEM_TOTAL_COUNT = 500;
+	const SHOP_ITEM_INITIAL_COUNT = 40;
+	const SHOP_ITEM_PAGE_COUNT = 30;
+	const SHOP_LOAD_SECONDS = 0.6;
+	const BAR_TRACK_COLOR = new Color(0.137, 0.169, 0.239, 1);
+	const ACCENT_COLORS = {
+		indigo: new Color(0.424, 0.482, 1, 1),
+		cyan: new Color(0.22, 0.839, 1, 1),
+		mint: new Color(0.263, 0.867, 0.561, 1),
+		amber: new Color(0.941, 0.702, 0.361, 1),
+		red: new Color(0.937, 0.325, 0.314, 1),
 	};
+	const ACCENT_CYCLE = [ACCENT_COLORS.indigo, ACCENT_COLORS.cyan, ACCENT_COLORS.mint, ACCENT_COLORS.amber];
+	const INK_COLOR = new Color(0.043, 0.055, 0.09, 1);
+	const TEXT_DIM_COLOR = new Color(0.486, 0.522, 0.596, 1);
+	const TEXT_COLOR = new Color(0.91, 0.925, 0.957, 1);
+
+	//==============================================================================
+	// 데이터 생성. (전부 코드 소관 — 문서에는 템플릿만 있다)
+	//==============================================================================
+	const dataRandom = new SeededRandom(20260831);
+
+	const HOME_CARDS = (() => {
+		const placeNames = ["Sunrise Valley", "Neon Arena", "Crystal Mine", "Sky Garden", "Iron Legion", "Deep Abyss",
+			"Ember Peak", "Frost Hollow", "Star Harbor", "Verdant Maze", "Silent Reef", "Thunder Steppe"];
+		const modeNames = ["Adventure", "PvP", "Idle", "Puzzle", "Strategy", "Roguelike"];
+		const metaTexts = ["12 stages", "Season 4", "x2 boost", "48 levels", "Co-op raid", "Hard mode", "New", "Weekly"];
+		const cardList = [];
+		for (let cardIndex = 0; cardIndex < 44; ++cardIndex) {
+			const placeName = placeNames[cardIndex % placeNames.length];
+			const modeName = dataRandom.pick(modeNames);
+			const cardTitle = (cardIndex < placeNames.length) ? placeName : (placeName + " " + (System.Math.floor(cardIndex / placeNames.length) + 1));
+			cardList.push({
+				title: cardTitle,
+				subtitle: modeName + "  ·  " + dataRandom.pick(metaTexts),
+				meta: "#" + (cardIndex + 1),
+				accent: ACCENT_CYCLE[cardIndex % ACCENT_CYCLE.length],
+				glyph: cardTitle.substring(0, 1),
+			});
+		}
+		return cardList;
+	})();
+
+	const FEATURED_PACKS = (() => {
+		const packNames = ["Starter Pack", "Weekend Boost", "Gem Bundle", "Legend Skin", "Energy Refill", "Season Ticket",
+			"Mythic Chest", "Daily Deal", "Founder Pack", "Arena Pass", "Pet Bundle", "Craft Kit", "Rune Box", "VIP Trial", "Relic Cache", "Star Chart"];
+		return packNames.map((packName, packIndex) => {
+			const price = 60 + dataRandom.nextInt(2, 12) * 40;
+			return {
+				title: packName,
+				caption: "Limited  ·  " + dataRandom.nextInt(1, 6) + "d " + dataRandom.nextInt(0, 23) + "h left",
+				price: price,
+				accent: ACCENT_CYCLE[packIndex % ACCENT_CYCLE.length],
+			};
+		});
+	})();
+
+	const SHOP_ITEMS = (() => {
+		const prefixNames = ["Iron", "Silver", "Golden", "Mystic", "Ancient", "Swift", "Grim", "Lucky", "Frozen", "Blazing"];
+		const itemNames = ["Sword", "Shield", "Potion", "Crystal", "Charm", "Boots", "Helm", "Ring", "Scroll", "Lantern"];
+		const captionTexts = ["+12 defense", "+8% speed", "Restores 50 HP", "Restores 30 MP", "+10% drop rate", "Random reward",
+			"+5 attack", "Night vision", "Fire resistance", "Unbreakable"];
+		const itemList = [];
+		for (let itemIndex = 0; itemIndex < SHOP_ITEM_TOTAL_COUNT; ++itemIndex) {
+			const itemTitle = prefixNames[dataRandom.nextInt(0, prefixNames.length - 1)] + " " + itemNames[itemIndex % itemNames.length];
+			itemList.push({
+				title: itemTitle,
+				caption: captionTexts[dataRandom.nextInt(0, captionTexts.length - 1)] + "  ·  Tier " + dataRandom.nextInt(1, 5),
+				price: 40 + dataRandom.nextInt(1, 24) * 40,
+				accent: ACCENT_CYCLE[itemIndex % ACCENT_CYCLE.length],
+			});
+		}
+		return itemList;
+	})();
+
+	const DIALOGUE_SCRIPT_TEXT = [
+		"/label intro",
+		"/speaker Guide",
+		"/say Welcome back, commander.",
+		"/say Every list on this screen is built from data at runtime.",
+		"/say Rows are recycled while you scroll - even at 500 items.",
+		"/say This text is revealed by the engine Typewriter.",
+		"/jump intro",
+	].join("\n");
 
 	//==============================================================================
 	// UI 쇼케이스 씬.
-	// - UIEditor 형식의 uiasset 여섯 벌을 읽어 화면을 조립한다.
-	//   home / shop / settings 는 서로 바꿔 보이는 화면, navigation 은 항상 보이는 아래 막대,
-	//   popup 과 toast 는 필요할 때 위에 띄운다.
-	// - 문서에는 배치만 있고 동작은 이름으로 노드를 찾아 여기에서 붙인다.
+	// - uiasset 문서 다섯 벌(레이아웃 + 목록 템플릿)을 읽고,
+	//   목록 항목 / 문구 / 동작은 전부 코드가 데이터로 채운다.
 	//==============================================================================
 	class ShowcaseScene extends Scene {
 		//==============================================================================
@@ -103,15 +189,24 @@
 		/** @private @type { System.Map } */ #screenRootMap;
 		/** @private @type { WorldNode | null } */ #navigationRootNode;
 		/** @private @type { WorldNode | null } */ #popupRootNode;
-		/** @private @type { WorldNode | null } */ #toastRootNode;
+		/** @private @type { WorldNode | null } */ #popupDialogNode;
+		/** @private @type { PopupMotion | null } */ #popupMotion;
+		/** @private @type { Typewriter | null } */ #typewriter;
+		/** @private @type { UIToast | null } */ #toast;
+		/** @private @type { FloatingText | null } */ #floatingText;
+		/** @private @type { BeepPlayer | null } */ #beepPlayer;
 		/** @private @type { string } */ #activeScreenName;
 		/** @private @type { number } */ #coinCount;
 		/** @private @type { Function | null } */ #popupConfirmHandler;
-		/** @private @type { string[] } */ #toastQueue;
-		/** @private @type { number } */ #toastRemainSeconds;
-		/** @private @type { boolean } */ #isToastShowing;
 		/** @private @type { number } */ #elapsedSeconds;
 		/** @private @type { FontFace | null } */ #fontFace;
+		/** @private @type { UIListView | null } */ #itemListView;
+		/** @private @type { number } */ #shopLoadedCount;
+		/** @private @type { number } */ #shopLoadRemainSeconds;
+		/** @private @type { object[] } */ #purchaseList;
+		/** @private @type { number } */ #purchaseTotal;
+		/** @private @type { DialogueRunner | null } */ #dialogueRunner;
+		/** @private @type { Typewriter | null } */ #dialogueTypewriter;
 
 		//==============================================================================
 		// 생성.
@@ -120,19 +215,27 @@
 			super();
 
 			this.#fontFace = null;
-
 			this.#touchRecognizer = null;
 			this.#screenRootMap = new System.Map();
 			this.#navigationRootNode = null;
 			this.#popupRootNode = null;
-			this.#toastRootNode = null;
+			this.#popupDialogNode = null;
+			this.#popupMotion = null;
+			this.#typewriter = null;
+			this.#toast = null;
+			this.#floatingText = null;
+			this.#beepPlayer = null;
 			this.#activeScreenName = "home";
 			this.#coinCount = 12480;
 			this.#popupConfirmHandler = null;
-			this.#toastQueue = [];
-			this.#toastRemainSeconds = 0;
-			this.#isToastShowing = false;
 			this.#elapsedSeconds = 0;
+			this.#itemListView = null;
+			this.#shopLoadedCount = SHOP_ITEM_INITIAL_COUNT;
+			this.#shopLoadRemainSeconds = 0;
+			this.#purchaseList = [];
+			this.#purchaseTotal = 0;
+			this.#dialogueRunner = null;
+			this.#dialogueTypewriter = null;
 		}
 
 		//==============================================================================
@@ -149,13 +252,13 @@
 		}
 
 		//==============================================================================
-		// 비동기 로드. (여섯 문서를 한꺼번에 읽는다)
+		// 비동기 로드. (문서 다섯 벌을 한꺼번에 읽는다)
 		//==============================================================================
 		/**
 		 * @param { Engine } engine
 		 */
 		async load(engine) {
-			// 기준 해상도(960x640)를 비율 그대로 창 안에 맞춘다.
+			// 기준 해상도(1440x900)를 비율 그대로 창 안에 맞춘다.
 			const viewManager = engine.getViewManager();
 			viewManager.setViewScaleMode(ViewScaleMode.stretchShort);
 
@@ -192,9 +295,25 @@
 			this.#popupRootNode.setActive(false);
 			root.addChild(this.#popupRootNode);
 
-			this.#toastRootNode = documentMap.get("toast");
-			this.#toastRootNode.setActive(false);
-			root.addChild(this.#toastRootNode);
+			// 코인 증감 연출. (엔진 FloatingText)
+			this.#floatingText = new FloatingText();
+			root.addChild(this.#floatingText);
+
+			// 토스트. (큐 / 등장 / 퇴장을 엔진 UIToast 가 맡는다)
+			this.#toast = new UIToast({
+				restY: TOAST_REST_Y,
+				holdSeconds: TOAST_HOLD_SECONDS,
+				backgroundColor: new Color(0.086, 0.106, 0.165, 0.96),
+				textColor: TEXT_COLOR,
+			});
+			root.addChild(this.#toast);
+			const toastLabelComponents = this.#toast.getComponents(UILabel);
+			if (toastLabelComponents.length > 0) {
+				toastLabelComponents[0].setBold(true);
+			}
+
+			// 단추 효과음. (엔진 BeepPlayer — 오디오 파일 없이 합성)
+			this.#beepPlayer = new BeepPlayer(engine.getAudioManager(), 0.25);
 
 			this.bindHome();
 			this.bindShop();
@@ -202,60 +321,275 @@
 			this.bindNavigation();
 			this.bindPopup();
 			this.applyHeadingStyles();
+			this.refreshCoinChips();
 		}
 
 		//==============================================================================
-		// 홈 화면 동작.
+		// 홈 화면 동작. (카드 목록 + 일일 패널 + 시즌 패널 + 대사 패널)
 		//==============================================================================
 		bindHome() {
 			const homeRootNode = this.#screenRootMap.get("home");
-			for (let cardIndex = 0; cardIndex < 6; ++cardIndex) {
-				const titleLabel = this.findLabel(homeRootNode, "CardTitle" + cardIndex);
-				const cardTitle = titleLabel ? titleLabel.getText() : ("Card " + cardIndex);
-				this.bindButton(homeRootNode, "OpenButton" + cardIndex, () => {
-					this.openPopup("Open " + cardTitle + "?", "It will use 10 energy. Rewards are doubled today.", () => {
-						this.showToast(cardTitle + " opened.  −10 energy");
-					});
+
+			// 카드 목록. (템플릿 + 데이터 → UIListView)
+			const cardListNode = this.findNodeByName(homeRootNode, "CardList");
+			const cardTemplateNode = this.findNodeByName(homeRootNode, "CardTemplate");
+			if (cardListNode && cardTemplateNode) {
+				const cardListView = cardListNode.addComponent(UIListView);
+				cardListView.setTemplateNode(cardTemplateNode);
+				cardListView.setSpacing(10);
+				cardListView.setBindItemEvent((itemNode, itemIndex) => {
+					this.bindHomeCard(itemNode, itemIndex);
 				});
+				cardListView.setItemCount(HOME_CARDS.length);
 			}
+
 			this.bindButton(homeRootNode, "ClaimButton", () => {
 				this.#coinCount += 250;
 				this.refreshCoinChips();
+				this.spawnCoinFloat("+250 ◆", true);
+				this.#beepPlayer.playPreset("success");
 				this.showToast("Daily reward claimed.  +250 ◆");
 			});
-			this.styleProgressBar(homeRootNode, "DailyEnergyBar", BAR_COLORS.Energy);
-			this.styleProgressBar(homeRootNode, "DailyQuestBar", BAR_COLORS.Quest);
-			this.styleProgressBar(homeRootNode, "DailySeasonPassBar", BAR_COLORS.SeasonPass);
+
+			this.styleProgressBar(homeRootNode, "DailyEnergyBar", ACCENT_COLORS.mint);
+			this.styleProgressBar(homeRootNode, "DailyQuestBar", ACCENT_COLORS.cyan);
+			this.styleProgressBar(homeRootNode, "DailySeasonPassBar", ACCENT_COLORS.amber);
+
+			// 시즌 승률 바. (엔진 UIProgressView 보조 게이지 — 반대편에서 패배 비율이 차오른다)
+			const versusBarNode = this.findNodeByName(homeRootNode, "ArenaVersusBar");
+			if (versusBarNode) {
+				const versusBarComponents = versusBarNode.getComponents(UIProgressView);
+				if (versusBarComponents.length > 0) {
+					const versusBarComponent = versusBarComponents[0];
+					versusBarComponent.setTrackColor(BAR_TRACK_COLOR);
+					versusBarComponent.setFillColor(ACCENT_COLORS.mint);
+					versusBarComponent.setCornerRadius(5);
+					versusBarComponent.setSecondaryValue(0.37);
+					versusBarComponent.setSecondaryFillColor(ACCENT_COLORS.red);
+				}
+			}
+
+			// 대사 패널. (엔진 DialogueRunner + Typewriter)
+			const tipBodyLabel = this.findLabel(homeRootNode, "TipBody");
+			if (tipBodyLabel) {
+				tipBodyLabel.setWordWrapWidth(330);
+				this.#dialogueRunner = new DialogueRunner();
+				this.#dialogueRunner.setScript(DialogueScriptParser.parse(DIALOGUE_SCRIPT_TEXT));
+				this.#dialogueRunner.start();
+				this.#dialogueTypewriter = new Typewriter(tipBodyLabel, { charactersPerSecond: 40 });
+				this.presentDialogueLine();
+				this.bindButton(homeRootNode, "TipNextButton", () => {
+					if (!this.#dialogueTypewriter.isFinished()) {
+						this.#dialogueTypewriter.skipToEnd();
+						return;
+					}
+					this.#dialogueRunner.advance();
+					this.presentDialogueLine();
+				});
+			}
 		}
 
 		//==============================================================================
-		// 상점 화면 동작.
+		// 홈 카드 한 줄 바인딩.
+		//==============================================================================
+		/**
+		 * @param { WorldNode } itemNode
+		 * @param { number } itemIndex
+		 */
+		bindHomeCard(itemNode, itemIndex) {
+			const cardData = HOME_CARDS[itemIndex];
+			this.applyFontToTree(itemNode);
+			this.setPaintColor(itemNode, "CardStripe", cardData.accent);
+			this.setPaintColor(itemNode, "CardIcon", cardData.accent);
+			this.setLabelText(itemNode, "CardGlyph", cardData.glyph);
+			this.setLabelText(itemNode, "CardTitle", cardData.title);
+			this.setLabelText(itemNode, "CardSubtitle", cardData.subtitle);
+			this.setLabelText(itemNode, "CardMeta", cardData.meta);
+			const glyphLabel = this.findLabel(itemNode, "CardGlyph");
+			if (glyphLabel) {
+				glyphLabel.setTextColor(INK_COLOR);
+			}
+			this.bindButton(itemNode, "CardOpenButton", () => {
+				this.openPopup("Open " + cardData.title + "?", "It will use 10 energy. Rewards are doubled today.", () => {
+					this.showToast(cardData.title + " opened.  −10 energy");
+				});
+			});
+		}
+
+		//==============================================================================
+		// 상점 화면 동작. (추천 띠 + 무한 스크롤 상품 목록 + 구매 기록)
 		//==============================================================================
 		bindShop() {
 			const shopRootNode = this.#screenRootMap.get("shop");
-			for (let featuredIndex = 0; featuredIndex < 6; ++featuredIndex) {
-				const featuredTitle = this.findLabel(shopRootNode, "FeaturedTitle" + featuredIndex);
-				const titleText = featuredTitle ? featuredTitle.getText() : "Featured";
-				this.bindButton(shopRootNode, "FeaturedBuy" + featuredIndex, () => {
-					this.openPopup("Buy " + titleText + "?", "This offer disappears when the timer runs out.", () => {
-						this.showToast(titleText + " purchased.");
-					});
+
+			// 추천 띠. (가로 UIListView)
+			const featuredListNode = this.findNodeByName(shopRootNode, "FeaturedList");
+			const featuredTemplateNode = this.findNodeByName(shopRootNode, "FeaturedTemplate");
+			if (featuredListNode && featuredTemplateNode) {
+				const featuredListView = featuredListNode.addComponent(UIListView);
+				featuredListView.setHorizontal(true);
+				featuredListView.setTemplateNode(featuredTemplateNode);
+				featuredListView.setSpacing(12);
+				featuredListView.setBindItemEvent((itemNode, itemIndex) => {
+					this.bindFeaturedTile(itemNode, itemIndex);
 				});
+				featuredListView.setItemCount(FEATURED_PACKS.length);
 			}
-			const itemPrices = [120, 150, 300, 420, 380, 999];
-			for (let itemIndex = 0; itemIndex < itemPrices.length; ++itemIndex) {
-				const itemTitle = this.findLabel(shopRootNode, "ItemTitle" + itemIndex);
-				const titleText = itemTitle ? itemTitle.getText() : "Item";
-				const price = itemPrices[itemIndex];
-				this.bindButton(shopRootNode, "BuyButton" + itemIndex, () => {
-					if (this.#coinCount < price) {
-						this.openPopup("Not enough coins", "You need ◆ " + price + " but have ◆ " + this.formatNumber(this.#coinCount) + ".", null);
-						return;
-					}
-					this.#coinCount -= price;
-					this.refreshCoinChips();
-					this.showToast(titleText + " purchased.  −" + price + " ◆");
+
+			// 상품 목록. (세로 UIListView — 끝에 닿으면 다음 페이지를 불러온다)
+			const itemListNode = this.findNodeByName(shopRootNode, "ItemList");
+			const itemTemplateNode = this.findNodeByName(shopRootNode, "ItemTemplate");
+			if (itemListNode && itemTemplateNode) {
+				this.#itemListView = itemListNode.addComponent(UIListView);
+				this.#itemListView.setTemplateNode(itemTemplateNode);
+				this.#itemListView.setSpacing(8);
+				this.#itemListView.setBindItemEvent((itemNode, itemIndex) => {
+					this.bindShopItem(itemNode, itemIndex);
 				});
+				this.#itemListView.setReachEndEvent(() => {
+					if (this.#shopLoadedCount < SHOP_ITEM_TOTAL_COUNT && this.#shopLoadRemainSeconds <= 0) {
+						this.#shopLoadRemainSeconds = SHOP_LOAD_SECONDS;
+					}
+				});
+				this.applyShopItemCount();
+			}
+			this.refreshPurchasePanel();
+		}
+
+		//==============================================================================
+		// 추천 띠 한 칸 바인딩.
+		//==============================================================================
+		/**
+		 * @param { WorldNode } itemNode
+		 * @param { number } itemIndex
+		 */
+		bindFeaturedTile(itemNode, itemIndex) {
+			const packData = FEATURED_PACKS[itemIndex];
+			this.applyFontToTree(itemNode);
+			this.setPaintColor(itemNode, "FeaturedStripe", packData.accent);
+			this.setLabelText(itemNode, "FeaturedTitle", packData.title);
+			this.setLabelText(itemNode, "FeaturedCaption", packData.caption);
+			this.setLabelText(itemNode, "FeaturedBuy", "◆ " + packData.price);
+			this.bindButton(itemNode, "FeaturedBuy", () => {
+				this.openPopup("Buy " + packData.title + "?", "This offer disappears when the timer runs out.", () => {
+					this.completePurchase(packData.title, packData.price);
+				});
+			});
+		}
+
+		//==============================================================================
+		// 상품 한 줄 바인딩. (마지막 칸은 로딩 줄)
+		//==============================================================================
+		/**
+		 * @param { WorldNode } itemNode
+		 * @param { number } itemIndex
+		 */
+		bindShopItem(itemNode, itemIndex) {
+			this.applyFontToTree(itemNode);
+			const iconNode = this.findNodeByName(itemNode, "ItemIcon");
+			const buyButtonNode = this.findNodeByName(itemNode, "ItemBuyButton");
+			const titleLabel = this.findLabel(itemNode, "ItemTitle");
+			const captionLabel = this.findLabel(itemNode, "ItemCaption");
+
+			// 로딩 줄. (아직 불러오지 않은 다음 페이지 자리)
+			if (itemIndex >= this.#shopLoadedCount) {
+				if (iconNode) {
+					iconNode.setActive(false);
+				}
+				if (buyButtonNode) {
+					buyButtonNode.setActive(false);
+				}
+				if (titleLabel) {
+					titleLabel.setText("Loading more…");
+					titleLabel.setTextColor(TEXT_DIM_COLOR);
+				}
+				if (captionLabel) {
+					captionLabel.setText("");
+				}
+				return;
+			}
+
+			const itemData = SHOP_ITEMS[itemIndex];
+			if (iconNode) {
+				iconNode.setActive(true);
+				const iconPaintComponents = iconNode.getComponents(Paint);
+				if (iconPaintComponents.length > 0) {
+					iconPaintComponents[0].setColor(itemData.accent);
+				}
+			}
+			if (buyButtonNode) {
+				buyButtonNode.setActive(true);
+			}
+			if (titleLabel) {
+				titleLabel.setText(itemData.title);
+				titleLabel.setTextColor(TEXT_COLOR);
+			}
+			if (captionLabel) {
+				captionLabel.setText(itemData.caption);
+			}
+			this.setLabelText(itemNode, "ItemBuyButton", "◆ " + itemData.price);
+			this.bindButton(itemNode, "ItemBuyButton", () => {
+				if (this.#coinCount < itemData.price) {
+					this.#beepPlayer.playPreset("error");
+					this.openPopup("Not enough coins", "You need ◆ " + itemData.price + " but have ◆ " + this.formatNumber(this.#coinCount) + ".", null);
+					return;
+				}
+				this.completePurchase(itemData.title, itemData.price);
+			});
+		}
+
+		//==============================================================================
+		// 구매 확정. (코인 차감 + 기록 + 연출)
+		//==============================================================================
+		/**
+		 * @param { string } itemTitle
+		 * @param { number } price
+		 */
+		completePurchase(itemTitle, price) {
+			this.#coinCount -= price;
+			this.#purchaseTotal += price;
+			this.#purchaseList.unshift({ title: itemTitle, price: price });
+			if (this.#purchaseList.length > 9) {
+				this.#purchaseList.length = 9;
+			}
+			this.refreshCoinChips();
+			this.refreshPurchasePanel();
+			this.spawnCoinFloat("−" + price + " ◆", false);
+			this.showToast(itemTitle + " purchased.  −" + price + " ◆");
+		}
+
+		//==============================================================================
+		// 구매 기록 패널 갱신.
+		//==============================================================================
+		refreshPurchasePanel() {
+			const shopRootNode = this.#screenRootMap.get("shop");
+			for (let rowIndex = 0; rowIndex < 9; ++rowIndex) {
+				const rowLabel = this.findLabel(shopRootNode, "PurchaseRow" + rowIndex);
+				if (!rowLabel) {
+					continue;
+				}
+				const purchaseData = this.#purchaseList[rowIndex];
+				rowLabel.setText(purchaseData ? (purchaseData.title + "   −◆ " + this.formatNumber(purchaseData.price)) : "");
+			}
+			const totalLabel = this.findLabel(shopRootNode, "PurchaseTotalValue");
+			if (totalLabel) {
+				totalLabel.setText("◆ " + this.formatNumber(this.#purchaseTotal));
+			}
+		}
+
+		//==============================================================================
+		// 상품 목록 항목 수 반영. (더 남았으면 로딩 줄 하나를 덧붙인다)
+		//==============================================================================
+		applyShopItemCount() {
+			if (!this.#itemListView) {
+				return;
+			}
+			const hasMore = this.#shopLoadedCount < SHOP_ITEM_TOTAL_COUNT;
+			this.#itemListView.setItemCount(this.#shopLoadedCount + (hasMore ? 1 : 0));
+			const shopRootNode = this.#screenRootMap.get("shop");
+			const countLabel = this.findLabel(shopRootNode, "ItemsCountCaption");
+			if (countLabel) {
+				countLabel.setText(this.#shopLoadedCount + " / " + SHOP_ITEM_TOTAL_COUNT + " loaded");
 			}
 		}
 
@@ -301,7 +635,7 @@
 				toggleComponent.setToggledEvent(() => {
 					const isOn = toggleComponent.getIsOn();
 					if (paintComponents.length > 0) {
-						paintComponents[0].setColor(isOn ? BAR_COLORS.Energy : new Color(0.227, 0.271, 0.376, 1));
+						paintComponents[0].setColor(isOn ? ACCENT_COLORS.mint : new Color(0.2, 0.239, 0.329, 1));
 					}
 					if (labelComponents.length > 0) {
 						labelComponents[0].setText(isOn ? "ON" : "OFF");
@@ -309,7 +643,19 @@
 					this.showToast(rowName + (isOn ? " enabled." : " disabled."));
 				});
 			}
-			this.styleProgressBar(settingsRootNode, "StorageBar", BAR_COLORS.Storage);
+			this.styleProgressBar(settingsRootNode, "StorageBar", ACCENT_COLORS.indigo);
+
+			// 저장 공간 바 반대편에 시스템 예약 영역 표시. (엔진 UIProgressView 보조 게이지)
+			const storageBarNode = this.findNodeByName(settingsRootNode, "StorageBar");
+			if (storageBarNode) {
+				const storageBarComponents = storageBarNode.getComponents(UIProgressView);
+				if (storageBarComponents.length > 0) {
+					const storageBarComponent = storageBarComponents[0];
+					storageBarComponent.setSecondaryValue(0.12);
+					storageBarComponent.setSecondaryFillColor(new Color(0.937, 0.325, 0.314, 0.85));
+				}
+			}
+
 			this.bindButton(settingsRootNode, "ResetButton", () => {
 				this.openPopup("Reset settings?", "All preferences go back to their defaults.", () => {
 					this.showToast("Settings restored.");
@@ -318,7 +664,7 @@
 		}
 
 		//==============================================================================
-		// 아래 탐색 막대 동작.
+		// 왼쪽 레일 동작.
 		//==============================================================================
 		bindNavigation() {
 			const navigationRootNode = this.#navigationRootNode;
@@ -355,6 +701,18 @@
 		//==============================================================================
 		bindPopup() {
 			const popupRootNode = this.#popupRootNode;
+			this.#popupDialogNode = this.findNodeByName(popupRootNode, "Dialog");
+			const messageLabel = this.findLabel(popupRootNode, "DialogMessage");
+			if (messageLabel) {
+				messageLabel.setWordWrapWidth(352);
+			}
+
+			// 등장 / 퇴장 전환. (엔진 PopupMotion — 막 알파 + 대화 상자 배율)
+			this.#popupMotion = new PopupMotion();
+			this.#popupMotion.setClosedEvent(() => {
+				popupRootNode.setActive(false);
+			});
+
 			this.bindButton(popupRootNode, "Overlay", () => {
 				this.closePopup();
 			});
@@ -371,11 +729,31 @@
 		}
 
 		//==============================================================================
+		// 대사 패널 현재 줄 표시.
+		//==============================================================================
+		presentDialogueLine() {
+			const currentEntry = this.#dialogueRunner.getCurrent();
+			if (currentEntry.kind === "line") {
+				this.#dialogueTypewriter.start(currentEntry.speaker + " —  " + currentEntry.text);
+			}
+		}
+
+		//==============================================================================
 		// 제목 글자는 굵게. (문서에는 굵기가 없으므로 코드에서 준다)
 		//==============================================================================
 		applyHeadingStyles() {
 			const root = this.getRoot();
-			this.visitLabels(root, (labelComponent, labelNode) => {
+			this.applyFontToTree(root);
+		}
+
+		//==============================================================================
+		// 보조: 노드 트리 전체 라벨에 서체 / 굵기 적용. (목록 항목은 나중에 생기므로 매 바인딩마다 부른다)
+		//==============================================================================
+		/**
+		 * @param { WorldNode } node
+		 */
+		applyFontToTree(node) {
+			this.visitLabels(node, (labelComponent, labelNode) => {
 				if (this.#fontFace) {
 					labelComponent.setFont(this.#fontFace);
 				}
@@ -447,7 +825,7 @@
 		}
 
 		//==============================================================================
-		// 팝업 열기. (막은 서서히, 대화 상자는 살짝 커지며 튀어 나온다)
+		// 팝업 열기.
 		//==============================================================================
 		/**
 		 * @param { string } titleText
@@ -456,7 +834,6 @@
 		 */
 		openPopup(titleText, messageText, confirmHandler) {
 			const popupRootNode = this.#popupRootNode;
-			const dialogNode = this.findNodeByName(popupRootNode, "Dialog");
 			const cancelNode = this.findNodeByName(popupRootNode, "CancelButton");
 			const confirmNode = this.findNodeByName(popupRootNode, "ConfirmButton");
 			const titleLabel = this.findLabel(popupRootNode, "DialogTitle");
@@ -473,35 +850,34 @@
 			const hasConfirm = (confirmHandler !== null);
 			if (cancelNode && confirmNode) {
 				cancelNode.setActive(hasConfirm);
-				confirmNode.setLocalPosition(hasConfirm ? Vector2.create(218, 168) : Vector2.create(28, 168));
-				confirmNode.setContentSize(hasConfirm ? Vector2.create(174, 52) : Vector2.create(364, 52));
+				confirmNode.setLocalPosition(hasConfirm ? Vector2.create(206, 148) : Vector2.create(24, 148));
+				confirmNode.setContentSize(hasConfirm ? Vector2.create(170, 44) : Vector2.create(352, 44));
 				const confirmLabel = this.findLabel(confirmNode, "ConfirmButton");
 				if (confirmLabel) {
 					confirmLabel.setText(hasConfirm ? "CONFIRM" : "OK");
 				}
 			}
 
-			popupRootNode.setActive(true);
-			popupRootNode.setLocalOpacity(0);
-			if (dialogNode) {
-				dialogNode.setScale(Vector2.one().multiply(0.86));
+			// 메시지는 타자기 효과로 드러낸다. (엔진 Typewriter)
+			if (messageLabel) {
+				this.#typewriter = new Typewriter(messageLabel, { charactersPerSecond: 90 });
+				this.#typewriter.start(messageText);
 			}
-			const tween = new Tween({ progress: 0 })
-				.to({ progress: 1 }, 0.26)
-				.easing(Tween.easingFunction.back.out)
-				.setUpdate((values) => {
-					popupRootNode.setLocalOpacity(System.Math.min(1, values.progress));
-					if (dialogNode) {
-						dialogNode.setScale(Vector2.one().multiply(0.86 + 0.14 * values.progress));
-					}
-				})
-				.setComplete(() => {
-					popupRootNode.setLocalOpacity(1);
-					if (dialogNode) {
-						dialogNode.setScale(Vector2.one());
-					}
-				});
-			this.startTween(tween);
+
+			popupRootNode.setActive(true);
+			this.#popupMotion.open();
+			this.applyPopupMotion();
+		}
+
+		//==============================================================================
+		// 팝업 전환 산출값 반영. (막 알파 + 대화 상자 배율)
+		//==============================================================================
+		applyPopupMotion() {
+			this.#popupRootNode.setLocalOpacity(this.#popupMotion.getDimRatio());
+			if (this.#popupDialogNode) {
+				const dialogScale = this.#popupMotion.getScale();
+				this.#popupDialogNode.setLocalScale(Vector2.create(dialogScale, dialogScale));
+			}
 		}
 
 		//==============================================================================
@@ -513,75 +889,21 @@
 				return;
 			}
 			this.#popupConfirmHandler = null;
-			const tween = new Tween({ progress: 1 })
-				.to({ progress: 0 }, 0.16)
-				.easing(Tween.easingFunction.quadratic.out)
-				.setUpdate((values) => {
-					popupRootNode.setLocalOpacity(values.progress);
-				})
-				.setComplete(() => {
-					popupRootNode.setActive(false);
-				});
-			this.startTween(tween);
+			this.#popupMotion.close();
 		}
 
 		//==============================================================================
-		// 토스트. (줄을 세워 하나씩 아래에서 떠오르고, 잠시 머문 뒤 사라진다)
+		// 토스트. (줄 세우기 / 등장 / 퇴장은 엔진 UIToast 가 맡는다)
 		//==============================================================================
 		/**
 		 * @param { string } messageText
 		 */
 		showToast(messageText) {
-			this.#toastQueue.push(messageText);
-			if (!this.#isToastShowing) {
-				this.presentNextToast();
-			}
-		}
-
-		presentNextToast() {
-			if (this.#toastQueue.length === 0) {
-				this.#isToastShowing = false;
-				return;
-			}
-			this.#isToastShowing = true;
-			const messageText = this.#toastQueue.shift();
-			const toastRootNode = this.#toastRootNode;
-			const toastLabel = this.findLabel(toastRootNode, "ToastLabel");
-			if (toastLabel) {
-				toastLabel.setText(messageText);
-			}
-			toastRootNode.setActive(true);
-			toastRootNode.setLocalOpacity(0);
-			const tween = new Tween({ progress: 0 })
-				.to({ progress: 1 }, 0.24)
-				.easing(Tween.easingFunction.quadratic.out)
-				.setUpdate((values) => {
-					toastRootNode.setLocalOpacity(values.progress);
-					toastRootNode.setLocalPosition(Vector2.create(480, TOAST_REST_Y + 28 * (1 - values.progress)));
-				})
-				.setComplete(() => {
-					this.#toastRemainSeconds = TOAST_HOLD_SECONDS;
-				});
-			this.startTween(tween);
-		}
-
-		dismissToast() {
-			const toastRootNode = this.#toastRootNode;
-			const tween = new Tween({ progress: 1 })
-				.to({ progress: 0 }, 0.2)
-				.easing(Tween.easingFunction.quadratic.out)
-				.setUpdate((values) => {
-					toastRootNode.setLocalOpacity(values.progress);
-				})
-				.setComplete(() => {
-					toastRootNode.setActive(false);
-					this.presentNextToast();
-				});
-			this.startTween(tween);
+			this.#toast.show(messageText);
 		}
 
 		//==============================================================================
-		// 갱신. (토스트 머무는 시간 / 헤더 칩 반짝임)
+		// 갱신. (팝업 전환 / 타자기 / 상품 로딩 진행)
 		//==============================================================================
 		/**
 		 * @param { number } deltaTime
@@ -590,11 +912,27 @@
 			super.tick(deltaTime);
 
 			this.#elapsedSeconds += deltaTime;
-			if (this.#toastRemainSeconds > 0) {
-				this.#toastRemainSeconds -= deltaTime;
-				if (this.#toastRemainSeconds <= 0) {
-					this.#toastRemainSeconds = 0;
-					this.dismissToast();
+			if (this.#typewriter) {
+				this.#typewriter.tick(deltaTime);
+			}
+			if (this.#dialogueTypewriter) {
+				this.#dialogueTypewriter.tick(deltaTime);
+			}
+			if (this.#popupRootNode && this.#popupRootNode.isActive()) {
+				this.#popupMotion.tick(deltaTime);
+				this.applyPopupMotion();
+			}
+
+			// 상품 다음 페이지 로딩. (짧은 지연으로 로딩 줄을 보여 준다)
+			if (this.#shopLoadRemainSeconds > 0) {
+				this.#shopLoadRemainSeconds -= deltaTime;
+				if (this.#shopLoadRemainSeconds <= 0) {
+					this.#shopLoadRemainSeconds = 0;
+					this.#shopLoadedCount = System.Math.min(SHOP_ITEM_TOTAL_COUNT, this.#shopLoadedCount + SHOP_ITEM_PAGE_COUNT);
+					this.applyShopItemCount();
+					if (this.#itemListView) {
+						this.#itemListView.refresh();
+					}
 				}
 			}
 		}
@@ -613,7 +951,7 @@
 			const canvasNativeSize = viewManager.getCanvasNativeSize();
 
 			viewManager.applyCanvasNativeRect(graphic);
-			graphic.setFillColor("rgb(15, 19, 32)");
+			graphic.setFillColor("rgb(11, 14, 23)");
 			graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
 
 			viewManager.applyViewRect(graphic);
@@ -666,7 +1004,13 @@
 			if (buttonComponents.length === 0) {
 				return;
 			}
-			buttonComponents[0].setClickedEvent(clickHandler);
+			buttonComponents[0].setMinimumPressedSeconds(0.05);
+			buttonComponents[0].setClickedEvent(() => {
+				if (this.#beepPlayer) {
+					this.#beepPlayer.playPreset("click");
+				}
+				clickHandler();
+			});
 		}
 
 		//==============================================================================
@@ -684,6 +1028,40 @@
 			}
 			const labelComponents = labelNode.getComponents(UILabel);
 			return (labelComponents.length > 0) ? labelComponents[0] : null;
+		}
+
+		//==============================================================================
+		// 보조: 이름으로 라벨을 찾아 글을 바꾼다.
+		//==============================================================================
+		/**
+		 * @param { WorldNode } rootNode
+		 * @param { string } nodeName
+		 * @param { string } text
+		 */
+		setLabelText(rootNode, nodeName, text) {
+			const labelComponent = this.findLabel(rootNode, nodeName);
+			if (labelComponent) {
+				labelComponent.setText(text);
+			}
+		}
+
+		//==============================================================================
+		// 보조: 이름으로 노드를 찾아 Paint 색을 바꾼다.
+		//==============================================================================
+		/**
+		 * @param { WorldNode } rootNode
+		 * @param { string } nodeName
+		 * @param { Color } fillColor
+		 */
+		setPaintColor(rootNode, nodeName, fillColor) {
+			const paintNode = this.findNodeByName(rootNode, nodeName);
+			if (!paintNode) {
+				return;
+			}
+			const paintComponents = paintNode.getComponents(Paint);
+			if (paintComponents.length > 0) {
+				paintComponents[0].setColor(fillColor);
+			}
 		}
 
 		//==============================================================================
@@ -706,7 +1084,24 @@
 			const progressComponent = progressComponents[0];
 			progressComponent.setTrackColor(BAR_TRACK_COLOR);
 			progressComponent.setFillColor(fillColor);
-			progressComponent.setCornerRadius(6);
+			progressComponent.setCornerRadius(4);
+		}
+
+		//==============================================================================
+		// 보조: 코인 칩 옆에 증감 텍스트를 띄운다. (엔진 FloatingText)
+		//==============================================================================
+		/**
+		 * @param { string } text
+		 * @param { boolean } isGain
+		 */
+		spawnCoinFloat(text, isGain) {
+			const floatColor = isGain ? ACCENT_COLORS.amber : ACCENT_COLORS.red;
+			this.#floatingText.spawn(text, COIN_CHIP_CENTER, { color: floatColor, fontSize: 15, rise: 30, duration: 0.9, jitter: 6 });
+			if (this.#fontFace) {
+				this.visitLabels(this.#floatingText, (labelComponent) => {
+					labelComponent.setFont(this.#fontFace);
+				});
+			}
 		}
 
 		//==============================================================================
@@ -726,7 +1121,7 @@
 		 * @returns { string }
 		 */
 		formatNumber(value) {
-			return value.toLocaleString("en-US");
+			return Format.formatNumber(value);
 		}
 
 		//==============================================================================
@@ -756,7 +1151,7 @@
 	// 엔진 실행.
 	//==============================================================================
 	const engineConfiguration = new EngineConfiguration();
-	engineConfiguration.referenceResolutionSize = Vector2.create(960, 640);
+	engineConfiguration.referenceResolutionSize = Vector2.create(1440, 900);
 	engineConfiguration.canvasId = "mainCanvas";
 	engineConfiguration.autoResizeOnWindowResize = true;
 	const engine = new Engine(engineConfiguration);

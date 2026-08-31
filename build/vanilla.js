@@ -3666,6 +3666,7 @@ var Node = class _Node extends Object2 {
 };
 
 // src/core/timemanager.js
+var System10 = globalThis;
 var TimeManager = class extends Object2 {
   static {
     __name(this, "TimeManager");
@@ -3716,7 +3717,8 @@ var TimeManager = class extends Object2 {
       this.#realtimeSinceStartup = realtimeSinceStartup;
       this.#previousFrameCheckTime = realtimeSinceStartup;
     }
-    const unscaledTimeDelta = realtimeSinceStartup - this.#realtimeSinceStartup;
+    const rawTimeDelta = realtimeSinceStartup - this.#realtimeSinceStartup;
+    const unscaledTimeDelta = System10.Math.min(0.25, System10.Math.max(0, rawTimeDelta));
     this.#realtimeSinceStartup = realtimeSinceStartup;
     this.#time += unscaledTimeDelta;
     this.#unscaledTimeDelta = unscaledTimeDelta;
@@ -4954,7 +4956,7 @@ var ImageTextureCache = class extends Object2 {
 };
 
 // src/core/graphic/textstringtexturecache.js
-var System10 = globalThis;
+var System11 = globalThis;
 var MAXIMUM_ENTRY_COUNT = 512;
 var TextStringTextureCache = class extends Object2 {
   static {
@@ -4984,10 +4986,10 @@ var TextStringTextureCache = class extends Object2 {
     super();
     this.#webGL2RenderingContext = webGL2RenderingContext;
     this.#entries = /* @__PURE__ */ new Map();
-    const bakeCanvas = System10.document.createElement("canvas");
+    const bakeCanvas = System11.document.createElement("canvas");
     this.#bakeCanvas = bakeCanvas;
     this.#bakeCanvasRenderingContext = bakeCanvas.getContext("2d", { willReadFrequently: false });
-    const measurementCanvas = System10.document.createElement("canvas");
+    const measurementCanvas = System11.document.createElement("canvas");
     this.#measurementCanvasRenderingContext = measurementCanvas.getContext("2d");
   }
   //==============================================================================
@@ -5017,7 +5019,7 @@ var TextStringTextureCache = class extends Object2 {
       return fontString;
     }
     return fontString.replace(/(\d+(?:\.\d+)?)px/, (matched, sizeText) => {
-      const scaledSize = System10.Number.parseFloat(sizeText) * scale;
+      const scaledSize = System11.Number.parseFloat(sizeText) * scale;
       return `${scaledSize}px`;
     });
   }
@@ -6535,7 +6537,7 @@ var Graphic = class extends Object2 {
 };
 
 // src/core/viewmanager.js
-var System11 = globalThis;
+var System12 = globalThis;
 var ViewScaleMode = {
   // 사용안함 (웹브라우저 크기가 변경되면 뷰 영역도 변경됨)
   none: "none",
@@ -6633,11 +6635,11 @@ var ViewManager = class extends Object2 {
     if (canvas === null || canvas === void 0) {
       return;
     }
-    let devicePixelRatio = System11.window.devicePixelRatio || 1;
+    let devicePixelRatio = System12.window.devicePixelRatio || 1;
     if (this.#maxRenderPixelRatio > 0 && devicePixelRatio > this.#maxRenderPixelRatio) {
       devicePixelRatio = this.#maxRenderPixelRatio;
     }
-    const clientNativeSize = Vector2.create(System11.window.innerWidth, System11.window.innerHeight);
+    const clientNativeSize = Vector2.create(System12.window.innerWidth, System12.window.innerHeight);
     const canvasNativeRect = canvas.getBoundingClientRect();
     const canvasNativeSize = Vector2.create(Math.round(canvasNativeRect.width), Math.round(canvasNativeRect.height));
     const canvasPixelSize = Vector2.create(Math.round(canvasNativeSize.x * devicePixelRatio), Math.round(canvasNativeSize.y * devicePixelRatio));
@@ -6995,8 +6997,8 @@ var ViewManager = class extends Object2 {
   applyAspectViewScaleMode() {
     const referenceResolutionSize = this.getReferenceResolutionSize();
     const canvas = this.getCanvas();
-    let screenWidth = System11.window.innerWidth;
-    let screenHeight = System11.window.innerHeight;
+    let screenWidth = System12.window.innerWidth;
+    let screenHeight = System12.window.innerHeight;
     if (canvas) {
       const canvasNativeRect = canvas.getBoundingClientRect();
       if (canvasNativeRect.width > 0 && canvasNativeRect.height > 0) {
@@ -7055,12 +7057,12 @@ var ViewManager = class extends Object2 {
    */
   readSafeAreaFromUrl() {
     try {
-      const parameters = new System11.URLSearchParams(System11.window.location.search);
+      const parameters = new System12.URLSearchParams(System12.window.location.search);
       const safeAreaText = parameters.get("safeArea");
       if (!safeAreaText) {
         return null;
       }
-      const parts = safeAreaText.split(",").map((part) => System11.parseFloat(part) || 0);
+      const parts = safeAreaText.split(",").map((part) => System12.parseFloat(part) || 0);
       return { top: parts[0] || 0, right: parts[1] || 0, bottom: parts[2] || 0, left: parts[3] || 0 };
     } catch (parseError) {
       return null;
@@ -7074,7 +7076,7 @@ var ViewManager = class extends Object2 {
    * @returns { object }
    */
   readSafeAreaFromEnvironment() {
-    const documentObject = System11.document;
+    const documentObject = System12.document;
     if (!documentObject || !documentObject.body) {
       return { top: 0, right: 0, bottom: 0, left: 0 };
     }
@@ -7084,18 +7086,18 @@ var ViewManager = class extends Object2 {
       documentObject.body.appendChild(probeElement);
       this.#safeAreaProbeElement = probeElement;
     }
-    const computedStyle = System11.getComputedStyle(this.#safeAreaProbeElement);
+    const computedStyle = System12.getComputedStyle(this.#safeAreaProbeElement);
     return {
-      top: System11.parseFloat(computedStyle.paddingTop) || 0,
-      right: System11.parseFloat(computedStyle.paddingRight) || 0,
-      bottom: System11.parseFloat(computedStyle.paddingBottom) || 0,
-      left: System11.parseFloat(computedStyle.paddingLeft) || 0
+      top: System12.parseFloat(computedStyle.paddingTop) || 0,
+      right: System12.parseFloat(computedStyle.paddingRight) || 0,
+      bottom: System12.parseFloat(computedStyle.paddingBottom) || 0,
+      left: System12.parseFloat(computedStyle.paddingLeft) || 0
     };
   }
 };
 
 // src/core/gamepadmanager.js
-var System12 = globalThis;
+var System13 = globalThis;
 var GamepadButtonCode = {
   // Face Buttons
   A_CROSS: 0,
@@ -7218,7 +7220,7 @@ var GamepadManager = class extends Object2 {
   // 모든 게임패드 갱신.
   //==============================================================================
   updateAllGamepads() {
-    const gamepads = System12.navigator.getGamepads();
+    const gamepads = System13.navigator.getGamepads();
     for (const hardwareIndex of this.#connectedGamepadIndices) {
       const gamepad = gamepads[hardwareIndex];
       if (!gamepad) {
@@ -7315,7 +7317,7 @@ var GamepadManager = class extends Object2 {
    * @returns { Gamepad[] }
    */
   getAllConnectedGamepads() {
-    const gamepads = System12.navigator.getGamepads();
+    const gamepads = System13.navigator.getGamepads();
     const connected = [];
     for (const hardwareIndex of this.#connectedGamepadIndices) {
       const gamepad = gamepads[hardwareIndex];
@@ -7345,7 +7347,7 @@ var GamepadManager = class extends Object2 {
       return void 0;
     }
     const hardwareIndex = this.#connectedGamepadIndices.at(gamepadIndex);
-    const gamepads = System12.navigator.getGamepads();
+    const gamepads = System13.navigator.getGamepads();
     return gamepads[hardwareIndex];
   }
 };
@@ -8990,7 +8992,7 @@ var Scene = class extends Object2 {
 };
 
 // src/core/scenemanager.js
-var System13 = globalThis;
+var System14 = globalThis;
 var SceneManager = class extends Object2 {
   static {
     __name(this, "SceneManager");
@@ -9029,8 +9031,8 @@ var SceneManager = class extends Object2 {
       scene.setEngine(engine);
       loadedScenes.push(scene);
       await scene.load(engine);
-      await new System13.Promise((resolve) => {
-        System13.setTimeout(resolve, 300);
+      await new System14.Promise((resolve) => {
+        System14.setTimeout(resolve, 300);
       });
       scene.setLoaded(true);
       scene.initialize(engine);
@@ -9084,8 +9086,8 @@ var SceneManager = class extends Object2 {
 };
 
 // src/core/asset.js
-var System14 = globalThis;
-var AssetType = System14.Object.freeze({
+var System15 = globalThis;
+var AssetType = System15.Object.freeze({
   none: "none",
   image: "image",
   audio: "audio",
@@ -9131,7 +9133,7 @@ var Asset = class extends Object2 {
       return;
     }
     this.setAssetPath(assetPath);
-    System14.Promise.resolve();
+    System15.Promise.resolve();
   }
   //==============================================================================
   // 애셋 언로드.
@@ -9204,7 +9206,7 @@ var Asset = class extends Object2 {
 };
 
 // src/resource/audioasset.js
-var System15 = globalThis;
+var System16 = globalThis;
 var AudioAsset = class extends Asset {
   static {
     __name(this, "AudioAsset");
@@ -9234,13 +9236,13 @@ var AudioAsset = class extends Asset {
     if (isLoaded) {
       return Promise.resolve();
     }
-    const audioContextType = System15.window.AudioContext || System15.window.webkitAudioContext;
+    const audioContextType = System16.window.AudioContext || System16.window.webkitAudioContext;
     if (!audioContextType) {
       console.error(`AudioContext is not supported.`);
       return;
     }
     try {
-      const response = await System15.fetch(assetPath);
+      const response = await System16.fetch(assetPath);
       const arrayBuffer = await response.arrayBuffer();
       const tempAudioContext = new audioContextType();
       this.#audioBuffer = await tempAudioContext.decodeAudioData(arrayBuffer);
@@ -9489,7 +9491,7 @@ var AudioPlayer = class {
 };
 
 // src/core/audiomanager.js
-var System16 = globalThis;
+var System17 = globalThis;
 var AudioManager = class extends Object2 {
   static {
     __name(this, "AudioManager");
@@ -9539,7 +9541,7 @@ var AudioManager = class extends Object2 {
     if (this.#audioContext) {
       return this.#audioContext;
     }
-    const audioContextType = System16.window.AudioContext || System16.window.webkitAudioContext;
+    const audioContextType = System17.window.AudioContext || System17.window.webkitAudioContext;
     if (audioContextType) {
       this.#audioContext = new audioContextType();
     }
@@ -9662,7 +9664,7 @@ var FontAsset = class extends Asset {
 };
 
 // src/core/engine.js
-var System17 = globalThis;
+var System18 = globalThis;
 var EngineConfiguration = class extends Object2 {
   static {
     __name(this, "EngineConfiguration");
@@ -9743,12 +9745,12 @@ var Engine = class extends Object2 {
   constructor(engineConfiguration) {
     super();
     if (engineConfiguration === null || engineConfiguration === void 0 || engineConfiguration instanceof EngineConfiguration === false) {
-      throw new System17.Error(`engineConfiguration is invalid.`);
+      throw new System18.Error(`engineConfiguration is invalid.`);
     }
     this.#engineConfiguration = engineConfiguration;
     this.#platform = new Platform();
     if (engineConfiguration.title !== "") {
-      System17.document.title = engineConfiguration.title;
+      System18.document.title = engineConfiguration.title;
     }
     const canvasId = this.#engineConfiguration.canvasId;
     const canvas = this.#platform.getOrAddCanvas(canvasId);
@@ -9765,7 +9767,7 @@ var Engine = class extends Object2 {
     this.#frameNumber = 0;
     this.#statisticsTextRect = Rect.zero();
     this.#version = Version.create(0, 3, 0);
-    System17.vanillaEngine = this;
+    System18.vanillaEngine = this;
     this.setupAllDocumentEvents();
     this.resize();
   }
@@ -9777,7 +9779,7 @@ var Engine = class extends Object2 {
    */
   run(scene) {
     if (scene === null || scene === void 0 || scene instanceof Scene === false) {
-      throw new System17.Error(`scene is invalid.`);
+      throw new System18.Error(`scene is invalid.`);
     }
     const internalFontFace = new FontFace(`DOSGothic`, `url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff")`);
     internalFontFace.load().then((loadedFont) => {
@@ -9786,13 +9788,13 @@ var Engine = class extends Object2 {
       sceneManager.loadScene(scene).catch((error) => {
         console.error(error);
       });
-      System17.window.addEventListener("resize", this.#resizeCallback);
-      if (System17.window.visualViewport) {
-        System17.window.visualViewport.addEventListener("resize", this.#resizeCallback);
-        System17.window.visualViewport.addEventListener("scroll", this.#resizeCallback);
+      System18.window.addEventListener("resize", this.#resizeCallback);
+      if (System18.window.visualViewport) {
+        System18.window.visualViewport.addEventListener("resize", this.#resizeCallback);
+        System18.window.visualViewport.addEventListener("scroll", this.#resizeCallback);
       }
       ++this.#frameNumber;
-      System17.window.requestAnimationFrame(this.#updateEngineCallback);
+      System18.window.requestAnimationFrame(this.#updateEngineCallback);
     }).catch((error) => {
       console.error(error);
     });
@@ -9822,9 +9824,9 @@ var Engine = class extends Object2 {
     const engineConfiguration = this.getEngineConfiguration();
     const viewManager = this.getViewManager();
     if (engineConfiguration.autoResizeOnWindowResize) {
-      const visualViewport = System17.window.visualViewport;
-      const clientWidth = visualViewport ? visualViewport.width : System17.window.innerWidth;
-      const clientHeight = visualViewport ? visualViewport.height : System17.window.innerHeight;
+      const visualViewport = System18.window.visualViewport;
+      const clientWidth = visualViewport ? visualViewport.width : System18.window.innerWidth;
+      const clientHeight = visualViewport ? visualViewport.height : System18.window.innerHeight;
       const clientNativeSize = Vector2.create(clientWidth, clientHeight);
       const canvas = viewManager.getCanvas();
       canvas.style.width = `${clientNativeSize.x}px`;
@@ -9862,7 +9864,7 @@ var Engine = class extends Object2 {
         inputManager2.clear();
       }
     }, "recoverEngineState");
-    System17.document.addEventListener("resume", () => {
+    System18.document.addEventListener("resume", () => {
       console.log(`[Engine] resume: persisted`);
       recoverEngineState();
       const sceneManager = this.getSceneManager();
@@ -9871,14 +9873,14 @@ var Engine = class extends Object2 {
         loadedScene.onPageProcessRestored();
       }
     });
-    System17.window.addEventListener("pageshow", (pageTransitionEvent) => {
+    System18.window.addEventListener("pageshow", (pageTransitionEvent) => {
       if (pageTransitionEvent.persisted) {
         console.log(`[Engine] pageshow: persisted`);
         dispatchPageProcessRestored();
       }
     });
-    System17.document.addEventListener("visibilitychange", () => {
-      if (System17.document.visibilityState === "visible") {
+    System18.document.addEventListener("visibilitychange", () => {
+      if (System18.document.visibilityState === "visible") {
         console.log(`[Engine] visibilitychange: visible`);
         recoverEngineState();
         const sceneManager = this.getSceneManager();
@@ -9888,11 +9890,11 @@ var Engine = class extends Object2 {
         }
       }
     });
-    System17.document.addEventListener("keydown", (keyboardEvent) => {
+    System18.document.addEventListener("keydown", (keyboardEvent) => {
       const key = keyboardEvent.code;
       inputManager.pushKey(key);
     });
-    System17.document.addEventListener("keyup", (keyboardEvent) => {
+    System18.document.addEventListener("keyup", (keyboardEvent) => {
       const key = keyboardEvent.code;
       inputManager.popKey(key);
     });
@@ -9920,7 +9922,7 @@ var Engine = class extends Object2 {
       this.updateCanvasNativeInputPosition(wheelEvent.clientX, wheelEvent.clientY);
       wheelEvent.preventDefault();
     }, { passive: false });
-    System17.window.addEventListener("mouseup", (touchEvent) => {
+    System18.window.addEventListener("mouseup", (touchEvent) => {
       const inputManager2 = this.getInputManager();
       if (!inputManager2.isTouchMoved()) {
         return;
@@ -9958,7 +9960,7 @@ var Engine = class extends Object2 {
       inputManager2.setTouchReleased(true);
       touchEvent.preventDefault();
     }, { passive: false });
-    System17.window.addEventListener("touchmove", (touchEvent) => {
+    System18.window.addEventListener("touchmove", (touchEvent) => {
       const touch = touchEvent.changedTouches[0];
       if (!touch) {
         return;
@@ -9979,34 +9981,34 @@ var Engine = class extends Object2 {
       inputManager2.setTouchMoved(false);
       inputManager2.setTouchCancelled(true);
     });
-    System17.window.addEventListener("blur", (focusEvent) => {
+    System18.window.addEventListener("blur", (focusEvent) => {
       const inputManager2 = this.getInputManager();
       inputManager2.setTouchMoved(false);
       inputManager2.setTouchReleased(true);
       focusEvent.preventDefault();
     }, { passive: false });
     const userGestureHandler = this.resumeOnUserGesture.bind(this);
-    System17.window.addEventListener("click", userGestureHandler);
-    System17.window.addEventListener("touchstart", userGestureHandler);
-    System17.window.addEventListener("keydown", userGestureHandler);
-    System17.window.addEventListener("focus", this.#resumeCallback);
-    System17.document.addEventListener("visibilitychange", () => {
-      if (System17.document.visibilityState === "visible") {
+    System18.window.addEventListener("click", userGestureHandler);
+    System18.window.addEventListener("touchstart", userGestureHandler);
+    System18.window.addEventListener("keydown", userGestureHandler);
+    System18.window.addEventListener("focus", this.#resumeCallback);
+    System18.document.addEventListener("visibilitychange", () => {
+      if (System18.document.visibilityState === "visible") {
         this.resume();
       }
     });
-    System17.document.addEventListener("pointerlockchange", () => {
+    System18.document.addEventListener("pointerlockchange", () => {
       if (document.pointerLockElement === canvas) {
       } else {
       }
     });
-    System17.window.addEventListener("gamepadconnected", (gamepadEvent) => {
+    System18.window.addEventListener("gamepadconnected", (gamepadEvent) => {
       const gamepad = gamepadEvent.gamepad;
       const inputManager2 = this.getInputManager();
       inputManager2.connectGamepad(gamepad);
       console.log(`gamepadconnected: ${gamepad.id}`);
     });
-    System17.window.addEventListener("gamepaddisconnected", (gamepadEvent) => {
+    System18.window.addEventListener("gamepaddisconnected", (gamepadEvent) => {
       const gamepad = gamepadEvent.gamepad;
       const inputManager2 = this.getInputManager();
       inputManager2.disconnectGamepad(gamepad);
@@ -10146,7 +10148,7 @@ var Engine = class extends Object2 {
     inputManager.clearWheelDelta();
     inputManager.updateFrameSnapshot();
     ++this.#frameNumber;
-    System17.window.requestAnimationFrame(this.#updateEngineCallback);
+    System18.window.requestAnimationFrame(this.#updateEngineCallback);
   }
   //==============================================================================
   // 커서 보이기 설정.
@@ -10265,7 +10267,7 @@ var Engine = class extends Object2 {
   //==============================================================================
   exitApplication() {
     try {
-      const capacitor = System17.Capacitor;
+      const capacitor = System18.Capacitor;
       if (capacitor && capacitor.Plugins && capacitor.Plugins.App && typeof capacitor.Plugins.App.exitApp === "function") {
         capacitor.Plugins.App.exitApp();
         return;
@@ -10273,7 +10275,7 @@ var Engine = class extends Object2 {
     } catch (nativeError) {
     }
     try {
-      System17.window.close();
+      System18.window.close();
     } catch (closeError) {
     }
   }
@@ -10287,7 +10289,7 @@ var Engine = class extends Object2 {
    * @returns { Engine }
    */
   static getEngine() {
-    return System17.vanillaEngine;
+    return System18.vanillaEngine;
   }
 };
 
@@ -11585,7 +11587,7 @@ var UIScrollView = class extends UIView {
 };
 
 // src/ui/touchrecognizer.js
-var System18 = globalThis;
+var System19 = globalThis;
 var DRAG_THRESHOLD = 10;
 var DELAY_PRESS_MS = 150;
 var TouchRecognizer = class extends TouchRaycaster {
@@ -11647,7 +11649,7 @@ var TouchRecognizer = class extends TouchRaycaster {
     }
     if (this.#scrollView) {
       const pressPosition = Vector2.create(viewInputPosition.x, viewInputPosition.y);
-      this.#pressTimerId = System18.setTimeout(() => {
+      this.#pressTimerId = System19.setTimeout(() => {
         this.#pressTimerId = null;
         if (this.#isDragging) return;
         if (this.#target !== target) return;
@@ -11683,10 +11685,10 @@ var TouchRecognizer = class extends TouchRaycaster {
     if (this.#scrollView && this.#pressPosition) {
       const dx = viewInputPosition.x - this.#pressPosition.x;
       const dy = viewInputPosition.y - this.#pressPosition.y;
-      if (System18.Math.abs(dx) > DRAG_THRESHOLD || System18.Math.abs(dy) > DRAG_THRESHOLD) {
+      if (System19.Math.abs(dx) > DRAG_THRESHOLD || System19.Math.abs(dy) > DRAG_THRESHOLD) {
         this.#isDragging = true;
         if (this.#pressTimerId !== null) {
-          System18.clearTimeout(this.#pressTimerId);
+          System19.clearTimeout(this.#pressTimerId);
           this.#pressTimerId = null;
         } else if (this.#pressDelivered && this.#target) {
           this.#target.touchCancel(viewInputPosition);
@@ -11720,7 +11722,7 @@ var TouchRecognizer = class extends TouchRaycaster {
       }
     } else if (this.#target) {
       if (this.#pressTimerId !== null) {
-        System18.clearTimeout(this.#pressTimerId);
+        System19.clearTimeout(this.#pressTimerId);
         this.#pressTimerId = null;
         this.#target.touchPress(this.#pressPosition || viewInputPosition);
         this.#pressDelivered = true;
@@ -11753,7 +11755,7 @@ var TouchRecognizer = class extends TouchRaycaster {
   //==============================================================================
   reset() {
     if (this.#pressTimerId !== null) {
-      System18.clearTimeout(this.#pressTimerId);
+      System19.clearTimeout(this.#pressTimerId);
       this.#pressTimerId = null;
     }
     this.#target = null;
@@ -11986,7 +11988,7 @@ var LayoutStrength = class _LayoutStrength {
 };
 
 // src/ui/autolayout/layoutconstraint.js
-var System19 = globalThis;
+var System20 = globalThis;
 var LayoutConstraint = class _LayoutConstraint {
   static {
     __name(this, "LayoutConstraint");
@@ -12011,7 +12013,7 @@ var LayoutConstraint = class _LayoutConstraint {
    */
   constructor(expression, relation, strength) {
     if (!(expression instanceof LayoutExpression)) {
-      throw new System19.Error("[LayoutConstraint] expression \uC740 LayoutExpression \uC774\uC5B4\uC57C \uD568.");
+      throw new System20.Error("[LayoutConstraint] expression \uC740 LayoutExpression \uC774\uC5B4\uC57C \uD568.");
     }
     this.#expression = expression;
     this.#relation = relation;
@@ -12061,7 +12063,7 @@ var LayoutConstraint = class _LayoutConstraint {
 };
 
 // src/ui/autolayout/layoutexpression.js
-var System20 = globalThis;
+var System21 = globalThis;
 var LayoutExpression = class _LayoutExpression {
   static {
     __name(this, "LayoutExpression");
@@ -12084,7 +12086,7 @@ var LayoutExpression = class _LayoutExpression {
    * @param { number } [constant]
    */
   constructor(terms, constant) {
-    this.#terms = System20.Array.isArray(terms) ? terms.slice() : [];
+    this.#terms = System21.Array.isArray(terms) ? terms.slice() : [];
     this.#constant = typeof constant === "number" ? constant : 0;
   }
   //==============================================================================
@@ -12131,7 +12133,7 @@ var LayoutExpression = class _LayoutExpression {
     if (typeof input === "number") {
       return _LayoutExpression.fromConstant(input);
     }
-    throw new System20.Error("[LayoutExpression] toExpression: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uC785\uB825 \uD0C0\uC785.");
+    throw new System21.Error("[LayoutExpression] toExpression: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uC785\uB825 \uD0C0\uC785.");
   }
   //==============================================================================
   // 항 배열 반환.
@@ -12218,7 +12220,7 @@ var LayoutExpression = class _LayoutExpression {
    */
   multiply(coefficient) {
     if (typeof coefficient !== "number") {
-      throw new System20.Error("[LayoutExpression] multiply: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
+      throw new System21.Error("[LayoutExpression] multiply: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
     }
     const ownTerms = this.getTerms();
     const newTerms = [];
@@ -12241,10 +12243,10 @@ var LayoutExpression = class _LayoutExpression {
    */
   divide(denominator) {
     if (typeof denominator !== "number") {
-      throw new System20.Error("[LayoutExpression] divide: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
+      throw new System21.Error("[LayoutExpression] divide: \uC2A4\uCE7C\uB77C(number) \uB9CC \uC9C0\uC6D0.");
     }
     if (denominator === 0) {
-      throw new System20.Error("[LayoutExpression] divide: 0 \uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC74C.");
+      throw new System21.Error("[LayoutExpression] divide: 0 \uC73C\uB85C \uB098\uB20C \uC218 \uC5C6\uC74C.");
     }
     const result = this.multiply(1 / denominator);
     return result;
@@ -12392,7 +12394,7 @@ var LayoutSymbol = class _LayoutSymbol {
 };
 
 // src/ui/autolayout/layoutrow.js
-var System21 = globalThis;
+var System22 = globalThis;
 var LayoutRow = class _LayoutRow {
   static {
     __name(this, "LayoutRow");
@@ -12412,7 +12414,7 @@ var LayoutRow = class _LayoutRow {
    * @param { number } [constant]
    */
   constructor(constant) {
-    this.#cells = new System21.Map();
+    this.#cells = new System22.Map();
     this.#constant = typeof constant === "number" ? constant : 0;
   }
   //==============================================================================
@@ -12538,7 +12540,7 @@ var LayoutRow = class _LayoutRow {
     const inverse = -1 / subjectCoefficient;
     cells.delete(subject);
     this.setConstant(this.getConstant() * inverse);
-    const updatedCells = new System21.Map();
+    const updatedCells = new System22.Map();
     for (const [symbol, value] of cells) {
       updatedCells.set(symbol, value * inverse);
     }
@@ -12598,7 +12600,7 @@ function nearZero(value) {
 __name(nearZero, "nearZero");
 
 // src/ui/autolayout/layoutsolver.js
-var System22 = globalThis;
+var System23 = globalThis;
 var LayoutSolver = class {
   static {
     __name(this, "LayoutSolver");
@@ -12627,10 +12629,10 @@ var LayoutSolver = class {
    * @constructor
    */
   constructor() {
-    this.#constraintTags = new System22.Map();
-    this.#rows = new System22.Map();
-    this.#variableSymbols = new System22.Map();
-    this.#editInfos = new System22.Map();
+    this.#constraintTags = new System23.Map();
+    this.#rows = new System23.Map();
+    this.#variableSymbols = new System23.Map();
+    this.#editInfos = new System23.Map();
     this.#infeasibleRows = [];
     this.#objective = new LayoutRow(0);
     this.#artificial = null;
@@ -12643,21 +12645,21 @@ var LayoutSolver = class {
    */
   addConstraint(constraint) {
     if (this.#constraintTags.has(constraint)) {
-      throw new System22.Error("[LayoutSolver] \uC774\uBBF8 \uCD94\uAC00\uB41C \uC81C\uC57D.");
+      throw new System23.Error("[LayoutSolver] \uC774\uBBF8 \uCD94\uAC00\uB41C \uC81C\uC57D.");
     }
     const tag = new LayoutTag();
     const row = this.createRow(constraint, tag);
     let subject = this.chooseSubject(row, tag);
     if (subject.isInvalid() && allDummies(row)) {
       if (!nearZero2(row.getConstant())) {
-        throw new System22.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
+        throw new System23.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
       }
       subject = tag.getMarker();
     }
     if (subject.isInvalid()) {
       const success = this.addWithArtificialVariable(row);
       if (!success) {
-        throw new System22.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
+        throw new System23.Error("[LayoutSolver] \uBAA8\uC21C \uC81C\uC57D: \uB9CC\uC871 \uBD88\uAC00\uB2A5.");
       }
     } else {
       row.solveFor(subject);
@@ -12676,7 +12678,7 @@ var LayoutSolver = class {
   removeConstraint(constraint) {
     const tag = this.#constraintTags.get(constraint);
     if (tag === void 0) {
-      throw new System22.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uC81C\uC57D.");
+      throw new System23.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uC81C\uC57D.");
     }
     this.#constraintTags.delete(constraint);
     this.removeConstraintEffects(constraint, tag);
@@ -12686,7 +12688,7 @@ var LayoutSolver = class {
     } else {
       const leavingSymbol = this.getMarkerLeavingSymbol(marker);
       if (leavingSymbol.isInvalid()) {
-        throw new System22.Error("[LayoutSolver] \uC81C\uC57D \uC81C\uAC70 \uC2E4\uD328 \u2014 leaving row \uC5C6\uC74C.");
+        throw new System23.Error("[LayoutSolver] \uC81C\uC57D \uC81C\uAC70 \uC2E4\uD328 \u2014 leaving row \uC5C6\uC74C.");
       }
       const leavingRow = this.#rows.get(leavingSymbol);
       this.#rows.delete(leavingSymbol);
@@ -12714,11 +12716,11 @@ var LayoutSolver = class {
    */
   addEditVariable(variable, strength) {
     if (this.#editInfos.has(variable)) {
-      throw new System22.Error("[LayoutSolver] \uC774\uBBF8 \uD3B8\uC9D1 \uBCC0\uC218\uB85C \uB4F1\uB85D\uB428.");
+      throw new System23.Error("[LayoutSolver] \uC774\uBBF8 \uD3B8\uC9D1 \uBCC0\uC218\uB85C \uB4F1\uB85D\uB428.");
     }
     const clipped = LayoutStrength.clipStrength(strength);
     if (clipped >= LayoutStrength.required) {
-      throw new System22.Error("[LayoutSolver] \uD3B8\uC9D1 \uBCC0\uC218\uC5D0\uB294 required \uAC15\uB3C4\uB97C \uC4F8 \uC218 \uC5C6\uC74C.");
+      throw new System23.Error("[LayoutSolver] \uD3B8\uC9D1 \uBCC0\uC218\uC5D0\uB294 required \uAC15\uB3C4\uB97C \uC4F8 \uC218 \uC5C6\uC74C.");
     }
     const expression = LayoutExpression.fromVariable(variable);
     const constraint = new LayoutConstraint(expression, LayoutRelation.equal, clipped);
@@ -12736,7 +12738,7 @@ var LayoutSolver = class {
   removeEditVariable(variable) {
     const editInfo = this.#editInfos.get(variable);
     if (editInfo === void 0) {
-      throw new System22.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
+      throw new System23.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
     }
     this.removeConstraint(editInfo.getConstraint());
     this.#editInfos.delete(variable);
@@ -12762,7 +12764,7 @@ var LayoutSolver = class {
   suggestValue(variable, value) {
     const editInfo = this.#editInfos.get(variable);
     if (editInfo === void 0) {
-      throw new System22.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
+      throw new System23.Error("[LayoutSolver] \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC740 \uD3B8\uC9D1 \uBCC0\uC218.");
     }
     const delta = value - editInfo.getConstant();
     editInfo.setConstant(value);
@@ -12982,7 +12984,7 @@ var LayoutSolver = class {
       }
       const leavingSymbol = this.getLeavingSymbol(enteringSymbol);
       if (leavingSymbol.isInvalid()) {
-        throw new System22.Error("[LayoutSolver] \uBAA9\uC801\uD568\uC218\uAC00 \uBB34\uD55C\uB300 \u2014 bound \uAC00 \uBD80\uC871\uD568.");
+        throw new System23.Error("[LayoutSolver] \uBAA9\uC801\uD568\uC218\uAC00 \uBB34\uD55C\uB300 \u2014 bound \uAC00 \uBD80\uC871\uD568.");
       }
       const leavingRow = this.#rows.get(leavingSymbol);
       this.#rows.delete(leavingSymbol);
@@ -12990,7 +12992,7 @@ var LayoutSolver = class {
       this.substitute(enteringSymbol, leavingRow);
       this.#rows.set(enteringSymbol, leavingRow);
     }
-    throw new System22.Error("[LayoutSolver] optimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
+    throw new System23.Error("[LayoutSolver] optimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
   }
   //==============================================================================
   // 내부: dual simplex 최적화. infeasible 행을 처리.
@@ -13011,14 +13013,14 @@ var LayoutSolver = class {
       }
       const enteringSymbol = this.getDualEnteringSymbol(row);
       if (enteringSymbol.isInvalid()) {
-        throw new System22.Error("[LayoutSolver] dual optimize \uC2E4\uD328 \u2014 entering \uC5C6\uC74C.");
+        throw new System23.Error("[LayoutSolver] dual optimize \uC2E4\uD328 \u2014 entering \uC5C6\uC74C.");
       }
       this.#rows.delete(leavingSymbol);
       row.solveForPair(leavingSymbol, enteringSymbol);
       this.substitute(enteringSymbol, row);
       this.#rows.set(enteringSymbol, row);
     }
-    throw new System22.Error("[LayoutSolver] dualOptimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
+    throw new System23.Error("[LayoutSolver] dualOptimize \uBC18\uBCF5 \uD55C\uACC4 \uCD08\uACFC.");
   }
   //==============================================================================
   // 내부: leaving symbol 결정. (Bland's rule 변형 + 비율 테스트)
@@ -13028,7 +13030,7 @@ var LayoutSolver = class {
    * @returns { LayoutSymbol }
    */
   getLeavingSymbol(enteringSymbol) {
-    let ratio = System22.Number.POSITIVE_INFINITY;
+    let ratio = System23.Number.POSITIVE_INFINITY;
     let result = LayoutSymbol.invalid();
     for (const [symbol, row] of this.#rows) {
       if (symbol.getType() === LayoutSymbolType.external) {
@@ -13053,7 +13055,7 @@ var LayoutSolver = class {
    * @returns { LayoutSymbol }
    */
   getDualEnteringSymbol(row) {
-    let ratio = System22.Number.POSITIVE_INFINITY;
+    let ratio = System23.Number.POSITIVE_INFINITY;
     let result = LayoutSymbol.invalid();
     const cells = row.getCells();
     for (const [symbol, value] of cells) {
@@ -13076,8 +13078,8 @@ var LayoutSolver = class {
    * @returns { LayoutSymbol }
    */
   getMarkerLeavingSymbol(marker) {
-    let ratio1 = System22.Number.POSITIVE_INFINITY;
-    let ratio2 = System22.Number.POSITIVE_INFINITY;
+    let ratio1 = System23.Number.POSITIVE_INFINITY;
+    let ratio2 = System23.Number.POSITIVE_INFINITY;
     let result1 = LayoutSymbol.invalid();
     let result2 = LayoutSymbol.invalid();
     let result3 = LayoutSymbol.invalid();
@@ -13248,14 +13250,14 @@ var LayoutPriority = class {
 };
 
 // src/ui/autolayout/layoutconstraintaxis.js
-var System23 = globalThis;
-var LayoutConstraintAxis = System23.Object.freeze({
+var System24 = globalThis;
+var LayoutConstraintAxis = System24.Object.freeze({
   horizontal: "horizontal",
   vertical: "vertical"
 });
 
 // src/ui/uinode.js
-var System24 = globalThis;
+var System25 = globalThis;
 var NO_INTRINSIC_METRIC = -1;
 var UINode = class _UINode extends TransformNode {
   static {
@@ -13498,7 +13500,7 @@ var UINode = class _UINode extends TransformNode {
     if (axis === LayoutConstraintAxis.vertical) {
       return this.#verticalHuggingPriority;
     }
-    throw new System24.Error("[UINode] getContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+    throw new System25.Error("[UINode] getContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
   }
   //==============================================================================
   // content hugging 우선순위 설정. (UIKit 의 setContentHuggingPriority(_:for:))
@@ -13514,7 +13516,7 @@ var UINode = class _UINode extends TransformNode {
     } else if (axis === LayoutConstraintAxis.vertical) {
       this.#verticalHuggingPriority = priority;
     } else {
-      throw new System24.Error("[UINode] setContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+      throw new System25.Error("[UINode] setContentHuggingPriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
     }
     this.invalidateIntrinsicContentSize();
   }
@@ -13533,7 +13535,7 @@ var UINode = class _UINode extends TransformNode {
     if (axis === LayoutConstraintAxis.vertical) {
       return this.#verticalCompressionResistancePriority;
     }
-    throw new System24.Error("[UINode] getContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+    throw new System25.Error("[UINode] getContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
   }
   //==============================================================================
   // content compression resistance 우선순위 설정.
@@ -13550,7 +13552,7 @@ var UINode = class _UINode extends TransformNode {
     } else if (axis === LayoutConstraintAxis.vertical) {
       this.#verticalCompressionResistancePriority = priority;
     } else {
-      throw new System24.Error("[UINode] setContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
+      throw new System25.Error("[UINode] setContentCompressionResistancePriority: \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uB294 \uCD95.");
     }
     this.invalidateIntrinsicContentSize();
   }
@@ -14000,7 +14002,7 @@ var UINode = class _UINode extends TransformNode {
 UINode.noIntrinsicMetric = NO_INTRINSIC_METRIC;
 
 // src/core/frame.js
-var System25 = globalThis;
+var System26 = globalThis;
 var Frame = class extends Object2 {
   static {
     __name(this, "Frame");
@@ -14025,7 +14027,7 @@ var Frame = class extends Object2 {
     super();
     this.#image = image;
     if (image === null || image === void 0) {
-      throw new System25.Error("image is null.");
+      throw new System26.Error("image is null.");
     }
     if (rect === null || rect === void 0) {
       this.#rect = Rect.create(0, 0, image.width, image.height);
@@ -14299,7 +14301,7 @@ var Animation = class extends Object2 {
 };
 
 // src/resource/imageasset.js
-var System26 = globalThis;
+var System27 = globalThis;
 var ImageAsset2 = class extends Asset {
   static {
     __name(this, "ImageAsset");
@@ -14315,7 +14317,7 @@ var ImageAsset2 = class extends Asset {
   constructor() {
     super();
     this.setAssetType(AssetType.image);
-    this.image = new System26.window.Image();
+    this.image = new System27.window.Image();
   }
   //==============================================================================
   // 비동기 애셋 로드.
@@ -14330,7 +14332,7 @@ var ImageAsset2 = class extends Asset {
       return Promise.resolve();
     }
     await super.load(assetPath);
-    this.image = new System26.window.Image();
+    this.image = new System27.window.Image();
     this.image.src = assetPath;
     await new Promise((resolve, reject) => {
       this.image.onload = () => {
@@ -14714,7 +14716,7 @@ var Sprite = class extends Paint {
 };
 
 // src/core/component/text.js
-var System27 = globalThis;
+var System28 = globalThis;
 var TextAlign = {
   left: "left",
   center: "center",
@@ -14733,7 +14735,7 @@ var TextBaseline = {
 var measurementCanvasRenderingContext = null;
 function getMeasurementCanvasRenderingContext() {
   if (measurementCanvasRenderingContext === null) {
-    const document2 = System27.document;
+    const document2 = System28.document;
     if (document2 === null || document2 === void 0) {
       return null;
     }
@@ -14908,7 +14910,7 @@ var Text = class extends Component {
     graphic.setTextBaseline("middle");
     const strokeColor = this.getStrokeColor();
     const textColor = this.getTextColor();
-    const decorationLineWidth = System27.Math.max(1, this.#fontSize / 16);
+    const decorationLineWidth = System28.Math.max(1, this.#fontSize / 16);
     let remainCount = this.#visibleCharacterCount;
     for (let lineIndex = 0; lineIndex < lineList.length; ++lineIndex) {
       let lineText = lineList[lineIndex];
@@ -15026,11 +15028,11 @@ var Text = class extends Component {
     if (this.#wordWrapWidth <= 0 && text.indexOf("\n") < 0) {
       return { width: this.measurePlainTextWidth(text), height: this.#fontSize * this.#lineSpacing, lineCount: 1 };
     }
-    const wrapWidth = this.#wordWrapWidth > 0 ? this.#wordWrapWidth : System27.Number.POSITIVE_INFINITY;
+    const wrapWidth = this.#wordWrapWidth > 0 ? this.#wordWrapWidth : System28.Number.POSITIVE_INFINITY;
     const lineList = this.wrapTextToLines(text, wrapWidth);
     let maxLineWidth = 0;
     for (const lineText of lineList) {
-      maxLineWidth = System27.Math.max(maxLineWidth, this.measurePlainTextWidth(lineText));
+      maxLineWidth = System28.Math.max(maxLineWidth, this.measurePlainTextWidth(lineText));
     }
     return { width: maxLineWidth, height: lineList.length * this.#fontSize * this.#lineSpacing, lineCount: lineList.length };
   }
@@ -15075,7 +15077,7 @@ var Text = class extends Component {
       const startX = this.computeUnderlineStartX(drawX, textWidth);
       const fontSize = this.#fontSize;
       graphic.setStrokeColor(textColor.toHEXString());
-      const lineWidth = System27.Math.max(1, fontSize / 16);
+      const lineWidth = System28.Math.max(1, fontSize / 16);
       if (this.#underline) {
         const underlineY = drawY + this.computeUnderlineOffsetY(fontSize);
         this.strokeHorizontalLine(graphic, startX, underlineY, textWidth, lineWidth);
@@ -15232,7 +15234,7 @@ var Text = class extends Component {
    * @param { number } wordWrapWidth
    */
   setWordWrapWidth(wordWrapWidth) {
-    this.#wordWrapWidth = System27.Math.max(0, wordWrapWidth);
+    this.#wordWrapWidth = System28.Math.max(0, wordWrapWidth);
   }
   //==============================================================================
   // 자동 줄바꿈 폭 반환.
@@ -15268,7 +15270,7 @@ var Text = class extends Component {
    * @param { number } lineSpacing
    */
   setLineSpacing(lineSpacing) {
-    this.#lineSpacing = System27.Math.max(0.1, lineSpacing);
+    this.#lineSpacing = System28.Math.max(0.1, lineSpacing);
   }
   //==============================================================================
   // 줄 간격 배율 반환.
@@ -15286,7 +15288,7 @@ var Text = class extends Component {
    * @param { number } visibleCharacterCount
    */
   setVisibleCharacterCount(visibleCharacterCount) {
-    this.#visibleCharacterCount = System27.Math.max(-1, System27.Math.floor(visibleCharacterCount));
+    this.#visibleCharacterCount = System28.Math.max(-1, System28.Math.floor(visibleCharacterCount));
   }
   //==============================================================================
   // 표시 글자 수 반환.
@@ -15536,7 +15538,7 @@ var Text = class extends Component {
 };
 
 // src/core/component/richtext.js
-var System28 = globalThis;
+var System29 = globalThis;
 var NAMED_COLORS = {
   red: "#ff0000",
   green: "#00ff00",
@@ -15591,8 +15593,8 @@ function buildAttributesForTag(tagName, value) {
     }
     case "size": {
       const trimmed = value !== void 0 && value !== null ? value.trim() : "";
-      const fontSize = System28.parseInt(trimmed, 10);
-      if (System28.Number.isFinite(fontSize) === false || fontSize <= 0) {
+      const fontSize = System29.parseInt(trimmed, 10);
+      if (System29.Number.isFinite(fontSize) === false || fontSize <= 0) {
         return null;
       }
       return { fontSize };
@@ -15618,7 +15620,7 @@ __name(buildAttributesForTag, "buildAttributesForTag");
 function mergeAttributeStack(stack) {
   const result = {};
   for (const attributes of stack) {
-    for (const key of System28.Object.keys(attributes)) {
+    for (const key of System29.Object.keys(attributes)) {
       if (key === "__tagName") {
         continue;
       }
@@ -15857,7 +15859,7 @@ var RichText = class extends Text {
       graphic.setFillColor(segmentTextColor.toHEXString());
       graphic.drawFillText(segmentText, cursorX, baselineY);
       const segmentWidth = graphic.measureText(segmentText).width;
-      const segmentLineWidth = System28.Math.max(1, segmentFontSize / 16);
+      const segmentLineWidth = System29.Math.max(1, segmentFontSize / 16);
       if (segmentUnderline) {
         const underlineY = baselineY + this.computeUnderlineOffsetY(segmentFontSize);
         graphic.setStrokeColor(segmentTextColor.toHEXString());
@@ -15939,7 +15941,7 @@ var RichText = class extends Text {
 };
 
 // src/misc/localstorage.js
-var System29 = globalThis;
+var System30 = globalThis;
 var LocalStorage = class _LocalStorage extends Object2 {
   static {
     __name(this, "LocalStorage");
@@ -15960,7 +15962,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
   // 전체 제거.
   //==============================================================================
   static clear() {
-    System29.window.localStorage.clear();
+    System30.window.localStorage.clear();
   }
   //==============================================================================
   // 문자열 값 설정.
@@ -15970,7 +15972,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
    * @param { string } stringValue
    */
   static setString(key, stringValue) {
-    System29.window.localStorage.setItem(key, stringValue);
+    System30.window.localStorage.setItem(key, stringValue);
   }
   //==============================================================================
   // 논리 값 설정.
@@ -15999,7 +16001,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
    * @param { string } key 
    */
   static remove(key) {
-    System29.window.localStorage.removeItem(key);
+    System30.window.localStorage.removeItem(key);
   }
   //==============================================================================
   // 문자열 값 반환.
@@ -16010,7 +16012,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
    * @returns { string }
    */
   static getString(key, defaultStringValue = "") {
-    const value = System29.window.localStorage.getItem(key);
+    const value = System30.window.localStorage.getItem(key);
     if (value === null || value === void 0) {
       _LocalStorage.setString(key, defaultStringValue);
       return defaultStringValue;
@@ -16067,7 +16069,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
    * @returns { number } 지운 키 수.
    */
   static clearByPrefix(prefix) {
-    const storage = System29.localStorage;
+    const storage = System30.localStorage;
     if (!storage || !prefix) {
       return 0;
     }
@@ -16084,7 +16086,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
     return removeKeyList.length;
   }
   static containsKey(key) {
-    return System29.window.localStorage.getItem(key) !== null;
+    return System30.window.localStorage.getItem(key) !== null;
   }
   //==============================================================================
   // 모든 키 반환.
@@ -16094,8 +16096,8 @@ var LocalStorage = class _LocalStorage extends Object2 {
    */
   static getKeys() {
     const keys = [];
-    for (let i = 0; i < System29.window.localStorage.length; ++i) {
-      const key = System29.window.localStorage.key(i);
+    for (let i = 0; i < System30.window.localStorage.length; ++i) {
+      const key = System30.window.localStorage.key(i);
       keys.push(key);
     }
     keys.sort();
@@ -16104,7 +16106,7 @@ var LocalStorage = class _LocalStorage extends Object2 {
 };
 
 // src/misc/devtools.js
-var System30 = globalThis;
+var System31 = globalThis;
 var TITLE_HEIGHT = 28;
 var TAB_HEIGHT = 24;
 var ITEM_HEIGHT = 20;
@@ -16565,7 +16567,7 @@ var DEVTools = class extends Object2 {
     }
     if (touchY <= panelY + TITLE_HEIGHT + TAB_HEIGHT) {
       const tabWidth = panelWidth / TABS.length;
-      const tabIndex = System30.Math.floor((touchX - panelX) / tabWidth);
+      const tabIndex = System31.Math.floor((touchX - panelX) / tabWidth);
       if (tabIndex >= 0 && tabIndex < TABS.length) {
         this.#activeTab = tabIndex;
       }
@@ -16597,7 +16599,7 @@ var DEVTools = class extends Object2 {
     if (touchX < panelX + leftWidth) {
       const treeItemsY = contentY + ITEM_HEIGHT * 2;
       const localY2 = touchY - treeItemsY + this.#treeScrollY;
-      const clickedIndex = System30.Math.floor(localY2 / ITEM_HEIGHT);
+      const clickedIndex = System31.Math.floor(localY2 / ITEM_HEIGHT);
       if (clickedIndex >= 0 && clickedIndex < this.#flatList.length) {
         const clickedItem = this.#flatList[clickedIndex];
         const clickedNode = clickedItem.node;
@@ -16635,7 +16637,7 @@ var DEVTools = class extends Object2 {
       return;
     }
     const localY = touchY - contentY + this.#inspectorScrollY;
-    const clickedLineIndex = System30.Math.floor(localY / ITEM_HEIGHT);
+    const clickedLineIndex = System31.Math.floor(localY / ITEM_HEIGHT);
     if (clickedLineIndex >= 0 && clickedLineIndex < this.#cachedInspectorLines.length) {
       const clickedLine = this.#cachedInspectorLines[clickedLineIndex];
       if (clickedLine.isComponentHeader && clickedLine.componentRef) {
@@ -16672,7 +16674,7 @@ var DEVTools = class extends Object2 {
       const isRightMode = this.#resizeMode === ResizeMode.right || this.#resizeMode === ResizeMode.bottomRight;
       if (isRightMode) {
         const newWidth = this.#resizeDragStartPanelWidth + deltaX;
-        this.#panelWidth = System30.Math.max(MIN_PANEL_WIDTH, newWidth);
+        this.#panelWidth = System31.Math.max(MIN_PANEL_WIDTH, newWidth);
       }
       const isLeftMode = this.#resizeMode === ResizeMode.left || this.#resizeMode === ResizeMode.topLeft || this.#resizeMode === ResizeMode.bottomLeft;
       if (isLeftMode) {
@@ -16685,7 +16687,7 @@ var DEVTools = class extends Object2 {
       const isBottomMode = this.#resizeMode === ResizeMode.bottom || this.#resizeMode === ResizeMode.bottomRight || this.#resizeMode === ResizeMode.bottomLeft;
       if (isBottomMode) {
         const newHeight = this.#resizeDragStartPanelHeight + deltaY;
-        this.#panelHeight = System30.Math.max(MIN_PANEL_HEIGHT, newHeight);
+        this.#panelHeight = System31.Math.max(MIN_PANEL_HEIGHT, newHeight);
       }
       const isTopMode = this.#resizeMode === ResizeMode.top || this.#resizeMode === ResizeMode.topLeft;
       if (isTopMode) {
@@ -16698,28 +16700,28 @@ var DEVTools = class extends Object2 {
       if (this.#resizeMode === ResizeMode.splitter) {
         const newLeftWidth = this.#resizeDragStartLeftWidth + deltaX;
         const maxLeftWidth = this.#panelWidth - MIN_LEFT_WIDTH;
-        this.#leftWidth = System30.Math.max(MIN_LEFT_WIDTH, System30.Math.min(maxLeftWidth, newLeftWidth));
+        this.#leftWidth = System31.Math.max(MIN_LEFT_WIDTH, System31.Math.min(maxLeftWidth, newLeftWidth));
       }
     }
     if (this.#isTreeScrollDragging) {
       const deltaY = touchY - this.#treeScrollDragStartMouseY;
       const newScrollY = this.#treeScrollDragStartScrollY - deltaY;
-      this.#treeScrollY = System30.Math.max(0, newScrollY);
+      this.#treeScrollY = System31.Math.max(0, newScrollY);
     }
     if (this.#isInspectorScrollDragging) {
       const deltaY = touchY - this.#inspectorScrollDragStartMouseY;
       const newScrollY = this.#inspectorScrollDragStartScrollY - deltaY;
-      this.#inspectorScrollY = System30.Math.max(0, newScrollY);
+      this.#inspectorScrollY = System31.Math.max(0, newScrollY);
     }
     if (this.#isLocalStorageScrollDragging) {
       const deltaY = touchY - this.#localStorageScrollDragStartMouseY;
       const newScrollY = this.#localStorageScrollDragStartScrollY - deltaY;
-      this.#localStorageScrollY = System30.Math.max(0, newScrollY);
+      this.#localStorageScrollY = System31.Math.max(0, newScrollY);
     }
     if (this.#isStatisticsScrollDragging) {
       const deltaY = touchY - this.#statisticsScrollDragStartMouseY;
       const newScrollY = this.#statisticsScrollDragStartScrollY - deltaY;
-      this.#statisticsScrollY = System30.Math.max(0, newScrollY);
+      this.#statisticsScrollY = System31.Math.max(0, newScrollY);
     }
   }
   //==============================================================================
@@ -16756,15 +16758,15 @@ var DEVTools = class extends Object2 {
     const clearBtnX = panelX + panelWidth - PADDING - clearBtnWidth;
     const addBtnX = clearBtnX - PADDING - addBtnWidth;
     if (touchX >= addBtnX && touchX <= addBtnX + addBtnWidth && touchY >= btnY && touchY <= btnY + btnHeight) {
-      const newKey = System30.window.prompt("\uD0A4 \uC785\uB825:");
+      const newKey = System31.window.prompt("\uD0A4 \uC785\uB825:");
       if (newKey !== null && newKey.trim() !== "") {
-        const newValue = System30.window.prompt("\uAC12 \uC785\uB825:") || "";
+        const newValue = System31.window.prompt("\uAC12 \uC785\uB825:") || "";
         LocalStorage.setString(newKey.trim(), newValue);
       }
       return;
     }
     if (touchX >= clearBtnX && touchX <= clearBtnX + clearBtnWidth && touchY >= btnY && touchY <= btnY + btnHeight) {
-      if (System30.window.confirm("\uBAA8\uB4E0 \uB85C\uCEEC \uC2A4\uD1A0\uB9AC\uC9C0 \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?")) {
+      if (System31.window.confirm("\uBAA8\uB4E0 \uB85C\uCEEC \uC2A4\uD1A0\uB9AC\uC9C0 \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?")) {
         LocalStorage.clear();
         this.#selectedLocalStorageKey = null;
       }
@@ -16789,7 +16791,7 @@ var DEVTools = class extends Object2 {
         if (buttonIndex >= 0) {
           switch (buttonIndex) {
             case 0: {
-              const newKey = System30.window.prompt("\uD0A4 \uC774\uB984 \uC218\uC815:", selectedKey);
+              const newKey = System31.window.prompt("\uD0A4 \uC774\uB984 \uC218\uC815:", selectedKey);
               if (newKey !== null && newKey.trim() !== "" && newKey.trim() !== selectedKey) {
                 const existingValue = LocalStorage.getString(selectedKey) || "";
                 LocalStorage.remove(selectedKey);
@@ -16800,7 +16802,7 @@ var DEVTools = class extends Object2 {
             }
             case 1: {
               const currentValue = LocalStorage.getString(selectedKey) || "";
-              const newValue = System30.window.prompt(`"${selectedKey}" \uAC12 \uC218\uC815:`, currentValue);
+              const newValue = System31.window.prompt(`"${selectedKey}" \uAC12 \uC218\uC815:`, currentValue);
               if (newValue !== null) {
                 LocalStorage.setString(selectedKey, newValue);
               }
@@ -16814,7 +16816,7 @@ var DEVTools = class extends Object2 {
               break;
             }
             case 3: {
-              if (System30.window.confirm(`"${selectedKey}" \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) {
+              if (System31.window.confirm(`"${selectedKey}" \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) {
                 LocalStorage.remove(selectedKey);
                 this.#selectedLocalStorageKey = null;
               }
@@ -16829,12 +16831,12 @@ var DEVTools = class extends Object2 {
     const keys = LocalStorage.getKeys();
     const delColWidth = 24;
     const localY = touchY - itemsY + this.#localStorageScrollY;
-    const clickedIndex = System30.Math.floor(localY / ITEM_HEIGHT);
+    const clickedIndex = System31.Math.floor(localY / ITEM_HEIGHT);
     if (touchY >= itemsY && clickedIndex >= 0 && clickedIndex < keys.length) {
       const clickedKey = keys[clickedIndex];
       const delBtnX = panelX + panelWidth - SCROLL_BAR_WIDTH - delColWidth;
       if (touchX >= delBtnX) {
-        if (System30.window.confirm(`"${clickedKey}" \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) {
+        if (System31.window.confirm(`"${clickedKey}" \uD56D\uBAA9\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?`)) {
           LocalStorage.remove(clickedKey);
           if (this.#selectedLocalStorageKey === clickedKey) {
             this.#selectedLocalStorageKey = null;
@@ -16898,9 +16900,9 @@ var DEVTools = class extends Object2 {
   getComponentProperties(component) {
     const properties = [];
     const seenNames = /* @__PURE__ */ new Set();
-    let proto = System30.Object.getPrototypeOf(component);
-    while (proto && proto.constructor && proto.constructor !== Component && proto !== System30.Object.prototype) {
-      const methodNames = System30.Object.getOwnPropertyNames(proto);
+    let proto = System31.Object.getPrototypeOf(component);
+    while (proto && proto.constructor && proto.constructor !== Component && proto !== System31.Object.prototype) {
+      const methodNames = System31.Object.getOwnPropertyNames(proto);
       for (let i = 0; i < methodNames.length; ++i) {
         const methodName = methodNames[i];
         if (seenNames.has(methodName)) {
@@ -16926,7 +16928,7 @@ var DEVTools = class extends Object2 {
         } catch (error) {
         }
       }
-      proto = System30.Object.getPrototypeOf(proto);
+      proto = System31.Object.getPrototypeOf(proto);
     }
     return properties;
   }
@@ -16986,9 +16988,9 @@ var DEVTools = class extends Object2 {
         return `(${rectX}, ${rectY}, ${value.width.toFixed(1)}, ${value.height.toFixed(1)})`;
       }
       if (typeof value.red === "number" && typeof value.green === "number" && typeof value.blue === "number") {
-        const r = System30.Math.round(value.red * 255);
-        const g = System30.Math.round(value.green * 255);
-        const b = System30.Math.round(value.blue * 255);
+        const r = System31.Math.round(value.red * 255);
+        const g = System31.Math.round(value.green * 255);
+        const b = System31.Math.round(value.blue * 255);
         const a = typeof value.alpha === "number" ? value.alpha.toFixed(2) : "1";
         return `rgba(${r}, ${g}, ${b}, ${a})`;
       }
@@ -17211,7 +17213,7 @@ var DEVTools = class extends Object2 {
     const totalItemsHeight = this.#flatList.length * ITEM_HEIGHT;
     if (totalItemsHeight > itemsHeight) {
       const maxTreeScrollY = totalItemsHeight - itemsHeight;
-      this.#treeScrollY = System30.Math.min(this.#treeScrollY, maxTreeScrollY);
+      this.#treeScrollY = System31.Math.min(this.#treeScrollY, maxTreeScrollY);
     } else {
       this.#treeScrollY = 0;
     }
@@ -17256,7 +17258,7 @@ var DEVTools = class extends Object2 {
         graphic.setTextAlign("right");
         const checkboxRightX = panelX + panelWidth - SCROLL_BAR_WIDTH - GIZMO_CHECKBOX_MARGIN;
         const checkboxX = checkboxRightX - GIZMO_CHECKBOX_SIZE;
-        const checkboxY = System30.Math.floor(itemMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+        const checkboxY = System31.Math.floor(itemMidY - GIZMO_CHECKBOX_SIZE * 0.5);
         const isGizmoVisible = typeof node.isGizmoVisible === "function" ? node.isGizmoVisible() : false;
         graphic.setFillColor(COLOR_ACCENT);
         graphic.drawRect(Rect.create(checkboxX, checkboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
@@ -17281,7 +17283,7 @@ var DEVTools = class extends Object2 {
     if (totalItemsHeight > itemsHeight) {
       const maxTreeScrollY = totalItemsHeight - itemsHeight;
       const scrollRatio = this.#treeScrollY / maxTreeScrollY;
-      const barHeight = System30.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
+      const barHeight = System31.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
       const barY = itemsY + scrollRatio * (itemsHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -17313,7 +17315,7 @@ var DEVTools = class extends Object2 {
     const totalContentHeight = inspectorLines.length * ITEM_HEIGHT;
     if (totalContentHeight > panelHeight) {
       const maxInspectorScrollY = totalContentHeight - panelHeight;
-      this.#inspectorScrollY = System30.Math.min(this.#inspectorScrollY, maxInspectorScrollY);
+      this.#inspectorScrollY = System31.Math.min(this.#inspectorScrollY, maxInspectorScrollY);
     } else {
       this.#inspectorScrollY = 0;
     }
@@ -17385,7 +17387,7 @@ var DEVTools = class extends Object2 {
     if (totalContentHeight > panelHeight) {
       const maxInspectorScrollY = totalContentHeight - panelHeight;
       const scrollRatio = this.#inspectorScrollY / maxInspectorScrollY;
-      const barHeight = System30.Math.max(20, panelHeight * panelHeight / totalContentHeight);
+      const barHeight = System31.Math.max(20, panelHeight * panelHeight / totalContentHeight);
       const barY = panelY + scrollRatio * (panelHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -17433,7 +17435,7 @@ var DEVTools = class extends Object2 {
     graphic.drawRect(Rect.create(panelX, columnHeaderY, panelWidth, ITEM_HEIGHT));
     const delColWidth = 24;
     const availableWidth = panelWidth - delColWidth - SCROLL_BAR_WIDTH;
-    const keyColWidth = System30.Math.floor(availableWidth * 0.4);
+    const keyColWidth = System31.Math.floor(availableWidth * 0.4);
     const valueColWidth = availableWidth - keyColWidth;
     graphic.setFillColor(COLOR_TEXT_DIM);
     graphic.setFontString(`${FONT_SIZE - 1}px monospace`);
@@ -17451,7 +17453,7 @@ var DEVTools = class extends Object2 {
     const totalItemsHeight = keys.length * ITEM_HEIGHT;
     if (totalItemsHeight > itemsHeight) {
       const maxScrollY = totalItemsHeight - itemsHeight;
-      this.#localStorageScrollY = System30.Math.min(this.#localStorageScrollY, maxScrollY);
+      this.#localStorageScrollY = System31.Math.min(this.#localStorageScrollY, maxScrollY);
     } else {
       this.#localStorageScrollY = 0;
     }
@@ -17478,12 +17480,12 @@ var DEVTools = class extends Object2 {
       graphic.setFontString(`${FONT_SIZE}px monospace`);
       graphic.setTextAlign("left");
       graphic.setTextBaseline("middle");
-      const maxKeyChars = System30.Math.floor(keyColWidth / 7);
+      const maxKeyChars = System31.Math.floor(keyColWidth / 7);
       const keyText = key.length > maxKeyChars ? key.slice(0, maxKeyChars - 3) + "..." : key;
       graphic.drawFillText(keyText, panelX + PADDING, itemMidY);
       graphic.setFillColor(COLOR_PROPERTY_VALUE);
       const valueStr = rawValue !== null ? rawValue : "(null)";
-      const maxValueChars = System30.Math.floor(valueColWidth / 7);
+      const maxValueChars = System31.Math.floor(valueColWidth / 7);
       const valueText = valueStr.length > maxValueChars ? valueStr.slice(0, maxValueChars - 3) + "..." : valueStr;
       graphic.drawFillText(valueText, panelX + keyColWidth + PADDING, itemMidY);
       const delBtnX = panelX + panelWidth - SCROLL_BAR_WIDTH - delColWidth;
@@ -17505,7 +17507,7 @@ var DEVTools = class extends Object2 {
     if (totalItemsHeight > itemsHeight) {
       const maxScrollY = totalItemsHeight - itemsHeight;
       const scrollRatio = this.#localStorageScrollY / maxScrollY;
-      const barHeight = System30.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
+      const barHeight = System31.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
       const barY = itemsY + scrollRatio * (itemsHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -17530,7 +17532,7 @@ var DEVTools = class extends Object2 {
       const contextButtonWidths = [];
       for (let labelIndex = 0; labelIndex < contextButtonCount; ++labelIndex) {
         const measuredTextWidth = graphic.measureText(contextButtonTexts[labelIndex]).width;
-        contextButtonWidths.push(System30.Math.ceil(measuredTextWidth) + contextButtonTextPadding * 2);
+        contextButtonWidths.push(System31.Math.ceil(measuredTextWidth) + contextButtonTextPadding * 2);
       }
       let totalContextButtonWidth = contextButtonGap * (contextButtonCount - 1);
       for (let widthIndex = 0; widthIndex < contextButtonWidths.length; ++widthIndex) {
@@ -17629,7 +17631,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Dim Background", panelX + PADDING, dimRowMidY);
     const dimCheckboxX = panelX + PADDING + 120;
-    const dimCheckboxY = System30.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const dimCheckboxY = System31.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isDimEnabled ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(dimCheckboxX, dimCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isDimEnabled) {
@@ -17644,7 +17646,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show All Gizmos", panelX + PADDING, gizmosRowMidY);
     const gizmosCheckboxX = panelX + PADDING + 120;
-    const gizmosCheckboxY = System30.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const gizmosCheckboxY = System31.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isAllGizmosVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(gizmosCheckboxX, gizmosCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isAllGizmosVisible) {
@@ -17659,7 +17661,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show Height Aspect Guide", panelX + PADDING, heightAspectGuideRowMidY);
     const heightAspectGuideCheckboxX = panelX + PADDING + 168;
-    const heightAspectGuideCheckboxY = System30.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const heightAspectGuideCheckboxY = System31.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isHeightAspectGuideVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(heightAspectGuideCheckboxX, heightAspectGuideCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isHeightAspectGuideVisible) {
@@ -17674,7 +17676,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show Width Aspect Guide", panelX + PADDING, widthAspectGuideRowMidY);
     const widthAspectGuideCheckboxX = panelX + PADDING + 168;
-    const widthAspectGuideCheckboxY = System30.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const widthAspectGuideCheckboxY = System31.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isWidthAspectGuideVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(widthAspectGuideCheckboxX, widthAspectGuideCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isWidthAspectGuideVisible) {
@@ -17689,7 +17691,7 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Show FPS", panelX + PADDING, framePerSecondRowMidY);
     const framePerSecondCheckboxX = panelX + PADDING + 120;
-    const framePerSecondCheckboxY = System30.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const framePerSecondCheckboxY = System31.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     graphic.setFillColor(this.#isFramePerSecondVisible ? COLOR_TRUE : COLOR_ACCENT);
     graphic.drawRect(Rect.create(framePerSecondCheckboxX, framePerSecondCheckboxY, GIZMO_CHECKBOX_SIZE, GIZMO_CHECKBOX_SIZE));
     if (!this.#isFramePerSecondVisible) {
@@ -17713,7 +17715,7 @@ var DEVTools = class extends Object2 {
     const dimRowY = panelY + ITEM_HEIGHT;
     const dimRowMidY = dimRowY + ITEM_HEIGHT * 0.5;
     const dimCheckboxX = panelX + PADDING + 120;
-    const dimCheckboxY = System30.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const dimCheckboxY = System31.Math.floor(dimRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isDimCheckboxHit = touchX >= dimCheckboxX && touchX <= dimCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= dimCheckboxY && touchY <= dimCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isDimCheckboxHit) {
       this.#isDimEnabled = !this.#isDimEnabled;
@@ -17723,7 +17725,7 @@ var DEVTools = class extends Object2 {
     const gizmosRowY = panelY + ITEM_HEIGHT * 2;
     const gizmosRowMidY = gizmosRowY + ITEM_HEIGHT * 0.5;
     const gizmosCheckboxX = panelX + PADDING + 120;
-    const gizmosCheckboxY = System30.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const gizmosCheckboxY = System31.Math.floor(gizmosRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isGizmosCheckboxHit = touchX >= gizmosCheckboxX && touchX <= gizmosCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= gizmosCheckboxY && touchY <= gizmosCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isGizmosCheckboxHit) {
       this.#isAllGizmosVisible = !this.#isAllGizmosVisible;
@@ -17735,7 +17737,7 @@ var DEVTools = class extends Object2 {
     const heightAspectGuideRowY = panelY + ITEM_HEIGHT * 3;
     const heightAspectGuideRowMidY = heightAspectGuideRowY + ITEM_HEIGHT * 0.5;
     const heightAspectGuideCheckboxX = panelX + PADDING + 168;
-    const heightAspectGuideCheckboxY = System30.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const heightAspectGuideCheckboxY = System31.Math.floor(heightAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isHeightAspectGuideCheckboxHit = touchX >= heightAspectGuideCheckboxX && touchX <= heightAspectGuideCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= heightAspectGuideCheckboxY && touchY <= heightAspectGuideCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isHeightAspectGuideCheckboxHit) {
       this.#isHeightAspectGuideVisible = !this.#isHeightAspectGuideVisible;
@@ -17745,7 +17747,7 @@ var DEVTools = class extends Object2 {
     const widthAspectGuideRowY = panelY + ITEM_HEIGHT * 4;
     const widthAspectGuideRowMidY = widthAspectGuideRowY + ITEM_HEIGHT * 0.5;
     const widthAspectGuideCheckboxX = panelX + PADDING + 168;
-    const widthAspectGuideCheckboxY = System30.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const widthAspectGuideCheckboxY = System31.Math.floor(widthAspectGuideRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isWidthAspectGuideCheckboxHit = touchX >= widthAspectGuideCheckboxX && touchX <= widthAspectGuideCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= widthAspectGuideCheckboxY && touchY <= widthAspectGuideCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isWidthAspectGuideCheckboxHit) {
       this.#isWidthAspectGuideVisible = !this.#isWidthAspectGuideVisible;
@@ -17755,7 +17757,7 @@ var DEVTools = class extends Object2 {
     const framePerSecondRowY = panelY + ITEM_HEIGHT * 5;
     const framePerSecondRowMidY = framePerSecondRowY + ITEM_HEIGHT * 0.5;
     const framePerSecondCheckboxX = panelX + PADDING + 120;
-    const framePerSecondCheckboxY = System30.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
+    const framePerSecondCheckboxY = System31.Math.floor(framePerSecondRowMidY - GIZMO_CHECKBOX_SIZE * 0.5);
     const isFramePerSecondCheckboxHit = touchX >= framePerSecondCheckboxX && touchX <= framePerSecondCheckboxX + GIZMO_CHECKBOX_SIZE && touchY >= framePerSecondCheckboxY && touchY <= framePerSecondCheckboxY + GIZMO_CHECKBOX_SIZE;
     if (isFramePerSecondCheckboxHit) {
       this.#isFramePerSecondVisible = !this.#isFramePerSecondVisible;
@@ -17771,7 +17773,7 @@ var DEVTools = class extends Object2 {
     }
     const settingsJson = LocalStorage.getString(SETTINGS_STORAGE_KEY);
     try {
-      const settingsObject = System30.JSON.parse(settingsJson);
+      const settingsObject = System31.JSON.parse(settingsJson);
       if (typeof settingsObject.dimEnabled === "boolean") {
         this.#isDimEnabled = settingsObject.dimEnabled;
       }
@@ -17795,7 +17797,7 @@ var DEVTools = class extends Object2 {
   //==============================================================================
   saveSettings() {
     const settingsObject = { dimEnabled: this.#isDimEnabled, allGizmosVisible: this.#isAllGizmosVisible, heightAspectGuideVisible: this.#isHeightAspectGuideVisible, widthAspectGuideVisible: this.#isWidthAspectGuideVisible, framePerSecondVisible: this.#isFramePerSecondVisible };
-    const settingsJson = System30.JSON.stringify(settingsObject);
+    const settingsJson = System31.JSON.stringify(settingsObject);
     LocalStorage.setString(SETTINGS_STORAGE_KEY, settingsJson);
   }
   //==============================================================================
@@ -17866,7 +17868,7 @@ var DEVTools = class extends Object2 {
     const timeDeltaText = `${timeDelta.toFixed(3)}s`;
     items.push({ key: "timeDelta", value: timeDeltaText, isSeparator: false, isSectionHeader: false });
     items.push({ key: "Memory (Chrome Only)", value: "", isSeparator: false, isSectionHeader: true });
-    const performanceMemory = System30.window.performance ? System30.window.performance.memory : null;
+    const performanceMemory = System31.window.performance ? System31.window.performance.memory : null;
     if (performanceMemory) {
       const usedHeapMegabytes = (performanceMemory.usedJSHeapSize / (1024 * 1024)).toFixed(2);
       items.push({ key: "usedJSHeapSize", value: `${usedHeapMegabytes} MB`, isSeparator: false, isSectionHeader: false });
@@ -17901,20 +17903,20 @@ var DEVTools = class extends Object2 {
     graphic.setTextBaseline("middle");
     graphic.drawFillText("Statistics", panelX + PADDING, panelY + ITEM_HEIGHT * 0.5);
     const availableWidth = panelWidth - SCROLL_BAR_WIDTH;
-    const keyColumnWidth = System30.Math.floor(availableWidth * 0.4);
+    const keyColumnWidth = System31.Math.floor(availableWidth * 0.4);
     const statisticsItems = this.gatherStatisticsItems();
     const itemsY = panelY + ITEM_HEIGHT;
     const itemsHeight = panelHeight - ITEM_HEIGHT;
     const totalItemsHeight = statisticsItems.length * ITEM_HEIGHT;
     if (totalItemsHeight > itemsHeight) {
       const maxStatisticsScrollY = totalItemsHeight - itemsHeight;
-      this.#statisticsScrollY = System30.Math.min(this.#statisticsScrollY, maxStatisticsScrollY);
+      this.#statisticsScrollY = System31.Math.min(this.#statisticsScrollY, maxStatisticsScrollY);
     } else {
       this.#statisticsScrollY = 0;
     }
     const valueColumnWidth = availableWidth - keyColumnWidth;
-    const maxKeyCharacters = System30.Math.floor(keyColumnWidth / 7);
-    const maxValueCharacters = System30.Math.floor(valueColumnWidth / 7);
+    const maxKeyCharacters = System31.Math.floor(keyColumnWidth / 7);
+    const maxValueCharacters = System31.Math.floor(valueColumnWidth / 7);
     graphic.beginClipRect(Rect.create(panelX, itemsY, panelWidth, itemsHeight));
     for (let itemIndex = 0; itemIndex < statisticsItems.length; ++itemIndex) {
       const statisticsItem = statisticsItems[itemIndex];
@@ -17967,7 +17969,7 @@ var DEVTools = class extends Object2 {
     if (totalItemsHeight > itemsHeight) {
       const maxStatisticsScrollY = totalItemsHeight - itemsHeight;
       const scrollRatio = this.#statisticsScrollY / maxStatisticsScrollY;
-      const barHeight = System30.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
+      const barHeight = System31.Math.max(20, itemsHeight * itemsHeight / totalItemsHeight);
       const barY = itemsY + scrollRatio * (itemsHeight - barHeight);
       graphic.setFillColor(COLOR_SCROLLBAR);
       graphic.drawRect(Rect.create(panelX + panelWidth - SCROLL_BAR_WIDTH, barY, SCROLL_BAR_WIDTH, barHeight));
@@ -17989,7 +17991,7 @@ var DEVTools = class extends Object2 {
     const statisticsItems = this.gatherStatisticsItems();
     const itemsY = panelY + ITEM_HEIGHT;
     const localY = touchY - itemsY + this.#statisticsScrollY;
-    const clickedIndex = System30.Math.floor(localY / ITEM_HEIGHT);
+    const clickedIndex = System31.Math.floor(localY / ITEM_HEIGHT);
     if (touchY >= itemsY && clickedIndex >= 0 && clickedIndex < statisticsItems.length) {
       const clickedItem = statisticsItems[clickedIndex];
       if (!clickedItem.isSeparator && !clickedItem.isSectionHeader) {
@@ -18011,7 +18013,7 @@ var DEVTools = class extends Object2 {
 };
 
 // src/ui/uiscene.js
-var System31 = globalThis;
+var System32 = globalThis;
 var UIScene = class extends Scene {
   static {
     __name(this, "UIScene");
@@ -18158,19 +18160,19 @@ var UIScene = class extends Scene {
    */
   async load(engine) {
     await super.load(engine);
-    this.#loadStartTime = System31.Date.now();
+    this.#loadStartTime = System32.Date.now();
     this.#loadTouchedToSkip = false;
     const skipHandler = /* @__PURE__ */ __name(() => {
       this.#loadTouchedToSkip = true;
     }, "skipHandler");
-    System31.window.addEventListener("pointerdown", skipHandler, { once: true });
+    System32.window.addEventListener("pointerdown", skipHandler, { once: true });
     try {
       await this.loadAssets();
-      while (System31.Date.now() - this.#loadStartTime < this.#loadMinDurationMs && !this.#loadTouchedToSkip) {
-        await new Promise((resolve) => System31.setTimeout(resolve, 50));
+      while (System32.Date.now() - this.#loadStartTime < this.#loadMinDurationMs && !this.#loadTouchedToSkip) {
+        await new Promise((resolve) => System32.setTimeout(resolve, 50));
       }
     } finally {
-      System31.window.removeEventListener("pointerdown", skipHandler);
+      System32.window.removeEventListener("pointerdown", skipHandler);
     }
     const viewManager = engine.getViewManager();
     const viewSize = viewManager.getViewSize();
@@ -18225,8 +18227,8 @@ var UIScene = class extends Scene {
       const positionY = (viewSize.y - targetHeight) * 0.5;
       graphic.drawImage(image, Vector2.create(positionX, positionY), Vector2.create(targetWidth, targetHeight));
     }
-    const elapsed = System31.Date.now() - this.#loadStartTime;
-    const progress = System31.Math.min(1, System31.Math.max(0, elapsed / this.#loadMinDurationMs));
+    const elapsed = System32.Date.now() - this.#loadStartTime;
+    const progress = System32.Math.min(1, System32.Math.max(0, elapsed / this.#loadMinDurationMs));
     const barWidth = viewSize.x * 0.6;
     const barHeight = 24;
     const barX = (viewSize.x - barWidth) * 0.5;
@@ -18281,8 +18283,8 @@ var UIScene = class extends Scene {
     const safeAreaRect = this.computeSafeAreaRect();
     const insetTop = safeAreaRect.position.y;
     const insetLeft = safeAreaRect.position.x;
-    const insetRight = System31.Math.max(viewSize.x - (safeAreaRect.position.x + safeAreaRect.size.x), 0);
-    const insetBottom = System31.Math.max(viewSize.y - (safeAreaRect.position.y + safeAreaRect.size.y), 0);
+    const insetRight = System32.Math.max(viewSize.x - (safeAreaRect.position.x + safeAreaRect.size.x), 0);
+    const insetBottom = System32.Math.max(viewSize.y - (safeAreaRect.position.y + safeAreaRect.size.y), 0);
     const previousInsets = this.#safeAreaInsets;
     if (previousInsets.top !== insetTop || previousInsets.left !== insetLeft || previousInsets.right !== insetRight || previousInsets.bottom !== insetBottom) {
       this.setSafeAreaInsets({
@@ -18305,20 +18307,20 @@ var UIScene = class extends Scene {
     const viewManager = engine.getViewManager();
     const viewSize = viewManager.getViewSize();
     const targetScale = viewManager.getTargetResolutionScale();
-    const div = System31.document.createElement("div");
+    const div = System32.document.createElement("div");
     div.style.position = "absolute";
     div.style.visibility = "hidden";
     div.style.paddingTop = "env(safe-area-inset-top)";
     div.style.paddingRight = "env(safe-area-inset-right)";
     div.style.paddingBottom = "env(safe-area-inset-bottom)";
     div.style.paddingLeft = "env(safe-area-inset-left)";
-    System31.document.body.appendChild(div);
-    const computedStyle = System31.window.getComputedStyle(div);
-    const insetTopCss = System31.Number.parseInt(computedStyle.paddingTop) || 0;
-    const insetRightCss = System31.Number.parseInt(computedStyle.paddingRight) || 0;
-    const insetBottomCss = System31.Number.parseInt(computedStyle.paddingBottom) || 0;
-    const insetLeftCss = System31.Number.parseInt(computedStyle.paddingLeft) || 0;
-    System31.document.body.removeChild(div);
+    System32.document.body.appendChild(div);
+    const computedStyle = System32.window.getComputedStyle(div);
+    const insetTopCss = System32.Number.parseInt(computedStyle.paddingTop) || 0;
+    const insetRightCss = System32.Number.parseInt(computedStyle.paddingRight) || 0;
+    const insetBottomCss = System32.Number.parseInt(computedStyle.paddingBottom) || 0;
+    const insetLeftCss = System32.Number.parseInt(computedStyle.paddingLeft) || 0;
+    System32.document.body.removeChild(div);
     const scale = targetScale > 0 ? targetScale : 1;
     const insetTop = insetTopCss / scale;
     const insetRight = insetRightCss / scale;
@@ -18326,8 +18328,8 @@ var UIScene = class extends Scene {
     const insetLeft = insetLeftCss / scale;
     const x = insetLeft;
     const y = insetTop;
-    const width = System31.Math.max(viewSize.x - insetLeft - insetRight, 0);
-    const height = System31.Math.max(viewSize.y - insetTop - insetBottom, 0);
+    const width = System32.Math.max(viewSize.x - insetLeft - insetRight, 0);
+    const height = System32.Math.max(viewSize.y - insetTop - insetBottom, 0);
     return Rect.create(x, y, width, height);
   }
   //==============================================================================
@@ -19201,7 +19203,7 @@ var UIControl = class extends UIView {
 };
 
 // src/ui/uibutton.js
-var System32 = globalThis;
+var System33 = globalThis;
 var ButtonState = {
   normal: Enum.begin(),
   hover: Enum.auto(),
@@ -19357,7 +19359,7 @@ var UIButton = class extends UIControl {
     if (currentButtonState === ButtonState.pressed || currentButtonState === ButtonState.disabled) {
       return;
     }
-    const engine = System32.vanillaEngine;
+    const engine = System33.vanillaEngine;
     if (!engine) {
       return;
     }
@@ -19636,7 +19638,7 @@ var UIButton = class extends UIControl {
    * @param { number } minimumPressedSeconds
    */
   setMinimumPressedSeconds(minimumPressedSeconds) {
-    this.#minimumPressedSeconds = System32.Math.max(0, minimumPressedSeconds);
+    this.#minimumPressedSeconds = System33.Math.max(0, minimumPressedSeconds);
   }
   //==============================================================================
   // 최소 눌림 표시 시간 반환.
@@ -20214,7 +20216,7 @@ var UIProgressView = class extends UIView {
 };
 
 // src/ui/uiinputfield.js
-var System33 = globalThis;
+var System34 = globalThis;
 var UIInputField = class extends WorldNode {
   static {
     __name(this, "UIInputField");
@@ -20524,8 +20526,8 @@ var UIInputField = class extends WorldNode {
         const selEnd = this.#domInput.selectionEnd;
         const selStart = this.#domInput.selectionStart;
         if (typeof selEnd === "number" && typeof selStart === "number") {
-          const ourMin = System33.Math.min(this.#cursorIndex, this.#selectionStart);
-          const ourMax = System33.Math.max(this.#cursorIndex, this.#selectionStart);
+          const ourMin = System34.Math.min(this.#cursorIndex, this.#selectionStart);
+          const ourMax = System34.Math.max(this.#cursorIndex, this.#selectionStart);
           if (selStart !== ourMin || selEnd !== ourMax) {
             this.#cursorIndex = selEnd;
             this.#selectionStart = selStart;
@@ -20568,8 +20570,8 @@ var UIInputField = class extends WorldNode {
     this.#selectionStart = this.#dragStartIndex;
     this.#cursorIndex = index;
     if (this.#domInput) {
-      const selStart = System33.Math.min(this.#dragStartIndex, index);
-      const selEnd = System33.Math.max(this.#dragStartIndex, index);
+      const selStart = System34.Math.min(this.#dragStartIndex, index);
+      const selEnd = System34.Math.max(this.#dragStartIndex, index);
       this.#domInput.setSelectionRange(selStart, selEnd);
     }
     this.#blinkTimer = 0;
@@ -20633,7 +20635,7 @@ var UIInputField = class extends WorldNode {
   refreshTextPositions() {
     const size = this.getContentSize();
     if (size.x <= 0 || size.y <= 0) return;
-    const inner = Vector2.create(System33.Math.max(0, size.x - this.#padding * 2), size.y);
+    const inner = Vector2.create(System34.Math.max(0, size.x - this.#padding * 2), size.y);
     this.#textTextNode.setLocalPosition(Vector2.create(this.#padding, 0));
     this.#textTextNode.setContentSize(inner);
     this.#placeholderTextNode.setLocalPosition(Vector2.create(this.#padding, 0));
@@ -20646,7 +20648,7 @@ var UIInputField = class extends WorldNode {
   //==============================================================================
   attachDOMInput() {
     if (this.#domInput) return;
-    const doc = System33.document;
+    const doc = System34.document;
     ensureGlobalHiddenInputStyle(doc);
     const input = doc.createElement("input");
     input.type = "text";
@@ -20809,11 +20811,11 @@ var UIInputField = class extends WorldNode {
   attachCanvasKeyboard() {
     if (this.#canvasKeydownHandler) return;
     this.#canvasKeydownHandler = (event) => this.handleCanvasKeydown(event);
-    System33.document.addEventListener("keydown", this.#canvasKeydownHandler);
+    System34.document.addEventListener("keydown", this.#canvasKeydownHandler);
   }
   detachCanvasKeyboard() {
     if (!this.#canvasKeydownHandler) return;
-    System33.document.removeEventListener("keydown", this.#canvasKeydownHandler);
+    System34.document.removeEventListener("keydown", this.#canvasKeydownHandler);
     this.#canvasKeydownHandler = null;
   }
   handleCanvasKeydown(event) {
@@ -20874,7 +20876,7 @@ var UIInputField = class extends WorldNode {
     this.#cursorVisible = true;
   }
   moveCursor(newIndex, extendSelection) {
-    const clamped = System33.Math.max(0, System33.Math.min(this.#value.length, newIndex));
+    const clamped = System34.Math.max(0, System34.Math.min(this.#value.length, newIndex));
     this.#cursorIndex = clamped;
     if (!extendSelection) this.#selectionStart = clamped;
     this.refreshTexts();
@@ -20907,8 +20909,8 @@ var UIInputField = class extends WorldNode {
   getSelectionRange() {
     if (!this.hasSelection()) return null;
     return {
-      start: System33.Math.min(this.#cursorIndex, this.#selectionStart),
-      end: System33.Math.max(this.#cursorIndex, this.#selectionStart)
+      start: System34.Math.min(this.#cursorIndex, this.#selectionStart),
+      end: System34.Math.max(this.#cursorIndex, this.#selectionStart)
     };
   }
   getSelectionText() {
@@ -20950,8 +20952,8 @@ var UIInputField = class extends WorldNode {
   }
   writeClipboard(text) {
     try {
-      if (System33.navigator && System33.navigator.clipboard) {
-        System33.navigator.clipboard.writeText(text).catch(() => {
+      if (System34.navigator && System34.navigator.clipboard) {
+        System34.navigator.clipboard.writeText(text).catch(() => {
         });
       }
     } catch (error) {
@@ -20959,12 +20961,12 @@ var UIInputField = class extends WorldNode {
   }
   readClipboard() {
     try {
-      if (System33.navigator && System33.navigator.clipboard) {
-        return System33.navigator.clipboard.readText();
+      if (System34.navigator && System34.navigator.clipboard) {
+        return System34.navigator.clipboard.readText();
       }
     } catch (error) {
     }
-    return System33.Promise.resolve("");
+    return System34.Promise.resolve("");
   }
   //==============================================================================
   // 컨텍스트 메뉴 (우클릭).
@@ -20998,7 +21000,7 @@ var UIInputField = class extends WorldNode {
   }
   showContextMenu(clientX, clientY) {
     this.hideContextMenu();
-    const doc = System33.document;
+    const doc = System34.document;
     const menu = doc.createElement("div");
     menu.style.position = "absolute";
     menu.style.left = `${clientX}px`;
@@ -21048,7 +21050,7 @@ var UIInputField = class extends WorldNode {
     }
     doc.body.appendChild(menu);
     this.#contextMenuElement = menu;
-    System33.setTimeout(() => {
+    System34.setTimeout(() => {
       const dismissHandler = /* @__PURE__ */ __name((event) => {
         if (this.#contextMenuElement && !this.#contextMenuElement.contains(event.target)) {
           this.hideContextMenu();
@@ -21069,7 +21071,7 @@ var UIInputField = class extends WorldNode {
       this.#contextMenuElement = null;
     }
     if (this.#contextMenuDismissHandler) {
-      System33.document.removeEventListener("pointerdown", this.#contextMenuDismissHandler, true);
+      System34.document.removeEventListener("pointerdown", this.#contextMenuDismissHandler, true);
       this.#contextMenuDismissHandler = null;
     }
   }
@@ -21092,8 +21094,8 @@ var BackgroundLayerRenderer = class extends Component {
       graphic.pushState();
       const fontFamily = state.fontFace ? state.fontFace.family : SYSTEM_FONT_STRING;
       graphic.setFontString(`${state.fontSize}px ${fontFamily}`);
-      const selStart = System33.Math.min(state.selectionStart, state.cursorIndex);
-      const selEnd = System33.Math.max(state.selectionStart, state.cursorIndex);
+      const selStart = System34.Math.min(state.selectionStart, state.cursorIndex);
+      const selEnd = System34.Math.max(state.selectionStart, state.cursorIndex);
       const startX = state.padding + graphic.measureText(state.value.slice(0, selStart)).width;
       const endX = state.padding + graphic.measureText(state.value.slice(0, selEnd)).width;
       const halfH = state.fontSize * 0.65;
@@ -21154,7 +21156,7 @@ var OverlayLayerRenderer = class extends Component {
       const y = inset;
       const rectW = contentSize.x - w;
       const rectH = contentSize.y - w;
-      const radius = System33.Math.max(0, state.bgRoundSize - inset);
+      const radius = System34.Math.max(0, state.bgRoundSize - inset);
       graphic.drawStrokeRoundRect(Rect.create(x, y, rectW, rectH), radius, w);
     }
     graphic.popState();
@@ -21164,7 +21166,7 @@ var offscreenMeasureCanvas = null;
 function getOffscreenMeasureContext() {
   if (!offscreenMeasureCanvas) {
     try {
-      offscreenMeasureCanvas = System33.document.createElement("canvas");
+      offscreenMeasureCanvas = System34.document.createElement("canvas");
     } catch (error) {
       return null;
     }
@@ -21539,13 +21541,13 @@ var UISlider = class extends UIControl {
 };
 
 // src/ui/uidocument.js
-var System34 = globalThis;
+var System35 = globalThis;
 var UIDOCUMENT_VERSION = 1;
 var NODE_TYPE_TABLE = {
   WorldNode
 };
 var NODE_REFERENCE_KEY = "$nodeRef";
-var REFLECTED_PROPERTY_EXCLUDE_NAMES = new System34.Set([
+var REFLECTED_PROPERTY_EXCLUDE_NAMES = new System35.Set([
   "Parent",
   "Node",
   "Owner",
@@ -21578,10 +21580,10 @@ var deserializeRootNode = null;
 var pendingNodeReferenceList = [];
 function collectReflectedProperties(targetObject) {
   const propertyList = [];
-  const visitedNameSet = new System34.Set();
-  let prototypeObject = System34.Object.getPrototypeOf(targetObject);
-  while (prototypeObject && prototypeObject !== System34.Object.prototype) {
-    for (const memberName of System34.Object.getOwnPropertyNames(prototypeObject)) {
+  const visitedNameSet = new System35.Set();
+  let prototypeObject = System35.Object.getPrototypeOf(targetObject);
+  while (prototypeObject && prototypeObject !== System35.Object.prototype) {
+    for (const memberName of System35.Object.getOwnPropertyNames(prototypeObject)) {
       let baseName = "";
       if (memberName.indexOf("get") === 0) {
         baseName = memberName.substring(3);
@@ -21603,7 +21605,7 @@ function collectReflectedProperties(targetObject) {
       visitedNameSet.add(baseName);
       propertyList.push({ name: baseName, getterName: memberName, setterName: "set" + baseName });
     }
-    prototypeObject = System34.Object.getPrototypeOf(prototypeObject);
+    prototypeObject = System35.Object.getPrototypeOf(prototypeObject);
   }
   return propertyList;
 }
@@ -21912,7 +21914,7 @@ var UIDocument = class _UIDocument extends Object2 {
     };
     const componentList = node.getAllComponents();
     const generatedTypeSet = _UIDocument.collectGeneratedComponentTypes(componentList);
-    const widgetContentNodeSet = new System34.Set();
+    const widgetContentNodeSet = new System35.Set();
     for (const component of componentList) {
       const componentTypeName = component.constructor.name;
       const propertyHandler = COMPONENT_PROPERTY_TABLE[componentTypeName];
@@ -21953,7 +21955,7 @@ var UIDocument = class _UIDocument extends Object2 {
    * @returns { Set<string> }
    */
   static collectGeneratedComponentTypes(componentList) {
-    const generatedTypeSet = new System34.Set();
+    const generatedTypeSet = new System35.Set();
     for (const component of componentList) {
       if (!(component instanceof UIView)) {
         continue;
@@ -22055,7 +22057,7 @@ var UIDocument = class _UIDocument extends Object2 {
       root: _UIDocument.serializeNode(rootNode)
     };
     deserializeRootNode = null;
-    const jsonText = isPretty ? System34.JSON.stringify(documentData, null, "	") : System34.JSON.stringify(documentData);
+    const jsonText = isPretty ? System35.JSON.stringify(documentData, null, "	") : System35.JSON.stringify(documentData);
     return jsonText;
   }
   //==============================================================================
@@ -22066,7 +22068,7 @@ var UIDocument = class _UIDocument extends Object2 {
    * @returns { WorldNode }
    */
   static fromJsonText(jsonText) {
-    const documentData = System34.JSON.parse(jsonText);
+    const documentData = System35.JSON.parse(jsonText);
     if (!documentData || !documentData.root) {
       throw new Error("UIDocument: invalid document.");
     }
@@ -22088,7 +22090,7 @@ var UIDocument = class _UIDocument extends Object2 {
    * @returns { string[] }
    */
   static getComponentTypeNames() {
-    const typeNames = System34.Object.keys(COMPONENT_TYPE_TABLE);
+    const typeNames = System35.Object.keys(COMPONENT_TYPE_TABLE);
     return typeNames;
   }
   //==============================================================================
@@ -22134,7 +22136,7 @@ var UIDocument = class _UIDocument extends Object2 {
    * @param { object } componentData
    */
   static loadNodeReferences(component, componentData) {
-    for (const propertyName of System34.Object.keys(componentData)) {
+    for (const propertyName of System35.Object.keys(componentData)) {
       const storedValue = componentData[propertyName];
       if (!storedValue || typeof storedValue !== "object" || storedValue[NODE_REFERENCE_KEY] === void 0) {
         continue;
@@ -22294,7 +22296,7 @@ var UIDocument = class _UIDocument extends Object2 {
         });
         continue;
       }
-      if (System34.Array.isArray(storedValue)) {
+      if (System35.Array.isArray(storedValue)) {
         if (currentValue instanceof Color && storedValue.length === 4) {
           component[property.setterName](arrayToColor(storedValue));
         } else if (currentValue instanceof Vector2 && storedValue.length === 2) {
@@ -22310,7 +22312,7 @@ var UIDocument = class _UIDocument extends Object2 {
 };
 
 // src/ui/uisnapscrollview.js
-var System35 = globalThis;
+var System36 = globalThis;
 var UISnapScrollView = class extends UIScrollView {
   static {
     __name(this, "UISnapScrollView");
@@ -22443,8 +22445,8 @@ var UISnapScrollView = class extends UIScrollView {
     const snapOffsets = this.computeSnapOffsets();
     const snapCurrentIndex = this.getSnapCurrentIndex();
     const maxIndex = children.length - 1;
-    const prevIndex = System35.Math.max(0, snapCurrentIndex - 1);
-    const nextIndex = System35.Math.min(maxIndex, snapCurrentIndex + 1);
+    const prevIndex = System36.Math.max(0, snapCurrentIndex - 1);
+    const nextIndex = System36.Math.min(maxIndex, snapCurrentIndex + 1);
     const isHorizontal = this.isHorizontal();
     const currentOffset = this.getScrollOffset();
     if (isHorizontal) {
@@ -22525,7 +22527,7 @@ var UISnapScrollView = class extends UIScrollView {
       const candidateChildContentSize = candidateChild.getContentSize();
       const targetItemSize = isHorizontal ? candidateChildContentSize.x : candidateChildContentSize.y;
       const pageChangeThreshold = this.getPageChangeThreshold();
-      if (System35.Math.abs(dragAmount) >= targetItemSize * pageChangeThreshold) {
+      if (System36.Math.abs(dragAmount) >= targetItemSize * pageChangeThreshold) {
         targetIndex = candidateIndex;
       } else {
         targetIndex = snapCurrentIndex;
@@ -22630,7 +22632,7 @@ var UISnapScrollView = class extends UIScrollView {
 };
 
 // src/resource/animationclip.js
-var System36 = globalThis;
+var System37 = globalThis;
 var AnimationClip = class _AnimationClip extends Object2 {
   static {
     __name(this, "AnimationClip");
@@ -22680,7 +22682,7 @@ var AnimationClip = class _AnimationClip extends Object2 {
     const frameRects = [];
     for (const frameId of frameIds) {
       let frameData = null;
-      if (System36.Array.isArray(atlasJson)) {
+      if (System37.Array.isArray(atlasJson)) {
         frameData = atlasJson[frameId];
       } else if (atlasJson && atlasJson.frames) {
         frameData = atlasJson.frames[frameId];
@@ -22768,7 +22770,7 @@ var AnimationClip = class _AnimationClip extends Object2 {
 };
 
 // src/resource/blobasset.js
-var System37 = globalThis;
+var System38 = globalThis;
 var BlobAsset = class extends Asset {
   static {
     __name(this, "BlobAsset");
@@ -22799,7 +22801,7 @@ var BlobAsset = class extends Asset {
       return Promise.resolve();
     }
     await super.load(assetPath);
-    const response = await System37.fetch(assetPath);
+    const response = await System38.fetch(assetPath);
     this.#blob = await response.blob();
     this.setLoaded(true);
   }
@@ -22815,7 +22817,7 @@ var BlobAsset = class extends Asset {
 };
 
 // src/resource/textasset.js
-var System38 = globalThis;
+var System39 = globalThis;
 var TextAsset = class extends Asset {
   static {
     __name(this, "TextAsset");
@@ -22863,11 +22865,11 @@ var TextAsset = class extends Asset {
   async load(assetPath) {
     const isLoaded = this.isLoaded();
     if (isLoaded) {
-      return System38.Promise.resolve();
+      return System39.Promise.resolve();
     }
     try {
       await super.load(assetPath);
-      const response = await System38.fetch(assetPath, this.isNoCache() ? { cache: "no-cache" } : void 0);
+      const response = await System39.fetch(assetPath, this.isNoCache() ? { cache: "no-cache" } : void 0);
       this.text = await response.text();
       this.setLoaded(true);
     } catch (error) {
@@ -22888,7 +22890,7 @@ var TextAsset = class extends Asset {
 };
 
 // src/resource/jsonasset.js
-var System39 = globalThis;
+var System40 = globalThis;
 var JsonAsset = class extends TextAsset {
   static {
     __name(this, "JsonAsset");
@@ -22916,7 +22918,7 @@ var JsonAsset = class extends TextAsset {
   async load(assetPath) {
     const isLoaded = this.isLoaded();
     if (isLoaded) {
-      return System39.Promise.resolve();
+      return System40.Promise.resolve();
     }
     try {
       await super.load(assetPath);
@@ -23106,12 +23108,12 @@ var ImageScroller = class extends Object2 {
 };
 
 // src/misc/toucheffect.js
-var System40 = globalThis;
+var System41 = globalThis;
 var PARTICLE_GRADIENT_CANVAS_SIZE = 64;
 var particleGradientCanvas = null;
 function getParticleGradientCanvas() {
   if (particleGradientCanvas === null) {
-    const canvas = System40.document.createElement("canvas");
+    const canvas = System41.document.createElement("canvas");
     canvas.width = PARTICLE_GRADIENT_CANVAS_SIZE;
     canvas.height = PARTICLE_GRADIENT_CANVAS_SIZE;
     const canvasRenderingContext = canvas.getContext("2d");
@@ -24296,7 +24298,7 @@ var Stack = class extends Object2 {
 };
 
 // src/experimental/collection/set.js
-var System41 = globalThis;
+var System42 = globalThis;
 var Set2 = class _Set extends Object2 {
   static {
     __name(this, "Set");
@@ -24314,7 +24316,7 @@ var Set2 = class _Set extends Object2 {
    */
   constructor() {
     super();
-    this.#items = new System41.Set();
+    this.#items = new System42.Set();
   }
   //==============================================================================
   // 데이터 추가.
@@ -24993,7 +24995,7 @@ var FullscreenPass = class extends Object2 {
 };
 
 // src/experimental/graphics/bloomeffect.js
-var System42 = globalThis;
+var System43 = globalThis;
 var BRIGHTPASS_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -25073,8 +25075,8 @@ var BloomEffect = class extends Object2 {
    * @param { number } sceneHeight
    */
   resize(sceneWidth, sceneHeight) {
-    const halfWidth = System42.Math.max(1, sceneWidth >> 1);
-    const halfHeight = System42.Math.max(1, sceneHeight >> 1);
+    const halfWidth = System43.Math.max(1, sceneWidth >> 1);
+    const halfHeight = System43.Math.max(1, sceneHeight >> 1);
     this.#pingRenderTarget.resize(halfWidth, halfHeight);
     this.#pongRenderTarget.resize(halfWidth, halfHeight);
   }
@@ -25220,7 +25222,7 @@ var BloomEffect = class extends Object2 {
 };
 
 // src/experimental/graphics/fbxloader.js
-var System43 = globalThis;
+var System44 = globalThis;
 var FBX_TIME_UNIT = 46186158e3;
 var FbxLoader = class _FbxLoader extends Object2 {
   static {
@@ -25249,7 +25251,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     super();
     this.#dataView = null;
     this.#fileBytes = null;
-    this.#textDecoder = new System43.TextDecoder();
+    this.#textDecoder = new System44.TextDecoder();
     this.#readCursor = 0;
     this.#useWideOffsets = false;
   }
@@ -25261,7 +25263,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Promise<object> }
    */
   static async loadFromUrl(url) {
-    const response = await System43.fetch(url);
+    const response = await System44.fetch(url);
     if (!response.ok) {
       throw new Error(`FbxLoader load failed: ${url}`);
     }
@@ -25278,8 +25280,8 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Promise<object> }
    */
   async parse(arrayBuffer) {
-    this.#fileBytes = new System43.Uint8Array(arrayBuffer);
-    this.#dataView = new System43.DataView(arrayBuffer);
+    this.#fileBytes = new System44.Uint8Array(arrayBuffer);
+    this.#dataView = new System44.DataView(arrayBuffer);
     const magicText = this.#textDecoder.decode(this.#fileBytes.subarray(0, 20));
     if (!magicText.startsWith("Kaydara FBX Binary")) {
       throw new Error("FbxLoader: not a binary FBX file.");
@@ -25307,7 +25309,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
   readOffsetValue() {
     const dataView = this.getDataView();
     if (this.#useWideOffsets) {
-      const value2 = System43.Number(dataView.getBigUint64(this.#readCursor, true));
+      const value2 = System44.Number(dataView.getBigUint64(this.#readCursor, true));
       this.#readCursor += 8;
       return value2;
     }
@@ -25376,8 +25378,8 @@ var FbxLoader = class _FbxLoader extends Object2 {
       sourceBytes = fileBytes.subarray(this.#readCursor, this.#readCursor + rawByteLength);
       this.#readCursor += rawByteLength;
     }
-    const elementView = new System43.DataView(sourceBytes.buffer, sourceBytes.byteOffset, sourceBytes.byteLength);
-    const resultArray = new System43.Array(arrayLength);
+    const elementView = new System44.DataView(sourceBytes.buffer, sourceBytes.byteOffset, sourceBytes.byteLength);
+    const resultArray = new System44.Array(arrayLength);
     for (let elementIndex = 0; elementIndex < arrayLength; ++elementIndex) {
       resultArray[elementIndex] = readElement(elementView, elementIndex * elementByteSize);
     }
@@ -25391,12 +25393,12 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Promise<Uint8Array> }
    */
   async inflate(compressedBytes) {
-    const decompressionStream = new System43.DecompressionStream("deflate");
-    const sourceResponse = new System43.Response(compressedBytes);
+    const decompressionStream = new System44.DecompressionStream("deflate");
+    const sourceResponse = new System44.Response(compressedBytes);
     const decompressedStream = sourceResponse.body.pipeThrough(decompressionStream);
-    const decompressedResponse = new System43.Response(decompressedStream);
+    const decompressedResponse = new System44.Response(decompressedStream);
     const decompressedArrayBuffer = await decompressedResponse.arrayBuffer();
-    const decompressedBytes = new System43.Uint8Array(decompressedArrayBuffer);
+    const decompressedBytes = new System44.Uint8Array(decompressedArrayBuffer);
     return decompressedBytes;
   }
   //==============================================================================
@@ -25409,7 +25411,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     const dataView = this.getDataView();
     const fileBytes = this.getFileBytes();
     const textDecoder = this.getTextDecoder();
-    const typeCode = System43.String.fromCharCode(dataView.getUint8(this.#readCursor));
+    const typeCode = System44.String.fromCharCode(dataView.getUint8(this.#readCursor));
     this.#readCursor += 1;
     switch (typeCode) {
       case "Y": {
@@ -25438,7 +25440,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         return { type: typeCode, value };
       }
       case "L": {
-        const value = System43.Number(dataView.getBigInt64(this.#readCursor, true));
+        const value = System44.Number(dataView.getBigInt64(this.#readCursor, true));
         this.#readCursor += 8;
         return { type: typeCode, value };
       }
@@ -25451,7 +25453,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         return { type: typeCode, value };
       }
       case "l": {
-        const value = await this.readArrayProperty(8, (view, offset) => System43.Number(view.getBigInt64(offset, true)));
+        const value = await this.readArrayProperty(8, (view, offset) => System44.Number(view.getBigInt64(offset, true)));
         return { type: typeCode, value };
       }
       case "i": {
@@ -25504,7 +25506,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         propertyConnectionList.push({ sourceId, destinationId, propertyName });
       }
     }
-    const objectById = new System43.Map();
+    const objectById = new System44.Map();
     for (const objectNode of objectsNode.children) {
       const objectId = objectNode.properties[0].value;
       objectById.set(objectId, objectNode);
@@ -25538,7 +25540,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Map<number, object> }
    */
   interpretGeometries(objectsNode) {
-    const geometryById = new System43.Map();
+    const geometryById = new System44.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Geometry") {
         continue;
@@ -25592,11 +25594,11 @@ var FbxLoader = class _FbxLoader extends Object2 {
     const uvReader = this.buildLayerReader(geometryNode, "LayerElementUV", "UV", 2);
     const materialLayer = this.buildMaterialLayer(geometryNode);
     const triangleCount = cornerVertexIndices.length / 3;
-    const outputPositions = new System43.Float32Array(cornerVertexIndices.length * 3);
-    const outputNormals = new System43.Float32Array(cornerVertexIndices.length * 3);
-    const outputTextureCoordinates = new System43.Float32Array(cornerVertexIndices.length * 2);
-    const outputOriginalVertexIndices = new System43.Int32Array(cornerVertexIndices.length);
-    const materialIndexPerTriangle = new System43.Int32Array(triangleCount);
+    const outputPositions = new System44.Float32Array(cornerVertexIndices.length * 3);
+    const outputNormals = new System44.Float32Array(cornerVertexIndices.length * 3);
+    const outputTextureCoordinates = new System44.Float32Array(cornerVertexIndices.length * 2);
+    const outputOriginalVertexIndices = new System44.Int32Array(cornerVertexIndices.length);
+    const materialIndexPerTriangle = new System44.Int32Array(triangleCount);
     for (let cornerIndex = 0; cornerIndex < cornerVertexIndices.length; ++cornerIndex) {
       const originalVertexIndex = cornerVertexIndices[cornerIndex];
       const polygonVertexPosition = cornerPolygonVertexPositions[cornerIndex];
@@ -25641,7 +25643,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
     const layerNode = geometryNode.children.find((child) => child.name === layerElementName);
     if (!layerNode) {
       return () => {
-        const zeroVector = new System43.Array(componentCount).fill(0);
+        const zeroVector = new System44.Array(componentCount).fill(0);
         return zeroVector;
       };
     }
@@ -25666,7 +25668,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
       if (referenceType === "IndexToDirect" && indexArray) {
         dataIndex = indexArray[mappedIndex];
       }
-      const componentValues = new System43.Array(componentCount);
+      const componentValues = new System44.Array(componentCount);
       for (let componentIndex = 0; componentIndex < componentCount; ++componentIndex) {
         componentValues[componentIndex] = dataArray[dataIndex * componentCount + componentIndex];
       }
@@ -25707,8 +25709,8 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { object }
    */
   interpretSkins(objectsNode, objectConnectionList) {
-    const skinDeformerById = new System43.Map();
-    const clusterById = new System43.Map();
+    const skinDeformerById = new System44.Map();
+    const clusterById = new System44.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Deformer") {
         continue;
@@ -25752,7 +25754,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Map<number, object> }
    */
   interpretVideos(objectsNode) {
-    const videoById = new System43.Map();
+    const videoById = new System44.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Video") {
         continue;
@@ -25766,7 +25768,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
       };
       videoById.set(videoId, video);
     }
-    const contentByFileName = new System43.Map();
+    const contentByFileName = new System44.Map();
     for (const video of videoById.values()) {
       if (!video.contentBytes || video.contentBytes.length === 0) {
         continue;
@@ -25810,7 +25812,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Map<number, object> }
    */
   interpretTextures(objectsNode, objectConnectionList) {
-    const textureById = new System43.Map();
+    const textureById = new System44.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Texture") {
         continue;
@@ -25841,7 +25843,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { Map<number, object> }
    */
   interpretMaterials(objectsNode, propertyConnectionList, textureById) {
-    const materialById = new System43.Map();
+    const materialById = new System44.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Material") {
         continue;
@@ -25905,7 +25907,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
    */
   interpretModels(objectsNode, objectConnectionList, geometryById, skinDeformerById, materialById) {
     const nodeList = [];
-    const nodeIdToIndex = new System43.Map();
+    const nodeIdToIndex = new System44.Map();
     for (const objectNode of objectsNode.children) {
       if (objectNode.name !== "Model") {
         continue;
@@ -25990,10 +25992,10 @@ var FbxLoader = class _FbxLoader extends Object2 {
    * @returns { object[] }
    */
   interpretAnimations(objectsNode, objectConnectionList, propertyConnectionList, nodeIdToIndex) {
-    const curveById = new System43.Map();
-    const curveNodeById = new System43.Map();
+    const curveById = new System44.Map();
+    const curveNodeById = new System44.Map();
     const layerIds = [];
-    const stackById = new System43.Map();
+    const stackById = new System44.Map();
     for (const objectNode of objectsNode.children) {
       const objectId = objectNode.properties[0].value;
       if (objectNode.name === "AnimationCurve") {
@@ -26022,7 +26024,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         curveNode.targetProperty = connection.propertyName;
       }
     }
-    const layerIdByCurveNodeId = new System43.Map();
+    const layerIdByCurveNodeId = new System44.Map();
     for (const connection of objectConnectionList) {
       if (layerIds.includes(connection.sourceId) && stackById.has(connection.destinationId)) {
         const stack = stackById.get(connection.destinationId);
@@ -26046,7 +26048,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
         const channelResult = this.buildAnimationChannel(curveNode, curveById, nodeIdToIndex);
         if (channelResult) {
           channelList.push(channelResult.channel);
-          duration = System43.Math.max(duration, channelResult.duration);
+          duration = System44.Math.max(duration, channelResult.duration);
         }
       }
       animationList.push({ name: stack.name, duration, channels: channelList });
@@ -26075,7 +26077,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
       return null;
     }
     const channelNames = ["X", "Y", "Z"];
-    const timeSet = new System43.Set();
+    const timeSet = new System44.Set();
     for (const channelName of channelNames) {
       const curveId = curveNode.curveByChannel[channelName];
       if (curveId === void 0) {
@@ -26086,13 +26088,13 @@ var FbxLoader = class _FbxLoader extends Object2 {
         timeSet.add(keyTime);
       }
     }
-    const sortedTimes = System43.Array.from(timeSet).sort((left, right) => left - right);
+    const sortedTimes = System44.Array.from(timeSet).sort((left, right) => left - right);
     if (sortedTimes.length === 0) {
       return null;
     }
     const componentCount = path === "rotation" ? 3 : 3;
-    const times = new System43.Float32Array(sortedTimes.length);
-    const values = new System43.Float32Array(sortedTimes.length * componentCount);
+    const times = new System44.Float32Array(sortedTimes.length);
+    const values = new System44.Float32Array(sortedTimes.length * componentCount);
     for (let timeIndex = 0; timeIndex < sortedTimes.length; ++timeIndex) {
       times[timeIndex] = sortedTimes[timeIndex] / FBX_TIME_UNIT;
       for (let channelIndex = 0; channelIndex < 3; ++channelIndex) {
@@ -26175,7 +26177,7 @@ var FbxLoader = class _FbxLoader extends Object2 {
 };
 
 // src/experimental/graphics/material.js
-var System44 = globalThis;
+var System45 = globalThis;
 var TEXTURE_UNIT_BASECOLOR = 0;
 var TEXTURE_UNIT_NORMAL = 2;
 var TEXTURE_UNIT_METALLICROUGHNESS = 3;
@@ -26313,13 +26315,13 @@ var Material = class _Material extends Object2 {
     const glTexture = webGL2RenderingContext.createTexture();
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, glTexture);
     if (!imageDescription || !imageDescription.bytes || imageDescription.bytes.length === 0) {
-      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System44.Uint8Array(fallbackColor));
+      webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System45.Uint8Array(fallbackColor));
       return glTexture;
     }
     const blobOptions = imageDescription.mimeType ? { type: imageDescription.mimeType } : {};
-    const imageBlob = new System44.Blob([imageDescription.bytes], blobOptions);
+    const imageBlob = new System45.Blob([imageDescription.bytes], blobOptions);
     const bitmapOptions = imageDescription.flipY ? { imageOrientation: "flipY" } : {};
-    const imageBitmap = await System44.createImageBitmap(imageBlob, bitmapOptions);
+    const imageBitmap = await System45.createImageBitmap(imageBlob, bitmapOptions);
     webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, imageBitmap);
     webGL2RenderingContext.generateMipmap(webGL2RenderingContext.TEXTURE_2D);
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR_MIPMAP_LINEAR);
@@ -26455,14 +26457,14 @@ var Material = class _Material extends Object2 {
 };
 
 // src/experimental/graphics/skinnedmodel.js
-var System45 = globalThis;
+var System46 = globalThis;
 var GLB_CHUNKTYPE_JSON = 1313821514;
 var GLB_CHUNKTYPE_BINARY = 5130562;
 var COMPONENT_ARRAY_TABLE = {
-  5121: System45.Uint8Array,
-  5123: System45.Uint16Array,
-  5125: System45.Uint32Array,
-  5126: System45.Float32Array
+  5121: System46.Uint8Array,
+  5123: System46.Uint16Array,
+  5125: System46.Uint32Array,
+  5126: System46.Float32Array
 };
 var TYPE_COMPONENT_COUNT_TABLE = {
   SCALAR: 1,
@@ -26472,7 +26474,7 @@ var TYPE_COMPONENT_COUNT_TABLE = {
   MAT4: 16
 };
 function createQuaternionFromFbxEuler(xDegree, yDegree, zDegree) {
-  const degreeToRadian2 = System45.Math.PI / 180;
+  const degreeToRadian2 = System46.Math.PI / 180;
   const rotationX = Quaternion.createFromEuler(xDegree * degreeToRadian2, 0, 0);
   const rotationY = Quaternion.createFromEuler(0, yDegree * degreeToRadian2, 0);
   const rotationZ = Quaternion.createFromEuler(0, 0, zDegree * degreeToRadian2);
@@ -26492,7 +26494,7 @@ function convertFbxAnimationChannels(sceneData, fbxAnimation, resolveNodeIndex) 
       const sourceFbxNode = sceneData.nodeList[fbxChannel.nodeIndex];
       const preRotationQuaternion = createQuaternionFromFbxEuler(sourceFbxNode.preRotationDegrees[0], sourceFbxNode.preRotationDegrees[1], sourceFbxNode.preRotationDegrees[2]);
       const keyCount = fbxChannel.times.length;
-      const quaternionValues = new System45.Float32Array(keyCount * 4);
+      const quaternionValues = new System46.Float32Array(keyCount * 4);
       for (let keyIndex = 0; keyIndex < keyCount; ++keyIndex) {
         const eulerQuaternion = createQuaternionFromFbxEuler(fbxChannel.values[keyIndex * 3], fbxChannel.values[keyIndex * 3 + 1], fbxChannel.values[keyIndex * 3 + 2]);
         const rotationQuaternion = preRotationQuaternion.multiply(eulerQuaternion);
@@ -26570,7 +26572,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     this.#fadeDuration = 0;
     this.#fadeElapsed = 0;
     this.#timeScale = 1;
-    this.#jointRotationOffsets = new System45.Map();
+    this.#jointRotationOffsets = new System46.Map();
   }
   //==============================================================================
   // URL 로부터 로드. (정적 — GLB 바이너리 glTF)
@@ -26582,7 +26584,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    * @returns { Promise<SkinnedModel> }
    */
   static async loadFromUrl(webGL2RenderingContext, url, skinnedModelRenderer) {
-    const response = await System45.fetch(url);
+    const response = await System46.fetch(url);
     if (!response.ok) {
       throw new Error(`SkinnedModel load failed: ${url}`);
     }
@@ -26615,7 +26617,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    * @param { ArrayBuffer } arrayBuffer
    */
   async parseBinary(arrayBuffer) {
-    const dataView = new System45.DataView(arrayBuffer);
+    const dataView = new System46.DataView(arrayBuffer);
     if (dataView.getUint32(0, true) !== 1179937895) {
       throw new Error("SkinnedModel: not a GLB file.");
     }
@@ -26627,9 +26629,9 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       const chunkType = dataView.getUint32(chunkOffset + 4, true);
       const chunkStart = chunkOffset + 8;
       if (chunkType === GLB_CHUNKTYPE_JSON) {
-        const jsonBytes = new System45.Uint8Array(arrayBuffer, chunkStart, chunkLength);
-        const jsonText = new System45.TextDecoder().decode(jsonBytes);
-        json = System45.JSON.parse(jsonText);
+        const jsonBytes = new System46.Uint8Array(arrayBuffer, chunkStart, chunkLength);
+        const jsonText = new System46.TextDecoder().decode(jsonBytes);
+        json = System46.JSON.parse(jsonText);
       } else if (chunkType === GLB_CHUNKTYPE_BINARY) {
         binaryBuffer = arrayBuffer.slice(chunkStart, chunkStart + chunkLength);
       }
@@ -26699,7 +26701,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return {
         jointNodeIndices: skin.joints.slice(),
         inverseBindMatrices,
-        jointMatrixArray: new System45.Float32Array(skin.joints.length * 16)
+        jointMatrixArray: new System46.Float32Array(skin.joints.length * 16)
       };
     });
     function createImageDescription(textureInfo) {
@@ -26709,7 +26711,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       const texture = json.textures[textureInfo.index];
       const image = json.images[texture.source];
       const bufferView = json.bufferViews[image.bufferView];
-      const imageBytes = new System45.Uint8Array(binaryBuffer, bufferView.byteOffset || 0, bufferView.byteLength);
+      const imageBytes = new System46.Uint8Array(binaryBuffer, bufferView.byteOffset || 0, bufferView.byteLength);
       return { bytes: imageBytes, mimeType: image.mimeType, flipY: false };
     }
     __name(createImageDescription, "createImageDescription");
@@ -26740,13 +26742,13 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       }
       const mesh = json.meshes[node.meshIndex];
       for (const primitive of mesh.primitives) {
-        const positions = new System45.Float32Array(readAccessorArray(primitive.attributes.POSITION));
-        const normals = primitive.attributes.NORMAL !== void 0 ? new System45.Float32Array(readAccessorArray(primitive.attributes.NORMAL)) : null;
-        const textureCoordinates = primitive.attributes.TEXCOORD_0 !== void 0 ? new System45.Float32Array(readAccessorArray(primitive.attributes.TEXCOORD_0)) : null;
-        const joints = new System45.Uint16Array(readAccessorArray(primitive.attributes.JOINTS_0));
+        const positions = new System46.Float32Array(readAccessorArray(primitive.attributes.POSITION));
+        const normals = primitive.attributes.NORMAL !== void 0 ? new System46.Float32Array(readAccessorArray(primitive.attributes.NORMAL)) : null;
+        const textureCoordinates = primitive.attributes.TEXCOORD_0 !== void 0 ? new System46.Float32Array(readAccessorArray(primitive.attributes.TEXCOORD_0)) : null;
+        const joints = new System46.Uint16Array(readAccessorArray(primitive.attributes.JOINTS_0));
         const weightAccessor = json.accessors[primitive.attributes.WEIGHTS_0];
         const weightSource = readAccessorArray(primitive.attributes.WEIGHTS_0);
-        const weights = new System45.Float32Array(weightSource.length);
+        const weights = new System46.Float32Array(weightSource.length);
         if (weightAccessor.componentType === 5126) {
           weights.set(weightSource);
         } else {
@@ -26758,7 +26760,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         let indices = null;
         if (primitive.indices !== void 0) {
           const indexSource = readAccessorArray(primitive.indices);
-          indices = indexSource instanceof System45.Uint8Array ? new System45.Uint16Array(indexSource) : indexSource;
+          indices = indexSource instanceof System46.Uint8Array ? new System46.Uint16Array(indexSource) : indexSource;
         }
         meshDescriptionList.push({
           positions,
@@ -26780,7 +26782,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         const times = readAccessorArray(sampler.input);
         const values = readAccessorArray(sampler.output);
         if (times.length > 0) {
-          duration = System45.Math.max(duration, times[times.length - 1]);
+          duration = System46.Math.max(duration, times[times.length - 1]);
         }
         return {
           nodeIndex: channel.target.node,
@@ -26822,7 +26824,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       };
     });
     this.#rootNodeIndices = sceneData.rootNodeIndices.slice();
-    const skinIdList = System45.Array.from(sceneData.skinDeformerById.keys());
+    const skinIdList = System46.Array.from(sceneData.skinDeformerById.keys());
     this.#skinList = skinIdList.map((skinId) => {
       const skinDeformer = sceneData.skinDeformerById.get(skinId);
       const jointNodeIndices = [];
@@ -26847,7 +26849,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return {
         jointNodeIndices,
         inverseBindMatrices,
-        jointMatrixArray: new System45.Float32Array(jointNodeIndices.length * 16)
+        jointMatrixArray: new System46.Float32Array(jointNodeIndices.length * 16)
       };
     });
     function createFbxImageDescription(textureId) {
@@ -26865,7 +26867,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return { bytes: video.contentBytes, mimeType: null, flipY: true };
     }
     __name(createFbxImageDescription, "createFbxImageDescription");
-    const materialIdList = System45.Array.from(sceneData.materialById.keys());
+    const materialIdList = System46.Array.from(sceneData.materialById.keys());
     const materialDescriptionList = materialIdList.map((materialId) => {
       const fbxMaterial = sceneData.materialById.get(materialId);
       const description = Material.createDefaultDescription();
@@ -26893,7 +26895,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       if (!geometry) {
         continue;
       }
-      const influencesPerVertex = new System45.Array(geometry.originalVertexCount);
+      const influencesPerVertex = new System46.Array(geometry.originalVertexCount);
       for (let vertexIndex = 0; vertexIndex < geometry.originalVertexCount; ++vertexIndex) {
         influencesPerVertex[vertexIndex] = [];
       }
@@ -26905,13 +26907,13 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
           influencesPerVertex[vertexIndex].push({ jointIndex: clusterLocalIndex, weight });
         }
       }
-      const vertexJointArray = new System45.Uint16Array(geometry.originalVertexCount * 4);
-      const vertexWeightArray = new System45.Float32Array(geometry.originalVertexCount * 4);
+      const vertexJointArray = new System46.Uint16Array(geometry.originalVertexCount * 4);
+      const vertexWeightArray = new System46.Float32Array(geometry.originalVertexCount * 4);
       for (let vertexIndex = 0; vertexIndex < geometry.originalVertexCount; ++vertexIndex) {
         const influenceList = influencesPerVertex[vertexIndex];
         influenceList.sort((left, right) => right.weight - left.weight);
         let weightSum = 0;
-        const usedCount = System45.Math.min(4, influenceList.length);
+        const usedCount = System46.Math.min(4, influenceList.length);
         for (let slotIndex = 0; slotIndex < usedCount; ++slotIndex) {
           weightSum += influenceList[slotIndex].weight;
         }
@@ -26924,8 +26926,8 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         }
       }
       const cornerCount = geometry.cornerCount;
-      const cornerJointArray = new System45.Uint16Array(cornerCount * 4);
-      const cornerWeightArray = new System45.Float32Array(cornerCount * 4);
+      const cornerJointArray = new System46.Uint16Array(cornerCount * 4);
+      const cornerWeightArray = new System46.Float32Array(cornerCount * 4);
       for (let cornerIndex = 0; cornerIndex < cornerCount; ++cornerIndex) {
         const originalVertexIndex = geometry.originalVertexIndices[cornerIndex];
         for (let slotIndex = 0; slotIndex < 4; ++slotIndex) {
@@ -26971,7 +26973,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
   async addAnimationsFromFbxUrl(url, clipName, ignoreTranslation = false) {
     const sceneData = await FbxLoader.loadFromUrl(url);
     const nodeList = this.getNodeList();
-    const nodeIndexByName = new System45.Map();
+    const nodeIndexByName = new System46.Map();
     for (let nodeIndex = 0; nodeIndex < nodeList.length; ++nodeIndex) {
       nodeIndexByName.set(nodeList[nodeIndex].name, nodeIndex);
     }
@@ -27029,7 +27031,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
         webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, meshDescription.indices, webGL2RenderingContext.STATIC_DRAW);
         indexCount = meshDescription.indices.length;
-        indexComponentType = meshDescription.indices instanceof System45.Uint32Array ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
+        indexComponentType = meshDescription.indices instanceof System46.Uint32Array ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
       }
       webGL2RenderingContext.bindVertexArray(null);
       const material = meshDescription.materialIndex >= 0 && materialList[meshDescription.materialIndex] ? materialList[meshDescription.materialIndex] : defaultMaterial;
@@ -27054,7 +27056,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    * @returns { Float32Array }
    */
   generateSmoothNormals(positions, indices) {
-    const normals = new System45.Float32Array(positions.length);
+    const normals = new System46.Float32Array(positions.length);
     const triangleCount = indices ? indices.length / 3 : positions.length / 9;
     for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
       const indexA = (indices ? indices[triangleIndex * 3] : triangleIndex * 3) * 3;
@@ -27080,7 +27082,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       normals[indexC + 2] += faceNormalZ;
     }
     for (let vertexIndex = 0; vertexIndex < normals.length; vertexIndex += 3) {
-      const normalLength = System45.Math.sqrt(normals[vertexIndex] * normals[vertexIndex] + normals[vertexIndex + 1] * normals[vertexIndex + 1] + normals[vertexIndex + 2] * normals[vertexIndex + 2]);
+      const normalLength = System46.Math.sqrt(normals[vertexIndex] * normals[vertexIndex] + normals[vertexIndex + 1] * normals[vertexIndex + 1] + normals[vertexIndex + 2] * normals[vertexIndex + 2]);
       if (normalLength > 0) {
         normals[vertexIndex] /= normalLength;
         normals[vertexIndex + 1] /= normalLength;
@@ -27183,9 +27185,9 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         channel.cursor += 1;
       }
       const frameIndex = channel.cursor;
-      const nextIndex = System45.Math.min(frameIndex + 1, keyCount - 1);
+      const nextIndex = System46.Math.min(frameIndex + 1, keyCount - 1);
       const spanDuration = times[nextIndex] - times[frameIndex];
-      const factor = spanDuration > 0 ? System45.Math.max(0, System45.Math.min(1, (loopedTime - times[frameIndex]) / spanDuration)) : 0;
+      const factor = spanDuration > 0 ? System46.Math.max(0, System46.Math.min(1, (loopedTime - times[frameIndex]) / spanDuration)) : 0;
       if (channel.path === "rotation") {
         const baseOffset = frameIndex * 4;
         const nextOffset = nextIndex * 4;
@@ -27218,15 +27220,14 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    */
   update(deltaTime) {
     const currentAnimation = this.#currentAnimation;
-    if (!currentAnimation) {
-      return;
-    }
-    this.#currentTime += deltaTime * this.#timeScale;
-    if (this.#previousAnimation) {
-      this.#previousTime += deltaTime * this.#timeScale;
-      this.#fadeElapsed += deltaTime;
-      if (this.#fadeElapsed >= this.#fadeDuration) {
-        this.#previousAnimation = null;
+    if (currentAnimation) {
+      this.#currentTime += deltaTime * this.#timeScale;
+      if (this.#previousAnimation) {
+        this.#previousTime += deltaTime * this.#timeScale;
+        this.#fadeElapsed += deltaTime;
+        if (this.#fadeElapsed >= this.#fadeDuration) {
+          this.#previousAnimation = null;
+        }
       }
     }
     const nodeList = this.getNodeList();
@@ -27239,12 +27240,14 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       node.currentScale[2] = node.baseScale[2];
       node.currentRotation = node.baseRotation;
     }
-    if (this.#previousAnimation) {
-      this.sampleAnimation(this.#previousAnimation, this.#previousTime, 1);
-      const blendWeight = System45.Math.min(this.#fadeElapsed / System45.Math.max(this.#fadeDuration, 1e-4), 1);
-      this.sampleAnimation(currentAnimation, this.#currentTime, blendWeight);
-    } else {
-      this.sampleAnimation(currentAnimation, this.#currentTime, 1);
+    if (currentAnimation) {
+      if (this.#previousAnimation) {
+        this.sampleAnimation(this.#previousAnimation, this.#previousTime, 1);
+        const blendWeight = System46.Math.min(this.#fadeElapsed / System46.Math.max(this.#fadeDuration, 1e-4), 1);
+        this.sampleAnimation(currentAnimation, this.#currentTime, blendWeight);
+      } else {
+        this.sampleAnimation(currentAnimation, this.#currentTime, 1);
+      }
     }
     for (const [nodeIndex, offsetRotation] of this.#jointRotationOffsets) {
       const node = nodeList[nodeIndex];
@@ -27785,7 +27788,7 @@ var SkinnedModelRenderer = class extends Object2 {
 };
 
 // src/experimental/graphics/shadowmap.js
-var System46 = globalThis;
+var System47 = globalThis;
 var ShadowMap = class extends Object2 {
   static {
     __name(this, "ShadowMap");
@@ -27853,8 +27856,8 @@ var ShadowMap = class extends Object2 {
     const viewMatrix = Matrix4.createLookAt(eyePosition, focusPosition, upDirection);
     const worldUnitsPerTexel = extent * 2 / this.getResolution();
     const viewElements = viewMatrix.getElements();
-    viewElements[12] = System46.Math.round(viewElements[12] / worldUnitsPerTexel) * worldUnitsPerTexel;
-    viewElements[13] = System46.Math.round(viewElements[13] / worldUnitsPerTexel) * worldUnitsPerTexel;
+    viewElements[12] = System47.Math.round(viewElements[12] / worldUnitsPerTexel) * worldUnitsPerTexel;
+    viewElements[13] = System47.Math.round(viewElements[13] / worldUnitsPerTexel) * worldUnitsPerTexel;
     const orthographicMatrix = Matrix4.createOrthographic(-extent, extent, -extent, extent, nearDistance, farDistance);
     const lightViewProjectionMatrix = orthographicMatrix.clone();
     lightViewProjectionMatrix.multiply(viewMatrix);
@@ -28239,7 +28242,7 @@ var BunchAsset = class extends BlobAsset {
 };
 
 // src/base/seededrandom.js
-var System47 = globalThis;
+var System48 = globalThis;
 var SeededRandom = class _SeededRandom extends Object2 {
   static {
     __name(this, "SeededRandom");
@@ -28296,8 +28299,8 @@ var SeededRandom = class _SeededRandom extends Object2 {
   nextValue() {
     this.#state = this.#state + 1831565813 >>> 0;
     let mixed = this.#state;
-    mixed = System47.Math.imul(mixed ^ mixed >>> 15, mixed | 1);
-    mixed ^= mixed + System47.Math.imul(mixed ^ mixed >>> 7, mixed | 61);
+    mixed = System48.Math.imul(mixed ^ mixed >>> 15, mixed | 1);
+    mixed ^= mixed + System48.Math.imul(mixed ^ mixed >>> 7, mixed | 61);
     const value = ((mixed ^ mixed >>> 14) >>> 0) / 4294967296;
     return value;
   }
@@ -28322,7 +28325,7 @@ var SeededRandom = class _SeededRandom extends Object2 {
    * @returns { number }
    */
   nextInt(minValue, maxValue) {
-    const value = minValue + System47.Math.floor(this.nextValue() * (maxValue - minValue + 1));
+    const value = minValue + System48.Math.floor(this.nextValue() * (maxValue - minValue + 1));
     return value;
   }
   //==============================================================================
@@ -28368,7 +28371,7 @@ var SeededRandom = class _SeededRandom extends Object2 {
    * @returns { number }
    */
   static createDailySeed(dateNumber, baseSeed = 2654435761) {
-    const mixed = (baseSeed ^ System47.Math.imul(dateNumber >>> 0, 2654435761)) >>> 0;
+    const mixed = (baseSeed ^ System48.Math.imul(dateNumber >>> 0, 2654435761)) >>> 0;
     return mixed || 1;
   }
   //==============================================================================
@@ -28379,14 +28382,14 @@ var SeededRandom = class _SeededRandom extends Object2 {
    * @param { number } baseSeed
    * @returns { SeededRandom }
    */
-  static fromDate(date = new System47.Date(), baseSeed = 2654435761) {
+  static fromDate(date = new System48.Date(), baseSeed = 2654435761) {
     const dateNumber = date.getFullYear() * 1e4 + (date.getMonth() + 1) * 100 + date.getDate();
     return new _SeededRandom(_SeededRandom.createDailySeed(dateNumber, baseSeed));
   }
 };
 
 // src/base/timer.js
-var System48 = globalThis;
+var System49 = globalThis;
 var Cooldown = class extends Object2 {
   static {
     __name(this, "Cooldown");
@@ -28407,7 +28410,7 @@ var Cooldown = class extends Object2 {
    */
   constructor(duration = 1) {
     super();
-    this.#duration = System48.Math.max(0, duration);
+    this.#duration = System49.Math.max(0, duration);
     this.#remainSeconds = 0;
   }
   //==============================================================================
@@ -28418,7 +28421,7 @@ var Cooldown = class extends Object2 {
    */
   tick(timeDelta) {
     if (this.#remainSeconds > 0) {
-      this.#remainSeconds = System48.Math.max(0, this.#remainSeconds - timeDelta);
+      this.#remainSeconds = System49.Math.max(0, this.#remainSeconds - timeDelta);
     }
   }
   //==============================================================================
@@ -28456,7 +28459,7 @@ var Cooldown = class extends Object2 {
    * @param { number } duration
    */
   setDuration(duration) {
-    this.#duration = System48.Math.max(0, duration);
+    this.#duration = System49.Math.max(0, duration);
   }
   //==============================================================================
   // 쿨다운 시간 반환.
@@ -28514,7 +28517,7 @@ var RepeatTimer = class extends Object2 {
    */
   constructor(interval = 1, elapsedEvent = null) {
     super();
-    this.#interval = System48.Math.max(1e-6, interval);
+    this.#interval = System49.Math.max(1e-6, interval);
     this.#elapsedSeconds = 0;
     this.#elapsedEvent = elapsedEvent;
     this.#isRunning = true;
@@ -28563,7 +28566,7 @@ var RepeatTimer = class extends Object2 {
    * @param { number } interval
    */
   setInterval(interval) {
-    this.#interval = System48.Math.max(1e-6, interval);
+    this.#interval = System49.Math.max(1e-6, interval);
   }
   //==============================================================================
   // 간격 반환.
@@ -28685,7 +28688,7 @@ var ObjectPool = class extends Object2 {
 };
 
 // src/base/fsm.js
-var System49 = globalThis;
+var System50 = globalThis;
 var FiniteStateMachine = class extends Object2 {
   static {
     __name(this, "FiniteStateMachine");
@@ -28711,7 +28714,7 @@ var FiniteStateMachine = class extends Object2 {
    */
   constructor() {
     super();
-    this.#stateTable = new System49.Map();
+    this.#stateTable = new System50.Map();
     this.#stateName = null;
     this.#stateSeconds = 0;
     this.#transitionGuard = null;
@@ -28844,7 +28847,7 @@ __export(format_exports, {
   formatNumberWithUnit: () => formatNumberWithUnit,
   formatPaddedNumber: () => formatPaddedNumber
 });
-var System50 = globalThis;
+var System51 = globalThis;
 function formatNumber(value, locale = "en-US") {
   return value.toLocaleString(locale);
 }
@@ -28854,7 +28857,7 @@ function formatNumberWithUnit(value, unitSuffix, locale = "ko-KR") {
 }
 __name(formatNumberWithUnit, "formatNumberWithUnit");
 function formatCompactNumber(value, fractionDigits = 1) {
-  const absoluteValue = System50.Math.abs(value);
+  const absoluteValue = System51.Math.abs(value);
   const sign = value < 0 ? "-" : "";
   if (absoluteValue >= 1e9) {
     return sign + trimTrailingZero((absoluteValue / 1e9).toFixed(fractionDigits)) + "B";
@@ -28869,7 +28872,7 @@ function formatCompactNumber(value, fractionDigits = 1) {
 }
 __name(formatCompactNumber, "formatCompactNumber");
 function formatPaddedNumber(value, digitCount, minValue = -Infinity, maxValue = Infinity) {
-  const clampedValue = System50.Math.min(maxValue, System50.Math.max(minValue, value));
+  const clampedValue = System51.Math.min(maxValue, System51.Math.max(minValue, value));
   if (clampedValue < 0) {
     const digitText = String(-clampedValue).padStart(digitCount - 1, "0");
     return "-" + digitText;
@@ -28878,8 +28881,8 @@ function formatPaddedNumber(value, digitCount, minValue = -Infinity, maxValue = 
 }
 __name(formatPaddedNumber, "formatPaddedNumber");
 function formatMinutesSeconds(totalSeconds) {
-  const flooredSeconds = System50.Math.max(0, System50.Math.floor(totalSeconds));
-  const minutes = System50.Math.floor(flooredSeconds / 60);
+  const flooredSeconds = System51.Math.max(0, System51.Math.floor(totalSeconds));
+  const minutes = System51.Math.floor(flooredSeconds / 60);
   const seconds2 = flooredSeconds % 60;
   return minutes + ":" + String(seconds2).padStart(2, "0");
 }
@@ -28900,7 +28903,7 @@ function trimTrailingZero(numberText) {
 __name(trimTrailingZero, "trimTrailingZero");
 
 // src/misc/persistedstore.js
-var System51 = globalThis;
+var System52 = globalThis;
 var PersistedStore = class extends Object2 {
   static {
     __name(this, "PersistedStore");
@@ -28933,7 +28936,7 @@ var PersistedStore = class extends Object2 {
     this.#version = version;
     this.#defaultState = defaultState;
     this.#state = this.readFromStorage();
-    this.#subscriberSet = new System51.Set();
+    this.#subscriberSet = new System52.Set();
   }
   //==============================================================================
   // 상태 반환. (복사본이 아니므로 직접 고치지 말고 set() 을 쓴다)
@@ -28951,7 +28954,7 @@ var PersistedStore = class extends Object2 {
    * @param { object } partialState
    */
   set(partialState) {
-    this.#state = System51.Object.assign({}, this.#state, partialState);
+    this.#state = System52.Object.assign({}, this.#state, partialState);
     this.writeToStorage();
     this.notify();
   }
@@ -28962,7 +28965,7 @@ var PersistedStore = class extends Object2 {
    * @param { object } nextState
    */
   replace(nextState) {
-    this.#state = System51.Object.assign({}, nextState);
+    this.#state = System52.Object.assign({}, nextState);
     this.writeToStorage();
     this.notify();
   }
@@ -29002,16 +29005,16 @@ var PersistedStore = class extends Object2 {
   readFromStorage() {
     const storedText = LocalStorage.getString(this.#storageKey, "");
     if (storedText.length === 0) {
-      return System51.Object.assign({}, this.#defaultState);
+      return System52.Object.assign({}, this.#defaultState);
     }
     try {
-      const parsed = System51.JSON.parse(storedText);
+      const parsed = System52.JSON.parse(storedText);
       if (!parsed || parsed.version !== this.#version || typeof parsed.state !== "object" || parsed.state === null) {
-        return System51.Object.assign({}, this.#defaultState);
+        return System52.Object.assign({}, this.#defaultState);
       }
-      return System51.Object.assign({}, this.#defaultState, parsed.state);
+      return System52.Object.assign({}, this.#defaultState, parsed.state);
     } catch (parseError) {
-      return System51.Object.assign({}, this.#defaultState);
+      return System52.Object.assign({}, this.#defaultState);
     }
   }
   //==============================================================================
@@ -29019,7 +29022,7 @@ var PersistedStore = class extends Object2 {
   //==============================================================================
   writeToStorage() {
     const payload = { version: this.#version, state: this.#state };
-    LocalStorage.setString(this.#storageKey, System51.JSON.stringify(payload));
+    LocalStorage.setString(this.#storageKey, System52.JSON.stringify(payload));
   }
   //==============================================================================
   // 저장 키 반환.
@@ -29033,13 +29036,13 @@ var PersistedStore = class extends Object2 {
 };
 
 // src/misc/localization.js
-var System52 = globalThis;
+var System53 = globalThis;
 var Localization = class _Localization extends Object2 {
   static {
     __name(this, "Localization");
   }
   /** @private @type { Map } */
-  static #tableByLanguage = new System52.Map();
+  static #tableByLanguage = new System53.Map();
   /** @private @type { string } */
   static #languageCode = "ko";
   /** @private @type { string } */
@@ -29055,7 +29058,7 @@ var Localization = class _Localization extends Object2 {
    * @returns { string }
    */
   static detectLanguage(supportedLanguageCodes, defaultLanguageCode = "ko") {
-    const navigatorObject = System52.navigator;
+    const navigatorObject = System53.navigator;
     const candidateList = [];
     if (navigatorObject) {
       if (navigatorObject.languages) {
@@ -29066,7 +29069,7 @@ var Localization = class _Localization extends Object2 {
         candidateList.push(navigatorObject.language);
       }
     }
-    const supportedSet = new System52.Set(supportedLanguageCodes.map((code) => code.toLowerCase()));
+    const supportedSet = new System53.Set(supportedLanguageCodes.map((code) => code.toLowerCase()));
     for (const languageTag of candidateList) {
       const loweredTag = languageTag.toLowerCase();
       if (supportedSet.has(loweredTag)) {
@@ -29145,7 +29148,7 @@ var Localization = class _Localization extends Object2 {
    */
   static textList(key) {
     const resolvedValue = _Localization.lookup(key);
-    if (System52.Array.isArray(resolvedValue)) {
+    if (System53.Array.isArray(resolvedValue)) {
       return resolvedValue;
     }
     if (typeof resolvedValue === "string") {
@@ -29180,7 +29183,7 @@ var Localization = class _Localization extends Object2 {
 };
 
 // src/misc/pathfinder.js
-var System53 = globalThis;
+var System54 = globalThis;
 var PathFinder = class extends Object2 {
   static {
     __name(this, "PathFinder");
@@ -29213,11 +29216,11 @@ var PathFinder = class extends Object2 {
     const toIndex = /* @__PURE__ */ __name((column, row) => {
       return row * columnCount + column;
     }, "toIndex");
-    const costFromStart = new System53.Float64Array(cellCount).fill(System53.Number.POSITIVE_INFINITY);
-    const cameFrom = new System53.Int32Array(cellCount).fill(-1);
-    const isClosed = new System53.Uint8Array(cellCount);
+    const costFromStart = new System54.Float64Array(cellCount).fill(System54.Number.POSITIVE_INFINITY);
+    const cameFrom = new System54.Int32Array(cellCount).fill(-1);
+    const isClosed = new System54.Uint8Array(cellCount);
     const heuristic = /* @__PURE__ */ __name((column, row) => {
-      return System53.Math.abs(column - goal.column) + System53.Math.abs(row - goal.row);
+      return System54.Math.abs(column - goal.column) + System54.Math.abs(row - goal.row);
     }, "heuristic");
     const heapScores = [];
     const heapIndices = [];
@@ -29282,7 +29285,7 @@ var PathFinder = class extends Object2 {
         const path = [];
         let traceIndex = goalIndex;
         while (traceIndex !== startIndex) {
-          path.push({ column: traceIndex % columnCount, row: System53.Math.floor(traceIndex / columnCount) });
+          path.push({ column: traceIndex % columnCount, row: System54.Math.floor(traceIndex / columnCount) });
           traceIndex = cameFrom[traceIndex];
         }
         path.reverse();
@@ -29293,7 +29296,7 @@ var PathFinder = class extends Object2 {
       }
       isClosed[currentIndex] = 1;
       const currentColumn = currentIndex % columnCount;
-      const currentRow = System53.Math.floor(currentIndex / columnCount);
+      const currentRow = System54.Math.floor(currentIndex / columnCount);
       for (const offset of neighborOffsets) {
         const nextColumn = currentColumn + offset[0];
         const nextRow = currentRow + offset[1];
@@ -29320,7 +29323,7 @@ var PathFinder = class extends Object2 {
 };
 
 // src/misc/grid.js
-var System54 = globalThis;
+var System55 = globalThis;
 var Grid = class _Grid extends Object2 {
   static {
     __name(this, "Grid");
@@ -29344,7 +29347,7 @@ var Grid = class _Grid extends Object2 {
     if (!isPassableHandler(start.column, start.row)) {
       return visitedList;
     }
-    const isVisited = new System54.Uint8Array(columnCount * rowCount);
+    const isVisited = new System55.Uint8Array(columnCount * rowCount);
     const pendingStack = [start.column, start.row];
     isVisited[start.row * columnCount + start.column] = 1;
     while (pendingStack.length > 0) {
@@ -29401,10 +29404,10 @@ var Grid = class _Grid extends Object2 {
    * @returns { boolean } 막힌 타일과 겹치면 참.
    */
   static testRectOverlap(worldRect, tileSize, isBlockedHandler) {
-    const startColumn = System54.Math.floor(worldRect.position.x / tileSize);
-    const endColumn = System54.Math.floor((worldRect.position.x + worldRect.size.x - 1e-6) / tileSize);
-    const startRow = System54.Math.floor(worldRect.position.y / tileSize);
-    const endRow = System54.Math.floor((worldRect.position.y + worldRect.size.y - 1e-6) / tileSize);
+    const startColumn = System55.Math.floor(worldRect.position.x / tileSize);
+    const endColumn = System55.Math.floor((worldRect.position.x + worldRect.size.x - 1e-6) / tileSize);
+    const startRow = System55.Math.floor(worldRect.position.y / tileSize);
+    const endRow = System55.Math.floor((worldRect.position.y + worldRect.size.y - 1e-6) / tileSize);
     for (let row = startRow; row <= endRow; ++row) {
       for (let column = startColumn; column <= endColumn; ++column) {
         if (isBlockedHandler(column, row)) {
@@ -29424,7 +29427,7 @@ var Grid = class _Grid extends Object2 {
    * @returns { object } { column, row }
    */
   static toCell(worldX, worldY, tileSize) {
-    return { column: System54.Math.floor(worldX / tileSize), row: System54.Math.floor(worldY / tileSize) };
+    return { column: System55.Math.floor(worldX / tileSize), row: System55.Math.floor(worldY / tileSize) };
   }
   //==============================================================================
   // 타일 좌표 → 타일 중심 월드 좌표. (정적)
@@ -29441,7 +29444,7 @@ var Grid = class _Grid extends Object2 {
 };
 
 // src/misc/collision2d.js
-var System55 = globalThis;
+var System56 = globalThis;
 var Collision2D = class extends Object2 {
   static {
     __name(this, "Collision2D");
@@ -29484,7 +29487,7 @@ var Collision2D = class extends Object2 {
     if (distanceSquared >= radiusSum * radiusSum) {
       return null;
     }
-    const distance = System55.Math.sqrt(distanceSquared);
+    const distance = System56.Math.sqrt(distanceSquared);
     let directionX = 1;
     let directionY = 0;
     if (distance > 1e-6) {
@@ -29548,7 +29551,7 @@ var Collision2D = class extends Object2 {
 };
 
 // src/misc/steering2d.js
-var System56 = globalThis;
+var System57 = globalThis;
 var Steering2D = class extends Object2 {
   static {
     __name(this, "Steering2D");
@@ -29565,7 +29568,7 @@ var Steering2D = class extends Object2 {
   static seek(position, targetPosition, speed) {
     const differenceX = targetPosition.x - position.x;
     const differenceY = targetPosition.y - position.y;
-    const distance = System56.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
+    const distance = System57.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
     if (distance < 1e-6) {
       return Vector2.zero();
     }
@@ -29588,7 +29591,7 @@ var Steering2D = class extends Object2 {
   static orbitAtRange(position, targetPosition, preferredRange, speed, elapsedSeconds, strafeRate = 1.7) {
     const differenceX = targetPosition.x - position.x;
     const differenceY = targetPosition.y - position.y;
-    const distance = System56.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
+    const distance = System57.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
     if (distance < 1e-6) {
       return Vector2.create(speed, 0);
     }
@@ -29596,11 +29599,11 @@ var Steering2D = class extends Object2 {
     const forwardY = differenceY / distance;
     const sideX = -forwardY;
     const sideY = forwardX;
-    const rangeError = System56.Math.max(-1, System56.Math.min(1, (distance - preferredRange) / preferredRange));
-    const strafeAmount = System56.Math.sin(elapsedSeconds * strafeRate);
+    const rangeError = System57.Math.max(-1, System57.Math.min(1, (distance - preferredRange) / preferredRange));
+    const strafeAmount = System57.Math.sin(elapsedSeconds * strafeRate);
     const desiredX = forwardX * rangeError + sideX * strafeAmount;
     const desiredY = forwardY * rangeError + sideY * strafeAmount;
-    const desiredLength = System56.Math.sqrt(desiredX * desiredX + desiredY * desiredY);
+    const desiredLength = System57.Math.sqrt(desiredX * desiredX + desiredY * desiredY);
     if (desiredLength < 1e-6) {
       return Vector2.zero();
     }
@@ -29609,7 +29612,7 @@ var Steering2D = class extends Object2 {
 };
 
 // src/misc/pointergesture.js
-var System57 = globalThis;
+var System58 = globalThis;
 var PointerGesture = class extends Object2 {
   static {
     __name(this, "PointerGesture");
@@ -29765,7 +29768,7 @@ var PointerGesture = class extends Object2 {
     if (!this.#isPressed || this.#isDragging || this.#longPressSeconds <= 0) {
       return 0;
     }
-    return System57.Math.min(1, this.#pressedSeconds / this.#longPressSeconds);
+    return System58.Math.min(1, this.#pressedSeconds / this.#longPressSeconds);
   }
   //==============================================================================
   // 상태 조회.
@@ -29815,7 +29818,7 @@ var PointerGesture = class extends Object2 {
 };
 
 // src/misc/focusnavigator.js
-var System58 = globalThis;
+var System59 = globalThis;
 var FocusNavigator = class extends Object2 {
   static {
     __name(this, "FocusNavigator");
@@ -29912,7 +29915,7 @@ var FocusNavigator = class extends Object2 {
     const currentCenterX = currentItem.rect.position.x + currentItem.rect.size.x * 0.5;
     const currentCenterY = currentItem.rect.position.y + currentItem.rect.size.y * 0.5;
     let bestItem = null;
-    let bestScore = System58.Number.POSITIVE_INFINITY;
+    let bestScore = System59.Number.POSITIVE_INFINITY;
     for (const item of this.#itemList) {
       if (item.id === this.#focusedId) {
         continue;
@@ -29925,7 +29928,7 @@ var FocusNavigator = class extends Object2 {
       if (forwardDistance <= 0) {
         continue;
       }
-      const crossDistance = System58.Math.abs(deltaX * directionY) + System58.Math.abs(deltaY * directionX);
+      const crossDistance = System59.Math.abs(deltaX * directionY) + System59.Math.abs(deltaY * directionX);
       const score = forwardDistance + crossDistance * this.#crossAxisPenalty;
       if (score < bestScore) {
         bestScore = score;
@@ -29941,7 +29944,7 @@ var FocusNavigator = class extends Object2 {
 };
 
 // src/misc/shaker.js
-var System59 = globalThis;
+var System60 = globalThis;
 var Shaker = class extends Object2 {
   static {
     __name(this, "Shaker");
@@ -29979,7 +29982,7 @@ var Shaker = class extends Object2 {
    * @param { number } strength 최대 오프셋. (픽셀)
    */
   addShake(strength) {
-    this.#strength = System59.Math.max(this.#strength, strength);
+    this.#strength = System60.Math.max(this.#strength, strength);
   }
   //==============================================================================
   // 갱신.
@@ -29990,7 +29993,7 @@ var Shaker = class extends Object2 {
   tick(timeDelta) {
     this.#elapsedSeconds += timeDelta;
     if (this.#strength > 0) {
-      this.#strength *= System59.Math.exp(-this.#decayRate * timeDelta);
+      this.#strength *= System60.Math.exp(-this.#decayRate * timeDelta);
       if (this.#strength < 0.05) {
         this.#strength = 0;
       }
@@ -30008,8 +30011,8 @@ var Shaker = class extends Object2 {
       return Vector2.zero();
     }
     const time = this.#elapsedSeconds;
-    const offsetX = System59.Math.sin(time * this.#frequency) * this.#strength;
-    const offsetY = System59.Math.cos(time * this.#frequency * 1.37) * this.#strength;
+    const offsetX = System60.Math.sin(time * this.#frequency) * this.#strength;
+    const offsetY = System60.Math.cos(time * this.#frequency * 1.37) * this.#strength;
     return Vector2.create(offsetX, offsetY);
   }
   //==============================================================================
@@ -30048,7 +30051,7 @@ var Shaker = class extends Object2 {
 };
 
 // src/misc/camera2d.js
-var System60 = globalThis;
+var System61 = globalThis;
 var Camera2D = class extends Object2 {
   static {
     __name(this, "Camera2D");
@@ -30104,18 +30107,18 @@ var Camera2D = class extends Object2 {
         this.#position.x + this.#velocity.x * timeDelta,
         this.#position.y + this.#velocity.y * timeDelta
       );
-      const damping = System60.Math.exp(-this.#inertiaDamping * timeDelta);
+      const damping = System61.Math.exp(-this.#inertiaDamping * timeDelta);
       this.#velocity = Vector2.create(this.#velocity.x * damping, this.#velocity.y * damping);
-      if (System60.Math.abs(this.#velocity.x) < 1 && System60.Math.abs(this.#velocity.y) < 1) {
+      if (System61.Math.abs(this.#velocity.x) < 1 && System61.Math.abs(this.#velocity.y) < 1) {
         this.#velocity = Vector2.zero();
       }
     }
     if (this.#tweenState) {
       const tween = this.#tweenState;
       tween.elapsedSeconds += timeDelta;
-      const linearRatio = System60.Math.min(1, tween.elapsedSeconds / tween.duration);
-      const easedRatio = 1 - System60.Math.pow(1 - linearRatio, 3);
-      this.#zoom = tween.fromZoom * System60.Math.pow(tween.toZoom / tween.fromZoom, easedRatio);
+      const linearRatio = System61.Math.min(1, tween.elapsedSeconds / tween.duration);
+      const easedRatio = 1 - System61.Math.pow(1 - linearRatio, 3);
+      this.#zoom = tween.fromZoom * System61.Math.pow(tween.toZoom / tween.fromZoom, easedRatio);
       this.#position = Vector2.create(
         lerp(tween.fromPosition.x, tween.toPosition.x, easedRatio),
         lerp(tween.fromPosition.y, tween.toPosition.y, easedRatio)
@@ -30212,7 +30215,7 @@ var Camera2D = class extends Object2 {
       toPosition: Vector2.create(targetPosition.x, targetPosition.y),
       fromZoom: this.#zoom,
       toZoom: clamp(targetZoom, this.#minZoom, this.#maxZoom),
-      duration: System60.Math.max(1e-4, duration),
+      duration: System61.Math.max(1e-4, duration),
       elapsedSeconds: 0
     };
   }
@@ -30339,7 +30342,7 @@ var Camera2D = class extends Object2 {
 };
 
 // src/misc/typewriter.js
-var System61 = globalThis;
+var System62 = globalThis;
 var Typewriter = class extends Object2 {
   static {
     __name(this, "Typewriter");
@@ -30416,9 +30419,9 @@ var Typewriter = class extends Object2 {
       return;
     }
     const speed = this.#charactersPerSecond * (this.#isFastForward ? this.#fastForwardMultiplier : 1);
-    const previousWholeCount = System61.Math.floor(this.#revealedCount);
-    this.#revealedCount = System61.Math.min(this.#fullText.length, this.#revealedCount + speed * timeDelta);
-    const currentWholeCount = System61.Math.floor(this.#revealedCount);
+    const previousWholeCount = System62.Math.floor(this.#revealedCount);
+    this.#revealedCount = System62.Math.min(this.#fullText.length, this.#revealedCount + speed * timeDelta);
+    const currentWholeCount = System62.Math.floor(this.#revealedCount);
     if (currentWholeCount !== previousWholeCount) {
       this.#target.setVisibleCharacterCount(currentWholeCount);
       if (this.#characterRevealedEvent) {
@@ -30502,7 +30505,7 @@ var Typewriter = class extends Object2 {
 };
 
 // src/misc/dialogue.js
-var System62 = globalThis;
+var System63 = globalThis;
 var DialogueRunner = class extends Object2 {
   static {
     __name(this, "DialogueRunner");
@@ -30524,7 +30527,7 @@ var DialogueRunner = class extends Object2 {
   constructor() {
     super();
     this.#entryList = [];
-    this.#labelTable = new System62.Map();
+    this.#labelTable = new System63.Map();
     this.#cursor = 0;
     this.#isFinished = true;
   }
@@ -30726,7 +30729,7 @@ var DialogueScriptParser = class extends Object2 {
 };
 
 // src/misc/spriteanimator.js
-var System63 = globalThis;
+var System64 = globalThis;
 var SpriteAnimator = class extends Component {
   static {
     __name(this, "SpriteAnimator");
@@ -30748,7 +30751,7 @@ var SpriteAnimator = class extends Component {
   constructor() {
     super();
     this.setComponentType("SpriteAnimator");
-    this.#clipTable = new System63.Map();
+    this.#clipTable = new System64.Map();
     this.#clipName = null;
     this.#animation = new Animation();
     this.#sprite = null;
@@ -31052,7 +31055,7 @@ var PlatformerBody = class extends Component {
 };
 
 // src/misc/floatingtext.js
-var System64 = globalThis;
+var System65 = globalThis;
 var FloatingText = class extends WorldNode {
   static {
     __name(this, "FloatingText");
@@ -31130,7 +31133,7 @@ var FloatingText = class extends WorldNode {
     for (let index = this.#activeList.length - 1; index >= 0; --index) {
       const item = this.#activeList[index];
       item.elapsedSeconds += timeDelta;
-      const linearRatio = System64.Math.min(1, item.elapsedSeconds / item.duration);
+      const linearRatio = System65.Math.min(1, item.elapsedSeconds / item.duration);
       const easedRatio = 1 - (1 - linearRatio) * (1 - linearRatio);
       item.node.setLocalPosition(Vector2.create(item.startPosition.x, item.startPosition.y - item.rise * easedRatio));
       item.node.setLocalOpacity(1 - linearRatio * linearRatio);
@@ -31163,7 +31166,7 @@ var FloatingText = class extends WorldNode {
 };
 
 // src/misc/beepplayer.js
-var System65 = globalThis;
+var System66 = globalThis;
 var BeepPlayer = class extends Object2 {
   static {
     __name(this, "BeepPlayer");
@@ -31212,16 +31215,16 @@ var BeepPlayer = class extends Object2 {
     }
     const startTime = audioContext.currentTime + delaySeconds;
     const endTime = startTime + durationSeconds;
-    const attackSeconds = System65.Math.min(5e-3, durationSeconds * 0.25);
-    const releaseSeconds = System65.Math.min(0.02, durationSeconds * 0.5);
-    const peakVolume = System65.Math.max(1e-4, this.#volume * volumeScale);
+    const attackSeconds = System66.Math.min(5e-3, durationSeconds * 0.25);
+    const releaseSeconds = System66.Math.min(0.02, durationSeconds * 0.5);
+    const peakVolume = System66.Math.max(1e-4, this.#volume * volumeScale);
     const oscillatorNode = audioContext.createOscillator();
     oscillatorNode.type = waveform;
     oscillatorNode.frequency.setValueAtTime(frequency, startTime);
     const gainNode = audioContext.createGain();
     gainNode.gain.setValueAtTime(1e-4, startTime);
     gainNode.gain.linearRampToValueAtTime(peakVolume, startTime + attackSeconds);
-    gainNode.gain.setValueAtTime(peakVolume, System65.Math.max(startTime + attackSeconds, endTime - releaseSeconds));
+    gainNode.gain.setValueAtTime(peakVolume, System66.Math.max(startTime + attackSeconds, endTime - releaseSeconds));
     gainNode.gain.exponentialRampToValueAtTime(1e-4, endTime);
     oscillatorNode.connect(gainNode);
     gainNode.connect(audioContext.destination);
@@ -31320,7 +31323,7 @@ var BeepPlayer = class extends Object2 {
    * @param { number } volume 0 ~ 1.
    */
   setVolume(volume) {
-    this.#volume = System65.Math.max(0, System65.Math.min(1, volume));
+    this.#volume = System66.Math.max(0, System66.Math.min(1, volume));
   }
   //==============================================================================
   // 기본 음량 반환.
@@ -31448,7 +31451,7 @@ var SoundEffectPool = class extends Object2 {
 };
 
 // src/ui/popupmotion.js
-var System66 = globalThis;
+var System67 = globalThis;
 var PopupMotionState = {
   closed: "closed",
   opening: "opening",
@@ -31566,14 +31569,14 @@ var PopupMotion = class extends Object2 {
       return 0;
     }
     if (this.#state === PopupMotionState.opening) {
-      const ratio2 = System66.Math.min(1, this.#elapsedSeconds / this.#openDuration);
+      const ratio2 = System67.Math.min(1, this.#elapsedSeconds / this.#openDuration);
       const smooth = ratio2 * ratio2 * (3 - 2 * ratio2);
       if (smooth < 0.72) {
         return 0.45 + (1.18 - 0.45) * (smooth / 0.72);
       }
       return 1.18 - (1.18 - 1) * ((smooth - 0.72) / 0.28);
     }
-    const ratio = System66.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
+    const ratio = System67.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
     if (ratio < 0.25) {
       return 1 + (1.08 - 1) * (ratio / 0.25);
     }
@@ -31595,9 +31598,9 @@ var PopupMotion = class extends Object2 {
       return 0;
     }
     if (this.#state === PopupMotionState.opening) {
-      return System66.Math.min(1, this.#elapsedSeconds / this.#openDuration);
+      return System67.Math.min(1, this.#elapsedSeconds / this.#openDuration);
     }
-    return 1 - System66.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
+    return 1 - System67.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
   }
   //==============================================================================
   // 조작 가능 여부. (완전히 열린 뒤에만 참)
@@ -31641,8 +31644,302 @@ var PopupMotion = class extends Object2 {
   }
 };
 
+// src/ui/uilistview.js
+var System68 = globalThis;
+var UIListView = class extends Component {
+  static {
+    __name(this, "UIListView");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { object | null } */
+  #templateData;
+  // 직렬화된 템플릿.
+  /** @private @type { number } */
+  #itemCount;
+  /** @private @type { number } */
+  #itemSize;
+  // 진행 축 방향 항목 크기.
+  /** @private @type { number } */
+  #spacing;
+  /** @private @type { boolean } */
+  #isHorizontal;
+  /** @private @type { number } */
+  #bufferItemCount;
+  // 화면 밖 여유 항목 수.
+  /** @private @type { Function | null } */
+  #bindItemEvent;
+  // (itemNode, itemIndex)
+  /** @private @type { Function | null } */
+  #reachEndEvent;
+  /** @private @type { number } */
+  #reachEndThreshold;
+  // 끝에서 이 거리 안이면 알림. (픽셀)
+  /** @private @type { boolean } */
+  #isReachEndArmed;
+  /** @private @type { System.Map } */
+  #activeItemMap;
+  // index → node
+  /** @private @type { import("../core/node/worldnode.js").WorldNode[] } */
+  #freeItemList;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   */
+  constructor() {
+    super();
+    this.#templateData = null;
+    this.#itemCount = 0;
+    this.#itemSize = 0;
+    this.#spacing = 0;
+    this.#isHorizontal = false;
+    this.#bufferItemCount = 1;
+    this.#bindItemEvent = null;
+    this.#reachEndEvent = null;
+    this.#reachEndThreshold = 120;
+    this.#isReachEndArmed = true;
+    this.#activeItemMap = new System68.Map();
+    this.#freeItemList = [];
+  }
+  //==============================================================================
+  // 의존 컴포넌트.
+  //==============================================================================
+  /**
+   * @override
+   * @returns { Function[] }
+   */
+  require() {
+    return [UIScrollView];
+  }
+  //==============================================================================
+  // 템플릿 설정.
+  // - 노드를 직렬화해 두고 필요할 때 복제한다. 원본은 감춘다.
+  //   항목 크기는 템플릿의 contentSize 진행 축 값에서 읽는다.
+  //==============================================================================
+  /**
+   * @param { import("../core/node/worldnode.js").WorldNode } templateNode
+   */
+  setTemplateNode(templateNode) {
+    this.#templateData = UIDocument.serializeNode(templateNode);
+    this.#templateData.active = true;
+    templateNode.setActive(false);
+    const templateSize = templateNode.getContentSize();
+    if (this.#itemSize <= 0) {
+      this.#itemSize = this.#isHorizontal ? templateSize.x : templateSize.y;
+    }
+  }
+  //==============================================================================
+  // 항목 수 설정. (스크롤 영역 갱신 + 끝 알림 재무장)
+  //==============================================================================
+  /**
+   * @param { number } itemCount
+   */
+  setItemCount(itemCount) {
+    const previousItemCount = this.#itemCount;
+    this.#itemCount = System68.Math.max(0, itemCount);
+    if (this.#itemCount > previousItemCount) {
+      this.#isReachEndArmed = true;
+    }
+    this.updateScrollContentSize();
+    this.refresh();
+  }
+  //==============================================================================
+  // 갱신. (보이는 범위 계산 → 회수 / 생성)
+  //==============================================================================
+  /**
+   * @override
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    if (!this.#templateData) {
+      return;
+    }
+    const scrollView = this.findScrollView();
+    if (!scrollView) {
+      return;
+    }
+    const node = this.getNode();
+    const contentSize = node.getContentSize();
+    const scrollOffset = scrollView.getScrollOffset();
+    const viewLength = this.#isHorizontal ? contentSize.x : contentSize.y;
+    const scrolled = this.#isHorizontal ? -scrollOffset.x : -scrollOffset.y;
+    const pitch = this.#itemSize + this.#spacing;
+    if (pitch <= 0) {
+      return;
+    }
+    let firstIndex = System68.Math.floor(scrolled / pitch) - this.#bufferItemCount;
+    let lastIndex = System68.Math.ceil((scrolled + viewLength) / pitch) + this.#bufferItemCount - 1;
+    firstIndex = System68.Math.max(0, firstIndex);
+    lastIndex = System68.Math.min(this.#itemCount - 1, lastIndex);
+    for (const [itemIndex, itemNode] of [...this.#activeItemMap]) {
+      if (itemIndex < firstIndex || itemIndex > lastIndex) {
+        itemNode.setActive(false);
+        this.#activeItemMap.delete(itemIndex);
+        this.#freeItemList.push(itemNode);
+      }
+    }
+    for (let itemIndex = firstIndex; itemIndex <= lastIndex; ++itemIndex) {
+      if (this.#activeItemMap.has(itemIndex)) {
+        continue;
+      }
+      const itemNode = this.acquireItemNode(scrollView);
+      itemNode.setName("Item" + itemIndex);
+      itemNode.setActive(true);
+      const itemPosition = this.#isHorizontal ? Vector2.create(itemIndex * pitch, 0) : Vector2.create(0, itemIndex * pitch);
+      itemNode.setLocalPosition(itemPosition);
+      this.#activeItemMap.set(itemIndex, itemNode);
+      if (this.#bindItemEvent) {
+        this.#bindItemEvent(itemNode, itemIndex);
+      }
+    }
+    if (this.#reachEndEvent && this.#isReachEndArmed && this.#itemCount > 0) {
+      const totalLength = this.#itemCount * pitch - this.#spacing;
+      const remainLength = totalLength - (scrolled + viewLength);
+      if (remainLength <= this.#reachEndThreshold) {
+        this.#isReachEndArmed = false;
+        this.#reachEndEvent();
+      }
+    }
+  }
+  //==============================================================================
+  // 항목 노드 확보. (회수분 재사용, 없으면 템플릿 복제)
+  //==============================================================================
+  /**
+   * @private
+   * @param { UIScrollView } scrollView
+   * @returns { import("../core/node/worldnode.js").WorldNode }
+   */
+  acquireItemNode(scrollView) {
+    const freeItemNode = this.#freeItemList.pop();
+    if (freeItemNode) {
+      return freeItemNode;
+    }
+    const itemNode = UIDocument.deserializeNode(this.#templateData);
+    const contentNode = scrollView.getContent();
+    if (contentNode) {
+      contentNode.addChild(itemNode);
+    } else {
+      this.getNode().addChild(itemNode);
+    }
+    return itemNode;
+  }
+  //==============================================================================
+  // 보이는 항목 전부 다시 바인딩. (데이터 내용이 바뀌었을 때)
+  //==============================================================================
+  refresh() {
+    if (!this.#bindItemEvent) {
+      return;
+    }
+    for (const [itemIndex, itemNode] of this.#activeItemMap) {
+      if (itemIndex >= this.#itemCount) {
+        continue;
+      }
+      this.#bindItemEvent(itemNode, itemIndex);
+    }
+  }
+  //==============================================================================
+  // 스크롤 영역 갱신.
+  //==============================================================================
+  /**
+   * @private
+   */
+  updateScrollContentSize() {
+    const scrollView = this.findScrollView();
+    if (!scrollView) {
+      return;
+    }
+    const pitch = this.#itemSize + this.#spacing;
+    const totalLength = this.#itemCount > 0 ? this.#itemCount * pitch - this.#spacing : 0;
+    const node = this.getNode();
+    const contentSize = node.getContentSize();
+    const scrollContentSize = this.#isHorizontal ? Vector2.create(totalLength, contentSize.y) : Vector2.create(contentSize.x, totalLength);
+    scrollView.setScrollContentSize(scrollContentSize);
+  }
+  //==============================================================================
+  // 같은 노드의 스크롤 뷰 반환.
+  //==============================================================================
+  /**
+   * @private
+   * @returns { UIScrollView | null }
+   */
+  findScrollView() {
+    const node = this.getNode();
+    if (!node) {
+      return null;
+    }
+    const scrollViewComponents = node.getComponents(UIScrollView);
+    return scrollViewComponents.length > 0 ? scrollViewComponents[0] : null;
+  }
+  //==============================================================================
+  // 특정 항목의 실제 노드 반환. (화면 밖이면 null)
+  //==============================================================================
+  /**
+   * @param { number } itemIndex
+   * @returns { import("../core/node/worldnode.js").WorldNode | null }
+   */
+  getItemNode(itemIndex) {
+    const itemNode = this.#activeItemMap.get(itemIndex);
+    return itemNode ? itemNode : null;
+  }
+  //==============================================================================
+  // 설정 메서드 목록.
+  //==============================================================================
+  /** @param { Function } bindItemEvent (itemNode, itemIndex) */
+  setBindItemEvent(bindItemEvent) {
+    this.#bindItemEvent = bindItemEvent;
+  }
+  /** @param { Function } reachEndEvent */
+  setReachEndEvent(reachEndEvent) {
+    this.#reachEndEvent = reachEndEvent;
+  }
+  /** @param { number } reachEndThreshold 픽셀. */
+  setReachEndThreshold(reachEndThreshold) {
+    this.#reachEndThreshold = reachEndThreshold;
+  }
+  /** @param { number } itemSize 진행 축 방향 항목 크기. */
+  setItemSize(itemSize) {
+    this.#itemSize = itemSize;
+    this.updateScrollContentSize();
+  }
+  /** @param { number } spacing 항목 사이 간격. */
+  setSpacing(spacing) {
+    this.#spacing = spacing;
+    this.updateScrollContentSize();
+  }
+  /** @param { boolean } isHorizontal 가로 진행 여부. (기본 세로) */
+  setHorizontal(isHorizontal) {
+    this.#isHorizontal = isHorizontal;
+  }
+  /** @param { number } bufferItemCount 화면 밖 여유 항목 수. */
+  setBufferItemCount(bufferItemCount) {
+    this.#bufferItemCount = System68.Math.max(0, bufferItemCount);
+  }
+  //==============================================================================
+  // 조회 메서드 목록.
+  //==============================================================================
+  /** @returns { number } */
+  getItemCount() {
+    return this.#itemCount;
+  }
+  /** @returns { number } */
+  getItemSize() {
+    return this.#itemSize;
+  }
+  /** @returns { number } */
+  getSpacing() {
+    return this.#spacing;
+  }
+  /** @returns { number } */
+  getActiveItemCount() {
+    return this.#activeItemMap.size;
+  }
+};
+
 // src/ui/uitoast.js
-var System67 = globalThis;
+var System69 = globalThis;
 var UIToast = class extends WorldNode {
   static {
     __name(this, "UIToast");
@@ -31741,7 +32038,7 @@ var UIToast = class extends WorldNode {
     }
     this.#phaseSeconds += timeDelta;
     if (this.#phase === "enter") {
-      const ratio = System67.Math.min(1, this.#phaseSeconds / 0.24);
+      const ratio = System69.Math.min(1, this.#phaseSeconds / 0.24);
       const eased = 1 - (1 - ratio) * (1 - ratio);
       this.setLocalOpacity(eased);
       this.updatePosition(eased);
@@ -31755,7 +32052,7 @@ var UIToast = class extends WorldNode {
         this.#phaseSeconds = 0;
       }
     } else if (this.#phase === "exit") {
-      const ratio = System67.Math.min(1, this.#phaseSeconds / 0.2);
+      const ratio = System69.Math.min(1, this.#phaseSeconds / 0.2);
       this.setLocalOpacity(1 - ratio);
       this.updatePosition(1 + ratio * 0.4);
       if (ratio >= 1) {
@@ -32068,7 +32365,7 @@ var UIDialog = class extends WorldNode {
 };
 
 // import.js
-var System68 = globalThis;
+var System70 = globalThis;
 export {
   Action,
   Animation,
@@ -32167,7 +32464,7 @@ export {
   SpriteAnimator,
   Stack,
   Steering2D,
-  System68 as System,
+  System70 as System,
   Text,
   TextAlign,
   TextAsset,
@@ -32187,6 +32484,7 @@ export {
   UIImageView,
   UIInputField,
   UILabel,
+  UIListView,
   UINode,
   UIProgressView,
   UIScene,

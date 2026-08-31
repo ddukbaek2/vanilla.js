@@ -128,6 +128,8 @@
 	uniform float elapsedTime;
 	uniform float aspectRatio;
 	uniform float shipStrength;
+	uniform vec4 shipAnchorList[4]; // xy = 선미 화면 좌표, z = 화면 크기, w = 밝기.
+	uniform vec4 beamAnchor; // xy = 기함 프로우 화면 좌표, zw = 화면 전방 방향.
 	out vec4 outputColor;
 
 	float hash21(vec2 point) {
@@ -150,85 +152,6 @@
 
 	float boxMask(vec2 point, vec2 minCorner, vec2 maxCorner) {
 		return axisMask(point.x, minCorner.x, maxCorner.x) * axisMask(point.y, minCorner.y, maxCorner.y);
-	}
-
-	// 전투순양함 형상. (스타크래프트풍 각진 블록 조합 — 곡선/테이퍼 없음)
-	// x = 실루엣 마스크, y = 블록별 면 톤. (각 면이 빛을 다르게 받아 입체감이 생긴다)
-	vec2 battlecruiserShape(vec2 shipLocal) {
-		float silhouetteMask = 0.0;
-		float faceTone = 0.0;
-		float blockMask;
-		blockMask = boxMask(shipLocal, vec2(-0.5, -0.06), vec2(-0.05, 0.06)); // 후방 본체 블록.
-		if (blockMask > silhouetteMask) { silhouetteMask = blockMask; faceTone = 0.5; }
-		blockMask = boxMask(shipLocal, vec2(-0.08, -0.022), vec2(0.26, 0.022)); // 중앙 넥.
-		if (blockMask > silhouetteMask) { silhouetteMask = blockMask; faceTone = 0.38; }
-		blockMask = boxMask(shipLocal, vec2(0.24, -0.055), vec2(0.46, 0.055)); // 해머헤드 프로우.
-		if (blockMask > silhouetteMask) { silhouetteMask = blockMask; faceTone = 0.62; }
-		blockMask = boxMask(shipLocal, vec2(0.42, -0.075), vec2(0.46, 0.075)); // 프로우 전면 립.
-		if (blockMask > silhouetteMask) { silhouetteMask = blockMask; faceTone = 0.8; }
-		blockMask = boxMask(shipLocal, vec2(-0.4, 0.06), vec2(-0.18, 0.105)); // 상부 구조물.
-		if (blockMask > silhouetteMask) { silhouetteMask = blockMask; faceTone = 0.32; }
-		blockMask = boxMask(shipLocal, vec2(-0.33, 0.105), vec2(-0.25, 0.135)); // 함교 타워.
-		if (blockMask > silhouetteMask) { silhouetteMask = blockMask; faceTone = 0.45; }
-		blockMask = boxMask(shipLocal, vec2(-0.38, -0.1), vec2(-0.22, -0.06)); // 하부 핀.
-		if (blockMask > silhouetteMask) { silhouetteMask = blockMask; faceTone = 0.26; }
-		return vec2(silhouetteMask, faceTone);
-	}
-
-	// 전투순양함 1척을 그린다.
-	// facingSign: +1 = 프로우가 오른쪽, -1 = 왼쪽. shipFade: 원거리 대기 흐림.
-	vec3 applyBattlecruiser(vec3 color, vec2 screenPoint, vec2 shipCenter, float shipScale, float facingSign, float tiltRadian, float shipFade, float shipTime) {
-		vec2 shipLocal = screenPoint - shipCenter;
-		float cosTilt = cos(tiltRadian);
-		float sinTilt = sin(tiltRadian);
-		shipLocal = vec2(shipLocal.x * cosTilt - shipLocal.y * sinTilt, shipLocal.x * sinTilt + shipLocal.y * cosTilt);
-		shipLocal.x *= facingSign;
-		shipLocal /= shipScale;
-
-		vec2 shape = battlecruiserShape(shipLocal);
-		float silhouetteMask = shape.x;
-		float faceTone = shape.y;
-		float shipMask = silhouetteMask * shipFade;
-
-		if (shipMask > 0.001) {
-			// 블록별 면 톤. (면마다 받는 빛이 달라 입체적으로 읽힌다)
-			vec3 shipColor = vec3(0.06, 0.04, 0.026) * (0.45 + faceTone * 1.7);
-
-			// 태양 방향(하부) 캐러멜 림 라이트.
-			float rimLight = smoothstep(0.02, -0.09, shipLocal.y);
-			shipColor += vec3(0.85, 0.5, 0.2) * rimLight * 0.4;
-
-			// 윗모서리 베벨 하이라이트. (바로 위가 빈 공간인 픽셀 = 블록 상단 모서리)
-			float aboveMask = battlecruiserShape(shipLocal + vec2(0.0, 0.01)).x;
-			float topBevel = clamp(silhouetteMask - aboveMask, 0.0, 1.0);
-			shipColor += vec3(0.9, 0.62, 0.3) * topBevel * 0.4;
-
-			// 프로우 방향 그라디언트. (태양을 향한 면이 미세하게 밝음)
-			float bowLight = smoothstep(-0.5, 0.46, shipLocal.x);
-			shipColor += vec3(0.3, 0.18, 0.08) * bowLight * 0.3;
-
-			// 패널 라인. (선체를 가로지르는 어두운 분할선 — 각진 디테일)
-			float panelLine = step(0.94, fract(shipLocal.x * 22.0));
-			shipColor *= 1.0 - panelLine * 0.35;
-
-			// 창문 불빛. (드문드문, 느리게 깜빡임)
-			vec2 windowCell = floor(shipLocal * vec2(180.0, 320.0));
-			float windowRandom = hash21(windowCell);
-			float windowLight = step(0.985, windowRandom) * (0.6 + 0.4 * sin(shipTime * (1.0 + windowRandom * 2.0) + windowRandom * 60.0));
-			shipColor += vec3(1.0, 0.9, 0.65) * windowLight * 0.5;
-			color = mix(color, shipColor, shipMask);
-		}
-
-		// 선미 엔진 글로우 4기. (맥동하는 골드 추진광)
-		float enginePulse = 0.75 + 0.25 * sin(shipTime * 3.1);
-		for (int engineIndex = 0; engineIndex < 4; ++engineIndex) {
-			float engineOffsetY = (float(engineIndex) - 1.5) * 0.026;
-			float engineDistance = length((shipLocal - vec2(-0.505, engineOffsetY)) * vec2(1.0, 1.5)) * shipScale;
-			color += vec3(1.0, 0.72, 0.32) * exp(-engineDistance * 240.0 / shipScale) * enginePulse * 0.9 * shipFade;
-			color += vec3(1.0, 0.6, 0.25) * exp(-engineDistance * 55.0 / shipScale) * enginePulse * 0.25 * shipFade;
-		}
-
-		return color;
 	}
 
 	void main() {
@@ -257,30 +180,24 @@
 			}
 		}
 
-		// 전투순양함 함대. (SHIPS 옵션으로 페이드)
+		// 전투순양함 함대. (함선 자체는 3D 모델 — 여기는 선미 엔진 글로우와 기함 주포만 그린다)
 		if (shipStrength > 0.001) {
-			// 기함. (좌측 상공 — 원거리감을 위해 축소, 미세 표류 + 살짝 기울어진 자세)
-			float flagshipTilt = -0.05;
-			float flagshipScale = 0.55;
-			vec2 flagshipCenter = vec2(-0.5 * aspectRatio + sin(elapsedTime * 0.05) * 0.012, 0.62 + sin(elapsedTime * 0.08) * 0.008);
-			color = applyBattlecruiser(color, screenPoint, flagshipCenter, flagshipScale, 1.0, flagshipTilt, 0.92 * shipStrength, elapsedTime);
-
-			// 맞은편 원거리 함선들. (반대 방향, 대기 흐림으로 멀리 있는 느낌)
-			vec2 escortCenter1 = vec2(0.52 * aspectRatio + sin(elapsedTime * 0.04 + 2.0) * 0.01, 0.66 + sin(elapsedTime * 0.06 + 1.0) * 0.008);
-			color = applyBattlecruiser(color, screenPoint, escortCenter1, 0.42, -1.0, 0.04, 0.75 * shipStrength, elapsedTime + 13.0);
-			vec2 escortCenter2 = vec2(0.3 * aspectRatio + sin(elapsedTime * 0.045 + 4.0) * 0.008, 0.78 + sin(elapsedTime * 0.07 + 3.0) * 0.006);
-			color = applyBattlecruiser(color, screenPoint, escortCenter2, 0.26, -1.0, 0.08, 0.55 * shipStrength, elapsedTime + 31.0);
-			vec2 escortCenter3 = vec2(0.68 * aspectRatio + sin(elapsedTime * 0.035 + 5.5) * 0.008, 0.42 + sin(elapsedTime * 0.055 + 2.5) * 0.006);
-			color = applyBattlecruiser(color, screenPoint, escortCenter3, 0.18, -1.0, -0.03, 0.45 * shipStrength, elapsedTime + 47.0);
+			// 선미 엔진 글로우. (JS 가 함선 선미를 화면에 투영해 넘긴 좌표에 맥동광)
+			for (int shipIndex = 0; shipIndex < 4; ++shipIndex) {
+				vec4 shipAnchor = shipAnchorList[shipIndex];
+				if (shipAnchor.w > 0.001) {
+					float enginePulse = 0.75 + 0.25 * sin(elapsedTime * 3.1 + float(shipIndex) * 1.7);
+					float engineDistance = length(screenPoint - shipAnchor.xy) / max(shipAnchor.z, 0.02);
+					color += vec3(1.0, 0.72, 0.32) * exp(-engineDistance * 95.0) * enginePulse * 0.9 * shipAnchor.w;
+					color += vec3(1.0, 0.6, 0.25) * exp(-engineDistance * 22.0) * enginePulse * 0.25 * shipAnchor.w;
+				}
+			}
 
 			// 기함 주포. (45초 주기 — 차지 후 초거대 광선 발사)
 			float fireCycle = 45.0;
 			float firePhase = fract(elapsedTime / fireCycle);
-			vec2 prowTipLocal = vec2(0.47 * flagshipScale, 0.0);
-			float cosFlagTilt = cos(-flagshipTilt);
-			float sinFlagTilt = sin(-flagshipTilt);
-			vec2 beamOrigin = flagshipCenter + vec2(prowTipLocal.x * cosFlagTilt - prowTipLocal.y * sinFlagTilt, prowTipLocal.x * sinFlagTilt + prowTipLocal.y * cosFlagTilt);
-			vec2 beamDirection = vec2(cosFlagTilt, sinFlagTilt);
+			vec2 beamOrigin = beamAnchor.xy;
+			vec2 beamDirection = normalize(beamAnchor.zw);
 
 			// 차지: 프로우에 에너지가 모임.
 			float chargeAmount = smoothstep(0.05, 0.1, firePhase) * (1.0 - smoothstep(0.1, 0.115, firePhase)) * shipStrength;
@@ -789,6 +706,55 @@
 	}
 
 	//==============================================================================
+	// 4x4 행렬 곱. (열우선, result = left * right)
+	//==============================================================================
+	function multiplyMatrix4(leftMatrix, rightMatrix) {
+		const result = new Float32Array(16);
+		for (let column = 0; column < 4; ++column) {
+			for (let row = 0; row < 4; ++row) {
+				let sum = 0;
+				for (let term = 0; term < 4; ++term) {
+					sum += leftMatrix[term * 4 + row] * rightMatrix[column * 4 + term];
+				}
+				result[column * 4 + row] = sum;
+			}
+		}
+		return result;
+	}
+
+	//==============================================================================
+	// 함선 모델 행렬 생성. (이동 x 요 회전 x 피치 회전 x 균등 스케일, 열우선)
+	//==============================================================================
+	function createShipModelMatrix(position, yawRadian, pitchRadian, scale) {
+		const cosYaw = System.Math.cos(yawRadian);
+		const sinYaw = System.Math.sin(yawRadian);
+		const cosPitch = System.Math.cos(pitchRadian);
+		const sinPitch = System.Math.sin(pitchRadian);
+		return new Float32Array([
+			cosYaw * scale, 0, -sinYaw * scale, 0,
+			sinYaw * sinPitch * scale, cosPitch * scale, cosYaw * sinPitch * scale, 0,
+			sinYaw * cosPitch * scale, -sinPitch * scale, cosYaw * cosPitch * scale, 0,
+			position[0], position[1], position[2], 1,
+		]);
+	}
+
+	//==============================================================================
+	// 행렬로 점 변환 후 화면 좌표로 투영. (배경 셰이더의 screenPoint 좌표계)
+	//==============================================================================
+	function projectPointToScreen(viewProjectionMatrix, point, aspectRatio) {
+		const x = point[0];
+		const y = point[1];
+		const z = point[2];
+		const clipX = viewProjectionMatrix[0] * x + viewProjectionMatrix[4] * y + viewProjectionMatrix[8] * z + viewProjectionMatrix[12];
+		const clipY = viewProjectionMatrix[1] * x + viewProjectionMatrix[5] * y + viewProjectionMatrix[9] * z + viewProjectionMatrix[13];
+		const clipW = viewProjectionMatrix[3] * x + viewProjectionMatrix[7] * y + viewProjectionMatrix[11] * z + viewProjectionMatrix[15];
+		if (clipW <= 0.0001) {
+			return null;
+		}
+		return [(clipX / clipW) * aspectRatio, clipY / clipW];
+	}
+
+	//==============================================================================
 	// 초기화.
 	//==============================================================================
 	const canvas = System.document.getElementById("mainCanvas");
@@ -806,6 +772,8 @@
 	const backgroundElapsedTimeLocation = webGL2RenderingContext.getUniformLocation(backgroundProgram, "elapsedTime");
 	const backgroundAspectRatioLocation = webGL2RenderingContext.getUniformLocation(backgroundProgram, "aspectRatio");
 	const backgroundShipStrengthLocation = webGL2RenderingContext.getUniformLocation(backgroundProgram, "shipStrength");
+	const backgroundShipAnchorListLocation = webGL2RenderingContext.getUniformLocation(backgroundProgram, "shipAnchorList");
+	const backgroundBeamAnchorLocation = webGL2RenderingContext.getUniformLocation(backgroundProgram, "beamAnchor");
 
 	// 지형 프로그램 + 그리드 메시.
 	const terrainProgram = createShaderProgram(webGL2RenderingContext, TERRAIN_VERTEXSHADER_SOURCE, TERRAIN_FRAGMENTSHADER_SOURCE);
@@ -1083,6 +1051,18 @@
 
 	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../../build/vanilla.js)
 	let uiGraphic = null;
+	let battlecruiserRenderer = null;
+	let battlecruiserModel = null;
+
+	// 함대 배치. (월드 좌표 — 카메라는 -z 를 바라본다. 기함이 크고 가까우며 호위함이 멀리 있다)
+	const shipDefinitions = [
+		{ basePosition: [-24, 15, -44], yawRadian: 1.25, pitchRadian: -0.04, scale: 2.4, driftSeed: 0, fade: 0.95 },
+		{ basePosition: [26, 19, -66], yawRadian: -1.35, pitchRadian: 0.03, scale: 1.7, driftSeed: 13, fade: 0.8 },
+		{ basePosition: [10, 25, -88], yawRadian: -1.15, pitchRadian: 0.06, scale: 1.25, driftSeed: 31, fade: 0.62 },
+		{ basePosition: [42, 9, -104], yawRadian: -1.5, pitchRadian: -0.02, scale: 1.0, driftSeed: 47, fade: 0.5 },
+	];
+	const SHIP_STERN_LOCAL = [0, 0.2, -3.5]; // 모델 로컬 선미. (엔진 글로우 앵커 — 프로우는 +z 쪽)
+	const SHIP_PROW_LOCAL = [0, 0.2, 5.8]; // 모델 로컬 프로우. (기함 주포 앵커)
 	let engineRect = null;
 	let engineVector2 = null;
 	try {
@@ -1096,6 +1076,22 @@
 		uiGraphic = new engineModule.Graphic(canvas);
 		engineRect = engineModule.Rect;
 		engineVector2 = engineModule.Vector2;
+
+		// 전투순양함 3D 모델. (Quaternius 'Ultimate Spaceships' Executioner — CC0)
+		try {
+			battlecruiserRenderer = new engineModule.SkinnedModelRenderer(webGL2RenderingContext);
+			battlecruiserRenderer.setSunDirection(0.0, 0.16, -0.99);
+			battlecruiserRenderer.setFogColor(0.3, 0.17, 0.07);
+			battlecruiserRenderer.setFogRange(40, 150);
+			engineModule.SkinnedModel.loadFromUrl(webGL2RenderingContext, "./assets/battlecruiser.glb", battlecruiserRenderer).then((loadedModel) => {
+				battlecruiserModel = loadedModel;
+			}).catch((modelError) => {
+				console.warn("전투순양함 모델을 불러오지 못했습니다.", modelError);
+			});
+		}
+		catch (rendererError) {
+			console.warn("전투순양함 렌더러를 만들지 못했습니다.", rendererError);
+		}
 	}
 	catch (engineError) {
 		console.warn("vanilla.js 엔진 모듈을 불러오지 못해 옵션 패널을 표시하지 않습니다.", engineError);
@@ -1404,8 +1400,62 @@
 		const cameraPitch = -0.06 + pointerCurrentY * 0.08;
 		const cameraYaw = pointerCurrentX * 0.12;
 		const fieldOfViewRadian = (System.Math.PI / 3) * (1 + boostFactor * 0.1);
-		const projectionMatrix = createPerspectiveMatrix(fieldOfViewRadian, aspectRatio, 0.1, 100);
+		const projectionMatrix = createPerspectiveMatrix(fieldOfViewRadian, aspectRatio, 0.1, 200);
 		const viewMatrix = createViewMatrix(cameraPosition, cameraPitch, cameraYaw);
+		const viewProjectionMatrix = multiplyMatrix4(projectionMatrix, viewMatrix);
+
+		// 함대 변환 / 화면 앵커 계산. (배경 셰이더의 엔진 글로우 / 주포가 이 좌표를 쓴다)
+		const shipStrengthValue = optionBlendValues.ships;
+		const shipModelMatrices = [];
+		const shipAnchorValues = new Float32Array(16);
+		const beamAnchorValues = new Float32Array([0, 0, 1, 0]);
+		if (battlecruiserModel && shipStrengthValue > 0.001) {
+			for (let shipIndex = 0; shipIndex < shipDefinitions.length; ++shipIndex) {
+				const shipDefinition = shipDefinitions[shipIndex];
+				const driftTime = elapsedTime + shipDefinition.driftSeed;
+				const shipPosition = [
+					shipDefinition.basePosition[0] + System.Math.sin(driftTime * 0.05) * 0.9,
+					shipDefinition.basePosition[1] + System.Math.sin(driftTime * 0.08) * 0.5,
+					shipDefinition.basePosition[2],
+				];
+
+				// SHIPS 토글 페이드는 스케일로 표현. (꺼지면 축소되며 사라진다)
+				const shipScale = shipDefinition.scale * (0.001 + 0.999 * shipStrengthValue);
+				const shipModelMatrix = createShipModelMatrix(shipPosition, shipDefinition.yawRadian, shipDefinition.pitchRadian, shipScale);
+				shipModelMatrices.push(shipModelMatrix);
+
+				// 선미 월드 좌표 → 화면 앵커.
+				const sternWorld = [
+					shipModelMatrix[0] * SHIP_STERN_LOCAL[0] + shipModelMatrix[4] * SHIP_STERN_LOCAL[1] + shipModelMatrix[8] * SHIP_STERN_LOCAL[2] + shipModelMatrix[12],
+					shipModelMatrix[1] * SHIP_STERN_LOCAL[0] + shipModelMatrix[5] * SHIP_STERN_LOCAL[1] + shipModelMatrix[9] * SHIP_STERN_LOCAL[2] + shipModelMatrix[13],
+					shipModelMatrix[2] * SHIP_STERN_LOCAL[0] + shipModelMatrix[6] * SHIP_STERN_LOCAL[1] + shipModelMatrix[10] * SHIP_STERN_LOCAL[2] + shipModelMatrix[14],
+				];
+				const sternScreen = projectPointToScreen(viewProjectionMatrix, sternWorld, aspectRatio);
+				if (sternScreen) {
+					shipAnchorValues[shipIndex * 4] = sternScreen[0];
+					shipAnchorValues[shipIndex * 4 + 1] = sternScreen[1];
+					shipAnchorValues[shipIndex * 4 + 2] = shipScale * 24 / -shipPosition[2];
+					shipAnchorValues[shipIndex * 4 + 3] = shipDefinition.fade * shipStrengthValue;
+				}
+
+				// 기함 프로우 / 전방 방향 → 주포 앵커.
+				if (shipIndex === 0) {
+					const prowWorld = [
+						shipModelMatrix[0] * SHIP_PROW_LOCAL[0] + shipModelMatrix[4] * SHIP_PROW_LOCAL[1] + shipModelMatrix[8] * SHIP_PROW_LOCAL[2] + shipModelMatrix[12],
+						shipModelMatrix[1] * SHIP_PROW_LOCAL[0] + shipModelMatrix[5] * SHIP_PROW_LOCAL[1] + shipModelMatrix[9] * SHIP_PROW_LOCAL[2] + shipModelMatrix[13],
+						shipModelMatrix[2] * SHIP_PROW_LOCAL[0] + shipModelMatrix[6] * SHIP_PROW_LOCAL[1] + shipModelMatrix[10] * SHIP_PROW_LOCAL[2] + shipModelMatrix[14],
+					];
+					const prowScreen = projectPointToScreen(viewProjectionMatrix, prowWorld, aspectRatio);
+					const sternScreenForDirection = sternScreen;
+					if (prowScreen && sternScreenForDirection) {
+						beamAnchorValues[0] = prowScreen[0];
+						beamAnchorValues[1] = prowScreen[1];
+						beamAnchorValues[2] = prowScreen[0] - sternScreenForDirection[0];
+						beamAnchorValues[3] = prowScreen[1] - sternScreenForDirection[1];
+					}
+				}
+			}
+		}
 
 		// === 1. 씬 → 오프스크린 렌더 타겟 ===
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, sceneRenderTarget.framebuffer);
@@ -1421,6 +1471,8 @@
 		webGL2RenderingContext.uniform1f(backgroundElapsedTimeLocation, elapsedTime);
 		webGL2RenderingContext.uniform1f(backgroundAspectRatioLocation, aspectRatio);
 		webGL2RenderingContext.uniform1f(backgroundShipStrengthLocation, optionBlendValues.ships);
+		webGL2RenderingContext.uniform4fv(backgroundShipAnchorListLocation, shipAnchorValues);
+		webGL2RenderingContext.uniform4fv(backgroundBeamAnchorLocation, beamAnchorValues);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
 
 		// 1-2. 지형.
@@ -1433,6 +1485,19 @@
 		webGL2RenderingContext.uniform1f(terrainElapsedTimeLocation, elapsedTime);
 		webGL2RenderingContext.uniform3f(terrainCameraPositionLocation, cameraPosition[0], cameraPosition[1], cameraPosition[2]);
 		webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, terrainIndexCount, webGL2RenderingContext.UNSIGNED_SHORT, 0);
+
+		// 1-2b. 전투순양함 함대. (Quaternius 'Executioner' 3D 모델 — 엔진 SkinnedModelRenderer)
+		if (battlecruiserModel && shipModelMatrices.length > 0) {
+			battlecruiserModel.update(deltaTime);
+
+			// 이전 프레임 후처리가 유닛1에 걸어 둔 씬 텍스처를 풀어 준다. (씬 타깃에 그리는 중이라 피드백 금지)
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+			for (const shipModelMatrix of shipModelMatrices) {
+				battlecruiserRenderer.draw(battlecruiserModel, viewProjectionMatrix, shipModelMatrix, cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+			}
+		}
 
 		// 1-3. 부스트 빛살. (가산 합성, 깊이 기록 없이 테스트만, 옵션 페이드)
 		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);

@@ -23,17 +23,17 @@
 			0
 		],
 		"contentSize": [
-			960,
-			640
+			1440,
+			900
 		],
 		"interactable": false,
 		"components": [
 			{
 				"type": "Paint",
 				"color": [
-					0.059,
-					0.075,
-					0.125,
+					0.043,
+					0.055,
+					0.09,
 					1
 				],
 				"roundSize": 0
@@ -42,11 +42,11 @@
 		"children": [
 			{
 				"type": "WorldNode",
-				"name": "Header",
+				"name": "Title",
 				"active": true,
 				"position": [
-					0,
-					0
+					240,
+					26
 				],
 				"scale": [
 					1,
@@ -63,30 +63,126 @@
 					0
 				],
 				"contentSize": [
-					960,
-					72
+					320,
+					30
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "UILabel",
+						"text": "HOME",
+						"fontSize": 21,
+						"textColor": [
+							0.91,
+							0.925,
+							0.957,
+							1
+						],
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						]
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "Subtitle",
+				"active": true,
+				"position": [
+					244,
+					58
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					400,
+					16
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "UILabel",
+						"text": "Everything below the fold is data-driven.",
+						"fontSize": 12,
+						"textColor": [
+							0.486,
+							0.522,
+							0.596,
+							1
+						],
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						]
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "CoinChip",
+				"active": true,
+				"position": [
+					1186,
+					28
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					110,
+					28
 				],
 				"interactable": false,
 				"components": [
 					{
 						"type": "Paint",
 						"color": [
-							0.078,
-							0.102,
-							0.165,
+							0.114,
+							0.141,
+							0.212,
 							1
 						],
-						"roundSize": 0
+						"roundSize": 14
 					}
 				],
 				"children": [
 					{
 						"type": "WorldNode",
-						"name": "Title",
+						"name": "CoinChipLabel",
 						"active": true,
 						"position": [
-							24,
-							18
+							0,
+							0
 						],
 						"scale": [
 							1,
@@ -103,19 +199,19 @@
 							0
 						],
 						"contentSize": [
-							340,
-							36
+							110,
+							28
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
-								"text": "VANILLA  SHOWCASE",
-								"fontSize": 22,
+								"text": "◆ 12,480",
+								"fontSize": 12,
 								"textColor": [
-									0.949,
-									0.961,
-									0.98,
+									0.941,
+									0.702,
+									0.361,
 									1
 								],
 								"backgroundColor": [
@@ -127,243 +223,105 @@
 							}
 						],
 						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "Subtitle",
-						"active": true,
-						"position": [
-							366,
-							24
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							200,
-							24
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "UILabel",
-								"text": "UI assets demo",
-								"fontSize": 13,
-								"textColor": [
-									0.541,
-									0.58,
-									0.659,
-									1
-								],
-								"backgroundColor": [
-									1,
-									1,
-									1,
-									0
-								]
-							}
-						],
-						"children": []
-					},
-					{
-						"type": "WorldNode",
-						"name": "CoinChip",
-						"active": true,
-						"position": [
-							700,
-							20
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							112,
-							32
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "Paint",
-								"color": [
-									0.125,
-									0.165,
-									0.251,
-									1
-								],
-								"roundSize": 16
-							}
-						],
-						"children": [
-							{
-								"type": "WorldNode",
-								"name": "CoinChipLabel",
-								"active": true,
-								"position": [
-									0,
-									0
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									112,
-									32
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "UILabel",
-										"text": "◆ 12,480",
-										"fontSize": 15,
-										"textColor": [
-											1,
-											0.702,
-											0.278,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							}
-						]
-					},
-					{
-						"type": "WorldNode",
-						"name": "GemChip",
-						"active": true,
-						"position": [
-							822,
-							20
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							114,
-							32
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "Paint",
-								"color": [
-									0.125,
-									0.165,
-									0.251,
-									1
-								],
-								"roundSize": 16
-							}
-						],
-						"children": [
-							{
-								"type": "WorldNode",
-								"name": "GemChipLabel",
-								"active": true,
-								"position": [
-									0,
-									0
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									114,
-									32
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "UILabel",
-										"text": "● 1,250",
-										"fontSize": 15,
-										"textColor": [
-											0.2,
-											0.82,
-											1,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							}
-						]
 					}
 				]
 			},
 			{
 				"type": "WorldNode",
-				"name": "CardList",
+				"name": "GemChip",
 				"active": true,
 				"position": [
-					24,
+					1306,
+					28
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					104,
+					28
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.114,
+							0.141,
+							0.212,
+							1
+						],
+						"roundSize": 14
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "GemChipLabel",
+						"active": true,
+						"position": [
+							0,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							104,
+							28
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "● 1,250",
+								"fontSize": 12,
+								"textColor": [
+									0.22,
+									0.839,
+									1,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "CardListLabel",
+				"active": true,
+				"position": [
+					240,
 					92
 				],
 				"scale": [
@@ -381,16 +339,64 @@
 					0
 				],
 				"contentSize": [
-					632,
-					468
+					300,
+					18
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "UILabel",
+						"text": "GAME MODES",
+						"fontSize": 11,
+						"textColor": [
+							0.29,
+							0.329,
+							0.408,
+							1
+						],
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						]
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "CardList",
+				"active": true,
+				"position": [
+					240,
+					114
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					792,
+					762
 				],
 				"interactable": true,
 				"components": [
 					{
 						"type": "UIScrollView",
 						"scrollContentSize": [
-							632,
-							768
+							792,
+							762
 						],
 						"scrollMode": "elastic",
 						"dragSensitivity": 1,
@@ -408,7 +414,7 @@
 				"contentChildren": [
 					{
 						"type": "WorldNode",
-						"name": "Card0",
+						"name": "CardTemplate",
 						"active": true,
 						"position": [
 							0,
@@ -429,26 +435,26 @@
 							0
 						],
 						"contentSize": [
-							632,
-							118
+							792,
+							84
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "Paint",
 								"color": [
+									0.086,
 									0.106,
-									0.133,
-									0.2,
+									0.161,
 									1
 								],
-								"roundSize": 14
+								"roundSize": 10
 							}
 						],
 						"children": [
 							{
 								"type": "WorldNode",
-								"name": "Stripe0",
+								"name": "CardStripe",
 								"active": true,
 								"position": [
 									0,
@@ -469,31 +475,31 @@
 									0
 								],
 								"contentSize": [
-									6,
-									118
+									3,
+									84
 								],
 								"interactable": false,
 								"components": [
 									{
 										"type": "Paint",
 										"color": [
-											0.357,
 											0.424,
+											0.482,
 											1,
 											1
 										],
-										"roundSize": 3
+										"roundSize": 1.5
 									}
 								],
 								"children": []
 							},
 							{
 								"type": "WorldNode",
-								"name": "Icon0",
+								"name": "CardIcon",
 								"active": true,
 								"position": [
-									22,
-									20
+									16,
+									14
 								],
 								"scale": [
 									1,
@@ -510,26 +516,26 @@
 									0
 								],
 								"contentSize": [
-									78,
-									78
+									56,
+									56
 								],
 								"interactable": false,
 								"components": [
 									{
 										"type": "Paint",
 										"color": [
-											0.357,
 											0.424,
+											0.482,
 											1,
 											1
 										],
-										"roundSize": 18
+										"roundSize": 12
 									}
 								],
 								"children": [
 									{
 										"type": "WorldNode",
-										"name": "IconGlyph0",
+										"name": "CardGlyph",
 										"active": true,
 										"position": [
 											0,
@@ -550,19 +556,19 @@
 											0
 										],
 										"contentSize": [
-											78,
-											78
+											56,
+											56
 										],
 										"interactable": false,
 										"components": [
 											{
 												"type": "UILabel",
 												"text": "S",
-												"fontSize": 34,
+												"fontSize": 24,
 												"textColor": [
-													0.059,
-													0.075,
-													0.125,
+													0.043,
+													0.055,
+													0.09,
 													1
 												],
 												"backgroundColor": [
@@ -579,59 +585,11 @@
 							},
 							{
 								"type": "WorldNode",
-								"name": "CardTitle0",
+								"name": "CardTitle",
 								"active": true,
 								"position": [
-									120,
-									24
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									320,
-									30
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "UILabel",
-										"text": "Sunrise Valley",
-										"fontSize": 21,
-										"textColor": [
-											0.949,
-											0.961,
-											0.98,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "CardSubtitle0",
-								"active": true,
-								"position": [
-									120,
-									60
+									88,
+									16
 								],
 								"scale": [
 									1,
@@ -649,18 +607,18 @@
 								],
 								"contentSize": [
 									360,
-									24
+									22
 								],
 								"interactable": false,
 								"components": [
 									{
 										"type": "UILabel",
-										"text": "Adventure  ·  12 stages",
-										"fontSize": 14,
+										"text": "Title",
+										"fontSize": 15,
 										"textColor": [
-											0.541,
-											0.58,
-											0.659,
+											0.91,
+											0.925,
+											0.957,
 											1
 										],
 										"backgroundColor": [
@@ -675,11 +633,11 @@
 							},
 							{
 								"type": "WorldNode",
-								"name": "OpenButton0",
+								"name": "CardSubtitle",
 								"active": true,
 								"position": [
-									500,
-									36
+									88,
+									44
 								],
 								"scale": [
 									1,
@@ -696,20 +654,116 @@
 									0
 								],
 								"contentSize": [
-									108,
-									46
+									420,
+									18
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "Subtitle",
+										"fontSize": 12,
+										"textColor": [
+											0.486,
+											0.522,
+											0.596,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "CardMeta",
+								"active": true,
+								"position": [
+									560,
+									16
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									120,
+									18
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "",
+										"fontSize": 11,
+										"textColor": [
+											0.29,
+											0.329,
+											0.408,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										]
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "CardOpenButton",
+								"active": true,
+								"position": [
+									692,
+									26
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									84,
+									32
 								],
 								"interactable": true,
 								"components": [
 									{
 										"type": "Paint",
 										"color": [
-											0.357,
-											0.424,
-											1,
+											0.114,
+											0.141,
+											0.212,
 											1
 										],
-										"roundSize": 12
+										"roundSize": 8
 									},
 									{
 										"type": "UIButton",
@@ -717,1697 +771,17 @@
 											0,
 											0,
 											0,
-											0.28
+											0.3
 										]
 									},
 									{
 										"type": "UILabel",
 										"text": "OPEN",
-										"fontSize": 16,
+										"fontSize": 12,
 										"textColor": [
-											0.059,
-											0.075,
-											0.125,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							}
-						]
-					},
-					{
-						"type": "WorldNode",
-						"name": "Card1",
-						"active": true,
-						"position": [
-							0,
-							130
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							632,
-							118
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "Paint",
-								"color": [
-									0.106,
-									0.133,
-									0.2,
-									1
-								],
-								"roundSize": 14
-							}
-						],
-						"children": [
-							{
-								"type": "WorldNode",
-								"name": "Stripe1",
-								"active": true,
-								"position": [
-									0,
-									0
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									6,
-									118
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											0.2,
-											0.82,
-											1,
-											1
-										],
-										"roundSize": 3
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "Icon1",
-								"active": true,
-								"position": [
-									22,
-									20
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									78,
-									78
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											0.2,
-											0.82,
-											1,
-											1
-										],
-										"roundSize": 18
-									}
-								],
-								"children": [
-									{
-										"type": "WorldNode",
-										"name": "IconGlyph1",
-										"active": true,
-										"position": [
-											0,
-											0
-										],
-										"scale": [
-											1,
-											1
-										],
-										"rotation": 0,
-										"opacity": 1,
-										"pivot": [
-											0,
-											0
-										],
-										"anchor": [
-											0,
-											0
-										],
-										"contentSize": [
-											78,
-											78
-										],
-										"interactable": false,
-										"components": [
-											{
-												"type": "UILabel",
-												"text": "N",
-												"fontSize": 34,
-												"textColor": [
-													0.059,
-													0.075,
-													0.125,
-													1
-												],
-												"backgroundColor": [
-													1,
-													1,
-													1,
-													0
-												]
-											}
-										],
-										"children": []
-									}
-								]
-							},
-							{
-								"type": "WorldNode",
-								"name": "CardTitle1",
-								"active": true,
-								"position": [
-									120,
-									24
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									320,
-									30
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "UILabel",
-										"text": "Neon Arena",
-										"fontSize": 21,
-										"textColor": [
-											0.949,
-											0.961,
-											0.98,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "CardSubtitle1",
-								"active": true,
-								"position": [
-									120,
-									60
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									360,
-									24
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "UILabel",
-										"text": "PvP  ·  Season 4",
-										"fontSize": 14,
-										"textColor": [
-											0.541,
-											0.58,
-											0.659,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "OpenButton1",
-								"active": true,
-								"position": [
-									500,
-									36
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									108,
-									46
-								],
-								"interactable": true,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											0.2,
-											0.82,
-											1,
-											1
-										],
-										"roundSize": 12
-									},
-									{
-										"type": "UIButton",
-										"pressedTintColor": [
-											0,
-											0,
-											0,
-											0.28
-										]
-									},
-									{
-										"type": "UILabel",
-										"text": "OPEN",
-										"fontSize": 16,
-										"textColor": [
-											0.059,
-											0.075,
-											0.125,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							}
-						]
-					},
-					{
-						"type": "WorldNode",
-						"name": "Card2",
-						"active": true,
-						"position": [
-							0,
-							260
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							632,
-							118
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "Paint",
-								"color": [
-									0.106,
-									0.133,
-									0.2,
-									1
-								],
-								"roundSize": 14
-							}
-						],
-						"children": [
-							{
-								"type": "WorldNode",
-								"name": "Stripe2",
-								"active": true,
-								"position": [
-									0,
-									0
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									6,
-									118
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											1,
-											0.361,
-											0.541,
-											1
-										],
-										"roundSize": 3
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "Icon2",
-								"active": true,
-								"position": [
-									22,
-									20
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									78,
-									78
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											1,
-											0.361,
-											0.541,
-											1
-										],
-										"roundSize": 18
-									}
-								],
-								"children": [
-									{
-										"type": "WorldNode",
-										"name": "IconGlyph2",
-										"active": true,
-										"position": [
-											0,
-											0
-										],
-										"scale": [
-											1,
-											1
-										],
-										"rotation": 0,
-										"opacity": 1,
-										"pivot": [
-											0,
-											0
-										],
-										"anchor": [
-											0,
-											0
-										],
-										"contentSize": [
-											78,
-											78
-										],
-										"interactable": false,
-										"components": [
-											{
-												"type": "UILabel",
-												"text": "C",
-												"fontSize": 34,
-												"textColor": [
-													0.059,
-													0.075,
-													0.125,
-													1
-												],
-												"backgroundColor": [
-													1,
-													1,
-													1,
-													0
-												]
-											}
-										],
-										"children": []
-									}
-								]
-							},
-							{
-								"type": "WorldNode",
-								"name": "CardTitle2",
-								"active": true,
-								"position": [
-									120,
-									24
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									320,
-									30
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "UILabel",
-										"text": "Crystal Mine",
-										"fontSize": 21,
-										"textColor": [
-											0.949,
-											0.961,
-											0.98,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "CardSubtitle2",
-								"active": true,
-								"position": [
-									120,
-									60
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									360,
-									24
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "UILabel",
-										"text": "Idle  ·  x2 boost active",
-										"fontSize": 14,
-										"textColor": [
-											0.541,
-											0.58,
-											0.659,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "OpenButton2",
-								"active": true,
-								"position": [
-									500,
-									36
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									108,
-									46
-								],
-								"interactable": true,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											1,
-											0.361,
-											0.541,
-											1
-										],
-										"roundSize": 12
-									},
-									{
-										"type": "UIButton",
-										"pressedTintColor": [
-											0,
-											0,
-											0,
-											0.28
-										]
-									},
-									{
-										"type": "UILabel",
-										"text": "OPEN",
-										"fontSize": 16,
-										"textColor": [
-											0.059,
-											0.075,
-											0.125,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							}
-						]
-					},
-					{
-						"type": "WorldNode",
-						"name": "Card3",
-						"active": true,
-						"position": [
-							0,
-							390
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							632,
-							118
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "Paint",
-								"color": [
-									0.106,
-									0.133,
-									0.2,
-									1
-								],
-								"roundSize": 14
-							}
-						],
-						"children": [
-							{
-								"type": "WorldNode",
-								"name": "Stripe3",
-								"active": true,
-								"position": [
-									0,
-									0
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									6,
-									118
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											0.239,
-											0.863,
-											0.518,
-											1
-										],
-										"roundSize": 3
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "Icon3",
-								"active": true,
-								"position": [
-									22,
-									20
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									78,
-									78
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											0.239,
-											0.863,
-											0.518,
-											1
-										],
-										"roundSize": 18
-									}
-								],
-								"children": [
-									{
-										"type": "WorldNode",
-										"name": "IconGlyph3",
-										"active": true,
-										"position": [
-											0,
-											0
-										],
-										"scale": [
-											1,
-											1
-										],
-										"rotation": 0,
-										"opacity": 1,
-										"pivot": [
-											0,
-											0
-										],
-										"anchor": [
-											0,
-											0
-										],
-										"contentSize": [
-											78,
-											78
-										],
-										"interactable": false,
-										"components": [
-											{
-												"type": "UILabel",
-												"text": "G",
-												"fontSize": 34,
-												"textColor": [
-													0.059,
-													0.075,
-													0.125,
-													1
-												],
-												"backgroundColor": [
-													1,
-													1,
-													1,
-													0
-												]
-											}
-										],
-										"children": []
-									}
-								]
-							},
-							{
-								"type": "WorldNode",
-								"name": "CardTitle3",
-								"active": true,
-								"position": [
-									120,
-									24
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									320,
-									30
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "UILabel",
-										"text": "Sky Garden",
-										"fontSize": 21,
-										"textColor": [
-											0.949,
-											0.961,
-											0.98,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "CardSubtitle3",
-								"active": true,
-								"position": [
-									120,
-									60
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									360,
-									24
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "UILabel",
-										"text": "Puzzle  ·  48 levels",
-										"fontSize": 14,
-										"textColor": [
-											0.541,
-											0.58,
-											0.659,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "OpenButton3",
-								"active": true,
-								"position": [
-									500,
-									36
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									108,
-									46
-								],
-								"interactable": true,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											0.239,
-											0.863,
-											0.518,
-											1
-										],
-										"roundSize": 12
-									},
-									{
-										"type": "UIButton",
-										"pressedTintColor": [
-											0,
-											0,
-											0,
-											0.28
-										]
-									},
-									{
-										"type": "UILabel",
-										"text": "OPEN",
-										"fontSize": 16,
-										"textColor": [
-											0.059,
-											0.075,
-											0.125,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							}
-						]
-					},
-					{
-						"type": "WorldNode",
-						"name": "Card4",
-						"active": true,
-						"position": [
-							0,
-							520
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							632,
-							118
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "Paint",
-								"color": [
-									0.106,
-									0.133,
-									0.2,
-									1
-								],
-								"roundSize": 14
-							}
-						],
-						"children": [
-							{
-								"type": "WorldNode",
-								"name": "Stripe4",
-								"active": true,
-								"position": [
-									0,
-									0
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									6,
-									118
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											1,
-											0.702,
-											0.278,
-											1
-										],
-										"roundSize": 3
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "Icon4",
-								"active": true,
-								"position": [
-									22,
-									20
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									78,
-									78
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											1,
-											0.702,
-											0.278,
-											1
-										],
-										"roundSize": 18
-									}
-								],
-								"children": [
-									{
-										"type": "WorldNode",
-										"name": "IconGlyph4",
-										"active": true,
-										"position": [
-											0,
-											0
-										],
-										"scale": [
-											1,
-											1
-										],
-										"rotation": 0,
-										"opacity": 1,
-										"pivot": [
-											0,
-											0
-										],
-										"anchor": [
-											0,
-											0
-										],
-										"contentSize": [
-											78,
-											78
-										],
-										"interactable": false,
-										"components": [
-											{
-												"type": "UILabel",
-												"text": "L",
-												"fontSize": 34,
-												"textColor": [
-													0.059,
-													0.075,
-													0.125,
-													1
-												],
-												"backgroundColor": [
-													1,
-													1,
-													1,
-													0
-												]
-											}
-										],
-										"children": []
-									}
-								]
-							},
-							{
-								"type": "WorldNode",
-								"name": "CardTitle4",
-								"active": true,
-								"position": [
-									120,
-									24
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									320,
-									30
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "UILabel",
-										"text": "Iron Legion",
-										"fontSize": 21,
-										"textColor": [
-											0.949,
-											0.961,
-											0.98,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "CardSubtitle4",
-								"active": true,
-								"position": [
-									120,
-									60
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									360,
-									24
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "UILabel",
-										"text": "Strategy  ·  Co-op raid",
-										"fontSize": 14,
-										"textColor": [
-											0.541,
-											0.58,
-											0.659,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "OpenButton4",
-								"active": true,
-								"position": [
-									500,
-									36
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									108,
-									46
-								],
-								"interactable": true,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											1,
-											0.702,
-											0.278,
-											1
-										],
-										"roundSize": 12
-									},
-									{
-										"type": "UIButton",
-										"pressedTintColor": [
-											0,
-											0,
-											0,
-											0.28
-										]
-									},
-									{
-										"type": "UILabel",
-										"text": "OPEN",
-										"fontSize": 16,
-										"textColor": [
-											0.059,
-											0.075,
-											0.125,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							}
-						]
-					},
-					{
-						"type": "WorldNode",
-						"name": "Card5",
-						"active": true,
-						"position": [
-							0,
-							650
-						],
-						"scale": [
-							1,
-							1
-						],
-						"rotation": 0,
-						"opacity": 1,
-						"pivot": [
-							0,
-							0
-						],
-						"anchor": [
-							0,
-							0
-						],
-						"contentSize": [
-							632,
-							118
-						],
-						"interactable": false,
-						"components": [
-							{
-								"type": "Paint",
-								"color": [
-									0.106,
-									0.133,
-									0.2,
-									1
-								],
-								"roundSize": 14
-							}
-						],
-						"children": [
-							{
-								"type": "WorldNode",
-								"name": "Stripe5",
-								"active": true,
-								"position": [
-									0,
-									0
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									6,
-									118
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											0.71,
-											0.482,
-											1,
-											1
-										],
-										"roundSize": 3
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "Icon5",
-								"active": true,
-								"position": [
-									22,
-									20
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									78,
-									78
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											0.71,
-											0.482,
-											1,
-											1
-										],
-										"roundSize": 18
-									}
-								],
-								"children": [
-									{
-										"type": "WorldNode",
-										"name": "IconGlyph5",
-										"active": true,
-										"position": [
-											0,
-											0
-										],
-										"scale": [
-											1,
-											1
-										],
-										"rotation": 0,
-										"opacity": 1,
-										"pivot": [
-											0,
-											0
-										],
-										"anchor": [
-											0,
-											0
-										],
-										"contentSize": [
-											78,
-											78
-										],
-										"interactable": false,
-										"components": [
-											{
-												"type": "UILabel",
-												"text": "A",
-												"fontSize": 34,
-												"textColor": [
-													0.059,
-													0.075,
-													0.125,
-													1
-												],
-												"backgroundColor": [
-													1,
-													1,
-													1,
-													0
-												]
-											}
-										],
-										"children": []
-									}
-								]
-							},
-							{
-								"type": "WorldNode",
-								"name": "CardTitle5",
-								"active": true,
-								"position": [
-									120,
-									24
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									320,
-									30
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "UILabel",
-										"text": "Deep Abyss",
-										"fontSize": 21,
-										"textColor": [
-											0.949,
-											0.961,
-											0.98,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "CardSubtitle5",
-								"active": true,
-								"position": [
-									120,
-									60
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									360,
-									24
-								],
-								"interactable": false,
-								"components": [
-									{
-										"type": "UILabel",
-										"text": "Roguelike  ·  Hard mode",
-										"fontSize": 14,
-										"textColor": [
-											0.541,
-											0.58,
-											0.659,
-											1
-										],
-										"backgroundColor": [
-											1,
-											1,
-											1,
-											0
-										]
-									}
-								],
-								"children": []
-							},
-							{
-								"type": "WorldNode",
-								"name": "OpenButton5",
-								"active": true,
-								"position": [
-									500,
-									36
-								],
-								"scale": [
-									1,
-									1
-								],
-								"rotation": 0,
-								"opacity": 1,
-								"pivot": [
-									0,
-									0
-								],
-								"anchor": [
-									0,
-									0
-								],
-								"contentSize": [
-									108,
-									46
-								],
-								"interactable": true,
-								"components": [
-									{
-										"type": "Paint",
-										"color": [
-											0.71,
-											0.482,
-											1,
-											1
-										],
-										"roundSize": 12
-									},
-									{
-										"type": "UIButton",
-										"pressedTintColor": [
-											0,
-											0,
-											0,
-											0.28
-										]
-									},
-									{
-										"type": "UILabel",
-										"text": "OPEN",
-										"fontSize": 16,
-										"textColor": [
-											0.059,
-											0.075,
-											0.125,
+											0.91,
+											0.925,
+											0.957,
 											1
 										],
 										"backgroundColor": [
@@ -2429,8 +803,8 @@
 				"name": "DailyPanel",
 				"active": true,
 				"position": [
-					680,
-					92
+					1050,
+					114
 				],
 				"scale": [
 					1,
@@ -2447,20 +821,20 @@
 					0
 				],
 				"contentSize": [
-					256,
-					468
+					366,
+					268
 				],
 				"interactable": false,
 				"components": [
 					{
 						"type": "Paint",
 						"color": [
+							0.063,
 							0.078,
-							0.102,
-							0.165,
+							0.122,
 							1
 						],
-						"roundSize": 16
+						"roundSize": 12
 					}
 				],
 				"children": [
@@ -2469,8 +843,8 @@
 						"name": "DailyTitle",
 						"active": true,
 						"position": [
-							22,
-							18
+							18,
+							14
 						],
 						"scale": [
 							1,
@@ -2487,19 +861,19 @@
 							0
 						],
 						"contentSize": [
-							120,
-							26
+							300,
+							18
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
 								"text": "DAILY",
-								"fontSize": 15,
+								"fontSize": 11,
 								"textColor": [
-									0.541,
-									0.58,
-									0.659,
+									0.29,
+									0.329,
+									0.408,
 									1
 								],
 								"backgroundColor": [
@@ -2517,8 +891,8 @@
 						"name": "DailyEnergyLabel",
 						"active": true,
 						"position": [
-							22,
-							64
+							18,
+							44
 						],
 						"scale": [
 							1,
@@ -2536,18 +910,18 @@
 						],
 						"contentSize": [
 							140,
-							22
+							16
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
 								"text": "Energy",
-								"fontSize": 15,
+								"fontSize": 12,
 								"textColor": [
-									0.949,
-									0.961,
-									0.98,
+									0.91,
+									0.925,
+									0.957,
 									1
 								],
 								"backgroundColor": [
@@ -2565,8 +939,8 @@
 						"name": "DailyEnergyCaption",
 						"active": true,
 						"position": [
-							140,
-							64
+							158,
+							44
 						],
 						"scale": [
 							1,
@@ -2583,19 +957,19 @@
 							0
 						],
 						"contentSize": [
-							94,
-							22
+							190,
+							16
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
 								"text": "72 / 100",
-								"fontSize": 13,
+								"fontSize": 11,
 								"textColor": [
-									0.541,
-									0.58,
-									0.659,
+									0.486,
+									0.522,
+									0.596,
 									1
 								],
 								"backgroundColor": [
@@ -2613,8 +987,8 @@
 						"name": "DailyEnergyBar",
 						"active": true,
 						"position": [
-							22,
-							98
+							18,
+							68
 						],
 						"scale": [
 							1,
@@ -2631,8 +1005,8 @@
 							0
 						],
 						"contentSize": [
-							212,
-							12
+							330,
+							8
 						],
 						"interactable": false,
 						"components": [
@@ -2650,8 +1024,8 @@
 						"name": "DailyQuestLabel",
 						"active": true,
 						"position": [
-							22,
-							156
+							18,
+							102
 						],
 						"scale": [
 							1,
@@ -2669,18 +1043,18 @@
 						],
 						"contentSize": [
 							140,
-							22
+							16
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
 								"text": "Quest",
-								"fontSize": 15,
+								"fontSize": 12,
 								"textColor": [
-									0.949,
-									0.961,
-									0.98,
+									0.91,
+									0.925,
+									0.957,
 									1
 								],
 								"backgroundColor": [
@@ -2698,8 +1072,8 @@
 						"name": "DailyQuestCaption",
 						"active": true,
 						"position": [
-							140,
-							156
+							158,
+							102
 						],
 						"scale": [
 							1,
@@ -2716,19 +1090,19 @@
 							0
 						],
 						"contentSize": [
-							94,
-							22
+							190,
+							16
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
 								"text": "2 / 5",
-								"fontSize": 13,
+								"fontSize": 11,
 								"textColor": [
-									0.541,
-									0.58,
-									0.659,
+									0.486,
+									0.522,
+									0.596,
 									1
 								],
 								"backgroundColor": [
@@ -2746,8 +1120,8 @@
 						"name": "DailyQuestBar",
 						"active": true,
 						"position": [
-							22,
-							190
+							18,
+							126
 						],
 						"scale": [
 							1,
@@ -2764,8 +1138,8 @@
 							0
 						],
 						"contentSize": [
-							212,
-							12
+							330,
+							8
 						],
 						"interactable": false,
 						"components": [
@@ -2783,8 +1157,8 @@
 						"name": "DailySeasonPassLabel",
 						"active": true,
 						"position": [
-							22,
-							248
+							18,
+							160
 						],
 						"scale": [
 							1,
@@ -2802,18 +1176,18 @@
 						],
 						"contentSize": [
 							140,
-							22
+							16
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
 								"text": "Season Pass",
-								"fontSize": 15,
+								"fontSize": 12,
 								"textColor": [
-									0.949,
-									0.961,
-									0.98,
+									0.91,
+									0.925,
+									0.957,
 									1
 								],
 								"backgroundColor": [
@@ -2831,8 +1205,8 @@
 						"name": "DailySeasonPassCaption",
 						"active": true,
 						"position": [
-							140,
-							248
+							158,
+							160
 						],
 						"scale": [
 							1,
@@ -2849,19 +1223,19 @@
 							0
 						],
 						"contentSize": [
-							94,
-							22
+							190,
+							16
 						],
 						"interactable": false,
 						"components": [
 							{
 								"type": "UILabel",
 								"text": "Lv. 44",
-								"fontSize": 13,
+								"fontSize": 11,
 								"textColor": [
-									0.541,
-									0.58,
-									0.659,
+									0.486,
+									0.522,
+									0.596,
 									1
 								],
 								"backgroundColor": [
@@ -2879,8 +1253,8 @@
 						"name": "DailySeasonPassBar",
 						"active": true,
 						"position": [
-							22,
-							282
+							18,
+							184
 						],
 						"scale": [
 							1,
@@ -2897,8 +1271,8 @@
 							0
 						],
 						"contentSize": [
-							212,
-							12
+							330,
+							8
 						],
 						"interactable": false,
 						"components": [
@@ -2916,8 +1290,8 @@
 						"name": "ClaimButton",
 						"active": true,
 						"position": [
-							22,
-							396
+							18,
+							218
 						],
 						"scale": [
 							1,
@@ -2934,20 +1308,20 @@
 							0
 						],
 						"contentSize": [
-							212,
-							50
+							330,
+							34
 						],
 						"interactable": true,
 						"components": [
 							{
 								"type": "Paint",
 								"color": [
-									0.357,
 									0.424,
+									0.482,
 									1,
 									1
 								],
-								"roundSize": 14
+								"roundSize": 8
 							},
 							{
 								"type": "UIButton",
@@ -2955,17 +1329,726 @@
 									0,
 									0,
 									0,
-									0.28
+									0.3
 								]
 							},
 							{
 								"type": "UILabel",
 								"text": "CLAIM REWARD",
-								"fontSize": 15,
+								"fontSize": 12,
 								"textColor": [
-									0.949,
-									0.961,
-									0.98,
+									0.91,
+									0.925,
+									0.957,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "SeasonPanel",
+				"active": true,
+				"position": [
+					1050,
+					394
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					366,
+					232
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.063,
+							0.078,
+							0.122,
+							1
+						],
+						"roundSize": 12
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "SeasonTitle",
+						"active": true,
+						"position": [
+							18,
+							14
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							300,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "ARENA SEASON",
+								"fontSize": 11,
+								"textColor": [
+									0.29,
+									0.329,
+									0.408,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ArenaRating",
+						"active": true,
+						"position": [
+							18,
+							40
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							160,
+							30
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "2,148",
+								"fontSize": 24,
+								"textColor": [
+									0.91,
+									0.925,
+									0.957,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ArenaRatingCaption",
+						"active": true,
+						"position": [
+							18,
+							74
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							200,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Rating  ·  Diamond II",
+								"fontSize": 11,
+								"textColor": [
+									0.486,
+									0.522,
+									0.596,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ArenaWinLabel",
+						"active": true,
+						"position": [
+							18,
+							108
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							160,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Win rate vs season",
+								"fontSize": 11,
+								"textColor": [
+									0.29,
+									0.329,
+									0.408,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ArenaVersusBar",
+						"active": true,
+						"position": [
+							18,
+							130
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							330,
+							10
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UIProgressView",
+								"value": 0.63,
+								"minValue": 0,
+								"maxValue": 1
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ArenaWinCaption",
+						"active": true,
+						"position": [
+							18,
+							148
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							120,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "W 63%",
+								"fontSize": 11,
+								"textColor": [
+									0.263,
+									0.867,
+									0.561,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ArenaLossCaption",
+						"active": true,
+						"position": [
+							268,
+							148
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							80,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "L 37%",
+								"fontSize": 11,
+								"textColor": [
+									0.937,
+									0.325,
+									0.314,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "SeasonHairline",
+						"active": true,
+						"position": [
+							18,
+							178
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							330,
+							1
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.137,
+									0.169,
+									0.239,
+									1
+								],
+								"roundSize": 0
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "SeasonEndsLabel",
+						"active": true,
+						"position": [
+							18,
+							190
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							200,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Season ends in",
+								"fontSize": 11,
+								"textColor": [
+									0.29,
+									0.329,
+									0.408,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "SeasonEndsValue",
+						"active": true,
+						"position": [
+							218,
+							188
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							130,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "12d 06:41",
+								"fontSize": 12,
+								"textColor": [
+									0.91,
+									0.925,
+									0.957,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "TipPanel",
+				"active": true,
+				"position": [
+					1050,
+					638
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					366,
+					238
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.063,
+							0.078,
+							0.122,
+							1
+						],
+						"roundSize": 12
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "TipTitle",
+						"active": true,
+						"position": [
+							18,
+							14
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							300,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "DIALOGUE",
+								"fontSize": 11,
+								"textColor": [
+									0.29,
+									0.329,
+									0.408,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "TipBody",
+						"active": true,
+						"position": [
+							18,
+							38
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							330,
+							150
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 12,
+								"textColor": [
+									0.486,
+									0.522,
+									0.596,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "TipNextButton",
+						"active": true,
+						"position": [
+							18,
+							190
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							330,
+							32
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.114,
+									0.141,
+									0.212,
+									1
+								],
+								"roundSize": 8
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.3
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "NEXT",
+								"fontSize": 12,
+								"textColor": [
+									0.91,
+									0.925,
+									0.957,
 									1
 								],
 								"backgroundColor": [

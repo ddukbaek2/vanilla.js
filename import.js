@@ -165,5 +165,6 @@ export { SoundEffectPool } from "./src/core/soundeffectpool.js";
 export { GamepadManager } from "./src/core/gamepadmanager.js";
 export { AudioPlayer } from "./src/core/audioplayer.js";
 export { PopupMotion, PopupMotionState } from "./src/ui/popupmotion.js";
+export { UIListView } from "./src/ui/uilistview.js";
 export { UIToast } from "./src/ui/uitoast.js";
 export { UIDialog } from "./src/ui/uidialog.js";
