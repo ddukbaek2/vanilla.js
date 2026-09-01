@@ -12,7 +12,7 @@
 		width: 100%;
 		height: 100%;
 		overflow: hidden;
-		background: #0b0d12;
+		background: #14171e;
 		touch-action: none;
 		user-select: none;
 	}
@@ -100,15 +100,61 @@
 	const CATALOG_PAGE_COUNT = 20;
 	const CATALOG_LOAD_SECONDS = 0.7;
 	const SIDE_PANEL_OFFSET = 356; // 화면 오른쪽 끝에서 사이드 패널 왼쪽까지.
-	const BAR_TRACK_COLOR = new Color(0.118, 0.141, 0.192, 1);
-	const ACCENT_COLOR = new Color(0.357, 0.424, 1, 1);
-	const POSITIVE_COLOR = new Color(0.247, 0.698, 0.498, 1);
-	const NEGATIVE_COLOR = new Color(0.851, 0.337, 0.31, 1);
-	const TEXT_COLOR = new Color(0.902, 0.914, 0.937, 1);
-	const TEXT_DIM_COLOR = new Color(0.541, 0.569, 0.627, 1);
-	const TEXT_FAINT_COLOR = new Color(0.329, 0.357, 0.412, 1);
-	const CARD_COLOR = new Color(0.09, 0.106, 0.141, 1);
-	const CARD_RAISED_COLOR = new Color(0.118, 0.141, 0.188, 1);
+	// 테마 표. (역할 → 색. 문서는 Dim 팔레트로 구워져 있고, 로드 때 역할로 캐시해 전환한다)
+	function themeColor(hexText) {
+		const red = System.Math.round(parseInt(hexText.substring(1, 3), 16) / 255 * 1000) / 1000;
+		const green = System.Math.round(parseInt(hexText.substring(3, 5), 16) / 255 * 1000) / 1000;
+		const blue = System.Math.round(parseInt(hexText.substring(5, 7), 16) / 255 * 1000) / 1000;
+		return new Color(red, green, blue, 1);
+	}
+	const THEME_TABLE = {
+		dim: {
+			label: "Dim",
+			background: themeColor("#14171e"), surface: themeColor("#1b202a"), card: themeColor("#232937"),
+			cardRaised: themeColor("#2c3344"), hairline: themeColor("#394154"), text: themeColor("#e8ebf2"),
+			textDim: themeColor("#9aa2b2"), textFaint: themeColor("#6b7387"), accent: themeColor("#6d7dff"),
+			positive: themeColor("#45b585"), negative: themeColor("#e06058"), ink: themeColor("#12151c"),
+			toggleOff: themeColor("#3c4457"), overlay: themeColor("#06080d"), textOnAccent: themeColor("#ffffff"),
+			barTrack: themeColor("#333a4b"), gridLine: new Color(1, 1, 1, 0.07), backgroundStyle: "rgb(20, 23, 30)",
+		},
+		dark: {
+			label: "Dark",
+			background: themeColor("#0b0d12"), surface: themeColor("#12151c"), card: themeColor("#171b24"),
+			cardRaised: themeColor("#1e2430"), hairline: themeColor("#262c38"), text: themeColor("#e6e9ef"),
+			textDim: themeColor("#8a91a0"), textFaint: themeColor("#545b69"), accent: themeColor("#5b6cff"),
+			positive: themeColor("#3fb27f"), negative: themeColor("#d9564f"), ink: themeColor("#0b0d12"),
+			toggleOff: themeColor("#2c3442"), overlay: themeColor("#04060a"), textOnAccent: themeColor("#e6e9ef"),
+			barTrack: themeColor("#1e2431"), gridLine: new Color(1, 1, 1, 0.07), backgroundStyle: "rgb(11, 13, 18)",
+		},
+		light: {
+			label: "Light",
+			background: themeColor("#eef1f6"), surface: themeColor("#ffffff"), card: themeColor("#f4f6fa"),
+			cardRaised: themeColor("#e6eaf2"), hairline: themeColor("#d9dfe9"), text: themeColor("#1d2433"),
+			textDim: themeColor("#5b6474"), textFaint: themeColor("#97a0b1"), accent: themeColor("#4f5fe8"),
+			positive: themeColor("#1f9e6e"), negative: themeColor("#d5483f"), ink: themeColor("#ffffff"),
+			toggleOff: themeColor("#c9d1dd"), overlay: themeColor("#2a3145"), textOnAccent: themeColor("#ffffff"),
+			barTrack: themeColor("#dde2ec"), gridLine: new Color(0, 0, 0, 0.08), backgroundStyle: "rgb(238, 241, 246)",
+		},
+	};
+	const THEME_KEYS = ["dim", "dark", "light"];
+	const THEME_STORAGE_KEY = "vanillaConsole.theme";
+
+	// 코드가 참조하는 가변 색. (테마 전환 때 채널을 통째로 바꾼다)
+	function assignColor(targetColor, sourceColor) {
+		targetColor.red = sourceColor.red;
+		targetColor.green = sourceColor.green;
+		targetColor.blue = sourceColor.blue;
+	}
+	const BAR_TRACK_COLOR = THEME_TABLE.dim.barTrack.clone();
+	const ACCENT_COLOR = THEME_TABLE.dim.accent.clone();
+	const POSITIVE_COLOR = THEME_TABLE.dim.positive.clone();
+	const NEGATIVE_COLOR = THEME_TABLE.dim.negative.clone();
+	const TEXT_COLOR = THEME_TABLE.dim.text.clone();
+	const TEXT_DIM_COLOR = THEME_TABLE.dim.textDim.clone();
+	const TEXT_FAINT_COLOR = THEME_TABLE.dim.textFaint.clone();
+	const TEXT_ON_ACCENT_COLOR = THEME_TABLE.dim.textOnAccent.clone();
+	const CARD_COLOR = THEME_TABLE.dim.card.clone();
+	const CARD_RAISED_COLOR = THEME_TABLE.dim.cardRaised.clone();
 
 	//==============================================================================
 	// 데이터 생성. (전부 코드 소관 — 문서에는 템플릿만 있다)
@@ -184,6 +230,13 @@
 		/** @private @type { FontFace | null } */ #fontFace;
 		/** @private @type { Vector2 } */ #appliedViewSize;
 		/** @private @type { number } */ #mainWidth; // 본문 컬럼 폭. (화면 폭에 맞춰 가변)
+		/** @private @type { string } */ #themeKey;
+		/** @private @type { object[] } */ #paintRoleCache; // { paint, role, alpha }
+		/** @private @type { object[] } */ #labelRoleCache; // { label, role }
+		/** @private @type { string } */ #backgroundStyle;
+		/** @private @type { UISpinner[] } */ #demoSpinners;
+		/** @private @type { UIDropdown | null } */ #themeDropdown;
+		/** @private @type { UIDropdown | null } */ #regionDropdown;
 
 		// 대시보드 상태.
 		/** @private @type { UILineChart | null } */ #liveChart;
@@ -236,6 +289,13 @@
 			this.#fontFace = null;
 			this.#appliedViewSize = Vector2.create(0, 0);
 			this.#mainWidth = 884;
+			this.#themeKey = "dim";
+			this.#paintRoleCache = [];
+			this.#labelRoleCache = [];
+			this.#backgroundStyle = THEME_TABLE.dim.backgroundStyle;
+			this.#demoSpinners = [];
+			this.#themeDropdown = null;
+			this.#regionDropdown = null;
 
 			this.#liveChart = null;
 			this.#revenueBars = null;
@@ -345,6 +405,17 @@
 			this.bindNavigation();
 			this.bindPopup();
 			this.applyHeadingStyles();
+			this.buildThemeRoleCache();
+			let savedThemeKey = "dim";
+			try {
+				const storedThemeKey = System.localStorage.getItem(THEME_STORAGE_KEY);
+				if (storedThemeKey && THEME_TABLE[storedThemeKey]) {
+					savedThemeKey = storedThemeKey;
+				}
+			}
+			catch (storageError) {
+			}
+			this.applyTheme(savedThemeKey);
 
 			// 우클릭 → 컨텍스트 메뉴. (컴포넌트 화면의 지정 영역에서만)
 			const canvas = System.document.getElementById("mainCanvas");
@@ -449,9 +520,16 @@
 			if (tagNode) {
 				tagNode.setLocalPosition(Vector2.create(this.#mainWidth - 132, 0));
 			}
+			const rowPaintComponents = itemNode.getComponents(Paint);
+			if (rowPaintComponents.length > 0) {
+				rowPaintComponents[0].setColor(CARD_COLOR.clone());
+			}
 			this.setLabelText(itemNode, "EventTime", eventData.time);
 			this.setLabelText(itemNode, "EventText", eventData.text);
 			this.setLabelText(itemNode, "EventTag", eventData.tag);
+			this.findLabel(itemNode, "EventTime").setTextColor(TEXT_FAINT_COLOR.clone());
+			this.findLabel(itemNode, "EventText").setTextColor(TEXT_COLOR.clone());
+			this.findLabel(itemNode, "EventTag").setTextColor(TEXT_DIM_COLOR.clone());
 		}
 
 		//==============================================================================
@@ -500,9 +578,16 @@
 			featuredListView.setBindItemEvent((itemNode, itemIndex) => {
 				const packData = FEATURED_PACKS[itemIndex];
 				this.applyFontToTree(itemNode);
+				const featuredPaintComponents = itemNode.getComponents(Paint);
+				if (featuredPaintComponents.length > 0) {
+					featuredPaintComponents[0].setColor(new Color(THEME_TABLE[this.#themeKey].surface.red, THEME_TABLE[this.#themeKey].surface.green, THEME_TABLE[this.#themeKey].surface.blue, 1));
+				}
 				this.setLabelText(itemNode, "FeaturedTitle", packData.title);
 				this.setLabelText(itemNode, "FeaturedCaption", packData.caption);
 				this.setLabelText(itemNode, "FeaturedPrice", "$" + packData.price.toFixed(2));
+				this.findLabel(itemNode, "FeaturedTitle").setTextColor(TEXT_COLOR.clone());
+				this.findLabel(itemNode, "FeaturedCaption").setTextColor(TEXT_DIM_COLOR.clone());
+				this.findLabel(itemNode, "FeaturedPrice").setTextColor(ACCENT_COLOR.clone());
 			});
 			featuredListView.setItemCount(FEATURED_PACKS.length);
 
@@ -606,6 +691,10 @@
 			const itemData = CATALOG_ITEMS[itemIndex];
 			const isInCart = this.#cartMap.has(itemIndex);
 			iconNode.setActive(true);
+			const iconPaintComponents = iconNode.getComponents(Paint);
+			if (iconPaintComponents.length > 0) {
+				iconPaintComponents[0].setColor(CARD_RAISED_COLOR.clone());
+			}
 			addButtonNode.setActive(true);
 			this.setLabelText(itemNode, "ItemGlyph", itemData.glyph);
 			titleLabel.setText(itemData.title);
@@ -619,7 +708,11 @@
 			if (addButtonPaintComponents.length > 0) {
 				addButtonPaintComponents[0].setColor(isInCart ? ACCENT_COLOR.clone() : CARD_RAISED_COLOR.clone());
 			}
+			this.findLabel(itemNode, "ItemGlyph").setTextColor(TEXT_DIM_COLOR.clone());
+			captionLabel.setTextColor(TEXT_FAINT_COLOR.clone());
+			priceLabel.setTextColor(TEXT_DIM_COLOR.clone());
 			this.setLabelText(itemNode, "ItemAddButton", isInCart ? "✓ ADDED" : "ADD");
+			this.findLabel(itemNode, "ItemAddButton").setTextColor(isInCart ? TEXT_ON_ACCENT_COLOR.clone() : TEXT_COLOR.clone());
 			this.bindButton(itemNode, "ItemAddButton", () => {
 				if (this.#cartMap.has(itemIndex)) {
 					this.#cartMap.delete(itemIndex);
@@ -770,23 +863,8 @@
 				});
 			}
 
-			// 드롭다운. (엔진 UIDropdown)
-			const themeSlotNode = this.findNodeByName(settingsRootNode, "ThemeDropdownSlot");
-			const themeDropdown = new UIDropdown({ width: 176, height: 28, optionHeight: 26 });
-			themeDropdown.setOptionList(["Dark", "Light", "System"]);
-			themeDropdown.setChangedEvent(() => {
-				this.showToast("Theme: " + themeDropdown.getSelectedText());
-			});
-			themeSlotNode.addChild(themeDropdown);
-			const regionSlotNode = this.findNodeByName(settingsRootNode, "RegionDropdownSlot");
-			const regionDropdown = new UIDropdown({ width: 176, height: 28, optionHeight: 26 });
-			regionDropdown.setOptionList(["Seoul", "Tokyo", "Frankfurt", "Oregon"]);
-			regionDropdown.setChangedEvent(() => {
-				this.showToast("Region: " + regionDropdown.getSelectedText());
-			});
-			regionSlotNode.addChild(regionDropdown);
-			this.applyFontToTree(themeDropdown);
-			this.applyFontToTree(regionDropdown);
+			// 드롭다운. (엔진 UIDropdown — 테마가 바뀌면 새 색으로 다시 만든다)
+			this.rebuildDropdowns();
 
 			// 저장 공간 게이지. (보조 게이지 = 시스템 예약 영역)
 			this.styleProgressBar(settingsRootNode, "StorageBar", ACCENT_COLOR);
@@ -801,6 +879,226 @@
 					this.showToast("Settings restored.");
 				});
 			});
+		}
+
+		//==============================================================================
+		// 설정 드롭다운 재구성. (테마 색을 생성자에 넣으므로 전환 때마다 새로 만든다)
+		//==============================================================================
+		rebuildDropdowns() {
+			const settingsRootNode = this.#screenRootMap.get("settings");
+			const theme = THEME_TABLE[this.#themeKey];
+			const dropdownOptions = {
+				width: 176,
+				height: 28,
+				optionHeight: 26,
+				baseColor: theme.cardRaised.clone(),
+				popupColor: theme.surface.clone(),
+				highlightColor: new Color(theme.accent.red, theme.accent.green, theme.accent.blue, 0.25),
+				textColor: theme.text.clone(),
+			};
+
+			const themeSlotNode = this.findNodeByName(settingsRootNode, "ThemeDropdownSlot");
+			const previousThemeIndex = this.#themeDropdown ? this.#themeDropdown.getSelectedIndex() : THEME_KEYS.indexOf(this.#themeKey);
+			if (this.#themeDropdown) {
+				themeSlotNode.removeChild(this.#themeDropdown);
+			}
+			this.#themeDropdown = new UIDropdown(dropdownOptions);
+			this.#themeDropdown.setOptionList(THEME_KEYS.map((themeKey) => THEME_TABLE[themeKey].label));
+			this.#themeDropdown.setSelectedIndex(System.Math.max(0, previousThemeIndex));
+			this.#themeDropdown.setChangedEvent(() => {
+				const selectedThemeKey = THEME_KEYS[this.#themeDropdown.getSelectedIndex()];
+				this.applyTheme(selectedThemeKey);
+				this.showToast("Theme: " + THEME_TABLE[selectedThemeKey].label);
+			});
+			themeSlotNode.addChild(this.#themeDropdown);
+			this.applyFontToTree(this.#themeDropdown);
+
+			const regionSlotNode = this.findNodeByName(settingsRootNode, "RegionDropdownSlot");
+			const previousRegionIndex = this.#regionDropdown ? this.#regionDropdown.getSelectedIndex() : 0;
+			if (this.#regionDropdown) {
+				regionSlotNode.removeChild(this.#regionDropdown);
+			}
+			this.#regionDropdown = new UIDropdown(dropdownOptions);
+			this.#regionDropdown.setOptionList(["Seoul", "Tokyo", "Frankfurt", "Oregon"]);
+			this.#regionDropdown.setSelectedIndex(previousRegionIndex);
+			this.#regionDropdown.setChangedEvent(() => {
+				this.showToast("Region: " + this.#regionDropdown.getSelectedText());
+			});
+			regionSlotNode.addChild(this.#regionDropdown);
+			this.applyFontToTree(this.#regionDropdown);
+		}
+
+		//==============================================================================
+		// 테마 역할 캐시 구축. (문서에 구워진 Dim 색을 역할로 되찾아 둔다 — 로드 때 한 번)
+		//==============================================================================
+		buildThemeRoleCache() {
+			const dimTheme = THEME_TABLE.dim;
+			const roleNames = ["background", "surface", "card", "cardRaised", "hairline", "text", "textDim",
+				"textFaint", "accent", "positive", "negative", "ink", "toggleOff", "overlay"];
+			const matchRole = (color) => {
+				for (const roleName of roleNames) {
+					const roleColor = dimTheme[roleName];
+					if (System.Math.abs(color.red - roleColor.red) < 0.01
+						&& System.Math.abs(color.green - roleColor.green) < 0.01
+						&& System.Math.abs(color.blue - roleColor.blue) < 0.01) {
+						return roleName;
+					}
+				}
+				return null;
+			};
+			const visit = (node) => {
+				for (const paintComponent of node.getComponents(Paint)) {
+					const paintColor = paintComponent.getColor();
+					const role = matchRole(paintColor);
+					if (role) {
+						this.#paintRoleCache.push({ paint: paintComponent, node: node, role: role, alpha: paintColor.alpha });
+					}
+				}
+				for (const labelComponent of node.getComponents(UILabel)) {
+					const textColor = labelComponent.getTextColor();
+					const role = matchRole(textColor);
+					if (role) {
+						this.#labelRoleCache.push({ label: labelComponent, node: node, role: role });
+					}
+				}
+				for (const childNode of node.getChildren()) {
+					visit(childNode);
+				}
+			};
+			visit(this.getRoot());
+
+			// 액센트 판 위의 글자는 전용 역할로. (라이트 테마에서 어두운 글자가 되지 않게)
+			const accentNodeSet = new System.Set();
+			for (const entry of this.#paintRoleCache) {
+				if (entry.role === "accent") {
+					accentNodeSet.add(entry.node);
+				}
+			}
+			for (const entry of this.#labelRoleCache) {
+				if ((entry.role === "text" || entry.role === "ink") && accentNodeSet.has(entry.node)) {
+					entry.role = "textOnAccent";
+				}
+			}
+		}
+
+		//==============================================================================
+		// 테마 적용. (역할 캐시 리매핑 + 코드 소관 위젯 재채색)
+		//==============================================================================
+		/**
+		 * @param { string } themeKey "dim" | "dark" | "light"
+		 */
+		applyTheme(themeKey) {
+			const theme = THEME_TABLE[themeKey];
+			if (!theme) {
+				return;
+			}
+			this.#themeKey = themeKey;
+			this.#backgroundStyle = theme.backgroundStyle;
+			System.document.body.style.background = theme.backgroundStyle;
+
+			// 코드가 참조하는 가변 색 갱신.
+			assignColor(BAR_TRACK_COLOR, theme.barTrack);
+			assignColor(ACCENT_COLOR, theme.accent);
+			assignColor(POSITIVE_COLOR, theme.positive);
+			assignColor(NEGATIVE_COLOR, theme.negative);
+			assignColor(TEXT_COLOR, theme.text);
+			assignColor(TEXT_DIM_COLOR, theme.textDim);
+			assignColor(TEXT_FAINT_COLOR, theme.textFaint);
+			assignColor(TEXT_ON_ACCENT_COLOR, theme.textOnAccent);
+			assignColor(CARD_COLOR, theme.card);
+			assignColor(CARD_RAISED_COLOR, theme.cardRaised);
+
+			// 문서 색 리매핑.
+			for (const entry of this.#paintRoleCache) {
+				const roleColor = theme[entry.role];
+				entry.paint.setColor(new Color(roleColor.red, roleColor.green, roleColor.blue, entry.alpha));
+			}
+			for (const entry of this.#labelRoleCache) {
+				const roleColor = theme[entry.role];
+				entry.label.setTextColor(new Color(roleColor.red, roleColor.green, roleColor.blue, 1));
+			}
+
+			// 진행바.
+			const dashboardRootNode = this.#screenRootMap.get("home");
+			const settingsRootNode = this.#screenRootMap.get("settings");
+			const componentsRootNode = this.#screenRootMap.get("components");
+			for (const barName of ["SystemCpuBar", "SystemMemoryBar", "SystemDiskBar"]) {
+				this.styleProgressBar(dashboardRootNode, barName, ACCENT_COLOR);
+			}
+			const diskBar = this.findProgressBar(dashboardRootNode, "SystemDiskBar");
+			diskBar.setSecondaryFillColor(new Color(theme.negative.red, theme.negative.green, theme.negative.blue, 0.7));
+			this.styleProgressBar(settingsRootNode, "StorageBar", ACCENT_COLOR);
+			const storageBar = this.findProgressBar(settingsRootNode, "StorageBar");
+			storageBar.setSecondaryFillColor(new Color(theme.negative.red, theme.negative.green, theme.negative.blue, 0.7));
+			this.styleProgressBar(componentsRootNode, "LongPressBar", ACCENT_COLOR);
+			this.styleProgressBar(componentsRootNode, "LoopProgressBar", ACCENT_COLOR);
+
+			// 차트.
+			this.#liveChart.setLineColor(theme.accent);
+			this.#liveChart.setGridColor(theme.gridLine);
+			this.#revenueBars.setBarColor(new Color(theme.accent.red, theme.accent.green, theme.accent.blue, 0.45));
+			this.#revenueBars.setHighlightColor(theme.accent);
+			this.#miniLineChart.setLineColor(theme.accent);
+			this.#miniLineChart.setGridColor(theme.gridLine);
+			this.#miniBarChart.setBarColor(new Color(theme.accent.red, theme.accent.green, theme.accent.blue, 0.45));
+			this.#miniBarChart.setHighlightColor(theme.accent);
+
+			// 토스트 / 스피너 / 컨텍스트 메뉴 / 드롭다운.
+			const toastPaintComponents = this.#toast.getComponents(Paint);
+			toastPaintComponents[0].setColor(new Color(theme.surface.red, theme.surface.green, theme.surface.blue, 0.97));
+			const toastLabelComponents = this.#toast.getComponents(UILabel);
+			toastLabelComponents[0].setTextColor(theme.text.clone());
+			this.#loadingSpinner.setDotColor(theme.textDim);
+			for (const demoSpinner of this.#demoSpinners) {
+				demoSpinner.setDotColor(demoSpinner === this.#demoSpinners[1] ? theme.accent : theme.textDim);
+			}
+			const root = this.getRoot();
+			if (this.#contextMenu) {
+				root.removeChild(this.#contextMenu);
+			}
+			this.#contextMenu = new UIContextMenu({ panelColor: theme.surface.clone(), textColor: theme.text.clone() });
+			root.addChild(this.#contextMenu);
+			this.rebuildDropdowns();
+
+			// 토글은 현재 상태에 맞춰 다시 칠한다.
+			for (const rowName of ["Autosave", "Telemetry"]) {
+				const toggleNode = this.findNodeByName(settingsRootNode, rowName + "Toggle");
+				const toggleComponent = toggleNode.getComponents(UIToggleButton)[0];
+				const isOn = toggleComponent.getIsOn();
+				toggleNode.getComponents(Paint)[0].setColor(isOn ? theme.accent.clone() : theme.toggleOff.clone());
+				toggleNode.getComponents(UILabel)[0].setTextColor(isOn ? theme.textOnAccent.clone() : theme.ink.clone());
+			}
+
+			// 레일 강조 글자.
+			this.refreshNavigationLabels();
+
+			// 목록은 새 색으로 다시 바인딩.
+			if (this.#eventListView) {
+				this.#eventListView.refresh();
+			}
+			if (this.#itemListView) {
+				this.#itemListView.refresh();
+			}
+			this.refreshDashboardStats();
+
+			try {
+				System.localStorage.setItem(THEME_STORAGE_KEY, themeKey);
+			}
+			catch (storageError) {
+			}
+		}
+
+		//==============================================================================
+		// 레일 글자색 갱신. (활성 탭은 액센트 판 위 글자색)
+		//==============================================================================
+		refreshNavigationLabels() {
+			const theme = THEME_TABLE[this.#themeKey];
+			for (let targetIndex = 0; targetIndex < NAVIGATION_TARGETS.length; ++targetIndex) {
+				const labelComponent = this.findLabel(this.#navigationRootNode, NAVIGATION_TARGETS[targetIndex].buttonName.replace("Nav", "NavLabel"));
+				if (labelComponent) {
+					labelComponent.setTextColor(targetIndex === this.#activeNavIndex ? theme.textOnAccent.clone() : theme.text.clone());
+				}
+			}
 		}
 
 		//==============================================================================
@@ -884,6 +1182,7 @@
 			const largeSpinner = new UISpinner({ radius: 13, dotRadius: 2.6, color: ACCENT_COLOR.clone(), rotationSpeed: 0.8 });
 			largeSpinner.setLocalPosition(Vector2.create(250, 68));
 			progressPanelNode.addChild(largeSpinner);
+			this.#demoSpinners = [smallSpinner, largeSpinner];
 			this.styleProgressBar(componentsRootNode, "LoopProgressBar", ACCENT_COLOR);
 
 			// 타자기.
@@ -1138,6 +1437,7 @@
 					highlightNode.setActive(targetIndex === navIndex);
 				}
 			}
+			this.refreshNavigationLabels();
 			const activeHighlightNode = this.findNodeByName(this.#navigationRootNode, NAVIGATION_TARGETS[navIndex].buttonName.replace("Nav", "NavActive"));
 			if (activeHighlightNode) {
 				const startOffsetY = (previousNavIndex - navIndex) * 42;
@@ -1545,7 +1845,7 @@
 			const canvasNativeSize = viewManager.getCanvasNativeSize();
 
 			viewManager.applyCanvasNativeRect(graphic);
-			graphic.setFillColor("rgb(11, 13, 18)");
+			graphic.setFillColor(this.#backgroundStyle);
 			graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
 
 			viewManager.applyViewRect(graphic);

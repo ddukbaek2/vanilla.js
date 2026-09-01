@@ -22,19 +22,19 @@ const MAIN_WIDTH = 884;
 const SIDE_X = 1124;
 const SIDE_WIDTH = 340;
 
-// 절제된 앱 팔레트. (단일 인디고 액센트 + 중립 톤, 상태색은 의미가 있을 때만)
-const COLOR_BACKGROUND = "#0b0d12";
-const COLOR_SURFACE = "#12151c";
-const COLOR_CARD = "#171b24";
-const COLOR_CARD_RAISED = "#1e2430";
-const COLOR_HAIRLINE = "#262c38";
-const COLOR_TEXT = "#e6e9ef";
-const COLOR_TEXT_DIM = "#8a91a0";
-const COLOR_TEXT_FAINT = "#545b69";
-const COLOR_ACCENT = "#5b6cff";
-const COLOR_POSITIVE = "#3fb27f";
-const COLOR_NEGATIVE = "#d9564f";
-const COLOR_INK = "#0b0d12";
+// 절제된 앱 팔레트. (기본 Dim 테마 — 런타임 테마 전환은 index.html 이 색을 역할로 캐시해 리매핑한다)
+const COLOR_BACKGROUND = "#14171e";
+const COLOR_SURFACE = "#1b202a";
+const COLOR_CARD = "#232937";
+const COLOR_CARD_RAISED = "#2c3344";
+const COLOR_HAIRLINE = "#394154";
+const COLOR_TEXT = "#e8ebf2";
+const COLOR_TEXT_DIM = "#9aa2b2";
+const COLOR_TEXT_FAINT = "#6b7387";
+const COLOR_ACCENT = "#6d7dff";
+const COLOR_POSITIVE = "#45b585";
+const COLOR_NEGATIVE = "#e06058";
+const COLOR_INK = "#12151c";
 const COLOR_TRANSPARENT = [1, 1, 1, 0];
 
 
@@ -363,7 +363,7 @@ function buildSettings() {
 		else if (definition.kind === "toggle") {
 			rowNode.children.push(makeNode(definition.name + "Toggle", 696, 9, 52, 22, {
 				interactable: true,
-				components: [paint(color(definition.on ? COLOR_ACCENT : "#2c3442"), 11), toggle(), label(definition.on ? "ON" : "OFF", 8.5, color(COLOR_INK))],
+				components: [paint(color(definition.on ? COLOR_ACCENT : "#3c4457"), 11), toggle(), label(definition.on ? "ON" : "OFF", 8.5, color(COLOR_INK))],
 			}));
 		}
 		else if (definition.kind === "slot") {
@@ -514,7 +514,7 @@ function buildPopup() {
 		children: [
 			makeNode("Overlay", 0, 0, DOCUMENT_WIDTH, DOCUMENT_HEIGHT, {
 				interactable: true,
-				components: [paint(color("#04060a", 0.62)), button(0)],
+				components: [paint(color("#06080d", 0.62)), button(0)],
 			}),
 			makeNode("Dialog", DOCUMENT_WIDTH * 0.5, DOCUMENT_HEIGHT * 0.5 - 10, 380, 196, {
 				pivot: [0.5, 0.5],

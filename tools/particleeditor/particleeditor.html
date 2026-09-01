@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vanilla.js - Particle Editor</title>
+<style>
+	html, body {
+		margin: 0;
+		padding: 0;
+		width: 100vw;
+		height: 100vh;
+		overflow: hidden;
+		background: #1f1f1f;
+		color: #cccccc;
+		font-family: "Segoe UI Variable", "Segoe UI", "Inter", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+		font-size: 13px;
+	}
+	#editorRoot {
+		display: flex;
+		width: 100vw;
+		height: 100vh;
+	}
+	#previewPane {
+		flex: 1;
+		position: relative;
+		background: #181818;
+		min-width: 0;
+	}
+	#previewCanvas {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+	#previewOverlay {
+		position: absolute;
+		left: 14px;
+		top: 12px;
+		pointer-events: none;
+		color: #8a8a8a;
+		font-size: 11px;
+		line-height: 1.7;
+	}
+	#previewOverlay b {
+		color: #cccccc;
+		font-size: 13px;
+		letter-spacing: 0.4px;
+	}
+	#inspectorPane {
+		width: 336px;
+		background: #1f1f1f;
+		border-left: 1px solid #2b2b2b;
+		overflow-y: auto;
+		padding: 0 0 40px 0;
+	}
+	.paneTitle {
+		padding: 12px 14px 10px 14px;
+		font-weight: 600;
+		color: #ffffff;
+		font-size: 13px;
+		border-bottom: 1px solid #2b2b2b;
+		position: sticky;
+		top: 0;
+		background: #1f1f1f;
+		z-index: 2;
+	}
+	.group {
+		border-bottom: 1px solid #2b2b2b;
+		padding: 10px 14px 12px 14px;
+	}
+	.groupTitle {
+		font-size: 11px;
+		color: #8a8a8a;
+		letter-spacing: 0.6px;
+		margin-bottom: 8px;
+	}
+	.row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 6px;
+	}
+	.row label {
+		flex: 0 0 96px;
+		font-size: 12px;
+		color: #aaaaaa;
+	}
+	.row input[type="number"] {
+		flex: 1;
+		min-width: 0;
+		background: #2b2b2b;
+		border: 1px solid #3c3c3c;
+		color: #dddddd;
+		border-radius: 4px;
+		padding: 3px 6px;
+		font-size: 12px;
+	}
+	.row input[type="color"] {
+		width: 36px;
+		height: 24px;
+		padding: 0;
+		border: 1px solid #3c3c3c;
+		border-radius: 4px;
+		background: #2b2b2b;
+	}
+	.row input[type="range"] {
+		flex: 1;
+	}
+	.row select {
+		flex: 1;
+		background: #2b2b2b;
+		border: 1px solid #3c3c3c;
+		color: #dddddd;
+		border-radius: 4px;
+		padding: 3px 4px;
+		font-size: 12px;
+	}
+	.row input[type="checkbox"] {
+		accent-color: #0078d4;
+	}
+	button {
+		background: #2b2b2b;
+		border: 1px solid #3c3c3c;
+		color: #dddddd;
+		border-radius: 5px;
+		padding: 5px 10px;
+		font-size: 12px;
+		cursor: pointer;
+	}
+	button:hover {
+		background: #333333;
+	}
+	button.primary {
+		background: #0078d4;
+		border-color: #0078d4;
+		color: #ffffff;
+	}
+	.buttonRow {
+		display: flex;
+		gap: 6px;
+		flex-wrap: wrap;
+	}
+	.presetRow {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 6px;
+	}
+	.gradientKeyRow {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin-bottom: 5px;
+	}
+	.gradientKeyRow input[type="number"] {
+		width: 52px;
+		background: #2b2b2b;
+		border: 1px solid #3c3c3c;
+		color: #dddddd;
+		border-radius: 4px;
+		padding: 3px 5px;
+		font-size: 11.5px;
+	}
+	.gradientKeyRow input[type="color"] {
+		width: 32px;
+		height: 22px;
+		padding: 0;
+		border: 1px solid #3c3c3c;
+		border-radius: 4px;
+	}
+	.gradientKeyRow button {
+		padding: 2px 8px;
+	}
+	.hint {
+		font-size: 10.5px;
+		color: #6f6f6f;
+		margin-top: 4px;
+		line-height: 1.5;
+	}
+</style>
+</head>
+<body>
+<div id="editorRoot">
+	<div id="previewPane">
+		<canvas id="previewCanvas"></canvas>
+		<div id="previewOverlay"><b>PARTICLE EDITOR</b><br>vanilla.js ParticleSystem — 값을 바꾸면 즉시 반영됩니다.<br><span id="statLine"></span></div>
+	</div>
+	<div id="inspectorPane">
+		<div class="paneTitle">Particle Inspector</div>
+		<div id="inspectorBody"></div>
+	</div>
+</div>
+<script type="module">
+	"use strict";
+	const System = globalThis;
+
+	//==============================================================================
+	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../../build/vanilla.js)
+	//==============================================================================
+	let engineModule = null;
+	try {
+		try {
+			engineModule = await import("./vanilla.js");
+		}
+		catch (importError) {
+			engineModule = await import("../../build/vanilla.js");
+		}
+	}
+	catch (engineError) {
+		System.document.body.innerHTML = "<p style=\"padding:2em\">vanilla.js 엔진 모듈을 불러오지 못했습니다.</p>";
+		throw engineError;
+	}
+
+	const Engine = engineModule.Engine;
+	const EngineConfiguration = engineModule.EngineConfiguration;
+	const Scene = engineModule.Scene;
+	const WorldNode = engineModule.WorldNode;
+	const Vector2 = engineModule.Vector2;
+	const Pivot = engineModule.Pivot;
+	const Rect = engineModule.Rect;
+	const ParticleSystem = engineModule.ParticleSystem;
+
+	//==============================================================================
+	// 기본 서술과 프리셋. (vfx 애셋 형식 — ParticleSystem.applyDescription 과 1:1)
+	//==============================================================================
+	const DEFAULT_DESCRIPTION = {
+		looping: true,
+		duration: 1,
+		maxParticleCount: 800,
+		emissionRate: 60,
+		bursts: [],
+		shape: "cone",
+		shapeRadius: 20,
+		coneAngle: 0.35,
+		boxSize: [200, 100],
+		edgeWidth: 400,
+		lifetime: [0.6, 1.2],
+		speed: [80, 180],
+		size: [6, 14],
+		rotation: [0, 0],
+		angularVelocity: [0, 0],
+		startColorA: [1, 0.75, 0.3, 1],
+		startColorB: [1, 0.5, 0.12, 1],
+		colorOverLifetime: [
+			{ time: 0, color: [1, 1, 0.85, 1] },
+			{ time: 0.5, color: [1, 0.6, 0.2, 0.9] },
+			{ time: 1, color: [0.65, 0.1, 0.02, 0] },
+		],
+		sizeOverLifetime: [1, 0.3],
+		gravity: [0, -110],
+		damping: 1,
+		attractor: null,
+		wobble: [0, 4],
+		renderShape: "circle",
+		blendMode: "lighter",
+		streakScale: 0.05,
+		worldSpace: false,
+	};
+
+	const PRESET_TABLE = {
+		Fire: null, // 기본 서술 그대로.
+		Snow: {
+			emissionRate: 70, shape: "edge", edgeWidth: 700, lifetime: [5, 8], speed: [30, 70], size: [2.5, 6],
+			gravity: [0, 12], damping: 0.1, wobble: [14, 1.4], renderShape: "circle", blendMode: "source-over",
+			startColorA: [1, 1, 1, 0.95], startColorB: [0.8, 0.88, 1, 0.55], sizeOverLifetime: [1, 1],
+			colorOverLifetime: [
+				{ time: 0, color: [1, 1, 1, 0] }, { time: 0.06, color: [1, 1, 1, 1] },
+				{ time: 0.92, color: [1, 1, 1, 1] }, { time: 1, color: [1, 1, 1, 0] },
+			],
+		},
+		Rain: {
+			emissionRate: 200, shape: "edge", edgeWidth: 760, lifetime: [0.8, 1.0], speed: [430, 540], size: [1.4, 2.2],
+			gravity: [0, 0], damping: 0, wobble: [0, 4], renderShape: "streak", streakScale: 0.03, blendMode: "source-over",
+			startColorA: [0.62, 0.74, 0.95, 0.55], startColorB: [0.75, 0.85, 1, 0.35], sizeOverLifetime: [1, 1],
+			colorOverLifetime: [{ time: 0, color: [1, 1, 1, 1] }, { time: 1, color: [1, 1, 1, 1] }],
+		},
+		Confetti: {
+			emissionRate: 0, bursts: [{ time: 0.1, count: 70 }], duration: 1.2, shape: "circle", shapeRadius: 10,
+			lifetime: [1.6, 2.6], speed: [150, 380], size: [4.5, 8], rotation: [0, 6.28], angularVelocity: [2.2, 3.6],
+			gravity: [0, 480], damping: 1.5, wobble: [8, 3], renderShape: "rect", blendMode: "source-over",
+			startColorA: [1, 0.45, 0.55, 1], startColorB: [0.4, 0.75, 1, 1], sizeOverLifetime: [1, 1],
+			colorOverLifetime: [
+				{ time: 0, color: [1, 1, 1, 1] }, { time: 0.85, color: [1, 1, 1, 1] }, { time: 1, color: [1, 1, 1, 0] },
+			],
+		},
+		Explosion: {
+			emissionRate: 0, bursts: [{ time: 0.1, count: 70 }], duration: 1.6, shape: "circle", shapeRadius: 8,
+			lifetime: [0.5, 1.2], speed: [240, 600], size: [2.5, 4.5], gravity: [0, 340], damping: 2.2,
+			renderShape: "streak", streakScale: 0.045, blendMode: "lighter", wobble: [0, 4],
+			startColorA: [1, 0.8, 0.35, 1], startColorB: [1, 0.5, 0.15, 1], sizeOverLifetime: [1, 0.6],
+			colorOverLifetime: [{ time: 0, color: [1, 1, 1, 1] }, { time: 1, color: [1, 0.3, 0.05, 0] }],
+		},
+		Firework: {
+			emissionRate: 0, bursts: [{ time: 0.1, count: 80 }], duration: 1.1, shape: "circle", shapeRadius: 4,
+			lifetime: [1.0, 1.8], speed: [120, 330], size: [2.5, 4.5], gravity: [0, 140], damping: 1.1,
+			renderShape: "circle", blendMode: "lighter", wobble: [0, 4],
+			startColorA: [0.5, 0.8, 1, 1], startColorB: [1, 0.6, 0.8, 1], sizeOverLifetime: [1, 0.6],
+			colorOverLifetime: [
+				{ time: 0, color: [1, 1, 1, 1] }, { time: 0.7, color: [1, 1, 1, 0.9] }, { time: 1, color: [1, 1, 1, 0] },
+			],
+		},
+		Sparkle: {
+			emissionRate: 60, shape: "box", boxSize: [700, 380], lifetime: [1.2, 2.4], speed: [0, 8], size: [2, 7],
+			gravity: [0, 0], damping: 0, renderShape: "circle", blendMode: "lighter", wobble: [0, 4],
+			startColorA: [0.75, 0.85, 1, 1], startColorB: [1, 0.9, 0.7, 1], sizeOverLifetime: [0.4, 1.3],
+			colorOverLifetime: [
+				{ time: 0, color: [1, 1, 1, 0] }, { time: 0.3, color: [1, 1, 1, 1] }, { time: 1, color: [1, 1, 1, 0] },
+			],
+		},
+		Bubbles: {
+			emissionRate: 30, shape: "edge", edgeWidth: 620, lifetime: [2.6, 4.4], speed: [70, 130], size: [4, 14],
+			gravity: [0, -30], damping: 0.2, wobble: [20, 2.4], renderShape: "circle", blendMode: "source-over",
+			startColorA: [0.6, 0.85, 1, 0.5], startColorB: [0.8, 0.95, 1, 0.3], sizeOverLifetime: [0.7, 1.15],
+			colorOverLifetime: [
+				{ time: 0, color: [1, 1, 1, 0] }, { time: 0.1, color: [1, 1, 1, 1] },
+				{ time: 0.85, color: [1, 1, 1, 1] }, { time: 1, color: [1, 1, 1, 0] },
+			],
+		},
+		Vortex: {
+			emissionRate: 140, shape: "circle", shapeRadius: 220, lifetime: [1.8, 3.2], speed: [10, 60], size: [2, 5],
+			gravity: [0, 0], damping: 0.35, attractor: { x: 0, y: 0, strength: 170, swirl: 240 },
+			renderShape: "circle", blendMode: "lighter", wobble: [0, 4],
+			startColorA: [0.5, 0.7, 1, 1], startColorB: [0.8, 0.6, 1, 1], sizeOverLifetime: [1, 0.5],
+			colorOverLifetime: [
+				{ time: 0, color: [1, 1, 1, 0] }, { time: 0.15, color: [1, 1, 1, 1] },
+				{ time: 0.85, color: [1, 1, 1, 0.9] }, { time: 1, color: [1, 1, 1, 0] },
+			],
+		},
+	};
+
+	let description = System.JSON.parse(System.JSON.stringify(DEFAULT_DESCRIPTION));
+
+	//==============================================================================
+	// 프리뷰 씬.
+	//==============================================================================
+	let particleSystem = null;
+	class PreviewScene extends Scene {
+		create() {
+			super.create();
+			const root = this.getRoot();
+			root.setPivot(Pivot.topLeft.clone());
+			root.setAnchor(Pivot.topLeft.clone());
+
+			const emitterNode = new WorldNode();
+			emitterNode.setName("Emitter");
+			emitterNode.setPivot(Pivot.topLeft.clone());
+			emitterNode.setAnchor(Pivot.topLeft.clone());
+			emitterNode.setLocalPosition(Vector2.create(480, 300));
+			root.addChild(emitterNode);
+			particleSystem = emitterNode.addComponent(ParticleSystem);
+			particleSystem.applyDescription(description);
+		}
+
+		preDraw(graphic) {
+			super.preDraw(graphic);
+			const engine = this.getEngine();
+			const viewManager = engine.getViewManager();
+			const canvasNativeSize = viewManager.getCanvasNativeSize();
+			viewManager.applyCanvasNativeRect(graphic);
+			graphic.setFillColor("rgb(16, 17, 20)");
+			graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+			viewManager.applyViewRect(graphic);
+		}
+
+		tick(timeDelta) {
+			super.tick(timeDelta);
+			const statLine = System.document.getElementById("statLine");
+			if (statLine && particleSystem) {
+				statLine.textContent = "particles " + particleSystem.getParticleCount();
+			}
+		}
+	}
+
+	//==============================================================================
+	// 인스펙터 구성. (description 을 진실의 원천으로 삼고 변경 즉시 반영)
+	//==============================================================================
+	const inspectorBody = System.document.getElementById("inspectorBody");
+
+	function applyToSystem() {
+		if (particleSystem) {
+			particleSystem.applyDescription(description);
+		}
+	}
+
+	function colorToHex(channels) {
+		const toByte = (value) => System.Math.round(value * 255).toString(16).padStart(2, "0");
+		return "#" + toByte(channels[0]) + toByte(channels[1]) + toByte(channels[2]);
+	}
+
+	function hexToColorChannels(hexText, alpha) {
+		return [
+			parseInt(hexText.substring(1, 3), 16) / 255,
+			parseInt(hexText.substring(3, 5), 16) / 255,
+			parseInt(hexText.substring(5, 7), 16) / 255,
+			alpha,
+		];
+	}
+
+	function makeGroup(titleText) {
+		const groupElement = System.document.createElement("div");
+		groupElement.className = "group";
+		const titleElement = System.document.createElement("div");
+		titleElement.className = "groupTitle";
+		titleElement.textContent = titleText;
+		groupElement.appendChild(titleElement);
+		inspectorBody.appendChild(groupElement);
+		return groupElement;
+	}
+
+	function makeRow(groupElement, labelText) {
+		const rowElement = System.document.createElement("div");
+		rowElement.className = "row";
+		const labelElement = System.document.createElement("label");
+		labelElement.textContent = labelText;
+		rowElement.appendChild(labelElement);
+		groupElement.appendChild(rowElement);
+		return rowElement;
+	}
+
+	function addNumberInput(rowElement, getValue, setValue, stepValue = 1) {
+		const inputElement = System.document.createElement("input");
+		inputElement.type = "number";
+		inputElement.step = String(stepValue);
+		inputElement.value = String(getValue());
+		inputElement.addEventListener("input", () => {
+			const parsedValue = System.Number.parseFloat(inputElement.value);
+			if (System.Number.isFinite(parsedValue)) {
+				setValue(parsedValue);
+				applyToSystem();
+			}
+		});
+		rowElement.appendChild(inputElement);
+		return inputElement;
+	}
+
+	function addPairRow(groupElement, labelText, getPair, setPair, stepValue = 1) {
+		const rowElement = makeRow(groupElement, labelText);
+		addNumberInput(rowElement, () => getPair()[0], (value) => { setPair(0, value); }, stepValue);
+		addNumberInput(rowElement, () => getPair()[1], (value) => { setPair(1, value); }, stepValue);
+	}
+
+	function addSelectRow(groupElement, labelText, optionList, getValue, setValue) {
+		const rowElement = makeRow(groupElement, labelText);
+		const selectElement = System.document.createElement("select");
+		for (const optionValue of optionList) {
+			const optionElement = System.document.createElement("option");
+			optionElement.value = optionValue;
+			optionElement.textContent = optionValue;
+			selectElement.appendChild(optionElement);
+		}
+		selectElement.value = getValue();
+		selectElement.addEventListener("change", () => {
+			setValue(selectElement.value);
+			applyToSystem();
+		});
+		rowElement.appendChild(selectElement);
+		return selectElement;
+	}
+
+	function addCheckboxRow(groupElement, labelText, getValue, setValue) {
+		const rowElement = makeRow(groupElement, labelText);
+		const checkboxElement = System.document.createElement("input");
+		checkboxElement.type = "checkbox";
+		checkboxElement.checked = getValue();
+		checkboxElement.addEventListener("change", () => {
+			setValue(checkboxElement.checked);
+			applyToSystem();
+		});
+		rowElement.appendChild(checkboxElement);
+		return checkboxElement;
+	}
+
+	function addColorRow(groupElement, labelText, getChannels, setChannels) {
+		const rowElement = makeRow(groupElement, labelText);
+		const colorElement = System.document.createElement("input");
+		colorElement.type = "color";
+		colorElement.value = colorToHex(getChannels());
+		const alphaElement = System.document.createElement("input");
+		alphaElement.type = "number";
+		alphaElement.step = "0.05";
+		alphaElement.min = "0";
+		alphaElement.max = "1";
+		alphaElement.value = String(getChannels()[3]);
+		const commitColor = () => {
+			const alphaValue = System.Number.parseFloat(alphaElement.value);
+			setChannels(hexToColorChannels(colorElement.value, System.Number.isFinite(alphaValue) ? alphaValue : 1));
+			applyToSystem();
+		};
+		colorElement.addEventListener("input", commitColor);
+		alphaElement.addEventListener("input", commitColor);
+		rowElement.appendChild(colorElement);
+		rowElement.appendChild(alphaElement);
+	}
+
+	//==============================================================================
+	// 그라디언트 키 편집기.
+	//==============================================================================
+	let gradientContainer = null;
+	function rebuildGradientRows() {
+		gradientContainer.textContent = "";
+		description.colorOverLifetime.forEach((gradientKey, keyIndex) => {
+			const rowElement = System.document.createElement("div");
+			rowElement.className = "gradientKeyRow";
+			const timeInput = System.document.createElement("input");
+			timeInput.type = "number";
+			timeInput.step = "0.05";
+			timeInput.min = "0";
+			timeInput.max = "1";
+			timeInput.value = String(gradientKey.time);
+			const colorInput = System.document.createElement("input");
+			colorInput.type = "color";
+			colorInput.value = colorToHex(gradientKey.color);
+			const alphaInput = System.document.createElement("input");
+			alphaInput.type = "number";
+			alphaInput.step = "0.05";
+			alphaInput.min = "0";
+			alphaInput.max = "1";
+			alphaInput.value = String(gradientKey.color[3]);
+			const removeButton = System.document.createElement("button");
+			removeButton.textContent = "−";
+			const commitKey = () => {
+				const timeValue = System.Number.parseFloat(timeInput.value);
+				const alphaValue = System.Number.parseFloat(alphaInput.value);
+				gradientKey.time = System.Number.isFinite(timeValue) ? timeValue : gradientKey.time;
+				gradientKey.color = hexToColorChannels(colorInput.value, System.Number.isFinite(alphaValue) ? alphaValue : 1);
+				description.colorOverLifetime.sort((left, right) => left.time - right.time);
+				applyToSystem();
+			};
+			timeInput.addEventListener("change", () => { commitKey(); rebuildGradientRows(); });
+			colorInput.addEventListener("input", commitKey);
+			alphaInput.addEventListener("input", commitKey);
+			removeButton.addEventListener("click", () => {
+				description.colorOverLifetime.splice(keyIndex, 1);
+				applyToSystem();
+				rebuildGradientRows();
+			});
+			rowElement.appendChild(timeInput);
+			rowElement.appendChild(colorInput);
+			rowElement.appendChild(alphaInput);
+			rowElement.appendChild(removeButton);
+			gradientContainer.appendChild(rowElement);
+		});
+	}
+
+	//==============================================================================
+	// 인스펙터 전체 구성.
+	//==============================================================================
+	function buildInspector() {
+		inspectorBody.textContent = "";
+
+		// 프리셋 / 파일.
+		const presetGroup = makeGroup("PRESET");
+		const presetRow = System.document.createElement("div");
+		presetRow.className = "presetRow";
+		for (const presetName of System.Object.keys(PRESET_TABLE)) {
+			const presetButton = System.document.createElement("button");
+			presetButton.textContent = presetName;
+			presetButton.addEventListener("click", () => {
+				description = System.JSON.parse(System.JSON.stringify(DEFAULT_DESCRIPTION));
+				const presetOverride = PRESET_TABLE[presetName];
+				if (presetOverride) {
+					System.Object.assign(description, System.JSON.parse(System.JSON.stringify(presetOverride)));
+				}
+				applyToSystem();
+				buildInspector();
+			});
+			presetRow.appendChild(presetButton);
+		}
+		presetGroup.appendChild(presetRow);
+
+		const fileGroup = makeGroup("FILE — .vfx.json");
+		const fileRow = System.document.createElement("div");
+		fileRow.className = "buttonRow";
+		const saveButton = System.document.createElement("button");
+		saveButton.className = "primary";
+		saveButton.textContent = "저장";
+		saveButton.addEventListener("click", () => {
+			const jsonText = System.JSON.stringify(description, null, "\t");
+			const blob = new System.Blob([jsonText], { type: "application/json" });
+			const anchorElement = System.document.createElement("a");
+			anchorElement.href = System.URL.createObjectURL(blob);
+			anchorElement.download = "effect.vfx.json";
+			anchorElement.click();
+			System.URL.revokeObjectURL(anchorElement.href);
+		});
+		const loadButton = System.document.createElement("button");
+		loadButton.textContent = "불러오기";
+		const fileInput = System.document.createElement("input");
+		fileInput.type = "file";
+		fileInput.accept = ".json";
+		fileInput.style.display = "none";
+		fileInput.addEventListener("change", async () => {
+			const selectedFile = fileInput.files[0];
+			if (!selectedFile) {
+				return;
+			}
+			const jsonText = await selectedFile.text();
+			description = System.Object.assign(System.JSON.parse(System.JSON.stringify(DEFAULT_DESCRIPTION)), System.JSON.parse(jsonText));
+			applyToSystem();
+			buildInspector();
+		});
+		loadButton.addEventListener("click", () => {
+			fileInput.click();
+		});
+		const burstButton = System.document.createElement("button");
+		burstButton.textContent = "버스트 x60";
+		burstButton.addEventListener("click", () => {
+			particleSystem.emit(60);
+		});
+		fileRow.appendChild(saveButton);
+		fileRow.appendChild(loadButton);
+		fileRow.appendChild(burstButton);
+		fileRow.appendChild(fileInput);
+		fileGroup.appendChild(fileRow);
+		const fileHint = System.document.createElement("div");
+		fileHint.className = "hint";
+		fileHint.textContent = "런타임에서는 particleSystem.applyDescription(JSON.parse(text)) 로 그대로 재생됩니다.";
+		fileGroup.appendChild(fileHint);
+
+		// 방출.
+		const emissionGroup = makeGroup("EMISSION");
+		addNumberInput(makeRow(emissionGroup, "Rate (개/초)"), () => description.emissionRate, (value) => { description.emissionRate = value; });
+		addCheckboxRow(emissionGroup, "Looping", () => description.looping, (value) => { description.looping = value; });
+		addNumberInput(makeRow(emissionGroup, "Duration"), () => description.duration, (value) => { description.duration = value; }, 0.1);
+		addNumberInput(makeRow(emissionGroup, "Max Particles"), () => description.maxParticleCount, (value) => { description.maxParticleCount = value; });
+
+		// 모양.
+		const shapeGroup = makeGroup("SHAPE");
+		addSelectRow(shapeGroup, "Shape", ["point", "circle", "cone", "box", "edge"], () => description.shape, (value) => { description.shape = value; });
+		addNumberInput(makeRow(shapeGroup, "Radius"), () => description.shapeRadius, (value) => { description.shapeRadius = value; });
+		addNumberInput(makeRow(shapeGroup, "Cone Angle"), () => description.coneAngle, (value) => { description.coneAngle = value; }, 0.05);
+		addPairRow(shapeGroup, "Box W/H", () => description.boxSize, (index, value) => { description.boxSize[index] = value; });
+		addNumberInput(makeRow(shapeGroup, "Edge Width"), () => description.edgeWidth, (value) => { description.edgeWidth = value; });
+
+		// 시작 범위.
+		const startGroup = makeGroup("START (min / max)");
+		addPairRow(startGroup, "Lifetime", () => description.lifetime, (index, value) => { description.lifetime[index] = value; }, 0.1);
+		addPairRow(startGroup, "Speed", () => description.speed, (index, value) => { description.speed[index] = value; });
+		addPairRow(startGroup, "Size", () => description.size, (index, value) => { description.size[index] = value; }, 0.5);
+		addPairRow(startGroup, "Rotation", () => description.rotation, (index, value) => { description.rotation[index] = value; }, 0.1);
+		addPairRow(startGroup, "Spin (rad/s)", () => description.angularVelocity, (index, value) => { description.angularVelocity[index] = value; }, 0.2);
+		addColorRow(startGroup, "Color A", () => description.startColorA, (channels) => { description.startColorA = channels; });
+		addColorRow(startGroup, "Color B", () => description.startColorB, (channels) => { description.startColorB = channels; });
+
+		// 수명 그라디언트.
+		const gradientGroup = makeGroup("COLOR OVER LIFETIME");
+		gradientContainer = System.document.createElement("div");
+		gradientGroup.appendChild(gradientContainer);
+		const addKeyButton = System.document.createElement("button");
+		addKeyButton.textContent = "+ 키 추가";
+		addKeyButton.addEventListener("click", () => {
+			description.colorOverLifetime.push({ time: 1, color: [1, 1, 1, 0] });
+			applyToSystem();
+			rebuildGradientRows();
+		});
+		gradientGroup.appendChild(addKeyButton);
+		rebuildGradientRows();
+		const sizeGroup = makeGroup("SIZE OVER LIFETIME");
+		addPairRow(sizeGroup, "Scale (시작/끝)", () => description.sizeOverLifetime, (index, value) => { description.sizeOverLifetime[index] = value; }, 0.1);
+
+		// 물리.
+		const physicsGroup = makeGroup("PHYSICS");
+		addPairRow(physicsGroup, "Gravity X/Y", () => description.gravity, (index, value) => { description.gravity[index] = value; });
+		addNumberInput(makeRow(physicsGroup, "Damping"), () => description.damping, (value) => { description.damping = value; }, 0.1);
+		addPairRow(physicsGroup, "Wobble (폭/속도)", () => description.wobble, (index, value) => { description.wobble[index] = value; }, 0.2);
+		const attractorCheckbox = addCheckboxRow(physicsGroup, "Attractor", () => description.attractor !== null, (isEnabled) => {
+			description.attractor = isEnabled ? { x: 0, y: 0, strength: 170, swirl: 240 } : null;
+			buildInspector();
+		});
+		if (description.attractor) {
+			addPairRow(physicsGroup, "  중심 X/Y", () => [description.attractor.x, description.attractor.y], (index, value) => {
+				if (index === 0) { description.attractor.x = value; } else { description.attractor.y = value; }
+			});
+			addNumberInput(makeRow(physicsGroup, "  끌림 세기"), () => description.attractor.strength, (value) => { description.attractor.strength = value; });
+			addNumberInput(makeRow(physicsGroup, "  소용돌이"), () => description.attractor.swirl, (value) => { description.attractor.swirl = value; });
+		}
+
+		// 렌더.
+		const renderGroup = makeGroup("RENDER");
+		addSelectRow(renderGroup, "Shape", ["circle", "rect", "streak"], () => description.renderShape, (value) => { description.renderShape = value; });
+		addSelectRow(renderGroup, "Blend", ["source-over", "lighter", "multiply", "screen"], () => description.blendMode, (value) => { description.blendMode = value; });
+		addNumberInput(makeRow(renderGroup, "Streak Scale"), () => description.streakScale, (value) => { description.streakScale = value; }, 0.005);
+		addCheckboxRow(renderGroup, "World Space", () => description.worldSpace, (value) => { description.worldSpace = value; });
+	}
+
+	buildInspector();
+
+	//==============================================================================
+	// 엔진 실행.
+	//==============================================================================
+	const engineConfiguration = new EngineConfiguration();
+	engineConfiguration.referenceResolutionSize = Vector2.create(960, 600);
+	engineConfiguration.canvasId = "previewCanvas";
+	engineConfiguration.autoResizeOnWindowResize = true;
+	const engine = new Engine(engineConfiguration);
+	engine.run(new PreviewScene());
+	System.particleEditorEngine = engine;
+</script>
+</body>
+</html>

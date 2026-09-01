@@ -31,9 +31,9 @@
 			{
 				"type": "Paint",
 				"color": [
-					0.043,
-					0.051,
-					0.071,
+					0.078,
+					0.09,
+					0.118,
 					1
 				],
 				"roundSize": 0
@@ -73,9 +73,9 @@
 						"text": "DASHBOARD",
 						"fontSize": 18,
 						"textColor": [
-							0.902,
-							0.914,
-							0.937,
+							0.91,
+							0.922,
+							0.949,
 							1
 						],
 						"backgroundColor": [
@@ -123,9 +123,9 @@
 						"text": "Live metrics — charts update every second.",
 						"fontSize": 11,
 						"textColor": [
-							0.541,
-							0.569,
-							0.627,
+							0.604,
+							0.635,
+							0.698,
 							1
 						],
 						"backgroundColor": [
@@ -171,9 +171,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.118,
-							0.141,
-							0.188,
+							0.173,
+							0.2,
+							0.267,
 							1
 						],
 						"roundSize": 13
@@ -213,9 +213,9 @@
 								"text": "●  All systems normal",
 								"fontSize": 10.5,
 								"textColor": [
-									0.247,
-									0.698,
-									0.498,
+									0.271,
+									0.71,
+									0.522,
 									1
 								],
 								"backgroundColor": [
@@ -263,9 +263,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -305,9 +305,9 @@
 								"text": "REVENUE (MTD)",
 								"fontSize": 9.5,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -355,9 +355,9 @@
 								"text": "",
 								"fontSize": 19,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -405,9 +405,9 @@
 								"text": "",
 								"fontSize": 10,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -455,9 +455,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -497,9 +497,9 @@
 								"text": "ACTIVE USERS",
 								"fontSize": 9.5,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -547,9 +547,9 @@
 								"text": "",
 								"fontSize": 19,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -597,9 +597,9 @@
 								"text": "",
 								"fontSize": 10,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -647,9 +647,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -689,9 +689,9 @@
 								"text": "REQUESTS / MIN",
 								"fontSize": 9.5,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -739,9 +739,9 @@
 								"text": "",
 								"fontSize": 19,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -789,9 +789,9 @@
 								"text": "",
 								"fontSize": 10,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -839,9 +839,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -881,9 +881,9 @@
 								"text": "UPTIME (90D)",
 								"fontSize": 9.5,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -931,9 +931,9 @@
 								"text": "",
 								"fontSize": 19,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -981,9 +981,9 @@
 								"text": "",
 								"fontSize": 10,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1031,9 +1031,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -1073,9 +1073,9 @@
 								"text": "REQUESTS PER SECOND",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1123,9 +1123,9 @@
 								"text": "",
 								"fontSize": 15,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -1203,9 +1203,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -1245,9 +1245,9 @@
 								"text": "REVENUE · LAST 14 DAYS",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1325,9 +1325,9 @@
 								"text": "",
 								"fontSize": 9.5,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1377,9 +1377,9 @@
 						"text": "RECENT EVENTS",
 						"fontSize": 10,
 						"textColor": [
-							0.329,
-							0.357,
-							0.412,
+							0.42,
+							0.451,
+							0.529,
 							1
 						],
 						"backgroundColor": [
@@ -1473,9 +1473,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.09,
-									0.106,
-									0.141,
+									0.137,
+									0.161,
+									0.216,
 									1
 								],
 								"roundSize": 8
@@ -1515,9 +1515,9 @@
 										"text": "",
 										"fontSize": 10,
 										"textColor": [
-											0.329,
-											0.357,
-											0.412,
+											0.42,
+											0.451,
+											0.529,
 											1
 										],
 										"backgroundColor": [
@@ -1565,9 +1565,9 @@
 										"text": "",
 										"fontSize": 11.5,
 										"textColor": [
-											0.902,
-											0.914,
-											0.937,
+											0.91,
+											0.922,
+											0.949,
 											1
 										],
 										"backgroundColor": [
@@ -1615,9 +1615,9 @@
 										"text": "",
 										"fontSize": 9.5,
 										"textColor": [
-											0.541,
-											0.569,
-											0.627,
+											0.604,
+											0.635,
+											0.698,
 											1
 										],
 										"backgroundColor": [
@@ -1667,9 +1667,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -1709,9 +1709,9 @@
 								"text": "SYSTEM",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1759,9 +1759,9 @@
 								"text": "CPU",
 								"fontSize": 11,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -1809,9 +1809,9 @@
 								"text": "8 cores",
 								"fontSize": 9.5,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1896,9 +1896,9 @@
 								"text": "Memory",
 								"fontSize": 11,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -1946,9 +1946,9 @@
 								"text": "32 GB",
 								"fontSize": 9.5,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -2033,9 +2033,9 @@
 								"text": "Disk",
 								"fontSize": 11,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -2083,9 +2083,9 @@
 								"text": "2 TB NVMe",
 								"fontSize": 9.5,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -2168,9 +2168,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.149,
-									0.173,
-									0.22,
+									0.224,
+									0.255,
+									0.329,
 									1
 								],
 								"roundSize": 0
@@ -2211,9 +2211,9 @@
 								"text": "OPEN INCIDENTS",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -2261,9 +2261,9 @@
 								"text": "0",
 								"fontSize": 16,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -2311,9 +2311,9 @@
 								"text": "No incidents in the last 30 days.",
 								"fontSize": 10,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -2359,9 +2359,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.149,
-									0.173,
-									0.22,
+									0.224,
+									0.255,
+									0.329,
 									1
 								],
 								"roundSize": 0
@@ -2402,9 +2402,9 @@
 								"text": "NOTES",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -2452,9 +2452,9 @@
 								"text": "Every panel on this screen is drawn by the\nvanilla.js engine - charts, lists and gauges\nare all engine components.",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [

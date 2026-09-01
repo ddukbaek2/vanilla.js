@@ -12,7 +12,7 @@
 		width: 100%;
 		height: 100%;
 		overflow: hidden;
-		background: #07090f;
+		background: #14171e;
 		touch-action: none;
 		user-select: none;
 	}
@@ -58,6 +58,7 @@
 	const Pivot = engineModule.Pivot;
 	const Rect = engineModule.Rect;
 	const Paint = engineModule.Paint;
+	const Mask = engineModule.Mask;
 	const UILabel = engineModule.UILabel;
 	const UIButton = engineModule.UIButton;
 	const TouchRecognizer = engineModule.TouchRecognizer;
@@ -71,26 +72,63 @@
 	// 전역 상수 목록.
 	//==============================================================================
 	const REFERENCE_WIDTH = 1280;
-	const REFERENCE_HEIGHT = 720;
-	const TEXT_COLOR = new Color(0.9, 0.92, 0.95, 1);
-	const TEXT_DIM_COLOR = new Color(0.5, 0.54, 0.6, 1);
-	const BUTTON_COLOR = new Color(0.1, 0.12, 0.17, 0.9);
-	const BUTTON_ACTIVE_COLOR = new Color(0.357, 0.424, 1, 1);
-	const MODE_DEFINITIONS = [
-		{ key: "fire", title: "FIRE", caption: "cone emitter · additive · color over lifetime" },
-		{ key: "fountain", title: "FOUNTAIN", caption: "gravity · damping · size over lifetime" },
-		{ key: "snow", title: "SNOW", caption: "edge emitter · slow fall · variable size" },
-		{ key: "confetti", title: "CONFETTI", caption: "click to burst · rect particles · angular velocity" },
-		{ key: "explosion", title: "EXPLOSION", caption: "click to burst · sparks + flash + smoke" },
-		{ key: "fireworks", title: "FIREWORKS", caption: "timed bursts · additive spheres · gravity" },
-		{ key: "trail", title: "MAGIC TRAIL", caption: "move the pointer · TrailRenderer + sparkles" },
-	];
+	const REFERENCE_HEIGHT = 760;
+	const STAGE_X = 24;
+	const STAGE_Y = 128;
+	const STAGE_WIDTH = 1232;
+	const STAGE_HEIGHT = 470;
+	const TEXT_COLOR = new Color(0.91, 0.922, 0.949, 1);
+	const TEXT_DIM_COLOR = new Color(0.604, 0.635, 0.698, 1);
+	const TEXT_FAINT_COLOR = new Color(0.42, 0.451, 0.529, 1);
+	const SURFACE_COLOR = new Color(0.106, 0.125, 0.165, 1);
+	const STAGE_COLOR = new Color(0.051, 0.063, 0.09, 1);
+	const HAIRLINE_COLOR = new Color(0.224, 0.255, 0.329, 1);
+	const ACCENT_COLOR = new Color(0.427, 0.49, 1, 1);
 	const effectRandom = new SeededRandom(20260901);
+
+	const MODE_DEFINITIONS = [
+		{ key: "fire", title: "FIRE",
+			description: "모닥불. 원뿔 방출 불꽃 위로 연기가 깔리고 불티가 튄다.",
+			modules: "ParticleSystem  ·  cone / circle emitter  ·  additive  ·  colorOverLifetime" },
+		{ key: "fountain", title: "FOUNTAIN",
+			description: "분수. 좁은 원뿔로 쏘아 올린 물줄기가 중력으로 떨어지고 물안개가 피어오른다.",
+			modules: "ParticleSystem  ·  gravity  ·  sizeOverLifetime" },
+		{ key: "snow", title: "SNOW",
+			description: "눈. 무대 위쪽 가장자리에서 흩날리며 떨어진다. 좌우 살랑임은 wobble 로 만든다.",
+			modules: "ParticleSystem  ·  edge emitter  ·  wobble" },
+		{ key: "rain", title: "RAIN",
+			description: "비. 속도 방향으로 늘어난 빗줄기가 쏟아지고 바닥에서 물방울이 튄다.",
+			modules: "ParticleSystem  ·  streak render  ·  edge emitter" },
+		{ key: "confetti", title: "CONFETTI",
+			description: "색종이. 1.2초마다 위쪽 임의 지점에서 터진다. 조각마다 회전이 걸려 있다.",
+			modules: "ParticleSystem  ·  burst  ·  rect render  ·  angular velocity" },
+		{ key: "explosion", title: "EXPLOSION",
+			description: "폭발. 섬광 → 파편 불꽃 → 피어오르는 연기가 겹쳐 한 번의 폭발을 만든다.",
+			modules: "ParticleSystem  ·  burst  ·  additive + normal 합성" },
+		{ key: "firework", title: "FIREWORK",
+			description: "불꽃놀이. 0.9초마다 밤하늘 임의 위치에서 색색의 구가 터지고 잔광이 떨어진다.",
+			modules: "ParticleSystem  ·  burst  ·  additive  ·  gravity" },
+		{ key: "sparkle", title: "SPARKLE",
+			description: "별가루. 무대 전체에 잔잔히 돋아나는 반짝임. 커졌다 사라지기를 반복한다.",
+			modules: "ParticleSystem  ·  box emitter  ·  soft disc sprite" },
+		{ key: "embers", title: "EMBERS",
+			description: "불씨. 바닥에서 피어올라 흔들리며 사그라드는 잉걸불.",
+			modules: "ParticleSystem  ·  edge emitter  ·  wobble  ·  additive" },
+		{ key: "bubbles", title: "BUBBLES",
+			description: "거품. 바닥에서 떠오르며 좌우로 흔들리고 수면 근처에서 사라진다.",
+			modules: "ParticleSystem  ·  wobble  ·  sizeOverLifetime" },
+		{ key: "vortex", title: "VORTEX",
+			description: "소용돌이. 중심을 향해 끌리면서 접선 방향으로 휘도는 입자들.",
+			modules: "ParticleSystem  ·  attractor (radial + swirl)" },
+		{ key: "trail", title: "TRAIL",
+			description: "마법 궤적. 리사주 곡선을 따라 도는 발광체가 띠를 남기고 별가루를 흩뿌린다.",
+			modules: "TrailRenderer + ParticleSystem  ·  additive" },
+	];
 
 	//==============================================================================
 	// 이펙트 씬.
-	// - 엔진 ParticleSystem / TrailRenderer 놀이터. 위 단추로 모드를 바꾸고,
-	//   포인터 클릭 / 이동으로 상호작용한다.
+	// - 엔진 ParticleSystem / TrailRenderer 놀이터. 모든 연출은 무대 상자 안에서
+	//   자동으로 무한 반복된다. (마우스 조작 불필요)
 	//==============================================================================
 	class EffectsScene extends Scene {
 		//==============================================================================
@@ -99,18 +137,17 @@
 		/** @private @type { TouchRecognizer | null } */ #touchRecognizer;
 		/** @private @type { string } */ #modeKey;
 		/** @private @type { System.Map } */ #modeRootMap; // key → WorldNode
-		/** @private @type { System.Map } */ #modeButtonMap; // key → { paintComponent }
-		/** @private @type { UILabel | null } */ #captionLabel;
+		/** @private @type { System.Map } */ #modeSystemsMap; // key → ParticleSystem[]
+		/** @private @type { System.Map } */ #tabMap; // key → { paintComponent, labelComponent }
+		/** @private @type { WorldNode | null } */ #stageNode;
+		/** @private @type { UILabel | null } */ #modeNameLabel;
+		/** @private @type { UILabel | null } */ #descriptionLabel;
+		/** @private @type { UILabel | null } */ #modulesLabel;
 		/** @private @type { UILabel | null } */ #countLabel;
-		/** @private @type { ParticleSystem[] } */ #particleSystems;
 		/** @private @type { WorldNode | null } */ #trailNode;
-		/** @private @type { ParticleSystem | null } */ #trailSparkles;
-		/** @private @type { object[] } */ #clickBurstSystems; // { key, systems: ParticleSystem[] }
-		/** @private @type { number } */ #fireworkAccumulator;
-		/** @private @type { ParticleSystem[] } */ #fireworkSystems;
-		/** @private @type { number } */ #fireworkCursor;
+		/** @private @type { number } */ #burstAccumulator;
+		/** @private @type { number } */ #burstCursor;
 		/** @private @type { number } */ #elapsedSeconds;
-		/** @private @type { Vector2 } */ #appliedViewSize;
 
 		//==============================================================================
 		// 생성.
@@ -120,18 +157,17 @@
 			this.#touchRecognizer = null;
 			this.#modeKey = "fire";
 			this.#modeRootMap = new System.Map();
-			this.#modeButtonMap = new System.Map();
-			this.#captionLabel = null;
+			this.#modeSystemsMap = new System.Map();
+			this.#tabMap = new System.Map();
+			this.#stageNode = null;
+			this.#modeNameLabel = null;
+			this.#descriptionLabel = null;
+			this.#modulesLabel = null;
 			this.#countLabel = null;
-			this.#particleSystems = [];
 			this.#trailNode = null;
-			this.#trailSparkles = null;
-			this.#clickBurstSystems = [];
-			this.#fireworkAccumulator = 0;
-			this.#fireworkSystems = [];
-			this.#fireworkCursor = 0;
+			this.#burstAccumulator = 0;
+			this.#burstCursor = 0;
 			this.#elapsedSeconds = 0;
-			this.#appliedViewSize = Vector2.create(0, 0);
 		}
 
 		//==============================================================================
@@ -154,21 +190,23 @@
 		 */
 		async load(engine) {
 			const viewManager = engine.getViewManager();
-			viewManager.setViewScaleMode(ViewScaleMode.stretchShortExpandLong);
+			viewManager.setViewScaleMode(ViewScaleMode.stretchShort);
 
-			const root = this.getRoot();
+			this.buildStage();
+			this.buildOverlayUi();
 
-			// 모드별 이펙트 뿌리.
 			this.buildFireMode();
 			this.buildFountainMode();
 			this.buildSnowMode();
+			this.buildRainMode();
 			this.buildConfettiMode();
 			this.buildExplosionMode();
-			this.buildFireworksMode();
+			this.buildFireworkMode();
+			this.buildSparkleMode();
+			this.buildEmbersMode();
+			this.buildBubblesMode();
+			this.buildVortexMode();
 			this.buildTrailMode();
-
-			// 상단 제목 / 모드 단추 / 하단 캡션.
-			this.buildOverlayUi();
 
 			// URL 로 초기 모드 지정. (?mode=fire)
 			const searchParams = new System.URLSearchParams(System.location.search);
@@ -178,41 +216,147 @@
 		}
 
 		//==============================================================================
-		// 보조: 모드 뿌리 노드 하나 만들기.
+		// 무대 상자. (테두리 + 클리핑 — 모든 이펙트는 이 안에서만 그려진다)
+		//==============================================================================
+		buildStage() {
+			const root = this.getRoot();
+
+			// 테두리 프레임.
+			const frameNode = new WorldNode();
+			frameNode.setName("StageFrame");
+			frameNode.setPivot(Pivot.topLeft.clone());
+			frameNode.setAnchor(Pivot.topLeft.clone());
+			frameNode.setContentSize(Vector2.create(STAGE_WIDTH + 2, STAGE_HEIGHT + 2));
+			frameNode.setLocalPosition(Vector2.create(STAGE_X - 1, STAGE_Y - 1));
+			const framePaint = frameNode.addComponent(Paint);
+			framePaint.setColor(HAIRLINE_COLOR.clone());
+			framePaint.setRoundSize(15);
+			root.addChild(frameNode);
+
+			// 무대 본체. (자식을 contentSize 로 클리핑)
+			this.#stageNode = new WorldNode();
+			this.#stageNode.setName("Stage");
+			this.#stageNode.setPivot(Pivot.topLeft.clone());
+			this.#stageNode.setAnchor(Pivot.topLeft.clone());
+			this.#stageNode.setContentSize(Vector2.create(STAGE_WIDTH, STAGE_HEIGHT));
+			this.#stageNode.setLocalPosition(Vector2.create(STAGE_X, STAGE_Y));
+			const stagePaint = this.#stageNode.addComponent(Paint);
+			stagePaint.setColor(STAGE_COLOR.clone());
+			stagePaint.setRoundSize(14);
+			this.#stageNode.addComponent(Mask);
+			root.addChild(this.#stageNode);
+		}
+
+		//==============================================================================
+		// 상단 제목 / 세그먼트 탭 바 / 하단 설명.
+		//==============================================================================
+		buildOverlayUi() {
+			const root = this.getRoot();
+
+			const makeLabelNode = (name, x, y, width, height, fontSize, textColor, isBold) => {
+				const labelNode = new WorldNode();
+				labelNode.setName(name);
+				labelNode.setPivot(Pivot.topLeft.clone());
+				labelNode.setAnchor(Pivot.topLeft.clone());
+				labelNode.setContentSize(Vector2.create(width, height));
+				labelNode.setLocalPosition(Vector2.create(x, y));
+				const labelComponent = labelNode.addComponent(UILabel);
+				labelComponent.setFontSize(fontSize);
+				labelComponent.setTextColor(textColor);
+				labelComponent.setTextAlign("left");
+				if (isBold) {
+					labelComponent.setBold(true);
+				}
+				root.addChild(labelNode);
+				return labelComponent;
+			};
+
+			const titleLabel = makeLabelNode("Title", 24, 18, 400, 26, 18, TEXT_COLOR, true);
+			titleLabel.setText("EFFECTS");
+			const subtitleLabel = makeLabelNode("Subtitle", 26, 46, 700, 16, 11, TEXT_DIM_COLOR, false);
+			subtitleLabel.setText("엔진 파티클 놀이터 — 모든 연출은 무대 안에서 자동으로 반복됩니다.");
+
+			// 세그먼트 탭 바. (하나의 막대 안에서 활성 탭만 액센트로 칠해진다)
+			const tabBarNode = new WorldNode();
+			tabBarNode.setName("TabBar");
+			tabBarNode.setPivot(Pivot.topLeft.clone());
+			tabBarNode.setAnchor(Pivot.topLeft.clone());
+			tabBarNode.setContentSize(Vector2.create(STAGE_WIDTH, 36));
+			tabBarNode.setLocalPosition(Vector2.create(STAGE_X, 78));
+			const tabBarPaint = tabBarNode.addComponent(Paint);
+			tabBarPaint.setColor(SURFACE_COLOR.clone());
+			tabBarPaint.setRoundSize(10);
+			root.addChild(tabBarNode);
+
+			const tabWidth = (STAGE_WIDTH - 8) / MODE_DEFINITIONS.length;
+			for (let modeIndex = 0; modeIndex < MODE_DEFINITIONS.length; ++modeIndex) {
+				const definition = MODE_DEFINITIONS[modeIndex];
+				const tabNode = new WorldNode();
+				tabNode.setName("Tab_" + definition.key);
+				tabNode.setPivot(Pivot.topLeft.clone());
+				tabNode.setAnchor(Pivot.topLeft.clone());
+				tabNode.setContentSize(Vector2.create(tabWidth, 28));
+				tabNode.setLocalPosition(Vector2.create(4 + modeIndex * tabWidth, 4));
+				tabNode.setInteractable(true);
+				const tabPaint = tabNode.addComponent(Paint);
+				tabPaint.setColor(new Color(0, 0, 0, 0));
+				tabPaint.setRoundSize(8);
+				const tabButton = tabNode.addComponent(UIButton);
+				tabButton.setPressedTintColor(new Color(1, 1, 1, 0.06));
+				tabButton.setClickedEvent(() => {
+					this.selectMode(definition.key);
+				});
+				const tabLabel = tabNode.addComponent(UILabel);
+				tabLabel.setText(definition.title);
+				tabLabel.setFontSize(9.5);
+				tabLabel.setTextColor(TEXT_DIM_COLOR);
+				tabLabel.setBold(true);
+				tabBarNode.addChild(tabNode);
+				this.#tabMap.set(definition.key, { paintComponent: tabPaint, labelComponent: tabLabel });
+			}
+
+			// 하단 설명 블록.
+			this.#modeNameLabel = makeLabelNode("ModeName", 24, STAGE_Y + STAGE_HEIGHT + 16, 300, 20, 13, TEXT_COLOR, true);
+			this.#descriptionLabel = makeLabelNode("ModeDescription", 24, STAGE_Y + STAGE_HEIGHT + 40, 900, 16, 11.5, TEXT_DIM_COLOR, false);
+			this.#modulesLabel = makeLabelNode("ModeModules", 24, STAGE_Y + STAGE_HEIGHT + 62, 900, 16, 10, TEXT_FAINT_COLOR, false);
+			this.#countLabel = makeLabelNode("ParticleCount", STAGE_X + STAGE_WIDTH - 220, STAGE_Y + STAGE_HEIGHT + 16, 220, 20, 11, TEXT_FAINT_COLOR, false);
+			this.#countLabel.setTextAlign("right");
+		}
+
+		//==============================================================================
+		// 보조: 모드 뿌리 / 파티클 노드.
 		//==============================================================================
 		/**
 		 * @param { string } modeKey
 		 * @returns { WorldNode }
 		 */
 		makeModeRoot(modeKey) {
-			const root = this.getRoot();
 			const modeRootNode = new WorldNode();
 			modeRootNode.setName("Mode_" + modeKey);
 			modeRootNode.setPivot(Pivot.topLeft.clone());
 			modeRootNode.setAnchor(Pivot.topLeft.clone());
 			modeRootNode.setActive(false);
-			root.addChild(modeRootNode);
+			this.#stageNode.addChild(modeRootNode);
 			this.#modeRootMap.set(modeKey, modeRootNode);
+			this.#modeSystemsMap.set(modeKey, []);
 			return modeRootNode;
 		}
 
-		//==============================================================================
-		// 보조: 파티클 노드 하나 만들기.
-		//==============================================================================
 		/**
+		 * @param { string } modeKey
 		 * @param { WorldNode } parentNode
 		 * @param { number } x
 		 * @param { number } y
 		 * @returns { ParticleSystem }
 		 */
-		makeParticleNode(parentNode, x, y) {
+		makeParticleNode(modeKey, parentNode, x, y) {
 			const particleNode = new WorldNode();
 			particleNode.setPivot(Pivot.topLeft.clone());
 			particleNode.setAnchor(Pivot.topLeft.clone());
 			particleNode.setLocalPosition(Vector2.create(x, y));
 			parentNode.addChild(particleNode);
 			const particleSystem = particleNode.addComponent(ParticleSystem);
-			this.#particleSystems.push(particleSystem);
+			this.#modeSystemsMap.get(modeKey).push(particleSystem);
 			return particleSystem;
 		}
 
@@ -221,58 +365,57 @@
 		//==============================================================================
 		buildFireMode() {
 			const modeRootNode = this.makeModeRoot("fire");
-			const centerX = REFERENCE_WIDTH * 0.5;
-			const baseY = REFERENCE_HEIGHT * 0.72;
+			const centerX = STAGE_WIDTH * 0.5;
+			const baseY = STAGE_HEIGHT * 0.82;
 
-			// 연기. (불보다 먼저 그려 뒤에 깔린다)
-			const smoke = this.makeParticleNode(modeRootNode, centerX, baseY - 30);
+			const smoke = this.makeParticleNode("fire", modeRootNode, centerX, baseY - 40);
 			smoke.setEmitterShape(EmitterShape.circle);
-			smoke.setShapeRadius(16);
-			smoke.setEmissionRate(22);
-			smoke.setStartLifetime(1.6, 2.6);
-			smoke.setStartSpeed(26, 60);
-			smoke.setStartSize(26, 52);
-			smoke.setGravity(6, -70);
+			smoke.setShapeRadius(18);
+			smoke.setEmissionRate(20);
+			smoke.setStartLifetime(1.8, 2.8);
+			smoke.setStartSpeed(24, 56);
+			smoke.setStartSize(30, 60);
+			smoke.setGravity(8, -80);
 			smoke.setDamping(0.6);
-			smoke.setStartColor(new Color(0.16, 0.15, 0.15, 0.35), new Color(0.28, 0.26, 0.25, 0.25));
+			smoke.setStartColor(new Color(0.13, 0.13, 0.14, 0.32), new Color(0.24, 0.23, 0.23, 0.22));
 			smoke.setColorOverLifetime([
 				{ time: 0, color: new Color(1, 1, 1, 0) },
-				{ time: 0.2, color: new Color(1, 1, 1, 1) },
+				{ time: 0.25, color: new Color(1, 1, 1, 1) },
 				{ time: 1, color: new Color(1, 1, 1, 0) },
 			]);
-			smoke.setSizeOverLifetime(0.7, 1.8);
+			smoke.setSizeOverLifetime(0.7, 1.9);
 
-			// 불꽃 본체.
-			const flame = this.makeParticleNode(modeRootNode, centerX, baseY);
+			const flame = this.makeParticleNode("fire", modeRootNode, centerX, baseY);
 			flame.setEmitterShape(EmitterShape.cone);
-			flame.setConeAngle(0.35);
-			flame.setShapeRadius(22);
-			flame.setEmissionRate(110);
-			flame.setStartLifetime(0.45, 0.95);
-			flame.setStartSpeed(70, 150);
-			flame.setStartSize(10, 22);
-			flame.setGravity(0, -110);
+			flame.setConeAngle(0.32);
+			flame.setShapeRadius(26);
+			flame.setEmissionRate(130);
+			flame.setStartLifetime(0.5, 1.0);
+			flame.setStartSpeed(80, 170);
+			flame.setStartSize(12, 26);
+			flame.setGravity(0, -120);
 			flame.setDamping(1.1);
 			flame.setAdditive(true);
-			flame.setStartColor(new Color(1, 0.75, 0.28, 1), new Color(1, 0.5, 0.12, 1));
+			flame.setStartColor(new Color(1, 0.76, 0.3, 1), new Color(1, 0.5, 0.12, 1));
 			flame.setColorOverLifetime([
 				{ time: 0, color: new Color(1, 1, 0.85, 1) },
 				{ time: 0.45, color: new Color(1, 0.62, 0.2, 0.9) },
-				{ time: 1, color: new Color(0.7, 0.1, 0.02, 0) },
+				{ time: 1, color: new Color(0.65, 0.1, 0.02, 0) },
 			]);
 			flame.setSizeOverLifetime(1, 0.25);
+			flame.setMaxParticleCount(700);
 
-			// 불티.
-			const sparks = this.makeParticleNode(modeRootNode, centerX, baseY - 8);
+			const sparks = this.makeParticleNode("fire", modeRootNode, centerX, baseY - 10);
 			sparks.setEmitterShape(EmitterShape.cone);
-			sparks.setConeAngle(0.55);
-			sparks.setEmissionRate(14);
-			sparks.setStartLifetime(0.8, 1.5);
-			sparks.setStartSpeed(120, 260);
+			sparks.setConeAngle(0.6);
+			sparks.setEmissionRate(16);
+			sparks.setStartLifetime(0.9, 1.6);
+			sparks.setStartSpeed(130, 280);
 			sparks.setStartSize(2, 3.5);
-			sparks.setGravity(0, 40);
-			sparks.setDamping(0.8);
+			sparks.setGravity(0, 60);
+			sparks.setDamping(0.9);
 			sparks.setAdditive(true);
+			sparks.setWobble(3, 9);
 			sparks.setStartColor(new Color(1, 0.85, 0.4, 1), new Color(1, 0.6, 0.2, 1));
 			sparks.setColorOverLifetime([
 				{ time: 0, color: new Color(1, 1, 1, 1) },
@@ -285,17 +428,17 @@
 		//==============================================================================
 		buildFountainMode() {
 			const modeRootNode = this.makeModeRoot("fountain");
-			const centerX = REFERENCE_WIDTH * 0.5;
-			const baseY = REFERENCE_HEIGHT * 0.78;
+			const centerX = STAGE_WIDTH * 0.5;
+			const baseY = STAGE_HEIGHT * 0.9;
 
-			const water = this.makeParticleNode(modeRootNode, centerX, baseY);
+			const water = this.makeParticleNode("fountain", modeRootNode, centerX, baseY);
 			water.setEmitterShape(EmitterShape.cone);
-			water.setConeAngle(0.22);
-			water.setEmissionRate(160);
-			water.setStartLifetime(1.4, 2.0);
-			water.setStartSpeed(360, 470);
+			water.setConeAngle(0.2);
+			water.setEmissionRate(170);
+			water.setStartLifetime(1.5, 2.1);
+			water.setStartSpeed(380, 500);
 			water.setStartSize(3, 7);
-			water.setGravity(0, 420);
+			water.setGravity(0, 460);
 			water.setStartColor(new Color(0.55, 0.8, 1, 0.9), new Color(0.8, 0.95, 1, 0.7));
 			water.setColorOverLifetime([
 				{ time: 0, color: new Color(1, 1, 1, 1) },
@@ -303,17 +446,16 @@
 				{ time: 1, color: new Color(1, 1, 1, 0) },
 			]);
 			water.setSizeOverLifetime(1, 0.6);
-			water.setMaxParticleCount(900);
+			water.setMaxParticleCount(1000);
 
-			// 물안개.
-			const mist = this.makeParticleNode(modeRootNode, centerX, baseY - 140);
+			const mist = this.makeParticleNode("fountain", modeRootNode, centerX, baseY - 170);
 			mist.setEmitterShape(EmitterShape.circle);
-			mist.setShapeRadius(50);
+			mist.setShapeRadius(60);
 			mist.setEmissionRate(12);
-			mist.setStartLifetime(1.2, 2.2);
-			mist.setStartSpeed(6, 20);
-			mist.setStartSize(30, 60);
-			mist.setStartColor(new Color(0.6, 0.8, 1, 0.08), new Color(0.7, 0.9, 1, 0.05));
+			mist.setStartLifetime(1.4, 2.4);
+			mist.setStartSpeed(6, 22);
+			mist.setStartSize(34, 66);
+			mist.setStartColor(new Color(0.6, 0.8, 1, 0.07), new Color(0.7, 0.9, 1, 0.05));
 			mist.setColorOverLifetime([
 				{ time: 0, color: new Color(1, 1, 1, 0) },
 				{ time: 0.4, color: new Color(1, 1, 1, 1) },
@@ -328,128 +470,155 @@
 		buildSnowMode() {
 			const modeRootNode = this.makeModeRoot("snow");
 
-			const snow = this.makeParticleNode(modeRootNode, REFERENCE_WIDTH * 0.5, -20);
+			const snow = this.makeParticleNode("snow", modeRootNode, STAGE_WIDTH * 0.5, -16);
 			snow.setEmitterShape(EmitterShape.edge);
-			snow.setEdgeWidth(REFERENCE_WIDTH * 1.4);
-			snow.setEmissionRate(60);
-			snow.setStartLifetime(6, 9);
-			snow.setStartSpeed(30, 70);
-			snow.setStartSize(2, 6);
-			snow.setGravity(6, 14);
+			snow.setEdgeWidth(STAGE_WIDTH * 1.1);
+			snow.setEmissionRate(70);
+			snow.setStartLifetime(7, 10);
+			snow.setStartSpeed(34, 74);
+			snow.setStartSize(2.5, 6.5);
+			snow.setGravity(0, 10);
 			snow.setDamping(0.12);
-			snow.setStartColor(new Color(1, 1, 1, 0.9), new Color(0.8, 0.88, 1, 0.5));
+			snow.setWobble(14, 1.4);
+			snow.setStartColor(new Color(1, 1, 1, 0.95), new Color(0.8, 0.88, 1, 0.55));
 			snow.setColorOverLifetime([
 				{ time: 0, color: new Color(1, 1, 1, 0) },
-				{ time: 0.08, color: new Color(1, 1, 1, 1) },
-				{ time: 0.9, color: new Color(1, 1, 1, 1) },
+				{ time: 0.06, color: new Color(1, 1, 1, 1) },
+				{ time: 0.92, color: new Color(1, 1, 1, 1) },
 				{ time: 1, color: new Color(1, 1, 1, 0) },
 			]);
-			snow.setMaxParticleCount(700);
+			snow.setMaxParticleCount(900);
 		}
 
 		//==============================================================================
-		// 모드: 색종이. (클릭 버스트)
+		// 모드: 비.
+		//==============================================================================
+		buildRainMode() {
+			const modeRootNode = this.makeModeRoot("rain");
+
+			const rain = this.makeParticleNode("rain", modeRootNode, STAGE_WIDTH * 0.5, -12);
+			rain.setEmitterShape(EmitterShape.edge);
+			rain.setEdgeWidth(STAGE_WIDTH * 1.2);
+			rain.setEmissionRate(220);
+			rain.setStartLifetime(0.9, 1.1);
+			rain.setStartSpeed(460, 560);
+			rain.setStartSize(1.4, 2.2);
+			rain.setRenderShape("streak");
+			rain.setStreakScale(0.03);
+			rain.setStartColor(new Color(0.62, 0.74, 0.95, 0.55), new Color(0.75, 0.85, 1, 0.35));
+			rain.setMaxParticleCount(1200);
+
+			// 바닥 튐.
+			const splash = this.makeParticleNode("rain", modeRootNode, STAGE_WIDTH * 0.5, STAGE_HEIGHT - 8);
+			splash.setEmitterShape(EmitterShape.edge);
+			splash.setEdgeWidth(STAGE_WIDTH * 1.05);
+			splash.setEmissionRate(90);
+			splash.setStartLifetime(0.25, 0.45);
+			splash.setStartSpeed(40, 110);
+			splash.setStartSize(1.2, 2.4);
+			splash.setGravity(0, 700);
+			splash.setStartColor(new Color(0.7, 0.8, 1, 0.5), new Color(0.85, 0.92, 1, 0.3));
+			splash.setColorOverLifetime([
+				{ time: 0, color: new Color(1, 1, 1, 1) },
+				{ time: 1, color: new Color(1, 1, 1, 0) },
+			]);
+		}
+
+		//==============================================================================
+		// 모드: 색종이. (자동 버스트 — 시스템마다 회전 방향을 갈라 자연스럽게)
 		//==============================================================================
 		buildConfettiMode() {
 			const modeRootNode = this.makeModeRoot("confetti");
-			const colorPairs = [
-				[new Color(1, 0.4, 0.5, 1), new Color(1, 0.7, 0.3, 1)],
-				[new Color(0.35, 0.75, 1, 1), new Color(0.4, 1, 0.7, 1)],
-				[new Color(0.8, 0.55, 1, 1), new Color(1, 0.9, 0.4, 1)],
+			const confettiSetups = [
+				{ colors: [new Color(1, 0.45, 0.55, 1), new Color(1, 0.72, 0.35, 1)], spin: [2.2, 3.6] },
+				{ colors: [new Color(0.4, 0.75, 1, 1), new Color(0.45, 1, 0.72, 1)], spin: [-3.6, -2.2] },
+				{ colors: [new Color(0.78, 0.58, 1, 1), new Color(1, 0.9, 0.45, 1)], spin: [2.6, 4.0] },
 			];
-			const burstSystems = [];
-			for (const colorPair of colorPairs) {
-				const confetti = this.makeParticleNode(modeRootNode, 0, 0);
+			for (const setup of confettiSetups) {
+				const confetti = this.makeParticleNode("confetti", modeRootNode, 0, 0);
 				confetti.setEmissionRate(0);
 				confetti.setEmitterShape(EmitterShape.circle);
-				confetti.setShapeRadius(8);
-				confetti.setStartLifetime(1.4, 2.4);
-				confetti.setStartSpeed(160, 420);
-				confetti.setStartSize(4, 9);
-				confetti.setGravity(0, 520);
-				confetti.setDamping(1.4);
+				confetti.setShapeRadius(10);
+				confetti.setStartLifetime(1.6, 2.6);
+				confetti.setStartSpeed(150, 380);
+				confetti.setStartSize(4.5, 8);
+				confetti.setGravity(0, 480);
+				confetti.setDamping(1.5);
 				confetti.setRenderShape("rect");
 				confetti.setStartRotation(0, System.Math.PI * 2);
-				confetti.setAngularVelocity(-8, 8);
-				confetti.setStartColor(colorPair[0], colorPair[1]);
+				confetti.setAngularVelocity(setup.spin[0], setup.spin[1]);
+				confetti.setWobble(8, 3);
+				confetti.setStartColor(setup.colors[0], setup.colors[1]);
 				confetti.setColorOverLifetime([
 					{ time: 0, color: new Color(1, 1, 1, 1) },
-					{ time: 0.8, color: new Color(1, 1, 1, 1) },
+					{ time: 0.85, color: new Color(1, 1, 1, 1) },
 					{ time: 1, color: new Color(1, 1, 1, 0) },
 				]);
-				confetti.setWorldSpace(true);
+				confetti.setWorldSpace(false);
 				confetti.setMaxParticleCount(900);
-				burstSystems.push(confetti);
 			}
-			this.#clickBurstSystems.push({ key: "confetti", systems: burstSystems, counts: [26, 26, 26] });
 		}
 
 		//==============================================================================
-		// 모드: 폭발. (클릭 버스트)
+		// 모드: 폭발. (자동 버스트)
 		//==============================================================================
 		buildExplosionMode() {
 			const modeRootNode = this.makeModeRoot("explosion");
 
-			// 섬광.
-			const flash = this.makeParticleNode(modeRootNode, 0, 0);
+			const smoke = this.makeParticleNode("explosion", modeRootNode, 0, 0);
+			smoke.setEmissionRate(0);
+			smoke.setEmitterShape(EmitterShape.circle);
+			smoke.setShapeRadius(22);
+			smoke.setStartLifetime(1.3, 2.3);
+			smoke.setStartSpeed(30, 120);
+			smoke.setStartSize(22, 50);
+			smoke.setGravity(0, -50);
+			smoke.setDamping(1.4);
+			smoke.setStartColor(new Color(0.18, 0.17, 0.16, 0.5), new Color(0.3, 0.28, 0.26, 0.35));
+			smoke.setColorOverLifetime([
+				{ time: 0, color: new Color(1, 1, 1, 0.9) },
+				{ time: 1, color: new Color(1, 1, 1, 0) },
+			]);
+			smoke.setSizeOverLifetime(0.8, 2.3);
+
+			const flash = this.makeParticleNode("explosion", modeRootNode, 0, 0);
 			flash.setEmissionRate(0);
-			flash.setStartLifetime(0.18, 0.25);
+			flash.setStartLifetime(0.16, 0.24);
 			flash.setStartSpeed(0, 10);
-			flash.setStartSize(60, 90);
+			flash.setStartSize(70, 100);
 			flash.setAdditive(true);
 			flash.setStartColor(new Color(1, 0.9, 0.6, 1));
 			flash.setColorOverLifetime([
 				{ time: 0, color: new Color(1, 1, 1, 1) },
 				{ time: 1, color: new Color(1, 0.6, 0.2, 0) },
 			]);
-			flash.setSizeOverLifetime(0.6, 1.6);
-			flash.setWorldSpace(true);
+			flash.setSizeOverLifetime(0.6, 1.7);
 
-			// 파편 불꽃.
-			const sparks = this.makeParticleNode(modeRootNode, 0, 0);
+			const sparks = this.makeParticleNode("explosion", modeRootNode, 0, 0);
 			sparks.setEmissionRate(0);
 			sparks.setEmitterShape(EmitterShape.circle);
-			sparks.setShapeRadius(6);
-			sparks.setStartLifetime(0.5, 1.1);
-			sparks.setStartSpeed(220, 560);
-			sparks.setStartSize(2.5, 5);
-			sparks.setGravity(0, 320);
+			sparks.setShapeRadius(8);
+			sparks.setStartLifetime(0.5, 1.2);
+			sparks.setStartSpeed(240, 600);
+			sparks.setStartSize(2.5, 4.5);
+			sparks.setGravity(0, 340);
 			sparks.setDamping(2.2);
 			sparks.setAdditive(true);
+			sparks.setRenderShape("streak");
+			sparks.setStreakScale(0.045);
 			sparks.setStartColor(new Color(1, 0.8, 0.35, 1), new Color(1, 0.5, 0.15, 1));
 			sparks.setColorOverLifetime([
 				{ time: 0, color: new Color(1, 1, 1, 1) },
 				{ time: 1, color: new Color(1, 0.3, 0.05, 0) },
 			]);
-			sparks.setWorldSpace(true);
 			sparks.setMaxParticleCount(900);
-
-			// 연기.
-			const smoke = this.makeParticleNode(modeRootNode, 0, 0);
-			smoke.setEmissionRate(0);
-			smoke.setEmitterShape(EmitterShape.circle);
-			smoke.setShapeRadius(20);
-			smoke.setStartLifetime(1.2, 2.2);
-			smoke.setStartSpeed(30, 110);
-			smoke.setStartSize(20, 46);
-			smoke.setGravity(0, -40);
-			smoke.setDamping(1.4);
-			smoke.setStartColor(new Color(0.2, 0.19, 0.18, 0.5), new Color(0.32, 0.3, 0.28, 0.35));
-			smoke.setColorOverLifetime([
-				{ time: 0, color: new Color(1, 1, 1, 0.9) },
-				{ time: 1, color: new Color(1, 1, 1, 0) },
-			]);
-			smoke.setSizeOverLifetime(0.8, 2.2);
-			smoke.setWorldSpace(true);
-
-			this.#clickBurstSystems.push({ key: "explosion", systems: [smoke, flash, sparks], counts: [14, 3, 60] });
 		}
 
 		//==============================================================================
-		// 모드: 불꽃놀이. (일정 주기로 하늘에서 터진다)
+		// 모드: 불꽃놀이. (자동 버스트)
 		//==============================================================================
-		buildFireworksMode() {
-			const modeRootNode = this.makeModeRoot("fireworks");
+		buildFireworkMode() {
+			const modeRootNode = this.makeModeRoot("firework");
 			const paletteList = [
 				[new Color(1, 0.5, 0.6, 1), new Color(1, 0.8, 0.5, 1)],
 				[new Color(0.5, 0.8, 1, 1), new Color(0.7, 1, 0.9, 1)],
@@ -457,14 +626,14 @@
 				[new Color(0.55, 1, 0.6, 1), new Color(1, 1, 0.7, 1)],
 			];
 			for (const palette of paletteList) {
-				const burst = this.makeParticleNode(modeRootNode, 0, 0);
+				const burst = this.makeParticleNode("firework", modeRootNode, 0, 0);
 				burst.setEmissionRate(0);
 				burst.setEmitterShape(EmitterShape.circle);
 				burst.setShapeRadius(4);
-				burst.setStartLifetime(0.9, 1.7);
-				burst.setStartSpeed(120, 340);
+				burst.setStartLifetime(1.0, 1.8);
+				burst.setStartSpeed(120, 330);
 				burst.setStartSize(2.5, 4.5);
-				burst.setGravity(0, 130);
+				burst.setGravity(0, 140);
 				burst.setDamping(1.1);
 				burst.setAdditive(true);
 				burst.setStartColor(palette[0], palette[1]);
@@ -473,14 +642,136 @@
 					{ time: 0.7, color: new Color(1, 1, 1, 0.9) },
 					{ time: 1, color: new Color(1, 1, 1, 0) },
 				]);
-				burst.setWorldSpace(true);
-				burst.setMaxParticleCount(700);
-				this.#fireworkSystems.push(burst);
+				burst.setMaxParticleCount(800);
 			}
 		}
 
 		//==============================================================================
-		// 모드: 마법 궤적. (포인터 추적 + 트레일 + 반짝임)
+		// 모드: 별가루.
+		//==============================================================================
+		buildSparkleMode() {
+			const modeRootNode = this.makeModeRoot("sparkle");
+
+			const sparkle = this.makeParticleNode("sparkle", modeRootNode, STAGE_WIDTH * 0.5, STAGE_HEIGHT * 0.5);
+			sparkle.setEmitterShape(EmitterShape.box);
+			sparkle.setBoxSize(STAGE_WIDTH * 0.94, STAGE_HEIGHT * 0.86);
+			sparkle.setEmissionRate(60);
+			sparkle.setStartLifetime(1.2, 2.4);
+			sparkle.setStartSpeed(0, 8);
+			sparkle.setStartSize(2, 7);
+			sparkle.setAdditive(true);
+			sparkle.setStartColor(new Color(0.75, 0.85, 1, 1), new Color(1, 0.9, 0.7, 1));
+			sparkle.setColorOverLifetime([
+				{ time: 0, color: new Color(1, 1, 1, 0) },
+				{ time: 0.3, color: new Color(1, 1, 1, 1) },
+				{ time: 1, color: new Color(1, 1, 1, 0) },
+			]);
+			sparkle.setSizeOverLifetime(0.4, 1.3);
+			sparkle.setMaxParticleCount(600);
+		}
+
+		//==============================================================================
+		// 모드: 불씨.
+		//==============================================================================
+		buildEmbersMode() {
+			const modeRootNode = this.makeModeRoot("embers");
+
+			const embers = this.makeParticleNode("embers", modeRootNode, STAGE_WIDTH * 0.5, STAGE_HEIGHT + 8);
+			embers.setEmitterShape(EmitterShape.edge);
+			embers.setEdgeWidth(STAGE_WIDTH * 0.96);
+			embers.setEmissionRate(46);
+			embers.setStartLifetime(2.6, 4.2);
+			embers.setStartSpeed(40, 90);
+			embers.setStartSize(2, 5);
+			embers.setGravity(0, -46);
+			embers.setDamping(0.25);
+			embers.setWobble(16, 1.8);
+			embers.setAdditive(true);
+			embers.setStartColor(new Color(1, 0.6, 0.2, 1), new Color(1, 0.8, 0.4, 0.8));
+			embers.setColorOverLifetime([
+				{ time: 0, color: new Color(1, 1, 1, 0) },
+				{ time: 0.12, color: new Color(1, 1, 1, 1) },
+				{ time: 0.7, color: new Color(1, 0.8, 0.6, 0.8) },
+				{ time: 1, color: new Color(0.6, 0.2, 0.05, 0) },
+			]);
+			embers.setSizeOverLifetime(1, 0.4);
+			embers.setMaxParticleCount(600);
+		}
+
+		//==============================================================================
+		// 모드: 거품.
+		//==============================================================================
+		buildBubblesMode() {
+			const modeRootNode = this.makeModeRoot("bubbles");
+
+			const bubbles = this.makeParticleNode("bubbles", modeRootNode, STAGE_WIDTH * 0.5, STAGE_HEIGHT + 10);
+			bubbles.setEmitterShape(EmitterShape.edge);
+			bubbles.setEdgeWidth(STAGE_WIDTH * 0.9);
+			bubbles.setEmissionRate(30);
+			bubbles.setStartLifetime(2.6, 4.4);
+			bubbles.setStartSpeed(70, 130);
+			bubbles.setStartSize(4, 14);
+			bubbles.setGravity(0, -30);
+			bubbles.setDamping(0.2);
+			bubbles.setWobble(20, 2.4);
+			bubbles.setStartColor(new Color(0.6, 0.85, 1, 0.5), new Color(0.8, 0.95, 1, 0.3));
+			bubbles.setColorOverLifetime([
+				{ time: 0, color: new Color(1, 1, 1, 0) },
+				{ time: 0.1, color: new Color(1, 1, 1, 1) },
+				{ time: 0.85, color: new Color(1, 1, 1, 1) },
+				{ time: 1, color: new Color(1, 1, 1, 0) },
+			]);
+			bubbles.setSizeOverLifetime(0.7, 1.15);
+			bubbles.setMaxParticleCount(500);
+		}
+
+		//==============================================================================
+		// 모드: 소용돌이.
+		//==============================================================================
+		buildVortexMode() {
+			const modeRootNode = this.makeModeRoot("vortex");
+			const centerX = STAGE_WIDTH * 0.5;
+			const centerY = STAGE_HEIGHT * 0.5;
+
+			const vortex = this.makeParticleNode("vortex", modeRootNode, centerX, centerY);
+			vortex.setEmitterShape(EmitterShape.circle);
+			vortex.setShapeRadius(220);
+			vortex.setEmissionRate(140);
+			vortex.setStartLifetime(1.8, 3.2);
+			vortex.setStartSpeed(10, 60);
+			vortex.setStartSize(2, 5);
+			vortex.setAdditive(true);
+			vortex.setAttractor(0, 0, 170, 240);
+			vortex.setDamping(0.35);
+			vortex.setStartColor(new Color(0.5, 0.7, 1, 1), new Color(0.8, 0.6, 1, 1));
+			vortex.setColorOverLifetime([
+				{ time: 0, color: new Color(1, 1, 1, 0) },
+				{ time: 0.15, color: new Color(1, 1, 1, 1) },
+				{ time: 0.85, color: new Color(1, 1, 1, 0.9) },
+				{ time: 1, color: new Color(1, 1, 1, 0) },
+			]);
+			vortex.setSizeOverLifetime(1, 0.5);
+			vortex.setMaxParticleCount(900);
+
+			// 중심 발광.
+			const core = this.makeParticleNode("vortex", modeRootNode, centerX, centerY);
+			core.setEmissionRate(20);
+			core.setEmitterShape(EmitterShape.circle);
+			core.setShapeRadius(8);
+			core.setStartLifetime(0.5, 0.9);
+			core.setStartSpeed(0, 12);
+			core.setStartSize(14, 26);
+			core.setAdditive(true);
+			core.setStartColor(new Color(0.7, 0.8, 1, 0.5), new Color(0.9, 0.85, 1, 0.35));
+			core.setColorOverLifetime([
+				{ time: 0, color: new Color(1, 1, 1, 0) },
+				{ time: 0.4, color: new Color(1, 1, 1, 1) },
+				{ time: 1, color: new Color(1, 1, 1, 0) },
+			]);
+		}
+
+		//==============================================================================
+		// 모드: 마법 궤적. (리사주 곡선 자동 주행)
 		//==============================================================================
 		buildTrailMode() {
 			const modeRootNode = this.makeModeRoot("trail");
@@ -490,137 +781,66 @@
 			this.#trailNode.setPivot(Pivot.middleCenter.clone());
 			this.#trailNode.setAnchor(Pivot.topLeft.clone());
 			this.#trailNode.setContentSize(Vector2.create(8, 8));
-			this.#trailNode.setLocalPosition(Vector2.create(REFERENCE_WIDTH * 0.5, REFERENCE_HEIGHT * 0.5));
+			this.#trailNode.setLocalPosition(Vector2.create(STAGE_WIDTH * 0.5, STAGE_HEIGHT * 0.5));
 			const coreTrail = this.#trailNode.addComponent(TrailRenderer);
-			coreTrail.setTime(0.55);
-			coreTrail.setWidth(16, 0);
+			coreTrail.setTime(0.6);
+			coreTrail.setWidth(18, 0);
 			coreTrail.setMinVertexDistance(2);
 			coreTrail.setAdditive(true);
 			coreTrail.setColors(new Color(0.45, 0.7, 1, 0.85), new Color(0.6, 0.4, 1, 0));
 			const sparkles = this.#trailNode.addComponent(ParticleSystem);
-			this.#particleSystems.push(sparkles);
+			this.#modeSystemsMap.get("trail").push(sparkles);
 			sparkles.setEmitterShape(EmitterShape.circle);
 			sparkles.setShapeRadius(6);
-			sparkles.setEmissionRate(90);
-			sparkles.setStartLifetime(0.4, 0.9);
-			sparkles.setStartSpeed(8, 50);
-			sparkles.setStartSize(1.5, 4);
-			sparkles.setGravity(0, 60);
+			sparkles.setEmissionRate(110);
+			sparkles.setStartLifetime(0.4, 1.0);
+			sparkles.setStartSpeed(8, 60);
+			sparkles.setStartSize(1.6, 4.5);
+			sparkles.setGravity(0, 70);
 			sparkles.setAdditive(true);
 			sparkles.setStartColor(new Color(0.7, 0.85, 1, 1), new Color(0.85, 0.7, 1, 1));
 			sparkles.setColorOverLifetime([
 				{ time: 0, color: new Color(1, 1, 1, 1) },
 				{ time: 1, color: new Color(1, 1, 1, 0) },
 			]);
-			this.#trailSparkles = sparkles;
 			modeRootNode.addChild(this.#trailNode);
 		}
 
 		//==============================================================================
-		// 상단 제목 / 모드 단추 / 하단 캡션.
-		//==============================================================================
-		buildOverlayUi() {
-			const root = this.getRoot();
-
-			const titleNode = new WorldNode();
-			titleNode.setName("Title");
-			titleNode.setPivot(Pivot.topLeft.clone());
-			titleNode.setAnchor(Pivot.topLeft.clone());
-			titleNode.setContentSize(Vector2.create(400, 28));
-			titleNode.setLocalPosition(Vector2.create(24, 18));
-			const titleLabel = titleNode.addComponent(UILabel);
-			titleLabel.setText("EFFECTS");
-			titleLabel.setFontSize(19);
-			titleLabel.setTextColor(TEXT_COLOR);
-			titleLabel.setTextAlign("left");
-			titleLabel.setBold(true);
-			root.addChild(titleNode);
-
-			const subtitleNode = new WorldNode();
-			subtitleNode.setName("Subtitle");
-			subtitleNode.setPivot(Pivot.topLeft.clone());
-			subtitleNode.setAnchor(Pivot.topLeft.clone());
-			subtitleNode.setContentSize(Vector2.create(500, 16));
-			subtitleNode.setLocalPosition(Vector2.create(26, 48));
-			const subtitleLabel = subtitleNode.addComponent(UILabel);
-			subtitleLabel.setText("engine ParticleSystem / TrailRenderer");
-			subtitleLabel.setFontSize(11);
-			subtitleLabel.setTextColor(TEXT_DIM_COLOR);
-			subtitleLabel.setTextAlign("left");
-			root.addChild(subtitleNode);
-
-			for (let modeIndex = 0; modeIndex < MODE_DEFINITIONS.length; ++modeIndex) {
-				const definition = MODE_DEFINITIONS[modeIndex];
-				const buttonNode = new WorldNode();
-				buttonNode.setName("ModeButton_" + definition.key);
-				buttonNode.setPivot(Pivot.topLeft.clone());
-				buttonNode.setAnchor(Pivot.topLeft.clone());
-				buttonNode.setContentSize(Vector2.create(118, 30));
-				buttonNode.setLocalPosition(Vector2.create(24 + modeIndex * 126, 78));
-				buttonNode.setInteractable(true);
-				const buttonPaint = buttonNode.addComponent(Paint);
-				buttonPaint.setColor(BUTTON_COLOR.clone());
-				buttonPaint.setRoundSize(8);
-				const buttonComponent = buttonNode.addComponent(UIButton);
-				buttonComponent.setClickedEvent(() => {
-					this.selectMode(definition.key);
-				});
-				const buttonLabel = buttonNode.addComponent(UILabel);
-				buttonLabel.setText(definition.title);
-				buttonLabel.setFontSize(10.5);
-				buttonLabel.setTextColor(TEXT_COLOR);
-				buttonLabel.setBold(true);
-				root.addChild(buttonNode);
-				this.#modeButtonMap.set(definition.key, { paintComponent: buttonPaint });
-			}
-
-			const captionNode = new WorldNode();
-			captionNode.setName("Caption");
-			captionNode.setPivot(Pivot.topLeft.clone());
-			captionNode.setAnchor(Pivot.topLeft.clone());
-			captionNode.setContentSize(Vector2.create(700, 16));
-			captionNode.setLocalPosition(Vector2.create(24, REFERENCE_HEIGHT - 54));
-			this.#captionLabel = captionNode.addComponent(UILabel);
-			this.#captionLabel.setFontSize(11);
-			this.#captionLabel.setTextColor(TEXT_DIM_COLOR);
-			this.#captionLabel.setTextAlign("left");
-			root.addChild(captionNode);
-
-			const countNode = new WorldNode();
-			countNode.setName("Count");
-			countNode.setPivot(Pivot.topLeft.clone());
-			countNode.setAnchor(Pivot.topLeft.clone());
-			countNode.setContentSize(Vector2.create(400, 16));
-			countNode.setLocalPosition(Vector2.create(24, REFERENCE_HEIGHT - 34));
-			this.#countLabel = countNode.addComponent(UILabel);
-			this.#countLabel.setFontSize(11);
-			this.#countLabel.setTextColor(TEXT_DIM_COLOR);
-			this.#countLabel.setTextAlign("left");
-			root.addChild(countNode);
-		}
-
-		//==============================================================================
-		// 모드 선택.
+		// 모드 선택. (이전 모드의 파티클을 지우고 새 모드를 재생)
 		//==============================================================================
 		/**
 		 * @param { string } modeKey
 		 */
 		selectMode(modeKey) {
 			this.#modeKey = modeKey;
+			this.#burstAccumulator = 0;
 			for (const [key, modeRootNode] of this.#modeRootMap) {
-				modeRootNode.setActive(key === modeKey);
+				const isActive = (key === modeKey);
+				modeRootNode.setActive(isActive);
+				for (const particleSystem of this.#modeSystemsMap.get(key)) {
+					if (isActive) {
+						particleSystem.stop(true);
+						particleSystem.play();
+					}
+					else {
+						particleSystem.stop(true);
+					}
+				}
 			}
-			for (const [key, buttonEntry] of this.#modeButtonMap) {
-				buttonEntry.paintComponent.setColor(key === modeKey ? BUTTON_ACTIVE_COLOR.clone() : BUTTON_COLOR.clone());
+			for (const [key, tabEntry] of this.#tabMap) {
+				const isActive = (key === modeKey);
+				tabEntry.paintComponent.setColor(isActive ? ACCENT_COLOR.clone() : new Color(0, 0, 0, 0));
+				tabEntry.labelComponent.setTextColor(isActive ? new Color(1, 1, 1, 1) : TEXT_DIM_COLOR.clone());
 			}
 			const definition = MODE_DEFINITIONS.find((entry) => entry.key === modeKey);
-			if (this.#captionLabel && definition) {
-				this.#captionLabel.setText(definition.caption);
-			}
+			this.#modeNameLabel.setText(definition.title);
+			this.#descriptionLabel.setText(definition.description);
+			this.#modulesLabel.setText(definition.modules);
 		}
 
 		//==============================================================================
-		// 갱신.
+		// 갱신. (자동 연출 진행)
 		//==============================================================================
 		/**
 		 * @param { number } deltaTime
@@ -629,39 +849,57 @@
 			super.tick(deltaTime);
 			this.#elapsedSeconds += deltaTime;
 
-			// 마법 궤적: 포인터 추적.
-			if (this.#modeKey === "trail" && this.#trailNode) {
-				const engine = this.getEngine();
-				const inputManager = engine.getInputManager();
-				const pointerPosition = inputManager.getViewInputPosition();
-				const currentPosition = this.#trailNode.getLocalPosition();
-				const blend = System.Math.min(deltaTime * 14, 1);
-				this.#trailNode.setLocalPosition(Vector2.create(
-					currentPosition.x + (pointerPosition.x - currentPosition.x) * blend,
-					currentPosition.y + (pointerPosition.y - currentPosition.y) * blend));
-			}
-
-			// 불꽃놀이: 주기적으로 하늘에서 터진다.
-			if (this.#modeKey === "fireworks") {
-				this.#fireworkAccumulator += deltaTime;
-				if (this.#fireworkAccumulator >= 0.9) {
-					this.#fireworkAccumulator -= 0.9;
-					const burst = this.#fireworkSystems[this.#fireworkCursor % this.#fireworkSystems.length];
-					this.#fireworkCursor += 1;
-					const burstX = effectRandom.nextRange(REFERENCE_WIDTH * 0.15, REFERENCE_WIDTH * 0.85);
-					const burstY = effectRandom.nextRange(REFERENCE_HEIGHT * 0.15, REFERENCE_HEIGHT * 0.5);
-					burst.emit(70, Vector2.create(burstX, burstY));
+			// 자동 버스트 모드.
+			if (this.#modeKey === "confetti") {
+				this.#burstAccumulator += deltaTime;
+				if (this.#burstAccumulator >= 1.2) {
+					this.#burstAccumulator -= 1.2;
+					const burstX = effectRandom.nextRange(STAGE_WIDTH * 0.15, STAGE_WIDTH * 0.85);
+					const burstY = effectRandom.nextRange(STAGE_HEIGHT * 0.12, STAGE_HEIGHT * 0.4);
+					for (const confetti of this.#modeSystemsMap.get("confetti")) {
+						confetti.emit(24, Vector2.create(burstX, burstY));
+					}
 				}
 			}
-
-			// 파티클 수 표기.
-			if (this.#countLabel) {
-				let totalCount = 0;
-				for (const particleSystem of this.#particleSystems) {
-					totalCount += particleSystem.getParticleCount();
+			else if (this.#modeKey === "explosion") {
+				this.#burstAccumulator += deltaTime;
+				if (this.#burstAccumulator >= 1.6) {
+					this.#burstAccumulator -= 1.6;
+					const burstX = effectRandom.nextRange(STAGE_WIDTH * 0.2, STAGE_WIDTH * 0.8);
+					const burstY = effectRandom.nextRange(STAGE_HEIGHT * 0.25, STAGE_HEIGHT * 0.75);
+					const explosionSystems = this.#modeSystemsMap.get("explosion");
+					explosionSystems[0].emit(14, Vector2.create(burstX, burstY));
+					explosionSystems[1].emit(3, Vector2.create(burstX, burstY));
+					explosionSystems[2].emit(64, Vector2.create(burstX, burstY));
 				}
-				this.#countLabel.setText("particles  " + totalCount);
 			}
+			else if (this.#modeKey === "firework") {
+				this.#burstAccumulator += deltaTime;
+				if (this.#burstAccumulator >= 0.9) {
+					this.#burstAccumulator -= 0.9;
+					const fireworkSystems = this.#modeSystemsMap.get("firework");
+					const burst = fireworkSystems[this.#burstCursor % fireworkSystems.length];
+					this.#burstCursor += 1;
+					const burstX = effectRandom.nextRange(STAGE_WIDTH * 0.12, STAGE_WIDTH * 0.88);
+					const burstY = effectRandom.nextRange(STAGE_HEIGHT * 0.15, STAGE_HEIGHT * 0.55);
+					burst.emit(72, Vector2.create(burstX, burstY));
+				}
+			}
+			else if (this.#modeKey === "trail" && this.#trailNode) {
+
+				// 리사주 곡선 주행.
+				const pathTime = this.#elapsedSeconds * 0.8;
+				const pathX = STAGE_WIDTH * 0.5 + STAGE_WIDTH * 0.36 * System.Math.sin(pathTime * 1.0);
+				const pathY = STAGE_HEIGHT * 0.5 + STAGE_HEIGHT * 0.32 * System.Math.sin(pathTime * 1.7 + 1.3);
+				this.#trailNode.setLocalPosition(Vector2.create(pathX, pathY));
+			}
+
+			// 파티클 수 표기. (활성 모드만)
+			let totalCount = 0;
+			for (const particleSystem of this.#modeSystemsMap.get(this.#modeKey)) {
+				totalCount += particleSystem.getParticleCount();
+			}
+			this.#countLabel.setText("particles  " + totalCount);
 		}
 
 		//==============================================================================
@@ -676,13 +914,13 @@
 			const viewManager = engine.getViewManager();
 			const canvasNativeSize = viewManager.getCanvasNativeSize();
 			viewManager.applyCanvasNativeRect(graphic);
-			graphic.setFillColor("rgb(7, 9, 15)");
+			graphic.setFillColor("rgb(20, 23, 30)");
 			graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
 			viewManager.applyViewRect(graphic);
 		}
 
 		//==============================================================================
-		// 터치 전달. (버스트 모드에서는 클릭 위치에서 터뜨린다)
+		// 터치 전달.
 		//==============================================================================
 		/**
 		 * @param { Vector2 } viewInputPosition
@@ -690,14 +928,6 @@
 		touchPress(viewInputPosition) {
 			if (this.#touchRecognizer) {
 				this.#touchRecognizer.touchPress(viewInputPosition);
-			}
-			for (const burstEntry of this.#clickBurstSystems) {
-				if (burstEntry.key !== this.#modeKey) {
-					continue;
-				}
-				for (let systemIndex = 0; systemIndex < burstEntry.systems.length; ++systemIndex) {
-					burstEntry.systems[systemIndex].emit(burstEntry.counts[systemIndex], viewInputPosition);
-				}
 			}
 		}
 

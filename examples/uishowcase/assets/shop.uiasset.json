@@ -31,9 +31,9 @@
 			{
 				"type": "Paint",
 				"color": [
-					0.043,
-					0.051,
-					0.071,
+					0.078,
+					0.09,
+					0.118,
 					1
 				],
 				"roundSize": 0
@@ -73,9 +73,9 @@
 						"text": "STORE",
 						"fontSize": 18,
 						"textColor": [
-							0.902,
-							0.914,
-							0.937,
+							0.91,
+							0.922,
+							0.949,
 							1
 						],
 						"backgroundColor": [
@@ -123,9 +123,9 @@
 						"text": "Add-ons for your workspace - one template, hundreds of rows.",
 						"fontSize": 11,
 						"textColor": [
-							0.541,
-							0.569,
-							0.627,
+							0.604,
+							0.635,
+							0.698,
 							1
 						],
 						"backgroundColor": [
@@ -171,9 +171,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.118,
-							0.141,
-							0.188,
+							0.173,
+							0.2,
+							0.267,
 							1
 						],
 						"roundSize": 13
@@ -213,9 +213,9 @@
 								"text": "●  All systems normal",
 								"fontSize": 10.5,
 								"textColor": [
-									0.247,
-									0.698,
-									0.498,
+									0.271,
+									0.71,
+									0.522,
 									1
 								],
 								"backgroundColor": [
@@ -265,9 +265,9 @@
 						"text": "FEATURED",
 						"fontSize": 10,
 						"textColor": [
-							0.329,
-							0.357,
-							0.412,
+							0.42,
+							0.451,
+							0.529,
 							1
 						],
 						"backgroundColor": [
@@ -361,9 +361,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.071,
-									0.082,
-									0.11,
+									0.106,
+									0.125,
+									0.165,
 									1
 								],
 								"roundSize": 10
@@ -403,9 +403,9 @@
 										"text": "",
 										"fontSize": 12.5,
 										"textColor": [
-											0.902,
-											0.914,
-											0.937,
+											0.91,
+											0.922,
+											0.949,
 											1
 										],
 										"backgroundColor": [
@@ -453,9 +453,9 @@
 										"text": "",
 										"fontSize": 9.5,
 										"textColor": [
-											0.541,
-											0.569,
-											0.627,
+											0.604,
+											0.635,
+											0.698,
 											1
 										],
 										"backgroundColor": [
@@ -503,8 +503,8 @@
 										"text": "",
 										"fontSize": 12,
 										"textColor": [
-											0.357,
-											0.424,
+											0.427,
+											0.49,
 											1,
 											1
 										],
@@ -557,9 +557,9 @@
 						"text": "CATALOG",
 						"fontSize": 10,
 						"textColor": [
-							0.329,
-							0.357,
-							0.412,
+							0.42,
+							0.451,
+							0.529,
 							1
 						],
 						"backgroundColor": [
@@ -607,9 +607,9 @@
 						"text": "",
 						"fontSize": 10,
 						"textColor": [
-							0.541,
-							0.569,
-							0.627,
+							0.604,
+							0.635,
+							0.698,
 							1
 						],
 						"backgroundColor": [
@@ -703,9 +703,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.09,
-									0.106,
-									0.141,
+									0.137,
+									0.161,
+									0.216,
 									1
 								],
 								"roundSize": 8
@@ -743,9 +743,9 @@
 									{
 										"type": "Paint",
 										"color": [
-											0.118,
-											0.141,
-											0.188,
+											0.173,
+											0.2,
+											0.267,
 											1
 										],
 										"roundSize": 7
@@ -785,9 +785,9 @@
 												"text": "",
 												"fontSize": 12,
 												"textColor": [
-													0.541,
-													0.569,
-													0.627,
+													0.604,
+													0.635,
+													0.698,
 													1
 												],
 												"backgroundColor": [
@@ -837,9 +837,9 @@
 										"text": "",
 										"fontSize": 12,
 										"textColor": [
-											0.902,
-											0.914,
-											0.937,
+											0.91,
+											0.922,
+											0.949,
 											1
 										],
 										"backgroundColor": [
@@ -887,9 +887,9 @@
 										"text": "",
 										"fontSize": 9.5,
 										"textColor": [
-											0.329,
-											0.357,
-											0.412,
+											0.42,
+											0.451,
+											0.529,
 											1
 										],
 										"backgroundColor": [
@@ -937,9 +937,9 @@
 										"text": "",
 										"fontSize": 11.5,
 										"textColor": [
-											0.541,
-											0.569,
-											0.627,
+											0.604,
+											0.635,
+											0.698,
 											1
 										],
 										"backgroundColor": [
@@ -985,9 +985,9 @@
 									{
 										"type": "Paint",
 										"color": [
-											0.118,
-											0.141,
-											0.188,
+											0.173,
+											0.2,
+											0.267,
 											1
 										],
 										"roundSize": 7
@@ -1006,9 +1006,9 @@
 										"text": "ADD",
 										"fontSize": 10.5,
 										"textColor": [
-											0.902,
-											0.914,
-											0.937,
+											0.91,
+											0.922,
+											0.949,
 											1
 										],
 										"backgroundColor": [
@@ -1058,9 +1058,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -1100,9 +1100,9 @@
 								"text": "CART",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1150,9 +1150,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1200,9 +1200,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1250,9 +1250,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1300,9 +1300,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1350,9 +1350,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1400,9 +1400,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1450,9 +1450,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1500,9 +1500,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1550,9 +1550,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1600,9 +1600,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1650,9 +1650,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1700,9 +1700,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1750,9 +1750,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1800,9 +1800,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1850,9 +1850,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1900,9 +1900,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1948,9 +1948,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.149,
-									0.173,
-									0.22,
+									0.224,
+									0.255,
+									0.329,
 									1
 								],
 								"roundSize": 0
@@ -1991,9 +1991,9 @@
 								"text": "Total",
 								"fontSize": 10.5,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -2041,9 +2041,9 @@
 								"text": "$0.00",
 								"fontSize": 13,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -2089,9 +2089,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.118,
-									0.141,
-									0.188,
+									0.173,
+									0.2,
+									0.267,
 									1
 								],
 								"roundSize": 8
@@ -2110,9 +2110,9 @@
 								"text": "CLEAR",
 								"fontSize": 10.5,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -2158,8 +2158,8 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.357,
-									0.424,
+									0.427,
+									0.49,
 									1,
 									1
 								],
@@ -2179,9 +2179,9 @@
 								"text": "CHECKOUT",
 								"fontSize": 10.5,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -2229,9 +2229,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -2271,9 +2271,9 @@
 								"text": "RECENT ORDERS",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -2321,9 +2321,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -2371,9 +2371,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -2421,9 +2421,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -2471,9 +2471,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -2521,9 +2521,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -2571,9 +2571,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -2621,9 +2621,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -2671,9 +2671,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -2721,9 +2721,9 @@
 								"text": "No orders yet.",
 								"fontSize": 10.5,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [

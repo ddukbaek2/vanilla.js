@@ -31,9 +31,9 @@
 			{
 				"type": "Paint",
 				"color": [
-					0.043,
-					0.051,
-					0.071,
+					0.078,
+					0.09,
+					0.118,
 					1
 				],
 				"roundSize": 0
@@ -73,9 +73,9 @@
 						"text": "SETTINGS",
 						"fontSize": 18,
 						"textColor": [
-							0.902,
-							0.914,
-							0.937,
+							0.91,
+							0.922,
+							0.949,
 							1
 						],
 						"backgroundColor": [
@@ -123,9 +123,9 @@
 						"text": "Changes apply immediately.",
 						"fontSize": 11,
 						"textColor": [
-							0.541,
-							0.569,
-							0.627,
+							0.604,
+							0.635,
+							0.698,
 							1
 						],
 						"backgroundColor": [
@@ -171,9 +171,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.118,
-							0.141,
-							0.188,
+							0.173,
+							0.2,
+							0.267,
 							1
 						],
 						"roundSize": 13
@@ -213,9 +213,9 @@
 								"text": "●  All systems normal",
 								"fontSize": 10.5,
 								"textColor": [
-									0.247,
-									0.698,
-									0.498,
+									0.271,
+									0.71,
+									0.522,
 									1
 								],
 								"backgroundColor": [
@@ -263,9 +263,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -305,9 +305,9 @@
 								"text": "PREFERENCES",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -353,9 +353,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.09,
-									0.106,
-									0.141,
+									0.137,
+									0.161,
+									0.216,
 									1
 								],
 								"roundSize": 8
@@ -395,9 +395,9 @@
 										"text": "Interface scale",
 										"fontSize": 11.5,
 										"textColor": [
-											0.902,
-											0.914,
-											0.937,
+											0.91,
+											0.922,
+											0.949,
 											1
 										],
 										"backgroundColor": [
@@ -445,9 +445,9 @@
 										"text": "100%",
 										"fontSize": 10,
 										"textColor": [
-											0.541,
-											0.569,
-											0.627,
+											0.604,
+											0.635,
+											0.698,
 											1
 										],
 										"backgroundColor": [
@@ -532,9 +532,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.09,
-									0.106,
-									0.141,
+									0.137,
+									0.161,
+									0.216,
 									1
 								],
 								"roundSize": 8
@@ -574,9 +574,9 @@
 										"text": "Notification sound",
 										"fontSize": 11.5,
 										"textColor": [
-											0.902,
-											0.914,
-											0.937,
+											0.91,
+											0.922,
+											0.949,
 											1
 										],
 										"backgroundColor": [
@@ -624,9 +624,9 @@
 										"text": "60%",
 										"fontSize": 10,
 										"textColor": [
-											0.541,
-											0.569,
-											0.627,
+											0.604,
+											0.635,
+											0.698,
 											1
 										],
 										"backgroundColor": [
@@ -711,9 +711,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.09,
-									0.106,
-									0.141,
+									0.137,
+									0.161,
+									0.216,
 									1
 								],
 								"roundSize": 8
@@ -753,9 +753,9 @@
 										"text": "Autosave",
 										"fontSize": 11.5,
 										"textColor": [
-											0.902,
-											0.914,
-											0.937,
+											0.91,
+											0.922,
+											0.949,
 											1
 										],
 										"backgroundColor": [
@@ -801,8 +801,8 @@
 									{
 										"type": "Paint",
 										"color": [
-											0.357,
-											0.424,
+											0.427,
+											0.49,
 											1,
 											1
 										],
@@ -822,9 +822,9 @@
 										"text": "ON",
 										"fontSize": 8.5,
 										"textColor": [
-											0.043,
-											0.051,
 											0.071,
+											0.082,
+											0.11,
 											1
 										],
 										"backgroundColor": [
@@ -872,9 +872,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.09,
-									0.106,
-									0.141,
+									0.137,
+									0.161,
+									0.216,
 									1
 								],
 								"roundSize": 8
@@ -914,9 +914,9 @@
 										"text": "Usage telemetry",
 										"fontSize": 11.5,
 										"textColor": [
-											0.902,
-											0.914,
-											0.937,
+											0.91,
+											0.922,
+											0.949,
 											1
 										],
 										"backgroundColor": [
@@ -962,9 +962,9 @@
 									{
 										"type": "Paint",
 										"color": [
-											0.173,
-											0.204,
-											0.259,
+											0.235,
+											0.267,
+											0.341,
 											1
 										],
 										"roundSize": 11
@@ -983,9 +983,9 @@
 										"text": "OFF",
 										"fontSize": 8.5,
 										"textColor": [
-											0.043,
-											0.051,
 											0.071,
+											0.082,
+											0.11,
 											1
 										],
 										"backgroundColor": [
@@ -1033,9 +1033,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.09,
-									0.106,
-									0.141,
+									0.137,
+									0.161,
+									0.216,
 									1
 								],
 								"roundSize": 8
@@ -1075,9 +1075,9 @@
 										"text": "Theme",
 										"fontSize": 11.5,
 										"textColor": [
-											0.902,
-											0.914,
-											0.937,
+											0.91,
+											0.922,
+											0.949,
 											1
 										],
 										"backgroundColor": [
@@ -1155,9 +1155,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.09,
-									0.106,
-									0.141,
+									0.137,
+									0.161,
+									0.216,
 									1
 								],
 								"roundSize": 8
@@ -1197,9 +1197,9 @@
 										"text": "Region",
 										"fontSize": 11.5,
 										"textColor": [
-											0.902,
-											0.914,
-											0.937,
+											0.91,
+											0.922,
+											0.949,
 											1
 										],
 										"backgroundColor": [
@@ -1277,9 +1277,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.09,
-									0.106,
-									0.141,
+									0.137,
+									0.161,
+									0.216,
 									1
 								],
 								"roundSize": 8
@@ -1319,9 +1319,9 @@
 										"text": "Storage",
 										"fontSize": 11.5,
 										"textColor": [
-											0.902,
-											0.914,
-											0.937,
+											0.91,
+											0.922,
+											0.949,
 											1
 										],
 										"backgroundColor": [
@@ -1369,9 +1369,9 @@
 										"text": "3.2 GB / 8 GB",
 										"fontSize": 10,
 										"textColor": [
-											0.541,
-											0.569,
-											0.627,
+											0.604,
+											0.635,
+											0.698,
 											1
 										],
 										"backgroundColor": [
@@ -1456,9 +1456,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.118,
-									0.141,
-									0.188,
+									0.173,
+									0.2,
+									0.267,
 									1
 								],
 								"roundSize": 8
@@ -1477,9 +1477,9 @@
 								"text": "RESET TO DEFAULTS",
 								"fontSize": 11,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -1527,9 +1527,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -1569,9 +1569,9 @@
 								"text": "ABOUT",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1619,9 +1619,9 @@
 								"text": "Version",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1669,9 +1669,9 @@
 								"text": "0.4.0-experimental",
 								"fontSize": 11,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -1719,9 +1719,9 @@
 								"text": "Renderer",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1769,9 +1769,9 @@
 								"text": "WebGL2",
 								"fontSize": 11,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -1819,9 +1819,9 @@
 								"text": "UI",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1869,9 +1869,9 @@
 								"text": "uiasset + UIListView",
 								"fontSize": 11,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -1919,9 +1919,9 @@
 								"text": "Audio",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1969,9 +1969,9 @@
 								"text": "BeepPlayer (synthesized)",
 								"fontSize": 11,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [

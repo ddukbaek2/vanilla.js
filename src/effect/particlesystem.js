@@ -49,6 +49,7 @@ export class ParticleSystem extends Component {
 	//==============================================================================
 	/** @private @type { object[] } */ #particleList;
 	/** @private @type { object[] } */ #freeList;
+	/** @private @type { number[] } */ #colorChannelBuffer; // 색 계산 재사용 버퍼.
 	/** @private @type { boolean } */ #isPlaying;
 	/** @private @type { boolean } */ #isLooping;
 	/** @private @type { number } */ #duration; // 루프 꺼짐일 때 방출이 이어지는 시간.
@@ -88,10 +89,18 @@ export class ParticleSystem extends Component {
 	/** @private @type { Vector2 } */ #gravity;
 	/** @private @type { number } */ #damping; // 초당 속도 감쇠 비율 계수.
 
+	// 힘.
+	/** @private @type { Vector2 | null } */ #attractorPosition; // 끌림 중심. (로컬 좌표, null 이면 안 씀)
+	/** @private @type { number } */ #attractorStrength; // 중심 방향 가속. (음수면 밀어냄)
+	/** @private @type { number } */ #attractorSwirl; // 중심 접선 방향 가속. (소용돌이)
+	/** @private @type { number } */ #wobbleAmplitude; // 좌우 살랑임 폭. (그리기 오프셋)
+	/** @private @type { number } */ #wobbleFrequency; // 살랑임 초당 각속도.
+
 	// 렌더.
-	/** @private @type { string } */ #renderShape; // "circle" | "rect" | "image"
+	/** @private @type { string } */ #renderShape; // "circle" | "rect" | "image" | "streak"
 	/** @private @type { * } */ #image;
-	/** @private @type { boolean } */ #isAdditive;
+	/** @private @type { string } */ #blendMode; // "source-over" | "lighter" | "multiply" | "screen"
+	/** @private @type { number } */ #streakScale; // streak 길이 = 속도 x 이 값.
 	/** @private @type { boolean } */ #isWorldSpace; // 참이면 방출 후 노드 이동의 영향을 받지 않는다.
 
 	//==============================================================================
@@ -105,6 +114,7 @@ export class ParticleSystem extends Component {
 		this.setComponentType("ParticleSystem");
 		this.#particleList = [];
 		this.#freeList = [];
+		this.#colorChannelBuffer = [1, 1, 1, 1];
 		this.#isPlaying = true;
 		this.#isLooping = true;
 		this.#duration = 1;
@@ -140,9 +150,15 @@ export class ParticleSystem extends Component {
 		this.#gravity = Vector2.create(0, 0);
 		this.#damping = 0;
 
+		this.#attractorPosition = null;
+		this.#attractorStrength = 0;
+		this.#attractorSwirl = 0;
+		this.#wobbleAmplitude = 0;
+		this.#wobbleFrequency = 4;
 		this.#renderShape = "circle";
 		this.#image = null;
-		this.#isAdditive = false;
+		this.#blendMode = "source-over";
+		this.#streakScale = 0.06;
 		this.#isWorldSpace = false;
 	}
 
@@ -235,6 +251,17 @@ export class ParticleSystem extends Component {
 			}
 			particle.velocityX += this.#gravity.x * timeDelta;
 			particle.velocityY += this.#gravity.y * timeDelta;
+			if (this.#attractorPosition) {
+				const toCenterX = this.#attractorPosition.x - particle.x;
+				const toCenterY = this.#attractorPosition.y - particle.y;
+				const centerDistance = System.Math.max(System.Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY), 4);
+				const directionX = toCenterX / centerDistance;
+				const directionY = toCenterY / centerDistance;
+				particle.velocityX += directionX * this.#attractorStrength * timeDelta;
+				particle.velocityY += directionY * this.#attractorStrength * timeDelta;
+				particle.velocityX += -directionY * this.#attractorSwirl * timeDelta;
+				particle.velocityY += directionX * this.#attractorSwirl * timeDelta;
+			}
 			if (this.#damping > 0) {
 				const dampingBlend = System.Math.max(0, 1 - this.#damping * timeDelta);
 				particle.velocityX *= dampingBlend;
@@ -317,6 +344,7 @@ export class ParticleSystem extends Component {
 		particle.size = Math.randomRange(this.#startSizeMin, this.#startSizeMax);
 		particle.rotation = Math.randomRange(this.#startRotationMin, this.#startRotationMax);
 		particle.angularVelocity = Math.randomRange(this.#angularVelocityMin, this.#angularVelocityMax);
+		particle.wobblePhase = Math.randomRange(0, System.Math.PI * 2);
 		particle.red = this.#startColorA.red + (this.#startColorB.red - this.#startColorA.red) * colorBlend;
 		particle.green = this.#startColorA.green + (this.#startColorB.green - this.#startColorA.green) * colorBlend;
 		particle.blue = this.#startColorA.blue + (this.#startColorB.blue - this.#startColorA.blue) * colorBlend;
@@ -325,15 +353,15 @@ export class ParticleSystem extends Component {
 	}
 
 	//==============================================================================
-	// 수명 비율에 따른 색 계산.
+	// 수명 비율에 따른 색 계산. (재사용 버퍼에 r, g, b, a 를 채운다)
 	//==============================================================================
 	/**
 	 * @private
 	 * @param { object } particle
 	 * @param { number } lifeRatio
-	 * @returns { string } rgba 문자열.
+	 * @param { number[] } outChannels 길이 4 배열.
 	 */
-	evaluateColor(particle, lifeRatio) {
+	evaluateColorChannels(particle, lifeRatio, outChannels) {
 		let red = particle.red;
 		let green = particle.green;
 		let blue = particle.blue;
@@ -358,25 +386,28 @@ export class ParticleSystem extends Component {
 			blue *= previousKey.color.blue + (nextKey.color.blue - previousKey.color.blue) * keyBlend;
 			alpha *= previousKey.color.alpha + (nextKey.color.alpha - previousKey.color.alpha) * keyBlend;
 		}
-		const redByte = System.Math.round(System.Math.max(0, System.Math.min(1, red)) * 255);
-		const greenByte = System.Math.round(System.Math.max(0, System.Math.min(1, green)) * 255);
-		const blueByte = System.Math.round(System.Math.max(0, System.Math.min(1, blue)) * 255);
-		return `rgba(${redByte}, ${greenByte}, ${blueByte}, ${System.Math.max(0, System.Math.min(1, alpha))})`;
+		outChannels[0] = red;
+		outChannels[1] = green;
+		outChannels[2] = blue;
+		outChannels[3] = System.Math.max(0, System.Math.min(1, alpha));
 	}
 
 	//==============================================================================
-	// 출력.
+	// 출력. (정점 색 배치 — 파티클 수와 무관하게 시스템당 드로우 한 번)
+	// - circle 은 부드러운 원 텍스처, rect / streak 은 흰 텍스처 쿼드로 그린다.
+	//   image 는 파티클 수가 적다는 가정으로 개별 드로우를 유지한다.
 	//==============================================================================
 	/**
 	 * @override
 	 * @param { Graphic } graphic
 	 */
 	draw(graphic) {
-		if (this.#particleList.length === 0) {
+		const particleCount = this.#particleList.length;
+		if (particleCount === 0) {
 			return;
 		}
-		if (this.#isAdditive) {
-			graphic.setBlendMode("lighter");
+		if (this.#blendMode !== "source-over") {
+			graphic.setBlendMode(this.#blendMode);
 		}
 
 		// 월드 공간이면 노드 이동을 상쇄해 방출 시점 위치에 고정한다.
@@ -389,37 +420,135 @@ export class ParticleSystem extends Component {
 			baseOffsetY = -nodePosition.y;
 		}
 
+		if (this.#renderShape === "image" && this.#image) {
+			this.drawImageParticles(graphic, baseOffsetX, baseOffsetY);
+		}
+		else {
+			this.drawBatchedParticles(graphic, baseOffsetX, baseOffsetY);
+		}
+
+		if (this.#blendMode !== "source-over") {
+			graphic.setBlendMode("source-over");
+		}
+	}
+
+	//==============================================================================
+	// 배치 출력 본체. (circle / rect / streak)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { Graphic } graphic
+	 * @param { number } baseOffsetX
+	 * @param { number } baseOffsetY
+	 */
+	drawBatchedParticles(graphic, baseOffsetX, baseOffsetY) {
+		const particleCount = this.#particleList.length;
+		const vertexData = graphic.getParticleVertexData(particleCount * 48);
+		const colorChannels = this.#colorChannelBuffer;
+		const isStreak = this.#renderShape === "streak";
+		const isRect = this.#renderShape === "rect";
+		let floatOffset = 0;
+
+		const writeVertex = (x, y, u, v) => {
+			vertexData[floatOffset++] = x;
+			vertexData[floatOffset++] = y;
+			vertexData[floatOffset++] = u;
+			vertexData[floatOffset++] = v;
+			vertexData[floatOffset++] = colorChannels[0];
+			vertexData[floatOffset++] = colorChannels[1];
+			vertexData[floatOffset++] = colorChannels[2];
+			vertexData[floatOffset++] = colorChannels[3];
+		};
+
 		for (const particle of this.#particleList) {
 			const lifeRatio = particle.age / particle.lifetime;
 			const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
 			const drawSize = System.Math.max(0.1, particle.size * sizeScale);
-			const colorText = this.evaluateColor(particle, lifeRatio);
-			const drawX = particle.x + baseOffsetX;
+			this.evaluateColorChannels(particle, lifeRatio, colorChannels);
+			let drawX = particle.x + baseOffsetX;
 			const drawY = particle.y + baseOffsetY;
-			if (this.#renderShape === "circle") {
-				graphic.setFillColor(colorText);
-				graphic.drawCircle(Vector2.create(drawX, drawY), drawSize * 0.5);
+			if (this.#wobbleAmplitude > 0) {
+				drawX += System.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
 			}
-			else if (this.#renderShape === "image" && this.#image) {
-				graphic.pushState();
-				graphic.translate(drawX, drawY);
-				graphic.rotate(particle.rotation);
-				graphic.multiplyGlobalAlpha(System.Math.max(0, System.Math.min(1, particle.alpha * (1 - lifeRatio))));
-				graphic.drawImage(this.#image, Vector2.create(-drawSize * 0.5, -drawSize * 0.5), Vector2.create(drawSize, drawSize));
-				graphic.popState();
+
+			if (isStreak) {
+
+				// 속도 방향으로 길게 늘인 쿼드. (비 / 유성)
+				const speed = System.Math.sqrt(particle.velocityX * particle.velocityX + particle.velocityY * particle.velocityY);
+				const safeSpeed = System.Math.max(speed, 0.001);
+				const directionX = particle.velocityX / safeSpeed;
+				const directionY = particle.velocityY / safeSpeed;
+				const tailX = drawX - particle.velocityX * this.#streakScale;
+				const tailY = drawY - particle.velocityY * this.#streakScale;
+				const halfWidth = drawSize * 0.5;
+				const sideX = -directionY * halfWidth;
+				const sideY = directionX * halfWidth;
+				writeVertex(drawX + sideX, drawY + sideY, 0, 0);
+				writeVertex(drawX - sideX, drawY - sideY, 1, 0);
+				writeVertex(tailX - sideX, tailY - sideY, 1, 1);
+				writeVertex(drawX + sideX, drawY + sideY, 0, 0);
+				writeVertex(tailX - sideX, tailY - sideY, 1, 1);
+				writeVertex(tailX + sideX, tailY + sideY, 0, 1);
+			}
+			else if (isRect && particle.rotation !== 0) {
+
+				// 회전 사각형.
+				const halfSize = drawSize * 0.5;
+				const cosValue = System.Math.cos(particle.rotation);
+				const sinValue = System.Math.sin(particle.rotation);
+				const axisX1 = cosValue * halfSize;
+				const axisY1 = sinValue * halfSize;
+				const axisX2 = -sinValue * halfSize;
+				const axisY2 = cosValue * halfSize;
+				writeVertex(drawX - axisX1 - axisX2, drawY - axisY1 - axisY2, 0, 0);
+				writeVertex(drawX + axisX1 - axisX2, drawY + axisY1 - axisY2, 1, 0);
+				writeVertex(drawX + axisX1 + axisX2, drawY + axisY1 + axisY2, 1, 1);
+				writeVertex(drawX - axisX1 - axisX2, drawY - axisY1 - axisY2, 0, 0);
+				writeVertex(drawX + axisX1 + axisX2, drawY + axisY1 + axisY2, 1, 1);
+				writeVertex(drawX - axisX1 + axisX2, drawY - axisY1 + axisY2, 0, 1);
 			}
 			else {
-				graphic.pushState();
-				graphic.translate(drawX, drawY);
-				graphic.rotate(particle.rotation);
-				graphic.setFillColor(colorText);
-				graphic.drawRect(Rect.create(-drawSize * 0.5, -drawSize * 0.5, drawSize, drawSize));
-				graphic.popState();
+
+				// 축 정렬 쿼드. (circle 은 부드러운 원 텍스처가 모양을 만든다)
+				const halfSize = drawSize * 0.5;
+				writeVertex(drawX - halfSize, drawY - halfSize, 0, 0);
+				writeVertex(drawX + halfSize, drawY - halfSize, 1, 0);
+				writeVertex(drawX + halfSize, drawY + halfSize, 1, 1);
+				writeVertex(drawX - halfSize, drawY - halfSize, 0, 0);
+				writeVertex(drawX + halfSize, drawY + halfSize, 1, 1);
+				writeVertex(drawX - halfSize, drawY + halfSize, 0, 1);
 			}
 		}
 
-		if (this.#isAdditive) {
-			graphic.setBlendMode("source-over");
+		const texture = (this.#renderShape === "circle") ? graphic.getSoftDiscTexture() : graphic.getWhiteTexture();
+		graphic.drawColoredQuads(floatOffset / 8, texture);
+	}
+
+	//==============================================================================
+	// 이미지 파티클 출력. (개별 드로우 — 파티클 수가 적은 연출용)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { Graphic } graphic
+	 * @param { number } baseOffsetX
+	 * @param { number } baseOffsetY
+	 */
+	drawImageParticles(graphic, baseOffsetX, baseOffsetY) {
+		for (const particle of this.#particleList) {
+			const lifeRatio = particle.age / particle.lifetime;
+			const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
+			const drawSize = System.Math.max(0.1, particle.size * sizeScale);
+			let drawX = particle.x + baseOffsetX;
+			const drawY = particle.y + baseOffsetY;
+			if (this.#wobbleAmplitude > 0) {
+				drawX += System.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
+			}
+			graphic.pushState();
+			graphic.translate(drawX, drawY);
+			graphic.rotate(particle.rotation);
+			graphic.multiplyGlobalAlpha(System.Math.max(0, System.Math.min(1, particle.alpha * (1 - lifeRatio))));
+			graphic.drawImage(this.#image, Vector2.create(-drawSize * 0.5, -drawSize * 0.5), Vector2.create(drawSize, drawSize));
+			graphic.popState();
 		}
 	}
 
@@ -532,9 +661,37 @@ export class ParticleSystem extends Component {
 		this.#image = image;
 	}
 
-	/** @param { boolean } isAdditive 가산 합성 여부. */
+	/** @param { boolean } isAdditive 가산 합성 여부. (setBlendMode("lighter") 의 설탕) */
 	setAdditive(isAdditive) {
-		this.#isAdditive = isAdditive;
+		this.#blendMode = isAdditive ? "lighter" : "source-over";
+	}
+
+	/** @param { string } blendMode "source-over" | "lighter" | "multiply" | "screen" */
+	setBlendMode(blendMode) {
+		this.#blendMode = blendMode;
+	}
+
+	/** @param { number } x @param { number } y @param { number } strength 중심 가속. @param { number } swirl 접선 가속. */
+	setAttractor(x, y, strength, swirl = 0) {
+		this.#attractorPosition = Vector2.create(x, y);
+		this.#attractorStrength = strength;
+		this.#attractorSwirl = swirl;
+	}
+
+	/** 어트랙터 해제. */
+	clearAttractor() {
+		this.#attractorPosition = null;
+	}
+
+	/** @param { number } amplitude 살랑임 폭. @param { number } frequency 초당 각속도. */
+	setWobble(amplitude, frequency = 4) {
+		this.#wobbleAmplitude = amplitude;
+		this.#wobbleFrequency = frequency;
+	}
+
+	/** @param { number } streakScale streak 길이 = 속도 x 이 값. */
+	setStreakScale(streakScale) {
+		this.#streakScale = streakScale;
 	}
 
 	/** @param { boolean } isWorldSpace 참이면 방출 뒤 노드 이동의 영향을 받지 않는다. */
@@ -555,6 +712,102 @@ export class ParticleSystem extends Component {
 	/** @param { number } maxParticleCount */
 	setMaxParticleCount(maxParticleCount) {
 		this.#maxParticleCount = maxParticleCount;
+	}
+
+	//==============================================================================
+	// 서술(JSON) 적용. — vfx 애셋 로드 / 파티클 편집기 공용.
+	// - 모든 항목은 선택 사항이며 준 것만 반영한다. 색은 [r, g, b, a] 배열.
+	//==============================================================================
+	/**
+	 * @param { object } description
+	 */
+	applyDescription(description) {
+		const toColor = (channels) => new Color(channels[0], channels[1], channels[2], (channels[3] !== undefined) ? channels[3] : 1);
+		if (description.looping !== undefined) {
+			this.setLooping(description.looping);
+		}
+		if (description.duration !== undefined) {
+			this.setDuration(description.duration);
+		}
+		if (description.maxParticleCount !== undefined) {
+			this.setMaxParticleCount(description.maxParticleCount);
+		}
+		if (description.emissionRate !== undefined) {
+			this.setEmissionRate(description.emissionRate);
+		}
+		if (description.bursts !== undefined) {
+			this.setBurstList(description.bursts);
+		}
+		if (description.shape !== undefined) {
+			this.setEmitterShape(description.shape);
+		}
+		if (description.shapeRadius !== undefined) {
+			this.setShapeRadius(description.shapeRadius);
+		}
+		if (description.coneAngle !== undefined) {
+			this.setConeAngle(description.coneAngle);
+		}
+		if (description.boxSize !== undefined) {
+			this.setBoxSize(description.boxSize[0], description.boxSize[1]);
+		}
+		if (description.edgeWidth !== undefined) {
+			this.setEdgeWidth(description.edgeWidth);
+		}
+		if (description.lifetime !== undefined) {
+			this.setStartLifetime(description.lifetime[0], description.lifetime[1]);
+		}
+		if (description.speed !== undefined) {
+			this.setStartSpeed(description.speed[0], description.speed[1]);
+		}
+		if (description.size !== undefined) {
+			this.setStartSize(description.size[0], description.size[1]);
+		}
+		if (description.rotation !== undefined) {
+			this.setStartRotation(description.rotation[0], description.rotation[1]);
+		}
+		if (description.angularVelocity !== undefined) {
+			this.setAngularVelocity(description.angularVelocity[0], description.angularVelocity[1]);
+		}
+		if (description.startColorA !== undefined) {
+			this.setStartColor(toColor(description.startColorA), toColor(description.startColorB !== undefined ? description.startColorB : description.startColorA));
+		}
+		if (description.colorOverLifetime !== undefined) {
+			this.setColorOverLifetime(description.colorOverLifetime.map((key) => {
+				return { time: key.time, color: toColor(key.color) };
+			}));
+		}
+		if (description.sizeOverLifetime !== undefined) {
+			this.setSizeOverLifetime(description.sizeOverLifetime[0], description.sizeOverLifetime[1]);
+		}
+		if (description.gravity !== undefined) {
+			this.setGravity(description.gravity[0], description.gravity[1]);
+		}
+		if (description.damping !== undefined) {
+			this.setDamping(description.damping);
+		}
+		if (description.attractor !== undefined) {
+			if (description.attractor) {
+				this.setAttractor(description.attractor.x, description.attractor.y, description.attractor.strength, description.attractor.swirl !== undefined ? description.attractor.swirl : 0);
+			}
+			else {
+				this.clearAttractor();
+			}
+		}
+		if (description.wobble !== undefined) {
+			this.setWobble(description.wobble[0], description.wobble[1] !== undefined ? description.wobble[1] : 4);
+		}
+		if (description.renderShape !== undefined) {
+			this.setRenderShape(description.renderShape);
+		}
+		if (description.blendMode !== undefined) {
+			this.setBlendMode(description.blendMode);
+		}
+		if (description.streakScale !== undefined) {
+			this.setStreakScale(description.streakScale);
+		}
+		if (description.worldSpace !== undefined) {
+			this.setWorldSpace(description.worldSpace);
+		}
 	}
 
 	//==============================================================================

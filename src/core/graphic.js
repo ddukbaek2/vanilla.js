@@ -54,7 +54,42 @@ void main() {
 `;
 
 // 버텍스 1개당 float 수. (x, y, u, v)
+// 파티클 배치 버텍스 셰이더. (정점마다 색을 실어 한 번의 드로우로 수백 개를 그린다)
+const PARTICLE_VERTEXSHADER_SOURCE = `#version 300 es
+in vec2 vertexPosition;
+in vec2 vertexTextureCoordinate;
+in vec4 vertexColor;
+uniform mat3 projectionMatrix;
+uniform mat3 modelMatrix;
+out vec2 fragmentTextureCoordinate;
+out vec4 fragmentColor;
+void main() {
+	vec3 transformedPosition = projectionMatrix * (modelMatrix * vec3(vertexPosition, 1.0));
+	gl_Position = vec4(transformedPosition.xy, 0.0, 1.0);
+	fragmentTextureCoordinate = vertexTextureCoordinate;
+	fragmentColor = vertexColor;
+}
+`;
+
+// 파티클 배치 프래그먼트 셰이더. (프리멀티플라이드 알파 출력)
+const PARTICLE_FRAGMENTSHADER_SOURCE = `#version 300 es
+precision highp float;
+in vec2 fragmentTextureCoordinate;
+in vec4 fragmentColor;
+uniform sampler2D mainTexture;
+uniform float globalAlpha;
+out vec4 outputColor;
+void main() {
+	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate);
+	float finalAlpha = textureColor.a * fragmentColor.a * globalAlpha;
+	vec3 finalColor = textureColor.rgb * fragmentColor.rgb * fragmentColor.a * globalAlpha;
+	outputColor = vec4(finalColor, finalAlpha);
+}
+`;
+
 const FLOATS_PER_VERTEX = 4;
+const PARTICLE_FLOATS_PER_VERTEX = 8; // x, y, u, v, r, g, b, a
+const PARTICLE_VERTEX_CAPACITY = 8192;
 
 // 스크래치 버텍스 버퍼 용량. (버텍스 수)
 const VERTEX_CAPACITY = 4096;
@@ -111,6 +146,11 @@ export class Graphic extends Object {
 	/** @private @type { WebGLBuffer } */ #vertexBuffer;
 	/** @private @type { Float32Array } */ #vertexData;
 	/** @private @type { WebGLTexture } */ #whiteTexture;
+	/** @private @type { ShaderProgram | null } */ #particleShaderProgram; // 파티클 배치 전용. (지연 생성)
+	/** @private @type { WebGLVertexArrayObject | null } */ #particleVertexArray;
+	/** @private @type { WebGLBuffer | null } */ #particleVertexBuffer;
+	/** @private @type { Float32Array | null } */ #particleVertexData;
+	/** @private @type { WebGLTexture | null } */ #softDiscTexture; // 부드러운 원 스프라이트. (지연 생성)
 	/** @private @type { ImageTextureCache } */ #imageTextureCache;
 	/** @private @type { TextStringTextureCache } */ #textStringTextureCache;
 	/** @private @type { TransformMatrix } */ #transformMatrix;
@@ -180,6 +220,13 @@ export class Graphic extends Object {
 		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, whitePixel);
 		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
 		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
+
+		// 파티클 배치 자원. (처음 쓸 때 만든다)
+		this.#particleShaderProgram = null;
+		this.#particleVertexArray = null;
+		this.#particleVertexBuffer = null;
+		this.#particleVertexData = null;
+		this.#softDiscTexture = null;
 
 		// 캐시.
 		this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext);
@@ -657,6 +704,143 @@ export class Graphic extends Object {
 		// 텍스처 바인드 및 출력.
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
+	}
+
+	//==============================================================================
+	// 파티클 배치 자원 준비. (셰이더 / 버텍스 어레이 / 부드러운 원 텍스처)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	ensureParticleBatchResources() {
+		if (this.#particleShaderProgram) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		this.#particleShaderProgram = new ShaderProgram(webGL2RenderingContext, PARTICLE_VERTEXSHADER_SOURCE, PARTICLE_FRAGMENTSHADER_SOURCE);
+		this.#particleVertexData = new Float32Array(PARTICLE_VERTEX_CAPACITY * PARTICLE_FLOATS_PER_VERTEX);
+		this.#particleVertexArray = webGL2RenderingContext.createVertexArray();
+		this.#particleVertexBuffer = webGL2RenderingContext.createBuffer();
+		webGL2RenderingContext.bindVertexArray(this.#particleVertexArray);
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#particleVertexBuffer);
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#particleVertexData.byteLength, webGL2RenderingContext.DYNAMIC_DRAW);
+		const positionLocation = this.#particleShaderProgram.getAttributeLocation("vertexPosition");
+		const textureCoordinateLocation = this.#particleShaderProgram.getAttributeLocation("vertexTextureCoordinate");
+		const colorLocation = this.#particleShaderProgram.getAttributeLocation("vertexColor");
+		const strideBytes = PARTICLE_FLOATS_PER_VERTEX * 4;
+		webGL2RenderingContext.enableVertexAttribArray(positionLocation);
+		webGL2RenderingContext.vertexAttribPointer(positionLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 0);
+		webGL2RenderingContext.enableVertexAttribArray(textureCoordinateLocation);
+		webGL2RenderingContext.vertexAttribPointer(textureCoordinateLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 8);
+		webGL2RenderingContext.enableVertexAttribArray(colorLocation);
+		webGL2RenderingContext.vertexAttribPointer(colorLocation, 4, webGL2RenderingContext.FLOAT, false, strideBytes, 16);
+		webGL2RenderingContext.bindVertexArray(null);
+		this.#particleShaderProgram.use();
+		const mainTextureLocation = this.#particleShaderProgram.getUniformLocation("mainTexture");
+		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
+		this.getShaderProgram().use();
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
+	}
+
+	//==============================================================================
+	// 파티클 배치 버텍스 배열 반환. (필요 시 증설 — x, y, u, v, r, g, b, a 인터리브)
+	//==============================================================================
+	/**
+	 * @param { number } minimumFloatCount
+	 * @returns { Float32Array }
+	 */
+	getParticleVertexData(minimumFloatCount) {
+		this.ensureParticleBatchResources();
+		if (this.#particleVertexData.length < minimumFloatCount) {
+			let nextLength = this.#particleVertexData.length;
+			while (nextLength < minimumFloatCount) {
+				nextLength *= 2;
+			}
+			this.#particleVertexData = new Float32Array(nextLength);
+			const webGL2RenderingContext = this.getWebGL2RenderingContext();
+			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#particleVertexBuffer);
+			webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#particleVertexData.byteLength, webGL2RenderingContext.DYNAMIC_DRAW);
+			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
+		}
+		return this.#particleVertexData;
+	}
+
+	//==============================================================================
+	// 파티클 배치 출력. (getParticleVertexData 에 채운 정점을 한 번에 그린다)
+	//==============================================================================
+	/**
+	 * @param { number } vertexCount
+	 * @param { WebGLTexture } texture
+	 */
+	drawColoredQuads(vertexCount, texture) {
+		if (vertexCount <= 0) {
+			return;
+		}
+		this.ensureParticleBatchResources();
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+
+		this.#particleShaderProgram.use();
+		webGL2RenderingContext.bindVertexArray(this.#particleVertexArray);
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#particleVertexBuffer);
+		webGL2RenderingContext.bufferSubData(webGL2RenderingContext.ARRAY_BUFFER, 0, this.#particleVertexData, 0, vertexCount * PARTICLE_FLOATS_PER_VERTEX);
+
+		const projectionMatrixLocation = this.#particleShaderProgram.getUniformLocation("projectionMatrix");
+		webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
+		this.#transformMatrix.writeToFloat32Array(this.#modelMatrixArray);
+		const modelMatrixLocation = this.#particleShaderProgram.getUniformLocation("modelMatrix");
+		webGL2RenderingContext.uniformMatrix3fv(modelMatrixLocation, false, this.#modelMatrixArray);
+		const globalAlphaLocation = this.#particleShaderProgram.getUniformLocation("globalAlpha");
+		webGL2RenderingContext.uniform1f(globalAlphaLocation, this.getGlobalAlpha());
+
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
+
+		// 기본 경로 상태 복원.
+		this.getShaderProgram().use();
+		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
+	}
+
+	//==============================================================================
+	// 부드러운 원 텍스처 반환. (가장자리가 잦아드는 64x64 원 — 파티클 기본 스프라이트)
+	//==============================================================================
+	/**
+	 * @returns { WebGLTexture }
+	 */
+	getSoftDiscTexture() {
+		if (this.#softDiscTexture) {
+			return this.#softDiscTexture;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const textureSize = 64;
+		const pixels = new System.Uint8Array(textureSize * textureSize * 4);
+		const halfSize = textureSize * 0.5;
+		for (let pixelY = 0; pixelY < textureSize; ++pixelY) {
+			for (let pixelX = 0; pixelX < textureSize; ++pixelX) {
+				const deltaX = (pixelX + 0.5 - halfSize) / halfSize;
+				const deltaY = (pixelY + 0.5 - halfSize) / halfSize;
+				const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+				// 중심은 꽉 차고 가장자리에서 부드럽게 사라진다.
+				let alphaRatio = 1 - (distance - 0.7) / 0.3;
+				alphaRatio = Math.max(0, Math.min(1, alphaRatio));
+				alphaRatio = alphaRatio * alphaRatio * (3 - 2 * alphaRatio);
+				const byteValue = Math.round(alphaRatio * 255);
+				const pixelOffset = (pixelY * textureSize + pixelX) * 4;
+				pixels[pixelOffset] = byteValue;
+				pixels[pixelOffset + 1] = byteValue;
+				pixels[pixelOffset + 2] = byteValue;
+				pixels[pixelOffset + 3] = byteValue;
+			}
+		}
+		this.#softDiscTexture = webGL2RenderingContext.createTexture();
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#softDiscTexture);
+		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, textureSize, textureSize, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, pixels);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.LINEAR);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+		return this.#softDiscTexture;
 	}
 
 	//==============================================================================

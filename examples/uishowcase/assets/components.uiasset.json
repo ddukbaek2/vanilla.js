@@ -31,9 +31,9 @@
 			{
 				"type": "Paint",
 				"color": [
-					0.043,
-					0.051,
-					0.071,
+					0.078,
+					0.09,
+					0.118,
 					1
 				],
 				"roundSize": 0
@@ -73,9 +73,9 @@
 						"text": "COMPONENTS",
 						"fontSize": 18,
 						"textColor": [
-							0.902,
-							0.914,
-							0.937,
+							0.91,
+							0.922,
+							0.949,
 							1
 						],
 						"backgroundColor": [
@@ -123,9 +123,9 @@
 						"text": "Every widget below is rendered by the engine.",
 						"fontSize": 11,
 						"textColor": [
-							0.541,
-							0.569,
-							0.627,
+							0.604,
+							0.635,
+							0.698,
 							1
 						],
 						"backgroundColor": [
@@ -171,9 +171,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.118,
-							0.141,
-							0.188,
+							0.173,
+							0.2,
+							0.267,
 							1
 						],
 						"roundSize": 13
@@ -213,9 +213,9 @@
 								"text": "●  All systems normal",
 								"fontSize": 10.5,
 								"textColor": [
-									0.247,
-									0.698,
-									0.498,
+									0.271,
+									0.71,
+									0.522,
 									1
 								],
 								"backgroundColor": [
@@ -263,9 +263,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -305,9 +305,9 @@
 								"text": "BUTTONS",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -353,8 +353,8 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.357,
-									0.424,
+									0.427,
+									0.49,
 									1,
 									1
 								],
@@ -374,9 +374,9 @@
 								"text": "DEFAULT",
 								"fontSize": 11,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -424,9 +424,9 @@
 								"text": "hover / press tint",
 								"fontSize": 9.5,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -472,9 +472,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.118,
-									0.141,
-									0.188,
+									0.173,
+									0.2,
+									0.267,
 									1
 								],
 								"roundSize": 8
@@ -493,9 +493,9 @@
 								"text": "DISABLED",
 								"fontSize": 11,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -543,9 +543,9 @@
 								"text": "setInteractable(false)",
 								"fontSize": 9.5,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -591,9 +591,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.118,
-									0.141,
-									0.188,
+									0.173,
+									0.2,
+									0.267,
 									1
 								],
 								"roundSize": 8
@@ -612,9 +612,9 @@
 								"text": "HOLD 1s",
 								"fontSize": 11,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -662,9 +662,9 @@
 								"text": "long press event",
 								"fontSize": 9.5,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -749,9 +749,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -799,9 +799,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -841,9 +841,9 @@
 								"text": "CONTEXT MENU",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -889,9 +889,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.09,
-									0.106,
-									0.141,
+									0.137,
+									0.161,
+									0.216,
 									1
 								],
 								"roundSize": 8
@@ -931,9 +931,9 @@
 										"text": "Right click here\n(or long press)",
 										"fontSize": 11,
 										"textColor": [
-											0.329,
-											0.357,
-											0.412,
+											0.42,
+											0.451,
+											0.529,
 											1
 										],
 										"backgroundColor": [
@@ -983,9 +983,9 @@
 								"text": "",
 								"fontSize": 10.5,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1033,9 +1033,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -1075,9 +1075,9 @@
 								"text": "DRAG & DROP",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1123,9 +1123,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.09,
-									0.106,
-									0.141,
+									0.137,
+									0.161,
+									0.216,
 									1
 								],
 								"roundSize": 8
@@ -1164,9 +1164,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.09,
-									0.106,
-									0.141,
+									0.137,
+									0.161,
+									0.216,
 									1
 								],
 								"roundSize": 8
@@ -1205,9 +1205,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.09,
-									0.106,
-									0.141,
+									0.137,
+									0.161,
+									0.216,
 									1
 								],
 								"roundSize": 8
@@ -1248,9 +1248,9 @@
 								"text": "Drag chips into slots.",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1298,9 +1298,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -1340,9 +1340,9 @@
 								"text": "PROGRESS",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1390,9 +1390,9 @@
 								"text": "UISpinner",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1440,9 +1440,9 @@
 								"text": "UIProgressView",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1527,9 +1527,9 @@
 								"text": "",
 								"fontSize": 10,
 								"textColor": [
-									0.541,
-									0.569,
-									0.627,
+									0.604,
+									0.635,
+									0.698,
 									1
 								],
 								"backgroundColor": [
@@ -1577,9 +1577,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -1619,9 +1619,9 @@
 								"text": "TYPEWRITER",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1669,9 +1669,9 @@
 								"text": "",
 								"fontSize": 11.5,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -1717,9 +1717,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.118,
-									0.141,
-									0.188,
+									0.173,
+									0.2,
+									0.267,
 									1
 								],
 								"roundSize": 8
@@ -1738,9 +1738,9 @@
 								"text": "REPLAY",
 								"fontSize": 10.5,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -1788,9 +1788,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -1830,9 +1830,9 @@
 								"text": "FEEDBACK",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -1878,9 +1878,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.118,
-									0.141,
-									0.188,
+									0.173,
+									0.2,
+									0.267,
 									1
 								],
 								"roundSize": 8
@@ -1899,9 +1899,9 @@
 								"text": "SHOW TOAST",
 								"fontSize": 11,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -1947,9 +1947,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.118,
-									0.141,
-									0.188,
+									0.173,
+									0.2,
+									0.267,
 									1
 								],
 								"roundSize": 8
@@ -1968,9 +1968,9 @@
 								"text": "SHOW DIALOG",
 								"fontSize": 11,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -2016,9 +2016,9 @@
 							{
 								"type": "Paint",
 								"color": [
-									0.118,
-									0.141,
-									0.188,
+									0.173,
+									0.2,
+									0.267,
 									1
 								],
 								"roundSize": 8
@@ -2037,9 +2037,9 @@
 								"text": "QUEUE 3 TOASTS",
 								"fontSize": 11,
 								"textColor": [
-									0.902,
-									0.914,
-									0.937,
+									0.91,
+									0.922,
+									0.949,
 									1
 								],
 								"backgroundColor": [
@@ -2087,9 +2087,9 @@
 								"text": "Toast queueing / popup motion are\nengine widgets.",
 								"fontSize": 9.5,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -2137,9 +2137,9 @@
 					{
 						"type": "Paint",
 						"color": [
-							0.071,
-							0.082,
-							0.11,
+							0.106,
+							0.125,
+							0.165,
 							1
 						],
 						"roundSize": 10
@@ -2179,9 +2179,9 @@
 								"text": "CHARTS",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -2229,9 +2229,9 @@
 								"text": "UILineChart",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
@@ -2309,9 +2309,9 @@
 								"text": "UIBarChart",
 								"fontSize": 10,
 								"textColor": [
-									0.329,
-									0.357,
-									0.412,
+									0.42,
+									0.451,
+									0.529,
 									1
 								],
 								"backgroundColor": [
