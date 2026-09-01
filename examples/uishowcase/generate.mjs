@@ -225,7 +225,7 @@ function buildDashboard() {
 				makeNode("LiveChart", 16, 40, MAIN_WIDTH - 32, 244, {}),
 			]),
 			panelNode("BarPanel", SIDE_X, 176, SIDE_WIDTH, 300, [
-				sectionLabel("BarTitle", 16, 12, "REVENUE · LAST 14 DAYS"),
+				sectionLabel("BarTitle", 16, 12, "REVENUE, LAST 14 DAYS"),
 				makeNode("RevenueBars", 16, 40, SIDE_WIDTH - 32, 220, {}),
 				textNode("BarCaption", 16, 268, SIDE_WIDTH - 32, 14, "", 9.5, color(COLOR_TEXT_FAINT)),
 			]),
@@ -499,7 +499,7 @@ function buildNavigation() {
 			textNode("BrandCaption", 23, 50, 156, 14, "CONSOLE", 9, color(COLOR_TEXT_FAINT)),
 			hairline("BrandHairline", 14, 86, RAIL_WIDTH - 28, 1),
 			...navigationNodes,
-			textNode("RailVersion", 22, DOCUMENT_HEIGHT - 36, 156, 14, "vanilla.js  ·  0.4.0", 9, color(COLOR_TEXT_FAINT)),
+			textNode("RailVersion", 22, DOCUMENT_HEIGHT - 36, 156, 14, "vanilla.js, 0.4.0", 9, color(COLOR_TEXT_FAINT)),
 		],
 	});
 	writeDocument("navigation.uiasset.json", rootNode);

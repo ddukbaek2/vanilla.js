@@ -167,7 +167,7 @@
 		return packNames.map((packName) => {
 			return {
 				title: packName,
-				caption: "Bundle  ·  " + dataRandom.nextInt(3, 9) + " add-ons",
+				caption: "Bundle, " + dataRandom.nextInt(3, 9) + " add-ons",
 				price: dataRandom.nextInt(19, 89) + 0.99,
 			};
 		});
@@ -182,7 +182,7 @@
 			const itemTitle = prefixNames[dataRandom.nextInt(0, prefixNames.length - 1)] + " " + toolNames[itemIndex % toolNames.length];
 			itemList.push({
 				title: itemTitle,
-				caption: categoryNames[dataRandom.nextInt(0, categoryNames.length - 1)] + "  ·  v" + dataRandom.nextInt(1, 4) + "." + dataRandom.nextInt(0, 9),
+				caption: categoryNames[dataRandom.nextInt(0, categoryNames.length - 1)] + ", v" + dataRandom.nextInt(1, 4) + "." + dataRandom.nextInt(0, 9),
 				price: dataRandom.nextInt(2, 49) + 0.99,
 				glyph: itemTitle.substring(0, 1),
 			});
@@ -458,7 +458,7 @@
 			for (const value of revenueValues) {
 				bestValue = System.Math.max(bestValue, value);
 			}
-			this.setLabelText(dashboardRootNode, "BarCaption", "Best day  $" + this.formatNumber(bestValue) + "  ·  highlighted: today");
+			this.setLabelText(dashboardRootNode, "BarCaption", "Best day  $" + this.formatNumber(bestValue) + ", highlighted: today");
 
 			// 이벤트 목록. (템플릿 + 데이터 → UIListView, 주기적으로 새 이벤트가 위에 쌓인다)
 			for (let eventIndex = 0; eventIndex < 24; ++eventIndex) {
@@ -626,7 +626,7 @@
 				const itemCount = this.#cartMap.size;
 				const totalPrice = this.getCartTotal();
 				this.openPopup("Confirm order", "Buy " + itemCount + " item" + (itemCount > 1 ? "s" : "") + " for $" + totalPrice.toFixed(2) + "?", () => {
-					this.#orderList.unshift({ text: itemCount + " items  ·  $" + totalPrice.toFixed(2) + "  ·  just now" });
+					this.#orderList.unshift({ text: itemCount + " items, $" + totalPrice.toFixed(2) + ", just now" });
 					if (this.#orderList.length > 8) {
 						this.#orderList.length = 8;
 					}
@@ -635,7 +635,7 @@
 					this.refreshOrderPanel();
 					this.#itemListView.refresh();
 					this.#beepPlayer.playPreset("confirm");
-					this.showToast("Order placed  ·  $" + totalPrice.toFixed(2));
+					this.showToast("Order placed, $" + totalPrice.toFixed(2));
 				});
 			});
 			this.refreshCartPanel();

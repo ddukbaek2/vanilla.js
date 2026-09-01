@@ -26,6 +26,7 @@ const htmlText = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <title>vanilla.js - UI Editor</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
 <style>
 	html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: #1e1e1e; color: #ccc; font-family: sans-serif; }
 </style>

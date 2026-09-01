@@ -37,3 +37,12 @@
 - 배포: 테마 쇼케이스는 배포 완료. EFFECTS V2 / 파티클 편집기는 NAS SMB 세션 단절(이름 해석 실패 + IP 자격 증명 부재)로 보류.
 - NAS 복구 후 일괄 배포(effects V2 / particleeditor 신규 / 전 배포처 엔진 / uieditor 재빌드 / 메인 도구 카드 / README).
   파티클 편집기 캔버스가 창 전체를 덮던 문제(autoResize) 수정, Engine.run 의 CDN 폰트 블로킹(실패 시 씬 미시작) 제거 — 프리뷰 파티클 렌더 스크린샷 검증.
+
+## EFFECTS 재구성 / 표기 정리 / 도구 아이콘·테마 통일 [21:30 → 진행]
+- EFFECTS: 탭 틴트 충돌 확인 후 구조 자체를 좌측 목록 + 우측 무대(Mask)로 개편(목록 색은 틴트 제외로 충돌 차단).
+  무대 안 텍스트는 설명 문장 대신 클래스 / 사용 코드 표기. 통계 3종(particles / vertices / triangles, 메모리는 표준 API 부재로 미표기).
+  버블·불씨가 edge 방출 방향(아래) 때문에 무대 밖으로 나가던 버그 수정(무대 안 하단 + 부력). 파티클 방출량 2~3배 증량.
+- 표기: 가운뎃점(·) 구분 기호 전부 제거(EFFECTS + 쇼케이스 문서 재생성), 페이지 <title> Title Case 통일, 홍보성 서브타이틀 제거.
+- 메인 페이지: 샘플 카드 flex-grow 로 마지막 카드가 한 줄을 채우던 문제 수정(grow 0).
+- 도구: 파비콘을 vanilla.js 공식 아이콘(assets/icons/icon-light.png, 바닐라 꽃)으로 통일 + 하단 배지(UI / Particle / Visual).
+  파티클 에디터 팔레트를 UI 에디터 PaneTheme 값으로 정렬, UI 에디터 빌드에 파비콘 링크 추가.

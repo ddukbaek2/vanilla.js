@@ -1242,7 +1242,7 @@
 						"components": [
 							{
 								"type": "UILabel",
-								"text": "REVENUE · LAST 14 DAYS",
+								"text": "REVENUE, LAST 14 DAYS",
 								"fontSize": 10,
 								"textColor": [
 									0.42,
