@@ -183,6 +183,7 @@
 		/** @private @type { number } */ #elapsedSeconds;
 		/** @private @type { FontFace | null } */ #fontFace;
 		/** @private @type { Vector2 } */ #appliedViewSize;
+		/** @private @type { number } */ #mainWidth; // 본문 컬럼 폭. (화면 폭에 맞춰 가변)
 
 		// 대시보드 상태.
 		/** @private @type { UILineChart | null } */ #liveChart;
@@ -234,6 +235,7 @@
 			this.#elapsedSeconds = 0;
 			this.#fontFace = null;
 			this.#appliedViewSize = Vector2.create(0, 0);
+			this.#mainWidth = 884;
 
 			this.#liveChart = null;
 			this.#revenueBars = null;
@@ -442,6 +444,11 @@
 				return;
 			}
 			this.applyFontToTree(itemNode);
+			itemNode.setContentSize(Vector2.create(this.#mainWidth - 32, 40));
+			const tagNode = this.findNodeByName(itemNode, "EventTag");
+			if (tagNode) {
+				tagNode.setLocalPosition(Vector2.create(this.#mainWidth - 132, 0));
+			}
 			this.setLabelText(itemNode, "EventTime", eventData.time);
 			this.setLabelText(itemNode, "EventText", eventData.text);
 			this.setLabelText(itemNode, "EventTag", eventData.tag);
@@ -565,6 +572,13 @@
 			const captionLabel = this.findLabel(itemNode, "ItemCaption");
 			const priceLabel = this.findLabel(itemNode, "ItemPrice");
 			const rowPaintComponents = itemNode.getComponents(Paint);
+			const rowWidth = this.#mainWidth - 32;
+			itemNode.setContentSize(Vector2.create(rowWidth, 44));
+			const priceNode = this.findNodeByName(itemNode, "ItemPrice");
+			if (priceNode) {
+				priceNode.setLocalPosition(Vector2.create(rowWidth - 194, 0));
+			}
+			addButtonNode.setLocalPosition(Vector2.create(rowWidth - 86, 9));
 
 			// 로딩 줄. (다음 페이지 자리 — 스피너 + 문구)
 			if (itemIndex >= this.#catalogLoadedCount) {
@@ -1349,7 +1363,7 @@
 			const railVersionNode = this.findNodeByName(railNode, "RailVersion");
 			railVersionNode.setLocalPosition(Vector2.create(22, viewHeight - 36));
 
-			// 화면 문서. (배경이 화면 전체를 덮도록)
+			// 화면 문서. (배경이 화면 전체를 덮고, 본문 컬럼은 남는 폭을 전부 쓴다)
 			const sidePanelNames = {
 				home: ["BarPanel", "SystemPanel"],
 				shop: ["CartPanel", "OrderPanel"],
@@ -1357,6 +1371,9 @@
 				components: ["DragPanel", "FeedbackPanel"],
 			};
 			const sideX = viewWidth - SIDE_PANEL_OFFSET;
+			const mainWidth = sideX - 224 - 16;
+			const fullWidth = viewWidth - 224 - 16;
+			this.#mainWidth = mainWidth;
 			for (const screenName of SCREEN_NAMES) {
 				const screenRootNode = this.#screenRootMap.get(screenName);
 				screenRootNode.setContentSize(Vector2.create(viewWidth, viewHeight));
@@ -1372,6 +1389,10 @@
 					}
 				}
 			}
+			this.applyFluidDashboard(mainWidth);
+			this.applyFluidStore(mainWidth, fullWidth);
+			this.applyFluidSettings(mainWidth);
+			this.applyFluidComponents(mainWidth, fullWidth);
 
 			// 팝업 / 토스트.
 			const overlayNode = this.findNodeByName(this.#popupRootNode, "Overlay");
@@ -1380,6 +1401,134 @@
 			this.#popupDialogNode.setLocalPosition(Vector2.create(viewWidth * 0.5, viewHeight * 0.5 - 10));
 			this.#toast.setRestX((224 + viewWidth) * 0.5);
 			this.#toast.setRestY(viewHeight - 52);
+		}
+
+		//==============================================================================
+		// 가변 폭: 대시보드. (KPI 카드 4분할 / 차트 패널 / 이벤트 목록)
+		//==============================================================================
+		/**
+		 * @param { number } mainWidth
+		 */
+		applyFluidDashboard(mainWidth) {
+			const dashboardRootNode = this.#screenRootMap.get("home");
+			const statNames = ["Revenue", "Users", "Requests", "Uptime"];
+			const cardWidth = (mainWidth - 48) / 4;
+			for (let statIndex = 0; statIndex < statNames.length; ++statIndex) {
+				const cardNode = this.findNodeByName(dashboardRootNode, "Stat" + statNames[statIndex]);
+				cardNode.setLocalPosition(Vector2.create(224 + statIndex * (cardWidth + 16), 82));
+				cardNode.setContentSize(Vector2.create(cardWidth, 78));
+			}
+			const chartPanelNode = this.findNodeByName(dashboardRootNode, "ChartPanel");
+			chartPanelNode.setContentSize(Vector2.create(mainWidth, 300));
+			const chartValueNode = this.findNodeByName(dashboardRootNode, "ChartValue");
+			chartValueNode.setLocalPosition(Vector2.create(mainWidth - 156, 8));
+			const liveChartNode = this.findNodeByName(dashboardRootNode, "LiveChart");
+			liveChartNode.setContentSize(Vector2.create(mainWidth - 32, 244));
+			const eventListNode = this.findNodeByName(dashboardRootNode, "EventList");
+			eventListNode.setContentSize(Vector2.create(mainWidth, 458));
+			if (this.#eventListView) {
+				this.#eventListView.setItemCount(this.#eventList.length);
+				this.#eventListView.refresh();
+			}
+		}
+
+		//==============================================================================
+		// 가변 폭: 스토어. (추천 띠 / 카탈로그 목록)
+		//==============================================================================
+		/**
+		 * @param { number } mainWidth
+		 * @param { number } fullWidth
+		 */
+		applyFluidStore(mainWidth, fullWidth) {
+			const storeRootNode = this.#screenRootMap.get("shop");
+			const featuredListNode = this.findNodeByName(storeRootNode, "FeaturedList");
+			featuredListNode.setContentSize(Vector2.create(fullWidth, 96));
+			const itemListNode = this.findNodeByName(storeRootNode, "ItemList");
+			itemListNode.setContentSize(Vector2.create(mainWidth, 732));
+			if (this.#itemListView) {
+				this.applyCatalogItemCount();
+				this.#itemListView.refresh();
+			}
+		}
+
+		//==============================================================================
+		// 가변 폭: 설정. (행과 오른쪽 컨트롤 자리)
+		//==============================================================================
+		/**
+		 * @param { number } mainWidth
+		 */
+		applyFluidSettings(mainWidth) {
+			const settingsRootNode = this.#screenRootMap.get("settings");
+			const settingsPanelNode = this.findNodeByName(settingsRootNode, "SettingsPanel");
+			settingsPanelNode.setContentSize(Vector2.create(mainWidth, 420));
+			const rowWidth = mainWidth - 32;
+			const rowNames = ["Scale", "Sound", "Autosave", "Telemetry", "Theme", "Region", "Storage"];
+			for (const rowName of rowNames) {
+				const rowNode = this.findNodeByName(settingsRootNode, "Row" + rowName);
+				rowNode.setContentSize(Vector2.create(rowWidth, 40));
+			}
+			for (const sliderName of ["Scale", "Sound"]) {
+				const sliderNode = this.findNodeByName(settingsRootNode, sliderName + "Slider");
+				sliderNode.setLocalPosition(Vector2.create(rowWidth - 288, 9));
+			}
+			for (const toggleName of ["Autosave", "Telemetry"]) {
+				const toggleNode = this.findNodeByName(settingsRootNode, toggleName + "Toggle");
+				toggleNode.setLocalPosition(Vector2.create(rowWidth - 72, 9));
+			}
+			for (const slotName of ["Theme", "Region"]) {
+				const slotNode = this.findNodeByName(settingsRootNode, slotName + "DropdownSlot");
+				slotNode.setLocalPosition(Vector2.create(rowWidth - 200, 6));
+			}
+			const storageBarNode = this.findNodeByName(settingsRootNode, "StorageBar");
+			storageBarNode.setLocalPosition(Vector2.create(rowWidth - 288, 16));
+			const resetButtonNode = this.findNodeByName(settingsRootNode, "ResetButton");
+			resetButtonNode.setContentSize(Vector2.create(rowWidth, 32));
+		}
+
+		//==============================================================================
+		// 가변 폭: 컴포넌트. (두 열 패널 / 차트 패널 반분할)
+		//==============================================================================
+		/**
+		 * @param { number } mainWidth
+		 * @param { number } fullWidth
+		 */
+		applyFluidComponents(mainWidth, fullWidth) {
+			const componentsRootNode = this.#screenRootMap.get("components");
+			const halfWidth = (mainWidth - 16) / 2;
+			const secondColumnX = 224 + halfWidth + 16;
+
+			const buttonsPanelNode = this.findNodeByName(componentsRootNode, "ButtonsPanel");
+			buttonsPanelNode.setContentSize(Vector2.create(halfWidth, 262));
+			const menuPanelNode = this.findNodeByName(componentsRootNode, "MenuPanel");
+			menuPanelNode.setLocalPosition(Vector2.create(secondColumnX, 82));
+			menuPanelNode.setContentSize(Vector2.create(halfWidth, 262));
+			const zoneNode = this.findNodeByName(componentsRootNode, "RightClickZone");
+			zoneNode.setContentSize(Vector2.create(halfWidth - 32, 150));
+			const zoneHintNode = this.findNodeByName(componentsRootNode, "RightClickHint");
+			zoneHintNode.setContentSize(Vector2.create(halfWidth - 32, 150));
+
+			const progressPanelNode = this.findNodeByName(componentsRootNode, "ProgressPanel");
+			progressPanelNode.setContentSize(Vector2.create(halfWidth, 220));
+			const loopBarNode = this.findNodeByName(componentsRootNode, "LoopProgressBar");
+			loopBarNode.setContentSize(Vector2.create(halfWidth - 32, 7));
+			const typePanelNode = this.findNodeByName(componentsRootNode, "TypePanel");
+			typePanelNode.setLocalPosition(Vector2.create(secondColumnX, 360));
+			typePanelNode.setContentSize(Vector2.create(halfWidth, 220));
+			const typeBodyNode = this.findNodeByName(componentsRootNode, "TypeBody");
+			typeBodyNode.setContentSize(Vector2.create(halfWidth - 32, 110));
+			const typeBodyLabel = this.findLabel(componentsRootNode, "TypeBody");
+			typeBodyLabel.setWordWrapWidth(halfWidth - 32);
+
+			const chartsPanelNode = this.findNodeByName(componentsRootNode, "ChartsPanel");
+			chartsPanelNode.setContentSize(Vector2.create(fullWidth, 380));
+			const chartWidth = (fullWidth - 48) / 2;
+			const miniLineNode = this.findNodeByName(componentsRootNode, "MiniLineChart");
+			miniLineNode.setContentSize(Vector2.create(chartWidth, 290));
+			const miniBarCaptionNode = this.findNodeByName(componentsRootNode, "MiniBarCaption");
+			miniBarCaptionNode.setLocalPosition(Vector2.create(16 + chartWidth + 16, 36));
+			const miniBarNode = this.findNodeByName(componentsRootNode, "MiniBarChart");
+			miniBarNode.setLocalPosition(Vector2.create(16 + chartWidth + 16, 58));
+			miniBarNode.setContentSize(Vector2.create(chartWidth, 290));
 		}
 
 		//==============================================================================
