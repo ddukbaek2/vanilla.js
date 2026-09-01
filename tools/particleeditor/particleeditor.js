@@ -16,6 +16,7 @@ import {
 	createEditorHeaderButtonElement, createEditorGroupElement, createEditorPropertyRowElement,
 	appendEditorNumberRow, appendEditorTextRow, appendEditorColorRow, appendEditorBooleanRow, appendEditorSelectRow,
 	decorateEditorInputElement, createEditorButtonElement, buildEditorWindowLayout, openEditorInputDialog,
+	EDITOR_ICON_SHAPES, createEditorHeaderIconElement, setEditorHeaderIconActive,
 } from "../common/editorkit.js";
 
 
@@ -205,14 +206,16 @@ class PreviewScene extends Scene {
 	//==============================================================================
 	/** @type { Function } */ #createdEvent;
 	/** @type { Function } */ #tickEvent;
+	/** @type { Function } */ #overlayEvent;
 
 	//==============================================================================
 	// 생성.
 	//==============================================================================
-	constructor(createdEvent, tickEvent) {
+	constructor(createdEvent, tickEvent, overlayEvent) {
 		super();
 		this.#createdEvent = createdEvent;
 		this.#tickEvent = tickEvent;
+		this.#overlayEvent = overlayEvent;
 	}
 
 	//==============================================================================
@@ -235,6 +238,9 @@ class PreviewScene extends Scene {
 		graphic.setFillColor("rgb(16, 17, 20)");
 		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
 		viewManager.applyViewRect(graphic);
+		if (this.#overlayEvent) {
+			this.#overlayEvent(graphic);
+		}
 	}
 
 	//==============================================================================
@@ -267,6 +273,13 @@ class ParticleEditor {
 	/** @private @type { HTMLElement | null } */ #inspectorBodyElement;
 	/** @private @type { HTMLElement | null } */ #statusTextElement;
 	/** @private @type { HTMLInputElement | null } */ #fileInputElement;
+	/** @private @type { HTMLInputElement | null } */ #imageInputElement;
+	/** @private @type { object[] } */ #assets;
+	/** @private @type { HTMLElement | null } */ #assetListElement;
+	/** @private @type { boolean } */ #isGridVisible;
+	/** @private @type { boolean } */ #isEditView;
+	/** @private @type { HTMLElement | null } */ #gridToggleElement;
+	/** @private @type { HTMLElement | null } */ #viewToggleElement;
 
 	//==============================================================================
 	// 생성.
@@ -282,6 +295,13 @@ class ParticleEditor {
 		this.#inspectorBodyElement = null;
 		this.#statusTextElement = null;
 		this.#fileInputElement = null;
+		this.#imageInputElement = null;
+		this.#assets = [];
+		this.#assetListElement = null;
+		this.#isGridVisible = true;
+		this.#isEditView = true;
+		this.#gridToggleElement = null;
+		this.#viewToggleElement = null;
 	}
 
 	//==============================================================================
@@ -350,8 +370,25 @@ class ParticleEditor {
 		hierarchyElement.appendChild(this.#hierarchyListElement);
 		hierarchyPane.getContainer().appendChild(hierarchyElement);
 
+		const assetsPane = new Pane({ size: 190, minSize: 110 });
+		const assetsElement = createEditorSectionElement("ASSETS", () => {
+			return [
+				{
+					id: "importImages",
+					label: "Import Images...",
+					action: () => {
+						this.#imageInputElement.click();
+					},
+				},
+			];
+		});
+		this.#assetListElement = PaneStyle.create("div", "", { style: { flex: "1", overflowY: "auto", position: "relative" } });
+		assetsElement.appendChild(this.#assetListElement);
+		assetsPane.getContainer().appendChild(assetsElement);
+
 		leftPane.addPane(presetPane);
 		leftPane.addPane(hierarchyPane);
+		leftPane.addPane(assetsPane);
 
 		// 중앙: 프리뷰.
 		const previewPane = new Pane({ size: "flex", minSize: 200 });
@@ -363,6 +400,16 @@ class ParticleEditor {
 		const previewSpacerElement = PaneStyle.create("div", "", {
 			style: { position: "relative", width: "auto", height: "auto", flex: "1" },
 		});
+		this.#gridToggleElement = createEditorHeaderIconElement(EDITOR_ICON_SHAPES.grid, "Show Grid");
+		this.#gridToggleElement.addEventListener("click", () => {
+			this.#isGridVisible = !this.#isGridVisible;
+			this.refreshViewToggles();
+		});
+		this.#viewToggleElement = createEditorHeaderIconElement(EDITOR_ICON_SHAPES.previewMode, "Render View");
+		this.#viewToggleElement.addEventListener("click", () => {
+			this.#isEditView = !this.#isEditView;
+			this.refreshViewToggles();
+		});
 		const restartButtonElement = createEditorHeaderButtonElement("RESTART");
 		restartButtonElement.addEventListener("click", () => {
 			this.restartAllSystems();
@@ -372,6 +419,8 @@ class ParticleEditor {
 			this.emitBurst();
 		});
 		previewTitleElement.appendChild(previewSpacerElement);
+		previewTitleElement.appendChild(this.#gridToggleElement);
+		previewTitleElement.appendChild(this.#viewToggleElement);
 		previewTitleElement.appendChild(restartButtonElement);
 		previewTitleElement.appendChild(burstButtonElement);
 		const canvasHolderElement = PaneStyle.create("div", "", {
@@ -416,6 +465,21 @@ class ParticleEditor {
 			this.#fileInputElement.value = "";
 		});
 		System.document.body.appendChild(this.#fileInputElement);
+
+		// 이미지 가져오기 입력.
+		this.#imageInputElement = System.document.createElement("input");
+		this.#imageInputElement.type = "file";
+		this.#imageInputElement.accept = "image/*";
+		this.#imageInputElement.multiple = true;
+		this.#imageInputElement.style.display = "none";
+		this.#imageInputElement.addEventListener("change", async () => {
+			for (const selectedFile of this.#imageInputElement.files) {
+				await this.importImageAsset(selectedFile);
+			}
+			this.#imageInputElement.value = "";
+			this.rebuildAssetList();
+		});
+		System.document.body.appendChild(this.#imageInputElement);
 
 		// 단축키.
 		System.window.addEventListener("keydown", (keyboardEvent) => {
@@ -645,6 +709,7 @@ class ParticleEditor {
 		particleSystem.applyDescription(systemEntry.description);
 		systemEntry.node = systemNode;
 		systemEntry.particleSystem = particleSystem;
+		this.applyImageFromDescription(systemEntry);
 	}
 
 	//==============================================================================
@@ -727,6 +792,149 @@ class ParticleEditor {
 	}
 
 	//==============================================================================
+	// 격자 / 화면 전환 표시 갱신.
+	//==============================================================================
+	refreshViewToggles() {
+		setEditorHeaderIconActive(this.#gridToggleElement, this.#isGridVisible && this.#isEditView);
+		setEditorHeaderIconActive(this.#viewToggleElement, this.#isEditView === false);
+	}
+
+	//==============================================================================
+	// 편집 오버레이 그리기. (격자 + 이미터 표시 — 결과 화면에서는 그리지 않는다)
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic
+	 */
+	drawViewOverlay(graphic) {
+		if (this.#isEditView === false) {
+			return;
+		}
+		const viewManager = this.#engine.getViewManager();
+		const viewSize = viewManager.getViewSize();
+		if (this.#isGridVisible) {
+			const gridSize = 50;
+			graphic.setStrokeColor("rgba(255, 255, 255, 0.05)");
+			for (let x = 0; x <= viewSize.x; x += gridSize) {
+				graphic.drawLine([Vector2.create(x, 0), Vector2.create(x, viewSize.y)], 1);
+			}
+			for (let y = 0; y <= viewSize.y; y += gridSize) {
+				graphic.drawLine([Vector2.create(0, y), Vector2.create(viewSize.x, y)], 1);
+			}
+		}
+
+		// 이미터 위치 십자 표시.
+		if (this.#emitterNode) {
+			const emitterPosition = this.#emitterNode.getLocalPosition();
+			graphic.setStrokeColor("rgba(212, 176, 106, 0.8)");
+			graphic.drawLine([Vector2.create(emitterPosition.x - 10, emitterPosition.y), Vector2.create(emitterPosition.x + 10, emitterPosition.y)], 1.5);
+			graphic.drawLine([Vector2.create(emitterPosition.x, emitterPosition.y - 10), Vector2.create(emitterPosition.x, emitterPosition.y + 10)], 1.5);
+		}
+	}
+
+	//==============================================================================
+	// 이미지 애셋 가져오기. (데이터 주소로 읽어 목록에 담는다)
+	//==============================================================================
+	/**
+	 * @param { File } imageFile
+	 */
+	importImageAsset(imageFile) {
+		return new System.Promise((resolve) => {
+			const fileReader = new System.FileReader();
+			fileReader.onload = () => {
+				const imageElement = new System.Image();
+				imageElement.onload = () => {
+					this.#assets.push({ name: imageFile.name, dataUrl: fileReader.result, imageElement: imageElement });
+					resolve();
+				};
+				imageElement.onerror = () => {
+					resolve();
+				};
+				imageElement.src = fileReader.result;
+			};
+			fileReader.readAsDataURL(imageFile);
+		});
+	}
+
+	//==============================================================================
+	// 애셋 목록 재구성.
+	//==============================================================================
+	rebuildAssetList() {
+		this.#assetListElement.textContent = "";
+		const imageIconMarkup = wrapEditorIconMarkup(EDITOR_ICON_SHAPES.image);
+		for (let assetIndex = 0; assetIndex < this.#assets.length; ++assetIndex) {
+			const assetEntry = this.#assets[assetIndex];
+			const rowElement = createEditorListRowElement(imageIconMarkup, assetEntry.name);
+			const currentIndex = assetIndex;
+			rowElement.addEventListener("click", () => {
+				this.applyAssetToSelectedSystem(currentIndex);
+			});
+			rowElement.addEventListener("contextmenu", (mouseEvent) => {
+				mouseEvent.preventDefault();
+				mouseEvent.stopPropagation();
+				openEditorMenuPanelAt(mouseEvent.clientX, mouseEvent.clientY, [
+					{
+						id: "applyAsset",
+						label: "Apply to Selected System",
+						action: () => {
+							this.applyAssetToSelectedSystem(currentIndex);
+						},
+					},
+					{ separator: true },
+					{
+						id: "removeAsset",
+						label: "Remove",
+						action: () => {
+							this.#assets.splice(currentIndex, 1);
+							this.rebuildAssetList();
+						},
+					},
+				]);
+			});
+			this.#assetListElement.appendChild(rowElement);
+		}
+	}
+
+	//==============================================================================
+	// 선택 시스템에 이미지 애셋 적용. (renderShape 를 image 로 바꾼다)
+	//==============================================================================
+	/**
+	 * @param { number } assetIndex
+	 */
+	applyAssetToSelectedSystem(assetIndex) {
+		const selectedEntry = this.getSelectedSystem();
+		const assetEntry = this.#assets[assetIndex];
+		if (!selectedEntry || !assetEntry) {
+			this.#statusTextElement.innerText = "Select a system in the hierarchy first.";
+			return;
+		}
+		selectedEntry.description.renderShape = "image";
+		selectedEntry.description.imageDataUrl = assetEntry.dataUrl;
+		this.applySelectedSystem();
+		if (selectedEntry.particleSystem) {
+			selectedEntry.particleSystem.setImage(assetEntry.imageElement);
+		}
+		this.rebuildInspector();
+		this.refreshStatus();
+	}
+
+	//==============================================================================
+	// 서술의 이미지 주소를 파티클 시스템에 반영. (파일에서 읽어온 문서용)
+	//==============================================================================
+	/**
+	 * @param { object } systemEntry
+	 */
+	applyImageFromDescription(systemEntry) {
+		if (!systemEntry.description.imageDataUrl || !systemEntry.particleSystem) {
+			return;
+		}
+		const imageElement = new System.Image();
+		imageElement.onload = () => {
+			systemEntry.particleSystem.setImage(imageElement);
+		};
+		imageElement.src = systemEntry.description.imageDataUrl;
+	}
+
+	//==============================================================================
 	// 계층 목록 재구성.
 	//==============================================================================
 	rebuildHierarchy() {
@@ -734,10 +942,20 @@ class ParticleEditor {
 			return;
 		}
 		this.#hierarchyListElement.textContent = "";
+
+		// 이미터 뿌리 줄. (누르면 선택을 푼다)
+		const emitterIconMarkup = wrapEditorIconMarkup(EDITOR_ICON_SHAPES.node);
+		const rootRowElement = createEditorListRowElement(emitterIconMarkup, "Emitter");
+		rootRowElement.addEventListener("click", () => {
+			this.selectSystem(-1);
+		});
+		this.#hierarchyListElement.appendChild(rootRowElement);
+
 		const systemIconMarkup = wrapEditorIconMarkup(ICON_SHAPES.system);
 		for (let systemIndex = 0; systemIndex < this.#systems.length; ++systemIndex) {
 			const systemEntry = this.#systems[systemIndex];
 			const rowElement = createEditorListRowElement(systemIconMarkup, systemEntry.name);
+			rowElement.style.paddingLeft = "30px";
 			setEditorListRowSelected(rowElement, systemIndex === this.#selectedIndex);
 			const currentIndex = systemIndex;
 			rowElement.addEventListener("click", () => {
@@ -767,8 +985,8 @@ class ParticleEditor {
 	selectSystem(systemIndex) {
 		this.#selectedIndex = systemIndex;
 		const rowElements = this.#hierarchyListElement.children;
-		for (let rowIndex = 0; rowIndex < rowElements.length; ++rowIndex) {
-			setEditorListRowSelected(rowElements[rowIndex], rowIndex === systemIndex);
+		for (let rowIndex = 1; rowIndex < rowElements.length; ++rowIndex) {
+			setEditorListRowSelected(rowElements[rowIndex], rowIndex - 1 === systemIndex);
 		}
 		this.rebuildInspector();
 		this.refreshStatus();
@@ -1118,7 +1336,7 @@ class ParticleEditor {
 
 		// 렌더.
 		const renderBodyElement = this.appendInspectorGroup("RENDER");
-		appendEditorSelectRow(renderBodyElement, "Shape", ["circle", "rect", "streak"], description.renderShape, (value) => {
+		appendEditorSelectRow(renderBodyElement, "Shape", ["circle", "rect", "streak", "image"], description.renderShape, (value) => {
 			description.renderShape = value;
 			applyChange();
 		});
@@ -1161,6 +1379,8 @@ class ParticleEditor {
 			this.addSystemFromPreset("Fire");
 		}, () => {
 			this.refreshStatus();
+		}, (graphic) => {
+			this.drawViewOverlay(graphic);
 		});
 		this.#engine.run(previewScene);
 	}

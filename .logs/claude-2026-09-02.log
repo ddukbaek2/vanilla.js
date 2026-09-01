@@ -1,0 +1,8 @@
+
+## 에디터 애셋 파이프라인 + 그리드/뷰 토글 + DnD 수리
+[03:20 요청 → 04:00 응답]
+- uieditor: 팔레트 드래그 앤 드롭이 죽어 있던 원인(PALETTE_DRAG_PREFIX / HIERARCHY_DRAG_PREFIX 상수 정의 소실) 복원. 좌측에 ASSETS 구획 추가 — 이미지 가져오기(Import Images...), 행 클릭으로 선택 노드의 Image 컴포넌트에 즉시 적용, 우클릭 메뉴.
+- particleeditor: HIERARCHY 를 트리 구조로(Emitter 뿌리 + 들여쓰기 자식). VIEW 에 격자 + 이미터 십자 표시, 헤더에 격자/화면 전환 아이콘 토글. ASSETS 구획 — 이미지 적용 시 renderShape "image" + 서술에 imageDataUrl 저장(파일 왕복 지원), 인스펙터 Shape 에 image 항목.
+- visualeditor: ASSETS 구획 복원(가짜 EXPLORER 대체 — 실제 이미지 가져오기/이름 바꾸기/삭제, .visual.json 저장/읽기에 포함). GAME VIEW 헤더 격자 토글.
+- editorkit: 공통 아이콘 목록(EDITOR_ICON_SHAPES)과 머리말 아이콘 단추(createEditorHeaderIconElement) 추가.
+- EFFECTS: 유사 7종 제거 + 신규 메커니즘 5종(LIGHTNING/GALAXY/SWARM/VOLCANO/WARP), 오버레이/스크롤바/COPY 개선 및 배포. (별도 커밋)

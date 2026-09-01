@@ -103,6 +103,57 @@ export function wrapEditorIconMarkup(shapeMarkup) {
 
 
 //==============================================================================
+// 공통 아이콘 그림 목록. (14x14 기준, 색은 글자색을 따른다)
+//==============================================================================
+export const EDITOR_ICON_SHAPES = {
+	grid: "<path d='M2 5.3h10M2 8.7h10M5.3 2v10M8.7 2v10' stroke='currentColor' stroke-width='1.3' fill='none'/>",
+	editMode: "<path d='M2.5 11.5l1.1-3 5.6-5.6a1.4 1.4 0 0 1 2 0l0.9 0.9a1.4 1.4 0 0 1 0 2l-5.6 5.6z' fill='currentColor'/>",
+	previewMode: "<path d='M1.5 7c1.6-2.8 3.4-4.2 5.5-4.2s3.9 1.4 5.5 4.2c-1.6 2.8-3.4 4.2-5.5 4.2S3.1 9.8 1.5 7z' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linejoin='round'/>",
+	folder: "<path d='M1.5 3.5h4l1.2 1.6h5.8v6.4h-11z' fill='currentColor'/>",
+	file: "<path d='M3.5 1.8h5l2.2 2.2v8.2h-7.2z' fill='none' stroke='currentColor' stroke-width='1.5'/>",
+	node: "<path d='M7 1.8l5.2 5.2-5.2 5.2-5.2-5.2z' fill='none' stroke='currentColor' stroke-width='1.5'/><circle cx='7' cy='7' r='1.6' fill='currentColor'/>",
+	image: "<rect x='1.8' y='2.5' width='10.4' height='9' rx='1.2' fill='none' stroke='currentColor' stroke-width='1.4'/><circle cx='5' cy='5.6' r='1.1' fill='currentColor'/><path d='M3 10.4l2.6-2.6 1.8 1.8 2.2-2.6 1.6 1.9' fill='none' stroke='currentColor' stroke-width='1.3'/>",
+};
+
+
+//==============================================================================
+// 구획 머리말에 놓는 아이콘 단추. (격자 / 화면 전환 등 토글)
+//==============================================================================
+/**
+ * @param { string } shapeMarkup
+ * @param { string } titleText
+ * @returns { HTMLElement }
+ */
+export function createEditorHeaderIconElement(shapeMarkup, titleText) {
+	const iconElement = PaneStyle.create("div", "", {
+		style: {
+			position: "relative", width: "22px", height: "20px",
+			display: "flex", alignItems: "center", justifyContent: "center",
+			marginLeft: "2px", cursor: "pointer", borderRadius: "4px", userSelect: "none",
+			color: PaneTheme.color.textDim,
+		},
+	});
+	iconElement.innerHTML = wrapEditorIconMarkup(shapeMarkup);
+	iconElement.title = titleText;
+	iconElement.addEventListener("mouseenter", () => {
+		iconElement.style.backgroundColor = EditorTheme.hoverColor;
+	});
+	iconElement.addEventListener("mouseleave", () => {
+		iconElement.style.backgroundColor = "transparent";
+	});
+	return iconElement;
+}
+
+/**
+ * @param { HTMLElement } iconElement
+ * @param { boolean } isActive
+ */
+export function setEditorHeaderIconActive(iconElement, isActive) {
+	iconElement.style.color = isActive ? EditorTheme.accentColor : PaneTheme.color.textDim;
+}
+
+
+//==============================================================================
 // 메뉴 패널 생성. (메뉴 막대와 오른쪽 단추 메뉴가 함께 쓴다)
 //==============================================================================
 /**

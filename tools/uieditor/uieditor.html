@@ -35131,6 +35131,15 @@ void main() {
     return "<svg width='18' height='18' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'>" + shapeMarkup + "</svg>";
   }
   __name(wrapEditorIconMarkup, "wrapEditorIconMarkup");
+  var EDITOR_ICON_SHAPES = {
+    grid: "<path d='M2 5.3h10M2 8.7h10M5.3 2v10M8.7 2v10' stroke='currentColor' stroke-width='1.3' fill='none'/>",
+    editMode: "<path d='M2.5 11.5l1.1-3 5.6-5.6a1.4 1.4 0 0 1 2 0l0.9 0.9a1.4 1.4 0 0 1 0 2l-5.6 5.6z' fill='currentColor'/>",
+    previewMode: "<path d='M1.5 7c1.6-2.8 3.4-4.2 5.5-4.2s3.9 1.4 5.5 4.2c-1.6 2.8-3.4 4.2-5.5 4.2S3.1 9.8 1.5 7z' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linejoin='round'/>",
+    folder: "<path d='M1.5 3.5h4l1.2 1.6h5.8v6.4h-11z' fill='currentColor'/>",
+    file: "<path d='M3.5 1.8h5l2.2 2.2v8.2h-7.2z' fill='none' stroke='currentColor' stroke-width='1.5'/>",
+    node: "<path d='M7 1.8l5.2 5.2-5.2 5.2-5.2-5.2z' fill='none' stroke='currentColor' stroke-width='1.5'/><circle cx='7' cy='7' r='1.6' fill='currentColor'/>",
+    image: "<rect x='1.8' y='2.5' width='10.4' height='9' rx='1.2' fill='none' stroke='currentColor' stroke-width='1.4'/><circle cx='5' cy='5.6' r='1.1' fill='currentColor'/><path d='M3 10.4l2.6-2.6 1.8 1.8 2.2-2.6 1.6 1.9' fill='none' stroke='currentColor' stroke-width='1.3'/>"
+  };
   function createEditorMenuPanelElement(menuItems) {
     const panelElement = System80.document.createElement("div");
     panelElement.id = "editorMenuPanel";
@@ -35696,6 +35705,66 @@ void main() {
     return rowElement;
   }
   __name(appendEditorBooleanRow, "appendEditorBooleanRow");
+  function openEditorInputDialog(titleText, labelText, currentText, acceptHandler, acceptLabelText = "Save") {
+    const existingDialog = System80.document.getElementById("editorDialog");
+    if (existingDialog) {
+      existingDialog.remove();
+    }
+    const backdropElement = System80.document.createElement("div");
+    backdropElement.id = "editorDialog";
+    backdropElement.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;z-index:10000;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;font-family:" + PaneTheme.font.family + ";";
+    const panelElement = System80.document.createElement("div");
+    panelElement.style.cssText = "min-width:340px;padding:16px 18px 14px 18px;border-radius:6px;background:" + PaneTheme.color.panel + ";border:1px solid " + PaneTheme.color.border + ";box-shadow:0 10px 30px rgba(0,0,0,0.55);color:" + PaneTheme.color.text + ";";
+    const titleElement = System80.document.createElement("div");
+    titleElement.innerText = titleText;
+    titleElement.style.cssText = "font-size:14px;font-weight:bold;color:" + EditorTheme.accentColor + ";margin-bottom:12px;";
+    panelElement.appendChild(titleElement);
+    const fieldLabelElement = System80.document.createElement("div");
+    fieldLabelElement.innerText = labelText;
+    fieldLabelElement.style.cssText = "font-size:12px;color:" + PaneTheme.color.textDim + ";margin-bottom:4px;";
+    panelElement.appendChild(fieldLabelElement);
+    const inputElement = System80.document.createElement("input");
+    inputElement.type = "text";
+    inputElement.value = currentText;
+    inputElement.style.cssText = "width:100%;box-sizing:border-box;padding:6px 8px;font-size:14px;border-radius:3px;background:" + PaneTheme.color.inputBg + ";border:1px solid " + PaneTheme.color.border + ";color:" + PaneTheme.color.text + ";outline:none;";
+    panelElement.appendChild(inputElement);
+    const buttonRowElement = System80.document.createElement("div");
+    buttonRowElement.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:14px;";
+    const cancelElement = createEditorButtonElement("Cancel", false);
+    const acceptElement = createEditorButtonElement(acceptLabelText, true);
+    buttonRowElement.appendChild(cancelElement);
+    buttonRowElement.appendChild(acceptElement);
+    panelElement.appendChild(buttonRowElement);
+    backdropElement.appendChild(panelElement);
+    System80.document.body.appendChild(backdropElement);
+    inputElement.focus();
+    inputElement.select();
+    const closeDialog = /* @__PURE__ */ __name(() => {
+      backdropElement.remove();
+    }, "closeDialog");
+    cancelElement.addEventListener("click", closeDialog);
+    acceptElement.addEventListener("click", () => {
+      const inputText = inputElement.value;
+      closeDialog();
+      acceptHandler(inputText);
+    });
+    inputElement.addEventListener("keydown", (keyboardEvent) => {
+      keyboardEvent.stopPropagation();
+      if (keyboardEvent.key === "Enter") {
+        const inputText = inputElement.value;
+        closeDialog();
+        acceptHandler(inputText);
+      } else if (keyboardEvent.key === "Escape") {
+        closeDialog();
+      }
+    });
+    backdropElement.addEventListener("mousedown", (mouseEvent) => {
+      if (mouseEvent.target === backdropElement) {
+        closeDialog();
+      }
+    });
+  }
+  __name(openEditorInputDialog, "openEditorInputDialog");
   function buildEditorWindowLayout(menuDefinitions, mainPane) {
     const rootPane = new Pane({ direction: "vertical" });
     const menuBarPane = new Pane({ size: 30, minSize: 30, maxSize: 30, isResizable: false });
@@ -35790,6 +35859,8 @@ void main() {
   var ANCHOR_MARK_SIZE = 6;
   var GRID_MINOR_COLOR = "rgba(255, 255, 255, 0.045)";
   var GRID_MAJOR_COLOR = "rgba(255, 255, 255, 0.10)";
+  var PALETTE_DRAG_PREFIX = "uieditor.palette:";
+  var HIERARCHY_DRAG_PREFIX = "uieditor.hierarchy:";
   var RESIZE_HANDLE_DEFINITIONS = [
     { id: "topLeft", ratioX: 0, ratioY: 0, moveLeft: true, moveTop: true, sizeX: -1, sizeY: -1, cursor: "nwse-resize" },
     { id: "top", ratioX: 0.5, ratioY: 0, moveLeft: false, moveTop: true, sizeX: 0, sizeY: -1, cursor: "ns-resize" },
@@ -35961,6 +36032,12 @@ void main() {
     #inspectorBodyElement;
     /** @private @type { HTMLElement } */
     #statusTextElement;
+    /** @private @type { HTMLInputElement } */
+    #imageInputElement;
+    /** @private @type { object[] } */
+    #imageAssets;
+    /** @private @type { HTMLElement } */
+    #assetListElement;
     /** @private @type { string[] } */
     #undoStack;
     /** @private @type { string[] } */
@@ -36028,6 +36105,9 @@ void main() {
       this.#hierarchyTreeElement = null;
       this.#inspectorBodyElement = null;
       this.#statusTextElement = null;
+      this.#imageInputElement = null;
+      this.#imageAssets = [];
+      this.#assetListElement = null;
       this.#undoStack = [];
       this.#redoStack = [];
       this.#dragMode = "none";
@@ -36137,8 +36217,37 @@ void main() {
       this.#hierarchyTreeElement = PaneStyle.create("div", "", { style: { flex: "1", overflowY: "auto", position: "relative" } });
       hierarchyElement.appendChild(this.#hierarchyTreeElement);
       hierarchyPane.getContainer().appendChild(hierarchyElement);
+      const assetsPane = new Pane({ size: 180, minSize: 110 });
+      const assetsElement = this.createSectionElement("ASSETS", () => {
+        return [
+          {
+            id: "importImages",
+            label: "Import Images...",
+            action: /* @__PURE__ */ __name(() => {
+              this.#imageInputElement.click();
+            }, "action")
+          }
+        ];
+      });
+      this.#assetListElement = PaneStyle.create("div", "", { style: { flex: "1", overflowY: "auto", position: "relative" } });
+      assetsElement.appendChild(this.#assetListElement);
+      assetsPane.getContainer().appendChild(assetsElement);
       leftPane.addPane(componentsPane);
       leftPane.addPane(hierarchyPane);
+      leftPane.addPane(assetsPane);
+      this.#imageInputElement = System81.document.createElement("input");
+      this.#imageInputElement.type = "file";
+      this.#imageInputElement.accept = "image/*";
+      this.#imageInputElement.multiple = true;
+      this.#imageInputElement.style.display = "none";
+      this.#imageInputElement.addEventListener("change", async () => {
+        for (const selectedFile of this.#imageInputElement.files) {
+          await this.importImageAsset(selectedFile);
+        }
+        this.#imageInputElement.value = "";
+        this.rebuildAssetList();
+      });
+      System81.document.body.appendChild(this.#imageInputElement);
       const centerPane = new Pane({ size: "flex", minSize: 200 });
       const centerElement = PaneStyle.create("div", "", {
         style: { display: "flex", flexDirection: "column", backgroundColor: PaneTheme.color.background }
@@ -37230,6 +37339,88 @@ void main() {
         { id: "bringToFront", label: "Bring to Front" },
         { id: "sendToBack", label: "Send to Back" }
       ]);
+    }
+    //==============================================================================
+    // 이미지 애셋 가져오기. (데이터 주소로 읽어 목록에 담는다)
+    //==============================================================================
+    /**
+     * @param { File } imageFile
+     */
+    importImageAsset(imageFile) {
+      return new System81.Promise((resolve) => {
+        const fileReader = new System81.FileReader();
+        fileReader.onload = () => {
+          const imageElement = new System81.Image();
+          imageElement.onload = () => {
+            this.#imageAssets.push({ name: imageFile.name, dataUrl: fileReader.result, imageElement });
+            resolve();
+          };
+          imageElement.onerror = () => {
+            resolve();
+          };
+          imageElement.src = fileReader.result;
+        };
+        fileReader.readAsDataURL(imageFile);
+      });
+    }
+    //==============================================================================
+    // 애셋 목록 재구성.
+    //==============================================================================
+    rebuildAssetList() {
+      this.#assetListElement.textContent = "";
+      for (let assetIndex = 0; assetIndex < this.#imageAssets.length; ++assetIndex) {
+        const assetEntry = this.#imageAssets[assetIndex];
+        const rowElement = createEditorListRowElement(wrapEditorIconMarkup(EDITOR_ICON_SHAPES.image), assetEntry.name);
+        const currentIndex = assetIndex;
+        rowElement.addEventListener("click", () => {
+          this.applyAssetToSelectedNode(currentIndex);
+        });
+        rowElement.addEventListener("contextmenu", (mouseEvent) => {
+          mouseEvent.preventDefault();
+          mouseEvent.stopPropagation();
+          this.openMenuPanelAt(mouseEvent.clientX, mouseEvent.clientY, [
+            {
+              id: "applyAsset",
+              label: "Apply to Selected Node",
+              action: /* @__PURE__ */ __name(() => {
+                this.applyAssetToSelectedNode(currentIndex);
+              }, "action")
+            },
+            { separator: true },
+            {
+              id: "removeAsset",
+              label: "Remove",
+              action: /* @__PURE__ */ __name(() => {
+                this.#imageAssets.splice(currentIndex, 1);
+                this.rebuildAssetList();
+              }, "action")
+            }
+          ]);
+        });
+        this.#assetListElement.appendChild(rowElement);
+      }
+    }
+    //==============================================================================
+    // 선택 노드의 이미지 뷰에 애셋 적용.
+    //==============================================================================
+    /**
+     * @param { number } assetIndex
+     */
+    applyAssetToSelectedNode(assetIndex) {
+      const assetEntry = this.#imageAssets[assetIndex];
+      const selectedNode = this.#selectedNode;
+      if (!assetEntry || !selectedNode) {
+        this.#statusTextElement.innerText = "Select a node with an Image component first.";
+        return;
+      }
+      const imageView = selectedNode.getComponent(UIImageView);
+      if (!imageView) {
+        this.#statusTextElement.innerText = "Selected node has no Image component.";
+        return;
+      }
+      this.pushUndoSnapshot();
+      imageView.setImage(assetEntry.imageElement);
+      this.#statusTextElement.innerText = "Applied " + assetEntry.name + " to " + selectedNode.getName() + ".";
     }
     //==============================================================================
     // 명령 실행.
@@ -38694,63 +38885,7 @@ void main() {
      * @param { Function } acceptHandler
      */
     openInputDialog(titleText, labelText, currentText, acceptHandler) {
-      const existingDialog = System81.document.getElementById("uieditorDialog");
-      if (existingDialog) {
-        existingDialog.remove();
-      }
-      const backdropElement = System81.document.createElement("div");
-      backdropElement.id = "uieditorDialog";
-      backdropElement.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;z-index:10000;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;font-family:" + PaneTheme.font.family + ";";
-      const panelElement = System81.document.createElement("div");
-      panelElement.style.cssText = "min-width:340px;padding:16px 18px 14px 18px;border-radius:6px;background:" + PaneTheme.color.panel + ";border:1px solid " + PaneTheme.color.border + ";box-shadow:0 10px 30px rgba(0,0,0,0.55);color:" + PaneTheme.color.text + ";";
-      const titleElement = System81.document.createElement("div");
-      titleElement.innerText = titleText;
-      titleElement.style.cssText = "font-size:14px;font-weight:bold;color:" + SELECTION_COLOR + ";margin-bottom:12px;";
-      panelElement.appendChild(titleElement);
-      const fieldLabelElement = System81.document.createElement("div");
-      fieldLabelElement.innerText = labelText;
-      fieldLabelElement.style.cssText = "font-size:12px;color:" + PaneTheme.color.textDim + ";margin-bottom:4px;";
-      panelElement.appendChild(fieldLabelElement);
-      const inputElement = System81.document.createElement("input");
-      inputElement.type = "text";
-      inputElement.value = currentText;
-      inputElement.style.cssText = "width:100%;box-sizing:border-box;padding:6px 8px;font-size:14px;border-radius:3px;background:" + PaneTheme.color.inputBg + ";border:1px solid " + PaneTheme.color.border + ";color:" + PaneTheme.color.text + ";outline:none;";
-      panelElement.appendChild(inputElement);
-      const buttonRowElement = System81.document.createElement("div");
-      buttonRowElement.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:14px;";
-      const cancelElement = this.createDialogButtonElement("Cancel", false);
-      const acceptElement = this.createDialogButtonElement("Save", true);
-      buttonRowElement.appendChild(cancelElement);
-      buttonRowElement.appendChild(acceptElement);
-      panelElement.appendChild(buttonRowElement);
-      backdropElement.appendChild(panelElement);
-      System81.document.body.appendChild(backdropElement);
-      inputElement.focus();
-      inputElement.select();
-      const closeDialog = /* @__PURE__ */ __name(() => {
-        backdropElement.remove();
-      }, "closeDialog");
-      cancelElement.addEventListener("click", closeDialog);
-      acceptElement.addEventListener("click", () => {
-        const inputText = inputElement.value;
-        closeDialog();
-        acceptHandler(inputText);
-      });
-      inputElement.addEventListener("keydown", (keyboardEvent) => {
-        keyboardEvent.stopPropagation();
-        if (keyboardEvent.key === "Enter") {
-          const inputText = inputElement.value;
-          closeDialog();
-          acceptHandler(inputText);
-        } else if (keyboardEvent.key === "Escape") {
-          closeDialog();
-        }
-      });
-      backdropElement.addEventListener("mousedown", (mouseEvent) => {
-        if (mouseEvent.target === backdropElement) {
-          closeDialog();
-        }
-      });
+      openEditorInputDialog(titleText, labelText, currentText, acceptHandler);
     }
     //==============================================================================
     // 대화 상자 단추.

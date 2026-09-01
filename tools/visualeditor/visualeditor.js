@@ -15,6 +15,7 @@ import {
 	openEditorMenuPanelAt, createEditorSectionElement, createEditorListRowElement, setEditorListRowSelected,
 	createEditorHeaderButtonElement, setEditorHeaderButtonSelected, createEditorPropertyRowElement,
 	decorateEditorInputElement, createEditorButtonElement, buildEditorWindowLayout, openEditorInputDialog,
+	EDITOR_ICON_SHAPES, createEditorHeaderIconElement, setEditorHeaderIconActive,
 } from "../common/editorkit.js";
 
 
@@ -153,6 +154,11 @@ class VisualEditor {
 	/** @private @type { HTMLElement } */ #hierarchyTreeElement;
 	/** @private @type { Function } */ #createHierarchyItem;
 	/** @private @type { HTMLInputElement } */ #fileInputElement;
+	/** @private @type { HTMLInputElement } */ #imageInputElement;
+	/** @private @type { object[] } */ #assets;
+	/** @private @type { HTMLElement } */ #assetListElement;
+	/** @private @type { boolean } */ #isGridVisible;
+	/** @private @type { HTMLElement } */ #gridToggleElement;
 
 	//==============================================================================
 	// 생성.
@@ -178,6 +184,11 @@ class VisualEditor {
 		this.#hierarchyTreeElement = null;
 		this.#createHierarchyItem = null;
 		this.#fileInputElement = null;
+		this.#imageInputElement = null;
+		this.#assets = [];
+		this.#assetListElement = null;
+		this.#isGridVisible = true;
+		this.#gridToggleElement = null;
 	}
 
 	//==============================================================================
@@ -333,7 +344,24 @@ class VisualEditor {
 		hierarchyElement.appendChild(hierarchyTree);
 		hierarchyPane.getContainer().appendChild(hierarchyElement);
 
+		const assetsPane = new Pane({ size: 200, minSize: 110 });
+		const assetsElement = createEditorSectionElement("ASSETS", () => {
+			return [
+				{
+					id: "importImages",
+					label: "Import Images...",
+					action: () => {
+						this.#imageInputElement.click();
+					},
+				},
+			];
+		});
+		this.#assetListElement = PaneStyle.create("div", "", { style: { flex: "1", overflowY: "auto", position: "relative" } });
+		assetsElement.appendChild(this.#assetListElement);
+		assetsPane.getContainer().appendChild(assetsElement);
+
 		leftSidePane.addPane(hierarchyPane);
+		leftSidePane.addPane(assetsPane);
 
 		// [중앙] 코드 에디터.
 		const codeEditorPane = new Pane({ size: 640, minSize: 150 });
@@ -355,6 +383,12 @@ class VisualEditor {
 		const gameCanvasSpacerElement = PaneStyle.create("div", "", {
 			style: { position: "relative", width: "auto", height: "auto", flex: "1" },
 		});
+		this.#gridToggleElement = createEditorHeaderIconElement(EDITOR_ICON_SHAPES.grid, "Show Grid");
+		this.#gridToggleElement.addEventListener("click", () => {
+			this.#isGridVisible = !this.#isGridVisible;
+			setEditorHeaderIconActive(this.#gridToggleElement, this.#isGridVisible);
+		});
+		setEditorHeaderIconActive(this.#gridToggleElement, true);
 		this.#playButtonElement = createEditorHeaderButtonElement("PLAY");
 		this.#pauseButtonElement = createEditorHeaderButtonElement("PAUSE");
 		this.#stopButtonElement = createEditorHeaderButtonElement("STOP");
@@ -368,6 +402,7 @@ class VisualEditor {
 			this.executeCommand("stop");
 		});
 		gameCanvasTitleElement.appendChild(gameCanvasSpacerElement);
+		gameCanvasTitleElement.appendChild(this.#gridToggleElement);
 		gameCanvasTitleElement.appendChild(this.#playButtonElement);
 		gameCanvasTitleElement.appendChild(this.#pauseButtonElement);
 		gameCanvasTitleElement.appendChild(this.#stopButtonElement);
@@ -550,6 +585,21 @@ class VisualEditor {
 		});
 		System.document.body.appendChild(this.#fileInputElement);
 
+		// 이미지 가져오기 입력.
+		this.#imageInputElement = System.document.createElement("input");
+		this.#imageInputElement.type = "file";
+		this.#imageInputElement.accept = "image/*";
+		this.#imageInputElement.multiple = true;
+		this.#imageInputElement.style.display = "none";
+		this.#imageInputElement.addEventListener("change", async () => {
+			for (const selectedFile of this.#imageInputElement.files) {
+				await this.importImageAsset(selectedFile);
+			}
+			this.#imageInputElement.value = "";
+			this.rebuildAssetList();
+		});
+		System.document.body.appendChild(this.#imageInputElement);
+
 		// 엔진 설정.
 		const engineConfiguration = new EngineConfiguration();
 		engineConfiguration.referenceResolutionSize = Vector2.create(1280, 800);
@@ -653,6 +703,68 @@ class VisualEditor {
 	}
 
 	//==============================================================================
+	// 이미지 애셋 가져오기. (데이터 주소로 읽어 목록에 담는다)
+	//==============================================================================
+	/**
+	 * @param { File } imageFile
+	 */
+	importImageAsset(imageFile) {
+		return new System.Promise((resolve) => {
+			const fileReader = new System.FileReader();
+			fileReader.onload = () => {
+				this.#assets.push({ name: imageFile.name, dataUrl: fileReader.result });
+				resolve();
+			};
+			fileReader.readAsDataURL(imageFile);
+		});
+	}
+
+	//==============================================================================
+	// 애셋 목록 재구성.
+	//==============================================================================
+	rebuildAssetList() {
+		this.#assetListElement.textContent = "";
+		const imageIconMarkup = wrapEditorIconMarkup(EDITOR_ICON_SHAPES.image);
+		for (let assetIndex = 0; assetIndex < this.#assets.length; ++assetIndex) {
+			const assetEntry = this.#assets[assetIndex];
+			const rowElement = createEditorListRowElement(imageIconMarkup, assetEntry.name);
+			const currentIndex = assetIndex;
+			rowElement.addEventListener("click", () => {
+				this.setStatusText("Assets > " + assetEntry.name);
+			});
+			rowElement.addEventListener("contextmenu", (mouseEvent) => {
+				mouseEvent.preventDefault();
+				mouseEvent.stopPropagation();
+				openEditorMenuPanelAt(mouseEvent.clientX, mouseEvent.clientY, [
+					{
+						id: "renameAsset",
+						label: "Rename",
+						action: () => {
+							openEditorInputDialog("Rename", "Asset name", assetEntry.name, (inputText) => {
+								const newName = inputText.trim();
+								if (newName) {
+									assetEntry.name = newName;
+									this.rebuildAssetList();
+								}
+							}, "Rename");
+						},
+					},
+					{ separator: true },
+					{
+						id: "removeAsset",
+						label: "Remove",
+						action: () => {
+							this.#assets.splice(currentIndex, 1);
+							this.rebuildAssetList();
+						},
+					},
+				]);
+			});
+			this.#assetListElement.appendChild(rowElement);
+		}
+	}
+
+	//==============================================================================
 	// 계층 트리 직렬화. (이름 / 활성 / 자식)
 	//==============================================================================
 	/**
@@ -714,6 +826,7 @@ class VisualEditor {
 			script: this.#editor.value,
 			properties: propertyTable,
 			hierarchy: this.composeHierarchyData(this.#hierarchyTreeElement),
+			assets: this.#assets.map((assetEntry) => ({ name: assetEntry.name, dataUrl: assetEntry.dataUrl })),
 		};
 		const jsonText = System.JSON.stringify(asset, null, "\t");
 		const blob = new System.Blob([jsonText], { type: "application/json" });
@@ -750,6 +863,10 @@ class VisualEditor {
 			this.#hierarchyTreeElement.textContent = "";
 			this.rebuildHierarchyFromData(this.#hierarchyTreeElement, parsedAsset.hierarchy);
 		}
+		if (System.Array.isArray(parsedAsset.assets)) {
+			this.#assets = parsedAsset.assets.map((assetEntry) => ({ name: assetEntry.name, dataUrl: assetEntry.dataUrl }));
+			this.rebuildAssetList();
+		}
 		this.compileCode();
 		this.executeCommand("stop");
 		this.printConsole("Opened " + fileName + ".");
@@ -759,6 +876,8 @@ class VisualEditor {
 	// 문서 초기화. (기본 스크립트 + 기본 프로퍼티 + 기본 계층)
 	//==============================================================================
 	resetDocument() {
+		this.#assets = [];
+		this.rebuildAssetList();
 		for (const propertyName of System.Object.keys(this.#inspector)) {
 			this.removeProperty(propertyName);
 		}
@@ -1033,6 +1152,9 @@ function tick(particle, properties, canvasSize) {
 		viewManager.applyCanvasNativeRect(graphic);
 		graphic.setFillColor(Colors.darkVanilla);
 		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		if (this.#isGridVisible === false) {
+			return;
+		}
 		const gridSize = 50;
 		const subGridSize = 10;
 		graphic.setStrokeColor("rgba(0, 0, 0, 0.05)");

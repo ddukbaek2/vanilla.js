@@ -11,6 +11,7 @@ import {
 	createEditorGroupElement, createEditorPropertyRowElement, appendEditorNumberRow, appendEditorTextRow,
 	appendEditorColorRow, appendEditorBooleanRow, composeEditorNumberText, decorateEditorInputElement,
 	createEditorButtonElement, buildEditorWindowLayout, openEditorInputDialog,
+	EDITOR_ICON_SHAPES,
 } from "../common/editorkit.js";
 import { Graphic } from "../../src/core/graphic.js";
 import { WorldNode } from "../../src/core/node/worldnode.js";
@@ -173,6 +174,10 @@ const ANCHOR_COLOR = "#3ddc84";
 const ANCHOR_MARK_SIZE = 6;
 const GRID_MINOR_COLOR = "rgba(255, 255, 255, 0.045)";
 const GRID_MAJOR_COLOR = "rgba(255, 255, 255, 0.10)";
+
+// 끌어다 놓기 식별 머리말.
+const PALETTE_DRAG_PREFIX = "uieditor.palette:";
+const HIERARCHY_DRAG_PREFIX = "uieditor.hierarchy:";
 
 // 크기 조절 손잡이 8방향.
 const RESIZE_HANDLE_DEFINITIONS = [
@@ -377,6 +382,9 @@ export class UIEditor {
 	/** @private @type { HTMLElement } */ #hierarchyTreeElement;
 	/** @private @type { HTMLElement } */ #inspectorBodyElement;
 	/** @private @type { HTMLElement } */ #statusTextElement;
+	/** @private @type { HTMLInputElement } */ #imageInputElement;
+	/** @private @type { object[] } */ #imageAssets;
+	/** @private @type { HTMLElement } */ #assetListElement;
 	/** @private @type { string[] } */ #undoStack;
 	/** @private @type { string[] } */ #redoStack;
 	/** @private @type { string } */ #dragMode;
@@ -419,6 +427,9 @@ export class UIEditor {
 		this.#hierarchyTreeElement = null;
 		this.#inspectorBodyElement = null;
 		this.#statusTextElement = null;
+		this.#imageInputElement = null;
+		this.#imageAssets = [];
+		this.#assetListElement = null;
 		this.#undoStack = [];
 		this.#redoStack = [];
 		this.#dragMode = "none";
@@ -536,8 +547,40 @@ export class UIEditor {
 		hierarchyElement.appendChild(this.#hierarchyTreeElement);
 		hierarchyPane.getContainer().appendChild(hierarchyElement);
 
+		const assetsPane = new Pane({ size: 180, minSize: 110 });
+		const assetsElement = this.createSectionElement("ASSETS", () => {
+			return [
+				{
+					id: "importImages",
+					label: "Import Images...",
+					action: () => {
+						this.#imageInputElement.click();
+					},
+				},
+			];
+		});
+		this.#assetListElement = PaneStyle.create("div", "", { style: { flex: "1", overflowY: "auto", position: "relative" } });
+		assetsElement.appendChild(this.#assetListElement);
+		assetsPane.getContainer().appendChild(assetsElement);
+
 		leftPane.addPane(componentsPane);
 		leftPane.addPane(hierarchyPane);
+		leftPane.addPane(assetsPane);
+
+		// 이미지 가져오기 입력.
+		this.#imageInputElement = System.document.createElement("input");
+		this.#imageInputElement.type = "file";
+		this.#imageInputElement.accept = "image/*";
+		this.#imageInputElement.multiple = true;
+		this.#imageInputElement.style.display = "none";
+		this.#imageInputElement.addEventListener("change", async () => {
+			for (const selectedFile of this.#imageInputElement.files) {
+				await this.importImageAsset(selectedFile);
+			}
+			this.#imageInputElement.value = "";
+			this.rebuildAssetList();
+		});
+		System.document.body.appendChild(this.#imageInputElement);
 
 		// 가운데: 편집 화면과 결과 화면을 탭으로 전환한다.
 		const centerPane = new Pane({ size: "flex", minSize: 200 });
@@ -1706,6 +1749,91 @@ export class UIEditor {
 			{ id: "bringToFront", label: "Bring to Front" },
 			{ id: "sendToBack", label: "Send to Back" },
 		]);
+	}
+
+	//==============================================================================
+	// 이미지 애셋 가져오기. (데이터 주소로 읽어 목록에 담는다)
+	//==============================================================================
+	/**
+	 * @param { File } imageFile
+	 */
+	importImageAsset(imageFile) {
+		return new System.Promise((resolve) => {
+			const fileReader = new System.FileReader();
+			fileReader.onload = () => {
+				const imageElement = new System.Image();
+				imageElement.onload = () => {
+					this.#imageAssets.push({ name: imageFile.name, dataUrl: fileReader.result, imageElement: imageElement });
+					resolve();
+				};
+				imageElement.onerror = () => {
+					resolve();
+				};
+				imageElement.src = fileReader.result;
+			};
+			fileReader.readAsDataURL(imageFile);
+		});
+	}
+
+	//==============================================================================
+	// 애셋 목록 재구성.
+	//==============================================================================
+	rebuildAssetList() {
+		this.#assetListElement.textContent = "";
+		for (let assetIndex = 0; assetIndex < this.#imageAssets.length; ++assetIndex) {
+			const assetEntry = this.#imageAssets[assetIndex];
+			const rowElement = createEditorListRowElement(wrapEditorIconMarkup(EDITOR_ICON_SHAPES.image), assetEntry.name);
+			const currentIndex = assetIndex;
+			rowElement.addEventListener("click", () => {
+				this.applyAssetToSelectedNode(currentIndex);
+			});
+			rowElement.addEventListener("contextmenu", (mouseEvent) => {
+				mouseEvent.preventDefault();
+				mouseEvent.stopPropagation();
+				this.openMenuPanelAt(mouseEvent.clientX, mouseEvent.clientY, [
+					{
+						id: "applyAsset",
+						label: "Apply to Selected Node",
+						action: () => {
+							this.applyAssetToSelectedNode(currentIndex);
+						},
+					},
+					{ separator: true },
+					{
+						id: "removeAsset",
+						label: "Remove",
+						action: () => {
+							this.#imageAssets.splice(currentIndex, 1);
+							this.rebuildAssetList();
+						},
+					},
+				]);
+			});
+			this.#assetListElement.appendChild(rowElement);
+		}
+	}
+
+	//==============================================================================
+	// 선택 노드의 이미지 뷰에 애셋 적용.
+	//==============================================================================
+	/**
+	 * @param { number } assetIndex
+	 */
+	applyAssetToSelectedNode(assetIndex) {
+		const assetEntry = this.#imageAssets[assetIndex];
+		const selectedNode = this.#selectedNode;
+		if (!assetEntry || !selectedNode) {
+			this.#statusTextElement.innerText = "Select a node with an Image component first.";
+			return;
+		}
+		const imageView = selectedNode.getComponent(UIImageView);
+		if (!imageView) {
+			this.#statusTextElement.innerText = "Selected node has no Image component.";
+			return;
+		}
+		this.pushUndoSnapshot();
+		imageView.setImage(assetEntry.imageElement);
+		this.#statusTextElement.innerText = "Applied " + assetEntry.name + " to " + selectedNode.getName() + ".";
 	}
 
 	//==============================================================================
