@@ -133,12 +133,8 @@ export class Engine extends Object {
 			throw new System.Error(`scene is invalid.`);
 		}
 		
-		// 기본 폰트 불러오기.
-		const internalFontFace = new FontFace(`DOSGothic`, `url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff")`);
-		// const internalFontFace = new FontFace(`DOSGothic`, `url("./assets/fonts/Consolas.woff2")`);
-		internalFontFace.load().then((loadedFont) => {
-			document.fonts.add(loadedFont);
-
+		// 씬 로드와 렌더 루프 시작. (기본 폰트가 실패하거나 늦어도 여기는 막히지 않는다)
+		const startEngine = () => {
 			// 씬 로드는 백그라운드로 시작. (렌더 루프가 drawOnLoad로 로딩 화면 출력)
 			const sceneManager = this.getSceneManager();
 			sceneManager.loadScene(scene).catch((error) => {
@@ -158,8 +154,16 @@ export class Engine extends Object {
 
 			++this.#frameNumber;
 			System.window.requestAnimationFrame(this.#updateEngineCallback);
+		};
+		startEngine();
+
+		// 기본 폰트는 뒤에서 불러온다. (성공하면 이후 그리는 글자부터 반영)
+		const internalFontFace = new FontFace(`DOSGothic`, `url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff")`);
+		// const internalFontFace = new FontFace(`DOSGothic`, `url("./assets/fonts/Consolas.woff2")`);
+		internalFontFace.load().then((loadedFont) => {
+			document.fonts.add(loadedFont);
 		}).catch((error) => {
-			console.error(error);
+			console.warn(`기본 폰트 로드 실패 — 시스템 폰트로 계속합니다.`, error);
 		});
 	}
 

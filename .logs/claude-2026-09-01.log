@@ -35,3 +35,5 @@
 - 파티클 편집기(tools/particleeditor): 좌 프리뷰 + 우 인스펙터(방출/모양/시작 범위/그라디언트 키/물리/렌더),
   프리셋 9종, .vfx.json 저장/불러오기/버스트. — visualasset 형식의 첫 구현.
 - 배포: 테마 쇼케이스는 배포 완료. EFFECTS V2 / 파티클 편집기는 NAS SMB 세션 단절(이름 해석 실패 + IP 자격 증명 부재)로 보류.
+- NAS 복구 후 일괄 배포(effects V2 / particleeditor 신규 / 전 배포처 엔진 / uieditor 재빌드 / 메인 도구 카드 / README).
+  파티클 편집기 캔버스가 창 전체를 덮던 문제(autoResize) 수정, Engine.run 의 CDN 폰트 블로킹(실패 시 씬 미시작) 제거 — 프리뷰 파티클 렌더 스크린샷 검증.

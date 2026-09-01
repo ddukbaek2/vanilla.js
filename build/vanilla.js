@@ -9956,9 +9956,7 @@ var Engine = class extends Object2 {
     if (scene === null || scene === void 0 || scene instanceof Scene === false) {
       throw new System19.Error(`scene is invalid.`);
     }
-    const internalFontFace = new FontFace(`DOSGothic`, `url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff")`);
-    internalFontFace.load().then((loadedFont) => {
-      document.fonts.add(loadedFont);
+    const startEngine = /* @__PURE__ */ __name(() => {
       const sceneManager = this.getSceneManager();
       sceneManager.loadScene(scene).catch((error) => {
         console.error(error);
@@ -9970,8 +9968,13 @@ var Engine = class extends Object2 {
       }
       ++this.#frameNumber;
       System19.window.requestAnimationFrame(this.#updateEngineCallback);
+    }, "startEngine");
+    startEngine();
+    const internalFontFace = new FontFace(`DOSGothic`, `url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff")`);
+    internalFontFace.load().then((loadedFont) => {
+      document.fonts.add(loadedFont);
     }).catch((error) => {
-      console.error(error);
+      console.warn(`\uAE30\uBCF8 \uD3F0\uD2B8 \uB85C\uB4DC \uC2E4\uD328 \u2014 \uC2DC\uC2A4\uD15C \uD3F0\uD2B8\uB85C \uACC4\uC18D\uD569\uB2C8\uB2E4.`, error);
     });
   }
   //==============================================================================
@@ -32566,6 +32569,100 @@ var ParticleSystem = class extends Component {
   /** @param { number } maxParticleCount */
   setMaxParticleCount(maxParticleCount) {
     this.#maxParticleCount = maxParticleCount;
+  }
+  //==============================================================================
+  // 서술(JSON) 적용. — vfx 애셋 로드 / 파티클 편집기 공용.
+  // - 모든 항목은 선택 사항이며 준 것만 반영한다. 색은 [r, g, b, a] 배열.
+  //==============================================================================
+  /**
+   * @param { object } description
+   */
+  applyDescription(description) {
+    const toColor = /* @__PURE__ */ __name((channels) => new Color(channels[0], channels[1], channels[2], channels[3] !== void 0 ? channels[3] : 1), "toColor");
+    if (description.looping !== void 0) {
+      this.setLooping(description.looping);
+    }
+    if (description.duration !== void 0) {
+      this.setDuration(description.duration);
+    }
+    if (description.maxParticleCount !== void 0) {
+      this.setMaxParticleCount(description.maxParticleCount);
+    }
+    if (description.emissionRate !== void 0) {
+      this.setEmissionRate(description.emissionRate);
+    }
+    if (description.bursts !== void 0) {
+      this.setBurstList(description.bursts);
+    }
+    if (description.shape !== void 0) {
+      this.setEmitterShape(description.shape);
+    }
+    if (description.shapeRadius !== void 0) {
+      this.setShapeRadius(description.shapeRadius);
+    }
+    if (description.coneAngle !== void 0) {
+      this.setConeAngle(description.coneAngle);
+    }
+    if (description.boxSize !== void 0) {
+      this.setBoxSize(description.boxSize[0], description.boxSize[1]);
+    }
+    if (description.edgeWidth !== void 0) {
+      this.setEdgeWidth(description.edgeWidth);
+    }
+    if (description.lifetime !== void 0) {
+      this.setStartLifetime(description.lifetime[0], description.lifetime[1]);
+    }
+    if (description.speed !== void 0) {
+      this.setStartSpeed(description.speed[0], description.speed[1]);
+    }
+    if (description.size !== void 0) {
+      this.setStartSize(description.size[0], description.size[1]);
+    }
+    if (description.rotation !== void 0) {
+      this.setStartRotation(description.rotation[0], description.rotation[1]);
+    }
+    if (description.angularVelocity !== void 0) {
+      this.setAngularVelocity(description.angularVelocity[0], description.angularVelocity[1]);
+    }
+    if (description.startColorA !== void 0) {
+      this.setStartColor(toColor(description.startColorA), toColor(description.startColorB !== void 0 ? description.startColorB : description.startColorA));
+    }
+    if (description.colorOverLifetime !== void 0) {
+      this.setColorOverLifetime(description.colorOverLifetime.map((key) => {
+        return { time: key.time, color: toColor(key.color) };
+      }));
+    }
+    if (description.sizeOverLifetime !== void 0) {
+      this.setSizeOverLifetime(description.sizeOverLifetime[0], description.sizeOverLifetime[1]);
+    }
+    if (description.gravity !== void 0) {
+      this.setGravity(description.gravity[0], description.gravity[1]);
+    }
+    if (description.damping !== void 0) {
+      this.setDamping(description.damping);
+    }
+    if (description.attractor !== void 0) {
+      if (description.attractor) {
+        this.setAttractor(description.attractor.x, description.attractor.y, description.attractor.strength, description.attractor.swirl !== void 0 ? description.attractor.swirl : 0);
+      } else {
+        this.clearAttractor();
+      }
+    }
+    if (description.wobble !== void 0) {
+      this.setWobble(description.wobble[0], description.wobble[1] !== void 0 ? description.wobble[1] : 4);
+    }
+    if (description.renderShape !== void 0) {
+      this.setRenderShape(description.renderShape);
+    }
+    if (description.blendMode !== void 0) {
+      this.setBlendMode(description.blendMode);
+    }
+    if (description.streakScale !== void 0) {
+      this.setStreakScale(description.streakScale);
+    }
+    if (description.worldSpace !== void 0) {
+      this.setWorldSpace(description.worldSpace);
+    }
   }
   //==============================================================================
   // 조회 메서드 목록.

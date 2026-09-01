@@ -693,7 +693,8 @@
 	const engineConfiguration = new EngineConfiguration();
 	engineConfiguration.referenceResolutionSize = Vector2.create(960, 600);
 	engineConfiguration.canvasId = "previewCanvas";
-	engineConfiguration.autoResizeOnWindowResize = true;
+	// 캔버스가 프리뷰 패널 크기를 따르도록 창 전체 자동 리사이즈는 끈다. (CSS 100% + 엔진 뷰 재계산)
+	engineConfiguration.autoResizeOnWindowResize = false;
 	const engine = new Engine(engineConfiguration);
 	engine.run(new PreviewScene());
 	System.particleEditorEngine = engine;
