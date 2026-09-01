@@ -35073,17 +35073,18 @@ void main() {
   var System80 = globalThis;
   var EditorTheme = {
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI Variable Text", "Segoe UI", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", Roboto, sans-serif',
-    accentColor: "#0078d4",
-    accentSoftColor: "#04395e",
+    accentColor: "#d4b06a",
+    accentSoftColor: "#463a22",
     inkColor: "#cccccc",
     inkDimColor: "#9d9d9d",
-    iconColor: "#85b6ea",
+    iconColor: "#d9c79a",
     borderColor: "#2b2b2b",
     borderSoftColor: "rgba(255, 255, 255, 0.045)",
     rowHeight: "26px",
     hoverColor: "#2a2d2e",
-    menuHoverColor: "#04395e",
+    menuHoverColor: "#463a22",
     selectedRowTextColor: "#ffffff",
+    onAccentTextColor: "#2a2016",
     backgroundColor: "#1f1f1f",
     panelColor: "#181818",
     groupColor: "#202020",
@@ -35448,7 +35449,7 @@ void main() {
   function createEditorButtonElement(labelText, isPrimary) {
     const buttonElement = System80.document.createElement("div");
     buttonElement.innerText = labelText;
-    buttonElement.style.cssText = "padding:6px 16px;font-size:13px;border-radius:3px;cursor:pointer;user-select:none;border:1px solid " + PaneTheme.color.border + ";" + (isPrimary ? "background:" + EditorTheme.accentColor + ";color:" + EditorTheme.selectedRowTextColor + ";border-color:" + EditorTheme.accentColor + ";" : "background:" + PaneTheme.color.inputBg + ";color:" + PaneTheme.color.text + ";");
+    buttonElement.style.cssText = "padding:6px 16px;font-size:13px;border-radius:3px;cursor:pointer;user-select:none;border:1px solid " + PaneTheme.color.border + ";" + (isPrimary ? "background:" + EditorTheme.accentColor + ";color:" + EditorTheme.onAccentTextColor + ";border-color:" + EditorTheme.accentColor + ";" : "background:" + PaneTheme.color.inputBg + ";color:" + PaneTheme.color.text + ";");
     buttonElement.addEventListener("mouseenter", () => {
       buttonElement.style.filter = "brightness(1.15)";
     });
@@ -35776,7 +35777,7 @@ void main() {
   var BORDER_SOFT_COLOR = EditorTheme.borderSoftColor;
   var ROW_HEIGHT = EditorTheme.rowHeight;
   var SELECTION_COLOR = ACCENT_COLOR;
-  var SNAP_GUIDE_COLOR = "rgba(0, 120, 212, 0.9)";
+  var SNAP_GUIDE_COLOR = "rgba(212, 176, 106, 0.9)";
   var HOVER_COLOR = EditorTheme.hoverColor;
   var MENU_HOVER_COLOR = ACCENT_SOFT_COLOR;
   var SELECTED_ROW_TEXT_COLOR = EditorTheme.selectedRowTextColor;

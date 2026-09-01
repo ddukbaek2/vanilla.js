@@ -11,17 +11,18 @@ import { Pane, PaneStyle, PaneTheme } from "../../src/web/pane.js";
 export const EditorTheme = {
 	fontFamily: "Inter, -apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"SF Pro Display\","
 		+ " \"Segoe UI Variable Text\", \"Segoe UI\", Pretendard, \"Apple SD Gothic Neo\", \"Malgun Gothic\", Roboto, sans-serif",
-	accentColor: "#0078d4",
-	accentSoftColor: "#04395e",
+	accentColor: "#d4b06a",
+	accentSoftColor: "#463a22",
 	inkColor: "#cccccc",
 	inkDimColor: "#9d9d9d",
-	iconColor: "#85b6ea",
+	iconColor: "#d9c79a",
 	borderColor: "#2b2b2b",
 	borderSoftColor: "rgba(255, 255, 255, 0.045)",
 	rowHeight: "26px",
 	hoverColor: "#2a2d2e",
-	menuHoverColor: "#04395e",
+	menuHoverColor: "#463a22",
 	selectedRowTextColor: "#ffffff",
+	onAccentTextColor: "#2a2016",
 	backgroundColor: "#1f1f1f",
 	panelColor: "#181818",
 	groupColor: "#202020",
@@ -400,7 +401,7 @@ export function createEditorHeaderButtonElement(labelText) {
 export function setEditorHeaderButtonSelected(buttonElement, isSelected) {
 	buttonElement.dataset.selected = isSelected ? "true" : "false";
 	buttonElement.style.backgroundColor = isSelected ? EditorTheme.accentColor : "transparent";
-	buttonElement.style.color = isSelected ? EditorTheme.selectedRowTextColor : PaneTheme.color.textDim;
+	buttonElement.style.color = isSelected ? EditorTheme.onAccentTextColor : PaneTheme.color.textDim;
 }
 
 
@@ -539,7 +540,7 @@ export function createEditorButtonElement(labelText, isPrimary) {
 	buttonElement.style.cssText = "padding:6px 16px;font-size:13px;border-radius:3px;cursor:pointer;user-select:none;"
 		+ "border:1px solid " + PaneTheme.color.border + ";"
 		+ (isPrimary
-			? ("background:" + EditorTheme.accentColor + ";color:" + EditorTheme.selectedRowTextColor + ";border-color:" + EditorTheme.accentColor + ";")
+			? ("background:" + EditorTheme.accentColor + ";color:" + EditorTheme.onAccentTextColor + ";border-color:" + EditorTheme.accentColor + ";")
 			: ("background:" + PaneTheme.color.inputBg + ";color:" + PaneTheme.color.text + ";"));
 	buttonElement.addEventListener("mouseenter", () => {
 		buttonElement.style.filter = "brightness(1.15)";
@@ -873,6 +874,91 @@ export function appendEditorSelectRow(parentElement, labelText, optionList, curr
 	});
 	rowElement.appendChild(selectElement);
 	return rowElement;
+}
+
+
+//==============================================================================
+// 한 줄 입력 대화 상자. (파일 이름, 새 이름 등)
+//==============================================================================
+/**
+ * @param { string } titleText
+ * @param { string } labelText
+ * @param { string } currentText
+ * @param { function(string): void } acceptHandler
+ * @param { string } acceptLabelText
+ */
+export function openEditorInputDialog(titleText, labelText, currentText, acceptHandler, acceptLabelText = "Save") {
+	const existingDialog = System.document.getElementById("editorDialog");
+	if (existingDialog) {
+		existingDialog.remove();
+	}
+	const backdropElement = System.document.createElement("div");
+	backdropElement.id = "editorDialog";
+	backdropElement.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;z-index:10000;"
+		+ "background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;"
+		+ "font-family:" + PaneTheme.font.family + ";";
+
+	const panelElement = System.document.createElement("div");
+	panelElement.style.cssText = "min-width:340px;padding:16px 18px 14px 18px;border-radius:6px;"
+		+ "background:" + PaneTheme.color.panel + ";border:1px solid " + PaneTheme.color.border + ";"
+		+ "box-shadow:0 10px 30px rgba(0,0,0,0.55);color:" + PaneTheme.color.text + ";";
+
+	const titleElement = System.document.createElement("div");
+	titleElement.innerText = titleText;
+	titleElement.style.cssText = "font-size:14px;font-weight:bold;color:" + EditorTheme.accentColor + ";margin-bottom:12px;";
+	panelElement.appendChild(titleElement);
+
+	const fieldLabelElement = System.document.createElement("div");
+	fieldLabelElement.innerText = labelText;
+	fieldLabelElement.style.cssText = "font-size:12px;color:" + PaneTheme.color.textDim + ";margin-bottom:4px;";
+	panelElement.appendChild(fieldLabelElement);
+
+	const inputElement = System.document.createElement("input");
+	inputElement.type = "text";
+	inputElement.value = currentText;
+	inputElement.style.cssText = "width:100%;box-sizing:border-box;padding:6px 8px;font-size:14px;border-radius:3px;"
+		+ "background:" + PaneTheme.color.inputBg + ";border:1px solid " + PaneTheme.color.border + ";"
+		+ "color:" + PaneTheme.color.text + ";outline:none;";
+	panelElement.appendChild(inputElement);
+
+	const buttonRowElement = System.document.createElement("div");
+	buttonRowElement.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:14px;";
+	const cancelElement = createEditorButtonElement("Cancel", false);
+	const acceptElement = createEditorButtonElement(acceptLabelText, true);
+	buttonRowElement.appendChild(cancelElement);
+	buttonRowElement.appendChild(acceptElement);
+	panelElement.appendChild(buttonRowElement);
+
+	backdropElement.appendChild(panelElement);
+	System.document.body.appendChild(backdropElement);
+	inputElement.focus();
+	inputElement.select();
+
+	const closeDialog = () => {
+		backdropElement.remove();
+	};
+	cancelElement.addEventListener("click", closeDialog);
+	acceptElement.addEventListener("click", () => {
+		const inputText = inputElement.value;
+		closeDialog();
+		acceptHandler(inputText);
+	});
+	inputElement.addEventListener("keydown", (keyboardEvent) => {
+		keyboardEvent.stopPropagation();
+		if (keyboardEvent.key === "Enter") {
+			const inputText = inputElement.value;
+			closeDialog();
+			acceptHandler(inputText);
+		}
+		else if (keyboardEvent.key === "Escape") {
+			closeDialog();
+		}
+	});
+	backdropElement.addEventListener("mousedown", (mouseEvent) => {
+		if (mouseEvent.target === backdropElement) {
+			closeDialog();
+		}
+	});
 }
 
 

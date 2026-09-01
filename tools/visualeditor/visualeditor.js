@@ -14,7 +14,7 @@ import {
 	EditorTheme, applyEditorTheme, setEditorCommandHandler, wrapEditorIconMarkup,
 	openEditorMenuPanelAt, createEditorSectionElement, createEditorListRowElement, setEditorListRowSelected,
 	createEditorHeaderButtonElement, setEditorHeaderButtonSelected, createEditorPropertyRowElement,
-	decorateEditorInputElement, createEditorButtonElement, buildEditorWindowLayout,
+	decorateEditorInputElement, createEditorButtonElement, buildEditorWindowLayout, openEditorInputDialog,
 } from "../common/editorkit.js";
 
 
@@ -30,6 +30,15 @@ const ICON_SHAPES = {
 
 // 메뉴 막대 구성. (일반 데스크톱 응용 프로그램과 같은 배치)
 const MENU_DEFINITIONS = [
+	{
+		title: "File",
+		items: [
+			{ id: "newDocument", label: "New", shortcut: "Ctrl+Alt+N" },
+			{ id: "load", label: "Open...", shortcut: "Ctrl+O" },
+			{ id: "save", label: "Save", shortcut: "Ctrl+S" },
+			{ id: "saveAs", label: "Save As...", shortcut: "Ctrl+Shift+S" },
+		],
+	},
 	{
 		title: "Playback",
 		items: [
@@ -140,6 +149,10 @@ class VisualEditor {
 	/** @private @type { HTMLElement } */ #pauseButtonElement;
 	/** @private @type { HTMLElement } */ #stopButtonElement;
 	/** @private @type { Pane } */ #rootPane;
+	/** @private @type { string } */ #assetFileName;
+	/** @private @type { HTMLElement } */ #hierarchyTreeElement;
+	/** @private @type { Function } */ #createHierarchyItem;
+	/** @private @type { HTMLInputElement } */ #fileInputElement;
 
 	//==============================================================================
 	// 생성.
@@ -161,6 +174,10 @@ class VisualEditor {
 		this.#pauseButtonElement = null;
 		this.#stopButtonElement = null;
 		this.#rootPane = null;
+		this.#assetFileName = "scene.visual.json";
+		this.#hierarchyTreeElement = null;
+		this.#createHierarchyItem = null;
+		this.#fileInputElement = null;
 	}
 
 	//==============================================================================
@@ -232,62 +249,8 @@ class VisualEditor {
 		// --- 메인 편집 영역 (가로) ---
 		const mainEditorPane = new Pane({ direction: "horizontal", size: "flex" });
 
-		// [왼쪽 영역] 탐색기 + 하이어라키.
+		// [왼쪽 영역] 하이어라키.
 		const leftSidePane = new Pane({ direction: "vertical", size: 250, minSize: 150 });
-
-		// 탐색기.
-		const explorerPane = new Pane({ size: "50%", minSize: 100 });
-		let explorerSelectedRow = null;
-		const selectExplorerRow = (rowElement, labelText) => {
-			if (explorerSelectedRow) {
-				setEditorListRowSelected(explorerSelectedRow, false);
-			}
-			explorerSelectedRow = rowElement;
-			setEditorListRowSelected(rowElement, true);
-			this.setStatusText("Explorer > " + labelText);
-		};
-		const createTreeItem = (labelText, isFolder = false) => {
-			return this.createTreeItemElement(isFolder ? "folder" : "file", labelText, {
-				dataType: "tree-item",
-				hasChildren: false,
-				isOpen: false,
-				onSelect: selectExplorerRow,
-			});
-		};
-		const explorerElement = createEditorSectionElement("EXPLORER", () => {
-			return [
-				{
-					id: "addExplorerItem",
-					label: "Add Item...",
-					action: () => {
-						const newName = System.prompt("Item name:", "");
-						if (newName) {
-							explorerTree.appendChild(createTreeItem(newName));
-						}
-					},
-				},
-			];
-		});
-		const explorerTree = PaneStyle.create("div", "", { style: { flex: "1", overflowY: "auto", position: "relative" } });
-		const assetsItem = createTreeItem("assets", true);
-		assetsItem.addChild(createTreeItem("audio"));
-		assetsItem.addChild(createTreeItem("images"));
-		assetsItem.addChild(createTreeItem("fonts"));
-		const sourceItem = createTreeItem("src", true);
-		sourceItem.addChild(createTreeItem("utils.js"));
-		sourceItem.addChild(createTreeItem("config.js"));
-		explorerTree.append(assetsItem, sourceItem, createTreeItem("main.js"), createTreeItem("suika.js"), createTreeItem("Suika_Visual.json"));
-		explorerTree.addEventListener("click", (mouseEvent) => {
-			if (!mouseEvent.target.closest("[data-type=\"tree-item\"]")) {
-				if (explorerSelectedRow) {
-					setEditorListRowSelected(explorerSelectedRow, false);
-					explorerSelectedRow = null;
-				}
-				this.setStatusText("No selection");
-			}
-		});
-		explorerElement.appendChild(explorerTree);
-		explorerPane.getContainer().appendChild(explorerElement);
 
 		// 하이어라키.
 		const hierarchyPane = new Pane({ size: "flex", minSize: 100 });
@@ -309,37 +272,43 @@ class VisualEditor {
 			});
 			const rowElement = wrapperElement.firstChild;
 			const activeButtonElement = System.document.createElement("button");
-			activeButtonElement.innerText = "Active";
-			activeButtonElement.dataset.active = "true";
-			activeButtonElement.style.cssText = "font-size:10px;padding:1px 6px;border:none;border-radius:3px;cursor:pointer;"
-				+ "background-color:" + PaneTheme.color.success + ";color:#10241a;flex-shrink:0;"
+			activeButtonElement.style.cssText = "font-size:10px;padding:1px 6px;border:none;border-radius:3px;cursor:pointer;flex-shrink:0;"
 				+ "font-family:" + EditorTheme.fontFamily + ";font-weight:600;";
+			const applyActiveState = (isActive) => {
+				activeButtonElement.dataset.active = isActive ? "true" : "false";
+				activeButtonElement.innerText = isActive ? "Active" : "Inactive";
+				activeButtonElement.style.backgroundColor = isActive ? PaneTheme.color.success : PaneTheme.color.resizer;
+				activeButtonElement.style.color = isActive ? "#10241a" : PaneTheme.color.textDim;
+			};
+			applyActiveState(true);
 			activeButtonElement.addEventListener("click", (mouseEvent) => {
 				mouseEvent.stopPropagation();
 				const isActive = activeButtonElement.dataset.active === "true";
-				activeButtonElement.dataset.active = isActive ? "false" : "true";
-				activeButtonElement.innerText = isActive ? "Inactive" : "Active";
-				activeButtonElement.style.backgroundColor = isActive ? PaneTheme.color.resizer : PaneTheme.color.success;
-				activeButtonElement.style.color = isActive ? PaneTheme.color.textDim : "#10241a";
+				applyActiveState(!isActive);
 			});
 			rowElement.appendChild(activeButtonElement);
+			wrapperElement.setActiveState = applyActiveState;
 			return wrapperElement;
 		};
+		this.#createHierarchyItem = createHierarchyItem;
 		const hierarchyElement = createEditorSectionElement("HIERARCHY", () => {
 			return [
 				{
 					id: "addHierarchyItem",
 					label: "Add Item...",
 					action: () => {
-						const newName = System.prompt("Item name:", "");
-						if (newName) {
-							hierarchyTree.appendChild(createHierarchyItem(newName));
-						}
+						openEditorInputDialog("Add Item", "Item name", "", (inputText) => {
+							const newName = inputText.trim();
+							if (newName) {
+								hierarchyTree.appendChild(createHierarchyItem(newName));
+							}
+						}, "Add");
 					},
 				},
 			];
 		});
 		const hierarchyTree = PaneStyle.create("div", "", { style: { flex: "1", overflowY: "auto", position: "relative" } });
+		this.#hierarchyTreeElement = hierarchyTree;
 		const visualRoot = createHierarchyItem("Visual Root");
 		const backgroundLayer = createHierarchyItem("Background Layer");
 		const particleEmitter = createHierarchyItem("Particle Emitter");
@@ -364,7 +333,6 @@ class VisualEditor {
 		hierarchyElement.appendChild(hierarchyTree);
 		hierarchyPane.getContainer().appendChild(hierarchyElement);
 
-		leftSidePane.addPane(explorerPane);
 		leftSidePane.addPane(hierarchyPane);
 
 		// [중앙] 코드 에디터.
@@ -509,46 +477,6 @@ class VisualEditor {
 			}
 			return target || null;
 		};
-		explorerTree.addEventListener("contextmenu", (mouseEvent) => {
-			mouseEvent.preventDefault();
-			const contextTarget = findContextTarget(mouseEvent.target, "tree-item");
-			openEditorMenuPanelAt(mouseEvent.clientX, mouseEvent.clientY, [
-				{
-					id: "addExplorerItem",
-					label: "Add",
-					action: () => {
-						const newName = System.prompt("Item name:", "");
-						if (newName) {
-							explorerTree.appendChild(createTreeItem(newName));
-						}
-					},
-				},
-				{
-					id: "renameExplorerItem",
-					label: "Rename",
-					action: () => {
-						if (!contextTarget) {
-							return;
-						}
-						const currentName = contextTarget.dataset.label;
-						const newName = System.prompt("New name:", currentName);
-						if (newName) {
-							contextTarget.querySelector("[data-role=\"label\"]").innerText = newName;
-							contextTarget.dataset.label = newName;
-						}
-					},
-				},
-				{
-					id: "removeExplorerItem",
-					label: "Remove",
-					action: () => {
-						if (contextTarget) {
-							contextTarget.remove();
-						}
-					},
-				},
-			]);
-		});
 		hierarchyTree.addEventListener("contextmenu", (mouseEvent) => {
 			mouseEvent.preventDefault();
 			const contextTarget = findContextTarget(mouseEvent.target, "hierarchy-item");
@@ -557,10 +485,12 @@ class VisualEditor {
 					id: "addHierarchyItem",
 					label: "Add",
 					action: () => {
-						const newName = System.prompt("Item name:", "");
-						if (newName) {
-							hierarchyTree.appendChild(createHierarchyItem(newName));
-						}
+						openEditorInputDialog("Add Item", "Item name", "", (inputText) => {
+							const newName = inputText.trim();
+							if (newName) {
+								hierarchyTree.appendChild(createHierarchyItem(newName));
+							}
+						}, "Add");
 					},
 				},
 				{
@@ -571,11 +501,13 @@ class VisualEditor {
 							return;
 						}
 						const currentName = contextTarget.dataset.label;
-						const newName = System.prompt("New name:", currentName);
-						if (newName) {
-							contextTarget.querySelector("[data-role=\"label\"]").innerText = newName;
-							contextTarget.dataset.label = newName;
-						}
+						openEditorInputDialog("Rename", "New name", currentName, (inputText) => {
+							const newName = inputText.trim();
+							if (newName) {
+								contextTarget.querySelector("[data-role=\"label\"]").innerText = newName;
+								contextTarget.dataset.label = newName;
+							}
+						}, "Rename");
 					},
 				},
 				{
@@ -601,6 +533,22 @@ class VisualEditor {
 				},
 			]);
 		});
+
+		// 파일 열기 입력.
+		this.#fileInputElement = System.document.createElement("input");
+		this.#fileInputElement.type = "file";
+		this.#fileInputElement.accept = ".json";
+		this.#fileInputElement.style.display = "none";
+		this.#fileInputElement.addEventListener("change", async () => {
+			const selectedFile = this.#fileInputElement.files[0];
+			if (!selectedFile) {
+				return;
+			}
+			const jsonText = await selectedFile.text();
+			this.loadAssetText(jsonText, selectedFile.name);
+			this.#fileInputElement.value = "";
+		});
+		System.document.body.appendChild(this.#fileInputElement);
 
 		// 엔진 설정.
 		const engineConfiguration = new EngineConfiguration();
@@ -665,6 +613,29 @@ class VisualEditor {
 				this.printConsole("Playback stopped.");
 				break;
 			}
+			case "newDocument": {
+				this.#assetFileName = "scene.visual.json";
+				this.resetDocument();
+				break;
+			}
+			case "save": {
+				this.saveAsset(this.#assetFileName);
+				break;
+			}
+			case "saveAs": {
+				openEditorInputDialog("Save As", "File name", this.#assetFileName, (inputText) => {
+					const fileName = inputText.trim();
+					if (fileName) {
+						this.#assetFileName = fileName;
+						this.saveAsset(fileName);
+					}
+				});
+				break;
+			}
+			case "load": {
+				this.#fileInputElement.click();
+				break;
+			}
 			case "resetLayout": {
 				this.#rootPane.resetLayout();
 				this.#rootPane.refresh();
@@ -679,6 +650,157 @@ class VisualEditor {
 				break;
 			}
 		}
+	}
+
+	//==============================================================================
+	// 계층 트리 직렬화. (이름 / 활성 / 자식)
+	//==============================================================================
+	/**
+	 * @param { HTMLElement } containerElement
+	 * @returns { object[] }
+	 */
+	composeHierarchyData(containerElement) {
+		const itemList = [];
+		for (const wrapperElement of containerElement.children) {
+			if (wrapperElement.dataset.type !== "hierarchy-item") {
+				continue;
+			}
+			const activeButtonElement = wrapperElement.querySelector("button");
+			const childContainerElement = wrapperElement.children[1];
+			itemList.push({
+				name: wrapperElement.dataset.label,
+				isActive: activeButtonElement.dataset.active === "true",
+				children: this.composeHierarchyData(childContainerElement),
+			});
+		}
+		return itemList;
+	}
+
+	//==============================================================================
+	// 계층 트리 복원.
+	//==============================================================================
+	/**
+	 * @param { HTMLElement } containerElement
+	 * @param { object[] } itemDataList
+	 */
+	rebuildHierarchyFromData(containerElement, itemDataList) {
+		for (const itemData of itemDataList) {
+			const wrapperElement = this.#createHierarchyItem(itemData.name);
+			wrapperElement.setActiveState(itemData.isActive !== false);
+			if (containerElement === this.#hierarchyTreeElement) {
+				containerElement.appendChild(wrapperElement);
+			}
+			else {
+				containerElement.addChild(wrapperElement);
+			}
+			if (System.Array.isArray(itemData.children) && itemData.children.length > 0) {
+				this.rebuildHierarchyFromData(wrapperElement, itemData.children);
+			}
+		}
+	}
+
+	//==============================================================================
+	// 애셋 저장. (.visual.json 내려받기 — 스크립트 + 프로퍼티 + 계층)
+	//==============================================================================
+	/**
+	 * @param { string } fileName
+	 */
+	saveAsset(fileName) {
+		const propertyTable = {};
+		for (const propertyName of System.Object.keys(this.#inspector)) {
+			propertyTable[propertyName] = this.#properties[propertyName];
+		}
+		const asset = {
+			script: this.#editor.value,
+			properties: propertyTable,
+			hierarchy: this.composeHierarchyData(this.#hierarchyTreeElement),
+		};
+		const jsonText = System.JSON.stringify(asset, null, "\t");
+		const blob = new System.Blob([jsonText], { type: "application/json" });
+		const anchorElement = System.document.createElement("a");
+		anchorElement.href = System.URL.createObjectURL(blob);
+		anchorElement.download = fileName;
+		anchorElement.click();
+		System.URL.revokeObjectURL(anchorElement.href);
+		this.printConsole("Saved " + fileName + ".");
+	}
+
+	//==============================================================================
+	// 애셋 읽기.
+	//==============================================================================
+	/**
+	 * @param { string } jsonText
+	 * @param { string } fileName
+	 */
+	loadAssetText(jsonText, fileName) {
+		const parsedAsset = System.JSON.parse(jsonText);
+		this.#assetFileName = fileName;
+		if (typeof parsedAsset.script === "string") {
+			this.#editor.value = parsedAsset.script;
+		}
+		for (const propertyName of System.Object.keys(this.#inspector)) {
+			this.removeProperty(propertyName);
+		}
+		if (parsedAsset.properties) {
+			for (const propertyName of System.Object.keys(parsedAsset.properties)) {
+				this.addProperty(propertyName, parsedAsset.properties[propertyName]);
+			}
+		}
+		if (System.Array.isArray(parsedAsset.hierarchy)) {
+			this.#hierarchyTreeElement.textContent = "";
+			this.rebuildHierarchyFromData(this.#hierarchyTreeElement, parsedAsset.hierarchy);
+		}
+		this.compileCode();
+		this.executeCommand("stop");
+		this.printConsole("Opened " + fileName + ".");
+	}
+
+	//==============================================================================
+	// 문서 초기화. (기본 스크립트 + 기본 프로퍼티 + 기본 계층)
+	//==============================================================================
+	resetDocument() {
+		for (const propertyName of System.Object.keys(this.#inspector)) {
+			this.removeProperty(propertyName);
+		}
+		this.addProperty("speed", 1.0);
+		this.addProperty("gravity", 0.1);
+		this.#hierarchyTreeElement.textContent = "";
+		this.rebuildHierarchyFromData(this.#hierarchyTreeElement, [
+			{ name: "Visual Root", isActive: true, children: [
+				{ name: "Background Layer", isActive: true, children: [] },
+				{ name: "Particle Emitter", isActive: true, children: [
+					{ name: "Main Particle", isActive: true, children: [] },
+					{ name: "Sub Particle", isActive: true, children: [] },
+				] },
+				{ name: "UI Layer", isActive: true, children: [] },
+			] },
+		]);
+		this.#editor.value = this.composeDefaultScript();
+		this.compileCode();
+		this.executeCommand("stop");
+	}
+
+	//==============================================================================
+	// 기본 스크립트.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	composeDefaultScript() {
+		return `
+function tick(particle, properties, canvasSize) {
+	particle.x += particle.vx * properties.speed;
+	particle.y += particle.vy * properties.speed;
+	particle.vy += properties.gravity;
+	if (particle.x < 0 || particle.x > canvasSize.x) {
+		particle.vx *= -1;
+		particle.x = particle.x < 0 ? 0 : canvasSize.x;
+	}
+	if (particle.y < 0 || particle.y > canvasSize.y) {
+		particle.vy *= -1;
+		particle.y = particle.y < 0 ? 0 : canvasSize.y;
+	}
+}`;
 	}
 
 	//==============================================================================
@@ -733,6 +855,25 @@ class VisualEditor {
 		System.window.addEventListener("keydown", (keyboardEvent) => {
 			if (keyboardEvent.ctrlKey && ["=", "-", "+", "0"].includes(keyboardEvent.key)) {
 				keyboardEvent.preventDefault();
+			}
+			if (keyboardEvent.ctrlKey && keyboardEvent.altKey && keyboardEvent.key.toLowerCase() === "n") {
+				keyboardEvent.preventDefault();
+				this.executeCommand("newDocument");
+				return;
+			}
+			if (keyboardEvent.ctrlKey && keyboardEvent.shiftKey && keyboardEvent.key.toLowerCase() === "s") {
+				keyboardEvent.preventDefault();
+				this.executeCommand("saveAs");
+				return;
+			}
+			if (keyboardEvent.ctrlKey && keyboardEvent.key.toLowerCase() === "s") {
+				keyboardEvent.preventDefault();
+				this.executeCommand("save");
+				return;
+			}
+			if (keyboardEvent.ctrlKey && keyboardEvent.key.toLowerCase() === "o") {
+				keyboardEvent.preventDefault();
+				this.executeCommand("load");
 			}
 		});
 		System.window.addEventListener("wheel", (wheelEvent) => {
@@ -950,20 +1091,7 @@ class VisualEditor {
 	//==============================================================================
 	run() {
 		this.initialize();
-		this.#editor.value = `
-function tick(particle, properties, canvasSize) {
-	particle.x += particle.vx * properties.speed;
-	particle.y += particle.vy * properties.speed;
-	particle.vy += properties.gravity;
-	if (particle.x < 0 || particle.x > canvasSize.x) {
-		particle.vx *= -1;
-		particle.x = particle.x < 0 ? 0 : canvasSize.x;
-	}
-	if (particle.y < 0 || particle.y > canvasSize.y) {
-		particle.vy *= -1;
-		particle.y = particle.y < 0 ? 0 : canvasSize.y;
-	}
-}`;
+		this.#editor.value = this.composeDefaultScript();
 		this.initParticles();
 		this.compileCode();
 		this.#gameView.setDrawEvent(this.drawOnStopState.bind(this));

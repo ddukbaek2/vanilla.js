@@ -54,3 +54,12 @@
 - tools/particleeditor: 단일 html 인라인 구현을 폐기하고 uieditor 와 동일한 구조(particleeditor.js + build.mjs 번들)로 재작성. 메뉴바(File/Playback) + 좌측 PRESETS 목록 + 중앙 PREVIEW(RESTART/BURST 헤더 버튼) + 우측 INSPECTOR 그룹 + 상태줄. 카피 전부 영문화.
 - tools/visualeditor: 별도 저장소(D:/Github/visualeditor)의 비주얼 에디터를 엔진 저장소에 편입(visualeditor.js + build.mjs). 툴바/패널 헤더/상태바/컨텍스트 메뉴/트리 행을 editorkit 로 교체, Play/Pause/Stop 은 GAME VIEW 헤더 버튼 + Playback 메뉴로. Canvas2D 직접 호출을 현 엔진 Graphic API(drawRect/drawLine/drawCircle)로 이식.
 - NAS 배포: portfolio/{uieditor,particleeditor,visualeditor}/index.html 갱신, 구 번들(css/js/vanilla.js) 정리. 라이브 스크린샷 검수 완료.
+
+## EFFECTS 개선 + 에디터 UX 구조 통일 + 바닐라 톤앤매너
+[21:50 요청 → 22:20 응답]
+- EFFECTS: usage 를 완전한 셋업 코드(클래스 선언과 변수 할당부터)로 전면 재작성, 코드 패널 반투명 배경 + COPY 클립보드 버튼(COPIED 피드백), 렌더 통계 패널 배경 + fps 표기 추가. 이펙트 8종 신규(smoke/fireflies/waterfall/leaves/meteor/portal/steam/blizzard)로 총 20종 — 좌측 UIScrollView 스크롤 실동작.
+- 바닐라 톤앤매너: EditorTheme 액센트를 파랑에서 골드(#d4b06a)/크림 아이콘(#d9c79a)/초콜릿 온액센트(#2a2016)로 교체. EFFECTS 선택 행도 동일 골드.
+- particleeditor v2: uieditor 와 동일 구조로 개편 — 좌측 PRESETS 팔레트(클릭=시스템 추가) + HIERARCHY(다중 파티클 시스템, 선택/우클릭 Duplicate·Rename·Delete) + VIEW + INSPECTOR(SYSTEM Name 포함) + File(New/Open/Save/Save As, 신형 애셋 { systems: [...] } — 구형 단일 서술도 읽음) + Edit 메뉴 + 단축키.
+- visualeditor v2: File 메뉴와 .visual.json 애셋 입출력(script+properties+hierarchy 직렬화/복원) 추가, 더미 EXPLORER 제거, prompt 를 공통 입력 대화 상자로 교체.
+- editorkit: openEditorInputDialog 공통화(uieditor 위임 전환).
+- NAS 배포(portfolio/effects·uieditor·particleeditor·visualeditor) + 라이브 검수 완료.

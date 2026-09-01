@@ -10,7 +10,7 @@ import {
 	openEditorMenuPanelAt, closeEditorMenuPanel, createEditorSectionElement, createEditorListRowElement,
 	createEditorGroupElement, createEditorPropertyRowElement, appendEditorNumberRow, appendEditorTextRow,
 	appendEditorColorRow, appendEditorBooleanRow, composeEditorNumberText, decorateEditorInputElement,
-	createEditorButtonElement, buildEditorWindowLayout,
+	createEditorButtonElement, buildEditorWindowLayout, openEditorInputDialog,
 } from "../common/editorkit.js";
 import { Graphic } from "../../src/core/graphic.js";
 import { WorldNode } from "../../src/core/node/worldnode.js";
@@ -160,7 +160,7 @@ const BORDER_SOFT_COLOR = EditorTheme.borderSoftColor;
 const ROW_HEIGHT = EditorTheme.rowHeight;
 
 const SELECTION_COLOR = ACCENT_COLOR;
-const SNAP_GUIDE_COLOR = "rgba(0, 120, 212, 0.9)";
+const SNAP_GUIDE_COLOR = "rgba(212, 176, 106, 0.9)";
 const HOVER_COLOR = EditorTheme.hoverColor;
 const MENU_HOVER_COLOR = ACCENT_SOFT_COLOR;
 const SELECTED_ROW_TEXT_COLOR = EditorTheme.selectedRowTextColor;
@@ -3297,77 +3297,7 @@ export class UIEditor {
 	 * @param { Function } acceptHandler
 	 */
 	openInputDialog(titleText, labelText, currentText, acceptHandler) {
-		const existingDialog = System.document.getElementById("uieditorDialog");
-		if (existingDialog) {
-			existingDialog.remove();
-		}
-		const backdropElement = System.document.createElement("div");
-		backdropElement.id = "uieditorDialog";
-		backdropElement.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;z-index:10000;"
-			+ "background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;"
-			+ "font-family:" + PaneTheme.font.family + ";";
-
-		const panelElement = System.document.createElement("div");
-		panelElement.style.cssText = "min-width:340px;padding:16px 18px 14px 18px;border-radius:6px;"
-			+ "background:" + PaneTheme.color.panel + ";border:1px solid " + PaneTheme.color.border + ";"
-			+ "box-shadow:0 10px 30px rgba(0,0,0,0.55);color:" + PaneTheme.color.text + ";";
-
-		const titleElement = System.document.createElement("div");
-		titleElement.innerText = titleText;
-		titleElement.style.cssText = "font-size:14px;font-weight:bold;color:" + SELECTION_COLOR + ";margin-bottom:12px;";
-		panelElement.appendChild(titleElement);
-
-		const fieldLabelElement = System.document.createElement("div");
-		fieldLabelElement.innerText = labelText;
-		fieldLabelElement.style.cssText = "font-size:12px;color:" + PaneTheme.color.textDim + ";margin-bottom:4px;";
-		panelElement.appendChild(fieldLabelElement);
-
-		const inputElement = System.document.createElement("input");
-		inputElement.type = "text";
-		inputElement.value = currentText;
-		inputElement.style.cssText = "width:100%;box-sizing:border-box;padding:6px 8px;font-size:14px;border-radius:3px;"
-			+ "background:" + PaneTheme.color.inputBg + ";border:1px solid " + PaneTheme.color.border + ";"
-			+ "color:" + PaneTheme.color.text + ";outline:none;";
-		panelElement.appendChild(inputElement);
-
-		const buttonRowElement = System.document.createElement("div");
-		buttonRowElement.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:14px;";
-		const cancelElement = this.createDialogButtonElement("Cancel", false);
-		const acceptElement = this.createDialogButtonElement("Save", true);
-		buttonRowElement.appendChild(cancelElement);
-		buttonRowElement.appendChild(acceptElement);
-		panelElement.appendChild(buttonRowElement);
-
-		backdropElement.appendChild(panelElement);
-		System.document.body.appendChild(backdropElement);
-		inputElement.focus();
-		inputElement.select();
-
-		const closeDialog = () => {
-			backdropElement.remove();
-		};
-		cancelElement.addEventListener("click", closeDialog);
-		acceptElement.addEventListener("click", () => {
-			const inputText = inputElement.value;
-			closeDialog();
-			acceptHandler(inputText);
-		});
-		inputElement.addEventListener("keydown", (keyboardEvent) => {
-			keyboardEvent.stopPropagation();
-			if (keyboardEvent.key === "Enter") {
-				const inputText = inputElement.value;
-				closeDialog();
-				acceptHandler(inputText);
-			}
-			else if (keyboardEvent.key === "Escape") {
-				closeDialog();
-			}
-		});
-		backdropElement.addEventListener("mousedown", (mouseEvent) => {
-			if (mouseEvent.target === backdropElement) {
-				closeDialog();
-			}
-		});
+		openEditorInputDialog(titleText, labelText, currentText, acceptHandler);
 	}
 
 	//==============================================================================
