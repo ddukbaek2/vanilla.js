@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<title>vanilla.js - Particle Editor</title>
+<title>vanilla.js - Visual Editor</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
 <style>
 	html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: #1e1e1e; color: #ccc; font-family: sans-serif; }
@@ -13,6 +13,20 @@
 (() => {
   var __defProp = Object.defineProperty;
   var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+
+  // src/base/colors.js
+  var Colors = {
+    /** @public @type { string } */
+    black: "#000000",
+    /** @public @type { string } */
+    white: "#ffffff",
+    /** @public @type { string } */
+    vanilla: "#f3e5ab",
+    /** @public @type { string } */
+    darkVanilla: "#d1c1b2",
+    /** @public @type { string } */
+    lightVanilla: "#f1e9d8"
+  };
 
   // src/base/reflection.js
   var System = globalThis;
@@ -212,157 +226,6 @@
     }
   };
 
-  // src/base/version.js
-  var Version = class _Version extends Object {
-    static {
-      __name(this, "Version");
-    }
-    //==============================================================================
-    // 멤버 변수 목록.
-    //==============================================================================
-    /** @private @type { number } */
-    #major;
-    /** @private @type { number } */
-    #minor;
-    /** @private @type { number } */
-    #patch;
-    /** @private @type { string } */
-    #branch;
-    //==============================================================================
-    // 생성.
-    //==============================================================================
-    /**
-     * @constructor
-     */
-    constructor() {
-      super();
-      this.#major = 0;
-      this.#minor = 0;
-      this.#patch = 0;
-      this.#branch = "";
-    }
-    //==============================================================================
-    // 메이저 설정.
-    //==============================================================================
-    /**
-     * @param { number } major
-     */
-    setMajor(major) {
-      this.#major = major;
-    }
-    //==============================================================================
-    // 메이저 반환.
-    //==============================================================================
-    /**
-     * @returns { number }
-     */
-    getMajor() {
-      return this.#major;
-    }
-    //==============================================================================
-    // 마이너 설정.
-    //==============================================================================
-    /**
-     * @param { number } minor
-     */
-    setMinor(minor) {
-      this.#minor = minor;
-    }
-    //==============================================================================
-    // 마이너 반환.
-    //==============================================================================
-    /**
-     * @returns { number }
-     */
-    getMinor() {
-      return this.#minor;
-    }
-    //==============================================================================
-    // 패치 설정.
-    //==============================================================================
-    /**
-     * @param { number } patch
-     */
-    setPatch(patch) {
-      this.#patch = patch;
-    }
-    //==============================================================================
-    // 패치 반환.
-    //==============================================================================
-    /**
-     * @returns { number }
-     */
-    getPatch() {
-      return this.#patch;
-    }
-    //==============================================================================
-    // 브랜치 설정.
-    //==============================================================================
-    /**
-     * @param { string } branch
-     */
-    setBranch(branch) {
-      this.#branch = branch;
-    }
-    //==============================================================================
-    // 브랜치 반환.
-    //==============================================================================
-    /**
-     * @returns { string }
-     */
-    getBranch() {
-      return this.#branch;
-    }
-    //==============================================================================
-    // 버전 문자열 반환.
-    //==============================================================================
-    /**
-     * @returns { number }
-     */
-    getVersionString() {
-      const major = this.getMajor();
-      const minor = this.getMinor();
-      const patch = this.getPatch();
-      const branch = this.getBranch();
-      if (branch === "") {
-        return `${major}.${minor}.${patch}`;
-      } else {
-        return `${major}.${minor}.${patch}-${branch}`;
-      }
-    }
-    //==============================================================================
-    // 생성.
-    //==============================================================================
-    /**
-     * @param { number } major 
-     * @param { number } minor
-     * @param { number } patch
-     * @param { string } branch
-     */
-    static create(major, minor, patch, branch = "") {
-      const version = new _Version();
-      version.setMajor(major);
-      version.setMinor(minor);
-      version.setPatch(patch);
-      version.setBranch(branch);
-      return version;
-    }
-  };
-
-  // src/base/colors.js
-  var Colors = {
-    /** @public @type { string } */
-    black: "#000000",
-    /** @public @type { string } */
-    white: "#ffffff",
-    /** @public @type { string } */
-    vanilla: "#f3e5ab",
-    /** @public @type { string } */
-    darkVanilla: "#d1c1b2",
-    /** @public @type { string } */
-    lightVanilla: "#f1e9d8"
-  };
-
   // src/base/math.js
   var System2 = globalThis;
   var PI = 3.141592653589793;
@@ -496,11 +359,6 @@
     return radian;
   }
   __name(degreeToRadian, "degreeToRadian");
-  function randomRange(minValue, maxValue) {
-    const value = minValue + (maxValue - minValue) * random();
-    return value;
-  }
-  __name(randomRange, "randomRange");
 
   // src/base/vector2.js
   var Vector2 = class _Vector2 extends Object2 {
@@ -901,137 +759,6 @@
       const x = clamp(value.x, min2.x, max2.x);
       const y = clamp(value.y, min2.y, max2.y);
       return _Vector2.create(x, y);
-    }
-  };
-
-  // src/core/timemanager.js
-  var System3 = globalThis;
-  var TimeManager = class extends Object2 {
-    static {
-      __name(this, "TimeManager");
-    }
-    //==============================================================================
-    // 멤버 변수 목록.
-    //==============================================================================
-    /** @private @type { number } */
-    #realtimeSinceStartup;
-    /** @private @type { number } */
-    #time;
-    /** @private @type { number } */
-    #unscaledTimeDelta;
-    /** @private @type { number } */
-    #fps;
-    /** @private @type { number } */
-    #framesThisSecond;
-    /** @private @type { number } */
-    #previousFrameCheckTime;
-    /** @private @type { number } */
-    #timeScale;
-    //==============================================================================
-    // 생성.
-    //==============================================================================
-    /**
-     * @constructor
-     * @param { Engine } engine 
-     */
-    constructor(engine) {
-      super();
-      this.#realtimeSinceStartup = 0;
-      this.#time = 0;
-      this.#unscaledTimeDelta = 0;
-      this.#fps = 0;
-      this.#framesThisSecond = 0;
-      this.#previousFrameCheckTime = 0;
-      this.#timeScale = 1;
-    }
-    //==============================================================================
-    // 시간 계산.
-    //==============================================================================
-    /**
-     * @param { number } timestamp
-     */
-    update(timestamp) {
-      const realtimeSinceStartup = timestamp * 1e-3;
-      if (this.#realtimeSinceStartup === 0) {
-        this.#realtimeSinceStartup = realtimeSinceStartup;
-        this.#previousFrameCheckTime = realtimeSinceStartup;
-      }
-      const rawTimeDelta = realtimeSinceStartup - this.#realtimeSinceStartup;
-      const unscaledTimeDelta = System3.Math.min(0.25, System3.Math.max(0, rawTimeDelta));
-      this.#realtimeSinceStartup = realtimeSinceStartup;
-      this.#time += unscaledTimeDelta;
-      this.#unscaledTimeDelta = unscaledTimeDelta;
-      if (realtimeSinceStartup >= this.#previousFrameCheckTime + 1) {
-        this.#fps = this.#framesThisSecond;
-        this.#framesThisSecond = 0;
-        this.#previousFrameCheckTime = realtimeSinceStartup;
-      }
-      ++this.#framesThisSecond;
-    }
-    //==============================================================================
-    // 현재 프라우저가 시작 된 이후 시간 반환. (초 단위)
-    //==============================================================================
-    /**
-     * @returns { number }
-     */
-    getRealtimeSinceStartup() {
-      return this.#realtimeSinceStartup;
-    }
-    //==============================================================================
-    // 현재 엔진이 시작 된 이후 시간 반환. (초 단위)
-    //==============================================================================
-    /**
-     * @returns { number }
-     */
-    getTime() {
-      return this.#time;
-    }
-    //==============================================================================
-    // 현재 프레임과 이전 프레임 사이의 경과 시간 반환. (초 단위)
-    //==============================================================================
-    /**
-     * @returns { number }
-     */
-    getUnscaleDeltaTime() {
-      return this.#unscaledTimeDelta;
-    }
-    //==============================================================================
-    // 현재 프레임과 이전 프레임 사이의 경과 시간 반환. (초 단위)
-    //==============================================================================
-    /**
-     * @returns { number }
-     */
-    getTimeDelta() {
-      const unscaledTimeDelta = this.getUnscaleDeltaTime();
-      const timeScale = this.getTimeScale();
-      return unscaledTimeDelta * timeScale;
-    }
-    //==============================================================================
-    // 현재 초당 프레임 수 반환.
-    //==============================================================================
-    /**
-     * @returns { number }
-     */
-    getFramePerSecond() {
-      return this.#fps;
-    }
-    //==============================================================================
-    // 시간 배율 설정.
-    //==============================================================================
-    /**
-     * @param { number } timeScale
-     */
-    setTimeScale(timeScale) {
-      this.#timeScale = timeScale;
-    }
-    //==============================================================================
-    // 시간 배율 반환.
-    //==============================================================================
-    /**
-     * @returns { number }
-     */
-    getTimeScale() {
-      return this.#timeScale;
     }
   };
 
@@ -1442,6 +1169,274 @@
       const position = Vector2.clamp(value.position, min2.position, max2.position);
       const size = Vector2.clamp(value.size, min2.size, max2.size);
       return _Rect.create(position.x, position.y, size.x, size.y);
+    }
+  };
+
+  // src/base/version.js
+  var Version = class _Version extends Object {
+    static {
+      __name(this, "Version");
+    }
+    //==============================================================================
+    // 멤버 변수 목록.
+    //==============================================================================
+    /** @private @type { number } */
+    #major;
+    /** @private @type { number } */
+    #minor;
+    /** @private @type { number } */
+    #patch;
+    /** @private @type { string } */
+    #branch;
+    //==============================================================================
+    // 생성.
+    //==============================================================================
+    /**
+     * @constructor
+     */
+    constructor() {
+      super();
+      this.#major = 0;
+      this.#minor = 0;
+      this.#patch = 0;
+      this.#branch = "";
+    }
+    //==============================================================================
+    // 메이저 설정.
+    //==============================================================================
+    /**
+     * @param { number } major
+     */
+    setMajor(major) {
+      this.#major = major;
+    }
+    //==============================================================================
+    // 메이저 반환.
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    getMajor() {
+      return this.#major;
+    }
+    //==============================================================================
+    // 마이너 설정.
+    //==============================================================================
+    /**
+     * @param { number } minor
+     */
+    setMinor(minor) {
+      this.#minor = minor;
+    }
+    //==============================================================================
+    // 마이너 반환.
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    getMinor() {
+      return this.#minor;
+    }
+    //==============================================================================
+    // 패치 설정.
+    //==============================================================================
+    /**
+     * @param { number } patch
+     */
+    setPatch(patch) {
+      this.#patch = patch;
+    }
+    //==============================================================================
+    // 패치 반환.
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    getPatch() {
+      return this.#patch;
+    }
+    //==============================================================================
+    // 브랜치 설정.
+    //==============================================================================
+    /**
+     * @param { string } branch
+     */
+    setBranch(branch) {
+      this.#branch = branch;
+    }
+    //==============================================================================
+    // 브랜치 반환.
+    //==============================================================================
+    /**
+     * @returns { string }
+     */
+    getBranch() {
+      return this.#branch;
+    }
+    //==============================================================================
+    // 버전 문자열 반환.
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    getVersionString() {
+      const major = this.getMajor();
+      const minor = this.getMinor();
+      const patch = this.getPatch();
+      const branch = this.getBranch();
+      if (branch === "") {
+        return `${major}.${minor}.${patch}`;
+      } else {
+        return `${major}.${minor}.${patch}-${branch}`;
+      }
+    }
+    //==============================================================================
+    // 생성.
+    //==============================================================================
+    /**
+     * @param { number } major 
+     * @param { number } minor
+     * @param { number } patch
+     * @param { string } branch
+     */
+    static create(major, minor, patch, branch = "") {
+      const version = new _Version();
+      version.setMajor(major);
+      version.setMinor(minor);
+      version.setPatch(patch);
+      version.setBranch(branch);
+      return version;
+    }
+  };
+
+  // src/core/timemanager.js
+  var System3 = globalThis;
+  var TimeManager = class extends Object2 {
+    static {
+      __name(this, "TimeManager");
+    }
+    //==============================================================================
+    // 멤버 변수 목록.
+    //==============================================================================
+    /** @private @type { number } */
+    #realtimeSinceStartup;
+    /** @private @type { number } */
+    #time;
+    /** @private @type { number } */
+    #unscaledTimeDelta;
+    /** @private @type { number } */
+    #fps;
+    /** @private @type { number } */
+    #framesThisSecond;
+    /** @private @type { number } */
+    #previousFrameCheckTime;
+    /** @private @type { number } */
+    #timeScale;
+    //==============================================================================
+    // 생성.
+    //==============================================================================
+    /**
+     * @constructor
+     * @param { Engine } engine 
+     */
+    constructor(engine) {
+      super();
+      this.#realtimeSinceStartup = 0;
+      this.#time = 0;
+      this.#unscaledTimeDelta = 0;
+      this.#fps = 0;
+      this.#framesThisSecond = 0;
+      this.#previousFrameCheckTime = 0;
+      this.#timeScale = 1;
+    }
+    //==============================================================================
+    // 시간 계산.
+    //==============================================================================
+    /**
+     * @param { number } timestamp
+     */
+    update(timestamp) {
+      const realtimeSinceStartup = timestamp * 1e-3;
+      if (this.#realtimeSinceStartup === 0) {
+        this.#realtimeSinceStartup = realtimeSinceStartup;
+        this.#previousFrameCheckTime = realtimeSinceStartup;
+      }
+      const rawTimeDelta = realtimeSinceStartup - this.#realtimeSinceStartup;
+      const unscaledTimeDelta = System3.Math.min(0.25, System3.Math.max(0, rawTimeDelta));
+      this.#realtimeSinceStartup = realtimeSinceStartup;
+      this.#time += unscaledTimeDelta;
+      this.#unscaledTimeDelta = unscaledTimeDelta;
+      if (realtimeSinceStartup >= this.#previousFrameCheckTime + 1) {
+        this.#fps = this.#framesThisSecond;
+        this.#framesThisSecond = 0;
+        this.#previousFrameCheckTime = realtimeSinceStartup;
+      }
+      ++this.#framesThisSecond;
+    }
+    //==============================================================================
+    // 현재 프라우저가 시작 된 이후 시간 반환. (초 단위)
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    getRealtimeSinceStartup() {
+      return this.#realtimeSinceStartup;
+    }
+    //==============================================================================
+    // 현재 엔진이 시작 된 이후 시간 반환. (초 단위)
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    getTime() {
+      return this.#time;
+    }
+    //==============================================================================
+    // 현재 프레임과 이전 프레임 사이의 경과 시간 반환. (초 단위)
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    getUnscaleDeltaTime() {
+      return this.#unscaledTimeDelta;
+    }
+    //==============================================================================
+    // 현재 프레임과 이전 프레임 사이의 경과 시간 반환. (초 단위)
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    getTimeDelta() {
+      const unscaledTimeDelta = this.getUnscaleDeltaTime();
+      const timeScale = this.getTimeScale();
+      return unscaledTimeDelta * timeScale;
+    }
+    //==============================================================================
+    // 현재 초당 프레임 수 반환.
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    getFramePerSecond() {
+      return this.#fps;
+    }
+    //==============================================================================
+    // 시간 배율 설정.
+    //==============================================================================
+    /**
+     * @param { number } timeScale
+     */
+    setTimeScale(timeScale) {
+      this.#timeScale = timeScale;
+    }
+    //==============================================================================
+    // 시간 배율 반환.
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    getTimeScale() {
+      return this.#timeScale;
     }
   };
 
@@ -8714,778 +8709,8 @@ void main() {
     }
   };
 
-  // src/effect/particlesystem.js
-  var System15 = globalThis;
-  var EmitterShape = {
-    point: "point",
-    circle: "circle",
-    cone: "cone",
-    box: "box",
-    edge: "edge"
-  };
-  var ParticleSystem = class extends Component {
-    static {
-      __name(this, "ParticleSystem");
-    }
-    //==============================================================================
-    // 멤버 변수 목록.
-    //==============================================================================
-    /** @private @type { object[] } */
-    #particleList;
-    /** @private @type { object[] } */
-    #freeList;
-    /** @private @type { number[] } */
-    #colorChannelBuffer;
-    // 색 계산 재사용 버퍼.
-    /** @private @type { boolean } */
-    #isPlaying;
-    /** @private @type { boolean } */
-    #isLooping;
-    /** @private @type { number } */
-    #duration;
-    // 루프 꺼짐일 때 방출이 이어지는 시간.
-    /** @private @type { number } */
-    #playElapsedSeconds;
-    /** @private @type { number } */
-    #maxParticleCount;
-    // 방출.
-    /** @private @type { number } */
-    #emissionRate;
-    // 초당 방출 수.
-    /** @private @type { number } */
-    #emissionAccumulator;
-    /** @private @type { object[] } */
-    #burstList;
-    // { time, count, fired }
-    /** @private @type { string } */
-    #emitterShape;
-    /** @private @type { number } */
-    #shapeRadius;
-    /** @private @type { number } */
-    #coneAngleRadian;
-    // cone 전용 반각.
-    /** @private @type { Vector2 } */
-    #boxSize;
-    /** @private @type { number } */
-    #edgeWidth;
-    // 시작 범위.
-    /** @private @type { number } */
-    #startLifetimeMin;
-    /** @private @type { number } */
-    #startLifetimeMax;
-    /** @private @type { number } */
-    #startSpeedMin;
-    /** @private @type { number } */
-    #startSpeedMax;
-    /** @private @type { number } */
-    #startSizeMin;
-    /** @private @type { number } */
-    #startSizeMax;
-    /** @private @type { number } */
-    #startRotationMin;
-    // 라디안.
-    /** @private @type { number } */
-    #startRotationMax;
-    /** @private @type { Color } */
-    #startColorA;
-    /** @private @type { Color } */
-    #startColorB;
-    // A~B 사이 무작위.
-    // 수명 동안 변화.
-    /** @private @type { object[] | null } */
-    #colorOverLifetime;
-    // [{ time, color }]
-    /** @private @type { number } */
-    #sizeOverLifetimeStart;
-    // 곱 계수.
-    /** @private @type { number } */
-    #sizeOverLifetimeEnd;
-    /** @private @type { number } */
-    #angularVelocityMin;
-    // 초당 라디안.
-    /** @private @type { number } */
-    #angularVelocityMax;
-    // 물리.
-    /** @private @type { Vector2 } */
-    #gravity;
-    /** @private @type { number } */
-    #damping;
-    // 초당 속도 감쇠 비율 계수.
-    // 힘.
-    /** @private @type { Vector2 | null } */
-    #attractorPosition;
-    // 끌림 중심. (로컬 좌표, null 이면 안 씀)
-    /** @private @type { number } */
-    #attractorStrength;
-    // 중심 방향 가속. (음수면 밀어냄)
-    /** @private @type { number } */
-    #attractorSwirl;
-    // 중심 접선 방향 가속. (소용돌이)
-    /** @private @type { number } */
-    #wobbleAmplitude;
-    // 좌우 살랑임 폭. (그리기 오프셋)
-    /** @private @type { number } */
-    #wobbleFrequency;
-    // 살랑임 초당 각속도.
-    // 렌더.
-    /** @private @type { string } */
-    #renderShape;
-    // "circle" | "rect" | "image" | "streak"
-    /** @private @type { * } */
-    #image;
-    /** @private @type { string } */
-    #blendMode;
-    // "source-over" | "lighter" | "multiply" | "screen"
-    /** @private @type { number } */
-    #streakScale;
-    // streak 길이 = 속도 x 이 값.
-    /** @private @type { boolean } */
-    #isWorldSpace;
-    // 참이면 방출 후 노드 이동의 영향을 받지 않는다.
-    //==============================================================================
-    // 생성.
-    //==============================================================================
-    /**
-     * @constructor
-     */
-    constructor() {
-      super();
-      this.setComponentType("ParticleSystem");
-      this.#particleList = [];
-      this.#freeList = [];
-      this.#colorChannelBuffer = [1, 1, 1, 1];
-      this.#isPlaying = true;
-      this.#isLooping = true;
-      this.#duration = 1;
-      this.#playElapsedSeconds = 0;
-      this.#maxParticleCount = 512;
-      this.#emissionRate = 20;
-      this.#emissionAccumulator = 0;
-      this.#burstList = [];
-      this.#emitterShape = EmitterShape.point;
-      this.#shapeRadius = 0;
-      this.#coneAngleRadian = 0.5;
-      this.#boxSize = Vector2.create(0, 0);
-      this.#edgeWidth = 0;
-      this.#startLifetimeMin = 1;
-      this.#startLifetimeMax = 1;
-      this.#startSpeedMin = 60;
-      this.#startSpeedMax = 60;
-      this.#startSizeMin = 6;
-      this.#startSizeMax = 6;
-      this.#startRotationMin = 0;
-      this.#startRotationMax = 0;
-      this.#startColorA = new Color(1, 1, 1, 1);
-      this.#startColorB = new Color(1, 1, 1, 1);
-      this.#colorOverLifetime = null;
-      this.#sizeOverLifetimeStart = 1;
-      this.#sizeOverLifetimeEnd = 1;
-      this.#angularVelocityMin = 0;
-      this.#angularVelocityMax = 0;
-      this.#gravity = Vector2.create(0, 0);
-      this.#damping = 0;
-      this.#attractorPosition = null;
-      this.#attractorStrength = 0;
-      this.#attractorSwirl = 0;
-      this.#wobbleAmplitude = 0;
-      this.#wobbleFrequency = 4;
-      this.#renderShape = "circle";
-      this.#image = null;
-      this.#blendMode = "source-over";
-      this.#streakScale = 0.06;
-      this.#isWorldSpace = false;
-    }
-    //==============================================================================
-    // 재생 / 정지.
-    //==============================================================================
-    play() {
-      this.#isPlaying = true;
-      this.#playElapsedSeconds = 0;
-      for (const burst of this.#burstList) {
-        burst.fired = false;
-      }
-    }
-    /**
-     * @param { boolean } isClearing 참이면 살아 있는 파티클도 지운다.
-     */
-    stop(isClearing = false) {
-      this.#isPlaying = false;
-      if (isClearing) {
-        this.#particleList.length = 0;
-      }
-    }
-    //==============================================================================
-    // 한 번에 여러 개 방출. (버튼 클릭 등 이벤트성 연출)
-    //==============================================================================
-    /**
-     * @param { number } count
-     * @param { Vector2 | null } worldOffset 방출 원점 보정. (노드 로컬 기준)
-     */
-    emit(count, worldOffset = null) {
-      for (let emitIndex = 0; emitIndex < count; ++emitIndex) {
-        this.spawnParticle(worldOffset);
-      }
-    }
-    //==============================================================================
-    // 갱신. (방출 + 적분)
-    //==============================================================================
-    /**
-     * @override
-     * @param { number } timeDelta
-     */
-    tick(timeDelta) {
-      if (this.#isPlaying) {
-        const previousElapsed = this.#playElapsedSeconds;
-        this.#playElapsedSeconds += timeDelta;
-        const isEmitWindow = this.#isLooping || this.#playElapsedSeconds <= this.#duration;
-        if (isEmitWindow && this.#emissionRate > 0) {
-          this.#emissionAccumulator += this.#emissionRate * timeDelta;
-          while (this.#emissionAccumulator >= 1) {
-            this.#emissionAccumulator -= 1;
-            this.spawnParticle(null);
-          }
-        }
-        for (const burst of this.#burstList) {
-          let burstTime = burst.time;
-          let currentTime = this.#playElapsedSeconds;
-          let previousTime = previousElapsed;
-          if (this.#isLooping && this.#duration > 0) {
-            currentTime = this.#playElapsedSeconds % this.#duration;
-            previousTime = previousElapsed % this.#duration;
-            if (currentTime < previousTime) {
-              burst.fired = false;
-            }
-          }
-          if (!burst.fired && previousTime <= burstTime && currentTime >= burstTime) {
-            burst.fired = this.#isLooping ? false : true;
-            if (this.#isLooping && currentTime >= burstTime) {
-              burst.fired = true;
-            }
-            this.emit(burst.count);
-          }
-        }
-      }
-      for (let particleIndex = this.#particleList.length - 1; particleIndex >= 0; --particleIndex) {
-        const particle = this.#particleList[particleIndex];
-        particle.age += timeDelta;
-        if (particle.age >= particle.lifetime) {
-          this.#freeList.push(particle);
-          this.#particleList.splice(particleIndex, 1);
-          continue;
-        }
-        particle.velocityX += this.#gravity.x * timeDelta;
-        particle.velocityY += this.#gravity.y * timeDelta;
-        if (this.#attractorPosition) {
-          const toCenterX = this.#attractorPosition.x - particle.x;
-          const toCenterY = this.#attractorPosition.y - particle.y;
-          const centerDistance = System15.Math.max(System15.Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY), 4);
-          const directionX = toCenterX / centerDistance;
-          const directionY = toCenterY / centerDistance;
-          particle.velocityX += directionX * this.#attractorStrength * timeDelta;
-          particle.velocityY += directionY * this.#attractorStrength * timeDelta;
-          particle.velocityX += -directionY * this.#attractorSwirl * timeDelta;
-          particle.velocityY += directionX * this.#attractorSwirl * timeDelta;
-        }
-        if (this.#damping > 0) {
-          const dampingBlend = System15.Math.max(0, 1 - this.#damping * timeDelta);
-          particle.velocityX *= dampingBlend;
-          particle.velocityY *= dampingBlend;
-        }
-        particle.x += particle.velocityX * timeDelta;
-        particle.y += particle.velocityY * timeDelta;
-        particle.rotation += particle.angularVelocity * timeDelta;
-      }
-    }
-    //==============================================================================
-    // 파티클 하나 생성.
-    //==============================================================================
-    /**
-     * @private
-     * @param { Vector2 | null } originOffset
-     */
-    spawnParticle(originOffset) {
-      if (this.#particleList.length >= this.#maxParticleCount) {
-        return;
-      }
-      let spawnX = 0;
-      let spawnY = 0;
-      let directionX = 0;
-      let directionY = -1;
-      const shape = this.#emitterShape;
-      if (shape === EmitterShape.circle) {
-        const angle = randomRange(0, System15.Math.PI * 2);
-        const radius = this.#shapeRadius * System15.Math.sqrt(randomRange(0, 1));
-        spawnX = System15.Math.cos(angle) * radius;
-        spawnY = System15.Math.sin(angle) * radius;
-        directionX = System15.Math.cos(angle);
-        directionY = System15.Math.sin(angle);
-      } else if (shape === EmitterShape.cone) {
-        const angle = -System15.Math.PI * 0.5 + randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
-        const radius = randomRange(0, this.#shapeRadius);
-        spawnX = System15.Math.cos(angle) * radius;
-        spawnY = System15.Math.sin(angle) * radius;
-        directionX = System15.Math.cos(angle);
-        directionY = System15.Math.sin(angle);
-      } else if (shape === EmitterShape.box) {
-        spawnX = randomRange(-this.#boxSize.x * 0.5, this.#boxSize.x * 0.5);
-        spawnY = randomRange(-this.#boxSize.y * 0.5, this.#boxSize.y * 0.5);
-      } else if (shape === EmitterShape.edge) {
-        spawnX = randomRange(-this.#edgeWidth * 0.5, this.#edgeWidth * 0.5);
-        directionY = 1;
-      } else {
-        const angle = randomRange(0, System15.Math.PI * 2);
-        directionX = System15.Math.cos(angle);
-        directionY = System15.Math.sin(angle);
-      }
-      if (originOffset) {
-        spawnX += originOffset.x;
-        spawnY += originOffset.y;
-      }
-      if (this.#isWorldSpace) {
-        const node = this.getNode();
-        const nodePosition = node.getLocalPosition();
-        spawnX += nodePosition.x;
-        spawnY += nodePosition.y;
-      }
-      const speed = randomRange(this.#startSpeedMin, this.#startSpeedMax);
-      const colorBlend = randomRange(0, 1);
-      const particle = this.#freeList.pop() || {};
-      particle.x = spawnX;
-      particle.y = spawnY;
-      particle.velocityX = directionX * speed;
-      particle.velocityY = directionY * speed;
-      particle.age = 0;
-      particle.lifetime = randomRange(this.#startLifetimeMin, this.#startLifetimeMax);
-      particle.size = randomRange(this.#startSizeMin, this.#startSizeMax);
-      particle.rotation = randomRange(this.#startRotationMin, this.#startRotationMax);
-      particle.angularVelocity = randomRange(this.#angularVelocityMin, this.#angularVelocityMax);
-      particle.wobblePhase = randomRange(0, System15.Math.PI * 2);
-      particle.red = this.#startColorA.red + (this.#startColorB.red - this.#startColorA.red) * colorBlend;
-      particle.green = this.#startColorA.green + (this.#startColorB.green - this.#startColorA.green) * colorBlend;
-      particle.blue = this.#startColorA.blue + (this.#startColorB.blue - this.#startColorA.blue) * colorBlend;
-      particle.alpha = this.#startColorA.alpha + (this.#startColorB.alpha - this.#startColorA.alpha) * colorBlend;
-      this.#particleList.push(particle);
-    }
-    //==============================================================================
-    // 수명 비율에 따른 색 계산. (재사용 버퍼에 r, g, b, a 를 채운다)
-    //==============================================================================
-    /**
-     * @private
-     * @param { object } particle
-     * @param { number } lifeRatio
-     * @param { number[] } outChannels 길이 4 배열.
-     */
-    evaluateColorChannels(particle, lifeRatio, outChannels) {
-      let red = particle.red;
-      let green = particle.green;
-      let blue = particle.blue;
-      let alpha = particle.alpha;
-      const gradient = this.#colorOverLifetime;
-      if (gradient && gradient.length > 0) {
-        let previousKey = gradient[0];
-        let nextKey = gradient[gradient.length - 1];
-        for (let keyIndex = 0; keyIndex < gradient.length; ++keyIndex) {
-          if (gradient[keyIndex].time <= lifeRatio) {
-            previousKey = gradient[keyIndex];
-          } else {
-            nextKey = gradient[keyIndex];
-            break;
-          }
-        }
-        const keySpan = System15.Math.max(nextKey.time - previousKey.time, 1e-4);
-        const keyBlend = System15.Math.max(0, System15.Math.min(1, (lifeRatio - previousKey.time) / keySpan));
-        red *= previousKey.color.red + (nextKey.color.red - previousKey.color.red) * keyBlend;
-        green *= previousKey.color.green + (nextKey.color.green - previousKey.color.green) * keyBlend;
-        blue *= previousKey.color.blue + (nextKey.color.blue - previousKey.color.blue) * keyBlend;
-        alpha *= previousKey.color.alpha + (nextKey.color.alpha - previousKey.color.alpha) * keyBlend;
-      }
-      outChannels[0] = red;
-      outChannels[1] = green;
-      outChannels[2] = blue;
-      outChannels[3] = System15.Math.max(0, System15.Math.min(1, alpha));
-    }
-    //==============================================================================
-    // 출력. (정점 색 배치 — 파티클 수와 무관하게 시스템당 드로우 한 번)
-    // - circle 은 부드러운 원 텍스처, rect / streak 은 흰 텍스처 쿼드로 그린다.
-    //   image 는 파티클 수가 적다는 가정으로 개별 드로우를 유지한다.
-    //==============================================================================
-    /**
-     * @override
-     * @param { Graphic } graphic
-     */
-    draw(graphic) {
-      const particleCount = this.#particleList.length;
-      if (particleCount === 0) {
-        return;
-      }
-      if (this.#blendMode !== "source-over") {
-        graphic.setBlendMode(this.#blendMode);
-      }
-      let baseOffsetX = 0;
-      let baseOffsetY = 0;
-      if (this.#isWorldSpace) {
-        const node = this.getNode();
-        const nodePosition = node.getLocalPosition();
-        baseOffsetX = -nodePosition.x;
-        baseOffsetY = -nodePosition.y;
-      }
-      if (this.#renderShape === "image" && this.#image) {
-        this.drawImageParticles(graphic, baseOffsetX, baseOffsetY);
-      } else {
-        this.drawBatchedParticles(graphic, baseOffsetX, baseOffsetY);
-      }
-      if (this.#blendMode !== "source-over") {
-        graphic.setBlendMode("source-over");
-      }
-    }
-    //==============================================================================
-    // 배치 출력 본체. (circle / rect / streak)
-    //==============================================================================
-    /**
-     * @private
-     * @param { Graphic } graphic
-     * @param { number } baseOffsetX
-     * @param { number } baseOffsetY
-     */
-    drawBatchedParticles(graphic, baseOffsetX, baseOffsetY) {
-      const particleCount = this.#particleList.length;
-      const vertexData = graphic.getParticleVertexData(particleCount * 48);
-      const colorChannels = this.#colorChannelBuffer;
-      const isStreak = this.#renderShape === "streak";
-      const isRect = this.#renderShape === "rect";
-      let floatOffset = 0;
-      const writeVertex = /* @__PURE__ */ __name((x, y, u, v) => {
-        vertexData[floatOffset++] = x;
-        vertexData[floatOffset++] = y;
-        vertexData[floatOffset++] = u;
-        vertexData[floatOffset++] = v;
-        vertexData[floatOffset++] = colorChannels[0];
-        vertexData[floatOffset++] = colorChannels[1];
-        vertexData[floatOffset++] = colorChannels[2];
-        vertexData[floatOffset++] = colorChannels[3];
-      }, "writeVertex");
-      for (const particle of this.#particleList) {
-        const lifeRatio = particle.age / particle.lifetime;
-        const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
-        const drawSize = System15.Math.max(0.1, particle.size * sizeScale);
-        this.evaluateColorChannels(particle, lifeRatio, colorChannels);
-        let drawX = particle.x + baseOffsetX;
-        const drawY = particle.y + baseOffsetY;
-        if (this.#wobbleAmplitude > 0) {
-          drawX += System15.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
-        }
-        if (isStreak) {
-          const speed = System15.Math.sqrt(particle.velocityX * particle.velocityX + particle.velocityY * particle.velocityY);
-          const safeSpeed = System15.Math.max(speed, 1e-3);
-          const directionX = particle.velocityX / safeSpeed;
-          const directionY = particle.velocityY / safeSpeed;
-          const tailX = drawX - particle.velocityX * this.#streakScale;
-          const tailY = drawY - particle.velocityY * this.#streakScale;
-          const halfWidth = drawSize * 0.5;
-          const sideX = -directionY * halfWidth;
-          const sideY = directionX * halfWidth;
-          writeVertex(drawX + sideX, drawY + sideY, 0, 0);
-          writeVertex(drawX - sideX, drawY - sideY, 1, 0);
-          writeVertex(tailX - sideX, tailY - sideY, 1, 1);
-          writeVertex(drawX + sideX, drawY + sideY, 0, 0);
-          writeVertex(tailX - sideX, tailY - sideY, 1, 1);
-          writeVertex(tailX + sideX, tailY + sideY, 0, 1);
-        } else if (isRect && particle.rotation !== 0) {
-          const halfSize = drawSize * 0.5;
-          const cosValue = System15.Math.cos(particle.rotation);
-          const sinValue = System15.Math.sin(particle.rotation);
-          const axisX1 = cosValue * halfSize;
-          const axisY1 = sinValue * halfSize;
-          const axisX2 = -sinValue * halfSize;
-          const axisY2 = cosValue * halfSize;
-          writeVertex(drawX - axisX1 - axisX2, drawY - axisY1 - axisY2, 0, 0);
-          writeVertex(drawX + axisX1 - axisX2, drawY + axisY1 - axisY2, 1, 0);
-          writeVertex(drawX + axisX1 + axisX2, drawY + axisY1 + axisY2, 1, 1);
-          writeVertex(drawX - axisX1 - axisX2, drawY - axisY1 - axisY2, 0, 0);
-          writeVertex(drawX + axisX1 + axisX2, drawY + axisY1 + axisY2, 1, 1);
-          writeVertex(drawX - axisX1 + axisX2, drawY - axisY1 + axisY2, 0, 1);
-        } else {
-          const halfSize = drawSize * 0.5;
-          writeVertex(drawX - halfSize, drawY - halfSize, 0, 0);
-          writeVertex(drawX + halfSize, drawY - halfSize, 1, 0);
-          writeVertex(drawX + halfSize, drawY + halfSize, 1, 1);
-          writeVertex(drawX - halfSize, drawY - halfSize, 0, 0);
-          writeVertex(drawX + halfSize, drawY + halfSize, 1, 1);
-          writeVertex(drawX - halfSize, drawY + halfSize, 0, 1);
-        }
-      }
-      const texture = this.#renderShape === "circle" ? graphic.getSoftDiscTexture() : graphic.getWhiteTexture();
-      graphic.drawColoredQuads(floatOffset / 8, texture);
-    }
-    //==============================================================================
-    // 이미지 파티클 출력. (개별 드로우 — 파티클 수가 적은 연출용)
-    //==============================================================================
-    /**
-     * @private
-     * @param { Graphic } graphic
-     * @param { number } baseOffsetX
-     * @param { number } baseOffsetY
-     */
-    drawImageParticles(graphic, baseOffsetX, baseOffsetY) {
-      for (const particle of this.#particleList) {
-        const lifeRatio = particle.age / particle.lifetime;
-        const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
-        const drawSize = System15.Math.max(0.1, particle.size * sizeScale);
-        let drawX = particle.x + baseOffsetX;
-        const drawY = particle.y + baseOffsetY;
-        if (this.#wobbleAmplitude > 0) {
-          drawX += System15.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
-        }
-        graphic.pushState();
-        graphic.translate(drawX, drawY);
-        graphic.rotate(particle.rotation);
-        graphic.multiplyGlobalAlpha(System15.Math.max(0, System15.Math.min(1, particle.alpha * (1 - lifeRatio))));
-        graphic.drawImage(this.#image, Vector2.create(-drawSize * 0.5, -drawSize * 0.5), Vector2.create(drawSize, drawSize));
-        graphic.popState();
-      }
-    }
-    //==============================================================================
-    // 설정 메서드 목록. (유니티 모듈 대응)
-    //==============================================================================
-    /** @param { number } emissionRate 초당 방출 수. */
-    setEmissionRate(emissionRate) {
-      this.#emissionRate = emissionRate;
-    }
-    /** @param { object[] } burstList [{ time, count }] */
-    setBurstList(burstList) {
-      this.#burstList = burstList.map((burst) => {
-        return { time: burst.time, count: burst.count, fired: false };
-      });
-    }
-    /** @param { string } emitterShape EmitterShape 값. */
-    setEmitterShape(emitterShape) {
-      this.#emitterShape = emitterShape;
-    }
-    /** @param { number } shapeRadius circle / cone 반지름. */
-    setShapeRadius(shapeRadius) {
-      this.#shapeRadius = shapeRadius;
-    }
-    /** @param { number } coneAngleRadian cone 반각. (라디안) */
-    setConeAngle(coneAngleRadian) {
-      this.#coneAngleRadian = coneAngleRadian;
-    }
-    /** @param { number } width @param { number } height box 크기. */
-    setBoxSize(width, height) {
-      this.#boxSize = Vector2.create(width, height);
-    }
-    /** @param { number } edgeWidth edge 가로 길이. */
-    setEdgeWidth(edgeWidth) {
-      this.#edgeWidth = edgeWidth;
-    }
-    /** @param { number } minSeconds @param { number } maxSeconds */
-    setStartLifetime(minSeconds, maxSeconds = minSeconds) {
-      this.#startLifetimeMin = minSeconds;
-      this.#startLifetimeMax = maxSeconds;
-    }
-    /** @param { number } minSpeed @param { number } maxSpeed */
-    setStartSpeed(minSpeed, maxSpeed = minSpeed) {
-      this.#startSpeedMin = minSpeed;
-      this.#startSpeedMax = maxSpeed;
-    }
-    /** @param { number } minSize @param { number } maxSize */
-    setStartSize(minSize, maxSize = minSize) {
-      this.#startSizeMin = minSize;
-      this.#startSizeMax = maxSize;
-    }
-    /** @param { number } minRadian @param { number } maxRadian */
-    setStartRotation(minRadian, maxRadian = minRadian) {
-      this.#startRotationMin = minRadian;
-      this.#startRotationMax = maxRadian;
-    }
-    /** @param { Color } colorA @param { Color } colorB 둘 사이 무작위. */
-    setStartColor(colorA, colorB = colorA) {
-      this.#startColorA = colorA.clone();
-      this.#startColorB = colorB.clone();
-    }
-    /** @param { object[] } gradient [{ time: 0~1, color }] */
-    setColorOverLifetime(gradient) {
-      this.#colorOverLifetime = gradient.map((key) => {
-        return { time: key.time, color: key.color.clone() };
-      });
-    }
-    /** @param { number } startScale @param { number } endScale */
-    setSizeOverLifetime(startScale, endScale) {
-      this.#sizeOverLifetimeStart = startScale;
-      this.#sizeOverLifetimeEnd = endScale;
-    }
-    /** @param { number } minRadianPerSecond @param { number } maxRadianPerSecond */
-    setAngularVelocity(minRadianPerSecond, maxRadianPerSecond = minRadianPerSecond) {
-      this.#angularVelocityMin = minRadianPerSecond;
-      this.#angularVelocityMax = maxRadianPerSecond;
-    }
-    /** @param { number } gravityX @param { number } gravityY */
-    setGravity(gravityX, gravityY) {
-      this.#gravity = Vector2.create(gravityX, gravityY);
-    }
-    /** @param { number } damping 초당 감쇠 계수. (0 = 없음) */
-    setDamping(damping) {
-      this.#damping = damping;
-    }
-    /** @param { string } renderShape "circle" | "rect" | "image" */
-    setRenderShape(renderShape) {
-      this.#renderShape = renderShape;
-    }
-    /** @param { * } image 엔진 이미지. (renderShape "image" 전용) */
-    setImage(image) {
-      this.#image = image;
-    }
-    /** @param { boolean } isAdditive 가산 합성 여부. (setBlendMode("lighter") 의 설탕) */
-    setAdditive(isAdditive) {
-      this.#blendMode = isAdditive ? "lighter" : "source-over";
-    }
-    /** @param { string } blendMode "source-over" | "lighter" | "multiply" | "screen" */
-    setBlendMode(blendMode) {
-      this.#blendMode = blendMode;
-    }
-    /** @param { number } x @param { number } y @param { number } strength 중심 가속. @param { number } swirl 접선 가속. */
-    setAttractor(x, y, strength, swirl = 0) {
-      this.#attractorPosition = Vector2.create(x, y);
-      this.#attractorStrength = strength;
-      this.#attractorSwirl = swirl;
-    }
-    /** 어트랙터 해제. */
-    clearAttractor() {
-      this.#attractorPosition = null;
-    }
-    /** @param { number } amplitude 살랑임 폭. @param { number } frequency 초당 각속도. */
-    setWobble(amplitude, frequency = 4) {
-      this.#wobbleAmplitude = amplitude;
-      this.#wobbleFrequency = frequency;
-    }
-    /** @param { number } streakScale streak 길이 = 속도 x 이 값. */
-    setStreakScale(streakScale) {
-      this.#streakScale = streakScale;
-    }
-    /** @param { boolean } isWorldSpace 참이면 방출 뒤 노드 이동의 영향을 받지 않는다. */
-    setWorldSpace(isWorldSpace) {
-      this.#isWorldSpace = isWorldSpace;
-    }
-    /** @param { boolean } isLooping */
-    setLooping(isLooping) {
-      this.#isLooping = isLooping;
-    }
-    /** @param { number } duration 루프 꺼짐일 때 방출 시간. (버스트 반복 주기) */
-    setDuration(duration) {
-      this.#duration = duration;
-    }
-    /** @param { number } maxParticleCount */
-    setMaxParticleCount(maxParticleCount) {
-      this.#maxParticleCount = maxParticleCount;
-    }
-    //==============================================================================
-    // 서술(JSON) 적용. — vfx 애셋 로드 / 파티클 편집기 공용.
-    // - 모든 항목은 선택 사항이며 준 것만 반영한다. 색은 [r, g, b, a] 배열.
-    //==============================================================================
-    /**
-     * @param { object } description
-     */
-    applyDescription(description) {
-      const toColor = /* @__PURE__ */ __name((channels) => new Color(channels[0], channels[1], channels[2], channels[3] !== void 0 ? channels[3] : 1), "toColor");
-      if (description.looping !== void 0) {
-        this.setLooping(description.looping);
-      }
-      if (description.duration !== void 0) {
-        this.setDuration(description.duration);
-      }
-      if (description.maxParticleCount !== void 0) {
-        this.setMaxParticleCount(description.maxParticleCount);
-      }
-      if (description.emissionRate !== void 0) {
-        this.setEmissionRate(description.emissionRate);
-      }
-      if (description.bursts !== void 0) {
-        this.setBurstList(description.bursts);
-      }
-      if (description.shape !== void 0) {
-        this.setEmitterShape(description.shape);
-      }
-      if (description.shapeRadius !== void 0) {
-        this.setShapeRadius(description.shapeRadius);
-      }
-      if (description.coneAngle !== void 0) {
-        this.setConeAngle(description.coneAngle);
-      }
-      if (description.boxSize !== void 0) {
-        this.setBoxSize(description.boxSize[0], description.boxSize[1]);
-      }
-      if (description.edgeWidth !== void 0) {
-        this.setEdgeWidth(description.edgeWidth);
-      }
-      if (description.lifetime !== void 0) {
-        this.setStartLifetime(description.lifetime[0], description.lifetime[1]);
-      }
-      if (description.speed !== void 0) {
-        this.setStartSpeed(description.speed[0], description.speed[1]);
-      }
-      if (description.size !== void 0) {
-        this.setStartSize(description.size[0], description.size[1]);
-      }
-      if (description.rotation !== void 0) {
-        this.setStartRotation(description.rotation[0], description.rotation[1]);
-      }
-      if (description.angularVelocity !== void 0) {
-        this.setAngularVelocity(description.angularVelocity[0], description.angularVelocity[1]);
-      }
-      if (description.startColorA !== void 0) {
-        this.setStartColor(toColor(description.startColorA), toColor(description.startColorB !== void 0 ? description.startColorB : description.startColorA));
-      }
-      if (description.colorOverLifetime !== void 0) {
-        this.setColorOverLifetime(description.colorOverLifetime.map((key) => {
-          return { time: key.time, color: toColor(key.color) };
-        }));
-      }
-      if (description.sizeOverLifetime !== void 0) {
-        this.setSizeOverLifetime(description.sizeOverLifetime[0], description.sizeOverLifetime[1]);
-      }
-      if (description.gravity !== void 0) {
-        this.setGravity(description.gravity[0], description.gravity[1]);
-      }
-      if (description.damping !== void 0) {
-        this.setDamping(description.damping);
-      }
-      if (description.attractor !== void 0) {
-        if (description.attractor) {
-          this.setAttractor(description.attractor.x, description.attractor.y, description.attractor.strength, description.attractor.swirl !== void 0 ? description.attractor.swirl : 0);
-        } else {
-          this.clearAttractor();
-        }
-      }
-      if (description.wobble !== void 0) {
-        this.setWobble(description.wobble[0], description.wobble[1] !== void 0 ? description.wobble[1] : 4);
-      }
-      if (description.renderShape !== void 0) {
-        this.setRenderShape(description.renderShape);
-      }
-      if (description.blendMode !== void 0) {
-        this.setBlendMode(description.blendMode);
-      }
-      if (description.streakScale !== void 0) {
-        this.setStreakScale(description.streakScale);
-      }
-      if (description.worldSpace !== void 0) {
-        this.setWorldSpace(description.worldSpace);
-      }
-    }
-    //==============================================================================
-    // 조회 메서드 목록.
-    //==============================================================================
-    /** @returns { number } */
-    getParticleCount() {
-      return this.#particleList.length;
-    }
-    /** @returns { boolean } */
-    isPlaying() {
-      return this.#isPlaying;
-    }
-  };
-
   // src/web/pane.js
-  var System16 = globalThis;
+  var System15 = globalThis;
   var PaneTheme = {
     color: {
       background: "#1e1e1e",
@@ -9535,7 +8760,7 @@ void main() {
      * @param { Object } options - { id, text, style, type, placeholder, accent, warning }
      */
     static create(tagName, preset = "", options = {}) {
-      const el = System16.document.createElement(tagName);
+      const el = System15.document.createElement(tagName);
       if (options.id) el.id = options.id;
       if (options.text) el.innerText = options.text;
       if (options.type) el.type = options.type;
@@ -9692,7 +8917,7 @@ void main() {
     }
     /** @private */
     #createContainer() {
-      this.#container = System16.document.createElement("div");
+      this.#container = System15.document.createElement("div");
       this.#container.style.position = "absolute";
       this.#container.style.overflow = "hidden";
       this.#container.style.boxSizing = "border-box";
@@ -9715,7 +8940,7 @@ void main() {
     }
     /** @private */
     #createResizer(prev, next) {
-      const resizer = System16.document.createElement("div");
+      const resizer = System15.document.createElement("div");
       resizer.style.position = "absolute";
       resizer.style.backgroundColor = PaneTheme.color.resizer;
       resizer.style.zIndex = "1000";
@@ -9746,10 +8971,10 @@ void main() {
           const grabRect = resizer.getBoundingClientRect();
           this.#resizeGrabOffset = this.#direction === "horizontal" ? e.clientX - grabRect.left : e.clientY - grabRect.top;
           resizer.style.backgroundColor = PaneTheme.color.resizerHover;
-          System16.document.body.style.cursor = resizer.style.cursor;
-          System16.document.body.style.userSelect = "none";
-          System16.document.addEventListener("mousemove", this.#onMouseMoveBind);
-          System16.document.addEventListener("mouseup", this.#onMouseUpBind);
+          System15.document.body.style.cursor = resizer.style.cursor;
+          System15.document.body.style.userSelect = "none";
+          System15.document.addEventListener("mousemove", this.#onMouseMoveBind);
+          System15.document.addEventListener("mouseup", this.#onMouseUpBind);
         });
       }
       resizer.dataset.thickness = thickness;
@@ -9780,10 +9005,10 @@ void main() {
     /** @private */
     #onMouseUp() {
       this.#isResizing = false;
-      System16.document.body.style.cursor = "default";
-      System16.document.body.style.userSelect = "auto";
-      System16.document.removeEventListener("mousemove", this.#onMouseMoveBind);
-      System16.document.removeEventListener("mouseup", this.#onMouseUpBind);
+      System15.document.body.style.cursor = "default";
+      System15.document.body.style.userSelect = "auto";
+      System15.document.removeEventListener("mousemove", this.#onMouseMoveBind);
+      System15.document.removeEventListener("mouseup", this.#onMouseUpBind);
       for (const r of this.#resizers) r.style.backgroundColor = PaneTheme.color.resizer;
     }
     //==============================================================================
@@ -9859,14 +9084,14 @@ void main() {
     refresh() {
       const p = this.#container.parentElement;
       if (!p) return;
-      this.updateLayout(0, 0, p.clientWidth || System16.window.innerWidth, p.clientHeight || System16.window.innerHeight);
+      this.updateLayout(0, 0, p.clientWidth || System15.window.innerWidth, p.clientHeight || System15.window.innerHeight);
     }
     attachTo(p) {
       p.appendChild(this.#container);
       const run = /* @__PURE__ */ __name(() => this.refresh(), "run");
-      System16.window.addEventListener("resize", run);
+      System15.window.addEventListener("resize", run);
       run();
-      System16.requestAnimationFrame(run);
+      System15.requestAnimationFrame(run);
     }
     isFlex() {
       return this.#initialSize === 0;
@@ -9901,7 +9126,7 @@ void main() {
   };
 
   // tools/common/editorkit.js
-  var System17 = globalThis;
+  var System16 = globalThis;
   var EditorTheme = {
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI Variable Text", "Segoe UI", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", Roboto, sans-serif',
     accentColor: "#0078d4",
@@ -9946,15 +9171,15 @@ void main() {
   }
   __name(setEditorCommandHandler, "setEditorCommandHandler");
   function applyEditorTheme() {
-    for (const colorName of System17.Object.keys(EDITOR_PANE_COLORS)) {
+    for (const colorName of System16.Object.keys(EDITOR_PANE_COLORS)) {
       PaneTheme.color[colorName] = EDITOR_PANE_COLORS[colorName];
     }
     PaneTheme.size.resizer = 3;
     PaneTheme.font.family = EditorTheme.fontFamily;
     PaneTheme.font.size = "13px";
-    const editorStyleElement = System17.document.createElement("style");
+    const editorStyleElement = System16.document.createElement("style");
     editorStyleElement.innerText = "* { scrollbar-width: thin; scrollbar-color: rgba(121, 121, 121, 0.4) transparent; }::-webkit-scrollbar { width: 10px; height: 10px; }::-webkit-scrollbar-track { background: transparent; }::-webkit-scrollbar-thumb { background: rgba(121, 121, 121, 0.4); }::-webkit-scrollbar-thumb:hover { background: rgba(121, 121, 121, 0.7); }::-webkit-scrollbar-corner { background: transparent; }input[type=checkbox] { accent-color: " + EditorTheme.accentColor + "; }body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }";
-    System17.document.head.appendChild(editorStyleElement);
+    System16.document.head.appendChild(editorStyleElement);
   }
   __name(applyEditorTheme, "applyEditorTheme");
   function wrapEditorIconMarkup(shapeMarkup) {
@@ -9962,7 +9187,7 @@ void main() {
   }
   __name(wrapEditorIconMarkup, "wrapEditorIconMarkup");
   function createEditorMenuPanelElement(menuItems) {
-    const panelElement = System17.document.createElement("div");
+    const panelElement = System16.document.createElement("div");
     panelElement.id = "editorMenuPanel";
     panelElement.style.cssText = "position:fixed;z-index:9999;min-width:196px;padding:4px 0;background:" + PaneTheme.color.toolbar + ";border:1px solid " + PaneTheme.color.border + ";border-radius:4px;box-shadow:0 6px 18px rgba(0,0,0,0.5);font-size:13px;color:" + PaneTheme.color.text + ";font-family:" + PaneTheme.font.family + ";";
     panelElement.addEventListener("mousedown", (mouseEvent) => {
@@ -9970,24 +9195,24 @@ void main() {
     });
     for (const menuItem of menuItems) {
       if (menuItem.separator) {
-        const separatorElement = System17.document.createElement("div");
+        const separatorElement = System16.document.createElement("div");
         separatorElement.style.cssText = "height:1px;margin:4px 8px;background:" + PaneTheme.color.border + ";";
         panelElement.appendChild(separatorElement);
         continue;
       }
-      const itemElement = System17.document.createElement("div");
+      const itemElement = System16.document.createElement("div");
       itemElement.style.cssText = "display:flex;align-items:center;padding:5px 12px 5px 8px;cursor:pointer;white-space:nowrap;";
-      const checkElement = System17.document.createElement("span");
+      const checkElement = System16.document.createElement("span");
       checkElement.style.cssText = "width:16px;flex:0 0 16px;color:" + EditorTheme.accentColor + ";";
       const isChecked = editorIsCommandChecked ? editorIsCommandChecked(menuItem.id) : false;
       checkElement.innerText = isChecked ? "\u2713" : "";
       itemElement.appendChild(checkElement);
-      const labelElement = System17.document.createElement("span");
+      const labelElement = System16.document.createElement("span");
       labelElement.style.cssText = "flex:1;";
       labelElement.innerText = menuItem.label;
       itemElement.appendChild(labelElement);
       if (menuItem.shortcut) {
-        const shortcutElement = System17.document.createElement("span");
+        const shortcutElement = System16.document.createElement("span");
         shortcutElement.style.cssText = "margin-left:24px;color:" + PaneTheme.color.textDim + ";font-size:12px;";
         shortcutElement.innerText = menuItem.shortcut;
         itemElement.appendChild(shortcutElement);
@@ -10016,13 +9241,13 @@ void main() {
   function openEditorMenuPanelAt(clientX, clientY, menuItems) {
     closeEditorMenuPanel();
     const panelElement = createEditorMenuPanelElement(menuItems);
-    panelElement.style.left = System17.Math.round(clientX) + "px";
-    panelElement.style.top = System17.Math.round(clientY) + "px";
-    System17.document.body.appendChild(panelElement);
+    panelElement.style.left = System16.Math.round(clientX) + "px";
+    panelElement.style.top = System16.Math.round(clientY) + "px";
+    System16.document.body.appendChild(panelElement);
   }
   __name(openEditorMenuPanelAt, "openEditorMenuPanelAt");
   function closeEditorMenuPanel() {
-    const existingPanel = System17.document.getElementById("editorMenuPanel");
+    const existingPanel = System16.document.getElementById("editorMenuPanel");
     if (existingPanel) {
       existingPanel.remove();
     }
@@ -10032,8 +9257,8 @@ void main() {
   }
   __name(closeEditorMenuPanel, "closeEditorMenuPanel");
   var openMenuCloseHandler = null;
-  System17.window.addEventListener("mousedown", () => {
-    const openedPanel = System17.document.getElementById("editorMenuPanel");
+  System16.window.addEventListener("mousedown", () => {
+    const openedPanel = System16.document.getElementById("editorMenuPanel");
     if (openedPanel || openMenuCloseHandler) {
       closeEditorMenuPanel();
     }
@@ -10062,9 +9287,9 @@ void main() {
       const titleElement = menuTitleElementList[menuIndex];
       const titleRect = titleElement.getBoundingClientRect();
       const panelElement = createEditorMenuPanelElement(menuDefinitions[menuIndex].items);
-      panelElement.style.left = System17.Math.round(titleRect.left) + "px";
-      panelElement.style.top = System17.Math.round(titleRect.bottom) + "px";
-      System17.document.body.appendChild(panelElement);
+      panelElement.style.left = System16.Math.round(titleRect.left) + "px";
+      panelElement.style.top = System16.Math.round(titleRect.bottom) + "px";
+      System16.document.body.appendChild(panelElement);
       titleElement.style.backgroundColor = EditorTheme.menuHoverColor;
       openMenuIndex = menuIndex;
       openMenuCloseHandler = closeDropdown;
@@ -10211,6 +9436,12 @@ void main() {
     return buttonElement;
   }
   __name(createEditorHeaderButtonElement, "createEditorHeaderButtonElement");
+  function setEditorHeaderButtonSelected(buttonElement, isSelected) {
+    buttonElement.dataset.selected = isSelected ? "true" : "false";
+    buttonElement.style.backgroundColor = isSelected ? EditorTheme.accentColor : "transparent";
+    buttonElement.style.color = isSelected ? EditorTheme.selectedRowTextColor : PaneTheme.color.textDim;
+  }
+  __name(setEditorHeaderButtonSelected, "setEditorHeaderButtonSelected");
   function createEditorListRowElement(glyphMarkup, labelText) {
     const rowElement = PaneStyle.create("div", "", {
       style: {
@@ -10317,7 +9548,7 @@ void main() {
   }
   __name(decorateEditorInputElement, "decorateEditorInputElement");
   function createEditorButtonElement(labelText, isPrimary) {
-    const buttonElement = System17.document.createElement("div");
+    const buttonElement = System16.document.createElement("div");
     buttonElement.innerText = labelText;
     buttonElement.style.cssText = "padding:6px 16px;font-size:13px;border-radius:3px;cursor:pointer;user-select:none;border:1px solid " + PaneTheme.color.border + ";" + (isPrimary ? "background:" + EditorTheme.accentColor + ";color:" + EditorTheme.selectedRowTextColor + ";border-color:" + EditorTheme.accentColor + ";" : "background:" + PaneTheme.color.inputBg + ";color:" + PaneTheme.color.text + ";");
     buttonElement.addEventListener("mouseenter", () => {
@@ -10329,91 +9560,6 @@ void main() {
     return buttonElement;
   }
   __name(createEditorButtonElement, "createEditorButtonElement");
-  function createEditorGroupElement(titleText, groupBodyElement, menuBuilder) {
-    const groupElement = PaneStyle.create("div", "", {
-      style: {
-        position: "relative",
-        width: "auto",
-        height: "30px",
-        flexShrink: "0",
-        display: "flex",
-        alignItems: "center",
-        padding: "0 8px 0 8px",
-        marginTop: "8px",
-        backgroundColor: EditorTheme.groupColor,
-        borderTop: "1px solid " + EditorTheme.borderColor,
-        borderBottom: "1px solid " + EditorTheme.borderSoftColor,
-        cursor: "pointer",
-        userSelect: "none"
-      }
-    });
-    const foldElement = PaneStyle.create("span", "", {
-      text: "\u25BE",
-      style: {
-        position: "relative",
-        width: "14px",
-        height: "auto",
-        flexShrink: "0",
-        fontSize: "12px",
-        color: PaneTheme.color.textDim,
-        textAlign: "center"
-      }
-    });
-    groupElement.appendChild(foldElement);
-    const titleElement = PaneStyle.create("span", "", {
-      text: titleText,
-      style: {
-        position: "relative",
-        width: "auto",
-        height: "auto",
-        flex: "1",
-        fontSize: "13px",
-        fontWeight: "600",
-        color: EditorTheme.inkColor
-      }
-    });
-    groupElement.appendChild(titleElement);
-    if (groupBodyElement) {
-      groupElement.addEventListener("click", () => {
-        const isFolded = groupBodyElement.style.display === "none";
-        groupBodyElement.style.display = isFolded ? "" : "none";
-        foldElement.innerText = isFolded ? "\u25BE" : "\u25B8";
-      });
-    }
-    if (menuBuilder) {
-      const moreElement = PaneStyle.create("div", "", {
-        text: "\u22EF",
-        style: {
-          position: "relative",
-          width: "20px",
-          height: "18px",
-          flexShrink: "0",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: "14px",
-          color: PaneTheme.color.textDim,
-          cursor: "pointer",
-          borderRadius: "3px",
-          userSelect: "none"
-        }
-      });
-      moreElement.addEventListener("mouseenter", () => {
-        moreElement.style.backgroundColor = EditorTheme.menuHoverColor;
-      });
-      moreElement.addEventListener("mouseleave", () => {
-        moreElement.style.backgroundColor = "transparent";
-      });
-      moreElement.addEventListener("click", (mouseEvent) => {
-        mouseEvent.stopPropagation();
-        const buttonRect = moreElement.getBoundingClientRect();
-        openEditorMenuPanelAt(buttonRect.right - 190, buttonRect.bottom + 2, menuBuilder());
-      });
-      groupElement.appendChild(moreElement);
-    }
-    return groupElement;
-  }
-  __name(createEditorGroupElement, "createEditorGroupElement");
   function createEditorPropertyRowElement(parentElement, labelText) {
     const rowElement = PaneStyle.create("div", "", {
       style: {
@@ -10444,124 +9590,6 @@ void main() {
     return rowElement;
   }
   __name(createEditorPropertyRowElement, "createEditorPropertyRowElement");
-  function composeEditorNumberText(value) {
-    const isInteger = System17.Math.abs(value - System17.Math.round(value)) < 1e-4;
-    return isInteger ? String(System17.Math.round(value)) : value.toFixed(2);
-  }
-  __name(composeEditorNumberText, "composeEditorNumberText");
-  function appendEditorNumberRow(parentElement, labelText, currentValue, stepAmount, applyCallback, beginEditCallback) {
-    const rowElement = createEditorPropertyRowElement(parentElement, labelText);
-    const inputElement = PaneStyle.create("input", "input", { type: "text" });
-    inputElement.style.position = "relative";
-    inputElement.style.width = "100%";
-    inputElement.value = composeEditorNumberText(currentValue);
-    const commitValue = /* @__PURE__ */ __name(() => {
-      const parsedValue = System17.Number(inputElement.value);
-      if (System17.Number.isFinite(parsedValue)) {
-        if (beginEditCallback) {
-          beginEditCallback();
-        }
-        applyCallback(parsedValue);
-      } else {
-        inputElement.value = composeEditorNumberText(currentValue);
-      }
-    }, "commitValue");
-    inputElement.addEventListener("change", commitValue);
-    inputElement.addEventListener("keydown", (keyboardEvent) => {
-      if (keyboardEvent.key === "Enter") {
-        inputElement.blur();
-      }
-      keyboardEvent.stopPropagation();
-    });
-    const labelElement = rowElement.firstChild;
-    labelElement.style.cursor = "ew-resize";
-    labelElement.addEventListener("mousedown", (mouseEvent) => {
-      mouseEvent.preventDefault();
-      const startX = mouseEvent.clientX;
-      const startValue = System17.Number(inputElement.value) || 0;
-      if (beginEditCallback) {
-        beginEditCallback();
-      }
-      const onMouseMove = /* @__PURE__ */ __name((moveEvent) => {
-        let nextValue = startValue + (moveEvent.clientX - startX) * stepAmount;
-        if (stepAmount >= 1) {
-          nextValue = System17.Math.round(nextValue);
-        }
-        inputElement.value = composeEditorNumberText(nextValue);
-        applyCallback(nextValue);
-      }, "onMouseMove");
-      const onMouseUp = /* @__PURE__ */ __name(() => {
-        System17.window.removeEventListener("mousemove", onMouseMove);
-        System17.window.removeEventListener("mouseup", onMouseUp);
-      }, "onMouseUp");
-      System17.window.addEventListener("mousemove", onMouseMove);
-      System17.window.addEventListener("mouseup", onMouseUp);
-    });
-    rowElement.appendChild(inputElement);
-    return rowElement;
-  }
-  __name(appendEditorNumberRow, "appendEditorNumberRow");
-  function appendEditorColorRow(parentElement, labelText, hexText, alphaValue, applyCallback, beginEditCallback) {
-    const rowElement = createEditorPropertyRowElement(parentElement, labelText);
-    const colorInputElement = PaneStyle.create("input", "", { type: "color" });
-    colorInputElement.style.cssText = "position:relative;width:34px;height:22px;padding:0;border:1px solid " + PaneTheme.color.border + ";background:transparent;cursor:pointer;flex-shrink:0;";
-    colorInputElement.value = hexText;
-    const alphaInputElement = PaneStyle.create("input", "input", { type: "text" });
-    alphaInputElement.style.position = "relative";
-    alphaInputElement.style.width = "100%";
-    alphaInputElement.value = alphaValue.toFixed(2);
-    const commitColor = /* @__PURE__ */ __name(() => {
-      const parsedAlpha = System17.Number(alphaInputElement.value);
-      const clampedAlpha = System17.Number.isFinite(parsedAlpha) ? System17.Math.max(0, System17.Math.min(1, parsedAlpha)) : alphaValue;
-      if (beginEditCallback) {
-        beginEditCallback();
-      }
-      applyCallback(colorInputElement.value, clampedAlpha);
-    }, "commitColor");
-    colorInputElement.addEventListener("input", commitColor);
-    alphaInputElement.addEventListener("change", commitColor);
-    alphaInputElement.addEventListener("keydown", (keyboardEvent) => {
-      keyboardEvent.stopPropagation();
-    });
-    rowElement.appendChild(colorInputElement);
-    rowElement.appendChild(alphaInputElement);
-    return rowElement;
-  }
-  __name(appendEditorColorRow, "appendEditorColorRow");
-  function appendEditorBooleanRow(parentElement, labelText, currentValue, changeHandler, beginEditCallback) {
-    const rowElement = createEditorPropertyRowElement(parentElement, labelText);
-    const checkElement = System17.document.createElement("input");
-    checkElement.type = "checkbox";
-    checkElement.checked = currentValue;
-    checkElement.style.cssText = "width:14px;height:14px;accent-color:" + EditorTheme.accentColor + ";cursor:pointer;";
-    checkElement.addEventListener("change", () => {
-      if (beginEditCallback) {
-        beginEditCallback();
-      }
-      changeHandler(checkElement.checked);
-    });
-    rowElement.appendChild(checkElement);
-    return rowElement;
-  }
-  __name(appendEditorBooleanRow, "appendEditorBooleanRow");
-  function appendEditorSelectRow(parentElement, labelText, optionList, currentValue, changeHandler) {
-    const rowElement = createEditorPropertyRowElement(parentElement, labelText);
-    const selectElement = System17.document.createElement("select");
-    selectElement.style.cssText = "flex:1;min-width:0;height:24px;box-sizing:border-box;padding:0 4px;font-family:" + EditorTheme.fontFamily + ";font-size:13px;border-radius:3px;outline:none;background:" + PaneTheme.color.inputBg + ";color:" + PaneTheme.color.text + ";border:1px solid " + EditorTheme.borderColor + ";cursor:pointer;";
-    for (const optionValue of optionList) {
-      const optionElement = System17.document.createElement("option");
-      optionElement.value = optionValue;
-      optionElement.textContent = optionValue;
-      selectElement.appendChild(optionElement);
-    }
-    selectElement.value = currentValue;
-    selectElement.addEventListener("change", () => {
-      changeHandler(selectElement.value);
-    });
-    rowElement.appendChild(selectElement);
-    return rowElement;
-  }
-  __name(appendEditorSelectRow, "appendEditorSelectRow");
   function buildEditorWindowLayout(menuDefinitions, mainPane) {
     const rootPane = new Pane({ direction: "vertical" });
     const menuBarPane = new Pane({ size: 30, minSize: 30, maxSize: 30, isResizable: false });
@@ -10577,438 +9605,587 @@ void main() {
   }
   __name(buildEditorWindowLayout, "buildEditorWindowLayout");
 
-  // tools/particleeditor/particleeditor.js
-  var System18 = globalThis;
-  var PRESET_ICON_MARKUP = "<circle cx='7' cy='7' r='2.2' fill='currentColor'/><circle cx='3' cy='3.6' r='1.2' fill='currentColor' opacity='0.7'/><circle cx='11.2' cy='4.4' r='1' fill='currentColor' opacity='0.55'/><circle cx='10.4' cy='10.8' r='1.3' fill='currentColor' opacity='0.7'/><circle cx='3.4' cy='10.4' r='0.9' fill='currentColor' opacity='0.5'/>";
-  var DEFAULT_DESCRIPTION = {
-    looping: true,
-    duration: 1,
-    maxParticleCount: 800,
-    emissionRate: 60,
-    bursts: [],
-    shape: "cone",
-    shapeRadius: 20,
-    coneAngle: 0.35,
-    boxSize: [200, 100],
-    edgeWidth: 400,
-    lifetime: [0.6, 1.2],
-    speed: [80, 180],
-    size: [6, 14],
-    rotation: [0, 0],
-    angularVelocity: [0, 0],
-    startColorA: [1, 0.75, 0.3, 1],
-    startColorB: [1, 0.5, 0.12, 1],
-    colorOverLifetime: [
-      { time: 0, color: [1, 1, 0.85, 1] },
-      { time: 0.5, color: [1, 0.6, 0.2, 0.9] },
-      { time: 1, color: [0.65, 0.1, 0.02, 0] }
-    ],
-    sizeOverLifetime: [1, 0.3],
-    gravity: [0, -110],
-    damping: 1,
-    attractor: null,
-    wobble: [0, 4],
-    renderShape: "circle",
-    blendMode: "lighter",
-    streakScale: 0.05,
-    worldSpace: false
-  };
-  var PRESET_TABLE = {
-    Fire: null,
-    // 기본 서술 그대로.
-    Snow: {
-      emissionRate: 70,
-      shape: "edge",
-      edgeWidth: 700,
-      lifetime: [5, 8],
-      speed: [30, 70],
-      size: [2.5, 6],
-      gravity: [0, 12],
-      damping: 0.1,
-      wobble: [14, 1.4],
-      renderShape: "circle",
-      blendMode: "source-over",
-      startColorA: [1, 1, 1, 0.95],
-      startColorB: [0.8, 0.88, 1, 0.55],
-      sizeOverLifetime: [1, 1],
-      colorOverLifetime: [
-        { time: 0, color: [1, 1, 1, 0] },
-        { time: 0.06, color: [1, 1, 1, 1] },
-        { time: 0.92, color: [1, 1, 1, 1] },
-        { time: 1, color: [1, 1, 1, 0] }
-      ]
-    },
-    Rain: {
-      emissionRate: 200,
-      shape: "edge",
-      edgeWidth: 760,
-      lifetime: [0.8, 1],
-      speed: [430, 540],
-      size: [1.4, 2.2],
-      gravity: [0, 0],
-      damping: 0,
-      wobble: [0, 4],
-      renderShape: "streak",
-      streakScale: 0.03,
-      blendMode: "source-over",
-      startColorA: [0.62, 0.74, 0.95, 0.55],
-      startColorB: [0.75, 0.85, 1, 0.35],
-      sizeOverLifetime: [1, 1],
-      colorOverLifetime: [{ time: 0, color: [1, 1, 1, 1] }, { time: 1, color: [1, 1, 1, 1] }]
-    },
-    Confetti: {
-      emissionRate: 0,
-      bursts: [{ time: 0.1, count: 70 }],
-      duration: 1.2,
-      shape: "circle",
-      shapeRadius: 10,
-      lifetime: [1.6, 2.6],
-      speed: [150, 380],
-      size: [4.5, 8],
-      rotation: [0, 6.28],
-      angularVelocity: [2.2, 3.6],
-      gravity: [0, 480],
-      damping: 1.5,
-      wobble: [8, 3],
-      renderShape: "rect",
-      blendMode: "source-over",
-      startColorA: [1, 0.45, 0.55, 1],
-      startColorB: [0.4, 0.75, 1, 1],
-      sizeOverLifetime: [1, 1],
-      colorOverLifetime: [
-        { time: 0, color: [1, 1, 1, 1] },
-        { time: 0.85, color: [1, 1, 1, 1] },
-        { time: 1, color: [1, 1, 1, 0] }
-      ]
-    },
-    Explosion: {
-      emissionRate: 0,
-      bursts: [{ time: 0.1, count: 70 }],
-      duration: 1.6,
-      shape: "circle",
-      shapeRadius: 8,
-      lifetime: [0.5, 1.2],
-      speed: [240, 600],
-      size: [2.5, 4.5],
-      gravity: [0, 340],
-      damping: 2.2,
-      renderShape: "streak",
-      streakScale: 0.045,
-      blendMode: "lighter",
-      wobble: [0, 4],
-      startColorA: [1, 0.8, 0.35, 1],
-      startColorB: [1, 0.5, 0.15, 1],
-      sizeOverLifetime: [1, 0.6],
-      colorOverLifetime: [{ time: 0, color: [1, 1, 1, 1] }, { time: 1, color: [1, 0.3, 0.05, 0] }]
-    },
-    Firework: {
-      emissionRate: 0,
-      bursts: [{ time: 0.1, count: 80 }],
-      duration: 1.1,
-      shape: "circle",
-      shapeRadius: 4,
-      lifetime: [1, 1.8],
-      speed: [120, 330],
-      size: [2.5, 4.5],
-      gravity: [0, 140],
-      damping: 1.1,
-      renderShape: "circle",
-      blendMode: "lighter",
-      wobble: [0, 4],
-      startColorA: [0.5, 0.8, 1, 1],
-      startColorB: [1, 0.6, 0.8, 1],
-      sizeOverLifetime: [1, 0.6],
-      colorOverLifetime: [
-        { time: 0, color: [1, 1, 1, 1] },
-        { time: 0.7, color: [1, 1, 1, 0.9] },
-        { time: 1, color: [1, 1, 1, 0] }
-      ]
-    },
-    Sparkle: {
-      emissionRate: 60,
-      shape: "box",
-      boxSize: [700, 380],
-      lifetime: [1.2, 2.4],
-      speed: [0, 8],
-      size: [2, 7],
-      gravity: [0, 0],
-      damping: 0,
-      renderShape: "circle",
-      blendMode: "lighter",
-      wobble: [0, 4],
-      startColorA: [0.75, 0.85, 1, 1],
-      startColorB: [1, 0.9, 0.7, 1],
-      sizeOverLifetime: [0.4, 1.3],
-      colorOverLifetime: [
-        { time: 0, color: [1, 1, 1, 0] },
-        { time: 0.3, color: [1, 1, 1, 1] },
-        { time: 1, color: [1, 1, 1, 0] }
-      ]
-    },
-    Bubbles: {
-      emissionRate: 30,
-      shape: "edge",
-      edgeWidth: 620,
-      lifetime: [2.6, 4.4],
-      speed: [70, 130],
-      size: [4, 14],
-      gravity: [0, -30],
-      damping: 0.2,
-      wobble: [20, 2.4],
-      renderShape: "circle",
-      blendMode: "source-over",
-      startColorA: [0.6, 0.85, 1, 0.5],
-      startColorB: [0.8, 0.95, 1, 0.3],
-      sizeOverLifetime: [0.7, 1.15],
-      colorOverLifetime: [
-        { time: 0, color: [1, 1, 1, 0] },
-        { time: 0.1, color: [1, 1, 1, 1] },
-        { time: 0.85, color: [1, 1, 1, 1] },
-        { time: 1, color: [1, 1, 1, 0] }
-      ]
-    },
-    Vortex: {
-      emissionRate: 140,
-      shape: "circle",
-      shapeRadius: 220,
-      lifetime: [1.8, 3.2],
-      speed: [10, 60],
-      size: [2, 5],
-      gravity: [0, 0],
-      damping: 0.35,
-      attractor: { x: 0, y: 0, strength: 170, swirl: 240 },
-      renderShape: "circle",
-      blendMode: "lighter",
-      wobble: [0, 4],
-      startColorA: [0.5, 0.7, 1, 1],
-      startColorB: [0.8, 0.6, 1, 1],
-      sizeOverLifetime: [1, 0.5],
-      colorOverLifetime: [
-        { time: 0, color: [1, 1, 1, 0] },
-        { time: 0.15, color: [1, 1, 1, 1] },
-        { time: 0.85, color: [1, 1, 1, 0.9] },
-        { time: 1, color: [1, 1, 1, 0] }
-      ]
-    }
+  // tools/visualeditor/visualeditor.js
+  var System17 = globalThis;
+  var ICON_SHAPES = {
+    folder: "<path d='M1.5 3.5h4l1.2 1.6h5.8v6.4h-11z' fill='currentColor'/>",
+    file: "<path d='M3.5 1.8h5l2.2 2.2v8.2h-7.2z' fill='none' stroke='currentColor' stroke-width='1.5'/>",
+    node: "<path d='M7 1.8l5.2 5.2-5.2 5.2-5.2-5.2z' fill='currentColor'/>"
   };
   var MENU_DEFINITIONS = [
     {
-      title: "File",
+      title: "Playback",
       items: [
-        { id: "newDescription", label: "New", shortcut: "Ctrl+Alt+N" },
-        { id: "load", label: "Open...", shortcut: "Ctrl+O" },
-        { id: "save", label: "Save", shortcut: "Ctrl+S" }
+        { id: "play", label: "Play", shortcut: "F5" },
+        { id: "pause", label: "Pause" },
+        { id: "stop", label: "Stop", shortcut: "Shift+F5" }
       ]
     },
     {
-      title: "Playback",
+      title: "View",
       items: [
-        { id: "restart", label: "Restart" },
-        { id: "burst", label: "Emit Burst x60", shortcut: "Space" }
+        { id: "resetLayout", label: "Reset Layout" }
       ]
     }
   ];
-  function composeHexText(channels) {
-    const toByte = /* @__PURE__ */ __name((value) => System18.Math.round(value * 255).toString(16).padStart(2, "0"), "toByte");
-    return "#" + toByte(channels[0]) + toByte(channels[1]) + toByte(channels[2]);
-  }
-  __name(composeHexText, "composeHexText");
-  function parseHexChannels(hexText, alphaValue) {
-    return [
-      System18.parseInt(hexText.substring(1, 3), 16) / 255,
-      System18.parseInt(hexText.substring(3, 5), 16) / 255,
-      System18.parseInt(hexText.substring(5, 7), 16) / 255,
-      alphaValue
-    ];
-  }
-  __name(parseHexChannels, "parseHexChannels");
-  var PreviewScene = class extends Scene {
+  var GameView = class extends Scene {
     static {
-      __name(this, "PreviewScene");
+      __name(this, "GameView");
     }
     //==============================================================================
     // 멤버 변수 목록.
     //==============================================================================
     /** @type { Function } */
-    #createdEvent;
-    /** @type { Function } */
-    #tickEvent;
+    #drawEvent;
     //==============================================================================
     // 생성.
     //==============================================================================
-    constructor(createdEvent, tickEvent) {
+    /**
+     * @constructor
+     */
+    constructor() {
       super();
-      this.#createdEvent = createdEvent;
-      this.#tickEvent = tickEvent;
+      this.#drawEvent = null;
     }
     //==============================================================================
-    // 씬 구성.
+    // 초기화.
     //==============================================================================
-    create() {
-      super.create();
-      this.#createdEvent(this);
-    }
-    //==============================================================================
-    // 바탕 그리기.
-    //==============================================================================
-    preDraw(graphic) {
-      super.preDraw(graphic);
-      const engine = this.getEngine();
+    /**
+     * @param { Engine } engine
+     */
+    initialize(engine) {
+      super.initialize(engine);
       const viewManager = engine.getViewManager();
-      const canvasNativeSize = viewManager.getCanvasNativeSize();
-      viewManager.applyCanvasNativeRect(graphic);
-      graphic.setFillColor("rgb(16, 17, 20)");
-      graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
-      viewManager.applyViewRect(graphic);
+      viewManager.setViewScaleMode(ViewScaleMode.none);
     }
     //==============================================================================
-    // 갱신.
+    // 출력.
     //==============================================================================
-    tick(timeDelta) {
-      super.tick(timeDelta);
-      this.#tickEvent();
+    /**
+     * @param { Graphic } graphic
+     */
+    draw(graphic) {
+      super.draw(graphic);
+      const drawEvent = this.getDrawEvent();
+      if (drawEvent !== null) {
+        drawEvent(graphic);
+      }
+    }
+    //==============================================================================
+    // 출력 설정.
+    //==============================================================================
+    /**
+     * @param { function(Graphic): void } callback
+     */
+    setDrawEvent(callback) {
+      this.#drawEvent = callback;
+    }
+    //==============================================================================
+    // 출력 반환.
+    //==============================================================================
+    /**
+     * @returns { function(Graphic): void }
+     */
+    getDrawEvent() {
+      return this.#drawEvent;
     }
   };
-  var ParticleEditor = class {
+  var VisualEditor = class {
     static {
-      __name(this, "ParticleEditor");
+      __name(this, "VisualEditor");
     }
     //==============================================================================
     // 멤버 변수 목록.
     //==============================================================================
-    /** @private @type { object } */
-    #description;
-    /** @private @type { ParticleSystem | null } */
-    #particleSystem;
-    /** @private @type { Engine | null } */
+    /** @private @type { System.Object } */
+    #inspector;
+    /** @private @type { Engine } */
     #engine;
-    /** @private @type { string } */
-    #presetName;
-    /** @private @type { Map } */
-    #presetRowMap;
-    /** @private @type { HTMLElement | null } */
-    #inspectorBodyElement;
-    /** @private @type { HTMLElement | null } */
-    #gradientContainerElement;
-    /** @private @type { HTMLElement | null } */
+    /** @private @type { GameView } */
+    #gameView;
+    /** @private @type { Function } */
+    #scripting;
+    /** @private @type { Proxy } */
+    #properties;
+    /** @private @type { HTMLElement } */
+    #editor;
+    /** @private @type { HTMLElement } */
+    #consolePane;
+    /** @private @type { HTMLElement } */
+    #inspectorPropsContainer;
+    /** @private @type { HTMLElement } */
     #statusTextElement;
-    /** @private @type { HTMLInputElement | null } */
-    #fileInputElement;
+    /** @private @type { Array } */
+    #particles;
+    /** @private @type { boolean } */
+    #isPlaying;
+    /** @private @type { HTMLElement } */
+    #consoleSelectedItem;
+    /** @private @type { HTMLElement } */
+    #playButtonElement;
+    /** @private @type { HTMLElement } */
+    #pauseButtonElement;
+    /** @private @type { HTMLElement } */
+    #stopButtonElement;
+    /** @private @type { Pane } */
+    #rootPane;
     //==============================================================================
     // 생성.
     //==============================================================================
     constructor() {
-      this.#description = System18.JSON.parse(System18.JSON.stringify(DEFAULT_DESCRIPTION));
-      this.#particleSystem = null;
+      this.#inspector = {};
       this.#engine = null;
-      this.#presetName = "Fire";
-      this.#presetRowMap = new System18.Map();
-      this.#inspectorBodyElement = null;
-      this.#gradientContainerElement = null;
+      this.#gameView = null;
+      this.#scripting = null;
+      this.#properties = null;
+      this.#editor = null;
+      this.#consolePane = null;
+      this.#inspectorPropsContainer = null;
       this.#statusTextElement = null;
-      this.#fileInputElement = null;
+      this.#particles = [];
+      this.#isPlaying = true;
+      this.#consoleSelectedItem = null;
+      this.#playButtonElement = null;
+      this.#pauseButtonElement = null;
+      this.#stopButtonElement = null;
+      this.#rootPane = null;
     }
     //==============================================================================
-    // 실행.
+    // 트리 한 줄 생성. (접기 화살표 + 기호 + 이름, 자식 컨테이너 포함)
     //==============================================================================
-    run() {
-      this.buildLayout();
-      this.selectPresetRow("Fire");
-      this.buildInspector();
-      this.startEngine();
+    /**
+     * @param { string } iconName
+     * @param { string } labelText
+     * @param { object } options - { dataType, hasChildren, isOpen, onSelect }
+     * @returns { HTMLElement }
+     */
+    createTreeItemElement(iconName, labelText, options) {
+      const wrapperElement = System17.document.createElement("div");
+      wrapperElement.dataset.type = options.dataType;
+      wrapperElement.dataset.label = labelText;
+      const glyphMarkup = wrapEditorIconMarkup(ICON_SHAPES[iconName]);
+      const rowElement = createEditorListRowElement(glyphMarkup, labelText);
+      rowElement.style.gap = "5px";
+      rowElement.style.paddingLeft = "8px";
+      wrapperElement.appendChild(rowElement);
+      const foldElement = System17.document.createElement("span");
+      foldElement.innerText = "\u25B8";
+      foldElement.style.cssText = "font-size:10px;color:" + PaneTheme.color.textDim + ";width:12px;flex-shrink:0;text-align:center;user-select:none;visibility:hidden;";
+      rowElement.insertBefore(foldElement, rowElement.firstChild);
+      const labelElement = rowElement.children[2];
+      labelElement.dataset.role = "label";
+      labelElement.style.flex = "1";
+      const childContainerElement = System17.document.createElement("div");
+      childContainerElement.style.paddingLeft = "16px";
+      childContainerElement.style.display = options.isOpen ? "block" : "none";
+      wrapperElement.appendChild(childContainerElement);
+      if (options.hasChildren) {
+        foldElement.style.visibility = "visible";
+        foldElement.innerText = options.isOpen ? "\u25BE" : "\u25B8";
+        foldElement.style.cursor = "pointer";
+      }
+      foldElement.addEventListener("click", (mouseEvent) => {
+        mouseEvent.stopPropagation();
+        const isOpen = childContainerElement.style.display !== "none";
+        childContainerElement.style.display = isOpen ? "none" : "block";
+        foldElement.innerText = isOpen ? "\u25B8" : "\u25BE";
+      });
+      wrapperElement.addChild = (childItemElement) => {
+        childContainerElement.appendChild(childItemElement);
+        foldElement.style.visibility = "visible";
+        const isOpen = childContainerElement.style.display !== "none";
+        foldElement.innerText = isOpen ? "\u25BE" : "\u25B8";
+        foldElement.style.cursor = "pointer";
+      };
+      rowElement.addEventListener("click", (mouseEvent) => {
+        mouseEvent.stopPropagation();
+        options.onSelect(rowElement, labelText);
+      });
+      return wrapperElement;
     }
     //==============================================================================
     // 창 구성.
     //==============================================================================
-    buildLayout() {
-      const mainPane = new Pane({ direction: "horizontal", size: "flex" });
-      const presetPane = new Pane({ size: 240, minSize: 170 });
-      const presetElement = createEditorSectionElement("PRESETS", null);
-      const presetListElement = PaneStyle.create("div", "", { style: { flex: "1", overflowY: "auto", position: "relative" } });
-      const presetIconMarkup = wrapEditorIconMarkup(PRESET_ICON_MARKUP);
-      for (const presetName of System18.Object.keys(PRESET_TABLE)) {
-        const rowElement = createEditorListRowElement(presetIconMarkup, presetName);
-        rowElement.addEventListener("click", () => {
-          this.applyPreset(presetName);
+    initialize() {
+      const mainEditorPane = new Pane({ direction: "horizontal", size: "flex" });
+      const leftSidePane = new Pane({ direction: "vertical", size: 250, minSize: 150 });
+      const explorerPane = new Pane({ size: "50%", minSize: 100 });
+      let explorerSelectedRow = null;
+      const selectExplorerRow = /* @__PURE__ */ __name((rowElement, labelText) => {
+        if (explorerSelectedRow) {
+          setEditorListRowSelected(explorerSelectedRow, false);
+        }
+        explorerSelectedRow = rowElement;
+        setEditorListRowSelected(rowElement, true);
+        this.setStatusText("Explorer > " + labelText);
+      }, "selectExplorerRow");
+      const createTreeItem = /* @__PURE__ */ __name((labelText, isFolder = false) => {
+        return this.createTreeItemElement(isFolder ? "folder" : "file", labelText, {
+          dataType: "tree-item",
+          hasChildren: false,
+          isOpen: false,
+          onSelect: selectExplorerRow
         });
-        this.#presetRowMap.set(presetName, rowElement);
-        presetListElement.appendChild(rowElement);
-      }
-      presetElement.appendChild(presetListElement);
-      presetPane.getContainer().appendChild(presetElement);
-      const previewPane = new Pane({ size: "flex", minSize: 200 });
-      const previewElement = createEditorSectionElement("PREVIEW", null);
-      const previewTitleElement = previewElement.firstChild;
-      previewTitleElement.style.display = "flex";
-      previewTitleElement.style.alignItems = "center";
-      previewTitleElement.style.paddingRight = "6px";
-      const previewSpacerElement = PaneStyle.create("div", "", {
+      }, "createTreeItem");
+      const explorerElement = createEditorSectionElement("EXPLORER", () => {
+        return [
+          {
+            id: "addExplorerItem",
+            label: "Add Item...",
+            action: /* @__PURE__ */ __name(() => {
+              const newName = System17.prompt("Item name:", "");
+              if (newName) {
+                explorerTree.appendChild(createTreeItem(newName));
+              }
+            }, "action")
+          }
+        ];
+      });
+      const explorerTree = PaneStyle.create("div", "", { style: { flex: "1", overflowY: "auto", position: "relative" } });
+      const assetsItem = createTreeItem("assets", true);
+      assetsItem.addChild(createTreeItem("audio"));
+      assetsItem.addChild(createTreeItem("images"));
+      assetsItem.addChild(createTreeItem("fonts"));
+      const sourceItem = createTreeItem("src", true);
+      sourceItem.addChild(createTreeItem("utils.js"));
+      sourceItem.addChild(createTreeItem("config.js"));
+      explorerTree.append(assetsItem, sourceItem, createTreeItem("main.js"), createTreeItem("suika.js"), createTreeItem("Suika_Visual.json"));
+      explorerTree.addEventListener("click", (mouseEvent) => {
+        if (!mouseEvent.target.closest('[data-type="tree-item"]')) {
+          if (explorerSelectedRow) {
+            setEditorListRowSelected(explorerSelectedRow, false);
+            explorerSelectedRow = null;
+          }
+          this.setStatusText("No selection");
+        }
+      });
+      explorerElement.appendChild(explorerTree);
+      explorerPane.getContainer().appendChild(explorerElement);
+      const hierarchyPane = new Pane({ size: "flex", minSize: 100 });
+      let hierarchySelectedRow = null;
+      const selectHierarchyRow = /* @__PURE__ */ __name((rowElement, labelText) => {
+        if (hierarchySelectedRow) {
+          setEditorListRowSelected(hierarchySelectedRow, false);
+        }
+        hierarchySelectedRow = rowElement;
+        setEditorListRowSelected(rowElement, true);
+        this.setStatusText("Hierarchy > " + labelText);
+      }, "selectHierarchyRow");
+      const createHierarchyItem = /* @__PURE__ */ __name((labelText) => {
+        const wrapperElement = this.createTreeItemElement("node", labelText, {
+          dataType: "hierarchy-item",
+          hasChildren: false,
+          isOpen: true,
+          onSelect: selectHierarchyRow
+        });
+        const rowElement = wrapperElement.firstChild;
+        const activeButtonElement = System17.document.createElement("button");
+        activeButtonElement.innerText = "Active";
+        activeButtonElement.dataset.active = "true";
+        activeButtonElement.style.cssText = "font-size:10px;padding:1px 6px;border:none;border-radius:3px;cursor:pointer;background-color:" + PaneTheme.color.success + ";color:#10241a;flex-shrink:0;font-family:" + EditorTheme.fontFamily + ";font-weight:600;";
+        activeButtonElement.addEventListener("click", (mouseEvent) => {
+          mouseEvent.stopPropagation();
+          const isActive = activeButtonElement.dataset.active === "true";
+          activeButtonElement.dataset.active = isActive ? "false" : "true";
+          activeButtonElement.innerText = isActive ? "Inactive" : "Active";
+          activeButtonElement.style.backgroundColor = isActive ? PaneTheme.color.resizer : PaneTheme.color.success;
+          activeButtonElement.style.color = isActive ? PaneTheme.color.textDim : "#10241a";
+        });
+        rowElement.appendChild(activeButtonElement);
+        return wrapperElement;
+      }, "createHierarchyItem");
+      const hierarchyElement = createEditorSectionElement("HIERARCHY", () => {
+        return [
+          {
+            id: "addHierarchyItem",
+            label: "Add Item...",
+            action: /* @__PURE__ */ __name(() => {
+              const newName = System17.prompt("Item name:", "");
+              if (newName) {
+                hierarchyTree.appendChild(createHierarchyItem(newName));
+              }
+            }, "action")
+          }
+        ];
+      });
+      const hierarchyTree = PaneStyle.create("div", "", { style: { flex: "1", overflowY: "auto", position: "relative" } });
+      const visualRoot = createHierarchyItem("Visual Root");
+      const backgroundLayer = createHierarchyItem("Background Layer");
+      const particleEmitter = createHierarchyItem("Particle Emitter");
+      const mainParticle = createHierarchyItem("Main Particle");
+      const subParticle = createHierarchyItem("Sub Particle");
+      const uiLayer = createHierarchyItem("UI Layer");
+      particleEmitter.addChild(mainParticle);
+      particleEmitter.addChild(subParticle);
+      visualRoot.addChild(backgroundLayer);
+      visualRoot.addChild(particleEmitter);
+      visualRoot.addChild(uiLayer);
+      hierarchyTree.appendChild(visualRoot);
+      hierarchyTree.addEventListener("click", (mouseEvent) => {
+        if (!mouseEvent.target.closest('[data-type="hierarchy-item"]')) {
+          if (hierarchySelectedRow) {
+            setEditorListRowSelected(hierarchySelectedRow, false);
+            hierarchySelectedRow = null;
+          }
+          this.setStatusText("No selection");
+        }
+      });
+      hierarchyElement.appendChild(hierarchyTree);
+      hierarchyPane.getContainer().appendChild(hierarchyElement);
+      leftSidePane.addPane(explorerPane);
+      leftSidePane.addPane(hierarchyPane);
+      const codeEditorPane = new Pane({ size: 640, minSize: 150 });
+      const codeEditorElement = createEditorSectionElement("SCRIPT", null);
+      this.#editor = PaneStyle.create("textarea", "textarea", {
+        id: "code-editor",
         style: { position: "relative", width: "auto", height: "auto", flex: "1" }
       });
-      const restartButtonElement = createEditorHeaderButtonElement("RESTART");
-      restartButtonElement.addEventListener("click", () => {
-        this.restartParticleSystem();
+      codeEditorElement.appendChild(this.#editor);
+      codeEditorPane.getContainer().appendChild(codeEditorElement);
+      const gameCanvasPane = new Pane({ size: "flex" });
+      const gameCanvasElement = createEditorSectionElement("GAME VIEW", null);
+      const gameCanvasTitleElement = gameCanvasElement.firstChild;
+      gameCanvasTitleElement.style.display = "flex";
+      gameCanvasTitleElement.style.alignItems = "center";
+      gameCanvasTitleElement.style.paddingRight = "6px";
+      const gameCanvasSpacerElement = PaneStyle.create("div", "", {
+        style: { position: "relative", width: "auto", height: "auto", flex: "1" }
       });
-      const burstButtonElement = createEditorHeaderButtonElement("BURST x60");
-      burstButtonElement.addEventListener("click", () => {
-        this.emitBurst();
+      this.#playButtonElement = createEditorHeaderButtonElement("PLAY");
+      this.#pauseButtonElement = createEditorHeaderButtonElement("PAUSE");
+      this.#stopButtonElement = createEditorHeaderButtonElement("STOP");
+      this.#playButtonElement.addEventListener("click", () => {
+        this.executeCommand("play");
       });
-      previewTitleElement.appendChild(previewSpacerElement);
-      previewTitleElement.appendChild(restartButtonElement);
-      previewTitleElement.appendChild(burstButtonElement);
+      this.#pauseButtonElement.addEventListener("click", () => {
+        this.executeCommand("pause");
+      });
+      this.#stopButtonElement.addEventListener("click", () => {
+        this.executeCommand("stop");
+      });
+      gameCanvasTitleElement.appendChild(gameCanvasSpacerElement);
+      gameCanvasTitleElement.appendChild(this.#playButtonElement);
+      gameCanvasTitleElement.appendChild(this.#pauseButtonElement);
+      gameCanvasTitleElement.appendChild(this.#stopButtonElement);
       const canvasHolderElement = PaneStyle.create("div", "", {
-        style: { position: "relative", width: "auto", height: "auto", flex: "1", backgroundColor: "rgb(16, 17, 20)", overflow: "hidden" }
+        style: { position: "relative", width: "auto", height: "auto", flex: "1", backgroundColor: "#000000", overflow: "hidden" }
       });
-      const canvasElement = PaneStyle.create("canvas", "", { id: "previewCanvas" });
+      const canvasElement = PaneStyle.create("canvas", "", { id: "game-canvas" });
       canvasHolderElement.appendChild(canvasElement);
-      previewElement.appendChild(canvasHolderElement);
-      previewPane.getContainer().appendChild(previewElement);
-      const inspectorPane = new Pane({ size: 336, minSize: 220 });
+      gameCanvasElement.appendChild(canvasHolderElement);
+      gameCanvasPane.getContainer().appendChild(gameCanvasElement);
+      const inspectorSidePane = new Pane({ size: 300, minSize: 180 });
       const inspectorElement = createEditorSectionElement("INSPECTOR", null);
-      this.#inspectorBodyElement = PaneStyle.create("div", "", {
-        style: { flex: "1", overflowY: "auto", position: "relative", paddingBottom: "40px" }
+      this.#inspectorPropsContainer = PaneStyle.create("div", "", {
+        id: "inspector-props",
+        style: { flex: "1", overflowY: "auto", position: "relative" }
       });
-      inspectorElement.appendChild(this.#inspectorBodyElement);
-      inspectorPane.getContainer().appendChild(inspectorElement);
-      mainPane.addPane(presetPane);
-      mainPane.addPane(previewPane);
-      mainPane.addPane(inspectorPane);
-      const windowLayout = buildEditorWindowLayout(MENU_DEFINITIONS, mainPane);
-      const rootPane = windowLayout.rootPane;
+      const addPropRowElement = PaneStyle.create("div", "", {
+        style: {
+          position: "relative",
+          width: "auto",
+          height: "auto",
+          flexShrink: "0",
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          padding: "8px 12px",
+          borderTop: "1px solid " + PaneTheme.color.border
+        }
+      });
+      const propertyNameInputElement = System17.document.createElement("input");
+      propertyNameInputElement.type = "text";
+      propertyNameInputElement.placeholder = "Name";
+      decorateEditorInputElement(propertyNameInputElement);
+      const propertyValueInputElement = System17.document.createElement("input");
+      propertyValueInputElement.type = "text";
+      propertyValueInputElement.placeholder = "Value";
+      decorateEditorInputElement(propertyValueInputElement);
+      propertyValueInputElement.style.flex = "0 0 60px";
+      const addPropertyButtonElement = createEditorButtonElement("Add", true);
+      addPropertyButtonElement.style.padding = "3px 12px";
+      addPropRowElement.append(propertyNameInputElement, propertyValueInputElement, addPropertyButtonElement);
+      inspectorElement.appendChild(this.#inspectorPropsContainer);
+      inspectorElement.appendChild(addPropRowElement);
+      inspectorSidePane.getContainer().appendChild(inspectorElement);
+      mainEditorPane.addPane(leftSidePane);
+      mainEditorPane.addPane(codeEditorPane);
+      mainEditorPane.addPane(gameCanvasPane);
+      mainEditorPane.addPane(inspectorSidePane);
+      const consoleBottomPane = new Pane({ size: 200, minSize: 50, resizableEdges: { top: true } });
+      const consolePanelElement = createEditorSectionElement("CONSOLE", () => {
+        return [
+          {
+            id: "clearConsole",
+            label: "Clear All",
+            action: /* @__PURE__ */ __name(() => {
+              this.#consolePane.innerHTML = "";
+            }, "action")
+          }
+        ];
+      });
+      this.#consolePane = PaneStyle.create("div", "", {
+        id: "console-pane",
+        style: {
+          position: "relative",
+          flex: "1",
+          overflowY: "auto",
+          padding: "4px 0",
+          fontFamily: PaneTheme.font.mono,
+          fontSize: "12px",
+          color: PaneTheme.color.success
+        }
+      });
+      consolePanelElement.appendChild(this.#consolePane);
+      consoleBottomPane.getContainer().appendChild(consolePanelElement);
+      const centerAreaPane = new Pane({ direction: "vertical", size: "flex" });
+      centerAreaPane.addPane(mainEditorPane);
+      centerAreaPane.addPane(consoleBottomPane);
+      const windowLayout = buildEditorWindowLayout(MENU_DEFINITIONS, centerAreaPane);
+      this.#rootPane = windowLayout.rootPane;
       this.#statusTextElement = windowLayout.statusTextElement;
-      rootPane.attachTo(System18.document.body);
-      this.#fileInputElement = System18.document.createElement("input");
-      this.#fileInputElement.type = "file";
-      this.#fileInputElement.accept = ".json";
-      this.#fileInputElement.style.display = "none";
-      this.#fileInputElement.addEventListener("change", async () => {
-        const selectedFile = this.#fileInputElement.files[0];
-        if (!selectedFile) {
-          return;
+      this.setStatusText("No selection");
+      this.#rootPane.setCallback(() => {
+        if (this.#engine) {
+          const graphic = this.#engine.getGraphic();
+          this.#engine.resize();
+          this.#gameView.draw(graphic);
         }
-        const jsonText = await selectedFile.text();
-        const baseDescription = System18.JSON.parse(System18.JSON.stringify(DEFAULT_DESCRIPTION));
-        this.#description = System18.Object.assign(baseDescription, System18.JSON.parse(jsonText));
-        this.selectPresetRow(null);
-        this.applyToSystem();
-        this.buildInspector();
       });
-      System18.document.body.appendChild(this.#fileInputElement);
-      System18.window.addEventListener("keydown", (keyboardEvent) => {
-        if (keyboardEvent.ctrlKey && keyboardEvent.key.toLowerCase() === "s") {
-          keyboardEvent.preventDefault();
-          this.executeCommand("save");
-          return;
+      System17.document.body.innerHTML = "";
+      this.#rootPane.attachTo(System17.document.body);
+      this.#consolePane.addEventListener("click", (mouseEvent) => {
+        if (mouseEvent.target === this.#consolePane) {
+          if (this.#consoleSelectedItem) {
+            this.#consoleSelectedItem.style.backgroundColor = "transparent";
+            this.#consoleSelectedItem = null;
+          }
+          this.setStatusText("No selection");
         }
-        if (keyboardEvent.ctrlKey && keyboardEvent.key.toLowerCase() === "o") {
-          keyboardEvent.preventDefault();
-          this.executeCommand("load");
-          return;
+      });
+      const findContextTarget = /* @__PURE__ */ __name((mouseEventTarget, dataType) => {
+        let target = mouseEventTarget;
+        while (target && target.dataset.type !== dataType) {
+          target = target.parentElement;
         }
-        if (keyboardEvent.key === " " && keyboardEvent.target === System18.document.body) {
-          keyboardEvent.preventDefault();
-          this.emitBurst();
+        return target || null;
+      }, "findContextTarget");
+      explorerTree.addEventListener("contextmenu", (mouseEvent) => {
+        mouseEvent.preventDefault();
+        const contextTarget = findContextTarget(mouseEvent.target, "tree-item");
+        openEditorMenuPanelAt(mouseEvent.clientX, mouseEvent.clientY, [
+          {
+            id: "addExplorerItem",
+            label: "Add",
+            action: /* @__PURE__ */ __name(() => {
+              const newName = System17.prompt("Item name:", "");
+              if (newName) {
+                explorerTree.appendChild(createTreeItem(newName));
+              }
+            }, "action")
+          },
+          {
+            id: "renameExplorerItem",
+            label: "Rename",
+            action: /* @__PURE__ */ __name(() => {
+              if (!contextTarget) {
+                return;
+              }
+              const currentName = contextTarget.dataset.label;
+              const newName = System17.prompt("New name:", currentName);
+              if (newName) {
+                contextTarget.querySelector('[data-role="label"]').innerText = newName;
+                contextTarget.dataset.label = newName;
+              }
+            }, "action")
+          },
+          {
+            id: "removeExplorerItem",
+            label: "Remove",
+            action: /* @__PURE__ */ __name(() => {
+              if (contextTarget) {
+                contextTarget.remove();
+              }
+            }, "action")
+          }
+        ]);
+      });
+      hierarchyTree.addEventListener("contextmenu", (mouseEvent) => {
+        mouseEvent.preventDefault();
+        const contextTarget = findContextTarget(mouseEvent.target, "hierarchy-item");
+        openEditorMenuPanelAt(mouseEvent.clientX, mouseEvent.clientY, [
+          {
+            id: "addHierarchyItem",
+            label: "Add",
+            action: /* @__PURE__ */ __name(() => {
+              const newName = System17.prompt("Item name:", "");
+              if (newName) {
+                hierarchyTree.appendChild(createHierarchyItem(newName));
+              }
+            }, "action")
+          },
+          {
+            id: "renameHierarchyItem",
+            label: "Rename",
+            action: /* @__PURE__ */ __name(() => {
+              if (!contextTarget) {
+                return;
+              }
+              const currentName = contextTarget.dataset.label;
+              const newName = System17.prompt("New name:", currentName);
+              if (newName) {
+                contextTarget.querySelector('[data-role="label"]').innerText = newName;
+                contextTarget.dataset.label = newName;
+              }
+            }, "action")
+          },
+          {
+            id: "removeHierarchyItem",
+            label: "Remove",
+            action: /* @__PURE__ */ __name(() => {
+              if (contextTarget) {
+                contextTarget.remove();
+              }
+            }, "action")
+          }
+        ]);
+      });
+      this.#consolePane.addEventListener("contextmenu", (mouseEvent) => {
+        mouseEvent.preventDefault();
+        openEditorMenuPanelAt(mouseEvent.clientX, mouseEvent.clientY, [
+          {
+            id: "clearConsole",
+            label: "Clear All",
+            action: /* @__PURE__ */ __name(() => {
+              this.#consolePane.innerHTML = "";
+            }, "action")
+          }
+        ]);
+      });
+      const engineConfiguration = new EngineConfiguration();
+      engineConfiguration.referenceResolutionSize = Vector2.create(1280, 800);
+      engineConfiguration.canvasId = "game-canvas";
+      engineConfiguration.autoResizeOnWindowResize = false;
+      engineConfiguration.useStatistics = true;
+      this.#engine = new Engine(engineConfiguration);
+      this.#gameView = new GameView();
+      this.#engine.run(this.#gameView);
+      addPropertyButtonElement.addEventListener("click", () => {
+        const propertyName = propertyNameInputElement.value.trim();
+        const rawValueText = propertyValueInputElement.value;
+        const parsedValue = this.parsePropertyValue(rawValueText);
+        if (propertyName && !this.#properties.hasOwnProperty(propertyName)) {
+          this.addProperty(propertyName, parsedValue);
+          propertyNameInputElement.value = "";
+          propertyValueInputElement.value = "";
         }
+      });
+      this.setupGlobalEvents();
+      this.setupDataBinding();
+      this.addProperty("speed", 1);
+      this.addProperty("gravity", 0.1);
+      this.#editor.addEventListener("input", () => {
+        this.compileCode();
       });
     }
     //==============================================================================
@@ -11019,30 +10196,37 @@ void main() {
      */
     executeCommand(commandId) {
       switch (commandId) {
-        case "newDescription": {
-          this.applyPreset("Fire");
+        case "play": {
+          this.compileCode();
+          this.initParticles();
+          this.#isPlaying = true;
+          this.updateButtonState("play");
+          this.#gameView.setDrawEvent(this.drawOnPlayState.bind(this));
+          this.printConsole("Playback started.");
           break;
         }
-        case "save": {
-          const jsonText = System18.JSON.stringify(this.#description, null, "	");
-          const blob = new System18.Blob([jsonText], { type: "application/json" });
-          const anchorElement = System18.document.createElement("a");
-          anchorElement.href = System18.URL.createObjectURL(blob);
-          anchorElement.download = "effect.vfx.json";
-          anchorElement.click();
-          System18.URL.revokeObjectURL(anchorElement.href);
+        case "pause": {
+          this.#isPlaying = false;
+          this.updateButtonState("pause");
+          this.printConsole("Playback paused.");
           break;
         }
-        case "load": {
-          this.#fileInputElement.click();
+        case "stop": {
+          this.#isPlaying = false;
+          this.initParticles();
+          this.updateButtonState("stop");
+          this.#gameView.setDrawEvent(this.drawOnStopState.bind(this));
+          this.printConsole("Playback stopped.");
           break;
         }
-        case "restart": {
-          this.restartParticleSystem();
-          break;
-        }
-        case "burst": {
-          this.emitBurst();
+        case "resetLayout": {
+          this.#rootPane.resetLayout();
+          this.#rootPane.refresh();
+          if (this.#engine) {
+            const graphic = this.#engine.getGraphic();
+            this.#engine.resize();
+            this.#gameView.draw(graphic);
+          }
           break;
         }
         default: {
@@ -11051,381 +10235,293 @@ void main() {
       }
     }
     //==============================================================================
-    // 프리셋 적용.
+    // 재생 단추 상태 표시.
     //==============================================================================
     /**
-     * @param { string } presetName
+     * @param { string } activeCommandId
      */
-    applyPreset(presetName) {
-      this.#description = System18.JSON.parse(System18.JSON.stringify(DEFAULT_DESCRIPTION));
-      const presetOverride = PRESET_TABLE[presetName];
-      if (presetOverride) {
-        const clonedOverride = System18.JSON.parse(System18.JSON.stringify(presetOverride));
-        System18.Object.assign(this.#description, clonedOverride);
-      }
-      this.selectPresetRow(presetName);
-      this.applyToSystem();
-      this.buildInspector();
-    }
-    //==============================================================================
-    // 프리셋 목록 선택 표시.
-    //==============================================================================
-    /**
-     * @param { string | null } presetName
-     */
-    selectPresetRow(presetName) {
-      this.#presetName = presetName;
-      for (const [rowPresetName, rowElement] of this.#presetRowMap) {
-        setEditorListRowSelected(rowElement, rowPresetName === presetName);
-      }
-      this.refreshStatus();
-    }
-    //==============================================================================
-    // 서술을 파티클 시스템에 반영.
-    //==============================================================================
-    applyToSystem() {
-      if (this.#particleSystem) {
-        this.#particleSystem.applyDescription(this.#description);
-      }
-    }
-    //==============================================================================
-    // 파티클 시스템 재시작.
-    //==============================================================================
-    restartParticleSystem() {
-      if (this.#particleSystem) {
-        this.#particleSystem.stop(true);
-        this.#particleSystem.applyDescription(this.#description);
-        this.#particleSystem.play();
-      }
-    }
-    //==============================================================================
-    // 버스트 방출.
-    //==============================================================================
-    emitBurst() {
-      if (this.#particleSystem) {
-        this.#particleSystem.emit(60);
-      }
+    updateButtonState(activeCommandId) {
+      setEditorHeaderButtonSelected(this.#playButtonElement, activeCommandId === "play");
+      setEditorHeaderButtonSelected(this.#pauseButtonElement, activeCommandId === "pause");
+      setEditorHeaderButtonSelected(this.#stopButtonElement, activeCommandId === "stop");
     }
     //==============================================================================
     // 상태줄 갱신.
     //==============================================================================
-    refreshStatus() {
-      if (!this.#statusTextElement) {
-        return;
+    /**
+     * @param { string } statusText
+     */
+    setStatusText(statusText) {
+      if (this.#statusTextElement) {
+        this.#statusTextElement.innerText = statusText;
       }
-      let particleCount = 0;
-      if (this.#particleSystem) {
-        particleCount = this.#particleSystem.getParticleCount();
-      }
-      const presetText = this.#presetName ? this.#presetName : "Custom";
-      this.#statusTextElement.innerText = presetText + "  |  particles " + particleCount + "  |  runtime: particleSystem.applyDescription(JSON.parse(text))";
     }
     //==============================================================================
-    // 그라디언트 키 목록 재구성.
-    //==============================================================================
-    rebuildGradientRows() {
-      this.#gradientContainerElement.textContent = "";
-      this.#description.colorOverLifetime.forEach((gradientKey, keyIndex) => {
-        const rowElement = PaneStyle.create("div", "", {
-          style: {
-            position: "relative",
-            width: "auto",
-            height: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            padding: "5px 12px",
-            borderBottom: "1px solid " + EditorTheme.borderSoftColor
-          }
-        });
-        const timeInputElement = System18.document.createElement("input");
-        timeInputElement.type = "text";
-        timeInputElement.value = String(gradientKey.time);
-        decorateEditorInputElement(timeInputElement);
-        timeInputElement.style.flex = "0 0 52px";
-        const colorInputElement = System18.document.createElement("input");
-        colorInputElement.type = "color";
-        colorInputElement.value = composeHexText(gradientKey.color);
-        colorInputElement.style.cssText = "position:relative;width:34px;height:22px;padding:0;border:1px solid " + PaneTheme.color.border + ";background:transparent;cursor:pointer;flex-shrink:0;";
-        const alphaInputElement = System18.document.createElement("input");
-        alphaInputElement.type = "text";
-        alphaInputElement.value = String(gradientKey.color[3]);
-        decorateEditorInputElement(alphaInputElement);
-        alphaInputElement.style.flex = "0 0 52px";
-        const removeButtonElement = createEditorButtonElement("Remove", false);
-        removeButtonElement.style.padding = "2px 10px";
-        removeButtonElement.style.fontSize = "12px";
-        const commitKey = /* @__PURE__ */ __name(() => {
-          const timeValue = System18.Number.parseFloat(timeInputElement.value);
-          const alphaValue = System18.Number.parseFloat(alphaInputElement.value);
-          gradientKey.time = System18.Number.isFinite(timeValue) ? timeValue : gradientKey.time;
-          const safeAlpha = System18.Number.isFinite(alphaValue) ? alphaValue : 1;
-          gradientKey.color = parseHexChannels(colorInputElement.value, safeAlpha);
-          this.#description.colorOverLifetime.sort((left, right) => left.time - right.time);
-          this.applyToSystem();
-        }, "commitKey");
-        timeInputElement.addEventListener("change", () => {
-          commitKey();
-          this.rebuildGradientRows();
-        });
-        colorInputElement.addEventListener("input", commitKey);
-        alphaInputElement.addEventListener("change", commitKey);
-        removeButtonElement.addEventListener("click", () => {
-          this.#description.colorOverLifetime.splice(keyIndex, 1);
-          this.applyToSystem();
-          this.rebuildGradientRows();
-        });
-        rowElement.appendChild(timeInputElement);
-        rowElement.appendChild(colorInputElement);
-        rowElement.appendChild(alphaInputElement);
-        rowElement.appendChild(removeButtonElement);
-        this.#gradientContainerElement.appendChild(rowElement);
-      });
-    }
-    //==============================================================================
-    // 인스펙터 묶음 추가.
+    // 값 글자 해석. (참 거짓 / 숫자 / 글자)
     //==============================================================================
     /**
-     * @param { string } titleText
-     * @returns { HTMLElement }
+     * @param { string } rawValueText
+     * @returns { * }
      */
-    appendInspectorGroup(titleText) {
-      const groupBodyElement = PaneStyle.create("div", "", {
-        style: { position: "relative", width: "auto", height: "auto" }
-      });
-      const groupElement = createEditorGroupElement(titleText, groupBodyElement, null);
-      this.#inspectorBodyElement.appendChild(groupElement);
-      this.#inspectorBodyElement.appendChild(groupBodyElement);
-      return groupBodyElement;
+    parsePropertyValue(rawValueText) {
+      const trimmedText = rawValueText.trim();
+      if (trimmedText === "true") {
+        return true;
+      }
+      if (trimmedText === "false") {
+        return false;
+      }
+      if (trimmedText !== "" && !System17.isNaN(System17.Number(trimmedText))) {
+        return System17.Number(trimmedText);
+      }
+      return rawValueText;
     }
     //==============================================================================
-    // 인스펙터 전체 구성.
+    // 이벤트 설정.
     //==============================================================================
-    buildInspector() {
-      this.#inspectorBodyElement.textContent = "";
-      const description = this.#description;
-      const applyChange = /* @__PURE__ */ __name(() => {
-        this.applyToSystem();
-      }, "applyChange");
-      const emissionBodyElement = this.appendInspectorGroup("EMISSION");
-      appendEditorNumberRow(emissionBodyElement, "Emission Rate", description.emissionRate, 1, (value) => {
-        description.emissionRate = value;
-        applyChange();
+    setupGlobalEvents() {
+      System17.window.addEventListener("keydown", (keyboardEvent) => {
+        if (keyboardEvent.ctrlKey && ["=", "-", "+", "0"].includes(keyboardEvent.key)) {
+          keyboardEvent.preventDefault();
+        }
       });
-      appendEditorBooleanRow(emissionBodyElement, "Looping", description.looping, (value) => {
-        description.looping = value;
-        applyChange();
+      System17.window.addEventListener("wheel", (wheelEvent) => {
+        if (wheelEvent.ctrlKey) {
+          wheelEvent.preventDefault();
+        }
+      }, { passive: false });
+    }
+    //==============================================================================
+    // 프로퍼티 데이터 초기화.
+    //==============================================================================
+    setupDataBinding() {
+      const self = this;
+      this.#properties = new System17.Proxy({}, {
+        set: /* @__PURE__ */ __name(function(target, key, value) {
+          if (target[key] !== value) {
+            target[key] = value;
+            const inspectorUI = self.getInspectorUI();
+            if (inspectorUI[key] && System17.document.activeElement !== inspectorUI[key]) {
+              inspectorUI[key].value = value;
+            }
+          }
+          return true;
+        }, "set")
       });
-      appendEditorNumberRow(emissionBodyElement, "Duration", description.duration, 0.1, (value) => {
-        description.duration = value;
-        applyChange();
+    }
+    //==============================================================================
+    // 인스펙터 프로퍼티 추가.
+    //==============================================================================
+    addProperty(name, value) {
+      this.#properties[name] = value;
+      const container = this.#inspectorPropsContainer;
+      if (!container) {
+        return;
+      }
+      const rowElement = createEditorPropertyRowElement(container, name);
+      rowElement.id = `prop-row-${name}`;
+      const inputElement = System17.document.createElement("input");
+      inputElement.type = "text";
+      inputElement.value = value;
+      decorateEditorInputElement(inputElement);
+      inputElement.addEventListener("input", (inputEvent) => {
+        const parsedValue = this.parsePropertyValue(inputEvent.target.value);
+        this.#properties[name] = parsedValue;
       });
-      appendEditorNumberRow(emissionBodyElement, "Max Particles", description.maxParticleCount, 1, (value) => {
-        description.maxParticleCount = value;
-        applyChange();
+      const removeButtonElement = createEditorButtonElement("X", false);
+      removeButtonElement.style.padding = "2px 8px";
+      removeButtonElement.style.fontSize = "12px";
+      removeButtonElement.style.flexShrink = "0";
+      removeButtonElement.addEventListener("click", () => {
+        this.removeProperty(name);
       });
-      const shapeBodyElement = this.appendInspectorGroup("SHAPE");
-      appendEditorSelectRow(shapeBodyElement, "Shape", ["point", "circle", "cone", "box", "edge"], description.shape, (value) => {
-        description.shape = value;
-        applyChange();
-      });
-      appendEditorNumberRow(shapeBodyElement, "Radius", description.shapeRadius, 1, (value) => {
-        description.shapeRadius = value;
-        applyChange();
-      });
-      appendEditorNumberRow(shapeBodyElement, "Cone Angle", description.coneAngle, 0.05, (value) => {
-        description.coneAngle = value;
-        applyChange();
-      });
-      appendEditorNumberRow(shapeBodyElement, "Box Width", description.boxSize[0], 1, (value) => {
-        description.boxSize[0] = value;
-        applyChange();
-      });
-      appendEditorNumberRow(shapeBodyElement, "Box Height", description.boxSize[1], 1, (value) => {
-        description.boxSize[1] = value;
-        applyChange();
-      });
-      appendEditorNumberRow(shapeBodyElement, "Edge Width", description.edgeWidth, 1, (value) => {
-        description.edgeWidth = value;
-        applyChange();
-      });
-      const startBodyElement = this.appendInspectorGroup("START RANGE");
-      appendEditorNumberRow(startBodyElement, "Lifetime Min", description.lifetime[0], 0.1, (value) => {
-        description.lifetime[0] = value;
-        applyChange();
-      });
-      appendEditorNumberRow(startBodyElement, "Lifetime Max", description.lifetime[1], 0.1, (value) => {
-        description.lifetime[1] = value;
-        applyChange();
-      });
-      appendEditorNumberRow(startBodyElement, "Speed Min", description.speed[0], 1, (value) => {
-        description.speed[0] = value;
-        applyChange();
-      });
-      appendEditorNumberRow(startBodyElement, "Speed Max", description.speed[1], 1, (value) => {
-        description.speed[1] = value;
-        applyChange();
-      });
-      appendEditorNumberRow(startBodyElement, "Size Min", description.size[0], 0.5, (value) => {
-        description.size[0] = value;
-        applyChange();
-      });
-      appendEditorNumberRow(startBodyElement, "Size Max", description.size[1], 0.5, (value) => {
-        description.size[1] = value;
-        applyChange();
-      });
-      appendEditorNumberRow(startBodyElement, "Rotation Min", description.rotation[0], 0.1, (value) => {
-        description.rotation[0] = value;
-        applyChange();
-      });
-      appendEditorNumberRow(startBodyElement, "Rotation Max", description.rotation[1], 0.1, (value) => {
-        description.rotation[1] = value;
-        applyChange();
-      });
-      appendEditorNumberRow(startBodyElement, "Spin Min", description.angularVelocity[0], 0.2, (value) => {
-        description.angularVelocity[0] = value;
-        applyChange();
-      });
-      appendEditorNumberRow(startBodyElement, "Spin Max", description.angularVelocity[1], 0.2, (value) => {
-        description.angularVelocity[1] = value;
-        applyChange();
-      });
-      const startColorAHex = composeHexText(description.startColorA);
-      appendEditorColorRow(startBodyElement, "Color A", startColorAHex, description.startColorA[3], (hexText, alphaValue) => {
-        description.startColorA = parseHexChannels(hexText, alphaValue);
-        applyChange();
-      });
-      const startColorBHex = composeHexText(description.startColorB);
-      appendEditorColorRow(startBodyElement, "Color B", startColorBHex, description.startColorB[3], (hexText, alphaValue) => {
-        description.startColorB = parseHexChannels(hexText, alphaValue);
-        applyChange();
-      });
-      const gradientBodyElement = this.appendInspectorGroup("COLOR OVER LIFETIME");
-      this.#gradientContainerElement = PaneStyle.create("div", "", {
-        style: { position: "relative", width: "auto", height: "auto" }
-      });
-      gradientBodyElement.appendChild(this.#gradientContainerElement);
-      const addKeyRowElement = PaneStyle.create("div", "", {
-        style: { position: "relative", width: "auto", height: "auto", padding: "8px 12px" }
-      });
-      const addKeyButtonElement = createEditorButtonElement("Add Key", false);
-      addKeyButtonElement.style.display = "inline-block";
-      addKeyButtonElement.addEventListener("click", () => {
-        description.colorOverLifetime.push({ time: 1, color: [1, 1, 1, 0] });
-        applyChange();
-        this.rebuildGradientRows();
-      });
-      addKeyRowElement.appendChild(addKeyButtonElement);
-      gradientBodyElement.appendChild(addKeyRowElement);
-      this.rebuildGradientRows();
-      const sizeBodyElement = this.appendInspectorGroup("SIZE OVER LIFETIME");
-      appendEditorNumberRow(sizeBodyElement, "Scale Start", description.sizeOverLifetime[0], 0.1, (value) => {
-        description.sizeOverLifetime[0] = value;
-        applyChange();
-      });
-      appendEditorNumberRow(sizeBodyElement, "Scale End", description.sizeOverLifetime[1], 0.1, (value) => {
-        description.sizeOverLifetime[1] = value;
-        applyChange();
-      });
-      const physicsBodyElement = this.appendInspectorGroup("PHYSICS");
-      appendEditorNumberRow(physicsBodyElement, "Gravity X", description.gravity[0], 1, (value) => {
-        description.gravity[0] = value;
-        applyChange();
-      });
-      appendEditorNumberRow(physicsBodyElement, "Gravity Y", description.gravity[1], 1, (value) => {
-        description.gravity[1] = value;
-        applyChange();
-      });
-      appendEditorNumberRow(physicsBodyElement, "Damping", description.damping, 0.1, (value) => {
-        description.damping = value;
-        applyChange();
-      });
-      appendEditorNumberRow(physicsBodyElement, "Wobble Width", description.wobble[0], 0.2, (value) => {
-        description.wobble[0] = value;
-        applyChange();
-      });
-      appendEditorNumberRow(physicsBodyElement, "Wobble Speed", description.wobble[1], 0.2, (value) => {
-        description.wobble[1] = value;
-        applyChange();
-      });
-      appendEditorBooleanRow(physicsBodyElement, "Attractor", description.attractor !== null, (isEnabled) => {
-        description.attractor = isEnabled ? { x: 0, y: 0, strength: 170, swirl: 240 } : null;
-        applyChange();
-        this.buildInspector();
-      });
-      if (description.attractor) {
-        appendEditorNumberRow(physicsBodyElement, "Center X", description.attractor.x, 1, (value) => {
-          description.attractor.x = value;
-          applyChange();
-        });
-        appendEditorNumberRow(physicsBodyElement, "Center Y", description.attractor.y, 1, (value) => {
-          description.attractor.y = value;
-          applyChange();
-        });
-        appendEditorNumberRow(physicsBodyElement, "Strength", description.attractor.strength, 1, (value) => {
-          description.attractor.strength = value;
-          applyChange();
-        });
-        appendEditorNumberRow(physicsBodyElement, "Swirl", description.attractor.swirl, 1, (value) => {
-          description.attractor.swirl = value;
-          applyChange();
+      rowElement.appendChild(inputElement);
+      rowElement.appendChild(removeButtonElement);
+      this.#inspector[name] = inputElement;
+    }
+    //==============================================================================
+    // 인스펙터 프로퍼티 제거.
+    //==============================================================================
+    removeProperty(name) {
+      const rowElement = System17.document.getElementById(`prop-row-${name}`);
+      if (rowElement) {
+        rowElement.remove();
+      }
+      delete this.#properties[name];
+      delete this.#inspector[name];
+    }
+    //==============================================================================
+    // 파티클 목록 초기화.
+    //==============================================================================
+    initParticles() {
+      const viewManager = this.#engine.getViewManager();
+      const canvasNativeSize = viewManager.getCanvasNativeSize();
+      this.#particles = [];
+      for (let particleIndex = 0; particleIndex < 200; ++particleIndex) {
+        this.#particles.push({
+          x: canvasNativeSize.x / 2,
+          y: canvasNativeSize.y / 2,
+          vx: (System17.Math.random() - 0.5) * 10,
+          vy: (System17.Math.random() - 0.5) * 10,
+          color: `hsl(${System17.Math.random() * 360}, 100%, 60%)`
         });
       }
-      const renderBodyElement = this.appendInspectorGroup("RENDER");
-      appendEditorSelectRow(renderBodyElement, "Shape", ["circle", "rect", "streak"], description.renderShape, (value) => {
-        description.renderShape = value;
-        applyChange();
-      });
-      appendEditorSelectRow(renderBodyElement, "Blend", ["source-over", "lighter", "multiply", "screen"], description.blendMode, (value) => {
-        description.blendMode = value;
-        applyChange();
-      });
-      appendEditorNumberRow(renderBodyElement, "Streak Scale", description.streakScale, 5e-3, (value) => {
-        description.streakScale = value;
-        applyChange();
-      });
-      appendEditorBooleanRow(renderBodyElement, "World Space", description.worldSpace, (value) => {
-        description.worldSpace = value;
-        applyChange();
-      });
     }
     //==============================================================================
-    // 엔진 실행.
+    // 콘솔 출력.
     //==============================================================================
-    startEngine() {
-      const engineConfiguration = new EngineConfiguration();
-      engineConfiguration.referenceResolutionSize = Vector2.create(960, 600);
-      engineConfiguration.canvasId = "previewCanvas";
-      engineConfiguration.autoResizeOnWindowResize = false;
-      this.#engine = new Engine(engineConfiguration);
-      const previewScene = new PreviewScene((scene) => {
-        const rootNode = scene.getRoot();
-        rootNode.setPivot(Pivot.topLeft.clone());
-        rootNode.setAnchor(Pivot.topLeft.clone());
-        const emitterNode = new WorldNode();
-        emitterNode.setName("Emitter");
-        emitterNode.setPivot(Pivot.topLeft.clone());
-        emitterNode.setAnchor(Pivot.topLeft.clone());
-        emitterNode.setLocalPosition(Vector2.create(480, 300));
-        rootNode.addChild(emitterNode);
-        this.#particleSystem = emitterNode.addComponent(ParticleSystem);
-        this.#particleSystem.applyDescription(this.#description);
-      }, () => {
-        this.refreshStatus();
+    printConsole(message, isError = false) {
+      const now = new System17.Date();
+      const hours = String(now.getHours()).padStart(2, "0");
+      const minutes = String(now.getMinutes()).padStart(2, "0");
+      const seconds = String(now.getSeconds()).padStart(2, "0");
+      const timestamp = `[${hours}:${minutes}:${seconds}]`;
+      const textColor = isError ? PaneTheme.color.error : PaneTheme.color.success;
+      const lineElement = System17.document.createElement("div");
+      lineElement.style.color = textColor;
+      lineElement.style.padding = "2px 12px";
+      lineElement.style.whiteSpace = "pre-wrap";
+      lineElement.style.cursor = "pointer";
+      lineElement.innerText = `${timestamp} ${message}`;
+      lineElement.addEventListener("mouseenter", () => {
+        if (lineElement !== this.#consoleSelectedItem) {
+          lineElement.style.backgroundColor = EditorTheme.hoverColor;
+        }
       });
-      this.#engine.run(previewScene);
+      lineElement.addEventListener("mouseleave", () => {
+        if (lineElement !== this.#consoleSelectedItem) {
+          lineElement.style.backgroundColor = "transparent";
+        }
+      });
+      lineElement.addEventListener("click", (mouseEvent) => {
+        mouseEvent.stopPropagation();
+        if (this.#consoleSelectedItem) {
+          this.#consoleSelectedItem.style.backgroundColor = "transparent";
+        }
+        this.#consoleSelectedItem = lineElement;
+        lineElement.style.backgroundColor = EditorTheme.accentSoftColor;
+        this.setStatusText(`Console > ${timestamp} ${message}`);
+      });
+      this.#consolePane.appendChild(lineElement);
+      this.#consolePane.scrollTop = this.#consolePane.scrollHeight;
+    }
+    //==============================================================================
+    // 코드 확인.
+    //==============================================================================
+    compileCode() {
+      try {
+        const buildFunction = new System17.Function(this.#editor.value + "\nreturn tick;");
+        this.#scripting = buildFunction();
+        if (typeof this.#scripting !== "function") {
+          throw new System17.Error("tick function is not defined.");
+        }
+        this.printConsole("Compiled successfully.");
+      } catch (error) {
+        this.printConsole("Compile error:\n" + error.message, true);
+      }
+    }
+    //==============================================================================
+    // 바탕 그리기. (배경 + 격자)
+    //==============================================================================
+    /**
+     * @param { Graphic } graphic
+     */
+    drawBackground(graphic) {
+      const viewManager = this.#engine.getViewManager();
+      const canvasNativeSize = viewManager.getCanvasNativeSize();
+      viewManager.applyCanvasNativeRect(graphic);
+      graphic.setFillColor(Colors.darkVanilla);
+      graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+      const gridSize = 50;
+      const subGridSize = 10;
+      graphic.setStrokeColor("rgba(0, 0, 0, 0.05)");
+      for (let x = 0; x <= canvasNativeSize.x; x += subGridSize) {
+        graphic.drawLine([Vector2.create(x, 0), Vector2.create(x, canvasNativeSize.y)], 0.5);
+      }
+      for (let y = 0; y <= canvasNativeSize.y; y += subGridSize) {
+        graphic.drawLine([Vector2.create(0, y), Vector2.create(canvasNativeSize.x, y)], 0.5);
+      }
+      graphic.setStrokeColor("rgba(0, 0, 0, 0.08)");
+      for (let x = 0; x <= canvasNativeSize.x; x += gridSize) {
+        graphic.drawLine([Vector2.create(x, 0), Vector2.create(x, canvasNativeSize.y)], 1);
+      }
+      for (let y = 0; y <= canvasNativeSize.y; y += gridSize) {
+        graphic.drawLine([Vector2.create(0, y), Vector2.create(canvasNativeSize.x, y)], 1);
+      }
+    }
+    //==============================================================================
+    // 재생 상태 출력.
+    //==============================================================================
+    /**
+     * @param { Graphic } graphic
+     */
+    drawOnPlayState(graphic) {
+      this.drawBackground(graphic);
+      const viewManager = this.#engine.getViewManager();
+      const canvasNativeSize = viewManager.getCanvasNativeSize();
+      for (const particle of this.#particles) {
+        if (this.#isPlaying && this.#scripting !== null) {
+          try {
+            this.#scripting(particle, this.#properties, canvasNativeSize);
+          } catch (error) {
+            this.printConsole("Runtime error:\n" + error.message, true);
+            this.#isPlaying = false;
+          }
+        }
+        graphic.setFillColor(particle.color);
+        graphic.drawCircle(Vector2.create(particle.x, particle.y), 3);
+      }
+    }
+    //==============================================================================
+    // 정지 상태 출력.
+    //==============================================================================
+    /**
+     * @param { Graphic } graphic
+     */
+    drawOnStopState(graphic) {
+      this.drawBackground(graphic);
+    }
+    //==============================================================================
+    // 실행.
+    //==============================================================================
+    run() {
+      this.initialize();
+      this.#editor.value = `
+function tick(particle, properties, canvasSize) {
+	particle.x += particle.vx * properties.speed;
+	particle.y += particle.vy * properties.speed;
+	particle.vy += properties.gravity;
+	if (particle.x < 0 || particle.x > canvasSize.x) {
+		particle.vx *= -1;
+		particle.x = particle.x < 0 ? 0 : canvasSize.x;
+	}
+	if (particle.y < 0 || particle.y > canvasSize.y) {
+		particle.vy *= -1;
+		particle.y = particle.y < 0 ? 0 : canvasSize.y;
+	}
+}`;
+      this.initParticles();
+      this.compileCode();
+      this.#gameView.setDrawEvent(this.drawOnStopState.bind(this));
+      this.updateButtonState("stop");
+    }
+    //==============================================================================
+    // 인스펙터 목록 반환.
+    //==============================================================================
+    getInspectorUI() {
+      return this.#inspector;
     }
   };
   applyEditorTheme();
-  var particleEditor = new ParticleEditor();
+  var visualEditor = new VisualEditor();
   setEditorCommandHandler((commandId) => {
-    particleEditor.executeCommand(commandId);
+    visualEditor.executeCommand(commandId);
   }, (commandId) => {
     return false;
   });
-  System18.particleEditor = particleEditor;
-  System18.document.title = "vanilla.js - Particle Editor";
-  particleEditor.run();
+  System17.visualEditor = visualEditor;
+  System17.document.title = "vanilla.js - Visual Editor";
+  visualEditor.run();
 })();
 
 </script>

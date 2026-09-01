@@ -46,3 +46,11 @@
 - 메인 페이지: 샘플 카드 flex-grow 로 마지막 카드가 한 줄을 채우던 문제 수정(grow 0).
 - 도구: 파비콘을 vanilla.js 공식 아이콘(assets/icons/icon-light.png, 바닐라 꽃)으로 통일 + 하단 배지(UI / Particle / Visual).
   파티클 에디터 팔레트를 UI 에디터 PaneTheme 값으로 정렬, UI 에디터 빌드에 파비콘 링크 추가.
+
+## 도구 3종 구현 통합 + 비주얼 에디터 엔진 편입
+[21:10 요청 → 21:45 응답]
+- tools/common/editorkit.js 신설: 편집기 공통 테마(EditorTheme, VSCode Dark Modern)와 메뉴바/드롭다운/섹션 헤더/목록 행/인스펙터 그룹·속성 행(숫자·글자·색·참거짓·선택)/상태줄/버튼/입력 상자 데코를 공용 모듈로 추출. buildEditorWindowLayout 으로 메뉴바+본문+상태줄 공통 조립.
+- tools/uieditor/uieditor.js: 자체 구현을 editorkit 위임으로 교체(3935줄 → 3457줄). 화면 카피 영문 통일(No selection / document / zoom / Save As 등). 동작·외형 불변 확인.
+- tools/particleeditor: 단일 html 인라인 구현을 폐기하고 uieditor 와 동일한 구조(particleeditor.js + build.mjs 번들)로 재작성. 메뉴바(File/Playback) + 좌측 PRESETS 목록 + 중앙 PREVIEW(RESTART/BURST 헤더 버튼) + 우측 INSPECTOR 그룹 + 상태줄. 카피 전부 영문화.
+- tools/visualeditor: 별도 저장소(D:/Github/visualeditor)의 비주얼 에디터를 엔진 저장소에 편입(visualeditor.js + build.mjs). 툴바/패널 헤더/상태바/컨텍스트 메뉴/트리 행을 editorkit 로 교체, Play/Pause/Stop 은 GAME VIEW 헤더 버튼 + Playback 메뉴로. Canvas2D 직접 호출을 현 엔진 Graphic API(drawRect/drawLine/drawCircle)로 이식.
+- NAS 배포: portfolio/{uieditor,particleeditor,visualeditor}/index.html 갱신, 구 번들(css/js/vanilla.js) 정리. 라이브 스크린샷 검수 완료.

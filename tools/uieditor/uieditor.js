@@ -5,6 +5,13 @@ const System = globalThis;
 import * as Engine from "../../import.js";
 import { Component } from "../../src/core/component.js";
 import { Pane, PaneStyle, PaneTheme } from "../../src/web/pane.js";
+import {
+	EditorTheme, applyEditorTheme, setEditorCommandHandler, wrapEditorIconMarkup,
+	openEditorMenuPanelAt, closeEditorMenuPanel, createEditorSectionElement, createEditorListRowElement,
+	createEditorGroupElement, createEditorPropertyRowElement, appendEditorNumberRow, appendEditorTextRow,
+	appendEditorColorRow, appendEditorBooleanRow, composeEditorNumberText, decorateEditorInputElement,
+	createEditorButtonElement, buildEditorWindowLayout,
+} from "../common/editorkit.js";
 import { Graphic } from "../../src/core/graphic.js";
 import { WorldNode } from "../../src/core/node/worldnode.js";
 import { Vector2 } from "../../src/base/vector2.js";
@@ -140,25 +147,24 @@ const NODE_KIND_LOOKUP = [
 
 // 편집 화면 표시 색.
 // 편집기 글꼴. 애플 계열을 앞에 두고 없는 환경은 뒤로 물린다.
-const EDITOR_FONT_FAMILY = "Inter, -apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"SF Pro Display\","
-	+ " \"Segoe UI Variable Text\", \"Segoe UI\", Pretendard, \"Apple SD Gothic Neo\", \"Malgun Gothic\", Roboto, sans-serif";
+const EDITOR_FONT_FAMILY = EditorTheme.fontFamily;
 
-const ACCENT_COLOR = "#0078d4";
-const ACCENT_SOFT_COLOR = "#04395e";
-const INK_COLOR = "#cccccc";
-const INK_DIM_COLOR = "#9d9d9d";
-const ICON_COLOR = "#85b6ea";
+const ACCENT_COLOR = EditorTheme.accentColor;
+const ACCENT_SOFT_COLOR = EditorTheme.accentSoftColor;
+const INK_COLOR = EditorTheme.inkColor;
+const INK_DIM_COLOR = EditorTheme.inkDimColor;
+const ICON_COLOR = EditorTheme.iconColor;
 
-const BORDER_COLOR = "#2b2b2b";
-const BORDER_SOFT_COLOR = "rgba(255, 255, 255, 0.045)";
-const ROW_HEIGHT = "26px";
+const BORDER_COLOR = EditorTheme.borderColor;
+const BORDER_SOFT_COLOR = EditorTheme.borderSoftColor;
+const ROW_HEIGHT = EditorTheme.rowHeight;
 
 const SELECTION_COLOR = ACCENT_COLOR;
 const SNAP_GUIDE_COLOR = "rgba(0, 120, 212, 0.9)";
-const HOVER_COLOR = "#2a2d2e";
+const HOVER_COLOR = EditorTheme.hoverColor;
 const MENU_HOVER_COLOR = ACCENT_SOFT_COLOR;
-const SELECTED_ROW_TEXT_COLOR = "#ffffff";
-const CANVAS_BACKGROUND_COLOR = "#1f1f1f";
+const SELECTED_ROW_TEXT_COLOR = EditorTheme.selectedRowTextColor;
+const CANVAS_BACKGROUND_COLOR = EditorTheme.canvasBackgroundColor;
 const PREVIEW_LETTERBOX_COLOR = "#111111";
 const PIVOT_COLOR = "#00c2ff";
 const PIVOT_SHADOW_COLOR = "#0b1b26";
@@ -167,21 +173,6 @@ const ANCHOR_COLOR = "#3ddc84";
 const ANCHOR_MARK_SIZE = 6;
 const GRID_MINOR_COLOR = "rgba(255, 255, 255, 0.045)";
 const GRID_MAJOR_COLOR = "rgba(255, 255, 255, 0.10)";
-
-// 편집기 색 테마. (VSCode Dark Modern 계열)
-const VANILLA_THEME_COLORS = {
-	background: "#1f1f1f",
-	panel: "#181818",
-	toolbar: "#181818",
-	border: BORDER_COLOR,
-	text: INK_COLOR,
-	textDim: INK_DIM_COLOR,
-	accent: ACCENT_SOFT_COLOR,
-	accentHover: ACCENT_COLOR,
-	inputBg: "#313131",
-	resizer: BORDER_COLOR,
-	resizerHover: ACCENT_COLOR,
-};
 
 // 크기 조절 손잡이 8방향.
 const RESIZE_HANDLE_DEFINITIONS = [
@@ -338,18 +329,7 @@ function collectEditableProperties(targetObject) {
  * @param { HTMLInputElement } inputElement
  */
 function decorateInputElement(inputElement) {
-	inputElement.style.cssText = "flex:1;min-width:0;height:24px;box-sizing:border-box;padding:0 7px;"
-		+ "font-family:" + EDITOR_FONT_FAMILY + ";font-size:13px;border-radius:3px;outline:none;"
-		+ "background:" + PaneTheme.color.inputBg + ";color:" + PaneTheme.color.text + ";"
-		+ "border:1px solid " + BORDER_COLOR + ";";
-	inputElement.addEventListener("focus", () => {
-		inputElement.style.borderColor = SELECTION_COLOR;
-		inputElement.style.boxShadow = "0 0 0 1px " + ACCENT_COLOR + " inset";
-	});
-	inputElement.addEventListener("blur", () => {
-		inputElement.style.borderColor = BORDER_COLOR;
-		inputElement.style.boxShadow = "none";
-	});
+	decorateEditorInputElement(inputElement);
 }
 
 
@@ -362,7 +342,7 @@ function decorateInputElement(inputElement) {
  */
 function createIconMarkup(iconName) {
 	const shapeMarkup = ICON_SHAPES[iconName] ? ICON_SHAPES[iconName] : ICON_SHAPES.empty;
-	return "<svg width='18' height='18' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'>" + shapeMarkup + "</svg>";
+	return wrapEditorIconMarkup(shapeMarkup);
 }
 
 
@@ -418,8 +398,6 @@ export class UIEditor {
 	/** @private @type { HTMLElement } */ #viewToggleElement;
 	/** @private @type { HTMLElement } */ #zoomReadoutElement;
 	/** @private @type { HTMLElement } */ #gridToggleElement;
-	/** @private @type { HTMLElement[] } */ #menuTitleElementList;
-	/** @private @type { number } */ #openMenuIndex;
 	/** @private @type { string } */ #renderScaleMode;
 	/** @private @type { string } */ #documentFileName;
 	/** @private @type { Map } */ #hierarchyRowNodeMap;
@@ -462,8 +440,6 @@ export class UIEditor {
 		this.#viewToggleElement = null;
 		this.#zoomReadoutElement = null;
 		this.#gridToggleElement = null;
-		this.#menuTitleElementList = [];
-		this.#openMenuIndex = -1;
 		this.#renderScaleMode = "fit";
 		this.#documentFileName = "ui.uiasset.json";
 		this.#hierarchyRowNodeMap = new System.Map();
@@ -503,13 +479,6 @@ export class UIEditor {
 	// 창 구성. (툴바 / 좌측 / 편집·결과 화면 / 인스펙터 / 상태줄)
 	//==============================================================================
 	buildLayout() {
-		const rootPane = new Pane({ direction: "vertical" });
-
-		// --- 메뉴 막대 ---
-		const menuBarPane = new Pane({ size: 30, minSize: 30, maxSize: 30, isResizable: false });
-		const menuBarElement = this.createMenuBarElement();
-		menuBarPane.getContainer().appendChild(menuBarElement);
-
 		// --- 가운데 영역 ---
 		const mainPane = new Pane({ direction: "horizontal", size: "flex" });
 
@@ -674,7 +643,7 @@ export class UIEditor {
 				color: PaneTheme.color.textDim, cursor: "pointer", borderRadius: "4px", userSelect: "none",
 			},
 		});
-		this.#zoomReadoutElement.title = "문서 전체 보기 (Ctrl+0)";
+		this.#zoomReadoutElement.title = "Zoom to Fit (Ctrl+0)";
 		this.#zoomReadoutElement.addEventListener("mouseenter", () => {
 			this.#zoomReadoutElement.style.backgroundColor = HOVER_COLOR;
 		});
@@ -695,7 +664,7 @@ export class UIEditor {
 			},
 		});
 		this.#gridToggleElement.innerHTML = createIconMarkup("grid");
-		this.#gridToggleElement.title = "격자 보기 (Ctrl+G)";
+		this.#gridToggleElement.title = "Show Grid (Ctrl+G)";
 		this.#gridToggleElement.addEventListener("mouseenter", () => {
 			this.#gridToggleElement.style.backgroundColor = HOVER_COLOR;
 		});
@@ -758,26 +727,10 @@ export class UIEditor {
 		mainPane.addPane(centerPane);
 		mainPane.addPane(inspectorPane);
 
-		// --- 상태줄 ---
-		const statusPane = new Pane({ size: 24, minSize: 24, maxSize: 24, isResizable: false });
-		const statusElement = PaneStyle.create("div", "", {
-			style: {
-				backgroundColor: PaneTheme.color.toolbar,
-				borderTop: "1px solid " + PaneTheme.color.border,
-				display: "flex",
-				alignItems: "center",
-				padding: "0 12px",
-				fontSize: "12px",
-				color: PaneTheme.color.textDim,
-			},
-		});
-		this.#statusTextElement = PaneStyle.create("span", "", { text: "", style: { position: "relative", width: "auto", height: "auto" } });
-		statusElement.appendChild(this.#statusTextElement);
-		statusPane.getContainer().appendChild(statusElement);
-
-		rootPane.addPane(menuBarPane);
-		rootPane.addPane(mainPane);
-		rootPane.addPane(statusPane);
+		// --- 메뉴 막대 + 상태줄 공통 조립 ---
+		const windowLayout = buildEditorWindowLayout(MENU_DEFINITIONS, mainPane);
+		const rootPane = windowLayout.rootPane;
+		this.#statusTextElement = windowLayout.statusTextElement;
 		rootPane.attachTo(System.document.body);
 
 		this.#editorGraphic = new Graphic(this.#editorCanvas);
@@ -791,160 +744,6 @@ export class UIEditor {
 			mouseEvent.preventDefault();
 		});
 
-		// 메뉴 바깥을 누르면 접는다.
-		System.window.addEventListener("mousedown", () => {
-			const openedPanel = System.document.getElementById("uieditorMenuPanel");
-			if (openedPanel || this.#openMenuIndex >= 0) {
-				this.closeMenuDropdown();
-			}
-		});
-	}
-
-	//==============================================================================
-	// 메뉴 막대 생성.
-	//==============================================================================
-	/**
-	 * @returns { HTMLElement }
-	 */
-	createMenuBarElement() {
-		const menuBarElement = PaneStyle.create("div", "", {
-			style: {
-				backgroundColor: PaneTheme.color.toolbar,
-				borderBottom: "1px solid " + PaneTheme.color.border,
-				display: "flex",
-				alignItems: "stretch",
-				padding: "0 4px",
-			},
-		});
-		this.#menuTitleElementList = [];
-		for (let menuIndex = 0; menuIndex < MENU_DEFINITIONS.length; ++menuIndex) {
-			const menuDefinition = MENU_DEFINITIONS[menuIndex];
-			const titleElement = PaneStyle.create("div", "", {
-				text: menuDefinition.title,
-				style: {
-					position: "relative",
-					width: "auto",
-					height: "22px",
-					margin: "auto 2px",
-					display: "flex",
-					alignItems: "center",
-					padding: "0 10px",
-					fontSize: "13px",
-					borderRadius: "4px",
-					color: PaneTheme.color.text,
-					cursor: "default",
-					userSelect: "none",
-				},
-			});
-			const currentMenuIndex = menuIndex;
-			titleElement.addEventListener("mousedown", (mouseEvent) => {
-				mouseEvent.preventDefault();
-				mouseEvent.stopPropagation();
-				if (this.#openMenuIndex === currentMenuIndex) {
-					this.closeMenuDropdown();
-					return;
-				}
-				this.openMenuDropdown(currentMenuIndex);
-			});
-			titleElement.addEventListener("mouseenter", () => {
-				if (this.#openMenuIndex >= 0 && this.#openMenuIndex !== currentMenuIndex) {
-					this.openMenuDropdown(currentMenuIndex);
-					return;
-				}
-				if (this.#openMenuIndex !== currentMenuIndex) {
-					titleElement.style.backgroundColor = MENU_HOVER_COLOR;
-				}
-			});
-			titleElement.addEventListener("mouseleave", () => {
-				if (this.#openMenuIndex !== currentMenuIndex) {
-					titleElement.style.backgroundColor = "transparent";
-				}
-			});
-			this.#menuTitleElementList.push(titleElement);
-			menuBarElement.appendChild(titleElement);
-		}
-		return menuBarElement;
-	}
-
-	//==============================================================================
-	// 메뉴 패널 생성. (메뉴 막대와 오른쪽 단추 메뉴가 함께 쓴다)
-	//==============================================================================
-	/**
-	 * @param { object[] } menuItems
-	 * @returns { HTMLElement }
-	 */
-	createMenuPanelElement(menuItems) {
-		const panelElement = System.document.createElement("div");
-		panelElement.id = "uieditorMenuPanel";
-		panelElement.style.cssText = "position:fixed;z-index:9999;min-width:196px;padding:4px 0;"
-			+ "background:" + PaneTheme.color.toolbar + ";border:1px solid " + PaneTheme.color.border + ";"
-			+ "border-radius:4px;box-shadow:0 6px 18px rgba(0,0,0,0.5);font-size:13px;color:" + PaneTheme.color.text + ";"
-			+ "font-family:" + PaneTheme.font.family + ";";
-		panelElement.addEventListener("mousedown", (mouseEvent) => {
-			mouseEvent.stopPropagation();
-		});
-		for (const menuItem of menuItems) {
-			if (menuItem.separator) {
-				const separatorElement = System.document.createElement("div");
-				separatorElement.style.cssText = "height:1px;margin:4px 8px;background:" + PaneTheme.color.border + ";";
-				panelElement.appendChild(separatorElement);
-				continue;
-			}
-			const itemElement = System.document.createElement("div");
-			itemElement.style.cssText = "display:flex;align-items:center;padding:5px 12px 5px 8px;cursor:pointer;white-space:nowrap;";
-
-			const checkElement = System.document.createElement("span");
-			checkElement.style.cssText = "width:16px;flex:0 0 16px;color:" + SELECTION_COLOR + ";";
-			checkElement.innerText = this.isCommandChecked(menuItem.id) ? "✓" : "";
-			itemElement.appendChild(checkElement);
-
-			const labelElement = System.document.createElement("span");
-			labelElement.style.cssText = "flex:1;";
-			labelElement.innerText = menuItem.label;
-			itemElement.appendChild(labelElement);
-
-			if (menuItem.shortcut) {
-				const shortcutElement = System.document.createElement("span");
-				shortcutElement.style.cssText = "margin-left:24px;color:" + PaneTheme.color.textDim + ";font-size:12px;";
-				shortcutElement.innerText = menuItem.shortcut;
-				itemElement.appendChild(shortcutElement);
-			}
-
-			itemElement.addEventListener("mouseenter", () => {
-				itemElement.style.backgroundColor = MENU_HOVER_COLOR;
-			});
-			itemElement.addEventListener("mouseleave", () => {
-				itemElement.style.backgroundColor = "transparent";
-			});
-			itemElement.addEventListener("click", () => {
-				this.closeMenuDropdown();
-				if (menuItem.action) {
-					menuItem.action();
-					return;
-				}
-				this.executeCommand(menuItem.id);
-			});
-			panelElement.appendChild(itemElement);
-		}
-		return panelElement;
-	}
-
-	//==============================================================================
-	// 메뉴 펼치기.
-	//==============================================================================
-	/**
-	 * @param { number } menuIndex
-	 */
-	openMenuDropdown(menuIndex) {
-		this.closeMenuDropdown();
-		const titleElement = this.#menuTitleElementList[menuIndex];
-		const titleRect = titleElement.getBoundingClientRect();
-		const panelElement = this.createMenuPanelElement(MENU_DEFINITIONS[menuIndex].items);
-		panelElement.style.left = System.Math.round(titleRect.left) + "px";
-		panelElement.style.top = System.Math.round(titleRect.bottom) + "px";
-		System.document.body.appendChild(panelElement);
-		titleElement.style.backgroundColor = MENU_HOVER_COLOR;
-		this.#openMenuIndex = menuIndex;
 	}
 
 	//==============================================================================
@@ -956,25 +755,14 @@ export class UIEditor {
 	 * @param { object[] } menuItems
 	 */
 	openMenuPanelAt(clientX, clientY, menuItems) {
-		this.closeMenuDropdown();
-		const panelElement = this.createMenuPanelElement(menuItems);
-		panelElement.style.left = System.Math.round(clientX) + "px";
-		panelElement.style.top = System.Math.round(clientY) + "px";
-		System.document.body.appendChild(panelElement);
+		openEditorMenuPanelAt(clientX, clientY, menuItems);
 	}
 
 	//==============================================================================
 	// 메뉴 접기.
 	//==============================================================================
 	closeMenuDropdown() {
-		const existingPanel = System.document.getElementById("uieditorMenuPanel");
-		if (existingPanel) {
-			existingPanel.remove();
-		}
-		if (this.#openMenuIndex >= 0) {
-			this.#menuTitleElementList[this.#openMenuIndex].style.backgroundColor = "transparent";
-		}
-		this.#openMenuIndex = -1;
+		closeEditorMenuPanel();
 	}
 
 	//==============================================================================
@@ -1005,7 +793,7 @@ export class UIEditor {
 		const renderModeLabel = { actual: "1:1", fit: "STRETCH S", stretchWidth: "STRETCH W", stretchHeight: "STRETCH H" }[this.#renderScaleMode];
 		this.#viewTitleElement.innerText = isEditorActive ? "VIEW" : ("VIEW - " + renderModeLabel);
 		this.#viewToggleElement.innerHTML = createIconMarkup(isEditorActive ? "previewMode" : "editMode");
-		this.#viewToggleElement.title = isEditorActive ? "결과 화면 보기" : "편집 화면으로";
+		this.#viewToggleElement.title = isEditorActive ? "Render View" : "Edit View";
 		this.refreshStatus();
 	}
 
@@ -1017,59 +805,10 @@ export class UIEditor {
 	 * @returns { HTMLElement }
 	 */
 	createSectionElement(titleText, menuBuilder) {
-		const sectionElement = PaneStyle.create("div", "panel", { style: { display: "flex", flexDirection: "column", padding: "0" } });
-		const titleElement = PaneStyle.create("div", "", {
-			text: titleText,
-			style: {
-				position: "relative",
-				width: "auto",
-				height: "30px",
-				lineHeight: "30px",
-				padding: "0 12px",
-				fontSize: "11px",
-				fontWeight: "600",
-				letterSpacing: "0.8px",
-				color: "#bbbbbb",
-				backgroundColor: PaneTheme.color.toolbar,
-				borderBottom: "1px solid " + PaneTheme.color.border,
-				flexShrink: "0",
-			},
-		});
-		sectionElement.appendChild(titleElement);
-		if (menuBuilder) {
-			titleElement.style.display = "flex";
-			titleElement.style.alignItems = "center";
-			titleElement.style.paddingRight = "6px";
-			const spacerElement = PaneStyle.create("div", "", {
-				style: { position: "relative", width: "auto", height: "auto", flex: "1" },
-			});
-			const moreElement = PaneStyle.create("div", "", {
-				text: "\u22EF",
-				style: {
-					position: "relative", width: "20px", height: "16px",
-					display: "flex", alignItems: "center", justifyContent: "center",
-					fontSize: "14px", color: PaneTheme.color.textDim,
-					cursor: "pointer", borderRadius: "3px", userSelect: "none",
-				},
-			});
-			moreElement.addEventListener("mouseenter", () => {
-				moreElement.style.backgroundColor = MENU_HOVER_COLOR;
-			});
-			moreElement.addEventListener("mouseleave", () => {
-				moreElement.style.backgroundColor = "transparent";
-			});
-			moreElement.addEventListener("click", (mouseEvent) => {
-				mouseEvent.stopPropagation();
-				const buttonRect = moreElement.getBoundingClientRect();
-				this.openMenuPanelAt(buttonRect.right - 200, buttonRect.bottom + 2, menuBuilder());
-			});
-			titleElement.appendChild(spacerElement);
-			titleElement.appendChild(moreElement);
-		}
-		return sectionElement;
+		return createEditorSectionElement(titleText, menuBuilder);
 	}
 
-	//==============================================================================
+		//==============================================================================
 	// 목록 한 줄 생성. (기호 + 이름)
 	//==============================================================================
 	/**
@@ -1078,55 +817,11 @@ export class UIEditor {
 	 * @returns { HTMLElement }
 	 */
 	createListRowElement(glyphText, labelText) {
-		const rowElement = PaneStyle.create("div", "", {
-			style: {
-				position: "relative",
-				width: "auto",
-				height: ROW_HEIGHT,
-				flexShrink: "0",
-				display: "flex",
-				alignItems: "center",
-				gap: "8px",
-				padding: "0 12px",
-				fontSize: "13px",
-				color: PaneTheme.color.text,
-				cursor: "pointer",
-				userSelect: "none",
-				borderLeft: "3px solid transparent",
-				whiteSpace: "nowrap",
-				overflow: "hidden",
-			},
-		});
-		const glyphElement = PaneStyle.create("span", "", {
-			style: {
-				position: "relative", width: "18px", height: "18px", flexShrink: "0",
-				display: "flex", alignItems: "center", justifyContent: "center", color: ICON_COLOR,
-			},
-		});
-		glyphElement.innerHTML = createIconMarkup(glyphText);
-		const labelElement = PaneStyle.create("span", "", {
-			text: labelText,
-			style: {
-				position: "relative", width: "auto", height: "auto",
-				overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-			},
-		});
-		rowElement.appendChild(glyphElement);
-		rowElement.appendChild(labelElement);
-		rowElement.addEventListener("mouseenter", () => {
-			if (rowElement.dataset.selected !== "true") {
-				rowElement.style.backgroundColor = HOVER_COLOR;
-			}
-		});
-		rowElement.addEventListener("mouseleave", () => {
-			if (rowElement.dataset.selected !== "true") {
-				rowElement.style.backgroundColor = "transparent";
-			}
-		});
-		return rowElement;
+		const glyphMarkup = createIconMarkup(glyphText);
+		return createEditorListRowElement(glyphMarkup, labelText);
 	}
 
-	//==============================================================================
+		//==============================================================================
 	// 그리기 루프 시작. (편집 화면과 결과 화면을 각각 그린다)
 	//==============================================================================
 	startRenderLoop() {
@@ -2862,7 +2557,7 @@ export class UIEditor {
 		const selectedNode = this.#selectedNode;
 		if (!selectedNode) {
 			const emptyElement = PaneStyle.create("div", "", {
-				text: "선택된 요소가 없습니다.",
+				text: "No selection.",
 				style: { position: "relative", width: "auto", height: "auto", padding: "12px 10px", fontSize: "13px", color: PaneTheme.color.textDim },
 			});
 			bodyElement.appendChild(emptyElement);
@@ -3015,7 +2710,7 @@ export class UIEditor {
 				borderRadius: "3px", cursor: "pointer", userSelect: "none",
 			},
 		});
-		pickElement.title = "노드 목록에서 고르기";
+		pickElement.title = "Pick from node list";
 		pickElement.addEventListener("mouseenter", () => {
 			pickElement.style.backgroundColor = HOVER_COLOR;
 		});
@@ -3060,13 +2755,13 @@ export class UIEditor {
 			+ "box-shadow:0 10px 30px rgba(0,0,0,0.55);color:" + PaneTheme.color.text + ";";
 
 		const titleElement = System.document.createElement("div");
-		titleElement.innerText = "노드 선택";
+		titleElement.innerText = "Select Node";
 		titleElement.style.cssText = "font-size:13px;font-weight:600;color:" + PaneTheme.color.text + ";margin-bottom:10px;";
 		panelElement.appendChild(titleElement);
 
 		const searchElement = System.document.createElement("input");
 		searchElement.type = "text";
-		searchElement.placeholder = "이름 또는 경로로 검색";
+		searchElement.placeholder = "Search by name or path";
 		decorateInputElement(searchElement);
 		searchElement.style.flex = "0 0 auto";
 		searchElement.style.width = "100%";
@@ -3080,7 +2775,7 @@ export class UIEditor {
 
 		const buttonRowElement = System.document.createElement("div");
 		buttonRowElement.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:12px;";
-		const cancelElement = this.createDialogButtonElement("취소", false);
+		const cancelElement = this.createDialogButtonElement("Cancel", false);
 		buttonRowElement.appendChild(cancelElement);
 		panelElement.appendChild(buttonRowElement);
 
@@ -3169,19 +2864,12 @@ export class UIEditor {
 	 * @param { Function } changeHandler
 	 */
 	appendBooleanRow(parentElement, labelText, currentValue, changeHandler) {
-		const rowElement = this.createPropertyRowElement(parentElement, labelText);
-		const checkElement = System.document.createElement("input");
-		checkElement.type = "checkbox";
-		checkElement.checked = currentValue;
-		checkElement.style.cssText = "width:14px;height:14px;accent-color:" + SELECTION_COLOR + ";cursor:pointer;";
-		checkElement.addEventListener("change", () => {
+		appendEditorBooleanRow(parentElement, labelText, currentValue, changeHandler, () => {
 			this.pushUndoSnapshot();
-			changeHandler(checkElement.checked);
 		});
-		rowElement.appendChild(checkElement);
 	}
 
-	//==============================================================================
+		//==============================================================================
 	// 두 값 좌표 속성 줄.
 	//==============================================================================
 	/**
@@ -3301,64 +2989,10 @@ export class UIEditor {
 	 * @returns { HTMLElement }
 	 */
 	createInspectorGroupElement(titleText, component, groupBodyElement) {
-		const groupElement = PaneStyle.create("div", "", {
-			style: {
-				position: "relative", width: "auto", height: "30px", flexShrink: "0",
-				display: "flex", alignItems: "center",
-				padding: "0 8px 0 8px", marginTop: "8px",
-				backgroundColor: "#202020",
-				borderTop: "1px solid " + BORDER_COLOR,
-				borderBottom: "1px solid " + BORDER_SOFT_COLOR,
-				cursor: "pointer", userSelect: "none",
-			},
-		});
-
-		const foldElement = PaneStyle.create("span", "", {
-			text: "\u25BE",
-			style: {
-				position: "relative", width: "14px", height: "auto", flexShrink: "0",
-				fontSize: "12px", color: PaneTheme.color.textDim, textAlign: "center",
-			},
-		});
-		groupElement.appendChild(foldElement);
-
-		const titleElement = PaneStyle.create("span", "", {
-			text: titleText,
-			style: {
-				position: "relative", width: "auto", height: "auto", flex: "1",
-				fontSize: "13px", fontWeight: "600", color: INK_COLOR,
-			},
-		});
-		groupElement.appendChild(titleElement);
-
-		if (groupBodyElement) {
-			groupElement.addEventListener("click", () => {
-				const isFolded = (groupBodyElement.style.display === "none");
-				groupBodyElement.style.display = isFolded ? "" : "none";
-				foldElement.innerText = isFolded ? "\u25BE" : "\u25B8";
-			});
-		}
-
+		let menuBuilder = null;
 		if (component) {
-			const moreElement = PaneStyle.create("div", "", {
-				text: "\u22EF",
-				style: {
-					position: "relative", width: "20px", height: "18px", flexShrink: "0",
-					display: "flex", alignItems: "center", justifyContent: "center",
-					fontSize: "14px", color: PaneTheme.color.textDim,
-					cursor: "pointer", borderRadius: "3px", userSelect: "none",
-				},
-			});
-			moreElement.addEventListener("mouseenter", () => {
-				moreElement.style.backgroundColor = MENU_HOVER_COLOR;
-			});
-			moreElement.addEventListener("mouseleave", () => {
-				moreElement.style.backgroundColor = "transparent";
-			});
-			moreElement.addEventListener("click", (mouseEvent) => {
-				mouseEvent.stopPropagation();
-				const buttonRect = moreElement.getBoundingClientRect();
-				this.openMenuPanelAt(buttonRect.right - 190, buttonRect.bottom + 2, [
+			menuBuilder = () => {
+				return [
 					{
 						id: "removeComponent",
 						label: "Remove Component",
@@ -3366,14 +3000,13 @@ export class UIEditor {
 							this.removeComponentFromSelectedNode(component);
 						},
 					},
-				]);
-			});
-			groupElement.appendChild(moreElement);
+				];
+			};
 		}
-		return groupElement;
+		return createEditorGroupElement(titleText, groupBodyElement, menuBuilder);
 	}
 
-	//==============================================================================
+		//==============================================================================
 	// 속성 한 줄의 공통 틀.
 	//==============================================================================
 	/**
@@ -3382,26 +3015,10 @@ export class UIEditor {
 	 * @returns { HTMLElement }
 	 */
 	createPropertyRowElement(parentElement, labelText) {
-		const rowElement = PaneStyle.create("div", "", {
-			style: {
-				position: "relative", width: "auto", height: "auto",
-				display: "flex", alignItems: "center", gap: "8px", padding: "6px 12px",
-				borderBottom: "1px solid " + BORDER_SOFT_COLOR,
-			},
-		});
-		const labelElement = PaneStyle.create("span", "", {
-			text: labelText,
-			style: {
-				position: "relative", width: "104px", height: "auto", flexShrink: "0",
-				fontSize: "13px", color: PaneTheme.color.textDim, lineHeight: "1.3",
-			},
-		});
-		rowElement.appendChild(labelElement);
-		parentElement.appendChild(rowElement);
-		return rowElement;
+		return createEditorPropertyRowElement(parentElement, labelText);
 	}
 
-	//==============================================================================
+		//==============================================================================
 	// 숫자 속성 줄. (직접 입력 + 라벨 좌우 끌기)
 	//==============================================================================
 	/**
@@ -3412,59 +3029,15 @@ export class UIEditor {
 	 * @param { function(number): void } applyCallback
 	 */
 	appendNumberRow(parentElement, labelText, currentValue, stepAmount, applyCallback) {
-		const rowElement = this.createPropertyRowElement(parentElement, labelText);
-		const inputElement = PaneStyle.create("input", "input", { type: "text" });
-		inputElement.style.position = "relative";
-		inputElement.style.width = "100%";
-		inputElement.value = this.composeNumberText(currentValue);
-
-		const commitValue = () => {
-			const parsedValue = System.Number(inputElement.value);
-			if (System.Number.isFinite(parsedValue)) {
-				this.pushUndoSnapshot();
-				applyCallback(parsedValue);
-				this.refreshStatus();
-			}
-			else {
-				inputElement.value = this.composeNumberText(currentValue);
-			}
-		};
-		inputElement.addEventListener("change", commitValue);
-		inputElement.addEventListener("keydown", (keyboardEvent) => {
-			if (keyboardEvent.key === "Enter") {
-				inputElement.blur();
-			}
-			keyboardEvent.stopPropagation();
-		});
-
-		const labelElement = rowElement.firstChild;
-		labelElement.style.cursor = "ew-resize";
-		labelElement.addEventListener("mousedown", (mouseEvent) => {
-			mouseEvent.preventDefault();
-			const startX = mouseEvent.clientX;
-			const startValue = System.Number(inputElement.value) || 0;
+		appendEditorNumberRow(parentElement, labelText, currentValue, stepAmount, (nextValue) => {
+			applyCallback(nextValue);
+			this.refreshStatus();
+		}, () => {
 			this.pushUndoSnapshot();
-			const onMouseMove = (moveEvent) => {
-				let nextValue = startValue + (moveEvent.clientX - startX) * stepAmount;
-				if (stepAmount >= 1) {
-					nextValue = System.Math.round(nextValue);
-				}
-				inputElement.value = this.composeNumberText(nextValue);
-				applyCallback(nextValue);
-				this.refreshStatus();
-			};
-			const onMouseUp = () => {
-				System.window.removeEventListener("mousemove", onMouseMove);
-				System.window.removeEventListener("mouseup", onMouseUp);
-			};
-			System.window.addEventListener("mousemove", onMouseMove);
-			System.window.addEventListener("mouseup", onMouseUp);
 		});
-
-		rowElement.appendChild(inputElement);
 	}
 
-	//==============================================================================
+		//==============================================================================
 	// 글자 속성 줄.
 	//==============================================================================
 	/**
@@ -3474,25 +3047,12 @@ export class UIEditor {
 	 * @param { function(string): void } applyCallback
 	 */
 	appendTextRow(parentElement, labelText, currentText, applyCallback) {
-		const rowElement = this.createPropertyRowElement(parentElement, labelText);
-		const inputElement = PaneStyle.create("input", "input", { type: "text" });
-		inputElement.style.position = "relative";
-		inputElement.style.width = "100%";
-		inputElement.value = currentText;
-		inputElement.addEventListener("change", () => {
+		appendEditorTextRow(parentElement, labelText, currentText, applyCallback, () => {
 			this.pushUndoSnapshot();
-			applyCallback(inputElement.value);
 		});
-		inputElement.addEventListener("keydown", (keyboardEvent) => {
-			if (keyboardEvent.key === "Enter") {
-				inputElement.blur();
-			}
-			keyboardEvent.stopPropagation();
-		});
-		rowElement.appendChild(inputElement);
 	}
 
-	//==============================================================================
+		//==============================================================================
 	// 색상 속성 줄.
 	//==============================================================================
 	/**
@@ -3502,37 +3062,19 @@ export class UIEditor {
 	 * @param { function(Color): void } applyCallback
 	 */
 	appendColorRow(parentElement, labelText, currentColor, applyCallback) {
-		const rowElement = this.createPropertyRowElement(parentElement, labelText);
-		const colorInputElement = PaneStyle.create("input", "", { type: "color" });
-		colorInputElement.style.cssText = "position:relative;width:34px;height:22px;padding:0;border:1px solid "
-			+ PaneTheme.color.border + ";background:transparent;cursor:pointer;flex-shrink:0;";
-		colorInputElement.value = currentColor.toHEXString().substring(0, 7);
-
-		const alphaInputElement = PaneStyle.create("input", "input", { type: "text" });
-		alphaInputElement.style.position = "relative";
-		alphaInputElement.style.width = "100%";
-		alphaInputElement.value = currentColor.alpha.toFixed(2);
-
-		const commitColor = () => {
-			const parsedColor = Color.createFromHEX(colorInputElement.value);
-			const parsedAlpha = System.Number(alphaInputElement.value);
+		const hexText = currentColor.toHEXString().substring(0, 7);
+		appendEditorColorRow(parentElement, labelText, hexText, currentColor.alpha, (nextHexText, nextAlpha) => {
+			const parsedColor = Color.createFromHEX(nextHexText);
 			if (parsedColor) {
-				parsedColor.alpha = System.Number.isFinite(parsedAlpha) ? System.Math.max(0, System.Math.min(1, parsedAlpha)) : currentColor.alpha;
-				this.pushUndoSnapshot();
+				parsedColor.alpha = nextAlpha;
 				applyCallback(parsedColor);
 			}
-		};
-		colorInputElement.addEventListener("input", commitColor);
-		alphaInputElement.addEventListener("change", commitColor);
-		alphaInputElement.addEventListener("keydown", (keyboardEvent) => {
-			keyboardEvent.stopPropagation();
+		}, () => {
+			this.pushUndoSnapshot();
 		});
-
-		rowElement.appendChild(colorInputElement);
-		rowElement.appendChild(alphaInputElement);
 	}
 
-	//==============================================================================
+		//==============================================================================
 	// 숫자 표기.
 	//==============================================================================
 	/**
@@ -3540,8 +3082,7 @@ export class UIEditor {
 	 * @returns { string }
 	 */
 	composeNumberText(value) {
-		const isInteger = System.Math.abs(value - System.Math.round(value)) < 0.0001;
-		return isInteger ? String(System.Math.round(value)) : value.toFixed(2);
+		return composeEditorNumberText(value);
 	}
 
 	//==============================================================================
@@ -3552,7 +3093,7 @@ export class UIEditor {
 			return;
 		}
 		const selectedNode = this.#selectedNode;
-		let statusText = "선택 없음";
+		let statusText = "No selection";
 		if (selectedNode) {
 			const localPosition = selectedNode.getLocalPosition();
 			const contentSize = selectedNode.getContentSize();
@@ -3565,14 +3106,14 @@ export class UIEditor {
 			}
 		}
 		const documentSize = this.getDocumentSize();
-		statusText += "        문서 " + System.Math.round(documentSize.x) + " x " + System.Math.round(documentSize.y);
+		statusText += "        document " + System.Math.round(documentSize.x) + " x " + System.Math.round(documentSize.y);
 		if (this.#activeViewName === "edit") {
 			const editorTransform = this.#editorCanvas ? this.getEditorTransform() : { scale: 1 };
-			statusText += "    배율 " + System.Math.round(editorTransform.scale * 100) + "%";
+			statusText += "    zoom " + System.Math.round(editorTransform.scale * 100) + "%";
 		}
 		else {
-			const renderModeText = { actual: "1:1 실제 크기", fit: "짧은 축 맞춤", stretchWidth: "가로 맞춤", stretchHeight: "세로 맞춤" }[this.#renderScaleMode];
-			statusText += "    결과 화면 " + renderModeText;
+			const renderModeText = { actual: "1:1 actual size", fit: "fit short axis", stretchWidth: "stretch width", stretchHeight: "stretch height" }[this.#renderScaleMode];
+			statusText += "    render view " + renderModeText;
 		}
 		this.#statusTextElement.innerText = statusText;
 
@@ -3732,7 +3273,7 @@ export class UIEditor {
 	// 다른 이름으로 저장. (이름을 물어본 뒤 내려받는다)
 	//==============================================================================
 	saveDocumentAs() {
-		this.openInputDialog("다른 이름으로 저장", "파일 이름", this.#documentFileName, (inputText) => {
+		this.openInputDialog("Save As", "File name", this.#documentFileName, (inputText) => {
 			let fileName = inputText.trim();
 			if (fileName.length === 0) {
 				return;
@@ -3791,8 +3332,8 @@ export class UIEditor {
 
 		const buttonRowElement = System.document.createElement("div");
 		buttonRowElement.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:14px;";
-		const cancelElement = this.createDialogButtonElement("취소", false);
-		const acceptElement = this.createDialogButtonElement("저장", true);
+		const cancelElement = this.createDialogButtonElement("Cancel", false);
+		const acceptElement = this.createDialogButtonElement("Save", true);
 		buttonRowElement.appendChild(cancelElement);
 		buttonRowElement.appendChild(acceptElement);
 		panelElement.appendChild(buttonRowElement);
@@ -3838,17 +3379,10 @@ export class UIEditor {
 	 * @returns { HTMLElement }
 	 */
 	createDialogButtonElement(labelText, isPrimary) {
-		const buttonElement = System.document.createElement("div");
-		buttonElement.innerText = labelText;
-		buttonElement.style.cssText = "padding:6px 16px;font-size:13px;border-radius:3px;cursor:pointer;user-select:none;"
-			+ "border:1px solid " + PaneTheme.color.border + ";"
-			+ (isPrimary
-				? ("background:" + SELECTION_COLOR + ";color:" + SELECTED_ROW_TEXT_COLOR + ";border-color:" + SELECTION_COLOR + ";")
-				: ("background:" + PaneTheme.color.inputBg + ";color:" + PaneTheme.color.text + ";"));
-		return buttonElement;
+		return createEditorButtonElement(labelText, isPrimary);
 	}
 
-	//==============================================================================
+		//==============================================================================
 	// 열기.
 	//==============================================================================
 	loadDocument() {
@@ -3895,24 +3429,7 @@ export class UIEditor {
 //==============================================================================
 // 편집기 실행.
 //==============================================================================
-for (const colorName of System.Object.keys(VANILLA_THEME_COLORS)) {
-	PaneTheme.color[colorName] = VANILLA_THEME_COLORS[colorName];
-}
-PaneTheme.size.resizer = 3;
-PaneTheme.font.family = EDITOR_FONT_FAMILY;
-PaneTheme.font.size = "13px";
-
-// 스크롤 막대 모양을 편집기 하나로 맞춘다.
-const editorStyleElement = System.document.createElement("style");
-editorStyleElement.innerText = "* { scrollbar-width: thin; scrollbar-color: rgba(121, 121, 121, 0.4) transparent; }"
-	+ "::-webkit-scrollbar { width: 10px; height: 10px; }"
-	+ "::-webkit-scrollbar-track { background: transparent; }"
-	+ "::-webkit-scrollbar-thumb { background: rgba(121, 121, 121, 0.4); }"
-	+ "::-webkit-scrollbar-thumb:hover { background: rgba(121, 121, 121, 0.7); }"
-	+ "::-webkit-scrollbar-corner { background: transparent; }"
-	+ "input[type=checkbox] { accent-color: " + ACCENT_COLOR + "; }"
-	+ "body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }";
-System.document.head.appendChild(editorStyleElement);
+applyEditorTheme();
 
 // 엔진이 내보내는 노드와 컴포넌트를 문서 형식에 등록한다.
 // 엔진을 올리면 새로 들어온 종류가 그대로 저장/복원 대상이 된다.
@@ -3930,6 +3447,11 @@ for (const exportName of System.Object.keys(Engine)) {
 }
 
 const uiEditor = new UIEditor();
+setEditorCommandHandler((commandId) => {
+	uiEditor.executeCommand(commandId);
+}, (commandId) => {
+	return uiEditor.isCommandChecked(commandId);
+});
 System.uiEditor = uiEditor;
 System.document.title = "vanilla.js - UI Editor";
 uiEditor.run();
