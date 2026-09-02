@@ -820,7 +820,7 @@
 				"components": [
 					{
 						"type": "UILabel",
-						"text": "vanilla.js, 0.4.0",
+						"text": "vanilla.js, 0.4.1",
 						"fontSize": 9,
 						"textColor": [
 							0.42,

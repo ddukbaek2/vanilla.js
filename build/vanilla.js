@@ -5800,7 +5800,8 @@ var Graphic = class extends Object2 {
     }
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const shaderProgram = this.getShaderProgram();
-    webGL2RenderingContext.bufferSubData(webGL2RenderingContext.ARRAY_BUFFER, 0, this.getVertexData(), 0, vertexCount * FLOATS_PER_VERTEX);
+    const vertexData = this.getVertexData();
+    webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, vertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, vertexCount * FLOATS_PER_VERTEX);
     this.#transformMatrix.writeToFloat32Array(this.#modelMatrixArray);
     const modelMatrixLocation = shaderProgram.getUniformLocation("modelMatrix");
     webGL2RenderingContext.uniformMatrix3fv(modelMatrixLocation, false, this.#modelMatrixArray);
@@ -5891,7 +5892,7 @@ var Graphic = class extends Object2 {
     this.#particleShaderProgram.use();
     webGL2RenderingContext.bindVertexArray(this.#particleVertexArray);
     webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#particleVertexBuffer);
-    webGL2RenderingContext.bufferSubData(webGL2RenderingContext.ARRAY_BUFFER, 0, this.#particleVertexData, 0, vertexCount * PARTICLE_FLOATS_PER_VERTEX);
+    webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#particleVertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, vertexCount * PARTICLE_FLOATS_PER_VERTEX);
     const projectionMatrixLocation = this.#particleShaderProgram.getUniformLocation("projectionMatrix");
     webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
     this.#transformMatrix.writeToFloat32Array(this.#modelMatrixArray);

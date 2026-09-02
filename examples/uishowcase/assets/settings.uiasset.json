@@ -1666,7 +1666,7 @@
 						"components": [
 							{
 								"type": "UILabel",
-								"text": "0.4.0-experimental",
+								"text": "0.4.1-experimental",
 								"fontSize": 11,
 								"textColor": [
 									0.91,

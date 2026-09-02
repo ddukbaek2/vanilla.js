@@ -681,8 +681,13 @@ export class Graphic extends Object {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const shaderProgram = this.getShaderProgram();
 
-		// 버텍스 업로드.
-		webGL2RenderingContext.bufferSubData(webGL2RenderingContext.ARRAY_BUFFER, 0, this.getVertexData(), 0, vertexCount * FLOATS_PER_VERTEX);
+		// 버텍스 업로드. bufferSubData 로 덮어쓰지 않고, 쓸 만큼만 새 저장소를 잡으며 올린다. (고아 처리)
+		// 드로우 콜마다 같은 버퍼를 오프셋 0 부터 덮어쓰면 GPU 가 지난 콜의 데이터를 아직 읽는 중이라,
+		// 사파리(ANGLE → Metal)는 콜마다 CPU 를 세워 GPU 가 끝나기를 기다린다. 드로우 콜 45 · 정점 1000 남짓에도
+		// 아이폰 10 fps · 맥 22 fps 가 나오고 크롬만 멀쩡한 증상이 이것이다. (크롬은 드라이버가 알아서 복사해 넘긴다)
+		// bufferData 는 부를 때마다 새 저장소를 만들어 지난 콜과 겹치지 않고, 브라우저가 저장소를 돌려쓰므로 할당 비용은 작다.
+		const vertexData = this.getVertexData();
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, vertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, vertexCount * FLOATS_PER_VERTEX);
 
 		// 유니폼 업로드.
 		this.#transformMatrix.writeToFloat32Array(this.#modelMatrixArray);
@@ -782,7 +787,8 @@ export class Graphic extends Object {
 		this.#particleShaderProgram.use();
 		webGL2RenderingContext.bindVertexArray(this.#particleVertexArray);
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#particleVertexBuffer);
-		webGL2RenderingContext.bufferSubData(webGL2RenderingContext.ARRAY_BUFFER, 0, this.#particleVertexData, 0, vertexCount * PARTICLE_FLOATS_PER_VERTEX);
+		// drawVertices 와 같은 까닭으로 bufferSubData 대신 bufferData 로 새 저장소를 잡으며 올린다. (사파리 드로우 콜 동기 대기)
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#particleVertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, vertexCount * PARTICLE_FLOATS_PER_VERTEX);
 
 		const projectionMatrixLocation = this.#particleShaderProgram.getUniformLocation("projectionMatrix");
 		webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
