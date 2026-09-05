@@ -17,6 +17,9 @@
   - SkinnedModelRenderer.drawWireframe / SkinnedModel.uploadWireframeIndices: 중복 없는 모서리 선 인덱스로 와이어프레임 출력
   - Material: sRGB 색 텍스처(SRGB8_ALPHA8), 캔버스 소스 이미지, 이방성 필터, 추가 텍스처 슬롯(setTexture), URL 이미지 서술 로더
   - RenderTarget: 다중 컬러 어태치먼트(MRT), RGBA16F 실수 컬러, 깊이 텍스처 옵션
+- ParticleSystem: EmitterShape 를 ParticleEmitterShape 로 개명하고, 문자열이던 렌더 모양을 ParticleRenderShape 열거형(circle / rect / streak / image)으로 통일 (값은 기존 문자열과 같아 vfx JSON 은 그대로 호환)
+- UIDropdown: 펼친 목록을 트리 뿌리로 옮겨 그려 나중에 그려지는 형제 노드에 가려지지 않게 수정 (접으면 되돌림)
+- UI 쇼케이스: 내비게이션 캡션을 CONSOLE 에서 UI SHOWCASE 로 변경
 
 # 0.4.1-experimental (2026-09-03)
 - Graphic: 정점 버퍼 올리기를 bufferSubData 덮어쓰기에서 bufferData 고아 처리로 교체 (drawVertices / drawColoredQuads)

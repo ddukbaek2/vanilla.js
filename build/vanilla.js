@@ -33172,12 +33172,18 @@ var PopupMotion = class extends Object2 {
 
 // src/effect/particlesystem.js
 var System71 = globalThis;
-var EmitterShape = {
+var ParticleEmitterShape = {
   point: "point",
   circle: "circle",
   cone: "cone",
   box: "box",
   edge: "edge"
+};
+var ParticleRenderShape = {
+  circle: "circle",
+  rect: "rect",
+  streak: "streak",
+  image: "image"
 };
 var ParticleSystem = class extends Component {
   static {
@@ -33286,7 +33292,7 @@ var ParticleSystem = class extends Component {
   // 렌더.
   /** @private @type { string } */
   #renderShape;
-  // "circle" | "rect" | "image" | "streak"
+  // ParticleRenderShape 값.
   /** @private @type { * } */
   #image;
   /** @private @type { string } */
@@ -33318,7 +33324,7 @@ var ParticleSystem = class extends Component {
     this.#emissionRate = 20;
     this.#emissionAccumulator = 0;
     this.#burstList = [];
-    this.#emitterShape = EmitterShape.point;
+    this.#emitterShape = ParticleEmitterShape.point;
     this.#shapeRadius = 0;
     this.#coneAngleRadian = 0.5;
     this.#boxSize = Vector2.create(0, 0);
@@ -33345,7 +33351,7 @@ var ParticleSystem = class extends Component {
     this.#attractorSwirl = 0;
     this.#wobbleAmplitude = 0;
     this.#wobbleFrequency = 4;
-    this.#renderShape = "circle";
+    this.#renderShape = ParticleRenderShape.circle;
     this.#image = null;
     this.#blendMode = "source-over";
     this.#streakScale = 0.06;
@@ -33468,24 +33474,24 @@ var ParticleSystem = class extends Component {
     let directionX = 0;
     let directionY = -1;
     const shape = this.#emitterShape;
-    if (shape === EmitterShape.circle) {
+    if (shape === ParticleEmitterShape.circle) {
       const angle = randomRange(0, System71.Math.PI * 2);
       const radius = this.#shapeRadius * System71.Math.sqrt(randomRange(0, 1));
       spawnX = System71.Math.cos(angle) * radius;
       spawnY = System71.Math.sin(angle) * radius;
       directionX = System71.Math.cos(angle);
       directionY = System71.Math.sin(angle);
-    } else if (shape === EmitterShape.cone) {
+    } else if (shape === ParticleEmitterShape.cone) {
       const angle = -System71.Math.PI * 0.5 + randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
       const radius = randomRange(0, this.#shapeRadius);
       spawnX = System71.Math.cos(angle) * radius;
       spawnY = System71.Math.sin(angle) * radius;
       directionX = System71.Math.cos(angle);
       directionY = System71.Math.sin(angle);
-    } else if (shape === EmitterShape.box) {
+    } else if (shape === ParticleEmitterShape.box) {
       spawnX = randomRange(-this.#boxSize.x * 0.5, this.#boxSize.x * 0.5);
       spawnY = randomRange(-this.#boxSize.y * 0.5, this.#boxSize.y * 0.5);
-    } else if (shape === EmitterShape.edge) {
+    } else if (shape === ParticleEmitterShape.edge) {
       spawnX = randomRange(-this.#edgeWidth * 0.5, this.#edgeWidth * 0.5);
       directionY = 1;
     } else {
@@ -33585,7 +33591,7 @@ var ParticleSystem = class extends Component {
       baseOffsetX = -nodePosition.x;
       baseOffsetY = -nodePosition.y;
     }
-    if (this.#renderShape === "image" && this.#image) {
+    if (this.#renderShape === ParticleRenderShape.image && this.#image) {
       this.drawImageParticles(graphic, baseOffsetX, baseOffsetY);
     } else {
       this.drawBatchedParticles(graphic, baseOffsetX, baseOffsetY);
@@ -33607,8 +33613,8 @@ var ParticleSystem = class extends Component {
     const particleCount = this.#particleList.length;
     const vertexData = graphic.getParticleVertexData(particleCount * 48);
     const colorChannels = this.#colorChannelBuffer;
-    const isStreak = this.#renderShape === "streak";
-    const isRect = this.#renderShape === "rect";
+    const isStreak = this.#renderShape === ParticleRenderShape.streak;
+    const isRect = this.#renderShape === ParticleRenderShape.rect;
     let floatOffset = 0;
     const writeVertex = /* @__PURE__ */ __name((x, y, u, v) => {
       vertexData[floatOffset++] = x;
@@ -33670,7 +33676,7 @@ var ParticleSystem = class extends Component {
         writeVertex(drawX - halfSize, drawY + halfSize, 0, 1);
       }
     }
-    const texture = this.#renderShape === "circle" ? graphic.getSoftDiscTexture() : graphic.getWhiteTexture();
+    const texture = this.#renderShape === ParticleRenderShape.circle ? graphic.getSoftDiscTexture() : graphic.getWhiteTexture();
     graphic.drawColoredQuads(floatOffset / 8, texture);
   }
   //==============================================================================
@@ -33713,7 +33719,7 @@ var ParticleSystem = class extends Component {
       return { time: burst.time, count: burst.count, fired: false };
     });
   }
-  /** @param { string } emitterShape EmitterShape 값. */
+  /** @param { string } emitterShape ParticleEmitterShape 값. */
   setEmitterShape(emitterShape) {
     this.#emitterShape = emitterShape;
   }
@@ -33782,11 +33788,11 @@ var ParticleSystem = class extends Component {
   setDamping(damping) {
     this.#damping = damping;
   }
-  /** @param { string } renderShape "circle" | "rect" | "image" */
+  /** @param { string } renderShape ParticleRenderShape 값. */
   setRenderShape(renderShape) {
     this.#renderShape = renderShape;
   }
-  /** @param { * } image 엔진 이미지. (renderShape "image" 전용) */
+  /** @param { * } image 엔진 이미지. (renderShape image 전용) */
   setImage(image) {
     this.#image = image;
   }
@@ -34789,14 +34795,73 @@ var UIDropdown = class extends WorldNode {
   }
   //==============================================================================
   // 펼침 / 접힘.
+  // - 펼칠 때 목록을 트리 뿌리로 옮겨 나중에 그려지는 형제 노드에 가려지지 않게 한다. (접으면 되돌린다)
   //==============================================================================
   /**
    * @param { boolean } isOpen
    */
   setOpen(isOpen) {
     this.#isOpen = isOpen;
+    if (isOpen) {
+      this.attachPopupToRoot();
+    } else {
+      this.detachPopupFromRoot();
+    }
     this.#popupNode.setActive(isOpen);
     this.#arrowLabel.setText(isOpen ? "\u25B4" : "\u25BE");
+  }
+  //==============================================================================
+  // 펼침 목록을 트리 뿌리로 이동. (머리 단추 아래 월드 위치를 뿌리 로컬 좌표로 환산)
+  //==============================================================================
+  /**
+   * @private
+   */
+  attachPopupToRoot() {
+    let rootNode = this;
+    while (rootNode.getParent()) {
+      rootNode = rootNode.getParent();
+    }
+    if (rootNode === this || !(rootNode instanceof WorldNode)) {
+      return;
+    }
+    const worldCorners = this.getWorldCorners();
+    const bottomLeft = worldCorners[3];
+    const rootPosition = rootNode.getPosition();
+    const rootContentSize = rootNode.getContentSize();
+    const rootPivot = rootNode.getPivot();
+    const rootScale = rootNode.getScale();
+    const rootRadian = degreeToRadian(rootNode.getRotation());
+    const cosRadian = cos(rootRadian);
+    const sinRadian = sin(rootRadian);
+    const offsetX = bottomLeft.x - rootPosition.x;
+    const offsetY = bottomLeft.y + 4 - rootPosition.y;
+    const unrotatedX = offsetX * cosRadian + offsetY * sinRadian;
+    const unrotatedY = -offsetX * sinRadian + offsetY * cosRadian;
+    const safeScaleX = rootScale.x !== 0 ? rootScale.x : 1;
+    const safeScaleY = rootScale.y !== 0 ? rootScale.y : 1;
+    const localX = unrotatedX / safeScaleX + rootContentSize.x * rootPivot.x;
+    const localY = unrotatedY / safeScaleY + rootContentSize.y * rootPivot.y;
+    this.removeChild(this.#popupNode);
+    rootNode.addChild(this.#popupNode);
+    this.#popupNode.setLocalPosition(Vector2.create(localX, localY));
+  }
+  //==============================================================================
+  // 펼침 목록을 머리 단추 아래로 되돌림.
+  //==============================================================================
+  /**
+   * @private
+   */
+  detachPopupFromRoot() {
+    const popupParent = this.#popupNode.getParent();
+    if (popupParent === this) {
+      return;
+    }
+    if (popupParent) {
+      popupParent.removeChild(this.#popupNode);
+    }
+    this.addChild(this.#popupNode);
+    const contentSize = this.getContentSize();
+    this.#popupNode.setLocalPosition(Vector2.create(0, contentSize.y + 4));
   }
   //==============================================================================
   // 머리 글 갱신.
@@ -35776,7 +35841,6 @@ export {
   DialogueRunner,
   DialogueScriptParser,
   Dictionary,
-  EmitterShape,
   Engine,
   EngineConfiguration,
   Enum,
@@ -35818,6 +35882,8 @@ export {
   Object2 as Object,
   ObjectPool,
   Paint,
+  ParticleEmitterShape,
+  ParticleRenderShape,
   ParticleSystem,
   PathFinder,
   PersistedStore,

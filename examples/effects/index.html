@@ -66,7 +66,8 @@
 	const TouchRecognizer = engineModule.TouchRecognizer;
 	const ViewScaleMode = engineModule.ViewScaleMode;
 	const ParticleSystem = engineModule.ParticleSystem;
-	const EmitterShape = engineModule.EmitterShape;
+	const ParticleEmitterShape = engineModule.ParticleEmitterShape;
+	const ParticleRenderShape = engineModule.ParticleRenderShape;
 	const TrailRenderer = engineModule.TrailRenderer;
 	const SeededRandom = engineModule.SeededRandom;
 
@@ -98,7 +99,7 @@
 	const MODE_DEFINITIONS = [
 		{ key: "fire", title: "FIRE", tag: "cone, additive", usage: [
 			"const flame = node.addComponent(ParticleSystem);",
-			"flame.setEmitterShape(EmitterShape.cone);",
+			"flame.setEmitterShape(ParticleEmitterShape.cone);",
 			"flame.setConeAngle(0.34);",
 			"flame.setAdditive(true);",
 			"flame.setGravity(0, -130);",
@@ -106,7 +107,7 @@
 		] },
 		{ key: "fountain", title: "FOUNTAIN", tag: "gravity", usage: [
 			"const water = node.addComponent(ParticleSystem);",
-			"water.setEmitterShape(EmitterShape.cone);",
+			"water.setEmitterShape(ParticleEmitterShape.cone);",
 			"water.setConeAngle(0.22);",
 			"water.setStartSpeed(420, 560);",
 			"water.setGravity(0, 460);",
@@ -114,29 +115,29 @@
 		] },
 		{ key: "snow", title: "SNOW", tag: "edge, wobble", usage: [
 			"const snow = node.addComponent(ParticleSystem);",
-			"snow.setEmitterShape(EmitterShape.edge);",
+			"snow.setEmitterShape(ParticleEmitterShape.edge);",
 			"snow.setEdgeWidth(stageWidth * 1.1);",
 			"snow.setStartLifetime(7, 11);",
 			"snow.setWobble(16, 1.4);",
 		] },
 		{ key: "rain", title: "RAIN", tag: "streak", usage: [
 			"const rain = node.addComponent(ParticleSystem);",
-			"rain.setEmitterShape(EmitterShape.edge);",
-			"rain.setRenderShape(\"streak\");",
+			"rain.setEmitterShape(ParticleEmitterShape.edge);",
+			"rain.setRenderShape(ParticleRenderShape.streak);",
 			"rain.setStreakScale(0.03);",
 			"rain.setStartSpeed(500, 620);",
 			"rain.setEmissionRate(520);",
 		] },
 		{ key: "confetti", title: "CONFETTI", tag: "burst, rect", usage: [
 			"const confetti = node.addComponent(ParticleSystem);",
-			"confetti.setRenderShape(\"rect\");",
+			"confetti.setRenderShape(ParticleRenderShape.rect);",
 			"confetti.setAngularVelocity(1.6, 3.2);",
 			"confetti.setGravity(0, 460);",
 			"confetti.emit(40, burstPosition);",
 		] },
 		{ key: "explosion", title: "EXPLOSION", tag: "burst, mixed", usage: [
 			"const sparks = node.addComponent(ParticleSystem);",
-			"sparks.setRenderShape(\"streak\");",
+			"sparks.setRenderShape(ParticleRenderShape.streak);",
 			"sparks.setStreakScale(0.045);",
 			"sparks.setAdditive(true);",
 			"sparks.setDamping(2.2);",
@@ -144,7 +145,7 @@
 		] },
 		{ key: "firework", title: "FIREWORK", tag: "burst, additive", usage: [
 			"const burst = node.addComponent(ParticleSystem);",
-			"burst.setEmitterShape(EmitterShape.circle);",
+			"burst.setEmitterShape(ParticleEmitterShape.circle);",
 			"burst.setShapeRadius(4);",
 			"burst.setAdditive(true);",
 			"burst.setGravity(0, 150);",
@@ -152,28 +153,28 @@
 		] },
 		{ key: "sparkle", title: "SPARKLE", tag: "box, soft disc", usage: [
 			"const sparkle = node.addComponent(ParticleSystem);",
-			"sparkle.setEmitterShape(EmitterShape.box);",
+			"sparkle.setEmitterShape(ParticleEmitterShape.box);",
 			"sparkle.setBoxSize(stageWidth * 0.94, stageHeight * 0.86);",
 			"sparkle.setAdditive(true);",
 			"sparkle.setSizeOverLifetime(0.4, 1.3);",
 		] },
 		{ key: "embers", title: "EMBERS", tag: "rise, wobble", usage: [
 			"const embers = node.addComponent(ParticleSystem);",
-			"embers.setEmitterShape(EmitterShape.edge);",
+			"embers.setEmitterShape(ParticleEmitterShape.edge);",
 			"embers.setGravity(0, -85);",
 			"embers.setWobble(18, 1.8);",
 			"embers.setAdditive(true);",
 		] },
 		{ key: "bubbles", title: "BUBBLES", tag: "rise, sway", usage: [
 			"const bubbles = node.addComponent(ParticleSystem);",
-			"bubbles.setEmitterShape(EmitterShape.edge);",
+			"bubbles.setEmitterShape(ParticleEmitterShape.edge);",
 			"bubbles.setGravity(0, -75);",
 			"bubbles.setWobble(22, 2.4);",
 			"bubbles.setSizeOverLifetime(0.7, 1.15);",
 		] },
 		{ key: "vortex", title: "VORTEX", tag: "attractor", usage: [
 			"const vortex = node.addComponent(ParticleSystem);",
-			"vortex.setEmitterShape(EmitterShape.circle);",
+			"vortex.setEmitterShape(ParticleEmitterShape.circle);",
 			"vortex.setShapeRadius(280);",
 			"vortex.setAttractor(0, 0, 190, 260);",
 			"vortex.setDamping(0.35);",
@@ -187,8 +188,8 @@
 		] },
 		{ key: "meteor", title: "METEOR", tag: "streak, diagonal", usage: [
 			"const meteor = node.addComponent(ParticleSystem);",
-			"meteor.setEmitterShape(EmitterShape.edge);",
-			"meteor.setRenderShape(\"streak\");",
+			"meteor.setEmitterShape(ParticleEmitterShape.edge);",
+			"meteor.setRenderShape(ParticleRenderShape.streak);",
 			"meteor.setStreakScale(0.09);",
 			"meteor.setGravity(420, 340);",
 		] },
@@ -217,7 +218,7 @@
 		] },
 		{ key: "volcano", title: "VOLCANO", tag: "burst, scene", usage: [
 			"const lava = node.addComponent(ParticleSystem);",
-			"lava.setEmitterShape(EmitterShape.cone);",
+			"lava.setEmitterShape(ParticleEmitterShape.cone);",
 			"lava.setStartSpeed(320, 560);",
 			"lava.setGravity(0, 640);",
 			"// eruption every 1.7 seconds",
@@ -225,9 +226,9 @@
 		] },
 		{ key: "warp", title: "WARP", tag: "radial streak", usage: [
 			"const warp = node.addComponent(ParticleSystem);",
-			"warp.setEmitterShape(EmitterShape.circle);",
+			"warp.setEmitterShape(ParticleEmitterShape.circle);",
 			"warp.setShapeRadius(26);",
-			"warp.setRenderShape(\"streak\");",
+			"warp.setRenderShape(ParticleRenderShape.streak);",
 			"warp.setStreakScale(0.1);",
 			"warp.setStartSpeed(480, 880);",
 		] },
@@ -633,7 +634,7 @@
 			const baseY = STAGE_HEIGHT * 0.82;
 
 			const smoke = this.makeParticleNode("fire", modeRootNode, centerX, baseY - 50);
-			smoke.setEmitterShape(EmitterShape.circle);
+			smoke.setEmitterShape(ParticleEmitterShape.circle);
 			smoke.setShapeRadius(24);
 			smoke.setEmissionRate(34);
 			smoke.setStartLifetime(1.8, 3.0);
@@ -651,7 +652,7 @@
 			smoke.setMaxParticleCount(400);
 
 			const flame = this.makeParticleNode("fire", modeRootNode, centerX, baseY);
-			flame.setEmitterShape(EmitterShape.cone);
+			flame.setEmitterShape(ParticleEmitterShape.cone);
 			flame.setConeAngle(0.34);
 			flame.setShapeRadius(34);
 			flame.setEmissionRate(300);
@@ -671,7 +672,7 @@
 			flame.setMaxParticleCount(1200);
 
 			const sparks = this.makeParticleNode("fire", modeRootNode, centerX, baseY - 12);
-			sparks.setEmitterShape(EmitterShape.cone);
+			sparks.setEmitterShape(ParticleEmitterShape.cone);
 			sparks.setConeAngle(0.65);
 			sparks.setEmissionRate(46);
 			sparks.setStartLifetime(0.9, 1.8);
@@ -698,7 +699,7 @@
 			const baseY = STAGE_HEIGHT * 0.9;
 
 			const water = this.makeParticleNode("fountain", modeRootNode, centerX, baseY);
-			water.setEmitterShape(EmitterShape.cone);
+			water.setEmitterShape(ParticleEmitterShape.cone);
 			water.setConeAngle(0.22);
 			water.setEmissionRate(420);
 			water.setStartLifetime(1.5, 2.2);
@@ -715,7 +716,7 @@
 			water.setMaxParticleCount(2000);
 
 			const mist = this.makeParticleNode("fountain", modeRootNode, centerX, baseY - 210);
-			mist.setEmitterShape(EmitterShape.circle);
+			mist.setEmitterShape(ParticleEmitterShape.circle);
 			mist.setShapeRadius(70);
 			mist.setEmissionRate(18);
 			mist.setStartLifetime(1.4, 2.4);
@@ -738,7 +739,7 @@
 			const modeRootNode = this.makeModeRoot("snow");
 
 			const snow = this.makeParticleNode("snow", modeRootNode, STAGE_WIDTH * 0.5, -16);
-			snow.setEmitterShape(EmitterShape.edge);
+			snow.setEmitterShape(ParticleEmitterShape.edge);
 			snow.setEdgeWidth(STAGE_WIDTH * 1.1);
 			snow.setEmissionRate(170);
 			snow.setStartLifetime(7, 11);
@@ -764,19 +765,19 @@
 			const modeRootNode = this.makeModeRoot("rain");
 
 			const rain = this.makeParticleNode("rain", modeRootNode, STAGE_WIDTH * 0.5, -12);
-			rain.setEmitterShape(EmitterShape.edge);
+			rain.setEmitterShape(ParticleEmitterShape.edge);
 			rain.setEdgeWidth(STAGE_WIDTH * 1.2);
 			rain.setEmissionRate(520);
 			rain.setStartLifetime(1.1, 1.4);
 			rain.setStartSpeed(500, 620);
 			rain.setStartSize(1.4, 2.2);
-			rain.setRenderShape("streak");
+			rain.setRenderShape(ParticleRenderShape.streak);
 			rain.setStreakScale(0.03);
 			rain.setStartColor(new Color(0.62, 0.74, 0.95, 0.55), new Color(0.75, 0.85, 1, 0.35));
 			rain.setMaxParticleCount(2400);
 
 			const splash = this.makeParticleNode("rain", modeRootNode, STAGE_WIDTH * 0.5, STAGE_HEIGHT - 8);
-			splash.setEmitterShape(EmitterShape.edge);
+			splash.setEmitterShape(ParticleEmitterShape.edge);
 			splash.setEdgeWidth(STAGE_WIDTH * 1.05);
 			splash.setEmissionRate(240);
 			splash.setStartLifetime(0.25, 0.45);
@@ -804,14 +805,14 @@
 			for (const setup of confettiSetups) {
 				const confetti = this.makeParticleNode("confetti", modeRootNode, 0, 0);
 				confetti.setEmissionRate(0);
-				confetti.setEmitterShape(EmitterShape.circle);
+				confetti.setEmitterShape(ParticleEmitterShape.circle);
 				confetti.setShapeRadius(12);
 				confetti.setStartLifetime(1.8, 3.0);
 				confetti.setStartSpeed(160, 420);
 				confetti.setStartSize(4.5, 8);
 				confetti.setGravity(0, 460);
 				confetti.setDamping(1.4);
-				confetti.setRenderShape("rect");
+				confetti.setRenderShape(ParticleRenderShape.rect);
 				confetti.setStartRotation(0, System.Math.PI * 2);
 				confetti.setAngularVelocity(setup.spin[0], setup.spin[1]);
 				confetti.setWobble(10, 3);
@@ -833,7 +834,7 @@
 
 			const smoke = this.makeParticleNode("explosion", modeRootNode, 0, 0);
 			smoke.setEmissionRate(0);
-			smoke.setEmitterShape(EmitterShape.circle);
+			smoke.setEmitterShape(ParticleEmitterShape.circle);
 			smoke.setShapeRadius(26);
 			smoke.setStartLifetime(1.3, 2.4);
 			smoke.setStartSpeed(30, 130);
@@ -863,7 +864,7 @@
 
 			const sparks = this.makeParticleNode("explosion", modeRootNode, 0, 0);
 			sparks.setEmissionRate(0);
-			sparks.setEmitterShape(EmitterShape.circle);
+			sparks.setEmitterShape(ParticleEmitterShape.circle);
 			sparks.setShapeRadius(10);
 			sparks.setStartLifetime(0.5, 1.3);
 			sparks.setStartSpeed(260, 680);
@@ -871,7 +872,7 @@
 			sparks.setGravity(0, 360);
 			sparks.setDamping(2.2);
 			sparks.setAdditive(true);
-			sparks.setRenderShape("streak");
+			sparks.setRenderShape(ParticleRenderShape.streak);
 			sparks.setStreakScale(0.045);
 			sparks.setStartColor(new Color(1, 0.8, 0.35, 1), new Color(1, 0.5, 0.15, 1));
 			sparks.setColorOverLifetime([
@@ -895,7 +896,7 @@
 			for (const palette of paletteList) {
 				const burst = this.makeParticleNode("firework", modeRootNode, 0, 0);
 				burst.setEmissionRate(0);
-				burst.setEmitterShape(EmitterShape.circle);
+				burst.setEmitterShape(ParticleEmitterShape.circle);
 				burst.setShapeRadius(4);
 				burst.setStartLifetime(1.1, 2.0);
 				burst.setStartSpeed(130, 380);
@@ -920,7 +921,7 @@
 			const modeRootNode = this.makeModeRoot("sparkle");
 
 			const sparkle = this.makeParticleNode("sparkle", modeRootNode, STAGE_WIDTH * 0.5, STAGE_HEIGHT * 0.5);
-			sparkle.setEmitterShape(EmitterShape.box);
+			sparkle.setEmitterShape(ParticleEmitterShape.box);
 			sparkle.setBoxSize(STAGE_WIDTH * 0.94, STAGE_HEIGHT * 0.86);
 			sparkle.setEmissionRate(160);
 			sparkle.setStartLifetime(1.2, 2.6);
@@ -944,7 +945,7 @@
 			const modeRootNode = this.makeModeRoot("embers");
 
 			const embers = this.makeParticleNode("embers", modeRootNode, STAGE_WIDTH * 0.5, STAGE_HEIGHT - 4);
-			embers.setEmitterShape(EmitterShape.edge);
+			embers.setEmitterShape(ParticleEmitterShape.edge);
 			embers.setEdgeWidth(STAGE_WIDTH * 0.96);
 			embers.setEmissionRate(130);
 			embers.setStartLifetime(2.8, 4.6);
@@ -972,7 +973,7 @@
 			const modeRootNode = this.makeModeRoot("bubbles");
 
 			const bubbles = this.makeParticleNode("bubbles", modeRootNode, STAGE_WIDTH * 0.5, STAGE_HEIGHT - 6);
-			bubbles.setEmitterShape(EmitterShape.edge);
+			bubbles.setEmitterShape(ParticleEmitterShape.edge);
 			bubbles.setEdgeWidth(STAGE_WIDTH * 0.9);
 			bubbles.setEmissionRate(75);
 			bubbles.setStartLifetime(2.8, 4.8);
@@ -1001,7 +1002,7 @@
 			const centerY = STAGE_HEIGHT * 0.5;
 
 			const vortex = this.makeParticleNode("vortex", modeRootNode, centerX, centerY);
-			vortex.setEmitterShape(EmitterShape.circle);
+			vortex.setEmitterShape(ParticleEmitterShape.circle);
 			vortex.setShapeRadius(280);
 			vortex.setEmissionRate(360);
 			vortex.setStartLifetime(1.8, 3.4);
@@ -1022,7 +1023,7 @@
 
 			const core = this.makeParticleNode("vortex", modeRootNode, centerX, centerY);
 			core.setEmissionRate(30);
-			core.setEmitterShape(EmitterShape.circle);
+			core.setEmitterShape(ParticleEmitterShape.circle);
 			core.setShapeRadius(10);
 			core.setStartLifetime(0.5, 0.9);
 			core.setStartSpeed(0, 12);
@@ -1058,7 +1059,7 @@
 			coreTrail.setColors(new Color(0.45, 0.7, 1, 0.85), new Color(0.6, 0.4, 1, 0));
 			const sparkles = this.#trailNode.addComponent(ParticleSystem);
 			this.#modeSystemsMap.get("trail").push(sparkles);
-			sparkles.setEmitterShape(EmitterShape.circle);
+			sparkles.setEmitterShape(ParticleEmitterShape.circle);
 			sparkles.setShapeRadius(7);
 			sparkles.setEmissionRate(240);
 			sparkles.setStartLifetime(0.4, 1.1);
@@ -1082,14 +1083,14 @@
 			const modeRootNode = this.makeModeRoot("meteor");
 
 			const meteor = this.makeParticleNode("meteor", modeRootNode, STAGE_WIDTH * 0.18, -20);
-			meteor.setEmitterShape(EmitterShape.edge);
+			meteor.setEmitterShape(ParticleEmitterShape.edge);
 			meteor.setEdgeWidth(STAGE_WIDTH * 1.5);
 			meteor.setEmissionRate(7);
 			meteor.setStartLifetime(1.0, 1.5);
 			meteor.setStartSpeed(60, 130);
 			meteor.setStartSize(2, 3.6);
 			meteor.setGravity(420, 340);
-			meteor.setRenderShape("streak");
+			meteor.setRenderShape(ParticleRenderShape.streak);
 			meteor.setStreakScale(0.09);
 			meteor.setAdditive(true);
 			meteor.setStartColor(new Color(1, 0.92, 0.72, 1), new Color(0.8, 0.88, 1, 1));
@@ -1102,7 +1103,7 @@
 			meteor.setMaxParticleCount(60);
 
 			const dust = this.makeParticleNode("meteor", modeRootNode, STAGE_WIDTH * 0.5, STAGE_HEIGHT * 0.5);
-			dust.setEmitterShape(EmitterShape.box);
+			dust.setEmitterShape(ParticleEmitterShape.box);
 			dust.setBoxSize(STAGE_WIDTH * 0.94, STAGE_HEIGHT * 0.86);
 			dust.setEmissionRate(16);
 			dust.setStartLifetime(2.4, 4.2);
@@ -1125,7 +1126,7 @@
 			const modeRootNode = this.makeModeRoot("lightning");
 
 			const bolt = this.makeParticleNode("lightning", modeRootNode, 0, 0);
-			bolt.setEmitterShape(EmitterShape.point);
+			bolt.setEmitterShape(ParticleEmitterShape.point);
 			bolt.setEmissionRate(0);
 			bolt.setStartLifetime(0.2, 0.45);
 			bolt.setStartSpeed(0, 8);
@@ -1139,7 +1140,7 @@
 			bolt.setMaxParticleCount(700);
 
 			const flash = this.makeParticleNode("lightning", modeRootNode, 0, 0);
-			flash.setEmitterShape(EmitterShape.point);
+			flash.setEmitterShape(ParticleEmitterShape.point);
 			flash.setEmissionRate(0);
 			flash.setStartLifetime(0.18, 0.28);
 			flash.setStartSpeed(0, 0);
@@ -1153,7 +1154,7 @@
 			flash.setMaxParticleCount(8);
 
 			const sparks = this.makeParticleNode("lightning", modeRootNode, 0, 0);
-			sparks.setEmitterShape(EmitterShape.circle);
+			sparks.setEmitterShape(ParticleEmitterShape.circle);
 			sparks.setShapeRadius(4);
 			sparks.setEmissionRate(0);
 			sparks.setStartLifetime(0.4, 0.9);
@@ -1185,7 +1186,7 @@
 			];
 			for (let armIndex = 0; armIndex < 3; ++armIndex) {
 				const arm = this.makeParticleNode("galaxy", modeRootNode, centerX, centerY);
-				arm.setEmitterShape(EmitterShape.circle);
+				arm.setEmitterShape(ParticleEmitterShape.circle);
 				arm.setShapeRadius(7);
 				arm.setEmissionRate(240);
 				arm.setStartLifetime(2.2, 3.6);
@@ -1206,7 +1207,7 @@
 			}
 
 			const core = this.makeParticleNode("galaxy", modeRootNode, centerX, centerY);
-			core.setEmitterShape(EmitterShape.circle);
+			core.setEmitterShape(ParticleEmitterShape.circle);
 			core.setShapeRadius(10);
 			core.setEmissionRate(22);
 			core.setStartLifetime(0.6, 1.2);
@@ -1229,7 +1230,7 @@
 			const modeRootNode = this.makeModeRoot("swarm");
 
 			const swarm = this.makeParticleNode("swarm", modeRootNode, STAGE_WIDTH * 0.5, STAGE_HEIGHT * 0.5);
-			swarm.setEmitterShape(EmitterShape.circle);
+			swarm.setEmitterShape(ParticleEmitterShape.circle);
 			swarm.setShapeRadius(180);
 			swarm.setEmissionRate(220);
 			swarm.setStartLifetime(1.8, 3.2);
@@ -1257,7 +1258,7 @@
 			const craterY = STAGE_HEIGHT * 0.8;
 
 			const smoke = this.makeParticleNode("volcano", modeRootNode, craterX, craterY - 10);
-			smoke.setEmitterShape(EmitterShape.circle);
+			smoke.setEmitterShape(ParticleEmitterShape.circle);
 			smoke.setShapeRadius(20);
 			smoke.setEmissionRate(46);
 			smoke.setStartLifetime(2.2, 3.8);
@@ -1275,7 +1276,7 @@
 			smoke.setMaxParticleCount(300);
 
 			const lava = this.makeParticleNode("volcano", modeRootNode, craterX, craterY);
-			lava.setEmitterShape(EmitterShape.cone);
+			lava.setEmitterShape(ParticleEmitterShape.cone);
 			lava.setConeAngle(0.5);
 			lava.setShapeRadius(18);
 			lava.setEmissionRate(0);
@@ -1292,7 +1293,7 @@
 			lava.setMaxParticleCount(400);
 
 			const glow = this.makeParticleNode("volcano", modeRootNode, craterX, craterY - 4);
-			glow.setEmitterShape(EmitterShape.circle);
+			glow.setEmitterShape(ParticleEmitterShape.circle);
 			glow.setShapeRadius(26);
 			glow.setEmissionRate(90);
 			glow.setStartLifetime(0.5, 1.1);
@@ -1317,13 +1318,13 @@
 			const centerY = STAGE_HEIGHT * 0.5;
 
 			const warp = this.makeParticleNode("warp", modeRootNode, centerX, centerY);
-			warp.setEmitterShape(EmitterShape.circle);
+			warp.setEmitterShape(ParticleEmitterShape.circle);
 			warp.setShapeRadius(26);
 			warp.setEmissionRate(460);
 			warp.setStartLifetime(0.5, 0.9);
 			warp.setStartSpeed(480, 880);
 			warp.setStartSize(1.5, 3);
-			warp.setRenderShape("streak");
+			warp.setRenderShape(ParticleRenderShape.streak);
 			warp.setStreakScale(0.1);
 			warp.setAdditive(true);
 			warp.setStartColor(new Color(0.7, 0.85, 1, 1), new Color(0.92, 0.96, 1, 1));
@@ -1335,7 +1336,7 @@
 			warp.setMaxParticleCount(1400);
 
 			const coreGlow = this.makeParticleNode("warp", modeRootNode, centerX, centerY);
-			coreGlow.setEmitterShape(EmitterShape.circle);
+			coreGlow.setEmitterShape(ParticleEmitterShape.circle);
 			coreGlow.setShapeRadius(8);
 			coreGlow.setEmissionRate(18);
 			coreGlow.setStartLifetime(0.5, 1);

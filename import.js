@@ -167,7 +167,7 @@ export { SoundEffectPool } from "./src/core/soundeffectpool.js";
 export { GamepadManager } from "./src/core/gamepadmanager.js";
 export { AudioPlayer } from "./src/core/audioplayer.js";
 export { PopupMotion, PopupMotionState } from "./src/ui/popupmotion.js";
-export { ParticleSystem, EmitterShape } from "./src/effect/particlesystem.js";
+export { ParticleSystem, ParticleEmitterShape, ParticleRenderShape } from "./src/effect/particlesystem.js";
 export { TrailRenderer } from "./src/effect/trailrenderer.js";
 export { UIListView } from "./src/ui/uilistview.js";
 export { UILineChart, UIBarChart } from "./src/ui/uichart.js";

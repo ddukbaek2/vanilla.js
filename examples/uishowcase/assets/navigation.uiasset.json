@@ -161,7 +161,7 @@
 				"components": [
 					{
 						"type": "UILabel",
-						"text": "CONSOLE",
+						"text": "UI SHOWCASE",
 						"fontSize": 9,
 						"textColor": [
 							0.42,

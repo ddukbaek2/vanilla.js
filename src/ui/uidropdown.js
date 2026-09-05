@@ -6,6 +6,7 @@ import { WorldNode } from "../core/node/worldnode.js";
 import { Vector2 } from "../base/vector2.js";
 import { Color } from "../base/color.js";
 import { Pivot } from "../base/pivot.js";
+import * as Math from "../base/math.js";
 import { Paint } from "../core/component/paint.js";
 import { UILabel } from "./uilabel.js";
 import { UIButton } from "./uibutton.js";
@@ -172,14 +173,76 @@ export class UIDropdown extends WorldNode {
 
 	//==============================================================================
 	// 펼침 / 접힘.
+	// - 펼칠 때 목록을 트리 뿌리로 옮겨 나중에 그려지는 형제 노드에 가려지지 않게 한다. (접으면 되돌린다)
 	//==============================================================================
 	/**
 	 * @param { boolean } isOpen
 	 */
 	setOpen(isOpen) {
 		this.#isOpen = isOpen;
+		if (isOpen) {
+			this.attachPopupToRoot();
+		}
+		else {
+			this.detachPopupFromRoot();
+		}
 		this.#popupNode.setActive(isOpen);
 		this.#arrowLabel.setText(isOpen ? "▴" : "▾");
+	}
+
+	//==============================================================================
+	// 펼침 목록을 트리 뿌리로 이동. (머리 단추 아래 월드 위치를 뿌리 로컬 좌표로 환산)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	attachPopupToRoot() {
+		let rootNode = this;
+		while (rootNode.getParent()) {
+			rootNode = rootNode.getParent();
+		}
+		if (rootNode === this || !(rootNode instanceof WorldNode)) {
+			return;
+		}
+		const worldCorners = this.getWorldCorners();
+		const bottomLeft = worldCorners[3];
+		const rootPosition = rootNode.getPosition();
+		const rootContentSize = rootNode.getContentSize();
+		const rootPivot = rootNode.getPivot();
+		const rootScale = rootNode.getScale();
+		const rootRadian = Math.degreeToRadian(rootNode.getRotation());
+		const cosRadian = Math.cos(rootRadian);
+		const sinRadian = Math.sin(rootRadian);
+		const offsetX = bottomLeft.x - rootPosition.x;
+		const offsetY = bottomLeft.y + 4 - rootPosition.y;
+		const unrotatedX = offsetX * cosRadian + offsetY * sinRadian;
+		const unrotatedY = -offsetX * sinRadian + offsetY * cosRadian;
+		const safeScaleX = rootScale.x !== 0 ? rootScale.x : 1;
+		const safeScaleY = rootScale.y !== 0 ? rootScale.y : 1;
+		const localX = unrotatedX / safeScaleX + rootContentSize.x * rootPivot.x;
+		const localY = unrotatedY / safeScaleY + rootContentSize.y * rootPivot.y;
+		this.removeChild(this.#popupNode);
+		rootNode.addChild(this.#popupNode);
+		this.#popupNode.setLocalPosition(Vector2.create(localX, localY));
+	}
+
+	//==============================================================================
+	// 펼침 목록을 머리 단추 아래로 되돌림.
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	detachPopupFromRoot() {
+		const popupParent = this.#popupNode.getParent();
+		if (popupParent === this) {
+			return;
+		}
+		if (popupParent) {
+			popupParent.removeChild(this.#popupNode);
+		}
+		this.addChild(this.#popupNode);
+		const contentSize = this.getContentSize();
+		this.#popupNode.setLocalPosition(Vector2.create(0, contentSize.y + 4));
 	}
 
 	//==============================================================================

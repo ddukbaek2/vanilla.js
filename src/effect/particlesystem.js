@@ -18,12 +18,27 @@ import * as Math from "../base/math.js";
 // - box: 사각 영역 안 무작위 위치, 위쪽 방향.
 // - edge: 가로 선분 위 무작위 위치, 위쪽 방향. (눈 / 비처럼 위에서 뿌릴 때)
 //==============================================================================
-export const EmitterShape = {
+export const ParticleEmitterShape = {
 	point: "point",
 	circle: "circle",
 	cone: "cone",
 	box: "box",
 	edge: "edge",
+};
+
+
+//==============================================================================
+// 파티클 렌더 모양.
+// - circle: 부드러운 원. (기본)
+// - rect: 사각형. (색종이 조각처럼 회전하는 판)
+// - streak: 진행 방향으로 늘인 띠. (비 / 유성)
+// - image: setImage 로 넣은 이미지.
+//==============================================================================
+export const ParticleRenderShape = {
+	circle: "circle",
+	rect: "rect",
+	streak: "streak",
+	image: "image",
 };
 
 
@@ -97,7 +112,7 @@ export class ParticleSystem extends Component {
 	/** @private @type { number } */ #wobbleFrequency; // 살랑임 초당 각속도.
 
 	// 렌더.
-	/** @private @type { string } */ #renderShape; // "circle" | "rect" | "image" | "streak"
+	/** @private @type { string } */ #renderShape; // ParticleRenderShape 값.
 	/** @private @type { * } */ #image;
 	/** @private @type { string } */ #blendMode; // "source-over" | "lighter" | "multiply" | "screen"
 	/** @private @type { number } */ #streakScale; // streak 길이 = 속도 x 이 값.
@@ -124,7 +139,7 @@ export class ParticleSystem extends Component {
 		this.#emissionRate = 20;
 		this.#emissionAccumulator = 0;
 		this.#burstList = [];
-		this.#emitterShape = EmitterShape.point;
+		this.#emitterShape = ParticleEmitterShape.point;
 		this.#shapeRadius = 0;
 		this.#coneAngleRadian = 0.5;
 		this.#boxSize = Vector2.create(0, 0);
@@ -155,7 +170,7 @@ export class ParticleSystem extends Component {
 		this.#attractorSwirl = 0;
 		this.#wobbleAmplitude = 0;
 		this.#wobbleFrequency = 4;
-		this.#renderShape = "circle";
+		this.#renderShape = ParticleRenderShape.circle;
 		this.#image = null;
 		this.#blendMode = "source-over";
 		this.#streakScale = 0.06;
@@ -289,7 +304,7 @@ export class ParticleSystem extends Component {
 		let directionX = 0;
 		let directionY = -1;
 		const shape = this.#emitterShape;
-		if (shape === EmitterShape.circle) {
+		if (shape === ParticleEmitterShape.circle) {
 			const angle = Math.randomRange(0, System.Math.PI * 2);
 			const radius = this.#shapeRadius * System.Math.sqrt(Math.randomRange(0, 1));
 			spawnX = System.Math.cos(angle) * radius;
@@ -297,7 +312,7 @@ export class ParticleSystem extends Component {
 			directionX = System.Math.cos(angle);
 			directionY = System.Math.sin(angle);
 		}
-		else if (shape === EmitterShape.cone) {
+		else if (shape === ParticleEmitterShape.cone) {
 			const angle = -System.Math.PI * 0.5 + Math.randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
 			const radius = Math.randomRange(0, this.#shapeRadius);
 			spawnX = System.Math.cos(angle) * radius;
@@ -305,11 +320,11 @@ export class ParticleSystem extends Component {
 			directionX = System.Math.cos(angle);
 			directionY = System.Math.sin(angle);
 		}
-		else if (shape === EmitterShape.box) {
+		else if (shape === ParticleEmitterShape.box) {
 			spawnX = Math.randomRange(-this.#boxSize.x * 0.5, this.#boxSize.x * 0.5);
 			spawnY = Math.randomRange(-this.#boxSize.y * 0.5, this.#boxSize.y * 0.5);
 		}
-		else if (shape === EmitterShape.edge) {
+		else if (shape === ParticleEmitterShape.edge) {
 			spawnX = Math.randomRange(-this.#edgeWidth * 0.5, this.#edgeWidth * 0.5);
 			directionY = 1;
 		}
@@ -420,7 +435,7 @@ export class ParticleSystem extends Component {
 			baseOffsetY = -nodePosition.y;
 		}
 
-		if (this.#renderShape === "image" && this.#image) {
+		if (this.#renderShape === ParticleRenderShape.image && this.#image) {
 			this.drawImageParticles(graphic, baseOffsetX, baseOffsetY);
 		}
 		else {
@@ -445,8 +460,8 @@ export class ParticleSystem extends Component {
 		const particleCount = this.#particleList.length;
 		const vertexData = graphic.getParticleVertexData(particleCount * 48);
 		const colorChannels = this.#colorChannelBuffer;
-		const isStreak = this.#renderShape === "streak";
-		const isRect = this.#renderShape === "rect";
+		const isStreak = this.#renderShape === ParticleRenderShape.streak;
+		const isRect = this.#renderShape === ParticleRenderShape.rect;
 		let floatOffset = 0;
 
 		const writeVertex = (x, y, u, v) => {
@@ -520,7 +535,7 @@ export class ParticleSystem extends Component {
 			}
 		}
 
-		const texture = (this.#renderShape === "circle") ? graphic.getSoftDiscTexture() : graphic.getWhiteTexture();
+		const texture = (this.#renderShape === ParticleRenderShape.circle) ? graphic.getSoftDiscTexture() : graphic.getWhiteTexture();
 		graphic.drawColoredQuads(floatOffset / 8, texture);
 	}
 
@@ -567,7 +582,7 @@ export class ParticleSystem extends Component {
 		});
 	}
 
-	/** @param { string } emitterShape EmitterShape 값. */
+	/** @param { string } emitterShape ParticleEmitterShape 값. */
 	setEmitterShape(emitterShape) {
 		this.#emitterShape = emitterShape;
 	}
@@ -651,12 +666,12 @@ export class ParticleSystem extends Component {
 		this.#damping = damping;
 	}
 
-	/** @param { string } renderShape "circle" | "rect" | "image" */
+	/** @param { string } renderShape ParticleRenderShape 값. */
 	setRenderShape(renderShape) {
 		this.#renderShape = renderShape;
 	}
 
-	/** @param { * } image 엔진 이미지. (renderShape "image" 전용) */
+	/** @param { * } image 엔진 이미지. (renderShape image 전용) */
 	setImage(image) {
 		this.#image = image;
 	}

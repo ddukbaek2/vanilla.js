@@ -25,3 +25,10 @@
 - 샘플: WIREFRAME 옵션(8, 깊이 프리패스 + 폴리곤 오프셋으로 앞면 모서리만), MATERIAL GRAPH 옵션(9, 좌측 노드 패널 — 원본 / 노화 텍스처 축소본, 표면 / 조명 파라미터 실시간 값, G-버퍼 3장 · SSS · HDR 버퍼 블릿 미리보기, 옵션 상태에 따라 노드 명암).
 - ddukbaek2.com 루트 페이지 샘플 목록에 Old Face 항목 추가(백업 index.html.backup-20260905b).
 - 검증: 크롬 1개씩 캡처 직후 종료 확인(잔여 0).
+
+## 파티클 열거형 개명 + UI 쇼케이스 수정
+[19:00 요청 → 19:10 응답]
+- ParticleSystem: EmitterShape → ParticleEmitterShape, 문자열 renderShape → ParticleRenderShape 열거형(값은 기존 문자열 유지 — vfx JSON 호환). import.js / EFFECTS 샘플(사용 코드 문자열 포함) / 파티클 편집기 번들 갱신. EFFECTS 헤드리스 캡처로 확인.
+- UIDropdown: 펼침 목록이 뒤에 그려지는 형제 노드에 가려지던 문제 → 펼칠 때 목록을 트리 뿌리로 옮기고(월드 → 뿌리 로컬 환산) 접으면 되돌림. 형제 패널이 덮는 테스트 씬으로 확인.
+- UI 쇼케이스: 내비게이션 캡션 CONSOLE → UI SHOWCASE (페이지 제목은 이미 UI Showcase).
+- 배포: portfolio/effects, particleeditor, uishowcase(navigation.uiasset.json + index.html + vanilla.js), oldface vanilla.js.
