@@ -1,5 +1,21 @@
 # 업데이트 기록
 
+# 0.5.0-experimental (2026-09-05)
+- OLD FACE 샘플 추가 (examples/oldface) — 실사 두상 스캔(Lee Perry-Smith, CC BY 3.0)을 노인으로 렌더링
+  - 선형 HDR 피부 파이프라인: 섀도우 깊이 → 피부 MRT(조도 / 알베도 / 스펙큘러) → 화면 공간 SSS → 합성 → 블룸 → ACES 톤 매핑 → FXAA
+  - 텍스처 노화(흰 수염 / 눈썹, 창백한 피부톤, 홍조, 검버섯, 주름 골 노멀)와 처짐 모프를 CPU 에서 생성
+  - 절차적 모프 타깃 10종으로 페이스 애니메이션 (호흡 / 눈 찡그림 / 눈썹 / 미소 / 턱 / 포인터를 따라가는 머리 회전)
+  - 렌더링 옵션 패널(숫자 키) + 우측 하단 렌더링 정보(fps / 프레임 시간 / 해상도 / 삼각형 / 정점 / 드로우 콜 / 모프 수)
+- experimental/graphics
+  - HumanSkinRenderer 추가 (SkinnedModelRenderer 파생 — 3점 조명 + 3색 반구 앰비언트 + 소프트박스 반사 환경,
+    탄젠트 노멀 + 4K 높이 미분 디테일 + 캐비티, 피부 F0 이중 로브 GGX + 잔털, 조도 / 알베도 / 스펙큘러 MRT 출력)
+  - SubsurfaceScatteringEffect 추가 (분리형 화면 공간 SSS — 피부 확산 프로파일 커널, 깊이 인식, 산란 폭 투영)
+  - SkinnedModel: 스킨 없는 정적 메시 로드(합성 스킨), 모프 타깃(glTF targets / weights 애니메이션 + addMorphTarget / setMorphWeight),
+    드로어블에 메시 CPU 데이터 유지, setMaterial 추가
+  - SkinnedModelRenderer: 프래그먼트 셰이더 주입 생성자, 모프 타깃 버텍스 경로(실수 텍스처 + gl_VertexID)
+  - Material: sRGB 색 텍스처(SRGB8_ALPHA8), 캔버스 소스 이미지, 이방성 필터, 추가 텍스처 슬롯(setTexture), URL 이미지 서술 로더
+  - RenderTarget: 다중 컬러 어태치먼트(MRT), RGBA16F 실수 컬러, 깊이 텍스처 옵션
+
 # 0.4.1-experimental (2026-09-03)
 - Graphic: 정점 버퍼 올리기를 bufferSubData 덮어쓰기에서 bufferData 고아 처리로 교체 (drawVertices / drawColoredQuads)
   — 사파리(ANGLE → Metal)는 GPU 가 아직 읽는 버퍼를 덮어쓰면 드로우 콜마다 CPU 를 세워, 드로우 콜 45 · 정점 1000 남짓에도

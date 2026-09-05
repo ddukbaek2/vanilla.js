@@ -34,6 +34,12 @@ const TYPE_COMPONENT_COUNT_TABLE = {
 	MAT4: 16,
 };
 
+// 모프 타깃 텍스처 가로 크기. (정점 델타를 실수 텍스처에 행 단위로 적재 — 버텍스 셰이더가 gl_VertexID 로 조회)
+const MORPH_TEXTURE_WIDTH = 2048;
+
+// 드로어블당 모프 타깃 최대 개수. (셰이더 유니폼 배열 크기와 일치)
+export const MORPH_TARGET_MAXIMUM = 32;
+
 
 //==============================================================================
 // 전역 함수 목록.
@@ -100,7 +106,8 @@ function convertFbxAnimationChannels(sceneData, fbxAnimation, resolveNodeIndex) 
 //==============================================================================
 // 스킨드 모델. (모델 인스턴스 — 메시/본/스킨/머티리얼/애니메이션 데이터 + 포즈 상태)
 // - GLB(바이너리 glTF)와 바이너리 FBX 를 공통 중립 스키마로 해석해 GL 리소스를 구성한다.
-// - 애니메이션 크로스페이드와 조인트 회전 오프셋(절차 포즈 가공)을 지원한다.
+// - 스킨 없는 정적 메시는 합성 스킨(조인트 1개)으로, 모프 타깃은 실수 텍스처로 올려 같은 스키닝 경로로 그린다.
+// - 애니메이션 크로스페이드와 조인트 회전 오프셋(절차 포즈 가공), 모프 가중치(glTF weights / 프로그램)를 지원한다.
 // - 렌더링은 SkinnedModelRenderer 가 담당한다. (모델은 렌더 기능을 갖지 않는다)
 //==============================================================================
 export class SkinnedModel extends Object {
@@ -327,28 +334,53 @@ export class SkinnedModel extends Object {
 			return description;
 		});
 
-		// 중립 메시 서술 구성. (스킨드 메시 노드의 프리미티브 — 접근자를 CPU 배열로 펼침)
+		// 중립 메시 서술 구성. (메시 노드의 프리미티브 — 접근자를 CPU 배열로 펼침)
+		// - 스킨 없는 정적 메시는 노드 자신을 유일한 조인트로 갖는 합성 스킨을 붙여 같은 스키닝 경로로 그린다.
 		const meshDescriptionList = [];
-		for (const node of this.#nodeList) {
-			if (node.meshIndex === undefined || node.skinIndex === undefined) {
+		for (let nodeIndex = 0; nodeIndex < this.#nodeList.length; ++nodeIndex) {
+			const node = this.#nodeList[nodeIndex];
+			if (node.meshIndex === undefined) {
 				continue;
 			}
 			const mesh = json.meshes[node.meshIndex];
+			const isStaticMesh = node.skinIndex === undefined;
+			if (isStaticMesh) {
+				this.#skinList.push({
+					jointNodeIndices: [nodeIndex],
+					inverseBindMatrices: [Matrix4.createIdentity()],
+					jointMatrixArray: new System.Float32Array(16),
+				});
+				node.skinIndex = this.#skinList.length - 1;
+			}
+			const targetNameList = mesh.extras && mesh.extras.targetNames ? mesh.extras.targetNames : [];
+			const baseMorphWeights = node.weights ? node.weights : (mesh.weights ? mesh.weights : []);
 			for (const primitive of mesh.primitives) {
 				const positions = new System.Float32Array(readAccessorArray(primitive.attributes.POSITION));
+				const vertexCount = positions.length / 3;
 				const normals = primitive.attributes.NORMAL !== undefined ? new System.Float32Array(readAccessorArray(primitive.attributes.NORMAL)) : null;
 				const textureCoordinates = primitive.attributes.TEXCOORD_0 !== undefined ? new System.Float32Array(readAccessorArray(primitive.attributes.TEXCOORD_0)) : null;
-				const joints = new System.Uint16Array(readAccessorArray(primitive.attributes.JOINTS_0));
-				const weightAccessor = json.accessors[primitive.attributes.WEIGHTS_0];
-				const weightSource = readAccessorArray(primitive.attributes.WEIGHTS_0);
-				const weights = new System.Float32Array(weightSource.length);
-				if (weightAccessor.componentType === 5126) {
-					weights.set(weightSource);
+				let joints = null;
+				let weights = null;
+				if (isStaticMesh) {
+					joints = new System.Uint16Array(vertexCount * 4);
+					weights = new System.Float32Array(vertexCount * 4);
+					for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
+						weights[vertexIndex * 4] = 1;
+					}
 				}
 				else {
-					const normalizeDivisor = weightAccessor.componentType === 5121 ? 255 : 65535;
-					for (let weightIndex = 0; weightIndex < weightSource.length; ++weightIndex) {
-						weights[weightIndex] = weightSource[weightIndex] / normalizeDivisor;
+					joints = new System.Uint16Array(readAccessorArray(primitive.attributes.JOINTS_0));
+					const weightAccessor = json.accessors[primitive.attributes.WEIGHTS_0];
+					const weightSource = readAccessorArray(primitive.attributes.WEIGHTS_0);
+					weights = new System.Float32Array(weightSource.length);
+					if (weightAccessor.componentType === 5126) {
+						weights.set(weightSource);
+					}
+					else {
+						const normalizeDivisor = weightAccessor.componentType === 5121 ? 255 : 65535;
+						for (let weightIndex = 0; weightIndex < weightSource.length; ++weightIndex) {
+							weights[weightIndex] = weightSource[weightIndex] / normalizeDivisor;
+						}
 					}
 				}
 				let indices = null;
@@ -356,6 +388,25 @@ export class SkinnedModel extends Object {
 					const indexSource = readAccessorArray(primitive.indices);
 					indices = indexSource instanceof System.Uint8Array ? new System.Uint16Array(indexSource) : indexSource;
 				}
+
+				// 모프 타깃. (위치 델타 필수, 노멀 델타 선택 — 이름은 mesh.extras.targetNames)
+				const morphTargets = [];
+				const primitiveTargets = primitive.targets ? primitive.targets : [];
+				for (let targetIndex = 0; targetIndex < primitiveTargets.length; ++targetIndex) {
+					const target = primitiveTargets[targetIndex];
+					if (target.POSITION === undefined) {
+						continue;
+					}
+					const positionDeltas = new System.Float32Array(readAccessorArray(target.POSITION));
+					const normalDeltas = target.NORMAL !== undefined ? new System.Float32Array(readAccessorArray(target.NORMAL)) : null;
+					const targetName = targetNameList[targetIndex] !== undefined ? targetNameList[targetIndex] : `target${targetIndex}`;
+					morphTargets.push({ name: targetName, positionDeltas: positionDeltas, normalDeltas: normalDeltas });
+				}
+				const morphWeights = new System.Float32Array(morphTargets.length);
+				for (let weightIndex = 0; weightIndex < morphTargets.length; ++weightIndex) {
+					morphWeights[weightIndex] = baseMorphWeights[weightIndex] !== undefined ? baseMorphWeights[weightIndex] : 0;
+				}
+
 				meshDescriptionList.push({
 					positions: positions,
 					normals: normals,
@@ -365,6 +416,9 @@ export class SkinnedModel extends Object {
 					indices: indices,
 					skinIndex: node.skinIndex,
 					materialIndex: primitive.material !== undefined ? primitive.material : -1,
+					nodeIndex: nodeIndex,
+					morphTargets: morphTargets,
+					morphWeights: morphWeights,
 				});
 			}
 		}
@@ -569,6 +623,9 @@ export class SkinnedModel extends Object {
 				indices: null,
 				skinIndex: skinListIndex,
 				materialIndex: materialIndex,
+				nodeIndex: ownerNode ? sceneData.nodeList.indexOf(ownerNode) : -1,
+				morphTargets: [],
+				morphWeights: new System.Float32Array(0),
 			});
 		}
 
@@ -665,6 +722,7 @@ export class SkinnedModel extends Object {
 			webGL2RenderingContext.bindVertexArray(null);
 
 			const material = meshDescription.materialIndex >= 0 && materialList[meshDescription.materialIndex] ? materialList[meshDescription.materialIndex] : defaultMaterial;
+			const morphTargetList = meshDescription.morphTargets ? meshDescription.morphTargets.slice() : [];
 			this.#drawableList.push({
 				vertexArray: vertexArray,
 				isIndexed: isIndexed,
@@ -674,8 +732,148 @@ export class SkinnedModel extends Object {
 				vertexCount: meshDescription.positions.length / 3,
 				material: material,
 				skinIndex: meshDescription.skinIndex,
+				nodeIndex: meshDescription.nodeIndex !== undefined ? meshDescription.nodeIndex : -1,
+				meshDescription: meshDescription,
+				morphTargetList: morphTargetList,
+				morphWeights: meshDescription.morphWeights ? new System.Float32Array(meshDescription.morphWeights) : new System.Float32Array(0),
+				morphTexture: null,
+				morphRowsPerTarget: 0,
+				morphTextureWidth: 0,
+				isMorphDirty: morphTargetList.length > 0,
 			});
 		}
+	}
+
+	//==============================================================================
+	// 모프 타깃 업로드. (드로어블의 델타 목록 → RGBA32F 텍스처, 타깃마다 위치 블록 + 노멀 블록)
+	// - 텍셀 인덱스 = 정점 인덱스. 블록 시작 행 = 타깃 인덱스 x 2 x 타깃당 행 수.
+	//==============================================================================
+	/**
+	 * @param { object } drawable
+	 */
+	uploadMorphTargets(drawable) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const targetCount = drawable.morphTargetList.length;
+		if (targetCount === 0) {
+			if (drawable.morphTexture) {
+				webGL2RenderingContext.deleteTexture(drawable.morphTexture);
+				drawable.morphTexture = null;
+			}
+			drawable.isMorphDirty = false;
+			return;
+		}
+		const vertexCount = drawable.vertexCount;
+		const textureWidth = System.Math.min(vertexCount, MORPH_TEXTURE_WIDTH);
+		const rowsPerTarget = System.Math.ceil(vertexCount / textureWidth);
+		const textureHeight = rowsPerTarget * 2 * targetCount;
+		const texelData = new System.Float32Array(textureWidth * textureHeight * 4);
+		for (let targetIndex = 0; targetIndex < targetCount; ++targetIndex) {
+			const morphTarget = drawable.morphTargetList[targetIndex];
+			const positionBlockOffset = targetIndex * 2 * rowsPerTarget * textureWidth;
+			const normalBlockOffset = positionBlockOffset + rowsPerTarget * textureWidth;
+			for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
+				const positionTexelOffset = (positionBlockOffset + vertexIndex) * 4;
+				texelData[positionTexelOffset] = morphTarget.positionDeltas[vertexIndex * 3];
+				texelData[positionTexelOffset + 1] = morphTarget.positionDeltas[vertexIndex * 3 + 1];
+				texelData[positionTexelOffset + 2] = morphTarget.positionDeltas[vertexIndex * 3 + 2];
+				if (morphTarget.normalDeltas) {
+					const normalTexelOffset = (normalBlockOffset + vertexIndex) * 4;
+					texelData[normalTexelOffset] = morphTarget.normalDeltas[vertexIndex * 3];
+					texelData[normalTexelOffset + 1] = morphTarget.normalDeltas[vertexIndex * 3 + 1];
+					texelData[normalTexelOffset + 2] = morphTarget.normalDeltas[vertexIndex * 3 + 2];
+				}
+			}
+		}
+		if (!drawable.morphTexture) {
+			drawable.morphTexture = webGL2RenderingContext.createTexture();
+		}
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, drawable.morphTexture);
+		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA32F, textureWidth, textureHeight, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.FLOAT, texelData);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+		drawable.morphRowsPerTarget = rowsPerTarget;
+		drawable.morphTextureWidth = textureWidth;
+		drawable.isMorphDirty = false;
+	}
+
+	//==============================================================================
+	// 모프 타깃 추가. (프로그램 생성 — 정점별 위치 델타 [+ 노멀 델타], 다음 update() 에서 업로드)
+	//==============================================================================
+	/**
+	 * @param { number } drawableIndex
+	 * @param { string } targetName
+	 * @param { Float32Array } positionDeltas
+	 * @param { Float32Array | null } normalDeltas
+	 */
+	addMorphTarget(drawableIndex, targetName, positionDeltas, normalDeltas = null) {
+		const drawable = this.#drawableList[drawableIndex];
+		if (!drawable) {
+			throw new Error(`SkinnedModel: drawable ${drawableIndex} not found.`);
+		}
+		if (drawable.morphTargetList.length >= MORPH_TARGET_MAXIMUM) {
+			throw new Error(`SkinnedModel: morph target limit ${MORPH_TARGET_MAXIMUM} exceeded.`);
+		}
+		if (positionDeltas.length !== drawable.vertexCount * 3) {
+			throw new Error(`SkinnedModel: morph target "${targetName}" delta count mismatch.`);
+		}
+		drawable.morphTargetList.push({ name: targetName, positionDeltas: positionDeltas, normalDeltas: normalDeltas });
+		const morphWeights = new System.Float32Array(drawable.morphTargetList.length);
+		morphWeights.set(drawable.morphWeights);
+		drawable.morphWeights = morphWeights;
+		drawable.isMorphDirty = true;
+	}
+
+	//==============================================================================
+	// 모프 가중치 설정. (이름 일치 타깃 전부 — 드로어블 여러 개가 같은 이름을 가질 수 있음)
+	//==============================================================================
+	/**
+	 * @param { string } targetName
+	 * @param { number } weight
+	 */
+	setMorphWeight(targetName, weight) {
+		for (const drawable of this.#drawableList) {
+			for (let targetIndex = 0; targetIndex < drawable.morphTargetList.length; ++targetIndex) {
+				if (drawable.morphTargetList[targetIndex].name === targetName) {
+					drawable.morphWeights[targetIndex] = weight;
+				}
+			}
+		}
+	}
+
+	//==============================================================================
+	// 모프 가중치 반환. (첫 일치 타깃 — 없으면 0)
+	//==============================================================================
+	/**
+	 * @param { string } targetName
+	 * @returns { number }
+	 */
+	getMorphWeight(targetName) {
+		for (const drawable of this.#drawableList) {
+			for (let targetIndex = 0; targetIndex < drawable.morphTargetList.length; ++targetIndex) {
+				if (drawable.morphTargetList[targetIndex].name === targetName) {
+					return drawable.morphWeights[targetIndex];
+				}
+			}
+		}
+		return 0;
+	}
+
+	//==============================================================================
+	// 머티리얼 교체. (드로어블 단위 — 외부 텍스처로 만든 머티리얼 인스턴스 적용)
+	//==============================================================================
+	/**
+	 * @param { number } drawableIndex
+	 * @param { Material } material
+	 */
+	setMaterial(drawableIndex, material) {
+		const drawable = this.#drawableList[drawableIndex];
+		if (!drawable) {
+			throw new Error(`SkinnedModel: drawable ${drawableIndex} not found.`);
+		}
+		drawable.material = material;
 	}
 
 	//==============================================================================
@@ -850,6 +1048,23 @@ export class SkinnedModel extends Object {
 					targetArray[componentIndex] = targetArray[componentIndex] + (sampledValue - targetArray[componentIndex]) * blendWeight;
 				}
 			}
+			else if (channel.path === "weights") {
+				// 모프 가중치. (키마다 타깃 개수만큼의 값 — 해당 노드의 드로어블 전부에 적용)
+				for (const drawable of this.#drawableList) {
+					if (drawable.nodeIndex !== channel.nodeIndex) {
+						continue;
+					}
+					const targetCount = drawable.morphWeights.length;
+					const baseOffset = frameIndex * targetCount;
+					const nextOffset = nextIndex * targetCount;
+					for (let targetIndex = 0; targetIndex < targetCount; ++targetIndex) {
+						const fromValue = channel.values[baseOffset + targetIndex];
+						const toValue = channel.values[nextOffset + targetIndex];
+						const sampledValue = fromValue + (toValue - fromValue) * factor;
+						drawable.morphWeights[targetIndex] = drawable.morphWeights[targetIndex] + (sampledValue - drawable.morphWeights[targetIndex]) * blendWeight;
+					}
+				}
+			}
 		}
 	}
 
@@ -939,6 +1154,13 @@ export class SkinnedModel extends Object {
 				jointMatrix.multiply(skin.inverseBindMatrices[jointIndex]);
 				const jointElements = jointMatrix.getElements();
 				skin.jointMatrixArray.set(jointElements, jointIndex * 16);
+			}
+		}
+
+		// 6. 모프 타깃 업로드. (추가/변경된 드로어블만)
+		for (const drawable of this.#drawableList) {
+			if (drawable.isMorphDirty) {
+				this.uploadMorphTargets(drawable);
 			}
 		}
 	}

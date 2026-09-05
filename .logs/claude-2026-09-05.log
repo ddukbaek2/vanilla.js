@@ -1,0 +1,18 @@
+# 2026-09-05 작업 로그
+
+## OLD FACE 샘플 신설 (실사 노인 두상 렌더링 + 페이스 애니메이션 + 렌더링 정보)
+[17:05 요청 → 18:30 응답]
+- 요청: "old face" 샘플 추가 — 엔진 역량 총동원, 없는 기능도 추가해 AAA 급 극실사 노인을 머리 / 얼굴 / 목 / 어깨까지 렌더링. 추가 요청: 언리얼엔진급 렌더링, 페이스 애니메이션, 우측 하단 렌더링 정보.
+- 애셋: three.js 저장소의 Lee Perry-Smith 두상 스캔(Infinite-Realities, CC BY 3.0) — 정적 메시 9,279 정점 / 17,684 삼각형, 알베도 / 스펙큘러 / 노멀 1K + 디스플레이스먼트 4K. 눈 감은 스캔, 민머리. UV 는 V 반전(flipY 업로드), 좌표계 Y 위 / Z 정면 확인 후 랜드마크 3D 좌표 산출.
+- 엔진 추가 (experimental/graphics):
+  - RenderTarget: MRT / RGBA16F / 깊이 텍스처 옵션.
+  - Material: sRGB 색 텍스처, 캔버스 소스, 이방성 필터, 추가 텍스처 슬롯(setTexture), URL 이미지 서술 로더(loadImageDescription).
+  - SkinnedModel: 스킨 없는 정적 메시(합성 스킨), 모프 타깃(glTF targets / weights 채널 + addMorphTarget / setMorphWeight, RGBA32F 텍스처 + gl_VertexID), 드로어블 meshDescription 유지, setMaterial.
+  - SkinnedModelRenderer: 프래그먼트 셰이더 주입 생성자, 모프 GLSL 을 본 / 깊이 버텍스 셰이더에 삽입.
+  - HumanSkinRenderer(신규): 선형 HDR 피부 셰이딩 — 3점 조명(키 섀도우) + 3색 반구 + 소프트박스 환경, 노멀 + 4K 높이 미분 디테일 + 캐비티, 이중 로브 GGX + 잔털, 조도 / 알베도 / 스펙큘러 MRT.
+  - SubsurfaceScatteringEffect(신규): 분리형 화면 공간 SSS(피부 확산 프로파일 커널, 깊이 인식, 산란 폭 투영). 렌더 후 유닛 1 해제(섀도우 샘플러 충돌 방지).
+- 샘플 (examples/oldface/index.html): 섀도우 깊이 → 피부 MRT → SSS → 합성 → 블룸 → ACES / 비네트 / 그레인 → FXAA → HUD. CPU 텍스처 노화(흰 수염 / 눈썹, 피부톤, 홍조, 검버섯, 유기적 주름 선 → 노멀 골), 절차적 모프 10종(눈썹 올림 / 찌푸림 / 눈 찡그림 / 턱 / 미소 / 머리 요 · 피치 · 롤 / 호흡 / 노화 처짐 + 팔자 접힘), 퍼포먼스 상태기(호흡 · 눈 찡그림 · 표정 이벤트 · 포인터 추적 머리 회전), 드래그 궤도 / 휠 줌, 옵션 패널 7종(숫자 키), 우측 하단 렌더링 정보 패널(fps / 프레임 / 해상도 / 삼각형 / 정점 / 드로우 콜 / 모프 수), CC BY 저작자 표기.
+- 검증: 스모크(정적 로드 / MRT / SSS / 모프 / 표준 렌더러 셰이더 컴파일) → 샘플 헤드리스 캡처 5회 반복 튜닝(주름 페인팅 느낌 제거, 노출 / 블룸 / 그레인 조정, 팔자 접힘 모프) → soldier / fox GLB 회귀 통과.
+- 발견: 엔진 Graphic HUD 는 3D 패스가 켠 CULL_FACE 를 끄고 그려야 텍스트 쿼드가 컬링되지 않는다(도형은 살아남고 텍스트만 사라지는 증상). 헤드리스 크롬은 user-data-dir 을 재사용하면 기존 인스턴스로 위임돼 새 페이지가 안 뜬다.
+- 배포: NAS portfolio/oldface (index.html / favicon.svg / vanilla.js / assets). UPDATE.md 0.5.0-experimental 기록.
+- 미해결 / 후속: 노화 알베도를 이미지 생성(나노바나나)으로 만들면 주름 · 피부 결이 더 자연스러워질 수 있음(사용자 허락 필요). 귀 투과광(두께 맵 없음)은 미구현.

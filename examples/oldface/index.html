@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<title>vanilla.js - OLD FACE</title>
+	<link rel="icon" href="./favicon.svg">
+	<style>
+		html, body {
+			margin: 0;
+			padding: 0;
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+			background: #08080a;
+			touch-action: none;
+			-webkit-user-select: none;
+			user-select: none;
+			-webkit-touch-callout: none;
+		}
+		#mainCanvas {
+			position: absolute;
+			left: 0;
+			top: 0;
+			width: 100%;
+			height: 100%;
+			display: block;
+			cursor: grab;
+		}
+		#mainCanvas.dragging {
+			cursor: grabbing;
+		}
+		#titleOverlay {
+			position: absolute;
+			left: 50%;
+			top: 7%;
+			transform: translateX(-50%);
+			text-align: center;
+			pointer-events: none;
+			user-select: none;
+			font-family: "Segoe UI Light", "Segoe UI", "Malgun Gothic", sans-serif;
+			animation: titleEntrance 3.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+		}
+		#titleMain {
+			font-size: clamp(26px, 5vw, 58px);
+			font-weight: 200;
+			letter-spacing: 0.5em;
+			text-indent: 0.5em;
+			color: #f2ece2;
+			text-shadow: 0 2px 18px rgba(0, 0, 0, 0.85), 0 0 42px rgba(255, 214, 170, 0.18);
+		}
+		#titleDivider {
+			width: min(240px, 40vw);
+			height: 1px;
+			margin: 14px auto 12px;
+			background: linear-gradient(90deg, transparent, rgba(242, 236, 226, 0.7), transparent);
+		}
+		#titleSub {
+			font-size: clamp(9px, 1.2vw, 12px);
+			font-weight: 300;
+			letter-spacing: 0.85em;
+			text-indent: 0.85em;
+			color: rgba(230, 226, 220, 0.78);
+			text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+		}
+		#homeLink {
+			position: absolute;
+			left: 50%;
+			bottom: 5.5%;
+			transform: translateX(-50%);
+			font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+			font-size: clamp(9px, 1.2vw, 12px);
+			font-weight: 300;
+			letter-spacing: 0.45em;
+			text-indent: 0.45em;
+			text-decoration: none;
+			color: rgba(242, 236, 226, 0.8);
+			padding: 10px 22px;
+			border: 1px solid rgba(242, 236, 226, 0.3);
+			border-radius: 999px;
+			background: rgba(14, 12, 14, 0.45);
+			backdrop-filter: blur(8px);
+			-webkit-backdrop-filter: blur(8px);
+			text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+			transition: color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+			animation: titleEntrance 3.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+		}
+		#homeLink:hover {
+			color: #ffffff;
+			border-color: rgba(255, 226, 180, 0.85);
+			background: rgba(40, 34, 30, 0.6);
+			box-shadow: 0 0 22px rgba(255, 226, 180, 0.3);
+		}
+		#optionPanel {
+			position: absolute;
+			right: 18px;
+			top: 18px;
+			width: 238px;
+			font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+			color: rgba(242, 236, 226, 0.86);
+			background: rgba(14, 12, 14, 0.5);
+			border: 1px solid rgba(242, 236, 226, 0.14);
+			border-radius: 12px;
+			backdrop-filter: blur(10px);
+			-webkit-backdrop-filter: blur(10px);
+			overflow: hidden;
+			animation: panelEntrance 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+		}
+		#optionTitle {
+			padding: 11px 16px 9px;
+			font-size: 10px;
+			font-weight: 600;
+			letter-spacing: 0.32em;
+			color: rgba(232, 201, 138, 0.95);
+			border-bottom: 1px solid rgba(242, 236, 226, 0.1);
+		}
+		.optionRow {
+			display: flex;
+			align-items: center;
+			height: 28px;
+			padding: 0 14px 0 12px;
+			font-size: 10.5px;
+			letter-spacing: 0.12em;
+			cursor: pointer;
+			transition: background 0.15s ease;
+		}
+		.optionRow:hover {
+			background: rgba(255, 255, 255, 0.06);
+		}
+		.optionKey {
+			width: 18px;
+			height: 16px;
+			line-height: 16px;
+			margin-right: 10px;
+			text-align: center;
+			font-size: 9px;
+			border-radius: 4px;
+			color: rgba(242, 236, 226, 0.6);
+			border: 1px solid rgba(242, 236, 226, 0.22);
+		}
+		.optionLabel {
+			flex: 1;
+		}
+		.optionState {
+			font-size: 9.5px;
+			letter-spacing: 0.18em;
+			color: rgba(242, 236, 226, 0.4);
+		}
+		.optionRow.on .optionState {
+			color: rgba(232, 201, 138, 1);
+		}
+		#footerNote {
+			position: absolute;
+			left: 18px;
+			bottom: 16px;
+			font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+			font-size: 9.5px;
+			letter-spacing: 0.16em;
+			line-height: 1.9;
+			color: rgba(242, 236, 226, 0.42);
+			text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+			pointer-events: none;
+			animation: panelEntrance 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+		}
+		#footerNote a {
+			color: rgba(242, 236, 226, 0.55);
+			text-decoration: none;
+			pointer-events: auto;
+		}
+		#loadingOverlay {
+			position: absolute;
+			inset: 0;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			background: #08080a;
+			font-family: "Segoe UI Light", "Segoe UI", "Malgun Gothic", sans-serif;
+			font-size: 11px;
+			font-weight: 300;
+			letter-spacing: 0.6em;
+			text-indent: 0.6em;
+			color: rgba(242, 236, 226, 0.6);
+			transition: opacity 1.4s ease;
+			z-index: 10;
+		}
+		#loadingOverlay.hidden {
+			opacity: 0;
+			pointer-events: none;
+		}
+		@keyframes titleEntrance {
+			0% { opacity: 0; transform: translateX(-50%) translateY(-14px); filter: blur(8px); }
+			100% { opacity: 1; transform: translateX(-50%) translateY(0); filter: blur(0); }
+		}
+		@keyframes panelEntrance {
+			0% { opacity: 0; }
+			100% { opacity: 1; }
+		}
+		@media (max-width: 720px) {
+			#optionPanel { width: 204px; right: 10px; top: 10px; }
+			#footerNote { bottom: 10px; left: 10px; font-size: 8.5px; }
+		}
+	</style>
+</head>
+<body>
+	<canvas id="mainCanvas"></canvas>
+	<div id="titleOverlay">
+		<div id="titleMain">OLD FACE</div>
+		<div id="titleDivider"></div>
+		<div id="titleSub">VANILLA.JS</div>
+	</div>
+	<div id="optionPanel">
+		<div id="optionTitle">RENDERING</div>
+	</div>
+	<div id="footerNote">
+		DRAG TO ORBIT, WHEEL TO ZOOM, MOVE THE POINTER TO TURN THE HEAD<br>
+		HEAD SCAN: <a href="https://ir-ltd.net/" target="_blank" rel="noopener">LEE PERRY-SMITH, INFINITE-REALITIES</a> (CC BY 3.0)
+	</div>
+	<a id="homeLink" href="https://ddukbaek2.com" target="_blank" rel="noopener">DDUKBAEK2.COM</a>
+	<div id="loadingOverlay">LOADING</div>
+	<script type="module">
+	"use strict";
+	const System = globalThis;
+
+
+	//==============================================================================
+	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../../build/vanilla.js)
+	//==============================================================================
+	let engineModule = null;
+	try {
+		try {
+			engineModule = await import("./vanilla.js");
+		}
+		catch (importError) {
+			engineModule = await import("../../build/vanilla.js");
+		}
+	}
+	catch (engineError) {
+		System.document.body.innerHTML = "<p style=\"color:#fff;font-family:sans-serif;padding:2em\">vanilla.js 엔진 모듈을 불러오지 못했습니다.</p>";
+		throw engineError;
+	}
+	const Graphic = engineModule.Graphic;
+	const Rect = engineModule.Rect;
+	const Vector3 = engineModule.Vector3;
+	const Matrix4 = engineModule.Matrix4;
+	const RenderTarget = engineModule.RenderTarget;
+	const FullscreenPass = engineModule.FullscreenPass;
+	const BloomEffect = engineModule.BloomEffect;
+	const SkinnedModel = engineModule.SkinnedModel;
+	const HumanSkinRenderer = engineModule.HumanSkinRenderer;
+	const SubsurfaceScatteringEffect = engineModule.SubsurfaceScatteringEffect;
+	const Material = engineModule.Material;
+	const ShadowMap = engineModule.ShadowMap;
+
+	//==============================================================================
+	// 전역 상수 목록.
+	//==============================================================================
+	const CAMERA_FIELD_OF_VIEW = 0.44;
+	const CAMERA_NEAR_DISTANCE = 1;
+	const CAMERA_FAR_DISTANCE = 80;
+	const CAMERA_MINIMUM_DISTANCE = 8.5;
+	const CAMERA_MAXIMUM_DISTANCE = 24;
+	const CAMERA_TARGET = Vector3.create(-0.05, 0.75, 0.55);
+	const SHADOWMAP_RESOLUTION = 2048;
+	const TEXTURE_SIZE = 1024;
+	const DETAIL_TEXTURE_SIZE = 4096;
+	const KEY_LIGHT_DIRECTION = Vector3.create(0.5, 0.62, 0.62).normalize();
+	const FILL_LIGHT_DIRECTION = Vector3.create(-0.75, 0.1, 0.6).normalize();
+	const RIM_LIGHT_DIRECTION = Vector3.create(0.55, 0.45, -0.72).normalize();
+
+	// 얼굴 랜드마크. (메시 좌표 — 정면 +z, 위 +y. 절차적 모프 타깃의 중심점)
+	const LANDMARKS = {
+		browLeft: [-0.89, 1.99, 1.99],
+		browRight: [0.65, 1.94, 1.98],
+		browMiddle: [-0.11, 1.91, 2.13],
+		eyelidLeft: [-0.77, 1.64, 1.83],
+		eyelidRight: [0.57, 1.62, 1.87],
+		mouthCornerLeft: [-0.53, 0.39, 2.11],
+		mouthCornerRight: [0.37, 0.42, 2.09],
+		cheekLeft: [-1.33, 0.65, 1.31],
+		cheekRight: [1.1, 0.66, 1.28],
+		jowlLeft: [-1.05, -0.13, 1.34],
+		jowlRight: [0.92, -0.02, 1.32],
+		templeLeft: [-1.46, 2.01, 0.95],
+		templeRight: [1.25, 2.03, 0.93],
+		noseTip: [-0.09, 1.03, 2.57],
+		upperLip: [-0.12, 0.62, 2.33],
+		lowerLip: [-0.07, 0.41, 2.26],
+		chin: [0.01, -0.28, 2.26],
+		neckFront: [-0.08, -0.9, 1.15],
+		glabella: [-0.1, 1.95, 2.1],
+		jawPivot: [-0.05, 1.42, 0.12],
+		neckPivot: [-0.05, -0.95, 0.25],
+	};
+
+	//==============================================================================
+	// 셰이더 소스 목록.
+	//==============================================================================
+	// 합성. (산란된 조도 x 알베도 + 스펙큘러 → 선형 HDR, 배경은 스튜디오 그라디언트)
+	const COMBINE_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec2 fragmentTextureCoordinate;
+	uniform sampler2D irradianceTexture;
+	uniform sampler2D albedoTexture;
+	uniform sampler2D specularTexture;
+	uniform float aspectRatio;
+	out vec4 outputColor;
+
+	void main() {
+		vec4 irradiance = texture(irradianceTexture, fragmentTextureCoordinate);
+		vec4 albedo = texture(albedoTexture, fragmentTextureCoordinate);
+		vec3 specular = texture(specularTexture, fragmentTextureCoordinate).rgb;
+		vec3 surfaceColor = irradiance.rgb * albedo.rgb + specular;
+
+		// 배경. (어두운 스튜디오 — 두상 뒤가 은은하게 밝은 방사형 그라디언트)
+		vec2 centered = (fragmentTextureCoordinate - vec2(0.5, 0.56)) * vec2(aspectRatio, 1.0);
+		float radial = dot(centered, centered);
+		vec3 backgroundColor = vec3(0.012, 0.012, 0.015) + vec3(0.075, 0.068, 0.07) * exp(-radial * 3.2);
+		backgroundColor += vec3(0.02, 0.016, 0.012) * smoothstep(0.2, -0.6, fragmentTextureCoordinate.y - 0.5);
+		vec3 color = mix(backgroundColor, surfaceColor, albedo.a);
+		outputColor = vec4(color, 1.0);
+	}
+	`;
+
+	// 톤 매핑 합성. (노출 → 블룸 가산 → ACES → 비네트 → 그레인 → sRGB)
+	const COMPOSITE_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec2 fragmentTextureCoordinate;
+	uniform sampler2D sceneTexture;
+	uniform sampler2D bloomTexture;
+	uniform float exposure;
+	uniform float bloomStrength;
+	uniform float vignetteStrength;
+	uniform float grainStrength;
+	uniform float elapsedTime;
+	uniform vec2 resolution;
+	out vec4 outputColor;
+
+	vec3 acesToneMap(vec3 color) {
+		const float a = 2.51;
+		const float b = 0.03;
+		const float c = 2.43;
+		const float d = 0.59;
+		const float e = 0.14;
+		return clamp((color * (a * color + b)) / (color * (c * color + d) + e), 0.0, 1.0);
+	}
+
+	float hash21(vec2 point) {
+		point = fract(point * vec2(234.34, 435.345));
+		point += dot(point, point + 34.23);
+		return fract(point.x * point.y);
+	}
+
+	void main() {
+		vec3 sceneColor = texture(sceneTexture, fragmentTextureCoordinate).rgb;
+		vec3 bloomColor = texture(bloomTexture, fragmentTextureCoordinate).rgb;
+		vec3 color = sceneColor * exposure + bloomColor * bloomStrength;
+		color = acesToneMap(color);
+
+		// 비네트.
+		vec2 centered = fragmentTextureCoordinate - 0.5;
+		float vignette = 1.0 - smoothstep(0.35, 0.95, length(centered * vec2(1.0, 0.85)) * 1.25);
+		color *= mix(1.0, vignette, vignetteStrength);
+
+		// 필름 그레인. (중간 밝기에서 가장 보이고 어두운 곳은 절반)
+		float grain = hash21(fragmentTextureCoordinate * resolution + fract(elapsedTime * 13.7) * 100.0) - 0.5;
+		float grainLuminance = dot(color, vec3(0.299, 0.587, 0.114));
+		color += grain * grainStrength * mix(0.5, 1.0, grainLuminance) * (1.0 - grainLuminance * 0.5);
+
+		// sRGB 인코딩.
+		vec3 encoded = mix(color * 12.92, 1.055 * pow(max(color, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055, step(0.0031308, color));
+		outputColor = vec4(encoded, 1.0);
+	}
+	`;
+
+	// FXAA. (휘도 대비 기반 가장자리 방향 검출 + 방향 블러 — LDR 출력에 적용)
+	const FXAA_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec2 fragmentTextureCoordinate;
+	uniform sampler2D sourceTexture;
+	uniform vec2 texelSize;
+	out vec4 outputColor;
+
+	float luminance(vec3 color) {
+		return dot(color, vec3(0.299, 0.587, 0.114));
+	}
+
+	void main() {
+		vec3 colorNorthWest = texture(sourceTexture, fragmentTextureCoordinate + vec2(-1.0, -1.0) * texelSize).rgb;
+		vec3 colorNorthEast = texture(sourceTexture, fragmentTextureCoordinate + vec2(1.0, -1.0) * texelSize).rgb;
+		vec3 colorSouthWest = texture(sourceTexture, fragmentTextureCoordinate + vec2(-1.0, 1.0) * texelSize).rgb;
+		vec3 colorSouthEast = texture(sourceTexture, fragmentTextureCoordinate + vec2(1.0, 1.0) * texelSize).rgb;
+		vec3 colorCenter = texture(sourceTexture, fragmentTextureCoordinate).rgb;
+		float lumaNorthWest = luminance(colorNorthWest);
+		float lumaNorthEast = luminance(colorNorthEast);
+		float lumaSouthWest = luminance(colorSouthWest);
+		float lumaSouthEast = luminance(colorSouthEast);
+		float lumaCenter = luminance(colorCenter);
+		float lumaMinimum = min(lumaCenter, min(min(lumaNorthWest, lumaNorthEast), min(lumaSouthWest, lumaSouthEast)));
+		float lumaMaximum = max(lumaCenter, max(max(lumaNorthWest, lumaNorthEast), max(lumaSouthWest, lumaSouthEast)));
+
+		vec2 direction;
+		direction.x = -((lumaNorthWest + lumaNorthEast) - (lumaSouthWest + lumaSouthEast));
+		direction.y = ((lumaNorthWest + lumaSouthWest) - (lumaNorthEast + lumaSouthEast));
+		float directionReduce = max((lumaNorthWest + lumaNorthEast + lumaSouthWest + lumaSouthEast) * (0.25 * 0.125), 1.0 / 128.0);
+		float reciprocalDirectionMinimum = 1.0 / (min(abs(direction.x), abs(direction.y)) + directionReduce);
+		direction = min(vec2(8.0), max(vec2(-8.0), direction * reciprocalDirectionMinimum)) * texelSize;
+
+		vec3 colorA = 0.5 * (texture(sourceTexture, fragmentTextureCoordinate + direction * (1.0 / 3.0 - 0.5)).rgb + texture(sourceTexture, fragmentTextureCoordinate + direction * (2.0 / 3.0 - 0.5)).rgb);
+		vec3 colorB = colorA * 0.5 + 0.25 * (texture(sourceTexture, fragmentTextureCoordinate + direction * -0.5).rgb + texture(sourceTexture, fragmentTextureCoordinate + direction * 0.5).rgb);
+		float lumaB = luminance(colorB);
+		vec3 color = (lumaB < lumaMinimum || lumaB > lumaMaximum) ? colorA : colorB;
+		outputColor = vec4(color, 1.0);
+	}
+	`;
+
+	//==============================================================================
+	// 전역 함수 목록.
+	//==============================================================================
+	function clampValue(value, minimumValue, maximumValue) {
+		return System.Math.max(minimumValue, System.Math.min(maximumValue, value));
+	}
+
+	function smoothstepValue(edge0, edge1, value) {
+		const normalized = clampValue((value - edge0) / (edge1 - edge0), 0, 1);
+		return normalized * normalized * (3 - 2 * normalized);
+	}
+
+	function mixValue(from, to, blend) {
+		return from + (to - from) * blend;
+	}
+
+	// 결정적 해시 잡음. (텍스처 노화 — 얼룩 / 반점 배치)
+	function hashNoise(x, y) {
+		const value = System.Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+		return value - System.Math.floor(value);
+	}
+
+	function valueNoise(x, y) {
+		const cellX = System.Math.floor(x);
+		const cellY = System.Math.floor(y);
+		const fractionX = x - cellX;
+		const fractionY = y - cellY;
+		const weightX = fractionX * fractionX * (3 - 2 * fractionX);
+		const weightY = fractionY * fractionY * (3 - 2 * fractionY);
+		const value00 = hashNoise(cellX, cellY);
+		const value10 = hashNoise(cellX + 1, cellY);
+		const value01 = hashNoise(cellX, cellY + 1);
+		const value11 = hashNoise(cellX + 1, cellY + 1);
+		const valueX0 = value00 + (value10 - value00) * weightX;
+		const valueX1 = value01 + (value11 - value01) * weightX;
+		return valueX0 + (valueX1 - valueX0) * weightY;
+	}
+
+	// 타원 마스크. (안쪽 1, 가장자리 부드럽게 0)
+	function ellipseMask(x, y, centerX, centerY, radiusX, radiusY) {
+		const normalizedX = (x - centerX) / radiusX;
+		const normalizedY = (y - centerY) / radiusY;
+		const distance = System.Math.sqrt(normalizedX * normalizedX + normalizedY * normalizedY);
+		return 1 - smoothstepValue(0.72, 1, distance);
+	}
+
+	// 가우시안 가중. (랜드마크 반경 — 반경에서 약 13% 로 감쇠)
+	function gaussianWeight(x, y, z, center, radius) {
+		const deltaX = x - center[0];
+		const deltaY = y - center[1];
+		const deltaZ = z - center[2];
+		const distanceSquared = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
+		const sigma = radius * 0.5;
+		return System.Math.exp(-distanceSquared / (2 * sigma * sigma));
+	}
+
+	//==============================================================================
+	// 캔버스 / 렌더링 컨텍스트.
+	//==============================================================================
+	const canvas = System.document.getElementById("mainCanvas");
+	const webGL2RenderingContext = canvas.getContext("webgl2", { antialias: false, depth: true, stencil: true, alpha: false, premultipliedAlpha: true });
+	if (!webGL2RenderingContext) {
+		System.document.body.innerHTML = "<p style=\"color:#fff;font-family:sans-serif;padding:2em\">WebGL2 를 지원하지 않는 브라우저입니다.</p>";
+		throw new Error("WebGL2 unsupported");
+	}
+	const uiGraphic = new Graphic(canvas);
+	const skinRenderer = new HumanSkinRenderer(webGL2RenderingContext);
+	const subsurfaceEffect = new SubsurfaceScatteringEffect(webGL2RenderingContext);
+	const bloomEffect = new BloomEffect(webGL2RenderingContext);
+	const shadowMap = new ShadowMap(webGL2RenderingContext, SHADOWMAP_RESOLUTION);
+	const sceneRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, true, { colorAttachmentCount: 3, useFloatColor: true, useDepthTexture: true });
+	const hdrRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, false, { useFloatColor: true });
+	const ldrRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, false);
+	const combinePass = new FullscreenPass(webGL2RenderingContext, COMBINE_FRAGMENTSHADER_SOURCE);
+	const compositePass = new FullscreenPass(webGL2RenderingContext, COMPOSITE_FRAGMENTSHADER_SOURCE);
+	const antialiasPass = new FullscreenPass(webGL2RenderingContext, FXAA_FRAGMENTSHADER_SOURCE);
+
+	// 조명 / 산란 / 블룸 기본값. (선형 공간)
+	skinRenderer.setLight(0, KEY_LIGHT_DIRECTION.x, KEY_LIGHT_DIRECTION.y, KEY_LIGHT_DIRECTION.z, 1.0, 0.92, 0.82, 2.6);
+	skinRenderer.setLight(1, FILL_LIGHT_DIRECTION.x, FILL_LIGHT_DIRECTION.y, FILL_LIGHT_DIRECTION.z, 0.6, 0.7, 0.9, 0.85);
+	skinRenderer.setLight(2, RIM_LIGHT_DIRECTION.x, RIM_LIGHT_DIRECTION.y, RIM_LIGHT_DIRECTION.z, 0.95, 0.97, 1.0, 1.4);
+	skinRenderer.setAmbientColors([0.17, 0.18, 0.22], [0.08, 0.075, 0.08], [0.03, 0.025, 0.03]);
+	skinRenderer.setSheenStrength(0.18);
+	skinRenderer.setDetailTexelSize(1 / DETAIL_TEXTURE_SIZE);
+	subsurfaceEffect.setScatterWidth(0.2);
+	bloomEffect.setThreshold(1.05, 1.9);
+	bloomEffect.setIterationCount(3);
+
+	//==============================================================================
+	// 렌더링 옵션. (우측 상단 패널 — 숫자 키로도 전환)
+	//==============================================================================
+	const optionDefinitions = [
+		{ name: "subsurface", label: "SUBSURFACE SCATTERING" },
+		{ name: "detail", label: "4K PORE DETAIL" },
+		{ name: "shadow", label: "KEY LIGHT SHADOW" },
+		{ name: "bloom", label: "BLOOM" },
+		{ name: "antialias", label: "FXAA" },
+		{ name: "animation", label: "FACE ANIMATION" },
+		{ name: "aging", label: "AGING" },
+	];
+	const optionStates = {
+		subsurface: true,
+		detail: true,
+		shadow: true,
+		bloom: true,
+		antialias: true,
+		animation: true,
+		aging: true,
+	};
+	const optionRowElements = {};
+	const optionPanelElement = System.document.getElementById("optionPanel");
+	optionDefinitions.forEach((definition, definitionIndex) => {
+		const rowElement = System.document.createElement("div");
+		rowElement.className = "optionRow";
+		const keyElement = System.document.createElement("span");
+		keyElement.className = "optionKey";
+		keyElement.textContent = String(definitionIndex + 1);
+		const labelElement = System.document.createElement("span");
+		labelElement.className = "optionLabel";
+		labelElement.textContent = definition.label;
+		const stateElement = System.document.createElement("span");
+		stateElement.className = "optionState";
+		rowElement.appendChild(keyElement);
+		rowElement.appendChild(labelElement);
+		rowElement.appendChild(stateElement);
+		rowElement.addEventListener("click", () => {
+			toggleOption(definition.name);
+		});
+		optionPanelElement.appendChild(rowElement);
+		optionRowElements[definition.name] = { rowElement: rowElement, stateElement: stateElement };
+	});
+
+	function refreshOptionPanel() {
+		for (const definition of optionDefinitions) {
+			const elements = optionRowElements[definition.name];
+			const isOn = optionStates[definition.name];
+			elements.stateElement.textContent = isOn ? "ON" : "OFF";
+			elements.rowElement.classList.toggle("on", isOn);
+		}
+	}
+
+	function toggleOption(optionName) {
+		optionStates[optionName] = !optionStates[optionName];
+		refreshOptionPanel();
+	}
+	refreshOptionPanel();
+
+	//==============================================================================
+	// 애셋 로드. (두상 GLB + 텍스처 4장 → 원본 / 노화 머티리얼)
+	//==============================================================================
+	const headModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "./assets/head.glb", skinRenderer);
+	const headDrawable = headModel.getDrawableList()[0];
+	const albedoDescription = await Material.loadImageDescription("./assets/head_albedo.jpg", { flipY: true, isColorData: true, anisotropy: 8 });
+	const normalDescription = await Material.loadImageDescription("./assets/head_normal.jpg", { flipY: true, anisotropy: 8 });
+	const specularDescription = await Material.loadImageDescription("./assets/head_specular.jpg", { flipY: true, anisotropy: 4 });
+	const heightDescription = await Material.loadImageDescription("./assets/head_displacement.jpg", { flipY: true, anisotropy: 8 });
+
+	const originalMaterialDescription = Material.createDefaultDescription();
+	originalMaterialDescription.baseColorImage = albedoDescription;
+	originalMaterialDescription.normalImage = normalDescription;
+	originalMaterialDescription.specularImage = specularDescription;
+	const originalMaterial = await Material.createFromDescription(webGL2RenderingContext, skinRenderer.getShaderProgram(), originalMaterialDescription);
+	const detailHeightTexture = await originalMaterial.createTexture(heightDescription, [128, 128, 128, 255]);
+	originalMaterial.setTexture("detailHeightTexture", 9, detailHeightTexture);
+
+	//==============================================================================
+	// 텍스처 노화. (알베도: 흰 수염 / 눈썹, 창백한 피부톤, 홍조, 검버섯, 주름 음영 — 노멀: 주름 골 합성)
+	// - 텍스처 좌표계는 이미지 기준(원점 좌상). 영역 타원은 1024 알베도 레이아웃에서 잡았다.
+	//==============================================================================
+	async function createAgedImages() {
+		const size = TEXTURE_SIZE;
+		const albedoBitmap = await System.createImageBitmap(new System.Blob([albedoDescription.bytes], { type: "image/jpeg" }));
+		const normalBitmap = await System.createImageBitmap(new System.Blob([normalDescription.bytes], { type: "image/jpeg" }));
+
+		function createCanvas(width, height) {
+			const element = System.document.createElement("canvas");
+			element.width = width;
+			element.height = height;
+			return element;
+		}
+		const albedoCanvas = createCanvas(size, size);
+		const albedoContext = albedoCanvas.getContext("2d", { willReadFrequently: true });
+		albedoContext.drawImage(albedoBitmap, 0, 0, size, size);
+		const albedoImageData = albedoContext.getImageData(0, 0, size, size);
+		const albedoPixels = albedoImageData.data;
+
+		const normalCanvas = createCanvas(size, size);
+		const normalContext = normalCanvas.getContext("2d", { willReadFrequently: true });
+		normalContext.drawImage(normalBitmap, 0, 0, size, size);
+		const normalImageData = normalContext.getImageData(0, 0, size, size);
+		const normalPixels = normalImageData.data;
+
+		// 국소 평균 휘도. (1/8 축소본 — 수염 검출의 기준 밝기)
+		const averageSize = size / 8;
+		const averageCanvas = createCanvas(averageSize, averageSize);
+		const averageContext = averageCanvas.getContext("2d", { willReadFrequently: true });
+		averageContext.imageSmoothingEnabled = true;
+		averageContext.imageSmoothingQuality = "high";
+		averageContext.drawImage(albedoBitmap, 0, 0, averageSize, averageSize);
+		const averagePixels = averageContext.getImageData(0, 0, averageSize, averageSize).data;
+
+		// 검버섯 레이어. (얼굴 / 정수리 / 목에 방사형 반점)
+		const spotCanvas = createCanvas(size, size);
+		const spotContext = spotCanvas.getContext("2d", { willReadFrequently: true });
+		const spotRegions = [
+			[512, 420, 290, 320],
+			[512, 150, 340, 120],
+			[512, 700, 250, 110],
+			[250, 500, 190, 240],
+			[774, 500, 190, 240],
+		];
+		let spotSeed = 7;
+		function nextRandom() {
+			spotSeed = (spotSeed * 16807) % 2147483647;
+			return spotSeed / 2147483647;
+		}
+		for (let spotIndex = 0; spotIndex < 320; ++spotIndex) {
+			const region = spotRegions[System.Math.floor(nextRandom() * spotRegions.length)];
+			const angle = nextRandom() * System.Math.PI * 2;
+			const reach = System.Math.sqrt(nextRandom());
+			const spotX = region[0] + System.Math.cos(angle) * reach * region[2];
+			const spotY = region[1] + System.Math.sin(angle) * reach * region[3];
+			const spotRadius = 1.6 + nextRandom() * nextRandom() * 8;
+			const spotAlpha = 0.25 + nextRandom() * 0.55;
+			const gradient = spotContext.createRadialGradient(spotX, spotY, 0, spotX, spotY, spotRadius);
+			gradient.addColorStop(0, `rgba(255, 255, 255, ${spotAlpha})`);
+			gradient.addColorStop(0.55, `rgba(255, 255, 255, ${spotAlpha * 0.7})`);
+			gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+			spotContext.fillStyle = gradient;
+			spotContext.beginPath();
+			spotContext.ellipse(spotX, spotY, spotRadius, spotRadius * (0.7 + nextRandom() * 0.5), angle, 0, System.Math.PI * 2);
+			spotContext.fill();
+		}
+		const spotPixels = spotContext.getImageData(0, 0, size, size).data;
+
+		// 주름 레이어. (높이 — 이마 / 미간 / 눈가 / 눈밑 / 팔자 / 입가 / 턱 / 윗입술 / 목, 굵기를 넓혀 가며 겹쳐 그려 가장자리를 부드럽게)
+		const wrinkleCanvas = createCanvas(size, size);
+		const wrinkleContext = wrinkleCanvas.getContext("2d", { willReadFrequently: true });
+		function strokePath(context, points, width, alpha) {
+			context.lineCap = "round";
+			context.lineJoin = "round";
+			context.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+			context.lineWidth = width;
+			context.beginPath();
+			context.moveTo(points[0][0], points[0][1]);
+			if (points.length === 3) {
+				context.quadraticCurveTo(points[1][0], points[1][1], points[2][0], points[2][1]);
+			}
+			else {
+				for (let pointIndex = 1; pointIndex < points.length; ++pointIndex) {
+					context.lineTo(points[pointIndex][0], points[pointIndex][1]);
+				}
+			}
+			context.stroke();
+		}
+		// 유기적 주름 선. (곡선을 잘게 나눠 법선 방향 잡음으로 흔들고, 양끝은 가늘고 옅게 — 넓은 깃털 패스로 골을 부드럽게)
+		let wrinkleSeed = 0;
+		function strokeWrinkle(points, width, alpha, waviness) {
+			wrinkleSeed += 1;
+			const sampleCount = 16;
+			const samples = [];
+			for (let sampleIndex = 0; sampleIndex <= sampleCount; ++sampleIndex) {
+				const t = sampleIndex / sampleCount;
+				let x = 0;
+				let y = 0;
+				if (points.length === 3) {
+					x = (1 - t) * (1 - t) * points[0][0] + 2 * (1 - t) * t * points[1][0] + t * t * points[2][0];
+					y = (1 - t) * (1 - t) * points[0][1] + 2 * (1 - t) * t * points[1][1] + t * t * points[2][1];
+				}
+				else {
+					x = points[0][0] + (points[1][0] - points[0][0]) * t;
+					y = points[0][1] + (points[1][1] - points[0][1]) * t;
+				}
+				samples.push([x, y]);
+			}
+			for (let sampleIndex = 0; sampleIndex <= sampleCount; ++sampleIndex) {
+				const previous = samples[System.Math.max(sampleIndex - 1, 0)];
+				const next = samples[System.Math.min(sampleIndex + 1, sampleCount)];
+				const tangentX = next[0] - previous[0];
+				const tangentY = next[1] - previous[1];
+				const tangentLength = System.Math.sqrt(tangentX * tangentX + tangentY * tangentY) || 1;
+				const noise = valueNoise(wrinkleSeed * 3.1 + sampleIndex * 0.55, wrinkleSeed * 0.73) - 0.5;
+				samples[sampleIndex][0] += -tangentY / tangentLength * noise * waviness * 2;
+				samples[sampleIndex][1] += tangentX / tangentLength * noise * waviness * 2;
+			}
+			for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
+				const t = (sampleIndex + 0.5) / sampleCount;
+				const taper = 0.2 + 0.8 * System.Math.pow(System.Math.sin(t * System.Math.PI), 0.6);
+				const segment = [samples[sampleIndex], samples[sampleIndex + 1]];
+				strokePath(wrinkleContext, segment, width * taper * 5.0, alpha * taper * 0.05);
+				strokePath(wrinkleContext, segment, width * taper * 2.6, alpha * taper * 0.1);
+				strokePath(wrinkleContext, segment, width * taper, alpha * taper * 0.5);
+			}
+		}
+		// 이마 고랑. (길이가 다른 3줄 + 끊어진 조각 + 옅은 보조선)
+		strokeWrinkle([[392, 172], [512, 150], [640, 172]], 2.2, 0.7, 3.4);
+		strokeWrinkle([[352, 200], [512, 176], [676, 200]], 2.5, 0.8, 3.2);
+		strokeWrinkle([[404, 226], [512, 204], [616, 226]], 2.2, 0.68, 3.4);
+		strokeWrinkle([[342, 232], [372, 226], [404, 230]], 1.5, 0.4, 2);
+		strokeWrinkle([[620, 230], [652, 226], [684, 232]], 1.5, 0.4, 2);
+		strokeWrinkle([[430, 246], [512, 232], [596, 246]], 1.4, 0.32, 2.6);
+		strokeWrinkle([[430, 186], [470, 180], [510, 186]], 1.1, 0.24, 2);
+		strokeWrinkle([[540, 212], [590, 206], [640, 212]], 1.1, 0.24, 2);
+		strokeWrinkle([[497, 246], [494, 270], [500, 296]], 1.8, 0.55, 1);
+		strokeWrinkle([[527, 246], [530, 270], [524, 296]], 1.8, 0.55, 1);
+		const crowFeet = [[40, -15, 1.5, 0.5], [44, 3, 1.7, 0.55], [38, 21, 1.5, 0.5], [28, 34, 1.2, 0.3]];
+		for (const corner of [[372, -1], [655, 1]]) {
+			for (const foot of crowFeet) {
+				strokeWrinkle([[corner[0], 300], [corner[0] + corner[1] * foot[0] * 0.5, 300 + foot[1] * 0.5], [corner[0] + corner[1] * foot[0], 300 + foot[1]]], foot[2], foot[3], 1.2);
+			}
+		}
+		strokeWrinkle([[395, 338], [440, 352], [485, 340]], 1.3, 0.35, 1.2);
+		strokeWrinkle([[540, 340], [585, 352], [630, 338]], 1.3, 0.35, 1.2);
+		strokeWrinkle([[400, 352], [440, 364], [480, 354]], 1.1, 0.22, 1.2);
+		strokeWrinkle([[545, 354], [585, 364], [625, 352]], 1.1, 0.22, 1.2);
+		strokeWrinkle([[462, 428], [444, 468], [450, 506]], 3.2, 0.5, 1.6);
+		strokeWrinkle([[562, 428], [580, 468], [574, 506]], 3.2, 0.5, 1.6);
+		strokeWrinkle([[442, 486], [434, 515], [438, 546]], 1.4, 0.2, 1.6);
+		strokeWrinkle([[583, 486], [591, 515], [587, 546]], 1.4, 0.2, 1.6);
+		strokeWrinkle([[468, 512], [512, 524], [556, 512]], 1.5, 0.35, 1.6);
+		for (const lipX of [484, 496, 508, 520, 532, 542]) {
+			strokeWrinkle([[lipX, 446], [lipX, 462]], 1.1, 0.32, 0.6);
+		}
+		for (const neckY of [694, 728]) {
+			strokeWrinkle([[392, neckY - 6], [512, neckY + 10], [636, neckY - 6]], 2.2, 0.26, 3);
+		}
+		const wrinklePixels = wrinkleContext.getImageData(0, 0, size, size).data;
+
+		// 미세 잔주름 레이어. (아주 짧고 옅은 무작위 선 — 노멀에만 반영, 볼 / 이마 / 눈가 / 목)
+		const crinkleCanvas = createCanvas(size, size);
+		const crinkleContext = crinkleCanvas.getContext("2d", { willReadFrequently: true });
+		const crinkleRegions = [
+			[400, 425, 80, 70],
+			[624, 425, 80, 70],
+			[512, 190, 160, 55],
+			[512, 720, 130, 60],
+			[352, 305, 36, 36],
+			[672, 305, 36, 36],
+		];
+		for (let crinkleIndex = 0; crinkleIndex < 1400; ++crinkleIndex) {
+			const region = crinkleRegions[System.Math.floor(nextRandom() * crinkleRegions.length)];
+			const angle = nextRandom() * System.Math.PI * 2;
+			const reach = System.Math.sqrt(nextRandom());
+			const startX = region[0] + System.Math.cos(angle) * reach * region[2];
+			const startY = region[1] + System.Math.sin(angle) * reach * region[3];
+			const direction = nextRandom() * System.Math.PI;
+			const length = 2 + nextRandom() * 3;
+			strokePath(crinkleContext, [[startX, startY], [startX + System.Math.cos(direction) * length, startY + System.Math.sin(direction) * length]], 1, 0.03 + nextRandom() * 0.05);
+		}
+		const crinklePixels = crinkleContext.getImageData(0, 0, size, size).data;
+
+		// 배경 평면색. (UV 셸 밖 — 피부 처리에서 제외)
+		const backgroundRed = albedoPixels[(8 * size + 8) * 4];
+		const backgroundGreen = albedoPixels[(8 * size + 8) * 4 + 1];
+		const backgroundBlue = albedoPixels[(8 * size + 8) * 4 + 2];
+
+		// 알베도 픽셀 처리.
+		for (let y = 0; y < size; ++y) {
+			for (let x = 0; x < size; ++x) {
+				const pixelOffset = (y * size + x) * 4;
+				let red = albedoPixels[pixelOffset] / 255;
+				let green = albedoPixels[pixelOffset + 1] / 255;
+				let blue = albedoPixels[pixelOffset + 2] / 255;
+				const backgroundDistance = System.Math.abs(red * 255 - backgroundRed) + System.Math.abs(green * 255 - backgroundGreen) + System.Math.abs(blue * 255 - backgroundBlue);
+				const skinMask = smoothstepValue(6, 30, backgroundDistance);
+				if (skinMask <= 0) {
+					continue;
+				}
+				const luminance = 0.299 * red + 0.587 * green + 0.114 * blue;
+				const maximumChannel = System.Math.max(red, System.Math.max(green, blue));
+				const minimumChannel = System.Math.min(red, System.Math.min(green, blue));
+				const saturation = maximumChannel > 0 ? (maximumChannel - minimumChannel) / maximumChannel : 0;
+				const averageOffset = ((y >> 3) * averageSize + (x >> 3)) * 4;
+				const localLuminance = (0.299 * averagePixels[averageOffset] + 0.587 * averagePixels[averageOffset + 1] + 0.114 * averagePixels[averageOffset + 2]) / 255;
+
+				// 흰 수염 / 눈썹. (국소 평균보다 어둡고 채도가 낮은 털 픽셀을 밝은 회백색으로)
+				let stubbleMask = ellipseMask(x, y, 512, 600, 228, 190);
+				stubbleMask *= 1 - ellipseMask(x, y, 512, 415, 88, 40);
+				stubbleMask *= 1 - ellipseMask(x, y, 512, 472, 78, 30);
+				const browMask = System.Math.max(ellipseMask(x, y, 430, 272, 80, 34), ellipseMask(x, y, 596, 272, 80, 34));
+				const darkness = clampValue((localLuminance - luminance) / 0.2, 0, 1);
+				const lowSaturation = clampValue((0.42 - saturation) / 0.3, 0, 1);
+				const hairAmount = darkness * (0.35 + 0.65 * lowSaturation);
+				const hairMask = System.Math.max(stubbleMask * 0.95, browMask * 0.85);
+				const grayLevel = 0.8 - darkness * 0.2;
+				const hairBlend = hairAmount * hairMask;
+				red = mixValue(red, grayLevel * 0.92, hairBlend);
+				green = mixValue(green, grayLevel * 0.9, hairBlend);
+				blue = mixValue(blue, grayLevel * 0.88, hairBlend);
+
+				// 피부톤. (약한 탈채도 + 누런 기미 + 살짝 어둡게)
+				const gray = 0.299 * red + 0.587 * green + 0.114 * blue;
+				red = mixValue(red, gray, 0.12) * 0.97;
+				green = mixValue(green, gray, 0.12) * 0.95 * 0.97;
+				blue = mixValue(blue, gray, 0.12) * 0.905 * 0.97;
+
+				// 홍조 얼룩. (코 / 볼 강조 — 실핏줄 자리)
+				const blotchNoise = valueNoise(x / 55, y / 55) * 0.6 + valueNoise(x / 23 + 7, y / 23 + 3) * 0.4;
+				const emphasis = System.Math.max(ellipseMask(x, y, 512, 400, 130, 120), System.Math.max(ellipseMask(x, y, 400, 425, 120, 100), ellipseMask(x, y, 624, 425, 120, 100)));
+				const blotch = smoothstepValue(0.55, 0.8, blotchNoise) * (0.3 + 0.7 * emphasis) * 0.8;
+				red = mixValue(red, red * 1.22, blotch);
+				green = mixValue(green, green * 0.88, blotch);
+				blue = mixValue(blue, blue * 0.84, blotch);
+
+				// 검버섯.
+				const spot = spotPixels[pixelOffset + 3] / 255;
+				red = mixValue(red, red * 0.55, spot);
+				green = mixValue(green, green * 0.42, spot);
+				blue = mixValue(blue, blue * 0.34, spot);
+
+				// 주름 음영. (골의 그늘 — 형태는 노멀이 만들고 색은 아주 옅게만)
+				const wrinkle = wrinklePixels[pixelOffset] / 255;
+				red *= 1 - wrinkle * 0.03;
+				green *= 1 - wrinkle * 0.045;
+				blue *= 1 - wrinkle * 0.05;
+
+				// 입술 탈색 / 눈 밑 그늘.
+				const lipMask = ellipseMask(x, y, 512, 472, 76, 27);
+				red = mixValue(red, red * 0.95, lipMask * 0.45);
+				green = mixValue(green, green * 1.12, lipMask * 0.45);
+				blue = mixValue(blue, blue * 1.1, lipMask * 0.45);
+				const eyeShadowMask = System.Math.max(ellipseMask(x, y, 432, 336, 78, 32), ellipseMask(x, y, 594, 336, 78, 32));
+				red *= mixValue(1, 0.9, eyeShadowMask * 0.6);
+				green *= mixValue(1, 0.86, eyeShadowMask * 0.6);
+				blue *= mixValue(1, 0.9, eyeShadowMask * 0.6);
+
+				albedoPixels[pixelOffset] = clampValue(red, 0, 1) * 255;
+				albedoPixels[pixelOffset + 1] = clampValue(green, 0, 1) * 255;
+				albedoPixels[pixelOffset + 2] = clampValue(blue, 0, 1) * 255;
+			}
+		}
+		albedoContext.putImageData(albedoImageData, 0, 0);
+
+		// 노멀 픽셀 처리. (주름 / 잔주름 높이 미분 → 골 형태로 탄젠트 노멀 기울임, 기존 요철 소폭 증폭)
+		const wrinkleSlope = 2.2;
+		const crinkleSlope = 1.0;
+		for (let y = 1; y < size - 1; ++y) {
+			for (let x = 1; x < size - 1; ++x) {
+				const pixelOffset = (y * size + x) * 4;
+				const leftOffset = (y * size + x - 1) * 4;
+				const rightOffset = (y * size + x + 1) * 4;
+				const upOffset = ((y - 1) * size + x) * 4;
+				const downOffset = ((y + 1) * size + x) * 4;
+				const slopeX = (wrinklePixels[rightOffset] - wrinklePixels[leftOffset]) / 255 * 0.5 * wrinkleSlope + (crinklePixels[rightOffset] - crinklePixels[leftOffset]) / 255 * 0.5 * crinkleSlope;
+				const slopeY = (wrinklePixels[downOffset] - wrinklePixels[upOffset]) / 255 * 0.5 * wrinkleSlope + (crinklePixels[downOffset] - crinklePixels[upOffset]) / 255 * 0.5 * crinkleSlope;
+				let normalX = normalPixels[pixelOffset] / 255 * 2 - 1;
+				let normalY = normalPixels[pixelOffset + 1] / 255 * 2 - 1;
+				let normalZ = normalPixels[pixelOffset + 2] / 255 * 2 - 1;
+				normalX = normalX * 1.15 + slopeX;
+				normalY = normalY * 1.15 - slopeY;
+				const normalLength = System.Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
+				normalPixels[pixelOffset] = (normalX / normalLength * 0.5 + 0.5) * 255;
+				normalPixels[pixelOffset + 1] = (normalY / normalLength * 0.5 + 0.5) * 255;
+				normalPixels[pixelOffset + 2] = (normalZ / normalLength * 0.5 + 0.5) * 255;
+			}
+		}
+		normalContext.putImageData(normalImageData, 0, 0);
+		return { albedoCanvas: albedoCanvas, normalCanvas: normalCanvas };
+	}
+
+	const agedImages = await createAgedImages();
+	const agedMaterialDescription = Material.createDefaultDescription();
+	agedMaterialDescription.baseColorImage = { source: agedImages.albedoCanvas, flipY: true, isColorData: true, anisotropy: 8 };
+	agedMaterialDescription.normalImage = { source: agedImages.normalCanvas, flipY: true, anisotropy: 8 };
+	agedMaterialDescription.specularImage = specularDescription;
+	const agedMaterial = await Material.createFromDescription(webGL2RenderingContext, skinRenderer.getShaderProgram(), agedMaterialDescription);
+	agedMaterial.setTexture("detailHeightTexture", 9, detailHeightTexture);
+	headModel.setMaterial(0, agedMaterial);
+
+	//==============================================================================
+	// 절차적 모프 타깃. (랜드마크 가우시안 가중 변위 — 표정 / 머리 회전 / 호흡 / 노화 처짐)
+	//==============================================================================
+	const meshDescription = headDrawable.meshDescription;
+	const meshPositions = meshDescription.positions;
+	const meshNormals = meshDescription.normals;
+	const vertexCount = headDrawable.vertexCount;
+
+	function createMorphTarget(targetName, displaceVertex) {
+		const deltas = new System.Float32Array(vertexCount * 3);
+		const delta = [0, 0, 0];
+		for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
+			const x = meshPositions[vertexIndex * 3];
+			const y = meshPositions[vertexIndex * 3 + 1];
+			const z = meshPositions[vertexIndex * 3 + 2];
+			const normalX = meshNormals[vertexIndex * 3];
+			const normalY = meshNormals[vertexIndex * 3 + 1];
+			const normalZ = meshNormals[vertexIndex * 3 + 2];
+			delta[0] = 0;
+			delta[1] = 0;
+			delta[2] = 0;
+			displaceVertex(x, y, z, normalX, normalY, normalZ, delta);
+			deltas[vertexIndex * 3] = delta[0];
+			deltas[vertexIndex * 3 + 1] = delta[1];
+			deltas[vertexIndex * 3 + 2] = delta[2];
+		}
+		headModel.addMorphTarget(0, targetName, deltas);
+	}
+
+	// 피벗 기준 회전 변위. (axis: 0 = x, 1 = y, 2 = z — 소각 선형 근사용 기준 각도)
+	function rotateAboutPivot(x, y, z, pivot, axis, angle, delta, weight) {
+		const localX = x - pivot[0];
+		const localY = y - pivot[1];
+		const localZ = z - pivot[2];
+		const cosine = System.Math.cos(angle);
+		const sine = System.Math.sin(angle);
+		let rotatedX = localX;
+		let rotatedY = localY;
+		let rotatedZ = localZ;
+		if (axis === 0) {
+			rotatedY = localY * cosine - localZ * sine;
+			rotatedZ = localY * sine + localZ * cosine;
+		}
+		else if (axis === 1) {
+			rotatedX = localX * cosine + localZ * sine;
+			rotatedZ = -localX * sine + localZ * cosine;
+		}
+		else {
+			rotatedX = localX * cosine - localY * sine;
+			rotatedY = localX * sine + localY * cosine;
+		}
+		delta[0] += (rotatedX - localX) * weight;
+		delta[1] += (rotatedY - localY) * weight;
+		delta[2] += (rotatedZ - localZ) * weight;
+	}
+
+	function headWeight(y) {
+		return smoothstepValue(-2.1, -0.5, y);
+	}
+
+	createMorphTarget("browRaise", (x, y, z, normalX, normalY, normalZ, delta) => {
+		const weight = gaussianWeight(x, y, z, LANDMARKS.browLeft, 0.8) + gaussianWeight(x, y, z, LANDMARKS.browRight, 0.8) + gaussianWeight(x, y, z, LANDMARKS.browMiddle, 0.55) * 0.8;
+		const foreheadWeight = gaussianWeight(x, y, z, [-0.1, 2.65, 1.95], 1.1) * 0.5;
+		delta[1] += 0.16 * System.Math.min(weight, 1) + 0.07 * foreheadWeight;
+		delta[2] += 0.02 * System.Math.min(weight, 1);
+	});
+	createMorphTarget("browFurrow", (x, y, z, normalX, normalY, normalZ, delta) => {
+		const leftWeight = gaussianWeight(x, y, z, LANDMARKS.browLeft, 0.65);
+		const rightWeight = gaussianWeight(x, y, z, LANDMARKS.browRight, 0.65);
+		const glabellaWeight = gaussianWeight(x, y, z, LANDMARKS.glabella, 0.35);
+		delta[0] += 0.1 * leftWeight - 0.1 * rightWeight;
+		delta[1] += -0.09 * (leftWeight + rightWeight);
+		delta[2] += -0.05 * glabellaWeight;
+	});
+	createMorphTarget("eyeSqueeze", (x, y, z, normalX, normalY, normalZ, delta) => {
+		const weight = gaussianWeight(x, y, z, LANDMARKS.eyelidLeft, 0.5) + gaussianWeight(x, y, z, LANDMARKS.eyelidRight, 0.5);
+		const lowerWeight = gaussianWeight(x, y, z, [LANDMARKS.eyelidLeft[0], LANDMARKS.eyelidLeft[1] - 0.22, LANDMARKS.eyelidLeft[2]], 0.4) + gaussianWeight(x, y, z, [LANDMARKS.eyelidRight[0], LANDMARKS.eyelidRight[1] - 0.22, LANDMARKS.eyelidRight[2]], 0.4);
+		delta[1] += -0.035 * weight + 0.025 * lowerWeight;
+		delta[2] += -0.025 * weight;
+	});
+	createMorphTarget("jawOpen", (x, y, z, normalX, normalY, normalZ, delta) => {
+		const upperCut = smoothstepValue(0.64, 0.36, y);
+		const neckCut = smoothstepValue(-1.15, -0.62, y);
+		const frontCut = smoothstepValue(-0.7, 0.05, z);
+		const sideCut = 1 - smoothstepValue(1.35, 1.75, System.Math.abs(x));
+		const weight = upperCut * neckCut * frontCut * sideCut;
+		rotateAboutPivot(x, y, z, LANDMARKS.jawPivot, 0, 0.1745, delta, weight);
+	});
+	createMorphTarget("smile", (x, y, z, normalX, normalY, normalZ, delta) => {
+		const leftWeight = gaussianWeight(x, y, z, LANDMARKS.mouthCornerLeft, 0.6);
+		const rightWeight = gaussianWeight(x, y, z, LANDMARKS.mouthCornerRight, 0.6);
+		const cheekWeight = gaussianWeight(x, y, z, LANDMARKS.cheekLeft, 0.75) + gaussianWeight(x, y, z, LANDMARKS.cheekRight, 0.75);
+		const lowerLidWeight = gaussianWeight(x, y, z, [LANDMARKS.eyelidLeft[0], LANDMARKS.eyelidLeft[1] - 0.22, LANDMARKS.eyelidLeft[2]], 0.4) + gaussianWeight(x, y, z, [LANDMARKS.eyelidRight[0], LANDMARKS.eyelidRight[1] - 0.22, LANDMARKS.eyelidRight[2]], 0.4);
+		delta[0] += -0.14 * leftWeight + 0.14 * rightWeight;
+		delta[1] += 0.14 * (leftWeight + rightWeight) + 0.08 * cheekWeight + 0.03 * lowerLidWeight;
+		delta[2] += -0.1 * (leftWeight + rightWeight) + 0.04 * cheekWeight;
+	});
+	createMorphTarget("headYaw", (x, y, z, normalX, normalY, normalZ, delta) => {
+		rotateAboutPivot(x, y, z, LANDMARKS.neckPivot, 1, 0.2094, delta, headWeight(y));
+	});
+	createMorphTarget("headPitch", (x, y, z, normalX, normalY, normalZ, delta) => {
+		rotateAboutPivot(x, y, z, LANDMARKS.neckPivot, 0, 0.1396, delta, headWeight(y));
+	});
+	createMorphTarget("headRoll", (x, y, z, normalX, normalY, normalZ, delta) => {
+		rotateAboutPivot(x, y, z, LANDMARKS.neckPivot, 2, 0.1047, delta, headWeight(y));
+	});
+	createMorphTarget("breath", (x, y, z, normalX, normalY, normalZ, delta) => {
+		const weight = smoothstepValue(-0.5, -2.4, y);
+		delta[1] += 0.055 * weight;
+		delta[2] += 0.03 * weight;
+	});
+	createMorphTarget("ageSag", (x, y, z, normalX, normalY, normalZ, delta) => {
+		const jowlLeft = gaussianWeight(x, y, z, LANDMARKS.jowlLeft, 0.95);
+		const jowlRight = gaussianWeight(x, y, z, LANDMARKS.jowlRight, 0.95);
+		delta[0] += -0.04 * jowlLeft + 0.04 * jowlRight;
+		delta[1] += -0.22 * (jowlLeft + jowlRight);
+		delta[2] += 0.03 * (jowlLeft + jowlRight);
+		const cheekWeight = gaussianWeight(x, y, z, LANDMARKS.cheekLeft, 0.7) + gaussianWeight(x, y, z, LANDMARKS.cheekRight, 0.7);
+		const templeWeight = gaussianWeight(x, y, z, LANDMARKS.templeLeft, 0.65) + gaussianWeight(x, y, z, LANDMARKS.templeRight, 0.65);
+		const hollow = 0.1 * cheekWeight + 0.11 * templeWeight;
+		delta[0] += -normalX * hollow;
+		delta[1] += -normalY * hollow;
+		delta[2] += -normalZ * hollow;
+		const eyeBagWeight = gaussianWeight(x, y, z, [LANDMARKS.eyelidLeft[0], LANDMARKS.eyelidLeft[1] - 0.3, LANDMARKS.eyelidLeft[2] - 0.05], 0.42) + gaussianWeight(x, y, z, [LANDMARKS.eyelidRight[0], LANDMARKS.eyelidRight[1] - 0.3, LANDMARKS.eyelidRight[2] - 0.05], 0.42);
+		delta[0] += normalX * 0.05 * eyeBagWeight;
+		delta[1] += normalY * 0.05 * eyeBagWeight;
+		delta[2] += normalZ * 0.05 * eyeBagWeight;
+		const upperLipWeight = gaussianWeight(x, y, z, LANDMARKS.upperLip, 0.38);
+		const lowerLipWeight = gaussianWeight(x, y, z, LANDMARKS.lowerLip, 0.38);
+		delta[1] += 0.02 * upperLipWeight - 0.01 * lowerLipWeight;
+		delta[2] += -0.045 * (upperLipWeight + lowerLipWeight);
+		const hoodWeight = gaussianWeight(x, y, z, [LANDMARKS.eyelidLeft[0], LANDMARKS.eyelidLeft[1] + 0.2, LANDMARKS.eyelidLeft[2] - 0.02], 0.5) + gaussianWeight(x, y, z, [LANDMARKS.eyelidRight[0], LANDMARKS.eyelidRight[1] + 0.2, LANDMARKS.eyelidRight[2] - 0.02], 0.5);
+		delta[1] += -0.045 * hoodWeight;
+		delta[2] += 0.025 * hoodWeight;
+		const socketWeight = gaussianWeight(x, y, z, [LANDMARKS.eyelidLeft[0] + 0.3, LANDMARKS.eyelidLeft[1] + 0.05, LANDMARKS.eyelidLeft[2] - 0.05], 0.35) + gaussianWeight(x, y, z, [LANDMARKS.eyelidRight[0] - 0.3, LANDMARKS.eyelidRight[1] + 0.05, LANDMARKS.eyelidRight[2] - 0.05], 0.35);
+		delta[0] += -normalX * 0.035 * socketWeight;
+		delta[1] += -normalY * 0.035 * socketWeight;
+		delta[2] += -normalZ * 0.035 * socketWeight;
+		const noseWeight = gaussianWeight(x, y, z, LANDMARKS.noseTip, 0.5);
+		delta[1] += -0.06 * noseWeight;
+		const pouchWeight = gaussianWeight(x, y, z, [LANDMARKS.mouthCornerLeft[0] - 0.42, LANDMARKS.mouthCornerLeft[1] + 0.3, LANDMARKS.mouthCornerLeft[2] - 0.32], 0.5) + gaussianWeight(x, y, z, [LANDMARKS.mouthCornerRight[0] + 0.42, LANDMARKS.mouthCornerRight[1] + 0.3, LANDMARKS.mouthCornerRight[2] - 0.32], 0.5);
+		const creaseWeight = gaussianWeight(x, y, z, [LANDMARKS.mouthCornerLeft[0] - 0.2, LANDMARKS.mouthCornerLeft[1] + 0.25, LANDMARKS.mouthCornerLeft[2] - 0.08], 0.24) + gaussianWeight(x, y, z, [LANDMARKS.mouthCornerRight[0] + 0.2, LANDMARKS.mouthCornerRight[1] + 0.25, LANDMARKS.mouthCornerRight[2] - 0.08], 0.24);
+		const foldOffset = 0.05 * pouchWeight - 0.03 * creaseWeight;
+		delta[0] += normalX * foldOffset;
+		delta[1] += normalY * foldOffset;
+		delta[2] += normalZ * foldOffset;
+		const browDroop = gaussianWeight(x, y, z, LANDMARKS.browLeft, 0.65) + gaussianWeight(x, y, z, LANDMARKS.browRight, 0.65);
+		delta[1] += -0.05 * browDroop;
+		const chinWeight = gaussianWeight(x, y, z, LANDMARKS.chin, 0.6);
+		delta[1] += -0.03 * chinWeight;
+		const neckWeight = gaussianWeight(x, y, z, LANDMARKS.neckFront, 0.6);
+		delta[1] += -0.05 * neckWeight;
+		delta[2] += 0.06 * neckWeight;
+	});
+	const morphTargetCount = headDrawable.morphTargetList.length;
+	headModel.update(0);
+
+	//==============================================================================
+	// 페이스 퍼포먼스. (호흡 / 눈 찡그림 / 눈썹 / 미소 / 턱 미세 움직임 / 시선 따라 머리 회전)
+	//==============================================================================
+	const performance = {
+		breathPhase: 0,
+		nextSqueezeTime: 2.2,
+		squeezeStartTime: -10,
+		expressionName: null,
+		expressionStartTime: 0,
+		expressionDuration: 0,
+		expressionPeak: 0,
+		nextExpressionTime: 3.5,
+		currentYaw: 0,
+		currentPitch: 0,
+		currentRoll: 0,
+		animationBlend: 1,
+		agingBlend: 1,
+		isAgedMaterialApplied: true,
+	};
+	const pointerState = {
+		normalizedX: 0,
+		normalizedY: 0,
+		hasMoved: false,
+	};
+
+	// 부드러운 언덕 포락선. (상승 / 유지 / 하강)
+	function bumpEnvelope(localTime, duration, attack, release) {
+		const rise = smoothstepValue(0, attack, localTime);
+		const fall = 1 - smoothstepValue(duration - release, duration, localTime);
+		return rise * fall;
+	}
+
+	function updatePerformance(elapsedTime, deltaTime) {
+		const targetBlend = optionStates.animation ? 1 : 0;
+		performance.animationBlend += (targetBlend - performance.animationBlend) * System.Math.min(1, deltaTime * 3);
+		const blend = performance.animationBlend;
+
+		// 호흡.
+		performance.breathPhase += deltaTime / 4.6;
+		const breath = 0.5 - 0.5 * System.Math.cos(performance.breathPhase * System.Math.PI * 2);
+		headModel.setMorphWeight("breath", breath * 0.9 * blend);
+
+		// 눈 찡그림. (감은 눈꺼풀이 잠깐 조여지는 순간)
+		if (elapsedTime >= performance.nextSqueezeTime) {
+			performance.squeezeStartTime = elapsedTime;
+			performance.nextSqueezeTime = elapsedTime + 3 + System.Math.random() * 4.5;
+		}
+		const squeezeLocal = elapsedTime - performance.squeezeStartTime;
+		const squeeze = squeezeLocal >= 0 && squeezeLocal < 0.42 ? System.Math.sin(squeezeLocal / 0.42 * System.Math.PI) : 0;
+		headModel.setMorphWeight("eyeSqueeze", squeeze * blend);
+
+		// 표정 이벤트. (눈썹 올림 / 미간 찌푸림 / 옅은 미소 / 턱 씰룩임)
+		if (elapsedTime >= performance.nextExpressionTime) {
+			const roll = System.Math.random();
+			if (roll < 0.34) {
+				performance.expressionName = "browRaise";
+				performance.expressionDuration = 1.8 + System.Math.random() * 1.4;
+				performance.expressionPeak = 0.55 + System.Math.random() * 0.45;
+			}
+			else if (roll < 0.58) {
+				performance.expressionName = "browFurrow";
+				performance.expressionDuration = 2.2 + System.Math.random() * 1.6;
+				performance.expressionPeak = 0.5 + System.Math.random() * 0.4;
+			}
+			else if (roll < 0.84) {
+				performance.expressionName = "smile";
+				performance.expressionDuration = 2.8 + System.Math.random() * 2;
+				performance.expressionPeak = 0.35 + System.Math.random() * 0.4;
+			}
+			else {
+				performance.expressionName = "jawOpen";
+				performance.expressionDuration = 1.1 + System.Math.random() * 0.6;
+				performance.expressionPeak = 0.18 + System.Math.random() * 0.14;
+			}
+			performance.expressionStartTime = elapsedTime;
+			performance.nextExpressionTime = elapsedTime + performance.expressionDuration + 1.5 + System.Math.random() * 4;
+		}
+		const expressionLocal = elapsedTime - performance.expressionStartTime;
+		const expressionValue = performance.expressionName && expressionLocal < performance.expressionDuration ? bumpEnvelope(expressionLocal, performance.expressionDuration, 0.55, 0.8) * performance.expressionPeak : 0;
+		for (const expressionName of ["browRaise", "browFurrow", "smile"]) {
+			headModel.setMorphWeight(expressionName, (performance.expressionName === expressionName ? expressionValue : 0) * blend);
+		}
+		const jawIdle = 0.05 + 0.04 * (valueNoise(elapsedTime * 0.6, 3.7) - 0.5) * 2;
+		const jawEvent = performance.expressionName === "jawOpen" ? expressionValue : 0;
+		headModel.setMorphWeight("jawOpen", (jawIdle + jawEvent) * blend);
+
+		// 머리 회전. (포인터 방향 + 느린 배회 — 지수 접근)
+		const wanderYaw = 0.32 * System.Math.sin(elapsedTime * 0.23) + 0.18 * System.Math.sin(elapsedTime * 0.61 + 1.3);
+		const wanderPitch = 0.14 * System.Math.sin(elapsedTime * 0.31 + 0.6) - breath * 0.06;
+		const wanderRoll = 0.12 * System.Math.sin(elapsedTime * 0.17 + 2.1);
+		const followYaw = pointerState.hasMoved ? pointerState.normalizedX * 0.85 : 0;
+		const followPitch = pointerState.hasMoved ? pointerState.normalizedY * 0.55 : 0;
+		const targetYaw = clampValue(wanderYaw + followYaw, -1.2, 1.2);
+		const targetPitch = clampValue(wanderPitch + followPitch, -0.8, 0.8);
+		const approach = System.Math.min(1, deltaTime * 2.2);
+		performance.currentYaw += (targetYaw - performance.currentYaw) * approach;
+		performance.currentPitch += (targetPitch - performance.currentPitch) * approach;
+		performance.currentRoll += (wanderRoll - performance.currentRoll) * approach;
+		headModel.setMorphWeight("headYaw", performance.currentYaw * blend);
+		headModel.setMorphWeight("headPitch", performance.currentPitch * blend);
+		headModel.setMorphWeight("headRoll", performance.currentRoll * blend);
+
+		// 노화 전환. (처짐 모프 + 노멀 / 디테일 강도 보간, 절반 지점에서 머티리얼 교체)
+		const agingTarget = optionStates.aging ? 1 : 0;
+		performance.agingBlend += (agingTarget - performance.agingBlend) * System.Math.min(1, deltaTime * 2.5);
+		const agingBlend = performance.agingBlend;
+		headModel.setMorphWeight("ageSag", agingBlend);
+		skinRenderer.setNormalStrength(mixValue(1.0, 1.35, agingBlend));
+		skinRenderer.setDetailStrength(optionStates.detail ? mixValue(6, 8, agingBlend) : 0);
+		skinRenderer.setCavityStrength(optionStates.detail ? mixValue(5, 7, agingBlend) : 0);
+		skinRenderer.setRoughnessRange(mixValue(0.3, 0.36, agingBlend), mixValue(0.6, 0.7, agingBlend));
+		const shouldApplyAged = agingBlend > 0.5;
+		if (shouldApplyAged !== performance.isAgedMaterialApplied) {
+			performance.isAgedMaterialApplied = shouldApplyAged;
+			headModel.setMaterial(0, shouldApplyAged ? agedMaterial : originalMaterial);
+		}
+	}
+
+	//==============================================================================
+	// 카메라 / 입력. (드래그 궤도 회전, 휠 줌, 포인터 이동 = 머리 방향)
+	//==============================================================================
+	const cameraState = {
+		yaw: 0.16,
+		pitch: 0.04,
+		distance: 15,
+		targetYaw: 0.16,
+		targetPitch: 0.04,
+		targetDistance: 15,
+		isDragging: false,
+		dragPointerId: -1,
+		lastPointerX: 0,
+		lastPointerY: 0,
+	};
+
+	canvas.addEventListener("pointerdown", (event) => {
+		cameraState.isDragging = true;
+		cameraState.dragPointerId = event.pointerId;
+		cameraState.lastPointerX = event.clientX;
+		cameraState.lastPointerY = event.clientY;
+		canvas.classList.add("dragging");
+		canvas.setPointerCapture(event.pointerId);
+	});
+	canvas.addEventListener("pointermove", (event) => {
+		if (cameraState.isDragging && event.pointerId === cameraState.dragPointerId) {
+			const deltaX = event.clientX - cameraState.lastPointerX;
+			const deltaY = event.clientY - cameraState.lastPointerY;
+			cameraState.lastPointerX = event.clientX;
+			cameraState.lastPointerY = event.clientY;
+			cameraState.targetYaw = clampValue(cameraState.targetYaw - deltaX * 0.006, -1.25, 1.25);
+			cameraState.targetPitch = clampValue(cameraState.targetPitch + deltaY * 0.004, -0.4, 0.55);
+			return;
+		}
+		pointerState.normalizedX = clampValue((event.clientX / System.window.innerWidth) * 2 - 1, -1, 1);
+		pointerState.normalizedY = clampValue((event.clientY / System.window.innerHeight) * 2 - 1, -1, 1);
+		pointerState.hasMoved = true;
+	});
+	function endDrag(event) {
+		if (event.pointerId === cameraState.dragPointerId) {
+			cameraState.isDragging = false;
+			cameraState.dragPointerId = -1;
+			canvas.classList.remove("dragging");
+		}
+	}
+	canvas.addEventListener("pointerup", endDrag);
+	canvas.addEventListener("pointercancel", endDrag);
+	canvas.addEventListener("wheel", (event) => {
+		event.preventDefault();
+		cameraState.targetDistance = clampValue(cameraState.targetDistance + event.deltaY * 0.01, CAMERA_MINIMUM_DISTANCE, CAMERA_MAXIMUM_DISTANCE);
+	}, { passive: false });
+	System.window.addEventListener("keydown", (event) => {
+		const optionIndex = System.parseInt(event.key, 10) - 1;
+		if (optionIndex >= 0 && optionIndex < optionDefinitions.length) {
+			toggleOption(optionDefinitions[optionIndex].name);
+		}
+	});
+
+	//==============================================================================
+	// 리사이즈.
+	//==============================================================================
+	function resizeCanvas() {
+		const devicePixelRatio = System.Math.min(System.window.devicePixelRatio || 1, 2);
+		const displayWidth = System.Math.floor(canvas.clientWidth * devicePixelRatio);
+		const displayHeight = System.Math.floor(canvas.clientHeight * devicePixelRatio);
+		if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+			canvas.width = displayWidth;
+			canvas.height = displayHeight;
+			sceneRenderTarget.resize(displayWidth, displayHeight);
+			hdrRenderTarget.resize(displayWidth, displayHeight);
+			ldrRenderTarget.resize(displayWidth, displayHeight);
+			subsurfaceEffect.resize(displayWidth, displayHeight);
+			bloomEffect.resize(displayWidth, displayHeight);
+		}
+	}
+
+	//==============================================================================
+	// HUD. (우측 하단 렌더링 정보 — 엔진 Graphic 으로 캔버스 안에 렌더링)
+	//==============================================================================
+	const statistics = {
+		smoothedFrameSeconds: 1 / 60,
+		drawCallCount: 0,
+	};
+	const triangleCount = headDrawable.indexCount / 3;
+
+	function renderHud() {
+		const devicePixelRatio = System.Math.min(System.window.devicePixelRatio || 1, 2);
+		const cssWidth = System.window.innerWidth;
+		const cssHeight = System.window.innerHeight;
+		uiGraphic.applySettings(null);
+		uiGraphic.scale(devicePixelRatio, devicePixelRatio);
+		uiGraphic.setGlobalAlpha(1);
+
+		const rowHeight = 16;
+		const rows = [
+			["fps", System.Math.round(1 / System.Math.max(statistics.smoothedFrameSeconds, 0.0001)).toString()],
+			["frame", (statistics.smoothedFrameSeconds * 1000).toFixed(1) + " ms"],
+			["render", canvas.width + " x " + canvas.height],
+			["triangles", triangleCount.toLocaleString("en-US")],
+			["vertices", vertexCount.toLocaleString("en-US")],
+			["draw calls", statistics.drawCallCount.toString()],
+			["morph targets", morphTargetCount.toString()],
+		];
+		const panelWidth = 178;
+		const panelHeight = rows.length * rowHeight + 18;
+		const panelX = cssWidth - panelWidth - 18;
+		const panelY = cssHeight - panelHeight - 18;
+		const panelRect = Rect.create(panelX, panelY, panelWidth, panelHeight);
+		uiGraphic.setFillColor("rgba(14, 12, 14, 0.55)");
+		uiGraphic.drawRoundRect(panelRect, 10);
+		uiGraphic.setStrokeColor("rgba(242, 236, 226, 0.14)");
+		uiGraphic.drawStrokeRoundRect(panelRect, 10, 1);
+		uiGraphic.setFontString(`400 10.5px "Segoe UI", "Malgun Gothic", sans-serif`);
+		uiGraphic.setTextBaseline("middle");
+		for (let rowIndex = 0; rowIndex < rows.length; ++rowIndex) {
+			const rowY = panelY + 9 + rowHeight * rowIndex + rowHeight * 0.5;
+			uiGraphic.setTextAlign("left");
+			uiGraphic.setFillColor("rgba(242, 236, 226, 0.45)");
+			uiGraphic.drawFillText(rows[rowIndex][0], panelX + 14, rowY);
+			uiGraphic.setTextAlign("right");
+			uiGraphic.setFillColor("rgba(242, 236, 226, 0.88)");
+			uiGraphic.drawFillText(rows[rowIndex][1], panelX + panelWidth - 14, rowY);
+		}
+	}
+
+	//==============================================================================
+	// 메인 루프. (섀도우 깊이 → 피부 MRT → 화면 공간 SSS → 합성(HDR) → 블룸 → 톤 매핑 → FXAA → HUD)
+	//==============================================================================
+	const startTimestamp = System.performance.now();
+	let previousTimestamp = startTimestamp;
+	const identityModelMatrix = Matrix4.createIdentity();
+	const identityModelElements = identityModelMatrix.getElements();
+	const shadowFocusPosition = Vector3.create(-0.05, 1.0, 0.6);
+	const shadowLightTravelDirection = KEY_LIGHT_DIRECTION.multiply(-1);
+
+	function renderFrame() {
+		resizeCanvas();
+		const currentTimestamp = System.performance.now();
+		const elapsedTime = (currentTimestamp - startTimestamp) / 1000;
+		const deltaTime = System.Math.min((currentTimestamp - previousTimestamp) / 1000, 0.1);
+		previousTimestamp = currentTimestamp;
+		statistics.smoothedFrameSeconds = statistics.smoothedFrameSeconds * 0.92 + deltaTime * 0.08;
+		const aspectRatio = canvas.width / canvas.height;
+		let drawCallCount = 0;
+
+		// 카메라. (목표값 지수 접근 + 미세한 자동 흔들림)
+		const cameraApproach = System.Math.min(1, deltaTime * 5);
+		cameraState.yaw += (cameraState.targetYaw - cameraState.yaw) * cameraApproach;
+		cameraState.pitch += (cameraState.targetPitch - cameraState.pitch) * cameraApproach;
+		cameraState.distance += (cameraState.targetDistance - cameraState.distance) * cameraApproach;
+		const swayYaw = cameraState.yaw + System.Math.sin(elapsedTime * 0.19) * 0.02;
+		const swayPitch = cameraState.pitch + System.Math.sin(elapsedTime * 0.27 + 1) * 0.01;
+		const cameraX = CAMERA_TARGET.x + System.Math.sin(swayYaw) * System.Math.cos(swayPitch) * cameraState.distance;
+		const cameraY = CAMERA_TARGET.y + System.Math.sin(swayPitch) * cameraState.distance;
+		const cameraZ = CAMERA_TARGET.z + System.Math.cos(swayYaw) * System.Math.cos(swayPitch) * cameraState.distance;
+		const cameraPosition = Vector3.create(cameraX, cameraY, cameraZ);
+		const viewMatrix = Matrix4.createLookAt(cameraPosition, CAMERA_TARGET, Vector3.up());
+		const projectionMatrix = Matrix4.createPerspective(CAMERA_FIELD_OF_VIEW, aspectRatio, CAMERA_NEAR_DISTANCE, CAMERA_FAR_DISTANCE);
+		const viewProjectionMatrix = projectionMatrix.clone();
+		viewProjectionMatrix.multiply(viewMatrix);
+		const viewProjectionElements = viewProjectionMatrix.getElements();
+
+		// 애니메이션.
+		updatePerformance(elapsedTime, deltaTime);
+		headModel.update(deltaTime);
+
+		// === 1. 섀도우 깊이 패스 (키 라이트) ===
+		webGL2RenderingContext.enable(webGL2RenderingContext.CULL_FACE);
+		webGL2RenderingContext.cullFace(webGL2RenderingContext.BACK);
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		shadowMap.updateLightMatrix(shadowFocusPosition, shadowLightTravelDirection, 5.6, 2, 30);
+		const lightViewProjectionMatrix = shadowMap.getLightViewProjectionMatrix();
+		const lightViewProjectionElements = lightViewProjectionMatrix.getElements();
+		if (optionStates.shadow) {
+			shadowMap.beginRender();
+			skinRenderer.drawDepth(headModel, lightViewProjectionElements, identityModelElements);
+			drawCallCount += 1;
+		}
+		const shadowDepthTexture = shadowMap.getDepthTexture();
+		skinRenderer.setShadowMap(shadowDepthTexture, lightViewProjectionElements, 1 / SHADOWMAP_RESOLUTION);
+		skinRenderer.setShadowStrength(optionStates.shadow ? 1 : 0);
+
+		// === 2. 피부 MRT 패스 (조도 / 알베도 / 스펙큘러 + 깊이) ===
+		sceneRenderTarget.bind();
+		webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+		webGL2RenderingContext.depthMask(true);
+		webGL2RenderingContext.clearColor(0, 0, 0, 0);
+		webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+		skinRenderer.draw(headModel, viewProjectionElements, identityModelElements, cameraX, cameraY, cameraZ);
+		drawCallCount += 1;
+
+		// === 3. 화면 공간 서브서피스 스캐터링 ===
+		const irradianceTexture = sceneRenderTarget.getColorTexture(0);
+		const albedoTexture = sceneRenderTarget.getColorTexture(1);
+		const specularTexture = sceneRenderTarget.getColorTexture(2);
+		const sceneDepthTexture = sceneRenderTarget.getDepthTexture();
+		let scatteredIrradianceTexture = irradianceTexture;
+		if (optionStates.subsurface) {
+			subsurfaceEffect.render(irradianceTexture, sceneDepthTexture, CAMERA_FIELD_OF_VIEW, aspectRatio, CAMERA_NEAR_DISTANCE, CAMERA_FAR_DISTANCE);
+			scatteredIrradianceTexture = subsurfaceEffect.getResultTexture();
+			drawCallCount += 2;
+		}
+
+		// === 4. 합성 → HDR (조도 x 알베도 + 스펙큘러 + 배경) ===
+		hdrRenderTarget.bind();
+		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+		combinePass.use();
+		webGL2RenderingContext.uniform1i(combinePass.getUniformLocation("irradianceTexture"), 0);
+		webGL2RenderingContext.uniform1i(combinePass.getUniformLocation("albedoTexture"), 1);
+		webGL2RenderingContext.uniform1i(combinePass.getUniformLocation("specularTexture"), 2);
+		webGL2RenderingContext.uniform1f(combinePass.getUniformLocation("aspectRatio"), aspectRatio);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, scatteredIrradianceTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, albedoTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE2);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, specularTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		combinePass.draw();
+		drawCallCount += 1;
+
+		// === 5. 블룸 ===
+		const hdrColorTexture = hdrRenderTarget.getColorTexture();
+		if (optionStates.bloom) {
+			bloomEffect.render(hdrColorTexture);
+			const bloomIterationCount = bloomEffect.getIterationCount();
+			drawCallCount += 1 + bloomIterationCount * 2;
+		}
+
+		// === 6. 톤 매핑 합성 → LDR (FXAA 켜짐) 또는 화면 ===
+		if (optionStates.antialias) {
+			ldrRenderTarget.bind();
+		}
+		else {
+			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+			webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
+		}
+		compositePass.use();
+		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("sceneTexture"), 0);
+		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("bloomTexture"), 1);
+		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("exposure"), 0.72);
+		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("bloomStrength"), optionStates.bloom ? 0.12 : 0);
+		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("vignetteStrength"), 0.5);
+		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("grainStrength"), 0.018);
+		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("elapsedTime"), elapsedTime);
+		webGL2RenderingContext.uniform2f(compositePass.getUniformLocation("resolution"), canvas.width, canvas.height);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, hdrColorTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+		const bloomResultTexture = optionStates.bloom ? bloomEffect.getResultTexture() : hdrColorTexture;
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, bloomResultTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		compositePass.draw();
+		drawCallCount += 1;
+
+		// === 7. FXAA → 화면 ===
+		if (optionStates.antialias) {
+			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+			webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
+			antialiasPass.use();
+			webGL2RenderingContext.uniform1i(antialiasPass.getUniformLocation("sourceTexture"), 0);
+			webGL2RenderingContext.uniform2f(antialiasPass.getUniformLocation("texelSize"), 1 / canvas.width, 1 / canvas.height);
+			const ldrColorTexture = ldrRenderTarget.getColorTexture();
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, ldrColorTexture);
+			antialiasPass.draw();
+			drawCallCount += 1;
+		}
+
+		// === 8. HUD (엔진 Graphic — 프리멀티플라이드 알파 블렌딩, 컬링 해제) ===
+		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
+		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
+		statistics.drawCallCount = drawCallCount;
+		renderHud();
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+
+
+		System.window.requestAnimationFrame(renderFrame);
+	}
+
+
+	System.document.getElementById("loadingOverlay").classList.add("hidden");
+	System.window.requestAnimationFrame(renderFrame);
+	</script>
+</body>
+</html>

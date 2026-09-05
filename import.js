@@ -133,6 +133,8 @@ export { FullscreenPass } from "./src/experimental/graphics/fullscreenpass.js";
 export { BloomEffect } from "./src/experimental/graphics/bloomeffect.js";
 export { SkinnedModel } from "./src/experimental/graphics/skinnedmodel.js";
 export { SkinnedModelRenderer } from "./src/experimental/graphics/skinnedmodelrenderer.js";
+export { HumanSkinRenderer } from "./src/experimental/graphics/humanskinrenderer.js";
+export { SubsurfaceScatteringEffect } from "./src/experimental/graphics/subsurfacescatteringeffect.js";
 export { Material } from "./src/experimental/graphics/material.js";
 export { ShadowMap } from "./src/experimental/graphics/shadowmap.js";
 export { Action } from "./src/experimental/action.js";

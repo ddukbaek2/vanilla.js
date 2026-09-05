@@ -4,12 +4,44 @@
 const System = globalThis;
 import { Object } from "../../base/object.js";
 import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
+import { MORPH_TARGET_MAXIMUM } from "./skinnedmodel.js";
 
 
 //==============================================================================
 // 전역 상수 목록.
 //==============================================================================
-// 스키닝 버텍스 셰이더. (조인트 4개 가중 혼합 — 어트리뷰트 위치 고정)
+// 모프 타깃 텍스처 유닛. (머티리얼 슬롯 0 / 2~8, 섀도우 맵 1, 추가 슬롯 9~ 와 겹치지 않는 값)
+const MORPH_TEXTURE_UNIT = 15;
+
+// 모프 타깃 GLSL. (버텍스 셰이더 삽입 — 실수 텍스처의 위치/노멀 델타를 가중 합산)
+// - 텍셀 인덱스 = gl_VertexID, 타깃 블록 = [위치 행들][노멀 행들] 순서.
+const MORPH_GLSL = `
+uniform sampler2D morphTexture;
+uniform int morphTargetCount;
+uniform int morphRowsPerTarget;
+uniform int morphTextureWidth;
+uniform float morphWeights[${MORPH_TARGET_MAXIMUM}];
+
+vec3 fetchMorphDelta(int blockRow, int vertexIndex) {
+	int texelX = vertexIndex % morphTextureWidth;
+	int texelY = blockRow + vertexIndex / morphTextureWidth;
+	return texelFetch(morphTexture, ivec2(texelX, texelY), 0).xyz;
+}
+
+void applyMorphTargets(inout vec3 position, inout vec3 normal) {
+	for (int targetIndex = 0; targetIndex < morphTargetCount; ++targetIndex) {
+		float weight = morphWeights[targetIndex];
+		if (abs(weight) < 0.0001) {
+			continue;
+		}
+		int blockRow = targetIndex * 2 * morphRowsPerTarget;
+		position += weight * fetchMorphDelta(blockRow, gl_VertexID);
+		normal += weight * fetchMorphDelta(blockRow + morphRowsPerTarget, gl_VertexID);
+	}
+}
+`;
+
+// 스키닝 버텍스 셰이더. (모프 타깃 → 조인트 4개 가중 혼합 — 어트리뷰트 위치 고정)
 const SKINNED_VERTEXSHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 vertexPosition;
 layout(location = 1) in vec3 vertexNormal;
@@ -24,17 +56,21 @@ out vec3 worldPosition;
 out vec3 worldNormal;
 out vec2 fragmentTextureCoordinate;
 out vec4 lightSpacePosition;
+${MORPH_GLSL}
 void main() {
+	// 노멀 미보유 모델 가드. (비활성 어트리뷰트는 영벡터 — 위쪽으로 대체)
+	vec3 safeNormal = dot(vertexNormal, vertexNormal) < 0.0001 ? vec3(0.0, 1.0, 0.0) : vertexNormal;
+	vec3 morphedPosition = vertexPosition;
+	vec3 morphedNormal = safeNormal;
+	applyMorphTargets(morphedPosition, morphedNormal);
+
 	mat4 skinMatrix = vertexWeights.x * jointMatrices[vertexJoints.x]
 		+ vertexWeights.y * jointMatrices[vertexJoints.y]
 		+ vertexWeights.z * jointMatrices[vertexJoints.z]
 		+ vertexWeights.w * jointMatrices[vertexJoints.w];
-	vec4 skinnedPosition = modelMatrix * skinMatrix * vec4(vertexPosition, 1.0);
+	vec4 skinnedPosition = modelMatrix * skinMatrix * vec4(morphedPosition, 1.0);
 	worldPosition = skinnedPosition.xyz;
-
-	// 노멀 미보유 모델 가드. (비활성 어트리뷰트는 영벡터 — 위쪽으로 대체)
-	vec3 safeNormal = dot(vertexNormal, vertexNormal) < 0.0001 ? vec3(0.0, 1.0, 0.0) : vertexNormal;
-	worldNormal = normalize(mat3(modelMatrix) * mat3(skinMatrix) * safeNormal);
+	worldNormal = normalize(mat3(modelMatrix) * mat3(skinMatrix) * normalize(morphedNormal));
 	fragmentTextureCoordinate = vertexTextureCoordinate;
 	lightSpacePosition = lightViewProjectionMatrix * skinnedPosition;
 	gl_Position = viewProjectionMatrix * skinnedPosition;
@@ -176,7 +212,7 @@ void main() {
 }
 `;
 
-// 깊이 전용 스키닝 버텍스 셰이더. (섀도우 맵 캐스팅)
+// 깊이 전용 스키닝 버텍스 셰이더. (섀도우 맵 캐스팅 — 모프 타깃 포함)
 const SKINNED_DEPTH_VERTEXSHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 vertexPosition;
 layout(location = 3) in uvec4 vertexJoints;
@@ -184,12 +220,16 @@ layout(location = 4) in vec4 vertexWeights;
 uniform mat4 modelMatrix;
 uniform mat4 lightViewProjectionMatrix;
 uniform mat4 jointMatrices[96];
+${MORPH_GLSL}
 void main() {
+	vec3 morphedPosition = vertexPosition;
+	vec3 morphedNormal = vec3(0.0, 1.0, 0.0);
+	applyMorphTargets(morphedPosition, morphedNormal);
 	mat4 skinMatrix = vertexWeights.x * jointMatrices[vertexJoints.x]
 		+ vertexWeights.y * jointMatrices[vertexJoints.y]
 		+ vertexWeights.z * jointMatrices[vertexJoints.z]
 		+ vertexWeights.w * jointMatrices[vertexJoints.w];
-	gl_Position = lightViewProjectionMatrix * modelMatrix * skinMatrix * vec4(vertexPosition, 1.0);
+	gl_Position = lightViewProjectionMatrix * modelMatrix * skinMatrix * vec4(morphedPosition, 1.0);
 }
 `;
 
@@ -205,6 +245,8 @@ void main() {
 // 스킨드 모델 렌더러. (스키닝 PBR 셰이더 템플릿 + 환경 상태 소유 — 씬당 하나)
 // - SkinnedModel 은 데이터/포즈만 갖고, 렌더링은 이 객체가 모델 인스턴스를 받아 수행한다.
 // - 환경 상태(섀도우 맵 / 태양 / 안개)는 모델이 아닌 렌더러에 설정한다.
+// - 프래그먼트 셰이더 소스를 주입하면 같은 스키닝/모프 버텍스 경로 위에 다른 셰이딩 템플릿을 세울 수 있다.
+//   (파생 렌더러는 use() 후 고유 유니폼을 설정하고 draw() 를 호출한다)
 //==============================================================================
 export class SkinnedModelRenderer extends Object {
 	//==============================================================================
@@ -227,12 +269,14 @@ export class SkinnedModelRenderer extends Object {
 	/**
 	 * @constructor
 	 * @param { WebGL2RenderingContext } webGL2RenderingContext
+	 * @param { string | null } fragmentShaderSource 대체 프래그먼트 셰이더 소스. (null 이면 기본 PBR)
 	 */
-	constructor(webGL2RenderingContext) {
+	constructor(webGL2RenderingContext, fragmentShaderSource = null) {
 		super();
 
+		const resolvedFragmentShaderSource = fragmentShaderSource ? fragmentShaderSource : SKINNED_FRAGMENTSHADER_SOURCE;
 		this.#webGL2RenderingContext = webGL2RenderingContext;
-		this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_VERTEXSHADER_SOURCE.trim(), SKINNED_FRAGMENTSHADER_SOURCE.trim());
+		this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_VERTEXSHADER_SOURCE.trim(), resolvedFragmentShaderSource.trim());
 		this.#depthShaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_DEPTH_VERTEXSHADER_SOURCE.trim(), SKINNED_DEPTH_FRAGMENTSHADER_SOURCE.trim());
 		this.#shadowMapTexture = null;
 		this.#lightViewProjectionElements = null;
@@ -297,6 +341,7 @@ export class SkinnedModelRenderer extends Object {
 		for (const drawable of drawableList) {
 			const skin = skinList[drawable.skinIndex];
 			webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skin.jointMatrixArray);
+			this.applyMorphUniforms(shaderProgram, drawable);
 			drawable.material.apply();
 			webGL2RenderingContext.bindVertexArray(drawable.vertexArray);
 			if (drawable.isIndexed) {
@@ -331,6 +376,7 @@ export class SkinnedModelRenderer extends Object {
 		for (const drawable of drawableList) {
 			const skin = skinList[drawable.skinIndex];
 			webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skin.jointMatrixArray);
+			this.applyMorphUniforms(depthShaderProgram, drawable);
 			webGL2RenderingContext.bindVertexArray(drawable.vertexArray);
 			if (drawable.isIndexed) {
 				webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, drawable.indexCount, drawable.indexComponentType, drawable.indexByteOffset);
@@ -340,6 +386,34 @@ export class SkinnedModelRenderer extends Object {
 			}
 		}
 		webGL2RenderingContext.bindVertexArray(null);
+	}
+
+	//==============================================================================
+	// 모프 유니폼 적용. (드로어블의 모프 텍스처/가중치 — 타깃이 없으면 개수 0 으로 비활성)
+	//==============================================================================
+	/**
+	 * @param { ShaderProgram } shaderProgram
+	 * @param { object } drawable
+	 */
+	applyMorphUniforms(shaderProgram, drawable) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const morphTargetCountLocation = shaderProgram.getUniformLocation("morphTargetCount");
+		const targetCount = drawable.morphTexture ? drawable.morphTargetList.length : 0;
+		webGL2RenderingContext.uniform1i(morphTargetCountLocation, targetCount);
+		if (targetCount === 0) {
+			return;
+		}
+		const morphRowsPerTargetLocation = shaderProgram.getUniformLocation("morphRowsPerTarget");
+		webGL2RenderingContext.uniform1i(morphRowsPerTargetLocation, drawable.morphRowsPerTarget);
+		const morphTextureWidthLocation = shaderProgram.getUniformLocation("morphTextureWidth");
+		webGL2RenderingContext.uniform1i(morphTextureWidthLocation, drawable.morphTextureWidth);
+		const morphWeightsLocation = shaderProgram.getUniformLocation("morphWeights[0]");
+		webGL2RenderingContext.uniform1fv(morphWeightsLocation, drawable.morphWeights);
+		const morphTextureLocation = shaderProgram.getUniformLocation("morphTexture");
+		webGL2RenderingContext.uniform1i(morphTextureLocation, MORPH_TEXTURE_UNIT);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + MORPH_TEXTURE_UNIT);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, drawable.morphTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 	}
 
 	//==============================================================================
