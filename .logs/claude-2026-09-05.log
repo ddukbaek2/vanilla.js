@@ -41,3 +41,24 @@
 - 엔진: glTF 희소 접근자, 모프 최대 96, 드로어블 materialName, Material.setSubsurfaceFactor / setUseAlphaCutout, 피부 셰이더 sRGB 디코드 · 러프니스 텍스처 · 알파 컷아웃 · 머티리얼별 SSS 마스크.
 - 샘플: 표정 버튼 13종(MB-Lab 프리셋 → 단위 가중치 JSON), 깜빡임 / 호흡은 눈 감기 / 가슴 팽창 단위, 머리는 head / neck 조인트 회전, 각막 제외, 핀치 줌, 정보 패널 홈 링크 회피. 검증: 기본 / HAPPY / ANGRY / SAD 캡처(크롬 1개씩 순차, 즉시 종료).
 - 라이선스: MB-Lab 캐릭터 애셋은 AGPL-3.0 — 페이지에 표기.
+
+## OLD FACE 대체 얼굴 후보 비교
+[21:40 요청 → 22:02 응답]
+- 요청: 생성한 노인이 못생겨서 다른 대체품 요청.
+- MB-Lab 헤드리스 후보 생성 스크립트(character / age / mass / tone / phenotype / body_preset 인자)로 6종 생성: hero(m_ca01 euromediterranean specialtype_hero01, 나이 0.62), ideal(m_ca01 mediterranid type_ideal, 0.68), nordic(m_ca01 nordid, 0.7), eastasian(m_as01, 0.75), latino(m_la01, 0.75), african(m_af01, 0.75).
+- 후보별 미리보기 페이지(examples/oldface_candidates, 임시)를 현재 샘플 파이프라인으로 캡처(크롬 1개씩 순차, 캡처 직후 종료, 잔여 0) → 비교 시트 전송. 선택 대기.
+- 샘플: 카메라 주시점 / 그림자 초점을 눈(human_eyes) 정점 중심에서 계산하도록 수정(후보마다 키가 달라도 얼굴 중앙 유지). node --check 통과. 미커밋.
+
+## OLD FACE: 첫 스캔 노인에 MB-Lab 표정 리그 연결 (wrap)
+[22:05 요청 → 00:25 응답]
+- 요청: 나이 0.6~0.75 후보는 노인이 아님 → 나이 1.0 후보 6종 재생성 후, "제일 처음 노인(스캔)이 제일 낫다, 지금 표정 데이터를 그 노인에 연결할 수 없나".
+- 방식: MB-Lab 토폴로지(눈알 / 치아 / 혀 / 표정 셰이프키 81종 / 골격)를 Lee Perry-Smith 스캔 형상에 감싸는 wrap 파이프라인을 Blender 헤드리스로 구현.
+  1. 정면 직교 렌더 2장 → mediapipe FaceLandmarker(478점) → 카메라 역투영 광선으로 3D 랜드마크(눈 윤곽 제외 436쌍).
+  2. Umeyama 유사 변환(스캔 → 바디 미터 좌표) + 두개골 앵커 24쌍(눈 중심 기준 동일 방향 광선 교점) + 3D 박판 스플라인(커널 -r, 정규화 0.002) → 잔차 평균 0.37mm.
+  3. 피부 정점 최근접 표면 투영 5회(법선 일치 가중, 입안 / 귀 / 눈 주변 제외, 스캔 경계 감쇠, 라플라시안 평활) → 셰이프키 전체와 본에 동일 적용.
+  4. 첫 버전의 노화 처리 이식: 알베도 노화(흰 수염 / 검버섯 / 홍조 / 주름 음영, 스캔 UV 2048)와 주름 골 높이맵(4K), 처짐 모프(ageSag, 눈꺼풀 항 절반)를 오프라인 적용.
+  5. Cycles selected-to-active 베이크(알베도 / 스페큘러 / 노화 높이 / 히트 마스크, 스캔 glb 는 UV v 위 방향이라 이미지 상하 반전) → Python 합성(노멀 / 디테일은 높이 미분, 바깥은 MB-Lab 텍스처 색 맞춤).
+- 시행착오: TPS 커널 부호(+r)로 해 폭주 → -r 로 수정 / 12mm 안쪽 제외 규칙이 두개골 투영을 막아 뒤통수 납작 → 입안 상자로 한정 / 정면 랜드마크만으로 깊이 스케일 미구속 → 두개골 앵커 추가 / 스캔 텍스처 V 반전 / PIL BoxBlur F 모드 미지원 → numpy 누적합 블러.
+- 샘플: 출처 표기(스캔 CC BY 3.0 + MB-Lab AGPL), 속눈썹 드로어블 제외(알파 컷아웃 잔점), 노멀 4K 라벨.
+- 검증: 크롬 1개씩 순차 캡처, 캡처 직후 크롬 / 서버 종료(잔여 0).
+- 결과: 스캔 얼굴에서 표정 13종 전환 확인(HAPPY / ANGRY / SAD / GRIN 캡처), 눈 뜸, 치아 / 혀 표시. NAS portfolio/oldface 배포(index.html + 애셋 5종, eyelash.png 삭제). 임시 디렉토리(oldface_candidates / oldface_first) 정리. 파이프라인 스크립트는 examples/oldface/tools/wrap 에 보관.

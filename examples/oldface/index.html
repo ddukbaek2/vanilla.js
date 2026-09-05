@@ -251,7 +251,7 @@
 	<div id="expressionPanel"></div>
 	<div id="footerNote">
 		DRAG TO ORBIT, WHEEL OR PINCH TO ZOOM, MOVE THE POINTER TO TURN THE HEAD<br>
-		CHARACTER: <a href="https://github.com/animate1978/MB-Lab" target="_blank" rel="noopener">MB-LAB 1.8 (AGPL-3.0)</a>, EXPRESSIONS: MB-LAB FACIAL UNITS AND PRESETS
+		HEAD SCAN: <a href="https://casual-effects.com/data/" target="_blank" rel="noopener">LEE PERRY-SMITH (CC BY 3.0)</a>, RIG AND EXPRESSIONS: <a href="https://github.com/animate1978/MB-Lab" target="_blank" rel="noopener">MB-LAB 1.8 (AGPL-3.0)</a>, WRAPPED IN BLENDER
 	</div>
 	<a id="homeLink" href="https://ddukbaek2.com" target="_blank" rel="noopener">DDUKBAEK2.COM</a>
 	<div id="loadingOverlay">LOADING</div>
@@ -298,7 +298,6 @@
 	const CAMERA_FAR_DISTANCE = 20;
 	const CAMERA_MINIMUM_DISTANCE = 0.42;
 	const CAMERA_MAXIMUM_DISTANCE = 1.9;
-	const CAMERA_TARGET = Vector3.create(0, 1.6, 0.06);
 	const SHADOWMAP_RESOLUTION = 2048;
 	const DETAIL_TEXTURE_SIZE = 4096;
 	const KEY_LIGHT_DIRECTION = Vector3.create(0.5, 0.62, 0.62).normalize();
@@ -329,7 +328,6 @@
 		{ keyword: "human_eyes", albedo: "eye_sclera.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.14, subsurfaceFactor: 0.0 },
 		{ keyword: "Iris", albedo: "eye_iris.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.2, subsurfaceFactor: 0.0 },
 		{ keyword: "pupil", albedo: null, normal: null, roughness: null, opacity: null, baseColorFactor: [0.01, 0.01, 0.01], useDetail: false, roughnessFactor: 0.2, subsurfaceFactor: 0.0 },
-		{ keyword: "eyelash", albedo: "eyelash.png", normal: null, roughness: null, opacity: "eyelash.png", baseColorFactor: null, useDetail: false, roughnessFactor: 0.8, subsurfaceFactor: 0.0 },
 		{ keyword: "teeth", albedo: "teeth_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.45, subsurfaceFactor: 0.25 },
 		{ keyword: "tongue", albedo: "tongue_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.4, subsurfaceFactor: 0.8 },
 		{ keyword: "nails", albedo: "nails_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.5, subsurfaceFactor: 0.5 },
@@ -584,9 +582,10 @@
 	const headModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "./assets/oldman.glb", skinRenderer);
 	const drawableList = headModel.getDrawableList();
 
-	// 각막은 투명 재질이라 그리지 않는다. (불투명 파이프라인 — 홍채와 공막이 가려지지 않도록 제외)
+	// 각막은 투명 재질이라 그리지 않는다. (불투명 파이프라인 — 홍채와 공막이 가려지지 않도록 제외) 속눈썹 띠는 알파 컷아웃 잔점이 남아 제외한다.
 	for (let drawableIndex = drawableList.length - 1; drawableIndex >= 0; --drawableIndex) {
-		if (drawableList[drawableIndex].materialName.includes("cornea")) {
+		const materialName = drawableList[drawableIndex].materialName;
+		if (materialName.includes("cornea") || materialName.includes("eyelash")) {
 			drawableList.splice(drawableIndex, 1);
 		}
 	}
@@ -636,6 +635,26 @@
 		}
 	}
 
+	// 카메라 초점. (공막 프리미티브의 정점 중심 = 눈 높이 — 캐릭터 키가 달라도 얼굴이 화면 중앙에 오도록)
+	const eyeCenter = Vector3.create(0, 1.6, 0.1);
+	for (const drawable of drawableList) {
+		if (!drawable.materialName.includes("human_eyes")) {
+			continue;
+		}
+		const positions = drawable.meshDescription.positions;
+		const eyeVertexCount = positions.length / 3;
+		let sumX = 0;
+		let sumY = 0;
+		let sumZ = 0;
+		for (let vertexIndex = 0; vertexIndex < eyeVertexCount; ++vertexIndex) {
+			sumX += positions[vertexIndex * 3];
+			sumY += positions[vertexIndex * 3 + 1];
+			sumZ += positions[vertexIndex * 3 + 2];
+		}
+		eyeCenter.set(sumX / eyeVertexCount, sumY / eyeVertexCount, sumZ / eyeVertexCount);
+	}
+	const CAMERA_TARGET = Vector3.create(eyeCenter.x, eyeCenter.y - 0.06, eyeCenter.z - 0.08);
+
 	// 통계용 합계.
 	let triangleCount = 0;
 	let vertexCount = 0;
@@ -670,7 +689,6 @@
 		sclera: await createThumbnail("eye_sclera.jpg"),
 		iris: await createThumbnail("eye_iris.jpg"),
 		teeth: await createThumbnail("teeth_albedo.jpg"),
-		eyelash: await createThumbnail("eyelash.png"),
 	};
 	headModel.update(0);
 
@@ -928,7 +946,7 @@
 				lines: [],
 				thumbnails: [
 					{ label: "ALBEDO 2K", image: thumbnails.albedo },
-					{ label: "NORMAL 2K", image: thumbnails.normal },
+					{ label: "NORMAL 4K", image: thumbnails.normal },
 					{ label: "ROUGH 2K", image: thumbnails.roughness },
 					{ label: "DETAIL 4K", image: thumbnails.detail },
 				],
@@ -936,12 +954,11 @@
 			{
 				title: "EYES AND PARTS",
 				isActive: true,
-				lines: ["sclera, iris, pupil, teeth, tongue, eyelash cutout", "no subsurface on eyes and teeth"],
+				lines: ["sclera, iris, pupil, teeth, tongue", "no subsurface on eyes and teeth"],
 				thumbnails: [
 					{ label: "SCLERA", image: thumbnails.sclera },
 					{ label: "IRIS", image: thumbnails.iris },
 					{ label: "TEETH", image: thumbnails.teeth },
-					{ label: "EYELASH", image: thumbnails.eyelash },
 				],
 			},
 			{
@@ -1186,7 +1203,7 @@
 	let previousTimestamp = startTimestamp;
 	const identityModelMatrix = Matrix4.createIdentity();
 	const identityModelElements = identityModelMatrix.getElements();
-	const shadowFocusPosition = Vector3.create(0, 1.58, 0.05);
+	const shadowFocusPosition = Vector3.create(eyeCenter.x, eyeCenter.y - 0.08, eyeCenter.z - 0.09);
 	const shadowLightTravelDirection = KEY_LIGHT_DIRECTION.multiply(-1);
 
 	function renderFrame() {

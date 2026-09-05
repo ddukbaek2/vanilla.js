@@ -1,10 +1,11 @@
 # 업데이트 기록
 
 # 0.5.0-experimental (2026-09-05)
-- OLD FACE 샘플 추가 (examples/oldface) — MB-Lab 1.8.1(AGPL-3.0)로 생성한 노인 캐릭터(골격 + 표정 단위 셰이프키 81종)를 피부 파이프라인으로 렌더링
-  - 애셋 생성: Blender 헤드리스 + MB-Lab 스크립트(examples/oldface/tools/mblab_export.py) — 나이 최대 체형, 눈 UV 병합, 나이 디스플레이스먼트로 노멀 맵 생성
+- OLD FACE 샘플 추가 (examples/oldface) — Lee Perry-Smith 두상 스캔(CC BY 3.0)의 형상 / 피부에 MB-Lab 1.8.1(AGPL-3.0)의 골격 + 눈알 / 치아 / 혀 + 표정 단위 셰이프키 81종을 입힌(wrap) 노인 캐릭터를 피부 파이프라인으로 렌더링
+  - 애셋 생성: Blender 헤드리스 wrap 파이프라인(examples/oldface/tools/wrap) — mediapipe 랜드마크 478점 + 두개골 앵커로 유사 변환 / 3D 박판 스플라인 / 표면 투영해 MB-Lab 토폴로지를 스캔에 맞추고(셰이프키 / 본 동일 적용),
+    스캔 UV 에서 노화(흰 수염 / 검버섯 / 홍조 / 주름 골 높이맵)와 처짐 모프를 적용한 뒤 Cycles 로 알베도 / 스페큘러 / 높이를 새 UV 에 베이크, 높이 미분으로 노멀 / 디테일 합성
   - 표정 버튼 13종(NEUTRAL / HAPPY / GRIN / PEACEFUL / EXCITED / ANGRY / FURIOUS / SAD / PAIN / DISGUSTED / BORED / CONFUSED / EMBARRASSED) — MB-Lab 프리셋을 표정 단위 가중치로 변환해 부드럽게 전환, 깜빡임과 호흡도 애셋 단위 사용
-  - 눈(공막 / 홍채 / 동공 / 속눈썹 컷아웃), 치아, 혀는 부위별 머티리얼로 분리(산란 마스크 0), 각막은 제외
+  - 눈(공막 / 홍채 / 동공), 치아, 혀는 부위별 머티리얼로 분리(산란 마스크 0), 각막과 속눈썹 띠는 제외
   - 머리 방향은 골격 head / neck 조인트 회전 오프셋으로 포인터를 따라감, 폰 핀치 줌, 렌더링 정보 패널이 홈 링크와 겹치면 위로 이동
   - 선형 HDR 피부 파이프라인: 섀도우 깊이 → 피부 MRT(조도 / 알베도 / 스펙큘러) → 화면 공간 SSS → 합성 → 블룸 → ACES 톤 매핑 → FXAA
   - 렌더링 옵션 패널(숫자 키) + 우측 하단 렌더링 정보(fps / 프레임 시간 / 해상도 / 삼각형 / 정점 / 드로우 콜 / 모프 수)
