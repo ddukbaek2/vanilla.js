@@ -1,0 +1,115 @@
+{
+ "neutral": {},
+ "happy": {
+  "Expressions_cheekSneerL_max": 0.1,
+  "Expressions_browOutVertR_max": 0.42,
+  "Expressions_cheekSneerR_max": 0.1,
+  "Expressions_eyeSquintL_max": 0.4,
+  "Expressions_mouthSmile_max": 1.0,
+  "Expressions_eyeSquintR_max": 0.4,
+  "Expressions_mouthSmileL_max": 0.18
+ },
+ "grin": {
+  "Expressions_mouthSmileOpen2_max": 1.0,
+  "Expressions_eyesVert_min": 0.2,
+  "Expressions_browsMidVert_max": 0.6
+ },
+ "angry": {
+  "Expressions_cheekSneerL_max": 1.0,
+  "Expressions_mouthOpenAggr_min": 0.56,
+  "Expressions_browSqueezeL_max": 1.0,
+  "Expressions_cheekSneerR_max": 1.0,
+  "Expressions_browSqueezeR_max": 1.0,
+  "Expressions_browsMidVert_min": 1.0
+ },
+ "furious": {
+  "Expressions_cheekSneerL_max": 1.0,
+  "Expressions_mouthOpenAggr_max": 1.0,
+  "Expressions_browSqueezeL_max": 1.0,
+  "Expressions_cheekSneerR_max": 1.0,
+  "Expressions_browSqueezeR_max": 1.0,
+  "Expressions_browsMidVert_min": 1.0
+ },
+ "sad": {
+  "Expressions_eyesHoriz_min": 0.42,
+  "Expressions_browOutVertR_min": 1.0,
+  "Expressions_eyeClosedL_max": 0.2,
+  "Expressions_eyeClosedPressureL_max": 0.42,
+  "Expressions_browOutVertL_min": 0.36,
+  "Expressions_eyeSquintL_max": 0.12,
+  "Expressions_eyeSquintR_max": 0.12,
+  "Expressions_mouthBite_min": 0.36,
+  "Expressions_eyeClosedR_max": 0.18,
+  "Expressions_browSqueezeL_max": 1.0,
+  "Expressions_eyeClosedPressureR_max": 0.42,
+  "Expressions_mouthOpen_min": 0.18,
+  "Expressions_mouthLowerOut_min": 0.36,
+  "Expressions_browsMidVert_max": 1.0,
+  "Expressions_browSqueezeR_max": 1.0,
+  "Expressions_eyesVert_min": 0.42
+ },
+ "disgusted": {
+  "Expressions_cheekSneerL_max": 0.42,
+  "Expressions_browSqueezeL_max": 0.72,
+  "Expressions_mouthHoriz_max": 0.18,
+  "Expressions_browOutVertR_max": 0.18,
+  "Expressions_mouthOpenAggr_min": 0.96,
+  "Expressions_eyeSquintL_max": 0.3,
+  "Expressions_browsMidVert_min": 0.3
+ },
+ "peaceful": {
+  "Expressions_mouthSmile_max": 0.24,
+  "Expressions_eyeClosedR_max": 1.0,
+  "Expressions_eyeClosedL_max": 1.0,
+  "Expressions_mouthSmileL_max": 0.12
+ },
+ "pain": {
+  "Expressions_cheekSneerL_max": 1.0,
+  "Expressions_browSqueezeL_max": 1.0,
+  "Expressions_browOutVertR_min": 1.0,
+  "Expressions_eyeClosedPressureR_max": 1.0,
+  "Expressions_browOutVertL_min": 1.0,
+  "Expressions_eyeClosedPressureL_max": 1.0,
+  "Expressions_mouthOpen_min": 1.0,
+  "Expressions_browSqueezeR_max": 1.0,
+  "Expressions_cheekSneerR_max": 1.0,
+  "Expressions_browsMidVert_min": 1.0
+ },
+ "bored": {
+  "Expressions_eyeClosedR_min": 0.54,
+  "Expressions_browOutVertR_max": 0.72,
+  "Expressions_eyeClosedL_min": 0.72,
+  "Expressions_browOutVertL_max": 0.78,
+  "Expressions_mouthOpenO_min": 0.48,
+  "Expressions_browsMidVert_max": 0.84,
+  "Expressions_mouthInflated_max": 1.0
+ },
+ "excited": {
+  "Expressions_browOutVertL_max": 1.0,
+  "Expressions_mouthSmileOpen_max": 1.0,
+  "Expressions_browOutVertR_max": 0.66,
+  "Expressions_browsMidVert_max": 1.0
+ },
+ "confused": {
+  "Expressions_cheekSneerL_max": 0.36,
+  "Expressions_browSqueezeL_max": 1.0,
+  "Expressions_eyeSquintL_max": 0.18,
+  "Expressions_eyeClosedR_max": 0.06,
+  "Expressions_mouthOpenAggr_min": 0.36,
+  "Expressions_eyeClosedPressureL_max": 0.06,
+  "Expressions_browsMidVert_max": 0.24,
+  "Expressions_eyesHoriz_max": 0.9,
+  "Expressions_eyeSquintR_max": 0.12,
+  "Expressions_browSqueezeR_max": 0.96,
+  "Expressions_mouthSmileL_max": 0.12
+ },
+ "embarrassed": {
+  "Expressions_eyesVert_min": 0.72,
+  "Expressions_eyeClosedL_max": 0.36,
+  "Expressions_browOutVertL_min": 0.3,
+  "Expressions_eyesHoriz_min": 0.66,
+  "Expressions_browsMidVert_max": 0.72,
+  "Expressions_mouthBite_max": 1.0,
+  "Expressions_eyeClosedR_max": 0.36
+ }
+}

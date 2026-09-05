@@ -12,6 +12,8 @@ import { SkinnedModelRenderer } from "./skinnedmodelrenderer.js";
 // - 조명: 방향광 3개(0번은 섀도우 맵 수신) + 3색 반구 앰비언트 + 조명 방향의 소프트박스 반사 환경.
 // - 노멀: 탄젠트 노멀 맵 + 고해상도 높이 맵 미분 디테일(모공/잔주름) + 캐비티 차폐.
 // - 스펙큘러: 피부 F0(0.028) 이중 로브 GGX + 잔털(스침각 시인) + 환경 BRDF 근사.
+// - 머티리얼: 색 텍스처는 sRGB 8비트로 받아 셰이더에서 디코드, 러프니스 = 범위 x 러프니스 텍스처(G) x roughnessFactor,
+//   SSS 마스크 = subsurfaceAmount x 머티리얼 subsurfaceFactor, 오파시티 텍스처 알파로 컷아웃.
 // - 출력 0: 확산 조도(rgb) + SSS 마스크(a) / 1: 선형 알베도(rgb) + 커버리지(a) / 2: 스펙큘러(rgb).
 const SKIN_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
@@ -22,9 +24,14 @@ in vec4 lightSpacePosition;
 uniform sampler2D baseColorTexture;
 uniform sampler2D normalTexture;
 uniform sampler2D specularTexture;
+uniform sampler2D metallicRoughnessTexture;
 uniform sampler2D occlusionTexture;
+uniform sampler2D opacityTexture;
 uniform sampler2D detailHeightTexture;
 uniform vec3 baseColorFactor;
+uniform float roughnessFactor;
+uniform int useAlphaCutout;
+uniform float subsurfaceFactor;
 uniform highp sampler2DShadow shadowMapTexture;
 uniform float shadowStrength;
 uniform float shadowTexelSize;
@@ -107,10 +114,25 @@ vec3 studioEnvironment(vec3 direction, float roughness) {
 	return environment;
 }
 
+// sRGB → 선형. (색 텍스처는 8비트 sRGB 로 올리고 여기서 디코드한다)
+vec3 decodeSrgb(vec3 encoded) {
+	return pow(max(encoded, vec3(0.0)), vec3(2.2));
+}
+
 void main() {
 	vec2 textureCoordinate = fragmentTextureCoordinate;
-	vec3 albedo = texture(baseColorTexture, textureCoordinate).rgb * baseColorFactor;
+
+	// 알파 컷아웃. (오파시티 텍스처의 알파 — 속눈썹 등)
+	if (useAlphaCutout == 1) {
+		float opacity = texture(opacityTexture, textureCoordinate).a;
+		if (opacity < 0.5) {
+			discard;
+		}
+	}
+
+	vec3 albedo = decodeSrgb(texture(baseColorTexture, textureCoordinate).rgb) * baseColorFactor;
 	float specularMap = texture(specularTexture, textureCoordinate).r;
+	float roughnessMap = texture(metallicRoughnessTexture, textureCoordinate).g;
 	float occlusion = texture(occlusionTexture, textureCoordinate).r;
 
 	vec3 geometryNormal = normalize(worldNormal);
@@ -139,7 +161,7 @@ void main() {
 	float cavity = clamp(1.0 + (heightCenter - heightAverage) * cavityStrength, 0.2, 1.0);
 
 	// 러프니스 / 피부 F0. (스펙큘러 맵이 밝을수록 매끈하고 반사가 강한 부위 — 입술 / 콧등)
-	float roughness = clamp(mix(roughnessRange.y, roughnessRange.x, specularMap), 0.03, 1.0);
+	float roughness = clamp(mix(roughnessRange.y, roughnessRange.x, specularMap) * roughnessMap * roughnessFactor, 0.03, 1.0);
 	float fresnelBase = 0.028 * specularStrength * mix(0.6, 1.4, specularMap);
 	float normalDotView = max(dot(surfaceNormal, viewDirection), 0.0001);
 	float geometryDotView = max(dot(geometryNormal, viewDirection), 0.0);
@@ -189,7 +211,7 @@ void main() {
 	specular += environment * (fresnelBase * environmentScaleBias.x + environmentScaleBias.y) * occlusion;
 	specular *= cavity;
 
-	irradianceOutput = vec4(irradiance, subsurfaceAmount);
+	irradianceOutput = vec4(irradiance, subsurfaceAmount * subsurfaceFactor);
 	albedoOutput = vec4(albedo, 1.0);
 	specularOutput = vec4(specular, 1.0);
 }

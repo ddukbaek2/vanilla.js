@@ -1,21 +1,25 @@
 # 업데이트 기록
 
 # 0.5.0-experimental (2026-09-05)
-- OLD FACE 샘플 추가 (examples/oldface) — 실사 두상 스캔(Lee Perry-Smith, CC BY 3.0)을 노인으로 렌더링
+- OLD FACE 샘플 추가 (examples/oldface) — MB-Lab 1.8.1(AGPL-3.0)로 생성한 노인 캐릭터(골격 + 표정 단위 셰이프키 81종)를 피부 파이프라인으로 렌더링
+  - 애셋 생성: Blender 헤드리스 + MB-Lab 스크립트(examples/oldface/tools/mblab_export.py) — 나이 최대 체형, 눈 UV 병합, 나이 디스플레이스먼트로 노멀 맵 생성
+  - 표정 버튼 13종(NEUTRAL / HAPPY / GRIN / PEACEFUL / EXCITED / ANGRY / FURIOUS / SAD / PAIN / DISGUSTED / BORED / CONFUSED / EMBARRASSED) — MB-Lab 프리셋을 표정 단위 가중치로 변환해 부드럽게 전환, 깜빡임과 호흡도 애셋 단위 사용
+  - 눈(공막 / 홍채 / 동공 / 속눈썹 컷아웃), 치아, 혀는 부위별 머티리얼로 분리(산란 마스크 0), 각막은 제외
+  - 머리 방향은 골격 head / neck 조인트 회전 오프셋으로 포인터를 따라감, 폰 핀치 줌, 렌더링 정보 패널이 홈 링크와 겹치면 위로 이동
   - 선형 HDR 피부 파이프라인: 섀도우 깊이 → 피부 MRT(조도 / 알베도 / 스펙큘러) → 화면 공간 SSS → 합성 → 블룸 → ACES 톤 매핑 → FXAA
-  - 텍스처 노화(흰 수염 / 눈썹, 창백한 피부톤, 홍조, 검버섯, 주름 골 노멀)와 처짐 모프를 CPU 에서 생성
-  - 절차적 모프 타깃 10종으로 페이스 애니메이션 (호흡 / 눈 찡그림 / 눈썹 / 미소 / 턱 / 포인터를 따라가는 머리 회전)
   - 렌더링 옵션 패널(숫자 키) + 우측 하단 렌더링 정보(fps / 프레임 시간 / 해상도 / 삼각형 / 정점 / 드로우 콜 / 모프 수)
   - 와이어프레임 토글(깊이 프리패스로 앞면 모서리만, 모프 / 스키닝 반영), 좌측 머티리얼 그래프 패널(원본 / 노화 텍스처 축소본, 셰이딩 파라미터, MRT / SSS / HDR 중간 버퍼 실시간 미리보기, 토글)
 - experimental/graphics
   - HumanSkinRenderer 추가 (SkinnedModelRenderer 파생 — 3점 조명 + 3색 반구 앰비언트 + 소프트박스 반사 환경,
     탄젠트 노멀 + 4K 높이 미분 디테일 + 캐비티, 피부 F0 이중 로브 GGX + 잔털, 조도 / 알베도 / 스펙큘러 MRT 출력)
   - SubsurfaceScatteringEffect 추가 (분리형 화면 공간 SSS — 피부 확산 프로파일 커널, 깊이 인식, 산란 폭 투영)
-  - SkinnedModel: 스킨 없는 정적 메시 로드(합성 스킨), 모프 타깃(glTF targets / weights 애니메이션 + addMorphTarget / setMorphWeight),
-    드로어블에 메시 CPU 데이터 유지, setMaterial 추가
+  - SkinnedModel: 스킨 없는 정적 메시 로드(합성 스킨), 모프 타깃(glTF targets / weights 애니메이션 + addMorphTarget / setMorphWeight, 최대 96),
+    glTF 희소(sparse) 접근자, 드로어블에 메시 CPU 데이터와 머티리얼 이름 유지, setMaterial 추가
   - SkinnedModelRenderer: 프래그먼트 셰이더 주입 생성자, 모프 타깃 버텍스 경로(실수 텍스처 + gl_VertexID)
   - SkinnedModelRenderer.drawWireframe / SkinnedModel.uploadWireframeIndices: 중복 없는 모서리 선 인덱스로 와이어프레임 출력
-  - Material: sRGB 색 텍스처(SRGB8_ALPHA8), 캔버스 소스 이미지, 이방성 필터, 추가 텍스처 슬롯(setTexture), URL 이미지 서술 로더
+  - Material: sRGB 색 텍스처(SRGB8_ALPHA8), 캔버스 소스 이미지, 이방성 필터, 추가 텍스처 슬롯(setTexture), URL 이미지 서술 로더,
+    머티리얼별 서브서피스 팩터(setSubsurfaceFactor), setUseAlphaCutout
+  - HumanSkinRenderer: 색 텍스처 셰이더 디코드, 러프니스 텍스처(G) x roughnessFactor, 오파시티 알파 컷아웃, 머티리얼별 SSS 마스크
   - RenderTarget: 다중 컬러 어태치먼트(MRT), RGBA16F 실수 컬러, 깊이 텍스처 옵션
 - ParticleSystem: EmitterShape 를 ParticleEmitterShape 로 개명하고, 문자열이던 렌더 모양을 ParticleRenderShape 열거형(circle / rect / streak / image)으로 통일 (값은 기존 문자열과 같아 vfx JSON 은 그대로 호환)
 - UIDropdown: 펼친 목록을 트리 뿌리로 옮겨 그려 나중에 그려지는 형제 노드에 가려지지 않게 수정 (접으면 되돌림)

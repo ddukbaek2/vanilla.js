@@ -26576,6 +26576,8 @@ var Material = class _Material extends Object2 {
   #opacityTexture;
   /** @private @type { Map<string, [number, WebGLTexture]> } */
   #extraTextureBindings;
+  /** @private @type { number } */
+  #subsurfaceFactor;
   //==============================================================================
   // 생성.
   //==============================================================================
@@ -26589,6 +26591,7 @@ var Material = class _Material extends Object2 {
     this.#webGL2RenderingContext = webGL2RenderingContext;
     this.#shaderProgram = shaderProgram;
     this.#extraTextureBindings = new System46.Map();
+    this.#subsurfaceFactor = 1;
     this.#baseColorFactor = [1, 1, 1];
     this.#metallicFactor = 1;
     this.#roughnessFactor = 1;
@@ -26760,6 +26763,9 @@ var Material = class _Material extends Object2 {
     const useAlphaCutout = this.getUseAlphaCutout();
     const useAlphaCutoutLocation = shaderProgram.getUniformLocation("useAlphaCutout");
     webGL2RenderingContext.uniform1i(useAlphaCutoutLocation, useAlphaCutout ? 1 : 0);
+    const subsurfaceFactor = this.getSubsurfaceFactor();
+    const subsurfaceFactorLocation = shaderProgram.getUniformLocation("subsurfaceFactor");
+    webGL2RenderingContext.uniform1f(subsurfaceFactorLocation, subsurfaceFactor);
     const textureBindings = this.getTextureBindings();
     for (const binding of textureBindings) {
       const uniformLocation = shaderProgram.getUniformLocation(binding[0]);
@@ -26824,6 +26830,33 @@ var Material = class _Material extends Object2 {
     return this.#useGlossiness;
   }
   //==============================================================================
+  // 서브서피스 팩터 설정. (피부 셰이더의 화면 공간 산란 마스크 배율 — 눈 / 치아처럼 산란하지 않는 부위는 0)
+  //==============================================================================
+  /**
+   * @param { number } subsurfaceFactor
+   */
+  setSubsurfaceFactor(subsurfaceFactor) {
+    this.#subsurfaceFactor = subsurfaceFactor;
+  }
+  //==============================================================================
+  // 서브서피스 팩터 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getSubsurfaceFactor() {
+    return this.#subsurfaceFactor;
+  }
+  //==============================================================================
+  // 알파 컷아웃 사용 여부 설정. (오파시티 텍스처를 나중에 붙인 머티리얼용)
+  //==============================================================================
+  /**
+   * @param { boolean } useAlphaCutout
+   */
+  setUseAlphaCutout(useAlphaCutout) {
+    this.#useAlphaCutout = useAlphaCutout;
+  }
+  //==============================================================================
   // 알파 컷아웃 사용 여부 반환. (오파시티 맵 보유 시 — 머리카락/속눈썹 등)
   //==============================================================================
   /**
@@ -26883,7 +26916,7 @@ var TYPE_COMPONENT_COUNT_TABLE = {
   MAT4: 16
 };
 var MORPH_TEXTURE_WIDTH = 2048;
-var MORPH_TARGET_MAXIMUM = 32;
+var MORPH_TARGET_MAXIMUM = 96;
 function createQuaternionFromFbxEuler(xDegree, yDegree, zDegree) {
   const degreeToRadian2 = System47.Math.PI / 180;
   const rotationX = Quaternion.createFromEuler(xDegree * degreeToRadian2, 0, 0);
@@ -27063,21 +27096,42 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
   async parseContent(json, binaryBuffer) {
     function readAccessorArray(accessorIndex) {
       const accessor = json.accessors[accessorIndex];
-      const bufferView = json.bufferViews[accessor.bufferView];
       const componentCount = TYPE_COMPONENT_COUNT_TABLE[accessor.type];
       const ArrayConstructor = COMPONENT_ARRAY_TABLE[accessor.componentType];
-      const elementOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
-      const tightByteSize = componentCount * ArrayConstructor.BYTES_PER_ELEMENT;
-      const byteStride = bufferView.byteStride || 0;
-      if (byteStride === 0 || byteStride === tightByteSize) {
-        const sourceArray = new ArrayConstructor(binaryBuffer, elementOffset, accessor.count * componentCount);
-        const copiedArray = new ArrayConstructor(sourceArray);
-        return copiedArray;
+      let resultArray = null;
+      if (accessor.bufferView === void 0) {
+        resultArray = new ArrayConstructor(accessor.count * componentCount);
+      } else {
+        const bufferView = json.bufferViews[accessor.bufferView];
+        const elementOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
+        const tightByteSize = componentCount * ArrayConstructor.BYTES_PER_ELEMENT;
+        const byteStride = bufferView.byteStride || 0;
+        if (byteStride === 0 || byteStride === tightByteSize) {
+          const sourceArray = new ArrayConstructor(binaryBuffer, elementOffset, accessor.count * componentCount);
+          resultArray = new ArrayConstructor(sourceArray);
+        } else {
+          resultArray = new ArrayConstructor(accessor.count * componentCount);
+          for (let elementIndex = 0; elementIndex < accessor.count; ++elementIndex) {
+            const sourceArray = new ArrayConstructor(binaryBuffer, elementOffset + elementIndex * byteStride, componentCount);
+            resultArray.set(sourceArray, elementIndex * componentCount);
+          }
+        }
       }
-      const resultArray = new ArrayConstructor(accessor.count * componentCount);
-      for (let elementIndex = 0; elementIndex < accessor.count; ++elementIndex) {
-        const sourceArray = new ArrayConstructor(binaryBuffer, elementOffset + elementIndex * byteStride, componentCount);
-        resultArray.set(sourceArray, elementIndex * componentCount);
+      if (accessor.sparse) {
+        const sparse = accessor.sparse;
+        const indexBufferView = json.bufferViews[sparse.indices.bufferView];
+        const IndexArrayConstructor = COMPONENT_ARRAY_TABLE[sparse.indices.componentType];
+        const indexOffset = (indexBufferView.byteOffset || 0) + (sparse.indices.byteOffset || 0);
+        const sparseIndices = new IndexArrayConstructor(binaryBuffer, indexOffset, sparse.count);
+        const valueBufferView = json.bufferViews[sparse.values.bufferView];
+        const valueOffset = (valueBufferView.byteOffset || 0) + (sparse.values.byteOffset || 0);
+        const sparseValues = new ArrayConstructor(binaryBuffer, valueOffset, sparse.count * componentCount);
+        for (let sparseIndex = 0; sparseIndex < sparse.count; ++sparseIndex) {
+          const targetElement = sparseIndices[sparseIndex];
+          for (let componentIndex = 0; componentIndex < componentCount; ++componentIndex) {
+            resultArray[targetElement * componentCount + componentIndex] = sparseValues[sparseIndex * componentCount + componentIndex];
+          }
+        }
       }
       return resultArray;
     }
@@ -27212,6 +27266,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         for (let weightIndex = 0; weightIndex < morphTargets.length; ++weightIndex) {
           morphWeights[weightIndex] = baseMorphWeights[weightIndex] !== void 0 ? baseMorphWeights[weightIndex] : 0;
         }
+        const materialName = primitive.material !== void 0 && json.materials[primitive.material].name ? json.materials[primitive.material].name : "";
         meshDescriptionList.push({
           positions,
           normals,
@@ -27221,6 +27276,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
           indices,
           skinIndex: node.skinIndex,
           materialIndex: primitive.material !== void 0 ? primitive.material : -1,
+          materialName,
           nodeIndex,
           morphTargets,
           morphWeights
@@ -27505,6 +27561,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         wireframeIndexComponentType: 0,
         vertexCount: meshDescription.positions.length / 3,
         material,
+        materialName: meshDescription.materialName !== void 0 ? meshDescription.materialName : "",
         skinIndex: meshDescription.skinIndex,
         nodeIndex: meshDescription.nodeIndex !== void 0 ? meshDescription.nodeIndex : -1,
         meshDescription,
@@ -28604,9 +28661,14 @@ in vec4 lightSpacePosition;
 uniform sampler2D baseColorTexture;
 uniform sampler2D normalTexture;
 uniform sampler2D specularTexture;
+uniform sampler2D metallicRoughnessTexture;
 uniform sampler2D occlusionTexture;
+uniform sampler2D opacityTexture;
 uniform sampler2D detailHeightTexture;
 uniform vec3 baseColorFactor;
+uniform float roughnessFactor;
+uniform int useAlphaCutout;
+uniform float subsurfaceFactor;
 uniform highp sampler2DShadow shadowMapTexture;
 uniform float shadowStrength;
 uniform float shadowTexelSize;
@@ -28689,10 +28751,25 @@ vec3 studioEnvironment(vec3 direction, float roughness) {
 	return environment;
 }
 
+// sRGB \u2192 \uC120\uD615. (\uC0C9 \uD14D\uC2A4\uCC98\uB294 8\uBE44\uD2B8 sRGB \uB85C \uC62C\uB9AC\uACE0 \uC5EC\uAE30\uC11C \uB514\uCF54\uB4DC\uD55C\uB2E4)
+vec3 decodeSrgb(vec3 encoded) {
+	return pow(max(encoded, vec3(0.0)), vec3(2.2));
+}
+
 void main() {
 	vec2 textureCoordinate = fragmentTextureCoordinate;
-	vec3 albedo = texture(baseColorTexture, textureCoordinate).rgb * baseColorFactor;
+
+	// \uC54C\uD30C \uCEF7\uC544\uC6C3. (\uC624\uD30C\uC2DC\uD2F0 \uD14D\uC2A4\uCC98\uC758 \uC54C\uD30C \u2014 \uC18D\uB208\uC379 \uB4F1)
+	if (useAlphaCutout == 1) {
+		float opacity = texture(opacityTexture, textureCoordinate).a;
+		if (opacity < 0.5) {
+			discard;
+		}
+	}
+
+	vec3 albedo = decodeSrgb(texture(baseColorTexture, textureCoordinate).rgb) * baseColorFactor;
 	float specularMap = texture(specularTexture, textureCoordinate).r;
+	float roughnessMap = texture(metallicRoughnessTexture, textureCoordinate).g;
 	float occlusion = texture(occlusionTexture, textureCoordinate).r;
 
 	vec3 geometryNormal = normalize(worldNormal);
@@ -28721,7 +28798,7 @@ void main() {
 	float cavity = clamp(1.0 + (heightCenter - heightAverage) * cavityStrength, 0.2, 1.0);
 
 	// \uB7EC\uD504\uB2C8\uC2A4 / \uD53C\uBD80 F0. (\uC2A4\uD399\uD058\uB7EC \uB9F5\uC774 \uBC1D\uC744\uC218\uB85D \uB9E4\uB048\uD558\uACE0 \uBC18\uC0AC\uAC00 \uAC15\uD55C \uBD80\uC704 \u2014 \uC785\uC220 / \uCF67\uB4F1)
-	float roughness = clamp(mix(roughnessRange.y, roughnessRange.x, specularMap), 0.03, 1.0);
+	float roughness = clamp(mix(roughnessRange.y, roughnessRange.x, specularMap) * roughnessMap * roughnessFactor, 0.03, 1.0);
 	float fresnelBase = 0.028 * specularStrength * mix(0.6, 1.4, specularMap);
 	float normalDotView = max(dot(surfaceNormal, viewDirection), 0.0001);
 	float geometryDotView = max(dot(geometryNormal, viewDirection), 0.0);
@@ -28771,7 +28848,7 @@ void main() {
 	specular += environment * (fresnelBase * environmentScaleBias.x + environmentScaleBias.y) * occlusion;
 	specular *= cavity;
 
-	irradianceOutput = vec4(irradiance, subsurfaceAmount);
+	irradianceOutput = vec4(irradiance, subsurfaceAmount * subsurfaceFactor);
 	albedoOutput = vec4(albedo, 1.0);
 	specularOutput = vec4(specular, 1.0);
 }

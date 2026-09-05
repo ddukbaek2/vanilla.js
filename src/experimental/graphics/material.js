@@ -46,6 +46,7 @@ export class Material extends Object {
 	/** @private @type { WebGLTexture } */ #specularTexture;
 	/** @private @type { WebGLTexture } */ #opacityTexture;
 	/** @private @type { Map<string, [number, WebGLTexture]> } */ #extraTextureBindings;
+	/** @private @type { number } */ #subsurfaceFactor;
 
 	//==============================================================================
 	// 생성.
@@ -61,6 +62,7 @@ export class Material extends Object {
 		this.#webGL2RenderingContext = webGL2RenderingContext;
 		this.#shaderProgram = shaderProgram;
 		this.#extraTextureBindings = new System.Map();
+		this.#subsurfaceFactor = 1;
 		this.#baseColorFactor = [1, 1, 1];
 		this.#metallicFactor = 1;
 		this.#roughnessFactor = 1;
@@ -238,6 +240,9 @@ export class Material extends Object {
 		const useAlphaCutout = this.getUseAlphaCutout();
 		const useAlphaCutoutLocation = shaderProgram.getUniformLocation("useAlphaCutout");
 		webGL2RenderingContext.uniform1i(useAlphaCutoutLocation, useAlphaCutout ? 1 : 0);
+		const subsurfaceFactor = this.getSubsurfaceFactor();
+		const subsurfaceFactorLocation = shaderProgram.getUniformLocation("subsurfaceFactor");
+		webGL2RenderingContext.uniform1f(subsurfaceFactorLocation, subsurfaceFactor);
 
 		const textureBindings = this.getTextureBindings();
 		for (const binding of textureBindings) {
@@ -307,6 +312,36 @@ export class Material extends Object {
 	 */
 	getUseGlossiness() {
 		return this.#useGlossiness;
+	}
+
+	//==============================================================================
+	// 서브서피스 팩터 설정. (피부 셰이더의 화면 공간 산란 마스크 배율 — 눈 / 치아처럼 산란하지 않는 부위는 0)
+	//==============================================================================
+	/**
+	 * @param { number } subsurfaceFactor
+	 */
+	setSubsurfaceFactor(subsurfaceFactor) {
+		this.#subsurfaceFactor = subsurfaceFactor;
+	}
+
+	//==============================================================================
+	// 서브서피스 팩터 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getSubsurfaceFactor() {
+		return this.#subsurfaceFactor;
+	}
+
+	//==============================================================================
+	// 알파 컷아웃 사용 여부 설정. (오파시티 텍스처를 나중에 붙인 머티리얼용)
+	//==============================================================================
+	/**
+	 * @param { boolean } useAlphaCutout
+	 */
+	setUseAlphaCutout(useAlphaCutout) {
+		this.#useAlphaCutout = useAlphaCutout;
 	}
 
 	//==============================================================================

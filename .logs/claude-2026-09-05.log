@@ -32,3 +32,12 @@
 - UIDropdown: 펼침 목록이 뒤에 그려지는 형제 노드에 가려지던 문제 → 펼칠 때 목록을 트리 뿌리로 옮기고(월드 → 뿌리 로컬 환산) 접으면 되돌림. 형제 패널이 덮는 테스트 씬으로 확인.
 - UI 쇼케이스: 내비게이션 캡션 CONSOLE → UI SHOWCASE (페이지 제목은 이미 UI Showcase).
 - 배포: portfolio/effects, particleeditor, uishowcase(navigation.uiasset.json + index.html + vanilla.js), oldface vanilla.js.
+
+## OLD FACE 애셋 교체: MB-Lab 노인 캐릭터 + 표정 프리셋
+[19:20 요청 → 21:25 응답]
+- 요청: 애셋 교체(노화 처리 불필요), 눈 뜬 얼굴, 표정(웃음 / 화남 / 슬픔) 자유 전환 — 페이스 리깅 없는 자작 표정 금지, 폰 핀치 줌, 머티리얼 그래프 기본 끔, 렌더링 정보 위로, fps 밑 프레임 시간 제거.
+- 조사: 믹사모 스톡 캐릭터(Remy 등)는 FBX 에 블렌드셰이프 0개, 저장 토큰은 export API 에서 만료. ICT-FaceKit(MIT)은 표정 53종이지만 텍스처 없음. 메타휴먼은 언리얼 밖 사용 불가. Blender 5.1 설치 확인 → MB-Lab 1.8.1(최종판, Blender 4.0+)을 헤드리스로 구동.
+- 애셋: m_ca01 + character_age 1.0 / mass -0.2 / tone -0.3 → finalize → 표정 단위 셰이프키 81종, 눈 UV(Eyes_cornea / Eyes_iris)를 주 UV 로 병합, 이미지 제외 glb 2.99MB. 텍스처는 MB-Lab 원본을 웹용으로 변환(알베도 2K, 4K 범프 → 디테일, 러프니스 → ORM, 나이 디스플레이스먼트 → 노멀 맵(B 아래 규약), 공막 / 홍채 / 치아 / 혀 / 손톱 / 속눈썹 RGBA).
+- 엔진: glTF 희소 접근자, 모프 최대 96, 드로어블 materialName, Material.setSubsurfaceFactor / setUseAlphaCutout, 피부 셰이더 sRGB 디코드 · 러프니스 텍스처 · 알파 컷아웃 · 머티리얼별 SSS 마스크.
+- 샘플: 표정 버튼 13종(MB-Lab 프리셋 → 단위 가중치 JSON), 깜빡임 / 호흡은 눈 감기 / 가슴 팽창 단위, 머리는 head / neck 조인트 회전, 각막 제외, 핀치 줌, 정보 패널 홈 링크 회피. 검증: 기본 / HAPPY / ANGRY / SAD 캡처(크롬 1개씩 순차, 즉시 종료).
+- 라이선스: MB-Lab 캐릭터 애셋은 AGPL-3.0 — 페이지에 표기.

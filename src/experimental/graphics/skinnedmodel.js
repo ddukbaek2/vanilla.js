@@ -38,7 +38,7 @@ const TYPE_COMPONENT_COUNT_TABLE = {
 const MORPH_TEXTURE_WIDTH = 2048;
 
 // 드로어블당 모프 타깃 최대 개수. (셰이더 유니폼 배열 크기와 일치)
-export const MORPH_TARGET_MAXIMUM = 32;
+export const MORPH_TARGET_MAXIMUM = 96;
 
 
 //==============================================================================
@@ -241,24 +241,49 @@ export class SkinnedModel extends Object {
 	 * @param { ArrayBuffer } binaryBuffer
 	 */
 	async parseContent(json, binaryBuffer) {
-		// 접근자 CPU 읽기. (촘촘한 배치 + 인터리브(byteStride) 배치 지원)
+		// 접근자 CPU 읽기. (촘촘한 배치 + 인터리브(byteStride) 배치 + 희소(sparse) 접근자 지원)
 		function readAccessorArray(accessorIndex) {
 			const accessor = json.accessors[accessorIndex];
-			const bufferView = json.bufferViews[accessor.bufferView];
 			const componentCount = TYPE_COMPONENT_COUNT_TABLE[accessor.type];
 			const ArrayConstructor = COMPONENT_ARRAY_TABLE[accessor.componentType];
-			const elementOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
-			const tightByteSize = componentCount * ArrayConstructor.BYTES_PER_ELEMENT;
-			const byteStride = bufferView.byteStride || 0;
-			if (byteStride === 0 || byteStride === tightByteSize) {
-				const sourceArray = new ArrayConstructor(binaryBuffer, elementOffset, accessor.count * componentCount);
-				const copiedArray = new ArrayConstructor(sourceArray);
-				return copiedArray;
+			let resultArray = null;
+			if (accessor.bufferView === undefined) {
+				resultArray = new ArrayConstructor(accessor.count * componentCount);
 			}
-			const resultArray = new ArrayConstructor(accessor.count * componentCount);
-			for (let elementIndex = 0; elementIndex < accessor.count; ++elementIndex) {
-				const sourceArray = new ArrayConstructor(binaryBuffer, elementOffset + elementIndex * byteStride, componentCount);
-				resultArray.set(sourceArray, elementIndex * componentCount);
+			else {
+				const bufferView = json.bufferViews[accessor.bufferView];
+				const elementOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
+				const tightByteSize = componentCount * ArrayConstructor.BYTES_PER_ELEMENT;
+				const byteStride = bufferView.byteStride || 0;
+				if (byteStride === 0 || byteStride === tightByteSize) {
+					const sourceArray = new ArrayConstructor(binaryBuffer, elementOffset, accessor.count * componentCount);
+					resultArray = new ArrayConstructor(sourceArray);
+				}
+				else {
+					resultArray = new ArrayConstructor(accessor.count * componentCount);
+					for (let elementIndex = 0; elementIndex < accessor.count; ++elementIndex) {
+						const sourceArray = new ArrayConstructor(binaryBuffer, elementOffset + elementIndex * byteStride, componentCount);
+						resultArray.set(sourceArray, elementIndex * componentCount);
+					}
+				}
+			}
+
+			// 희소 접근자. (인덱스 목록의 요소만 값으로 덮어쓴다 — 모프 타깃 델타에 흔히 쓰인다)
+			if (accessor.sparse) {
+				const sparse = accessor.sparse;
+				const indexBufferView = json.bufferViews[sparse.indices.bufferView];
+				const IndexArrayConstructor = COMPONENT_ARRAY_TABLE[sparse.indices.componentType];
+				const indexOffset = (indexBufferView.byteOffset || 0) + (sparse.indices.byteOffset || 0);
+				const sparseIndices = new IndexArrayConstructor(binaryBuffer, indexOffset, sparse.count);
+				const valueBufferView = json.bufferViews[sparse.values.bufferView];
+				const valueOffset = (valueBufferView.byteOffset || 0) + (sparse.values.byteOffset || 0);
+				const sparseValues = new ArrayConstructor(binaryBuffer, valueOffset, sparse.count * componentCount);
+				for (let sparseIndex = 0; sparseIndex < sparse.count; ++sparseIndex) {
+					const targetElement = sparseIndices[sparseIndex];
+					for (let componentIndex = 0; componentIndex < componentCount; ++componentIndex) {
+						resultArray[targetElement * componentCount + componentIndex] = sparseValues[sparseIndex * componentCount + componentIndex];
+					}
+				}
 			}
 			return resultArray;
 		}
@@ -407,6 +432,7 @@ export class SkinnedModel extends Object {
 					morphWeights[weightIndex] = baseMorphWeights[weightIndex] !== undefined ? baseMorphWeights[weightIndex] : 0;
 				}
 
+				const materialName = primitive.material !== undefined && json.materials[primitive.material].name ? json.materials[primitive.material].name : "";
 				meshDescriptionList.push({
 					positions: positions,
 					normals: normals,
@@ -416,6 +442,7 @@ export class SkinnedModel extends Object {
 					indices: indices,
 					skinIndex: node.skinIndex,
 					materialIndex: primitive.material !== undefined ? primitive.material : -1,
+					materialName: materialName,
 					nodeIndex: nodeIndex,
 					morphTargets: morphTargets,
 					morphWeights: morphWeights,
@@ -736,6 +763,7 @@ export class SkinnedModel extends Object {
 				wireframeIndexComponentType: 0,
 				vertexCount: meshDescription.positions.length / 3,
 				material: material,
+				materialName: meshDescription.materialName !== undefined ? meshDescription.materialName : "",
 				skinIndex: meshDescription.skinIndex,
 				nodeIndex: meshDescription.nodeIndex !== undefined ? meshDescription.nodeIndex : -1,
 				meshDescription: meshDescription,
