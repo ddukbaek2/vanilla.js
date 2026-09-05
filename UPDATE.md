@@ -6,6 +6,7 @@
   - 텍스처 노화(흰 수염 / 눈썹, 창백한 피부톤, 홍조, 검버섯, 주름 골 노멀)와 처짐 모프를 CPU 에서 생성
   - 절차적 모프 타깃 10종으로 페이스 애니메이션 (호흡 / 눈 찡그림 / 눈썹 / 미소 / 턱 / 포인터를 따라가는 머리 회전)
   - 렌더링 옵션 패널(숫자 키) + 우측 하단 렌더링 정보(fps / 프레임 시간 / 해상도 / 삼각형 / 정점 / 드로우 콜 / 모프 수)
+  - 와이어프레임 토글(깊이 프리패스로 앞면 모서리만, 모프 / 스키닝 반영), 좌측 머티리얼 그래프 패널(원본 / 노화 텍스처 축소본, 셰이딩 파라미터, MRT / SSS / HDR 중간 버퍼 실시간 미리보기, 토글)
 - experimental/graphics
   - HumanSkinRenderer 추가 (SkinnedModelRenderer 파생 — 3점 조명 + 3색 반구 앰비언트 + 소프트박스 반사 환경,
     탄젠트 노멀 + 4K 높이 미분 디테일 + 캐비티, 피부 F0 이중 로브 GGX + 잔털, 조도 / 알베도 / 스펙큘러 MRT 출력)
@@ -13,6 +14,7 @@
   - SkinnedModel: 스킨 없는 정적 메시 로드(합성 스킨), 모프 타깃(glTF targets / weights 애니메이션 + addMorphTarget / setMorphWeight),
     드로어블에 메시 CPU 데이터 유지, setMaterial 추가
   - SkinnedModelRenderer: 프래그먼트 셰이더 주입 생성자, 모프 타깃 버텍스 경로(실수 텍스처 + gl_VertexID)
+  - SkinnedModelRenderer.drawWireframe / SkinnedModel.uploadWireframeIndices: 중복 없는 모서리 선 인덱스로 와이어프레임 출력
   - Material: sRGB 색 텍스처(SRGB8_ALPHA8), 캔버스 소스 이미지, 이방성 필터, 추가 텍스처 슬롯(setTexture), URL 이미지 서술 로더
   - RenderTarget: 다중 컬러 어태치먼트(MRT), RGBA16F 실수 컬러, 깊이 텍스처 옵션
 

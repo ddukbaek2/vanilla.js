@@ -711,9 +711,10 @@ export class SkinnedModel extends Object {
 			// 인덱스. (없는 메시는 drawArrays 로 출력)
 			let indexCount = 0;
 			let indexComponentType = 0;
+			let indexBuffer = null;
 			const isIndexed = meshDescription.indices !== null;
 			if (isIndexed) {
-				const indexBuffer = webGL2RenderingContext.createBuffer();
+				indexBuffer = webGL2RenderingContext.createBuffer();
 				webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
 				webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, meshDescription.indices, webGL2RenderingContext.STATIC_DRAW);
 				indexCount = meshDescription.indices.length;
@@ -726,9 +727,13 @@ export class SkinnedModel extends Object {
 			this.#drawableList.push({
 				vertexArray: vertexArray,
 				isIndexed: isIndexed,
+				indexBuffer: indexBuffer,
 				indexCount: indexCount,
 				indexComponentType: indexComponentType,
 				indexByteOffset: 0,
+				wireframeIndexBuffer: null,
+				wireframeIndexCount: 0,
+				wireframeIndexComponentType: 0,
 				vertexCount: meshDescription.positions.length / 3,
 				material: material,
 				skinIndex: meshDescription.skinIndex,
@@ -742,6 +747,53 @@ export class SkinnedModel extends Object {
 				isMorphDirty: morphTargetList.length > 0,
 			});
 		}
+	}
+
+	//==============================================================================
+	// 와이어프레임 인덱스 업로드. (삼각형 인덱스 → 중복 없는 모서리 선 인덱스, 비인덱스 메시는 삼각형별 3변)
+	// - 드로어블의 버텍스 어레이와 무관한 별도 엘리먼트 버퍼. 렌더러가 선 출력 시 잠시 바꿔 끼운다.
+	//==============================================================================
+	/**
+	 * @param { object } drawable
+	 */
+	uploadWireframeIndices(drawable) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const triangleIndices = drawable.meshDescription.indices;
+		const vertexCount = drawable.vertexCount;
+		const edgeList = [];
+		if (triangleIndices) {
+			const edgeKeySet = new System.Set();
+			const triangleCount = triangleIndices.length / 3;
+			for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
+				for (let cornerIndex = 0; cornerIndex < 3; ++cornerIndex) {
+					const indexA = triangleIndices[triangleIndex * 3 + cornerIndex];
+					const indexB = triangleIndices[triangleIndex * 3 + (cornerIndex + 1) % 3];
+					const minimumIndex = System.Math.min(indexA, indexB);
+					const maximumIndex = System.Math.max(indexA, indexB);
+					const edgeKey = minimumIndex * vertexCount + maximumIndex;
+					if (edgeKeySet.has(edgeKey)) {
+						continue;
+					}
+					edgeKeySet.add(edgeKey);
+					edgeList.push(minimumIndex, maximumIndex);
+				}
+			}
+		}
+		else {
+			for (let vertexIndex = 0; vertexIndex + 2 < vertexCount; vertexIndex += 3) {
+				edgeList.push(vertexIndex, vertexIndex + 1, vertexIndex + 1, vertexIndex + 2, vertexIndex + 2, vertexIndex);
+			}
+		}
+		const useUnsignedInt = vertexCount > 65535;
+		const wireframeIndices = useUnsignedInt ? new System.Uint32Array(edgeList) : new System.Uint16Array(edgeList);
+		const wireframeIndexBuffer = webGL2RenderingContext.createBuffer();
+		webGL2RenderingContext.bindVertexArray(null);
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, wireframeIndexBuffer);
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, wireframeIndices, webGL2RenderingContext.STATIC_DRAW);
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, null);
+		drawable.wireframeIndexBuffer = wireframeIndexBuffer;
+		drawable.wireframeIndexCount = wireframeIndices.length;
+		drawable.wireframeIndexComponentType = useUnsignedInt ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
 	}
 
 	//==============================================================================

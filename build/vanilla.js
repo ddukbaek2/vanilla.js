@@ -27481,9 +27481,10 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       this.bindFloatAttribute(shaderProgram, "vertexWeights", meshDescription.weights, 4);
       let indexCount = 0;
       let indexComponentType = 0;
+      let indexBuffer = null;
       const isIndexed = meshDescription.indices !== null;
       if (isIndexed) {
-        const indexBuffer = webGL2RenderingContext.createBuffer();
+        indexBuffer = webGL2RenderingContext.createBuffer();
         webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
         webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, meshDescription.indices, webGL2RenderingContext.STATIC_DRAW);
         indexCount = meshDescription.indices.length;
@@ -27495,9 +27496,13 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       this.#drawableList.push({
         vertexArray,
         isIndexed,
+        indexBuffer,
         indexCount,
         indexComponentType,
         indexByteOffset: 0,
+        wireframeIndexBuffer: null,
+        wireframeIndexCount: 0,
+        wireframeIndexComponentType: 0,
         vertexCount: meshDescription.positions.length / 3,
         material,
         skinIndex: meshDescription.skinIndex,
@@ -27511,6 +27516,51 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         isMorphDirty: morphTargetList.length > 0
       });
     }
+  }
+  //==============================================================================
+  // 와이어프레임 인덱스 업로드. (삼각형 인덱스 → 중복 없는 모서리 선 인덱스, 비인덱스 메시는 삼각형별 3변)
+  // - 드로어블의 버텍스 어레이와 무관한 별도 엘리먼트 버퍼. 렌더러가 선 출력 시 잠시 바꿔 끼운다.
+  //==============================================================================
+  /**
+   * @param { object } drawable
+   */
+  uploadWireframeIndices(drawable) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const triangleIndices = drawable.meshDescription.indices;
+    const vertexCount = drawable.vertexCount;
+    const edgeList = [];
+    if (triangleIndices) {
+      const edgeKeySet = new System47.Set();
+      const triangleCount = triangleIndices.length / 3;
+      for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
+        for (let cornerIndex = 0; cornerIndex < 3; ++cornerIndex) {
+          const indexA = triangleIndices[triangleIndex * 3 + cornerIndex];
+          const indexB = triangleIndices[triangleIndex * 3 + (cornerIndex + 1) % 3];
+          const minimumIndex = System47.Math.min(indexA, indexB);
+          const maximumIndex = System47.Math.max(indexA, indexB);
+          const edgeKey = minimumIndex * vertexCount + maximumIndex;
+          if (edgeKeySet.has(edgeKey)) {
+            continue;
+          }
+          edgeKeySet.add(edgeKey);
+          edgeList.push(minimumIndex, maximumIndex);
+        }
+      }
+    } else {
+      for (let vertexIndex = 0; vertexIndex + 2 < vertexCount; vertexIndex += 3) {
+        edgeList.push(vertexIndex, vertexIndex + 1, vertexIndex + 1, vertexIndex + 2, vertexIndex + 2, vertexIndex);
+      }
+    }
+    const useUnsignedInt = vertexCount > 65535;
+    const wireframeIndices = useUnsignedInt ? new System47.Uint32Array(edgeList) : new System47.Uint16Array(edgeList);
+    const wireframeIndexBuffer = webGL2RenderingContext.createBuffer();
+    webGL2RenderingContext.bindVertexArray(null);
+    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, wireframeIndexBuffer);
+    webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, wireframeIndices, webGL2RenderingContext.STATIC_DRAW);
+    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, null);
+    drawable.wireframeIndexBuffer = wireframeIndexBuffer;
+    drawable.wireframeIndexCount = wireframeIndices.length;
+    drawable.wireframeIndexComponentType = useUnsignedInt ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
   }
   //==============================================================================
   // 모프 타깃 업로드. (드로어블의 델타 목록 → RGBA32F 텍스처, 타깃마다 위치 블록 + 노멀 블록)
@@ -28212,6 +28262,33 @@ precision highp float;
 void main() {
 }
 `;
+var SKINNED_WIREFRAME_VERTEXSHADER_SOURCE = `#version 300 es
+layout(location = 0) in vec3 vertexPosition;
+layout(location = 3) in uvec4 vertexJoints;
+layout(location = 4) in vec4 vertexWeights;
+uniform mat4 modelMatrix;
+uniform mat4 viewProjectionMatrix;
+uniform mat4 jointMatrices[96];
+${MORPH_GLSL}
+void main() {
+	vec3 morphedPosition = vertexPosition;
+	vec3 morphedNormal = vec3(0.0, 1.0, 0.0);
+	applyMorphTargets(morphedPosition, morphedNormal);
+	mat4 skinMatrix = vertexWeights.x * jointMatrices[vertexJoints.x]
+		+ vertexWeights.y * jointMatrices[vertexJoints.y]
+		+ vertexWeights.z * jointMatrices[vertexJoints.z]
+		+ vertexWeights.w * jointMatrices[vertexJoints.w];
+	gl_Position = viewProjectionMatrix * modelMatrix * skinMatrix * vec4(morphedPosition, 1.0);
+}
+`;
+var SKINNED_WIREFRAME_FRAGMENTSHADER_SOURCE = `#version 300 es
+precision highp float;
+uniform vec4 wireframeColor;
+out vec4 outputColor;
+void main() {
+	outputColor = wireframeColor;
+}
+`;
 var SkinnedModelRenderer = class extends Object2 {
   static {
     __name(this, "SkinnedModelRenderer");
@@ -28225,6 +28302,8 @@ var SkinnedModelRenderer = class extends Object2 {
   #shaderProgram;
   /** @private @type { ShaderProgram } */
   #depthShaderProgram;
+  /** @private @type { ShaderProgram } */
+  #wireframeShaderProgram;
   /** @private @type { WebGLTexture | null } */
   #shadowMapTexture;
   /** @private @type { Float32Array | null } */
@@ -28253,6 +28332,7 @@ var SkinnedModelRenderer = class extends Object2 {
     this.#webGL2RenderingContext = webGL2RenderingContext;
     this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_VERTEXSHADER_SOURCE.trim(), resolvedFragmentShaderSource.trim());
     this.#depthShaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_DEPTH_VERTEXSHADER_SOURCE.trim(), SKINNED_DEPTH_FRAGMENTSHADER_SOURCE.trim());
+    this.#wireframeShaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_WIREFRAME_VERTEXSHADER_SOURCE.trim(), SKINNED_WIREFRAME_FRAGMENTSHADER_SOURCE.trim());
     this.#shadowMapTexture = null;
     this.#lightViewProjectionElements = null;
     this.#shadowStrength = 0;
@@ -28355,6 +28435,46 @@ var SkinnedModelRenderer = class extends Object2 {
     webGL2RenderingContext.bindVertexArray(null);
   }
   //==============================================================================
+  // 와이어프레임 출력. (모서리 선 — 모프 / 스키닝 반영, 블렌드 / 깊이 상태는 호출자가 잡는다)
+  // - 드로어블 버텍스 어레이의 엘리먼트 버퍼를 잠시 선 인덱스로 바꿔 그리고 원래 인덱스로 되돌린다.
+  //==============================================================================
+  /**
+   * @param { SkinnedModel } skinnedModel
+   * @param { Float32Array } viewProjectionElements
+   * @param { Float32Array } modelMatrixElements
+   * @param { number } red
+   * @param { number } green
+   * @param { number } blue
+   * @param { number } alpha
+   */
+  drawWireframe(skinnedModel, viewProjectionElements, modelMatrixElements, red, green, blue, alpha) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const wireframeShaderProgram = this.getWireframeShaderProgram();
+    wireframeShaderProgram.use();
+    const viewProjectionLocation = wireframeShaderProgram.getUniformLocation("viewProjectionMatrix");
+    webGL2RenderingContext.uniformMatrix4fv(viewProjectionLocation, false, viewProjectionElements);
+    const modelMatrixLocation = wireframeShaderProgram.getUniformLocation("modelMatrix");
+    webGL2RenderingContext.uniformMatrix4fv(modelMatrixLocation, false, modelMatrixElements);
+    const wireframeColorLocation = wireframeShaderProgram.getUniformLocation("wireframeColor");
+    webGL2RenderingContext.uniform4f(wireframeColorLocation, red, green, blue, alpha);
+    const jointMatricesLocation = wireframeShaderProgram.getUniformLocation("jointMatrices[0]");
+    const skinList = skinnedModel.getSkinList();
+    const drawableList = skinnedModel.getDrawableList();
+    for (const drawable of drawableList) {
+      if (!drawable.wireframeIndexBuffer) {
+        skinnedModel.uploadWireframeIndices(drawable);
+      }
+      const skin = skinList[drawable.skinIndex];
+      webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skin.jointMatrixArray);
+      this.applyMorphUniforms(wireframeShaderProgram, drawable);
+      webGL2RenderingContext.bindVertexArray(drawable.vertexArray);
+      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, drawable.wireframeIndexBuffer);
+      webGL2RenderingContext.drawElements(webGL2RenderingContext.LINES, drawable.wireframeIndexCount, drawable.wireframeIndexComponentType, 0);
+      webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, drawable.indexBuffer);
+    }
+    webGL2RenderingContext.bindVertexArray(null);
+  }
+  //==============================================================================
   // 모프 유니폼 적용. (드로어블의 모프 텍스처/가중치 — 타깃이 없으면 개수 0 으로 비활성)
   //==============================================================================
   /**
@@ -28452,6 +28572,15 @@ var SkinnedModelRenderer = class extends Object2 {
    */
   getDepthShaderProgram() {
     return this.#depthShaderProgram;
+  }
+  //==============================================================================
+  // 와이어프레임 셰이더 프로그램 반환.
+  //==============================================================================
+  /**
+   * @returns { ShaderProgram }
+   */
+  getWireframeShaderProgram() {
+    return this.#wireframeShaderProgram;
   }
   //==============================================================================
   // 렌더링 컨텍스트 반환.

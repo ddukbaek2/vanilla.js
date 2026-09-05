@@ -240,6 +240,37 @@ void main() {
 }
 `;
 
+// 와이어프레임 버텍스 셰이더. (모프 + 스키닝을 그대로 따르는 선 출력)
+const SKINNED_WIREFRAME_VERTEXSHADER_SOURCE = `#version 300 es
+layout(location = 0) in vec3 vertexPosition;
+layout(location = 3) in uvec4 vertexJoints;
+layout(location = 4) in vec4 vertexWeights;
+uniform mat4 modelMatrix;
+uniform mat4 viewProjectionMatrix;
+uniform mat4 jointMatrices[96];
+${MORPH_GLSL}
+void main() {
+	vec3 morphedPosition = vertexPosition;
+	vec3 morphedNormal = vec3(0.0, 1.0, 0.0);
+	applyMorphTargets(morphedPosition, morphedNormal);
+	mat4 skinMatrix = vertexWeights.x * jointMatrices[vertexJoints.x]
+		+ vertexWeights.y * jointMatrices[vertexJoints.y]
+		+ vertexWeights.z * jointMatrices[vertexJoints.z]
+		+ vertexWeights.w * jointMatrices[vertexJoints.w];
+	gl_Position = viewProjectionMatrix * modelMatrix * skinMatrix * vec4(morphedPosition, 1.0);
+}
+`;
+
+// 와이어프레임 프래그먼트 셰이더. (단색)
+const SKINNED_WIREFRAME_FRAGMENTSHADER_SOURCE = `#version 300 es
+precision highp float;
+uniform vec4 wireframeColor;
+out vec4 outputColor;
+void main() {
+	outputColor = wireframeColor;
+}
+`;
+
 
 //==============================================================================
 // 스킨드 모델 렌더러. (스키닝 PBR 셰이더 템플릿 + 환경 상태 소유 — 씬당 하나)
@@ -255,6 +286,7 @@ export class SkinnedModelRenderer extends Object {
 	/** @private @type { WebGL2RenderingContext } */ #webGL2RenderingContext;
 	/** @private @type { ShaderProgram } */ #shaderProgram;
 	/** @private @type { ShaderProgram } */ #depthShaderProgram;
+	/** @private @type { ShaderProgram } */ #wireframeShaderProgram;
 	/** @private @type { WebGLTexture | null } */ #shadowMapTexture;
 	/** @private @type { Float32Array | null } */ #lightViewProjectionElements;
 	/** @private @type { number } */ #shadowStrength;
@@ -278,6 +310,7 @@ export class SkinnedModelRenderer extends Object {
 		this.#webGL2RenderingContext = webGL2RenderingContext;
 		this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_VERTEXSHADER_SOURCE.trim(), resolvedFragmentShaderSource.trim());
 		this.#depthShaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_DEPTH_VERTEXSHADER_SOURCE.trim(), SKINNED_DEPTH_FRAGMENTSHADER_SOURCE.trim());
+		this.#wireframeShaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_WIREFRAME_VERTEXSHADER_SOURCE.trim(), SKINNED_WIREFRAME_FRAGMENTSHADER_SOURCE.trim());
 		this.#shadowMapTexture = null;
 		this.#lightViewProjectionElements = null;
 		this.#shadowStrength = 0;
@@ -389,6 +422,47 @@ export class SkinnedModelRenderer extends Object {
 	}
 
 	//==============================================================================
+	// 와이어프레임 출력. (모서리 선 — 모프 / 스키닝 반영, 블렌드 / 깊이 상태는 호출자가 잡는다)
+	// - 드로어블 버텍스 어레이의 엘리먼트 버퍼를 잠시 선 인덱스로 바꿔 그리고 원래 인덱스로 되돌린다.
+	//==============================================================================
+	/**
+	 * @param { SkinnedModel } skinnedModel
+	 * @param { Float32Array } viewProjectionElements
+	 * @param { Float32Array } modelMatrixElements
+	 * @param { number } red
+	 * @param { number } green
+	 * @param { number } blue
+	 * @param { number } alpha
+	 */
+	drawWireframe(skinnedModel, viewProjectionElements, modelMatrixElements, red, green, blue, alpha) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const wireframeShaderProgram = this.getWireframeShaderProgram();
+		wireframeShaderProgram.use();
+		const viewProjectionLocation = wireframeShaderProgram.getUniformLocation("viewProjectionMatrix");
+		webGL2RenderingContext.uniformMatrix4fv(viewProjectionLocation, false, viewProjectionElements);
+		const modelMatrixLocation = wireframeShaderProgram.getUniformLocation("modelMatrix");
+		webGL2RenderingContext.uniformMatrix4fv(modelMatrixLocation, false, modelMatrixElements);
+		const wireframeColorLocation = wireframeShaderProgram.getUniformLocation("wireframeColor");
+		webGL2RenderingContext.uniform4f(wireframeColorLocation, red, green, blue, alpha);
+		const jointMatricesLocation = wireframeShaderProgram.getUniformLocation("jointMatrices[0]");
+		const skinList = skinnedModel.getSkinList();
+		const drawableList = skinnedModel.getDrawableList();
+		for (const drawable of drawableList) {
+			if (!drawable.wireframeIndexBuffer) {
+				skinnedModel.uploadWireframeIndices(drawable);
+			}
+			const skin = skinList[drawable.skinIndex];
+			webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skin.jointMatrixArray);
+			this.applyMorphUniforms(wireframeShaderProgram, drawable);
+			webGL2RenderingContext.bindVertexArray(drawable.vertexArray);
+			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, drawable.wireframeIndexBuffer);
+			webGL2RenderingContext.drawElements(webGL2RenderingContext.LINES, drawable.wireframeIndexCount, drawable.wireframeIndexComponentType, 0);
+			webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, drawable.indexBuffer);
+		}
+		webGL2RenderingContext.bindVertexArray(null);
+	}
+
+	//==============================================================================
 	// 모프 유니폼 적용. (드로어블의 모프 텍스처/가중치 — 타깃이 없으면 개수 0 으로 비활성)
 	//==============================================================================
 	/**
@@ -493,6 +567,16 @@ export class SkinnedModelRenderer extends Object {
 	 */
 	getDepthShaderProgram() {
 		return this.#depthShaderProgram;
+	}
+
+	//==============================================================================
+	// 와이어프레임 셰이더 프로그램 반환.
+	//==============================================================================
+	/**
+	 * @returns { ShaderProgram }
+	 */
+	getWireframeShaderProgram() {
+		return this.#wireframeShaderProgram;
 	}
 
 	//==============================================================================

@@ -240,6 +240,7 @@
 	}
 	const Graphic = engineModule.Graphic;
 	const Rect = engineModule.Rect;
+	const Vector2 = engineModule.Vector2;
 	const Vector3 = engineModule.Vector3;
 	const Matrix4 = engineModule.Matrix4;
 	const RenderTarget = engineModule.RenderTarget;
@@ -413,6 +414,26 @@
 	}
 	`;
 
+	// 버퍼 미리보기. (머티리얼 그래프 패널 — 중간 버퍼를 작은 뷰포트에 톤 매핑해 표시)
+	const PREVIEW_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec2 fragmentTextureCoordinate;
+	uniform sampler2D sourceTexture;
+	uniform float displayScale;
+	uniform int useCoverage;
+	out vec4 outputColor;
+
+	void main() {
+		vec4 sourceSample = texture(sourceTexture, fragmentTextureCoordinate);
+		vec3 color = sourceSample.rgb * displayScale;
+		color = color / (1.0 + color);
+		if (useCoverage == 1) {
+			color = mix(vec3(0.05, 0.05, 0.06), color, sourceSample.a);
+		}
+		outputColor = vec4(pow(color, vec3(1.0 / 2.2)), 1.0);
+	}
+	`;
+
 	//==============================================================================
 	// 전역 함수 목록.
 	//==============================================================================
@@ -489,6 +510,7 @@
 	const combinePass = new FullscreenPass(webGL2RenderingContext, COMBINE_FRAGMENTSHADER_SOURCE);
 	const compositePass = new FullscreenPass(webGL2RenderingContext, COMPOSITE_FRAGMENTSHADER_SOURCE);
 	const antialiasPass = new FullscreenPass(webGL2RenderingContext, FXAA_FRAGMENTSHADER_SOURCE);
+	const previewPass = new FullscreenPass(webGL2RenderingContext, PREVIEW_FRAGMENTSHADER_SOURCE);
 
 	// 조명 / 산란 / 블룸 기본값. (선형 공간)
 	skinRenderer.setLight(0, KEY_LIGHT_DIRECTION.x, KEY_LIGHT_DIRECTION.y, KEY_LIGHT_DIRECTION.z, 1.0, 0.92, 0.82, 2.6);
@@ -512,6 +534,8 @@
 		{ name: "antialias", label: "FXAA" },
 		{ name: "animation", label: "FACE ANIMATION" },
 		{ name: "aging", label: "AGING" },
+		{ name: "wireframe", label: "WIREFRAME" },
+		{ name: "materialGraph", label: "MATERIAL GRAPH" },
 	];
 	const optionStates = {
 		subsurface: true,
@@ -521,6 +545,8 @@
 		antialias: true,
 		animation: true,
 		aging: true,
+		wireframe: false,
+		materialGraph: true,
 	};
 	const optionRowElements = {};
 	const optionPanelElement = System.document.getElementById("optionPanel");
@@ -593,6 +619,24 @@
 			element.height = height;
 			return element;
 		}
+		function createThumbnail(imageSource) {
+			const thumbnailCanvas = createCanvas(96, 96);
+			const thumbnailContext = thumbnailCanvas.getContext("2d");
+			thumbnailContext.imageSmoothingEnabled = true;
+			thumbnailContext.imageSmoothingQuality = "high";
+			thumbnailContext.drawImage(imageSource, 0, 0, 96, 96);
+			return thumbnailCanvas;
+		}
+		const specularBitmap = await System.createImageBitmap(new System.Blob([specularDescription.bytes], { type: "image/jpeg" }));
+		const heightBitmap = await System.createImageBitmap(new System.Blob([heightDescription.bytes], { type: "image/jpeg" }));
+		const sourceThumbnails = {
+			albedo: createThumbnail(albedoBitmap),
+			normal: createThumbnail(normalBitmap),
+			specular: createThumbnail(specularBitmap),
+			height: createThumbnail(heightBitmap),
+		};
+		specularBitmap.close();
+		heightBitmap.close();
 		const albedoCanvas = createCanvas(size, size);
 		const albedoContext = albedoCanvas.getContext("2d", { willReadFrequently: true });
 		albedoContext.drawImage(albedoBitmap, 0, 0, size, size);
@@ -870,7 +914,9 @@
 			}
 		}
 		normalContext.putImageData(normalImageData, 0, 0);
-		return { albedoCanvas: albedoCanvas, normalCanvas: normalCanvas };
+		sourceThumbnails.agedAlbedo = createThumbnail(albedoCanvas);
+		sourceThumbnails.agedNormal = createThumbnail(normalCanvas);
+		return { albedoCanvas: albedoCanvas, normalCanvas: normalCanvas, thumbnails: sourceThumbnails };
 	}
 
 	const agedImages = await createAgedImages();
@@ -1063,6 +1109,13 @@
 		normalizedY: 0,
 		hasMoved: false,
 	};
+	const shadingState = {
+		normalStrength: 1,
+		detailStrength: 6,
+		cavityStrength: 5,
+		roughnessMinimum: 0.3,
+		roughnessMaximum: 0.6,
+	};
 
 	// 부드러운 언덕 포락선. (상승 / 유지 / 하강)
 	function bumpEnvelope(localTime, duration, attack, release) {
@@ -1146,10 +1199,15 @@
 		performance.agingBlend += (agingTarget - performance.agingBlend) * System.Math.min(1, deltaTime * 2.5);
 		const agingBlend = performance.agingBlend;
 		headModel.setMorphWeight("ageSag", agingBlend);
-		skinRenderer.setNormalStrength(mixValue(1.0, 1.35, agingBlend));
-		skinRenderer.setDetailStrength(optionStates.detail ? mixValue(6, 8, agingBlend) : 0);
-		skinRenderer.setCavityStrength(optionStates.detail ? mixValue(5, 7, agingBlend) : 0);
-		skinRenderer.setRoughnessRange(mixValue(0.3, 0.36, agingBlend), mixValue(0.6, 0.7, agingBlend));
+		shadingState.normalStrength = mixValue(1.0, 1.35, agingBlend);
+		shadingState.detailStrength = optionStates.detail ? mixValue(6, 8, agingBlend) : 0;
+		shadingState.cavityStrength = optionStates.detail ? mixValue(5, 7, agingBlend) : 0;
+		shadingState.roughnessMinimum = mixValue(0.3, 0.36, agingBlend);
+		shadingState.roughnessMaximum = mixValue(0.6, 0.7, agingBlend);
+		skinRenderer.setNormalStrength(shadingState.normalStrength);
+		skinRenderer.setDetailStrength(shadingState.detailStrength);
+		skinRenderer.setCavityStrength(shadingState.cavityStrength);
+		skinRenderer.setRoughnessRange(shadingState.roughnessMinimum, shadingState.roughnessMaximum);
 		const shouldApplyAged = agingBlend > 0.5;
 		if (shouldApplyAged !== performance.isAgedMaterialApplied) {
 			performance.isAgedMaterialApplied = shouldApplyAged;
@@ -1234,6 +1292,225 @@
 	}
 
 	//==============================================================================
+	// 머티리얼 그래프. (좌측 — 텍스처 입력부터 셰이딩 / MRT / SSS / 합성 / 포스트까지의 흐름을 노드로 표시)
+	// - 원본 / 노화 텍스처는 축소본 이미지, 중간 버퍼는 매 프레임 GL 블릿으로 실시간 표시한다.
+	//==============================================================================
+	const GRAPH_PANEL_X = 18;
+	const GRAPH_PANEL_Y = 18;
+	const GRAPH_PANEL_WIDTH = 262;
+	const GRAPH_PADDING = 12;
+	const GRAPH_NODE_GAP = 8;
+	const GRAPH_IMAGE_THUMBNAIL_SIZE = 44;
+	const GRAPH_BUFFER_THUMBNAIL_WIDTH = 70;
+	const GRAPH_LINE_HEIGHT = 13;
+	const GRAPH_ACTIVE_TITLE_COLOR = "rgba(232, 201, 138, 0.95)";
+	const GRAPH_INACTIVE_TITLE_COLOR = "rgba(232, 201, 138, 0.38)";
+	const GRAPH_ACTIVE_TEXT_COLOR = "rgba(242, 236, 226, 0.74)";
+	const GRAPH_INACTIVE_TEXT_COLOR = "rgba(242, 236, 226, 0.32)";
+	const GRAPH_LABEL_COLOR = "rgba(242, 236, 226, 0.5)";
+
+	function buildMaterialGraphNodes(buffers) {
+		const thumbnails = agedImages.thumbnails;
+		const nodes = [
+			{
+				title: "SOURCE TEXTURES",
+				isActive: true,
+				lines: [],
+				thumbnails: [
+					{ label: "ALBEDO 1K", image: thumbnails.albedo },
+					{ label: "NORMAL 1K", image: thumbnails.normal },
+					{ label: "SPEC 1K", image: thumbnails.specular },
+					{ label: "HEIGHT 4K", image: thumbnails.height },
+				],
+			},
+			{
+				title: "AGING (CPU)",
+				isActive: optionStates.aging,
+				lines: ["gray stubble and brows, spots, wrinkle grooves", "sag morph " + performance.agingBlend.toFixed(2)],
+				thumbnails: [
+					{ label: "OLD ALBEDO", image: thumbnails.agedAlbedo },
+					{ label: "OLD NORMAL", image: thumbnails.agedNormal },
+				],
+			},
+			{
+				title: "SURFACE",
+				isActive: true,
+				lines: [
+					"normal = tangent map x " + shadingState.normalStrength.toFixed(2),
+					"+ 4K height gradient x " + shadingState.detailStrength.toFixed(1) + " (UDN blend)",
+					"cavity = height - blur(height) x " + shadingState.cavityStrength.toFixed(1),
+					"roughness " + shadingState.roughnessMinimum.toFixed(2) + " to " + shadingState.roughnessMaximum.toFixed(2) + " by spec map, F0 0.028",
+				],
+				thumbnails: [],
+			},
+			{
+				title: "LIGHTING",
+				isActive: true,
+				lines: [
+					"key 2.6 warm, shadow " + (optionStates.shadow ? "on" : "off") + ", fill 0.85 cool, rim 1.4",
+					"hemisphere ambient, dual-lobe GGX, sheen, env BRDF",
+				],
+				thumbnails: [],
+			},
+			{
+				title: "G-BUFFER (MRT RGBA16F)",
+				isActive: true,
+				lines: [],
+				thumbnails: [
+					{ label: "IRRADIANCE", texture: buffers.irradianceTexture, displayScale: 0.5, useCoverage: 1 },
+					{ label: "ALBEDO", texture: buffers.albedoTexture, displayScale: 1.6, useCoverage: 1 },
+					{ label: "SPECULAR", texture: buffers.specularTexture, displayScale: 3, useCoverage: 1 },
+				],
+			},
+			{
+				title: "SUBSURFACE AND COMBINE",
+				isActive: optionStates.subsurface,
+				lines: ["separable SSS, width 0.20, depth aware", "irradiance x albedo + specular + background"],
+				thumbnails: [
+					{ label: "SCATTERED", texture: buffers.scatteredIrradianceTexture, displayScale: 0.5, useCoverage: 1 },
+					{ label: "HDR", texture: buffers.hdrColorTexture, displayScale: 0.72, useCoverage: 0 },
+				],
+			},
+			{
+				title: "POST",
+				isActive: true,
+				lines: ["bloom " + (optionStates.bloom ? "on" : "off") + ", ACES, vignette, grain, FXAA " + (optionStates.antialias ? "on" : "off")],
+				thumbnails: [],
+			},
+		];
+		return nodes;
+	}
+
+	function layoutMaterialGraph(nodes, aspectRatio) {
+		const contentWidth = GRAPH_PANEL_WIDTH - GRAPH_PADDING * 2;
+		let cursorY = GRAPH_PANEL_Y + GRAPH_PADDING;
+		for (const node of nodes) {
+			node.x = GRAPH_PANEL_X + GRAPH_PADDING;
+			node.y = cursorY;
+			let contentY = node.y + 22;
+			if (node.thumbnails.length > 0) {
+				const isImageRow = node.thumbnails[0].image !== undefined;
+				const thumbnailWidth = isImageRow ? GRAPH_IMAGE_THUMBNAIL_SIZE : GRAPH_BUFFER_THUMBNAIL_WIDTH;
+				const thumbnailHeight = isImageRow ? GRAPH_IMAGE_THUMBNAIL_SIZE : System.Math.round(GRAPH_BUFFER_THUMBNAIL_WIDTH / aspectRatio);
+				const spacing = clampValue((contentWidth - 16 - node.thumbnails.length * thumbnailWidth) / System.Math.max(node.thumbnails.length - 1, 1), 6, 26);
+				for (let thumbnailIndex = 0; thumbnailIndex < node.thumbnails.length; ++thumbnailIndex) {
+					const thumbnail = node.thumbnails[thumbnailIndex];
+					thumbnail.x = node.x + 8 + thumbnailIndex * (thumbnailWidth + spacing);
+					thumbnail.y = contentY;
+					thumbnail.width = thumbnailWidth;
+					thumbnail.height = thumbnailHeight;
+				}
+				contentY += thumbnailHeight + 14;
+			}
+			node.textY = contentY;
+			contentY += node.lines.length * GRAPH_LINE_HEIGHT;
+			node.width = contentWidth;
+			node.height = contentY - node.y + 8;
+			cursorY = node.y + node.height + GRAPH_NODE_GAP;
+		}
+		const panelHeight = cursorY - GRAPH_NODE_GAP + GRAPH_PADDING - GRAPH_PANEL_Y;
+		return panelHeight;
+	}
+
+	function renderMaterialGraph(buffers) {
+		const devicePixelRatio = System.Math.min(System.window.devicePixelRatio || 1, 2);
+		const cssWidth = System.window.innerWidth;
+		const cssHeight = System.window.innerHeight;
+		const aspectRatio = canvas.width / canvas.height;
+		const nodes = buildMaterialGraphNodes(buffers);
+		const panelHeight = layoutMaterialGraph(nodes, aspectRatio);
+		const graphScale = System.Math.min(1, (cssHeight - 96) / panelHeight);
+		let previewDrawCallCount = 0;
+
+		// 1. 패널 / 노드 배경. (엔진 Graphic)
+		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
+		uiGraphic.applySettings(null);
+		uiGraphic.scale(devicePixelRatio * graphScale, devicePixelRatio * graphScale);
+		uiGraphic.setGlobalAlpha(1);
+		const panelRect = Rect.create(GRAPH_PANEL_X, GRAPH_PANEL_Y, GRAPH_PANEL_WIDTH, panelHeight);
+		uiGraphic.setFillColor("rgba(14, 12, 14, 0.55)");
+		uiGraphic.drawRoundRect(panelRect, 12);
+		uiGraphic.setStrokeColor("rgba(242, 236, 226, 0.14)");
+		uiGraphic.drawStrokeRoundRect(panelRect, 12, 1);
+		for (const node of nodes) {
+			const nodeRect = Rect.create(node.x, node.y, node.width, node.height);
+			uiGraphic.setFillColor(node.isActive ? "rgba(255, 255, 255, 0.045)" : "rgba(255, 255, 255, 0.02)");
+			uiGraphic.drawRoundRect(nodeRect, 8);
+			for (const thumbnail of node.thumbnails) {
+				uiGraphic.setFillColor("rgba(0, 0, 0, 0.4)");
+				uiGraphic.drawRect(Rect.create(thumbnail.x, thumbnail.y, thumbnail.width, thumbnail.height));
+			}
+		}
+
+		// 2. 중간 버퍼 블릿. (뷰포트를 썸네일 사각형으로 제한)
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		previewPass.use();
+		webGL2RenderingContext.uniform1i(previewPass.getUniformLocation("sourceTexture"), 0);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		const pixelScale = devicePixelRatio * graphScale;
+		for (const node of nodes) {
+			for (const thumbnail of node.thumbnails) {
+				if (!thumbnail.texture) {
+					continue;
+				}
+				const viewportX = System.Math.round(thumbnail.x * pixelScale);
+				const viewportY = System.Math.round(canvas.height - (thumbnail.y + thumbnail.height) * pixelScale);
+				const viewportWidth = System.Math.round(thumbnail.width * pixelScale);
+				const viewportHeight = System.Math.round(thumbnail.height * pixelScale);
+				webGL2RenderingContext.viewport(viewportX, viewportY, viewportWidth, viewportHeight);
+				webGL2RenderingContext.uniform1f(previewPass.getUniformLocation("displayScale"), thumbnail.displayScale);
+				webGL2RenderingContext.uniform1i(previewPass.getUniformLocation("useCoverage"), thumbnail.useCoverage);
+				webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, thumbnail.texture);
+				previewPass.draw();
+				previewDrawCallCount += 1;
+			}
+		}
+		webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
+
+		// 3. 텍스처 축소본 / 제목 / 설명 / 연결선. (엔진 Graphic)
+		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+		uiGraphic.applySettings(null);
+		uiGraphic.scale(devicePixelRatio * graphScale, devicePixelRatio * graphScale);
+		uiGraphic.setTextBaseline("middle");
+		uiGraphic.setTextAlign("left");
+		for (let nodeIndex = 0; nodeIndex < nodes.length; ++nodeIndex) {
+			const node = nodes[nodeIndex];
+			uiGraphic.setGlobalAlpha(1);
+			for (const thumbnail of node.thumbnails) {
+				if (thumbnail.image) {
+					uiGraphic.setGlobalAlpha(node.isActive ? 1 : 0.4);
+					uiGraphic.drawImage(thumbnail.image, Vector2.create(thumbnail.x, thumbnail.y), Vector2.create(thumbnail.width, thumbnail.height));
+					uiGraphic.setGlobalAlpha(1);
+				}
+				uiGraphic.setStrokeColor("rgba(242, 236, 226, 0.18)");
+				uiGraphic.drawStrokeRect(Rect.create(thumbnail.x, thumbnail.y, thumbnail.width, thumbnail.height), 1);
+				uiGraphic.setFontString(`400 8px "Segoe UI", "Malgun Gothic", sans-serif`);
+				uiGraphic.setFillColor(GRAPH_LABEL_COLOR);
+				uiGraphic.drawFillText(thumbnail.label, thumbnail.x, thumbnail.y + thumbnail.height + 7);
+			}
+			uiGraphic.setFontString(`600 9.5px "Segoe UI", "Malgun Gothic", sans-serif`);
+			uiGraphic.setFillColor(node.isActive ? GRAPH_ACTIVE_TITLE_COLOR : GRAPH_INACTIVE_TITLE_COLOR);
+			uiGraphic.drawFillText(node.title, node.x + 8, node.y + 11);
+			uiGraphic.setFontString(`400 9px "Segoe UI", "Malgun Gothic", sans-serif`);
+			uiGraphic.setFillColor(node.isActive ? GRAPH_ACTIVE_TEXT_COLOR : GRAPH_INACTIVE_TEXT_COLOR);
+			for (let lineIndex = 0; lineIndex < node.lines.length; ++lineIndex) {
+				uiGraphic.drawFillText(node.lines[lineIndex], node.x + 8, node.textY + lineIndex * GRAPH_LINE_HEIGHT + 6);
+			}
+			if (nodeIndex < nodes.length - 1) {
+				const connectorX = node.x + 22;
+				const connectorTop = node.y + node.height;
+				uiGraphic.setStrokeColor("rgba(232, 201, 138, 0.5)");
+				uiGraphic.drawLine([Vector2.create(connectorX, connectorTop), Vector2.create(connectorX, connectorTop + GRAPH_NODE_GAP)], 1);
+				uiGraphic.setFillColor("rgba(232, 201, 138, 0.8)");
+				uiGraphic.drawCircle(Vector2.create(connectorX, connectorTop + GRAPH_NODE_GAP * 0.5), 1.8);
+			}
+		}
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		return previewDrawCallCount;
+	}
+
+	//==============================================================================
 	// HUD. (우측 하단 렌더링 정보 — 엔진 Graphic 으로 캔버스 안에 렌더링)
 	//==============================================================================
 	const statistics = {
@@ -1283,7 +1560,7 @@
 	}
 
 	//==============================================================================
-	// 메인 루프. (섀도우 깊이 → 피부 MRT → 화면 공간 SSS → 합성(HDR) → 블룸 → 톤 매핑 → FXAA → HUD)
+	// 메인 루프. (섀도우 깊이 → 피부 MRT → 화면 공간 SSS → 합성(HDR) → 블룸 → 톤 매핑 → FXAA → 와이어프레임 → 머티리얼 그래프 → HUD)
 	//==============================================================================
 	const startTimestamp = System.performance.now();
 	let previousTimestamp = startTimestamp;
@@ -1425,8 +1702,44 @@
 			drawCallCount += 1;
 		}
 
-		// === 8. HUD (엔진 Graphic — 프리멀티플라이드 알파 블렌딩, 컬링 해제) ===
+		// === 8. 와이어프레임 (화면 깊이 프리패스로 앞면 모서리만 — 모프 / 스키닝 반영) ===
+		if (optionStates.wireframe) {
+			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+			webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
+			webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+			webGL2RenderingContext.depthMask(true);
+			webGL2RenderingContext.clear(webGL2RenderingContext.DEPTH_BUFFER_BIT);
+			webGL2RenderingContext.colorMask(false, false, false, false);
+			webGL2RenderingContext.enable(webGL2RenderingContext.POLYGON_OFFSET_FILL);
+			webGL2RenderingContext.polygonOffset(1.5, 2);
+			skinRenderer.drawDepth(headModel, viewProjectionElements, identityModelElements);
+			webGL2RenderingContext.disable(webGL2RenderingContext.POLYGON_OFFSET_FILL);
+			webGL2RenderingContext.colorMask(true, true, true, true);
+			webGL2RenderingContext.depthMask(false);
+			webGL2RenderingContext.depthFunc(webGL2RenderingContext.LEQUAL);
+			webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+			webGL2RenderingContext.blendFunc(webGL2RenderingContext.SRC_ALPHA, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
+			skinRenderer.drawWireframe(headModel, viewProjectionElements, identityModelElements, 0.91, 0.79, 0.54, 0.55);
+			webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+			webGL2RenderingContext.depthMask(true);
+			webGL2RenderingContext.depthFunc(webGL2RenderingContext.LESS);
+			webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+			drawCallCount += 2;
+		}
+
+		// === 9. 머티리얼 그래프 (좌측 — 텍스처 / 셰이딩 흐름 + 중간 버퍼 실시간 미리보기) ===
 		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
+		if (optionStates.materialGraph) {
+			drawCallCount += renderMaterialGraph({
+				irradianceTexture: irradianceTexture,
+				albedoTexture: albedoTexture,
+				specularTexture: specularTexture,
+				scatteredIrradianceTexture: scatteredIrradianceTexture,
+				hdrColorTexture: hdrColorTexture,
+			});
+		}
+
+		// === 10. HUD (엔진 Graphic — 프리멀티플라이드 알파 블렌딩, 컬링 해제) ===
 		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
 		webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
 		statistics.drawCallCount = drawCallCount;

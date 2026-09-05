@@ -16,3 +16,12 @@
 - 발견: 엔진 Graphic HUD 는 3D 패스가 켠 CULL_FACE 를 끄고 그려야 텍스트 쿼드가 컬링되지 않는다(도형은 살아남고 텍스트만 사라지는 증상). 헤드리스 크롬은 user-data-dir 을 재사용하면 기존 인스턴스로 위임돼 새 페이지가 안 뜬다.
 - 배포: NAS portfolio/oldface (index.html / favicon.svg / vanilla.js / assets). UPDATE.md 0.5.0-experimental 기록.
 - 미해결 / 후속: 노화 알베도를 이미지 생성(나노바나나)으로 만들면 주름 · 피부 결이 더 자연스러워질 수 있음(사용자 허락 필요). 귀 투과광(두께 맵 없음)은 미구현.
+
+## OLD FACE 후속: 와이어프레임 토글 + 머티리얼 그래프 패널 + 사이트 목록
+[18:40 요청 → 19:00 응답]
+- 사용자 지적: 검증용 헤드리스 크롬을 닫지 않고 병렬로 계속 띄워 PC 가 렉에 걸림 → 즉시 전부 종료, CLAUDE.md "검증 프로세스 방침" 추가(즉시 종료, 최대 1개 / 비교 시 2개 순차), 메모리 기록.
+- hookify 플러그인 훅 4개가 python3(Store 스텁 / 미존재) 때문에 매번 실패해 로그를 찍던 문제 → 규칙 파일이 없어 플러그인 비활성화(~/.claude/settings.json).
+- 엔진: SkinnedModel.uploadWireframeIndices(중복 없는 모서리 선 인덱스), SkinnedModelRenderer.drawWireframe(모프 / 스키닝 반영 선 출력, 드로어블 인덱스 버퍼 보관).
+- 샘플: WIREFRAME 옵션(8, 깊이 프리패스 + 폴리곤 오프셋으로 앞면 모서리만), MATERIAL GRAPH 옵션(9, 좌측 노드 패널 — 원본 / 노화 텍스처 축소본, 표면 / 조명 파라미터 실시간 값, G-버퍼 3장 · SSS · HDR 버퍼 블릿 미리보기, 옵션 상태에 따라 노드 명암).
+- ddukbaek2.com 루트 페이지 샘플 목록에 Old Face 항목 추가(백업 index.html.backup-20260905b).
+- 검증: 크롬 1개씩 캡처 직후 종료 확인(잔여 0).
