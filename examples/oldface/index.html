@@ -251,7 +251,7 @@
 	<div id="expressionPanel"></div>
 	<div id="footerNote">
 		DRAG TO ORBIT, WHEEL OR PINCH TO ZOOM, MOVE THE POINTER TO TURN THE HEAD<br>
-		CHARACTER: <a href="https://github.com/microsoft/Microsoft-Rocketbox" target="_blank" rel="noopener">MICROSOFT ROCKETBOX MALE ADULT 05 (MIT)</a>, EXPRESSIONS: ARKIT BLENDSHAPE PRESETS
+		CHARACTER: <a href="https://github.com/microsoft/Microsoft-Rocketbox" target="_blank" rel="noopener">MICROSOFT ROCKETBOX MALE ADULT 03 (MIT)</a>, EXPRESSIONS: ARKIT BLENDSHAPE PRESETS
 	</div>
 	<a id="homeLink" href="https://ddukbaek2.com" target="_blank" rel="noopener">DDUKBAEK2.COM</a>
 	<div id="loadingOverlay">LOADING</div>
@@ -324,8 +324,8 @@
 	// 부위별 머티리얼 정의. (glb 머티리얼 이름 부분 일치 → 텍스처 / 팩터 / 산란 마스크)
 	const PART_MATERIAL_DEFINITIONS = [
 		{ keyword: "eyes", albedo: "head_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.14, subsurfaceFactor: 0.0 },
-		{ keyword: "head", albedo: "head_albedo.jpg", normal: "head_normal.jpg", roughness: "head_roughness.jpg", opacity: null, baseColorFactor: null, useDetail: true, roughnessFactor: 0.8, subsurfaceFactor: 1.0 },
-		{ keyword: "body", albedo: "body_albedo.jpg", normal: "body_normal.jpg", roughness: "body_roughness.jpg", opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.9, subsurfaceFactor: 0.5 },
+		{ keyword: "head", albedo: "head_albedo.jpg", normal: "head_normal.jpg", roughness: "head_roughness.jpg", opacity: null, baseColorFactor: null, useDetail: true, roughnessFactor: 1.0, subsurfaceFactor: 1.0 },
+		{ keyword: "body", albedo: "body_albedo.jpg", normal: "body_normal.jpg", roughness: "body_roughness.jpg", opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.5 },
 		{ keyword: "opacity", albedo: "hair.png", normal: null, roughness: null, opacity: "hair.png", baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0 },
 	];
 
@@ -506,7 +506,7 @@
 	skinRenderer.setAmbientColors([0.2, 0.21, 0.25], [0.13, 0.12, 0.12], [0.09, 0.08, 0.075]);
 	skinRenderer.setSheenStrength(0.18);
 	skinRenderer.setNormalStrength(1.5);
-	skinRenderer.setSpecularStrength(0.85);
+	skinRenderer.setSpecularStrength(0.65);
 	skinRenderer.setRoughnessRange(1.0, 1.0);
 	skinRenderer.setDetailTexelSize(1 / DETAIL_TEXTURE_SIZE);
 	subsurfaceEffect.setScatterWidth(0.008);
@@ -1216,8 +1216,8 @@
 		// 표정 / 머리 방향 / 스키닝 갱신.
 		updateExpressions(elapsedTime, deltaTime);
 		updateHeadDirection(elapsedTime, deltaTime);
-		skinRenderer.setDetailStrength(optionStates.detail ? 6 : 0);
-		skinRenderer.setCavityStrength(optionStates.detail ? 3.5 : 0);
+		skinRenderer.setDetailStrength(optionStates.detail ? 3.5 : 0);
+		skinRenderer.setCavityStrength(optionStates.detail ? 2.5 : 0);
 		headModel.update(deltaTime);
 
 		// === 1. 섀도우 깊이 패스 (키 라이트) ===

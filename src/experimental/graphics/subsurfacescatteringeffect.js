@@ -30,6 +30,9 @@ uniform float aspectRatio;
 uniform vec2 depthRange;
 out vec4 outputColor;
 
+// 화면 높이 대비 최대 산란 폭. (커널 표본 수가 고정이라 이보다 넓으면 표본 간격이 벌어진다)
+const float MAXIMUM_PROJECTED_WIDTH = 0.05;
+
 float linearizeDepth(float depthSample) {
 	float nearDistance = depthRange.x;
 	float farDistance = depthRange.y;
@@ -46,9 +49,10 @@ void main() {
 	}
 	float centerDepth = linearizeDepth(texture(depthTexture, fragmentTextureCoordinate).r);
 
-	// 화면 공간 스텝. (산란 폭을 투영 창 거리 / 깊이로 화면 크기에 맞춤, 가로는 화면비 보정)
+	// 화면 공간 스텝. (산란 폭을 투영 창 거리 / 깊이로 화면 크기에 맞춤, 가로는 화면비 보정 — 근접 시 표본 간격이 벌어져 띠가 지지 않도록 화면 높이 기준 폭을 제한)
 	float projectedScale = distanceToProjectionWindow / centerDepth;
-	vec2 finalStep = scatterWidth * projectedScale * blurDirection * centerMask / float(${KERNEL_RANGE});
+	float projectedWidth = min(scatterWidth * projectedScale, MAXIMUM_PROJECTED_WIDTH);
+	vec2 finalStep = projectedWidth * blurDirection * centerMask / float(${KERNEL_RANGE});
 	finalStep.x /= aspectRatio;
 
 	vec3 color = centerSample.rgb * kernel[0].rgb;

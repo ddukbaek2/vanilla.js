@@ -49,6 +49,30 @@ for key in keys.key_blocks:
     key.value = 0.0
 print("shape keys kept:", len(keys.key_blocks) - 1)
 
+# 어깨 아래는 잘라낸다 (흉상 — 머리 본에서 30cm 아래 평면보다 낮은 폴리곤과 팔 폴리곤 제거, 뚫린 구멍은 어두운 캡으로 메움)
+import bmesh
+cut_height = head_bone.head_local.z - 0.30
+arm_group_indices = {g.index for g in body.vertex_groups if any(part in g.name for part in ("UpperArm", "Forearm", "Hand", "Finger"))}
+arm_weight = {}
+for vertex in body.data.vertices:
+    arm_weight[vertex.index] = sum(group.weight for group in vertex.groups if group.group in arm_group_indices)
+# 머리카락 카드(눈 위 6cm 보다 높은 opacity 폴리곤)는 뺀다 — 알파 컷아웃에서 판처럼 보이고, 두피에는 머리카락이 그려져 있다. 속눈썹 / 눈썹 카드는 남긴다.
+material_names = [m.name.lower() if m else "" for m in body.data.materials]
+eye_group_indices = [g.index for g in body.vertex_groups if g.name in ("Bip01 REye", "Bip01 LEye")]
+eye_height = sum(v.co.z for v in body.data.vertices if any(group.group in eye_group_indices and group.weight > 0.5 for group in v.groups)) / max(1, sum(1 for v in body.data.vertices if any(group.group in eye_group_indices and group.weight > 0.5 for group in v.groups)))
+body_material_index = [i for i, n in enumerate(material_names) if "body" in n][0]
+bm = bmesh.new()
+bm.from_mesh(body.data)
+removed = [f for f in bm.faces if all(v.co.z < cut_height for v in f.verts) or all(arm_weight[v.index] > 0.5 for v in f.verts) or ("opacity" in material_names[f.material_index] and f.calc_center_median().z > eye_height + 0.06)]
+bmesh.ops.delete(bm, geom=removed, context="FACES")
+boundary_edges = [e for e in bm.edges if e.is_boundary]
+filled = bmesh.ops.holes_fill(bm, edges=boundary_edges, sides=0)
+for face in filled["faces"]:
+    face.material_index = body_material_index
+bm.to_mesh(body.data)
+bm.free()
+print("bust cut at z:", round(cut_height, 3), "eye height:", round(eye_height, 3), "removed polygons:", len(removed), "cap faces:", len(filled["faces"]), "polygons left:", len(body.data.polygons), "vertices left:", len(body.data.vertices))
+
 eye_group_indices = [g.index for g in body.vertex_groups if g.name in ("Bip01 REye", "Bip01 LEye")]
 eye_vertices = set()
 for vertex in body.data.vertices:
