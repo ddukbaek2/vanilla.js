@@ -251,7 +251,7 @@
 	<div id="expressionPanel"></div>
 	<div id="footerNote">
 		DRAG TO ORBIT, WHEEL OR PINCH TO ZOOM, MOVE THE POINTER TO TURN THE HEAD<br>
-		HEAD SCAN: <a href="https://casual-effects.com/data/" target="_blank" rel="noopener">LEE PERRY-SMITH (CC BY 3.0)</a>, RIG AND EXPRESSIONS: <a href="https://github.com/animate1978/MB-Lab" target="_blank" rel="noopener">MB-LAB 1.8 (AGPL-3.0)</a>, WRAPPED IN BLENDER
+		CHARACTER: <a href="https://github.com/microsoft/Microsoft-Rocketbox" target="_blank" rel="noopener">MICROSOFT ROCKETBOX MALE ADULT 05 (MIT)</a>, EXPRESSIONS: ARKIT BLENDSHAPE PRESETS
 	</div>
 	<a id="homeLink" href="https://ddukbaek2.com" target="_blank" rel="noopener">DDUKBAEK2.COM</a>
 	<div id="loadingOverlay">LOADING</div>
@@ -304,7 +304,7 @@
 	const FILL_LIGHT_DIRECTION = Vector3.create(-0.75, 0.1, 0.6).normalize();
 	const RIM_LIGHT_DIRECTION = Vector3.create(0.55, 0.45, -0.72).normalize();
 
-	// 표정 프리셋 표시 목록. (assets/expressions.json 의 키 — MB-Lab 프리셋을 표정 단위 가중치로 변환한 것)
+	// 표정 프리셋 표시 목록. (assets/expressions.json 의 키 — ARKit 블렌드셰이프 52종의 가중치 조합)
 	const EXPRESSION_DEFINITIONS = [
 		{ name: "neutral", label: "NEUTRAL" },
 		{ name: "happy", label: "HAPPY" },
@@ -323,14 +323,10 @@
 
 	// 부위별 머티리얼 정의. (glb 머티리얼 이름 부분 일치 → 텍스처 / 팩터 / 산란 마스크)
 	const PART_MATERIAL_DEFINITIONS = [
-		{ keyword: "skin3", albedo: "skin_albedo.jpg", normal: "skin_normal.jpg", roughness: "skin_roughness.jpg", opacity: null, baseColorFactor: null, useDetail: true, roughnessFactor: 1.4, subsurfaceFactor: 1.0 },
-		{ keyword: "generic", albedo: "skin_albedo.jpg", normal: "skin_normal.jpg", roughness: "skin_roughness.jpg", opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 1.4, subsurfaceFactor: 1.0 },
-		{ keyword: "human_eyes", albedo: "eye_sclera.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.14, subsurfaceFactor: 0.0 },
-		{ keyword: "Iris", albedo: "eye_iris.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.2, subsurfaceFactor: 0.0 },
-		{ keyword: "pupil", albedo: null, normal: null, roughness: null, opacity: null, baseColorFactor: [0.01, 0.01, 0.01], useDetail: false, roughnessFactor: 0.2, subsurfaceFactor: 0.0 },
-		{ keyword: "teeth", albedo: "teeth_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.45, subsurfaceFactor: 0.25 },
-		{ keyword: "tongue", albedo: "tongue_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.4, subsurfaceFactor: 0.8 },
-		{ keyword: "nails", albedo: "nails_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.5, subsurfaceFactor: 0.5 },
+		{ keyword: "eyes", albedo: "head_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.14, subsurfaceFactor: 0.0 },
+		{ keyword: "head", albedo: "head_albedo.jpg", normal: "head_normal.jpg", roughness: "head_roughness.jpg", opacity: null, baseColorFactor: null, useDetail: true, roughnessFactor: 0.8, subsurfaceFactor: 1.0 },
+		{ keyword: "body", albedo: "body_albedo.jpg", normal: "body_normal.jpg", roughness: "body_roughness.jpg", opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.9, subsurfaceFactor: 0.5 },
+		{ keyword: "opacity", albedo: "hair.png", normal: null, roughness: null, opacity: "hair.png", baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0 },
 	];
 
 	//==============================================================================
@@ -577,18 +573,10 @@
 	refreshOptionPanel();
 
 	//==============================================================================
-	// 애셋 로드. (MB-Lab 노인 캐릭터 glb — 골격 + 표정 단위 모프 81종, 부위별 텍스처는 직접 로드)
+	// 애셋 로드. (Microsoft Rocketbox 중년 남성 glb — 골격 + ARKit 블렌드셰이프 52종, 부위별 텍스처는 직접 로드)
 	//==============================================================================
-	const headModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "./assets/oldman.glb", skinRenderer);
+	const headModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "./assets/character.glb", skinRenderer);
 	const drawableList = headModel.getDrawableList();
-
-	// 각막은 투명 재질이라 그리지 않는다. (불투명 파이프라인 — 홍채와 공막이 가려지지 않도록 제외) 속눈썹 띠는 알파 컷아웃 잔점이 남아 제외한다.
-	for (let drawableIndex = drawableList.length - 1; drawableIndex >= 0; --drawableIndex) {
-		const materialName = drawableList[drawableIndex].materialName;
-		if (materialName.includes("cornea") || materialName.includes("eyelash")) {
-			drawableList.splice(drawableIndex, 1);
-		}
-	}
 
 	const imageDescriptionCache = new System.Map();
 	async function loadAssetImage(fileName) {
@@ -635,10 +623,10 @@
 		}
 	}
 
-	// 카메라 초점. (공막 프리미티브의 정점 중심 = 눈 높이 — 캐릭터 키가 달라도 얼굴이 화면 중앙에 오도록)
+	// 카메라 초점. (눈알 프리미티브의 정점 중심 = 눈 높이 — 캐릭터 키가 달라도 얼굴이 화면 중앙에 오도록)
 	const eyeCenter = Vector3.create(0, 1.6, 0.1);
 	for (const drawable of drawableList) {
-		if (!drawable.materialName.includes("human_eyes")) {
+		if (!drawable.materialName.includes("eyes")) {
 			continue;
 		}
 		const positions = drawable.meshDescription.positions;
@@ -682,18 +670,17 @@
 		return thumbnailCanvas;
 	}
 	const thumbnails = {
-		albedo: await createThumbnail("skin_albedo.jpg"),
-		normal: await createThumbnail("skin_normal.jpg"),
-		roughness: await createThumbnail("skin_roughness.jpg"),
+		albedo: await createThumbnail("head_albedo.jpg"),
+		normal: await createThumbnail("head_normal.jpg"),
+		roughness: await createThumbnail("head_roughness.jpg"),
 		detail: await createThumbnail("skin_detail.jpg"),
-		sclera: await createThumbnail("eye_sclera.jpg"),
-		iris: await createThumbnail("eye_iris.jpg"),
-		teeth: await createThumbnail("teeth_albedo.jpg"),
+		body: await createThumbnail("body_albedo.jpg"),
+		hair: await createThumbnail("hair.png"),
 	};
 	headModel.update(0);
 
 	//==============================================================================
-	// 표정. (MB-Lab 프리셋 → 표정 단위 셰이프키 가중치 — 버튼으로 전환, 매 프레임 부드럽게 접근)
+	// 표정. (ARKit 블렌드셰이프 가중치 프리셋 — 버튼으로 전환, 매 프레임 부드럽게 접근)
 	// - 깜빡임과 호흡도 애셋의 표정 단위(눈 감기 / 가슴 팽창)를 그대로 쓴다.
 	//==============================================================================
 	const expressionResponse = await System.fetch("./assets/expressions.json");
@@ -710,7 +697,6 @@
 		currentWeights: new System.Map(),
 		nextBlinkTime: 2.5,
 		blinkStartTime: -10,
-		breathPhase: 0,
 	};
 	for (const unitName of expressionUnitNameSet) {
 		expressionState.targetWeights.set(unitName, 0);
@@ -762,15 +748,10 @@
 		}
 		const blinkLocal = elapsedTime - expressionState.blinkStartTime;
 		const blink = blinkLocal >= 0 && blinkLocal < 0.3 ? System.Math.sin(blinkLocal / 0.3 * System.Math.PI) : 0;
-		const leftClosed = System.Math.max(expressionState.currentWeights.get("Expressions_eyeClosedL_max") || 0, blink);
-		const rightClosed = System.Math.max(expressionState.currentWeights.get("Expressions_eyeClosedR_max") || 0, blink);
-		headModel.setMorphWeight("Expressions_eyeClosedL_max", leftClosed);
-		headModel.setMorphWeight("Expressions_eyeClosedR_max", rightClosed);
-
-		// 호흡. (가슴 팽창 단위)
-		expressionState.breathPhase += deltaTime / 4.4;
-		const breath = 0.5 - 0.5 * System.Math.cos(expressionState.breathPhase * System.Math.PI * 2);
-		headModel.setMorphWeight("Expressions_chestExpansion_max", breath * 0.5);
+		const leftClosed = System.Math.max(expressionState.currentWeights.get("AK_09_EyeBlinkLeft") || 0, blink);
+		const rightClosed = System.Math.max(expressionState.currentWeights.get("AK_10_EyeBlinkRight") || 0, blink);
+		headModel.setMorphWeight("AK_09_EyeBlinkLeft", leftClosed);
+		headModel.setMorphWeight("AK_10_EyeBlinkRight", rightClosed);
 	}
 
 	//==============================================================================
@@ -796,8 +777,8 @@
 		const approach = System.Math.min(1, deltaTime * 2.2);
 		headState.currentYaw += (targetYaw - headState.currentYaw) * approach;
 		headState.currentPitch += (targetPitch - headState.currentPitch) * approach;
-		headModel.setJointRotationOffset("head", Quaternion.createFromEuler(headState.currentPitch * 0.6, headState.currentYaw * 0.65, 0));
-		headModel.setJointRotationOffset("neck", Quaternion.createFromEuler(headState.currentPitch * 0.4, headState.currentYaw * 0.35, 0));
+		headModel.setJointRotationOffset("Bip01 Head", Quaternion.createFromEuler(headState.currentPitch * 0.6, headState.currentYaw * 0.65, 0));
+		headModel.setJointRotationOffset("Bip01 Neck", Quaternion.createFromEuler(headState.currentPitch * 0.4, headState.currentYaw * 0.35, 0));
 	}
 
 	//==============================================================================
@@ -946,19 +927,18 @@
 				lines: [],
 				thumbnails: [
 					{ label: "ALBEDO 2K", image: thumbnails.albedo },
-					{ label: "NORMAL 4K", image: thumbnails.normal },
+					{ label: "NORMAL 2K", image: thumbnails.normal },
 					{ label: "ROUGH 2K", image: thumbnails.roughness },
 					{ label: "DETAIL 4K", image: thumbnails.detail },
 				],
 			},
 			{
-				title: "EYES AND PARTS",
+				title: "BODY, EYES AND HAIR",
 				isActive: true,
-				lines: ["sclera, iris, pupil, teeth, tongue", "no subsurface on eyes and teeth"],
+				lines: ["eyes from the head atlas, hair and brow cards with alpha cutout", "no subsurface on eyes and hair"],
 				thumbnails: [
-					{ label: "SCLERA", image: thumbnails.sclera },
-					{ label: "IRIS", image: thumbnails.iris },
-					{ label: "TEETH", image: thumbnails.teeth },
+					{ label: "BODY 2K", image: thumbnails.body },
+					{ label: "HAIR CARDS", image: thumbnails.hair },
 				],
 			},
 			{
@@ -1002,7 +982,7 @@
 			{
 				title: "EXPRESSION",
 				isActive: true,
-				lines: ["preset " + expressionState.activeName + ", " + morphTargetCount + " MB-Lab units, " + activeUnitCount + " active", "blink and breathing from eye and chest units, head via bones"],
+				lines: ["preset " + expressionState.activeName + ", " + morphTargetCount + " ARKit units, " + activeUnitCount + " active", "blink from eye blink units, head via bones"],
 				thumbnails: [],
 			},
 			{

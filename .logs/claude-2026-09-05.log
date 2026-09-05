@@ -62,3 +62,12 @@
 - 샘플: 출처 표기(스캔 CC BY 3.0 + MB-Lab AGPL), 속눈썹 드로어블 제외(알파 컷아웃 잔점), 노멀 4K 라벨.
 - 검증: 크롬 1개씩 순차 캡처, 캡처 직후 크롬 / 서버 종료(잔여 0).
 - 결과: 스캔 얼굴에서 표정 13종 전환 확인(HAPPY / ANGRY / SAD / GRIN 캡처), 눈 뜸, 치아 / 혀 표시. NAS portfolio/oldface 배포(index.html + 애셋 5종, eyelash.png 삭제). 임시 디렉토리(oldface_candidates / oldface_first) 정리. 파이프라인 스크립트는 examples/oldface/tools/wrap 에 보관.
+
+## OLD FACE: 합성 폐기 → Microsoft Rocketbox 중년 남성으로 교체
+[00:35 요청 → 03:05 응답]
+- 요청: 합성 결과는 불쾌한 골짜기(사용자 반응) → "정상적인 중년 남자 아무거나, 표정 있고 머리카락 / 수염 있어도 좋음", MB-Lab 외 표정 애셋 여부 질문.
+- 조사: Ready Player Me 는 ARKit 52 모프 GLB 를 주지만 이 PC 에서 models.readyplayer.me 가 해석되지 않음. Microsoft Rocketbox(MIT, 115종)는 얼굴용 FBX 에 ARKit 52 + FACS 48 + 비짐 15 + Vive 30 블렌드셰이프와 얼굴 본 25개, 헤어 / 수염 카드가 있음 → Male_Adult_05 채택.
+- 변환: FBX 테이크 애니메이션이 남아 있으면 glTF 루트에 0.01 스케일 / 위치 키가 실려 캐릭터가 2cm 로 보이는 문제 → 액션 제거 + 포즈 초기화 + cm 단위를 데이터에 굽기로 해결. ARKit 키만 유지(엔진 모프 최대 96), 눈 본 가중 폴리곤을 눈 머티리얼로 분리(카메라 초점).
+- 샘플: 머티리얼 4종(eyes / head / body / opacity 헤어 카드 알파 컷아웃), 깜빡임 EyeBlink 단위, 호흡 제거, Bip01 Head / Neck 조인트, ARKit 프리셋 13종 작성, 출처 표기, 머티리얼 그래프(BODY / HAIR CARDS).
+- MB-Lab 중년 후보(hero 0.85)도 만들어 봤으나 대머리라 사용자 요구(머리카락 / 수염)에 맞지 않아 폐기. wrap 파이프라인은 저장소에서 제거(git 2a0932a 에 남음).
+- 검증: 크롬 1개씩 순차 캡처, 즉시 종료(잔여 0).
