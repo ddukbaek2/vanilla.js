@@ -15,6 +15,7 @@ export const SKIN_SHADING_EYE = 1;
 export const SKIN_SHADING_HAIR = 2;
 export const SKIN_SHADING_OCCLUSION = 3;
 export const SKIN_SHADING_FLUID = 4;
+export const SKIN_SHADING_FACIALHAIR = 5;
 
 // 추가 텍스처 유닛. (머티리얼 기본 슬롯 0 / 2~8 과 섀도우 1, 모프 15 를 피한 9~14)
 // - 피부: 9 높이 디테일, 10 마이크로(노멀 rgb + 캐비티 a), 11 주름 마스크 아틀라스(4x4), 12 주름 노멀 아틀라스(2x2), 13 주름 색 아틀라스(2x2)
@@ -38,6 +39,7 @@ const SHADOW_SAMPLE_COUNT = 24;
 // - 눈: 각막 굴절 시차로 홍채를 샘플링, 홍채 노멀 / 림버스 / 동공, 각막 유리 하이라이트 + 환경 반사, 공막 정맥 노멀.
 // - 머리카락: 카드 탄젠트 아틀라스로 Kajiya-Kay 이중 로브 이방성 하이라이트, 뿌리 차폐, 투과 역광, 컷아웃 + 프린지 블렌드 2패스.
 // - 차폐 / 유체: 블렌드 패스 전용 — 눈꺼풀 차폐 메시는 조도만 어둡게, 눈물선 / 침은 스펙큘러만 얹는다.
+// - 얼굴 털(눈썹 / 수염): 머리카락과 같은 셰이딩이지만 흔들림은 적용하지 않는다.
 // - 출력 0: 확산 조도(rgb) + SSS 마스크(a) / 1: 선형 알베도(rgb) + 커버리지(a) / 2: 스펙큘러(rgb) / 3: 월드 노멀(rgb).
 const SKIN_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
@@ -249,9 +251,9 @@ void shadeSkin(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirection, 
 			vec2 tileCoordinate = layerTileCoordinate(textureCoordinate, layerIndex);
 			vec3 wrinkleNormal = texture(layerNormalTexture, tileCoordinate).xyz * 2.0 - 1.0;
 			tangentNormal = blendTangentNormal(tangentNormal, wrinkleNormal.xy * weight * wrinkleNormalStrength);
-			// 주름 색 맵은 중간 회색(0.5) 기준의 오버레이 — 가중치만큼 밝기 / 색 변화를 곱한다
+			// 주름 색 맵은 중간 회색(0.5) 기준의 오버레이 — 가중치만큼 밝기 / 색 변화를 곱하되 (눈꺼풀이 파랗게 뜨지 않도록) 폭을 제한한다
 			vec3 wrinkleColor = texture(layerColorTexture, tileCoordinate).rgb;
-			albedo *= decodeSrgb(mix(vec3(0.5), wrinkleColor, weight * wrinkleColorStrength) * 2.0);
+			albedo *= clamp(vec3(1.0) + (wrinkleColor - vec3(0.5)) * 2.0 * weight * wrinkleColorStrength, vec3(0.7), vec3(1.3));
 		}
 	}
 
@@ -497,7 +499,7 @@ void shadeOverlay(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirectio
 	float coverage = texture(baseColorTexture, textureCoordinate).a * baseColorFactor.x;
 	irradianceOutput = vec4(0.0, 0.0, 0.0, 0.0);
 	albedoOutput = vec4(0.0, 0.0, 0.0, 0.0);
-	specularOutput = vec4(specular * 2.0, 0.5 * coverage);
+	specularOutput = vec4(specular * 1.2, 0.5 * coverage);
 	normalOutput = vec4(0.0, 0.0, 0.0, 0.0);
 }
 
@@ -506,7 +508,8 @@ void main() {
 
 	// 커버리지. (머리카락은 기본 색 알파, 그 외 컷아웃 머티리얼은 오파시티 텍스처 알파)
 	float coverage = 1.0;
-	if (shadingMode == ${SKIN_SHADING_HAIR}) {
+	bool isHairMode = shadingMode == ${SKIN_SHADING_HAIR} || shadingMode == ${SKIN_SHADING_FACIALHAIR};
+	if (isHairMode) {
 		coverage = texture(baseColorTexture, textureCoordinate).a;
 		if (passMode == 0 && coverage < 0.5) {
 			discard;
@@ -533,10 +536,10 @@ void main() {
 	if (shadingMode == ${SKIN_SHADING_EYE}) {
 		shadeEye(textureCoordinate, geometryNormal, viewDirection, tangentFrame);
 	}
-	else if (shadingMode == ${SKIN_SHADING_HAIR}) {
+	else if (isHairMode) {
 		shadeHair(textureCoordinate, geometryNormal, viewDirection, tangentFrame, coverage);
 	}
-	else if (shadingMode >= ${SKIN_SHADING_OCCLUSION}) {
+	else if (shadingMode == ${SKIN_SHADING_OCCLUSION} || shadingMode == ${SKIN_SHADING_FLUID}) {
 		shadeOverlay(textureCoordinate, geometryNormal, viewDirection);
 	}
 	else {
@@ -582,7 +585,7 @@ void main() {
 		float strandCoordinate = textureLod(layerNormalTexture, vertexTextureCoordinate, 0.0).a;
 		float tip = strandCoordinate * strandCoordinate;
 		float phase = skinnedPosition.x * 7.0 + skinnedPosition.y * 5.0 + hairSway.y * hairSway.z;
-		vec3 offset = vec3(sin(phase) * 0.6 + sin(phase * 2.3 + 1.7) * 0.25, -abs(sin(phase * 0.7 + 0.4)) * 0.25, cos(phase * 1.3) * 0.5);
+		vec3 offset = vec3(sin(phase) * 0.6 + sin(phase * 2.3 + 1.7) * 0.25, -abs(sin(phase * 0.7 + 0.4)) * 0.12, cos(phase * 1.3) * 0.35);
 		skinnedPosition.xyz += offset * hairSway.x * tip;
 	}
 	worldPosition = skinnedPosition.xyz;
@@ -797,8 +800,8 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 		const drawableList = skinnedModel.getDrawableList();
 		for (const drawable of drawableList) {
 			const shadingMode = this.getMaterialShadingMode(drawable.material);
-			const isOverlay = shadingMode >= SKIN_SHADING_OCCLUSION;
-			const isHair = shadingMode === SKIN_SHADING_HAIR;
+			const isOverlay = shadingMode === SKIN_SHADING_OCCLUSION || shadingMode === SKIN_SHADING_FLUID;
+			const isHair = shadingMode === SKIN_SHADING_HAIR || shadingMode === SKIN_SHADING_FACIALHAIR;
 			if (passMode === 0 && isOverlay) {
 				continue;
 			}
@@ -850,12 +853,13 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 			const coverageTextureLocation = shaderProgram.getUniformLocation("coverageTexture");
 			for (const drawable of drawableList) {
 				const shadingMode = this.getMaterialShadingMode(drawable.material);
-				if (shadingMode >= SKIN_SHADING_OCCLUSION) {
+				if (shadingMode === SKIN_SHADING_OCCLUSION || shadingMode === SKIN_SHADING_FLUID) {
 					continue;
 				}
 				const material = drawable.material;
 				const useAlphaCutout = material.getUseAlphaCutout();
-				const needsCutout = shadingMode === SKIN_SHADING_HAIR || useAlphaCutout;
+				const isHairMaterial = shadingMode === SKIN_SHADING_HAIR || shadingMode === SKIN_SHADING_FACIALHAIR;
+				const needsCutout = isHairMaterial || useAlphaCutout;
 				if (needsCutout !== useCutout) {
 					continue;
 				}
@@ -865,7 +869,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 				if (useCutout) {
 					// 커버리지 텍스처. (머리카락은 기본 색 알파, 그 외는 오파시티 텍스처)
 					const textureBindings = material.getTextureBindings();
-					const coverageName = shadingMode === SKIN_SHADING_HAIR ? "baseColorTexture" : "opacityTexture";
+					const coverageName = isHairMaterial ? "baseColorTexture" : "opacityTexture";
 					for (const binding of textureBindings) {
 						if (binding[0] === coverageName) {
 							webGL2RenderingContext.uniform1i(coverageTextureLocation, 0);

@@ -28659,6 +28659,7 @@ var SKIN_SHADING_EYE = 1;
 var SKIN_SHADING_HAIR = 2;
 var SKIN_SHADING_OCCLUSION = 3;
 var SKIN_SHADING_FLUID = 4;
+var SKIN_SHADING_FACIALHAIR = 5;
 var SKIN_TEXTURE_UNIT_DETAILHEIGHT = 9;
 var SKIN_TEXTURE_UNIT_MICRO = 10;
 var SKIN_TEXTURE_UNIT_MASKATLAS = 11;
@@ -28877,9 +28878,9 @@ void shadeSkin(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirection, 
 			vec2 tileCoordinate = layerTileCoordinate(textureCoordinate, layerIndex);
 			vec3 wrinkleNormal = texture(layerNormalTexture, tileCoordinate).xyz * 2.0 - 1.0;
 			tangentNormal = blendTangentNormal(tangentNormal, wrinkleNormal.xy * weight * wrinkleNormalStrength);
-			// \uC8FC\uB984 \uC0C9 \uB9F5\uC740 \uC911\uAC04 \uD68C\uC0C9(0.5) \uAE30\uC900\uC758 \uC624\uBC84\uB808\uC774 \u2014 \uAC00\uC911\uCE58\uB9CC\uD07C \uBC1D\uAE30 / \uC0C9 \uBCC0\uD654\uB97C \uACF1\uD55C\uB2E4
+			// \uC8FC\uB984 \uC0C9 \uB9F5\uC740 \uC911\uAC04 \uD68C\uC0C9(0.5) \uAE30\uC900\uC758 \uC624\uBC84\uB808\uC774 \u2014 \uAC00\uC911\uCE58\uB9CC\uD07C \uBC1D\uAE30 / \uC0C9 \uBCC0\uD654\uB97C \uACF1\uD558\uB418 (\uB208\uAEBC\uD480\uC774 \uD30C\uB797\uAC8C \uB728\uC9C0 \uC54A\uB3C4\uB85D) \uD3ED\uC744 \uC81C\uD55C\uD55C\uB2E4
 			vec3 wrinkleColor = texture(layerColorTexture, tileCoordinate).rgb;
-			albedo *= decodeSrgb(mix(vec3(0.5), wrinkleColor, weight * wrinkleColorStrength) * 2.0);
+			albedo *= clamp(vec3(1.0) + (wrinkleColor - vec3(0.5)) * 2.0 * weight * wrinkleColorStrength, vec3(0.7), vec3(1.3));
 		}
 	}
 
@@ -29125,7 +29126,7 @@ void shadeOverlay(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirectio
 	float coverage = texture(baseColorTexture, textureCoordinate).a * baseColorFactor.x;
 	irradianceOutput = vec4(0.0, 0.0, 0.0, 0.0);
 	albedoOutput = vec4(0.0, 0.0, 0.0, 0.0);
-	specularOutput = vec4(specular * 2.0, 0.5 * coverage);
+	specularOutput = vec4(specular * 1.2, 0.5 * coverage);
 	normalOutput = vec4(0.0, 0.0, 0.0, 0.0);
 }
 
@@ -29134,7 +29135,8 @@ void main() {
 
 	// \uCEE4\uBC84\uB9AC\uC9C0. (\uBA38\uB9AC\uCE74\uB77D\uC740 \uAE30\uBCF8 \uC0C9 \uC54C\uD30C, \uADF8 \uC678 \uCEF7\uC544\uC6C3 \uBA38\uD2F0\uB9AC\uC5BC\uC740 \uC624\uD30C\uC2DC\uD2F0 \uD14D\uC2A4\uCC98 \uC54C\uD30C)
 	float coverage = 1.0;
-	if (shadingMode == ${SKIN_SHADING_HAIR}) {
+	bool isHairMode = shadingMode == ${SKIN_SHADING_HAIR} || shadingMode == ${SKIN_SHADING_FACIALHAIR};
+	if (isHairMode) {
 		coverage = texture(baseColorTexture, textureCoordinate).a;
 		if (passMode == 0 && coverage < 0.5) {
 			discard;
@@ -29161,10 +29163,10 @@ void main() {
 	if (shadingMode == ${SKIN_SHADING_EYE}) {
 		shadeEye(textureCoordinate, geometryNormal, viewDirection, tangentFrame);
 	}
-	else if (shadingMode == ${SKIN_SHADING_HAIR}) {
+	else if (isHairMode) {
 		shadeHair(textureCoordinate, geometryNormal, viewDirection, tangentFrame, coverage);
 	}
-	else if (shadingMode >= ${SKIN_SHADING_OCCLUSION}) {
+	else if (shadingMode == ${SKIN_SHADING_OCCLUSION} || shadingMode == ${SKIN_SHADING_FLUID}) {
 		shadeOverlay(textureCoordinate, geometryNormal, viewDirection);
 	}
 	else {
@@ -29208,7 +29210,7 @@ void main() {
 		float strandCoordinate = textureLod(layerNormalTexture, vertexTextureCoordinate, 0.0).a;
 		float tip = strandCoordinate * strandCoordinate;
 		float phase = skinnedPosition.x * 7.0 + skinnedPosition.y * 5.0 + hairSway.y * hairSway.z;
-		vec3 offset = vec3(sin(phase) * 0.6 + sin(phase * 2.3 + 1.7) * 0.25, -abs(sin(phase * 0.7 + 0.4)) * 0.25, cos(phase * 1.3) * 0.5);
+		vec3 offset = vec3(sin(phase) * 0.6 + sin(phase * 2.3 + 1.7) * 0.25, -abs(sin(phase * 0.7 + 0.4)) * 0.12, cos(phase * 1.3) * 0.35);
 		skinnedPosition.xyz += offset * hairSway.x * tip;
 	}
 	worldPosition = skinnedPosition.xyz;
@@ -29441,8 +29443,8 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     const drawableList = skinnedModel.getDrawableList();
     for (const drawable of drawableList) {
       const shadingMode = this.getMaterialShadingMode(drawable.material);
-      const isOverlay = shadingMode >= SKIN_SHADING_OCCLUSION;
-      const isHair = shadingMode === SKIN_SHADING_HAIR;
+      const isOverlay = shadingMode === SKIN_SHADING_OCCLUSION || shadingMode === SKIN_SHADING_FLUID;
+      const isHair = shadingMode === SKIN_SHADING_HAIR || shadingMode === SKIN_SHADING_FACIALHAIR;
       if (passMode === 0 && isOverlay) {
         continue;
       }
@@ -29492,12 +29494,13 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
       const coverageTextureLocation = shaderProgram.getUniformLocation("coverageTexture");
       for (const drawable of drawableList) {
         const shadingMode = this.getMaterialShadingMode(drawable.material);
-        if (shadingMode >= SKIN_SHADING_OCCLUSION) {
+        if (shadingMode === SKIN_SHADING_OCCLUSION || shadingMode === SKIN_SHADING_FLUID) {
           continue;
         }
         const material = drawable.material;
         const useAlphaCutout = material.getUseAlphaCutout();
-        const needsCutout = shadingMode === SKIN_SHADING_HAIR || useAlphaCutout;
+        const isHairMaterial = shadingMode === SKIN_SHADING_HAIR || shadingMode === SKIN_SHADING_FACIALHAIR;
+        const needsCutout = isHairMaterial || useAlphaCutout;
         if (needsCutout !== useCutout) {
           continue;
         }
@@ -29506,7 +29509,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
         this.applyMorphUniforms(shaderProgram, drawable);
         if (useCutout) {
           const textureBindings = material.getTextureBindings();
-          const coverageName = shadingMode === SKIN_SHADING_HAIR ? "baseColorTexture" : "opacityTexture";
+          const coverageName = isHairMaterial ? "baseColorTexture" : "opacityTexture";
           for (const binding of textureBindings) {
             if (binding[0] === coverageName) {
               webGL2RenderingContext.uniform1i(coverageTextureLocation, 0);
@@ -37199,6 +37202,7 @@ export {
   RepeatTimer,
   RichText,
   SKIN_SHADING_EYE,
+  SKIN_SHADING_FACIALHAIR,
   SKIN_SHADING_FLUID,
   SKIN_SHADING_HAIR,
   SKIN_SHADING_OCCLUSION,
