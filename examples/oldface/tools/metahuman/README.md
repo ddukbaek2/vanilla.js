@@ -33,6 +33,7 @@
 14. LOD (슬라이더용)
    - `OLDFACE_LOD=1 OLDFACE_DUMP_DIR=.../Dump_oldman_lod1 UE -ExecutePythonScript=ue/ue_dump_rig.py` (LOD2 도 같은 방식) — DNA 의 lod1 / lod2 메시 덤프(LOD 메시는 블렌드셰이프 없이 조인트만), `riglogic_from_dump.py` → `build_metahuman_glb.py` 로 `character_lod1.glb` / `character_lod2.glb`. `character_lod0.glb` 는 카드 없이 `oldman_arkit.npz` 로 빌드
    - 머리카락: 카드 LOD0~4 를 `cards_raw.npz` 에 모두 추출한 뒤 `Grooms/parts_lod{N}.json` 으로 `python fit_hair_cards.py ... Head/hair_lod{N}.npz --cards-only` → `hair_lod{N}.glb`
+16. `UE -ExecutePythonScript=ue/ue_export_dcc.py` — DCC 패키지(DCC/OldMan/Maps: Head_Basecolor / Normal / SRMF / CM / WM, Eyes_Color / Normal, Teeth, Masks). 텍스처 소스 해상도를 4K / 8K 로 요청해도 결과는 2K 이고 8K 소스 상태에서는 텍스처 컴파일(4.6GB) 중 메모리 부족으로 죽으니 RES4K 이하로 요청한다. `python compose_dcc_textures.py <DCC/Maps> <assets> [홍채 반경]` 로 eye_sclera / eye_iris / 눈 노멀 / head_specular / head_roughness 를 만든다.
 15. 샘플 슬라이더는 HEAD_LOD_FILES / HAIR_LEVEL_DEFINITIONS / SHADOW_LEVEL_DEFINITIONS 로 애셋과 단계를 정의한다.
 
 참고

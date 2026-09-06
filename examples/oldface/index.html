@@ -427,7 +427,7 @@
 		{ keyword: "saliva", shading: "fluid", albedo: null, normal: null, roughness: null, opacity: null, baseColorFactor: [0.4, 1, 1], useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: {} },
 		{ keyword: "eyeball", shading: "eye", albedo: "eye_sclera.jpg", normal: "eye_sclera_normal.jpg", roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: { layerColor: "eye_iris.png", layerNormal: "eye_iris_normal.png" } },
 		{ keyword: "eyelashes", shading: "skin", albedo: "eyelash.png", normal: null, roughness: null, opacity: "eyelash.png", baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: {} },
-		{ keyword: "head", shading: "skin", albedo: "head_albedo.jpg", normal: "head_normal.jpg", roughness: "head_roughness.jpg", opacity: null, baseColorFactor: null, useDetail: true, roughnessFactor: 0.85, subsurfaceFactor: 1.0, extra: { micro: "skin_micro.png", maskAtlas: "wrinkle_masks.png", layerNormal: "wrinkle_normal.jpg", layerColor: "wrinkle_color.jpg" } },
+		{ keyword: "head", shading: "skin", albedo: "head_albedo.jpg", normal: "head_normal.jpg", roughness: "head_roughness.jpg", specular: "head_specular.jpg", opacity: null, baseColorFactor: null, useDetail: true, roughnessFactor: 1.0, subsurfaceFactor: 1.0, extra: { micro: "skin_micro.png", maskAtlas: "wrinkle_masks.png", layerNormal: "wrinkle_normal.jpg", layerColor: "wrinkle_color.jpg" } },
 		{ keyword: "teeth", shading: "skin", albedo: "teeth_albedo.jpg", normal: "teeth_normal.jpg", roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.4, subsurfaceFactor: 0.25, extra: {} },
 		{ keyword: "hair", shading: "hair", albedo: "hair.png", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: { layerNormal: "hair_tangent.png" } },
 		{ keyword: "beard", shading: "hair", albedo: "beard.png", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: { layerNormal: "beard_tangent.png" } },
@@ -858,6 +858,7 @@
 		description.baseColorImage = await loadAssetImage(definition.albedo);
 		description.normalImage = await loadAssetImage(definition.normal);
 		description.metallicRoughnessImage = await loadAssetImage(definition.roughness);
+		description.specularImage = await loadAssetImage(definition.specular);
 		description.opacityImage = await loadAssetImage(definition.opacity);
 		description.roughnessFactor = definition.roughnessFactor;
 		if (definition.baseColorFactor) {
@@ -1612,7 +1613,7 @@
 		skinRenderer.setNormalStrength(sliderStates.normalStrength);
 		skinRenderer.setWrinkleMaps(optionStates.wrinkle, sliderStates.wrinkleDepth, System.Math.min(1, sliderStates.wrinkleDepth * 0.9));
 		skinRenderer.setSpecularStrength(sliderStates.specular);
-		skinRenderer.setRoughnessRange(sliderStates.roughness, sliderStates.roughness);
+		skinRenderer.setRoughnessRange(sliderStates.roughness * 0.85, sliderStates.roughness * 1.1);
 		skinRenderer.setSheenStrength(sliderStates.sheen);
 		skinRenderer.setShadowSoftness(sliderStates.shadowSoftness);
 		skinRenderer.setLight(0, KEY_LIGHT_DIRECTION.x, KEY_LIGHT_DIRECTION.y, KEY_LIGHT_DIRECTION.z, 1.0, 0.92, 0.82, sliderStates.keyIntensity);
