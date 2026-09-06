@@ -1768,6 +1768,11 @@
 		drawCallCount: 0,
 		hudTop: System.window.innerHeight - 190,
 		optionMaximumHeight: 0,
+		memorySampleTime: -1e9,
+		gpuMemoryBytes: 0,
+		gpuMemoryText: "",
+		jsHeapBytes: 0,
+		jsHeapText: "",
 	};
 	const homeLinkElement = System.document.getElementById("homeLink");
 
@@ -1779,6 +1784,26 @@
 		uiGraphic.scale(devicePixelRatio, devicePixelRatio);
 		uiGraphic.setGlobalAlpha(1);
 
+		// 메모리 수치는 1초에 한 번 표본을 읽고, 직전 표시값 대비 5% 넘게 변할 때만 바꾼다. (JS 힙은 GC 로 오르내리므로 매 프레임 보여 주면 톱니처럼 흔들린다)
+		const hudTimestamp = System.performance.now();
+		if (hudTimestamp - statistics.memorySampleTime >= 1000) {
+			statistics.memorySampleTime = hudTimestamp;
+			const gpuMemoryBytes = estimateGpuMemoryBytes();
+			if (System.Math.abs(gpuMemoryBytes - statistics.gpuMemoryBytes) > statistics.gpuMemoryBytes * 0.05) {
+				statistics.gpuMemoryBytes = gpuMemoryBytes;
+				statistics.gpuMemoryText = formatMegabytes(gpuMemoryBytes);
+			}
+			if (System.performance.memory) {
+				const usedHeapBytes = System.performance.memory.usedJSHeapSize;
+				if (System.Math.abs(usedHeapBytes - statistics.jsHeapBytes) > statistics.jsHeapBytes * 0.05) {
+					statistics.jsHeapBytes = usedHeapBytes;
+					statistics.jsHeapText = formatMegabytes(usedHeapBytes) + " / " + formatMegabytes(System.performance.memory.jsHeapSizeLimit);
+				}
+			}
+			else {
+				statistics.jsHeapText = "n/a";
+			}
+		}
 		const rowHeight = 16;
 		const rows = [
 			["fps", System.Math.round(1 / System.Math.max(statistics.smoothedFrameSeconds, 0.0001)).toString()],
@@ -1788,9 +1813,8 @@
 			["vertices", vertexCount.toLocaleString("en-US")],
 			["draw calls", statistics.drawCallCount.toString()],
 			["morph targets", morphTargetCount.toString()],
-			["gpu memory (est.)", formatMegabytes(estimateGpuMemoryBytes())],
-			["js heap", System.performance.memory ? formatMegabytes(System.performance.memory.usedJSHeapSize) + " / " + formatMegabytes(System.performance.memory.jsHeapSizeLimit) : "n/a"],
-			["device memory", System.navigator.deviceMemory ? System.navigator.deviceMemory + " GB" : "n/a"],
+			["gpu memory (est.)", statistics.gpuMemoryText],
+			["js heap", statistics.jsHeapText],
 		];
 		const panelWidth = 214;
 		const panelHeight = rows.length * rowHeight + 18;
