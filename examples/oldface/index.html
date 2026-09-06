@@ -251,7 +251,7 @@
 	<div id="expressionPanel"></div>
 	<div id="footerNote">
 		DRAG TO ORBIT, WHEEL OR PINCH TO ZOOM, MOVE THE POINTER TO TURN THE HEAD<br>
-		CHARACTER: <a href="https://github.com/microsoft/Microsoft-Rocketbox" target="_blank" rel="noopener">MICROSOFT ROCKETBOX MALE ADULT 03 (MIT)</a>, EXPRESSIONS: ARKIT BLENDSHAPE PRESETS
+		CHARACTER: <a href="https://www.metahuman.com/" target="_blank" rel="noopener">EPIC METAHUMAN (TARO DNA, RIGLOGIC BAKED TO ARKIT SHAPES)</a>, EXPRESSIONS: ARKIT BLENDSHAPE PRESETS
 	</div>
 	<a id="homeLink" href="https://ddukbaek2.com" target="_blank" rel="noopener">DDUKBAEK2.COM</a>
 	<div id="loadingOverlay">LOADING</div>
@@ -323,10 +323,10 @@
 
 	// 부위별 머티리얼 정의. (glb 머티리얼 이름 부분 일치 → 텍스처 / 팩터 / 산란 마스크)
 	const PART_MATERIAL_DEFINITIONS = [
-		{ keyword: "eyes", albedo: "head_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.14, subsurfaceFactor: 0.0 },
-		{ keyword: "head", albedo: "head_albedo.jpg", normal: "head_normal.jpg", roughness: "head_roughness.jpg", opacity: null, baseColorFactor: null, useDetail: true, roughnessFactor: 1.0, subsurfaceFactor: 1.0 },
-		{ keyword: "body", albedo: "body_albedo.jpg", normal: "body_normal.jpg", roughness: "body_roughness.jpg", opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.5 },
-		{ keyword: "opacity", albedo: "hair.png", normal: null, roughness: null, opacity: "hair.png", baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0 },
+		{ keyword: "eyeball", albedo: "eye_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.14, subsurfaceFactor: 0.0 },
+		{ keyword: "eyelashes", albedo: "eyelash.png", normal: null, roughness: null, opacity: "eyelash.png", baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0 },
+		{ keyword: "head", albedo: "head_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: true, roughnessFactor: 0.7, subsurfaceFactor: 1.0 },
+		{ keyword: "teeth", albedo: "teeth_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.45, subsurfaceFactor: 0.25 },
 	];
 
 	//==============================================================================
@@ -573,7 +573,7 @@
 	refreshOptionPanel();
 
 	//==============================================================================
-	// 애셋 로드. (Microsoft Rocketbox 중년 남성 glb — 골격 + ARKit 블렌드셰이프 52종, 부위별 텍스처는 직접 로드)
+	// 애셋 로드. (메타휴먼 얼굴 glb — DNA 의 RigLogic 을 굽은 ARKit 셰이프키, 부위별 텍스처는 직접 로드)
 	//==============================================================================
 	const headModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "./assets/character.glb", skinRenderer);
 	const drawableList = headModel.getDrawableList();
@@ -626,7 +626,7 @@
 	// 카메라 초점. (눈알 프리미티브의 정점 중심 = 눈 높이 — 캐릭터 키가 달라도 얼굴이 화면 중앙에 오도록)
 	const eyeCenter = Vector3.create(0, 1.6, 0.1);
 	for (const drawable of drawableList) {
-		if (!drawable.materialName.includes("eyes")) {
+		if (!drawable.materialName.includes("eyeball")) {
 			continue;
 		}
 		const positions = drawable.meshDescription.positions;
@@ -671,11 +671,10 @@
 	}
 	const thumbnails = {
 		albedo: await createThumbnail("head_albedo.jpg"),
-		normal: await createThumbnail("head_normal.jpg"),
-		roughness: await createThumbnail("head_roughness.jpg"),
 		detail: await createThumbnail("skin_detail.jpg"),
-		body: await createThumbnail("body_albedo.jpg"),
-		hair: await createThumbnail("hair.png"),
+		eye: await createThumbnail("eye_albedo.jpg"),
+		teeth: await createThumbnail("teeth_albedo.jpg"),
+		eyelash: await createThumbnail("eyelash.png"),
 	};
 	headModel.update(0);
 
@@ -748,10 +747,10 @@
 		}
 		const blinkLocal = elapsedTime - expressionState.blinkStartTime;
 		const blink = blinkLocal >= 0 && blinkLocal < 0.3 ? System.Math.sin(blinkLocal / 0.3 * System.Math.PI) : 0;
-		const leftClosed = System.Math.max(expressionState.currentWeights.get("AK_09_EyeBlinkLeft") || 0, blink);
-		const rightClosed = System.Math.max(expressionState.currentWeights.get("AK_10_EyeBlinkRight") || 0, blink);
-		headModel.setMorphWeight("AK_09_EyeBlinkLeft", leftClosed);
-		headModel.setMorphWeight("AK_10_EyeBlinkRight", rightClosed);
+		const leftClosed = System.Math.max(expressionState.currentWeights.get("EyeBlinkLeft") || 0, blink);
+		const rightClosed = System.Math.max(expressionState.currentWeights.get("EyeBlinkRight") || 0, blink);
+		headModel.setMorphWeight("EyeBlinkLeft", leftClosed);
+		headModel.setMorphWeight("EyeBlinkRight", rightClosed);
 	}
 
 	//==============================================================================
@@ -777,8 +776,7 @@
 		const approach = System.Math.min(1, deltaTime * 2.2);
 		headState.currentYaw += (targetYaw - headState.currentYaw) * approach;
 		headState.currentPitch += (targetPitch - headState.currentPitch) * approach;
-		headModel.setJointRotationOffset("Bip01 Head", Quaternion.createFromEuler(headState.currentPitch * 0.6, headState.currentYaw * 0.65, 0));
-		headModel.setJointRotationOffset("Bip01 Neck", Quaternion.createFromEuler(headState.currentPitch * 0.4, headState.currentYaw * 0.35, 0));
+		updateModelMatrix();
 	}
 
 	//==============================================================================
@@ -926,19 +924,18 @@
 				isActive: true,
 				lines: [],
 				thumbnails: [
-					{ label: "ALBEDO 2K", image: thumbnails.albedo },
-					{ label: "NORMAL 2K", image: thumbnails.normal },
-					{ label: "ROUGH 2K", image: thumbnails.roughness },
+					{ label: "ALBEDO", image: thumbnails.albedo },
 					{ label: "DETAIL 4K", image: thumbnails.detail },
 				],
 			},
 			{
-				title: "BODY, EYES AND HAIR",
+				title: "EYES, TEETH AND LASHES",
 				isActive: true,
-				lines: ["eyes from the head atlas, hair and brow cards with alpha cutout", "no subsurface on eyes and hair"],
+				lines: ["metahuman eye atlas (sclera and iris), teeth, lash cards with alpha cutout", "no subsurface on eyes and lashes"],
 				thumbnails: [
-					{ label: "BODY 2K", image: thumbnails.body },
-					{ label: "HAIR CARDS", image: thumbnails.hair },
+					{ label: "EYE", image: thumbnails.eye },
+					{ label: "TEETH", image: thumbnails.teeth },
+					{ label: "LASHES", image: thumbnails.eyelash },
 				],
 			},
 			{
@@ -982,7 +979,7 @@
 			{
 				title: "EXPRESSION",
 				isActive: true,
-				lines: ["preset " + expressionState.activeName + ", " + morphTargetCount + " ARKit units, " + activeUnitCount + " active", "blink from eye blink units, head via bones"],
+				lines: ["preset " + expressionState.activeName + ", " + morphTargetCount + " ARKit shapes baked from RigLogic, " + activeUnitCount + " active", "blink from eye blink shapes"],
 				thumbnails: [],
 			},
 			{
@@ -1181,8 +1178,16 @@
 	//==============================================================================
 	const startTimestamp = System.performance.now();
 	let previousTimestamp = startTimestamp;
-	const identityModelMatrix = Matrix4.createIdentity();
-	const identityModelElements = identityModelMatrix.getElements();
+	// 흉상 모델 행렬. (골격이 없는 메시라 목 아래 피벗을 중심으로 포인터 방향에 맞춰 회전)
+	const headPivot = Vector3.create(eyeCenter.x, eyeCenter.y - 0.22, eyeCenter.z - 0.06);
+	let modelElements = Matrix4.createIdentity().getElements();
+	function updateModelMatrix() {
+		const modelMatrix = Matrix4.createTranslation(headPivot.x, headPivot.y, headPivot.z);
+		modelMatrix.multiply(Matrix4.createRotationY(headState.currentYaw * 0.8));
+		modelMatrix.multiply(Matrix4.createRotationX(headState.currentPitch * 0.7));
+		modelMatrix.multiply(Matrix4.createTranslation(-headPivot.x, -headPivot.y, -headPivot.z));
+		modelElements = modelMatrix.getElements();
+	}
 	const shadowFocusPosition = Vector3.create(eyeCenter.x, eyeCenter.y - 0.08, eyeCenter.z - 0.09);
 	const shadowLightTravelDirection = KEY_LIGHT_DIRECTION.multiply(-1);
 
@@ -1229,7 +1234,7 @@
 		const lightViewProjectionElements = lightViewProjectionMatrix.getElements();
 		if (optionStates.shadow) {
 			shadowMap.beginRender();
-			skinRenderer.drawDepth(headModel, lightViewProjectionElements, identityModelElements);
+			skinRenderer.drawDepth(headModel, lightViewProjectionElements, modelElements);
 			drawCallCount += drawableList.length;
 		}
 		const shadowDepthTexture = shadowMap.getDepthTexture();
@@ -1242,7 +1247,7 @@
 		webGL2RenderingContext.depthMask(true);
 		webGL2RenderingContext.clearColor(0, 0, 0, 0);
 		webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
-		skinRenderer.draw(headModel, viewProjectionElements, identityModelElements, cameraX, cameraY, cameraZ);
+		skinRenderer.draw(headModel, viewProjectionElements, modelElements, cameraX, cameraY, cameraZ);
 		drawCallCount += drawableList.length;
 
 		// === 3. 화면 공간 서브서피스 스캐터링 ===
@@ -1332,14 +1337,14 @@
 			webGL2RenderingContext.colorMask(false, false, false, false);
 			webGL2RenderingContext.enable(webGL2RenderingContext.POLYGON_OFFSET_FILL);
 			webGL2RenderingContext.polygonOffset(1.5, 2);
-			skinRenderer.drawDepth(headModel, viewProjectionElements, identityModelElements);
+			skinRenderer.drawDepth(headModel, viewProjectionElements, modelElements);
 			webGL2RenderingContext.disable(webGL2RenderingContext.POLYGON_OFFSET_FILL);
 			webGL2RenderingContext.colorMask(true, true, true, true);
 			webGL2RenderingContext.depthMask(false);
 			webGL2RenderingContext.depthFunc(webGL2RenderingContext.LEQUAL);
 			webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
 			webGL2RenderingContext.blendFunc(webGL2RenderingContext.SRC_ALPHA, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
-			skinRenderer.drawWireframe(headModel, viewProjectionElements, identityModelElements, 0.91, 0.79, 0.54, 0.55);
+			skinRenderer.drawWireframe(headModel, viewProjectionElements, modelElements, 0.91, 0.79, 0.54, 0.55);
 			webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 			webGL2RenderingContext.depthMask(true);
 			webGL2RenderingContext.depthFunc(webGL2RenderingContext.LESS);

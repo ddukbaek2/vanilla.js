@@ -1,12 +1,12 @@
 # 업데이트 기록
 
 # 0.5.0-experimental (2026-09-05)
-- OLD FACE 샘플 추가 (examples/oldface) — Microsoft Rocketbox(MIT) 장년 남성 아바타(Male_Adult_03 — 회색 머리, 재킷, 골격 80본, ARKit 블렌드셰이프 52종)를 피부 파이프라인으로 렌더링
-  - 애셋 생성: Blender 헤드리스 스크립트(examples/oldface/tools/rocketbox_export.py) — 얼굴용 FBX 의 테이크 애니메이션 제거, cm 단위를 데이터에 굽기, ARKit 키만 유지, 어깨 아래와 팔 제거 후 구멍 메움(흉상), 판처럼 보이는 머리카락 카드 제거(두피에 그려진 머리 사용), 눈알 폴리곤을 별도 머티리얼로 분리해 glb 로 내보냄.
-    텍스처는 tools/rocketbox_textures.py 로 변환(알베도 / 노멀 JPEG, 스페큘러 → ORM 러프니스, 헤어 카드 RGBA PNG)
+- OLD FACE 샘플 추가 (examples/oldface) — 에픽 메타휴먼 얼굴(Taro DNA: 머리 2.4만 정점 + 치아 / 눈알 / 속눈썹, RigLogic 을 ARKit 51종 셰이프키로 굽음)을 피부 파이프라인으로 렌더링
+  - 애셋 생성(examples/oldface/tools/metahuman): UE 5.8 에서 ARKit 매핑 애니메이션의 raw 제어 커브를 덤프하고, 에픽 DNA 라이브러리로 DNA 의 RigLogic(PSD / 조인트 그룹 행렬 / 블렌드셰이프 채널)을 직접 평가해 포즈별 정점을 계산, Blender 로 희소 셰이프키 glb 생성.
+    눈(공막 + 홍채 합성) / 치아 / 속눈썹 텍스처는 메타휴먼 플러그인 기본 텍스처, 피부 알베도는 자리표시자(코어 데이터 설치 후 교체 예정)
   - 표정 버튼 13종(NEUTRAL / HAPPY / GRIN / PEACEFUL / EXCITED / ANGRY / FURIOUS / SAD / PAIN / DISGUSTED / BORED / CONFUSED / EMBARRASSED) — ARKit 블렌드셰이프 가중치 프리셋(assets/expressions.json)을 부드럽게 전환, 깜빡임은 EyeBlink 단위
-  - 머리 / 몸 / 눈 / 속눈썹 카드(알파 컷아웃)를 부위별 머티리얼로 분리(눈과 카드는 산란 마스크 0)
-  - 머리 방향은 골격 Bip01 Head / Neck 조인트 회전 오프셋으로 포인터를 따라감, 카메라 초점은 눈알 정점 중심, 폰 핀치 줌, 렌더링 정보 패널이 홈 링크와 겹치면 위로 이동
+  - 머리 / 치아 / 눈알 / 속눈썹 카드(알파 컷아웃)를 부위별 머티리얼로 분리(눈과 카드는 산란 마스크 0)
+  - 머리 방향은 흉상 모델 행렬을 목 아래 피벗으로 회전해 포인터를 따라감, 카메라 초점은 눈알 정점 중심, 폰 핀치 줌, 렌더링 정보 패널이 홈 링크와 겹치면 위로 이동
   - 선형 HDR 피부 파이프라인: 섀도우 깊이 → 피부 MRT(조도 / 알베도 / 스펙큘러) → 화면 공간 SSS → 합성 → 블룸 → ACES 톤 매핑 → FXAA
   - 렌더링 옵션 패널(숫자 키) + 우측 하단 렌더링 정보(fps / 프레임 시간 / 해상도 / 삼각형 / 정점 / 드로우 콜 / 모프 수)
   - 와이어프레임 토글(깊이 프리패스로 앞면 모서리만, 모프 / 스키닝 반영), 좌측 머티리얼 그래프 패널(원본 / 노화 텍스처 축소본, 셰이딩 파라미터, MRT / SSS / HDR 중간 버퍼 실시간 미리보기, 토글)
