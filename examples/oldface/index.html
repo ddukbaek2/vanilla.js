@@ -425,6 +425,7 @@
 	// 머리 LOD / 머리카락 품질 단계별 애셋. (머리카락: 카드 LOD, 프린지 블렌드, 흔들림 배율)
 	const HEAD_LOD_FILES = ["character_lod0.glb", "character_lod1.glb", "character_lod2.glb"];
 	const HAIR_LEVEL_DEFINITIONS = [
+		{ label: "NONE", file: null, fringe: false, sway: 0 },
 		{ label: "LOW", file: "hair_lod4.glb", fringe: false, sway: 0 },
 		{ label: "MEDIUM", file: "hair_lod3.glb", fringe: false, sway: 0.5 },
 		{ label: "HIGH", file: "hair_lod2.glb", fringe: true, sway: 0.8 },
@@ -795,7 +796,7 @@
 		{ group: "RENDER", name: "vignette", label: "VIGNETTE", minimum: 0, maximum: 1, step: 0.02, value: 0.5, format: (value) => value.toFixed(2) },
 		{ group: "RENDER", name: "grain", label: "FILM GRAIN", minimum: 0, maximum: 0.06, step: 0.002, value: 0, format: (value) => value.toFixed(3) },
 		{ group: "GEOMETRY", name: "headLod", label: "HEAD MESH LOD", minimum: 0, maximum: 2, step: 1, value: 1, format: (value) => "LOD " + (2 - value) },
-		{ group: "GEOMETRY", name: "hairQuality", label: "HAIR CARDS", minimum: 0, maximum: 4, step: 1, value: 2, format: (value) => HAIR_LEVEL_DEFINITIONS[value].label },
+		{ group: "GEOMETRY", name: "hairQuality", label: "HAIR CARDS", minimum: 0, maximum: 5, step: 1, value: 3, format: (value) => HAIR_LEVEL_DEFINITIONS[value].label },
 		{ group: "GEOMETRY", name: "textureSize", label: "TEXTURE SIZE", minimum: 0, maximum: 3, step: 1, value: 3, format: (value) => TEXTURE_SIZE_LABELS[value] },
 		{ group: "SHADOW", name: "shadowQuality", label: "SHADOW MAP", minimum: 0, maximum: 4, step: 1, value: 1, format: (value) => SHADOW_LEVEL_DEFINITIONS[value].label },
 		{ group: "SHADOW", name: "shadowSoftness", label: "SHADOW SOFTNESS", minimum: 0, maximum: 8, step: 0.25, value: 3, format: (value) => value.toFixed(2) },
@@ -1004,7 +1005,7 @@
 		materialByKeyword.set(definition.keyword, material);
 	}
 	headModel = await loadModelFile(HEAD_LOD_FILES[2 - sliderStates.headLod]);
-	hairModel = await loadModelFile(HAIR_LEVEL_DEFINITIONS[sliderStates.hairQuality].file);
+	hairModel = HAIR_LEVEL_DEFINITIONS[sliderStates.hairQuality].file ? await loadModelFile(HAIR_LEVEL_DEFINITIONS[sliderStates.hairQuality].file) : null;
 	const drawableList = headModel.getDrawableList();
 
 	// 카메라 초점. (눈알 프리미티브의 정점 중심 = 눈 높이 — 캐릭터 키가 달라도 얼굴이 화면 중앙에 오도록)
@@ -1094,12 +1095,19 @@
 		}
 		else if (name === "hairQuality") {
 			pendingHairQuality = value;
-			loadModelFile(HAIR_LEVEL_DEFINITIONS[value].file).then((model) => {
-				if (pendingHairQuality === value) {
-					hairModel = model;
-					refreshStatistics();
-				}
-			});
+			const hairFile = HAIR_LEVEL_DEFINITIONS[value].file;
+			if (!hairFile) {
+				hairModel = null;
+				refreshStatistics();
+			}
+			else {
+				loadModelFile(hairFile).then((model) => {
+					if (pendingHairQuality === value) {
+						hairModel = model;
+						refreshStatistics();
+					}
+				});
+			}
 		}
 		else if (name === "textureSize") {
 			applyTextureSize(3 - value);
