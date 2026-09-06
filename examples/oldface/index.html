@@ -419,7 +419,9 @@
 	const CAMERA_MINIMUM_DISTANCE = 0.42;
 	const CAMERA_MAXIMUM_DISTANCE = 1.9;
 	const SHADOWMAP_RESOLUTION = 4096;
-	const FRAME_RATE_OPTIONS = [30, 60, 0];
+	const FRAME_RATE_OPTIONS = [30, 60];
+	// 내부 렌더 픽셀 예산. (3840 x 2160 — 슈퍼샘플링을 곱해도 이 이상은 만들지 않는다)
+	const RENDER_PIXEL_BUDGET = 3840 * 2160;
 	// 머리 LOD / 머리카락 품질 단계별 애셋. (머리카락: 카드 LOD, 프린지 블렌드, 흔들림 배율)
 	const HEAD_LOD_FILES = ["character_lod0.glb", "character_lod1.glb", "character_lod2.glb"];
 	const HAIR_LEVEL_DEFINITIONS = [
@@ -784,8 +786,8 @@
 	// 슬라이더 옵션. (렌더 / 지오메트리 / 그림자 / 피부 / AO / 조명 / 머리카락 / 눈 / 애니메이션 — 값은 매 프레임 적용)
 	//==============================================================================
 	const sliderDefinitions = [
-		{ group: "RENDER", name: "frameRate", label: "FRAME RATE", minimum: 0, maximum: 2, step: 1, value: 1, format: (value) => (FRAME_RATE_OPTIONS[value] === 0 ? "MAX" : FRAME_RATE_OPTIONS[value] + " FPS") },
-		{ group: "RENDER", name: "renderScale", label: "SUPERSAMPLING", minimum: 0.5, maximum: 2, step: 0.25, value: 1.5, format: (value) => value.toFixed(2) + "X" },
+		{ group: "RENDER", name: "frameRate", label: "FRAME RATE", minimum: 0, maximum: 1, step: 1, value: 0, format: (value) => FRAME_RATE_OPTIONS[value] + " FPS" },
+		{ group: "RENDER", name: "renderScale", label: "RESOLUTION SCALE", minimum: 0.5, maximum: 2, step: 0.05, value: 1, format: (value) => System.Math.round(value * 100) + "%" },
 		{ group: "RENDER", name: "antialias", label: "ANTI-ALIASING", minimum: 0, maximum: 2, step: 1, value: 1, format: (value) => ANTIALIAS_LABELS[value] },
 		{ group: "RENDER", name: "exposure", label: "EXPOSURE", minimum: 0.3, maximum: 1.5, step: 0.02, value: 0.72, format: (value) => value.toFixed(2) },
 		{ group: "RENDER", name: "bloomStrength", label: "BLOOM STRENGTH", minimum: 0, maximum: 0.4, step: 0.01, value: 0.12, format: (value) => value.toFixed(2) },
@@ -1412,8 +1414,11 @@
 		const devicePixelRatio = System.Math.min(System.window.devicePixelRatio || 1, 2);
 		const displayWidth = System.Math.floor(canvas.clientWidth * devicePixelRatio);
 		const displayHeight = System.Math.floor(canvas.clientHeight * devicePixelRatio);
-		const renderWidth = System.Math.max(2, System.Math.floor(displayWidth * sliderStates.renderScale));
-		const renderHeight = System.Math.max(2, System.Math.floor(displayHeight * sliderStates.renderScale));
+		// 내부 렌더 해상도. (캔버스 x 슈퍼샘플링 — 고해상도 모니터에서 5760 px 같은 크기가 되지 않도록 4K 픽셀 예산으로 제한)
+		const pixelBudgetScale = System.Math.sqrt(RENDER_PIXEL_BUDGET / System.Math.max(displayWidth * displayHeight, 1));
+		const effectiveRenderScale = System.Math.min(sliderStates.renderScale, pixelBudgetScale);
+		const renderWidth = System.Math.max(2, System.Math.floor(displayWidth * effectiveRenderScale));
+		const renderHeight = System.Math.max(2, System.Math.floor(displayHeight * effectiveRenderScale));
 		if (canvas.width !== displayWidth || canvas.height !== displayHeight || sceneRenderTarget.getWidth() !== renderWidth || sceneRenderTarget.getHeight() !== renderHeight) {
 			canvas.width = displayWidth;
 			canvas.height = displayHeight;
@@ -1437,13 +1442,17 @@
 	const GRAPH_PADDING = 12;
 	const GRAPH_NODE_PADDING = 10;
 	const GRAPH_NODE_GAP = 8;
-	const GRAPH_IMAGE_THUMBNAIL_SIZE = 62;
-	const GRAPH_BUFFER_THUMBNAIL_WIDTH = 100;
-	const GRAPH_LINE_HEIGHT = 15;
+	const GRAPH_IMAGE_THUMBNAIL_SIZE = 72;
+	const GRAPH_BUFFER_THUMBNAIL_WIDTH = 104;
+	const GRAPH_LINE_HEIGHT = 20;
 	const GRAPH_TITLE_FONT = `600 10px "Segoe UI", "Malgun Gothic", sans-serif`;
+	const GRAPH_TITLE_SPACING = 3.2;
 	const GRAPH_NODE_TITLE_FONT = `600 9px "Segoe UI", "Malgun Gothic", sans-serif`;
-	const GRAPH_TEXT_FONT = `400 9.5px "Segoe UI", "Malgun Gothic", sans-serif`;
-	const GRAPH_LABEL_FONT = `400 8.5px "Segoe UI", "Malgun Gothic", sans-serif`;
+	const GRAPH_NODE_TITLE_SPACING = 2.7;
+	const GRAPH_TEXT_FONT = `400 10.5px "Segoe UI", "Malgun Gothic", sans-serif`;
+	const GRAPH_TEXT_SPACING = 1.26;
+	const GRAPH_LABEL_FONT = `400 9px "Segoe UI", "Malgun Gothic", sans-serif`;
+	const GRAPH_LABEL_SPACING = 1.6;
 	const GRAPH_ACTIVE_TITLE_COLOR = "rgba(232, 201, 138, 0.95)";
 	const GRAPH_INACTIVE_TITLE_COLOR = "rgba(232, 201, 138, 0.38)";
 	const GRAPH_ACTIVE_TEXT_COLOR = "rgba(242, 236, 226, 0.74)";
@@ -1526,7 +1535,7 @@
 			{
 				title: "POST",
 				isActive: true,
-				lines: ["bloom " + (optionStates.bloom ? sliderStates.bloomStrength.toFixed(2) : "off") + ", exposure " + sliderStates.exposure.toFixed(2) + ", ACES, vignette, grain", "supersampling " + sliderStates.renderScale.toFixed(2) + "x, " + ANTIALIAS_LABELS[sliderStates.antialias].toLowerCase() + ", " + HAIR_LEVEL_DEFINITIONS[sliderStates.hairQuality].label.toLowerCase() + " hair, head lod " + (2 - sliderStates.headLod)],
+				lines: ["bloom " + (optionStates.bloom ? sliderStates.bloomStrength.toFixed(2) : "off") + ", exposure " + sliderStates.exposure.toFixed(2) + ", ACES, vignette, grain", "resolution scale " + System.Math.round(sliderStates.renderScale * 100) + "%, " + ANTIALIAS_LABELS[sliderStates.antialias].toLowerCase() + ", " + HAIR_LEVEL_DEFINITIONS[sliderStates.hairQuality].label.toLowerCase() + " hair, head lod " + (2 - sliderStates.headLod)],
 				thumbnails: [],
 			},
 		];
@@ -1542,7 +1551,7 @@
 			let currentLine = "";
 			for (const word of words) {
 				const candidate = currentLine.length > 0 ? currentLine + " " + word : word;
-				const candidateWidth = uiGraphic.measureText(candidate).width;
+				const candidateWidth = uiGraphic.measureText(candidate).width + candidate.length * GRAPH_TEXT_SPACING;
 				if (candidateWidth > maximumWidth && currentLine.length > 0) {
 					wrappedLines.push(currentLine);
 					currentLine = word;
@@ -1576,8 +1585,7 @@
 		const margin = isNarrow ? 10 : GRAPH_PANEL_MARGIN;
 		const panelWidth = isNarrow ? cssWidth - margin * 2 : GRAPH_PANEL_WIDTH;
 		const panelY = isNarrow ? margin + 34 + 8 : margin;
-		const reservedBottom = isNarrow ? 330 : 172;
-		const maximumHeight = System.Math.max(GRAPH_TITLE_HEIGHT + 60, cssHeight - panelY - reservedBottom);
+		const maximumHeight = System.Math.max(GRAPH_TITLE_HEIGHT + 60, System.Math.min(cssHeight, statistics.hudTop) - panelY - 12);
 		return { x: margin, y: panelY, width: panelWidth, maximumHeight: maximumHeight };
 	}
 
@@ -1590,7 +1598,7 @@
 			node.lines = wrapGraphLines(node.lines, textWidth);
 			node.x = GRAPH_PADDING;
 			node.y = cursorY;
-			let contentY = node.y + 24;
+			let contentY = node.y + 28;
 			if (node.thumbnails.length > 0) {
 				const isImageRow = node.thumbnails[0].image !== undefined;
 				const thumbnailWidth = isImageRow ? GRAPH_IMAGE_THUMBNAIL_SIZE : GRAPH_BUFFER_THUMBNAIL_WIDTH;
@@ -1603,7 +1611,7 @@
 					thumbnail.width = thumbnailWidth;
 					thumbnail.height = thumbnailHeight;
 				}
-				contentY += thumbnailHeight + 16;
+				contentY += thumbnailHeight + 20;
 			}
 			node.textY = contentY;
 			contentY += node.lines.length * GRAPH_LINE_HEIGHT;
@@ -1654,13 +1662,13 @@
 		uiGraphic.setTextAlign("left");
 		uiGraphic.setFontString(GRAPH_TITLE_FONT);
 		uiGraphic.setFillColor(GRAPH_ACTIVE_TITLE_COLOR);
-		drawSpacedText("MATERIAL GRAPH", frame.x + 16, frame.y + GRAPH_TITLE_HEIGHT * 0.5 + 1, 3.2);
+		drawSpacedText("MATERIAL GRAPH", frame.x + 16, frame.y + GRAPH_TITLE_HEIGHT * 0.5 + 1, GRAPH_TITLE_SPACING);
 		uiGraphic.setFontString(GRAPH_LABEL_FONT);
 		uiGraphic.setFillColor(GRAPH_LABEL_COLOR);
 		const hintText = materialGraphState.maximumScroll > 0 ? "SCROLL" : "";
 		if (hintText.length > 0) {
-			const hintWidth = uiGraphic.measureText(hintText).width + hintText.length * 1.5;
-			drawSpacedText(hintText, frame.x + frame.width - 16 - hintWidth, frame.y + GRAPH_TITLE_HEIGHT * 0.5 + 1, 1.5);
+			const hintWidth = uiGraphic.measureText(hintText).width + hintText.length * GRAPH_LABEL_SPACING;
+			drawSpacedText(hintText, frame.x + frame.width - 16 - hintWidth, frame.y + GRAPH_TITLE_HEIGHT * 0.5 + 1, GRAPH_LABEL_SPACING);
 		}
 		uiGraphic.setStrokeColor("rgba(242, 236, 226, 0.1)");
 		uiGraphic.drawLine([Vector2.create(frame.x, contentTop), Vector2.create(frame.x + frame.width, contentTop)], 1);
@@ -1728,15 +1736,15 @@
 				uiGraphic.drawStrokeRect(Rect.create(thumbnailX, thumbnailY, thumbnail.width, thumbnail.height), 1);
 				uiGraphic.setFontString(GRAPH_LABEL_FONT);
 				uiGraphic.setFillColor(GRAPH_LABEL_COLOR);
-				drawSpacedText(thumbnail.label, thumbnailX, thumbnailY + thumbnail.height + 8, 1);
+				drawSpacedText(thumbnail.label, thumbnailX, thumbnailY + thumbnail.height + 9, GRAPH_LABEL_SPACING);
 			}
 			uiGraphic.setFontString(GRAPH_NODE_TITLE_FONT);
 			uiGraphic.setFillColor(node.isActive ? GRAPH_ACTIVE_TITLE_COLOR : GRAPH_INACTIVE_TITLE_COLOR);
-			drawSpacedText(node.title, nodeX + GRAPH_NODE_PADDING, nodeY + 12, 2.6);
+			drawSpacedText(node.title, nodeX + GRAPH_NODE_PADDING, nodeY + 14, GRAPH_NODE_TITLE_SPACING);
 			uiGraphic.setFontString(GRAPH_TEXT_FONT);
 			uiGraphic.setFillColor(node.isActive ? GRAPH_ACTIVE_TEXT_COLOR : GRAPH_INACTIVE_TEXT_COLOR);
 			for (let lineIndex = 0; lineIndex < node.lines.length; ++lineIndex) {
-				uiGraphic.drawFillText(node.lines[lineIndex], nodeX + GRAPH_NODE_PADDING, originY + node.textY + lineIndex * GRAPH_LINE_HEIGHT + 7);
+				drawSpacedText(node.lines[lineIndex], nodeX + GRAPH_NODE_PADDING, originY + node.textY + lineIndex * GRAPH_LINE_HEIGHT + 9, GRAPH_TEXT_SPACING);
 			}
 			if (nodeIndex < nodes.length - 1) {
 				const connectorX = nodeX + 22;
@@ -1758,6 +1766,8 @@
 	const statistics = {
 		smoothedFrameSeconds: 1 / 60,
 		drawCallCount: 0,
+		hudTop: System.window.innerHeight - 190,
+		optionMaximumHeight: 0,
 	};
 	const homeLinkElement = System.document.getElementById("homeLink");
 
@@ -1772,7 +1782,8 @@
 		const rowHeight = 16;
 		const rows = [
 			["fps", System.Math.round(1 / System.Math.max(statistics.smoothedFrameSeconds, 0.0001)).toString()],
-			["render", sceneRenderTarget.getWidth() + " x " + sceneRenderTarget.getHeight()],
+			["display", canvas.width + " x " + canvas.height],
+			["render buffer", sceneRenderTarget.getWidth() + " x " + sceneRenderTarget.getHeight()],
 			["triangles", System.Math.round(triangleCount).toLocaleString("en-US")],
 			["vertices", vertexCount.toLocaleString("en-US")],
 			["draw calls", statistics.drawCallCount.toString()],
@@ -1789,6 +1800,13 @@
 		const isOverlappingHomeLink = homeLinkRect.right > panelX && homeLinkRect.top < panelY + panelHeight;
 		if (isOverlappingHomeLink) {
 			panelY = homeLinkRect.top - panelHeight - 12;
+		}
+		// 옵션 패널 / 머티리얼 그래프는 이 HUD 위까지만 내려오게 한다 (겹침 방지)
+		statistics.hudTop = panelY;
+		const optionMaximumHeight = System.Math.max(120, panelY - 18 - 12);
+		if (statistics.optionMaximumHeight !== optionMaximumHeight) {
+			statistics.optionMaximumHeight = optionMaximumHeight;
+			optionPanelElement.style.maxHeight = optionMaximumHeight + "px";
 		}
 		const panelRect = Rect.create(panelX, panelY, panelWidth, panelHeight);
 		uiGraphic.setFillColor("rgba(14, 12, 14, 0.55)");
@@ -1830,7 +1848,7 @@
 		// 프레임 레이트 제한. (30 / 60 / 최대 — 목표 간격보다 이르면 건너뛴다)
 		const targetFrameRate = FRAME_RATE_OPTIONS[sliderStates.frameRate];
 		const nowTimestamp = System.performance.now();
-		if (targetFrameRate > 0 && nowTimestamp - previousTimestamp < 1000 / targetFrameRate - 1.5) {
+		if (nowTimestamp - previousTimestamp < 1000 / targetFrameRate - 1.5) {
 			System.window.requestAnimationFrame(renderFrame);
 			return;
 		}
