@@ -2006,13 +2006,18 @@
 			["draw calls", statistics.drawCallCount.toString()],
 			["morph targets", morphTargetCount.toString()],
 			["cpu frame", statistics.cpuFrameMilliseconds.toFixed(2) + " ms"],
-			["gpu shadow", formatPassTime("shadow")],
-			["gpu scene", formatPassTime("scene")],
-			["gpu sss + ao", formatPassTime("scatter")],
-			["gpu post", formatPassTime("post")],
-			["gpu memory (est.)", statistics.gpuMemoryText],
-			[statistics.jsHeapLabel, statistics.jsHeapText],
 		];
+		// 읽을 수 없는 값의 행은 아예 만들지 않는다 (GPU 타이머 확장이 없으면 패스 시간, 힙 API 가 없으면 힙)
+		if (timerExtension) {
+			rows.push(["gpu shadow", formatPassTime("shadow")]);
+			rows.push(["gpu scene", formatPassTime("scene")]);
+			rows.push(["gpu sss + ao", formatPassTime("scatter")]);
+			rows.push(["gpu post", formatPassTime("post")]);
+		}
+		rows.push(["gpu memory (est.)", statistics.gpuMemoryText]);
+		if (System.performance.memory) {
+			rows.push(["js heap", statistics.jsHeapText]);
+		}
 		const panelWidth = 214;
 		const panelHeight = rows.length * rowHeight + 18;
 		const panelX = cssWidth - panelWidth - 18;
