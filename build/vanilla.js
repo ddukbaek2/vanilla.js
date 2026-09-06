@@ -28382,12 +28382,14 @@ var SkinnedModelRenderer = class extends Object2 {
    * @constructor
    * @param { WebGL2RenderingContext } webGL2RenderingContext
    * @param { string | null } fragmentShaderSource 대체 프래그먼트 셰이더 소스. (null 이면 기본 PBR)
+   * @param { string | null } vertexShaderSource 대체 버텍스 셰이더 소스. (null 이면 기본 스키닝 — 같은 어트리뷰트 / 출력 규약을 지켜야 한다)
    */
-  constructor(webGL2RenderingContext, fragmentShaderSource = null) {
+  constructor(webGL2RenderingContext, fragmentShaderSource = null, vertexShaderSource = null) {
     super();
     const resolvedFragmentShaderSource = fragmentShaderSource ? fragmentShaderSource : SKINNED_FRAGMENTSHADER_SOURCE;
+    const resolvedVertexShaderSource = vertexShaderSource ? vertexShaderSource : SKINNED_VERTEXSHADER_SOURCE;
     this.#webGL2RenderingContext = webGL2RenderingContext;
-    this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_VERTEXSHADER_SOURCE.trim(), resolvedFragmentShaderSource.trim());
+    this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, resolvedVertexShaderSource.trim(), resolvedFragmentShaderSource.trim());
     this.#depthShaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_DEPTH_VERTEXSHADER_SOURCE.trim(), SKINNED_DEPTH_FRAGMENTSHADER_SOURCE.trim());
     this.#wireframeShaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_WIREFRAME_VERTEXSHADER_SOURCE.trim(), SKINNED_WIREFRAME_FRAGMENTSHADER_SOURCE.trim());
     this.#shadowMapTexture = null;
@@ -28664,9 +28666,10 @@ var SKIN_TEXTURE_UNIT_LAYERNORMAL = 12;
 var SKIN_TEXTURE_UNIT_LAYERCOLOR = 13;
 var SKIN_TEXTURE_UNIT_AUXILIARY = 14;
 var WRINKLE_CHANNEL_COUNT = 64;
-var SHADOW_SAMPLE_COUNT = 12;
+var SHADOW_SAMPLE_COUNT = 24;
 var SKIN_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
+precision highp int;
 in vec3 worldPosition;
 in vec3 worldNormal;
 in vec2 fragmentTextureCoordinate;
@@ -28693,6 +28696,7 @@ uniform highp sampler2DShadow shadowMapTexture;
 uniform float shadowStrength;
 uniform float shadowTexelSize;
 uniform float shadowSoftness;
+uniform int shadowSampleCount;
 uniform vec3 cameraPosition;
 uniform vec3 lightDirections[3];
 uniform vec3 lightColors[3];
@@ -28727,11 +28731,14 @@ layout(location = 3) out vec4 normalOutput;
 
 const float PI = 3.14159265;
 
-// \uD3EC\uC544\uC1A1 \uC6D0\uD310. (12 \uD45C\uBCF8 \u2014 \uD504\uB798\uADF8\uBA3C\uD2B8\uB9C8\uB2E4 \uD68C\uC804)
+// \uD3EC\uC544\uC1A1 \uC6D0\uD310. (24 \uD45C\uBCF8 \u2014 \uD504\uB798\uADF8\uBA3C\uD2B8\uB9C8\uB2E4 \uD68C\uC804, \uC55E\uCABD \uD45C\uBCF8\uBD80\uD130 \uC4F4\uB2E4)
 const vec2 POISSON_DISK[${SHADOW_SAMPLE_COUNT}] = vec2[](
 	vec2(-0.326, -0.406), vec2(-0.840, -0.074), vec2(-0.696, 0.457), vec2(-0.203, 0.621),
 	vec2(0.962, -0.195), vec2(0.473, -0.480), vec2(0.519, 0.767), vec2(0.185, -0.893),
-	vec2(0.507, 0.064), vec2(0.896, 0.412), vec2(-0.322, -0.933), vec2(-0.792, -0.598));
+	vec2(0.507, 0.064), vec2(0.896, 0.412), vec2(-0.322, -0.933), vec2(-0.792, -0.598),
+	vec2(0.130, 0.240), vec2(-0.520, 0.120), vec2(0.310, -0.150), vec2(-0.110, -0.680),
+	vec2(0.700, 0.240), vec2(-0.450, 0.780), vec2(0.020, 0.930), vec2(-0.950, -0.300),
+	vec2(0.630, -0.740), vec2(-0.240, 0.060), vec2(0.280, 0.520), vec2(-0.610, -0.250));
 
 float interleavedGradientNoise(vec2 screenPosition) {
 	return fract(52.9829189 * fract(dot(screenPosition, vec2(0.06711056, 0.00583715))));
@@ -28752,10 +28759,13 @@ float sampleShadowFactor(float normalDotLight) {
 	float radius = shadowTexelSize * shadowSoftness;
 	float shadowSum = 0.0;
 	for (int sampleIndex = 0; sampleIndex < ${SHADOW_SAMPLE_COUNT}; ++sampleIndex) {
+		if (sampleIndex >= shadowSampleCount) {
+			break;
+		}
 		vec2 tapOffset = rotation * POISSON_DISK[sampleIndex] * radius;
 		shadowSum += texture(shadowMapTexture, vec3(projected.xy + tapOffset, projected.z - bias));
 	}
-	return shadowSum / float(${SHADOW_SAMPLE_COUNT});
+	return shadowSum / float(max(shadowSampleCount, 1));
 }
 
 // \uD654\uBA74 \uACF5\uAC04 \uBBF8\uBD84 \uCF54\uD0C4\uC820\uD2B8 \uD504\uB808\uC784. (\uD0C4\uC820\uD2B8 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8 \uBD88\uD544\uC694)
@@ -29162,6 +29172,52 @@ void main() {
 	}
 }
 `;
+var SKIN_VERTEXSHADER_SOURCE = `#version 300 es
+layout(location = 0) in vec3 vertexPosition;
+layout(location = 1) in vec3 vertexNormal;
+layout(location = 2) in vec2 vertexTextureCoordinate;
+layout(location = 3) in uvec4 vertexJoints;
+layout(location = 4) in vec4 vertexWeights;
+uniform mat4 modelMatrix;
+uniform mat4 viewProjectionMatrix;
+uniform mat4 lightViewProjectionMatrix;
+uniform mat4 jointMatrices[96];
+uniform int shadingMode;
+uniform sampler2D layerNormalTexture;
+uniform vec4 hairSway;
+out vec3 worldPosition;
+out vec3 worldNormal;
+out vec2 fragmentTextureCoordinate;
+out vec4 lightSpacePosition;
+${MORPH_GLSL}
+void main() {
+	// \uB178\uBA40 \uBBF8\uBCF4\uC720 \uBAA8\uB378 \uAC00\uB4DC. (\uBE44\uD65C\uC131 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8\uB294 \uC601\uBCA1\uD130 \u2014 \uC704\uCABD\uC73C\uB85C \uB300\uCCB4)
+	vec3 safeNormal = dot(vertexNormal, vertexNormal) < 0.0001 ? vec3(0.0, 1.0, 0.0) : vertexNormal;
+	vec3 morphedPosition = vertexPosition;
+	vec3 morphedNormal = safeNormal;
+	applyMorphTargets(morphedPosition, morphedNormal);
+
+	mat4 skinMatrix = vertexWeights.x * jointMatrices[vertexJoints.x]
+		+ vertexWeights.y * jointMatrices[vertexJoints.y]
+		+ vertexWeights.z * jointMatrices[vertexJoints.z]
+		+ vertexWeights.w * jointMatrices[vertexJoints.w];
+	vec4 skinnedPosition = modelMatrix * skinMatrix * vec4(morphedPosition, 1.0);
+
+	// \uBA38\uB9AC\uCE74\uB77D \uD754\uB4E4\uB9BC. (hairSway: x \uC9C4\uD3ED(m), y \uC2DC\uAC04, z \uC8FC\uD30C\uC218 \u2014 \uAC00\uB2E5 \uB05D\uC77C\uC218\uB85D, \uB0AE\uC740 \uC8FC\uD30C\uC218 \uC5EC\uB7EC \uACB9)
+	if (shadingMode == ${SKIN_SHADING_HAIR} && hairSway.x > 0.0) {
+		float strandCoordinate = textureLod(layerNormalTexture, vertexTextureCoordinate, 0.0).a;
+		float tip = strandCoordinate * strandCoordinate;
+		float phase = skinnedPosition.x * 7.0 + skinnedPosition.y * 5.0 + hairSway.y * hairSway.z;
+		vec3 offset = vec3(sin(phase) * 0.6 + sin(phase * 2.3 + 1.7) * 0.25, -abs(sin(phase * 0.7 + 0.4)) * 0.25, cos(phase * 1.3) * 0.5);
+		skinnedPosition.xyz += offset * hairSway.x * tip;
+	}
+	worldPosition = skinnedPosition.xyz;
+	worldNormal = normalize(mat3(modelMatrix) * mat3(skinMatrix) * normalize(morphedNormal));
+	fragmentTextureCoordinate = vertexTextureCoordinate;
+	lightSpacePosition = lightViewProjectionMatrix * skinnedPosition;
+	gl_Position = viewProjectionMatrix * skinnedPosition;
+}
+`;
 var CUTOUT_DEPTH_VERTEXSHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 vertexPosition;
 layout(location = 2) in vec2 vertexTextureCoordinate;
@@ -29215,6 +29271,12 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
   #shadowTexelSize;
   /** @private @type { number } */
   #shadowSoftness;
+  /** @private @type { number } */
+  #shadowSampleCount;
+  /** @private @type { number[] } */
+  #hairSway;
+  /** @private @type { boolean } */
+  #useHairFringe;
   /** @private @type { Float32Array } */
   #lightDirections;
   /** @private @type { Float32Array } */
@@ -29275,7 +29337,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
    * @param { WebGL2RenderingContext } webGL2RenderingContext
    */
   constructor(webGL2RenderingContext) {
-    super(webGL2RenderingContext, SKIN_FRAGMENTSHADER_SOURCE);
+    super(webGL2RenderingContext, SKIN_FRAGMENTSHADER_SOURCE, SKIN_VERTEXSHADER_SOURCE);
     this.#cutoutDepthShaderProgram = new ShaderProgram(webGL2RenderingContext, CUTOUT_DEPTH_VERTEXSHADER_SOURCE.trim(), CUTOUT_DEPTH_FRAGMENTSHADER_SOURCE.trim());
     this.#materialShadingModes = new System48.Map();
     this.#shadowMapTexture = null;
@@ -29283,6 +29345,9 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     this.#shadowStrength = 0;
     this.#shadowTexelSize = 1 / 2048;
     this.#shadowSoftness = 2.5;
+    this.#shadowSampleCount = 12;
+    this.#hairSway = [0, 0, 1.5];
+    this.#useHairFringe = true;
     this.#lightDirections = new System48.Float32Array(9);
     this.#lightColors = new System48.Float32Array(9);
     this.#ambientSkyColor = [0.34, 0.36, 0.42];
@@ -29368,6 +29433,8 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     this.applyShadowUniforms(shaderProgram);
     const passModeLocation = shaderProgram.getUniformLocation("passMode");
     webGL2RenderingContext.uniform1i(passModeLocation, passMode);
+    const hairSwayLocation = shaderProgram.getUniformLocation("hairSway");
+    webGL2RenderingContext.uniform4f(hairSwayLocation, this.#hairSway[0], this.#hairSway[1], this.#hairSway[2], 0);
     const shadingModeLocation = shaderProgram.getUniformLocation("shadingMode");
     const jointMatricesLocation = shaderProgram.getUniformLocation("jointMatrices[0]");
     const skinList = skinnedModel.getSkinList();
@@ -29380,6 +29447,9 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
         continue;
       }
       if (passMode === 1 && !isOverlay && !isHair) {
+        continue;
+      }
+      if (passMode === 1 && isHair && !this.#useHairFringe) {
         continue;
       }
       const skin = skinList[drawable.skinIndex];
@@ -29529,6 +29599,8 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     const shadowStrengthLocation = shaderProgram.getUniformLocation("shadowStrength");
     const shadowSoftnessLocation = shaderProgram.getUniformLocation("shadowSoftness");
     webGL2RenderingContext.uniform1f(shadowSoftnessLocation, this.#shadowSoftness);
+    const shadowSampleCountLocation = shaderProgram.getUniformLocation("shadowSampleCount");
+    webGL2RenderingContext.uniform1i(shadowSampleCountLocation, this.#shadowSampleCount);
     if (this.#shadowMapTexture && this.#lightViewProjectionElements) {
       const lightViewProjectionLocation = shaderProgram.getUniformLocation("lightViewProjectionMatrix");
       webGL2RenderingContext.uniformMatrix4fv(lightViewProjectionLocation, false, this.#lightViewProjectionElements);
@@ -29576,6 +29648,35 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
    */
   setShadowSoftness(shadowSoftness) {
     this.#shadowSoftness = shadowSoftness;
+  }
+  //==============================================================================
+  // 그림자 표본 수 설정. (1 ~ 24 — 많을수록 부드럽고 느리다)
+  //==============================================================================
+  /**
+   * @param { number } shadowSampleCount
+   */
+  setShadowSampleCount(shadowSampleCount) {
+    this.#shadowSampleCount = System48.Math.max(1, System48.Math.min(SHADOW_SAMPLE_COUNT, System48.Math.floor(shadowSampleCount)));
+  }
+  //==============================================================================
+  // 머리카락 흔들림 설정. (진폭 m / 시간 초 / 주파수 — 진폭 0 이면 없음)
+  //==============================================================================
+  /**
+   * @param { number } amplitude
+   * @param { number } time
+   * @param { number } frequency
+   */
+  setHairSway(amplitude, time, frequency) {
+    this.#hairSway = [amplitude, time, frequency];
+  }
+  //==============================================================================
+  // 머리카락 프린지 블렌드 사용 설정. (false 면 컷아웃만 — 성능 위주)
+  //==============================================================================
+  /**
+   * @param { boolean } useHairFringe
+   */
+  setHairFringe(useHairFringe) {
+    this.#useHairFringe = useHairFringe;
   }
   //==============================================================================
   // 머티리얼 셰이딩 모드 등록. (등록하지 않은 머티리얼은 피부)

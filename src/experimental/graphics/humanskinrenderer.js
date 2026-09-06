@@ -29,8 +29,8 @@ export const SKIN_TEXTURE_UNIT_AUXILIARY = 14;
 // 주름 마스크 채널 수. (4x4 아틀라스 x RGBA — 채널마다 주름 맵 1 / 2 / 3 기여 가중치 vec3)
 export const WRINKLE_CHANNEL_COUNT = 64;
 
-// 섀도우 포아송 표본. (회전 노이즈로 흩어 부드러운 반영)
-const SHADOW_SAMPLE_COUNT = 12;
+// 섀도우 포아송 표본 최대치. (회전 노이즈로 흩어 부드러운 반영 — 실제 표본 수는 shadowSampleCount 유니폼)
+const SHADOW_SAMPLE_COUNT = 24;
 
 // 인체 피부 프래그먼트 셰이더. (선형 HDR — 화면 공간 SSS 를 위해 조도 / 알베도 / 스펙큘러를 분리 출력)
 // - 조명: 방향광 3개(0번은 섀도우 맵 수신) + 3색 반구 앰비언트 + 조명 방향의 소프트박스 반사 환경.
@@ -41,6 +41,7 @@ const SHADOW_SAMPLE_COUNT = 12;
 // - 출력 0: 확산 조도(rgb) + SSS 마스크(a) / 1: 선형 알베도(rgb) + 커버리지(a) / 2: 스펙큘러(rgb) / 3: 월드 노멀(rgb).
 const SKIN_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
+precision highp int;
 in vec3 worldPosition;
 in vec3 worldNormal;
 in vec2 fragmentTextureCoordinate;
@@ -67,6 +68,7 @@ uniform highp sampler2DShadow shadowMapTexture;
 uniform float shadowStrength;
 uniform float shadowTexelSize;
 uniform float shadowSoftness;
+uniform int shadowSampleCount;
 uniform vec3 cameraPosition;
 uniform vec3 lightDirections[3];
 uniform vec3 lightColors[3];
@@ -101,11 +103,14 @@ layout(location = 3) out vec4 normalOutput;
 
 const float PI = 3.14159265;
 
-// 포아송 원판. (12 표본 — 프래그먼트마다 회전)
+// 포아송 원판. (24 표본 — 프래그먼트마다 회전, 앞쪽 표본부터 쓴다)
 const vec2 POISSON_DISK[${SHADOW_SAMPLE_COUNT}] = vec2[](
 	vec2(-0.326, -0.406), vec2(-0.840, -0.074), vec2(-0.696, 0.457), vec2(-0.203, 0.621),
 	vec2(0.962, -0.195), vec2(0.473, -0.480), vec2(0.519, 0.767), vec2(0.185, -0.893),
-	vec2(0.507, 0.064), vec2(0.896, 0.412), vec2(-0.322, -0.933), vec2(-0.792, -0.598));
+	vec2(0.507, 0.064), vec2(0.896, 0.412), vec2(-0.322, -0.933), vec2(-0.792, -0.598),
+	vec2(0.130, 0.240), vec2(-0.520, 0.120), vec2(0.310, -0.150), vec2(-0.110, -0.680),
+	vec2(0.700, 0.240), vec2(-0.450, 0.780), vec2(0.020, 0.930), vec2(-0.950, -0.300),
+	vec2(0.630, -0.740), vec2(-0.240, 0.060), vec2(0.280, 0.520), vec2(-0.610, -0.250));
 
 float interleavedGradientNoise(vec2 screenPosition) {
 	return fract(52.9829189 * fract(dot(screenPosition, vec2(0.06711056, 0.00583715))));
@@ -126,10 +131,13 @@ float sampleShadowFactor(float normalDotLight) {
 	float radius = shadowTexelSize * shadowSoftness;
 	float shadowSum = 0.0;
 	for (int sampleIndex = 0; sampleIndex < ${SHADOW_SAMPLE_COUNT}; ++sampleIndex) {
+		if (sampleIndex >= shadowSampleCount) {
+			break;
+		}
 		vec2 tapOffset = rotation * POISSON_DISK[sampleIndex] * radius;
 		shadowSum += texture(shadowMapTexture, vec3(projected.xy + tapOffset, projected.z - bias));
 	}
-	return shadowSum / float(${SHADOW_SAMPLE_COUNT});
+	return shadowSum / float(max(shadowSampleCount, 1));
 }
 
 // 화면 공간 미분 코탄젠트 프레임. (탄젠트 어트리뷰트 불필요)
@@ -537,6 +545,54 @@ void main() {
 }
 `;
 
+// 피부 버텍스 셰이더. (기본 스키닝 / 모프 경로 + 머리카락 흔들림 — 카드 탄젠트 아틀라스의 가닥 좌표(a)가 클수록(끝) 크게 흔든다)
+const SKIN_VERTEXSHADER_SOURCE = `#version 300 es
+layout(location = 0) in vec3 vertexPosition;
+layout(location = 1) in vec3 vertexNormal;
+layout(location = 2) in vec2 vertexTextureCoordinate;
+layout(location = 3) in uvec4 vertexJoints;
+layout(location = 4) in vec4 vertexWeights;
+uniform mat4 modelMatrix;
+uniform mat4 viewProjectionMatrix;
+uniform mat4 lightViewProjectionMatrix;
+uniform mat4 jointMatrices[96];
+uniform int shadingMode;
+uniform sampler2D layerNormalTexture;
+uniform vec4 hairSway;
+out vec3 worldPosition;
+out vec3 worldNormal;
+out vec2 fragmentTextureCoordinate;
+out vec4 lightSpacePosition;
+${MORPH_GLSL}
+void main() {
+	// 노멀 미보유 모델 가드. (비활성 어트리뷰트는 영벡터 — 위쪽으로 대체)
+	vec3 safeNormal = dot(vertexNormal, vertexNormal) < 0.0001 ? vec3(0.0, 1.0, 0.0) : vertexNormal;
+	vec3 morphedPosition = vertexPosition;
+	vec3 morphedNormal = safeNormal;
+	applyMorphTargets(morphedPosition, morphedNormal);
+
+	mat4 skinMatrix = vertexWeights.x * jointMatrices[vertexJoints.x]
+		+ vertexWeights.y * jointMatrices[vertexJoints.y]
+		+ vertexWeights.z * jointMatrices[vertexJoints.z]
+		+ vertexWeights.w * jointMatrices[vertexJoints.w];
+	vec4 skinnedPosition = modelMatrix * skinMatrix * vec4(morphedPosition, 1.0);
+
+	// 머리카락 흔들림. (hairSway: x 진폭(m), y 시간, z 주파수 — 가닥 끝일수록, 낮은 주파수 여러 겹)
+	if (shadingMode == ${SKIN_SHADING_HAIR} && hairSway.x > 0.0) {
+		float strandCoordinate = textureLod(layerNormalTexture, vertexTextureCoordinate, 0.0).a;
+		float tip = strandCoordinate * strandCoordinate;
+		float phase = skinnedPosition.x * 7.0 + skinnedPosition.y * 5.0 + hairSway.y * hairSway.z;
+		vec3 offset = vec3(sin(phase) * 0.6 + sin(phase * 2.3 + 1.7) * 0.25, -abs(sin(phase * 0.7 + 0.4)) * 0.25, cos(phase * 1.3) * 0.5);
+		skinnedPosition.xyz += offset * hairSway.x * tip;
+	}
+	worldPosition = skinnedPosition.xyz;
+	worldNormal = normalize(mat3(modelMatrix) * mat3(skinMatrix) * normalize(morphedNormal));
+	fragmentTextureCoordinate = vertexTextureCoordinate;
+	lightSpacePosition = lightViewProjectionMatrix * skinnedPosition;
+	gl_Position = viewProjectionMatrix * skinnedPosition;
+}
+`;
+
 // 컷아웃 깊이 버텍스 셰이더. (섀도우 맵 캐스팅 — 머리카락 / 속눈썹의 투명 영역을 오파시티로 제거하기 위해 UV 를 넘긴다)
 const CUTOUT_DEPTH_VERTEXSHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 vertexPosition;
@@ -592,6 +648,9 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	/** @private @type { number } */ #shadowStrength;
 	/** @private @type { number } */ #shadowTexelSize;
 	/** @private @type { number } */ #shadowSoftness;
+	/** @private @type { number } */ #shadowSampleCount;
+	/** @private @type { number[] } */ #hairSway;
+	/** @private @type { boolean } */ #useHairFringe;
 	/** @private @type { Float32Array } */ #lightDirections;
 	/** @private @type { Float32Array } */ #lightColors;
 	/** @private @type { number[] } */ #ambientSkyColor;
@@ -627,7 +686,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	 * @param { WebGL2RenderingContext } webGL2RenderingContext
 	 */
 	constructor(webGL2RenderingContext) {
-		super(webGL2RenderingContext, SKIN_FRAGMENTSHADER_SOURCE);
+		super(webGL2RenderingContext, SKIN_FRAGMENTSHADER_SOURCE, SKIN_VERTEXSHADER_SOURCE);
 
 		this.#cutoutDepthShaderProgram = new ShaderProgram(webGL2RenderingContext, CUTOUT_DEPTH_VERTEXSHADER_SOURCE.trim(), CUTOUT_DEPTH_FRAGMENTSHADER_SOURCE.trim());
 		this.#materialShadingModes = new System.Map();
@@ -636,6 +695,9 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 		this.#shadowStrength = 0;
 		this.#shadowTexelSize = 1 / 2048;
 		this.#shadowSoftness = 2.5;
+		this.#shadowSampleCount = 12;
+		this.#hairSway = [0, 0, 1.5];
+		this.#useHairFringe = true;
 		this.#lightDirections = new System.Float32Array(9);
 		this.#lightColors = new System.Float32Array(9);
 		this.#ambientSkyColor = [0.34, 0.36, 0.42];
@@ -726,6 +788,8 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 		this.applyShadowUniforms(shaderProgram);
 		const passModeLocation = shaderProgram.getUniformLocation("passMode");
 		webGL2RenderingContext.uniform1i(passModeLocation, passMode);
+		const hairSwayLocation = shaderProgram.getUniformLocation("hairSway");
+		webGL2RenderingContext.uniform4f(hairSwayLocation, this.#hairSway[0], this.#hairSway[1], this.#hairSway[2], 0);
 		const shadingModeLocation = shaderProgram.getUniformLocation("shadingMode");
 
 		const jointMatricesLocation = shaderProgram.getUniformLocation("jointMatrices[0]");
@@ -739,6 +803,9 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 				continue;
 			}
 			if (passMode === 1 && !isOverlay && !isHair) {
+				continue;
+			}
+			if (passMode === 1 && isHair && !this.#useHairFringe) {
 				continue;
 			}
 			const skin = skinList[drawable.skinIndex];
@@ -894,6 +961,8 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 		const shadowStrengthLocation = shaderProgram.getUniformLocation("shadowStrength");
 		const shadowSoftnessLocation = shaderProgram.getUniformLocation("shadowSoftness");
 		webGL2RenderingContext.uniform1f(shadowSoftnessLocation, this.#shadowSoftness);
+		const shadowSampleCountLocation = shaderProgram.getUniformLocation("shadowSampleCount");
+		webGL2RenderingContext.uniform1i(shadowSampleCountLocation, this.#shadowSampleCount);
 		if (this.#shadowMapTexture && this.#lightViewProjectionElements) {
 			const lightViewProjectionLocation = shaderProgram.getUniformLocation("lightViewProjectionMatrix");
 			webGL2RenderingContext.uniformMatrix4fv(lightViewProjectionLocation, false, this.#lightViewProjectionElements);
@@ -945,6 +1014,38 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	 */
 	setShadowSoftness(shadowSoftness) {
 		this.#shadowSoftness = shadowSoftness;
+	}
+
+	//==============================================================================
+	// 그림자 표본 수 설정. (1 ~ 24 — 많을수록 부드럽고 느리다)
+	//==============================================================================
+	/**
+	 * @param { number } shadowSampleCount
+	 */
+	setShadowSampleCount(shadowSampleCount) {
+		this.#shadowSampleCount = System.Math.max(1, System.Math.min(SHADOW_SAMPLE_COUNT, System.Math.floor(shadowSampleCount)));
+	}
+
+	//==============================================================================
+	// 머리카락 흔들림 설정. (진폭 m / 시간 초 / 주파수 — 진폭 0 이면 없음)
+	//==============================================================================
+	/**
+	 * @param { number } amplitude
+	 * @param { number } time
+	 * @param { number } frequency
+	 */
+	setHairSway(amplitude, time, frequency) {
+		this.#hairSway = [amplitude, time, frequency];
+	}
+
+	//==============================================================================
+	// 머리카락 프린지 블렌드 사용 설정. (false 면 컷아웃만 — 성능 위주)
+	//==============================================================================
+	/**
+	 * @param { boolean } useHairFringe
+	 */
+	setHairFringe(useHairFringe) {
+		this.#useHairFringe = useHairFringe;
 	}
 
 	//==============================================================================

@@ -21,7 +21,7 @@ public:
 	static UDNA* GetDNAFromSkeletalMesh(USkeletalMesh* SkeletalMesh);
 
 	UFUNCTION(BlueprintCallable, Category = "OldFace")
-	static bool DumpGeometry(UDNA* DNA, const FString& OutputDirectory);
+	static bool DumpGeometry(UDNA* DNA, const FString& OutputDirectory, int32 LodIndex = 0);
 
 	UFUNCTION(BlueprintCallable, Category = "OldFace")
 	static bool EvaluatePoses(UDNA* DNA, const TArray<FString>& RawControlNames, const TArray<float>& FlatValues, int32 PoseCount, const FString& OutputDirectory);

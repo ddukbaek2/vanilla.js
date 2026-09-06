@@ -66,7 +66,7 @@ UDNA* UOldFaceRigLogicLibrary::GetDNAFromSkeletalMesh(USkeletalMesh* SkeletalMes
 	return UserData != nullptr ? UserData->DNAAsset.Get() : nullptr;
 }
 
-bool UOldFaceRigLogicLibrary::DumpGeometry(UDNA* DNA, const FString& OutputDirectory)
+bool UOldFaceRigLogicLibrary::DumpGeometry(UDNA* DNA, const FString& OutputDirectory, int32 LodIndex)
 {
 	if (DNA == nullptr)
 	{
@@ -125,16 +125,19 @@ bool UOldFaceRigLogicLibrary::DumpGeometry(UDNA* DNA, const FString& OutputDirec
 	}
 	Manifest->SetArrayField(TEXT("animated_map_names"), AnimatedMapNames);
 
-	// LOD0 메시
+	// 지정 LOD 메시
+	const FString LodTag = FString::Printf(TEXT("_lod%d_"), LodIndex);
+	const FString LodSuffix = FString::Printf(TEXT("_lod%d_mesh"), LodIndex);
+	Manifest->SetNumberField(TEXT("lod_index"), LodIndex);
 	TArray<TSharedPtr<FJsonValue>> MeshEntries;
 	for (uint16 MeshIndex = 0; MeshIndex < Reader->GetMeshCount(); ++MeshIndex)
 	{
 		const FString MeshName = Reader->GetMeshName(MeshIndex);
-		if (!MeshName.Contains(TEXT("_lod0_")))
+		if (!MeshName.Contains(LodTag))
 		{
 			continue;
 		}
-		const FString ShortName = MeshName.Replace(TEXT("_lod0_mesh"), TEXT(""));
+		const FString ShortName = MeshName.Replace(*LodSuffix, TEXT(""));
 		const FString Prefix = FPaths::Combine(OutputDirectory, ShortName + TEXT("__"));
 
 		TArrayView<const float> Xs = Reader->GetVertexPositionXs(MeshIndex);

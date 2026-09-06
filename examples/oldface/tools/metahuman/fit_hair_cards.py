@@ -6,7 +6,8 @@ from scipy.spatial import cKDTree
 # 그룸 카드 메시(아키타입 머리 기준)를 대상 캐릭터 머리에 바인딩해 중립 / 포즈별 정점을 만든다.
 # 카드 정점마다 소스 머리의 최근접 삼각형(무게중심 좌표 + 삼각형 로컬 프레임 오프셋)을 찾고, 같은 토폴로지의
 # 대상 머리(중립, 포즈)에서 그 삼각형 프레임으로 위치를 재구성한다 (그룸 바인딩의 RBF 를 국소 프레임 전달로 대신).
-# 사용: python fit_hair_cards.py <parts.json> <target npz> <output npz>
+# 사용: python fit_hair_cards.py <parts.json> <target npz> <output npz> [--cards-only]
+# --cards-only: 대상 머리 메시를 빼고 카드 파트만 담는다 (머리카락 LOD 별 glb 용)
 # parts.json: [{"name": "hair", "cards": "<cards_raw.npz 의 키 접두어>", "source_head": "<legacy_heads_dna.npz 의 키>"}]
 # 소스 머리 정점(DNA 순서, Maya cm)은 legacy_heads_to_dna.py 가 만들고, 삼각형은 아키타입 덤프의 것을 쓴다.
 parts = json.load(open(sys.argv[1]))
@@ -115,11 +116,12 @@ def apply(binding, vertices, triangles):
     closest = bary[:, 0:1] * v0[triangle_index] + bary[:, 1:2] * v1[triangle_index] + bary[:, 2:3] * v2[triangle_index]
     return closest + np.einsum("ijk,ik->ij", frames[triangle_index], local)
 
-output = {key: target[key] for key in target.files if key != "meta"}
+cards_only = "--cards-only" in sys.argv
+output = {} if cards_only else {key: target[key] for key in target.files if key != "meta"}
 target_layout = target["head__layout_positions"]
 target_triangles = target_layout[target["head__triangles"]].astype(np.int64)
 target_neutral = target["head__neutral"].astype(np.float64)
-mesh_names = list(meta["mesh_names"])
+mesh_names = [] if cards_only else list(meta["mesh_names"])
 for part in parts:
     name = part["name"]
     prefix = part["cards"]

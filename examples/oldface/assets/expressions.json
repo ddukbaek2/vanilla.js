@@ -1,4 +1,18 @@
 {
+ "serious": {
+  "BrowDownLeft": 0.42,
+  "BrowDownRight": 0.42,
+  "BrowInnerUp": 0.12,
+  "EyeSquintLeft": 0.2,
+  "EyeSquintRight": 0.2,
+  "MouthFrownLeft": 0.22,
+  "MouthFrownRight": 0.22,
+  "MouthPressLeft": 0.35,
+  "MouthPressRight": 0.35,
+  "NoseSneerLeft": 0.06,
+  "NoseSneerRight": 0.06,
+  "JawForward": 0.05
+ },
  "neutral": {},
  "happy": {
   "MouthSmileLeft": 0.85,

@@ -302,13 +302,15 @@ export class SkinnedModelRenderer extends Object {
 	 * @constructor
 	 * @param { WebGL2RenderingContext } webGL2RenderingContext
 	 * @param { string | null } fragmentShaderSource 대체 프래그먼트 셰이더 소스. (null 이면 기본 PBR)
+	 * @param { string | null } vertexShaderSource 대체 버텍스 셰이더 소스. (null 이면 기본 스키닝 — 같은 어트리뷰트 / 출력 규약을 지켜야 한다)
 	 */
-	constructor(webGL2RenderingContext, fragmentShaderSource = null) {
+	constructor(webGL2RenderingContext, fragmentShaderSource = null, vertexShaderSource = null) {
 		super();
 
 		const resolvedFragmentShaderSource = fragmentShaderSource ? fragmentShaderSource : SKINNED_FRAGMENTSHADER_SOURCE;
+		const resolvedVertexShaderSource = vertexShaderSource ? vertexShaderSource : SKINNED_VERTEXSHADER_SOURCE;
 		this.#webGL2RenderingContext = webGL2RenderingContext;
-		this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_VERTEXSHADER_SOURCE.trim(), resolvedFragmentShaderSource.trim());
+		this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, resolvedVertexShaderSource.trim(), resolvedFragmentShaderSource.trim());
 		this.#depthShaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_DEPTH_VERTEXSHADER_SOURCE.trim(), SKINNED_DEPTH_FRAGMENTSHADER_SOURCE.trim());
 		this.#wireframeShaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_WIREFRAME_VERTEXSHADER_SOURCE.trim(), SKINNED_WIREFRAME_FRAGMENTSHADER_SOURCE.trim());
 		this.#shadowMapTexture = null;

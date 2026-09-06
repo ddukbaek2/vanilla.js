@@ -30,6 +30,11 @@
    - `python compose_lookdev_textures.py <Lookdev> <Textures> <CM/WM 텍스처> <Grooms> <assets>` — 마이크로 노멀 + 캐비티(skin_micro.png), 주름 마스크 아틀라스(wrinkle_masks.png, 4x4 타일), 주름 노멀 / 색 아틀라스(wrinkle_normal.jpg / wrinkle_color.jpg, 2x2 타일), 공막 / 홍채 색 / 노멀, 눈꺼풀 차폐 알파(eye_occlusion.png), 치아 노멀, 카드 탄젠트 아틀라스
    - `python make_wrinkles_json.py <Dump> wrinkle_mapping.json <assets/wrinkles.json>` — 마스크 채널 → 영역 / 주름 맵 기여, ARKit 셰이프 → 영역 값(C++ 덤프의 RigLogic 애니메이티드 맵 출력). 채널 매핑은 마스크 텍스처의 UV 무게중심으로 추정한 것(wrinkle_mapping.json)
 
+14. LOD (슬라이더용)
+   - `OLDFACE_LOD=1 OLDFACE_DUMP_DIR=.../Dump_oldman_lod1 UE -ExecutePythonScript=ue/ue_dump_rig.py` (LOD2 도 같은 방식) — DNA 의 lod1 / lod2 메시 덤프(LOD 메시는 블렌드셰이프 없이 조인트만), `riglogic_from_dump.py` → `build_metahuman_glb.py` 로 `character_lod1.glb` / `character_lod2.glb`. `character_lod0.glb` 는 카드 없이 `oldman_arkit.npz` 로 빌드
+   - 머리카락: 카드 LOD0~4 를 `cards_raw.npz` 에 모두 추출한 뒤 `Grooms/parts_lod{N}.json` 으로 `python fit_hair_cards.py ... Head/hair_lod{N}.npz --cards-only` → `hair_lod{N}.glb`
+15. 샘플 슬라이더는 HEAD_LOD_FILES / HAIR_LEVEL_DEFINITIONS / SHADOW_LEVEL_DEFINITIONS 로 애셋과 단계를 정의한다.
+
 참고
 - `riglogic_eval.py` 는 DNA 2.1 파일(에픽 MetaHuman-DNA-Calibration 동봉 Taro 등)을 Python 바인딩(dnacalib)으로 평가하던 이전 경로. UE 5.8 이 내보내는 DNA 2.5 는 읽지 못하므로 4 ~ 6 의 C++ 덤프 경로를 쓴다.
 - 머티리얼 내보내기의 얼굴 텍스처 애셋은 desired_texture_sources_resolutions 를 8K 로 올려도 2048 로 만들어진다. 주름 색 맵(CM1~3)은 중간 회색 기준 오버레이, 주름 노멀 맵(WM1~3)은 xy 델타(파랑 채널 없음)다.

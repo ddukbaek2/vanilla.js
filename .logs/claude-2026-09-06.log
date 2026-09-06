@@ -19,3 +19,12 @@
 - 애셋: C++ 덤프에 애니메이티드 맵(82 채널) 출력 추가, 룩데브 텍스처(주름 마스크 10장 / 마이크로 노멀 / 눈 / 치아) PNG, 눈 차폐 / 눈물선 / 침 메시 포함 glb, 주름 아틀라스 / 마스크 아틀라스 / 눈 / 탄젠트 텍스처 합성(compose_lookdev_textures.py), wrinkles.json(make_wrinkles_json.py).
 - 함정: 마스터 머티리얼 T3D 에는 그래프 파라미터가 없어 마스크 채널 → 영역 매핑을 마스크 UV 무게중심으로 추정(wrinkle_mapping.json). CM 맵은 중간 회색 오버레이(그대로 섞으면 얼굴에 회청색 얼룩), WM 맵은 xy 델타. 아틀라스 타일은 glTF v=0 이 이미지 첫 행이라 위에서부터 채워야 함. 프린지 블렌드는 알베도 버퍼를 흰색으로 당기면 안 되고(흰 얼룩) 조도 감쇠 + 스펙큘러 버퍼에 색을 얹는 방식이어야 함. 배경을 알베도 알파로 섞으면 프린지가 검게 나와 배경을 씬 패스에서 직접 그림. desired_texture_sources_resolutions 8K 요청 후에도 머티리얼 내보내기 텍스처는 2K. DCC 패키지 내보내기는 8K 텍스처 컴파일(4.6GB)에서 시스템 메모리 부족으로 강제 종료돼 포기 — 피부는 2K + 마이크로 노멀로 유지. T_EyeMidPlaneDisplacement 내보내기는 UE 크래시.
 - 검증: 하네스에 오류 보고(window error / unhandledrejection / console.error → /__report) 추가. 중립 / happy / angry / grin / 눈 근접 캡처로 주름·눈·머리카락 확인. 크롬 / 서버 종료, 잔존 0.
+
+## OLD FACE 옵션 전면 확장 / LOD / 기본 표정 / 파비콘 (0.5.7-experimental)
+[02:15 요청 → 03:30 응답(09-07)]
+- 요청: 더 늙은 프리셋 여부, 주름 재질 리얼하게, 옵션 텍스트 겹침 폭 확대, 블룸 / 샘플링 / 텍스처 크기 / LOD / 머리카락 단계 / 세밀한 그림자 / 렌더링 횟수 등 만들 수 있는 옵션은 전부 슬라이더로, 머티리얼 그래프 2배 + 세로 스크롤, 기본 표정을 진중하게, 눈꺼풀 위 흰 줄 버그, 실사 얼굴 아이콘.
+- 슬라이더 36종 + 패널 스크롤. 머리 LOD 0 / 1 / 2 와 머리카락 카드 LOD 0 ~ 4 를 별도 glb(총 8개, assets 58MB)로 나눠 슬라이더에서 동적 로드(모델 캐시, 활성 모델 목록으로 모프 / 드로우). 텍스처 크기는 TEXTURE_MIN_LOD, 섀도우 품질은 ShadowMap 재생성 + 표본 수 유니폼(포아송 24), 프레임 레이트는 requestAnimationFrame 건너뛰기.
+- 엔진: SkinnedModelRenderer 에 버텍스 셰이더 주입 옵션, HumanSkinRenderer 버텍스 셰이더(머리카락 흔들림 — 탄젠트 아틀라스 알파를 버텍스에서 샘플), setShadowSampleCount / setHairSway / setHairFringe. 프래그먼트에 precision highp int 를 넣어야 shadingMode 유니폼 정밀도 불일치 링크 오류가 없다.
+- 표정 SERIOUS(BrowDown 0.42 / MouthPress 0.35 / MouthFrown 0.22 등) 기본값. 눈물선 / 침은 eye_occlusion 알파를 커버리지로 쓰던 것을 상수 커버리지(0.22 / 0.4)로 바꿔 눈꺼풀 위 흰 줄 제거. 파비콘은 SERIOUS 표정 캡처를 원형 크롭 + 금색 링으로 합성.
+- 프리셋 조사: skin 설정만으로는 나이를 알 수 없어(face_texture_index 만 존재) 남성 프리셋 15종을 복제 → 피부 합성 → 클라우드 2K 텍스처 → 머티리얼 내보내기로 알베도를 뽑아 비교(로컬 합성만으로는 텍스처 애셋이 생기지 않음).
+- 검증: 하네스에 sliders= / options= 파라미터 추가, 최저(LOD2 + LOW 헤어 + 1/4 텍스처 + 1K 섀도우 + 0.75x) / 최고(LOD0 + CINEMATIC + 8K + 2x) 캡처 확인. 크롬 / 서버 잔존 0.
