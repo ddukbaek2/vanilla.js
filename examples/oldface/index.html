@@ -47,6 +47,7 @@
 			font-weight: 200;
 			letter-spacing: 0.5em;
 			text-indent: 0.5em;
+			white-space: nowrap;
 			color: #f2ece2;
 			text-shadow: 0 2px 18px rgba(0, 0, 0, 0.85), 0 0 42px rgba(255, 214, 170, 0.18);
 		}
@@ -369,6 +370,7 @@
 		}
 		@media (max-width: 720px) {
 			#optionPanel { width: 316px; right: 10px; top: 10px; max-height: calc(100vh - 170px); }
+			#titleMain { font-size: 24px; letter-spacing: 0.32em; text-indent: 0.32em; }
 			#footerNote { left: 10px; right: 10px; bottom: 10px; font-size: 8px; letter-spacing: 0.08em; line-height: 1.6; }
 			#expressionPanel { bottom: calc(5.5% + 50px); gap: 4px; }
 			.expressionButton { padding: 6px 9px; font-size: 9px; letter-spacing: 0.12em; }
@@ -749,6 +751,7 @@
 		{ name: "wrinkle", label: "EXPRESSION WRINKLE MAPS" },
 		{ name: "wireframe", label: "WIREFRAME" },
 		{ name: "materialGraph", label: "MATERIAL GRAPH" },
+		{ name: "hud", label: "RENDERING INFO" },
 	];
 	const DEFAULT_OPTION_STATES = {
 		subsurface: true,
@@ -759,6 +762,7 @@
 		wrinkle: true,
 		wireframe: false,
 		materialGraph: false,
+		hud: false,
 	};
 	const optionStates = {
 		subsurface: true,
@@ -769,6 +773,7 @@
 		wrinkle: true,
 		wireframe: false,
 		materialGraph: false,
+		hud: false,
 	};
 	const optionRowElements = {};
 	const optionPanelElement = System.document.getElementById("optionPanel");
@@ -1411,8 +1416,8 @@
 	};
 
 	function updateHeadDirection(elapsedTime, deltaTime) {
-		const wanderYaw = 0.08 * System.Math.sin(elapsedTime * 0.23) + 0.05 * System.Math.sin(elapsedTime * 0.61 + 1.3);
-		const wanderPitch = 0.04 * System.Math.sin(elapsedTime * 0.31 + 0.6);
+		const wanderYaw = 0.035 * System.Math.sin(elapsedTime * 0.23) + 0.02 * System.Math.sin(elapsedTime * 0.61 + 1.3);
+		const wanderPitch = 0.015 * System.Math.sin(elapsedTime * 0.31 + 0.6);
 		const followYaw = pointerState.hasMoved ? pointerState.normalizedX * 0.42 * sliderStates.headFollow : 0;
 		const followPitch = pointerState.hasMoved ? pointerState.normalizedY * 0.22 * sliderStates.headFollow : 0;
 		const targetYaw = clampValue(wanderYaw + followYaw, -0.6, 0.6);
@@ -1965,6 +1970,16 @@
 	};
 	const homeLinkElement = System.document.getElementById("homeLink");
 
+	// 옵션 패널 / 머티리얼 그래프의 아래 한계. (HUD 가 켜져 있으면 HUD 위, 꺼져 있으면 화면 아래 여백)
+	function updatePanelLimits(hudTop) {
+		statistics.hudTop = hudTop;
+		const optionMaximumHeight = System.Math.max(120, hudTop - 18 - 12);
+		if (statistics.optionMaximumHeight !== optionMaximumHeight) {
+			statistics.optionMaximumHeight = optionMaximumHeight;
+			optionPanelElement.style.maxHeight = optionMaximumHeight + "px";
+		}
+	}
+
 	function renderHud() {
 		const devicePixelRatio = System.Math.min(System.window.devicePixelRatio || 1, 2);
 		const cssWidth = System.window.innerWidth;
@@ -2018,7 +2033,11 @@
 		if (System.performance.memory) {
 			rows.push(["js heap", statistics.jsHeapText]);
 		}
-		const panelWidth = 214;
+		const isNarrowScreen = cssWidth < 640;
+		if (isNarrowScreen) {
+			rows.length = System.Math.min(rows.length, 4);
+		}
+		const panelWidth = isNarrowScreen ? 150 : 214;
 		const panelHeight = rows.length * rowHeight + 18;
 		const panelX = cssWidth - panelWidth - 18;
 		let panelY = cssHeight - panelHeight - 18;
@@ -2028,12 +2047,7 @@
 			panelY = homeLinkRect.top - panelHeight - 12;
 		}
 		// 옵션 패널 / 머티리얼 그래프는 이 HUD 위까지만 내려오게 한다 (겹침 방지)
-		statistics.hudTop = panelY;
-		const optionMaximumHeight = System.Math.max(120, panelY - 18 - 12);
-		if (statistics.optionMaximumHeight !== optionMaximumHeight) {
-			statistics.optionMaximumHeight = optionMaximumHeight;
-			optionPanelElement.style.maxHeight = optionMaximumHeight + "px";
-		}
+		updatePanelLimits(panelY);
 		const panelRect = Rect.create(panelX, panelY, panelWidth, panelHeight);
 		uiGraphic.setFillColor("rgba(14, 12, 14, 0.55)");
 		uiGraphic.drawRoundRect(panelRect, 10);
@@ -2098,9 +2112,12 @@
 		cameraState.distance += (cameraState.targetDistance - cameraState.distance) * cameraApproach;
 		const swayYaw = cameraState.yaw + System.Math.sin(elapsedTime * 0.19) * 0.02;
 		const swayPitch = cameraState.pitch + System.Math.sin(elapsedTime * 0.27 + 1) * 0.01;
-		const cameraX = CAMERA_TARGET.x + System.Math.sin(swayYaw) * System.Math.cos(swayPitch) * cameraState.distance;
-		const cameraY = CAMERA_TARGET.y + System.Math.sin(swayPitch) * cameraState.distance;
-		const cameraZ = CAMERA_TARGET.z + System.Math.cos(swayYaw) * System.Math.cos(swayPitch) * cameraState.distance;
+		// 세로 화면(폰) 은 가로 시야가 좁아 얼굴이 잘리므로 화면비에 맞춰 거리를 늘린다
+		const portraitFactor = aspectRatio < 1.2 ? System.Math.pow(1.2 / aspectRatio, 0.55) : 1;
+		const cameraDistance = cameraState.distance * portraitFactor;
+		const cameraX = CAMERA_TARGET.x + System.Math.sin(swayYaw) * System.Math.cos(swayPitch) * cameraDistance;
+		const cameraY = CAMERA_TARGET.y + System.Math.sin(swayPitch) * cameraDistance;
+		const cameraZ = CAMERA_TARGET.z + System.Math.cos(swayYaw) * System.Math.cos(swayPitch) * cameraDistance;
 		const cameraPosition = Vector3.create(cameraX, cameraY, cameraZ);
 		const viewMatrix = Matrix4.createLookAt(cameraPosition, CAMERA_TARGET, Vector3.up());
 		const projectionMatrix = Matrix4.createPerspective(CAMERA_FIELD_OF_VIEW, aspectRatio, CAMERA_NEAR_DISTANCE, CAMERA_FAR_DISTANCE);
@@ -2342,7 +2359,12 @@
 		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
 		webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
 		statistics.drawCallCount = drawCallCount;
-		renderHud();
+		if (optionStates.hud) {
+			renderHud();
+		}
+		else {
+			updatePanelLimits(System.window.innerHeight - 18);
+		}
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 		statistics.cpuFrameMilliseconds = statistics.cpuFrameMilliseconds * 0.9 + (System.performance.now() - cpuFrameStart) * 0.1;
 
