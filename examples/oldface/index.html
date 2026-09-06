@@ -420,8 +420,8 @@
 	const CAMERA_MAXIMUM_DISTANCE = 1.9;
 	const SHADOWMAP_RESOLUTION = 4096;
 	const FRAME_RATE_OPTIONS = [30, 60];
-	// 내부 렌더 픽셀 예산. (3840 x 2160 — 슈퍼샘플링을 곱해도 이 이상은 만들지 않는다)
-	const RENDER_PIXEL_BUDGET = 3840 * 2160;
+	// 내부 렌더 기준 픽셀 수. (2560 x 1440 — 캔버스가 이보다 크면(4K / 고배율 모니터) 100% 가 이 크기가 되고, RESOLUTION SCALE 은 여기에 곱한다)
+	const RENDER_PIXEL_BUDGET = 2560 * 1440;
 	// 머리 LOD / 머리카락 품질 단계별 애셋. (머리카락: 카드 LOD, 프린지 블렌드, 흔들림 배율)
 	const HEAD_LOD_FILES = ["character_lod0.glb", "character_lod1.glb", "character_lod2.glb"];
 	const HAIR_LEVEL_DEFINITIONS = [
@@ -1428,9 +1428,9 @@
 		const devicePixelRatio = System.Math.min(System.window.devicePixelRatio || 1, 2);
 		const displayWidth = System.Math.floor(canvas.clientWidth * devicePixelRatio);
 		const displayHeight = System.Math.floor(canvas.clientHeight * devicePixelRatio);
-		// 내부 렌더 해상도. (캔버스 x 슈퍼샘플링 — 고해상도 모니터에서 5760 px 같은 크기가 되지 않도록 4K 픽셀 예산으로 제한)
-		const pixelBudgetScale = System.Math.sqrt(RENDER_PIXEL_BUDGET / System.Math.max(displayWidth * displayHeight, 1));
-		const effectiveRenderScale = System.Math.min(sliderStates.renderScale, pixelBudgetScale);
+		// 내부 렌더 해상도. (기준 픽셀 수를 넘는 캔버스는 기준 크기로 줄인 뒤 RESOLUTION SCALE 을 곱한다 — 4K 모니터에서 8 메가픽셀을 매 프레임 셰이딩하지 않도록)
+		const pixelBudgetScale = System.Math.min(1, System.Math.sqrt(RENDER_PIXEL_BUDGET / System.Math.max(displayWidth * displayHeight, 1)));
+		const effectiveRenderScale = sliderStates.renderScale * pixelBudgetScale;
 		const renderWidth = System.Math.max(2, System.Math.floor(displayWidth * effectiveRenderScale));
 		const renderHeight = System.Math.max(2, System.Math.floor(displayHeight * effectiveRenderScale));
 		if (canvas.width !== displayWidth || canvas.height !== displayHeight || sceneRenderTarget.getWidth() !== renderWidth || sceneRenderTarget.getHeight() !== renderHeight) {
