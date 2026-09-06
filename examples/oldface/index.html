@@ -2018,6 +2018,7 @@
 	//==============================================================================
 	const startTimestamp = System.performance.now();
 	let previousTimestamp = startTimestamp;
+	const frameLimiter = { nextFrameDue: startTimestamp };
 	// 흉상 모델 행렬. (골격이 없는 메시라 목 아래 피벗을 중심으로 포인터 방향에 맞춰 회전)
 	const headPivot = Vector3.create(eyeCenter.x, eyeCenter.y - 0.22, eyeCenter.z - 0.06);
 	let modelElements = Matrix4.createIdentity().getElements();
@@ -2032,13 +2033,15 @@
 	const shadowLightTravelDirection = KEY_LIGHT_DIRECTION.multiply(-1);
 
 	function renderFrame() {
-		// 프레임 레이트 제한. (30 / 60 / 최대 — 목표 간격보다 이르면 건너뛴다)
+		// 프레임 레이트 제한. (30 / 60 — 다음 프레임 예정 시각을 누적해 vsync 콜백의 흔들림에 프레임을 잃지 않는다. 예정보다 6ms 이상 이르면 건너뛰고, 한 간격 넘게 늦었으면 예정을 지금으로 맞춘다)
 		const targetFrameRate = FRAME_RATE_OPTIONS[sliderStates.frameRate];
+		const frameInterval = 1000 / targetFrameRate;
 		const nowTimestamp = System.performance.now();
-		if (nowTimestamp - previousTimestamp < 1000 / targetFrameRate - 1.5) {
+		if (nowTimestamp < frameLimiter.nextFrameDue - 6) {
 			System.window.requestAnimationFrame(renderFrame);
 			return;
 		}
+		frameLimiter.nextFrameDue = nowTimestamp - frameLimiter.nextFrameDue > frameInterval ? nowTimestamp + frameInterval : frameLimiter.nextFrameDue + frameInterval;
 		resizeCanvas();
 		const currentTimestamp = nowTimestamp;
 		const elapsedTime = (currentTimestamp - startTimestamp) / 1000;
