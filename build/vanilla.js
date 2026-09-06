@@ -28721,6 +28721,7 @@ uniform float wrinkleColorStrength;
 uniform float eyeIrisRadius;
 uniform float eyePupilRadius;
 uniform float eyeIrisDepth;
+uniform float eyeClosure;
 uniform vec3 hairSpecularShift;
 uniform vec3 hairSpecularPower;
 uniform vec3 hairSpecularIntensity;
@@ -28906,8 +28907,8 @@ void shadeSkin(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirection, 
 
 	// \uB7EC\uD504\uB2C8\uC2A4 / \uD53C\uBD80 F0. (\uACE8\uC740 \uAC70\uCE60\uACE0 \uC2A4\uD399\uD058\uB7EC \uB9F5\uC774 \uBC1D\uC740 \uBD80\uC704(\uC785\uC220 / \uCF67\uB4F1)\uB294 \uB9E4\uB048)
 	float roughness = mix(roughnessRange.y, roughnessRange.x, specularMap) * roughnessMap * roughnessFactor;
-	roughness = clamp(roughness * mix(1.25, 0.9, cavity), 0.03, 1.0);
-	float fresnelBase = 0.028 * specularStrength * mix(0.6, 1.4, specularMap);
+	roughness = clamp(roughness * mix(1.25, 0.9, cavity), 0.28, 1.0);
+	float fresnelBase = 0.028 * specularStrength * mix(0.7, 1.2, specularMap);
 	float normalDotView = max(dot(surfaceNormal, viewDirection), 0.0001);
 	float geometryDotView = max(dot(geometryNormal, viewDirection), 0.0);
 
@@ -28934,13 +28935,13 @@ void shadeSkin(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirection, 
 			float viewDotHalf = max(dot(viewDirection, halfVector), 0.0);
 			float fresnel = fresnelBase + (1.0 - fresnelBase) * pow(1.0 - viewDotHalf, 5.0);
 			float lobeWide = specularLobe(normalDotHalf, normalDotLight, normalDotView, roughness);
-			float lobeTight = specularLobe(normalDotHalf, normalDotLight, normalDotView, clamp(roughness * 0.5, 0.03, 1.0));
-			specular += lightColor * fresnel * (0.75 * lobeWide + 0.25 * lobeTight) * PI * normalDotLight * lightShadow;
+			float lobeTight = specularLobe(normalDotHalf, normalDotLight, normalDotView, clamp(roughness * 0.65, 0.2, 1.0));
+			specular += lightColor * fresnel * (0.8 * lobeWide + 0.2 * lobeTight) * PI * normalDotLight * lightShadow;
 		}
 
-		// \uC794\uD138. (\uC2A4\uCE68\uAC01\uC5D0\uC11C \uBE5B\uC744 \uAC10\uC2F8\uB294 \uC605\uC740 \uC0B0\uB780 \u2014 \uB9BC \uB77C\uC774\uD2B8\uC5D0 \uD2B9\uD788 \uBC18\uC751)
+		// \uC794\uD138. (\uC2A4\uCE68\uAC01\uC5D0\uC11C \uBE5B\uC744 \uAC10\uC2F8\uB294 \uC605\uC740 \uC0B0\uB780 \u2014 \uB9BC \uB77C\uC774\uD2B8\uC5D0 \uD2B9\uD788 \uBC18\uC751, \uD53C\uBD80\uC0C9\uC744 \uB760\uACE0 \uB208\uAEBC\uD480 \uAC00\uC7A5\uC790\uB9AC \uAC19\uC740 \uC881\uC740 \uBA74\uC5D0\uC11C \uD770 \uC904\uC774 \uB418\uC9C0 \uC54A\uAC8C \uC57D\uD558\uAC8C)
 		float wrapDotLight = max(dot(geometryNormal, lightDirection) * 0.5 + 0.5, 0.0);
-		specular += lightColor * pow(1.0 - geometryDotView, 4.0) * wrapDotLight * sheenStrength * lightShadow;
+		specular += lightColor * mix(vec3(1.0), albedo * 2.0, 0.5) * pow(1.0 - geometryDotView, 5.0) * wrapDotLight * sheenStrength * 0.5 * lightShadow;
 	}
 
 	// \uC570\uBE44\uC5B8\uD2B8 \uD655\uC0B0 + \uD658\uACBD \uBC18\uC0AC.
@@ -29022,7 +29023,11 @@ void shadeEye(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirection, m
 	vec3 reflection = reflect(-viewDirection, corneaNormal);
 	vec3 environment = studioEnvironment(reflection, corneaRoughness);
 	vec2 environmentScaleBias = environmentBrdf(corneaRoughness, normalDotView);
-	specular += environment * (fresnelBase * environmentScaleBias.x + environmentScaleBias.y) * 1.4;
+	specular += environment * (fresnelBase * environmentScaleBias.x + environmentScaleBias.y) * 1.1;
+	// \uB208\uAEBC\uD480\uC774 \uAC10\uAE38\uC218\uB85D \uB208\uC54C\uC740 \uB208\uAEBC\uD480 \uADF8\uB298\uC5D0 \uB4E4\uC5B4\uAC04\uB2E4 (\uD2C8 \uC0AC\uC774\uB85C \uD770 \uD558\uC774\uB77C\uC774\uD2B8\uAC00 \uBE44\uCE58\uC9C0 \uC54A\uAC8C)
+	float lidShade = 1.0 - eyeClosure * 0.75;
+	irradiance *= lidShade;
+	specular *= lidShade * lidShade;
 
 	irradianceOutput = vec4(irradiance * albedo * baseColorFactor, 0.0);
 	albedoOutput = vec4(1.0, 1.0, 1.0, 1.0);
@@ -29323,6 +29328,8 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
   #eyePupilRadius;
   /** @private @type { number } */
   #eyeIrisDepth;
+  /** @private @type { number } */
+  #eyeClosure;
   /** @private @type { number[] } */
   #hairSpecularShift;
   /** @private @type { number[] } */
@@ -29372,6 +29379,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     this.#eyeIrisRadius = 0.133;
     this.#eyePupilRadius = 0.04;
     this.#eyeIrisDepth = 0.05;
+    this.#eyeClosure = 0;
     this.#hairSpecularShift = [-0.12, 0.14, 0];
     this.#hairSpecularPower = [180, 28, 0];
     this.#hairSpecularIntensity = [0.35, 0.5, 0.25];
@@ -29580,6 +29588,8 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     webGL2RenderingContext.uniform1f(eyePupilRadiusLocation, this.#eyePupilRadius);
     const eyeIrisDepthLocation = shaderProgram.getUniformLocation("eyeIrisDepth");
     webGL2RenderingContext.uniform1f(eyeIrisDepthLocation, this.#eyeIrisDepth);
+    const eyeClosureLocation = shaderProgram.getUniformLocation("eyeClosure");
+    webGL2RenderingContext.uniform1f(eyeClosureLocation, this.#eyeClosure);
     const hairSpecularShiftLocation = shaderProgram.getUniformLocation("hairSpecularShift");
     webGL2RenderingContext.uniform3f(hairSpecularShiftLocation, this.#hairSpecularShift[0], this.#hairSpecularShift[1], this.#hairSpecularShift[2]);
     const hairSpecularPowerLocation = shaderProgram.getUniformLocation("hairSpecularPower");
@@ -29861,6 +29871,15 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     this.#eyeIrisRadius = irisRadius;
     this.#eyePupilRadius = pupilRadius;
     this.#eyeIrisDepth = irisDepth;
+  }
+  //==============================================================================
+  // 눈꺼풀 감김 정도 설정. (0 = 뜬 눈, 1 = 감은 눈 — 눈알을 눈꺼풀 그늘만큼 어둡게)
+  //==============================================================================
+  /**
+   * @param { number } eyeClosure
+   */
+  setEyeClosure(eyeClosure) {
+    this.#eyeClosure = System48.Math.max(0, System48.Math.min(1, eyeClosure));
   }
   //==============================================================================
   // 머리카락 파라미터 설정. (1차 / 2차 로브 시프트 · 지수 · 강도, 투과 강도, 뿌리 차폐)

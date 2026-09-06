@@ -94,6 +94,7 @@ uniform float wrinkleColorStrength;
 uniform float eyeIrisRadius;
 uniform float eyePupilRadius;
 uniform float eyeIrisDepth;
+uniform float eyeClosure;
 uniform vec3 hairSpecularShift;
 uniform vec3 hairSpecularPower;
 uniform vec3 hairSpecularIntensity;
@@ -279,8 +280,8 @@ void shadeSkin(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirection, 
 
 	// 러프니스 / 피부 F0. (골은 거칠고 스펙큘러 맵이 밝은 부위(입술 / 콧등)는 매끈)
 	float roughness = mix(roughnessRange.y, roughnessRange.x, specularMap) * roughnessMap * roughnessFactor;
-	roughness = clamp(roughness * mix(1.25, 0.9, cavity), 0.03, 1.0);
-	float fresnelBase = 0.028 * specularStrength * mix(0.6, 1.4, specularMap);
+	roughness = clamp(roughness * mix(1.25, 0.9, cavity), 0.28, 1.0);
+	float fresnelBase = 0.028 * specularStrength * mix(0.7, 1.2, specularMap);
 	float normalDotView = max(dot(surfaceNormal, viewDirection), 0.0001);
 	float geometryDotView = max(dot(geometryNormal, viewDirection), 0.0);
 
@@ -307,13 +308,13 @@ void shadeSkin(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirection, 
 			float viewDotHalf = max(dot(viewDirection, halfVector), 0.0);
 			float fresnel = fresnelBase + (1.0 - fresnelBase) * pow(1.0 - viewDotHalf, 5.0);
 			float lobeWide = specularLobe(normalDotHalf, normalDotLight, normalDotView, roughness);
-			float lobeTight = specularLobe(normalDotHalf, normalDotLight, normalDotView, clamp(roughness * 0.5, 0.03, 1.0));
-			specular += lightColor * fresnel * (0.75 * lobeWide + 0.25 * lobeTight) * PI * normalDotLight * lightShadow;
+			float lobeTight = specularLobe(normalDotHalf, normalDotLight, normalDotView, clamp(roughness * 0.65, 0.2, 1.0));
+			specular += lightColor * fresnel * (0.8 * lobeWide + 0.2 * lobeTight) * PI * normalDotLight * lightShadow;
 		}
 
-		// 잔털. (스침각에서 빛을 감싸는 옅은 산란 — 림 라이트에 특히 반응)
+		// 잔털. (스침각에서 빛을 감싸는 옅은 산란 — 림 라이트에 특히 반응, 피부색을 띠고 눈꺼풀 가장자리 같은 좁은 면에서 흰 줄이 되지 않게 약하게)
 		float wrapDotLight = max(dot(geometryNormal, lightDirection) * 0.5 + 0.5, 0.0);
-		specular += lightColor * pow(1.0 - geometryDotView, 4.0) * wrapDotLight * sheenStrength * lightShadow;
+		specular += lightColor * mix(vec3(1.0), albedo * 2.0, 0.5) * pow(1.0 - geometryDotView, 5.0) * wrapDotLight * sheenStrength * 0.5 * lightShadow;
 	}
 
 	// 앰비언트 확산 + 환경 반사.
@@ -395,7 +396,11 @@ void shadeEye(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirection, m
 	vec3 reflection = reflect(-viewDirection, corneaNormal);
 	vec3 environment = studioEnvironment(reflection, corneaRoughness);
 	vec2 environmentScaleBias = environmentBrdf(corneaRoughness, normalDotView);
-	specular += environment * (fresnelBase * environmentScaleBias.x + environmentScaleBias.y) * 1.4;
+	specular += environment * (fresnelBase * environmentScaleBias.x + environmentScaleBias.y) * 1.1;
+	// 눈꺼풀이 감길수록 눈알은 눈꺼풀 그늘에 들어간다 (틈 사이로 흰 하이라이트가 비치지 않게)
+	float lidShade = 1.0 - eyeClosure * 0.75;
+	irradiance *= lidShade;
+	specular *= lidShade * lidShade;
 
 	irradianceOutput = vec4(irradiance * albedo * baseColorFactor, 0.0);
 	albedoOutput = vec4(1.0, 1.0, 1.0, 1.0);
@@ -676,6 +681,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	/** @private @type { number } */ #eyeIrisRadius;
 	/** @private @type { number } */ #eyePupilRadius;
 	/** @private @type { number } */ #eyeIrisDepth;
+	/** @private @type { number } */ #eyeClosure;
 	/** @private @type { number[] } */ #hairSpecularShift;
 	/** @private @type { number[] } */ #hairSpecularPower;
 	/** @private @type { number[] } */ #hairSpecularIntensity;
@@ -723,6 +729,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 		this.#eyeIrisRadius = 0.133;
 		this.#eyePupilRadius = 0.04;
 		this.#eyeIrisDepth = 0.05;
+		this.#eyeClosure = 0;
 		this.#hairSpecularShift = [-0.12, 0.14, 0];
 		this.#hairSpecularPower = [180, 28, 0];
 		this.#hairSpecularIntensity = [0.35, 0.5, 0.25];
@@ -942,6 +949,8 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 		webGL2RenderingContext.uniform1f(eyePupilRadiusLocation, this.#eyePupilRadius);
 		const eyeIrisDepthLocation = shaderProgram.getUniformLocation("eyeIrisDepth");
 		webGL2RenderingContext.uniform1f(eyeIrisDepthLocation, this.#eyeIrisDepth);
+		const eyeClosureLocation = shaderProgram.getUniformLocation("eyeClosure");
+		webGL2RenderingContext.uniform1f(eyeClosureLocation, this.#eyeClosure);
 		const hairSpecularShiftLocation = shaderProgram.getUniformLocation("hairSpecularShift");
 		webGL2RenderingContext.uniform3f(hairSpecularShiftLocation, this.#hairSpecularShift[0], this.#hairSpecularShift[1], this.#hairSpecularShift[2]);
 		const hairSpecularPowerLocation = shaderProgram.getUniformLocation("hairSpecularPower");
@@ -1247,6 +1256,16 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 		this.#eyeIrisRadius = irisRadius;
 		this.#eyePupilRadius = pupilRadius;
 		this.#eyeIrisDepth = irisDepth;
+	}
+
+	//==============================================================================
+	// 눈꺼풀 감김 정도 설정. (0 = 뜬 눈, 1 = 감은 눈 — 눈알을 눈꺼풀 그늘만큼 어둡게)
+	//==============================================================================
+	/**
+	 * @param { number } eyeClosure
+	 */
+	setEyeClosure(eyeClosure) {
+		this.#eyeClosure = System.Math.max(0, System.Math.min(1, eyeClosure));
 	}
 
 	//==============================================================================
