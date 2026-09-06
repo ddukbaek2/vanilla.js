@@ -161,6 +161,35 @@
 		#optionPanel.collapsed #optionTitle {
 			border-bottom: none;
 		}
+		#contextMenu {
+			position: absolute;
+			display: none;
+			min-width: 168px;
+			padding: 6px 0;
+			font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+			font-size: 10px;
+			letter-spacing: 0.16em;
+			color: rgba(242, 236, 226, 0.86);
+			background: rgba(14, 12, 14, 0.72);
+			border: 1px solid rgba(242, 236, 226, 0.14);
+			border-radius: 10px;
+			backdrop-filter: blur(10px);
+			-webkit-backdrop-filter: blur(10px);
+			z-index: 8;
+			user-select: none;
+		}
+		#contextMenu.open {
+			display: block;
+		}
+		.contextItem {
+			padding: 8px 16px;
+			cursor: pointer;
+			white-space: nowrap;
+		}
+		.contextItem:hover {
+			background: rgba(212, 176, 106, 0.16);
+			color: rgba(232, 201, 138, 1);
+		}
 		#optionTitle {
 			cursor: pointer;
 			user-select: none;
@@ -357,6 +386,7 @@
 		<div id="optionTitle">OPTIONS</div>
 	</div>
 	<div id="expressionPanel"></div>
+	<div id="contextMenu"></div>
 	<div id="footerNote">
 		DRAG TO ORBIT, WHEEL OR PINCH TO ZOOM<br>
 		CHARACTER: <a href="https://www.metahuman.com/" target="_blank" rel="noopener">EPIC METAHUMAN (WALTER PRESET, EXPRESSION WRINKLE MAPS, RIGLOGIC BAKED TO ARKIT SHAPES, GROOM CARDS)</a>, EXPRESSIONS: ARKIT BLENDSHAPE PRESETS
@@ -449,19 +479,14 @@
 	// 표정 프리셋 표시 목록. (assets/expressions.json 의 키 — ARKit 블렌드셰이프 52종의 가중치 조합)
 	const EXPRESSION_DEFINITIONS = [
 		{ name: "serious", label: "SERIOUS" },
-		{ name: "neutral", label: "NEUTRAL" },
 		{ name: "happy", label: "HAPPY" },
 		{ name: "grin", label: "GRIN" },
-		{ name: "peaceful", label: "PEACEFUL" },
 		{ name: "excited", label: "EXCITED" },
 		{ name: "angry", label: "ANGRY" },
 		{ name: "furious", label: "FURIOUS" },
-		{ name: "sad", label: "SAD" },
-		{ name: "pain", label: "PAIN" },
 		{ name: "disgusted", label: "DISGUSTED" },
 		{ name: "bored", label: "BORED" },
 		{ name: "confused", label: "CONFUSED" },
-		{ name: "embarrassed", label: "EMBARRASSED" },
 	];
 
 	// 부위별 머티리얼 정의. (glb 머티리얼 이름 부분 일치 → 텍스처 / 팩터 / 산란 마스크)
@@ -724,6 +749,16 @@
 		{ name: "wireframe", label: "WIREFRAME" },
 		{ name: "materialGraph", label: "MATERIAL GRAPH" },
 	];
+	const DEFAULT_OPTION_STATES = {
+		subsurface: true,
+		detail: true,
+		shadow: true,
+		bloom: true,
+		occlusion: true,
+		wrinkle: true,
+		wireframe: false,
+		materialGraph: false,
+	};
 	const optionStates = {
 		subsurface: true,
 		detail: true,
@@ -844,6 +879,7 @@
 		labelElement.textContent = definition.label;
 		const inputElement = System.document.createElement("input");
 		inputElement.className = "sliderInput";
+		inputElement.dataset.sliderName = definition.name;
 		inputElement.type = "range";
 		inputElement.min = String(definition.minimum);
 		inputElement.max = String(definition.maximum);
@@ -864,6 +900,61 @@
 		optionPanelElement.appendChild(rowElement);
 		sliderValueElements[definition.name] = valueElement;
 	}
+	// 옵션 리셋. (토글 / 슬라이더를 정의된 기본값으로 — 모델 / 텍스처 / 섀도우 변경 처리도 그대로 탄다)
+	const sliderInputElements = {};
+	for (const inputElement of optionPanelElement.querySelectorAll("input[type=range]")) {
+		sliderInputElements[inputElement.dataset.sliderName] = inputElement;
+	}
+	function resetOptions() {
+		for (const definition of optionDefinitions) {
+			optionStates[definition.name] = DEFAULT_OPTION_STATES[definition.name];
+		}
+		refreshOptionPanel();
+		for (const definition of sliderDefinitions) {
+			if (sliderStates[definition.name] === definition.value) {
+				continue;
+			}
+			sliderStates[definition.name] = definition.value;
+			sliderInputElements[definition.name].value = String(definition.value);
+			sliderValueElements[definition.name].textContent = definition.format(definition.value);
+			onSliderChanged(definition.name, definition.value);
+		}
+	}
+
+	// 우클릭 컨텍스트 메뉴. (브라우저 메뉴 대신 — 회전 리셋 / 옵션 리셋 / 머티리얼 그래프)
+	const contextMenuElement = System.document.getElementById("contextMenu");
+	const CONTEXT_MENU_ITEMS = [
+		{ label: "RESET VIEW", action: () => { resetView(); } },
+		{ label: "RESET OPTIONS", action: () => { resetOptions(); } },
+		{ label: "TOGGLE MATERIAL GRAPH", action: () => { toggleOption("materialGraph"); } },
+	];
+	for (const item of CONTEXT_MENU_ITEMS) {
+		const itemElement = System.document.createElement("div");
+		itemElement.className = "contextItem";
+		itemElement.textContent = item.label;
+		itemElement.addEventListener("click", () => {
+			contextMenuElement.classList.remove("open");
+			item.action();
+		});
+		contextMenuElement.appendChild(itemElement);
+	}
+	System.document.addEventListener("contextmenu", (event) => {
+		event.preventDefault();
+		if (event.target.closest("#optionPanel") || event.target.closest("#expressionPanel")) {
+			return;
+		}
+		const menuWidth = contextMenuElement.offsetWidth || 180;
+		const menuHeight = contextMenuElement.offsetHeight || 110;
+		contextMenuElement.style.left = System.Math.min(event.clientX, System.window.innerWidth - menuWidth - 8) + "px";
+		contextMenuElement.style.top = System.Math.min(event.clientY, System.window.innerHeight - menuHeight - 8) + "px";
+		contextMenuElement.classList.add("open");
+	});
+	System.document.addEventListener("pointerdown", (event) => {
+		if (!event.target.closest("#contextMenu")) {
+			contextMenuElement.classList.remove("open");
+		}
+	});
+
 	// 슬라이더 조작 중 캔버스 카메라 입력을 막는다.
 	optionPanelElement.addEventListener("pointerdown", (event) => {
 		event.stopPropagation();
@@ -1203,6 +1294,7 @@
 			const regionValue = wrinkleRegionValues.has(channel.region) ? System.Math.min(wrinkleRegionValues.get(channel.region), 1) : 0;
 			skinRenderer.setWrinkleChannelWeight(channelIndex, regionValue * channel.maps[0], regionValue * channel.maps[1], regionValue * channel.maps[2]);
 		}
+		skinRenderer.finishWrinkleChannelWeights();
 	}
 	const expressionUnitNameSet = new System.Set();
 	for (const presetName in expressionTable) {
@@ -1320,6 +1412,14 @@
 		lastPointerX: 0,
 		lastPointerY: 0,
 	};
+	const DEFAULT_CAMERA_YAW = cameraState.yaw;
+	const DEFAULT_CAMERA_PITCH = cameraState.pitch;
+	const DEFAULT_CAMERA_DISTANCE = cameraState.distance;
+	function resetView() {
+		cameraState.targetYaw = DEFAULT_CAMERA_YAW;
+		cameraState.targetPitch = DEFAULT_CAMERA_PITCH;
+		cameraState.targetDistance = DEFAULT_CAMERA_DISTANCE;
+	}
 	const activePointerMap = new System.Map();
 	const pinchState = {
 		isPinching: false,
@@ -1777,6 +1877,51 @@
 	//==============================================================================
 	// HUD. (우측 하단 렌더링 정보 — 엔진 Graphic 으로 캔버스 안에 렌더링, 홈 링크와 겹치면 그 위로)
 	//==============================================================================
+	// 패스별 GPU 시간. (EXT_disjoint_timer_query_webgl2 — 결과는 몇 프레임 뒤에 도착하므로 대기 목록을 매 프레임 확인)
+	const timerExtension = webGL2RenderingContext.getExtension("EXT_disjoint_timer_query_webgl2");
+	const passTimer = { pendingList: [], current: null, milliseconds: {} };
+	function beginPass(passName) {
+		if (!timerExtension || passTimer.current) {
+			return;
+		}
+		const query = webGL2RenderingContext.createQuery();
+		webGL2RenderingContext.beginQuery(timerExtension.TIME_ELAPSED_EXT, query);
+		passTimer.current = { name: passName, query: query };
+	}
+	function endPass() {
+		if (!timerExtension || !passTimer.current) {
+			return;
+		}
+		webGL2RenderingContext.endQuery(timerExtension.TIME_ELAPSED_EXT);
+		passTimer.pendingList.push(passTimer.current);
+		passTimer.current = null;
+	}
+	function pollPassTimers() {
+		if (!timerExtension) {
+			return;
+		}
+		const disjoint = webGL2RenderingContext.getParameter(timerExtension.GPU_DISJOINT_EXT);
+		const remainingList = [];
+		for (const pending of passTimer.pendingList) {
+			const isAvailable = webGL2RenderingContext.getQueryParameter(pending.query, webGL2RenderingContext.QUERY_RESULT_AVAILABLE);
+			if (!isAvailable) {
+				remainingList.push(pending);
+				continue;
+			}
+			if (!disjoint) {
+				const nanoseconds = webGL2RenderingContext.getQueryParameter(pending.query, webGL2RenderingContext.QUERY_RESULT);
+				const previous = passTimer.milliseconds[pending.name] !== undefined ? passTimer.milliseconds[pending.name] : nanoseconds / 1e6;
+				passTimer.milliseconds[pending.name] = previous * 0.9 + (nanoseconds / 1e6) * 0.1;
+			}
+			webGL2RenderingContext.deleteQuery(pending.query);
+		}
+		passTimer.pendingList = remainingList;
+	}
+	function formatPassTime(passName) {
+		const milliseconds = passTimer.milliseconds[passName];
+		return milliseconds !== undefined ? milliseconds.toFixed(2) + " ms" : "n/a";
+	}
+
 	const statistics = {
 		smoothedFrameSeconds: 1 / 60,
 		drawCallCount: 0,
@@ -1827,6 +1972,10 @@
 			["vertices", vertexCount.toLocaleString("en-US")],
 			["draw calls", statistics.drawCallCount.toString()],
 			["morph targets", morphTargetCount.toString()],
+			["gpu shadow", formatPassTime("shadow")],
+			["gpu scene", formatPassTime("scene")],
+			["gpu sss + ao", formatPassTime("scatter")],
+			["gpu post", formatPassTime("post")],
 			["gpu memory (est.)", statistics.gpuMemoryText],
 			["js heap", statistics.jsHeapText],
 		];
@@ -1949,7 +2098,10 @@
 		const renderWidth = sceneRenderTarget.getWidth();
 		const renderHeight = sceneRenderTarget.getHeight();
 
+		pollPassTimers();
+
 		// === 1. 섀도우 깊이 패스 (키 라이트) ===
+		beginPass("shadow");
 		webGL2RenderingContext.enable(webGL2RenderingContext.CULL_FACE);
 		webGL2RenderingContext.cullFace(webGL2RenderingContext.BACK);
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
@@ -1967,7 +2119,10 @@
 		skinRenderer.setShadowMap(shadowDepthTexture, lightViewProjectionElements, 1 / shadowMapResolution);
 		skinRenderer.setShadowStrength(optionStates.shadow ? sliderStates.shadowStrength : 0);
 
+		endPass();
+
 		// === 2. 피부 MRT 패스 (조도 / 알베도 / 스펙큘러 + 깊이) ===
+		beginPass("scene");
 		sceneRenderTarget.bind();
 		webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
 		webGL2RenderingContext.depthMask(true);
@@ -1997,7 +2152,10 @@
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 		drawCallCount += 6;
 
+		endPass();
+
 		// === 3. 화면 공간 서브서피스 스캐터링 / 앰비언트 오클루전 ===
+		beginPass("scatter");
 		const irradianceTexture = sceneRenderTarget.getColorTexture(0);
 		const albedoTexture = sceneRenderTarget.getColorTexture(1);
 		const specularTexture = sceneRenderTarget.getColorTexture(2);
@@ -2017,7 +2175,10 @@
 			drawCallCount += 2;
 		}
 
+		endPass();
+
 		// === 4. 합성 → HDR (조도 x 알베도 + 스펙큘러 + 배경) ===
+		beginPass("post");
 		hdrRenderTarget.bind();
 		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
 		combinePass.use();
@@ -2090,6 +2251,8 @@
 			antialiasPass.draw();
 			drawCallCount += 1;
 		}
+
+		endPass();
 
 		// === 8. 와이어프레임 (화면 깊이 프리패스로 앞면 모서리만 — 모프 / 스키닝 반영) ===
 		if (optionStates.wireframe) {

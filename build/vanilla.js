@@ -28715,6 +28715,7 @@ uniform float subsurfaceAmount;
 uniform float microTiling;
 uniform float microStrength;
 uniform int useWrinkleMaps;
+uniform int wrinkleTileMask;
 uniform vec3 wrinkleChannelWeights[${WRINKLE_CHANNEL_COUNT}];
 uniform float wrinkleNormalStrength;
 uniform float wrinkleColorStrength;
@@ -28837,10 +28838,13 @@ vec3 blendTangentNormal(vec3 baseNormal, vec2 detailXy) {
 	return normalize(vec3(baseNormal.xy + detailXy, baseNormal.z));
 }
 
-// \uC8FC\uB984 \uB9F5 \uAC00\uC911\uCE58. (\uB9C8\uC2A4\uD06C \uC544\uD2C0\uB77C\uC2A4 4x4 \uD0C0\uC77C x RGBA \uCC44\uB110 \u2192 \uC8FC\uB984 \uB9F5 1 / 2 / 3 \uAE30\uC5EC \uD569)
+// \uC8FC\uB984 \uB9F5 \uAC00\uC911\uCE58. (\uB9C8\uC2A4\uD06C \uC544\uD2C0\uB77C\uC2A4 4x4 \uD0C0\uC77C x RGBA \uCC44\uB110 \u2192 \uC8FC\uB984 \uB9F5 1 / 2 / 3 \uAE30\uC5EC \uD569 \u2014 \uAC00\uC911\uCE58\uAC00 \uC788\uB294 \uD0C0\uC77C\uB9CC \uC0D8\uD50C)
 vec3 wrinkleWeights(vec2 textureCoordinate) {
 	vec3 weights = vec3(0.0);
 	for (int tileIndex = 0; tileIndex < 16; ++tileIndex) {
+		if ((wrinkleTileMask & (1 << tileIndex)) == 0) {
+			continue;
+		}
 		vec2 tileOffset = vec2(float(tileIndex % 4), float(tileIndex / 4)) * 0.25;
 		vec4 mask = texture(maskAtlasTexture, textureCoordinate * 0.25 + tileOffset);
 		weights += mask.r * wrinkleChannelWeights[tileIndex * 4];
@@ -28868,8 +28872,8 @@ void shadeSkin(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirection, 
 	tangentNormal.xy *= normalStrength;
 	tangentNormal = normalize(tangentNormal);
 
-	// \uD45C\uC815 \uC8FC\uB984. (\uB9C8\uC2A4\uD06C \uAC00\uC911\uCE58\uB9CC\uD07C \uC8FC\uB984 \uB178\uBA40\uC744 UDN \uD569\uC131\uD558\uACE0 \uC8FC\uB984 \uC0C9\uC73C\uB85C \uC54C\uBCA0\uB3C4\uB97C \uB2F9\uAE34\uB2E4)
-	if (useWrinkleMaps == 1) {
+	// \uD45C\uC815 \uC8FC\uB984. (\uB9C8\uC2A4\uD06C \uAC00\uC911\uCE58\uB9CC\uD07C \uC8FC\uB984 \uB178\uBA40\uC744 UDN \uD569\uC131\uD558\uACE0 \uC8FC\uB984 \uC0C9\uC73C\uB85C \uC54C\uBCA0\uB3C4\uB97C \uB2F9\uAE34\uB2E4 \u2014 \uD65C\uC131 \uD0C0\uC77C\uC774 \uC5C6\uC73C\uBA74 \uD1B5\uC9F8\uB85C \uAC74\uB108\uB6F4\uB2E4)
+	if (useWrinkleMaps == 1 && wrinkleTileMask != 0) {
 		vec3 weights = wrinkleWeights(textureCoordinate);
 		for (int layerIndex = 0; layerIndex < 3; ++layerIndex) {
 			float weight = weights[layerIndex];
@@ -29319,6 +29323,8 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
   /** @private @type { Float32Array } */
   #wrinkleChannelWeights;
   /** @private @type { number } */
+  #wrinkleTileMask;
+  /** @private @type { number } */
   #wrinkleNormalStrength;
   /** @private @type { number } */
   #wrinkleColorStrength;
@@ -29374,6 +29380,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     this.#microStrength = 0;
     this.#useWrinkleMaps = false;
     this.#wrinkleChannelWeights = new System48.Float32Array(WRINKLE_CHANNEL_COUNT * 3);
+    this.#wrinkleTileMask = 0;
     this.#wrinkleNormalStrength = 1;
     this.#wrinkleColorStrength = 1;
     this.#eyeIrisRadius = 0.133;
@@ -29578,6 +29585,8 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     webGL2RenderingContext.uniform1i(useWrinkleMapsLocation, this.#useWrinkleMaps ? 1 : 0);
     const wrinkleChannelWeightsLocation = shaderProgram.getUniformLocation("wrinkleChannelWeights[0]");
     webGL2RenderingContext.uniform3fv(wrinkleChannelWeightsLocation, this.#wrinkleChannelWeights);
+    const wrinkleTileMaskLocation = shaderProgram.getUniformLocation("wrinkleTileMask");
+    webGL2RenderingContext.uniform1i(wrinkleTileMaskLocation, this.#wrinkleTileMask);
     const wrinkleNormalStrengthLocation = shaderProgram.getUniformLocation("wrinkleNormalStrength");
     webGL2RenderingContext.uniform1f(wrinkleNormalStrengthLocation, this.#wrinkleNormalStrength);
     const wrinkleColorStrengthLocation = shaderProgram.getUniformLocation("wrinkleColorStrength");
@@ -29858,6 +29867,19 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     this.#wrinkleChannelWeights[channelIndex * 3] = weight1;
     this.#wrinkleChannelWeights[channelIndex * 3 + 1] = weight2;
     this.#wrinkleChannelWeights[channelIndex * 3 + 2] = weight3;
+  }
+  //==============================================================================
+  // 주름 채널 가중치 적용 마무리. (가중치가 있는 타일만 골라 비트마스크로 — 셰이더가 빈 타일을 건너뛴다)
+  //==============================================================================
+  finishWrinkleChannelWeights() {
+    let tileMask = 0;
+    for (let channelIndex = 0; channelIndex < WRINKLE_CHANNEL_COUNT; ++channelIndex) {
+      const weightSum = this.#wrinkleChannelWeights[channelIndex * 3] + this.#wrinkleChannelWeights[channelIndex * 3 + 1] + this.#wrinkleChannelWeights[channelIndex * 3 + 2];
+      if (weightSum > 2e-3) {
+        tileMask |= 1 << (channelIndex >> 2);
+      }
+    }
+    this.#wrinkleTileMask = tileMask;
   }
   //==============================================================================
   // 눈 파라미터 설정. (UV 단위 — 홍채 반경 / 동공 반경 / 홍채 평면 깊이)
