@@ -15,7 +15,7 @@ const MORPH_TEXTURE_UNIT = 15;
 
 // 모프 타깃 GLSL. (버텍스 셰이더 삽입 — 실수 텍스처의 위치/노멀 델타를 가중 합산)
 // - 텍셀 인덱스 = gl_VertexID, 타깃 블록 = [위치 행들][노멀 행들] 순서.
-const MORPH_GLSL = `
+export const MORPH_GLSL = `
 uniform sampler2D morphTexture;
 uniform int morphTargetCount;
 uniform int morphRowsPerTarget;

@@ -28652,6 +28652,19 @@ var SkinnedModelRenderer = class extends Object2 {
 
 // src/experimental/graphics/humanskinrenderer.js
 var System48 = globalThis;
+var SKIN_SHADING_SKIN = 0;
+var SKIN_SHADING_EYE = 1;
+var SKIN_SHADING_HAIR = 2;
+var SKIN_SHADING_OCCLUSION = 3;
+var SKIN_SHADING_FLUID = 4;
+var SKIN_TEXTURE_UNIT_DETAILHEIGHT = 9;
+var SKIN_TEXTURE_UNIT_MICRO = 10;
+var SKIN_TEXTURE_UNIT_MASKATLAS = 11;
+var SKIN_TEXTURE_UNIT_LAYERNORMAL = 12;
+var SKIN_TEXTURE_UNIT_LAYERCOLOR = 13;
+var SKIN_TEXTURE_UNIT_AUXILIARY = 14;
+var WRINKLE_CHANNEL_COUNT = 64;
+var SHADOW_SAMPLE_COUNT = 12;
 var SKIN_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
 in vec3 worldPosition;
@@ -28665,13 +28678,21 @@ uniform sampler2D metallicRoughnessTexture;
 uniform sampler2D occlusionTexture;
 uniform sampler2D opacityTexture;
 uniform sampler2D detailHeightTexture;
+uniform sampler2D microTexture;
+uniform sampler2D maskAtlasTexture;
+uniform sampler2D layerNormalTexture;
+uniform sampler2D layerColorTexture;
+uniform sampler2D auxiliaryTexture;
 uniform vec3 baseColorFactor;
 uniform float roughnessFactor;
 uniform int useAlphaCutout;
 uniform float subsurfaceFactor;
+uniform int shadingMode;
+uniform int passMode;
 uniform highp sampler2DShadow shadowMapTexture;
 uniform float shadowStrength;
 uniform float shadowTexelSize;
+uniform float shadowSoftness;
 uniform vec3 cameraPosition;
 uniform vec3 lightDirections[3];
 uniform vec3 lightColors[3];
@@ -28686,26 +28707,55 @@ uniform vec2 roughnessRange;
 uniform float specularStrength;
 uniform float sheenStrength;
 uniform float subsurfaceAmount;
+uniform float microTiling;
+uniform float microStrength;
+uniform int useWrinkleMaps;
+uniform vec3 wrinkleChannelWeights[${WRINKLE_CHANNEL_COUNT}];
+uniform float wrinkleNormalStrength;
+uniform float wrinkleColorStrength;
+uniform float eyeIrisRadius;
+uniform float eyePupilRadius;
+uniform float eyeIrisDepth;
+uniform vec3 hairSpecularShift;
+uniform vec3 hairSpecularPower;
+uniform vec3 hairSpecularIntensity;
+uniform float hairRootShade;
 layout(location = 0) out vec4 irradianceOutput;
 layout(location = 1) out vec4 albedoOutput;
 layout(location = 2) out vec4 specularOutput;
+layout(location = 3) out vec4 normalOutput;
 
 const float PI = 3.14159265;
 
-float sampleShadowFactor() {
+// \uD3EC\uC544\uC1A1 \uC6D0\uD310. (12 \uD45C\uBCF8 \u2014 \uD504\uB798\uADF8\uBA3C\uD2B8\uB9C8\uB2E4 \uD68C\uC804)
+const vec2 POISSON_DISK[${SHADOW_SAMPLE_COUNT}] = vec2[](
+	vec2(-0.326, -0.406), vec2(-0.840, -0.074), vec2(-0.696, 0.457), vec2(-0.203, 0.621),
+	vec2(0.962, -0.195), vec2(0.473, -0.480), vec2(0.519, 0.767), vec2(0.185, -0.893),
+	vec2(0.507, 0.064), vec2(0.896, 0.412), vec2(-0.322, -0.933), vec2(-0.792, -0.598));
+
+float interleavedGradientNoise(vec2 screenPosition) {
+	return fract(52.9829189 * fract(dot(screenPosition, vec2(0.06711056, 0.00583715))));
+}
+
+// \uC100\uB3C4\uC6B0. (\uD68C\uC804 \uD3EC\uC544\uC1A1 PCF \u2014 \uBE44\uAD50 \uC0D8\uD50C\uB7EC, \uACBD\uC0AC \uBE44\uB840 \uBC14\uC774\uC5B4\uC2A4)
+float sampleShadowFactor(float normalDotLight) {
 	vec3 projected = lightSpacePosition.xyz / lightSpacePosition.w;
 	projected = projected * 0.5 + 0.5;
 	if (projected.x < 0.0 || projected.x > 1.0 || projected.y < 0.0 || projected.y > 1.0 || projected.z > 1.0) {
 		return 1.0;
 	}
+	float bias = 0.0012 + 0.0035 * (1.0 - normalDotLight);
+	float angle = interleavedGradientNoise(gl_FragCoord.xy) * 2.0 * PI;
+	float cosine = cos(angle);
+	float sine = sin(angle);
+	mat2 rotation = mat2(cosine, sine, -sine, cosine);
+	float radius = shadowTexelSize * shadowSoftness;
 	float shadowSum = 0.0;
-	for (int offsetY = -2; offsetY <= 2; ++offsetY) {
-		for (int offsetX = -2; offsetX <= 2; ++offsetX) {
-			vec2 tapOffset = vec2(float(offsetX), float(offsetY)) * shadowTexelSize * 1.2;
-			shadowSum += texture(shadowMapTexture, vec3(projected.xy + tapOffset, projected.z - 0.0022));
-		}
+	for (int sampleIndex = 0; sampleIndex < ${SHADOW_SAMPLE_COUNT}; ++sampleIndex) {
+		vec2 tapOffset = rotation * POISSON_DISK[sampleIndex] * radius;
+		shadowSum += texture(shadowMapTexture, vec3(projected.xy + tapOffset, projected.z - bias));
 	}
-	return shadowSum / 25.0;
+	return shadowSum / float(${SHADOW_SAMPLE_COUNT});
 }
 
 // \uD654\uBA74 \uACF5\uAC04 \uBBF8\uBD84 \uCF54\uD0C4\uC820\uD2B8 \uD504\uB808\uC784. (\uD0C4\uC820\uD2B8 \uC5B4\uD2B8\uB9AC\uBDF0\uD2B8 \uBD88\uD544\uC694)
@@ -28751,61 +28801,109 @@ vec3 studioEnvironment(vec3 direction, float roughness) {
 	return environment;
 }
 
+// \uD658\uACBD BRDF \uADFC\uC0AC. (Karis)
+vec2 environmentBrdf(float roughness, float normalDotView) {
+	vec4 coefficient0 = vec4(-1.0, -0.0275, -0.572, 0.022);
+	vec4 coefficient1 = vec4(1.0, 0.0425, 1.04, -0.04);
+	vec4 roughnessTerm = roughness * coefficient0 + coefficient1;
+	float a004 = min(roughnessTerm.x * roughnessTerm.x, exp2(-9.28 * normalDotView)) * roughnessTerm.x + roughnessTerm.y;
+	return vec2(-1.04, 1.04) * a004 + roughnessTerm.zw;
+}
+
+vec3 hemisphereAmbient(vec3 direction) {
+	float upness = direction.y;
+	return upness > 0.0 ? mix(ambientHorizonColor, ambientSkyColor, upness) : mix(ambientHorizonColor, ambientGroundColor, -upness);
+}
+
 // sRGB \u2192 \uC120\uD615. (\uC0C9 \uD14D\uC2A4\uCC98\uB294 8\uBE44\uD2B8 sRGB \uB85C \uC62C\uB9AC\uACE0 \uC5EC\uAE30\uC11C \uB514\uCF54\uB4DC\uD55C\uB2E4)
 vec3 decodeSrgb(vec3 encoded) {
 	return pow(max(encoded, vec3(0.0)), vec3(2.2));
 }
 
-void main() {
-	vec2 textureCoordinate = fragmentTextureCoordinate;
+// UDN \uB178\uBA40 \uD569\uC131. (\uD0C4\uC820\uD2B8 \uACF5\uAC04 xy \uB204\uC801)
+vec3 blendTangentNormal(vec3 baseNormal, vec2 detailXy) {
+	return normalize(vec3(baseNormal.xy + detailXy, baseNormal.z));
+}
 
-	// \uC54C\uD30C \uCEF7\uC544\uC6C3. (\uC624\uD30C\uC2DC\uD2F0 \uD14D\uC2A4\uCC98\uC758 \uC54C\uD30C \u2014 \uC18D\uB208\uC379 \uB4F1)
-	if (useAlphaCutout == 1) {
-		float opacity = texture(opacityTexture, textureCoordinate).a;
-		if (opacity < 0.5) {
-			discard;
-		}
+// \uC8FC\uB984 \uB9F5 \uAC00\uC911\uCE58. (\uB9C8\uC2A4\uD06C \uC544\uD2C0\uB77C\uC2A4 4x4 \uD0C0\uC77C x RGBA \uCC44\uB110 \u2192 \uC8FC\uB984 \uB9F5 1 / 2 / 3 \uAE30\uC5EC \uD569)
+vec3 wrinkleWeights(vec2 textureCoordinate) {
+	vec3 weights = vec3(0.0);
+	for (int tileIndex = 0; tileIndex < 16; ++tileIndex) {
+		vec2 tileOffset = vec2(float(tileIndex % 4), float(tileIndex / 4)) * 0.25;
+		vec4 mask = texture(maskAtlasTexture, textureCoordinate * 0.25 + tileOffset);
+		weights += mask.r * wrinkleChannelWeights[tileIndex * 4];
+		weights += mask.g * wrinkleChannelWeights[tileIndex * 4 + 1];
+		weights += mask.b * wrinkleChannelWeights[tileIndex * 4 + 2];
+		weights += mask.a * wrinkleChannelWeights[tileIndex * 4 + 3];
 	}
+	return clamp(weights, 0.0, 1.0);
+}
 
-	vec3 albedo = decodeSrgb(texture(baseColorTexture, textureCoordinate).rgb) * baseColorFactor;
+// 2x2 \uC544\uD2C0\uB77C\uC2A4 \uD0C0\uC77C \uC88C\uD45C. (0 \uC88C\uD558, 1 \uC6B0\uD558, 2 \uC88C\uC0C1)
+vec2 layerTileCoordinate(vec2 textureCoordinate, int tileIndex) {
+	return textureCoordinate * 0.5 + vec2(float(tileIndex % 2), float(tileIndex / 2)) * 0.5;
+}
+
+//==============================================================================
+// \uD53C\uBD80.
+//==============================================================================
+void shadeSkin(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirection, mat3 tangentFrame) {
+	vec3 albedo = decodeSrgb(texture(baseColorTexture, textureCoordinate).rgb);
 	float specularMap = texture(specularTexture, textureCoordinate).r;
 	float roughnessMap = texture(metallicRoughnessTexture, textureCoordinate).g;
 	float occlusion = texture(occlusionTexture, textureCoordinate).r;
-
-	vec3 geometryNormal = normalize(worldNormal);
-	vec3 viewDirection = normalize(cameraPosition - worldPosition);
-	if (dot(geometryNormal, viewDirection) < 0.0) {
-		geometryNormal = -geometryNormal;
-	}
-	mat3 tangentFrame = computeTangentFrame(geometryNormal);
-
-	// \uB178\uBA40 \uB9F5 + \uB192\uC774 \uB9F5 \uBBF8\uBD84 \uB514\uD14C\uC77C. (UDN \uD569\uC131)
 	vec3 tangentNormal = texture(normalTexture, textureCoordinate).xyz * 2.0 - 1.0;
 	tangentNormal.xy *= normalStrength;
+	tangentNormal = normalize(tangentNormal);
+
+	// \uD45C\uC815 \uC8FC\uB984. (\uB9C8\uC2A4\uD06C \uAC00\uC911\uCE58\uB9CC\uD07C \uC8FC\uB984 \uB178\uBA40\uC744 UDN \uD569\uC131\uD558\uACE0 \uC8FC\uB984 \uC0C9\uC73C\uB85C \uC54C\uBCA0\uB3C4\uB97C \uB2F9\uAE34\uB2E4)
+	if (useWrinkleMaps == 1) {
+		vec3 weights = wrinkleWeights(textureCoordinate);
+		for (int layerIndex = 0; layerIndex < 3; ++layerIndex) {
+			float weight = weights[layerIndex];
+			if (weight < 0.002) {
+				continue;
+			}
+			vec2 tileCoordinate = layerTileCoordinate(textureCoordinate, layerIndex);
+			vec3 wrinkleNormal = texture(layerNormalTexture, tileCoordinate).xyz * 2.0 - 1.0;
+			tangentNormal = blendTangentNormal(tangentNormal, wrinkleNormal.xy * weight * wrinkleNormalStrength);
+			// \uC8FC\uB984 \uC0C9 \uB9F5\uC740 \uC911\uAC04 \uD68C\uC0C9(0.5) \uAE30\uC900\uC758 \uC624\uBC84\uB808\uC774 \u2014 \uAC00\uC911\uCE58\uB9CC\uD07C \uBC1D\uAE30 / \uC0C9 \uBCC0\uD654\uB97C \uACF1\uD55C\uB2E4
+			vec3 wrinkleColor = texture(layerColorTexture, tileCoordinate).rgb;
+			albedo *= decodeSrgb(mix(vec3(0.5), wrinkleColor, weight * wrinkleColorStrength) * 2.0);
+		}
+	}
+
+	// \uB9C8\uC774\uD06C\uB85C \uB178\uBA40 / \uCE90\uBE44\uD2F0. (\uD0C0\uC77C\uB9C1 \u2014 \uBAA8\uACF5 \uC0AC\uC774 \uBBF8\uC138 \uC694\uCCA0)
+	vec4 micro = texture(microTexture, textureCoordinate * microTiling);
+	vec2 microNormalXy = (micro.xy * 2.0 - 1.0) * microStrength;
+	float microCavity = mix(1.0, micro.a, microStrength * 0.6);
+
+	// \uB192\uC774 \uB9F5 \uBBF8\uBD84 \uB514\uD14C\uC77C. (\uBAA8\uACF5 \uCE90\uBE44\uD2F0 \uB192\uC774)
 	float heightLeft = texture(detailHeightTexture, textureCoordinate - vec2(detailTexelSize, 0.0)).r;
 	float heightRight = texture(detailHeightTexture, textureCoordinate + vec2(detailTexelSize, 0.0)).r;
 	float heightDown = texture(detailHeightTexture, textureCoordinate - vec2(0.0, detailTexelSize)).r;
 	float heightUp = texture(detailHeightTexture, textureCoordinate + vec2(0.0, detailTexelSize)).r;
 	vec2 heightGradient = vec2(heightRight - heightLeft, heightUp - heightDown);
-	vec3 detailNormal = normalize(vec3(-heightGradient * detailStrength, 1.0));
-	vec3 combinedTangentNormal = normalize(vec3(tangentNormal.xy + detailNormal.xy, tangentNormal.z * detailNormal.z));
+	vec3 combinedTangentNormal = blendTangentNormal(tangentNormal, -heightGradient * detailStrength + microNormalXy);
 	vec3 surfaceNormal = normalize(tangentFrame * combinedTangentNormal);
-	vec3 diffuseNormal = normalize(mix(geometryNormal, surfaceNormal, 0.7));
+	vec3 diffuseNormal = normalize(mix(geometryNormal, normalize(tangentFrame * tangentNormal), 0.75));
 
-	// \uCE90\uBE44\uD2F0. (\uB192\uC774 - \uC800\uC5ED \uB192\uC774 \u2014 \uBAA8\uACF5/\uC8FC\uB984 \uACE8 \uCC28\uD3D0)
+	// \uCE90\uBE44\uD2F0. (\uB192\uC774 - \uC800\uC5ED \uB192\uC774 \u2014 \uBAA8\uACF5 / \uC8FC\uB984 \uACE8 \uCC28\uD3D0)
 	float heightCenter = texture(detailHeightTexture, textureCoordinate).r;
 	float heightAverage = textureLod(detailHeightTexture, textureCoordinate, 4.0).r;
-	float cavity = clamp(1.0 + (heightCenter - heightAverage) * cavityStrength, 0.2, 1.0);
+	float cavity = clamp(1.0 + (heightCenter - heightAverage) * cavityStrength, 0.2, 1.0) * microCavity;
 
-	// \uB7EC\uD504\uB2C8\uC2A4 / \uD53C\uBD80 F0. (\uC2A4\uD399\uD058\uB7EC \uB9F5\uC774 \uBC1D\uC744\uC218\uB85D \uB9E4\uB048\uD558\uACE0 \uBC18\uC0AC\uAC00 \uAC15\uD55C \uBD80\uC704 \u2014 \uC785\uC220 / \uCF67\uB4F1)
-	float roughness = clamp(mix(roughnessRange.y, roughnessRange.x, specularMap) * roughnessMap * roughnessFactor, 0.03, 1.0);
+	// \uB7EC\uD504\uB2C8\uC2A4 / \uD53C\uBD80 F0. (\uACE8\uC740 \uAC70\uCE60\uACE0 \uC2A4\uD399\uD058\uB7EC \uB9F5\uC774 \uBC1D\uC740 \uBD80\uC704(\uC785\uC220 / \uCF67\uB4F1)\uB294 \uB9E4\uB048)
+	float roughness = mix(roughnessRange.y, roughnessRange.x, specularMap) * roughnessMap * roughnessFactor;
+	roughness = clamp(roughness * mix(1.25, 0.9, cavity), 0.03, 1.0);
 	float fresnelBase = 0.028 * specularStrength * mix(0.6, 1.4, specularMap);
 	float normalDotView = max(dot(surfaceNormal, viewDirection), 0.0001);
 	float geometryDotView = max(dot(geometryNormal, viewDirection), 0.0);
 
+	float keyDotLight = max(dot(diffuseNormal, normalize(lightDirections[0])), 0.0);
 	float shadowFactor = 1.0;
 	if (shadowStrength > 0.001) {
-		shadowFactor = mix(1.0, sampleShadowFactor(), shadowStrength);
+		shadowFactor = mix(1.0, sampleShadowFactor(keyDotLight), shadowStrength);
 	}
 
 	// \uC9C1\uC811\uAD11. (\uD655\uC0B0 \uC870\uB3C4\uB294 \uBD80\uB4DC\uB7EC\uC6B4 \uB178\uBA40, \uC2A4\uD399\uD058\uB7EC\uB294 \uB514\uD14C\uC77C \uB178\uBA40)
@@ -28834,23 +28932,266 @@ void main() {
 		specular += lightColor * pow(1.0 - geometryDotView, 4.0) * wrapDotLight * sheenStrength * lightShadow;
 	}
 
-	// \uC570\uBE44\uC5B8\uD2B8 \uD655\uC0B0 + \uD658\uACBD \uBC18\uC0AC. (Karis \uD658\uACBD BRDF \uADFC\uC0AC)
-	float upness = diffuseNormal.y;
-	vec3 ambient = upness > 0.0 ? mix(ambientHorizonColor, ambientSkyColor, upness) : mix(ambientHorizonColor, ambientGroundColor, -upness);
-	irradiance += ambient * occlusion * mix(1.0, cavity, 0.5);
+	// \uC570\uBE44\uC5B8\uD2B8 \uD655\uC0B0 + \uD658\uACBD \uBC18\uC0AC.
+	irradiance += hemisphereAmbient(diffuseNormal) * occlusion * mix(1.0, cavity, 0.5);
 	vec3 reflection = reflect(-viewDirection, surfaceNormal);
 	vec3 environment = studioEnvironment(reflection, roughness);
-	vec4 coefficient0 = vec4(-1.0, -0.0275, -0.572, 0.022);
-	vec4 coefficient1 = vec4(1.0, 0.0425, 1.04, -0.04);
-	vec4 roughnessTerm = roughness * coefficient0 + coefficient1;
-	float a004 = min(roughnessTerm.x * roughnessTerm.x, exp2(-9.28 * normalDotView)) * roughnessTerm.x + roughnessTerm.y;
-	vec2 environmentScaleBias = vec2(-1.04, 1.04) * a004 + roughnessTerm.zw;
+	vec2 environmentScaleBias = environmentBrdf(roughness, normalDotView);
 	specular += environment * (fresnelBase * environmentScaleBias.x + environmentScaleBias.y) * occlusion;
 	specular *= cavity;
 
 	irradianceOutput = vec4(irradiance, subsurfaceAmount * subsurfaceFactor);
-	albedoOutput = vec4(albedo, 1.0);
+	albedoOutput = vec4(albedo * baseColorFactor, 1.0);
 	specularOutput = vec4(specular, 1.0);
+	normalOutput = vec4(surfaceNormal, 1.0);
+}
+
+//==============================================================================
+// \uB208. (\uAE30\uBCF8 \uC0C9 = \uACF5\uB9C9, 12 = \uD64D\uCC44 \uC0C9, 13 = \uD64D\uCC44 \uB178\uBA40, \uB178\uBA40 \uB9F5 = \uACF5\uB9C9 \uC815\uB9E5 \u2014 UV \uC911\uC2EC\uC774 \uB3D9\uACF5)
+//==============================================================================
+void shadeEye(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirection, mat3 tangentFrame) {
+	vec2 centered = textureCoordinate - vec2(0.5);
+	float radial = length(centered);
+	float corneaMask = 1.0 - smoothstep(eyeIrisRadius * 0.95, eyeIrisRadius * 1.25, radial);
+
+	// \uAC01\uB9C9 \uAD74\uC808 \uC2DC\uCC28. (\uAD74\uC808\uB41C \uC2DC\uC120\uC744 \uD0C4\uC820\uD2B8 \uACF5\uAC04\uC73C\uB85C \uB0B4\uB824 \uD64D\uCC44 \uD3C9\uBA74 \uAE4A\uC774\uB9CC\uD07C UV \uB97C \uBBFC\uB2E4)
+	vec3 refracted = refract(-viewDirection, geometryNormal, 1.0 / 1.376);
+	vec3 refractedTangent = transpose(tangentFrame) * refracted;
+	vec2 parallax = refractedTangent.xy / max(-refractedTangent.z, 0.25) * eyeIrisDepth * corneaMask;
+	vec2 irisCoordinate = textureCoordinate + parallax;
+	vec2 irisCentered = irisCoordinate - vec2(0.5);
+	float irisRadial = length(irisCentered);
+	vec2 irisTextureCoordinate = irisCentered / (eyeIrisRadius * 2.0) + vec2(0.5);
+	vec4 irisSample = texture(layerColorTexture, irisTextureCoordinate);
+	vec3 irisColor = decodeSrgb(irisSample.rgb);
+	float irisMask = (1.0 - smoothstep(eyeIrisRadius * 0.97, eyeIrisRadius * 1.03, irisRadial)) * corneaMask;
+	float limbus = smoothstep(eyeIrisRadius * 0.72, eyeIrisRadius * 1.0, irisRadial);
+	irisColor *= mix(1.0, 0.25, limbus);
+	float pupil = 1.0 - smoothstep(eyePupilRadius * 0.8, eyePupilRadius * 1.15, irisRadial);
+	irisColor = mix(irisColor, vec3(0.002), pupil);
+
+	vec3 scleraColor = decodeSrgb(texture(baseColorTexture, textureCoordinate).rgb);
+	vec3 albedo = mix(scleraColor, irisColor, irisMask);
+
+	// \uB178\uBA40. (\uACF5\uB9C9 \uC815\uB9E5 + \uD64D\uCC44 \uC694\uCCA0 \u2014 \uAC01\uB9C9 \uD558\uC774\uB77C\uC774\uD2B8\uB294 \uB9E4\uB048\uD55C \uAE30\uD558 \uB178\uBA40)
+	vec3 scleraNormal = texture(normalTexture, textureCoordinate).xyz * 2.0 - 1.0;
+	scleraNormal.xy *= 0.5 * (1.0 - corneaMask);
+	vec3 irisNormal = texture(layerNormalTexture, irisTextureCoordinate).xyz * 2.0 - 1.0;
+	vec3 diffuseTangentNormal = normalize(vec3(scleraNormal.xy + irisNormal.xy * irisMask * 0.8, 1.0));
+	vec3 diffuseNormal = normalize(tangentFrame * diffuseTangentNormal);
+	vec3 corneaNormal = normalize(mix(normalize(tangentFrame * normalize(vec3(scleraNormal.xy, 1.0))), geometryNormal, corneaMask));
+
+	// \uD64D\uCC44 \uC548\uCABD \uC790\uAE30 \uCC28\uD3D0. (\uB9BC\uBC84\uC2A4 \uCABD \uC5B4\uB461\uACE0 \uB3D9\uACF5 \uCABD\uC73C\uB85C \uD30C\uC5EC \uC788\uB294 \uB290\uB08C)
+	float irisDepthShade = mix(1.0, 0.65 + 0.35 * (1.0 - limbus), irisMask);
+
+	float normalDotView = max(dot(corneaNormal, viewDirection), 0.0001);
+	float fresnelBase = 0.025;
+	float corneaRoughness = mix(0.16, 0.035, corneaMask);
+	vec3 irradiance = vec3(0.0);
+	vec3 specular = vec3(0.0);
+	for (int lightIndex = 0; lightIndex < 3; ++lightIndex) {
+		vec3 lightDirection = normalize(lightDirections[lightIndex]);
+		vec3 lightColor = lightColors[lightIndex];
+		// \uD64D\uCC44\uB294 \uAC01\uB9C9 \uC548\uCABD\uC5D0\uC11C \uAD74\uC808\uB41C \uBE5B\uC744 \uBC1B\uC544 \uBC1D\uAE30\uAC00 \uB113\uAC8C \uD37C\uC9C4\uB2E4
+		float diffuseDotLight = max(dot(diffuseNormal, lightDirection), 0.0);
+		float wrapped = max(dot(diffuseNormal, lightDirection) * 0.6 + 0.4, 0.0);
+		irradiance += lightColor * mix(diffuseDotLight, wrapped, irisMask);
+
+		float normalDotLight = max(dot(corneaNormal, lightDirection), 0.0);
+		if (normalDotLight > 0.0) {
+			vec3 halfVector = normalize(viewDirection + lightDirection);
+			float normalDotHalf = max(dot(corneaNormal, halfVector), 0.0);
+			float viewDotHalf = max(dot(viewDirection, halfVector), 0.0);
+			float fresnel = fresnelBase + (1.0 - fresnelBase) * pow(1.0 - viewDotHalf, 5.0);
+			specular += lightColor * fresnel * specularLobe(normalDotHalf, normalDotLight, normalDotView, corneaRoughness) * PI * normalDotLight;
+		}
+	}
+	irradiance += hemisphereAmbient(diffuseNormal) * 1.1;
+	irradiance *= irisDepthShade;
+	vec3 reflection = reflect(-viewDirection, corneaNormal);
+	vec3 environment = studioEnvironment(reflection, corneaRoughness);
+	vec2 environmentScaleBias = environmentBrdf(corneaRoughness, normalDotView);
+	specular += environment * (fresnelBase * environmentScaleBias.x + environmentScaleBias.y) * 1.4;
+
+	irradianceOutput = vec4(irradiance * albedo * baseColorFactor, 0.0);
+	albedoOutput = vec4(1.0, 1.0, 1.0, 1.0);
+	specularOutput = vec4(specular, 1.0);
+	normalOutput = vec4(corneaNormal, 1.0);
+}
+
+//==============================================================================
+// \uBA38\uB9AC\uCE74\uB77D. (\uAE30\uBCF8 \uC0C9 rgb + \uCEE4\uBC84\uB9AC\uC9C0 a, 12 = \uCE74\uB4DC \uD0C4\uC820\uD2B8 rgb + \uAC00\uB2E5 \uC88C\uD45C a)
+//==============================================================================
+void shadeHair(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirection, mat3 tangentFrame, float coverage) {
+	vec3 albedo = decodeSrgb(texture(baseColorTexture, textureCoordinate).rgb) * baseColorFactor;
+	vec4 tangentSample = texture(layerNormalTexture, textureCoordinate);
+	vec3 cardTangent = tangentSample.xyz * 2.0 - 1.0;
+	vec3 strandTangent = normalize(tangentFrame * cardTangent);
+	float strandCoordinate = tangentSample.a;
+
+	// \uBFCC\uB9AC \uCC28\uD3D0. (\uB450\uD53C \uCABD \uAC00\uB2E5\uC740 \uACB9\uCCD0\uC11C \uC5B4\uB461\uB2E4)
+	float rootShade = mix(1.0 - hairRootShade, 1.0, smoothstep(0.0, 0.6, strandCoordinate));
+	albedo *= rootShade;
+
+	float keyDotLight = max(dot(geometryNormal, normalize(lightDirections[0])) * 0.5 + 0.5, 0.0);
+	float shadowFactor = 1.0;
+	if (shadowStrength > 0.001) {
+		shadowFactor = mix(1.0, sampleShadowFactor(keyDotLight), shadowStrength * 0.85);
+	}
+
+	vec3 irradiance = vec3(0.0);
+	vec3 specular = vec3(0.0);
+	for (int lightIndex = 0; lightIndex < 3; ++lightIndex) {
+		vec3 lightDirection = normalize(lightDirections[lightIndex]);
+		vec3 lightColor = lightColors[lightIndex];
+		float lightShadow = lightIndex == 0 ? shadowFactor : 1.0;
+
+		// \uD655\uC0B0. (Kajiya \uAC00\uB2E5 \uD655\uC0B0\uACFC \uAC10\uC2FC \uB7A8\uBC84\uD2B8\uB97C \uC11E\uC5B4 \uCE74\uB4DC \uD2F0\uAC00 \uB35C \uB098\uAC8C)
+		float tangentDotLight = dot(strandTangent, lightDirection);
+		float strandDiffuse = sqrt(max(1.0 - tangentDotLight * tangentDotLight, 0.0));
+		float wrappedDiffuse = max(dot(geometryNormal, lightDirection) * 0.5 + 0.5, 0.0);
+		irradiance += lightColor * mix(strandDiffuse, wrappedDiffuse, 0.55) * 0.55 * lightShadow;
+
+		// \uC774\uBC29\uC131 \uD558\uC774\uB77C\uC774\uD2B8. (\uBFCC\uB9AC \uCABD\uC73C\uB85C \uBBFC \uBC31\uC0C9 1\uCC28 \uB85C\uBE0C + \uB05D \uCABD\uC73C\uB85C \uBBFC \uC0C9 2\uCC28 \uB85C\uBE0C)
+		vec3 halfVector = normalize(viewDirection + lightDirection);
+		vec3 shiftedPrimary = normalize(strandTangent + geometryNormal * hairSpecularShift.x);
+		vec3 shiftedSecondary = normalize(strandTangent + geometryNormal * hairSpecularShift.y);
+		float tangentDotHalfPrimary = dot(shiftedPrimary, halfVector);
+		float tangentDotHalfSecondary = dot(shiftedSecondary, halfVector);
+		float lobePrimary = pow(sqrt(max(1.0 - tangentDotHalfPrimary * tangentDotHalfPrimary, 0.0)), hairSpecularPower.x);
+		float lobeSecondary = pow(sqrt(max(1.0 - tangentDotHalfSecondary * tangentDotHalfSecondary, 0.0)), hairSpecularPower.y);
+		float lightWrap = smoothstep(-0.35, 0.35, dot(geometryNormal, lightDirection));
+		specular += lightColor * (lobePrimary * hairSpecularIntensity.x + lobeSecondary * hairSpecularIntensity.y * albedo) * lightWrap * lightShadow;
+
+		// \uD22C\uACFC \uC5ED\uAD11. (\uBE5B\uC744 \uB4F1\uC9C4 \uAC00\uB2E5\uC774 \uBE44\uCCD0 \uBCF4\uC778\uB2E4)
+		float backlight = pow(max(dot(viewDirection, -lightDirection), 0.0), 6.0);
+		specular += lightColor * albedo * backlight * hairSpecularIntensity.z * lightShadow;
+	}
+	irradiance += hemisphereAmbient(geometryNormal) * rootShade;
+
+	// \uD504\uB9B0\uC9C0 \uBE14\uB80C\uB4DC \uD328\uC2A4: \uC870\uB3C4\uB294 \uCEE4\uBC84\uB9AC\uC9C0\uB9CC\uD07C \uC904\uC774\uACE0(\uC54C\uD30C\uB9CC \uAE30\uC5EC) \uC0C9\uC740 \uC2A4\uD399\uD058\uB7EC \uBC84\uD37C\uC5D0 \uC5B9\uB294\uB2E4 \u2192 (1 - a) x \uBC14\uB2E5 + a x \uBA38\uB9AC\uCE74\uB77D
+	if (passMode == 1) {
+		irradianceOutput = vec4(0.0, 0.0, 0.0, coverage);
+		albedoOutput = vec4(0.0, 0.0, 0.0, 0.0);
+		specularOutput = vec4(irradiance * albedo + specular, coverage);
+		normalOutput = vec4(0.0, 0.0, 0.0, 0.0);
+		return;
+	}
+	irradianceOutput = vec4(irradiance * albedo, 0.0);
+	albedoOutput = vec4(1.0, 1.0, 1.0, 1.0);
+	specularOutput = vec4(specular, 1.0);
+	normalOutput = vec4(geometryNormal, 1.0);
+}
+
+//==============================================================================
+// \uCC28\uD3D0 / \uC720\uCCB4. (\uBE14\uB80C\uB4DC \uD328\uC2A4 \u2014 \uCC28\uD3D0\uB294 \uC870\uB3C4\uB9CC \uC5B4\uB461\uAC8C, \uC720\uCCB4\uB294 \uC2A4\uD399\uD058\uB7EC\uB9CC \uC5B9\uB294\uB2E4)
+//==============================================================================
+void shadeOverlay(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirection) {
+	if (shadingMode == ${SKIN_SHADING_OCCLUSION}) {
+		float darkness = texture(baseColorTexture, textureCoordinate).a * baseColorFactor.x;
+		irradianceOutput = vec4(0.0, 0.0, 0.0, darkness);
+		albedoOutput = vec4(0.0, 0.0, 0.0, 0.0);
+		specularOutput = vec4(0.0, 0.0, 0.0, darkness * 0.6);
+		normalOutput = vec4(0.0, 0.0, 0.0, 0.0);
+		return;
+	}
+	float normalDotView = max(dot(geometryNormal, viewDirection), 0.0001);
+	float fresnelBase = 0.02;
+	vec3 specular = vec3(0.0);
+	for (int lightIndex = 0; lightIndex < 3; ++lightIndex) {
+		vec3 lightDirection = normalize(lightDirections[lightIndex]);
+		float normalDotLight = max(dot(geometryNormal, lightDirection), 0.0);
+		if (normalDotLight > 0.0) {
+			vec3 halfVector = normalize(viewDirection + lightDirection);
+			float normalDotHalf = max(dot(geometryNormal, halfVector), 0.0);
+			float viewDotHalf = max(dot(viewDirection, halfVector), 0.0);
+			float fresnel = fresnelBase + (1.0 - fresnelBase) * pow(1.0 - viewDotHalf, 5.0);
+			specular += lightColors[lightIndex] * fresnel * specularLobe(normalDotHalf, normalDotLight, normalDotView, 0.08) * PI * normalDotLight;
+		}
+	}
+	vec3 reflection = reflect(-viewDirection, geometryNormal);
+	vec2 environmentScaleBias = environmentBrdf(0.08, normalDotView);
+	specular += studioEnvironment(reflection, 0.08) * (fresnelBase * environmentScaleBias.x + environmentScaleBias.y);
+	float coverage = texture(baseColorTexture, textureCoordinate).a * baseColorFactor.x;
+	irradianceOutput = vec4(0.0, 0.0, 0.0, 0.0);
+	albedoOutput = vec4(0.0, 0.0, 0.0, 0.0);
+	specularOutput = vec4(specular * 2.0, 0.5 * coverage);
+	normalOutput = vec4(0.0, 0.0, 0.0, 0.0);
+}
+
+void main() {
+	vec2 textureCoordinate = fragmentTextureCoordinate;
+
+	// \uCEE4\uBC84\uB9AC\uC9C0. (\uBA38\uB9AC\uCE74\uB77D\uC740 \uAE30\uBCF8 \uC0C9 \uC54C\uD30C, \uADF8 \uC678 \uCEF7\uC544\uC6C3 \uBA38\uD2F0\uB9AC\uC5BC\uC740 \uC624\uD30C\uC2DC\uD2F0 \uD14D\uC2A4\uCC98 \uC54C\uD30C)
+	float coverage = 1.0;
+	if (shadingMode == ${SKIN_SHADING_HAIR}) {
+		coverage = texture(baseColorTexture, textureCoordinate).a;
+		if (passMode == 0 && coverage < 0.5) {
+			discard;
+		}
+		if (passMode == 1 && (coverage >= 0.5 || coverage < 0.03)) {
+			discard;
+		}
+		coverage = passMode == 1 ? coverage * 2.0 : 1.0;
+	}
+	else if (useAlphaCutout == 1) {
+		float opacity = texture(opacityTexture, textureCoordinate).a;
+		if (opacity < 0.5) {
+			discard;
+		}
+	}
+
+	vec3 geometryNormal = normalize(worldNormal);
+	vec3 viewDirection = normalize(cameraPosition - worldPosition);
+	if (dot(geometryNormal, viewDirection) < 0.0) {
+		geometryNormal = -geometryNormal;
+	}
+	mat3 tangentFrame = computeTangentFrame(geometryNormal);
+
+	if (shadingMode == ${SKIN_SHADING_EYE}) {
+		shadeEye(textureCoordinate, geometryNormal, viewDirection, tangentFrame);
+	}
+	else if (shadingMode == ${SKIN_SHADING_HAIR}) {
+		shadeHair(textureCoordinate, geometryNormal, viewDirection, tangentFrame, coverage);
+	}
+	else if (shadingMode >= ${SKIN_SHADING_OCCLUSION}) {
+		shadeOverlay(textureCoordinate, geometryNormal, viewDirection);
+	}
+	else {
+		shadeSkin(textureCoordinate, geometryNormal, viewDirection, tangentFrame);
+	}
+}
+`;
+var CUTOUT_DEPTH_VERTEXSHADER_SOURCE = `#version 300 es
+layout(location = 0) in vec3 vertexPosition;
+layout(location = 2) in vec2 vertexTextureCoordinate;
+layout(location = 3) in uvec4 vertexJoints;
+layout(location = 4) in vec4 vertexWeights;
+uniform mat4 modelMatrix;
+uniform mat4 lightViewProjectionMatrix;
+uniform mat4 jointMatrices[96];
+out vec2 fragmentTextureCoordinate;
+${MORPH_GLSL}
+void main() {
+	vec3 morphedPosition = vertexPosition;
+	vec3 morphedNormal = vec3(0.0, 1.0, 0.0);
+	applyMorphTargets(morphedPosition, morphedNormal);
+	mat4 skinMatrix = vertexWeights.x * jointMatrices[vertexJoints.x]
+		+ vertexWeights.y * jointMatrices[vertexJoints.y]
+		+ vertexWeights.z * jointMatrices[vertexJoints.z]
+		+ vertexWeights.w * jointMatrices[vertexJoints.w];
+	fragmentTextureCoordinate = vertexTextureCoordinate;
+	gl_Position = lightViewProjectionMatrix * modelMatrix * skinMatrix * vec4(morphedPosition, 1.0);
+}
+`;
+var CUTOUT_DEPTH_FRAGMENTSHADER_SOURCE = `#version 300 es
+precision highp float;
+in vec2 fragmentTextureCoordinate;
+uniform sampler2D coverageTexture;
+void main() {
+	if (texture(coverageTexture, fragmentTextureCoordinate).a < 0.5) {
+		discard;
+	}
 }
 `;
 var HumanSkinRenderer = class extends SkinnedModelRenderer {
@@ -28860,6 +29201,20 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
   //==============================================================================
   // 멤버 변수 목록.
   //==============================================================================
+  /** @private @type { ShaderProgram } */
+  #cutoutDepthShaderProgram;
+  /** @private @type { Map<Material, number> } */
+  #materialShadingModes;
+  /** @private @type { WebGLTexture | null } */
+  #shadowMapTexture;
+  /** @private @type { Float32Array | null } */
+  #lightViewProjectionElements;
+  /** @private @type { number } */
+  #shadowStrength;
+  /** @private @type { number } */
+  #shadowTexelSize;
+  /** @private @type { number } */
+  #shadowSoftness;
   /** @private @type { Float32Array } */
   #lightDirections;
   /** @private @type { Float32Array } */
@@ -28886,6 +29241,32 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
   #sheenStrength;
   /** @private @type { number } */
   #subsurfaceAmount;
+  /** @private @type { number } */
+  #microTiling;
+  /** @private @type { number } */
+  #microStrength;
+  /** @private @type { boolean } */
+  #useWrinkleMaps;
+  /** @private @type { Float32Array } */
+  #wrinkleChannelWeights;
+  /** @private @type { number } */
+  #wrinkleNormalStrength;
+  /** @private @type { number } */
+  #wrinkleColorStrength;
+  /** @private @type { number } */
+  #eyeIrisRadius;
+  /** @private @type { number } */
+  #eyePupilRadius;
+  /** @private @type { number } */
+  #eyeIrisDepth;
+  /** @private @type { number[] } */
+  #hairSpecularShift;
+  /** @private @type { number[] } */
+  #hairSpecularPower;
+  /** @private @type { number[] } */
+  #hairSpecularIntensity;
+  /** @private @type { number } */
+  #hairRootShade;
   //==============================================================================
   // 생성.
   //==============================================================================
@@ -28895,6 +29276,13 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
    */
   constructor(webGL2RenderingContext) {
     super(webGL2RenderingContext, SKIN_FRAGMENTSHADER_SOURCE);
+    this.#cutoutDepthShaderProgram = new ShaderProgram(webGL2RenderingContext, CUTOUT_DEPTH_VERTEXSHADER_SOURCE.trim(), CUTOUT_DEPTH_FRAGMENTSHADER_SOURCE.trim());
+    this.#materialShadingModes = new System48.Map();
+    this.#shadowMapTexture = null;
+    this.#lightViewProjectionElements = null;
+    this.#shadowStrength = 0;
+    this.#shadowTexelSize = 1 / 2048;
+    this.#shadowSoftness = 2.5;
     this.#lightDirections = new System48.Float32Array(9);
     this.#lightColors = new System48.Float32Array(9);
     this.#ambientSkyColor = [0.34, 0.36, 0.42];
@@ -28908,12 +29296,25 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     this.#specularStrength = 1;
     this.#sheenStrength = 0.35;
     this.#subsurfaceAmount = 1;
+    this.#microTiling = 0;
+    this.#microStrength = 0;
+    this.#useWrinkleMaps = false;
+    this.#wrinkleChannelWeights = new System48.Float32Array(WRINKLE_CHANNEL_COUNT * 3);
+    this.#wrinkleNormalStrength = 1;
+    this.#wrinkleColorStrength = 1;
+    this.#eyeIrisRadius = 0.133;
+    this.#eyePupilRadius = 0.04;
+    this.#eyeIrisDepth = 0.05;
+    this.#hairSpecularShift = [-0.12, 0.14, 0];
+    this.#hairSpecularPower = [180, 28, 0];
+    this.#hairSpecularIntensity = [0.35, 0.5, 0.25];
+    this.#hairRootShade = 0.45;
     this.setLight(0, 0.45, 0.6, 0.65, 1, 0.93, 0.85, 3.2);
     this.setLight(1, -0.7, 0.15, 0.6, 0.55, 0.65, 0.85, 0.8);
     this.setLight(2, 0.5, 0.4, -0.75, 0.9, 0.95, 1, 2.2);
   }
   //==============================================================================
-  // 출력. (피부 유니폼 설정 후 기반 렌더러의 드로어블 순회)
+  // 불투명 패스 출력. (피부 / 눈 / 머리카락 컷아웃 — 깊이 쓰기)
   //==============================================================================
   /**
    * @override
@@ -28925,9 +29326,143 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
    * @param { number } cameraZ
    */
   draw(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ) {
+    this.drawPass(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ, 0);
+  }
+  //==============================================================================
+  // 블렌드 패스 출력. (머리카락 프린지 / 차폐 / 유체 — 호출자가 블렌드 켜고 깊이 쓰기를 끈 뒤 호출)
+  //==============================================================================
+  /**
+   * @param { SkinnedModel } skinnedModel
+   * @param { Float32Array } viewProjectionElements
+   * @param { Float32Array } modelMatrixElements
+   * @param { number } cameraX
+   * @param { number } cameraY
+   * @param { number } cameraZ
+   */
+  drawBlended(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ) {
+    this.drawPass(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ, 1);
+  }
+  //==============================================================================
+  // 패스 출력. (공통 유니폼 → 드로어블 순회 — 패스에 맞는 셰이딩 모드만)
+  //==============================================================================
+  /**
+   * @param { SkinnedModel } skinnedModel
+   * @param { Float32Array } viewProjectionElements
+   * @param { Float32Array } modelMatrixElements
+   * @param { number } cameraX
+   * @param { number } cameraY
+   * @param { number } cameraZ
+   * @param { number } passMode 0 = 불투명, 1 = 블렌드.
+   */
+  drawPass(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ, passMode) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const shaderProgram = this.getShaderProgram();
     shaderProgram.use();
+    const viewProjectionLocation = shaderProgram.getUniformLocation("viewProjectionMatrix");
+    webGL2RenderingContext.uniformMatrix4fv(viewProjectionLocation, false, viewProjectionElements);
+    const modelMatrixLocation = shaderProgram.getUniformLocation("modelMatrix");
+    webGL2RenderingContext.uniformMatrix4fv(modelMatrixLocation, false, modelMatrixElements);
+    const cameraPositionLocation = shaderProgram.getUniformLocation("cameraPosition");
+    webGL2RenderingContext.uniform3f(cameraPositionLocation, cameraX, cameraY, cameraZ);
+    this.applyEnvironmentUniforms(shaderProgram);
+    this.applyShadowUniforms(shaderProgram);
+    const passModeLocation = shaderProgram.getUniformLocation("passMode");
+    webGL2RenderingContext.uniform1i(passModeLocation, passMode);
+    const shadingModeLocation = shaderProgram.getUniformLocation("shadingMode");
+    const jointMatricesLocation = shaderProgram.getUniformLocation("jointMatrices[0]");
+    const skinList = skinnedModel.getSkinList();
+    const drawableList = skinnedModel.getDrawableList();
+    for (const drawable of drawableList) {
+      const shadingMode = this.getMaterialShadingMode(drawable.material);
+      const isOverlay = shadingMode >= SKIN_SHADING_OCCLUSION;
+      const isHair = shadingMode === SKIN_SHADING_HAIR;
+      if (passMode === 0 && isOverlay) {
+        continue;
+      }
+      if (passMode === 1 && !isOverlay && !isHair) {
+        continue;
+      }
+      const skin = skinList[drawable.skinIndex];
+      webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skin.jointMatrixArray);
+      this.applyMorphUniforms(shaderProgram, drawable);
+      webGL2RenderingContext.uniform1i(shadingModeLocation, shadingMode);
+      drawable.material.apply();
+      webGL2RenderingContext.bindVertexArray(drawable.vertexArray);
+      if (drawable.isIndexed) {
+        webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, drawable.indexCount, drawable.indexComponentType, drawable.indexByteOffset);
+      } else {
+        webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, drawable.vertexCount);
+      }
+    }
+    webGL2RenderingContext.bindVertexArray(null);
+  }
+  //==============================================================================
+  // 깊이 패스 출력. (섀도우 맵 캐스팅 — 컷아웃 / 머리카락 머티리얼은 커버리지 텍스처로 투명 영역 제거, 차폐 / 유체는 제외)
+  //==============================================================================
+  /**
+   * @override
+   * @param { SkinnedModel } skinnedModel
+   * @param { Float32Array } lightViewProjectionElements
+   * @param { Float32Array } modelMatrixElements
+   */
+  drawDepth(skinnedModel, lightViewProjectionElements, modelMatrixElements) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const skinList = skinnedModel.getSkinList();
+    const drawableList = skinnedModel.getDrawableList();
+    const depthShaderProgram = this.getDepthShaderProgram();
+    const cutoutDepthShaderProgram = this.getCutoutDepthShaderProgram();
+    for (const shaderProgram of [depthShaderProgram, cutoutDepthShaderProgram]) {
+      const useCutout = shaderProgram === cutoutDepthShaderProgram;
+      shaderProgram.use();
+      const lightViewProjectionLocation = shaderProgram.getUniformLocation("lightViewProjectionMatrix");
+      webGL2RenderingContext.uniformMatrix4fv(lightViewProjectionLocation, false, lightViewProjectionElements);
+      const modelMatrixLocation = shaderProgram.getUniformLocation("modelMatrix");
+      webGL2RenderingContext.uniformMatrix4fv(modelMatrixLocation, false, modelMatrixElements);
+      const jointMatricesLocation = shaderProgram.getUniformLocation("jointMatrices[0]");
+      const coverageTextureLocation = shaderProgram.getUniformLocation("coverageTexture");
+      for (const drawable of drawableList) {
+        const shadingMode = this.getMaterialShadingMode(drawable.material);
+        if (shadingMode >= SKIN_SHADING_OCCLUSION) {
+          continue;
+        }
+        const material = drawable.material;
+        const useAlphaCutout = material.getUseAlphaCutout();
+        const needsCutout = shadingMode === SKIN_SHADING_HAIR || useAlphaCutout;
+        if (needsCutout !== useCutout) {
+          continue;
+        }
+        const skin = skinList[drawable.skinIndex];
+        webGL2RenderingContext.uniformMatrix4fv(jointMatricesLocation, false, skin.jointMatrixArray);
+        this.applyMorphUniforms(shaderProgram, drawable);
+        if (useCutout) {
+          const textureBindings = material.getTextureBindings();
+          const coverageName = shadingMode === SKIN_SHADING_HAIR ? "baseColorTexture" : "opacityTexture";
+          for (const binding of textureBindings) {
+            if (binding[0] === coverageName) {
+              webGL2RenderingContext.uniform1i(coverageTextureLocation, 0);
+              webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+              webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, binding[2]);
+            }
+          }
+        }
+        webGL2RenderingContext.bindVertexArray(drawable.vertexArray);
+        if (drawable.isIndexed) {
+          webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, drawable.indexCount, drawable.indexComponentType, drawable.indexByteOffset);
+        } else {
+          webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, drawable.vertexCount);
+        }
+      }
+    }
+    webGL2RenderingContext.bindVertexArray(null);
+  }
+  //==============================================================================
+  // 환경 유니폼 적용. (조명 / 앰비언트 / 피부 / 주름 / 마이크로 / 눈 / 머리카락 파라미터)
+  //==============================================================================
+  /**
+   * @param { ShaderProgram } shaderProgram
+   */
+  applyEnvironmentUniforms(shaderProgram) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const lightDirectionsLocation = shaderProgram.getUniformLocation("lightDirections[0]");
     webGL2RenderingContext.uniform3fv(lightDirectionsLocation, this.#lightDirections);
     const lightColorsLocation = shaderProgram.getUniformLocation("lightColors[0]");
@@ -28954,7 +29489,114 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     webGL2RenderingContext.uniform1f(sheenStrengthLocation, this.#sheenStrength);
     const subsurfaceAmountLocation = shaderProgram.getUniformLocation("subsurfaceAmount");
     webGL2RenderingContext.uniform1f(subsurfaceAmountLocation, this.#subsurfaceAmount);
-    super.draw(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ);
+    const microTilingLocation = shaderProgram.getUniformLocation("microTiling");
+    webGL2RenderingContext.uniform1f(microTilingLocation, this.#microTiling);
+    const microStrengthLocation = shaderProgram.getUniformLocation("microStrength");
+    webGL2RenderingContext.uniform1f(microStrengthLocation, this.#microStrength);
+    const useWrinkleMapsLocation = shaderProgram.getUniformLocation("useWrinkleMaps");
+    webGL2RenderingContext.uniform1i(useWrinkleMapsLocation, this.#useWrinkleMaps ? 1 : 0);
+    const wrinkleChannelWeightsLocation = shaderProgram.getUniformLocation("wrinkleChannelWeights[0]");
+    webGL2RenderingContext.uniform3fv(wrinkleChannelWeightsLocation, this.#wrinkleChannelWeights);
+    const wrinkleNormalStrengthLocation = shaderProgram.getUniformLocation("wrinkleNormalStrength");
+    webGL2RenderingContext.uniform1f(wrinkleNormalStrengthLocation, this.#wrinkleNormalStrength);
+    const wrinkleColorStrengthLocation = shaderProgram.getUniformLocation("wrinkleColorStrength");
+    webGL2RenderingContext.uniform1f(wrinkleColorStrengthLocation, this.#wrinkleColorStrength);
+    const eyeIrisRadiusLocation = shaderProgram.getUniformLocation("eyeIrisRadius");
+    webGL2RenderingContext.uniform1f(eyeIrisRadiusLocation, this.#eyeIrisRadius);
+    const eyePupilRadiusLocation = shaderProgram.getUniformLocation("eyePupilRadius");
+    webGL2RenderingContext.uniform1f(eyePupilRadiusLocation, this.#eyePupilRadius);
+    const eyeIrisDepthLocation = shaderProgram.getUniformLocation("eyeIrisDepth");
+    webGL2RenderingContext.uniform1f(eyeIrisDepthLocation, this.#eyeIrisDepth);
+    const hairSpecularShiftLocation = shaderProgram.getUniformLocation("hairSpecularShift");
+    webGL2RenderingContext.uniform3f(hairSpecularShiftLocation, this.#hairSpecularShift[0], this.#hairSpecularShift[1], this.#hairSpecularShift[2]);
+    const hairSpecularPowerLocation = shaderProgram.getUniformLocation("hairSpecularPower");
+    webGL2RenderingContext.uniform3f(hairSpecularPowerLocation, this.#hairSpecularPower[0], this.#hairSpecularPower[1], this.#hairSpecularPower[2]);
+    const hairSpecularIntensityLocation = shaderProgram.getUniformLocation("hairSpecularIntensity");
+    webGL2RenderingContext.uniform3f(hairSpecularIntensityLocation, this.#hairSpecularIntensity[0], this.#hairSpecularIntensity[1], this.#hairSpecularIntensity[2]);
+    const hairRootShadeLocation = shaderProgram.getUniformLocation("hairRootShade");
+    webGL2RenderingContext.uniform1f(hairRootShadeLocation, this.#hairRootShade);
+  }
+  //==============================================================================
+  // 섀도우 유니폼 적용. (섀도우 샘플러 타입 불일치로 드로우가 무효화되지 않도록 강도와 무관하게 항상 바인드)
+  //==============================================================================
+  /**
+   * @param { ShaderProgram } shaderProgram
+   */
+  applyShadowUniforms(shaderProgram) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const shadowMapTextureLocation = shaderProgram.getUniformLocation("shadowMapTexture");
+    webGL2RenderingContext.uniform1i(shadowMapTextureLocation, 1);
+    const shadowStrengthLocation = shaderProgram.getUniformLocation("shadowStrength");
+    const shadowSoftnessLocation = shaderProgram.getUniformLocation("shadowSoftness");
+    webGL2RenderingContext.uniform1f(shadowSoftnessLocation, this.#shadowSoftness);
+    if (this.#shadowMapTexture && this.#lightViewProjectionElements) {
+      const lightViewProjectionLocation = shaderProgram.getUniformLocation("lightViewProjectionMatrix");
+      webGL2RenderingContext.uniformMatrix4fv(lightViewProjectionLocation, false, this.#lightViewProjectionElements);
+      const shadowTexelSizeLocation = shaderProgram.getUniformLocation("shadowTexelSize");
+      webGL2RenderingContext.uniform1f(shadowTexelSizeLocation, this.#shadowTexelSize);
+      webGL2RenderingContext.uniform1f(shadowStrengthLocation, this.#shadowStrength);
+      webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#shadowMapTexture);
+      webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+    } else {
+      webGL2RenderingContext.uniform1f(shadowStrengthLocation, 0);
+    }
+  }
+  //==============================================================================
+  // 섀도우 맵 설정. (본 패스에서 그림자 수신 — 기반 렌더러에도 전달)
+  //==============================================================================
+  /**
+   * @override
+   * @param { WebGLTexture | null } shadowMapTexture
+   * @param { Float32Array | null } lightViewProjectionElements
+   * @param { number } texelSize
+   */
+  setShadowMap(shadowMapTexture, lightViewProjectionElements, texelSize) {
+    super.setShadowMap(shadowMapTexture, lightViewProjectionElements, texelSize);
+    this.#shadowMapTexture = shadowMapTexture;
+    this.#lightViewProjectionElements = lightViewProjectionElements;
+    this.#shadowTexelSize = texelSize;
+  }
+  //==============================================================================
+  // 그림자 강도 설정. (0 = 수신 안 함)
+  //==============================================================================
+  /**
+   * @override
+   * @param { number } shadowStrength
+   */
+  setShadowStrength(shadowStrength) {
+    super.setShadowStrength(shadowStrength);
+    this.#shadowStrength = shadowStrength;
+  }
+  //==============================================================================
+  // 그림자 부드러움 설정. (포아송 반경 — 섀도우 텍셀 단위)
+  //==============================================================================
+  /**
+   * @param { number } shadowSoftness
+   */
+  setShadowSoftness(shadowSoftness) {
+    this.#shadowSoftness = shadowSoftness;
+  }
+  //==============================================================================
+  // 머티리얼 셰이딩 모드 등록. (등록하지 않은 머티리얼은 피부)
+  //==============================================================================
+  /**
+   * @param { Material } material
+   * @param { number } shadingMode
+   */
+  setMaterialShading(material, shadingMode) {
+    this.#materialShadingModes.set(material, shadingMode);
+  }
+  //==============================================================================
+  // 머티리얼 셰이딩 모드 반환.
+  //==============================================================================
+  /**
+   * @param { Material } material
+   * @returns { number }
+   */
+  getMaterialShadingMode(material) {
+    const shadingMode = this.#materialShadingModes.get(material);
+    return shadingMode !== void 0 ? shadingMode : SKIN_SHADING_SKIN;
   }
   //==============================================================================
   // 조명 설정. (0 = 키 라이트: 섀도우 맵 수신 / 1 = 필 / 2 = 림 — 방향은 표면에서 빛을 향하는 벡터)
@@ -29065,10 +29707,482 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
   setSubsurfaceAmount(subsurfaceAmount) {
     this.#subsurfaceAmount = subsurfaceAmount;
   }
+  //==============================================================================
+  // 마이크로 노멀 설정. (타일링 횟수 / 강도 — 0 이면 사용 안 함)
+  //==============================================================================
+  /**
+   * @param { number } microTiling
+   * @param { number } microStrength
+   */
+  setMicroDetail(microTiling, microStrength) {
+    this.#microTiling = microTiling;
+    this.#microStrength = microStrength;
+  }
+  //==============================================================================
+  // 주름 맵 사용 설정. (마스크 아틀라스 / 주름 노멀 / 색 아틀라스가 머티리얼에 붙어 있어야 한다)
+  //==============================================================================
+  /**
+   * @param { boolean } useWrinkleMaps
+   * @param { number } normalStrength
+   * @param { number } colorStrength
+   */
+  setWrinkleMaps(useWrinkleMaps, normalStrength, colorStrength) {
+    this.#useWrinkleMaps = useWrinkleMaps;
+    this.#wrinkleNormalStrength = normalStrength;
+    this.#wrinkleColorStrength = colorStrength;
+  }
+  //==============================================================================
+  // 주름 채널 가중치 설정. (채널 = 마스크 아틀라스 타일 x 4 + RGBA 순서, 값 = 주름 맵 1 / 2 / 3 기여)
+  //==============================================================================
+  /**
+   * @param { number } channelIndex
+   * @param { number } weight1
+   * @param { number } weight2
+   * @param { number } weight3
+   */
+  setWrinkleChannelWeight(channelIndex, weight1, weight2, weight3) {
+    this.#wrinkleChannelWeights[channelIndex * 3] = weight1;
+    this.#wrinkleChannelWeights[channelIndex * 3 + 1] = weight2;
+    this.#wrinkleChannelWeights[channelIndex * 3 + 2] = weight3;
+  }
+  //==============================================================================
+  // 눈 파라미터 설정. (UV 단위 — 홍채 반경 / 동공 반경 / 홍채 평면 깊이)
+  //==============================================================================
+  /**
+   * @param { number } irisRadius
+   * @param { number } pupilRadius
+   * @param { number } irisDepth
+   */
+  setEyeParameters(irisRadius, pupilRadius, irisDepth) {
+    this.#eyeIrisRadius = irisRadius;
+    this.#eyePupilRadius = pupilRadius;
+    this.#eyeIrisDepth = irisDepth;
+  }
+  //==============================================================================
+  // 머리카락 파라미터 설정. (1차 / 2차 로브 시프트 · 지수 · 강도, 투과 강도, 뿌리 차폐)
+  //==============================================================================
+  /**
+   * @param { number[] } specularShift [1차, 2차]
+   * @param { number[] } specularPower [1차, 2차]
+   * @param { number[] } specularIntensity [1차, 2차, 투과]
+   * @param { number } rootShade
+   */
+  setHairParameters(specularShift, specularPower, specularIntensity, rootShade) {
+    this.#hairSpecularShift = [specularShift[0], specularShift[1], 0];
+    this.#hairSpecularPower = [specularPower[0], specularPower[1], 0];
+    this.#hairSpecularIntensity = specularIntensity.slice(0, 3);
+    this.#hairRootShade = rootShade;
+  }
+  //==============================================================================
+  // 컷아웃 깊이 셰이더 프로그램 반환.
+  //==============================================================================
+  /**
+   * @returns { ShaderProgram }
+   */
+  getCutoutDepthShaderProgram() {
+    return this.#cutoutDepthShaderProgram;
+  }
+};
+
+// src/experimental/graphics/ambientocclusioneffect.js
+var System49 = globalThis;
+var SAMPLE_COUNT = 16;
+var OCCLUSION_FRAGMENTSHADER_SOURCE = `#version 300 es
+precision highp float;
+in vec2 fragmentTextureCoordinate;
+uniform sampler2D depthTexture;
+uniform sampler2D normalTexture;
+uniform mat3 viewRotation;
+uniform vec2 depthRange;
+uniform vec2 projectionScale;
+uniform vec3 sampleKernel[${SAMPLE_COUNT}];
+uniform float radius;
+uniform float intensity;
+uniform float bias;
+out vec4 outputColor;
+
+const float PI = 3.14159265;
+
+float linearizeDepth(float depthSample) {
+	float nearDistance = depthRange.x;
+	float farDistance = depthRange.y;
+	float normalizedDepth = depthSample * 2.0 - 1.0;
+	return 2.0 * nearDistance * farDistance / (farDistance + nearDistance - normalizedDepth * (farDistance - nearDistance));
+}
+
+// \uD654\uBA74 \uC88C\uD45C + \uC120\uD615 \uAE4A\uC774 \u2192 \uBDF0 \uACF5\uAC04 \uC704\uCE58. (\uCE74\uBA54\uB77C\uAC00 -z \uB97C \uBCF8\uB2E4)
+vec3 reconstructViewPosition(vec2 textureCoordinate, float linearDepth) {
+	vec2 normalized = textureCoordinate * 2.0 - 1.0;
+	return vec3(normalized * projectionScale * linearDepth, -linearDepth);
+}
+
+float interleavedGradientNoise(vec2 screenPosition) {
+	return fract(52.9829189 * fract(dot(screenPosition, vec2(0.06711056, 0.00583715))));
+}
+
+void main() {
+	float depthSample = texture(depthTexture, fragmentTextureCoordinate).r;
+	if (depthSample >= 1.0) {
+		outputColor = vec4(1.0);
+		return;
+	}
+	float linearDepth = linearizeDepth(depthSample);
+	vec3 viewPosition = reconstructViewPosition(fragmentTextureCoordinate, linearDepth);
+	vec4 normalSample = texture(normalTexture, fragmentTextureCoordinate);
+	if (normalSample.a < 0.5) {
+		outputColor = vec4(1.0);
+		return;
+	}
+	vec3 viewNormal = normalize(viewRotation * normalSample.xyz);
+
+	// \uB178\uBA40 \uAE30\uC900 \uBC18\uAD6C \uD504\uB808\uC784. (\uD68C\uC804 \uB178\uC774\uC988\uB85C \uD45C\uBCF8 \uBC29\uD5A5\uC744 \uD769\uB294\uB2E4)
+	float angle = interleavedGradientNoise(gl_FragCoord.xy) * 2.0 * PI;
+	vec3 randomVector = vec3(cos(angle), sin(angle), 0.0);
+	vec3 tangent = normalize(randomVector - viewNormal * dot(randomVector, viewNormal));
+	vec3 bitangent = cross(viewNormal, tangent);
+	mat3 hemisphereFrame = mat3(tangent, bitangent, viewNormal);
+
+	float occlusion = 0.0;
+	for (int sampleIndex = 0; sampleIndex < ${SAMPLE_COUNT}; ++sampleIndex) {
+		vec3 samplePosition = viewPosition + hemisphereFrame * sampleKernel[sampleIndex] * radius;
+		// \uD45C\uBCF8\uC744 \uD654\uBA74\uC5D0 \uD22C\uC601\uD574 \uADF8 \uC790\uB9AC\uC758 \uC2E4\uC81C \uAE4A\uC774\uC640 \uBE44\uAD50
+		vec2 sampleCoordinate = (samplePosition.xy / projectionScale) / -samplePosition.z * 0.5 + 0.5;
+		if (sampleCoordinate.x < 0.0 || sampleCoordinate.x > 1.0 || sampleCoordinate.y < 0.0 || sampleCoordinate.y > 1.0) {
+			continue;
+		}
+		float sceneDepth = linearizeDepth(texture(depthTexture, sampleCoordinate).r);
+		float rangeCheck = smoothstep(0.0, 1.0, radius / max(abs(linearDepth - sceneDepth), 0.0001));
+		occlusion += (sceneDepth <= -samplePosition.z - bias ? 1.0 : 0.0) * rangeCheck;
+	}
+	float visibility = 1.0 - occlusion / float(${SAMPLE_COUNT}) * intensity;
+	outputColor = vec4(clamp(visibility, 0.0, 1.0), linearDepth, 0.0, 1.0);
+}
+`;
+var BLUR_FRAGMENTSHADER_SOURCE2 = `#version 300 es
+precision highp float;
+in vec2 fragmentTextureCoordinate;
+uniform sampler2D sourceTexture;
+uniform vec2 blurDirection;
+uniform vec2 texelSize;
+out vec4 outputColor;
+
+void main() {
+	vec2 center = texture(sourceTexture, fragmentTextureCoordinate).rg;
+	float weightSum = 1.0;
+	float visibilitySum = center.r;
+	for (int offset = 1; offset <= 4; ++offset) {
+		for (int sign = -1; sign <= 1; sign += 2) {
+			vec2 sampleCoordinate = fragmentTextureCoordinate + blurDirection * texelSize * float(offset * sign);
+			vec2 sampleValue = texture(sourceTexture, sampleCoordinate).rg;
+			float depthWeight = 1.0 - smoothstep(0.0, center.g * 0.05, abs(sampleValue.g - center.g));
+			visibilitySum += sampleValue.r * depthWeight;
+			weightSum += depthWeight;
+		}
+	}
+	outputColor = vec4(visibilitySum / weightSum, center.g, 0.0, 1.0);
+}
+`;
+var AmbientOcclusionEffect = class extends Object2 {
+  static {
+    __name(this, "AmbientOcclusionEffect");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WebGL2RenderingContext } */
+  #webGL2RenderingContext;
+  /** @private @type { FullscreenPass } */
+  #occlusionPass;
+  /** @private @type { FullscreenPass } */
+  #blurPass;
+  /** @private @type { RenderTarget } */
+  #occlusionRenderTarget;
+  /** @private @type { RenderTarget } */
+  #pingRenderTarget;
+  /** @private @type { RenderTarget } */
+  #pongRenderTarget;
+  /** @private @type { Float32Array } */
+  #sampleKernel;
+  /** @private @type { number } */
+  #radius;
+  /** @private @type { number } */
+  #intensity;
+  /** @private @type { number } */
+  #bias;
+  /** @private @type { number } */
+  #scale;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { WebGL2RenderingContext } webGL2RenderingContext
+   */
+  constructor(webGL2RenderingContext) {
+    super();
+    this.#webGL2RenderingContext = webGL2RenderingContext;
+    this.#occlusionPass = new FullscreenPass(webGL2RenderingContext, OCCLUSION_FRAGMENTSHADER_SOURCE);
+    this.#blurPass = new FullscreenPass(webGL2RenderingContext, BLUR_FRAGMENTSHADER_SOURCE2);
+    this.#occlusionRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, false, { useFloatColor: true });
+    this.#pingRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, false, { useFloatColor: true });
+    this.#pongRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, false, { useFloatColor: true });
+    this.#radius = 0.03;
+    this.#intensity = 1;
+    this.#bias = 2e-3;
+    this.#scale = 0.5;
+    this.#sampleKernel = new System49.Float32Array(SAMPLE_COUNT * 3);
+    this.computeKernel();
+  }
+  //==============================================================================
+  // 표본 커널 계산. (반구 안에 고르게 — 중심 쪽에 더 촘촘히)
+  //==============================================================================
+  computeKernel() {
+    for (let sampleIndex = 0; sampleIndex < SAMPLE_COUNT; ++sampleIndex) {
+      const goldenAngle = 2.39996323;
+      const angle = sampleIndex * goldenAngle;
+      const height = (sampleIndex + 0.5) / SAMPLE_COUNT;
+      const ring = System49.Math.sqrt(1 - height * height);
+      let scale = (sampleIndex + 1) / SAMPLE_COUNT;
+      scale = 0.15 + 0.85 * scale * scale;
+      this.#sampleKernel[sampleIndex * 3] = System49.Math.cos(angle) * ring * scale;
+      this.#sampleKernel[sampleIndex * 3 + 1] = System49.Math.sin(angle) * ring * scale;
+      this.#sampleKernel[sampleIndex * 3 + 2] = height * scale;
+    }
+  }
+  //==============================================================================
+  // 크기 변경. (본 패스 해상도 — 내부는 축소 배율 적용)
+  //==============================================================================
+  /**
+   * @param { number } width
+   * @param { number } height
+   */
+  resize(width, height) {
+    const scale = this.getScale();
+    const scaledWidth = System49.Math.max(1, System49.Math.floor(width * scale));
+    const scaledHeight = System49.Math.max(1, System49.Math.floor(height * scale));
+    this.#occlusionRenderTarget.resize(scaledWidth, scaledHeight);
+    this.#pingRenderTarget.resize(scaledWidth, scaledHeight);
+    this.#pongRenderTarget.resize(scaledWidth, scaledHeight);
+  }
+  //==============================================================================
+  // 차폐 렌더링. (차폐 → 가로 블러 → 세로 블러 — 결과는 getResultTexture())
+  // - 부수 효과: 깊이/블렌드 비활성, TEXTURE0 활성, 프레임버퍼 바인드가 변경된다.
+  //==============================================================================
+  /**
+   * @param { WebGLTexture } depthTexture 본 패스 깊이 텍스처.
+   * @param { WebGLTexture } normalTexture 월드 노멀 텍스처. (알파 = 커버리지)
+   * @param { Float32Array } viewMatrixElements 뷰 행렬 원소. (열 우선 4x4)
+   * @param { number } fieldOfViewRadian 세로 시야각.
+   * @param { number } aspectRatio
+   * @param { number } nearDistance
+   * @param { number } farDistance
+   */
+  render(depthTexture, normalTexture, viewMatrixElements, fieldOfViewRadian, aspectRatio, nearDistance, farDistance) {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+    webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+    const occlusionPass = this.getOcclusionPass();
+    occlusionPass.use();
+    const depthTextureLocation = occlusionPass.getUniformLocation("depthTexture");
+    webGL2RenderingContext.uniform1i(depthTextureLocation, 0);
+    const normalTextureLocation = occlusionPass.getUniformLocation("normalTexture");
+    webGL2RenderingContext.uniform1i(normalTextureLocation, 2);
+    const viewRotation = new System49.Float32Array([
+      viewMatrixElements[0],
+      viewMatrixElements[1],
+      viewMatrixElements[2],
+      viewMatrixElements[4],
+      viewMatrixElements[5],
+      viewMatrixElements[6],
+      viewMatrixElements[8],
+      viewMatrixElements[9],
+      viewMatrixElements[10]
+    ]);
+    const viewRotationLocation = occlusionPass.getUniformLocation("viewRotation");
+    webGL2RenderingContext.uniformMatrix3fv(viewRotationLocation, false, viewRotation);
+    const depthRangeLocation = occlusionPass.getUniformLocation("depthRange");
+    webGL2RenderingContext.uniform2f(depthRangeLocation, nearDistance, farDistance);
+    const tangentHalfFieldOfView = System49.Math.tan(fieldOfViewRadian * 0.5);
+    const projectionScaleLocation = occlusionPass.getUniformLocation("projectionScale");
+    webGL2RenderingContext.uniform2f(projectionScaleLocation, tangentHalfFieldOfView * aspectRatio, tangentHalfFieldOfView);
+    const sampleKernelLocation = occlusionPass.getUniformLocation("sampleKernel[0]");
+    webGL2RenderingContext.uniform3fv(sampleKernelLocation, this.#sampleKernel);
+    const radiusLocation = occlusionPass.getUniformLocation("radius");
+    webGL2RenderingContext.uniform1f(radiusLocation, this.getRadius());
+    const intensityLocation = occlusionPass.getUniformLocation("intensity");
+    webGL2RenderingContext.uniform1f(intensityLocation, this.getIntensity());
+    const biasLocation = occlusionPass.getUniformLocation("bias");
+    webGL2RenderingContext.uniform1f(biasLocation, this.getBias());
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE2);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, normalTexture);
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, depthTexture);
+    const occlusionRenderTarget = this.getOcclusionRenderTarget();
+    occlusionRenderTarget.bind();
+    occlusionPass.draw();
+    const blurPass = this.getBlurPass();
+    blurPass.use();
+    const sourceTextureLocation = blurPass.getUniformLocation("sourceTexture");
+    webGL2RenderingContext.uniform1i(sourceTextureLocation, 0);
+    const texelSizeLocation = blurPass.getUniformLocation("texelSize");
+    const occlusionWidth = occlusionRenderTarget.getWidth();
+    const occlusionHeight = occlusionRenderTarget.getHeight();
+    webGL2RenderingContext.uniform2f(texelSizeLocation, 1 / occlusionWidth, 1 / occlusionHeight);
+    const blurDirectionLocation = blurPass.getUniformLocation("blurDirection");
+    const pingRenderTarget = this.getPingRenderTarget();
+    pingRenderTarget.bind();
+    webGL2RenderingContext.uniform2f(blurDirectionLocation, 1, 0);
+    const occlusionTexture = occlusionRenderTarget.getColorTexture();
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, occlusionTexture);
+    blurPass.draw();
+    const pongRenderTarget = this.getPongRenderTarget();
+    pongRenderTarget.bind();
+    webGL2RenderingContext.uniform2f(blurDirectionLocation, 0, 1);
+    const pingTexture = pingRenderTarget.getColorTexture();
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, pingTexture);
+    blurPass.draw();
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE2);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+  }
+  //==============================================================================
+  // 결과 텍스처 반환. (render() 이후 — r 가시율)
+  //==============================================================================
+  /**
+   * @returns { WebGLTexture | null }
+   */
+  getResultTexture() {
+    const pongRenderTarget = this.getPongRenderTarget();
+    const resultTexture = pongRenderTarget.getColorTexture();
+    return resultTexture;
+  }
+  //==============================================================================
+  // 파라미터 설정. (표본 반경(월드) / 강도 / 깊이 바이어스)
+  //==============================================================================
+  /**
+   * @param { number } radius
+   * @param { number } intensity
+   * @param { number } bias
+   */
+  setParameters(radius, intensity, bias) {
+    this.#radius = radius;
+    this.#intensity = intensity;
+    this.#bias = bias;
+  }
+  //==============================================================================
+  // 내부 해상도 배율 설정. (resize 전에 호출)
+  //==============================================================================
+  /**
+   * @param { number } scale
+   */
+  setScale(scale) {
+    this.#scale = scale;
+  }
+  //==============================================================================
+  // 파괴. (GL 리소스 해제)
+  //==============================================================================
+  /**
+   * @override
+   */
+  destroy() {
+    this.#occlusionRenderTarget.destroy();
+    this.#pingRenderTarget.destroy();
+    this.#pongRenderTarget.destroy();
+  }
+  //==============================================================================
+  // 렌더링 컨텍스트 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGL2RenderingContext }
+   */
+  getWebGL2RenderingContext() {
+    return this.#webGL2RenderingContext;
+  }
+  //==============================================================================
+  // 차폐 패스 반환.
+  //==============================================================================
+  /**
+   * @returns { FullscreenPass }
+   */
+  getOcclusionPass() {
+    return this.#occlusionPass;
+  }
+  //==============================================================================
+  // 블러 패스 반환.
+  //==============================================================================
+  /**
+   * @returns { FullscreenPass }
+   */
+  getBlurPass() {
+    return this.#blurPass;
+  }
+  //==============================================================================
+  // 차폐 렌더 타겟 반환.
+  //==============================================================================
+  /**
+   * @returns { RenderTarget }
+   */
+  getOcclusionRenderTarget() {
+    return this.#occlusionRenderTarget;
+  }
+  //==============================================================================
+  // 핑 렌더 타겟 반환. (가로 블러 결과)
+  //==============================================================================
+  /**
+   * @returns { RenderTarget }
+   */
+  getPingRenderTarget() {
+    return this.#pingRenderTarget;
+  }
+  //==============================================================================
+  // 퐁 렌더 타겟 반환. (최종 결과 보관)
+  //==============================================================================
+  /**
+   * @returns { RenderTarget }
+   */
+  getPongRenderTarget() {
+    return this.#pongRenderTarget;
+  }
+  //==============================================================================
+  // 표본 반경 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getRadius() {
+    return this.#radius;
+  }
+  //==============================================================================
+  // 강도 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getIntensity() {
+    return this.#intensity;
+  }
+  //==============================================================================
+  // 깊이 바이어스 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getBias() {
+    return this.#bias;
+  }
+  //==============================================================================
+  // 내부 해상도 배율 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getScale() {
+    return this.#scale;
+  }
 };
 
 // src/experimental/graphics/subsurfacescatteringeffect.js
-var System49 = globalThis;
+var System50 = globalThis;
 var KERNEL_SAMPLE_COUNT = 17;
 var KERNEL_RANGE = 3;
 var SCATTER_FRAGMENTSHADER_SOURCE = `#version 300 es
@@ -29162,7 +30276,7 @@ var SubsurfaceScatteringEffect = class extends Object2 {
     this.#scatterWidth = 0.2;
     this.#falloffColor = [1, 0.37, 0.3];
     this.#strengthColor = [0.48, 0.41, 0.28];
-    this.#kernel = new System49.Float32Array(KERNEL_SAMPLE_COUNT * 4);
+    this.#kernel = new System50.Float32Array(KERNEL_SAMPLE_COUNT * 4);
     this.computeKernel();
   }
   //==============================================================================
@@ -29174,7 +30288,7 @@ var SubsurfaceScatteringEffect = class extends Object2 {
     const strengthColor = this.getStrengthColor();
     function evaluateGaussian(variance, distance, channelIndex) {
       const scaledDistance = distance / (1e-3 + falloffColor[channelIndex]);
-      return System49.Math.exp(-(scaledDistance * scaledDistance) / (2 * variance)) / (2 * System49.Math.PI * variance);
+      return System50.Math.exp(-(scaledDistance * scaledDistance) / (2 * variance)) / (2 * System50.Math.PI * variance);
     }
     __name(evaluateGaussian, "evaluateGaussian");
     function evaluateProfile(distance, channelIndex) {
@@ -29186,13 +30300,13 @@ var SubsurfaceScatteringEffect = class extends Object2 {
     for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
       const linearOffset = -KERNEL_RANGE + sampleIndex * step;
       const sign = linearOffset < 0 ? -1 : 1;
-      const normalizedOffset = System49.Math.abs(linearOffset) / KERNEL_RANGE;
+      const normalizedOffset = System50.Math.abs(linearOffset) / KERNEL_RANGE;
       offsets.push(KERNEL_RANGE * sign * normalizedOffset * normalizedOffset);
     }
     const weights = [];
     for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
-      const leftWidth = sampleIndex > 0 ? System49.Math.abs(offsets[sampleIndex] - offsets[sampleIndex - 1]) : 0;
-      const rightWidth = sampleIndex < sampleCount - 1 ? System49.Math.abs(offsets[sampleIndex] - offsets[sampleIndex + 1]) : 0;
+      const leftWidth = sampleIndex > 0 ? System50.Math.abs(offsets[sampleIndex] - offsets[sampleIndex - 1]) : 0;
+      const rightWidth = sampleIndex < sampleCount - 1 ? System50.Math.abs(offsets[sampleIndex] - offsets[sampleIndex + 1]) : 0;
       const area = (leftWidth + rightWidth) * 0.5;
       const weight = [];
       for (let channelIndex = 0; channelIndex < 3; ++channelIndex) {
@@ -29263,7 +30377,7 @@ var SubsurfaceScatteringEffect = class extends Object2 {
     const scatterWidthLocation = scatterPass.getUniformLocation("scatterWidth");
     webGL2RenderingContext.uniform1f(scatterWidthLocation, this.getScatterWidth());
     const distanceToProjectionWindowLocation = scatterPass.getUniformLocation("distanceToProjectionWindow");
-    webGL2RenderingContext.uniform1f(distanceToProjectionWindowLocation, 1 / System49.Math.tan(fieldOfViewRadian * 0.5));
+    webGL2RenderingContext.uniform1f(distanceToProjectionWindowLocation, 1 / System50.Math.tan(fieldOfViewRadian * 0.5));
     const aspectRatioLocation = scatterPass.getUniformLocation("aspectRatio");
     webGL2RenderingContext.uniform1f(aspectRatioLocation, aspectRatio);
     const depthRangeLocation = scatterPass.getUniformLocation("depthRange");
@@ -29395,7 +30509,7 @@ var SubsurfaceScatteringEffect = class extends Object2 {
 };
 
 // src/experimental/graphics/shadowmap.js
-var System50 = globalThis;
+var System51 = globalThis;
 var ShadowMap = class extends Object2 {
   static {
     __name(this, "ShadowMap");
@@ -29463,8 +30577,8 @@ var ShadowMap = class extends Object2 {
     const viewMatrix = Matrix4.createLookAt(eyePosition, focusPosition, upDirection);
     const worldUnitsPerTexel = extent * 2 / this.getResolution();
     const viewElements = viewMatrix.getElements();
-    viewElements[12] = System50.Math.round(viewElements[12] / worldUnitsPerTexel) * worldUnitsPerTexel;
-    viewElements[13] = System50.Math.round(viewElements[13] / worldUnitsPerTexel) * worldUnitsPerTexel;
+    viewElements[12] = System51.Math.round(viewElements[12] / worldUnitsPerTexel) * worldUnitsPerTexel;
+    viewElements[13] = System51.Math.round(viewElements[13] / worldUnitsPerTexel) * worldUnitsPerTexel;
     const orthographicMatrix = Matrix4.createOrthographic(-extent, extent, -extent, extent, nearDistance, farDistance);
     const lightViewProjectionMatrix = orthographicMatrix.clone();
     lightViewProjectionMatrix.multiply(viewMatrix);
@@ -29849,7 +30963,7 @@ var BunchAsset = class extends BlobAsset {
 };
 
 // src/base/seededrandom.js
-var System51 = globalThis;
+var System52 = globalThis;
 var SeededRandom = class _SeededRandom extends Object2 {
   static {
     __name(this, "SeededRandom");
@@ -29906,8 +31020,8 @@ var SeededRandom = class _SeededRandom extends Object2 {
   nextValue() {
     this.#state = this.#state + 1831565813 >>> 0;
     let mixed = this.#state;
-    mixed = System51.Math.imul(mixed ^ mixed >>> 15, mixed | 1);
-    mixed ^= mixed + System51.Math.imul(mixed ^ mixed >>> 7, mixed | 61);
+    mixed = System52.Math.imul(mixed ^ mixed >>> 15, mixed | 1);
+    mixed ^= mixed + System52.Math.imul(mixed ^ mixed >>> 7, mixed | 61);
     const value = ((mixed ^ mixed >>> 14) >>> 0) / 4294967296;
     return value;
   }
@@ -29932,7 +31046,7 @@ var SeededRandom = class _SeededRandom extends Object2 {
    * @returns { number }
    */
   nextInt(minValue, maxValue) {
-    const value = minValue + System51.Math.floor(this.nextValue() * (maxValue - minValue + 1));
+    const value = minValue + System52.Math.floor(this.nextValue() * (maxValue - minValue + 1));
     return value;
   }
   //==============================================================================
@@ -29978,7 +31092,7 @@ var SeededRandom = class _SeededRandom extends Object2 {
    * @returns { number }
    */
   static createDailySeed(dateNumber, baseSeed = 2654435761) {
-    const mixed = (baseSeed ^ System51.Math.imul(dateNumber >>> 0, 2654435761)) >>> 0;
+    const mixed = (baseSeed ^ System52.Math.imul(dateNumber >>> 0, 2654435761)) >>> 0;
     return mixed || 1;
   }
   //==============================================================================
@@ -29989,14 +31103,14 @@ var SeededRandom = class _SeededRandom extends Object2 {
    * @param { number } baseSeed
    * @returns { SeededRandom }
    */
-  static fromDate(date = new System51.Date(), baseSeed = 2654435761) {
+  static fromDate(date = new System52.Date(), baseSeed = 2654435761) {
     const dateNumber = date.getFullYear() * 1e4 + (date.getMonth() + 1) * 100 + date.getDate();
     return new _SeededRandom(_SeededRandom.createDailySeed(dateNumber, baseSeed));
   }
 };
 
 // src/base/timer.js
-var System52 = globalThis;
+var System53 = globalThis;
 var Cooldown = class extends Object2 {
   static {
     __name(this, "Cooldown");
@@ -30017,7 +31131,7 @@ var Cooldown = class extends Object2 {
    */
   constructor(duration = 1) {
     super();
-    this.#duration = System52.Math.max(0, duration);
+    this.#duration = System53.Math.max(0, duration);
     this.#remainSeconds = 0;
   }
   //==============================================================================
@@ -30028,7 +31142,7 @@ var Cooldown = class extends Object2 {
    */
   tick(timeDelta) {
     if (this.#remainSeconds > 0) {
-      this.#remainSeconds = System52.Math.max(0, this.#remainSeconds - timeDelta);
+      this.#remainSeconds = System53.Math.max(0, this.#remainSeconds - timeDelta);
     }
   }
   //==============================================================================
@@ -30066,7 +31180,7 @@ var Cooldown = class extends Object2 {
    * @param { number } duration
    */
   setDuration(duration) {
-    this.#duration = System52.Math.max(0, duration);
+    this.#duration = System53.Math.max(0, duration);
   }
   //==============================================================================
   // 쿨다운 시간 반환.
@@ -30124,7 +31238,7 @@ var RepeatTimer = class extends Object2 {
    */
   constructor(interval = 1, elapsedEvent = null) {
     super();
-    this.#interval = System52.Math.max(1e-6, interval);
+    this.#interval = System53.Math.max(1e-6, interval);
     this.#elapsedSeconds = 0;
     this.#elapsedEvent = elapsedEvent;
     this.#isRunning = true;
@@ -30173,7 +31287,7 @@ var RepeatTimer = class extends Object2 {
    * @param { number } interval
    */
   setInterval(interval) {
-    this.#interval = System52.Math.max(1e-6, interval);
+    this.#interval = System53.Math.max(1e-6, interval);
   }
   //==============================================================================
   // 간격 반환.
@@ -30295,7 +31409,7 @@ var ObjectPool = class extends Object2 {
 };
 
 // src/base/fsm.js
-var System53 = globalThis;
+var System54 = globalThis;
 var FiniteStateMachine = class extends Object2 {
   static {
     __name(this, "FiniteStateMachine");
@@ -30321,7 +31435,7 @@ var FiniteStateMachine = class extends Object2 {
    */
   constructor() {
     super();
-    this.#stateTable = new System53.Map();
+    this.#stateTable = new System54.Map();
     this.#stateName = null;
     this.#stateSeconds = 0;
     this.#transitionGuard = null;
@@ -30454,7 +31568,7 @@ __export(format_exports, {
   formatNumberWithUnit: () => formatNumberWithUnit,
   formatPaddedNumber: () => formatPaddedNumber
 });
-var System54 = globalThis;
+var System55 = globalThis;
 function formatNumber(value, locale = "en-US") {
   return value.toLocaleString(locale);
 }
@@ -30464,7 +31578,7 @@ function formatNumberWithUnit(value, unitSuffix, locale = "ko-KR") {
 }
 __name(formatNumberWithUnit, "formatNumberWithUnit");
 function formatCompactNumber(value, fractionDigits = 1) {
-  const absoluteValue = System54.Math.abs(value);
+  const absoluteValue = System55.Math.abs(value);
   const sign = value < 0 ? "-" : "";
   if (absoluteValue >= 1e9) {
     return sign + trimTrailingZero((absoluteValue / 1e9).toFixed(fractionDigits)) + "B";
@@ -30479,7 +31593,7 @@ function formatCompactNumber(value, fractionDigits = 1) {
 }
 __name(formatCompactNumber, "formatCompactNumber");
 function formatPaddedNumber(value, digitCount, minValue = -Infinity, maxValue = Infinity) {
-  const clampedValue = System54.Math.min(maxValue, System54.Math.max(minValue, value));
+  const clampedValue = System55.Math.min(maxValue, System55.Math.max(minValue, value));
   if (clampedValue < 0) {
     const digitText = String(-clampedValue).padStart(digitCount - 1, "0");
     return "-" + digitText;
@@ -30488,8 +31602,8 @@ function formatPaddedNumber(value, digitCount, minValue = -Infinity, maxValue = 
 }
 __name(formatPaddedNumber, "formatPaddedNumber");
 function formatMinutesSeconds(totalSeconds) {
-  const flooredSeconds = System54.Math.max(0, System54.Math.floor(totalSeconds));
-  const minutes = System54.Math.floor(flooredSeconds / 60);
+  const flooredSeconds = System55.Math.max(0, System55.Math.floor(totalSeconds));
+  const minutes = System55.Math.floor(flooredSeconds / 60);
   const seconds2 = flooredSeconds % 60;
   return minutes + ":" + String(seconds2).padStart(2, "0");
 }
@@ -30510,7 +31624,7 @@ function trimTrailingZero(numberText) {
 __name(trimTrailingZero, "trimTrailingZero");
 
 // src/misc/persistedstore.js
-var System55 = globalThis;
+var System56 = globalThis;
 var PersistedStore = class extends Object2 {
   static {
     __name(this, "PersistedStore");
@@ -30543,7 +31657,7 @@ var PersistedStore = class extends Object2 {
     this.#version = version;
     this.#defaultState = defaultState;
     this.#state = this.readFromStorage();
-    this.#subscriberSet = new System55.Set();
+    this.#subscriberSet = new System56.Set();
   }
   //==============================================================================
   // 상태 반환. (복사본이 아니므로 직접 고치지 말고 set() 을 쓴다)
@@ -30561,7 +31675,7 @@ var PersistedStore = class extends Object2 {
    * @param { object } partialState
    */
   set(partialState) {
-    this.#state = System55.Object.assign({}, this.#state, partialState);
+    this.#state = System56.Object.assign({}, this.#state, partialState);
     this.writeToStorage();
     this.notify();
   }
@@ -30572,7 +31686,7 @@ var PersistedStore = class extends Object2 {
    * @param { object } nextState
    */
   replace(nextState) {
-    this.#state = System55.Object.assign({}, nextState);
+    this.#state = System56.Object.assign({}, nextState);
     this.writeToStorage();
     this.notify();
   }
@@ -30612,16 +31726,16 @@ var PersistedStore = class extends Object2 {
   readFromStorage() {
     const storedText = LocalStorage.getString(this.#storageKey, "");
     if (storedText.length === 0) {
-      return System55.Object.assign({}, this.#defaultState);
+      return System56.Object.assign({}, this.#defaultState);
     }
     try {
-      const parsed = System55.JSON.parse(storedText);
+      const parsed = System56.JSON.parse(storedText);
       if (!parsed || parsed.version !== this.#version || typeof parsed.state !== "object" || parsed.state === null) {
-        return System55.Object.assign({}, this.#defaultState);
+        return System56.Object.assign({}, this.#defaultState);
       }
-      return System55.Object.assign({}, this.#defaultState, parsed.state);
+      return System56.Object.assign({}, this.#defaultState, parsed.state);
     } catch (parseError) {
-      return System55.Object.assign({}, this.#defaultState);
+      return System56.Object.assign({}, this.#defaultState);
     }
   }
   //==============================================================================
@@ -30629,7 +31743,7 @@ var PersistedStore = class extends Object2 {
   //==============================================================================
   writeToStorage() {
     const payload = { version: this.#version, state: this.#state };
-    LocalStorage.setString(this.#storageKey, System55.JSON.stringify(payload));
+    LocalStorage.setString(this.#storageKey, System56.JSON.stringify(payload));
   }
   //==============================================================================
   // 저장 키 반환.
@@ -30643,13 +31757,13 @@ var PersistedStore = class extends Object2 {
 };
 
 // src/misc/localization.js
-var System56 = globalThis;
+var System57 = globalThis;
 var Localization = class _Localization extends Object2 {
   static {
     __name(this, "Localization");
   }
   /** @private @type { Map } */
-  static #tableByLanguage = new System56.Map();
+  static #tableByLanguage = new System57.Map();
   /** @private @type { string } */
   static #languageCode = "ko";
   /** @private @type { string } */
@@ -30665,7 +31779,7 @@ var Localization = class _Localization extends Object2 {
    * @returns { string }
    */
   static detectLanguage(supportedLanguageCodes, defaultLanguageCode = "ko") {
-    const navigatorObject = System56.navigator;
+    const navigatorObject = System57.navigator;
     const candidateList = [];
     if (navigatorObject) {
       if (navigatorObject.languages) {
@@ -30676,7 +31790,7 @@ var Localization = class _Localization extends Object2 {
         candidateList.push(navigatorObject.language);
       }
     }
-    const supportedSet = new System56.Set(supportedLanguageCodes.map((code) => code.toLowerCase()));
+    const supportedSet = new System57.Set(supportedLanguageCodes.map((code) => code.toLowerCase()));
     for (const languageTag of candidateList) {
       const loweredTag = languageTag.toLowerCase();
       if (supportedSet.has(loweredTag)) {
@@ -30755,7 +31869,7 @@ var Localization = class _Localization extends Object2 {
    */
   static textList(key) {
     const resolvedValue = _Localization.lookup(key);
-    if (System56.Array.isArray(resolvedValue)) {
+    if (System57.Array.isArray(resolvedValue)) {
       return resolvedValue;
     }
     if (typeof resolvedValue === "string") {
@@ -30790,7 +31904,7 @@ var Localization = class _Localization extends Object2 {
 };
 
 // src/misc/pathfinder.js
-var System57 = globalThis;
+var System58 = globalThis;
 var PathFinder = class extends Object2 {
   static {
     __name(this, "PathFinder");
@@ -30823,11 +31937,11 @@ var PathFinder = class extends Object2 {
     const toIndex = /* @__PURE__ */ __name((column, row) => {
       return row * columnCount + column;
     }, "toIndex");
-    const costFromStart = new System57.Float64Array(cellCount).fill(System57.Number.POSITIVE_INFINITY);
-    const cameFrom = new System57.Int32Array(cellCount).fill(-1);
-    const isClosed = new System57.Uint8Array(cellCount);
+    const costFromStart = new System58.Float64Array(cellCount).fill(System58.Number.POSITIVE_INFINITY);
+    const cameFrom = new System58.Int32Array(cellCount).fill(-1);
+    const isClosed = new System58.Uint8Array(cellCount);
     const heuristic = /* @__PURE__ */ __name((column, row) => {
-      return System57.Math.abs(column - goal.column) + System57.Math.abs(row - goal.row);
+      return System58.Math.abs(column - goal.column) + System58.Math.abs(row - goal.row);
     }, "heuristic");
     const heapScores = [];
     const heapIndices = [];
@@ -30892,7 +32006,7 @@ var PathFinder = class extends Object2 {
         const path = [];
         let traceIndex = goalIndex;
         while (traceIndex !== startIndex) {
-          path.push({ column: traceIndex % columnCount, row: System57.Math.floor(traceIndex / columnCount) });
+          path.push({ column: traceIndex % columnCount, row: System58.Math.floor(traceIndex / columnCount) });
           traceIndex = cameFrom[traceIndex];
         }
         path.reverse();
@@ -30903,7 +32017,7 @@ var PathFinder = class extends Object2 {
       }
       isClosed[currentIndex] = 1;
       const currentColumn = currentIndex % columnCount;
-      const currentRow = System57.Math.floor(currentIndex / columnCount);
+      const currentRow = System58.Math.floor(currentIndex / columnCount);
       for (const offset of neighborOffsets) {
         const nextColumn = currentColumn + offset[0];
         const nextRow = currentRow + offset[1];
@@ -30930,7 +32044,7 @@ var PathFinder = class extends Object2 {
 };
 
 // src/misc/grid.js
-var System58 = globalThis;
+var System59 = globalThis;
 var Grid = class _Grid extends Object2 {
   static {
     __name(this, "Grid");
@@ -30954,7 +32068,7 @@ var Grid = class _Grid extends Object2 {
     if (!isPassableHandler(start.column, start.row)) {
       return visitedList;
     }
-    const isVisited = new System58.Uint8Array(columnCount * rowCount);
+    const isVisited = new System59.Uint8Array(columnCount * rowCount);
     const pendingStack = [start.column, start.row];
     isVisited[start.row * columnCount + start.column] = 1;
     while (pendingStack.length > 0) {
@@ -31011,10 +32125,10 @@ var Grid = class _Grid extends Object2 {
    * @returns { boolean } 막힌 타일과 겹치면 참.
    */
   static testRectOverlap(worldRect, tileSize, isBlockedHandler) {
-    const startColumn = System58.Math.floor(worldRect.position.x / tileSize);
-    const endColumn = System58.Math.floor((worldRect.position.x + worldRect.size.x - 1e-6) / tileSize);
-    const startRow = System58.Math.floor(worldRect.position.y / tileSize);
-    const endRow = System58.Math.floor((worldRect.position.y + worldRect.size.y - 1e-6) / tileSize);
+    const startColumn = System59.Math.floor(worldRect.position.x / tileSize);
+    const endColumn = System59.Math.floor((worldRect.position.x + worldRect.size.x - 1e-6) / tileSize);
+    const startRow = System59.Math.floor(worldRect.position.y / tileSize);
+    const endRow = System59.Math.floor((worldRect.position.y + worldRect.size.y - 1e-6) / tileSize);
     for (let row = startRow; row <= endRow; ++row) {
       for (let column = startColumn; column <= endColumn; ++column) {
         if (isBlockedHandler(column, row)) {
@@ -31034,7 +32148,7 @@ var Grid = class _Grid extends Object2 {
    * @returns { object } { column, row }
    */
   static toCell(worldX, worldY, tileSize) {
-    return { column: System58.Math.floor(worldX / tileSize), row: System58.Math.floor(worldY / tileSize) };
+    return { column: System59.Math.floor(worldX / tileSize), row: System59.Math.floor(worldY / tileSize) };
   }
   //==============================================================================
   // 타일 좌표 → 타일 중심 월드 좌표. (정적)
@@ -31051,7 +32165,7 @@ var Grid = class _Grid extends Object2 {
 };
 
 // src/misc/collision2d.js
-var System59 = globalThis;
+var System60 = globalThis;
 var Collision2D = class extends Object2 {
   static {
     __name(this, "Collision2D");
@@ -31094,7 +32208,7 @@ var Collision2D = class extends Object2 {
     if (distanceSquared >= radiusSum * radiusSum) {
       return null;
     }
-    const distance = System59.Math.sqrt(distanceSquared);
+    const distance = System60.Math.sqrt(distanceSquared);
     let directionX = 1;
     let directionY = 0;
     if (distance > 1e-6) {
@@ -31158,7 +32272,7 @@ var Collision2D = class extends Object2 {
 };
 
 // src/misc/steering2d.js
-var System60 = globalThis;
+var System61 = globalThis;
 var Steering2D = class extends Object2 {
   static {
     __name(this, "Steering2D");
@@ -31175,7 +32289,7 @@ var Steering2D = class extends Object2 {
   static seek(position, targetPosition, speed) {
     const differenceX = targetPosition.x - position.x;
     const differenceY = targetPosition.y - position.y;
-    const distance = System60.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
+    const distance = System61.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
     if (distance < 1e-6) {
       return Vector2.zero();
     }
@@ -31198,7 +32312,7 @@ var Steering2D = class extends Object2 {
   static orbitAtRange(position, targetPosition, preferredRange, speed, elapsedSeconds, strafeRate = 1.7) {
     const differenceX = targetPosition.x - position.x;
     const differenceY = targetPosition.y - position.y;
-    const distance = System60.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
+    const distance = System61.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
     if (distance < 1e-6) {
       return Vector2.create(speed, 0);
     }
@@ -31206,11 +32320,11 @@ var Steering2D = class extends Object2 {
     const forwardY = differenceY / distance;
     const sideX = -forwardY;
     const sideY = forwardX;
-    const rangeError = System60.Math.max(-1, System60.Math.min(1, (distance - preferredRange) / preferredRange));
-    const strafeAmount = System60.Math.sin(elapsedSeconds * strafeRate);
+    const rangeError = System61.Math.max(-1, System61.Math.min(1, (distance - preferredRange) / preferredRange));
+    const strafeAmount = System61.Math.sin(elapsedSeconds * strafeRate);
     const desiredX = forwardX * rangeError + sideX * strafeAmount;
     const desiredY = forwardY * rangeError + sideY * strafeAmount;
-    const desiredLength = System60.Math.sqrt(desiredX * desiredX + desiredY * desiredY);
+    const desiredLength = System61.Math.sqrt(desiredX * desiredX + desiredY * desiredY);
     if (desiredLength < 1e-6) {
       return Vector2.zero();
     }
@@ -31219,7 +32333,7 @@ var Steering2D = class extends Object2 {
 };
 
 // src/misc/pointergesture.js
-var System61 = globalThis;
+var System62 = globalThis;
 var PointerGesture = class extends Object2 {
   static {
     __name(this, "PointerGesture");
@@ -31375,7 +32489,7 @@ var PointerGesture = class extends Object2 {
     if (!this.#isPressed || this.#isDragging || this.#longPressSeconds <= 0) {
       return 0;
     }
-    return System61.Math.min(1, this.#pressedSeconds / this.#longPressSeconds);
+    return System62.Math.min(1, this.#pressedSeconds / this.#longPressSeconds);
   }
   //==============================================================================
   // 상태 조회.
@@ -31425,7 +32539,7 @@ var PointerGesture = class extends Object2 {
 };
 
 // src/misc/focusnavigator.js
-var System62 = globalThis;
+var System63 = globalThis;
 var FocusNavigator = class extends Object2 {
   static {
     __name(this, "FocusNavigator");
@@ -31522,7 +32636,7 @@ var FocusNavigator = class extends Object2 {
     const currentCenterX = currentItem.rect.position.x + currentItem.rect.size.x * 0.5;
     const currentCenterY = currentItem.rect.position.y + currentItem.rect.size.y * 0.5;
     let bestItem = null;
-    let bestScore = System62.Number.POSITIVE_INFINITY;
+    let bestScore = System63.Number.POSITIVE_INFINITY;
     for (const item of this.#itemList) {
       if (item.id === this.#focusedId) {
         continue;
@@ -31535,7 +32649,7 @@ var FocusNavigator = class extends Object2 {
       if (forwardDistance <= 0) {
         continue;
       }
-      const crossDistance = System62.Math.abs(deltaX * directionY) + System62.Math.abs(deltaY * directionX);
+      const crossDistance = System63.Math.abs(deltaX * directionY) + System63.Math.abs(deltaY * directionX);
       const score = forwardDistance + crossDistance * this.#crossAxisPenalty;
       if (score < bestScore) {
         bestScore = score;
@@ -31551,7 +32665,7 @@ var FocusNavigator = class extends Object2 {
 };
 
 // src/misc/shaker.js
-var System63 = globalThis;
+var System64 = globalThis;
 var Shaker = class extends Object2 {
   static {
     __name(this, "Shaker");
@@ -31589,7 +32703,7 @@ var Shaker = class extends Object2 {
    * @param { number } strength 최대 오프셋. (픽셀)
    */
   addShake(strength) {
-    this.#strength = System63.Math.max(this.#strength, strength);
+    this.#strength = System64.Math.max(this.#strength, strength);
   }
   //==============================================================================
   // 갱신.
@@ -31600,7 +32714,7 @@ var Shaker = class extends Object2 {
   tick(timeDelta) {
     this.#elapsedSeconds += timeDelta;
     if (this.#strength > 0) {
-      this.#strength *= System63.Math.exp(-this.#decayRate * timeDelta);
+      this.#strength *= System64.Math.exp(-this.#decayRate * timeDelta);
       if (this.#strength < 0.05) {
         this.#strength = 0;
       }
@@ -31618,8 +32732,8 @@ var Shaker = class extends Object2 {
       return Vector2.zero();
     }
     const time = this.#elapsedSeconds;
-    const offsetX = System63.Math.sin(time * this.#frequency) * this.#strength;
-    const offsetY = System63.Math.cos(time * this.#frequency * 1.37) * this.#strength;
+    const offsetX = System64.Math.sin(time * this.#frequency) * this.#strength;
+    const offsetY = System64.Math.cos(time * this.#frequency * 1.37) * this.#strength;
     return Vector2.create(offsetX, offsetY);
   }
   //==============================================================================
@@ -31658,7 +32772,7 @@ var Shaker = class extends Object2 {
 };
 
 // src/misc/camera2d.js
-var System64 = globalThis;
+var System65 = globalThis;
 var Camera2D = class extends Object2 {
   static {
     __name(this, "Camera2D");
@@ -31714,18 +32828,18 @@ var Camera2D = class extends Object2 {
         this.#position.x + this.#velocity.x * timeDelta,
         this.#position.y + this.#velocity.y * timeDelta
       );
-      const damping = System64.Math.exp(-this.#inertiaDamping * timeDelta);
+      const damping = System65.Math.exp(-this.#inertiaDamping * timeDelta);
       this.#velocity = Vector2.create(this.#velocity.x * damping, this.#velocity.y * damping);
-      if (System64.Math.abs(this.#velocity.x) < 1 && System64.Math.abs(this.#velocity.y) < 1) {
+      if (System65.Math.abs(this.#velocity.x) < 1 && System65.Math.abs(this.#velocity.y) < 1) {
         this.#velocity = Vector2.zero();
       }
     }
     if (this.#tweenState) {
       const tween = this.#tweenState;
       tween.elapsedSeconds += timeDelta;
-      const linearRatio = System64.Math.min(1, tween.elapsedSeconds / tween.duration);
-      const easedRatio = 1 - System64.Math.pow(1 - linearRatio, 3);
-      this.#zoom = tween.fromZoom * System64.Math.pow(tween.toZoom / tween.fromZoom, easedRatio);
+      const linearRatio = System65.Math.min(1, tween.elapsedSeconds / tween.duration);
+      const easedRatio = 1 - System65.Math.pow(1 - linearRatio, 3);
+      this.#zoom = tween.fromZoom * System65.Math.pow(tween.toZoom / tween.fromZoom, easedRatio);
       this.#position = Vector2.create(
         lerp(tween.fromPosition.x, tween.toPosition.x, easedRatio),
         lerp(tween.fromPosition.y, tween.toPosition.y, easedRatio)
@@ -31822,7 +32936,7 @@ var Camera2D = class extends Object2 {
       toPosition: Vector2.create(targetPosition.x, targetPosition.y),
       fromZoom: this.#zoom,
       toZoom: clamp(targetZoom, this.#minZoom, this.#maxZoom),
-      duration: System64.Math.max(1e-4, duration),
+      duration: System65.Math.max(1e-4, duration),
       elapsedSeconds: 0
     };
   }
@@ -31949,7 +33063,7 @@ var Camera2D = class extends Object2 {
 };
 
 // src/misc/typewriter.js
-var System65 = globalThis;
+var System66 = globalThis;
 var Typewriter = class extends Object2 {
   static {
     __name(this, "Typewriter");
@@ -32026,9 +33140,9 @@ var Typewriter = class extends Object2 {
       return;
     }
     const speed = this.#charactersPerSecond * (this.#isFastForward ? this.#fastForwardMultiplier : 1);
-    const previousWholeCount = System65.Math.floor(this.#revealedCount);
-    this.#revealedCount = System65.Math.min(this.#fullText.length, this.#revealedCount + speed * timeDelta);
-    const currentWholeCount = System65.Math.floor(this.#revealedCount);
+    const previousWholeCount = System66.Math.floor(this.#revealedCount);
+    this.#revealedCount = System66.Math.min(this.#fullText.length, this.#revealedCount + speed * timeDelta);
+    const currentWholeCount = System66.Math.floor(this.#revealedCount);
     if (currentWholeCount !== previousWholeCount) {
       this.#target.setVisibleCharacterCount(currentWholeCount);
       if (this.#characterRevealedEvent) {
@@ -32112,7 +33226,7 @@ var Typewriter = class extends Object2 {
 };
 
 // src/misc/dialogue.js
-var System66 = globalThis;
+var System67 = globalThis;
 var DialogueRunner = class extends Object2 {
   static {
     __name(this, "DialogueRunner");
@@ -32134,7 +33248,7 @@ var DialogueRunner = class extends Object2 {
   constructor() {
     super();
     this.#entryList = [];
-    this.#labelTable = new System66.Map();
+    this.#labelTable = new System67.Map();
     this.#cursor = 0;
     this.#isFinished = true;
   }
@@ -32336,7 +33450,7 @@ var DialogueScriptParser = class extends Object2 {
 };
 
 // src/misc/spriteanimator.js
-var System67 = globalThis;
+var System68 = globalThis;
 var SpriteAnimator = class extends Component {
   static {
     __name(this, "SpriteAnimator");
@@ -32358,7 +33472,7 @@ var SpriteAnimator = class extends Component {
   constructor() {
     super();
     this.setComponentType("SpriteAnimator");
-    this.#clipTable = new System67.Map();
+    this.#clipTable = new System68.Map();
     this.#clipName = null;
     this.#animation = new Animation();
     this.#sprite = null;
@@ -32662,7 +33776,7 @@ var PlatformerBody = class extends Component {
 };
 
 // src/misc/floatingtext.js
-var System68 = globalThis;
+var System69 = globalThis;
 var FloatingText = class extends WorldNode {
   static {
     __name(this, "FloatingText");
@@ -32740,7 +33854,7 @@ var FloatingText = class extends WorldNode {
     for (let index = this.#activeList.length - 1; index >= 0; --index) {
       const item = this.#activeList[index];
       item.elapsedSeconds += timeDelta;
-      const linearRatio = System68.Math.min(1, item.elapsedSeconds / item.duration);
+      const linearRatio = System69.Math.min(1, item.elapsedSeconds / item.duration);
       const easedRatio = 1 - (1 - linearRatio) * (1 - linearRatio);
       item.node.setLocalPosition(Vector2.create(item.startPosition.x, item.startPosition.y - item.rise * easedRatio));
       item.node.setLocalOpacity(1 - linearRatio * linearRatio);
@@ -32773,7 +33887,7 @@ var FloatingText = class extends WorldNode {
 };
 
 // src/misc/beepplayer.js
-var System69 = globalThis;
+var System70 = globalThis;
 var BeepPlayer = class extends Object2 {
   static {
     __name(this, "BeepPlayer");
@@ -32822,16 +33936,16 @@ var BeepPlayer = class extends Object2 {
     }
     const startTime = audioContext.currentTime + delaySeconds;
     const endTime = startTime + durationSeconds;
-    const attackSeconds = System69.Math.min(5e-3, durationSeconds * 0.25);
-    const releaseSeconds = System69.Math.min(0.02, durationSeconds * 0.5);
-    const peakVolume = System69.Math.max(1e-4, this.#volume * volumeScale);
+    const attackSeconds = System70.Math.min(5e-3, durationSeconds * 0.25);
+    const releaseSeconds = System70.Math.min(0.02, durationSeconds * 0.5);
+    const peakVolume = System70.Math.max(1e-4, this.#volume * volumeScale);
     const oscillatorNode = audioContext.createOscillator();
     oscillatorNode.type = waveform;
     oscillatorNode.frequency.setValueAtTime(frequency, startTime);
     const gainNode = audioContext.createGain();
     gainNode.gain.setValueAtTime(1e-4, startTime);
     gainNode.gain.linearRampToValueAtTime(peakVolume, startTime + attackSeconds);
-    gainNode.gain.setValueAtTime(peakVolume, System69.Math.max(startTime + attackSeconds, endTime - releaseSeconds));
+    gainNode.gain.setValueAtTime(peakVolume, System70.Math.max(startTime + attackSeconds, endTime - releaseSeconds));
     gainNode.gain.exponentialRampToValueAtTime(1e-4, endTime);
     oscillatorNode.connect(gainNode);
     gainNode.connect(audioContext.destination);
@@ -32930,7 +34044,7 @@ var BeepPlayer = class extends Object2 {
    * @param { number } volume 0 ~ 1.
    */
   setVolume(volume) {
-    this.#volume = System69.Math.max(0, System69.Math.min(1, volume));
+    this.#volume = System70.Math.max(0, System70.Math.min(1, volume));
   }
   //==============================================================================
   // 기본 음량 반환.
@@ -33058,7 +34172,7 @@ var SoundEffectPool = class extends Object2 {
 };
 
 // src/ui/popupmotion.js
-var System70 = globalThis;
+var System71 = globalThis;
 var PopupMotionState = {
   closed: "closed",
   opening: "opening",
@@ -33176,14 +34290,14 @@ var PopupMotion = class extends Object2 {
       return 0;
     }
     if (this.#state === PopupMotionState.opening) {
-      const ratio2 = System70.Math.min(1, this.#elapsedSeconds / this.#openDuration);
+      const ratio2 = System71.Math.min(1, this.#elapsedSeconds / this.#openDuration);
       const smooth = ratio2 * ratio2 * (3 - 2 * ratio2);
       if (smooth < 0.72) {
         return 0.45 + (1.18 - 0.45) * (smooth / 0.72);
       }
       return 1.18 - (1.18 - 1) * ((smooth - 0.72) / 0.28);
     }
-    const ratio = System70.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
+    const ratio = System71.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
     if (ratio < 0.25) {
       return 1 + (1.08 - 1) * (ratio / 0.25);
     }
@@ -33205,9 +34319,9 @@ var PopupMotion = class extends Object2 {
       return 0;
     }
     if (this.#state === PopupMotionState.opening) {
-      return System70.Math.min(1, this.#elapsedSeconds / this.#openDuration);
+      return System71.Math.min(1, this.#elapsedSeconds / this.#openDuration);
     }
-    return 1 - System70.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
+    return 1 - System71.Math.min(1, this.#elapsedSeconds / this.#closeDuration);
   }
   //==============================================================================
   // 조작 가능 여부. (완전히 열린 뒤에만 참)
@@ -33252,7 +34366,7 @@ var PopupMotion = class extends Object2 {
 };
 
 // src/effect/particlesystem.js
-var System71 = globalThis;
+var System72 = globalThis;
 var ParticleEmitterShape = {
   point: "point",
   circle: "circle",
@@ -33521,7 +34635,7 @@ var ParticleSystem = class extends Component {
       if (this.#attractorPosition) {
         const toCenterX = this.#attractorPosition.x - particle.x;
         const toCenterY = this.#attractorPosition.y - particle.y;
-        const centerDistance = System71.Math.max(System71.Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY), 4);
+        const centerDistance = System72.Math.max(System72.Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY), 4);
         const directionX = toCenterX / centerDistance;
         const directionY = toCenterY / centerDistance;
         particle.velocityX += directionX * this.#attractorStrength * timeDelta;
@@ -33530,7 +34644,7 @@ var ParticleSystem = class extends Component {
         particle.velocityY += directionX * this.#attractorSwirl * timeDelta;
       }
       if (this.#damping > 0) {
-        const dampingBlend = System71.Math.max(0, 1 - this.#damping * timeDelta);
+        const dampingBlend = System72.Math.max(0, 1 - this.#damping * timeDelta);
         particle.velocityX *= dampingBlend;
         particle.velocityY *= dampingBlend;
       }
@@ -33556,19 +34670,19 @@ var ParticleSystem = class extends Component {
     let directionY = -1;
     const shape = this.#emitterShape;
     if (shape === ParticleEmitterShape.circle) {
-      const angle = randomRange(0, System71.Math.PI * 2);
-      const radius = this.#shapeRadius * System71.Math.sqrt(randomRange(0, 1));
-      spawnX = System71.Math.cos(angle) * radius;
-      spawnY = System71.Math.sin(angle) * radius;
-      directionX = System71.Math.cos(angle);
-      directionY = System71.Math.sin(angle);
+      const angle = randomRange(0, System72.Math.PI * 2);
+      const radius = this.#shapeRadius * System72.Math.sqrt(randomRange(0, 1));
+      spawnX = System72.Math.cos(angle) * radius;
+      spawnY = System72.Math.sin(angle) * radius;
+      directionX = System72.Math.cos(angle);
+      directionY = System72.Math.sin(angle);
     } else if (shape === ParticleEmitterShape.cone) {
-      const angle = -System71.Math.PI * 0.5 + randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
+      const angle = -System72.Math.PI * 0.5 + randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
       const radius = randomRange(0, this.#shapeRadius);
-      spawnX = System71.Math.cos(angle) * radius;
-      spawnY = System71.Math.sin(angle) * radius;
-      directionX = System71.Math.cos(angle);
-      directionY = System71.Math.sin(angle);
+      spawnX = System72.Math.cos(angle) * radius;
+      spawnY = System72.Math.sin(angle) * radius;
+      directionX = System72.Math.cos(angle);
+      directionY = System72.Math.sin(angle);
     } else if (shape === ParticleEmitterShape.box) {
       spawnX = randomRange(-this.#boxSize.x * 0.5, this.#boxSize.x * 0.5);
       spawnY = randomRange(-this.#boxSize.y * 0.5, this.#boxSize.y * 0.5);
@@ -33576,9 +34690,9 @@ var ParticleSystem = class extends Component {
       spawnX = randomRange(-this.#edgeWidth * 0.5, this.#edgeWidth * 0.5);
       directionY = 1;
     } else {
-      const angle = randomRange(0, System71.Math.PI * 2);
-      directionX = System71.Math.cos(angle);
-      directionY = System71.Math.sin(angle);
+      const angle = randomRange(0, System72.Math.PI * 2);
+      directionX = System72.Math.cos(angle);
+      directionY = System72.Math.sin(angle);
     }
     if (originOffset) {
       spawnX += originOffset.x;
@@ -33602,7 +34716,7 @@ var ParticleSystem = class extends Component {
     particle.size = randomRange(this.#startSizeMin, this.#startSizeMax);
     particle.rotation = randomRange(this.#startRotationMin, this.#startRotationMax);
     particle.angularVelocity = randomRange(this.#angularVelocityMin, this.#angularVelocityMax);
-    particle.wobblePhase = randomRange(0, System71.Math.PI * 2);
+    particle.wobblePhase = randomRange(0, System72.Math.PI * 2);
     particle.red = this.#startColorA.red + (this.#startColorB.red - this.#startColorA.red) * colorBlend;
     particle.green = this.#startColorA.green + (this.#startColorB.green - this.#startColorA.green) * colorBlend;
     particle.blue = this.#startColorA.blue + (this.#startColorB.blue - this.#startColorA.blue) * colorBlend;
@@ -33635,8 +34749,8 @@ var ParticleSystem = class extends Component {
           break;
         }
       }
-      const keySpan = System71.Math.max(nextKey.time - previousKey.time, 1e-4);
-      const keyBlend = System71.Math.max(0, System71.Math.min(1, (lifeRatio - previousKey.time) / keySpan));
+      const keySpan = System72.Math.max(nextKey.time - previousKey.time, 1e-4);
+      const keyBlend = System72.Math.max(0, System72.Math.min(1, (lifeRatio - previousKey.time) / keySpan));
       red *= previousKey.color.red + (nextKey.color.red - previousKey.color.red) * keyBlend;
       green *= previousKey.color.green + (nextKey.color.green - previousKey.color.green) * keyBlend;
       blue *= previousKey.color.blue + (nextKey.color.blue - previousKey.color.blue) * keyBlend;
@@ -33645,7 +34759,7 @@ var ParticleSystem = class extends Component {
     outChannels[0] = red;
     outChannels[1] = green;
     outChannels[2] = blue;
-    outChannels[3] = System71.Math.max(0, System71.Math.min(1, alpha));
+    outChannels[3] = System72.Math.max(0, System72.Math.min(1, alpha));
   }
   //==============================================================================
   // 출력. (정점 색 배치 — 파티클 수와 무관하게 시스템당 드로우 한 번)
@@ -33710,16 +34824,16 @@ var ParticleSystem = class extends Component {
     for (const particle of this.#particleList) {
       const lifeRatio = particle.age / particle.lifetime;
       const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
-      const drawSize = System71.Math.max(0.1, particle.size * sizeScale);
+      const drawSize = System72.Math.max(0.1, particle.size * sizeScale);
       this.evaluateColorChannels(particle, lifeRatio, colorChannels);
       let drawX = particle.x + baseOffsetX;
       const drawY = particle.y + baseOffsetY;
       if (this.#wobbleAmplitude > 0) {
-        drawX += System71.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
+        drawX += System72.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
       }
       if (isStreak) {
-        const speed = System71.Math.sqrt(particle.velocityX * particle.velocityX + particle.velocityY * particle.velocityY);
-        const safeSpeed = System71.Math.max(speed, 1e-3);
+        const speed = System72.Math.sqrt(particle.velocityX * particle.velocityX + particle.velocityY * particle.velocityY);
+        const safeSpeed = System72.Math.max(speed, 1e-3);
         const directionX = particle.velocityX / safeSpeed;
         const directionY = particle.velocityY / safeSpeed;
         const tailX = drawX - particle.velocityX * this.#streakScale;
@@ -33735,8 +34849,8 @@ var ParticleSystem = class extends Component {
         writeVertex(tailX + sideX, tailY + sideY, 0, 1);
       } else if (isRect && particle.rotation !== 0) {
         const halfSize = drawSize * 0.5;
-        const cosValue = System71.Math.cos(particle.rotation);
-        const sinValue = System71.Math.sin(particle.rotation);
+        const cosValue = System72.Math.cos(particle.rotation);
+        const sinValue = System72.Math.sin(particle.rotation);
         const axisX1 = cosValue * halfSize;
         const axisY1 = sinValue * halfSize;
         const axisX2 = -sinValue * halfSize;
@@ -33773,16 +34887,16 @@ var ParticleSystem = class extends Component {
     for (const particle of this.#particleList) {
       const lifeRatio = particle.age / particle.lifetime;
       const sizeScale = this.#sizeOverLifetimeStart + (this.#sizeOverLifetimeEnd - this.#sizeOverLifetimeStart) * lifeRatio;
-      const drawSize = System71.Math.max(0.1, particle.size * sizeScale);
+      const drawSize = System72.Math.max(0.1, particle.size * sizeScale);
       let drawX = particle.x + baseOffsetX;
       const drawY = particle.y + baseOffsetY;
       if (this.#wobbleAmplitude > 0) {
-        drawX += System71.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
+        drawX += System72.Math.sin(particle.age * this.#wobbleFrequency + particle.wobblePhase) * this.#wobbleAmplitude;
       }
       graphic.pushState();
       graphic.translate(drawX, drawY);
       graphic.rotate(particle.rotation);
-      graphic.multiplyGlobalAlpha(System71.Math.max(0, System71.Math.min(1, particle.alpha * (1 - lifeRatio))));
+      graphic.multiplyGlobalAlpha(System72.Math.max(0, System72.Math.min(1, particle.alpha * (1 - lifeRatio))));
       graphic.drawImage(this.#image, Vector2.create(-drawSize * 0.5, -drawSize * 0.5), Vector2.create(drawSize, drawSize));
       graphic.popState();
     }
@@ -34028,7 +35142,7 @@ var ParticleSystem = class extends Component {
 };
 
 // src/effect/trailrenderer.js
-var System72 = globalThis;
+var System73 = globalThis;
 var TrailRenderer = class extends Component {
   static {
     __name(this, "TrailRenderer");
@@ -34127,10 +35241,10 @@ var TrailRenderer = class extends Component {
       const nextPoint = this.#pointList[pointIndex + 1];
       const ageRatio = point.age / this.#pointLifetime;
       const freshRatio = 1 - ageRatio;
-      const segmentWidth = System72.Math.max(0.1, this.#endWidth + (this.#startWidth - this.#endWidth) * freshRatio);
-      const red = System72.Math.round((this.#endColor.red + (this.#startColor.red - this.#endColor.red) * freshRatio) * 255);
-      const green = System72.Math.round((this.#endColor.green + (this.#startColor.green - this.#endColor.green) * freshRatio) * 255);
-      const blue = System72.Math.round((this.#endColor.blue + (this.#startColor.blue - this.#endColor.blue) * freshRatio) * 255);
+      const segmentWidth = System73.Math.max(0.1, this.#endWidth + (this.#startWidth - this.#endWidth) * freshRatio);
+      const red = System73.Math.round((this.#endColor.red + (this.#startColor.red - this.#endColor.red) * freshRatio) * 255);
+      const green = System73.Math.round((this.#endColor.green + (this.#startColor.green - this.#endColor.green) * freshRatio) * 255);
+      const blue = System73.Math.round((this.#endColor.blue + (this.#startColor.blue - this.#endColor.blue) * freshRatio) * 255);
       const alpha = this.#endColor.alpha + (this.#startColor.alpha - this.#endColor.alpha) * freshRatio;
       graphic.setStrokeColor(`rgba(${red}, ${green}, ${blue}, ${alpha})`);
       graphic.drawLine([
@@ -34187,7 +35301,7 @@ var TrailRenderer = class extends Component {
 };
 
 // src/ui/uilistview.js
-var System73 = globalThis;
+var System74 = globalThis;
 var UIListView = class extends Component {
   static {
     __name(this, "UIListView");
@@ -34243,7 +35357,7 @@ var UIListView = class extends Component {
     this.#reachEndEvent = null;
     this.#reachEndThreshold = 120;
     this.#isReachEndArmed = true;
-    this.#activeItemMap = new System73.Map();
+    this.#activeItemMap = new System74.Map();
     this.#freeItemList = [];
   }
   //==============================================================================
@@ -34281,7 +35395,7 @@ var UIListView = class extends Component {
    */
   setItemCount(itemCount) {
     const previousItemCount = this.#itemCount;
-    this.#itemCount = System73.Math.max(0, itemCount);
+    this.#itemCount = System74.Math.max(0, itemCount);
     if (this.#itemCount > previousItemCount) {
       this.#isReachEndArmed = true;
     }
@@ -34312,10 +35426,10 @@ var UIListView = class extends Component {
     if (pitch <= 0) {
       return;
     }
-    let firstIndex = System73.Math.floor(scrolled / pitch) - this.#bufferItemCount;
-    let lastIndex = System73.Math.ceil((scrolled + viewLength) / pitch) + this.#bufferItemCount - 1;
-    firstIndex = System73.Math.max(0, firstIndex);
-    lastIndex = System73.Math.min(this.#itemCount - 1, lastIndex);
+    let firstIndex = System74.Math.floor(scrolled / pitch) - this.#bufferItemCount;
+    let lastIndex = System74.Math.ceil((scrolled + viewLength) / pitch) + this.#bufferItemCount - 1;
+    firstIndex = System74.Math.max(0, firstIndex);
+    lastIndex = System74.Math.min(this.#itemCount - 1, lastIndex);
     for (const [itemIndex, itemNode] of [...this.#activeItemMap]) {
       if (itemIndex < firstIndex || itemIndex > lastIndex) {
         itemNode.setActive(false);
@@ -34457,7 +35571,7 @@ var UIListView = class extends Component {
   }
   /** @param { number } bufferItemCount 화면 밖 여유 항목 수. */
   setBufferItemCount(bufferItemCount) {
-    this.#bufferItemCount = System73.Math.max(0, bufferItemCount);
+    this.#bufferItemCount = System74.Math.max(0, bufferItemCount);
   }
   //==============================================================================
   // 조회 메서드 목록.
@@ -34481,7 +35595,7 @@ var UIListView = class extends Component {
 };
 
 // src/ui/uichart.js
-var System74 = globalThis;
+var System75 = globalThis;
 var UILineChart = class extends Component {
   static {
     __name(this, "UILineChart");
@@ -34564,8 +35678,8 @@ var UILineChart = class extends Component {
       let autoLow = this.#valueList[0];
       let autoHigh = this.#valueList[0];
       for (const value of this.#valueList) {
-        autoLow = System74.Math.min(autoLow, value);
-        autoHigh = System74.Math.max(autoHigh, value);
+        autoLow = System75.Math.min(autoLow, value);
+        autoHigh = System75.Math.max(autoHigh, value);
       }
       if (lowValue === null) {
         lowValue = autoLow;
@@ -34574,7 +35688,7 @@ var UILineChart = class extends Component {
         highValue = autoHigh;
       }
     }
-    const valueRange = System74.Math.max(highValue - lowValue, 1e-4);
+    const valueRange = System75.Math.max(highValue - lowValue, 1e-4);
     const points = [];
     for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
       const ratio = sampleIndex / (this.#maxSampleCount - 1);
@@ -34589,7 +35703,7 @@ var UILineChart = class extends Component {
   //==============================================================================
   /** @param { number } maxSampleCount */
   setMaxSampleCount(maxSampleCount) {
-    this.#maxSampleCount = System74.Math.max(2, maxSampleCount);
+    this.#maxSampleCount = System75.Math.max(2, maxSampleCount);
   }
   /** @returns { number } */
   getMaxSampleCount() {
@@ -34678,13 +35792,13 @@ var UIBarChart = class extends Component {
     if (highValue === null) {
       highValue = 1e-4;
       for (const value of this.#valueList) {
-        highValue = System74.Math.max(highValue, value);
+        highValue = System75.Math.max(highValue, value);
       }
     }
     const barWidth = (width - this.#barGap * (barCount - 1)) / barCount;
     for (let barIndex = 0; barIndex < barCount; ++barIndex) {
-      const valueRatio = System74.Math.max(0, System74.Math.min(1, this.#valueList[barIndex] / highValue));
-      const barHeight = System74.Math.max(1, valueRatio * height);
+      const valueRatio = System75.Math.max(0, System75.Math.min(1, this.#valueList[barIndex] / highValue));
+      const barHeight = System75.Math.max(1, valueRatio * height);
       const barX = barIndex * (barWidth + this.#barGap);
       const barColor = barIndex === this.#highlightIndex ? this.#highlightColor : this.#barColor;
       graphic.setFillColor(barColor.toRGBAString());
@@ -34725,7 +35839,7 @@ var UIBarChart = class extends Component {
 };
 
 // src/ui/uidropdown.js
-var System75 = globalThis;
+var System76 = globalThis;
 var UIDropdown = class extends WorldNode {
   static {
     __name(this, "UIDropdown");
@@ -34823,7 +35937,7 @@ var UIDropdown = class extends WorldNode {
    */
   setOptionList(optionList) {
     this.#optionList = optionList.slice();
-    this.#selectedIndex = System75.Math.min(this.#selectedIndex, System75.Math.max(0, this.#optionList.length - 1));
+    this.#selectedIndex = System76.Math.min(this.#selectedIndex, System76.Math.max(0, this.#optionList.length - 1));
     const childList = this.#popupNode.getChildren().slice();
     for (const childNode of childList) {
       this.#popupNode.removeChild(childNode);
@@ -34978,7 +36092,7 @@ var UIDropdown = class extends WorldNode {
   }
   /** @param { number } selectedIndex */
   setSelectedIndex(selectedIndex) {
-    this.#selectedIndex = System75.Math.max(0, System75.Math.min(selectedIndex, this.#optionList.length - 1));
+    this.#selectedIndex = System76.Math.max(0, System76.Math.min(selectedIndex, this.#optionList.length - 1));
     this.refreshHeader();
     this.refreshHighlight();
   }
@@ -34998,7 +36112,7 @@ var UIDropdown = class extends WorldNode {
 };
 
 // src/ui/uicontextmenu.js
-var System76 = globalThis;
+var System77 = globalThis;
 var UIContextMenu = class extends WorldNode {
   static {
     __name(this, "UIContextMenu");
@@ -35116,8 +36230,8 @@ var UIContextMenu = class extends WorldNode {
     }
     this.setContentSize(Vector2.create(areaWidth, areaHeight));
     this.#overlayNode.setContentSize(Vector2.create(areaWidth, areaHeight));
-    const menuX = System76.Math.min(position.x, areaWidth - this.#menuWidth - 4);
-    const menuY = System76.Math.min(position.y, areaHeight - panelHeight - 4);
+    const menuX = System77.Math.min(position.x, areaWidth - this.#menuWidth - 4);
+    const menuY = System77.Math.min(position.y, areaHeight - panelHeight - 4);
     this.#panelNode.setLocalPosition(Vector2.create(menuX, menuY));
     this.setActive(true);
   }
@@ -35139,7 +36253,7 @@ var UIContextMenu = class extends WorldNode {
 };
 
 // src/ui/uidraggable.js
-var System77 = globalThis;
+var System78 = globalThis;
 var UIDraggable = class extends UIControl {
   static {
     __name(this, "UIDraggable");
@@ -35284,7 +36398,7 @@ var UIDraggable = class extends UIControl {
     }
     const node = this.getNode();
     const localPosition = node.getLocalPosition();
-    const blend = System77.Math.min(this.#snapBackSpeed * timeDelta, 1);
+    const blend = System78.Math.min(this.#snapBackSpeed * timeDelta, 1);
     const nextX = localPosition.x + (this.#homePosition.x - localPosition.x) * blend;
     const nextY = localPosition.y + (this.#homePosition.y - localPosition.y) * blend;
     node.setLocalPosition(Vector2.create(nextX, nextY));
@@ -35348,7 +36462,7 @@ var UIDraggable = class extends UIControl {
 };
 
 // src/ui/uispinner.js
-var System78 = globalThis;
+var System79 = globalThis;
 var UISpinner = class extends WorldNode {
   static {
     __name(this, "UISpinner");
@@ -35389,15 +36503,15 @@ var UISpinner = class extends WorldNode {
     this.setContentSize(Vector2.create((radius + dotRadius) * 2, (radius + dotRadius) * 2));
     const center = radius + dotRadius;
     for (let dotIndex = 0; dotIndex < this.#dotCount; ++dotIndex) {
-      const angle = dotIndex / this.#dotCount * System78.Math.PI * 2;
+      const angle = dotIndex / this.#dotCount * System79.Math.PI * 2;
       const dotNode = new WorldNode();
       dotNode.setName("SpinnerDot" + dotIndex);
       dotNode.setPivot(Pivot.middleCenter.clone());
       dotNode.setAnchor(Pivot.topLeft.clone());
       dotNode.setContentSize(Vector2.create(dotRadius * 2, dotRadius * 2));
       dotNode.setLocalPosition(Vector2.create(
-        center + System78.Math.cos(angle) * radius,
-        center + System78.Math.sin(angle) * radius
+        center + System79.Math.cos(angle) * radius,
+        center + System79.Math.sin(angle) * radius
       ));
       const paint = dotNode.addComponent(Paint);
       paint.setColor(this.#dotColor.clone());
@@ -35453,7 +36567,7 @@ var UISpinner = class extends WorldNode {
 };
 
 // src/ui/uitoast.js
-var System79 = globalThis;
+var System80 = globalThis;
 var UIToast = class extends WorldNode {
   static {
     __name(this, "UIToast");
@@ -35556,7 +36670,7 @@ var UIToast = class extends WorldNode {
     }
     this.#phaseSeconds += timeDelta;
     if (this.#phase === "enter") {
-      const ratio = System79.Math.min(1, this.#phaseSeconds / 0.24);
+      const ratio = System80.Math.min(1, this.#phaseSeconds / 0.24);
       const eased = 1 - (1 - ratio) * (1 - ratio);
       this.setLocalOpacity(eased);
       this.updatePosition(eased);
@@ -35570,7 +36684,7 @@ var UIToast = class extends WorldNode {
         this.#phaseSeconds = 0;
       }
     } else if (this.#phase === "exit") {
-      const ratio = System79.Math.min(1, this.#phaseSeconds / 0.2);
+      const ratio = System80.Math.min(1, this.#phaseSeconds / 0.2);
       this.setLocalOpacity(1 - ratio);
       this.updatePosition(1 + ratio * 0.4);
       if (ratio >= 1) {
@@ -35895,9 +37009,10 @@ var UIDialog = class extends WorldNode {
 };
 
 // import.js
-var System80 = globalThis;
+var System81 = globalThis;
 export {
   Action,
+  AmbientOcclusionEffect,
   Animation,
   AnimationClip,
   AnimationState,
@@ -35982,6 +37097,17 @@ export {
   RenderTarget,
   RepeatTimer,
   RichText,
+  SKIN_SHADING_EYE,
+  SKIN_SHADING_FLUID,
+  SKIN_SHADING_HAIR,
+  SKIN_SHADING_OCCLUSION,
+  SKIN_SHADING_SKIN,
+  SKIN_TEXTURE_UNIT_AUXILIARY,
+  SKIN_TEXTURE_UNIT_DETAILHEIGHT,
+  SKIN_TEXTURE_UNIT_LAYERCOLOR,
+  SKIN_TEXTURE_UNIT_LAYERNORMAL,
+  SKIN_TEXTURE_UNIT_MASKATLAS,
+  SKIN_TEXTURE_UNIT_MICRO,
   Scene,
   SceneManager,
   ScrollBarAxis,
@@ -35999,7 +37125,7 @@ export {
   Stack,
   Steering2D,
   SubsurfaceScatteringEffect,
-  System80 as System,
+  System81 as System,
   Text,
   TextAlign,
   TextAsset,

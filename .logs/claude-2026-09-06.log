@@ -11,3 +11,11 @@
 - 검증: 임시 하네스(preserveDrawingBuffer + ?expression / zoom 파라미터, toDataURL → devserver POST)로 헤드리스 크롬 1개씩 순차 캡처(중립 / happy / angry / 줌) — 턱수염이 턱, 눈썹이 이마를 따라가고 피부 주름 / 흰머리 확인. 캡처 직후 크롬 / 데브서버 종료, 하네스 파일 삭제, 잔존 프로세스 0.
 - 배포: NAS portfolio/oldface (index.html, vanilla.js, assets 14 파일). 문서: UPDATE.md 0.5.5-experimental, tools/metahuman/README.md 전면 개정.
 - 함정: Git Bash 가 환경 변수의 "/Game/..." 을 "C:/Program Files/Git/Game/..." 으로 바꿔 애셋 레지스트리 조회가 0 건이 됨 → MSYS_NO_PATHCONV=1 / MSYS2_ENV_CONV_EXCL="*". 새 프로세스에서 Export 폴더를 보려면 scan_paths_synchronous 필요. UGroomBindingAsset 은 get_editor_property("source_skeletal_mesh") 로 읽음. MetaHumanCollection.items 는 보호 프로퍼티라 get_slot_names / get_item_keys_for_slot / get_item_display_name 으로 조회.
+
+## OLD FACE 렌더링을 언리얼 메타휴먼 룩으로 상향 (0.5.6-experimental)
+[00:25 요청 → 02:10 응답(09-07)]
+- 요청: "이상하게 고품질 같지 않다" → 원인 분석 후 "전체적으로 다 언리얼 따라가게 조정해, 언리얼보다도 높일 수 있다면 높여, 느려 보이지만 않으면 됨".
+- 엔진: HumanSkinRenderer 를 셰이딩 모드 통합 셰이더로 재작성(피부 / 눈 / 머리카락 / 차폐 / 유체, 불투명 + 블렌드 2 패스, 컷아웃 깊이 셰이더로 머리카락 그림자, MRT 4 출력에 월드 노멀). 피부: 주름 맵 3종(마스크 아틀라스 채널 x RigLogic 애니메이티드 맵 가중치) + 마이크로 노멀 / 캐비티 + 회전 포아송 PCF. 눈: 각막 굴절 시차 홍채 + 홍채 노멀 + 림버스 / 동공 + 각막 하이라이트 + 눈꺼풀 차폐 셸. 머리카락: 탄젠트 아틀라스 Kajiya-Kay 이중 로브 + 뿌리 차폐 + 투과 + 프린지 블렌드. AmbientOcclusionEffect 신규(SSAO + 깊이 인식 블러). 샘플: 1.5x 슈퍼샘플링, 배경을 씬 MRT 에 직접, 4K 섀도우 맵, 옵션 토글 2종.
+- 애셋: C++ 덤프에 애니메이티드 맵(82 채널) 출력 추가, 룩데브 텍스처(주름 마스크 10장 / 마이크로 노멀 / 눈 / 치아) PNG, 눈 차폐 / 눈물선 / 침 메시 포함 glb, 주름 아틀라스 / 마스크 아틀라스 / 눈 / 탄젠트 텍스처 합성(compose_lookdev_textures.py), wrinkles.json(make_wrinkles_json.py).
+- 함정: 마스터 머티리얼 T3D 에는 그래프 파라미터가 없어 마스크 채널 → 영역 매핑을 마스크 UV 무게중심으로 추정(wrinkle_mapping.json). CM 맵은 중간 회색 오버레이(그대로 섞으면 얼굴에 회청색 얼룩), WM 맵은 xy 델타. 아틀라스 타일은 glTF v=0 이 이미지 첫 행이라 위에서부터 채워야 함. 프린지 블렌드는 알베도 버퍼를 흰색으로 당기면 안 되고(흰 얼룩) 조도 감쇠 + 스펙큘러 버퍼에 색을 얹는 방식이어야 함. 배경을 알베도 알파로 섞으면 프린지가 검게 나와 배경을 씬 패스에서 직접 그림. desired_texture_sources_resolutions 8K 요청 후에도 머티리얼 내보내기 텍스처는 2K. DCC 패키지 내보내기는 8K 텍스처 컴파일(4.6GB)에서 시스템 메모리 부족으로 강제 종료돼 포기 — 피부는 2K + 마이크로 노멀로 유지. T_EyeMidPlaneDisplacement 내보내기는 UE 크래시.
+- 검증: 하네스에 오류 보고(window error / unhandledrejection / console.error → /__report) 추가. 중립 / happy / angry / grin / 눈 근접 캡처로 주름·눈·머리카락 확인. 크롬 / 서버 종료, 잔존 0.

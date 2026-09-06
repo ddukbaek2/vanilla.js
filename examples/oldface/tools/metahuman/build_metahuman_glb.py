@@ -14,7 +14,7 @@ data = np.load(npz_path)
 meta = json.loads(str(data["meta"]))
 pose_names = meta["pose_names"]
 mesh_names = meta["mesh_names"]
-SKIP = {"saliva", "eyeshell", "eyeEdge", "cartilage"}
+SKIP = {"cartilage"}
 # 메시별 셰이프키 최소 이동 (m). 머리카락은 두피의 미세한 움직임까지 셰이프키로 남기면 용량만 커지므로 4mm 미만은 버린다.
 SNAP_THRESHOLD = {"hair": 0.004}
 

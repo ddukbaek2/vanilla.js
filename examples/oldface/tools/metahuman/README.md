@@ -25,7 +25,11 @@
 10. `python compose_metahuman_textures.py <CharacterTextures> <Textures> <assets>` — 피부 알베도 / 노멀(UE DirectX Y- → glTF Y+ 로 G 반전) / 캐비티 → 러프니스(ORM G)와 디테일 높이, 눈 / 치아 / 속눈썹(Sparse)
 11. `python compose_hair_textures.py <Grooms> <assets>` — 카드 커버리지를 알파로, 깊이 / 가닥 좌표로 음영을 준 RGBA (hair / beard / mustache / eyebrows)
 12. `assets/expressions.json` 은 ARKit 셰이프 이름(MouthSmileLeft 등) 가중치 프리셋
+13. 룩데브 텍스처 (언리얼 룩 재현)
+   - `UE -ExecutePythonScript=ue/ue_upgrade_assets.py` — 주름 마스크(T_head_wm*_msk_*) / 마이크로 노멀 / 눈(공막 노멀, 홍채 노멀) / 치아 텍스처 PNG, 마스터 머티리얼 T3D, 캐릭터 텍스처 소스 8K 재요청(내보내기 애셋은 2K 로 남는다 — 고해상도는 `ue/ue_export_dcc.py` 의 DCC 패키지에서 얻는다)
+   - `python compose_lookdev_textures.py <Lookdev> <Textures> <CM/WM 텍스처> <Grooms> <assets>` — 마이크로 노멀 + 캐비티(skin_micro.png), 주름 마스크 아틀라스(wrinkle_masks.png, 4x4 타일), 주름 노멀 / 색 아틀라스(wrinkle_normal.jpg / wrinkle_color.jpg, 2x2 타일), 공막 / 홍채 색 / 노멀, 눈꺼풀 차폐 알파(eye_occlusion.png), 치아 노멀, 카드 탄젠트 아틀라스
+   - `python make_wrinkles_json.py <Dump> wrinkle_mapping.json <assets/wrinkles.json>` — 마스크 채널 → 영역 / 주름 맵 기여, ARKit 셰이프 → 영역 값(C++ 덤프의 RigLogic 애니메이티드 맵 출력). 채널 매핑은 마스크 텍스처의 UV 무게중심으로 추정한 것(wrinkle_mapping.json)
 
 참고
 - `riglogic_eval.py` 는 DNA 2.1 파일(에픽 MetaHuman-DNA-Calibration 동봉 Taro 등)을 Python 바인딩(dnacalib)으로 평가하던 이전 경로. UE 5.8 이 내보내는 DNA 2.5 는 읽지 못하므로 4 ~ 6 의 C++ 덤프 경로를 쓴다.
-- 얼굴 텍스처 애셋은 2048 해상도로 내보내진다.
+- 머티리얼 내보내기의 얼굴 텍스처 애셋은 desired_texture_sources_resolutions 를 8K 로 올려도 2048 로 만들어진다. 주름 색 맵(CM1~3)은 중간 회색 기준 오버레이, 주름 노멀 맵(WM1~3)은 xy 델타(파랑 채널 없음)다.

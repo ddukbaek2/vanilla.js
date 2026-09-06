@@ -9,10 +9,10 @@ grooms = sys.argv[1].rstrip("/\\") + "/"
 assets = sys.argv[2].rstrip("/\\") + "/"
 PARTS = [
     # (출력 이름, 아틀라스 이름, 기본색 sRGB, 출력 크기, 커버리지 배율)
-    ("hair.png", "Hair_S_BobLayered_Hair_S_BobLayered_CardsAtlas_Attribute", (168, 162, 154), 2048, 1.3),
-    ("beard.png", "Goatee_L_Wavy_Goatee_L_Wavy_CardsAtlas_Attribute", (172, 166, 158), 2048, 1.9),
-    ("eyebrows.png", "Eyebrows_M_Messy_Eyebrows_M_Messy_CardsAtlas_Attribute", (118, 108, 98), 1024, 1.6),
-    ("mustache.png", "Mustache_L_Wavy_Mustache_L_Wavy_CardsAtlas_Attribute", (172, 166, 158), 2048, 2.2),
+    ("hair.png", "Hair_S_BobLayered_Hair_S_BobLayered_CardsAtlas_Attribute", (164, 159, 152), 2048, 1.2),
+    ("beard.png", "Goatee_L_Wavy_Goatee_L_Wavy_CardsAtlas_Attribute", (158, 153, 146), 2048, 1.5),
+    ("eyebrows.png", "Eyebrows_M_Messy_Eyebrows_M_Messy_CardsAtlas_Attribute", (110, 102, 94), 1024, 1.4),
+    ("mustache.png", "Mustache_L_Wavy_Mustache_L_Wavy_CardsAtlas_Attribute", (158, 153, 146), 2048, 1.6),
 ]
 for output_name, atlas_name, color, size, coverage_scale in PARTS:
     atlas = np.asarray(Image.open(grooms + atlas_name + ".png").convert("RGBA")).astype(np.float32) / 255.0

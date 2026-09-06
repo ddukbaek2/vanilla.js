@@ -251,7 +251,7 @@
 	<div id="expressionPanel"></div>
 	<div id="footerNote">
 		DRAG TO ORBIT, WHEEL OR PINCH TO ZOOM, MOVE THE POINTER TO TURN THE HEAD<br>
-		CHARACTER: <a href="https://www.metahuman.com/" target="_blank" rel="noopener">EPIC METAHUMAN (WALTER PRESET, RIGLOGIC BAKED TO ARKIT SHAPES, GROOM CARDS)</a>, EXPRESSIONS: ARKIT BLENDSHAPE PRESETS
+		CHARACTER: <a href="https://www.metahuman.com/" target="_blank" rel="noopener">EPIC METAHUMAN (WALTER PRESET, EXPRESSION WRINKLE MAPS, RIGLOGIC BAKED TO ARKIT SHAPES, GROOM CARDS)</a>, EXPRESSIONS: ARKIT BLENDSHAPE PRESETS
 	</div>
 	<a id="homeLink" href="https://ddukbaek2.com" target="_blank" rel="noopener">DDUKBAEK2.COM</a>
 	<div id="loadingOverlay">LOADING</div>
@@ -287,6 +287,17 @@
 	const SkinnedModel = engineModule.SkinnedModel;
 	const HumanSkinRenderer = engineModule.HumanSkinRenderer;
 	const SubsurfaceScatteringEffect = engineModule.SubsurfaceScatteringEffect;
+	const AmbientOcclusionEffect = engineModule.AmbientOcclusionEffect;
+	const SKIN_SHADING_SKIN = engineModule.SKIN_SHADING_SKIN;
+	const SKIN_SHADING_EYE = engineModule.SKIN_SHADING_EYE;
+	const SKIN_SHADING_HAIR = engineModule.SKIN_SHADING_HAIR;
+	const SKIN_SHADING_OCCLUSION = engineModule.SKIN_SHADING_OCCLUSION;
+	const SKIN_SHADING_FLUID = engineModule.SKIN_SHADING_FLUID;
+	const SKIN_TEXTURE_UNIT_DETAILHEIGHT = engineModule.SKIN_TEXTURE_UNIT_DETAILHEIGHT;
+	const SKIN_TEXTURE_UNIT_MICRO = engineModule.SKIN_TEXTURE_UNIT_MICRO;
+	const SKIN_TEXTURE_UNIT_MASKATLAS = engineModule.SKIN_TEXTURE_UNIT_MASKATLAS;
+	const SKIN_TEXTURE_UNIT_LAYERNORMAL = engineModule.SKIN_TEXTURE_UNIT_LAYERNORMAL;
+	const SKIN_TEXTURE_UNIT_LAYERCOLOR = engineModule.SKIN_TEXTURE_UNIT_LAYERCOLOR;
 	const Material = engineModule.Material;
 	const ShadowMap = engineModule.ShadowMap;
 
@@ -298,7 +309,9 @@
 	const CAMERA_FAR_DISTANCE = 20;
 	const CAMERA_MINIMUM_DISTANCE = 0.42;
 	const CAMERA_MAXIMUM_DISTANCE = 1.9;
-	const SHADOWMAP_RESOLUTION = 2048;
+	const SHADOWMAP_RESOLUTION = 4096;
+	// 슈퍼샘플링 배율. (내부 렌더 해상도 = 캔버스 x 배율 — 최종 FXAA 패스에서 축소)
+	const RENDER_SCALE = 1.5;
 	const DETAIL_TEXTURE_SIZE = 4096;
 	const KEY_LIGHT_DIRECTION = Vector3.create(0.5, 0.62, 0.62).normalize();
 	const FILL_LIGHT_DIRECTION = Vector3.create(-0.75, 0.1, 0.6).normalize();
@@ -322,16 +335,22 @@
 	];
 
 	// 부위별 머티리얼 정의. (glb 머티리얼 이름 부분 일치 → 텍스처 / 팩터 / 산란 마스크)
+	// - shading: 피부 / 눈 / 머리카락 / 차폐 / 유체, extra: 추가 텍스처 슬롯(유닛 → 파일), useDetail: 높이 디테일 + 마이크로 + 주름 아틀라스(피부 전용)
 	const PART_MATERIAL_DEFINITIONS = [
-		{ keyword: "eyeball", albedo: "eye_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.14, subsurfaceFactor: 0.0 },
-		{ keyword: "eyelashes", albedo: "eyelash.png", normal: null, roughness: null, opacity: "eyelash.png", baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0 },
-		{ keyword: "head", albedo: "head_albedo.jpg", normal: "head_normal.jpg", roughness: "head_roughness.jpg", opacity: null, baseColorFactor: null, useDetail: true, roughnessFactor: 0.85, subsurfaceFactor: 1.0 },
-		{ keyword: "teeth", albedo: "teeth_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.45, subsurfaceFactor: 0.25 },
-		{ keyword: "hair", albedo: "hair.png", normal: null, roughness: null, opacity: "hair.png", baseColorFactor: null, useDetail: false, roughnessFactor: 0.75, subsurfaceFactor: 0.0 },
-		{ keyword: "beard", albedo: "beard.png", normal: null, roughness: null, opacity: "beard.png", baseColorFactor: null, useDetail: false, roughnessFactor: 0.75, subsurfaceFactor: 0.0 },
-		{ keyword: "mustache", albedo: "mustache.png", normal: null, roughness: null, opacity: "mustache.png", baseColorFactor: null, useDetail: false, roughnessFactor: 0.75, subsurfaceFactor: 0.0 },
-		{ keyword: "eyebrows", albedo: "eyebrows.png", normal: null, roughness: null, opacity: "eyebrows.png", baseColorFactor: null, useDetail: false, roughnessFactor: 0.8, subsurfaceFactor: 0.0 },
+		{ keyword: "eyeshell", shading: "occlusion", albedo: "eye_occlusion.png", normal: null, roughness: null, opacity: null, baseColorFactor: [0.75, 1, 1], useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: {} },
+		{ keyword: "eyeEdge", shading: "fluid", albedo: "eye_occlusion.png", normal: null, roughness: null, opacity: null, baseColorFactor: [0.9, 1, 1], useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: {} },
+		{ keyword: "saliva", shading: "fluid", albedo: "eye_occlusion.png", normal: null, roughness: null, opacity: null, baseColorFactor: [0.7, 1, 1], useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: {} },
+		{ keyword: "eyeball", shading: "eye", albedo: "eye_sclera.jpg", normal: "eye_sclera_normal.jpg", roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: { layerColor: "eye_iris.png", layerNormal: "eye_iris_normal.png" } },
+		{ keyword: "eyelashes", shading: "skin", albedo: "eyelash.png", normal: null, roughness: null, opacity: "eyelash.png", baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: {} },
+		{ keyword: "head", shading: "skin", albedo: "head_albedo.jpg", normal: "head_normal.jpg", roughness: "head_roughness.jpg", opacity: null, baseColorFactor: null, useDetail: true, roughnessFactor: 0.85, subsurfaceFactor: 1.0, extra: { micro: "skin_micro.png", maskAtlas: "wrinkle_masks.png", layerNormal: "wrinkle_normal.jpg", layerColor: "wrinkle_color.jpg" } },
+		{ keyword: "teeth", shading: "skin", albedo: "teeth_albedo.jpg", normal: "teeth_normal.jpg", roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.4, subsurfaceFactor: 0.25, extra: {} },
+		{ keyword: "hair", shading: "hair", albedo: "hair.png", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: { layerNormal: "hair_tangent.png" } },
+		{ keyword: "beard", shading: "hair", albedo: "beard.png", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: { layerNormal: "beard_tangent.png" } },
+		{ keyword: "mustache", shading: "hair", albedo: "mustache.png", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: { layerNormal: "mustache_tangent.png" } },
+		{ keyword: "eyebrows", shading: "hair", albedo: "eyebrows.png", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: { layerNormal: "eyebrows_tangent.png" } },
 	];
+	const SHADING_MODE_BY_NAME = { skin: SKIN_SHADING_SKIN, eye: SKIN_SHADING_EYE, hair: SKIN_SHADING_HAIR, occlusion: SKIN_SHADING_OCCLUSION, fluid: SKIN_SHADING_FLUID };
+	const EXTRA_TEXTURE_UNITS = { micro: SKIN_TEXTURE_UNIT_MICRO, maskAtlas: SKIN_TEXTURE_UNIT_MASKATLAS, layerNormal: SKIN_TEXTURE_UNIT_LAYERNORMAL, layerColor: SKIN_TEXTURE_UNIT_LAYERCOLOR };
 
 	//==============================================================================
 	// 셰이더 소스 목록.
@@ -343,22 +362,40 @@
 	uniform sampler2D irradianceTexture;
 	uniform sampler2D albedoTexture;
 	uniform sampler2D specularTexture;
+	uniform sampler2D occlusionTexture;
 	uniform float aspectRatio;
+	uniform float occlusionStrength;
 	out vec4 outputColor;
 
 	void main() {
 		vec4 irradiance = texture(irradianceTexture, fragmentTextureCoordinate);
 		vec4 albedo = texture(albedoTexture, fragmentTextureCoordinate);
 		vec3 specular = texture(specularTexture, fragmentTextureCoordinate).rgb;
-		vec3 surfaceColor = irradiance.rgb * albedo.rgb + specular;
+		float visibility = mix(1.0, texture(occlusionTexture, fragmentTextureCoordinate).r, occlusionStrength);
+		vec3 color = irradiance.rgb * albedo.rgb * visibility + specular * mix(1.0, visibility, 0.6);
+		outputColor = vec4(color, 1.0);
+	}
+	`;
 
-		// 배경. (어두운 스튜디오 — 두상 뒤가 은은하게 밝은 방사형 그라디언트)
+	// 배경. (씬 MRT 에 직접 — 어두운 스튜디오, 두상 뒤가 은은하게 밝은 방사형 그라디언트. 조도 = 배경색, 알베도 1, 산란 / 노멀 없음)
+	const BACKGROUND_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec2 fragmentTextureCoordinate;
+	uniform float aspectRatio;
+	layout(location = 0) out vec4 irradianceOutput;
+	layout(location = 1) out vec4 albedoOutput;
+	layout(location = 2) out vec4 specularOutput;
+	layout(location = 3) out vec4 normalOutput;
+
+	void main() {
 		vec2 centered = (fragmentTextureCoordinate - vec2(0.5, 0.56)) * vec2(aspectRatio, 1.0);
 		float radial = dot(centered, centered);
 		vec3 backgroundColor = vec3(0.012, 0.012, 0.015) + vec3(0.075, 0.068, 0.07) * exp(-radial * 3.2);
 		backgroundColor += vec3(0.02, 0.016, 0.012) * smoothstep(0.2, -0.6, fragmentTextureCoordinate.y - 0.5);
-		vec3 color = mix(backgroundColor, surfaceColor, albedo.a);
-		outputColor = vec4(color, 1.0);
+		irradianceOutput = vec4(backgroundColor, 0.0);
+		albedoOutput = vec4(1.0, 1.0, 1.0, 1.0);
+		specularOutput = vec4(0.0, 0.0, 0.0, 1.0);
+		normalOutput = vec4(0.0, 0.0, 0.0, 0.0);
 	}
 	`;
 
@@ -493,12 +530,14 @@
 	const uiGraphic = new Graphic(canvas);
 	const skinRenderer = new HumanSkinRenderer(webGL2RenderingContext);
 	const subsurfaceEffect = new SubsurfaceScatteringEffect(webGL2RenderingContext);
+	const ambientOcclusionEffect = new AmbientOcclusionEffect(webGL2RenderingContext);
 	const bloomEffect = new BloomEffect(webGL2RenderingContext);
 	const shadowMap = new ShadowMap(webGL2RenderingContext, SHADOWMAP_RESOLUTION);
-	const sceneRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, true, { colorAttachmentCount: 3, useFloatColor: true, useDepthTexture: true });
+	const sceneRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, true, { colorAttachmentCount: 4, useFloatColor: true, useDepthTexture: true });
 	const hdrRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, false, { useFloatColor: true });
 	const ldrRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, false);
 	const combinePass = new FullscreenPass(webGL2RenderingContext, COMBINE_FRAGMENTSHADER_SOURCE);
+	const backgroundPass = new FullscreenPass(webGL2RenderingContext, BACKGROUND_FRAGMENTSHADER_SOURCE);
 	const compositePass = new FullscreenPass(webGL2RenderingContext, COMPOSITE_FRAGMENTSHADER_SOURCE);
 	const antialiasPass = new FullscreenPass(webGL2RenderingContext, FXAA_FRAGMENTSHADER_SOURCE);
 	const previewPass = new FullscreenPass(webGL2RenderingContext, PREVIEW_FRAGMENTSHADER_SOURCE);
@@ -513,7 +552,13 @@
 	skinRenderer.setSpecularStrength(0.65);
 	skinRenderer.setRoughnessRange(1.0, 1.0);
 	skinRenderer.setDetailTexelSize(1 / DETAIL_TEXTURE_SIZE);
+	skinRenderer.setShadowSoftness(3.0);
+	skinRenderer.setMicroDetail(38, 0.55);
+	skinRenderer.setWrinkleMaps(true, 1.0, 0.9);
+	skinRenderer.setEyeParameters(0.14, 0.042, 0.05);
+	skinRenderer.setHairParameters([-0.1, 0.16], [160, 24], [0.12, 0.26, 0.2], 0.55);
 	subsurfaceEffect.setScatterWidth(0.008);
+	ambientOcclusionEffect.setParameters(0.028, 1.15, 0.0015);
 	bloomEffect.setThreshold(1.05, 1.9);
 	bloomEffect.setIterationCount(3);
 
@@ -525,7 +570,9 @@
 		{ name: "detail", label: "4K PORE DETAIL" },
 		{ name: "shadow", label: "KEY LIGHT SHADOW" },
 		{ name: "bloom", label: "BLOOM" },
-		{ name: "antialias", label: "FXAA" },
+		{ name: "antialias", label: "FXAA (1.5X SUPERSAMPLED)" },
+		{ name: "occlusion", label: "AMBIENT OCCLUSION" },
+		{ name: "wrinkle", label: "EXPRESSION WRINKLE MAPS" },
 		{ name: "wireframe", label: "WIREFRAME" },
 		{ name: "materialGraph", label: "MATERIAL GRAPH" },
 	];
@@ -535,6 +582,8 @@
 		shadow: true,
 		bloom: true,
 		antialias: true,
+		occlusion: true,
+		wrinkle: true,
 		wireframe: false,
 		materialGraph: false,
 	};
@@ -613,8 +662,14 @@
 			if (!detailHeightTexture) {
 				detailHeightTexture = await material.createTexture(detailDescription, [128, 128, 128, 255]);
 			}
-			material.setTexture("detailHeightTexture", 9, detailHeightTexture);
+			material.setTexture("detailHeightTexture", SKIN_TEXTURE_UNIT_DETAILHEIGHT, detailHeightTexture);
 		}
+		for (const slotName in definition.extra) {
+			const extraDescription = await loadAssetImage(definition.extra[slotName]);
+			const extraTexture = await material.createTexture(extraDescription, [128, 128, 255, 255]);
+			material.setTexture(slotName + "Texture", EXTRA_TEXTURE_UNITS[slotName], extraTexture);
+		}
+		skinRenderer.setMaterialShading(material, SHADING_MODE_BY_NAME[definition.shading]);
 		materialByKeyword.set(definition.keyword, material);
 	}
 	for (let drawableIndex = 0; drawableIndex < drawableList.length; ++drawableIndex) {
@@ -678,7 +733,7 @@
 		normal: await createThumbnail("head_normal.jpg"),
 		detail: await createThumbnail("skin_detail.jpg"),
 		hair: await createThumbnail("hair.png"),
-		eye: await createThumbnail("eye_albedo.jpg"),
+		eye: await createThumbnail("eye_iris.png"),
 		teeth: await createThumbnail("teeth_albedo.jpg"),
 		eyelash: await createThumbnail("eyelash.png"),
 	};
@@ -690,6 +745,30 @@
 	//==============================================================================
 	const expressionResponse = await System.fetch("./assets/expressions.json");
 	const expressionTable = await expressionResponse.json();
+	// 주름 맵 정의. (channels: 마스크 아틀라스 채널 → 영역 이름 / 주름 맵 기여, shapes: ARKit 셰이프 → 영역 값 — RigLogic 애니메이티드 맵 출력)
+	const wrinkleResponse = await System.fetch("./assets/wrinkles.json");
+	const wrinkleTable = await wrinkleResponse.json();
+	const wrinkleRegionValues = new System.Map();
+	function updateWrinkleWeights() {
+		wrinkleRegionValues.clear();
+		if (optionStates.wrinkle) {
+			for (const [unitName, weight] of expressionState.currentWeights) {
+				const regionTable = wrinkleTable.shapes[unitName];
+				if (!regionTable || weight < 0.001) {
+					continue;
+				}
+				for (const regionName in regionTable) {
+					const previousValue = wrinkleRegionValues.has(regionName) ? wrinkleRegionValues.get(regionName) : 0;
+					wrinkleRegionValues.set(regionName, previousValue + regionTable[regionName] * weight);
+				}
+			}
+		}
+		for (let channelIndex = 0; channelIndex < wrinkleTable.channels.length; ++channelIndex) {
+			const channel = wrinkleTable.channels[channelIndex];
+			const regionValue = wrinkleRegionValues.has(channel.region) ? System.Math.min(wrinkleRegionValues.get(channel.region), 1) : 0;
+			skinRenderer.setWrinkleChannelWeight(channelIndex, regionValue * channel.maps[0], regionValue * channel.maps[1], regionValue * channel.maps[2]);
+		}
+	}
 	const expressionUnitNameSet = new System.Set();
 	for (const presetName in expressionTable) {
 		for (const unitName in expressionTable[presetName]) {
@@ -891,11 +970,14 @@
 		if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
 			canvas.width = displayWidth;
 			canvas.height = displayHeight;
-			sceneRenderTarget.resize(displayWidth, displayHeight);
-			hdrRenderTarget.resize(displayWidth, displayHeight);
-			ldrRenderTarget.resize(displayWidth, displayHeight);
-			subsurfaceEffect.resize(displayWidth, displayHeight);
-			bloomEffect.resize(displayWidth, displayHeight);
+			const renderWidth = System.Math.floor(displayWidth * RENDER_SCALE);
+			const renderHeight = System.Math.floor(displayHeight * RENDER_SCALE);
+			sceneRenderTarget.resize(renderWidth, renderHeight);
+			hdrRenderTarget.resize(renderWidth, renderHeight);
+			ldrRenderTarget.resize(renderWidth, renderHeight);
+			subsurfaceEffect.resize(renderWidth, renderHeight);
+			ambientOcclusionEffect.resize(renderWidth, renderHeight);
+			bloomEffect.resize(renderWidth, renderHeight);
 		}
 	}
 
@@ -938,7 +1020,7 @@
 			{
 				title: "EYES, TEETH, LASHES AND GROOM",
 				isActive: true,
-				lines: ["metahuman eye atlas (sclera and iris), teeth, lash and hair cards with alpha cutout", "no subsurface on eyes, lashes and hair"],
+				lines: ["refractive cornea, iris parallax and normal, eyelid occlusion shell", "kajiya-kay dual lobe hair cards, cutout + blended fringe"],
 				thumbnails: [
 					{ label: "EYE", image: thumbnails.eye },
 					{ label: "TEETH", image: thumbnails.teeth },
@@ -950,8 +1032,8 @@
 				title: "SURFACE",
 				isActive: true,
 				lines: [
-					"normal = metahuman normal map x 1.5 + cavity height x " + (optionStates.detail ? "6" : "0"),
-					"cavity = height - blur(height), metahuman cavity as roughness x factor",
+					"normal = metahuman normal x 1.5 + wrinkle maps x mask weights + micro normal x38",
+					"cavity = height - blur(height) x micro cavity, roughness from cavity",
 					"skin F0 0.028, eyes 0.04 glossy",
 				],
 				thumbnails: [],
@@ -1229,9 +1311,13 @@
 		// 표정 / 머리 방향 / 스키닝 갱신.
 		updateExpressions(elapsedTime, deltaTime);
 		updateHeadDirection(elapsedTime, deltaTime);
+		updateWrinkleWeights();
 		skinRenderer.setDetailStrength(optionStates.detail ? 3.5 : 0);
 		skinRenderer.setCavityStrength(optionStates.detail ? 2.5 : 0);
+		skinRenderer.setMicroDetail(38, optionStates.detail ? 0.55 : 0);
 		headModel.update(deltaTime);
+		const renderWidth = sceneRenderTarget.getWidth();
+		const renderHeight = sceneRenderTarget.getHeight();
 
 		// === 1. 섀도우 깊이 패스 (키 라이트) ===
 		webGL2RenderingContext.enable(webGL2RenderingContext.CULL_FACE);
@@ -1255,14 +1341,39 @@
 		webGL2RenderingContext.depthMask(true);
 		webGL2RenderingContext.clearColor(0, 0, 0, 0);
 		webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+		backgroundPass.use();
+		webGL2RenderingContext.uniform1f(backgroundPass.getUniformLocation("aspectRatio"), aspectRatio);
+		backgroundPass.draw();
+		webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+		drawCallCount += 1;
 		skinRenderer.draw(headModel, viewProjectionElements, modelElements, cameraX, cameraY, cameraZ);
 		drawCallCount += drawableList.length;
 
-		// === 3. 화면 공간 서브서피스 스캐터링 ===
+		// === 2b. 블렌드 패스 (머리카락 프린지 / 눈꺼풀 차폐 / 눈물선 / 침 — 깊이 쓰기 없이 어태치먼트별 알파 블렌드) ===
+		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.blendFuncSeparate(webGL2RenderingContext.SRC_ALPHA, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA, webGL2RenderingContext.ZERO, webGL2RenderingContext.ONE);
+		webGL2RenderingContext.depthMask(false);
+		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
+		skinRenderer.drawBlended(headModel, viewProjectionElements, modelElements, cameraX, cameraY, cameraZ);
+		webGL2RenderingContext.enable(webGL2RenderingContext.CULL_FACE);
+		webGL2RenderingContext.depthMask(true);
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		drawCallCount += 6;
+
+		// === 3. 화면 공간 서브서피스 스캐터링 / 앰비언트 오클루전 ===
 		const irradianceTexture = sceneRenderTarget.getColorTexture(0);
 		const albedoTexture = sceneRenderTarget.getColorTexture(1);
 		const specularTexture = sceneRenderTarget.getColorTexture(2);
+		const normalTexture = sceneRenderTarget.getColorTexture(3);
 		const sceneDepthTexture = sceneRenderTarget.getDepthTexture();
+		let occlusionResultTexture = albedoTexture;
+		if (optionStates.occlusion) {
+			const viewMatrixElements = viewMatrix.getElements();
+			ambientOcclusionEffect.render(sceneDepthTexture, normalTexture, viewMatrixElements, CAMERA_FIELD_OF_VIEW, aspectRatio, CAMERA_NEAR_DISTANCE, CAMERA_FAR_DISTANCE);
+			occlusionResultTexture = ambientOcclusionEffect.getResultTexture();
+			drawCallCount += 3;
+		}
 		let scatteredIrradianceTexture = irradianceTexture;
 		if (optionStates.subsurface) {
 			subsurfaceEffect.render(irradianceTexture, sceneDepthTexture, CAMERA_FIELD_OF_VIEW, aspectRatio, CAMERA_NEAR_DISTANCE, CAMERA_FAR_DISTANCE);
@@ -1277,15 +1388,22 @@
 		webGL2RenderingContext.uniform1i(combinePass.getUniformLocation("irradianceTexture"), 0);
 		webGL2RenderingContext.uniform1i(combinePass.getUniformLocation("albedoTexture"), 1);
 		webGL2RenderingContext.uniform1i(combinePass.getUniformLocation("specularTexture"), 2);
+		webGL2RenderingContext.uniform1i(combinePass.getUniformLocation("occlusionTexture"), 3);
 		webGL2RenderingContext.uniform1f(combinePass.getUniformLocation("aspectRatio"), aspectRatio);
+		webGL2RenderingContext.uniform1f(combinePass.getUniformLocation("occlusionStrength"), optionStates.occlusion ? 1 : 0);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, scatteredIrradianceTexture);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, albedoTexture);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE2);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, specularTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE3);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, occlusionResultTexture);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		combinePass.draw();
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		drawCallCount += 1;
 
 		// === 5. 블룸 ===
@@ -1312,7 +1430,7 @@
 		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("vignetteStrength"), 0.5);
 		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("grainStrength"), 0.018);
 		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("elapsedTime"), elapsedTime);
-		webGL2RenderingContext.uniform2f(compositePass.getUniformLocation("resolution"), canvas.width, canvas.height);
+		webGL2RenderingContext.uniform2f(compositePass.getUniformLocation("resolution"), renderWidth, renderHeight);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, hdrColorTexture);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
@@ -1328,7 +1446,7 @@
 			webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
 			antialiasPass.use();
 			webGL2RenderingContext.uniform1i(antialiasPass.getUniformLocation("sourceTexture"), 0);
-			webGL2RenderingContext.uniform2f(antialiasPass.getUniformLocation("texelSize"), 1 / canvas.width, 1 / canvas.height);
+			webGL2RenderingContext.uniform2f(antialiasPass.getUniformLocation("texelSize"), 1 / renderWidth, 1 / renderHeight);
 			const ldrColorTexture = ldrRenderTarget.getColorTexture();
 			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, ldrColorTexture);
 			antialiasPass.draw();

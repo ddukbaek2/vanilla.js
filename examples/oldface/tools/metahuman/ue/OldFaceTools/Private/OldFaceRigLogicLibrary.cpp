@@ -118,6 +118,12 @@ bool UOldFaceRigLogicLibrary::DumpGeometry(UDNA* DNA, const FString& OutputDirec
 		ChannelNames.Add(MakeShared<FJsonValueString>(Reader->GetBlendShapeChannelName(Index)));
 	}
 	Manifest->SetArrayField(TEXT("blendshape_channel_names"), ChannelNames);
+	TArray<TSharedPtr<FJsonValue>> AnimatedMapNames;
+	for (uint16 Index = 0; Index < Reader->GetAnimatedMapCount(); ++Index)
+	{
+		AnimatedMapNames.Add(MakeShared<FJsonValueString>(Reader->GetAnimatedMapName(Index)));
+	}
+	Manifest->SetArrayField(TEXT("animated_map_names"), AnimatedMapNames);
 
 	// LOD0 메시
 	TArray<TSharedPtr<FJsonValue>> MeshEntries;
@@ -286,8 +292,10 @@ bool UOldFaceRigLogicLibrary::EvaluatePoses(UDNA* DNA, const TArray<FString>& Ra
 	TArray<float> JointValues;
 	JointValues.Reserve(PoseCount * JointCount * 10);
 	TArray<float> BlendShapeValues;
+	TArray<float> AnimatedMapValues;
 	const int32 NameCount = RawControlNames.Num();
 	int32 BlendShapeCount = 0;
+	int32 AnimatedMapCount = 0;
 	for (int32 Pose = 0; Pose < PoseCount; ++Pose)
 	{
 		for (uint16 Index = 0; Index < RawCount; ++Index)
@@ -328,16 +336,22 @@ bool UOldFaceRigLogicLibrary::EvaluatePoses(UDNA* DNA, const TArray<FString>& Ra
 		TArrayView<const float> BlendShapes = Instance.GetBlendShapeOutputs();
 		BlendShapeCount = BlendShapes.Num();
 		BlendShapeValues.Append(BlendShapes.GetData(), BlendShapes.Num());
+		RigLogic.CalculateAnimatedMaps(&Instance);
+		TArrayView<const float> AnimatedMaps = Instance.GetAnimatedMapOutputs();
+		AnimatedMapCount = AnimatedMaps.Num();
+		AnimatedMapValues.Append(AnimatedMaps.GetData(), AnimatedMaps.Num());
 	}
 	WriteFloatFile(FPaths::Combine(OutputDirectory, TEXT("poses_joints.f32")), JointValues);
 	WriteFloatFile(FPaths::Combine(OutputDirectory, TEXT("poses_blendshapes.f32")), BlendShapeValues);
+	WriteFloatFile(FPaths::Combine(OutputDirectory, TEXT("poses_animatedmaps.f32")), AnimatedMapValues);
 
 	TSharedRef<FJsonObject> Manifest = MakeShared<FJsonObject>();
 	Manifest->SetNumberField(TEXT("pose_count"), PoseCount);
 	Manifest->SetNumberField(TEXT("joint_count"), JointCount);
 	Manifest->SetNumberField(TEXT("joint_attribute_count"), 10);
 	Manifest->SetNumberField(TEXT("blendshape_count"), BlendShapeCount);
+	Manifest->SetNumberField(TEXT("animated_map_count"), AnimatedMapCount);
 	Manifest->SetNumberField(TEXT("matched_controls"), MatchedCount);
-	UE_LOG(LogTemp, Warning, TEXT("[OLDFACE] evaluated %d poses, joints %d, blendshapes %d, matched controls %d of %d"), PoseCount, JointCount, BlendShapeCount, MatchedCount, NameCount);
+	UE_LOG(LogTemp, Warning, TEXT("[OLDFACE] evaluated %d poses, joints %d, blendshapes %d, animated maps %d, matched controls %d of %d"), PoseCount, JointCount, BlendShapeCount, AnimatedMapCount, MatchedCount, NameCount);
 	return WriteJsonFile(FPaths::Combine(OutputDirectory, TEXT("poses_manifest.json")), Manifest);
 }
