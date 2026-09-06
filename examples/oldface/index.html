@@ -807,7 +807,7 @@
 		{ group: "SKIN", name: "microNormal", label: "MICRO NORMAL", minimum: 0, maximum: 1.5, step: 0.05, value: 0.55, format: (value) => value.toFixed(2) },
 		{ group: "SKIN", name: "wrinkleDepth", label: "WRINKLE DEPTH", minimum: 0, maximum: 2, step: 0.05, value: 1, format: (value) => value.toFixed(2) },
 		{ group: "SKIN", name: "subsurfaceWidth", label: "SSS WIDTH", minimum: 0, maximum: 20, step: 0.5, value: 8, format: (value) => value.toFixed(1) + " MM" },
-		{ group: "SKIN", name: "specular", label: "SPECULAR", minimum: 0, maximum: 1.5, step: 0.05, value: 0.65, format: (value) => value.toFixed(2) },
+		{ group: "SKIN", name: "specular", label: "SPECULAR", minimum: 0, maximum: 2, step: 0.05, value: 1.25, format: (value) => value.toFixed(2) },
 		{ group: "SKIN", name: "roughness", label: "ROUGHNESS", minimum: 0.5, maximum: 1.4, step: 0.02, value: 0.9, format: (value) => value.toFixed(2) },
 		{ group: "SKIN", name: "sheen", label: "PEACH FUZZ SHEEN", minimum: 0, maximum: 0.6, step: 0.02, value: 0.12, format: (value) => value.toFixed(2) },
 		{ group: "AMBIENT OCCLUSION", name: "occlusionStrength", label: "AO STRENGTH", minimum: 0, maximum: 2, step: 0.05, value: 1.15, format: (value) => value.toFixed(2) },
@@ -1026,7 +1026,7 @@
 		}
 		eyeCenter.set(sumX / eyeVertexCount, sumY / eyeVertexCount, sumZ / eyeVertexCount);
 	}
-	const CAMERA_TARGET = Vector3.create(eyeCenter.x, eyeCenter.y - 0.06, eyeCenter.z - 0.08);
+	const CAMERA_TARGET = Vector3.create(eyeCenter.x, eyeCenter.y + 0.005, eyeCenter.z - 0.08);
 
 	// 통계용 합계. (활성 모델 전체 — LOD / 머리카락 단계가 바뀌면 다시 센다)
 	let triangleCount = 0;
@@ -1305,10 +1305,10 @@
 	const cameraState = {
 		yaw: 0,
 		pitch: 0.02,
-		distance: 0.78,
+		distance: 0.6,
 		targetYaw: 0,
 		targetPitch: 0.02,
-		targetDistance: 0.78,
+		targetDistance: 0.6,
 		isDragging: false,
 		dragPointerId: -1,
 		lastPointerX: 0,
