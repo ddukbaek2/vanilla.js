@@ -1,0 +1,51 @@
+{
+ "FileVersion": 3,
+ "EngineAssociation": "5.8",
+ "Category": "",
+ "Description": "OLD FACE MetaHuman export project",
+ "Plugins": [
+  {
+   "Name": "PythonScriptPlugin",
+   "Enabled": true
+  },
+  {
+   "Name": "EditorScriptingUtilities",
+   "Enabled": true
+  },
+  {
+   "Name": "MetaHumanCharacter",
+   "Enabled": true
+  },
+  {
+   "Name": "MetaHumanSDK",
+   "Enabled": true
+  },
+  {
+   "Name": "MetaHumanCoreTech",
+   "Enabled": true
+  },
+  {
+   "Name": "MetaHumanCoreML",
+   "Enabled": true
+  },
+  {
+   "Name": "RigLogic",
+   "Enabled": true
+  },
+  {
+   "Name": "HairStrands",
+   "Enabled": true
+  },
+  {
+   "Name": "GeometryScripting",
+   "Enabled": true
+  }
+ ],
+ "Modules": [
+  {
+   "Name": "OldFaceTools",
+   "Type": "Runtime",
+   "LoadingPhase": "Default"
+  }
+ ]
+}

@@ -1,5 +1,11 @@
 # 업데이트 기록
 
+# 0.5.5-experimental (2026-09-07)
+- OLD FACE 애셋을 메타휴먼 크리에이터 노인 프리셋 "Walter" 로 교체 — 실제 피부 텍스처(알베도 / 노멀 / 캐비티 → 러프니스와 디테일 높이), 그룸 카드 머리카락 / 눈썹 / 콧수염 / 턱수염, 총 11.1만 삼각형, ARKit 51 셰이프키(얼굴 리그 RigLogic 을 그대로 계산)
+  - UE 5.8.2 + MetaHuman Creator Core Data 헤드리스 파이프라인(examples/oldface/tools/metahuman/ue): 프리셋 복제 → 클라우드 오토리그(JOINTS_AND_BLEND_SHAPES) / 고해상도 텍스처 → DNA / 머리 메시 / 머티리얼 텍스처 내보내기 → C++ 모듈 OldFaceTools 로 DNA 2.5 지오메트리 덤프와 RigLogic 포즈 평가(엔진의 RigLogicLib 사용, 65 프레임 ARKit 매핑 커브)
+  - 그룸 카드: 그룸 애셋의 카드 LOD1 스태틱 메시와 아틀라스(Layout2: Attribute R 커버리지 / G 깊이, Tangent A 가닥 좌표)를 꺼내 바인딩 소스 머리(레거시 그룸 머리, UV 로 DNA 정점 순서 대응)의 최근접 삼각형 프레임으로 Walter 머리에 다시 붙이고, 같은 바인딩으로 표정 포즈마다 정점을 옮겨 셰이프키로 굽음(턱수염이 턱, 눈썹이 이마를 따라감). 머리카락만 양면 사본, 셰이프키는 4mm 이상 이동만 유지
+  - 샘플: 머리 머티리얼에 메타휴먼 노멀 / 러프니스 맵, 그룸 카드 4종 머티리얼(알파 컷아웃, 산란 없음), 머티리얼 그래프 패널 썸네일(NORMAL / CAVITY / HAIR), 크레딧 문구
+
 # 0.5.0-experimental (2026-09-05)
 - OLD FACE 샘플 추가 (examples/oldface) — 에픽 메타휴먼 얼굴(Taro DNA: 머리 2.4만 정점 + 치아 / 눈알 / 속눈썹, RigLogic 을 ARKit 51종 셰이프키로 굽음)을 피부 파이프라인으로 렌더링
   - 애셋 생성(examples/oldface/tools/metahuman): UE 5.8 에서 ARKit 매핑 애니메이션의 raw 제어 커브를 덤프하고, 에픽 DNA 라이브러리로 DNA 의 RigLogic(PSD / 조인트 그룹 행렬 / 블렌드셰이프 채널)을 직접 평가해 포즈별 정점을 계산, Blender 로 희소 셰이프키 glb 생성.

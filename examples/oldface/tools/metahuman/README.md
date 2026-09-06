@@ -1,19 +1,31 @@
 # OLD FACE 메타휴먼 애셋 생성
 
-에픽 메타휴먼 얼굴(DNA)에서 RigLogic 을 직접 계산해 ARKit 52 표정을 셰이프키로 굽고 glb 로 만든다. 언리얼 에디터의 후처리 AnimBP 는 헤드리스에서 본을 갱신하지 않아, DNA 의 행동 데이터(PSD / 조인트 그룹 행렬 / 블렌드셰이프 채널)로 평가한다.
+에픽 메타휴먼 크리에이터 프리셋(현재 "Walter", 노인 남성)에서 얼굴 DNA / 피부 텍스처 / 그룸 카드를 꺼내고, DNA 의 RigLogic 을 언리얼 엔진 안에서 직접 계산해 ARKit 52 표정을 셰이프키로 굽고 glb 로 만든다. 언리얼 에디터의 후처리 AnimBP 는 헤드리스에서 본을 갱신하지 않으므로, C++ 모듈(`ue/OldFaceTools`)이 엔진의 RigLogicLib 으로 조인트 / 블렌드셰이프 출력을 평가한다.
 
 준비물
-- Unreal Engine 5.8 (MetaHuman 플러그인 동봉) — ARKit 매핑 애니메이션 `AS_MetaHuman_ARKit_Mapping` 과 기본 눈 / 치아 / 속눈썹 텍스처를 꺼내는 데만 쓴다.
-- Epic `MetaHuman-DNA-Calibration` 저장소(Python 3.10 용 `lib/Maya2024/windows` 바인딩)와 동봉 DNA(`data/dna_files/Taro.dna`). 현재 공개 라이브러리는 DNA 2.1 까지만 읽으므로 UE 5.8 이 내보내는 2.5 DNA 는 읽지 못한다.
-- Blender 5.1, Python 3.10 + numpy + Pillow.
+- Unreal Engine 5.8.2 + 에픽 런처의 "MetaHuman Creator Core Data" 옵션 설치, 에픽 계정 로그인(오토리그 / 고해상도 텍스처는 클라우드 서비스). 처음 한 번 에디터가 띄우는 메타휴먼 로그인 창에서 로그인해 두면 이후 헤드리스 실행에서도 재사용된다.
+- `ue/OldFaceProject.uproject` 를 D:/MetaHumanExport/OldFaceProject 같은 곳에 두고 `ue/OldFaceTools` 를 Source 에 넣어 `Build.bat OldFaceProjectEditor Win64 Development -Project=...` 로 빌드한다(RigLogicModule / RigLogicLib 의존).
+- Blender 5.1, Python 3.10 + numpy + scipy + Pillow.
+- 작업 디렉토리는 D:/MetaHumanExport 기준으로 스크립트에 적혀 있다(환경 변수 OLDFACE_* 로 바꿀 수 있는 항목은 각 스크립트 상단 참고). Git Bash 에서 `/Game/...` 경로를 환경 변수로 넘길 때는 `MSYS_NO_PATHCONV=1 MSYS2_ENV_CONV_EXCL="*"` 를 붙여야 한다.
 
-순서
-1. `UnrealEditor-Cmd.exe <project.uproject> -ExecutePythonScript=dump_arkit_curves.py -unattended -RenderOffScreen` — 프레임별 raw 제어 커브(CTRL_expressions_*) 덤프 → `arkit_curves.json`
-2. `UnrealEditor-Cmd.exe ... -ExecutePythonScript=export_textures.py` — 공막 / 홍채 / 치아 / 속눈썹 PNG 내보내기
-3. `python riglogic_eval.py <Taro.dna> <arkit_curves.json> <out.npz>` — RigLogic 평가(raw → PSD → 조인트 델타(위치 cm, 회전 도 XYZ) / 블렌드셰이프 가중치 → 계층 합성 → LBS)로 포즈별 정점 위치
-4. `blender -b --python build_metahuman_glb.py -- <out.npz> <character.glb> [렌더 디렉토리]` — 메시(머리 / 치아 / 눈알 / 속눈썹) + 희소 셰이프키 glb (Maya Y 위 cm → Blender 변환)
-5. `python strip_default_weights.py <character.glb>` — 기본 가중치 제거
-6. `python compose_textures.py <UE 텍스처 디렉토리> <assets>` — 눈 / 치아 / 속눈썹 / 피부 자리표시자
-7. `assets/expressions.json` 은 ARKit 셰이프 이름(MouthSmileLeft 등) 가중치 프리셋
+순서 (`UE=UnrealEditor-Cmd.exe <project.uproject> -unattended -nosplash -nopause -RenderOffScreen -stdout -FullStdOutLogOutput`)
+1. `UE -ExecutePythonScript=dump_arkit_curves.py` — ARKit 매핑 애니메이션의 프레임별 raw 제어 커브(CTRL_expressions_*) 덤프 → `Head/arkit_curves.json` (65 프레임)
+2. `UE -ExecutePythonScript=export_textures.py` — 플러그인 기본 공막 / 홍채 / 치아 / 속눈썹 PNG → `Textures/`
+3. `OLDFACE_PRESET=Walter UE -ExecutePythonScript=ue/ue_create_character.py` — 프리셋 복제(/Game/OldFace/OldMan) → 피부 합성 → 클라우드 오토리그(JOINTS_AND_BLEND_SHAPES) → 고해상도 텍스처 → DNA(`Character/OldMan_Head.dna`) / 머리 스켈레탈 메시 / 머티리얼 텍스처 애셋 내보내기
+4. `OLDFACE_DNA_FILE=.../OldMan_Head.dna OLDFACE_DUMP_DIR=.../Dump_oldman UE -ExecutePythonScript=ue/ue_dump_rig.py` — C++ 모듈로 DNA 지오메트리(메시별 정점 / UV / 삼각형 / 스킨 가중치 / 블렌드셰이프 델타)와 65 포즈의 조인트 / 블렌드셰이프 출력 덤프
+5. `OLDFACE_EXPORT_PATH=/Game/OldFace/Export/OldMan_MaterialsExport UE -ExecutePythonScript=ue/ue_export_character_textures.py` — 얼굴 / 몸 텍스처 PNG (`CharacterTextures/`, 2K)
+6. `python riglogic_from_dump.py <Dump_oldman> <Dump_oldman/pose_names.json> Head/oldman_arkit.npz` — 조인트 계층 합성 + LBS + 블렌드셰이프로 포즈별 정점 위치
+7. 그룸 카드 (머리카락 / 눈썹 / 콧수염 / 턱수염)
+   - `OLDFACE_GROOM_NAMES=BobLayered,Goatee_L_Wavy,Mustache_L_Wavy,Eyebrows_M_Messy UE -ExecutePythonScript=ue/ue_export_grooms.py` — 카드 LOD 스태틱 메시 FBX 와 아틀라스(Layout2: Attribute R 커버리지 / G 깊이, Tangent A 가닥 좌표)
+   - `UE -ExecutePythonScript=ue/ue_export_legacy_heads.py` — 그룸 바인딩 소스 머리(SKM_Groom_Head_Legacy01 / 02) FBX 와 캐릭터 슬롯 선택(어떤 그룸을 쓰는지) 출력
+   - Blender 로 FBX 정점 / UV / 삼각형을 npz 로 뽑고(`Grooms/cards_raw.npz`, `Grooms/legacy_heads_raw.npz`), `python legacy_heads_to_dna.py` 로 레거시 머리를 UV 기준 DNA 정점 순서에 대응
+   - `python fit_hair_cards.py Grooms/parts.json Head/oldman_arkit.npz Head/oldman_full.npz` — 카드 정점을 소스 머리의 최근접 삼각형(무게중심 + 로컬 프레임 오프셋)에 바인딩해 Walter 중립 / 포즈별 위치로 재구성 (머리카락은 양면 사본)
+8. `blender -b --python build_metahuman_glb.py -- Head/oldman_full.npz character.glb [렌더 디렉토리]` — 메시(머리 / 치아 / 눈알 / 속눈썹 / 그룸 4종) + 희소 셰이프키 glb (Maya Y 위 cm → Blender 변환, 머리카락은 4mm 미만 이동 버림)
+9. `python strip_default_weights.py character.glb` — 기본 가중치 제거
+10. `python compose_metahuman_textures.py <CharacterTextures> <Textures> <assets>` — 피부 알베도 / 노멀(UE DirectX Y- → glTF Y+ 로 G 반전) / 캐비티 → 러프니스(ORM G)와 디테일 높이, 눈 / 치아 / 속눈썹(Sparse)
+11. `python compose_hair_textures.py <Grooms> <assets>` — 카드 커버리지를 알파로, 깊이 / 가닥 좌표로 음영을 준 RGBA (hair / beard / mustache / eyebrows)
+12. `assets/expressions.json` 은 ARKit 셰이프 이름(MouthSmileLeft 등) 가중치 프리셋
 
-미완: 피부 알베도 / 노멀과 노인 얼굴, 머리카락은 "MetaHuman Creator Core Data"(런처 설치) 와 에픽 클라우드(오토리그 / 텍스처 다운로드) 가 있어야 만들 수 있다.
+참고
+- `riglogic_eval.py` 는 DNA 2.1 파일(에픽 MetaHuman-DNA-Calibration 동봉 Taro 등)을 Python 바인딩(dnacalib)으로 평가하던 이전 경로. UE 5.8 이 내보내는 DNA 2.5 는 읽지 못하므로 4 ~ 6 의 C++ 덤프 경로를 쓴다.
+- 얼굴 텍스처 애셋은 2048 해상도로 내보내진다.

@@ -15,6 +15,8 @@ meta = json.loads(str(data["meta"]))
 pose_names = meta["pose_names"]
 mesh_names = meta["mesh_names"]
 SKIP = {"saliva", "eyeshell", "eyeEdge", "cartilage"}
+# 메시별 셰이프키 최소 이동 (m). 머리카락은 두피의 미세한 움직임까지 셰이프키로 남기면 용량만 커지므로 4mm 미만은 버린다.
+SNAP_THRESHOLD = {"hair": 0.004}
 
 def to_blender(points_cm):
     # Maya Y 위 (x, y, z) → Blender Z 위 (x, -z, y), cm → m
@@ -57,7 +59,7 @@ for name in mesh_names:
         posed = to_blender(data[f"{name}__pose_{frame}"][layout_positions])
         # 스키닝 수치 잡음(1e-7 수준)을 기준 위치로 되돌려 희소 셰이프키가 되게 한다 (0.05mm 미만 이동 무시)
         delta = posed - vertices
-        posed = np.where(np.linalg.norm(delta, axis=1, keepdims=True) < 0.00005, vertices, posed)
+        posed = np.where(np.linalg.norm(delta, axis=1, keepdims=True) < SNAP_THRESHOLD.get(name, 0.00005), vertices, posed)
         if not np.any(np.abs(posed - vertices) > 0.0):
             continue
         key = obj.shape_key_add(name=pose_name, from_mix=False)

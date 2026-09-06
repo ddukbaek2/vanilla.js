@@ -251,7 +251,7 @@
 	<div id="expressionPanel"></div>
 	<div id="footerNote">
 		DRAG TO ORBIT, WHEEL OR PINCH TO ZOOM, MOVE THE POINTER TO TURN THE HEAD<br>
-		CHARACTER: <a href="https://www.metahuman.com/" target="_blank" rel="noopener">EPIC METAHUMAN (TARO DNA, RIGLOGIC BAKED TO ARKIT SHAPES)</a>, EXPRESSIONS: ARKIT BLENDSHAPE PRESETS
+		CHARACTER: <a href="https://www.metahuman.com/" target="_blank" rel="noopener">EPIC METAHUMAN (WALTER PRESET, RIGLOGIC BAKED TO ARKIT SHAPES, GROOM CARDS)</a>, EXPRESSIONS: ARKIT BLENDSHAPE PRESETS
 	</div>
 	<a id="homeLink" href="https://ddukbaek2.com" target="_blank" rel="noopener">DDUKBAEK2.COM</a>
 	<div id="loadingOverlay">LOADING</div>
@@ -325,8 +325,12 @@
 	const PART_MATERIAL_DEFINITIONS = [
 		{ keyword: "eyeball", albedo: "eye_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.14, subsurfaceFactor: 0.0 },
 		{ keyword: "eyelashes", albedo: "eyelash.png", normal: null, roughness: null, opacity: "eyelash.png", baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0 },
-		{ keyword: "head", albedo: "head_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: true, roughnessFactor: 0.7, subsurfaceFactor: 1.0 },
+		{ keyword: "head", albedo: "head_albedo.jpg", normal: "head_normal.jpg", roughness: "head_roughness.jpg", opacity: null, baseColorFactor: null, useDetail: true, roughnessFactor: 0.85, subsurfaceFactor: 1.0 },
 		{ keyword: "teeth", albedo: "teeth_albedo.jpg", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.45, subsurfaceFactor: 0.25 },
+		{ keyword: "hair", albedo: "hair.png", normal: null, roughness: null, opacity: "hair.png", baseColorFactor: null, useDetail: false, roughnessFactor: 0.75, subsurfaceFactor: 0.0 },
+		{ keyword: "beard", albedo: "beard.png", normal: null, roughness: null, opacity: "beard.png", baseColorFactor: null, useDetail: false, roughnessFactor: 0.75, subsurfaceFactor: 0.0 },
+		{ keyword: "mustache", albedo: "mustache.png", normal: null, roughness: null, opacity: "mustache.png", baseColorFactor: null, useDetail: false, roughnessFactor: 0.75, subsurfaceFactor: 0.0 },
+		{ keyword: "eyebrows", albedo: "eyebrows.png", normal: null, roughness: null, opacity: "eyebrows.png", baseColorFactor: null, useDetail: false, roughnessFactor: 0.8, subsurfaceFactor: 0.0 },
 	];
 
 	//==============================================================================
@@ -671,7 +675,9 @@
 	}
 	const thumbnails = {
 		albedo: await createThumbnail("head_albedo.jpg"),
+		normal: await createThumbnail("head_normal.jpg"),
 		detail: await createThumbnail("skin_detail.jpg"),
+		hair: await createThumbnail("hair.png"),
 		eye: await createThumbnail("eye_albedo.jpg"),
 		teeth: await createThumbnail("teeth_albedo.jpg"),
 		eyelash: await createThumbnail("eyelash.png"),
@@ -925,25 +931,27 @@
 				lines: [],
 				thumbnails: [
 					{ label: "ALBEDO", image: thumbnails.albedo },
-					{ label: "DETAIL 4K", image: thumbnails.detail },
+					{ label: "NORMAL", image: thumbnails.normal },
+					{ label: "CAVITY", image: thumbnails.detail },
 				],
 			},
 			{
-				title: "EYES, TEETH AND LASHES",
+				title: "EYES, TEETH, LASHES AND GROOM",
 				isActive: true,
-				lines: ["metahuman eye atlas (sclera and iris), teeth, lash cards with alpha cutout", "no subsurface on eyes and lashes"],
+				lines: ["metahuman eye atlas (sclera and iris), teeth, lash and hair cards with alpha cutout", "no subsurface on eyes, lashes and hair"],
 				thumbnails: [
 					{ label: "EYE", image: thumbnails.eye },
 					{ label: "TEETH", image: thumbnails.teeth },
 					{ label: "LASHES", image: thumbnails.eyelash },
+					{ label: "HAIR", image: thumbnails.hair },
 				],
 			},
 			{
 				title: "SURFACE",
 				isActive: true,
 				lines: [
-					"normal = displacement map x 1.5 + 4K height x " + (optionStates.detail ? "6" : "0"),
-					"cavity = height - blur(height), roughness map x factor",
+					"normal = metahuman normal map x 1.5 + cavity height x " + (optionStates.detail ? "6" : "0"),
+					"cavity = height - blur(height), metahuman cavity as roughness x factor",
 					"skin F0 0.028, eyes 0.04 glossy",
 				],
 				thumbnails: [],
