@@ -1026,7 +1026,7 @@
 		}
 		eyeCenter.set(sumX / eyeVertexCount, sumY / eyeVertexCount, sumZ / eyeVertexCount);
 	}
-	const CAMERA_TARGET = Vector3.create(eyeCenter.x, eyeCenter.y + 0.005, eyeCenter.z - 0.08);
+	const CAMERA_TARGET = Vector3.create(eyeCenter.x, eyeCenter.y + 0.03, eyeCenter.z - 0.08);
 
 	// 통계용 합계. (활성 모델 전체 — LOD / 머리카락 단계가 바뀌면 다시 센다)
 	let triangleCount = 0;
@@ -1305,10 +1305,10 @@
 	const cameraState = {
 		yaw: 0,
 		pitch: 0.02,
-		distance: 0.6,
+		distance: 0.55,
 		targetYaw: 0,
 		targetPitch: 0.02,
-		targetDistance: 0.6,
+		targetDistance: 0.55,
 		isDragging: false,
 		dragPointerId: -1,
 		lastPointerX: 0,
