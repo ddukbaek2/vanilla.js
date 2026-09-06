@@ -1926,6 +1926,7 @@
 		smoothedFrameSeconds: 1 / 60,
 		drawCallCount: 0,
 		hudTop: System.window.innerHeight - 190,
+		cpuFrameMilliseconds: 0,
 		optionMaximumHeight: 0,
 		memorySampleTime: -1e9,
 		gpuMemoryBytes: 0,
@@ -1972,6 +1973,7 @@
 			["vertices", vertexCount.toLocaleString("en-US")],
 			["draw calls", statistics.drawCallCount.toString()],
 			["morph targets", morphTargetCount.toString()],
+			["cpu frame", statistics.cpuFrameMilliseconds.toFixed(2) + " ms"],
 			["gpu shadow", formatPassTime("shadow")],
 			["gpu scene", formatPassTime("scene")],
 			["gpu sss + ao", formatPassTime("scatter")],
@@ -2042,6 +2044,7 @@
 			return;
 		}
 		frameLimiter.nextFrameDue = nowTimestamp - frameLimiter.nextFrameDue > frameInterval ? nowTimestamp + frameInterval : frameLimiter.nextFrameDue + frameInterval;
+		const cpuFrameStart = nowTimestamp;
 		resizeCanvas();
 		const currentTimestamp = nowTimestamp;
 		const elapsedTime = (currentTimestamp - startTimestamp) / 1000;
@@ -2304,6 +2307,7 @@
 		statistics.drawCallCount = drawCallCount;
 		renderHud();
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		statistics.cpuFrameMilliseconds = statistics.cpuFrameMilliseconds * 0.9 + (System.performance.now() - cpuFrameStart) * 0.1;
 
 		System.window.requestAnimationFrame(renderFrame);
 	}
