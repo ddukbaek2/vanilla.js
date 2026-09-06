@@ -132,7 +132,7 @@
 			right: 18px;
 			top: 18px;
 			width: 372px;
-			max-height: calc(100vh - 36px);
+			max-height: calc(100vh - 190px);
 			overflow-y: auto;
 			overflow-x: hidden;
 			scrollbar-width: thin;
@@ -146,7 +146,28 @@
 			-webkit-backdrop-filter: blur(10px);
 			animation: panelEntrance 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 		}
+		#optionPanel {
+			z-index: 5;
+		}
+		#optionPanel.collapsed {
+			width: auto;
+			min-width: 168px;
+			max-height: none;
+			overflow: hidden;
+		}
+		#optionPanel.collapsed > :not(#optionTitle) {
+			display: none;
+		}
+		#optionPanel.collapsed #optionTitle {
+			border-bottom: none;
+		}
 		#optionTitle {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 18px;
+			cursor: pointer;
+			user-select: none;
 			padding: 11px 16px 9px;
 			font-size: 10px;
 			font-weight: 600;
@@ -217,7 +238,9 @@
 			text-overflow: ellipsis;
 		}
 		.sliderInput {
-			flex: 1;
+			flex: 1 1 0;
+			min-width: 0;
+			width: 100%;
 			-webkit-appearance: none;
 			appearance: none;
 			height: 2px;
@@ -320,8 +343,8 @@
 			100% { opacity: 1; }
 		}
 		@media (max-width: 720px) {
-			#optionPanel { width: 316px; right: 10px; top: 10px; }
-			#footerNote { display: none; }
+			#optionPanel { width: 316px; right: 10px; top: 10px; max-height: calc(100vh - 170px); }
+			#footerNote { left: 10px; right: 10px; bottom: 10px; font-size: 8px; letter-spacing: 0.08em; line-height: 1.6; }
 			#expressionPanel { bottom: calc(5.5% + 50px); gap: 4px; }
 			.expressionButton { padding: 6px 9px; font-size: 9px; letter-spacing: 0.12em; }
 		}
@@ -335,7 +358,7 @@
 		<div id="titleSub">VANILLA.JS</div>
 	</div>
 	<div id="optionPanel">
-		<div id="optionTitle">RENDERING</div>
+		<div id="optionTitle"><span>RENDERING</span><span id="optionToggle">SHOW</span></div>
 	</div>
 	<div id="expressionPanel"></div>
 	<div id="footerNote">
@@ -735,7 +758,19 @@
 		optionRowElements[definition.name] = { rowElement: rowElement, stateElement: stateElement };
 	});
 
-	const footerNoteElement = System.document.getElementById("footerNote");
+	// 패널 접기 / 펼치기. (기본 접음 — 모바일에서 화면을 가리지 않도록, 제목을 누르면 전환)
+	const optionTitleElement = System.document.getElementById("optionTitle");
+	const optionToggleElement = System.document.getElementById("optionToggle");
+	let isOptionPanelCollapsed = true;
+	function refreshOptionPanelCollapse() {
+		optionPanelElement.classList.toggle("collapsed", isOptionPanelCollapsed);
+		optionToggleElement.textContent = isOptionPanelCollapsed ? "SHOW" : "HIDE";
+	}
+	optionTitleElement.addEventListener("click", () => {
+		isOptionPanelCollapsed = !isOptionPanelCollapsed;
+		refreshOptionPanelCollapse();
+	});
+	refreshOptionPanelCollapse();
 	function refreshOptionPanel() {
 		for (const definition of optionDefinitions) {
 			const elements = optionRowElements[definition.name];
@@ -743,8 +778,6 @@
 			elements.stateElement.textContent = isOn ? "ON" : "OFF";
 			elements.rowElement.classList.toggle("on", isOn);
 		}
-		// 머티리얼 그래프(좌측, 2배 폭)가 켜지면 좌측 하단 크레딧을 그래프 오른쪽으로 비킨다
-		footerNoteElement.style.left = optionStates.materialGraph ? ((GRAPH_PANEL_X + GRAPH_PANEL_WIDTH + GRAPH_PANEL_X) * GRAPH_DISPLAY_SCALE + 18) + "px" : "";
 	}
 
 	function toggleOption(optionName) {
@@ -1403,14 +1436,20 @@
 	// 머티리얼 그래프. (좌측 — 텍스처 입력부터 셰이딩 / MRT / SSS / 합성 / 포스트까지의 흐름을 노드로 표시)
 	// - 텍스처는 축소본 이미지, 중간 버퍼는 매 프레임 GL 블릿으로 실시간 표시한다.
 	//==============================================================================
-	const GRAPH_PANEL_X = 18;
-	const GRAPH_PANEL_Y = 18;
-	const GRAPH_PANEL_WIDTH = 262;
+	// 그래픽 설정 패널과 같은 규격. (여백 18 / 폭 372, 제목 바 34, 패딩 12 — 모바일은 여백 10 / 전체 폭)
+	const GRAPH_PANEL_MARGIN = 18;
+	const GRAPH_PANEL_WIDTH = 372;
+	const GRAPH_TITLE_HEIGHT = 34;
 	const GRAPH_PADDING = 12;
+	const GRAPH_NODE_PADDING = 10;
 	const GRAPH_NODE_GAP = 8;
-	const GRAPH_IMAGE_THUMBNAIL_SIZE = 44;
-	const GRAPH_BUFFER_THUMBNAIL_WIDTH = 70;
-	const GRAPH_LINE_HEIGHT = 13;
+	const GRAPH_IMAGE_THUMBNAIL_SIZE = 62;
+	const GRAPH_BUFFER_THUMBNAIL_WIDTH = 100;
+	const GRAPH_LINE_HEIGHT = 15;
+	const GRAPH_TITLE_FONT = `600 10px "Segoe UI", "Malgun Gothic", sans-serif`;
+	const GRAPH_NODE_TITLE_FONT = `600 9px "Segoe UI", "Malgun Gothic", sans-serif`;
+	const GRAPH_TEXT_FONT = `400 9.5px "Segoe UI", "Malgun Gothic", sans-serif`;
+	const GRAPH_LABEL_FONT = `400 8.5px "Segoe UI", "Malgun Gothic", sans-serif`;
 	const GRAPH_ACTIVE_TITLE_COLOR = "rgba(232, 201, 138, 0.95)";
 	const GRAPH_INACTIVE_TITLE_COLOR = "rgba(232, 201, 138, 0.38)";
 	const GRAPH_ACTIVE_TEXT_COLOR = "rgba(242, 236, 226, 0.74)";
@@ -1502,7 +1541,7 @@
 
 	// 노드 설명을 노드 폭에 맞춰 단어 단위로 줄바꿈한다. (실제 폰트로 측정)
 	function wrapGraphLines(lines, maximumWidth) {
-		uiGraphic.setFontString(`400 9px "Segoe UI", "Malgun Gothic", sans-serif`);
+		uiGraphic.setFontString(GRAPH_TEXT_FONT);
 		const wrappedLines = [];
 		for (const line of lines) {
 			const words = line.split(" ");
@@ -1525,103 +1564,142 @@
 		return wrappedLines;
 	}
 
-	function layoutMaterialGraph(nodes, aspectRatio) {
-		const contentWidth = GRAPH_PANEL_WIDTH - GRAPH_PADDING * 2;
-		let cursorY = GRAPH_PANEL_Y + GRAPH_PADDING;
+	// 자간 있는 텍스트. (제목 — CSS letter-spacing 과 같은 느낌으로 글자마다 간격을 더한다)
+	function drawSpacedText(text, x, y, spacing) {
+		let cursorX = x;
+		for (const character of text) {
+			uiGraphic.drawFillText(character, cursorX, y);
+			cursorX += uiGraphic.measureText(character).width + spacing;
+		}
+		return cursorX - x - spacing;
+	}
+
+	// 패널 배치. (모바일은 접힌 그래픽 설정 아래 전체 폭 카드, 아래쪽은 표정 버튼 / 크레딧 영역을 남긴다)
+	function getMaterialGraphFrame() {
+		const cssWidth = System.window.innerWidth;
+		const cssHeight = System.window.innerHeight;
+		const isNarrow = cssWidth < 640;
+		const margin = isNarrow ? 10 : GRAPH_PANEL_MARGIN;
+		const panelWidth = isNarrow ? cssWidth - margin * 2 : GRAPH_PANEL_WIDTH;
+		const panelY = isNarrow ? margin + 34 + 8 : margin;
+		const reservedBottom = isNarrow ? 330 : 172;
+		const maximumHeight = System.Math.max(GRAPH_TITLE_HEIGHT + 60, cssHeight - panelY - reservedBottom);
+		return { x: margin, y: panelY, width: panelWidth, maximumHeight: maximumHeight };
+	}
+
+	// 노드 배치. (패널 좌표계 — 내용 영역의 y 는 제목 바 아래 0 부터)
+	function layoutMaterialGraph(nodes, panelWidth, aspectRatio) {
+		const contentWidth = panelWidth - GRAPH_PADDING * 2;
+		const textWidth = contentWidth - GRAPH_NODE_PADDING * 2;
+		let cursorY = GRAPH_PADDING;
 		for (const node of nodes) {
-			node.lines = wrapGraphLines(node.lines, contentWidth - 16);
-			node.x = GRAPH_PANEL_X + GRAPH_PADDING;
+			node.lines = wrapGraphLines(node.lines, textWidth);
+			node.x = GRAPH_PADDING;
 			node.y = cursorY;
-			let contentY = node.y + 22;
+			let contentY = node.y + 24;
 			if (node.thumbnails.length > 0) {
 				const isImageRow = node.thumbnails[0].image !== undefined;
 				const thumbnailWidth = isImageRow ? GRAPH_IMAGE_THUMBNAIL_SIZE : GRAPH_BUFFER_THUMBNAIL_WIDTH;
 				const thumbnailHeight = isImageRow ? GRAPH_IMAGE_THUMBNAIL_SIZE : System.Math.round(GRAPH_BUFFER_THUMBNAIL_WIDTH / aspectRatio);
-				const spacing = clampValue((contentWidth - 16 - node.thumbnails.length * thumbnailWidth) / System.Math.max(node.thumbnails.length - 1, 1), 6, 26);
+				const spacing = clampValue((textWidth - node.thumbnails.length * thumbnailWidth) / System.Math.max(node.thumbnails.length - 1, 1), 6, 30);
 				for (let thumbnailIndex = 0; thumbnailIndex < node.thumbnails.length; ++thumbnailIndex) {
 					const thumbnail = node.thumbnails[thumbnailIndex];
-					thumbnail.x = node.x + 8 + thumbnailIndex * (thumbnailWidth + spacing);
+					thumbnail.x = node.x + GRAPH_NODE_PADDING + thumbnailIndex * (thumbnailWidth + spacing);
 					thumbnail.y = contentY;
 					thumbnail.width = thumbnailWidth;
 					thumbnail.height = thumbnailHeight;
 				}
-				contentY += thumbnailHeight + 14;
+				contentY += thumbnailHeight + 16;
 			}
 			node.textY = contentY;
 			contentY += node.lines.length * GRAPH_LINE_HEIGHT;
 			node.width = contentWidth;
-			node.height = contentY - node.y + 8;
+			node.height = contentY - node.y + GRAPH_NODE_PADDING;
 			cursorY = node.y + node.height + GRAPH_NODE_GAP;
 		}
-		const panelHeight = cursorY - GRAPH_NODE_GAP + GRAPH_PADDING - GRAPH_PANEL_Y;
-		return panelHeight;
+		return cursorY - GRAPH_NODE_GAP + GRAPH_PADDING;
 	}
 
-	// 그래프 표시 배율 / 스크롤 상태. (2배 확대, 화면보다 길면 휠로 세로 스크롤)
-	const GRAPH_DISPLAY_SCALE = 2;
-	const materialGraphState = { scrollOffset: 0, maximumScroll: 0, visibleWidth: 0, visibleHeight: 0, isDragging: false, dragPointerId: -1, lastPointerY: 0 };
+	// 스크롤 / 입력 상태. (휠 / 드래그로 세로 스크롤 — 패널 사각형 안에서만)
+	const materialGraphState = { scrollOffset: 0, maximumScroll: 0, left: 0, top: 0, right: 0, bottom: 0, isDragging: false, dragPointerId: -1, lastPointerY: 0 };
 	function isPointerOnMaterialGraph(clientX, clientY) {
-		return optionStates.materialGraph && clientX < materialGraphState.visibleWidth && clientY < materialGraphState.visibleHeight;
+		return optionStates.materialGraph && clientX >= materialGraphState.left && clientX < materialGraphState.right && clientY >= materialGraphState.top && clientY < materialGraphState.bottom;
 	}
 
 	function renderMaterialGraph(buffers) {
 		const devicePixelRatio = System.Math.min(System.window.devicePixelRatio || 1, 2);
-		const cssHeight = System.window.innerHeight;
 		const aspectRatio = canvas.width / canvas.height;
+		const frame = getMaterialGraphFrame();
 		const nodes = buildMaterialGraphNodes(buffers);
-		const panelHeight = layoutMaterialGraph(nodes, aspectRatio);
-		const graphScale = GRAPH_DISPLAY_SCALE;
-		const totalHeight = (panelHeight + GRAPH_PANEL_Y * 2) * graphScale;
-		materialGraphState.maximumScroll = System.Math.max(0, totalHeight - cssHeight);
+		const contentHeight = layoutMaterialGraph(nodes, frame.width, aspectRatio);
+		const panelHeight = System.Math.min(GRAPH_TITLE_HEIGHT + contentHeight, frame.maximumHeight);
+		const viewHeight = panelHeight - GRAPH_TITLE_HEIGHT;
+		materialGraphState.maximumScroll = System.Math.max(0, contentHeight - viewHeight);
 		materialGraphState.scrollOffset = clampValue(materialGraphState.scrollOffset, 0, materialGraphState.maximumScroll);
-		materialGraphState.visibleWidth = (GRAPH_PANEL_X + GRAPH_PANEL_WIDTH + GRAPH_PANEL_X) * graphScale;
-		materialGraphState.visibleHeight = System.Math.min(cssHeight, totalHeight);
-		const scrollShift = -materialGraphState.scrollOffset / graphScale;
-		for (const node of nodes) {
-			node.y += scrollShift;
-			node.textY += scrollShift;
-			for (const thumbnail of node.thumbnails) {
-				thumbnail.y += scrollShift;
-			}
-		}
+		materialGraphState.left = frame.x;
+		materialGraphState.top = frame.y;
+		materialGraphState.right = frame.x + frame.width;
+		materialGraphState.bottom = frame.y + panelHeight;
+		const contentTop = frame.y + GRAPH_TITLE_HEIGHT;
+		const originY = contentTop - materialGraphState.scrollOffset;
+		const contentRect = Rect.create(frame.x, contentTop, frame.width, viewHeight);
 		let previewDrawCallCount = 0;
 
-		// 1. 패널 / 노드 배경. (엔진 Graphic)
+		// 1. 패널 / 제목 바 / 노드 배경. (엔진 Graphic — 내용은 제목 아래 영역으로 클립)
 		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
 		webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
 		uiGraphic.applySettings(null);
-		uiGraphic.scale(devicePixelRatio * graphScale, devicePixelRatio * graphScale);
+		uiGraphic.scale(devicePixelRatio, devicePixelRatio);
 		uiGraphic.setGlobalAlpha(1);
-		const panelRect = Rect.create(GRAPH_PANEL_X, GRAPH_PANEL_Y + scrollShift, GRAPH_PANEL_WIDTH, panelHeight);
-		uiGraphic.setFillColor("rgba(14, 12, 14, 0.55)");
+		const panelRect = Rect.create(frame.x, frame.y, frame.width, panelHeight);
+		uiGraphic.setFillColor("rgba(14, 12, 14, 0.5)");
 		uiGraphic.drawRoundRect(panelRect, 12);
 		uiGraphic.setStrokeColor("rgba(242, 236, 226, 0.14)");
 		uiGraphic.drawStrokeRoundRect(panelRect, 12, 1);
+		uiGraphic.setTextBaseline("middle");
+		uiGraphic.setTextAlign("left");
+		uiGraphic.setFontString(GRAPH_TITLE_FONT);
+		uiGraphic.setFillColor(GRAPH_ACTIVE_TITLE_COLOR);
+		drawSpacedText("MATERIAL GRAPH", frame.x + 16, frame.y + GRAPH_TITLE_HEIGHT * 0.5 + 1, 3.2);
+		uiGraphic.setFontString(GRAPH_LABEL_FONT);
+		uiGraphic.setFillColor(GRAPH_LABEL_COLOR);
+		const hintText = materialGraphState.maximumScroll > 0 ? "SCROLL" : "";
+		if (hintText.length > 0) {
+			const hintWidth = uiGraphic.measureText(hintText).width + hintText.length * 1.5;
+			drawSpacedText(hintText, frame.x + frame.width - 16 - hintWidth, frame.y + GRAPH_TITLE_HEIGHT * 0.5 + 1, 1.5);
+		}
+		uiGraphic.setStrokeColor("rgba(242, 236, 226, 0.1)");
+		uiGraphic.drawLine([Vector2.create(frame.x, contentTop), Vector2.create(frame.x + frame.width, contentTop)], 1);
+		uiGraphic.beginClipRect(contentRect);
 		for (const node of nodes) {
-			const nodeRect = Rect.create(node.x, node.y, node.width, node.height);
+			const nodeRect = Rect.create(frame.x + node.x, originY + node.y, node.width, node.height);
 			uiGraphic.setFillColor(node.isActive ? "rgba(255, 255, 255, 0.045)" : "rgba(255, 255, 255, 0.02)");
 			uiGraphic.drawRoundRect(nodeRect, 8);
 			for (const thumbnail of node.thumbnails) {
 				uiGraphic.setFillColor("rgba(0, 0, 0, 0.4)");
-				uiGraphic.drawRect(Rect.create(thumbnail.x, thumbnail.y, thumbnail.width, thumbnail.height));
+				uiGraphic.drawRect(Rect.create(frame.x + thumbnail.x, originY + thumbnail.y, thumbnail.width, thumbnail.height));
 			}
 		}
+		uiGraphic.endClipRect();
 
-		// 2. 중간 버퍼 블릿. (뷰포트를 썸네일 사각형으로 제한)
+		// 2. 중간 버퍼 블릿. (뷰포트를 썸네일 사각형으로 제한 — 내용 영역 안에 온전히 들어온 것만)
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 		previewPass.use();
 		webGL2RenderingContext.uniform1i(previewPass.getUniformLocation("sourceTexture"), 0);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
-		const pixelScale = devicePixelRatio * graphScale;
 		for (const node of nodes) {
 			for (const thumbnail of node.thumbnails) {
 				if (!thumbnail.texture) {
 					continue;
 				}
-				const viewportX = System.Math.round(thumbnail.x * pixelScale);
-				const viewportY = System.Math.round(canvas.height - (thumbnail.y + thumbnail.height) * pixelScale);
-				const viewportWidth = System.Math.round(thumbnail.width * pixelScale);
-				const viewportHeight = System.Math.round(thumbnail.height * pixelScale);
+				const thumbnailTop = originY + thumbnail.y;
+				if (thumbnailTop < contentTop || thumbnailTop + thumbnail.height > contentTop + viewHeight) {
+					continue;
+				}
+				const viewportX = System.Math.round((frame.x + thumbnail.x) * devicePixelRatio);
+				const viewportY = System.Math.round(canvas.height - (thumbnailTop + thumbnail.height) * devicePixelRatio);
+				const viewportWidth = System.Math.round(thumbnail.width * devicePixelRatio);
+				const viewportHeight = System.Math.round(thumbnail.height * devicePixelRatio);
 				webGL2RenderingContext.viewport(viewportX, viewportY, viewportWidth, viewportHeight);
 				webGL2RenderingContext.uniform1f(previewPass.getUniformLocation("displayScale"), thumbnail.displayScale);
 				webGL2RenderingContext.uniform1i(previewPass.getUniformLocation("useCoverage"), thumbnail.useCoverage);
@@ -1632,44 +1710,50 @@
 		}
 		webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
 
-		// 3. 텍스처 축소본 / 제목 / 설명 / 연결선. (엔진 Graphic)
+		// 3. 텍스처 축소본 / 제목 / 설명 / 연결선. (엔진 Graphic — 클립)
 		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
 		uiGraphic.applySettings(null);
-		uiGraphic.scale(devicePixelRatio * graphScale, devicePixelRatio * graphScale);
+		uiGraphic.scale(devicePixelRatio, devicePixelRatio);
 		uiGraphic.setTextBaseline("middle");
 		uiGraphic.setTextAlign("left");
+		uiGraphic.beginClipRect(contentRect);
 		for (let nodeIndex = 0; nodeIndex < nodes.length; ++nodeIndex) {
 			const node = nodes[nodeIndex];
+			const nodeX = frame.x + node.x;
+			const nodeY = originY + node.y;
 			uiGraphic.setGlobalAlpha(1);
 			for (const thumbnail of node.thumbnails) {
+				const thumbnailX = frame.x + thumbnail.x;
+				const thumbnailY = originY + thumbnail.y;
 				if (thumbnail.image) {
 					uiGraphic.setGlobalAlpha(node.isActive ? 1 : 0.4);
-					uiGraphic.drawImage(thumbnail.image, Vector2.create(thumbnail.x, thumbnail.y), Vector2.create(thumbnail.width, thumbnail.height));
+					uiGraphic.drawImage(thumbnail.image, Vector2.create(thumbnailX, thumbnailY), Vector2.create(thumbnail.width, thumbnail.height));
 					uiGraphic.setGlobalAlpha(1);
 				}
 				uiGraphic.setStrokeColor("rgba(242, 236, 226, 0.18)");
-				uiGraphic.drawStrokeRect(Rect.create(thumbnail.x, thumbnail.y, thumbnail.width, thumbnail.height), 1);
-				uiGraphic.setFontString(`400 8px "Segoe UI", "Malgun Gothic", sans-serif`);
+				uiGraphic.drawStrokeRect(Rect.create(thumbnailX, thumbnailY, thumbnail.width, thumbnail.height), 1);
+				uiGraphic.setFontString(GRAPH_LABEL_FONT);
 				uiGraphic.setFillColor(GRAPH_LABEL_COLOR);
-				uiGraphic.drawFillText(thumbnail.label, thumbnail.x, thumbnail.y + thumbnail.height + 7);
+				drawSpacedText(thumbnail.label, thumbnailX, thumbnailY + thumbnail.height + 8, 1);
 			}
-			uiGraphic.setFontString(`600 9.5px "Segoe UI", "Malgun Gothic", sans-serif`);
+			uiGraphic.setFontString(GRAPH_NODE_TITLE_FONT);
 			uiGraphic.setFillColor(node.isActive ? GRAPH_ACTIVE_TITLE_COLOR : GRAPH_INACTIVE_TITLE_COLOR);
-			uiGraphic.drawFillText(node.title, node.x + 8, node.y + 11);
-			uiGraphic.setFontString(`400 9px "Segoe UI", "Malgun Gothic", sans-serif`);
+			drawSpacedText(node.title, nodeX + GRAPH_NODE_PADDING, nodeY + 12, 2.6);
+			uiGraphic.setFontString(GRAPH_TEXT_FONT);
 			uiGraphic.setFillColor(node.isActive ? GRAPH_ACTIVE_TEXT_COLOR : GRAPH_INACTIVE_TEXT_COLOR);
 			for (let lineIndex = 0; lineIndex < node.lines.length; ++lineIndex) {
-				uiGraphic.drawFillText(node.lines[lineIndex], node.x + 8, node.textY + lineIndex * GRAPH_LINE_HEIGHT + 6);
+				uiGraphic.drawFillText(node.lines[lineIndex], nodeX + GRAPH_NODE_PADDING, originY + node.textY + lineIndex * GRAPH_LINE_HEIGHT + 7);
 			}
 			if (nodeIndex < nodes.length - 1) {
-				const connectorX = node.x + 22;
-				const connectorTop = node.y + node.height;
+				const connectorX = nodeX + 22;
+				const connectorTop = nodeY + node.height;
 				uiGraphic.setStrokeColor("rgba(232, 201, 138, 0.5)");
 				uiGraphic.drawLine([Vector2.create(connectorX, connectorTop), Vector2.create(connectorX, connectorTop + GRAPH_NODE_GAP)], 1);
 				uiGraphic.setFillColor("rgba(232, 201, 138, 0.8)");
 				uiGraphic.drawCircle(Vector2.create(connectorX, connectorTop + GRAPH_NODE_GAP * 0.5), 1.8);
 			}
 		}
+		uiGraphic.endClipRect();
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 		return previewDrawCallCount;
 	}
