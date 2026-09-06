@@ -797,7 +797,7 @@
 		{ group: "GEOMETRY", name: "headLod", label: "HEAD MESH LOD", minimum: 0, maximum: 2, step: 1, value: 2, format: (value) => "LOD " + (2 - value) },
 		{ group: "GEOMETRY", name: "hairQuality", label: "HAIR CARDS", minimum: 0, maximum: 4, step: 1, value: 2, format: (value) => HAIR_LEVEL_DEFINITIONS[value].label },
 		{ group: "GEOMETRY", name: "textureSize", label: "TEXTURE SIZE", minimum: 0, maximum: 3, step: 1, value: 3, format: (value) => TEXTURE_SIZE_LABELS[value] },
-		{ group: "SHADOW", name: "shadowQuality", label: "SHADOW MAP", minimum: 0, maximum: 4, step: 1, value: 2, format: (value) => SHADOW_LEVEL_DEFINITIONS[value].label },
+		{ group: "SHADOW", name: "shadowQuality", label: "SHADOW MAP", minimum: 0, maximum: 4, step: 1, value: 1, format: (value) => SHADOW_LEVEL_DEFINITIONS[value].label },
 		{ group: "SHADOW", name: "shadowSoftness", label: "SHADOW SOFTNESS", minimum: 0, maximum: 8, step: 0.25, value: 3, format: (value) => value.toFixed(2) },
 		{ group: "SHADOW", name: "shadowStrength", label: "SHADOW STRENGTH", minimum: 0, maximum: 1, step: 0.02, value: 0.85, format: (value) => value.toFixed(2) },
 		{ group: "SKIN", name: "normalStrength", label: "NORMAL MAP", minimum: 0, maximum: 3, step: 0.05, value: 1.5, format: (value) => value.toFixed(2) },
