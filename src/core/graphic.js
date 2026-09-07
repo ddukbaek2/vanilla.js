@@ -1412,8 +1412,9 @@ export class Graphic extends Object {
 	 * @param { object } entry
 	 * @param { number } x
 	 * @param { number } y
+	 * @param { Color | null } color - 흰색으로 구운 글자에 곱할 색. (null 이면 흰색 그대로)
 	 */
-	drawTextEntry(entry, x, y) {
+	drawTextEntry(entry, x, y, color = null) {
 		// 가로 정렬 오프셋.
 		const textAlign = this.getTextAlign();
 		let alignOffset = 0;
@@ -1447,7 +1448,7 @@ export class Graphic extends Object {
 			quadX + entry.quadWidth, quadY + entry.quadHeight,
 			0, 0, 1, 1);
 		const whiteColor = this.getWhiteColor();
-		this.drawVertices(vertexCountOffset / FLOATS_PER_VERTEX, entry.texture, whiteColor);
+		this.drawVertices(vertexCountOffset / FLOATS_PER_VERTEX, entry.texture, color ? color : whiteColor);
 	}
 
 	//==============================================================================
@@ -1464,17 +1465,17 @@ export class Graphic extends Object {
 			return;
 		}
 
+		// 글자는 흰색으로 굽고 그릴 때 색을 곱한다. (색이 바뀌어도 다시 굽지 않는다 — 틴트 전환 / 색 애니메이션)
 		const textStringTextureCache = this.getTextStringTextureCache();
 		const fontString = this.getFontString();
 		const fillColor = this.getFillColor();
-		const fillColorString = fillColor.toHEXString();
 		const bakeScale = this.calculateTextBakeScale();
-		const entry = textStringTextureCache.getEntry("fill", text, fontString, fillColorString, 0, bakeScale);
+		const entry = textStringTextureCache.getEntry("fill", text, fontString, "#ffffff", 0, bakeScale);
 		if (!entry) {
 			return;
 		}
 
-		this.drawTextEntry(entry, x, y);
+		this.drawTextEntry(entry, x, y, fillColor);
 	}
 
 	//==============================================================================
@@ -1495,14 +1496,13 @@ export class Graphic extends Object {
 		const textStringTextureCache = this.getTextStringTextureCache();
 		const fontString = this.getFontString();
 		const strokeColor = this.getStrokeColor();
-		const strokeColorString = strokeColor.toHEXString();
 		const bakeScale = this.calculateTextBakeScale();
-		const entry = textStringTextureCache.getEntry("stroke", text, fontString, strokeColorString, lineWidth, bakeScale);
+		const entry = textStringTextureCache.getEntry("stroke", text, fontString, "#ffffff", lineWidth, bakeScale);
 		if (!entry) {
 			return;
 		}
 
-		this.drawTextEntry(entry, x, y);
+		this.drawTextEntry(entry, x, y, strokeColor);
 	}
 
 	//==============================================================================

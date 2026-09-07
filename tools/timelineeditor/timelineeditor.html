@@ -4791,8 +4791,9 @@ void main() {
      * @param { object } entry
      * @param { number } x
      * @param { number } y
+     * @param { Color | null } color - 흰색으로 구운 글자에 곱할 색. (null 이면 흰색 그대로)
      */
-    drawTextEntry(entry, x, y) {
+    drawTextEntry(entry, x, y, color = null) {
       const textAlign = this.getTextAlign();
       let alignOffset = 0;
       if (textAlign === "center") {
@@ -4825,7 +4826,7 @@ void main() {
         1
       );
       const whiteColor = this.getWhiteColor();
-      this.drawVertices(vertexCountOffset / FLOATS_PER_VERTEX, entry.texture, whiteColor);
+      this.drawVertices(vertexCountOffset / FLOATS_PER_VERTEX, entry.texture, color ? color : whiteColor);
     }
     //==============================================================================
     // 텍스트 채움 출력. (Canvas2D fillText 대응)
@@ -4843,13 +4844,12 @@ void main() {
       const textStringTextureCache = this.getTextStringTextureCache();
       const fontString = this.getFontString();
       const fillColor = this.getFillColor();
-      const fillColorString = fillColor.toHEXString();
       const bakeScale = this.calculateTextBakeScale();
-      const entry = textStringTextureCache.getEntry("fill", text, fontString, fillColorString, 0, bakeScale);
+      const entry = textStringTextureCache.getEntry("fill", text, fontString, "#ffffff", 0, bakeScale);
       if (!entry) {
         return;
       }
-      this.drawTextEntry(entry, x, y);
+      this.drawTextEntry(entry, x, y, fillColor);
     }
     //==============================================================================
     // 텍스트 외곽선 출력. (Canvas2D strokeText 대응)
@@ -4868,13 +4868,12 @@ void main() {
       const textStringTextureCache = this.getTextStringTextureCache();
       const fontString = this.getFontString();
       const strokeColor = this.getStrokeColor();
-      const strokeColorString = strokeColor.toHEXString();
       const bakeScale = this.calculateTextBakeScale();
-      const entry = textStringTextureCache.getEntry("stroke", text, fontString, strokeColorString, lineWidth, bakeScale);
+      const entry = textStringTextureCache.getEntry("stroke", text, fontString, "#ffffff", lineWidth, bakeScale);
       if (!entry) {
         return;
       }
-      this.drawTextEntry(entry, x, y);
+      this.drawTextEntry(entry, x, y, strokeColor);
     }
     //==============================================================================
     // 노드 출력.
@@ -12143,7 +12142,7 @@ void main() {
     fontSize: { kind: "number", label: "Font Size", apply: /* @__PURE__ */ __name((node, value) => {
       const textComponent = node.getComponent(Text);
       if (textComponent) {
-        textComponent.setFontSize(value);
+        textComponent.setFontSize(System20.Math.round(value));
       }
     }, "apply") },
     visibleCharacters: { kind: "number", label: "Visible Characters", apply: /* @__PURE__ */ __name((node, value) => {

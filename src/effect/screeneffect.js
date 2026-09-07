@@ -877,6 +877,12 @@ export class ScreenEffect extends Object {
 		if (width <= 0 || height <= 0) {
 			return;
 		}
+		// 켜진 효과가 없으면 오프스크린을 거치지 않는다. (화면 크기 복사 패스 비용 0)
+		const hasActiveEffect = this.hasActiveEffect();
+		if (!hasActiveEffect) {
+			this.#isBound = false;
+			return;
+		}
 		this.ensureTargets(width, height);
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, this.#sceneTarget.framebuffer);
 		webGL2RenderingContext.viewport(0, 0, width, height);
@@ -1015,6 +1021,21 @@ export class ScreenEffect extends Object {
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
 		webGL2RenderingContext.bindVertexArray(null);
 		graphic.restoreRenderState();
+	}
+
+	//==============================================================================
+	// 켜진 효과 여부. (세기 0 은 꺼진 것으로 본다)
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	hasActiveEffect() {
+		for (const effectState of this.#effectTable.values()) {
+			if (effectState.isEnabled && effectState.strength > 0) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	//==============================================================================

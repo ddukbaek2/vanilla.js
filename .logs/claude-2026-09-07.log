@@ -10,3 +10,9 @@
 - 검증: 헤드리스 크롬 1개씩 순차(shot.sh / shotlog.sh + serve.sh, 콘솔 로그 stderr 수집). 스프라이트 48종 그리드 / 화면 효과 16종 컨택트 시트 / 편집기 시나리오 5종(선택 · 재생 · 커브 · 노드 추가 + 자동 키 + 되돌리기 · 마커) DOM 덤프로 오류 0 / 샘플 모드별 캡처. 남은 크롬 0.
 - 함정: 헤드리스 SwiftShader 에서는 캔버스 요소 → WebGL 텍스처 업로드가 빈 결과(PNG / 데이터 주소 Image 는 정상) → 테스트와 샘플은 PNG 파일을 쓴다. 문서 생성기에서 첫 키 이전 값 유지 규칙 때문에 2.4초에 시작하는 섬광 트랙이 처음부터 켜져 있던 것 → 0초 키 추가. mergeTracks 묶음을 document() 에 잘못 넘겨 TITLE 문서가 비었던 것 수정. SeededRandom 은 random() 이 아니라 nextValue().
 - 배포: NAS portfolio/timelineeditor · timeline · spritefx, 루트 index.html 도구 / 샘플 목록 추가, README 링크. 문서: UPDATE.md 0.5.8-experimental.
+
+## 타임라인 / 스프라이트 샘플 성능 개선
+[16:20 요청 → 17:10 응답]
+- 요청: "스프라이트 샘플하고 타임라인 샘플하고 왜 이리 느리냐".
+- 계측: 샘플 사본(prof.html)에 씬 tick / draw / postDraw 시간과 Graphic.drawVertices 호출 수를 감싸 재고, devserver 의 /__hold 로 load 를 9.5초 늦춰 헤드리스 --dump-dom 이 실시간 값을 받게 함. 결과(SwiftShader 기준): effects 125 드로우 콜 / 틱 5.8ms, spritefx hitStop 441 드로우 콜 / 틱 74ms(목록 132행의 Paint + 라벨 + 버튼 호버 판정), timeline title 은 화면 효과 유휴 복사 패스 때문에 15 → 53 fps 차이.
+- 수정: (1) Graphic 글자를 흰색으로 굽고 drawTextEntry 에서 색을 곱함 — 색이 바뀔 때 재굽기 없음. (2) Timeline fontSize 트랙 정수화. (3) ScreenEffect.hasActiveEffect 로 유휴 시 begin 이 오프스크린을 잡지 않음. (4) spritefx 목록 행 컬링(updateListCulling) + 비반복 파티클 노드 만료 정리(pruneParticles). (5) spritefx SeededRandom.nextValue 오류 수정.

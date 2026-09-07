@@ -1083,6 +1083,7 @@
 			this.state = null;
 			this.worldZoom = 1;
 			this.heroKnockback = 0;
+			this.spawnedParticleList = [];
 		}
 
 		//==============================================================================
@@ -1196,7 +1197,33 @@
 			}, descriptionOverrides);
 			particleSystem.applyDescription(description);
 			this.modeRoot.addChild(particleNode);
+			if (!description.looping) {
+				// 비반복 시스템은 방출 창 + 최장 수명이 지나면 지운다. (ParticleSystem 은 스스로 끝났다고 알리지 않는다)
+				this.spawnedParticleList.push({ particleSystem: particleSystem, expireTime: this.getElapsed() + description.duration + description.lifetime[1] + 0.5 });
+			}
 			return particleSystem;
+		}
+
+		getElapsed() {
+			return this.#elapsed;
+		}
+
+		//==============================================================================
+		// 다 탄 파티클 노드 정리. (연출이 계속 뿌리는 시스템이 쌓여 프레임을 갉지 않게)
+		//==============================================================================
+		pruneParticles() {
+			for (let index = this.spawnedParticleList.length - 1; index >= 0; --index) {
+				const entry = this.spawnedParticleList[index];
+				const particleNode = entry.particleSystem.getNode();
+				if (!particleNode || particleNode.getParent() !== this.modeRoot) {
+					this.spawnedParticleList.splice(index, 1);
+					continue;
+				}
+				if (this.#elapsed >= entry.expireTime && entry.particleSystem.getParticleCount() === 0) {
+					this.modeRoot.removeChild(particleNode);
+					this.spawnedParticleList.splice(index, 1);
+				}
+			}
 		}
 
 		spawnHitSparks(position) {
@@ -1332,11 +1359,26 @@
 				titleLabel.setText(definition.title);
 				rowButton.excludeNodeFromTint(titleLabel.getNode());
 				contentNode.addChild(rowNode);
-				this.#listRowMap.set(definition.key, { paintComponent: rowPaint, titleLabel: titleLabel, y: y });
+				this.#listRowMap.set(definition.key, { paintComponent: rowPaint, titleLabel: titleLabel, y: y, rowNode: rowNode });
 				y += LIST_ROW_HEIGHT;
 			}
 			listScroll.setScrollContentSize(Vector2.create(LIST_WIDTH, y + 8));
 			this.listScroll = listScroll;
+		}
+
+		//==============================================================================
+		// 목록 행 컬링. (보이는 범위 밖 행은 비활성 — 130여 행의 그리기 / 호버 판정을 아낀다)
+		//==============================================================================
+		updateListCulling() {
+			const scrollOffset = this.listScroll.getScrollOffset();
+			const topY = scrollOffset.y - LIST_ROW_HEIGHT;
+			const bottomY = scrollOffset.y + LIST_HEIGHT + LIST_ROW_HEIGHT;
+			for (const rowEntry of this.#listRowMap.values()) {
+				const isInside = rowEntry.y + LIST_ROW_HEIGHT >= topY && rowEntry.y <= bottomY;
+				if (rowEntry.rowNode.isActive() !== isInside) {
+					rowEntry.rowNode.setActive(isInside);
+				}
+			}
 		}
 
 		//==============================================================================
@@ -1475,6 +1517,7 @@
 			this.shaker.stop();
 			this.screenEffect.disableAll();
 			this.modeRoot.removeChildren();
+			this.spawnedParticleList = [];
 			this.floatingText.clear();
 			this.setSubjectsVisible(true);
 			this.hero.setLocalPosition(Vector2.create(300, FLOOR_Y - 60));
@@ -1544,6 +1587,8 @@
 			if (this.#mode) {
 				this.#mode.update(this, this.#elapsed, timeDelta, unscaledDelta);
 			}
+			this.pruneParticles();
+			this.updateListCulling();
 
 			// 공용 피사체 애니메이션.
 			const coinFrame = System.Math.floor(this.#elapsed * 12) % 8;

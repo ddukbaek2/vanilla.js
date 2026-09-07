@@ -6473,8 +6473,9 @@ var Graphic = class extends Object2 {
    * @param { object } entry
    * @param { number } x
    * @param { number } y
+   * @param { Color | null } color - 흰색으로 구운 글자에 곱할 색. (null 이면 흰색 그대로)
    */
-  drawTextEntry(entry, x, y) {
+  drawTextEntry(entry, x, y, color = null) {
     const textAlign = this.getTextAlign();
     let alignOffset = 0;
     if (textAlign === "center") {
@@ -6507,7 +6508,7 @@ var Graphic = class extends Object2 {
       1
     );
     const whiteColor = this.getWhiteColor();
-    this.drawVertices(vertexCountOffset / FLOATS_PER_VERTEX, entry.texture, whiteColor);
+    this.drawVertices(vertexCountOffset / FLOATS_PER_VERTEX, entry.texture, color ? color : whiteColor);
   }
   //==============================================================================
   // 텍스트 채움 출력. (Canvas2D fillText 대응)
@@ -6525,13 +6526,12 @@ var Graphic = class extends Object2 {
     const textStringTextureCache = this.getTextStringTextureCache();
     const fontString = this.getFontString();
     const fillColor = this.getFillColor();
-    const fillColorString = fillColor.toHEXString();
     const bakeScale = this.calculateTextBakeScale();
-    const entry = textStringTextureCache.getEntry("fill", text, fontString, fillColorString, 0, bakeScale);
+    const entry = textStringTextureCache.getEntry("fill", text, fontString, "#ffffff", 0, bakeScale);
     if (!entry) {
       return;
     }
-    this.drawTextEntry(entry, x, y);
+    this.drawTextEntry(entry, x, y, fillColor);
   }
   //==============================================================================
   // 텍스트 외곽선 출력. (Canvas2D strokeText 대응)
@@ -6550,13 +6550,12 @@ var Graphic = class extends Object2 {
     const textStringTextureCache = this.getTextStringTextureCache();
     const fontString = this.getFontString();
     const strokeColor = this.getStrokeColor();
-    const strokeColorString = strokeColor.toHEXString();
     const bakeScale = this.calculateTextBakeScale();
-    const entry = textStringTextureCache.getEntry("stroke", text, fontString, strokeColorString, lineWidth, bakeScale);
+    const entry = textStringTextureCache.getEntry("stroke", text, fontString, "#ffffff", lineWidth, bakeScale);
     if (!entry) {
       return;
     }
-    this.drawTextEntry(entry, x, y);
+    this.drawTextEntry(entry, x, y, strokeColor);
   }
   //==============================================================================
   // 노드 출력.
@@ -37308,6 +37307,11 @@ var ScreenEffect = class extends Object2 {
     if (width <= 0 || height <= 0) {
       return;
     }
+    const hasActiveEffect = this.hasActiveEffect();
+    if (!hasActiveEffect) {
+      this.#isBound = false;
+      return;
+    }
     this.ensureTargets(width, height);
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, this.#sceneTarget.framebuffer);
     webGL2RenderingContext.viewport(0, 0, width, height);
@@ -37429,6 +37433,20 @@ var ScreenEffect = class extends Object2 {
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
     webGL2RenderingContext.bindVertexArray(null);
     graphic.restoreRenderState();
+  }
+  //==============================================================================
+  // 켜진 효과 여부. (세기 0 은 꺼진 것으로 본다)
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  hasActiveEffect() {
+    for (const effectState of this.#effectTable.values()) {
+      if (effectState.isEnabled && effectState.strength > 0) {
+        return true;
+      }
+    }
+    return false;
   }
   //==============================================================================
   // 렌더 대상 준비. (크기가 바뀌면 다시 만든다)
@@ -37832,7 +37850,7 @@ var TIMELINE_PROPERTY_DEFINITIONS = {
   fontSize: { kind: "number", label: "Font Size", apply: /* @__PURE__ */ __name((node, value) => {
     const textComponent = node.getComponent(Text);
     if (textComponent) {
-      textComponent.setFontSize(value);
+      textComponent.setFontSize(System76.Math.round(value));
     }
   }, "apply") },
   visibleCharacters: { kind: "number", label: "Visible Characters", apply: /* @__PURE__ */ __name((node, value) => {

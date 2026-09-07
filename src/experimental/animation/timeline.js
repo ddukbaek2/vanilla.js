@@ -225,7 +225,8 @@ export const TIMELINE_PROPERTY_DEFINITIONS = {
 	fontSize: { kind: "number", label: "Font Size", apply: (node, value) => {
 		const textComponent = node.getComponent(Text);
 		if (textComponent) {
-			textComponent.setFontSize(value);
+			// 글자 텍스처는 (문자열, 폰트) 조합마다 굽히므로 정수 픽셀로 맞춰 매 프레임 재굽기를 막는다.
+			textComponent.setFontSize(System.Math.round(value));
 		}
 	} },
 	visibleCharacters: { kind: "number", label: "Visible Characters", apply: (node, value) => {
