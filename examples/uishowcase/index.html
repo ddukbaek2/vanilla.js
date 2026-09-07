@@ -35,10 +35,12 @@
 	//==============================================================================
 	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../../build/vanilla.js)
 	//==============================================================================
+	// 배포 스탬프를 주소에 붙여 브라우저가 옛 엔진을 캐시에서 꺼내 쓰지 않게 한다. (엔진을 다시 올릴 때 값을 바꾼다)
+	const ENGINE_CACHE_STAMP = "20260907d";
 	let engineModule = null;
 	try {
 		try {
-			engineModule = await import("./vanilla.js");
+			engineModule = await import("./vanilla.js?v=" + ENGINE_CACHE_STAMP);
 		}
 		catch (importError) {
 			engineModule = await import("../../build/vanilla.js");
@@ -1879,6 +1881,43 @@
 			if (this.#touchRecognizer) {
 				this.#touchRecognizer.touchRelease(viewInputPosition);
 			}
+		}
+
+		//==============================================================================
+		// 마우스 휠. (포인터 아래 가장 안쪽 스크롤 뷰로 전달 — UIScene 이 아닌 씬은 직접 넘겨야 한다)
+		//==============================================================================
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 * @param { Vector2 } wheelDelta
+		 */
+		touchWheel(viewInputPosition, wheelDelta) {
+			const scrollView = this.findScrollViewAt(this.getRoot(), viewInputPosition);
+			if (scrollView) {
+				scrollView.wheel(wheelDelta);
+			}
+		}
+
+		/**
+		 * @param { WorldNode } node
+		 * @param { Vector2 } viewInputPosition
+		 * @returns { UIScrollView | null }
+		 */
+		findScrollViewAt(node, viewInputPosition) {
+			if (!node.isActive()) {
+				return null;
+			}
+			const children = node.getChildren();
+			for (let childIndex = children.length - 1; childIndex >= 0; --childIndex) {
+				const found = this.findScrollViewAt(children[childIndex], viewInputPosition);
+				if (found) {
+					return found;
+				}
+			}
+			const scrollView = (typeof node.getComponent === "function") ? node.getComponent(UIScrollView) : null;
+			if (scrollView && typeof node.contains === "function" && node.contains(viewInputPosition)) {
+				return scrollView;
+			}
+			return null;
 		}
 
 		//==============================================================================

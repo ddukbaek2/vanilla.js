@@ -1643,6 +1643,43 @@
 				this.#touchRecognizer.touchRelease(viewInputPosition);
 			}
 		}
+
+		//==============================================================================
+		// 마우스 휠. (포인터 아래 가장 안쪽 스크롤 뷰로 전달 — UIScene 이 아닌 씬은 직접 넘겨야 한다)
+		//==============================================================================
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 * @param { Vector2 } wheelDelta
+		 */
+		touchWheel(viewInputPosition, wheelDelta) {
+			const scrollView = this.findScrollViewAt(this.getRoot(), viewInputPosition);
+			if (scrollView) {
+				scrollView.wheel(wheelDelta);
+			}
+		}
+
+		/**
+		 * @param { WorldNode } node
+		 * @param { Vector2 } viewInputPosition
+		 * @returns { UIScrollView | null }
+		 */
+		findScrollViewAt(node, viewInputPosition) {
+			if (!node.isActive()) {
+				return null;
+			}
+			const children = node.getChildren();
+			for (let childIndex = children.length - 1; childIndex >= 0; --childIndex) {
+				const found = this.findScrollViewAt(children[childIndex], viewInputPosition);
+				if (found) {
+					return found;
+				}
+			}
+			const scrollView = (typeof node.getComponent === "function") ? node.getComponent(UIScrollView) : null;
+			if (scrollView && typeof node.contains === "function" && node.contains(viewInputPosition)) {
+				return scrollView;
+			}
+			return null;
+		}
 	}
 
 	//==============================================================================
