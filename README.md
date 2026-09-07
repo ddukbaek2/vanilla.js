@@ -46,7 +46,7 @@
 - https://ddukbaek2.com/portfolio/particleeffects
 - https://ddukbaek2.com/portfolio/timelineshowcase
 - https://ddukbaek2.com/portfolio/spriteeffects
-- https://ddukbaek2.com/portfolio/celshading
+- https://ddukbaek2.com/portfolio/toonshading
 
 ### 게임
 - https://ddukbaek2.com/portfolio/talesofcultivation

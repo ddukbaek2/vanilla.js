@@ -49,3 +49,7 @@
 - 카메라: 줌 거리에 따라 초점 높이가 몸 → 얼굴로 올라가고(부드러운 곡선), 우클릭 / Shift 드래그 · 두 손가락 세로 이동으로 초점 높이 팬, 더블클릭 얼굴 / 전신, 팬 뒤에는 컨텍스트 메뉴 억제.
 - 신체 애니메이션: Ancient Mountain 의 Mixamo 클립(idle / walk / run) 을 숨은 골격에서 재생하고 Remy T 포즈 표(mixamo_rest.json, 개발 시 Remy.fbx 에서 굽음 — FBX 이름은 "이름 Model" 형식이라 분리 필요)를 기준으로 뼈별 월드 회전 변화를 VRM 휴머노이드 뼈(손가락 포함 53개)에 옮김. 부모부터 처리해 지연 누적 없음, 골반 높이만 모델 행렬로. BODY ANIMATION 슬라이더(PROCEDURAL / IDLE / WALK / RUN, 기본 IDLE), 애니메이션 중에는 머리 추적을 리타깃 위에 얹고 호흡 / 흔들림은 끔.
 - 검증: 실제 GPU 캡처로 눈 방향(좌우 카메라), idle / walk 자세 확인. 헤드리스 1280x800 에서 1080P 기준(1927x1075 슈퍼샘플링) 26fps.
+
+## 샘플 이름 변경: Cel Shading → Toon Shading
+[07:50 요청 → 07:58 응답]
+- 요청: 셀 셰이딩 대신 이 기법에 더 표준적으로 쓰는 이름으로. 업계 표준 용어 Toon Shading(유니티 Toon Shader / VRM MToon 등) 으로 저장소 디렉토리(examples/toonshading), 제목, README, NAS 폴더 / 루트 목록 / created.json 을 모두 바꿈.
