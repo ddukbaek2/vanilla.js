@@ -1,0 +1,695 @@
+{
+	"name": "Cutscene",
+	"duration": 7,
+	"frameRate": 30,
+	"loop": false,
+	"stage": {
+		"width": 960,
+		"height": 540,
+		"backgroundColor": "#101114ff",
+		"nodes": [
+			{
+				"name": "Sky",
+				"type": "paint",
+				"parent": null,
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540,
+				"color": "#141a2aff"
+			},
+			{
+				"name": "Camera",
+				"type": "group",
+				"parent": null,
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540
+			},
+			{
+				"name": "Moon",
+				"type": "paint",
+				"parent": "Camera",
+				"x": 760,
+				"y": 90,
+				"width": 90,
+				"height": 90,
+				"color": "#f2ece2ff",
+				"roundSize": 45
+			},
+			{
+				"name": "Hill Far",
+				"type": "paint",
+				"parent": "Camera",
+				"x": 300,
+				"y": 470,
+				"width": 900,
+				"height": 420,
+				"color": "#1c2436ff",
+				"roundSize": 210
+			},
+			{
+				"name": "Hill Near",
+				"type": "paint",
+				"parent": "Camera",
+				"x": 700,
+				"y": 520,
+				"width": 1100,
+				"height": 420,
+				"color": "#232f45ff",
+				"roundSize": 210
+			},
+			{
+				"name": "Ground",
+				"type": "paint",
+				"parent": "Camera",
+				"x": 480,
+				"y": 500,
+				"width": 1400,
+				"height": 120,
+				"color": "#2a3650ff"
+			},
+			{
+				"name": "Gem",
+				"type": "sprite",
+				"parent": "Camera",
+				"x": 720,
+				"y": 400,
+				"width": 56,
+				"height": 56,
+				"image": "gem.png"
+			},
+			{
+				"name": "Gem Light",
+				"type": "paint",
+				"parent": "Camera",
+				"x": 720,
+				"y": 400,
+				"width": 140,
+				"height": 140,
+				"color": "#80b8ff22",
+				"roundSize": 70
+			},
+			{
+				"name": "Hero",
+				"type": "sprite",
+				"parent": "Camera",
+				"x": 180,
+				"y": 410,
+				"width": 112,
+				"height": 112,
+				"image": "slime.png",
+				"frameColumns": 8,
+				"frameRows": 1
+			},
+			{
+				"name": "Bat",
+				"type": "sprite",
+				"parent": "Camera",
+				"x": 1100,
+				"y": 160,
+				"width": 96,
+				"height": 72,
+				"image": "bat.png",
+				"frameColumns": 4,
+				"frameRows": 1
+			},
+			{
+				"name": "Bar Top",
+				"type": "paint",
+				"parent": null,
+				"x": 480,
+				"y": -40,
+				"width": 960,
+				"height": 80,
+				"color": "#000000ff"
+			},
+			{
+				"name": "Bar Bottom",
+				"type": "paint",
+				"parent": null,
+				"x": 480,
+				"y": 580,
+				"width": 960,
+				"height": 80,
+				"color": "#000000ff"
+			},
+			{
+				"name": "Dialogue Box",
+				"type": "paint",
+				"parent": null,
+				"x": 480,
+				"y": 470,
+				"width": 760,
+				"height": 88,
+				"color": "#0b0d12dd",
+				"roundSize": 12,
+				"opacity": 0
+			},
+			{
+				"name": "Speaker",
+				"type": "text",
+				"parent": null,
+				"x": 140,
+				"y": 448,
+				"width": 200,
+				"height": 24,
+				"text": "SLIME",
+				"fontSize": 13,
+				"bold": true,
+				"color": "#d4b06aff",
+				"textAlign": "left",
+				"opacity": 0
+			},
+			{
+				"name": "Dialogue",
+				"type": "text",
+				"parent": null,
+				"x": 140,
+				"y": 482,
+				"width": 700,
+				"height": 30,
+				"text": "That gem... it's been calling me since the ruins.",
+				"fontSize": 20,
+				"color": "#f2ece2ff",
+				"textAlign": "left",
+				"opacity": 0
+			},
+			{
+				"name": "Fade",
+				"type": "paint",
+				"parent": null,
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540,
+				"color": "#000000ff",
+				"opacity": 0
+			}
+		]
+	},
+	"tracks": [
+		{
+			"target": "Bar Top",
+			"property": "y",
+			"keys": [
+				{
+					"time": 0,
+					"value": -40,
+					"easing": "cubic.out"
+				},
+				{
+					"time": 0.8,
+					"value": 40,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Bar Bottom",
+			"property": "y",
+			"keys": [
+				{
+					"time": 0,
+					"value": 580,
+					"easing": "cubic.out"
+				},
+				{
+					"time": 0.8,
+					"value": 500,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Camera",
+			"property": "x",
+			"keys": [
+				{
+					"time": 0,
+					"value": 480,
+					"easing": "sinusoidal.inOut"
+				},
+				{
+					"time": 4,
+					"value": 240,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 7,
+					"value": 240,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Camera",
+			"property": "scaleX",
+			"keys": [
+				{
+					"time": 3.5,
+					"value": 1,
+					"easing": "sinusoidal.inOut"
+				},
+				{
+					"time": 6.5,
+					"value": 1.25,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Camera",
+			"property": "scaleY",
+			"keys": [
+				{
+					"time": 3.5,
+					"value": 1,
+					"easing": "sinusoidal.inOut"
+				},
+				{
+					"time": 6.5,
+					"value": 1.25,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Hero",
+			"property": "x",
+			"keys": [
+				{
+					"time": 0.5,
+					"value": 180,
+					"easing": "linear"
+				},
+				{
+					"time": 3.8,
+					"value": 560,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Hero",
+			"property": "y",
+			"keys": [
+				{
+					"time": 0.5,
+					"value": 410,
+					"easing": "quadratic.out"
+				},
+				{
+					"time": 0.9,
+					"value": 340,
+					"easing": "quadratic.in"
+				},
+				{
+					"time": 1.3,
+					"value": 410,
+					"easing": "quadratic.out"
+				},
+				{
+					"time": 1.7,
+					"value": 340,
+					"easing": "quadratic.in"
+				},
+				{
+					"time": 2.1,
+					"value": 410,
+					"easing": "quadratic.out"
+				},
+				{
+					"time": 2.5,
+					"value": 340,
+					"easing": "quadratic.in"
+				},
+				{
+					"time": 2.9,
+					"value": 410,
+					"easing": "quadratic.out"
+				},
+				{
+					"time": 3.3,
+					"value": 340,
+					"easing": "quadratic.in"
+				},
+				{
+					"time": 3.7,
+					"value": 410,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Hero",
+			"property": "frame",
+			"keys": [
+				{
+					"time": 0,
+					"value": 0,
+					"easing": "linear"
+				},
+				{
+					"time": 7,
+					"value": 56,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Bat",
+			"property": "frame",
+			"keys": [
+				{
+					"time": 0,
+					"value": 0,
+					"easing": "linear"
+				},
+				{
+					"time": 7,
+					"value": 42,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Bat",
+			"property": "x",
+			"keys": [
+				{
+					"time": 0,
+					"value": 1100,
+					"easing": "sinusoidal.inOut"
+				},
+				{
+					"time": 3,
+					"value": 300,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 7,
+					"value": -200,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Bat",
+			"property": "y",
+			"keys": [
+				{
+					"time": 0,
+					"value": 160,
+					"easing": "sinusoidal.inOut"
+				},
+				{
+					"time": 1.5,
+					"value": 110,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 3,
+					"value": 190,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 4.5,
+					"value": 120,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 7,
+					"value": 170,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Gem",
+			"property": "y",
+			"keys": [
+				{
+					"time": 0,
+					"value": 400,
+					"easing": "sinusoidal.inOut"
+				},
+				{
+					"time": 1,
+					"value": 388,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 2,
+					"value": 400,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 3,
+					"value": 388,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 4,
+					"value": 400,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 5,
+					"value": 388,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 6,
+					"value": 400,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Gem Light",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 0,
+					"value": 0.6,
+					"easing": "sinusoidal.inOut"
+				},
+				{
+					"time": 1,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 2,
+					"value": 0.6,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 3,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 4,
+					"value": 0.6,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 5,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 6,
+					"value": 0.6,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Dialogue Box",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 3.9,
+					"value": 0,
+					"easing": "cubic.out"
+				},
+				{
+					"time": 4.3,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 6.3,
+					"value": 1,
+					"easing": "cubic.in"
+				},
+				{
+					"time": 6.7,
+					"value": 0,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Speaker",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 4,
+					"value": 0,
+					"easing": "cubic.out"
+				},
+				{
+					"time": 4.3,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 6.3,
+					"value": 1,
+					"easing": "cubic.in"
+				},
+				{
+					"time": 6.7,
+					"value": 0,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Dialogue",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 4.1,
+					"value": 0,
+					"easing": "step"
+				},
+				{
+					"time": 4.15,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 6.3,
+					"value": 1,
+					"easing": "cubic.in"
+				},
+				{
+					"time": 6.7,
+					"value": 0,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Dialogue",
+			"property": "visibleCharacters",
+			"keys": [
+				{
+					"time": 4.1,
+					"value": 0,
+					"easing": "linear"
+				},
+				{
+					"time": 5.9,
+					"value": 50,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Fade",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 6.4,
+					"value": 0,
+					"easing": "cubic.in"
+				},
+				{
+					"time": 7,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "screen",
+			"property": "vignette",
+			"keys": [
+				{
+					"time": 0,
+					"value": 0,
+					"easing": "sinusoidal.out"
+				},
+				{
+					"time": 1.2,
+					"value": 0.85,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "screen",
+			"property": "colorGrade",
+			"keys": [
+				{
+					"time": 0,
+					"value": 1,
+					"easing": "step"
+				}
+			]
+		},
+		{
+			"target": "screen",
+			"property": "colorGrade.saturation",
+			"keys": [
+				{
+					"time": 0,
+					"value": 1.15,
+					"easing": "linear"
+				},
+				{
+					"time": 5.5,
+					"value": 1.15,
+					"easing": "cubic.in"
+				},
+				{
+					"time": 7,
+					"value": 0.2,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "screen",
+			"property": "grain",
+			"keys": [
+				{
+					"time": 0,
+					"value": 0.35,
+					"easing": "step"
+				}
+			]
+		}
+	],
+	"markers": [
+		{
+			"time": 0.8,
+			"name": "bars"
+		},
+		{
+			"time": 3.9,
+			"name": "dialogue"
+		},
+		{
+			"time": 6.4,
+			"name": "fade"
+		}
+	]
+}

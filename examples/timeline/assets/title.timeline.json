@@ -1,0 +1,458 @@
+{
+	"name": "Title Reveal",
+	"duration": 5,
+	"frameRate": 30,
+	"loop": true,
+	"stage": {
+		"width": 960,
+		"height": 540,
+		"backgroundColor": "#101114ff",
+		"nodes": [
+			{
+				"name": "Backdrop",
+				"type": "paint",
+				"parent": null,
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540,
+				"color": "#171a22ff"
+			},
+			{
+				"name": "Glow",
+				"type": "paint",
+				"parent": null,
+				"x": 480,
+				"y": 290,
+				"width": 560,
+				"height": 560,
+				"color": "#d4b06a22",
+				"roundSize": 280,
+				"scaleX": 0.3,
+				"scaleY": 0.3,
+				"opacity": 0
+			},
+			{
+				"name": "Word",
+				"type": "text",
+				"parent": null,
+				"x": 480,
+				"y": 250,
+				"width": 900,
+				"height": 120,
+				"text": "VANILLA",
+				"fontSize": 96,
+				"bold": true,
+				"color": "#f2ece2ff",
+				"opacity": 0
+			},
+			{
+				"name": "Underline",
+				"type": "paint",
+				"parent": null,
+				"x": 480,
+				"y": 318,
+				"width": 0,
+				"height": 4,
+				"color": "#d4b06aff"
+			},
+			{
+				"name": "Subtitle",
+				"type": "text",
+				"parent": null,
+				"x": 480,
+				"y": 360,
+				"width": 700,
+				"height": 40,
+				"text": "TIMELINE · KEYFRAMES · EASING",
+				"fontSize": 22,
+				"color": "#9aa2b2ff",
+				"opacity": 0
+			},
+			{
+				"name": "Burst",
+				"type": "particle",
+				"parent": null,
+				"x": 480,
+				"y": 250,
+				"width": 20,
+				"height": 20,
+				"particle": {
+					"looping": false,
+					"duration": 1.2,
+					"maxParticleCount": 600,
+					"emissionRate": 0,
+					"bursts": [
+						{
+							"time": 0,
+							"count": 90
+						}
+					],
+					"shape": "circle",
+					"shapeRadius": 6,
+					"coneAngle": 0.35,
+					"boxSize": [
+						200,
+						100
+					],
+					"edgeWidth": 400,
+					"lifetime": [
+						0.5,
+						1.1
+					],
+					"speed": [
+						220,
+						520
+					],
+					"size": [
+						3,
+						6
+					],
+					"rotation": [
+						0,
+						0
+					],
+					"angularVelocity": [
+						0,
+						0
+					],
+					"startColorA": [
+						1,
+						0.85,
+						0.4,
+						1
+					],
+					"startColorB": [
+						1,
+						0.55,
+						0.2,
+						1
+					],
+					"colorOverLifetime": [
+						{
+							"time": 0,
+							"color": [
+								1,
+								1,
+								1,
+								1
+							]
+						},
+						{
+							"time": 1,
+							"color": [
+								1,
+								0.4,
+								0.1,
+								0
+							]
+						}
+					],
+					"sizeOverLifetime": [
+						1,
+						0.5
+					],
+					"gravity": [
+						0,
+						240
+					],
+					"damping": 1.6,
+					"attractor": null,
+					"wobble": [
+						0,
+						4
+					],
+					"renderShape": "streak",
+					"blendMode": "lighter",
+					"streakScale": 0.04,
+					"worldSpace": false
+				}
+			}
+		]
+	},
+	"tracks": [
+		{
+			"target": "Word",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 0,
+					"value": 0,
+					"easing": "cubic.out"
+				},
+				{
+					"time": 0.7,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 4.4,
+					"value": 1,
+					"easing": "cubic.in"
+				},
+				{
+					"time": 5,
+					"value": 0,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Word",
+			"property": "y",
+			"keys": [
+				{
+					"time": 0,
+					"value": 300,
+					"easing": "cubic.out"
+				},
+				{
+					"time": 0.9,
+					"value": 250,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Word",
+			"property": "scaleX",
+			"keys": [
+				{
+					"time": 0,
+					"value": 0.7,
+					"easing": "back.out"
+				},
+				{
+					"time": 1,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Word",
+			"property": "scaleY",
+			"keys": [
+				{
+					"time": 0,
+					"value": 0.7,
+					"easing": "back.out"
+				},
+				{
+					"time": 1,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Word",
+			"property": "fontSize",
+			"keys": [
+				{
+					"time": 2.8,
+					"value": 96,
+					"easing": "sinusoidal.inOut"
+				},
+				{
+					"time": 3.6,
+					"value": 104,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 4.4,
+					"value": 96,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Underline",
+			"property": "width",
+			"keys": [
+				{
+					"time": 0.5,
+					"value": 0,
+					"easing": "quartic.out"
+				},
+				{
+					"time": 1.4,
+					"value": 520,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 4.4,
+					"value": 520,
+					"easing": "cubic.in"
+				},
+				{
+					"time": 5,
+					"value": 0,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Subtitle",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 1,
+					"value": 0,
+					"easing": "sinusoidal.out"
+				},
+				{
+					"time": 1.8,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 4.4,
+					"value": 1,
+					"easing": "cubic.in"
+				},
+				{
+					"time": 5,
+					"value": 0,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Subtitle",
+			"property": "y",
+			"keys": [
+				{
+					"time": 1,
+					"value": 384,
+					"easing": "cubic.out"
+				},
+				{
+					"time": 1.8,
+					"value": 360,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Subtitle",
+			"property": "visibleCharacters",
+			"keys": [
+				{
+					"time": 1,
+					"value": 0,
+					"easing": "linear"
+				},
+				{
+					"time": 2.2,
+					"value": 30,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Glow",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 0.3,
+					"value": 0,
+					"easing": "sinusoidal.out"
+				},
+				{
+					"time": 1.4,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 4.2,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 5,
+					"value": 0,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Glow",
+			"property": "scaleX",
+			"keys": [
+				{
+					"time": 0.3,
+					"value": 0.3,
+					"easing": "sinusoidal.out"
+				},
+				{
+					"time": 1.8,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Glow",
+			"property": "scaleY",
+			"keys": [
+				{
+					"time": 0.3,
+					"value": 0.3,
+					"easing": "sinusoidal.out"
+				},
+				{
+					"time": 1.8,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Word",
+			"property": "color",
+			"keys": [
+				{
+					"time": 2.6,
+					"value": "#f2ece2ff",
+					"easing": "sinusoidal.inOut"
+				},
+				{
+					"time": 3.4,
+					"value": "#d4b06aff",
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 4.2,
+					"value": "#f2ece2ff",
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Burst",
+			"property": "event",
+			"keys": [
+				{
+					"time": 0.85,
+					"value": "play",
+					"easing": "step"
+				}
+			]
+		}
+	],
+	"markers": [
+		{
+			"time": 0.85,
+			"name": "hit"
+		},
+		{
+			"time": 2.6,
+			"name": "shine"
+		},
+		{
+			"time": 4.4,
+			"name": "outro"
+		}
+	]
+}

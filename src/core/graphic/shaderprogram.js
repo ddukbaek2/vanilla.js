@@ -25,8 +25,9 @@ export class ShaderProgram extends Object {
 	 * @param { WebGL2RenderingContext } webGL2RenderingContext
 	 * @param { string } vertexShaderSource
 	 * @param { string } fragmentShaderSource
+	 * @param { object | null } attributeLocationTable - 링크 전에 고정할 어트리뷰트 위치. ({ 이름: 위치 } — 다른 프로그램의 버텍스 어레이를 함께 쓸 때)
 	 */
-	constructor(webGL2RenderingContext, vertexShaderSource, fragmentShaderSource) {
+	constructor(webGL2RenderingContext, vertexShaderSource, fragmentShaderSource, attributeLocationTable = null) {
 		super();
 
 		this.#webGL2RenderingContext = webGL2RenderingContext;
@@ -39,6 +40,11 @@ export class ShaderProgram extends Object {
 		const program = webGL2RenderingContext.createProgram();
 		webGL2RenderingContext.attachShader(program, vertexShader);
 		webGL2RenderingContext.attachShader(program, fragmentShader);
+		if (attributeLocationTable) {
+			for (const attributeName in attributeLocationTable) {
+				webGL2RenderingContext.bindAttribLocation(program, attributeLocationTable[attributeName], attributeName);
+			}
+		}
 		webGL2RenderingContext.linkProgram(program);
 		if (!webGL2RenderingContext.getProgramParameter(program, webGL2RenderingContext.LINK_STATUS)) {
 			const programError = webGL2RenderingContext.getProgramInfoLog(program);

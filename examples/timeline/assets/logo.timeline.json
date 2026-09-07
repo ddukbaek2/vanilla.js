@@ -1,0 +1,552 @@
+{
+	"name": "Logo Sting",
+	"duration": 4.6,
+	"frameRate": 30,
+	"loop": true,
+	"stage": {
+		"width": 960,
+		"height": 540,
+		"backgroundColor": "#101114ff",
+		"nodes": [
+			{
+				"name": "Backdrop",
+				"type": "paint",
+				"parent": null,
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540,
+				"color": "#0d0f14ff"
+			},
+			{
+				"name": "Ring",
+				"type": "paint",
+				"parent": null,
+				"x": 480,
+				"y": 260,
+				"width": 300,
+				"height": 300,
+				"color": "#d4b06a00",
+				"roundSize": 150,
+				"scaleX": 0.2,
+				"scaleY": 0.2
+			},
+			{
+				"name": "Emblem",
+				"type": "sprite",
+				"parent": null,
+				"x": 480,
+				"y": 260,
+				"width": 220,
+				"height": 220,
+				"image": "emblem.png",
+				"effect": "shine",
+				"effectProgress": 0,
+				"effectColor": "#fff3c8ff",
+				"scaleX": 0,
+				"scaleY": 0,
+				"rotation": -30
+			},
+			{
+				"name": "Caption",
+				"type": "text",
+				"parent": null,
+				"x": 480,
+				"y": 420,
+				"width": 600,
+				"height": 40,
+				"text": "VANILLA.JS",
+				"fontSize": 30,
+				"bold": true,
+				"color": "#d4b06aff",
+				"opacity": 0
+			},
+			{
+				"name": "Stars",
+				"type": "particle",
+				"parent": null,
+				"x": 480,
+				"y": 260,
+				"width": 20,
+				"height": 20,
+				"particle": {
+					"looping": false,
+					"duration": 1.2,
+					"maxParticleCount": 600,
+					"emissionRate": 0,
+					"bursts": [
+						{
+							"time": 0,
+							"count": 50
+						}
+					],
+					"shape": "circle",
+					"shapeRadius": 6,
+					"coneAngle": 0.35,
+					"boxSize": [
+						200,
+						100
+					],
+					"edgeWidth": 400,
+					"lifetime": [
+						0.5,
+						1.1
+					],
+					"speed": [
+						120,
+						320
+					],
+					"size": [
+						3,
+						6
+					],
+					"rotation": [
+						0,
+						0
+					],
+					"angularVelocity": [
+						0,
+						0
+					],
+					"startColorA": [
+						1,
+						0.95,
+						0.75,
+						1
+					],
+					"startColorB": [
+						1,
+						0.8,
+						0.4,
+						1
+					],
+					"colorOverLifetime": [
+						{
+							"time": 0,
+							"color": [
+								1,
+								1,
+								1,
+								1
+							]
+						},
+						{
+							"time": 1,
+							"color": [
+								1,
+								0.4,
+								0.1,
+								0
+							]
+						}
+					],
+					"sizeOverLifetime": [
+						1,
+						0.5
+					],
+					"gravity": [
+						0,
+						120
+					],
+					"damping": 1.6,
+					"attractor": null,
+					"wobble": [
+						0,
+						4
+					],
+					"renderShape": "circle",
+					"blendMode": "lighter",
+					"streakScale": 0.04,
+					"worldSpace": false
+				}
+			},
+			{
+				"name": "Dust",
+				"type": "particle",
+				"parent": null,
+				"x": 480,
+				"y": 260,
+				"width": 20,
+				"height": 20,
+				"particle": {
+					"looping": true,
+					"duration": 1.2,
+					"maxParticleCount": 600,
+					"emissionRate": 25,
+					"bursts": [],
+					"shape": "box",
+					"shapeRadius": 6,
+					"coneAngle": 0.35,
+					"boxSize": [
+						520,
+						320
+					],
+					"edgeWidth": 400,
+					"lifetime": [
+						1.4,
+						2.4
+					],
+					"speed": [
+						0,
+						12
+					],
+					"size": [
+						1.5,
+						4
+					],
+					"rotation": [
+						0,
+						0
+					],
+					"angularVelocity": [
+						0,
+						0
+					],
+					"startColorA": [
+						1,
+						0.9,
+						0.6,
+						0.8
+					],
+					"startColorB": [
+						1,
+						1,
+						1,
+						0.6
+					],
+					"colorOverLifetime": [
+						{
+							"time": 0,
+							"color": [
+								1,
+								1,
+								1,
+								0
+							]
+						},
+						{
+							"time": 0.4,
+							"color": [
+								1,
+								1,
+								1,
+								1
+							]
+						},
+						{
+							"time": 1,
+							"color": [
+								1,
+								1,
+								1,
+								0
+							]
+						}
+					],
+					"sizeOverLifetime": [
+						1,
+						0.5
+					],
+					"gravity": [
+						0,
+						-16
+					],
+					"damping": 0,
+					"attractor": null,
+					"wobble": [
+						0,
+						4
+					],
+					"renderShape": "circle",
+					"blendMode": "lighter",
+					"streakScale": 0.04,
+					"worldSpace": false
+				}
+			},
+			{
+				"name": "Emblem Dissolve",
+				"type": "sprite",
+				"parent": null,
+				"x": 480,
+				"y": 260,
+				"width": 220,
+				"height": 220,
+				"image": "emblem.png",
+				"effect": "dissolve",
+				"effectProgress": 0,
+				"effectColor": "#ffb347ff",
+				"opacity": 0
+			}
+		]
+	},
+	"tracks": [
+		{
+			"target": "Emblem",
+			"property": "scaleX",
+			"keys": [
+				{
+					"time": 0.1,
+					"value": 0,
+					"easing": "back.out"
+				},
+				{
+					"time": 0.7,
+					"value": 1.15,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 1,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Emblem",
+			"property": "scaleY",
+			"keys": [
+				{
+					"time": 0.1,
+					"value": 0,
+					"easing": "back.out"
+				},
+				{
+					"time": 0.7,
+					"value": 1.15,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 1,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Emblem",
+			"property": "rotation",
+			"keys": [
+				{
+					"time": 0.1,
+					"value": -30,
+					"easing": "elastic.out"
+				},
+				{
+					"time": 1.2,
+					"value": 0,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Emblem",
+			"property": "effect",
+			"keys": [
+				{
+					"time": 1.1,
+					"value": 0,
+					"easing": "linear"
+				},
+				{
+					"time": 1.9,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 3.4,
+					"value": 0,
+					"easing": "step"
+				},
+				{
+					"time": 3.5,
+					"value": 0,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Ring",
+			"property": "color",
+			"keys": [
+				{
+					"time": 0.5,
+					"value": "#d4b06a00",
+					"easing": "cubic.out"
+				},
+				{
+					"time": 0.8,
+					"value": "#d4b06a55",
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 1.6,
+					"value": "#d4b06a00",
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Ring",
+			"property": "scaleX",
+			"keys": [
+				{
+					"time": 0.5,
+					"value": 0.2,
+					"easing": "cubic.out"
+				},
+				{
+					"time": 1.6,
+					"value": 2.6,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Ring",
+			"property": "scaleY",
+			"keys": [
+				{
+					"time": 0.5,
+					"value": 0.2,
+					"easing": "cubic.out"
+				},
+				{
+					"time": 1.6,
+					"value": 2.6,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Caption",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 1.2,
+					"value": 0,
+					"easing": "sinusoidal.out"
+				},
+				{
+					"time": 1.8,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 3.6,
+					"value": 1,
+					"easing": "cubic.in"
+				},
+				{
+					"time": 4.2,
+					"value": 0,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Caption",
+			"property": "y",
+			"keys": [
+				{
+					"time": 1.2,
+					"value": 440,
+					"easing": "cubic.out"
+				},
+				{
+					"time": 1.8,
+					"value": 420,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Stars",
+			"property": "event",
+			"keys": [
+				{
+					"time": 0.6,
+					"value": "play",
+					"easing": "step"
+				}
+			]
+		},
+		{
+			"target": "Emblem",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 3.5,
+					"value": 1,
+					"easing": "linear"
+				},
+				{
+					"time": 3.55,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Emblem Dissolve",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 3.45,
+					"value": 0,
+					"easing": "step"
+				},
+				{
+					"time": 3.5,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Emblem",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 3.45,
+					"value": 1,
+					"easing": "step"
+				},
+				{
+					"time": 3.5,
+					"value": 0,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Emblem Dissolve",
+			"property": "effect",
+			"keys": [
+				{
+					"time": 3.5,
+					"value": 0,
+					"easing": "quadratic.in"
+				},
+				{
+					"time": 4.4,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		}
+	],
+	"markers": [
+		{
+			"time": 0.6,
+			"name": "impact"
+		},
+		{
+			"time": 1.1,
+			"name": "shine"
+		},
+		{
+			"time": 3.5,
+			"name": "dissolve"
+		}
+	]
+}

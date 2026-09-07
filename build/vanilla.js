@@ -4778,8 +4778,9 @@ var ShaderProgram = class extends Object2 {
    * @param { WebGL2RenderingContext } webGL2RenderingContext
    * @param { string } vertexShaderSource
    * @param { string } fragmentShaderSource
+   * @param { object | null } attributeLocationTable - 링크 전에 고정할 어트리뷰트 위치. ({ 이름: 위치 } — 다른 프로그램의 버텍스 어레이를 함께 쓸 때)
    */
-  constructor(webGL2RenderingContext, vertexShaderSource, fragmentShaderSource) {
+  constructor(webGL2RenderingContext, vertexShaderSource, fragmentShaderSource, attributeLocationTable = null) {
     super();
     this.#webGL2RenderingContext = webGL2RenderingContext;
     this.#attributeLocations = /* @__PURE__ */ new Map();
@@ -4789,6 +4790,11 @@ var ShaderProgram = class extends Object2 {
     const program = webGL2RenderingContext.createProgram();
     webGL2RenderingContext.attachShader(program, vertexShader);
     webGL2RenderingContext.attachShader(program, fragmentShader);
+    if (attributeLocationTable) {
+      for (const attributeName in attributeLocationTable) {
+        webGL2RenderingContext.bindAttribLocation(program, attributeLocationTable[attributeName], attributeName);
+      }
+    }
     webGL2RenderingContext.linkProgram(program);
     if (!webGL2RenderingContext.getProgramParameter(program, webGL2RenderingContext.LINK_STATUS)) {
       const programError = webGL2RenderingContext.getProgramInfoLog(program);
@@ -5293,6 +5299,9 @@ var Graphic = class extends Object2 {
   #imageSmoothingQuality;
   /** @private @type { ShaderProgram } */
   #shaderProgram;
+  /** @private @type { ShaderProgram | null } */
+  #shaderProgramOverride;
+  // 드로우에 잠시 바꿔 끼우는 프로그램. (ShaderSprite 등)
   /** @private @type { WebGLVertexArrayObject } */
   #vertexArray;
   /** @private @type { WebGLBuffer } */
@@ -5372,6 +5381,7 @@ var Graphic = class extends Object2 {
     this.#isImageSmoothingEnabled = true;
     this.#imageSmoothingQuality = "high";
     this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, VERTEXSHADER_SOURCE, FRAGMENTSHADER_SOURCE);
+    this.#shaderProgramOverride = null;
     this.#vertexData = new Float32Array(VERTEX_CAPACITY * FLOATS_PER_VERTEX);
     this.#vertexArray = webGL2RenderingContext.createVertexArray();
     this.#vertexBuffer = webGL2RenderingContext.createBuffer();
@@ -5447,6 +5457,7 @@ var Graphic = class extends Object2 {
    */
   applySettings(engine) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    this.#shaderProgramOverride = null;
     const shaderProgram = this.getShaderProgram();
     const drawingBufferWidth = webGL2RenderingContext.drawingBufferWidth;
     const drawingBufferHeight = webGL2RenderingContext.drawingBufferHeight;
@@ -6645,7 +6656,48 @@ var Graphic = class extends Object2 {
    * @returns { ShaderProgram }
    */
   getShaderProgram() {
+    if (this.#shaderProgramOverride) {
+      return this.#shaderProgramOverride;
+    }
     return this.#shaderProgram;
+  }
+  //==============================================================================
+  // 셰이더 프로그램 바꿔 끼우기. (null 이면 기본 프로그램으로 복귀)
+  // - 기본 프로그램과 같은 어트리뷰트 위치 / 유니폼 이름(projectionMatrix, modelMatrix, mainColor, tintColor, globalAlpha, mainTexture)을 갖춰야 한다.
+  //==============================================================================
+  /**
+   * @param { ShaderProgram | null } shaderProgram
+   */
+  setShaderProgramOverride(shaderProgram) {
+    this.#shaderProgramOverride = shaderProgram;
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    const activeShaderProgram = this.getShaderProgram();
+    activeShaderProgram.use();
+    const projectionMatrixLocation = activeShaderProgram.getUniformLocation("projectionMatrix");
+    webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
+    const mainTextureLocation = activeShaderProgram.getUniformLocation("mainTexture");
+    webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
+  }
+  //==============================================================================
+  // 렌더 상태 복구. (외부 WebGL 패스가 프로그램 / 버텍스 어레이 / 뷰포트를 바꾼 뒤 Graphic 출력을 이어갈 때)
+  //==============================================================================
+  restoreRenderState() {
+    const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    webGL2RenderingContext.viewport(0, 0, this.#appliedViewportWidth, this.#appliedViewportHeight);
+    const shaderProgram = this.getShaderProgram();
+    shaderProgram.use();
+    webGL2RenderingContext.bindVertexArray(this.getVertexArray());
+    webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.getVertexBuffer());
+    const projectionMatrixLocation = shaderProgram.getUniformLocation("projectionMatrix");
+    webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
+    const mainTextureLocation = shaderProgram.getUniformLocation("mainTexture");
+    webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+    webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+    webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+    webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
+    const blendMode = this.getBlendMode();
+    this.setBlendMode(blendMode);
   }
   //==============================================================================
   // 버텍스 어레이 반환.
@@ -35445,8 +35497,3120 @@ var TrailRenderer = class extends Component {
   }
 };
 
-// src/ui/uilistview.js
+// src/effect/shadersprite.js
 var System74 = globalThis;
+var ShaderSpriteEffect = {
+  none: "none",
+  // --- 색 ---
+  flash: "flash",
+  // 실루엣을 단색으로 덮음. (피격 섬광 — progress = 세기, color = 덮을 색)
+  silhouette: "silhouette",
+  // 실루엣 단색. (progress = 세기, color = 색 — 그림자 / 잔상)
+  colorize: "colorize",
+  // 곱셈 틴트. (progress = 세기, color = 곱할 색)
+  grayscale: "grayscale",
+  // 무채색. (progress = 세기, color = 틴트)
+  sepia: "sepia",
+  // 세피아.
+  invert: "invert",
+  // 색 반전.
+  hueShift: "hueShift",
+  // 색상 회전. (progress 0 → 1 = 0 → 360도)
+  colorAdjust: "colorAdjust",
+  // 대비 / 채도 / 밝기. (parameters = [대비, 채도, 밝기], progress = 적용 비율)
+  posterize: "posterize",
+  // 포스터화. (parameters = [단계 수])
+  threshold: "threshold",
+  // 흑백 문턱. (parameters = [문턱])
+  gradientMap: "gradientMap",
+  // 밝기를 두 색 사이로 매핑. (parameters.xyz = 어두운 색, color = 밝은 색)
+  // --- 외곽 ---
+  outline: "outline",
+  // 실루엣 바깥 외곽선. (color = 선 색, parameters = [두께 픽셀])
+  innerOutline: "innerOutline",
+  // 실루엣 안쪽 외곽선. (color = 선 색, parameters = [두께 픽셀])
+  glow: "glow",
+  // 바깥 발광. (color = 빛 색, parameters = [반지름 픽셀])
+  innerGlow: "innerGlow",
+  // 안쪽 발광. (color = 빛 색, parameters = [반지름 픽셀])
+  shadow: "shadow",
+  // 드롭 섀도. (color = 그림자 색, parameters = [오프셋 x 픽셀, 오프셋 y 픽셀])
+  edgeDetect: "edgeDetect",
+  // 윤곽 검출. (color = 선 색)
+  emboss: "emboss",
+  // 엠보스.
+  sharpen: "sharpen",
+  // 샤픈.
+  // --- 흐림 ---
+  blur: "blur",
+  // 가우시안 블러. (parameters = [반지름 픽셀])
+  motionBlur: "motionBlur",
+  // 방향 블러. (parameters = [방향 x, 방향 y, 길이 픽셀])
+  radialBlur: "radialBlur",
+  // 중심 방사 블러. (parameters = [길이 0 ~ 1])
+  // --- 왜곡 ---
+  wave: "wave",
+  // 가로 물결 왜곡. (parameters = [빈도, 속도, 진폭])
+  flag: "flag",
+  // 깃발 펄럭임. (parameters = [빈도, 속도, 진폭])
+  ripple: "ripple",
+  // 중심 파문. (parameters = [빈도, 속도, 진폭])
+  heatHaze: "heatHaze",
+  // 아지랑이. (parameters = [노이즈 배율, 속도, 진폭])
+  bulge: "bulge",
+  // 볼록 / 오목. (parameters = [세기 — 음수면 오목])
+  swirl: "swirl",
+  // 소용돌이. (parameters = [회전 수])
+  mirror: "mirror",
+  // 좌우 대칭. (parameters = [0 가로 / 1 세로])
+  kaleidoscope: "kaleidoscope",
+  // 만화경. (parameters = [조각 수])
+  jitter: "jitter",
+  // 흔들림. (parameters = [진폭 픽셀, 초당 변화])
+  pixelate: "pixelate",
+  // 모자이크. (parameters = [가장 거친 블록 수])
+  glitch: "glitch",
+  // 가로 줄 어긋남 + 색 분리. (parameters = [줄 수, 초당 변화, 어긋남 폭])
+  chromatic: "chromatic",
+  // 색수차. (parameters = [분리 픽셀])
+  // --- 화면 무늬 ---
+  hologram: "hologram",
+  // 주사선 + 틴트 + 깜빡임. (color = 틴트, parameters = [주사선 수, 흐르는 속도])
+  scanlines: "scanlines",
+  // 주사선. (parameters = [주사선 수])
+  oldFilm: "oldFilm",
+  // 낡은 필름. (세피아 + 그레인 + 스크래치 + 깜빡임)
+  vignette: "vignette",
+  // 비네트. (color = 가장자리 색, parameters = [시작, 끝])
+  shine: "shine",
+  // 대각선 하이라이트 띠가 지나감. (color = 띠 색, parameters = [띠 폭])
+  // --- 사라짐 / 드러남 (progress 0 → 1) ---
+  dissolve: "dissolve",
+  // 노이즈로 타 들어가며 사라짐. (color = 가장자리 색, parameters = [노이즈 배율, 가장자리 폭])
+  burn: "burn",
+  // 불에 타듯 사라짐. (안쪽 밝은 띠 + 바깥 그을음, parameters = [노이즈 배율, 띠 폭])
+  noiseFade: "noiseFade",
+  // 노이즈 알파 페이드. (parameters = [노이즈 배율, 부드러움])
+  pixelDissolve: "pixelDissolve",
+  // 블록 단위로 사라짐. (parameters = [블록 수])
+  wipe: "wipe",
+  // 방향 와이프로 드러남. (parameters = [방향 x, 방향 y, 부드러움])
+  iris: "iris",
+  // 원형 아이리스로 드러남. (parameters = [중심 x, 중심 y, 부드러움])
+  diamondWipe: "diamondWipe",
+  // 마름모 와이프. (parameters = [부드러움])
+  clockWipe: "clockWipe",
+  // 시계 방향 와이프. (parameters = [부드러움])
+  blinds: "blinds",
+  // 블라인드. (parameters = [줄 수, 부드러움])
+  checkerWipe: "checkerWipe"
+  // 체커 보드. (parameters = [칸 수])
+};
+var DEFAULT_PARAMETER_TABLE = {
+  none: [0, 0, 0, 0],
+  flash: [0, 0, 0, 0],
+  silhouette: [0, 0, 0, 0],
+  colorize: [0, 0, 0, 0],
+  grayscale: [0, 0, 0, 0],
+  sepia: [0, 0, 0, 0],
+  invert: [0, 0, 0, 0],
+  hueShift: [0, 0, 0, 0],
+  colorAdjust: [1.4, 1.3, 1.1, 0],
+  posterize: [4, 0, 0, 0],
+  threshold: [0.5, 0, 0, 0],
+  gradientMap: [0.1, 0.05, 0.25, 0],
+  outline: [2, 0, 0, 0],
+  innerOutline: [2, 0, 0, 0],
+  glow: [6, 0, 0, 0],
+  innerGlow: [5, 0, 0, 0],
+  shadow: [6, 6, 0, 0],
+  edgeDetect: [0, 0, 0, 0],
+  emboss: [0, 0, 0, 0],
+  sharpen: [0, 0, 0, 0],
+  blur: [3, 0, 0, 0],
+  motionBlur: [1, 0, 12, 0],
+  radialBlur: [0.12, 0, 0, 0],
+  wave: [12, 4, 0.03, 0],
+  flag: [8, 5, 0.06, 0],
+  ripple: [40, 6, 0.02, 0],
+  heatHaze: [6, 1.5, 0.02, 0],
+  bulge: [0.6, 0, 0, 0],
+  swirl: [1, 0, 0, 0],
+  mirror: [0, 0, 0, 0],
+  kaleidoscope: [6, 0, 0, 0],
+  jitter: [4, 24, 0, 0],
+  pixelate: [24, 0, 0, 0],
+  glitch: [18, 12, 0.15, 0],
+  chromatic: [3, 0, 0, 0],
+  hologram: [120, 6, 0, 0],
+  scanlines: [90, 0, 0, 0],
+  oldFilm: [0, 0, 0, 0],
+  vignette: [0.4, 1, 0, 0],
+  shine: [0.15, 0, 0, 0],
+  dissolve: [8, 0.08, 0, 0],
+  burn: [8, 0.06, 0, 0],
+  noiseFade: [6, 0.2, 0, 0],
+  pixelDissolve: [16, 0, 0, 0],
+  wipe: [1, 0, 0.05, 0],
+  iris: [0.5, 0.5, 0.05, 0],
+  diamondWipe: [0.05, 0, 0, 0],
+  clockWipe: [0.02, 0, 0, 0],
+  blinds: [8, 0.05, 0, 0],
+  checkerWipe: [8, 0, 0, 0]
+};
+var DEFAULT_COLOR_TABLE = {
+  none: [1, 1, 1, 1],
+  flash: [1, 1, 1, 1],
+  silhouette: [0, 0, 0, 1],
+  colorize: [1, 0.5, 0.5, 1],
+  grayscale: [1, 1, 1, 1],
+  sepia: [1, 1, 1, 1],
+  invert: [1, 1, 1, 1],
+  hueShift: [1, 1, 1, 1],
+  colorAdjust: [1, 1, 1, 1],
+  posterize: [1, 1, 1, 1],
+  threshold: [1, 1, 1, 1],
+  gradientMap: [1, 0.85, 0.5, 1],
+  outline: [1, 1, 1, 1],
+  innerOutline: [1, 1, 1, 1],
+  glow: [1, 0.85, 0.4, 1],
+  innerGlow: [1, 0.85, 0.4, 1],
+  shadow: [0, 0, 0, 0.6],
+  edgeDetect: [1, 1, 1, 1],
+  emboss: [1, 1, 1, 1],
+  sharpen: [1, 1, 1, 1],
+  blur: [1, 1, 1, 1],
+  motionBlur: [1, 1, 1, 1],
+  radialBlur: [1, 1, 1, 1],
+  wave: [1, 1, 1, 1],
+  flag: [1, 1, 1, 1],
+  ripple: [1, 1, 1, 1],
+  heatHaze: [1, 1, 1, 1],
+  bulge: [1, 1, 1, 1],
+  swirl: [1, 1, 1, 1],
+  mirror: [1, 1, 1, 1],
+  kaleidoscope: [1, 1, 1, 1],
+  jitter: [1, 1, 1, 1],
+  pixelate: [1, 1, 1, 1],
+  glitch: [1, 1, 1, 1],
+  chromatic: [1, 1, 1, 1],
+  hologram: [0.4, 0.9, 1, 1],
+  scanlines: [1, 1, 1, 1],
+  oldFilm: [1, 1, 1, 1],
+  vignette: [0, 0, 0, 1],
+  shine: [1, 1, 1, 1],
+  dissolve: [1, 0.6, 0.2, 1],
+  burn: [1, 0.7, 0.25, 1],
+  noiseFade: [1, 1, 1, 1],
+  pixelDissolve: [1, 1, 1, 1],
+  wipe: [1, 1, 1, 1],
+  iris: [1, 1, 1, 1],
+  diamondWipe: [1, 1, 1, 1],
+  clockWipe: [1, 1, 1, 1],
+  blinds: [1, 1, 1, 1],
+  checkerWipe: [1, 1, 1, 1]
+};
+var EFFECT_BODY_TABLE = {
+  flash: `
+	textureColor.rgb = mix(textureColor.rgb, effectColor.rgb * textureColor.a, effectProgress * effectColor.a);
+	`,
+  silhouette: `
+	textureColor.rgb = mix(textureColor.rgb, effectColor.rgb * textureColor.a, effectProgress);
+	textureColor *= mix(1.0, effectColor.a, effectProgress);
+	`,
+  colorize: `
+	textureColor.rgb *= mix(vec3(1.0), effectColor.rgb, effectProgress * effectColor.a);
+	`,
+  grayscale: `
+	float gray = dot(textureColor.rgb, vec3(0.299, 0.587, 0.114));
+	textureColor.rgb = mix(textureColor.rgb, vec3(gray) * effectColor.rgb, effectProgress);
+	`,
+  sepia: `
+	float gray = dot(textureColor.rgb, vec3(0.299, 0.587, 0.114));
+	textureColor.rgb = mix(textureColor.rgb, gray * vec3(1.2, 1.0, 0.78), effectProgress);
+	`,
+  invert: `
+	textureColor.rgb = mix(textureColor.rgb, vec3(textureColor.a) - textureColor.rgb, effectProgress);
+	`,
+  hueShift: `
+	float hueAngle = effectProgress * 6.28318530718;
+	vec3 yiq = mat3(0.299, 0.596, 0.211, 0.587, -0.274, -0.523, 0.114, -0.322, 0.312) * textureColor.rgb;
+	float chroma = length(yiq.yz);
+	float hue = atan(yiq.z, yiq.y) + hueAngle;
+	yiq.yz = vec2(cos(hue), sin(hue)) * chroma;
+	textureColor.rgb = mat3(1.0, 1.0, 1.0, 0.956, -0.272, -1.106, 0.621, -0.647, 1.703) * yiq;
+	`,
+  colorAdjust: `
+	vec3 straight = unpremultiply(textureColor);
+	float gray = dot(straight, vec3(0.299, 0.587, 0.114));
+	vec3 adjusted = mix(vec3(gray), straight, effectParameters.y);
+	adjusted = (adjusted - 0.5) * effectParameters.x + 0.5;
+	adjusted *= effectParameters.z;
+	textureColor.rgb = mix(textureColor.rgb, clamp(adjusted, 0.0, 1.0) * textureColor.a, effectProgress);
+	`,
+  posterize: `
+	vec3 straight = unpremultiply(textureColor);
+	float levels = max(effectParameters.x, 1.0);
+	vec3 posterized = floor(straight * levels + 0.5) / levels;
+	textureColor.rgb = mix(textureColor.rgb, posterized * textureColor.a, effectProgress);
+	`,
+  threshold: `
+	vec3 straight = unpremultiply(textureColor);
+	float gray = dot(straight, vec3(0.299, 0.587, 0.114));
+	vec3 binary = vec3(step(effectParameters.x, gray)) * effectColor.rgb;
+	textureColor.rgb = mix(textureColor.rgb, binary * textureColor.a, effectProgress);
+	`,
+  gradientMap: `
+	vec3 straight = unpremultiply(textureColor);
+	float gray = dot(straight, vec3(0.299, 0.587, 0.114));
+	vec3 mapped = mix(effectParameters.xyz, effectColor.rgb, gray);
+	textureColor.rgb = mix(textureColor.rgb, mapped * textureColor.a, effectProgress);
+	`,
+  outline: `
+	vec2 outlineStep = texelSize * effectParameters.x;
+	float neighborAlpha = 0.0;
+	for (int sampleIndex = 0; sampleIndex < 8; ++sampleIndex) {
+		float angle = float(sampleIndex) * 0.78539816;
+		neighborAlpha = max(neighborAlpha, sampleSprite(uv + vec2(cos(angle), sin(angle)) * outlineStep).a);
+	}
+	float outlineMask = clamp(neighborAlpha - textureColor.a, 0.0, 1.0) * effectProgress * effectColor.a;
+	textureColor.rgb += effectColor.rgb * outlineMask;
+	textureColor.a += outlineMask;
+	`,
+  innerOutline: `
+	vec2 outlineStep = texelSize * effectParameters.x;
+	float minimumAlpha = 1.0;
+	for (int sampleIndex = 0; sampleIndex < 8; ++sampleIndex) {
+		float angle = float(sampleIndex) * 0.78539816;
+		minimumAlpha = min(minimumAlpha, sampleSprite(uv + vec2(cos(angle), sin(angle)) * outlineStep).a);
+	}
+	float edgeMask = clamp(textureColor.a - minimumAlpha, 0.0, 1.0) * effectProgress * effectColor.a;
+	textureColor.rgb = mix(textureColor.rgb, effectColor.rgb * textureColor.a, edgeMask);
+	`,
+  glow: `
+	float alphaSum = 0.0;
+	for (int sampleIndex = 0; sampleIndex < 12; ++sampleIndex) {
+		float angle = float(sampleIndex) * 0.52359878;
+		vec2 offset = vec2(cos(angle), sin(angle)) * texelSize * effectParameters.x;
+		alphaSum += sampleSprite(uv + offset).a;
+		alphaSum += sampleSprite(uv + offset * 0.5).a;
+	}
+	float glowAlpha = clamp(alphaSum / 24.0 * 1.5, 0.0, 1.0) * (1.0 - textureColor.a) * effectProgress * effectColor.a;
+	textureColor.rgb += effectColor.rgb * glowAlpha;
+	textureColor.a += glowAlpha;
+	`,
+  innerGlow: `
+	float alphaSum = 0.0;
+	for (int sampleIndex = 0; sampleIndex < 12; ++sampleIndex) {
+		float angle = float(sampleIndex) * 0.52359878;
+		vec2 offset = vec2(cos(angle), sin(angle)) * texelSize * effectParameters.x;
+		alphaSum += sampleSprite(uv + offset).a;
+		alphaSum += sampleSprite(uv + offset * 0.5).a;
+	}
+	float glowMask = clamp(1.0 - alphaSum / 24.0, 0.0, 1.0) * textureColor.a * effectProgress * effectColor.a;
+	textureColor.rgb = mix(textureColor.rgb, effectColor.rgb * textureColor.a, glowMask);
+	`,
+  shadow: `
+	vec2 shadowOffset = effectParameters.xy * texelSize;
+	float shadowAlpha = sampleSprite(uv - shadowOffset).a * effectColor.a * effectProgress * (1.0 - textureColor.a);
+	textureColor.rgb += effectColor.rgb * shadowAlpha;
+	textureColor.a += shadowAlpha;
+	`,
+  edgeDetect: `
+	float gradientX = 0.0;
+	float gradientY = 0.0;
+	gradientX += luminanceAt(uv + vec2(-texelSize.x, -texelSize.y)) * -1.0 + luminanceAt(uv + vec2(texelSize.x, -texelSize.y));
+	gradientX += luminanceAt(uv + vec2(-texelSize.x, 0.0)) * -2.0 + luminanceAt(uv + vec2(texelSize.x, 0.0)) * 2.0;
+	gradientX += luminanceAt(uv + vec2(-texelSize.x, texelSize.y)) * -1.0 + luminanceAt(uv + vec2(texelSize.x, texelSize.y));
+	gradientY += luminanceAt(uv + vec2(-texelSize.x, -texelSize.y)) * -1.0 + luminanceAt(uv + vec2(-texelSize.x, texelSize.y));
+	gradientY += luminanceAt(uv + vec2(0.0, -texelSize.y)) * -2.0 + luminanceAt(uv + vec2(0.0, texelSize.y)) * 2.0;
+	gradientY += luminanceAt(uv + vec2(texelSize.x, -texelSize.y)) * -1.0 + luminanceAt(uv + vec2(texelSize.x, texelSize.y));
+	float edge = clamp(length(vec2(gradientX, gradientY)) * 2.0, 0.0, 1.0);
+	textureColor = mix(textureColor, vec4(effectColor.rgb * edge, edge) * effectColor.a, effectProgress);
+	`,
+  emboss: `
+	vec3 lower = sampleSprite(uv - texelSize).rgb;
+	vec3 upper = sampleSprite(uv + texelSize).rgb;
+	float relief = dot(upper - lower, vec3(0.299, 0.587, 0.114)) * 2.0 + 0.5;
+	textureColor.rgb = mix(textureColor.rgb, vec3(clamp(relief, 0.0, 1.0)) * textureColor.a, effectProgress);
+	`,
+  sharpen: `
+	vec4 neighbors = sampleSprite(uv + vec2(texelSize.x, 0.0)) + sampleSprite(uv - vec2(texelSize.x, 0.0)) + sampleSprite(uv + vec2(0.0, texelSize.y)) + sampleSprite(uv - vec2(0.0, texelSize.y));
+	vec4 sharpened = clamp(textureColor * 5.0 - neighbors, 0.0, 1.0);
+	textureColor = mix(textureColor, sharpened, effectProgress);
+	`,
+  blur: `
+	vec2 blurStep = texelSize * effectParameters.x * effectProgress;
+	vec4 sum = vec4(0.0);
+	for (int y = -1; y <= 1; ++y) {
+		for (int x = -1; x <= 1; ++x) {
+			float weight = (x == 0 && y == 0) ? 4.0 : ((x == 0 || y == 0) ? 2.0 : 1.0);
+			sum += sampleSprite(uv + vec2(float(x), float(y)) * blurStep) * weight;
+		}
+	}
+	textureColor = sum / 16.0;
+	`,
+  motionBlur: `
+	vec2 blurDirection = normalize(effectParameters.xy + vec2(0.0001, 0.0)) * texelSize * effectParameters.z * effectProgress;
+	vec4 sum = vec4(0.0);
+	for (int sampleIndex = 0; sampleIndex < 8; ++sampleIndex) {
+		float offset = (float(sampleIndex) - 3.5) / 3.5;
+		sum += sampleSprite(uv + blurDirection * offset);
+	}
+	textureColor = sum / 8.0;
+	`,
+  radialBlur: `
+	vec2 toCenter = (vec2(0.5) - local) * effectParameters.x * effectProgress;
+	vec4 sum = vec4(0.0);
+	for (int sampleIndex = 0; sampleIndex < 8; ++sampleIndex) {
+		sum += sampleLocal(local + toCenter * (float(sampleIndex) / 8.0));
+	}
+	textureColor = sum / 8.0;
+	`,
+  wave: `
+	float waveOffset = sin(local.y * effectParameters.x + effectTime * effectParameters.y) * effectParameters.z * effectProgress;
+	textureColor = sampleLocal(local + vec2(waveOffset, 0.0));
+	`,
+  flag: `
+	float flagOffset = sin(local.x * effectParameters.x - effectTime * effectParameters.y) * effectParameters.z * effectProgress * local.x;
+	textureColor = sampleLocal(local + vec2(0.0, flagOffset));
+	`,
+  ripple: `
+	vec2 fromCenter = local - 0.5;
+	float rippleDistance = length(fromCenter);
+	float rippleWave = sin(rippleDistance * effectParameters.x - effectTime * effectParameters.y) * effectParameters.z * effectProgress;
+	vec2 rippleDirection = rippleDistance > 0.0001 ? fromCenter / rippleDistance : vec2(0.0);
+	textureColor = sampleLocal(local + rippleDirection * rippleWave);
+	`,
+  heatHaze: `
+	vec2 hazeOffset = vec2(valueNoise(local * effectParameters.x + vec2(0.0, effectTime * effectParameters.y)), valueNoise(local * effectParameters.x + vec2(effectTime * effectParameters.y, 7.3))) - 0.5;
+	textureColor = sampleLocal(local + hazeOffset * effectParameters.z * effectProgress);
+	`,
+  bulge: `
+	vec2 fromCenter = local - 0.5;
+	float bulgeRadius = length(fromCenter) * 2.0;
+	float bulgeFactor = 1.0 - effectParameters.x * effectProgress * (1.0 - clamp(bulgeRadius, 0.0, 1.0));
+	textureColor = sampleLocal(0.5 + fromCenter * bulgeFactor);
+	`,
+  swirl: `
+	vec2 fromCenter = local - 0.5;
+	float swirlRadius = length(fromCenter) * 2.0;
+	float swirlAngle = effectParameters.x * effectProgress * 6.28318530718 * pow(1.0 - clamp(swirlRadius, 0.0, 1.0), 2.0);
+	float cosine = cos(swirlAngle);
+	float sine = sin(swirlAngle);
+	textureColor = sampleLocal(0.5 + vec2(fromCenter.x * cosine - fromCenter.y * sine, fromCenter.x * sine + fromCenter.y * cosine));
+	`,
+  mirror: `
+	vec2 mirrored = local;
+	if (effectParameters.x < 0.5) {
+		mirrored.x = local.x < 0.5 ? local.x : 1.0 - local.x;
+	}
+	else {
+		mirrored.y = local.y < 0.5 ? local.y : 1.0 - local.y;
+	}
+	textureColor = mix(textureColor, sampleLocal(mirrored), step(0.5, effectProgress));
+	`,
+  kaleidoscope: `
+	vec2 fromCenter = local - 0.5;
+	float kaleidoRadius = length(fromCenter);
+	float segmentAngle = 6.28318530718 / max(effectParameters.x, 1.0);
+	float kaleidoAngle = atan(fromCenter.y, fromCenter.x);
+	kaleidoAngle = abs(mod(kaleidoAngle, segmentAngle) - segmentAngle * 0.5);
+	vec4 kaleidoColor = sampleLocal(0.5 + vec2(cos(kaleidoAngle), sin(kaleidoAngle)) * kaleidoRadius);
+	textureColor = mix(textureColor, kaleidoColor, effectProgress);
+	`,
+  jitter: `
+	float jitterSeed = floor(effectTime * effectParameters.y) + effectSeed;
+	vec2 jitterOffset = (vec2(hash21(vec2(jitterSeed, 1.0)), hash21(vec2(jitterSeed, 2.0))) - 0.5) * effectParameters.x * effectProgress;
+	textureColor = sampleSprite(uv + jitterOffset * texelSize);
+	`,
+  pixelate: `
+	float blockCount = mix(512.0, max(1.0, effectParameters.x), effectProgress);
+	vec2 blockLocal = (floor(local * blockCount) + 0.5) / blockCount;
+	textureColor = sampleLocal(blockLocal);
+	`,
+  glitch: `
+	float glitchSeed = floor(effectTime * effectParameters.y) + effectSeed;
+	float glitchRow = floor(local.y * effectParameters.x);
+	float rowRandom = hash21(vec2(glitchRow, glitchSeed));
+	float shift = step(0.75, rowRandom) * (hash21(vec2(glitchSeed, glitchRow)) - 0.5) * effectParameters.z * effectProgress;
+	vec2 shiftedLocal = local + vec2(shift, 0.0);
+	textureColor = sampleLocal(shiftedLocal);
+	float split = effectProgress * 0.02 * step(0.5, rowRandom);
+	textureColor.r = sampleLocal(shiftedLocal + vec2(split, 0.0)).r;
+	textureColor.b = sampleLocal(shiftedLocal - vec2(split, 0.0)).b;
+	`,
+  chromatic: `
+	vec2 chromaticStep = vec2(texelSize.x * effectParameters.x * effectProgress, 0.0);
+	textureColor.r = sampleSprite(uv + chromaticStep).r;
+	textureColor.b = sampleSprite(uv - chromaticStep).b;
+	`,
+  hologram: `
+	float scan = 0.7 + 0.3 * sin(local.y * effectParameters.x - effectTime * effectParameters.y);
+	float flicker = 0.92 + 0.08 * sin(effectTime * 23.0 + effectSeed);
+	float jitter = step(0.97, hash21(vec2(floor(effectTime * 14.0), effectSeed))) * 0.03;
+	vec4 jitterColor = sampleLocal(local + vec2(jitter, 0.0));
+	textureColor = mix(textureColor, jitterColor, effectProgress);
+	float luminance = dot(textureColor.rgb, vec3(0.299, 0.587, 0.114));
+	vec3 holoColor = effectColor.rgb * (luminance * 0.6 + textureColor.a * 0.4) * scan * flicker;
+	textureColor.rgb = mix(textureColor.rgb, holoColor, effectProgress * effectColor.a);
+	textureColor.a *= mix(1.0, 0.8 * scan, effectProgress);
+	`,
+  scanlines: `
+	float lines = 0.5 + 0.5 * sin(local.y * effectParameters.x);
+	textureColor.rgb *= 1.0 - effectProgress * 0.5 * lines;
+	`,
+  oldFilm: `
+	float gray = dot(textureColor.rgb, vec3(0.299, 0.587, 0.114));
+	vec3 filmColor = gray * vec3(1.15, 1.0, 0.8);
+	float grain = (hash21(local * 300.0 + fract(effectTime * 9.1) * 100.0) - 0.5) * 0.25 * textureColor.a;
+	float scratchSeed = floor(effectTime * 8.0);
+	float scratchX = hash21(vec2(scratchSeed, effectSeed));
+	float scratch = (1.0 - smoothstep(0.0, 0.006, abs(local.x - scratchX))) * step(0.6, hash21(vec2(scratchSeed, 3.0))) * textureColor.a;
+	float flicker = 0.9 + 0.1 * hash21(vec2(floor(effectTime * 12.0), 5.0));
+	float vignette = 1.0 - smoothstep(0.5, 1.0, distance(local, vec2(0.5)) * 1.4142) * 0.6;
+	vec3 aged = (filmColor + grain + scratch * 0.8) * flicker * vignette;
+	textureColor.rgb = mix(textureColor.rgb, clamp(aged, 0.0, 1.0), effectProgress);
+	`,
+  vignette: `
+	float vignetteDistance = distance(local, vec2(0.5)) * 1.4142;
+	float vignetteMask = smoothstep(effectParameters.x, effectParameters.y, vignetteDistance) * effectProgress * effectColor.a;
+	textureColor.rgb = mix(textureColor.rgb, effectColor.rgb * textureColor.a, vignetteMask);
+	`,
+  shine: `
+	float band = local.x * 0.8 + local.y * 0.5;
+	float bandCenter = mix(-0.4, 1.7, effectProgress);
+	float glow = 1.0 - smoothstep(0.0, max(effectParameters.x, 0.001), abs(band - bandCenter));
+	textureColor.rgb += effectColor.rgb * glow * glow * textureColor.a * effectColor.a;
+	`,
+  dissolve: `
+	float dissolveNoise = valueNoise(local * effectParameters.x + vec2(effectSeed * 17.0, effectSeed * 31.0));
+	float threshold = effectProgress * (1.0 + effectParameters.y * 2.0) - effectParameters.y;
+	float edge = smoothstep(threshold, threshold + effectParameters.y, dissolveNoise);
+	float keep = step(threshold, dissolveNoise);
+	vec3 edgeColor = effectColor.rgb * textureColor.a * effectColor.a;
+	textureColor.rgb = mix(edgeColor, textureColor.rgb, edge) * keep;
+	textureColor.a *= keep;
+	`,
+  burn: `
+	float burnNoise = valueNoise(local * effectParameters.x + vec2(effectSeed * 13.0, effectSeed * 29.0));
+	float threshold = effectProgress * (1.0 + effectParameters.y * 4.0) - effectParameters.y * 2.0;
+	float keep = step(threshold, burnNoise);
+	float innerBand = smoothstep(threshold, threshold + effectParameters.y, burnNoise);
+	float outerBand = smoothstep(threshold + effectParameters.y, threshold + effectParameters.y * 2.0, burnNoise);
+	vec3 emberColor = effectColor.rgb * textureColor.a * effectColor.a;
+	vec3 sootColor = vec3(0.05, 0.02, 0.01) * textureColor.a;
+	textureColor.rgb = mix(emberColor, mix(sootColor, textureColor.rgb, outerBand), innerBand) * keep;
+	textureColor.a *= keep;
+	`,
+  noiseFade: `
+	float fadeNoise = valueNoise(local * effectParameters.x + vec2(effectSeed * 11.0, effectSeed * 23.0));
+	float softness = max(effectParameters.y, 0.001);
+	float fadeMask = smoothstep(effectProgress * (1.0 + softness) - softness, effectProgress * (1.0 + softness), fadeNoise);
+	textureColor *= fadeMask;
+	`,
+  pixelDissolve: `
+	vec2 blockCell = floor(local * effectParameters.x);
+	float blockRandom = hash21(blockCell + effectSeed);
+	textureColor *= step(effectProgress, blockRandom);
+	`,
+  wipe: `
+	vec2 wipeDirection = normalize(effectParameters.xy + vec2(0.0001, 0.0));
+	float wipeDistance = dot(local - 0.5, wipeDirection) + 0.5;
+	float softness = max(effectParameters.z, 0.0001);
+	float reveal = 1.0 - smoothstep(effectProgress * (1.0 + softness) - softness, effectProgress * (1.0 + softness), wipeDistance);
+	textureColor *= reveal;
+	`,
+  iris: `
+	float irisRadius = effectProgress * 0.7072;
+	float softness = max(effectParameters.z, 0.0001);
+	float reveal = 1.0 - smoothstep(irisRadius, irisRadius + softness, distance(local, effectParameters.xy));
+	textureColor *= reveal;
+	`,
+  diamondWipe: `
+	float diamondDistance = abs(local.x - 0.5) + abs(local.y - 0.5);
+	float softness = max(effectParameters.x, 0.0001);
+	float reveal = 1.0 - smoothstep(effectProgress * (1.0 + softness), effectProgress * (1.0 + softness) + softness, diamondDistance);
+	textureColor *= reveal;
+	`,
+  clockWipe: `
+	vec2 fromCenter = local - 0.5;
+	float clockAngle = (atan(fromCenter.x, -fromCenter.y) + 3.14159265) / 6.28318530718;
+	float softness = max(effectParameters.x, 0.0001);
+	float reveal = 1.0 - smoothstep(effectProgress, effectProgress + softness, clockAngle);
+	textureColor *= reveal;
+	`,
+  blinds: `
+	float stripe = fract(local.y * effectParameters.x);
+	float softness = max(effectParameters.y, 0.0001);
+	float reveal = 1.0 - smoothstep(effectProgress, effectProgress + softness, stripe);
+	textureColor *= reveal;
+	`,
+  checkerWipe: `
+	vec2 checkerCell = floor(local * effectParameters.x);
+	float parity = mod(checkerCell.x + checkerCell.y, 2.0);
+	float cellThreshold = parity * 0.5 + hash21(checkerCell + effectSeed) * 0.5;
+	textureColor *= step(cellThreshold, effectProgress * 1.0001);
+	`
+};
+var VERTEXSHADER_SOURCE2 = `#version 300 es
+in vec2 vertexPosition;
+in vec2 vertexTextureCoordinate;
+uniform mat3 projectionMatrix;
+uniform mat3 modelMatrix;
+out vec2 fragmentTextureCoordinate;
+void main() {
+	vec3 transformedPosition = projectionMatrix * (modelMatrix * vec3(vertexPosition, 1.0));
+	gl_Position = vec4(transformedPosition.xy, 0.0, 1.0);
+	fragmentTextureCoordinate = vertexTextureCoordinate;
+}
+`;
+var FRAGMENTSHADER_TEMPLATE = `#version 300 es
+precision highp float;
+in vec2 fragmentTextureCoordinate;
+uniform sampler2D mainTexture;
+uniform vec4 mainColor;
+uniform vec4 tintColor;
+uniform float globalAlpha;
+uniform float effectTime;
+uniform float effectProgress;
+uniform float effectSeed;
+uniform vec4 effectColor;
+uniform vec4 effectParameters;
+uniform vec4 textureRect;
+uniform vec2 texelSize;
+out vec4 outputColor;
+
+float hash21(vec2 point) {
+	vec3 scrambled = fract(vec3(point.xyx) * 0.1031);
+	scrambled += dot(scrambled, scrambled.yzx + 33.33);
+	return fract((scrambled.x + scrambled.y) * scrambled.z);
+}
+
+float valueNoise(vec2 point) {
+	vec2 cell = floor(point);
+	vec2 fraction = fract(point);
+	vec2 blend = fraction * fraction * (3.0 - 2.0 * fraction);
+	float bottom = mix(hash21(cell), hash21(cell + vec2(1.0, 0.0)), blend.x);
+	float top = mix(hash21(cell + vec2(0.0, 1.0)), hash21(cell + vec2(1.0, 1.0)), blend.x);
+	return mix(bottom, top, blend.y);
+}
+
+vec4 sampleSprite(vec2 uv) {
+	if (uv.x < textureRect.x || uv.x > textureRect.z || uv.y < textureRect.y || uv.y > textureRect.w) {
+		return vec4(0.0);
+	}
+	return texture(mainTexture, uv);
+}
+
+vec4 sampleLocal(vec2 local) {
+	if (local.x < 0.0 || local.x > 1.0 || local.y < 0.0 || local.y > 1.0) {
+		return vec4(0.0);
+	}
+	return texture(mainTexture, textureRect.xy + local * (textureRect.zw - textureRect.xy));
+}
+
+vec3 unpremultiply(vec4 color) {
+	return color.rgb / max(color.a, 0.0001);
+}
+
+float luminanceAt(vec2 uv) {
+	vec4 sampled = sampleSprite(uv);
+	return dot(sampled.rgb, vec3(0.299, 0.587, 0.114));
+}
+
+void main() {
+	vec2 uv = fragmentTextureCoordinate;
+	vec2 local = (uv - textureRect.xy) / max(textureRect.zw - textureRect.xy, vec2(0.000001));
+	vec4 textureColor = sampleSprite(uv);
+	EFFECT_BODY
+	vec3 tintedColor = mix(textureColor.rgb, tintColor.rgb * textureColor.a, tintColor.a);
+	float finalAlpha = textureColor.a * mainColor.a * globalAlpha;
+	vec3 finalColor = tintedColor * mainColor.rgb * mainColor.a * globalAlpha;
+	outputColor = vec4(finalColor, finalAlpha);
+}
+`;
+var programCacheByContext = new System74.WeakMap();
+function resolveEffectProgram(graphic, effect) {
+  const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
+  let programTable = programCacheByContext.get(webGL2RenderingContext);
+  if (!programTable) {
+    programTable = new System74.Map();
+    programCacheByContext.set(webGL2RenderingContext, programTable);
+  }
+  let shaderProgram = programTable.get(effect);
+  if (!shaderProgram) {
+    const defaultShaderProgram = graphic.getShaderProgram();
+    const attributeLocationTable = {
+      vertexPosition: defaultShaderProgram.getAttributeLocation("vertexPosition"),
+      vertexTextureCoordinate: defaultShaderProgram.getAttributeLocation("vertexTextureCoordinate")
+    };
+    const fragmentShaderSource = FRAGMENTSHADER_TEMPLATE.replace("EFFECT_BODY", EFFECT_BODY_TABLE[effect]);
+    shaderProgram = new ShaderProgram(webGL2RenderingContext, VERTEXSHADER_SOURCE2, fragmentShaderSource, attributeLocationTable);
+    programTable.set(effect, shaderProgram);
+  }
+  return shaderProgram;
+}
+__name(resolveEffectProgram, "resolveEffectProgram");
+var ShaderSprite = class extends Sprite {
+  static {
+    __name(this, "ShaderSprite");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { string } */
+  #effect;
+  /** @private @type { number } */
+  #effectProgress;
+  /** @private @type { number } */
+  #effectTime;
+  /** @private @type { number } */
+  #effectSeed;
+  /** @private @type { Color } */
+  #effectColor;
+  /** @private @type { number[] } */
+  #effectParameters;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  constructor() {
+    super();
+    this.setComponentType("ShaderSprite");
+    this.#effect = ShaderSpriteEffect.none;
+    this.#effectProgress = 0;
+    this.#effectTime = 0;
+    this.#effectSeed = System74.Math.random() * 100;
+    this.#effectColor = Color.white();
+    this.#effectParameters = [0, 0, 0, 0];
+  }
+  //==============================================================================
+  // 갱신. (효과 시간 누적)
+  //==============================================================================
+  /**
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    super.tick(timeDelta);
+    this.#effectTime += timeDelta;
+  }
+  //==============================================================================
+  // 출력. (효과가 있으면 프로그램을 바꿔 끼우고 Sprite 출력 경로를 그대로 탄다)
+  //==============================================================================
+  /**
+   * @param { Graphic } graphic
+   */
+  draw(graphic) {
+    const image = this.getImage();
+    const effect = this.getEffect();
+    if (effect === ShaderSpriteEffect.none || image === null || image === void 0) {
+      super.draw(graphic);
+      return;
+    }
+    const shaderProgram = resolveEffectProgram(graphic, effect);
+    graphic.setShaderProgramOverride(shaderProgram);
+    const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
+    let imageRect = this.getImageRect();
+    if (imageRect === null || imageRect === void 0 || imageRect.equals(Rect.zero())) {
+      imageRect = Rect.create(0, 0, image.width, image.height);
+    }
+    const imageWidth = System74.Math.max(1, image.width);
+    const imageHeight = System74.Math.max(1, image.height);
+    const effectColor = this.getEffectColor();
+    const effectParameters = this.getEffectParameters();
+    webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("effectTime"), this.getEffectTime());
+    webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("effectProgress"), this.getEffectProgress());
+    webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("effectSeed"), this.getEffectSeed());
+    webGL2RenderingContext.uniform4f(shaderProgram.getUniformLocation("effectColor"), effectColor.red, effectColor.green, effectColor.blue, effectColor.alpha);
+    webGL2RenderingContext.uniform4f(shaderProgram.getUniformLocation("effectParameters"), effectParameters[0], effectParameters[1], effectParameters[2], effectParameters[3]);
+    webGL2RenderingContext.uniform4f(
+      shaderProgram.getUniformLocation("textureRect"),
+      imageRect.position.x / imageWidth,
+      imageRect.position.y / imageHeight,
+      (imageRect.position.x + imageRect.size.x) / imageWidth,
+      (imageRect.position.y + imageRect.size.y) / imageHeight
+    );
+    webGL2RenderingContext.uniform2f(shaderProgram.getUniformLocation("texelSize"), 1 / imageWidth, 1 / imageHeight);
+    super.draw(graphic);
+    graphic.setShaderProgramOverride(null);
+  }
+  //==============================================================================
+  // 효과 설정. (효과별 기본 파라미터 / 색으로 되돌린다)
+  //==============================================================================
+  /**
+   * @param { string } effect
+   */
+  setEffect(effect) {
+    const isKnownEffect = EFFECT_BODY_TABLE[effect] !== void 0 || effect === ShaderSpriteEffect.none;
+    this.#effect = isKnownEffect ? effect : ShaderSpriteEffect.none;
+    const defaultParameters = DEFAULT_PARAMETER_TABLE[this.#effect];
+    this.#effectParameters = [defaultParameters[0], defaultParameters[1], defaultParameters[2], defaultParameters[3]];
+    const defaultColor = DEFAULT_COLOR_TABLE[this.#effect];
+    this.#effectColor = new Color(defaultColor[0], defaultColor[1], defaultColor[2], defaultColor[3]);
+  }
+  //==============================================================================
+  // 효과 반환.
+  //==============================================================================
+  /**
+   * @returns { string }
+   */
+  getEffect() {
+    return this.#effect;
+  }
+  //==============================================================================
+  // 진행도 설정. (0 ~ 1)
+  //==============================================================================
+  /**
+   * @param { number } effectProgress
+   */
+  setEffectProgress(effectProgress) {
+    this.#effectProgress = System74.Math.max(0, System74.Math.min(1, effectProgress));
+  }
+  //==============================================================================
+  // 진행도 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getEffectProgress() {
+    return this.#effectProgress;
+  }
+  //==============================================================================
+  // 효과 시간 설정.
+  //==============================================================================
+  /**
+   * @param { number } effectTime
+   */
+  setEffectTime(effectTime) {
+    this.#effectTime = effectTime;
+  }
+  //==============================================================================
+  // 효과 시간 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getEffectTime() {
+    return this.#effectTime;
+  }
+  //==============================================================================
+  // 시드 설정. (같은 노이즈 무늬를 원할 때 고정)
+  //==============================================================================
+  /**
+   * @param { number } effectSeed
+   */
+  setEffectSeed(effectSeed) {
+    this.#effectSeed = effectSeed;
+  }
+  //==============================================================================
+  // 시드 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getEffectSeed() {
+    return this.#effectSeed;
+  }
+  //==============================================================================
+  // 효과 색 설정.
+  //==============================================================================
+  /**
+   * @param { Color } color
+   */
+  setEffectColor(color) {
+    if (color === null || color === void 0) {
+      return;
+    }
+    this.#effectColor = color.clone();
+  }
+  //==============================================================================
+  // 효과 색 반환.
+  //==============================================================================
+  /**
+   * @returns { Color }
+   */
+  getEffectColor() {
+    return this.#effectColor;
+  }
+  //==============================================================================
+  // 효과 파라미터 설정. (효과마다 뜻이 다르다 — ShaderSpriteEffect 주석 참고)
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   * @param { number } z
+   * @param { number } w
+   */
+  setEffectParameters(x, y = 0, z = 0, w = 0) {
+    this.#effectParameters = [x, y, z, w];
+  }
+  //==============================================================================
+  // 효과 파라미터 반환.
+  //==============================================================================
+  /**
+   * @returns { number[] }
+   */
+  getEffectParameters() {
+    return this.#effectParameters;
+  }
+  //==============================================================================
+  // 효과 기본 파라미터 반환. (정적)
+  //==============================================================================
+  /**
+   * @param { string } effect
+   * @returns { number[] }
+   */
+  static getDefaultParameters(effect) {
+    const defaultParameters = DEFAULT_PARAMETER_TABLE[effect] ? DEFAULT_PARAMETER_TABLE[effect] : DEFAULT_PARAMETER_TABLE.none;
+    return [defaultParameters[0], defaultParameters[1], defaultParameters[2], defaultParameters[3]];
+  }
+  //==============================================================================
+  // 효과 기본 색 반환. (정적)
+  //==============================================================================
+  /**
+   * @param { string } effect
+   * @returns { Color }
+   */
+  static getDefaultColor(effect) {
+    const defaultColor = DEFAULT_COLOR_TABLE[effect] ? DEFAULT_COLOR_TABLE[effect] : DEFAULT_COLOR_TABLE.none;
+    return new Color(defaultColor[0], defaultColor[1], defaultColor[2], defaultColor[3]);
+  }
+};
+
+// src/effect/screeneffect.js
+var System75 = globalThis;
+var ScreenEffectType = {
+  // --- 형태 왜곡 ---
+  lensDistortion: "lensDistortion",
+  // 배럴 / 핀쿠션 렌즈 왜곡. (parameters = [세기 — 음수면 핀쿠션])
+  bulge: "bulge",
+  // 볼록 / 오목. (parameters = [중심 x, 중심 y, 세기, 반지름])
+  swirl: "swirl",
+  // 소용돌이. (parameters = [중심 x, 중심 y, 회전 수, 반지름])
+  kaleidoscope: "kaleidoscope",
+  // 만화경. (parameters = [조각 수])
+  mirror: "mirror",
+  // 대칭. (parameters = [0 가로 / 1 세로])
+  ripple: "ripple",
+  // 물 파문. (parameters = [중심 x, 중심 y, 빈도, 속도])
+  heatHaze: "heatHaze",
+  // 아지랑이. (parameters = [노이즈 배율, 속도])
+  jitter: "jitter",
+  // 화면 흔들림. (parameters = [진폭 픽셀, 초당 변화])
+  doubleVision: "doubleVision",
+  // 겹쳐 보임. (parameters = [간격, 흔들리는 속도])
+  pixelate: "pixelate",
+  // 모자이크. (strength 0 → 1, parameters = [가장 큰 블록 픽셀])
+  shockwave: "shockwave",
+  // 충격파 링 왜곡. (parameters = [중심 x, 중심 y, 반지름 0 ~ 1.5, 폭], color = 링 빛)
+  wave: "wave",
+  // 화면 물결. (parameters = [빈도, 속도])
+  // --- 흐림 ---
+  motionBlur: "motionBlur",
+  // 방향 블러. (parameters = [각도 라디안, 길이 픽셀])
+  zoomBlur: "zoomBlur",
+  // 중심으로 뻗는 방사 블러. (parameters = [중심 x, 중심 y, 길이])
+  blur: "blur",
+  // 가우시안 블러. (parameters = [반지름 픽셀])
+  tiltShift: "tiltShift",
+  // 틸트 시프트. (parameters = [초점 y, 초점 폭, 반지름 픽셀])
+  godRays: "godRays",
+  // 빛줄기. (parameters = [중심 x, 중심 y, 문턱, 감쇠], color = 빛 색)
+  bloom: "bloom",
+  // 밝은 곳 번짐. (parameters = [문턱, 세기 배율, 반지름 픽셀])
+  anamorphic: "anamorphic",
+  // 가로 렌즈 플레어. (parameters = [문턱, 세기 배율, 폭 픽셀], color = 플레어 색)
+  // --- 글리치 ---
+  glitch: "glitch",
+  // 가로 줄 어긋남 + 색 분리 + 블록 반전. (parameters = [줄 수, 초당 변화, 어긋남 폭])
+  vhs: "vhs",
+  // VHS 테이프. (흔들림 + 색 번짐 + 노이즈 줄, parameters = [흔들림, 노이즈])
+  chromatic: "chromatic",
+  // 색수차. (parameters = [배율])
+  // --- 색 ---
+  whiteBalance: "whiteBalance",
+  // 색온도 / 틴트. (parameters = [온도 -1 ~ 1, 틴트 -1 ~ 1])
+  liftGammaGain: "liftGammaGain",
+  // 리프트 / 감마 / 게인. (parameters = [리프트, 감마, 게인])
+  colorGrade: "colorGrade",
+  // 대비 / 채도 / 밝기 + 틴트. (parameters = [대비, 채도, 밝기], color = 틴트)
+  hueShift: "hueShift",
+  // 색상 회전. (parameters = [회전 수 — strength 와 곱])
+  splitToning: "splitToning",
+  // 스플릿 토닝. (parameters.xyz = 그림자 색, color = 하이라이트 색, w = 균형)
+  tonemap: "tonemap",
+  // ACES 톤매핑. (parameters = [노출])
+  gradientMap: "gradientMap",
+  // 밝기를 두 색 사이로 매핑. (parameters.xyz = 어두운 색, color = 밝은 색)
+  sepia: "sepia",
+  // 세피아.
+  grayscale: "grayscale",
+  // 무채색.
+  posterize: "posterize",
+  // 포스터화. (parameters = [단계 수])
+  dither: "dither",
+  // 오더드 디더링. (parameters = [단계 수, 픽셀 크기])
+  halftone: "halftone",
+  // 하프톤 점. (parameters = [격자 픽셀])
+  sharpen: "sharpen",
+  // 샤픈.
+  edgeDetect: "edgeDetect",
+  // 윤곽 검출. (color = 선 색)
+  oldFilm: "oldFilm",
+  // 낡은 필름. (세피아 + 그레인 + 스크래치 + 깜빡임)
+  nightVision: "nightVision",
+  // 야시경. (color = 틴트)
+  invert: "invert",
+  // 색 반전.
+  // --- 무늬 / 마스크 ---
+  scanline: "scanline",
+  // CRT 곡면 + 주사선 + RGB 마스크. (parameters = [곡률, 주사선 밀도])
+  grain: "grain",
+  // 필름 그레인.
+  rain: "rain",
+  // 빗줄기. (parameters = [줄 수, 밀도, 속도], color = 빗줄기 색)
+  fog: "fog",
+  // 세로 안개. (parameters = [시작 y, 끝 y], color = 안개 색)
+  vignette: "vignette",
+  // 비네트. (parameters = [시작 거리, 끝 거리], color = 가장자리 색)
+  spotlight: "spotlight",
+  // 스포트라이트 바깥 어둡힘. (parameters = [중심 x, 중심 y, 반지름, 부드러움], color = 바깥 색)
+  speedLines: "speedLines",
+  // 집중선. (parameters = [중심 x, 중심 y, 밀도, 속도], color = 선 색)
+  letterbox: "letterbox",
+  // 위아래 / 좌우 검은 띠. (parameters = [세로 띠 비율, 가로 띠 비율], color = 띠 색)
+  // --- 전환 (strength 0 → 1 로 color 에 덮인다) ---
+  pixelDissolve: "pixelDissolve",
+  // 블록 디졸브. (parameters = [블록 수])
+  wipe: "wipe",
+  // 방향 와이프. (parameters = [방향 x, 방향 y, 부드러움])
+  irisWipe: "irisWipe",
+  // 원형 아이리스. (parameters = [중심 x, 중심 y, 부드러움])
+  diamondWipe: "diamondWipe",
+  // 마름모 와이프. (parameters = [부드러움])
+  clockWipe: "clockWipe",
+  // 시계 와이프. (parameters = [부드러움])
+  blinds: "blinds",
+  // 블라인드. (parameters = [줄 수, 부드러움])
+  checkerWipe: "checkerWipe",
+  // 체커 보드. (parameters = [칸 수])
+  noiseFade: "noiseFade",
+  // 노이즈 페이드. (parameters = [노이즈 배율, 부드러움])
+  burn: "burn",
+  // 불에 타듯. (parameters = [노이즈 배율, 띠 폭], color = 덮을 색, 띠는 주황)
+  tvOff: "tvOff",
+  // 브라운관 끄기. (세로로 눌리며 밝은 선으로)
+  fade: "fade"
+  // 단색으로 페이드. (color = 목표 색)
+};
+var EFFECT_ORDER = [
+  "lensDistortion",
+  "bulge",
+  "swirl",
+  "kaleidoscope",
+  "mirror",
+  "ripple",
+  "heatHaze",
+  "jitter",
+  "doubleVision",
+  "pixelate",
+  "shockwave",
+  "wave",
+  "motionBlur",
+  "zoomBlur",
+  "blur",
+  "tiltShift",
+  "godRays",
+  "bloom",
+  "anamorphic",
+  "glitch",
+  "vhs",
+  "chromatic",
+  "whiteBalance",
+  "liftGammaGain",
+  "colorGrade",
+  "hueShift",
+  "splitToning",
+  "tonemap",
+  "gradientMap",
+  "sepia",
+  "grayscale",
+  "posterize",
+  "dither",
+  "halftone",
+  "sharpen",
+  "edgeDetect",
+  "oldFilm",
+  "nightVision",
+  "invert",
+  "scanline",
+  "grain",
+  "rain",
+  "fog",
+  "vignette",
+  "spotlight",
+  "speedLines",
+  "letterbox",
+  "pixelDissolve",
+  "wipe",
+  "irisWipe",
+  "diamondWipe",
+  "clockWipe",
+  "blinds",
+  "checkerWipe",
+  "noiseFade",
+  "burn",
+  "tvOff",
+  "fade"
+];
+var DEFAULT_PARAMETER_TABLE2 = {
+  lensDistortion: [0.35, 0, 0, 0],
+  bulge: [0.5, 0.5, 0.5, 0.5],
+  swirl: [0.5, 0.5, 0.6, 0.5],
+  kaleidoscope: [6, 0, 0, 0],
+  mirror: [0, 0, 0, 0],
+  ripple: [0.5, 0.5, 40, 6],
+  heatHaze: [6, 1.5, 0, 0],
+  jitter: [8, 24, 0, 0],
+  doubleVision: [0.02, 3, 0, 0],
+  pixelate: [12, 0, 0, 0],
+  shockwave: [0.5, 0.5, 0, 0.1],
+  wave: [18, 4, 0, 0],
+  motionBlur: [0, 24, 0, 0],
+  zoomBlur: [0.5, 0.5, 0.35, 0],
+  blur: [4, 0, 0, 0],
+  tiltShift: [0.5, 0.18, 6, 0],
+  godRays: [0.5, 0.35, 0.6, 0.94],
+  bloom: [0.65, 1.2, 4, 0],
+  anamorphic: [0.75, 1.5, 24, 0],
+  glitch: [20, 10, 0.08, 0],
+  vhs: [0.01, 0.35, 0, 0],
+  chromatic: [1, 0, 0, 0],
+  whiteBalance: [0.4, 0, 0, 0],
+  liftGammaGain: [0, 1, 1, 0],
+  colorGrade: [1, 1, 1, 0],
+  hueShift: [1, 0, 0, 0],
+  splitToning: [0.1, 0.15, 0.45, 0.5],
+  tonemap: [1, 0, 0, 0],
+  gradientMap: [0.05, 0.03, 0.2, 0],
+  sepia: [0, 0, 0, 0],
+  grayscale: [0, 0, 0, 0],
+  posterize: [5, 0, 0, 0],
+  dither: [4, 2, 0, 0],
+  halftone: [6, 0, 0, 0],
+  sharpen: [0, 0, 0, 0],
+  edgeDetect: [0, 0, 0, 0],
+  oldFilm: [0, 0, 0, 0],
+  nightVision: [0, 0, 0, 0],
+  invert: [0, 0, 0, 0],
+  scanline: [0.15, 0.5, 0, 0],
+  grain: [0, 0, 0, 0],
+  rain: [90, 8, 1.6, 0],
+  fog: [0.35, 1, 0, 0],
+  vignette: [0.45, 1.1, 0, 0],
+  spotlight: [0.5, 0.5, 0.25, 0.2],
+  speedLines: [0.5, 0.5, 14, 6],
+  letterbox: [0.12, 0, 0, 0],
+  pixelDissolve: [24, 0, 0, 0],
+  wipe: [1, 0, 0.05, 0],
+  irisWipe: [0.5, 0.5, 0.05, 0],
+  diamondWipe: [0.05, 0, 0, 0],
+  clockWipe: [0.02, 0, 0, 0],
+  blinds: [10, 0.05, 0, 0],
+  checkerWipe: [10, 0, 0, 0],
+  noiseFade: [5, 0.2, 0, 0],
+  burn: [5, 0.06, 0, 0],
+  tvOff: [0, 0, 0, 0],
+  fade: [0, 0, 0, 0]
+};
+var SCREEN_EFFECT_PARAMETER_NAMES = {
+  lensDistortion: ["intensity"],
+  bulge: ["centerX", "centerY", "intensity", "radius"],
+  swirl: ["centerX", "centerY", "turns", "radius"],
+  kaleidoscope: ["segments"],
+  mirror: ["axis"],
+  ripple: ["centerX", "centerY", "frequency", "speed"],
+  heatHaze: ["scale", "speed"],
+  jitter: ["amplitude", "rate"],
+  doubleVision: ["offset", "speed"],
+  pixelate: ["blockSize"],
+  shockwave: ["centerX", "centerY", "radius", "width"],
+  wave: ["frequency", "speed"],
+  motionBlur: ["angle", "length"],
+  zoomBlur: ["centerX", "centerY", "length"],
+  blur: ["radius"],
+  tiltShift: ["focusY", "focusWidth", "radius"],
+  godRays: ["centerX", "centerY", "threshold", "decay"],
+  bloom: ["threshold", "intensity", "radius"],
+  anamorphic: ["threshold", "intensity", "width"],
+  glitch: ["rows", "rate", "shift"],
+  vhs: ["wobble", "noise"],
+  chromatic: ["scale"],
+  whiteBalance: ["temperature", "tint"],
+  liftGammaGain: ["lift", "gamma", "gain"],
+  colorGrade: ["contrast", "saturation", "brightness"],
+  hueShift: ["turns"],
+  splitToning: ["shadowRed", "shadowGreen", "shadowBlue", "balance"],
+  tonemap: ["exposure"],
+  gradientMap: ["darkRed", "darkGreen", "darkBlue"],
+  sepia: [],
+  grayscale: [],
+  posterize: ["levels"],
+  dither: ["levels", "pixelSize"],
+  halftone: ["cellSize"],
+  sharpen: [],
+  edgeDetect: [],
+  oldFilm: [],
+  nightVision: [],
+  invert: [],
+  scanline: ["curvature", "density"],
+  grain: [],
+  rain: ["columns", "density", "speed"],
+  fog: ["start", "end"],
+  vignette: ["inner", "outer"],
+  spotlight: ["centerX", "centerY", "radius", "softness"],
+  speedLines: ["centerX", "centerY", "density", "speed"],
+  letterbox: ["vertical", "horizontal"],
+  pixelDissolve: ["blocks"],
+  wipe: ["directionX", "directionY", "softness"],
+  irisWipe: ["centerX", "centerY", "softness"],
+  diamondWipe: ["softness"],
+  clockWipe: ["softness"],
+  blinds: ["count", "softness"],
+  checkerWipe: ["cells"],
+  noiseFade: ["scale", "softness"],
+  burn: ["scale", "width"],
+  tvOff: [],
+  fade: []
+};
+var DEFAULT_COLOR_TABLE2 = {
+  shockwave: [1, 1, 1, 0.6],
+  godRays: [1, 0.95, 0.8, 1],
+  anamorphic: [0.5, 0.7, 1, 1],
+  colorGrade: [1, 1, 1, 0],
+  splitToning: [1, 0.85, 0.55, 1],
+  gradientMap: [1, 0.9, 0.6, 1],
+  edgeDetect: [1, 1, 1, 1],
+  nightVision: [0.35, 1, 0.45, 1],
+  rain: [0.8, 0.9, 1, 0.45],
+  fog: [0.75, 0.8, 0.9, 1],
+  vignette: [0, 0, 0, 1],
+  spotlight: [0, 0, 0, 1],
+  speedLines: [1, 1, 1, 0.8],
+  letterbox: [0, 0, 0, 1],
+  pixelDissolve: [0, 0, 0, 1],
+  wipe: [0, 0, 0, 1],
+  irisWipe: [0, 0, 0, 1],
+  diamondWipe: [0, 0, 0, 1],
+  clockWipe: [0, 0, 0, 1],
+  blinds: [0, 0, 0, 1],
+  checkerWipe: [0, 0, 0, 1],
+  noiseFade: [0, 0, 0, 1],
+  burn: [0, 0, 0, 1],
+  tvOff: [0, 0, 0, 1],
+  fade: [0, 0, 0, 1]
+};
+var FRAGMENTSHADER_HEADER = `#version 300 es
+precision highp float;
+in vec2 fragmentTextureCoordinate;
+uniform sampler2D sourceTexture;
+uniform sampler2D auxiliaryTexture;
+uniform vec2 resolution;
+uniform float time;
+uniform float strength;
+uniform vec4 parameters;
+uniform vec4 effectColor;
+out vec4 outputColor;
+
+float hash21(vec2 point) {
+	vec3 scrambled = fract(vec3(point.xyx) * 0.1031);
+	scrambled += dot(scrambled, scrambled.yzx + 33.33);
+	return fract((scrambled.x + scrambled.y) * scrambled.z);
+}
+
+float valueNoise(vec2 point) {
+	vec2 cell = floor(point);
+	vec2 fraction = fract(point);
+	vec2 blend = fraction * fraction * (3.0 - 2.0 * fraction);
+	float bottom = mix(hash21(cell), hash21(cell + vec2(1.0, 0.0)), blend.x);
+	float top = mix(hash21(cell + vec2(0.0, 1.0)), hash21(cell + vec2(1.0, 1.0)), blend.x);
+	return mix(bottom, top, blend.y);
+}
+
+vec4 sampleScreen(vec2 screenUv) {
+	vec2 clamped = clamp(screenUv, 0.0, 1.0);
+	return texture(sourceTexture, vec2(clamped.x, 1.0 - clamped.y));
+}
+
+float luminanceAt(vec2 uv) {
+	return dot(texture(sourceTexture, uv).rgb, vec3(0.299, 0.587, 0.114));
+}
+
+void main() {
+	vec2 uv = fragmentTextureCoordinate;
+	vec2 screenUv = vec2(uv.x, 1.0 - uv.y);
+	vec4 color = texture(sourceTexture, uv);
+`;
+var FRAGMENTSHADER_FOOTER = `
+	outputColor = vec4(color.rgb, 1.0);
+}
+`;
+var EFFECT_BODY_TABLE2 = {
+  copy: ``,
+  lensDistortion: `
+	vec2 centered = uv - 0.5;
+	float radiusSquared = dot(centered, centered);
+	float distortion = parameters.x * strength;
+	vec2 warped = uv + centered * radiusSquared * distortion;
+	warped = 0.5 + (warped - 0.5) / (1.0 + 0.25 * max(distortion, 0.0));
+	vec2 insideMask = step(vec2(0.0), warped) * step(warped, vec2(1.0));
+	color = texture(sourceTexture, warped) * insideMask.x * insideMask.y;
+	`,
+  bulge: `
+	float aspect = resolution.x / resolution.y;
+	vec2 fromCenter = (screenUv - parameters.xy) * vec2(aspect, 1.0);
+	float bulgeDistance = length(fromCenter) / max(parameters.w, 0.001);
+	float bulgeFactor = 1.0 - parameters.z * strength * (1.0 - clamp(bulgeDistance, 0.0, 1.0));
+	vec2 warpedScreen = parameters.xy + fromCenter * bulgeFactor / vec2(aspect, 1.0);
+	color = sampleScreen(warpedScreen);
+	`,
+  swirl: `
+	float aspect = resolution.x / resolution.y;
+	vec2 fromCenter = (screenUv - parameters.xy) * vec2(aspect, 1.0);
+	float swirlDistance = length(fromCenter) / max(parameters.w, 0.001);
+	float swirlAngle = parameters.z * strength * 6.28318530718 * pow(1.0 - clamp(swirlDistance, 0.0, 1.0), 2.0);
+	float cosine = cos(swirlAngle);
+	float sine = sin(swirlAngle);
+	vec2 rotated = vec2(fromCenter.x * cosine - fromCenter.y * sine, fromCenter.x * sine + fromCenter.y * cosine);
+	color = sampleScreen(parameters.xy + rotated / vec2(aspect, 1.0));
+	`,
+  kaleidoscope: `
+	float aspect = resolution.x / resolution.y;
+	vec2 fromCenter = (screenUv - 0.5) * vec2(aspect, 1.0);
+	float kaleidoRadius = length(fromCenter);
+	float segmentAngle = 6.28318530718 / max(parameters.x, 1.0);
+	float kaleidoAngle = atan(fromCenter.y, fromCenter.x);
+	kaleidoAngle = abs(mod(kaleidoAngle, segmentAngle) - segmentAngle * 0.5);
+	vec2 mirroredScreen = 0.5 + vec2(cos(kaleidoAngle), sin(kaleidoAngle)) * kaleidoRadius / vec2(aspect, 1.0);
+	color = mix(color, sampleScreen(mirroredScreen), strength);
+	`,
+  mirror: `
+	vec2 mirroredScreen = screenUv;
+	if (parameters.x < 0.5) {
+		mirroredScreen.x = screenUv.x < 0.5 ? screenUv.x : 1.0 - screenUv.x;
+	}
+	else {
+		mirroredScreen.y = screenUv.y < 0.5 ? screenUv.y : 1.0 - screenUv.y;
+	}
+	color = mix(color, sampleScreen(mirroredScreen), step(0.5, strength));
+	`,
+  ripple: `
+	float aspect = resolution.x / resolution.y;
+	vec2 fromCenter = (screenUv - parameters.xy) * vec2(aspect, 1.0);
+	float rippleDistance = length(fromCenter);
+	float rippleWave = sin(rippleDistance * parameters.z - time * parameters.w) * strength * 0.012 / (1.0 + rippleDistance * 4.0);
+	vec2 rippleDirection = rippleDistance > 0.0001 ? fromCenter / rippleDistance : vec2(0.0);
+	color = sampleScreen(screenUv + rippleDirection * rippleWave / vec2(aspect, 1.0));
+	`,
+  heatHaze: `
+	vec2 hazeOffset = vec2(valueNoise(uv * parameters.x + vec2(0.0, time * parameters.y)), valueNoise(uv * parameters.x + vec2(time * parameters.y, 7.3))) - 0.5;
+	color = texture(sourceTexture, uv + hazeOffset * strength * 0.03);
+	`,
+  jitter: `
+	float jitterSeed = floor(time * parameters.y);
+	vec2 jitterOffset = (vec2(hash21(vec2(jitterSeed, 1.0)), hash21(vec2(jitterSeed, 2.0))) - 0.5) * parameters.x * strength / resolution;
+	color = texture(sourceTexture, clamp(uv + jitterOffset, 0.0, 1.0));
+	`,
+  doubleVision: `
+	vec2 visionOffset = vec2(sin(time * parameters.y) * parameters.x, cos(time * parameters.y * 0.7) * parameters.x * 0.5) * strength;
+	color = (texture(sourceTexture, uv + visionOffset) + texture(sourceTexture, uv - visionOffset)) * 0.5;
+	`,
+  pixelate: `
+	float block = max(1.0, parameters.x * strength);
+	vec2 pixelUv = (floor(uv * resolution / block) + 0.5) * block / resolution;
+	color = texture(sourceTexture, pixelUv);
+	`,
+  shockwave: `
+	float aspect = resolution.x / resolution.y;
+	vec2 delta = (screenUv - parameters.xy) * vec2(aspect, 1.0);
+	float ringDistance = length(delta);
+	float ringWidth = max(parameters.w, 0.001);
+	float ring = 1.0 - smoothstep(0.0, ringWidth, abs(ringDistance - parameters.z));
+	float wave = sin((ringDistance - parameters.z) / ringWidth * 3.14159265) * ring;
+	vec2 direction = ringDistance > 0.0001 ? delta / ringDistance : vec2(0.0);
+	vec2 uvDirection = vec2(direction.x, -direction.y);
+	vec2 displaced = uv - uvDirection / vec2(aspect, 1.0) * wave * strength * 0.06;
+	color = texture(sourceTexture, displaced);
+	color.rgb += effectColor.rgb * ring * ring * strength * effectColor.a;
+	`,
+  wave: `
+	vec2 displaced = uv + vec2(sin(uv.y * parameters.x + time * parameters.y), cos(uv.x * parameters.x * 0.7 + time * parameters.y * 0.8)) * strength * 0.012;
+	color = texture(sourceTexture, displaced);
+	`,
+  motionBlur: `
+	vec2 blurDirection = vec2(cos(parameters.x), -sin(parameters.x)) * parameters.y * strength / resolution;
+	vec4 sum = vec4(0.0);
+	for (int sampleIndex = 0; sampleIndex < 12; ++sampleIndex) {
+		float offset = (float(sampleIndex) - 5.5) / 5.5;
+		sum += texture(sourceTexture, uv + blurDirection * offset);
+	}
+	color = sum / 12.0;
+	`,
+  zoomBlur: `
+	vec2 toCenter = (parameters.xy - screenUv) * strength * parameters.z;
+	toCenter.y = -toCenter.y;
+	vec4 sum = vec4(0.0);
+	for (int sampleIndex = 0; sampleIndex < 12; ++sampleIndex) {
+		sum += texture(sourceTexture, uv + toCenter * (float(sampleIndex) / 12.0));
+	}
+	color = sum / 12.0;
+	`,
+  blur: `
+	vec2 blurStep = parameters.zw / resolution * parameters.x * strength;
+	vec4 sum = color * 0.227027;
+	sum += (texture(sourceTexture, uv + blurStep * 1.3846) + texture(sourceTexture, uv - blurStep * 1.3846)) * 0.3162162;
+	sum += (texture(sourceTexture, uv + blurStep * 3.2307) + texture(sourceTexture, uv - blurStep * 3.2307)) * 0.0702703;
+	color = sum;
+	`,
+  tiltShift: `
+	float focusDistance = smoothstep(parameters.y * 0.5, parameters.y * 1.5, abs(screenUv.y - parameters.x));
+	vec2 blurStep = parameters.zw / resolution * focusDistance * strength;
+	vec4 sum = color * 0.227027;
+	sum += (texture(sourceTexture, uv + blurStep * 1.3846) + texture(sourceTexture, uv - blurStep * 1.3846)) * 0.3162162;
+	sum += (texture(sourceTexture, uv + blurStep * 3.2307) + texture(sourceTexture, uv - blurStep * 3.2307)) * 0.0702703;
+	color = sum;
+	`,
+  godRays: `
+	vec2 rayCenter = vec2(parameters.x, 1.0 - parameters.y);
+	vec2 rayStep = (rayCenter - uv) / 16.0;
+	vec3 rays = vec3(0.0);
+	float weight = 1.0;
+	vec2 sampleUv = uv;
+	for (int sampleIndex = 0; sampleIndex < 16; ++sampleIndex) {
+		sampleUv += rayStep;
+		vec3 sampled = texture(sourceTexture, sampleUv).rgb;
+		float luminance = dot(sampled, vec3(0.299, 0.587, 0.114));
+		rays += sampled * smoothstep(parameters.z - 0.1, parameters.z + 0.1, luminance) * weight;
+		weight *= parameters.w;
+	}
+	color.rgb += rays / 16.0 * effectColor.rgb * strength * 2.0;
+	`,
+  bloomBright: `
+	float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	float knee = smoothstep(parameters.x - 0.1, parameters.x + 0.1, luminance);
+	color.rgb *= knee;
+	`,
+  bloomComposite: `
+	vec3 bloom = texture(auxiliaryTexture, uv).rgb;
+	color.rgb += bloom * strength * parameters.y;
+	`,
+  anamorphicComposite: `
+	vec3 flare = texture(auxiliaryTexture, uv).rgb;
+	color.rgb += flare * effectColor.rgb * strength * parameters.y;
+	`,
+  glitch: `
+	float seed = floor(time * parameters.y);
+	float row = floor(uv.y * parameters.x);
+	float rowRandom = hash21(vec2(row, seed));
+	float shift = step(0.8, rowRandom) * (hash21(vec2(seed, row)) - 0.5) * parameters.z * strength;
+	vec2 shifted = uv + vec2(shift, 0.0);
+	color = texture(sourceTexture, shifted);
+	float split = strength * 0.012 * step(0.5, rowRandom);
+	color.r = texture(sourceTexture, shifted + vec2(split, 0.0)).r;
+	color.b = texture(sourceTexture, shifted - vec2(split, 0.0)).b;
+	float blockNoise = step(0.93, hash21(floor(uv * vec2(8.0, 6.0)) + seed)) * strength;
+	color.rgb = mix(color.rgb, 1.0 - color.rgb, blockNoise * 0.6);
+	`,
+  vhs: `
+	float band = fract(time * 0.35);
+	float bandMask = smoothstep(0.0, 0.05, abs(screenUv.y - band)) ;
+	float wobble = (sin(time * 9.0 + uv.y * 40.0) * 0.5 + (1.0 - bandMask) * 3.0) * parameters.x * strength;
+	vec2 shifted = uv + vec2(wobble, 0.0);
+	color = texture(sourceTexture, shifted);
+	color.r = texture(sourceTexture, shifted + vec2(0.006 * strength, 0.0)).r;
+	color.b = texture(sourceTexture, shifted - vec2(0.006 * strength, 0.0)).b;
+	float lineNoise = hash21(vec2(floor(uv.y * resolution.y * 0.5), floor(time * 30.0)));
+	float noiseLine = step(1.0 - parameters.y * 0.08, lineNoise) * strength;
+	color.rgb = mix(color.rgb, vec3(0.9), noiseLine * 0.6);
+	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	color.rgb = mix(color.rgb, vec3(gray), 0.2 * strength);
+	color.rgb += (hash21(uv * resolution + fract(time * 5.0) * 100.0) - 0.5) * parameters.y * 0.3 * strength;
+	`,
+  chromatic: `
+	vec2 offset = (uv - 0.5) * strength * 0.03 * parameters.x;
+	color.r = texture(sourceTexture, uv + offset).r;
+	color.b = texture(sourceTexture, uv - offset).b;
+	`,
+  whiteBalance: `
+	vec3 balanced = color.rgb * vec3(1.0 + parameters.x * 0.25, 1.0 + parameters.y * 0.15, 1.0 - parameters.x * 0.25);
+	color.rgb = mix(color.rgb, clamp(balanced, 0.0, 1.0), strength);
+	`,
+  liftGammaGain: `
+	vec3 graded = color.rgb * parameters.z + parameters.x * (1.0 - color.rgb);
+	graded = pow(max(graded, vec3(0.0)), vec3(1.0 / max(parameters.y, 0.01)));
+	color.rgb = mix(color.rgb, clamp(graded, 0.0, 1.0), strength);
+	`,
+  colorGrade: `
+	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	vec3 graded = mix(vec3(gray), color.rgb, parameters.y);
+	graded = (graded - 0.5) * parameters.x + 0.5;
+	graded *= parameters.z;
+	graded *= mix(vec3(1.0), effectColor.rgb, effectColor.a);
+	color.rgb = mix(color.rgb, clamp(graded, 0.0, 1.0), strength);
+	`,
+  hueShift: `
+	float hueAngle = strength * parameters.x * 6.28318530718;
+	vec3 yiq = mat3(0.299, 0.596, 0.211, 0.587, -0.274, -0.523, 0.114, -0.322, 0.312) * color.rgb;
+	float chroma = length(yiq.yz);
+	float hue = atan(yiq.z, yiq.y) + hueAngle;
+	yiq.yz = vec2(cos(hue), sin(hue)) * chroma;
+	color.rgb = clamp(mat3(1.0, 1.0, 1.0, 0.956, -0.272, -1.106, 0.621, -0.647, 1.703) * yiq, 0.0, 1.0);
+	`,
+  splitToning: `
+	float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	float highlightWeight = smoothstep(parameters.w - 0.3, parameters.w + 0.3, luminance);
+	vec3 toned = color.rgb * mix(parameters.xyz * 2.0, effectColor.rgb * 2.0, highlightWeight);
+	color.rgb = mix(color.rgb, clamp(mix(color.rgb, toned, 0.5), 0.0, 1.0), strength);
+	`,
+  tonemap: `
+	vec3 exposed = color.rgb * parameters.x;
+	vec3 mapped = (exposed * (2.51 * exposed + 0.03)) / (exposed * (2.43 * exposed + 0.59) + 0.14);
+	color.rgb = mix(color.rgb, clamp(mapped, 0.0, 1.0), strength);
+	`,
+  gradientMap: `
+	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	color.rgb = mix(color.rgb, mix(parameters.xyz, effectColor.rgb, gray), strength);
+	`,
+  sepia: `
+	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	color.rgb = mix(color.rgb, gray * vec3(1.2, 1.0, 0.78), strength);
+	`,
+  grayscale: `
+	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	color.rgb = mix(color.rgb, vec3(gray), strength);
+	`,
+  posterize: `
+	float levels = max(parameters.x, 1.0);
+	color.rgb = mix(color.rgb, floor(color.rgb * levels + 0.5) / levels, strength);
+	`,
+  dither: `
+	float pixelSize = max(parameters.y, 1.0);
+	vec2 pixelCell = floor(uv * resolution / pixelSize);
+	vec3 sampled = texture(sourceTexture, (pixelCell + 0.5) * pixelSize / resolution).rgb;
+	int bayerX = int(mod(pixelCell.x, 4.0));
+	int bayerY = int(mod(pixelCell.y, 4.0));
+	int bayerIndex = bayerX + bayerY * 4;
+	float bayerValues[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+	float bayerThreshold = (bayerValues[bayerIndex] + 0.5) / 16.0 - 0.5;
+	float levels = max(parameters.x, 2.0) - 1.0;
+	vec3 dithered = floor(sampled * levels + bayerThreshold + 0.5) / levels;
+	color.rgb = mix(color.rgb, clamp(dithered, 0.0, 1.0), strength);
+	`,
+  halftone: `
+	float cellSize = max(parameters.x, 2.0);
+	vec2 cell = floor(uv * resolution / cellSize);
+	vec2 cellCenter = (cell + 0.5) * cellSize / resolution;
+	vec3 sampled = texture(sourceTexture, cellCenter).rgb;
+	float luminance = dot(sampled, vec3(0.299, 0.587, 0.114));
+	float dotRadius = (1.0 - luminance) * 0.7;
+	float cellDistance = length((uv * resolution / cellSize) - (cell + 0.5));
+	float dotMask = 1.0 - smoothstep(dotRadius - 0.1, dotRadius + 0.1, cellDistance);
+	vec3 halftoned = mix(vec3(1.0), vec3(0.05), dotMask);
+	color.rgb = mix(color.rgb, halftoned * mix(vec3(1.0), sampled + 0.3, 0.4), strength);
+	`,
+  sharpen: `
+	vec2 texel = 1.0 / resolution;
+	vec3 neighbors = texture(sourceTexture, uv + vec2(texel.x, 0.0)).rgb + texture(sourceTexture, uv - vec2(texel.x, 0.0)).rgb + texture(sourceTexture, uv + vec2(0.0, texel.y)).rgb + texture(sourceTexture, uv - vec2(0.0, texel.y)).rgb;
+	vec3 sharpened = clamp(color.rgb * 5.0 - neighbors, 0.0, 1.0);
+	color.rgb = mix(color.rgb, sharpened, strength);
+	`,
+  edgeDetect: `
+	vec2 texel = 1.0 / resolution;
+	float gradientX = 0.0;
+	float gradientY = 0.0;
+	gradientX += luminanceAt(uv + vec2(-texel.x, -texel.y)) * -1.0 + luminanceAt(uv + vec2(texel.x, -texel.y));
+	gradientX += luminanceAt(uv + vec2(-texel.x, 0.0)) * -2.0 + luminanceAt(uv + vec2(texel.x, 0.0)) * 2.0;
+	gradientX += luminanceAt(uv + vec2(-texel.x, texel.y)) * -1.0 + luminanceAt(uv + vec2(texel.x, texel.y));
+	gradientY += luminanceAt(uv + vec2(-texel.x, -texel.y)) * -1.0 + luminanceAt(uv + vec2(-texel.x, texel.y));
+	gradientY += luminanceAt(uv + vec2(0.0, -texel.y)) * -2.0 + luminanceAt(uv + vec2(0.0, texel.y)) * 2.0;
+	gradientY += luminanceAt(uv + vec2(texel.x, -texel.y)) * -1.0 + luminanceAt(uv + vec2(texel.x, texel.y));
+	float edge = clamp(length(vec2(gradientX, gradientY)) * 2.0, 0.0, 1.0);
+	color.rgb = mix(color.rgb, effectColor.rgb * edge, strength);
+	`,
+  oldFilm: `
+	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	vec3 filmColor = gray * vec3(1.15, 1.0, 0.8);
+	float grain = (hash21(uv * resolution + fract(time * 9.1) * 100.0) - 0.5) * 0.25;
+	float scratchSeed = floor(time * 8.0);
+	float scratchX = hash21(vec2(scratchSeed, 1.0));
+	float scratch = (1.0 - smoothstep(0.0, 0.003, abs(uv.x - scratchX))) * step(0.6, hash21(vec2(scratchSeed, 3.0)));
+	float flicker = 0.9 + 0.1 * hash21(vec2(floor(time * 12.0), 5.0));
+	float vignette = 1.0 - smoothstep(0.5, 1.0, distance(uv, vec2(0.5)) * 1.4142) * 0.6;
+	vec3 aged = (filmColor + grain + scratch * 0.8) * flicker * vignette;
+	color.rgb = mix(color.rgb, clamp(aged, 0.0, 1.0), strength);
+	`,
+  nightVision: `
+	float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+	float amplified = clamp(gray * 1.8 + 0.08, 0.0, 1.0);
+	float noise = (hash21(uv * resolution + fract(time * 7.0) * 100.0) - 0.5) * 0.25;
+	float lines = 0.9 + 0.1 * sin(uv.y * resolution.y * 1.5);
+	float vignette = 1.0 - smoothstep(0.55, 1.0, distance(uv, vec2(0.5)) * 1.4142);
+	vec3 visionColor = effectColor.rgb * (amplified + noise) * lines * vignette;
+	color.rgb = mix(color.rgb, clamp(visionColor, 0.0, 1.0), strength);
+	`,
+  invert: `
+	color.rgb = mix(color.rgb, vec3(1.0) - color.rgb, strength);
+	`,
+  scanline: `
+	vec2 centered = uv - 0.5;
+	float radiusSquared = dot(centered, centered);
+	vec2 warped = uv + centered * radiusSquared * parameters.x * strength;
+	vec2 insideMask = step(vec2(0.0), warped) * step(warped, vec2(1.0));
+	color = texture(sourceTexture, warped) * insideMask.x * insideMask.y;
+	float lines = 0.5 + 0.5 * sin(warped.y * resolution.y * 3.14159265 * parameters.y);
+	color.rgb *= 1.0 - strength * 0.35 * lines;
+	float maskPhase = warped.x * resolution.x * 2.0943951;
+	color.rgb *= 1.0 + strength * 0.08 * vec3(sin(maskPhase), sin(maskPhase + 2.0943951), sin(maskPhase + 4.1887902));
+	`,
+  grain: `
+	float grainValue = hash21(uv * resolution + fract(time * 7.13) * 100.0) - 0.5;
+	color.rgb += grainValue * strength * 0.25;
+	`,
+  rain: `
+	float column = floor(screenUv.x * parameters.x);
+	float columnRandom = hash21(vec2(column, 1.0));
+	float streakY = fract(screenUv.y * parameters.y * (0.6 + columnRandom * 0.8) - time * parameters.z * (0.8 + columnRandom * 0.6) + columnRandom * 7.0);
+	float columnX = fract(screenUv.x * parameters.x);
+	float streak = smoothstep(0.7, 1.0, streakY) * (1.0 - smoothstep(0.0, 0.25, abs(columnX - 0.5))) * step(0.35, columnRandom);
+	color.rgb = mix(color.rgb, effectColor.rgb, streak * strength * effectColor.a);
+	`,
+  fog: `
+	float fogMask = smoothstep(parameters.x, parameters.y, screenUv.y) * strength;
+	color.rgb = mix(color.rgb, effectColor.rgb, fogMask * effectColor.a);
+	`,
+  vignette: `
+	float vignetteDistance = distance(uv, vec2(0.5)) * 1.4142;
+	float vignetteMask = smoothstep(parameters.x, parameters.y, vignetteDistance) * strength;
+	color.rgb = mix(color.rgb, effectColor.rgb, vignetteMask * effectColor.a);
+	`,
+  spotlight: `
+	float aspect = resolution.x / resolution.y;
+	float spotDistance = length((screenUv - parameters.xy) * vec2(aspect, 1.0));
+	float spotMask = smoothstep(parameters.z, parameters.z + max(parameters.w, 0.001), spotDistance) * strength;
+	color.rgb = mix(color.rgb, effectColor.rgb, spotMask * effectColor.a);
+	`,
+  speedLines: `
+	float aspect = resolution.x / resolution.y;
+	vec2 delta = (screenUv - parameters.xy) * vec2(aspect, 1.0);
+	float lineDistance = length(delta);
+	float angle = atan(delta.y, delta.x);
+	float streak = valueNoise(vec2(cos(angle), sin(angle)) * parameters.z + vec2(time * parameters.w, 0.0));
+	float lineMask = smoothstep(0.55, 0.75, streak) * smoothstep(0.15, 0.6, lineDistance);
+	color.rgb = mix(color.rgb, effectColor.rgb, lineMask * strength * effectColor.a);
+	`,
+  letterbox: `
+	float bar = parameters.x * strength;
+	float pillar = parameters.y * strength;
+	float inside = step(bar, uv.y) * step(uv.y, 1.0 - bar) * step(pillar, uv.x) * step(uv.x, 1.0 - pillar);
+	color.rgb = mix(effectColor.rgb, color.rgb, inside);
+	`,
+  pixelDissolve: `
+	vec2 blockCell = floor(screenUv * vec2(parameters.x, parameters.x * resolution.y / resolution.x));
+	float blockRandom = hash21(blockCell + 3.7);
+	color.rgb = mix(color.rgb, effectColor.rgb, step(blockRandom, strength) * effectColor.a);
+	`,
+  wipe: `
+	vec2 wipeDirection = normalize(parameters.xy + vec2(0.0001, 0.0));
+	float wipeDistance = dot(screenUv - 0.5, wipeDirection) + 0.5;
+	float softness = max(parameters.z, 0.0001);
+	float cover = 1.0 - smoothstep(strength * (1.0 + softness) - softness, strength * (1.0 + softness), wipeDistance);
+	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
+	`,
+  irisWipe: `
+	float aspect = resolution.x / resolution.y;
+	float irisDistance = length((screenUv - parameters.xy) * vec2(aspect, 1.0));
+	float softness = max(parameters.z, 0.0001);
+	float visibleRadius = (1.0 - strength) * 0.9 * max(aspect, 1.0);
+	float cover = smoothstep(visibleRadius, visibleRadius + softness, irisDistance);
+	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
+	`,
+  diamondWipe: `
+	float diamondDistance = abs(screenUv.x - 0.5) + abs(screenUv.y - 0.5);
+	float softness = max(parameters.x, 0.0001);
+	float cover = 1.0 - smoothstep(strength * (1.0 + softness), strength * (1.0 + softness) + softness, diamondDistance);
+	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
+	`,
+  clockWipe: `
+	vec2 fromCenter = screenUv - 0.5;
+	float clockAngle = (atan(fromCenter.x, -fromCenter.y) + 3.14159265) / 6.28318530718;
+	float softness = max(parameters.x, 0.0001);
+	float cover = 1.0 - smoothstep(strength, strength + softness, clockAngle);
+	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
+	`,
+  blinds: `
+	float stripe = fract(screenUv.y * parameters.x);
+	float softness = max(parameters.y, 0.0001);
+	float cover = 1.0 - smoothstep(strength, strength + softness, stripe);
+	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
+	`,
+  checkerWipe: `
+	vec2 checkerCell = floor(screenUv * vec2(parameters.x, parameters.x * resolution.y / resolution.x));
+	float parity = mod(checkerCell.x + checkerCell.y, 2.0);
+	float cellThreshold = parity * 0.5 + hash21(checkerCell + 1.3) * 0.5;
+	color.rgb = mix(color.rgb, effectColor.rgb, step(cellThreshold, strength * 1.0001) * effectColor.a);
+	`,
+  noiseFade: `
+	float fadeNoise = valueNoise(screenUv * vec2(parameters.x * resolution.x / resolution.y, parameters.x) + 2.1);
+	float softness = max(parameters.y, 0.001);
+	float cover = 1.0 - smoothstep(strength * (1.0 + softness) - softness, strength * (1.0 + softness), fadeNoise);
+	color.rgb = mix(color.rgb, effectColor.rgb, cover * effectColor.a);
+	`,
+  burn: `
+	float burnNoise = valueNoise(screenUv * vec2(parameters.x * resolution.x / resolution.y, parameters.x) + 5.3);
+	float threshold = strength * (1.0 + parameters.y * 4.0) - parameters.y * 2.0;
+	float burned = 1.0 - step(threshold, burnNoise);
+	float innerBand = smoothstep(threshold, threshold + parameters.y, burnNoise);
+	float outerBand = smoothstep(threshold + parameters.y, threshold + parameters.y * 2.0, burnNoise);
+	vec3 emberColor = vec3(1.0, 0.55, 0.15);
+	vec3 sootColor = vec3(0.05, 0.02, 0.01);
+	vec3 burning = mix(emberColor, mix(sootColor, color.rgb, outerBand), innerBand);
+	color.rgb = mix(burning, effectColor.rgb, burned * effectColor.a);
+	`,
+  tvOff: `
+	float collapse = max(1.0 - strength, 0.0);
+	float squeeze = max(collapse * collapse, 0.002);
+	float centeredY = (screenUv.y - 0.5) / squeeze + 0.5;
+	float widthSqueeze = smoothstep(0.0, 0.15, collapse);
+	float centeredX = (screenUv.x - 0.5) / max(widthSqueeze, 0.002) + 0.5;
+	float inside = step(0.0, centeredY) * step(centeredY, 1.0) * step(0.0, centeredX) * step(centeredX, 1.0);
+	vec3 collapsed = sampleScreen(vec2(centeredX, centeredY)).rgb * (1.0 + (1.0 - collapse) * 2.0);
+	float glowLine = (1.0 - smoothstep(0.0, 0.01 + squeeze * 0.5, abs(screenUv.y - 0.5))) * (1.0 - collapse) * step(0.02, widthSqueeze);
+	color.rgb = mix(effectColor.rgb, collapsed, inside) + vec3(glowLine);
+	color.rgb = mix(color.rgb, effectColor.rgb, step(0.999, strength));
+	`,
+  fade: `
+	color.rgb = mix(color.rgb, effectColor.rgb, strength * effectColor.a);
+	`
+};
+function createColorTexture(webGL2RenderingContext, width, height) {
+  const texture = webGL2RenderingContext.createTexture();
+  webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+  webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, width, height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, null);
+  webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR);
+  webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.LINEAR);
+  webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+  webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+  return texture;
+}
+__name(createColorTexture, "createColorTexture");
+function createRenderTarget(webGL2RenderingContext, width, height, useStencil) {
+  const texture = createColorTexture(webGL2RenderingContext, width, height);
+  const framebuffer = webGL2RenderingContext.createFramebuffer();
+  webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
+  webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, texture, 0);
+  let stencilRenderbuffer = null;
+  if (useStencil) {
+    stencilRenderbuffer = webGL2RenderingContext.createRenderbuffer();
+    webGL2RenderingContext.bindRenderbuffer(webGL2RenderingContext.RENDERBUFFER, stencilRenderbuffer);
+    webGL2RenderingContext.renderbufferStorage(webGL2RenderingContext.RENDERBUFFER, webGL2RenderingContext.DEPTH24_STENCIL8, width, height);
+    webGL2RenderingContext.framebufferRenderbuffer(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.DEPTH_STENCIL_ATTACHMENT, webGL2RenderingContext.RENDERBUFFER, stencilRenderbuffer);
+  }
+  webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+  return { framebuffer, texture, stencilRenderbuffer, width, height };
+}
+__name(createRenderTarget, "createRenderTarget");
+function destroyRenderTarget(webGL2RenderingContext, renderTarget) {
+  if (!renderTarget) {
+    return;
+  }
+  webGL2RenderingContext.deleteFramebuffer(renderTarget.framebuffer);
+  webGL2RenderingContext.deleteTexture(renderTarget.texture);
+  if (renderTarget.stencilRenderbuffer) {
+    webGL2RenderingContext.deleteRenderbuffer(renderTarget.stencilRenderbuffer);
+  }
+}
+__name(destroyRenderTarget, "destroyRenderTarget");
+var ScreenEffect = class extends Object2 {
+  static {
+    __name(this, "ScreenEffect");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WebGL2RenderingContext } */
+  #webGL2RenderingContext;
+  /** @private @type { System.Map } */
+  #passTable;
+  /** @private @type { System.Map } */
+  #effectTable;
+  /** @private @type { object | null } */
+  #sceneTarget;
+  /** @private @type { object | null } */
+  #pingTarget;
+  /** @private @type { object | null } */
+  #pongTarget;
+  /** @private @type { object | null } */
+  #halfTargetA;
+  /** @private @type { object | null } */
+  #halfTargetB;
+  /** @private @type { number } */
+  #time;
+  /** @private @type { boolean } */
+  #isBound;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @param { Graphic } graphic
+   */
+  constructor(graphic) {
+    super();
+    this.#webGL2RenderingContext = graphic.getWebGL2RenderingContext();
+    this.#passTable = new System75.Map();
+    this.#effectTable = new System75.Map();
+    this.#sceneTarget = null;
+    this.#pingTarget = null;
+    this.#pongTarget = null;
+    this.#halfTargetA = null;
+    this.#halfTargetB = null;
+    this.#time = 0;
+    this.#isBound = false;
+    for (const effectType of EFFECT_ORDER) {
+      const defaultParameters = DEFAULT_PARAMETER_TABLE2[effectType];
+      const defaultColor = DEFAULT_COLOR_TABLE2[effectType] ? DEFAULT_COLOR_TABLE2[effectType] : [1, 1, 1, 1];
+      this.#effectTable.set(effectType, {
+        isEnabled: false,
+        strength: 1,
+        parameters: [defaultParameters[0], defaultParameters[1], defaultParameters[2], defaultParameters[3]],
+        color: new Color(defaultColor[0], defaultColor[1], defaultColor[2], defaultColor[3])
+      });
+    }
+  }
+  //==============================================================================
+  // 갱신. (애니메이션 효과의 시간)
+  //==============================================================================
+  /**
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    this.#time += timeDelta;
+  }
+  //==============================================================================
+  // 오프스크린 출력 시작. (씬 preDraw 첫머리)
+  //==============================================================================
+  /**
+   * @param { Graphic } graphic
+   */
+  begin(graphic) {
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    const width = webGL2RenderingContext.drawingBufferWidth;
+    const height = webGL2RenderingContext.drawingBufferHeight;
+    if (width <= 0 || height <= 0) {
+      return;
+    }
+    this.ensureTargets(width, height);
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, this.#sceneTarget.framebuffer);
+    webGL2RenderingContext.viewport(0, 0, width, height);
+    webGL2RenderingContext.clearColor(0, 0, 0, 1);
+    webGL2RenderingContext.clearStencil(0);
+    webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.STENCIL_BUFFER_BIT);
+    this.#isBound = true;
+  }
+  //==============================================================================
+  // 효과 적용 후 화면 출력. (씬 postDraw 끝)
+  //==============================================================================
+  /**
+   * @param { Graphic } graphic
+   */
+  end(graphic) {
+    if (!this.#isBound) {
+      return;
+    }
+    this.#isBound = false;
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    const width = this.#sceneTarget.width;
+    const height = this.#sceneTarget.height;
+    webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+    webGL2RenderingContext.disable(webGL2RenderingContext.STENCIL_TEST);
+    const stepList = [];
+    for (const effectType of EFFECT_ORDER) {
+      const effectState = this.#effectTable.get(effectType);
+      if (!effectState.isEnabled || effectState.strength <= 0) {
+        continue;
+      }
+      if (effectType === "blur") {
+        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[0], 0, 1, 0], target: "pingpong" });
+        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[0], 0, 0, 1], target: "pingpong" });
+        continue;
+      }
+      if (effectType === "bloom") {
+        stepList.push({ passName: "bloomBright", state: effectState, parameters: effectState.parameters, target: "halfA" });
+        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[2], 0, 1, 0], target: "halfB", source: "halfA" });
+        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[2], 0, 0, 1], target: "halfA", source: "halfB" });
+        stepList.push({ passName: "bloomComposite", state: effectState, parameters: effectState.parameters, target: "pingpong", auxiliary: "halfA", source: "previous" });
+        continue;
+      }
+      if (effectType === "anamorphic") {
+        stepList.push({ passName: "bloomBright", state: effectState, parameters: effectState.parameters, target: "halfA" });
+        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[2], 0, 1, 0], target: "halfB", source: "halfA" });
+        stepList.push({ passName: "blur", state: effectState, parameters: [effectState.parameters[2] * 0.5, 0, 1, 0], target: "halfA", source: "halfB" });
+        stepList.push({ passName: "anamorphicComposite", state: effectState, parameters: effectState.parameters, target: "pingpong", auxiliary: "halfA", source: "previous" });
+        continue;
+      }
+      if (effectType === "tiltShift") {
+        stepList.push({ passName: "tiltShift", state: effectState, parameters: [effectState.parameters[0], effectState.parameters[1], effectState.parameters[2], 0], target: "pingpong" });
+        stepList.push({ passName: "tiltShift", state: effectState, parameters: [effectState.parameters[0], effectState.parameters[1], 0, effectState.parameters[2]], target: "pingpong" });
+        continue;
+      }
+      stepList.push({ passName: effectType, state: effectState, parameters: effectState.parameters, target: "pingpong" });
+    }
+    if (stepList.length === 0) {
+      stepList.push({ passName: "copy", state: null, parameters: [0, 0, 0, 0], target: "pingpong" });
+    }
+    let lastScreenIndex = -1;
+    for (let stepIndex = 0; stepIndex < stepList.length; ++stepIndex) {
+      if (stepList[stepIndex].target === "pingpong") {
+        lastScreenIndex = stepIndex;
+      }
+    }
+    let previousTexture = this.#sceneTarget.texture;
+    let pingPongTurn = 0;
+    for (let stepIndex = 0; stepIndex < stepList.length; ++stepIndex) {
+      const step = stepList[stepIndex];
+      const pass = this.resolvePass(step.passName);
+      let targetTexture = null;
+      if (stepIndex === lastScreenIndex) {
+        webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+        webGL2RenderingContext.viewport(0, 0, width, height);
+      } else if (step.target === "halfA" || step.target === "halfB") {
+        const halfTarget = step.target === "halfA" ? this.#halfTargetA : this.#halfTargetB;
+        webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, halfTarget.framebuffer);
+        webGL2RenderingContext.viewport(0, 0, halfTarget.width, halfTarget.height);
+        targetTexture = halfTarget.texture;
+      } else {
+        const pingPongTarget = pingPongTurn % 2 === 0 ? this.#pingTarget : this.#pongTarget;
+        pingPongTurn += 1;
+        webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, pingPongTarget.framebuffer);
+        webGL2RenderingContext.viewport(0, 0, width, height);
+        targetTexture = pingPongTarget.texture;
+      }
+      let sourceTexture = previousTexture;
+      if (step.source === "halfA") {
+        sourceTexture = this.#halfTargetA.texture;
+      } else if (step.source === "halfB") {
+        sourceTexture = this.#halfTargetB.texture;
+      }
+      const isHalfTarget = step.target === "halfA" || step.target === "halfB";
+      const passWidth = isHalfTarget ? this.#halfTargetA.width : width;
+      const passHeight = isHalfTarget ? this.#halfTargetA.height : height;
+      pass.use();
+      webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sourceTexture);
+      webGL2RenderingContext.uniform1i(pass.getUniformLocation("sourceTexture"), 0);
+      if (step.auxiliary) {
+        const auxiliaryTarget = step.auxiliary === "halfA" ? this.#halfTargetA : this.#halfTargetB;
+        webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+        webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, auxiliaryTarget.texture);
+        webGL2RenderingContext.uniform1i(pass.getUniformLocation("auxiliaryTexture"), 1);
+        webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+      }
+      webGL2RenderingContext.uniform2f(pass.getUniformLocation("resolution"), passWidth, passHeight);
+      webGL2RenderingContext.uniform1f(pass.getUniformLocation("time"), this.#time);
+      const strength = step.state ? step.state.strength : 1;
+      webGL2RenderingContext.uniform1f(pass.getUniformLocation("strength"), strength);
+      webGL2RenderingContext.uniform4f(pass.getUniformLocation("parameters"), step.parameters[0], step.parameters[1], step.parameters[2], step.parameters[3]);
+      const color = step.state ? step.state.color : Color.white();
+      webGL2RenderingContext.uniform4f(pass.getUniformLocation("effectColor"), color.red, color.green, color.blue, color.alpha);
+      pass.draw();
+      if (!isHalfTarget) {
+        previousTexture = targetTexture;
+      }
+    }
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+    webGL2RenderingContext.bindVertexArray(null);
+    graphic.restoreRenderState();
+  }
+  //==============================================================================
+  // 렌더 대상 준비. (크기가 바뀌면 다시 만든다)
+  //==============================================================================
+  /**
+   * @param { number } width
+   * @param { number } height
+   */
+  ensureTargets(width, height) {
+    if (this.#sceneTarget && this.#sceneTarget.width === width && this.#sceneTarget.height === height) {
+      return;
+    }
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    destroyRenderTarget(webGL2RenderingContext, this.#sceneTarget);
+    destroyRenderTarget(webGL2RenderingContext, this.#pingTarget);
+    destroyRenderTarget(webGL2RenderingContext, this.#pongTarget);
+    destroyRenderTarget(webGL2RenderingContext, this.#halfTargetA);
+    destroyRenderTarget(webGL2RenderingContext, this.#halfTargetB);
+    const halfWidth = System75.Math.max(1, System75.Math.round(width / 2));
+    const halfHeight = System75.Math.max(1, System75.Math.round(height / 2));
+    this.#sceneTarget = createRenderTarget(webGL2RenderingContext, width, height, true);
+    this.#pingTarget = createRenderTarget(webGL2RenderingContext, width, height, false);
+    this.#pongTarget = createRenderTarget(webGL2RenderingContext, width, height, false);
+    this.#halfTargetA = createRenderTarget(webGL2RenderingContext, halfWidth, halfHeight, false);
+    this.#halfTargetB = createRenderTarget(webGL2RenderingContext, halfWidth, halfHeight, false);
+  }
+  //==============================================================================
+  // 패스 반환. (없으면 컴파일)
+  //==============================================================================
+  /**
+   * @param { string } passName
+   * @returns { FullscreenPass }
+   */
+  resolvePass(passName) {
+    let pass = this.#passTable.get(passName);
+    if (!pass) {
+      const fragmentShaderSource = FRAGMENTSHADER_HEADER + EFFECT_BODY_TABLE2[passName] + FRAGMENTSHADER_FOOTER;
+      pass = new FullscreenPass(this.#webGL2RenderingContext, fragmentShaderSource);
+      this.#passTable.set(passName, pass);
+    }
+    return pass;
+  }
+  //==============================================================================
+  // 효과 켜기 / 끄기.
+  //==============================================================================
+  /**
+   * @param { string } effectType
+   * @param { boolean } isEnabled
+   */
+  setEnabled(effectType, isEnabled) {
+    const effectState = this.#effectTable.get(effectType);
+    if (effectState) {
+      effectState.isEnabled = isEnabled;
+    }
+  }
+  //==============================================================================
+  // 효과 켜짐 여부 반환.
+  //==============================================================================
+  /**
+   * @param { string } effectType
+   * @returns { boolean }
+   */
+  isEnabled(effectType) {
+    const effectState = this.#effectTable.get(effectType);
+    return effectState ? effectState.isEnabled : false;
+  }
+  //==============================================================================
+  // 세기 설정. (0 이면 꺼진 것과 같다)
+  //==============================================================================
+  /**
+   * @param { string } effectType
+   * @param { number } strength
+   */
+  setStrength(effectType, strength) {
+    const effectState = this.#effectTable.get(effectType);
+    if (effectState) {
+      effectState.strength = strength;
+    }
+  }
+  //==============================================================================
+  // 세기 반환.
+  //==============================================================================
+  /**
+   * @param { string } effectType
+   * @returns { number }
+   */
+  getStrength(effectType) {
+    const effectState = this.#effectTable.get(effectType);
+    return effectState ? effectState.strength : 0;
+  }
+  //==============================================================================
+  // 파라미터 설정. (효과마다 뜻이 다르다 — ScreenEffectType 주석 참고)
+  //==============================================================================
+  /**
+   * @param { string } effectType
+   * @param { number } x
+   * @param { number } y
+   * @param { number } z
+   * @param { number } w
+   */
+  setParameters(effectType, x, y = 0, z = 0, w = 0) {
+    const effectState = this.#effectTable.get(effectType);
+    if (effectState) {
+      effectState.parameters = [x, y, z, w];
+    }
+  }
+  //==============================================================================
+  // 파라미터 하나 설정. (이름은 SCREEN_EFFECT_PARAMETER_NAMES)
+  //==============================================================================
+  /**
+   * @param { string } effectType
+   * @param { string } parameterName
+   * @param { number } value
+   */
+  setParameter(effectType, parameterName, value) {
+    const effectState = this.#effectTable.get(effectType);
+    const parameterNames = SCREEN_EFFECT_PARAMETER_NAMES[effectType];
+    if (!effectState || !parameterNames) {
+      return;
+    }
+    const parameterIndex = parameterNames.indexOf(parameterName);
+    if (parameterIndex >= 0) {
+      effectState.parameters[parameterIndex] = value;
+    }
+  }
+  //==============================================================================
+  // 파라미터 반환.
+  //==============================================================================
+  /**
+   * @param { string } effectType
+   * @returns { number[] }
+   */
+  getParameters(effectType) {
+    const effectState = this.#effectTable.get(effectType);
+    return effectState ? effectState.parameters : [0, 0, 0, 0];
+  }
+  //==============================================================================
+  // 색 설정.
+  //==============================================================================
+  /**
+   * @param { string } effectType
+   * @param { Color } color
+   */
+  setColor(effectType, color) {
+    const effectState = this.#effectTable.get(effectType);
+    if (effectState && color) {
+      effectState.color = color.clone();
+    }
+  }
+  //==============================================================================
+  // 색 반환.
+  //==============================================================================
+  /**
+   * @param { string } effectType
+   * @returns { Color }
+   */
+  getColor(effectType) {
+    const effectState = this.#effectTable.get(effectType);
+    return effectState ? effectState.color : Color.white();
+  }
+  //==============================================================================
+  // 전부 끄기.
+  //==============================================================================
+  disableAll() {
+    for (const effectState of this.#effectTable.values()) {
+      effectState.isEnabled = false;
+    }
+  }
+  //==============================================================================
+  // 타임라인 속성 적용. ("vignette" = 세기(0 이면 끔), "shockwave.radius" = 파라미터, "fade.color" = 색)
+  //==============================================================================
+  /**
+   * @param { string } propertyName
+   * @param { * } value
+   */
+  setTimelineProperty(propertyName, value) {
+    const separatorIndex = propertyName.indexOf(".");
+    const effectType = separatorIndex >= 0 ? propertyName.substring(0, separatorIndex) : propertyName;
+    const memberName = separatorIndex >= 0 ? propertyName.substring(separatorIndex + 1) : "";
+    const effectState = this.#effectTable.get(effectType);
+    if (!effectState) {
+      return;
+    }
+    if (memberName === "") {
+      const strength = System75.Number(value);
+      effectState.strength = strength;
+      effectState.isEnabled = strength > 0;
+      return;
+    }
+    if (memberName === "color") {
+      effectState.color = typeof value === "string" ? Color.createFromHEX(value) : effectState.color;
+      return;
+    }
+    if (memberName === "enabled") {
+      effectState.isEnabled = value === true || value === "true";
+      return;
+    }
+    this.setParameter(effectType, memberName, System75.Number(value));
+  }
+  //==============================================================================
+  // 시간 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getTime() {
+    return this.#time;
+  }
+  //==============================================================================
+  // 씬 텍스처 반환. (end 이후 — 마지막 프레임의 원본 화면)
+  //==============================================================================
+  /**
+   * @returns { WebGLTexture | null }
+   */
+  getSceneTexture() {
+    return this.#sceneTarget ? this.#sceneTarget.texture : null;
+  }
+  //==============================================================================
+  // 적용 차례 반환. (정적)
+  //==============================================================================
+  /**
+   * @returns { string[] }
+   */
+  static getEffectOrder() {
+    return EFFECT_ORDER.slice();
+  }
+  //==============================================================================
+  // 파괴. (WebGL 자원 해제)
+  //==============================================================================
+  destroy() {
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    destroyRenderTarget(webGL2RenderingContext, this.#sceneTarget);
+    destroyRenderTarget(webGL2RenderingContext, this.#pingTarget);
+    destroyRenderTarget(webGL2RenderingContext, this.#pongTarget);
+    destroyRenderTarget(webGL2RenderingContext, this.#halfTargetA);
+    destroyRenderTarget(webGL2RenderingContext, this.#halfTargetB);
+    this.#sceneTarget = null;
+    this.#pingTarget = null;
+    this.#pongTarget = null;
+    this.#halfTargetA = null;
+    this.#halfTargetB = null;
+    super.destroy();
+  }
+};
+
+// src/experimental/animation/timeline.js
+var System76 = globalThis;
+var TIMELINE_EASING_NAMES = (() => {
+  const nameList = ["linear", "step", "bezier"];
+  for (const familyName of ["quadratic", "cubic", "quartic", "quintic", "sinusoidal", "exponential", "circular", "elastic", "back", "bounce"]) {
+    nameList.push(familyName + ".in");
+    nameList.push(familyName + ".out");
+    nameList.push(familyName + ".inOut");
+  }
+  return nameList;
+})();
+function createBezierEasing(x1, y1, x2, y2) {
+  const clampedX1 = System76.Math.max(0, System76.Math.min(1, x1));
+  const clampedX2 = System76.Math.max(0, System76.Math.min(1, x2));
+  const sampleCurve = /* @__PURE__ */ __name((t, p1, p2) => {
+    const oneMinus = 1 - t;
+    return 3 * oneMinus * oneMinus * t * p1 + 3 * oneMinus * t * t * p2 + t * t * t;
+  }, "sampleCurve");
+  const sampleDerivative = /* @__PURE__ */ __name((t, p1, p2) => {
+    const oneMinus = 1 - t;
+    return 3 * oneMinus * oneMinus * p1 + 6 * oneMinus * t * (p2 - p1) + 3 * t * t * (1 - p2);
+  }, "sampleDerivative");
+  return (progress) => {
+    if (progress <= 0) {
+      return 0;
+    }
+    if (progress >= 1) {
+      return 1;
+    }
+    let t = progress;
+    for (let iteration = 0; iteration < 8; ++iteration) {
+      const error = sampleCurve(t, clampedX1, clampedX2) - progress;
+      if (System76.Math.abs(error) < 1e-5) {
+        break;
+      }
+      const derivative = sampleDerivative(t, clampedX1, clampedX2);
+      if (System76.Math.abs(derivative) < 1e-6) {
+        break;
+      }
+      t -= error / derivative;
+      t = System76.Math.max(0, System76.Math.min(1, t));
+    }
+    return sampleCurve(t, y1, y2);
+  };
+}
+__name(createBezierEasing, "createBezierEasing");
+function resolveTimelineEasing(easingName, curve = null) {
+  if (!easingName || easingName === "linear") {
+    return Tween.easingFunction.linear;
+  }
+  if (easingName === "step") {
+    return (progress) => 0;
+  }
+  if (easingName === "bezier") {
+    const controlPoints = System76.Array.isArray(curve) && curve.length >= 4 ? curve : [0.42, 0, 0.58, 1];
+    return createBezierEasing(controlPoints[0], controlPoints[1], controlPoints[2], controlPoints[3]);
+  }
+  const separatorIndex = easingName.indexOf(".");
+  if (separatorIndex < 0) {
+    return Tween.easingFunction.linear;
+  }
+  const familyName = easingName.substring(0, separatorIndex);
+  const directionName = easingName.substring(separatorIndex + 1);
+  const family = Tween.easingFunction[familyName];
+  if (!family || typeof family[directionName] !== "function") {
+    return Tween.easingFunction.linear;
+  }
+  return family[directionName];
+}
+__name(resolveTimelineEasing, "resolveTimelineEasing");
+function parseTimelineColor(hexText) {
+  const text = typeof hexText === "string" && hexText.startsWith("#") ? hexText.substring(1) : "ffffff";
+  const red = System76.parseInt(text.substring(0, 2), 16) / 255;
+  const green = System76.parseInt(text.substring(2, 4), 16) / 255;
+  const blue = System76.parseInt(text.substring(4, 6), 16) / 255;
+  const alpha = text.length >= 8 ? System76.parseInt(text.substring(6, 8), 16) / 255 : 1;
+  return [
+    System76.Number.isFinite(red) ? red : 1,
+    System76.Number.isFinite(green) ? green : 1,
+    System76.Number.isFinite(blue) ? blue : 1,
+    System76.Number.isFinite(alpha) ? alpha : 1
+  ];
+}
+__name(parseTimelineColor, "parseTimelineColor");
+function composeTimelineColor(channels) {
+  const toByte = /* @__PURE__ */ __name((value) => System76.Math.round(System76.Math.max(0, System76.Math.min(1, value)) * 255).toString(16).padStart(2, "0"), "toByte");
+  return "#" + toByte(channels[0]) + toByte(channels[1]) + toByte(channels[2]) + toByte(channels[3] === void 0 ? 1 : channels[3]);
+}
+__name(composeTimelineColor, "composeTimelineColor");
+function createColorFromText(hexText) {
+  const channels = parseTimelineColor(hexText);
+  return new Color(channels[0], channels[1], channels[2], channels[3]);
+}
+__name(createColorFromText, "createColorFromText");
+function applyNodeColor(node, hexText) {
+  const textComponent = node.getComponent(Text);
+  if (textComponent) {
+    textComponent.setTextColor(createColorFromText(hexText));
+    return;
+  }
+  const paintComponent = node.getComponent(Paint);
+  if (paintComponent) {
+    paintComponent.setColor(createColorFromText(hexText));
+  }
+}
+__name(applyNodeColor, "applyNodeColor");
+var TIMELINE_PROPERTY_DEFINITIONS = {
+  x: { kind: "number", label: "X", apply: /* @__PURE__ */ __name((node, value) => {
+    const localPosition = node.getLocalPosition();
+    node.setLocalPosition(Vector2.create(value, localPosition.y));
+  }, "apply") },
+  y: { kind: "number", label: "Y", apply: /* @__PURE__ */ __name((node, value) => {
+    const localPosition = node.getLocalPosition();
+    node.setLocalPosition(Vector2.create(localPosition.x, value));
+  }, "apply") },
+  width: { kind: "number", label: "Width", apply: /* @__PURE__ */ __name((node, value) => {
+    const contentSize = node.getContentSize();
+    node.setContentSize(Vector2.create(value, contentSize.y));
+  }, "apply") },
+  height: { kind: "number", label: "Height", apply: /* @__PURE__ */ __name((node, value) => {
+    const contentSize = node.getContentSize();
+    node.setContentSize(Vector2.create(contentSize.x, value));
+  }, "apply") },
+  scaleX: { kind: "number", label: "Scale X", apply: /* @__PURE__ */ __name((node, value) => {
+    const localScale = node.getLocalScale();
+    node.setLocalScale(Vector2.create(value, localScale.y));
+  }, "apply") },
+  scaleY: { kind: "number", label: "Scale Y", apply: /* @__PURE__ */ __name((node, value) => {
+    const localScale = node.getLocalScale();
+    node.setLocalScale(Vector2.create(localScale.x, value));
+  }, "apply") },
+  rotation: { kind: "number", label: "Rotation", apply: /* @__PURE__ */ __name((node, value) => {
+    node.setLocalRotation(value);
+  }, "apply") },
+  opacity: { kind: "number", label: "Opacity", apply: /* @__PURE__ */ __name((node, value) => {
+    node.setLocalOpacity(System76.Math.max(0, System76.Math.min(1, value)));
+  }, "apply") },
+  visible: { kind: "boolean", label: "Visible", apply: /* @__PURE__ */ __name((node, value) => {
+    node.setActive(value === true || value === "true");
+  }, "apply") },
+  color: { kind: "color", label: "Color", apply: /* @__PURE__ */ __name((node, value) => {
+    applyNodeColor(node, value);
+  }, "apply") },
+  text: { kind: "string", label: "Text", apply: /* @__PURE__ */ __name((node, value) => {
+    const textComponent = node.getComponent(Text);
+    if (textComponent) {
+      textComponent.setText(String(value));
+    }
+  }, "apply") },
+  number: { kind: "number", label: "Number", apply: /* @__PURE__ */ __name((node, value) => {
+    const textComponent = node.getComponent(Text);
+    if (textComponent) {
+      textComponent.setText(String(System76.Math.round(value)));
+    }
+  }, "apply") },
+  fontSize: { kind: "number", label: "Font Size", apply: /* @__PURE__ */ __name((node, value) => {
+    const textComponent = node.getComponent(Text);
+    if (textComponent) {
+      textComponent.setFontSize(value);
+    }
+  }, "apply") },
+  visibleCharacters: { kind: "number", label: "Visible Characters", apply: /* @__PURE__ */ __name((node, value) => {
+    const textComponent = node.getComponent(Text);
+    if (textComponent) {
+      textComponent.setVisibleCharacterCount(System76.Math.round(value));
+    }
+  }, "apply") },
+  frame: { kind: "number", label: "Frame", apply: /* @__PURE__ */ __name((node, value) => {
+    const sprite = node.getComponent(ShaderSprite);
+    if (sprite) {
+      applySpriteFrame(sprite, System76.Math.round(value));
+    }
+  }, "apply") },
+  effect: { kind: "number", label: "Effect Progress", apply: /* @__PURE__ */ __name((node, value) => {
+    const sprite = node.getComponent(ShaderSprite);
+    if (sprite) {
+      sprite.setEffectProgress(value);
+    }
+  }, "apply") },
+  event: { kind: "string", label: "Event", apply: null }
+};
+var spriteFrameGridTable = new System76.WeakMap();
+var soundPlayerTable = new System76.WeakMap();
+var timelineAudioManager = null;
+function applySpriteFrame(sprite, frameIndex) {
+  const image = sprite.getImage();
+  const frameGrid = spriteFrameGridTable.get(sprite);
+  const gridColumns = frameGrid ? frameGrid.columns : 1;
+  const gridRows = frameGrid ? frameGrid.rows : 1;
+  if (!image || gridColumns <= 1 && gridRows <= 1) {
+    return;
+  }
+  const frameCount = gridColumns * gridRows;
+  const wrappedIndex = (frameIndex % frameCount + frameCount) % frameCount;
+  const frameWidth = image.width / gridColumns;
+  const frameHeight = image.height / gridRows;
+  const column = wrappedIndex % gridColumns;
+  const row = System76.Math.floor(wrappedIndex / gridColumns);
+  sprite.setImageRect(Rect.create(column * frameWidth, row * frameHeight, frameWidth, frameHeight));
+}
+__name(applySpriteFrame, "applySpriteFrame");
+function interpolateValue(kind, fromValue, toValue, easedProgress) {
+  if (kind === "number") {
+    return fromValue + (toValue - fromValue) * easedProgress;
+  }
+  if (kind === "color") {
+    const fromChannels = parseTimelineColor(fromValue);
+    const toChannels = parseTimelineColor(toValue);
+    const mixedChannels = [0, 0, 0, 0];
+    for (let channelIndex = 0; channelIndex < 4; ++channelIndex) {
+      mixedChannels[channelIndex] = fromChannels[channelIndex] + (toChannels[channelIndex] - fromChannels[channelIndex]) * easedProgress;
+    }
+    return composeTimelineColor(mixedChannels);
+  }
+  return fromValue;
+}
+__name(interpolateValue, "interpolateValue");
+var TIMELINE_NODE_DEFAULTS = {
+  type: "group",
+  parent: null,
+  x: 0,
+  y: 0,
+  width: 100,
+  height: 100,
+  scaleX: 1,
+  scaleY: 1,
+  rotation: 0,
+  opacity: 1,
+  pivotX: 0.5,
+  pivotY: 0.5,
+  visible: true,
+  color: "#ffffffff",
+  roundSize: 0,
+  image: "",
+  frameColumns: 1,
+  frameRows: 1,
+  frame: 0,
+  effect: "none",
+  effectProgress: 0,
+  effectColor: "",
+  blendMode: "source-over",
+  text: "Text",
+  fontSize: 32,
+  bold: false,
+  textAlign: "center",
+  particle: null,
+  audio: "",
+  volume: 1
+};
+var Timeline = class _Timeline extends Object2 {
+  static {
+    __name(this, "Timeline");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { object } */
+  #description;
+  /** @private @type { object[] } */
+  #compiledTracks;
+  /** @private @type { object[] } */
+  #compiledMarkers;
+  /** @private @type { System.Map } */
+  #targetTable;
+  /** @private @type { Function | null } */
+  #targetResolver;
+  /** @private @type { Function | null } */
+  #eventHandler;
+  /** @private @type { Function | null } */
+  #markerHandler;
+  /** @private @type { Function | null } */
+  #completeHandler;
+  /** @private @type { number } */
+  #time;
+  /** @private @type { number } */
+  #speed;
+  /** @private @type { boolean } */
+  #isPlaying;
+  /** @private @type { boolean } */
+  #isDirty;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @param { object | null } description
+   */
+  constructor(description = null) {
+    super();
+    this.#description = null;
+    this.#compiledTracks = [];
+    this.#compiledMarkers = [];
+    this.#targetTable = new System76.Map();
+    this.#targetResolver = null;
+    this.#eventHandler = null;
+    this.#markerHandler = null;
+    this.#completeHandler = null;
+    this.#time = 0;
+    this.#speed = 1;
+    this.#isPlaying = false;
+    this.#isDirty = true;
+    this.setDescription(description ? description : _Timeline.createEmptyDescription());
+  }
+  //==============================================================================
+  // 빈 서술 생성. (정적)
+  //==============================================================================
+  /**
+   * @returns { object }
+   */
+  static createEmptyDescription() {
+    return {
+      name: "Timeline",
+      duration: 3,
+      frameRate: 30,
+      loop: true,
+      stage: { width: 960, height: 540, backgroundColor: "#101114ff", nodes: [] },
+      tracks: [],
+      markers: []
+    };
+  }
+  //==============================================================================
+  // 주소에서 읽기. (정적)
+  //==============================================================================
+  /**
+   * @param { string } url
+   * @returns { Promise<Timeline> }
+   */
+  static async loadFromUrl(url) {
+    const response = await System76.fetch(url);
+    const description = await response.json();
+    return new _Timeline(description);
+  }
+  //==============================================================================
+  // 서술 설정. (참조를 그대로 쓴다 — 편집기가 고친 뒤 invalidate() 로 다시 컴파일)
+  //==============================================================================
+  /**
+   * @param { object } description
+   */
+  setDescription(description) {
+    this.#description = description;
+    if (!this.#description.stage) {
+      this.#description.stage = { width: 960, height: 540, backgroundColor: "#101114ff", nodes: [] };
+    }
+    if (!System76.Array.isArray(this.#description.stage.nodes)) {
+      this.#description.stage.nodes = [];
+    }
+    if (!System76.Array.isArray(this.#description.tracks)) {
+      this.#description.tracks = [];
+    }
+    if (!System76.Array.isArray(this.#description.markers)) {
+      this.#description.markers = [];
+    }
+    this.invalidate();
+  }
+  //==============================================================================
+  // 서술 반환.
+  //==============================================================================
+  /**
+   * @returns { object }
+   */
+  getDescription() {
+    return this.#description;
+  }
+  //==============================================================================
+  // 다시 컴파일 요청. (트랙 / 키가 바뀌었을 때)
+  //==============================================================================
+  invalidate() {
+    this.#isDirty = true;
+  }
+  //==============================================================================
+  // 컴파일. (키를 시간순으로 정렬하고 대상 / 속성 정의를 붙인다)
+  //==============================================================================
+  compile() {
+    this.#compiledTracks = [];
+    for (const track of this.#description.tracks) {
+      const definition = TIMELINE_PROPERTY_DEFINITIONS[track.property];
+      const keys = System76.Array.isArray(track.keys) ? track.keys.slice() : [];
+      keys.sort((left, right) => left.time - right.time);
+      const target = this.resolveTarget(track.target);
+      const kind = definition ? definition.kind : typeof (keys.length > 0 ? keys[0].value : 0) === "number" ? "number" : "string";
+      this.#compiledTracks.push({ track, keys, definition, kind, target });
+    }
+    this.#compiledMarkers = this.#description.markers.slice();
+    this.#compiledMarkers.sort((left, right) => left.time - right.time);
+    this.#isDirty = false;
+  }
+  //==============================================================================
+  // 대상 해석. (무대 노드 표 → 사용자 해석기)
+  //==============================================================================
+  /**
+   * @param { string } targetName
+   * @returns { object | null }
+   */
+  resolveTarget(targetName) {
+    if (this.#targetTable.has(targetName)) {
+      return this.#targetTable.get(targetName);
+    }
+    if (this.#targetResolver) {
+      const resolvedTarget = this.#targetResolver(targetName);
+      if (resolvedTarget) {
+        return resolvedTarget;
+      }
+    }
+    return null;
+  }
+  //==============================================================================
+  // 대상 해석기 설정. (이름 → 객체. 노드가 아니어도 setTimelineProperty(이름, 값) 이 있으면 된다)
+  //==============================================================================
+  /**
+   * @param { Function | null } targetResolver
+   */
+  setTargetResolver(targetResolver) {
+    this.#targetResolver = targetResolver;
+    this.invalidate();
+  }
+  //==============================================================================
+  // 대상 직접 등록.
+  //==============================================================================
+  /**
+   * @param { string } targetName
+   * @param { object } target
+   */
+  setTarget(targetName, target) {
+    this.#targetTable.set(targetName, target);
+    this.invalidate();
+  }
+  //==============================================================================
+  // 대상 반환.
+  //==============================================================================
+  /**
+   * @param { string } targetName
+   * @returns { object | null }
+   */
+  getTarget(targetName) {
+    return this.#targetTable.has(targetName) ? this.#targetTable.get(targetName) : null;
+  }
+  //==============================================================================
+  // 노드 트리에 이름으로 붙이기. (무대를 직접 만든 경우)
+  //==============================================================================
+  /**
+   * @param { WorldNode } rootNode
+   */
+  bind(rootNode) {
+    for (const track of this.#description.tracks) {
+      if (this.#targetTable.has(track.target)) {
+        continue;
+      }
+      const foundNode = rootNode.getName() === track.target ? rootNode : rootNode.findChildRecursiveByName(track.target);
+      if (foundNode) {
+        this.#targetTable.set(track.target, foundNode);
+      }
+    }
+    this.invalidate();
+  }
+  //==============================================================================
+  // 무대 노드 생성. (서술의 stage.nodes 를 노드 트리로 만들고 대상으로 등록)
+  //==============================================================================
+  /**
+   * @param { WorldNode } parentNode
+   * @param { Function | null } imageResolver - (이미지 이름) → HTMLImageElement | HTMLCanvasElement | null
+   * @returns { System.Map } 이름 → 노드
+   */
+  buildStage(parentNode, imageResolver2 = null) {
+    const nodeTable = new System76.Map();
+    const nodeDescriptions = this.#description.stage.nodes;
+    for (const nodeDescription of nodeDescriptions) {
+      const node = _Timeline.createStageNode(nodeDescription, imageResolver2);
+      nodeTable.set(nodeDescription.name, node);
+      this.#targetTable.set(nodeDescription.name, node);
+    }
+    for (const nodeDescription of nodeDescriptions) {
+      const node = nodeTable.get(nodeDescription.name);
+      const parentDescriptionNode = nodeDescription.parent ? nodeTable.get(nodeDescription.parent) : null;
+      if (parentDescriptionNode) {
+        parentDescriptionNode.addChild(node);
+      } else {
+        parentNode.addChild(node);
+      }
+    }
+    this.invalidate();
+    return nodeTable;
+  }
+  //==============================================================================
+  // 무대 노드 한 개 생성. (정적)
+  //==============================================================================
+  /**
+   * @param { object } nodeDescription
+   * @param { Function | null } imageResolver
+   * @returns { WorldNode }
+   */
+  static createStageNode(nodeDescription, imageResolver2 = null) {
+    const description = System76.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
+    const node = new WorldNode();
+    node.setName(description.name);
+    _Timeline.applyStageNodeDescription(node, description, imageResolver2);
+    return node;
+  }
+  //==============================================================================
+  // 노드에 서술 반영. (정적 — 편집기가 값을 고칠 때도 쓴다)
+  //==============================================================================
+  /**
+   * @param { WorldNode } node
+   * @param { object } nodeDescription
+   * @param { Function | null } imageResolver
+   */
+  static applyStageNodeDescription(node, nodeDescription, imageResolver2 = null) {
+    const description = System76.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
+    node.setPivot(Vector2.create(description.pivotX, description.pivotY));
+    node.setAnchor(Pivot.topLeft.clone());
+    node.setContentSize(Vector2.create(description.width, description.height));
+    node.setLocalPosition(Vector2.create(description.x, description.y));
+    node.setLocalScale(Vector2.create(description.scaleX, description.scaleY));
+    node.setLocalRotation(description.rotation);
+    node.setLocalOpacity(description.opacity);
+    node.setActive(description.visible !== false);
+    if (description.type === "paint") {
+      const paintComponent = node.getOrAddComponent(Paint);
+      paintComponent.setColor(createColorFromText(description.color));
+      paintComponent.setRoundSize(description.roundSize);
+    } else if (description.type === "sprite") {
+      const sprite = node.getOrAddComponent(ShaderSprite);
+      spriteFrameGridTable.set(sprite, { columns: System76.Math.max(1, description.frameColumns), rows: System76.Math.max(1, description.frameRows) });
+      let image = null;
+      if (description.image && imageResolver2) {
+        image = imageResolver2(description.image);
+      }
+      if (!image && description.image && description.image.startsWith("data:")) {
+        image = new System76.Image();
+        image.onload = () => {
+          applySpriteFrame(sprite, description.frame);
+        };
+        image.src = description.image;
+      }
+      sprite.setImage(image);
+      sprite.setImageRect(Rect.zero());
+      applySpriteFrame(sprite, description.frame);
+      sprite.setColor(createColorFromText(description.color === "#ffffffff" ? "#ffffff00" : description.color));
+      sprite.setSpriteBlendMode(description.blendMode);
+      sprite.setEffect(description.effect);
+      sprite.setEffectProgress(description.effectProgress);
+      if (description.effectColor) {
+        sprite.setEffectColor(createColorFromText(description.effectColor));
+      }
+    } else if (description.type === "text") {
+      const textComponent = node.getOrAddComponent(Text);
+      textComponent.setText(description.text);
+      textComponent.setFontSize(description.fontSize);
+      textComponent.setBold(description.bold === true);
+      textComponent.setTextColor(createColorFromText(description.color));
+      textComponent.setTextAlign(description.textAlign);
+      textComponent.setTextBaseline("middle");
+    } else if (description.type === "particle") {
+      const particleSystem = node.getOrAddComponent(ParticleSystem);
+      if (description.particle) {
+        particleSystem.applyDescription(description.particle);
+      }
+    } else if (description.type === "sound") {
+      let soundEntry = soundPlayerTable.get(node);
+      if (!soundEntry) {
+        soundEntry = { audioPlayer: null, audioAsset: null, audioSource: "", volume: 1 };
+        soundPlayerTable.set(node, soundEntry);
+      }
+      soundEntry.volume = description.volume;
+      if (description.audio && description.audio !== soundEntry.audioSource) {
+        soundEntry.audioSource = description.audio;
+        const audioAsset = new AudioAsset();
+        soundEntry.audioAsset = audioAsset;
+        audioAsset.load(description.audio).then(() => {
+          if (soundEntry.audioPlayer) {
+            soundEntry.audioPlayer.setAudioAsset(audioAsset);
+          }
+        }).catch(() => {
+        });
+      }
+      if (!soundEntry.audioPlayer && timelineAudioManager) {
+        soundEntry.audioPlayer = timelineAudioManager.createAudioPlayer();
+        if (soundEntry.audioAsset) {
+          soundEntry.audioPlayer.setAudioAsset(soundEntry.audioAsset);
+        }
+      }
+    }
+  }
+  //==============================================================================
+  // 오디오 매니저 설정. (정적 — 사운드 노드가 플레이어를 만들 때 쓴다)
+  //==============================================================================
+  /**
+   * @param { object | null } audioManager
+   */
+  static setAudioManager(audioManager) {
+    timelineAudioManager = audioManager;
+  }
+  //==============================================================================
+  // 사운드 노드 정지. (정적 — 편집기가 정지 / 되감기 때 부른다)
+  //==============================================================================
+  /**
+   * @param { WorldNode } node
+   */
+  static stopSound(node) {
+    const soundEntry = soundPlayerTable.get(node);
+    if (soundEntry && soundEntry.audioPlayer) {
+      soundEntry.audioPlayer.stop();
+    }
+  }
+  //==============================================================================
+  // 재생.
+  //==============================================================================
+  play() {
+    if (this.#time >= this.getDuration() && !this.isLoop()) {
+      this.#time = 0;
+    }
+    this.#isPlaying = true;
+  }
+  //==============================================================================
+  // 일시 정지.
+  //==============================================================================
+  pause() {
+    this.#isPlaying = false;
+  }
+  //==============================================================================
+  // 정지. (처음으로)
+  //==============================================================================
+  stop() {
+    this.#isPlaying = false;
+    for (const target of this.#targetTable.values()) {
+      const soundEntry = soundPlayerTable.get(target);
+      if (soundEntry && soundEntry.audioPlayer) {
+        soundEntry.audioPlayer.stop();
+      }
+    }
+    this.seek(0);
+  }
+  //==============================================================================
+  // 시간 이동. (이벤트는 발생하지 않는다)
+  //==============================================================================
+  /**
+   * @param { number } time
+   */
+  seek(time) {
+    this.#time = System76.Math.max(0, System76.Math.min(this.getDuration(), time));
+    this.evaluate(this.#time);
+  }
+  //==============================================================================
+  // 갱신. (시간을 흘리고 값을 적용, 지나친 이벤트 / 마커를 발생)
+  //==============================================================================
+  /**
+   * @param { number } timeDelta
+   */
+  tick(timeDelta) {
+    if (!this.#isPlaying) {
+      return;
+    }
+    const duration = this.getDuration();
+    const previousTime = this.#time;
+    let nextTime = previousTime + timeDelta * this.#speed;
+    if (nextTime >= duration) {
+      if (this.isLoop() && duration > 0) {
+        this.fireEventsBetween(previousTime, duration, true);
+        nextTime = nextTime % duration;
+        this.fireEventsBetween(-1, nextTime, true);
+      } else {
+        this.fireEventsBetween(previousTime, duration, true);
+        this.#time = duration;
+        this.#isPlaying = false;
+        this.evaluate(this.#time);
+        if (this.#completeHandler) {
+          this.#completeHandler(this);
+        }
+        return;
+      }
+    } else if (nextTime < 0) {
+      nextTime = 0;
+    } else {
+      this.fireEventsBetween(previousTime, nextTime, false);
+    }
+    this.#time = nextTime;
+    this.evaluate(this.#time);
+  }
+  //==============================================================================
+  // 구간 안의 이벤트 키 / 마커 발생. (fromTime 초과 ~ toTime 이하, isInclusiveEnd 면 끝도 포함)
+  //==============================================================================
+  /**
+   * @param { number } fromTime
+   * @param { number } toTime
+   * @param { boolean } isInclusiveEnd
+   */
+  fireEventsBetween(fromTime, toTime, isInclusiveEnd) {
+    if (this.#isDirty) {
+      this.compile();
+    }
+    const isInside = /* @__PURE__ */ __name((time) => {
+      if (time <= fromTime) {
+        return false;
+      }
+      return isInclusiveEnd ? time <= toTime : time < toTime;
+    }, "isInside");
+    for (const compiledTrack of this.#compiledTracks) {
+      if (compiledTrack.track.property !== "event" || compiledTrack.track.enabled === false) {
+        continue;
+      }
+      for (const key of compiledTrack.keys) {
+        if (isInside(key.time)) {
+          this.dispatchEvent(compiledTrack, key);
+        }
+      }
+    }
+    if (this.#markerHandler) {
+      for (const marker of this.#compiledMarkers) {
+        if (isInside(marker.time)) {
+          this.#markerHandler(marker.name, marker, this);
+        }
+      }
+    }
+  }
+  //==============================================================================
+  // 이벤트 키 처리. (파티클 대상은 play / stop / emit:N 을 스스로 처리, 그 외는 핸들러)
+  //==============================================================================
+  /**
+   * @param { object } compiledTrack
+   * @param { object } key
+   */
+  dispatchEvent(compiledTrack, key) {
+    const target = compiledTrack.target;
+    const eventName = String(key.value);
+    const soundEntry = target ? soundPlayerTable.get(target) : null;
+    if (soundEntry && soundEntry.audioPlayer) {
+      if (eventName === "play" || eventName === "loop") {
+        if (soundEntry.audioAsset && soundEntry.audioAsset.isLoaded()) {
+          soundEntry.audioPlayer.setAudioAsset(soundEntry.audioAsset);
+          soundEntry.audioPlayer.setTime(0);
+          soundEntry.audioPlayer.play(eventName === "loop");
+        }
+      } else if (eventName === "stop") {
+        soundEntry.audioPlayer.stop();
+      }
+    }
+    if (target && typeof target.getComponent === "function") {
+      const particleSystem = target.getComponent(ParticleSystem);
+      if (particleSystem) {
+        if (eventName === "play") {
+          particleSystem.play();
+        } else if (eventName === "stop") {
+          particleSystem.stop(false);
+        } else if (eventName === "clear") {
+          particleSystem.stop(true);
+        } else if (eventName.startsWith("emit")) {
+          const separatorIndex = eventName.indexOf(":");
+          const emitCount = separatorIndex >= 0 ? System76.Number(eventName.substring(separatorIndex + 1)) : 30;
+          particleSystem.emit(System76.Number.isFinite(emitCount) ? emitCount : 30);
+        }
+      }
+    }
+    if (this.#eventHandler) {
+      this.#eventHandler(compiledTrack.track.target, eventName, key, this);
+    }
+  }
+  //==============================================================================
+  // 시간의 값 적용. (연속 속성만 — 이벤트는 tick 에서만 발생)
+  //==============================================================================
+  /**
+   * @param { number } time
+   */
+  evaluate(time) {
+    if (this.#isDirty) {
+      this.compile();
+    }
+    for (const compiledTrack of this.#compiledTracks) {
+      if (compiledTrack.track.enabled === false || compiledTrack.keys.length === 0 || compiledTrack.track.property === "event") {
+        continue;
+      }
+      const target = compiledTrack.target;
+      if (!target) {
+        continue;
+      }
+      const value = _Timeline.sampleKeys(compiledTrack.keys, compiledTrack.kind, time);
+      if (compiledTrack.definition && compiledTrack.definition.apply && typeof target.getComponent === "function") {
+        compiledTrack.definition.apply(target, value);
+      } else if (typeof target.setTimelineProperty === "function") {
+        target.setTimelineProperty(compiledTrack.track.property, value);
+      }
+    }
+  }
+  //==============================================================================
+  // 키 목록에서 시간의 값 표본. (정적 — 편집기의 커브 그리기도 쓴다)
+  //==============================================================================
+  /**
+   * @param { object[] } sortedKeys
+   * @param { string } kind
+   * @param { number } time
+   * @returns { * }
+   */
+  static sampleKeys(sortedKeys, kind, time) {
+    const keyCount = sortedKeys.length;
+    if (keyCount === 0) {
+      return kind === "number" ? 0 : null;
+    }
+    if (time <= sortedKeys[0].time) {
+      return sortedKeys[0].value;
+    }
+    if (time >= sortedKeys[keyCount - 1].time) {
+      return sortedKeys[keyCount - 1].value;
+    }
+    let segmentIndex = 0;
+    while (segmentIndex < keyCount - 2 && sortedKeys[segmentIndex + 1].time <= time) {
+      segmentIndex += 1;
+    }
+    const fromKey = sortedKeys[segmentIndex];
+    const toKey = sortedKeys[segmentIndex + 1];
+    const segmentDuration = toKey.time - fromKey.time;
+    if (segmentDuration <= 0) {
+      return toKey.value;
+    }
+    if (kind !== "number" && kind !== "color") {
+      return fromKey.value;
+    }
+    const easingFunction = resolveTimelineEasing(fromKey.easing, fromKey.curve);
+    const progress = (time - fromKey.time) / segmentDuration;
+    const easedProgress = easingFunction(System76.Math.max(0, System76.Math.min(1, progress)));
+    return interpolateValue(kind, fromKey.value, toKey.value, easedProgress);
+  }
+  //==============================================================================
+  // 트랙의 시간 값 표본. (서술 트랙 그대로 — 정렬은 여기서)
+  //==============================================================================
+  /**
+   * @param { object } track
+   * @param { number } time
+   * @returns { * }
+   */
+  static sampleTrack(track, time) {
+    const definition = TIMELINE_PROPERTY_DEFINITIONS[track.property];
+    const kind = definition ? definition.kind : "number";
+    const sortedKeys = (track.keys ? track.keys : []).slice().sort((left, right) => left.time - right.time);
+    return _Timeline.sampleKeys(sortedKeys, kind, time);
+  }
+  //==============================================================================
+  // 시간 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getTime() {
+    return this.#time;
+  }
+  //==============================================================================
+  // 재생 중 여부 반환.
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  isPlaying() {
+    return this.#isPlaying;
+  }
+  //==============================================================================
+  // 속도 설정. (1 = 실시간)
+  //==============================================================================
+  /**
+   * @param { number } speed
+   */
+  setSpeed(speed) {
+    this.#speed = speed;
+  }
+  //==============================================================================
+  // 속도 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getSpeed() {
+    return this.#speed;
+  }
+  //==============================================================================
+  // 반복 설정.
+  //==============================================================================
+  /**
+   * @param { boolean } isLoop
+   */
+  setLoop(isLoop) {
+    this.#description.loop = isLoop;
+  }
+  //==============================================================================
+  // 반복 여부 반환.
+  //==============================================================================
+  /**
+   * @returns { boolean }
+   */
+  isLoop() {
+    return this.#description.loop === true;
+  }
+  //==============================================================================
+  // 길이 반환. (초)
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getDuration() {
+    const duration = System76.Number(this.#description.duration);
+    return System76.Number.isFinite(duration) && duration > 0 ? duration : 0;
+  }
+  //==============================================================================
+  // 초당 프레임 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getFrameRate() {
+    const frameRate = System76.Number(this.#description.frameRate);
+    return System76.Number.isFinite(frameRate) && frameRate > 0 ? frameRate : 30;
+  }
+  //==============================================================================
+  // 이벤트 핸들러 설정. ((대상 이름, 이벤트 이름, 키, 타임라인))
+  //==============================================================================
+  /**
+   * @param { Function | null } eventHandler
+   */
+  setEventHandler(eventHandler) {
+    this.#eventHandler = eventHandler;
+  }
+  //==============================================================================
+  // 마커 핸들러 설정. ((마커 이름, 마커, 타임라인))
+  //==============================================================================
+  /**
+   * @param { Function | null } markerHandler
+   */
+  setMarkerHandler(markerHandler) {
+    this.#markerHandler = markerHandler;
+  }
+  //==============================================================================
+  // 완료 핸들러 설정. (반복이 아닐 때 끝에 닿으면)
+  //==============================================================================
+  /**
+   * @param { Function | null } completeHandler
+   */
+  setCompleteHandler(completeHandler) {
+    this.#completeHandler = completeHandler;
+  }
+};
+
+// src/ui/uilistview.js
+var System77 = globalThis;
 var UIListView = class extends Component {
   static {
     __name(this, "UIListView");
@@ -35502,7 +38666,7 @@ var UIListView = class extends Component {
     this.#reachEndEvent = null;
     this.#reachEndThreshold = 120;
     this.#isReachEndArmed = true;
-    this.#activeItemMap = new System74.Map();
+    this.#activeItemMap = new System77.Map();
     this.#freeItemList = [];
   }
   //==============================================================================
@@ -35540,7 +38704,7 @@ var UIListView = class extends Component {
    */
   setItemCount(itemCount) {
     const previousItemCount = this.#itemCount;
-    this.#itemCount = System74.Math.max(0, itemCount);
+    this.#itemCount = System77.Math.max(0, itemCount);
     if (this.#itemCount > previousItemCount) {
       this.#isReachEndArmed = true;
     }
@@ -35571,10 +38735,10 @@ var UIListView = class extends Component {
     if (pitch <= 0) {
       return;
     }
-    let firstIndex = System74.Math.floor(scrolled / pitch) - this.#bufferItemCount;
-    let lastIndex = System74.Math.ceil((scrolled + viewLength) / pitch) + this.#bufferItemCount - 1;
-    firstIndex = System74.Math.max(0, firstIndex);
-    lastIndex = System74.Math.min(this.#itemCount - 1, lastIndex);
+    let firstIndex = System77.Math.floor(scrolled / pitch) - this.#bufferItemCount;
+    let lastIndex = System77.Math.ceil((scrolled + viewLength) / pitch) + this.#bufferItemCount - 1;
+    firstIndex = System77.Math.max(0, firstIndex);
+    lastIndex = System77.Math.min(this.#itemCount - 1, lastIndex);
     for (const [itemIndex, itemNode] of [...this.#activeItemMap]) {
       if (itemIndex < firstIndex || itemIndex > lastIndex) {
         itemNode.setActive(false);
@@ -35716,7 +38880,7 @@ var UIListView = class extends Component {
   }
   /** @param { number } bufferItemCount 화면 밖 여유 항목 수. */
   setBufferItemCount(bufferItemCount) {
-    this.#bufferItemCount = System74.Math.max(0, bufferItemCount);
+    this.#bufferItemCount = System77.Math.max(0, bufferItemCount);
   }
   //==============================================================================
   // 조회 메서드 목록.
@@ -35740,7 +38904,7 @@ var UIListView = class extends Component {
 };
 
 // src/ui/uichart.js
-var System75 = globalThis;
+var System78 = globalThis;
 var UILineChart = class extends Component {
   static {
     __name(this, "UILineChart");
@@ -35823,8 +38987,8 @@ var UILineChart = class extends Component {
       let autoLow = this.#valueList[0];
       let autoHigh = this.#valueList[0];
       for (const value of this.#valueList) {
-        autoLow = System75.Math.min(autoLow, value);
-        autoHigh = System75.Math.max(autoHigh, value);
+        autoLow = System78.Math.min(autoLow, value);
+        autoHigh = System78.Math.max(autoHigh, value);
       }
       if (lowValue === null) {
         lowValue = autoLow;
@@ -35833,7 +38997,7 @@ var UILineChart = class extends Component {
         highValue = autoHigh;
       }
     }
-    const valueRange = System75.Math.max(highValue - lowValue, 1e-4);
+    const valueRange = System78.Math.max(highValue - lowValue, 1e-4);
     const points = [];
     for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
       const ratio = sampleIndex / (this.#maxSampleCount - 1);
@@ -35848,7 +39012,7 @@ var UILineChart = class extends Component {
   //==============================================================================
   /** @param { number } maxSampleCount */
   setMaxSampleCount(maxSampleCount) {
-    this.#maxSampleCount = System75.Math.max(2, maxSampleCount);
+    this.#maxSampleCount = System78.Math.max(2, maxSampleCount);
   }
   /** @returns { number } */
   getMaxSampleCount() {
@@ -35937,13 +39101,13 @@ var UIBarChart = class extends Component {
     if (highValue === null) {
       highValue = 1e-4;
       for (const value of this.#valueList) {
-        highValue = System75.Math.max(highValue, value);
+        highValue = System78.Math.max(highValue, value);
       }
     }
     const barWidth = (width - this.#barGap * (barCount - 1)) / barCount;
     for (let barIndex = 0; barIndex < barCount; ++barIndex) {
-      const valueRatio = System75.Math.max(0, System75.Math.min(1, this.#valueList[barIndex] / highValue));
-      const barHeight = System75.Math.max(1, valueRatio * height);
+      const valueRatio = System78.Math.max(0, System78.Math.min(1, this.#valueList[barIndex] / highValue));
+      const barHeight = System78.Math.max(1, valueRatio * height);
       const barX = barIndex * (barWidth + this.#barGap);
       const barColor = barIndex === this.#highlightIndex ? this.#highlightColor : this.#barColor;
       graphic.setFillColor(barColor.toRGBAString());
@@ -35984,7 +39148,7 @@ var UIBarChart = class extends Component {
 };
 
 // src/ui/uidropdown.js
-var System76 = globalThis;
+var System79 = globalThis;
 var UIDropdown = class extends WorldNode {
   static {
     __name(this, "UIDropdown");
@@ -36082,7 +39246,7 @@ var UIDropdown = class extends WorldNode {
    */
   setOptionList(optionList) {
     this.#optionList = optionList.slice();
-    this.#selectedIndex = System76.Math.min(this.#selectedIndex, System76.Math.max(0, this.#optionList.length - 1));
+    this.#selectedIndex = System79.Math.min(this.#selectedIndex, System79.Math.max(0, this.#optionList.length - 1));
     const childList = this.#popupNode.getChildren().slice();
     for (const childNode of childList) {
       this.#popupNode.removeChild(childNode);
@@ -36237,7 +39401,7 @@ var UIDropdown = class extends WorldNode {
   }
   /** @param { number } selectedIndex */
   setSelectedIndex(selectedIndex) {
-    this.#selectedIndex = System76.Math.max(0, System76.Math.min(selectedIndex, this.#optionList.length - 1));
+    this.#selectedIndex = System79.Math.max(0, System79.Math.min(selectedIndex, this.#optionList.length - 1));
     this.refreshHeader();
     this.refreshHighlight();
   }
@@ -36257,7 +39421,7 @@ var UIDropdown = class extends WorldNode {
 };
 
 // src/ui/uicontextmenu.js
-var System77 = globalThis;
+var System80 = globalThis;
 var UIContextMenu = class extends WorldNode {
   static {
     __name(this, "UIContextMenu");
@@ -36375,8 +39539,8 @@ var UIContextMenu = class extends WorldNode {
     }
     this.setContentSize(Vector2.create(areaWidth, areaHeight));
     this.#overlayNode.setContentSize(Vector2.create(areaWidth, areaHeight));
-    const menuX = System77.Math.min(position.x, areaWidth - this.#menuWidth - 4);
-    const menuY = System77.Math.min(position.y, areaHeight - panelHeight - 4);
+    const menuX = System80.Math.min(position.x, areaWidth - this.#menuWidth - 4);
+    const menuY = System80.Math.min(position.y, areaHeight - panelHeight - 4);
     this.#panelNode.setLocalPosition(Vector2.create(menuX, menuY));
     this.setActive(true);
   }
@@ -36398,7 +39562,7 @@ var UIContextMenu = class extends WorldNode {
 };
 
 // src/ui/uidraggable.js
-var System78 = globalThis;
+var System81 = globalThis;
 var UIDraggable = class extends UIControl {
   static {
     __name(this, "UIDraggable");
@@ -36543,7 +39707,7 @@ var UIDraggable = class extends UIControl {
     }
     const node = this.getNode();
     const localPosition = node.getLocalPosition();
-    const blend = System78.Math.min(this.#snapBackSpeed * timeDelta, 1);
+    const blend = System81.Math.min(this.#snapBackSpeed * timeDelta, 1);
     const nextX = localPosition.x + (this.#homePosition.x - localPosition.x) * blend;
     const nextY = localPosition.y + (this.#homePosition.y - localPosition.y) * blend;
     node.setLocalPosition(Vector2.create(nextX, nextY));
@@ -36607,7 +39771,7 @@ var UIDraggable = class extends UIControl {
 };
 
 // src/ui/uispinner.js
-var System79 = globalThis;
+var System82 = globalThis;
 var UISpinner = class extends WorldNode {
   static {
     __name(this, "UISpinner");
@@ -36648,15 +39812,15 @@ var UISpinner = class extends WorldNode {
     this.setContentSize(Vector2.create((radius + dotRadius) * 2, (radius + dotRadius) * 2));
     const center = radius + dotRadius;
     for (let dotIndex = 0; dotIndex < this.#dotCount; ++dotIndex) {
-      const angle = dotIndex / this.#dotCount * System79.Math.PI * 2;
+      const angle = dotIndex / this.#dotCount * System82.Math.PI * 2;
       const dotNode = new WorldNode();
       dotNode.setName("SpinnerDot" + dotIndex);
       dotNode.setPivot(Pivot.middleCenter.clone());
       dotNode.setAnchor(Pivot.topLeft.clone());
       dotNode.setContentSize(Vector2.create(dotRadius * 2, dotRadius * 2));
       dotNode.setLocalPosition(Vector2.create(
-        center + System79.Math.cos(angle) * radius,
-        center + System79.Math.sin(angle) * radius
+        center + System82.Math.cos(angle) * radius,
+        center + System82.Math.sin(angle) * radius
       ));
       const paint = dotNode.addComponent(Paint);
       paint.setColor(this.#dotColor.clone());
@@ -36712,7 +39876,7 @@ var UISpinner = class extends WorldNode {
 };
 
 // src/ui/uitoast.js
-var System80 = globalThis;
+var System83 = globalThis;
 var UIToast = class extends WorldNode {
   static {
     __name(this, "UIToast");
@@ -36815,7 +39979,7 @@ var UIToast = class extends WorldNode {
     }
     this.#phaseSeconds += timeDelta;
     if (this.#phase === "enter") {
-      const ratio = System80.Math.min(1, this.#phaseSeconds / 0.24);
+      const ratio = System83.Math.min(1, this.#phaseSeconds / 0.24);
       const eased = 1 - (1 - ratio) * (1 - ratio);
       this.setLocalOpacity(eased);
       this.updatePosition(eased);
@@ -36829,7 +39993,7 @@ var UIToast = class extends WorldNode {
         this.#phaseSeconds = 0;
       }
     } else if (this.#phase === "exit") {
-      const ratio = System80.Math.min(1, this.#phaseSeconds / 0.2);
+      const ratio = System83.Math.min(1, this.#phaseSeconds / 0.2);
       this.setLocalOpacity(1 - ratio);
       this.updatePosition(1 + ratio * 0.4);
       if (ratio >= 1) {
@@ -37154,7 +40318,7 @@ var UIDialog = class extends WorldNode {
 };
 
 // import.js
-var System81 = globalThis;
+var System84 = globalThis;
 export {
   Action,
   AmbientOcclusionEffect,
@@ -37242,6 +40406,7 @@ export {
   RenderTarget,
   RepeatTimer,
   RichText,
+  SCREEN_EFFECT_PARAMETER_NAMES,
   SKIN_SHADING_EYE,
   SKIN_SHADING_FACIALHAIR,
   SKIN_SHADING_FLUID,
@@ -37256,10 +40421,14 @@ export {
   SKIN_TEXTURE_UNIT_MICRO,
   Scene,
   SceneManager,
+  ScreenEffect,
+  ScreenEffectType,
   ScrollBarAxis,
   SeededRandom,
   Set2 as Set,
   ShaderProgram,
+  ShaderSprite,
+  ShaderSpriteEffect,
   ShadowMap,
   Shaker,
   Singleton,
@@ -37271,12 +40440,16 @@ export {
   Stack,
   Steering2D,
   SubsurfaceScatteringEffect,
-  System81 as System,
+  System84 as System,
+  TIMELINE_EASING_NAMES,
+  TIMELINE_NODE_DEFAULTS,
+  TIMELINE_PROPERTY_DEFINITIONS,
   Text,
   TextAlign,
   TextAsset,
   TextBaseline,
   TimeManager,
+  Timeline,
   TouchEffect,
   TouchParticle,
   TouchRaycaster,
@@ -37318,6 +40491,10 @@ export {
   Visual,
   VisualAsset,
   wait_exports as Wait,
-  WorldNode
+  WorldNode,
+  composeTimelineColor,
+  createBezierEasing,
+  parseTimelineColor,
+  resolveTimelineEasing
 };
 //# sourceMappingURL=vanilla.js.map

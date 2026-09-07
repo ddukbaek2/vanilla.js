@@ -142,6 +142,7 @@ export class Graphic extends Object {
 	/** @private @type { boolean } */ #isImageSmoothingEnabled;
 	/** @private @type { string } */ #imageSmoothingQuality;
 	/** @private @type { ShaderProgram } */ #shaderProgram;
+	/** @private @type { ShaderProgram | null } */ #shaderProgramOverride; // 드로우에 잠시 바꿔 끼우는 프로그램. (ShaderSprite 등)
 	/** @private @type { WebGLVertexArrayObject } */ #vertexArray;
 	/** @private @type { WebGLBuffer } */ #vertexBuffer;
 	/** @private @type { Float32Array } */ #vertexData;
@@ -195,6 +196,7 @@ export class Graphic extends Object {
 
 		// 셰이더 프로그램.
 		this.#shaderProgram = new ShaderProgram(webGL2RenderingContext, VERTEXSHADER_SOURCE, FRAGMENTSHADER_SOURCE);
+		this.#shaderProgramOverride = null;
 
 		// 버텍스 어레이 / 버텍스 버퍼. (스트리밍, 인터리브 x/y/u/v)
 		this.#vertexData = new Float32Array(VERTEX_CAPACITY * FLOATS_PER_VERTEX);
@@ -289,6 +291,7 @@ export class Graphic extends Object {
 	 */
 	applySettings(engine) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		this.#shaderProgramOverride = null;
 		const shaderProgram = this.getShaderProgram();
 
 		// 뷰포트/프로젝션 갱신.
@@ -1621,7 +1624,50 @@ export class Graphic extends Object {
 	 * @returns { ShaderProgram }
 	 */
 	getShaderProgram() {
+		if (this.#shaderProgramOverride) {
+			return this.#shaderProgramOverride;
+		}
 		return this.#shaderProgram;
+	}
+
+	//==============================================================================
+	// 셰이더 프로그램 바꿔 끼우기. (null 이면 기본 프로그램으로 복귀)
+	// - 기본 프로그램과 같은 어트리뷰트 위치 / 유니폼 이름(projectionMatrix, modelMatrix, mainColor, tintColor, globalAlpha, mainTexture)을 갖춰야 한다.
+	//==============================================================================
+	/**
+	 * @param { ShaderProgram | null } shaderProgram
+	 */
+	setShaderProgramOverride(shaderProgram) {
+		this.#shaderProgramOverride = shaderProgram;
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const activeShaderProgram = this.getShaderProgram();
+		activeShaderProgram.use();
+		const projectionMatrixLocation = activeShaderProgram.getUniformLocation("projectionMatrix");
+		webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
+		const mainTextureLocation = activeShaderProgram.getUniformLocation("mainTexture");
+		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
+	}
+
+	//==============================================================================
+	// 렌더 상태 복구. (외부 WebGL 패스가 프로그램 / 버텍스 어레이 / 뷰포트를 바꾼 뒤 Graphic 출력을 이어갈 때)
+	//==============================================================================
+	restoreRenderState() {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		webGL2RenderingContext.viewport(0, 0, this.#appliedViewportWidth, this.#appliedViewportHeight);
+		const shaderProgram = this.getShaderProgram();
+		shaderProgram.use();
+		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.getVertexBuffer());
+		const projectionMatrixLocation = shaderProgram.getUniformLocation("projectionMatrix");
+		webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
+		const mainTextureLocation = shaderProgram.getUniformLocation("mainTexture");
+		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
+		const blendMode = this.getBlendMode();
+		this.setBlendMode(blendMode);
 	}
 
 	//==============================================================================
