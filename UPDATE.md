@@ -9,6 +9,9 @@
 - 샘플 timeline(examples/timeline) 신규 — 편집기 문서 8종(제목 리빌 / 로고 스팅 / HUD 인트로 / 컷신 / 콤보 팝업 / 장면 전환 / 반복 아이들 / 패럴랙스)을 생성기(generate.mjs)로 만들고 트랜스포트(재생 / 정지 / 반복 / 속도 / 스크럽 + 마커 눈금)로 재생, 화면 효과 트랙 연동
 - 성능: Graphic 이 글자를 흰색으로 굽고 그릴 때 색을 곱하도록 바꿔 색 변화(버튼 틴트 전환 / 타임라인 색 트랙)마다 텍스트를 다시 굽지 않음, 타임라인 fontSize 트랙은 정수 픽셀로 적용, ScreenEffect 는 켜진 효과가 없으면 오프스크린 / 복사 패스를 건너뜀, spritefx 목록은 보이는 행만 활성(프레임당 드로우 콜 441 → 약 170) + 다 탄 파티클 노드 정리
 - ScreenEffect 적용 영역: setRegion(x, y, 폭, 높이, 둥근 모서리 반지름 — 캔버스 픽셀) 으로 무대 창 안에만 효과를 걸 수 있음. 씬을 오프스크린에 그리지 않고 화면에서 영역만 떠 와(blitFramebuffer) 처리한 뒤 같은 자리에 되돌려 놓으며, 둥근 모서리 바깥은 원본을 유지. resetAll() 로 모드 전환 때 이전 파라미터 / 색이 남지 않게 함. timeline · spritefx 샘플은 무대 사각형(모서리 14)에만 효과가 걸린다
+- Mask 에 둥근 모서리(setRoundSize) — Graphic.beginClipRect(rect, roundSize) 가 둥근 사각형을 스텐실에 써서 무대 컨텐트가 배경 모양대로 잘린다. timeline · spritefx · effects 샘플의 무대(반지름 14)에 적용
+- Timeline 이 파티클을 시간으로 다룸 — 대상 파티클 시스템을 수동 틱(ParticleSystem.setManualTick / simulate)으로 바꿔 재생 중에만 진행하고, 스크럽 / 되감기 / 반복 감기 때는 비운 뒤 0초부터 이벤트를 다시 밟으며 재시뮬레이션한다. 일시 정지하면 파티클도 멈춘다
+- 샘플 이름: Effects → Particle Effects, Timeline → Timeline Showcase, Sprite FX → Sprite Effects. 두 새 샘플에서 상단 설명과 무대 위 코드 패널을 뺐다(시연용). Sprite Effects 목록은 스프라이트 셰이더 → 화면 효과 → 연출 차례
 - 샘플 spritefx(examples/spritefx) 신규 — 절차적 픽셀 스프라이트(슬라임 / 코인 / 박쥐 / 문장 / 별 / 보석)로 ShaderSprite 48종 · ScreenEffect 58종을 표에서 자동 나열하고, 연출 조합 25종(히트 스톱 / 화면 흔들림 / 슬로 모션 / 잔상 / 플립북 / 떠오르는 데미지 / 타자기 대사 / 슬래시 트레일 / 패럴랙스 / 카메라 펀치 / 스쿼시 앤 스트레치 / 스폰·디스폰 / 체력 바 / 번개 / 레벨 업 / 텔레포트 / 프리즈 프레임 / 포털 / 수중 / 상태 이상 / 승리 / 게임 오버 / 낮·밤 / 피격 넉백 / 폭우) 시연
 
 # 0.5.7-experimental (2026-09-07)

@@ -117,6 +117,7 @@ export class ParticleSystem extends Component {
 	/** @private @type { string } */ #blendMode; // "source-over" | "lighter" | "multiply" | "screen"
 	/** @private @type { number } */ #streakScale; // streak 길이 = 속도 x 이 값.
 	/** @private @type { boolean } */ #isWorldSpace; // 참이면 방출 후 노드 이동의 영향을 받지 않는다.
+	/** @private @type { boolean } */ #isManualTick; // 참이면 노드 갱신에서 진행하지 않고 simulate() 로만 진행한다. (타임라인 등 외부 시간)
 
 	//==============================================================================
 	// 생성.
@@ -132,6 +133,7 @@ export class ParticleSystem extends Component {
 		this.#colorChannelBuffer = [1, 1, 1, 1];
 		this.#isPlaying = true;
 		this.#isLooping = true;
+		this.#isManualTick = false;
 		this.#duration = 1;
 		this.#playElapsedSeconds = 0;
 		this.#maxParticleCount = 512;
@@ -212,13 +214,26 @@ export class ParticleSystem extends Component {
 	}
 
 	//==============================================================================
-	// 갱신. (방출 + 적분)
+	// 갱신. (노드 갱신 — 수동 틱이면 건너뛴다)
 	//==============================================================================
 	/**
 	 * @override
 	 * @param { number } timeDelta
 	 */
 	tick(timeDelta) {
+		if (this.#isManualTick) {
+			return;
+		}
+		this.simulate(timeDelta);
+	}
+
+	//==============================================================================
+	// 시간 진행. (방출 + 적분 — 수동 틱 모드에서는 외부가 부른다)
+	//==============================================================================
+	/**
+	 * @param { number } timeDelta
+	 */
+	simulate(timeDelta) {
 		// 방출.
 		if (this.#isPlaying) {
 			const previousElapsed = this.#playElapsedSeconds;
@@ -836,5 +851,18 @@ export class ParticleSystem extends Component {
 	/** @returns { boolean } */
 	isPlaying() {
 		return this.#isPlaying;
+	}
+
+	//==============================================================================
+	// 수동 틱 설정. (참이면 노드 갱신 대신 simulate() 로만 진행 — 타임라인이 시간을 다룬다)
+	//==============================================================================
+	/** @param { boolean } isManualTick */
+	setManualTick(isManualTick) {
+		this.#isManualTick = isManualTick;
+	}
+
+	/** @returns { boolean } */
+	isManualTick() {
+		return this.#isManualTick;
 	}
 }

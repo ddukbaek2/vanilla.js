@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>vanilla.js - Timeline</title>
+<title>vanilla.js - Timeline Showcase</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
 <style>
 	html, body {
@@ -97,50 +97,14 @@
 	const IMAGE_NAME_LIST = ["emblem.png", "slime.png", "star.png", "coin.png", "bat.png", "gem.png", "cover.png"];
 
 	const MODE_DEFINITIONS = [
-		{ key: "title", file: "title.timeline.json", title: "TITLE REVEAL", tag: "opacity · y · width · typewriter · marker → burst", usage: [
-			"const timeline = await Timeline.loadFromUrl(\"./assets/title.timeline.json\");",
-			"timeline.buildStage(stageNode, (imageName) => imageTable[imageName]);",
-			"timeline.setMarkerHandler((markerName) => flashMarker(markerName));",
-			"timeline.play();",
-			"// 매 프레임: timeline.tick(timeDelta);",
-		] },
-		{ key: "logo", file: "logo.timeline.json", title: "LOGO STING", tag: "back.out scale · elastic rotation · shine · dissolve", usage: [
-			"// 스프라이트 노드는 ShaderSprite 로 만들어진다 — \"effect\" 트랙이 진행도를 민다.",
-			"{ target: \"Emblem\", property: \"effect\", keys: [{ time: 1.1, value: 0 }, { time: 1.9, value: 1 }] }",
-			"// 다른 효과로 바꾸려면 노드 서술의 effect 를 \"dissolve\" / \"glow\" / \"wipe\" ... 로 바꾼다.",
-		] },
-		{ key: "hud", file: "hud.timeline.json", title: "HUD INTRO", tag: "stagger · number count · frame sheet · text step", usage: [
-			"// number 트랙은 반올림해 글자로 적는다. (점수 카운트)",
-			"{ target: \"Score\", property: \"number\", keys: [{ time: 1.2, value: 0, easing: \"quadratic.out\" }, { time: 3, value: 48250 }] }",
-			"// frame 트랙은 frameColumns x frameRows 시트에서 프레임을 고른다.",
-			"{ target: \"Coin\", property: \"frame\", keys: [{ time: 0, value: 0, easing: \"linear\" }, { time: 4, value: 32 }] }",
-		] },
-		{ key: "cutscene", file: "cutscene.timeline.json", title: "CUTSCENE", tag: "camera group · letterbox · dialogue · screen effect", usage: [
-			"// \"screen\" 대상은 샘플이 ScreenEffect 로 해석한다. (setTimelineProperty)",
-			"timeline.setTargetResolver((name) => name === \"screen\" ? screenEffect : null);",
-			"{ target: \"screen\", property: \"vignette\", keys: [{ time: 0, value: 0 }, { time: 1.2, value: 0.85 }] }",
-			"{ target: \"screen\", property: \"colorGrade.saturation\", keys: [{ time: 5.5, value: 1.15 }, { time: 7, value: 0.2 }] }",
-		] },
-		{ key: "combo", file: "combo.timeline.json", title: "COMBO POPUP", tag: "11 hits · elastic · color flash · particle events", usage: [
-			"// 이벤트 트랙의 키 값이 파티클 노드를 다룬다. (play / stop / emit:N)",
-			"{ target: \"Sparks\", property: \"event\", keys: [{ time: 0.2, value: \"play\" }, { time: 0.4, value: \"play\" }] }",
-			"timeline.setEventHandler((target, eventName) => { /* 커스텀 이벤트 */ });",
-		] },
-		{ key: "transition", file: "transition.timeline.json", title: "SCENE TRANSITION", tag: "iris wipe · pixel dissolve · visible step", usage: [
-			"// 검은 커버 스프라이트의 iris / pixelDissolve 효과 진행도로 장면을 덮고 걷는다.",
-			"{ target: \"Cover\", property: \"effect\", keys: [{ time: 2, value: 0 }, { time: 3, value: 1 }, { time: 4, value: 0 }] }",
-			"{ target: \"Scene B\", property: \"visible\", keys: [{ time: 3, value: true, easing: \"step\" }] }",
-		] },
-		{ key: "idle", file: "idle.timeline.json", title: "LOOPING IDLE", tag: "sinusoidal loops · blink · glow pulse", usage: [
-			"// loop: true 문서는 끝에서 처음으로 감기며 그 사이 이벤트도 빠짐없이 발생한다.",
-			"timeline.setLoop(true);",
-			"timeline.setSpeed(0.5); // 슬로 모션",
-		] },
-		{ key: "parallax", file: "parallax.timeline.json", title: "PARALLAX FLYBY", tag: "layer groups · camera zoom · fog + bloom", usage: [
-			"// 그룹 노드의 x 트랙으로 층마다 다른 속도를 낸다. 카메라는 부모 그룹의 scale / y.",
-			"{ target: \"Layer Near\", property: \"x\", keys: [{ time: 0, value: 480, easing: \"linear\" }, { time: 8, value: -300 }] }",
-			"{ target: \"screen\", property: \"fog\", keys: [{ time: 0, value: 0.5 }, { time: 4, value: 0.2 }] }",
-		] },
+		{ key: "title", file: "title.timeline.json", title: "TITLE REVEAL", tag: "opacity · y · width · typewriter · marker → burst" },
+		{ key: "logo", file: "logo.timeline.json", title: "LOGO STING", tag: "back.out scale · elastic rotation · shine · dissolve" },
+		{ key: "hud", file: "hud.timeline.json", title: "HUD INTRO", tag: "stagger · number count · frame sheet · text step" },
+		{ key: "cutscene", file: "cutscene.timeline.json", title: "CUTSCENE", tag: "camera group · letterbox · dialogue · screen effect" },
+		{ key: "combo", file: "combo.timeline.json", title: "COMBO POPUP", tag: "11 hits · elastic · color flash · particle events" },
+		{ key: "transition", file: "transition.timeline.json", title: "SCENE TRANSITION", tag: "iris wipe · pixel dissolve · visible step" },
+		{ key: "idle", file: "idle.timeline.json", title: "LOOPING IDLE", tag: "sinusoidal loops · blink · glow pulse" },
+		{ key: "parallax", file: "parallax.timeline.json", title: "PARALLAX FLYBY", tag: "layer groups · camera zoom · fog + bloom" },
 	];
 
 	//==============================================================================
@@ -158,12 +122,6 @@
 		/** @private @type { WorldNode | null } */ #stageNode;
 		/** @private @type { WorldNode | null } */ #stageContentNode;
 		/** @private @type { ScreenEffect | null } */ #screenEffect;
-		/** @private @type { UILabel | null } */ #stageTitleLabel;
-		/** @private @type { UILabel | null } */ #stageUsageLabel;
-		/** @private @type { WorldNode | null } */ #usagePanelNode;
-		/** @private @type { WorldNode | null } */ #copyButtonNode;
-		/** @private @type { UILabel | null } */ #copyButtonLabel;
-		/** @private @type { number } */ #copyResetSeconds;
 		/** @private @type { UILabel | null } */ #playLabel;
 		/** @private @type { UILabel | null } */ #loopLabel;
 		/** @private @type { UILabel | null } */ #speedLabel;
@@ -192,12 +150,6 @@
 			this.#stageNode = null;
 			this.#stageContentNode = null;
 			this.#screenEffect = null;
-			this.#stageTitleLabel = null;
-			this.#stageUsageLabel = null;
-			this.#usagePanelNode = null;
-			this.#copyButtonNode = null;
-			this.#copyButtonLabel = null;
-			this.#copyResetSeconds = 0;
 			this.#playLabel = null;
 			this.#loopLabel = null;
 			this.#speedLabel = null;
@@ -342,9 +294,7 @@
 		buildHeader() {
 			const root = this.getRoot();
 			const titleLabel = this.makeLabel(root, "Title", 24, 24, 400, 26, 18, TEXT_COLOR, true);
-			titleLabel.setText("TIMELINE");
-			const hintLabel = this.makeLabel(root, "Hint", 288, 30, 900, 20, 10.5, TEXT_FAINT_COLOR, false);
-			hintLabel.setText("모든 시퀀스는 Timeline Editor 가 저장하는 .timeline.json 그대로입니다 — 열어서 키를 옮기고 다시 저장하면 이 화면이 그대로 바뀝니다.");
+			titleLabel.setText("TIMELINE SHOWCASE");
 			this.#fpsLabel = this.makeLabel(root, "Fps", REFERENCE_WIDTH - 24 - 200, 26, 200, 20, 11, TEXT_FAINT_COLOR, false, "right");
 			this.#fpsLabel.setText("fps  --");
 		}
@@ -419,7 +369,8 @@
 			const stagePaint = this.#stageNode.addComponent(Paint);
 			stagePaint.setColor(STAGE_COLOR.clone());
 			stagePaint.setRoundSize(14);
-			this.#stageNode.addComponent(Mask);
+			const stageMask = this.#stageNode.addComponent(Mask);
+			stageMask.setRoundSize(14);
 			root.addChild(this.#stageNode);
 
 			this.#stageContentNode = new WorldNode();
@@ -434,43 +385,9 @@
 		}
 
 		//==============================================================================
-		// 무대 위 사용 코드 패널.
+		// 무대 위 표시. (마커 / 이벤트 알림)
 		//==============================================================================
 		buildStageOverlay() {
-			this.#usagePanelNode = new WorldNode();
-			this.#usagePanelNode.setName("UsagePanel");
-			this.#usagePanelNode.setPivot(Pivot.topLeft.clone());
-			this.#usagePanelNode.setAnchor(Pivot.topLeft.clone());
-			this.#usagePanelNode.setContentSize(Vector2.create(420, 120));
-			this.#usagePanelNode.setLocalPosition(Vector2.create(16, 16));
-			const usagePanelPaint = this.#usagePanelNode.addComponent(Paint);
-			usagePanelPaint.setColor(new Color(0, 0, 0, 0.55));
-			usagePanelPaint.setRoundSize(10);
-			this.#stageNode.addChild(this.#usagePanelNode);
-			this.#stageTitleLabel = this.makeLabel(this.#usagePanelNode, "StageTitle", 12, 9, 280, 22, 15, TEXT_COLOR, true);
-			this.#stageUsageLabel = this.makeLabel(this.#usagePanelNode, "StageUsage", 12, 40, 396, 78, 10.5, TEXT_DIM_COLOR, false);
-			this.#stageUsageLabel.setTextBaseline("top");
-			this.#copyButtonNode = new WorldNode();
-			this.#copyButtonNode.setName("UsageCopyButton");
-			this.#copyButtonNode.setPivot(Pivot.topLeft.clone());
-			this.#copyButtonNode.setAnchor(Pivot.topLeft.clone());
-			this.#copyButtonNode.setContentSize(Vector2.create(52, 19));
-			this.#copyButtonNode.setLocalPosition(Vector2.create(352, 8));
-			this.#copyButtonNode.setInteractable(true);
-			const copyButtonPaint = this.#copyButtonNode.addComponent(Paint);
-			copyButtonPaint.setColor(new Color(1, 1, 1, 0.09));
-			copyButtonPaint.setRoundSize(6);
-			const copyButton = this.#copyButtonNode.addComponent(UIButton);
-			copyButton.setPressedTintColor(new Color(1, 1, 1, 0.14));
-			copyButton.setClickedEvent(() => {
-				this.copyUsageToClipboard();
-			});
-			this.#copyButtonLabel = this.makeLabel(this.#copyButtonNode, "UsageCopyLabel", 0, 0, 52, 19, 8.5, TEXT_COLOR, true, "center");
-			this.#copyButtonLabel.setText("COPY");
-			this.#copyButtonLabel.setTextBaseline("middle");
-			copyButton.excludeNodeFromTint(this.#copyButtonLabel.getNode());
-			this.#usagePanelNode.addChild(this.#copyButtonNode);
-
 			// 마커 / 이벤트 표시.
 			this.#markerLabel = this.makeLabel(this.#stageNode, "MarkerFlash", 16, STAGE_HEIGHT - 34, 600, 20, 11, ACCENT_COLOR, true);
 			this.#markerLabel.setText("");
@@ -609,21 +526,6 @@
 				rowEntry.tagLabel.setTextColor(isActive ? new Color(0.165, 0.126, 0.086, 0.72) : TEXT_FAINT_COLOR.clone());
 			}
 			const mode = this.getCurrentMode();
-			const definition = mode.definition;
-			this.#stageTitleLabel.setText(definition.title);
-			this.#stageUsageLabel.setText(definition.usage.join("\n"));
-			let longestLineLength = 0;
-			for (const usageLine of definition.usage) {
-				longestLineLength = System.Math.max(longestLineLength, usageLine.length);
-			}
-			const usageLineHeight = 10.5 * 1.25;
-			const codeWidth = longestLineLength * 5.9 + 24 + 66;
-			const panelWidth = System.Math.min(STAGE_WIDTH - 32, System.Math.max(codeWidth, definition.title.length * 9.5 + 100));
-			const panelHeight = 40 + definition.usage.length * usageLineHeight + 12;
-			this.#usagePanelNode.setContentSize(Vector2.create(panelWidth, panelHeight));
-			this.#copyButtonNode.setLocalPosition(Vector2.create(panelWidth - 60, 8));
-			this.#stageUsageLabel.getNode().setContentSize(Vector2.create(panelWidth - 24, panelHeight - 48));
-			this.#copyButtonLabel.setText("COPY");
 			this.rebuildMarkerTicks(mode.timeline);
 			this.refreshTransport();
 			this.flashMarker("");
@@ -665,26 +567,6 @@
 		}
 
 		//==============================================================================
-		// 사용 코드 복사.
-		//==============================================================================
-		copyUsageToClipboard() {
-			const mode = this.getCurrentMode();
-			if (!mode) {
-				return;
-			}
-			const usageText = mode.definition.usage.join("\n");
-			if (System.navigator.clipboard) {
-				System.navigator.clipboard.writeText(usageText).then(() => {
-					this.#copyButtonLabel.setText("COPIED");
-					this.#copyResetSeconds = 1.2;
-				}).catch(() => {
-					this.#copyButtonLabel.setText("FAILED");
-					this.#copyResetSeconds = 1.2;
-				});
-			}
-		}
-
-		//==============================================================================
 		// 시간 표기.
 		//==============================================================================
 		formatTime(seconds) {
@@ -716,12 +598,6 @@
 				this.#timeLabel.setText(this.formatTime(mode.timeline.getTime()) + " / " + this.formatTime(duration));
 			}
 			this.#screenEffect.tick(timeDelta);
-			if (this.#copyResetSeconds > 0) {
-				this.#copyResetSeconds -= timeDelta;
-				if (this.#copyResetSeconds <= 0) {
-					this.#copyButtonLabel.setText("COPY");
-				}
-			}
 			if (this.#markerFlashSeconds > 0) {
 				this.#markerFlashSeconds -= timeDelta;
 				const alpha = System.Math.min(1, this.#markerFlashSeconds / 0.4);

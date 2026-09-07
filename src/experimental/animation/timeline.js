@@ -377,6 +377,7 @@ export class Timeline extends Object {
 	/** @private @type { number } */ #speed;
 	/** @private @type { boolean } */ #isPlaying;
 	/** @private @type { boolean } */ #isDirty;
+	/** @private @type { ParticleSystem[] } */ #particleSystems; // 타임라인 시간으로 진행하는 파티클. (대상 노드에서 모은다)
 
 	//==============================================================================
 	// 생성.
@@ -398,6 +399,7 @@ export class Timeline extends Object {
 		this.#speed = 1;
 		this.#isPlaying = false;
 		this.#isDirty = true;
+		this.#particleSystems = [];
 		this.setDescription(description ? description : Timeline.createEmptyDescription());
 	}
 
@@ -488,6 +490,88 @@ export class Timeline extends Object {
 		this.#compiledMarkers = this.#description.markers.slice();
 		this.#compiledMarkers.sort((left, right) => left.time - right.time);
 		this.#isDirty = false;
+		this.collectParticleSystems();
+	}
+
+	//==============================================================================
+	// 대상 노드의 파티클 시스템 수집. (수동 틱으로 바꿔 타임라인 시간으로만 진행한다)
+	//==============================================================================
+	collectParticleSystems() {
+		this.#particleSystems = [];
+		for (const target of this.#targetTable.values()) {
+			if (!target || typeof target.getComponent !== "function") {
+				continue;
+			}
+			const particleSystem = target.getComponent(ParticleSystem);
+			if (particleSystem && !this.#particleSystems.includes(particleSystem)) {
+				particleSystem.setManualTick(true);
+				this.#particleSystems.push(particleSystem);
+			}
+		}
+	}
+
+	//==============================================================================
+	// 파티클 시간 진행. (재생 중 매 프레임)
+	//==============================================================================
+	/**
+	 * @param { number } timeDelta
+	 */
+	simulateParticles(timeDelta) {
+		if (timeDelta <= 0) {
+			return;
+		}
+		for (const particleSystem of this.#particleSystems) {
+			particleSystem.simulate(timeDelta);
+		}
+	}
+
+	//==============================================================================
+	// 파티클 재시뮬레이션. (스크럽 / 되감기 — 비운 뒤 0초부터 이벤트를 다시 밟으며 진행)
+	//==============================================================================
+	/**
+	 * @param { number } time
+	 */
+	resimulateParticles(time) {
+		if (this.#isDirty) {
+			this.compile();
+		}
+		if (this.#particleSystems.length === 0) {
+			return;
+		}
+		for (const particleSystem of this.#particleSystems) {
+			particleSystem.stop(true);
+		}
+		// 파티클 대상 이벤트 키를 시간순으로 모은다.
+		const eventList = [];
+		for (const compiledTrack of this.#compiledTracks) {
+			if (compiledTrack.track.property !== "event" || compiledTrack.track.enabled === false) {
+				continue;
+			}
+			const target = compiledTrack.target;
+			if (!target || typeof target.getComponent !== "function" || !target.getComponent(ParticleSystem)) {
+				continue;
+			}
+			for (const key of compiledTrack.keys) {
+				if (key.time <= time) {
+					eventList.push({ time: key.time, compiledTrack: compiledTrack, key: key });
+				}
+			}
+		}
+		eventList.sort((left, right) => left.time - right.time);
+		const stepSeconds = System.Math.max(1 / 60, time / 600);
+		let currentTime = 0;
+		const advanceTo = (targetTime) => {
+			while (currentTime < targetTime - 0.000001) {
+				const stepDelta = System.Math.min(stepSeconds, targetTime - currentTime);
+				this.simulateParticles(stepDelta);
+				currentTime += stepDelta;
+			}
+		};
+		for (const eventEntry of eventList) {
+			advanceTo(eventEntry.time);
+			this.dispatchEvent(eventEntry.compiledTrack, eventEntry.key, true);
+		}
+		advanceTo(time);
 	}
 
 	//==============================================================================
@@ -751,6 +835,9 @@ export class Timeline extends Object {
 				soundEntry.audioPlayer.stop();
 			}
 		}
+		for (const particleSystem of this.#particleSystems) {
+			particleSystem.stop(true);
+		}
 		this.seek(0);
 	}
 
@@ -763,6 +850,7 @@ export class Timeline extends Object {
 	seek(time) {
 		this.#time = System.Math.max(0, System.Math.min(this.getDuration(), time));
 		this.evaluate(this.#time);
+		this.resimulateParticles(this.#time);
 	}
 
 	//==============================================================================
@@ -778,14 +866,18 @@ export class Timeline extends Object {
 		const duration = this.getDuration();
 		const previousTime = this.#time;
 		let nextTime = previousTime + timeDelta * this.#speed;
+		let isWrapped = false;
 		if (nextTime >= duration) {
 			if (this.isLoop() && duration > 0) {
 				this.fireEventsBetween(previousTime, duration, true);
+				this.simulateParticles(duration - previousTime);
 				nextTime = nextTime % duration;
 				this.fireEventsBetween(-1, nextTime, true);
+				isWrapped = true;
 			}
 			else {
 				this.fireEventsBetween(previousTime, duration, true);
+				this.simulateParticles(duration - previousTime);
 				this.#time = duration;
 				this.#isPlaying = false;
 				this.evaluate(this.#time);
@@ -803,6 +895,13 @@ export class Timeline extends Object {
 		}
 		this.#time = nextTime;
 		this.evaluate(this.#time);
+		// 파티클은 타임라인 시간으로만 진행한다. (감기면 처음부터 다시 — 매 반복이 같게)
+		if (isWrapped) {
+			this.resimulateParticles(this.#time);
+		}
+		else {
+			this.simulateParticles(this.#time - previousTime);
+		}
 	}
 
 	//==============================================================================
@@ -848,11 +947,12 @@ export class Timeline extends Object {
 	/**
 	 * @param { object } compiledTrack
 	 * @param { object } key
+	 * @param { boolean } isSilent - 재시뮬레이션용. (사운드 / 사용자 핸들러는 부르지 않고 파티클만)
 	 */
-	dispatchEvent(compiledTrack, key) {
+	dispatchEvent(compiledTrack, key, isSilent = false) {
 		const target = compiledTrack.target;
 		const eventName = String(key.value);
-		const soundEntry = target ? soundPlayerTable.get(target) : null;
+		const soundEntry = (target && !isSilent) ? soundPlayerTable.get(target) : null;
 		if (soundEntry && soundEntry.audioPlayer) {
 			if (eventName === "play" || eventName === "loop") {
 				if (soundEntry.audioAsset && soundEntry.audioAsset.isLoaded()) {
@@ -884,7 +984,7 @@ export class Timeline extends Object {
 				}
 			}
 		}
-		if (this.#eventHandler) {
+		if (this.#eventHandler && !isSilent) {
 			this.#eventHandler(compiledTrack.track.target, eventName, key, this);
 		}
 	}

@@ -22,3 +22,20 @@
 - 요청: "창이 활성화될 때만 효과가 나와야 하는데 전체 샘플이 같이 도는 것 같다", "창 영역을 벗어나 전체 화면에 효과가 붙는 것도 문제", "라운딩도 넘어서는 게 문제".
 - 확인: 두 샘플 모두 선택한 모드만 tick / draw 한다(타임라인은 비활성 무대 뿌리를 엔진이 건너뜀). 다만 ScreenEffect 가 캔버스 전체를 처리해 목록 / 제목까지 덮였고, disableAll 이 파라미터 / 색을 되돌리지 않아 HEALTH BAR 의 붉은 비네트 · LIGHTNING 의 흰 페이드 · PORTAL 의 소용돌이 중심이 다음 모드에 남았다.
 - 수정: ScreenEffect.setRegion(캔버스 픽셀 + 둥근 모서리) — begin 은 아무것도 잡지 않고 end 에서 화면 영역을 blitFramebuffer 로 떠 와 영역 크기 핑퐁으로 처리, 마지막에 regionComposite 패스(둥근 사각형 SDF 로 바깥은 원본)와 viewport / scissor 로 제자리에 출력. resetAll 추가. 샘플은 applyStageRegion() 으로 매 프레임 무대 사각형(뷰 → 캔버스 픽셀, 반지름 14)을 넘긴다.
+
+## 타임라인 편집기 파비콘 통일
+[20:10 요청 → 20:15 응답]
+- 요청: "타임라인 에디터의 경우 다른 에디터들과 아이콘이 다름".
+- 파티클 / UI 편집기는 같은 favicon.svg(512 PNG 내장 — 크림 바탕에 갈색 별, 바닐라 로고)를 쓴다. 타임라인 편집기의 자체 벡터 아이콘을 그 파일로 교체하고 NAS portfolio/timelineeditor/favicon.svg 갱신.
+
+## 무대 컨텐트 둥근 모서리 클리핑 / 목록 컬링 부호 수정
+[20:20 요청 → 20:45 응답]
+- 요청: "두 샘플 모두 라운딩을 무시한다 — 컨텐트 영역은 둥근데 실제 렌더는 사각형", "좌측 스크롤 뷰를 올리면 TELEPORT 밑부터 이상하고 SPRITE SHADER 항목이 세로로 크게 나온다".
+- Mask 는 Graphic.beginClipRect 로 사각형만 스텐실에 쓰고 있었다 → beginClipRect(rect, roundSize) 와 endClipRect 가 drawRoundRect 로 같은 모양을 INCR / DECR 하도록, Mask.setRoundSize 추가. timeline / spritefx / effects 무대 마스크 14.
+- 목록: UIScrollView 오프셋은 내릴수록 음수인데 컬링이 양수로 읽어 아래 행을 꺼 버렸고(SPRITE SHADER 머리말 아래가 빈 공간), 선택 행 자동 스크롤도 양수라 움직이지 않았다 → 부호 수정.
+
+## 파티클을 타임라인 시간에 묶기 / 설명 · 코드 제거 / 이름 변경
+[20:50 요청 → 21:40 응답]
+- 요청: "타임라인에서 파티클이 벗어난 느낌", "타임라인 샘플 위쪽 설명 빼라", "각 샘플에 코드가 왜 들어가냐 빼라(스프라이트도)", "스스로 설명하지 마라", "Sprite FX 에 스프라이트 효과가 없다"(목록 컬링 버그로 SPRITE SHADER 행이 숨어 있던 것), "Effects → Particle Effects, Timeline → Timeline Showcase, Sprite FX → Sprite Effects".
+- ParticleSystem.setManualTick / simulate 추가. Timeline 이 대상 파티클을 모아 재생 중 simulateParticles(dt × speed), seek / 루프 감기 때 resimulateParticles(0초부터 이벤트를 조용히 다시 밟음), stop 에서 비움. 편집기 스크럽 / 정지 / 재생이 모두 파티클에 반영된다.
+- 두 샘플에서 상단 설명(hint), 무대 위 코드 패널(제목 / 코드 / COPY), usage 데이터 제거. Sprite Effects 목록 차례를 스프라이트 셰이더 → 화면 효과 → 연출로. 페이지 제목 / 헤더 / 루트 목록 이름 변경(디렉토리는 유지).

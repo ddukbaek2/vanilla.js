@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>vanilla.js - Sprite FX</title>
+<title>vanilla.js - Sprite Effects</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
 <style>
 	html, body {
@@ -146,13 +146,6 @@
 				category: "SPRITE SHADER",
 				title: humanize(effectName),
 				tag: SPRITE_EFFECT_TAG_TABLE[effectName] ? SPRITE_EFFECT_TAG_TABLE[effectName] : "ShaderSprite",
-				usage: [
-					"const sprite = node.addComponent(ShaderSprite);",
-					"sprite.setImage(image);",
-					"sprite.setEffect(ShaderSpriteEffect." + effectName + ");",
-					"sprite.setEffectProgress(progress); // 0 ~ 1",
-					"sprite.setEffectColor(color); sprite.setEffectParameters(x, y, z, w); // 효과별 기본값 있음",
-				],
 				setup: (scene) => {
 					scene.applySubjectEffect(effectName);
 				},
@@ -201,18 +194,11 @@
 	function composeScreenEffectModes() {
 		const modeList = [];
 		for (const effectType of ScreenEffect.getEffectOrder()) {
-			const parameterNames = SCREEN_EFFECT_PARAMETER_NAMES[effectType] || [];
-			modeList.push({
+				modeList.push({
 				key: "screen." + effectType,
 				category: "SCREEN EFFECT",
 				title: humanize(effectType),
 				tag: SCREEN_EFFECT_TAG_TABLE[effectType] ? SCREEN_EFFECT_TAG_TABLE[effectType] : "ScreenEffect",
-				usage: [
-					"const screenEffect = new ScreenEffect(engine.getGraphic());",
-					"screenEffect.setEnabled(ScreenEffectType." + effectType + ", true);",
-					"screenEffect.setStrength(ScreenEffectType." + effectType + ", 1);" + (parameterNames.length > 0 ? "  // parameters: [" + parameterNames.join(", ") + "]" : ""),
-					"// preDraw: screenEffect.begin(graphic)   postDraw: screenEffect.end(graphic)   tick: screenEffect.tick(timeDelta)",
-				],
 				setup: (scene) => {
 					scene.screenEffect.setEnabled(effectType, true);
 					scene.screenEffect.setStrength(effectType, 1);
@@ -255,7 +241,6 @@
 	const STAGING_DEFINITIONS = [
 		{
 			key: "staging.hitStop", title: "HIT STOP", tag: "타임 스케일 0 + 섬광 + 흔들림 + 데미지 숫자",
-			usage: ["timeManager.setTimeScale(0);  // 0.08초 뒤 1 로", "heroSprite.setEffect(ShaderSpriteEffect.flash); heroSprite.setEffectProgress(1);", "shaker.addShake(14); floatingText.spawn(\"-128\", position, { color: red });", "screenEffect.setEnabled(ScreenEffectType.chromatic, true);"],
 			setup: (scene) => {
 				scene.state = { nextHit: 0.6, freezeRemaining: 0, flash: 0 };
 				scene.screenEffect.setEnabled(ScreenEffectType.chromatic, true);
@@ -288,7 +273,6 @@
 		},
 		{
 			key: "staging.screenShake", title: "SCREEN SHAKE", tag: "Shaker — 사인 합성 + 지수 감쇠",
-			usage: ["const shaker = new Shaker({ decayRate: 9, frequency: 42 });", "shaker.addShake(24);", "// 매 프레임: shaker.tick(dt); stage.setLocalPosition(base.add(shaker.getOffset()));"],
 			setup: (scene) => {
 				scene.state = { nextShake: 0.4 };
 			},
@@ -303,7 +287,6 @@
 		},
 		{
 			key: "staging.slowMotion", title: "SLOW MOTION", tag: "타임 스케일 0.2 + 채도 / 집중선 (불릿 타임)",
-			usage: ["timeManager.setTimeScale(0.2);", "screenEffect.setEnabled(ScreenEffectType.colorGrade, true); screenEffect.setParameters(colorGrade, 1.2, 0.3, 1);", "screenEffect.setEnabled(ScreenEffectType.speedLines, true);"],
 			setup: (scene) => {
 				scene.state = { phase: 0 };
 				scene.screenEffect.setEnabled(ScreenEffectType.colorGrade, true);
@@ -323,7 +306,6 @@
 		},
 		{
 			key: "staging.afterimage", title: "AFTERIMAGE", tag: "실루엣 잔상 — silhouette 효과 사본이 남는다",
-			usage: ["// 0.05초마다 주인공 위치에 ShaderSprite(silhouette) 사본을 놓고 투명도를 줄인다.", "ghost.setEffect(ShaderSpriteEffect.silhouette); ghost.setEffectColor(new Color(0.4, 0.8, 1, 1));"],
 			setup: (scene) => {
 				scene.state = { spawnAccumulator: 0, ghosts: [] };
 			},
@@ -358,7 +340,6 @@
 		},
 		{
 			key: "staging.flipbook", title: "FLIPBOOK", tag: "SpriteAnimator 클립 전환 + 완료 콜백",
-			usage: ["const animator = node.addComponent(SpriteAnimator);", "animator.addClip(\"idle\", image, idleRects, 10, true);", "animator.addClip(\"jump\", image, jumpRects, 14, false);", "animator.play(\"jump\", { onComplete: () => animator.play(\"idle\") });"],
 			setup: (scene) => {
 				scene.state = { nextJump: 1, jumpTime: -1 };
 				scene.setSubjectsVisible(true);
@@ -381,7 +362,6 @@
 		},
 		{
 			key: "staging.floatingDamage", title: "FLOATING DAMAGE", tag: "FloatingText — 재사용 풀, 치명타는 크고 금색",
-			usage: ["const floatingText = new FloatingText();", "stage.addChild(floatingText);", "floatingText.spawn(\"-120\", position, { color: white, fontSize: 24 });", "floatingText.spawn(\"CRIT 999\", position, { color: gold, fontSize: 40, rise: 80 });"],
 			setup: (scene) => {
 				scene.state = { accumulator: 0 };
 			},
@@ -403,7 +383,6 @@
 		},
 		{
 			key: "staging.typewriter", title: "TYPEWRITER DIALOGUE", tag: "Typewriter — 초당 글자 수 + 스킵 + 완료 이벤트",
-			usage: ["const typewriter = new Typewriter(label, { charactersPerSecond: 28 });", "typewriter.start(\"안녕. 폐허의 보석이 나를 불렀어.\");", "// 매 프레임: typewriter.tick(dt);  입력: typewriter.isFinished() ? next() : typewriter.skipToEnd();"],
 			setup: (scene) => {
 				const boxNode = scene.makePaint(scene.modeRoot, 484, 560, 760, 100, new Color(0.03, 0.04, 0.07, 0.88), 12);
 				scene.makePaint(scene.modeRoot, 484, 560, 764, 104, new Color(0.83, 0.69, 0.42, 0.25), 13);
@@ -439,7 +418,6 @@
 		},
 		{
 			key: "staging.slashTrail", title: "SLASH TRAIL", tag: "TrailRenderer 호 궤적 + 스파크 + 피격 섬광",
-			usage: ["const trail = bladeNode.addComponent(TrailRenderer);", "trail.setTime(0.25); trail.setWidth(26, 0); trail.setAdditive(true);", "trail.setColors(new Color(1, 0.9, 0.6, 1), new Color(1, 0.6, 0.2, 0));"],
 			setup: (scene) => {
 				const bladeNode = new WorldNode();
 				bladeNode.setPivot(Pivot.middleCenter.clone());
@@ -484,7 +462,6 @@
 		},
 		{
 			key: "staging.parallax", title: "PARALLAX", tag: "층별 다른 속도 + 카메라 살짝 줌",
-			usage: ["// 멀수록 느리게: farLayer.x -= 20 * dt, midLayer.x -= 60 * dt, nearLayer.x -= 140 * dt", "// 스크롤 폭을 넘으면 되감아 무한 반복."],
 			setup: (scene) => {
 				scene.setSubjectsVisible(false);
 				const layers = [];
@@ -531,7 +508,6 @@
 		},
 		{
 			key: "staging.cameraPunch", title: "CAMERA PUNCH", tag: "타격 순간 줌 인 → 되돌림 + 흔들림 + 색수차",
-			usage: ["// worldNode.setLocalScale(1.12) 로 순간 확대, 지수 감쇠로 1 로 복귀.", "shaker.addShake(12); screenEffect.setStrength(ScreenEffectType.chromatic, 1.5);"],
 			setup: (scene) => {
 				scene.state = { nextPunch: 0.5, punch: 0 };
 				scene.screenEffect.setEnabled(ScreenEffectType.chromatic, true);
@@ -552,7 +528,6 @@
 		},
 		{
 			key: "staging.squashStretch", title: "SQUASH & STRETCH", tag: "점프 — 도약 늘림 / 착지 눌림",
-			usage: ["// 상승: scale(0.85, 1.2)  정점: (1, 1)  착지: (1.3, 0.7) → 스프링으로 복귀."],
 			setup: (scene) => {
 				scene.state = { velocity: 0, y: FLOOR_Y - 60, scaleX: 1, scaleY: 1, nextJump: 0.5 };
 			},
@@ -583,7 +558,6 @@
 		},
 		{
 			key: "staging.spawnDespawn", title: "SPAWN / DESPAWN", tag: "pixelDissolve 등장 → back.out 팝 → dissolve 퇴장",
-			usage: ["enemy.setEffect(ShaderSpriteEffect.pixelDissolve); enemy.setEffectProgress(1 - t); // 등장", "enemy.setEffect(ShaderSpriteEffect.dissolve); enemy.setEffectProgress(t); // 퇴장"],
 			setup: (scene) => {
 				scene.state = { enemies: [], nextSpawn: 0.3 };
 			},
@@ -627,7 +601,6 @@
 		},
 		{
 			key: "staging.healthBar", title: "HEALTH BAR", tag: "즉시 줄어드는 막대 + 뒤따르는 잔상 막대",
-			usage: ["// 데미지: fill.width = hp;  ghost.width 는 0.4초 뒤부터 천천히 따라온다.", "// 위험 구간(< 30%) 은 붉게 깜빡이고 vignette 를 켠다."],
 			setup: (scene) => {
 				scene.makePaint(scene.modeRoot, 484, 590, 620, 30, new Color(0.03, 0.04, 0.07, 0.9), 15);
 				const ghostNode = scene.makePaint(scene.modeRoot, 176, 590, 616, 22, new Color(1, 1, 1, 0.85), 11);
@@ -673,7 +646,6 @@
 		},
 		{
 			key: "staging.lightning", title: "LIGHTNING", tag: "흰 섬광 + 반전 깜빡임 + 흔들림 + 천둥 흔들림",
-			usage: ["screenEffect.setEnabled(ScreenEffectType.invert, true); // 2 프레임", "screenEffect.setEnabled(ScreenEffectType.fade, true); screenEffect.setColor(fade, white);", "shaker.addShake(18);"],
 			setup: (scene) => {
 				scene.state = { nextStrike: 0.8, flash: 0 };
 				scene.screenEffect.setEnabled(ScreenEffectType.fade, true);
@@ -697,7 +669,6 @@
 		},
 		{
 			key: "staging.levelUp", title: "LEVEL UP", tag: "확장 링 + 파티클 분수 + 색상 회전 발광 + 글자 팝",
-			usage: ["heroSprite.setEffect(ShaderSpriteEffect.glow); heroSprite.setEffectColor(gold);", "ring.setLocalScale(t * 4); ring.setLocalOpacity(1 - t);", "particles.emit(120);"],
 			setup: (scene) => {
 				scene.state = { nextLevel: 0.6, rings: [], labelNode: null };
 				scene.heroSprite.setEffect(ShaderSpriteEffect.glow);
@@ -732,7 +703,6 @@
 		},
 		{
 			key: "staging.teleport", title: "TELEPORT", tag: "pixelDissolve 아웃 → 순간 이동 → 디졸브 인 + 색수차 팝",
-			usage: ["heroSprite.setEffect(ShaderSpriteEffect.pixelDissolve); // 0 → 1 로 사라짐", "hero.setLocalPosition(destination);", "heroSprite.setEffectProgress(1 → 0); screenEffect.setStrength(ScreenEffectType.chromatic, 2);"],
 			setup: (scene) => {
 				scene.state = { phase: 0, timer: 0, side: 0 };
 				scene.heroSprite.setEffect(ShaderSpriteEffect.pixelDissolve);
@@ -770,7 +740,6 @@
 		},
 		{
 			key: "staging.freezeFrame", title: "FREEZE FRAME", tag: "레터박스 + 타임 스케일 0 + 세피아 + 자막",
-			usage: ["timeManager.setTimeScale(0);", "screenEffect.setEnabled(ScreenEffectType.letterbox, true); screenEffect.setEnabled(ScreenEffectType.sepia, true);"],
 			setup: (scene) => {
 				scene.state = { blend: 0 };
 				scene.screenEffect.setEnabled(ScreenEffectType.letterbox, true);
@@ -797,7 +766,6 @@
 		},
 		{
 			key: "staging.portal", title: "PORTAL", tag: "화면 소용돌이 + 원형 빛 + 주인공 빨려 들어감",
-			usage: ["screenEffect.setEnabled(ScreenEffectType.swirl, true); screenEffect.setParameters(swirl, cx, cy, 0.9, 0.35);", "hero.setLocalScale(1 - t); hero.setLocalRotation(t * 720);"],
 			setup: (scene) => {
 				const glowNode = scene.makePaint(scene.modeRoot, 700, 300, 180, 180, new Color(0.5, 0.35, 1, 0.55), 90);
 				scene.state = { glowNode: glowNode };
@@ -822,7 +790,6 @@
 		},
 		{
 			key: "staging.underwater", title: "UNDERWATER", tag: "물결 + 푸른 컬러 그레이드 + 거품 + 빛줄기",
-			usage: ["screenEffect.setEnabled(ScreenEffectType.wave, true);", "screenEffect.setEnabled(ScreenEffectType.colorGrade, true); screenEffect.setColor(colorGrade, new Color(0.5, 0.8, 1, 0.6));", "screenEffect.setEnabled(ScreenEffectType.godRays, true);"],
 			setup: (scene) => {
 				scene.screenEffect.setEnabled(ScreenEffectType.wave, true);
 				scene.screenEffect.setStrength(ScreenEffectType.wave, 0.5);
@@ -841,7 +808,6 @@
 		},
 		{
 			key: "staging.statusEffects", title: "STATUS EFFECTS", tag: "독 / 화염 / 빙결 / 유령 / 무적 — 주인공 셰이더 순환",
-			usage: ["// poison: colorize green + hueShift  burning: burn + heatHaze + fire particles", "// frozen: gradientMap ice + outline  ghost: hologram  invincible: hueShift + outline"],
 			setup: (scene) => {
 				scene.state = { index: -1, timer: 99, label: scene.makeLabel(scene.modeRoot, 300, FLOOR_Y - 150, 300, 24, 16, ACCENT_COLOR, true, "center"), particle: null };
 				scene.setSubjectsVisible(false);
@@ -894,7 +860,6 @@
 		},
 		{
 			key: "staging.victory", title: "VICTORY", tag: "컨페티 + 집중선 + 문장 광택 + 줌 + 글자",
-			usage: ["confetti.emit(200); screenEffect.setEnabled(ScreenEffectType.speedLines, true);", "emblemSprite.setEffect(ShaderSpriteEffect.shine);"],
 			setup: (scene) => {
 				scene.state = { nextBurst: 0.2 };
 				scene.screenEffect.setEnabled(ScreenEffectType.speedLines, true);
@@ -922,7 +887,6 @@
 		},
 		{
 			key: "staging.gameOver", title: "GAME OVER", tag: "무채색 페이드 + 레터박스 + 브라운관 끄기",
-			usage: ["screenEffect.setEnabled(ScreenEffectType.grayscale, true);", "screenEffect.setEnabled(ScreenEffectType.tvOff, true); screenEffect.setStrength(tvOff, t);"],
 			setup: (scene) => {
 				scene.screenEffect.setEnabled(ScreenEffectType.grayscale, true);
 				scene.screenEffect.setEnabled(ScreenEffectType.vignette, true);
@@ -944,7 +908,6 @@
 		},
 		{
 			key: "staging.dayNight", title: "DAY / NIGHT", tag: "색온도 + 리프트 / 게인 + 별 파티클 + 안개",
-			usage: ["screenEffect.setEnabled(ScreenEffectType.whiteBalance, true); screenEffect.setParameters(whiteBalance, temperature, tint);", "screenEffect.setEnabled(ScreenEffectType.liftGammaGain, true); screenEffect.setParameters(liftGammaGain, lift, gamma, gain);"],
 			setup: (scene) => {
 				scene.screenEffect.setEnabled(ScreenEffectType.whiteBalance, true);
 				scene.screenEffect.setEnabled(ScreenEffectType.liftGammaGain, true);
@@ -965,7 +928,6 @@
 		},
 		{
 			key: "staging.damageFlash", title: "DAMAGE FLASH + KNOCKBACK", tag: "붉은 섬광 + 밀려남 + 무적 깜빡임",
-			usage: ["heroSprite.setEffect(ShaderSpriteEffect.flash); heroSprite.setEffectColor(red);", "// 0.6초 동안 sin 으로 불투명도 깜빡임 (무적 시간)"],
 			setup: (scene) => {
 				scene.state = { nextHit: 0.7, invincible: 0 };
 				scene.heroSprite.setEffect(ShaderSpriteEffect.flash);
@@ -988,7 +950,6 @@
 		},
 		{
 			key: "staging.rainStorm", title: "RAIN STORM", tag: "빗줄기 화면 효과 + 빗방울 파티클 + 물웅덩이 파문",
-			usage: ["screenEffect.setEnabled(ScreenEffectType.rain, true);", "rainParticles.setRenderShape(ParticleRenderShape.streak);"],
 			setup: (scene) => {
 				scene.screenEffect.setEnabled(ScreenEffectType.rain, true);
 				scene.screenEffect.setEnabled(ScreenEffectType.colorGrade, true);
@@ -1024,7 +985,7 @@
 		definition.category = "STAGING";
 	}
 
-	const MODE_DEFINITIONS = STAGING_DEFINITIONS.concat(composeSpriteEffectModes(), composeScreenEffectModes());
+	const MODE_DEFINITIONS = composeSpriteEffectModes().concat(composeScreenEffectModes(), STAGING_DEFINITIONS);
 
 	//==============================================================================
 	// 스프라이트 연출 씬.
@@ -1039,12 +1000,6 @@
 		/** @private @type { System.Map } */ #listRowMap;
 		/** @private @type { System.Map } */ #imageTable;
 		/** @private @type { WorldNode | null } */ #stageNode;
-		/** @private @type { UILabel | null } */ #stageTitleLabel;
-		/** @private @type { UILabel | null } */ #stageUsageLabel;
-		/** @private @type { WorldNode | null } */ #usagePanelNode;
-		/** @private @type { WorldNode | null } */ #copyButtonNode;
-		/** @private @type { UILabel | null } */ #copyButtonLabel;
-		/** @private @type { number } */ #copyResetSeconds;
 		/** @private @type { UILabel | null } */ #fpsLabel;
 		/** @private @type { number } */ #averageDelta;
 		/** @private @type { Vector2 } */ #worldBasePosition;
@@ -1060,12 +1015,6 @@
 			this.#listRowMap = new System.Map();
 			this.#imageTable = new System.Map();
 			this.#stageNode = null;
-			this.#stageTitleLabel = null;
-			this.#stageUsageLabel = null;
-			this.#usagePanelNode = null;
-			this.#copyButtonNode = null;
-			this.#copyButtonLabel = null;
-			this.#copyResetSeconds = 0;
 			this.#fpsLabel = null;
 			this.#averageDelta = 0;
 			this.#worldBasePosition = Vector2.create(0, 0);
@@ -1122,7 +1071,6 @@
 			this.buildList();
 			this.buildStage();
 			this.buildWorld();
-			this.buildStageOverlay();
 			const searchParams = new System.URLSearchParams(System.location.search);
 			const requestedMode = searchParams.get("mode");
 			const isKnownMode = MODE_DEFINITIONS.some((definition) => definition.key === requestedMode);
@@ -1293,9 +1241,7 @@
 		buildHeader() {
 			const root = this.getRoot();
 			const titleLabel = this.makeLabel(root, 24, 37, 400, 26, 18, TEXT_COLOR, true);
-			titleLabel.setText("SPRITE FX");
-			const hintLabel = this.makeLabel(root, 288, 40, 900, 20, 10.5, TEXT_FAINT_COLOR, false);
-			hintLabel.setText("ShaderSprite " + (System.Object.keys(ShaderSpriteEffect).length - 1) + "종 · ScreenEffect " + ScreenEffect.getEffectOrder().length + "종 · 연출 조합 " + STAGING_DEFINITIONS.length + "종 — 모두 엔진 내장. 목록을 스크롤해 고르세요.");
+			titleLabel.setText("SPRITE EFFECTS");
 			this.#fpsLabel = this.makeLabel(root, REFERENCE_WIDTH - 24 - 200, 37, 200, 20, 11, TEXT_FAINT_COLOR, false, "left");
 			this.#fpsLabel.getNode().setPivot(Pivot.middleRight.clone());
 			this.#fpsLabel.getNode().setLocalPosition(Vector2.create(REFERENCE_WIDTH - 24, 37));
@@ -1370,9 +1316,10 @@
 		// 목록 행 컬링. (보이는 범위 밖 행은 비활성 — 130여 행의 그리기 / 호버 판정을 아낀다)
 		//==============================================================================
 		updateListCulling() {
+			// 스크롤 오프셋은 내릴수록 음수. (컨텐트가 위로 이동)
 			const scrollOffset = this.listScroll.getScrollOffset();
-			const topY = scrollOffset.y - LIST_ROW_HEIGHT;
-			const bottomY = scrollOffset.y + LIST_HEIGHT + LIST_ROW_HEIGHT;
+			const topY = -scrollOffset.y - LIST_ROW_HEIGHT;
+			const bottomY = -scrollOffset.y + LIST_HEIGHT + LIST_ROW_HEIGHT;
 			for (const rowEntry of this.#listRowMap.values()) {
 				const isInside = rowEntry.y + LIST_ROW_HEIGHT >= topY && rowEntry.y <= bottomY;
 				if (rowEntry.rowNode.isActive() !== isInside) {
@@ -1404,7 +1351,8 @@
 			const stagePaint = this.#stageNode.addComponent(Paint);
 			stagePaint.setColor(STAGE_COLOR.clone());
 			stagePaint.setRoundSize(14);
-			this.#stageNode.addComponent(Mask);
+			const stageMask = this.#stageNode.addComponent(Mask);
+			stageMask.setRoundSize(14);
 			root.addChild(this.#stageNode);
 		}
 
@@ -1461,43 +1409,6 @@
 		}
 
 		//==============================================================================
-		// 무대 위 사용 코드 패널.
-		//==============================================================================
-		buildStageOverlay() {
-			this.#usagePanelNode = new WorldNode();
-			this.#usagePanelNode.setPivot(Pivot.topLeft.clone());
-			this.#usagePanelNode.setAnchor(Pivot.topLeft.clone());
-			this.#usagePanelNode.setContentSize(Vector2.create(420, 120));
-			this.#usagePanelNode.setLocalPosition(Vector2.create(16, 16));
-			const usagePanelPaint = this.#usagePanelNode.addComponent(Paint);
-			usagePanelPaint.setColor(new Color(0, 0, 0, 0.55));
-			usagePanelPaint.setRoundSize(10);
-			this.#stageNode.addChild(this.#usagePanelNode);
-			this.#stageTitleLabel = this.makeLabel(this.#usagePanelNode, 12, 20, 280, 22, 15, TEXT_COLOR, true);
-			this.#stageUsageLabel = this.makeLabel(this.#usagePanelNode, 12, 40, 396, 78, 10.5, TEXT_DIM_COLOR, false);
-			this.#stageUsageLabel.getNode().setPivot(Pivot.topLeft.clone());
-			this.#stageUsageLabel.setTextBaseline("top");
-			this.#copyButtonNode = new WorldNode();
-			this.#copyButtonNode.setPivot(Pivot.topLeft.clone());
-			this.#copyButtonNode.setAnchor(Pivot.topLeft.clone());
-			this.#copyButtonNode.setContentSize(Vector2.create(52, 19));
-			this.#copyButtonNode.setLocalPosition(Vector2.create(352, 8));
-			this.#copyButtonNode.setInteractable(true);
-			const copyButtonPaint = this.#copyButtonNode.addComponent(Paint);
-			copyButtonPaint.setColor(new Color(1, 1, 1, 0.09));
-			copyButtonPaint.setRoundSize(6);
-			const copyButton = this.#copyButtonNode.addComponent(UIButton);
-			copyButton.setPressedTintColor(new Color(1, 1, 1, 0.14));
-			copyButton.setClickedEvent(() => {
-				this.copyUsageToClipboard();
-			});
-			this.#copyButtonLabel = this.makeLabel(this.#copyButtonNode, 26, 9.5, 52, 19, 8.5, TEXT_COLOR, true, "center");
-			this.#copyButtonLabel.setText("COPY");
-			copyButton.excludeNodeFromTint(this.#copyButtonLabel.getNode());
-			this.#usagePanelNode.addChild(this.#copyButtonNode);
-		}
-
-		//==============================================================================
 		// 모드 선택. (이전 모드 정리 → 공용 세계 초기화 → 새 모드 준비)
 		//==============================================================================
 		selectMode(modeKey) {
@@ -1538,41 +1449,12 @@
 				rowEntry.paintComponent.setColor(isActive ? ACCENT_COLOR.clone() : new Color(0, 0, 0, 0));
 				rowEntry.titleLabel.setTextColor(isActive ? ON_ACCENT_COLOR.clone() : TEXT_COLOR.clone());
 			}
-			this.#stageTitleLabel.setText(definition.title + "   ·   " + definition.tag);
-			this.#stageUsageLabel.setText(definition.usage.join("\n"));
-			let longestLineLength = definition.title.length + definition.tag.length + 6;
-			for (const usageLine of definition.usage) {
-				longestLineLength = System.Math.max(longestLineLength, usageLine.length);
-			}
-			const usageLineHeight = 10.5 * 1.25;
-			const panelWidth = System.Math.min(STAGE_WIDTH - 32, longestLineLength * 5.9 + 24 + 66);
-			const panelHeight = 40 + definition.usage.length * usageLineHeight + 12;
-			this.#usagePanelNode.setContentSize(Vector2.create(panelWidth, panelHeight));
-			this.#copyButtonNode.setLocalPosition(Vector2.create(panelWidth - 60, 8));
-			this.#stageUsageLabel.getNode().setContentSize(Vector2.create(panelWidth - 24, panelHeight - 48));
-			this.#copyButtonLabel.setText("COPY");
-
 			// 목록 스크롤을 선택 행으로.
 			const rowEntry = this.#listRowMap.get(modeKey);
 			if (rowEntry && this.listScroll) {
 				const targetOffset = System.Math.max(0, rowEntry.y - LIST_HEIGHT / 2);
-				this.listScroll.setScrollOffset(Vector2.create(0, targetOffset));
-			}
-		}
-
-		copyUsageToClipboard() {
-			if (!this.#mode) {
-				return;
-			}
-			const usageText = this.#mode.usage.join("\n");
-			if (System.navigator.clipboard) {
-				System.navigator.clipboard.writeText(usageText).then(() => {
-					this.#copyButtonLabel.setText("COPIED");
-					this.#copyResetSeconds = 1.2;
-				}).catch(() => {
-					this.#copyButtonLabel.setText("FAILED");
-					this.#copyResetSeconds = 1.2;
-				});
+				this.listScroll.setScrollOffset(Vector2.create(0, -targetOffset));
+				this.updateListCulling();
 			}
 		}
 
@@ -1607,12 +1489,6 @@
 			this.worldNode.setLocalScale(Vector2.create(this.worldZoom, this.worldZoom));
 			this.screenEffect.tick(unscaledDelta);
 
-			if (this.#copyResetSeconds > 0) {
-				this.#copyResetSeconds -= unscaledDelta;
-				if (this.#copyResetSeconds <= 0) {
-					this.#copyButtonLabel.setText("COPY");
-				}
-			}
 			this.#averageDelta = this.#averageDelta === 0 ? unscaledDelta : this.#averageDelta * 0.95 + unscaledDelta * 0.05;
 			if (this.#averageDelta > 0) {
 				this.#fpsLabel.setText("fps  " + System.Math.round(1 / this.#averageDelta));

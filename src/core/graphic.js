@@ -1535,11 +1535,13 @@ export class Graphic extends Object {
 	//==============================================================================
 	// 출력 영역 제한 시작.
 	// - 스텐실 버퍼 기반이라 회전/스케일이 걸린 영역도 정확히 잘린다.
+	// - roundSize 를 주면 둥근 사각형으로 잘린다. (Paint 의 roundSize 와 같은 값이면 배경과 정확히 맞는다)
 	//==============================================================================
 	/**
-	 * @type { Rect } rect
+	 * @param { Rect } rect
+	 * @param { number } roundSize
 	 */
-	beginClipRect(rect) {
+	beginClipRect(rect, roundSize = 0) {
 		// 상태 저장. (Canvas2D save 대응)
 		this.pushState();
 
@@ -1547,6 +1549,7 @@ export class Graphic extends Object {
 		const previousClipDepth = this.#clipStack.length;
 		this.#clipStack.push({
 			rect: rect.clone(),
+			roundSize: roundSize,
 			transformMatrix: this.#transformMatrix.clone(),
 		});
 
@@ -1558,7 +1561,12 @@ export class Graphic extends Object {
 		webGL2RenderingContext.colorMask(false, false, false, false);
 		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.ALWAYS, 0, 0xFF);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.INCR);
-		this.drawRect(rect);
+		if (roundSize > 0) {
+			this.drawRoundRect(rect, roundSize);
+		}
+		else {
+			this.drawRect(rect);
+		}
 		webGL2RenderingContext.colorMask(true, true, true, true);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
 		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.EQUAL, previousClipDepth + 1, 0xFF);
@@ -1581,7 +1589,12 @@ export class Graphic extends Object {
 		webGL2RenderingContext.colorMask(false, false, false, false);
 		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.ALWAYS, 0, 0xFF);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.DECR);
-		this.drawRect(clipEntry.rect);
+		if (clipEntry.roundSize > 0) {
+			this.drawRoundRect(clipEntry.rect, clipEntry.roundSize);
+		}
+		else {
+			this.drawRect(clipEntry.rect);
+		}
 		webGL2RenderingContext.colorMask(true, true, true, true);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
 

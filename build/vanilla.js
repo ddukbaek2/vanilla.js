@@ -6583,16 +6583,19 @@ var Graphic = class extends Object2 {
   //==============================================================================
   // 출력 영역 제한 시작.
   // - 스텐실 버퍼 기반이라 회전/스케일이 걸린 영역도 정확히 잘린다.
+  // - roundSize 를 주면 둥근 사각형으로 잘린다. (Paint 의 roundSize 와 같은 값이면 배경과 정확히 맞는다)
   //==============================================================================
   /**
-   * @type { Rect } rect
+   * @param { Rect } rect
+   * @param { number } roundSize
    */
-  beginClipRect(rect) {
+  beginClipRect(rect, roundSize = 0) {
     this.pushState();
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const previousClipDepth = this.#clipStack.length;
     this.#clipStack.push({
       rect: rect.clone(),
+      roundSize,
       transformMatrix: this.#transformMatrix.clone()
     });
     if (previousClipDepth === 0) {
@@ -6601,7 +6604,11 @@ var Graphic = class extends Object2 {
     webGL2RenderingContext.colorMask(false, false, false, false);
     webGL2RenderingContext.stencilFunc(webGL2RenderingContext.ALWAYS, 0, 255);
     webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.INCR);
-    this.drawRect(rect);
+    if (roundSize > 0) {
+      this.drawRoundRect(rect, roundSize);
+    } else {
+      this.drawRect(rect);
+    }
     webGL2RenderingContext.colorMask(true, true, true, true);
     webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
     webGL2RenderingContext.stencilFunc(webGL2RenderingContext.EQUAL, previousClipDepth + 1, 255);
@@ -6619,7 +6626,11 @@ var Graphic = class extends Object2 {
     webGL2RenderingContext.colorMask(false, false, false, false);
     webGL2RenderingContext.stencilFunc(webGL2RenderingContext.ALWAYS, 0, 255);
     webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.DECR);
-    this.drawRect(clipEntry.rect);
+    if (clipEntry.roundSize > 0) {
+      this.drawRoundRect(clipEntry.rect, clipEntry.roundSize);
+    } else {
+      this.drawRect(clipEntry.rect);
+    }
     webGL2RenderingContext.colorMask(true, true, true, true);
     webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
     const clipDepth = this.#clipStack.length;
@@ -8021,11 +8032,18 @@ var Mask = class extends Component {
     __name(this, "Mask");
   }
   //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { number } */
+  #roundSize;
+  // 둥근 모서리 반지름. (0 이면 사각형)
+  //==============================================================================
   // 생성.
   //==============================================================================
   constructor() {
     super();
     this.setComponentType("Mask");
+    this.#roundSize = 0;
   }
   //==============================================================================
   // 클리핑 시작. (노드의 draw 가 자식 그리기 직전에 호출)
@@ -8043,7 +8061,8 @@ var Mask = class extends Component {
     }
     const contentSize = node.getContentSize();
     const clipRect = Rect.create(0, 0, contentSize.x, contentSize.y);
-    graphic.beginClipRect(clipRect);
+    const roundSize = this.getRoundSize();
+    graphic.beginClipRect(clipRect, roundSize);
   }
   //==============================================================================
   // 클리핑 종료. (노드의 draw 가 자식 그리기 직후에 호출)
@@ -8053,6 +8072,24 @@ var Mask = class extends Component {
    */
   endClip(graphic) {
     graphic.endClipRect();
+  }
+  //==============================================================================
+  // 둥근 모서리 반지름 설정. (Paint 의 roundSize 와 같은 값을 주면 배경 모양대로 잘린다)
+  //==============================================================================
+  /**
+   * @param { number } roundSize
+   */
+  setRoundSize(roundSize) {
+    this.#roundSize = Math.max(0, roundSize);
+  }
+  //==============================================================================
+  // 둥근 모서리 반지름 반환.
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getRoundSize() {
+    return this.#roundSize;
   }
 };
 
@@ -34695,6 +34732,9 @@ var ParticleSystem = class extends Component {
   /** @private @type { boolean } */
   #isWorldSpace;
   // 참이면 방출 후 노드 이동의 영향을 받지 않는다.
+  /** @private @type { boolean } */
+  #isManualTick;
+  // 참이면 노드 갱신에서 진행하지 않고 simulate() 로만 진행한다. (타임라인 등 외부 시간)
   //==============================================================================
   // 생성.
   //==============================================================================
@@ -34709,6 +34749,7 @@ var ParticleSystem = class extends Component {
     this.#colorChannelBuffer = [1, 1, 1, 1];
     this.#isPlaying = true;
     this.#isLooping = true;
+    this.#isManualTick = false;
     this.#duration = 1;
     this.#playElapsedSeconds = 0;
     this.#maxParticleCount = 512;
@@ -34780,13 +34821,25 @@ var ParticleSystem = class extends Component {
     }
   }
   //==============================================================================
-  // 갱신. (방출 + 적분)
+  // 갱신. (노드 갱신 — 수동 틱이면 건너뛴다)
   //==============================================================================
   /**
    * @override
    * @param { number } timeDelta
    */
   tick(timeDelta) {
+    if (this.#isManualTick) {
+      return;
+    }
+    this.simulate(timeDelta);
+  }
+  //==============================================================================
+  // 시간 진행. (방출 + 적분 — 수동 틱 모드에서는 외부가 부른다)
+  //==============================================================================
+  /**
+   * @param { number } timeDelta
+   */
+  simulate(timeDelta) {
     if (this.#isPlaying) {
       const previousElapsed = this.#playElapsedSeconds;
       this.#playElapsedSeconds += timeDelta;
@@ -35334,6 +35387,17 @@ var ParticleSystem = class extends Component {
   /** @returns { boolean } */
   isPlaying() {
     return this.#isPlaying;
+  }
+  //==============================================================================
+  // 수동 틱 설정. (참이면 노드 갱신 대신 simulate() 로만 진행 — 타임라인이 시간을 다룬다)
+  //==============================================================================
+  /** @param { boolean } isManualTick */
+  setManualTick(isManualTick) {
+    this.#isManualTick = isManualTick;
+  }
+  /** @returns { boolean } */
+  isManualTick() {
+    return this.#isManualTick;
   }
 };
 
@@ -38043,6 +38107,9 @@ var Timeline = class _Timeline extends Object2 {
   #isPlaying;
   /** @private @type { boolean } */
   #isDirty;
+  /** @private @type { ParticleSystem[] } */
+  #particleSystems;
+  // 타임라인 시간으로 진행하는 파티클. (대상 노드에서 모은다)
   //==============================================================================
   // 생성.
   //==============================================================================
@@ -38063,6 +38130,7 @@ var Timeline = class _Timeline extends Object2 {
     this.#speed = 1;
     this.#isPlaying = false;
     this.#isDirty = true;
+    this.#particleSystems = [];
     this.setDescription(description ? description : _Timeline.createEmptyDescription());
   }
   //==============================================================================
@@ -38147,6 +38215,84 @@ var Timeline = class _Timeline extends Object2 {
     this.#compiledMarkers = this.#description.markers.slice();
     this.#compiledMarkers.sort((left, right) => left.time - right.time);
     this.#isDirty = false;
+    this.collectParticleSystems();
+  }
+  //==============================================================================
+  // 대상 노드의 파티클 시스템 수집. (수동 틱으로 바꿔 타임라인 시간으로만 진행한다)
+  //==============================================================================
+  collectParticleSystems() {
+    this.#particleSystems = [];
+    for (const target of this.#targetTable.values()) {
+      if (!target || typeof target.getComponent !== "function") {
+        continue;
+      }
+      const particleSystem = target.getComponent(ParticleSystem);
+      if (particleSystem && !this.#particleSystems.includes(particleSystem)) {
+        particleSystem.setManualTick(true);
+        this.#particleSystems.push(particleSystem);
+      }
+    }
+  }
+  //==============================================================================
+  // 파티클 시간 진행. (재생 중 매 프레임)
+  //==============================================================================
+  /**
+   * @param { number } timeDelta
+   */
+  simulateParticles(timeDelta) {
+    if (timeDelta <= 0) {
+      return;
+    }
+    for (const particleSystem of this.#particleSystems) {
+      particleSystem.simulate(timeDelta);
+    }
+  }
+  //==============================================================================
+  // 파티클 재시뮬레이션. (스크럽 / 되감기 — 비운 뒤 0초부터 이벤트를 다시 밟으며 진행)
+  //==============================================================================
+  /**
+   * @param { number } time
+   */
+  resimulateParticles(time) {
+    if (this.#isDirty) {
+      this.compile();
+    }
+    if (this.#particleSystems.length === 0) {
+      return;
+    }
+    for (const particleSystem of this.#particleSystems) {
+      particleSystem.stop(true);
+    }
+    const eventList = [];
+    for (const compiledTrack of this.#compiledTracks) {
+      if (compiledTrack.track.property !== "event" || compiledTrack.track.enabled === false) {
+        continue;
+      }
+      const target = compiledTrack.target;
+      if (!target || typeof target.getComponent !== "function" || !target.getComponent(ParticleSystem)) {
+        continue;
+      }
+      for (const key of compiledTrack.keys) {
+        if (key.time <= time) {
+          eventList.push({ time: key.time, compiledTrack, key });
+        }
+      }
+    }
+    eventList.sort((left, right) => left.time - right.time);
+    const stepSeconds = System76.Math.max(1 / 60, time / 600);
+    let currentTime = 0;
+    const advanceTo = /* @__PURE__ */ __name((targetTime) => {
+      while (currentTime < targetTime - 1e-6) {
+        const stepDelta = System76.Math.min(stepSeconds, targetTime - currentTime);
+        this.simulateParticles(stepDelta);
+        currentTime += stepDelta;
+      }
+    }, "advanceTo");
+    for (const eventEntry of eventList) {
+      advanceTo(eventEntry.time);
+      this.dispatchEvent(eventEntry.compiledTrack, eventEntry.key, true);
+    }
+    advanceTo(time);
   }
   //==============================================================================
   // 대상 해석. (무대 노드 표 → 사용자 해석기)
@@ -38391,6 +38537,9 @@ var Timeline = class _Timeline extends Object2 {
         soundEntry.audioPlayer.stop();
       }
     }
+    for (const particleSystem of this.#particleSystems) {
+      particleSystem.stop(true);
+    }
     this.seek(0);
   }
   //==============================================================================
@@ -38402,6 +38551,7 @@ var Timeline = class _Timeline extends Object2 {
   seek(time) {
     this.#time = System76.Math.max(0, System76.Math.min(this.getDuration(), time));
     this.evaluate(this.#time);
+    this.resimulateParticles(this.#time);
   }
   //==============================================================================
   // 갱신. (시간을 흘리고 값을 적용, 지나친 이벤트 / 마커를 발생)
@@ -38416,13 +38566,17 @@ var Timeline = class _Timeline extends Object2 {
     const duration = this.getDuration();
     const previousTime = this.#time;
     let nextTime = previousTime + timeDelta * this.#speed;
+    let isWrapped = false;
     if (nextTime >= duration) {
       if (this.isLoop() && duration > 0) {
         this.fireEventsBetween(previousTime, duration, true);
+        this.simulateParticles(duration - previousTime);
         nextTime = nextTime % duration;
         this.fireEventsBetween(-1, nextTime, true);
+        isWrapped = true;
       } else {
         this.fireEventsBetween(previousTime, duration, true);
+        this.simulateParticles(duration - previousTime);
         this.#time = duration;
         this.#isPlaying = false;
         this.evaluate(this.#time);
@@ -38438,6 +38592,11 @@ var Timeline = class _Timeline extends Object2 {
     }
     this.#time = nextTime;
     this.evaluate(this.#time);
+    if (isWrapped) {
+      this.resimulateParticles(this.#time);
+    } else {
+      this.simulateParticles(this.#time - previousTime);
+    }
   }
   //==============================================================================
   // 구간 안의 이벤트 키 / 마커 발생. (fromTime 초과 ~ toTime 이하, isInclusiveEnd 면 끝도 포함)
@@ -38481,11 +38640,12 @@ var Timeline = class _Timeline extends Object2 {
   /**
    * @param { object } compiledTrack
    * @param { object } key
+   * @param { boolean } isSilent - 재시뮬레이션용. (사운드 / 사용자 핸들러는 부르지 않고 파티클만)
    */
-  dispatchEvent(compiledTrack, key) {
+  dispatchEvent(compiledTrack, key, isSilent = false) {
     const target = compiledTrack.target;
     const eventName = String(key.value);
-    const soundEntry = target ? soundPlayerTable.get(target) : null;
+    const soundEntry = target && !isSilent ? soundPlayerTable.get(target) : null;
     if (soundEntry && soundEntry.audioPlayer) {
       if (eventName === "play" || eventName === "loop") {
         if (soundEntry.audioAsset && soundEntry.audioAsset.isLoaded()) {
@@ -38513,7 +38673,7 @@ var Timeline = class _Timeline extends Object2 {
         }
       }
     }
-    if (this.#eventHandler) {
+    if (this.#eventHandler && !isSilent) {
       this.#eventHandler(compiledTrack.track.target, eventName, key, this);
     }
   }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>vanilla.js - Effects</title>
+<title>vanilla.js - Particle Effects</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
 <style>
 	html, body {
@@ -373,7 +373,7 @@
 				return labelComponent;
 			};
 			const titleLabel = makeLabelNode("Title", 24, 24, 400, 26, 18, TEXT_COLOR, true);
-			titleLabel.setText("EFFECTS");
+			titleLabel.setText("PARTICLE EFFECTS");
 		}
 
 		//==============================================================================
@@ -490,7 +490,8 @@
 			const stagePaint = this.#stageNode.addComponent(Paint);
 			stagePaint.setColor(STAGE_COLOR.clone());
 			stagePaint.setRoundSize(14);
-			this.#stageNode.addComponent(Mask);
+			const stageMask = this.#stageNode.addComponent(Mask);
+			stageMask.setRoundSize(14);
 			root.addChild(this.#stageNode);
 
 		}
