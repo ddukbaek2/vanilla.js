@@ -511,6 +511,12 @@
 		{ name: "Idle", label: "IDLE", file: "anims/idle.fbx" },
 		{ name: "Walk", label: "WALK", file: "anims/walk.fbx" },
 		{ name: "Run", label: "RUN", file: "anims/run.fbx" },
+		{ name: "Jump", label: "JUMP", file: "anims/jump.fbx" },
+		{ name: "Wave", label: "WAVE", file: "anims/wave.fbx" },
+		{ name: "Greet", label: "GREET", file: "anims/greet.fbx" },
+		{ name: "Clap", label: "CLAP", file: "anims/clap.fbx" },
+		{ name: "Cheer", label: "CHEER", file: "anims/cheer.fbx" },
+		{ name: "Dance", label: "DANCE", file: "anims/dance.fbx" },
 	];
 	const MIXAMO_REST_FILE = "anims/mixamo_rest.json";
 	// Mixamo 뼈 → VRM 휴머노이드 뼈. (부모가 먼저 오도록 나열)
@@ -536,6 +542,8 @@
 	const FACE_SPHERE_OFFSET = [0, -0.025, -0.05];
 	// 스프링 본 적분 간격. (프레임 레이트와 무관하게 이 간격으로 나눠 돈다)
 	const SPRING_STEP_SECONDS = 1 / 60;
+	// 콜라이더 여유. (VRoid 반지름은 T 포즈 기준이라 애니메이션 중 옷 위 머리카락이 파고들기 쉽다)
+	const SPRING_COLLIDER_MARGIN = 0.012;
 	const HAIR_SPHERE_OFFSET = [0, 0.02, -0.03];
 
 	//==============================================================================
@@ -1753,7 +1761,7 @@
 	}
 	const mixamoHipsRestHeight = mixamoRestTable.Hips ? mixamoRestTable.Hips.position[1] : 100;
 	const vrmHipsRestHeight = restWorldPositionList[humanoidNodeIndexByBone.get("hips")].y;
-	const animationState = { activeName: "", hipsOffsetY: 0 };
+	const animationState = { activeName: "", hipsOffsetY: 0, springResetPending: true };
 	let animationHipsHeightScale = vrmHipsRestHeight / System.Math.max(mixamoHipsRestHeight, 1);
 
 	// 애니메이션 버튼. (표정 버튼 아래 — 실제 Mixamo 본 애니메이션)
@@ -1774,6 +1782,7 @@
 			return;
 		}
 		animationState.activeName = animationName;
+		animationState.springResetPending = true;
 		animationModel.playAnimation(clipNameByAnimation.get(animationName), 0.3);
 		for (const [name, buttonElement] of animationButtonMap) {
 			buttonElement.classList.toggle("active", name === animationName);
@@ -1949,22 +1958,27 @@
 			nextTail = vectorAdd(nextTail, vectorScale(joint.gravityDirection, joint.gravityPower * gravityScale * deltaTime));
 			nextTail = vectorAdd(worldPosition, vectorScale(vectorNormalize(vectorSubtract(nextTail, worldPosition)), joint.boneLength));
 
-			// 콜라이더 밀어내기.
-			for (const colliderIndex of joint.colliderIndices) {
-				const collider = springColliderList[colliderIndex];
-				let closest = collider.worldHead;
-				if (collider.isCapsule) {
-					const segment = vectorSubtract(collider.worldTail, collider.worldHead);
-					const segmentLengthSquared = vectorDot(segment, segment);
-					const along = segmentLengthSquared > 0.000001 ? clampValue(vectorDot(vectorSubtract(nextTail, collider.worldHead), segment) / segmentLengthSquared, 0, 1) : 0;
-					closest = vectorAdd(collider.worldHead, vectorScale(segment, along));
-				}
-				const toTail = vectorSubtract(nextTail, closest);
-				const distance = vectorLength(toTail);
-				const minimumDistance = collider.radius + joint.hitRadius;
-				if (distance < minimumDistance) {
-					nextTail = vectorAdd(closest, vectorScale(vectorNormalize(toTail), minimumDistance));
-					nextTail = vectorAdd(worldPosition, vectorScale(vectorNormalize(vectorSubtract(nextTail, worldPosition)), joint.boneLength));
+			// 콜라이더 밀어내기. (꼬리 → 뼈 중간점 순서로 두 번 — 중간점이 파고들면 꼬리를 같은 방향으로 밀어 뼈 전체를 뺀다)
+			for (let probePass = 0; probePass < 2; ++probePass) {
+				for (const colliderIndex of joint.colliderIndices) {
+					const collider = springColliderList[colliderIndex];
+					const probePoint = probePass === 0 ? nextTail : vectorScale(vectorAdd(worldPosition, nextTail), 0.5);
+					let closest = collider.worldHead;
+					if (collider.isCapsule) {
+						const segment = vectorSubtract(collider.worldTail, collider.worldHead);
+						const segmentLengthSquared = vectorDot(segment, segment);
+						const along = segmentLengthSquared > 0.000001 ? clampValue(vectorDot(vectorSubtract(probePoint, collider.worldHead), segment) / segmentLengthSquared, 0, 1) : 0;
+						closest = vectorAdd(collider.worldHead, vectorScale(segment, along));
+					}
+					const toProbe = vectorSubtract(probePoint, closest);
+					const distance = vectorLength(toProbe);
+					const minimumDistance = collider.radius + SPRING_COLLIDER_MARGIN + joint.hitRadius;
+					if (distance < minimumDistance) {
+						const pushDirection = vectorNormalize(toProbe);
+						const pushAmount = minimumDistance - distance;
+						nextTail = vectorAdd(nextTail, vectorScale(pushDirection, probePass === 0 ? pushAmount : pushAmount * 2));
+						nextTail = vectorAdd(worldPosition, vectorScale(vectorNormalize(vectorSubtract(nextTail, worldPosition)), joint.boneLength));
+					}
 				}
 			}
 			joint.previousTail = joint.currentTail;
@@ -2773,6 +2787,11 @@
 		updateConstraints();
 		// 골격을 한 번 갱신해 이번 프레임의 뼈 위치를 확정한 뒤 스프링을 돌리고, 스프링 회전을 반영해 한 번 더 갱신한다. (뿌리가 한 프레임 늦지 않도록)
 		model.update(deltaTime);
+		// 자세가 크게 바뀐 직후(진입 / 클립 전환)에는 꼬리를 현재 자세에 맞춰 다시 잡는다. (T 포즈 꼬리에서 출발하면 옷 / 머리카락이 확 당겨진다)
+		if (animationState.springResetPending) {
+			animationState.springResetPending = false;
+			resetSpringBones();
+		}
 		if (optionStates.springBones) {
 			let remainingTime = deltaTime;
 			while (remainingTime > 0.0001) {
