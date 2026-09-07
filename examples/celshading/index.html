@@ -500,6 +500,31 @@
 	const HUMANOID_UPPER_CHEST = "upperChest";
 	const HUMANOID_LEFT_EYE = "leftEye";
 	const HUMANOID_RIGHT_EYE = "rightEye";
+	// 신체 애니메이션. (Mixamo 클립 — 이름은 Remy T 포즈 표(mixamo_rest.json)와 같은 뼈 이름)
+	const BODY_ANIMATION_LABELS = ["PROCEDURAL", "IDLE", "WALK", "RUN"];
+	const BODY_ANIMATION_CLIPS = [null, "Idle", "Walk", "Run"];
+	const MIXAMO_SKELETON_FILE = "anims/idle.fbx";
+	const MIXAMO_REST_FILE = "anims/mixamo_rest.json";
+	const MIXAMO_CLIP_FILES = [["Walk", "anims/walk.fbx"], ["Run", "anims/run.fbx"]];
+	// Mixamo 뼈 → VRM 휴머노이드 뼈. (부모가 먼저 오도록 나열)
+	const MIXAMO_BONE_MAP = [
+		["Hips", "hips"], ["Spine", "spine"], ["Spine1", "chest"], ["Spine2", "upperChest"], ["Neck", "neck"], ["Head", "head"],
+		["LeftShoulder", "leftShoulder"], ["LeftArm", "leftUpperArm"], ["LeftForeArm", "leftLowerArm"], ["LeftHand", "leftHand"],
+		["LeftHandThumb1", "leftThumbMetacarpal"], ["LeftHandThumb2", "leftThumbProximal"], ["LeftHandThumb3", "leftThumbDistal"],
+		["LeftHandIndex1", "leftIndexProximal"], ["LeftHandIndex2", "leftIndexIntermediate"], ["LeftHandIndex3", "leftIndexDistal"],
+		["LeftHandMiddle1", "leftMiddleProximal"], ["LeftHandMiddle2", "leftMiddleIntermediate"], ["LeftHandMiddle3", "leftMiddleDistal"],
+		["LeftHandRing1", "leftRingProximal"], ["LeftHandRing2", "leftRingIntermediate"], ["LeftHandRing3", "leftRingDistal"],
+		["LeftHandPinky1", "leftLittleProximal"], ["LeftHandPinky2", "leftLittleIntermediate"], ["LeftHandPinky3", "leftLittleDistal"],
+		["RightShoulder", "rightShoulder"], ["RightArm", "rightUpperArm"], ["RightForeArm", "rightLowerArm"], ["RightHand", "rightHand"],
+		["RightHandThumb1", "rightThumbMetacarpal"], ["RightHandThumb2", "rightThumbProximal"], ["RightHandThumb3", "rightThumbDistal"],
+		["RightHandIndex1", "rightIndexProximal"], ["RightHandIndex2", "rightIndexIntermediate"], ["RightHandIndex3", "rightIndexDistal"],
+		["RightHandMiddle1", "rightMiddleProximal"], ["RightHandMiddle2", "rightMiddleIntermediate"], ["RightHandMiddle3", "rightMiddleDistal"],
+		["RightHandRing1", "rightRingProximal"], ["RightHandRing2", "rightRingIntermediate"], ["RightHandRing3", "rightRingDistal"],
+		["RightHandPinky1", "rightLittleProximal"], ["RightHandPinky2", "rightLittleIntermediate"], ["RightHandPinky3", "rightLittleDistal"],
+		["LeftUpLeg", "leftUpperLeg"], ["LeftLeg", "leftLowerLeg"], ["LeftFoot", "leftFoot"], ["LeftToeBase", "leftToes"],
+		["RightUpLeg", "rightUpperLeg"], ["RightLeg", "rightLowerLeg"], ["RightFoot", "rightFoot"], ["RightToeBase", "rightToes"],
+	];
+
 	// A 포즈. (T 포즈 VRM 의 팔을 내리는 회전 — 라디안)
 	const ARM_LOWER_RADIAN = 1.22;
 	const ELBOW_BEND_RADIAN = 0.3;
@@ -1349,6 +1374,7 @@
 		{ group: "OUTLINE", name: "outlineBrightness", label: "OUTLINE BRIGHTNESS", minimum: 0.2, maximum: 2, step: 0.02, value: 1, format: (value) => value.toFixed(2) },
 		{ group: "SHADOW MAP", name: "shadowStrength", label: "SHADOW STRENGTH", minimum: 0, maximum: 1, step: 0.02, value: 0.85, format: (value) => value.toFixed(2) },
 		{ group: "SHADOW MAP", name: "shadowSoftness", label: "SHADOW SOFTNESS", minimum: 0, maximum: 6, step: 0.25, value: 1.5, format: (value) => value.toFixed(2) },
+		{ group: "ANIMATION", name: "bodyAnimation", label: "BODY ANIMATION", minimum: 0, maximum: 3, step: 1, value: 1, format: (value) => BODY_ANIMATION_LABELS[value] },
 		{ group: "ANIMATION", name: "turntableSpeed", label: "TURNTABLE SPEED", minimum: 0.05, maximum: 1.5, step: 0.05, value: 0.35, format: (value) => value.toFixed(2) },
 		{ group: "ANIMATION", name: "headFollow", label: "HEAD FOLLOW POINTER", minimum: 0, maximum: 1, step: 0.05, value: 0.5, format: (value) => value.toFixed(2) },
 		{ group: "ANIMATION", name: "eyeFollow", label: "EYE CONTACT", minimum: 0, maximum: 1, step: 0.05, value: 0.85, format: (value) => value.toFixed(2) },
@@ -1520,6 +1546,9 @@
 	const nodeList = model.getNodeList();
 	const drawableList = model.getDrawableList();
 	const skinList = model.getSkinList();
+	// T 포즈 월드 회전. (리타깃의 기준 — 오프셋을 넣기 전에 잡는다)
+	const restWorldRotationList = nodeList.map((node) => quaternionFromMatrixElements(node.worldMatrix.getElements()));
+	const restWorldPositionList = nodeList.map((node) => transformPoint(node.worldMatrix, makeVector(0, 0, 0)));
 
 	// 문서 이미지 → GL 텍스처. (엔진이 만들지 않는 MToon 전용 텍스처 — 얼굴 아웃라인 마스크)
 	async function createTextureFromImageIndex(imageIndex) {
@@ -1687,8 +1716,8 @@
 		setLocalRotationOffset(nodeIndex, quaternionConjugate(baseRotation).multiply(newLocal));
 	}
 
-	// A 포즈. (팔 내리기 + 팔꿈치 / 손목 이완 — 로컬 축 회전)
-	{
+	// A 포즈. (팔 내리기 + 팔꿈치 / 손목 이완 — 로컬 축 회전. 신체 애니메이션이 꺼져 있을 때의 자세)
+	function applyProceduralPose() {
 		const leftUpperArmIndex = humanoidNodeIndexByBone.get("leftUpperArm");
 		const rightUpperArmIndex = humanoidNodeIndexByBone.get("rightUpperArm");
 		const leftLowerArmIndex = humanoidNodeIndexByBone.get("leftLowerArm");
@@ -1714,16 +1743,95 @@
 				}
 			}
 		}
-	}
-	// 체중 이동. (골반 / 척추 살짝 기울여 정자세를 푼다)
-	{
+		// 체중 이동. (골반 / 척추 살짝 기울여 정자세를 푼다)
 		const hipsIndex = humanoidNodeIndexByBone.get("hips");
 		const spineIndex = humanoidNodeIndexByBone.get("spine");
-		const zAxis = makeVector(0, 0, 1);
 		setLocalRotationOffset(hipsIndex, quaternionFromAxisAngle(zAxis, 0.035));
 		setLocalRotationOffset(spineIndex, quaternionFromAxisAngle(zAxis, -0.03));
 	}
+	applyProceduralPose();
 	model.update(0);
+
+	//==============================================================================
+	// 신체 애니메이션. (Mixamo 골격을 숨겨 놓고 재생 → 뼈마다 T 포즈 대비 월드 회전 변화를 VRM 뼈에 그대로 — 부모부터 처리해 지연이 쌓이지 않는다)
+	//==============================================================================
+	reportLoading("loading animation", 0.93);
+	const mixamoRestTable = await (await System.fetch("./assets/" + MIXAMO_REST_FILE)).json();
+	const animationModel = await SkinnedModel.loadFromFbxUrl(webGL2RenderingContext, "./assets/" + MIXAMO_SKELETON_FILE, toonRenderer);
+	const idleClipName = animationModel.getAnimationNameList()[0];
+	for (const clipEntry of MIXAMO_CLIP_FILES) {
+		await animationModel.addAnimationsFromFbxUrl("./assets/" + clipEntry[1], clipEntry[0]);
+	}
+	const animationNodeList = animationModel.getNodeList();
+	const animationNodeIndexByBone = new System.Map();
+	for (let nodeIndex = 0; nodeIndex < animationNodeList.length; ++nodeIndex) {
+		const shortName = animationNodeList[nodeIndex].name.split("\u0000")[0];
+		if (shortName.startsWith("mixamorig:")) {
+			animationNodeIndexByBone.set(shortName.replace("mixamorig:", ""), nodeIndex);
+		}
+	}
+	// 대응표를 실제 노드 쌍으로. (둘 다 있는 뼈만, 부모 순서 유지)
+	const retargetEntryList = [];
+	for (const pair of MIXAMO_BONE_MAP) {
+		const sourceIndex = animationNodeIndexByBone.get(pair[0]);
+		const targetIndex = humanoidNodeIndexByBone.get(pair[1]);
+		const restEntry = mixamoRestTable[pair[0]];
+		if (sourceIndex === undefined || targetIndex === undefined || !restEntry) {
+			continue;
+		}
+		const restRotation = Quaternion.create(restEntry.rotation[0], restEntry.rotation[1], restEntry.rotation[2], restEntry.rotation[3]);
+		retargetEntryList.push({ sourceIndex: sourceIndex, targetIndex: targetIndex, sourceRestInverse: quaternionConjugate(restRotation) });
+	}
+	const retargetTargetSet = new System.Set(retargetEntryList.map((entry) => entry.targetIndex));
+	const mixamoHipsRestHeight = mixamoRestTable.Hips ? mixamoRestTable.Hips.position[1] : 100;
+	const vrmHipsRestHeight = restWorldPositionList[humanoidNodeIndexByBone.get("hips")].y;
+	const animationState = { activeClipIndex: -1, hipsOffsetY: 0 };
+	let animationHipsHeightScale = vrmHipsRestHeight / System.Math.max(mixamoHipsRestHeight, 1);
+
+	function applyBodyAnimation(deltaTime, headFollowRotation) {
+		const clipIndex = sliderStates.bodyAnimation;
+		if (clipIndex !== animationState.activeClipIndex) {
+			animationState.activeClipIndex = clipIndex;
+			if (clipIndex === 0) {
+				rotationOffsetByNodeIndex.forEach((offsetQuaternion, nodeIndex) => {
+					if (retargetTargetSet.has(nodeIndex)) {
+						offsetQuaternion.set(0, 0, 0, 1);
+					}
+				});
+				applyProceduralPose();
+				animationState.hipsOffsetY = 0;
+			}
+			else {
+				animationModel.playAnimation(clipIndex === 1 ? idleClipName : BODY_ANIMATION_CLIPS[clipIndex], 0.25);
+			}
+		}
+		if (clipIndex === 0) {
+			return false;
+		}
+		animationModel.update(deltaTime);
+		const desiredWorldByTarget = new System.Map();
+		for (const entry of retargetEntryList) {
+			const sourceWorld = quaternionFromMatrixElements(animationNodeList[entry.sourceIndex].worldMatrix.getElements());
+			let worldDelta = sourceWorld.multiply(entry.sourceRestInverse);
+			if (entry.targetIndex === headNodeIndex) {
+				worldDelta = headFollowRotation.multiply(worldDelta);
+			}
+			const desiredWorld = worldDelta.multiply(restWorldRotationList[entry.targetIndex]);
+			desiredWorldByTarget.set(entry.targetIndex, desiredWorld);
+			const parentIndex = parentIndexList[entry.targetIndex];
+			const parentWorld = parentIndex < 0 ? Quaternion.identity() : (desiredWorldByTarget.has(parentIndex) ? desiredWorldByTarget.get(parentIndex) : getNodeWorldRotation(parentIndex));
+			const baseRotation = nodeList[entry.targetIndex].baseRotation;
+			const newLocal = quaternionConjugate(parentWorld).multiply(desiredWorld);
+			setLocalRotationOffset(entry.targetIndex, quaternionConjugate(baseRotation).multiply(newLocal));
+		}
+		// 골반 높이. (클립의 위아래 움직임만 — 제자리 재생)
+		const hipsSourceIndex = animationNodeIndexByBone.get("Hips");
+		if (hipsSourceIndex !== undefined && mixamoRestTable.Hips) {
+			const hipsElements = animationNodeList[hipsSourceIndex].worldMatrix.getElements();
+			animationState.hipsOffsetY = (hipsElements[13] - mixamoRestTable.Hips.position[1]) * animationHipsHeightScale;
+		}
+		return true;
+	}
 
 	//==============================================================================
 	// 노드 제약. (VRMC_node_constraint — roll: 원본의 축 성분 회전을 복사, aim: 축이 원본 노드를 향하도록 — 직전 프레임 월드 기준)
@@ -2001,8 +2109,9 @@
 		currentPitch: 0,
 		leftEyeRotation: Quaternion.identity(),
 		rightEyeRotation: Quaternion.identity(),
+		followRotation: Quaternion.identity(),
 	};
-	// 머리 뼈의 기본 월드 회전. (VRoid 뼈는 로컬 축이 뒤바뀌어 있어 정면 방향은 '기본 자세 대비 얼마나 돌았나' 로 구한다)
+	// 머리 뼈의 기본 월드 회전. (VRoid 뼈는 로컬 축이 뒤바뀌어 있어 정면 방향은 기본 자세 대비 얼마나 돌았나로 구한다)
 	const headRestRotation = getNodeWorldRotation(headNodeIndex);
 	const pointerState = {
 		normalizedX: 0,
@@ -2020,7 +2129,7 @@
 		return { rotation: headRotation, position: headPosition, forward: vectorNormalize(rotateVector(headTurn, makeVector(0, 0, 1))) };
 	}
 
-	function updateHeadAndEyes(elapsedTime, deltaTime, cameraPosition) {
+	function updateHeadAndEyes(elapsedTime, deltaTime, cameraPosition, isBodyAnimated) {
 		const headFrame = getHeadFrame();
 		// 카메라 방향을 모델 공간으로. (턴테이블 역회전)
 		const cameraModelSpace = rotateVector(quaternionConjugate(modelRotation), cameraPosition);
@@ -2039,8 +2148,11 @@
 		headState.currentPitch += (targetPitch - headState.currentPitch) * approach;
 		const headRotation = quaternionFromAxisAngle(makeVector(0, 1, 0), headState.currentYaw * 0.65).multiply(quaternionFromAxisAngle(makeVector(1, 0, 0), -headState.currentPitch * 0.65));
 		const neckRotation = quaternionFromAxisAngle(makeVector(0, 1, 0), headState.currentYaw * 0.35).multiply(quaternionFromAxisAngle(makeVector(1, 0, 0), -headState.currentPitch * 0.35));
-		setModelSpaceRotationOffset(headNodeIndex, headRotation);
-		setModelSpaceRotationOffset(neckNodeIndex, neckRotation);
+		if (!isBodyAnimated) {
+			setModelSpaceRotationOffset(headNodeIndex, headRotation);
+			setModelSpaceRotationOffset(neckNodeIndex, neckRotation);
+		}
+		headState.followRotation = headRotation.multiply(neckRotation);
 
 		// 시선. (눈마다 자기 위치에서 카메라를 향하는 회전 — 머리 정면 → 목표 방향의 최단 회전을 모델 공간에서 만들고 10° 안으로 묶는다. 두 눈이 각자 모이므로 가까운 카메라도 자연스럽다)
 		const eyeApproach = System.Math.min(1, deltaTime * 9);
@@ -2062,11 +2174,13 @@
 			setModelSpaceRotationOffset(eyeNodeIndex, nextGaze);
 		}
 
-		// 호흡 + 아이들 흔들림. (가슴 앞뒤, 상체 좌우로 아주 느리게)
-		const breath = System.Math.sin(elapsedTime * 1.9) * 0.012 * sliderStates.breathing;
-		const sway = System.Math.sin(elapsedTime * 0.45) * 0.014 * sliderStates.breathing;
-		setModelSpaceRotationOffset(upperChestNodeIndex, quaternionFromAxisAngle(makeVector(1, 0, 0), -breath).multiply(quaternionFromAxisAngle(makeVector(0, 0, 1), sway)));
-		setModelSpaceRotationOffset(chestNodeIndex, quaternionFromAxisAngle(makeVector(1, 0, 0), -breath * 0.5));
+		// 호흡 + 아이들 흔들림. (가슴 앞뒤, 상체 좌우로 아주 느리게 — 절차 포즈일 때만)
+		if (!isBodyAnimated) {
+			const breath = System.Math.sin(elapsedTime * 1.9) * 0.012 * sliderStates.breathing;
+			const sway = System.Math.sin(elapsedTime * 0.45) * 0.014 * sliderStates.breathing;
+			setModelSpaceRotationOffset(upperChestNodeIndex, quaternionFromAxisAngle(makeVector(1, 0, 0), -breath).multiply(quaternionFromAxisAngle(makeVector(0, 0, 1), sway)));
+			setModelSpaceRotationOffset(chestNodeIndex, quaternionFromAxisAngle(makeVector(1, 0, 0), -breath * 0.5));
+		}
 	}
 
 	//==============================================================================
@@ -2641,7 +2755,8 @@
 		if (optionStates.turntable) {
 			turntableAngle += deltaTime * sliderStates.turntableSpeed;
 		}
-		modelMatrix = Matrix4.createRotationY(turntableAngle);
+		modelMatrix = Matrix4.createTranslation(0, animationState.hipsOffsetY, 0);
+		modelMatrix.multiply(Matrix4.createRotationY(turntableAngle));
 		modelRotation = quaternionFromAxisAngle(makeVector(0, 1, 0), turntableAngle);
 		const modelElements = modelMatrix.getElements();
 
@@ -2683,7 +2798,9 @@
 
 		// 표정 / 머리 / 시선 / 제약 / 스프링 → 스키닝 갱신. (직전 프레임 월드 행렬 기준으로 오프셋을 정하고 한 번 갱신한다)
 		updateExpressions(elapsedTime, deltaTime);
-		updateHeadAndEyes(elapsedTime, deltaTime, makeVector(cameraX, cameraY, cameraZ));
+		const isBodyAnimated = sliderStates.bodyAnimation > 0;
+		updateHeadAndEyes(elapsedTime, deltaTime, makeVector(cameraX, cameraY, cameraZ), isBodyAnimated);
+		applyBodyAnimation(deltaTime, headState.followRotation);
 		updateConstraints();
 		if (optionStates.springBones) {
 			let remainingTime = deltaTime;
