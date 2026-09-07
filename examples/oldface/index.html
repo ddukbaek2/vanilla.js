@@ -710,6 +710,8 @@
 	const bloomEffect = new BloomEffect(webGL2RenderingContext);
 	let shadowMap = new ShadowMap(webGL2RenderingContext, SHADOWMAP_RESOLUTION);
 	let shadowMapResolution = SHADOWMAP_RESOLUTION;
+	// 렌더 타겟 한 변의 상한. (RENDER BASE 를 화면보다 크게 잡는 슈퍼샘플링이 GPU 한계를 넘지 않도록)
+	const maxRenderTargetSize = System.Math.min(webGL2RenderingContext.getParameter(webGL2RenderingContext.MAX_TEXTURE_SIZE), webGL2RenderingContext.getParameter(webGL2RenderingContext.MAX_RENDERBUFFER_SIZE));
 	const sceneRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, true, { colorAttachmentCount: 4, useFloatColor: true, useDepthTexture: true });
 	const hdrRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, false, { useFloatColor: true });
 	const ldrRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, false);
@@ -1559,13 +1561,15 @@
 		const devicePixelRatio = System.Math.min(System.window.devicePixelRatio || 1, 2);
 		const displayWidth = System.Math.floor(canvas.clientWidth * devicePixelRatio);
 		const displayHeight = System.Math.floor(canvas.clientHeight * devicePixelRatio);
-		// 내부 렌더 해상도. (기준 픽셀 수를 넘는 캔버스는 기준 크기로 줄인 뒤 RESOLUTION SCALE 을 곱한다 — 4K 모니터에서 8 메가픽셀을 매 프레임 셰이딩하지 않도록)
+		// 내부 렌더 해상도. (RENDER BASE 의 픽셀 수를 캔버스 종횡비로 잡는다 — 화면이 더 크면 줄이고 작으면 슈퍼샘플링. 거기에 RESOLUTION SCALE 을 곱하고 GPU 상한으로 자른다)
 		const renderBaseHeight = RENDER_BASE_OPTIONS[sliderStates.renderBase];
 		const renderPixelBudget = renderBaseHeight * (16 / 9) * renderBaseHeight;
-		const pixelBudgetScale = System.Math.min(1, System.Math.sqrt(renderPixelBudget / System.Math.max(displayWidth * displayHeight, 1)));
+		const pixelBudgetScale = System.Math.sqrt(renderPixelBudget / System.Math.max(displayWidth * displayHeight, 1));
 		const effectiveRenderScale = sliderStates.renderScale * pixelBudgetScale;
-		const renderWidth = System.Math.max(2, System.Math.floor(displayWidth * effectiveRenderScale));
-		const renderHeight = System.Math.max(2, System.Math.floor(displayHeight * effectiveRenderScale));
+		const longestDisplaySide = System.Math.max(displayWidth, displayHeight, 1);
+		const sizeLimitScale = System.Math.min(1, maxRenderTargetSize / (longestDisplaySide * effectiveRenderScale));
+		const renderWidth = System.Math.max(2, System.Math.floor(displayWidth * effectiveRenderScale * sizeLimitScale));
+		const renderHeight = System.Math.max(2, System.Math.floor(displayHeight * effectiveRenderScale * sizeLimitScale));
 		if (canvas.width !== displayWidth || canvas.height !== displayHeight || sceneRenderTarget.getWidth() !== renderWidth || sceneRenderTarget.getHeight() !== renderHeight) {
 			canvas.width = displayWidth;
 			canvas.height = displayHeight;

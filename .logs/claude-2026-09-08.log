@@ -21,3 +21,10 @@
 ## 비주얼 편집기 아이콘 저장소 동기화
 [01:25 요청 → 01:27 응답]
 - 요청: "맞춰" — 저장소 tools/visualeditor/favicon.svg(JS 로고)를 NAS 의 계열 아이콘("Visual") 으로 교체.
+
+## Old Face 모바일에서 RENDER BASE 가 효과 없음
+[01:30 요청 → 01:45 응답]
+- 요청: "올드페이스 샘플 모바일에서 렌더 베이스가 영향을 안 준다".
+- 원인: resizeCanvas 의 pixelBudgetScale 이 min(1, sqrt(기준 픽셀 수 / 화면 픽셀 수)) — 상한(캡) 으로만 작동해 화면 픽셀 수가 기준보다 작은 폰(예: 978x1404 ≈ 1.4 MP)에서는 1080P / 1440P / 4K 가 전부 1 배로 같았다.
+- 수정: 클램프를 없애 기준 픽셀 수를 캔버스 종횡비로 그대로 잡는다(화면이 크면 축소, 작으면 슈퍼샘플링). 렌더 타겟 한 변은 MAX_TEXTURE_SIZE / MAX_RENDERBUFFER_SIZE 의 작은 값으로 자른다(maxRenderTargetSize). RESOLUTION SCALE 은 그대로 곱한다.
+- 검증: 400x800 · DSF 2 헤드리스(같은 폴더의 임시 프로브 복사본, 검증 후 삭제) — 720P 801x1150, 1080P 1201x1725, 1440P 1602x2300, 4K 2403x3450 (각각 0.92 / 2.07 / 3.68 / 8.29 MP). NAS portfolio/oldface 배포. 크롬 / 서버 잔여 0.
