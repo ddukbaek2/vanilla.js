@@ -389,7 +389,7 @@
 	<div id="expressionPanel"></div>
 	<div id="contextMenu"></div>
 	<div id="footerNote">
-		DRAG TO ORBIT, WHEEL OR PINCH TO ZOOM<br>
+		DRAG TO ORBIT, WHEEL OR PINCH TO ZOOM, RIGHT-DRAG OR TWO FINGERS TO PAN, DOUBLE-CLICK TO FOCUS<br>
 		CHARACTER: <a href="https://github.com/pixiv/three-vrm" target="_blank" rel="noopener">VRM1 CONSTRAINT TWIST SAMPLE &copy; 2022 PIXIV INC. (VRM PUBLIC LICENSE 1.0)</a>
 	</div>
 	<a id="homeLink" href="https://ddukbaek2.com" target="_blank" rel="noopener">DDUKBAEK2.COM</a>
@@ -506,6 +506,8 @@
 	const WRIST_RELAX_RADIAN = 0.16;
 	// 구면 노멀 중심. (눈 중심 기준 오프셋 — 얼굴은 눈 뒤, 머리카락은 두개골 중심)
 	const FACE_SPHERE_OFFSET = [0, -0.025, -0.05];
+	// 스프링 본 적분 간격. (프레임 레이트와 무관하게 이 간격으로 나눠 돈다)
+	const SPRING_STEP_SECONDS = 1 / 60;
 	const HAIR_SPHERE_OFFSET = [0, 0.02, -0.03];
 
 	//==============================================================================
@@ -628,7 +630,9 @@
 		if (isSeeThrough == 1) {
 			float hairMask = texture(hairMaskTexture, screenCoordinate).r;
 			float hairDepth = linearizeDepth(texture(hairDepthTexture, screenCoordinate).r);
-			if (hairMask < 0.5 || hairDepth > fragmentDepth - 0.0005) {
+			vec3 partNormal = normalize(worldNormal);
+			vec3 partViewDirection = normalize(cameraPosition - worldPosition);
+			if (hairMask < 0.5 || hairDepth > fragmentDepth - 0.0005 || dot(partNormal, partViewDirection) < 0.2) {
 				discard;
 			}
 		}
@@ -858,7 +862,15 @@
 		backgroundAtPixel += backgroundColor * 0.6 * smoothstep(0.2, -0.6, screenCoordinate.y - 0.5);
 		float shadowFactor = 1.0;
 		if (shadowStrength > 0.001) {
-			shadowFactor = mix(1.0, sampleShadowFactor(lightSpacePosition, shadowMapTexture, shadowTexelSize, shadowSoftness, 0.0008), shadowStrength);
+			vec3 projected = lightSpacePosition.xyz / lightSpacePosition.w * 0.5 + 0.5;
+			float shadowSum = 0.0;
+			for (int offsetY = 0; offsetY <= 1; ++offsetY) {
+				for (int offsetX = 0; offsetX <= 1; ++offsetX) {
+					vec2 tapOffset = (vec2(float(offsetX), float(offsetY)) - 0.5) * shadowTexelSize * shadowSoftness * 1.5;
+					shadowSum += texture(shadowMapTexture, vec3(projected.xy + tapOffset, projected.z - 0.0008));
+				}
+			}
+			shadowFactor = mix(1.0, shadowSum * 0.25, shadowStrength);
 			shadowFactor = smoothstep(0.2, 0.8, shadowFactor);
 		}
 		vec3 color = floorColor * mix(0.42, 1.0, shadowFactor);
@@ -1295,7 +1307,7 @@
 	// 슬라이더 옵션. (렌더 / 조명 / 램프 / 얼굴 / 머리카락 / 스펙큘러 / 림 / 아웃라인 / 그림자 / 애니메이션 — 값은 매 프레임 적용)
 	//==============================================================================
 	const sliderDefinitions = [
-		{ group: "RENDER", name: "frameRate", label: "FRAME RATE", minimum: 0, maximum: 1, step: 1, value: 1, format: (value) => FRAME_RATE_OPTIONS[value] + " FPS" },
+		{ group: "RENDER", name: "frameRate", label: "FRAME RATE", minimum: 0, maximum: 1, step: 1, value: 0, format: (value) => FRAME_RATE_OPTIONS[value] + " FPS" },
 		{ group: "RENDER", name: "renderBase", label: "RENDER BASE", minimum: 0, maximum: 3, step: 1, value: 1, format: (value) => RENDER_BASE_LABELS[value] },
 		{ group: "RENDER", name: "renderScale", label: "RESOLUTION SCALE", minimum: 0.5, maximum: 2, step: 0.05, value: 1, format: (value) => System.Math.round(value * 100) + "%" },
 		{ group: "RENDER", name: "antialias", label: "ANTI-ALIASING", minimum: 0, maximum: 2, step: 1, value: 1, format: (value) => ANTIALIAS_LABELS[value] },
@@ -1421,6 +1433,10 @@
 	System.document.addEventListener("contextmenu", (event) => {
 		event.preventDefault();
 		if (event.target.closest("#optionPanel") || event.target.closest("#expressionPanel")) {
+			return;
+		}
+		if (cameraState.hasPanned) {
+			cameraState.hasPanned = false;
 			return;
 		}
 		const menuWidth = contextMenuElement.offsetWidth || 180;
@@ -1983,9 +1999,11 @@
 	const headState = {
 		currentYaw: 0,
 		currentPitch: 0,
-		eyeYaw: 0,
-		eyePitch: 0,
+		leftEyeRotation: Quaternion.identity(),
+		rightEyeRotation: Quaternion.identity(),
 	};
+	// 머리 뼈의 기본 월드 회전. (VRoid 뼈는 로컬 축이 뒤바뀌어 있어 정면 방향은 '기본 자세 대비 얼마나 돌았나' 로 구한다)
+	const headRestRotation = getNodeWorldRotation(headNodeIndex);
 	const pointerState = {
 		normalizedX: 0,
 		normalizedY: 0,
@@ -1998,7 +2016,8 @@
 	function getHeadFrame() {
 		const headRotation = getNodeWorldRotation(headNodeIndex);
 		const headPosition = transformPoint(nodeList[headNodeIndex].worldMatrix, makeVector(lookAtOffset[0], lookAtOffset[1], lookAtOffset[2]));
-		return { rotation: headRotation, position: headPosition, forward: rotateVector(headRotation, makeVector(0, 0, 1)) };
+		const headTurn = headRotation.multiply(quaternionConjugate(headRestRotation));
+		return { rotation: headRotation, position: headPosition, forward: vectorNormalize(rotateVector(headTurn, makeVector(0, 0, 1))) };
 	}
 
 	function updateHeadAndEyes(elapsedTime, deltaTime, cameraPosition) {
@@ -2023,19 +2042,24 @@
 		setModelSpaceRotationOffset(headNodeIndex, headRotation);
 		setModelSpaceRotationOffset(neckNodeIndex, neckRotation);
 
-		// 시선. (머리가 돌아간 만큼 뺀 나머지를 눈이 맡는다 — 한계 ±12°)
-		const eyeTargetYaw = clampValue((cameraYaw - headState.currentYaw) * sliderStates.eyeFollow, -0.21, 0.21);
-		const eyeTargetPitch = clampValue((cameraPitch - headState.currentPitch) * sliderStates.eyeFollow, -0.16, 0.16);
+		// 시선. (눈마다 자기 위치에서 카메라를 향하는 회전 — 머리 정면 → 목표 방향의 최단 회전을 모델 공간에서 만들고 10° 안으로 묶는다. 두 눈이 각자 모이므로 가까운 카메라도 자연스럽다)
 		const eyeApproach = System.Math.min(1, deltaTime * 9);
-		headState.eyeYaw += (eyeTargetYaw - headState.eyeYaw) * eyeApproach;
-		headState.eyePitch += (eyeTargetPitch - headState.eyePitch) * eyeApproach;
-		const eyeLocalRotation = quaternionFromAxisAngle(makeVector(0, 1, 0), headState.eyeYaw).multiply(quaternionFromAxisAngle(makeVector(1, 0, 0), -headState.eyePitch));
-		const eyeModelRotation = headFrame.rotation.multiply(eyeLocalRotation).multiply(quaternionConjugate(headFrame.rotation));
-		if (leftEyeNodeIndex !== undefined) {
-			setModelSpaceRotationOffset(leftEyeNodeIndex, eyeModelRotation);
-		}
-		if (rightEyeNodeIndex !== undefined) {
-			setModelSpaceRotationOffset(rightEyeNodeIndex, eyeModelRotation);
+		const eyeMaximumRadian = 0.17;
+		const eyeEntries = [[leftEyeNodeIndex, "leftEyeRotation"], [rightEyeNodeIndex, "rightEyeRotation"]];
+		for (const eyeEntry of eyeEntries) {
+			const eyeNodeIndex = eyeEntry[0];
+			if (eyeNodeIndex === undefined) {
+				continue;
+			}
+			const eyePosition = transformPoint(nodeList[eyeNodeIndex].worldMatrix, makeVector(0, 0, 0));
+			const toCameraFromEye = vectorNormalize(vectorSubtract(cameraModelSpace, eyePosition));
+			const fullGaze = quaternionFromTo(headFrame.forward, toCameraFromEye);
+			const gazeRadian = 2 * System.Math.acos(clampValue(System.Math.abs(fullGaze.w), -1, 1));
+			const gazeScale = System.Math.min(1, eyeMaximumRadian / System.Math.max(gazeRadian, 0.000001)) * sliderStates.eyeFollow;
+			const targetGaze = Quaternion.slerp(Quaternion.identity(), fullGaze, gazeScale);
+			const nextGaze = Quaternion.slerp(headState[eyeEntry[1]], targetGaze, eyeApproach);
+			headState[eyeEntry[1]] = nextGaze;
+			setModelSpaceRotationOffset(eyeNodeIndex, nextGaze);
 		}
 
 		// 호흡 + 아이들 흔들림. (가슴 앞뒤, 상체 좌우로 아주 느리게)
@@ -2057,11 +2081,32 @@
 		targetDistance: BODY_FOCUS_DISTANCE,
 		focusHeight: BODY_FOCUS_HEIGHT,
 		targetFocusHeight: BODY_FOCUS_HEIGHT,
+		isManualFocus: false,
 		isDragging: false,
+		isPanning: false,
+		hasPanned: false,
 		dragPointerId: -1,
 		lastPointerX: 0,
 		lastPointerY: 0,
 	};
+	const FOCUS_HEIGHT_MINIMUM = 0.15;
+	const FOCUS_HEIGHT_MAXIMUM = 1.75;
+	// 줌 거리에 맞는 초점 높이. (멀면 몸 가운데, 가까우면 얼굴 — 직접 팬하기 전까지 줌이 초점을 끌고 간다)
+	function getAutomaticFocusHeight(distance) {
+		const zoomRatio = clampValue((distance - FACE_FOCUS_DISTANCE) / (BODY_FOCUS_DISTANCE - FACE_FOCUS_DISTANCE), 0, 1);
+		const eased = zoomRatio * zoomRatio * (3 - 2 * zoomRatio);
+		return headPositionWorld.y + (BODY_FOCUS_HEIGHT - headPositionWorld.y) * eased;
+	}
+	function setTargetDistance(distance) {
+		cameraState.targetDistance = clampValue(distance, CAMERA_MINIMUM_DISTANCE, CAMERA_MAXIMUM_DISTANCE);
+		if (!cameraState.isManualFocus) {
+			cameraState.targetFocusHeight = getAutomaticFocusHeight(cameraState.targetDistance);
+		}
+	}
+	function panFocusHeight(deltaPixels) {
+		cameraState.isManualFocus = true;
+		cameraState.targetFocusHeight = clampValue(cameraState.targetFocusHeight + deltaPixels * 0.0022 * cameraState.targetDistance, FOCUS_HEIGHT_MINIMUM, FOCUS_HEIGHT_MAXIMUM);
+	}
 	const DEFAULT_CAMERA_YAW = cameraState.yaw;
 	const DEFAULT_CAMERA_PITCH = cameraState.pitch;
 	function resetView() {
@@ -2070,10 +2115,12 @@
 		focusBody();
 	}
 	function focusFace() {
+		cameraState.isManualFocus = false;
 		cameraState.targetDistance = FACE_FOCUS_DISTANCE;
 		cameraState.targetFocusHeight = headPositionWorld.y;
 	}
 	function focusBody() {
+		cameraState.isManualFocus = false;
 		cameraState.targetDistance = BODY_FOCUS_DISTANCE;
 		cameraState.targetFocusHeight = BODY_FOCUS_HEIGHT;
 	}
@@ -2081,6 +2128,7 @@
 	const pinchState = {
 		isPinching: false,
 		lastDistance: 0,
+		lastCenterY: 0,
 	};
 	function getPinchDistance() {
 		const pointerList = System.Array.from(activePointerMap.values());
@@ -2088,17 +2136,26 @@
 		const deltaY = pointerList[0].y - pointerList[1].y;
 		return System.Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 	}
+	function getPinchCenterY() {
+		const pointerList = System.Array.from(activePointerMap.values());
+		return (pointerList[0].y + pointerList[1].y) * 0.5;
+	}
 	canvas.addEventListener("pointerdown", (event) => {
 		activePointerMap.set(event.pointerId, { x: event.clientX, y: event.clientY });
 		canvas.setPointerCapture(event.pointerId);
 		if (activePointerMap.size >= 2) {
 			pinchState.isPinching = true;
 			pinchState.lastDistance = getPinchDistance();
+			pinchState.lastCenterY = getPinchCenterY();
 			cameraState.isDragging = false;
+			cameraState.isPanning = false;
 			cameraState.dragPointerId = -1;
 			canvas.classList.remove("dragging");
 			return;
 		}
+		// 우클릭(또는 Shift) 드래그 = 위아래 팬, 그 외 = 궤도 회전.
+		cameraState.isPanning = event.button === 2 || event.shiftKey;
+		cameraState.hasPanned = false;
 		cameraState.isDragging = true;
 		cameraState.dragPointerId = event.pointerId;
 		cameraState.lastPointerX = event.clientX;
@@ -2111,11 +2168,17 @@
 		}
 		if (pinchState.isPinching && activePointerMap.size >= 2) {
 			const pinchDistance = getPinchDistance();
+			const pinchCenterY = getPinchCenterY();
 			if (pinchState.lastDistance > 0) {
 				const zoomRatio = pinchState.lastDistance / System.Math.max(pinchDistance, 1);
-				cameraState.targetDistance = clampValue(cameraState.targetDistance * zoomRatio, CAMERA_MINIMUM_DISTANCE, CAMERA_MAXIMUM_DISTANCE);
+				setTargetDistance(cameraState.targetDistance * zoomRatio);
+				// 두 손가락을 같이 위아래로 움직이면 팬.
+				if (System.Math.abs(pinchCenterY - pinchState.lastCenterY) > 0.5) {
+					panFocusHeight(pinchCenterY - pinchState.lastCenterY);
+				}
 			}
 			pinchState.lastDistance = pinchDistance;
+			pinchState.lastCenterY = pinchCenterY;
 			return;
 		}
 		if (cameraState.isDragging && event.pointerId === cameraState.dragPointerId) {
@@ -2123,6 +2186,13 @@
 			const deltaY = event.clientY - cameraState.lastPointerY;
 			cameraState.lastPointerX = event.clientX;
 			cameraState.lastPointerY = event.clientY;
+			if (cameraState.isPanning) {
+				if (deltaX !== 0 || deltaY !== 0) {
+					cameraState.hasPanned = true;
+				}
+				panFocusHeight(deltaY);
+				return;
+			}
 			cameraState.targetYaw -= deltaX * 0.006;
 			cameraState.targetPitch = clampValue(cameraState.targetPitch + deltaY * 0.004, -0.5, 1.1);
 			return;
@@ -2139,6 +2209,7 @@
 		}
 		if (event.pointerId === cameraState.dragPointerId) {
 			cameraState.isDragging = false;
+			cameraState.isPanning = false;
 			cameraState.dragPointerId = -1;
 			canvas.classList.remove("dragging");
 		}
@@ -2147,7 +2218,7 @@
 	canvas.addEventListener("pointercancel", endDrag);
 	canvas.addEventListener("wheel", (event) => {
 		event.preventDefault();
-		cameraState.targetDistance = clampValue(cameraState.targetDistance * (1 + event.deltaY * 0.0012), CAMERA_MINIMUM_DISTANCE, CAMERA_MAXIMUM_DISTANCE);
+		setTargetDistance(cameraState.targetDistance * (1 + event.deltaY * 0.0012));
 	}, { passive: false });
 	canvas.addEventListener("dblclick", () => {
 		if (cameraState.targetDistance > (FACE_FOCUS_DISTANCE + BODY_FOCUS_DISTANCE) * 0.5) {
@@ -2545,18 +2616,18 @@
 	//==============================================================================
 	const startTimestamp = System.performance.now();
 	let previousTimestamp = startTimestamp;
-	const frameLimiter = { nextFrameDue: startTimestamp };
+	const frameLimiter = { lastRenderTime: -1e9 };
 	let turntableAngle = 0;
 
 	function renderFrame() {
 		const targetFrameRate = FRAME_RATE_OPTIONS[sliderStates.frameRate];
 		const frameInterval = 1000 / targetFrameRate;
 		const nowTimestamp = System.performance.now();
-		if (nowTimestamp < frameLimiter.nextFrameDue - 6) {
+		if (nowTimestamp - frameLimiter.lastRenderTime < frameInterval - 4) {
 			System.window.requestAnimationFrame(renderFrame);
 			return;
 		}
-		frameLimiter.nextFrameDue = nowTimestamp - frameLimiter.nextFrameDue > frameInterval ? nowTimestamp + frameInterval : frameLimiter.nextFrameDue + frameInterval;
+		frameLimiter.lastRenderTime = nowTimestamp;
 		const cpuFrameStart = nowTimestamp;
 		resizeCanvas();
 		const elapsedTime = (nowTimestamp - startTimestamp) / 1000;
@@ -2615,7 +2686,12 @@
 		updateHeadAndEyes(elapsedTime, deltaTime, makeVector(cameraX, cameraY, cameraZ));
 		updateConstraints();
 		if (optionStates.springBones) {
-			updateSpringBones(deltaTime);
+			let remainingTime = deltaTime;
+			while (remainingTime > 0.0001) {
+				const stepTime = System.Math.min(SPRING_STEP_SECONDS, remainingTime);
+				updateSpringBones(stepTime);
+				remainingTime -= stepTime;
+			}
 		}
 		else {
 			resetSpringBones();
