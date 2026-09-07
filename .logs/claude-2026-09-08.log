@@ -17,3 +17,7 @@
 - 분석: 편집기 아이콘(uieditor / particleeditor / visualeditor-NAS)은 512 viewBox, 같은 바닐라 꽃 PNG 바탕 + rx 118 클립 + 아래 띠(#2a2016, 0.72) + 라벨 텍스트(Segoe UI 700, #f2e3c4: "UI" 96 / "Particle" 84 / "Visual" 88). 어제 커밋 e769932 는 particleeditor 아이콘을 통째로 복사해 라벨이 "Particle" 인 채였다(원래 다른 세션이 만든 64 viewBox 다이아몬드 키 아이콘은 계열이 달랐던 것).
 - 수정: 같은 바탕 + 띠에 "Timeline"(80) 라벨을 얹은 아이콘으로 교체. 4종을 나란히 렌더링해 확인, NAS portfolio/timelineeditor/favicon.svg 배포.
 - 발견: 저장소 tools/visualeditor/favicon.svg 는 노란 JS 로고이고 NAS 의 것은 계열 아이콘("Visual") — 저장소 쪽이 오래된 상태. 요청 범위 밖이라 손대지 않고 보고만.
+
+## 비주얼 편집기 아이콘 저장소 동기화
+[01:25 요청 → 01:27 응답]
+- 요청: "맞춰" — 저장소 tools/visualeditor/favicon.svg(JS 로고)를 NAS 의 계열 아이콘("Visual") 으로 교체.
