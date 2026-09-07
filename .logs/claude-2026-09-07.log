@@ -39,3 +39,8 @@
 - 요청: "타임라인에서 파티클이 벗어난 느낌", "타임라인 샘플 위쪽 설명 빼라", "각 샘플에 코드가 왜 들어가냐 빼라(스프라이트도)", "스스로 설명하지 마라", "Sprite FX 에 스프라이트 효과가 없다"(목록 컬링 버그로 SPRITE SHADER 행이 숨어 있던 것), "Effects → Particle Effects, Timeline → Timeline Showcase, Sprite FX → Sprite Effects".
 - ParticleSystem.setManualTick / simulate 추가. Timeline 이 대상 파티클을 모아 재생 중 simulateParticles(dt × speed), seek / 루프 감기 때 resimulateParticles(0초부터 이벤트를 조용히 다시 밟음), stop 에서 비움. 편집기 스크럽 / 정지 / 재생이 모두 파티클에 반영된다.
 - 두 샘플에서 상단 설명(hint), 무대 위 코드 패널(제목 / 코드 / COPY), usage 데이터 제거. Sprite Effects 목록 차례를 스프라이트 셰이더 → 화면 효과 → 연출로. 페이지 제목 / 헤더 / 루트 목록 이름 변경(디렉토리는 유지).
+
+## 샘플 디렉토리 이름을 uishowcase 방식으로 통일
+[21:45 요청 → 21:55 응답]
+- 요청: "uishowcase 하고 이름 통일하라고, 대소문자 이런 거 안 가리냐".
+- 디렉토리를 표시 이름 그대로 소문자 붙여쓰기로: examples/effects → particleeffects, timeline → timelineshowcase, spritefx → spriteeffects (git mv). NAS 도 같은 이름으로 옮기고 루트 index.html 링크 · README · created.json(생성일 승계) 갱신. 옛 주소 /portfolio/effects 는 404.

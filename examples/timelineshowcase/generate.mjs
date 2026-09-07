@@ -2,7 +2,7 @@
 // 타임라인 샘플 애셋 생성기. — 8가지 연출 시퀀스를 타임라인 편집기 문서 형식(.timeline.json)으로 만든다.
 // - 형식은 Timeline 런타임 / 타임라인 편집기와 1:1 이다. (무대 노드 + 트랙 + 마커)
 // - 이미지는 assets/ 의 파일 이름으로 가리키고, index.html 이 미리 읽어 이름으로 넘긴다.
-// - 실행: node examples/timeline/generate.mjs
+// - 실행: node examples/timelineshowcase/generate.mjs
 //==============================================================================
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
