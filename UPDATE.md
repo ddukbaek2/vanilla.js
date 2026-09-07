@@ -12,7 +12,7 @@
 - Mask 에 둥근 모서리(setRoundSize) — Graphic.beginClipRect(rect, roundSize) 가 둥근 사각형을 스텐실에 써서 무대 컨텐트가 배경 모양대로 잘린다. timelineshowcase · spriteeffects · particleeffects 샘플의 무대(반지름 14)에 적용
 - Timeline 이 파티클을 시간으로 다룸 — 대상 파티클 시스템을 수동 틱(ParticleSystem.setManualTick / simulate)으로 바꿔 재생 중에만 진행하고, 스크럽 / 되감기 / 반복 감기 때는 비운 뒤 0초부터 이벤트를 다시 밟으며 재시뮬레이션한다. 일시 정지하면 파티클도 멈춘다
 - 샘플 이름: Effects → Particle Effects, Timeline → Timeline Showcase, Sprite FX → Sprite Effects. 두 새 샘플에서 상단 설명과 무대 위 코드 패널을 뺐다(시연용). Sprite Effects 목록은 스프라이트 셰이더 → 화면 효과 → 연출 차례
-- Toon Shading: Mixamo 클립(idle / walk / run) → VRM 휴머노이드 리타깃(BODY ANIMATION), 눈마다 카메라를 향하는 시선, 줌 연동 초점 + 우클릭 / 두 손가락 팬, 스프링 본 고정 서브스텝, 프레임 제한기 개선, 기본 30fps
+- Toon Shading: Mixamo 클립(idle / walk / run) → VRM 휴머노이드 리타깃(표정 아래 애니메이션 버튼, 절차 포즈 / 호흡 제거), 스프링 본은 갱신 뒤 신선한 뼈 위치 + 체인 전파, 눈마다 카메라를 향하는 시선, 줌 연동 초점 + 우클릭 / 두 손가락 팬, 스프링 본 고정 서브스텝, 프레임 제한기 개선, 기본 30fps
 - 샘플 toonshading(examples/toonshading, 처음 이름 celshading) 신규 — VRM 1.0(pixiv Twist Sample) 캐릭터를 호요버스풍 셀 셰이딩으로: 3 톤 램프 · 구면 노멀 얼굴 / 머리카락 · 앞머리 그림자 · 천사 고리 · 계단 스펙큘러 · 화면 공간 림 · 뒤집힌 껍질 아웃라인 · 앞머리 너머 비침 · 스프링 본 · 시선 / 표정 · 바닥 그림자, Old Face 식 옵션 패널. 엔진은 MORPH_GLSL 을 내보내 커스텀 버텍스 셰이더가 모프 경로를 공유
 - Old Face: RENDER BASE 가 화면보다 작은 기준으로만 줄이던 상한 방식에서 기준 픽셀 수를 그대로 잡는 방식으로 — 폰처럼 화면 픽셀 수가 기준보다 작으면 슈퍼샘플링, 한 변은 GPU 최대 텍스처 / 렌더버퍼 크기로 제한
 - Timeline 파티클 재현성: 수집한 파티클 시스템에 시드 난수(ParticleSystem.setRandomSeed — stop(true) 마다 시드로 되돌아감)를 줘 스크럽 / 되감기마다 같은 결과. 이벤트 트랙이 없는 파티클은 타임라인 시작과 함께 자유 재생. 틱 끝이 키 시간과 정확히 같을 때 이벤트가 빠지던 구간 판정(fireEventsBetween) 수정. Timeline Showcase 는 눌린 채 같은 위치면 seek 하지 않음
