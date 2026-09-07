@@ -132,7 +132,7 @@ export { RenderTarget } from "./src/experimental/graphics/rendertarget.js";
 export { FullscreenPass } from "./src/experimental/graphics/fullscreenpass.js";
 export { BloomEffect } from "./src/experimental/graphics/bloomeffect.js";
 export { SkinnedModel } from "./src/experimental/graphics/skinnedmodel.js";
-export { SkinnedModelRenderer } from "./src/experimental/graphics/skinnedmodelrenderer.js";
+export { SkinnedModelRenderer, MORPH_GLSL } from "./src/experimental/graphics/skinnedmodelrenderer.js";
 export { HumanSkinRenderer, SKIN_SHADING_SKIN, SKIN_SHADING_EYE, SKIN_SHADING_HAIR, SKIN_SHADING_OCCLUSION, SKIN_SHADING_FLUID, SKIN_SHADING_FACIALHAIR, SKIN_TEXTURE_UNIT_DETAILHEIGHT, SKIN_TEXTURE_UNIT_MICRO, SKIN_TEXTURE_UNIT_MASKATLAS, SKIN_TEXTURE_UNIT_LAYERNORMAL, SKIN_TEXTURE_UNIT_LAYERCOLOR, SKIN_TEXTURE_UNIT_AUXILIARY } from "./src/experimental/graphics/humanskinrenderer.js";
 export { AmbientOcclusionEffect } from "./src/experimental/graphics/ambientocclusioneffect.js";
 export { SubsurfaceScatteringEffect } from "./src/experimental/graphics/subsurfacescatteringeffect.js";

@@ -28,3 +28,13 @@
 - 원인: resizeCanvas 의 pixelBudgetScale 이 min(1, sqrt(기준 픽셀 수 / 화면 픽셀 수)) — 상한(캡) 으로만 작동해 화면 픽셀 수가 기준보다 작은 폰(예: 978x1404 ≈ 1.4 MP)에서는 1080P / 1440P / 4K 가 전부 1 배로 같았다.
 - 수정: 클램프를 없애 기준 픽셀 수를 캔버스 종횡비로 그대로 잡는다(화면이 크면 축소, 작으면 슈퍼샘플링). 렌더 타겟 한 변은 MAX_TEXTURE_SIZE / MAX_RENDERBUFFER_SIZE 의 작은 값으로 자른다(maxRenderTargetSize). RESOLUTION SCALE 은 그대로 곱한다.
 - 검증: 400x800 · DSF 2 헤드리스(같은 폴더의 임시 프로브 복사본, 검증 후 삭제) — 720P 801x1150, 1080P 1201x1725, 1440P 1602x2300, 4K 2403x3450 (각각 0.92 / 2.07 / 3.68 / 8.29 MP). NAS portfolio/oldface 배포. 크롬 / 서버 잔여 0.
+
+## 새 샘플: Cel Shading (호요버스풍 애니 캐릭터)
+[02:00 요청 → 05:20 응답]
+- 요청: "셸 셰이딩 기법으로 호요버스 최고급 퀄리티 같은 애니풍 3D 서브컬쳐 캐릭터 샘플". 애셋 질문에 "재배포 허용 VRM 샘플" 선택. 중간에 "스샷상의 품질은 다 개쓰레긴데 좀 찾아봐".
+- 애셋: pixiv VRM1_Constraint_Twist_Sample.vrm (VRoid 소녀, VRM Public License 1.0, 크레딧 불요). Seed-san / Alicia 도 검토 후 제외.
+- 엔진: import.js 에 MORPH_GLSL 내보내기 추가(커스텀 버텍스 셰이더용) → 재빌드.
+- 샘플(examples/celshading): VRM 확장 직접 파싱(MToon / 휴머노이드 / 표정 / 스프링 본 / roll · aim 제약), 섀도우 맵 → 머리카락 마스크 → 씬 MRT(배경 / 바닥 그림자 · 금색 고리 / 셀 셰이딩 3 톤 / 아웃라인 / 앞머리 너머 비침) → 블룸 → 림 + ACES + 채도 · 대비 → FXAA. 얼굴 / 머리카락 구면 노멀 굽기, 천사 고리, 계단 스펙큘러, 앞머리 그림자, 시선 · 머리 추적, 깜빡임 / 표정 6종, 호흡 · 흔들림, 스프링 본(머리카락 / 옷), 턴테이블, RENDER BASE / FXAA / HUD 등 Old Face 와 같은 옵션 패널.
+- 리서치: Genshin 셰이더 분석(램프 / 라이트맵 / SDF 얼굴 / 깊이 림 / 뒤집힌 껍질 아웃라인, 그림자 소프트니스 ≈ 0.1), StarRailNPRShader(노멀 스무딩 자동화 / 투명 앞머리 / 오브젝트 그림자) → 노멀 굽기 · 마스크 기반 앞머리 그림자 · 3 톤으로 반영.
+- 함정 / 수정: 깊이 전용 셰이더로 컬러 FBO 그리기 무효(마스크 셰이더로 교체), 선형 공간 대비가 배경을 검게 뭉갬(sRGB 뒤로), 앞머리가 피부에 붙어 깊이 차 판정 실패(마스크 + 8mm 허용치), 헤드리스 가상 시간 예산이 텍스처 디코드에 소진(페이지 내부 캡처 하네스 cel_capture.sh / make_cel_probe.py + 디버그 뷰 모드).
+- 배포: NAS portfolio/celshading(index.html / favicon.svg / vanilla.js / assets/VRM), 루트 index.html 샘플 목록 "Cel Shading", created.json, README 링크. 크롬 / 서버 잔여 0.

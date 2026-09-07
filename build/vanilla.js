@@ -40685,6 +40685,7 @@ export {
   List,
   LocalStorage,
   Localization,
+  MORPH_GLSL,
   Mask,
   Material,
   math_exports as Math,
