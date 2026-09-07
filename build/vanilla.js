@@ -37189,12 +37189,26 @@ var EFFECT_BODY_TABLE2 = {
 	`,
   fade: `
 	color.rgb = mix(color.rgb, effectColor.rgb, strength * effectColor.a);
+	`,
+  regionComposite: `
+	vec4 original = texture(auxiliaryTexture, uv);
+	vec2 pixel = uv * resolution;
+	vec2 halfSize = resolution * 0.5;
+	float cornerRadius = min(parameters.x, min(halfSize.x, halfSize.y));
+	vec2 cornerOffset = abs(pixel - halfSize) - (halfSize - cornerRadius);
+	float cornerDistance = length(max(cornerOffset, 0.0)) + min(max(cornerOffset.x, cornerOffset.y), 0.0) - cornerRadius;
+	float inside = 1.0 - smoothstep(-0.75, 0.75, cornerDistance);
+	color = mix(original, color, inside);
 	`
 };
-function createColorTexture(webGL2RenderingContext, width, height) {
+function createColorTexture(webGL2RenderingContext, width, height, isOpaque = false) {
   const texture = webGL2RenderingContext.createTexture();
   webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-  webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, width, height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, null);
+  if (isOpaque) {
+    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGB8, width, height, 0, webGL2RenderingContext.RGB, webGL2RenderingContext.UNSIGNED_BYTE, null);
+  } else {
+    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, width, height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, null);
+  }
   webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR);
   webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.LINEAR);
   webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
@@ -37202,8 +37216,8 @@ function createColorTexture(webGL2RenderingContext, width, height) {
   return texture;
 }
 __name(createColorTexture, "createColorTexture");
-function createRenderTarget(webGL2RenderingContext, width, height, useStencil) {
-  const texture = createColorTexture(webGL2RenderingContext, width, height);
+function createRenderTarget(webGL2RenderingContext, width, height, useStencil, isOpaque = false) {
+  const texture = createColorTexture(webGL2RenderingContext, width, height, isOpaque);
   const framebuffer = webGL2RenderingContext.createFramebuffer();
   webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
   webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, texture, 0);
@@ -37256,6 +37270,8 @@ var ScreenEffect = class extends Object2 {
   #time;
   /** @private @type { boolean } */
   #isBound;
+  /** @private @type { object | null } */
+  #region;
   //==============================================================================
   // 생성.
   //==============================================================================
@@ -37274,6 +37290,13 @@ var ScreenEffect = class extends Object2 {
     this.#halfTargetB = null;
     this.#time = 0;
     this.#isBound = false;
+    this.#region = null;
+    this.resetAll();
+  }
+  //==============================================================================
+  // 전부 기본값으로. (끄고, 세기 1, 파라미터 / 색 기본 — 모드 전환 때 이전 설정이 남지 않게)
+  //==============================================================================
+  resetAll() {
     for (const effectType of EFFECT_ORDER) {
       const defaultParameters = DEFAULT_PARAMETER_TABLE2[effectType];
       const defaultColor = DEFAULT_COLOR_TABLE2[effectType] ? DEFAULT_COLOR_TABLE2[effectType] : [1, 1, 1, 1];
@@ -37286,6 +37309,34 @@ var ScreenEffect = class extends Object2 {
     }
   }
   //==============================================================================
+  // 적용 영역 설정. (캔버스 픽셀, 왼쪽 위 원점 — null 이면 화면 전체)
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   * @param { number } width
+   * @param { number } height
+   * @param { number } cornerRadius - 둥근 모서리 반지름(픽셀). 0 이면 사각형.
+   */
+  setRegion(x, y, width, height, cornerRadius = 0) {
+    this.#region = { x, y, width, height, cornerRadius: System75.Math.max(0, cornerRadius) };
+  }
+  //==============================================================================
+  // 적용 영역 해제. (화면 전체)
+  //==============================================================================
+  clearRegion() {
+    this.#region = null;
+  }
+  //==============================================================================
+  // 적용 영역 반환.
+  //==============================================================================
+  /**
+   * @returns { object | null }
+   */
+  getRegion() {
+    return this.#region;
+  }
+  //==============================================================================
   // 갱신. (애니메이션 효과의 시간)
   //==============================================================================
   /**
@@ -37295,33 +37346,16 @@ var ScreenEffect = class extends Object2 {
     this.#time += timeDelta;
   }
   //==============================================================================
-  // 오프스크린 출력 시작. (씬 preDraw 첫머리)
+  // 시작. (씬 preDraw 첫머리 — 씬은 화면에 그대로 그린다. 켜진 효과가 있을 때만 end 가 일한다)
   //==============================================================================
   /**
    * @param { Graphic } graphic
    */
   begin(graphic) {
-    const webGL2RenderingContext = this.#webGL2RenderingContext;
-    const width = webGL2RenderingContext.drawingBufferWidth;
-    const height = webGL2RenderingContext.drawingBufferHeight;
-    if (width <= 0 || height <= 0) {
-      return;
-    }
-    const hasActiveEffect = this.hasActiveEffect();
-    if (!hasActiveEffect) {
-      this.#isBound = false;
-      return;
-    }
-    this.ensureTargets(width, height);
-    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, this.#sceneTarget.framebuffer);
-    webGL2RenderingContext.viewport(0, 0, width, height);
-    webGL2RenderingContext.clearColor(0, 0, 0, 1);
-    webGL2RenderingContext.clearStencil(0);
-    webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.STENCIL_BUFFER_BIT);
-    this.#isBound = true;
+    this.#isBound = this.hasActiveEffect();
   }
   //==============================================================================
-  // 효과 적용 후 화면 출력. (씬 postDraw 끝)
+  // 효과 적용. (씬 postDraw 끝 — 화면의 영역을 떠 와 효과를 걸고 같은 자리에 되돌려 놓는다)
   //==============================================================================
   /**
    * @param { Graphic } graphic
@@ -37332,8 +37366,34 @@ var ScreenEffect = class extends Object2 {
     }
     this.#isBound = false;
     const webGL2RenderingContext = this.#webGL2RenderingContext;
-    const width = this.#sceneTarget.width;
-    const height = this.#sceneTarget.height;
+    const bufferWidth = webGL2RenderingContext.drawingBufferWidth;
+    const bufferHeight = webGL2RenderingContext.drawingBufferHeight;
+    if (bufferWidth <= 0 || bufferHeight <= 0) {
+      return;
+    }
+    let regionX = 0;
+    let regionY = 0;
+    let regionWidth = bufferWidth;
+    let regionHeight = bufferHeight;
+    let cornerRadius = 0;
+    if (this.#region) {
+      regionX = System75.Math.max(0, System75.Math.round(this.#region.x));
+      regionY = System75.Math.max(0, System75.Math.round(this.#region.y));
+      regionWidth = System75.Math.min(bufferWidth - regionX, System75.Math.round(this.#region.width));
+      regionHeight = System75.Math.min(bufferHeight - regionY, System75.Math.round(this.#region.height));
+      cornerRadius = this.#region.cornerRadius;
+    }
+    if (regionWidth <= 0 || regionHeight <= 0) {
+      return;
+    }
+    const width = regionWidth;
+    const height = regionHeight;
+    this.ensureTargets(width, height);
+    const glRegionY = bufferHeight - (regionY + regionHeight);
+    webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+    webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+    webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#sceneTarget.texture);
+    webGL2RenderingContext.copyTexSubImage2D(webGL2RenderingContext.TEXTURE_2D, 0, 0, 0, regionX, glRegionY, width, height);
     webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
     webGL2RenderingContext.disable(webGL2RenderingContext.STENCIL_TEST);
     const stepList = [];
@@ -37371,6 +37431,9 @@ var ScreenEffect = class extends Object2 {
     if (stepList.length === 0) {
       stepList.push({ passName: "copy", state: null, parameters: [0, 0, 0, 0], target: "pingpong" });
     }
+    if (cornerRadius > 0) {
+      stepList.push({ passName: "regionComposite", state: null, parameters: [cornerRadius, 0, 0, 0], target: "pingpong", auxiliary: "scene" });
+    }
     let lastScreenIndex = -1;
     for (let stepIndex = 0; stepIndex < stepList.length; ++stepIndex) {
       if (stepList[stepIndex].target === "pingpong") {
@@ -37385,7 +37448,9 @@ var ScreenEffect = class extends Object2 {
       let targetTexture = null;
       if (stepIndex === lastScreenIndex) {
         webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
-        webGL2RenderingContext.viewport(0, 0, width, height);
+        webGL2RenderingContext.viewport(regionX, glRegionY, width, height);
+        webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
+        webGL2RenderingContext.scissor(regionX, glRegionY, width, height);
       } else if (step.target === "halfA" || step.target === "halfB") {
         const halfTarget = step.target === "halfA" ? this.#halfTargetA : this.#halfTargetB;
         webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, halfTarget.framebuffer);
@@ -37412,9 +37477,14 @@ var ScreenEffect = class extends Object2 {
       webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sourceTexture);
       webGL2RenderingContext.uniform1i(pass.getUniformLocation("sourceTexture"), 0);
       if (step.auxiliary) {
-        const auxiliaryTarget = step.auxiliary === "halfA" ? this.#halfTargetA : this.#halfTargetB;
+        let auxiliaryTexture = this.#halfTargetB.texture;
+        if (step.auxiliary === "halfA") {
+          auxiliaryTexture = this.#halfTargetA.texture;
+        } else if (step.auxiliary === "scene") {
+          auxiliaryTexture = this.#sceneTarget.texture;
+        }
         webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
-        webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, auxiliaryTarget.texture);
+        webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, auxiliaryTexture);
         webGL2RenderingContext.uniform1i(pass.getUniformLocation("auxiliaryTexture"), 1);
         webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
       }
@@ -37430,6 +37500,7 @@ var ScreenEffect = class extends Object2 {
         previousTexture = targetTexture;
       }
     }
+    webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
     webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
     webGL2RenderingContext.bindVertexArray(null);
     graphic.restoreRenderState();
@@ -37467,7 +37538,7 @@ var ScreenEffect = class extends Object2 {
     destroyRenderTarget(webGL2RenderingContext, this.#halfTargetB);
     const halfWidth = System75.Math.max(1, System75.Math.round(width / 2));
     const halfHeight = System75.Math.max(1, System75.Math.round(height / 2));
-    this.#sceneTarget = createRenderTarget(webGL2RenderingContext, width, height, true);
+    this.#sceneTarget = createRenderTarget(webGL2RenderingContext, width, height, false, true);
     this.#pingTarget = createRenderTarget(webGL2RenderingContext, width, height, false);
     this.#pongTarget = createRenderTarget(webGL2RenderingContext, width, height, false);
     this.#halfTargetA = createRenderTarget(webGL2RenderingContext, halfWidth, halfHeight, false);
@@ -37656,7 +37727,7 @@ var ScreenEffect = class extends Object2 {
     return this.#time;
   }
   //==============================================================================
-  // 씬 텍스처 반환. (end 이후 — 마지막 프레임의 원본 화면)
+  // 씬 텍스처 반환. (end 이후 — 마지막 프레임에 떠 온 영역 원본)
   //==============================================================================
   /**
    * @returns { WebGLTexture | null }

@@ -597,7 +597,7 @@
 				mode.rootNode.setActive(key === modeKey);
 				mode.timeline.stop();
 			}
-			this.#screenEffect.disableAll();
+			this.#screenEffect.resetAll();
 			const activeMode = this.#modeTable.get(modeKey);
 			activeMode.timeline.setSpeed(SPEED_LIST[this.#speedIndex]);
 			activeMode.timeline.seek(0);
@@ -738,6 +738,7 @@
 		//==============================================================================
 		preDraw(graphic) {
 			super.preDraw(graphic);
+			this.applyStageRegion();
 			this.#screenEffect.begin(graphic);
 			const engine = this.getEngine();
 			const viewManager = engine.getViewManager();
@@ -751,6 +752,24 @@
 		postDraw(graphic) {
 			super.postDraw(graphic);
 			this.#screenEffect.end(graphic);
+		}
+
+		//==============================================================================
+		// 화면 효과 적용 영역 = 무대 사각형. (뷰 좌표 → 캔버스 픽셀, 둥근 모서리 포함)
+		//==============================================================================
+		applyStageRegion() {
+			const engine = this.getEngine();
+			const viewManager = engine.getViewManager();
+			const viewNativeRect = viewManager.getViewNativeRect();
+			const targetResolutionScale = viewManager.getTargetResolutionScale();
+			const devicePixelRatio = viewManager.getDevicePixelRatio();
+			const pixelScale = targetResolutionScale * devicePixelRatio;
+			this.#screenEffect.setRegion(
+				(viewNativeRect.position.x * devicePixelRatio) + STAGE_X * pixelScale,
+				(viewNativeRect.position.y * devicePixelRatio) + STAGE_Y * pixelScale,
+				STAGE_WIDTH * pixelScale,
+				STAGE_HEIGHT * pixelScale,
+				14 * pixelScale);
 		}
 
 		//==============================================================================

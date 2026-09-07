@@ -861,7 +861,7 @@
 				if (state.timer > 2.4) {
 					state.timer = 0;
 					state.index = (state.index + 1) % statusList.length;
-					scene.screenEffect.disableAll();
+					scene.screenEffect.resetAll();
 					if (state.particle) {
 						scene.modeRoot.removeChild(state.particle.getNode());
 						state.particle = null;
@@ -1515,7 +1515,7 @@
 			this.heroKnockback = 0;
 			this.setTimeScale(1);
 			this.shaker.stop();
-			this.screenEffect.disableAll();
+			this.screenEffect.resetAll();
 			this.modeRoot.removeChildren();
 			this.spawnedParticleList = [];
 			this.floatingText.clear();
@@ -1624,6 +1624,7 @@
 		//==============================================================================
 		preDraw(graphic) {
 			super.preDraw(graphic);
+			this.applyStageRegion();
 			this.screenEffect.begin(graphic);
 			const engine = this.getEngine();
 			const viewManager = engine.getViewManager();
@@ -1637,6 +1638,24 @@
 		postDraw(graphic) {
 			super.postDraw(graphic);
 			this.screenEffect.end(graphic);
+		}
+
+		//==============================================================================
+		// 화면 효과 적용 영역 = 무대 사각형. (뷰 좌표 → 캔버스 픽셀, 둥근 모서리 포함)
+		//==============================================================================
+		applyStageRegion() {
+			const engine = this.getEngine();
+			const viewManager = engine.getViewManager();
+			const viewNativeRect = viewManager.getViewNativeRect();
+			const targetResolutionScale = viewManager.getTargetResolutionScale();
+			const devicePixelRatio = viewManager.getDevicePixelRatio();
+			const pixelScale = targetResolutionScale * devicePixelRatio;
+			this.screenEffect.setRegion(
+				(viewNativeRect.position.x * devicePixelRatio) + STAGE_X * pixelScale,
+				(viewNativeRect.position.y * devicePixelRatio) + STAGE_Y * pixelScale,
+				STAGE_WIDTH * pixelScale,
+				STAGE_HEIGHT * pixelScale,
+				14 * pixelScale);
 		}
 
 		//==============================================================================

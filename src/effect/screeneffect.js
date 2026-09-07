@@ -727,22 +727,38 @@ const EFFECT_BODY_TABLE = {
 	fade: `
 	color.rgb = mix(color.rgb, effectColor.rgb, strength * effectColor.a);
 	`,
+	regionComposite: `
+	vec4 original = texture(auxiliaryTexture, uv);
+	vec2 pixel = uv * resolution;
+	vec2 halfSize = resolution * 0.5;
+	float cornerRadius = min(parameters.x, min(halfSize.x, halfSize.y));
+	vec2 cornerOffset = abs(pixel - halfSize) - (halfSize - cornerRadius);
+	float cornerDistance = length(max(cornerOffset, 0.0)) + min(max(cornerOffset.x, cornerOffset.y), 0.0) - cornerRadius;
+	float inside = 1.0 - smoothstep(-0.75, 0.75, cornerDistance);
+	color = mix(original, color, inside);
+	`,
 };
 
 
 //==============================================================================
-// 색 텍스처 생성. (RGBA8, 선형 필터, 가장자리 고정)
+// 색 텍스처 생성. (RGBA8 — 화면 사본은 RGB8: 기본 프레임버퍼(alpha: false)에서 copyTexSubImage2D 로 떠 오려면 성분이 같아야 한다)
 //==============================================================================
 /**
  * @param { WebGL2RenderingContext } webGL2RenderingContext
  * @param { number } width
  * @param { number } height
+ * @param { boolean } isOpaque
  * @returns { WebGLTexture }
  */
-function createColorTexture(webGL2RenderingContext, width, height) {
+function createColorTexture(webGL2RenderingContext, width, height, isOpaque = false) {
 	const texture = webGL2RenderingContext.createTexture();
 	webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-	webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, width, height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, null);
+	if (isOpaque) {
+		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGB8, width, height, 0, webGL2RenderingContext.RGB, webGL2RenderingContext.UNSIGNED_BYTE, null);
+	}
+	else {
+		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, width, height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, null);
+	}
 	webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR);
 	webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.LINEAR);
 	webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
@@ -752,17 +768,18 @@ function createColorTexture(webGL2RenderingContext, width, height) {
 
 
 //==============================================================================
-// 렌더 대상 생성. (색 텍스처 + 필요하면 스텐실 렌더버퍼 — Graphic 의 클리핑이 스텐실을 쓴다)
+// 렌더 대상 생성. (색 텍스처 + 필요하면 스텐실 렌더버퍼)
 //==============================================================================
 /**
  * @param { WebGL2RenderingContext } webGL2RenderingContext
  * @param { number } width
  * @param { number } height
  * @param { boolean } useStencil
+ * @param { boolean } isOpaque
  * @returns { object }
  */
-function createRenderTarget(webGL2RenderingContext, width, height, useStencil) {
-	const texture = createColorTexture(webGL2RenderingContext, width, height);
+function createRenderTarget(webGL2RenderingContext, width, height, useStencil, isOpaque = false) {
+	const texture = createColorTexture(webGL2RenderingContext, width, height, isOpaque);
 	const framebuffer = webGL2RenderingContext.createFramebuffer();
 	webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
 	webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, texture, 0);
@@ -798,8 +815,9 @@ function destroyRenderTarget(webGL2RenderingContext, renderTarget) {
 
 
 //==============================================================================
-// 화면 효과. (씬 전체 후처리 사슬)
-// - begin() 이후의 Graphic 출력을 오프스크린에 받아 두었다가 end() 에서 켜진 효과를 차례로 걸어 화면에 올린다.
+// 화면 효과. (씬 후처리 사슬)
+// - 씬은 화면에 그대로 그리고, end() 에서 화면(또는 setRegion 으로 정한 영역)을 떠 와 켜진 효과를 차례로 건 뒤 같은 자리에 되돌려 놓는다.
+// - 영역은 캔버스 픽셀 좌표(왼쪽 위 원점)이며 둥근 모서리 반지름을 주면 그 바깥은 원본을 유지한다.
 // - 사용:
 //     // 씬 load 에서
 //     this.screenEffect = new ScreenEffect(engine.getGraphic());
@@ -823,6 +841,7 @@ export class ScreenEffect extends Object {
 	/** @private @type { object | null } */ #halfTargetB;
 	/** @private @type { number } */ #time;
 	/** @private @type { boolean } */ #isBound;
+	/** @private @type { object | null } */ #region;
 
 	//==============================================================================
 	// 생성.
@@ -842,6 +861,14 @@ export class ScreenEffect extends Object {
 		this.#halfTargetB = null;
 		this.#time = 0;
 		this.#isBound = false;
+		this.#region = null;
+		this.resetAll();
+	}
+
+	//==============================================================================
+	// 전부 기본값으로. (끄고, 세기 1, 파라미터 / 색 기본 — 모드 전환 때 이전 설정이 남지 않게)
+	//==============================================================================
+	resetAll() {
 		for (const effectType of EFFECT_ORDER) {
 			const defaultParameters = DEFAULT_PARAMETER_TABLE[effectType];
 			const defaultColor = DEFAULT_COLOR_TABLE[effectType] ? DEFAULT_COLOR_TABLE[effectType] : [1, 1, 1, 1];
@@ -855,6 +882,37 @@ export class ScreenEffect extends Object {
 	}
 
 	//==============================================================================
+	// 적용 영역 설정. (캔버스 픽셀, 왼쪽 위 원점 — null 이면 화면 전체)
+	//==============================================================================
+	/**
+	 * @param { number } x
+	 * @param { number } y
+	 * @param { number } width
+	 * @param { number } height
+	 * @param { number } cornerRadius - 둥근 모서리 반지름(픽셀). 0 이면 사각형.
+	 */
+	setRegion(x, y, width, height, cornerRadius = 0) {
+		this.#region = { x: x, y: y, width: width, height: height, cornerRadius: System.Math.max(0, cornerRadius) };
+	}
+
+	//==============================================================================
+	// 적용 영역 해제. (화면 전체)
+	//==============================================================================
+	clearRegion() {
+		this.#region = null;
+	}
+
+	//==============================================================================
+	// 적용 영역 반환.
+	//==============================================================================
+	/**
+	 * @returns { object | null }
+	 */
+	getRegion() {
+		return this.#region;
+	}
+
+	//==============================================================================
 	// 갱신. (애니메이션 효과의 시간)
 	//==============================================================================
 	/**
@@ -865,35 +923,17 @@ export class ScreenEffect extends Object {
 	}
 
 	//==============================================================================
-	// 오프스크린 출력 시작. (씬 preDraw 첫머리)
+	// 시작. (씬 preDraw 첫머리 — 씬은 화면에 그대로 그린다. 켜진 효과가 있을 때만 end 가 일한다)
 	//==============================================================================
 	/**
 	 * @param { Graphic } graphic
 	 */
 	begin(graphic) {
-		const webGL2RenderingContext = this.#webGL2RenderingContext;
-		const width = webGL2RenderingContext.drawingBufferWidth;
-		const height = webGL2RenderingContext.drawingBufferHeight;
-		if (width <= 0 || height <= 0) {
-			return;
-		}
-		// 켜진 효과가 없으면 오프스크린을 거치지 않는다. (화면 크기 복사 패스 비용 0)
-		const hasActiveEffect = this.hasActiveEffect();
-		if (!hasActiveEffect) {
-			this.#isBound = false;
-			return;
-		}
-		this.ensureTargets(width, height);
-		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, this.#sceneTarget.framebuffer);
-		webGL2RenderingContext.viewport(0, 0, width, height);
-		webGL2RenderingContext.clearColor(0, 0, 0, 1);
-		webGL2RenderingContext.clearStencil(0);
-		webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.STENCIL_BUFFER_BIT);
-		this.#isBound = true;
+		this.#isBound = this.hasActiveEffect();
 	}
 
 	//==============================================================================
-	// 효과 적용 후 화면 출력. (씬 postDraw 끝)
+	// 효과 적용. (씬 postDraw 끝 — 화면의 영역을 떠 와 효과를 걸고 같은 자리에 되돌려 놓는다)
 	//==============================================================================
 	/**
 	 * @param { Graphic } graphic
@@ -904,8 +944,38 @@ export class ScreenEffect extends Object {
 		}
 		this.#isBound = false;
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
-		const width = this.#sceneTarget.width;
-		const height = this.#sceneTarget.height;
+		const bufferWidth = webGL2RenderingContext.drawingBufferWidth;
+		const bufferHeight = webGL2RenderingContext.drawingBufferHeight;
+		if (bufferWidth <= 0 || bufferHeight <= 0) {
+			return;
+		}
+
+		// 영역 결정. (버퍼 안으로 자른다)
+		let regionX = 0;
+		let regionY = 0;
+		let regionWidth = bufferWidth;
+		let regionHeight = bufferHeight;
+		let cornerRadius = 0;
+		if (this.#region) {
+			regionX = System.Math.max(0, System.Math.round(this.#region.x));
+			regionY = System.Math.max(0, System.Math.round(this.#region.y));
+			regionWidth = System.Math.min(bufferWidth - regionX, System.Math.round(this.#region.width));
+			regionHeight = System.Math.min(bufferHeight - regionY, System.Math.round(this.#region.height));
+			cornerRadius = this.#region.cornerRadius;
+		}
+		if (regionWidth <= 0 || regionHeight <= 0) {
+			return;
+		}
+		const width = regionWidth;
+		const height = regionHeight;
+		this.ensureTargets(width, height);
+
+		// 화면 영역 → 씬 대상 복사. (GL 은 아래가 0. 기본 프레임버퍼는 멀티샘플 / 무알파라 blitFramebuffer 대신 copyTexSubImage2D 로 RGB8 텍스처에 떠 온다)
+		const glRegionY = bufferHeight - (regionY + regionHeight);
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#sceneTarget.texture);
+		webGL2RenderingContext.copyTexSubImage2D(webGL2RenderingContext.TEXTURE_2D, 0, 0, 0, regionX, glRegionY, width, height);
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 		webGL2RenderingContext.disable(webGL2RenderingContext.STENCIL_TEST);
 
@@ -945,6 +1015,10 @@ export class ScreenEffect extends Object {
 		if (stepList.length === 0) {
 			stepList.push({ passName: "copy", state: null, parameters: [0, 0, 0, 0], target: "pingpong" });
 		}
+		// 둥근 모서리 영역이면 마지막에 원본과 합성한다. (모서리 바깥은 원본 그대로)
+		if (cornerRadius > 0) {
+			stepList.push({ passName: "regionComposite", state: null, parameters: [cornerRadius, 0, 0, 0], target: "pingpong", auxiliary: "scene" });
+		}
 
 		// 마지막 화면 출력 단계를 찾는다. (하프 대상에 그리는 단계는 화면이 될 수 없다)
 		let lastScreenIndex = -1;
@@ -964,7 +1038,9 @@ export class ScreenEffect extends Object {
 			let targetTexture = null;
 			if (stepIndex === lastScreenIndex) {
 				webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
-				webGL2RenderingContext.viewport(0, 0, width, height);
+				webGL2RenderingContext.viewport(regionX, glRegionY, width, height);
+				webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
+				webGL2RenderingContext.scissor(regionX, glRegionY, width, height);
 			}
 			else if (step.target === "halfA" || step.target === "halfB") {
 				const halfTarget = step.target === "halfA" ? this.#halfTargetA : this.#halfTargetB;
@@ -997,9 +1073,15 @@ export class ScreenEffect extends Object {
 			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sourceTexture);
 			webGL2RenderingContext.uniform1i(pass.getUniformLocation("sourceTexture"), 0);
 			if (step.auxiliary) {
-				const auxiliaryTarget = step.auxiliary === "halfA" ? this.#halfTargetA : this.#halfTargetB;
+				let auxiliaryTexture = this.#halfTargetB.texture;
+				if (step.auxiliary === "halfA") {
+					auxiliaryTexture = this.#halfTargetA.texture;
+				}
+				else if (step.auxiliary === "scene") {
+					auxiliaryTexture = this.#sceneTarget.texture;
+				}
 				webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
-				webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, auxiliaryTarget.texture);
+				webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, auxiliaryTexture);
 				webGL2RenderingContext.uniform1i(pass.getUniformLocation("auxiliaryTexture"), 1);
 				webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 			}
@@ -1018,6 +1100,7 @@ export class ScreenEffect extends Object {
 			}
 		}
 
+		webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
 		webGL2RenderingContext.bindVertexArray(null);
 		graphic.restoreRenderState();
@@ -1057,7 +1140,7 @@ export class ScreenEffect extends Object {
 		destroyRenderTarget(webGL2RenderingContext, this.#halfTargetB);
 		const halfWidth = System.Math.max(1, System.Math.round(width / 2));
 		const halfHeight = System.Math.max(1, System.Math.round(height / 2));
-		this.#sceneTarget = createRenderTarget(webGL2RenderingContext, width, height, true);
+		this.#sceneTarget = createRenderTarget(webGL2RenderingContext, width, height, false, true);
 		this.#pingTarget = createRenderTarget(webGL2RenderingContext, width, height, false);
 		this.#pongTarget = createRenderTarget(webGL2RenderingContext, width, height, false);
 		this.#halfTargetA = createRenderTarget(webGL2RenderingContext, halfWidth, halfHeight, false);
@@ -1260,7 +1343,7 @@ export class ScreenEffect extends Object {
 	}
 
 	//==============================================================================
-	// 씬 텍스처 반환. (end 이후 — 마지막 프레임의 원본 화면)
+	// 씬 텍스처 반환. (end 이후 — 마지막 프레임에 떠 온 영역 원본)
 	//==============================================================================
 	/**
 	 * @returns { WebGLTexture | null }

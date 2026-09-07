@@ -16,3 +16,9 @@
 - 요청: "스프라이트 샘플하고 타임라인 샘플하고 왜 이리 느리냐".
 - 계측: 샘플 사본(prof.html)에 씬 tick / draw / postDraw 시간과 Graphic.drawVertices 호출 수를 감싸 재고, devserver 의 /__hold 로 load 를 9.5초 늦춰 헤드리스 --dump-dom 이 실시간 값을 받게 함. 결과(SwiftShader 기준): effects 125 드로우 콜 / 틱 5.8ms, spritefx hitStop 441 드로우 콜 / 틱 74ms(목록 132행의 Paint + 라벨 + 버튼 호버 판정), timeline title 은 화면 효과 유휴 복사 패스 때문에 15 → 53 fps 차이.
 - 수정: (1) Graphic 글자를 흰색으로 굽고 drawTextEntry 에서 색을 곱함 — 색이 바뀔 때 재굽기 없음. (2) Timeline fontSize 트랙 정수화. (3) ScreenEffect.hasActiveEffect 로 유휴 시 begin 이 오프스크린을 잡지 않음. (4) spritefx 목록 행 컬링(updateListCulling) + 비반복 파티클 노드 만료 정리(pruneParticles). (5) spritefx SeededRandom.nextValue 오류 수정.
+
+## 화면 효과를 무대 창 안(둥근 모서리)으로 제한, 모드 전환 잔존 상태 제거
+[17:15 요청 → 17:50 응답]
+- 요청: "창이 활성화될 때만 효과가 나와야 하는데 전체 샘플이 같이 도는 것 같다", "창 영역을 벗어나 전체 화면에 효과가 붙는 것도 문제", "라운딩도 넘어서는 게 문제".
+- 확인: 두 샘플 모두 선택한 모드만 tick / draw 한다(타임라인은 비활성 무대 뿌리를 엔진이 건너뜀). 다만 ScreenEffect 가 캔버스 전체를 처리해 목록 / 제목까지 덮였고, disableAll 이 파라미터 / 색을 되돌리지 않아 HEALTH BAR 의 붉은 비네트 · LIGHTNING 의 흰 페이드 · PORTAL 의 소용돌이 중심이 다음 모드에 남았다.
+- 수정: ScreenEffect.setRegion(캔버스 픽셀 + 둥근 모서리) — begin 은 아무것도 잡지 않고 end 에서 화면 영역을 blitFramebuffer 로 떠 와 영역 크기 핑퐁으로 처리, 마지막에 regionComposite 패스(둥근 사각형 SDF 로 바깥은 원본)와 viewport / scissor 로 제자리에 출력. resetAll 추가. 샘플은 applyStageRegion() 으로 매 프레임 무대 사각형(뷰 → 캔버스 픽셀, 반지름 14)을 넘긴다.
