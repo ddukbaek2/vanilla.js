@@ -361,6 +361,10 @@ export const TIMELINE_NODE_DEFAULTS = {
 //     timeline.play();
 //     // 매 프레임: timeline.tick(timeDelta);
 //==============================================================================
+// 파티클 시드. (수집 차례로 서로 다른 시드를 준다)
+const PARTICLE_RANDOM_SEED_BASE = 0x9E3779B1;
+const PARTICLE_RANDOM_SEED_STEP = 7919;
+
 export class Timeline extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -378,6 +382,7 @@ export class Timeline extends Object {
 	/** @private @type { boolean } */ #isPlaying;
 	/** @private @type { boolean } */ #isDirty;
 	/** @private @type { ParticleSystem[] } */ #particleSystems; // 타임라인 시간으로 진행하는 파티클. (대상 노드에서 모은다)
+	/** @private @type { System.Set } */ #particleFreeRunSet; // 이벤트 트랙이 없는 파티클. (타임라인이 시작하면 바로 도는 것으로 본다)
 
 	//==============================================================================
 	// 생성.
@@ -400,6 +405,7 @@ export class Timeline extends Object {
 		this.#isPlaying = false;
 		this.#isDirty = true;
 		this.#particleSystems = [];
+		this.#particleFreeRunSet = new System.Set();
 		this.setDescription(description ? description : Timeline.createEmptyDescription());
 	}
 
@@ -494,10 +500,17 @@ export class Timeline extends Object {
 	}
 
 	//==============================================================================
-	// 대상 노드의 파티클 시스템 수집. (수동 틱으로 바꿔 타임라인 시간으로만 진행한다)
+	// 대상 노드의 파티클 시스템 수집. (수동 틱으로 바꿔 타임라인 시간으로만 진행하고, 시드를 줘서 되감을 때마다 같은 결과가 나오게 한다)
 	//==============================================================================
 	collectParticleSystems() {
 		this.#particleSystems = [];
+		this.#particleFreeRunSet = new System.Set();
+		const eventTargetSet = new System.Set();
+		for (const compiledTrack of this.#compiledTracks) {
+			if (compiledTrack.track.property === "event" && compiledTrack.target) {
+				eventTargetSet.add(compiledTrack.target);
+			}
+		}
 		for (const target of this.#targetTable.values()) {
 			if (!target || typeof target.getComponent !== "function") {
 				continue;
@@ -505,6 +518,13 @@ export class Timeline extends Object {
 			const particleSystem = target.getComponent(ParticleSystem);
 			if (particleSystem && !this.#particleSystems.includes(particleSystem)) {
 				particleSystem.setManualTick(true);
+				const randomSeed = particleSystem.getRandomSeed();
+				if (randomSeed === null) {
+					particleSystem.setRandomSeed(PARTICLE_RANDOM_SEED_BASE + this.#particleSystems.length * PARTICLE_RANDOM_SEED_STEP);
+				}
+				if (!eventTargetSet.has(target)) {
+					this.#particleFreeRunSet.add(particleSystem);
+				}
 				this.#particleSystems.push(particleSystem);
 			}
 		}
@@ -540,6 +560,9 @@ export class Timeline extends Object {
 		}
 		for (const particleSystem of this.#particleSystems) {
 			particleSystem.stop(true);
+		}
+		for (const particleSystem of this.#particleFreeRunSet) {
+			particleSystem.play();
 		}
 		// 파티클 대상 이벤트 키를 시간순으로 모은다.
 		const eventList = [];
@@ -869,14 +892,14 @@ export class Timeline extends Object {
 		let isWrapped = false;
 		if (nextTime >= duration) {
 			if (this.isLoop() && duration > 0) {
-				this.fireEventsBetween(previousTime, duration, true);
+				this.fireEventsBetween(previousTime, duration);
 				this.simulateParticles(duration - previousTime);
 				nextTime = nextTime % duration;
-				this.fireEventsBetween(-1, nextTime, true);
+				this.fireEventsBetween(-1, nextTime);
 				isWrapped = true;
 			}
 			else {
-				this.fireEventsBetween(previousTime, duration, true);
+				this.fireEventsBetween(previousTime, duration);
 				this.simulateParticles(duration - previousTime);
 				this.#time = duration;
 				this.#isPlaying = false;
@@ -891,7 +914,7 @@ export class Timeline extends Object {
 			nextTime = 0;
 		}
 		else {
-			this.fireEventsBetween(previousTime, nextTime, false);
+			this.fireEventsBetween(previousTime, nextTime);
 		}
 		this.#time = nextTime;
 		this.evaluate(this.#time);
@@ -905,14 +928,13 @@ export class Timeline extends Object {
 	}
 
 	//==============================================================================
-	// 구간 안의 이벤트 키 / 마커 발생. (fromTime 초과 ~ toTime 이하, isInclusiveEnd 면 끝도 포함)
+	// 구간 안의 이벤트 키 / 마커 발생. (fromTime 초과 ~ toTime 이하)
 	//==============================================================================
 	/**
 	 * @param { number } fromTime
 	 * @param { number } toTime
-	 * @param { boolean } isInclusiveEnd
 	 */
-	fireEventsBetween(fromTime, toTime, isInclusiveEnd) {
+	fireEventsBetween(fromTime, toTime) {
 		if (this.#isDirty) {
 			this.compile();
 		}
@@ -920,7 +942,7 @@ export class Timeline extends Object {
 			if (time <= fromTime) {
 				return false;
 			}
-			return isInclusiveEnd ? time <= toTime : time < toTime;
+			return time <= toTime;
 		};
 		for (const compiledTrack of this.#compiledTracks) {
 			if (compiledTrack.track.property !== "event" || compiledTrack.track.enabled === false) {

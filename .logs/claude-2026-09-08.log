@@ -1,0 +1,12 @@
+# 2026-09-08 작업 로그
+
+## 스크럽 중 파티클이 계속 움직이는 문제
+[00:45 요청 → 01:05 응답]
+- 요청: "프레스 상태일 때 파티클 움직이는 건 여전한데".
+- 원인 1: 엔진은 mousedown 부터 mouseup 까지 매 프레임 touchMove 를 넘긴다(포인터가 안 움직여도). 스크럽을 잡고 있으면 매 프레임 seek → 파티클 재시뮬레이션이 다시 돌았다.
+- 원인 2: ParticleSystem 스폰이 전역 난수(Math.randomRange)를 써서 재시뮬레이션마다 다른 결과 → 눌린 채로 파티클이 계속 흔들려 보였다.
+- 원인 3: 재시뮬레이션이 stop(true) 로 시작해 이벤트 트랙이 없는 파티클(Logo 의 Dust 등)은 되감은 뒤 영영 안 돌았다.
+- 수정: ParticleSystem.setRandomSeed / getRandomSeed / randomRange — 시드가 있으면 SeededRandom 으로 스폰, stop(true) 가 시드와 방출 누적기를 되돌린다. Timeline.collectParticleSystems 가 수집 차례로 시드를 주고, 이벤트 트랙이 없는 파티클은 재시뮬레이션 시작 때 play(). Timeline Showcase seekToView 는 목표 시간이 현재 시간과 같으면 seek 하지 않음.
+- 덤: fireEventsBetween 구간을 (from, to] 로 통일 — 틱 끝이 키 시간과 정확히 같으면(1/60 × 3 = 0.05 등) 이번 틱에서도 다음 틱에서도 이벤트가 빠지던 버그. 검증 하네스에서 parallax 의 Stars Far 가 재생 경로에서 0개로 잡혀 발견.
+- 검증: 헤드리스 하네스(build 밑 임시 페이지)로 logo / title / combo / parallax 를 두 번 seek 해 파티클 수 동일, Dust 24개 살아 있음, 재생 경로도 같은 값. 샘플 logo 모드 스크린샷 정상, 콘솔 오류 0. 크롬 / 서버 잔여 0.
+- 배포: NAS timelineshowcase / spriteeffects / particleeffects / uishowcase 의 vanilla.js + index.html(ENGINE_CACHE_STAMP 20260908a), timelineeditor 재빌드 배포.

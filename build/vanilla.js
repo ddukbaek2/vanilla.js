@@ -34735,6 +34735,11 @@ var ParticleSystem = class extends Component {
   /** @private @type { boolean } */
   #isManualTick;
   // 참이면 노드 갱신에서 진행하지 않고 simulate() 로만 진행한다. (타임라인 등 외부 시간)
+  /** @private @type { SeededRandom | null } */
+  #random;
+  // 시드가 있으면 이 난수로 스폰한다. (stop(true) 로 비우면 시드로 되돌아가 같은 결과가 나온다 — 타임라인 스크럽)
+  /** @private @type { number | null } */
+  #randomSeed;
   //==============================================================================
   // 생성.
   //==============================================================================
@@ -34750,6 +34755,8 @@ var ParticleSystem = class extends Component {
     this.#isPlaying = true;
     this.#isLooping = true;
     this.#isManualTick = false;
+    this.#random = null;
+    this.#randomSeed = null;
     this.#duration = 1;
     this.#playElapsedSeconds = 0;
     this.#maxParticleCount = 512;
@@ -34806,6 +34813,10 @@ var ParticleSystem = class extends Component {
     this.#isPlaying = false;
     if (isClearing) {
       this.#particleList.length = 0;
+      this.#emissionAccumulator = 0;
+      if (this.#random) {
+        this.#random.setSeed(this.#randomSeed);
+      }
     }
   }
   //==============================================================================
@@ -34919,27 +34930,27 @@ var ParticleSystem = class extends Component {
     let directionY = -1;
     const shape = this.#emitterShape;
     if (shape === ParticleEmitterShape.circle) {
-      const angle = randomRange(0, System72.Math.PI * 2);
-      const radius = this.#shapeRadius * System72.Math.sqrt(randomRange(0, 1));
+      const angle = this.randomRange(0, System72.Math.PI * 2);
+      const radius = this.#shapeRadius * System72.Math.sqrt(this.randomRange(0, 1));
       spawnX = System72.Math.cos(angle) * radius;
       spawnY = System72.Math.sin(angle) * radius;
       directionX = System72.Math.cos(angle);
       directionY = System72.Math.sin(angle);
     } else if (shape === ParticleEmitterShape.cone) {
-      const angle = -System72.Math.PI * 0.5 + randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
-      const radius = randomRange(0, this.#shapeRadius);
+      const angle = -System72.Math.PI * 0.5 + this.randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
+      const radius = this.randomRange(0, this.#shapeRadius);
       spawnX = System72.Math.cos(angle) * radius;
       spawnY = System72.Math.sin(angle) * radius;
       directionX = System72.Math.cos(angle);
       directionY = System72.Math.sin(angle);
     } else if (shape === ParticleEmitterShape.box) {
-      spawnX = randomRange(-this.#boxSize.x * 0.5, this.#boxSize.x * 0.5);
-      spawnY = randomRange(-this.#boxSize.y * 0.5, this.#boxSize.y * 0.5);
+      spawnX = this.randomRange(-this.#boxSize.x * 0.5, this.#boxSize.x * 0.5);
+      spawnY = this.randomRange(-this.#boxSize.y * 0.5, this.#boxSize.y * 0.5);
     } else if (shape === ParticleEmitterShape.edge) {
-      spawnX = randomRange(-this.#edgeWidth * 0.5, this.#edgeWidth * 0.5);
+      spawnX = this.randomRange(-this.#edgeWidth * 0.5, this.#edgeWidth * 0.5);
       directionY = 1;
     } else {
-      const angle = randomRange(0, System72.Math.PI * 2);
+      const angle = this.randomRange(0, System72.Math.PI * 2);
       directionX = System72.Math.cos(angle);
       directionY = System72.Math.sin(angle);
     }
@@ -34953,19 +34964,19 @@ var ParticleSystem = class extends Component {
       spawnX += nodePosition.x;
       spawnY += nodePosition.y;
     }
-    const speed = randomRange(this.#startSpeedMin, this.#startSpeedMax);
-    const colorBlend = randomRange(0, 1);
+    const speed = this.randomRange(this.#startSpeedMin, this.#startSpeedMax);
+    const colorBlend = this.randomRange(0, 1);
     const particle = this.#freeList.pop() || {};
     particle.x = spawnX;
     particle.y = spawnY;
     particle.velocityX = directionX * speed;
     particle.velocityY = directionY * speed;
     particle.age = 0;
-    particle.lifetime = randomRange(this.#startLifetimeMin, this.#startLifetimeMax);
-    particle.size = randomRange(this.#startSizeMin, this.#startSizeMax);
-    particle.rotation = randomRange(this.#startRotationMin, this.#startRotationMax);
-    particle.angularVelocity = randomRange(this.#angularVelocityMin, this.#angularVelocityMax);
-    particle.wobblePhase = randomRange(0, System72.Math.PI * 2);
+    particle.lifetime = this.randomRange(this.#startLifetimeMin, this.#startLifetimeMax);
+    particle.size = this.randomRange(this.#startSizeMin, this.#startSizeMax);
+    particle.rotation = this.randomRange(this.#startRotationMin, this.#startRotationMax);
+    particle.angularVelocity = this.randomRange(this.#angularVelocityMin, this.#angularVelocityMax);
+    particle.wobblePhase = this.randomRange(0, System72.Math.PI * 2);
     particle.red = this.#startColorA.red + (this.#startColorB.red - this.#startColorA.red) * colorBlend;
     particle.green = this.#startColorA.green + (this.#startColorB.green - this.#startColorA.green) * colorBlend;
     particle.blue = this.#startColorA.blue + (this.#startColorB.blue - this.#startColorA.blue) * colorBlend;
@@ -35398,6 +35409,32 @@ var ParticleSystem = class extends Component {
   /** @returns { boolean } */
   isManualTick() {
     return this.#isManualTick;
+  }
+  //==============================================================================
+  // 난수 시드 설정. (설정하면 스폰 난수가 시드 난수로 바뀌고 stop(true) 마다 시드로 되돌아간다 — 되감기 재현용)
+  //==============================================================================
+  /** @param { number } seed */
+  setRandomSeed(seed) {
+    this.#randomSeed = seed;
+    this.#random = new SeededRandom(seed);
+  }
+  /** @returns { number | null } */
+  getRandomSeed() {
+    return this.#randomSeed;
+  }
+  //==============================================================================
+  // 스폰용 난수. (시드가 있으면 시드 난수, 없으면 전역 난수)
+  //==============================================================================
+  /**
+   * @param { number } minValue
+   * @param { number } maxValue
+   * @returns { number }
+   */
+  randomRange(minValue, maxValue) {
+    if (this.#random) {
+      return this.#random.nextRange(minValue, maxValue);
+    }
+    return randomRange(minValue, maxValue);
   }
 };
 
@@ -38076,6 +38113,8 @@ var TIMELINE_NODE_DEFAULTS = {
   audio: "",
   volume: 1
 };
+var PARTICLE_RANDOM_SEED_BASE = 2654435761;
+var PARTICLE_RANDOM_SEED_STEP = 7919;
 var Timeline = class _Timeline extends Object2 {
   static {
     __name(this, "Timeline");
@@ -38110,6 +38149,9 @@ var Timeline = class _Timeline extends Object2 {
   /** @private @type { ParticleSystem[] } */
   #particleSystems;
   // 타임라인 시간으로 진행하는 파티클. (대상 노드에서 모은다)
+  /** @private @type { System.Set } */
+  #particleFreeRunSet;
+  // 이벤트 트랙이 없는 파티클. (타임라인이 시작하면 바로 도는 것으로 본다)
   //==============================================================================
   // 생성.
   //==============================================================================
@@ -38131,6 +38173,7 @@ var Timeline = class _Timeline extends Object2 {
     this.#isPlaying = false;
     this.#isDirty = true;
     this.#particleSystems = [];
+    this.#particleFreeRunSet = new System76.Set();
     this.setDescription(description ? description : _Timeline.createEmptyDescription());
   }
   //==============================================================================
@@ -38218,10 +38261,17 @@ var Timeline = class _Timeline extends Object2 {
     this.collectParticleSystems();
   }
   //==============================================================================
-  // 대상 노드의 파티클 시스템 수집. (수동 틱으로 바꿔 타임라인 시간으로만 진행한다)
+  // 대상 노드의 파티클 시스템 수집. (수동 틱으로 바꿔 타임라인 시간으로만 진행하고, 시드를 줘서 되감을 때마다 같은 결과가 나오게 한다)
   //==============================================================================
   collectParticleSystems() {
     this.#particleSystems = [];
+    this.#particleFreeRunSet = new System76.Set();
+    const eventTargetSet = new System76.Set();
+    for (const compiledTrack of this.#compiledTracks) {
+      if (compiledTrack.track.property === "event" && compiledTrack.target) {
+        eventTargetSet.add(compiledTrack.target);
+      }
+    }
     for (const target of this.#targetTable.values()) {
       if (!target || typeof target.getComponent !== "function") {
         continue;
@@ -38229,6 +38279,13 @@ var Timeline = class _Timeline extends Object2 {
       const particleSystem = target.getComponent(ParticleSystem);
       if (particleSystem && !this.#particleSystems.includes(particleSystem)) {
         particleSystem.setManualTick(true);
+        const randomSeed = particleSystem.getRandomSeed();
+        if (randomSeed === null) {
+          particleSystem.setRandomSeed(PARTICLE_RANDOM_SEED_BASE + this.#particleSystems.length * PARTICLE_RANDOM_SEED_STEP);
+        }
+        if (!eventTargetSet.has(target)) {
+          this.#particleFreeRunSet.add(particleSystem);
+        }
         this.#particleSystems.push(particleSystem);
       }
     }
@@ -38262,6 +38319,9 @@ var Timeline = class _Timeline extends Object2 {
     }
     for (const particleSystem of this.#particleSystems) {
       particleSystem.stop(true);
+    }
+    for (const particleSystem of this.#particleFreeRunSet) {
+      particleSystem.play();
     }
     const eventList = [];
     for (const compiledTrack of this.#compiledTracks) {
@@ -38569,13 +38629,13 @@ var Timeline = class _Timeline extends Object2 {
     let isWrapped = false;
     if (nextTime >= duration) {
       if (this.isLoop() && duration > 0) {
-        this.fireEventsBetween(previousTime, duration, true);
+        this.fireEventsBetween(previousTime, duration);
         this.simulateParticles(duration - previousTime);
         nextTime = nextTime % duration;
-        this.fireEventsBetween(-1, nextTime, true);
+        this.fireEventsBetween(-1, nextTime);
         isWrapped = true;
       } else {
-        this.fireEventsBetween(previousTime, duration, true);
+        this.fireEventsBetween(previousTime, duration);
         this.simulateParticles(duration - previousTime);
         this.#time = duration;
         this.#isPlaying = false;
@@ -38588,7 +38648,7 @@ var Timeline = class _Timeline extends Object2 {
     } else if (nextTime < 0) {
       nextTime = 0;
     } else {
-      this.fireEventsBetween(previousTime, nextTime, false);
+      this.fireEventsBetween(previousTime, nextTime);
     }
     this.#time = nextTime;
     this.evaluate(this.#time);
@@ -38599,14 +38659,13 @@ var Timeline = class _Timeline extends Object2 {
     }
   }
   //==============================================================================
-  // 구간 안의 이벤트 키 / 마커 발생. (fromTime 초과 ~ toTime 이하, isInclusiveEnd 면 끝도 포함)
+  // 구간 안의 이벤트 키 / 마커 발생. (fromTime 초과 ~ toTime 이하)
   //==============================================================================
   /**
    * @param { number } fromTime
    * @param { number } toTime
-   * @param { boolean } isInclusiveEnd
    */
-  fireEventsBetween(fromTime, toTime, isInclusiveEnd) {
+  fireEventsBetween(fromTime, toTime) {
     if (this.#isDirty) {
       this.compile();
     }
@@ -38614,7 +38673,7 @@ var Timeline = class _Timeline extends Object2 {
       if (time <= fromTime) {
         return false;
       }
-      return isInclusiveEnd ? time <= toTime : time < toTime;
+      return time <= toTime;
     }, "isInside");
     for (const compiledTrack of this.#compiledTracks) {
       if (compiledTrack.track.property !== "event" || compiledTrack.track.enabled === false) {

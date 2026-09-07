@@ -8,6 +8,7 @@ import { Color } from "../base/color.js";
 import { Component } from "../core/component.js";
 import { Graphic } from "../core/graphic.js";
 import * as Math from "../base/math.js";
+import { SeededRandom } from "../base/seededrandom.js";
 
 
 //==============================================================================
@@ -118,6 +119,8 @@ export class ParticleSystem extends Component {
 	/** @private @type { number } */ #streakScale; // streak 길이 = 속도 x 이 값.
 	/** @private @type { boolean } */ #isWorldSpace; // 참이면 방출 후 노드 이동의 영향을 받지 않는다.
 	/** @private @type { boolean } */ #isManualTick; // 참이면 노드 갱신에서 진행하지 않고 simulate() 로만 진행한다. (타임라인 등 외부 시간)
+	/** @private @type { SeededRandom | null } */ #random; // 시드가 있으면 이 난수로 스폰한다. (stop(true) 로 비우면 시드로 되돌아가 같은 결과가 나온다 — 타임라인 스크럽)
+	/** @private @type { number | null } */ #randomSeed;
 
 	//==============================================================================
 	// 생성.
@@ -134,6 +137,8 @@ export class ParticleSystem extends Component {
 		this.#isPlaying = true;
 		this.#isLooping = true;
 		this.#isManualTick = false;
+		this.#random = null;
+		this.#randomSeed = null;
 		this.#duration = 1;
 		this.#playElapsedSeconds = 0;
 		this.#maxParticleCount = 512;
@@ -197,6 +202,10 @@ export class ParticleSystem extends Component {
 		this.#isPlaying = false;
 		if (isClearing) {
 			this.#particleList.length = 0;
+			this.#emissionAccumulator = 0;
+			if (this.#random) {
+				this.#random.setSeed(this.#randomSeed);
+			}
 		}
 	}
 
@@ -320,31 +329,31 @@ export class ParticleSystem extends Component {
 		let directionY = -1;
 		const shape = this.#emitterShape;
 		if (shape === ParticleEmitterShape.circle) {
-			const angle = Math.randomRange(0, System.Math.PI * 2);
-			const radius = this.#shapeRadius * System.Math.sqrt(Math.randomRange(0, 1));
+			const angle = this.randomRange(0, System.Math.PI * 2);
+			const radius = this.#shapeRadius * System.Math.sqrt(this.randomRange(0, 1));
 			spawnX = System.Math.cos(angle) * radius;
 			spawnY = System.Math.sin(angle) * radius;
 			directionX = System.Math.cos(angle);
 			directionY = System.Math.sin(angle);
 		}
 		else if (shape === ParticleEmitterShape.cone) {
-			const angle = -System.Math.PI * 0.5 + Math.randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
-			const radius = Math.randomRange(0, this.#shapeRadius);
+			const angle = -System.Math.PI * 0.5 + this.randomRange(-this.#coneAngleRadian, this.#coneAngleRadian);
+			const radius = this.randomRange(0, this.#shapeRadius);
 			spawnX = System.Math.cos(angle) * radius;
 			spawnY = System.Math.sin(angle) * radius;
 			directionX = System.Math.cos(angle);
 			directionY = System.Math.sin(angle);
 		}
 		else if (shape === ParticleEmitterShape.box) {
-			spawnX = Math.randomRange(-this.#boxSize.x * 0.5, this.#boxSize.x * 0.5);
-			spawnY = Math.randomRange(-this.#boxSize.y * 0.5, this.#boxSize.y * 0.5);
+			spawnX = this.randomRange(-this.#boxSize.x * 0.5, this.#boxSize.x * 0.5);
+			spawnY = this.randomRange(-this.#boxSize.y * 0.5, this.#boxSize.y * 0.5);
 		}
 		else if (shape === ParticleEmitterShape.edge) {
-			spawnX = Math.randomRange(-this.#edgeWidth * 0.5, this.#edgeWidth * 0.5);
+			spawnX = this.randomRange(-this.#edgeWidth * 0.5, this.#edgeWidth * 0.5);
 			directionY = 1;
 		}
 		else {
-			const angle = Math.randomRange(0, System.Math.PI * 2);
+			const angle = this.randomRange(0, System.Math.PI * 2);
 			directionX = System.Math.cos(angle);
 			directionY = System.Math.sin(angle);
 		}
@@ -362,19 +371,19 @@ export class ParticleSystem extends Component {
 			spawnY += nodePosition.y;
 		}
 
-		const speed = Math.randomRange(this.#startSpeedMin, this.#startSpeedMax);
-		const colorBlend = Math.randomRange(0, 1);
+		const speed = this.randomRange(this.#startSpeedMin, this.#startSpeedMax);
+		const colorBlend = this.randomRange(0, 1);
 		const particle = this.#freeList.pop() || {};
 		particle.x = spawnX;
 		particle.y = spawnY;
 		particle.velocityX = directionX * speed;
 		particle.velocityY = directionY * speed;
 		particle.age = 0;
-		particle.lifetime = Math.randomRange(this.#startLifetimeMin, this.#startLifetimeMax);
-		particle.size = Math.randomRange(this.#startSizeMin, this.#startSizeMax);
-		particle.rotation = Math.randomRange(this.#startRotationMin, this.#startRotationMax);
-		particle.angularVelocity = Math.randomRange(this.#angularVelocityMin, this.#angularVelocityMax);
-		particle.wobblePhase = Math.randomRange(0, System.Math.PI * 2);
+		particle.lifetime = this.randomRange(this.#startLifetimeMin, this.#startLifetimeMax);
+		particle.size = this.randomRange(this.#startSizeMin, this.#startSizeMax);
+		particle.rotation = this.randomRange(this.#startRotationMin, this.#startRotationMax);
+		particle.angularVelocity = this.randomRange(this.#angularVelocityMin, this.#angularVelocityMax);
+		particle.wobblePhase = this.randomRange(0, System.Math.PI * 2);
 		particle.red = this.#startColorA.red + (this.#startColorB.red - this.#startColorA.red) * colorBlend;
 		particle.green = this.#startColorA.green + (this.#startColorB.green - this.#startColorA.green) * colorBlend;
 		particle.blue = this.#startColorA.blue + (this.#startColorB.blue - this.#startColorA.blue) * colorBlend;
@@ -864,5 +873,34 @@ export class ParticleSystem extends Component {
 	/** @returns { boolean } */
 	isManualTick() {
 		return this.#isManualTick;
+	}
+
+	//==============================================================================
+	// 난수 시드 설정. (설정하면 스폰 난수가 시드 난수로 바뀌고 stop(true) 마다 시드로 되돌아간다 — 되감기 재현용)
+	//==============================================================================
+	/** @param { number } seed */
+	setRandomSeed(seed) {
+		this.#randomSeed = seed;
+		this.#random = new SeededRandom(seed);
+	}
+
+	/** @returns { number | null } */
+	getRandomSeed() {
+		return this.#randomSeed;
+	}
+
+	//==============================================================================
+	// 스폰용 난수. (시드가 있으면 시드 난수, 없으면 전역 난수)
+	//==============================================================================
+	/**
+	 * @param { number } minValue
+	 * @param { number } maxValue
+	 * @returns { number }
+	 */
+	randomRange(minValue, maxValue) {
+		if (this.#random) {
+			return this.#random.nextRange(minValue, maxValue);
+		}
+		return Math.randomRange(minValue, maxValue);
 	}
 }

@@ -12,6 +12,7 @@
 - Mask 에 둥근 모서리(setRoundSize) — Graphic.beginClipRect(rect, roundSize) 가 둥근 사각형을 스텐실에 써서 무대 컨텐트가 배경 모양대로 잘린다. timelineshowcase · spriteeffects · particleeffects 샘플의 무대(반지름 14)에 적용
 - Timeline 이 파티클을 시간으로 다룸 — 대상 파티클 시스템을 수동 틱(ParticleSystem.setManualTick / simulate)으로 바꿔 재생 중에만 진행하고, 스크럽 / 되감기 / 반복 감기 때는 비운 뒤 0초부터 이벤트를 다시 밟으며 재시뮬레이션한다. 일시 정지하면 파티클도 멈춘다
 - 샘플 이름: Effects → Particle Effects, Timeline → Timeline Showcase, Sprite FX → Sprite Effects. 두 새 샘플에서 상단 설명과 무대 위 코드 패널을 뺐다(시연용). Sprite Effects 목록은 스프라이트 셰이더 → 화면 효과 → 연출 차례
+- Timeline 파티클 재현성: 수집한 파티클 시스템에 시드 난수(ParticleSystem.setRandomSeed — stop(true) 마다 시드로 되돌아감)를 줘 스크럽 / 되감기마다 같은 결과. 이벤트 트랙이 없는 파티클은 타임라인 시작과 함께 자유 재생. 틱 끝이 키 시간과 정확히 같을 때 이벤트가 빠지던 구간 판정(fireEventsBetween) 수정. Timeline Showcase 는 눌린 채 같은 위치면 seek 하지 않음
 - 샘플 공통: 페이지 제목 Title Case 통일, Scene 기반 샘플(Sprite Effects / Particle Effects / UI Showcase)에 휠 → 스크롤 뷰 전달, 엔진 import 에 캐시 스탬프, Sprite Effects 목록은 행을 눌러도 스크롤을 옮기지 않음. Timeline Showcase 스크럽은 잡으면 일시 정지 · PLAY 로 재개
 - 샘플 spritefx(examples/spriteeffects) 신규 — 절차적 픽셀 스프라이트(슬라임 / 코인 / 박쥐 / 문장 / 별 / 보석)로 ShaderSprite 48종 · ScreenEffect 58종을 표에서 자동 나열하고, 연출 조합 25종(히트 스톱 / 화면 흔들림 / 슬로 모션 / 잔상 / 플립북 / 떠오르는 데미지 / 타자기 대사 / 슬래시 트레일 / 패럴랙스 / 카메라 펀치 / 스쿼시 앤 스트레치 / 스폰·디스폰 / 체력 바 / 번개 / 레벨 업 / 텔레포트 / 프리즈 프레임 / 포털 / 수중 / 상태 이상 / 승리 / 게임 오버 / 낮·밤 / 피격 넉백 / 폭우) 시연
 
