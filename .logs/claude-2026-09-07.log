@@ -51,3 +51,8 @@
 - Timeline Showcase: 스크럽 바를 누르면 timeline.pause(), 끌면 seek, 놓아도 정지 유지. 세 샘플 + UI Showcase 의 엔진 import 에 ENGINE_CACHE_STAMP("./vanilla.js?v=...") 를 붙여 엔진 재배포 때 캐시를 피한다.
 - 페이지 제목은 Title Case 로 통일(OLD FACE → Old Face, ANCIENT MOUNTAIN → Ancient Mountain — 저장소 + NAS). 서버의 폴더 / 링크는 모두 새 이름(particleeffects / timelineshowcase / spriteeffects) — 사용자 화면의 옛 링크는 캐시.
 - 휠: UIScene 만 TouchRaycaster 로 휠을 스크롤 뷰에 넘기고 Scene + TouchRecognizer 샘플은 무시하고 있었다 → Sprite Effects / Particle Effects / UI Showcase 씬에 touchWheel(포인터 아래 가장 안쪽 UIScrollView 로 전달) 추가.
+
+## 목록 행 선택 시 자동 스크롤 제거
+[22:45 요청 → 22:50 응답]
+- 요청: "스프라이트 효과 / 타임라인 쇼케이스 스크롤 뷰에서 누른 행이 꼭 중앙으로 이동해 버린다 — 빼라".
+- Sprite Effects selectMode 의 '선택 행을 목록 가운데로' setScrollOffset 블록 제거. (초기 진입 시 주소의 mode 로 열 때도 목록은 맨 위에서 시작) Timeline Showcase 는 고정 목록(스크롤 뷰 없음)이라 해당 코드가 없어 손대지 않음.

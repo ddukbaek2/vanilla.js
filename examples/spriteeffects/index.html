@@ -1451,13 +1451,6 @@
 				rowEntry.paintComponent.setColor(isActive ? ACCENT_COLOR.clone() : new Color(0, 0, 0, 0));
 				rowEntry.titleLabel.setTextColor(isActive ? ON_ACCENT_COLOR.clone() : TEXT_COLOR.clone());
 			}
-			// 목록 스크롤을 선택 행으로.
-			const rowEntry = this.#listRowMap.get(modeKey);
-			if (rowEntry && this.listScroll) {
-				const targetOffset = System.Math.max(0, rowEntry.y - LIST_HEIGHT / 2);
-				this.listScroll.setScrollOffset(Vector2.create(0, -targetOffset));
-				this.updateListCulling();
-			}
 		}
 
 		//==============================================================================
