@@ -77,3 +77,5 @@
 - BLOOM STRENGTH 기본값을 슬라이더 최대값 0.5 로.
 - 기본 뷰를 다시 전신(초점 0.95m / 거리 4.0m) 으로 — 확대는 휠 / 더블클릭으로.
 - OUTLINE WIDTH 기본값 0 (아웃라인 패스는 폭 0 이면 건너뜀).
+- 다리가 좌우로 미끄러지는 문제: 리타깃이 골반 회전만 옮기고 이동은 Y 만 반영해, 체중 이동 클립에서 골반이 옆으로 가지 않아 다리만 벌어졌다 → 골반 이동을 X/Y/Z 모두 반영(턴테이블 회전 뒤에 적용).
+- 아이들 클립 교체: Breathing Idle → Female Standing Idle. 후보 3종(Female Standing Idle / Neutral Idle / Standing Idle)을 받아 발 세계 좌표 이동량(발 미끄러짐)과 자세를 비교해 선택. 발 수평 이동 0.4cm 이하.

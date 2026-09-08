@@ -1760,7 +1760,7 @@
 	}
 	const mixamoHipsRestHeight = mixamoRestTable.Hips ? mixamoRestTable.Hips.position[1] : 100;
 	const vrmHipsRestHeight = restWorldPositionList[humanoidNodeIndexByBone.get("hips")].y;
-	const animationState = { activeName: "", hipsOffsetY: 0, springResetPending: true };
+	const animationState = { activeName: "", hipsOffset: makeVector(0, 0, 0), springResetPending: true };
 	let animationHipsHeightScale = vrmHipsRestHeight / System.Math.max(mixamoHipsRestHeight, 1);
 
 	// 애니메이션 버튼. (표정 버튼 아래 — 실제 Mixamo 본 애니메이션)
@@ -1806,11 +1806,12 @@
 			const newLocal = quaternionConjugate(parentWorld).multiply(desiredWorld);
 			setLocalRotationOffset(entry.targetIndex, quaternionConjugate(baseRotation).multiply(newLocal));
 		}
-		// 골반 높이. (클립의 위아래 움직임만 — 제자리 재생)
+		// 골반 이동. (클립의 골반 위치 변화를 키 비율로 — 체중 이동 때 골반이 실제로 옆으로 움직여야 다리가 미끄러지지 않는다)
 		const hipsSourceIndex = animationNodeIndexByBone.get("Hips");
 		if (hipsSourceIndex !== undefined && mixamoRestTable.Hips) {
 			const hipsElements = animationNodeList[hipsSourceIndex].worldMatrix.getElements();
-			animationState.hipsOffsetY = (hipsElements[13] - mixamoRestTable.Hips.position[1]) * animationHipsHeightScale;
+			const restPosition = mixamoRestTable.Hips.position;
+			animationState.hipsOffset = makeVector((hipsElements[12] - restPosition[0]) * animationHipsHeightScale, (hipsElements[13] - restPosition[1]) * animationHipsHeightScale, (hipsElements[14] - restPosition[2]) * animationHipsHeightScale);
 		}
 	}
 
@@ -2738,8 +2739,9 @@
 		if (optionStates.turntable) {
 			turntableAngle += deltaTime * sliderStates.turntableSpeed;
 		}
-		modelMatrix = Matrix4.createTranslation(0, animationState.hipsOffsetY, 0);
-		modelMatrix.multiply(Matrix4.createRotationY(turntableAngle));
+		// 턴테이블 회전 뒤에 골반 이동. (이동은 캐릭터 기준이라 회전과 같이 돈다)
+		modelMatrix = Matrix4.createRotationY(turntableAngle);
+		modelMatrix.multiply(Matrix4.createTranslation(animationState.hipsOffset.x, animationState.hipsOffset.y, animationState.hipsOffset.z));
 		modelRotation = quaternionFromAxisAngle(makeVector(0, 1, 0), turntableAngle);
 		const modelElements = modelMatrix.getElements();
 
