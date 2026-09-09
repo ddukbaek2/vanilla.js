@@ -85,3 +85,10 @@
 - 요청: 깃허브 README 에 현재 샘플 / 도구를 모두 링크하고 꾸미기, 현재 버전까지 릴리스 + 태깅.
 - README 전면 개편: 가운데 정렬 머리말 + 배지 5종, 소개 / 빠른 시작(실제 API 로 검증한 최소 예제 + esbuild 명령) / 주요 기능 표 7갈래 / 도구 표(웹 4종 + 명령줄 6종) / 샘플 표 8종(설명 · 데모 · 소스) / 게임 3종 / 저장소 구조 / 개발 환경 / 링크 / 라이선스. 제목 오타 vinalla.js → vanilla.js, 상대 링크 18개 전부 존재 확인.
 - 배포: experimental 브랜치 67 커밋 푸시(4f99903 → 505bd39), 주석 태그 v0.5.8-experimental 생성 / 푸시, GitHub 릴리스 발행(UPDATE.md 0.5.8 절을 본문으로, 샘플 / 도구 링크 머리말 포함). dev 브랜치는 건드리지 않음.
+
+## 브랜치 흐름 정리 (experimental / dev → release)
+[11:00 요청 → 11:20 응답]
+- 지적: experimental 과 dev 는 동급이고 release 가 최종인데 dev 를 빼고 올렸다.
+- dev 를 experimental 과 같은 커밋으로 fast-forward, release 에는 --no-ff 병합(과거 관례인 "dev 브랜치 병합 (버전)" 형식). release 에만 있던 resumeContext 커밋 2개는 내용이 이미 현재 코드에 반영되어 있어 충돌 없음.
+- 태그 v0.5.8-experimental 은 과거 v0.2.1 관례대로 release 병합 커밋을 가리키도록 옮기고, GitHub 릴리스 대상 브랜치도 release 로 수정.
+- README 지적 반영: 소개를 엔진 기능 설명으로 정리(작업 과정 / 방침 문장 제거), 본문 전체를 존댓말로.
