@@ -112,7 +112,7 @@ export class Engine extends Object {
 		this.#frameNumber = 0;
 
 		this.#statisticsTextRect = Rect.zero();
-		this.#version = Version.create(0, 2, 1);
+		this.#version = Version.create(0, 3, 0);
 
 		// 현재 엔진 인스턴스 글로벌 등록. (루트 노드 등 컨텍스트 없는 객체에서 ViewManager 등 접근용)
 		System.vanillaEngine = this;
@@ -133,12 +133,8 @@ export class Engine extends Object {
 			throw new System.Error(`scene is invalid.`);
 		}
 		
-		// 기본 폰트 불러오기.
-		const internalFontFace = new FontFace(`DOSGothic`, `url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff")`);
-		// const internalFontFace = new FontFace(`DOSGothic`, `url("./assets/fonts/Consolas.woff2")`);
-		internalFontFace.load().then((loadedFont) => {
-			document.fonts.add(loadedFont);
-
+		// 씬 로드와 렌더 루프 시작. (기본 폰트가 실패하거나 늦어도 여기는 막히지 않는다)
+		const startEngine = () => {
 			// 씬 로드는 백그라운드로 시작. (렌더 루프가 drawOnLoad로 로딩 화면 출력)
 			const sceneManager = this.getSceneManager();
 			sceneManager.loadScene(scene).catch((error) => {
@@ -158,8 +154,16 @@ export class Engine extends Object {
 
 			++this.#frameNumber;
 			System.window.requestAnimationFrame(this.#updateEngineCallback);
+		};
+		startEngine();
+
+		// 기본 폰트는 뒤에서 불러온다. (성공하면 이후 그리는 글자부터 반영)
+		const internalFontFace = new FontFace(`DOSGothic`, `url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff")`);
+		// const internalFontFace = new FontFace(`DOSGothic`, `url("./assets/fonts/Consolas.woff2")`);
+		internalFontFace.load().then((loadedFont) => {
+			document.fonts.add(loadedFont);
 		}).catch((error) => {
-			console.error(error);
+			console.warn(`기본 폰트 로드 실패 — 시스템 폰트로 계속합니다.`, error);
 		});
 	}
 
@@ -489,7 +493,6 @@ export class Engine extends Object {
 	 * @param { Graphic } graphic 
 	 */
 	drawStatistics(graphic) {
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const timeManager = this.getTimeManager();
 		const viewManager = this.getViewManager();
 		const inputManager = this.getInputManager();
@@ -499,7 +502,7 @@ export class Engine extends Object {
 		const drawStatisticsText = (text) => {
 			if (text) {
 				// 출력.
-				canvasRenderingContext.fillText(text, textPosition.x, textPosition.y);
+				graphic.drawFillText(text, textPosition.x, textPosition.y);
 				
 				// 자동 외곽선 출력.
 				// canvasRenderingContext.strokeText(text, textPosition.x, textPosition.y);
@@ -524,7 +527,7 @@ export class Engine extends Object {
 			textPosition.y += 16;
 
 			// 영역 출력.
-			const metrics = canvasRenderingContext.measureText(text);
+			const metrics = graphic.measureText(text);
 			const width = metrics.width; // metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight)
 			const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
 			const textRect = Rect.create(textPosition.x, textPosition.y, width, height);
@@ -552,8 +555,8 @@ export class Engine extends Object {
 
 		// 배경 출력.
 		// 기본 위치인 화면 좌상단으로 이동.
-		canvasRenderingContext.setTransform(1, 0, 0, 1, 0, 0);
-		canvasRenderingContext.scale(1.4, 1.4);
+		graphic.setTransform(1, 0, 0, 1, 0, 0);
+		graphic.scale(1.4, 1.4);
 		graphic.setFillColor("rgba(0, 0, 0, 0.6)");
 		graphic.drawRoundRect(Rect.create(
 			this.#statisticsTextRect.position.x - 10,
@@ -565,10 +568,10 @@ export class Engine extends Object {
 		this.#statisticsTextRect.size.y = 0;
 
 		// canvasRenderingContext.letterSpacing = "-1px";
-		canvasRenderingContext.font = `16px DOSGothic`;
-		canvasRenderingContext.textAlign = "left";
-		canvasRenderingContext.textBaseline = "top";
-		canvasRenderingContext.fillStyle = Colors.white;
+		graphic.setFontString(`16px DOSGothic`);
+		graphic.setTextAlign("left");
+		graphic.setTextBaseline("top");
+		graphic.setFillColor(Colors.white);
 		// canvasRenderingContext.fillStyle = Colors.white; // Colors.lightVanilla;
 		// canvasRenderingContext.lineWidth = 4;
 		// canvasRenderingContext.strokeStyle = Colors.black; // Colors.darkVanilla;
@@ -734,6 +737,7 @@ export class Engine extends Object {
 		inputManager.setTouchReleased(false);
 		inputManager.setTouchCancelled(false);
 		inputManager.clearWheelDelta();
+		inputManager.updateFrameSnapshot();
 
 		// 다음 프레임 호출 요청.
 		++this.#frameNumber;
@@ -862,6 +866,30 @@ export class Engine extends Object {
 	/**
 	 * @returns { number }
 	 */
+	//==============================================================================
+	// 응용 프로그램 종료.
+	// - Capacitor 네이티브면 App 플러그인으로 끝내고, 웹이면 창 닫기를 시도한다.
+	//   (둘 다 환경에 따라 거부될 수 있으며 실패해도 예외를 내지 않는다)
+	//==============================================================================
+	exitApplication() {
+		try {
+			const capacitor = System.Capacitor;
+			if (capacitor && capacitor.Plugins && capacitor.Plugins.App && typeof capacitor.Plugins.App.exitApp === "function") {
+				capacitor.Plugins.App.exitApp();
+				return;
+			}
+		}
+		catch (nativeError) {
+			// 네이티브 종료 실패는 무시하고 웹 방식을 시도한다.
+		}
+		try {
+			System.window.close();
+		}
+		catch (closeError) {
+			// 브라우저가 거부하면 할 수 있는 것이 없다.
+		}
+	}
+
 	getFrameNumber() {
 		return this.#frameNumber;
 	}

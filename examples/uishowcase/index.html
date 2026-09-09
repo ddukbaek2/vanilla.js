@@ -1,0 +1,2059 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>vanilla.js - UI Showcase</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<style>
+	html, body {
+		margin: 0;
+		padding: 0;
+		width: 100%;
+		height: 100%;
+		overflow: hidden;
+		background: #14171e;
+		touch-action: none;
+		user-select: none;
+	}
+	#mainCanvas {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+	"use strict";
+	const System = globalThis;
+
+	//==============================================================================
+	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../../build/vanilla.js)
+	//==============================================================================
+	// 배포 스탬프를 주소에 붙여 브라우저가 옛 엔진을 캐시에서 꺼내 쓰지 않게 한다. (엔진을 다시 올릴 때 값을 바꾼다)
+	const ENGINE_CACHE_STAMP = "20260908a";
+	let engineModule = null;
+	try {
+		try {
+			engineModule = await import("./vanilla.js?v=" + ENGINE_CACHE_STAMP);
+		}
+		catch (importError) {
+			engineModule = await import("../../build/vanilla.js");
+		}
+	}
+	catch (engineError) {
+		System.document.body.innerHTML = "<p style=\"color:#fff;font-family:sans-serif;padding:2em\">vanilla.js 엔진 모듈을 불러오지 못했습니다.</p>";
+		throw engineError;
+	}
+
+	const Engine = engineModule.Engine;
+	const EngineConfiguration = engineModule.EngineConfiguration;
+	const Scene = engineModule.Scene;
+	const WorldNode = engineModule.WorldNode;
+	const Vector2 = engineModule.Vector2;
+	const Color = engineModule.Color;
+	const Pivot = engineModule.Pivot;
+	const Rect = engineModule.Rect;
+	const Paint = engineModule.Paint;
+	const Tween = engineModule.Tween;
+	const UILabel = engineModule.UILabel;
+	const UIButton = engineModule.UIButton;
+	const UIToggleButton = engineModule.UIToggleButton;
+	const UISlider = engineModule.UISlider;
+	const UIProgressView = engineModule.UIProgressView;
+	const UIScrollView = engineModule.UIScrollView;
+	const UIListView = engineModule.UIListView;
+	const UILineChart = engineModule.UILineChart;
+	const UIBarChart = engineModule.UIBarChart;
+	const UIDropdown = engineModule.UIDropdown;
+	const UIContextMenu = engineModule.UIContextMenu;
+	const UIDraggable = engineModule.UIDraggable;
+	const UISpinner = engineModule.UISpinner;
+	const UIDocument = engineModule.UIDocument;
+	const TouchRecognizer = engineModule.TouchRecognizer;
+	const ViewScaleMode = engineModule.ViewScaleMode;
+	const PopupMotion = engineModule.PopupMotion;
+	const UIToast = engineModule.UIToast;
+	const Typewriter = engineModule.Typewriter;
+	const BeepPlayer = engineModule.BeepPlayer;
+	const Format = engineModule.Format;
+	const SeededRandom = engineModule.SeededRandom;
+
+	//==============================================================================
+	// 전역 상수 목록.
+	//==============================================================================
+	const ASSET_FILE_NAMES = ["home", "shop", "settings", "components", "navigation", "popup"];
+	const SHOWCASE_FONT_SOURCE = "local(\"SF Pro Display\"), local(\"SF Pro Text\"), local(\"Segoe UI Variable Display\"),"
+		+ " local(\"Segoe UI Variable\"), local(\"Inter\"), local(\"Segoe UI\"), local(\"Apple SD Gothic Neo\"), local(\"Malgun Gothic\")";
+	const SCREEN_NAMES = ["home", "shop", "settings", "components"];
+	const NAVIGATION_TARGETS = [
+		{ buttonName: "NavDASHBOARD", screenName: "home" },
+		{ buttonName: "NavSTORE", screenName: "shop" },
+		{ buttonName: "NavSETTINGS", screenName: "settings" },
+		{ buttonName: "NavCOMPONENTS", screenName: "components" },
+	];
+	const CATALOG_TOTAL_COUNT = 500;
+	const CATALOG_INITIAL_COUNT = 12;
+	const CATALOG_PAGE_COUNT = 20;
+	const CATALOG_LOAD_SECONDS = 0.7;
+	const SIDE_PANEL_OFFSET = 356; // 화면 오른쪽 끝에서 사이드 패널 왼쪽까지.
+	// 테마 표. (역할 → 색. 문서는 Dim 팔레트로 구워져 있고, 로드 때 역할로 캐시해 전환한다)
+	function themeColor(hexText) {
+		const red = System.Math.round(parseInt(hexText.substring(1, 3), 16) / 255 * 1000) / 1000;
+		const green = System.Math.round(parseInt(hexText.substring(3, 5), 16) / 255 * 1000) / 1000;
+		const blue = System.Math.round(parseInt(hexText.substring(5, 7), 16) / 255 * 1000) / 1000;
+		return new Color(red, green, blue, 1);
+	}
+	const THEME_TABLE = {
+		dim: {
+			label: "Dim",
+			background: themeColor("#14171e"), surface: themeColor("#1b202a"), card: themeColor("#232937"),
+			cardRaised: themeColor("#2c3344"), hairline: themeColor("#394154"), text: themeColor("#e8ebf2"),
+			textDim: themeColor("#9aa2b2"), textFaint: themeColor("#6b7387"), accent: themeColor("#6d7dff"),
+			positive: themeColor("#45b585"), negative: themeColor("#e06058"), ink: themeColor("#12151c"),
+			toggleOff: themeColor("#3c4457"), overlay: themeColor("#06080d"), textOnAccent: themeColor("#ffffff"),
+			barTrack: themeColor("#333a4b"), gridLine: new Color(1, 1, 1, 0.07), backgroundStyle: "rgb(20, 23, 30)",
+		},
+		dark: {
+			label: "Dark",
+			background: themeColor("#0b0d12"), surface: themeColor("#12151c"), card: themeColor("#171b24"),
+			cardRaised: themeColor("#1e2430"), hairline: themeColor("#262c38"), text: themeColor("#e6e9ef"),
+			textDim: themeColor("#8a91a0"), textFaint: themeColor("#545b69"), accent: themeColor("#5b6cff"),
+			positive: themeColor("#3fb27f"), negative: themeColor("#d9564f"), ink: themeColor("#0b0d12"),
+			toggleOff: themeColor("#2c3442"), overlay: themeColor("#04060a"), textOnAccent: themeColor("#e6e9ef"),
+			barTrack: themeColor("#1e2431"), gridLine: new Color(1, 1, 1, 0.07), backgroundStyle: "rgb(11, 13, 18)",
+		},
+		light: {
+			label: "Light",
+			background: themeColor("#eef1f6"), surface: themeColor("#ffffff"), card: themeColor("#f4f6fa"),
+			cardRaised: themeColor("#e6eaf2"), hairline: themeColor("#d9dfe9"), text: themeColor("#1d2433"),
+			textDim: themeColor("#5b6474"), textFaint: themeColor("#97a0b1"), accent: themeColor("#4f5fe8"),
+			positive: themeColor("#1f9e6e"), negative: themeColor("#d5483f"), ink: themeColor("#ffffff"),
+			toggleOff: themeColor("#c9d1dd"), overlay: themeColor("#2a3145"), textOnAccent: themeColor("#ffffff"),
+			barTrack: themeColor("#dde2ec"), gridLine: new Color(0, 0, 0, 0.08), backgroundStyle: "rgb(238, 241, 246)",
+		},
+	};
+	const THEME_KEYS = ["dim", "dark", "light"];
+	const THEME_STORAGE_KEY = "vanillaConsole.theme";
+
+	// 코드가 참조하는 가변 색. (테마 전환 때 채널을 통째로 바꾼다)
+	function assignColor(targetColor, sourceColor) {
+		targetColor.red = sourceColor.red;
+		targetColor.green = sourceColor.green;
+		targetColor.blue = sourceColor.blue;
+	}
+	const BAR_TRACK_COLOR = THEME_TABLE.dim.barTrack.clone();
+	const ACCENT_COLOR = THEME_TABLE.dim.accent.clone();
+	const POSITIVE_COLOR = THEME_TABLE.dim.positive.clone();
+	const NEGATIVE_COLOR = THEME_TABLE.dim.negative.clone();
+	const TEXT_COLOR = THEME_TABLE.dim.text.clone();
+	const TEXT_DIM_COLOR = THEME_TABLE.dim.textDim.clone();
+	const TEXT_FAINT_COLOR = THEME_TABLE.dim.textFaint.clone();
+	const TEXT_ON_ACCENT_COLOR = THEME_TABLE.dim.textOnAccent.clone();
+	const CARD_COLOR = THEME_TABLE.dim.card.clone();
+	const CARD_RAISED_COLOR = THEME_TABLE.dim.cardRaised.clone();
+
+	//==============================================================================
+	// 데이터 생성. (전부 코드 소관 — 문서에는 템플릿만 있다)
+	//==============================================================================
+	const dataRandom = new SeededRandom(20260901);
+
+	const FEATURED_PACKS = (() => {
+		const packNames = ["Team Bundle", "Pro Toolkit", "Analytics Pack", "Security Suite", "CI Booster", "Design Kit",
+			"Data Bridge", "API Gateway", "Backup Plus", "Insight Pack", "Workflow Kit", "Edge Cache"];
+		return packNames.map((packName) => {
+			return {
+				title: packName,
+				caption: "Bundle, " + dataRandom.nextInt(3, 9) + " add-ons",
+				price: dataRandom.nextInt(19, 89) + 0.99,
+			};
+		});
+	})();
+
+	const CATALOG_ITEMS = (() => {
+		const prefixNames = ["Auto", "Smart", "Quick", "Pro", "Team", "Cloud", "Secure", "Batch", "Live", "Meta"];
+		const toolNames = ["Backup", "Formatter", "Linter", "Themes", "Sync", "Deploy", "Monitor", "Export", "Webhooks", "Search"];
+		const categoryNames = ["Productivity", "Integration", "Developer tools", "Analytics", "Security"];
+		const itemList = [];
+		for (let itemIndex = 0; itemIndex < CATALOG_TOTAL_COUNT; ++itemIndex) {
+			const itemTitle = prefixNames[dataRandom.nextInt(0, prefixNames.length - 1)] + " " + toolNames[itemIndex % toolNames.length];
+			itemList.push({
+				title: itemTitle,
+				caption: categoryNames[dataRandom.nextInt(0, categoryNames.length - 1)] + ", v" + dataRandom.nextInt(1, 4) + "." + dataRandom.nextInt(0, 9),
+				price: dataRandom.nextInt(2, 49) + 0.99,
+				glyph: itemTitle.substring(0, 1),
+			});
+		}
+		return itemList;
+	})();
+
+	const EVENT_MESSAGES = [
+		{ text: "Deploy finished on production", tag: "deploy" },
+		{ text: "Nightly backup completed", tag: "system" },
+		{ text: "New member joined the workspace", tag: "auth" },
+		{ text: "API key rotated", tag: "auth" },
+		{ text: "Invoice paid", tag: "billing" },
+		{ text: "Build #4132 passed", tag: "ci" },
+		{ text: "Alert resolved: high latency", tag: "system" },
+		{ text: "Config updated by admin", tag: "system" },
+		{ text: "Weekly report generated", tag: "report" },
+		{ text: "Cache purged on edge nodes", tag: "deploy" },
+	];
+
+	const TYPEWRITER_TEXT = "Text reveal is driven by the engine Typewriter -\nit exposes characters one by one on any label,\nwith skip and completion callbacks.";
+
+	//==============================================================================
+	// UI 쇼케이스 씬. — "VANILLA CONSOLE"
+	// - uiasset 문서(레이아웃 + 목록 템플릿)를 읽고, 데이터 / 동작은 전부 코드가 채운다.
+	//==============================================================================
+	class ShowcaseScene extends Scene {
+		//==============================================================================
+		// 멤버 변수 목록.
+		//==============================================================================
+		/** @private @type { TouchRecognizer | null } */ #touchRecognizer;
+		/** @private @type { System.Map } */ #screenRootMap;
+		/** @private @type { WorldNode | null } */ #navigationRootNode;
+		/** @private @type { WorldNode | null } */ #popupRootNode;
+		/** @private @type { WorldNode | null } */ #popupDialogNode;
+		/** @private @type { PopupMotion | null } */ #popupMotion;
+		/** @private @type { Typewriter | null } */ #popupTypewriter;
+		/** @private @type { UIToast | null } */ #toast;
+		/** @private @type { UIContextMenu | null } */ #contextMenu;
+		/** @private @type { BeepPlayer | null } */ #beepPlayer;
+		/** @private @type { string } */ #activeScreenName;
+		/** @private @type { number } */ #activeNavIndex;
+		/** @private @type { Function | null } */ #popupConfirmHandler;
+		/** @private @type { number } */ #elapsedSeconds;
+		/** @private @type { FontFace | null } */ #fontFace;
+		/** @private @type { Vector2 } */ #appliedViewSize;
+		/** @private @type { number } */ #mainWidth; // 본문 컬럼 폭. (화면 폭에 맞춰 가변)
+		/** @private @type { string } */ #themeKey;
+		/** @private @type { object[] } */ #paintRoleCache; // { paint, role, alpha }
+		/** @private @type { object[] } */ #labelRoleCache; // { label, role }
+		/** @private @type { string } */ #backgroundStyle;
+		/** @private @type { UISpinner[] } */ #demoSpinners;
+		/** @private @type { UIDropdown | null } */ #themeDropdown;
+		/** @private @type { UIDropdown | null } */ #regionDropdown;
+
+		// 대시보드 상태.
+		/** @private @type { UILineChart | null } */ #liveChart;
+		/** @private @type { UIBarChart | null } */ #revenueBars;
+		/** @private @type { UIListView | null } */ #eventListView;
+		/** @private @type { object[] } */ #eventList;
+		/** @private @type { number } */ #secondAccumulator;
+		/** @private @type { number } */ #eventAccumulator;
+		/** @private @type { number } */ #requestsPerSecond;
+		/** @private @type { number } */ #activeUserCount;
+		/** @private @type { number } */ #revenueValue;
+		/** @private @type { number } */ #cpuRatio;
+		/** @private @type { number } */ #memoryRatio;
+
+		// 스토어 상태.
+		/** @private @type { UIListView | null } */ #itemListView;
+		/** @private @type { number } */ #catalogLoadedCount;
+		/** @private @type { number } */ #catalogLoadRemainSeconds;
+		/** @private @type { UISpinner | null } */ #loadingSpinner;
+		/** @private @type { System.Map } */ #cartMap; // itemIndex → itemData
+		/** @private @type { object[] } */ #orderList;
+
+		// 컴포넌트 화면 상태.
+		/** @private @type { UIButton | null } */ #longPressButton;
+		/** @private @type { Typewriter | null } */ #demoTypewriter;
+		/** @private @type { UILineChart | null } */ #miniLineChart;
+		/** @private @type { UIBarChart | null } */ #miniBarChart;
+		/** @private @type { number } */ #miniChartPhase;
+
+		//==============================================================================
+		// 생성.
+		//==============================================================================
+		constructor() {
+			super();
+
+			this.#touchRecognizer = null;
+			this.#screenRootMap = new System.Map();
+			this.#navigationRootNode = null;
+			this.#popupRootNode = null;
+			this.#popupDialogNode = null;
+			this.#popupMotion = null;
+			this.#popupTypewriter = null;
+			this.#toast = null;
+			this.#contextMenu = null;
+			this.#beepPlayer = null;
+			this.#activeScreenName = "home";
+			this.#activeNavIndex = 0;
+			this.#popupConfirmHandler = null;
+			this.#elapsedSeconds = 0;
+			this.#fontFace = null;
+			this.#appliedViewSize = Vector2.create(0, 0);
+			this.#mainWidth = 884;
+			this.#themeKey = "dim";
+			this.#paintRoleCache = [];
+			this.#labelRoleCache = [];
+			this.#backgroundStyle = THEME_TABLE.dim.backgroundStyle;
+			this.#demoSpinners = [];
+			this.#themeDropdown = null;
+			this.#regionDropdown = null;
+
+			this.#liveChart = null;
+			this.#revenueBars = null;
+			this.#eventListView = null;
+			this.#eventList = [];
+			this.#secondAccumulator = 0;
+			this.#eventAccumulator = 0;
+			this.#requestsPerSecond = 142;
+			this.#activeUserCount = 12847;
+			this.#revenueValue = 182540;
+			this.#cpuRatio = 0.34;
+			this.#memoryRatio = 0.58;
+
+			this.#itemListView = null;
+			this.#catalogLoadedCount = CATALOG_INITIAL_COUNT;
+			this.#catalogLoadRemainSeconds = 0;
+			this.#loadingSpinner = null;
+			this.#cartMap = new System.Map();
+			this.#orderList = [];
+
+			this.#longPressButton = null;
+			this.#demoTypewriter = null;
+			this.#miniLineChart = null;
+			this.#miniBarChart = null;
+			this.#miniChartPhase = 0;
+		}
+
+		//==============================================================================
+		// 씬 구성.
+		//==============================================================================
+		create() {
+			super.create();
+
+			const root = this.getRoot();
+			root.setPivot(Pivot.topLeft.clone());
+			root.setAnchor(Pivot.topLeft.clone());
+			this.#touchRecognizer = new TouchRecognizer();
+			this.#touchRecognizer.setRootNode(root);
+		}
+
+		//==============================================================================
+		// 비동기 로드.
+		//==============================================================================
+		/**
+		 * @param { Engine } engine
+		 */
+		async load(engine) {
+			// 짧은 축을 기준 해상도(1680x1000)에 맞추고 긴 축은 화면 전체를 채운다. (좌우 여백 없음)
+			const viewManager = engine.getViewManager();
+			viewManager.setViewScaleMode(ViewScaleMode.stretchShortExpandLong);
+
+			// 시스템에 깔린 서체 가운데 애플 / 세고이 계열을 찾아 쓴다. 없으면 엔진 기본 서체 그대로.
+			try {
+				const fontFace = new System.FontFace("ShowcaseSans", SHOWCASE_FONT_SOURCE);
+				await fontFace.load();
+				System.document.fonts.add(fontFace);
+				this.#fontFace = fontFace;
+			}
+			catch (fontError) {
+				this.#fontFace = null;
+			}
+
+			const documentMap = new System.Map();
+			const fetchPromises = ASSET_FILE_NAMES.map(async (fileName) => {
+				const response = await System.fetch("./assets/" + fileName + ".uiasset.json", { cache: "no-cache" });
+				const jsonText = await response.text();
+				documentMap.set(fileName, UIDocument.fromJsonText(jsonText));
+			});
+			await System.Promise.all(fetchPromises);
+
+			const root = this.getRoot();
+			for (const screenName of SCREEN_NAMES) {
+				const screenRootNode = documentMap.get(screenName);
+				this.#screenRootMap.set(screenName, screenRootNode);
+				root.addChild(screenRootNode);
+				screenRootNode.setActive(screenName === this.#activeScreenName);
+			}
+			this.#navigationRootNode = documentMap.get("navigation");
+			root.addChild(this.#navigationRootNode);
+
+			this.#popupRootNode = documentMap.get("popup");
+			this.#popupRootNode.setActive(false);
+			root.addChild(this.#popupRootNode);
+
+			// 토스트. (큐 / 등장 / 퇴장을 엔진 UIToast 가 맡는다)
+			this.#toast = new UIToast({
+				width: 340,
+				height: 36,
+				fontSize: 12,
+				holdSeconds: 1.8,
+				backgroundColor: new Color(0.071, 0.086, 0.125, 0.97),
+				textColor: TEXT_COLOR,
+			});
+			root.addChild(this.#toast);
+
+			// 컨텍스트 메뉴. (맨 위에 그려지도록 마지막에 붙인다)
+			this.#contextMenu = new UIContextMenu();
+			root.addChild(this.#contextMenu);
+
+			// 단추 효과음. (엔진 BeepPlayer — 설정의 알림 소리 슬라이더와 연동)
+			this.#beepPlayer = new BeepPlayer(engine.getAudioManager(), 0.18);
+
+			this.bindDashboard();
+			this.bindStore();
+			this.bindSettings();
+			this.bindComponents();
+			this.bindNavigation();
+			this.bindPopup();
+			this.applyHeadingStyles();
+			this.buildThemeRoleCache();
+			let savedThemeKey = "dim";
+			try {
+				const storedThemeKey = System.localStorage.getItem(THEME_STORAGE_KEY);
+				if (storedThemeKey && THEME_TABLE[storedThemeKey]) {
+					savedThemeKey = storedThemeKey;
+				}
+			}
+			catch (storageError) {
+			}
+			this.applyTheme(savedThemeKey);
+
+			// 우클릭 → 컨텍스트 메뉴. (컴포넌트 화면의 지정 영역에서만)
+			const canvas = System.document.getElementById("mainCanvas");
+			canvas.addEventListener("contextmenu", (mouseEvent) => {
+				mouseEvent.preventDefault();
+				this.tryOpenContextMenu();
+			});
+		}
+
+		//==============================================================================
+		// 대시보드 동작. (KPI / 실시간 차트 / 이벤트 목록 / 시스템 게이지)
+		//==============================================================================
+		bindDashboard() {
+			const dashboardRootNode = this.#screenRootMap.get("home");
+
+			// 실시간 라인 차트. (매초 pushValue)
+			const liveChartNode = this.findNodeByName(dashboardRootNode, "LiveChart");
+			this.#liveChart = liveChartNode.addComponent(UILineChart);
+			this.#liveChart.setMaxSampleCount(90);
+			this.#liveChart.setLineColor(ACCENT_COLOR);
+			this.#liveChart.setValueRange(0, 260);
+			const historyValues = [];
+			for (let sampleIndex = 0; sampleIndex < 90; ++sampleIndex) {
+				historyValues.push(120 + dataRandom.nextInt(0, 70) + System.Math.sin(sampleIndex * 0.2) * 24);
+			}
+			this.#liveChart.setValueList(historyValues);
+
+			// 매출 바 차트. (14일)
+			const revenueBarsNode = this.findNodeByName(dashboardRootNode, "RevenueBars");
+			this.#revenueBars = revenueBarsNode.addComponent(UIBarChart);
+			const revenueValues = [];
+			for (let dayIndex = 0; dayIndex < 14; ++dayIndex) {
+				revenueValues.push(2400 + dataRandom.nextInt(0, 2800));
+			}
+			this.#revenueBars.setValueList(revenueValues);
+			this.#revenueBars.setBarColor(new Color(0.357, 0.424, 1, 0.45));
+			this.#revenueBars.setHighlightColor(ACCENT_COLOR);
+			this.#revenueBars.setHighlightIndex(13);
+			let bestValue = 0;
+			for (const value of revenueValues) {
+				bestValue = System.Math.max(bestValue, value);
+			}
+			this.setLabelText(dashboardRootNode, "BarCaption", "Best day  $" + this.formatNumber(bestValue) + ", highlighted: today");
+
+			// 이벤트 목록. (템플릿 + 데이터 → UIListView, 주기적으로 새 이벤트가 위에 쌓인다)
+			for (let eventIndex = 0; eventIndex < 24; ++eventIndex) {
+				this.#eventList.push(this.makeEventData(-(eventIndex + 1) * 7));
+			}
+			const eventListNode = this.findNodeByName(dashboardRootNode, "EventList");
+			const eventTemplateNode = this.findNodeByName(dashboardRootNode, "EventTemplate");
+			this.#eventListView = eventListNode.addComponent(UIListView);
+			this.#eventListView.setTemplateNode(eventTemplateNode);
+			this.#eventListView.setSpacing(6);
+			this.#eventListView.setBindItemEvent((itemNode, itemIndex) => {
+				this.bindEventRow(itemNode, itemIndex);
+			});
+			this.#eventListView.setItemCount(this.#eventList.length);
+
+			// 시스템 게이지.
+			this.styleProgressBar(dashboardRootNode, "SystemCpuBar", ACCENT_COLOR);
+			this.styleProgressBar(dashboardRootNode, "SystemMemoryBar", ACCENT_COLOR);
+			this.styleProgressBar(dashboardRootNode, "SystemDiskBar", ACCENT_COLOR);
+			const diskBar = this.findProgressBar(dashboardRootNode, "SystemDiskBar");
+			if (diskBar) {
+				diskBar.setValue(0.4);
+				diskBar.setSecondaryValue(0.08);
+				diskBar.setSecondaryFillColor(new Color(0.851, 0.337, 0.31, 0.7));
+			}
+
+			this.refreshDashboardStats();
+		}
+
+		//==============================================================================
+		// 이벤트 데이터 하나 생성. (분 오프셋으로 시각 표기)
+		//==============================================================================
+		/**
+		 * @param { number } minuteOffset
+		 * @returns { object }
+		 */
+		makeEventData(minuteOffset) {
+			const eventMessage = EVENT_MESSAGES[dataRandom.nextInt(0, EVENT_MESSAGES.length - 1)];
+			const now = new System.Date(System.Date.now() + minuteOffset * 60000);
+			const timeText = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+			return { time: timeText, text: eventMessage.text, tag: eventMessage.tag };
+		}
+
+		//==============================================================================
+		// 이벤트 한 줄 바인딩.
+		//==============================================================================
+		/**
+		 * @param { WorldNode } itemNode
+		 * @param { number } itemIndex
+		 */
+		bindEventRow(itemNode, itemIndex) {
+			const eventData = this.#eventList[itemIndex];
+			if (!eventData) {
+				return;
+			}
+			this.applyFontToTree(itemNode);
+			itemNode.setContentSize(Vector2.create(this.#mainWidth - 32, 40));
+			const tagNode = this.findNodeByName(itemNode, "EventTag");
+			if (tagNode) {
+				tagNode.setLocalPosition(Vector2.create(this.#mainWidth - 132, 0));
+			}
+			const rowPaintComponents = itemNode.getComponents(Paint);
+			if (rowPaintComponents.length > 0) {
+				rowPaintComponents[0].setColor(CARD_COLOR.clone());
+			}
+			this.setLabelText(itemNode, "EventTime", eventData.time);
+			this.setLabelText(itemNode, "EventText", eventData.text);
+			this.setLabelText(itemNode, "EventTag", eventData.tag);
+			this.findLabel(itemNode, "EventTime").setTextColor(TEXT_FAINT_COLOR.clone());
+			this.findLabel(itemNode, "EventText").setTextColor(TEXT_COLOR.clone());
+			this.findLabel(itemNode, "EventTag").setTextColor(TEXT_DIM_COLOR.clone());
+		}
+
+		//==============================================================================
+		// KPI 카드 갱신.
+		//==============================================================================
+		refreshDashboardStats() {
+			const dashboardRootNode = this.#screenRootMap.get("home");
+			this.setLabelText(dashboardRootNode, "StatRevenueValue", "$" + this.formatNumber(System.Math.round(this.#revenueValue)));
+			this.setStatDelta(dashboardRootNode, "StatRevenueDelta", "+4.2% vs last month", true);
+			this.setLabelText(dashboardRootNode, "StatUsersValue", this.formatNumber(this.#activeUserCount));
+			this.setStatDelta(dashboardRootNode, "StatUsersDelta", "+318 today", true);
+			this.setLabelText(dashboardRootNode, "StatRequestsValue", this.formatNumber(System.Math.round(this.#requestsPerSecond * 60)));
+			this.setStatDelta(dashboardRootNode, "StatRequestsDelta", this.#requestsPerSecond >= 140 ? "above baseline" : "below baseline", this.#requestsPerSecond >= 140);
+			this.setLabelText(dashboardRootNode, "StatUptimeValue", "99.98%");
+			this.setStatDelta(dashboardRootNode, "StatUptimeDelta", "SLA met", true);
+			this.setLabelText(dashboardRootNode, "ChartValue", System.Math.round(this.#requestsPerSecond) + " rps");
+		}
+
+		/**
+		 * @param { WorldNode } rootNode
+		 * @param { string } nodeName
+		 * @param { string } text
+		 * @param { boolean } isPositive
+		 */
+		setStatDelta(rootNode, nodeName, text, isPositive) {
+			const deltaLabel = this.findLabel(rootNode, nodeName);
+			if (deltaLabel) {
+				deltaLabel.setText(text);
+				deltaLabel.setTextColor(isPositive ? POSITIVE_COLOR : NEGATIVE_COLOR);
+			}
+		}
+
+		//==============================================================================
+		// 스토어 동작. (추천 띠 / 카탈로그 / 카트 / 최근 주문)
+		//==============================================================================
+		bindStore() {
+			const storeRootNode = this.#screenRootMap.get("shop");
+
+			// 추천 띠. (가로 UIListView)
+			const featuredListNode = this.findNodeByName(storeRootNode, "FeaturedList");
+			const featuredTemplateNode = this.findNodeByName(storeRootNode, "FeaturedTemplate");
+			const featuredListView = featuredListNode.addComponent(UIListView);
+			featuredListView.setHorizontal(true);
+			featuredListView.setTemplateNode(featuredTemplateNode);
+			featuredListView.setSpacing(10);
+			featuredListView.setBindItemEvent((itemNode, itemIndex) => {
+				const packData = FEATURED_PACKS[itemIndex];
+				this.applyFontToTree(itemNode);
+				const featuredPaintComponents = itemNode.getComponents(Paint);
+				if (featuredPaintComponents.length > 0) {
+					featuredPaintComponents[0].setColor(new Color(THEME_TABLE[this.#themeKey].surface.red, THEME_TABLE[this.#themeKey].surface.green, THEME_TABLE[this.#themeKey].surface.blue, 1));
+				}
+				this.setLabelText(itemNode, "FeaturedTitle", packData.title);
+				this.setLabelText(itemNode, "FeaturedCaption", packData.caption);
+				this.setLabelText(itemNode, "FeaturedPrice", "$" + packData.price.toFixed(2));
+				this.findLabel(itemNode, "FeaturedTitle").setTextColor(TEXT_COLOR.clone());
+				this.findLabel(itemNode, "FeaturedCaption").setTextColor(TEXT_DIM_COLOR.clone());
+				this.findLabel(itemNode, "FeaturedPrice").setTextColor(ACCENT_COLOR.clone());
+			});
+			featuredListView.setItemCount(FEATURED_PACKS.length);
+
+			// 카탈로그. (세로 UIListView — 끝에 닿으면 다음 페이지를 불러온다)
+			const itemListNode = this.findNodeByName(storeRootNode, "ItemList");
+			const itemTemplateNode = this.findNodeByName(storeRootNode, "ItemTemplate");
+			this.#itemListView = itemListNode.addComponent(UIListView);
+			this.#itemListView.setTemplateNode(itemTemplateNode);
+			this.#itemListView.setSpacing(6);
+			this.#itemListView.setBindItemEvent((itemNode, itemIndex) => {
+				this.bindCatalogRow(itemNode, itemIndex);
+			});
+			this.#itemListView.setReachEndEvent(() => {
+				if (this.#catalogLoadedCount < CATALOG_TOTAL_COUNT && this.#catalogLoadRemainSeconds <= 0) {
+					this.#catalogLoadRemainSeconds = CATALOG_LOAD_SECONDS;
+				}
+			});
+			this.#loadingSpinner = new UISpinner({ radius: 8, dotRadius: 1.8, color: TEXT_DIM_COLOR.clone() });
+			this.#loadingSpinner.setActive(false);
+			this.applyCatalogItemCount();
+
+			this.bindButton(storeRootNode, "CartClearButton", () => {
+				if (this.#cartMap.size === 0) {
+					return;
+				}
+				this.#cartMap.clear();
+				this.refreshCartPanel();
+				this.#itemListView.refresh();
+				this.showToast("Cart cleared.");
+			});
+			this.bindButton(storeRootNode, "CartCheckoutButton", () => {
+				if (this.#cartMap.size === 0) {
+					this.showToast("Cart is empty.");
+					return;
+				}
+				const itemCount = this.#cartMap.size;
+				const totalPrice = this.getCartTotal();
+				this.openPopup("Confirm order", "Buy " + itemCount + " item" + (itemCount > 1 ? "s" : "") + " for $" + totalPrice.toFixed(2) + "?", () => {
+					this.#orderList.unshift({ text: itemCount + " items, $" + totalPrice.toFixed(2) + ", just now" });
+					if (this.#orderList.length > 8) {
+						this.#orderList.length = 8;
+					}
+					this.#cartMap.clear();
+					this.refreshCartPanel();
+					this.refreshOrderPanel();
+					this.#itemListView.refresh();
+					this.#beepPlayer.playPreset("confirm");
+					this.showToast("Order placed, $" + totalPrice.toFixed(2));
+				});
+			});
+			this.refreshCartPanel();
+			this.refreshOrderPanel();
+		}
+
+		//==============================================================================
+		// 카탈로그 한 줄 바인딩. (마지막 칸은 로딩 줄)
+		//==============================================================================
+		/**
+		 * @param { WorldNode } itemNode
+		 * @param { number } itemIndex
+		 */
+		bindCatalogRow(itemNode, itemIndex) {
+			this.applyFontToTree(itemNode);
+			const iconNode = this.findNodeByName(itemNode, "ItemIcon");
+			const addButtonNode = this.findNodeByName(itemNode, "ItemAddButton");
+			const titleLabel = this.findLabel(itemNode, "ItemTitle");
+			const captionLabel = this.findLabel(itemNode, "ItemCaption");
+			const priceLabel = this.findLabel(itemNode, "ItemPrice");
+			const rowPaintComponents = itemNode.getComponents(Paint);
+			const rowWidth = this.#mainWidth - 32;
+			itemNode.setContentSize(Vector2.create(rowWidth, 44));
+			const priceNode = this.findNodeByName(itemNode, "ItemPrice");
+			if (priceNode) {
+				priceNode.setLocalPosition(Vector2.create(rowWidth - 194, 0));
+			}
+			addButtonNode.setLocalPosition(Vector2.create(rowWidth - 86, 9));
+
+			// 로딩 줄. (다음 페이지 자리 — 스피너 + 문구)
+			if (itemIndex >= this.#catalogLoadedCount) {
+				iconNode.setActive(false);
+				addButtonNode.setActive(false);
+				priceLabel.setText("");
+				captionLabel.setText("");
+				titleLabel.setText("        Loading");
+				titleLabel.setTextColor(TEXT_FAINT_COLOR);
+				if (this.#loadingSpinner.getParent() !== itemNode) {
+					itemNode.addChild(this.#loadingSpinner);
+				}
+				this.#loadingSpinner.setLocalPosition(Vector2.create(26, 22));
+				this.#loadingSpinner.setActive(true);
+				if (rowPaintComponents.length > 0) {
+					rowPaintComponents[0].setColor(new Color(0.09, 0.106, 0.141, 0.5));
+				}
+				return;
+			}
+
+			if (this.#loadingSpinner.getParent() === itemNode) {
+				this.#loadingSpinner.setActive(false);
+			}
+
+			const itemData = CATALOG_ITEMS[itemIndex];
+			const isInCart = this.#cartMap.has(itemIndex);
+			iconNode.setActive(true);
+			const iconPaintComponents = iconNode.getComponents(Paint);
+			if (iconPaintComponents.length > 0) {
+				iconPaintComponents[0].setColor(CARD_RAISED_COLOR.clone());
+			}
+			addButtonNode.setActive(true);
+			this.setLabelText(itemNode, "ItemGlyph", itemData.glyph);
+			titleLabel.setText(itemData.title);
+			titleLabel.setTextColor(TEXT_COLOR);
+			captionLabel.setText(itemData.caption);
+			priceLabel.setText("$" + itemData.price.toFixed(2));
+			if (rowPaintComponents.length > 0) {
+				rowPaintComponents[0].setColor(isInCart ? CARD_RAISED_COLOR : CARD_COLOR);
+			}
+			const addButtonPaintComponents = addButtonNode.getComponents(Paint);
+			if (addButtonPaintComponents.length > 0) {
+				addButtonPaintComponents[0].setColor(isInCart ? ACCENT_COLOR.clone() : CARD_RAISED_COLOR.clone());
+			}
+			this.findLabel(itemNode, "ItemGlyph").setTextColor(TEXT_DIM_COLOR.clone());
+			captionLabel.setTextColor(TEXT_FAINT_COLOR.clone());
+			priceLabel.setTextColor(TEXT_DIM_COLOR.clone());
+			this.setLabelText(itemNode, "ItemAddButton", isInCart ? "✓ ADDED" : "ADD");
+			this.findLabel(itemNode, "ItemAddButton").setTextColor(isInCart ? TEXT_ON_ACCENT_COLOR.clone() : TEXT_COLOR.clone());
+			this.bindButton(itemNode, "ItemAddButton", () => {
+				if (this.#cartMap.has(itemIndex)) {
+					this.#cartMap.delete(itemIndex);
+				}
+				else {
+					this.#cartMap.set(itemIndex, itemData);
+				}
+				this.bindCatalogRow(itemNode, itemIndex);
+				this.refreshCartPanel();
+			});
+		}
+
+		//==============================================================================
+		// 카트 합계.
+		//==============================================================================
+		/**
+		 * @returns { number }
+		 */
+		getCartTotal() {
+			let totalPrice = 0;
+			for (const itemData of this.#cartMap.values()) {
+				totalPrice += itemData.price;
+			}
+			return totalPrice;
+		}
+
+		//==============================================================================
+		// 카트 패널 갱신.
+		//==============================================================================
+		refreshCartPanel() {
+			const storeRootNode = this.#screenRootMap.get("shop");
+			const cartItems = [...this.#cartMap.values()];
+			for (let rowIndex = 0; rowIndex < 8; ++rowIndex) {
+				const nameLabel = this.findLabel(storeRootNode, "CartRowName" + rowIndex);
+				const priceLabel = this.findLabel(storeRootNode, "CartRowPrice" + rowIndex);
+				if (!nameLabel || !priceLabel) {
+					continue;
+				}
+				if (rowIndex === 7 && cartItems.length > 8) {
+					nameLabel.setText("+ " + (cartItems.length - 7) + " more");
+					priceLabel.setText("");
+				}
+				else if (rowIndex < cartItems.length) {
+					nameLabel.setText(cartItems[rowIndex].title);
+					priceLabel.setText("$" + cartItems[rowIndex].price.toFixed(2));
+				}
+				else {
+					nameLabel.setText(rowIndex === 0 ? "Nothing selected." : "");
+					priceLabel.setText("");
+				}
+			}
+			const totalLabel = this.findLabel(storeRootNode, "CartTotalValue");
+			if (totalLabel) {
+				totalLabel.setText("$" + this.getCartTotal().toFixed(2));
+			}
+		}
+
+		//==============================================================================
+		// 최근 주문 패널 갱신.
+		//==============================================================================
+		refreshOrderPanel() {
+			const storeRootNode = this.#screenRootMap.get("shop");
+			const emptyCaption = this.findLabel(storeRootNode, "OrderEmptyCaption");
+			if (emptyCaption) {
+				const emptyNode = this.findNodeByName(storeRootNode, "OrderEmptyCaption");
+				emptyNode.setActive(this.#orderList.length === 0);
+			}
+			for (let rowIndex = 0; rowIndex < 8; ++rowIndex) {
+				const rowLabel = this.findLabel(storeRootNode, "OrderRow" + rowIndex);
+				if (rowLabel) {
+					rowLabel.setText(this.#orderList[rowIndex] ? this.#orderList[rowIndex].text : "");
+				}
+			}
+		}
+
+		//==============================================================================
+		// 카탈로그 항목 수 반영. (더 남았으면 로딩 줄 하나를 덧붙인다)
+		//==============================================================================
+		applyCatalogItemCount() {
+			const hasMore = this.#catalogLoadedCount < CATALOG_TOTAL_COUNT;
+			this.#itemListView.setItemCount(this.#catalogLoadedCount + (hasMore ? 1 : 0));
+			const storeRootNode = this.#screenRootMap.get("shop");
+			const countLabel = this.findLabel(storeRootNode, "ItemsCountCaption");
+			if (countLabel) {
+				countLabel.setText(this.#catalogLoadedCount + " / " + CATALOG_TOTAL_COUNT + " loaded");
+			}
+		}
+
+		//==============================================================================
+		// 설정 화면 동작.
+		//==============================================================================
+		bindSettings() {
+			const settingsRootNode = this.#screenRootMap.get("settings");
+
+			// 슬라이더. (알림 소리는 비프 음량과 실제로 연동)
+			const sliderRows = [
+				{ name: "Scale", format: (value) => System.Math.round(50 + value * 100) + "%" },
+				{ name: "Sound", format: (value) => System.Math.round(value * 100) + "%" },
+			];
+			for (const row of sliderRows) {
+				const sliderNode = this.findNodeByName(settingsRootNode, row.name + "Slider");
+				const captionLabel = this.findLabel(settingsRootNode, row.name + "Caption");
+				if (!sliderNode) {
+					continue;
+				}
+				const sliderComponents = sliderNode.getComponents(UISlider);
+				if (sliderComponents.length === 0) {
+					continue;
+				}
+				const sliderComponent = sliderComponents[0];
+				sliderComponent.setThumbColor(new Color(1, 1, 1, 1));
+				// 엔진은 값이 아니라 슬라이더 자신을 넘겨준다. 값은 슬라이더에서 읽는다.
+				sliderComponent.setValueChangedEvent(() => {
+					const sliderValue = sliderComponent.getValue();
+					if (captionLabel) {
+						captionLabel.setText(row.format(sliderValue));
+					}
+					if (row.name === "Sound") {
+						this.#beepPlayer.setVolume(sliderValue * 0.3);
+					}
+				});
+			}
+
+			// 토글.
+			for (const rowName of ["Autosave", "Telemetry"]) {
+				const toggleNode = this.findNodeByName(settingsRootNode, rowName + "Toggle");
+				if (!toggleNode) {
+					continue;
+				}
+				const toggleComponents = toggleNode.getComponents(UIToggleButton);
+				const paintComponents = toggleNode.getComponents(Paint);
+				const labelComponents = toggleNode.getComponents(UILabel);
+				if (toggleComponents.length === 0) {
+					continue;
+				}
+				const toggleComponent = toggleComponents[0];
+				toggleComponent.setIsOn(rowName === "Autosave");
+				// 엔진은 켜짐 여부가 아니라 토글 자신을 넘겨준다. 상태는 토글에서 읽는다.
+				toggleComponent.setToggledEvent(() => {
+					const isOn = toggleComponent.getIsOn();
+					if (paintComponents.length > 0) {
+						paintComponents[0].setColor(isOn ? ACCENT_COLOR.clone() : new Color(0.173, 0.204, 0.259, 1));
+					}
+					if (labelComponents.length > 0) {
+						labelComponents[0].setText(isOn ? "ON" : "OFF");
+					}
+					this.showToast(rowName + (isOn ? " enabled." : " disabled."));
+				});
+			}
+
+			// 드롭다운. (엔진 UIDropdown — 테마가 바뀌면 새 색으로 다시 만든다)
+			this.rebuildDropdowns();
+
+			// 저장 공간 게이지. (보조 게이지 = 시스템 예약 영역)
+			this.styleProgressBar(settingsRootNode, "StorageBar", ACCENT_COLOR);
+			const storageBar = this.findProgressBar(settingsRootNode, "StorageBar");
+			if (storageBar) {
+				storageBar.setSecondaryValue(0.12);
+				storageBar.setSecondaryFillColor(new Color(0.851, 0.337, 0.31, 0.7));
+			}
+
+			this.bindButton(settingsRootNode, "ResetButton", () => {
+				this.openPopup("Reset settings?", "All preferences go back to their defaults.", () => {
+					this.showToast("Settings restored.");
+				});
+			});
+		}
+
+		//==============================================================================
+		// 설정 드롭다운 재구성. (테마 색을 생성자에 넣으므로 전환 때마다 새로 만든다)
+		//==============================================================================
+		rebuildDropdowns() {
+			const settingsRootNode = this.#screenRootMap.get("settings");
+			const theme = THEME_TABLE[this.#themeKey];
+			const dropdownOptions = {
+				width: 176,
+				height: 28,
+				optionHeight: 26,
+				baseColor: theme.cardRaised.clone(),
+				popupColor: theme.surface.clone(),
+				highlightColor: new Color(theme.accent.red, theme.accent.green, theme.accent.blue, 0.25),
+				textColor: theme.text.clone(),
+			};
+
+			const themeSlotNode = this.findNodeByName(settingsRootNode, "ThemeDropdownSlot");
+			const previousThemeIndex = this.#themeDropdown ? this.#themeDropdown.getSelectedIndex() : THEME_KEYS.indexOf(this.#themeKey);
+			if (this.#themeDropdown) {
+				themeSlotNode.removeChild(this.#themeDropdown);
+			}
+			this.#themeDropdown = new UIDropdown(dropdownOptions);
+			this.#themeDropdown.setOptionList(THEME_KEYS.map((themeKey) => THEME_TABLE[themeKey].label));
+			this.#themeDropdown.setSelectedIndex(System.Math.max(0, previousThemeIndex));
+			this.#themeDropdown.setChangedEvent(() => {
+				const selectedThemeKey = THEME_KEYS[this.#themeDropdown.getSelectedIndex()];
+				this.applyTheme(selectedThemeKey);
+				this.showToast("Theme: " + THEME_TABLE[selectedThemeKey].label);
+			});
+			themeSlotNode.addChild(this.#themeDropdown);
+			this.applyFontToTree(this.#themeDropdown);
+
+			const regionSlotNode = this.findNodeByName(settingsRootNode, "RegionDropdownSlot");
+			const previousRegionIndex = this.#regionDropdown ? this.#regionDropdown.getSelectedIndex() : 0;
+			if (this.#regionDropdown) {
+				regionSlotNode.removeChild(this.#regionDropdown);
+			}
+			this.#regionDropdown = new UIDropdown(dropdownOptions);
+			this.#regionDropdown.setOptionList(["Seoul", "Tokyo", "Frankfurt", "Oregon"]);
+			this.#regionDropdown.setSelectedIndex(previousRegionIndex);
+			this.#regionDropdown.setChangedEvent(() => {
+				this.showToast("Region: " + this.#regionDropdown.getSelectedText());
+			});
+			regionSlotNode.addChild(this.#regionDropdown);
+			this.applyFontToTree(this.#regionDropdown);
+		}
+
+		//==============================================================================
+		// 테마 역할 캐시 구축. (문서에 구워진 Dim 색을 역할로 되찾아 둔다 — 로드 때 한 번)
+		//==============================================================================
+		buildThemeRoleCache() {
+			const dimTheme = THEME_TABLE.dim;
+			const roleNames = ["background", "surface", "card", "cardRaised", "hairline", "text", "textDim",
+				"textFaint", "accent", "positive", "negative", "ink", "toggleOff", "overlay"];
+			const matchRole = (color) => {
+				for (const roleName of roleNames) {
+					const roleColor = dimTheme[roleName];
+					if (System.Math.abs(color.red - roleColor.red) < 0.01
+						&& System.Math.abs(color.green - roleColor.green) < 0.01
+						&& System.Math.abs(color.blue - roleColor.blue) < 0.01) {
+						return roleName;
+					}
+				}
+				return null;
+			};
+			const visit = (node) => {
+				for (const paintComponent of node.getComponents(Paint)) {
+					const paintColor = paintComponent.getColor();
+					const role = matchRole(paintColor);
+					if (role) {
+						this.#paintRoleCache.push({ paint: paintComponent, node: node, role: role, alpha: paintColor.alpha });
+					}
+				}
+				for (const labelComponent of node.getComponents(UILabel)) {
+					const textColor = labelComponent.getTextColor();
+					const role = matchRole(textColor);
+					if (role) {
+						this.#labelRoleCache.push({ label: labelComponent, node: node, role: role });
+					}
+				}
+				for (const childNode of node.getChildren()) {
+					visit(childNode);
+				}
+			};
+			visit(this.getRoot());
+
+			// 액센트 판 위의 글자는 전용 역할로. (라이트 테마에서 어두운 글자가 되지 않게)
+			const accentNodeSet = new System.Set();
+			for (const entry of this.#paintRoleCache) {
+				if (entry.role === "accent") {
+					accentNodeSet.add(entry.node);
+				}
+			}
+			for (const entry of this.#labelRoleCache) {
+				if ((entry.role === "text" || entry.role === "ink") && accentNodeSet.has(entry.node)) {
+					entry.role = "textOnAccent";
+				}
+			}
+		}
+
+		//==============================================================================
+		// 테마 적용. (역할 캐시 리매핑 + 코드 소관 위젯 재채색)
+		//==============================================================================
+		/**
+		 * @param { string } themeKey "dim" | "dark" | "light"
+		 */
+		applyTheme(themeKey) {
+			const theme = THEME_TABLE[themeKey];
+			if (!theme) {
+				return;
+			}
+			this.#themeKey = themeKey;
+			this.#backgroundStyle = theme.backgroundStyle;
+			System.document.body.style.background = theme.backgroundStyle;
+
+			// 코드가 참조하는 가변 색 갱신.
+			assignColor(BAR_TRACK_COLOR, theme.barTrack);
+			assignColor(ACCENT_COLOR, theme.accent);
+			assignColor(POSITIVE_COLOR, theme.positive);
+			assignColor(NEGATIVE_COLOR, theme.negative);
+			assignColor(TEXT_COLOR, theme.text);
+			assignColor(TEXT_DIM_COLOR, theme.textDim);
+			assignColor(TEXT_FAINT_COLOR, theme.textFaint);
+			assignColor(TEXT_ON_ACCENT_COLOR, theme.textOnAccent);
+			assignColor(CARD_COLOR, theme.card);
+			assignColor(CARD_RAISED_COLOR, theme.cardRaised);
+
+			// 문서 색 리매핑.
+			for (const entry of this.#paintRoleCache) {
+				const roleColor = theme[entry.role];
+				entry.paint.setColor(new Color(roleColor.red, roleColor.green, roleColor.blue, entry.alpha));
+			}
+			for (const entry of this.#labelRoleCache) {
+				const roleColor = theme[entry.role];
+				entry.label.setTextColor(new Color(roleColor.red, roleColor.green, roleColor.blue, 1));
+			}
+
+			// 진행바.
+			const dashboardRootNode = this.#screenRootMap.get("home");
+			const settingsRootNode = this.#screenRootMap.get("settings");
+			const componentsRootNode = this.#screenRootMap.get("components");
+			for (const barName of ["SystemCpuBar", "SystemMemoryBar", "SystemDiskBar"]) {
+				this.styleProgressBar(dashboardRootNode, barName, ACCENT_COLOR);
+			}
+			const diskBar = this.findProgressBar(dashboardRootNode, "SystemDiskBar");
+			diskBar.setSecondaryFillColor(new Color(theme.negative.red, theme.negative.green, theme.negative.blue, 0.7));
+			this.styleProgressBar(settingsRootNode, "StorageBar", ACCENT_COLOR);
+			const storageBar = this.findProgressBar(settingsRootNode, "StorageBar");
+			storageBar.setSecondaryFillColor(new Color(theme.negative.red, theme.negative.green, theme.negative.blue, 0.7));
+			this.styleProgressBar(componentsRootNode, "LongPressBar", ACCENT_COLOR);
+			this.styleProgressBar(componentsRootNode, "LoopProgressBar", ACCENT_COLOR);
+
+			// 차트.
+			this.#liveChart.setLineColor(theme.accent);
+			this.#liveChart.setGridColor(theme.gridLine);
+			this.#revenueBars.setBarColor(new Color(theme.accent.red, theme.accent.green, theme.accent.blue, 0.45));
+			this.#revenueBars.setHighlightColor(theme.accent);
+			this.#miniLineChart.setLineColor(theme.accent);
+			this.#miniLineChart.setGridColor(theme.gridLine);
+			this.#miniBarChart.setBarColor(new Color(theme.accent.red, theme.accent.green, theme.accent.blue, 0.45));
+			this.#miniBarChart.setHighlightColor(theme.accent);
+
+			// 토스트 / 스피너 / 컨텍스트 메뉴 / 드롭다운.
+			const toastPaintComponents = this.#toast.getComponents(Paint);
+			toastPaintComponents[0].setColor(new Color(theme.surface.red, theme.surface.green, theme.surface.blue, 0.97));
+			const toastLabelComponents = this.#toast.getComponents(UILabel);
+			toastLabelComponents[0].setTextColor(theme.text.clone());
+			this.#loadingSpinner.setDotColor(theme.textDim);
+			for (const demoSpinner of this.#demoSpinners) {
+				demoSpinner.setDotColor(demoSpinner === this.#demoSpinners[1] ? theme.accent : theme.textDim);
+			}
+			const root = this.getRoot();
+			if (this.#contextMenu) {
+				root.removeChild(this.#contextMenu);
+			}
+			this.#contextMenu = new UIContextMenu({ panelColor: theme.surface.clone(), textColor: theme.text.clone() });
+			root.addChild(this.#contextMenu);
+			this.rebuildDropdowns();
+
+			// 토글은 현재 상태에 맞춰 다시 칠한다.
+			for (const rowName of ["Autosave", "Telemetry"]) {
+				const toggleNode = this.findNodeByName(settingsRootNode, rowName + "Toggle");
+				const toggleComponent = toggleNode.getComponents(UIToggleButton)[0];
+				const isOn = toggleComponent.getIsOn();
+				toggleNode.getComponents(Paint)[0].setColor(isOn ? theme.accent.clone() : theme.toggleOff.clone());
+				toggleNode.getComponents(UILabel)[0].setTextColor(isOn ? theme.textOnAccent.clone() : theme.ink.clone());
+			}
+
+			// 레일 강조 글자.
+			this.refreshNavigationLabels();
+
+			// 목록은 새 색으로 다시 바인딩.
+			if (this.#eventListView) {
+				this.#eventListView.refresh();
+			}
+			if (this.#itemListView) {
+				this.#itemListView.refresh();
+			}
+			this.refreshDashboardStats();
+
+			try {
+				System.localStorage.setItem(THEME_STORAGE_KEY, themeKey);
+			}
+			catch (storageError) {
+			}
+		}
+
+		//==============================================================================
+		// 레일 글자색 갱신. (활성 탭은 액센트 판 위 글자색)
+		//==============================================================================
+		refreshNavigationLabels() {
+			const theme = THEME_TABLE[this.#themeKey];
+			for (let targetIndex = 0; targetIndex < NAVIGATION_TARGETS.length; ++targetIndex) {
+				const labelComponent = this.findLabel(this.#navigationRootNode, NAVIGATION_TARGETS[targetIndex].buttonName.replace("Nav", "NavLabel"));
+				if (labelComponent) {
+					labelComponent.setTextColor(targetIndex === this.#activeNavIndex ? theme.textOnAccent.clone() : theme.text.clone());
+				}
+			}
+		}
+
+		//==============================================================================
+		// 컴포넌트 화면 동작. (버튼 상태 / 컨텍스트 메뉴 / 드래그 / 진행 / 타자기 / 피드백 / 차트)
+		//==============================================================================
+		bindComponents() {
+			const componentsRootNode = this.#screenRootMap.get("components");
+
+			// 버튼 상태.
+			this.bindButton(componentsRootNode, "NormalButton", () => {
+				this.setLabelText(componentsRootNode, "ButtonsResult", "Clicked.");
+			});
+			const disabledButtonNode = this.findNodeByName(componentsRootNode, "DisabledButton");
+			const disabledButtonComponents = disabledButtonNode.getComponents(UIButton);
+			if (disabledButtonComponents.length > 0) {
+				disabledButtonComponents[0].setInteractable(false);
+			}
+			const disabledLabelComponents = disabledButtonNode.getComponents(UILabel);
+			if (disabledLabelComponents.length > 0) {
+				disabledLabelComponents[0].setTextColor(TEXT_FAINT_COLOR);
+			}
+			const longPressButtonNode = this.findNodeByName(componentsRootNode, "LongPressButton");
+			const longPressComponents = longPressButtonNode.getComponents(UIButton);
+			if (longPressComponents.length > 0) {
+				this.#longPressButton = longPressComponents[0];
+				this.#longPressButton.setLongPressSeconds(1);
+				this.#longPressButton.setLongPressedEvent(() => {
+					this.#beepPlayer.playPreset("confirm");
+					this.setLabelText(componentsRootNode, "ButtonsResult", "Long press fired.  (click was swallowed)");
+				});
+				this.#longPressButton.setClickedEvent(() => {
+					this.#beepPlayer.playPreset("click");
+					this.setLabelText(componentsRootNode, "ButtonsResult", "Released before 1s - normal click.");
+				});
+			}
+			this.styleProgressBar(componentsRootNode, "LongPressBar", ACCENT_COLOR);
+
+			// 컨텍스트 메뉴. (우클릭은 캔버스 이벤트, 길게 누름은 버튼 이벤트로 같은 메뉴를 연다)
+			const rightClickZoneNode = this.findNodeByName(componentsRootNode, "RightClickZone");
+			const zoneButtonComponents = rightClickZoneNode.getComponents(UIButton);
+			if (zoneButtonComponents.length === 0) {
+				const zoneButton = rightClickZoneNode.addComponent(UIButton);
+				zoneButton.setPressedTintColor(new Color(1, 1, 1, 0.04));
+				zoneButton.setLongPressSeconds(0.55);
+				zoneButton.setLongPressedEvent(() => {
+					this.openZoneContextMenu();
+				});
+			}
+
+			// 드래그 앤 드롭. (엔진 UIDraggable — 칩을 슬롯에 끌어다 놓는다)
+			const dragPanelNode = this.findNodeByName(componentsRootNode, "DragPanel");
+			const chipNames = ["A", "B", "C"];
+			for (let chipIndex = 0; chipIndex < chipNames.length; ++chipIndex) {
+				const chipNode = new WorldNode();
+				chipNode.setName("DragChip" + chipNames[chipIndex]);
+				chipNode.setPivot(Pivot.topLeft.clone());
+				chipNode.setAnchor(Pivot.topLeft.clone());
+				chipNode.setContentSize(Vector2.create(76, 30));
+				chipNode.setLocalPosition(Vector2.create(16 + chipIndex * 92, 48));
+				const chipPaint = chipNode.addComponent(Paint);
+				chipPaint.setColor(CARD_RAISED_COLOR.clone());
+				chipPaint.setRoundSize(8);
+				const chipLabel = chipNode.addComponent(UILabel);
+				chipLabel.setText("Chip " + chipNames[chipIndex]);
+				chipLabel.setFontSize(10.5);
+				chipLabel.setTextColor(TEXT_COLOR);
+				const chipDraggable = chipNode.addComponent(UIDraggable);
+				chipDraggable.setSnapBackEnabled(true);
+				chipDraggable.setDragEndEvent(() => {
+					this.tryDropChip(chipNode, chipDraggable, dragPanelNode, chipNames[chipIndex]);
+				});
+				dragPanelNode.addChild(chipNode);
+				this.applyFontToTree(chipNode);
+			}
+
+			// 진행 표시. (스피너 두 개 + 순환 진행바)
+			const progressPanelNode = this.findNodeByName(componentsRootNode, "ProgressPanel");
+			const smallSpinner = new UISpinner({ radius: 8, dotRadius: 1.8, color: TEXT_DIM_COLOR.clone() });
+			smallSpinner.setLocalPosition(Vector2.create(180, 68));
+			progressPanelNode.addChild(smallSpinner);
+			const largeSpinner = new UISpinner({ radius: 13, dotRadius: 2.6, color: ACCENT_COLOR.clone(), rotationSpeed: 0.8 });
+			largeSpinner.setLocalPosition(Vector2.create(250, 68));
+			progressPanelNode.addChild(largeSpinner);
+			this.#demoSpinners = [smallSpinner, largeSpinner];
+			this.styleProgressBar(componentsRootNode, "LoopProgressBar", ACCENT_COLOR);
+
+			// 타자기.
+			const typeBodyLabel = this.findLabel(componentsRootNode, "TypeBody");
+			typeBodyLabel.setWordWrapWidth(398);
+			this.#demoTypewriter = new Typewriter(typeBodyLabel, { charactersPerSecond: 45 });
+			this.#demoTypewriter.start(TYPEWRITER_TEXT);
+			this.bindButton(componentsRootNode, "TypeReplayButton", () => {
+				this.#demoTypewriter.start(TYPEWRITER_TEXT);
+			});
+
+			// 피드백.
+			this.bindButton(componentsRootNode, "ToastButton", () => {
+				this.showToast("Saved to workspace.");
+			});
+			this.bindButton(componentsRootNode, "DialogButton", () => {
+				this.openPopup("Delete workspace?", "This removes 3 projects and their history.\nThis action cannot be undone.", () => {
+					this.showToast("Workspace deleted.");
+				});
+			});
+			this.bindButton(componentsRootNode, "QueueToastButton", () => {
+				this.showToast("First toast.");
+				this.showToast("Second toast, queued.");
+				this.showToast("Third toast, queued.");
+			});
+
+			// 차트 데모.
+			const miniLineNode = this.findNodeByName(componentsRootNode, "MiniLineChart");
+			this.#miniLineChart = miniLineNode.addComponent(UILineChart);
+			this.#miniLineChart.setMaxSampleCount(120);
+			this.#miniLineChart.setLineColor(ACCENT_COLOR);
+			this.#miniLineChart.setValueRange(-1.3, 1.3);
+			const miniBarNode = this.findNodeByName(componentsRootNode, "MiniBarChart");
+			this.#miniBarChart = miniBarNode.addComponent(UIBarChart);
+			this.#miniBarChart.setBarColor(new Color(0.357, 0.424, 1, 0.45));
+			this.#miniBarChart.setHighlightColor(ACCENT_COLOR);
+			const miniBarValues = [];
+			for (let barIndex = 0; barIndex < 12; ++barIndex) {
+				miniBarValues.push(20 + dataRandom.nextInt(0, 80));
+			}
+			this.#miniBarChart.setValueList(miniBarValues);
+		}
+
+		//==============================================================================
+		// 드래그 칩 드롭 판정. (슬롯 안이면 눌러앉고, 아니면 스냅백)
+		//==============================================================================
+		/**
+		 * @param { WorldNode } chipNode
+		 * @param { UIDraggable } chipDraggable
+		 * @param { WorldNode } dragPanelNode
+		 * @param { string } chipName
+		 */
+		tryDropChip(chipNode, chipDraggable, dragPanelNode, chipName) {
+			const componentsRootNode = this.#screenRootMap.get("components");
+			const chipPosition = chipNode.getLocalPosition();
+			const chipCenterX = chipPosition.x + 38;
+			const chipCenterY = chipPosition.y + 15;
+			const slotNames = ["DragSlotA", "DragSlotB", "DragSlotC"];
+			for (const slotName of slotNames) {
+				const slotNode = this.findNodeByName(dragPanelNode, slotName);
+				const slotPosition = slotNode.getLocalPosition();
+				const slotSize = slotNode.getContentSize();
+				if (chipCenterX >= slotPosition.x && chipCenterX <= slotPosition.x + slotSize.x
+					&& chipCenterY >= slotPosition.y && chipCenterY <= slotPosition.y + slotSize.y) {
+					chipNode.setLocalPosition(Vector2.create(slotPosition.x + (slotSize.x - 76) * 0.5, slotPosition.y + (slotSize.y - 30) * 0.5));
+					chipDraggable.settleHere();
+					this.setLabelText(componentsRootNode, "DragResult", "Chip " + chipName + " → " + slotName.replace("DragSlot", "Slot "));
+					return;
+				}
+			}
+			this.setLabelText(componentsRootNode, "DragResult", "Missed - snapped back.");
+		}
+
+		//==============================================================================
+		// 컨텍스트 메뉴 열기. (우클릭 — 컴포넌트 화면의 지정 영역 안일 때만)
+		//==============================================================================
+		tryOpenContextMenu() {
+			if (this.#activeScreenName !== "components") {
+				return;
+			}
+			const engine = this.getEngine();
+			const inputManager = engine.getInputManager();
+			const viewInputPosition = inputManager.getViewInputPosition();
+			const componentsRootNode = this.#screenRootMap.get("components");
+			const zoneNode = this.findNodeByName(componentsRootNode, "RightClickZone");
+			if (!zoneNode.contains(viewInputPosition)) {
+				return;
+			}
+			this.openContextMenuAt(viewInputPosition);
+		}
+
+		//==============================================================================
+		// 지정 영역 가운데에 컨텍스트 메뉴 열기. (길게 누름 경로)
+		//==============================================================================
+		openZoneContextMenu() {
+			const engine = this.getEngine();
+			const inputManager = engine.getInputManager();
+			this.openContextMenuAt(inputManager.getViewInputPosition());
+		}
+
+		/**
+		 * @param { Vector2 } viewPosition
+		 */
+		openContextMenuAt(viewPosition) {
+			const componentsRootNode = this.#screenRootMap.get("components");
+			this.#contextMenu.show(viewPosition, [
+				{ text: "Duplicate", handler: () => { this.setLabelText(componentsRootNode, "MenuResult", "Duplicate selected."); } },
+				{ text: "Rename", handler: () => { this.setLabelText(componentsRootNode, "MenuResult", "Rename selected."); } },
+				{ text: "Share (soon)", isDisabled: true },
+				{ text: "Delete", handler: () => { this.setLabelText(componentsRootNode, "MenuResult", "Delete selected."); } },
+			]);
+			this.applyFontToTree(this.#contextMenu);
+		}
+
+		//==============================================================================
+		// 왼쪽 레일 동작. (강조 알약이 이전 항목에서 미끄러져 온다)
+		//==============================================================================
+		bindNavigation() {
+			const navigationRootNode = this.#navigationRootNode;
+			for (let targetIndex = 0; targetIndex < NAVIGATION_TARGETS.length; ++targetIndex) {
+				const target = NAVIGATION_TARGETS[targetIndex];
+				this.bindButton(navigationRootNode, target.buttonName, () => {
+					this.switchScreen(target.screenName, targetIndex);
+				});
+				const buttonNode = this.findNodeByName(navigationRootNode, target.buttonName);
+				const highlightNode = this.findNodeByName(navigationRootNode, target.buttonName.replace("Nav", "NavActive"));
+				if (buttonNode && highlightNode) {
+					const buttonComponents = buttonNode.getComponents(UIButton);
+					if (buttonComponents.length > 0) {
+						buttonComponents[0].excludeNodeFromTint(highlightNode);
+					}
+				}
+			}
+		}
+
+		//==============================================================================
+		// 팝업 동작.
+		//==============================================================================
+		bindPopup() {
+			const popupRootNode = this.#popupRootNode;
+			this.#popupDialogNode = this.findNodeByName(popupRootNode, "Dialog");
+			const messageLabel = this.findLabel(popupRootNode, "DialogMessage");
+			if (messageLabel) {
+				messageLabel.setWordWrapWidth(336);
+			}
+
+			// 등장 / 퇴장 전환. (엔진 PopupMotion — 막 알파 + 대화 상자 배율)
+			this.#popupMotion = new PopupMotion();
+			this.#popupMotion.setClosedEvent(() => {
+				popupRootNode.setActive(false);
+			});
+
+			this.bindButton(popupRootNode, "Overlay", () => {
+				this.closePopup();
+			});
+			this.bindButton(popupRootNode, "CancelButton", () => {
+				this.closePopup();
+			});
+			this.bindButton(popupRootNode, "ConfirmButton", () => {
+				const confirmHandler = this.#popupConfirmHandler;
+				this.closePopup();
+				if (confirmHandler) {
+					confirmHandler();
+				}
+			});
+		}
+
+		//==============================================================================
+		// 서체 / 굵기 일괄 적용.
+		//==============================================================================
+		applyHeadingStyles() {
+			this.applyFontToTree(this.getRoot());
+		}
+
+		//==============================================================================
+		// 보조: 노드 트리 전체 라벨에 서체 / 굵기 적용. (목록 항목은 나중에 생기므로 바인딩마다 부른다)
+		//==============================================================================
+		/**
+		 * @param { WorldNode } node
+		 */
+		applyFontToTree(node) {
+			this.visitLabels(node, (labelComponent, labelNode) => {
+				if (this.#fontFace) {
+					labelComponent.setFont(this.#fontFace);
+				}
+				const nodeName = labelNode.getName();
+				const isBold = nodeName === "Title" || nodeName === "Brand"
+					|| nodeName.indexOf("NavLabel") === 0
+					|| nodeName.endsWith("Value")
+					|| nodeName.endsWith("Button");
+				if (isBold) {
+					labelComponent.setBold(true);
+				}
+			});
+		}
+
+		//==============================================================================
+		// 보조: 모든 라벨을 찾아 처리한다.
+		//==============================================================================
+		/**
+		 * @param { WorldNode } node
+		 * @param { Function } visitHandler
+		 */
+		visitLabels(node, visitHandler) {
+			const labelComponents = node.getComponents(UILabel);
+			for (const labelComponent of labelComponents) {
+				visitHandler(labelComponent, node);
+			}
+			for (const childNode of node.getChildren()) {
+				this.visitLabels(childNode, visitHandler);
+			}
+		}
+
+		//==============================================================================
+		// 화면 전환. (내용은 떠오르고, 레일 강조는 이전 자리에서 미끄러져 온다)
+		//==============================================================================
+		/**
+		 * @param { string } screenName
+		 * @param { number } navIndex
+		 */
+		switchScreen(screenName, navIndex) {
+			if (screenName === this.#activeScreenName) {
+				return;
+			}
+			const previousRootNode = this.#screenRootMap.get(this.#activeScreenName);
+			const nextRootNode = this.#screenRootMap.get(screenName);
+			const previousNavIndex = this.#activeNavIndex;
+			this.#activeScreenName = screenName;
+			this.#activeNavIndex = navIndex;
+			previousRootNode.setActive(false);
+			nextRootNode.setActive(true);
+			nextRootNode.setLocalOpacity(0);
+			nextRootNode.setLocalPosition(Vector2.create(0, 14));
+
+			const contentTween = new Tween({ progress: 0 })
+				.to({ progress: 1 }, 0.26)
+				.easing(Tween.easingFunction.quadratic.out)
+				.setUpdate((values) => {
+					nextRootNode.setLocalOpacity(values.progress);
+					nextRootNode.setLocalPosition(Vector2.create(0, 14 * (1 - values.progress)));
+				})
+				.setComplete(() => {
+					nextRootNode.setLocalOpacity(1);
+					nextRootNode.setLocalPosition(Vector2.create(0, 0));
+				});
+			this.startTween(contentTween);
+
+			// 레일 강조 알약 슬라이드.
+			for (let targetIndex = 0; targetIndex < NAVIGATION_TARGETS.length; ++targetIndex) {
+				const highlightNode = this.findNodeByName(this.#navigationRootNode, NAVIGATION_TARGETS[targetIndex].buttonName.replace("Nav", "NavActive"));
+				if (highlightNode) {
+					highlightNode.setActive(targetIndex === navIndex);
+				}
+			}
+			this.refreshNavigationLabels();
+			const activeHighlightNode = this.findNodeByName(this.#navigationRootNode, NAVIGATION_TARGETS[navIndex].buttonName.replace("Nav", "NavActive"));
+			if (activeHighlightNode) {
+				const startOffsetY = (previousNavIndex - navIndex) * 42;
+				activeHighlightNode.setLocalPosition(Vector2.create(0, startOffsetY));
+				const slideTween = new Tween({ progress: 0 })
+					.to({ progress: 1 }, 0.22)
+					.easing(Tween.easingFunction.quadratic.out)
+					.setUpdate((values) => {
+						activeHighlightNode.setLocalPosition(Vector2.create(0, startOffsetY * (1 - values.progress)));
+					})
+					.setComplete(() => {
+						activeHighlightNode.setLocalPosition(Vector2.create(0, 0));
+					});
+				this.startTween(slideTween);
+			}
+		}
+
+		//==============================================================================
+		// 팝업 열기.
+		//==============================================================================
+		/**
+		 * @param { string } titleText
+		 * @param { string } messageText
+		 * @param { Function | null } confirmHandler
+		 */
+		openPopup(titleText, messageText, confirmHandler) {
+			const popupRootNode = this.#popupRootNode;
+			const cancelNode = this.findNodeByName(popupRootNode, "CancelButton");
+			const confirmNode = this.findNodeByName(popupRootNode, "ConfirmButton");
+			const titleLabel = this.findLabel(popupRootNode, "DialogTitle");
+			const messageLabel = this.findLabel(popupRootNode, "DialogMessage");
+			if (titleLabel) {
+				titleLabel.setText(titleText);
+			}
+			this.#popupConfirmHandler = confirmHandler;
+
+			// 확인만 있는 알림이면 취소를 감추고 확인을 가운데로 넓힌다.
+			const hasConfirm = (confirmHandler !== null);
+			if (cancelNode && confirmNode) {
+				cancelNode.setActive(hasConfirm);
+				confirmNode.setLocalPosition(hasConfirm ? Vector2.create(196, 134) : Vector2.create(22, 134));
+				confirmNode.setContentSize(hasConfirm ? Vector2.create(162, 40) : Vector2.create(336, 40));
+				const confirmLabel = this.findLabel(confirmNode, "ConfirmButton");
+				if (confirmLabel) {
+					confirmLabel.setText(hasConfirm ? "CONFIRM" : "OK");
+				}
+			}
+
+			// 메시지는 타자기 효과로 드러낸다. (엔진 Typewriter)
+			if (messageLabel) {
+				this.#popupTypewriter = new Typewriter(messageLabel, { charactersPerSecond: 110 });
+				this.#popupTypewriter.start(messageText);
+			}
+
+			popupRootNode.setActive(true);
+			this.#popupMotion.open();
+			this.applyPopupMotion();
+		}
+
+		//==============================================================================
+		// 팝업 전환 산출값 반영. (막 알파 + 대화 상자 배율)
+		//==============================================================================
+		applyPopupMotion() {
+			this.#popupRootNode.setLocalOpacity(this.#popupMotion.getDimRatio());
+			if (this.#popupDialogNode) {
+				const dialogScale = this.#popupMotion.getScale();
+				this.#popupDialogNode.setLocalScale(Vector2.create(dialogScale, dialogScale));
+			}
+		}
+
+		//==============================================================================
+		// 팝업 닫기.
+		//==============================================================================
+		closePopup() {
+			const popupRootNode = this.#popupRootNode;
+			if (!popupRootNode.isActive()) {
+				return;
+			}
+			this.#popupConfirmHandler = null;
+			this.#popupMotion.close();
+		}
+
+		//==============================================================================
+		// 토스트.
+		//==============================================================================
+		/**
+		 * @param { string } messageText
+		 */
+		showToast(messageText) {
+			this.#toast.show(messageText);
+		}
+
+		//==============================================================================
+		// 갱신. (실시간 지표 / 팝업 전환 / 타자기 / 로딩 / 반응형 자리)
+		//==============================================================================
+		/**
+		 * @param { number } deltaTime
+		 */
+		tick(deltaTime) {
+			super.tick(deltaTime);
+
+			this.#elapsedSeconds += deltaTime;
+			this.applyResponsiveLayout();
+
+			if (this.#popupTypewriter) {
+				this.#popupTypewriter.tick(deltaTime);
+			}
+			if (this.#demoTypewriter) {
+				this.#demoTypewriter.tick(deltaTime);
+			}
+			if (this.#popupRootNode && this.#popupRootNode.isActive()) {
+				this.#popupMotion.tick(deltaTime);
+				this.applyPopupMotion();
+			}
+
+			// 매초 지표 갱신. (실시간 라인 차트 / KPI)
+			this.#secondAccumulator += deltaTime;
+			if (this.#secondAccumulator >= 1) {
+				this.#secondAccumulator -= 1;
+				this.#requestsPerSecond = System.Math.max(40, System.Math.min(250,
+					this.#requestsPerSecond + (System.Math.random() - 0.48) * 30));
+				this.#activeUserCount += System.Math.round((System.Math.random() - 0.35) * 9);
+				this.#revenueValue += System.Math.random() * 14;
+				if (this.#liveChart) {
+					this.#liveChart.pushValue(this.#requestsPerSecond);
+				}
+				this.refreshDashboardStats();
+				if (this.#miniBarChart) {
+					this.#miniBarChart.setHighlightIndex(System.Math.floor(this.#elapsedSeconds) % 12);
+				}
+			}
+
+			// 이벤트 목록에 주기적으로 새 항목이 위에 쌓인다.
+			this.#eventAccumulator += deltaTime;
+			if (this.#eventAccumulator >= 5) {
+				this.#eventAccumulator -= 5;
+				this.#eventList.unshift(this.makeEventData(0));
+				if (this.#eventListView) {
+					this.#eventListView.setItemCount(this.#eventList.length);
+					this.#eventListView.refresh();
+				}
+			}
+
+			// 시스템 게이지 흔들림.
+			const dashboardRootNode = this.#screenRootMap.get("home");
+			if (dashboardRootNode && dashboardRootNode.isActive()) {
+				this.#cpuRatio += ((0.28 + System.Math.sin(this.#elapsedSeconds * 0.7) * 0.1 + this.#requestsPerSecond * 0.0008) - this.#cpuRatio) * System.Math.min(deltaTime * 2, 1);
+				this.#memoryRatio += ((0.55 + System.Math.sin(this.#elapsedSeconds * 0.13) * 0.05) - this.#memoryRatio) * System.Math.min(deltaTime, 1);
+				const cpuBar = this.findProgressBar(dashboardRootNode, "SystemCpuBar");
+				if (cpuBar) {
+					cpuBar.setValue(this.#cpuRatio);
+				}
+				const memoryBar = this.findProgressBar(dashboardRootNode, "SystemMemoryBar");
+				if (memoryBar) {
+					memoryBar.setValue(this.#memoryRatio);
+				}
+			}
+
+			// 카탈로그 다음 페이지 로딩. (짧은 지연으로 스피너 로딩 줄을 보여 준다)
+			if (this.#catalogLoadRemainSeconds > 0) {
+				this.#catalogLoadRemainSeconds -= deltaTime;
+				if (this.#catalogLoadRemainSeconds <= 0) {
+					this.#catalogLoadRemainSeconds = 0;
+					this.#catalogLoadedCount = System.Math.min(CATALOG_TOTAL_COUNT, this.#catalogLoadedCount + CATALOG_PAGE_COUNT);
+					this.applyCatalogItemCount();
+					this.#itemListView.refresh();
+				}
+			}
+
+			// 길게 누름 게이지.
+			const componentsRootNode = this.#screenRootMap.get("components");
+			if (componentsRootNode && componentsRootNode.isActive()) {
+				if (this.#longPressButton) {
+					const longPressBar = this.findProgressBar(componentsRootNode, "LongPressBar");
+					if (longPressBar) {
+						const holdRatio = System.Math.min(1, this.#longPressButton.getPressedElapsedSeconds() / this.#longPressButton.getLongPressSeconds());
+						longPressBar.setValue(holdRatio);
+					}
+				}
+
+				// 순환 진행바.
+				const loopRatio = (this.#elapsedSeconds % 3) / 3;
+				const loopBar = this.findProgressBar(componentsRootNode, "LoopProgressBar");
+				if (loopBar) {
+					loopBar.setValue(loopRatio);
+				}
+				this.setLabelText(componentsRootNode, "LoopProgressValue", System.Math.round(loopRatio * 100) + "%");
+
+				// 흐르는 사인 라인 차트.
+				if (this.#miniLineChart) {
+					this.#miniChartPhase += deltaTime * 2;
+					const waveValues = [];
+					for (let sampleIndex = 0; sampleIndex < 120; ++sampleIndex) {
+						waveValues.push(System.Math.sin(sampleIndex * 0.12 + this.#miniChartPhase) * (0.6 + 0.35 * System.Math.sin(sampleIndex * 0.031 + this.#miniChartPhase * 0.4)));
+					}
+					this.#miniLineChart.setValueList(waveValues);
+				}
+			}
+		}
+
+		//==============================================================================
+		// 반응형 자리 반영. (화면 크기가 바뀔 때만 — 우측 패널을 화면 오른쪽 끝에 붙인다)
+		//==============================================================================
+		applyResponsiveLayout() {
+			const engine = this.getEngine();
+			const viewManager = engine.getViewManager();
+			const viewSize = viewManager.getViewSize();
+			if (viewSize.x === this.#appliedViewSize.x && viewSize.y === this.#appliedViewSize.y) {
+				return;
+			}
+			this.#appliedViewSize = Vector2.create(viewSize.x, viewSize.y);
+			const viewWidth = viewSize.x;
+			const viewHeight = viewSize.y;
+
+			const root = this.getRoot();
+			root.setContentSize(Vector2.create(viewWidth, viewHeight));
+
+			// 왼쪽 레일. (세로 전체)
+			const railNode = this.#navigationRootNode;
+			railNode.setContentSize(Vector2.create(200, viewHeight));
+			const railHairlineNode = this.findNodeByName(railNode, "RailHairline");
+			railHairlineNode.setContentSize(Vector2.create(1, viewHeight));
+			const railVersionNode = this.findNodeByName(railNode, "RailVersion");
+			railVersionNode.setLocalPosition(Vector2.create(22, viewHeight - 36));
+
+			// 화면 문서. (배경이 화면 전체를 덮고, 본문 컬럼은 남는 폭을 전부 쓴다)
+			const sidePanelNames = {
+				home: ["BarPanel", "SystemPanel"],
+				shop: ["CartPanel", "OrderPanel"],
+				settings: ["AboutPanel"],
+				components: ["DragPanel", "FeedbackPanel"],
+			};
+			const sideX = viewWidth - SIDE_PANEL_OFFSET;
+			const mainWidth = sideX - 224 - 16;
+			const fullWidth = viewWidth - 224 - 16;
+			this.#mainWidth = mainWidth;
+			for (const screenName of SCREEN_NAMES) {
+				const screenRootNode = this.#screenRootMap.get(screenName);
+				screenRootNode.setContentSize(Vector2.create(viewWidth, viewHeight));
+				const statusChipNode = this.findNodeByName(screenRootNode, "StatusChip");
+				if (statusChipNode) {
+					statusChipNode.setLocalPosition(Vector2.create(viewWidth - 260, 26));
+				}
+				for (const panelName of sidePanelNames[screenName]) {
+					const panelNode = this.findNodeByName(screenRootNode, panelName);
+					if (panelNode) {
+						const panelPosition = panelNode.getLocalPosition();
+						panelNode.setLocalPosition(Vector2.create(sideX, panelPosition.y));
+					}
+				}
+			}
+			this.applyFluidDashboard(mainWidth);
+			this.applyFluidStore(mainWidth, fullWidth);
+			this.applyFluidSettings(mainWidth);
+			this.applyFluidComponents(mainWidth, fullWidth);
+
+			// 팝업 / 토스트.
+			const overlayNode = this.findNodeByName(this.#popupRootNode, "Overlay");
+			this.#popupRootNode.setContentSize(Vector2.create(viewWidth, viewHeight));
+			overlayNode.setContentSize(Vector2.create(viewWidth, viewHeight));
+			this.#popupDialogNode.setLocalPosition(Vector2.create(viewWidth * 0.5, viewHeight * 0.5 - 10));
+			this.#toast.setRestX((224 + viewWidth) * 0.5);
+			this.#toast.setRestY(viewHeight - 52);
+		}
+
+		//==============================================================================
+		// 가변 폭: 대시보드. (KPI 카드 4분할 / 차트 패널 / 이벤트 목록)
+		//==============================================================================
+		/**
+		 * @param { number } mainWidth
+		 */
+		applyFluidDashboard(mainWidth) {
+			const dashboardRootNode = this.#screenRootMap.get("home");
+			const statNames = ["Revenue", "Users", "Requests", "Uptime"];
+			const cardWidth = (mainWidth - 48) / 4;
+			for (let statIndex = 0; statIndex < statNames.length; ++statIndex) {
+				const cardNode = this.findNodeByName(dashboardRootNode, "Stat" + statNames[statIndex]);
+				cardNode.setLocalPosition(Vector2.create(224 + statIndex * (cardWidth + 16), 82));
+				cardNode.setContentSize(Vector2.create(cardWidth, 78));
+			}
+			const chartPanelNode = this.findNodeByName(dashboardRootNode, "ChartPanel");
+			chartPanelNode.setContentSize(Vector2.create(mainWidth, 300));
+			const chartValueNode = this.findNodeByName(dashboardRootNode, "ChartValue");
+			chartValueNode.setLocalPosition(Vector2.create(mainWidth - 156, 8));
+			const liveChartNode = this.findNodeByName(dashboardRootNode, "LiveChart");
+			liveChartNode.setContentSize(Vector2.create(mainWidth - 32, 244));
+			const eventListNode = this.findNodeByName(dashboardRootNode, "EventList");
+			eventListNode.setContentSize(Vector2.create(mainWidth, 458));
+			if (this.#eventListView) {
+				this.#eventListView.setItemCount(this.#eventList.length);
+				this.#eventListView.refresh();
+			}
+		}
+
+		//==============================================================================
+		// 가변 폭: 스토어. (추천 띠 / 카탈로그 목록)
+		//==============================================================================
+		/**
+		 * @param { number } mainWidth
+		 * @param { number } fullWidth
+		 */
+		applyFluidStore(mainWidth, fullWidth) {
+			const storeRootNode = this.#screenRootMap.get("shop");
+			const featuredListNode = this.findNodeByName(storeRootNode, "FeaturedList");
+			featuredListNode.setContentSize(Vector2.create(fullWidth, 96));
+			const itemListNode = this.findNodeByName(storeRootNode, "ItemList");
+			itemListNode.setContentSize(Vector2.create(mainWidth, 732));
+			if (this.#itemListView) {
+				this.applyCatalogItemCount();
+				this.#itemListView.refresh();
+			}
+		}
+
+		//==============================================================================
+		// 가변 폭: 설정. (행과 오른쪽 컨트롤 자리)
+		//==============================================================================
+		/**
+		 * @param { number } mainWidth
+		 */
+		applyFluidSettings(mainWidth) {
+			const settingsRootNode = this.#screenRootMap.get("settings");
+			const settingsPanelNode = this.findNodeByName(settingsRootNode, "SettingsPanel");
+			settingsPanelNode.setContentSize(Vector2.create(mainWidth, 420));
+			const rowWidth = mainWidth - 32;
+			const rowNames = ["Scale", "Sound", "Autosave", "Telemetry", "Theme", "Region", "Storage"];
+			for (const rowName of rowNames) {
+				const rowNode = this.findNodeByName(settingsRootNode, "Row" + rowName);
+				rowNode.setContentSize(Vector2.create(rowWidth, 40));
+			}
+			for (const sliderName of ["Scale", "Sound"]) {
+				const sliderNode = this.findNodeByName(settingsRootNode, sliderName + "Slider");
+				sliderNode.setLocalPosition(Vector2.create(rowWidth - 288, 9));
+			}
+			for (const toggleName of ["Autosave", "Telemetry"]) {
+				const toggleNode = this.findNodeByName(settingsRootNode, toggleName + "Toggle");
+				toggleNode.setLocalPosition(Vector2.create(rowWidth - 72, 9));
+			}
+			for (const slotName of ["Theme", "Region"]) {
+				const slotNode = this.findNodeByName(settingsRootNode, slotName + "DropdownSlot");
+				slotNode.setLocalPosition(Vector2.create(rowWidth - 200, 6));
+			}
+			const storageBarNode = this.findNodeByName(settingsRootNode, "StorageBar");
+			storageBarNode.setLocalPosition(Vector2.create(rowWidth - 288, 16));
+			const resetButtonNode = this.findNodeByName(settingsRootNode, "ResetButton");
+			resetButtonNode.setContentSize(Vector2.create(rowWidth, 32));
+		}
+
+		//==============================================================================
+		// 가변 폭: 컴포넌트. (두 열 패널 / 차트 패널 반분할)
+		//==============================================================================
+		/**
+		 * @param { number } mainWidth
+		 * @param { number } fullWidth
+		 */
+		applyFluidComponents(mainWidth, fullWidth) {
+			const componentsRootNode = this.#screenRootMap.get("components");
+			const halfWidth = (mainWidth - 16) / 2;
+			const secondColumnX = 224 + halfWidth + 16;
+
+			const buttonsPanelNode = this.findNodeByName(componentsRootNode, "ButtonsPanel");
+			buttonsPanelNode.setContentSize(Vector2.create(halfWidth, 262));
+			const menuPanelNode = this.findNodeByName(componentsRootNode, "MenuPanel");
+			menuPanelNode.setLocalPosition(Vector2.create(secondColumnX, 82));
+			menuPanelNode.setContentSize(Vector2.create(halfWidth, 262));
+			const zoneNode = this.findNodeByName(componentsRootNode, "RightClickZone");
+			zoneNode.setContentSize(Vector2.create(halfWidth - 32, 150));
+			const zoneHintNode = this.findNodeByName(componentsRootNode, "RightClickHint");
+			zoneHintNode.setContentSize(Vector2.create(halfWidth - 32, 150));
+
+			const progressPanelNode = this.findNodeByName(componentsRootNode, "ProgressPanel");
+			progressPanelNode.setContentSize(Vector2.create(halfWidth, 220));
+			const loopBarNode = this.findNodeByName(componentsRootNode, "LoopProgressBar");
+			loopBarNode.setContentSize(Vector2.create(halfWidth - 32, 7));
+			const typePanelNode = this.findNodeByName(componentsRootNode, "TypePanel");
+			typePanelNode.setLocalPosition(Vector2.create(secondColumnX, 360));
+			typePanelNode.setContentSize(Vector2.create(halfWidth, 220));
+			const typeBodyNode = this.findNodeByName(componentsRootNode, "TypeBody");
+			typeBodyNode.setContentSize(Vector2.create(halfWidth - 32, 110));
+			const typeBodyLabel = this.findLabel(componentsRootNode, "TypeBody");
+			typeBodyLabel.setWordWrapWidth(halfWidth - 32);
+
+			const chartsPanelNode = this.findNodeByName(componentsRootNode, "ChartsPanel");
+			chartsPanelNode.setContentSize(Vector2.create(fullWidth, 380));
+			const chartWidth = (fullWidth - 48) / 2;
+			const miniLineNode = this.findNodeByName(componentsRootNode, "MiniLineChart");
+			miniLineNode.setContentSize(Vector2.create(chartWidth, 290));
+			const miniBarCaptionNode = this.findNodeByName(componentsRootNode, "MiniBarCaption");
+			miniBarCaptionNode.setLocalPosition(Vector2.create(16 + chartWidth + 16, 36));
+			const miniBarNode = this.findNodeByName(componentsRootNode, "MiniBarChart");
+			miniBarNode.setLocalPosition(Vector2.create(16 + chartWidth + 16, 58));
+			miniBarNode.setContentSize(Vector2.create(chartWidth, 290));
+		}
+
+		//==============================================================================
+		// 출력 전 처리. (뷰 좌표계 적용 + 배경 채움)
+		//==============================================================================
+		/**
+		 * @param { Graphic } graphic
+		 */
+		preDraw(graphic) {
+			super.preDraw(graphic);
+
+			const engine = this.getEngine();
+			const viewManager = engine.getViewManager();
+			const canvasNativeSize = viewManager.getCanvasNativeSize();
+
+			viewManager.applyCanvasNativeRect(graphic);
+			graphic.setFillColor(this.#backgroundStyle);
+			graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+
+			viewManager.applyViewRect(graphic);
+		}
+
+		//==============================================================================
+		// 터치 전달. (TouchRecognizer 로 위젯에 넘긴다)
+		//==============================================================================
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 */
+		touchPress(viewInputPosition) {
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchPress(viewInputPosition);
+			}
+		}
+
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 */
+		touchMove(viewInputPosition) {
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchMove(viewInputPosition);
+			}
+		}
+
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 */
+		touchRelease(viewInputPosition) {
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchRelease(viewInputPosition);
+			}
+		}
+
+		//==============================================================================
+		// 마우스 휠. (포인터 아래 가장 안쪽 스크롤 뷰로 전달 — UIScene 이 아닌 씬은 직접 넘겨야 한다)
+		//==============================================================================
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 * @param { Vector2 } wheelDelta
+		 */
+		touchWheel(viewInputPosition, wheelDelta) {
+			const scrollView = this.findScrollViewAt(this.getRoot(), viewInputPosition);
+			if (scrollView) {
+				scrollView.wheel(wheelDelta);
+			}
+		}
+
+		/**
+		 * @param { WorldNode } node
+		 * @param { Vector2 } viewInputPosition
+		 * @returns { UIScrollView | null }
+		 */
+		findScrollViewAt(node, viewInputPosition) {
+			if (!node.isActive()) {
+				return null;
+			}
+			const children = node.getChildren();
+			for (let childIndex = children.length - 1; childIndex >= 0; --childIndex) {
+				const found = this.findScrollViewAt(children[childIndex], viewInputPosition);
+				if (found) {
+					return found;
+				}
+			}
+			const scrollView = (typeof node.getComponent === "function") ? node.getComponent(UIScrollView) : null;
+			if (scrollView && typeof node.contains === "function" && node.contains(viewInputPosition)) {
+				return scrollView;
+			}
+			return null;
+		}
+
+		//==============================================================================
+		// 보조: 이름으로 단추를 찾아 눌림 처리를 붙인다.
+		//==============================================================================
+		/**
+		 * @param { WorldNode } rootNode
+		 * @param { string } nodeName
+		 * @param { Function } clickHandler
+		 */
+		bindButton(rootNode, nodeName, clickHandler) {
+			const buttonNode = this.findNodeByName(rootNode, nodeName);
+			if (!buttonNode) {
+				return;
+			}
+			const buttonComponents = buttonNode.getComponents(UIButton);
+			if (buttonComponents.length === 0) {
+				return;
+			}
+			buttonComponents[0].setMinimumPressedSeconds(0.05);
+			buttonComponents[0].setClickedEvent(() => {
+				if (this.#beepPlayer) {
+					this.#beepPlayer.playPreset("click");
+				}
+				clickHandler();
+			});
+		}
+
+		//==============================================================================
+		// 보조: 이름으로 라벨 컴포넌트를 찾는다.
+		//==============================================================================
+		/**
+		 * @param { WorldNode } rootNode
+		 * @param { string } nodeName
+		 * @returns { UILabel | null }
+		 */
+		findLabel(rootNode, nodeName) {
+			const labelNode = this.findNodeByName(rootNode, nodeName);
+			if (!labelNode) {
+				return null;
+			}
+			const labelComponents = labelNode.getComponents(UILabel);
+			return (labelComponents.length > 0) ? labelComponents[0] : null;
+		}
+
+		//==============================================================================
+		// 보조: 이름으로 라벨을 찾아 글을 바꾼다.
+		//==============================================================================
+		/**
+		 * @param { WorldNode } rootNode
+		 * @param { string } nodeName
+		 * @param { string } text
+		 */
+		setLabelText(rootNode, nodeName, text) {
+			const labelComponent = this.findLabel(rootNode, nodeName);
+			if (labelComponent) {
+				labelComponent.setText(text);
+			}
+		}
+
+		//==============================================================================
+		// 보조: 이름으로 진행바 컴포넌트를 찾는다.
+		//==============================================================================
+		/**
+		 * @param { WorldNode } rootNode
+		 * @param { string } nodeName
+		 * @returns { UIProgressView | null }
+		 */
+		findProgressBar(rootNode, nodeName) {
+			const barNode = this.findNodeByName(rootNode, nodeName);
+			if (!barNode) {
+				return null;
+			}
+			const progressComponents = barNode.getComponents(UIProgressView);
+			return (progressComponents.length > 0) ? progressComponents[0] : null;
+		}
+
+		//==============================================================================
+		// 보조: 진행바 색을 맞춘다.
+		//==============================================================================
+		/**
+		 * @param { WorldNode } rootNode
+		 * @param { string } nodeName
+		 * @param { Color } fillColor
+		 */
+		styleProgressBar(rootNode, nodeName, fillColor) {
+			const progressComponent = this.findProgressBar(rootNode, nodeName);
+			if (!progressComponent) {
+				return;
+			}
+			progressComponent.setTrackColor(BAR_TRACK_COLOR);
+			progressComponent.setFillColor(fillColor);
+			progressComponent.setCornerRadius(3);
+		}
+
+		/**
+		 * @param { number } value
+		 * @returns { string }
+		 */
+		formatNumber(value) {
+			return Format.formatNumber(value);
+		}
+
+		//==============================================================================
+		// 보조: 이름으로 노드 검색. (재귀 — 위젯 content 안쪽까지 훑는다)
+		//==============================================================================
+		/**
+		 * @param { WorldNode } node
+		 * @param { string } targetName
+		 * @returns { WorldNode | null }
+		 */
+		findNodeByName(node, targetName) {
+			if (node.getName() === targetName) {
+				return node;
+			}
+			const childNodeList = node.getChildren();
+			for (const childNode of childNodeList) {
+				const foundNode = this.findNodeByName(childNode, targetName);
+				if (foundNode) {
+					return foundNode;
+				}
+			}
+			return null;
+		}
+	}
+
+	//==============================================================================
+	// 엔진 실행.
+	//==============================================================================
+	const engineConfiguration = new EngineConfiguration();
+	engineConfiguration.referenceResolutionSize = Vector2.create(1680, 1000);
+	engineConfiguration.canvasId = "mainCanvas";
+	engineConfiguration.autoResizeOnWindowResize = true;
+	const engine = new Engine(engineConfiguration);
+	engine.run(new ShowcaseScene());
+	System.showcaseEngine = engine;
+</script>
+</body>
+</html>

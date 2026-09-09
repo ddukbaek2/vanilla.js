@@ -6,6 +6,7 @@ import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
 import { Rect } from "../base/rect.js";
 import { Engine } from "./engine.js";
+import { Graphic } from "./graphic.js";
 
 
 //==============================================================================
@@ -53,6 +54,9 @@ export class ViewManager extends Object {
 	/** @private @type { HTMLCanvasElement } */ #canvas; // 캔버스.
 	/** @private @type { number } */ #devicePixelRatio; // 장치의 화면 배율.
 	/** @private @type { number } */ #targetResolutionScale; // 기준 해상도와 화면 해상도 사이의 크기 배율.
+	/** @private @type { number } */ #maxRenderPixelRatio; // 렌더에 쓸 devicePixelRatio 상한. (0 이면 제한 없음)
+	/** @private @type { object | null } */ #safeAreaOverride; // 세이프에어리어 강제값. (CSS px)
+	/** @private @type { HTMLElement | null } */ #safeAreaProbeElement; // env() 측정용 숨은 요소.
 	/** @private @type { Vector2 } */ #clientNativeSize; // 웹페이지 전체 영역.
 	/** @private @type { Vector2 } */ #canvasNativeSize; // 캔버스의 전체 영역. (기본 좌표계 기준)
 	/** @private @type { Vector2 } */ #canvasPixelSize; // 캔버스 영역 내부의 픽셀 렌더링 기준 전체 화면 영역.
@@ -76,6 +80,9 @@ export class ViewManager extends Object {
 		this.#canvas = null;
 		this.#devicePixelRatio = 1.0;
 		this.#targetResolutionScale = 1.0;
+		this.#maxRenderPixelRatio = 0;
+		this.#safeAreaOverride = null;
+		this.#safeAreaProbeElement = null;
 		this.#clientNativeSize = Vector2.zero();
 		this.#canvasNativeSize = Vector2.zero();
 		this.#canvasPixelSize = Vector2.zero();
@@ -100,7 +107,10 @@ export class ViewManager extends Object {
 		if (canvas === null || canvas === undefined) {
 			return;
 		}
-		const devicePixelRatio = System.window.devicePixelRatio || 1;
+		let devicePixelRatio = System.window.devicePixelRatio || 1;
+		if (this.#maxRenderPixelRatio > 0 && devicePixelRatio > this.#maxRenderPixelRatio) {
+			devicePixelRatio = this.#maxRenderPixelRatio;
+		}
 		const clientNativeSize = Vector2.create(System.window.innerWidth, System.window.innerHeight);
 		const canvasNativeRect = canvas.getBoundingClientRect();
 		const canvasNativeSize = Vector2.create(Math.round(canvasNativeRect.width), Math.round(canvasNativeRect.height));
@@ -256,17 +266,17 @@ export class ViewManager extends Object {
 	/**
 	 * @public
 	 * @method
-	 * @param { CanvasRenderingContext2D } canvasRenderingContext
+	 * @param { Graphic } graphic
 	 * @param { number } scaleX
 	 * @param { number } scaleY
 	 * @param { number } skewX
 	 * @param { number } skewY
 	 * @param { number } translateX
 	 * @param { number } translateY
-	* 
+	*
 	 */
-	applyTransform(canvasRenderingContext, scaleX, scaleY, skewX, skewY, translateX, translateY){
-		canvasRenderingContext.setTransform(scaleX, skewY, skewX, scaleY, translateX, translateY); // DOMMatrix2DInit
+	applyTransform(graphic, scaleX, scaleY, skewX, skewY, translateX, translateY){
+		graphic.setTransform(scaleX, skewY, skewX, scaleY, translateX, translateY); // DOMMatrix2DInit
 	}
 
 	//==============================================================================
@@ -277,9 +287,9 @@ export class ViewManager extends Object {
 	/**
 	 * @public
 	 * @method
-	 * @param { CanvasRenderingContext2D } canvasRenderingContext
+	 * @param { Graphic } graphic
 	 */
-	applyCanvasNativeRect(canvasRenderingContext) {
+	applyCanvasNativeRect(graphic) {
 		const devicePixelRatio = this.getDevicePixelRatio();
 		const scaleX = 1 * devicePixelRatio; // a
 		const scaleY = 1 * devicePixelRatio; // d
@@ -287,8 +297,8 @@ export class ViewManager extends Object {
 		const skewY = 0; // b
 		const translateX = 0; // e
 		const translateY = 0; // f
-		// canvasRenderingContext.setTransform(1, 0, 0, 1, 0, 0); // 기본.
-		this.applyTransform(canvasRenderingContext, scaleX, scaleY, skewX, skewY, translateX, translateY);
+		// graphic.setTransform(1, 0, 0, 1, 0, 0); // 기본.
+		this.applyTransform(graphic, scaleX, scaleY, skewX, skewY, translateX, translateY);
 	}
 
 	//==============================================================================
@@ -300,9 +310,9 @@ export class ViewManager extends Object {
 	/**
 	 * @public
 	 * @method
-	 * @param { CanvasRenderingContext2D } canvasRenderingContext
+	 * @param { Graphic } graphic
 	 */
-	applyViewRect(canvasRenderingContext) {
+	applyViewRect(graphic) {
 		const devicePixelRatio = this.getDevicePixelRatio();
 		const targetResolutionScale = this.getTargetResolutionScale();
 		const viewNativeRect = this.getViewNativeRect();
@@ -312,7 +322,7 @@ export class ViewManager extends Object {
 		const skewY = 0;
 		const translateX = viewNativeRect.position.x * devicePixelRatio;
 		const translateY = viewNativeRect.position.y * devicePixelRatio;
-		this.applyTransform(canvasRenderingContext, scaleX, scaleY, skewX, skewY, translateX, translateY);
+		this.applyTransform(graphic, scaleX, scaleY, skewX, skewY, translateX, translateY);
 	}
 
 	//==============================================================================
@@ -482,5 +492,141 @@ export class ViewManager extends Object {
 		const viewX = Math.round((canvasPosition.x * devicePixelRatio - viewNativeRect.position.x * devicePixelRatio) / totalScale);
 		const viewY = Math.round((canvasPosition.y * devicePixelRatio - viewNativeRect.position.y * devicePixelRatio) / totalScale);
 		return Vector2.create(viewX, viewY);
+	}
+
+	//==============================================================================
+	// 렌더 배율 상한 설정.
+	// - 고DPI 기기에서 캔버스가 과대해지는 것을 막는다. 0 이면 제한하지 않는다.
+	//==============================================================================
+	/**
+	 * @param { number } maxRenderPixelRatio
+	 */
+	setMaxRenderPixelRatio(maxRenderPixelRatio) {
+		this.#maxRenderPixelRatio = Math.max(0, maxRenderPixelRatio);
+		this.calculateViewRect();
+	}
+
+	//==============================================================================
+	// 렌더 배율 상한 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getMaxRenderPixelRatio() {
+		return this.#maxRenderPixelRatio;
+	}
+
+	//==============================================================================
+	// 종횡비에 맞는 뷰 스케일 모드 자동 선택.
+	// - 화면이 기준 해상도보다 세로로 길면 가로를 고정하고 세로를 늘리고,
+	//   가로로 길면 세로를 고정하고 가로를 늘린다. (여러 게임이 복붙하던 로직)
+	//==============================================================================
+	applyAspectViewScaleMode() {
+		const referenceResolutionSize = this.getReferenceResolutionSize();
+		const canvas = this.getCanvas();
+		let screenWidth = System.window.innerWidth;
+		let screenHeight = System.window.innerHeight;
+		if (canvas) {
+			const canvasNativeRect = canvas.getBoundingClientRect();
+			if (canvasNativeRect.width > 0 && canvasNativeRect.height > 0) {
+				screenWidth = canvasNativeRect.width;
+				screenHeight = canvasNativeRect.height;
+			}
+		}
+		const screenAspect = screenWidth / screenHeight;
+		const referenceAspect = referenceResolutionSize.x / referenceResolutionSize.y;
+		if (screenAspect < referenceAspect) {
+			this.setViewScaleMode(ViewScaleMode.stretchWidthExpandHeight);
+		}
+		else {
+			this.setViewScaleMode(ViewScaleMode.stretchHeightExpandWidth);
+		}
+	}
+
+	//==============================================================================
+	// 세이프에어리어 강제값 설정. (CSS px — 데스크톱에서 노치를 흉내 낼 때)
+	//==============================================================================
+	/**
+	 * @param { object | null } insets { top, right, bottom, left }
+	 */
+	setSafeAreaOverride(insets) {
+		this.#safeAreaOverride = insets;
+	}
+
+	//==============================================================================
+	// 세이프에어리어 인셋 반환. (뷰 좌표)
+	// - env(safe-area-inset-*) 를 숨은 요소의 padding 으로 실측해 뷰 좌표로 환산한다.
+	// - 우선순위: setSafeAreaOverride() > URL ?safeArea=top,right,bottom,left > env() 실측.
+	//==============================================================================
+	/**
+	 * @returns { object } { top, right, bottom, left }
+	 */
+	getSafeAreaInsets() {
+		let cssInsets = this.#safeAreaOverride;
+		if (!cssInsets) {
+			cssInsets = this.readSafeAreaFromUrl();
+		}
+		if (!cssInsets) {
+			cssInsets = this.readSafeAreaFromEnvironment();
+		}
+		const targetResolutionScale = this.getTargetResolutionScale();
+		const scale = (targetResolutionScale > 0) ? (1 / targetResolutionScale) : 1;
+		return {
+			top: cssInsets.top * scale,
+			right: cssInsets.right * scale,
+			bottom: cssInsets.bottom * scale,
+			left: cssInsets.left * scale,
+		};
+	}
+
+	//==============================================================================
+	// URL 쿼리에서 세이프에어리어 읽기. (?safeArea=44,0,34,0)
+	//==============================================================================
+	/**
+	 * @private
+	 * @returns { object | null }
+	 */
+	readSafeAreaFromUrl() {
+		try {
+			const parameters = new System.URLSearchParams(System.window.location.search);
+			const safeAreaText = parameters.get("safeArea");
+			if (!safeAreaText) {
+				return null;
+			}
+			const parts = safeAreaText.split(",").map((part) => System.parseFloat(part) || 0);
+			return { top: parts[0] || 0, right: parts[1] || 0, bottom: parts[2] || 0, left: parts[3] || 0 };
+		}
+		catch (parseError) {
+			return null;
+		}
+	}
+
+	//==============================================================================
+	// env(safe-area-inset-*) 실측.
+	//==============================================================================
+	/**
+	 * @private
+	 * @returns { object }
+	 */
+	readSafeAreaFromEnvironment() {
+		const documentObject = System.document;
+		if (!documentObject || !documentObject.body) {
+			return { top: 0, right: 0, bottom: 0, left: 0 };
+		}
+		if (!this.#safeAreaProbeElement) {
+			const probeElement = documentObject.createElement("div");
+			probeElement.style.cssText = "position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;"
+				+ "padding-top:env(safe-area-inset-top);padding-right:env(safe-area-inset-right);"
+				+ "padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);";
+			documentObject.body.appendChild(probeElement);
+			this.#safeAreaProbeElement = probeElement;
+		}
+		const computedStyle = System.getComputedStyle(this.#safeAreaProbeElement);
+		return {
+			top: System.parseFloat(computedStyle.paddingTop) || 0,
+			right: System.parseFloat(computedStyle.paddingRight) || 0,
+			bottom: System.parseFloat(computedStyle.paddingBottom) || 0,
+			left: System.parseFloat(computedStyle.paddingLeft) || 0,
+		};
 	}
 }

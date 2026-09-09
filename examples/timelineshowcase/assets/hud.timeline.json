@@ -1,0 +1,620 @@
+{
+	"name": "HUD Intro",
+	"duration": 4,
+	"frameRate": 30,
+	"loop": true,
+	"stage": {
+		"width": 960,
+		"height": 540,
+		"backgroundColor": "#101114ff",
+		"nodes": [
+			{
+				"name": "Backdrop",
+				"type": "paint",
+				"parent": null,
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540,
+				"color": "#0f141bff"
+			},
+			{
+				"name": "Top Bar",
+				"type": "paint",
+				"parent": null,
+				"x": 480,
+				"y": -30,
+				"width": 960,
+				"height": 58,
+				"color": "#171d27ff"
+			},
+			{
+				"name": "Title",
+				"type": "text",
+				"parent": null,
+				"x": 140,
+				"y": -30,
+				"width": 240,
+				"height": 30,
+				"text": "STAGE 3 · RUINS",
+				"fontSize": 18,
+				"bold": true,
+				"color": "#f2ece2ff",
+				"textAlign": "left"
+			},
+			{
+				"name": "Score Label",
+				"type": "text",
+				"parent": null,
+				"x": 830,
+				"y": -30,
+				"width": 120,
+				"height": 30,
+				"text": "SCORE",
+				"fontSize": 12,
+				"color": "#9aa2b2ff",
+				"textAlign": "right"
+			},
+			{
+				"name": "Score",
+				"type": "text",
+				"parent": null,
+				"x": 830,
+				"y": -30,
+				"width": 200,
+				"height": 30,
+				"text": "0",
+				"fontSize": 24,
+				"bold": true,
+				"color": "#d4b06aff",
+				"textAlign": "right"
+			},
+			{
+				"name": "Health Panel",
+				"type": "paint",
+				"parent": null,
+				"x": -170,
+				"y": 470,
+				"width": 320,
+				"height": 84,
+				"color": "#171d27ff",
+				"roundSize": 14
+			},
+			{
+				"name": "Health Label",
+				"type": "text",
+				"parent": null,
+				"x": -170,
+				"y": 450,
+				"width": 280,
+				"height": 20,
+				"text": "HP",
+				"fontSize": 12,
+				"bold": true,
+				"color": "#9aa2b2ff",
+				"textAlign": "left"
+			},
+			{
+				"name": "Health Track",
+				"type": "paint",
+				"parent": null,
+				"x": -170,
+				"y": 482,
+				"width": 280,
+				"height": 14,
+				"color": "#0b0e13ff",
+				"roundSize": 7
+			},
+			{
+				"name": "Health Fill",
+				"type": "paint",
+				"parent": null,
+				"x": -170,
+				"y": 482,
+				"width": 0,
+				"height": 14,
+				"color": "#45b585ff",
+				"roundSize": 7,
+				"pivotX": 0
+			},
+			{
+				"name": "Coin Panel",
+				"type": "paint",
+				"parent": null,
+				"x": 1130,
+				"y": 470,
+				"width": 220,
+				"height": 84,
+				"color": "#171d27ff",
+				"roundSize": 14
+			},
+			{
+				"name": "Coin",
+				"type": "sprite",
+				"parent": null,
+				"x": 1130,
+				"y": 470,
+				"width": 48,
+				"height": 48,
+				"image": "coin.png",
+				"frameColumns": 8,
+				"frameRows": 1
+			},
+			{
+				"name": "Coin Count",
+				"type": "text",
+				"parent": null,
+				"x": 1130,
+				"y": 470,
+				"width": 100,
+				"height": 40,
+				"text": "0",
+				"fontSize": 26,
+				"bold": true,
+				"color": "#f2ece2ff",
+				"textAlign": "left"
+			},
+			{
+				"name": "Hero",
+				"type": "sprite",
+				"parent": null,
+				"x": 480,
+				"y": 330,
+				"width": 128,
+				"height": 128,
+				"image": "slime.png",
+				"frameColumns": 8,
+				"frameRows": 1,
+				"opacity": 0
+			},
+			{
+				"name": "Hero Shadow",
+				"type": "paint",
+				"parent": null,
+				"x": 480,
+				"y": 392,
+				"width": 90,
+				"height": 16,
+				"color": "#00000066",
+				"roundSize": 8,
+				"opacity": 0
+			},
+			{
+				"name": "Ready",
+				"type": "text",
+				"parent": null,
+				"x": 480,
+				"y": 200,
+				"width": 500,
+				"height": 70,
+				"text": "READY",
+				"fontSize": 64,
+				"bold": true,
+				"color": "#f2ece2ff",
+				"opacity": 0
+			}
+		]
+	},
+	"tracks": [
+		{
+			"target": "Top Bar",
+			"property": "y",
+			"keys": [
+				{
+					"time": 0,
+					"value": -30,
+					"easing": "quartic.out"
+				},
+				{
+					"time": 0.6,
+					"value": 29,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Title",
+			"property": "y",
+			"keys": [
+				{
+					"time": 0.1,
+					"value": -30,
+					"easing": "quartic.out"
+				},
+				{
+					"time": 0.7,
+					"value": 29,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Score Label",
+			"property": "y",
+			"keys": [
+				{
+					"time": 0.15,
+					"value": -30,
+					"easing": "quartic.out"
+				},
+				{
+					"time": 0.75,
+					"value": 18,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Score",
+			"property": "y",
+			"keys": [
+				{
+					"time": 0.15,
+					"value": -30,
+					"easing": "quartic.out"
+				},
+				{
+					"time": 0.75,
+					"value": 38,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Health Panel",
+			"property": "x",
+			"keys": [
+				{
+					"time": 0.3,
+					"value": -170,
+					"easing": "back.out"
+				},
+				{
+					"time": 0.9,
+					"value": 190,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Health Label",
+			"property": "x",
+			"keys": [
+				{
+					"time": 0.3,
+					"value": -170,
+					"easing": "back.out"
+				},
+				{
+					"time": 0.9,
+					"value": 190,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Health Track",
+			"property": "x",
+			"keys": [
+				{
+					"time": 0.3,
+					"value": -170,
+					"easing": "back.out"
+				},
+				{
+					"time": 0.9,
+					"value": 190,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Health Fill",
+			"property": "x",
+			"keys": [
+				{
+					"time": 0.3,
+					"value": -310,
+					"easing": "back.out"
+				},
+				{
+					"time": 0.9,
+					"value": 50,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Health Fill",
+			"property": "width",
+			"keys": [
+				{
+					"time": 1,
+					"value": 0,
+					"easing": "quartic.out"
+				},
+				{
+					"time": 1.8,
+					"value": 280,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Coin Panel",
+			"property": "x",
+			"keys": [
+				{
+					"time": 0.4,
+					"value": 1130,
+					"easing": "back.out"
+				},
+				{
+					"time": 1,
+					"value": 830,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Coin",
+			"property": "x",
+			"keys": [
+				{
+					"time": 0.4,
+					"value": 1130,
+					"easing": "back.out"
+				},
+				{
+					"time": 1,
+					"value": 760,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Coin Count",
+			"property": "x",
+			"keys": [
+				{
+					"time": 0.4,
+					"value": 1130,
+					"easing": "back.out"
+				},
+				{
+					"time": 1,
+					"value": 850,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Coin",
+			"property": "frame",
+			"keys": [
+				{
+					"time": 0,
+					"value": 0,
+					"easing": "linear"
+				},
+				{
+					"time": 4,
+					"value": 32,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Coin Count",
+			"property": "number",
+			"keys": [
+				{
+					"time": 1.2,
+					"value": 0,
+					"easing": "quadratic.out"
+				},
+				{
+					"time": 2.4,
+					"value": 128,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Score",
+			"property": "number",
+			"keys": [
+				{
+					"time": 1.2,
+					"value": 0,
+					"easing": "quadratic.out"
+				},
+				{
+					"time": 3,
+					"value": 48250,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Hero",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 0.8,
+					"value": 0,
+					"easing": "cubic.out"
+				},
+				{
+					"time": 1.2,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Hero",
+			"property": "y",
+			"keys": [
+				{
+					"time": 0.8,
+					"value": 250,
+					"easing": "bounce.out"
+				},
+				{
+					"time": 1.5,
+					"value": 330,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Hero",
+			"property": "frame",
+			"keys": [
+				{
+					"time": 0,
+					"value": 0,
+					"easing": "linear"
+				},
+				{
+					"time": 4,
+					"value": 30,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Hero Shadow",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 0.8,
+					"value": 0,
+					"easing": "cubic.out"
+				},
+				{
+					"time": 1.5,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Hero Shadow",
+			"property": "scaleX",
+			"keys": [
+				{
+					"time": 0.8,
+					"value": 0.4,
+					"easing": "bounce.out"
+				},
+				{
+					"time": 1.5,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Ready",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 1.9,
+					"value": 0,
+					"easing": "cubic.out"
+				},
+				{
+					"time": 2.2,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 3.2,
+					"value": 1,
+					"easing": "cubic.in"
+				},
+				{
+					"time": 3.6,
+					"value": 0,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Ready",
+			"property": "scaleX",
+			"keys": [
+				{
+					"time": 1.9,
+					"value": 1.6,
+					"easing": "back.out"
+				},
+				{
+					"time": 2.3,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Ready",
+			"property": "scaleY",
+			"keys": [
+				{
+					"time": 1.9,
+					"value": 1.6,
+					"easing": "back.out"
+				},
+				{
+					"time": 2.3,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Ready",
+			"property": "text",
+			"keys": [
+				{
+					"time": 1.9,
+					"value": "READY",
+					"easing": "step"
+				},
+				{
+					"time": 3,
+					"value": "GO!",
+					"easing": "step"
+				}
+			]
+		},
+		{
+			"target": "Ready",
+			"property": "color",
+			"keys": [
+				{
+					"time": 1.9,
+					"value": "#f2ece2ff",
+					"easing": "step"
+				},
+				{
+					"time": 3,
+					"value": "#d4b06aff",
+					"easing": "step"
+				}
+			]
+		}
+	],
+	"markers": [
+		{
+			"time": 1.9,
+			"name": "ready"
+		},
+		{
+			"time": 3,
+			"name": "go"
+		}
+	]
+}

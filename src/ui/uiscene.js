@@ -231,18 +231,17 @@ export class UIScene extends Scene {
 		if (!engine) {
 			return;
 		}
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const viewManager = engine.getViewManager();
 		const canvasNativeSize = viewManager.getCanvasNativeSize();
 		const viewSize = viewManager.getViewSize();
 
 		// 캔버스 전체 검은색.
-		viewManager.applyCanvasNativeRect(canvasRenderingContext);
+		viewManager.applyCanvasNativeRect(graphic);
 		graphic.setFillColor(Color.black());
 		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
 
 		// 뷰 좌표계 적용.
-		viewManager.applyViewRect(canvasRenderingContext);
+		viewManager.applyViewRect(graphic);
 		graphic.setFillColor(Color.black());
 		graphic.drawRect(Rect.create(0, 0, viewSize.x, viewSize.y));
 
@@ -255,7 +254,7 @@ export class UIScene extends Scene {
 			const targetHeight = targetWidth * ratio;
 			const positionX = (viewSize.x - targetWidth) * 0.5;
 			const positionY = (viewSize.y - targetHeight) * 0.5;
-			canvasRenderingContext.drawImage(image, positionX, positionY, targetWidth, targetHeight);
+			graphic.drawImage(image, Vector2.create(positionX, positionY), Vector2.create(targetWidth, targetHeight));
 		}
 
 		// 하단 로딩 게이지.
@@ -265,10 +264,10 @@ export class UIScene extends Scene {
 		const barHeight = 24;
 		const barX = (viewSize.x - barWidth) * 0.5;
 		const barY = viewSize.y * 0.78;
-		canvasRenderingContext.fillStyle = "#333333";
-		canvasRenderingContext.fillRect(barX, barY, barWidth, barHeight);
-		canvasRenderingContext.fillStyle = "#ffffff";
-		canvasRenderingContext.fillRect(barX, barY, barWidth * progress, barHeight);
+		graphic.setFillColor("#333333");
+		graphic.drawRect(Rect.create(barX, barY, barWidth, barHeight));
+		graphic.setFillColor("#ffffff");
+		graphic.drawRect(Rect.create(barX, barY, barWidth * progress, barHeight));
 	}
 
 	//==============================================================================
@@ -614,15 +613,14 @@ export class UIScene extends Scene {
 		super.preDraw(graphic);
 
 		const engine = this.getEngine();
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const viewManager = engine.getViewManager();
 		const canvasNativeSize = viewManager.getCanvasNativeSize();
 
-		viewManager.applyCanvasNativeRect(canvasRenderingContext);
+		viewManager.applyCanvasNativeRect(graphic);
 		graphic.setFillColor(this.#sceneBackgroundColor);
 		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
 
-		viewManager.applyViewRect(canvasRenderingContext);
+		viewManager.applyViewRect(graphic);
 	}
 
 	//==============================================================================

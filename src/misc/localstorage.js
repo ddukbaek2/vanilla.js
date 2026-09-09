@@ -137,6 +137,32 @@ export class LocalStorage extends Object {
 	 * @param { string } key 
 	 * @returns { boolean }
 	 */
+	//==============================================================================
+	// 접두사로 시작하는 키 일괄 삭제. (정적)
+	// - 게임 네임스페이스의 저장 데이터를 통째로 지울 때 쓴다.
+	//==============================================================================
+	/**
+	 * @param { string } prefix
+	 * @returns { number } 지운 키 수.
+	 */
+	static clearByPrefix(prefix) {
+		const storage = System.localStorage;
+		if (!storage || !prefix) {
+			return 0;
+		}
+		const removeKeyList = [];
+		for (let index = 0; index < storage.length; ++index) {
+			const key = storage.key(index);
+			if (key && key.indexOf(prefix) === 0) {
+				removeKeyList.push(key);
+			}
+		}
+		for (const key of removeKeyList) {
+			storage.removeItem(key);
+		}
+		return removeKeyList.length;
+	}
+
 	static containsKey(key) {
 		return System.window.localStorage.getItem(key) !== null;
 	}

@@ -138,18 +138,14 @@ export class VirtualPad extends Object {
 	 * @param { Grpahic } graphic
 	 */
 	draw(graphic) {
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
-
 		const padPosition = this.getPadPosition();
 		const padRadius = this.getPadRadius();
 		const padColor = this.getPadColor();
 		const padColorString = padColor.toRGBAString();
 
 		// 바깥 원.
-		canvasRenderingContext.fillStyle = padColorString;
-		canvasRenderingContext.beginPath();
-		canvasRenderingContext.arc(padPosition.x, padPosition.y, padRadius, 0, Math.PI * 2);
-		canvasRenderingContext.fill();
+		graphic.setFillColor(padColorString);
+		graphic.drawCircle(padPosition, padRadius);
 
 		const ballPosition = this.getBallPosition();
 		const ballRadius = this.getBallRadius();
@@ -157,10 +153,8 @@ export class VirtualPad extends Object {
 		const ballColorString = ballColor.toRGBAString();
 
 		// 내부 원.
-		canvasRenderingContext.fillStyle = ballColorString;
-		canvasRenderingContext.beginPath();
-		canvasRenderingContext.arc(ballPosition.x, ballPosition.y, ballRadius, 0, Math.PI * 2);
-		canvasRenderingContext.fill();
+		graphic.setFillColor(ballColorString);
+		graphic.drawCircle(ballPosition, ballRadius);
 	}
 
 	//==============================================================================

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>GLB TEST</title>
+</head>
+<body style="margin:0">
+	<canvas id="testCanvas" width="800" height="600"></canvas>
+	<script type="module">
+		const System = globalThis;
+
+		async function report(text) {
+			await System.fetch("/__report?text=" + encodeURIComponent(text));
+		}
+
+		(async () => {
+			try {
+				await report("STAGE import");
+				const engineModule = await import("../../build/vanilla.js");
+				const SkinnedModel = engineModule.SkinnedModel;
+				const SkinnedModelRenderer = engineModule.SkinnedModelRenderer;
+				const Matrix4 = engineModule.Matrix4;
+				const Vector3 = engineModule.Vector3;
+				const canvas = document.getElementById("testCanvas");
+				const webGL2RenderingContext = canvas.getContext("webgl2");
+				webGL2RenderingContext.viewport(0, 0, 800, 600);
+				webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+				webGL2RenderingContext.enable(webGL2RenderingContext.CULL_FACE);
+				webGL2RenderingContext.clearColor(0.16, 0.2, 0.26, 1);
+
+				const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+
+				async function loadDrawAndCapture(shotName, url, animationName, cameraX, cameraY, cameraZ, targetY) {
+					const model = await SkinnedModel.loadFromUrl(webGL2RenderingContext, url, skinnedModelRenderer);
+					await report(`LOADED ${shotName} anims=` + model.getAnimationNameList().join("|"));
+					if (animationName) {
+						model.playAnimation(animationName, 0);
+					}
+					skinnedModelRenderer.setSunDirection(0.45, 0.76, 0.47);
+					skinnedModelRenderer.setFogRange(300, 800);
+					model.update(0.4);
+					webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+					const cameraPosition = Vector3.create(cameraX, cameraY, cameraZ);
+					const cameraTarget = Vector3.create(0, targetY, 0);
+					const cameraUp = Vector3.up();
+					const viewMatrix = Matrix4.createLookAt(cameraPosition, cameraTarget, cameraUp);
+					const projectionMatrix = Matrix4.createPerspective(System.Math.PI / 3, 800 / 600, 0.1, 2000);
+					const viewProjectionMatrix = projectionMatrix.clone();
+					viewProjectionMatrix.multiply(viewMatrix);
+					const modelMatrix = Matrix4.createIdentity();
+					const viewProjectionElements = viewProjectionMatrix.getElements();
+					const modelMatrixElements = modelMatrix.getElements();
+					skinnedModelRenderer.draw(model, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ);
+					const drawError = webGL2RenderingContext.getError();
+					const dataUrl = canvas.toDataURL("image/png");
+					await System.fetch("/__screenshot?name=" + shotName, { method: "POST", body: dataUrl });
+					await report(`SHOT ${shotName} drawError=${drawError}`);
+				}
+
+				// soldier: 키 약 1.8 유닛. fox: 키 약 80cm 스케일(원본 단위 큼).
+				await loadDrawAndCapture("glb_soldier", "./assets/soldier.glb", "Idle", 0, 1.4, 3.2, 1.0);
+				await loadDrawAndCapture("glb_fox", "./assets/fox.glb", "Walk", 0, 80, 220, 45);
+
+				await report("OK");
+			}
+			catch (error) {
+				await report(`FAIL ${error.message} ${error.stack}`);
+			}
+		})();
+	</script>
+</body>
+</html>

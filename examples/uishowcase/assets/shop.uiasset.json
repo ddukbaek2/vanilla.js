@@ -1,0 +1,2745 @@
+{
+	"version": 1,
+	"root": {
+		"type": "WorldNode",
+		"name": "Store",
+		"active": true,
+		"position": [
+			0,
+			0
+		],
+		"scale": [
+			1,
+			1
+		],
+		"rotation": 0,
+		"opacity": 1,
+		"pivot": [
+			0,
+			0
+		],
+		"anchor": [
+			0,
+			0
+		],
+		"contentSize": [
+			1680,
+			1000
+		],
+		"interactable": false,
+		"components": [
+			{
+				"type": "Paint",
+				"color": [
+					0.078,
+					0.09,
+					0.118,
+					1
+				],
+				"roundSize": 0
+			}
+		],
+		"children": [
+			{
+				"type": "WorldNode",
+				"name": "Title",
+				"active": true,
+				"position": [
+					224,
+					22
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					360,
+					26
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "UILabel",
+						"text": "STORE",
+						"fontSize": 18,
+						"textColor": [
+							0.91,
+							0.922,
+							0.949,
+							1
+						],
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						],
+						"textAlign": "left",
+						"textBaseline": "middle"
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "Subtitle",
+				"active": true,
+				"position": [
+					226,
+					50
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					480,
+					14
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "UILabel",
+						"text": "Add-ons for your workspace - one template, hundreds of rows.",
+						"fontSize": 11,
+						"textColor": [
+							0.604,
+							0.635,
+							0.698,
+							1
+						],
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						],
+						"textAlign": "left",
+						"textBaseline": "middle"
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "StatusChip",
+				"active": true,
+				"position": [
+					1420,
+					26
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					244,
+					26
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.173,
+							0.2,
+							0.267,
+							1
+						],
+						"roundSize": 13
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "StatusChipLabel",
+						"active": true,
+						"position": [
+							0,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							244,
+							26
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "●  All systems normal",
+								"fontSize": 10.5,
+								"textColor": [
+									0.271,
+									0.71,
+									0.522,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "center",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "FeaturedLabel",
+				"active": true,
+				"position": [
+					224,
+					82
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					300,
+					16
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "UILabel",
+						"text": "FEATURED",
+						"fontSize": 10,
+						"textColor": [
+							0.42,
+							0.451,
+							0.529,
+							1
+						],
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						],
+						"textAlign": "left",
+						"textBaseline": "middle"
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "FeaturedList",
+				"active": true,
+				"position": [
+					224,
+					102
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					1192,
+					96
+				],
+				"interactable": true,
+				"components": [
+					{
+						"type": "UIScrollView",
+						"scrollContentSize": [
+							1192,
+							96
+						],
+						"scrollMode": "elastic",
+						"dragSensitivity": 1,
+						"horizontal": true,
+						"vertical": false,
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						]
+					}
+				],
+				"children": [],
+				"contentChildren": [
+					{
+						"type": "WorldNode",
+						"name": "FeaturedTemplate",
+						"active": true,
+						"position": [
+							0,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							196,
+							96
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.106,
+									0.125,
+									0.165,
+									1
+								],
+								"roundSize": 10
+							}
+						],
+						"children": [
+							{
+								"type": "WorldNode",
+								"name": "FeaturedTitle",
+								"active": true,
+								"position": [
+									14,
+									12
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									168,
+									18
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "",
+										"fontSize": 12.5,
+										"textColor": [
+											0.91,
+											0.922,
+											0.949,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										],
+										"textAlign": "left",
+										"textBaseline": "middle"
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "FeaturedCaption",
+								"active": true,
+								"position": [
+									14,
+									34
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									168,
+									14
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "",
+										"fontSize": 9.5,
+										"textColor": [
+											0.604,
+											0.635,
+											0.698,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										],
+										"textAlign": "left",
+										"textBaseline": "middle"
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "FeaturedPrice",
+								"active": true,
+								"position": [
+									14,
+									64
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									100,
+									18
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "",
+										"fontSize": 12,
+										"textColor": [
+											0.427,
+											0.49,
+											1,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										],
+										"textAlign": "left",
+										"textBaseline": "middle"
+									}
+								],
+								"children": []
+							}
+						]
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "ItemsLabel",
+				"active": true,
+				"position": [
+					224,
+					222
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					300,
+					16
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "UILabel",
+						"text": "CATALOG",
+						"fontSize": 10,
+						"textColor": [
+							0.42,
+							0.451,
+							0.529,
+							1
+						],
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						],
+						"textAlign": "left",
+						"textBaseline": "middle"
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "ItemsCountCaption",
+				"active": true,
+				"position": [
+					300,
+					220
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					240,
+					18
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "UILabel",
+						"text": "",
+						"fontSize": 10,
+						"textColor": [
+							0.604,
+							0.635,
+							0.698,
+							1
+						],
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						],
+						"textAlign": "left",
+						"textBaseline": "middle"
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "ItemList",
+				"active": true,
+				"position": [
+					224,
+					244
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					884,
+					732
+				],
+				"interactable": true,
+				"components": [
+					{
+						"type": "UIScrollView",
+						"scrollContentSize": [
+							884,
+							732
+						],
+						"scrollMode": "elastic",
+						"dragSensitivity": 1,
+						"horizontal": false,
+						"vertical": true,
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						]
+					}
+				],
+				"children": [],
+				"contentChildren": [
+					{
+						"type": "WorldNode",
+						"name": "ItemTemplate",
+						"active": true,
+						"position": [
+							0,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							852,
+							44
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.137,
+									0.161,
+									0.216,
+									1
+								],
+								"roundSize": 8
+							}
+						],
+						"children": [
+							{
+								"type": "WorldNode",
+								"name": "ItemIcon",
+								"active": true,
+								"position": [
+									10,
+									8
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									28,
+									28
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "Paint",
+										"color": [
+											0.173,
+											0.2,
+											0.267,
+											1
+										],
+										"roundSize": 7
+									}
+								],
+								"children": [
+									{
+										"type": "WorldNode",
+										"name": "ItemGlyph",
+										"active": true,
+										"position": [
+											0,
+											0
+										],
+										"scale": [
+											1,
+											1
+										],
+										"rotation": 0,
+										"opacity": 1,
+										"pivot": [
+											0,
+											0
+										],
+										"anchor": [
+											0,
+											0
+										],
+										"contentSize": [
+											28,
+											28
+										],
+										"interactable": false,
+										"components": [
+											{
+												"type": "UILabel",
+												"text": "",
+												"fontSize": 12,
+												"textColor": [
+													0.604,
+													0.635,
+													0.698,
+													1
+												],
+												"backgroundColor": [
+													1,
+													1,
+													1,
+													0
+												],
+												"textAlign": "center",
+												"textBaseline": "middle"
+											}
+										],
+										"children": []
+									}
+								]
+							},
+							{
+								"type": "WorldNode",
+								"name": "ItemTitle",
+								"active": true,
+								"position": [
+									52,
+									4
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									420,
+									20
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "",
+										"fontSize": 12,
+										"textColor": [
+											0.91,
+											0.922,
+											0.949,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										],
+										"textAlign": "left",
+										"textBaseline": "middle"
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "ItemCaption",
+								"active": true,
+								"position": [
+									52,
+									24
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									480,
+									14
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "",
+										"fontSize": 9.5,
+										"textColor": [
+											0.42,
+											0.451,
+											0.529,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										],
+										"textAlign": "left",
+										"textBaseline": "middle"
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "ItemPrice",
+								"active": true,
+								"position": [
+									658,
+									0
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									90,
+									44
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "",
+										"fontSize": 11.5,
+										"textColor": [
+											0.604,
+											0.635,
+											0.698,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										],
+										"textAlign": "right",
+										"textBaseline": "middle"
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "ItemAddButton",
+								"active": true,
+								"position": [
+									766,
+									9
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									86,
+									26
+								],
+								"interactable": true,
+								"components": [
+									{
+										"type": "Paint",
+										"color": [
+											0.173,
+											0.2,
+											0.267,
+											1
+										],
+										"roundSize": 7
+									},
+									{
+										"type": "UIButton",
+										"pressedTintColor": [
+											0,
+											0,
+											0,
+											0.25
+										]
+									},
+									{
+										"type": "UILabel",
+										"text": "ADD",
+										"fontSize": 10.5,
+										"textColor": [
+											0.91,
+											0.922,
+											0.949,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										],
+										"textAlign": "center",
+										"textBaseline": "middle"
+									}
+								],
+								"children": []
+							}
+						]
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "CartPanel",
+				"active": true,
+				"position": [
+					1124,
+					244
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					340,
+					348
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.125,
+							0.165,
+							1
+						],
+						"roundSize": 10
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "CartTitle",
+						"active": true,
+						"position": [
+							16,
+							12
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							300,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "CART",
+								"fontSize": 10,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartRowName0",
+						"active": true,
+						"position": [
+							16,
+							32
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							220,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartRowPrice0",
+						"active": true,
+						"position": [
+							216,
+							32
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							108,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "right",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartRowName1",
+						"active": true,
+						"position": [
+							16,
+							54
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							220,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartRowPrice1",
+						"active": true,
+						"position": [
+							216,
+							54
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							108,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "right",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartRowName2",
+						"active": true,
+						"position": [
+							16,
+							76
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							220,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartRowPrice2",
+						"active": true,
+						"position": [
+							216,
+							76
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							108,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "right",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartRowName3",
+						"active": true,
+						"position": [
+							16,
+							98
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							220,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartRowPrice3",
+						"active": true,
+						"position": [
+							216,
+							98
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							108,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "right",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartRowName4",
+						"active": true,
+						"position": [
+							16,
+							120
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							220,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartRowPrice4",
+						"active": true,
+						"position": [
+							216,
+							120
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							108,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "right",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartRowName5",
+						"active": true,
+						"position": [
+							16,
+							142
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							220,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartRowPrice5",
+						"active": true,
+						"position": [
+							216,
+							142
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							108,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "right",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartRowName6",
+						"active": true,
+						"position": [
+							16,
+							164
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							220,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartRowPrice6",
+						"active": true,
+						"position": [
+							216,
+							164
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							108,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "right",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartRowName7",
+						"active": true,
+						"position": [
+							16,
+							186
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							220,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartRowPrice7",
+						"active": true,
+						"position": [
+							216,
+							186
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							108,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "right",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartHairline",
+						"active": true,
+						"position": [
+							16,
+							240
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							1
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.224,
+									0.255,
+									0.329,
+									1
+								],
+								"roundSize": 0
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartTotalLabel",
+						"active": true,
+						"position": [
+							16,
+							252
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							120,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Total",
+								"fontSize": 10.5,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartTotalValue",
+						"active": true,
+						"position": [
+							176,
+							250
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							148,
+							20
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "$0.00",
+								"fontSize": 13,
+								"textColor": [
+									0.91,
+									0.922,
+									0.949,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "right",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartClearButton",
+						"active": true,
+						"position": [
+							16,
+							284
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							148,
+							30
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.173,
+									0.2,
+									0.267,
+									1
+								],
+								"roundSize": 8
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.25
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "CLEAR",
+								"fontSize": 10.5,
+								"textColor": [
+									0.91,
+									0.922,
+									0.949,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "center",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "CartCheckoutButton",
+						"active": true,
+						"position": [
+							176,
+							284
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							148,
+							30
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.427,
+									0.49,
+									1,
+									1
+								],
+								"roundSize": 8
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.25
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "CHECKOUT",
+								"fontSize": 10.5,
+								"textColor": [
+									0.91,
+									0.922,
+									0.949,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "center",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "OrderPanel",
+				"active": true,
+				"position": [
+					1124,
+					608
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					340,
+					368
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.125,
+							0.165,
+							1
+						],
+						"roundSize": 10
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "OrderTitle",
+						"active": true,
+						"position": [
+							16,
+							12
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							300,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "RECENT ORDERS",
+								"fontSize": 10,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "OrderRow0",
+						"active": true,
+						"position": [
+							16,
+							32
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "OrderRow1",
+						"active": true,
+						"position": [
+							16,
+							54
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "OrderRow2",
+						"active": true,
+						"position": [
+							16,
+							76
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "OrderRow3",
+						"active": true,
+						"position": [
+							16,
+							98
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "OrderRow4",
+						"active": true,
+						"position": [
+							16,
+							120
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "OrderRow5",
+						"active": true,
+						"position": [
+							16,
+							142
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "OrderRow6",
+						"active": true,
+						"position": [
+							16,
+							164
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "OrderRow7",
+						"active": true,
+						"position": [
+							16,
+							186
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "OrderEmptyCaption",
+						"active": true,
+						"position": [
+							16,
+							32
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "No orders yet.",
+								"fontSize": 10.5,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					}
+				]
+			}
+		]
+	}
+}

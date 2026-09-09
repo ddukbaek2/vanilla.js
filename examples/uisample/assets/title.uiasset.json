@@ -1,0 +1,526 @@
+{
+	"version": 1,
+	"root": {
+		"type": "WorldNode",
+		"name": "Root",
+		"active": true,
+		"position": [
+			0,
+			0
+		],
+		"scale": [
+			1,
+			1
+		],
+		"rotation": 0,
+		"opacity": 1,
+		"pivot": [
+			0,
+			0
+		],
+		"anchor": [
+			0,
+			0
+		],
+		"contentSize": [
+			960,
+			640
+		],
+		"interactable": false,
+		"components": [],
+		"children": [
+			{
+				"type": "WorldNode",
+				"name": "Panel",
+				"active": true,
+				"position": [
+					180,
+					80
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					600,
+					480
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.13,
+							0.15,
+							0.19,
+							0.96
+						],
+						"roundSize": 18
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "Title",
+						"active": true,
+						"position": [
+							40,
+							34
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							520,
+							48
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "UI ASSET SAMPLE",
+								"fontSize": 30,
+								"textColor": [
+									0.93,
+									0.95,
+									0.98,
+									1
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "Description",
+						"active": true,
+						"position": [
+							40,
+							92
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							520,
+							28
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "UIEditor 로 만든 문서를 그대로 불러온 화면입니다.",
+								"fontSize": 16,
+								"textColor": [
+									0.62,
+									0.66,
+									0.72,
+									1
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ProgressTrack",
+						"active": true,
+						"position": [
+							40,
+							150
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							520,
+							20
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UIProgressView",
+								"value": 0.35,
+								"minValue": 0,
+								"maxValue": 1
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ItemList",
+						"active": true,
+						"position": [
+							40,
+							196
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							520,
+							190
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.09,
+									0.1,
+									0.13,
+									1
+								],
+								"roundSize": 10
+							},
+							{
+								"type": "UIScrollView",
+								"scrollContentSize": [
+									520,
+									520
+								],
+								"dragSensitivity": 1
+							}
+						],
+						"children": [],
+						"contentChildren": [
+							{
+								"type": "WorldNode",
+								"name": "Item0",
+								"active": true,
+								"position": [
+									10,
+									10
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									500,
+									56
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "Paint",
+										"color": [
+											0.19,
+											0.28,
+											0.42,
+											1
+										],
+										"roundSize": 8
+									},
+									{
+										"type": "UILabel",
+										"text": "  목록 항목 1",
+										"fontSize": 18,
+										"textColor": [
+											0.9,
+											0.92,
+											0.95,
+											1
+										]
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "Item1",
+								"active": true,
+								"position": [
+									10,
+									76
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									500,
+									56
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "Paint",
+										"color": [
+											0.19,
+											0.28,
+											0.42,
+											1
+										],
+										"roundSize": 8
+									},
+									{
+										"type": "UILabel",
+										"text": "  목록 항목 2",
+										"fontSize": 18,
+										"textColor": [
+											0.9,
+											0.92,
+											0.95,
+											1
+										]
+									}
+								],
+								"children": []
+							},
+							{
+								"type": "WorldNode",
+								"name": "Item2",
+								"active": true,
+								"position": [
+									10,
+									142
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									500,
+									56
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "Paint",
+										"color": [
+											0.19,
+											0.28,
+											0.42,
+											1
+										],
+										"roundSize": 8
+									},
+									{
+										"type": "UILabel",
+										"text": "  목록 항목 3",
+										"fontSize": 18,
+										"textColor": [
+											0.9,
+											0.92,
+											0.95,
+											1
+										]
+									}
+								],
+								"children": []
+							}
+						]
+					},
+					{
+						"type": "WorldNode",
+						"name": "StartButton",
+						"active": true,
+						"position": [
+							40,
+							404
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							246,
+							52
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.29,
+									0.45,
+									0.72,
+									1
+								],
+								"roundSize": 12
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.3
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "        시작",
+								"fontSize": 20,
+								"textColor": [
+									0.95,
+									0.96,
+									0.98,
+									1
+								]
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "OptionButton",
+						"active": true,
+						"position": [
+							314,
+							404
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							246,
+							52
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.24,
+									0.26,
+									0.31,
+									1
+								],
+								"roundSize": 12
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.3
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "        설정",
+								"fontSize": 20,
+								"textColor": [
+									0.95,
+									0.96,
+									0.98,
+									1
+								]
+							}
+						],
+						"children": []
+					}
+				]
+			}
+		]
+	}
+}

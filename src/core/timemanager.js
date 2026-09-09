@@ -57,7 +57,9 @@ export class TimeManager extends Object {
 		}
 
 		// 시간 반영.
-		const unscaledTimeDelta = (realtimeSinceStartup - this.#realtimeSinceStartup);
+		// (타이머 역행 시 음수, 백그라운드 탭 복귀 시 거대 값이 들어올 수 있어 [0, 0.25초]로 막는다)
+		const rawTimeDelta = (realtimeSinceStartup - this.#realtimeSinceStartup);
+		const unscaledTimeDelta = System.Math.min(0.25, System.Math.max(0, rawTimeDelta));
 		this.#realtimeSinceStartup = realtimeSinceStartup;
 		this.#time += unscaledTimeDelta;
 		this.#unscaledTimeDelta = unscaledTimeDelta;

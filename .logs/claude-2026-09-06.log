@@ -1,0 +1,34 @@
+# 2026-09-06 작업 로그
+
+## OLD FACE 애셋을 메타휴먼 크리에이터 노인 프리셋 Walter 로 교체 (0.5.5-experimental)
+[19:40 요청 → 00:20 응답(09-07)]
+- 요청: MB-Lab / 스캔 wrap / Rocketbox / 임의 표정 프리셋을 모두 거부하고 "메타휴먼을 쓰라"는 지시. 코어 데이터 설치와 UE 5.8.2 업데이트, 메타휴먼 클라우드 로그인은 사용자가 수행("로그인함").
+- 캐릭터 생성(UE 헤드리스, examples/oldface/tools/metahuman/ue/ue_create_character.py): 프리셋 Walter 복제 → 피부 합성 → 클라우드 오토리그(JOINTS_AND_BLEND_SHAPES) → 고해상도 텍스처 → DNA(OldMan_Head.dna 50MB) / 머리 스켈레탈 메시 / 머티리얼 텍스처 애셋(얼굴 알베도 / 노멀 / 캐비티 2K, 몸) 내보내기.
+- DNA 2.5 는 공개 Python 바인딩이 못 읽어 C++ 모듈 OldFaceTools(UDNA 로드, FRigLogic / FRigInstance 로 65 프레임 ARKit 매핑 커브 평가, 지오메트리 / 스킨 가중치 / 블렌드셰이프 델타 덤프)를 프로젝트에 추가해 빌드. riglogic_from_dump.py 가 조인트 계층 합성 + LBS + 블렌드셰이프로 포즈별 정점 계산(머리 24,049 정점, 컨트롤 251/274 매칭).
+- 그룸 카드: 캐릭터 슬롯 선택(Hair_S_BobLayered / Eyebrows_M_Messy / Goatee_L_Wavy / Mustache_L_Wavy / Eyelashes_S_Sparse)을 조회해 그룸 애셋의 카드 LOD1 스태틱 메시와 아틀라스(Layout2) 내보내기. 카드는 바인딩 소스 머리(SKM_Groom_Head_Legacy01 / 02, 서로 12.75cm 높이 차)에 맞춰져 있어 FBX 로 꺼낸 뒤 UV 로 DNA 정점 순서에 대응(legacy_heads_to_dna.py)하고, 최근접 삼각형 무게중심 + 로컬 프레임 오프셋 바인딩(fit_hair_cards.py)으로 Walter 머리와 표정 포즈마다 재구성. 머리카락만 양면 사본, 셰이프키 4mm 임계값으로 glb 13.9MB.
+- 텍스처: 얼굴 알베도 2K, 노멀(UE DirectX Y- → G 반전), 캐비티 → 러프니스(ORM G) / 디테일 높이, 눈(공막 + 홍채) / 치아 / 속눈썹(Sparse), 카드 아틀라스 커버리지(R) → 알파, 깊이(G) 와 Tangent 알파(가닥 좌표)로 음영, 파트별 커버리지 배율(머리 1.3 / 턱수염 1.9 / 눈썹 1.6 / 콧수염 2.2).
+- 샘플(index.html): 머리 머티리얼에 노멀 / 러프니스 맵, hair / beard / mustache / eyebrows 머티리얼(알파 컷아웃, SSS 0), 그래프 패널 썸네일(NORMAL / CAVITY / HAIR) 과 문구, 크레딧 "WALTER PRESET".
+- 검증: 임시 하네스(preserveDrawingBuffer + ?expression / zoom 파라미터, toDataURL → devserver POST)로 헤드리스 크롬 1개씩 순차 캡처(중립 / happy / angry / 줌) — 턱수염이 턱, 눈썹이 이마를 따라가고 피부 주름 / 흰머리 확인. 캡처 직후 크롬 / 데브서버 종료, 하네스 파일 삭제, 잔존 프로세스 0.
+- 배포: NAS portfolio/oldface (index.html, vanilla.js, assets 14 파일). 문서: UPDATE.md 0.5.5-experimental, tools/metahuman/README.md 전면 개정.
+- 함정: Git Bash 가 환경 변수의 "/Game/..." 을 "C:/Program Files/Git/Game/..." 으로 바꿔 애셋 레지스트리 조회가 0 건이 됨 → MSYS_NO_PATHCONV=1 / MSYS2_ENV_CONV_EXCL="*". 새 프로세스에서 Export 폴더를 보려면 scan_paths_synchronous 필요. UGroomBindingAsset 은 get_editor_property("source_skeletal_mesh") 로 읽음. MetaHumanCollection.items 는 보호 프로퍼티라 get_slot_names / get_item_keys_for_slot / get_item_display_name 으로 조회.
+
+## OLD FACE 렌더링을 언리얼 메타휴먼 룩으로 상향 (0.5.6-experimental)
+[00:25 요청 → 02:10 응답(09-07)]
+- 요청: "이상하게 고품질 같지 않다" → 원인 분석 후 "전체적으로 다 언리얼 따라가게 조정해, 언리얼보다도 높일 수 있다면 높여, 느려 보이지만 않으면 됨".
+- 엔진: HumanSkinRenderer 를 셰이딩 모드 통합 셰이더로 재작성(피부 / 눈 / 머리카락 / 차폐 / 유체, 불투명 + 블렌드 2 패스, 컷아웃 깊이 셰이더로 머리카락 그림자, MRT 4 출력에 월드 노멀). 피부: 주름 맵 3종(마스크 아틀라스 채널 x RigLogic 애니메이티드 맵 가중치) + 마이크로 노멀 / 캐비티 + 회전 포아송 PCF. 눈: 각막 굴절 시차 홍채 + 홍채 노멀 + 림버스 / 동공 + 각막 하이라이트 + 눈꺼풀 차폐 셸. 머리카락: 탄젠트 아틀라스 Kajiya-Kay 이중 로브 + 뿌리 차폐 + 투과 + 프린지 블렌드. AmbientOcclusionEffect 신규(SSAO + 깊이 인식 블러). 샘플: 1.5x 슈퍼샘플링, 배경을 씬 MRT 에 직접, 4K 섀도우 맵, 옵션 토글 2종.
+- 애셋: C++ 덤프에 애니메이티드 맵(82 채널) 출력 추가, 룩데브 텍스처(주름 마스크 10장 / 마이크로 노멀 / 눈 / 치아) PNG, 눈 차폐 / 눈물선 / 침 메시 포함 glb, 주름 아틀라스 / 마스크 아틀라스 / 눈 / 탄젠트 텍스처 합성(compose_lookdev_textures.py), wrinkles.json(make_wrinkles_json.py).
+- 함정: 마스터 머티리얼 T3D 에는 그래프 파라미터가 없어 마스크 채널 → 영역 매핑을 마스크 UV 무게중심으로 추정(wrinkle_mapping.json). CM 맵은 중간 회색 오버레이(그대로 섞으면 얼굴에 회청색 얼룩), WM 맵은 xy 델타. 아틀라스 타일은 glTF v=0 이 이미지 첫 행이라 위에서부터 채워야 함. 프린지 블렌드는 알베도 버퍼를 흰색으로 당기면 안 되고(흰 얼룩) 조도 감쇠 + 스펙큘러 버퍼에 색을 얹는 방식이어야 함. 배경을 알베도 알파로 섞으면 프린지가 검게 나와 배경을 씬 패스에서 직접 그림. desired_texture_sources_resolutions 8K 요청 후에도 머티리얼 내보내기 텍스처는 2K. DCC 패키지 내보내기는 8K 텍스처 컴파일(4.6GB)에서 시스템 메모리 부족으로 강제 종료돼 포기 — 피부는 2K + 마이크로 노멀로 유지. T_EyeMidPlaneDisplacement 내보내기는 UE 크래시.
+- 검증: 하네스에 오류 보고(window error / unhandledrejection / console.error → /__report) 추가. 중립 / happy / angry / grin / 눈 근접 캡처로 주름·눈·머리카락 확인. 크롬 / 서버 종료, 잔존 0.
+
+## OLD FACE 옵션 전면 확장 / LOD / 기본 표정 / 파비콘 (0.5.7-experimental)
+[02:15 요청 → 03:30 응답(09-07)]
+- 요청: 더 늙은 프리셋 여부, 주름 재질 리얼하게, 옵션 텍스트 겹침 폭 확대, 블룸 / 샘플링 / 텍스처 크기 / LOD / 머리카락 단계 / 세밀한 그림자 / 렌더링 횟수 등 만들 수 있는 옵션은 전부 슬라이더로, 머티리얼 그래프 2배 + 세로 스크롤, 기본 표정을 진중하게, 눈꺼풀 위 흰 줄 버그, 실사 얼굴 아이콘.
+- 슬라이더 36종 + 패널 스크롤. 머리 LOD 0 / 1 / 2 와 머리카락 카드 LOD 0 ~ 4 를 별도 glb(총 8개, assets 58MB)로 나눠 슬라이더에서 동적 로드(모델 캐시, 활성 모델 목록으로 모프 / 드로우). 텍스처 크기는 TEXTURE_MIN_LOD, 섀도우 품질은 ShadowMap 재생성 + 표본 수 유니폼(포아송 24), 프레임 레이트는 requestAnimationFrame 건너뛰기.
+- 엔진: SkinnedModelRenderer 에 버텍스 셰이더 주입 옵션, HumanSkinRenderer 버텍스 셰이더(머리카락 흔들림 — 탄젠트 아틀라스 알파를 버텍스에서 샘플), setShadowSampleCount / setHairSway / setHairFringe. 프래그먼트에 precision highp int 를 넣어야 shadingMode 유니폼 정밀도 불일치 링크 오류가 없다.
+- 표정 SERIOUS(BrowDown 0.42 / MouthPress 0.35 / MouthFrown 0.22 등) 기본값. 눈물선 / 침은 eye_occlusion 알파를 커버리지로 쓰던 것을 상수 커버리지(0.22 / 0.4)로 바꿔 눈꺼풀 위 흰 줄 제거. 파비콘은 SERIOUS 표정 캡처를 원형 크롭 + 금색 링으로 합성.
+- 프리셋 조사: skin 설정만으로는 나이를 알 수 없어(face_texture_index 만 존재) 남성 프리셋 15종을 복제 → 피부 합성 → 클라우드 2K 텍스처 → 머티리얼 내보내기로 알베도를 뽑아 비교(로컬 합성만으로는 텍스처 애셋이 생기지 않음).
+- 검증: 하네스에 sliders= / options= 파라미터 추가, 최저(LOD2 + LOW 헤어 + 1/4 텍스처 + 1K 섀도우 + 0.75x) / 최고(LOD0 + CINEMATIC + 8K + 2x) 캡처 확인. 크롬 / 서버 잔존 0.
+- DCC 패키지 내보내기는 텍스처 소스를 RES4K 로 낮추면 통과했지만 결과 맵은 여전히 2K. 대신 Eyes_Color(메타휴먼 합성 눈 — 실제 청회색 홍채) / Eyes_Normal / Head_SRMF(R 스펙큘러, G 러프니스)를 얻어 눈과 피부 스펙큘러에 적용(compose_dcc_textures.py). 커밋 후 배포.
+- 후속 피드백 처리: 포트폴리오 목록 썸네일 후보가 favicon.svg / .ico 뿐이라 favicon.svg(PNG 내장) 복구. 옵션 패널은 overflow: hidden 이 overflow-y 를 덮어 스크롤 불가 → 제거. 슬라이더 방향(좌 성능 / 우 품질)으로 LOD / 텍스처 크기 반전. 그래프 드래그 스크롤 · measureText 줄바꿈 · 크레딧 이동. 렌더링 정보에 GPU 메모리 추정 / performance.memory / deviceMemory. FXAA 토글 → ANTI-ALIASING 슬라이더(+샤픈), 로딩 바. 눈썹 / 수염 씰룩임 → FACIALHAIR 모드(흔들림 제외). 눈꺼풀 흰색: CM 오버레이(B 최대 0.74 → 2.3배) 폭 [0.7, 1.3] 제한, 눈물선 유체 축소, 눈 감김(eyeClosure) 만큼 눈알 조도 / 스펙큘러 감쇠.
+- 감은 눈꺼풀 가장자리의 흰 줄은 잔털(sheen) 항이 스침각에서 광원색 그대로 더해진 것 → pow 5, 피부색 틴트, 0.5 배, 기본 0.12. 피부 스펙큘러 최소 러프니스 0.28, 타이트 로브 비중 0.2.
+- 모바일 피드백: 설정 패널 접기(기본 접음) / z-index 5, 값 칸(range input min-width 0) 수정, 패널 max-height 로 HUD 영역 확보. 머티리얼 그래프를 Graphic 의 beginClipRect(스텐실) 로 내부 스크롤하는 설정 패널 규격 카드로 재작성(모바일 전체 폭, 아래 330px 은 HUD / 표정 / 크레딧 영역). 크레딧 모바일 표시.

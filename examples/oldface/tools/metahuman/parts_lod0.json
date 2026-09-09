@@ -1,0 +1,23 @@
+[
+ {
+  "name": "hair",
+  "cards": "Hair_S_BobLayered_cards_lod0",
+  "source_head": "SKM_Groom_Head_Legacy01",
+  "double_sided": true
+ },
+ {
+  "name": "beard",
+  "cards": "Goatee_L_Wavy_cards_lod0",
+  "source_head": "SKM_Groom_Head_Legacy02"
+ },
+ {
+  "name": "mustache",
+  "cards": "Mustache_L_Wavy_cards_lod0",
+  "source_head": "SKM_Groom_Head_Legacy02"
+ },
+ {
+  "name": "eyebrows",
+  "cards": "Eyebrows_M_Messy_cards_lod0",
+  "source_head": "SKM_Groom_Head_Legacy02"
+ }
+]

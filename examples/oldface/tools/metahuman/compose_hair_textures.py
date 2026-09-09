@@ -1,0 +1,37 @@
+import sys
+import numpy as np
+from PIL import Image
+from scipy import ndimage
+
+# 그룸 카드 아틀라스(Layout2: Attribute R = 커버리지, G = 깊이)에서 샘플용 RGBA 텍스처를 만든다.
+# 색은 그룸 머티리얼 파라미터 대신 지정한 기본색을 쓰고, 깊이로 약간의 명암 변화를 준다.
+# 사용: python compose_hair_textures.py <Grooms 디렉토리> <assets 디렉토리>
+grooms = sys.argv[1].rstrip("/\\") + "/"
+assets = sys.argv[2].rstrip("/\\") + "/"
+PARTS = [
+    # (출력 이름, 아틀라스 이름, 기본색 sRGB, 출력 크기, 커버리지 배율)
+    ("hair.png", "Hair_S_BobLayered_Hair_S_BobLayered_CardsAtlas_Attribute", (190, 186, 180), 2048, 1.2),
+    ("beard.png", "Goatee_L_Wavy_Goatee_L_Wavy_CardsAtlas_Attribute", (176, 171, 164), 2048, 1.5),
+    ("eyebrows.png", "Eyebrows_M_Messy_Eyebrows_M_Messy_CardsAtlas_Attribute", (110, 102, 94), 1024, 1.4),
+    ("mustache.png", "Mustache_L_Wavy_Mustache_L_Wavy_CardsAtlas_Attribute", (176, 171, 164), 2048, 1.6),
+]
+for output_name, atlas_name, color, size, coverage_scale in PARTS:
+    atlas = np.asarray(Image.open(grooms + atlas_name + ".png").convert("RGBA")).astype(np.float32) / 255.0
+    coverage = atlas[..., 0]
+    depth = atlas[..., 1]
+    # Tangent 아틀라스 알파 = 가닥 방향 좌표(뿌리 0 → 끝 1). 뿌리 쪽을 어둡게 해 볼륨감을 준다.
+    tangent = Image.open(grooms + atlas_name.replace("_Attribute", "_Tangent") + ".png").convert("RGBA").resize(atlas.shape[1::-1], Image.BILINEAR)
+    coordinate = np.asarray(tangent).astype(np.float32)[..., 3] / 255.0
+    shade = (0.55 + 0.45 * depth) * (0.72 + 0.28 * coordinate)
+    # 가닥 밖(커버리지 0) 픽셀은 가장 가까운 가닥의 색으로 채운다 — 밉맵 / 리샘플링에서 어두운 테두리가 생기지 않게 (알파 블리딩 패딩)
+    covered = coverage > 0.02
+    nearest = ndimage.distance_transform_edt(~covered, return_distances=False, return_indices=True)
+    padded_shade = shade[nearest[0], nearest[1]]
+    rgb = np.stack([np.full_like(coverage, color[channel] / 255.0) * padded_shade for channel in range(3)], axis=-1)
+    # 커버리지를 알파로 (알파 테스트 0.5 기준이라 가는 가닥이 남도록 파트별 배율로 키운다)
+    alpha = np.clip(coverage * coverage_scale, 0.0, 1.0)
+    image = Image.fromarray((np.concatenate([rgb, alpha[..., None]], axis=-1) * 255 + 0.5).astype(np.uint8), "RGBA")
+    if image.size[0] != size:
+        image = image.resize((size, size), Image.LANCZOS)
+    image.save(assets + output_name, optimize=True)
+    print(output_name, image.size, "alpha>0.5 ratio", float((alpha > 0.5).mean()).__round__(3))

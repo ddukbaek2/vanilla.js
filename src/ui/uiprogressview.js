@@ -34,6 +34,8 @@ export class UIProgressView extends UIView {
 	/** @private @type { number } */ #minValue;
 	/** @private @type { number } */ #maxValue;
 	/** @private @type { Color } */  #fillColor;
+	/** @private @type { number | null } */ #secondaryValue; // 반대편에서 차오르는 값. (null 이면 안 씀)
+	/** @private @type { Color } */ #secondaryFillColor;
 	/** @private @type { number } */ #cornerRadius;
 	/** @private @type { string } */ #direction;
 
@@ -47,6 +49,8 @@ export class UIProgressView extends UIView {
 		this.#minValue = 0;
 		this.#maxValue = 1;
 		this.#fillColor = new Color(0.23, 0.51, 0.96, 1); // blue-500 근사
+		this.#secondaryValue = null;
+		this.#secondaryFillColor = new Color(0.94, 0.33, 0.31, 1);
 		this.#cornerRadius = 0;
 		this.#direction = ProgressDirection.horizontal;
 		// 트랙 색은 UIView 의 backgroundColor 로 일원화.
@@ -101,6 +105,32 @@ export class UIProgressView extends UIView {
 		}
 		else {
 			graphic.drawRect(fillRect);
+		}
+
+		// 반대편 게이지. (점유율 / 대전 게이지처럼 한 바에 양쪽을 함께 보일 때)
+		if (this.#secondaryValue !== null) {
+			const range = this.#maxValue - this.#minValue;
+			if (range > 0) {
+				const secondaryRatio = Math.clamp((this.#secondaryValue - this.#minValue) / range, 0, 1);
+				if (secondaryRatio > 0) {
+					let secondaryRect;
+					if (this.#direction === ProgressDirection.vertical) {
+						const secondaryHeight = contentSize.y * secondaryRatio;
+						secondaryRect = Rect.create(0, 0, contentSize.x, secondaryHeight);
+					}
+					else {
+						const secondaryWidth = contentSize.x * secondaryRatio;
+						secondaryRect = Rect.create(contentSize.x - secondaryWidth, 0, secondaryWidth, contentSize.y);
+					}
+					graphic.setFillColor(this.#secondaryFillColor);
+					if (this.#cornerRadius > 0) {
+						graphic.drawRoundRect(secondaryRect, this.#cornerRadius);
+					}
+					else {
+						graphic.drawRect(secondaryRect);
+					}
+				}
+			}
 		}
 	}
 
@@ -161,6 +191,46 @@ export class UIProgressView extends UIView {
 	/**
 	 * @param { Color } color
 	 */
+	//==============================================================================
+	// 반대편 값 설정. (null 이면 끔 — 진행 방향의 반대쪽 끝에서 차오른다)
+	//==============================================================================
+	/**
+	 * @param { number | null } secondaryValue
+	 */
+	setSecondaryValue(secondaryValue) {
+		this.#secondaryValue = (secondaryValue === null) ? null : Math.clamp(secondaryValue, this.#minValue, this.#maxValue);
+	}
+
+	//==============================================================================
+	// 반대편 값 반환.
+	//==============================================================================
+	/**
+	 * @returns { number | null }
+	 */
+	getSecondaryValue() {
+		return this.#secondaryValue;
+	}
+
+	//==============================================================================
+	// 반대편 채움 색 설정.
+	//==============================================================================
+	/**
+	 * @param { Color } color
+	 */
+	setSecondaryFillColor(color) {
+		this.#secondaryFillColor = color;
+	}
+
+	//==============================================================================
+	// 반대편 채움 색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color }
+	 */
+	getSecondaryFillColor() {
+		return this.#secondaryFillColor;
+	}
+
 	setTrackColor(color) {
 		this.setBackgroundColor(color);
 	}

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>vanilla.js - UI Sample</title>
+<style>
+	html, body {
+		margin: 0;
+		padding: 0;
+		width: 100%;
+		height: 100%;
+		overflow: hidden;
+		background: #10131a;
+		touch-action: none;
+		user-select: none;
+	}
+	#mainCanvas {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+	"use strict";
+	const System = globalThis;
+
+	//==============================================================================
+	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../../build/vanilla.js)
+	//==============================================================================
+	let engineModule = null;
+	try {
+		try {
+			engineModule = await import("./vanilla.js");
+		}
+		catch (importError) {
+			engineModule = await import("../../build/vanilla.js");
+		}
+	}
+	catch (engineError) {
+		System.document.body.innerHTML = "<p style=\"color:#fff;font-family:sans-serif;padding:2em\">vanilla.js 엔진 모듈을 불러오지 못했습니다.</p>";
+		throw engineError;
+	}
+
+	const Engine = engineModule.Engine;
+	const EngineConfiguration = engineModule.EngineConfiguration;
+	const Scene = engineModule.Scene;
+	const WorldNode = engineModule.WorldNode;
+	const Vector2 = engineModule.Vector2;
+	const Color = engineModule.Color;
+	const Pivot = engineModule.Pivot;
+	const Rect = engineModule.Rect;
+	const Paint = engineModule.Paint;
+	const UILabel = engineModule.UILabel;
+	const UIButton = engineModule.UIButton;
+	const UIProgressView = engineModule.UIProgressView;
+	const UIDocument = engineModule.UIDocument;
+	const TouchRecognizer = engineModule.TouchRecognizer;
+
+	//==============================================================================
+	// UI 애셋 샘플 씬.
+	// - UIEditor 로 만든 uiasset(JSON) 을 그대로 불러와 화면을 구성한다.
+	// - 불러온 노드는 살아 있는 엔진 UI 노드이므로, 이름으로 찾아 동작을 붙인다.
+	//==============================================================================
+	class UISampleScene extends Scene {
+		//==============================================================================
+		// 멤버 변수 목록.
+		//==============================================================================
+		/** @private @type { WorldNode | null } */ #documentRootNode;
+		/** @private @type { TouchRecognizer | null } */ #touchRecognizer;
+		/** @private @type { UIProgressView | null } */ #progressView;
+		/** @private @type { UILabel | null } */ #statusLabel;
+		/** @private @type { number } */ #elapsedSeconds;
+
+		//==============================================================================
+		// 생성.
+		//==============================================================================
+		constructor() {
+			super();
+
+			this.#documentRootNode = null;
+			this.#touchRecognizer = null;
+			this.#progressView = null;
+			this.#statusLabel = null;
+			this.#elapsedSeconds = 0;
+		}
+
+		//==============================================================================
+		// 씬 구성.
+		//==============================================================================
+		create() {
+			super.create();
+
+			const root = this.getRoot();
+			root.setPivot(Pivot.topLeft.clone());
+			root.setAnchor(Pivot.topLeft.clone());
+			this.#touchRecognizer = new TouchRecognizer();
+			this.#touchRecognizer.setRootNode(root);
+		}
+
+		//==============================================================================
+		// 비동기 로드. (uiasset 파일을 읽어 노드 트리로 복원)
+		//==============================================================================
+		/**
+		 * @param { Engine } engine
+		 */
+		async load(engine) {
+			const response = await System.fetch("./assets/title.uiasset.json", { cache: "no-cache" });
+			const jsonText = await response.text();
+			this.#documentRootNode = UIDocument.fromJsonText(jsonText);
+			this.getRoot().addChild(this.#documentRootNode);
+
+			// 불러온 노드에 동작 연결. (이름으로 찾는다)
+			const startButtonNode = this.findNodeByName(this.#documentRootNode, "StartButton");
+			if (startButtonNode) {
+				const buttonComponents = startButtonNode.getComponents(UIButton);
+				if (buttonComponents.length > 0) {
+					buttonComponents[0].setClickedEvent(() => {
+						this.setStatusText("시작을 눌렀습니다.");
+					});
+				}
+			}
+			const optionButtonNode = this.findNodeByName(this.#documentRootNode, "OptionButton");
+			if (optionButtonNode) {
+				const buttonComponents = optionButtonNode.getComponents(UIButton);
+				if (buttonComponents.length > 0) {
+					buttonComponents[0].setClickedEvent(() => {
+						this.setStatusText("설정을 눌렀습니다.");
+					});
+				}
+			}
+
+			const progressNode = this.findNodeByName(this.#documentRootNode, "ProgressTrack");
+			if (progressNode) {
+				const progressComponents = progressNode.getComponents(UIProgressView);
+				if (progressComponents.length > 0) {
+					this.#progressView = progressComponents[0];
+				}
+			}
+
+			// 상태 표시줄은 코드로 덧붙인다. (문서에 없는 요소도 함께 쓸 수 있다는 예시)
+			const statusNode = new WorldNode();
+			statusNode.setName("Status");
+			statusNode.setPivot(Pivot.topLeft.clone());
+			statusNode.setAnchor(Pivot.topLeft.clone());
+			statusNode.setContentSize(Vector2.create(520, 26));
+			statusNode.setLocalPosition(Vector2.create(220, 560));
+			const statusLabel = statusNode.addComponent(UILabel);
+			statusLabel.setText("버튼을 눌러 보세요. 목록은 위아래로 끌 수 있습니다.");
+			statusLabel.setFontSize(15);
+			statusLabel.setTextColor(new Color(0.55, 0.6, 0.68, 1));
+			this.#statusLabel = statusLabel;
+			this.getRoot().addChild(statusNode);
+		}
+
+		//==============================================================================
+		// 이름으로 노드 검색. (재귀 — 위젯 content 안쪽까지 훑는다)
+		//==============================================================================
+		/**
+		 * @param { WorldNode } node
+		 * @param { string } targetName
+		 * @returns { WorldNode | null }
+		 */
+		findNodeByName(node, targetName) {
+			if (node.getName() === targetName) {
+				return node;
+			}
+			const childNodeList = node.getChildren();
+			for (const childNode of childNodeList) {
+				const foundNode = this.findNodeByName(childNode, targetName);
+				if (foundNode) {
+					return foundNode;
+				}
+			}
+			return null;
+		}
+
+		//==============================================================================
+		// 상태 문구 설정.
+		//==============================================================================
+		/**
+		 * @param { string } text
+		 */
+		setStatusText(text) {
+			if (this.#statusLabel) {
+				this.#statusLabel.setText(text);
+			}
+		}
+
+		//==============================================================================
+		// 갱신. (진행바를 천천히 채워 살아 있는 화면임을 보인다)
+		//==============================================================================
+		/**
+		 * @param { number } deltaTime
+		 */
+		tick(deltaTime) {
+			super.tick(deltaTime);
+
+			this.#elapsedSeconds += deltaTime;
+			if (this.#progressView) {
+				const progressRatio = (System.Math.sin(this.#elapsedSeconds * 0.8) * 0.5 + 0.5);
+				this.#progressView.setValue(progressRatio);
+			}
+		}
+
+		//==============================================================================
+		// 출력 전 처리. (뷰 좌표계 적용 + 배경 채움)
+		//==============================================================================
+		/**
+		 * @param { Graphic } graphic
+		 */
+		preDraw(graphic) {
+			super.preDraw(graphic);
+
+			const engine = this.getEngine();
+			const viewManager = engine.getViewManager();
+			const canvasNativeSize = viewManager.getCanvasNativeSize();
+
+			viewManager.applyCanvasNativeRect(graphic);
+			graphic.setFillColor("rgb(16, 19, 26)");
+			graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+
+			viewManager.applyViewRect(graphic);
+		}
+
+		//==============================================================================
+		// 터치 전달. (TouchRecognizer 로 위젯에 넘긴다)
+		//==============================================================================
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 */
+		touchPress(viewInputPosition) {
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchPress(viewInputPosition);
+			}
+		}
+
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 */
+		touchMove(viewInputPosition) {
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchMove(viewInputPosition);
+			}
+		}
+
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 */
+		touchRelease(viewInputPosition) {
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchRelease(viewInputPosition);
+			}
+		}
+	}
+
+	//==============================================================================
+	// 엔진 실행.
+	//==============================================================================
+	const engineConfiguration = new EngineConfiguration();
+	engineConfiguration.referenceResolutionSize = Vector2.create(960, 640);
+	engineConfiguration.canvasId = "mainCanvas";
+	engineConfiguration.autoResizeOnWindowResize = true;
+	const engine = new Engine(engineConfiguration);
+	engine.run(new UISampleScene());
+</script>
+</body>
+</html>

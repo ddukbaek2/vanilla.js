@@ -67,8 +67,6 @@ export class Sprite extends Paint {
 	/** @private @type { string } */ #spriteDrawMode;
 	/** @private @type { string } */ #spriteBlendMode;
 	/** @private @type { Rect } */ #nineSlice;
-	/** @private @type { OffscreenCanvas | null } */ #tintCanvas;
-	/** @private @type { OffscreenCanvasRenderingContext2D | null } */ #tintContext;
 
 	//==============================================================================
 	// 생성.
@@ -86,8 +84,6 @@ export class Sprite extends Paint {
 		this.#spriteDrawMode = SpriteDrawMode.simple;
 		this.#spriteBlendMode = SpriteBlendMode.normal;
 		this.#nineSlice = Rect.zero();
-		this.#tintCanvas = null;
-		this.#tintContext = null;
 		super.setColor(Color.transparent());
 	}
 
@@ -108,7 +104,6 @@ export class Sprite extends Paint {
 	 * @param { Graphic } graphic
 	 */
 	draw(graphic) {
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
 		const image = this.getImage();
 		const color = super.getColor();
 
@@ -141,7 +136,12 @@ export class Sprite extends Paint {
 		}
 
 		// 블렌드 모드 설정.
-		canvasRenderingContext.globalCompositeOperation = spriteBlendMode;
+		graphic.setBlendMode(spriteBlendMode);
+
+		// 컬러 틴트 설정. (알파가 0 초과일 때만, 이미지 실루엣 안쪽에만 색을 덮음)
+		if (color.alpha > 0) {
+			graphic.setImageTintColor(color);
+		}
 
 		// 드로우 모드에 따라 이미지 출력.
 		switch (spriteDrawMode) {
@@ -173,14 +173,12 @@ export class Sprite extends Paint {
 					const fillHeight = Math.abs(imageSize.y);
 
 					// 클리핑 후 수동 타일 반복.
-					canvasRenderingContext.save();
-					canvasRenderingContext.translate(position.x, position.y);
-					canvasRenderingContext.beginPath();
-					canvasRenderingContext.rect(0, 0, fillWidth, fillHeight);
-					canvasRenderingContext.clip();
+					graphic.pushState();
+					graphic.translate(position.x, position.y);
+					graphic.beginClipRect(Rect.create(0, 0, fillWidth, fillHeight));
 					for (let ty = 0; ty < fillHeight; ty += tileHeight) {
 						for (let tx = 0; tx < fillWidth; tx += tileWidth) {
-							canvasRenderingContext.drawImage(
+							graphic.drawImageWithSourceAndDestination(
 								image,
 								imageRect.position.x, imageRect.position.y,
 								imageRect.width, imageRect.height,
@@ -188,118 +186,19 @@ export class Sprite extends Paint {
 							);
 						}
 					}
-					canvasRenderingContext.restore();
+					graphic.endClipRect();
+					graphic.popState();
 					break;
 				}
 		}
 
-		// 컬러 틴트 적용. (항상, draw mode 위에 덮어씌움. 투명 영역 제외)
+		// 컬러 틴트 해제.
 		if (color.alpha > 0) {
-			const tintWidth = Math.ceil(contentSize.x);
-			const tintHeight = Math.ceil(contentSize.y);
-			if (tintWidth > 0 && tintHeight > 0) {
-				if (!this.#tintCanvas || this.#tintCanvas.width !== tintWidth || this.#tintCanvas.height !== tintHeight) {
-					this.#tintCanvas = new OffscreenCanvas(tintWidth, tintHeight);
-					this.#tintContext = this.#tintCanvas.getContext("2d");
-				}
-				this.#tintContext.clearRect(0, 0, tintWidth, tintHeight);
-
-				// draw mode에 맞춰 tintCanvas에 이미지 그리기 (알파 마스크 원본).
-				switch (spriteDrawMode) {
-					case SpriteDrawMode.simple: {
-							let imageRect = this.getImageRect();
-							if (imageRect === null || imageRect === undefined || imageRect.equals(Rect.zero())) {
-								imageRect = Rect.create(0, 0, image.width, image.height);
-							}
-							this.#tintContext.drawImage(
-								image,
-								imageRect.position.x, imageRect.position.y,
-								imageRect.width, imageRect.height,
-								0, 0, tintWidth, tintHeight
-							);
-							break;
-						}
-					case SpriteDrawMode.sliced: {
-							const nineSlice = this.getNineSlice();
-							const sw = image.width;
-							const sh = image.height;
-							const left = nineSlice.position.x;
-							const top = nineSlice.position.y;
-							const right = nineSlice.size.x;
-							const bottom = nineSlice.size.y;
-							const dw = Math.max(tintWidth, left + right);
-							const dh = Math.max(tintHeight, top + bottom);
-							const hasHorizontal = left > 0 || right > 0;
-							const hasVertical = top > 0 || bottom > 0;
-							if (hasHorizontal && hasVertical) {
-								const centerSrcW = sw - left - right;
-								const centerSrcH = sh - top - bottom;
-								const centerDstW = dw - left - right;
-								const centerDstH = dh - top - bottom;
-								this.#tintContext.drawImage(image, 0, 0, left, top, 0, 0, left + 1, top + 1);
-								this.#tintContext.drawImage(image, left, 0, centerSrcW, top, left, 0, centerDstW + 1, top + 1);
-								this.#tintContext.drawImage(image, sw - right, 0, right, top, dw - right, 0, right, top + 1);
-								this.#tintContext.drawImage(image, 0, top, left, centerSrcH, 0, top, left + 1, centerDstH + 1);
-								this.#tintContext.drawImage(image, left, top, centerSrcW, centerSrcH, left, top, centerDstW + 1, centerDstH + 1);
-								this.#tintContext.drawImage(image, sw - right, top, right, centerSrcH, dw - right, top, right, centerDstH + 1);
-								this.#tintContext.drawImage(image, 0, sh - bottom, left, bottom, 0, dh - bottom, left + 1, bottom);
-								this.#tintContext.drawImage(image, left, sh - bottom, centerSrcW, bottom, left, dh - bottom, centerDstW + 1, bottom);
-								this.#tintContext.drawImage(image, sw - right, sh - bottom, right, bottom, dw - right, dh - bottom, right, bottom);
-							}
-							else if (hasHorizontal) {
-								const centerSrcW = sw - left - right;
-								const centerDstW = dw - left - right;
-								this.#tintContext.drawImage(image, 0, 0, left, sh, 0, 0, left + 1, dh);
-								this.#tintContext.drawImage(image, left, 0, centerSrcW, sh, left, 0, centerDstW + 1, dh);
-								this.#tintContext.drawImage(image, sw - right, 0, right, sh, dw - right, 0, right, dh);
-							}
-							else if (hasVertical) {
-								const centerSrcH = sh - top - bottom;
-								const centerDstH = dh - top - bottom;
-								this.#tintContext.drawImage(image, 0, 0, sw, top, 0, 0, dw, top + 1);
-								this.#tintContext.drawImage(image, 0, top, sw, centerSrcH, 0, top, dw, centerDstH + 1);
-								this.#tintContext.drawImage(image, 0, sh - bottom, sw, bottom, 0, dh - bottom, dw, bottom);
-							}
-							else {
-								this.#tintContext.drawImage(image, 0, 0, sw, sh, 0, 0, dw, dh);
-							}
-							break;
-						}
-					case SpriteDrawMode.tiled: {
-							let imageRect = this.getImageRect();
-							if (imageRect === null || imageRect === undefined || imageRect.equals(Rect.zero())) {
-								imageRect = Rect.create(0, 0, image.width, image.height);
-							}
-							const tileWidth = Math.ceil(imageRect.width);
-							const tileHeight = Math.ceil(imageRect.height);
-							for (let ty = 0; ty < tintHeight; ty += tileHeight) {
-								for (let tx = 0; tx < tintWidth; tx += tileWidth) {
-									this.#tintContext.drawImage(
-										image,
-										imageRect.position.x, imageRect.position.y,
-										imageRect.width, imageRect.height,
-										tx, ty, tileWidth, tileHeight
-									);
-								}
-							}
-							break;
-						}
-				}
-
-				// source-atop으로 투명 영역 제외하여 틴트 적용.
-				this.#tintContext.globalCompositeOperation = "source-atop";
-				this.#tintContext.fillStyle = color.toRGBAString();
-				this.#tintContext.fillRect(0, 0, tintWidth, tintHeight);
-				this.#tintContext.globalCompositeOperation = "source-over";
-
-				// 틴트 오버레이를 source-over로 main canvas에 합성.
-				canvasRenderingContext.globalCompositeOperation = "source-over";
-				canvasRenderingContext.drawImage(this.#tintCanvas, position.x, position.y, imageSize.x, imageSize.y);
-			}
+			graphic.setImageTintColor(null);
 		}
 
 		// 블렌드 모드 복원.
-		canvasRenderingContext.globalCompositeOperation = "source-over";
+		graphic.setBlendMode(SpriteBlendMode.normal);
 	}
 
 	//==============================================================================

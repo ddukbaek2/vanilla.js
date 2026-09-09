@@ -1,0 +1,2382 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<title>vanilla.js - Old Face</title>
+	<link rel="icon" type="image/png" href="./favicon.png">
+	<link rel="apple-touch-icon" href="./favicon.png">
+	<style>
+		html, body {
+			margin: 0;
+			padding: 0;
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+			background: #08080a;
+			touch-action: none;
+			-webkit-user-select: none;
+			user-select: none;
+			-webkit-touch-callout: none;
+		}
+		#mainCanvas {
+			position: absolute;
+			left: 0;
+			top: 0;
+			width: 100%;
+			height: 100%;
+			display: block;
+			cursor: grab;
+		}
+		#mainCanvas.dragging {
+			cursor: grabbing;
+		}
+		#titleOverlay {
+			position: absolute;
+			left: 50%;
+			top: 7%;
+			transform: translateX(-50%);
+			text-align: center;
+			pointer-events: none;
+			user-select: none;
+			font-family: "Segoe UI Light", "Segoe UI", "Malgun Gothic", sans-serif;
+			animation: titleEntrance 3.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+		}
+		#titleMain {
+			font-size: clamp(26px, 5vw, 58px);
+			font-weight: 200;
+			letter-spacing: 0.5em;
+			text-indent: 0.5em;
+			white-space: nowrap;
+			color: #f2ece2;
+			text-shadow: 0 2px 18px rgba(0, 0, 0, 0.85), 0 0 42px rgba(255, 214, 170, 0.18);
+		}
+		#titleDivider {
+			width: min(240px, 40vw);
+			height: 1px;
+			margin: 14px auto 12px;
+			background: linear-gradient(90deg, transparent, rgba(242, 236, 226, 0.7), transparent);
+		}
+		#titleSub {
+			font-size: clamp(9px, 1.2vw, 12px);
+			font-weight: 300;
+			letter-spacing: 0.85em;
+			text-indent: 0.85em;
+			color: rgba(230, 226, 220, 0.78);
+			text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+		}
+		#homeLink {
+			position: absolute;
+			left: 50%;
+			bottom: 5.5%;
+			transform: translateX(-50%);
+			font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+			font-size: clamp(9px, 1.2vw, 12px);
+			font-weight: 300;
+			letter-spacing: 0.45em;
+			text-indent: 0.45em;
+			text-decoration: none;
+			color: rgba(242, 236, 226, 0.8);
+			padding: 10px 22px;
+			border: 1px solid rgba(242, 236, 226, 0.3);
+			border-radius: 999px;
+			background: rgba(14, 12, 14, 0.45);
+			backdrop-filter: blur(8px);
+			-webkit-backdrop-filter: blur(8px);
+			text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+			transition: color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+			animation: titleEntrance 3.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+		}
+		#homeLink:hover {
+			color: #ffffff;
+			border-color: rgba(255, 226, 180, 0.85);
+			background: rgba(40, 34, 30, 0.6);
+			box-shadow: 0 0 22px rgba(255, 226, 180, 0.3);
+		}
+		#expressionPanel {
+			position: absolute;
+			left: 50%;
+			bottom: calc(5.5% + 56px);
+			transform: translateX(-50%);
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: center;
+			gap: 6px;
+			max-width: min(760px, 92vw);
+			font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+			animation: panelEntrance 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+		}
+		.expressionButton {
+			padding: 7px 13px;
+			font-size: 10px;
+			letter-spacing: 0.18em;
+			color: rgba(242, 236, 226, 0.78);
+			background: rgba(14, 12, 14, 0.5);
+			border: 1px solid rgba(242, 236, 226, 0.18);
+			border-radius: 999px;
+			backdrop-filter: blur(8px);
+			-webkit-backdrop-filter: blur(8px);
+			cursor: pointer;
+			transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+		}
+		.expressionButton:hover {
+			border-color: rgba(242, 236, 226, 0.45);
+			color: #ffffff;
+		}
+		.expressionButton.active {
+			color: #2a2016;
+			background: rgba(232, 201, 138, 0.95);
+			border-color: rgba(232, 201, 138, 1);
+		}
+		#optionPanel {
+			position: absolute;
+			right: 18px;
+			top: 18px;
+			width: 372px;
+			max-height: calc(100vh - 190px);
+			overflow-y: auto;
+			overflow-x: hidden;
+			scrollbar-width: thin;
+			scrollbar-color: rgba(212, 176, 106, 0.45) transparent;
+			font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+			color: rgba(242, 236, 226, 0.86);
+			background: rgba(14, 12, 14, 0.5);
+			border: 1px solid rgba(242, 236, 226, 0.14);
+			border-radius: 12px;
+			backdrop-filter: blur(10px);
+			-webkit-backdrop-filter: blur(10px);
+			animation: panelEntrance 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+		}
+		#optionPanel {
+			z-index: 5;
+		}
+		#optionPanel.collapsed {
+			width: auto;
+			min-width: 120px;
+			max-height: none;
+			overflow: hidden;
+		}
+		#optionPanel.collapsed > :not(#optionTitle) {
+			display: none;
+		}
+		#optionPanel.collapsed #optionTitle {
+			border-bottom: none;
+		}
+		#contextMenu {
+			position: absolute;
+			display: none;
+			min-width: 168px;
+			padding: 6px 0;
+			font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+			font-size: 10px;
+			letter-spacing: 0.16em;
+			color: rgba(242, 236, 226, 0.86);
+			background: rgba(14, 12, 14, 0.72);
+			border: 1px solid rgba(242, 236, 226, 0.14);
+			border-radius: 10px;
+			backdrop-filter: blur(10px);
+			-webkit-backdrop-filter: blur(10px);
+			z-index: 8;
+			user-select: none;
+		}
+		#contextMenu.open {
+			display: block;
+		}
+		.contextItem {
+			padding: 8px 16px;
+			cursor: pointer;
+			white-space: nowrap;
+		}
+		.contextItem:hover {
+			background: rgba(212, 176, 106, 0.16);
+			color: rgba(232, 201, 138, 1);
+		}
+		#optionTitle {
+			cursor: pointer;
+			user-select: none;
+			padding: 11px 16px 9px;
+			font-size: 10px;
+			font-weight: 600;
+			letter-spacing: 0.32em;
+			color: rgba(232, 201, 138, 0.95);
+			border-bottom: 1px solid rgba(242, 236, 226, 0.1);
+		}
+		.optionRow {
+			display: flex;
+			align-items: center;
+			height: 28px;
+			padding: 0 14px 0 12px;
+			font-size: 10.5px;
+			letter-spacing: 0.12em;
+			cursor: pointer;
+			transition: background 0.15s ease;
+		}
+		.optionRow:hover {
+			background: rgba(255, 255, 255, 0.06);
+		}
+		.optionKey {
+			width: 18px;
+			height: 16px;
+			line-height: 16px;
+			margin-right: 10px;
+			text-align: center;
+			font-size: 9px;
+			border-radius: 4px;
+			color: rgba(242, 236, 226, 0.6);
+			border: 1px solid rgba(242, 236, 226, 0.22);
+		}
+		.optionLabel {
+			flex: 1;
+			white-space: nowrap;
+		}
+		.optionState {
+			flex: none;
+			margin-left: 14px;
+			font-size: 9.5px;
+			letter-spacing: 0.18em;
+			white-space: nowrap;
+			color: rgba(242, 236, 226, 0.4);
+		}
+		.optionRow.on .optionState {
+			color: rgba(232, 201, 138, 1);
+		}
+		.optionGroup {
+			padding: 9px 14px 4px 12px;
+			font-size: 9px;
+			font-weight: 600;
+			letter-spacing: 0.3em;
+			color: rgba(232, 201, 138, 0.7);
+			border-top: 1px solid rgba(242, 236, 226, 0.08);
+		}
+		.sliderRow {
+			display: flex;
+			align-items: center;
+			height: 26px;
+			padding: 0 14px 0 12px;
+			font-size: 9.5px;
+			letter-spacing: 0.1em;
+		}
+		.sliderLabel {
+			flex: none;
+			width: 118px;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+		.sliderInput {
+			flex: 1 1 0;
+			min-width: 0;
+			width: 100%;
+			-webkit-appearance: none;
+			appearance: none;
+			height: 2px;
+			margin: 0 10px 0 4px;
+			background: rgba(242, 236, 226, 0.18);
+			outline: none;
+			cursor: pointer;
+		}
+		.sliderInput::-webkit-slider-thumb {
+			-webkit-appearance: none;
+			appearance: none;
+			width: 10px;
+			height: 10px;
+			border-radius: 50%;
+			background: rgba(212, 176, 106, 1);
+			border: 1px solid rgba(20, 16, 12, 0.8);
+		}
+		.sliderInput::-moz-range-thumb {
+			width: 10px;
+			height: 10px;
+			border-radius: 50%;
+			background: rgba(212, 176, 106, 1);
+			border: 1px solid rgba(20, 16, 12, 0.8);
+		}
+		.sliderValue {
+			flex: none;
+			width: 82px;
+			text-align: right;
+			font-size: 9px;
+			letter-spacing: 0.08em;
+			color: rgba(232, 201, 138, 0.9);
+			white-space: nowrap;
+		}
+		#footerNote {
+			position: absolute;
+			left: 18px;
+			bottom: 16px;
+			font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+			font-size: 9.5px;
+			letter-spacing: 0.16em;
+			line-height: 1.9;
+			color: rgba(242, 236, 226, 0.42);
+			text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+			pointer-events: none;
+			animation: panelEntrance 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+		}
+		#footerNote a {
+			color: rgba(242, 236, 226, 0.55);
+			text-decoration: none;
+			pointer-events: auto;
+		}
+		#loadingOverlay {
+			position: absolute;
+			inset: 0;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			background: #08080a;
+			font-family: "Segoe UI Light", "Segoe UI", "Malgun Gothic", sans-serif;
+			font-size: 11px;
+			font-weight: 300;
+			letter-spacing: 0.6em;
+			text-indent: 0.6em;
+			color: rgba(242, 236, 226, 0.6);
+			transition: opacity 1.4s ease;
+			z-index: 10;
+		}
+		#loadingOverlay.hidden {
+			opacity: 0;
+			pointer-events: none;
+		}
+		#loadingOverlay {
+			flex-direction: column;
+			gap: 14px;
+		}
+		#loadingBar {
+			width: 260px;
+			height: 2px;
+			background: rgba(242, 236, 226, 0.12);
+			overflow: hidden;
+		}
+		#loadingFill {
+			width: 0;
+			height: 100%;
+			background: rgba(212, 176, 106, 0.9);
+			transition: width 0.25s ease;
+		}
+		#loadingDetail {
+			font-size: 9px;
+			letter-spacing: 0.3em;
+			text-indent: 0.3em;
+			color: rgba(242, 236, 226, 0.35);
+		}
+		@keyframes titleEntrance {
+			0% { opacity: 0; transform: translateX(-50%) translateY(-14px); filter: blur(8px); }
+			100% { opacity: 1; transform: translateX(-50%) translateY(0); filter: blur(0); }
+		}
+		@keyframes panelEntrance {
+			0% { opacity: 0; }
+			100% { opacity: 1; }
+		}
+		@media (max-width: 720px) {
+			#optionPanel { width: 316px; right: 10px; top: 10px; max-height: calc(100vh - 170px); }
+			#titleMain { font-size: 24px; letter-spacing: 0.32em; text-indent: 0.32em; }
+			#footerNote { left: 10px; right: 10px; bottom: 10px; font-size: 8px; letter-spacing: 0.08em; line-height: 1.6; }
+			#expressionPanel { bottom: calc(5.5% + 50px); gap: 4px; }
+			.expressionButton { padding: 6px 9px; font-size: 9px; letter-spacing: 0.12em; }
+		}
+	</style>
+</head>
+<body>
+	<canvas id="mainCanvas"></canvas>
+	<div id="titleOverlay">
+		<div id="titleMain">OLD FACE</div>
+		<div id="titleDivider"></div>
+		<div id="titleSub">VANILLA.JS</div>
+	</div>
+	<div id="optionPanel">
+		<div id="optionTitle">OPTIONS</div>
+	</div>
+	<div id="expressionPanel"></div>
+	<div id="contextMenu"></div>
+	<div id="footerNote">
+		DRAG TO ORBIT, WHEEL OR PINCH TO ZOOM<br>
+		CHARACTER: <a href="https://www.metahuman.com/" target="_blank" rel="noopener">EPIC METAHUMAN (WALTER PRESET, EXPRESSION WRINKLE MAPS, RIGLOGIC BAKED TO ARKIT SHAPES, GROOM CARDS)</a>, EXPRESSIONS: ARKIT BLENDSHAPE PRESETS
+	</div>
+	<a id="homeLink" href="https://ddukbaek2.com" target="_blank" rel="noopener">DDUKBAEK2.COM</a>
+	<div id="loadingOverlay"><div id="loadingLabel">LOADING</div><div id="loadingBar"><div id="loadingFill"></div></div><div id="loadingDetail"></div></div>
+	<script type="module">
+	"use strict";
+	const System = globalThis;
+
+	//==============================================================================
+	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../../build/vanilla.js)
+	//==============================================================================
+	let engineModule = null;
+	try {
+		try {
+			engineModule = await import("./vanilla.js");
+		}
+		catch (importError) {
+			engineModule = await import("../../build/vanilla.js");
+		}
+	}
+	catch (engineError) {
+		System.document.body.innerHTML = "<p style=\"color:#fff;font-family:sans-serif;padding:2em\">vanilla.js 엔진 모듈을 불러오지 못했습니다.</p>";
+		throw engineError;
+	}
+	const Graphic = engineModule.Graphic;
+	const Rect = engineModule.Rect;
+	const Vector2 = engineModule.Vector2;
+	const Vector3 = engineModule.Vector3;
+	const Matrix4 = engineModule.Matrix4;
+	const Quaternion = engineModule.Quaternion;
+	const RenderTarget = engineModule.RenderTarget;
+	const FullscreenPass = engineModule.FullscreenPass;
+	const BloomEffect = engineModule.BloomEffect;
+	const SkinnedModel = engineModule.SkinnedModel;
+	const HumanSkinRenderer = engineModule.HumanSkinRenderer;
+	const SubsurfaceScatteringEffect = engineModule.SubsurfaceScatteringEffect;
+	const AmbientOcclusionEffect = engineModule.AmbientOcclusionEffect;
+	const SKIN_SHADING_SKIN = engineModule.SKIN_SHADING_SKIN;
+	const SKIN_SHADING_EYE = engineModule.SKIN_SHADING_EYE;
+	const SKIN_SHADING_HAIR = engineModule.SKIN_SHADING_HAIR;
+	const SKIN_SHADING_OCCLUSION = engineModule.SKIN_SHADING_OCCLUSION;
+	const SKIN_SHADING_FLUID = engineModule.SKIN_SHADING_FLUID;
+	const SKIN_SHADING_FACIALHAIR = engineModule.SKIN_SHADING_FACIALHAIR;
+	const SKIN_TEXTURE_UNIT_DETAILHEIGHT = engineModule.SKIN_TEXTURE_UNIT_DETAILHEIGHT;
+	const SKIN_TEXTURE_UNIT_MICRO = engineModule.SKIN_TEXTURE_UNIT_MICRO;
+	const SKIN_TEXTURE_UNIT_MASKATLAS = engineModule.SKIN_TEXTURE_UNIT_MASKATLAS;
+	const SKIN_TEXTURE_UNIT_LAYERNORMAL = engineModule.SKIN_TEXTURE_UNIT_LAYERNORMAL;
+	const SKIN_TEXTURE_UNIT_LAYERCOLOR = engineModule.SKIN_TEXTURE_UNIT_LAYERCOLOR;
+	const Material = engineModule.Material;
+	const ShadowMap = engineModule.ShadowMap;
+
+	//==============================================================================
+	// 전역 상수 목록.
+	//==============================================================================
+	const CAMERA_FIELD_OF_VIEW = 0.44;
+	const CAMERA_NEAR_DISTANCE = 0.05;
+	const CAMERA_FAR_DISTANCE = 20;
+	const CAMERA_MINIMUM_DISTANCE = 0.42;
+	const CAMERA_MAXIMUM_DISTANCE = 1.9;
+	const SHADOWMAP_RESOLUTION = 4096;
+	const FRAME_RATE_OPTIONS = [30, 60];
+	// 내부 렌더 기준 해상도 후보. (세로 픽셀 — 캔버스가 이보다 크면 100% 가 이 크기가 되고, RESOLUTION SCALE 은 여기에 곱한다)
+	const RENDER_BASE_OPTIONS = [720, 1080, 1440, 2160];
+	const RENDER_BASE_LABELS = ["720P", "1080P", "1440P", "4K"];
+	// 머리 LOD / 머리카락 품질 단계별 애셋. (머리카락: 카드 LOD, 프린지 블렌드, 흔들림 배율)
+	const HEAD_LOD_FILES = ["character_lod0.glb", "character_lod1.glb", "character_lod2.glb"];
+	const HAIR_LEVEL_DEFINITIONS = [
+		{ label: "NONE", file: null, fringe: false, sway: 0 },
+		{ label: "LOW", file: "hair_lod4.glb", fringe: false, sway: 0 },
+		{ label: "MEDIUM", file: "hair_lod3.glb", fringe: false, sway: 0.5 },
+		{ label: "HIGH", file: "hair_lod2.glb", fringe: true, sway: 0.8 },
+		{ label: "ULTRA", file: "hair_lod1.glb", fringe: true, sway: 1 },
+		{ label: "CINEMATIC", file: "hair_lod0.glb", fringe: true, sway: 1 },
+	];
+	const SHADOW_LEVEL_DEFINITIONS = [
+		{ label: "1K HARD", resolution: 1024, sampleCount: 4 },
+		{ label: "2K", resolution: 2048, sampleCount: 8 },
+		{ label: "4K", resolution: 4096, sampleCount: 12 },
+		{ label: "4K FINE", resolution: 4096, sampleCount: 20 },
+		{ label: "8K FINE", resolution: 8192, sampleCount: 24 },
+	];
+	const TEXTURE_SIZE_LABELS = ["EIGHTH", "QUARTER", "HALF", "FULL"];
+	const ANTIALIAS_LABELS = ["OFF", "FXAA", "FXAA + SHARPEN"];
+	const DETAIL_TEXTURE_SIZE = 4096;
+	const KEY_LIGHT_DIRECTION = Vector3.create(0.5, 0.62, 0.62).normalize();
+	const FILL_LIGHT_DIRECTION = Vector3.create(-0.75, 0.1, 0.6).normalize();
+	const RIM_LIGHT_DIRECTION = Vector3.create(0.55, 0.45, -0.72).normalize();
+
+	// 표정 프리셋 표시 목록. (assets/expressions.json 의 키 — ARKit 블렌드셰이프 52종의 가중치 조합)
+	const EXPRESSION_DEFINITIONS = [
+		{ name: "serious", label: "SERIOUS" },
+		{ name: "happy", label: "HAPPY" },
+		{ name: "grin", label: "GRIN" },
+		{ name: "excited", label: "EXCITED" },
+		{ name: "angry", label: "ANGRY" },
+		{ name: "furious", label: "FURIOUS" },
+		{ name: "disgusted", label: "DISGUSTED" },
+		{ name: "bored", label: "BORED" },
+		{ name: "confused", label: "CONFUSED" },
+	];
+
+	// 부위별 머티리얼 정의. (glb 머티리얼 이름 부분 일치 → 텍스처 / 팩터 / 산란 마스크)
+	// - shading: 피부 / 눈 / 머리카락 / 차폐 / 유체, extra: 추가 텍스처 슬롯(유닛 → 파일), useDetail: 높이 디테일 + 마이크로 + 주름 아틀라스(피부 전용)
+	const PART_MATERIAL_DEFINITIONS = [
+		{ keyword: "eyeshell", shading: "occlusion", albedo: "eye_occlusion.png", normal: null, roughness: null, opacity: null, baseColorFactor: [0.75, 1, 1], useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: {} },
+		{ keyword: "eyeEdge", shading: "fluid", albedo: null, normal: null, roughness: null, opacity: null, baseColorFactor: [0.07, 1, 1], useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: {} },
+		{ keyword: "saliva", shading: "fluid", albedo: null, normal: null, roughness: null, opacity: null, baseColorFactor: [0.4, 1, 1], useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: {} },
+		{ keyword: "eyeball", shading: "eye", albedo: "eye_sclera.jpg", normal: "eye_sclera_normal.jpg", roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: { layerColor: "eye_iris.png", layerNormal: "eye_iris_normal.png" } },
+		{ keyword: "eyelashes", shading: "skin", albedo: "eyelash.png", normal: null, roughness: null, opacity: "eyelash.png", baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: {} },
+		{ keyword: "head", shading: "skin", albedo: "head_albedo.jpg", normal: "head_normal.jpg", roughness: "head_roughness.jpg", specular: "head_specular.jpg", opacity: null, baseColorFactor: null, useDetail: true, roughnessFactor: 1.0, subsurfaceFactor: 1.0, extra: { micro: "skin_micro.png", maskAtlas: "wrinkle_masks.png", layerNormal: "wrinkle_normal.jpg", layerColor: "wrinkle_color.jpg" } },
+		{ keyword: "teeth", shading: "skin", albedo: "teeth_albedo.jpg", normal: "teeth_normal.jpg", roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 0.4, subsurfaceFactor: 0.25, extra: {} },
+		{ keyword: "hair", shading: "hair", albedo: "hair.png", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: { layerNormal: "hair_tangent.png" } },
+		{ keyword: "beard", shading: "facialHair", albedo: "beard.png", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: { layerNormal: "beard_tangent.png" } },
+		{ keyword: "mustache", shading: "facialHair", albedo: "mustache.png", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: { layerNormal: "mustache_tangent.png" } },
+		{ keyword: "eyebrows", shading: "facialHair", albedo: "eyebrows.png", normal: null, roughness: null, opacity: null, baseColorFactor: null, useDetail: false, roughnessFactor: 1.0, subsurfaceFactor: 0.0, extra: { layerNormal: "eyebrows_tangent.png" } },
+	];
+	const SHADING_MODE_BY_NAME = { skin: SKIN_SHADING_SKIN, eye: SKIN_SHADING_EYE, hair: SKIN_SHADING_HAIR, facialHair: SKIN_SHADING_FACIALHAIR, occlusion: SKIN_SHADING_OCCLUSION, fluid: SKIN_SHADING_FLUID };
+	const EXTRA_TEXTURE_UNITS = { micro: SKIN_TEXTURE_UNIT_MICRO, maskAtlas: SKIN_TEXTURE_UNIT_MASKATLAS, layerNormal: SKIN_TEXTURE_UNIT_LAYERNORMAL, layerColor: SKIN_TEXTURE_UNIT_LAYERCOLOR };
+
+	//==============================================================================
+	// 셰이더 소스 목록.
+	//==============================================================================
+	// 합성. (산란된 조도 x 알베도 + 스펙큘러 → 선형 HDR, 배경은 스튜디오 그라디언트)
+	const COMBINE_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec2 fragmentTextureCoordinate;
+	uniform sampler2D irradianceTexture;
+	uniform sampler2D albedoTexture;
+	uniform sampler2D specularTexture;
+	uniform sampler2D occlusionTexture;
+	uniform float aspectRatio;
+	uniform float occlusionStrength;
+	out vec4 outputColor;
+
+	void main() {
+		vec4 irradiance = texture(irradianceTexture, fragmentTextureCoordinate);
+		vec4 albedo = texture(albedoTexture, fragmentTextureCoordinate);
+		vec3 specular = texture(specularTexture, fragmentTextureCoordinate).rgb;
+		float visibility = mix(1.0, texture(occlusionTexture, fragmentTextureCoordinate).r, occlusionStrength);
+		vec3 color = irradiance.rgb * albedo.rgb * visibility + specular * mix(1.0, visibility, 0.6);
+		outputColor = vec4(color, 1.0);
+	}
+	`;
+
+	// 배경. (씬 MRT 에 직접 — 어두운 스튜디오, 두상 뒤가 은은하게 밝은 방사형 그라디언트. 조도 = 배경색, 알베도 1, 산란 / 노멀 없음)
+	const BACKGROUND_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec2 fragmentTextureCoordinate;
+	uniform float aspectRatio;
+	layout(location = 0) out vec4 irradianceOutput;
+	layout(location = 1) out vec4 albedoOutput;
+	layout(location = 2) out vec4 specularOutput;
+	layout(location = 3) out vec4 normalOutput;
+
+	void main() {
+		vec2 centered = (fragmentTextureCoordinate - vec2(0.5, 0.56)) * vec2(aspectRatio, 1.0);
+		float radial = dot(centered, centered);
+		vec3 backgroundColor = vec3(0.012, 0.012, 0.015) + vec3(0.075, 0.068, 0.07) * exp(-radial * 3.2);
+		backgroundColor += vec3(0.02, 0.016, 0.012) * smoothstep(0.2, -0.6, fragmentTextureCoordinate.y - 0.5);
+		irradianceOutput = vec4(backgroundColor, 0.0);
+		albedoOutput = vec4(1.0, 1.0, 1.0, 1.0);
+		specularOutput = vec4(0.0, 0.0, 0.0, 1.0);
+		normalOutput = vec4(0.0, 0.0, 0.0, 0.0);
+	}
+	`;
+
+	// 톤 매핑 합성. (노출 → 블룸 가산 → ACES → 비네트 → 그레인 → sRGB)
+	const COMPOSITE_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec2 fragmentTextureCoordinate;
+	uniform sampler2D sceneTexture;
+	uniform sampler2D bloomTexture;
+	uniform float exposure;
+	uniform float bloomStrength;
+	uniform float vignetteStrength;
+	uniform float grainStrength;
+	uniform float elapsedTime;
+	uniform vec2 resolution;
+	out vec4 outputColor;
+
+	vec3 acesToneMap(vec3 color) {
+		const float a = 2.51;
+		const float b = 0.03;
+		const float c = 2.43;
+		const float d = 0.59;
+		const float e = 0.14;
+		return clamp((color * (a * color + b)) / (color * (c * color + d) + e), 0.0, 1.0);
+	}
+
+	float hash21(vec2 point) {
+		point = fract(point * vec2(234.34, 435.345));
+		point += dot(point, point + 34.23);
+		return fract(point.x * point.y);
+	}
+
+	void main() {
+		vec3 sceneColor = texture(sceneTexture, fragmentTextureCoordinate).rgb;
+		vec3 bloomColor = texture(bloomTexture, fragmentTextureCoordinate).rgb;
+		vec3 color = sceneColor * exposure + bloomColor * bloomStrength;
+		color = acesToneMap(color);
+
+		// 비네트.
+		vec2 centered = fragmentTextureCoordinate - 0.5;
+		float vignette = 1.0 - smoothstep(0.35, 0.95, length(centered * vec2(1.0, 0.85)) * 1.25);
+		color *= mix(1.0, vignette, vignetteStrength);
+
+		// 필름 그레인. (중간 밝기에서 가장 보이고 어두운 곳은 절반)
+		float grain = hash21(fragmentTextureCoordinate * resolution + fract(elapsedTime * 13.7) * 100.0) - 0.5;
+		float grainLuminance = dot(color, vec3(0.299, 0.587, 0.114));
+		color += grain * grainStrength * mix(0.5, 1.0, grainLuminance) * (1.0 - grainLuminance * 0.5);
+
+		// sRGB 인코딩.
+		vec3 encoded = mix(color * 12.92, 1.055 * pow(max(color, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055, step(0.0031308, color));
+		outputColor = vec4(encoded, 1.0);
+	}
+	`;
+
+	// FXAA. (휘도 대비 기반 가장자리 방향 검출 + 방향 블러 — LDR 출력에 적용)
+	const FXAA_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec2 fragmentTextureCoordinate;
+	uniform sampler2D sourceTexture;
+	uniform vec2 texelSize;
+	uniform float sharpenStrength;
+	out vec4 outputColor;
+
+	float luminance(vec3 color) {
+		return dot(color, vec3(0.299, 0.587, 0.114));
+	}
+
+	// 대비 적응 샤픈. (이웃 4개와의 최소 / 최대 대비가 낮은 곳만 또렷하게 — 가장자리는 과하게 세우지 않는다)
+	vec3 sharpen(vec3 color, vec2 coordinate) {
+		vec3 north = texture(sourceTexture, coordinate + vec2(0.0, -1.0) * texelSize).rgb;
+		vec3 south = texture(sourceTexture, coordinate + vec2(0.0, 1.0) * texelSize).rgb;
+		vec3 west = texture(sourceTexture, coordinate + vec2(-1.0, 0.0) * texelSize).rgb;
+		vec3 east = texture(sourceTexture, coordinate + vec2(1.0, 0.0) * texelSize).rgb;
+		vec3 minimumColor = min(color, min(min(north, south), min(west, east)));
+		vec3 maximumColor = max(color, max(max(north, south), max(west, east)));
+		vec3 contrast = min(minimumColor, 1.0 - maximumColor) / max(maximumColor, vec3(0.001));
+		vec3 weight = sqrt(clamp(contrast, 0.0, 1.0)) * sharpenStrength;
+		vec3 sharpened = (color + (north + south + west + east) * weight) / (1.0 + 4.0 * weight);
+		return mix(color, color * 2.0 - sharpened, weight);
+	}
+
+	void main() {
+		vec3 colorNorthWest = texture(sourceTexture, fragmentTextureCoordinate + vec2(-1.0, -1.0) * texelSize).rgb;
+		vec3 colorNorthEast = texture(sourceTexture, fragmentTextureCoordinate + vec2(1.0, -1.0) * texelSize).rgb;
+		vec3 colorSouthWest = texture(sourceTexture, fragmentTextureCoordinate + vec2(-1.0, 1.0) * texelSize).rgb;
+		vec3 colorSouthEast = texture(sourceTexture, fragmentTextureCoordinate + vec2(1.0, 1.0) * texelSize).rgb;
+		vec3 colorCenter = texture(sourceTexture, fragmentTextureCoordinate).rgb;
+		float lumaNorthWest = luminance(colorNorthWest);
+		float lumaNorthEast = luminance(colorNorthEast);
+		float lumaSouthWest = luminance(colorSouthWest);
+		float lumaSouthEast = luminance(colorSouthEast);
+		float lumaCenter = luminance(colorCenter);
+		float lumaMinimum = min(lumaCenter, min(min(lumaNorthWest, lumaNorthEast), min(lumaSouthWest, lumaSouthEast)));
+		float lumaMaximum = max(lumaCenter, max(max(lumaNorthWest, lumaNorthEast), max(lumaSouthWest, lumaSouthEast)));
+
+		vec2 direction;
+		direction.x = -((lumaNorthWest + lumaNorthEast) - (lumaSouthWest + lumaSouthEast));
+		direction.y = ((lumaNorthWest + lumaSouthWest) - (lumaNorthEast + lumaSouthEast));
+		float directionReduce = max((lumaNorthWest + lumaNorthEast + lumaSouthWest + lumaSouthEast) * (0.25 * 0.125), 1.0 / 128.0);
+		float reciprocalDirectionMinimum = 1.0 / (min(abs(direction.x), abs(direction.y)) + directionReduce);
+		direction = min(vec2(8.0), max(vec2(-8.0), direction * reciprocalDirectionMinimum)) * texelSize;
+
+		vec3 colorA = 0.5 * (texture(sourceTexture, fragmentTextureCoordinate + direction * (1.0 / 3.0 - 0.5)).rgb + texture(sourceTexture, fragmentTextureCoordinate + direction * (2.0 / 3.0 - 0.5)).rgb);
+		vec3 colorB = colorA * 0.5 + 0.25 * (texture(sourceTexture, fragmentTextureCoordinate + direction * -0.5).rgb + texture(sourceTexture, fragmentTextureCoordinate + direction * 0.5).rgb);
+		float lumaB = luminance(colorB);
+		vec3 color = (lumaB < lumaMinimum || lumaB > lumaMaximum) ? colorA : colorB;
+		if (sharpenStrength > 0.0) {
+			color = sharpen(color, fragmentTextureCoordinate);
+		}
+		outputColor = vec4(color, 1.0);
+	}
+	`;
+
+	// 버퍼 미리보기. (머티리얼 그래프 패널 — 중간 버퍼를 작은 뷰포트에 톤 매핑해 표시)
+	const PREVIEW_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec2 fragmentTextureCoordinate;
+	uniform sampler2D sourceTexture;
+	uniform float displayScale;
+	uniform int useCoverage;
+	out vec4 outputColor;
+
+	void main() {
+		vec4 sourceSample = texture(sourceTexture, fragmentTextureCoordinate);
+		vec3 color = sourceSample.rgb * displayScale;
+		color = color / (1.0 + color);
+		if (useCoverage == 1) {
+			color = mix(vec3(0.05, 0.05, 0.06), color, sourceSample.a);
+		}
+		outputColor = vec4(pow(color, vec3(1.0 / 2.2)), 1.0);
+	}
+	`;
+
+	//==============================================================================
+	// 전역 함수 목록.
+	//==============================================================================
+	function clampValue(value, minimumValue, maximumValue) {
+		return System.Math.max(minimumValue, System.Math.min(maximumValue, value));
+	}
+
+	//==============================================================================
+	// 캔버스 / 렌더링 컨텍스트.
+	//==============================================================================
+	const canvas = System.document.getElementById("mainCanvas");
+	const webGL2RenderingContext = canvas.getContext("webgl2", { antialias: false, depth: true, stencil: true, alpha: false, premultipliedAlpha: true });
+	if (!webGL2RenderingContext) {
+		System.document.body.innerHTML = "<p style=\"color:#fff;font-family:sans-serif;padding:2em\">WebGL2 를 지원하지 않는 브라우저입니다.</p>";
+		throw new Error("WebGL2 unsupported");
+	}
+	const uiGraphic = new Graphic(canvas);
+	const skinRenderer = new HumanSkinRenderer(webGL2RenderingContext);
+	const subsurfaceEffect = new SubsurfaceScatteringEffect(webGL2RenderingContext);
+	const ambientOcclusionEffect = new AmbientOcclusionEffect(webGL2RenderingContext);
+	const bloomEffect = new BloomEffect(webGL2RenderingContext);
+	let shadowMap = new ShadowMap(webGL2RenderingContext, SHADOWMAP_RESOLUTION);
+	let shadowMapResolution = SHADOWMAP_RESOLUTION;
+	// 렌더 타겟 한 변의 상한. (RENDER BASE 를 화면보다 크게 잡는 슈퍼샘플링이 GPU 한계를 넘지 않도록)
+	const maxRenderTargetSize = System.Math.min(webGL2RenderingContext.getParameter(webGL2RenderingContext.MAX_TEXTURE_SIZE), webGL2RenderingContext.getParameter(webGL2RenderingContext.MAX_RENDERBUFFER_SIZE));
+	const sceneRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, true, { colorAttachmentCount: 4, useFloatColor: true, useDepthTexture: true });
+	const hdrRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, false, { useFloatColor: true });
+	const ldrRenderTarget = new RenderTarget(webGL2RenderingContext, 2, 2, false);
+	const combinePass = new FullscreenPass(webGL2RenderingContext, COMBINE_FRAGMENTSHADER_SOURCE);
+	const backgroundPass = new FullscreenPass(webGL2RenderingContext, BACKGROUND_FRAGMENTSHADER_SOURCE);
+	const compositePass = new FullscreenPass(webGL2RenderingContext, COMPOSITE_FRAGMENTSHADER_SOURCE);
+	const antialiasPass = new FullscreenPass(webGL2RenderingContext, FXAA_FRAGMENTSHADER_SOURCE);
+	const previewPass = new FullscreenPass(webGL2RenderingContext, PREVIEW_FRAGMENTSHADER_SOURCE);
+
+	// 조명 / 피부 / 산란 / 블룸 기본값. (선형 공간, 미터 단위 캐릭터)
+	skinRenderer.setLight(0, KEY_LIGHT_DIRECTION.x, KEY_LIGHT_DIRECTION.y, KEY_LIGHT_DIRECTION.z, 1.0, 0.92, 0.82, 2.6);
+	skinRenderer.setLight(1, FILL_LIGHT_DIRECTION.x, FILL_LIGHT_DIRECTION.y, FILL_LIGHT_DIRECTION.z, 0.6, 0.7, 0.9, 1.1);
+	skinRenderer.setLight(2, RIM_LIGHT_DIRECTION.x, RIM_LIGHT_DIRECTION.y, RIM_LIGHT_DIRECTION.z, 0.95, 0.97, 1.0, 1.4);
+	skinRenderer.setAmbientColors([0.2, 0.21, 0.25], [0.13, 0.12, 0.12], [0.09, 0.08, 0.075]);
+	skinRenderer.setSheenStrength(0.18);
+	skinRenderer.setNormalStrength(1.5);
+	skinRenderer.setSpecularStrength(0.65);
+	skinRenderer.setRoughnessRange(1.0, 1.0);
+	skinRenderer.setDetailTexelSize(1 / DETAIL_TEXTURE_SIZE);
+	skinRenderer.setShadowSoftness(3.0);
+	skinRenderer.setMicroDetail(38, 0.55);
+	skinRenderer.setWrinkleMaps(true, 1.0, 0.9);
+	skinRenderer.setEyeParameters(0.14, 0.042, 0.05);
+	skinRenderer.setHairParameters([-0.1, 0.16], [160, 24], [0.12, 0.26, 0.2], 0.55);
+	subsurfaceEffect.setScatterWidth(0.008);
+	ambientOcclusionEffect.setParameters(0.028, 1.15, 0.0015);
+	bloomEffect.setThreshold(1.05, 1.9);
+	bloomEffect.setIterationCount(3);
+
+	//==============================================================================
+	// 렌더링 옵션. (우측 상단 패널 — 숫자 키로도 전환)
+	//==============================================================================
+	const optionDefinitions = [
+		{ name: "subsurface", label: "SUBSURFACE SCATTERING" },
+		{ name: "detail", label: "4K PORE DETAIL" },
+		{ name: "shadow", label: "KEY LIGHT SHADOW" },
+		{ name: "bloom", label: "BLOOM" },
+		{ name: "occlusion", label: "AMBIENT OCCLUSION" },
+		{ name: "wrinkle", label: "EXPRESSION WRINKLE MAPS" },
+		{ name: "wireframe", label: "WIREFRAME" },
+		{ name: "materialGraph", label: "MATERIAL GRAPH" },
+		{ name: "hud", label: "RENDERING INFO" },
+	];
+	const DEFAULT_OPTION_STATES = {
+		subsurface: true,
+		detail: true,
+		shadow: true,
+		bloom: true,
+		occlusion: true,
+		wrinkle: true,
+		wireframe: false,
+		materialGraph: false,
+		hud: false,
+	};
+	const optionStates = {
+		subsurface: true,
+		detail: true,
+		shadow: true,
+		bloom: true,
+		occlusion: true,
+		wrinkle: true,
+		wireframe: false,
+		materialGraph: false,
+		hud: false,
+	};
+	const optionRowElements = {};
+	const optionPanelElement = System.document.getElementById("optionPanel");
+	optionDefinitions.forEach((definition, definitionIndex) => {
+		const rowElement = System.document.createElement("div");
+		rowElement.className = "optionRow";
+		const keyElement = System.document.createElement("span");
+		keyElement.className = "optionKey";
+		keyElement.textContent = String(definitionIndex + 1);
+		const labelElement = System.document.createElement("span");
+		labelElement.className = "optionLabel";
+		labelElement.textContent = definition.label;
+		const stateElement = System.document.createElement("span");
+		stateElement.className = "optionState";
+		rowElement.appendChild(keyElement);
+		rowElement.appendChild(labelElement);
+		rowElement.appendChild(stateElement);
+		rowElement.addEventListener("click", () => {
+			toggleOption(definition.name);
+		});
+		optionPanelElement.appendChild(rowElement);
+		optionRowElements[definition.name] = { rowElement: rowElement, stateElement: stateElement };
+	});
+
+	// 패널 접기 / 펼치기. (기본 접음 — 모바일에서 화면을 가리지 않도록, 제목을 누르면 전환)
+	const optionTitleElement = System.document.getElementById("optionTitle");
+	let isOptionPanelCollapsed = true;
+	function refreshOptionPanelCollapse() {
+		optionPanelElement.classList.toggle("collapsed", isOptionPanelCollapsed);
+	}
+	optionTitleElement.addEventListener("click", () => {
+		isOptionPanelCollapsed = !isOptionPanelCollapsed;
+		refreshOptionPanelCollapse();
+	});
+	refreshOptionPanelCollapse();
+	function refreshOptionPanel() {
+		for (const definition of optionDefinitions) {
+			const elements = optionRowElements[definition.name];
+			const isOn = optionStates[definition.name];
+			elements.stateElement.textContent = isOn ? "ON" : "OFF";
+			elements.rowElement.classList.toggle("on", isOn);
+		}
+	}
+
+	function toggleOption(optionName) {
+		optionStates[optionName] = !optionStates[optionName];
+		refreshOptionPanel();
+	}
+	refreshOptionPanel();
+
+	//==============================================================================
+	// 슬라이더 옵션. (렌더 / 지오메트리 / 그림자 / 피부 / AO / 조명 / 머리카락 / 눈 / 애니메이션 — 값은 매 프레임 적용)
+	//==============================================================================
+	const sliderDefinitions = [
+		{ group: "RENDER", name: "frameRate", label: "FRAME RATE", minimum: 0, maximum: 1, step: 1, value: 0, format: (value) => FRAME_RATE_OPTIONS[value] + " FPS" },
+		{ group: "RENDER", name: "renderBase", label: "RENDER BASE", minimum: 0, maximum: 3, step: 1, value: 1, format: (value) => RENDER_BASE_LABELS[value] },
+		{ group: "RENDER", name: "renderScale", label: "RESOLUTION SCALE", minimum: 0.5, maximum: 2, step: 0.05, value: 1, format: (value) => System.Math.round(value * 100) + "%" },
+		{ group: "RENDER", name: "antialias", label: "ANTI-ALIASING", minimum: 0, maximum: 2, step: 1, value: 1, format: (value) => ANTIALIAS_LABELS[value] },
+		{ group: "RENDER", name: "exposure", label: "EXPOSURE", minimum: 0.3, maximum: 1.5, step: 0.01, value: 0.95, format: (value) => value.toFixed(2) },
+		{ group: "RENDER", name: "bloomStrength", label: "BLOOM STRENGTH", minimum: 0, maximum: 0.4, step: 0.01, value: 0.12, format: (value) => value.toFixed(2) },
+		{ group: "RENDER", name: "bloomThreshold", label: "BLOOM THRESHOLD", minimum: 0.5, maximum: 2.5, step: 0.05, value: 1.05, format: (value) => value.toFixed(2) },
+		{ group: "RENDER", name: "vignette", label: "VIGNETTE", minimum: 0, maximum: 1, step: 0.02, value: 0.5, format: (value) => value.toFixed(2) },
+		{ group: "RENDER", name: "grain", label: "FILM GRAIN", minimum: 0, maximum: 0.06, step: 0.002, value: 0, format: (value) => value.toFixed(3) },
+		{ group: "GEOMETRY", name: "headLod", label: "HEAD MESH LOD", minimum: 0, maximum: 2, step: 1, value: 1, format: (value) => "LOD " + (2 - value) },
+		{ group: "GEOMETRY", name: "hairQuality", label: "HAIR CARDS", minimum: 0, maximum: 5, step: 1, value: 3, format: (value) => HAIR_LEVEL_DEFINITIONS[value].label },
+		{ group: "GEOMETRY", name: "textureSize", label: "TEXTURE SIZE", minimum: 0, maximum: 3, step: 1, value: 3, format: (value) => TEXTURE_SIZE_LABELS[value] },
+		{ group: "SHADOW", name: "shadowQuality", label: "SHADOW MAP", minimum: 0, maximum: 4, step: 1, value: 1, format: (value) => SHADOW_LEVEL_DEFINITIONS[value].label },
+		{ group: "SHADOW", name: "shadowSoftness", label: "SHADOW SOFTNESS", minimum: 0, maximum: 8, step: 0.25, value: 3, format: (value) => value.toFixed(2) },
+		{ group: "SHADOW", name: "shadowStrength", label: "SHADOW STRENGTH", minimum: 0, maximum: 1, step: 0.02, value: 0.85, format: (value) => value.toFixed(2) },
+		{ group: "SKIN", name: "normalStrength", label: "NORMAL MAP", minimum: 0, maximum: 3, step: 0.05, value: 1.5, format: (value) => value.toFixed(2) },
+		{ group: "SKIN", name: "poreDetail", label: "PORE DETAIL", minimum: 0, maximum: 8, step: 0.1, value: 3.5, format: (value) => value.toFixed(1) },
+		{ group: "SKIN", name: "cavity", label: "CAVITY", minimum: 0, maximum: 6, step: 0.1, value: 2.5, format: (value) => value.toFixed(1) },
+		{ group: "SKIN", name: "microNormal", label: "MICRO NORMAL", minimum: 0, maximum: 1.5, step: 0.05, value: 0.55, format: (value) => value.toFixed(2) },
+		{ group: "SKIN", name: "wrinkleDepth", label: "WRINKLE DEPTH", minimum: 0, maximum: 2, step: 0.05, value: 1, format: (value) => value.toFixed(2) },
+		{ group: "SKIN", name: "subsurfaceWidth", label: "SSS WIDTH", minimum: 0, maximum: 20, step: 0.5, value: 8, format: (value) => value.toFixed(1) + " MM" },
+		{ group: "SKIN", name: "specular", label: "SPECULAR", minimum: 0, maximum: 2, step: 0.05, value: 1.25, format: (value) => value.toFixed(2) },
+		{ group: "SKIN", name: "roughness", label: "ROUGHNESS", minimum: 0.5, maximum: 1.4, step: 0.02, value: 0.9, format: (value) => value.toFixed(2) },
+		{ group: "SKIN", name: "sheen", label: "PEACH FUZZ SHEEN", minimum: 0, maximum: 0.6, step: 0.02, value: 0.12, format: (value) => value.toFixed(2) },
+		{ group: "AMBIENT OCCLUSION", name: "occlusionStrength", label: "AO STRENGTH", minimum: 0, maximum: 2, step: 0.05, value: 1.15, format: (value) => value.toFixed(2) },
+		{ group: "AMBIENT OCCLUSION", name: "occlusionRadius", label: "AO RADIUS", minimum: 0.01, maximum: 0.08, step: 0.002, value: 0.028, format: (value) => (value * 100).toFixed(1) + " CM" },
+		{ group: "LIGHTING", name: "keyIntensity", label: "KEY LIGHT", minimum: 0, maximum: 5, step: 0.1, value: 2.6, format: (value) => value.toFixed(1) },
+		{ group: "LIGHTING", name: "fillIntensity", label: "FILL LIGHT", minimum: 0, maximum: 3, step: 0.1, value: 1.1, format: (value) => value.toFixed(1) },
+		{ group: "LIGHTING", name: "rimIntensity", label: "RIM LIGHT", minimum: 0, maximum: 4, step: 0.1, value: 1.4, format: (value) => value.toFixed(1) },
+		{ group: "LIGHTING", name: "ambientIntensity", label: "AMBIENT", minimum: 0, maximum: 2.5, step: 0.05, value: 1, format: (value) => value.toFixed(2) },
+		{ group: "HAIR", name: "hairSway", label: "HAIR SWAY", minimum: 0, maximum: 1, step: 0.05, value: 0.25, format: (value) => value.toFixed(2) },
+		{ group: "HAIR", name: "hairSpecular", label: "HAIR SPECULAR", minimum: 0, maximum: 1, step: 0.05, value: 0.5, format: (value) => value.toFixed(2) },
+		{ group: "HAIR", name: "hairRootShade", label: "HAIR ROOT SHADE", minimum: 0, maximum: 1, step: 0.05, value: 0, format: (value) => value.toFixed(2) },
+		{ group: "EYES", name: "irisSize", label: "IRIS SIZE", minimum: 0.1, maximum: 0.18, step: 0.002, value: 0.14, format: (value) => value.toFixed(3) },
+		{ group: "EYES", name: "pupilSize", label: "PUPIL SIZE", minimum: 0.015, maximum: 0.075, step: 0.001, value: 0.042, format: (value) => value.toFixed(3) },
+		{ group: "EYES", name: "irisDepth", label: "IRIS DEPTH", minimum: 0, maximum: 0.1, step: 0.005, value: 0.05, format: (value) => value.toFixed(3) },
+		{ group: "ANIMATION", name: "headFollow", label: "HEAD FOLLOW POINTER", minimum: 0, maximum: 1, step: 0.05, value: 0, format: (value) => value.toFixed(2) },
+		{ group: "ANIMATION", name: "blinkRate", label: "BLINK RATE", minimum: 0, maximum: 2, step: 0.1, value: 1, format: (value) => value.toFixed(1) + "X" },
+	];
+	const sliderStates = {};
+	const sliderValueElements = {};
+	let previousGroupName = null;
+	for (const definition of sliderDefinitions) {
+		sliderStates[definition.name] = definition.value;
+		if (definition.group !== previousGroupName) {
+			const groupElement = System.document.createElement("div");
+			groupElement.className = "optionGroup";
+			groupElement.textContent = definition.group;
+			optionPanelElement.appendChild(groupElement);
+			previousGroupName = definition.group;
+		}
+		const rowElement = System.document.createElement("div");
+		rowElement.className = "sliderRow";
+		const labelElement = System.document.createElement("span");
+		labelElement.className = "sliderLabel";
+		labelElement.textContent = definition.label;
+		const inputElement = System.document.createElement("input");
+		inputElement.className = "sliderInput";
+		inputElement.dataset.sliderName = definition.name;
+		inputElement.type = "range";
+		inputElement.min = String(definition.minimum);
+		inputElement.max = String(definition.maximum);
+		inputElement.step = String(definition.step);
+		inputElement.value = String(definition.value);
+		const valueElement = System.document.createElement("span");
+		valueElement.className = "sliderValue";
+		valueElement.textContent = definition.format(definition.value);
+		inputElement.addEventListener("input", () => {
+			const value = System.Number(inputElement.value);
+			sliderStates[definition.name] = value;
+			valueElement.textContent = definition.format(value);
+			onSliderChanged(definition.name, value);
+		});
+		rowElement.appendChild(labelElement);
+		rowElement.appendChild(inputElement);
+		rowElement.appendChild(valueElement);
+		optionPanelElement.appendChild(rowElement);
+		sliderValueElements[definition.name] = valueElement;
+	}
+	// 옵션 리셋. (토글 / 슬라이더를 정의된 기본값으로 — 모델 / 텍스처 / 섀도우 변경 처리도 그대로 탄다)
+	const sliderInputElements = {};
+	for (const inputElement of optionPanelElement.querySelectorAll("input[type=range]")) {
+		sliderInputElements[inputElement.dataset.sliderName] = inputElement;
+	}
+	function resetOptions() {
+		for (const definition of optionDefinitions) {
+			optionStates[definition.name] = DEFAULT_OPTION_STATES[definition.name];
+		}
+		refreshOptionPanel();
+		for (const definition of sliderDefinitions) {
+			if (sliderStates[definition.name] === definition.value) {
+				continue;
+			}
+			sliderStates[definition.name] = definition.value;
+			sliderInputElements[definition.name].value = String(definition.value);
+			sliderValueElements[definition.name].textContent = definition.format(definition.value);
+			onSliderChanged(definition.name, definition.value);
+		}
+	}
+
+	// 우클릭 컨텍스트 메뉴. (브라우저 메뉴 대신 — 회전 리셋 / 옵션 리셋 / 머티리얼 그래프)
+	const contextMenuElement = System.document.getElementById("contextMenu");
+	const CONTEXT_MENU_ITEMS = [
+		{ label: "RESET VIEW", action: () => { resetView(); } },
+		{ label: "RESET OPTIONS", action: () => { resetOptions(); } },
+		{ label: "TOGGLE MATERIAL GRAPH", action: () => { toggleOption("materialGraph"); } },
+	];
+	for (const item of CONTEXT_MENU_ITEMS) {
+		const itemElement = System.document.createElement("div");
+		itemElement.className = "contextItem";
+		itemElement.textContent = item.label;
+		itemElement.addEventListener("click", () => {
+			contextMenuElement.classList.remove("open");
+			item.action();
+		});
+		contextMenuElement.appendChild(itemElement);
+	}
+	System.document.addEventListener("contextmenu", (event) => {
+		event.preventDefault();
+		if (event.target.closest("#optionPanel") || event.target.closest("#expressionPanel")) {
+			return;
+		}
+		const menuWidth = contextMenuElement.offsetWidth || 180;
+		const menuHeight = contextMenuElement.offsetHeight || 110;
+		contextMenuElement.style.left = System.Math.min(event.clientX, System.window.innerWidth - menuWidth - 8) + "px";
+		contextMenuElement.style.top = System.Math.min(event.clientY, System.window.innerHeight - menuHeight - 8) + "px";
+		contextMenuElement.classList.add("open");
+	});
+	System.document.addEventListener("pointerdown", (event) => {
+		if (!event.target.closest("#contextMenu")) {
+			contextMenuElement.classList.remove("open");
+		}
+	});
+
+	// 슬라이더 조작 중 캔버스 카메라 입력을 막는다.
+	optionPanelElement.addEventListener("pointerdown", (event) => {
+		event.stopPropagation();
+	});
+	optionPanelElement.addEventListener("wheel", (event) => {
+		event.stopPropagation();
+	});
+
+	//==============================================================================
+	// 애셋 로드. (메타휴먼 얼굴 glb — DNA 의 RigLogic 을 굽은 ARKit 셰이프키, 부위별 텍스처는 직접 로드)
+	//==============================================================================
+	// 머리 LOD 와 머리카락 단계는 별도 glb — 슬라이더로 바꾸면 필요할 때 로드해 캐시한다.
+	const modelCache = new System.Map();
+	async function loadModelFile(fileName) {
+		if (!modelCache.has(fileName)) {
+			const model = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "./assets/" + fileName, skinRenderer);
+			assignMaterials(model);
+			model.update(0);
+			modelCache.set(fileName, model);
+			if (loadingProgress.completed < loadingProgress.total) {
+				advanceLoading(fileName);
+			}
+		}
+		return modelCache.get(fileName);
+	}
+	const materialByKeyword = new System.Map();
+	function assignMaterials(model) {
+		const modelDrawableList = model.getDrawableList();
+		for (let drawableIndex = 0; drawableIndex < modelDrawableList.length; ++drawableIndex) {
+			const drawable = modelDrawableList[drawableIndex];
+			for (const [keyword, material] of materialByKeyword) {
+				if (drawable.materialName.includes(keyword)) {
+					model.setMaterial(drawableIndex, material);
+					break;
+				}
+			}
+		}
+	}
+	let headModel = null;
+	let hairModel = null;
+	function getActiveModels() {
+		const models = [];
+		if (headModel) {
+			models.push(headModel);
+		}
+		if (hairModel) {
+			models.push(hairModel);
+		}
+		return models;
+	}
+
+	// 로딩 진행. (텍스처 파일 + 모델 + 표정 / 주름 정의 — 항목 완료 수 기준)
+	const loadingProgress = { completed: 0, total: 0 };
+	const loadingFillElement = System.document.getElementById("loadingFill");
+	const loadingDetailElement = System.document.getElementById("loadingDetail");
+	function advanceLoading(itemName) {
+		loadingProgress.completed += 1;
+		const ratio = loadingProgress.total > 0 ? System.Math.min(1, loadingProgress.completed / loadingProgress.total) : 0;
+		loadingFillElement.style.width = (ratio * 100).toFixed(1) + "%";
+		loadingDetailElement.textContent = itemName.toUpperCase() + "  " + loadingProgress.completed + " / " + loadingProgress.total;
+	}
+	{
+		const assetFileSet = new System.Set();
+		for (const definition of PART_MATERIAL_DEFINITIONS) {
+			for (const fileName of [definition.albedo, definition.normal, definition.roughness, definition.specular, definition.opacity]) {
+				if (fileName) {
+					assetFileSet.add(fileName);
+				}
+			}
+			for (const slotName in definition.extra) {
+				assetFileSet.add(definition.extra[slotName]);
+			}
+		}
+		assetFileSet.add("skin_detail.jpg");
+		loadingProgress.total = assetFileSet.size + 2 + 2;
+	}
+	const imageDescriptionCache = new System.Map();
+	// PNG / JPEG 헤더에서 크기를 읽는다. (텍스처 GPU 메모리 추정 — 디코드 없이)
+	function readImageSize(bytes) {
+		if (bytes.length > 24 && bytes[0] === 0x89 && bytes[1] === 0x50) {
+			const view = new System.DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+			return { width: view.getUint32(16), height: view.getUint32(20) };
+		}
+		let offset = 2;
+		while (offset + 9 < bytes.length) {
+			if (bytes[offset] !== 0xFF) {
+				offset += 1;
+				continue;
+			}
+			const marker = bytes[offset + 1];
+			const segmentLength = (bytes[offset + 2] << 8) | bytes[offset + 3];
+			if (marker >= 0xC0 && marker <= 0xCF && marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC) {
+				return { width: (bytes[offset + 7] << 8) | bytes[offset + 8], height: (bytes[offset + 5] << 8) | bytes[offset + 6] };
+			}
+			offset += 2 + segmentLength;
+		}
+		return { width: 0, height: 0 };
+	}
+	async function loadAssetImage(fileName) {
+		if (!fileName) {
+			return null;
+		}
+		if (!imageDescriptionCache.has(fileName)) {
+			const imageDescription = await Material.loadImageDescription("./assets/" + fileName, { flipY: false, isColorData: false, anisotropy: 8 });
+			imageDescription.size = readImageSize(imageDescription.bytes);
+			imageDescriptionCache.set(fileName, imageDescription);
+			advanceLoading(fileName);
+		}
+		return imageDescriptionCache.get(fileName);
+	}
+
+	const detailDescription = await loadAssetImage("skin_detail.jpg");
+	let detailHeightTexture = null;
+	for (const definition of PART_MATERIAL_DEFINITIONS) {
+		const description = Material.createDefaultDescription();
+		description.baseColorImage = await loadAssetImage(definition.albedo);
+		description.normalImage = await loadAssetImage(definition.normal);
+		description.metallicRoughnessImage = await loadAssetImage(definition.roughness);
+		description.specularImage = await loadAssetImage(definition.specular);
+		description.opacityImage = await loadAssetImage(definition.opacity);
+		description.roughnessFactor = definition.roughnessFactor;
+		if (definition.baseColorFactor) {
+			description.baseColorFactor = definition.baseColorFactor.slice();
+		}
+		const material = await Material.createFromDescription(webGL2RenderingContext, skinRenderer.getShaderProgram(), description);
+		material.setSubsurfaceFactor(definition.subsurfaceFactor);
+		if (definition.useDetail) {
+			if (!detailHeightTexture) {
+				detailHeightTexture = await material.createTexture(detailDescription, [128, 128, 128, 255]);
+			}
+			material.setTexture("detailHeightTexture", SKIN_TEXTURE_UNIT_DETAILHEIGHT, detailHeightTexture);
+		}
+		for (const slotName in definition.extra) {
+			const extraDescription = await loadAssetImage(definition.extra[slotName]);
+			const extraTexture = await material.createTexture(extraDescription, [128, 128, 255, 255]);
+			material.setTexture(slotName + "Texture", EXTRA_TEXTURE_UNITS[slotName], extraTexture);
+		}
+		skinRenderer.setMaterialShading(material, SHADING_MODE_BY_NAME[definition.shading]);
+		materialByKeyword.set(definition.keyword, material);
+	}
+	headModel = await loadModelFile(HEAD_LOD_FILES[2 - sliderStates.headLod]);
+	hairModel = HAIR_LEVEL_DEFINITIONS[sliderStates.hairQuality].file ? await loadModelFile(HAIR_LEVEL_DEFINITIONS[sliderStates.hairQuality].file) : null;
+	const drawableList = headModel.getDrawableList();
+
+	// 카메라 초점. (양쪽 눈알 프리미티브 정점의 평균 = 두 눈 사이 — 캐릭터 키가 달라도 얼굴이 화면 정중앙에 오도록)
+	const eyeCenter = Vector3.create(0, 1.6, 0.1);
+	{
+		let sumX = 0;
+		let sumY = 0;
+		let sumZ = 0;
+		let eyeVertexCount = 0;
+		for (const drawable of drawableList) {
+			if (!drawable.materialName.includes("eyeball")) {
+				continue;
+			}
+			const positions = drawable.meshDescription.positions;
+			const vertexCountOfEye = positions.length / 3;
+			for (let vertexIndex = 0; vertexIndex < vertexCountOfEye; ++vertexIndex) {
+				sumX += positions[vertexIndex * 3];
+				sumY += positions[vertexIndex * 3 + 1];
+				sumZ += positions[vertexIndex * 3 + 2];
+			}
+			eyeVertexCount += vertexCountOfEye;
+		}
+		if (eyeVertexCount > 0) {
+			eyeCenter.set(sumX / eyeVertexCount, sumY / eyeVertexCount, sumZ / eyeVertexCount);
+		}
+	}
+	const CAMERA_TARGET = Vector3.create(eyeCenter.x, eyeCenter.y - 0.045, eyeCenter.z - 0.08);
+
+	// 통계용 합계. (활성 모델 전체 — LOD / 머리카락 단계가 바뀌면 다시 센다)
+	let triangleCount = 0;
+	let vertexCount = 0;
+	let morphTargetCount = 0;
+	function refreshStatistics() {
+		triangleCount = 0;
+		vertexCount = 0;
+		morphTargetCount = 0;
+		for (const model of getActiveModels()) {
+			for (const drawable of model.getDrawableList()) {
+				triangleCount += drawable.isIndexed ? drawable.indexCount / 3 : drawable.vertexCount / 3;
+				vertexCount += drawable.vertexCount;
+				morphTargetCount = System.Math.max(morphTargetCount, drawable.morphTargetList.length);
+			}
+		}
+	}
+	refreshStatistics();
+
+	// GPU 메모리 추정. (텍스처 밉 포함 + 로드된 모델의 버텍스 / 인덱스 / 모프 텍스처 + 렌더 타겟 + 섀도우 맵 — 브라우저 API 없이 계산)
+	function estimateGpuMemoryBytes() {
+		let bytes = 0;
+		for (const imageDescription of imageDescriptionCache.values()) {
+			bytes += imageDescription.size.width * imageDescription.size.height * 4 * 1.3333;
+		}
+		for (const model of modelCache.values()) {
+			for (const drawable of model.getDrawableList()) {
+				const meshDescription = drawable.meshDescription;
+				for (const arrayName of ["positions", "normals", "textureCoordinates", "joints", "weights", "indices"]) {
+					const array = meshDescription[arrayName];
+					if (array && array.byteLength) {
+						bytes += array.byteLength;
+					}
+				}
+				if (drawable.morphTexture) {
+					bytes += drawable.morphTextureWidth * drawable.morphRowsPerTarget * 2 * drawable.morphTargetList.length * 16;
+				}
+			}
+		}
+		const renderPixels = sceneRenderTarget.getWidth() * sceneRenderTarget.getHeight();
+		bytes += renderPixels * (4 * 8 + 4);
+		bytes += renderPixels * 8;
+		bytes += renderPixels * 4;
+		bytes += renderPixels * 8 * 2;
+		bytes += renderPixels * 0.25 * 8 * 3;
+		bytes += renderPixels * 8 * 0.4;
+		bytes += shadowMapResolution * shadowMapResolution * 4;
+		return bytes;
+	}
+	function formatMegabytes(bytes) {
+		return (bytes / 1048576).toFixed(0) + " MB";
+	}
+
+	// JS 쪽에 붙들고 있는 메모리 추정. (브라우저가 힙 API 를 주지 않을 때 — 사파리 / 파이어폭스: 텍스처 원본 바이트 + 모델 메시 배열 + 모프 델타)
+	function estimateJsRetainedBytes() {
+		let bytes = 0;
+		for (const imageDescription of imageDescriptionCache.values()) {
+			bytes += imageDescription.bytes.byteLength;
+		}
+		for (const model of modelCache.values()) {
+			for (const drawable of model.getDrawableList()) {
+				const meshDescription = drawable.meshDescription;
+				for (const arrayName of ["positions", "normals", "textureCoordinates", "joints", "weights", "indices"]) {
+					const array = meshDescription[arrayName];
+					if (array && array.byteLength) {
+						bytes += array.byteLength;
+					}
+				}
+				for (const morphTarget of drawable.morphTargetList) {
+					bytes += morphTarget.positionDeltas ? morphTarget.positionDeltas.byteLength : 0;
+					bytes += morphTarget.normalDeltas ? morphTarget.normalDeltas.byteLength : 0;
+				}
+			}
+		}
+		return bytes;
+	}
+
+	// 슬라이더 변경 처리. (모델 교체는 비동기 로드 — 로드가 끝날 때까지 이전 모델을 유지)
+	let pendingHeadLod = -1;
+	let pendingHairQuality = -1;
+	function onSliderChanged(name, value) {
+		if (name === "headLod") {
+			pendingHeadLod = value;
+			loadModelFile(HEAD_LOD_FILES[2 - value]).then((model) => {
+				if (pendingHeadLod === value) {
+					headModel = model;
+					refreshStatistics();
+				}
+			});
+		}
+		else if (name === "hairQuality") {
+			pendingHairQuality = value;
+			const hairFile = HAIR_LEVEL_DEFINITIONS[value].file;
+			if (!hairFile) {
+				hairModel = null;
+				refreshStatistics();
+			}
+			else {
+				loadModelFile(hairFile).then((model) => {
+					if (pendingHairQuality === value) {
+						hairModel = model;
+						refreshStatistics();
+					}
+				});
+			}
+		}
+		else if (name === "textureSize") {
+			applyTextureSize(3 - value);
+		}
+		else if (name === "shadowQuality") {
+			applyShadowQuality(value);
+		}
+	}
+
+	// 텍스처 크기. (모든 머티리얼 텍스처의 최소 밉 레벨을 올려 실효 해상도를 낮춘다 — 1x1 대체 텍스처는 영향 없음)
+	function applyTextureSize(level) {
+		for (const material of materialByKeyword.values()) {
+			for (const binding of material.getTextureBindings()) {
+				webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, binding[2]);
+				webGL2RenderingContext.texParameterf(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_LOD, level);
+			}
+		}
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+	}
+
+	// 섀도우 품질. (해상도가 바뀌면 섀도우 맵 재생성)
+	function applyShadowQuality(level) {
+		const shadowLevel = SHADOW_LEVEL_DEFINITIONS[level];
+		if (shadowLevel.resolution !== shadowMapResolution) {
+			shadowMap = new ShadowMap(webGL2RenderingContext, shadowLevel.resolution);
+			shadowMapResolution = shadowLevel.resolution;
+		}
+		skinRenderer.setShadowSampleCount(shadowLevel.sampleCount);
+	}
+	applyShadowQuality(sliderStates.shadowQuality);
+
+	// 머티리얼 그래프용 축소본.
+	async function createThumbnail(fileName) {
+		const imageDescription = await loadAssetImage(fileName);
+		const bitmap = await System.createImageBitmap(new System.Blob([imageDescription.bytes], { type: imageDescription.mimeType || "image/jpeg" }));
+		const thumbnailCanvas = System.document.createElement("canvas");
+		thumbnailCanvas.width = 96;
+		thumbnailCanvas.height = 96;
+		const thumbnailContext = thumbnailCanvas.getContext("2d");
+		thumbnailContext.fillStyle = "#101012";
+		thumbnailContext.fillRect(0, 0, 96, 96);
+		thumbnailContext.imageSmoothingEnabled = true;
+		thumbnailContext.imageSmoothingQuality = "high";
+		thumbnailContext.drawImage(bitmap, 0, 0, 96, 96);
+		bitmap.close();
+		return thumbnailCanvas;
+	}
+	const thumbnails = {
+		albedo: await createThumbnail("head_albedo.jpg"),
+		normal: await createThumbnail("head_normal.jpg"),
+		detail: await createThumbnail("skin_detail.jpg"),
+		hair: await createThumbnail("hair.png"),
+		eye: await createThumbnail("eye_iris.png"),
+		teeth: await createThumbnail("teeth_albedo.jpg"),
+		eyelash: await createThumbnail("eyelash.png"),
+	};
+	headModel.update(0);
+
+	//==============================================================================
+	// 표정. (ARKit 블렌드셰이프 가중치 프리셋 — 버튼으로 전환, 매 프레임 부드럽게 접근)
+	// - 깜빡임과 호흡도 애셋의 표정 단위(눈 감기 / 가슴 팽창)를 그대로 쓴다.
+	//==============================================================================
+	const expressionResponse = await System.fetch("./assets/expressions.json");
+	const expressionTable = await expressionResponse.json();
+	advanceLoading("expressions.json");
+	// 주름 맵 정의. (channels: 마스크 아틀라스 채널 → 영역 이름 / 주름 맵 기여, shapes: ARKit 셰이프 → 영역 값 — RigLogic 애니메이티드 맵 출력)
+	const wrinkleResponse = await System.fetch("./assets/wrinkles.json");
+	const wrinkleTable = await wrinkleResponse.json();
+	advanceLoading("wrinkles.json");
+	const wrinkleRegionValues = new System.Map();
+	function updateWrinkleWeights() {
+		wrinkleRegionValues.clear();
+		if (optionStates.wrinkle) {
+			for (const [unitName, weight] of expressionState.currentWeights) {
+				const regionTable = wrinkleTable.shapes[unitName];
+				if (!regionTable || weight < 0.001) {
+					continue;
+				}
+				for (const regionName in regionTable) {
+					const previousValue = wrinkleRegionValues.has(regionName) ? wrinkleRegionValues.get(regionName) : 0;
+					wrinkleRegionValues.set(regionName, previousValue + regionTable[regionName] * weight);
+				}
+			}
+		}
+		for (let channelIndex = 0; channelIndex < wrinkleTable.channels.length; ++channelIndex) {
+			const channel = wrinkleTable.channels[channelIndex];
+			const regionValue = wrinkleRegionValues.has(channel.region) ? System.Math.min(wrinkleRegionValues.get(channel.region), 1) : 0;
+			skinRenderer.setWrinkleChannelWeight(channelIndex, regionValue * channel.maps[0], regionValue * channel.maps[1], regionValue * channel.maps[2]);
+		}
+		skinRenderer.finishWrinkleChannelWeights();
+	}
+	const expressionUnitNameSet = new System.Set();
+	for (const presetName in expressionTable) {
+		for (const unitName in expressionTable[presetName]) {
+			expressionUnitNameSet.add(unitName);
+		}
+	}
+	const expressionState = {
+		activeName: "serious",
+		targetWeights: new System.Map(),
+		currentWeights: new System.Map(),
+		nextBlinkTime: 2.5,
+		blinkStartTime: -10,
+	};
+	for (const unitName of expressionUnitNameSet) {
+		expressionState.targetWeights.set(unitName, 0);
+		expressionState.currentWeights.set(unitName, 0);
+	}
+
+	const expressionPanelElement = System.document.getElementById("expressionPanel");
+	const expressionButtonMap = new System.Map();
+	for (const definition of EXPRESSION_DEFINITIONS) {
+		if (!expressionTable[definition.name]) {
+			continue;
+		}
+		const buttonElement = System.document.createElement("button");
+		buttonElement.className = "expressionButton";
+		buttonElement.textContent = definition.label;
+		buttonElement.addEventListener("click", () => {
+			selectExpression(definition.name);
+		});
+		expressionPanelElement.appendChild(buttonElement);
+		expressionButtonMap.set(definition.name, buttonElement);
+	}
+
+	function selectExpression(presetName) {
+		expressionState.activeName = presetName;
+		const preset = expressionTable[presetName];
+		for (const unitName of expressionUnitNameSet) {
+			expressionState.targetWeights.set(unitName, preset[unitName] !== undefined ? preset[unitName] : 0);
+		}
+		for (const [name, buttonElement] of expressionButtonMap) {
+			buttonElement.classList.toggle("active", name === presetName);
+		}
+	}
+	selectExpression("serious");
+
+	function updateExpressions(elapsedTime, deltaTime) {
+		const approach = System.Math.min(1, deltaTime * 6);
+		for (const unitName of expressionUnitNameSet) {
+			const currentWeight = expressionState.currentWeights.get(unitName);
+			const targetWeight = expressionState.targetWeights.get(unitName);
+			const nextWeight = currentWeight + (targetWeight - currentWeight) * approach;
+			expressionState.currentWeights.set(unitName, nextWeight);
+			for (const model of getActiveModels()) {
+				model.setMorphWeight(unitName, nextWeight);
+			}
+		}
+
+		// 깜빡임. (눈 감기 단위 — 표정이 감은 만큼보다 크게 덮어쓴다, 간격은 BLINK RATE 슬라이더)
+		if (elapsedTime >= expressionState.nextBlinkTime) {
+			expressionState.blinkStartTime = elapsedTime;
+			const blinkInterval = sliderStates.blinkRate > 0.001 ? (2.8 + System.Math.random() * 3.6) / sliderStates.blinkRate : 1e9;
+			expressionState.nextBlinkTime = elapsedTime + blinkInterval;
+		}
+		const blinkLocal = elapsedTime - expressionState.blinkStartTime;
+		const blink = blinkLocal >= 0 && blinkLocal < 0.3 ? System.Math.sin(blinkLocal / 0.3 * System.Math.PI) : 0;
+		const leftClosed = System.Math.max(expressionState.currentWeights.get("EyeBlinkLeft") || 0, blink);
+		const rightClosed = System.Math.max(expressionState.currentWeights.get("EyeBlinkRight") || 0, blink);
+		for (const model of getActiveModels()) {
+			model.setMorphWeight("EyeBlinkLeft", leftClosed);
+			model.setMorphWeight("EyeBlinkRight", rightClosed);
+		}
+		skinRenderer.setEyeClosure(System.Math.max(leftClosed, rightClosed));
+	}
+
+	//==============================================================================
+	// 머리 방향. (골격 head / neck 조인트 회전 오프셋 — 포인터 방향 + 느린 배회)
+	//==============================================================================
+	const headState = {
+		currentYaw: 0,
+		currentPitch: 0,
+	};
+	const pointerState = {
+		normalizedX: 0,
+		normalizedY: 0,
+		hasMoved: false,
+	};
+
+	function updateHeadDirection(elapsedTime, deltaTime) {
+		const wanderYaw = 0.035 * System.Math.sin(elapsedTime * 0.23) + 0.02 * System.Math.sin(elapsedTime * 0.61 + 1.3);
+		const wanderPitch = 0.015 * System.Math.sin(elapsedTime * 0.31 + 0.6);
+		const followYaw = pointerState.hasMoved ? pointerState.normalizedX * 0.42 * sliderStates.headFollow : 0;
+		const followPitch = pointerState.hasMoved ? pointerState.normalizedY * 0.22 * sliderStates.headFollow : 0;
+		const targetYaw = clampValue(wanderYaw + followYaw, -0.6, 0.6);
+		const targetPitch = clampValue(wanderPitch + followPitch, -0.35, 0.35);
+		const approach = System.Math.min(1, deltaTime * 2.2);
+		headState.currentYaw += (targetYaw - headState.currentYaw) * approach;
+		headState.currentPitch += (targetPitch - headState.currentPitch) * approach;
+		updateModelMatrix();
+	}
+
+	//==============================================================================
+	// 카메라 / 입력. (드래그 궤도 회전, 휠 / 핀치 줌, 포인터 이동 = 머리 방향)
+	//==============================================================================
+	const cameraState = {
+		yaw: 0,
+		pitch: 0.02,
+		distance: 0.68,
+		targetYaw: 0,
+		targetPitch: 0.02,
+		targetDistance: 0.68,
+		isDragging: false,
+		dragPointerId: -1,
+		lastPointerX: 0,
+		lastPointerY: 0,
+	};
+	const DEFAULT_CAMERA_YAW = cameraState.yaw;
+	const DEFAULT_CAMERA_PITCH = cameraState.pitch;
+	const DEFAULT_CAMERA_DISTANCE = cameraState.distance;
+	function resetView() {
+		cameraState.targetYaw = DEFAULT_CAMERA_YAW;
+		cameraState.targetPitch = DEFAULT_CAMERA_PITCH;
+		cameraState.targetDistance = DEFAULT_CAMERA_DISTANCE;
+	}
+	const activePointerMap = new System.Map();
+	const pinchState = {
+		isPinching: false,
+		lastDistance: 0,
+	};
+
+	function getPinchDistance() {
+		const pointerList = System.Array.from(activePointerMap.values());
+		const deltaX = pointerList[0].x - pointerList[1].x;
+		const deltaY = pointerList[0].y - pointerList[1].y;
+		return System.Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+	}
+
+	canvas.addEventListener("pointerdown", (event) => {
+		activePointerMap.set(event.pointerId, { x: event.clientX, y: event.clientY });
+		canvas.setPointerCapture(event.pointerId);
+		if (activePointerMap.size >= 2) {
+			pinchState.isPinching = true;
+			pinchState.lastDistance = getPinchDistance();
+			cameraState.isDragging = false;
+			cameraState.dragPointerId = -1;
+			canvas.classList.remove("dragging");
+			return;
+		}
+		// 머티리얼 그래프 위에서는 드래그로 그래프를 스크롤한다
+		if (isPointerOnMaterialGraph(event.clientX, event.clientY)) {
+			materialGraphState.isDragging = true;
+			materialGraphState.dragPointerId = event.pointerId;
+			materialGraphState.lastPointerY = event.clientY;
+			return;
+		}
+		cameraState.isDragging = true;
+		cameraState.dragPointerId = event.pointerId;
+		cameraState.lastPointerX = event.clientX;
+		cameraState.lastPointerY = event.clientY;
+		canvas.classList.add("dragging");
+	});
+	canvas.addEventListener("pointermove", (event) => {
+		if (activePointerMap.has(event.pointerId)) {
+			activePointerMap.set(event.pointerId, { x: event.clientX, y: event.clientY });
+		}
+		if (materialGraphState.isDragging && event.pointerId === materialGraphState.dragPointerId) {
+			materialGraphState.scrollOffset = clampValue(materialGraphState.scrollOffset - (event.clientY - materialGraphState.lastPointerY), 0, materialGraphState.maximumScroll);
+			materialGraphState.lastPointerY = event.clientY;
+			return;
+		}
+		if (pinchState.isPinching && activePointerMap.size >= 2) {
+			const pinchDistance = getPinchDistance();
+			if (pinchState.lastDistance > 0) {
+				const zoomRatio = pinchState.lastDistance / System.Math.max(pinchDistance, 1);
+				cameraState.targetDistance = clampValue(cameraState.targetDistance * zoomRatio, CAMERA_MINIMUM_DISTANCE, CAMERA_MAXIMUM_DISTANCE);
+			}
+			pinchState.lastDistance = pinchDistance;
+			return;
+		}
+		if (cameraState.isDragging && event.pointerId === cameraState.dragPointerId) {
+			const deltaX = event.clientX - cameraState.lastPointerX;
+			const deltaY = event.clientY - cameraState.lastPointerY;
+			cameraState.lastPointerX = event.clientX;
+			cameraState.lastPointerY = event.clientY;
+			cameraState.targetYaw = clampValue(cameraState.targetYaw - deltaX * 0.006, -1.25, 1.25);
+			cameraState.targetPitch = clampValue(cameraState.targetPitch + deltaY * 0.004, -0.4, 0.55);
+			return;
+		}
+		pointerState.normalizedX = clampValue((event.clientX / System.window.innerWidth) * 2 - 1, -1, 1);
+		pointerState.normalizedY = clampValue((event.clientY / System.window.innerHeight) * 2 - 1, -1, 1);
+		pointerState.hasMoved = true;
+	});
+	function endDrag(event) {
+		activePointerMap.delete(event.pointerId);
+		if (event.pointerId === materialGraphState.dragPointerId) {
+			materialGraphState.isDragging = false;
+			materialGraphState.dragPointerId = -1;
+		}
+		if (activePointerMap.size < 2) {
+			pinchState.isPinching = false;
+			pinchState.lastDistance = 0;
+		}
+		if (event.pointerId === cameraState.dragPointerId) {
+			cameraState.isDragging = false;
+			cameraState.dragPointerId = -1;
+			canvas.classList.remove("dragging");
+		}
+	}
+	canvas.addEventListener("pointerup", endDrag);
+	canvas.addEventListener("pointercancel", endDrag);
+	canvas.addEventListener("wheel", (event) => {
+		event.preventDefault();
+		if (isPointerOnMaterialGraph(event.clientX, event.clientY)) {
+			materialGraphState.scrollOffset = clampValue(materialGraphState.scrollOffset + event.deltaY, 0, materialGraphState.maximumScroll);
+			return;
+		}
+		cameraState.targetDistance = clampValue(cameraState.targetDistance * (1 + event.deltaY * 0.0012), CAMERA_MINIMUM_DISTANCE, CAMERA_MAXIMUM_DISTANCE);
+	}, { passive: false });
+	System.window.addEventListener("keydown", (event) => {
+		const optionIndex = System.parseInt(event.key, 10) - 1;
+		if (optionIndex >= 0 && optionIndex < optionDefinitions.length) {
+			toggleOption(optionDefinitions[optionIndex].name);
+		}
+	});
+
+	//==============================================================================
+	// 리사이즈.
+	//==============================================================================
+	function resizeCanvas() {
+		const devicePixelRatio = System.Math.min(System.window.devicePixelRatio || 1, 2);
+		const displayWidth = System.Math.floor(canvas.clientWidth * devicePixelRatio);
+		const displayHeight = System.Math.floor(canvas.clientHeight * devicePixelRatio);
+		// 내부 렌더 해상도. (RENDER BASE 의 픽셀 수를 캔버스 종횡비로 잡는다 — 화면이 더 크면 줄이고 작으면 슈퍼샘플링. 거기에 RESOLUTION SCALE 을 곱하고 GPU 상한으로 자른다)
+		const renderBaseHeight = RENDER_BASE_OPTIONS[sliderStates.renderBase];
+		const renderPixelBudget = renderBaseHeight * (16 / 9) * renderBaseHeight;
+		const pixelBudgetScale = System.Math.sqrt(renderPixelBudget / System.Math.max(displayWidth * displayHeight, 1));
+		const effectiveRenderScale = sliderStates.renderScale * pixelBudgetScale;
+		const longestDisplaySide = System.Math.max(displayWidth, displayHeight, 1);
+		const sizeLimitScale = System.Math.min(1, maxRenderTargetSize / (longestDisplaySide * effectiveRenderScale));
+		const renderWidth = System.Math.max(2, System.Math.floor(displayWidth * effectiveRenderScale * sizeLimitScale));
+		const renderHeight = System.Math.max(2, System.Math.floor(displayHeight * effectiveRenderScale * sizeLimitScale));
+		if (canvas.width !== displayWidth || canvas.height !== displayHeight || sceneRenderTarget.getWidth() !== renderWidth || sceneRenderTarget.getHeight() !== renderHeight) {
+			canvas.width = displayWidth;
+			canvas.height = displayHeight;
+			sceneRenderTarget.resize(renderWidth, renderHeight);
+			hdrRenderTarget.resize(renderWidth, renderHeight);
+			ldrRenderTarget.resize(renderWidth, renderHeight);
+			subsurfaceEffect.resize(renderWidth, renderHeight);
+			ambientOcclusionEffect.resize(renderWidth, renderHeight);
+			bloomEffect.resize(renderWidth, renderHeight);
+		}
+	}
+
+	//==============================================================================
+	// 머티리얼 그래프. (좌측 — 텍스처 입력부터 셰이딩 / MRT / SSS / 합성 / 포스트까지의 흐름을 노드로 표시)
+	// - 텍스처는 축소본 이미지, 중간 버퍼는 매 프레임 GL 블릿으로 실시간 표시한다.
+	//==============================================================================
+	// 그래픽 설정 패널과 같은 규격. (여백 18 / 폭 372, 제목 바 34, 패딩 12 — 모바일은 여백 10 / 전체 폭)
+	const GRAPH_PANEL_MARGIN = 18;
+	const GRAPH_PANEL_WIDTH = 372;
+	const GRAPH_TITLE_HEIGHT = 34;
+	const GRAPH_PADDING = 12;
+	const GRAPH_NODE_PADDING = 10;
+	const GRAPH_NODE_GAP = 8;
+	const GRAPH_IMAGE_THUMBNAIL_SIZE = 72;
+	const GRAPH_BUFFER_THUMBNAIL_WIDTH = 104;
+	const GRAPH_LINE_HEIGHT = 20;
+	const GRAPH_TITLE_FONT = `600 10px "Segoe UI", "Malgun Gothic", sans-serif`;
+	const GRAPH_TITLE_SPACING = 3.2;
+	const GRAPH_NODE_TITLE_FONT = `600 9px "Segoe UI", "Malgun Gothic", sans-serif`;
+	const GRAPH_NODE_TITLE_SPACING = 2.7;
+	const GRAPH_TEXT_FONT = `400 10.5px "Segoe UI", "Malgun Gothic", sans-serif`;
+	const GRAPH_TEXT_SPACING = 1.26;
+	const GRAPH_LABEL_FONT = `400 9px "Segoe UI", "Malgun Gothic", sans-serif`;
+	const GRAPH_LABEL_SPACING = 1.6;
+	const GRAPH_ACTIVE_TITLE_COLOR = "rgba(232, 201, 138, 0.95)";
+	const GRAPH_INACTIVE_TITLE_COLOR = "rgba(232, 201, 138, 0.38)";
+	const GRAPH_ACTIVE_TEXT_COLOR = "rgba(242, 236, 226, 0.74)";
+	const GRAPH_INACTIVE_TEXT_COLOR = "rgba(242, 236, 226, 0.32)";
+	const GRAPH_LABEL_COLOR = "rgba(242, 236, 226, 0.5)";
+
+	function buildMaterialGraphNodes(buffers) {
+		let activeUnitCount = 0;
+		for (const unitName of expressionUnitNameSet) {
+			if (expressionState.currentWeights.get(unitName) > 0.02) {
+				activeUnitCount += 1;
+			}
+		}
+		const nodes = [
+			{
+				title: "SKIN TEXTURES",
+				isActive: true,
+				lines: [],
+				thumbnails: [
+					{ label: "ALBEDO", image: thumbnails.albedo },
+					{ label: "NORMAL", image: thumbnails.normal },
+					{ label: "CAVITY", image: thumbnails.detail },
+				],
+			},
+			{
+				title: "EYES, TEETH, LASHES AND GROOM",
+				isActive: true,
+				lines: ["refractive cornea, iris parallax and normal, eyelid occlusion shell", "kajiya-kay dual lobe hair cards, cutout + blended fringe"],
+				thumbnails: [
+					{ label: "EYE", image: thumbnails.eye },
+					{ label: "TEETH", image: thumbnails.teeth },
+					{ label: "LASHES", image: thumbnails.eyelash },
+					{ label: "HAIR", image: thumbnails.hair },
+				],
+			},
+			{
+				title: "SURFACE",
+				isActive: true,
+				lines: [
+					"normal = metahuman normal x 1.5 + wrinkle maps x mask weights + micro normal x38",
+					"cavity = height - blur(height) x micro cavity, roughness from cavity",
+					"skin F0 0.028, eyes 0.04 glossy",
+				],
+				thumbnails: [],
+			},
+			{
+				title: "LIGHTING",
+				isActive: true,
+				lines: [
+					"key 2.6 warm, shadow " + (optionStates.shadow ? "on" : "off") + ", fill 0.85 cool, rim 1.4",
+					"hemisphere ambient, dual-lobe GGX, sheen, env BRDF",
+				],
+				thumbnails: [],
+			},
+			{
+				title: "G-BUFFER (MRT RGBA16F)",
+				isActive: true,
+				lines: [],
+				thumbnails: [
+					{ label: "IRRADIANCE", texture: buffers.irradianceTexture, displayScale: 0.5, useCoverage: 1 },
+					{ label: "ALBEDO", texture: buffers.albedoTexture, displayScale: 1.6, useCoverage: 1 },
+					{ label: "SPECULAR", texture: buffers.specularTexture, displayScale: 3, useCoverage: 1 },
+				],
+			},
+			{
+				title: "SUBSURFACE AND COMBINE",
+				isActive: optionStates.subsurface,
+				lines: ["separable SSS, width 8 mm, depth aware", "irradiance x albedo + specular + background"],
+				thumbnails: [
+					{ label: "SCATTERED", texture: buffers.scatteredIrradianceTexture, displayScale: 0.5, useCoverage: 1 },
+					{ label: "HDR", texture: buffers.hdrColorTexture, displayScale: 0.72, useCoverage: 0 },
+				],
+			},
+			{
+				title: "EXPRESSION",
+				isActive: true,
+				lines: ["preset " + expressionState.activeName + ", " + morphTargetCount + " ARKit shapes baked from RigLogic, " + activeUnitCount + " active", "blink from eye blink shapes"],
+				thumbnails: [],
+			},
+			{
+				title: "POST",
+				isActive: true,
+				lines: ["bloom " + (optionStates.bloom ? sliderStates.bloomStrength.toFixed(2) : "off") + ", exposure " + sliderStates.exposure.toFixed(2) + ", ACES, vignette, grain", "resolution scale " + System.Math.round(sliderStates.renderScale * 100) + "%, " + ANTIALIAS_LABELS[sliderStates.antialias].toLowerCase() + ", " + HAIR_LEVEL_DEFINITIONS[sliderStates.hairQuality].label.toLowerCase() + " hair, head lod " + (2 - sliderStates.headLod)],
+				thumbnails: [],
+			},
+		];
+		return nodes;
+	}
+
+	// 노드 설명을 노드 폭에 맞춰 단어 단위로 줄바꿈한다. (실제 폰트로 측정)
+	function wrapGraphLines(lines, maximumWidth) {
+		uiGraphic.setFontString(GRAPH_TEXT_FONT);
+		const wrappedLines = [];
+		for (const line of lines) {
+			const words = line.split(" ");
+			let currentLine = "";
+			for (const word of words) {
+				const candidate = currentLine.length > 0 ? currentLine + " " + word : word;
+				const candidateWidth = uiGraphic.measureText(candidate).width + candidate.length * GRAPH_TEXT_SPACING;
+				if (candidateWidth > maximumWidth && currentLine.length > 0) {
+					wrappedLines.push(currentLine);
+					currentLine = word;
+				}
+				else {
+					currentLine = candidate;
+				}
+			}
+			if (currentLine.length > 0) {
+				wrappedLines.push(currentLine);
+			}
+		}
+		return wrappedLines;
+	}
+
+	// 자간 있는 텍스트. (제목 — CSS letter-spacing 과 같은 느낌으로 글자마다 간격을 더한다)
+	function drawSpacedText(text, x, y, spacing) {
+		let cursorX = x;
+		for (const character of text) {
+			uiGraphic.drawFillText(character, cursorX, y);
+			cursorX += uiGraphic.measureText(character).width + spacing;
+		}
+		return cursorX - x - spacing;
+	}
+
+	// 패널 배치. (모바일은 접힌 그래픽 설정 아래 전체 폭 카드, 아래쪽은 표정 버튼 / 크레딧 영역을 남긴다)
+	function getMaterialGraphFrame() {
+		const cssWidth = System.window.innerWidth;
+		const cssHeight = System.window.innerHeight;
+		const isNarrow = cssWidth < 640;
+		const margin = isNarrow ? 10 : GRAPH_PANEL_MARGIN;
+		const panelWidth = isNarrow ? cssWidth - margin * 2 : GRAPH_PANEL_WIDTH;
+		const panelY = isNarrow ? margin + 34 + 8 : margin;
+		const maximumHeight = System.Math.max(GRAPH_TITLE_HEIGHT + 60, System.Math.min(cssHeight, statistics.hudTop) - panelY - 12);
+		return { x: margin, y: panelY, width: panelWidth, maximumHeight: maximumHeight };
+	}
+
+	// 노드 배치. (패널 좌표계 — 내용 영역의 y 는 제목 바 아래 0 부터)
+	function layoutMaterialGraph(nodes, panelWidth, aspectRatio) {
+		const contentWidth = panelWidth - GRAPH_PADDING * 2;
+		const textWidth = contentWidth - GRAPH_NODE_PADDING * 2;
+		let cursorY = GRAPH_PADDING;
+		for (const node of nodes) {
+			node.lines = wrapGraphLines(node.lines, textWidth);
+			node.x = GRAPH_PADDING;
+			node.y = cursorY;
+			let contentY = node.y + 28;
+			if (node.thumbnails.length > 0) {
+				const isImageRow = node.thumbnails[0].image !== undefined;
+				const thumbnailWidth = isImageRow ? GRAPH_IMAGE_THUMBNAIL_SIZE : GRAPH_BUFFER_THUMBNAIL_WIDTH;
+				const thumbnailHeight = isImageRow ? GRAPH_IMAGE_THUMBNAIL_SIZE : System.Math.round(GRAPH_BUFFER_THUMBNAIL_WIDTH / aspectRatio);
+				const spacing = clampValue((textWidth - node.thumbnails.length * thumbnailWidth) / System.Math.max(node.thumbnails.length - 1, 1), 6, 30);
+				for (let thumbnailIndex = 0; thumbnailIndex < node.thumbnails.length; ++thumbnailIndex) {
+					const thumbnail = node.thumbnails[thumbnailIndex];
+					thumbnail.x = node.x + GRAPH_NODE_PADDING + thumbnailIndex * (thumbnailWidth + spacing);
+					thumbnail.y = contentY;
+					thumbnail.width = thumbnailWidth;
+					thumbnail.height = thumbnailHeight;
+				}
+				contentY += thumbnailHeight + 20;
+			}
+			node.textY = contentY;
+			contentY += node.lines.length * GRAPH_LINE_HEIGHT;
+			node.width = contentWidth;
+			node.height = contentY - node.y + GRAPH_NODE_PADDING;
+			cursorY = node.y + node.height + GRAPH_NODE_GAP;
+		}
+		return cursorY - GRAPH_NODE_GAP + GRAPH_PADDING;
+	}
+
+	// 스크롤 / 입력 상태. (휠 / 드래그로 세로 스크롤 — 패널 사각형 안에서만)
+	const materialGraphState = { scrollOffset: 0, maximumScroll: 0, left: 0, top: 0, right: 0, bottom: 0, isDragging: false, dragPointerId: -1, lastPointerY: 0 };
+	function isPointerOnMaterialGraph(clientX, clientY) {
+		return optionStates.materialGraph && clientX >= materialGraphState.left && clientX < materialGraphState.right && clientY >= materialGraphState.top && clientY < materialGraphState.bottom;
+	}
+
+	function renderMaterialGraph(buffers) {
+		const devicePixelRatio = System.Math.min(System.window.devicePixelRatio || 1, 2);
+		const aspectRatio = canvas.width / canvas.height;
+		const frame = getMaterialGraphFrame();
+		const nodes = buildMaterialGraphNodes(buffers);
+		const contentHeight = layoutMaterialGraph(nodes, frame.width, aspectRatio);
+		const panelHeight = System.Math.min(GRAPH_TITLE_HEIGHT + contentHeight, frame.maximumHeight);
+		const viewHeight = panelHeight - GRAPH_TITLE_HEIGHT;
+		materialGraphState.maximumScroll = System.Math.max(0, contentHeight - viewHeight);
+		materialGraphState.scrollOffset = clampValue(materialGraphState.scrollOffset, 0, materialGraphState.maximumScroll);
+		materialGraphState.left = frame.x;
+		materialGraphState.top = frame.y;
+		materialGraphState.right = frame.x + frame.width;
+		materialGraphState.bottom = frame.y + panelHeight;
+		const contentTop = frame.y + GRAPH_TITLE_HEIGHT;
+		const originY = contentTop - materialGraphState.scrollOffset;
+		const contentRect = Rect.create(frame.x, contentTop, frame.width, viewHeight);
+		let previewDrawCallCount = 0;
+
+		// 1. 패널 / 제목 바 / 노드 배경. (엔진 Graphic — 내용은 제목 아래 영역으로 클립)
+		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
+		uiGraphic.applySettings(null);
+		uiGraphic.scale(devicePixelRatio, devicePixelRatio);
+		uiGraphic.setGlobalAlpha(1);
+		const panelRect = Rect.create(frame.x, frame.y, frame.width, panelHeight);
+		uiGraphic.setFillColor("rgba(14, 12, 14, 0.5)");
+		uiGraphic.drawRoundRect(panelRect, 12);
+		uiGraphic.setStrokeColor("rgba(242, 236, 226, 0.14)");
+		uiGraphic.drawStrokeRoundRect(panelRect, 12, 1);
+		uiGraphic.setTextBaseline("middle");
+		uiGraphic.setTextAlign("left");
+		uiGraphic.setFontString(GRAPH_TITLE_FONT);
+		uiGraphic.setFillColor(GRAPH_ACTIVE_TITLE_COLOR);
+		drawSpacedText("MATERIAL GRAPH", frame.x + 16, frame.y + GRAPH_TITLE_HEIGHT * 0.5 + 1, GRAPH_TITLE_SPACING);
+		uiGraphic.setFontString(GRAPH_LABEL_FONT);
+		uiGraphic.setFillColor(GRAPH_LABEL_COLOR);
+		const hintText = materialGraphState.maximumScroll > 0 ? "SCROLL" : "";
+		if (hintText.length > 0) {
+			const hintWidth = uiGraphic.measureText(hintText).width + hintText.length * GRAPH_LABEL_SPACING;
+			drawSpacedText(hintText, frame.x + frame.width - 16 - hintWidth, frame.y + GRAPH_TITLE_HEIGHT * 0.5 + 1, GRAPH_LABEL_SPACING);
+		}
+		uiGraphic.setStrokeColor("rgba(242, 236, 226, 0.1)");
+		uiGraphic.drawLine([Vector2.create(frame.x, contentTop), Vector2.create(frame.x + frame.width, contentTop)], 1);
+		uiGraphic.beginClipRect(contentRect);
+		for (const node of nodes) {
+			const nodeRect = Rect.create(frame.x + node.x, originY + node.y, node.width, node.height);
+			uiGraphic.setFillColor(node.isActive ? "rgba(255, 255, 255, 0.045)" : "rgba(255, 255, 255, 0.02)");
+			uiGraphic.drawRoundRect(nodeRect, 8);
+			for (const thumbnail of node.thumbnails) {
+				uiGraphic.setFillColor("rgba(0, 0, 0, 0.4)");
+				uiGraphic.drawRect(Rect.create(frame.x + thumbnail.x, originY + thumbnail.y, thumbnail.width, thumbnail.height));
+			}
+		}
+		uiGraphic.endClipRect();
+
+		// 2. 중간 버퍼 블릿. (뷰포트를 썸네일 사각형으로 제한 — 내용 영역 안에 온전히 들어온 것만)
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		previewPass.use();
+		webGL2RenderingContext.uniform1i(previewPass.getUniformLocation("sourceTexture"), 0);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		for (const node of nodes) {
+			for (const thumbnail of node.thumbnails) {
+				if (!thumbnail.texture) {
+					continue;
+				}
+				const thumbnailTop = originY + thumbnail.y;
+				if (thumbnailTop < contentTop || thumbnailTop + thumbnail.height > contentTop + viewHeight) {
+					continue;
+				}
+				const viewportX = System.Math.round((frame.x + thumbnail.x) * devicePixelRatio);
+				const viewportY = System.Math.round(canvas.height - (thumbnailTop + thumbnail.height) * devicePixelRatio);
+				const viewportWidth = System.Math.round(thumbnail.width * devicePixelRatio);
+				const viewportHeight = System.Math.round(thumbnail.height * devicePixelRatio);
+				webGL2RenderingContext.viewport(viewportX, viewportY, viewportWidth, viewportHeight);
+				webGL2RenderingContext.uniform1f(previewPass.getUniformLocation("displayScale"), thumbnail.displayScale);
+				webGL2RenderingContext.uniform1i(previewPass.getUniformLocation("useCoverage"), thumbnail.useCoverage);
+				webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, thumbnail.texture);
+				previewPass.draw();
+				previewDrawCallCount += 1;
+			}
+		}
+		webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
+
+		// 3. 텍스처 축소본 / 제목 / 설명 / 연결선. (엔진 Graphic — 클립)
+		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+		uiGraphic.applySettings(null);
+		uiGraphic.scale(devicePixelRatio, devicePixelRatio);
+		uiGraphic.setTextBaseline("middle");
+		uiGraphic.setTextAlign("left");
+		uiGraphic.beginClipRect(contentRect);
+		for (let nodeIndex = 0; nodeIndex < nodes.length; ++nodeIndex) {
+			const node = nodes[nodeIndex];
+			const nodeX = frame.x + node.x;
+			const nodeY = originY + node.y;
+			uiGraphic.setGlobalAlpha(1);
+			for (const thumbnail of node.thumbnails) {
+				const thumbnailX = frame.x + thumbnail.x;
+				const thumbnailY = originY + thumbnail.y;
+				if (thumbnail.image) {
+					uiGraphic.setGlobalAlpha(node.isActive ? 1 : 0.4);
+					uiGraphic.drawImage(thumbnail.image, Vector2.create(thumbnailX, thumbnailY), Vector2.create(thumbnail.width, thumbnail.height));
+					uiGraphic.setGlobalAlpha(1);
+				}
+				uiGraphic.setStrokeColor("rgba(242, 236, 226, 0.18)");
+				uiGraphic.drawStrokeRect(Rect.create(thumbnailX, thumbnailY, thumbnail.width, thumbnail.height), 1);
+				uiGraphic.setFontString(GRAPH_LABEL_FONT);
+				uiGraphic.setFillColor(GRAPH_LABEL_COLOR);
+				drawSpacedText(thumbnail.label, thumbnailX, thumbnailY + thumbnail.height + 9, GRAPH_LABEL_SPACING);
+			}
+			uiGraphic.setFontString(GRAPH_NODE_TITLE_FONT);
+			uiGraphic.setFillColor(node.isActive ? GRAPH_ACTIVE_TITLE_COLOR : GRAPH_INACTIVE_TITLE_COLOR);
+			drawSpacedText(node.title, nodeX + GRAPH_NODE_PADDING, nodeY + 14, GRAPH_NODE_TITLE_SPACING);
+			uiGraphic.setFontString(GRAPH_TEXT_FONT);
+			uiGraphic.setFillColor(node.isActive ? GRAPH_ACTIVE_TEXT_COLOR : GRAPH_INACTIVE_TEXT_COLOR);
+			for (let lineIndex = 0; lineIndex < node.lines.length; ++lineIndex) {
+				drawSpacedText(node.lines[lineIndex], nodeX + GRAPH_NODE_PADDING, originY + node.textY + lineIndex * GRAPH_LINE_HEIGHT + 9, GRAPH_TEXT_SPACING);
+			}
+			if (nodeIndex < nodes.length - 1) {
+				const connectorX = nodeX + 22;
+				const connectorTop = nodeY + node.height;
+				uiGraphic.setStrokeColor("rgba(232, 201, 138, 0.5)");
+				uiGraphic.drawLine([Vector2.create(connectorX, connectorTop), Vector2.create(connectorX, connectorTop + GRAPH_NODE_GAP)], 1);
+				uiGraphic.setFillColor("rgba(232, 201, 138, 0.8)");
+				uiGraphic.drawCircle(Vector2.create(connectorX, connectorTop + GRAPH_NODE_GAP * 0.5), 1.8);
+			}
+		}
+		uiGraphic.endClipRect();
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		return previewDrawCallCount;
+	}
+
+	//==============================================================================
+	// HUD. (우측 하단 렌더링 정보 — 엔진 Graphic 으로 캔버스 안에 렌더링, 홈 링크와 겹치면 그 위로)
+	//==============================================================================
+	// 패스별 GPU 시간. (EXT_disjoint_timer_query_webgl2 — 결과는 몇 프레임 뒤에 도착하므로 대기 목록을 매 프레임 확인)
+	const timerExtension = webGL2RenderingContext.getExtension("EXT_disjoint_timer_query_webgl2");
+	const passTimer = { pendingList: [], current: null, milliseconds: {} };
+	function beginPass(passName) {
+		if (!timerExtension || passTimer.current) {
+			return;
+		}
+		const query = webGL2RenderingContext.createQuery();
+		webGL2RenderingContext.beginQuery(timerExtension.TIME_ELAPSED_EXT, query);
+		passTimer.current = { name: passName, query: query };
+	}
+	function endPass() {
+		if (!timerExtension || !passTimer.current) {
+			return;
+		}
+		webGL2RenderingContext.endQuery(timerExtension.TIME_ELAPSED_EXT);
+		passTimer.pendingList.push(passTimer.current);
+		passTimer.current = null;
+	}
+	function pollPassTimers() {
+		if (!timerExtension) {
+			return;
+		}
+		const disjoint = webGL2RenderingContext.getParameter(timerExtension.GPU_DISJOINT_EXT);
+		const remainingList = [];
+		for (const pending of passTimer.pendingList) {
+			const isAvailable = webGL2RenderingContext.getQueryParameter(pending.query, webGL2RenderingContext.QUERY_RESULT_AVAILABLE);
+			if (!isAvailable) {
+				remainingList.push(pending);
+				continue;
+			}
+			if (!disjoint) {
+				const nanoseconds = webGL2RenderingContext.getQueryParameter(pending.query, webGL2RenderingContext.QUERY_RESULT);
+				const previous = passTimer.milliseconds[pending.name] !== undefined ? passTimer.milliseconds[pending.name] : nanoseconds / 1e6;
+				passTimer.milliseconds[pending.name] = previous * 0.9 + (nanoseconds / 1e6) * 0.1;
+			}
+			webGL2RenderingContext.deleteQuery(pending.query);
+		}
+		passTimer.pendingList = remainingList;
+	}
+	function formatPassTime(passName) {
+		const milliseconds = passTimer.milliseconds[passName];
+		return milliseconds !== undefined ? milliseconds.toFixed(2) + " ms" : "n/a";
+	}
+
+	const statistics = {
+		smoothedFrameSeconds: 1 / 60,
+		drawCallCount: 0,
+		hudTop: System.window.innerHeight - 190,
+		cpuFrameMilliseconds: 0,
+		optionMaximumHeight: 0,
+		memorySampleTime: -1e9,
+		gpuMemoryBytes: 0,
+		gpuMemoryText: "",
+		jsHeapBytes: 0,
+		jsHeapText: "",
+		jsHeapLabel: "js heap",
+	};
+	const homeLinkElement = System.document.getElementById("homeLink");
+
+	// 옵션 패널 / 머티리얼 그래프의 아래 한계. (HUD 가 켜져 있으면 HUD 위, 꺼져 있으면 화면 아래 여백)
+	function updatePanelLimits(hudTop) {
+		statistics.hudTop = hudTop;
+		const optionMaximumHeight = System.Math.max(120, hudTop - 18 - 12);
+		if (statistics.optionMaximumHeight !== optionMaximumHeight) {
+			statistics.optionMaximumHeight = optionMaximumHeight;
+			optionPanelElement.style.maxHeight = optionMaximumHeight + "px";
+		}
+	}
+
+	function renderHud() {
+		const devicePixelRatio = System.Math.min(System.window.devicePixelRatio || 1, 2);
+		const cssWidth = System.window.innerWidth;
+		const cssHeight = System.window.innerHeight;
+		uiGraphic.applySettings(null);
+		uiGraphic.scale(devicePixelRatio, devicePixelRatio);
+		uiGraphic.setGlobalAlpha(1);
+
+		// 메모리 수치는 1초에 한 번 표본을 읽고, 직전 표시값 대비 5% 넘게 변할 때만 바꾼다. (JS 힙은 GC 로 오르내리므로 매 프레임 보여 주면 톱니처럼 흔들린다)
+		const hudTimestamp = System.performance.now();
+		if (hudTimestamp - statistics.memorySampleTime >= 1000) {
+			statistics.memorySampleTime = hudTimestamp;
+			const gpuMemoryBytes = estimateGpuMemoryBytes();
+			if (System.Math.abs(gpuMemoryBytes - statistics.gpuMemoryBytes) > statistics.gpuMemoryBytes * 0.05) {
+				statistics.gpuMemoryBytes = gpuMemoryBytes;
+				statistics.gpuMemoryText = formatMegabytes(gpuMemoryBytes);
+			}
+			if (System.performance.memory) {
+				const usedHeapBytes = System.performance.memory.usedJSHeapSize;
+				if (System.Math.abs(usedHeapBytes - statistics.jsHeapBytes) > statistics.jsHeapBytes * 0.05) {
+					statistics.jsHeapBytes = usedHeapBytes;
+					statistics.jsHeapText = formatMegabytes(usedHeapBytes) + " / " + formatMegabytes(System.performance.memory.jsHeapSizeLimit);
+				}
+				statistics.jsHeapLabel = "js heap";
+			}
+			else {
+				// 힙 API 가 없는 브라우저(사파리 등)는 엔진이 붙들고 있는 바이트 추정치를 보여 준다
+				statistics.jsHeapText = formatMegabytes(estimateJsRetainedBytes());
+				statistics.jsHeapLabel = "js retained (est.)";
+			}
+		}
+		const rowHeight = 16;
+		const rows = [
+			["fps", System.Math.round(1 / System.Math.max(statistics.smoothedFrameSeconds, 0.0001)).toString()],
+			["display", canvas.width + " x " + canvas.height],
+			["render buffer", sceneRenderTarget.getWidth() + " x " + sceneRenderTarget.getHeight()],
+			["triangles", System.Math.round(triangleCount).toLocaleString("en-US")],
+			["vertices", vertexCount.toLocaleString("en-US")],
+			["draw calls", statistics.drawCallCount.toString()],
+			["morph targets", morphTargetCount.toString()],
+			["cpu frame", statistics.cpuFrameMilliseconds.toFixed(2) + " ms"],
+		];
+		// 읽을 수 없는 값의 행은 아예 만들지 않는다 (GPU 타이머 확장이 없으면 패스 시간, 힙 API 가 없으면 힙)
+		if (timerExtension) {
+			rows.push(["gpu shadow", formatPassTime("shadow")]);
+			rows.push(["gpu scene", formatPassTime("scene")]);
+			rows.push(["gpu sss + ao", formatPassTime("scatter")]);
+			rows.push(["gpu post", formatPassTime("post")]);
+		}
+		rows.push(["gpu memory (est.)", statistics.gpuMemoryText]);
+		if (System.performance.memory) {
+			rows.push(["js heap", statistics.jsHeapText]);
+		}
+		const isNarrowScreen = cssWidth < 640;
+		if (isNarrowScreen) {
+			rows.length = System.Math.min(rows.length, 4);
+		}
+		const panelWidth = isNarrowScreen ? 150 : 214;
+		const panelHeight = rows.length * rowHeight + 18;
+		const panelX = cssWidth - panelWidth - 18;
+		let panelY = cssHeight - panelHeight - 18;
+		const homeLinkRect = homeLinkElement.getBoundingClientRect();
+		const isOverlappingHomeLink = homeLinkRect.right > panelX && homeLinkRect.top < panelY + panelHeight;
+		if (isOverlappingHomeLink) {
+			panelY = homeLinkRect.top - panelHeight - 12;
+		}
+		// 옵션 패널 / 머티리얼 그래프는 이 HUD 위까지만 내려오게 한다 (겹침 방지)
+		updatePanelLimits(panelY);
+		const panelRect = Rect.create(panelX, panelY, panelWidth, panelHeight);
+		uiGraphic.setFillColor("rgba(14, 12, 14, 0.55)");
+		uiGraphic.drawRoundRect(panelRect, 10);
+		uiGraphic.setStrokeColor("rgba(242, 236, 226, 0.14)");
+		uiGraphic.drawStrokeRoundRect(panelRect, 10, 1);
+		uiGraphic.setFontString(`400 10.5px "Segoe UI", "Malgun Gothic", sans-serif`);
+		uiGraphic.setTextBaseline("middle");
+		for (let rowIndex = 0; rowIndex < rows.length; ++rowIndex) {
+			const rowY = panelY + 9 + rowHeight * rowIndex + rowHeight * 0.5;
+			uiGraphic.setTextAlign("left");
+			uiGraphic.setFillColor("rgba(242, 236, 226, 0.45)");
+			uiGraphic.drawFillText(rows[rowIndex][0], panelX + 14, rowY);
+			uiGraphic.setTextAlign("right");
+			uiGraphic.setFillColor("rgba(242, 236, 226, 0.88)");
+			uiGraphic.drawFillText(rows[rowIndex][1], panelX + panelWidth - 14, rowY);
+		}
+	}
+
+	//==============================================================================
+	// 메인 루프. (섀도우 깊이 → 피부 MRT → 화면 공간 SSS → 합성(HDR) → 블룸 → 톤 매핑 → FXAA → 와이어프레임 → 머티리얼 그래프 → HUD)
+	//==============================================================================
+	const startTimestamp = System.performance.now();
+	let previousTimestamp = startTimestamp;
+	const frameLimiter = { nextFrameDue: startTimestamp };
+	// 흉상 모델 행렬. (골격이 없는 메시라 목 아래 피벗을 중심으로 포인터 방향에 맞춰 회전)
+	const headPivot = Vector3.create(eyeCenter.x, eyeCenter.y - 0.22, eyeCenter.z - 0.06);
+	let modelElements = Matrix4.createIdentity().getElements();
+	function updateModelMatrix() {
+		const modelMatrix = Matrix4.createTranslation(headPivot.x, headPivot.y, headPivot.z);
+		modelMatrix.multiply(Matrix4.createRotationY(headState.currentYaw * 0.8));
+		modelMatrix.multiply(Matrix4.createRotationX(headState.currentPitch * 0.7));
+		modelMatrix.multiply(Matrix4.createTranslation(-headPivot.x, -headPivot.y, -headPivot.z));
+		modelElements = modelMatrix.getElements();
+	}
+	const shadowFocusPosition = Vector3.create(eyeCenter.x, eyeCenter.y - 0.08, eyeCenter.z - 0.09);
+	const shadowLightTravelDirection = KEY_LIGHT_DIRECTION.multiply(-1);
+
+	function renderFrame() {
+		// 프레임 레이트 제한. (30 / 60 — 다음 프레임 예정 시각을 누적해 vsync 콜백의 흔들림에 프레임을 잃지 않는다. 예정보다 6ms 이상 이르면 건너뛰고, 한 간격 넘게 늦었으면 예정을 지금으로 맞춘다)
+		const targetFrameRate = FRAME_RATE_OPTIONS[sliderStates.frameRate];
+		const frameInterval = 1000 / targetFrameRate;
+		const nowTimestamp = System.performance.now();
+		if (nowTimestamp < frameLimiter.nextFrameDue - 6) {
+			System.window.requestAnimationFrame(renderFrame);
+			return;
+		}
+		frameLimiter.nextFrameDue = nowTimestamp - frameLimiter.nextFrameDue > frameInterval ? nowTimestamp + frameInterval : frameLimiter.nextFrameDue + frameInterval;
+		const cpuFrameStart = nowTimestamp;
+		resizeCanvas();
+		const currentTimestamp = nowTimestamp;
+		const elapsedTime = (currentTimestamp - startTimestamp) / 1000;
+		const deltaTime = System.Math.min((currentTimestamp - previousTimestamp) / 1000, 0.1);
+		previousTimestamp = currentTimestamp;
+		statistics.smoothedFrameSeconds = statistics.smoothedFrameSeconds * 0.92 + deltaTime * 0.08;
+		const aspectRatio = canvas.width / canvas.height;
+		let drawCallCount = 0;
+
+		// 카메라. (목표값 지수 접근 + 미세한 자동 흔들림)
+		const cameraApproach = System.Math.min(1, deltaTime * 5);
+		cameraState.yaw += (cameraState.targetYaw - cameraState.yaw) * cameraApproach;
+		cameraState.pitch += (cameraState.targetPitch - cameraState.pitch) * cameraApproach;
+		cameraState.distance += (cameraState.targetDistance - cameraState.distance) * cameraApproach;
+		const swayYaw = cameraState.yaw + System.Math.sin(elapsedTime * 0.19) * 0.02;
+		const swayPitch = cameraState.pitch + System.Math.sin(elapsedTime * 0.27 + 1) * 0.01;
+		// 세로 화면(폰) 은 가로 시야가 좁아 얼굴이 잘리므로 화면비에 맞춰 거리를 늘린다
+		const portraitFactor = aspectRatio < 1.2 ? System.Math.pow(1.2 / aspectRatio, 0.55) : 1;
+		const cameraDistance = cameraState.distance * portraitFactor;
+		const cameraX = CAMERA_TARGET.x + System.Math.sin(swayYaw) * System.Math.cos(swayPitch) * cameraDistance;
+		const cameraY = CAMERA_TARGET.y + System.Math.sin(swayPitch) * cameraDistance;
+		const cameraZ = CAMERA_TARGET.z + System.Math.cos(swayYaw) * System.Math.cos(swayPitch) * cameraDistance;
+		const cameraPosition = Vector3.create(cameraX, cameraY, cameraZ);
+		const viewMatrix = Matrix4.createLookAt(cameraPosition, CAMERA_TARGET, Vector3.up());
+		const projectionMatrix = Matrix4.createPerspective(CAMERA_FIELD_OF_VIEW, aspectRatio, CAMERA_NEAR_DISTANCE, CAMERA_FAR_DISTANCE);
+		const viewProjectionMatrix = projectionMatrix.clone();
+		viewProjectionMatrix.multiply(viewMatrix);
+		const viewProjectionElements = viewProjectionMatrix.getElements();
+
+		// 표정 / 머리 방향 / 스키닝 갱신.
+		updateExpressions(elapsedTime, deltaTime);
+		updateHeadDirection(elapsedTime, deltaTime);
+		updateWrinkleWeights();
+		skinRenderer.setDetailStrength(optionStates.detail ? sliderStates.poreDetail : 0);
+		skinRenderer.setCavityStrength(optionStates.detail ? sliderStates.cavity : 0);
+		skinRenderer.setMicroDetail(38, optionStates.detail ? sliderStates.microNormal : 0);
+		skinRenderer.setNormalStrength(sliderStates.normalStrength);
+		skinRenderer.setWrinkleMaps(optionStates.wrinkle, sliderStates.wrinkleDepth, System.Math.min(1, sliderStates.wrinkleDepth * 0.45));
+		skinRenderer.setSpecularStrength(sliderStates.specular);
+		skinRenderer.setRoughnessRange(sliderStates.roughness * 0.85, sliderStates.roughness * 1.1);
+		skinRenderer.setSheenStrength(sliderStates.sheen);
+		skinRenderer.setShadowSoftness(sliderStates.shadowSoftness);
+		skinRenderer.setLight(0, KEY_LIGHT_DIRECTION.x, KEY_LIGHT_DIRECTION.y, KEY_LIGHT_DIRECTION.z, 1.0, 0.92, 0.82, sliderStates.keyIntensity);
+		skinRenderer.setLight(1, FILL_LIGHT_DIRECTION.x, FILL_LIGHT_DIRECTION.y, FILL_LIGHT_DIRECTION.z, 0.6, 0.7, 0.9, sliderStates.fillIntensity);
+		skinRenderer.setLight(2, RIM_LIGHT_DIRECTION.x, RIM_LIGHT_DIRECTION.y, RIM_LIGHT_DIRECTION.z, 0.95, 0.97, 1.0, sliderStates.rimIntensity);
+		const ambientScale = sliderStates.ambientIntensity;
+		skinRenderer.setAmbientColors([0.2 * ambientScale, 0.21 * ambientScale, 0.25 * ambientScale], [0.13 * ambientScale, 0.12 * ambientScale, 0.12 * ambientScale], [0.09 * ambientScale, 0.08 * ambientScale, 0.075 * ambientScale]);
+		const hairLevel = HAIR_LEVEL_DEFINITIONS[sliderStates.hairQuality];
+		skinRenderer.setHairFringe(hairLevel.fringe);
+		skinRenderer.setHairSway(sliderStates.hairSway * hairLevel.sway * 0.012, elapsedTime, 1.6);
+		skinRenderer.setHairParameters([-0.1, 0.16], [160, 24], [0.24 * sliderStates.hairSpecular, 0.52 * sliderStates.hairSpecular, 0.2], sliderStates.hairRootShade);
+		skinRenderer.setEyeParameters(sliderStates.irisSize, sliderStates.pupilSize, sliderStates.irisDepth);
+		subsurfaceEffect.setScatterWidth(sliderStates.subsurfaceWidth * 0.001);
+		ambientOcclusionEffect.setParameters(sliderStates.occlusionRadius, sliderStates.occlusionStrength, 0.0015);
+		bloomEffect.setThreshold(sliderStates.bloomThreshold, sliderStates.bloomThreshold + 0.85);
+		const activeModels = getActiveModels();
+		for (const model of activeModels) {
+			model.update(deltaTime);
+		}
+		const renderWidth = sceneRenderTarget.getWidth();
+		const renderHeight = sceneRenderTarget.getHeight();
+
+		pollPassTimers();
+
+		// === 1. 섀도우 깊이 패스 (키 라이트) ===
+		beginPass("shadow");
+		webGL2RenderingContext.enable(webGL2RenderingContext.CULL_FACE);
+		webGL2RenderingContext.cullFace(webGL2RenderingContext.BACK);
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		shadowMap.updateLightMatrix(shadowFocusPosition, shadowLightTravelDirection, 0.45, 0.2, 4);
+		const lightViewProjectionMatrix = shadowMap.getLightViewProjectionMatrix();
+		const lightViewProjectionElements = lightViewProjectionMatrix.getElements();
+		if (optionStates.shadow) {
+			shadowMap.beginRender();
+			for (const model of activeModels) {
+				skinRenderer.drawDepth(model, lightViewProjectionElements, modelElements);
+				drawCallCount += model.getDrawableList().length;
+			}
+		}
+		const shadowDepthTexture = shadowMap.getDepthTexture();
+		skinRenderer.setShadowMap(shadowDepthTexture, lightViewProjectionElements, 1 / shadowMapResolution);
+		skinRenderer.setShadowStrength(optionStates.shadow ? sliderStates.shadowStrength : 0);
+
+		endPass();
+
+		// === 2. 피부 MRT 패스 (조도 / 알베도 / 스펙큘러 + 깊이) ===
+		beginPass("scene");
+		sceneRenderTarget.bind();
+		webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+		webGL2RenderingContext.depthMask(true);
+		webGL2RenderingContext.clearColor(0, 0, 0, 0);
+		webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+		backgroundPass.use();
+		webGL2RenderingContext.uniform1f(backgroundPass.getUniformLocation("aspectRatio"), aspectRatio);
+		backgroundPass.draw();
+		webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+		drawCallCount += 1;
+		for (const model of activeModels) {
+			skinRenderer.draw(model, viewProjectionElements, modelElements, cameraX, cameraY, cameraZ);
+			drawCallCount += model.getDrawableList().length;
+		}
+
+		// === 2b. 블렌드 패스 (머리카락 프린지 / 눈꺼풀 차폐 / 눈물선 / 침 — 깊이 쓰기 없이 어태치먼트별 알파 블렌드) ===
+		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.blendFuncSeparate(webGL2RenderingContext.SRC_ALPHA, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA, webGL2RenderingContext.ZERO, webGL2RenderingContext.ONE);
+		webGL2RenderingContext.depthMask(false);
+		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
+		for (const model of activeModels) {
+			skinRenderer.drawBlended(model, viewProjectionElements, modelElements, cameraX, cameraY, cameraZ);
+		}
+		webGL2RenderingContext.enable(webGL2RenderingContext.CULL_FACE);
+		webGL2RenderingContext.depthMask(true);
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		drawCallCount += 6;
+
+		endPass();
+
+		// === 3. 화면 공간 서브서피스 스캐터링 / 앰비언트 오클루전 ===
+		beginPass("scatter");
+		const irradianceTexture = sceneRenderTarget.getColorTexture(0);
+		const albedoTexture = sceneRenderTarget.getColorTexture(1);
+		const specularTexture = sceneRenderTarget.getColorTexture(2);
+		const normalTexture = sceneRenderTarget.getColorTexture(3);
+		const sceneDepthTexture = sceneRenderTarget.getDepthTexture();
+		let occlusionResultTexture = albedoTexture;
+		if (optionStates.occlusion) {
+			const viewMatrixElements = viewMatrix.getElements();
+			ambientOcclusionEffect.render(sceneDepthTexture, normalTexture, viewMatrixElements, CAMERA_FIELD_OF_VIEW, aspectRatio, CAMERA_NEAR_DISTANCE, CAMERA_FAR_DISTANCE);
+			occlusionResultTexture = ambientOcclusionEffect.getResultTexture();
+			drawCallCount += 3;
+		}
+		let scatteredIrradianceTexture = irradianceTexture;
+		if (optionStates.subsurface) {
+			subsurfaceEffect.render(irradianceTexture, sceneDepthTexture, CAMERA_FIELD_OF_VIEW, aspectRatio, CAMERA_NEAR_DISTANCE, CAMERA_FAR_DISTANCE);
+			scatteredIrradianceTexture = subsurfaceEffect.getResultTexture();
+			drawCallCount += 2;
+		}
+
+		endPass();
+
+		// === 4. 합성 → HDR (조도 x 알베도 + 스펙큘러 + 배경) ===
+		beginPass("post");
+		hdrRenderTarget.bind();
+		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+		combinePass.use();
+		webGL2RenderingContext.uniform1i(combinePass.getUniformLocation("irradianceTexture"), 0);
+		webGL2RenderingContext.uniform1i(combinePass.getUniformLocation("albedoTexture"), 1);
+		webGL2RenderingContext.uniform1i(combinePass.getUniformLocation("specularTexture"), 2);
+		webGL2RenderingContext.uniform1i(combinePass.getUniformLocation("occlusionTexture"), 3);
+		webGL2RenderingContext.uniform1f(combinePass.getUniformLocation("aspectRatio"), aspectRatio);
+		webGL2RenderingContext.uniform1f(combinePass.getUniformLocation("occlusionStrength"), optionStates.occlusion ? System.Math.min(1, sliderStates.occlusionStrength) : 0);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, scatteredIrradianceTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, albedoTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE2);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, specularTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE3);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, occlusionResultTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		combinePass.draw();
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		drawCallCount += 1;
+
+		// === 5. 블룸 ===
+		const hdrColorTexture = hdrRenderTarget.getColorTexture();
+		if (optionStates.bloom) {
+			bloomEffect.render(hdrColorTexture);
+			const bloomIterationCount = bloomEffect.getIterationCount();
+			drawCallCount += 1 + bloomIterationCount * 2;
+		}
+
+		// === 6. 톤 매핑 합성 → LDR (FXAA 켜짐) 또는 화면 ===
+		const useAntialias = sliderStates.antialias > 0;
+		if (useAntialias) {
+			ldrRenderTarget.bind();
+		}
+		else {
+			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+			webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
+		}
+		compositePass.use();
+		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("sceneTexture"), 0);
+		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("bloomTexture"), 1);
+		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("exposure"), sliderStates.exposure);
+		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("bloomStrength"), optionStates.bloom ? sliderStates.bloomStrength : 0);
+		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("vignetteStrength"), sliderStates.vignette);
+		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("grainStrength"), sliderStates.grain);
+		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("elapsedTime"), elapsedTime);
+		webGL2RenderingContext.uniform2f(compositePass.getUniformLocation("resolution"), renderWidth, renderHeight);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, hdrColorTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+		const bloomResultTexture = optionStates.bloom ? bloomEffect.getResultTexture() : hdrColorTexture;
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, bloomResultTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		compositePass.draw();
+		drawCallCount += 1;
+
+		// === 7. FXAA (+ 샤픈) → 화면 ===
+		if (useAntialias) {
+			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+			webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
+			antialiasPass.use();
+			webGL2RenderingContext.uniform1i(antialiasPass.getUniformLocation("sourceTexture"), 0);
+			webGL2RenderingContext.uniform2f(antialiasPass.getUniformLocation("texelSize"), 1 / renderWidth, 1 / renderHeight);
+			webGL2RenderingContext.uniform1f(antialiasPass.getUniformLocation("sharpenStrength"), sliderStates.antialias >= 2 ? 0.5 : 0);
+			const ldrColorTexture = ldrRenderTarget.getColorTexture();
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, ldrColorTexture);
+			antialiasPass.draw();
+			drawCallCount += 1;
+		}
+
+		endPass();
+
+		// === 8. 와이어프레임 (화면 깊이 프리패스로 앞면 모서리만 — 모프 / 스키닝 반영) ===
+		if (optionStates.wireframe) {
+			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+			webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
+			webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+			webGL2RenderingContext.depthMask(true);
+			webGL2RenderingContext.clear(webGL2RenderingContext.DEPTH_BUFFER_BIT);
+			webGL2RenderingContext.colorMask(false, false, false, false);
+			webGL2RenderingContext.enable(webGL2RenderingContext.POLYGON_OFFSET_FILL);
+			webGL2RenderingContext.polygonOffset(1.5, 2);
+			for (const model of activeModels) {
+				skinRenderer.drawDepth(model, viewProjectionElements, modelElements);
+			}
+			webGL2RenderingContext.disable(webGL2RenderingContext.POLYGON_OFFSET_FILL);
+			webGL2RenderingContext.colorMask(true, true, true, true);
+			webGL2RenderingContext.depthMask(false);
+			webGL2RenderingContext.depthFunc(webGL2RenderingContext.LEQUAL);
+			webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+			webGL2RenderingContext.blendFunc(webGL2RenderingContext.SRC_ALPHA, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
+			for (const model of activeModels) {
+				skinRenderer.drawWireframe(model, viewProjectionElements, modelElements, 0.91, 0.79, 0.54, 0.55);
+			}
+			webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+			webGL2RenderingContext.depthMask(true);
+			webGL2RenderingContext.depthFunc(webGL2RenderingContext.LESS);
+			webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+			drawCallCount += (triangleCount > 0 ? activeModels.length : 0) * 2;
+		}
+
+		// === 9. 머티리얼 그래프 (좌측 — 텍스처 / 셰이딩 흐름 + 중간 버퍼 실시간 미리보기) ===
+		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
+		if (optionStates.materialGraph) {
+			drawCallCount += renderMaterialGraph({
+				irradianceTexture: irradianceTexture,
+				albedoTexture: albedoTexture,
+				specularTexture: specularTexture,
+				scatteredIrradianceTexture: scatteredIrradianceTexture,
+				hdrColorTexture: hdrColorTexture,
+			});
+		}
+
+		// === 10. HUD (엔진 Graphic — 프리멀티플라이드 알파 블렌딩, 컬링 해제) ===
+		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
+		statistics.drawCallCount = drawCallCount;
+		if (optionStates.hud) {
+			renderHud();
+		}
+		else {
+			updatePanelLimits(System.window.innerHeight - 18);
+		}
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		statistics.cpuFrameMilliseconds = statistics.cpuFrameMilliseconds * 0.9 + (System.performance.now() - cpuFrameStart) * 0.1;
+
+		System.window.requestAnimationFrame(renderFrame);
+	}
+
+	System.document.getElementById("loadingOverlay").classList.add("hidden");
+	System.window.requestAnimationFrame(renderFrame);
+	</script>
+</body>
+</html>

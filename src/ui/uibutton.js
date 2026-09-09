@@ -40,7 +40,15 @@ export class UIButton extends UIControl {
 	/** @private @type { function(UIButton): void } */ #releasedEvent;
 	/** @private @type { function(UIButton): void } */ #clickedEvent;
 	/** @private @type { boolean } */ #isPressTracking;
+	/** @private @type { number } */ #minimumPressedSeconds; // 눌린 그림을 보여 줄 최소 시간. (0 이면 즉시)
+	/** @private @type { number } */ #pressedElapsedSeconds; // 이번 누름이 이어진 시간.
+	/** @private @type { object | null } */ #pendingRelease; // 최소 시간을 채우려고 미뤄 둔 뗌 처리.
+	/** @private @type { function(UIButton): void } */ #longPressedEvent; // 길게 누름 알림. (한 번만)
+	/** @private @type { number } */ #longPressSeconds; // 길게 누름 판정 시간.
+	/** @private @type { boolean } */ #hasLongPressFired; // 이번 누름에서 길게 누름이 발화했는지.
 	/** @private @type { Color } */ #pressedTintColor;
+	/** @private @type { Color } */ #hoverTintColor;
+	/** @private @type { function(UIButton): void } */ #hoverEvent;
 	/** @private @type { number } */ #transitionDuration;
 	/** @private @type { number } */ #tintProgress;
 	/** @private @type { Array } */ #colorEntries;
@@ -64,7 +72,15 @@ export class UIButton extends UIControl {
 		this.#releasedEvent = null;
 		this.#clickedEvent = null;
 		this.#isPressTracking = false;
+		this.#minimumPressedSeconds = 0;
+		this.#pressedElapsedSeconds = 0;
+		this.#pendingRelease = null;
+		this.#longPressedEvent = null;
+		this.#longPressSeconds = 0.5;
+		this.#hasLongPressFired = false;
 		this.#pressedTintColor = new Color(0, 0, 0, 0.3);
+		this.#hoverTintColor = new Color(1, 1, 1, 0.12);
+		this.#hoverEvent = null;
 		this.#transitionDuration = 0.3;
 		this.#tintProgress = 0;
 		this.#colorEntries = [];
@@ -120,7 +136,67 @@ export class UIButton extends UIControl {
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
+		if (this.#isPressTracking) {
+			this.#pressedElapsedSeconds += timeDelta;
+
+			// 길게 누름. (임계 시간을 넘기는 순간 한 번만 알린다)
+			if (this.#longPressedEvent && !this.#hasLongPressFired && this.#pressedElapsedSeconds >= this.#longPressSeconds) {
+				this.#hasLongPressFired = true;
+				this.#longPressedEvent(this);
+			}
+		}
+
+		// 최소 눌림 표시 시간을 채우려고 미뤄 둔 뗌 처리를 마저 한다.
+		if (this.#pendingRelease) {
+			this.#pendingRelease.remainSeconds -= timeDelta;
+			if (this.#pendingRelease.remainSeconds <= 0) {
+				const releasePosition = this.#pendingRelease.viewInputPosition;
+				this.#pendingRelease = null;
+				this.performRelease(releasePosition);
+			}
+		}
+		this.updateHoverState();
 		this.updateTintTransition(timeDelta);
+	}
+
+	//==============================================================================
+	// 마우스 오버 상태 갱신.
+	// - 누르고 있는 중이거나 사용 불가일 때는 건드리지 않는다.
+	// - 엔진 인스턴스는 전역 접근자로 얻어 순환 참조를 만들지 않는다.
+	//==============================================================================
+	updateHoverState() {
+		if (!this.getInteractable()) {
+			return;
+		}
+		const currentButtonState = this.getButtonState();
+		if (currentButtonState === ButtonState.pressed || currentButtonState === ButtonState.disabled) {
+			return;
+		}
+		const engine = System.vanillaEngine;
+		if (!engine) {
+			return;
+		}
+		const node = this.getNode();
+		if (!node) {
+			return;
+		}
+		const inputManager = engine.getInputManager();
+		const viewInputPosition = inputManager.getViewInputPosition();
+		const isHovering = node.contains(viewInputPosition);
+		if (isHovering && currentButtonState !== ButtonState.hover) {
+			this.setButtonState(ButtonState.hover);
+			this.collectColorTargets();
+			this.#tintProgress = 0;
+			const hoverEvent = this.getHoverEvent();
+			if (hoverEvent) {
+				hoverEvent(this);
+			}
+		}
+		else if (!isHovering && currentButtonState === ButtonState.hover) {
+			this.setButtonState(ButtonState.normal);
+			this.collectColorTargets();
+			this.#tintProgress = 0;
+		}
 	}
 
 	//==============================================================================
@@ -145,6 +221,9 @@ export class UIButton extends UIControl {
 			return;
 		}
 		this.#isPressTracking = true;
+		this.#pressedElapsedSeconds = 0;
+		this.#pendingRelease = null;
+		this.#hasLongPressFired = false;
 		this.setButtonState(ButtonState.pressed);
 		this.collectColorTargets();
 		const pressedEvent = this.getPressedEvent();
@@ -167,6 +246,25 @@ export class UIButton extends UIControl {
 			return;
 		}
 		this.#isPressTracking = false;
+
+		// 최소 눌림 표시 시간을 아직 못 채웠으면, 그만큼 눌린 모습을 유지한 뒤 처리한다.
+		if (this.#minimumPressedSeconds > 0 && this.#pressedElapsedSeconds < this.#minimumPressedSeconds) {
+			this.#pendingRelease = {
+				viewInputPosition: viewInputPosition,
+				remainSeconds: this.#minimumPressedSeconds - this.#pressedElapsedSeconds,
+			};
+			return;
+		}
+		this.performRelease(viewInputPosition);
+	}
+
+	//==============================================================================
+	// 뗌 처리 본문.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition
+	 */
+	performRelease(viewInputPosition) {
 		this.setButtonState(ButtonState.released);
 		this.#tintProgress = 0;
 		this.applyTintProgress(0);
@@ -176,7 +274,7 @@ export class UIButton extends UIControl {
 		}
 		const node = this.getNode();
 		const isInsideBounds = node.contains(viewInputPosition);
-		if (isInsideBounds) {
+		if (isInsideBounds && !this.#hasLongPressFired) {
 			const clickedEvent = this.getClickedEvent();
 			if (clickedEvent) {
 				clickedEvent(this);
@@ -196,6 +294,7 @@ export class UIButton extends UIControl {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchCancel(viewInputPosition) {
+		this.#pendingRelease = null;
 		if (!this.#isPressTracking) {
 			return;
 		}
@@ -216,9 +315,10 @@ export class UIButton extends UIControl {
 		}
 		const buttonState = this.getButtonState();
 		const isPressed = buttonState === ButtonState.pressed;
+		const isHovering = buttonState === ButtonState.hover;
 		const transitionDuration = this.getTransitionDuration();
 
-		if (isPressed) {
+		if (isPressed || isHovering) {
 			this.#tintProgress = Math.min(this.#tintProgress + timeDelta / transitionDuration, 1);
 		}
 		else {
@@ -232,7 +332,7 @@ export class UIButton extends UIControl {
 	// 틴트 적용.
 	//==============================================================================
 	applyTintProgress(progress) {
-		const pressedTintColor = this.getPressedTintColor();
+		const pressedTintColor = this.getButtonState() === ButtonState.hover ? this.getHoverTintColor() : this.getPressedTintColor();
 		for (const colorEntry of this.#colorEntries) {
 			if (colorEntry.type === "sprite" || colorEntry.type === "imageview") {
 				const overlayAlpha = Math.lerp(0, pressedTintColor.alpha, progress);
@@ -377,6 +477,67 @@ export class UIButton extends UIControl {
 	/**
 	 * @param { function(UIButton): boolean } callback
 	 */
+	//==============================================================================
+	// 최소 눌림 표시 시간 설정.
+	// - 짧게 톡 눌러도 이 시간만큼 눌린 모습이 보인 뒤 클릭이 실행된다. (기본 0 = 즉시)
+	//==============================================================================
+	// 길게 누름 알림 설정. (임계 시간을 넘기면 한 번 알리고, 그 누름의 클릭은 삼킨다)
+	//==============================================================================
+	/**
+	 * @param { function(UIButton): void } longPressedEvent
+	 */
+	setLongPressedEvent(longPressedEvent) {
+		this.#longPressedEvent = longPressedEvent;
+	}
+
+	//==============================================================================
+	// 길게 누름 판정 시간 설정. (초)
+	//==============================================================================
+	/**
+	 * @param { number } longPressSeconds
+	 */
+	setLongPressSeconds(longPressSeconds) {
+		this.#longPressSeconds = longPressSeconds;
+	}
+
+	//==============================================================================
+	// 이번 누름이 이어진 시간 반환. (게이지 연출용)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getPressedElapsedSeconds() {
+		return this.#isPressTracking ? this.#pressedElapsedSeconds : 0;
+	}
+
+	//==============================================================================
+	// 길게 누름 판정 시간 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getLongPressSeconds() {
+		return this.#longPressSeconds;
+	}
+
+	//==============================================================================
+	/**
+	 * @param { number } minimumPressedSeconds
+	 */
+	setMinimumPressedSeconds(minimumPressedSeconds) {
+		this.#minimumPressedSeconds = System.Math.max(0, minimumPressedSeconds);
+	}
+
+	//==============================================================================
+	// 최소 눌림 표시 시간 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getMinimumPressedSeconds() {
+		return this.#minimumPressedSeconds;
+	}
+
 	setClickEvent(callback) {
 		this.#clickEvent = callback;
 	}
@@ -464,6 +625,46 @@ export class UIButton extends UIControl {
 	 */
 	getClickedEvent() {
 		return this.#clickedEvent;
+	}
+
+	//==============================================================================
+	// 눌림 틴트 색상 설정.
+	//==============================================================================
+	/**
+	 * @param { Color } color
+	 */
+	setHoverTintColor(color) {
+		this.#hoverTintColor = color.clone();
+	}
+
+	//==============================================================================
+	// 오버 틴트 색상 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color }
+	 */
+	getHoverTintColor() {
+		return this.#hoverTintColor;
+	}
+
+	//==============================================================================
+	// 오버 진입 이벤트 설정.
+	//==============================================================================
+	/**
+	 * @param { function(UIButton): void } callback
+	 */
+	setHoverEvent(callback) {
+		this.#hoverEvent = callback;
+	}
+
+	//==============================================================================
+	// 오버 진입 이벤트 반환.
+	//==============================================================================
+	/**
+	 * @returns { function(UIButton): void }
+	 */
+	getHoverEvent() {
+		return this.#hoverEvent;
 	}
 
 	//==============================================================================

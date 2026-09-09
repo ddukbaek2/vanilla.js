@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<title>vanilla.js - Neon Horizon</title>
+	<link rel="icon" href="./favicon.svg">
+	<style>
+		html, body {
+			margin: 0;
+			padding: 0;
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+			background: #0d0704;
+			touch-action: none;
+			-webkit-user-select: none;
+			user-select: none;
+			-webkit-touch-callout: none;
+		}
+		#mainCanvas {
+			position: absolute;
+			left: 0;
+			top: 0;
+			width: 100%;
+			height: 100%;
+			display: block;
+		}
+		#titleOverlay {
+			position: absolute;
+			left: 50%;
+			top: 13%;
+			transform: translateX(-50%);
+			text-align: center;
+			pointer-events: none;
+			user-select: none;
+			font-family: "Segoe UI Light", "Segoe UI", "Malgun Gothic", sans-serif;
+			animation: titleEntrance 3.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+		}
+		#titleMain {
+			font-size: clamp(28px, 5.6vw, 68px);
+			font-weight: 200;
+			letter-spacing: 0.5em;
+			text-indent: 0.5em;
+			color: #f1e9d8;
+			text-shadow: 0 0 28px rgba(243, 229, 171, 0.4), 0 0 64px rgba(255, 180, 90, 0.2);
+		}
+		#titleDivider {
+			width: min(240px, 40vw);
+			height: 1px;
+			margin: 16px auto 14px;
+			background: linear-gradient(90deg, transparent, rgba(243, 229, 171, 0.7), transparent);
+		}
+		#titleSub {
+			font-size: clamp(9px, 1.2vw, 12px);
+			font-weight: 300;
+			letter-spacing: 0.85em;
+			text-indent: 0.85em;
+			color: rgba(209, 193, 178, 0.75);
+			text-shadow: 0 0 10px rgba(243, 229, 171, 0.4);
+		}
+		#homeLink {
+			position: absolute;
+			left: 50%;
+			bottom: 6.5%;
+			transform: translateX(-50%);
+			font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+			font-size: clamp(9px, 1.2vw, 12px);
+			font-weight: 300;
+			letter-spacing: 0.45em;
+			text-indent: 0.45em;
+			text-decoration: none;
+			color: rgba(241, 233, 216, 0.75);
+			padding: 10px 22px;
+			border: 1px solid rgba(243, 229, 171, 0.3);
+			border-radius: 999px;
+			background: rgba(13, 7, 4, 0.45);
+			backdrop-filter: blur(8px);
+			-webkit-backdrop-filter: blur(8px);
+			text-shadow: 0 0 10px rgba(243, 229, 171, 0.4);
+			transition: color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+			animation: titleEntrance 3.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+		}
+		#homeLink:hover {
+			color: #fffaf0;
+			border-color: rgba(243, 229, 171, 0.85);
+			background: rgba(58, 36, 14, 0.55);
+			box-shadow: 0 0 22px rgba(243, 229, 171, 0.35), inset 0 0 12px rgba(243, 229, 171, 0.12);
+		}
+		@keyframes titleEntrance {
+			0% { opacity: 0; transform: translateX(-50%) translateY(-14px); filter: blur(8px); }
+			100% { opacity: 1; transform: translateX(-50%) translateY(0); filter: blur(0); }
+		}
+	</style>
+</head>
+<body>
+	<canvas id="mainCanvas"></canvas>
+	<div id="titleOverlay">
+		<div id="titleMain">NEON HORIZON</div>
+		<div id="titleDivider"></div>
+		<div id="titleSub">VANILLA.JS</div>
+	</div>
+	<a id="homeLink" href="https://ddukbaek2.com" target="_blank" rel="noopener">DDUKBAEK2.COM</a>
+	<script type="module">
+	"use strict";
+	const System = globalThis;
+
+	//==============================================================================
+	// 셰이더 소스 목록.
+	//==============================================================================
+	// 풀스크린 삼각형 공용 버텍스 셰이더. (gl_VertexID 사용, 버텍스 버퍼 불필요)
+	const FULLSCREEN_VERTEXSHADER_SOURCE = `#version 300 es
+	out vec2 fragmentCoordinate;
+	out vec2 fragmentTextureCoordinate;
+	void main() {
+		vec2 positions[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
+		vec2 position = positions[gl_VertexID];
+		fragmentCoordinate = position;
+		fragmentTextureCoordinate = position * 0.5 + 0.5;
+		gl_Position = vec4(position, 0.999, 1.0);
+	}
+	`;
+
+	// 배경. (초콜릿 하늘 + 줄무늬 바닐라 태양 + 별 + 유성 + 지평선 글로우)
+	const BACKGROUND_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec2 fragmentCoordinate;
+	uniform float elapsedTime;
+	uniform float aspectRatio;
+	uniform float shipStrength;
+	uniform vec4 shipAnchorList[4]; // xy = 선미 화면 좌표, z = 화면 크기, w = 밝기.
+	uniform vec4 beamAnchor; // xy = 기함 프로우 화면 좌표, zw = 화면 전방 방향.
+	out vec4 outputColor;
+
+	float hash21(vec2 point) {
+		point = fract(point * vec2(234.34, 435.345));
+		point += dot(point, point + 34.23);
+		return fract(point.x * point.y);
+	}
+
+	float segmentDistance(vec2 point, vec2 segmentStart, vec2 segmentEnd) {
+		vec2 startToPoint = point - segmentStart;
+		vec2 startToEnd = segmentEnd - segmentStart;
+		float projection = clamp(dot(startToPoint, startToEnd) / dot(startToEnd, startToEnd), 0.0, 1.0);
+		return length(startToPoint - startToEnd * projection);
+	}
+
+	float axisMask(float value, float minValue, float maxValue) {
+		float edge = 0.0015;
+		return smoothstep(minValue - edge, minValue + edge, value) * (1.0 - smoothstep(maxValue - edge, maxValue + edge, value));
+	}
+
+	float boxMask(vec2 point, vec2 minCorner, vec2 maxCorner) {
+		return axisMask(point.x, minCorner.x, maxCorner.x) * axisMask(point.y, minCorner.y, maxCorner.y);
+	}
+
+	void main() {
+		vec2 screenPoint = vec2(fragmentCoordinate.x * aspectRatio, fragmentCoordinate.y);
+		float horizonY = -0.08;
+
+		// 하늘 그라디언트. (위: 짙은 초콜릿, 지평선: 따뜻한 캐러멜)
+		vec3 skyTopColor = vec3(0.045, 0.028, 0.014);
+		vec3 skyHorizonColor = vec3(0.46, 0.26, 0.1);
+		float skyGradient = smoothstep(1.1, horizonY, fragmentCoordinate.y);
+		vec3 color = mix(skyTopColor, skyHorizonColor, skyGradient * skyGradient);
+
+		// 별. (지평선 위에서만, 셀 내 원형 스프라이트 + 반짝임)
+		if (fragmentCoordinate.y > horizonY) {
+			vec2 starGrid = screenPoint * 60.0;
+			vec2 starCell = floor(starGrid);
+			float starRandom = hash21(starCell);
+			if (starRandom > 0.93) {
+				vec2 starLocalPoint = fract(starGrid) - vec2(fract(starRandom * 13.7), fract(starRandom * 71.3));
+				float starDistance = length(starLocalPoint);
+				float starSize = 0.04 + fract(starRandom * 93.1) * 0.08;
+				float starIntensity = smoothstep(starSize, 0.0, starDistance);
+				float twinkle = 0.45 + 0.55 * sin(elapsedTime * (2.0 + starRandom * 6.0) + starRandom * 40.0);
+				float starFade = smoothstep(horizonY, horizonY + 0.35, fragmentCoordinate.y);
+				color += vec3(1.0, 0.95, 0.84) * starIntensity * twinkle * starFade * 0.8;
+			}
+		}
+
+		// 전투순양함 함대. (함선 자체는 3D 모델 — 여기는 선미 엔진 글로우와 기함 주포만 그린다)
+		if (shipStrength > 0.001) {
+			// 선미 엔진 글로우. (JS 가 함선 선미를 화면에 투영해 넘긴 좌표에 맥동광)
+			for (int shipIndex = 0; shipIndex < 4; ++shipIndex) {
+				vec4 shipAnchor = shipAnchorList[shipIndex];
+				if (shipAnchor.w > 0.001) {
+					float enginePulse = 0.75 + 0.25 * sin(elapsedTime * 3.1 + float(shipIndex) * 1.7);
+					float engineDistance = length(screenPoint - shipAnchor.xy) / max(shipAnchor.z, 0.02);
+					color += vec3(1.0, 0.72, 0.32) * exp(-engineDistance * 95.0) * enginePulse * 0.9 * shipAnchor.w;
+					color += vec3(1.0, 0.6, 0.25) * exp(-engineDistance * 22.0) * enginePulse * 0.25 * shipAnchor.w;
+				}
+			}
+
+			// 기함 주포. (45초 주기 — 차지 후 초거대 광선 발사)
+			float fireCycle = 22.0;
+			float firePhase = fract(elapsedTime / fireCycle);
+			vec2 beamOrigin = beamAnchor.xy;
+			vec2 beamDirection = normalize(beamAnchor.zw);
+
+			// 차지: 프로우에 에너지가 모임.
+			float chargeAmount = smoothstep(0.05, 0.1, firePhase) * (1.0 - smoothstep(0.1, 0.115, firePhase)) * shipStrength;
+			float chargeDistance = length(screenPoint - beamOrigin);
+			color += vec3(1.0, 0.85, 0.5) * exp(-chargeDistance * 90.0) * chargeAmount * 2.2;
+			color += vec3(1.0, 0.7, 0.35) * exp(-chargeDistance * 22.0) * chargeAmount * 0.5;
+
+			// 발사: 화면을 가로지르는 초거대 광선.
+			float beamStrength = smoothstep(0.1, 0.108, firePhase) * (1.0 - smoothstep(0.15, 0.17, firePhase)) * shipStrength;
+			if (beamStrength > 0.001) {
+				float beamFlicker = 0.85 + 0.15 * sin(elapsedTime * 47.0);
+				float beamDistance = segmentDistance(screenPoint, beamOrigin, beamOrigin + beamDirection * 5.0);
+				color += vec3(1.0, 0.97, 0.85) * exp(-beamDistance * 220.0) * beamStrength * beamFlicker * 3.0;
+				color += vec3(1.0, 0.8, 0.45) * exp(-beamDistance * 40.0) * beamStrength * beamFlicker * 0.9;
+				color += vec3(1.0, 0.6, 0.3) * exp(-beamDistance * 9.0) * beamStrength * 0.25;
+
+				// 발사 순간 프로우 섬광.
+				color += vec3(1.0, 0.95, 0.8) * exp(-chargeDistance * 30.0) * beamStrength * 1.2;
+			}
+		}
+
+		// 유성. (몇 초에 한 번씩 대각선 스트릭)
+		{
+			float shootingCycle = 6.0;
+			float shootingSeed = floor(elapsedTime / shootingCycle);
+			float shootingPhase = fract(elapsedTime / shootingCycle);
+			float seedRandom = hash21(vec2(shootingSeed, 17.0));
+			if (shootingPhase < 0.16) {
+				float travel = shootingPhase / 0.16;
+				vec2 startPoint = vec2(-aspectRatio + seedRandom * aspectRatio * 2.0, 0.95 - seedRandom * 0.3);
+				vec2 velocity = vec2(1.6 + seedRandom * 0.8, -0.55);
+				vec2 headPoint = startPoint + velocity * travel;
+				vec2 tailPoint = headPoint - velocity * 0.16;
+				float streakDistance = segmentDistance(screenPoint, tailPoint, headPoint);
+				float streakFade = (1.0 - travel) * smoothstep(horizonY + 0.1, horizonY + 0.3, fragmentCoordinate.y);
+				color += vec3(1.0, 0.94, 0.8) * exp(-streakDistance * 220.0) * streakFade * 1.6;
+				color += vec3(0.9, 0.68, 0.38) * exp(-streakDistance * 40.0) * streakFade * 0.35;
+			}
+		}
+
+		// 태양. (지평선에 걸친 그라디언트 디스크, 하단은 대기 헤이즈에 녹아듦)
+		vec2 sunCenter = vec2(0.0, horizonY + 0.18);
+		float sunDistance = length(vec2(screenPoint.x, (fragmentCoordinate.y - sunCenter.y) * 1.0) - vec2(sunCenter.x, 0.0));
+		float sunRadius = 0.34;
+		float sunDisc = smoothstep(sunRadius, sunRadius - 0.012, sunDistance);
+
+		// 하단 대기 용해. (수평선 근처에서 부드럽게 사라짐)
+		float sunLocalY = (fragmentCoordinate.y - (sunCenter.y - sunRadius)) / (sunRadius * 2.0);
+		sunDisc *= smoothstep(-0.08, 0.3, sunLocalY);
+
+		// 태양 색상 그라디언트. (위: 크림 바닐라, 아래: 구운 캐러멜)
+		vec3 sunColor = mix(vec3(0.95, 0.42, 0.12), vec3(1.0, 0.93, 0.66), clamp(sunLocalY, 0.0, 1.0));
+		color = mix(color, sunColor, sunDisc);
+
+		// 태양 주변 글로우 + 지평선 글로우.
+		float sunGlow = exp(-sunDistance * 4.2) * 0.38;
+		color += vec3(1.0, 0.62, 0.24) * sunGlow;
+		float horizonGlow = exp(-abs(fragmentCoordinate.y - horizonY) * 9.0) * 0.5;
+		color += vec3(0.95, 0.55, 0.2) * horizonGlow;
+
+		outputColor = vec4(color, 1.0);
+	}
+	`;
+
+	// 지형. (정점에서 높이 변위 + 등장 페이드, 프래그먼트에서 네온 그리드 + 유광 물웅덩이)
+	const TERRAIN_VERTEXSHADER_SOURCE = `#version 300 es
+	in vec2 vertexGridPosition;
+	uniform mat4 projectionMatrix;
+	uniform mat4 viewMatrix;
+	uniform float scrollOffset;
+	out vec3 fragmentWorldPosition;
+	out float fragmentViewDistance;
+	out float fragmentHeight;
+
+	// 정수 격자 해시. (JS 쪽 플레이어 충돌 계산과 비트 단위로 동일한 결정적 난수)
+	float latticeRandom(int cellX, int cellZ) {
+		uint hashValue = uint(cellX) * 374761393u + uint(cellZ) * 668265263u;
+		hashValue = (hashValue ^ (hashValue >> 13u)) * 1274126177u;
+		hashValue = hashValue ^ (hashValue >> 16u);
+		return float(hashValue & 65535u) / 65535.0;
+	}
+
+	// 밸류 노이즈. (격자 난수의 쌍선형 보간 — 반복 없는 절차적 지형의 기반)
+	float valueNoise(vec2 point) {
+		vec2 cellOrigin = floor(point);
+		vec2 cellFraction = point - cellOrigin;
+		vec2 weight = cellFraction * cellFraction * (3.0 - 2.0 * cellFraction);
+		int cellX = int(cellOrigin.x);
+		int cellZ = int(cellOrigin.y);
+		float value00 = latticeRandom(cellX, cellZ);
+		float value10 = latticeRandom(cellX + 1, cellZ);
+		float value01 = latticeRandom(cellX, cellZ + 1);
+		float value11 = latticeRandom(cellX + 1, cellZ + 1);
+		float valueX0 = mix(value00, value10, weight.x);
+		float valueX1 = mix(value01, value11, weight.x);
+		return mix(valueX0, valueX1, weight.y);
+	}
+
+	float terrainHeight(vec2 worldXZ) {
+		// 중앙(도로)은 평평하고 좌우로 갈수록 산이 솟는 구조.
+		// 다중 옥타브 밸류 노이즈라 같은 지형이 반복되지 않는다.
+		float sideFactor = smoothstep(2.2, 9.0, abs(worldXZ.x));
+		float noiseLarge = valueNoise(worldXZ * 0.06);
+		float noiseMedium = valueNoise(worldXZ * 0.15 + 37.0);
+		float noiseSmall = valueNoise(worldXZ * 0.37 + 91.0);
+		float combined = noiseLarge * 1.4 + noiseMedium * 0.65 + noiseSmall * 0.25;
+		return pow(max(combined - 0.7, 0.0), 1.5) * 4.6 * sideFactor;
+	}
+
+	void main() {
+		// 셀 단위 스냅 스크롤: 높이를 셀 경계에 고정 샘플링하고 잔여분만큼 메시를 밀어서
+		// 언덕이 출렁이지 않고 단단한 지형 그대로 카메라 쪽으로 흘러오게 한다. (셀 크기 1)
+		float snappedOffset = floor(scrollOffset);
+		float residualOffset = scrollOffset - snappedOffset;
+		vec2 worldXZ = vec2(vertexGridPosition.x, vertexGridPosition.y + snappedOffset);
+		float height = terrainHeight(worldXZ);
+		float viewDistance = vertexGridPosition.y - residualOffset;
+
+		// 등장 페이드: 먼 곳의 언덕이 잘려 나타나지 않고 지평선에서 서서히 솟아오르도록.
+		float emergenceFade = 1.0 - smoothstep(34.0, 44.0, viewDistance);
+		height *= emergenceFade;
+
+		// 카메라는 -z 방향을 바라보므로 렌더 좌표의 z 는 부호를 뒤집는다.
+		vec3 renderPosition = vec3(vertexGridPosition.x, height, -viewDistance);
+		fragmentWorldPosition = vec3(worldXZ.x, height, worldXZ.y);
+		fragmentViewDistance = viewDistance;
+		fragmentHeight = height;
+		gl_Position = projectionMatrix * viewMatrix * vec4(renderPosition, 1.0);
+	}
+	`;
+	const TERRAIN_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec3 fragmentWorldPosition;
+	in float fragmentViewDistance;
+	in float fragmentHeight;
+	uniform float elapsedTime;
+	uniform float scrollOffset;
+	uniform vec3 cameraPosition;
+	out vec4 outputColor;
+
+	void main() {
+		// 셀 경계까지의 거리 기반 안티앨리어싱 그리드 라인. (월드 좌표 고정 → 지형과 함께 흐름)
+		vec2 gridCoordinate = fragmentWorldPosition.xz * 0.5;
+		vec2 gridDistance = abs(fract(gridCoordinate - 0.5) - 0.5) / fwidth(gridCoordinate);
+		float lineDistance = min(gridDistance.x, gridDistance.y);
+		float lineIntensity = 1.0 - smoothstep(0.0, 1.6, lineDistance);
+
+		// 높이에 따른 네온 색상. (캐러멜 → 크림 바닐라)
+		float heightRatio = clamp(fragmentHeight * 0.22, 0.0, 1.0);
+		vec3 lineColor = mix(vec3(0.95, 0.58, 0.14), vec3(1.0, 0.95, 0.75), heightRatio);
+
+		// 면 단위(플랫 셰이딩) 라이팅. (태양의 캐러멜 필 + 하늘의 아이보리 필)
+		vec3 surfacePosition = vec3(fragmentWorldPosition.x, fragmentHeight, fragmentViewDistance);
+		vec3 surfaceNormal = normalize(cross(dFdx(surfacePosition), dFdy(surfacePosition)));
+		if (surfaceNormal.y < 0.0) {
+			surfaceNormal = -surfaceNormal;
+		}
+		vec3 sunDirection = normalize(vec3(-fragmentWorldPosition.x * 0.02, 0.25, 1.0));
+		float sunLight = pow(max(dot(surfaceNormal, sunDirection), 0.0), 2.0);
+		float skyLight = max(surfaceNormal.y, 0.0);
+
+		// 바닥 면 색상. (라이팅 반영된 로우폴리 패싯)
+		vec3 floorColor = vec3(0.05, 0.032, 0.016);
+		floorColor += vec3(0.42, 0.24, 0.09) * sunLight * smoothstep(0.2, 2.5, fragmentHeight);
+		floorColor += vec3(0.12, 0.1, 0.07) * skyLight * 0.35;
+
+		float lineGlow = 1.0 - smoothstep(0.0, 6.0, lineDistance);
+		vec3 color = floorColor + lineColor * lineIntensity * 1.35 + lineColor * lineGlow * 0.22;
+
+		// 도로 중앙 에너지 스트림. (주기가 티 나지 않는 다층 파동이 매끄럽게 흘러오는 형태)
+		float lateralGlow = exp(-abs(fragmentWorldPosition.x) * 1.6);
+		float coreGlow = exp(-abs(fragmentWorldPosition.x) * 5.0);
+		float flowShimmer = sin(fragmentViewDistance * 0.55 + scrollOffset * 1.4) * 0.5
+		                  + sin(fragmentViewDistance * 0.23 + scrollOffset * 0.8 + 1.7) * 0.35
+		                  + sin(fragmentViewDistance * 0.91 + scrollOffset * 2.3 + 3.9) * 0.15;
+		float streamFlow = 0.55 + 0.3 * flowShimmer;
+		color += vec3(1.0, 0.88, 0.55) * (lateralGlow * 0.3 + coreGlow * 0.45) * streamFlow;
+
+		// 맥동. (라인이 은은하게 숨쉬듯)
+		color *= 0.94 + 0.06 * sin(elapsedTime * 2.2 + fragmentViewDistance * 0.35);
+
+		// 거리 안개. (지평선 색으로 흡수, 측면 원거리도 함께 흡수해 지형 가장자리를 감춤)
+		float lateralDistance = max(abs(fragmentWorldPosition.x - cameraPosition.x) - 12.0, 0.0);
+		float fogFactor = smoothstep(18.0, 46.0, fragmentViewDistance + lateralDistance * 1.6);
+		vec3 fogColor = vec3(0.42, 0.24, 0.1);
+		color = mix(color, fogColor, fogFactor);
+
+		outputColor = vec4(color, 1.0);
+	}
+	`;
+
+	// 부스트 빛살. (꾹 누르면 가속하며 카메라를 스쳐 지나가는 먼지빛살)
+	const STREAK_VERTEXSHADER_SOURCE = `#version 300 es
+	in vec4 streakData; // x, y, z, seed
+	in float streakEndFlag; // 0 = 머리, 1 = 꼬리
+	uniform mat4 projectionMatrix;
+	uniform mat4 viewMatrix;
+	uniform float streakScroll;
+	uniform float boostFactor;
+	uniform float heightOffset;
+	uniform float lateralOffset;
+	out float fragmentSeed;
+	out float fragmentTailRatio;
+
+	void main() {
+		float seed = streakData.w;
+
+		// 먼 곳에서 카메라 쪽으로 접근. (개체별 속도 편차, 부스트 시 꼬리가 길어짐)
+		// 밴드 전체가 카메라 높이를 따라 이동해 언덕 위에서도 빈 구간이 없다.
+		float speedFactor = 0.7 + seed * 0.6;
+		float loopZ = 46.0 - mod(streakData.z + streakScroll * speedFactor, 46.0);
+		float streakLength = (0.6 + seed * 1.0) * (0.35 + boostFactor * 2.2);
+		vec3 worldPosition = vec3(streakData.x + lateralOffset, streakData.y + heightOffset, loopZ + streakEndFlag * streakLength);
+
+		// 카메라는 -z 방향을 바라보므로 렌더 좌표의 z 는 부호를 뒤집는다.
+		vec3 renderPosition = vec3(worldPosition.x, worldPosition.y, -worldPosition.z);
+		gl_Position = projectionMatrix * viewMatrix * vec4(renderPosition, 1.0);
+		fragmentSeed = seed;
+		fragmentTailRatio = streakEndFlag;
+	}
+	`;
+	const STREAK_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in float fragmentSeed;
+	in float fragmentTailRatio;
+	uniform float boostFactor;
+	uniform float fadeFactor;
+	out vec4 outputColor;
+
+	void main() {
+		vec3 goldColor = vec3(1.0, 0.72, 0.35);
+		vec3 creamColor = vec3(0.97, 0.9, 0.68);
+		vec3 color = mix(goldColor, creamColor, fract(fragmentSeed * 3.77));
+		float headFade = 1.0 - fragmentTailRatio;
+
+		// 부스트 중에만 선명해짐. (평상시엔 거의 보이지 않음)
+		float boostAlpha = 0.04 + boostFactor * 0.9;
+		outputColor = vec4(color * headFade * boostAlpha * fadeFactor, 0.0);
+	}
+	`;
+
+	// 부유 먼지 파티클. (가산 합성 포인트 스프라이트, 지형 깊이에 가려짐)
+	const PARTICLE_VERTEXSHADER_SOURCE = `#version 300 es
+	in vec4 vertexParticle; // x, y, z, seed
+	uniform mat4 projectionMatrix;
+	uniform mat4 viewMatrix;
+	uniform float elapsedTime;
+	uniform float heightOffset;
+	uniform float lateralOffset;
+	out float fragmentSeed;
+	out float fragmentProximityFade;
+
+	void main() {
+		float seed = vertexParticle.w;
+
+		// 각자 다른 속도로 떠오르고 좌우로 흔들림.
+		// 밴드 전체가 카메라 높이를 따라 이동해 언덕 위에서도 빈 구간이 없다.
+		float floatY = mod(vertexParticle.y + elapsedTime * (0.12 + seed * 0.25), 7.0);
+		float swayX = vertexParticle.x + sin(elapsedTime * (0.4 + seed) + seed * 40.0) * 0.4;
+		float loopZ = mod(vertexParticle.z + elapsedTime * 1.2, 38.0) + 2.0;
+
+		// 카메라는 -z 방향을 바라보므로 렌더 좌표의 z 는 부호를 뒤집는다.
+		vec3 renderPosition = vec3(swayX + lateralOffset, floatY + 0.2 + heightOffset, -loopZ);
+
+		vec4 viewPosition = viewMatrix * vec4(renderPosition, 1.0);
+		gl_Position = projectionMatrix * viewPosition;
+		float viewDepth = max(-viewPosition.z, 0.1);
+		gl_PointSize = clamp(70.0 / viewDepth, 1.5, 14.0);
+
+		// 카메라에 너무 가까운 파티클은 페이드. (거대한 원이 화면을 가리지 않도록)
+		fragmentProximityFade = smoothstep(1.2, 5.0, viewDepth);
+		fragmentSeed = seed;
+	}
+	`;
+	const PARTICLE_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in float fragmentSeed;
+	in float fragmentProximityFade;
+	uniform float elapsedTime;
+	uniform float fadeFactor;
+	out vec4 outputColor;
+
+	void main() {
+		// 원형 소프트 스프라이트.
+		vec2 pointOffset = gl_PointCoord - 0.5;
+		float pointDistance = length(pointOffset);
+		float alpha = smoothstep(0.5, 0.05, pointDistance);
+
+		// 파티클마다 색상과 반짝임 위상 차이.
+		vec3 goldColor = vec3(1.0, 0.72, 0.35);
+		vec3 creamColor = vec3(0.97, 0.9, 0.68);
+		vec3 color = mix(goldColor, creamColor, fract(fragmentSeed * 7.31));
+		float twinkle = 0.55 + 0.45 * sin(elapsedTime * (1.5 + fragmentSeed * 3.0) + fragmentSeed * 50.0);
+
+		outputColor = vec4(color * alpha * twinkle * fragmentProximityFade * fadeFactor * 0.45, 0.0);
+	}
+	`;
+
+	// 블룸 1단계: 밝은 영역 추출. (씬 → 하프 해상도)
+	const BRIGHTPASS_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec2 fragmentTextureCoordinate;
+	uniform sampler2D sceneTexture;
+	out vec4 outputColor;
+
+	void main() {
+		vec3 sceneColor = texture(sceneTexture, fragmentTextureCoordinate).rgb;
+		float brightness = max(max(sceneColor.r, sceneColor.g), sceneColor.b);
+		float extractFactor = smoothstep(0.5, 0.95, brightness);
+		outputColor = vec4(sceneColor * extractFactor, 1.0);
+	}
+	`;
+
+	// 블룸 2단계: 9탭 가우시안 블러. (가로/세로 분리)
+	const BLUR_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec2 fragmentTextureCoordinate;
+	uniform sampler2D sourceTexture;
+	uniform vec2 blurDirection; // (1/width, 0) 또는 (0, 1/height)
+	out vec4 outputColor;
+
+	void main() {
+		float weights[5] = float[5](0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
+		vec3 color = texture(sourceTexture, fragmentTextureCoordinate).rgb * weights[0];
+		for (int tapIndex = 1; tapIndex < 5; ++tapIndex) {
+			vec2 tapOffset = blurDirection * float(tapIndex) * 1.6;
+			color += texture(sourceTexture, fragmentTextureCoordinate + tapOffset).rgb * weights[tapIndex];
+			color += texture(sourceTexture, fragmentTextureCoordinate - tapOffset).rgb * weights[tapIndex];
+		}
+		outputColor = vec4(color, 1.0);
+	}
+	`;
+
+	// 최종 합성: 씬 + 블룸 + 색수차 + 필믹 톤맵 + 비네트 + 레터박스.
+	const COMPOSITE_FRAGMENTSHADER_SOURCE = `#version 300 es
+	precision highp float;
+	in vec2 fragmentCoordinate;
+	in vec2 fragmentTextureCoordinate;
+	uniform sampler2D sceneTexture;
+	uniform sampler2D bloomTexture;
+	uniform float elapsedTime;
+	uniform float boostFactor;
+	uniform vec2 resolution;
+	uniform float bloomStrength;
+	uniform float aberrationStrength;
+	uniform float filmStrength;
+	uniform float letterboxStrength;
+	out vec4 outputColor;
+
+	float hash21(vec2 point) {
+		point = fract(point * vec2(234.34, 435.345));
+		point += dot(point, point + 34.23);
+		return fract(point.x * point.y);
+	}
+
+	void main() {
+		// 색수차. (가장자리로 갈수록 RGB 채널 분리, 부스트 시 강화되어 가속감)
+		vec2 centerOffset = fragmentTextureCoordinate - 0.5;
+		float aberrationAmount = dot(centerOffset, centerOffset) * (0.012 + boostFactor * 0.02) * aberrationStrength;
+		vec2 aberrationOffset = centerOffset * aberrationAmount;
+		float channelRed = texture(sceneTexture, fragmentTextureCoordinate + aberrationOffset).r;
+		float channelGreen = texture(sceneTexture, fragmentTextureCoordinate).g;
+		float channelBlue = texture(sceneTexture, fragmentTextureCoordinate - aberrationOffset).b;
+		vec3 color = vec3(channelRed, channelGreen, channelBlue);
+
+		// 블룸 가산.
+		vec3 bloomColor = texture(bloomTexture, fragmentTextureCoordinate).rgb;
+		color += bloomColor * 0.95 * bloomStrength;
+
+		// 은은한 스캔라인.
+		float scanline = sin(fragmentTextureCoordinate.y * resolution.y * 1.6) * 0.5 + 0.5;
+		color *= mix(1.0, 0.97 + scanline * 0.03, filmStrength);
+
+		// 필름 그레인.
+		float grain = hash21(fragmentTextureCoordinate * resolution.xy + fract(elapsedTime) * 371.0);
+		color += (grain - 0.5) * 0.012 * filmStrength;
+
+		// 비네트.
+		float vignette = 1.0 - dot(fragmentCoordinate * 0.5, fragmentCoordinate * 0.5);
+		color *= clamp(vignette, 0.0, 1.0);
+
+		// ACES 근사 필믹 톤 매핑.
+		color = clamp((color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14), 0.0, 1.0);
+
+		// 시네마틱 레터박스.
+		float letterboxCurve = smoothstep(0.0, 0.01, fragmentTextureCoordinate.y - 0.045)
+		                     * smoothstep(0.0, 0.01, 0.955 - fragmentTextureCoordinate.y);
+		color *= mix(1.0, letterboxCurve, letterboxStrength);
+
+		// 인트로 페이드인. (검은 화면에서 서서히 등장)
+		float introFade = smoothstep(0.2, 2.6, elapsedTime);
+		color *= introFade;
+
+		outputColor = vec4(color, 1.0);
+	}
+	`;
+
+	//==============================================================================
+	// 셰이더 프로그램 생성.
+	//==============================================================================
+	function createShaderProgram(webGL2RenderingContext, vertexShaderSource, fragmentShaderSource) {
+		const vertexShader = webGL2RenderingContext.createShader(webGL2RenderingContext.VERTEX_SHADER);
+		webGL2RenderingContext.shaderSource(vertexShader, vertexShaderSource.trim());
+		webGL2RenderingContext.compileShader(vertexShader);
+		if (!webGL2RenderingContext.getShaderParameter(vertexShader, webGL2RenderingContext.COMPILE_STATUS)) {
+			throw new Error(webGL2RenderingContext.getShaderInfoLog(vertexShader));
+		}
+
+		const fragmentShader = webGL2RenderingContext.createShader(webGL2RenderingContext.FRAGMENT_SHADER);
+		webGL2RenderingContext.shaderSource(fragmentShader, fragmentShaderSource.trim());
+		webGL2RenderingContext.compileShader(fragmentShader);
+		if (!webGL2RenderingContext.getShaderParameter(fragmentShader, webGL2RenderingContext.COMPILE_STATUS)) {
+			throw new Error(webGL2RenderingContext.getShaderInfoLog(fragmentShader));
+		}
+
+		const program = webGL2RenderingContext.createProgram();
+		webGL2RenderingContext.attachShader(program, vertexShader);
+		webGL2RenderingContext.attachShader(program, fragmentShader);
+		webGL2RenderingContext.linkProgram(program);
+		if (!webGL2RenderingContext.getProgramParameter(program, webGL2RenderingContext.LINK_STATUS)) {
+			throw new Error(webGL2RenderingContext.getProgramInfoLog(program));
+		}
+
+		return program;
+	}
+
+	//==============================================================================
+	// 렌더 타겟(프레임버퍼 + 컬러 텍스처 [+ 깊이]) 생성.
+	//==============================================================================
+	function createRenderTarget(webGL2RenderingContext, width, height, useDepth) {
+		const colorTexture = webGL2RenderingContext.createTexture();
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, colorTexture);
+		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, width, height, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, null);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.LINEAR);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+
+		const framebuffer = webGL2RenderingContext.createFramebuffer();
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
+		webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, colorTexture, 0);
+
+		let depthRenderbuffer = null;
+		if (useDepth) {
+			depthRenderbuffer = webGL2RenderingContext.createRenderbuffer();
+			webGL2RenderingContext.bindRenderbuffer(webGL2RenderingContext.RENDERBUFFER, depthRenderbuffer);
+			webGL2RenderingContext.renderbufferStorage(webGL2RenderingContext.RENDERBUFFER, webGL2RenderingContext.DEPTH_COMPONENT16, width, height);
+			webGL2RenderingContext.framebufferRenderbuffer(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.DEPTH_ATTACHMENT, webGL2RenderingContext.RENDERBUFFER, depthRenderbuffer);
+		}
+
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+		return { framebuffer: framebuffer, colorTexture: colorTexture, depthRenderbuffer: depthRenderbuffer, width: width, height: height };
+	}
+
+	//==============================================================================
+	// 렌더 타겟 파기.
+	//==============================================================================
+	function destroyRenderTarget(webGL2RenderingContext, renderTarget) {
+		if (!renderTarget) {
+			return;
+		}
+		webGL2RenderingContext.deleteFramebuffer(renderTarget.framebuffer);
+		webGL2RenderingContext.deleteTexture(renderTarget.colorTexture);
+		if (renderTarget.depthRenderbuffer) {
+			webGL2RenderingContext.deleteRenderbuffer(renderTarget.depthRenderbuffer);
+		}
+	}
+
+	//==============================================================================
+	// 원근 투영 행렬 생성. (열우선)
+	//==============================================================================
+	function createPerspectiveMatrix(fieldOfViewRadian, aspectRatio, nearDistance, farDistance) {
+		const focalLength = 1.0 / System.Math.tan(fieldOfViewRadian / 2);
+		const rangeInverse = 1.0 / (nearDistance - farDistance);
+		return new Float32Array([
+			focalLength / aspectRatio, 0, 0, 0,
+			0, focalLength, 0, 0,
+			0, 0, (nearDistance + farDistance) * rangeInverse, -1,
+			0, 0, nearDistance * farDistance * rangeInverse * 2, 0,
+		]);
+	}
+
+	//==============================================================================
+	// 뷰 행렬 생성. (카메라 위치 + 피치/요 회전, 열우선)
+	//==============================================================================
+	function createViewMatrix(cameraPosition, pitchRadian, yawRadian) {
+		const cosPitch = System.Math.cos(pitchRadian);
+		const sinPitch = System.Math.sin(pitchRadian);
+		const cosYaw = System.Math.cos(yawRadian);
+		const sinYaw = System.Math.sin(yawRadian);
+
+		// 카메라 기저 축 벡터. (-z 를 바라보는 표준 시선, yaw + 는 오른쪽, pitch + 는 위쪽)
+		const rightAxis = [cosYaw, 0, sinYaw];
+		const upAxis = [-sinPitch * sinYaw, cosPitch, sinPitch * cosYaw];
+		const backAxis = [-sinYaw * cosPitch, -sinPitch, cosYaw * cosPitch];
+
+		return new Float32Array([
+			rightAxis[0], upAxis[0], backAxis[0], 0,
+			rightAxis[1], upAxis[1], backAxis[1], 0,
+			rightAxis[2], upAxis[2], backAxis[2], 0,
+			-(rightAxis[0] * cameraPosition[0] + rightAxis[1] * cameraPosition[1] + rightAxis[2] * cameraPosition[2]),
+			-(upAxis[0] * cameraPosition[0] + upAxis[1] * cameraPosition[1] + upAxis[2] * cameraPosition[2]),
+			-(backAxis[0] * cameraPosition[0] + backAxis[1] * cameraPosition[1] + backAxis[2] * cameraPosition[2]),
+			1,
+		]);
+	}
+
+	//==============================================================================
+	// 4x4 행렬 곱. (열우선, result = left * right)
+	//==============================================================================
+	function multiplyMatrix4(leftMatrix, rightMatrix) {
+		const result = new Float32Array(16);
+		for (let column = 0; column < 4; ++column) {
+			for (let row = 0; row < 4; ++row) {
+				let sum = 0;
+				for (let term = 0; term < 4; ++term) {
+					sum += leftMatrix[term * 4 + row] * rightMatrix[column * 4 + term];
+				}
+				result[column * 4 + row] = sum;
+			}
+		}
+		return result;
+	}
+
+	//==============================================================================
+	// 함선 모델 행렬 생성. (이동 x 요 회전 x 피치 회전 x 균등 스케일, 열우선)
+	//==============================================================================
+	function createShipModelMatrix(position, yawRadian, pitchRadian, scale) {
+		const cosYaw = System.Math.cos(yawRadian);
+		const sinYaw = System.Math.sin(yawRadian);
+		const cosPitch = System.Math.cos(pitchRadian);
+		const sinPitch = System.Math.sin(pitchRadian);
+		return new Float32Array([
+			cosYaw * scale, 0, -sinYaw * scale, 0,
+			sinYaw * sinPitch * scale, cosPitch * scale, cosYaw * sinPitch * scale, 0,
+			sinYaw * cosPitch * scale, -sinPitch * scale, cosYaw * cosPitch * scale, 0,
+			position[0], position[1], position[2], 1,
+		]);
+	}
+
+	//==============================================================================
+	// 행렬로 점 변환 후 화면 좌표로 투영. (배경 셰이더의 screenPoint 좌표계)
+	//==============================================================================
+	function projectPointToScreen(viewProjectionMatrix, point, aspectRatio) {
+		const x = point[0];
+		const y = point[1];
+		const z = point[2];
+		const clipX = viewProjectionMatrix[0] * x + viewProjectionMatrix[4] * y + viewProjectionMatrix[8] * z + viewProjectionMatrix[12];
+		const clipY = viewProjectionMatrix[1] * x + viewProjectionMatrix[5] * y + viewProjectionMatrix[9] * z + viewProjectionMatrix[13];
+		const clipW = viewProjectionMatrix[3] * x + viewProjectionMatrix[7] * y + viewProjectionMatrix[11] * z + viewProjectionMatrix[15];
+		if (clipW <= 0.0001) {
+			return null;
+		}
+		return [(clipX / clipW) * aspectRatio, clipY / clipW];
+	}
+
+	//==============================================================================
+	// 초기화.
+	//==============================================================================
+	const canvas = System.document.getElementById("mainCanvas");
+	const webGL2RenderingContext = canvas.getContext("webgl2", { antialias: false, depth: false });
+	if (!webGL2RenderingContext) {
+		System.document.body.innerHTML = "<p style=\"color:#fff;font-family:sans-serif;padding:2em\">WebGL2 를 지원하지 않는 브라우저입니다.</p>";
+		throw new Error("WebGL2 Not Supported.");
+	}
+
+	// 풀스크린 패스 공용 VAO. (버텍스 버퍼 불필요)
+	const fullscreenVertexArray = webGL2RenderingContext.createVertexArray();
+
+	// 배경 프로그램.
+	const backgroundProgram = createShaderProgram(webGL2RenderingContext, FULLSCREEN_VERTEXSHADER_SOURCE, BACKGROUND_FRAGMENTSHADER_SOURCE);
+	const backgroundElapsedTimeLocation = webGL2RenderingContext.getUniformLocation(backgroundProgram, "elapsedTime");
+	const backgroundAspectRatioLocation = webGL2RenderingContext.getUniformLocation(backgroundProgram, "aspectRatio");
+	const backgroundShipStrengthLocation = webGL2RenderingContext.getUniformLocation(backgroundProgram, "shipStrength");
+	const backgroundShipAnchorListLocation = webGL2RenderingContext.getUniformLocation(backgroundProgram, "shipAnchorList");
+	const backgroundBeamAnchorLocation = webGL2RenderingContext.getUniformLocation(backgroundProgram, "beamAnchor");
+
+	// 지형 프로그램 + 그리드 메시.
+	const terrainProgram = createShaderProgram(webGL2RenderingContext, TERRAIN_VERTEXSHADER_SOURCE, TERRAIN_FRAGMENTSHADER_SOURCE);
+	const terrainProjectionMatrixLocation = webGL2RenderingContext.getUniformLocation(terrainProgram, "projectionMatrix");
+	const terrainViewMatrixLocation = webGL2RenderingContext.getUniformLocation(terrainProgram, "viewMatrix");
+	const terrainScrollOffsetLocation = webGL2RenderingContext.getUniformLocation(terrainProgram, "scrollOffset");
+	const terrainElapsedTimeLocation = webGL2RenderingContext.getUniformLocation(terrainProgram, "elapsedTime");
+	const terrainCameraPositionLocation = webGL2RenderingContext.getUniformLocation(terrainProgram, "cameraPosition");
+
+	// 그리드 정점 목록. (x: -40..40, z: 0..48, 셀 크기 1 — 오밀조밀한 패싯 + 넓은 좌우 범위)
+	const GRID_HALF_WIDTH = 40;
+	const GRID_DEPTH = 48;
+	const GRID_CELL_SIZE = 1;
+	const gridColumnCount = (GRID_HALF_WIDTH * 2) / GRID_CELL_SIZE;
+	const gridRowCount = GRID_DEPTH / GRID_CELL_SIZE;
+	const terrainPositions = [];
+	const terrainIndices = [];
+	for (let rowIndex = 0; rowIndex <= gridRowCount; ++rowIndex) {
+		for (let columnIndex = 0; columnIndex <= gridColumnCount; ++columnIndex) {
+			const positionX = -GRID_HALF_WIDTH + columnIndex * GRID_CELL_SIZE;
+			const positionZ = rowIndex * GRID_CELL_SIZE;
+			terrainPositions.push(positionX, positionZ);
+		}
+	}
+	const gridVertexStride = gridColumnCount + 1;
+	for (let rowIndex = 0; rowIndex < gridRowCount; ++rowIndex) {
+		for (let columnIndex = 0; columnIndex < gridColumnCount; ++columnIndex) {
+			const topLeft = rowIndex * gridVertexStride + columnIndex;
+			const topRight = topLeft + 1;
+			const bottomLeft = topLeft + gridVertexStride;
+			const bottomRight = bottomLeft + 1;
+			terrainIndices.push(topLeft, bottomLeft, topRight, topRight, bottomLeft, bottomRight);
+		}
+	}
+	const terrainVertexArray = webGL2RenderingContext.createVertexArray();
+	webGL2RenderingContext.bindVertexArray(terrainVertexArray);
+	const terrainVertexBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, terrainVertexBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, new Float32Array(terrainPositions), webGL2RenderingContext.STATIC_DRAW);
+	const terrainGridPositionLocation = webGL2RenderingContext.getAttribLocation(terrainProgram, "vertexGridPosition");
+	webGL2RenderingContext.enableVertexAttribArray(terrainGridPositionLocation);
+	webGL2RenderingContext.vertexAttribPointer(terrainGridPositionLocation, 2, webGL2RenderingContext.FLOAT, false, 0, 0);
+	const terrainIndexBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, terrainIndexBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, new Uint16Array(terrainIndices), webGL2RenderingContext.STATIC_DRAW);
+	webGL2RenderingContext.bindVertexArray(null);
+	const terrainIndexCount = terrainIndices.length;
+
+	// 부스트 빛살 프로그램 + 라인 버퍼. (빛살당 머리/꼬리 2정점 인터리브)
+	const streakProgram = createShaderProgram(webGL2RenderingContext, STREAK_VERTEXSHADER_SOURCE, STREAK_FRAGMENTSHADER_SOURCE);
+	const streakProjectionMatrixLocation = webGL2RenderingContext.getUniformLocation(streakProgram, "projectionMatrix");
+	const streakViewMatrixLocation = webGL2RenderingContext.getUniformLocation(streakProgram, "viewMatrix");
+	const streakScrollLocation = webGL2RenderingContext.getUniformLocation(streakProgram, "streakScroll");
+	const streakBoostFactorLocation = webGL2RenderingContext.getUniformLocation(streakProgram, "boostFactor");
+	const streakHeightOffsetLocation = webGL2RenderingContext.getUniformLocation(streakProgram, "heightOffset");
+	const streakLateralOffsetLocation = webGL2RenderingContext.getUniformLocation(streakProgram, "lateralOffset");
+	const streakFadeFactorLocation = webGL2RenderingContext.getUniformLocation(streakProgram, "fadeFactor");
+	const STREAK_COUNT = 300;
+	const STREAK_FLOATS_PER_VERTEX = 5;
+	const streakVertexData = new Float32Array(STREAK_COUNT * 2 * STREAK_FLOATS_PER_VERTEX);
+	for (let streakIndex = 0; streakIndex < STREAK_COUNT; ++streakIndex) {
+		const sideSign = streakIndex % 2 === 0 ? 1 : -1;
+		const streakX = sideSign * (1.5 + System.Math.random() * 16);
+		const streakY = 0.3 + System.Math.random() * 6.2;
+		const streakZ = System.Math.random() * 46;
+		const streakSeed = System.Math.random();
+		for (let endIndex = 0; endIndex < 2; ++endIndex) {
+			const vertexOffset = (streakIndex * 2 + endIndex) * STREAK_FLOATS_PER_VERTEX;
+			streakVertexData[vertexOffset + 0] = streakX;
+			streakVertexData[vertexOffset + 1] = streakY;
+			streakVertexData[vertexOffset + 2] = streakZ;
+			streakVertexData[vertexOffset + 3] = streakSeed;
+			streakVertexData[vertexOffset + 4] = endIndex;
+		}
+	}
+	const streakVertexArray = webGL2RenderingContext.createVertexArray();
+	webGL2RenderingContext.bindVertexArray(streakVertexArray);
+	const streakVertexBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, streakVertexBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, streakVertexData, webGL2RenderingContext.STATIC_DRAW);
+	const streakDataLocation = webGL2RenderingContext.getAttribLocation(streakProgram, "streakData");
+	const streakEndFlagLocation = webGL2RenderingContext.getAttribLocation(streakProgram, "streakEndFlag");
+	const streakStrideBytes = STREAK_FLOATS_PER_VERTEX * 4;
+	webGL2RenderingContext.enableVertexAttribArray(streakDataLocation);
+	webGL2RenderingContext.vertexAttribPointer(streakDataLocation, 4, webGL2RenderingContext.FLOAT, false, streakStrideBytes, 0);
+	webGL2RenderingContext.enableVertexAttribArray(streakEndFlagLocation);
+	webGL2RenderingContext.vertexAttribPointer(streakEndFlagLocation, 1, webGL2RenderingContext.FLOAT, false, streakStrideBytes, 16);
+	webGL2RenderingContext.bindVertexArray(null);
+
+	// 파티클 프로그램 + 정적 시드 버퍼.
+	const particleProgram = createShaderProgram(webGL2RenderingContext, PARTICLE_VERTEXSHADER_SOURCE, PARTICLE_FRAGMENTSHADER_SOURCE);
+	const particleProjectionMatrixLocation = webGL2RenderingContext.getUniformLocation(particleProgram, "projectionMatrix");
+	const particleViewMatrixLocation = webGL2RenderingContext.getUniformLocation(particleProgram, "viewMatrix");
+	const particleElapsedTimeLocation = webGL2RenderingContext.getUniformLocation(particleProgram, "elapsedTime");
+	const particleFadeFactorLocation = webGL2RenderingContext.getUniformLocation(particleProgram, "fadeFactor");
+	const particleHeightOffsetLocation = webGL2RenderingContext.getUniformLocation(particleProgram, "heightOffset");
+	const particleLateralOffsetLocation = webGL2RenderingContext.getUniformLocation(particleProgram, "lateralOffset");
+	const PARTICLE_COUNT = 500;
+	const particleData = new Float32Array(PARTICLE_COUNT * 4);
+	for (let particleIndex = 0; particleIndex < PARTICLE_COUNT; ++particleIndex) {
+		particleData[particleIndex * 4 + 0] = (System.Math.random() - 0.5) * 34;
+		particleData[particleIndex * 4 + 1] = System.Math.random() * 7;
+		particleData[particleIndex * 4 + 2] = System.Math.random() * 38;
+		particleData[particleIndex * 4 + 3] = System.Math.random();
+	}
+	const particleVertexArray = webGL2RenderingContext.createVertexArray();
+	webGL2RenderingContext.bindVertexArray(particleVertexArray);
+	const particleVertexBuffer = webGL2RenderingContext.createBuffer();
+	webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, particleVertexBuffer);
+	webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, particleData, webGL2RenderingContext.STATIC_DRAW);
+	const particleAttributeLocation = webGL2RenderingContext.getAttribLocation(particleProgram, "vertexParticle");
+	webGL2RenderingContext.enableVertexAttribArray(particleAttributeLocation);
+	webGL2RenderingContext.vertexAttribPointer(particleAttributeLocation, 4, webGL2RenderingContext.FLOAT, false, 0, 0);
+	webGL2RenderingContext.bindVertexArray(null);
+
+	// 포스트 프로세싱 프로그램 목록.
+	const brightPassProgram = createShaderProgram(webGL2RenderingContext, FULLSCREEN_VERTEXSHADER_SOURCE, BRIGHTPASS_FRAGMENTSHADER_SOURCE);
+	const brightPassSceneTextureLocation = webGL2RenderingContext.getUniformLocation(brightPassProgram, "sceneTexture");
+	const blurProgram = createShaderProgram(webGL2RenderingContext, FULLSCREEN_VERTEXSHADER_SOURCE, BLUR_FRAGMENTSHADER_SOURCE);
+	const blurSourceTextureLocation = webGL2RenderingContext.getUniformLocation(blurProgram, "sourceTexture");
+	const blurDirectionLocation = webGL2RenderingContext.getUniformLocation(blurProgram, "blurDirection");
+	const compositeProgram = createShaderProgram(webGL2RenderingContext, FULLSCREEN_VERTEXSHADER_SOURCE, COMPOSITE_FRAGMENTSHADER_SOURCE);
+	const compositeSceneTextureLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "sceneTexture");
+	const compositeBloomTextureLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "bloomTexture");
+	const compositeElapsedTimeLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "elapsedTime");
+	const compositeBoostFactorLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "boostFactor");
+	const compositeResolutionLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "resolution");
+	const compositeBloomStrengthLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "bloomStrength");
+	const compositeAberrationStrengthLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "aberrationStrength");
+	const compositeFilmStrengthLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "filmStrength");
+	const compositeLetterboxStrengthLocation = webGL2RenderingContext.getUniformLocation(compositeProgram, "letterboxStrength");
+
+	// 렌더 타겟. (리사이즈 시 재생성)
+	let sceneRenderTarget = null;
+	let bloomRenderTargetA = null;
+	let bloomRenderTargetB = null;
+
+	//==============================================================================
+	// 입력. (마우스 / 터치: 시선 시차 + 드래그 좌우 이동 + 꾹 누르면 부스트)
+	//==============================================================================
+	const PLAYER_MOVE_LIMIT = 14;
+	let pointerTargetX = 0;
+	let pointerTargetY = 0;
+	let pointerCurrentX = 0;
+	let pointerCurrentY = 0;
+	let isBoostPressed = false;
+	let dragLastClientX = null;
+	let playerTargetX = 0;
+	function updatePointerTarget(clientX, clientY) {
+		pointerTargetX = (clientX / System.window.innerWidth) * 2 - 1;
+		pointerTargetY = (clientY / System.window.innerHeight) * 2 - 1;
+	}
+	function updateDragMove(clientX) {
+		if (dragLastClientX !== null) {
+			const dragDelta = clientX - dragLastClientX;
+			playerTargetX += dragDelta * (26 / System.window.innerWidth);
+			playerTargetX = System.Math.max(-PLAYER_MOVE_LIMIT, System.Math.min(PLAYER_MOVE_LIMIT, playerTargetX));
+		}
+		dragLastClientX = clientX;
+	}
+	System.window.addEventListener("mousemove", (event) => {
+		updatePointerTarget(event.clientX, event.clientY);
+		if (activeSliderName !== null) {
+			updateSliderFromClientX(event.clientX);
+			return;
+		}
+		if (isBoostPressed) {
+			updateDragMove(event.clientX);
+		}
+	});
+	System.window.addEventListener("mousedown", (event) => {
+		if (event.button !== 0) {
+			return;
+		}
+		if (event.target && event.target.id === "homeLink") {
+			return;
+		}
+		if (handlePanelPress(event.clientX, event.clientY)) {
+			return;
+		}
+		isBoostPressed = true;
+		dragLastClientX = event.clientX;
+	});
+	System.window.addEventListener("mouseup", () => {
+		isBoostPressed = false;
+		dragLastClientX = null;
+		activeSliderName = null;
+	});
+
+	// 우클릭 컨텍스트 메뉴 차단.
+	System.window.addEventListener("contextmenu", (event) => {
+		event.preventDefault();
+	});
+
+	// 모바일 롱프레스 선택/번역/확대 등 시스템 인터랙션 차단. (passive: false + preventDefault)
+	System.window.addEventListener("touchstart", (event) => {
+		if (event.target && event.target.id === "homeLink") {
+			return;
+		}
+		event.preventDefault();
+		if (event.touches.length > 0) {
+			if (handlePanelPress(event.touches[0].clientX, event.touches[0].clientY)) {
+				return;
+			}
+			updatePointerTarget(event.touches[0].clientX, event.touches[0].clientY);
+			dragLastClientX = event.touches[0].clientX;
+		}
+		isBoostPressed = true;
+	}, { passive: false });
+	System.window.addEventListener("touchmove", (event) => {
+		if (event.target && event.target.id === "homeLink") {
+			return;
+		}
+		event.preventDefault();
+		if (event.touches.length > 0) {
+			updatePointerTarget(event.touches[0].clientX, event.touches[0].clientY);
+			if (activeSliderName !== null) {
+				updateSliderFromClientX(event.touches[0].clientX);
+				return;
+			}
+			updateDragMove(event.touches[0].clientX);
+		}
+	}, { passive: false });
+	System.window.addEventListener("touchend", () => {
+		isBoostPressed = false;
+		dragLastClientX = null;
+		activeSliderName = null;
+	});
+	System.window.addEventListener("touchcancel", () => {
+		isBoostPressed = false;
+		dragLastClientX = null;
+		activeSliderName = null;
+	});
+
+	//==============================================================================
+	// 옵션 패널. (vanilla.js 엔진의 Graphic 으로 캔버스 안에서 직접 렌더링)
+	// - 같은 캔버스의 WebGL2 컨텍스트를 공유한다. (getContext 는 동일 컨텍스트 반환)
+	//==============================================================================
+	const optionDefinitions = [
+		{ name: "bloom", label: "BLOOM", type: "toggle" },
+		{ name: "aberration", label: "CHROMATIC", type: "toggle" },
+		{ name: "film", label: "FILM GRAIN", type: "toggle" },
+		{ name: "letterbox", label: "LETTERBOX", type: "toggle" },
+		{ name: "particles", label: "PARTICLES", type: "toggle" },
+		{ name: "streaks", label: "STREAKS", type: "toggle" },
+		{ name: "ships", label: "SHIPS", type: "toggle" },
+		{ name: "glow", label: "GLOW", type: "slider", minimumValue: 0, maximumValue: 1.5, defaultValue: 1 },
+		{ name: "speed", label: "SPEED", type: "slider", minimumValue: 0.4, maximumValue: 2, defaultValue: 1 },
+	];
+	const optionStates = {
+		bloom: true,
+		aberration: true,
+		film: true,
+		letterbox: true,
+		particles: true,
+		streaks: true,
+		ships: true,
+	};
+	const optionBlendValues = {
+		bloom: 1,
+		aberration: 1,
+		film: 1,
+		letterbox: 1,
+		particles: 1,
+		streaks: 1,
+		ships: 1,
+	};
+	const sliderValues = {
+		glow: 1,
+		speed: 1,
+	};
+	let activeSliderName = null;
+	let isPanelCollapsed = true;
+	let panelCollapseBlend = 0;
+
+	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../../build/vanilla.js)
+	let uiGraphic = null;
+	let battlecruiserRenderer = null;
+	let battlecruiserModel = null;
+	let escortModel = null;
+
+	// 함대 배치. (월드 좌표 — 카메라는 -z 를 바라본다. 기함 1척 + 호위함 3척이 원거리 상공에 떠 있다)
+	const shipDefinitions = [
+		{ isFlagship: true, basePosition: [-34, 21, -78], yawRadian: 1.35, pitchRadian: -0.04, scale: 34, driftSeed: 0, fade: 0.95 },
+		{ isFlagship: false, basePosition: [34, 25, -105], yawRadian: -1.35, pitchRadian: 0.03, scale: 20, driftSeed: 13, fade: 0.8 },
+		{ isFlagship: false, basePosition: [14, 32, -135], yawRadian: -1.2, pitchRadian: 0.05, scale: 13, driftSeed: 31, fade: 0.62 },
+		{ isFlagship: false, basePosition: [55, 13, -150], yawRadian: -1.5, pitchRadian: -0.02, scale: 10, driftSeed: 47, fade: 0.5 },
+	];
+	const SHIP_STERN_LOCAL = [0, 0, -0.56]; // 모델 로컬 선미. (엔진 글로우 앵커 — 프로우는 +z 쪽)
+	const SHIP_PROW_LOCAL = [0, 0, 0.47]; // 모델 로컬 프로우. (기함 주포 앵커)
+	let engineRect = null;
+	let engineVector2 = null;
+	try {
+		let engineModule = null;
+		try {
+			engineModule = await import("./vanilla.js");
+		}
+		catch (importError) {
+			engineModule = await import("../../build/vanilla.js");
+		}
+		uiGraphic = new engineModule.Graphic(canvas);
+		engineRect = engineModule.Rect;
+		engineVector2 = engineModule.Vector2;
+
+		// 전투순양함 3D 모델. (옛 SDF 블록 배치를 그대로 세운 절차 생성 GLB — 창문 / 엔진은 자발광)
+		try {
+			battlecruiserRenderer = new engineModule.SkinnedModelRenderer(webGL2RenderingContext);
+			battlecruiserRenderer.setSunDirection(0.32, 0.38, 0.87);
+			battlecruiserRenderer.setFogColor(0.24, 0.14, 0.06);
+			battlecruiserRenderer.setFogRange(60, 190);
+			const flagshipPromise = engineModule.SkinnedModel.loadFromUrl(webGL2RenderingContext, "./assets/battlecruiser.glb", battlecruiserRenderer);
+			const escortPromise = engineModule.SkinnedModel.loadFromUrl(webGL2RenderingContext, "./assets/escort.glb", battlecruiserRenderer);
+			System.Promise.all([flagshipPromise, escortPromise]).then(([loadedFlagship, loadedEscort]) => {
+				battlecruiserModel = loadedFlagship;
+				escortModel = loadedEscort;
+			}).catch((modelError) => {
+				console.warn("전투순양함 모델을 불러오지 못했습니다.", modelError);
+			});
+		}
+		catch (rendererError) {
+			console.warn("전투순양함 렌더러를 만들지 못했습니다.", rendererError);
+		}
+	}
+	catch (engineError) {
+		console.warn("vanilla.js 엔진 모듈을 불러오지 못해 옵션 패널을 표시하지 않습니다.", engineError);
+	}
+
+	// 패널 레이아웃. (CSS 픽셀 기준, 우측 상단 고정)
+	const PANEL_WIDTH = 236;
+	const PANEL_HEADER_HEIGHT = 40;
+	const PANEL_ROW_HEIGHT = 30;
+	const PANEL_MARGIN_RIGHT = 18;
+	function calculatePanelLayout() {
+		const panelX = System.window.innerWidth - PANEL_MARGIN_RIGHT - PANEL_WIDTH;
+		const panelY = 18;
+		const listHeight = (optionDefinitions.length * PANEL_ROW_HEIGHT + 10) * panelCollapseBlend;
+		const panelHeight = PANEL_HEADER_HEIGHT + listHeight;
+		return { panelX: panelX, panelY: panelY, panelHeight: panelHeight, listHeight: listHeight };
+	}
+
+	// 패널 히트 테스트. (true 반환 시 부스트/드래그 입력으로 전달하지 않음)
+	function handlePanelPress(clientX, clientY) {
+		if (!uiGraphic) {
+			return false;
+		}
+		const panelLayout = calculatePanelLayout();
+		if (clientX < panelLayout.panelX || clientX > panelLayout.panelX + PANEL_WIDTH) {
+			return false;
+		}
+		if (clientY < panelLayout.panelY || clientY > panelLayout.panelY + panelLayout.panelHeight) {
+			return false;
+		}
+
+		// 헤더: 접기/펴기.
+		if (clientY < panelLayout.panelY + PANEL_HEADER_HEIGHT) {
+			isPanelCollapsed = !isPanelCollapsed;
+			return true;
+		}
+
+		// 목록: 행 토글 / 슬라이더 드래그 시작.
+		if (panelCollapseBlend > 0.9) {
+			const rowIndex = System.Math.floor((clientY - panelLayout.panelY - PANEL_HEADER_HEIGHT - 4) / PANEL_ROW_HEIGHT);
+			if (rowIndex >= 0 && rowIndex < optionDefinitions.length) {
+				const optionDefinition = optionDefinitions[rowIndex];
+				if (optionDefinition.type === "slider") {
+					activeSliderName = optionDefinition.name;
+					updateSliderFromClientX(clientX);
+				}
+				else {
+					optionStates[optionDefinition.name] = !optionStates[optionDefinition.name];
+				}
+			}
+		}
+		return true;
+	}
+
+	// 슬라이더 트랙의 화면 X 범위. (렌더링과 히트 테스트가 공유)
+	const SLIDER_TRACK_WIDTH = 90;
+	function calculateSliderTrackX(panelX) {
+		return panelX + PANEL_WIDTH - 16 - SLIDER_TRACK_WIDTH;
+	}
+
+	// 드래그 중인 슬라이더 값 갱신.
+	function updateSliderFromClientX(clientX) {
+		if (activeSliderName === null) {
+			return;
+		}
+		let sliderDefinition = null;
+		for (const optionDefinition of optionDefinitions) {
+			if (optionDefinition.name === activeSliderName) {
+				sliderDefinition = optionDefinition;
+			}
+		}
+		if (!sliderDefinition) {
+			return;
+		}
+		const panelLayout = calculatePanelLayout();
+		const trackX = calculateSliderTrackX(panelLayout.panelX);
+		const normalized = System.Math.max(0, System.Math.min(1, (clientX - trackX) / SLIDER_TRACK_WIDTH));
+		sliderValues[activeSliderName] = sliderDefinition.minimumValue + (sliderDefinition.maximumValue - sliderDefinition.minimumValue) * normalized;
+	}
+
+	//==============================================================================
+	// 옵션 패널 렌더링. (매 프레임, 포스트 프로세싱이 끝난 화면 위에)
+	//==============================================================================
+	function renderOptionPanel(introFade) {
+		if (!uiGraphic) {
+			return;
+		}
+		const devicePixelRatio = System.Math.min(System.window.devicePixelRatio || 1, 2);
+		const panelLayout = calculatePanelLayout();
+
+		uiGraphic.applySettings(null);
+		uiGraphic.scale(devicePixelRatio, devicePixelRatio);
+		uiGraphic.setGlobalAlpha(introFade);
+
+		// 패널 배경 + 테두리.
+		const panelRect = engineRect.create(panelLayout.panelX, panelLayout.panelY, PANEL_WIDTH, panelLayout.panelHeight);
+		uiGraphic.setFillColor("rgba(13, 7, 4, 0.6)");
+		uiGraphic.drawRoundRect(panelRect, 14);
+		uiGraphic.setStrokeColor("rgba(243, 229, 171, 0.25)");
+		uiGraphic.drawStrokeRoundRect(panelRect, 14, 1);
+
+		// 헤더.
+		uiGraphic.setFontString(`300 11px "Segoe UI", sans-serif`);
+		uiGraphic.setTextAlign("left");
+		uiGraphic.setTextBaseline("middle");
+		uiGraphic.setFillColor("rgba(243, 229, 171, 0.9)");
+		uiGraphic.drawFillText("O P T I O N S", panelLayout.panelX + 16, panelLayout.panelY + PANEL_HEADER_HEIGHT * 0.5 + 1);
+		uiGraphic.setTextAlign("right");
+		uiGraphic.setFillColor("rgba(243, 229, 171, 0.6)");
+		const arrowText = isPanelCollapsed ? "▸" : "▾";
+		uiGraphic.drawFillText(arrowText, panelLayout.panelX + PANEL_WIDTH - 16, panelLayout.panelY + PANEL_HEADER_HEIGHT * 0.5 + 1);
+
+		// 목록. (접힘 애니메이션에 따라 알파 페이드)
+		if (panelCollapseBlend > 0.05) {
+			const listAlpha = introFade * panelCollapseBlend;
+			for (let rowIndex = 0; rowIndex < optionDefinitions.length; ++rowIndex) {
+				const optionDefinition = optionDefinitions[rowIndex];
+				const rowY = panelLayout.panelY + PANEL_HEADER_HEIGHT + 4 + rowIndex * PANEL_ROW_HEIGHT;
+				if (rowY + PANEL_ROW_HEIGHT > panelLayout.panelY + panelLayout.panelHeight) {
+					break;
+				}
+				const rowMiddleY = rowY + PANEL_ROW_HEIGHT * 0.5;
+				uiGraphic.setGlobalAlpha(listAlpha);
+
+				// 레이블.
+				uiGraphic.setTextAlign("left");
+				uiGraphic.setFontString(`300 11px "Segoe UI", sans-serif`);
+				uiGraphic.setFillColor("rgba(241, 233, 216, 0.8)");
+				uiGraphic.drawFillText(optionDefinition.label, panelLayout.panelX + 16, rowMiddleY + 1);
+
+				if (optionDefinition.type === "slider") {
+					// 슬라이더. (트랙 + 채움 + 노브)
+					const sliderRange = optionDefinition.maximumValue - optionDefinition.minimumValue;
+					const sliderNormalized = (sliderValues[optionDefinition.name] - optionDefinition.minimumValue) / sliderRange;
+					const trackX = calculateSliderTrackX(panelLayout.panelX);
+					const trackRect = engineRect.create(trackX, rowMiddleY - 2, SLIDER_TRACK_WIDTH, 4);
+					uiGraphic.setFillColor("rgba(241, 233, 216, 0.18)");
+					uiGraphic.drawRoundRect(trackRect, 2);
+					const filledRect = engineRect.create(trackX, rowMiddleY - 2, SLIDER_TRACK_WIDTH * sliderNormalized, 4);
+					uiGraphic.setFillColor("rgba(232, 162, 60, 0.9)");
+					uiGraphic.drawRoundRect(filledRect, 2);
+					const sliderKnobCenter = engineVector2.create(trackX + SLIDER_TRACK_WIDTH * sliderNormalized, rowMiddleY);
+					uiGraphic.setFillColor("#fffaf0");
+					uiGraphic.drawCircle(sliderKnobCenter, 6);
+				}
+				else {
+					// 토글 스위치. (트랙 + 이동 노브, 상태 전환은 매 프레임 보간)
+					const toggleBlend = optionBlendValues[optionDefinition.name];
+					const switchX = panelLayout.panelX + PANEL_WIDTH - 16 - 36;
+					const switchY = rowMiddleY - 9.5;
+					const trackRect = engineRect.create(switchX, switchY, 36, 19);
+					const trackRed = 0.16 + (0.85 - 0.16) * toggleBlend;
+					const trackGreen = 0.14 + (0.72 - 0.14) * toggleBlend;
+					const trackBlue = 0.1 + (0.35 - 0.1) * toggleBlend;
+					uiGraphic.setFillColor(`rgba(${System.Math.round(trackRed * 255)}, ${System.Math.round(trackGreen * 255)}, ${System.Math.round(trackBlue * 255)}, 0.85)`);
+					uiGraphic.drawRoundRect(trackRect, 9.5);
+					uiGraphic.setStrokeColor(`rgba(243, 229, 171, ${0.25 + toggleBlend * 0.45})`);
+					uiGraphic.drawStrokeRoundRect(trackRect, 9.5, 1);
+					const knobX = switchX + 9.5 + toggleBlend * 17;
+					const knobCenter = engineVector2.create(knobX, rowMiddleY);
+					uiGraphic.setFillColor(toggleBlend > 0.5 ? "#fffaf0" : "rgba(241, 233, 216, 0.75)");
+					uiGraphic.drawCircle(knobCenter, 6.5);
+				}
+			}
+		}
+	}
+
+	//==============================================================================
+	// 지형 높이. (셰이더의 terrainHeight 와 동일한 수식 — 플레이어 발밑 계산용)
+	//==============================================================================
+	function smoothstepValue(edgeStart, edgeEnd, value) {
+		const normalized = System.Math.max(0, System.Math.min(1, (value - edgeStart) / (edgeEnd - edgeStart)));
+		return normalized * normalized * (3 - 2 * normalized);
+	}
+	function latticeRandomAt(cellX, cellZ) {
+		// 셰이더 latticeRandom 과 비트 단위로 동일한 32비트 정수 해시.
+		let hashValue = (Math.imul(cellX, 374761393) + Math.imul(cellZ, 668265263)) >>> 0;
+		hashValue = Math.imul(hashValue ^ (hashValue >>> 13), 1274126177) >>> 0;
+		hashValue = (hashValue ^ (hashValue >>> 16)) >>> 0;
+		return (hashValue & 65535) / 65535;
+	}
+	function valueNoiseAt(pointX, pointZ) {
+		const cellOriginX = System.Math.floor(pointX);
+		const cellOriginZ = System.Math.floor(pointZ);
+		const fractionX = pointX - cellOriginX;
+		const fractionZ = pointZ - cellOriginZ;
+		const weightX = fractionX * fractionX * (3 - 2 * fractionX);
+		const weightZ = fractionZ * fractionZ * (3 - 2 * fractionZ);
+		const value00 = latticeRandomAt(cellOriginX, cellOriginZ);
+		const value10 = latticeRandomAt(cellOriginX + 1, cellOriginZ);
+		const value01 = latticeRandomAt(cellOriginX, cellOriginZ + 1);
+		const value11 = latticeRandomAt(cellOriginX + 1, cellOriginZ + 1);
+		const valueX0 = value00 + (value10 - value00) * weightX;
+		const valueX1 = value01 + (value11 - value01) * weightX;
+		return valueX0 + (valueX1 - valueX0) * weightZ;
+	}
+	function terrainHeightAt(worldX, worldZ) {
+		const sideFactor = smoothstepValue(2.2, 9.0, System.Math.abs(worldX));
+		const noiseLarge = valueNoiseAt(worldX * 0.06, worldZ * 0.06);
+		const noiseMedium = valueNoiseAt(worldX * 0.15 + 37.0, worldZ * 0.15 + 37.0);
+		const noiseSmall = valueNoiseAt(worldX * 0.37 + 91.0, worldZ * 0.37 + 91.0);
+		const combined = noiseLarge * 1.4 + noiseMedium * 0.65 + noiseSmall * 0.25;
+		return System.Math.pow(System.Math.max(combined - 0.7, 0), 1.5) * 4.6 * sideFactor;
+	}
+
+	//==============================================================================
+	// 지형 표면 높이. (메시와 동일하게 셀 코너 높이를 쌍선형 보간 — 표면 관통 방지)
+	//==============================================================================
+	function terrainSurfaceHeightAt(worldX, worldZ) {
+		const cellStartX = System.Math.floor(worldX / GRID_CELL_SIZE) * GRID_CELL_SIZE;
+		const cellStartZ = System.Math.floor(worldZ / GRID_CELL_SIZE) * GRID_CELL_SIZE;
+		const normalizedX = (worldX - cellStartX) / GRID_CELL_SIZE;
+		const normalizedZ = (worldZ - cellStartZ) / GRID_CELL_SIZE;
+		const cornerHeight00 = terrainHeightAt(cellStartX, cellStartZ);
+		const cornerHeight10 = terrainHeightAt(cellStartX + GRID_CELL_SIZE, cellStartZ);
+		const cornerHeight01 = terrainHeightAt(cellStartX, cellStartZ + GRID_CELL_SIZE);
+		const cornerHeight11 = terrainHeightAt(cellStartX + GRID_CELL_SIZE, cellStartZ + GRID_CELL_SIZE);
+		const nearHeight = cornerHeight00 + (cornerHeight10 - cornerHeight00) * normalizedX;
+		const farHeight = cornerHeight01 + (cornerHeight11 - cornerHeight01) * normalizedX;
+		return nearHeight + (farHeight - nearHeight) * normalizedZ;
+	}
+
+	//==============================================================================
+	// 리사이즈. (캔버스 크기 + 렌더 타겟 재생성)
+	//==============================================================================
+	function resizeCanvas() {
+		const devicePixelRatio = System.Math.min(System.window.devicePixelRatio || 1, 2);
+		const displayWidth = System.Math.floor(canvas.clientWidth * devicePixelRatio);
+		const displayHeight = System.Math.floor(canvas.clientHeight * devicePixelRatio);
+		if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+			canvas.width = displayWidth;
+			canvas.height = displayHeight;
+
+			destroyRenderTarget(webGL2RenderingContext, sceneRenderTarget);
+			destroyRenderTarget(webGL2RenderingContext, bloomRenderTargetA);
+			destroyRenderTarget(webGL2RenderingContext, bloomRenderTargetB);
+			const bloomWidth = System.Math.max(1, displayWidth >> 1);
+			const bloomHeight = System.Math.max(1, displayHeight >> 1);
+			sceneRenderTarget = createRenderTarget(webGL2RenderingContext, displayWidth, displayHeight, true);
+			bloomRenderTargetA = createRenderTarget(webGL2RenderingContext, bloomWidth, bloomHeight, false);
+			bloomRenderTargetB = createRenderTarget(webGL2RenderingContext, bloomWidth, bloomHeight, false);
+		}
+	}
+
+	//==============================================================================
+	// 메인 루프.
+	//==============================================================================
+	const startTimestamp = System.performance.now();
+	let previousTimestamp = startTimestamp;
+	let boostFactor = 0;
+	let scrollDistance = 0;
+	let streakScroll = 0;
+	let playerCurrentX = 0;
+	let runBobPhase = 0;
+	function renderFrame() {
+		resizeCanvas();
+		const currentTimestamp = System.performance.now();
+		const elapsedTime = (currentTimestamp - startTimestamp) / 1000;
+		const deltaTime = System.Math.min((currentTimestamp - previousTimestamp) / 1000, 0.1);
+		previousTimestamp = currentTimestamp;
+		const aspectRatio = canvas.width / canvas.height;
+
+		// 부스트 가감속. (누르면 서서히 가속, 떼면 서서히 감속)
+		const boostTarget = isBoostPressed ? 1 : 0;
+		const boostBlend = isBoostPressed ? 2.2 : 1.2;
+		boostFactor += (boostTarget - boostFactor) * System.Math.min(boostBlend * deltaTime, 1);
+
+		// 옵션 토글 / 패널 접힘 보간. (부드러운 트랜지션)
+		for (const optionDefinition of optionDefinitions) {
+			if (optionDefinition.type !== "toggle") {
+				continue;
+			}
+			const optionTarget = optionStates[optionDefinition.name] ? 1 : 0;
+			optionBlendValues[optionDefinition.name] += (optionTarget - optionBlendValues[optionDefinition.name]) * System.Math.min(7 * deltaTime, 1);
+		}
+		const collapseTarget = isPanelCollapsed ? 0 : 1;
+		panelCollapseBlend += (collapseTarget - panelCollapseBlend) * System.Math.min(8 * deltaTime, 1);
+
+
+		// 전진 거리 적분. (지형 스크롤 / 빛살 이동 — SPEED 슬라이더 반영)
+		scrollDistance += (4.2 + boostFactor * 16) * sliderValues.speed * deltaTime;
+		streakScroll += (10 + boostFactor * 34) * sliderValues.speed * deltaTime;
+
+		// 포인터 지연 추적. (부드러운 시차)
+		pointerCurrentX += (pointerTargetX - pointerCurrentX) * 0.04;
+		pointerCurrentY += (pointerTargetY - pointerCurrentY) * 0.04;
+
+		// 플레이어 좌우 이동. (드래그 목표를 부드럽게 추적)
+		playerCurrentX += (playerTargetX - playerCurrentX) * System.Math.min(5 * deltaTime, 1);
+
+		// 플레이어 발밑 지형 높이. (메시와 동일한 보간 → 언덕을 오르내리고 관통하지 않음)
+		const playerWorldZ = scrollDistance - 0.5;
+		const surfaceHeight = terrainSurfaceHeightAt(playerCurrentX, playerWorldZ);
+
+		// 달리기 보행 바운스. (속도에 비례한 발걸음 리듬)
+		runBobPhase += (4.2 + boostFactor * 16) * sliderValues.speed * deltaTime * 0.55;
+		const runBobY = System.Math.sin(runBobPhase * 2) * 0.05 * (1 + boostFactor * 0.6);
+		const runSwayX = System.Math.sin(runBobPhase) * 0.05;
+
+		// 카메라. (지면 + 눈높이 + 보행 바운스 + 포인터 시차 + 부스트 시 화각 확장)
+		const cameraPosition = [
+			playerCurrentX + runSwayX + pointerCurrentX * 0.4,
+			surfaceHeight + 1.9 + runBobY + pointerCurrentY * -0.3,
+			0.5,
+		];
+		const cameraPitch = -0.06 + pointerCurrentY * 0.08;
+		const cameraYaw = pointerCurrentX * 0.12;
+		const fieldOfViewRadian = (System.Math.PI / 3) * (1 + boostFactor * 0.1);
+		const projectionMatrix = createPerspectiveMatrix(fieldOfViewRadian, aspectRatio, 0.1, 200);
+		const viewMatrix = createViewMatrix(cameraPosition, cameraPitch, cameraYaw);
+		const viewProjectionMatrix = multiplyMatrix4(projectionMatrix, viewMatrix);
+
+		// 함대 변환 / 화면 앵커 계산. (배경 셰이더의 엔진 글로우 / 주포가 이 좌표를 쓴다)
+		const shipStrengthValue = optionBlendValues.ships;
+		const shipModelMatrices = [];
+		const shipAnchorValues = new Float32Array(16);
+		const beamAnchorValues = new Float32Array([0, 0, 1, 0]);
+		if (battlecruiserModel && shipStrengthValue > 0.001) {
+			for (let shipIndex = 0; shipIndex < shipDefinitions.length; ++shipIndex) {
+				const shipDefinition = shipDefinitions[shipIndex];
+				const driftTime = elapsedTime + shipDefinition.driftSeed;
+				const shipPosition = [
+					shipDefinition.basePosition[0] + System.Math.sin(driftTime * 0.05) * 1.4,
+					shipDefinition.basePosition[1] + System.Math.sin(driftTime * 0.08) * 0.8,
+					shipDefinition.basePosition[2],
+				];
+
+				// SHIPS 토글 페이드는 스케일로 표현. (꺼지면 축소되며 사라진다)
+				const shipScale = shipDefinition.scale * (0.001 + 0.999 * shipStrengthValue);
+				const shipModelMatrix = createShipModelMatrix(shipPosition, shipDefinition.yawRadian, shipDefinition.pitchRadian, shipScale);
+				shipModelMatrices.push(shipModelMatrix);
+
+				// 선미 월드 좌표 → 화면 앵커.
+				const sternWorld = [
+					shipModelMatrix[0] * SHIP_STERN_LOCAL[0] + shipModelMatrix[4] * SHIP_STERN_LOCAL[1] + shipModelMatrix[8] * SHIP_STERN_LOCAL[2] + shipModelMatrix[12],
+					shipModelMatrix[1] * SHIP_STERN_LOCAL[0] + shipModelMatrix[5] * SHIP_STERN_LOCAL[1] + shipModelMatrix[9] * SHIP_STERN_LOCAL[2] + shipModelMatrix[13],
+					shipModelMatrix[2] * SHIP_STERN_LOCAL[0] + shipModelMatrix[6] * SHIP_STERN_LOCAL[1] + shipModelMatrix[10] * SHIP_STERN_LOCAL[2] + shipModelMatrix[14],
+				];
+				const sternScreen = projectPointToScreen(viewProjectionMatrix, sternWorld, aspectRatio);
+				if (sternScreen) {
+					shipAnchorValues[shipIndex * 4] = sternScreen[0];
+					shipAnchorValues[shipIndex * 4 + 1] = sternScreen[1];
+					shipAnchorValues[shipIndex * 4 + 2] = shipScale * 2.4 / -shipPosition[2];
+					shipAnchorValues[shipIndex * 4 + 3] = shipDefinition.fade * shipStrengthValue;
+				}
+
+				// 기함 프로우 / 전방 방향 → 주포 앵커.
+				if (shipIndex === 0) {
+					const prowWorld = [
+						shipModelMatrix[0] * SHIP_PROW_LOCAL[0] + shipModelMatrix[4] * SHIP_PROW_LOCAL[1] + shipModelMatrix[8] * SHIP_PROW_LOCAL[2] + shipModelMatrix[12],
+						shipModelMatrix[1] * SHIP_PROW_LOCAL[0] + shipModelMatrix[5] * SHIP_PROW_LOCAL[1] + shipModelMatrix[9] * SHIP_PROW_LOCAL[2] + shipModelMatrix[13],
+						shipModelMatrix[2] * SHIP_PROW_LOCAL[0] + shipModelMatrix[6] * SHIP_PROW_LOCAL[1] + shipModelMatrix[10] * SHIP_PROW_LOCAL[2] + shipModelMatrix[14],
+					];
+					const prowScreen = projectPointToScreen(viewProjectionMatrix, prowWorld, aspectRatio);
+					const sternScreenForDirection = sternScreen;
+					if (prowScreen && sternScreenForDirection) {
+						beamAnchorValues[0] = prowScreen[0];
+						beamAnchorValues[1] = prowScreen[1];
+						beamAnchorValues[2] = prowScreen[0] - sternScreenForDirection[0];
+						beamAnchorValues[3] = prowScreen[1] - sternScreenForDirection[1];
+					}
+				}
+			}
+		}
+
+		// === 1. 씬 → 오프스크린 렌더 타겟 ===
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, sceneRenderTarget.framebuffer);
+		webGL2RenderingContext.viewport(0, 0, sceneRenderTarget.width, sceneRenderTarget.height);
+		webGL2RenderingContext.clearColor(0.04, 0.025, 0.012, 1.0);
+		webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+
+		// 1-1. 배경.
+		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.useProgram(backgroundProgram);
+		webGL2RenderingContext.bindVertexArray(fullscreenVertexArray);
+		webGL2RenderingContext.uniform1f(backgroundElapsedTimeLocation, elapsedTime);
+		webGL2RenderingContext.uniform1f(backgroundAspectRatioLocation, aspectRatio);
+		webGL2RenderingContext.uniform1f(backgroundShipStrengthLocation, optionBlendValues.ships);
+		webGL2RenderingContext.uniform4fv(backgroundShipAnchorListLocation, shipAnchorValues);
+		webGL2RenderingContext.uniform4fv(backgroundBeamAnchorLocation, beamAnchorValues);
+		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
+
+		// 1-2. 지형.
+		webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+		webGL2RenderingContext.useProgram(terrainProgram);
+		webGL2RenderingContext.bindVertexArray(terrainVertexArray);
+		webGL2RenderingContext.uniformMatrix4fv(terrainProjectionMatrixLocation, false, projectionMatrix);
+		webGL2RenderingContext.uniformMatrix4fv(terrainViewMatrixLocation, false, viewMatrix);
+		webGL2RenderingContext.uniform1f(terrainScrollOffsetLocation, scrollDistance);
+		webGL2RenderingContext.uniform1f(terrainElapsedTimeLocation, elapsedTime);
+		webGL2RenderingContext.uniform3f(terrainCameraPositionLocation, cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+		webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, terrainIndexCount, webGL2RenderingContext.UNSIGNED_SHORT, 0);
+
+		// 1-2b. 전투순양함 함대. (절차 생성 배틀크루저 — 엔진 SkinnedModelRenderer)
+		if (battlecruiserModel && shipModelMatrices.length > 0) {
+			battlecruiserModel.update(deltaTime);
+			if (escortModel) {
+				escortModel.update(deltaTime);
+			}
+
+			// 이전 프레임 후처리가 유닛1에 걸어 둔 씬 텍스처를 풀어 준다. (씬 타깃에 그리는 중이라 피드백 금지)
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+			for (let shipIndex = 0; shipIndex < shipModelMatrices.length; ++shipIndex) {
+				const shipModel = (shipDefinitions[shipIndex].isFlagship || !escortModel) ? battlecruiserModel : escortModel;
+				battlecruiserRenderer.draw(shipModel, viewProjectionMatrix, shipModelMatrices[shipIndex], cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+			}
+		}
+
+		// 1-3. 부스트 빛살. (가산 합성, 깊이 기록 없이 테스트만, 옵션 페이드)
+		webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE);
+		webGL2RenderingContext.depthMask(false);
+		if (optionBlendValues.streaks > 0.01) {
+			webGL2RenderingContext.useProgram(streakProgram);
+			webGL2RenderingContext.bindVertexArray(streakVertexArray);
+			webGL2RenderingContext.uniformMatrix4fv(streakProjectionMatrixLocation, false, projectionMatrix);
+			webGL2RenderingContext.uniformMatrix4fv(streakViewMatrixLocation, false, viewMatrix);
+			webGL2RenderingContext.uniform1f(streakScrollLocation, streakScroll);
+			webGL2RenderingContext.uniform1f(streakBoostFactorLocation, boostFactor);
+			webGL2RenderingContext.uniform1f(streakHeightOffsetLocation, cameraPosition[1] - 2.1);
+			webGL2RenderingContext.uniform1f(streakLateralOffsetLocation, playerCurrentX);
+			webGL2RenderingContext.uniform1f(streakFadeFactorLocation, optionBlendValues.streaks);
+			webGL2RenderingContext.drawArrays(webGL2RenderingContext.LINES, 0, STREAK_COUNT * 2);
+		}
+
+		// 1-5. 파티클. (가산 합성, 깊이 테스트로 지형에 가려짐, 옵션 페이드)
+		if (optionBlendValues.particles > 0.01) {
+			webGL2RenderingContext.useProgram(particleProgram);
+			webGL2RenderingContext.bindVertexArray(particleVertexArray);
+			webGL2RenderingContext.uniformMatrix4fv(particleProjectionMatrixLocation, false, projectionMatrix);
+			webGL2RenderingContext.uniformMatrix4fv(particleViewMatrixLocation, false, viewMatrix);
+			webGL2RenderingContext.uniform1f(particleElapsedTimeLocation, elapsedTime);
+			webGL2RenderingContext.uniform1f(particleFadeFactorLocation, optionBlendValues.particles);
+			webGL2RenderingContext.uniform1f(particleHeightOffsetLocation, cameraPosition[1] - 2.1);
+			webGL2RenderingContext.uniform1f(particleLateralOffsetLocation, playerCurrentX);
+			webGL2RenderingContext.drawArrays(webGL2RenderingContext.POINTS, 0, PARTICLE_COUNT);
+		}
+		webGL2RenderingContext.depthMask(true);
+		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+		webGL2RenderingContext.bindVertexArray(fullscreenVertexArray);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+
+		// === 2. 블룸: 밝은 영역 추출 (하프 해상도) ===
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, bloomRenderTargetA.framebuffer);
+		webGL2RenderingContext.viewport(0, 0, bloomRenderTargetA.width, bloomRenderTargetA.height);
+		webGL2RenderingContext.useProgram(brightPassProgram);
+		webGL2RenderingContext.uniform1i(brightPassSceneTextureLocation, 0);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sceneRenderTarget.colorTexture);
+		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
+
+		// === 3. 블룸: 가로/세로 가우시안 블러 핑퐁 ===
+		webGL2RenderingContext.useProgram(blurProgram);
+		webGL2RenderingContext.uniform1i(blurSourceTextureLocation, 0);
+		const BLUR_ITERATION_COUNT = 2;
+		for (let blurIndex = 0; blurIndex < BLUR_ITERATION_COUNT; ++blurIndex) {
+			// 가로. (A → B)
+			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, bloomRenderTargetB.framebuffer);
+			webGL2RenderingContext.uniform2f(blurDirectionLocation, 1 / bloomRenderTargetA.width, 0);
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, bloomRenderTargetA.colorTexture);
+			webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
+
+			// 세로. (B → A)
+			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, bloomRenderTargetA.framebuffer);
+			webGL2RenderingContext.uniform2f(blurDirectionLocation, 0, 1 / bloomRenderTargetB.height);
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, bloomRenderTargetB.colorTexture);
+			webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
+		}
+
+		// === 4. 최종 합성 → 화면 ===
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+		webGL2RenderingContext.viewport(0, 0, canvas.width, canvas.height);
+		webGL2RenderingContext.useProgram(compositeProgram);
+		webGL2RenderingContext.uniform1i(compositeSceneTextureLocation, 0);
+		webGL2RenderingContext.uniform1i(compositeBloomTextureLocation, 1);
+		webGL2RenderingContext.uniform1f(compositeElapsedTimeLocation, elapsedTime);
+		webGL2RenderingContext.uniform1f(compositeBoostFactorLocation, boostFactor);
+		webGL2RenderingContext.uniform2f(compositeResolutionLocation, canvas.width, canvas.height);
+		webGL2RenderingContext.uniform1f(compositeBloomStrengthLocation, optionBlendValues.bloom * sliderValues.glow);
+		webGL2RenderingContext.uniform1f(compositeAberrationStrengthLocation, optionBlendValues.aberration);
+		webGL2RenderingContext.uniform1f(compositeFilmStrengthLocation, optionBlendValues.film);
+		webGL2RenderingContext.uniform1f(compositeLetterboxStrengthLocation, optionBlendValues.letterbox);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sceneRenderTarget.colorTexture);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, bloomRenderTargetA.colorTexture);
+		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+
+		// === 5. 옵션 패널 (vanilla.js 엔진 Graphic 으로 캔버스 안에 렌더링) ===
+		const introFade = System.Math.max(0, System.Math.min(1, (elapsedTime - 0.2) / 2.4));
+		renderOptionPanel(introFade);
+
+		System.window.requestAnimationFrame(renderFrame);
+	}
+
+	System.window.requestAnimationFrame(renderFrame);
+	</script>
+</body>
+</html>

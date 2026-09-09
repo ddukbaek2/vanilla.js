@@ -1,0 +1,22 @@
+# 2026-08-31 작업 로그
+
+## 엔진 기능 흡수 (실험적 브랜치) [08-30 요청 → 13:06 응답]
+- 요청: 루트와 동일 계층의 vanilla.js 사용 프로젝트(샘플 / 도구 제외)를 전수 조사해, 프로젝트에는 있는데 엔진에 없는 범용 기능을 전부 실험적 브랜치에 추가. 질문 없이 전체 추가하되 품질 최상, 버그 없음.
+- 조사: Explore 서브에이전트 6개로 16개 프로젝트 조사, 결과를 feature_survey.md 로 통합. 반복 구현 패턴(지수 감쇠 접근, 안전 영역, 시드 난수, 팝업 전환, 토스트, 제스처, FSM 등) 우선.
+- 추가 (base): math 난수 / 보간 유틸, SeededRandom, Cooldown / RepeatTimer, ObjectPool, FiniteStateMachine 재작성, Format, Color.fromHEXCached.
+- 추가 (core): InputManager 키 엣지 검출, ViewManager 안전 영역 / 화면비 자동 스케일 / 픽셀 배율 상한, Engine.exitApplication, TextAsset noCache, SoundEffectPool, Text 자동 줄바꿈 / 글자 수 노출, AnimationClip.fromAtlas.
+- 추가 (ui): UILabel 줄바꿈 전달, UIButton 최소 눌림 시간, UIProgressView 보조 게이지, PopupMotion, UIToast, UIDialog.
+- 추가 (misc): PathFinder, Grid, Collision2D, Steering2D, Camera2D, PointerGesture, Shaker, FocusNavigator, PersistedStore, Localization, LocalStorage.clearByPrefix, Typewriter, DialogueRunner / Parser, SpriteAnimator, PlatformerBody, FloatingText, BeepPlayer.
+- import.js 에 신규 모듈과 기존 미공개 모듈(FiniteStateMachine / LocalStorage / GamepadManager / AudioPlayer) 노출, build/vanilla.js / vanilla.min.js 재빌드.
+- 검증: 순수 로직 Node 테스트 41 + 42건 통과, 헤드리스 크롬 실엔진 스모크 26건 통과 (줄바꿈 측정 / 타자기 / 토스트 / 대화 상자 / 떠오르는 텍스트 / 플랫포머 착지 / 입력 엣지 / 안전 영역).
+- 보류 (사유와 함께 feature_survey.md 에 기록): 전역 색 리맵, NoticeCenter, GamepadCursor, borrow 풀, Scene 모달 스택, 원격 config.
+
+## 쇼케이스 개편 / UIListView / 네온호라이즌 3D 함선 [11:00 요청 → 19:10 응답]
+- 요청: 새 엔진 기능을 UI 쇼케이스와 UI 편집기에 반영, UI 를 고해상도처럼 오밀조밀하게, 목록은 템플릿 + 데이터로 수백 건 동적 생성, 무한 스크롤 / 스크롤 중 로딩, 고급진 때깔, 네온호라이즌 전투순양함을 무료 3D 애셋으로 교체.
+- 엔진: UIListView(재활용 리스트) 신규, TimeManager dt 클램프, SkinnedModel 정적 모델 지원(무애니메이션 update).
+- 쇼케이스: 1440x900 고밀도 재설계(왼쪽 레일 / 절제된 팔레트), generate.mjs 전면 재작성(항목 대신 템플릿만), index.html 재작성 — 카드 44건 / 상품 500건(무한 스크롤 + 로딩 줄) / 추천 16건을 SeededRandom 데이터로 생성, DialogueRunner + Typewriter 대사 패널, 구매 기록 패널, UIToast / PopupMotion / FloatingText / BeepPlayer / 보조 게이지 통합. 헤드리스 스모크 16/16 통과(재활용 확인: 500건을 노드 11개로).
+- 편집기: 리플렉션 인스펙터가 새 get/set 프로퍼티를 자동 노출하므로 코드 수정 불요, 헤드리스 로드 확인.
+- 네온호라이즌: SDF 함선 제거 → Quaternius Executioner(CC0, OpenGameArt 팩) OBJ 를 자체 변환기로 GLB화(뼈 1개 트리비얼 스킨), 같은 컨텍스트에서 SkinnedModelRenderer 로 4척 렌더. 이슈 2건 해결 — 무애니메이션 모델의 관절 행렬 미계산(엔진 수정), 후처리 텍스처 피드백 루프로 인한 INVALID_OPERATION(유닛1 언바인드). 스크린샷으로 구도 / 역광 / 안개 확인.
+- 미배포: dev 병합 / 사이트 배포는 요청 대기.
+- 후속: 라벨 정렬이 문서에서 복원되지 않는 문제 발견 — UILabel 정렬 게터 추가 + UIDocument UILabel 핸들러에 textAlign/textBaseline 저장/복원 보강, generate.mjs 에 정렬 지정(제목 좌측/캡션 우측). 스크린샷 확인, 스모크 16/16 재통과.
+- 배포(09-01): uishowcase(index/엔진/애셋 5벌), neonhorizon(index/엔진/battlecruiser.glb), uieditor(단일 HTML 재빌드)를 NAS 포트폴리오에 반영, 라이브 HTTP 200 및 스크린샷 확인.

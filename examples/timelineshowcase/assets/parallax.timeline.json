@@ -1,0 +1,591 @@
+{
+	"name": "Parallax Flyby",
+	"duration": 8,
+	"frameRate": 30,
+	"loop": true,
+	"stage": {
+		"width": 960,
+		"height": 540,
+		"backgroundColor": "#101114ff",
+		"nodes": [
+			{
+				"name": "Sky",
+				"type": "paint",
+				"parent": null,
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540,
+				"color": "#0f1a2eff"
+			},
+			{
+				"name": "Camera",
+				"type": "group",
+				"parent": null,
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540
+			},
+			{
+				"name": "Stars Far",
+				"type": "particle",
+				"parent": "Camera",
+				"x": 480,
+				"y": 200,
+				"width": 20,
+				"height": 20,
+				"particle": {
+					"looping": true,
+					"duration": 1.2,
+					"maxParticleCount": 600,
+					"emissionRate": 0,
+					"bursts": [
+						{
+							"time": 0,
+							"count": 120
+						}
+					],
+					"shape": "box",
+					"shapeRadius": 6,
+					"coneAngle": 0.35,
+					"boxSize": [
+						1400,
+						360
+					],
+					"edgeWidth": 400,
+					"lifetime": [
+						30,
+						30
+					],
+					"speed": [
+						0,
+						0
+					],
+					"size": [
+						1,
+						2.5
+					],
+					"rotation": [
+						0,
+						0
+					],
+					"angularVelocity": [
+						0,
+						0
+					],
+					"startColorA": [
+						1,
+						1,
+						1,
+						0.9
+					],
+					"startColorB": [
+						0.7,
+						0.8,
+						1,
+						0.5
+					],
+					"colorOverLifetime": [
+						{
+							"time": 0,
+							"color": [
+								1,
+								1,
+								1,
+								1
+							]
+						},
+						{
+							"time": 1,
+							"color": [
+								1,
+								1,
+								1,
+								1
+							]
+						}
+					],
+					"sizeOverLifetime": [
+						1,
+						1
+					],
+					"gravity": [
+						0,
+						0
+					],
+					"damping": 0,
+					"attractor": null,
+					"wobble": [
+						0,
+						4
+					],
+					"renderShape": "circle",
+					"blendMode": "lighter",
+					"streakScale": 0.04,
+					"worldSpace": false
+				}
+			},
+			{
+				"name": "Layer Far",
+				"type": "group",
+				"parent": "Camera",
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540
+			},
+			{
+				"name": "Mountain 1",
+				"type": "paint",
+				"parent": "Layer Far",
+				"x": 200,
+				"y": 460,
+				"width": 700,
+				"height": 500,
+				"color": "#1a2740ff",
+				"roundSize": 250
+			},
+			{
+				"name": "Mountain 2",
+				"type": "paint",
+				"parent": "Layer Far",
+				"x": 760,
+				"y": 480,
+				"width": 800,
+				"height": 560,
+				"color": "#1a2740ff",
+				"roundSize": 280
+			},
+			{
+				"name": "Mountain 3",
+				"type": "paint",
+				"parent": "Layer Far",
+				"x": 1300,
+				"y": 470,
+				"width": 700,
+				"height": 500,
+				"color": "#1a2740ff",
+				"roundSize": 250
+			},
+			{
+				"name": "Layer Mid",
+				"type": "group",
+				"parent": "Camera",
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540
+			},
+			{
+				"name": "Hill 1",
+				"type": "paint",
+				"parent": "Layer Mid",
+				"x": 100,
+				"y": 540,
+				"width": 600,
+				"height": 420,
+				"color": "#233552ff",
+				"roundSize": 210
+			},
+			{
+				"name": "Hill 2",
+				"type": "paint",
+				"parent": "Layer Mid",
+				"x": 620,
+				"y": 560,
+				"width": 720,
+				"height": 460,
+				"color": "#233552ff",
+				"roundSize": 230
+			},
+			{
+				"name": "Hill 3",
+				"type": "paint",
+				"parent": "Layer Mid",
+				"x": 1200,
+				"y": 540,
+				"width": 600,
+				"height": 420,
+				"color": "#233552ff",
+				"roundSize": 210
+			},
+			{
+				"name": "Layer Near",
+				"type": "group",
+				"parent": "Camera",
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540
+			},
+			{
+				"name": "Ground",
+				"type": "paint",
+				"parent": "Layer Near",
+				"x": 480,
+				"y": 540,
+				"width": 2400,
+				"height": 160,
+				"color": "#2d4468ff"
+			},
+			{
+				"name": "Tree 1",
+				"type": "paint",
+				"parent": "Layer Near",
+				"x": 160,
+				"y": 430,
+				"width": 40,
+				"height": 140,
+				"color": "#1c2c48ff",
+				"roundSize": 20
+			},
+			{
+				"name": "Tree 2",
+				"type": "paint",
+				"parent": "Layer Near",
+				"x": 520,
+				"y": 420,
+				"width": 48,
+				"height": 160,
+				"color": "#1c2c48ff",
+				"roundSize": 24
+			},
+			{
+				"name": "Tree 3",
+				"type": "paint",
+				"parent": "Layer Near",
+				"x": 900,
+				"y": 436,
+				"width": 40,
+				"height": 130,
+				"color": "#1c2c48ff",
+				"roundSize": 20
+			},
+			{
+				"name": "Bat",
+				"type": "sprite",
+				"parent": "Camera",
+				"x": -120,
+				"y": 180,
+				"width": 128,
+				"height": 96,
+				"image": "bat.png",
+				"frameColumns": 4,
+				"frameRows": 1
+			},
+			{
+				"name": "Title",
+				"type": "text",
+				"parent": null,
+				"x": 480,
+				"y": 120,
+				"width": 700,
+				"height": 60,
+				"text": "PARALLAX FLYBY",
+				"fontSize": 44,
+				"bold": true,
+				"color": "#f2ece2ff",
+				"opacity": 0
+			}
+		]
+	},
+	"tracks": [
+		{
+			"target": "Layer Far",
+			"property": "x",
+			"keys": [
+				{
+					"time": 0,
+					"value": 480,
+					"easing": "linear"
+				},
+				{
+					"time": 8,
+					"value": 320,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Layer Mid",
+			"property": "x",
+			"keys": [
+				{
+					"time": 0,
+					"value": 480,
+					"easing": "linear"
+				},
+				{
+					"time": 8,
+					"value": 100,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Layer Near",
+			"property": "x",
+			"keys": [
+				{
+					"time": 0,
+					"value": 480,
+					"easing": "linear"
+				},
+				{
+					"time": 8,
+					"value": -300,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Stars Far",
+			"property": "x",
+			"keys": [
+				{
+					"time": 0,
+					"value": 480,
+					"easing": "linear"
+				},
+				{
+					"time": 8,
+					"value": 400,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Camera",
+			"property": "scaleX",
+			"keys": [
+				{
+					"time": 0,
+					"value": 1,
+					"easing": "sinusoidal.inOut"
+				},
+				{
+					"time": 4,
+					"value": 1.2,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 8,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Camera",
+			"property": "scaleY",
+			"keys": [
+				{
+					"time": 0,
+					"value": 1,
+					"easing": "sinusoidal.inOut"
+				},
+				{
+					"time": 4,
+					"value": 1.2,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 8,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Camera",
+			"property": "y",
+			"keys": [
+				{
+					"time": 0,
+					"value": 270,
+					"easing": "sinusoidal.inOut"
+				},
+				{
+					"time": 4,
+					"value": 240,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 8,
+					"value": 270,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Bat",
+			"property": "x",
+			"keys": [
+				{
+					"time": 0.5,
+					"value": -120,
+					"easing": "linear"
+				},
+				{
+					"time": 6.5,
+					"value": 1100,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Bat",
+			"property": "y",
+			"keys": [
+				{
+					"time": 0.5,
+					"value": 180,
+					"easing": "sinusoidal.inOut"
+				},
+				{
+					"time": 2,
+					"value": 120,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 3.5,
+					"value": 200,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 5,
+					"value": 130,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 6.5,
+					"value": 180,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Bat",
+			"property": "frame",
+			"keys": [
+				{
+					"time": 0,
+					"value": 0,
+					"easing": "linear"
+				},
+				{
+					"time": 8,
+					"value": 48,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Bat",
+			"property": "scaleX",
+			"keys": [
+				{
+					"time": 0,
+					"value": 1,
+					"easing": "step"
+				}
+			]
+		},
+		{
+			"target": "Title",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 0.4,
+					"value": 0,
+					"easing": "cubic.out"
+				},
+				{
+					"time": 1.2,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 6.5,
+					"value": 1,
+					"easing": "cubic.in"
+				},
+				{
+					"time": 7.3,
+					"value": 0,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Title",
+			"property": "y",
+			"keys": [
+				{
+					"time": 0.4,
+					"value": 140,
+					"easing": "cubic.out"
+				},
+				{
+					"time": 1.2,
+					"value": 120,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Stars Far",
+			"property": "event",
+			"keys": [
+				{
+					"time": 0.05,
+					"value": "play",
+					"easing": "step"
+				}
+			]
+		},
+		{
+			"target": "screen",
+			"property": "fog",
+			"keys": [
+				{
+					"time": 0,
+					"value": 0.5,
+					"easing": "sinusoidal.inOut"
+				},
+				{
+					"time": 4,
+					"value": 0.2,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 8,
+					"value": 0.5,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "screen",
+			"property": "bloom",
+			"keys": [
+				{
+					"time": 0,
+					"value": 0.6,
+					"easing": "step"
+				}
+			]
+		}
+	],
+	"markers": [
+		{
+			"time": 0.5,
+			"name": "bat"
+		},
+		{
+			"time": 4,
+			"name": "zoom"
+		}
+	]
+}

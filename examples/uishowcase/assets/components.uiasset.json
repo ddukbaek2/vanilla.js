@@ -1,0 +1,2363 @@
+{
+	"version": 1,
+	"root": {
+		"type": "WorldNode",
+		"name": "Components",
+		"active": true,
+		"position": [
+			0,
+			0
+		],
+		"scale": [
+			1,
+			1
+		],
+		"rotation": 0,
+		"opacity": 1,
+		"pivot": [
+			0,
+			0
+		],
+		"anchor": [
+			0,
+			0
+		],
+		"contentSize": [
+			1680,
+			1000
+		],
+		"interactable": false,
+		"components": [
+			{
+				"type": "Paint",
+				"color": [
+					0.078,
+					0.09,
+					0.118,
+					1
+				],
+				"roundSize": 0
+			}
+		],
+		"children": [
+			{
+				"type": "WorldNode",
+				"name": "Title",
+				"active": true,
+				"position": [
+					224,
+					22
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					360,
+					26
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "UILabel",
+						"text": "COMPONENTS",
+						"fontSize": 18,
+						"textColor": [
+							0.91,
+							0.922,
+							0.949,
+							1
+						],
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						],
+						"textAlign": "left",
+						"textBaseline": "middle"
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "Subtitle",
+				"active": true,
+				"position": [
+					226,
+					50
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					480,
+					14
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "UILabel",
+						"text": "Every widget below is rendered by the engine.",
+						"fontSize": 11,
+						"textColor": [
+							0.604,
+							0.635,
+							0.698,
+							1
+						],
+						"backgroundColor": [
+							1,
+							1,
+							1,
+							0
+						],
+						"textAlign": "left",
+						"textBaseline": "middle"
+					}
+				],
+				"children": []
+			},
+			{
+				"type": "WorldNode",
+				"name": "StatusChip",
+				"active": true,
+				"position": [
+					1420,
+					26
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					244,
+					26
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.173,
+							0.2,
+							0.267,
+							1
+						],
+						"roundSize": 13
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "StatusChipLabel",
+						"active": true,
+						"position": [
+							0,
+							0
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							244,
+							26
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "●  All systems normal",
+								"fontSize": 10.5,
+								"textColor": [
+									0.271,
+									0.71,
+									0.522,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "center",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "ButtonsPanel",
+				"active": true,
+				"position": [
+					224,
+					82
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					430,
+					262
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.125,
+							0.165,
+							1
+						],
+						"roundSize": 10
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "ButtonsTitle",
+						"active": true,
+						"position": [
+							16,
+							12
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							300,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "BUTTONS",
+								"fontSize": 10,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "NormalButton",
+						"active": true,
+						"position": [
+							16,
+							40
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							190,
+							32
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.427,
+									0.49,
+									1,
+									1
+								],
+								"roundSize": 8
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.25
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "DEFAULT",
+								"fontSize": 11,
+								"textColor": [
+									0.91,
+									0.922,
+									0.949,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "center",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "NormalCaption",
+						"active": true,
+						"position": [
+							222,
+							40
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							190,
+							32
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "hover / press tint",
+								"fontSize": 9.5,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "DisabledButton",
+						"active": true,
+						"position": [
+							16,
+							84
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							190,
+							32
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.173,
+									0.2,
+									0.267,
+									1
+								],
+								"roundSize": 8
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.25
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "DISABLED",
+								"fontSize": 11,
+								"textColor": [
+									0.91,
+									0.922,
+									0.949,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "center",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "DisabledCaption",
+						"active": true,
+						"position": [
+							222,
+							84
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							190,
+							32
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "setInteractable(false)",
+								"fontSize": 9.5,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "LongPressButton",
+						"active": true,
+						"position": [
+							16,
+							128
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							190,
+							32
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.173,
+									0.2,
+									0.267,
+									1
+								],
+								"roundSize": 8
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.25
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "HOLD 1s",
+								"fontSize": 11,
+								"textColor": [
+									0.91,
+									0.922,
+									0.949,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "center",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "LongPressCaption",
+						"active": true,
+						"position": [
+							222,
+							128
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							190,
+							32
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "long press event",
+								"fontSize": 9.5,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "LongPressBar",
+						"active": true,
+						"position": [
+							16,
+							168
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							190,
+							5
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UIProgressView",
+								"value": 0,
+								"minValue": 0,
+								"maxValue": 1
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ButtonsResult",
+						"active": true,
+						"position": [
+							16,
+							196
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							398,
+							40
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "MenuPanel",
+				"active": true,
+				"position": [
+					674,
+					82
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					430,
+					262
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.125,
+							0.165,
+							1
+						],
+						"roundSize": 10
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "MenuTitle",
+						"active": true,
+						"position": [
+							16,
+							12
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							300,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "CONTEXT MENU",
+								"fontSize": 10,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "RightClickZone",
+						"active": true,
+						"position": [
+							16,
+							40
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							398,
+							150
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.137,
+									0.161,
+									0.216,
+									1
+								],
+								"roundSize": 8
+							}
+						],
+						"children": [
+							{
+								"type": "WorldNode",
+								"name": "RightClickHint",
+								"active": true,
+								"position": [
+									0,
+									0
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0,
+									0
+								],
+								"anchor": [
+									0,
+									0
+								],
+								"contentSize": [
+									398,
+									150
+								],
+								"interactable": false,
+								"components": [
+									{
+										"type": "UILabel",
+										"text": "Right click here\n(or long press)",
+										"fontSize": 11,
+										"textColor": [
+											0.42,
+											0.451,
+											0.529,
+											1
+										],
+										"backgroundColor": [
+											1,
+											1,
+											1,
+											0
+										],
+										"textAlign": "center",
+										"textBaseline": "middle"
+									}
+								],
+								"children": []
+							}
+						]
+					},
+					{
+						"type": "WorldNode",
+						"name": "MenuResult",
+						"active": true,
+						"position": [
+							16,
+							204
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							398,
+							32
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10.5,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "DragPanel",
+				"active": true,
+				"position": [
+					1124,
+					82
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					340,
+					262
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.125,
+							0.165,
+							1
+						],
+						"roundSize": 10
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "DragTitle",
+						"active": true,
+						"position": [
+							16,
+							12
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							300,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "DRAG & DROP",
+								"fontSize": 10,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "DragSlotA",
+						"active": true,
+						"position": [
+							16,
+							150
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							92,
+							66
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.137,
+									0.161,
+									0.216,
+									1
+								],
+								"roundSize": 8
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "DragSlotB",
+						"active": true,
+						"position": [
+							124,
+							150
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							92,
+							66
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.137,
+									0.161,
+									0.216,
+									1
+								],
+								"roundSize": 8
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "DragSlotC",
+						"active": true,
+						"position": [
+							232,
+							150
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							92,
+							66
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.137,
+									0.161,
+									0.216,
+									1
+								],
+								"roundSize": 8
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "DragResult",
+						"active": true,
+						"position": [
+							16,
+							228
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							20
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Drag chips into slots.",
+								"fontSize": 10,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "ProgressPanel",
+				"active": true,
+				"position": [
+					224,
+					360
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					430,
+					220
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.125,
+							0.165,
+							1
+						],
+						"roundSize": 10
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "ProgressTitle",
+						"active": true,
+						"position": [
+							16,
+							12
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							300,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "PROGRESS",
+								"fontSize": 10,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "SpinnerCaption",
+						"active": true,
+						"position": [
+							16,
+							40
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							120,
+							60
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "UISpinner",
+								"fontSize": 10,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ProgressCaption",
+						"active": true,
+						"position": [
+							16,
+							124
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							120,
+							20
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "UIProgressView",
+								"fontSize": 10,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "LoopProgressBar",
+						"active": true,
+						"position": [
+							16,
+							152
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							398,
+							7
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UIProgressView",
+								"value": 0,
+								"minValue": 0,
+								"maxValue": 1
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "LoopProgressValue",
+						"active": true,
+						"position": [
+							16,
+							172
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							398,
+							18
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 10,
+								"textColor": [
+									0.604,
+									0.635,
+									0.698,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "TypePanel",
+				"active": true,
+				"position": [
+					674,
+					360
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					430,
+					220
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.125,
+							0.165,
+							1
+						],
+						"roundSize": 10
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "TypeTitle",
+						"active": true,
+						"position": [
+							16,
+							12
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							300,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "TYPEWRITER",
+								"fontSize": 10,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "TypeBody",
+						"active": true,
+						"position": [
+							16,
+							40
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							398,
+							110
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "",
+								"fontSize": 11.5,
+								"textColor": [
+									0.91,
+									0.922,
+									0.949,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "top"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "TypeReplayButton",
+						"active": true,
+						"position": [
+							16,
+							168
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							120,
+							30
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.173,
+									0.2,
+									0.267,
+									1
+								],
+								"roundSize": 8
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.25
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "REPLAY",
+								"fontSize": 10.5,
+								"textColor": [
+									0.91,
+									0.922,
+									0.949,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "center",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "FeedbackPanel",
+				"active": true,
+				"position": [
+					1124,
+					360
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					340,
+					220
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.125,
+							0.165,
+							1
+						],
+						"roundSize": 10
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "FeedbackTitle",
+						"active": true,
+						"position": [
+							16,
+							12
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							300,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "FEEDBACK",
+								"fontSize": 10,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ToastButton",
+						"active": true,
+						"position": [
+							16,
+							40
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							32
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.173,
+									0.2,
+									0.267,
+									1
+								],
+								"roundSize": 8
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.25
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "SHOW TOAST",
+								"fontSize": 11,
+								"textColor": [
+									0.91,
+									0.922,
+									0.949,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "center",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "DialogButton",
+						"active": true,
+						"position": [
+							16,
+							84
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							32
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.173,
+									0.2,
+									0.267,
+									1
+								],
+								"roundSize": 8
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.25
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "SHOW DIALOG",
+								"fontSize": 11,
+								"textColor": [
+									0.91,
+									0.922,
+									0.949,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "center",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "QueueToastButton",
+						"active": true,
+						"position": [
+							16,
+							128
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							32
+						],
+						"interactable": true,
+						"components": [
+							{
+								"type": "Paint",
+								"color": [
+									0.173,
+									0.2,
+									0.267,
+									1
+								],
+								"roundSize": 8
+							},
+							{
+								"type": "UIButton",
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.25
+								]
+							},
+							{
+								"type": "UILabel",
+								"text": "QUEUE 3 TOASTS",
+								"fontSize": 11,
+								"textColor": [
+									0.91,
+									0.922,
+									0.949,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "center",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "FeedbackCaption",
+						"active": true,
+						"position": [
+							16,
+							172
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							308,
+							32
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "Toast queueing / popup motion are\nengine widgets.",
+								"fontSize": 9.5,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "top"
+							}
+						],
+						"children": []
+					}
+				]
+			},
+			{
+				"type": "WorldNode",
+				"name": "ChartsPanel",
+				"active": true,
+				"position": [
+					224,
+					596
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0,
+					0
+				],
+				"anchor": [
+					0,
+					0
+				],
+				"contentSize": [
+					1240,
+					380
+				],
+				"interactable": false,
+				"components": [
+					{
+						"type": "Paint",
+						"color": [
+							0.106,
+							0.125,
+							0.165,
+							1
+						],
+						"roundSize": 10
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "ChartsTitle",
+						"active": true,
+						"position": [
+							16,
+							12
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							300,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "CHARTS",
+								"fontSize": 10,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "MiniLineCaption",
+						"active": true,
+						"position": [
+							16,
+							36
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							200,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "UILineChart",
+								"fontSize": 10,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "MiniLineChart",
+						"active": true,
+						"position": [
+							16,
+							58
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							592,
+							290
+						],
+						"interactable": false,
+						"components": [],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "MiniBarCaption",
+						"active": true,
+						"position": [
+							632,
+							36
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							200,
+							16
+						],
+						"interactable": false,
+						"components": [
+							{
+								"type": "UILabel",
+								"text": "UIBarChart",
+								"fontSize": 10,
+								"textColor": [
+									0.42,
+									0.451,
+									0.529,
+									1
+								],
+								"backgroundColor": [
+									1,
+									1,
+									1,
+									0
+								],
+								"textAlign": "left",
+								"textBaseline": "middle"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "MiniBarChart",
+						"active": true,
+						"position": [
+							632,
+							58
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0,
+							0
+						],
+						"anchor": [
+							0,
+							0
+						],
+						"contentSize": [
+							592,
+							290
+						],
+						"interactable": false,
+						"components": [],
+						"children": []
+					}
+				]
+			}
+		]
+	}
+}

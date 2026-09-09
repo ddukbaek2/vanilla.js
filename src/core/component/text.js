@@ -109,6 +109,10 @@ export class Text extends Component {
 	/** @private @type { boolean } */ #strikethrough;
 	/** @private @type { string } */ #textAlign;
 	/** @private @type { string } */ #textBaseline;
+	/** @private @type { number } */ #wordWrapWidth; // 0 이면 한 줄. 넘으면 이 폭에서 줄을 바꾼다.
+	/** @private @type { string } */ #wrapMode; // "word": 공백 단위(넘치는 단어는 글자 분할) | "char": 글자 단위.
+	/** @private @type { number } */ #lineSpacing; // 줄 간격 배율.
+	/** @private @type { number } */ #visibleCharacterCount; // 표시 글자 수. -1 이면 전체.
 
 	//==============================================================================
 	// 생성.
@@ -128,6 +132,10 @@ export class Text extends Component {
 		this.#strikethrough = false;
 		this.#textAlign = "center";
 		this.#textBaseline = "middle";
+		this.#wordWrapWidth = 0;
+		this.#wrapMode = "word";
+		this.#lineSpacing = 1.25;
+		this.#visibleCharacterCount = -1;
 	}
 
 	//==============================================================================
@@ -158,7 +166,208 @@ export class Text extends Component {
 		}
 		const node = this.getNode();
 		const contentSize = node.getContentSize();
-		this.drawPlainText(graphic, contentSize, text);
+		if (this.#wordWrapWidth > 0 || text.indexOf("\n") >= 0) {
+			this.drawWrappedText(graphic, contentSize, text);
+			return;
+		}
+		const visibleText = this.applyVisibleCharacterCount(text);
+		if (!visibleText) {
+			return;
+		}
+		this.drawPlainText(graphic, contentSize, visibleText);
+	}
+
+	//==============================================================================
+	// 표시 글자 수만큼 앞에서 자르기.
+	//==============================================================================
+	/**
+	 * @param { string } text
+	 * @returns { string }
+	 */
+	applyVisibleCharacterCount(text) {
+		if (this.#visibleCharacterCount < 0) {
+			return text;
+		}
+		return text.slice(0, this.#visibleCharacterCount);
+	}
+
+	//==============================================================================
+	// 여러 줄 텍스트 그리기. (자동 줄바꿈 + 명시적 개행 + 표시 글자 수)
+	// - textBaseline 은 줄 묶음의 세로 정렬로 쓴다. (top / middle / bottom)
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic
+	 * @param { Vector2 } contentSize
+	 * @param { string } fullText
+	 */
+	drawWrappedText(graphic, contentSize, fullText) {
+		const wrapWidth = (this.#wordWrapWidth > 0) ? this.#wordWrapWidth : contentSize.x;
+		const lineList = this.wrapTextToLines(fullText, wrapWidth);
+		const lineHeight = this.#fontSize * this.#lineSpacing;
+		const blockHeight = lineList.length * lineHeight;
+
+		let blockTop;
+		if (this.#textBaseline === "top" || this.#textBaseline === "hanging") {
+			blockTop = 0;
+		}
+		else if (this.#textBaseline === "bottom" || this.#textBaseline === "ideographic" || this.#textBaseline === "alphabetic") {
+			blockTop = contentSize.y - blockHeight;
+		}
+		else {
+			blockTop = (contentSize.y - blockHeight) * 0.5;
+		}
+
+		let drawX;
+		if (this.#textAlign === "left" || this.#textAlign === "start") {
+			drawX = 0;
+		}
+		else if (this.#textAlign === "right" || this.#textAlign === "end") {
+			drawX = contentSize.x;
+		}
+		else {
+			drawX = contentSize.x * 0.5;
+		}
+
+		graphic.setFontString(buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic));
+		graphic.setTextAlign(this.#textAlign);
+		graphic.setTextBaseline("middle");
+
+		const strokeColor = this.getStrokeColor();
+		const textColor = this.getTextColor();
+		const decorationLineWidth = System.Math.max(1, this.#fontSize / 16);
+
+		let remainCount = this.#visibleCharacterCount;
+		for (let lineIndex = 0; lineIndex < lineList.length; ++lineIndex) {
+			let lineText = lineList[lineIndex];
+			if (remainCount >= 0) {
+				if (remainCount <= 0) {
+					break;
+				}
+				if (lineText.length > remainCount) {
+					lineText = lineText.slice(0, remainCount);
+				}
+				remainCount -= lineList[lineIndex].length;
+			}
+			if (lineText.length === 0) {
+				continue;
+			}
+			const lineY = blockTop + (lineIndex + 0.5) * lineHeight;
+			if (strokeColor && this.#strokeWidth > 0) {
+				graphic.setStrokeColor(strokeColor.toHEXString());
+				graphic.drawStrokeText(lineText, drawX, lineY, this.#strokeWidth);
+			}
+			graphic.setFillColor(textColor.toHEXString());
+			graphic.drawFillText(lineText, drawX, lineY);
+
+			if (this.#underline || this.#strikethrough) {
+				const lineWidth = this.measurePlainTextWidth(lineText);
+				const startX = this.computeUnderlineStartX(drawX, lineWidth);
+				graphic.setStrokeColor(textColor.toHEXString());
+				if (this.#underline) {
+					this.strokeHorizontalLine(graphic, startX, lineY + this.#fontSize * 0.5 + decorationLineWidth, lineWidth, decorationLineWidth);
+				}
+				if (this.#strikethrough) {
+					this.strokeHorizontalLine(graphic, startX, lineY, lineWidth, decorationLineWidth);
+				}
+			}
+		}
+	}
+
+	//==============================================================================
+	// 텍스트를 폭에 맞춰 줄 배열로 나누기.
+	// - "word": 공백 단위로 채우고, 한 단어가 폭을 넘으면 글자 단위로 강제 분할.
+	//   (공백 없는 CJK 문장은 통째로 한 단어이므로 자연히 글자 단위가 된다)
+	// - "char": 처음부터 글자 단위.
+	// - 명시적 개행(\n)은 항상 지켜진다.
+	//==============================================================================
+	/**
+	 * @param { string } text
+	 * @param { number } maxWidth
+	 * @returns { string[] }
+	 */
+	wrapTextToLines(text, maxWidth) {
+		const measurementContext = getMeasurementCanvasRenderingContext();
+		if (measurementContext === null || maxWidth <= 0) {
+			return text.split("\n");
+		}
+		measurementContext.save();
+		measurementContext.font = buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic);
+		const measureWidth = (candidateText) => {
+			return measurementContext.measureText(candidateText).width;
+		};
+
+		const lineList = [];
+		const appendByCharacter = (chunkText, seedText) => {
+			// seedText 에 chunkText 를 글자 단위로 이어 붙이며 넘칠 때마다 줄을 확정한다.
+			let currentLine = seedText;
+			for (const character of chunkText) {
+				const candidate = currentLine + character;
+				if (currentLine.length > 0 && measureWidth(candidate) > maxWidth) {
+					lineList.push(currentLine);
+					currentLine = character;
+				}
+				else {
+					currentLine = candidate;
+				}
+			}
+			return currentLine;
+		};
+
+		for (const paragraphText of text.split("\n")) {
+			if (paragraphText.length === 0) {
+				lineList.push("");
+				continue;
+			}
+			if (this.#wrapMode === "char") {
+				const lastLine = appendByCharacter(paragraphText, "");
+				lineList.push(lastLine);
+				continue;
+			}
+			let currentLine = "";
+			for (const wordText of paragraphText.split(" ")) {
+				const candidate = (currentLine.length > 0) ? (currentLine + " " + wordText) : wordText;
+				if (measureWidth(candidate) <= maxWidth) {
+					currentLine = candidate;
+					continue;
+				}
+				if (currentLine.length > 0) {
+					lineList.push(currentLine);
+					currentLine = "";
+				}
+				if (measureWidth(wordText) <= maxWidth) {
+					currentLine = wordText;
+				}
+				else {
+					currentLine = appendByCharacter(wordText, "");
+				}
+			}
+			lineList.push(currentLine);
+		}
+		measurementContext.restore();
+		return lineList;
+	}
+
+	//==============================================================================
+	// 줄바꿈 반영 크기 측정. (레이아웃 용)
+	//==============================================================================
+	/**
+	 * @returns { object } { width, height, lineCount }
+	 */
+	measureWrappedSize() {
+		const text = this.getText();
+		if (!text) {
+			return { width: 0, height: 0, lineCount: 0 };
+		}
+		if (this.#wordWrapWidth <= 0 && text.indexOf("\n") < 0) {
+			return { width: this.measurePlainTextWidth(text), height: this.#fontSize * this.#lineSpacing, lineCount: 1 };
+		}
+		const wrapWidth = (this.#wordWrapWidth > 0) ? this.#wordWrapWidth : System.Number.POSITIVE_INFINITY;
+		const lineList = this.wrapTextToLines(text, wrapWidth);
+		let maxLineWidth = 0;
+		for (const lineText of lineList) {
+			maxLineWidth = System.Math.max(maxLineWidth, this.measurePlainTextWidth(lineText));
+		}
+		return { width: maxLineWidth, height: lineList.length * this.#fontSize * this.#lineSpacing, lineCount: lineList.length };
 	}
 
 	//==============================================================================
@@ -192,35 +401,33 @@ export class Text extends Component {
 			drawY = contentSize.y * 0.5;
 		}
 
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
-		canvasRenderingContext.font = buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic);
-		canvasRenderingContext.textAlign = this.#textAlign;
-		canvasRenderingContext.textBaseline = this.#textBaseline;
+		graphic.setFontString(buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic));
+		graphic.setTextAlign(this.#textAlign);
+		graphic.setTextBaseline(this.#textBaseline);
 
 		const strokeColor = this.getStrokeColor();
 		if (strokeColor && this.#strokeWidth > 0) {
-			canvasRenderingContext.strokeStyle = strokeColor.toHEXString();
-			canvasRenderingContext.lineWidth = this.#strokeWidth;
-			canvasRenderingContext.strokeText(text, drawX, drawY);
+			graphic.setStrokeColor(strokeColor.toHEXString());
+			graphic.drawStrokeText(text, drawX, drawY, this.#strokeWidth);
 		}
 
 		const textColor = this.getTextColor();
-		canvasRenderingContext.fillStyle = textColor.toHEXString();
-		canvasRenderingContext.fillText(text, drawX, drawY);
+		graphic.setFillColor(textColor.toHEXString());
+		graphic.drawFillText(text, drawX, drawY);
 
 		if (this.#underline || this.#strikethrough) {
 			const textWidth = this.measurePlainTextWidth(text);
 			const startX = this.computeUnderlineStartX(drawX, textWidth);
 			const fontSize = this.#fontSize;
-			canvasRenderingContext.strokeStyle = textColor.toHEXString();
-			canvasRenderingContext.lineWidth = System.Math.max(1, fontSize / 16);
+			graphic.setStrokeColor(textColor.toHEXString());
+			const lineWidth = System.Math.max(1, fontSize / 16);
 			if (this.#underline) {
 				const underlineY = drawY + this.computeUnderlineOffsetY(fontSize);
-				this.strokeHorizontalLine(canvasRenderingContext, startX, underlineY, textWidth);
+				this.strokeHorizontalLine(graphic, startX, underlineY, textWidth, lineWidth);
 			}
 			if (this.#strikethrough) {
 				const strikeY = drawY + this.computeStrikethroughOffsetY(fontSize);
-				this.strokeHorizontalLine(canvasRenderingContext, startX, strikeY, textWidth);
+				this.strokeHorizontalLine(graphic, startX, strikeY, textWidth, lineWidth);
 			}
 		}
 	}
@@ -300,16 +507,17 @@ export class Text extends Component {
 	// 가로 라인 stroke.
 	//==============================================================================
 	/**
-	 * @param { CanvasRenderingContext2D } canvasRenderingContext
+	 * @param { Graphic } graphic
 	 * @param { number } x
 	 * @param { number } y
 	 * @param { number } width
+	 * @param { number } lineWidth
 	 */
-	strokeHorizontalLine(canvasRenderingContext, x, y, width) {
-		canvasRenderingContext.beginPath();
-		canvasRenderingContext.moveTo(x, y);
-		canvasRenderingContext.lineTo(x + width, y);
-		canvasRenderingContext.stroke();
+	strokeHorizontalLine(graphic, x, y, width, lineWidth = 1) {
+		graphic.drawLine([
+			Vector2.create(x, y),
+			Vector2.create(x + width, y),
+		], lineWidth);
 	}
 
 	//==============================================================================
@@ -373,6 +581,86 @@ export class Text extends Component {
 	/**
 	 * @param { string } text
 	 */
+	//==============================================================================
+	// 자동 줄바꿈 폭 설정. (0 이면 한 줄)
+	//==============================================================================
+	/**
+	 * @param { number } wordWrapWidth
+	 */
+	setWordWrapWidth(wordWrapWidth) {
+		this.#wordWrapWidth = System.Math.max(0, wordWrapWidth);
+	}
+
+	//==============================================================================
+	// 자동 줄바꿈 폭 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getWordWrapWidth() {
+		return this.#wordWrapWidth;
+	}
+
+	//==============================================================================
+	// 줄바꿈 방식 설정. ("word" | "char")
+	//==============================================================================
+	/**
+	 * @param { string } wrapMode
+	 */
+	setWrapMode(wrapMode) {
+		this.#wrapMode = wrapMode;
+	}
+
+	//==============================================================================
+	// 줄바꿈 방식 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getWrapMode() {
+		return this.#wrapMode;
+	}
+
+	//==============================================================================
+	// 줄 간격 배율 설정.
+	//==============================================================================
+	/**
+	 * @param { number } lineSpacing
+	 */
+	setLineSpacing(lineSpacing) {
+		this.#lineSpacing = System.Math.max(0.1, lineSpacing);
+	}
+
+	//==============================================================================
+	// 줄 간격 배율 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getLineSpacing() {
+		return this.#lineSpacing;
+	}
+
+	//==============================================================================
+	// 표시 글자 수 설정. (-1 이면 전체 — 타자기 연출용)
+	//==============================================================================
+	/**
+	 * @param { number } visibleCharacterCount
+	 */
+	setVisibleCharacterCount(visibleCharacterCount) {
+		this.#visibleCharacterCount = System.Math.max(-1, System.Math.floor(visibleCharacterCount));
+	}
+
+	//==============================================================================
+	// 표시 글자 수 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getVisibleCharacterCount() {
+		return this.#visibleCharacterCount;
+	}
+
 	setText(text) {
 		this.#text = text;
 	}
@@ -626,15 +914,18 @@ export class Text extends Component {
 		const fontSize = textComponent.getFontSize();
 		const text = textComponent.getText();
 
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
-		canvasRenderingContext.save();
-		canvasRenderingContext.font = buildFontString(fontFace, fontSize, false, false);
+		const measurementContext = getMeasurementCanvasRenderingContext();
+		if (measurementContext === null) {
+			return Rect.create(0, 0, 0, 0);
+		}
+		measurementContext.save();
+		measurementContext.font = buildFontString(fontFace, fontSize, false, false);
 
-		const metrics = canvasRenderingContext.measureText(text);
+		const metrics = measurementContext.measureText(text);
 		const width = metrics.width;
 		const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
 
-		canvasRenderingContext.restore();
+		measurementContext.restore();
 
 		return Rect.create(0, 0, width, height);
 	}

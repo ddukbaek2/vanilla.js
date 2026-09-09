@@ -3,6 +3,7 @@
 //==============================================================================
 const System = globalThis;
 import { Vector2 } from "../base/vector2.js";
+import { Rect } from "../base/rect.js";
 import { Pivot } from "../base/pivot.js";
 import { Color } from "../base/color.js";
 import { WorldNode } from "../core/node/worldnode.js";
@@ -363,8 +364,8 @@ export class UIInputField extends WorldNode {
 	touchCancel() { this.#dragStartIndex = -1; }
 
 	//==============================================================================
-	// localX(노드 로컬 X) → 문자 인덱스. 측정은 엔진 메인 캔버스 ctx 로
-	//   (실 렌더와 동일 폰트 보장).
+	// localX(노드 로컬 X) → 문자 인덱스. 측정은 오프스크린 2D ctx 로.
+	//   (메인 캔버스는 WebGL2 컨텍스트라 2D 측정 불가)
 	//==============================================================================
 	measureIndexAtLocalX(localX) {
 		const value = this.#value;
@@ -394,10 +395,6 @@ export class UIInputField extends WorldNode {
 	}
 
 	getMeasureContext() {
-		if (this.#engine) {
-			const canvas = this.#engine.getViewManager().getCanvas();
-			if (canvas) return canvas.getContext("2d");
-		}
 		return getOffscreenMeasureContext();
 	}
 
@@ -888,19 +885,18 @@ class BackgroundLayerRenderer extends Component {
 		if (contentSize.x <= 0 || contentSize.y <= 0) return;
 		// 선택 영역 (조합 중엔 표시 안 함).
 		if (state.composition.length === 0 && state.selectionStart !== state.cursorIndex) {
-			const ctx = graphic.getCanvasRenderingContext();
-			ctx.save();
+			graphic.pushState();
 			const fontFamily = state.fontFace ? state.fontFace.family : SYSTEM_FONT_STRING;
-			ctx.font = `${state.fontSize}px ${fontFamily}`;
+			graphic.setFontString(`${state.fontSize}px ${fontFamily}`);
 			const selStart = System.Math.min(state.selectionStart, state.cursorIndex);
 			const selEnd = System.Math.max(state.selectionStart, state.cursorIndex);
-			const startX = state.padding + ctx.measureText(state.value.slice(0, selStart)).width;
-			const endX = state.padding + ctx.measureText(state.value.slice(0, selEnd)).width;
+			const startX = state.padding + graphic.measureText(state.value.slice(0, selStart)).width;
+			const endX = state.padding + graphic.measureText(state.value.slice(0, selEnd)).width;
 			const halfH = state.fontSize * 0.65;
 			const drawY = contentSize.y * 0.5;
-			ctx.fillStyle = state.selectionColor.toHEXString();
-			ctx.fillRect(startX, drawY - halfH, endX - startX, halfH * 2);
-			ctx.restore();
+			graphic.setFillColor(state.selectionColor.toHEXString());
+			graphic.drawRect(Rect.create(startX, drawY - halfH, endX - startX, halfH * 2));
+			graphic.popState();
 		}
 	}
 }
@@ -924,62 +920,51 @@ class OverlayLayerRenderer extends Component {
 		const contentSize = node.getContentSize();
 		if (contentSize.x <= 0 || contentSize.y <= 0) return;
 
-		const ctx = graphic.getCanvasRenderingContext();
-		ctx.save();
+		graphic.pushState();
 		const fontFamily = state.fontFace ? state.fontFace.family : SYSTEM_FONT_STRING;
-		ctx.font = `${state.fontSize}px ${fontFamily}`;
+		graphic.setFontString(`${state.fontSize}px ${fontFamily}`);
 		const drawY = contentSize.y * 0.5;
 		const padding = state.padding;
 		const before = state.value.slice(0, state.cursorIndex);
 
 		// 조합 중 밑줄.
 		if (state.composition.length > 0) {
-			const beforeWidth = ctx.measureText(before).width;
-			const compWidth = ctx.measureText(state.composition).width;
+			const beforeWidth = graphic.measureText(before).width;
+			const compWidth = graphic.measureText(state.composition).width;
 			const underlineY = drawY + state.fontSize * 0.55;
-			ctx.strokeStyle = state.compositionUnderlineColor.toHEXString();
-			ctx.lineWidth = 2;
-			ctx.beginPath();
-			ctx.moveTo(padding + beforeWidth, underlineY);
-			ctx.lineTo(padding + beforeWidth + compWidth, underlineY);
-			ctx.stroke();
+			graphic.setStrokeColor(state.compositionUnderlineColor.toHEXString());
+			graphic.drawLine([
+				Vector2.create(padding + beforeWidth, underlineY),
+				Vector2.create(padding + beforeWidth + compWidth, underlineY),
+			], 2);
 		}
 
 		// 커서.
 		if (state.focused && state.cursorVisible) {
 			const cursorBeforeText = before + state.composition;
-			const cursorX = padding + ctx.measureText(cursorBeforeText).width;
+			const cursorX = padding + graphic.measureText(cursorBeforeText).width;
 			const halfHeight = state.fontSize * 0.6;
-			ctx.strokeStyle = state.cursorColor.toHEXString();
-			ctx.lineWidth = 2;
-			ctx.beginPath();
-			ctx.moveTo(cursorX, drawY - halfHeight);
-			ctx.lineTo(cursorX, drawY + halfHeight);
-			ctx.stroke();
+			graphic.setStrokeColor(state.cursorColor.toHEXString());
+			graphic.drawLine([
+				Vector2.create(cursorX, drawY - halfHeight),
+				Vector2.create(cursorX, drawY + halfHeight),
+			], 2);
 		}
 
 		// 포커스 테두리.
 		if (state.focused && state.focusBorderWidth > 0) {
 			const w = state.focusBorderWidth;
 			const inset = w * 0.5;
-			ctx.strokeStyle = state.focusBorderColor.toHEXString();
-			ctx.lineWidth = w;
+			graphic.setStrokeColor(state.focusBorderColor.toHEXString());
 			const x = inset;
 			const y = inset;
 			const rectW = contentSize.x - w;
 			const rectH = contentSize.y - w;
 			const radius = System.Math.max(0, state.bgRoundSize - inset);
-			ctx.beginPath();
-			if (typeof ctx.roundRect === "function") {
-				ctx.roundRect(x, y, rectW, rectH, radius);
-			}
-			else {
-				ctx.rect(x, y, rectW, rectH);
-			}
-			ctx.stroke();
+			graphic.drawStrokeRoundRect(Rect.create(x, y, rectW, rectH), radius, w);
 		}
 
-		ctx.restore();
+		graphic.popState();
 	}
 }
 

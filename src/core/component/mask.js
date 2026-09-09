@@ -15,11 +15,17 @@ import { Graphic } from "../graphic.js";
 //==============================================================================
 export class Mask extends Component {
 	//==============================================================================
+	// 멤버 변수 목록.
+	//==============================================================================
+	/** @private @type { number } */ #roundSize; // 둥근 모서리 반지름. (0 이면 사각형)
+
+	//==============================================================================
 	// 생성.
 	//==============================================================================
 	constructor() {
 		super();
 		this.setComponentType("Mask");
+		this.#roundSize = 0;
 	}
 
 	//==============================================================================
@@ -38,7 +44,8 @@ export class Mask extends Component {
 		}
 		const contentSize = node.getContentSize();
 		const clipRect = Rect.create(0, 0, contentSize.x, contentSize.y);
-		graphic.beginClipRect(clipRect);
+		const roundSize = this.getRoundSize();
+		graphic.beginClipRect(clipRect, roundSize);
 	}
 
 	//==============================================================================
@@ -49,5 +56,25 @@ export class Mask extends Component {
 	 */
 	endClip(graphic) {
 		graphic.endClipRect();
+	}
+
+	//==============================================================================
+	// 둥근 모서리 반지름 설정. (Paint 의 roundSize 와 같은 값을 주면 배경 모양대로 잘린다)
+	//==============================================================================
+	/**
+	 * @param { number } roundSize
+	 */
+	setRoundSize(roundSize) {
+		this.#roundSize = Math.max(0, roundSize);
+	}
+
+	//==============================================================================
+	// 둥근 모서리 반지름 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getRoundSize() {
+		return this.#roundSize;
 	}
 }

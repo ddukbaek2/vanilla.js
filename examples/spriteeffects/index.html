@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>vanilla.js - Sprite Effects</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<style>
+	html, body {
+		margin: 0;
+		padding: 0;
+		width: 100%;
+		height: 100%;
+		overflow: hidden;
+		background: #14171e;
+		touch-action: none;
+		user-select: none;
+	}
+	#mainCanvas {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+	"use strict";
+	const System = globalThis;
+
+	//==============================================================================
+	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../../build/vanilla.js)
+	// - 배포 스탬프를 주소에 붙여 브라우저가 옛 엔진을 캐시에서 꺼내 쓰지 않게 한다. (엔진을 다시 올릴 때 값을 바꾼다)
+	//==============================================================================
+	const ENGINE_CACHE_STAMP = "20260908a";
+	let engineModule = null;
+	try {
+		try {
+			engineModule = await import("./vanilla.js?v=" + ENGINE_CACHE_STAMP);
+		}
+		catch (importError) {
+			engineModule = await import("../../build/vanilla.js");
+		}
+	}
+	catch (engineError) {
+		System.document.body.innerHTML = "<p style=\"color:#fff;font-family:sans-serif;padding:2em\">vanilla.js 엔진 모듈을 불러오지 못했습니다.</p>";
+		throw engineError;
+	}
+
+	const Engine = engineModule.Engine;
+	const EngineConfiguration = engineModule.EngineConfiguration;
+	const Scene = engineModule.Scene;
+	const WorldNode = engineModule.WorldNode;
+	const Vector2 = engineModule.Vector2;
+	const Color = engineModule.Color;
+	const Pivot = engineModule.Pivot;
+	const Rect = engineModule.Rect;
+	const Paint = engineModule.Paint;
+	const Mask = engineModule.Mask;
+	const UILabel = engineModule.UILabel;
+	const UIButton = engineModule.UIButton;
+	const UIScrollView = engineModule.UIScrollView;
+	const UIScrollBar = engineModule.UIScrollBar;
+	const TouchRecognizer = engineModule.TouchRecognizer;
+	const ViewScaleMode = engineModule.ViewScaleMode;
+	const ParticleSystem = engineModule.ParticleSystem;
+	const TrailRenderer = engineModule.TrailRenderer;
+	const ShaderSprite = engineModule.ShaderSprite;
+	const ShaderSpriteEffect = engineModule.ShaderSpriteEffect;
+	const ScreenEffect = engineModule.ScreenEffect;
+	const ScreenEffectType = engineModule.ScreenEffectType;
+	const SCREEN_EFFECT_PARAMETER_NAMES = engineModule.SCREEN_EFFECT_PARAMETER_NAMES;
+	const SpriteAnimator = engineModule.SpriteAnimator;
+	const Shaker = engineModule.Shaker;
+	const FloatingText = engineModule.FloatingText;
+	const Typewriter = engineModule.Typewriter;
+	const SeededRandom = engineModule.SeededRandom;
+
+	//==============================================================================
+	// 전역 상수 목록.
+	//==============================================================================
+	const REFERENCE_WIDTH = 1280;
+	const REFERENCE_HEIGHT = 760;
+	const LIST_X = 24;
+	const LIST_Y = 78;
+	const LIST_WIDTH = 248;
+	const LIST_HEIGHT = 656;
+	const LIST_ROW_HEIGHT = 36;
+	const LIST_HEADER_HEIGHT = 34;
+	const STAGE_X = 288;
+	const STAGE_Y = 78;
+	const STAGE_WIDTH = 968;
+	const STAGE_HEIGHT = 656;
+	const FLOOR_Y = 440;
+	const TEXT_COLOR = new Color(0.91, 0.922, 0.949, 1);
+	const TEXT_DIM_COLOR = new Color(0.604, 0.635, 0.698, 1);
+	const TEXT_FAINT_COLOR = new Color(0.42, 0.451, 0.529, 1);
+	const SURFACE_COLOR = new Color(0.106, 0.125, 0.165, 1);
+	const STAGE_COLOR = new Color(0.051, 0.063, 0.09, 1);
+	const HAIRLINE_COLOR = new Color(0.224, 0.255, 0.329, 1);
+	const ACCENT_COLOR = new Color(0.831, 0.69, 0.416, 1);
+	const ON_ACCENT_COLOR = new Color(0.165, 0.126, 0.086, 1);
+	const IMAGE_NAME_LIST = ["emblem.png", "slime.png", "star.png", "coin.png", "bat.png", "gem.png", "cover.png"];
+	const fxRandom = new SeededRandom(20260907);
+
+	//==============================================================================
+	// 이름 꾸미기. ("pixelDissolve" → "PIXEL DISSOLVE")
+	//==============================================================================
+	function humanize(name) {
+		return name.replace(/([A-Z])/g, " $1").toUpperCase();
+	}
+
+	//==============================================================================
+	// 왕복 진행도. (0 → 1 → 0, 끝에서 잠깐 머문다)
+	//==============================================================================
+	function pingPong(elapsed, period) {
+		const phase = (elapsed % period) / period;
+		const raw = phase < 0.5 ? phase * 2 : 2 - phase * 2;
+		return System.Math.max(0, System.Math.min(1, raw * 1.3 - 0.15));
+	}
+
+	//==============================================================================
+	// 스프라이트 셰이더 모드 목록. (ShaderSpriteEffect 표에서 자동으로 만든다)
+	//==============================================================================
+	const SPRITE_TRANSITION_SET = new System.Set(["dissolve", "burn", "noiseFade", "pixelDissolve", "wipe", "iris", "diamondWipe", "clockWipe", "blinds", "checkerWipe", "pixelate"]);
+	const SPRITE_OSCILLATE_SET = new System.Set(["blur", "motionBlur", "radialBlur", "chromatic", "glitch", "jitter", "wave", "flag", "ripple", "heatHaze", "bulge", "swirl", "colorAdjust", "posterize", "threshold", "invert", "sepia", "grayscale", "silhouette", "colorize", "gradientMap", "vignette", "oldFilm", "scanlines", "emboss", "sharpen", "edgeDetect"]);
+	const SPRITE_EFFECT_TAG_TABLE = {
+		dissolve: "노이즈 문턱 + 불꽃 가장자리", burn: "속 불씨 + 겉 그을음", flash: "피격 섬광", outline: "실루엣 바깥 선", innerOutline: "실루엣 안쪽 선", glow: "바깥 발광", innerGlow: "안쪽 발광",
+		shadow: "드롭 섀도", hologram: "주사선 + 틴트 + 지터", shine: "광택 띠 지나감", silhouette: "그림자 / 잔상", wipe: "방향 와이프", iris: "원형 아이리스", chromatic: "RGB 분리",
+		hueShift: "색상 360도 회전", pixelate: "모자이크", glitch: "줄 어긋남 + 색 분리", wave: "가로 물결", flag: "깃발 펄럭임", ripple: "중심 파문", heatHaze: "아지랑이", bulge: "볼록 / 오목",
+		swirl: "소용돌이", mirror: "대칭", kaleidoscope: "만화경", jitter: "떨림", blur: "가우시안", motionBlur: "방향 블러", radialBlur: "방사 블러", colorAdjust: "대비 / 채도 / 밝기",
+		posterize: "포스터화", threshold: "흑백 문턱", gradientMap: "2색 매핑", edgeDetect: "소벨 윤곽", emboss: "엠보스", sharpen: "샤픈", scanlines: "주사선", oldFilm: "낡은 필름", vignette: "비네트",
+		noiseFade: "노이즈 알파", pixelDissolve: "블록 디졸브", diamondWipe: "마름모", clockWipe: "시계 방향", blinds: "블라인드", checkerWipe: "체커 보드", sepia: "세피아", grayscale: "무채색", invert: "반전", colorize: "곱셈 틴트",
+	};
+
+	function composeSpriteEffectModes() {
+		const modeList = [];
+		for (const effectName of System.Object.keys(ShaderSpriteEffect)) {
+			if (effectName === "none") {
+				continue;
+			}
+			modeList.push({
+				key: "sprite." + effectName,
+				category: "SPRITE SHADER",
+				title: humanize(effectName),
+				tag: SPRITE_EFFECT_TAG_TABLE[effectName] ? SPRITE_EFFECT_TAG_TABLE[effectName] : "ShaderSprite",
+				setup: (scene) => {
+					scene.applySubjectEffect(effectName);
+				},
+				update: (scene, elapsed) => {
+					let progress = 1;
+					if (SPRITE_TRANSITION_SET.has(effectName)) {
+						progress = pingPong(elapsed, 3.2);
+					}
+					else if (effectName === "shine") {
+						progress = (elapsed % 1.8) / 1.8;
+					}
+					else if (effectName === "flash") {
+						progress = System.Math.max(0, 1 - ((elapsed % 1.2) / 1.2) * 3);
+					}
+					else if (effectName === "hueShift") {
+						progress = (elapsed % 3) / 3;
+					}
+					else if (SPRITE_OSCILLATE_SET.has(effectName)) {
+						progress = 0.5 + 0.5 * System.Math.sin(elapsed * 1.8);
+					}
+					else {
+						progress = 0.85 + 0.15 * System.Math.sin(elapsed * 3);
+					}
+					scene.setSubjectProgress(progress);
+				},
+			});
+		}
+		return modeList;
+	}
+
+	//==============================================================================
+	// 화면 효과 모드 목록. (ScreenEffect 적용 차례 표에서 자동으로 만든다)
+	//==============================================================================
+	const SCREEN_TRANSITION_SET = new System.Set(["pixelDissolve", "wipe", "irisWipe", "diamondWipe", "clockWipe", "blinds", "checkerWipe", "noiseFade", "burn", "tvOff", "fade"]);
+	const SCREEN_OSCILLATE_SET = new System.Set(["zoomBlur", "motionBlur", "blur", "tiltShift", "chromatic", "pixelate", "doubleVision", "jitter", "glitch", "vhs", "wave", "ripple", "heatHaze", "lensDistortion", "bulge", "swirl", "invert", "hueShift"]);
+	const SCREEN_EFFECT_TAG_TABLE = {
+		lensDistortion: "배럴 / 핀쿠션", bulge: "볼록 렌즈", swirl: "소용돌이", kaleidoscope: "만화경", mirror: "대칭", ripple: "물 파문", heatHaze: "아지랑이", jitter: "화면 떨림", doubleVision: "겹쳐 보임",
+		pixelate: "모자이크", shockwave: "충격파 링", wave: "물결", motionBlur: "방향 블러", zoomBlur: "방사 블러", blur: "가우시안", tiltShift: "틸트 시프트", godRays: "빛줄기", bloom: "밝은 곳 번짐",
+		anamorphic: "가로 플레어", glitch: "글리치", vhs: "VHS 테이프", chromatic: "색수차", whiteBalance: "색온도", liftGammaGain: "리프트 / 감마 / 게인", colorGrade: "대비 / 채도 / 틴트",
+		hueShift: "색상 회전", splitToning: "스플릿 토닝", tonemap: "ACES", gradientMap: "2색 매핑", sepia: "세피아", grayscale: "무채색", posterize: "포스터화", dither: "베이어 디더", halftone: "하프톤 점",
+		sharpen: "샤픈", edgeDetect: "윤곽", oldFilm: "낡은 필름", nightVision: "야시경", invert: "반전", scanline: "CRT", grain: "그레인", rain: "빗줄기", fog: "안개", vignette: "비네트",
+		spotlight: "스포트라이트 — 주인공 추적", speedLines: "집중선", letterbox: "레터박스", pixelDissolve: "블록 전환", wipe: "방향 와이프", irisWipe: "아이리스", diamondWipe: "마름모", clockWipe: "시계", blinds: "블라인드",
+		checkerWipe: "체커", noiseFade: "노이즈 페이드", burn: "불에 타듯", tvOff: "브라운관 끄기", fade: "페이드",
+	};
+
+	function composeScreenEffectModes() {
+		const modeList = [];
+		for (const effectType of ScreenEffect.getEffectOrder()) {
+				modeList.push({
+				key: "screen." + effectType,
+				category: "SCREEN EFFECT",
+				title: humanize(effectType),
+				tag: SCREEN_EFFECT_TAG_TABLE[effectType] ? SCREEN_EFFECT_TAG_TABLE[effectType] : "ScreenEffect",
+				setup: (scene) => {
+					scene.screenEffect.setEnabled(effectType, true);
+					scene.screenEffect.setStrength(effectType, 1);
+				},
+				update: (scene, elapsed) => {
+					const screenEffect = scene.screenEffect;
+					if (SCREEN_TRANSITION_SET.has(effectType)) {
+						screenEffect.setStrength(effectType, pingPong(elapsed, 3.2));
+					}
+					else if (effectType === "shockwave") {
+						screenEffect.setParameters(effectType, 0.5, 0.55, (elapsed % 1.6) / 1.6 * 1.4, 0.12);
+						screenEffect.setStrength(effectType, 1);
+					}
+					else if (effectType === "spotlight") {
+						const heroPosition = scene.getHeroStagePosition();
+						screenEffect.setParameters(effectType, heroPosition.x, heroPosition.y, 0.16, 0.14);
+					}
+					else if (effectType === "godRays") {
+						screenEffect.setParameters(effectType, 0.5, 0.2, 0.55, 0.94);
+						screenEffect.setStrength(effectType, 0.7 + 0.3 * System.Math.sin(elapsed * 1.5));
+					}
+					else if (effectType === "letterbox") {
+						screenEffect.setStrength(effectType, pingPong(elapsed, 4));
+					}
+					else if (SCREEN_OSCILLATE_SET.has(effectType)) {
+						screenEffect.setStrength(effectType, 0.5 + 0.5 * System.Math.sin(elapsed * 1.6));
+					}
+					else {
+						screenEffect.setStrength(effectType, 0.85 + 0.15 * System.Math.sin(elapsed * 2.2));
+					}
+				},
+			});
+		}
+		return modeList;
+	}
+
+	//==============================================================================
+	// 연출 모드 목록. (엔진 기능 조합 — 파티클 / 트레일 / 흔들림 / 타임 스케일 / 애니메이터 / 타자기 / 떠오르는 글자 + 셰이더)
+	//==============================================================================
+	const STAGING_DEFINITIONS = [
+		{
+			key: "staging.hitStop", title: "HIT STOP", tag: "타임 스케일 0 + 섬광 + 흔들림 + 데미지 숫자",
+			setup: (scene) => {
+				scene.state = { nextHit: 0.6, freezeRemaining: 0, flash: 0 };
+				scene.screenEffect.setEnabled(ScreenEffectType.chromatic, true);
+				scene.screenEffect.setStrength(ScreenEffectType.chromatic, 0);
+				scene.heroSprite.setEffect(ShaderSpriteEffect.flash);
+			},
+			update: (scene, elapsed, timeDelta, unscaledDelta) => {
+				const state = scene.state;
+				if (state.freezeRemaining > 0) {
+					state.freezeRemaining -= unscaledDelta;
+					if (state.freezeRemaining <= 0) {
+						scene.setTimeScale(1);
+					}
+				}
+				if (elapsed >= state.nextHit) {
+					state.nextHit = elapsed + 1.4;
+					state.freezeRemaining = 0.09;
+					state.flash = 1;
+					scene.setTimeScale(0);
+					scene.shaker.addShake(16);
+					scene.spawnHitSparks(scene.getHeroPosition());
+					scene.floatingText.spawn("-" + System.Math.round(80 + fxRandom.nextValue() * 120), Vector2.create(scene.getHeroPosition().x + 20, scene.getHeroPosition().y - 70), { color: new Color(1, 0.4, 0.4, 1), fontSize: 30 });
+					scene.heroKnockback = 1;
+				}
+				state.flash = System.Math.max(0, state.flash - unscaledDelta * 4);
+				scene.heroSprite.setEffectProgress(state.flash);
+				scene.screenEffect.setStrength(ScreenEffectType.chromatic, state.flash * 1.5);
+				scene.applyHeroKnockback(timeDelta, 260);
+			},
+		},
+		{
+			key: "staging.screenShake", title: "SCREEN SHAKE", tag: "Shaker — 사인 합성 + 지수 감쇠",
+			setup: (scene) => {
+				scene.state = { nextShake: 0.4 };
+			},
+			update: (scene, elapsed) => {
+				if (elapsed >= scene.state.nextShake) {
+					scene.state.nextShake = elapsed + 1.6;
+					scene.shaker.addShake(26);
+					scene.spawnHitSparks(Vector2.create(484, FLOOR_Y));
+					scene.floatingText.spawn("BOOM", Vector2.create(484, FLOOR_Y - 60), { color: ACCENT_COLOR, fontSize: 34 });
+				}
+			},
+		},
+		{
+			key: "staging.slowMotion", title: "SLOW MOTION", tag: "타임 스케일 0.2 + 채도 / 집중선 (불릿 타임)",
+			setup: (scene) => {
+				scene.state = { phase: 0 };
+				scene.screenEffect.setEnabled(ScreenEffectType.colorGrade, true);
+				scene.screenEffect.setParameters(ScreenEffectType.colorGrade, 1.2, 0.3, 1.05);
+				scene.screenEffect.setEnabled(ScreenEffectType.speedLines, true);
+				scene.spawnRainParticles();
+			},
+			update: (scene, elapsed, timeDelta, unscaledDelta) => {
+				const cycle = (elapsed % 4) / 4;
+				const isSlow = cycle > 0.35 && cycle < 0.85;
+				scene.setTimeScale(isSlow ? 0.2 : 1);
+				const blend = isSlow ? 1 : 0;
+				scene.state.phase += (blend - scene.state.phase) * System.Math.min(1, unscaledDelta * 6);
+				scene.screenEffect.setStrength(ScreenEffectType.colorGrade, scene.state.phase);
+				scene.screenEffect.setStrength(ScreenEffectType.speedLines, scene.state.phase * 0.8);
+			},
+		},
+		{
+			key: "staging.afterimage", title: "AFTERIMAGE", tag: "실루엣 잔상 — silhouette 효과 사본이 남는다",
+			setup: (scene) => {
+				scene.state = { spawnAccumulator: 0, ghosts: [] };
+			},
+			update: (scene, elapsed, timeDelta) => {
+				const state = scene.state;
+				const heroPosition = Vector2.create(484 + System.Math.sin(elapsed * 2.2) * 300, FLOOR_Y - 60 - System.Math.abs(System.Math.sin(elapsed * 4.4)) * 120);
+				scene.hero.setLocalPosition(heroPosition);
+				scene.heroSprite.setHorizontalFlip(System.Math.cos(elapsed * 2.2) < 0);
+				state.spawnAccumulator += timeDelta;
+				if (state.spawnAccumulator >= 0.05) {
+					state.spawnAccumulator = 0;
+					const ghostNode = scene.makeSprite(scene.modeRoot, "slime.png", heroPosition.x, heroPosition.y, 128, 128, 8);
+					const ghostSprite = ghostNode.getComponent(ShaderSprite);
+					ghostSprite.setImageRect(scene.heroSprite.getImageRect());
+					ghostSprite.setHorizontalFlip(scene.heroSprite.isHorizontalFlip());
+					ghostSprite.setEffect(ShaderSpriteEffect.silhouette);
+					ghostSprite.setEffectColor(new Color(0.4, 0.8, 1, 1));
+					ghostSprite.setEffectProgress(1);
+					ghostSprite.setSpriteBlendMode("lighter");
+					state.ghosts.push({ node: ghostNode, life: 0.45 });
+				}
+				for (let ghostIndex = state.ghosts.length - 1; ghostIndex >= 0; --ghostIndex) {
+					const ghost = state.ghosts[ghostIndex];
+					ghost.life -= timeDelta;
+					ghost.node.setLocalOpacity(System.Math.max(0, ghost.life / 0.45) * 0.6);
+					if (ghost.life <= 0) {
+						scene.modeRoot.removeChild(ghost.node);
+						state.ghosts.splice(ghostIndex, 1);
+					}
+				}
+			},
+		},
+		{
+			key: "staging.flipbook", title: "FLIPBOOK", tag: "SpriteAnimator 클립 전환 + 완료 콜백",
+			setup: (scene) => {
+				scene.state = { nextJump: 1, jumpTime: -1 };
+				scene.setSubjectsVisible(true);
+			},
+			update: (scene, elapsed, timeDelta) => {
+				const state = scene.state;
+				if (elapsed >= state.nextJump) {
+					state.nextJump = elapsed + 2.2;
+					state.jumpTime = elapsed;
+					scene.heroAnimator.play("jump", { onComplete: () => { scene.heroAnimator.play("idle"); } });
+				}
+				if (state.jumpTime >= 0) {
+					const jumpPhase = System.Math.min(1, (elapsed - state.jumpTime) / 0.7);
+					scene.hero.setLocalPosition(Vector2.create(300, FLOOR_Y - 60 - System.Math.sin(jumpPhase * System.Math.PI) * 140));
+					if (jumpPhase >= 1) {
+						state.jumpTime = -1;
+					}
+				}
+			},
+		},
+		{
+			key: "staging.floatingDamage", title: "FLOATING DAMAGE", tag: "FloatingText — 재사용 풀, 치명타는 크고 금색",
+			setup: (scene) => {
+				scene.state = { accumulator: 0 };
+			},
+			update: (scene, elapsed, timeDelta) => {
+				scene.state.accumulator += timeDelta;
+				if (scene.state.accumulator >= 0.32) {
+					scene.state.accumulator = 0;
+					const isCritical = fxRandom.nextValue() < 0.2;
+					const targetPosition = Vector2.create(560 + (fxRandom.nextValue() - 0.5) * 360, FLOOR_Y - 120 + (fxRandom.nextValue() - 0.5) * 120);
+					scene.floatingText.spawn(isCritical ? "CRIT " + System.Math.round(500 + fxRandom.nextValue() * 500) : "-" + System.Math.round(20 + fxRandom.nextValue() * 180), targetPosition, {
+						color: isCritical ? ACCENT_COLOR : new Color(1, 1, 1, 1), fontSize: isCritical ? 40 : 24, rise: isCritical ? 90 : 50, duration: isCritical ? 1.1 : 0.8,
+					});
+					if (isCritical) {
+						scene.shaker.addShake(8);
+						scene.spawnHitSparks(targetPosition);
+					}
+				}
+			},
+		},
+		{
+			key: "staging.typewriter", title: "TYPEWRITER DIALOGUE", tag: "Typewriter — 초당 글자 수 + 스킵 + 완료 이벤트",
+			setup: (scene) => {
+				const boxNode = scene.makePaint(scene.modeRoot, 484, 560, 760, 100, new Color(0.03, 0.04, 0.07, 0.88), 12);
+				scene.makePaint(scene.modeRoot, 484, 560, 764, 104, new Color(0.83, 0.69, 0.42, 0.25), 13);
+				boxNode.setLocalPosition(Vector2.create(484, 560));
+				scene.modeRoot.removeChild(boxNode);
+				scene.modeRoot.addChild(boxNode);
+				const speakerLabel = scene.makeLabel(scene.modeRoot, 132, 522, 300, 20, 12, ACCENT_COLOR, true, "left");
+				speakerLabel.setText("SLIME");
+				const lineLabel = scene.makeLabel(scene.modeRoot, 132, 540, 700, 60, 20, TEXT_COLOR, false, "left");
+				lineLabel.getNode().setPivot(Pivot.topLeft.clone());
+				lineLabel.setTextBaseline("top");
+				const caretLabel = scene.makeLabel(scene.modeRoot, 830, 590, 20, 20, 16, ACCENT_COLOR, true, "center");
+				caretLabel.setText("▼");
+				const lines = ["That gem... it's been calling me since the ruins.", "Every hero needs a proper entrance. Roll the effects!", "Typewriter + FloatingText + Shaker — all engine built-ins."];
+				const typewriter = new Typewriter(lineLabel, { charactersPerSecond: 28 });
+				scene.state = { typewriter: typewriter, lineIndex: 0, lines: lines, wait: 0, caretLabel: caretLabel };
+				typewriter.start(lines[0]);
+				scene.hero.setLocalPosition(Vector2.create(300, FLOOR_Y - 60));
+			},
+			update: (scene, elapsed, timeDelta) => {
+				const state = scene.state;
+				state.typewriter.tick(timeDelta);
+				state.caretLabel.getNode().setLocalOpacity(state.typewriter.isFinished() ? 0.5 + 0.5 * System.Math.sin(elapsed * 8) : 0);
+				if (state.typewriter.isFinished()) {
+					state.wait += timeDelta;
+					if (state.wait > 1.6) {
+						state.wait = 0;
+						state.lineIndex = (state.lineIndex + 1) % state.lines.length;
+						state.typewriter.start(state.lines[state.lineIndex]);
+					}
+				}
+			},
+		},
+		{
+			key: "staging.slashTrail", title: "SLASH TRAIL", tag: "TrailRenderer 호 궤적 + 스파크 + 피격 섬광",
+			setup: (scene) => {
+				const bladeNode = new WorldNode();
+				bladeNode.setPivot(Pivot.middleCenter.clone());
+				bladeNode.setAnchor(Pivot.topLeft.clone());
+				bladeNode.setContentSize(Vector2.create(8, 8));
+				const trail = bladeNode.addComponent(TrailRenderer);
+				trail.setTime(0.28);
+				trail.setWidth(30, 0);
+				trail.setAdditive(true);
+				trail.setColors(new Color(1, 0.92, 0.6, 1), new Color(1, 0.55, 0.2, 0));
+				scene.modeRoot.addChild(bladeNode);
+				scene.state = { bladeNode: bladeNode, trail: trail, swingStart: 0.4, didHit: false };
+				scene.subjectTable.bat.node.setLocalPosition(Vector2.create(700, 300));
+			},
+			update: (scene, elapsed, timeDelta) => {
+				const state = scene.state;
+				const swingPhase = (elapsed - state.swingStart) / 0.42;
+				if (swingPhase >= 0 && swingPhase <= 1) {
+					const angle = -2.4 + swingPhase * 3.2;
+					const radius = 130 + System.Math.sin(swingPhase * System.Math.PI) * 60;
+					state.bladeNode.setLocalPosition(Vector2.create(560 + System.Math.cos(angle) * radius, 320 + System.Math.sin(angle) * radius));
+					state.trail.setEmitting(true);
+					if (swingPhase > 0.55 && !state.didHit) {
+						state.didHit = true;
+						scene.spawnHitSparks(Vector2.create(700, 300));
+						scene.shaker.addShake(9);
+						scene.subjectTable.bat.sprite.setEffect(ShaderSpriteEffect.flash);
+						scene.subjectTable.bat.sprite.setEffectProgress(1);
+						scene.floatingText.spawn("-" + System.Math.round(60 + fxRandom.nextValue() * 80), Vector2.create(700, 240), { color: new Color(1, 0.5, 0.4, 1), fontSize: 26 });
+					}
+				}
+				else {
+					state.trail.setEmitting(false);
+					if (swingPhase > 1) {
+						state.swingStart = elapsed + 0.9;
+						state.didHit = false;
+					}
+				}
+				const batSprite = scene.subjectTable.bat.sprite;
+				batSprite.setEffectProgress(System.Math.max(0, batSprite.getEffectProgress() - timeDelta * 5));
+			},
+		},
+		{
+			key: "staging.parallax", title: "PARALLAX", tag: "층별 다른 속도 + 카메라 살짝 줌",
+			setup: (scene) => {
+				scene.setSubjectsVisible(false);
+				const layers = [];
+				const layerDefinitions = [
+					{ speed: 18, y: 380, height: 300, color: new Color(0.11, 0.15, 0.25, 1), count: 5, width: 420 },
+					{ speed: 60, y: 440, height: 260, color: new Color(0.16, 0.22, 0.34, 1), count: 6, width: 340 },
+					{ speed: 150, y: 520, height: 220, color: new Color(0.2, 0.28, 0.42, 1), count: 8, width: 260 },
+				];
+				for (const definition of layerDefinitions) {
+					const layerNode = new WorldNode();
+					layerNode.setPivot(Pivot.topLeft.clone());
+					layerNode.setAnchor(Pivot.topLeft.clone());
+					layerNode.setContentSize(Vector2.create(STAGE_WIDTH * 2, STAGE_HEIGHT));
+					scene.modeRoot.addChild(layerNode);
+					for (let index = 0; index < definition.count * 2; ++index) {
+						scene.makePaint(layerNode, index * definition.width, definition.y, definition.width * 1.1, definition.height, definition.color, definition.width * 0.5);
+					}
+					layers.push({ node: layerNode, speed: definition.speed, wrap: definition.count * definition.width });
+				}
+				scene.hero.setActive(true);
+				scene.modeRoot.removeChild(scene.hero);
+				scene.worldNode.removeChild(scene.hero);
+				scene.modeRoot.addChild(scene.hero);
+				scene.hero.setLocalPosition(Vector2.create(300, FLOOR_Y - 60));
+				scene.state = { layers: layers, scroll: 0 };
+			},
+			update: (scene, elapsed, timeDelta) => {
+				for (const layer of scene.state.layers) {
+					const position = layer.node.getLocalPosition();
+					let x = position.x - layer.speed * timeDelta;
+					if (x < -layer.wrap) {
+						x += layer.wrap;
+					}
+					layer.node.setLocalPosition(Vector2.create(x, 0));
+				}
+				scene.heroSprite.setHorizontalFlip(false);
+				scene.hero.setLocalPosition(Vector2.create(300, FLOOR_Y - 60 - System.Math.abs(System.Math.sin(elapsed * 6)) * 14));
+				scene.worldZoom = 1.04 + System.Math.sin(elapsed * 0.6) * 0.03;
+			},
+			cleanup: (scene) => {
+				scene.modeRoot.removeChild(scene.hero);
+				scene.worldNode.addChild(scene.hero);
+			},
+		},
+		{
+			key: "staging.cameraPunch", title: "CAMERA PUNCH", tag: "타격 순간 줌 인 → 되돌림 + 흔들림 + 색수차",
+			setup: (scene) => {
+				scene.state = { nextPunch: 0.5, punch: 0 };
+				scene.screenEffect.setEnabled(ScreenEffectType.chromatic, true);
+				scene.screenEffect.setStrength(ScreenEffectType.chromatic, 0);
+			},
+			update: (scene, elapsed, timeDelta) => {
+				const state = scene.state;
+				if (elapsed >= state.nextPunch) {
+					state.nextPunch = elapsed + 1.5;
+					state.punch = 1;
+					scene.shaker.addShake(12);
+					scene.spawnHitSparks(scene.getHeroPosition());
+				}
+				state.punch = System.Math.max(0, state.punch - timeDelta * 3);
+				scene.worldZoom = 1 + state.punch * 0.14;
+				scene.screenEffect.setStrength(ScreenEffectType.chromatic, state.punch * 1.5);
+			},
+		},
+		{
+			key: "staging.squashStretch", title: "SQUASH & STRETCH", tag: "점프 — 도약 늘림 / 착지 눌림",
+			setup: (scene) => {
+				scene.state = { velocity: 0, y: FLOOR_Y - 60, scaleX: 1, scaleY: 1, nextJump: 0.5 };
+			},
+			update: (scene, elapsed, timeDelta) => {
+				const state = scene.state;
+				if (elapsed >= state.nextJump && state.y >= FLOOR_Y - 60) {
+					state.nextJump = elapsed + 1.6;
+					state.velocity = -680;
+					state.scaleX = 0.8;
+					state.scaleY = 1.3;
+				}
+				state.velocity += 1600 * timeDelta;
+				state.y += state.velocity * timeDelta;
+				if (state.y >= FLOOR_Y - 60) {
+					if (state.velocity > 200) {
+						state.scaleX = 1.35;
+						state.scaleY = 0.65;
+						scene.spawnDust(Vector2.create(scene.hero.getLocalPosition().x, FLOOR_Y));
+					}
+					state.y = FLOOR_Y - 60;
+					state.velocity = 0;
+				}
+				state.scaleX += (1 - state.scaleX) * System.Math.min(1, timeDelta * 9);
+				state.scaleY += (1 - state.scaleY) * System.Math.min(1, timeDelta * 9);
+				scene.hero.setLocalPosition(Vector2.create(300, state.y));
+				scene.hero.setLocalScale(Vector2.create(state.scaleX, state.scaleY));
+			},
+		},
+		{
+			key: "staging.spawnDespawn", title: "SPAWN / DESPAWN", tag: "pixelDissolve 등장 → back.out 팝 → dissolve 퇴장",
+			setup: (scene) => {
+				scene.state = { enemies: [], nextSpawn: 0.3 };
+			},
+			update: (scene, elapsed, timeDelta) => {
+				const state = scene.state;
+				if (elapsed >= state.nextSpawn) {
+					state.nextSpawn = elapsed + 0.9;
+					const enemyNode = scene.makeSprite(scene.modeRoot, "bat.png", 420 + fxRandom.nextValue() * 460, 180 + fxRandom.nextValue() * 180, 96, 72, 4);
+					const enemySprite = enemyNode.getComponent(ShaderSprite);
+					enemySprite.setEffect(ShaderSpriteEffect.pixelDissolve);
+					state.enemies.push({ node: enemyNode, sprite: enemySprite, age: 0 });
+				}
+				for (let enemyIndex = state.enemies.length - 1; enemyIndex >= 0; --enemyIndex) {
+					const enemy = state.enemies[enemyIndex];
+					enemy.age += timeDelta;
+					enemy.sprite.setImageRect(Rect.create(System.Math.floor(enemy.age * 12) % 4 * 64, 0, 64, 48));
+					if (enemy.age < 0.6) {
+						enemy.sprite.setEffectProgress(1 - enemy.age / 0.6);
+						const pop = 1 + System.Math.sin(System.Math.min(1, enemy.age / 0.6) * System.Math.PI) * 0.25;
+						enemy.node.setLocalScale(Vector2.create(pop, pop));
+					}
+					else if (enemy.age < 2.2) {
+						enemy.sprite.setEffectProgress(0);
+						enemy.node.setLocalScale(Vector2.create(1, 1));
+						const position = enemy.node.getLocalPosition();
+						enemy.node.setLocalPosition(Vector2.create(position.x, position.y + System.Math.sin(enemy.age * 6) * 0.8));
+					}
+					else if (enemy.age < 3.0) {
+						if (enemy.sprite.getEffect() !== ShaderSpriteEffect.dissolve) {
+							enemy.sprite.setEffect(ShaderSpriteEffect.dissolve);
+							enemy.sprite.setEffectColor(new Color(0.6, 0.4, 1, 1));
+						}
+						enemy.sprite.setEffectProgress((enemy.age - 2.2) / 0.8);
+					}
+					else {
+						scene.modeRoot.removeChild(enemy.node);
+						state.enemies.splice(enemyIndex, 1);
+					}
+				}
+			},
+		},
+		{
+			key: "staging.healthBar", title: "HEALTH BAR", tag: "즉시 줄어드는 막대 + 뒤따르는 잔상 막대",
+			setup: (scene) => {
+				scene.makePaint(scene.modeRoot, 484, 590, 620, 30, new Color(0.03, 0.04, 0.07, 0.9), 15);
+				const ghostNode = scene.makePaint(scene.modeRoot, 176, 590, 616, 22, new Color(1, 1, 1, 0.85), 11);
+				ghostNode.setPivot(Vector2.create(0, 0.5));
+				const fillNode = scene.makePaint(scene.modeRoot, 176, 590, 616, 22, new Color(0.27, 0.71, 0.52, 1), 11);
+				fillNode.setPivot(Vector2.create(0, 0.5));
+				const label = scene.makeLabel(scene.modeRoot, 484, 590, 200, 24, 13, TEXT_COLOR, true, "center");
+				label.setTextBaseline("middle");
+				scene.state = { health: 1, ghost: 1, nextHit: 1, ghostDelay: 0, fillNode: fillNode, ghostNode: ghostNode, label: label, fillPaint: fillNode.getComponent(Paint) };
+				scene.screenEffect.setEnabled(ScreenEffectType.vignette, true);
+				scene.screenEffect.setColor(ScreenEffectType.vignette, new Color(0.6, 0.05, 0.05, 1));
+				scene.screenEffect.setStrength(ScreenEffectType.vignette, 0);
+			},
+			update: (scene, elapsed, timeDelta) => {
+				const state = scene.state;
+				if (elapsed >= state.nextHit) {
+					state.nextHit = elapsed + 1.1;
+					if (state.health <= 0.05) {
+						state.health = 1;
+						state.ghost = 1;
+					}
+					else {
+						state.health = System.Math.max(0, state.health - 0.12 - fxRandom.nextValue() * 0.16);
+						state.ghostDelay = 0.4;
+						scene.shaker.addShake(6);
+						scene.heroKnockback = 1;
+						scene.floatingText.spawn("-" + System.Math.round(state.health * 100 > 0 ? 40 + fxRandom.nextValue() * 60 : 99), Vector2.create(scene.getHeroPosition().x, scene.getHeroPosition().y - 70), { color: new Color(1, 0.45, 0.45, 1) });
+					}
+				}
+				state.ghostDelay = System.Math.max(0, state.ghostDelay - timeDelta);
+				if (state.ghostDelay <= 0) {
+					state.ghost += (state.health - state.ghost) * System.Math.min(1, timeDelta * 4);
+				}
+				state.fillNode.setContentSize(Vector2.create(616 * state.health, 22));
+				state.ghostNode.setContentSize(Vector2.create(616 * state.ghost, 22));
+				const isDanger = state.health < 0.3;
+				const pulse = 0.5 + 0.5 * System.Math.sin(elapsed * 9);
+				state.fillPaint.setColor(isDanger ? new Color(0.9, 0.25 + pulse * 0.2, 0.25, 1) : new Color(0.27, 0.71, 0.52, 1));
+				scene.screenEffect.setStrength(ScreenEffectType.vignette, isDanger ? 0.5 + pulse * 0.4 : 0);
+				state.label.setText("HP " + System.Math.round(state.health * 100) + " / 100");
+				scene.applyHeroKnockback(timeDelta, 180);
+			},
+		},
+		{
+			key: "staging.lightning", title: "LIGHTNING", tag: "흰 섬광 + 반전 깜빡임 + 흔들림 + 천둥 흔들림",
+			setup: (scene) => {
+				scene.state = { nextStrike: 0.8, flash: 0 };
+				scene.screenEffect.setEnabled(ScreenEffectType.fade, true);
+				scene.screenEffect.setColor(ScreenEffectType.fade, new Color(1, 1, 1, 1));
+				scene.screenEffect.setStrength(ScreenEffectType.fade, 0);
+				scene.screenEffect.setEnabled(ScreenEffectType.invert, true);
+				scene.screenEffect.setStrength(ScreenEffectType.invert, 0);
+				scene.spawnRainParticles();
+			},
+			update: (scene, elapsed, timeDelta) => {
+				const state = scene.state;
+				if (elapsed >= state.nextStrike) {
+					state.nextStrike = elapsed + 1.8 + fxRandom.nextValue() * 1.6;
+					state.flash = 1;
+					scene.shaker.addShake(18);
+				}
+				state.flash = System.Math.max(0, state.flash - timeDelta * 3.5);
+				scene.screenEffect.setStrength(ScreenEffectType.fade, state.flash * 0.9);
+				scene.screenEffect.setStrength(ScreenEffectType.invert, state.flash > 0.85 ? 1 : 0);
+			},
+		},
+		{
+			key: "staging.levelUp", title: "LEVEL UP", tag: "확장 링 + 파티클 분수 + 색상 회전 발광 + 글자 팝",
+			setup: (scene) => {
+				scene.state = { nextLevel: 0.6, rings: [], labelNode: null };
+				scene.heroSprite.setEffect(ShaderSpriteEffect.glow);
+				scene.heroSprite.setEffectColor(ACCENT_COLOR);
+				scene.heroSprite.setEffectParameters(10, 0, 0, 0);
+			},
+			update: (scene, elapsed, timeDelta) => {
+				const state = scene.state;
+				if (elapsed >= state.nextLevel) {
+					state.nextLevel = elapsed + 2.6;
+					const heroPosition = scene.getHeroPosition();
+					const ringNode = scene.makePaint(scene.modeRoot, heroPosition.x, heroPosition.y, 120, 120, new Color(0.83, 0.69, 0.42, 0.9), 60);
+					state.rings.push({ node: ringNode, age: 0 });
+					const particleSystem = scene.spawnParticle({ bursts: [{ time: 0, count: 140 }], speed: [200, 520], gravity: [0, 520], lifetime: [0.8, 1.6], renderShape: "circle", size: [3, 7], startColorA: [1, 0.9, 0.5, 1], startColorB: [1, 0.7, 0.3, 1], colorOverLifetime: [{ time: 0, color: [1, 1, 1, 1] }, { time: 1, color: [1, 0.8, 0.3, 0] }] }, heroPosition.x, heroPosition.y);
+					particleSystem.play();
+					scene.floatingText.spawn("LEVEL UP!", Vector2.create(heroPosition.x, heroPosition.y - 100), { color: ACCENT_COLOR, fontSize: 40, rise: 60, duration: 1.4 });
+					scene.shaker.addShake(6);
+				}
+				for (let ringIndex = state.rings.length - 1; ringIndex >= 0; --ringIndex) {
+					const ring = state.rings[ringIndex];
+					ring.age += timeDelta;
+					const phase = System.Math.min(1, ring.age / 0.9);
+					ring.node.setLocalScale(Vector2.create(1 + phase * 4, 1 + phase * 4));
+					ring.node.setLocalOpacity(1 - phase);
+					if (phase >= 1) {
+						scene.modeRoot.removeChild(ring.node);
+						state.rings.splice(ringIndex, 1);
+					}
+				}
+				scene.heroSprite.setEffectProgress(0.6 + 0.4 * System.Math.sin(elapsed * 6));
+			},
+		},
+		{
+			key: "staging.teleport", title: "TELEPORT", tag: "pixelDissolve 아웃 → 순간 이동 → 디졸브 인 + 색수차 팝",
+			setup: (scene) => {
+				scene.state = { phase: 0, timer: 0, side: 0 };
+				scene.heroSprite.setEffect(ShaderSpriteEffect.pixelDissolve);
+				scene.heroSprite.setEffectParameters(12, 0, 0, 0);
+				scene.screenEffect.setEnabled(ScreenEffectType.chromatic, true);
+				scene.screenEffect.setStrength(ScreenEffectType.chromatic, 0);
+			},
+			update: (scene, elapsed, timeDelta) => {
+				const state = scene.state;
+				state.timer += timeDelta;
+				if (state.phase === 0 && state.timer > 1.2) {
+					state.phase = 1;
+					state.timer = 0;
+				}
+				if (state.phase === 1) {
+					scene.heroSprite.setEffectProgress(System.Math.min(1, state.timer / 0.5));
+					if (state.timer >= 0.5) {
+						state.phase = 2;
+						state.timer = 0;
+						state.side = 1 - state.side;
+						scene.hero.setLocalPosition(Vector2.create(state.side === 0 ? 300 : 680, FLOOR_Y - 60));
+						scene.spawnHitSparks(scene.getHeroPosition());
+						scene.screenEffect.setStrength(ScreenEffectType.chromatic, 2);
+					}
+				}
+				else if (state.phase === 2) {
+					scene.heroSprite.setEffectProgress(1 - System.Math.min(1, state.timer / 0.5));
+					if (state.timer >= 0.5) {
+						state.phase = 0;
+						state.timer = 0;
+					}
+				}
+				scene.screenEffect.setStrength(ScreenEffectType.chromatic, System.Math.max(0, scene.screenEffect.getStrength(ScreenEffectType.chromatic) - timeDelta * 5));
+			},
+		},
+		{
+			key: "staging.freezeFrame", title: "FREEZE FRAME", tag: "레터박스 + 타임 스케일 0 + 세피아 + 자막",
+			setup: (scene) => {
+				scene.state = { blend: 0 };
+				scene.screenEffect.setEnabled(ScreenEffectType.letterbox, true);
+				scene.screenEffect.setEnabled(ScreenEffectType.sepia, true);
+				scene.screenEffect.setEnabled(ScreenEffectType.vignette, true);
+				const label = scene.makeLabel(scene.modeRoot, 484, 96, 700, 40, 26, TEXT_COLOR, true, "center");
+				label.setText("\"...and that was the moment everything changed.\"");
+				scene.state.label = label;
+			},
+			update: (scene, elapsed, timeDelta, unscaledDelta) => {
+				const cycle = (elapsed % 5) / 5;
+				const isFrozen = cycle > 0.3 && cycle < 0.8;
+				scene.setTimeScale(isFrozen ? 0 : 1);
+				const state = scene.state;
+				state.blend += ((isFrozen ? 1 : 0) - state.blend) * System.Math.min(1, unscaledDelta * 5);
+				scene.screenEffect.setStrength(ScreenEffectType.letterbox, state.blend);
+				scene.screenEffect.setStrength(ScreenEffectType.sepia, state.blend * 0.8);
+				scene.screenEffect.setStrength(ScreenEffectType.vignette, state.blend * 0.8);
+				state.label.getNode().setLocalOpacity(state.blend);
+			},
+			cleanup: (scene) => {
+				scene.setTimeScale(1);
+			},
+		},
+		{
+			key: "staging.portal", title: "PORTAL", tag: "화면 소용돌이 + 원형 빛 + 주인공 빨려 들어감",
+			setup: (scene) => {
+				const glowNode = scene.makePaint(scene.modeRoot, 700, 300, 180, 180, new Color(0.5, 0.35, 1, 0.55), 90);
+				scene.state = { glowNode: glowNode };
+				scene.screenEffect.setEnabled(ScreenEffectType.swirl, true);
+				scene.screenEffect.setParameters(ScreenEffectType.swirl, (STAGE_X + 700) / REFERENCE_WIDTH, (STAGE_Y + 300) / REFERENCE_HEIGHT, 0.9, 0.35);
+				scene.screenEffect.setEnabled(ScreenEffectType.bloom, true);
+				scene.screenEffect.setStrength(ScreenEffectType.bloom, 0.8);
+				const particleSystem = scene.spawnParticle({ looping: true, emissionRate: 90, bursts: [], shape: "circle", shapeRadius: 90, lifetime: [0.8, 1.4], speed: [30, 90], size: [2, 5], gravity: [0, 0], damping: 0.5, renderShape: "circle", attractor: { x: 0, y: 0, strength: 240, swirl: 320 }, startColorA: [0.6, 0.4, 1, 1], startColorB: [0.3, 0.8, 1, 1], colorOverLifetime: [{ time: 0, color: [1, 1, 1, 0] }, { time: 0.3, color: [1, 1, 1, 1] }, { time: 1, color: [1, 1, 1, 0] }] }, 700, 300);
+				particleSystem.play();
+			},
+			update: (scene, elapsed, timeDelta) => {
+				const cycle = (elapsed % 3.2) / 3.2;
+				const pull = System.Math.max(0, System.Math.min(1, (cycle - 0.3) / 0.6));
+				const startPosition = Vector2.create(300, FLOOR_Y - 60);
+				const eased = pull * pull;
+				scene.hero.setLocalPosition(Vector2.create(startPosition.x + (700 - startPosition.x) * eased, startPosition.y + (300 - startPosition.y) * eased));
+				scene.hero.setLocalScale(Vector2.create(1 - eased, 1 - eased));
+				scene.hero.setLocalRotation(eased * 720);
+				scene.state.glowNode.setLocalScale(Vector2.create(1 + System.Math.sin(elapsed * 4) * 0.08, 1 + System.Math.cos(elapsed * 4) * 0.08));
+				scene.screenEffect.setStrength(ScreenEffectType.swirl, 0.6 + pull * 0.4);
+			},
+		},
+		{
+			key: "staging.underwater", title: "UNDERWATER", tag: "물결 + 푸른 컬러 그레이드 + 거품 + 빛줄기",
+			setup: (scene) => {
+				scene.screenEffect.setEnabled(ScreenEffectType.wave, true);
+				scene.screenEffect.setStrength(ScreenEffectType.wave, 0.5);
+				scene.screenEffect.setEnabled(ScreenEffectType.colorGrade, true);
+				scene.screenEffect.setParameters(ScreenEffectType.colorGrade, 1.05, 0.8, 0.95);
+				scene.screenEffect.setColor(ScreenEffectType.colorGrade, new Color(0.5, 0.8, 1, 0.6));
+				scene.screenEffect.setEnabled(ScreenEffectType.godRays, true);
+				scene.screenEffect.setParameters(ScreenEffectType.godRays, 0.5, 0.05, 0.5, 0.93);
+				scene.screenEffect.setStrength(ScreenEffectType.godRays, 0.6);
+				const bubbles = scene.spawnParticle({ looping: true, emissionRate: 30, bursts: [], shape: "edge", edgeWidth: 900, lifetime: [2.6, 4.4], speed: [50, 110], size: [4, 14], gravity: [0, -30], damping: 0.2, wobble: [20, 2.4], renderShape: "circle", blendMode: "source-over", startColorA: [0.6, 0.85, 1, 0.5], startColorB: [0.8, 0.95, 1, 0.3], sizeOverLifetime: [0.7, 1.15], colorOverLifetime: [{ time: 0, color: [1, 1, 1, 0] }, { time: 0.1, color: [1, 1, 1, 1] }, { time: 0.85, color: [1, 1, 1, 1] }, { time: 1, color: [1, 1, 1, 0] }] }, 484, STAGE_HEIGHT + 20);
+				bubbles.play();
+			},
+			update: (scene, elapsed) => {
+				scene.hero.setLocalPosition(Vector2.create(300, FLOOR_Y - 90 + System.Math.sin(elapsed * 1.5) * 24));
+			},
+		},
+		{
+			key: "staging.statusEffects", title: "STATUS EFFECTS", tag: "독 / 화염 / 빙결 / 유령 / 무적 — 주인공 셰이더 순환",
+			setup: (scene) => {
+				scene.state = { index: -1, timer: 99, label: scene.makeLabel(scene.modeRoot, 300, FLOOR_Y - 150, 300, 24, 16, ACCENT_COLOR, true, "center"), particle: null };
+				scene.setSubjectsVisible(false);
+				scene.hero.setActive(true);
+			},
+			update: (scene, elapsed, timeDelta) => {
+				const state = scene.state;
+				state.timer += timeDelta;
+				const statusList = [
+					{ name: "POISON", apply: () => { scene.heroSprite.setEffect(ShaderSpriteEffect.colorize); scene.heroSprite.setEffectColor(new Color(0.45, 1, 0.35, 1)); } },
+					{ name: "BURNING", apply: () => { scene.heroSprite.setEffect(ShaderSpriteEffect.burn); scene.screenEffect.setEnabled(ScreenEffectType.heatHaze, true); scene.screenEffect.setStrength(ScreenEffectType.heatHaze, 0.6); state.particle = scene.spawnParticle({ looping: true, emissionRate: 70, bursts: [], shape: "cone", shapeRadius: 24, coneAngle: 0.3, lifetime: [0.5, 1], speed: [80, 160], size: [6, 14], gravity: [0, -140], damping: 1, renderShape: "circle", startColorA: [1, 0.75, 0.3, 1], startColorB: [1, 0.5, 0.12, 1], colorOverLifetime: [{ time: 0, color: [1, 1, 0.85, 1] }, { time: 0.5, color: [1, 0.6, 0.2, 0.9] }, { time: 1, color: [0.65, 0.1, 0.02, 0] }], sizeOverLifetime: [1, 0.3] }, 300, FLOOR_Y - 60); state.particle.play(); } },
+					{ name: "FROZEN", apply: () => { scene.heroSprite.setEffect(ShaderSpriteEffect.gradientMap); scene.heroSprite.setEffectColor(new Color(0.85, 0.95, 1, 1)); scene.heroSprite.setEffectParameters(0.1, 0.25, 0.55, 0); scene.screenEffect.setEnabled(ScreenEffectType.whiteBalance, true); scene.screenEffect.setParameters(ScreenEffectType.whiteBalance, -0.8, 0, 0, 0); } },
+					{ name: "GHOST", apply: () => { scene.heroSprite.setEffect(ShaderSpriteEffect.hologram); } },
+					{ name: "INVINCIBLE", apply: () => { scene.heroSprite.setEffect(ShaderSpriteEffect.outline); scene.heroSprite.setEffectColor(ACCENT_COLOR); scene.heroSprite.setEffectParameters(4, 0, 0, 0); scene.screenEffect.setEnabled(ScreenEffectType.speedLines, true); scene.screenEffect.setStrength(ScreenEffectType.speedLines, 0.5); } },
+					{ name: "STEALTH", apply: () => { scene.heroSprite.setEffect(ShaderSpriteEffect.silhouette); scene.heroSprite.setEffectColor(new Color(0.1, 0.1, 0.2, 0.55)); } },
+				];
+				if (state.timer > 2.4) {
+					state.timer = 0;
+					state.index = (state.index + 1) % statusList.length;
+					scene.screenEffect.resetAll();
+					if (state.particle) {
+						scene.modeRoot.removeChild(state.particle.getNode());
+						state.particle = null;
+					}
+					scene.hero.setLocalOpacity(1);
+					statusList[state.index].apply();
+					state.label.setText(statusList[state.index].name);
+				}
+				const statusName = statusList[state.index] ? statusList[state.index].name : "";
+				if (statusName === "POISON") {
+					scene.heroSprite.setEffectProgress(0.5 + 0.5 * System.Math.sin(elapsed * 6));
+				}
+				else if (statusName === "BURNING") {
+					scene.heroSprite.setEffectProgress(0.2 + 0.1 * System.Math.sin(elapsed * 9));
+				}
+				else if (statusName === "GHOST") {
+					scene.heroSprite.setEffectProgress(1);
+					scene.hero.setLocalOpacity(0.7 + 0.2 * System.Math.sin(elapsed * 5));
+				}
+				else if (statusName === "INVINCIBLE") {
+					scene.heroSprite.setEffectProgress(0.6 + 0.4 * System.Math.sin(elapsed * 12));
+				}
+				else if (statusName === "STEALTH") {
+					scene.heroSprite.setEffectProgress(0.85 + 0.15 * System.Math.sin(elapsed * 3));
+				}
+				else {
+					scene.heroSprite.setEffectProgress(1);
+				}
+			},
+		},
+		{
+			key: "staging.victory", title: "VICTORY", tag: "컨페티 + 집중선 + 문장 광택 + 줌 + 글자",
+			setup: (scene) => {
+				scene.state = { nextBurst: 0.2 };
+				scene.screenEffect.setEnabled(ScreenEffectType.speedLines, true);
+				scene.screenEffect.setStrength(ScreenEffectType.speedLines, 0.6);
+				scene.screenEffect.setEnabled(ScreenEffectType.bloom, true);
+				scene.screenEffect.setStrength(ScreenEffectType.bloom, 0.5);
+				scene.subjectTable.emblem.sprite.setEffect(ShaderSpriteEffect.shine);
+				const label = scene.makeLabel(scene.modeRoot, 484, 330, 700, 80, 64, ACCENT_COLOR, true, "center");
+				label.setText("VICTORY");
+				label.setTextBaseline("middle");
+				scene.state.label = label;
+			},
+			update: (scene, elapsed, timeDelta) => {
+				const state = scene.state;
+				if (elapsed >= state.nextBurst) {
+					state.nextBurst = elapsed + 1.3;
+					const confetti = scene.spawnParticle({ bursts: [{ time: 0, count: 120 }], shape: "circle", shapeRadius: 10, lifetime: [1.6, 2.6], speed: [200, 520], size: [5, 9], rotation: [0, 6.28], angularVelocity: [2.2, 3.6], gravity: [0, 520], damping: 1.5, wobble: [8, 3], renderShape: "rect", blendMode: "source-over", startColorA: [1, 0.45, 0.55, 1], startColorB: [0.4, 0.75, 1, 1], sizeOverLifetime: [1, 1], colorOverLifetime: [{ time: 0, color: [1, 1, 1, 1] }, { time: 0.85, color: [1, 1, 1, 1] }, { time: 1, color: [1, 1, 1, 0] }] }, 200 + fxRandom.nextValue() * 560, 120);
+					confetti.play();
+				}
+				scene.subjectTable.emblem.sprite.setEffectProgress((elapsed % 1.6) / 1.6);
+				const pop = 1 + System.Math.max(0, System.Math.sin(elapsed * 2.4)) * 0.08;
+				state.label.getNode().setLocalScale(Vector2.create(pop, pop));
+				scene.worldZoom = 1.03 + System.Math.sin(elapsed * 1.2) * 0.02;
+			},
+		},
+		{
+			key: "staging.gameOver", title: "GAME OVER", tag: "무채색 페이드 + 레터박스 + 브라운관 끄기",
+			setup: (scene) => {
+				scene.screenEffect.setEnabled(ScreenEffectType.grayscale, true);
+				scene.screenEffect.setEnabled(ScreenEffectType.vignette, true);
+				scene.screenEffect.setEnabled(ScreenEffectType.tvOff, true);
+				const label = scene.makeLabel(scene.modeRoot, 484, 300, 700, 80, 56, new Color(0.9, 0.3, 0.3, 1), true, "center");
+				label.setText("GAME OVER");
+				label.setTextBaseline("middle");
+				scene.state = { label: label };
+			},
+			update: (scene, elapsed) => {
+				const cycle = (elapsed % 6) / 6;
+				const gray = System.Math.min(1, cycle / 0.3);
+				scene.screenEffect.setStrength(ScreenEffectType.grayscale, gray);
+				scene.screenEffect.setStrength(ScreenEffectType.vignette, gray);
+				scene.state.label.getNode().setLocalOpacity(System.Math.max(0, System.Math.min(1, (cycle - 0.2) / 0.2)));
+				scene.screenEffect.setStrength(ScreenEffectType.tvOff, System.Math.max(0, System.Math.min(1, (cycle - 0.7) / 0.25)));
+				scene.hero.setLocalRotation(System.Math.min(90, cycle * 400));
+			},
+		},
+		{
+			key: "staging.dayNight", title: "DAY / NIGHT", tag: "색온도 + 리프트 / 게인 + 별 파티클 + 안개",
+			setup: (scene) => {
+				scene.screenEffect.setEnabled(ScreenEffectType.whiteBalance, true);
+				scene.screenEffect.setEnabled(ScreenEffectType.liftGammaGain, true);
+				scene.screenEffect.setEnabled(ScreenEffectType.fog, true);
+				scene.screenEffect.setColor(ScreenEffectType.fog, new Color(0.9, 0.7, 0.5, 1));
+				scene.screenEffect.setParameters(ScreenEffectType.fog, 0.55, 1.1, 0, 0);
+				const stars = scene.spawnParticle({ looping: true, emissionRate: 0, bursts: [{ time: 0, count: 90 }], shape: "box", boxSize: [960, 300], lifetime: [60, 60], speed: [0, 0], size: [1.5, 3], gravity: [0, 0], damping: 0, renderShape: "circle", startColorA: [1, 1, 1, 1], startColorB: [0.8, 0.9, 1, 0.8], colorOverLifetime: [{ time: 0, color: [1, 1, 1, 1] }, { time: 1, color: [1, 1, 1, 1] }], sizeOverLifetime: [1, 1] }, 484, 180);
+				stars.play();
+				scene.state = { stars: stars.getNode() };
+			},
+			update: (scene, elapsed) => {
+				const dayPhase = 0.5 + 0.5 * System.Math.sin(elapsed * 0.7);
+				scene.screenEffect.setParameters(ScreenEffectType.whiteBalance, 0.9 - dayPhase * 1.6, 0, 0, 0);
+				scene.screenEffect.setParameters(ScreenEffectType.liftGammaGain, -0.08 * (1 - dayPhase), 1, 0.55 + dayPhase * 0.6, 0);
+				scene.screenEffect.setStrength(ScreenEffectType.fog, dayPhase * 0.5);
+				scene.state.stars.setLocalOpacity(1 - dayPhase);
+			},
+		},
+		{
+			key: "staging.damageFlash", title: "DAMAGE FLASH + KNOCKBACK", tag: "붉은 섬광 + 밀려남 + 무적 깜빡임",
+			setup: (scene) => {
+				scene.state = { nextHit: 0.7, invincible: 0 };
+				scene.heroSprite.setEffect(ShaderSpriteEffect.flash);
+				scene.heroSprite.setEffectColor(new Color(1, 0.3, 0.3, 1));
+			},
+			update: (scene, elapsed, timeDelta) => {
+				const state = scene.state;
+				if (elapsed >= state.nextHit) {
+					state.nextHit = elapsed + 1.8;
+					state.invincible = 0.9;
+					scene.heroKnockback = 1;
+					scene.shaker.addShake(8);
+					scene.spawnHitSparks(scene.getHeroPosition());
+				}
+				state.invincible = System.Math.max(0, state.invincible - timeDelta);
+				scene.heroSprite.setEffectProgress(System.Math.max(0, (state.invincible - 0.7) / 0.2));
+				scene.hero.setLocalOpacity(state.invincible > 0 ? (System.Math.sin(elapsed * 40) > 0 ? 1 : 0.35) : 1);
+				scene.applyHeroKnockback(timeDelta, 220);
+			},
+		},
+		{
+			key: "staging.rainStorm", title: "RAIN STORM", tag: "빗줄기 화면 효과 + 빗방울 파티클 + 물웅덩이 파문",
+			setup: (scene) => {
+				scene.screenEffect.setEnabled(ScreenEffectType.rain, true);
+				scene.screenEffect.setEnabled(ScreenEffectType.colorGrade, true);
+				scene.screenEffect.setParameters(ScreenEffectType.colorGrade, 1.1, 0.7, 0.85);
+				scene.screenEffect.setColor(ScreenEffectType.colorGrade, new Color(0.7, 0.8, 1, 0.5));
+				scene.spawnRainParticles();
+				scene.state = { rings: [], accumulator: 0 };
+			},
+			update: (scene, elapsed, timeDelta) => {
+				const state = scene.state;
+				state.accumulator += timeDelta;
+				if (state.accumulator > 0.12) {
+					state.accumulator = 0;
+					const ringNode = scene.makePaint(scene.modeRoot, 40 + fxRandom.nextValue() * 880, FLOOR_Y + 10 + fxRandom.nextValue() * 80, 20, 8, new Color(0.7, 0.85, 1, 0.5), 4);
+					state.rings.push({ node: ringNode, age: 0 });
+				}
+				for (let ringIndex = state.rings.length - 1; ringIndex >= 0; --ringIndex) {
+					const ring = state.rings[ringIndex];
+					ring.age += timeDelta;
+					const phase = System.Math.min(1, ring.age / 0.6);
+					ring.node.setLocalScale(Vector2.create(1 + phase * 2.5, 1 + phase * 2.5));
+					ring.node.setLocalOpacity(1 - phase);
+					if (phase >= 1) {
+						scene.modeRoot.removeChild(ring.node);
+						state.rings.splice(ringIndex, 1);
+					}
+				}
+			},
+		},
+	];
+
+	for (const definition of STAGING_DEFINITIONS) {
+		definition.category = "STAGING";
+	}
+
+	const MODE_DEFINITIONS = composeSpriteEffectModes().concat(composeScreenEffectModes(), STAGING_DEFINITIONS);
+
+	//==============================================================================
+	// 스프라이트 연출 씬.
+	//==============================================================================
+	class SpriteFxScene extends Scene {
+		//==============================================================================
+		// 멤버 변수 목록.
+		//==============================================================================
+		/** @private @type { TouchRecognizer | null } */ #touchRecognizer;
+		/** @private @type { object | null } */ #mode;
+		/** @private @type { number } */ #elapsed;
+		/** @private @type { System.Map } */ #listRowMap;
+		/** @private @type { System.Map } */ #imageTable;
+		/** @private @type { WorldNode | null } */ #stageNode;
+		/** @private @type { UILabel | null } */ #fpsLabel;
+		/** @private @type { number } */ #averageDelta;
+		/** @private @type { Vector2 } */ #worldBasePosition;
+
+		//==============================================================================
+		// 생성.
+		//==============================================================================
+		constructor() {
+			super();
+			this.#touchRecognizer = null;
+			this.#mode = null;
+			this.#elapsed = 0;
+			this.#listRowMap = new System.Map();
+			this.#imageTable = new System.Map();
+			this.#stageNode = null;
+			this.#fpsLabel = null;
+			this.#averageDelta = 0;
+			this.#worldBasePosition = Vector2.create(0, 0);
+
+			// 연출 모드가 다루는 공개 멤버.
+			this.worldNode = null;
+			this.modeRoot = null;
+			this.hero = null;
+			this.heroSprite = null;
+			this.heroAnimator = null;
+			this.subjectTable = {};
+			this.screenEffect = null;
+			this.shaker = new Shaker({ decayRate: 9, frequency: 42 });
+			this.floatingText = null;
+			this.state = null;
+			this.worldZoom = 1;
+			this.heroKnockback = 0;
+			this.spawnedParticleList = [];
+		}
+
+		//==============================================================================
+		// 씬 구성.
+		//==============================================================================
+		create() {
+			super.create();
+			const root = this.getRoot();
+			root.setPivot(Pivot.topLeft.clone());
+			root.setAnchor(Pivot.topLeft.clone());
+			this.#touchRecognizer = new TouchRecognizer();
+			this.#touchRecognizer.setRootNode(root);
+		}
+
+		//==============================================================================
+		// 로드.
+		//==============================================================================
+		async load(engine) {
+			const viewManager = engine.getViewManager();
+			viewManager.setViewScaleMode(ViewScaleMode.stretchShort);
+			this.screenEffect = new ScreenEffect(engine.getGraphic());
+			await System.Promise.all(IMAGE_NAME_LIST.map((imageName) => {
+				return new System.Promise((resolve) => {
+					const imageElement = new System.Image();
+					imageElement.onload = () => {
+						this.#imageTable.set(imageName, imageElement);
+						resolve();
+					};
+					imageElement.onerror = () => {
+						resolve();
+					};
+					imageElement.src = "./assets/" + imageName;
+				});
+			}));
+			this.buildHeader();
+			this.buildList();
+			this.buildStage();
+			this.buildWorld();
+			const searchParams = new System.URLSearchParams(System.location.search);
+			const requestedMode = searchParams.get("mode");
+			const isKnownMode = MODE_DEFINITIONS.some((definition) => definition.key === requestedMode);
+			this.selectMode(isKnownMode ? requestedMode : MODE_DEFINITIONS[0].key);
+		}
+
+		//==============================================================================
+		// 노드 생성 도우미. (연출 모드도 쓴다)
+		//==============================================================================
+		makeLabel(parentNode, x, y, width, height, fontSize, textColor, isBold, textAlign = "left") {
+			const labelNode = new WorldNode();
+			labelNode.setPivot(textAlign === "center" ? Pivot.middleCenter.clone() : Pivot.middleLeft.clone());
+			labelNode.setAnchor(Pivot.topLeft.clone());
+			labelNode.setContentSize(Vector2.create(width, height));
+			labelNode.setLocalPosition(Vector2.create(x, y));
+			const labelComponent = labelNode.addComponent(UILabel);
+			labelComponent.setFontSize(fontSize);
+			labelComponent.setTextColor(textColor);
+			labelComponent.setTextAlign(textAlign);
+			labelComponent.setTextBaseline("middle");
+			if (isBold) {
+				labelComponent.setBold(true);
+			}
+			parentNode.addChild(labelNode);
+			return labelComponent;
+		}
+
+		makePaint(parentNode, x, y, width, height, color, roundSize) {
+			const paintNode = new WorldNode();
+			paintNode.setPivot(Pivot.middleCenter.clone());
+			paintNode.setAnchor(Pivot.topLeft.clone());
+			paintNode.setContentSize(Vector2.create(width, height));
+			paintNode.setLocalPosition(Vector2.create(x, y));
+			const paint = paintNode.addComponent(Paint);
+			paint.setColor(color.clone());
+			paint.setRoundSize(roundSize);
+			parentNode.addChild(paintNode);
+			return paintNode;
+		}
+
+		makeSprite(parentNode, imageName, x, y, width, height, frameColumns = 1) {
+			const spriteNode = new WorldNode();
+			spriteNode.setPivot(Pivot.middleCenter.clone());
+			spriteNode.setAnchor(Pivot.topLeft.clone());
+			spriteNode.setContentSize(Vector2.create(width, height));
+			spriteNode.setLocalPosition(Vector2.create(x, y));
+			const sprite = spriteNode.addComponent(ShaderSprite);
+			const image = this.#imageTable.get(imageName);
+			sprite.setImage(image);
+			if (image && frameColumns > 1) {
+				sprite.setImageRect(Rect.create(0, 0, image.width / frameColumns, image.height));
+			}
+			parentNode.addChild(spriteNode);
+			return spriteNode;
+		}
+
+		spawnParticle(descriptionOverrides, x, y) {
+			const particleNode = new WorldNode();
+			particleNode.setPivot(Pivot.middleCenter.clone());
+			particleNode.setAnchor(Pivot.topLeft.clone());
+			particleNode.setContentSize(Vector2.create(10, 10));
+			particleNode.setLocalPosition(Vector2.create(x, y));
+			const particleSystem = particleNode.addComponent(ParticleSystem);
+			const description = System.Object.assign({
+				looping: false, duration: 1.2, maxParticleCount: 800, emissionRate: 0, bursts: [{ time: 0, count: 40 }],
+				shape: "circle", shapeRadius: 6, coneAngle: 0.35, boxSize: [200, 100], edgeWidth: 400,
+				lifetime: [0.4, 0.9], speed: [160, 420], size: [3, 6], rotation: [0, 0], angularVelocity: [0, 0],
+				startColorA: [1, 0.85, 0.4, 1], startColorB: [1, 0.55, 0.2, 1],
+				colorOverLifetime: [{ time: 0, color: [1, 1, 1, 1] }, { time: 1, color: [1, 0.4, 0.1, 0] }],
+				sizeOverLifetime: [1, 0.5], gravity: [0, 300], damping: 1.6, attractor: null, wobble: [0, 4],
+				renderShape: "streak", blendMode: "lighter", streakScale: 0.04, worldSpace: false,
+			}, descriptionOverrides);
+			particleSystem.applyDescription(description);
+			this.modeRoot.addChild(particleNode);
+			if (!description.looping) {
+				// 비반복 시스템은 방출 창 + 최장 수명이 지나면 지운다. (ParticleSystem 은 스스로 끝났다고 알리지 않는다)
+				this.spawnedParticleList.push({ particleSystem: particleSystem, expireTime: this.getElapsed() + description.duration + description.lifetime[1] + 0.5 });
+			}
+			return particleSystem;
+		}
+
+		getElapsed() {
+			return this.#elapsed;
+		}
+
+		//==============================================================================
+		// 다 탄 파티클 노드 정리. (연출이 계속 뿌리는 시스템이 쌓여 프레임을 갉지 않게)
+		//==============================================================================
+		pruneParticles() {
+			for (let index = this.spawnedParticleList.length - 1; index >= 0; --index) {
+				const entry = this.spawnedParticleList[index];
+				const particleNode = entry.particleSystem.getNode();
+				if (!particleNode || particleNode.getParent() !== this.modeRoot) {
+					this.spawnedParticleList.splice(index, 1);
+					continue;
+				}
+				if (this.#elapsed >= entry.expireTime && entry.particleSystem.getParticleCount() === 0) {
+					this.modeRoot.removeChild(particleNode);
+					this.spawnedParticleList.splice(index, 1);
+				}
+			}
+		}
+
+		spawnHitSparks(position) {
+			const particleSystem = this.spawnParticle({}, position.x, position.y);
+			particleSystem.play();
+		}
+
+		spawnDust(position) {
+			const particleSystem = this.spawnParticle({ bursts: [{ time: 0, count: 18 }], speed: [60, 160], gravity: [0, -40], lifetime: [0.3, 0.6], size: [6, 14], renderShape: "circle", blendMode: "source-over", startColorA: [0.6, 0.6, 0.7, 0.5], startColorB: [0.8, 0.8, 0.85, 0.35], colorOverLifetime: [{ time: 0, color: [1, 1, 1, 1] }, { time: 1, color: [1, 1, 1, 0] }], sizeOverLifetime: [0.6, 1.6] }, position.x, position.y);
+			particleSystem.play();
+		}
+
+		spawnRainParticles() {
+			const rain = this.spawnParticle({ looping: true, emissionRate: 260, bursts: [], shape: "edge", edgeWidth: 1100, lifetime: [0.7, 0.9], speed: [700, 900], size: [1.4, 2.2], gravity: [0, 0], damping: 0, renderShape: "streak", streakScale: 0.03, blendMode: "source-over", startColorA: [0.62, 0.74, 0.95, 0.5], startColorB: [0.75, 0.85, 1, 0.3], sizeOverLifetime: [1, 1], colorOverLifetime: [{ time: 0, color: [1, 1, 1, 1] }, { time: 1, color: [1, 1, 1, 1] }] }, 484, -40);
+			rain.play();
+			return rain;
+		}
+
+		getHeroPosition() {
+			return this.hero.getLocalPosition();
+		}
+
+		getHeroStagePosition() {
+			const heroPosition = this.getHeroPosition();
+			return Vector2.create((STAGE_X + heroPosition.x) / REFERENCE_WIDTH, (STAGE_Y + heroPosition.y) / REFERENCE_HEIGHT);
+		}
+
+		setTimeScale(timeScale) {
+			const engine = this.getEngine();
+			engine.getTimeManager().setTimeScale(timeScale);
+		}
+
+		applyHeroKnockback(timeDelta, distance) {
+			if (this.heroKnockback <= 0) {
+				return;
+			}
+			this.heroKnockback = System.Math.max(0, this.heroKnockback - timeDelta * 2.5);
+			const eased = this.heroKnockback * this.heroKnockback;
+			this.hero.setLocalPosition(Vector2.create(300 - eased * distance * 0.25, FLOOR_Y - 60));
+			this.hero.setLocalRotation(-eased * 18);
+		}
+
+		setSubjectsVisible(isVisible) {
+			for (const subjectName of System.Object.keys(this.subjectTable)) {
+				this.subjectTable[subjectName].node.setActive(isVisible);
+			}
+			this.hero.setActive(isVisible);
+		}
+
+		applySubjectEffect(effectName) {
+			for (const subjectName of System.Object.keys(this.subjectTable)) {
+				this.subjectTable[subjectName].sprite.setEffect(effectName);
+			}
+			this.heroSprite.setEffect(effectName);
+		}
+
+		setSubjectProgress(progress) {
+			for (const subjectName of System.Object.keys(this.subjectTable)) {
+				this.subjectTable[subjectName].sprite.setEffectProgress(progress);
+			}
+			this.heroSprite.setEffectProgress(progress);
+		}
+
+		//==============================================================================
+		// 상단 제목.
+		//==============================================================================
+		buildHeader() {
+			const root = this.getRoot();
+			const titleLabel = this.makeLabel(root, 24, 37, 400, 26, 18, TEXT_COLOR, true);
+			titleLabel.setText("SPRITE EFFECTS");
+			this.#fpsLabel = this.makeLabel(root, REFERENCE_WIDTH - 24 - 200, 37, 200, 20, 11, TEXT_FAINT_COLOR, false, "left");
+			this.#fpsLabel.getNode().setPivot(Pivot.middleRight.clone());
+			this.#fpsLabel.getNode().setLocalPosition(Vector2.create(REFERENCE_WIDTH - 24, 37));
+			this.#fpsLabel.setTextAlign("right");
+			this.#fpsLabel.setText("fps  --");
+		}
+
+		//==============================================================================
+		// 왼쪽 목록. (분류 머리말 + 스크롤)
+		//==============================================================================
+		buildList() {
+			const root = this.getRoot();
+			const listNode = new WorldNode();
+			listNode.setPivot(Pivot.topLeft.clone());
+			listNode.setAnchor(Pivot.topLeft.clone());
+			listNode.setContentSize(Vector2.create(LIST_WIDTH, LIST_HEIGHT));
+			listNode.setLocalPosition(Vector2.create(LIST_X, LIST_Y));
+			listNode.setInteractable(true);
+			const listPaint = listNode.addComponent(Paint);
+			listPaint.setColor(SURFACE_COLOR.clone());
+			listPaint.setRoundSize(12);
+			const listScroll = listNode.addComponent(UIScrollView);
+			listScroll.setHorizontal(false);
+			listScroll.setVertical(true);
+			root.addChild(listNode);
+
+			const listScrollBar = new UIScrollBar();
+			listScrollBar.setContentSize(Vector2.create(6, LIST_HEIGHT - 12));
+			listScrollBar.setLocalPosition(Vector2.create(LIST_X + LIST_WIDTH - 10, LIST_Y + 6));
+			listScrollBar.setScrollView(listScroll);
+			listScrollBar.setTrackColor(new Color(1, 1, 1, 0.05));
+			listScrollBar.setThumbColor(new Color(1, 1, 1, 0.22));
+			root.addChild(listScrollBar);
+
+			const contentNode = listScroll.getContent();
+			let y = 8;
+			let lastCategory = "";
+			for (const definition of MODE_DEFINITIONS) {
+				if (definition.category !== lastCategory) {
+					lastCategory = definition.category;
+					const headerLabel = this.makeLabel(contentNode, 22, y + LIST_HEADER_HEIGHT / 2 + 4, LIST_WIDTH - 44, 20, 10, TEXT_FAINT_COLOR, true, "left");
+					headerLabel.setText(definition.category);
+					y += LIST_HEADER_HEIGHT;
+				}
+				const rowNode = new WorldNode();
+				rowNode.setPivot(Pivot.topLeft.clone());
+				rowNode.setAnchor(Pivot.topLeft.clone());
+				rowNode.setContentSize(Vector2.create(LIST_WIDTH - 16, LIST_ROW_HEIGHT - 4));
+				rowNode.setLocalPosition(Vector2.create(8, y));
+				rowNode.setInteractable(true);
+				const rowPaint = rowNode.addComponent(Paint);
+				rowPaint.setColor(new Color(0, 0, 0, 0));
+				rowPaint.setRoundSize(9);
+				const rowButton = rowNode.addComponent(UIButton);
+				rowButton.setPressedTintColor(new Color(1, 1, 1, 0.05));
+				rowButton.setClickedEvent(() => {
+					this.selectMode(definition.key);
+				});
+				rowButton.excludeComponentFromTint(rowPaint);
+				const titleLabel = this.makeLabel(rowNode, 14, (LIST_ROW_HEIGHT - 4) / 2, LIST_WIDTH - 44, 20, 11.5, TEXT_COLOR, true, "left");
+				titleLabel.setText(definition.title);
+				rowButton.excludeNodeFromTint(titleLabel.getNode());
+				contentNode.addChild(rowNode);
+				this.#listRowMap.set(definition.key, { paintComponent: rowPaint, titleLabel: titleLabel, y: y, rowNode: rowNode });
+				y += LIST_ROW_HEIGHT;
+			}
+			listScroll.setScrollContentSize(Vector2.create(LIST_WIDTH, y + 8));
+			this.listScroll = listScroll;
+		}
+
+		//==============================================================================
+		// 목록 행 컬링. (보이는 범위 밖 행은 비활성 — 130여 행의 그리기 / 호버 판정을 아낀다)
+		//==============================================================================
+		updateListCulling() {
+			// 스크롤 오프셋은 내릴수록 음수. (컨텐트가 위로 이동)
+			const scrollOffset = this.listScroll.getScrollOffset();
+			const topY = -scrollOffset.y - LIST_ROW_HEIGHT;
+			const bottomY = -scrollOffset.y + LIST_HEIGHT + LIST_ROW_HEIGHT;
+			for (const rowEntry of this.#listRowMap.values()) {
+				const isInside = rowEntry.y + LIST_ROW_HEIGHT >= topY && rowEntry.y <= bottomY;
+				if (rowEntry.rowNode.isActive() !== isInside) {
+					rowEntry.rowNode.setActive(isInside);
+				}
+			}
+		}
+
+		//==============================================================================
+		// 무대.
+		//==============================================================================
+		buildStage() {
+			const root = this.getRoot();
+			const frameNode = new WorldNode();
+			frameNode.setPivot(Pivot.topLeft.clone());
+			frameNode.setAnchor(Pivot.topLeft.clone());
+			frameNode.setContentSize(Vector2.create(STAGE_WIDTH + 2, STAGE_HEIGHT + 2));
+			frameNode.setLocalPosition(Vector2.create(STAGE_X - 1, STAGE_Y - 1));
+			const framePaint = frameNode.addComponent(Paint);
+			framePaint.setColor(HAIRLINE_COLOR.clone());
+			framePaint.setRoundSize(15);
+			root.addChild(frameNode);
+
+			this.#stageNode = new WorldNode();
+			this.#stageNode.setPivot(Pivot.topLeft.clone());
+			this.#stageNode.setAnchor(Pivot.topLeft.clone());
+			this.#stageNode.setContentSize(Vector2.create(STAGE_WIDTH, STAGE_HEIGHT));
+			this.#stageNode.setLocalPosition(Vector2.create(STAGE_X, STAGE_Y));
+			const stagePaint = this.#stageNode.addComponent(Paint);
+			stagePaint.setColor(STAGE_COLOR.clone());
+			stagePaint.setRoundSize(14);
+			const stageMask = this.#stageNode.addComponent(Mask);
+			stageMask.setRoundSize(14);
+			root.addChild(this.#stageNode);
+		}
+
+		//==============================================================================
+		// 공용 세계. (바탕 + 바닥 + 주인공 + 피사체들 + 연출 뿌리 + 떠오르는 글자)
+		//==============================================================================
+		buildWorld() {
+			this.worldNode = new WorldNode();
+			this.worldNode.setPivot(Pivot.middleCenter.clone());
+			this.worldNode.setAnchor(Pivot.topLeft.clone());
+			this.worldNode.setContentSize(Vector2.create(STAGE_WIDTH, STAGE_HEIGHT));
+			this.#worldBasePosition = Vector2.create(STAGE_WIDTH / 2, STAGE_HEIGHT / 2);
+			this.worldNode.setLocalPosition(this.#worldBasePosition.clone());
+			this.#stageNode.addChild(this.worldNode);
+
+			this.makePaint(this.worldNode, STAGE_WIDTH / 2, STAGE_HEIGHT / 2, STAGE_WIDTH + 80, STAGE_HEIGHT + 80, new Color(0.07, 0.09, 0.14, 1), 0);
+			this.makePaint(this.worldNode, STAGE_WIDTH / 2, 60, 2200, 1200, new Color(0.11, 0.14, 0.22, 1), 600);
+			this.makePaint(this.worldNode, STAGE_WIDTH / 2, FLOOR_Y + 140, STAGE_WIDTH + 80, 280, new Color(0.13, 0.17, 0.25, 1), 0);
+			this.makePaint(this.worldNode, STAGE_WIDTH / 2, FLOOR_Y + 2, STAGE_WIDTH + 80, 4, new Color(0.25, 0.32, 0.45, 1), 0);
+
+			this.modeRoot = new WorldNode();
+			this.modeRoot.setPivot(Pivot.topLeft.clone());
+			this.modeRoot.setAnchor(Pivot.topLeft.clone());
+			this.modeRoot.setContentSize(Vector2.create(STAGE_WIDTH, STAGE_HEIGHT));
+
+			const emblemNode = this.makeSprite(this.worldNode, "emblem.png", 484, 160, 150, 150);
+			const starNode = this.makeSprite(this.worldNode, "star.png", 720, 150, 72, 72);
+			const coinNode = this.makeSprite(this.worldNode, "coin.png", 620, FLOOR_Y - 32, 56, 56, 8);
+			const gemNode = this.makeSprite(this.worldNode, "gem.png", 800, FLOOR_Y - 34, 60, 60);
+			const batNode = this.makeSprite(this.worldNode, "bat.png", 800, 220, 96, 72, 4);
+			this.subjectTable = {
+				emblem: { node: emblemNode, sprite: emblemNode.getComponent(ShaderSprite) },
+				star: { node: starNode, sprite: starNode.getComponent(ShaderSprite) },
+				coin: { node: coinNode, sprite: coinNode.getComponent(ShaderSprite) },
+				gem: { node: gemNode, sprite: gemNode.getComponent(ShaderSprite) },
+				bat: { node: batNode, sprite: batNode.getComponent(ShaderSprite) },
+			};
+
+			this.hero = this.makeSprite(this.worldNode, "slime.png", 300, FLOOR_Y - 60, 128, 128, 8);
+			this.heroSprite = this.hero.getComponent(ShaderSprite);
+			this.heroAnimator = this.hero.addComponent(SpriteAnimator);
+			const slimeImage = this.#imageTable.get("slime.png");
+			const idleRects = [];
+			for (let frameIndex = 0; frameIndex < 8; ++frameIndex) {
+				idleRects.push(Rect.create(frameIndex * 64, 0, 64, 64));
+			}
+			this.heroAnimator.addClip("idle", slimeImage, idleRects, 10, true);
+			this.heroAnimator.addClip("jump", slimeImage, [idleRects[2], idleRects[3], idleRects[4], idleRects[5], idleRects[6], idleRects[7], idleRects[0]], 14, false);
+			this.heroAnimator.play("idle");
+
+			this.worldNode.addChild(this.modeRoot);
+			this.floatingText = new FloatingText();
+			this.worldNode.addChild(this.floatingText);
+		}
+
+		//==============================================================================
+		// 모드 선택. (이전 모드 정리 → 공용 세계 초기화 → 새 모드 준비)
+		//==============================================================================
+		selectMode(modeKey) {
+			const definition = MODE_DEFINITIONS.find((entry) => entry.key === modeKey);
+			if (!definition) {
+				return;
+			}
+			if (this.#mode && this.#mode.cleanup) {
+				this.#mode.cleanup(this);
+			}
+			this.#mode = definition;
+			this.#elapsed = 0;
+			this.state = null;
+			this.worldZoom = 1;
+			this.heroKnockback = 0;
+			this.setTimeScale(1);
+			this.shaker.stop();
+			this.screenEffect.resetAll();
+			this.modeRoot.removeChildren();
+			this.spawnedParticleList = [];
+			this.floatingText.clear();
+			this.setSubjectsVisible(true);
+			this.hero.setLocalPosition(Vector2.create(300, FLOOR_Y - 60));
+			this.hero.setLocalScale(Vector2.create(1, 1));
+			this.hero.setLocalRotation(0);
+			this.hero.setLocalOpacity(1);
+			this.heroSprite.setHorizontalFlip(false);
+			this.heroSprite.setEffect(ShaderSpriteEffect.none);
+			this.heroAnimator.play("idle");
+			this.subjectTable.bat.node.setLocalPosition(Vector2.create(800, 220));
+			for (const subjectName of System.Object.keys(this.subjectTable)) {
+				this.subjectTable[subjectName].sprite.setEffect(ShaderSpriteEffect.none);
+			}
+			definition.setup(this);
+
+			for (const [key, rowEntry] of this.#listRowMap) {
+				const isActive = (key === modeKey);
+				rowEntry.paintComponent.setColor(isActive ? ACCENT_COLOR.clone() : new Color(0, 0, 0, 0));
+				rowEntry.titleLabel.setTextColor(isActive ? ON_ACCENT_COLOR.clone() : TEXT_COLOR.clone());
+			}
+		}
+
+		//==============================================================================
+		// 갱신.
+		//==============================================================================
+		tick(timeDelta) {
+			super.tick(timeDelta);
+			const engine = this.getEngine();
+			const unscaledDelta = engine.getTimeManager().getUnscaleDeltaTime();
+			this.#elapsed += unscaledDelta;
+			if (this.#mode) {
+				this.#mode.update(this, this.#elapsed, timeDelta, unscaledDelta);
+			}
+			this.pruneParticles();
+			this.updateListCulling();
+
+			// 공용 피사체 애니메이션.
+			const coinFrame = System.Math.floor(this.#elapsed * 12) % 8;
+			this.subjectTable.coin.sprite.setImageRect(Rect.create(coinFrame * 48, 0, 48, 48));
+			const batFrame = System.Math.floor(this.#elapsed * 10) % 4;
+			this.subjectTable.bat.sprite.setImageRect(Rect.create(batFrame * 64, 0, 64, 48));
+			if (this.#mode && this.#mode.key !== "staging.slashTrail") {
+				this.subjectTable.bat.node.setLocalPosition(Vector2.create(800 + System.Math.sin(this.#elapsed * 1.3) * 60, 220 + System.Math.sin(this.#elapsed * 2.6) * 30));
+			}
+			this.subjectTable.star.node.setLocalRotation(System.Math.sin(this.#elapsed * 1.5) * 12);
+			this.subjectTable.gem.node.setLocalPosition(Vector2.create(800, FLOOR_Y - 34 - System.Math.abs(System.Math.sin(this.#elapsed * 2)) * 10));
+
+			this.shaker.tick(unscaledDelta);
+			const shakeOffset = this.shaker.getOffset();
+			this.worldNode.setLocalPosition(Vector2.create(this.#worldBasePosition.x + shakeOffset.x, this.#worldBasePosition.y + shakeOffset.y));
+			this.worldNode.setLocalScale(Vector2.create(this.worldZoom, this.worldZoom));
+			this.screenEffect.tick(unscaledDelta);
+
+			this.#averageDelta = this.#averageDelta === 0 ? unscaledDelta : this.#averageDelta * 0.95 + unscaledDelta * 0.05;
+			if (this.#averageDelta > 0) {
+				this.#fpsLabel.setText("fps  " + System.Math.round(1 / this.#averageDelta));
+			}
+		}
+
+		//==============================================================================
+		// 출력 전 / 후 처리.
+		//==============================================================================
+		preDraw(graphic) {
+			super.preDraw(graphic);
+			this.applyStageRegion();
+			this.screenEffect.begin(graphic);
+			const engine = this.getEngine();
+			const viewManager = engine.getViewManager();
+			const canvasNativeSize = viewManager.getCanvasNativeSize();
+			viewManager.applyCanvasNativeRect(graphic);
+			graphic.setFillColor("rgb(20, 23, 30)");
+			graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+			viewManager.applyViewRect(graphic);
+		}
+
+		postDraw(graphic) {
+			super.postDraw(graphic);
+			this.screenEffect.end(graphic);
+		}
+
+		//==============================================================================
+		// 화면 효과 적용 영역 = 무대 사각형. (뷰 좌표 → 캔버스 픽셀, 둥근 모서리 포함)
+		//==============================================================================
+		applyStageRegion() {
+			const engine = this.getEngine();
+			const viewManager = engine.getViewManager();
+			const viewNativeRect = viewManager.getViewNativeRect();
+			const targetResolutionScale = viewManager.getTargetResolutionScale();
+			const devicePixelRatio = viewManager.getDevicePixelRatio();
+			const pixelScale = targetResolutionScale * devicePixelRatio;
+			this.screenEffect.setRegion(
+				(viewNativeRect.position.x * devicePixelRatio) + STAGE_X * pixelScale,
+				(viewNativeRect.position.y * devicePixelRatio) + STAGE_Y * pixelScale,
+				STAGE_WIDTH * pixelScale,
+				STAGE_HEIGHT * pixelScale,
+				14 * pixelScale);
+		}
+
+		//==============================================================================
+		// 터치 전달.
+		//==============================================================================
+		touchPress(viewInputPosition) {
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchPress(viewInputPosition);
+			}
+		}
+
+		touchMove(viewInputPosition) {
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchMove(viewInputPosition);
+			}
+		}
+
+		touchRelease(viewInputPosition) {
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchRelease(viewInputPosition);
+			}
+		}
+
+		//==============================================================================
+		// 마우스 휠. (포인터 아래 가장 안쪽 스크롤 뷰로 전달 — UIScene 이 아닌 씬은 직접 넘겨야 한다)
+		//==============================================================================
+		/**
+		 * @param { Vector2 } viewInputPosition
+		 * @param { Vector2 } wheelDelta
+		 */
+		touchWheel(viewInputPosition, wheelDelta) {
+			const scrollView = this.findScrollViewAt(this.getRoot(), viewInputPosition);
+			if (scrollView) {
+				scrollView.wheel(wheelDelta);
+			}
+		}
+
+		/**
+		 * @param { WorldNode } node
+		 * @param { Vector2 } viewInputPosition
+		 * @returns { UIScrollView | null }
+		 */
+		findScrollViewAt(node, viewInputPosition) {
+			if (!node.isActive()) {
+				return null;
+			}
+			const children = node.getChildren();
+			for (let childIndex = children.length - 1; childIndex >= 0; --childIndex) {
+				const found = this.findScrollViewAt(children[childIndex], viewInputPosition);
+				if (found) {
+					return found;
+				}
+			}
+			const scrollView = (typeof node.getComponent === "function") ? node.getComponent(UIScrollView) : null;
+			if (scrollView && typeof node.contains === "function" && node.contains(viewInputPosition)) {
+				return scrollView;
+			}
+			return null;
+		}
+
+		touchCancel(viewInputPosition) {
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchCancel(viewInputPosition);
+			}
+		}
+	}
+
+	//==============================================================================
+	// 엔진 실행.
+	//==============================================================================
+	const engineConfiguration = new EngineConfiguration();
+	engineConfiguration.referenceResolutionSize = Vector2.create(REFERENCE_WIDTH, REFERENCE_HEIGHT);
+	engineConfiguration.canvasId = "mainCanvas";
+	engineConfiguration.autoResizeOnWindowResize = true;
+	const engine = new Engine(engineConfiguration);
+	engine.run(new SpriteFxScene());
+	System.spriteFxEngine = engine;
+</script>
+</body>
+</html>

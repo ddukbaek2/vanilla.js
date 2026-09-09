@@ -1,0 +1,458 @@
+{
+	"name": "Scene Transition",
+	"duration": 10,
+	"frameRate": 30,
+	"loop": true,
+	"stage": {
+		"width": 960,
+		"height": 540,
+		"backgroundColor": "#101114ff",
+		"nodes": [
+			{
+				"name": "Scene A",
+				"type": "group",
+				"parent": null,
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540
+			},
+			{
+				"name": "Sky A",
+				"type": "paint",
+				"parent": "Scene A",
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540,
+				"color": "#1b2a44ff"
+			},
+			{
+				"name": "Sun",
+				"type": "paint",
+				"parent": "Scene A",
+				"x": 720,
+				"y": 150,
+				"width": 120,
+				"height": 120,
+				"color": "#ffd166ff",
+				"roundSize": 60
+			},
+			{
+				"name": "Field",
+				"type": "paint",
+				"parent": "Scene A",
+				"x": 480,
+				"y": 470,
+				"width": 960,
+				"height": 180,
+				"color": "#2f6b45ff"
+			},
+			{
+				"name": "Hero A",
+				"type": "sprite",
+				"parent": "Scene A",
+				"x": 300,
+				"y": 350,
+				"width": 112,
+				"height": 112,
+				"image": "slime.png",
+				"frameColumns": 8,
+				"frameRows": 1
+			},
+			{
+				"name": "Label A",
+				"type": "text",
+				"parent": "Scene A",
+				"x": 480,
+				"y": 80,
+				"width": 500,
+				"height": 40,
+				"text": "MEADOW",
+				"fontSize": 30,
+				"bold": true,
+				"color": "#f2ece2ff"
+			},
+			{
+				"name": "Scene B",
+				"type": "group",
+				"parent": null,
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540,
+				"visible": false
+			},
+			{
+				"name": "Sky B",
+				"type": "paint",
+				"parent": "Scene B",
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540,
+				"color": "#160f1eff"
+			},
+			{
+				"name": "Moon B",
+				"type": "paint",
+				"parent": "Scene B",
+				"x": 240,
+				"y": 130,
+				"width": 90,
+				"height": 90,
+				"color": "#e8e2f2ff",
+				"roundSize": 45
+			},
+			{
+				"name": "Cave",
+				"type": "paint",
+				"parent": "Scene B",
+				"x": 480,
+				"y": 480,
+				"width": 960,
+				"height": 160,
+				"color": "#2a1f33ff"
+			},
+			{
+				"name": "Bat B",
+				"type": "sprite",
+				"parent": "Scene B",
+				"x": 640,
+				"y": 220,
+				"width": 96,
+				"height": 72,
+				"image": "bat.png",
+				"frameColumns": 4,
+				"frameRows": 1
+			},
+			{
+				"name": "Gem B",
+				"type": "sprite",
+				"parent": "Scene B",
+				"x": 480,
+				"y": 380,
+				"width": 64,
+				"height": 64,
+				"image": "gem.png"
+			},
+			{
+				"name": "Label B",
+				"type": "text",
+				"parent": "Scene B",
+				"x": 480,
+				"y": 80,
+				"width": 500,
+				"height": 40,
+				"text": "CRYSTAL CAVE",
+				"fontSize": 30,
+				"bold": true,
+				"color": "#f2ece2ff"
+			},
+			{
+				"name": "Cover",
+				"type": "sprite",
+				"parent": null,
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540,
+				"image": "cover.png",
+				"color": "#000000ff",
+				"effect": "iris",
+				"effectProgress": 0,
+				"opacity": 0
+			},
+			{
+				"name": "Cover Pixel",
+				"type": "sprite",
+				"parent": null,
+				"x": 480,
+				"y": 270,
+				"width": 960,
+				"height": 540,
+				"image": "cover.png",
+				"color": "#000000ff",
+				"effect": "pixelDissolve",
+				"effectProgress": 1,
+				"opacity": 0
+			}
+		]
+	},
+	"tracks": [
+		{
+			"target": "Hero A",
+			"property": "x",
+			"keys": [
+				{
+					"time": 0,
+					"value": 300,
+					"easing": "linear"
+				},
+				{
+					"time": 2,
+					"value": 420,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 8,
+					"value": 420,
+					"easing": "linear"
+				},
+				{
+					"time": 10,
+					"value": 540,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Hero A",
+			"property": "frame",
+			"keys": [
+				{
+					"time": 0,
+					"value": 0,
+					"easing": "linear"
+				},
+				{
+					"time": 10,
+					"value": 80,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Bat B",
+			"property": "frame",
+			"keys": [
+				{
+					"time": 0,
+					"value": 0,
+					"easing": "linear"
+				},
+				{
+					"time": 10,
+					"value": 60,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Bat B",
+			"property": "x",
+			"keys": [
+				{
+					"time": 3,
+					"value": 640,
+					"easing": "sinusoidal.inOut"
+				},
+				{
+					"time": 5,
+					"value": 400,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 7,
+					"value": 640,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Gem B",
+			"property": "y",
+			"keys": [
+				{
+					"time": 3,
+					"value": 380,
+					"easing": "sinusoidal.inOut"
+				},
+				{
+					"time": 4,
+					"value": 368,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 5,
+					"value": 380,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 6,
+					"value": 368,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 7,
+					"value": 380,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Cover",
+			"property": "effect",
+			"keys": [
+				{
+					"time": 2,
+					"value": 0,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 3,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 3,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 4,
+					"value": 0,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Scene A",
+			"property": "visible",
+			"keys": [
+				{
+					"time": 0,
+					"value": true,
+					"easing": "step"
+				},
+				{
+					"time": 3,
+					"value": false,
+					"easing": "step"
+				},
+				{
+					"time": 8,
+					"value": true,
+					"easing": "step"
+				}
+			]
+		},
+		{
+			"target": "Scene B",
+			"property": "visible",
+			"keys": [
+				{
+					"time": 0,
+					"value": false,
+					"easing": "step"
+				},
+				{
+					"time": 3,
+					"value": true,
+					"easing": "step"
+				},
+				{
+					"time": 8,
+					"value": false,
+					"easing": "step"
+				}
+			]
+		},
+		{
+			"target": "Cover Pixel",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 6.9,
+					"value": 0,
+					"easing": "step"
+				},
+				{
+					"time": 7,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 9,
+					"value": 1,
+					"easing": "step"
+				},
+				{
+					"time": 9.05,
+					"value": 0,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Cover Pixel",
+			"property": "effect",
+			"keys": [
+				{
+					"time": 7,
+					"value": 1,
+					"easing": "linear"
+				},
+				{
+					"time": 8,
+					"value": 0,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 8,
+					"value": 0,
+					"easing": "linear"
+				},
+				{
+					"time": 9,
+					"value": 1,
+					"easing": "cubic.inOut"
+				}
+			]
+		},
+		{
+			"target": "Cover",
+			"property": "opacity",
+			"keys": [
+				{
+					"time": 1.9,
+					"value": 0,
+					"easing": "step"
+				},
+				{
+					"time": 2,
+					"value": 1,
+					"easing": "cubic.inOut"
+				},
+				{
+					"time": 4,
+					"value": 1,
+					"easing": "step"
+				},
+				{
+					"time": 4.05,
+					"value": 0,
+					"easing": "cubic.inOut"
+				}
+			]
+		}
+	],
+	"markers": [
+		{
+			"time": 2,
+			"name": "iris out"
+		},
+		{
+			"time": 3,
+			"name": "scene B"
+		},
+		{
+			"time": 7,
+			"name": "pixel out"
+		},
+		{
+			"time": 8,
+			"name": "scene A"
+		}
+	]
+}

@@ -30,6 +30,8 @@ export class UISlider extends UIControl {
 	/** @private @type { Color } */  #fillColor;
 	/** @private @type { Color } */  #thumbColor;
 	/** @private @type { number } */ #thumbRadius;
+	/** @private @type { number } */ #trackThickness;
+	/** @private @type { WorldNode } */ #thumbNode;
 	/** @private @type { number } */ #cornerRadius;
 	/** @private @type { string } */ #direction;
 	/** @private @type { boolean } */ #isDragging;
@@ -49,6 +51,8 @@ export class UISlider extends UIControl {
 		this.#fillColor = new Color(0.23, 0.51, 0.96, 1); // blue-500 근사
 		this.#thumbColor = new Color(1, 1, 1, 1);
 		this.#thumbRadius = 16;
+		this.#trackThickness = 0;
+		this.#thumbNode = null;
 		this.#cornerRadius = 0;
 		this.#direction = ProgressDirection.horizontal;
 		this.#isDragging = false;
@@ -87,8 +91,17 @@ export class UISlider extends UIControl {
 			return;
 		}
 
-		// 트랙.
-		const trackRect = Rect.create(0, 0, contentSize.x, contentSize.y);
+		// 트랙. (두께를 정했으면 노드 가운데에 그 두께로 그린다)
+		const trackThickness = this.#trackThickness;
+		let trackRect = Rect.create(0, 0, contentSize.x, contentSize.y);
+		if (trackThickness > 0) {
+			if (this.#direction === ProgressDirection.vertical) {
+				trackRect = Rect.create((contentSize.x - trackThickness) * 0.5, 0, trackThickness, contentSize.y);
+			}
+			else {
+				trackRect = Rect.create(0, (contentSize.y - trackThickness) * 0.5, contentSize.x, trackThickness);
+			}
+		}
 		graphic.setFillColor(this.#trackColor);
 		if (this.#cornerRadius > 0) {
 			graphic.drawRoundRect(trackRect, this.#cornerRadius);
@@ -103,11 +116,11 @@ export class UISlider extends UIControl {
 			let fillRect;
 			if (this.#direction === ProgressDirection.vertical) {
 				const fillHeight = contentSize.y * ratio;
-				fillRect = Rect.create(0, contentSize.y - fillHeight, contentSize.x, fillHeight);
+				fillRect = Rect.create(trackRect.position.x, contentSize.y - fillHeight, trackRect.size.x, fillHeight);
 			}
 			else {
 				const fillWidth = contentSize.x * ratio;
-				fillRect = Rect.create(0, 0, fillWidth, contentSize.y);
+				fillRect = Rect.create(0, trackRect.position.y, fillWidth, trackRect.size.y);
 			}
 			graphic.setFillColor(this.#fillColor);
 			if (this.#cornerRadius > 0) {
@@ -128,6 +141,13 @@ export class UISlider extends UIControl {
 		else {
 			thumbX = contentSize.x * ratio;
 			thumbY = contentSize.y * 0.5;
+		}
+
+		// thumb 노드를 지정했으면 그 노드를 자리에 옮기고 원은 그리지 않는다.
+		if (this.#thumbNode) {
+			const thumbSize = this.#thumbNode.getContentSize();
+			this.#thumbNode.setLocalPosition(Vector2.create(thumbX - thumbSize.x * 0.5, thumbY - thumbSize.y * 0.5));
+			return;
 		}
 
 		// thumb 그리기 (원).
@@ -284,6 +304,12 @@ export class UISlider extends UIControl {
 	//==============================================================================
 	/** @param { number } radius */ setThumbRadius(radius) { this.#thumbRadius = radius; }
 	getThumbRadius() { return this.#thumbRadius; }
+
+	/** @param { number } thickness */ setTrackThickness(thickness) { this.#trackThickness = thickness; }
+	getTrackThickness() { return this.#trackThickness; }
+
+	/** @param { WorldNode } node */ setThumbNode(node) { this.#thumbNode = node; }
+	getThumbNode() { return this.#thumbNode; }
 
 	/** @param { number } radius */ setCornerRadius(radius) { this.#cornerRadius = radius; }
 	getCornerRadius() { return this.#cornerRadius; }

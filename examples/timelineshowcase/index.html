@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>vanilla.js - Timeline Showcase</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<style>
+	html, body {
+		margin: 0;
+		padding: 0;
+		width: 100%;
+		height: 100%;
+		overflow: hidden;
+		background: #14171e;
+		touch-action: none;
+		user-select: none;
+	}
+	#mainCanvas {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+	"use strict";
+	const System = globalThis;
+
+	//==============================================================================
+	// 엔진 모듈 로드. (배포본은 ./vanilla.js, 저장소는 ../../build/vanilla.js)
+	// - 배포 스탬프를 주소에 붙여 브라우저가 옛 엔진을 캐시에서 꺼내 쓰지 않게 한다. (엔진을 다시 올릴 때 값을 바꾼다)
+	//==============================================================================
+	const ENGINE_CACHE_STAMP = "20260908a";
+	let engineModule = null;
+	try {
+		try {
+			engineModule = await import("./vanilla.js?v=" + ENGINE_CACHE_STAMP);
+		}
+		catch (importError) {
+			engineModule = await import("../../build/vanilla.js");
+		}
+	}
+	catch (engineError) {
+		System.document.body.innerHTML = "<p style=\"color:#fff;font-family:sans-serif;padding:2em\">vanilla.js 엔진 모듈을 불러오지 못했습니다.</p>";
+		throw engineError;
+	}
+
+	const Engine = engineModule.Engine;
+	const EngineConfiguration = engineModule.EngineConfiguration;
+	const Scene = engineModule.Scene;
+	const WorldNode = engineModule.WorldNode;
+	const Vector2 = engineModule.Vector2;
+	const Color = engineModule.Color;
+	const Pivot = engineModule.Pivot;
+	const Rect = engineModule.Rect;
+	const Paint = engineModule.Paint;
+	const Mask = engineModule.Mask;
+	const UILabel = engineModule.UILabel;
+	const UIButton = engineModule.UIButton;
+	const TouchRecognizer = engineModule.TouchRecognizer;
+	const ViewScaleMode = engineModule.ViewScaleMode;
+	const Timeline = engineModule.Timeline;
+	const ScreenEffect = engineModule.ScreenEffect;
+
+	//==============================================================================
+	// 전역 상수 목록.
+	//==============================================================================
+	const REFERENCE_WIDTH = 1280;
+	const REFERENCE_HEIGHT = 760;
+	const LIST_X = 24;
+	const LIST_Y = 78;
+	const LIST_WIDTH = 248;
+	const LIST_HEIGHT = 656;
+	const LIST_ROW_HEIGHT = 58;
+	const STAGE_X = 288;
+	const STAGE_Y = 78;
+	const STAGE_WIDTH = 968;
+	const STAGE_HEIGHT = 544;
+	const TRANSPORT_Y = 634;
+	const TRANSPORT_HEIGHT = 100;
+	const DOCUMENT_WIDTH = 960;
+	const DOCUMENT_HEIGHT = 540;
+	const TEXT_COLOR = new Color(0.91, 0.922, 0.949, 1);
+	const TEXT_DIM_COLOR = new Color(0.604, 0.635, 0.698, 1);
+	const TEXT_FAINT_COLOR = new Color(0.42, 0.451, 0.529, 1);
+	const SURFACE_COLOR = new Color(0.106, 0.125, 0.165, 1);
+	const STAGE_COLOR = new Color(0.051, 0.063, 0.09, 1);
+	const HAIRLINE_COLOR = new Color(0.224, 0.255, 0.329, 1);
+	const ACCENT_COLOR = new Color(0.831, 0.69, 0.416, 1);
+	const ON_ACCENT_COLOR = new Color(0.165, 0.126, 0.086, 1);
+	const MARKER_COLOR = new Color(0.435, 0.694, 1, 1);
+	const SPEED_LIST = [0.5, 1, 2];
+	const IMAGE_NAME_LIST = ["emblem.png", "slime.png", "star.png", "coin.png", "bat.png", "gem.png", "cover.png"];
+
+	const MODE_DEFINITIONS = [
+		{ key: "title", file: "title.timeline.json", title: "TITLE REVEAL", tag: "opacity · y · width · typewriter · marker → burst" },
+		{ key: "logo", file: "logo.timeline.json", title: "LOGO STING", tag: "back.out scale · elastic rotation · shine · dissolve" },
+		{ key: "hud", file: "hud.timeline.json", title: "HUD INTRO", tag: "stagger · number count · frame sheet · text step" },
+		{ key: "cutscene", file: "cutscene.timeline.json", title: "CUTSCENE", tag: "camera group · letterbox · dialogue · screen effect" },
+		{ key: "combo", file: "combo.timeline.json", title: "COMBO POPUP", tag: "11 hits · elastic · color flash · particle events" },
+		{ key: "transition", file: "transition.timeline.json", title: "SCENE TRANSITION", tag: "iris wipe · pixel dissolve · visible step" },
+		{ key: "idle", file: "idle.timeline.json", title: "LOOPING IDLE", tag: "sinusoidal loops · blink · glow pulse" },
+		{ key: "parallax", file: "parallax.timeline.json", title: "PARALLAX FLYBY", tag: "layer groups · camera zoom · fog + bloom" },
+	];
+
+	//==============================================================================
+	// 타임라인 씬.
+	//==============================================================================
+	class TimelineScene extends Scene {
+		//==============================================================================
+		// 멤버 변수 목록.
+		//==============================================================================
+		/** @private @type { TouchRecognizer | null } */ #touchRecognizer;
+		/** @private @type { string } */ #modeKey;
+		/** @private @type { System.Map } */ #modeTable; // key → { rootNode, timeline, description }
+		/** @private @type { System.Map } */ #listRowMap;
+		/** @private @type { System.Map } */ #imageTable;
+		/** @private @type { WorldNode | null } */ #stageNode;
+		/** @private @type { WorldNode | null } */ #stageContentNode;
+		/** @private @type { ScreenEffect | null } */ #screenEffect;
+		/** @private @type { UILabel | null } */ #playLabel;
+		/** @private @type { UILabel | null } */ #loopLabel;
+		/** @private @type { UILabel | null } */ #speedLabel;
+		/** @private @type { UILabel | null } */ #timeLabel;
+		/** @private @type { UILabel | null } */ #markerLabel;
+		/** @private @type { number } */ #markerFlashSeconds;
+		/** @private @type { WorldNode | null } */ #scrubTrackNode;
+		/** @private @type { WorldNode | null } */ #scrubFillNode;
+		/** @private @type { WorldNode | null } */ #scrubHandleNode;
+		/** @private @type { WorldNode[] } */ #markerTickNodes;
+		/** @private @type { boolean } */ #isScrubbing;
+		/** @private @type { number } */ #speedIndex;
+		/** @private @type { UILabel | null } */ #fpsLabel;
+		/** @private @type { number } */ #averageDelta;
+
+		//==============================================================================
+		// 생성.
+		//==============================================================================
+		constructor() {
+			super();
+			this.#touchRecognizer = null;
+			this.#modeKey = "title";
+			this.#modeTable = new System.Map();
+			this.#listRowMap = new System.Map();
+			this.#imageTable = new System.Map();
+			this.#stageNode = null;
+			this.#stageContentNode = null;
+			this.#screenEffect = null;
+			this.#playLabel = null;
+			this.#loopLabel = null;
+			this.#speedLabel = null;
+			this.#timeLabel = null;
+			this.#markerLabel = null;
+			this.#markerFlashSeconds = 0;
+			this.#scrubTrackNode = null;
+			this.#scrubFillNode = null;
+			this.#scrubHandleNode = null;
+			this.#markerTickNodes = [];
+			this.#isScrubbing = false;
+			this.#speedIndex = 1;
+			this.#fpsLabel = null;
+			this.#averageDelta = 0;
+		}
+
+		//==============================================================================
+		// 씬 구성.
+		//==============================================================================
+		create() {
+			super.create();
+			const root = this.getRoot();
+			root.setPivot(Pivot.topLeft.clone());
+			root.setAnchor(Pivot.topLeft.clone());
+			this.#touchRecognizer = new TouchRecognizer();
+			this.#touchRecognizer.setRootNode(root);
+		}
+
+		//==============================================================================
+		// 로드.
+		//==============================================================================
+		/**
+		 * @param { Engine } engine
+		 */
+		async load(engine) {
+			const viewManager = engine.getViewManager();
+			viewManager.setViewScaleMode(ViewScaleMode.stretchShort);
+			this.#screenEffect = new ScreenEffect(engine.getGraphic());
+			Timeline.setAudioManager(engine.getAudioManager());
+
+			// 이미지 미리 읽기. (문서는 파일 이름으로 가리킨다)
+			await System.Promise.all(IMAGE_NAME_LIST.map((imageName) => {
+				return new System.Promise((resolve) => {
+					const imageElement = new System.Image();
+					imageElement.onload = () => {
+						this.#imageTable.set(imageName, imageElement);
+						resolve();
+					};
+					imageElement.onerror = () => {
+						resolve();
+					};
+					imageElement.src = "./assets/" + imageName;
+				});
+			}));
+
+			this.buildHeader();
+			this.buildList();
+			this.buildStage();
+			this.buildTransport();
+
+			// 문서 읽기 → 모드마다 무대 뿌리와 타임라인.
+			for (const definition of MODE_DEFINITIONS) {
+				const timeline = await Timeline.loadFromUrl("./assets/" + definition.file);
+				const rootNode = new WorldNode();
+				rootNode.setName("Mode_" + definition.key);
+				rootNode.setPivot(Pivot.topLeft.clone());
+				rootNode.setAnchor(Pivot.topLeft.clone());
+				rootNode.setContentSize(Vector2.create(DOCUMENT_WIDTH, DOCUMENT_HEIGHT));
+				rootNode.setActive(false);
+				this.#stageContentNode.addChild(rootNode);
+				timeline.buildStage(rootNode, (imageName) => {
+					return this.#imageTable.has(imageName) ? this.#imageTable.get(imageName) : null;
+				});
+				timeline.setTargetResolver((targetName) => {
+					return targetName === "screen" ? this.#screenEffect : null;
+				});
+				timeline.setMarkerHandler((markerName) => {
+					this.flashMarker("marker · " + markerName);
+				});
+				timeline.setEventHandler((targetName, eventName) => {
+					this.flashMarker("event · " + targetName + " · " + eventName);
+				});
+				this.#modeTable.set(definition.key, { rootNode: rootNode, timeline: timeline, definition: definition });
+			}
+			this.buildStageOverlay();
+
+			const searchParams = new System.URLSearchParams(System.location.search);
+			const requestedMode = searchParams.get("mode");
+			const isKnownMode = MODE_DEFINITIONS.some((definition) => definition.key === requestedMode);
+			this.selectMode(isKnownMode ? requestedMode : "title");
+		}
+
+		//==============================================================================
+		// 라벨 노드 생성 도우미.
+		//==============================================================================
+		makeLabel(parentNode, name, x, y, width, height, fontSize, textColor, isBold, textAlign = "left") {
+			const labelNode = new WorldNode();
+			labelNode.setName(name);
+			labelNode.setPivot(Pivot.topLeft.clone());
+			labelNode.setAnchor(Pivot.topLeft.clone());
+			labelNode.setContentSize(Vector2.create(width, height));
+			labelNode.setLocalPosition(Vector2.create(x, y));
+			const labelComponent = labelNode.addComponent(UILabel);
+			labelComponent.setFontSize(fontSize);
+			labelComponent.setTextColor(textColor);
+			labelComponent.setTextAlign(textAlign);
+			if (isBold) {
+				labelComponent.setBold(true);
+			}
+			parentNode.addChild(labelNode);
+			return labelComponent;
+		}
+
+		//==============================================================================
+		// 단추 노드 생성 도우미.
+		//==============================================================================
+		makeButton(parentNode, name, x, y, width, height, labelText, clickHandler) {
+			const buttonNode = new WorldNode();
+			buttonNode.setName(name);
+			buttonNode.setPivot(Pivot.topLeft.clone());
+			buttonNode.setAnchor(Pivot.topLeft.clone());
+			buttonNode.setContentSize(Vector2.create(width, height));
+			buttonNode.setLocalPosition(Vector2.create(x, y));
+			buttonNode.setInteractable(true);
+			const buttonPaint = buttonNode.addComponent(Paint);
+			buttonPaint.setColor(new Color(1, 1, 1, 0.08));
+			buttonPaint.setRoundSize(8);
+			const button = buttonNode.addComponent(UIButton);
+			button.setPressedTintColor(new Color(1, 1, 1, 0.14));
+			button.setClickedEvent(clickHandler);
+			const label = this.makeLabel(buttonNode, name + "Label", 0, 0, width, height, 11, TEXT_COLOR, true, "center");
+			label.setText(labelText);
+			label.setTextBaseline("middle");
+			button.excludeNodeFromTint(label.getNode());
+			parentNode.addChild(buttonNode);
+			return label;
+		}
+
+		//==============================================================================
+		// 상단 제목.
+		//==============================================================================
+		buildHeader() {
+			const root = this.getRoot();
+			const titleLabel = this.makeLabel(root, "Title", 24, 24, 400, 26, 18, TEXT_COLOR, true);
+			titleLabel.setText("TIMELINE SHOWCASE");
+			this.#fpsLabel = this.makeLabel(root, "Fps", REFERENCE_WIDTH - 24 - 200, 26, 200, 20, 11, TEXT_FAINT_COLOR, false, "right");
+			this.#fpsLabel.setText("fps  --");
+		}
+
+		//==============================================================================
+		// 왼쪽 시퀀스 목록.
+		//==============================================================================
+		buildList() {
+			const root = this.getRoot();
+			const listNode = new WorldNode();
+			listNode.setName("SequenceList");
+			listNode.setPivot(Pivot.topLeft.clone());
+			listNode.setAnchor(Pivot.topLeft.clone());
+			listNode.setContentSize(Vector2.create(LIST_WIDTH, LIST_HEIGHT));
+			listNode.setLocalPosition(Vector2.create(LIST_X, LIST_Y));
+			const listPaint = listNode.addComponent(Paint);
+			listPaint.setColor(SURFACE_COLOR.clone());
+			listPaint.setRoundSize(12);
+			root.addChild(listNode);
+
+			for (let modeIndex = 0; modeIndex < MODE_DEFINITIONS.length; ++modeIndex) {
+				const definition = MODE_DEFINITIONS[modeIndex];
+				const rowNode = new WorldNode();
+				rowNode.setName("Row_" + definition.key);
+				rowNode.setPivot(Pivot.topLeft.clone());
+				rowNode.setAnchor(Pivot.topLeft.clone());
+				rowNode.setContentSize(Vector2.create(LIST_WIDTH - 16, LIST_ROW_HEIGHT - 6));
+				rowNode.setLocalPosition(Vector2.create(8, 8 + modeIndex * LIST_ROW_HEIGHT));
+				rowNode.setInteractable(true);
+				const rowPaint = rowNode.addComponent(Paint);
+				rowPaint.setColor(new Color(0, 0, 0, 0));
+				rowPaint.setRoundSize(9);
+				const rowButton = rowNode.addComponent(UIButton);
+				rowButton.setPressedTintColor(new Color(1, 1, 1, 0.05));
+				rowButton.setClickedEvent(() => {
+					this.selectMode(definition.key);
+				});
+				rowButton.excludeComponentFromTint(rowPaint);
+				const titleLabel = this.makeLabel(rowNode, "RowTitle_" + definition.key, 14, 8, LIST_WIDTH - 44, 20, 12, TEXT_COLOR, true);
+				titleLabel.setText(definition.title);
+				rowButton.excludeNodeFromTint(titleLabel.getNode());
+				const tagLabel = this.makeLabel(rowNode, "RowTag_" + definition.key, 14, 29, LIST_WIDTH - 44, 16, 9, TEXT_FAINT_COLOR, false);
+				tagLabel.setText(definition.tag);
+				rowButton.excludeNodeFromTint(tagLabel.getNode());
+				listNode.addChild(rowNode);
+				this.#listRowMap.set(definition.key, { paintComponent: rowPaint, titleLabel: titleLabel, tagLabel: tagLabel });
+			}
+		}
+
+		//==============================================================================
+		// 무대. (문서 960x540 을 무대 크기에 맞춰 확대)
+		//==============================================================================
+		buildStage() {
+			const root = this.getRoot();
+			const frameNode = new WorldNode();
+			frameNode.setName("StageFrame");
+			frameNode.setPivot(Pivot.topLeft.clone());
+			frameNode.setAnchor(Pivot.topLeft.clone());
+			frameNode.setContentSize(Vector2.create(STAGE_WIDTH + 2, STAGE_HEIGHT + 2));
+			frameNode.setLocalPosition(Vector2.create(STAGE_X - 1, STAGE_Y - 1));
+			const framePaint = frameNode.addComponent(Paint);
+			framePaint.setColor(HAIRLINE_COLOR.clone());
+			framePaint.setRoundSize(15);
+			root.addChild(frameNode);
+
+			this.#stageNode = new WorldNode();
+			this.#stageNode.setName("Stage");
+			this.#stageNode.setPivot(Pivot.topLeft.clone());
+			this.#stageNode.setAnchor(Pivot.topLeft.clone());
+			this.#stageNode.setContentSize(Vector2.create(STAGE_WIDTH, STAGE_HEIGHT));
+			this.#stageNode.setLocalPosition(Vector2.create(STAGE_X, STAGE_Y));
+			const stagePaint = this.#stageNode.addComponent(Paint);
+			stagePaint.setColor(STAGE_COLOR.clone());
+			stagePaint.setRoundSize(14);
+			const stageMask = this.#stageNode.addComponent(Mask);
+			stageMask.setRoundSize(14);
+			root.addChild(this.#stageNode);
+
+			this.#stageContentNode = new WorldNode();
+			this.#stageContentNode.setName("StageContent");
+			this.#stageContentNode.setPivot(Pivot.topLeft.clone());
+			this.#stageContentNode.setAnchor(Pivot.topLeft.clone());
+			this.#stageContentNode.setContentSize(Vector2.create(DOCUMENT_WIDTH, DOCUMENT_HEIGHT));
+			this.#stageContentNode.setLocalPosition(Vector2.create(0, 0));
+			const stageScale = System.Math.min(STAGE_WIDTH / DOCUMENT_WIDTH, STAGE_HEIGHT / DOCUMENT_HEIGHT);
+			this.#stageContentNode.setLocalScale(Vector2.create(stageScale, stageScale));
+			this.#stageNode.addChild(this.#stageContentNode);
+		}
+
+		//==============================================================================
+		// 무대 위 표시. (마커 / 이벤트 알림)
+		//==============================================================================
+		buildStageOverlay() {
+			// 마커 / 이벤트 표시.
+			this.#markerLabel = this.makeLabel(this.#stageNode, "MarkerFlash", 16, STAGE_HEIGHT - 34, 600, 20, 11, ACCENT_COLOR, true);
+			this.#markerLabel.setText("");
+		}
+
+		//==============================================================================
+		// 트랜스포트. (재생 / 정지 / 반복 / 속도 / 스크럽 막대 + 마커 눈금 + 시간)
+		//==============================================================================
+		buildTransport() {
+			const root = this.getRoot();
+			const panelNode = new WorldNode();
+			panelNode.setName("Transport");
+			panelNode.setPivot(Pivot.topLeft.clone());
+			panelNode.setAnchor(Pivot.topLeft.clone());
+			panelNode.setContentSize(Vector2.create(STAGE_WIDTH, TRANSPORT_HEIGHT));
+			panelNode.setLocalPosition(Vector2.create(STAGE_X, TRANSPORT_Y));
+			const panelPaint = panelNode.addComponent(Paint);
+			panelPaint.setColor(SURFACE_COLOR.clone());
+			panelPaint.setRoundSize(12);
+			root.addChild(panelNode);
+
+			this.#playLabel = this.makeButton(panelNode, "PlayButton", 16, 14, 72, 30, "PAUSE", () => {
+				this.togglePlay();
+			});
+			this.makeButton(panelNode, "StopButton", 96, 14, 60, 30, "STOP", () => {
+				const mode = this.getCurrentMode();
+				if (mode) {
+					mode.timeline.stop();
+					this.refreshTransport();
+				}
+			});
+			this.#loopLabel = this.makeButton(panelNode, "LoopButton", 164, 14, 76, 30, "LOOP ON", () => {
+				const mode = this.getCurrentMode();
+				if (mode) {
+					mode.timeline.setLoop(!mode.timeline.isLoop());
+					this.refreshTransport();
+				}
+			});
+			this.#speedLabel = this.makeButton(panelNode, "SpeedButton", 248, 14, 60, 30, "1x", () => {
+				this.#speedIndex = (this.#speedIndex + 1) % SPEED_LIST.length;
+				for (const mode of this.#modeTable.values()) {
+					mode.timeline.setSpeed(SPEED_LIST[this.#speedIndex]);
+				}
+				this.refreshTransport();
+			});
+			this.#timeLabel = this.makeLabel(panelNode, "TimeLabel", STAGE_WIDTH - 16 - 260, 20, 260, 20, 12, TEXT_COLOR, true, "right");
+			this.#timeLabel.setText("00:00.00 / 00:00.00");
+
+			// 스크럽 막대.
+			this.#scrubTrackNode = new WorldNode();
+			this.#scrubTrackNode.setName("ScrubTrack");
+			this.#scrubTrackNode.setPivot(Pivot.topLeft.clone());
+			this.#scrubTrackNode.setAnchor(Pivot.topLeft.clone());
+			this.#scrubTrackNode.setContentSize(Vector2.create(STAGE_WIDTH - 32, 8));
+			this.#scrubTrackNode.setLocalPosition(Vector2.create(16, 66));
+			const trackPaint = this.#scrubTrackNode.addComponent(Paint);
+			trackPaint.setColor(new Color(1, 1, 1, 0.08));
+			trackPaint.setRoundSize(4);
+			panelNode.addChild(this.#scrubTrackNode);
+
+			this.#scrubFillNode = new WorldNode();
+			this.#scrubFillNode.setName("ScrubFill");
+			this.#scrubFillNode.setPivot(Pivot.topLeft.clone());
+			this.#scrubFillNode.setAnchor(Pivot.topLeft.clone());
+			this.#scrubFillNode.setContentSize(Vector2.create(0, 8));
+			this.#scrubFillNode.setLocalPosition(Vector2.create(0, 0));
+			const fillPaint = this.#scrubFillNode.addComponent(Paint);
+			fillPaint.setColor(ACCENT_COLOR.clone());
+			fillPaint.setRoundSize(4);
+			this.#scrubTrackNode.addChild(this.#scrubFillNode);
+
+			this.#scrubHandleNode = new WorldNode();
+			this.#scrubHandleNode.setName("ScrubHandle");
+			this.#scrubHandleNode.setPivot(Pivot.middleCenter.clone());
+			this.#scrubHandleNode.setAnchor(Pivot.topLeft.clone());
+			this.#scrubHandleNode.setContentSize(Vector2.create(16, 16));
+			this.#scrubHandleNode.setLocalPosition(Vector2.create(0, 4));
+			const handlePaint = this.#scrubHandleNode.addComponent(Paint);
+			handlePaint.setColor(TEXT_COLOR.clone());
+			handlePaint.setRoundSize(8);
+			this.#scrubTrackNode.addChild(this.#scrubHandleNode);
+		}
+
+		//==============================================================================
+		// 마커 눈금 재구성. (모드마다 마커 위치가 다르다)
+		//==============================================================================
+		rebuildMarkerTicks(timeline) {
+			for (const tickNode of this.#markerTickNodes) {
+				this.#scrubTrackNode.removeChild(tickNode);
+			}
+			this.#markerTickNodes = [];
+			const description = timeline.getDescription();
+			const duration = timeline.getDuration();
+			const trackWidth = this.#scrubTrackNode.getContentSize().x;
+			for (const marker of description.markers) {
+				const tickNode = new WorldNode();
+				tickNode.setName("MarkerTick");
+				tickNode.setPivot(Pivot.topCenter.clone());
+				tickNode.setAnchor(Pivot.topLeft.clone());
+				tickNode.setContentSize(Vector2.create(3, 14));
+				tickNode.setLocalPosition(Vector2.create(duration > 0 ? marker.time / duration * trackWidth : 0, -3));
+				const tickPaint = tickNode.addComponent(Paint);
+				tickPaint.setColor(MARKER_COLOR.clone());
+				tickPaint.setRoundSize(1.5);
+				this.#scrubTrackNode.addChild(tickNode);
+				this.#markerTickNodes.push(tickNode);
+			}
+			// 손잡이가 눈금 위에 오도록 뒤로 옮긴다.
+			this.#scrubTrackNode.removeChild(this.#scrubHandleNode);
+			this.#scrubTrackNode.addChild(this.#scrubHandleNode);
+		}
+
+		//==============================================================================
+		// 모드 선택.
+		//==============================================================================
+		getCurrentMode() {
+			return this.#modeTable.get(this.#modeKey) || null;
+		}
+
+		selectMode(modeKey) {
+			this.#modeKey = modeKey;
+			// 다른 모드를 먼저 멈춘다. (stop 은 0초 값을 적용하므로 화면 효과 트랙이 남지 않게 그 뒤에 전부 끈다)
+			for (const [key, mode] of this.#modeTable) {
+				mode.rootNode.setActive(key === modeKey);
+				mode.timeline.stop();
+			}
+			this.#screenEffect.resetAll();
+			const activeMode = this.#modeTable.get(modeKey);
+			activeMode.timeline.setSpeed(SPEED_LIST[this.#speedIndex]);
+			activeMode.timeline.seek(0);
+			activeMode.timeline.play();
+			for (const [key, rowEntry] of this.#listRowMap) {
+				const isActive = (key === modeKey);
+				rowEntry.paintComponent.setColor(isActive ? ACCENT_COLOR.clone() : new Color(0, 0, 0, 0));
+				rowEntry.titleLabel.setTextColor(isActive ? ON_ACCENT_COLOR.clone() : TEXT_COLOR.clone());
+				rowEntry.tagLabel.setTextColor(isActive ? new Color(0.165, 0.126, 0.086, 0.72) : TEXT_FAINT_COLOR.clone());
+			}
+			const mode = this.getCurrentMode();
+			this.rebuildMarkerTicks(mode.timeline);
+			this.refreshTransport();
+			this.flashMarker("");
+		}
+
+		//==============================================================================
+		// 재생 / 일시 정지.
+		//==============================================================================
+		togglePlay() {
+			const mode = this.getCurrentMode();
+			if (!mode) {
+				return;
+			}
+			if (mode.timeline.isPlaying()) {
+				mode.timeline.pause();
+			}
+			else {
+				mode.timeline.play();
+			}
+			this.refreshTransport();
+		}
+
+		refreshTransport() {
+			const mode = this.getCurrentMode();
+			if (!mode) {
+				return;
+			}
+			this.#playLabel.setText(mode.timeline.isPlaying() ? "PAUSE" : "PLAY");
+			this.#loopLabel.setText(mode.timeline.isLoop() ? "LOOP ON" : "LOOP OFF");
+			this.#speedLabel.setText(SPEED_LIST[this.#speedIndex] + "x");
+		}
+
+		//==============================================================================
+		// 마커 / 이벤트 표시.
+		//==============================================================================
+		flashMarker(text) {
+			this.#markerLabel.setText(text);
+			this.#markerFlashSeconds = 1.4;
+		}
+
+		//==============================================================================
+		// 시간 표기.
+		//==============================================================================
+		formatTime(seconds) {
+			const wholeSeconds = System.Math.floor(seconds);
+			const hundredths = System.Math.floor((seconds - wholeSeconds) * 100);
+			const minutes = System.Math.floor(wholeSeconds / 60);
+			return String(minutes).padStart(2, "0") + ":" + String(wholeSeconds % 60).padStart(2, "0") + "." + String(hundredths).padStart(2, "0");
+		}
+
+		//==============================================================================
+		// 갱신.
+		//==============================================================================
+		tick(timeDelta) {
+			super.tick(timeDelta);
+			const mode = this.getCurrentMode();
+			if (mode) {
+				if (!this.#isScrubbing) {
+					const wasPlaying = mode.timeline.isPlaying();
+					mode.timeline.tick(timeDelta);
+					if (wasPlaying !== mode.timeline.isPlaying()) {
+						this.refreshTransport();
+					}
+				}
+				const duration = mode.timeline.getDuration();
+				const progress = duration > 0 ? mode.timeline.getTime() / duration : 0;
+				const trackWidth = this.#scrubTrackNode.getContentSize().x;
+				this.#scrubFillNode.setContentSize(Vector2.create(progress * trackWidth, 8));
+				this.#scrubHandleNode.setLocalPosition(Vector2.create(progress * trackWidth, 4));
+				this.#timeLabel.setText(this.formatTime(mode.timeline.getTime()) + " / " + this.formatTime(duration));
+			}
+			this.#screenEffect.tick(timeDelta);
+			if (this.#markerFlashSeconds > 0) {
+				this.#markerFlashSeconds -= timeDelta;
+				const alpha = System.Math.min(1, this.#markerFlashSeconds / 0.4);
+				this.#markerLabel.setTextColor(new Color(ACCENT_COLOR.red, ACCENT_COLOR.green, ACCENT_COLOR.blue, alpha));
+			}
+			this.#averageDelta = this.#averageDelta === 0 ? timeDelta : this.#averageDelta * 0.95 + timeDelta * 0.05;
+			if (this.#averageDelta > 0) {
+				this.#fpsLabel.setText("fps  " + System.Math.round(1 / this.#averageDelta));
+			}
+		}
+
+		//==============================================================================
+		// 출력 전 / 후 처리. (화면 효과 사슬 사이에 씬을 그린다)
+		//==============================================================================
+		preDraw(graphic) {
+			super.preDraw(graphic);
+			this.applyStageRegion();
+			this.#screenEffect.begin(graphic);
+			const engine = this.getEngine();
+			const viewManager = engine.getViewManager();
+			const canvasNativeSize = viewManager.getCanvasNativeSize();
+			viewManager.applyCanvasNativeRect(graphic);
+			graphic.setFillColor("rgb(20, 23, 30)");
+			graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+			viewManager.applyViewRect(graphic);
+		}
+
+		postDraw(graphic) {
+			super.postDraw(graphic);
+			this.#screenEffect.end(graphic);
+		}
+
+		//==============================================================================
+		// 화면 효과 적용 영역 = 무대 사각형. (뷰 좌표 → 캔버스 픽셀, 둥근 모서리 포함)
+		//==============================================================================
+		applyStageRegion() {
+			const engine = this.getEngine();
+			const viewManager = engine.getViewManager();
+			const viewNativeRect = viewManager.getViewNativeRect();
+			const targetResolutionScale = viewManager.getTargetResolutionScale();
+			const devicePixelRatio = viewManager.getDevicePixelRatio();
+			const pixelScale = targetResolutionScale * devicePixelRatio;
+			this.#screenEffect.setRegion(
+				(viewNativeRect.position.x * devicePixelRatio) + STAGE_X * pixelScale,
+				(viewNativeRect.position.y * devicePixelRatio) + STAGE_Y * pixelScale,
+				STAGE_WIDTH * pixelScale,
+				STAGE_HEIGHT * pixelScale,
+				14 * pixelScale);
+		}
+
+		//==============================================================================
+		// 터치. (스크럽 막대는 직접 처리, 나머지는 인식기)
+		//==============================================================================
+		isInsideScrub(viewInputPosition) {
+			const trackPosition = this.#scrubTrackNode.getPosition();
+			const trackSize = this.#scrubTrackNode.getContentSize();
+			return viewInputPosition.x >= trackPosition.x - 10 && viewInputPosition.x <= trackPosition.x + trackSize.x + 10
+				&& viewInputPosition.y >= trackPosition.y - 16 && viewInputPosition.y <= trackPosition.y + trackSize.y + 16;
+		}
+
+		seekToView(viewInputPosition) {
+			const mode = this.getCurrentMode();
+			if (!mode) {
+				return;
+			}
+			const trackPosition = this.#scrubTrackNode.getPosition();
+			const trackWidth = this.#scrubTrackNode.getContentSize().x;
+			const progress = System.Math.max(0, System.Math.min(1, (viewInputPosition.x - trackPosition.x) / trackWidth));
+			const targetTime = progress * mode.timeline.getDuration();
+			const currentTime = mode.timeline.getTime();
+			if (targetTime === currentTime) {
+				return;
+			}
+			mode.timeline.seek(targetTime);
+		}
+
+		touchPress(viewInputPosition) {
+			if (this.isInsideScrub(viewInputPosition)) {
+				this.#isScrubbing = true;
+				const mode = this.getCurrentMode();
+				if (mode) {
+					mode.timeline.pause();
+					this.refreshTransport();
+				}
+				this.seekToView(viewInputPosition);
+				return;
+			}
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchPress(viewInputPosition);
+			}
+		}
+
+		touchMove(viewInputPosition) {
+			if (this.#isScrubbing) {
+				this.seekToView(viewInputPosition);
+				return;
+			}
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchMove(viewInputPosition);
+			}
+		}
+
+		touchRelease(viewInputPosition) {
+			if (this.#isScrubbing) {
+				this.#isScrubbing = false;
+				return;
+			}
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchRelease(viewInputPosition);
+			}
+		}
+
+		touchCancel(viewInputPosition) {
+			this.#isScrubbing = false;
+			if (this.#touchRecognizer) {
+				this.#touchRecognizer.touchCancel(viewInputPosition);
+			}
+		}
+	}
+
+	//==============================================================================
+	// 엔진 실행.
+	//==============================================================================
+	const engineConfiguration = new EngineConfiguration();
+	engineConfiguration.referenceResolutionSize = Vector2.create(REFERENCE_WIDTH, REFERENCE_HEIGHT);
+	engineConfiguration.canvasId = "mainCanvas";
+	engineConfiguration.autoResizeOnWindowResize = true;
+	const engine = new Engine(engineConfiguration);
+	engine.run(new TimelineScene());
+	System.timelineEngine = engine;
+</script>
+</body>
+</html>

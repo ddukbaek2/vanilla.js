@@ -1,0 +1,90 @@
+# 2026-09-05 작업 로그
+
+## OLD FACE 샘플 신설 (실사 노인 두상 렌더링 + 페이스 애니메이션 + 렌더링 정보)
+[17:05 요청 → 18:30 응답]
+- 요청: "old face" 샘플 추가 — 엔진 역량 총동원, 없는 기능도 추가해 AAA 급 극실사 노인을 머리 / 얼굴 / 목 / 어깨까지 렌더링. 추가 요청: 언리얼엔진급 렌더링, 페이스 애니메이션, 우측 하단 렌더링 정보.
+- 애셋: three.js 저장소의 Lee Perry-Smith 두상 스캔(Infinite-Realities, CC BY 3.0) — 정적 메시 9,279 정점 / 17,684 삼각형, 알베도 / 스펙큘러 / 노멀 1K + 디스플레이스먼트 4K. 눈 감은 스캔, 민머리. UV 는 V 반전(flipY 업로드), 좌표계 Y 위 / Z 정면 확인 후 랜드마크 3D 좌표 산출.
+- 엔진 추가 (experimental/graphics):
+  - RenderTarget: MRT / RGBA16F / 깊이 텍스처 옵션.
+  - Material: sRGB 색 텍스처, 캔버스 소스, 이방성 필터, 추가 텍스처 슬롯(setTexture), URL 이미지 서술 로더(loadImageDescription).
+  - SkinnedModel: 스킨 없는 정적 메시(합성 스킨), 모프 타깃(glTF targets / weights 채널 + addMorphTarget / setMorphWeight, RGBA32F 텍스처 + gl_VertexID), 드로어블 meshDescription 유지, setMaterial.
+  - SkinnedModelRenderer: 프래그먼트 셰이더 주입 생성자, 모프 GLSL 을 본 / 깊이 버텍스 셰이더에 삽입.
+  - HumanSkinRenderer(신규): 선형 HDR 피부 셰이딩 — 3점 조명(키 섀도우) + 3색 반구 + 소프트박스 환경, 노멀 + 4K 높이 미분 디테일 + 캐비티, 이중 로브 GGX + 잔털, 조도 / 알베도 / 스펙큘러 MRT.
+  - SubsurfaceScatteringEffect(신규): 분리형 화면 공간 SSS(피부 확산 프로파일 커널, 깊이 인식, 산란 폭 투영). 렌더 후 유닛 1 해제(섀도우 샘플러 충돌 방지).
+- 샘플 (examples/oldface/index.html): 섀도우 깊이 → 피부 MRT → SSS → 합성 → 블룸 → ACES / 비네트 / 그레인 → FXAA → HUD. CPU 텍스처 노화(흰 수염 / 눈썹, 피부톤, 홍조, 검버섯, 유기적 주름 선 → 노멀 골), 절차적 모프 10종(눈썹 올림 / 찌푸림 / 눈 찡그림 / 턱 / 미소 / 머리 요 · 피치 · 롤 / 호흡 / 노화 처짐 + 팔자 접힘), 퍼포먼스 상태기(호흡 · 눈 찡그림 · 표정 이벤트 · 포인터 추적 머리 회전), 드래그 궤도 / 휠 줌, 옵션 패널 7종(숫자 키), 우측 하단 렌더링 정보 패널(fps / 프레임 / 해상도 / 삼각형 / 정점 / 드로우 콜 / 모프 수), CC BY 저작자 표기.
+- 검증: 스모크(정적 로드 / MRT / SSS / 모프 / 표준 렌더러 셰이더 컴파일) → 샘플 헤드리스 캡처 5회 반복 튜닝(주름 페인팅 느낌 제거, 노출 / 블룸 / 그레인 조정, 팔자 접힘 모프) → soldier / fox GLB 회귀 통과.
+- 발견: 엔진 Graphic HUD 는 3D 패스가 켠 CULL_FACE 를 끄고 그려야 텍스트 쿼드가 컬링되지 않는다(도형은 살아남고 텍스트만 사라지는 증상). 헤드리스 크롬은 user-data-dir 을 재사용하면 기존 인스턴스로 위임돼 새 페이지가 안 뜬다.
+- 배포: NAS portfolio/oldface (index.html / favicon.svg / vanilla.js / assets). UPDATE.md 0.5.0-experimental 기록.
+- 미해결 / 후속: 노화 알베도를 이미지 생성(나노바나나)으로 만들면 주름 · 피부 결이 더 자연스러워질 수 있음(사용자 허락 필요). 귀 투과광(두께 맵 없음)은 미구현.
+
+## OLD FACE 후속: 와이어프레임 토글 + 머티리얼 그래프 패널 + 사이트 목록
+[18:40 요청 → 19:00 응답]
+- 사용자 지적: 검증용 헤드리스 크롬을 닫지 않고 병렬로 계속 띄워 PC 가 렉에 걸림 → 즉시 전부 종료, CLAUDE.md "검증 프로세스 방침" 추가(즉시 종료, 최대 1개 / 비교 시 2개 순차), 메모리 기록.
+- hookify 플러그인 훅 4개가 python3(Store 스텁 / 미존재) 때문에 매번 실패해 로그를 찍던 문제 → 규칙 파일이 없어 플러그인 비활성화(~/.claude/settings.json).
+- 엔진: SkinnedModel.uploadWireframeIndices(중복 없는 모서리 선 인덱스), SkinnedModelRenderer.drawWireframe(모프 / 스키닝 반영 선 출력, 드로어블 인덱스 버퍼 보관).
+- 샘플: WIREFRAME 옵션(8, 깊이 프리패스 + 폴리곤 오프셋으로 앞면 모서리만), MATERIAL GRAPH 옵션(9, 좌측 노드 패널 — 원본 / 노화 텍스처 축소본, 표면 / 조명 파라미터 실시간 값, G-버퍼 3장 · SSS · HDR 버퍼 블릿 미리보기, 옵션 상태에 따라 노드 명암).
+- ddukbaek2.com 루트 페이지 샘플 목록에 Old Face 항목 추가(백업 index.html.backup-20260905b).
+- 검증: 크롬 1개씩 캡처 직후 종료 확인(잔여 0).
+
+## 파티클 열거형 개명 + UI 쇼케이스 수정
+[19:00 요청 → 19:10 응답]
+- ParticleSystem: EmitterShape → ParticleEmitterShape, 문자열 renderShape → ParticleRenderShape 열거형(값은 기존 문자열 유지 — vfx JSON 호환). import.js / EFFECTS 샘플(사용 코드 문자열 포함) / 파티클 편집기 번들 갱신. EFFECTS 헤드리스 캡처로 확인.
+- UIDropdown: 펼침 목록이 뒤에 그려지는 형제 노드에 가려지던 문제 → 펼칠 때 목록을 트리 뿌리로 옮기고(월드 → 뿌리 로컬 환산) 접으면 되돌림. 형제 패널이 덮는 테스트 씬으로 확인.
+- UI 쇼케이스: 내비게이션 캡션 CONSOLE → UI SHOWCASE (페이지 제목은 이미 UI Showcase).
+- 배포: portfolio/effects, particleeditor, uishowcase(navigation.uiasset.json + index.html + vanilla.js), oldface vanilla.js.
+
+## OLD FACE 애셋 교체: MB-Lab 노인 캐릭터 + 표정 프리셋
+[19:20 요청 → 21:25 응답]
+- 요청: 애셋 교체(노화 처리 불필요), 눈 뜬 얼굴, 표정(웃음 / 화남 / 슬픔) 자유 전환 — 페이스 리깅 없는 자작 표정 금지, 폰 핀치 줌, 머티리얼 그래프 기본 끔, 렌더링 정보 위로, fps 밑 프레임 시간 제거.
+- 조사: 믹사모 스톡 캐릭터(Remy 등)는 FBX 에 블렌드셰이프 0개, 저장 토큰은 export API 에서 만료. ICT-FaceKit(MIT)은 표정 53종이지만 텍스처 없음. 메타휴먼은 언리얼 밖 사용 불가. Blender 5.1 설치 확인 → MB-Lab 1.8.1(최종판, Blender 4.0+)을 헤드리스로 구동.
+- 애셋: m_ca01 + character_age 1.0 / mass -0.2 / tone -0.3 → finalize → 표정 단위 셰이프키 81종, 눈 UV(Eyes_cornea / Eyes_iris)를 주 UV 로 병합, 이미지 제외 glb 2.99MB. 텍스처는 MB-Lab 원본을 웹용으로 변환(알베도 2K, 4K 범프 → 디테일, 러프니스 → ORM, 나이 디스플레이스먼트 → 노멀 맵(B 아래 규약), 공막 / 홍채 / 치아 / 혀 / 손톱 / 속눈썹 RGBA).
+- 엔진: glTF 희소 접근자, 모프 최대 96, 드로어블 materialName, Material.setSubsurfaceFactor / setUseAlphaCutout, 피부 셰이더 sRGB 디코드 · 러프니스 텍스처 · 알파 컷아웃 · 머티리얼별 SSS 마스크.
+- 샘플: 표정 버튼 13종(MB-Lab 프리셋 → 단위 가중치 JSON), 깜빡임 / 호흡은 눈 감기 / 가슴 팽창 단위, 머리는 head / neck 조인트 회전, 각막 제외, 핀치 줌, 정보 패널 홈 링크 회피. 검증: 기본 / HAPPY / ANGRY / SAD 캡처(크롬 1개씩 순차, 즉시 종료).
+- 라이선스: MB-Lab 캐릭터 애셋은 AGPL-3.0 — 페이지에 표기.
+
+## OLD FACE 대체 얼굴 후보 비교
+[21:40 요청 → 22:02 응답]
+- 요청: 생성한 노인이 못생겨서 다른 대체품 요청.
+- MB-Lab 헤드리스 후보 생성 스크립트(character / age / mass / tone / phenotype / body_preset 인자)로 6종 생성: hero(m_ca01 euromediterranean specialtype_hero01, 나이 0.62), ideal(m_ca01 mediterranid type_ideal, 0.68), nordic(m_ca01 nordid, 0.7), eastasian(m_as01, 0.75), latino(m_la01, 0.75), african(m_af01, 0.75).
+- 후보별 미리보기 페이지(examples/oldface_candidates, 임시)를 현재 샘플 파이프라인으로 캡처(크롬 1개씩 순차, 캡처 직후 종료, 잔여 0) → 비교 시트 전송. 선택 대기.
+- 샘플: 카메라 주시점 / 그림자 초점을 눈(human_eyes) 정점 중심에서 계산하도록 수정(후보마다 키가 달라도 얼굴 중앙 유지). node --check 통과. 미커밋.
+
+## OLD FACE: 첫 스캔 노인에 MB-Lab 표정 리그 연결 (wrap)
+[22:05 요청 → 00:25 응답]
+- 요청: 나이 0.6~0.75 후보는 노인이 아님 → 나이 1.0 후보 6종 재생성 후, "제일 처음 노인(스캔)이 제일 낫다, 지금 표정 데이터를 그 노인에 연결할 수 없나".
+- 방식: MB-Lab 토폴로지(눈알 / 치아 / 혀 / 표정 셰이프키 81종 / 골격)를 Lee Perry-Smith 스캔 형상에 감싸는 wrap 파이프라인을 Blender 헤드리스로 구현.
+  1. 정면 직교 렌더 2장 → mediapipe FaceLandmarker(478점) → 카메라 역투영 광선으로 3D 랜드마크(눈 윤곽 제외 436쌍).
+  2. Umeyama 유사 변환(스캔 → 바디 미터 좌표) + 두개골 앵커 24쌍(눈 중심 기준 동일 방향 광선 교점) + 3D 박판 스플라인(커널 -r, 정규화 0.002) → 잔차 평균 0.37mm.
+  3. 피부 정점 최근접 표면 투영 5회(법선 일치 가중, 입안 / 귀 / 눈 주변 제외, 스캔 경계 감쇠, 라플라시안 평활) → 셰이프키 전체와 본에 동일 적용.
+  4. 첫 버전의 노화 처리 이식: 알베도 노화(흰 수염 / 검버섯 / 홍조 / 주름 음영, 스캔 UV 2048)와 주름 골 높이맵(4K), 처짐 모프(ageSag, 눈꺼풀 항 절반)를 오프라인 적용.
+  5. Cycles selected-to-active 베이크(알베도 / 스페큘러 / 노화 높이 / 히트 마스크, 스캔 glb 는 UV v 위 방향이라 이미지 상하 반전) → Python 합성(노멀 / 디테일은 높이 미분, 바깥은 MB-Lab 텍스처 색 맞춤).
+- 시행착오: TPS 커널 부호(+r)로 해 폭주 → -r 로 수정 / 12mm 안쪽 제외 규칙이 두개골 투영을 막아 뒤통수 납작 → 입안 상자로 한정 / 정면 랜드마크만으로 깊이 스케일 미구속 → 두개골 앵커 추가 / 스캔 텍스처 V 반전 / PIL BoxBlur F 모드 미지원 → numpy 누적합 블러.
+- 샘플: 출처 표기(스캔 CC BY 3.0 + MB-Lab AGPL), 속눈썹 드로어블 제외(알파 컷아웃 잔점), 노멀 4K 라벨.
+- 검증: 크롬 1개씩 순차 캡처, 캡처 직후 크롬 / 서버 종료(잔여 0).
+- 결과: 스캔 얼굴에서 표정 13종 전환 확인(HAPPY / ANGRY / SAD / GRIN 캡처), 눈 뜸, 치아 / 혀 표시. NAS portfolio/oldface 배포(index.html + 애셋 5종, eyelash.png 삭제). 임시 디렉토리(oldface_candidates / oldface_first) 정리. 파이프라인 스크립트는 examples/oldface/tools/wrap 에 보관.
+
+## OLD FACE: 합성 폐기 → Microsoft Rocketbox 중년 남성으로 교체
+[00:35 요청 → 03:05 응답]
+- 요청: 합성 결과는 불쾌한 골짜기(사용자 반응) → "정상적인 중년 남자 아무거나, 표정 있고 머리카락 / 수염 있어도 좋음", MB-Lab 외 표정 애셋 여부 질문.
+- 조사: Ready Player Me 는 ARKit 52 모프 GLB 를 주지만 이 PC 에서 models.readyplayer.me 가 해석되지 않음. Microsoft Rocketbox(MIT, 115종)는 얼굴용 FBX 에 ARKit 52 + FACS 48 + 비짐 15 + Vive 30 블렌드셰이프와 얼굴 본 25개, 헤어 / 수염 카드가 있음 → Male_Adult_05 채택.
+- 변환: FBX 테이크 애니메이션이 남아 있으면 glTF 루트에 0.01 스케일 / 위치 키가 실려 캐릭터가 2cm 로 보이는 문제 → 액션 제거 + 포즈 초기화 + cm 단위를 데이터에 굽기로 해결. ARKit 키만 유지(엔진 모프 최대 96), 눈 본 가중 폴리곤을 눈 머티리얼로 분리(카메라 초점).
+- 샘플: 머티리얼 4종(eyes / head / body / opacity 헤어 카드 알파 컷아웃), 깜빡임 EyeBlink 단위, 호흡 제거, Bip01 Head / Neck 조인트, ARKit 프리셋 13종 작성, 출처 표기, 머티리얼 그래프(BODY / HAIR CARDS).
+- MB-Lab 중년 후보(hero 0.85)도 만들어 봤으나 대머리라 사용자 요구(머리카락 / 수염)에 맞지 않아 폐기. wrap 파이프라인은 저장소에서 제거(git 2a0932a 에 남음).
+- 검증: 크롬 1개씩 순차 캡처, 즉시 종료(잔여 0).
+
+## OLD FACE: 흉상 절단 + Male_Adult_03 교체 + 근접 광택 조정
+[03:10 요청 → 03:50 응답]
+- 요청: 어깨 아래 안 보이게, 체격이 빈약하고 너무 젊음, 너무 줌인하면 조명이 이상함, 왜 FBX 를 glb 로 변환했나.
+- 절단: rocketbox_export.py 에서 머리 본 30cm 아래 평면보다 낮은 폴리곤 제거(흉상). 더 나이 든 M03(회색 머리, 재킷)로 교체 — 얼굴 비교 시트로 M03 / M13 / M14 확인.
+- 근접 광택: Rocketbox 스페큘러 맵이 거의 검정이라 러프니스가 평탄해 젖은 피부처럼 보임 → 머리 / 몸 roughnessFactor 1.0, 스페큘러 0.65, 디테일 3.5 / 캐비티 2.5. SSS 셰이더에 화면 높이 대비 최대 산란 폭 0.05 추가(근접 시 표본 간격 확대로 띠 지는 것 방지) → 엔진 재빌드.
+- FBX 직접 로드: 엔진 FBX 로더는 스킨 클러스터만 지원하고 블렌드셰이프 디포머는 파싱하지 않아 glb 변환이 필요했음(모프 96 제한으로 175 → 52 키 축소도 필요).
+- 흉상: 팔 폴리곤(UpperArm / Forearm / Hand / Finger 가중)도 제거하고 구멍은 몸 재질로 메움. M03 머리카락 카드는 알파 컷아웃에서 회색 판처럼 보여 제거(두피에 그려진 머리 사용, 속눈썹 카드는 유지). NAS 배포(index.html / vanilla.js / 애셋).
+
+## OLD FACE: 메타휴먼 전환 (DNA 기반 RigLogic 직접 계산)
+[04:00 요청 → 18:05 응답]
+- 요청: 표정 어색 / 모델 엉성 → "메타휴먼 써라" (포트폴리오라 라이선스 무관).
+- 조사: 2025.06 라이선스 변경으로 메타휴먼 타 엔진 사용 허용. UE 5.7 / 5.8 설치됨. 코어 데이터(프리셋 / 텍스처 합성 / 몸 텍스처 / 그룸) 미설치 → 텍스처 합성에서 크래시. 오토리그 / 고해상도 텍스처는 클라우드 로그인 필요. 사용자에게 런처 설치 안내.
+- UE 헤드리스 시도(모두 실패): AnimPose + 후처리 AnimBP 평가는 RigLogic 이 컴포넌트 문맥 없이 단언 실패, 시퀀서 틱 / 굽기(export_anim_sequence) / 에디터 애니메이션 업데이트 / override_animation_data 는 헤드리스에서 본 갱신 없음(입력 커브만 기록).
+- 해결: Epic MetaHuman-DNA-Calibration(Python 3.10 바인딩)으로 DNA 행동 데이터를 읽어 RigLogic 을 numpy 로 직접 구현(raw → PSD 곱 → 조인트 그룹 행렬 → 관절 델타(위치 / 회전 XYZ 도) + 블렌드셰이프 채널 → 계층 합성 → LBS). UE 에서는 ARKit 매핑 애니메이션의 raw 제어 커브(get_float_keys)만 덤프. 동봉 Taro.dna(메타휴먼 남성)로 51 포즈 정점 계산 → Blender 희소 셰이프키 glb 6.8MB(잡음 스냅으로 희소화, 기본 weights 제거 필수).
+- 샘플: 머티리얼(head / teeth / eyeball / eyelashes), 눈 알베도(공막 + 홍채 반경 0.17 합성), 치아 / 속눈썹 기본 텍스처, 피부 자리표시자, 머리 회전은 모델 행렬 피벗 회전으로 대체(본 없음).
+- 한계: 공개 DNA 라이브러리(1.3.1)는 DNA 2.1 까지 → UE 5.8 이 내보내는 커스텀 DNA(2.5)는 못 읽음. 노인 얼굴 / 피부 텍스처 / 머리카락은 코어 데이터 + 클라우드 필요.

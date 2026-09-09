@@ -2,6 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
+import { Rect } from "../base/rect.js";
 import { Object } from "../base/object.js";
 import { Frame } from "../core/frame.js";
 
@@ -33,6 +34,44 @@ export class AnimationClip extends Object {
 	/**
 	 * @param { Frame[] } frames
 	 */
+	//==============================================================================
+	// 아틀라스 JSON 으로 클립 생성. (정적)
+	// - TexturePacker 형식({ frames: { 이름: { frame: {x,y,w,h} } } })과
+	//   배열 형식([{x,y,w,h}, ...]) 둘 다 받는다.
+	// - frameIds 순서대로 프레임을 뽑아 duration = frameCount / fps 로 만든다.
+	//==============================================================================
+	/**
+	 * @param { object } atlasJson
+	 * @param { string[] | number[] } frameIds
+	 * @param { number } fps
+	 * @param { boolean } isLoop
+	 * @returns { AnimationClip }
+	 */
+	static fromAtlas(atlasJson, frameIds, fps = 10, isLoop = true) {
+		const clip = new AnimationClip();
+		const frameRects = [];
+		for (const frameId of frameIds) {
+			let frameData = null;
+			if (System.Array.isArray(atlasJson)) {
+				frameData = atlasJson[frameId];
+			}
+			else if (atlasJson && atlasJson.frames) {
+				frameData = atlasJson.frames[frameId];
+			}
+			if (!frameData) {
+				continue;
+			}
+			const rectData = frameData.frame ? frameData.frame : frameData;
+			const width = (rectData.w !== undefined) ? rectData.w : rectData.width;
+			const height = (rectData.h !== undefined) ? rectData.h : rectData.height;
+			frameRects.push(Rect.create(rectData.x, rectData.y, width, height));
+		}
+		clip.setFrames(frameRects);
+		clip.setLoop(isLoop);
+		clip.setDuration((fps > 0) ? (frameRects.length / fps) : 0);
+		return clip;
+	}
+
 	setFrames(frames) {
 		this.#frames = frames;
 	}

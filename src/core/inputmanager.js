@@ -164,6 +164,7 @@ export class InputManager extends Object {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { Set<string> } */ #keys; // 키 목록.
+	/** @private @type { Set<string> } */ #previousKeys; // 이전 프레임 키 목록. (엣지 감지용)
 	/** @private @type { boolean } */ #isTouchPressed; // 입력시 딱 한번 눌림.
 	/** @private @type { boolean } */ #isTouchReleased; // 입력시 딱 한번 뗌.
 	/** @private @type { boolean } */ #isTouchCancelled; // 입력시 딱 한번 취소됨.
@@ -184,6 +185,7 @@ export class InputManager extends Object {
 	constructor(engine) {
 		super();
 		this.#keys = new Set();
+		this.#previousKeys = new Set();
 		this.#isTouchPressed = false;
 		this.#isTouchReleased = false;
 		this.#isTouchCancelled = false;
@@ -213,6 +215,7 @@ export class InputManager extends Object {
 	//==============================================================================
 	clear() {
 		this.#keys.clear();
+		this.#previousKeys.clear();
 		this.#isTouchPressed = false;
 		this.#isTouchReleased = false;
 		this.#isTouchCancelled = false;
@@ -276,6 +279,40 @@ export class InputManager extends Object {
 	 */
 	isKeyPressed(key) {
 		return this.#keys.has(key);
+	}
+
+	//==============================================================================
+	// 이번 프레임에 방금 눌린 키인지 여부.
+	// - 게임마다 wasPressed 변수를 손으로 들고 다니던 것을 대신한다.
+	//==============================================================================
+	/**
+	 * @param { string } key
+	 * @returns { boolean }
+	 */
+	isKeyJustPressed(key) {
+		return this.#keys.has(key) && !this.#previousKeys.has(key);
+	}
+
+	//==============================================================================
+	// 이번 프레임에 방금 떼어진 키인지 여부.
+	//==============================================================================
+	/**
+	 * @param { string } key
+	 * @returns { boolean }
+	 */
+	isKeyJustReleased(key) {
+		return !this.#keys.has(key) && this.#previousKeys.has(key);
+	}
+
+	//==============================================================================
+	// 프레임 스냅샷 갱신.
+	// - 엔진이 프레임 끝에서 부른다. 현재 키 상태를 이전 프레임 상태로 복사한다.
+	//==============================================================================
+	updateFrameSnapshot() {
+		this.#previousKeys.clear();
+		for (const key of this.#keys) {
+			this.#previousKeys.add(key);
+		}
 	}
 
 	//==============================================================================

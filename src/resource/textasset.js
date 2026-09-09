@@ -27,6 +27,28 @@ export class TextAsset extends Asset
 	}
 
 	//==============================================================================
+	// 캐시 무효화 로드 여부 설정.
+	// - 참이면 fetch 에 cache: "no-cache" 를 붙여, 배포 뒤 브라우저가 옛 데이터를
+	//   계속 쓰는 문제를 막는다. (데이터 테이블 JSON 등)
+	//==============================================================================
+	/**
+	 * @param { boolean } isNoCache
+	 */
+	setNoCache(isNoCache) {
+		this.__isNoCache = isNoCache;
+	}
+
+	//==============================================================================
+	// 캐시 무효화 로드 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isNoCache() {
+		return this.__isNoCache === true;
+	}
+
+	//==============================================================================
 	// 비동기 애셋 로드.
 	//==============================================================================
 	/**
@@ -43,7 +65,7 @@ export class TextAsset extends Asset
 		try {
 			// 로드.
 			await super.load(assetPath);
-			const response = await System.fetch(assetPath);
+			const response = await System.fetch(assetPath, this.isNoCache() ? { cache: "no-cache" } : undefined);
 			this.text = await response.text();
 			this.setLoaded(true);
 			// await Wait.nextFrame();

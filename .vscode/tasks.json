@@ -39,6 +39,20 @@
 			"problemMatcher": []
 		},
 		{
+			"label": "UIEditor: Build",
+			"type": "shell",
+			"command": "node tools/uieditor/build.mjs",
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
+			"label": "UIEditor: Open",
+			"type": "shell",
+			"command": "node tools/uieditor/build.mjs; if ($?) { Start-Process 'tools/uieditor/uieditor.html' }",
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
 			"label": "Tutorial: Build (Debug)",
 			"type": "shell",
 			"command": "esbuild tutorial.js --bundle --outfile=build/bundle.js --format=iife --keep-names --sourcemap",

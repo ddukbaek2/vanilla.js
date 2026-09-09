@@ -1,0 +1,108 @@
+# 2026-08-20 작업 로그 (Claude)
+
+## Remy 눈 흰색 / 착지 공중정지 / 등반 지형 파묻힘 3건 수정 [15:50 요청 → 16:15 응답]
+- 요청: 눈에 흰 게 나오는 원인 불명, 점프 착지 시 공중에서 멈춤(애니 문제인지 로직 문제인지 불명),
+  등반 시 산에 파고듦(애니만 있고 실제 좌표 보정은 안 하는지 질문).
+
+### 1) 눈 흰색 — 원인 2겹, 둘 다 엔진 결함
+- (a) FBX 텍스처 중복 참조 미처리: Eyelashes 머티리얼의 Diffuse 가 Remy_Body_Diffuse.png 를 가리키는데
+  FBX 는 같은 파일을 두 번 참조할 때 두 번째 Video 노드의 Content 를 비워 둔다(bytes=0).
+  로더가 이를 못 찾아 흰색 1x1 대체 텍스처를 물려 속눈썹이 흰 판으로 렌더됐다.
+  → fbxloader.js interpretVideos 에 파일명 기준 콘텐츠 공유 보완 추가(extractFileName 헬퍼 신설).
+     검증: Eyelashes diffuse bytes 0 → 4,502,121.
+- (b) Opacity(알파) 맵 미지원: 애셋에 Remy_Body_Opacity.png(속눈썹 가닥 마스크) /
+  Remy_Hair_Opacity.png 가 있고 OP 프로퍼티 "TransparentColor" 로 연결되는데 엔진이 이를 전혀 읽지 않았다.
+  셰이더도 outputColor 알파를 1.0 고정 → 속눈썹/머리카락이 불투명 판.
+  → fbxloader: opacityTextureId 슬롯 + TransparentColor/TransparencyFactor 연결 추가.
+     material.js: opacity 텍스처(유닛 8) + useAlphaCutout 플래그 + getUseAlphaCutout().
+     skinnedmodelrenderer.js: 프래그먼트 셰이더에 알파 컷아웃(opacity < 0.5 → discard).
+- 검증: 얼굴 클로즈업 렌더 — 흰 판 소멸, 머리카락 가닥 분리 정상. Opacity 맵 UV 영역과
+  Eyelashes UV(0.50~0.60, 0.60~0.70)가 flipY 포함 정확히 일치함을 확인.
+- 비고: 깊이 패스(그림자)에는 컷아웃 미적용. 현재 시각적 문제 없어 보류.
+
+### 2) 착지 시 공중 정지 — 애니 문제(루트 모션)
+- land.fbx(Falling To Landing)는 in-place 가 아니라 Hips 루트 모션이 살아 있다.
+  Hips Y = 305.9 → 127.9 → 194.7 (바인드 포즈 209). 즉 클립 시작 프레임이 바인드보다 +97cm.
+  착지 순간 이 클립을 처음부터 재생 → 모델만 약 0.46 유닛 공중으로 순간 이동 후 낙하 자세 유지.
+  게임 로직의 playerY 는 이미 지면이었으므로 로직 문제가 아님.
+- → index.html: land 클립 로드에 ignoreTranslation=true 추가. (climb 과 동일 처리)
+- 검증: 샘플에서 점프 후 620ms 캡처 — 발이 지면에 붙고 그림자와 일치.
+
+### 3) 등반 시 산 파고듦 — 보정 함수가 사실상 무력했음
+- 기존 resolveBodyTerrainOverlap() 의 문제:
+  · 매 프레임 playerX/Z 를 base→rim 직선 보간으로 덮어쓴 뒤 보정하므로 밀어낸 결과가 누적되지 않음.
+  · 프레임당 최대 밀어내기가 0.25 x 2회 = 0.5 유닛. 경사 절벽에서 필요한 양에 크게 못 미침.
+  · 겹침 검사를 playerY + 0.45 한 높이에서만 수행.
+  → 즉 등반 경로가 실제 지형과 무관한 직선이었고, 보정은 형식만 있었다.
+- → resolveClimbWallContact(wallDirectionX, wallDirectionZ) 로 교체:
+  현재 높이의 실제 지형 표면을 찾아 (1) 몸통이 지형 안이면 벽 바깥으로 후진,
+  (2) 벽에서 떨어졌으면 손 닿는 거리(0.42)까지 전진. 매 프레임 완전 재배치라 누적 문제 없음.
+  climbAttach / climbing / climbCancel 3곳 호출부 교체. 기존 함수는 미사용이 되어 제거.
+- 검증(수치): index.html 의 지형 함수를 추출해 Node 로 등반 시뮬레이션. 등반 가능 지점 40곳 비교.
+  · 수정 전: 39/40 지점에서 파묻힘, 최대 깊이 2.11 유닛(캐릭터 키 1.8 초과), 등반 시간의 56.3%
+  · 수정 후: 0/40 지점, 최대 깊이 0.00 유닛, 0.0%
+
+## 2차 수정 — 착지 클립 도입부 / 등반 충돌을 캐릭터 전체 박스로 [19:20 요청 → 19:45 응답]
+- 피드백: 1번은 해결. 2번은 "착지 시점에 엉뚱한 애니가 잠깐 나오다 착지 애니가 나옴".
+  3번은 "덜 파고들지만 여전히 파고듦, 충돌 박스가 바닥면 정도만 잡히는 듯 —
+  OBB 기반 캐릭터 전체 박스로 만들어 박스와 경사로가 안 겹치게 하는 게 낫다".
+
+### 2) 착지 — 클립 앞 25%가 공중 낙하 구간이었음 (루트 모션 제거만으로는 부족)
+- land.fbx Hips Y 궤적 분석: 0%=305.9 → 25%=198.0 (급락, 공중 낙하) → 44%=127.9 (웅크림 최저)
+  → 81%=194.4 (일어섬). 즉 클립 앞 25%가 아직 공중에서 떨어지는 포즈다.
+  1차 수정(ignoreTranslation)은 Hips 높이 이동만 없앴을 뿐 포즈는 그대로여서
+  착지 순간 팔 벌리고 다리 접은 낙하 자세가 잠깐 재생됐다. = 사용자가 본 "엉뚱한 애니".
+- → skinnedmodel.js: playAnimation(name, fadeDuration, startTime) 에 startTime 추가.
+     index.html: LAND_CLIP_CONTACT_TIME = 0.29 로 발이 닿는 시점부터 재생.
+- 검증: fbx_test 로 동일 클립의 0초 포즈와 0.29초 포즈를 각각 렌더해 비교.
+  0초 = 팔 벌린 공중 낙하 자세, 0.29초 = 두 발을 내리고 균형 잡는 착지 자세로 확인.
+- 비고: Mixamo trim 재다운로드가 더 깔끔하나 access_token 이 2026-08-20 01:55 만료되어 엔진 기능으로 해결.
+
+### 3) 등반 — 충돌 판정을 점 1개에서 캐릭터 전체 박스로 교체
+- 1차 수정의 실제 문제: 겹침 검사를 "몸통 중심 1점(playerY+0.9)"에서만 했다.
+  사용자 지적대로 바닥면 수준 판정이라 상체가 경사면에 박히는 것을 잡지 못했다.
+  1차 수정 후 "0/40 해결"이라 보고했던 것도 같은 1점 기준으로 측정한 탓 — 측정 자체가 느슨했다.
+- → sampleBodyBoxTerrainHeight(centerX, centerZ, forwardX, forwardZ) 신설:
+     진행 방향으로 회전한 사각형(OBB 바닥면, 반폭 0.3 / 반깊이 0.24)을 3x3 = 9점 샘플해
+     박스가 덮는 지형의 최고 높이를 구한다. 높이맵 지형은 지면 위가 항상 빈 공간이므로
+     박스 바닥(playerY)과 이 최고 높이만 비교하면 박스 전체의 겹침을 판정할 수 있다.
+     (src/base/obb.js 의 OBB 는 Vector2 4모서리의 2D 전용이라 3D 박스로는 쓰지 않음)
+- → resolveClimbWallContact 3단계로 재구성:
+     1. 박스가 지형과 겹치면 벽 바깥으로 후진 (수직 절벽 대응, 최대 14스텝)
+     2. 벽에서 떨어졌으면 손 닿는 거리까지 전진 (허공 등반 방지)
+     3. 후진으로 해소되지 않은 겹침은 playerY 를 지형 표면 높이로 올려 해결 (완만한 경사면 등반)
+- 검증(시뮬레이션, 등반 지점 40곳, 판정 기준을 캐릭터 전체 박스로 통일):
+  · 이전(중심 1점): 40/40 지점에서 겹침, 최대 1.93 유닛, 겹친 프레임 98.7%
+  · 신규(전체 박스): 0/40 지점, 최대 0.00 유닛, 0.0%
+  · 벽과의 최대 거리는 두 방식 모두 동일 — 신규 방식이 허공 등반을 유발하지 않음.
+
+### 배포
+- NAS(\\DS216PLUSII\web\ddukbaek2\portfolio\ancientmountain): index.html + vanilla.js 갱신.
+- 실서비스 http://ddukbaek2.com/portfolio/ancientmountain/ CDP 캡처로 보행/머리카락/그림자 정상 확인.
+- 스크래치패드 검증 도구: inspect_roots.mjs(클립 루트 모션 범위), inspect_opacity.mjs(OP 슬롯명),
+  extract_opacity.mjs(알파맵 추출), terrain_extract.js + simulate_climb.mjs(등반 시뮬레이션),
+  inspect_land_curve.mjs(착지 클립 프레임별 Hips 궤적), simulate_climb2.mjs(전체 박스 방식 비교),
+  capture_landing.mjs(점프-착지 연속 캡처).
+- 2차 수정분도 동일 경로에 재배포 완료. (index.html + vanilla.js)
+
+## 3차 수정 — 점프 흐름을 낙하 → 착지 → 대기/이동으로 단순화 [2026-08-21 14:40 요청 → 14:52 응답]
+- 피드백: 점프 여전히 미해결. "그냥 심플하게 낙하애니 → 착지애니 → 대기애니(혹은 이동애니)로".
+  사용자가 새 Mixamo access_token 제공(2026-08-22 14:40 만료).
+- 남아 있던 원인 2가지:
+  (a) 클립 도입부: 2차 수정의 startTime=0.29 는 재생 위치만 옮긴 우회책이었다.
+      새 토큰으로 Mixamo export trim=[27,100] 을 적용해 land.fbx 를 재다운로드.
+      duration 1.067 → 0.767초, 첫 프레임 HipsY 305.9 → 174.1(접지 상태)로 공중 구간이 애셋에서 제거됨.
+      → startTime 우회 불필요해져 skinnedmodel.js 의 playAnimation startTime 파라미터 원복(제거).
+         land 로드의 ignoreTranslation 도 해제 — 트림 후 Hips Y 이동은 웅크림/일어서기 표현이라 유지가 맞다.
+  (b) 크로스페이드 잔상: landRecover 진입 시 fadeDuration 0.1 로 낙하 자세가 0.1초간 섞여 나왔다.
+      낙하 클립(Falling Idle)은 팔 벌린 공중 자세라 착지 순간에 겹치면 "엉뚱한 애니"로 보인다.
+      → 착지 진입은 페이드 0(즉시 전환), 낙하 진입은 0.15 → 0.08 로 단축.
+- 상태 흐름 단순화: 착지 시 landingImpulse > 0.28 조건으로 landRecover 를 건너뛰던 분기를 제거.
+  낙하 높이와 무관하게 항상 jumpDown → landRecover → ground 를 거친다.
+  착지 클립 길이에 맞춰 timeScale 1.6 → 1.8. (0.767 / 1.8 = 0.43초 ≈ landRecover 0.42초)
+- 검증:
+  · 상태 전이 기록(임시 훅 + CDP): ground → jumpDown → landRecover → ground 순서 확인 후 훅 제거.
+  · 트림 클립 첫 프레임 렌더: 팔 벌린 공중 자세가 아닌 두 발 접지 자세로 확인.
+  · 페이드 0 동작은 코드 경로로 확인(fadeElapsed >= fadeDuration 이면 previousAnimation 즉시 해제).
+  · 비고: 헤드리스 SwiftShader 환경은 약 8fps 라 점프 순간 스크린샷 캡처는 신뢰할 수 없어 사용하지 않음.
+- 배포: index.html + vanilla.js + assets/anims/land.fbx(트림본) NAS 갱신.
