@@ -18,13 +18,14 @@
 
 ## 소개
 
-빌드 도구도 패키지 설치도 없이 `<script type="module">` 한 줄로 시작하는 웹게임 엔진이다.
-런타임 의존성이 하나도 없고, 모든 타입 정보는 JSDoc 으로 붙어 있어 편집기 자동 완성이 그대로 동작한다.
+vanilla.js 는 외부 라이브러리 없이 브라우저에서 바로 동작하는 웹게임 엔진입니다.
+번들 하나를 모듈로 불러오면 씬 · 노드 · 입력 · UI · 파티클 · 오디오가 모두 준비됩니다.
 
-- 소스 160 개 파일 / 약 48,500 줄, 번들 `build/vanilla.min.js` 약 455 KB
-- 렌더러는 WebGL2 단일 프로그램 기반. 스프라이트 · 텍스트 · 도형 · 마스크를 한 경로로 그린다
-- 2D 게임에 필요한 것(씬 / 노드 / 입력 / UI / 파티클 / 오디오)부터 실험적인 3D(스키닝 · 툰 · 피부 셰이딩)까지 한 저장소에서 다룬다
-- 엔진과 함께 쓰는 웹 저작 도구(UI · 파티클 · 타임라인 · 비주얼 편집기)를 같이 만든다
+- 런타임 의존성 0, 번들 `build/vanilla.min.js` 약 455 KB
+- WebGL2 단일 프로그램 렌더러. 스프라이트 · 텍스트 · 도형 · 마스크가 같은 출력 경로를 씁니다
+- 노드 / 컴포넌트 구조, 해상도 대응 뷰, 제약 기반 레이아웃을 갖춘 UI 시스템
+- 파티클 · 셰이더 효과 · 타임라인 · 스키닝 3D 가 같은 API 위에 얹혀 있습니다
+- 공개 API 전체에 JSDoc 타입이 붙어 편집기 자동 완성과 타입 힌트가 동작합니다
 
 ## 빠른 시작
 
@@ -50,7 +51,7 @@
 </script>
 ```
 
-번들을 직접 만들 때는 esbuild 를 쓴다.
+번들을 직접 만들 때는 esbuild 를 씁니다.
 
 ```bash
 esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap
@@ -72,7 +73,7 @@ esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify
 
 ## 도구
 
-엔진과 같은 저장소에서 만드는 웹 저작 도구다. 브라우저에서 바로 열리고, 결과물은 JSON 문서로 저장한다.
+엔진과 함께 쓰는 웹 저작 도구입니다. 브라우저에서 바로 열리고, 결과물은 JSON 문서로 저장됩니다.
 
 | 도구 | 설명 | 데모 | 소스 |
 | --- | --- | --- | --- |
@@ -81,7 +82,7 @@ esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify
 | Timeline Editor | 유니티 타임라인 / 언리얼 시퀀서 쓰임새의 키프레임 저작. 도프 시트 + 커브, 자동 키, 이벤트 / 마커 | [열기](https://ddukbaek2.com/portfolio/timelineeditor/) | [`tools/timelineeditor`](tools/timelineeditor) |
 | Visual Editor | 씬 / 게임 뷰 · 계층 · 인스펙터를 갖춘 통합 편집기 | [열기](https://ddukbaek2.com/portfolio/visualeditor/) | [`tools/visualeditor`](tools/visualeditor) |
 
-명령줄 도구는 Node.js 로 실행한다. 자세한 사용법은 [`tools/TOOLS.md`](tools/TOOLS.md) 에 있다.
+명령줄 도구는 Node.js 로 실행합니다. 자세한 사용법은 [`tools/TOOLS.md`](tools/TOOLS.md) 에 있습니다.
 
 | 명령 | 설명 |
 | --- | --- |
@@ -94,7 +95,7 @@ esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify
 
 ## 샘플
 
-모두 저장소의 `examples/` 에 소스가 있고, 아래 링크는 배포본이다.
+모두 저장소의 `examples/` 에 소스가 있고, 아래 링크는 배포본입니다.
 
 | 샘플 | 설명 | 데모 | 소스 |
 | --- | --- | --- | --- |
@@ -109,7 +110,7 @@ esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify
 
 ## 게임
 
-엔진으로 만든 플레이 가능한 결과물이다.
+엔진으로 만든 플레이 가능한 결과물입니다.
 
 | 게임 | 링크 |
 | --- | --- |
