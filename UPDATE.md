@@ -6,7 +6,7 @@
 - Graphic: 글자 안티앨리어싱 끄기(setTextAntialiasEnabled)와 그리기 버퍼 보존(preserveDrawingBuffer)을 옵션으로 추가
 - Toon Shading: 표정 / 동작 버튼 줄을 세로 스택 컨테이너로 묶어 모바일 겹침 제거
 
-# 0.3.0 (2026-09-07)
+# 0.3.0 (2026-09-09)
 - 타임라인 편집기(tools/timelineeditor) 신규 — 유니티 타임라인 / 언리얼 시퀀서 쓰임새의 키프레임 저작 도구. 노드별 묶음 트랙 도프 시트 + 커브 보기(값 세로 끌기), 자동 키(레코드) 모드, 속성 줄 ◆ 키 단추, 이벤트 / 사운드 트랙, 마커, 이징 31종 + 3차 베지어(프리셋 6종 + 곡선 미리보기), 다중 선택 / 상자 선택 / 끌기 / 복사·붙여넣기 / 시간 배율 / 뒤집기, 프레임 스냅, 되돌리기 64단계, 무대 미리보기에서 노드 선택 · 끌어 옮기기, 이미지 / 오디오 애셋(데이터 주소로 문서에 내장), .timeline.json 저장 / 열기, 사용 코드 복사
 - Timeline 런타임(src/experimental/animation/timeline.js) — 무대 노드 서술(group / paint / sprite / text / particle / sound) 생성, 트랙(x, y, width, height, scaleX, scaleY, rotation, opacity, visible, color, text, number, fontSize, visibleCharacters, frame, effect, event) 보간, 첫 키 이전 / 마지막 키 이후 값 유지, 반복 시 구간 이벤트 발생, 마커 / 이벤트 / 완료 핸들러, 대상 해석기(노드가 아닌 객체도 setTimelineProperty 로 구동)
 - ShaderSprite(src/effect/shadersprite.js) 신규 — Sprite 와 같은 출력 경로에 프래그먼트 효과 48종(색: flash / silhouette / colorize / grayscale / sepia / invert / hueShift / colorAdjust / posterize / threshold / gradientMap · 외곽: outline / innerOutline / glow / innerGlow / shadow / edgeDetect / emboss / sharpen · 흐림: blur / motionBlur / radialBlur · 왜곡: wave / flag / ripple / heatHaze / bulge / swirl / mirror / kaleidoscope / jitter / pixelate / glitch / chromatic · 무늬: hologram / scanlines / oldFilm / vignette / shine · 전환: dissolve / burn / noiseFade / pixelDissolve / wipe / iris / diamondWipe / clockWipe / blinds / checkerWipe)
@@ -25,7 +25,15 @@
 - 샘플 공통: 페이지 제목 Title Case 통일, Scene 기반 샘플(Sprite Effects / Particle Effects / UI Showcase)에 휠 → 스크롤 뷰 전달, 엔진 import 에 캐시 스탬프, Sprite Effects 목록은 행을 눌러도 스크롤을 옮기지 않음. Timeline Showcase 스크럽은 잡으면 일시 정지 · PLAY 로 재개
 - 샘플 spritefx(examples/spriteeffects) 신규 — 절차적 픽셀 스프라이트(슬라임 / 코인 / 박쥐 / 문장 / 별 / 보석)로 ShaderSprite 48종 · ScreenEffect 58종을 표에서 자동 나열하고, 연출 조합 25종(히트 스톱 / 화면 흔들림 / 슬로 모션 / 잔상 / 플립북 / 떠오르는 데미지 / 타자기 대사 / 슬래시 트레일 / 패럴랙스 / 카메라 펀치 / 스쿼시 앤 스트레치 / 스폰·디스폰 / 체력 바 / 번개 / 레벨 업 / 텔레포트 / 프리즈 프레임 / 포털 / 수중 / 상태 이상 / 승리 / 게임 오버 / 낮·밤 / 피격 넉백 / 폭우) 시연
 
-# 0.5.7-experimental (2026-09-07)
+- 새 샘플 Toon Shading(examples/toonshading) — VRM1 Twist Sample 을 호요버스풍 셀 셰이딩으로. 3 톤 램프 / 구면 노멀 / 앞머리 그림자 / 천사 고리 / 림 / 아웃라인 / 비침 / 스프링 본 / 표정, 엔진 MORPH_GLSL 내보내기. (이름은 Cel Shading 에서 바꿨다)
+- Toon Shading 동작: Mixamo 클립 리타깃(IDLE / WALK / RUN + JUMP / GREET / CLAP / CHEER / DANCE), 골반 이동을 X/Y/Z 모두 리타깃해 다리 미끄러짐 제거, 스프링 본 갱신 순서 / 체인 전파 / 클립 전환 시 꼬리 재설정, 콜라이더 여유 + 중간점 검사
+- Toon Shading 시선: 두 눈이 각자 카메라를 향하고(뼈 로컬 축과 무관) 머리 정면 방향을 보정, 비침 패스 정면 가드, 우클릭 / 두 손가락 팬 + 줌 연동 초점
+- Old Face: RENDER BASE 를 상한이 아닌 기준 픽셀 수로 적용(모바일 슈퍼샘플링), 렌더 타겟 한 변을 GPU 상한으로 제한
+- Timeline: 파티클을 시드 난수로 돌려 스크럽 재현성 확보, 이벤트가 없는 파티클은 자유 재생, 틱 경계에서 이벤트가 빠지던 것 수정
+- README 개편: 배지 / 빠른 시작 / 기능 표 / 도구 · 샘플 · 게임 링크 표 / 저장소 구조, 소개를 엔진 기능 설명으로 정리하고 본문을 존댓말로
+- 편집기 파비콘 정리: 타임라인 편집기가 파티클 편집기 아이콘을 덮어썼던 것을 바로잡고, 편집기 계열(공통 바탕 + 띠 + 라벨) 로 통일
+
+# 0.2.8 (2026-09-07)
 - OLD FACE 옵션 전면 확장 — 우측 패널에 슬라이더 36종(렌더: 프레임 레이트 30 / 60 / 최대, 슈퍼샘플링 0.5~2x, 노출, 블룸 강도 / 문턱, 비네트, 그레인 / 지오메트리: 머리 메시 LOD 0~2, 머리카락 카드 5단계(LOW~CINEMATIC), 텍스처 크기 4단계 / 그림자: 섀도우 맵 1K~8K + 표본 4~24, 부드러움, 강도 / 피부: 노멀, 모공, 캐비티, 마이크로 노멀, 주름 깊이, SSS 폭, 스펙큘러, 러프니스, 잔털 / AO 강도 · 반경 / 조명 키 · 필 · 림 · 앰비언트 / 머리카락 흔들림 · 스펙큘러 · 뿌리 차폐 / 눈 홍채 · 동공 · 깊이 / 머리 따라가기 · 깜빡임 빈도), 패널 세로 스크롤 · 폭 확대
   - 머리 LOD 0 / 1 / 2 (24k / 12k / 6k 정점) 와 머리카락 카드 LOD 0~4 를 별도 glb 로 나눠 슬라이더로 필요할 때 로드, 텍스처 크기는 TEXTURE_MIN_LOD 로 실효 해상도 조절, 섀도우 맵은 해상도 변경 시 재생성
   - HumanSkinRenderer: 버텍스 셰이더 주입(기반 렌더러 옵션) 으로 머리카락 흔들림(가닥 끝 가중 사인 합성), 섀도우 표본 수 유니폼(포아송 24), 프린지 블렌드 토글
@@ -36,7 +44,7 @@
   - 그래픽 설정 패널 접기 / 펼치기(기본 접음, 제목 클릭) + 표정 버튼 위 z-index, 슬라이더 값 칸 잘림 수정, 머티리얼 그래프를 설정 패널과 같은 규격(폭 372 / 여백 18 / 제목 바 / 패딩 / 폰트 / 스텐실 클립 내부 스크롤)으로 재구성 — 모바일은 접힌 설정 아래 전체 폭 카드, 크레딧은 모바일에서도 표시
   - 패널 제목 OPTIONS, 옵션 패널 / 그래프 높이를 렌더링 정보 HUD 위까지로 자동 제한, 그래프 구성 요소 크기(제목 10px · 그룹 9px · 본문 10.5px · 자간)를 옵션 패널 CSS 와 동일하게, 프레임 레이트 30 / 60(기본 30), RENDER SCALE 슬라이더(해상도 대비 % — 내부 렌더 버퍼, 4K 픽셀 예산 제한), HUD 에 display / render buffer 분리 표시
 
-# 0.5.6-experimental (2026-09-07)
+# 0.2.7 (2026-09-07)
 - OLD FACE 렌더링을 언리얼 메타휴먼 룩에 맞춰 상향 — HumanSkinRenderer 를 셰이딩 모드(피부 / 눈 / 머리카락 / 차폐 / 유체) 통합 셰이더로 재작성
   - 피부: 표정 주름 맵 3종(노멀 / 색 오버레이) 을 메타휴먼 마스크 아틀라스(4x4 타일 x RGBA 채널) 와 RigLogic 애니메이티드 맵 출력으로 가중 혼합(assets/wrinkles.json), 타일링 마이크로 노멀 / 캐비티, 골 기반 러프니스, 회전 포아송 PCF 소프트 섀도우(4K 섀도우 맵)
   - 눈: 각막 굴절 시차 홍채, 홍채 노멀 / 림버스 / 동공, 각막 하이라이트 + 환경 반사, 공막 정맥 노멀, 눈꺼풀 차폐 셸 메시(블렌드 어둡힘), 눈물선 / 침 메시(유체 스펙큘러)
@@ -46,13 +54,13 @@
   - 애셋: 메타휴먼 룩데브 텍스처(주름 마스크 / 마이크로 노멀 / 눈 / 치아) 내보내기와 합성 스크립트, C++ 덤프에 애니메이티드 맵 출력 추가
   - 렌더링 옵션 패널에 AMBIENT OCCLUSION / EXPRESSION WRINKLE MAPS 토글 추가
 
-# 0.5.5-experimental (2026-09-07)
+# 0.2.6 (2026-09-07)
 - OLD FACE 애셋을 메타휴먼 크리에이터 노인 프리셋 "Walter" 로 교체 — 실제 피부 텍스처(알베도 / 노멀 / 캐비티 → 러프니스와 디테일 높이), 그룸 카드 머리카락 / 눈썹 / 콧수염 / 턱수염, 총 11.1만 삼각형, ARKit 51 셰이프키(얼굴 리그 RigLogic 을 그대로 계산)
   - UE 5.8.2 + MetaHuman Creator Core Data 헤드리스 파이프라인(examples/oldface/tools/metahuman/ue): 프리셋 복제 → 클라우드 오토리그(JOINTS_AND_BLEND_SHAPES) / 고해상도 텍스처 → DNA / 머리 메시 / 머티리얼 텍스처 내보내기 → C++ 모듈 OldFaceTools 로 DNA 2.5 지오메트리 덤프와 RigLogic 포즈 평가(엔진의 RigLogicLib 사용, 65 프레임 ARKit 매핑 커브)
   - 그룸 카드: 그룸 애셋의 카드 LOD1 스태틱 메시와 아틀라스(Layout2: Attribute R 커버리지 / G 깊이, Tangent A 가닥 좌표)를 꺼내 바인딩 소스 머리(레거시 그룸 머리, UV 로 DNA 정점 순서 대응)의 최근접 삼각형 프레임으로 Walter 머리에 다시 붙이고, 같은 바인딩으로 표정 포즈마다 정점을 옮겨 셰이프키로 굽음(턱수염이 턱, 눈썹이 이마를 따라감). 머리카락만 양면 사본, 셰이프키는 4mm 이상 이동만 유지
   - 샘플: 머리 머티리얼에 메타휴먼 노멀 / 러프니스 맵, 그룸 카드 4종 머티리얼(알파 컷아웃, 산란 없음), 머티리얼 그래프 패널 썸네일(NORMAL / CAVITY / HAIR), 크레딧 문구
 
-# 0.5.0-experimental (2026-09-05)
+# 0.2.5 (2026-09-05)
 - OLD FACE 샘플 추가 (examples/oldface) — 에픽 메타휴먼 얼굴(Taro DNA: 머리 2.4만 정점 + 치아 / 눈알 / 속눈썹, RigLogic 을 ARKit 51종 셰이프키로 굽음)을 피부 파이프라인으로 렌더링
   - 애셋 생성(examples/oldface/tools/metahuman): UE 5.8 에서 ARKit 매핑 애니메이션의 raw 제어 커브를 덤프하고, 에픽 DNA 라이브러리로 DNA 의 RigLogic(PSD / 조인트 그룹 행렬 / 블렌드셰이프 채널)을 직접 평가해 포즈별 정점을 계산, Blender 로 희소 셰이프키 glb 생성.
     눈(공막 + 홍채 합성) / 치아 / 속눈썹 텍스처는 메타휴먼 플러그인 기본 텍스처, 피부 알베도는 자리표시자(코어 데이터 설치 후 교체 예정)
@@ -78,14 +86,14 @@
 - UIDropdown: 펼친 목록을 트리 뿌리로 옮겨 그려 나중에 그려지는 형제 노드에 가려지지 않게 수정 (접으면 되돌림)
 - UI 쇼케이스: 내비게이션 캡션을 CONSOLE 에서 UI SHOWCASE 로 변경
 
-# 0.4.1-experimental (2026-09-03)
+# 0.2.4 (2026-09-03)
 - Graphic: 정점 버퍼 올리기를 bufferSubData 덮어쓰기에서 bufferData 고아 처리로 교체 (drawVertices / drawColoredQuads)
   — 사파리(ANGLE → Metal)는 GPU 가 아직 읽는 버퍼를 덮어쓰면 드로우 콜마다 CPU 를 세워, 드로우 콜 45 · 정점 1000 남짓에도
   아이폰 10 fps · 맥 22 fps 가 나왔음. 교체 뒤 맥 사파리 60 fps 확인 (srpg 프로젝트에서 발견, 크롬은 영향 없음)
 - 에디터 · EFFECTS 샘플: 이펙트 20종 + 코드 패널 / 복사 / fps, 유사 이펙트 7종 정리와 신규 메커니즘 5종, 오버레이 / 스크롤바 개선,
   ASSETS 구획 3종 · 파티클 계층 트리 · 격자 / 뷰 토글 · 팔레트 드래그 앤 드롭 수리
 
-# 0.4.0-experimental (2026-08-31)
+# 0.2.3 (2026-08-31)
 - 형제 게임 프로젝트들에서 반복 구현되던 범용 기능을 엔진으로 흡수 (실험적 브랜치)
 - base
   - math: randomRange / randomInt / pickRandom / shuffle / approach / moveTowards 추가
@@ -144,7 +152,7 @@
 - 파티클 편집기 tools/particleeditor 추가 (라이브 프리뷰 + 전체 속성 인스펙터 + 프리셋 9종 + .vfx.json 저장/불러오기)
 - Engine.run: 기본 폰트(CDN) 로드가 실패하거나 늦어도 씬 로드 / 렌더 루프가 막히지 않게 수정
 
-# 0.3.0 (2026-08-30)
+# 0.2.2 (2026-08-30)
 - 렌더러 교체: Canvas 2D -> WebGL2
 - WebGL2 3D 샘플 추가 (NEON HORIZON / ancientmountain) — 절차적 지형, 블룸, 파티클, 함대 연출
 - FBX 로더에 스키닝 / PBR 머터리얼 / 애니메이션 클립 처리 추가
