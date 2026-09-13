@@ -32,6 +32,9 @@ export class EngineConfiguration extends Object {
 	/** @type { boolean } */ useStatistics; // 정보창 출력 여부.
 	/** @type { boolean } */ autoResizeOnWindowResize; // 윈도우가 리사이즈 될 때 캔버스 사이즈 자동 반영.
 	/** @type { string } */ title; // 이름.
+	// 프레임이 끝난 뒤에도 그린 것을 캔버스에 남길지. 캔버스 위에 후처리를 얹는 프로젝트가 켠다.
+	// (다른 캔버스가 texImage2D 나 drawImage 로 읽으려면 필요하다) 한 번 더 복사하는 만큼 비용이 있다.
+	/** @type { boolean } */ preserveDrawingBuffer;
 
 	//==============================================================================
 	// 생성.
@@ -45,6 +48,7 @@ export class EngineConfiguration extends Object {
 		this.useStatistics = false;
 		this.autoResizeOnWindowResize = false;
 		this.title = "";
+		this.preserveDrawingBuffer = false;
 	}
 }
 
@@ -96,7 +100,7 @@ export class Engine extends Object {
 		const canvas = this.#platform.getOrAddCanvas(canvasId);
 		
 
-		this.#graphic = new Graphic(canvas);
+		this.#graphic = new Graphic(canvas, engineConfiguration.preserveDrawingBuffer === true);
 		this.#sceneManager = new SceneManager(this);
 		this.#timeManager = new TimeManager(this);
 		this.#viewManager = new ViewManager(this);

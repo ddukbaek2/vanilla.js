@@ -10,6 +10,34 @@ import * as Math from "../../base/math.js";
 // 전역 상수 목록.
 //==============================================================================
 const MAXIMUM_ENTRY_COUNT = 512; // 캐시 엔트리 상한.
+// 글자 안티앨리어싱. 끄면 구운 글자의 알파를 문턱값으로 0 과 255 로 가르고 텍스처를 NEAREST 로 뽑는다.
+// 도트 글꼴을 설계 크기의 정수 배로 그리는 프로젝트가 끈다. 기본은 켜짐이라 동작이 바뀌지 않는다.
+let isTextAntialiasEnabled = true;
+const ALPHA_THRESHOLD = 128;
+
+
+//==============================================================================
+// 글자 안티앨리어싱 켬 / 끔.
+//
+// 켜고 끈 다음에 굽는 글자부터 적용된다. 이미 구워 둔 글자는 그대로다.
+//==============================================================================
+/**
+ * @param { boolean } value
+ */
+export function setTextAntialiasEnabled(value) {
+	isTextAntialiasEnabled = value;
+}
+
+
+//==============================================================================
+// 글자 안티앨리어싱이 켜져 있는지.
+//==============================================================================
+/**
+ * @returns { boolean }
+ */
+export function isTextAntialiasOn() {
+	return isTextAntialiasEnabled;
+}
 
 
 //==============================================================================
@@ -196,6 +224,16 @@ export class TextStringTextureCache extends Object {
 			bakeCanvasRenderingContext.fillText(text, scaledPenX, scaledBaselineY);
 		}
 
+		// 안티앨리어싱을 끈 경우: 알파를 문턱값으로 갈라 가장자리의 반투명 픽셀을 없앤다.
+		if (!isTextAntialiasEnabled) {
+			const imageData = bakeCanvasRenderingContext.getImageData(0, 0, bakeWidth, bakeHeight);
+			const pixels = imageData.data;
+			for (let pixelIndex = 3; pixelIndex < pixels.length; pixelIndex += 4) {
+				pixels[pixelIndex] = pixels[pixelIndex] >= ALPHA_THRESHOLD ? 255 : 0;
+			}
+			bakeCanvasRenderingContext.putImageData(imageData, 0, 0);
+		}
+
 		// 텍스처 업로드. (프리멀티플라이드 알파)
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const texture = webGL2RenderingContext.createTexture();
@@ -205,8 +243,9 @@ export class TextStringTextureCache extends Object {
 		webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
 		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
-		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR);
-		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.LINEAR);
+		const textureFilter = isTextAntialiasEnabled ? webGL2RenderingContext.LINEAR : webGL2RenderingContext.NEAREST;
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, textureFilter);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, textureFilter);
 
 		// 논리 좌표(스케일 나눔) 기준 메트릭 저장.
 		const entry = {

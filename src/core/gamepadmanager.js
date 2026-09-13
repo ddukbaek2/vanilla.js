@@ -168,6 +168,34 @@ export class GamepadManager extends Object {
 	//==============================================================================
 	updateAllGamepads() {
 		const gamepads = System.navigator.getGamepads();
+
+		// 브라우저가 주고 있는데 아직 맞이하지 않은 패드를 여기서 붙인다.
+		//
+		// gamepadconnected 이벤트는 페이지가 뜬 뒤 그 패드를 처음 만질 때 한 번만 온다.
+		// 그 순간을 놓치면(이벤트를 걸기 전에 눌렀거나, 다른 탭에서 눌렀거나, 페이지를 새로 고쳤거나)
+		// 영영 붙지 않아 패드가 먹지 않는다. 매 갱신마다 훑어 보완한다.
+		for (let index = 0; index < gamepads.length; ++index) {
+			const gamepad = gamepads[index];
+			if (gamepad === null || gamepad === undefined) {
+				continue;
+			}
+			if (this.#connectedGamepadIndices.indexOf(gamepad.index) !== -1) {
+				continue;
+			}
+			this.connect(gamepad);
+		}
+
+		// 뽑힌 패드를 놓아준다. disconnect 이벤트도 같은 이유로 놓칠 수 있다.
+		for (let index = this.#connectedGamepadIndices.length - 1; index >= 0; --index) {
+			const hardwareIndex = this.#connectedGamepadIndices[index];
+			const gamepad = gamepads[hardwareIndex];
+			if (gamepad !== null && gamepad !== undefined) {
+				continue;
+			}
+			this.#connectedGamepadIndices.splice(index, 1);
+			this.#connectedGamepadStates.delete(hardwareIndex);
+		}
+
 		for (const hardwareIndex of this.#connectedGamepadIndices) {
 			const gamepad = gamepads[hardwareIndex];
 			if (!gamepad) {

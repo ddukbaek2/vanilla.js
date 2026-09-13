@@ -93,21 +93,24 @@
 			background: rgba(40, 34, 30, 0.6);
 			box-shadow: 0 0 22px rgba(255, 226, 180, 0.3);
 		}
-		#expressionPanel, #animationPanel {
+		#controlPanel {
 			position: absolute;
 			left: 50%;
-			bottom: calc(5.5% + 96px);
+			bottom: calc(5.5% + 52px);
 			transform: translateX(-50%);
 			display: flex;
-			flex-wrap: wrap;
-			justify-content: center;
-			gap: 6px;
+			flex-direction: column;
+			align-items: center;
+			gap: 8px;
 			max-width: min(760px, 92vw);
 			font-family: "Segoe UI", "Malgun Gothic", sans-serif;
 			animation: panelEntrance 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 		}
-		#animationPanel {
-			bottom: calc(5.5% + 56px);
+		#expressionPanel, #animationPanel {
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: center;
+			gap: 6px;
 		}
 		.expressionButton {
 			padding: 7px 13px;
@@ -374,8 +377,8 @@
 			#optionPanel { width: 316px; right: 10px; top: 10px; max-height: calc(100vh - 170px); }
 			#titleMain { font-size: 24px; letter-spacing: 0.32em; text-indent: 0.32em; }
 			#footerNote { left: 10px; right: 10px; bottom: 10px; font-size: 8px; letter-spacing: 0.08em; line-height: 1.6; }
-			#expressionPanel { bottom: calc(5.5% + 86px); gap: 4px; }
-			#animationPanel { bottom: calc(5.5% + 50px); gap: 4px; }
+			#controlPanel { bottom: calc(5.5% + 46px); gap: 10px; max-width: 94vw; }
+			#expressionPanel, #animationPanel { gap: 4px; }
 			.expressionButton { padding: 6px 9px; font-size: 9px; letter-spacing: 0.12em; }
 		}
 	</style>
@@ -390,8 +393,10 @@
 	<div id="optionPanel">
 		<div id="optionTitle">OPTIONS</div>
 	</div>
-	<div id="expressionPanel"></div>
-	<div id="animationPanel"></div>
+	<div id="controlPanel">
+		<div id="expressionPanel"></div>
+		<div id="animationPanel"></div>
+	</div>
 	<div id="contextMenu"></div>
 	<div id="footerNote">
 		DRAG TO ORBIT, WHEEL OR PINCH TO ZOOM, RIGHT-DRAG OR TWO FINGERS TO PAN, DOUBLE-CLICK TO FOCUS<br>
@@ -1466,7 +1471,7 @@
 	}
 	System.document.addEventListener("contextmenu", (event) => {
 		event.preventDefault();
-		if (event.target.closest("#optionPanel") || event.target.closest("#expressionPanel") || event.target.closest("#animationPanel")) {
+		if (event.target.closest("#optionPanel") || event.target.closest("#controlPanel")) {
 			return;
 		}
 		if (cameraState.hasPanned) {

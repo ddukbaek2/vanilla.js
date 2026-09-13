@@ -180,10 +180,17 @@ export class Graphic extends Object {
 	 * @constructor
 	 * @param { HTMLCanvasElement } canvas
 	 */
-	constructor(canvas) {
+	constructor(canvas, preserveDrawingBuffer) {
 		super();
 
-		const webGL2RenderingContext = canvas.getContext("webgl2", { alpha: false, stencil: true, premultipliedAlpha: true }); // WebGL2RenderingContext
+		// preserveDrawingBuffer 를 켜면 프레임이 끝난 뒤에도 그린 것이 캔버스에 남는다.
+		// 캔버스 위에 후처리를 얹는 프로젝트가 그 그림을 읽어 쓴다. (엔진 설정에서 켠다)
+		const webGL2RenderingContext = canvas.getContext("webgl2", {
+			alpha: false,
+			stencil: true,
+			premultipliedAlpha: true,
+			preserveDrawingBuffer: preserveDrawingBuffer === true,
+		}); // WebGL2RenderingContext
 		if (!webGL2RenderingContext) {
 			throw new Error("WebGL2 Not Supported.");
 		}
