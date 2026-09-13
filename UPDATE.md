@@ -1,6 +1,12 @@
 # 업데이트 기록
 
-# 0.5.8-experimental (2026-09-07)
+# 0.3.1 (2026-09-14)
+- GamepadManager: gamepadconnected 이벤트를 놓쳐도 패드를 붙잡는다. 그 이벤트는 페이지가 뜬 뒤 패드를 처음 만질 때 한 번만 오므로, 놓치면 연결 목록이 빈 채로 남아 패드가 먹지 않았다. updateAllGamepads 가 매 갱신마다 navigator.getGamepads() 를 훑어 아직 맞이하지 않은 패드를 붙이고 뽑힌 패드를 놓아준다
+- FontAsset: loadFont(family, assetPath, descriptors) 로 FontFace 서술자를 넘길 수 있다. 주지 않으면 굵기와 기울기가 모두 normal 로 등록되어, 같은 패밀리에 굵기가 다른 파일을 올리면 나중 것이 앞 것을 덮어썼다
+- Graphic: 글자 안티앨리어싱 끄기(setTextAntialiasEnabled)와 그리기 버퍼 보존(preserveDrawingBuffer)을 옵션으로 추가
+- Toon Shading: 표정 / 동작 버튼 줄을 세로 스택 컨테이너로 묶어 모바일 겹침 제거
+
+# 0.3.0 (2026-09-07)
 - 타임라인 편집기(tools/timelineeditor) 신규 — 유니티 타임라인 / 언리얼 시퀀서 쓰임새의 키프레임 저작 도구. 노드별 묶음 트랙 도프 시트 + 커브 보기(값 세로 끌기), 자동 키(레코드) 모드, 속성 줄 ◆ 키 단추, 이벤트 / 사운드 트랙, 마커, 이징 31종 + 3차 베지어(프리셋 6종 + 곡선 미리보기), 다중 선택 / 상자 선택 / 끌기 / 복사·붙여넣기 / 시간 배율 / 뒤집기, 프레임 스냅, 되돌리기 64단계, 무대 미리보기에서 노드 선택 · 끌어 옮기기, 이미지 / 오디오 애셋(데이터 주소로 문서에 내장), .timeline.json 저장 / 열기, 사용 코드 복사
 - Timeline 런타임(src/experimental/animation/timeline.js) — 무대 노드 서술(group / paint / sprite / text / particle / sound) 생성, 트랙(x, y, width, height, scaleX, scaleY, rotation, opacity, visible, color, text, number, fontSize, visibleCharacters, frame, effect, event) 보간, 첫 키 이전 / 마지막 키 이후 값 유지, 반복 시 구간 이벤트 발생, 마커 / 이벤트 / 완료 핸들러, 대상 해석기(노드가 아닌 객체도 setTimelineProperty 로 구동)
 - ShaderSprite(src/effect/shadersprite.js) 신규 — Sprite 와 같은 출력 경로에 프래그먼트 효과 48종(색: flash / silhouette / colorize / grayscale / sepia / invert / hueShift / colorAdjust / posterize / threshold / gradientMap · 외곽: outline / innerOutline / glow / innerGlow / shadow / edgeDetect / emboss / sharpen · 흐림: blur / motionBlur / radialBlur · 왜곡: wave / flag / ripple / heatHaze / bulge / swirl / mirror / kaleidoscope / jitter / pixelate / glitch / chromatic · 무늬: hologram / scanlines / oldFilm / vignette / shine · 전환: dissolve / burn / noiseFade / pixelDissolve / wipe / iris / diamondWipe / clockWipe / blinds / checkerWipe)
