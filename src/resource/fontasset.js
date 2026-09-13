@@ -46,10 +46,11 @@ export class FontAsset extends Asset
 	// 비동기 애셋 로드.
 	//==============================================================================
 	/**
-	 * @param { string } family 
-	 * @param { string } assetPath 
+	 * @param { string } family
+	 * @param { string } assetPath
+	 * @param { object } descriptors FontFace 서술자. (weight, style, stretch, unicodeRange, display 등)
 	 */
-	async loadFont(family, assetPath) {
+	async loadFont(family, assetPath, descriptors) {
 
 		if (this.fontFace) {
 			return Promise.resolve();
@@ -60,7 +61,10 @@ export class FontAsset extends Asset
 
 		// this.FontFace = new FontFace(this.Family, `url(${this.AssetPath}) format("woff2")`);
 		// const assetPath = this.getAssetPath();
-		this.fontFace = new FontFace(this.family, `url(${assetPath})`);
+		// 서술자를 주지 않으면 굵기와 기울기가 모두 normal 로 등록된다.
+		// 같은 패밀리에 굵기가 다른 파일을 여러 개 올릴 때는 반드시 주어야 나중 것이 앞 것을 덮지 않는다.
+		const fontFaceDescriptors = descriptors === undefined || descriptors === null ? {} : descriptors;
+		this.fontFace = new FontFace(this.family, `url(${assetPath})`, fontFaceDescriptors);
 		await this.fontFace.load();
 
 		// 브라우저 폰트셋 등록.
