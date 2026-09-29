@@ -148,8 +148,9 @@ UPDATE.md       업데이트 기록
 ## 링크
 
 - 저장소: <https://github.com/ddukbaek2/vanilla.js>
-- 템플릿: <https://github.com/ddukbaek2/playablegames-template>
-- 배포 페이지: <https://ddukbaek2.com/vanilla.js>
+- 템플릿: <https://github.com/ddukbaek2/playablegame-template>
+- 템플릿: <https://github.com/ddukbaek2/retrogame-template>
+- 배포 페이지: <https://ddukbaek2.com>
 
 ## 라이선스
 
