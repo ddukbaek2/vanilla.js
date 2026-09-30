@@ -99,6 +99,7 @@ const CORNER_SEGMENT_COUNT = 8;
 
 // 텍스트 베이크 스케일 상한. (과도한 확대 굽기 방지)
 const MAXIMUM_TEXT_BAKE_SCALE = 8;
+const DEFAULT_TEXT_BAKE_SCALE_STEP = 0.25;
 
 
 //==============================================================================
@@ -172,6 +173,8 @@ export class Graphic extends Object {
 	/** @private @type { Float32Array } */ #modelMatrixArray;
 	/** @private @type { number } */ #appliedViewportWidth;
 	/** @private @type { number } */ #appliedViewportHeight;
+	/** @private @type { number } */ #textBakeScaleStep; // 텍스트 베이크 스케일 양자화 단위. (0 이면 양자화하지 않음)
+	/** @private @type { boolean } */ #isTextPixelSnapEnabled; // 텍스트 쿼드를 디바이스 픽셀 격자에 맞출지.
 	/** @private @type { number } */ #drawCallCount; // 이번 프레임의 드로우 콜 수.
 	/** @private @type { number } */ #drawVertexCount; // 이번 프레임에 그린 정점 수.
 	/** @private @type { number } */ #lastFrameDrawCallCount; // 지난 프레임의 드로우 콜 수.
@@ -263,6 +266,8 @@ export class Graphic extends Object {
 		this.#modelMatrixArray = new Float32Array(9);
 		this.#appliedViewportWidth = 0;
 		this.#appliedViewportHeight = 0;
+		this.#textBakeScaleStep = DEFAULT_TEXT_BAKE_SCALE_STEP;
+		this.#isTextPixelSnapEnabled = false;
 		this.#drawCallCount = 0;
 		this.#drawVertexCount = 0;
 		this.#lastFrameDrawCallCount = 0;
@@ -1456,14 +1461,59 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
-	// 텍스트 베이크 스케일 계산. (현재 변환 행렬 기반, 0.25 단위 양자화)
+	// 텍스트 베이크 스케일 양자화 단위 설정.
+	// - 기본 0.25. 확대 축소가 잦은 글자가 스케일마다 새로 구워지지 않게 묶는다.
+	// - 0 이면 양자화하지 않고 실제 스케일 그대로 굽는다. (스케일이 고정된 UI 글자를 늘리지 않고 1:1 로 그릴 때)
+	//==============================================================================
+	/**
+	 * @param { number } textBakeScaleStep
+	 */
+	setTextBakeScaleStep(textBakeScaleStep) {
+		this.#textBakeScaleStep = Math.max(0, textBakeScaleStep);
+	}
+
+	//==============================================================================
+	// 텍스트 베이크 스케일 양자화 단위 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getTextBakeScaleStep() {
+		return this.#textBakeScaleStep;
+	}
+
+	//==============================================================================
+	// 텍스트 픽셀 스냅 설정.
+	// - 켜면 회전 / 기울임이 없는 변환에서 글자 쿼드의 왼쪽 위를 디바이스 픽셀 격자에 맞춘다.
+	// - 베이크 스케일이 실제 스케일과 같을 때(setTextBakeScaleStep(0)) 텍셀과 픽셀이 1:1 로 맞아 가장 선명하다.
+	//==============================================================================
+	/**
+	 * @param { boolean } isTextPixelSnapEnabled
+	 */
+	setTextPixelSnapEnabled(isTextPixelSnapEnabled) {
+		this.#isTextPixelSnapEnabled = isTextPixelSnapEnabled;
+	}
+
+	//==============================================================================
+	// 텍스트 픽셀 스냅 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isTextPixelSnapEnabled() {
+		return this.#isTextPixelSnapEnabled;
+	}
+
+	//==============================================================================
+	// 텍스트 베이크 스케일 계산. (현재 변환 행렬 기반, 양자화 단위는 setTextBakeScaleStep)
 	//==============================================================================
 	/**
 	 * @returns { number }
 	 */
 	calculateTextBakeScale(){
 		const maximumScale = this.#transformMatrix.getMaximumScale();
-		const quantizedScale = Math.round(maximumScale * 4) / 4;
+		const textBakeScaleStep = this.getTextBakeScaleStep();
+		const quantizedScale = textBakeScaleStep > 0 ? Math.round(maximumScale / textBakeScaleStep) * textBakeScaleStep : maximumScale;
 		return Math.clamp(quantizedScale, 0.25, MAXIMUM_TEXT_BAKE_SCALE);
 	}
 
@@ -1503,8 +1553,18 @@ export class Graphic extends Object {
 			baselineOffset = -entry.fontDescent;
 		}
 
-		const quadX = x + alignOffset - entry.penOffsetX;
-		const quadY = y + baselineOffset - entry.baselineOffsetY;
+		let quadX = x + alignOffset - entry.penOffsetX;
+		let quadY = y + baselineOffset - entry.baselineOffsetY;
+
+		// 픽셀 스냅. (회전 / 기울임이 없을 때만, 쿼드의 왼쪽 위를 디바이스 픽셀에 맞춘다)
+		const isTextPixelSnapEnabled = this.isTextPixelSnapEnabled();
+		const transformMatrix = this.#transformMatrix;
+		if (isTextPixelSnapEnabled && transformMatrix.b === 0 && transformMatrix.c === 0 && transformMatrix.a > 0 && transformMatrix.d > 0) {
+			const devicePoint = transformMatrix.transformPoint(quadX, quadY);
+			quadX += (Math.round(devicePoint.x) - devicePoint.x) / transformMatrix.a;
+			quadY += (Math.round(devicePoint.y) - devicePoint.y) / transformMatrix.d;
+		}
+
 		const vertexCountOffset = this.writeQuad(0,
 			quadX, quadY,
 			quadX + entry.quadWidth, quadY + entry.quadHeight,

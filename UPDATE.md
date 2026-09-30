@@ -1,5 +1,8 @@
 # 업데이트 기록
 
+# 0.3.3 (2026-10-01)
+- Graphic: 텍스트 선명도 선택 기능. setTextBakeScaleStep(step) 으로 베이크 스케일 양자화 단위를 정한다. (기본 0.25 그대로, 0 이면 실제 스케일로 굽는다) setTextPixelSnapEnabled(true) 면 회전 / 기울임이 없는 변환에서 글자 쿼드를 디바이스 픽셀 격자에 맞춘다. 둘을 함께 쓰면 스케일이 고정된 UI 글자가 늘어나지 않고 1:1 로 그려진다
+
 # 0.3.2 (2026-10-01)
 - Graphic: 프레임 그리기 통계를 센다. 엔진이 매 프레임 씬을 그리기 전에 beginFrameStatistics() 를 부르고, 지난 프레임의 드로우 콜 / 정점 / 삼각형 수를 getLastFrameDrawCallCount() / getLastFrameVertexCount() / getLastFrameTriangleCount() 로 읽는다. 2D 경로(drawVertices, drawColoredQuads)만 센다. 개발 정보 창(useStatistics)에도 세 값을 띄운다
 
