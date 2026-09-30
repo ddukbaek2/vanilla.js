@@ -1,5 +1,8 @@
 # 업데이트 기록
 
+# 0.3.2 (2026-10-01)
+- Graphic: 프레임 그리기 통계를 센다. 엔진이 매 프레임 씬을 그리기 전에 beginFrameStatistics() 를 부르고, 지난 프레임의 드로우 콜 / 정점 / 삼각형 수를 getLastFrameDrawCallCount() / getLastFrameVertexCount() / getLastFrameTriangleCount() 로 읽는다. 2D 경로(drawVertices, drawColoredQuads)만 센다. 개발 정보 창(useStatistics)에도 세 값을 띄운다
+
 # 0.3.1 (2026-09-14)
 - GamepadManager: gamepadconnected 이벤트를 놓쳐도 패드를 붙잡는다. 그 이벤트는 페이지가 뜬 뒤 패드를 처음 만질 때 한 번만 오므로, 놓치면 연결 목록이 빈 채로 남아 패드가 먹지 않았다. updateAllGamepads 가 매 갱신마다 navigator.getGamepads() 를 훑어 아직 맞이하지 않은 패드를 붙이고 뽑힌 패드를 놓아준다
 - FontAsset: loadFont(family, assetPath, descriptors) 로 FontFace 서술자를 넘길 수 있다. 주지 않으면 굵기와 기울기가 모두 normal 로 등록되어, 같은 패밀리에 굵기가 다른 파일을 올리면 나중 것이 앞 것을 덮어썼다

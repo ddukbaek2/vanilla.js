@@ -627,6 +627,12 @@ export class Engine extends Object {
 		drawStatisticsText(`time: ${time}s`);
 		drawStatisticsText(`framePerSecond: ${framePerSecond}`);
 		drawStatisticsText(`timeDelta: ${timeDelta}s`);
+		const drawCallCount = graphic.getLastFrameDrawCallCount();
+		const vertexCount = graphic.getLastFrameVertexCount();
+		const triangleCount = graphic.getLastFrameTriangleCount();
+		drawStatisticsText(`drawCalls: ${drawCallCount}`);
+		drawStatisticsText(`vertices: ${vertexCount}`);
+		drawStatisticsText(`triangles: ${triangleCount}`);
 		// drawOutlineText(``);
 
 		// // 메모리 사용 정보 출력.
@@ -700,6 +706,9 @@ export class Engine extends Object {
 		// this.CanvasContext.imageSmoothingEnabled = true;
     	// this.CanvasContext.imageSmoothingQuality = "high";
 		// this.canvasRenderingContext.canvas.style.textRendering = "optimizeLegibility";
+
+		// 그리기 통계. (지난 프레임 값을 넘겨 두고 이번 프레임을 새로 센다)
+		graphic.beginFrameStatistics();
 
 		// 씬 처리.
 		const sceneManager = this.getSceneManager();

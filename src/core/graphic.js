@@ -172,6 +172,10 @@ export class Graphic extends Object {
 	/** @private @type { Float32Array } */ #modelMatrixArray;
 	/** @private @type { number } */ #appliedViewportWidth;
 	/** @private @type { number } */ #appliedViewportHeight;
+	/** @private @type { number } */ #drawCallCount; // 이번 프레임의 드로우 콜 수.
+	/** @private @type { number } */ #drawVertexCount; // 이번 프레임에 그린 정점 수.
+	/** @private @type { number } */ #lastFrameDrawCallCount; // 지난 프레임의 드로우 콜 수.
+	/** @private @type { number } */ #lastFrameDrawVertexCount; // 지난 프레임에 그린 정점 수.
 
 	//==============================================================================
 	// 생성.
@@ -259,6 +263,10 @@ export class Graphic extends Object {
 		this.#modelMatrixArray = new Float32Array(9);
 		this.#appliedViewportWidth = 0;
 		this.#appliedViewportHeight = 0;
+		this.#drawCallCount = 0;
+		this.#drawVertexCount = 0;
+		this.#lastFrameDrawCallCount = 0;
+		this.#lastFrameDrawVertexCount = 0;
 
 		// 블렌드 함수 매핑 테이블. (프리멀티플라이드 알파 기준)
 		// - 고정 블렌딩으로 재현 가능한 모드만 등록. 그 외는 source-over 폴백.
@@ -719,6 +727,51 @@ export class Graphic extends Object {
 		// 텍스처 바인드 및 출력.
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
+		this.#drawCallCount += 1;
+		this.#drawVertexCount += vertexCount;
+	}
+
+	//==============================================================================
+	// 프레임 그리기 통계 시작.
+	// - 엔진이 매 프레임 씬을 그리기 전에 부른다. 지난 프레임의 드로우 콜 / 정점 수를 넘겨 두고 이번 프레임 값을 비운다.
+	// - 2D 경로(drawVertices, drawColoredQuads)만 센다. 3D 렌더러와 화면 효과 패스는 세지 않는다.
+	//==============================================================================
+	beginFrameStatistics() {
+		this.#lastFrameDrawCallCount = this.#drawCallCount;
+		this.#lastFrameDrawVertexCount = this.#drawVertexCount;
+		this.#drawCallCount = 0;
+		this.#drawVertexCount = 0;
+	}
+
+	//==============================================================================
+	// 지난 프레임의 드로우 콜 수 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getLastFrameDrawCallCount() {
+		return this.#lastFrameDrawCallCount;
+	}
+
+	//==============================================================================
+	// 지난 프레임에 그린 정점 수 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getLastFrameVertexCount() {
+		return this.#lastFrameDrawVertexCount;
+	}
+
+	//==============================================================================
+	// 지난 프레임에 그린 삼각형 수 반환. (모든 드로우 콜이 삼각형 목록이다)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getLastFrameTriangleCount() {
+		const lastFrameVertexCount = this.getLastFrameVertexCount();
+		return System.Math.floor(lastFrameVertexCount / 3);
 	}
 
 	//==============================================================================
@@ -810,6 +863,8 @@ export class Graphic extends Object {
 
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
+		this.#drawCallCount += 1;
+		this.#drawVertexCount += vertexCount;
 
 		// 기본 경로 상태 복원.
 		this.getShaderProgram().use();
