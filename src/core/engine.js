@@ -18,6 +18,10 @@ import { AudioManager } from "./audiomanager.js";
 import { FontAsset } from "../resource/fontasset.js";
 
 
+// 최대 FPS 제한에서 간격을 덜 요구하는 여유. (밀리초) 주사율의 흔들림 때문에 제 간격보다 조금 일찍 온 프레임을 건너뛰지 않게 한다.
+const FRAME_LIMIT_TOLERANCE_MILLISECONDS = 4;
+
+
 
 //==============================================================================
 // 엔진 설정.
@@ -35,6 +39,9 @@ export class EngineConfiguration extends Object {
 	// 프레임이 끝난 뒤에도 그린 것을 캔버스에 남길지. 캔버스 위에 후처리를 얹는 프로젝트가 켠다.
 	// (다른 캔버스가 texImage2D 나 drawImage 로 읽으려면 필요하다) 한 번 더 복사하는 만큼 비용이 있다.
 	/** @type { boolean } */ preserveDrawingBuffer;
+	// 최대 FPS. 0 이면 제한하지 않는다. (화면 주사율을 따른다) 정하면 그보다 빨리 온 프레임은 건너뛰어
+	// 주사율이 높거나 프레임이 들쭉날쭉한 기기에서도 고른 간격으로 돈다.
+	/** @type { number } */ maximumFramePerSecond;
 
 	//==============================================================================
 	// 생성.
@@ -49,6 +56,7 @@ export class EngineConfiguration extends Object {
 		this.autoResizeOnWindowResize = false;
 		this.title = "";
 		this.preserveDrawingBuffer = false;
+		this.maximumFramePerSecond = 0;
 	}
 }
 
@@ -72,6 +80,7 @@ export class Engine extends Object {
 	/** @private @type { () => void  } */ #resumeCallback;
 	/** @private @type { FrameRequestCallback } */ #updateEngineCallback;
 	/** @private @type { number } */ #frameNumber;
+	/** @private @type { number } */ #lastFrameTimestamp; // 마지막으로 처리한 프레임의 시각. (최대 FPS 제한용, 밀리초, 아직 없으면 -1)
 	/** @private @type { Rect } */ #statisticsTextRect;
 	/** @private @type { Version } */ #version;
 
@@ -114,6 +123,7 @@ export class Engine extends Object {
 		this.#resumeCallback = this.resume.bind(this);
 		this.#updateEngineCallback = this.updateEngine.bind(this);
 		this.#frameNumber = 0;
+		this.#lastFrameTimestamp = -1;
 
 		this.#statisticsTextRect = Rect.zero();
 		this.#version = Version.create(0, 3, 0);
@@ -688,6 +698,19 @@ export class Engine extends Object {
 	 */
 	updateEngine(timestamp) {
 
+		// 최대 FPS 제한. (정한 간격보다 빨리 온 프레임은 건너뛴다. 주사율의 흔들림을 받아 주려고 간격을 조금 덜 요구한다)
+		const engineConfiguration = this.getEngineConfiguration();
+		const maximumFramePerSecond = engineConfiguration.maximumFramePerSecond;
+		if (maximumFramePerSecond > 0) {
+			const frameInterval = 1000 / maximumFramePerSecond;
+			const elapsedMilliseconds = timestamp - this.#lastFrameTimestamp;
+			if (this.#lastFrameTimestamp >= 0 && elapsedMilliseconds < frameInterval - FRAME_LIMIT_TOLERANCE_MILLISECONDS) {
+				System.window.requestAnimationFrame(this.#updateEngineCallback);
+				return;
+			}
+			this.#lastFrameTimestamp = timestamp;
+		}
+
 		// 렌더러 처리.
 		const graphic = this.getGraphic();
 		graphic.applySettings(this);
@@ -740,7 +763,6 @@ export class Engine extends Object {
 		}
 
 		// 개발 정보 출력.
-		const engineConfiguration = this.getEngineConfiguration();
 		if (engineConfiguration.useStatistics) {
 			this.drawStatistics(graphic);
 		}
