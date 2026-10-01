@@ -87,9 +87,45 @@ void main() {
 }
 `;
 
+// 스프라이트 묶어 그리기 버텍스 셰이더. (정점은 쌓을 때 이미 디바이스 픽셀 좌표로 바꿔 둔다)
+const BATCH_VERTEXSHADER_SOURCE = `#version 300 es
+in vec2 vertexPosition;
+in vec2 vertexTextureCoordinate;
+in vec4 vertexColor;
+in vec4 vertexTintColor;
+uniform mat3 projectionMatrix;
+out vec2 fragmentTextureCoordinate;
+out vec4 fragmentColor;
+out vec4 fragmentTintColor;
+void main() {
+	vec3 transformedPosition = projectionMatrix * vec3(vertexPosition, 1.0);
+	gl_Position = vec4(transformedPosition.xy, 0.0, 1.0);
+	fragmentTextureCoordinate = vertexTextureCoordinate;
+	fragmentColor = vertexColor;
+	fragmentTintColor = vertexTintColor;
+}
+`;
+
+// 스프라이트 묶어 그리기 프래그먼트 셰이더. (기본 셰이더와 같은 셈. 정점 색은 mainColor.rgb * mainColor.a * globalAlpha 와 mainColor.a * globalAlpha)
+const BATCH_FRAGMENTSHADER_SOURCE = `#version 300 es
+precision highp float;
+in vec2 fragmentTextureCoordinate;
+in vec4 fragmentColor;
+in vec4 fragmentTintColor;
+uniform sampler2D mainTexture;
+out vec4 outputColor;
+void main() {
+	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate);
+	vec3 tintedColor = mix(textureColor.rgb, fragmentTintColor.rgb * textureColor.a, fragmentTintColor.a);
+	outputColor = vec4(tintedColor * fragmentColor.rgb, textureColor.a * fragmentColor.a);
+}
+`;
+
 const FLOATS_PER_VERTEX = 4;
 const PARTICLE_FLOATS_PER_VERTEX = 8; // x, y, u, v, r, g, b, a
 const PARTICLE_VERTEX_CAPACITY = 8192;
+const BATCH_FLOATS_PER_VERTEX = 12; // x, y, u, v, r, g, b, a, tintR, tintG, tintB, tintA
+const BATCH_VERTEX_CAPACITY = 16384;
 
 // 스크래치 버텍스 버퍼 용량. (버텍스 수)
 const VERTEX_CAPACITY = 4096;
@@ -153,6 +189,13 @@ export class Graphic extends Object {
 	/** @private @type { WebGLBuffer | null } */ #particleVertexBuffer;
 	/** @private @type { Float32Array | null } */ #particleVertexData;
 	/** @private @type { WebGLTexture | null } */ #softDiscTexture; // 부드러운 원 스프라이트. (지연 생성)
+	/** @private @type { boolean } */ #isSpriteBatchingEnabled; // 같은 텍스처의 연이은 드로우를 한 번에 그릴지.
+	/** @private @type { ShaderProgram | null } */ #batchShaderProgram; // 묶어 그리기 전용. (지연 생성)
+	/** @private @type { WebGLVertexArrayObject | null } */ #batchVertexArray;
+	/** @private @type { WebGLBuffer | null } */ #batchVertexBuffer;
+	/** @private @type { Float32Array | null } */ #batchVertexData;
+	/** @private @type { number } */ #batchVertexCount; // 쌓여서 아직 그리지 않은 정점 수.
+	/** @private @type { WebGLTexture | null } */ #batchTexture; // 쌓인 정점이 쓰는 텍스처.
 	/** @private @type { ImageTextureCache } */ #imageTextureCache;
 	/** @private @type { TextStringTextureCache } */ #textStringTextureCache;
 	/** @private @type { TransformMatrix } */ #transformMatrix;
@@ -243,6 +286,15 @@ export class Graphic extends Object {
 		this.#particleVertexBuffer = null;
 		this.#particleVertexData = null;
 		this.#softDiscTexture = null;
+
+		// 묶어 그리기 자원. (켤 때 만든다)
+		this.#isSpriteBatchingEnabled = false;
+		this.#batchShaderProgram = null;
+		this.#batchVertexArray = null;
+		this.#batchVertexBuffer = null;
+		this.#batchVertexData = null;
+		this.#batchVertexCount = 0;
+		this.#batchTexture = null;
 
 		// 캐시.
 		this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext);
@@ -559,6 +611,10 @@ export class Graphic extends Object {
 			blendFunction = this.#blendFunctionTable.get("source-over");
 		}
 
+		// 블렌드가 바뀌면 그 전에 쌓인 것을 먼저 그린다.
+		if (blendMode !== this.#blendMode) {
+			this.flushSpriteBatch();
+		}
 		this.#blendMode = blendMode;
 		webGL2RenderingContext.blendFunc(blendFunction[0], blendFunction[1]);
 	}
@@ -701,6 +757,13 @@ export class Graphic extends Object {
 			return;
 		}
 
+		// 묶어 그리기가 켜져 있으면 쌓아 두었다가 텍스처나 상태가 바뀔 때 한 번에 그린다. (바꿔 끼운 셰이더는 제 유니폼을 쓰므로 바로 그린다)
+		if (this.#isSpriteBatchingEnabled && this.#shaderProgramOverride === null && vertexCount <= BATCH_VERTEX_CAPACITY) {
+			this.appendSpriteBatch(vertexCount, texture, color);
+			return;
+		}
+		this.flushSpriteBatch();
+
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const shaderProgram = this.getShaderProgram();
 
@@ -780,6 +843,172 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// 스프라이트 묶어 그리기 설정.
+	// - 켜면 같은 텍스처를 쓰는 연이은 드로우(이미지, 도형, 글자)를 정점에 변환과 색을 실어 쌓아 두었다가 한 번의 드로우 콜로 그린다.
+	// - 텍스처, 블렌드, 클리핑, 바꿔 끼운 셰이더가 바뀌거나 버퍼가 차면 그때까지 쌓인 것을 그리고, 프레임 끝에 엔진이 남은 것을 그린다.
+	// - 여러 그림을 한 장(아틀라스)에 모아 두면 드로우 콜이 크게 준다.
+	// - 켠 채로 WebGL 을 직접 다루는 패스(외부 렌더러 등)를 끼울 때는 그 전에 flushSpriteBatch() 를 부른다.
+	//==============================================================================
+	/**
+	 * @param { boolean } isSpriteBatchingEnabled
+	 */
+	setSpriteBatchingEnabled(isSpriteBatchingEnabled) {
+		if (!isSpriteBatchingEnabled) {
+			this.flushSpriteBatch();
+		}
+		else {
+			this.ensureSpriteBatchResources();
+		}
+		this.#isSpriteBatchingEnabled = isSpriteBatchingEnabled === true;
+	}
+
+	//==============================================================================
+	// 스프라이트 묶어 그리기 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isSpriteBatchingEnabled() {
+		return this.#isSpriteBatchingEnabled;
+	}
+
+	//==============================================================================
+	// 묶어 그리기 자원 준비. (셰이더 / 버텍스 어레이)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	ensureSpriteBatchResources() {
+		if (this.#batchShaderProgram) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		this.#batchShaderProgram = new ShaderProgram(webGL2RenderingContext, BATCH_VERTEXSHADER_SOURCE, BATCH_FRAGMENTSHADER_SOURCE);
+		this.#batchVertexData = new Float32Array(BATCH_VERTEX_CAPACITY * BATCH_FLOATS_PER_VERTEX);
+		this.#batchVertexArray = webGL2RenderingContext.createVertexArray();
+		this.#batchVertexBuffer = webGL2RenderingContext.createBuffer();
+		webGL2RenderingContext.bindVertexArray(this.#batchVertexArray);
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexBuffer);
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData.byteLength, webGL2RenderingContext.DYNAMIC_DRAW);
+		const positionLocation = this.#batchShaderProgram.getAttributeLocation("vertexPosition");
+		const textureCoordinateLocation = this.#batchShaderProgram.getAttributeLocation("vertexTextureCoordinate");
+		const colorLocation = this.#batchShaderProgram.getAttributeLocation("vertexColor");
+		const tintColorLocation = this.#batchShaderProgram.getAttributeLocation("vertexTintColor");
+		const strideBytes = BATCH_FLOATS_PER_VERTEX * 4;
+		webGL2RenderingContext.enableVertexAttribArray(positionLocation);
+		webGL2RenderingContext.vertexAttribPointer(positionLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 0);
+		webGL2RenderingContext.enableVertexAttribArray(textureCoordinateLocation);
+		webGL2RenderingContext.vertexAttribPointer(textureCoordinateLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 8);
+		webGL2RenderingContext.enableVertexAttribArray(colorLocation);
+		webGL2RenderingContext.vertexAttribPointer(colorLocation, 4, webGL2RenderingContext.FLOAT, false, strideBytes, 16);
+		webGL2RenderingContext.enableVertexAttribArray(tintColorLocation);
+		webGL2RenderingContext.vertexAttribPointer(tintColorLocation, 4, webGL2RenderingContext.FLOAT, false, strideBytes, 32);
+		webGL2RenderingContext.bindVertexArray(null);
+		this.#batchShaderProgram.use();
+		const mainTextureLocation = this.#batchShaderProgram.getUniformLocation("mainTexture");
+		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
+		this.getShaderProgram().use();
+		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
+	}
+
+	//==============================================================================
+	// 스크래치 버텍스(x, y, u, v)를 묶음에 쌓기. (지금 변환으로 디바이스 좌표를 셈하고 색과 틴트를 정점마다 싣는다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { number } vertexCount
+	 * @param { WebGLTexture } texture
+	 * @param { Color } color
+	 */
+	appendSpriteBatch(vertexCount, texture, color) {
+		this.ensureSpriteBatchResources();
+		if (texture !== this.#batchTexture || this.#batchVertexCount + vertexCount > BATCH_VERTEX_CAPACITY) {
+			this.flushSpriteBatch();
+			this.#batchTexture = texture;
+		}
+
+		// 기본 셰이더와 같은 색 셈을 정점 색 하나로 미리 곱해 둔다.
+		const globalAlpha = this.getGlobalAlpha();
+		const colorAlpha = color.alpha * globalAlpha;
+		const colorRed = color.red * colorAlpha;
+		const colorGreen = color.green * colorAlpha;
+		const colorBlue = color.blue * colorAlpha;
+		const imageTintColor = this.getImageTintColor();
+		let tintRed = 0;
+		let tintGreen = 0;
+		let tintBlue = 0;
+		let tintAlpha = 0;
+		if (imageTintColor) {
+			tintRed = imageTintColor.red;
+			tintGreen = imageTintColor.green;
+			tintBlue = imageTintColor.blue;
+			tintAlpha = imageTintColor.alpha;
+		}
+
+		const transformMatrix = this.#transformMatrix;
+		const matrixA = transformMatrix.a;
+		const matrixB = transformMatrix.b;
+		const matrixC = transformMatrix.c;
+		const matrixD = transformMatrix.d;
+		const matrixE = transformMatrix.e;
+		const matrixF = transformMatrix.f;
+		const vertexData = this.getVertexData();
+		const batchVertexData = this.#batchVertexData;
+		let sourceOffset = 0;
+		let targetOffset = this.#batchVertexCount * BATCH_FLOATS_PER_VERTEX;
+		for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
+			const positionX = vertexData[sourceOffset];
+			const positionY = vertexData[sourceOffset + 1];
+			batchVertexData[targetOffset] = matrixA * positionX + matrixC * positionY + matrixE;
+			batchVertexData[targetOffset + 1] = matrixB * positionX + matrixD * positionY + matrixF;
+			batchVertexData[targetOffset + 2] = vertexData[sourceOffset + 2];
+			batchVertexData[targetOffset + 3] = vertexData[sourceOffset + 3];
+			batchVertexData[targetOffset + 4] = colorRed;
+			batchVertexData[targetOffset + 5] = colorGreen;
+			batchVertexData[targetOffset + 6] = colorBlue;
+			batchVertexData[targetOffset + 7] = colorAlpha;
+			batchVertexData[targetOffset + 8] = tintRed;
+			batchVertexData[targetOffset + 9] = tintGreen;
+			batchVertexData[targetOffset + 10] = tintBlue;
+			batchVertexData[targetOffset + 11] = tintAlpha;
+			sourceOffset += FLOATS_PER_VERTEX;
+			targetOffset += BATCH_FLOATS_PER_VERTEX;
+		}
+		this.#batchVertexCount += vertexCount;
+	}
+
+	//==============================================================================
+	// 쌓인 묶음 그리기. (쌓인 것이 없으면 아무것도 하지 않는다)
+	//==============================================================================
+	flushSpriteBatch() {
+		const batchVertexCount = this.#batchVertexCount;
+		if (batchVertexCount <= 0) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+
+		this.#batchShaderProgram.use();
+		webGL2RenderingContext.bindVertexArray(this.#batchVertexArray);
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexBuffer);
+		// drawVertices 와 같은 까닭으로 bufferSubData 대신 bufferData 로 새 저장소를 잡으며 올린다. (사파리 드로우 콜 동기 대기)
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, batchVertexCount * BATCH_FLOATS_PER_VERTEX);
+		const projectionMatrixLocation = this.#batchShaderProgram.getUniformLocation("projectionMatrix");
+		webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#batchTexture);
+		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, batchVertexCount);
+		this.#drawCallCount += 1;
+		this.#drawVertexCount += batchVertexCount;
+		this.#batchVertexCount = 0;
+		this.#batchTexture = null;
+
+		// 기본 경로 상태 복원.
+		this.getShaderProgram().use();
+		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
+	}
+
+	//==============================================================================
 	// 파티클 배치 자원 준비. (셰이더 / 버텍스 어레이 / 부드러운 원 텍스처)
 	//==============================================================================
 	/**
@@ -849,6 +1078,7 @@ export class Graphic extends Object {
 		if (vertexCount <= 0) {
 			return;
 		}
+		this.flushSpriteBatch();
 		this.ensureParticleBatchResources();
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 
@@ -1675,6 +1905,8 @@ export class Graphic extends Object {
 			transformMatrix: this.#transformMatrix.clone(),
 		});
 
+		// 클리핑 전에 쌓인 것을 먼저 그린다. (스텐실 상태가 바뀌기 전)
+		this.flushSpriteBatch();
 		if (previousClipDepth === 0) {
 			webGL2RenderingContext.enable(webGL2RenderingContext.STENCIL_TEST);
 		}
@@ -1689,6 +1921,7 @@ export class Graphic extends Object {
 		else {
 			this.drawRect(rect);
 		}
+		this.flushSpriteBatch();
 		webGL2RenderingContext.colorMask(true, true, true, true);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
 		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.EQUAL, previousClipDepth + 1, 0xFF);
@@ -1707,6 +1940,7 @@ export class Graphic extends Object {
 
 		// 기록 시점의 변환 행렬로 같은 영역을 DECR 해 스텐실 원복.
 		// (begin 과 end 사이에 변환이 바뀌었을 수 있으므로 스냅샷 사용)
+		this.flushSpriteBatch();
 		this.#transformMatrix = clipEntry.transformMatrix;
 		webGL2RenderingContext.colorMask(false, false, false, false);
 		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.ALWAYS, 0, 0xFF);
@@ -1717,6 +1951,7 @@ export class Graphic extends Object {
 		else {
 			this.drawRect(clipEntry.rect);
 		}
+		this.flushSpriteBatch();
 		webGL2RenderingContext.colorMask(true, true, true, true);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
 
@@ -1773,6 +2008,7 @@ export class Graphic extends Object {
 	 * @param { ShaderProgram | null } shaderProgram
 	 */
 	setShaderProgramOverride(shaderProgram) {
+		this.flushSpriteBatch();
 		this.#shaderProgramOverride = shaderProgram;
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const activeShaderProgram = this.getShaderProgram();

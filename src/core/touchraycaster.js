@@ -142,6 +142,7 @@ export class TouchRaycaster extends Object {
 	// - 루트 노드로부터 draw() 호출 순서대로 번호를 매기며 순회한다.
 	// - 활성화 상태이고 isInteractable()이 참이며 터치 좌표를 포함하는
 	//   노드 중 가장 높은 번호의 노드를 반환한다.
+	// - Mask 가 붙은 노드의 자손은 그 노드 영역 안에서만 맞는다. (잘려 보이지 않는 곳은 눌리지 않는다)
 	//==============================================================================
 	/**
 	 * @param { Vector2 } viewInputPosition
@@ -183,6 +184,11 @@ export class TouchRaycaster extends Object {
 				}
 			}
 
+			// 잘라 그리는 노드 밖이면 자손은 보이지 않으므로 맞지 않는다. (Mask 를 들이지 않으려고 컴포넌트 종류 이름으로 본다)
+			if (node instanceof WorldNode && this.isMaskedOut(node, viewInputPosition)) {
+				return;
+			}
+
 			// 자식 순회. (draw() 순서와 동일)
 			const children = node.getChildren();
 			for (const child of children) {
@@ -193,6 +199,24 @@ export class TouchRaycaster extends Object {
 		traverse(rootNode);
 
 		return hitNode;
+	}
+
+	//==============================================================================
+	// Mask 가 붙은 노드인데 좌표가 그 영역 밖인지.
+	//==============================================================================
+	/**
+	 * @param { WorldNode } node
+	 * @param { Vector2 } viewInputPosition
+	 * @returns { boolean }
+	 */
+	isMaskedOut(node, viewInputPosition) {
+		const components = node.getAllComponents();
+		for (const component of components) {
+			if (component && typeof component.getComponentType === "function" && component.getComponentType() === "Mask" && component.isEnable()) {
+				return !node.contains(viewInputPosition);
+			}
+		}
+		return false;
 	}
 
 	//==============================================================================

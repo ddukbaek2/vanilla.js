@@ -766,6 +766,9 @@ export class Engine extends Object {
 		if (engineConfiguration.useStatistics) {
 			this.drawStatistics(graphic);
 		}
+
+		// 묶어 그리기로 쌓여 남은 것을 그린다.
+		graphic.flushSpriteBatch();
 		
 		// 입력 관련해서 상태 유지가 아닌, 현재 프레임이 끝난 후에는 다음 프레임에서는 상태를 유지하지 않음. (1회성)
 		inputManager.setTouchPressed(false);
