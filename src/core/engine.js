@@ -42,6 +42,9 @@ export class EngineConfiguration extends Object {
 	// 최대 FPS. 0 이면 제한하지 않는다. (화면 주사율을 따른다) 정하면 그보다 빨리 온 프레임은 건너뛰어
 	// 주사율이 높거나 프레임이 들쭉날쭉한 기기에서도 고른 간격으로 돈다.
 	/** @type { number } */ maximumFramePerSecond;
+	// 기본 폰트(DOSGothic) 주소. run() 이 뒤에서 불러온다. 빈 글이면 불러오지 않는다.
+	// (인터넷 없이 도는 데스크탑 앱이나 외부 요청을 막은 페이지는 비우거나 자체 경로를 준다)
+	/** @type { string } */ defaultFontUrl;
 
 	//==============================================================================
 	// 생성.
@@ -57,6 +60,7 @@ export class EngineConfiguration extends Object {
 		this.title = "";
 		this.preserveDrawingBuffer = false;
 		this.maximumFramePerSecond = 0;
+		this.defaultFontUrl = "https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff";
 	}
 }
 
@@ -171,8 +175,13 @@ export class Engine extends Object {
 		};
 		startEngine();
 
-		// 기본 폰트는 뒤에서 불러온다. (성공하면 이후 그리는 글자부터 반영)
-		const internalFontFace = new FontFace(`DOSGothic`, `url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff")`);
+		// 기본 폰트는 뒤에서 불러온다. (성공하면 이후 그리는 글자부터 반영) 주소가 비었으면 불러오지 않는다.
+		const engineConfiguration = this.getEngineConfiguration();
+		const defaultFontUrl = engineConfiguration.defaultFontUrl;
+		if (!defaultFontUrl) {
+			return;
+		}
+		const internalFontFace = new FontFace(`DOSGothic`, `url("${defaultFontUrl}")`);
 		// const internalFontFace = new FontFace(`DOSGothic`, `url("./assets/fonts/Consolas.woff2")`);
 		internalFontFace.load().then((loadedFont) => {
 			document.fonts.add(loadedFont);
