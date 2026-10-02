@@ -234,6 +234,17 @@ export function openEditorMenuPanelAt(clientX, clientY, menuItems) {
 	panelElement.style.left = System.Math.round(clientX) + "px";
 	panelElement.style.top = System.Math.round(clientY) + "px";
 	System.document.body.appendChild(panelElement);
+
+	// 창 밖으로 나가면 안으로 들인다. (오른쪽 끝에서 열면 왼쪽으로, 아래 끝에서 열면 위로)
+	const panelRect = panelElement.getBoundingClientRect();
+	const viewportWidth = System.document.documentElement.clientWidth;
+	const viewportHeight = System.document.documentElement.clientHeight;
+	if (panelRect.right > viewportWidth) {
+		panelElement.style.left = System.Math.max(0, System.Math.round(viewportWidth - panelRect.width)) + "px";
+	}
+	if (panelRect.bottom > viewportHeight) {
+		panelElement.style.top = System.Math.max(0, System.Math.round(viewportHeight - panelRect.height)) + "px";
+	}
 }
 
 
