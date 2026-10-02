@@ -240,10 +240,10 @@ export function openEditorMenuPanelAt(clientX, clientY, menuItems) {
 	const viewportWidth = System.document.documentElement.clientWidth;
 	const viewportHeight = System.document.documentElement.clientHeight;
 	if (panelRect.right > viewportWidth) {
-		panelElement.style.left = System.Math.max(0, System.Math.round(viewportWidth - panelRect.width)) + "px";
+		panelElement.style.left = System.Math.max(0, System.Math.floor(viewportWidth - panelRect.width)) + "px";
 	}
 	if (panelRect.bottom > viewportHeight) {
-		panelElement.style.top = System.Math.max(0, System.Math.round(viewportHeight - panelRect.height)) + "px";
+		panelElement.style.top = System.Math.max(0, System.Math.floor(viewportHeight - panelRect.height)) + "px";
 	}
 }
 
