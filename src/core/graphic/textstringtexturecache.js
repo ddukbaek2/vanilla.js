@@ -41,6 +41,53 @@ export function isTextAntialiasOn() {
 
 
 //==============================================================================
+// unicode-range 글 → 코드 포인트 범위 목록. ("U+0-FF, U+4??" → [[0, 255], [1024, 1279]], 비었으면 전체)
+//==============================================================================
+/**
+ * @param { string } unicodeRange
+ * @returns { number[][] }
+ */
+function parseUnicodeRange(unicodeRange) {
+	const ranges = [];
+	if (typeof unicodeRange !== "string" || unicodeRange === "") {
+		ranges.push([0, 0x10ffff]);
+		return ranges;
+	}
+	for (const rangeText of unicodeRange.split(",")) {
+		const rangeMatch = rangeText.trim().match(/^U\+([0-9a-fA-F?]+)(?:-([0-9a-fA-F]+))?$/i);
+		if (rangeMatch === null) {
+			continue;
+		}
+		const startText = rangeMatch[1].replace(/\?/g, "0");
+		const endText = rangeMatch[2] !== undefined ? rangeMatch[2] : rangeMatch[1].replace(/\?/g, "F");
+		ranges.push([System.parseInt(startText, 16), System.parseInt(endText, 16)]);
+	}
+	return ranges;
+}
+
+
+//==============================================================================
+// 글에 범위 안의 글자가 있는지.
+//==============================================================================
+/**
+ * @param { string } text
+ * @param { number[][] } ranges
+ * @returns { boolean }
+ */
+function hasCharacterInRanges(text, ranges) {
+	for (const character of text) {
+		const codePoint = character.codePointAt(0);
+		for (const range of ranges) {
+			if (codePoint >= range[0] && codePoint <= range[1]) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+
+//==============================================================================
 // 문자열 텍스처 캐시.
 // - WebGL2 에는 텍스트 API 가 없으므로, 오프스크린 2D 캔버스에 문자열을 굽고
 //   GPU 텍스처로 업로드해 쿼드로 출력한다. 같은 (문자열, 폰트, 색, 스케일) 조합은
@@ -271,6 +318,50 @@ export class TextStringTextureCache extends Object {
 			webGL2RenderingContext.deleteTexture(entry.texture);
 		}
 		entries.clear();
+	}
+
+	//==============================================================================
+	// 받아진 웹 폰트로 다시 구울 엔트리 파기.
+	//
+	// 늦게 받아진 폰트 얼굴(FontFace)의 이름을 쓰는 폰트 문자열로 구웠고, 그 얼굴의 글자 범위(unicodeRange)에 든 글자가 있는
+	// 엔트리만 텍스처째 버린다. 다음에 그 글자를 그릴 때 받은 폰트로 다시 굽는다. 나머지 엔트리는 그대로 쓴다.
+	// (캐시를 통째로 비우면 폰트가 받아질 때마다 모든 글자를 한꺼번에 다시 구워 그 프레임이 길어진다)
+	//==============================================================================
+	/**
+	 * @param { Iterable<FontFace> } fontFaces
+	 * @returns { number } 버린 엔트리 수.
+	 */
+	invalidateFontFaces(fontFaces) {
+		const targets = [];
+		for (const fontFace of fontFaces) {
+			const familyName = System.String(fontFace.family).replace(/["']/g, "").trim().toLowerCase();
+			if (familyName === "") {
+				continue;
+			}
+			targets.push({ familyName: familyName, ranges: parseUnicodeRange(fontFace.unicodeRange) });
+		}
+		if (targets.length === 0) {
+			return 0;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const entries = this.getEntries();
+		let removedCount = 0;
+		for (const [entryKey, entry] of System.Array.from(entries)) {
+			// 열쇠는 mode|scale|lineWidth|colorString|fontString|text 이다. (글에는 | 가 들 수 있다)
+			const keyParts = entryKey.split("|");
+			const fontString = keyParts.length > 4 ? keyParts[4].toLowerCase() : "";
+			const text = keyParts.slice(5).join("|");
+			const isAffected = targets.some((target) => {
+				return fontString.includes(target.familyName) && hasCharacterInRanges(text, target.ranges);
+			});
+			if (!isAffected) {
+				continue;
+			}
+			webGL2RenderingContext.deleteTexture(entry.texture);
+			entries.delete(entryKey);
+			removedCount += 1;
+		}
+		return removedCount;
 	}
 
 	//==============================================================================

@@ -48,6 +48,10 @@ export class EngineConfiguration extends Object {
 	// 글자 입력칸이 포커스된 동안 가로는 그대로이고 세로만 줄어드는 리사이즈를 무시할지. (모바일의 화면 키보드)
 	// 끄면(기본) iOS 사파리에서 키보드가 뜰 때 visualViewport 의 세로가 줄어 캔버스와 화면 전체가 작아진다. 키보드가 내려가면 다시 맞춘다.
 	/** @type { boolean } */ ignoreVirtualKeyboardResize;
+	// 웹 폰트가 늦게 받아지면 그 폰트로 구운 글자 텍스처 가운데 그 폰트의 글자 범위에 든 것만 버려 다시 굽게 할지.
+	// 끄면(기본) 받기 전에 다른 폰트로 구운 글자는 캐시에서 밀려날 때까지 그대로 남는다.
+	// (unicode-range 로 나눈 폰트 조각을 그때그때 받는 프로젝트가 켠다. 받은 조각마다 그 글자만 다시 구우므로 프레임이 크게 길어지지 않는다)
+	/** @type { boolean } */ rebakeTextOnFontLoad;
 
 	//==============================================================================
 	// 생성.
@@ -65,6 +69,7 @@ export class EngineConfiguration extends Object {
 		this.maximumFramePerSecond = 0;
 		this.defaultFontUrl = "https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff";
 		this.ignoreVirtualKeyboardResize = false;
+		this.rebakeTextOnFontLoad = false;
 	}
 }
 
@@ -181,8 +186,17 @@ export class Engine extends Object {
 		};
 		startEngine();
 
-		// 기본 폰트는 뒤에서 불러온다. (성공하면 이후 그리는 글자부터 반영) 주소가 비었으면 불러오지 않는다.
+		// 웹 폰트가 받아질 때마다 그 폰트의 글자로 구운 텍스처만 다시 굽게 한다. (옵션)
 		const engineConfiguration = this.getEngineConfiguration();
+		if (engineConfiguration.rebakeTextOnFontLoad && System.document.fonts) {
+			System.document.fonts.addEventListener("loadingdone", (fontFaceSetLoadEvent) => {
+				const graphic = this.getGraphic();
+				const textStringTextureCache = graphic.getTextStringTextureCache();
+				textStringTextureCache.invalidateFontFaces(fontFaceSetLoadEvent.fontfaces);
+			});
+		}
+
+		// 기본 폰트는 뒤에서 불러온다. (성공하면 이후 그리는 글자부터 반영) 주소가 비었으면 불러오지 않는다.
 		const defaultFontUrl = engineConfiguration.defaultFontUrl;
 		if (!defaultFontUrl) {
 			return;

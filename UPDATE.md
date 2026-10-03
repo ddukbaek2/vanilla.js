@@ -1,5 +1,9 @@
 # 업데이트 기록
 
+# 0.3.10 (2026-10-03)
+- EngineConfiguration.rebakeTextOnFontLoad: 웹 폰트가 늦게 받아지면(document.fonts 의 loadingdone) 그 폰트로 구운 글자 텍스처 가운데 그 폰트 얼굴의 글자 범위(unicodeRange)에 든 글자가 있는 것만 버려, 다음에 그릴 때 받은 폰트로 다시 굽는다. (기본 false) 받기 전에 대신 쓴 폰트로 구운 글자가 그대로 남지 않고, 캐시를 통째로 비우지 않아 받을 때마다 모든 글자를 한꺼번에 다시 굽느라 프레임이 길어지지 않는다
+- TextStringTextureCache.invalidateFontFaces(fontFaces): 그 폰트 얼굴들의 이름을 쓰고 그 글자 범위에 든 글자가 있는 엔트리만 텍스처째 버린다. (버린 수를 돌려준다)
+
 # 0.3.9 (2026-10-03)
 - EngineConfiguration.ignoreVirtualKeyboardResize: 글자 입력칸이 포커스된 동안 가로는 그대로이고 세로만 줄어드는 리사이즈(모바일의 화면 키보드)를 무시한다. (기본 false) iOS 사파리에서 입력칸을 누르면 visualViewport 의 세로가 줄어 캔버스와 화면 전체가 갑자기 작아지던 것을 막는다. 키보드가 내려가면 다시 맞춘다. Engine.isTextInputFocused() 로 포커스를 본다
 
