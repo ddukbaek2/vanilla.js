@@ -1,5 +1,8 @@
 # 업데이트 기록
 
+# 0.3.9 (2026-10-03)
+- EngineConfiguration.ignoreVirtualKeyboardResize: 글자 입력칸이 포커스된 동안 가로는 그대로이고 세로만 줄어드는 리사이즈(모바일의 화면 키보드)를 무시한다. (기본 false) iOS 사파리에서 입력칸을 누르면 visualViewport 의 세로가 줄어 캔버스와 화면 전체가 갑자기 작아지던 것을 막는다. 키보드가 내려가면 다시 맞춘다. Engine.isTextInputFocused() 로 포커스를 본다
+
 # 0.3.8 (2026-10-03)
 - editorkit: openEditorMenuPanelAt 이 연 메뉴가 창 밖으로 나가면 안으로 들인다. (오른쪽 끝에서 연 오른쪽 단추 메뉴는 왼쪽으로, 아래 끝에서 연 메뉴는 위로)
 

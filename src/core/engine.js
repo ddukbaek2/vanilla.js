@@ -45,6 +45,9 @@ export class EngineConfiguration extends Object {
 	// 기본 폰트(DOSGothic) 주소. run() 이 뒤에서 불러온다. 빈 글이면 불러오지 않는다.
 	// (인터넷 없이 도는 데스크탑 앱이나 외부 요청을 막은 페이지는 비우거나 자체 경로를 준다)
 	/** @type { string } */ defaultFontUrl;
+	// 글자 입력칸이 포커스된 동안 가로는 그대로이고 세로만 줄어드는 리사이즈를 무시할지. (모바일의 화면 키보드)
+	// 끄면(기본) iOS 사파리에서 키보드가 뜰 때 visualViewport 의 세로가 줄어 캔버스와 화면 전체가 작아진다. 키보드가 내려가면 다시 맞춘다.
+	/** @type { boolean } */ ignoreVirtualKeyboardResize;
 
 	//==============================================================================
 	// 생성.
@@ -61,6 +64,7 @@ export class EngineConfiguration extends Object {
 		this.preserveDrawingBuffer = false;
 		this.maximumFramePerSecond = 0;
 		this.defaultFontUrl = "https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff";
+		this.ignoreVirtualKeyboardResize = false;
 	}
 }
 
@@ -81,6 +85,7 @@ export class Engine extends Object {
 	/** @private @type { InputManager } */ #inputManager;
 	/** @private @type { AudioManager } */ #audioManager;
 	/** @private @type { () => void  } */ #resizeCallback;
+	/** @private @type { Vector2 | null } */ #appliedClientNativeSize; // 마지막으로 캔버스에 준 CSS 크기.
 	/** @private @type { () => void  } */ #resumeCallback;
 	/** @private @type { FrameRequestCallback } */ #updateEngineCallback;
 	/** @private @type { number } */ #frameNumber;
@@ -122,6 +127,7 @@ export class Engine extends Object {
 		this.#audioManager = new AudioManager(this);
 
 		this.#resizeCallback = this.resize.bind(this);
+		this.#appliedClientNativeSize = null;
 		// 일반 resume (visibilitychange/focus 등) — user gesture 가 아닐 수 있으므로
 		// AudioManager 가 hasUserGesture 체크 후 silently skip.
 		this.#resumeCallback = this.resume.bind(this);
@@ -223,8 +229,19 @@ export class Engine extends Object {
 			//  layout viewport 와 visual viewport 가 다를 때 후자가 실제 보이는 영역)
 			const visualViewport = System.window.visualViewport;
 			const clientWidth = visualViewport ? visualViewport.width : System.window.innerWidth;
-			const clientHeight = visualViewport ? visualViewport.height : System.window.innerHeight;
+			let clientHeight = visualViewport ? visualViewport.height : System.window.innerHeight;
+
+			// 화면 키보드: 글자 입력칸이 포커스된 동안 가로가 같고 세로만 줄었으면 크기를 그대로 둔다. (설정으로 켠다)
+			const appliedClientNativeSize = this.#appliedClientNativeSize;
+			const isTextInputFocused = this.isTextInputFocused();
+			if (engineConfiguration.ignoreVirtualKeyboardResize && isTextInputFocused && appliedClientNativeSize !== null) {
+				const isSameWidth = System.Math.abs(clientWidth - appliedClientNativeSize.x) < 1;
+				if (isSameWidth && clientHeight < appliedClientNativeSize.y) {
+					clientHeight = appliedClientNativeSize.y;
+				}
+			}
 			const clientNativeSize = Vector2.create(clientWidth, clientHeight);
+			this.#appliedClientNativeSize = clientNativeSize;
 			const canvas = viewManager.getCanvas();
 
 			// 캔버스 크기 스타일 조정. (사파리에서 필수)
@@ -251,6 +268,32 @@ export class Engine extends Object {
 				console.error(error);
 			}
 		}
+	}
+
+	//==============================================================================
+	// 글자 입력칸이 포커스되어 있는지. (input 의 글자 종류, textarea, contenteditable)
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isTextInputFocused() {
+		const activeElement = System.document.activeElement;
+		if (!activeElement) {
+			return false;
+		}
+		if (activeElement.isContentEditable) {
+			return true;
+		}
+		const tagName = activeElement.tagName;
+		if (tagName === "TEXTAREA") {
+			return true;
+		}
+		if (tagName !== "INPUT") {
+			return false;
+		}
+		const inputType = (activeElement.type || "text").toLowerCase();
+		const nonTextInputTypes = ["button", "checkbox", "color", "file", "hidden", "image", "radio", "range", "reset", "submit"];
+		return !nonTextInputTypes.includes(inputType);
 	}
 
 	//==============================================================================
