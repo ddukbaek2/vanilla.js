@@ -61,6 +61,65 @@ export function getMeasurementCanvasRenderingContext() {
 
 
 //==============================================================================
+// 글자 묶음과 단어로 나누기. (줄바꿈 용, Intl.Segmenter 가 있으면 쓴다)
+// - 글자 묶음(grapheme): 받침, 성조, 결합 부호가 앞 글자에서 떨어지지 않는다. 없으면 코드 포인트 단위.
+// - 단어: 태국어, 라오어, 크메르어, 버마어, 한중일처럼 공백 없이 쓰는 글자도 단어 사이를 찾는다.
+//   문장 부호처럼 단어가 아닌 조각은 앞 단어에 붙인다. (줄 맨 앞에 문장 부호가 오지 않게) 없으면 통째로 한 조각.
+//==============================================================================
+let graphemeSegmenter = null;
+let wordSegmenter = null;
+
+/**
+ * @param { string } text
+ * @returns { string[] }
+ */
+export function splitGraphemes(text) {
+	if (graphemeSegmenter === null && System.Intl && typeof System.Intl.Segmenter === "function") {
+		graphemeSegmenter = new System.Intl.Segmenter(undefined, { granularity: "grapheme" });
+	}
+	if (graphemeSegmenter === null) {
+		return System.Array.from(text);
+	}
+	const pieces = [];
+	for (const segmentData of graphemeSegmenter.segment(text)) {
+		pieces.push(segmentData.segment);
+	}
+	return pieces;
+}
+
+/**
+ * @param { string } text
+ * @returns { string[] } 단어마다 한 조각. (단어가 아닌 조각은 앞 단어에 붙인다)
+ */
+export function splitWords(text) {
+	if (wordSegmenter === null && System.Intl && typeof System.Intl.Segmenter === "function") {
+		wordSegmenter = new System.Intl.Segmenter(undefined, { granularity: "word" });
+	}
+	if (wordSegmenter === null) {
+		return [text];
+	}
+	const pieces = [];
+	let pendingPrefix = "";
+	for (const segmentData of wordSegmenter.segment(text)) {
+		if (segmentData.isWordLike) {
+			pieces.push(pendingPrefix + segmentData.segment);
+			pendingPrefix = "";
+		}
+		else if (pieces.length > 0) {
+			pieces[pieces.length - 1] += segmentData.segment;
+		}
+		else {
+			pendingPrefix += segmentData.segment;
+		}
+	}
+	if (pendingPrefix.length > 0) {
+		pieces.push(pendingPrefix);
+	}
+	return pieces;
+}
+
+
+//==============================================================================
 // 폰트 문자열 합성 (canvas font property 형식).
 //==============================================================================
 /**
@@ -298,9 +357,9 @@ export class Text extends Component {
 
 		const lineList = [];
 		const appendByCharacter = (chunkText, seedText) => {
-			// seedText 에 chunkText 를 글자 단위로 이어 붙이며 넘칠 때마다 줄을 확정한다.
+			// seedText 에 chunkText 를 글자 묶음 단위로 이어 붙이며 넘칠 때마다 줄을 확정한다.
 			let currentLine = seedText;
-			for (const character of chunkText) {
+			for (const character of splitGraphemes(chunkText)) {
 				const candidate = currentLine + character;
 				if (currentLine.length > 0 && measureWidth(candidate) > maxWidth) {
 					lineList.push(currentLine);
@@ -328,6 +387,25 @@ export class Text extends Component {
 				const candidate = (currentLine.length > 0) ? (currentLine + " " + wordText) : wordText;
 				if (measureWidth(candidate) <= maxWidth) {
 					currentLine = candidate;
+					continue;
+				}
+				// 공백 없이 이어 쓴 조각(태국어 등)에 단어가 여럿이면, 단어 사이에서 나눠 지금 줄의 남은 자리부터 채운다.
+				const wordPieces = splitWords(wordText);
+				if (wordPieces.length > 1) {
+					let isFirstPiece = true;
+					for (const wordPiece of wordPieces) {
+						const separator = (isFirstPiece && currentLine.length > 0) ? " " : "";
+						isFirstPiece = false;
+						const pieceCandidate = currentLine + separator + wordPiece;
+						if (measureWidth(pieceCandidate) <= maxWidth) {
+							currentLine = pieceCandidate;
+							continue;
+						}
+						if (currentLine.length > 0) {
+							lineList.push(currentLine);
+						}
+						currentLine = (measureWidth(wordPiece) <= maxWidth) ? wordPiece : appendByCharacter(wordPiece, "");
+					}
 					continue;
 				}
 				if (currentLine.length > 0) {
