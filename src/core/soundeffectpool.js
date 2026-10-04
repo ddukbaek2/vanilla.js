@@ -13,14 +13,18 @@ import { AudioPlayer } from "./audioplayer.js";
 // - 사용:
 //     const pool = new SoundEffectPool(engine.getAudioManager(), 6);
 //     pool.play(hitAudioAsset);
+//     pool.play(hitAudioAsset, 0.5);   // 이 재생만 절반 음량.
+//     pool.setVolume(0.8);             // 풀 전체의 음량. (재생 중인 것에도 곱해진다)
 //==============================================================================
 export class SoundEffectPool extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { AudioPlayer[] } */ #playerList;
+	/** @private @type { number[] } */ #playerVolumeList; // 플레이어마다 마지막 재생의 음량. (풀의 음량을 곱하기 전)
 	/** @private @type { number } */ #nextIndex;
 	/** @private @type { boolean } */ #isMuted;
+	/** @private @type { number } */ #volume; // 풀 전체의 음량. (0 ~ 1)
 
 	//==============================================================================
 	// 생성.
@@ -34,29 +38,37 @@ export class SoundEffectPool extends Object {
 		super();
 
 		this.#playerList = [];
+		this.#playerVolumeList = [];
 		this.#nextIndex = 0;
 		this.#isMuted = false;
+		this.#volume = 1;
 		for (let index = 0; index < voiceCount; ++index) {
 			this.#playerList.push(audioManager.createAudioPlayer());
+			this.#playerVolumeList.push(1);
 		}
 	}
 
 	//==============================================================================
 	// 효과음 재생.
 	// - 다음 차례의 플레이어에 애셋을 실어 재생한다. 그 플레이어가 재생 중이었다면 끊고 새로 튼다.
+	// - 음량은 이 재생의 음량(0 ~ 1)에 풀의 음량을 곱한 것이다.
 	//==============================================================================
 	/**
 	 * @param { AudioAsset } audioAsset
+	 * @param { number } volume 이 재생의 음량. (0 ~ 1, 기본 1)
 	 */
-	play(audioAsset) {
+	play(audioAsset, volume = 1) {
 		if (this.#isMuted || !audioAsset) {
 			return;
 		}
-		const player = this.#playerList[this.#nextIndex];
+		const playerIndex = this.#nextIndex;
+		const player = this.#playerList[playerIndex];
 		this.#nextIndex = (this.#nextIndex + 1) % this.#playerList.length;
 		if (player.isPlaying()) {
 			player.stop();
 		}
+		this.#playerVolumeList[playerIndex] = volume;
+		player.setVolume(volume * this.#volume);
 		player.setAudioAsset(audioAsset);
 		player.play(false);
 	}
@@ -88,6 +100,29 @@ export class SoundEffectPool extends Object {
 				player.unmute();
 			}
 		}
+	}
+
+	//==============================================================================
+	// 풀 전체의 음량 설정. (0 ~ 1, 재생 중인 것에도 바로 곱해진다)
+	//==============================================================================
+	/**
+	 * @param { number } volume
+	 */
+	setVolume(volume) {
+		this.#volume = System.Number.isFinite(volume) ? System.Math.max(0, System.Math.min(1, volume)) : 1;
+		for (let index = 0; index < this.#playerList.length; ++index) {
+			this.#playerList[index].setVolume(this.#playerVolumeList[index] * this.#volume);
+		}
+	}
+
+	//==============================================================================
+	// 풀 전체의 음량.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getVolume() {
+		return this.#volume;
 	}
 
 	//==============================================================================
