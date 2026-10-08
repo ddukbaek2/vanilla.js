@@ -32,7 +32,7 @@ export class GameScene extends Scene {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { DEVTools } */ #devtools;
+	/** @private @type { DEVTools | null } */ #devtools; // EngineConfiguration.useDevTools 가 꺼져 있으면 null.
 	/** @private @type { TouchRecognizer } */ #touchRaycaster;
 	/** @private @type { WorldNode } */ #safeAreaNode;
 	/** @private @type { Rect } */ #lastSafeAreaRect;
@@ -253,10 +253,14 @@ export class GameScene extends Scene {
 		// ViewScaleMode 적용.
 		engine.getViewManager().setViewScaleMode(this.#viewScaleMode);
 
-		// 개발자 도구.
-		this.#devtools = new DEVTools();
-		this.#devtools.setEngine(engine);
-		this.#devtools.setRootNodes([this.getRoot()]);
+		// 개발자 도구. (EngineConfiguration.useDevTools 가 꺼져 있으면 만들지 않는다)
+		this.#devtools = null;
+		const engineConfiguration = engine.getEngineConfiguration();
+		if (engineConfiguration.useDevTools !== false) {
+			this.#devtools = new DEVTools();
+			this.#devtools.setEngine(engine);
+			this.#devtools.setRootNodes([this.getRoot()]);
+		}
 
 		// 터치 레이캐스터.
 		this.#touchRaycaster = new TouchRecognizer();
@@ -362,9 +366,11 @@ export class GameScene extends Scene {
 			this.layout();
 		}
 
-		const timeManager = engine.getTimeManager();
-		const unscaledTimeDelta = timeManager.getUnscaleDeltaTime();
-		this.#devtools.tick(unscaledTimeDelta);
+		if (this.#devtools !== null) {
+			const timeManager = engine.getTimeManager();
+			const unscaledTimeDelta = timeManager.getUnscaleDeltaTime();
+			this.#devtools.tick(unscaledTimeDelta);
+		}
 	}
 
 	//==============================================================================
@@ -374,6 +380,9 @@ export class GameScene extends Scene {
 	 * @returns { boolean }
 	 */
 	isDevToolsCapturingInput() {
+		if (this.#devtools === null) {
+			return false;
+		}
 		return this.#devtools.isVisible() && this.#devtools.isPointerInsidePanel();
 	}
 

@@ -52,6 +52,9 @@ export class EngineConfiguration extends Object {
 	// 끄면(기본) 받기 전에 다른 폰트로 구운 글자는 캐시에서 밀려날 때까지 그대로 남는다.
 	// (unicode-range 로 나눈 폰트 조각을 그때그때 받는 프로젝트가 켠다. 받은 조각마다 그 글자만 다시 구우므로 프레임이 크게 길어지지 않는다)
 	/** @type { boolean } */ rebakeTextOnFontLoad;
+	// 개발자 도구(F2 로 여닫는 패널과 기즈모)를 쓸지. 끄면 GameScene 이 만들지 않고 F2 도 받지 않는다.
+	// (켜면(기본) 지금까지와 같다. 출시 빌드처럼 사용자에게 보이면 안 되는 곳에서 끈다)
+	/** @type { boolean } */ useDevTools;
 
 	//==============================================================================
 	// 생성.
@@ -70,6 +73,7 @@ export class EngineConfiguration extends Object {
 		this.defaultFontUrl = "https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff";
 		this.ignoreVirtualKeyboardResize = false;
 		this.rebakeTextOnFontLoad = false;
+		this.useDevTools = true;
 	}
 }
 

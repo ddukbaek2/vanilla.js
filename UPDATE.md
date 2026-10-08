@@ -1,5 +1,8 @@
 # 업데이트 기록
 
+# 0.3.13 (2026-10-09)
+- EngineConfiguration.useDevTools: 개발자 도구(F2 로 여닫는 패널과 기즈모)를 쓸지. (기본 true, 지금까지와 같다) 끄면 GameScene 이 DEVTools 를 만들지 않아 F2 를 받지 않고, 입력도 가로채지 않는다. 출시 빌드처럼 사용자에게 개발 도구가 보이면 안 되는 곳에서 끈다
+
 # 0.3.12 (2026-10-05)
 - AudioPlayer: setVolume(volume) / getVolume(). 음량(0 ~ 1)을 정한다. 음소거(mute)와 따로 기억해, unmute 가 1 이 아니라 정한 음량으로 돌아간다. (기본 1, 지금까지와 같다)
 - SoundEffectPool: play(audioAsset, volume) 의 두 번째 인자로 이 재생만의 음량을 준다. (기본 1) setVolume(volume) / getVolume() 은 풀 전체의 음량이고 재생 중인 것에도 바로 곱해진다. 음악과 효과음의 크기 설정, 거리에 따라 작아지는 효과음에 쓴다
