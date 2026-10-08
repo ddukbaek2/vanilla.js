@@ -393,7 +393,7 @@ export class TransformNode extends ComponentNode {
 				continue;
 			}
 
-			opcacity *= current.getLocalOpacity();
+			globalOpacity *= current.getLocalOpacity();
 		}
 
 		globalOpacity = Math.clamp(globalOpacity, 0, 1);
