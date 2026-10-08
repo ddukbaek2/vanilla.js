@@ -177,6 +177,7 @@ export class Graphic extends Object {
 	/** @private @type { WebGL2RenderingContext } */ #webGL2RenderingContext;
 	/** @private @type { boolean } */ #isForceGizmosVisible;
 	/** @private @type { boolean } */ #isImageSmoothingEnabled;
+	/** @private @type { boolean } */ #isImageMipmapEnabled;
 	/** @private @type { string } */ #imageSmoothingQuality;
 	/** @private @type { ShaderProgram } */ #shaderProgram;
 	/** @private @type { ShaderProgram | null } */ #shaderProgramOverride; // 드로우에 잠시 바꿔 끼우는 프로그램. (ShaderSprite 등)
@@ -249,6 +250,7 @@ export class Graphic extends Object {
 		this.#webGL2RenderingContext = webGL2RenderingContext;
 		this.#isForceGizmosVisible = false;
 		this.#isImageSmoothingEnabled = true;
+		this.#isImageMipmapEnabled = false;
 		this.#imageSmoothingQuality = "high";
 
 		// 셰이더 프로그램.
@@ -426,6 +428,29 @@ export class Graphic extends Object {
 	 */
 	isImageSmoothingEnabled() {
 		return this.#isImageSmoothingEnabled;
+	}
+
+	//==============================================================================
+	// 이미지 밉맵 활성화 여부 설정. (기본 false)
+	// - 켜면 스무딩이 켜진 이미지 텍스처에 밉맵을 만들고 축소 필터를 LINEAR_MIPMAP_LINEAR 로 한다.
+	// - 큰 그림(아틀라스 등)을 크게 줄여 그릴 때 가장자리의 계단과 자글거림이 줄어든다.
+	// - 아틀라스는 그림 둘레의 여백(늘여 붙인 가장자리)이 넉넉해야 작은 밉맵 단계에서 옆 그림이 번져 들지 않는다.
+	//==============================================================================
+	/**
+	 * @param { boolean } value
+	 */
+	setImageMipmapEnabled(value) {
+		this.#isImageMipmapEnabled = value;
+	}
+
+	//==============================================================================
+	// 이미지 밉맵 활성화 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isImageMipmapEnabled() {
+		return this.#isImageMipmapEnabled;
 	}
 
 	//==============================================================================
@@ -1518,7 +1543,8 @@ export class Graphic extends Object {
 	drawImageWithSourceAndDestination(image, sourceX, sourceY, sourceWidth, sourceHeight, destinationX, destinationY, destinationWidth, destinationHeight) {
 		const imageTextureCache = this.getImageTextureCache();
 		const isImageSmoothingEnabled = this.isImageSmoothingEnabled();
-		const texture = imageTextureCache.getTexture(image, isImageSmoothingEnabled);
+		const isImageMipmapEnabled = this.isImageMipmapEnabled();
+		const texture = imageTextureCache.getTexture(image, isImageSmoothingEnabled, isImageMipmapEnabled);
 		if (!texture) {
 			return;
 		}
