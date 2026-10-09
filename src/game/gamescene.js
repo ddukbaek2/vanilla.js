@@ -487,6 +487,8 @@ export class GameScene extends Scene {
 	 */
 	postDraw(graphic) {
 		super.postDraw(graphic);
-		this.#devtools.draw(graphic);
+		if (this.#devtools !== null) {
+			this.#devtools.draw(graphic);
+		}
 	}
 }
