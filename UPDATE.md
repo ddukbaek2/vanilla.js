@@ -1,5 +1,8 @@
 # 업데이트 기록
 
+# 0.3.17 (2026-10-10)
+- Text 줄바꿈: 줄바꿈 없는 빈칸(U+00A0)으로 이은 단어 사이에서는 줄을 바꾸지 않는다. 공백으로 나눈 조각이 넘쳐 단어 경계에서 나눌 때(0.3.11) 줄바꿈 없는 빈칸 뒤의 단어를 앞 조각에 붙인다. 이름과 값, 숫자와 단위처럼 한 줄에 있어야 하는 글을 줄바꿈 없는 빈칸으로 이으면 갈라지지 않는다. (지금까지는 Intl.Segmenter 의 단어 경계에서 갈라졌다) splitWords(text) 도 같은 조각을 돌려준다
+
 # 0.3.16 (2026-10-09)
 - Graphic: setTextDirection(direction) / getTextDirection(). 글자의 문단 방향. ("inherit" | "ltr" | "rtl" | "auto", Canvas2D direction 대응, pushState / popState 에 든다) 글자를 그 방향으로 굽고(캔버스의 direction, 텍스처 캐시의 열쇠에 든다), 정렬 "start" / "end" 가 그 방향에 따라 왼쪽, 오른쪽이 된다. "inherit" 는 "ltr" 로 본다. (기본, 지금까지와 같다) "auto" 는 문자열마다 처음 나오는 방향이 강한 글자로 정한다. (HTML 의 dir="auto", 없으면 "ltr", 닉네임처럼 사용자가 쓴 글에 쓴다) 오른쪽에서 왼쪽으로 쓰는 언어(아랍어, 히브리어 등)에서 문장 끝의 문장 부호와 숫자로 시작하는 글이 반대쪽에 붙던 것을 바르게 한다
 - Graphic: resolveTextDirection(text) (실제 방향 "ltr" / "rtl"), resolveTextAlign(textAlign, textDirection) ("start" / "end" 를 "left" / "right" 로)

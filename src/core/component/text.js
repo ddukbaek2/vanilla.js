@@ -65,9 +65,12 @@ export function getMeasurementCanvasRenderingContext() {
 // - 글자 묶음(grapheme): 받침, 성조, 결합 부호가 앞 글자에서 떨어지지 않는다. 없으면 코드 포인트 단위.
 // - 단어: 태국어, 라오어, 크메르어, 버마어, 한중일처럼 공백 없이 쓰는 글자도 단어 사이를 찾는다.
 //   문장 부호처럼 단어가 아닌 조각은 앞 단어에 붙인다. (줄 맨 앞에 문장 부호가 오지 않게) 없으면 통째로 한 조각.
+//   줄바꿈 없는 빈칸(U+00A0)으로 이은 단어 사이는 나누지 않는다. (이름과 값, 숫자와 단위처럼 함께 있어야 하는 것)
 //==============================================================================
 let graphemeSegmenter = null;
 let wordSegmenter = null;
+// 줄바꿈 없는 빈칸. (이 빈칸으로 이은 단어 사이에서는 줄을 바꾸지 않는다)
+const NO_BREAK_SPACE = " ";
 
 /**
  * @param { string } text
@@ -89,7 +92,7 @@ export function splitGraphemes(text) {
 
 /**
  * @param { string } text
- * @returns { string[] } 단어마다 한 조각. (단어가 아닌 조각은 앞 단어에 붙인다)
+ * @returns { string[] } 단어마다 한 조각. (단어가 아닌 조각은 앞 단어에 붙인다, 줄바꿈 없는 빈칸으로 이은 단어는 한 조각)
  */
 export function splitWords(text) {
 	if (wordSegmenter === null && System.Intl && typeof System.Intl.Segmenter === "function") {
@@ -100,13 +103,24 @@ export function splitWords(text) {
 	}
 	const pieces = [];
 	let pendingPrefix = "";
+	// 앞 조각이 줄바꿈 없는 빈칸(U+00A0)으로 끝나 다음 단어를 이어 붙여야 하는지.
+	let isGluedToPrevious = false;
 	for (const segmentData of wordSegmenter.segment(text)) {
 		if (segmentData.isWordLike) {
-			pieces.push(pendingPrefix + segmentData.segment);
+			if (isGluedToPrevious && pieces.length > 0) {
+				pieces[pieces.length - 1] += segmentData.segment;
+			}
+			else {
+				pieces.push(pendingPrefix + segmentData.segment);
+			}
 			pendingPrefix = "";
+			isGluedToPrevious = false;
 		}
 		else if (pieces.length > 0) {
 			pieces[pieces.length - 1] += segmentData.segment;
+			if (segmentData.segment.includes(NO_BREAK_SPACE)) {
+				isGluedToPrevious = true;
+			}
 		}
 		else {
 			pendingPrefix += segmentData.segment;
