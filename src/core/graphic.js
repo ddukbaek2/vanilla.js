@@ -141,6 +141,11 @@ const CORNER_SEGMENT_COUNT = 8;
 const MAXIMUM_TEXT_BAKE_SCALE = 8;
 const DEFAULT_TEXT_BAKE_SCALE_STEP = 0.25;
 
+// 오른쪽에서 왼쪽으로 쓰는 글자. (히브리, 아랍, 시리아, 타나, 은코, 사마리아, 만다 문자와 표시형, 보조 평면의 오른쪽에서 왼쪽 문자)
+const RIGHT_TO_LEFT_CHARACTER_PATTERN = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u;
+// 방향이 강한 글자. (글자 갈래의 문자, 방향 표시 문자 LRM / RLM / ALM)
+const STRONG_DIRECTION_CHARACTER_PATTERN = /[\p{L}\u200E\u200F\u061C]/u;
+
 
 //==============================================================================
 // 색상 값을 Color 인스턴스로 변환.
@@ -217,6 +222,7 @@ export class Graphic extends Object {
 	/** @private @type { string } */ #fontString;
 	/** @private @type { string } */ #textAlign;
 	/** @private @type { string } */ #textBaseline;
+	/** @private @type { string } */ #textDirection;
 	/** @private @type { object[] } */ #clipStack;
 	/** @private @type { Float32Array } */ #projectionMatrixArray;
 	/** @private @type { Float32Array } */ #modelMatrixArray;
@@ -320,6 +326,7 @@ export class Graphic extends Object {
 		this.#imageTintColor = null;
 		this.#fontString = "10px sans-serif";
 		this.#textAlign = "start";
+		this.#textDirection = "inherit";
 		this.#textBaseline = "alphabetic";
 		this.#clipStack = [];
 		this.#projectionMatrixArray = new Float32Array(9);
@@ -555,6 +562,7 @@ export class Graphic extends Object {
 			fontString: this.#fontString,
 			textAlign: this.#textAlign,
 			textBaseline: this.#textBaseline,
+			textDirection: this.#textDirection,
 		};
 		this.#stateStack.push(stateSnapshot);
 	}
@@ -576,6 +584,7 @@ export class Graphic extends Object {
 		this.#fontString = stateSnapshot.fontString;
 		this.#textAlign = stateSnapshot.textAlign;
 		this.#textBaseline = stateSnapshot.textBaseline;
+		this.#textDirection = stateSnapshot.textDirection;
 		if (this.#blendMode !== stateSnapshot.blendMode) {
 			this.setBlendMode(stateSnapshot.blendMode);
 		}
@@ -1741,6 +1750,80 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// 텍스트 방향 설정. ("inherit" | "ltr" | "rtl" | "auto", Canvas2D direction 대응)
+	// - 문단의 방향이다. 글자 안의 순서(양방향 알고리즘)와 정렬 "start" / "end" 의 왼쪽, 오른쪽이 이것을 따른다.
+	// - "inherit" 는 "ltr" 로 본다. (기본, 지금까지와 같다)
+	// - "auto" 는 문자열마다 처음 나오는 방향이 강한 글자로 정한다. (HTML 의 dir="auto", 없으면 "ltr") 사용자가 쓴 글(닉네임 등)에 쓴다.
+	//==============================================================================
+	/**
+	 * @param { string } textDirection
+	 */
+	setTextDirection(textDirection) {
+		if (textDirection) {
+			this.#textDirection = textDirection;
+		}
+	}
+
+	//==============================================================================
+	// 텍스트 방향 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getTextDirection() {
+		return this.#textDirection;
+	}
+
+	//==============================================================================
+	// 문자열의 실제 방향 계산. ("ltr" 또는 "rtl", "auto" 는 처음 나오는 방향이 강한 글자로)
+	//==============================================================================
+	/**
+	 * @param { string } text
+	 * @returns { string }
+	 */
+	resolveTextDirection(text) {
+		const textDirection = this.getTextDirection();
+		if (textDirection === "rtl") {
+			return "rtl";
+		}
+		if (textDirection !== "auto" || !text) {
+			return "ltr";
+		}
+		for (const character of text) {
+			if (!STRONG_DIRECTION_CHARACTER_PATTERN.test(character)) {
+				continue;
+			}
+			if (character === "\u200E") {
+				return "ltr";
+			}
+			const isRightToLeft = RIGHT_TO_LEFT_CHARACTER_PATTERN.test(character) || character === "\u200F" || character === "\u061C";
+			return isRightToLeft ? "rtl" : "ltr";
+		}
+		return "ltr";
+	}
+
+	//==============================================================================
+	// 실제 가로 정렬 계산. ("start" / "end" 를 방향에 따라 "left" / "right" 로)
+	//==============================================================================
+	/**
+	 * @param { string } textAlign
+	 * @param { string } textDirection "ltr" 또는 "rtl".
+	 * @returns { string } "left" | "center" | "right"
+	 */
+	resolveTextAlign(textAlign, textDirection) {
+		if (textAlign === "start") {
+			return textDirection === "rtl" ? "right" : "left";
+		}
+		if (textAlign === "end") {
+			return textDirection === "rtl" ? "left" : "right";
+		}
+		if (textAlign === "center" || textAlign === "right") {
+			return textAlign;
+		}
+		return "left";
+	}
+
+	//==============================================================================
 	// 텍스트 베이스라인 설정. ("top" | "hanging" | "middle" | "alphabetic" | "ideographic" | "bottom")
 	//==============================================================================
 	/**
@@ -1840,15 +1923,16 @@ export class Graphic extends Object {
 	 * @param { number } x
 	 * @param { number } y
 	 * @param { Color | null } color - 흰색으로 구운 글자에 곱할 색. (null 이면 흰색 그대로)
+	 * @param { string } textDirection - 정렬 "start" / "end" 를 가를 방향. ("ltr" 또는 "rtl", 기본 "ltr")
 	 */
-	drawTextEntry(entry, x, y, color = null) {
+	drawTextEntry(entry, x, y, color = null, textDirection = "ltr") {
 		// 가로 정렬 오프셋.
-		const textAlign = this.getTextAlign();
+		const textAlign = this.resolveTextAlign(this.getTextAlign(), textDirection);
 		let alignOffset = 0;
 		if (textAlign === "center") {
 			alignOffset = -entry.advanceWidth / 2;
 		}
-		else if (textAlign === "right" || textAlign === "end") {
+		else if (textAlign === "right") {
 			alignOffset = -entry.advanceWidth;
 		}
 
@@ -1907,12 +1991,13 @@ export class Graphic extends Object {
 		const fontString = this.getFontString();
 		const fillColor = this.getFillColor();
 		const bakeScale = this.calculateTextBakeScale();
-		const entry = textStringTextureCache.getEntry("fill", text, fontString, "#ffffff", 0, bakeScale);
+		const textDirection = this.resolveTextDirection(text);
+		const entry = textStringTextureCache.getEntry("fill", text, fontString, "#ffffff", 0, bakeScale, textDirection);
 		if (!entry) {
 			return;
 		}
 
-		this.drawTextEntry(entry, x, y, fillColor);
+		this.drawTextEntry(entry, x, y, fillColor, textDirection);
 	}
 
 	//==============================================================================
@@ -1934,12 +2019,13 @@ export class Graphic extends Object {
 		const fontString = this.getFontString();
 		const strokeColor = this.getStrokeColor();
 		const bakeScale = this.calculateTextBakeScale();
-		const entry = textStringTextureCache.getEntry("stroke", text, fontString, "#ffffff", lineWidth, bakeScale);
+		const textDirection = this.resolveTextDirection(text);
+		const entry = textStringTextureCache.getEntry("stroke", text, fontString, "#ffffff", lineWidth, bakeScale, textDirection);
 		if (!entry) {
 			return;
 		}
 
-		this.drawTextEntry(entry, x, y, strokeColor);
+		this.drawTextEntry(entry, x, y, strokeColor, textDirection);
 	}
 
 	//==============================================================================

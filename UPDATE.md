@@ -1,5 +1,11 @@
 # 업데이트 기록
 
+# 0.3.16 (2026-10-09)
+- Graphic: setTextDirection(direction) / getTextDirection(). 글자의 문단 방향. ("inherit" | "ltr" | "rtl" | "auto", Canvas2D direction 대응, pushState / popState 에 든다) 글자를 그 방향으로 굽고(캔버스의 direction, 텍스처 캐시의 열쇠에 든다), 정렬 "start" / "end" 가 그 방향에 따라 왼쪽, 오른쪽이 된다. "inherit" 는 "ltr" 로 본다. (기본, 지금까지와 같다) "auto" 는 문자열마다 처음 나오는 방향이 강한 글자로 정한다. (HTML 의 dir="auto", 없으면 "ltr", 닉네임처럼 사용자가 쓴 글에 쓴다) 오른쪽에서 왼쪽으로 쓰는 언어(아랍어, 히브리어 등)에서 문장 끝의 문장 부호와 숫자로 시작하는 글이 반대쪽에 붙던 것을 바르게 한다
+- Graphic: resolveTextDirection(text) (실제 방향 "ltr" / "rtl"), resolveTextAlign(textAlign, textDirection) ("start" / "end" 를 "left" / "right" 로)
+- Text, UILabel: setTextDirection(direction) / getTextDirection(). ("inherit" 면 그리는 때의 Graphic 방향, 기본) 여러 줄 글은 글 전체로 방향을 정해 모든 줄에 쓴다. 서식 조각(segment)으로 그리는 RichText 는 방향과 상관없이 왼쪽에서 오른쪽으로 잇는다
+- TextStringTextureCache.getEntry / bakeEntry: 마지막 인자로 방향을 받는다. (기본 "ltr") 경계는 늘 왼쪽 기준으로 잰다
+
 # 0.3.15 (2026-10-09)
 - Graphic: setImageMipmapEnabled(value) / isImageMipmapEnabled(). 스무딩이 켜진 이미지 텍스처에 밉맵을 만들고 축소 필터를 LINEAR_MIPMAP_LINEAR 로 한다. (기본 false, 지금까지와 같다) 큰 그림(아틀라스 등)을 크게 줄여 그릴 때(작은 화면, 멀리 물러난 카메라) 가장자리의 계단과 자글거림이 줄어든다. 밉맵은 텍스처마다 처음 필요할 때 한 번 만든다. 아틀라스는 그림 둘레의 여백이 넉넉해야 작은 밉맵 단계에서 옆 그림이 번져 들지 않는다
 - ImageTextureCache.getTexture(image, isSmoothingEnabled, isMipmapEnabled): 세 번째 인자로 밉맵을 쓸지 받는다. (기본 false)

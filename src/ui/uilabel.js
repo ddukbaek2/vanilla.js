@@ -465,6 +465,35 @@ export class UILabel extends UIView {
 	}
 
 	//==============================================================================
+	// 글자 방향 설정. ("inherit" | "ltr" | "rtl" | "auto", Text.setTextDirection 과 같다)
+	// - 서식 조각(segment)으로 그리는 리치 텍스트는 방향과 상관없이 왼쪽에서 오른쪽으로 잇는다.
+	//==============================================================================
+	/**
+	 * @param { "inherit" | "ltr" | "rtl" | "auto" } textDirection
+	 */
+	setTextDirection(textDirection) {
+		if (this.#text) {
+			this.#text.setTextDirection(textDirection);
+		}
+		if (this.#richText) {
+			this.#richText.setTextDirection(textDirection);
+		}
+	}
+
+	//==============================================================================
+	// 글자 방향 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getTextDirection() {
+		if (this.#text) {
+			return this.#text.getTextDirection();
+		}
+		return "inherit";
+	}
+
+	//==============================================================================
 	// 세로 정렬 설정.
 	//==============================================================================
 	/**

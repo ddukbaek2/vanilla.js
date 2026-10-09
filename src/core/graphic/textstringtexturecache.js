@@ -162,6 +162,7 @@ export class TextStringTextureCache extends Object {
 	//==============================================================================
 	// 문자열 텍스처 엔트리 반환. (없으면 굽기 후 반환)
 	// - mode: "fill" 또는 "stroke".
+	// - textDirection: 문단의 방향. ("ltr" 또는 "rtl", 캔버스의 direction 으로 굽는다)
 	// - 반환 필드는 전부 논리 좌표(스케일 나눔) 기준.
 	//==============================================================================
 	/**
@@ -171,14 +172,15 @@ export class TextStringTextureCache extends Object {
 	 * @param { string } colorString
 	 * @param { number } lineWidth
 	 * @param { number } scale
+	 * @param { string } textDirection 기본 "ltr".
 	 * @returns { object | null }
 	 */
-	getEntry(mode, text, fontString, colorString, lineWidth, scale) {
+	getEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection = "ltr") {
 		if (!text) {
 			return null;
 		}
 
-		const entryKey = `${mode}|${scale}|${lineWidth}|${colorString}|${fontString}|${text}`;
+		const entryKey = `${mode}|${textDirection}|${scale}|${lineWidth}|${colorString}|${fontString}|${text}`;
 		const entries = this.getEntries();
 		if (entries.has(entryKey)) {
 			// LRU 갱신. (재삽입으로 최신화)
@@ -188,7 +190,7 @@ export class TextStringTextureCache extends Object {
 			return entry;
 		}
 
-		const entry = this.bakeEntry(mode, text, fontString, colorString, lineWidth, scale);
+		const entry = this.bakeEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection);
 		if (!entry) {
 			return null;
 		}
@@ -217,15 +219,19 @@ export class TextStringTextureCache extends Object {
 	 * @param { string } colorString
 	 * @param { number } lineWidth
 	 * @param { number } scale
+	 * @param { string } textDirection 기본 "ltr".
 	 * @returns { object | null }
 	 */
-	bakeEntry(mode, text, fontString, colorString, lineWidth, scale) {
+	bakeEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection = "ltr") {
 		const bakeCanvas = this.getBakeCanvas();
 		const bakeCanvasRenderingContext = this.getBakeCanvasRenderingContext();
 
 		// 확대 배율이 적용된 폰트로 측정.
 		const scaledFontString = this.buildScaledFontString(fontString, scale);
 		bakeCanvasRenderingContext.font = scaledFontString;
+		bakeCanvasRenderingContext.direction = textDirection;
+		// 경계는 왼쪽 기준으로 잰다. (오른쪽에서 왼쪽 방향의 기본 정렬 "start" 는 오른쪽 기준이다)
+		bakeCanvasRenderingContext.textAlign = "left";
 		const scaledTextMetrics = bakeCanvasRenderingContext.measureText(text);
 
 		// 글리프 실측 경계. (측정 미지원 브라우저는 전진폭 기반 근사)
@@ -259,6 +265,7 @@ export class TextStringTextureCache extends Object {
 		bakeCanvas.height = bakeHeight;
 		bakeCanvasRenderingContext.clearRect(0, 0, bakeWidth, bakeHeight);
 		bakeCanvasRenderingContext.font = scaledFontString;
+		bakeCanvasRenderingContext.direction = textDirection;
 		bakeCanvasRenderingContext.textAlign = "left";
 		bakeCanvasRenderingContext.textBaseline = "alphabetic";
 		if (mode === "stroke") {
@@ -347,10 +354,10 @@ export class TextStringTextureCache extends Object {
 		const entries = this.getEntries();
 		let removedCount = 0;
 		for (const [entryKey, entry] of System.Array.from(entries)) {
-			// 열쇠는 mode|scale|lineWidth|colorString|fontString|text 이다. (글에는 | 가 들 수 있다)
+			// 열쇠는 mode|textDirection|scale|lineWidth|colorString|fontString|text 이다. (글에는 | 가 들 수 있다)
 			const keyParts = entryKey.split("|");
-			const fontString = keyParts.length > 4 ? keyParts[4].toLowerCase() : "";
-			const text = keyParts.slice(5).join("|");
+			const fontString = keyParts.length > 5 ? keyParts[5].toLowerCase() : "";
+			const text = keyParts.slice(6).join("|");
 			const isAffected = targets.some((target) => {
 				return fontString.includes(target.familyName) && hasCharacterInRanges(text, target.ranges);
 			});

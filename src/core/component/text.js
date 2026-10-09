@@ -168,6 +168,7 @@ export class Text extends Component {
 	/** @private @type { boolean } */ #strikethrough;
 	/** @private @type { string } */ #textAlign;
 	/** @private @type { string } */ #textBaseline;
+	/** @private @type { string } */ #textDirection; // 문단의 방향. ("inherit" 면 그리는 때의 Graphic 방향을 따른다)
 	/** @private @type { number } */ #wordWrapWidth; // 0 이면 한 줄. 넘으면 이 폭에서 줄을 바꾼다.
 	/** @private @type { string } */ #wrapMode; // "word": 공백 단위(넘치는 단어는 글자 분할) | "char": 글자 단위.
 	/** @private @type { number } */ #lineSpacing; // 줄 간격 배율.
@@ -191,6 +192,7 @@ export class Text extends Component {
 		this.#strikethrough = false;
 		this.#textAlign = "center";
 		this.#textBaseline = "middle";
+		this.#textDirection = "inherit";
 		this.#wordWrapWidth = 0;
 		this.#wrapMode = "word";
 		this.#lineSpacing = 1.25;
@@ -225,6 +227,9 @@ export class Text extends Component {
 		}
 		const node = this.getNode();
 		const contentSize = node.getContentSize();
+		if (this.#textDirection !== "inherit") {
+			graphic.setTextDirection(this.#textDirection);
+		}
 		if (this.#wordWrapWidth > 0 || text.indexOf("\n") >= 0) {
 			this.drawWrappedText(graphic, contentSize, text);
 			return;
@@ -276,11 +281,15 @@ export class Text extends Component {
 			blockTop = (contentSize.y - blockHeight) * 0.5;
 		}
 
+		// 문단의 방향은 글 전체로 정해 모든 줄에 쓴다. ("start" / "end" 정렬도 그 방향을 따른다)
+		const textDirection = graphic.resolveTextDirection(fullText);
+		graphic.setTextDirection(textDirection);
+		const textAlign = graphic.resolveTextAlign(this.#textAlign, textDirection);
 		let drawX;
-		if (this.#textAlign === "left" || this.#textAlign === "start") {
+		if (textAlign === "left") {
 			drawX = 0;
 		}
-		else if (this.#textAlign === "right" || this.#textAlign === "end") {
+		else if (textAlign === "right") {
 			drawX = contentSize.x;
 		}
 		else {
@@ -288,7 +297,7 @@ export class Text extends Component {
 		}
 
 		graphic.setFontString(buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic));
-		graphic.setTextAlign(this.#textAlign);
+		graphic.setTextAlign(textAlign);
 		graphic.setTextBaseline("middle");
 
 		const strokeColor = this.getStrokeColor();
@@ -320,7 +329,7 @@ export class Text extends Component {
 
 			if (this.#underline || this.#strikethrough) {
 				const lineWidth = this.measurePlainTextWidth(lineText);
-				const startX = this.computeUnderlineStartX(drawX, lineWidth);
+				const startX = this.computeUnderlineStartX(drawX, lineWidth, textAlign);
 				graphic.setStrokeColor(textColor.toHEXString());
 				if (this.#underline) {
 					this.strokeHorizontalLine(graphic, startX, lineY + this.#fontSize * 0.5 + decorationLineWidth, lineWidth, decorationLineWidth);
@@ -457,11 +466,14 @@ export class Text extends Component {
 	 * @param { string } text
 	 */
 	drawPlainText(graphic, contentSize, text) {
+		const textDirection = graphic.resolveTextDirection(text);
+		graphic.setTextDirection(textDirection);
+		const textAlign = graphic.resolveTextAlign(this.#textAlign, textDirection);
 		let drawX;
-		if (this.#textAlign === "left" || this.#textAlign === "start") {
+		if (textAlign === "left") {
 			drawX = 0;
 		}
-		else if (this.#textAlign === "right" || this.#textAlign === "end") {
+		else if (textAlign === "right") {
 			drawX = contentSize.x;
 		}
 		else {
@@ -480,7 +492,7 @@ export class Text extends Component {
 		}
 
 		graphic.setFontString(buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic));
-		graphic.setTextAlign(this.#textAlign);
+		graphic.setTextAlign(textAlign);
 		graphic.setTextBaseline(this.#textBaseline);
 
 		const strokeColor = this.getStrokeColor();
@@ -495,7 +507,7 @@ export class Text extends Component {
 
 		if (this.#underline || this.#strikethrough) {
 			const textWidth = this.measurePlainTextWidth(text);
-			const startX = this.computeUnderlineStartX(drawX, textWidth);
+			const startX = this.computeUnderlineStartX(drawX, textWidth, textAlign);
 			const fontSize = this.#fontSize;
 			graphic.setStrokeColor(textColor.toHEXString());
 			const lineWidth = System.Math.max(1, fontSize / 16);
@@ -535,13 +547,14 @@ export class Text extends Component {
 	/**
 	 * @param { number } drawX
 	 * @param { number } textWidth
+	 * @param { string } textAlign 실제 정렬. (기본은 이 글자의 정렬, "start" 는 왼쪽, "end" 는 오른쪽으로 본다)
 	 * @returns { number }
 	 */
-	computeUnderlineStartX(drawX, textWidth) {
-		if (this.#textAlign === "left" || this.#textAlign === "start") {
+	computeUnderlineStartX(drawX, textWidth, textAlign = this.#textAlign) {
+		if (textAlign === "left" || textAlign === "start") {
 			return drawX;
 		}
-		if (this.#textAlign === "right" || this.#textAlign === "end") {
+		if (textAlign === "right" || textAlign === "end") {
 			return drawX - textWidth;
 		}
 		return drawX - textWidth * 0.5;
@@ -957,6 +970,28 @@ export class Text extends Component {
 	 */
 	getTextAlign() {
 		return this.#textAlign;
+	}
+
+	//==============================================================================
+	// 글자 방향 설정. ("inherit" | "ltr" | "rtl" | "auto", Graphic.setTextDirection 과 같다)
+	// - "inherit" 면 그리는 때의 Graphic 방향을 따른다. (기본)
+	// - 정렬 "start" / "end" 가 이 방향에 따라 왼쪽, 오른쪽이 된다. (오른쪽에서 왼쪽 언어의 화면은 "rtl" 과 "start")
+	//==============================================================================
+	/**
+	 * @param { "inherit" | "ltr" | "rtl" | "auto" } textDirection
+	 */
+	setTextDirection(textDirection) {
+		this.#textDirection = textDirection;
+	}
+
+	//==============================================================================
+	// 글자 방향 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getTextDirection() {
+		return this.#textDirection;
 	}
 
 	//==============================================================================
