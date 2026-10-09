@@ -1585,7 +1585,7 @@ export class Graphic extends Object {
 			throw new Error("image is null");
 		}
 
-		if (imageRect === null || imageRect === undefined || imageRect.equals(Rect.zero())) {
+		if (imageRect === null || imageRect === undefined || imageRect.isZero()) {
 			imageRect = Rect.create(0, 0, image.width, image.height);
 		}
 

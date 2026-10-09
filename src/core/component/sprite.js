@@ -148,7 +148,7 @@ export class Sprite extends Paint {
 			case SpriteDrawMode.simple: {
 					// 이미지 소스 조정.
 					let imageRect = this.getImageRect();
-					if (imageRect === null || imageRect === undefined || imageRect.equals(Rect.zero())) {
+					if (imageRect === null || imageRect === undefined || imageRect.isZero()) {
 						imageRect = Rect.create(0, 0, image.width, image.height);
 					}
 
@@ -163,7 +163,7 @@ export class Sprite extends Paint {
 			case SpriteDrawMode.tiled: {
 					// 이미지 소스 조정.
 					let imageRect = this.getImageRect();
-					if (imageRect === null || imageRect === undefined || imageRect.equals(Rect.zero())) {
+					if (imageRect === null || imageRect === undefined || imageRect.isZero()) {
 						imageRect = Rect.create(0, 0, image.width, image.height);
 					}
 

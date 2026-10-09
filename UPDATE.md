@@ -1,5 +1,11 @@
 # 업데이트 기록
 
+# 0.3.19 (2026-10-10)
+- Rect: isZero(). 위치와 크기가 모두 0 인지를 새 객체를 만들지 않고 본다
+- Sprite, Graphic.drawImageWithImageRect, ShaderSprite: 그림 영역이 비었는지 볼 때 Rect.zero() 를 만들어 견주던 것을 isZero() 로 바꿔, 그림마다 프레임마다 생기던 객체(Rect 하나와 Vector2 둘)를 없앤다
+- WorldNode.pushTransform: 피봇만큼 당기는 자리를 Vector2 로 만들지 않고 바로 옮긴다. (노드마다 프레임마다 객체 하나)
+- 그리는 결과는 같다
+
 # 0.3.18 (2026-10-10)
 - GameScene.postDraw: 개발자 도구를 만들지 않았을 때(EngineConfiguration.useDevTools 가 false, 0.3.13) 없는 도구를 그리려다 매 프레임 오류(Cannot read properties of null)가 나던 것을 고친다. 도구가 있을 때만 그린다
 
