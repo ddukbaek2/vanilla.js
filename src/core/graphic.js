@@ -36,6 +36,7 @@ void main() {
 // 프래그먼트 셰이더. (프리멀티플라이드 알파 출력)
 // - 단색 도형은 1x1 흰색 텍스처를 바인드해 같은 경로로 처리한다.
 // - tintColor 는 이미지 실루엣(알파) 안쪽에만 색을 덮는 틴트. (alpha 0 이면 비활성)
+// - textureLodBias 는 밉맵 단계를 고를 때 더하는 값. (setImageMipmapBias, 음수면 더 큰 단계를 골라 또렷해진다)
 const FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -43,9 +44,10 @@ uniform sampler2D mainTexture;
 uniform vec4 mainColor;
 uniform vec4 tintColor;
 uniform float globalAlpha;
+uniform float textureLodBias;
 out vec4 outputColor;
 void main() {
-	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate);
+	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate, textureLodBias);
 	vec3 tintedColor = mix(textureColor.rgb, tintColor.rgb * textureColor.a, tintColor.a);
 	float finalAlpha = textureColor.a * mainColor.a * globalAlpha;
 	vec3 finalColor = tintedColor * mainColor.rgb * mainColor.a * globalAlpha;
@@ -78,9 +80,10 @@ in vec2 fragmentTextureCoordinate;
 in vec4 fragmentColor;
 uniform sampler2D mainTexture;
 uniform float globalAlpha;
+uniform float textureLodBias;
 out vec4 outputColor;
 void main() {
-	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate);
+	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate, textureLodBias);
 	float finalAlpha = textureColor.a * fragmentColor.a * globalAlpha;
 	vec3 finalColor = textureColor.rgb * fragmentColor.rgb * fragmentColor.a * globalAlpha;
 	outputColor = vec4(finalColor, finalAlpha);
@@ -113,9 +116,10 @@ in vec2 fragmentTextureCoordinate;
 in vec4 fragmentColor;
 in vec4 fragmentTintColor;
 uniform sampler2D mainTexture;
+uniform float textureLodBias;
 out vec4 outputColor;
 void main() {
-	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate);
+	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate, textureLodBias);
 	vec3 tintedColor = mix(textureColor.rgb, fragmentTintColor.rgb * textureColor.a, fragmentTintColor.a);
 	outputColor = vec4(tintedColor * fragmentColor.rgb, textureColor.a * fragmentColor.a);
 }
@@ -178,6 +182,7 @@ export class Graphic extends Object {
 	/** @private @type { boolean } */ #isForceGizmosVisible;
 	/** @private @type { boolean } */ #isImageSmoothingEnabled;
 	/** @private @type { boolean } */ #isImageMipmapEnabled;
+	/** @private @type { number } */ #imageMipmapBias;
 	/** @private @type { string } */ #imageSmoothingQuality;
 	/** @private @type { ShaderProgram } */ #shaderProgram;
 	/** @private @type { ShaderProgram | null } */ #shaderProgramOverride; // 드로우에 잠시 바꿔 끼우는 프로그램. (ShaderSprite 등)
@@ -251,6 +256,7 @@ export class Graphic extends Object {
 		this.#isForceGizmosVisible = false;
 		this.#isImageSmoothingEnabled = true;
 		this.#isImageMipmapEnabled = false;
+		this.#imageMipmapBias = 0;
 		this.#imageSmoothingQuality = "high";
 
 		// 셰이더 프로그램.
@@ -352,6 +358,7 @@ export class Graphic extends Object {
 		shaderProgram.use();
 		const mainTextureLocation = shaderProgram.getUniformLocation("mainTexture");
 		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
+		this.applyImageMipmapBias(shaderProgram);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 	}
 
@@ -451,6 +458,56 @@ export class Graphic extends Object {
 	 */
 	isImageMipmapEnabled() {
 		return this.#isImageMipmapEnabled;
+	}
+
+	//==============================================================================
+	// 이미지 밉맵 단계 보정 설정. (기본 0)
+	// - 밉맵 단계를 고를 때 더하는 값. 음수면 한 단계 큰 그림 쪽을 골라 또렷해지고, 너무 작으면 다시 자글거린다. (-0.5 안팎)
+	// - 기본 셰이더(낱장, 묶어 그리기, 파티클)에 적용한다. 바꿔 끼운 셰이더는 textureLodBias 유니폼이 있으면 받는다.
+	//==============================================================================
+	/**
+	 * @param { number } value
+	 */
+	setImageMipmapBias(value) {
+		this.flushSpriteBatch();
+		this.#imageMipmapBias = value;
+		const shaderPrograms = [this.#shaderProgram, this.#batchShaderProgram, this.#particleShaderProgram, this.#shaderProgramOverride];
+		for (const shaderProgram of shaderPrograms) {
+			if (!shaderProgram) {
+				continue;
+			}
+			shaderProgram.use();
+			this.applyImageMipmapBias(shaderProgram);
+		}
+		const activeShaderProgram = this.getShaderProgram();
+		activeShaderProgram.use();
+	}
+
+	//==============================================================================
+	// 이미지 밉맵 단계 보정 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getImageMipmapBias() {
+		return this.#imageMipmapBias;
+	}
+
+	//==============================================================================
+	// 사용 중인 셰이더 프로그램에 밉맵 단계 보정 적용. (유니폼이 없는 프로그램은 넘어간다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { ShaderProgram } shaderProgram
+	 */
+	applyImageMipmapBias(shaderProgram) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const textureLodBiasLocation = shaderProgram.getUniformLocation("textureLodBias");
+		if (textureLodBiasLocation === null) {
+			return;
+		}
+		const imageMipmapBias = this.getImageMipmapBias();
+		webGL2RenderingContext.uniform1f(textureLodBiasLocation, imageMipmapBias);
 	}
 
 	//==============================================================================
@@ -932,6 +989,7 @@ export class Graphic extends Object {
 		this.#batchShaderProgram.use();
 		const mainTextureLocation = this.#batchShaderProgram.getUniformLocation("mainTexture");
 		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
+		this.applyImageMipmapBias(this.#batchShaderProgram);
 		this.getShaderProgram().use();
 		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
@@ -1065,6 +1123,7 @@ export class Graphic extends Object {
 		this.#particleShaderProgram.use();
 		const mainTextureLocation = this.#particleShaderProgram.getUniformLocation("mainTexture");
 		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
+		this.applyImageMipmapBias(this.#particleShaderProgram);
 		this.getShaderProgram().use();
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
 	}
@@ -2043,6 +2102,7 @@ export class Graphic extends Object {
 		webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
 		const mainTextureLocation = activeShaderProgram.getUniformLocation("mainTexture");
 		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
+		this.applyImageMipmapBias(activeShaderProgram);
 	}
 
 	//==============================================================================

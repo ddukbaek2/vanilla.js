@@ -3,6 +3,7 @@
 # 0.3.15 (2026-10-09)
 - Graphic: setImageMipmapEnabled(value) / isImageMipmapEnabled(). 스무딩이 켜진 이미지 텍스처에 밉맵을 만들고 축소 필터를 LINEAR_MIPMAP_LINEAR 로 한다. (기본 false, 지금까지와 같다) 큰 그림(아틀라스 등)을 크게 줄여 그릴 때(작은 화면, 멀리 물러난 카메라) 가장자리의 계단과 자글거림이 줄어든다. 밉맵은 텍스처마다 처음 필요할 때 한 번 만든다. 아틀라스는 그림 둘레의 여백이 넉넉해야 작은 밉맵 단계에서 옆 그림이 번져 들지 않는다
 - ImageTextureCache.getTexture(image, isSmoothingEnabled, isMipmapEnabled): 세 번째 인자로 밉맵을 쓸지 받는다. (기본 false)
+- Graphic: setImageMipmapBias(value) / getImageMipmapBias(). 밉맵 단계를 고를 때 더하는 값. (기본 0, 지금까지와 같다) 음수면 한 단계 큰 그림 쪽을 골라 줄여 그린 그림의 외곽선이 옅어지지 않는다. (-0.5 안팎, 너무 작으면 다시 자글거린다) 기본 셰이더(낱장, 묶어 그리기, 파티클)의 프래그먼트 셰이더가 textureLodBias 유니폼으로 받고, 바꿔 끼운 셰이더는 그 유니폼이 있으면 받는다
 
 # 0.3.14 (2026-10-09)
 - Object: 고유식별자(instanceId)를 생성자에서 만들지 않고 처음 getInstanceId() 를 부를 때 만든다. Vector2, Rect, Color, TransformMatrix 처럼 프레임마다 많이 만드는 값 객체가 만들 때마다 GUID 를 지어 그리기 시간의 대부분을 쓰던 것을 없앤다. (한 게임의 측정에서 프레임의 스크립트 시간이 4 ~ 7 배 줄었다) 부르는 쪽에서 보이는 동작은 같다
