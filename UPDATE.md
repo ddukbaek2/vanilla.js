@@ -1,5 +1,8 @@
 # 업데이트 기록
 
+# 0.3.20 (2026-10-12)
+- UIInputField (DOM 입력): 캔버스의 touchend 에서도 필드를 눌렀으면 포커스를 준다. touchstart 는 사용자 활성화를 주지 않아, 페이지의 첫 터치가 필드면 안드로이드 크롬(웹뷰, 다른 출처의 iframe 포함)이 포커스는 받되 키보드를 띄우지 않았다. 입력은 포커스를 쥔 채라 다시 눌러도 키보드가 뜨지 않고, 필드 바깥을 눌러 포커스가 빠진 뒤에야 떴다. 활성화가 한 번도 없던 때에 얻은 포커스면(navigator.userActivation.hasBeenActive) 손을 뗄 때 blur 뒤 다시 포커스를 줘 키보드를 띄운다. 이미 키보드가 뜬 필드를 다시 누르는 보통의 경우는 지금까지와 같다
+
 # 0.3.19 (2026-10-10)
 - Rect: isZero(). 위치와 크기가 모두 0 인지를 새 객체를 만들지 않고 본다
 - Sprite, Graphic.drawImageWithImageRect, ShaderSprite: 그림 영역이 비었는지 볼 때 Rect.zero() 를 만들어 견주던 것을 isZero() 로 바꿔, 그림마다 프레임마다 생기던 객체(Rect 하나와 Vector2 둘)를 없앤다

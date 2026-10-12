@@ -41,6 +41,7 @@ export class UIInputField extends WorldNode {
 	/** @private @type { number } */ #selectionStart;
 	/** @private @type { number } */ #dragStartIndex;
 	/** @private @type { boolean } */ #focused;
+	/** @private @type { boolean } */ #isFocusedWithoutActivation; // 사용자 활성화가 한 번도 없던 때에 얻은 포커스인지. (모바일 브라우저가 키보드를 띄우지 않음)
 	/** @private @type { number } */ #blinkTimer;
 	/** @private @type { boolean } */ #cursorVisible;
 
@@ -94,6 +95,7 @@ export class UIInputField extends WorldNode {
 		this.#selectionStart = 0;
 		this.#dragStartIndex = -1;
 		this.#focused = false;
+		this.#isFocusedWithoutActivation = false;
 		this.#blinkTimer = 0;
 		this.#cursorVisible = true;
 
@@ -516,6 +518,10 @@ export class UIInputField extends WorldNode {
 	//   호출을 막는 문제를 우회한다.
 	// - hit-test 통과 시: 동기 focus → 키보드 표시.
 	// - hit-test 실패 (필드 바깥 터치) 시: 현재 focus 상태면 blur → 키보드 숨김.
+	// - touchend 에서도 hit-test 통과 시 focus 한다. touchstart 는 사용자 활성화를
+	//   주지 않아, 페이지의 첫 터치가 필드면 안드로이드 크롬(웹뷰, 다른 출처의
+	//   iframe 포함)이 focus 는 받되 키보드를 띄우지 않는다. 그때 얻은 포커스면
+	//   (활성화를 주는) touchend 에서 blur 뒤 다시 focus 해 키보드를 띄운다.
 	//==============================================================================
 	attachCanvasFocusHandler() {
 		if (this.#canvasFocusHandler) return;
@@ -546,14 +552,19 @@ export class UIInputField extends WorldNode {
 			const viewInputPosition = viewManager.canvasPositionToViewPosition(canvasPosition);
 			const isVisibleInHierarchy = (typeof this.isVisibleInHierarchy === "function") ? this.isVisibleInHierarchy() : true;
 			const isInside = isVisibleInHierarchy && this.contains(viewInputPosition);
+			const isRelease = pointerEvent.type === "touchend";
 			if (isInside) {
+				if (isRelease && this.#focused && this.#isFocusedWithoutActivation) {
+					this.#domInput.blur();
+				}
 				this.#domInput.focus();
 			}
-			else if (this.#focused) {
+			else if (this.#focused && !isRelease) {
 				this.#domInput.blur();
 			}
 		};
 		canvas.addEventListener("touchstart", this.#canvasFocusHandler, { passive: true });
+		canvas.addEventListener("touchend", this.#canvasFocusHandler, { passive: true });
 		canvas.addEventListener("mousedown", this.#canvasFocusHandler, { passive: true });
 	}
 
@@ -569,6 +580,7 @@ export class UIInputField extends WorldNode {
 				const canvas = viewManager.getCanvas();
 				if (canvas) {
 					canvas.removeEventListener("touchstart", this.#canvasFocusHandler);
+					canvas.removeEventListener("touchend", this.#canvasFocusHandler);
 					canvas.removeEventListener("mousedown", this.#canvasFocusHandler);
 				}
 			}
@@ -689,6 +701,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	handleFocus() {
 		this.#focused = true;
+		this.#isFocusedWithoutActivation = !hasStickyUserActivation();
 		this.#blinkTimer = 0;
 		this.#cursorVisible = true;
 	}
@@ -966,6 +979,20 @@ class OverlayLayerRenderer extends Component {
 
 		graphic.popState();
 	}
+}
+
+
+//==============================================================================
+// 이 페이지에 사용자 활성화(누름, 키 입력)가 한 번이라도 있었는지.
+// (navigator.userActivation 이 없는 브라우저는 있었던 것으로 본다)
+//==============================================================================
+function hasStickyUserActivation() {
+	const navigator = System.navigator;
+	const userActivation = navigator ? navigator.userActivation : undefined;
+	if (!userActivation) {
+		return true;
+	}
+	return userActivation.hasBeenActive;
 }
 
 
