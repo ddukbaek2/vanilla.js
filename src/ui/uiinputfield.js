@@ -27,6 +27,7 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	/** @private @type { * } */ #engine;
 	/** @private @type { boolean } */ #useDOMInput;
+	/** @private @type { boolean } */ #useTouchEndFocus; // 손을 뗄 때(touchend)도 포커스를 줄지. (기본 false, setUseTouchEndFocus)
 	/** @private @type { HTMLInputElement | null } */ #domInput;
 	/** @private @type { Function | null } */ #canvasKeydownHandler;
 	/** @private @type { Function | null } */ #canvasFocusHandler;
@@ -81,6 +82,7 @@ export class UIInputField extends WorldNode {
 
 		this.#engine = null;
 		this.#useDOMInput = false;
+		this.#useTouchEndFocus = false;
 		this.#domInput = null;
 		this.#canvasKeydownHandler = null;
 		this.#canvasFocusHandler = null;
@@ -168,6 +170,11 @@ export class UIInputField extends WorldNode {
 	setEngine(engine) { this.#engine = engine; }
 	setUseDOMInput(use) { this.#useDOMInput = !!use; }
 	isUsingDOMInput() { return this.#useDOMInput; }
+	// DOM 입력일 때 손을 뗄 때(touchend)도 포커스를 줄지. (기본 false, 꺼져 있으면 touchstart 에서만 준다)
+	// 켜면 사용자 활성화가 한 번도 없던 때(페이지의 첫 touchstart)에 얻은 포커스를 손을 뗄 때 다시 줘,
+	// 그런 포커스에 키보드를 띄우지 않는 브라우저(안드로이드 크롬, 웹뷰)에서도 키보드가 뜨게 한다.
+	setUseTouchEndFocus(use) { this.#useTouchEndFocus = !!use; }
+	isUsingTouchEndFocus() { return this.#useTouchEndFocus; }
 
 	setText(text) {
 		this.#value = String(text || "");
@@ -518,10 +525,11 @@ export class UIInputField extends WorldNode {
 	//   호출을 막는 문제를 우회한다.
 	// - hit-test 통과 시: 동기 focus → 키보드 표시.
 	// - hit-test 실패 (필드 바깥 터치) 시: 현재 focus 상태면 blur → 키보드 숨김.
-	// - touchend 에서도 hit-test 통과 시 focus 한다. touchstart 는 사용자 활성화를
-	//   주지 않아, 페이지의 첫 터치가 필드면 안드로이드 크롬(웹뷰, 다른 출처의
-	//   iframe 포함)이 focus 는 받되 키보드를 띄우지 않는다. 그때 얻은 포커스면
-	//   (활성화를 주는) touchend 에서 blur 뒤 다시 focus 해 키보드를 띄운다.
+	// - setUseTouchEndFocus(true) 일 때만 touchend 에서도 hit-test 통과 시 focus
+	//   한다. touchstart 는 사용자 활성화를 주지 않아, 페이지의 첫 터치가 필드면
+	//   안드로이드 크롬(웹뷰, 다른 출처의 iframe 포함)이 focus 는 받되 키보드를
+	//   띄우지 않는다. 그때 얻은 포커스면 (활성화를 주는) touchend 에서 blur 뒤
+	//   다시 focus 해 키보드를 띄운다. 꺼져 있으면 touchend 는 아무것도 하지 않는다.
 	//==============================================================================
 	attachCanvasFocusHandler() {
 		if (this.#canvasFocusHandler) return;
@@ -532,6 +540,8 @@ export class UIInputField extends WorldNode {
 		const canvas = viewManager.getCanvas();
 		if (!canvas) return;
 		this.#canvasFocusHandler = (pointerEvent) => {
+			const isRelease = pointerEvent.type === "touchend";
+			if (isRelease && !this.#useTouchEndFocus) return;
 			let clientX;
 			let clientY;
 			const changedTouches = pointerEvent.changedTouches;
@@ -552,7 +562,6 @@ export class UIInputField extends WorldNode {
 			const viewInputPosition = viewManager.canvasPositionToViewPosition(canvasPosition);
 			const isVisibleInHierarchy = (typeof this.isVisibleInHierarchy === "function") ? this.isVisibleInHierarchy() : true;
 			const isInside = isVisibleInHierarchy && this.contains(viewInputPosition);
-			const isRelease = pointerEvent.type === "touchend";
 			if (isInside) {
 				if (isRelease && this.#focused && this.#isFocusedWithoutActivation) {
 					this.#domInput.blur();
