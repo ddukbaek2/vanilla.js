@@ -55,6 +55,10 @@ export class EngineConfiguration extends Object {
 	// 개발자 도구(F2 로 여닫는 패널과 기즈모)를 쓸지. 끄면 GameScene 이 만들지 않고 F2 도 받지 않는다.
 	// (켜면(기본) 지금까지와 같다. 출시 빌드처럼 사용자에게 보이면 안 되는 곳에서 끈다)
 	/** @type { boolean } */ useDevTools;
+	// 캔버스의 긴 쪽이 짧은 쪽의 몇 배까지인지. 0 이면 제한하지 않는다. (기본, 지금까지와 같다)
+	// 정하면 autoResizeOnWindowResize 로 맞출 때 창이 그보다 길쭉하면 캔버스를 그 비까지 줄여 창의 가운데에 둔다. (남는 곳은 페이지의 바탕)
+	// (게임 영역의 가로세로 비를 제한하는 포털처럼, 캔버스가 창을 다 채우면 안 되는 곳에서 정한다)
+	/** @type { number } */ maxCanvasAspectRatio;
 
 	//==============================================================================
 	// 생성.
@@ -74,6 +78,7 @@ export class EngineConfiguration extends Object {
 		this.ignoreVirtualKeyboardResize = false;
 		this.rebakeTextOnFontLoad = false;
 		this.useDevTools = true;
+		this.maxCanvasAspectRatio = 0;
 	}
 }
 
@@ -262,9 +267,26 @@ export class Engine extends Object {
 			this.#appliedClientNativeSize = clientNativeSize;
 			const canvas = viewManager.getCanvas();
 
-			// 캔버스 크기 스타일 조정. (사파리에서 필수)
-			canvas.style.width = `${clientNativeSize.x}px`;
-			canvas.style.height = `${clientNativeSize.y}px`;
+			// 설정: 캔버스의 가로세로 비 제한. (창이 그보다 길쭉하면 캔버스를 줄여 창의 가운데에 둔다)
+			const maxCanvasAspectRatio = engineConfiguration.maxCanvasAspectRatio;
+			if (maxCanvasAspectRatio > 0) {
+				const canvasWidth = System.Math.floor(System.Math.min(clientNativeSize.x, clientNativeSize.y * maxCanvasAspectRatio));
+				const canvasHeight = System.Math.floor(System.Math.min(clientNativeSize.y, clientNativeSize.x * maxCanvasAspectRatio));
+				const canvasLeft = System.Math.floor((clientNativeSize.x - canvasWidth) * 0.5);
+				const canvasTop = System.Math.floor((clientNativeSize.y - canvasHeight) * 0.5);
+				canvas.style.width = `${canvasWidth}px`;
+				canvas.style.height = `${canvasHeight}px`;
+				canvas.style.marginLeft = `${canvasLeft}px`;
+				canvas.style.marginTop = `${canvasTop}px`;
+			}
+			else {
+				// 캔버스 크기 스타일 조정. (사파리에서 필수)
+				canvas.style.width = `${clientNativeSize.x}px`;
+				canvas.style.height = `${clientNativeSize.y}px`;
+				// 제한을 끄면 가운데에 두던 여백을 지운다. (정한 적이 없으면 아무것도 바뀌지 않는다)
+				canvas.style.marginLeft = "";
+				canvas.style.marginTop = "";
+			}
 		}
 
 		// 뷰 영역 계산.
