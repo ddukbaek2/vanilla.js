@@ -28,6 +28,7 @@ export class UIInputField extends WorldNode {
 	/** @private @type { * } */ #engine;
 	/** @private @type { boolean } */ #useDOMInput;
 	/** @private @type { boolean } */ #useTouchEndFocus; // 손을 뗄 때(touchend)도 포커스를 줄지. (기본 false, setUseTouchEndFocus)
+	/** @private @type { boolean } */ #useDirectTouch; // DOM 입력을 필드 위에서 직접 누르게 할지. (기본 false, setUseDirectTouch)
 	/** @private @type { HTMLInputElement | null } */ #domInput;
 	/** @private @type { Function | null } */ #canvasKeydownHandler;
 	/** @private @type { Function | null } */ #canvasFocusHandler;
@@ -83,6 +84,7 @@ export class UIInputField extends WorldNode {
 		this.#engine = null;
 		this.#useDOMInput = false;
 		this.#useTouchEndFocus = false;
+		this.#useDirectTouch = false;
 		this.#domInput = null;
 		this.#canvasKeydownHandler = null;
 		this.#canvasFocusHandler = null;
@@ -175,6 +177,11 @@ export class UIInputField extends WorldNode {
 	// 그런 포커스에 키보드를 띄우지 않는 브라우저(안드로이드 크롬, 웹뷰)에서도 키보드가 뜨게 한다.
 	setUseTouchEndFocus(use) { this.#useTouchEndFocus = !!use; }
 	isUsingTouchEndFocus() { return this.#useTouchEndFocus; }
+	// DOM 입력을 필드 위에서 손가락(마우스)이 직접 누르게 할지. (기본 false, 꺼져 있으면 DOM 입력은 누름을 받지 않고 캔버스가 포커스를 준다)
+	// 켜면 필드가 보이는 동안 투명한 DOM 입력이 필드 자리에서 누름을 받아, 브라우저의 기본 동작으로 포커스(다른 출처의 iframe 이면 그 프레임까지)와
+	// 키보드를 연다. 코드로 준 포커스를 받지 않는 웹뷰(앱 안의 iframe 등)에서 쓴다. 포커스를 받으면 커서는 글 끝에 둔다.
+	setUseDirectTouch(use) { this.#useDirectTouch = !!use; }
+	isUsingDirectTouch() { return this.#useDirectTouch; }
 
 	setText(text) {
 		this.#value = String(text || "");
@@ -611,6 +618,15 @@ export class UIInputField extends WorldNode {
 		this.#domInput.style.top = `${canvasRect.top + globalPos.y * targetScale}px`;
 		this.#domInput.style.width = `${contentSize.x * targetScale}px`;
 		this.#domInput.style.height = `${contentSize.y * targetScale}px`;
+		if (this.#useDirectTouch) {
+			const isVisibleInHierarchy = (typeof this.isVisibleInHierarchy === "function") ? this.isVisibleInHierarchy() : true;
+			const pointerEvents = isVisibleInHierarchy ? "auto" : "none";
+			if (this.#domInput.style.pointerEvents !== pointerEvents) {
+				this.#domInput.style.pointerEvents = pointerEvents;
+				this.#domInput.style.userSelect = "text";
+				this.#domInput.style.webkitUserSelect = "text";
+			}
+		}
 	}
 
 	handleDOMInputEvent() {
@@ -713,6 +729,15 @@ export class UIInputField extends WorldNode {
 		this.#isFocusedWithoutActivation = !hasStickyUserActivation();
 		this.#blinkTimer = 0;
 		this.#cursorVisible = true;
+		// 직접 누름이면 브라우저가 투명한 글자의 누른 자리에 커서를 두므로, 그 뒤에 글 끝으로 옮긴다. (캔버스의 글자와 자리가 다르다)
+		if (this.#useDirectTouch && this.#domInput) {
+			const input = this.#domInput;
+			System.setTimeout(() => {
+				if (this.#domInput !== input) return;
+				const length = input.value.length;
+				input.setSelectionRange(length, length);
+			}, 0);
+		}
 	}
 	handleBlur() {
 		this.#focused = false;
