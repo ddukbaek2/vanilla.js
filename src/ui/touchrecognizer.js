@@ -30,6 +30,9 @@ const DELAY_PRESS_MS = 150;
 //     2) 그 위 ScrollView 에 touchPress(최초 누른 위치) → touchMove(현재) 를
 //        순서대로 보내 스크롤을 인계한다.
 // - 임계 이내면 누른 노드에만 touch* 를 보낸다. (기본 버튼처럼 동작)
+// - ScrollView 가 setPassesCrossAxisDrag(true) 면, 스크롤하지 않는 축으로 더 많이 끈
+//   손가락은 인계하지 않는다. 보류된 press 를 곧바로 hit 노드에 보내고 그 뒤 move 도
+//   hit 노드에 보낸다. (스크롤 안의 슬라이더를 가로로 끌 때)
 // - 부모에 ScrollView 가 있을 때는 hit 노드의 touchPress 전달을 DELAY_PRESS_MS
 //   만큼 지연시킨다. 그 사이 드래그로 판명나면 press 가 아예 전달되지 않으므로
 //   "프레스 트렌지션 도중 취소" 가 발생하지 않는다. 짧은 탭은 release 시점에
@@ -124,7 +127,19 @@ export class TouchRecognizer extends TouchRaycaster {
 		if (this.#scrollView && this.#pressPosition) {
 			const dx = viewInputPosition.x - this.#pressPosition.x;
 			const dy = viewInputPosition.y - this.#pressPosition.y;
-			if (System.Math.abs(dx) > DRAG_THRESHOLD || System.Math.abs(dy) > DRAG_THRESHOLD) {
+			if ((System.Math.abs(dx) > DRAG_THRESHOLD || System.Math.abs(dy) > DRAG_THRESHOLD) && !this.#scrollView.isScrollDrag(dx, dy)) {
+				// 스크롤하지 않는 축의 드래그. 이 손가락은 끝까지 hit 노드의 것이다.
+				this.#scrollView = null;
+				if (this.#pressTimerId !== null) {
+					System.clearTimeout(this.#pressTimerId);
+					this.#pressTimerId = null;
+					if (this.#target) {
+						this.#pressDelivered = true;
+						this.#target.touchPress(this.#pressPosition);
+					}
+				}
+			}
+			else if (System.Math.abs(dx) > DRAG_THRESHOLD || System.Math.abs(dy) > DRAG_THRESHOLD) {
 				this.#isDragging = true;
 				// 보류 중인 지연 press 가 있다면 취소. press 자체를 보내지 않으므로 cancel 도 불필요.
 				if (this.#pressTimerId !== null) {

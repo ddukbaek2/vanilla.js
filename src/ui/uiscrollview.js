@@ -58,6 +58,7 @@ export class UIScrollView extends UIView {
 	/** @private @type { boolean } */ #showsVerticalScrollBar;
 	/** @private @type { boolean } */ #showsHorizontalScrollBar;
 	/** @private @type { number } */ #wheelScrollScale;
+	/** @private @type { boolean } */ #passesCrossAxisDrag; // 스크롤하지 않는 축으로 끄는 손가락을 누른 노드에 남길지.
 
 	//==============================================================================
 	// 생성.
@@ -85,6 +86,7 @@ export class UIScrollView extends UIView {
 		this.#showsVerticalScrollBar = false;
 		this.#showsHorizontalScrollBar = false;
 		this.#wheelScrollScale = WHEEL_SCROLL_SCALE;
+		this.#passesCrossAxisDrag = false;
 	}
 
 	//==============================================================================
@@ -404,6 +406,57 @@ export class UIScrollView extends UIView {
 	 */
 	isVertical() {
 		return this.#verticalEnabled;
+	}
+
+	//==============================================================================
+	// 스크롤하지 않는 축으로 끄는 손가락을 누른 노드에 남길지 설정. (기본 false)
+	// - false 면 지금까지처럼 어느 쪽이든 드래그 임계를 넘으면 스크롤 뷰가 가져간다.
+	// - true 면 세로만 스크롤하는 뷰에서 가로로 더 많이 끈 손가락(가로만이면 세로로)은 가져가지 않고,
+	//   누른 노드(슬라이더 등)가 곧바로 누름을 받아 끝까지 끈다. 두 축 모두 스크롤하면 늘 가져간다.
+	//==============================================================================
+	/**
+	 * @param { boolean } passes
+	 */
+	setPassesCrossAxisDrag(passes) {
+		this.#passesCrossAxisDrag = !!passes;
+	}
+
+	//==============================================================================
+	// 스크롤하지 않는 축으로 끄는 손가락을 누른 노드에 남기는지 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isPassingCrossAxisDrag() {
+		return this.#passesCrossAxisDrag;
+	}
+
+	//==============================================================================
+	// 끈 방향이 이 뷰가 가져갈 드래그인지. (스크롤하지 않는 축의 드래그를 남기는 옵션을 켰을 때만 가려낸다)
+	//==============================================================================
+	/**
+	 * @param { number } deltaX
+	 * @param { number } deltaY
+	 * @returns { boolean }
+	 */
+	isScrollDrag(deltaX, deltaY) {
+		if (!this.#passesCrossAxisDrag) {
+			return true;
+		}
+		const horizontalEnabled = this.#horizontalEnabled;
+		const verticalEnabled = this.#verticalEnabled;
+		if (horizontalEnabled && verticalEnabled) {
+			return true;
+		}
+		const absoluteX = System.Math.abs(deltaX);
+		const absoluteY = System.Math.abs(deltaY);
+		if (verticalEnabled) {
+			return absoluteY >= absoluteX;
+		}
+		if (horizontalEnabled) {
+			return absoluteX >= absoluteY;
+		}
+		return false;
 	}
 
 	//==============================================================================

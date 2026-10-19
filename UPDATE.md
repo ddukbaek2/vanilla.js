@@ -1,5 +1,8 @@
 # 업데이트 기록
 
+# 0.3.24 (2026-10-20)
+- UIScrollView: setPassesCrossAxisDrag(passes) / isPassingCrossAxisDrag() / isScrollDrag(deltaX, deltaY). (기본 false, 꺼져 있으면 지금까지와 같다) 켜면 세로만 스크롤하는 뷰에서 가로로 더 많이 끈 손가락(가로만 스크롤하면 세로로 더 많이 끈 손가락)은 TouchRecognizer 가 뷰로 넘기지 않는다. 보류된 누름을 곧바로 누른 노드에 보내고 그 뒤의 이동과 뗌도 그 노드가 받는다. 두 축 모두 스크롤하는 뷰는 늘 가져간다. (스크롤 안의 슬라이더를 가로로 끌 때, 드래그 임계를 넘자마자 세로 스크롤이 손가락을 가져가 슬라이더가 움직이지 않던 것)
+
 # 0.3.23 (2026-10-13)
 - EngineConfiguration: maxCanvasAspectRatio. (기본 0, 제한하지 않아 지금까지와 같다) 캔버스의 긴 쪽이 짧은 쪽의 몇 배까지인지. 정하면 autoResizeOnWindowResize 로 맞출 때 창이 그보다 길쭉하면 캔버스를 그 비까지 줄이고, 왼쪽과 위의 여백(margin)으로 창의 가운데에 둔다. 남는 곳은 페이지의 바탕이다. 실행 중에 바꾸면 resize() 를 불러 맞춘다. 입력 좌표와 뷰 계산은 지금처럼 캔버스의 실제 자리(getBoundingClientRect)를 읽으므로 그대로 맞는다. (게임 영역의 가로세로 비를 제한하는 웹 게임 포털에서 쓴다)
 
