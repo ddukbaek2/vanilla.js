@@ -108,40 +108,6 @@ export class AudioManager extends Object {
 	}
 
 	//==============================================================================
-	// 오디오 컨텍스트 다시 만들기.
-	// - 지금의 AudioContext 를 닫고(close) 새로 만든 뒤 재개를 시도한다. (user gesture 전이면 재개는 no-op)
-	// - iOS WebKit 은 앱 전환 뒤 재개한 컨텍스트가 "running" 인데도 currentTime 이 흐르지 않아
-	//   소리가 나지 않는 일이 있다. 상태로는 알 수 없고 suspend / resume 으로도 돌아오지 않을 때 쓴다.
-	//   (페이지를 다시 열면 소리가 돌아오는 것처럼 새 컨텍스트는 소리를 낸다)
-	// - 이전에 만든 AudioPlayer 와 SoundEffectPool 은 닫힌 컨텍스트에 묶여 있으므로 부른 쪽이 다시 만든다.
-	//   AudioAsset 의 버퍼는 컨텍스트에 묶이지 않아 그대로 쓴다.
-	// - 엔진은 스스로 부르지 않는다. (부르지 않으면 지금까지와 같다)
-	//==============================================================================
-	/**
-	 * @returns { AudioContext | null }
-	 */
-	recreateContext() {
-		const audioContext = this.#audioContext;
-		this.#audioContext = null;
-		if (audioContext) {
-			try {
-				const result = audioContext.close();
-				if (result && typeof result.catch === "function") {
-					result.catch(() => {
-						// 이미 닫혔거나 닫을 수 없는 컨텍스트. 버린다.
-					});
-				}
-			}
-			catch (error) {
-				// 동기 예외도 무시.
-			}
-		}
-		const newAudioContext = this.ensureAudioContext();
-		this.resumeContext();
-		return newAudioContext;
-	}
-
-	//==============================================================================
 	// 오디오 플레이어 생성.
 	//==============================================================================
 	/**
