@@ -1,5 +1,8 @@
 # 업데이트 기록
 
+# 0.3.26 (2026-10-22)
+- AudioManager: recreateContext(). (엔진은 스스로 부르지 않아, 부르지 않으면 지금까지와 같다) 지금의 AudioContext 를 닫고 새로 만든 뒤 재개를 시도하고 새 컨텍스트를 돌려준다. 이전에 만든 AudioPlayer 와 SoundEffectPool 은 닫힌 컨텍스트에 묶여 있으므로 부른 쪽이 다시 만든다. AudioAsset 의 버퍼는 그대로 쓴다. iOS WebKit 에서 앱 전환 뒤 재개한 컨텍스트가 "running" 인데도 currentTime 이 흐르지 않아 소리가 나지 않을 때 쓴다. (상태로는 알 수 없고, 돌아온 순간의 resume() 이 "Failed to start the audio device" 로 실패한 뒤 생겼다)
+
 # 0.3.25 (2026-10-21)
 - EngineConfiguration: resumeAudioOnTouchEnd. (기본 false, 꺼져 있으면 지금까지와 같다) 켜면 손을 뗄 때(touchend, pointerup)에도 사용자 입력으로 보고 오디오 컨텍스트를 깨운다. (markUserGesture 와 resumeContext) touchstart 는 사용자 활성화를 주지 않아, iOS WebKit 에서 앱 전환이나 전면 광고로 멈춘(suspended, interrupted) 컨텍스트에 resume() 을 불러도 깨어나지 않았다. 캔버스를 끄는 조작은 기본 동작을 막아 click 이 생기지 않으므로, 화면을 끌기만 하는 게임은 한 번 포커스를 잃으면 소리가 돌아오지 않았다. 생성 때 정한다. (리스너를 그때 단다)
 
