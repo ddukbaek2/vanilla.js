@@ -107,8 +107,12 @@ export class UIView extends Component {
 		}
 
 		//  컨텐트 영역 출력.
-		const contentSize = node.getContentSize();
+		// 투명한 바탕은 그리지 않는다. (보이지 않는 드로우가 묶어 그리기를 끊지 않게)
 		const backgroundColor = this.getBackgroundColor();
+		if (backgroundColor.alpha <= 0) {
+			return;
+		}
+		const contentSize = node.getContentSize();
 		const backgroundRect = Rect.create(0, 0, contentSize.x, contentSize.y);
 		graphic.setFillColor(backgroundColor);
 		graphic.drawRect(backgroundRect);

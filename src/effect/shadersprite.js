@@ -705,7 +705,7 @@ export class ShaderSprite extends Sprite {
 
 		const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
 		let imageRect = this.getImageRect();
-		if (imageRect === null || imageRect === undefined || imageRect.equals(Rect.zero())) {
+		if (imageRect === null || imageRect === undefined || imageRect.isZero()) {
 			imageRect = Rect.create(0, 0, image.width, image.height);
 		}
 		const imageWidth = System.Math.max(1, image.width);

@@ -19,6 +19,7 @@ export class AudioPlayer {
 	/** @private @type { GainNode | null } */ #gainNode;
 	/** @private @type { boolean } */ #isPlaying;
 	/** @private @type { boolean } */ #isMuted;
+	/** @private @type { number } */ #volume; // 음량. (0 ~ 1, 음소거를 풀면 이 음량으로 돌아간다)
 	/** @private @type { boolean } */ #isLoop; // 루프 여부.
 	/** @private @type { number } */ #time; // 재생 위치 (초). play() 호출 시 이 위치부터 재생.
 
@@ -36,6 +37,7 @@ export class AudioPlayer {
 		this.#gainNode = null;
 		this.#isPlaying = false;
 		this.#isMuted = false;
+		this.#volume = 1;
 		this.#isLoop = false;
 		this.#time = 0;
 
@@ -134,13 +136,37 @@ export class AudioPlayer {
 	}
 
 	//==============================================================================
-	// 음소거 해제.
+	// 음소거 해제. (설정한 음량으로 돌아간다)
 	//==============================================================================
 	unmute() {
 		if (this.#gainNode) {
-			this.#gainNode.gain.value = 1;
+			this.#gainNode.gain.value = this.#volume;
 			this.#isMuted = false;
 		}
+	}
+
+	//==============================================================================
+	// 음량 설정. (0 ~ 1, 음소거 중이면 음소거를 풀 때 적용된다)
+	//==============================================================================
+	/**
+	 * @param { number } volume
+	 */
+	setVolume(volume) {
+		const clampedVolume = System.Number.isFinite(volume) ? System.Math.max(0, System.Math.min(1, volume)) : 1;
+		this.#volume = clampedVolume;
+		if (this.#gainNode && !this.#isMuted) {
+			this.#gainNode.gain.value = clampedVolume;
+		}
+	}
+
+	//==============================================================================
+	// 음량 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getVolume() {
+		return this.#volume;
 	}
 
 	//==============================================================================

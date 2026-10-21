@@ -176,6 +176,7 @@ export class Pane {
     
     /** @private @type { boolean } */ #isResizable; 
     /** @private @type { Object } */ #resizableEdges; 
+    /** @private @type { boolean } */ #isVisible;
     
     /** @private @type { Function } */ #onResizeCallback;
     /** @private @type { Pane } */ #parentPane;
@@ -206,6 +207,7 @@ export class Pane {
         this.#isResizable = options.isResizable !== undefined ? options.isResizable : true;
         this.#resizableEdges = options.resizableEdges || { top: true, bottom: true, left: true, right: true };
 
+        this.#isVisible = true;
         this.#children = [];
         this.#resizers = [];
         this.#parentPane = null;
@@ -351,17 +353,25 @@ export class Pane {
 
         if (this.#children.length === 0) return;
 
+        // 숨긴 자식과 맞닿은 리사이저는 숨기고 두께에서 뺀다.
         let totalResizerThick = 0;
-        this.#resizers.forEach(r => totalResizerThick += parseInt(r.dataset.thickness));
+        for (let i = 0; i < this.#resizers.length; i++) {
+            const isResizerVisible = this.#children[i].isVisible() && this.#children[i + 1].isVisible();
+            this.#resizers[i].style.display = isResizerVisible ? "" : "none";
+            if (isResizerVisible) totalResizerThick += parseInt(this.#resizers[i].dataset.thickness);
+        }
 
         const avail = (this.#direction === "horizontal" ? w : h) - totalResizerThick;
         
         let used = 0;
         let flexCount = 0;
+        let lastVisibleIndex = -1;
         const sizes = new Array(this.#children.length).fill(0);
 
         for (let i = 0; i < this.#children.length; i++) {
             const child = this.#children[i];
+            if (!child.isVisible()) continue;
+            lastVisibleIndex = i;
             if (child.isFlex()) {
                 flexCount++;
             } else {
@@ -377,12 +387,13 @@ export class Pane {
 
         const perFlex = flexCount > 0 ? Math.max(0, avail - used) / flexCount : 0;
         for (let i = 0; i < this.#children.length; i++) {
-            if (this.#children[i].isFlex()) sizes[i] = perFlex;
+            if (this.#children[i].isVisible() && this.#children[i].isFlex()) sizes[i] = perFlex;
         }
 
         let offset = 0;
         for (let i = 0; i < this.#children.length; i++) {
-            const childSize = (i === this.#children.length - 1) ? 
+            if (!this.#children[i].isVisible()) continue;
+            const childSize = (i === lastVisibleIndex) ? 
                 (this.#direction === "horizontal" ? w : h) - offset : sizes[i];
             
             if (this.#direction === "horizontal") {
@@ -392,7 +403,7 @@ export class Pane {
             }
             
             offset += childSize;
-            if (i < this.#resizers.length) {
+            if (i < this.#resizers.length && this.#resizers[i].style.display !== "none") {
                 const r = this.#resizers[i];
                 const thick = parseInt(r.dataset.thickness);
                 if (this.#direction === "horizontal") {
@@ -430,6 +441,18 @@ export class Pane {
         System.requestAnimationFrame(run);
     }
 
+    //==============================================================================
+    // 보이기 / 숨기기. (숨긴 패널은 자리를 차지하지 않고, 맞닿은 리사이저도 숨는다)
+    //==============================================================================
+    setVisible(isVisible) {
+        this.#isVisible = isVisible;
+        this.#container.style.display = isVisible ? "" : "none";
+        let root = this;
+        while (root.#parentPane) root = root.#parentPane;
+        root.refresh();
+    }
+
+    isVisible() { return this.#isVisible; }
     isFlex() { return this.#initialSize === 0; }
     getInitialSize() { return this.#initialSize; }
     getFixedSize() { return this.#fixedSize; }

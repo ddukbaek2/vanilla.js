@@ -18,6 +18,10 @@ import { AudioManager } from "./audiomanager.js";
 import { FontAsset } from "../resource/fontasset.js";
 
 
+// 최대 FPS 제한에서 간격을 덜 요구하는 여유. (밀리초) 주사율의 흔들림 때문에 제 간격보다 조금 일찍 온 프레임을 건너뛰지 않게 한다.
+const FRAME_LIMIT_TOLERANCE_MILLISECONDS = 4;
+
+
 
 //==============================================================================
 // 엔진 설정.
@@ -35,6 +39,31 @@ export class EngineConfiguration extends Object {
 	// 프레임이 끝난 뒤에도 그린 것을 캔버스에 남길지. 캔버스 위에 후처리를 얹는 프로젝트가 켠다.
 	// (다른 캔버스가 texImage2D 나 drawImage 로 읽으려면 필요하다) 한 번 더 복사하는 만큼 비용이 있다.
 	/** @type { boolean } */ preserveDrawingBuffer;
+	// 최대 FPS. 0 이면 제한하지 않는다. (화면 주사율을 따른다) 정하면 그보다 빨리 온 프레임은 건너뛰어
+	// 주사율이 높거나 프레임이 들쭉날쭉한 기기에서도 고른 간격으로 돈다.
+	/** @type { number } */ maximumFramePerSecond;
+	// 기본 폰트(DOSGothic) 주소. run() 이 뒤에서 불러온다. 빈 글이면 불러오지 않는다.
+	// (인터넷 없이 도는 데스크탑 앱이나 외부 요청을 막은 페이지는 비우거나 자체 경로를 준다)
+	/** @type { string } */ defaultFontUrl;
+	// 글자 입력칸이 포커스된 동안 가로는 그대로이고 세로만 줄어드는 리사이즈를 무시할지. (모바일의 화면 키보드)
+	// 끄면(기본) iOS 사파리에서 키보드가 뜰 때 visualViewport 의 세로가 줄어 캔버스와 화면 전체가 작아진다. 키보드가 내려가면 다시 맞춘다.
+	/** @type { boolean } */ ignoreVirtualKeyboardResize;
+	// 웹 폰트가 늦게 받아지면 그 폰트로 구운 글자 텍스처 가운데 그 폰트의 글자 범위에 든 것만 버려 다시 굽게 할지.
+	// 끄면(기본) 받기 전에 다른 폰트로 구운 글자는 캐시에서 밀려날 때까지 그대로 남는다.
+	// (unicode-range 로 나눈 폰트 조각을 그때그때 받는 프로젝트가 켠다. 받은 조각마다 그 글자만 다시 구우므로 프레임이 크게 길어지지 않는다)
+	/** @type { boolean } */ rebakeTextOnFontLoad;
+	// 개발자 도구(F2 로 여닫는 패널과 기즈모)를 쓸지. 끄면 GameScene 이 만들지 않고 F2 도 받지 않는다.
+	// (켜면(기본) 지금까지와 같다. 출시 빌드처럼 사용자에게 보이면 안 되는 곳에서 끈다)
+	/** @type { boolean } */ useDevTools;
+	// 캔버스의 긴 쪽이 짧은 쪽의 몇 배까지인지. 0 이면 제한하지 않는다. (기본, 지금까지와 같다)
+	// 정하면 autoResizeOnWindowResize 로 맞출 때 창이 그보다 길쭉하면 캔버스를 그 비까지 줄여 창의 가운데에 둔다. (남는 곳은 페이지의 바탕)
+	// (게임 영역의 가로세로 비를 제한하는 포털처럼, 캔버스가 창을 다 채우면 안 되는 곳에서 정한다)
+	/** @type { number } */ maxCanvasAspectRatio;
+	// 손을 뗄 때(touchend, pointerup)에도 오디오 컨텍스트를 깨울지. 생성 때 정한다.
+	// 끄면(기본) 지금까지처럼 click, touchstart, keydown 에서만 깨운다. touchstart 는 사용자 활성화를 주지 않아,
+	// iOS WebKit 에서 앱 전환이나 전면 광고로 멈춘(suspended, interrupted) 컨텍스트를 화면을 끌기만 하는 게임이 다시 깨우지 못했다.
+	// (캔버스를 끄는 조작이 기본 동작을 막아 click 이 생기지 않는 게임이 켠다)
+	/** @type { boolean } */ resumeAudioOnTouchEnd;
 
 	//==============================================================================
 	// 생성.
@@ -49,6 +78,13 @@ export class EngineConfiguration extends Object {
 		this.autoResizeOnWindowResize = false;
 		this.title = "";
 		this.preserveDrawingBuffer = false;
+		this.maximumFramePerSecond = 0;
+		this.defaultFontUrl = "https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff";
+		this.ignoreVirtualKeyboardResize = false;
+		this.rebakeTextOnFontLoad = false;
+		this.useDevTools = true;
+		this.maxCanvasAspectRatio = 0;
+		this.resumeAudioOnTouchEnd = false;
 	}
 }
 
@@ -69,9 +105,11 @@ export class Engine extends Object {
 	/** @private @type { InputManager } */ #inputManager;
 	/** @private @type { AudioManager } */ #audioManager;
 	/** @private @type { () => void  } */ #resizeCallback;
+	/** @private @type { Vector2 | null } */ #appliedClientNativeSize; // 마지막으로 캔버스에 준 CSS 크기.
 	/** @private @type { () => void  } */ #resumeCallback;
 	/** @private @type { FrameRequestCallback } */ #updateEngineCallback;
 	/** @private @type { number } */ #frameNumber;
+	/** @private @type { number } */ #lastFrameTimestamp; // 마지막으로 처리한 프레임의 시각. (최대 FPS 제한용, 밀리초, 아직 없으면 -1)
 	/** @private @type { Rect } */ #statisticsTextRect;
 	/** @private @type { Version } */ #version;
 
@@ -109,11 +147,13 @@ export class Engine extends Object {
 		this.#audioManager = new AudioManager(this);
 
 		this.#resizeCallback = this.resize.bind(this);
+		this.#appliedClientNativeSize = null;
 		// 일반 resume (visibilitychange/focus 등) — user gesture 가 아닐 수 있으므로
 		// AudioManager 가 hasUserGesture 체크 후 silently skip.
 		this.#resumeCallback = this.resume.bind(this);
 		this.#updateEngineCallback = this.updateEngine.bind(this);
 		this.#frameNumber = 0;
+		this.#lastFrameTimestamp = -1;
 
 		this.#statisticsTextRect = Rect.zero();
 		this.#version = Version.create(0, 3, 0);
@@ -161,8 +201,22 @@ export class Engine extends Object {
 		};
 		startEngine();
 
-		// 기본 폰트는 뒤에서 불러온다. (성공하면 이후 그리는 글자부터 반영)
-		const internalFontFace = new FontFace(`DOSGothic`, `url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff")`);
+		// 웹 폰트가 받아질 때마다 그 폰트의 글자로 구운 텍스처만 다시 굽게 한다. (옵션)
+		const engineConfiguration = this.getEngineConfiguration();
+		if (engineConfiguration.rebakeTextOnFontLoad && System.document.fonts) {
+			System.document.fonts.addEventListener("loadingdone", (fontFaceSetLoadEvent) => {
+				const graphic = this.getGraphic();
+				const textStringTextureCache = graphic.getTextStringTextureCache();
+				textStringTextureCache.invalidateFontFaces(fontFaceSetLoadEvent.fontfaces);
+			});
+		}
+
+		// 기본 폰트는 뒤에서 불러온다. (성공하면 이후 그리는 글자부터 반영) 주소가 비었으면 불러오지 않는다.
+		const defaultFontUrl = engineConfiguration.defaultFontUrl;
+		if (!defaultFontUrl) {
+			return;
+		}
+		const internalFontFace = new FontFace(`DOSGothic`, `url("${defaultFontUrl}")`);
 		// const internalFontFace = new FontFace(`DOSGothic`, `url("./assets/fonts/Consolas.woff2")`);
 		internalFontFace.load().then((loadedFont) => {
 			document.fonts.add(loadedFont);
@@ -204,13 +258,41 @@ export class Engine extends Object {
 			//  layout viewport 와 visual viewport 가 다를 때 후자가 실제 보이는 영역)
 			const visualViewport = System.window.visualViewport;
 			const clientWidth = visualViewport ? visualViewport.width : System.window.innerWidth;
-			const clientHeight = visualViewport ? visualViewport.height : System.window.innerHeight;
+			let clientHeight = visualViewport ? visualViewport.height : System.window.innerHeight;
+
+			// 화면 키보드: 글자 입력칸이 포커스된 동안 가로가 같고 세로만 줄었으면 크기를 그대로 둔다. (설정으로 켠다)
+			const appliedClientNativeSize = this.#appliedClientNativeSize;
+			const isTextInputFocused = this.isTextInputFocused();
+			if (engineConfiguration.ignoreVirtualKeyboardResize && isTextInputFocused && appliedClientNativeSize !== null) {
+				const isSameWidth = System.Math.abs(clientWidth - appliedClientNativeSize.x) < 1;
+				if (isSameWidth && clientHeight < appliedClientNativeSize.y) {
+					clientHeight = appliedClientNativeSize.y;
+				}
+			}
 			const clientNativeSize = Vector2.create(clientWidth, clientHeight);
+			this.#appliedClientNativeSize = clientNativeSize;
 			const canvas = viewManager.getCanvas();
 
-			// 캔버스 크기 스타일 조정. (사파리에서 필수)
-			canvas.style.width = `${clientNativeSize.x}px`;
-			canvas.style.height = `${clientNativeSize.y}px`;
+			// 설정: 캔버스의 가로세로 비 제한. (창이 그보다 길쭉하면 캔버스를 줄여 창의 가운데에 둔다)
+			const maxCanvasAspectRatio = engineConfiguration.maxCanvasAspectRatio;
+			if (maxCanvasAspectRatio > 0) {
+				const canvasWidth = System.Math.floor(System.Math.min(clientNativeSize.x, clientNativeSize.y * maxCanvasAspectRatio));
+				const canvasHeight = System.Math.floor(System.Math.min(clientNativeSize.y, clientNativeSize.x * maxCanvasAspectRatio));
+				const canvasLeft = System.Math.floor((clientNativeSize.x - canvasWidth) * 0.5);
+				const canvasTop = System.Math.floor((clientNativeSize.y - canvasHeight) * 0.5);
+				canvas.style.width = `${canvasWidth}px`;
+				canvas.style.height = `${canvasHeight}px`;
+				canvas.style.marginLeft = `${canvasLeft}px`;
+				canvas.style.marginTop = `${canvasTop}px`;
+			}
+			else {
+				// 캔버스 크기 스타일 조정. (사파리에서 필수)
+				canvas.style.width = `${clientNativeSize.x}px`;
+				canvas.style.height = `${clientNativeSize.y}px`;
+				// 제한을 끄면 가운데에 두던 여백을 지운다. (정한 적이 없으면 아무것도 바뀌지 않는다)
+				canvas.style.marginLeft = "";
+				canvas.style.marginTop = "";
+			}
 		}
 
 		// 뷰 영역 계산.
@@ -232,6 +314,32 @@ export class Engine extends Object {
 				console.error(error);
 			}
 		}
+	}
+
+	//==============================================================================
+	// 글자 입력칸이 포커스되어 있는지. (input 의 글자 종류, textarea, contenteditable)
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isTextInputFocused() {
+		const activeElement = System.document.activeElement;
+		if (!activeElement) {
+			return false;
+		}
+		if (activeElement.isContentEditable) {
+			return true;
+		}
+		const tagName = activeElement.tagName;
+		if (tagName === "TEXTAREA") {
+			return true;
+		}
+		if (tagName !== "INPUT") {
+			return false;
+		}
+		const inputType = (activeElement.type || "text").toLowerCase();
+		const nonTextInputTypes = ["button", "checkbox", "color", "file", "hidden", "image", "radio", "range", "reset", "submit"];
+		return !nonTextInputTypes.includes(inputType);
 	}
 
 	//==============================================================================
@@ -433,6 +541,11 @@ export class Engine extends Object {
 		System.window.addEventListener("click", userGestureHandler);
 		System.window.addEventListener("touchstart", userGestureHandler);
 		System.window.addEventListener("keydown", userGestureHandler);
+		// touchend 와 (마우스가 아닌) pointerup 은 사용자 활성화를 준다. (켠 때만)
+		if (this.#engineConfiguration.resumeAudioOnTouchEnd) {
+			System.window.addEventListener("touchend", userGestureHandler);
+			System.window.addEventListener("pointerup", userGestureHandler);
+		}
 		System.window.addEventListener("focus", this.#resumeCallback);
 		System.document.addEventListener("visibilitychange", () => {
 			if (System.document.visibilityState === "visible") {
@@ -627,6 +740,12 @@ export class Engine extends Object {
 		drawStatisticsText(`time: ${time}s`);
 		drawStatisticsText(`framePerSecond: ${framePerSecond}`);
 		drawStatisticsText(`timeDelta: ${timeDelta}s`);
+		const drawCallCount = graphic.getLastFrameDrawCallCount();
+		const vertexCount = graphic.getLastFrameVertexCount();
+		const triangleCount = graphic.getLastFrameTriangleCount();
+		drawStatisticsText(`drawCalls: ${drawCallCount}`);
+		drawStatisticsText(`vertices: ${vertexCount}`);
+		drawStatisticsText(`triangles: ${triangleCount}`);
 		// drawOutlineText(``);
 
 		// // 메모리 사용 정보 출력.
@@ -682,6 +801,19 @@ export class Engine extends Object {
 	 */
 	updateEngine(timestamp) {
 
+		// 최대 FPS 제한. (정한 간격보다 빨리 온 프레임은 건너뛴다. 주사율의 흔들림을 받아 주려고 간격을 조금 덜 요구한다)
+		const engineConfiguration = this.getEngineConfiguration();
+		const maximumFramePerSecond = engineConfiguration.maximumFramePerSecond;
+		if (maximumFramePerSecond > 0) {
+			const frameInterval = 1000 / maximumFramePerSecond;
+			const elapsedMilliseconds = timestamp - this.#lastFrameTimestamp;
+			if (this.#lastFrameTimestamp >= 0 && elapsedMilliseconds < frameInterval - FRAME_LIMIT_TOLERANCE_MILLISECONDS) {
+				System.window.requestAnimationFrame(this.#updateEngineCallback);
+				return;
+			}
+			this.#lastFrameTimestamp = timestamp;
+		}
+
 		// 렌더러 처리.
 		const graphic = this.getGraphic();
 		graphic.applySettings(this);
@@ -700,6 +832,9 @@ export class Engine extends Object {
 		// this.CanvasContext.imageSmoothingEnabled = true;
     	// this.CanvasContext.imageSmoothingQuality = "high";
 		// this.canvasRenderingContext.canvas.style.textRendering = "optimizeLegibility";
+
+		// 그리기 통계. (지난 프레임 값을 넘겨 두고 이번 프레임을 새로 센다)
+		graphic.beginFrameStatistics();
 
 		// 씬 처리.
 		const sceneManager = this.getSceneManager();
@@ -731,10 +866,12 @@ export class Engine extends Object {
 		}
 
 		// 개발 정보 출력.
-		const engineConfiguration = this.getEngineConfiguration();
 		if (engineConfiguration.useStatistics) {
 			this.drawStatistics(graphic);
 		}
+
+		// 묶어 그리기로 쌓여 남은 것을 그린다.
+		graphic.flushSpriteBatch();
 		
 		// 입력 관련해서 상태 유지가 아닌, 현재 프레임이 끝난 후에는 다음 프레임에서는 상태를 유지하지 않음. (1회성)
 		inputManager.setTouchPressed(false);

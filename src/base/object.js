@@ -15,7 +15,7 @@ export class Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { string } */ #instanceId; // 고유식별자.
+	/** @private @type { string } */ #instanceId; // 고유식별자. (처음 getInstanceId() 를 부를 때 만든다, 아직이면 빈 글)
 	/** @private @type { boolean } */ #isDestroyed; // 고유식별자.
 
 	//==============================================================================
@@ -25,7 +25,8 @@ export class Object {
 	 * @constant
 	 */
 	constructor() {
-		this.#instanceId = Reflection.createGUID();
+		// 고유식별자는 처음 부를 때 만든다. (Vector2, Rect, Color 처럼 많이 만드는 값 객체가 만들 때마다 GUID 를 짓지 않게)
+		this.#instanceId = "";
 		this.#isDestroyed = false;
 	}
 
@@ -71,6 +72,9 @@ export class Object {
 	 * @returns { string }
 	 */
 	getInstanceId() {
+		if (this.#instanceId === "") {
+			this.#instanceId = Reflection.createGUID();
+		}
 		return this.#instanceId;
 	}
 

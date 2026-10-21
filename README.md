@@ -4,7 +4,7 @@
 
 **외부 의존성 없이 바닐라 자바스크립트로 만드는 경량 웹게임 엔진**
 
-[![version](https://img.shields.io/badge/version-0.3.1-d4b06a?style=flat-square)](UPDATE.md)
+[![version](https://img.shields.io/badge/version-0.3.12-d4b06a?style=flat-square)](UPDATE.md)
 [![license](https://img.shields.io/badge/license-MIT-3f3f46?style=flat-square)](LICENSE)
 [![dependencies](https://img.shields.io/badge/dependencies-0-3f3f46?style=flat-square)](import.js)
 [![renderer](https://img.shields.io/badge/renderer-WebGL2-3f3f46?style=flat-square)](src/core/graphic.js)
@@ -148,8 +148,9 @@ UPDATE.md       업데이트 기록
 ## 링크
 
 - 저장소: <https://github.com/ddukbaek2/vanilla.js>
-- 템플릿: <https://github.com/ddukbaek2/playablegames-template>
-- 배포 페이지: <https://ddukbaek2.com/vanilla.js>
+- 템플릿: <https://github.com/ddukbaek2/playablegame-template>
+- 템플릿: <https://github.com/ddukbaek2/retrogame-template>
+- 배포 페이지: <https://ddukbaek2.com>
 
 ## 라이선스
 

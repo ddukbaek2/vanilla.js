@@ -61,6 +61,79 @@ export function getMeasurementCanvasRenderingContext() {
 
 
 //==============================================================================
+// 글자 묶음과 단어로 나누기. (줄바꿈 용, Intl.Segmenter 가 있으면 쓴다)
+// - 글자 묶음(grapheme): 받침, 성조, 결합 부호가 앞 글자에서 떨어지지 않는다. 없으면 코드 포인트 단위.
+// - 단어: 태국어, 라오어, 크메르어, 버마어, 한중일처럼 공백 없이 쓰는 글자도 단어 사이를 찾는다.
+//   문장 부호처럼 단어가 아닌 조각은 앞 단어에 붙인다. (줄 맨 앞에 문장 부호가 오지 않게) 없으면 통째로 한 조각.
+//   줄바꿈 없는 빈칸(U+00A0)으로 이은 단어 사이는 나누지 않는다. (이름과 값, 숫자와 단위처럼 함께 있어야 하는 것)
+//==============================================================================
+let graphemeSegmenter = null;
+let wordSegmenter = null;
+// 줄바꿈 없는 빈칸. (이 빈칸으로 이은 단어 사이에서는 줄을 바꾸지 않는다)
+const NO_BREAK_SPACE = " ";
+
+/**
+ * @param { string } text
+ * @returns { string[] }
+ */
+export function splitGraphemes(text) {
+	if (graphemeSegmenter === null && System.Intl && typeof System.Intl.Segmenter === "function") {
+		graphemeSegmenter = new System.Intl.Segmenter(undefined, { granularity: "grapheme" });
+	}
+	if (graphemeSegmenter === null) {
+		return System.Array.from(text);
+	}
+	const pieces = [];
+	for (const segmentData of graphemeSegmenter.segment(text)) {
+		pieces.push(segmentData.segment);
+	}
+	return pieces;
+}
+
+/**
+ * @param { string } text
+ * @returns { string[] } 단어마다 한 조각. (단어가 아닌 조각은 앞 단어에 붙인다, 줄바꿈 없는 빈칸으로 이은 단어는 한 조각)
+ */
+export function splitWords(text) {
+	if (wordSegmenter === null && System.Intl && typeof System.Intl.Segmenter === "function") {
+		wordSegmenter = new System.Intl.Segmenter(undefined, { granularity: "word" });
+	}
+	if (wordSegmenter === null) {
+		return [text];
+	}
+	const pieces = [];
+	let pendingPrefix = "";
+	// 앞 조각이 줄바꿈 없는 빈칸(U+00A0)으로 끝나 다음 단어를 이어 붙여야 하는지.
+	let isGluedToPrevious = false;
+	for (const segmentData of wordSegmenter.segment(text)) {
+		if (segmentData.isWordLike) {
+			if (isGluedToPrevious && pieces.length > 0) {
+				pieces[pieces.length - 1] += segmentData.segment;
+			}
+			else {
+				pieces.push(pendingPrefix + segmentData.segment);
+			}
+			pendingPrefix = "";
+			isGluedToPrevious = false;
+		}
+		else if (pieces.length > 0) {
+			pieces[pieces.length - 1] += segmentData.segment;
+			if (segmentData.segment.includes(NO_BREAK_SPACE)) {
+				isGluedToPrevious = true;
+			}
+		}
+		else {
+			pendingPrefix += segmentData.segment;
+		}
+	}
+	if (pendingPrefix.length > 0) {
+		pieces.push(pendingPrefix);
+	}
+	return pieces;
+}
+
+
+//==============================================================================
 // 폰트 문자열 합성 (canvas font property 형식).
 //==============================================================================
 /**
@@ -109,6 +182,7 @@ export class Text extends Component {
 	/** @private @type { boolean } */ #strikethrough;
 	/** @private @type { string } */ #textAlign;
 	/** @private @type { string } */ #textBaseline;
+	/** @private @type { string } */ #textDirection; // 문단의 방향. ("inherit" 면 그리는 때의 Graphic 방향을 따른다)
 	/** @private @type { number } */ #wordWrapWidth; // 0 이면 한 줄. 넘으면 이 폭에서 줄을 바꾼다.
 	/** @private @type { string } */ #wrapMode; // "word": 공백 단위(넘치는 단어는 글자 분할) | "char": 글자 단위.
 	/** @private @type { number } */ #lineSpacing; // 줄 간격 배율.
@@ -132,6 +206,7 @@ export class Text extends Component {
 		this.#strikethrough = false;
 		this.#textAlign = "center";
 		this.#textBaseline = "middle";
+		this.#textDirection = "inherit";
 		this.#wordWrapWidth = 0;
 		this.#wrapMode = "word";
 		this.#lineSpacing = 1.25;
@@ -166,6 +241,9 @@ export class Text extends Component {
 		}
 		const node = this.getNode();
 		const contentSize = node.getContentSize();
+		if (this.#textDirection !== "inherit") {
+			graphic.setTextDirection(this.#textDirection);
+		}
 		if (this.#wordWrapWidth > 0 || text.indexOf("\n") >= 0) {
 			this.drawWrappedText(graphic, contentSize, text);
 			return;
@@ -217,11 +295,15 @@ export class Text extends Component {
 			blockTop = (contentSize.y - blockHeight) * 0.5;
 		}
 
+		// 문단의 방향은 글 전체로 정해 모든 줄에 쓴다. ("start" / "end" 정렬도 그 방향을 따른다)
+		const textDirection = graphic.resolveTextDirection(fullText);
+		graphic.setTextDirection(textDirection);
+		const textAlign = graphic.resolveTextAlign(this.#textAlign, textDirection);
 		let drawX;
-		if (this.#textAlign === "left" || this.#textAlign === "start") {
+		if (textAlign === "left") {
 			drawX = 0;
 		}
-		else if (this.#textAlign === "right" || this.#textAlign === "end") {
+		else if (textAlign === "right") {
 			drawX = contentSize.x;
 		}
 		else {
@@ -229,7 +311,7 @@ export class Text extends Component {
 		}
 
 		graphic.setFontString(buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic));
-		graphic.setTextAlign(this.#textAlign);
+		graphic.setTextAlign(textAlign);
 		graphic.setTextBaseline("middle");
 
 		const strokeColor = this.getStrokeColor();
@@ -261,7 +343,7 @@ export class Text extends Component {
 
 			if (this.#underline || this.#strikethrough) {
 				const lineWidth = this.measurePlainTextWidth(lineText);
-				const startX = this.computeUnderlineStartX(drawX, lineWidth);
+				const startX = this.computeUnderlineStartX(drawX, lineWidth, textAlign);
 				graphic.setStrokeColor(textColor.toHEXString());
 				if (this.#underline) {
 					this.strokeHorizontalLine(graphic, startX, lineY + this.#fontSize * 0.5 + decorationLineWidth, lineWidth, decorationLineWidth);
@@ -298,9 +380,9 @@ export class Text extends Component {
 
 		const lineList = [];
 		const appendByCharacter = (chunkText, seedText) => {
-			// seedText 에 chunkText 를 글자 단위로 이어 붙이며 넘칠 때마다 줄을 확정한다.
+			// seedText 에 chunkText 를 글자 묶음 단위로 이어 붙이며 넘칠 때마다 줄을 확정한다.
 			let currentLine = seedText;
-			for (const character of chunkText) {
+			for (const character of splitGraphemes(chunkText)) {
 				const candidate = currentLine + character;
 				if (currentLine.length > 0 && measureWidth(candidate) > maxWidth) {
 					lineList.push(currentLine);
@@ -328,6 +410,25 @@ export class Text extends Component {
 				const candidate = (currentLine.length > 0) ? (currentLine + " " + wordText) : wordText;
 				if (measureWidth(candidate) <= maxWidth) {
 					currentLine = candidate;
+					continue;
+				}
+				// 공백 없이 이어 쓴 조각(태국어 등)에 단어가 여럿이면, 단어 사이에서 나눠 지금 줄의 남은 자리부터 채운다.
+				const wordPieces = splitWords(wordText);
+				if (wordPieces.length > 1) {
+					let isFirstPiece = true;
+					for (const wordPiece of wordPieces) {
+						const separator = (isFirstPiece && currentLine.length > 0) ? " " : "";
+						isFirstPiece = false;
+						const pieceCandidate = currentLine + separator + wordPiece;
+						if (measureWidth(pieceCandidate) <= maxWidth) {
+							currentLine = pieceCandidate;
+							continue;
+						}
+						if (currentLine.length > 0) {
+							lineList.push(currentLine);
+						}
+						currentLine = (measureWidth(wordPiece) <= maxWidth) ? wordPiece : appendByCharacter(wordPiece, "");
+					}
 					continue;
 				}
 				if (currentLine.length > 0) {
@@ -379,11 +480,14 @@ export class Text extends Component {
 	 * @param { string } text
 	 */
 	drawPlainText(graphic, contentSize, text) {
+		const textDirection = graphic.resolveTextDirection(text);
+		graphic.setTextDirection(textDirection);
+		const textAlign = graphic.resolveTextAlign(this.#textAlign, textDirection);
 		let drawX;
-		if (this.#textAlign === "left" || this.#textAlign === "start") {
+		if (textAlign === "left") {
 			drawX = 0;
 		}
-		else if (this.#textAlign === "right" || this.#textAlign === "end") {
+		else if (textAlign === "right") {
 			drawX = contentSize.x;
 		}
 		else {
@@ -402,7 +506,7 @@ export class Text extends Component {
 		}
 
 		graphic.setFontString(buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic));
-		graphic.setTextAlign(this.#textAlign);
+		graphic.setTextAlign(textAlign);
 		graphic.setTextBaseline(this.#textBaseline);
 
 		const strokeColor = this.getStrokeColor();
@@ -417,7 +521,7 @@ export class Text extends Component {
 
 		if (this.#underline || this.#strikethrough) {
 			const textWidth = this.measurePlainTextWidth(text);
-			const startX = this.computeUnderlineStartX(drawX, textWidth);
+			const startX = this.computeUnderlineStartX(drawX, textWidth, textAlign);
 			const fontSize = this.#fontSize;
 			graphic.setStrokeColor(textColor.toHEXString());
 			const lineWidth = System.Math.max(1, fontSize / 16);
@@ -457,13 +561,14 @@ export class Text extends Component {
 	/**
 	 * @param { number } drawX
 	 * @param { number } textWidth
+	 * @param { string } textAlign 실제 정렬. (기본은 이 글자의 정렬, "start" 는 왼쪽, "end" 는 오른쪽으로 본다)
 	 * @returns { number }
 	 */
-	computeUnderlineStartX(drawX, textWidth) {
-		if (this.#textAlign === "left" || this.#textAlign === "start") {
+	computeUnderlineStartX(drawX, textWidth, textAlign = this.#textAlign) {
+		if (textAlign === "left" || textAlign === "start") {
 			return drawX;
 		}
-		if (this.#textAlign === "right" || this.#textAlign === "end") {
+		if (textAlign === "right" || textAlign === "end") {
 			return drawX - textWidth;
 		}
 		return drawX - textWidth * 0.5;
@@ -879,6 +984,28 @@ export class Text extends Component {
 	 */
 	getTextAlign() {
 		return this.#textAlign;
+	}
+
+	//==============================================================================
+	// 글자 방향 설정. ("inherit" | "ltr" | "rtl" | "auto", Graphic.setTextDirection 과 같다)
+	// - "inherit" 면 그리는 때의 Graphic 방향을 따른다. (기본)
+	// - 정렬 "start" / "end" 가 이 방향에 따라 왼쪽, 오른쪽이 된다. (오른쪽에서 왼쪽 언어의 화면은 "rtl" 과 "start")
+	//==============================================================================
+	/**
+	 * @param { "inherit" | "ltr" | "rtl" | "auto" } textDirection
+	 */
+	setTextDirection(textDirection) {
+		this.#textDirection = textDirection;
+	}
+
+	//==============================================================================
+	// 글자 방향 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getTextDirection() {
+		return this.#textDirection;
 	}
 
 	//==============================================================================

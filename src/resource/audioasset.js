@@ -5,6 +5,10 @@ const System = globalThis;
 import { Asset, AssetType } from "../core/asset.js";
 
 
+// OfflineAudioContext 로 디코딩할 때의 샘플레이트. (재생하는 AudioContext 의 샘플레이트가 다르면 재생할 때 맞춰진다)
+const DECODE_SAMPLE_RATE = 44100;
+
+
 //==============================================================================
 // 오디오 애셋.
 //==============================================================================
@@ -37,8 +41,11 @@ export class AudioAsset extends Asset {
 			return Promise.resolve();
 		}
 
+		// 디코딩은 OfflineAudioContext 로 한다. (스피커를 잡지 않고, user gesture 전에 만들어도 자동재생 경고가 없으며,
+		//  여러 애셋을 한꺼번에 받아도 실시간 AudioContext 의 개수 제한에 걸리지 않는다) 없으면 잠시 쓰는 AudioContext 로 한다.
+		const offlineAudioContextType = System.window.OfflineAudioContext || System.window.webkitOfflineAudioContext;
 		const audioContextType = System.window.AudioContext || System.window.webkitAudioContext;
-		if (!audioContextType) {
+		if (!offlineAudioContextType && !audioContextType) {
 			console.error(`AudioContext is not supported.`);
 			return;
 		}
@@ -46,9 +53,15 @@ export class AudioAsset extends Asset {
 		try {
 			const response = await System.fetch(assetPath);
 			const arrayBuffer = await response.arrayBuffer();
-			const tempAudioContext = new audioContextType();
-			this.#audioBuffer = await tempAudioContext.decodeAudioData(arrayBuffer);
-			await tempAudioContext.close();
+			if (offlineAudioContextType) {
+				const decodeAudioContext = new offlineAudioContextType(1, 1, DECODE_SAMPLE_RATE);
+				this.#audioBuffer = await decodeAudioContext.decodeAudioData(arrayBuffer);
+			}
+			else {
+				const tempAudioContext = new audioContextType();
+				this.#audioBuffer = await tempAudioContext.decodeAudioData(arrayBuffer);
+				await tempAudioContext.close();
+			}
 			this.setLoaded(true);
 		}
 		catch (error) {

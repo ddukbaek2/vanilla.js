@@ -36,6 +36,7 @@ void main() {
 // 프래그먼트 셰이더. (프리멀티플라이드 알파 출력)
 // - 단색 도형은 1x1 흰색 텍스처를 바인드해 같은 경로로 처리한다.
 // - tintColor 는 이미지 실루엣(알파) 안쪽에만 색을 덮는 틴트. (alpha 0 이면 비활성)
+// - textureLodBias 는 밉맵 단계를 고를 때 더하는 값. (setImageMipmapBias, 음수면 더 큰 단계를 골라 또렷해진다)
 const FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -43,9 +44,10 @@ uniform sampler2D mainTexture;
 uniform vec4 mainColor;
 uniform vec4 tintColor;
 uniform float globalAlpha;
+uniform float textureLodBias;
 out vec4 outputColor;
 void main() {
-	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate);
+	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate, textureLodBias);
 	vec3 tintedColor = mix(textureColor.rgb, tintColor.rgb * textureColor.a, tintColor.a);
 	float finalAlpha = textureColor.a * mainColor.a * globalAlpha;
 	vec3 finalColor = tintedColor * mainColor.rgb * mainColor.a * globalAlpha;
@@ -78,18 +80,56 @@ in vec2 fragmentTextureCoordinate;
 in vec4 fragmentColor;
 uniform sampler2D mainTexture;
 uniform float globalAlpha;
+uniform float textureLodBias;
 out vec4 outputColor;
 void main() {
-	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate);
+	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate, textureLodBias);
 	float finalAlpha = textureColor.a * fragmentColor.a * globalAlpha;
 	vec3 finalColor = textureColor.rgb * fragmentColor.rgb * fragmentColor.a * globalAlpha;
 	outputColor = vec4(finalColor, finalAlpha);
 }
 `;
 
+// 스프라이트 묶어 그리기 버텍스 셰이더. (정점은 쌓을 때 이미 디바이스 픽셀 좌표로 바꿔 둔다)
+const BATCH_VERTEXSHADER_SOURCE = `#version 300 es
+in vec2 vertexPosition;
+in vec2 vertexTextureCoordinate;
+in vec4 vertexColor;
+in vec4 vertexTintColor;
+uniform mat3 projectionMatrix;
+out vec2 fragmentTextureCoordinate;
+out vec4 fragmentColor;
+out vec4 fragmentTintColor;
+void main() {
+	vec3 transformedPosition = projectionMatrix * vec3(vertexPosition, 1.0);
+	gl_Position = vec4(transformedPosition.xy, 0.0, 1.0);
+	fragmentTextureCoordinate = vertexTextureCoordinate;
+	fragmentColor = vertexColor;
+	fragmentTintColor = vertexTintColor;
+}
+`;
+
+// 스프라이트 묶어 그리기 프래그먼트 셰이더. (기본 셰이더와 같은 셈. 정점 색은 mainColor.rgb * mainColor.a * globalAlpha 와 mainColor.a * globalAlpha)
+const BATCH_FRAGMENTSHADER_SOURCE = `#version 300 es
+precision highp float;
+in vec2 fragmentTextureCoordinate;
+in vec4 fragmentColor;
+in vec4 fragmentTintColor;
+uniform sampler2D mainTexture;
+uniform float textureLodBias;
+out vec4 outputColor;
+void main() {
+	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate, textureLodBias);
+	vec3 tintedColor = mix(textureColor.rgb, fragmentTintColor.rgb * textureColor.a, fragmentTintColor.a);
+	outputColor = vec4(tintedColor * fragmentColor.rgb, textureColor.a * fragmentColor.a);
+}
+`;
+
 const FLOATS_PER_VERTEX = 4;
 const PARTICLE_FLOATS_PER_VERTEX = 8; // x, y, u, v, r, g, b, a
 const PARTICLE_VERTEX_CAPACITY = 8192;
+const BATCH_FLOATS_PER_VERTEX = 12; // x, y, u, v, r, g, b, a, tintR, tintG, tintB, tintA
+const BATCH_VERTEX_CAPACITY = 16384;
 
 // 스크래치 버텍스 버퍼 용량. (버텍스 수)
 const VERTEX_CAPACITY = 4096;
@@ -99,6 +139,12 @@ const CORNER_SEGMENT_COUNT = 8;
 
 // 텍스트 베이크 스케일 상한. (과도한 확대 굽기 방지)
 const MAXIMUM_TEXT_BAKE_SCALE = 8;
+const DEFAULT_TEXT_BAKE_SCALE_STEP = 0.25;
+
+// 오른쪽에서 왼쪽으로 쓰는 글자. (히브리, 아랍, 시리아, 타나, 은코, 사마리아, 만다 문자와 표시형, 보조 평면의 오른쪽에서 왼쪽 문자)
+const RIGHT_TO_LEFT_CHARACTER_PATTERN = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u;
+// 방향이 강한 글자. (글자 갈래의 문자, 방향 표시 문자 LRM / RLM / ALM)
+const STRONG_DIRECTION_CHARACTER_PATTERN = /[\p{L}\u200E\u200F\u061C]/u;
 
 
 //==============================================================================
@@ -140,6 +186,8 @@ export class Graphic extends Object {
 	/** @private @type { WebGL2RenderingContext } */ #webGL2RenderingContext;
 	/** @private @type { boolean } */ #isForceGizmosVisible;
 	/** @private @type { boolean } */ #isImageSmoothingEnabled;
+	/** @private @type { boolean } */ #isImageMipmapEnabled;
+	/** @private @type { number } */ #imageMipmapBias;
 	/** @private @type { string } */ #imageSmoothingQuality;
 	/** @private @type { ShaderProgram } */ #shaderProgram;
 	/** @private @type { ShaderProgram | null } */ #shaderProgramOverride; // 드로우에 잠시 바꿔 끼우는 프로그램. (ShaderSprite 등)
@@ -152,6 +200,13 @@ export class Graphic extends Object {
 	/** @private @type { WebGLBuffer | null } */ #particleVertexBuffer;
 	/** @private @type { Float32Array | null } */ #particleVertexData;
 	/** @private @type { WebGLTexture | null } */ #softDiscTexture; // 부드러운 원 스프라이트. (지연 생성)
+	/** @private @type { boolean } */ #isSpriteBatchingEnabled; // 같은 텍스처의 연이은 드로우를 한 번에 그릴지.
+	/** @private @type { ShaderProgram | null } */ #batchShaderProgram; // 묶어 그리기 전용. (지연 생성)
+	/** @private @type { WebGLVertexArrayObject | null } */ #batchVertexArray;
+	/** @private @type { WebGLBuffer | null } */ #batchVertexBuffer;
+	/** @private @type { Float32Array | null } */ #batchVertexData;
+	/** @private @type { number } */ #batchVertexCount; // 쌓여서 아직 그리지 않은 정점 수.
+	/** @private @type { WebGLTexture | null } */ #batchTexture; // 쌓인 정점이 쓰는 텍스처.
 	/** @private @type { ImageTextureCache } */ #imageTextureCache;
 	/** @private @type { TextStringTextureCache } */ #textStringTextureCache;
 	/** @private @type { TransformMatrix } */ #transformMatrix;
@@ -167,11 +222,18 @@ export class Graphic extends Object {
 	/** @private @type { string } */ #fontString;
 	/** @private @type { string } */ #textAlign;
 	/** @private @type { string } */ #textBaseline;
+	/** @private @type { string } */ #textDirection;
 	/** @private @type { object[] } */ #clipStack;
 	/** @private @type { Float32Array } */ #projectionMatrixArray;
 	/** @private @type { Float32Array } */ #modelMatrixArray;
 	/** @private @type { number } */ #appliedViewportWidth;
 	/** @private @type { number } */ #appliedViewportHeight;
+	/** @private @type { number } */ #textBakeScaleStep; // 텍스트 베이크 스케일 양자화 단위. (0 이면 양자화하지 않음)
+	/** @private @type { boolean } */ #isTextPixelSnapEnabled; // 텍스트 쿼드를 디바이스 픽셀 격자에 맞출지.
+	/** @private @type { number } */ #drawCallCount; // 이번 프레임의 드로우 콜 수.
+	/** @private @type { number } */ #drawVertexCount; // 이번 프레임에 그린 정점 수.
+	/** @private @type { number } */ #lastFrameDrawCallCount; // 지난 프레임의 드로우 콜 수.
+	/** @private @type { number } */ #lastFrameDrawVertexCount; // 지난 프레임에 그린 정점 수.
 
 	//==============================================================================
 	// 생성.
@@ -199,6 +261,8 @@ export class Graphic extends Object {
 		this.#webGL2RenderingContext = webGL2RenderingContext;
 		this.#isForceGizmosVisible = false;
 		this.#isImageSmoothingEnabled = true;
+		this.#isImageMipmapEnabled = false;
+		this.#imageMipmapBias = 0;
 		this.#imageSmoothingQuality = "high";
 
 		// 셰이더 프로그램.
@@ -237,6 +301,15 @@ export class Graphic extends Object {
 		this.#particleVertexData = null;
 		this.#softDiscTexture = null;
 
+		// 묶어 그리기 자원. (켤 때 만든다)
+		this.#isSpriteBatchingEnabled = false;
+		this.#batchShaderProgram = null;
+		this.#batchVertexArray = null;
+		this.#batchVertexBuffer = null;
+		this.#batchVertexData = null;
+		this.#batchVertexCount = 0;
+		this.#batchTexture = null;
+
 		// 캐시.
 		this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext);
 		this.#textStringTextureCache = new TextStringTextureCache(webGL2RenderingContext);
@@ -253,12 +326,19 @@ export class Graphic extends Object {
 		this.#imageTintColor = null;
 		this.#fontString = "10px sans-serif";
 		this.#textAlign = "start";
+		this.#textDirection = "inherit";
 		this.#textBaseline = "alphabetic";
 		this.#clipStack = [];
 		this.#projectionMatrixArray = new Float32Array(9);
 		this.#modelMatrixArray = new Float32Array(9);
 		this.#appliedViewportWidth = 0;
 		this.#appliedViewportHeight = 0;
+		this.#textBakeScaleStep = DEFAULT_TEXT_BAKE_SCALE_STEP;
+		this.#isTextPixelSnapEnabled = false;
+		this.#drawCallCount = 0;
+		this.#drawVertexCount = 0;
+		this.#lastFrameDrawCallCount = 0;
+		this.#lastFrameDrawVertexCount = 0;
 
 		// 블렌드 함수 매핑 테이블. (프리멀티플라이드 알파 기준)
 		// - 고정 블렌딩으로 재현 가능한 모드만 등록. 그 외는 source-over 폴백.
@@ -285,6 +365,7 @@ export class Graphic extends Object {
 		shaderProgram.use();
 		const mainTextureLocation = shaderProgram.getUniformLocation("mainTexture");
 		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
+		this.applyImageMipmapBias(shaderProgram);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 	}
 
@@ -364,6 +445,79 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// 이미지 밉맵 활성화 여부 설정. (기본 false)
+	// - 켜면 스무딩이 켜진 이미지 텍스처에 밉맵을 만들고 축소 필터를 LINEAR_MIPMAP_LINEAR 로 한다.
+	// - 큰 그림(아틀라스 등)을 크게 줄여 그릴 때 가장자리의 계단과 자글거림이 줄어든다.
+	// - 아틀라스는 그림 둘레의 여백(늘여 붙인 가장자리)이 넉넉해야 작은 밉맵 단계에서 옆 그림이 번져 들지 않는다.
+	//==============================================================================
+	/**
+	 * @param { boolean } value
+	 */
+	setImageMipmapEnabled(value) {
+		this.#isImageMipmapEnabled = value;
+	}
+
+	//==============================================================================
+	// 이미지 밉맵 활성화 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isImageMipmapEnabled() {
+		return this.#isImageMipmapEnabled;
+	}
+
+	//==============================================================================
+	// 이미지 밉맵 단계 보정 설정. (기본 0)
+	// - 밉맵 단계를 고를 때 더하는 값. 음수면 한 단계 큰 그림 쪽을 골라 또렷해지고, 너무 작으면 다시 자글거린다. (-0.5 안팎)
+	// - 기본 셰이더(낱장, 묶어 그리기, 파티클)에 적용한다. 바꿔 끼운 셰이더는 textureLodBias 유니폼이 있으면 받는다.
+	//==============================================================================
+	/**
+	 * @param { number } value
+	 */
+	setImageMipmapBias(value) {
+		this.flushSpriteBatch();
+		this.#imageMipmapBias = value;
+		const shaderPrograms = [this.#shaderProgram, this.#batchShaderProgram, this.#particleShaderProgram, this.#shaderProgramOverride];
+		for (const shaderProgram of shaderPrograms) {
+			if (!shaderProgram) {
+				continue;
+			}
+			shaderProgram.use();
+			this.applyImageMipmapBias(shaderProgram);
+		}
+		const activeShaderProgram = this.getShaderProgram();
+		activeShaderProgram.use();
+	}
+
+	//==============================================================================
+	// 이미지 밉맵 단계 보정 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getImageMipmapBias() {
+		return this.#imageMipmapBias;
+	}
+
+	//==============================================================================
+	// 사용 중인 셰이더 프로그램에 밉맵 단계 보정 적용. (유니폼이 없는 프로그램은 넘어간다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { ShaderProgram } shaderProgram
+	 */
+	applyImageMipmapBias(shaderProgram) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const textureLodBiasLocation = shaderProgram.getUniformLocation("textureLodBias");
+		if (textureLodBiasLocation === null) {
+			return;
+		}
+		const imageMipmapBias = this.getImageMipmapBias();
+		webGL2RenderingContext.uniform1f(textureLodBiasLocation, imageMipmapBias);
+	}
+
+	//==============================================================================
 	// 이미지 스무딩 퀄리티 설정. ("low", "medium", "high")
 	// - WebGL2 에서는 LINEAR/NEAREST 이분법이라 보관만 한다.
 	//==============================================================================
@@ -408,6 +562,7 @@ export class Graphic extends Object {
 			fontString: this.#fontString,
 			textAlign: this.#textAlign,
 			textBaseline: this.#textBaseline,
+			textDirection: this.#textDirection,
 		};
 		this.#stateStack.push(stateSnapshot);
 	}
@@ -429,6 +584,7 @@ export class Graphic extends Object {
 		this.#fontString = stateSnapshot.fontString;
 		this.#textAlign = stateSnapshot.textAlign;
 		this.#textBaseline = stateSnapshot.textBaseline;
+		this.#textDirection = stateSnapshot.textDirection;
 		if (this.#blendMode !== stateSnapshot.blendMode) {
 			this.setBlendMode(stateSnapshot.blendMode);
 		}
@@ -546,6 +702,10 @@ export class Graphic extends Object {
 			blendFunction = this.#blendFunctionTable.get("source-over");
 		}
 
+		// 블렌드가 바뀌면 그 전에 쌓인 것을 먼저 그린다.
+		if (blendMode !== this.#blendMode) {
+			this.flushSpriteBatch();
+		}
 		this.#blendMode = blendMode;
 		webGL2RenderingContext.blendFunc(blendFunction[0], blendFunction[1]);
 	}
@@ -688,6 +848,13 @@ export class Graphic extends Object {
 			return;
 		}
 
+		// 묶어 그리기가 켜져 있으면 쌓아 두었다가 텍스처나 상태가 바뀔 때 한 번에 그린다. (바꿔 끼운 셰이더는 제 유니폼을 쓰므로 바로 그린다)
+		if (this.#isSpriteBatchingEnabled && this.#shaderProgramOverride === null && vertexCount <= BATCH_VERTEX_CAPACITY) {
+			this.appendSpriteBatch(vertexCount, texture, color);
+			return;
+		}
+		this.flushSpriteBatch();
+
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const shaderProgram = this.getShaderProgram();
 
@@ -719,6 +886,218 @@ export class Graphic extends Object {
 		// 텍스처 바인드 및 출력.
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
+		this.#drawCallCount += 1;
+		this.#drawVertexCount += vertexCount;
+	}
+
+	//==============================================================================
+	// 프레임 그리기 통계 시작.
+	// - 엔진이 매 프레임 씬을 그리기 전에 부른다. 지난 프레임의 드로우 콜 / 정점 수를 넘겨 두고 이번 프레임 값을 비운다.
+	// - 2D 경로(drawVertices, drawColoredQuads)만 센다. 3D 렌더러와 화면 효과 패스는 세지 않는다.
+	//==============================================================================
+	beginFrameStatistics() {
+		this.#lastFrameDrawCallCount = this.#drawCallCount;
+		this.#lastFrameDrawVertexCount = this.#drawVertexCount;
+		this.#drawCallCount = 0;
+		this.#drawVertexCount = 0;
+	}
+
+	//==============================================================================
+	// 지난 프레임의 드로우 콜 수 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getLastFrameDrawCallCount() {
+		return this.#lastFrameDrawCallCount;
+	}
+
+	//==============================================================================
+	// 지난 프레임에 그린 정점 수 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getLastFrameVertexCount() {
+		return this.#lastFrameDrawVertexCount;
+	}
+
+	//==============================================================================
+	// 지난 프레임에 그린 삼각형 수 반환. (모든 드로우 콜이 삼각형 목록이다)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getLastFrameTriangleCount() {
+		const lastFrameVertexCount = this.getLastFrameVertexCount();
+		return System.Math.floor(lastFrameVertexCount / 3);
+	}
+
+	//==============================================================================
+	// 스프라이트 묶어 그리기 설정.
+	// - 켜면 같은 텍스처를 쓰는 연이은 드로우(이미지, 도형, 글자)를 정점에 변환과 색을 실어 쌓아 두었다가 한 번의 드로우 콜로 그린다.
+	// - 텍스처, 블렌드, 클리핑, 바꿔 끼운 셰이더가 바뀌거나 버퍼가 차면 그때까지 쌓인 것을 그리고, 프레임 끝에 엔진이 남은 것을 그린다.
+	// - 여러 그림을 한 장(아틀라스)에 모아 두면 드로우 콜이 크게 준다.
+	// - 켠 채로 WebGL 을 직접 다루는 패스(외부 렌더러 등)를 끼울 때는 그 전에 flushSpriteBatch() 를 부른다.
+	//==============================================================================
+	/**
+	 * @param { boolean } isSpriteBatchingEnabled
+	 */
+	setSpriteBatchingEnabled(isSpriteBatchingEnabled) {
+		if (!isSpriteBatchingEnabled) {
+			this.flushSpriteBatch();
+		}
+		else {
+			this.ensureSpriteBatchResources();
+		}
+		this.#isSpriteBatchingEnabled = isSpriteBatchingEnabled === true;
+	}
+
+	//==============================================================================
+	// 스프라이트 묶어 그리기 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isSpriteBatchingEnabled() {
+		return this.#isSpriteBatchingEnabled;
+	}
+
+	//==============================================================================
+	// 묶어 그리기 자원 준비. (셰이더 / 버텍스 어레이)
+	//==============================================================================
+	/**
+	 * @private
+	 */
+	ensureSpriteBatchResources() {
+		if (this.#batchShaderProgram) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		this.#batchShaderProgram = new ShaderProgram(webGL2RenderingContext, BATCH_VERTEXSHADER_SOURCE, BATCH_FRAGMENTSHADER_SOURCE);
+		this.#batchVertexData = new Float32Array(BATCH_VERTEX_CAPACITY * BATCH_FLOATS_PER_VERTEX);
+		this.#batchVertexArray = webGL2RenderingContext.createVertexArray();
+		this.#batchVertexBuffer = webGL2RenderingContext.createBuffer();
+		webGL2RenderingContext.bindVertexArray(this.#batchVertexArray);
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexBuffer);
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData.byteLength, webGL2RenderingContext.DYNAMIC_DRAW);
+		const positionLocation = this.#batchShaderProgram.getAttributeLocation("vertexPosition");
+		const textureCoordinateLocation = this.#batchShaderProgram.getAttributeLocation("vertexTextureCoordinate");
+		const colorLocation = this.#batchShaderProgram.getAttributeLocation("vertexColor");
+		const tintColorLocation = this.#batchShaderProgram.getAttributeLocation("vertexTintColor");
+		const strideBytes = BATCH_FLOATS_PER_VERTEX * 4;
+		webGL2RenderingContext.enableVertexAttribArray(positionLocation);
+		webGL2RenderingContext.vertexAttribPointer(positionLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 0);
+		webGL2RenderingContext.enableVertexAttribArray(textureCoordinateLocation);
+		webGL2RenderingContext.vertexAttribPointer(textureCoordinateLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 8);
+		webGL2RenderingContext.enableVertexAttribArray(colorLocation);
+		webGL2RenderingContext.vertexAttribPointer(colorLocation, 4, webGL2RenderingContext.FLOAT, false, strideBytes, 16);
+		webGL2RenderingContext.enableVertexAttribArray(tintColorLocation);
+		webGL2RenderingContext.vertexAttribPointer(tintColorLocation, 4, webGL2RenderingContext.FLOAT, false, strideBytes, 32);
+		webGL2RenderingContext.bindVertexArray(null);
+		this.#batchShaderProgram.use();
+		const mainTextureLocation = this.#batchShaderProgram.getUniformLocation("mainTexture");
+		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
+		this.applyImageMipmapBias(this.#batchShaderProgram);
+		this.getShaderProgram().use();
+		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
+	}
+
+	//==============================================================================
+	// 스크래치 버텍스(x, y, u, v)를 묶음에 쌓기. (지금 변환으로 디바이스 좌표를 셈하고 색과 틴트를 정점마다 싣는다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { number } vertexCount
+	 * @param { WebGLTexture } texture
+	 * @param { Color } color
+	 */
+	appendSpriteBatch(vertexCount, texture, color) {
+		this.ensureSpriteBatchResources();
+		if (texture !== this.#batchTexture || this.#batchVertexCount + vertexCount > BATCH_VERTEX_CAPACITY) {
+			this.flushSpriteBatch();
+			this.#batchTexture = texture;
+		}
+
+		// 기본 셰이더와 같은 색 셈을 정점 색 하나로 미리 곱해 둔다.
+		const globalAlpha = this.getGlobalAlpha();
+		const colorAlpha = color.alpha * globalAlpha;
+		const colorRed = color.red * colorAlpha;
+		const colorGreen = color.green * colorAlpha;
+		const colorBlue = color.blue * colorAlpha;
+		const imageTintColor = this.getImageTintColor();
+		let tintRed = 0;
+		let tintGreen = 0;
+		let tintBlue = 0;
+		let tintAlpha = 0;
+		if (imageTintColor) {
+			tintRed = imageTintColor.red;
+			tintGreen = imageTintColor.green;
+			tintBlue = imageTintColor.blue;
+			tintAlpha = imageTintColor.alpha;
+		}
+
+		const transformMatrix = this.#transformMatrix;
+		const matrixA = transformMatrix.a;
+		const matrixB = transformMatrix.b;
+		const matrixC = transformMatrix.c;
+		const matrixD = transformMatrix.d;
+		const matrixE = transformMatrix.e;
+		const matrixF = transformMatrix.f;
+		const vertexData = this.getVertexData();
+		const batchVertexData = this.#batchVertexData;
+		let sourceOffset = 0;
+		let targetOffset = this.#batchVertexCount * BATCH_FLOATS_PER_VERTEX;
+		for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
+			const positionX = vertexData[sourceOffset];
+			const positionY = vertexData[sourceOffset + 1];
+			batchVertexData[targetOffset] = matrixA * positionX + matrixC * positionY + matrixE;
+			batchVertexData[targetOffset + 1] = matrixB * positionX + matrixD * positionY + matrixF;
+			batchVertexData[targetOffset + 2] = vertexData[sourceOffset + 2];
+			batchVertexData[targetOffset + 3] = vertexData[sourceOffset + 3];
+			batchVertexData[targetOffset + 4] = colorRed;
+			batchVertexData[targetOffset + 5] = colorGreen;
+			batchVertexData[targetOffset + 6] = colorBlue;
+			batchVertexData[targetOffset + 7] = colorAlpha;
+			batchVertexData[targetOffset + 8] = tintRed;
+			batchVertexData[targetOffset + 9] = tintGreen;
+			batchVertexData[targetOffset + 10] = tintBlue;
+			batchVertexData[targetOffset + 11] = tintAlpha;
+			sourceOffset += FLOATS_PER_VERTEX;
+			targetOffset += BATCH_FLOATS_PER_VERTEX;
+		}
+		this.#batchVertexCount += vertexCount;
+	}
+
+	//==============================================================================
+	// 쌓인 묶음 그리기. (쌓인 것이 없으면 아무것도 하지 않는다)
+	//==============================================================================
+	flushSpriteBatch() {
+		const batchVertexCount = this.#batchVertexCount;
+		if (batchVertexCount <= 0) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+
+		this.#batchShaderProgram.use();
+		webGL2RenderingContext.bindVertexArray(this.#batchVertexArray);
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexBuffer);
+		// drawVertices 와 같은 까닭으로 bufferSubData 대신 bufferData 로 새 저장소를 잡으며 올린다. (사파리 드로우 콜 동기 대기)
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, batchVertexCount * BATCH_FLOATS_PER_VERTEX);
+		const projectionMatrixLocation = this.#batchShaderProgram.getUniformLocation("projectionMatrix");
+		webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#batchTexture);
+		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, batchVertexCount);
+		this.#drawCallCount += 1;
+		this.#drawVertexCount += batchVertexCount;
+		this.#batchVertexCount = 0;
+		this.#batchTexture = null;
+
+		// 기본 경로 상태 복원.
+		this.getShaderProgram().use();
+		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
 	}
 
 	//==============================================================================
@@ -753,6 +1132,7 @@ export class Graphic extends Object {
 		this.#particleShaderProgram.use();
 		const mainTextureLocation = this.#particleShaderProgram.getUniformLocation("mainTexture");
 		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
+		this.applyImageMipmapBias(this.#particleShaderProgram);
 		this.getShaderProgram().use();
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
 	}
@@ -791,6 +1171,7 @@ export class Graphic extends Object {
 		if (vertexCount <= 0) {
 			return;
 		}
+		this.flushSpriteBatch();
 		this.ensureParticleBatchResources();
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 
@@ -810,6 +1191,8 @@ export class Graphic extends Object {
 
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
+		this.#drawCallCount += 1;
+		this.#drawVertexCount += vertexCount;
 
 		// 기본 경로 상태 복원.
 		this.getShaderProgram().use();
@@ -1202,7 +1585,7 @@ export class Graphic extends Object {
 			throw new Error("image is null");
 		}
 
-		if (imageRect === null || imageRect === undefined || imageRect.equals(Rect.zero())) {
+		if (imageRect === null || imageRect === undefined || imageRect.isZero()) {
 			imageRect = Rect.create(0, 0, image.width, image.height);
 		}
 
@@ -1228,7 +1611,8 @@ export class Graphic extends Object {
 	drawImageWithSourceAndDestination(image, sourceX, sourceY, sourceWidth, sourceHeight, destinationX, destinationY, destinationWidth, destinationHeight) {
 		const imageTextureCache = this.getImageTextureCache();
 		const isImageSmoothingEnabled = this.isImageSmoothingEnabled();
-		const texture = imageTextureCache.getTexture(image, isImageSmoothingEnabled);
+		const isImageMipmapEnabled = this.isImageMipmapEnabled();
+		const texture = imageTextureCache.getTexture(image, isImageSmoothingEnabled, isImageMipmapEnabled);
 		if (!texture) {
 			return;
 		}
@@ -1366,6 +1750,80 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// 텍스트 방향 설정. ("inherit" | "ltr" | "rtl" | "auto", Canvas2D direction 대응)
+	// - 문단의 방향이다. 글자 안의 순서(양방향 알고리즘)와 정렬 "start" / "end" 의 왼쪽, 오른쪽이 이것을 따른다.
+	// - "inherit" 는 "ltr" 로 본다. (기본, 지금까지와 같다)
+	// - "auto" 는 문자열마다 처음 나오는 방향이 강한 글자로 정한다. (HTML 의 dir="auto", 없으면 "ltr") 사용자가 쓴 글(닉네임 등)에 쓴다.
+	//==============================================================================
+	/**
+	 * @param { string } textDirection
+	 */
+	setTextDirection(textDirection) {
+		if (textDirection) {
+			this.#textDirection = textDirection;
+		}
+	}
+
+	//==============================================================================
+	// 텍스트 방향 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getTextDirection() {
+		return this.#textDirection;
+	}
+
+	//==============================================================================
+	// 문자열의 실제 방향 계산. ("ltr" 또는 "rtl", "auto" 는 처음 나오는 방향이 강한 글자로)
+	//==============================================================================
+	/**
+	 * @param { string } text
+	 * @returns { string }
+	 */
+	resolveTextDirection(text) {
+		const textDirection = this.getTextDirection();
+		if (textDirection === "rtl") {
+			return "rtl";
+		}
+		if (textDirection !== "auto" || !text) {
+			return "ltr";
+		}
+		for (const character of text) {
+			if (!STRONG_DIRECTION_CHARACTER_PATTERN.test(character)) {
+				continue;
+			}
+			if (character === "\u200E") {
+				return "ltr";
+			}
+			const isRightToLeft = RIGHT_TO_LEFT_CHARACTER_PATTERN.test(character) || character === "\u200F" || character === "\u061C";
+			return isRightToLeft ? "rtl" : "ltr";
+		}
+		return "ltr";
+	}
+
+	//==============================================================================
+	// 실제 가로 정렬 계산. ("start" / "end" 를 방향에 따라 "left" / "right" 로)
+	//==============================================================================
+	/**
+	 * @param { string } textAlign
+	 * @param { string } textDirection "ltr" 또는 "rtl".
+	 * @returns { string } "left" | "center" | "right"
+	 */
+	resolveTextAlign(textAlign, textDirection) {
+		if (textAlign === "start") {
+			return textDirection === "rtl" ? "right" : "left";
+		}
+		if (textAlign === "end") {
+			return textDirection === "rtl" ? "left" : "right";
+		}
+		if (textAlign === "center" || textAlign === "right") {
+			return textAlign;
+		}
+		return "left";
+	}
+
+	//==============================================================================
 	// 텍스트 베이스라인 설정. ("top" | "hanging" | "middle" | "alphabetic" | "ideographic" | "bottom")
 	//==============================================================================
 	/**
@@ -1401,14 +1859,59 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
-	// 텍스트 베이크 스케일 계산. (현재 변환 행렬 기반, 0.25 단위 양자화)
+	// 텍스트 베이크 스케일 양자화 단위 설정.
+	// - 기본 0.25. 확대 축소가 잦은 글자가 스케일마다 새로 구워지지 않게 묶는다.
+	// - 0 이면 양자화하지 않고 실제 스케일 그대로 굽는다. (스케일이 고정된 UI 글자를 늘리지 않고 1:1 로 그릴 때)
+	//==============================================================================
+	/**
+	 * @param { number } textBakeScaleStep
+	 */
+	setTextBakeScaleStep(textBakeScaleStep) {
+		this.#textBakeScaleStep = Math.max(0, textBakeScaleStep);
+	}
+
+	//==============================================================================
+	// 텍스트 베이크 스케일 양자화 단위 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getTextBakeScaleStep() {
+		return this.#textBakeScaleStep;
+	}
+
+	//==============================================================================
+	// 텍스트 픽셀 스냅 설정.
+	// - 켜면 회전 / 기울임이 없는 변환에서 글자 쿼드의 왼쪽 위를 디바이스 픽셀 격자에 맞춘다.
+	// - 베이크 스케일이 실제 스케일과 같을 때(setTextBakeScaleStep(0)) 텍셀과 픽셀이 1:1 로 맞아 가장 선명하다.
+	//==============================================================================
+	/**
+	 * @param { boolean } isTextPixelSnapEnabled
+	 */
+	setTextPixelSnapEnabled(isTextPixelSnapEnabled) {
+		this.#isTextPixelSnapEnabled = isTextPixelSnapEnabled;
+	}
+
+	//==============================================================================
+	// 텍스트 픽셀 스냅 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isTextPixelSnapEnabled() {
+		return this.#isTextPixelSnapEnabled;
+	}
+
+	//==============================================================================
+	// 텍스트 베이크 스케일 계산. (현재 변환 행렬 기반, 양자화 단위는 setTextBakeScaleStep)
 	//==============================================================================
 	/**
 	 * @returns { number }
 	 */
 	calculateTextBakeScale(){
 		const maximumScale = this.#transformMatrix.getMaximumScale();
-		const quantizedScale = Math.round(maximumScale * 4) / 4;
+		const textBakeScaleStep = this.getTextBakeScaleStep();
+		const quantizedScale = textBakeScaleStep > 0 ? Math.round(maximumScale / textBakeScaleStep) * textBakeScaleStep : maximumScale;
 		return Math.clamp(quantizedScale, 0.25, MAXIMUM_TEXT_BAKE_SCALE);
 	}
 
@@ -1420,15 +1923,16 @@ export class Graphic extends Object {
 	 * @param { number } x
 	 * @param { number } y
 	 * @param { Color | null } color - 흰색으로 구운 글자에 곱할 색. (null 이면 흰색 그대로)
+	 * @param { string } textDirection - 정렬 "start" / "end" 를 가를 방향. ("ltr" 또는 "rtl", 기본 "ltr")
 	 */
-	drawTextEntry(entry, x, y, color = null) {
+	drawTextEntry(entry, x, y, color = null, textDirection = "ltr") {
 		// 가로 정렬 오프셋.
-		const textAlign = this.getTextAlign();
+		const textAlign = this.resolveTextAlign(this.getTextAlign(), textDirection);
 		let alignOffset = 0;
 		if (textAlign === "center") {
 			alignOffset = -entry.advanceWidth / 2;
 		}
-		else if (textAlign === "right" || textAlign === "end") {
+		else if (textAlign === "right") {
 			alignOffset = -entry.advanceWidth;
 		}
 
@@ -1448,8 +1952,18 @@ export class Graphic extends Object {
 			baselineOffset = -entry.fontDescent;
 		}
 
-		const quadX = x + alignOffset - entry.penOffsetX;
-		const quadY = y + baselineOffset - entry.baselineOffsetY;
+		let quadX = x + alignOffset - entry.penOffsetX;
+		let quadY = y + baselineOffset - entry.baselineOffsetY;
+
+		// 픽셀 스냅. (회전 / 기울임이 없을 때만, 쿼드의 왼쪽 위를 디바이스 픽셀에 맞춘다)
+		const isTextPixelSnapEnabled = this.isTextPixelSnapEnabled();
+		const transformMatrix = this.#transformMatrix;
+		if (isTextPixelSnapEnabled && transformMatrix.b === 0 && transformMatrix.c === 0 && transformMatrix.a > 0 && transformMatrix.d > 0) {
+			const devicePoint = transformMatrix.transformPoint(quadX, quadY);
+			quadX += (Math.round(devicePoint.x) - devicePoint.x) / transformMatrix.a;
+			quadY += (Math.round(devicePoint.y) - devicePoint.y) / transformMatrix.d;
+		}
+
 		const vertexCountOffset = this.writeQuad(0,
 			quadX, quadY,
 			quadX + entry.quadWidth, quadY + entry.quadHeight,
@@ -1477,12 +1991,13 @@ export class Graphic extends Object {
 		const fontString = this.getFontString();
 		const fillColor = this.getFillColor();
 		const bakeScale = this.calculateTextBakeScale();
-		const entry = textStringTextureCache.getEntry("fill", text, fontString, "#ffffff", 0, bakeScale);
+		const textDirection = this.resolveTextDirection(text);
+		const entry = textStringTextureCache.getEntry("fill", text, fontString, "#ffffff", 0, bakeScale, textDirection);
 		if (!entry) {
 			return;
 		}
 
-		this.drawTextEntry(entry, x, y, fillColor);
+		this.drawTextEntry(entry, x, y, fillColor, textDirection);
 	}
 
 	//==============================================================================
@@ -1504,12 +2019,13 @@ export class Graphic extends Object {
 		const fontString = this.getFontString();
 		const strokeColor = this.getStrokeColor();
 		const bakeScale = this.calculateTextBakeScale();
-		const entry = textStringTextureCache.getEntry("stroke", text, fontString, "#ffffff", lineWidth, bakeScale);
+		const textDirection = this.resolveTextDirection(text);
+		const entry = textStringTextureCache.getEntry("stroke", text, fontString, "#ffffff", lineWidth, bakeScale, textDirection);
 		if (!entry) {
 			return;
 		}
 
-		this.drawTextEntry(entry, x, y, strokeColor);
+		this.drawTextEntry(entry, x, y, strokeColor, textDirection);
 	}
 
 	//==============================================================================
@@ -1560,6 +2076,8 @@ export class Graphic extends Object {
 			transformMatrix: this.#transformMatrix.clone(),
 		});
 
+		// 클리핑 전에 쌓인 것을 먼저 그린다. (스텐실 상태가 바뀌기 전)
+		this.flushSpriteBatch();
 		if (previousClipDepth === 0) {
 			webGL2RenderingContext.enable(webGL2RenderingContext.STENCIL_TEST);
 		}
@@ -1574,6 +2092,7 @@ export class Graphic extends Object {
 		else {
 			this.drawRect(rect);
 		}
+		this.flushSpriteBatch();
 		webGL2RenderingContext.colorMask(true, true, true, true);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
 		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.EQUAL, previousClipDepth + 1, 0xFF);
@@ -1592,6 +2111,7 @@ export class Graphic extends Object {
 
 		// 기록 시점의 변환 행렬로 같은 영역을 DECR 해 스텐실 원복.
 		// (begin 과 end 사이에 변환이 바뀌었을 수 있으므로 스냅샷 사용)
+		this.flushSpriteBatch();
 		this.#transformMatrix = clipEntry.transformMatrix;
 		webGL2RenderingContext.colorMask(false, false, false, false);
 		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.ALWAYS, 0, 0xFF);
@@ -1602,6 +2122,7 @@ export class Graphic extends Object {
 		else {
 			this.drawRect(clipEntry.rect);
 		}
+		this.flushSpriteBatch();
 		webGL2RenderingContext.colorMask(true, true, true, true);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
 
@@ -1658,6 +2179,7 @@ export class Graphic extends Object {
 	 * @param { ShaderProgram | null } shaderProgram
 	 */
 	setShaderProgramOverride(shaderProgram) {
+		this.flushSpriteBatch();
 		this.#shaderProgramOverride = shaderProgram;
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const activeShaderProgram = this.getShaderProgram();
@@ -1666,6 +2188,7 @@ export class Graphic extends Object {
 		webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
 		const mainTextureLocation = activeShaderProgram.getUniformLocation("mainTexture");
 		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
+		this.applyImageMipmapBias(activeShaderProgram);
 	}
 
 	//==============================================================================

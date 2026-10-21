@@ -72,8 +72,7 @@ export class WorldNode extends TransformNode {
             // 마지막 원점에서 현재 컨텐트사이즈 크기를 기준으로한 피봇만큼 상대적으로 당김.
             const pivot = this.getPivot();
             const contentSize = this.getContentSize();
-            const pivotPosition = Vector2.create(contentSize.x * pivot.x, contentSize.y * pivot.y);
-            graphic.translate(-pivotPosition.x, -pivotPosition.y);
+            graphic.translate(-contentSize.x * pivot.x, -contentSize.y * pivot.y);
 
             // 투명도 반영.
             const localOpacity = this.getLocalOpacity();

@@ -943,6 +943,9 @@ export class ScreenEffect extends Object {
 			return;
 		}
 		this.#isBound = false;
+
+		// 묶어 그리기로 쌓인 것을 먼저 화면에 그린다. (그 화면을 떠 온다)
+		graphic.flushSpriteBatch();
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
 		const bufferWidth = webGL2RenderingContext.drawingBufferWidth;
 		const bufferHeight = webGL2RenderingContext.drawingBufferHeight;
