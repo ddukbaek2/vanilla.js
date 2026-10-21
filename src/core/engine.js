@@ -59,6 +59,11 @@ export class EngineConfiguration extends Object {
 	// 정하면 autoResizeOnWindowResize 로 맞출 때 창이 그보다 길쭉하면 캔버스를 그 비까지 줄여 창의 가운데에 둔다. (남는 곳은 페이지의 바탕)
 	// (게임 영역의 가로세로 비를 제한하는 포털처럼, 캔버스가 창을 다 채우면 안 되는 곳에서 정한다)
 	/** @type { number } */ maxCanvasAspectRatio;
+	// 손을 뗄 때(touchend, pointerup)에도 오디오 컨텍스트를 깨울지. 생성 때 정한다.
+	// 끄면(기본) 지금까지처럼 click, touchstart, keydown 에서만 깨운다. touchstart 는 사용자 활성화를 주지 않아,
+	// iOS WebKit 에서 앱 전환이나 전면 광고로 멈춘(suspended, interrupted) 컨텍스트를 화면을 끌기만 하는 게임이 다시 깨우지 못했다.
+	// (캔버스를 끄는 조작이 기본 동작을 막아 click 이 생기지 않는 게임이 켠다)
+	/** @type { boolean } */ resumeAudioOnTouchEnd;
 
 	//==============================================================================
 	// 생성.
@@ -79,6 +84,7 @@ export class EngineConfiguration extends Object {
 		this.rebakeTextOnFontLoad = false;
 		this.useDevTools = true;
 		this.maxCanvasAspectRatio = 0;
+		this.resumeAudioOnTouchEnd = false;
 	}
 }
 
@@ -535,6 +541,11 @@ export class Engine extends Object {
 		System.window.addEventListener("click", userGestureHandler);
 		System.window.addEventListener("touchstart", userGestureHandler);
 		System.window.addEventListener("keydown", userGestureHandler);
+		// touchend 와 (마우스가 아닌) pointerup 은 사용자 활성화를 준다. (켠 때만)
+		if (this.#engineConfiguration.resumeAudioOnTouchEnd) {
+			System.window.addEventListener("touchend", userGestureHandler);
+			System.window.addEventListener("pointerup", userGestureHandler);
+		}
 		System.window.addEventListener("focus", this.#resumeCallback);
 		System.document.addEventListener("visibilitychange", () => {
 			if (System.document.visibilityState === "visible") {

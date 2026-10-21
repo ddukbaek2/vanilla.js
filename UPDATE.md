@@ -1,5 +1,8 @@
 # 업데이트 기록
 
+# 0.3.25 (2026-10-21)
+- EngineConfiguration: resumeAudioOnTouchEnd. (기본 false, 꺼져 있으면 지금까지와 같다) 켜면 손을 뗄 때(touchend, pointerup)에도 사용자 입력으로 보고 오디오 컨텍스트를 깨운다. (markUserGesture 와 resumeContext) touchstart 는 사용자 활성화를 주지 않아, iOS WebKit 에서 앱 전환이나 전면 광고로 멈춘(suspended, interrupted) 컨텍스트에 resume() 을 불러도 깨어나지 않았다. 캔버스를 끄는 조작은 기본 동작을 막아 click 이 생기지 않으므로, 화면을 끌기만 하는 게임은 한 번 포커스를 잃으면 소리가 돌아오지 않았다. 생성 때 정한다. (리스너를 그때 단다)
+
 # 0.3.24 (2026-10-20)
 - UIScrollView: setPassesCrossAxisDrag(passes) / isPassingCrossAxisDrag() / isScrollDrag(deltaX, deltaY). (기본 false, 꺼져 있으면 지금까지와 같다) 켜면 세로만 스크롤하는 뷰에서 가로로 더 많이 끈 손가락(가로만 스크롤하면 세로로 더 많이 끈 손가락)은 TouchRecognizer 가 뷰로 넘기지 않는다. 보류된 누름을 곧바로 누른 노드에 보내고 그 뒤의 이동과 뗌도 그 노드가 받는다. 두 축 모두 스크롤하는 뷰는 늘 가져간다. (스크롤 안의 슬라이더를 가로로 끌 때, 드래그 임계를 넘자마자 세로 스크롤이 손가락을 가져가 슬라이더가 움직이지 않던 것)
 
