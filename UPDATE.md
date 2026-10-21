@@ -1,5 +1,8 @@
 # 업데이트 기록
 
+# 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.
+
 # 0.3.25 (2026-10-21)
 - EngineConfiguration: resumeAudioOnTouchEnd. (기본 false, 꺼져 있으면 지금까지와 같다) 켜면 손을 뗄 때(touchend, pointerup)에도 사용자 입력으로 보고 오디오 컨텍스트를 깨운다. (markUserGesture 와 resumeContext) touchstart 는 사용자 활성화를 주지 않아, iOS WebKit 에서 앱 전환이나 전면 광고로 멈춘(suspended, interrupted) 컨텍스트에 resume() 을 불러도 깨어나지 않았다. 캔버스를 끄는 조작은 기본 동작을 막아 click 이 생기지 않으므로, 화면을 끌기만 하는 게임은 한 번 포커스를 잃으면 소리가 돌아오지 않았다. 생성 때 정한다. (리스너를 그때 단다)
 
