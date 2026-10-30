@@ -18,8 +18,11 @@ import { AudioManager } from "./audiomanager.js";
 import { FontAsset } from "../resource/fontasset.js";
 
 
-// 최대 FPS 제한에서 간격을 덜 요구하는 여유. (밀리초) 주사율의 흔들림 때문에 제 간격보다 조금 일찍 온 프레임을 건너뛰지 않게 한다.
+// 최대 FPS 제한에서 제 차례보다 일찍 온 프레임도 처리하는 여유. (밀리초) 주사율의 흔들림 때문에 제 차례보다 조금 일찍 온 프레임을 건너뛰지 않게 한다.
 const FRAME_LIMIT_TOLERANCE_MILLISECONDS = 4;
+
+// 최대 FPS 제한에서 제 차례보다 이만큼 안쪽으로 일찍 온 프레임을 처리하면 그 시각부터 다시 센다. (밀리초) 주사율이 최대 FPS 와 거의 같은 화면(60.05 Hz 에서 60 FPS 등)에서 조금씩 앞서 간 것이 쌓여 가끔 한 프레임을 건너뛰지 않게 한다.
+const FRAME_LIMIT_RESYNC_MILLISECONDS = 1;
 
 
 
@@ -109,7 +112,9 @@ export class Engine extends Object {
 	/** @private @type { () => void  } */ #resumeCallback;
 	/** @private @type { FrameRequestCallback } */ #updateEngineCallback;
 	/** @private @type { number } */ #frameNumber;
-	/** @private @type { number } */ #lastFrameTimestamp; // 마지막으로 처리한 프레임의 시각. (최대 FPS 제한용, 밀리초, 아직 없으면 -1)
+	/** @private @type { number } */ #frameLimitStartTimestamp; // 최대 FPS 제한에서 프레임 수를 세기 시작한 시각. (밀리초, 아직 없으면 -1)
+	/** @private @type { number } */ #frameLimitFrameCount; // 세기 시작한 뒤 처리한 프레임 수.
+	/** @private @type { number } */ #frameLimitFramePerSecond; // 세고 있는 최대 FPS. (바뀌면 다시 센다)
 	/** @private @type { Rect } */ #statisticsTextRect;
 	/** @private @type { Version } */ #version;
 
@@ -153,7 +158,9 @@ export class Engine extends Object {
 		this.#resumeCallback = this.resume.bind(this);
 		this.#updateEngineCallback = this.updateEngine.bind(this);
 		this.#frameNumber = 0;
-		this.#lastFrameTimestamp = -1;
+		this.#frameLimitStartTimestamp = -1;
+		this.#frameLimitFrameCount = 0;
+		this.#frameLimitFramePerSecond = 0;
 
 		this.#statisticsTextRect = Rect.zero();
 		this.#version = Version.create(0, 3, 2);
@@ -801,17 +808,30 @@ export class Engine extends Object {
 	 */
 	updateEngine(timestamp) {
 
-		// 최대 FPS 제한. (정한 간격보다 빨리 온 프레임은 건너뛴다. 주사율의 흔들림을 받아 주려고 간격을 조금 덜 요구한다)
+		// 최대 FPS 제한. (세기 시작한 때부터 처리한 프레임 수로 다음 프레임의 차례를 정하고, 차례보다 일찍 온 프레임은 건너뛴다.
+		//  밀린 것은 다음 프레임에 처리하므로 주사율이 최대 FPS 로 나누어떨어지지 않아도(90 Hz 에서 60 FPS 등) 평균이 최대 FPS 가 된다)
 		const engineConfiguration = this.getEngineConfiguration();
 		const maximumFramePerSecond = engineConfiguration.maximumFramePerSecond;
 		if (maximumFramePerSecond > 0) {
 			const frameInterval = 1000 / maximumFramePerSecond;
-			const elapsedMilliseconds = timestamp - this.#lastFrameTimestamp;
-			if (this.#lastFrameTimestamp >= 0 && elapsedMilliseconds < frameInterval - FRAME_LIMIT_TOLERANCE_MILLISECONDS) {
+			if (this.#frameLimitStartTimestamp < 0 || this.#frameLimitFramePerSecond !== maximumFramePerSecond) {
+				this.#frameLimitStartTimestamp = timestamp;
+				this.#frameLimitFrameCount = 0;
+				this.#frameLimitFramePerSecond = maximumFramePerSecond;
+			}
+			const dueTimestamp = this.#frameLimitStartTimestamp + this.#frameLimitFrameCount * frameInterval;
+			const earlyMilliseconds = dueTimestamp - timestamp;
+			if (earlyMilliseconds > FRAME_LIMIT_TOLERANCE_MILLISECONDS) {
 				System.window.requestAnimationFrame(this.#updateEngineCallback);
 				return;
 			}
-			this.#lastFrameTimestamp = timestamp;
+
+			// 한 프레임 넘게 밀렸거나(창이 가려졌다 돌아옴 등) 차례와 거의 같게 왔으면 이 시각부터 다시 센다. (밀린 것을 몰아서 처리하지 않고, 조금씩 앞서 간 것이 쌓이지 않게)
+			if (earlyMilliseconds < -frameInterval || (earlyMilliseconds > 0 && earlyMilliseconds <= FRAME_LIMIT_RESYNC_MILLISECONDS)) {
+				this.#frameLimitStartTimestamp = timestamp;
+				this.#frameLimitFrameCount = 0;
+			}
+			++this.#frameLimitFrameCount;
 		}
 
 		// 렌더러 처리.

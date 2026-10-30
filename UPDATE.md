@@ -1,5 +1,8 @@
 # 업데이트 기록
 
+# 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- Engine: 최대 FPS 제한(EngineConfiguration.maximumFramePerSecond)을 처리한 프레임 수로 센다. 세기 시작한 때부터 처리한 프레임 수로 다음 프레임의 차례(시작 시각 + 수 × 간격)를 정하고, 차례보다 4 ms 넘게 일찍 온 프레임만 건너뛴다. 밀린 것은 다음 프레임에 처리해 평균이 최대 FPS 가 된다. 지금까지는 마지막으로 처리한 프레임 뒤로 간격보다 4 ms 덜 지났으면 건너뛰고 기준을 처리한 프레임의 시각으로 다시 잡아 밀린 것을 잊었으므로, 주사율이 최대 FPS 로 나누어떨어지지 않으면 제한이 어긋났다. (60 FPS 에서 90 Hz 는 한 프레임 걸러 45, 144 Hz 는 72, 75 Hz 는 하나도 건너뛰지 않아 75) 한 프레임 넘게 밀리면(창이 가려졌다 돌아옴 등) 몰아서 처리하지 않고 그 시각부터 다시 센다. 차례보다 1 ms 안쪽으로 일찍 온 프레임을 처리하면 그 시각부터 다시 세어, 주사율이 최대 FPS 와 거의 같은 화면(60.05 Hz 등)에서 조금씩 앞서 간 것이 쌓여 가끔 한 프레임을 건너뛰지 않는다. 최대 FPS 를 바꾸면 다시 센다. 60 Hz 화면의 60 FPS, 주사율의 약수인 최대 FPS(90 Hz 의 30 FPS 등)는 지금까지와 같다.
+
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.
 - EngineConfiguration: resumeAudioOnTouchEnd. (기본 false, 꺼져 있으면 지금까지와 같다) 켜면 손을 뗄 때(touchend, pointerup)에도 사용자 입력으로 보고 오디오 컨텍스트를 깨운다. (markUserGesture 와 resumeContext) touchstart 는 사용자 활성화를 주지 않아, iOS WebKit 에서 앱 전환이나 전면 광고로 멈춘(suspended, interrupted) 컨텍스트에 resume() 을 불러도 깨어나지 않았다. 캔버스를 끄는 조작은 기본 동작을 막아 click 이 생기지 않으므로, 화면을 끌기만 하는 게임은 한 번 포커스를 잃으면 소리가 돌아오지 않았다. 생성 때 정한다. (리스너를 그때 단다)
