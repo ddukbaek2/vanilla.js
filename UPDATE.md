@@ -1,6 +1,20 @@
 # 업데이트 기록
 
 # 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- 렌더링: 노드와 Paint 를 그릴 때 프레임마다 생기던 객체와 드로우 콜마다의 일을 줄인다. 그리는 결과는 같고 부르는 쪽의 사용법도 같다. (아래 벤치 장면과 예제 uishowcase, uisample, spriteeffects, particleeffects, timelineshowcase 를 시계를 고정해 같은 프레임에서 뜨면 화면 픽셀이 고치기 전과 같다) 크롬(헤드리스, 실제 GPU)에서 Paint 로 둥근 사각형을 그리는 노드 8천 개가 움직이는 장면(rustgame-test 의 같은 스펙 비교 벤치)을 같은 때에 재면 그리기가 78.0 ms 에서 13.0 ~ 14.4 ms, 프레임이 90.1 ms 에서 23.9 ~ 26.3 ms 가 되고, 60 FPS 를 지키는 노드 수는 1천에서 4천 ~ 6천이 된다. (한 PC 의 측정, 게임 로직 시간은 그대로다)
+- Graphic.drawRoundRect: 꼭짓점 36 개의 cos / sin 을 모듈을 읽을 때 한 번 구해 둔 표로 셈하고, Vector2 배열을 만들지 않고 고쳐 쓰는 칸에 적은 좌표로 바로 버텍스를 쓴다. (노드마다 프레임마다 삼각함수 72 번, Vector2 36 개, 코너 객체 4 개가 없어진다) 표는 지금까지와 같은 식(엔진 base/math.js 의 cos / sin)으로 구해 꼭짓점 값이 비트까지 같다. buildRoundRectPositions 도 표를 쓴다. (돌려주는 Vector2 배열은 지금처럼 새로 만든다) drawRoundRect 는 이제 buildRoundRectPositions 를 거치지 않는다
+- Graphic: writeRoundRectPositionData(rect, roundSize), drawRoundRectPositionData(color). 라운드 사각형 좌표를 모듈의 칸에 적고, 그 칸으로 채움을 그린다. (drawRoundRect 가 쓴다)
+- Paint.draw: 그릴 때마다 Rect 하나(안의 Vector2 포함)와 내용 크기 복제본을 만들던 것을, 모듈에 하나 둔 사각 영역을 고쳐 쓰고 WorldNode.copyContentSizeTo 로 크기를 받게 바꾼다. graphic 의 그리기 함수에 넘긴 사각 영역은 다음 Paint 를 그릴 때 바뀐다. (엔진 안에서 받은 사각 영역을 들고 있는 곳은 없다)
+- WorldNode: copyContentSizeTo(target). 내용 크기를 복제본 없이 target 에 적는다. getContentSize 를 덮어쓴 하위 클래스(UINode 등)면 그 함수가 주는 값을 적는다
+- TransformNode, WorldNode 의 pushTransform: 위치, 크기, 피봇, 내용 크기를 복제본 없이 읽는다. (노드마다 프레임마다 Vector2 넷) TransformNode.applyLocalTransform(graphic) 이 로컬 위치, 회전, 크기를 건다. 그 getter 들을 덮어쓴 하위 클래스면 지금처럼 getter 를 불러 읽는다
+- TransformMatrix: rotate(0) 과 scale(1, 1) 은 행렬을 셈하지 않고 돌아간다. (결과는 같다, 회전하지 않는 노드도 그릴 때마다 부른다)
+- Graphic.pushState / popState: 저장할 때마다 행렬 복제본과 상태 객체를 만들지 않고, 스택 깊이마다 만들어 둔 칸에 지금 행렬 객체와 그 값을 적는다. 복원하면 저장할 때의 행렬 객체에 그 값을 되돌려 적고 다시 지금 행렬로 삼는다. 그래서 getTransformMatrix() 로 받아 둔 행렬은 복원 뒤에도 지금 행렬이다. (지금까지는 복원하면 저장해 둔 복제본으로 바뀌어, 받아 둔 행렬은 더는 지금 행렬이 아니었다)
+- TransformNode.setLocalPosition / setLocalScale, WorldNode.setPivot / setContentSize: 받은 벡터를 복제하지 않고 가진 벡터에 값을 옮겨 적는다. getter 는 지금처럼 복제해 주므로 가진 벡터는 밖으로 나가지 않는다
+- Rect: 생성자와 create() 가 갓 만든 Vector2 를 setter 로 한 번 더 복제하지 않는다. (Rect.create 하나에 Vector2 여덟 개이던 것이 두 개)
+- Color.clone(): Reflection.clone 을 거치지 않고 rgba 를 바로 옮긴 새 Color 를 만든다. (Rect.clone 처럼 하위 클래스가 아니라 Color 를 돌려준다, 엔진 안에 Color 의 하위 클래스는 없다) setFillColor 처럼 그릴 때마다 부르는 곳이 있다
+- Reflection.clone: getter 와 setter 를 함께 가진 프로퍼티 이름 목록을 프로토타입마다 처음 한 번만 훑어 두고 쓴다. (부를 때마다 프로토타입 사슬을 훑었다) 복사하는 차례와 값은 같다
+- Object: 비공개 필드(#instanceId, #isDestroyed)를 뺀다. 고유식별자는 처음 getInstanceId() 를 부를 때 모듈의 WeakMap 에 넣는다. isDestroyed() 는 지금처럼 늘 false 다. (destroy() 가 파괴 표시를 남기지 않았다) 모든 엔진 객체가 만들어질 때마다 채우던 칸 둘이 없어진다
+- Graphic.drawVertices: 유니폼 자리(modelMatrix, mainColor, tintColor, globalAlpha)를 드로우 콜마다 이름으로 찾지 않고 셰이더 프로그램이 바뀔 때만 찾는다. (uploadDrawUniforms) 기본 프로그램의 틴트와 전역 투명도는 지난번에 올린 값과 같으면 다시 올리지 않는다. 프레임 시작(applySettings)과 프로그램이 바뀔 때 올린 값을 잊고, 바꿔 끼운 프로그램(setShaderProgramOverride)에는 늘 올린다. 게임이 기본 프로그램의 tintColor, globalAlpha 유니폼을 직접 올리면 다음 드로우 콜이 그 값을 바로잡지 않을 수 있다. (엔진 안에는 그런 곳이 없다)
 - Engine: 최대 FPS 제한(EngineConfiguration.maximumFramePerSecond)을 처리한 프레임 수로 센다. 세기 시작한 때부터 처리한 프레임 수로 다음 프레임의 차례(시작 시각 + 수 × 간격)를 정하고, 차례보다 4 ms 넘게 일찍 온 프레임만 건너뛴다. 밀린 것은 다음 프레임에 처리해 평균이 최대 FPS 가 된다. 지금까지는 마지막으로 처리한 프레임 뒤로 간격보다 4 ms 덜 지났으면 건너뛰고 기준을 처리한 프레임의 시각으로 다시 잡아 밀린 것을 잊었으므로, 주사율이 최대 FPS 로 나누어떨어지지 않으면 제한이 어긋났다. (60 FPS 에서 90 Hz 는 한 프레임 걸러 45, 144 Hz 는 72, 75 Hz 는 하나도 건너뛰지 않아 75) 한 프레임 넘게 밀리면(창이 가려졌다 돌아옴 등) 몰아서 처리하지 않고 그 시각부터 다시 센다. 차례보다 1 ms 안쪽으로 일찍 온 프레임을 처리하면 그 시각부터 다시 세어, 주사율이 최대 FPS 와 거의 같은 화면(60.05 Hz 등)에서 조금씩 앞서 간 것이 쌓여 가끔 한 프레임을 건너뛰지 않는다. 최대 FPS 를 바꾸면 다시 센다. 60 Hz 화면의 60 FPS, 주사율의 약수인 최대 FPS(90 Hz 의 30 FPS 등)는 지금까지와 같다.
 
 # 0.3.2 (2026-10-22)

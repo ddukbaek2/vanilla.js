@@ -51,18 +51,38 @@ export class TransformNode extends ComponentNode {
 			graphic.pushState();
 
 			// 트랜스폼 반영.
-			const localPosition = this.getLocalPosition();
-			const localRotation = this.getLocalRotation();
-			const radian = Math.degreeToRadian(localRotation);
-			const localScale = this.getLocalScale();
-			graphic.translate(localPosition.x, localPosition.y);
-			graphic.rotate(radian);
-			graphic.scale(localScale.x, localScale.y);
+			this.applyLocalTransform(graphic);
 
 			// 투명도 반영.
 			const localOpacity = this.getLocalOpacity();
 			graphic.multiplyGlobalAlpha(localOpacity);
 		}
+	}
+
+	//==============================================================================
+	// 로컬 위치, 회전, 크기를 graphic 의 변환에 건다.
+	// - 위치와 크기를 복제하지 않고 읽는다. getLocalPosition() / getLocalScale() 을 덮어쓴 하위 클래스면 그 함수로 읽는다.
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic
+	 */
+	applyLocalTransform(graphic) {
+		const localRotation = this.getLocalRotation();
+		const radian = Math.degreeToRadian(localRotation);
+		const isLocalPositionOverridden = this.getLocalPosition !== TransformNode.prototype.getLocalPosition;
+		const isLocalScaleOverridden = this.getLocalScale !== TransformNode.prototype.getLocalScale;
+		if (isLocalPositionOverridden || isLocalScaleOverridden) {
+			const localPosition = this.getLocalPosition();
+			const localScale = this.getLocalScale();
+			graphic.translate(localPosition.x, localPosition.y);
+			graphic.rotate(radian);
+			graphic.scale(localScale.x, localScale.y);
+			return;
+		}
+
+		graphic.translate(this.#localPosition.x, this.#localPosition.y);
+		graphic.rotate(radian);
+		graphic.scale(this.#localScale.x, this.#localScale.y);
 	}
 
 	//==============================================================================
@@ -281,7 +301,9 @@ export class TransformNode extends ComponentNode {
 	 * @param { Vector2 } position 
 	 */
 	setLocalPosition(position) {
-		this.#localPosition = position.clone();
+		// 복제본을 새로 만들지 않고 가진 벡터에 값을 옮겨 적는다. (가진 벡터는 밖으로 내주지 않는다, getLocalPosition() 은 복제해 준다)
+		this.#localPosition.x = position.x;
+		this.#localPosition.y = position.y;
 	}
 
 	//==============================================================================
@@ -301,7 +323,9 @@ export class TransformNode extends ComponentNode {
 	 * @param { Vector2 } scale 
 	 */
 	setLocalScale(scale) {
-		this.#localScale = scale.clone();
+		// 복제본을 새로 만들지 않고 가진 벡터에 값을 옮겨 적는다. (getLocalScale() 은 복제해 준다)
+		this.#localScale.x = scale.x;
+		this.#localScale.y = scale.y;
 	}
 
 	//==============================================================================

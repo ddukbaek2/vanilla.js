@@ -172,7 +172,12 @@ export class Color extends Object {
 	 * @returns { this }
 	 */
 	clone() {
-		const obj = super.clone();
+		// 프로토타입을 훑는 Reflection.clone 을 거치지 않고 rgba 를 바로 옮긴다. (setFillColor 처럼 그릴 때마다 부르는 곳이 있다)
+		const red = this.red;
+		const green = this.green;
+		const blue = this.blue;
+		const alpha = this.alpha;
+		const obj = /** @type { this } */ (new Color(red, green, blue, alpha));
 		return obj;
 	}
 

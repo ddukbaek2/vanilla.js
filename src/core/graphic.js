@@ -137,6 +137,26 @@ const VERTEX_CAPACITY = 4096;
 // 라운드 사각형 / 원의 코너 아크 분할 수.
 const CORNER_SEGMENT_COUNT = 8;
 
+// 라운드 사각형 경로의 점 수. (코너 4개, 코너마다 분할 수 + 1)
+const ROUND_RECT_POSITION_COUNT = 4 * (CORNER_SEGMENT_COUNT + 1);
+
+// 라운드 사각형 경로의 점마다 단위 원의 cos / sin. (우상 → 우하 → 좌하 → 좌상 코너, 각도가 늘 같으므로 처음에 한 번만 구한다)
+const ROUND_RECT_COSINE_TABLE = new System.Float64Array(ROUND_RECT_POSITION_COUNT);
+const ROUND_RECT_SINE_TABLE = new System.Float64Array(ROUND_RECT_POSITION_COUNT);
+const ROUND_RECT_CORNER_START_RADIAN_LIST = [-Math.PI / 2, 0, Math.PI / 2, Math.PI];
+for (let cornerIndex = 0; cornerIndex < 4; ++cornerIndex) {
+	const startRadian = ROUND_RECT_CORNER_START_RADIAN_LIST[cornerIndex];
+	for (let segmentIndex = 0; segmentIndex <= CORNER_SEGMENT_COUNT; ++segmentIndex) {
+		const positionIndex = cornerIndex * (CORNER_SEGMENT_COUNT + 1) + segmentIndex;
+		const radian = startRadian + (Math.PI / 2) * (segmentIndex / CORNER_SEGMENT_COUNT);
+		ROUND_RECT_COSINE_TABLE[positionIndex] = Math.cos(radian);
+		ROUND_RECT_SINE_TABLE[positionIndex] = Math.sin(radian);
+	}
+}
+
+// 라운드 사각형 경로 좌표를 적어 두고 고쳐 쓰는 칸. (x, y 차례)
+const ROUND_RECT_POSITION_DATA = new System.Float64Array(ROUND_RECT_POSITION_COUNT * 2);
+
 // 텍스트 베이크 스케일 상한. (과도한 확대 굽기 방지)
 const MAXIMUM_TEXT_BAKE_SCALE = 8;
 const DEFAULT_TEXT_BAKE_SCALE_STEP = 0.25;
@@ -211,6 +231,7 @@ export class Graphic extends Object {
 	/** @private @type { TextStringTextureCache } */ #textStringTextureCache;
 	/** @private @type { TransformMatrix } */ #transformMatrix;
 	/** @private @type { object[] } */ #stateStack;
+	/** @private @type { object[] } */ #stateSnapshotPool; // 상태 저장 칸. (스택 깊이마다 하나씩 만들어 두고 고쳐 쓴다)
 	/** @private @type { number } */ #globalAlpha;
 	/** @private @type { string } */ #blendMode;
 	/** @private @type { Map<string, number[]> } */ #blendFunctionTable;
@@ -226,6 +247,14 @@ export class Graphic extends Object {
 	/** @private @type { object[] } */ #clipStack;
 	/** @private @type { Float32Array } */ #projectionMatrixArray;
 	/** @private @type { Float32Array } */ #modelMatrixArray;
+	/** @private @type { ShaderProgram | null } */ #uniformLocationProgram; // 아래 유니폼 자리를 찾아 둔 셰이더 프로그램.
+	/** @private @type { WebGLUniformLocation | null } */ #modelMatrixLocation;
+	/** @private @type { WebGLUniformLocation | null } */ #mainColorLocation;
+	/** @private @type { WebGLUniformLocation | null } */ #tintColorLocation;
+	/** @private @type { WebGLUniformLocation | null } */ #globalAlphaLocation;
+	/** @private @type { boolean } */ #isUploadedUniformKnown; // 기본 프로그램에 마지막으로 올린 틴트와 전역 투명도를 알고 있는지.
+	/** @private @type { number[] } */ #uploadedTintColorValueList; // 기본 프로그램에 마지막으로 올린 틴트. (r, g, b, a)
+	/** @private @type { number } */ #uploadedGlobalAlpha; // 기본 프로그램에 마지막으로 올린 전역 투명도.
 	/** @private @type { number } */ #appliedViewportWidth;
 	/** @private @type { number } */ #appliedViewportHeight;
 	/** @private @type { number } */ #textBakeScaleStep; // 텍스트 베이크 스케일 양자화 단위. (0 이면 양자화하지 않음)
@@ -317,6 +346,7 @@ export class Graphic extends Object {
 		// 상태.
 		this.#transformMatrix = new TransformMatrix();
 		this.#stateStack = [];
+		this.#stateSnapshotPool = [];
 		this.#globalAlpha = 1.0;
 		this.#blendMode = "source-over";
 		this.#warnedBlendModes = new Set();
@@ -331,6 +361,14 @@ export class Graphic extends Object {
 		this.#clipStack = [];
 		this.#projectionMatrixArray = new Float32Array(9);
 		this.#modelMatrixArray = new Float32Array(9);
+		this.#uniformLocationProgram = null;
+		this.#modelMatrixLocation = null;
+		this.#mainColorLocation = null;
+		this.#tintColorLocation = null;
+		this.#globalAlphaLocation = null;
+		this.#isUploadedUniformKnown = false;
+		this.#uploadedTintColorValueList = [0, 0, 0, 0];
+		this.#uploadedGlobalAlpha = 1.0;
 		this.#appliedViewportWidth = 0;
 		this.#appliedViewportHeight = 0;
 		this.#textBakeScaleStep = DEFAULT_TEXT_BAKE_SCALE_STEP;
@@ -409,6 +447,7 @@ export class Graphic extends Object {
 
 		// 프레임 시작 기준 상태로 리셋.
 		this.#stateStack.length = 0;
+		this.#isUploadedUniformKnown = false;
 		this.#transformMatrix.setIdentity();
 		this.#globalAlpha = 1.0;
 		this.#imageTintColor = null;
@@ -552,18 +591,49 @@ export class Graphic extends Object {
 	// 상태 저장. (변환/알파/블렌드/색상/폰트/틴트 — Canvas2D save 대응)
 	//==============================================================================
 	pushState() {
-		const stateSnapshot = {
-			transformMatrix: this.#transformMatrix.clone(),
-			globalAlpha: this.#globalAlpha,
-			blendMode: this.#blendMode,
-			fillColor: this.#fillColor,
-			strokeColor: this.#strokeColor,
-			imageTintColor: this.#imageTintColor,
-			fontString: this.#fontString,
-			textAlign: this.#textAlign,
-			textBaseline: this.#textBaseline,
-			textDirection: this.#textDirection,
-		};
+		// 저장할 때마다 행렬 복제본과 상태 객체를 새로 만들지 않고, 스택 깊이마다 만들어 둔 칸에 적는다.
+		const depth = this.#stateStack.length;
+		let stateSnapshot = this.#stateSnapshotPool[depth];
+		if (stateSnapshot === undefined) {
+			stateSnapshot = {
+				transformMatrix: null,
+				matrixA: 1,
+				matrixB: 0,
+				matrixC: 0,
+				matrixD: 1,
+				matrixE: 0,
+				matrixF: 0,
+				globalAlpha: 1.0,
+				blendMode: "",
+				fillColor: null,
+				strokeColor: null,
+				imageTintColor: null,
+				fontString: "",
+				textAlign: "",
+				textBaseline: "",
+				textDirection: "",
+			};
+			this.#stateSnapshotPool.push(stateSnapshot);
+		}
+
+		// 행렬은 지금 행렬 객체와 그 값을 적는다. (복원할 때 이 객체에 값을 되돌려 적고 다시 지금 행렬로 삼는다)
+		const transformMatrix = this.#transformMatrix;
+		stateSnapshot.transformMatrix = transformMatrix;
+		stateSnapshot.matrixA = transformMatrix.a;
+		stateSnapshot.matrixB = transformMatrix.b;
+		stateSnapshot.matrixC = transformMatrix.c;
+		stateSnapshot.matrixD = transformMatrix.d;
+		stateSnapshot.matrixE = transformMatrix.e;
+		stateSnapshot.matrixF = transformMatrix.f;
+		stateSnapshot.globalAlpha = this.#globalAlpha;
+		stateSnapshot.blendMode = this.#blendMode;
+		stateSnapshot.fillColor = this.#fillColor;
+		stateSnapshot.strokeColor = this.#strokeColor;
+		stateSnapshot.imageTintColor = this.#imageTintColor;
+		stateSnapshot.fontString = this.#fontString;
+		stateSnapshot.textAlign = this.#textAlign;
+		stateSnapshot.textBaseline = this.#textBaseline;
+		stateSnapshot.textDirection = this.#textDirection;
 		this.#stateStack.push(stateSnapshot);
 	}
 
@@ -576,7 +646,10 @@ export class Graphic extends Object {
 			return;
 		}
 
-		this.#transformMatrix = stateSnapshot.transformMatrix;
+		const transformMatrix = stateSnapshot.transformMatrix;
+		transformMatrix.setTransform(stateSnapshot.matrixA, stateSnapshot.matrixB, stateSnapshot.matrixC, stateSnapshot.matrixD, stateSnapshot.matrixE, stateSnapshot.matrixF);
+		this.#transformMatrix = transformMatrix;
+		stateSnapshot.transformMatrix = null;
 		this.#globalAlpha = stateSnapshot.globalAlpha;
 		this.#fillColor = stateSnapshot.fillColor;
 		this.#strokeColor = stateSnapshot.strokeColor;
@@ -867,27 +940,74 @@ export class Graphic extends Object {
 		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, vertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, vertexCount * FLOATS_PER_VERTEX);
 
 		// 유니폼 업로드.
-		this.#transformMatrix.writeToFloat32Array(this.#modelMatrixArray);
-		const modelMatrixLocation = shaderProgram.getUniformLocation("modelMatrix");
-		webGL2RenderingContext.uniformMatrix3fv(modelMatrixLocation, false, this.#modelMatrixArray);
-		const mainColorLocation = shaderProgram.getUniformLocation("mainColor");
-		webGL2RenderingContext.uniform4f(mainColorLocation, color.red, color.green, color.blue, color.alpha);
-		const tintColorLocation = shaderProgram.getUniformLocation("tintColor");
-		const imageTintColor = this.getImageTintColor();
-		if (imageTintColor) {
-			webGL2RenderingContext.uniform4f(tintColorLocation, imageTintColor.red, imageTintColor.green, imageTintColor.blue, imageTintColor.alpha);
-		}
-		else {
-			webGL2RenderingContext.uniform4f(tintColorLocation, 0, 0, 0, 0);
-		}
-		const globalAlphaLocation = shaderProgram.getUniformLocation("globalAlpha");
-		webGL2RenderingContext.uniform1f(globalAlphaLocation, this.getGlobalAlpha());
+		this.uploadDrawUniforms(shaderProgram, color);
 
 		// 텍스처 바인드 및 출력.
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
 		this.#drawCallCount += 1;
 		this.#drawVertexCount += vertexCount;
+	}
+
+	//==============================================================================
+	// 드로우 콜 하나의 유니폼 업로드. (drawVertices 가 부른다)
+	// - 유니폼 자리는 셰이더 프로그램이 바뀔 때만 다시 찾는다.
+	// - 기본 프로그램의 틴트와 전역 투명도는 지난번에 올린 값과 같으면 다시 올리지 않는다. (프레임 시작과 프로그램이 바뀔 때 잊는다)
+	// - 바꿔 끼운 셰이더 프로그램에는 늘 올린다.
+	//==============================================================================
+	/**
+	 * @param { ShaderProgram } shaderProgram
+	 * @param { Color } color
+	 */
+	uploadDrawUniforms(shaderProgram, color) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		if (shaderProgram !== this.#uniformLocationProgram) {
+			this.#uniformLocationProgram = shaderProgram;
+			this.#modelMatrixLocation = shaderProgram.getUniformLocation("modelMatrix");
+			this.#mainColorLocation = shaderProgram.getUniformLocation("mainColor");
+			this.#tintColorLocation = shaderProgram.getUniformLocation("tintColor");
+			this.#globalAlphaLocation = shaderProgram.getUniformLocation("globalAlpha");
+			this.#isUploadedUniformKnown = false;
+		}
+
+		this.#transformMatrix.writeToFloat32Array(this.#modelMatrixArray);
+		webGL2RenderingContext.uniformMatrix3fv(this.#modelMatrixLocation, false, this.#modelMatrixArray);
+		webGL2RenderingContext.uniform4f(this.#mainColorLocation, color.red, color.green, color.blue, color.alpha);
+
+		// 틴트. (없으면 0, 0, 0, 0)
+		const imageTintColor = this.getImageTintColor();
+		let tintRed = 0;
+		let tintGreen = 0;
+		let tintBlue = 0;
+		let tintAlpha = 0;
+		if (imageTintColor) {
+			tintRed = imageTintColor.red;
+			tintGreen = imageTintColor.green;
+			tintBlue = imageTintColor.blue;
+			tintAlpha = imageTintColor.alpha;
+		}
+		const globalAlpha = this.getGlobalAlpha();
+
+		const isDefaultProgram = shaderProgram === this.#shaderProgram;
+		const isUploadedUniformKnown = isDefaultProgram && this.#isUploadedUniformKnown;
+		const uploadedTintColorValueList = this.#uploadedTintColorValueList;
+		const isSameTintColor = isUploadedUniformKnown && uploadedTintColorValueList[0] === tintRed && uploadedTintColorValueList[1] === tintGreen && uploadedTintColorValueList[2] === tintBlue && uploadedTintColorValueList[3] === tintAlpha;
+		if (!isSameTintColor) {
+			webGL2RenderingContext.uniform4f(this.#tintColorLocation, tintRed, tintGreen, tintBlue, tintAlpha);
+		}
+		const isSameGlobalAlpha = isUploadedUniformKnown && this.#uploadedGlobalAlpha === globalAlpha;
+		if (!isSameGlobalAlpha) {
+			webGL2RenderingContext.uniform1f(this.#globalAlphaLocation, globalAlpha);
+		}
+
+		if (isDefaultProgram) {
+			uploadedTintColorValueList[0] = tintRed;
+			uploadedTintColorValueList[1] = tintGreen;
+			uploadedTintColorValueList[2] = tintBlue;
+			uploadedTintColorValueList[3] = tintAlpha;
+			this.#uploadedGlobalAlpha = globalAlpha;
+			this.#isUploadedUniformKnown = true;
+		}
 	}
 
 	//==============================================================================
@@ -1391,6 +1511,25 @@ export class Graphic extends Object {
 	 * @returns { Vector2[] }
 	 */
 	buildRoundRectPositions(rect, roundSize) {
+		this.writeRoundRectPositionData(rect, roundSize);
+		const positions = [];
+		for (let positionIndex = 0; positionIndex < ROUND_RECT_POSITION_COUNT; ++positionIndex) {
+			const positionX = ROUND_RECT_POSITION_DATA[positionIndex * 2];
+			const positionY = ROUND_RECT_POSITION_DATA[positionIndex * 2 + 1];
+			positions.push(Vector2.create(positionX, positionY));
+		}
+		return positions;
+	}
+
+	//==============================================================================
+	// 라운드 사각형 경로 좌표를 ROUND_RECT_POSITION_DATA 에 적는다. (시계 방향, 볼록 다각형, x, y 차례)
+	// - 점마다의 cos / sin 은 처음에 구해 둔 표를 쓴다.
+	//==============================================================================
+	/**
+	 * @param { Rect } rect
+	 * @param { number } roundSize
+	 */
+	writeRoundRectPositionData(rect, roundSize) {
 		const leftX = rect.position.x;
 		const topY = rect.position.y;
 		const rightX = leftX + rect.size.x;
@@ -1398,23 +1537,25 @@ export class Graphic extends Object {
 		const clampedRoundSize = Math.min(roundSize, Math.min(Math.abs(rect.size.x), Math.abs(rect.size.y)) / 2);
 
 		// 코너 중심 4개. (우상 → 우하 → 좌하 → 좌상)
-		const cornerCenters = [
-			{ x: rightX - clampedRoundSize, y: topY + clampedRoundSize, startRadian: -Math.PI / 2 },
-			{ x: rightX - clampedRoundSize, y: bottomY - clampedRoundSize, startRadian: 0 },
-			{ x: leftX + clampedRoundSize, y: bottomY - clampedRoundSize, startRadian: Math.PI / 2 },
-			{ x: leftX + clampedRoundSize, y: topY + clampedRoundSize, startRadian: Math.PI },
-		];
-
-		const positions = [];
-		for (const cornerCenter of cornerCenters) {
+		const rightCenterX = rightX - clampedRoundSize;
+		const leftCenterX = leftX + clampedRoundSize;
+		const topCenterY = topY + clampedRoundSize;
+		const bottomCenterY = bottomY - clampedRoundSize;
+		for (let cornerIndex = 0; cornerIndex < 4; ++cornerIndex) {
+			let centerX = leftCenterX;
+			if (cornerIndex < 2) {
+				centerX = rightCenterX;
+			}
+			let centerY = topCenterY;
+			if (cornerIndex === 1 || cornerIndex === 2) {
+				centerY = bottomCenterY;
+			}
 			for (let segmentIndex = 0; segmentIndex <= CORNER_SEGMENT_COUNT; ++segmentIndex) {
-				const radian = cornerCenter.startRadian + (Math.PI / 2) * (segmentIndex / CORNER_SEGMENT_COUNT);
-				const positionX = cornerCenter.x + Math.cos(radian) * clampedRoundSize;
-				const positionY = cornerCenter.y + Math.sin(radian) * clampedRoundSize;
-				positions.push(Vector2.create(positionX, positionY));
+				const positionIndex = cornerIndex * (CORNER_SEGMENT_COUNT + 1) + segmentIndex;
+				ROUND_RECT_POSITION_DATA[positionIndex * 2] = centerX + ROUND_RECT_COSINE_TABLE[positionIndex] * clampedRoundSize;
+				ROUND_RECT_POSITION_DATA[positionIndex * 2 + 1] = centerY + ROUND_RECT_SINE_TABLE[positionIndex] * clampedRoundSize;
 			}
 		}
-		return positions;
 	}
 
 	//==============================================================================
@@ -1467,13 +1608,48 @@ export class Graphic extends Object {
 	 */
 	drawRoundRect(rect, roundSize) {
 		if (roundSize > 0) {
-			const positions = this.buildRoundRectPositions(rect, roundSize);
+			// 점 배열을 만들지 않고 적어 둔 좌표로 바로 그린다.
+			this.writeRoundRectPositionData(rect, roundSize);
 			const fillColor = this.getFillColor();
-			this.drawConvexPolygon(positions, fillColor);
+			this.drawRoundRectPositionData(fillColor);
 		}
 		else {
 			this.drawRect(rect);
 		}
+	}
+
+	//==============================================================================
+	// ROUND_RECT_POSITION_DATA 에 적힌 라운드 사각형 채움 출력. (첫 점 기준 팬 분할, drawConvexPolygon 과 같은 삼각형)
+	//==============================================================================
+	/**
+	 * @param { Color } color
+	 */
+	drawRoundRectPositionData(color) {
+		const vertexData = this.getVertexData();
+		let offset = 0;
+		let vertexCount = 0;
+		const firstX = ROUND_RECT_POSITION_DATA[0];
+		const firstY = ROUND_RECT_POSITION_DATA[1];
+		for (let positionIndex = 1; positionIndex < ROUND_RECT_POSITION_COUNT - 1; ++positionIndex) {
+			if ((vertexCount + 3) * FLOATS_PER_VERTEX > vertexData.length) {
+				break;
+			}
+			vertexData[offset++] = firstX;
+			vertexData[offset++] = firstY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = ROUND_RECT_POSITION_DATA[positionIndex * 2];
+			vertexData[offset++] = ROUND_RECT_POSITION_DATA[positionIndex * 2 + 1];
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = ROUND_RECT_POSITION_DATA[positionIndex * 2 + 2];
+			vertexData[offset++] = ROUND_RECT_POSITION_DATA[positionIndex * 2 + 3];
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexCount += 3;
+		}
+
+		this.drawVertices(vertexCount, this.getWhiteTexture(), color);
 	}
 
 	//==============================================================================

@@ -6,18 +6,20 @@ import * as Reflection from "./reflection.js";
 
 
 //==============================================================================
+// 전역 상수 목록.
+//==============================================================================
+// 오브젝트마다의 고유식별자. (처음 getInstanceId() 를 부를 때 만들어 넣는다)
+// 기반 오브젝트에 비공개 필드를 두면 Vector2, Rect, Color, TransformMatrix 처럼 프레임마다 많이 만드는 값 객체가 만들 때마다 그 칸을 채우므로 밖에 둔다.
+const instanceIdTable = new System.WeakMap();
+
+
+//==============================================================================
 // 기반 오브젝트.
 //==============================================================================
 /**
  * @class
  */
 export class Object {
-	//==============================================================================
-	// 멤버 변수 목록.
-	//==============================================================================
-	/** @private @type { string } */ #instanceId; // 고유식별자. (처음 getInstanceId() 를 부를 때 만든다, 아직이면 빈 글)
-	/** @private @type { boolean } */ #isDestroyed; // 고유식별자.
-
 	//==============================================================================
 	// 생성.
 	//==============================================================================
@@ -26,8 +28,6 @@ export class Object {
 	 */
 	constructor() {
 		// 고유식별자는 처음 부를 때 만든다. (Vector2, Rect, Color 처럼 많이 만드는 값 객체가 만들 때마다 GUID 를 짓지 않게)
-		this.#instanceId = "";
-		this.#isDestroyed = false;
 	}
 
 	//==============================================================================
@@ -72,20 +72,23 @@ export class Object {
 	 * @returns { string }
 	 */
 	getInstanceId() {
-		if (this.#instanceId === "") {
-			this.#instanceId = Reflection.createGUID();
+		let instanceId = instanceIdTable.get(this);
+		if (instanceId === undefined) {
+			instanceId = Reflection.createGUID();
+			instanceIdTable.set(this, instanceId);
 		}
-		return this.#instanceId;
+		return instanceId;
 	}
 
 	//==============================================================================
 	// 파괴 여부 반환.
+	// - destroy() 가 파괴 표시를 남기지 않으므로 늘 false 다.
 	//==============================================================================
 	/**
 	 * @returns { boolean }
 	 */
 	isDestroyed() {
-		return this.#isDestroyed;
+		return false;
 	}
 
 	//==============================================================================

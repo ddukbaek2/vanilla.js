@@ -26,8 +26,9 @@ export class Rect extends Object {
 	constructor() {
 		super();
 
-		this.position = Vector2.zero();
-		this.size = Vector2.zero();
+		// 갓 만든 벡터라 setter 로 한 번 더 복제하지 않는다.
+		this.#position = Vector2.zero();
+		this.#size = Vector2.zero();
 	}
 
 	//==============================================================================
@@ -414,9 +415,10 @@ export class Rect extends Object {
 	 * @returns { Rect }
 	 */
 	static create(x, y, width, height) {
+		// 생성자가 만든 벡터에 값만 적는다. (Vector2 를 새로 만들어 setter 로 다시 복제하지 않는다)
 		var obj = new Rect();
-		obj.position = Vector2.create(x, y);
-		obj.size = Vector2.create(width, height);
+		obj.position.set(x, y);
+		obj.size.set(width, height);
 		return obj;
 	}
 

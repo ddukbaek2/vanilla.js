@@ -5,6 +5,13 @@ const System = globalThis;
 
 
 //==============================================================================
+// 전역 상수 목록.
+//==============================================================================
+// 프로토타입마다 getter 와 setter 를 함께 가진 프로퍼티 이름 목록. (clone() 이 그 프로토타입을 처음 만날 때 한 번만 훑는다)
+const accessorNameListTable = new System.WeakMap();
+
+
+//==============================================================================
 // 유효한 객체인지 여부 반환.
 //==============================================================================
 /**
@@ -50,21 +57,47 @@ export function clone(target) {
 	System.Object.assign(obj, target);
 
 	// 2. 클래스 프로토타입에 정의된 getter/setter를 통한 프로퍼티 복사 (프라이빗 변수 접근).
-	let currentProto = System.Object.getPrototypeOf(target);
+	const accessorNameList = getAccessorNameList(target);
+	for (const prop of accessorNameList) {
+		obj[prop] = target[prop];
+	}
+
+	return obj;
+}
+
+
+//==============================================================================
+// getter 와 setter 를 함께 가진 프로퍼티 이름 목록 반환.
+// - 프로토타입 사슬을 아래에서 위로 훑은 차례다. (덮어쓴 이름은 층마다 한 번씩 든다)
+// - 프로토타입마다 처음 한 번만 훑어 두고 같은 목록을 돌려준다.
+//==============================================================================
+/**
+ * @param { object } target
+ * @returns { string[] }
+ */
+function getAccessorNameList(target) {
+	const targetProto = System.Object.getPrototypeOf(target);
+	let accessorNameList = accessorNameListTable.get(targetProto);
+	if (accessorNameList !== undefined) {
+		return accessorNameList;
+	}
+
+	accessorNameList = [];
+	let currentProto = targetProto;
 	while (currentProto && currentProto !== System.Object.prototype) {
 		const props = System.Object.getOwnPropertyNames(currentProto);
 		for (const prop of props) {
 			if (prop !== "constructor") {
 				const descriptor = System.Object.getOwnPropertyDescriptor(currentProto, prop);
 				if (descriptor && descriptor.get && descriptor.set) {
-					obj[prop] = target[prop];
+					accessorNameList.push(prop);
 				}
 			}
 		}
 		currentProto = System.Object.getPrototypeOf(currentProto);
 	}
-
-	return obj;
+	accessorNameListTable.set(targetProto, accessorNameList);
+	return accessorNameList;
 }
 
 

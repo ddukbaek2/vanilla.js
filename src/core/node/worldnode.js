@@ -59,20 +59,22 @@ export class WorldNode extends TransformNode {
             // 트랜스폼 반영.
             // localPosition 은 부모 영역 내 자기 객체의 중심점 좌표 (anchor / pivot 영향 없음).
             // anchor 는 anchoredPosition 계산용 메타데이터일 뿐 렌더에 직접 영향 주지 않는다.
-            const localPosition = this.getLocalPosition();
-            const localRotation = this.getLocalRotation();
-            const radian = Math.degreeToRadian(localRotation);
-            const localScale = this.getLocalScale();
-            graphic.translate(localPosition.x, localPosition.y);
-            graphic.rotate(radian);
-            graphic.scale(localScale.x, localScale.y);
+            this.applyLocalTransform(graphic);
 
             // 현재 노드의 피봇 반영.
             // 캔버스2D는 기준점을 좌상으로 여기고 우하방향으로 그림을 그리므로.
             // 마지막 원점에서 현재 컨텐트사이즈 크기를 기준으로한 피봇만큼 상대적으로 당김.
-            const pivot = this.getPivot();
-            const contentSize = this.getContentSize();
-            graphic.translate(-contentSize.x * pivot.x, -contentSize.y * pivot.y);
+            // 피봇과 내용 크기는 복제하지 않고 읽는다. getPivot() / getContentSize() 를 덮어쓴 하위 클래스면 그 함수로 읽는다.
+            const isPivotOverridden = this.getPivot !== WorldNode.prototype.getPivot;
+            const isContentSizeOverridden = this.getContentSize !== WorldNode.prototype.getContentSize;
+            if (isPivotOverridden || isContentSizeOverridden) {
+                const pivot = this.getPivot();
+                const contentSize = this.getContentSize();
+                graphic.translate(-contentSize.x * pivot.x, -contentSize.y * pivot.y);
+            }
+            else {
+                graphic.translate(-this.#contentSize.x * this.#pivot.x, -this.#contentSize.y * this.#pivot.y);
+            }
 
             // 투명도 반영.
             const localOpacity = this.getLocalOpacity();
@@ -182,7 +184,7 @@ export class WorldNode extends TransformNode {
      * @param { Vector2 } pivot
      */
     setPivot(pivot) {
-        this.#pivot = pivot.clone();
+        // 복제본을 새로 만들지 않고 가진 벡터에 값을 옮겨 적는다. (getPivot() 은 복제해 준다)
         this.#pivot.x = Math.clamp(pivot.x, 0, 1);
         this.#pivot.y = Math.clamp(pivot.y, 0, 1);
     }
@@ -204,7 +206,9 @@ export class WorldNode extends TransformNode {
      * @param { Vector2 } contentSize
      */
     setContentSize(contentSize) {
-        this.#contentSize = contentSize.clone();
+        // 복제본을 새로 만들지 않고 가진 벡터에 값을 옮겨 적는다. (getContentSize() 는 복제해 준다)
+        this.#contentSize.x = contentSize.x;
+        this.#contentSize.y = contentSize.y;
     }
 
     //==============================================================================
@@ -216,6 +220,26 @@ export class WorldNode extends TransformNode {
      */
     getContentSize() {
         return this.#contentSize.clone();
+    }
+
+    //==============================================================================
+    // 실제 내용 크기를 target 에 적는다. (복제본을 만들지 않는다, Paint 가 그릴 때마다 쓴다)
+    // - getContentSize() 를 덮어쓴 하위 클래스면 그 함수가 주는 값을 적는다.
+    //==============================================================================
+    /**
+     * @param { Vector2 } target
+     */
+    copyContentSizeTo(target) {
+        const isContentSizeOverridden = this.getContentSize !== WorldNode.prototype.getContentSize;
+        if (isContentSizeOverridden) {
+            const contentSize = this.getContentSize();
+            target.x = contentSize.x;
+            target.y = contentSize.y;
+            return;
+        }
+
+        target.x = this.#contentSize.x;
+        target.y = this.#contentSize.y;
     }
 
     //==============================================================================

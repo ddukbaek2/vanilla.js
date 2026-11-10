@@ -184,6 +184,11 @@ export class TransformMatrix extends Object {
 	 * @param { number } radian
 	 */
 	rotate(radian) {
+		// 회전이 없으면 행렬이 그대로다. (회전하지 않는 노드도 그릴 때마다 부른다)
+		if (radian === 0) {
+			return;
+		}
+
 		const cosRadian = Math.cos(radian);
 		const sinRadian = Math.sin(radian);
 		const a = this.#a;
@@ -204,6 +209,11 @@ export class TransformMatrix extends Object {
 	 * @param { number } y
 	 */
 	scale(x, y) {
+		// 크기가 그대로면 행렬도 그대로다.
+		if (x === 1 && y === 1) {
+			return;
+		}
+
 		this.#a = this.#a * x;
 		this.#b = this.#b * x;
 		this.#c = this.#c * y;

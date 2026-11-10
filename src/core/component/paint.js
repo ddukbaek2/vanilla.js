@@ -9,6 +9,13 @@ import { TransformNode } from "../node/transformnode.js";
 
 
 //==============================================================================
+// 전역 상수 목록.
+//==============================================================================
+// 그릴 때마다 고쳐 쓰는 사각 영역. (graphic 의 그리기 함수는 받은 사각 영역을 그 자리에서 읽기만 하고 들고 있지 않는다)
+const paintRect = new Rect();
+
+
+//==============================================================================
 // 내용의 색상과 투명도를 결정하는 컴포넌트.
 //==============================================================================
 export class Paint extends Component {
@@ -43,9 +50,19 @@ export class Paint extends Component {
 
 		// Component.draw()를 호출하는 쪽은 TransformNode이므로 신뢰하고 사용.
 		// if (node instanceof TransformNode)
-		const contentSize = node.getContentSize();
 		const color = this.getColor();
-		const rect = Rect.create(0, 0, contentSize.x, contentSize.y);
+		const rect = paintRect;
+		const rectPosition = rect.position;
+		const rectSize = rect.size;
+		rectPosition.set(0, 0);
+		if (typeof node.copyContentSizeTo === "function") {
+			// 내용 크기를 복제본 없이 받는다.
+			node.copyContentSizeTo(rectSize);
+		}
+		else {
+			const contentSize = node.getContentSize();
+			rectSize.set(contentSize.x, contentSize.y);
+		}
 
 		// 출력.
 		graphic.setFillColor(color);
