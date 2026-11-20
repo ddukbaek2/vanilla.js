@@ -85,6 +85,7 @@ export { UIScrollView } from "./src/ui/uiscrollview.js";
 export { UIProgressView } from "./src/ui/uiprogressview.js";
 export { UIProgressRing } from "./src/ui/uiprogressring.js";
 export { UIHitArea } from "./src/ui/uihitarea.js";
+export { ButtonMotion, ButtonMotionStyle, attachButtonMotion, setButtonMotionArea, shakeButton } from "./src/ui/buttonmotion.js";
 export { UIScrollBar, ScrollBarAxis } from "./src/ui/uiscrollbar.js";
 export { UIInputField } from "./src/ui/uiinputfield.js";
 export { LayoutStrength } from "./src/ui/autolayout/layoutstrength.js";
