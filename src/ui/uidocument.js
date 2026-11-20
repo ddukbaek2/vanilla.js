@@ -11,6 +11,9 @@ import { Sprite } from "../core/component/sprite.js";
 import { Text } from "../core/component/text.js";
 import { RichText } from "../core/component/richtext.js";
 import { Mask } from "../core/component/mask.js";
+import { Outline } from "../core/component/outline.js";
+import { SoftShade } from "../core/component/softshade.js";
+import { ShadowText } from "../core/component/shadowtext.js";
 import { UIView } from "./uiview.js";
 import { UILabel } from "./uilabel.js";
 import { UIImageView } from "./uiimageview.js";
@@ -19,6 +22,7 @@ import { UIToggleButton } from "./uitogglebutton.js";
 import { UIProgressView } from "./uiprogressview.js";
 import { UISlider } from "./uislider.js";
 import { UIScrollView } from "./uiscrollview.js";
+import { UIProgressRing } from "./uiprogressring.js";
 
 
 //==============================================================================
@@ -49,6 +53,10 @@ const COMPONENT_TYPE_TABLE = {
 	Text: Text,
 	RichText: RichText,
 	Mask: Mask,
+	Outline: Outline,
+	SoftShade: SoftShade,
+	ShadowText: ShadowText,
+	UIProgressRing: UIProgressRing,
 	UILabel: UILabel,
 	UIImageView: UIImageView,
 	UIButton: UIButton,
@@ -661,6 +669,17 @@ export class UIDocument extends Object {
 	static getComponentTypeNames() {
 		const typeNames = System.Object.keys(COMPONENT_TYPE_TABLE);
 		return typeNames;
+	}
+
+	//==============================================================================
+	// 컴포넌트의 편집할 수 있는 속성 목록. (짝이 맞는 get 또는 is 와 set, 에디터의 인스펙터가 쓴다)
+	//==============================================================================
+	/**
+	 * @param { * } component
+	 * @returns { Array<object> } { name, getterName, setterName } 의 배열.
+	 */
+	static getReflectedProperties(component) {
+		return collectReflectedProperties(component);
 	}
 
 	//==============================================================================

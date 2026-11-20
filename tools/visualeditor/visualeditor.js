@@ -2,69 +2,135 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Colors } from "../../src/base/colors.js";
-import { Vector2 } from "../../src/base/vector2.js";
-import { Rect } from "../../src/base/rect.js";
-import { Engine, EngineConfiguration } from "../../src/core/engine.js";
-import { Scene } from "../../src/core/scene.js";
-import { ViewScaleMode } from "../../src/core/viewmanager.js";
-import { Graphic } from "../../src/core/graphic.js";
-import { Pane, PaneStyle, PaneTheme } from "../../src/web/pane.js";
-import {
-	EditorTheme, applyEditorTheme, setEditorCommandHandler, wrapEditorIconMarkup,
-	openEditorMenuPanelAt, createEditorSectionElement, createEditorListRowElement, setEditorListRowSelected,
-	createEditorHeaderButtonElement, setEditorHeaderButtonSelected, createEditorPropertyRowElement,
-	decorateEditorInputElement, createEditorButtonElement, buildEditorWindowLayout, openEditorInputDialog,
-	EDITOR_ICON_SHAPES, createEditorHeaderIconElement, setEditorHeaderIconActive,
-} from "../common/editorkit.js";
+import { Engine, EngineConfiguration, WorldNode, Vector2, Pivot, Color, Paint, Sprite, Text, UIDocument } from "../../import.js";
+import { EDITOR_STYLE_TEXT } from "./editorstyle.js";
+import { EditorScene, EditorTool, HandleKind, HANDLE_LENGTH } from "./editorscene.js";
+import { ProjectPanel, ASSET_DRAG_TYPE } from "./projectpanel.js";
+import { HierarchyPanel } from "./hierarchypanel.js";
+import { InspectorPanel } from "./inspectorpanel.js";
+import { ModelPreview } from "./modelpreview.js";
 
 
 //==============================================================================
 // 전역 상수 목록.
 //==============================================================================
-// 목록에 쓰는 그림 아이콘. (14x14 기준, 색은 글자색을 따른다)
-const ICON_SHAPES = {
-	folder: "<path d='M1.5 3.5h4l1.2 1.6h5.8v6.4h-11z' fill='currentColor'/>",
-	file: "<path d='M3.5 1.8h5l2.2 2.2v8.2h-7.2z' fill='none' stroke='currentColor' stroke-width='1.5'/>",
-	node: "<path d='M7 1.8l5.2 5.2-5.2 5.2-5.2-5.2z' fill='currentColor'/>",
-};
+// 되돌리기 기록의 최대 칸 수.
+const UNDO_LIMIT = 200;
 
-// 메뉴 막대 구성. (일반 데스크톱 응용 프로그램과 같은 배치)
-const MENU_DEFINITIONS = [
+// 같은 값을 잇달아 바꿀 때 한 칸으로 묶는 시간. (밀리초)
+const UNDO_MERGE_MILLISECONDS = 600;
+
+// 콘솔 최대 줄 수.
+const CONSOLE_LINE_LIMIT = 500;
+
+// 지난 작업을 브라우저에 남겨 두는 열쇠. (다시 열면 되살린다)
+const AUTOSAVE_STORAGE_KEY = "vanillaVisualEditor.autosave";
+
+// 새 씬을 저장할 기본 경로.
+const DEFAULT_SCENE_PATH = "scenes/untitled.scene.json";
+
+// 만들기 메뉴의 노드 종류. (이름, 만드는 함수)
+const NODE_PRESET_LIST = [
 	{
-		title: "File",
-		items: [
-			{ id: "newDocument", label: "New", shortcut: "Ctrl+Alt+N" },
-			{ id: "load", label: "Open...", shortcut: "Ctrl+O" },
-			{ id: "save", label: "Save", shortcut: "Ctrl+S" },
-			{ id: "saveAs", label: "Save As...", shortcut: "Ctrl+Shift+S" },
-		],
+		label: "빈 노드", create: (node) => {
+			node.setContentSize(Vector2.create(100, 100));
+		},
 	},
 	{
-		title: "Playback",
-		items: [
-			{ id: "play", label: "Play", shortcut: "F5" },
-			{ id: "pause", label: "Pause" },
-			{ id: "stop", label: "Stop", shortcut: "Shift+F5" },
-		],
+		label: "Paint (사각형)", create: (node) => {
+			node.setContentSize(Vector2.create(200, 120));
+			const paint = node.addComponent(Paint);
+			paint.setColor(new Color(0.3, 0.55, 1, 1));
+			paint.setRoundSize(12);
+		},
 	},
 	{
-		title: "View",
-		items: [
-			{ id: "resetLayout", label: "Reset Layout" },
-		],
+		label: "Sprite", create: (node) => {
+			node.setContentSize(Vector2.create(128, 128));
+			node.addComponent(Sprite);
+		},
+	},
+	{
+		label: "Text", create: (node) => {
+			node.setContentSize(Vector2.create(240, 48));
+			const text = node.addComponent(Text);
+			text.setText("Text");
+			text.setFontSize(32);
+			text.setTextColor(new Color(1, 1, 1, 1));
+		},
 	},
 ];
 
 
 //==============================================================================
-// 게임뷰.
+// DOM 요소 만들기.
 //==============================================================================
-class GameView extends Scene {
+/**
+ * @param { string } tagName
+ * @param { string } className
+ * @param { string } text
+ * @returns { HTMLElement }
+ */
+function createElement(tagName, className = "", text = "") {
+	const element = System.document.createElement(tagName);
+	if (className !== "") {
+		element.className = className;
+	}
+	if (text !== "") {
+		element.textContent = text;
+	}
+	return element;
+}
+
+//==============================================================================
+// 바이트 수를 읽기 쉬운 글로.
+//==============================================================================
+/**
+ * @param { number } byteCount
+ * @returns { string }
+ */
+function formatByteCount(byteCount) {
+	if (byteCount < 1024) {
+		return `${byteCount} B`;
+	}
+	if (byteCount < 1024 * 1024) {
+		return `${(byteCount / 1024).toFixed(1)} KB`;
+	}
+	return `${(byteCount / 1024 / 1024).toFixed(2)} MB`;
+}
+
+
+//==============================================================================
+// 비주얼 에디터. (유니티처럼 씬을 짓고, 애셋을 다루고, 저장하고, 재생해 본다)
+// - 화면: 위 메뉴와 도구 막대, 왼쪽 하이어라키, 가운데 씬 뷰(엔진 캔버스), 오른쪽 인스펙터, 아래 프로젝트와 콘솔.
+// - 씬은 UIDocument 형식(.scene.json)으로 저장한다. 게임은 UIDocument.fromJsonText 로 그대로 읽는다.
+//   에디터만 쓰는 값(frameSize)은 같은 JSON 에 함께 둔다. (UIDocument 는 모르는 키를 무시한다)
+// - 되돌리기는 바꾸기 전 문서 전체를 JSON 으로 남기는 방식이다. 고른 노드는 자식 차례 경로로 되찾는다.
+// - 재생은 문서를 남겨 두고 노드를 갱신하다가, 멈추면 남겨 둔 문서로 되돌린다. (유니티처럼 재생 중 바꾼 것은 사라진다)
+//==============================================================================
+export class VisualEditor {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { Function } */ #drawEvent;
+	/** @private @type { object } */ #elements; // 화면 요소 모음.
+	/** @private @type { Engine } */ #engine;
+	/** @private @type { EditorScene } */ #scene;
+	/** @private @type { ProjectPanel } */ #projectPanel;
+	/** @private @type { HierarchyPanel } */ #hierarchyPanel;
+	/** @private @type { InspectorPanel } */ #inspectorPanel;
+	/** @private @type { Array<object> } */ #undoList; // { label, jsonText, selectionPath }
+	/** @private @type { Array<object> } */ #redoList;
+	/** @private @type { object } */ #lastChange; // { label, node, time } 잇단 바꾸기 묶기.
+	/** @private @type { string } */ #scenePath;
+	/** @private @type { boolean } */ #isDirty;
+	/** @private @type { string | null } */ #playSnapshot; // 재생 전 문서.
+	/** @private @type { object | null } */ #dragState; // 씬 뷰에서 끄는 중인 것.
+	/** @private @type { boolean } */ #isSpaceDown;
+	/** @private @type { HTMLElement | null } */ #contextMenuElement;
+	/** @private @type { number } */ #nodeCounter;
+	/** @private @type { object | null } */ #clipboardNodeData; // 복사한 노드. (UIDocument.serializeNode 결과)
+	/** @private @type { number } */ #autosaveTimer;
+	/** @private @type { object | null } */ #savedCameraState; // 게임 뷰로 가기 전 씬 뷰 카메라.
 
 	//==============================================================================
 	// 생성.
@@ -73,1173 +139,1788 @@ class GameView extends Scene {
 	 * @constructor
 	 */
 	constructor() {
-		super();
-		this.#drawEvent = null;
+		this.#undoList = [];
+		this.#redoList = [];
+		this.#lastChange = { label: "", node: null, time: 0 };
+		this.#scenePath = "";
+		this.#isDirty = false;
+		this.#playSnapshot = null;
+		this.#dragState = null;
+		this.#isSpaceDown = false;
+		this.#contextMenuElement = null;
+		this.#nodeCounter = 0;
+		this.#clipboardNodeData = null;
+		this.#autosaveTimer = 0;
+		this.#savedCameraState = null;
 	}
 
 	//==============================================================================
-	// 초기화.
+	// 시작. (화면 짓기, 패널, 엔진)
 	//==============================================================================
-	/**
-	 * @param { Engine } engine
-	 */
-	initialize(engine) {
-		super.initialize(engine);
-		const viewManager = engine.getViewManager();
-		viewManager.setViewScaleMode(ViewScaleMode.none);
-	}
-
-	//==============================================================================
-	// 출력.
-	//==============================================================================
-	/**
-	 * @param { Graphic } graphic
-	 */
-	draw(graphic) {
-		super.draw(graphic);
-		const drawEvent = this.getDrawEvent();
-		if (drawEvent !== null) {
-			drawEvent(graphic);
-		}
-	}
-
-	//==============================================================================
-	// 출력 설정.
-	//==============================================================================
-	/**
-	 * @param { function(Graphic): void } callback
-	 */
-	setDrawEvent(callback) {
-		this.#drawEvent = callback;
-	}
-
-	//==============================================================================
-	// 출력 반환.
-	//==============================================================================
-	/**
-	 * @returns { function(Graphic): void }
-	 */
-	getDrawEvent() {
-		return this.#drawEvent;
-	}
-}
-
-
-//==============================================================================
-// 비주얼 에디터.
-// - 창 구성과 조작 UI 는 DOM(Pane) 으로 만들고, 게임 화면만 엔진이 그린다.
-// - tick 스크립트를 즉시 컴파일해 파티클 무리에 적용한다.
-//==============================================================================
-class VisualEditor {
-	//==============================================================================
-	// 멤버 변수 목록.
-	//==============================================================================
-	/** @private @type { System.Object } */ #inspector;
-	/** @private @type { Engine } */ #engine;
-	/** @private @type { GameView } */ #gameView;
-	/** @private @type { Function } */ #scripting;
-	/** @private @type { Proxy } */ #properties;
-	/** @private @type { HTMLElement } */ #editor;
-	/** @private @type { HTMLElement } */ #consolePane;
-	/** @private @type { HTMLElement } */ #inspectorPropsContainer;
-	/** @private @type { HTMLElement } */ #statusTextElement;
-	/** @private @type { Array } */ #particles;
-	/** @private @type { boolean } */ #isPlaying;
-	/** @private @type { HTMLElement } */ #consoleSelectedItem;
-	/** @private @type { HTMLElement } */ #playButtonElement;
-	/** @private @type { HTMLElement } */ #pauseButtonElement;
-	/** @private @type { HTMLElement } */ #stopButtonElement;
-	/** @private @type { Pane } */ #rootPane;
-	/** @private @type { string } */ #assetFileName;
-	/** @private @type { HTMLElement } */ #hierarchyTreeElement;
-	/** @private @type { Function } */ #createHierarchyItem;
-	/** @private @type { HTMLInputElement } */ #fileInputElement;
-	/** @private @type { HTMLInputElement } */ #imageInputElement;
-	/** @private @type { object[] } */ #assets;
-	/** @private @type { HTMLElement } */ #assetListElement;
-	/** @private @type { boolean } */ #isGridVisible;
-	/** @private @type { HTMLElement } */ #gridToggleElement;
-
-	//==============================================================================
-	// 생성.
-	//==============================================================================
-	constructor() {
-		this.#inspector = { };
-		this.#engine = null;
-		this.#gameView = null;
-		this.#scripting = null;
-		this.#properties = null;
-		this.#editor = null;
-		this.#consolePane = null;
-		this.#inspectorPropsContainer = null;
-		this.#statusTextElement = null;
-		this.#particles = [];
-		this.#isPlaying = true;
-		this.#consoleSelectedItem = null;
-		this.#playButtonElement = null;
-		this.#pauseButtonElement = null;
-		this.#stopButtonElement = null;
-		this.#rootPane = null;
-		this.#assetFileName = "scene.visual.json";
-		this.#hierarchyTreeElement = null;
-		this.#createHierarchyItem = null;
-		this.#fileInputElement = null;
-		this.#imageInputElement = null;
-		this.#assets = [];
-		this.#assetListElement = null;
-		this.#isGridVisible = true;
-		this.#gridToggleElement = null;
-	}
-
-	//==============================================================================
-	// 트리 한 줄 생성. (접기 화살표 + 기호 + 이름, 자식 컨테이너 포함)
-	//==============================================================================
-	/**
-	 * @param { string } iconName
-	 * @param { string } labelText
-	 * @param { object } options - { dataType, hasChildren, isOpen, onSelect }
-	 * @returns { HTMLElement }
-	 */
-	createTreeItemElement(iconName, labelText, options) {
-		const wrapperElement = System.document.createElement("div");
-		wrapperElement.dataset.type = options.dataType;
-		wrapperElement.dataset.label = labelText;
-
-		const glyphMarkup = wrapEditorIconMarkup(ICON_SHAPES[iconName]);
-		const rowElement = createEditorListRowElement(glyphMarkup, labelText);
-		rowElement.style.gap = "5px";
-		rowElement.style.paddingLeft = "8px";
-		wrapperElement.appendChild(rowElement);
-
-		const foldElement = System.document.createElement("span");
-		foldElement.innerText = "▸";
-		foldElement.style.cssText = "font-size:10px;color:" + PaneTheme.color.textDim
-			+ ";width:12px;flex-shrink:0;text-align:center;user-select:none;visibility:hidden;";
-		rowElement.insertBefore(foldElement, rowElement.firstChild);
-
-		const labelElement = rowElement.children[2];
-		labelElement.dataset.role = "label";
-		labelElement.style.flex = "1";
-
-		const childContainerElement = System.document.createElement("div");
-		childContainerElement.style.paddingLeft = "16px";
-		childContainerElement.style.display = options.isOpen ? "block" : "none";
-		wrapperElement.appendChild(childContainerElement);
-
-		if (options.hasChildren) {
-			foldElement.style.visibility = "visible";
-			foldElement.innerText = options.isOpen ? "▾" : "▸";
-			foldElement.style.cursor = "pointer";
-		}
-		foldElement.addEventListener("click", (mouseEvent) => {
-			mouseEvent.stopPropagation();
-			const isOpen = childContainerElement.style.display !== "none";
-			childContainerElement.style.display = isOpen ? "none" : "block";
-			foldElement.innerText = isOpen ? "▸" : "▾";
-		});
-
-		wrapperElement.addChild = (childItemElement) => {
-			childContainerElement.appendChild(childItemElement);
-			foldElement.style.visibility = "visible";
-			const isOpen = childContainerElement.style.display !== "none";
-			foldElement.innerText = isOpen ? "▾" : "▸";
-			foldElement.style.cursor = "pointer";
-		};
-
-		rowElement.addEventListener("click", (mouseEvent) => {
-			mouseEvent.stopPropagation();
-			options.onSelect(rowElement, labelText);
-		});
-		return wrapperElement;
-	}
-
-	//==============================================================================
-	// 창 구성.
-	//==============================================================================
-	initialize() {
-		// --- 메인 편집 영역 (가로) ---
-		const mainEditorPane = new Pane({ direction: "horizontal", size: "flex" });
-
-		// [왼쪽 영역] 하이어라키.
-		const leftSidePane = new Pane({ direction: "vertical", size: 250, minSize: 150 });
-
-		// 하이어라키.
-		const hierarchyPane = new Pane({ size: "flex", minSize: 100 });
-		let hierarchySelectedRow = null;
-		const selectHierarchyRow = (rowElement, labelText) => {
-			if (hierarchySelectedRow) {
-				setEditorListRowSelected(hierarchySelectedRow, false);
-			}
-			hierarchySelectedRow = rowElement;
-			setEditorListRowSelected(rowElement, true);
-			this.setStatusText("Hierarchy > " + labelText);
-		};
-		const createHierarchyItem = (labelText) => {
-			const wrapperElement = this.createTreeItemElement("node", labelText, {
-				dataType: "hierarchy-item",
-				hasChildren: false,
-				isOpen: true,
-				onSelect: selectHierarchyRow,
-			});
-			const rowElement = wrapperElement.firstChild;
-			const activeButtonElement = System.document.createElement("button");
-			activeButtonElement.style.cssText = "font-size:10px;padding:1px 6px;border:none;border-radius:3px;cursor:pointer;flex-shrink:0;"
-				+ "font-family:" + EditorTheme.fontFamily + ";font-weight:600;";
-			const applyActiveState = (isActive) => {
-				activeButtonElement.dataset.active = isActive ? "true" : "false";
-				activeButtonElement.innerText = isActive ? "Active" : "Inactive";
-				activeButtonElement.style.backgroundColor = isActive ? PaneTheme.color.success : PaneTheme.color.resizer;
-				activeButtonElement.style.color = isActive ? "#10241a" : PaneTheme.color.textDim;
-			};
-			applyActiveState(true);
-			activeButtonElement.addEventListener("click", (mouseEvent) => {
-				mouseEvent.stopPropagation();
-				const isActive = activeButtonElement.dataset.active === "true";
-				applyActiveState(!isActive);
-			});
-			rowElement.appendChild(activeButtonElement);
-			wrapperElement.setActiveState = applyActiveState;
-			return wrapperElement;
-		};
-		this.#createHierarchyItem = createHierarchyItem;
-		const hierarchyElement = createEditorSectionElement("HIERARCHY", () => {
-			return [
-				{
-					id: "addHierarchyItem",
-					label: "Add Item...",
-					action: () => {
-						openEditorInputDialog("Add Item", "Item name", "", (inputText) => {
-							const newName = inputText.trim();
-							if (newName) {
-								hierarchyTree.appendChild(createHierarchyItem(newName));
-							}
-						}, "Add");
-					},
-				},
-			];
-		});
-		const hierarchyTree = PaneStyle.create("div", "", { style: { flex: "1", overflowY: "auto", position: "relative" } });
-		this.#hierarchyTreeElement = hierarchyTree;
-		const visualRoot = createHierarchyItem("Visual Root");
-		const backgroundLayer = createHierarchyItem("Background Layer");
-		const particleEmitter = createHierarchyItem("Particle Emitter");
-		const mainParticle = createHierarchyItem("Main Particle");
-		const subParticle = createHierarchyItem("Sub Particle");
-		const uiLayer = createHierarchyItem("UI Layer");
-		particleEmitter.addChild(mainParticle);
-		particleEmitter.addChild(subParticle);
-		visualRoot.addChild(backgroundLayer);
-		visualRoot.addChild(particleEmitter);
-		visualRoot.addChild(uiLayer);
-		hierarchyTree.appendChild(visualRoot);
-		hierarchyTree.addEventListener("click", (mouseEvent) => {
-			if (!mouseEvent.target.closest("[data-type=\"hierarchy-item\"]")) {
-				if (hierarchySelectedRow) {
-					setEditorListRowSelected(hierarchySelectedRow, false);
-					hierarchySelectedRow = null;
-				}
-				this.setStatusText("No selection");
-			}
-		});
-		hierarchyElement.appendChild(hierarchyTree);
-		hierarchyPane.getContainer().appendChild(hierarchyElement);
-
-		const assetsPane = new Pane({ size: 200, minSize: 110 });
-		const assetsElement = createEditorSectionElement("ASSETS", () => {
-			return [
-				{
-					id: "importImages",
-					label: "Import Images...",
-					action: () => {
-						this.#imageInputElement.click();
-					},
-				},
-			];
-		});
-		this.#assetListElement = PaneStyle.create("div", "", { style: { flex: "1", overflowY: "auto", position: "relative" } });
-		assetsElement.appendChild(this.#assetListElement);
-		assetsPane.getContainer().appendChild(assetsElement);
-
-		leftSidePane.addPane(hierarchyPane);
-		leftSidePane.addPane(assetsPane);
-
-		// [중앙] 코드 에디터.
-		const codeEditorPane = new Pane({ size: 640, minSize: 150 });
-		const codeEditorElement = createEditorSectionElement("SCRIPT", null);
-		this.#editor = PaneStyle.create("textarea", "textarea", {
-			id: "code-editor",
-			style: { position: "relative", width: "auto", height: "auto", flex: "1" },
-		});
-		codeEditorElement.appendChild(this.#editor);
-		codeEditorPane.getContainer().appendChild(codeEditorElement);
-
-		// [중앙-우측] 게임 화면.
-		const gameCanvasPane = new Pane({ size: "flex" });
-		const gameCanvasElement = createEditorSectionElement("GAME VIEW", null);
-		const gameCanvasTitleElement = gameCanvasElement.firstChild;
-		gameCanvasTitleElement.style.display = "flex";
-		gameCanvasTitleElement.style.alignItems = "center";
-		gameCanvasTitleElement.style.paddingRight = "6px";
-		const gameCanvasSpacerElement = PaneStyle.create("div", "", {
-			style: { position: "relative", width: "auto", height: "auto", flex: "1" },
-		});
-		this.#gridToggleElement = createEditorHeaderIconElement(EDITOR_ICON_SHAPES.grid, "Show Grid");
-		this.#gridToggleElement.addEventListener("click", () => {
-			this.#isGridVisible = !this.#isGridVisible;
-			setEditorHeaderIconActive(this.#gridToggleElement, this.#isGridVisible);
-		});
-		setEditorHeaderIconActive(this.#gridToggleElement, true);
-		this.#playButtonElement = createEditorHeaderButtonElement("PLAY");
-		this.#pauseButtonElement = createEditorHeaderButtonElement("PAUSE");
-		this.#stopButtonElement = createEditorHeaderButtonElement("STOP");
-		this.#playButtonElement.addEventListener("click", () => {
-			this.executeCommand("play");
-		});
-		this.#pauseButtonElement.addEventListener("click", () => {
-			this.executeCommand("pause");
-		});
-		this.#stopButtonElement.addEventListener("click", () => {
-			this.executeCommand("stop");
-		});
-		gameCanvasTitleElement.appendChild(gameCanvasSpacerElement);
-		gameCanvasTitleElement.appendChild(this.#gridToggleElement);
-		gameCanvasTitleElement.appendChild(this.#playButtonElement);
-		gameCanvasTitleElement.appendChild(this.#pauseButtonElement);
-		gameCanvasTitleElement.appendChild(this.#stopButtonElement);
-		const canvasHolderElement = PaneStyle.create("div", "", {
-			style: { position: "relative", width: "auto", height: "auto", flex: "1", backgroundColor: "#000000", overflow: "hidden" },
-		});
-		const canvasElement = PaneStyle.create("canvas", "", { id: "game-canvas" });
-		canvasHolderElement.appendChild(canvasElement);
-		gameCanvasElement.appendChild(canvasHolderElement);
-		gameCanvasPane.getContainer().appendChild(gameCanvasElement);
-
-		// [오른쪽] 인스펙터.
-		const inspectorSidePane = new Pane({ size: 300, minSize: 180 });
-		const inspectorElement = createEditorSectionElement("INSPECTOR", null);
-		this.#inspectorPropsContainer = PaneStyle.create("div", "", {
-			id: "inspector-props",
-			style: { flex: "1", overflowY: "auto", position: "relative" },
-		});
-		const addPropRowElement = PaneStyle.create("div", "", {
-			style: {
-				position: "relative", width: "auto", height: "auto", flexShrink: "0",
-				display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px",
-				borderTop: "1px solid " + PaneTheme.color.border,
+	start() {
+		const styleElement = createElement("style");
+		styleElement.textContent = EDITOR_STYLE_TEXT;
+		System.document.head.append(styleElement);
+		this.#elements = this.buildLayout();
+		this.hookConsole();
+		const elements = this.#elements;
+		this.#projectPanel = new ProjectPanel(elements.projectFolders, elements.projectAssets, {
+			selectAsset: (asset) => {
+				this.showAsset(asset);
+			},
+			openAsset: (asset) => {
+				this.openAsset(asset);
+			},
+			changed: () => {
+				this.updateStatus();
+				this.log(`애셋 ${this.#projectPanel.getAssetCount()}개를 읽었다.`);
 			},
 		});
-		const propertyNameInputElement = System.document.createElement("input");
-		propertyNameInputElement.type = "text";
-		propertyNameInputElement.placeholder = "Name";
-		decorateEditorInputElement(propertyNameInputElement);
-		const propertyValueInputElement = System.document.createElement("input");
-		propertyValueInputElement.type = "text";
-		propertyValueInputElement.placeholder = "Value";
-		decorateEditorInputElement(propertyValueInputElement);
-		propertyValueInputElement.style.flex = "0 0 60px";
-		const addPropertyButtonElement = createEditorButtonElement("Add", true);
-		addPropertyButtonElement.style.padding = "3px 12px";
-		addPropRowElement.append(propertyNameInputElement, propertyValueInputElement, addPropertyButtonElement);
-		inspectorElement.appendChild(this.#inspectorPropsContainer);
-		inspectorElement.appendChild(addPropRowElement);
-		inspectorSidePane.getContainer().appendChild(inspectorElement);
-
-		mainEditorPane.addPane(leftSidePane);
-		mainEditorPane.addPane(codeEditorPane);
-		mainEditorPane.addPane(gameCanvasPane);
-		mainEditorPane.addPane(inspectorSidePane);
-
-		// --- 하단 콘솔 영역 ---
-		const consoleBottomPane = new Pane({ size: 200, minSize: 50, resizableEdges: { top: true } });
-		const consolePanelElement = createEditorSectionElement("CONSOLE", () => {
-			return [
-				{
-					id: "clearConsole",
-					label: "Clear All",
-					action: () => {
-						this.#consolePane.innerHTML = "";
-					},
-				},
-			];
+		UIDocument.setImageResolver((path) => {
+			return this.#projectPanel.readImage(path);
 		});
-		this.#consolePane = PaneStyle.create("div", "", {
-			id: "console-pane",
-			style: {
-				position: "relative", flex: "1", overflowY: "auto", padding: "4px 0",
-				fontFamily: PaneTheme.font.mono, fontSize: "12px", color: PaneTheme.color.success,
+		this.#hierarchyPanel = new HierarchyPanel(elements.hierarchyBody, {
+			select: (node) => {
+				this.select(node);
 			},
-		});
-		consolePanelElement.appendChild(this.#consolePane);
-		consoleBottomPane.getContainer().appendChild(consolePanelElement);
-
-		// --- 가운데 영역 (편집 + 콘솔) ---
-		const centerAreaPane = new Pane({ direction: "vertical", size: "flex" });
-		centerAreaPane.addPane(mainEditorPane);
-		centerAreaPane.addPane(consoleBottomPane);
-
-		// --- 메뉴 막대 + 상태줄 공통 조립 ---
-		const windowLayout = buildEditorWindowLayout(MENU_DEFINITIONS, centerAreaPane);
-		this.#rootPane = windowLayout.rootPane;
-		this.#statusTextElement = windowLayout.statusTextElement;
-		this.setStatusText("No selection");
-
-		this.#rootPane.setCallback(() => {
-			if (this.#engine) {
-				const graphic = this.#engine.getGraphic();
-				this.#engine.resize();
-				this.#gameView.draw(graphic);
-			}
-		});
-		System.document.body.innerHTML = "";
-		this.#rootPane.attachTo(System.document.body);
-
-		// 콘솔 빈 곳을 누르면 선택 해제.
-		this.#consolePane.addEventListener("click", (mouseEvent) => {
-			if (mouseEvent.target === this.#consolePane) {
-				if (this.#consoleSelectedItem) {
-					this.#consoleSelectedItem.style.backgroundColor = "transparent";
-					this.#consoleSelectedItem = null;
-				}
-				this.setStatusText("No selection");
-			}
-		});
-
-		// 오른쪽 단추 메뉴.
-		const findContextTarget = (mouseEventTarget, dataType) => {
-			let target = mouseEventTarget;
-			while (target && target.dataset.type !== dataType) {
-				target = target.parentElement;
-			}
-			return target || null;
-		};
-		hierarchyTree.addEventListener("contextmenu", (mouseEvent) => {
-			mouseEvent.preventDefault();
-			const contextTarget = findContextTarget(mouseEvent.target, "hierarchy-item");
-			openEditorMenuPanelAt(mouseEvent.clientX, mouseEvent.clientY, [
-				{
-					id: "addHierarchyItem",
-					label: "Add",
-					action: () => {
-						openEditorInputDialog("Add Item", "Item name", "", (inputText) => {
-							const newName = inputText.trim();
-							if (newName) {
-								hierarchyTree.appendChild(createHierarchyItem(newName));
-							}
-						}, "Add");
-					},
-				},
-				{
-					id: "renameHierarchyItem",
-					label: "Rename",
-					action: () => {
-						if (!contextTarget) {
-							return;
-						}
-						const currentName = contextTarget.dataset.label;
-						openEditorInputDialog("Rename", "New name", currentName, (inputText) => {
-							const newName = inputText.trim();
-							if (newName) {
-								contextTarget.querySelector("[data-role=\"label\"]").innerText = newName;
-								contextTarget.dataset.label = newName;
-							}
-						}, "Rename");
-					},
-				},
-				{
-					id: "removeHierarchyItem",
-					label: "Remove",
-					action: () => {
-						if (contextTarget) {
-							contextTarget.remove();
-						}
-					},
-				},
-			]);
-		});
-		this.#consolePane.addEventListener("contextmenu", (mouseEvent) => {
-			mouseEvent.preventDefault();
-			openEditorMenuPanelAt(mouseEvent.clientX, mouseEvent.clientY, [
-				{
-					id: "clearConsole",
-					label: "Clear All",
-					action: () => {
-						this.#consolePane.innerHTML = "";
-					},
-				},
-			]);
-		});
-
-		// 파일 열기 입력.
-		this.#fileInputElement = System.document.createElement("input");
-		this.#fileInputElement.type = "file";
-		this.#fileInputElement.accept = ".json";
-		this.#fileInputElement.style.display = "none";
-		this.#fileInputElement.addEventListener("change", async () => {
-			const selectedFile = this.#fileInputElement.files[0];
-			if (!selectedFile) {
-				return;
-			}
-			const jsonText = await selectedFile.text();
-			this.loadAssetText(jsonText, selectedFile.name);
-			this.#fileInputElement.value = "";
-		});
-		System.document.body.appendChild(this.#fileInputElement);
-
-		// 이미지 가져오기 입력.
-		this.#imageInputElement = System.document.createElement("input");
-		this.#imageInputElement.type = "file";
-		this.#imageInputElement.accept = "image/*";
-		this.#imageInputElement.multiple = true;
-		this.#imageInputElement.style.display = "none";
-		this.#imageInputElement.addEventListener("change", async () => {
-			for (const selectedFile of this.#imageInputElement.files) {
-				await this.importImageAsset(selectedFile);
-			}
-			this.#imageInputElement.value = "";
-			this.rebuildAssetList();
-		});
-		System.document.body.appendChild(this.#imageInputElement);
-
-		// 엔진 설정.
-		const engineConfiguration = new EngineConfiguration();
-		engineConfiguration.referenceResolutionSize = Vector2.create(1280, 800);
-		engineConfiguration.canvasId = "game-canvas";
-		engineConfiguration.autoResizeOnWindowResize = false;
-		engineConfiguration.useStatistics = true;
-		this.#engine = new Engine(engineConfiguration);
-		this.#gameView = new GameView();
-		this.#engine.run(this.#gameView);
-
-		// 이벤트 연동.
-		addPropertyButtonElement.addEventListener("click", () => {
-			const propertyName = propertyNameInputElement.value.trim();
-			const rawValueText = propertyValueInputElement.value;
-			const parsedValue = this.parsePropertyValue(rawValueText);
-			if (propertyName && !this.#properties.hasOwnProperty(propertyName)) {
-				this.addProperty(propertyName, parsedValue);
-				propertyNameInputElement.value = "";
-				propertyValueInputElement.value = "";
-			}
-		});
-
-		this.setupGlobalEvents();
-		this.setupDataBinding();
-		this.addProperty("speed", 1.0);
-		this.addProperty("gravity", 0.1);
-
-		this.#editor.addEventListener("input", () => {
-			this.compileCode();
-		});
-	}
-
-	//==============================================================================
-	// 메뉴 명령 실행.
-	//==============================================================================
-	/**
-	 * @param { string } commandId
-	 */
-	executeCommand(commandId) {
-		switch (commandId) {
-			case "play": {
-				this.compileCode();
-				this.initParticles();
-				this.#isPlaying = true;
-				this.updateButtonState("play");
-				this.#gameView.setDrawEvent(this.drawOnPlayState.bind(this));
-				this.printConsole("Playback started.");
-				break;
-			}
-			case "pause": {
-				this.#isPlaying = false;
-				this.updateButtonState("pause");
-				this.printConsole("Playback paused.");
-				break;
-			}
-			case "stop": {
-				this.#isPlaying = false;
-				this.initParticles();
-				this.updateButtonState("stop");
-				this.#gameView.setDrawEvent(this.drawOnStopState.bind(this));
-				this.printConsole("Playback stopped.");
-				break;
-			}
-			case "newDocument": {
-				this.#assetFileName = "scene.visual.json";
-				this.resetDocument();
-				break;
-			}
-			case "save": {
-				this.saveAsset(this.#assetFileName);
-				break;
-			}
-			case "saveAs": {
-				openEditorInputDialog("Save As", "File name", this.#assetFileName, (inputText) => {
-					const fileName = inputText.trim();
-					if (fileName) {
-						this.#assetFileName = fileName;
-						this.saveAsset(fileName);
-					}
+			move: (node, parentNode, index) => {
+				this.moveNode(node, parentNode, index);
+			},
+			rename: (node, name) => {
+				this.change("이름 바꾸기", () => {
+					node.setName(name);
 				});
-				break;
+			},
+			contextMenu: (node, x, y) => {
+				this.showNodeContextMenu(node, x, y);
+			},
+		});
+		this.#inspectorPanel = new InspectorPanel(elements.inspectorBody, {
+			change: (label, apply) => {
+				this.change(label, apply);
+			},
+			readImage: (path) => {
+				return this.#projectPanel.readImage(path);
+			},
+			addComponent: (node, typeName) => {
+				this.addComponent(node, typeName);
+			},
+			removeComponent: (node, component) => {
+				this.change(`${component.constructor.name} 빼기`, () => {
+					node.removeComponent(component);
+				}, true);
+			},
+		});
+
+		// 엔진. (씬 뷰 캔버스, 크기는 패널을 따른다)
+		const engineConfiguration = new EngineConfiguration();
+		engineConfiguration.canvasId = "editorCanvas";
+		engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+		engineConfiguration.autoResizeOnWindowResize = false;
+		this.#engine = new Engine(engineConfiguration);
+		this.#scene = new EditorScene();
+		this.#scene.setReadyEvent(() => {
+			if (!this.restoreAutosave()) {
+				this.createStarterScene();
 			}
-			case "load": {
-				this.#fileInputElement.click();
-				break;
+			this.refreshAll();
+			this.log("에디터를 시작했다. File > 프로젝트 폴더 열기로 애셋 폴더를 연다.");
+		});
+		this.#engine.run(this.#scene);
+		const resizeObserver = new System.ResizeObserver(() => {
+			this.#engine.resize();
+		});
+		resizeObserver.observe(elements.canvasHolder);
+		this.setupSceneInput();
+		this.setupKeyboard();
+		this.setupSplitters();
+		System.window.addEventListener("beforeunload", (beforeUnloadEvent) => {
+			if (this.#isDirty) {
+				beforeUnloadEvent.preventDefault();
 			}
-			case "resetLayout": {
-				this.#rootPane.resetLayout();
-				this.#rootPane.refresh();
-				if (this.#engine) {
-					const graphic = this.#engine.getGraphic();
-					this.#engine.resize();
-					this.#gameView.draw(graphic);
-				}
-				break;
-			}
-			default: {
-				break;
-			}
-		}
+		});
+		System.setInterval(() => {
+			this.updateOverlay();
+		}, 250);
 	}
 
 	//==============================================================================
-	// 이미지 애셋 가져오기. (데이터 주소로 읽어 목록에 담는다)
+	// 화면 짓기.
 	//==============================================================================
 	/**
-	 * @param { File } imageFile
+	 * @returns { object }
 	 */
-	importImageAsset(imageFile) {
-		return new System.Promise((resolve) => {
-			const fileReader = new System.FileReader();
-			fileReader.onload = () => {
-				this.#assets.push({ name: imageFile.name, dataUrl: fileReader.result });
-				resolve();
-			};
-			fileReader.readAsDataURL(imageFile);
+	buildLayout() {
+		const rootElement = createElement("div", "editorRoot");
+		const menuBar = createElement("div", "menuBar");
+		const toolBar = createElement("div", "toolBar");
+		const hierarchyPanel = createElement("div", "panel hierarchyPanel");
+		const hierarchyHeader = createElement("div", "panelHeader", "Hierarchy");
+		const hierarchyAddButton = createElement("button", "smallButton", "＋");
+		hierarchyAddButton.title = "노드 만들기";
+		hierarchyAddButton.style.marginLeft = "auto";
+		hierarchyHeader.append(hierarchyAddButton);
+		const hierarchySearch = createElement("input", "inspectorNameInput hierarchySearch");
+		hierarchySearch.placeholder = "찾기";
+		hierarchySearch.addEventListener("input", () => {
+			this.#hierarchyPanel.setFilterText(hierarchySearch.value.trim());
+		});
+		hierarchySearch.addEventListener("keydown", (keyboardEvent) => {
+			keyboardEvent.stopPropagation();
+		});
+		const hierarchyBody = createElement("div", "panelBody");
+		hierarchyPanel.append(hierarchyHeader, hierarchySearch, hierarchyBody);
+		const scenePanel = createElement("div", "panel scenePanel");
+		const sceneHeader = createElement("div", "panelHeader");
+		const sceneTab = createElement("span", "panelTab isActive", "Scene");
+		const gameTab = createElement("span", "panelTab", "Game");
+		sceneTab.addEventListener("click", () => {
+			this.setGameView(false);
+		});
+		gameTab.addEventListener("click", () => {
+			this.setGameView(true);
+		});
+		sceneHeader.append(sceneTab, gameTab);
+		const sceneTitle = createElement("span", "", "");
+		sceneTitle.style.textTransform = "none";
+		sceneTitle.style.fontWeight = "400";
+		sceneHeader.append(sceneTitle);
+		const canvasHolder = createElement("div", "sceneCanvasHolder");
+		const canvasElement = createElement("canvas");
+		canvasElement.id = "editorCanvas";
+		canvasElement.tabIndex = 0;
+		canvasHolder.append(canvasElement);
+		const sceneOverlay = createElement("div", "sceneOverlay");
+		scenePanel.append(sceneHeader, canvasHolder, sceneOverlay);
+		const inspectorPanel = createElement("div", "panel inspectorPanel");
+		const inspectorBody = createElement("div", "panelBody");
+		inspectorPanel.append(createElement("div", "panelHeader", "Inspector"), inspectorBody);
+		const bottomPanel = createElement("div", "panel bottomPanel");
+		const bottomHeader = createElement("div", "panelHeader");
+		const projectTab = createElement("span", "panelTab isActive", "Project");
+		const consoleTab = createElement("span", "panelTab", "Console");
+		const consoleClearButton = createElement("button", "smallButton", "지우기");
+		consoleClearButton.style.marginLeft = "auto";
+		consoleClearButton.style.display = "none";
+		const projectButtons = createElement("span", "projectButtons");
+		projectButtons.style.marginLeft = "auto";
+		projectButtons.style.display = "flex";
+		projectButtons.style.gap = "4px";
+		const openFolderButton = createElement("button", "smallButton", "폴더 열기");
+		openFolderButton.addEventListener("click", () => {
+			this.openProjectFolder();
+		});
+		const importButton = createElement("button", "smallButton", "가져오기");
+		importButton.title = "파일을 지금 폴더로 가져온다";
+		importButton.addEventListener("click", () => {
+			this.importAssetFiles();
+		});
+		const rescanButton = createElement("button", "smallButton", "새로 고침");
+		rescanButton.addEventListener("click", () => {
+			this.#projectPanel.rescan();
+		});
+		projectButtons.append(openFolderButton, importButton, rescanButton);
+		bottomHeader.append(projectTab, consoleTab, projectButtons, consoleClearButton);
+		const projectBody = createElement("div", "panelBody projectBody");
+		const projectFolders = createElement("div", "projectFolders");
+		const projectAssets = createElement("div", "projectAssets");
+		projectBody.append(projectFolders, projectAssets);
+		const consoleBody = createElement("div", "panelBody consoleBody");
+		consoleBody.style.display = "none";
+		bottomPanel.append(bottomHeader, projectBody, consoleBody);
+		const splitLeft = createElement("div", "splitter splitLeft");
+		const splitRight = createElement("div", "splitter splitRight");
+		const splitBottom = createElement("div", "splitter splitBottom");
+		const statusBar = createElement("div", "statusBar");
+		rootElement.append(menuBar, toolBar, hierarchyPanel, splitLeft, scenePanel, splitRight, inspectorPanel, splitBottom, bottomPanel, statusBar);
+		System.document.body.append(rootElement);
+
+		// 아래 패널 탭.
+		const selectTab = (isProject) => {
+			projectTab.classList.toggle("isActive", isProject);
+			consoleTab.classList.toggle("isActive", !isProject);
+			projectBody.style.display = isProject ? "" : "none";
+			consoleBody.style.display = isProject ? "none" : "";
+			consoleClearButton.style.display = isProject ? "none" : "";
+			projectButtons.style.display = isProject ? "flex" : "none";
+		};
+		projectTab.addEventListener("click", () => {
+			selectTab(true);
+		});
+		consoleTab.addEventListener("click", () => {
+			selectTab(false);
+		});
+		consoleClearButton.addEventListener("click", () => {
+			consoleBody.textContent = "";
+		});
+		hierarchyAddButton.addEventListener("click", () => {
+			const buttonRect = hierarchyAddButton.getBoundingClientRect();
+			this.showNodeContextMenu(null, buttonRect.left, buttonRect.bottom);
+		});
+		const elements = {
+			rootElement, menuBar, toolBar, hierarchyBody, sceneTitle, canvasHolder, canvasElement, sceneOverlay,
+			inspectorBody, projectFolders, projectAssets, consoleBody, consoleTab, statusBar, toolButtons: {}, playButton: null,
+			sceneTab, gameTab,
+		};
+		this.buildMenu(menuBar);
+		this.buildToolBar(toolBar, elements);
+		return elements;
+	}
+
+	//==============================================================================
+	// 메뉴 짓기.
+	//==============================================================================
+	/**
+	 * @param { HTMLElement } menuBar
+	 */
+	buildMenu(menuBar) {
+		const menuList = [
+			{
+				title: "File", commands: [
+					{ label: "새 씬", shortcut: "Ctrl+N", run: () => this.newScene() },
+					{ label: "프로젝트 폴더 열기", shortcut: "", run: () => this.openProjectFolder() },
+					{ label: "씬 파일 열기", shortcut: "Ctrl+O", run: () => this.openSceneFile() },
+					null,
+					{ label: "씬 저장", shortcut: "Ctrl+S", run: () => this.saveScene(false) },
+					{ label: "다른 이름으로 저장", shortcut: "Ctrl+Shift+S", run: () => this.saveScene(true) },
+					null,
+					{ label: "애셋 가져오기", shortcut: "", run: () => this.importAssetFiles() },
+					{ label: "고른 노드를 프리팹으로 저장", shortcut: "", run: () => this.saveSelectedAsPrefab() },
+				],
+			},
+			{
+				title: "Edit", commands: [
+					{ label: "되돌리기", shortcut: "Ctrl+Z", run: () => this.undo() },
+					{ label: "다시 하기", shortcut: "Ctrl+Shift+Z", run: () => this.redo() },
+					null,
+					{ label: "복사", shortcut: "Ctrl+C", run: () => this.copySelected() },
+					{ label: "붙여넣기", shortcut: "Ctrl+V", run: () => this.pasteNode() },
+					{ label: "복제", shortcut: "Ctrl+D", run: () => this.duplicateSelected() },
+					{ label: "지우기", shortcut: "Delete", run: () => this.deleteSelected() },
+					null,
+					{ label: "재생 / 멈춤", shortcut: "Ctrl+P", run: () => this.togglePlay() },
+				],
+			},
+			{
+				title: "Node", commands: NODE_PRESET_LIST.map((preset) => {
+					return { label: `${preset.label} 만들기`, shortcut: "", run: () => this.createNode(preset, null) };
+				}),
+			},
+			{
+				title: "View", commands: [
+					{ label: "씬 뷰 / 게임 뷰", shortcut: "Tab", run: () => this.setGameView(!this.#scene.isGameView()) },
+					{ label: "화면 틀 맞추기", shortcut: "Home", run: () => this.#scene.frameDocument() },
+					{ label: "고른 노드로", shortcut: "F", run: () => this.#scene.frameSelected() },
+					null,
+					{ label: "화면 틀 크기", shortcut: "", run: () => this.askFrameSize() },
+				],
+			},
+		];
+		let openMenuElement = null;
+		const closeMenu = () => {
+			if (openMenuElement !== null) {
+				openMenuElement.classList.remove("isOpen");
+				openMenuElement = null;
+			}
+		};
+		for (const menu of menuList) {
+			const menuElement = createElement("div", "menuItem", menu.title);
+			const popupElement = createElement("div", "menuPopup");
+			for (const command of menu.commands) {
+				if (command === null) {
+					popupElement.append(createElement("div", "menuSeparator"));
+					continue;
+				}
+				const commandElement = createElement("div", "menuCommand");
+				commandElement.append(createElement("span", "", command.label), createElement("span", "menuShortcut", command.shortcut));
+				commandElement.addEventListener("click", (mouseEvent) => {
+					mouseEvent.stopPropagation();
+					closeMenu();
+					command.run();
+				});
+				popupElement.append(commandElement);
+			}
+			menuElement.append(popupElement);
+			menuElement.addEventListener("click", (mouseEvent) => {
+				mouseEvent.stopPropagation();
+				const isOpen = menuElement === openMenuElement;
+				closeMenu();
+				if (!isOpen) {
+					menuElement.classList.add("isOpen");
+					openMenuElement = menuElement;
+				}
+			});
+			menuElement.addEventListener("mouseenter", () => {
+				if (openMenuElement !== null && openMenuElement !== menuElement) {
+					closeMenu();
+					menuElement.classList.add("isOpen");
+					openMenuElement = menuElement;
+				}
+			});
+			menuBar.append(menuElement);
+		}
+		System.document.addEventListener("click", () => {
+			closeMenu();
+			this.closeContextMenu();
 		});
 	}
 
 	//==============================================================================
-	// 애셋 목록 재구성.
+	// 도구 막대 짓기. (도구, 재생, 저장)
 	//==============================================================================
-	rebuildAssetList() {
-		this.#assetListElement.textContent = "";
-		const imageIconMarkup = wrapEditorIconMarkup(EDITOR_ICON_SHAPES.image);
-		for (let assetIndex = 0; assetIndex < this.#assets.length; ++assetIndex) {
-			const assetEntry = this.#assets[assetIndex];
-			const rowElement = createEditorListRowElement(imageIconMarkup, assetEntry.name);
-			const currentIndex = assetIndex;
-			rowElement.addEventListener("click", () => {
-				this.setStatusText("Assets > " + assetEntry.name);
+	/**
+	 * @param { HTMLElement } toolBar
+	 * @param { object } elements
+	 */
+	buildToolBar(toolBar, elements) {
+		const toolGroup = createElement("div", "toolGroup");
+		const toolList = [
+			{ tool: EditorTool.hand, label: "✋", title: "밀기 (Q)" },
+			{ tool: EditorTool.move, label: "✥", title: "옮기기 (W)" },
+			{ tool: EditorTool.rotate, label: "⟳", title: "돌리기 (E)" },
+			{ tool: EditorTool.scale, label: "⤢", title: "키우기 (R)" },
+		];
+		for (const toolItem of toolList) {
+			const buttonElement = createElement("button", "toolButton", toolItem.label);
+			buttonElement.title = toolItem.title;
+			buttonElement.addEventListener("click", () => {
+				this.setTool(toolItem.tool);
 			});
-			rowElement.addEventListener("contextmenu", (mouseEvent) => {
-				mouseEvent.preventDefault();
-				mouseEvent.stopPropagation();
-				openEditorMenuPanelAt(mouseEvent.clientX, mouseEvent.clientY, [
-					{
-						id: "renameAsset",
-						label: "Rename",
-						action: () => {
-							openEditorInputDialog("Rename", "Asset name", assetEntry.name, (inputText) => {
-								const newName = inputText.trim();
-								if (newName) {
-									assetEntry.name = newName;
-									this.rebuildAssetList();
-								}
-							}, "Rename");
-						},
-					},
-					{ separator: true },
-					{
-						id: "removeAsset",
-						label: "Remove",
-						action: () => {
-							this.#assets.splice(currentIndex, 1);
-							this.rebuildAssetList();
-						},
-					},
-				]);
-			});
-			this.#assetListElement.appendChild(rowElement);
+			elements.toolButtons[toolItem.tool] = buttonElement;
+			toolGroup.append(buttonElement);
+		}
+		const playGroup = createElement("div", "toolGroup");
+		const playButton = createElement("button", "toolButton", "▶ 재생");
+		playButton.title = "재생 / 멈춤 (Ctrl+P)";
+		playButton.addEventListener("click", () => {
+			this.togglePlay();
+		});
+		elements.playButton = playButton;
+		playGroup.append(playButton);
+		const fileGroup = createElement("div", "toolGroup");
+		const saveButton = createElement("button", "toolButton", "저장");
+		saveButton.title = "씬 저장 (Ctrl+S)";
+		saveButton.addEventListener("click", () => {
+			this.saveScene(false);
+		});
+		const undoButton = createElement("button", "toolButton", "↶");
+		undoButton.title = "되돌리기 (Ctrl+Z)";
+		undoButton.addEventListener("click", () => {
+			this.undo();
+		});
+		const redoButton = createElement("button", "toolButton", "↷");
+		redoButton.title = "다시 하기 (Ctrl+Shift+Z)";
+		redoButton.addEventListener("click", () => {
+			this.redo();
+		});
+		fileGroup.append(saveButton, undoButton, redoButton);
+		toolBar.append(toolGroup, createElement("div", "toolSpacer"), playGroup, createElement("div", "toolSpacer"), fileGroup);
+		toolGroup.querySelector("button:nth-child(2)").classList.add("isActive");
+	}
+
+	//==============================================================================
+	// 처음 씬. (틀 가운데 제목 글과 사각형 하나)
+	//==============================================================================
+	createStarterScene() {
+		const documentRoot = this.#scene.getDocumentRoot();
+		const frameSize = this.#scene.getFrameSize();
+		const panelNode = new WorldNode();
+		panelNode.setName("Panel");
+		panelNode.setContentSize(Vector2.create(520, 300));
+		panelNode.setLocalPosition(Vector2.create(frameSize.x * 0.5, frameSize.y * 0.5));
+		const paint = panelNode.addComponent(Paint);
+		paint.setColor(new Color(0.22, 0.4, 0.75, 1));
+		paint.setRoundSize(24);
+		documentRoot.addChild(panelNode);
+		const titleNode = new WorldNode();
+		titleNode.setName("Title");
+		titleNode.setContentSize(Vector2.create(440, 60));
+		titleNode.setLocalPosition(Vector2.create(260, 110));
+		const text = titleNode.addComponent(Text);
+		text.setText("vanilla.js");
+		text.setFontSize(48);
+		text.setTextColor(new Color(1, 1, 1, 1));
+		panelNode.addChild(titleNode);
+		this.#scenePath = "";
+		this.#isDirty = false;
+	}
+
+	//==============================================================================
+	// 값 바꾸기. (되돌리기 한 칸을 남기고 적용, 같은 것을 잇달아 바꾸면 한 칸으로 묶는다)
+	//==============================================================================
+	/**
+	 * @param { string } label
+	 * @param { function(): void } apply
+	 * @param { boolean } isStructural - 노드나 컴포넌트가 늘거나 줄면 true. (패널을 다시 짓는다)
+	 */
+	change(label, apply, isStructural = false) {
+		const selectedNode = this.#scene.getSelectedNode();
+		const now = System.performance.now();
+		const lastChange = this.#lastChange;
+		const isMerged = !isStructural && lastChange.label === label && lastChange.node === selectedNode && now - lastChange.time < UNDO_MERGE_MILLISECONDS;
+		if (!isMerged) {
+			this.recordUndo(label);
+		}
+		this.#lastChange = { label: label, node: selectedNode, time: now };
+		try {
+			apply();
+		}
+		catch (error) {
+			this.log(`${label}: ${error.message}`, "error");
+		}
+		this.markDirty();
+		if (isStructural) {
+			this.refreshAll();
+		}
+		else {
+			this.#inspectorPanel.refresh();
+			this.#hierarchyPanel.render(this.#scene.getDocumentRoot(), this.#scene.getSelectedNode());
 		}
 	}
 
 	//==============================================================================
-	// 계층 트리 직렬화. (이름 / 활성 / 자식)
+	// 되돌리기 한 칸 남기기. (지금 문서 전체)
 	//==============================================================================
 	/**
-	 * @param { HTMLElement } containerElement
-	 * @returns { object[] }
+	 * @param { string } label
 	 */
-	composeHierarchyData(containerElement) {
-		const itemList = [];
-		for (const wrapperElement of containerElement.children) {
-			if (wrapperElement.dataset.type !== "hierarchy-item") {
+	recordUndo(label) {
+		this.#undoList.push(this.captureState(label));
+		if (this.#undoList.length > UNDO_LIMIT) {
+			this.#undoList.shift();
+		}
+		this.#redoList.length = 0;
+	}
+
+	//==============================================================================
+	// 지금 문서와 고른 노드 남기기.
+	//==============================================================================
+	/**
+	 * @param { string } label
+	 * @returns { object }
+	 */
+	captureState(label) {
+		const documentRoot = this.#scene.getDocumentRoot();
+		return {
+			label: label,
+			jsonText: UIDocument.toJsonText(documentRoot, false),
+			selectionPath: this.findIndexPath(this.#scene.getSelectedNode()),
+		};
+	}
+
+	//==============================================================================
+	// 남긴 문서로 되돌리기.
+	//==============================================================================
+	/**
+	 * @param { object } state
+	 */
+	restoreState(state) {
+		const documentRoot = UIDocument.fromJsonText(state.jsonText);
+		this.#scene.replaceDocumentRoot(documentRoot);
+		this.#scene.setSelectedNode(this.findNodeByIndexPath(state.selectionPath));
+		this.#lastChange = { label: "", node: null, time: 0 };
+		this.refreshAll();
+	}
+
+	//==============================================================================
+	// 되돌리기와 다시 하기.
+	//==============================================================================
+	undo() {
+		const state = this.#undoList.pop();
+		if (!state) {
+			return;
+		}
+		this.#redoList.push(this.captureState(state.label));
+		this.restoreState(state);
+		this.markDirty();
+		this.log(`되돌림: ${state.label}`);
+	}
+
+	redo() {
+		const state = this.#redoList.pop();
+		if (!state) {
+			return;
+		}
+		this.#undoList.push(this.captureState(state.label));
+		this.restoreState(state);
+		this.markDirty();
+		this.log(`다시 함: ${state.label}`);
+	}
+
+	//==============================================================================
+	// 노드의 자식 차례 경로. (문서 루트부터, 이름이 겹쳐도 하나로 정해진다)
+	//==============================================================================
+	/**
+	 * @param { WorldNode | null } node
+	 * @returns { Array<number> | null }
+	 */
+	findIndexPath(node) {
+		if (node === null) {
+			return null;
+		}
+		const documentRoot = this.#scene.getDocumentRoot();
+		const indexPath = [];
+		let currentNode = node;
+		while (currentNode !== null && currentNode !== undefined && currentNode !== documentRoot) {
+			const parentNode = currentNode.getParent();
+			if (!parentNode) {
+				return null;
+			}
+			indexPath.unshift(parentNode.getChildren().indexOf(currentNode));
+			currentNode = parentNode;
+		}
+		return currentNode === documentRoot ? indexPath : null;
+	}
+
+	//==============================================================================
+	// 자식 차례 경로로 노드 찾기.
+	//==============================================================================
+	/**
+	 * @param { Array<number> | null } indexPath
+	 * @returns { WorldNode | null }
+	 */
+	findNodeByIndexPath(indexPath) {
+		if (indexPath === null) {
+			return null;
+		}
+		let currentNode = this.#scene.getDocumentRoot();
+		for (const childIndex of indexPath) {
+			const childNodeList = currentNode.getChildren();
+			if (childIndex < 0 || childIndex >= childNodeList.length) {
+				return null;
+			}
+			currentNode = childNodeList[childIndex];
+		}
+		return currentNode;
+	}
+
+	//==============================================================================
+	// 노드 고르기.
+	//==============================================================================
+	/**
+	 * @param { WorldNode | null } node
+	 */
+	select(node) {
+		if (node === this.#scene.getSelectedNode()) {
+			return;
+		}
+		this.#scene.setSelectedNode(node);
+		this.#lastChange = { label: "", node: null, time: 0 };
+		if (node !== null) {
+			this.#hierarchyPanel.revealNode(node);
+		}
+		this.#hierarchyPanel.render(this.#scene.getDocumentRoot(), node);
+		this.#inspectorPanel.render(node);
+		this.updateStatus();
+	}
+
+	//==============================================================================
+	// 노드 만들기. (부모가 없으면 고른 노드 밑, 그것도 없으면 맨 위, 화면 가운데에)
+	//==============================================================================
+	/**
+	 * @param { object } preset
+	 * @param { WorldNode | null } parentNode
+	 * @returns { WorldNode }
+	 */
+	createNode(preset, parentNode) {
+		const node = new WorldNode();
+		this.#nodeCounter += 1;
+		node.setName(preset.label.split(" ")[0].replace("빈", "Node") + this.#nodeCounter);
+		preset.create(node);
+		this.change(`${preset.label} 만들기`, () => {
+			const targetParent = parentNode || this.#scene.getDocumentRoot();
+			targetParent.addChild(node);
+			const viewSize = this.#engine.getViewManager().getViewSize();
+			this.placeAtViewPosition(node, Vector2.create(viewSize.x * 0.5, viewSize.y * 0.5));
+			this.#scene.setSelectedNode(node);
+		}, true);
+		return node;
+	}
+
+	//==============================================================================
+	// 노드를 화면 위치로 옮기기. (부모의 회전과 크기를 풀어 지역 위치로)
+	//==============================================================================
+	/**
+	 * @param { WorldNode } node
+	 * @param { Vector2 } viewPosition
+	 */
+	placeAtViewPosition(node, viewPosition) {
+		const currentPosition = node.getPosition();
+		const localDelta = this.worldDeltaToLocal(node, viewPosition.x - currentPosition.x, viewPosition.y - currentPosition.y);
+		const localPosition = node.getLocalPosition();
+		node.setLocalPosition(Vector2.create(System.Math.round(localPosition.x + localDelta.x), System.Math.round(localPosition.y + localDelta.y)));
+	}
+
+	//==============================================================================
+	// 화면에서의 움직임을 부모 기준 움직임으로.
+	//==============================================================================
+	/**
+	 * @param { WorldNode } node
+	 * @param { number } deltaX
+	 * @param { number } deltaY
+	 * @returns { Vector2 }
+	 */
+	worldDeltaToLocal(node, deltaX, deltaY) {
+		const parentNode = node.getParent();
+		if (!parentNode) {
+			return Vector2.create(deltaX, deltaY);
+		}
+		const radian = -parentNode.getRotation() * System.Math.PI / 180;
+		const cosine = System.Math.cos(radian);
+		const sine = System.Math.sin(radian);
+		const parentScale = parentNode.getScale();
+		const rotatedX = deltaX * cosine - deltaY * sine;
+		const rotatedY = deltaX * sine + deltaY * cosine;
+		return Vector2.create(parentScale.x !== 0 ? rotatedX / parentScale.x : 0, parentScale.y !== 0 ? rotatedY / parentScale.y : 0);
+	}
+
+	//==============================================================================
+	// 노드 옮기기. (부모와 차례, 화면 위치는 지킨다)
+	//==============================================================================
+	/**
+	 * @param { WorldNode } node
+	 * @param { WorldNode } parentNode
+	 * @param { number } index
+	 */
+	moveNode(node, parentNode, index) {
+		this.change("부모 바꾸기", () => {
+			const worldPosition = node.getPosition();
+			const oldParent = node.getParent();
+			let targetIndex = index;
+			if (oldParent === parentNode && oldParent.getChildren().indexOf(node) < index) {
+				targetIndex -= 1;
+			}
+			if (oldParent !== parentNode) {
+				parentNode.addChild(node);
+				this.placeAtViewPosition(node, worldPosition);
+			}
+			node.setSiblingIndex(targetIndex);
+		}, true);
+	}
+
+	//==============================================================================
+	// 컴포넌트 더하기.
+	//==============================================================================
+	/**
+	 * @param { WorldNode } node
+	 * @param { string } typeName
+	 */
+	addComponent(node, typeName) {
+		const componentType = UIDocument.getComponentType(typeName);
+		if (!componentType) {
+			return;
+		}
+		this.change(`${typeName} 더하기`, () => {
+			node.addComponent(componentType);
+		}, true);
+	}
+
+	//==============================================================================
+	// 고른 노드 복제. (바로 뒤 형제로)
+	//==============================================================================
+	duplicateSelected() {
+		const selectedNode = this.#scene.getSelectedNode();
+		if (selectedNode === null) {
+			return;
+		}
+		this.change("복제", () => {
+			const nodeData = UIDocument.serializeNode(selectedNode);
+			const copiedNode = UIDocument.deserializeNode(nodeData);
+			const parentNode = selectedNode.getParent();
+			parentNode.addChild(copiedNode);
+			copiedNode.setSiblingIndex(parentNode.getChildren().indexOf(selectedNode) + 1);
+			const localPosition = copiedNode.getLocalPosition();
+			copiedNode.setLocalPosition(Vector2.create(localPosition.x + 20, localPosition.y + 20));
+			copiedNode.setName(`${selectedNode.getName()} (복제)`);
+			this.#scene.setSelectedNode(copiedNode);
+		}, true);
+	}
+
+	//==============================================================================
+	// 고른 노드 지우기.
+	//==============================================================================
+	deleteSelected() {
+		const selectedNode = this.#scene.getSelectedNode();
+		if (selectedNode === null) {
+			return;
+		}
+		this.change("지우기", () => {
+			selectedNode.getParent().removeChild(selectedNode);
+			this.#scene.setSelectedNode(null);
+		}, true);
+	}
+
+	//==============================================================================
+	// 노드 오른쪽 클릭 메뉴.
+	//==============================================================================
+	/**
+	 * @param { WorldNode | null } node
+	 * @param { number } x
+	 * @param { number } y
+	 */
+	showNodeContextMenu(node, x, y) {
+		const commandList = NODE_PRESET_LIST.map((preset) => {
+			return { label: node === null ? `${preset.label} 만들기` : `자식으로 ${preset.label}`, run: () => this.createNode(preset, node) };
+		});
+		if (node !== null) {
+			commandList.push(null);
+			commandList.push({ label: "복사", run: () => this.copySelected() });
+			commandList.push({ label: "붙여넣기", run: () => this.pasteNode() });
+			commandList.push({ label: "복제", run: () => this.duplicateSelected() });
+			commandList.push({ label: "프리팹으로 저장", run: () => this.saveSelectedAsPrefab() });
+			commandList.push({ label: "지우기", run: () => this.deleteSelected() });
+			commandList.push({ label: "고른 노드로 보기", run: () => this.#scene.frameSelected() });
+		}
+		this.showContextMenu(commandList, x, y);
+	}
+
+	//==============================================================================
+	// 떠 있는 메뉴 띄우기.
+	//==============================================================================
+	/**
+	 * @param { Array<object | null> } commandList - { label, run } 또는 null(구분선)
+	 * @param { number } x
+	 * @param { number } y
+	 */
+	showContextMenu(commandList, x, y) {
+		this.closeContextMenu();
+		const menuElement = createElement("div", "contextMenu");
+		for (const command of commandList) {
+			if (command === null) {
+				menuElement.append(createElement("div", "menuSeparator"));
 				continue;
 			}
-			const activeButtonElement = wrapperElement.querySelector("button");
-			const childContainerElement = wrapperElement.children[1];
-			itemList.push({
-				name: wrapperElement.dataset.label,
-				isActive: activeButtonElement.dataset.active === "true",
-				children: this.composeHierarchyData(childContainerElement),
+			const commandElement = createElement("div", "menuCommand", command.label);
+			commandElement.addEventListener("click", (mouseEvent) => {
+				mouseEvent.stopPropagation();
+				this.closeContextMenu();
+				command.run();
 			});
+			menuElement.append(commandElement);
 		}
-		return itemList;
+		menuElement.style.left = `${x}px`;
+		menuElement.style.top = `${y}px`;
+		System.document.body.append(menuElement);
+		const menuRect = menuElement.getBoundingClientRect();
+		if (menuRect.bottom > System.window.innerHeight) {
+			menuElement.style.top = `${System.Math.max(0, y - menuRect.height)}px`;
+		}
+		this.#contextMenuElement = menuElement;
+		menuElement.addEventListener("click", (mouseEvent) => {
+			mouseEvent.stopPropagation();
+		});
+	}
+
+	closeContextMenu() {
+		if (this.#contextMenuElement !== null) {
+			this.#contextMenuElement.remove();
+			this.#contextMenuElement = null;
+		}
 	}
 
 	//==============================================================================
-	// 계층 트리 복원.
+	// 씬 뷰 입력. (고르기, 손잡이 끌기, 밀기, 키우기, 애셋 놓기)
 	//==============================================================================
-	/**
-	 * @param { HTMLElement } containerElement
-	 * @param { object[] } itemDataList
-	 */
-	rebuildHierarchyFromData(containerElement, itemDataList) {
-		for (const itemData of itemDataList) {
-			const wrapperElement = this.#createHierarchyItem(itemData.name);
-			wrapperElement.setActiveState(itemData.isActive !== false);
-			if (containerElement === this.#hierarchyTreeElement) {
-				containerElement.appendChild(wrapperElement);
+	setupSceneInput() {
+		const canvasElement = this.#elements.canvasElement;
+		const readViewPosition = (pointerEvent) => {
+			const canvasRect = canvasElement.getBoundingClientRect();
+			return Vector2.create(pointerEvent.clientX - canvasRect.left, pointerEvent.clientY - canvasRect.top);
+		};
+		canvasElement.addEventListener("contextmenu", (mouseEvent) => {
+			mouseEvent.preventDefault();
+		});
+		canvasElement.addEventListener("pointerdown", (pointerEvent) => {
+			canvasElement.focus();
+			this.closeContextMenu();
+			const scene = this.#scene;
+			const viewPosition = readViewPosition(pointerEvent);
+			canvasElement.setPointerCapture(pointerEvent.pointerId);
+			if (scene.isGameView()) {
+				return;
+			}
+			const isPan = pointerEvent.button === 1 || pointerEvent.button === 2 || this.#isSpaceDown || scene.getTool() === EditorTool.hand;
+			if (isPan) {
+				this.#dragState = { kind: "pan", lastPosition: viewPosition };
+				return;
+			}
+			if (pointerEvent.button !== 0) {
+				return;
+			}
+			let handleKind = scene.pickHandle(viewPosition);
+			if (handleKind === HandleKind.none) {
+				const pickedNode = scene.pickNode(viewPosition);
+				this.select(pickedNode);
+				if (pickedNode === null) {
+					this.#dragState = null;
+					return;
+				}
+				handleKind = scene.getTool() === EditorTool.move ? HandleKind.moveFree : HandleKind.none;
+				if (handleKind === HandleKind.none) {
+					return;
+				}
+			}
+			const node = scene.getSelectedNode();
+			this.#dragState = {
+				kind: "handle",
+				handleKind: handleKind,
+				node: node,
+				startPosition: viewPosition,
+				startLocalPosition: node.getLocalPosition().clone(),
+				startLocalScale: node.getLocalScale().clone(),
+				startLocalRotation: node.getLocalRotation(),
+				startAngle: System.Math.atan2(viewPosition.y - node.getPosition().y, viewPosition.x - node.getPosition().x),
+				isRecorded: false,
+			};
+		});
+		canvasElement.addEventListener("pointermove", (pointerEvent) => {
+			const viewPosition = readViewPosition(pointerEvent);
+			const dragState = this.#dragState;
+			if (dragState === null) {
+				this.#scene.setHoverNode(this.#scene.isGameView() ? null : this.#scene.pickNode(viewPosition));
+				return;
+			}
+			if (dragState.kind === "pan") {
+				this.#scene.panCamera(viewPosition.x - dragState.lastPosition.x, viewPosition.y - dragState.lastPosition.y);
+				dragState.lastPosition = viewPosition;
+				return;
+			}
+			this.dragHandle(dragState, viewPosition, pointerEvent);
+		});
+		const endDrag = () => {
+			const dragState = this.#dragState;
+			this.#dragState = null;
+			if (dragState !== null && dragState.kind === "handle" && dragState.isRecorded) {
+				this.#inspectorPanel.refresh();
+			}
+		};
+		canvasElement.addEventListener("pointerup", endDrag);
+		canvasElement.addEventListener("pointercancel", endDrag);
+		canvasElement.addEventListener("pointerleave", () => {
+			this.#scene.setHoverNode(null);
+		});
+		canvasElement.addEventListener("wheel", (wheelEvent) => {
+			wheelEvent.preventDefault();
+			const viewPosition = readViewPosition(wheelEvent);
+			if (wheelEvent.ctrlKey || wheelEvent.metaKey || System.Math.abs(wheelEvent.deltaX) < 1) {
+				const zoomRatio = System.Math.exp(-wheelEvent.deltaY * (wheelEvent.ctrlKey ? 0.01 : 0.0015));
+				this.#scene.zoomCamera(zoomRatio, viewPosition);
 			}
 			else {
-				containerElement.addChild(wrapperElement);
+				this.#scene.panCamera(-wheelEvent.deltaX, -wheelEvent.deltaY);
 			}
-			if (System.Array.isArray(itemData.children) && itemData.children.length > 0) {
-				this.rebuildHierarchyFromData(wrapperElement, itemData.children);
+		}, { passive: false });
+
+		// 애셋 놓기. (그림은 Sprite 노드로, 씬은 열기)
+		canvasElement.addEventListener("dragover", (dragEvent) => {
+			if (dragEvent.dataTransfer.types.includes(ASSET_DRAG_TYPE)) {
+				dragEvent.preventDefault();
+				dragEvent.dataTransfer.dropEffect = "copy";
 			}
-		}
+		});
+		canvasElement.addEventListener("drop", (dragEvent) => {
+			const path = dragEvent.dataTransfer.getData(ASSET_DRAG_TYPE);
+			const asset = this.#projectPanel.findAsset(path);
+			if (asset === null) {
+				return;
+			}
+			dragEvent.preventDefault();
+			const viewPosition = readViewPosition(dragEvent);
+			if (asset.kind === "image") {
+				this.createSpriteFromAsset(asset, viewPosition);
+			}
+			else if (asset.kind === "scene") {
+				this.openAsset(asset);
+			}
+			else if (asset.kind === "prefab") {
+				this.instantiatePrefab(asset, viewPosition);
+			}
+			else {
+				this.log(`${asset.kind} 애셋은 씬에 바로 놓을 수 없다: ${asset.path}`, "warning");
+			}
+		});
 	}
 
 	//==============================================================================
-	// 애셋 저장. (.visual.json 내려받기 — 스크립트 + 프로퍼티 + 계층)
+	// 손잡이 끌기. (처음 움직일 때 되돌리기 한 칸, Ctrl 은 격자 맞춤, Shift 는 15 도 맞춤)
 	//==============================================================================
 	/**
-	 * @param { string } fileName
+	 * @param { object } dragState
+	 * @param { Vector2 } viewPosition
+	 * @param { PointerEvent } pointerEvent
 	 */
-	saveAsset(fileName) {
-		const propertyTable = {};
-		for (const propertyName of System.Object.keys(this.#inspector)) {
-			propertyTable[propertyName] = this.#properties[propertyName];
+	dragHandle(dragState, viewPosition, pointerEvent) {
+		const node = dragState.node;
+		const deltaX = viewPosition.x - dragState.startPosition.x;
+		const deltaY = viewPosition.y - dragState.startPosition.y;
+		if (!dragState.isRecorded) {
+			if (System.Math.abs(deltaX) + System.Math.abs(deltaY) < 2) {
+				return;
+			}
+			this.recordUndo("손잡이로 바꾸기");
+			dragState.isRecorded = true;
 		}
-		const asset = {
-			script: this.#editor.value,
-			properties: propertyTable,
-			hierarchy: this.composeHierarchyData(this.#hierarchyTreeElement),
-			assets: this.#assets.map((assetEntry) => ({ name: assetEntry.name, dataUrl: assetEntry.dataUrl })),
-		};
-		const jsonText = System.JSON.stringify(asset, null, "\t");
-		const blob = new System.Blob([jsonText], { type: "application/json" });
-		const anchorElement = System.document.createElement("a");
-		anchorElement.href = System.URL.createObjectURL(blob);
-		anchorElement.download = fileName;
-		anchorElement.click();
-		System.URL.revokeObjectURL(anchorElement.href);
-		this.printConsole("Saved " + fileName + ".");
+		const isSnap = pointerEvent.ctrlKey || pointerEvent.metaKey;
+		const handleKind = dragState.handleKind;
+		if (handleKind === HandleKind.moveFree || handleKind === HandleKind.moveX || handleKind === HandleKind.moveY) {
+			const localDelta = this.worldDeltaToLocal(node, handleKind === HandleKind.moveY ? 0 : deltaX, handleKind === HandleKind.moveX ? 0 : deltaY);
+			let nextX = dragState.startLocalPosition.x + localDelta.x;
+			let nextY = dragState.startLocalPosition.y + localDelta.y;
+			if (isSnap) {
+				nextX = System.Math.round(nextX / 10) * 10;
+				nextY = System.Math.round(nextY / 10) * 10;
+			}
+			else {
+				nextX = System.Math.round(nextX);
+				nextY = System.Math.round(nextY);
+			}
+			node.setLocalPosition(Vector2.create(nextX, nextY));
+		}
+		else if (handleKind === HandleKind.rotate) {
+			const origin = node.getPosition();
+			const angle = System.Math.atan2(viewPosition.y - origin.y, viewPosition.x - origin.x);
+			let nextRotation = dragState.startLocalRotation + (angle - dragState.startAngle) * 180 / System.Math.PI;
+			nextRotation = pointerEvent.shiftKey ? System.Math.round(nextRotation / 15) * 15 : System.Math.round(nextRotation * 10) / 10;
+			node.setLocalRotation(nextRotation);
+		}
+		else {
+			const startScale = dragState.startLocalScale;
+			let ratioX = 1;
+			let ratioY = 1;
+			if (handleKind === HandleKind.scaleX) {
+				ratioX = 1 + deltaX / HANDLE_LENGTH;
+			}
+			else if (handleKind === HandleKind.scaleY) {
+				ratioY = 1 - deltaY / HANDLE_LENGTH;
+			}
+			else {
+				ratioX = 1 + (deltaX - deltaY) / HANDLE_LENGTH;
+				ratioY = ratioX;
+			}
+			const roundScale = (value) => {
+				return isSnap ? System.Math.round(value * 10) / 10 : System.Math.round(value * 1000) / 1000;
+			};
+			node.setLocalScale(Vector2.create(roundScale(startScale.x * ratioX), roundScale(startScale.y * ratioY)));
+		}
+		this.markDirty();
+		this.#inspectorPanel.refresh();
 	}
 
 	//==============================================================================
-	// 애셋 읽기.
+	// 그림 애셋으로 Sprite 노드 만들기.
+	//==============================================================================
+	/**
+	 * @param { object } asset
+	 * @param { Vector2 } viewPosition
+	 */
+	createSpriteFromAsset(asset, viewPosition) {
+		const image = this.#projectPanel.readImage(asset.path);
+		if (image === null) {
+			this.log(`그림을 읽지 못했다: ${asset.path}`, "error");
+			return;
+		}
+		const node = new WorldNode();
+		node.setName(asset.name.replace(/\.[^.]+$/, ""));
+		node.setContentSize(Vector2.create(image.naturalWidth, image.naturalHeight));
+		const sprite = node.addComponent(Sprite);
+		sprite.imagePath = asset.path;
+		sprite.setImage(image);
+		const selectedNode = this.#scene.getSelectedNode();
+		this.change("그림 놓기", () => {
+			const parentNode = selectedNode !== null ? selectedNode : this.#scene.getDocumentRoot();
+			parentNode.addChild(node);
+			this.placeAtViewPosition(node, viewPosition);
+			this.#scene.setSelectedNode(node);
+		}, true);
+	}
+
+	//==============================================================================
+	// 키보드. (도구, 단축키, 스페이스 밀기)
+	//==============================================================================
+	setupKeyboard() {
+		System.document.addEventListener("keydown", (keyboardEvent) => {
+			const targetElement = keyboardEvent.target;
+			if (targetElement && (targetElement.tagName === "INPUT" || targetElement.tagName === "TEXTAREA" || targetElement.tagName === "SELECT")) {
+				return;
+			}
+			const isCommand = keyboardEvent.ctrlKey || keyboardEvent.metaKey;
+			const key = keyboardEvent.key.toLowerCase();
+			let isHandled = true;
+			if (isCommand && key === "z") {
+				if (keyboardEvent.shiftKey) {
+					this.redo();
+				}
+				else {
+					this.undo();
+				}
+			}
+			else if (isCommand && key === "y") {
+				this.redo();
+			}
+			else if (isCommand && key === "s") {
+				this.saveScene(keyboardEvent.shiftKey);
+			}
+			else if (isCommand && key === "o") {
+				this.openSceneFile();
+			}
+			else if (isCommand && key === "n") {
+				this.newScene();
+			}
+			else if (isCommand && key === "c") {
+				this.copySelected();
+			}
+			else if (isCommand && key === "v") {
+				this.pasteNode();
+			}
+			else if (isCommand && key === "d") {
+				this.duplicateSelected();
+			}
+			else if (isCommand && key === "p") {
+				this.togglePlay();
+			}
+			else if (isCommand) {
+				isHandled = false;
+			}
+			else if (key === "delete" || key === "backspace") {
+				this.deleteSelected();
+			}
+			else if (key === "q") {
+				this.setTool(EditorTool.hand);
+			}
+			else if (key === "w") {
+				this.setTool(EditorTool.move);
+			}
+			else if (key === "e") {
+				this.setTool(EditorTool.rotate);
+			}
+			else if (key === "r") {
+				this.setTool(EditorTool.scale);
+			}
+			else if (key === "f") {
+				this.#scene.frameSelected();
+			}
+			else if (key === "tab") {
+				this.setGameView(!this.#scene.isGameView());
+			}
+			else if (key === "home") {
+				this.#scene.frameDocument();
+			}
+			else if (key === "escape") {
+				this.select(null);
+			}
+			else if (key === " ") {
+				this.#isSpaceDown = true;
+			}
+			else if (key.startsWith("arrow") && this.#scene.getSelectedNode() !== null) {
+				const step = keyboardEvent.shiftKey ? 10 : 1;
+				const offsetX = key === "arrowleft" ? -step : (key === "arrowright" ? step : 0);
+				const offsetY = key === "arrowup" ? -step : (key === "arrowdown" ? step : 0);
+				const node = this.#scene.getSelectedNode();
+				this.change("화살표로 옮기기", () => {
+					const localPosition = node.getLocalPosition();
+					node.setLocalPosition(Vector2.create(localPosition.x + offsetX, localPosition.y + offsetY));
+				});
+			}
+			else {
+				isHandled = false;
+			}
+			if (isHandled) {
+				keyboardEvent.preventDefault();
+			}
+		});
+		System.document.addEventListener("keyup", (keyboardEvent) => {
+			if (keyboardEvent.key === " ") {
+				this.#isSpaceDown = false;
+			}
+		});
+	}
+
+	//==============================================================================
+	// 도구 바꾸기.
+	//==============================================================================
+	/**
+	 * @param { string } tool
+	 */
+	setTool(tool) {
+		this.#scene.setTool(tool);
+		for (const [buttonTool, buttonElement] of System.Object.entries(this.#elements.toolButtons)) {
+			buttonElement.classList.toggle("isActive", buttonTool === tool);
+		}
+	}
+
+	//==============================================================================
+	// 재생과 멈춤. (멈추면 재생 전 문서로 되돌린다)
+	//==============================================================================
+	togglePlay() {
+		const scene = this.#scene;
+		const playButton = this.#elements.playButton;
+		if (!scene.isPlaying()) {
+			this.#playSnapshot = UIDocument.toJsonText(scene.getDocumentRoot(), false);
+			scene.setPlaying(true);
+			playButton.classList.add("isPlaying");
+			playButton.textContent = "■ 멈춤";
+			this.setGameView(true);
+			this.log("재생을 시작했다. 멈추면 재생 중 바꾼 것은 되돌아간다.");
+		}
+		else {
+			scene.setPlaying(false);
+			playButton.classList.remove("isPlaying");
+			playButton.textContent = "▶ 재생";
+			this.setGameView(false);
+			if (this.#playSnapshot !== null) {
+				const selectionPath = this.findIndexPath(scene.getSelectedNode());
+				this.restoreState({ label: "재생", jsonText: this.#playSnapshot, selectionPath: selectionPath });
+				this.#playSnapshot = null;
+			}
+			this.log("재생을 멈췄다.");
+		}
+	}
+
+	//==============================================================================
+	// 새 씬.
+	//==============================================================================
+	newScene() {
+		if (this.#isDirty && !System.window.confirm("저장하지 않은 바꾼 것이 있다. 새 씬을 열까?")) {
+			return;
+		}
+		this.#scene.replaceDocumentRoot(this.#scene.createDocumentRoot());
+		this.#undoList.length = 0;
+		this.#redoList.length = 0;
+		this.#scenePath = "";
+		this.#isDirty = false;
+		this.refreshAll();
+		this.scheduleAutosave();
+		this.log("새 씬을 만들었다.");
+	}
+
+	//==============================================================================
+	// 프로젝트 폴더 열기. (안 되는 브라우저면 끌어다 놓기를 알린다)
+	//==============================================================================
+	async openProjectFolder() {
+		try {
+			const isOpened = await this.#projectPanel.openFolder();
+			if (!isOpened) {
+				this.log("이 브라우저는 폴더 열기를 지원하지 않는다. 애셋 폴더를 프로젝트 패널에 끌어다 놓는다. (저장은 내려받기로 한다)", "warning");
+			}
+		}
+		catch (error) {
+			if (error.name !== "AbortError") {
+				this.log(`폴더를 열지 못했다: ${error.message}`, "error");
+			}
+		}
+	}
+
+	//==============================================================================
+	// 씬 파일 열기. (파일 고르기)
+	//==============================================================================
+	openSceneFile() {
+		const inputElement = createElement("input");
+		inputElement.type = "file";
+		inputElement.accept = ".json";
+		inputElement.addEventListener("change", async () => {
+			const file = inputElement.files[0];
+			if (file) {
+				this.loadSceneText(await file.text(), file.name);
+			}
+		});
+		inputElement.click();
+	}
+
+	//==============================================================================
+	// 씬 글 읽어 열기.
 	//==============================================================================
 	/**
 	 * @param { string } jsonText
-	 * @param { string } fileName
+	 * @param { string } path
 	 */
-	loadAssetText(jsonText, fileName) {
-		const parsedAsset = System.JSON.parse(jsonText);
-		this.#assetFileName = fileName;
-		if (typeof parsedAsset.script === "string") {
-			this.#editor.value = parsedAsset.script;
-		}
-		for (const propertyName of System.Object.keys(this.#inspector)) {
-			this.removeProperty(propertyName);
-		}
-		if (parsedAsset.properties) {
-			for (const propertyName of System.Object.keys(parsedAsset.properties)) {
-				this.addProperty(propertyName, parsedAsset.properties[propertyName]);
+	loadSceneText(jsonText, path) {
+		try {
+			const documentData = System.JSON.parse(jsonText);
+			const documentRoot = UIDocument.fromJsonText(jsonText);
+			if (System.Array.isArray(documentData.frameSize)) {
+				this.#scene.setFrameSize(Vector2.create(documentData.frameSize[0], documentData.frameSize[1]));
 			}
+			if (this.#scene.isPlaying()) {
+				this.togglePlay();
+			}
+			this.#scene.replaceDocumentRoot(documentRoot);
+			this.#scene.frameDocument();
+			this.#undoList.length = 0;
+			this.#redoList.length = 0;
+			this.#scenePath = path;
+			this.#isDirty = false;
+			this.refreshAll();
+			this.log(`씬을 열었다: ${path}`);
 		}
-		if (System.Array.isArray(parsedAsset.hierarchy)) {
-			this.#hierarchyTreeElement.textContent = "";
-			this.rebuildHierarchyFromData(this.#hierarchyTreeElement, parsedAsset.hierarchy);
+		catch (error) {
+			this.log(`씬을 열지 못했다: ${path}: ${error.message}`, "error");
 		}
-		if (System.Array.isArray(parsedAsset.assets)) {
-			this.#assets = parsedAsset.assets.map((assetEntry) => ({ name: assetEntry.name, dataUrl: assetEntry.dataUrl }));
-			this.rebuildAssetList();
-		}
-		this.compileCode();
-		this.executeCommand("stop");
-		this.printConsole("Opened " + fileName + ".");
 	}
 
 	//==============================================================================
-	// 문서 초기화. (기본 스크립트 + 기본 프로퍼티 + 기본 계층)
+	// 씬 저장. (폴더가 열려 있으면 그 안에, 아니면 내려받기)
 	//==============================================================================
-	resetDocument() {
-		this.#assets = [];
-		this.rebuildAssetList();
-		for (const propertyName of System.Object.keys(this.#inspector)) {
-			this.removeProperty(propertyName);
+	/**
+	 * @param { boolean } isSaveAs
+	 */
+	async saveScene(isSaveAs) {
+		let scenePath = this.#scenePath;
+		if (isSaveAs || scenePath === "") {
+			const answer = System.window.prompt("씬 파일 경로 (프로젝트 폴더 기준)", scenePath || DEFAULT_SCENE_PATH);
+			if (!answer) {
+				return;
+			}
+			scenePath = answer.endsWith(".json") ? answer : `${answer}.scene.json`;
 		}
-		this.addProperty("speed", 1.0);
-		this.addProperty("gravity", 0.1);
-		this.#hierarchyTreeElement.textContent = "";
-		this.rebuildHierarchyFromData(this.#hierarchyTreeElement, [
-			{ name: "Visual Root", isActive: true, children: [
-				{ name: "Background Layer", isActive: true, children: [] },
-				{ name: "Particle Emitter", isActive: true, children: [
-					{ name: "Main Particle", isActive: true, children: [] },
-					{ name: "Sub Particle", isActive: true, children: [] },
-				] },
-				{ name: "UI Layer", isActive: true, children: [] },
-			] },
-		]);
-		this.#editor.value = this.composeDefaultScript();
-		this.compileCode();
-		this.executeCommand("stop");
+		const jsonText = this.buildSceneJsonText();
+		try {
+			const savedTo = await this.#projectPanel.writeTextFile(scenePath, jsonText);
+			this.#scenePath = scenePath;
+			this.#isDirty = false;
+			this.updateStatus();
+			this.log(savedTo === "folder" ? `씬을 저장했다: ${scenePath}` : `씬을 내려받았다: ${scenePath} (폴더를 열면 그 안에 바로 저장한다)`);
+		}
+		catch (error) {
+			this.log(`저장하지 못했다: ${error.message}`, "error");
+		}
 	}
 
 	//==============================================================================
-	// 기본 스크립트.
+	// 씬 파일 글. (UIDocument 문서에 에디터 값 frameSize 를 얹는다)
 	//==============================================================================
 	/**
 	 * @returns { string }
 	 */
-	composeDefaultScript() {
-		return `
-function tick(particle, properties, canvasSize) {
-	particle.x += particle.vx * properties.speed;
-	particle.y += particle.vy * properties.speed;
-	particle.vy += properties.gravity;
-	if (particle.x < 0 || particle.x > canvasSize.x) {
-		particle.vx *= -1;
-		particle.x = particle.x < 0 ? 0 : canvasSize.x;
-	}
-	if (particle.y < 0 || particle.y > canvasSize.y) {
-		particle.vy *= -1;
-		particle.y = particle.y < 0 ? 0 : canvasSize.y;
-	}
-}`;
+	buildSceneJsonText() {
+		const documentData = System.JSON.parse(UIDocument.toJsonText(this.#scene.getDocumentRoot(), false));
+		const frameSize = this.#scene.getFrameSize();
+		documentData.frameSize = [frameSize.x, frameSize.y];
+		return System.JSON.stringify(documentData, null, "\t");
 	}
 
 	//==============================================================================
-	// 재생 단추 상태 표시.
+	// 고른 노드 복사.
 	//==============================================================================
-	/**
-	 * @param { string } activeCommandId
-	 */
-	updateButtonState(activeCommandId) {
-		setEditorHeaderButtonSelected(this.#playButtonElement, activeCommandId === "play");
-		setEditorHeaderButtonSelected(this.#pauseButtonElement, activeCommandId === "pause");
-		setEditorHeaderButtonSelected(this.#stopButtonElement, activeCommandId === "stop");
-	}
-
-	//==============================================================================
-	// 상태줄 갱신.
-	//==============================================================================
-	/**
-	 * @param { string } statusText
-	 */
-	setStatusText(statusText) {
-		if (this.#statusTextElement) {
-			this.#statusTextElement.innerText = statusText;
-		}
-	}
-
-	//==============================================================================
-	// 값 글자 해석. (참 거짓 / 숫자 / 글자)
-	//==============================================================================
-	/**
-	 * @param { string } rawValueText
-	 * @returns { * }
-	 */
-	parsePropertyValue(rawValueText) {
-		const trimmedText = rawValueText.trim();
-		if (trimmedText === "true") {
-			return true;
-		}
-		if (trimmedText === "false") {
-			return false;
-		}
-		if (trimmedText !== "" && !System.isNaN(System.Number(trimmedText))) {
-			return System.Number(trimmedText);
-		}
-		return rawValueText;
-	}
-
-	//==============================================================================
-	// 이벤트 설정.
-	//==============================================================================
-	setupGlobalEvents() {
-		System.window.addEventListener("keydown", (keyboardEvent) => {
-			if (keyboardEvent.ctrlKey && ["=", "-", "+", "0"].includes(keyboardEvent.key)) {
-				keyboardEvent.preventDefault();
-			}
-			if (keyboardEvent.ctrlKey && keyboardEvent.altKey && keyboardEvent.key.toLowerCase() === "n") {
-				keyboardEvent.preventDefault();
-				this.executeCommand("newDocument");
-				return;
-			}
-			if (keyboardEvent.ctrlKey && keyboardEvent.shiftKey && keyboardEvent.key.toLowerCase() === "s") {
-				keyboardEvent.preventDefault();
-				this.executeCommand("saveAs");
-				return;
-			}
-			if (keyboardEvent.ctrlKey && keyboardEvent.key.toLowerCase() === "s") {
-				keyboardEvent.preventDefault();
-				this.executeCommand("save");
-				return;
-			}
-			if (keyboardEvent.ctrlKey && keyboardEvent.key.toLowerCase() === "o") {
-				keyboardEvent.preventDefault();
-				this.executeCommand("load");
-			}
-		});
-		System.window.addEventListener("wheel", (wheelEvent) => {
-			if (wheelEvent.ctrlKey) {
-				wheelEvent.preventDefault();
-			}
-		}, { passive: false });
-	}
-
-	//==============================================================================
-	// 프로퍼티 데이터 초기화.
-	//==============================================================================
-	setupDataBinding() {
-		const self = this;
-		this.#properties = new System.Proxy({}, {
-			set: function(target, key, value) {
-				if (target[key] !== value) {
-					target[key] = value;
-					const inspectorUI = self.getInspectorUI();
-					if (inspectorUI[key] && System.document.activeElement !== inspectorUI[key]) {
-						inspectorUI[key].value = value;
-					}
-				}
-				return true;
-			}
-		});
-	}
-
-	//==============================================================================
-	// 인스펙터 프로퍼티 추가.
-	//==============================================================================
-	addProperty(name, value) {
-		this.#properties[name] = value;
-		const container = this.#inspectorPropsContainer;
-		if (!container) {
+	copySelected() {
+		const selectedNode = this.#scene.getSelectedNode();
+		if (selectedNode === null) {
 			return;
 		}
-		const rowElement = createEditorPropertyRowElement(container, name);
-		rowElement.id = `prop-row-${name}`;
-		const inputElement = System.document.createElement("input");
-		inputElement.type = "text";
-		inputElement.value = value;
-		decorateEditorInputElement(inputElement);
-		inputElement.addEventListener("input", (inputEvent) => {
-			const parsedValue = this.parsePropertyValue(inputEvent.target.value);
-			this.#properties[name] = parsedValue;
-		});
-		const removeButtonElement = createEditorButtonElement("X", false);
-		removeButtonElement.style.padding = "2px 8px";
-		removeButtonElement.style.fontSize = "12px";
-		removeButtonElement.style.flexShrink = "0";
-		removeButtonElement.addEventListener("click", () => {
-			this.removeProperty(name);
-		});
-		rowElement.appendChild(inputElement);
-		rowElement.appendChild(removeButtonElement);
-
-		// 추가.
-		this.#inspector[name] = inputElement;
+		this.#clipboardNodeData = UIDocument.serializeNode(selectedNode);
+		this.log(`복사했다: ${selectedNode.getName()}`);
 	}
 
 	//==============================================================================
-	// 인스펙터 프로퍼티 제거.
+	// 붙여넣기. (고른 노드의 바로 뒤 형제로, 고른 것이 없으면 맨 위에)
 	//==============================================================================
-	removeProperty(name) {
-		const rowElement = System.document.getElementById(`prop-row-${name}`);
-		if (rowElement) {
-			rowElement.remove();
+	pasteNode() {
+		const nodeData = this.#clipboardNodeData;
+		if (nodeData === null) {
+			return;
 		}
-		delete this.#properties[name];
-		delete this.#inspector[name];
+		const selectedNode = this.#scene.getSelectedNode();
+		this.change("붙여넣기", () => {
+			const pastedNode = UIDocument.deserializeNode(nodeData);
+			const parentNode = selectedNode !== null ? selectedNode.getParent() : this.#scene.getDocumentRoot();
+			parentNode.addChild(pastedNode);
+			if (selectedNode !== null) {
+				pastedNode.setSiblingIndex(parentNode.getChildren().indexOf(selectedNode) + 1);
+			}
+			this.#scene.setSelectedNode(pastedNode);
+		}, true);
 	}
 
 	//==============================================================================
-	// 파티클 목록 초기화.
+	// 고른 노드를 프리팹 애셋으로 저장. (prefabs/이름.prefab.json, UIDocument 문서 하나)
 	//==============================================================================
-	initParticles() {
-		const viewManager = this.#engine.getViewManager();
-		const canvasNativeSize = viewManager.getCanvasNativeSize();
-		this.#particles = [];
-		for (let particleIndex = 0; particleIndex < 200; ++particleIndex) {
-			this.#particles.push({
-				x: canvasNativeSize.x / 2,
-				y: canvasNativeSize.y / 2,
-				vx: (System.Math.random() - 0.5) * 10,
-				vy: (System.Math.random() - 0.5) * 10,
-				color: `hsl(${System.Math.random() * 360}, 100%, 60%)`
-			});
+	async saveSelectedAsPrefab() {
+		const selectedNode = this.#scene.getSelectedNode();
+		if (selectedNode === null) {
+			this.log("프리팹으로 저장할 노드를 먼저 고른다.", "warning");
+			return;
 		}
-	}
-
-	//==============================================================================
-	// 콘솔 출력.
-	//==============================================================================
-	printConsole(message, isError = false) {
-		const now = new System.Date();
-		const hours = String(now.getHours()).padStart(2, "0");
-		const minutes = String(now.getMinutes()).padStart(2, "0");
-		const seconds = String(now.getSeconds()).padStart(2, "0");
-		const timestamp = `[${hours}:${minutes}:${seconds}]`;
-		const textColor = isError ? PaneTheme.color.error : PaneTheme.color.success;
-		const lineElement = System.document.createElement("div");
-		lineElement.style.color = textColor;
-		lineElement.style.padding = "2px 12px";
-		lineElement.style.whiteSpace = "pre-wrap";
-		lineElement.style.cursor = "pointer";
-		lineElement.innerText = `${timestamp} ${message}`;
-		lineElement.addEventListener("mouseenter", () => {
-			if (lineElement !== this.#consoleSelectedItem) {
-				lineElement.style.backgroundColor = EditorTheme.hoverColor;
-			}
-		});
-		lineElement.addEventListener("mouseleave", () => {
-			if (lineElement !== this.#consoleSelectedItem) {
-				lineElement.style.backgroundColor = "transparent";
-			}
-		});
-		lineElement.addEventListener("click", (mouseEvent) => {
-			mouseEvent.stopPropagation();
-			if (this.#consoleSelectedItem) {
-				this.#consoleSelectedItem.style.backgroundColor = "transparent";
-			}
-			this.#consoleSelectedItem = lineElement;
-			lineElement.style.backgroundColor = EditorTheme.accentSoftColor;
-			this.setStatusText(`Console > ${timestamp} ${message}`);
-		});
-		this.#consolePane.appendChild(lineElement);
-		this.#consolePane.scrollTop = this.#consolePane.scrollHeight;
-	}
-
-	//==============================================================================
-	// 코드 확인.
-	//==============================================================================
-	compileCode() {
+		const safeName = (selectedNode.getName() || "Prefab").replace(/[\\/:*?"<>|]/g, "_");
+		const prefabPath = `prefabs/${safeName}.prefab.json`;
 		try {
-			const buildFunction = new System.Function(this.#editor.value + "\nreturn tick;");
-			this.#scripting = buildFunction();
-			if (typeof this.#scripting !== "function") {
-				throw new System.Error("tick function is not defined.");
-			}
-			this.printConsole("Compiled successfully.");
+			const savedTo = await this.#projectPanel.writeTextFile(prefabPath, UIDocument.toJsonText(selectedNode, true));
+			this.log(savedTo === "folder" ? `프리팹을 저장했다: ${prefabPath}` : `프리팹을 내려받았다: ${prefabPath}`);
 		}
 		catch (error) {
-			this.printConsole("Compile error:\n" + error.message, true);
+			this.log(`프리팹을 저장하지 못했다: ${error.message}`, "error");
 		}
 	}
 
 	//==============================================================================
-	// 바탕 그리기. (배경 + 격자)
+	// 프리팹 애셋 꺼내기. (화면 위치에, 고른 노드가 있으면 그 밑에)
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { object } asset
+	 * @param { Vector2 } viewPosition
 	 */
-	drawBackground(graphic) {
-		const viewManager = this.#engine.getViewManager();
-		const canvasNativeSize = viewManager.getCanvasNativeSize();
-		viewManager.applyCanvasNativeRect(graphic);
-		graphic.setFillColor(Colors.darkVanilla);
-		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
-		if (this.#isGridVisible === false) {
+	async instantiatePrefab(asset, viewPosition) {
+		let prefabNode = null;
+		try {
+			prefabNode = UIDocument.fromJsonText(await asset.file.text());
+		}
+		catch (error) {
+			this.log(`프리팹을 읽지 못했다: ${asset.path}: ${error.message}`, "error");
 			return;
 		}
-		const gridSize = 50;
-		const subGridSize = 10;
-		graphic.setStrokeColor("rgba(0, 0, 0, 0.05)");
-		for (let x = 0; x <= canvasNativeSize.x; x += subGridSize) {
-			graphic.drawLine([Vector2.create(x, 0), Vector2.create(x, canvasNativeSize.y)], 0.5);
+		const selectedNode = this.#scene.getSelectedNode();
+		this.change("프리팹 꺼내기", () => {
+			const parentNode = selectedNode !== null ? selectedNode : this.#scene.getDocumentRoot();
+			parentNode.addChild(prefabNode);
+			this.placeAtViewPosition(prefabNode, viewPosition);
+			this.#scene.setSelectedNode(prefabNode);
+		}, true);
+	}
+
+	//==============================================================================
+	// 애셋 파일 가져오기. (파일 고르기, 프로젝트 패널의 지금 폴더로)
+	//==============================================================================
+	importAssetFiles() {
+		const inputElement = createElement("input");
+		inputElement.type = "file";
+		inputElement.multiple = true;
+		inputElement.addEventListener("change", async () => {
+			const fileList = System.Array.from(inputElement.files);
+			if (fileList.length === 0) {
+				return;
+			}
+			try {
+				await this.#projectPanel.importFiles(fileList);
+				this.log(`파일 ${fileList.length}개를 가져왔다.`);
+			}
+			catch (error) {
+				this.log(`가져오지 못했다: ${error.message}`, "error");
+			}
+		});
+		inputElement.click();
+	}
+
+	//==============================================================================
+	// 씬 뷰와 게임 뷰 바꾸기.
+	//==============================================================================
+	/**
+	 * @param { boolean } isGameView
+	 */
+	setGameView(isGameView) {
+		const scene = this.#scene;
+		if (scene.isGameView() === isGameView) {
+			return;
 		}
-		for (let y = 0; y <= canvasNativeSize.y; y += subGridSize) {
-			graphic.drawLine([Vector2.create(0, y), Vector2.create(canvasNativeSize.x, y)], 0.5);
+		const cameraNode = scene.getCameraNode();
+		if (isGameView) {
+			this.#savedCameraState = { position: cameraNode.getLocalPosition().clone(), scale: cameraNode.getLocalScale().clone() };
 		}
-		graphic.setStrokeColor("rgba(0, 0, 0, 0.08)");
-		for (let x = 0; x <= canvasNativeSize.x; x += gridSize) {
-			graphic.drawLine([Vector2.create(x, 0), Vector2.create(x, canvasNativeSize.y)], 1);
+		scene.setGameView(isGameView);
+		if (isGameView) {
+			scene.frameDocument();
 		}
-		for (let y = 0; y <= canvasNativeSize.y; y += gridSize) {
-			graphic.drawLine([Vector2.create(0, y), Vector2.create(canvasNativeSize.x, y)], 1);
+		else if (this.#savedCameraState !== null) {
+			cameraNode.setLocalPosition(this.#savedCameraState.position);
+			cameraNode.setLocalScale(this.#savedCameraState.scale);
+		}
+		this.#elements.sceneTab.classList.toggle("isActive", !isGameView);
+		this.#elements.gameTab.classList.toggle("isActive", isGameView);
+	}
+
+	//==============================================================================
+	// 화면 틀 크기 묻기.
+	//==============================================================================
+	askFrameSize() {
+		const frameSize = this.#scene.getFrameSize();
+		const answer = System.window.prompt("화면 틀 크기 (가로x세로)", `${frameSize.x}x${frameSize.y}`);
+		const match = answer ? answer.match(/^\s*(\d+)\s*[x×*, ]\s*(\d+)\s*$/) : null;
+		if (match === null) {
+			return;
+		}
+		this.#scene.setFrameSize(Vector2.create(System.Number(match[1]), System.Number(match[2])));
+		this.#scene.frameDocument();
+		this.markDirty();
+	}
+
+	//==============================================================================
+	// 애셋 열기. (두 번 누르기, 씬이면 열고 소리면 들려 준다)
+	//==============================================================================
+	/**
+	 * @param { object } asset
+	 */
+	async openAsset(asset) {
+		if (asset.kind === "scene") {
+			if (this.#isDirty && !System.window.confirm("저장하지 않은 바꾼 것이 있다. 이 씬을 열까?")) {
+				return;
+			}
+			this.loadSceneText(await asset.file.text(), asset.path);
+		}
+		else if (asset.kind === "audio") {
+			new System.Audio(asset.url).play();
+		}
+		else if (asset.kind === "prefab") {
+			const viewSize = this.#engine.getViewManager().getViewSize();
+			this.instantiatePrefab(asset, Vector2.create(viewSize.x * 0.5, viewSize.y * 0.5));
+		}
+		else {
+			this.showAsset(asset);
 		}
 	}
 
 	//==============================================================================
-	// 재생 상태 출력.
+	// 애셋 미리보기. (인스펙터 자리에)
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { object } asset
 	 */
-	drawOnPlayState(graphic) {
-		this.drawBackground(graphic);
-		const viewManager = this.#engine.getViewManager();
-		const canvasNativeSize = viewManager.getCanvasNativeSize();
-		for (const particle of this.#particles) {
-			if (this.#isPlaying && this.#scripting !== null) {
+	async showAsset(asset) {
+		this.#scene.setSelectedNode(null);
+		this.#hierarchyPanel.render(this.#scene.getDocumentRoot(), null);
+		const inspectorBody = this.#elements.inspectorBody;
+		inspectorBody.textContent = "";
+		const previewElement = createElement("div", "assetPreview");
+		const titleElement = createElement("div", "inspectorSectionHeader", asset.name);
+		inspectorBody.append(titleElement, previewElement);
+		const infoLines = [`경로: ${asset.path}`, `종류: ${asset.kind}`, `크기: ${formatByteCount(asset.file.size)}`];
+		if (asset.kind === "image") {
+			const image = this.#projectPanel.readImage(asset.path);
+			if (image !== null) {
+				infoLines.push(`해상도: ${image.naturalWidth} x ${image.naturalHeight}`);
+			}
+			const imageElement = createElement("img");
+			imageElement.src = asset.url;
+			previewElement.append(imageElement);
+			infoLines.push("씬 뷰나 Sprite 의 Image 칸에 끌어다 놓는다.");
+		}
+		else if (asset.kind === "audio") {
+			const audioElement = createElement("audio");
+			audioElement.controls = true;
+			audioElement.src = asset.url;
+			audioElement.style.width = "100%";
+			previewElement.append(audioElement);
+		}
+		else if (asset.kind === "json" || asset.kind === "scene" || asset.kind === "prefab" || asset.kind === "text") {
+			const text = await asset.file.text();
+			const preElement = createElement("pre", "", text.length > 20000 ? `${text.substring(0, 20000)}\n…` : text);
+			previewElement.append(preElement);
+			if (asset.kind === "scene") {
+				infoLines.push("두 번 누르면 씬을 연다.");
+			}
+			else if (asset.kind === "prefab") {
+				infoLines.push("씬 뷰에 끌어다 놓거나 두 번 누르면 꺼낸다.");
+			}
+		}
+		else if (asset.kind === "font") {
+			const fontName = `editorPreview${System.Math.floor(System.Math.random() * 1e9)}`;
+			try {
+				const fontFace = new System.FontFace(fontName, `url(${asset.url})`);
+				await fontFace.load();
+				System.document.fonts.add(fontFace);
+				const sampleElement = createElement("div", "", "가나다라 ABC abc 0123");
+				sampleElement.style.fontFamily = fontName;
+				sampleElement.style.fontSize = "28px";
+				sampleElement.style.padding = "8px 0";
+				previewElement.append(sampleElement);
+			}
+			catch (error) {
+				infoLines.push(`글꼴을 읽지 못했다: ${error.message}`);
+			}
+		}
+		else if (asset.kind === "model") {
+			infoLines.push(...(await this.readModelInfo(asset)));
+			if (asset.name.toLowerCase().endsWith(".glb")) {
+				const previewCanvas = createElement("canvas", "modelPreviewCanvas");
+				previewElement.append(previewCanvas);
 				try {
-					this.#scripting(particle, this.#properties, canvasNativeSize);
+					const modelPreview = new ModelPreview(previewCanvas);
+					const modelInfo = modelPreview.load(await asset.file.arrayBuffer());
+					infoLines.push(`꼭짓점: ${modelInfo.vertexCount}개, 삼각형: ${modelInfo.triangleCount}개`);
+					infoLines.push(`모델 크기: ${modelInfo.size.map((value) => value.toFixed(2)).join(" x ")}`);
+					infoLines.push("미리보기를 끌면 돌아간다.");
 				}
 				catch (error) {
-					this.printConsole("Runtime error:\n" + error.message, true);
-					this.#isPlaying = false;
+					previewCanvas.remove();
+					infoLines.push(`미리보기를 그리지 못했다: ${error.message}`);
 				}
 			}
-			graphic.setFillColor(particle.color);
-			graphic.drawCircle(Vector2.create(particle.x, particle.y), 3);
+		}
+		for (const line of infoLines) {
+			previewElement.append(createElement("div", "fieldLabel", line));
 		}
 	}
 
 	//==============================================================================
-	// 정지 상태 출력.
+	// GLB 정보 읽기. (메시, 노드, 뼈대, 애니메이션 수)
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { object } asset
+	 * @returns { Promise<Array<string>> }
 	 */
-	drawOnStopState(graphic) {
-		this.drawBackground(graphic);
+	async readModelInfo(asset) {
+		if (!asset.name.toLowerCase().endsWith(".glb")) {
+			return [];
+		}
+		try {
+			const arrayBuffer = await asset.file.arrayBuffer();
+			const dataView = new System.DataView(arrayBuffer);
+			const jsonLength = dataView.getUint32(12, true);
+			const jsonText = new System.TextDecoder().decode(new System.Uint8Array(arrayBuffer, 20, jsonLength));
+			const gltf = System.JSON.parse(jsonText);
+			const animationNameList = (gltf.animations || []).map((animation, animationIndex) => animation.name || `#${animationIndex}`);
+			const jointCount = (gltf.skins || []).reduce((total, skin) => total + skin.joints.length, 0);
+			return [
+				`메시: ${(gltf.meshes || []).length}개`,
+				`노드: ${(gltf.nodes || []).length}개`,
+				`뼈: ${jointCount}개`,
+				`애니메이션: ${animationNameList.length > 0 ? animationNameList.join(", ") : "없음"}`,
+			];
+		}
+		catch (error) {
+			return [`GLB 를 읽지 못했다: ${error.message}`];
+		}
 	}
 
 	//==============================================================================
-	// 실행.
+	// 바뀐 표시.
 	//==============================================================================
-	run() {
-		this.initialize();
-		this.#editor.value = this.composeDefaultScript();
-		this.initParticles();
-		this.compileCode();
-		this.#gameView.setDrawEvent(this.drawOnStopState.bind(this));
-		this.updateButtonState("stop");
+	markDirty() {
+		if (!this.#isDirty) {
+			this.#isDirty = true;
+			this.updateStatus();
+		}
+		this.scheduleAutosave();
 	}
 
 	//==============================================================================
-	// 인스펙터 목록 반환.
+	// 자동 보관 예약. (바꾸고 1 초 뒤 브라우저 저장소에, 재생 중에는 남기지 않는다)
 	//==============================================================================
-	getInspectorUI() {
-		return this.#inspector;
+	scheduleAutosave() {
+		System.clearTimeout(this.#autosaveTimer);
+		this.#autosaveTimer = System.setTimeout(() => {
+			if (this.#scene.isPlaying()) {
+				return;
+			}
+			try {
+				const autosaveData = {
+					scenePath: this.#scenePath,
+					isDirty: this.#isDirty,
+					jsonText: this.buildSceneJsonText(),
+				};
+				System.localStorage.setItem(AUTOSAVE_STORAGE_KEY, System.JSON.stringify(autosaveData));
+			}
+			catch (exception) {
+				// 저장소를 쓸 수 없으면(사생활 보호 창, 꽉 참) 자동 보관만 건너뛴다.
+			}
+		}, 1000);
+	}
+
+	//==============================================================================
+	// 자동 보관 되살리기. (있으면 true)
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	restoreAutosave() {
+		let autosaveText = null;
+		try {
+			autosaveText = System.localStorage.getItem(AUTOSAVE_STORAGE_KEY);
+		}
+		catch (exception) {
+			return false;
+		}
+		if (!autosaveText) {
+			return false;
+		}
+		try {
+			const autosaveData = System.JSON.parse(autosaveText);
+			this.loadSceneText(autosaveData.jsonText, autosaveData.scenePath || "");
+			this.#isDirty = autosaveData.isDirty === true;
+			this.log("지난번에 하던 씬을 되살렸다. (브라우저 자동 보관)");
+			return true;
+		}
+		catch (exception) {
+			return false;
+		}
+	}
+
+	//==============================================================================
+	// 패널 모두 다시 짓기.
+	//==============================================================================
+	refreshAll() {
+		const scene = this.#scene;
+		this.#hierarchyPanel.render(scene.getDocumentRoot(), scene.getSelectedNode());
+		this.#inspectorPanel.render(scene.getSelectedNode());
+		this.updateStatus();
+	}
+
+	//==============================================================================
+	// 상태 줄과 씬 제목.
+	//==============================================================================
+	updateStatus() {
+		const elements = this.#elements;
+		const scenePath = this.#scenePath || "Untitled";
+		elements.sceneTitle.textContent = `${scenePath}${this.#isDirty ? " *" : ""}`;
+		System.document.title = `${scenePath}${this.#isDirty ? " *" : ""} - vanilla.js Editor`;
+		let nodeCount = 0;
+		const countNodes = (node) => {
+			for (const childNode of node.getChildren()) {
+				nodeCount += 1;
+				countNodes(childNode);
+			}
+		};
+		if (this.#scene) {
+			countNodes(this.#scene.getDocumentRoot());
+		}
+		const projectName = this.#projectPanel ? this.#projectPanel.getProjectName() : "";
+		const statusList = [
+			projectName !== "" ? `프로젝트: ${projectName}${this.#projectPanel.hasDirectory() ? "" : " (읽기만)"}` : "프로젝트 없음",
+			`노드 ${nodeCount}개`,
+			`되돌리기 ${this.#undoList.length}칸`,
+		];
+		elements.statusBar.textContent = statusList.join("   |   ");
+	}
+
+	//==============================================================================
+	// 씬 뷰 위 글. (배율과 화면 틀)
+	//==============================================================================
+	updateOverlay() {
+		const scene = this.#scene;
+		if (!scene || !scene.getCameraNode()) {
+			return;
+		}
+		const frameSize = scene.getFrameSize();
+		const toolName = { hand: "밀기", move: "옮기기", rotate: "돌리기", scale: "키우기" }[scene.getTool()];
+		this.#elements.sceneOverlay.textContent = `${System.Math.round(scene.getZoom() * 100)}%   ${frameSize.x} x ${frameSize.y}   ${toolName}${scene.isPlaying() ? "   재생 중" : ""}`;
+	}
+
+	//==============================================================================
+	// 콘솔에 적기.
+	//==============================================================================
+	/**
+	 * @param { string } text
+	 * @param { string } level - "log", "warning", "error"
+	 */
+	log(text, level = "log") {
+		const consoleBody = this.#elements.consoleBody;
+		const now = new System.Date();
+		const timeText = `${System.String(now.getHours()).padStart(2, "0")}:${System.String(now.getMinutes()).padStart(2, "0")}:${System.String(now.getSeconds()).padStart(2, "0")}`;
+		const lineElement = createElement("div", "consoleLine" + (level === "warning" ? " isWarning" : (level === "error" ? " isError" : "")), `[${timeText}] ${text}`);
+		consoleBody.append(lineElement);
+		while (consoleBody.childElementCount > CONSOLE_LINE_LIMIT) {
+			consoleBody.firstChild.remove();
+		}
+		consoleBody.scrollTop = consoleBody.scrollHeight;
+		if (level === "error") {
+			this.#elements.consoleTab.style.color = "var(--editor-danger)";
+		}
+	}
+
+	//==============================================================================
+	// 브라우저 콘솔의 경고와 오류도 에디터 콘솔에. (원래 출력은 그대로)
+	//==============================================================================
+	hookConsole() {
+		const originalWarn = System.console.warn.bind(System.console);
+		const originalError = System.console.error.bind(System.console);
+		const formatArguments = (argumentList) => {
+			return argumentList.map((argument) => {
+				if (argument instanceof System.Error) {
+					return argument.stack || argument.message;
+				}
+				return typeof argument === "object" ? System.String(argument) : System.String(argument);
+			}).join(" ");
+		};
+		System.console.warn = (...argumentList) => {
+			originalWarn(...argumentList);
+			this.log(formatArguments(argumentList), "warning");
+		};
+		System.console.error = (...argumentList) => {
+			originalError(...argumentList);
+			this.log(formatArguments(argumentList), "error");
+		};
+		System.window.addEventListener("error", (errorEvent) => {
+			this.log(errorEvent.message, "error");
+		});
+		this.#elements.consoleTab.addEventListener("click", () => {
+			this.#elements.consoleTab.style.color = "";
+		});
+	}
+
+	//==============================================================================
+	// 패널 사이 막대 끌어 크기 바꾸기.
+	//==============================================================================
+	setupSplitters() {
+		const rootElement = this.#elements.rootElement;
+		const sizes = { left: 250, right: 300, bottom: 230 };
+		const applySizes = () => {
+			rootElement.style.gridTemplateColumns = `${sizes.left}px 6px 1fr 6px ${sizes.right}px`;
+			rootElement.style.gridTemplateRows = `26px 34px 1fr 6px ${sizes.bottom}px 22px`;
+		};
+		const attach = (className, update) => {
+			const splitterElement = rootElement.querySelector(className);
+			splitterElement.addEventListener("pointerdown", (pointerEvent) => {
+				splitterElement.setPointerCapture(pointerEvent.pointerId);
+				const moveListener = (moveEvent) => {
+					update(moveEvent);
+					applySizes();
+				};
+				const upListener = () => {
+					splitterElement.removeEventListener("pointermove", moveListener);
+					splitterElement.removeEventListener("pointerup", upListener);
+				};
+				splitterElement.addEventListener("pointermove", moveListener);
+				splitterElement.addEventListener("pointerup", upListener);
+			});
+		};
+		attach(".splitLeft", (moveEvent) => {
+			sizes.left = System.Math.max(140, System.Math.min(600, moveEvent.clientX));
+		});
+		attach(".splitRight", (moveEvent) => {
+			sizes.right = System.Math.max(200, System.Math.min(700, System.window.innerWidth - moveEvent.clientX));
+		});
+		attach(".splitBottom", (moveEvent) => {
+			sizes.bottom = System.Math.max(80, System.Math.min(System.window.innerHeight - 200, System.window.innerHeight - 22 - moveEvent.clientY));
+		});
+	}
+
+	//==============================================================================
+	// 시험용 손잡이. (자동 시험이 에디터 안을 들여다볼 때)
+	//==============================================================================
+	/**
+	 * @returns { object }
+	 */
+	getTestHandles() {
+		return {
+			scene: this.#scene,
+			projectPanel: this.#projectPanel,
+			undoCount: () => this.#undoList.length,
+			redoCount: () => this.#redoList.length,
+			select: (node) => this.select(node),
+			undo: () => this.undo(),
+			redo: () => this.redo(),
+			duplicate: () => this.duplicateSelected(),
+			remove: () => this.deleteSelected(),
+			togglePlay: () => this.togglePlay(),
+			createNode: (presetIndex) => this.createNode(NODE_PRESET_LIST[presetIndex], null),
+			loadSceneText: (jsonText, path) => this.loadSceneText(jsonText, path),
+			saveText: () => UIDocument.toJsonText(this.#scene.getDocumentRoot(), true),
+			showAsset: (asset) => this.showAsset(asset),
+			copy: () => this.copySelected(),
+			paste: () => this.pasteNode(),
+			setGameView: (isGameView) => this.setGameView(isGameView),
+			instantiatePrefab: (asset, position) => this.instantiatePrefab(asset, position),
+		};
 	}
 }
 
 
 //==============================================================================
-// 편집기 실행.
+// 시작.
 //==============================================================================
-applyEditorTheme();
-
 const visualEditor = new VisualEditor();
-setEditorCommandHandler((commandId) => {
-	visualEditor.executeCommand(commandId);
-}, (commandId) => {
-	return false;
-});
 System.visualEditor = visualEditor;
-System.document.title = "vanilla.js - Visual Editor";
-visualEditor.run();
+if (System.document.readyState === "loading") {
+	System.document.addEventListener("DOMContentLoaded", () => {
+		visualEditor.start();
+	});
+}
+else {
+	visualEditor.start();
+}
