@@ -324,7 +324,7 @@ export async function loadUiFontText(text) {
 	if (fontGroups.length === 0 || typeof text !== "string" || text === "") {
 		return;
 	}
-	// 글자마다 굵기마다 그 글자를 그릴 조각(나중에 올린 것부터 보아 범위에 드는 첫 조각)을 모읍다.
+	// 글자마다 굵기마다 그 글자를 그릴 조각(나중에 올린 것부터 보아 범위에 드는 첫 조각)을 모은다.
 	const fontFacesToLoad = new System.Set();
 	for (const character of text) {
 		requestedCharacters.add(character);
