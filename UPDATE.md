@@ -1,6 +1,22 @@
 # 업데이트 기록
 
 # 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- 외계행성 광부 키우기(webgame-rimminer)가 게임 쪽에 따로 만들어 쓰던 범용 기능을 엔진으로 옮긴다. (게임 코드는 건드리지 않았다, 게임은 지금처럼 자기 것을 쓴다)
+- ShaderWarmer: 셰이더 미리 링크. 켤 때 같은 소스를 KHR_parallel_shader_compile 로 뒤에서 링크해 브라우저 프로그램 캐시에 남겨, 나중에 ShaderProgram 이 같은 소스를 지을 때 주 스레드가 멈추지 않게 한다. 확장이 없으면 아무것도 하지 않는다. 매 프레임 update(), isFinished(), isSupported(). 어트리뷰트 위치는 ShaderProgram 과 같은 attributeLocationTable 로 준다
+- Outline: 테만 그리는 컴포넌트. (Paint 는 속을 채우기만 한다) 둥근 네모 테(setRoundSize) 또는 동그라미 테(setCircle), 선은 내용 크기 안쪽에 들어온다. setColor(Color 나 "#rrggbb", "rgba(...)"), setLineWidth
+- UIProgressRing: 진행 고리 컴포넌트. 노드의 꼴(둥근 네모, 둥근 정도가 크기의 반이면 동그라미)을 따라 위 가운데에서 시계 방향으로 채운 몫(setRatio)만큼 채운 색, 나머지는 바탕 색으로 그린다. 둘레의 점은 크기, 둥근 정도, 굵기가 바뀔 때만 셈한다
+- UIHitArea: 누르는 자리 넓히기. UIHitArea.attach(buttonNode, minimumSize) 로 단추 바로 뒤 형제로 투명한 누름 자리를 두어 가로세로를 minimumSize 이상으로 넓힌다. 넓힌 몫을 누르면 단추의 클릭 알림을 부르고, 단추가 꺼지거나 누를 수 없으면 따른다. 단추의 자리, 크기, 피봇을 프레임마다 따라간다. setClipNode 로 넓힌 몫을 창이나 스크롤 칸 안으로 자를 수 있다
+- FrameProbe: 처지는 기기 가리기. 기다리는 초 뒤 재는 초 동안 프레임 간격을 보아, 목표 간격의 1.4 배를 넘긴 프레임이 25% 이상이면 처지는 기기다. (90 Hz 화면의 60 FPS 처럼 늘 한 장 걸러 그리는 것은 처진 것으로 보지 않는다) restart, measureAgain, 값은 setSeconds, setSlowFrameThreshold 로 바꾼다
+- PointerCursor: 마우스 커서. 켜면(PointerCursor.getInstance().setEnabled(true)) 엔진이 프레임 끝마다 캔버스의 커서를 정한다. UIButton 위(누르는 중 포함)면 단추의 커서(처음은 pointer), 아니면 setScreenCursor 로 정한 커서다. registerImageCursor 로 1 배와 2 배 그림 커서를 더한다. 손가락 기기에서는 건드리지 않는다. 꺼져 있으면(기본) 지금까지와 같다
+- UIButton: 마우스가 올라 있거나 누르는 중이면 PointerCursor 에 알린다. (PointerCursor 가 꺼져 있으면 아무 일도 없다)
+- Engine: 프레임 끝(묶어 그리기를 그린 뒤)에 PointerCursor.apply() 를 부른다
+- Platform: isDesktopWeb() (모바일이 아니고, 손가락 입력이 여럿 되는 맥인 아이패드도 아님), isCoarsePointer() (CSS pointer: coarse)
+- ViewManager: getCssPixelScale(). 뷰 한 단위가 화면에서 몇 CSS 픽셀인지. (작은 화면에서 UI 층만 키울 배율을 셈할 때 쓴다)
+- SoftShade, SoftShadeShape: 부드러운 그늘 컴포넌트. 글 뒤를 어둡게 눌러 밝은 바탕 위에서도 읽히게 한다. 띠(가운데가 가장 짙고 위아래와 양옆으로 엷어짐) 또는 바닥(아래가 가장 짙은 세로 그라데이션)을 작은 캔버스에 구워 내용 크기로 늘려 그린다. 크기, 모양, 색, 짙기가 바뀔 때만 다시 굽는다
+- ShadowText: 그림자를 깐 한 줄 글 컴포넌트. 그림자 위에 글을 얹은 모습을 캔버스 한 장에 구워 그리므로 노드의 불투명도가 글과 그림자에 한 장째로 먹는다. (Text 두 벌로 깔면 흐리게 할 때 밑의 그림자가 비친다) 그림자는 번지게(setShadow 의 shadowBlur) 할 수 있고, 넘치면 setFitMinimumRatio 까지 줄여 맞춘다. 가로 정렬과 자리는 Graphic.drawTextEntry 와 같은 셈, 세로는 가운데. setFontFace, setTextDirection
+- ShadowImage: 그림자를 깐 그림 컴포넌트. 그림(또는 setImage(image, imageRect) 로 아틀라스의 조각)을 노드 안에 비를 지켜 가운데로 그리고, 그림의 모양 밑에 그림자를 칠해 한 장으로 굽는다. setImageColor 로 그림을 한 빛으로 칠할 수 있다
+- buildRGBAString(colorText, opacity): "#rrggbb" 와 불투명도로 캔버스의 rgba 색 글을 만든다. (shadowtext.js)
+- CameraGestures: 카메라 손짓. 3D 판이나 지도를 돌리고 밀고 키우는 손짓을 캔버스의 DOM 사건에서 따로 읽는다. 마우스 오른쪽 끌기(가로는 돌리기, 화면 너비가 한 바퀴, 세로는 기울이기, 끌지 않고 떼면 오른쪽 클릭), 가운데 끌기(밀기), 두 손가락(밀기, 오므려 키우기, 문턱을 넘게 비틀면 돌리기). 모인 양은 takePan, takeRotation, takeTilt, takeZoom, getZoomAnchor 로 매 프레임 꺼낸다. 손짓 중이면 isGestureActive. 손가락을 뗀 바로 뒤의 흉내 낸 마우스 사건은 무시한다. setThresholds 로 문턱을 바꾸고 dispose 로 뗀다
 - 렌더링: 노드와 Paint 를 그릴 때 프레임마다 생기던 객체와 드로우 콜마다의 일을 줄인다. 그리는 결과는 같고 부르는 쪽의 사용법도 같다. (아래 벤치 장면과 예제 uishowcase, uisample, spriteeffects, particleeffects, timelineshowcase 를 시계를 고정해 같은 프레임에서 뜨면 화면 픽셀이 고치기 전과 같다) 크롬(헤드리스, 실제 GPU)에서 Paint 로 둥근 사각형을 그리는 노드 8천 개가 움직이는 장면(rustgame-test 의 같은 스펙 비교 벤치)을 같은 때에 재면 그리기가 78.0 ms 에서 13.0 ~ 14.4 ms, 프레임이 90.1 ms 에서 23.9 ~ 26.3 ms 가 되고, 60 FPS 를 지키는 노드 수는 1천에서 4천 ~ 6천이 된다. (한 PC 의 측정, 게임 로직 시간은 그대로다)
 - Graphic.drawRoundRect: 꼭짓점 36 개의 cos / sin 을 모듈을 읽을 때 한 번 구해 둔 표로 셈하고, Vector2 배열을 만들지 않고 고쳐 쓰는 칸에 적은 좌표로 바로 버텍스를 쓴다. (노드마다 프레임마다 삼각함수 72 번, Vector2 36 개, 코너 객체 4 개가 없어진다) 표는 지금까지와 같은 식(엔진 base/math.js 의 cos / sin)으로 구해 꼭짓점 값이 비트까지 같다. buildRoundRectPositions 도 표를 쓴다. (돌려주는 Vector2 배열은 지금처럼 새로 만든다) drawRoundRect 는 이제 buildRoundRectPositions 를 거치지 않는다
 - Graphic: writeRoundRectPositionData(rect, roundSize), drawRoundRectPositionData(color). 라운드 사각형 좌표를 모듈의 칸에 적고, 그 칸으로 채움을 그린다. (drawRoundRect 가 쓴다)

@@ -441,6 +441,24 @@ export class ViewManager extends Object {
 		return this.#viewSize;
 	}
 
+	//==============================================================================
+	// 뷰 한 단위가 화면에서 몇 CSS 픽셀인지 반환. (캔버스의 CSS 높이 / 뷰 높이, 못 재면 1)
+	// - 뷰의 고정된 쪽은 늘 같은 길이라, 작은 화면(포털의 PC iframe 등)에서는 한 단위가 1 CSS 픽셀보다 한참 작아져 글자가 읽히지 않는다.
+	//   UI 층만 키울 배율을 셈할 때 쓴다. (예: 최소 CSS 배율 / 이 값)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getCssPixelScale() {
+		const canvas = this.getCanvas();
+		const viewSize = this.getViewSize();
+		if (!canvas) {
+			return 1;
+		}
+		const canvasHeight = canvas.clientHeight;
+		return viewSize.y > 0 && canvasHeight > 0 ? canvasHeight / viewSize.y : 1;
+	}
+
 	// //==============================================================================
 	// // 화면 전체 영역 반환.
 	// //==============================================================================

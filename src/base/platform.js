@@ -143,6 +143,40 @@ export class Platform extends Object {
 	}
 
 	//==============================================================================
+	// 데스크탑 웹인지 반환. (마우스 휠, 키보드 안내처럼 데스크탑에서만 보일 것을 가릴 때 쓴다)
+	// - 모바일이면 아니다. 아이패드의 사파리는 데스크탑처럼 맥이라고 알리므로, 맥인데 손가락 입력이 여럿 되면 아이패드로 본다.
+	// - 플랫폼 정보를 새로 읽는다.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isDesktopWeb() {
+		this.getPlatformInfo();
+		if (this.isMobile) {
+			return false;
+		}
+		const maxTouchPoints = System.navigator.maxTouchPoints || 0;
+		if (this.platformName === PlatformType.macOS && maxTouchPoints > 1) {
+			return false;
+		}
+		return true;
+	}
+
+	//==============================================================================
+	// 주된 손이 손가락인지 반환. (CSS 의 pointer: coarse, 단축키 안내처럼 마우스로 하는 화면에만 보일 것을 가릴 때 쓴다)
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isCoarsePointer() {
+		if (typeof System.matchMedia !== "function") {
+			return false;
+		}
+		const mediaQueryList = System.matchMedia("(pointer: coarse)");
+		return mediaQueryList.matches;
+	}
+
+	//==============================================================================
 	// 리소스 사용량 반환.
 	//==============================================================================
 	/**

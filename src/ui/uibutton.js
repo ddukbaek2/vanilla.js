@@ -13,6 +13,7 @@ import { Text } from "../core/component/text.js";
 import { Paint } from "../core/component/paint.js";
 import { UIImageView } from "./uiimageview.js";
 import { UILabel } from "./uilabel.js";
+import { PointerCursor } from "../core/pointercursor.js";
 
 
 //==============================================================================
@@ -157,6 +158,13 @@ export class UIButton extends UIControl {
 		}
 		this.updateHoverState();
 		this.updateTintTransition(timeDelta);
+
+		// 마우스가 올라 있거나 누르는 중이면 커서에 알린다. (PointerCursor 가 켜져 있을 때만 커서가 바뀐다)
+		const buttonState = this.getButtonState();
+		if (this.getInteractable() && (buttonState === ButtonState.hover || buttonState === ButtonState.pressed)) {
+			const pointerCursor = PointerCursor.getInstance();
+			pointerCursor.markOverButton();
+		}
 	}
 
 	//==============================================================================

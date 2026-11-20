@@ -16,6 +16,7 @@ import { Rect } from "../base/rect.js";
 import { SceneManager } from "./scenemanager.js";
 import { AudioManager } from "./audiomanager.js";
 import { FontAsset } from "../resource/fontasset.js";
+import { PointerCursor } from "./pointercursor.js";
 
 
 // 최대 FPS 제한에서 제 차례보다 일찍 온 프레임도 처리하는 여유. (밀리초) 주사율의 흔들림 때문에 제 차례보다 조금 일찍 온 프레임을 건너뛰지 않게 한다.
@@ -892,6 +893,10 @@ export class Engine extends Object {
 
 		// 묶어 그리기로 쌓여 남은 것을 그린다.
 		graphic.flushSpriteBatch();
+
+		// 마우스 커서. (켜져 있을 때만 캔버스의 커서를 정한다)
+		const pointerCursor = PointerCursor.getInstance();
+		pointerCursor.apply();
 		
 		// 입력 관련해서 상태 유지가 아닌, 현재 프레임이 끝난 후에는 다음 프레임에서는 상태를 유지하지 않음. (1회성)
 		inputManager.setTouchPressed(false);
