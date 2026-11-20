@@ -11,7 +11,7 @@ import { VERTEX_FLOAT_COUNT, SKIN_FLOAT_COUNT } from "./meshbuilder.js";
 // 전역 상수 목록.
 //==============================================================================
 // 한 모형이 쓰는 뼈대 수의 상한. (셰이더의 유니폼 배열 크기)
-export const TOON_MAXIMUM_JOINTS = 32;
+export const TOON_MAXIMUM_JOINTS = 96;
 
 // 어트리뷰트 자리. (모든 프로그램이 같은 자리를 써서 버텍스 어레이 하나를 함께 쓴다)
 export const TOON_ATTRIBUTE_LOCATIONS = System.Object.freeze({
