@@ -23255,9 +23255,11 @@ html, body {
      */
     preDraw(graphic) {
       const engine = this.getEngine();
-      const viewSize = engine.getViewManager().getViewSize();
+      const viewManager = engine.getViewManager();
+      const viewSize = viewManager.getViewSize();
       const cameraPosition = this.#cameraNode.getLocalPosition();
       const zoom = this.#cameraNode.getLocalScale().x;
+      viewManager.applyViewRect(graphic);
       if (this.#isGameView) {
         graphic.setFillColor(new Color(0.1, 0.1, 0.12, 1));
         graphic.drawRect(Rect.create(0, 0, viewSize.x, viewSize.y));

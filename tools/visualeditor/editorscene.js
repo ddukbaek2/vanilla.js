@@ -168,9 +168,13 @@ export class EditorScene extends Scene {
 	 */
 	preDraw(graphic) {
 		const engine = this.getEngine();
-		const viewSize = engine.getViewManager().getViewSize();
+		const viewManager = engine.getViewManager();
+		const viewSize = viewManager.getViewSize();
 		const cameraPosition = this.#cameraNode.getLocalPosition();
 		const zoom = this.#cameraNode.getLocalScale().x;
+
+		// 뷰 좌표계 적용. (레티나처럼 픽셀 배율이 1 이 아니면 이걸 걸어야 캔버스를 꽉 채운다)
+		viewManager.applyViewRect(graphic);
 		if (this.#isGameView) {
 			graphic.setFillColor(new Color(0.1, 0.1, 0.12, 1));
 			graphic.drawRect(Rect.create(0, 0, viewSize.x, viewSize.y));
