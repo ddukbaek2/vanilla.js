@@ -1,5 +1,5 @@
 //==============================================================================
-// 에디터의 화면 꼴. (유니티처럼 위 메뉴와 도구 막대, 왼쪽 하이어라키, 가운데 씬 뷰, 오른쪽 인스펙터, 아래 프로젝트와 콘솔)
+// 에디터의 화면 꼴. (위 메뉴와 도구 막대, 가운데 도킹 창들, 아래 상태 줄)
 //==============================================================================
 export const EDITOR_STYLE_TEXT = `
 :root {
@@ -30,20 +30,12 @@ html, body {
 	user-select: none;
 }
 .editorRoot {
-	display: grid;
-	grid-template-rows: 26px 34px 1fr 6px 230px 22px;
-	grid-template-columns: 250px 6px 1fr 6px 300px;
-	grid-template-areas:
-		"menu menu menu menu menu"
-		"toolbar toolbar toolbar toolbar toolbar"
-		"hierarchy splitLeft scene splitRight inspector"
-		"splitBottom splitBottom splitBottom splitRight inspector"
-		"bottom bottom bottom splitRight inspector"
-		"status status status status status";
+	display: flex;
+	flex-direction: column;
 	height: 100vh;
 }
 .menuBar {
-	grid-area: menu;
+	flex: 0 0 26px;
 	display: flex;
 	align-items: center;
 	background: var(--editor-panel);
@@ -94,7 +86,7 @@ html, body {
 	margin: 4px 0;
 }
 .toolBar {
-	grid-area: toolbar;
+	flex: 0 0 34px;
 	display: flex;
 	align-items: center;
 	gap: 4px;
@@ -168,39 +160,206 @@ html, body {
 	overflow: auto;
 	min-height: 0;
 }
-.hierarchyPanel {
-	grid-area: hierarchy;
-}
-.scenePanel {
-	grid-area: scene;
-	position: relative;
-}
-.inspectorPanel {
-	grid-area: inspector;
-}
-.bottomPanel {
-	grid-area: bottom;
-}
-.splitter {
+.dockRoot {
+	flex: 1 1 0px;
+	display: flex;
+	min-height: 0;
+	padding: 4px;
 	background: var(--editor-background);
 }
-.splitter:hover {
-	background: var(--editor-accent-dim);
+.dockRoot > * {
+	flex: 1 1 0px;
 }
-.splitLeft {
-	grid-area: splitLeft;
+.dockSplit {
+	display: flex;
+	min-width: 0;
+	min-height: 0;
+}
+.dockSplit.isRow {
+	flex-direction: row;
+}
+.dockSplit.isColumn {
+	flex-direction: column;
+}
+.dockSplitter {
+	flex: 0 0 4px;
+	border-radius: 2px;
+	transition: background 0.12s;
+}
+.dockSplit.isRow > .dockSplitter {
 	cursor: col-resize;
 }
-.splitRight {
-	grid-area: splitRight;
-	cursor: col-resize;
-}
-.splitBottom {
-	grid-area: splitBottom;
+.dockSplit.isColumn > .dockSplitter {
 	cursor: row-resize;
 }
+.dockSplitter:hover, .dockSplitter.isDragging {
+	background: var(--editor-accent);
+}
+.dockGroup {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	background: var(--editor-panel);
+	border: 1px solid var(--editor-border);
+	border-radius: 6px;
+	overflow: hidden;
+}
+.dockTabStrip {
+	display: flex;
+	align-items: stretch;
+	flex: 0 0 28px;
+	background: #202125;
+	border-bottom: 1px solid var(--editor-border);
+	min-width: 0;
+}
+.dockTabList {
+	display: flex;
+	align-items: stretch;
+	min-width: 0;
+	overflow: hidden;
+}
+.dockTab {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 0 10px 0 12px;
+	color: var(--editor-text-dim);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	cursor: default;
+	border-right: 1px solid var(--editor-border);
+	position: relative;
+	white-space: nowrap;
+	transition: background 0.12s, color 0.12s;
+}
+.dockTab:hover {
+	color: var(--editor-text);
+	background: rgba(255, 255, 255, 0.03);
+}
+.dockTab.isActive {
+	color: var(--editor-text);
+	background: var(--editor-panel);
+}
+.dockTab.isActive::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	height: 2px;
+	background: var(--editor-accent);
+}
+.dockTab.isAlert .dockTabTitle {
+	color: var(--editor-danger);
+}
+.dockTabClose {
+	width: 16px;
+	height: 16px;
+	line-height: 15px;
+	text-align: center;
+	border-radius: 3px;
+	font-size: 13px;
+	font-weight: 400;
+	opacity: 0;
+	transition: opacity 0.12s, background 0.12s;
+}
+.dockTab:hover .dockTabClose, .dockTab.isActive .dockTabClose {
+	opacity: 0.6;
+}
+.dockTabClose:hover {
+	opacity: 1 !important;
+	background: rgba(255, 255, 255, 0.12);
+}
+.dockTabTools {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin-left: auto;
+	padding: 0 6px;
+	min-width: 0;
+}
+.dockBody {
+	flex: 1 1 0px;
+	position: relative;
+	min-height: 0;
+	min-width: 0;
+}
+.dockContent {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+}
+.dockIndicator {
+	position: fixed;
+	z-index: 900;
+	pointer-events: none;
+	border: 2px solid var(--editor-accent);
+	border-radius: 6px;
+	background: rgba(76, 141, 255, 0.2);
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+	opacity: 0;
+	transform: scale(0.97);
+	transition: left 0.11s ease-out, top 0.11s ease-out, width 0.11s ease-out, height 0.11s ease-out, opacity 0.1s, transform 0.1s;
+}
+.dockIndicator.isVisible {
+	opacity: 1;
+	transform: scale(1);
+}
+.dockIndicator.isInstant {
+	transition: opacity 0.1s, transform 0.1s;
+}
+.dockTabMarker {
+	position: fixed;
+	z-index: 901;
+	width: 3px;
+	border-radius: 2px;
+	pointer-events: none;
+	background: var(--editor-accent);
+	display: none;
+}
+.dockTabMarker.isVisible {
+	display: block;
+}
+.dockGhost {
+	position: fixed;
+	left: 0;
+	top: 0;
+	z-index: 950;
+	pointer-events: none;
+	padding: 5px 12px;
+	border-radius: 4px;
+	background: var(--editor-panel-raised);
+	border: 1px solid var(--editor-accent);
+	color: var(--editor-text);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+	opacity: 0.92;
+}
+body.isDockDragging, body.isDockDragging * {
+	cursor: grabbing !important;
+}
+.dockEmpty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: 1;
+	color: var(--editor-text-dim);
+	font-size: 12px;
+	text-align: center;
+	padding: 16px;
+	cursor: pointer;
+}
 .statusBar {
-	grid-area: status;
+	flex: 0 0 22px;
 	display: flex;
 	align-items: center;
 	gap: 16px;
@@ -212,7 +371,7 @@ html, body {
 }
 .sceneCanvasHolder {
 	position: absolute;
-	top: 26px;
+	top: 0;
 	left: 0;
 	right: 0;
 	bottom: 0;
@@ -225,7 +384,7 @@ html, body {
 }
 .sceneOverlay {
 	position: absolute;
-	top: 32px;
+	top: 6px;
 	right: 10px;
 	color: var(--editor-text-dim);
 	font-size: 11px;
@@ -497,5 +656,37 @@ html, body {
 	padding: 4px 0;
 	z-index: 200;
 	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.sceneTitleOverlay {
+	position: absolute;
+	top: 6px;
+	left: 10px;
+	color: var(--editor-text-dim);
+	font-size: 11px;
+	pointer-events: none;
+}
+.viewHost {
+	position: relative;
+	flex: 1 1 0px;
+	min-height: 0;
+	background: var(--editor-background);
+}
+.viewPlaceholder {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--editor-text-dim);
+	text-align: center;
+	line-height: 1.7;
+	cursor: pointer;
+}
+.viewPlaceholder:hover {
+	color: var(--editor-text);
+}
+.windowToolButtons {
+	display: flex;
+	gap: 4px;
 }
 `;

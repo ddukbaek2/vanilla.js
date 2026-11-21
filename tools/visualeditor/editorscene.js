@@ -55,6 +55,7 @@ export class EditorScene extends Scene {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { WorldNode } */ #cameraNode;
+	/** @private @type { Vector2 | null } */ #lastViewSize; // 지난 화면 크기. (씬 뷰 가운데 지키기)
 	/** @private @type { WorldNode } */ #documentRoot;
 	/** @private @type { boolean } */ #isPlaying;
 	/** @private @type { WorldNode | null } */ #selectedNode;
@@ -79,6 +80,7 @@ export class EditorScene extends Scene {
 		this.#frameSize = Vector2.create(1280, 720);
 		this.#readyEvent = null;
 		this.#isGameView = false;
+		this.#lastViewSize = null;
 	}
 
 	//==============================================================================
@@ -135,8 +137,22 @@ export class EditorScene extends Scene {
 	 */
 	resize(canvasNativeSize) {
 		super.resize(canvasNativeSize);
+		const engine = this.getEngine();
+		const viewSize = engine ? engine.getViewManager().getViewSize() : canvasNativeSize;
+		const lastViewSize = this.#lastViewSize;
+		this.#lastViewSize = Vector2.create(viewSize.x, viewSize.y);
 		if (this.#isGameView) {
 			this.frameDocument();
+			return;
+		}
+
+		// 씬 뷰는 창 크기가 바뀌어도 보던 가운데를 그대로 가운데에 둔다. (창을 끌어 붙일 때 그림이 밀려나지 않게)
+		if (lastViewSize !== null && lastViewSize.x > 0 && lastViewSize.y > 0 && this.#cameraNode) {
+			const cameraPosition = this.#cameraNode.getLocalPosition();
+			this.#cameraNode.setLocalPosition(Vector2.create(
+				cameraPosition.x + (viewSize.x - lastViewSize.x) * 0.5,
+				cameraPosition.y + (viewSize.y - lastViewSize.y) * 0.5,
+			));
 		}
 	}
 

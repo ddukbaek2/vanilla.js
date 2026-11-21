@@ -9,6 +9,7 @@ import { ProjectPanel, ASSET_DRAG_TYPE } from "./projectpanel.js";
 import { HierarchyPanel } from "./hierarchypanel.js";
 import { InspectorPanel } from "./inspectorpanel.js";
 import { ModelPreview } from "./modelpreview.js";
+import { DockLayout } from "./docklayout.js";
 
 
 //==============================================================================
@@ -25,6 +26,27 @@ const CONSOLE_LINE_LIMIT = 500;
 
 // 지난 작업을 브라우저에 남겨 두는 열쇠. (다시 열면 되살린다)
 const AUTOSAVE_STORAGE_KEY = "vanillaVisualEditor.autosave";
+
+// 창 배치를 브라우저에 남겨 두는 열쇠.
+const DOCK_STORAGE_KEY = "vanillaVisualEditor.dockLayout";
+
+// 처음 창 배치. (하이어라키 왼쪽, 씬과 게임 가운데, 프로젝트와 콘솔 아래, 인스펙터 오른쪽)
+const DEFAULT_DOCK_TREE = {
+	kind: "split", direction: "row", weights: [1150, 320], children: [
+		{
+			kind: "split", direction: "column", weights: [3, 1.15], children: [
+				{
+					kind: "split", direction: "row", weights: [250, 900], children: [
+						{ kind: "group", windowIds: ["hierarchy"], activeId: "hierarchy" },
+						{ kind: "group", windowIds: ["scene", "game"], activeId: "scene" },
+					],
+				},
+				{ kind: "group", windowIds: ["project", "console"], activeId: "project" },
+			],
+		},
+		{ kind: "group", windowIds: ["inspector"], activeId: "inspector" },
+	],
+};
 
 // 새 씬을 저장할 기본 경로.
 const DEFAULT_SCENE_PATH = "scenes/untitled.scene.json";
@@ -102,7 +124,8 @@ function formatByteCount(byteCount) {
 
 //==============================================================================
 // 비주얼 에디터. (유니티처럼 씬을 짓고, 애셋을 다루고, 저장하고, 재생해 본다)
-// - 화면: 위 메뉴와 도구 막대, 왼쪽 하이어라키, 가운데 씬 뷰(엔진 캔버스), 오른쪽 인스펙터, 아래 프로젝트와 콘솔.
+// - 화면: 위 메뉴와 도구 막대 밑에 도킹 창들(Hierarchy, Scene, Game, Inspector, Project, Console).
+//   창 탭을 끌어 다른 창에 탭으로 합치거나 위아래양옆으로 나누어 붙인다. (docklayout.js)
 // - 씬은 UIDocument 형식(.scene.json)으로 저장한다. 게임은 UIDocument.fromJsonText 로 그대로 읽는다.
 //   에디터만 쓰는 값(frameSize)은 같은 JSON 에 함께 둔다. (UIDocument 는 모르는 키를 무시한다)
 // - 되돌리기는 바꾸기 전 문서 전체를 JSON 으로 남기는 방식이다. 고른 노드는 자식 차례 경로로 되찾는다.
@@ -131,6 +154,7 @@ export class VisualEditor {
 	/** @private @type { object | null } */ #clipboardNodeData; // 복사한 노드. (UIDocument.serializeNode 결과)
 	/** @private @type { number } */ #autosaveTimer;
 	/** @private @type { object | null } */ #savedCameraState; // 게임 뷰로 가기 전 씬 뷰 카메라.
+	/** @private @type { DockLayout | null } */ #dockLayout; // 창 도킹 배치.
 
 	//==============================================================================
 	// 생성.
@@ -152,6 +176,7 @@ export class VisualEditor {
 		this.#clipboardNodeData = null;
 		this.#autosaveTimer = 0;
 		this.#savedCameraState = null;
+		this.#dockLayout = null;
 	}
 
 	//==============================================================================
@@ -223,17 +248,20 @@ export class VisualEditor {
 			if (!this.restoreAutosave()) {
 				this.createStarterScene();
 			}
+			this.placeViewCanvas();
 			this.refreshAll();
 			this.log("에디터를 시작했다. File > 프로젝트 폴더 열기로 애셋 폴더를 연다.");
 		});
 		this.#engine.run(this.#scene);
 		const resizeObserver = new System.ResizeObserver(() => {
-			this.#engine.resize();
+			// 가려진 탭에 있으면 크기가 0 이 되므로 그때는 그대로 둔다.
+			if (elements.canvasHolder.clientWidth > 0 && elements.canvasHolder.clientHeight > 0) {
+				this.#engine.resize();
+			}
 		});
 		resizeObserver.observe(elements.canvasHolder);
 		this.setupSceneInput();
 		this.setupKeyboard();
-		this.setupSplitters();
 		System.window.addEventListener("beforeunload", (beforeUnloadEvent) => {
 			if (this.#isDirty) {
 				beforeUnloadEvent.preventDefault();
@@ -245,7 +273,9 @@ export class VisualEditor {
 	}
 
 	//==============================================================================
-	// 화면 짓기.
+	// 화면 짓기. (위 메뉴와 도구 막대, 가운데 도킹 창들, 아래 상태 줄)
+	// - 창마다 내용 요소와 탭 줄 오른쪽 도구 요소를 만들어 도킹 배치에 넘긴다.
+	// - Scene 창과 Game 창은 캔버스 하나를 나누어 쓴다. 고른 쪽으로 캔버스를 옮겨 달고, 다른 쪽에는 안내를 둔다.
 	//==============================================================================
 	/**
 	 * @returns { object }
@@ -254,12 +284,15 @@ export class VisualEditor {
 		const rootElement = createElement("div", "editorRoot");
 		const menuBar = createElement("div", "menuBar");
 		const toolBar = createElement("div", "toolBar");
-		const hierarchyPanel = createElement("div", "panel hierarchyPanel");
-		const hierarchyHeader = createElement("div", "panelHeader", "Hierarchy");
+		const dockRootElement = createElement("div", "dockRoot");
+		const statusBar = createElement("div", "statusBar");
+		rootElement.append(menuBar, toolBar, dockRootElement, statusBar);
+		System.document.body.append(rootElement);
+
+		// Hierarchy.
+		const hierarchyContent = createElement("div", "panel hierarchyPanel");
 		const hierarchyAddButton = createElement("button", "smallButton", "＋");
 		hierarchyAddButton.title = "노드 만들기";
-		hierarchyAddButton.style.marginLeft = "auto";
-		hierarchyHeader.append(hierarchyAddButton);
 		const hierarchySearch = createElement("input", "inspectorNameInput hierarchySearch");
 		hierarchySearch.placeholder = "찾기";
 		hierarchySearch.addEventListener("input", () => {
@@ -269,43 +302,43 @@ export class VisualEditor {
 			keyboardEvent.stopPropagation();
 		});
 		const hierarchyBody = createElement("div", "panelBody");
-		hierarchyPanel.append(hierarchyHeader, hierarchySearch, hierarchyBody);
-		const scenePanel = createElement("div", "panel scenePanel");
-		const sceneHeader = createElement("div", "panelHeader");
-		const sceneTab = createElement("span", "panelTab isActive", "Scene");
-		const gameTab = createElement("span", "panelTab", "Game");
-		sceneTab.addEventListener("click", () => {
-			this.setGameView(false);
+		hierarchyContent.append(hierarchySearch, hierarchyBody);
+		hierarchyAddButton.addEventListener("click", (mouseEvent) => {
+			mouseEvent.stopPropagation();
+			const buttonRect = hierarchyAddButton.getBoundingClientRect();
+			this.showNodeContextMenu(null, buttonRect.left, buttonRect.bottom);
 		});
-		gameTab.addEventListener("click", () => {
-			this.setGameView(true);
-		});
-		sceneHeader.append(sceneTab, gameTab);
-		const sceneTitle = createElement("span", "", "");
-		sceneTitle.style.textTransform = "none";
-		sceneTitle.style.fontWeight = "400";
-		sceneHeader.append(sceneTitle);
+
+		// Scene 과 Game. (캔버스 하나를 나누어 쓴다)
 		const canvasHolder = createElement("div", "sceneCanvasHolder");
 		const canvasElement = createElement("canvas");
 		canvasElement.id = "editorCanvas";
 		canvasElement.tabIndex = 0;
-		canvasHolder.append(canvasElement);
+		const sceneTitle = createElement("div", "sceneTitleOverlay");
 		const sceneOverlay = createElement("div", "sceneOverlay");
-		scenePanel.append(sceneHeader, canvasHolder, sceneOverlay);
-		const inspectorPanel = createElement("div", "panel inspectorPanel");
+		canvasHolder.append(canvasElement, sceneTitle, sceneOverlay);
+		const viewHostTable = {};
+		for (const windowId of ["scene", "game"]) {
+			const viewContent = createElement("div", `panel ${windowId}ViewPanel`);
+			const viewHost = createElement("div", "viewHost");
+			const placeholder = createElement("div", "viewPlaceholder", windowId === "scene" ? "씬 뷰는 지금 Game 창에 있다.\n누르면 여기로 옮긴다." : "게임 뷰는 지금 Scene 창에 있다.\n누르면 여기로 옮긴다.");
+			placeholder.style.whiteSpace = "pre-line";
+			placeholder.addEventListener("click", () => {
+				this.setGameView(windowId === "game");
+			});
+			viewHost.append(placeholder);
+			viewContent.append(viewHost);
+			viewHostTable[windowId] = { content: viewContent, host: viewHost, placeholder };
+		}
+
+		// Inspector.
+		const inspectorContent = createElement("div", "panel inspectorPanel");
 		const inspectorBody = createElement("div", "panelBody");
-		inspectorPanel.append(createElement("div", "panelHeader", "Inspector"), inspectorBody);
-		const bottomPanel = createElement("div", "panel bottomPanel");
-		const bottomHeader = createElement("div", "panelHeader");
-		const projectTab = createElement("span", "panelTab isActive", "Project");
-		const consoleTab = createElement("span", "panelTab", "Console");
-		const consoleClearButton = createElement("button", "smallButton", "지우기");
-		consoleClearButton.style.marginLeft = "auto";
-		consoleClearButton.style.display = "none";
-		const projectButtons = createElement("span", "projectButtons");
-		projectButtons.style.marginLeft = "auto";
-		projectButtons.style.display = "flex";
-		projectButtons.style.gap = "4px";
+		inspectorContent.append(inspectorBody);
+
+		// Project.
+		const projectContent = createElement("div", "panel projectPanel");
+		const projectButtons = createElement("div", "windowToolButtons");
 		const openFolderButton = createElement("button", "smallButton", "폴더 열기");
 		openFolderButton.addEventListener("click", () => {
 			this.openProjectFolder();
@@ -320,51 +353,92 @@ export class VisualEditor {
 			this.#projectPanel.rescan();
 		});
 		projectButtons.append(openFolderButton, importButton, rescanButton);
-		bottomHeader.append(projectTab, consoleTab, projectButtons, consoleClearButton);
 		const projectBody = createElement("div", "panelBody projectBody");
 		const projectFolders = createElement("div", "projectFolders");
 		const projectAssets = createElement("div", "projectAssets");
 		projectBody.append(projectFolders, projectAssets);
-		const consoleBody = createElement("div", "panelBody consoleBody");
-		consoleBody.style.display = "none";
-		bottomPanel.append(bottomHeader, projectBody, consoleBody);
-		const splitLeft = createElement("div", "splitter splitLeft");
-		const splitRight = createElement("div", "splitter splitRight");
-		const splitBottom = createElement("div", "splitter splitBottom");
-		const statusBar = createElement("div", "statusBar");
-		rootElement.append(menuBar, toolBar, hierarchyPanel, splitLeft, scenePanel, splitRight, inspectorPanel, splitBottom, bottomPanel, statusBar);
-		System.document.body.append(rootElement);
+		projectContent.append(projectBody);
 
-		// 아래 패널 탭.
-		const selectTab = (isProject) => {
-			projectTab.classList.toggle("isActive", isProject);
-			consoleTab.classList.toggle("isActive", !isProject);
-			projectBody.style.display = isProject ? "" : "none";
-			consoleBody.style.display = isProject ? "none" : "";
-			consoleClearButton.style.display = isProject ? "none" : "";
-			projectButtons.style.display = isProject ? "flex" : "none";
-		};
-		projectTab.addEventListener("click", () => {
-			selectTab(true);
-		});
-		consoleTab.addEventListener("click", () => {
-			selectTab(false);
-		});
+		// Console.
+		const consoleContent = createElement("div", "panel consolePanel");
+		const consoleClearButton = createElement("button", "smallButton", "지우기");
+		const consoleBody = createElement("div", "panelBody consoleBody");
+		consoleContent.append(consoleBody);
 		consoleClearButton.addEventListener("click", () => {
 			consoleBody.textContent = "";
 		});
-		hierarchyAddButton.addEventListener("click", () => {
-			const buttonRect = hierarchyAddButton.getBoundingClientRect();
-			this.showNodeContextMenu(null, buttonRect.left, buttonRect.bottom);
-		});
+
 		const elements = {
-			rootElement, menuBar, toolBar, hierarchyBody, sceneTitle, canvasHolder, canvasElement, sceneOverlay,
-			inspectorBody, projectFolders, projectAssets, consoleBody, consoleTab, statusBar, toolButtons: {}, playButton: null,
-			sceneTab, gameTab,
+			rootElement, menuBar, toolBar, dockRootElement, hierarchyBody, sceneTitle, canvasHolder, canvasElement, sceneOverlay,
+			inspectorBody, projectFolders, projectAssets, consoleBody, statusBar, toolButtons: {}, playButton: null,
+			viewHostTable, viewWindowId: "",
 		};
+		this.#elements = elements;
+
+		// 도킹 배치. (처음 모양은 하이어라키 왼쪽, 씬 가운데, 인스펙터 오른쪽, 프로젝트와 콘솔 아래)
+		const windowList = [
+			{ id: "hierarchy", title: "Hierarchy", contentElement: hierarchyContent, toolElement: hierarchyAddButton, homeSide: "left" },
+			{ id: "scene", title: "Scene", contentElement: viewHostTable.scene.content, isClosable: false, homeSide: "center" },
+			{ id: "game", title: "Game", contentElement: viewHostTable.game.content, homeSide: "center", homeNeighborId: "scene" },
+			{ id: "inspector", title: "Inspector", contentElement: inspectorContent, homeSide: "right" },
+			{ id: "project", title: "Project", contentElement: projectContent, toolElement: projectButtons, homeSide: "bottom", homeNeighborId: "console" },
+			{ id: "console", title: "Console", contentElement: consoleContent, toolElement: consoleClearButton, homeSide: "bottom", homeNeighborId: "project" },
+		];
+		this.#dockLayout = new DockLayout(dockRootElement, windowList, DEFAULT_DOCK_TREE, DOCK_STORAGE_KEY, {
+			activate: (windowId) => {
+				if (windowId === "scene" || windowId === "game") {
+					this.attachViewCanvas(windowId);
+				}
+			},
+			rendered: () => {
+				this.placeViewCanvas();
+			},
+		});
+		this.#dockLayout.render();
 		this.buildMenu(menuBar);
 		this.buildToolBar(toolBar, elements);
 		return elements;
+	}
+
+	//==============================================================================
+	// 캔버스를 둘 창 정하기. (지금 단 창이 가려졌는데 다른 쪽이 보이면 그쪽으로 옮긴다)
+	//==============================================================================
+	placeViewCanvas() {
+		const elements = this.#elements;
+		const dockLayout = this.#dockLayout;
+		if (!elements || !dockLayout) {
+			return;
+		}
+		let windowId = elements.viewWindowId || "scene";
+		if (!dockLayout.isWindowOpen(windowId)) {
+			windowId = "scene";
+		}
+		const otherId = windowId === "scene" ? "game" : "scene";
+		if (!dockLayout.isWindowVisible(windowId) && dockLayout.isWindowVisible(otherId)) {
+			windowId = otherId;
+		}
+		this.attachViewCanvas(windowId);
+	}
+
+	//==============================================================================
+	// 캔버스를 Scene 창이나 Game 창에 달기. (게임 뷰 여부도 맞춘다)
+	//==============================================================================
+	/**
+	 * @param { string } windowId scene, game
+	 */
+	attachViewCanvas(windowId) {
+		const elements = this.#elements;
+		const viewHostTable = elements.viewHostTable;
+		const host = viewHostTable[windowId].host;
+		if (elements.canvasHolder.parentElement !== host) {
+			host.append(elements.canvasHolder);
+		}
+		viewHostTable.scene.placeholder.style.display = windowId === "scene" ? "none" : "";
+		viewHostTable.game.placeholder.style.display = windowId === "game" ? "none" : "";
+		elements.viewWindowId = windowId;
+		if (this.#scene) {
+			this.applyGameView(windowId === "game");
+		}
 	}
 
 	//==============================================================================
@@ -413,6 +487,18 @@ export class VisualEditor {
 					{ label: "고른 노드로", shortcut: "F", run: () => this.#scene.frameSelected() },
 					null,
 					{ label: "화면 틀 크기", shortcut: "", run: () => this.askFrameSize() },
+				],
+			},
+			{
+				title: "Window", commands: [
+					{ label: "Hierarchy", shortcut: "", run: () => this.#dockLayout.activateWindow("hierarchy") },
+					{ label: "Scene", shortcut: "", run: () => this.setGameView(false) },
+					{ label: "Game", shortcut: "", run: () => this.setGameView(true) },
+					{ label: "Inspector", shortcut: "", run: () => this.#dockLayout.activateWindow("inspector") },
+					{ label: "Project", shortcut: "", run: () => this.#dockLayout.activateWindow("project") },
+					{ label: "Console", shortcut: "", run: () => this.#dockLayout.activateWindow("console") },
+					null,
+					{ label: "창 배치 되돌리기", shortcut: "", run: () => this.#dockLayout.resetLayout() },
 				],
 			},
 		];
@@ -1505,6 +1591,18 @@ export class VisualEditor {
 	 * @param { boolean } isGameView
 	 */
 	setGameView(isGameView) {
+		const windowId = isGameView ? "game" : "scene";
+		this.#dockLayout.activateWindow(windowId);
+		this.attachViewCanvas(windowId);
+	}
+
+	//==============================================================================
+	// 씬 카메라를 게임 뷰나 씬 뷰로. (게임 뷰는 화면 틀을 꽉 채우고, 씬 뷰로 오면 전 카메라로 되돌린다)
+	//==============================================================================
+	/**
+	 * @param { boolean } isGameView
+	 */
+	applyGameView(isGameView) {
 		const scene = this.#scene;
 		if (scene.isGameView() === isGameView) {
 			return;
@@ -1521,8 +1619,6 @@ export class VisualEditor {
 			cameraNode.setLocalPosition(this.#savedCameraState.position);
 			cameraNode.setLocalScale(this.#savedCameraState.scale);
 		}
-		this.#elements.sceneTab.classList.toggle("isActive", !isGameView);
-		this.#elements.gameTab.classList.toggle("isActive", isGameView);
 	}
 
 	//==============================================================================
@@ -1808,8 +1904,8 @@ export class VisualEditor {
 			consoleBody.firstChild.remove();
 		}
 		consoleBody.scrollTop = consoleBody.scrollHeight;
-		if (level === "error") {
-			this.#elements.consoleTab.style.color = "var(--editor-danger)";
+		if (level === "error" && this.#dockLayout !== null) {
+			this.#dockLayout.setWindowAlert("console", true);
 		}
 	}
 
@@ -1838,46 +1934,6 @@ export class VisualEditor {
 		System.window.addEventListener("error", (errorEvent) => {
 			this.log(errorEvent.message, "error");
 		});
-		this.#elements.consoleTab.addEventListener("click", () => {
-			this.#elements.consoleTab.style.color = "";
-		});
-	}
-
-	//==============================================================================
-	// 패널 사이 막대 끌어 크기 바꾸기.
-	//==============================================================================
-	setupSplitters() {
-		const rootElement = this.#elements.rootElement;
-		const sizes = { left: 250, right: 300, bottom: 230 };
-		const applySizes = () => {
-			rootElement.style.gridTemplateColumns = `${sizes.left}px 6px 1fr 6px ${sizes.right}px`;
-			rootElement.style.gridTemplateRows = `26px 34px 1fr 6px ${sizes.bottom}px 22px`;
-		};
-		const attach = (className, update) => {
-			const splitterElement = rootElement.querySelector(className);
-			splitterElement.addEventListener("pointerdown", (pointerEvent) => {
-				splitterElement.setPointerCapture(pointerEvent.pointerId);
-				const moveListener = (moveEvent) => {
-					update(moveEvent);
-					applySizes();
-				};
-				const upListener = () => {
-					splitterElement.removeEventListener("pointermove", moveListener);
-					splitterElement.removeEventListener("pointerup", upListener);
-				};
-				splitterElement.addEventListener("pointermove", moveListener);
-				splitterElement.addEventListener("pointerup", upListener);
-			});
-		};
-		attach(".splitLeft", (moveEvent) => {
-			sizes.left = System.Math.max(140, System.Math.min(600, moveEvent.clientX));
-		});
-		attach(".splitRight", (moveEvent) => {
-			sizes.right = System.Math.max(200, System.Math.min(700, System.window.innerWidth - moveEvent.clientX));
-		});
-		attach(".splitBottom", (moveEvent) => {
-			sizes.bottom = System.Math.max(80, System.Math.min(System.window.innerHeight - 200, System.window.innerHeight - 22 - moveEvent.clientY));
-		});
 	}
 
 	//==============================================================================
@@ -1905,6 +1961,7 @@ export class VisualEditor {
 			copy: () => this.copySelected(),
 			paste: () => this.pasteNode(),
 			setGameView: (isGameView) => this.setGameView(isGameView),
+			dockLayout: this.#dockLayout,
 			instantiatePrefab: (asset, position) => this.instantiatePrefab(asset, position),
 		};
 	}

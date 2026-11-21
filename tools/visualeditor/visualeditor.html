@@ -22632,20 +22632,12 @@ html, body {
 	user-select: none;
 }
 .editorRoot {
-	display: grid;
-	grid-template-rows: 26px 34px 1fr 6px 230px 22px;
-	grid-template-columns: 250px 6px 1fr 6px 300px;
-	grid-template-areas:
-		"menu menu menu menu menu"
-		"toolbar toolbar toolbar toolbar toolbar"
-		"hierarchy splitLeft scene splitRight inspector"
-		"splitBottom splitBottom splitBottom splitRight inspector"
-		"bottom bottom bottom splitRight inspector"
-		"status status status status status";
+	display: flex;
+	flex-direction: column;
 	height: 100vh;
 }
 .menuBar {
-	grid-area: menu;
+	flex: 0 0 26px;
 	display: flex;
 	align-items: center;
 	background: var(--editor-panel);
@@ -22696,7 +22688,7 @@ html, body {
 	margin: 4px 0;
 }
 .toolBar {
-	grid-area: toolbar;
+	flex: 0 0 34px;
 	display: flex;
 	align-items: center;
 	gap: 4px;
@@ -22770,39 +22762,206 @@ html, body {
 	overflow: auto;
 	min-height: 0;
 }
-.hierarchyPanel {
-	grid-area: hierarchy;
-}
-.scenePanel {
-	grid-area: scene;
-	position: relative;
-}
-.inspectorPanel {
-	grid-area: inspector;
-}
-.bottomPanel {
-	grid-area: bottom;
-}
-.splitter {
+.dockRoot {
+	flex: 1 1 0px;
+	display: flex;
+	min-height: 0;
+	padding: 4px;
 	background: var(--editor-background);
 }
-.splitter:hover {
-	background: var(--editor-accent-dim);
+.dockRoot > * {
+	flex: 1 1 0px;
 }
-.splitLeft {
-	grid-area: splitLeft;
+.dockSplit {
+	display: flex;
+	min-width: 0;
+	min-height: 0;
+}
+.dockSplit.isRow {
+	flex-direction: row;
+}
+.dockSplit.isColumn {
+	flex-direction: column;
+}
+.dockSplitter {
+	flex: 0 0 4px;
+	border-radius: 2px;
+	transition: background 0.12s;
+}
+.dockSplit.isRow > .dockSplitter {
 	cursor: col-resize;
 }
-.splitRight {
-	grid-area: splitRight;
-	cursor: col-resize;
-}
-.splitBottom {
-	grid-area: splitBottom;
+.dockSplit.isColumn > .dockSplitter {
 	cursor: row-resize;
 }
+.dockSplitter:hover, .dockSplitter.isDragging {
+	background: var(--editor-accent);
+}
+.dockGroup {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	background: var(--editor-panel);
+	border: 1px solid var(--editor-border);
+	border-radius: 6px;
+	overflow: hidden;
+}
+.dockTabStrip {
+	display: flex;
+	align-items: stretch;
+	flex: 0 0 28px;
+	background: #202125;
+	border-bottom: 1px solid var(--editor-border);
+	min-width: 0;
+}
+.dockTabList {
+	display: flex;
+	align-items: stretch;
+	min-width: 0;
+	overflow: hidden;
+}
+.dockTab {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 0 10px 0 12px;
+	color: var(--editor-text-dim);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	cursor: default;
+	border-right: 1px solid var(--editor-border);
+	position: relative;
+	white-space: nowrap;
+	transition: background 0.12s, color 0.12s;
+}
+.dockTab:hover {
+	color: var(--editor-text);
+	background: rgba(255, 255, 255, 0.03);
+}
+.dockTab.isActive {
+	color: var(--editor-text);
+	background: var(--editor-panel);
+}
+.dockTab.isActive::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	height: 2px;
+	background: var(--editor-accent);
+}
+.dockTab.isAlert .dockTabTitle {
+	color: var(--editor-danger);
+}
+.dockTabClose {
+	width: 16px;
+	height: 16px;
+	line-height: 15px;
+	text-align: center;
+	border-radius: 3px;
+	font-size: 13px;
+	font-weight: 400;
+	opacity: 0;
+	transition: opacity 0.12s, background 0.12s;
+}
+.dockTab:hover .dockTabClose, .dockTab.isActive .dockTabClose {
+	opacity: 0.6;
+}
+.dockTabClose:hover {
+	opacity: 1 !important;
+	background: rgba(255, 255, 255, 0.12);
+}
+.dockTabTools {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin-left: auto;
+	padding: 0 6px;
+	min-width: 0;
+}
+.dockBody {
+	flex: 1 1 0px;
+	position: relative;
+	min-height: 0;
+	min-width: 0;
+}
+.dockContent {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+}
+.dockIndicator {
+	position: fixed;
+	z-index: 900;
+	pointer-events: none;
+	border: 2px solid var(--editor-accent);
+	border-radius: 6px;
+	background: rgba(76, 141, 255, 0.2);
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+	opacity: 0;
+	transform: scale(0.97);
+	transition: left 0.11s ease-out, top 0.11s ease-out, width 0.11s ease-out, height 0.11s ease-out, opacity 0.1s, transform 0.1s;
+}
+.dockIndicator.isVisible {
+	opacity: 1;
+	transform: scale(1);
+}
+.dockIndicator.isInstant {
+	transition: opacity 0.1s, transform 0.1s;
+}
+.dockTabMarker {
+	position: fixed;
+	z-index: 901;
+	width: 3px;
+	border-radius: 2px;
+	pointer-events: none;
+	background: var(--editor-accent);
+	display: none;
+}
+.dockTabMarker.isVisible {
+	display: block;
+}
+.dockGhost {
+	position: fixed;
+	left: 0;
+	top: 0;
+	z-index: 950;
+	pointer-events: none;
+	padding: 5px 12px;
+	border-radius: 4px;
+	background: var(--editor-panel-raised);
+	border: 1px solid var(--editor-accent);
+	color: var(--editor-text);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+	opacity: 0.92;
+}
+body.isDockDragging, body.isDockDragging * {
+	cursor: grabbing !important;
+}
+.dockEmpty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: 1;
+	color: var(--editor-text-dim);
+	font-size: 12px;
+	text-align: center;
+	padding: 16px;
+	cursor: pointer;
+}
 .statusBar {
-	grid-area: status;
+	flex: 0 0 22px;
 	display: flex;
 	align-items: center;
 	gap: 16px;
@@ -22814,7 +22973,7 @@ html, body {
 }
 .sceneCanvasHolder {
 	position: absolute;
-	top: 26px;
+	top: 0;
 	left: 0;
 	right: 0;
 	bottom: 0;
@@ -22827,7 +22986,7 @@ html, body {
 }
 .sceneOverlay {
 	position: absolute;
-	top: 32px;
+	top: 6px;
 	right: 10px;
 	color: var(--editor-text-dim);
 	font-size: 11px;
@@ -23100,6 +23259,38 @@ html, body {
 	z-index: 200;
 	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
 }
+.sceneTitleOverlay {
+	position: absolute;
+	top: 6px;
+	left: 10px;
+	color: var(--editor-text-dim);
+	font-size: 11px;
+	pointer-events: none;
+}
+.viewHost {
+	position: relative;
+	flex: 1 1 0px;
+	min-height: 0;
+	background: var(--editor-background);
+}
+.viewPlaceholder {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--editor-text-dim);
+	text-align: center;
+	line-height: 1.7;
+	cursor: pointer;
+}
+.viewPlaceholder:hover {
+	color: var(--editor-text);
+}
+.windowToolButtons {
+	display: flex;
+	gap: 4px;
+}
 `;
 
   // tools/visualeditor/editorscene.js
@@ -23141,6 +23332,9 @@ html, body {
     //==============================================================================
     /** @private @type { WorldNode } */
     #cameraNode;
+    /** @private @type { Vector2 | null } */
+    #lastViewSize;
+    // 지난 화면 크기. (씬 뷰 가운데 지키기)
     /** @private @type { WorldNode } */
     #documentRoot;
     /** @private @type { boolean } */
@@ -23173,6 +23367,7 @@ html, body {
       this.#frameSize = Vector2.create(1280, 720);
       this.#readyEvent = null;
       this.#isGameView = false;
+      this.#lastViewSize = null;
     }
     //==============================================================================
     // 생성. (카메라 노드와 문서 루트)
@@ -23225,8 +23420,20 @@ html, body {
      */
     resize(canvasNativeSize) {
       super.resize(canvasNativeSize);
+      const engine = this.getEngine();
+      const viewSize = engine ? engine.getViewManager().getViewSize() : canvasNativeSize;
+      const lastViewSize = this.#lastViewSize;
+      this.#lastViewSize = Vector2.create(viewSize.x, viewSize.y);
       if (this.#isGameView) {
         this.frameDocument();
+        return;
+      }
+      if (lastViewSize !== null && lastViewSize.x > 0 && lastViewSize.y > 0 && this.#cameraNode) {
+        const cameraPosition = this.#cameraNode.getLocalPosition();
+        this.#cameraNode.setLocalPosition(Vector2.create(
+          cameraPosition.x + (viewSize.x - lastViewSize.x) * 0.5,
+          cameraPosition.y + (viewSize.y - lastViewSize.y) * 0.5
+        ));
       }
     }
     //==============================================================================
@@ -25192,12 +25399,1038 @@ html, body {
     }
   };
 
-  // tools/visualeditor/visualeditor.js
+  // tools/visualeditor/docklayout.js
   var System50 = globalThis;
+  var DRAG_START_DISTANCE = 6;
+  var EDGE_ZONE_RATIO = 0.3;
+  var ROOT_EDGE_PIXELS = 18;
+  var ROOT_EDGE_RATIO = 0.25;
+  var MINIMUM_GROUP_PIXELS = 90;
+  var SIDE_DIRECTION_TABLE = {
+    left: "row",
+    right: "row",
+    top: "column",
+    bottom: "column"
+  };
+  function createElement(tagName, className = "", text = "") {
+    const element = System50.document.createElement(tagName);
+    if (className !== "") {
+      element.className = className;
+    }
+    if (text !== "") {
+      element.textContent = text;
+    }
+    return element;
+  }
+  __name(createElement, "createElement");
+  function cloneTree(node) {
+    return System50.JSON.parse(System50.JSON.stringify(node));
+  }
+  __name(cloneTree, "cloneTree");
+  var DockLayout = class {
+    static {
+      __name(this, "DockLayout");
+    }
+    //==============================================================================
+    // 멤버 변수 목록.
+    //==============================================================================
+    /** @private @type { HTMLElement } */
+    #rootElement;
+    /** @private @type { Map<string, object> } */
+    #windowTable;
+    // 이름 → { id, title, contentElement, toolElement, isClosable, homeSide, homeNeighborId }
+    /** @private @type { object } */
+    #defaultTree;
+    /** @private @type { object } */
+    #tree;
+    /** @private @type { Map<string, string> } */
+    #closedNeighborTable;
+    // 닫은 창 → 닫을 때 같은 묶음에 있던 창.
+    /** @private @type { object | null } */
+    #maximizedGroup;
+    /** @private @type { Set<string> } */
+    #alertSet;
+    // 탭에 빨간 표시를 할 창.
+    /** @private @type { string } */
+    #storageKey;
+    /** @private @type { object } */
+    #callbacks;
+    // { activate(id), rendered() }
+    /** @private @type { HTMLElement } */
+    #indicatorElement;
+    // 놓을 자리 칸.
+    /** @private @type { HTMLElement } */
+    #markerElement;
+    // 탭 사이 넣을 자리 막대.
+    /** @private @type { HTMLElement | null } */
+    #ghostElement;
+    // 끄는 탭 그림자.
+    /** @private @type { Map<object, HTMLElement> } */
+    #groupElementTable;
+    // 묶음 → 그린 요소.
+    //==============================================================================
+    // 생성.
+    //==============================================================================
+    /**
+     * @constructor
+     * @param { HTMLElement } rootElement
+     * @param { Array<object> } windowList { id, title, contentElement, toolElement?, isClosable?, homeSide?, homeNeighborId? }
+     * @param { object } defaultTree
+     * @param { string } storageKey
+     * @param { object } callbacks
+     */
+    constructor(rootElement, windowList, defaultTree, storageKey, callbacks) {
+      this.#rootElement = rootElement;
+      this.#windowTable = /* @__PURE__ */ new Map();
+      for (const windowItem of windowList) {
+        windowItem.contentElement.classList.add("dockContent");
+        this.#windowTable.set(windowItem.id, {
+          id: windowItem.id,
+          title: windowItem.title,
+          contentElement: windowItem.contentElement,
+          toolElement: windowItem.toolElement || null,
+          isClosable: windowItem.isClosable !== false,
+          homeSide: windowItem.homeSide || "center",
+          homeNeighborId: windowItem.homeNeighborId || ""
+        });
+      }
+      this.#defaultTree = cloneTree(defaultTree);
+      this.#tree = cloneTree(defaultTree);
+      this.#closedNeighborTable = /* @__PURE__ */ new Map();
+      this.#maximizedGroup = null;
+      this.#alertSet = /* @__PURE__ */ new Set();
+      this.#storageKey = storageKey;
+      this.#callbacks = callbacks;
+      this.#indicatorElement = createElement("div", "dockIndicator");
+      this.#markerElement = createElement("div", "dockTabMarker");
+      this.#ghostElement = null;
+      this.#groupElementTable = /* @__PURE__ */ new Map();
+      System50.document.body.append(this.#indicatorElement, this.#markerElement);
+      this.load();
+    }
+    //==============================================================================
+    // 브라우저에 남긴 배치 읽기. (맞지 않으면 기본 배치)
+    //==============================================================================
+    load() {
+      let savedData = null;
+      try {
+        const savedText = System50.localStorage.getItem(this.#storageKey);
+        savedData = savedText ? System50.JSON.parse(savedText) : null;
+      } catch (error) {
+        savedData = null;
+      }
+      if (savedData !== null && this.isValidTree(savedData.tree)) {
+        this.#tree = savedData.tree;
+        this.#closedNeighborTable = new Map(System50.Object.entries(savedData.closedNeighbors || {}));
+      } else {
+        this.#tree = cloneTree(this.#defaultTree);
+        this.#closedNeighborTable = /* @__PURE__ */ new Map();
+      }
+      for (const windowId of this.#windowTable.keys()) {
+        if (this.findGroupOf(windowId) === null && !this.#closedNeighborTable.has(windowId)) {
+          this.placeWindow(windowId);
+        }
+      }
+    }
+    //==============================================================================
+    // 배치 남기기.
+    //==============================================================================
+    save() {
+      try {
+        System50.localStorage.setItem(this.#storageKey, System50.JSON.stringify({
+          tree: this.#tree,
+          closedNeighbors: System50.Object.fromEntries(this.#closedNeighborTable)
+        }));
+      } catch (error) {
+      }
+    }
+    //==============================================================================
+    // 기본 배치로 되돌리기.
+    //==============================================================================
+    resetLayout() {
+      this.#tree = cloneTree(this.#defaultTree);
+      this.#closedNeighborTable = /* @__PURE__ */ new Map();
+      this.#maximizedGroup = null;
+      this.save();
+      this.render();
+    }
+    //==============================================================================
+    // 남긴 나무가 쓸 만한지. (모르는 창, 겹친 창, 빈 묶음이 없어야 한다)
+    //==============================================================================
+    /**
+     * @param { object } tree
+     * @returns { boolean }
+     */
+    isValidTree(tree) {
+      const seenSet = /* @__PURE__ */ new Set();
+      const visit = /* @__PURE__ */ __name((node) => {
+        if (node === null || typeof node !== "object") {
+          return false;
+        }
+        if (node.kind === "group") {
+          if (!System50.Array.isArray(node.windowIds) || node.windowIds.length === 0) {
+            return false;
+          }
+          for (const windowId of node.windowIds) {
+            if (!this.#windowTable.has(windowId) || seenSet.has(windowId)) {
+              return false;
+            }
+            seenSet.add(windowId);
+          }
+          if (!node.windowIds.includes(node.activeId)) {
+            node.activeId = node.windowIds[0];
+          }
+          return true;
+        }
+        if (node.kind === "split") {
+          if (node.direction !== "row" && node.direction !== "column") {
+            return false;
+          }
+          if (!System50.Array.isArray(node.children) || node.children.length === 0) {
+            return false;
+          }
+          if (!System50.Array.isArray(node.weights) || node.weights.length !== node.children.length) {
+            node.weights = node.children.map(() => 1);
+          }
+          return node.children.every(visit);
+        }
+        return false;
+      }, "visit");
+      if (!visit(tree)) {
+        return false;
+      }
+      for (const windowItem of this.#windowTable.values()) {
+        if (!windowItem.isClosable && !seenSet.has(windowItem.id)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    //==============================================================================
+    // 창이 든 묶음과 그 부모 찾기.
+    //==============================================================================
+    /**
+     * @param { string } windowId
+     * @returns { object | null } { group, parent }
+     */
+    findGroupOf(windowId) {
+      let result = null;
+      this.visitGroups((group, parent) => {
+        if (result === null && group.windowIds.includes(windowId)) {
+          result = { group, parent };
+        }
+      });
+      return result;
+    }
+    //==============================================================================
+    // 모든 묶음 돌기.
+    //==============================================================================
+    /**
+     * @param { function } visitor (group, parent)
+     */
+    visitGroups(visitor) {
+      const visit = /* @__PURE__ */ __name((node, parent) => {
+        if (node.kind === "group") {
+          visitor(node, parent);
+          return;
+        }
+        for (const child of node.children) {
+          visit(child, node);
+        }
+      }, "visit");
+      visit(this.#tree, null);
+    }
+    //==============================================================================
+    // 마디의 부모 찾기.
+    //==============================================================================
+    /**
+     * @param { object } targetNode
+     * @returns { object | null }
+     */
+    findParent(targetNode) {
+      const visit = /* @__PURE__ */ __name((node) => {
+        if (node.kind !== "split") {
+          return null;
+        }
+        for (const child of node.children) {
+          if (child === targetNode) {
+            return node;
+          }
+          const found = visit(child);
+          if (found !== null) {
+            return found;
+          }
+        }
+        return null;
+      }, "visit");
+      return visit(this.#tree);
+    }
+    //==============================================================================
+    // 나무에서 창 빼기. (빈 묶음은 없애고, 하나 남은 나누기는 풀고, 같은 방향 나누기는 합친다)
+    //==============================================================================
+    /**
+     * @param { string } windowId
+     */
+    removeWindowFromTree(windowId) {
+      const found = this.findGroupOf(windowId);
+      if (found === null) {
+        return;
+      }
+      const group = found.group;
+      const index = group.windowIds.indexOf(windowId);
+      group.windowIds.splice(index, 1);
+      if (group.activeId === windowId) {
+        group.activeId = group.windowIds[System50.Math.min(index, group.windowIds.length - 1)] || "";
+      }
+      if (this.#maximizedGroup === group && group.windowIds.length === 0) {
+        this.#maximizedGroup = null;
+      }
+      this.#tree = this.normalize(this.#tree) || { kind: "group", windowIds: [], activeId: "" };
+    }
+    //==============================================================================
+    // 나무 정리.
+    //==============================================================================
+    /**
+     * @param { object } node
+     * @returns { object | null }
+     */
+    normalize(node) {
+      if (node.kind === "group") {
+        return node.windowIds.length > 0 ? node : null;
+      }
+      const childList = [];
+      const weightList = [];
+      for (let index = 0; index < node.children.length; ++index) {
+        const child = this.normalize(node.children[index]);
+        if (child === null) {
+          continue;
+        }
+        const weight = node.weights[index];
+        if (child.kind === "split" && child.direction === node.direction) {
+          const childWeightSum = child.weights.reduce((sum, value) => sum + value, 0);
+          for (let childIndex = 0; childIndex < child.children.length; ++childIndex) {
+            childList.push(child.children[childIndex]);
+            weightList.push(weight * child.weights[childIndex] / childWeightSum);
+          }
+          continue;
+        }
+        childList.push(child);
+        weightList.push(weight);
+      }
+      if (childList.length === 0) {
+        return null;
+      }
+      if (childList.length === 1) {
+        return childList[0];
+      }
+      node.children = childList;
+      node.weights = weightList;
+      return node;
+    }
+    //==============================================================================
+    // 묶음 옆에 새 창 묶음 붙이기.
+    //==============================================================================
+    /**
+     * @param { object } targetNode
+     * @param { string } side left, right, top, bottom
+     * @param { string } windowId
+     */
+    splitBeside(targetNode, side, windowId) {
+      const direction = SIDE_DIRECTION_TABLE[side];
+      const isBefore = side === "left" || side === "top";
+      const newGroup = { kind: "group", windowIds: [windowId], activeId: windowId };
+      const parent = this.findParent(targetNode);
+      if (parent !== null && parent.direction === direction) {
+        const index = parent.children.indexOf(targetNode);
+        const halfWeight = parent.weights[index] * 0.5;
+        parent.weights[index] = halfWeight;
+        parent.children.splice(isBefore ? index : index + 1, 0, newGroup);
+        parent.weights.splice(isBefore ? index : index + 1, 0, halfWeight);
+        return;
+      }
+      const split = {
+        kind: "split",
+        direction,
+        children: isBefore ? [newGroup, targetNode] : [targetNode, newGroup],
+        weights: [1, 1]
+      };
+      this.replaceNode(targetNode, split);
+    }
+    //==============================================================================
+    // 도킹 전체 바깥쪽에 새 창 묶음 붙이기.
+    //==============================================================================
+    /**
+     * @param { string } side
+     * @param { string } windowId
+     */
+    splitRoot(side, windowId) {
+      const direction = SIDE_DIRECTION_TABLE[side];
+      const isBefore = side === "left" || side === "top";
+      const newGroup = { kind: "group", windowIds: [windowId], activeId: windowId };
+      const root = this.#tree;
+      if (root.kind === "split" && root.direction === direction) {
+        const weightSum = root.weights.reduce((sum, value) => sum + value, 0);
+        const newWeight = weightSum * ROOT_EDGE_RATIO / (1 - ROOT_EDGE_RATIO);
+        root.children.splice(isBefore ? 0 : root.children.length, 0, newGroup);
+        root.weights.splice(isBefore ? 0 : root.weights.length, 0, newWeight);
+        return;
+      }
+      const restWeight = (1 - ROOT_EDGE_RATIO) / ROOT_EDGE_RATIO;
+      this.#tree = {
+        kind: "split",
+        direction,
+        children: isBefore ? [newGroup, root] : [root, newGroup],
+        weights: isBefore ? [1, restWeight] : [restWeight, 1]
+      };
+    }
+    //==============================================================================
+    // 마디 갈아 끼우기.
+    //==============================================================================
+    /**
+     * @param { object } oldNode
+     * @param { object } newNode
+     */
+    replaceNode(oldNode, newNode) {
+      if (this.#tree === oldNode) {
+        this.#tree = newNode;
+        return;
+      }
+      const parent = this.findParent(oldNode);
+      if (parent !== null) {
+        parent.children[parent.children.indexOf(oldNode)] = newNode;
+      }
+    }
+    //==============================================================================
+    // 닫혀 있던 창을 제자리에 두기. (닫을 때 같이 있던 창 옆, 없으면 창마다 정한 쪽)
+    //==============================================================================
+    /**
+     * @param { string } windowId
+     */
+    placeWindow(windowId) {
+      const windowItem = this.#windowTable.get(windowId);
+      const closedNeighborId = this.#closedNeighborTable.get(windowId);
+      this.#closedNeighborTable.delete(windowId);
+      for (const neighborId of [closedNeighborId, windowItem.homeNeighborId]) {
+        const neighbor = neighborId ? this.findGroupOf(neighborId) : null;
+        if (neighbor !== null) {
+          neighbor.group.windowIds.push(windowId);
+          neighbor.group.activeId = windowId;
+          return;
+        }
+      }
+      if (this.#tree.kind === "group" && this.#tree.windowIds.length === 0) {
+        this.#tree = { kind: "group", windowIds: [windowId], activeId: windowId };
+        return;
+      }
+      if (windowItem.homeSide === "center") {
+        let largestGroup = null;
+        let largestArea = -1;
+        this.visitGroups((group) => {
+          const groupElement = this.#groupElementTable.get(group);
+          const rect = groupElement ? groupElement.getBoundingClientRect() : { width: 1, height: 1 };
+          if (rect.width * rect.height > largestArea) {
+            largestArea = rect.width * rect.height;
+            largestGroup = group;
+          }
+        });
+        largestGroup.windowIds.push(windowId);
+        largestGroup.activeId = windowId;
+        return;
+      }
+      this.splitRoot(windowItem.homeSide, windowId);
+    }
+    //==============================================================================
+    // 창 보이기. (닫혀 있으면 열고, 탭을 앞으로)
+    //==============================================================================
+    /**
+     * @param { string } windowId
+     */
+    activateWindow(windowId) {
+      if (!this.#windowTable.has(windowId)) {
+        return;
+      }
+      let found = this.findGroupOf(windowId);
+      if (found === null) {
+        this.placeWindow(windowId);
+        found = this.findGroupOf(windowId);
+      }
+      if (this.#maximizedGroup !== null && this.#maximizedGroup !== found.group) {
+        this.#maximizedGroup = null;
+      }
+      found.group.activeId = windowId;
+      this.#alertSet.delete(windowId);
+      this.save();
+      this.render();
+      this.#callbacks.activate(windowId);
+    }
+    //==============================================================================
+    // 창 닫기.
+    //==============================================================================
+    /**
+     * @param { string } windowId
+     */
+    closeWindow(windowId) {
+      const windowItem = this.#windowTable.get(windowId);
+      if (!windowItem || !windowItem.isClosable) {
+        return;
+      }
+      const found = this.findGroupOf(windowId);
+      if (found === null) {
+        return;
+      }
+      const neighborId = found.group.windowIds.find((otherId) => otherId !== windowId);
+      this.#closedNeighborTable.set(windowId, neighborId || "");
+      this.removeWindowFromTree(windowId);
+      this.save();
+      this.render();
+    }
+    //==============================================================================
+    // 창이 열려 있는지. (어느 묶음에든 들어 있으면)
+    //==============================================================================
+    /**
+     * @param { string } windowId
+     * @returns { boolean }
+     */
+    isWindowOpen(windowId) {
+      return this.findGroupOf(windowId) !== null;
+    }
+    //==============================================================================
+    // 창이 지금 화면에 보이는지. (묶음의 앞 탭이고, 펼친 묶음에 가리지 않았으면)
+    //==============================================================================
+    /**
+     * @param { string } windowId
+     * @returns { boolean }
+     */
+    isWindowVisible(windowId) {
+      const found = this.findGroupOf(windowId);
+      if (found === null || found.group.activeId !== windowId) {
+        return false;
+      }
+      return this.#maximizedGroup === null || this.#maximizedGroup === found.group;
+    }
+    //==============================================================================
+    // 탭 빨간 표시. (콘솔 오류처럼 눈길을 끌 때)
+    //==============================================================================
+    /**
+     * @param { string } windowId
+     * @param { boolean } isAlert
+     */
+    setWindowAlert(windowId, isAlert) {
+      if (isAlert && this.isWindowVisible(windowId)) {
+        return;
+      }
+      if (isAlert) {
+        this.#alertSet.add(windowId);
+      } else {
+        this.#alertSet.delete(windowId);
+      }
+      const tabElement = this.#rootElement.querySelector(`.dockTab[data-window-id="${windowId}"]`);
+      if (tabElement !== null) {
+        tabElement.classList.toggle("isAlert", isAlert);
+      }
+    }
+    //==============================================================================
+    // 묶음 크게 펼치기와 되돌리기.
+    //==============================================================================
+    /**
+     * @param { object } group
+     */
+    toggleMaximize(group) {
+      this.#maximizedGroup = this.#maximizedGroup === group ? null : group;
+      this.render();
+    }
+    //==============================================================================
+    // 다시 그리기.
+    //==============================================================================
+    render() {
+      const rootElement = this.#rootElement;
+      const scrollList = [];
+      for (const windowItem of this.#windowTable.values()) {
+        for (const scrollElement of [windowItem.contentElement, ...windowItem.contentElement.querySelectorAll("*")]) {
+          if (scrollElement.scrollTop !== 0 || scrollElement.scrollLeft !== 0) {
+            scrollList.push({ element: scrollElement, top: scrollElement.scrollTop, left: scrollElement.scrollLeft });
+          }
+        }
+      }
+      this.#groupElementTable = /* @__PURE__ */ new Map();
+      rootElement.textContent = "";
+      const rootNode = this.#maximizedGroup !== null ? this.#maximizedGroup : this.#tree;
+      rootElement.append(this.renderNode(rootNode));
+      for (const scrollItem of scrollList) {
+        scrollItem.element.scrollTop = scrollItem.top;
+        scrollItem.element.scrollLeft = scrollItem.left;
+      }
+      this.#callbacks.rendered();
+    }
+    //==============================================================================
+    // 마디 그리기.
+    //==============================================================================
+    /**
+     * @param { object } node
+     * @returns { HTMLElement }
+     */
+    renderNode(node) {
+      if (node.kind === "group") {
+        return this.renderGroup(node);
+      }
+      return this.renderSplit(node);
+    }
+    //==============================================================================
+    // 나누기 그리기. (자식 사이에 크기 막대)
+    //==============================================================================
+    /**
+     * @param { object } split
+     * @returns { HTMLElement }
+     */
+    renderSplit(split) {
+      const splitElement = createElement("div", `dockSplit ${split.direction === "row" ? "isRow" : "isColumn"}`);
+      const childElementList = [];
+      for (let index = 0; index < split.children.length; ++index) {
+        if (index > 0) {
+          const splitterElement = createElement("div", "dockSplitter");
+          this.attachSplitter(splitterElement, split, index - 1, childElementList);
+          splitElement.append(splitterElement);
+        }
+        const childElement = this.renderNode(split.children[index]);
+        childElement.style.flex = `${split.weights[index]} 1 0px`;
+        childElementList.push(childElement);
+        splitElement.append(childElement);
+      }
+      return splitElement;
+    }
+    //==============================================================================
+    // 크기 막대 끌기. (양옆 두 마디의 비율만 바꾼다)
+    //==============================================================================
+    /**
+     * @param { HTMLElement } splitterElement
+     * @param { object } split
+     * @param { number } index 막대 앞 마디 차례.
+     * @param { Array<HTMLElement> } childElementList
+     */
+    attachSplitter(splitterElement, split, index, childElementList) {
+      const isRow = split.direction === "row";
+      splitterElement.addEventListener("pointerdown", (pointerEvent) => {
+        pointerEvent.preventDefault();
+        splitterElement.setPointerCapture(pointerEvent.pointerId);
+        splitterElement.classList.add("isDragging");
+        const firstElement = childElementList[index];
+        const secondElement = childElementList[index + 1];
+        const firstRect = firstElement.getBoundingClientRect();
+        const secondRect = secondElement.getBoundingClientRect();
+        const firstSize = isRow ? firstRect.width : firstRect.height;
+        const secondSize = isRow ? secondRect.width : secondRect.height;
+        const pairSize = firstSize + secondSize;
+        const pairWeight = split.weights[index] + split.weights[index + 1];
+        const startPosition = isRow ? pointerEvent.clientX : pointerEvent.clientY;
+        const minimumSize = System50.Math.min(MINIMUM_GROUP_PIXELS, pairSize * 0.5);
+        const moveListener = /* @__PURE__ */ __name((moveEvent) => {
+          const delta = (isRow ? moveEvent.clientX : moveEvent.clientY) - startPosition;
+          const newFirstSize = System50.Math.max(minimumSize, System50.Math.min(pairSize - minimumSize, firstSize + delta));
+          split.weights[index] = pairWeight * newFirstSize / pairSize;
+          split.weights[index + 1] = pairWeight - split.weights[index];
+          firstElement.style.flex = `${split.weights[index]} 1 0px`;
+          secondElement.style.flex = `${split.weights[index + 1]} 1 0px`;
+        }, "moveListener");
+        const upListener = /* @__PURE__ */ __name(() => {
+          splitterElement.classList.remove("isDragging");
+          splitterElement.removeEventListener("pointermove", moveListener);
+          splitterElement.removeEventListener("pointerup", upListener);
+          splitterElement.removeEventListener("pointercancel", upListener);
+          this.save();
+        }, "upListener");
+        splitterElement.addEventListener("pointermove", moveListener);
+        splitterElement.addEventListener("pointerup", upListener);
+        splitterElement.addEventListener("pointercancel", upListener);
+      });
+    }
+    //==============================================================================
+    // 묶음 그리기. (탭 줄, 앞 탭의 도구, 내용)
+    //==============================================================================
+    /**
+     * @param { object } group
+     * @returns { HTMLElement }
+     */
+    renderGroup(group) {
+      const groupElement = createElement("div", "dockGroup");
+      if (group === this.#maximizedGroup) {
+        groupElement.classList.add("isMaximized");
+      }
+      const tabStrip = createElement("div", "dockTabStrip");
+      const tabList = createElement("div", "dockTabList");
+      const bodyElement = createElement("div", "dockBody");
+      for (const windowId of group.windowIds) {
+        const windowItem = this.#windowTable.get(windowId);
+        const isActive = windowId === group.activeId;
+        const tabElement = createElement("div", "dockTab" + (isActive ? " isActive" : "") + (this.#alertSet.has(windowId) ? " isAlert" : ""));
+        tabElement.dataset.windowId = windowId;
+        tabElement.append(createElement("span", "dockTabTitle", windowItem.title));
+        if (windowItem.isClosable) {
+          const closeButton = createElement("span", "dockTabClose", "\xD7");
+          closeButton.title = "\uB2EB\uAE30";
+          closeButton.addEventListener("pointerdown", (pointerEvent) => {
+            pointerEvent.stopPropagation();
+          });
+          closeButton.addEventListener("click", (mouseEvent) => {
+            mouseEvent.stopPropagation();
+            this.closeWindow(windowId);
+          });
+          tabElement.append(closeButton);
+        }
+        tabElement.addEventListener("pointerdown", (pointerEvent) => {
+          this.beginTabPress(pointerEvent, tabElement, group, windowId);
+        });
+        tabElement.addEventListener("dblclick", () => {
+          this.toggleMaximize(group);
+        });
+        tabElement.addEventListener("auxclick", (mouseEvent) => {
+          if (mouseEvent.button === 1) {
+            this.closeWindow(windowId);
+          }
+        });
+        tabList.append(tabElement);
+        windowItem.contentElement.style.display = isActive ? "" : "none";
+        bodyElement.append(windowItem.contentElement);
+      }
+      tabStrip.append(tabList);
+      const activeItem = this.#windowTable.get(group.activeId);
+      if (activeItem && activeItem.toolElement !== null) {
+        const toolHolder = createElement("div", "dockTabTools");
+        toolHolder.append(activeItem.toolElement);
+        tabStrip.append(toolHolder);
+      }
+      groupElement.append(tabStrip, bodyElement);
+      this.#groupElementTable.set(group, groupElement);
+      return groupElement;
+    }
+    //==============================================================================
+    // 탭 누르기. (그대로 떼면 탭 고르기, 끌면 도킹 끌기)
+    //==============================================================================
+    /**
+     * @param { PointerEvent } pointerEvent
+     * @param { HTMLElement } tabElement
+     * @param { object } group
+     * @param { string } windowId
+     */
+    beginTabPress(pointerEvent, tabElement, group, windowId) {
+      if (pointerEvent.button !== 0) {
+        return;
+      }
+      pointerEvent.preventDefault();
+      const startX = pointerEvent.clientX;
+      const startY = pointerEvent.clientY;
+      let isDragging = false;
+      let target = null;
+      const pointerId = pointerEvent.pointerId;
+      tabElement.setPointerCapture(pointerId);
+      const moveListener = /* @__PURE__ */ __name((moveEvent) => {
+        if (!isDragging) {
+          if (System50.Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) < DRAG_START_DISTANCE) {
+            return;
+          }
+          isDragging = true;
+          if (this.#maximizedGroup !== null) {
+            this.#maximizedGroup = null;
+            this.render();
+          }
+          this.beginDragVisual(windowId);
+        }
+        this.moveGhost(moveEvent.clientX, moveEvent.clientY);
+        target = this.findDropTarget(moveEvent.clientX, moveEvent.clientY, windowId);
+        this.showDropTarget(target);
+      }, "moveListener");
+      const finish = /* @__PURE__ */ __name((isCancelled) => {
+        tabElement.removeEventListener("pointermove", moveListener);
+        tabElement.removeEventListener("pointerup", upListener);
+        tabElement.removeEventListener("pointercancel", cancelListener);
+        System50.window.removeEventListener("keydown", keyListener, true);
+        if (tabElement.hasPointerCapture(pointerId)) {
+          tabElement.releasePointerCapture(pointerId);
+        }
+        if (!isDragging) {
+          if (!isCancelled) {
+            this.activateWindow(windowId);
+          }
+          return;
+        }
+        this.endDragVisual();
+        if (!isCancelled && target !== null) {
+          this.applyDrop(windowId, target);
+        }
+      }, "finish");
+      const upListener = /* @__PURE__ */ __name(() => {
+        finish(false);
+      }, "upListener");
+      const cancelListener = /* @__PURE__ */ __name(() => {
+        finish(true);
+      }, "cancelListener");
+      const keyListener = /* @__PURE__ */ __name((keyboardEvent) => {
+        if (keyboardEvent.key === "Escape") {
+          keyboardEvent.stopPropagation();
+          keyboardEvent.preventDefault();
+          finish(true);
+        }
+      }, "keyListener");
+      tabElement.addEventListener("pointermove", moveListener);
+      tabElement.addEventListener("pointerup", upListener);
+      tabElement.addEventListener("pointercancel", cancelListener);
+      System50.window.addEventListener("keydown", keyListener, true);
+    }
+    //==============================================================================
+    // 끌기 모습 시작과 끝. (탭 그림자, 놓을 자리 칸)
+    //==============================================================================
+    /**
+     * @param { string } windowId
+     */
+    beginDragVisual(windowId) {
+      const ghostElement = createElement("div", "dockGhost", this.#windowTable.get(windowId).title);
+      System50.document.body.append(ghostElement);
+      this.#ghostElement = ghostElement;
+      System50.document.body.classList.add("isDockDragging");
+    }
+    endDragVisual() {
+      if (this.#ghostElement !== null) {
+        this.#ghostElement.remove();
+        this.#ghostElement = null;
+      }
+      System50.document.body.classList.remove("isDockDragging");
+      this.#indicatorElement.classList.remove("isVisible");
+      this.#markerElement.classList.remove("isVisible");
+    }
+    /**
+     * @param { number } clientX
+     * @param { number } clientY
+     */
+    moveGhost(clientX, clientY) {
+      if (this.#ghostElement !== null) {
+        this.#ghostElement.style.transform = `translate(${clientX + 12}px, ${clientY + 10}px)`;
+      }
+    }
+    //==============================================================================
+    // 놓을 자리 찾기.
+    // - 돌려주는 것: { kind: "root", side, rect } | { kind: "split", group, side, rect } | { kind: "tabs", group, index, rect, markerX, markerRect } | null
+    //==============================================================================
+    /**
+     * @param { number } clientX
+     * @param { number } clientY
+     * @param { string } windowId 끄는 창.
+     * @returns { object | null }
+     */
+    findDropTarget(clientX, clientY, windowId) {
+      const rootRect = this.#rootElement.getBoundingClientRect();
+      if (clientX < rootRect.left || clientX > rootRect.right || clientY < rootRect.top || clientY > rootRect.bottom) {
+        return null;
+      }
+      const source = this.findGroupOf(windowId);
+      const isAlone = source !== null && source.group.windowIds.length === 1;
+      let hitGroup = null;
+      let hitElement = null;
+      for (const [group, groupElement] of this.#groupElementTable) {
+        const rect = groupElement.getBoundingClientRect();
+        if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+          hitGroup = group;
+          hitElement = groupElement;
+          break;
+        }
+      }
+      const isOwnGroup = hitGroup !== null && source !== null && source.group === hitGroup;
+      const stripElement = hitElement !== null ? hitElement.querySelector(".dockTabStrip") : null;
+      const stripRect = stripElement !== null ? stripElement.getBoundingClientRect() : null;
+      if (stripRect !== null && clientY <= stripRect.bottom) {
+        if (isOwnGroup && isAlone) {
+          return null;
+        }
+        const tabElementList = [...stripElement.querySelectorAll(".dockTab")];
+        let index = 0;
+        let markerX = tabElementList.length > 0 ? tabElementList[0].getBoundingClientRect().left : stripRect.left + 4;
+        for (const tabElement of tabElementList) {
+          const tabRect = tabElement.getBoundingClientRect();
+          if (clientX > tabRect.left + tabRect.width * 0.5) {
+            index += 1;
+            markerX = tabRect.right;
+          }
+        }
+        return { kind: "tabs", group: hitGroup, index, rect: rectOf(hitElement.getBoundingClientRect()), markerRect: { left: markerX - 1, top: stripRect.top + 4, width: 3, height: stripRect.height - 8 } };
+      }
+      const rootSideList = [
+        { side: "left", distance: clientX - rootRect.left },
+        { side: "right", distance: rootRect.right - clientX },
+        { side: "top", distance: clientY - rootRect.top },
+        { side: "bottom", distance: rootRect.bottom - clientY }
+      ];
+      rootSideList.sort((first, second) => first.distance - second.distance);
+      if (rootSideList[0].distance < ROOT_EDGE_PIXELS && !(isAlone && this.#tree === source.group)) {
+        const side = rootSideList[0].side;
+        const isRow = SIDE_DIRECTION_TABLE[side] === "row";
+        const bandSize = (isRow ? rootRect.width : rootRect.height) * ROOT_EDGE_RATIO;
+        const rect = {
+          left: side === "right" ? rootRect.right - bandSize : rootRect.left,
+          top: side === "bottom" ? rootRect.bottom - bandSize : rootRect.top,
+          width: isRow ? bandSize : rootRect.width,
+          height: isRow ? rootRect.height : bandSize
+        };
+        return { kind: "root", side, rect };
+      }
+      if (hitGroup === null) {
+        return null;
+      }
+      const groupRect = hitElement.getBoundingClientRect();
+      const bodyTop = stripRect.bottom;
+      const bodyHeight = System50.Math.max(1, groupRect.bottom - bodyTop);
+      const ratioX = (clientX - groupRect.left) / System50.Math.max(1, groupRect.width);
+      const ratioY = (clientY - bodyTop) / bodyHeight;
+      const sideList = [
+        { side: "left", distance: ratioX },
+        { side: "right", distance: 1 - ratioX },
+        { side: "top", distance: ratioY },
+        { side: "bottom", distance: 1 - ratioY }
+      ];
+      sideList.sort((first, second) => first.distance - second.distance);
+      if (sideList[0].distance < EDGE_ZONE_RATIO) {
+        if (isOwnGroup && isAlone) {
+          return null;
+        }
+        const side = sideList[0].side;
+        const halfWidth = groupRect.width * 0.5;
+        const halfHeight = groupRect.height * 0.5;
+        const rect = {
+          left: side === "right" ? groupRect.left + halfWidth : groupRect.left,
+          top: side === "bottom" ? groupRect.top + halfHeight : groupRect.top,
+          width: side === "left" || side === "right" ? halfWidth : groupRect.width,
+          height: side === "top" || side === "bottom" ? halfHeight : groupRect.height
+        };
+        return { kind: "split", group: hitGroup, side, rect };
+      }
+      if (isOwnGroup) {
+        return null;
+      }
+      return { kind: "tabs", group: hitGroup, index: hitGroup.windowIds.length, rect: rectOf(groupRect), markerRect: null };
+    }
+    //==============================================================================
+    // 놓을 자리 보여 주기. (칸이 미끄러지듯 옮겨 간다)
+    //==============================================================================
+    /**
+     * @param { object | null } target
+     */
+    showDropTarget(target) {
+      const indicatorElement = this.#indicatorElement;
+      const markerElement = this.#markerElement;
+      if (target === null) {
+        indicatorElement.classList.remove("isVisible");
+        markerElement.classList.remove("isVisible");
+        return;
+      }
+      const rect = target.rect;
+      const isFirstShow = !indicatorElement.classList.contains("isVisible");
+      if (isFirstShow) {
+        indicatorElement.classList.add("isInstant");
+      }
+      indicatorElement.style.left = `${rect.left + 3}px`;
+      indicatorElement.style.top = `${rect.top + 3}px`;
+      indicatorElement.style.width = `${System50.Math.max(0, rect.width - 6)}px`;
+      indicatorElement.style.height = `${System50.Math.max(0, rect.height - 6)}px`;
+      if (isFirstShow) {
+        void indicatorElement.offsetWidth;
+        indicatorElement.classList.remove("isInstant");
+      }
+      indicatorElement.classList.add("isVisible");
+      if (target.kind === "tabs" && target.markerRect !== null) {
+        const markerRect = target.markerRect;
+        markerElement.style.left = `${markerRect.left}px`;
+        markerElement.style.top = `${markerRect.top}px`;
+        markerElement.style.height = `${markerRect.height}px`;
+        markerElement.classList.add("isVisible");
+      } else {
+        markerElement.classList.remove("isVisible");
+      }
+    }
+    //==============================================================================
+    // 놓기. (나무를 고치고 다시 그린다)
+    //==============================================================================
+    /**
+     * @param { string } windowId
+     * @param { object } target
+     */
+    applyDrop(windowId, target) {
+      const source = this.findGroupOf(windowId);
+      if (source === null) {
+        return;
+      }
+      if (target.kind === "tabs") {
+        const targetGroup = target.group;
+        let index = target.index;
+        if (source.group === targetGroup) {
+          const currentIndex = targetGroup.windowIds.indexOf(windowId);
+          if (currentIndex < index) {
+            index -= 1;
+          }
+          targetGroup.windowIds.splice(currentIndex, 1);
+          targetGroup.windowIds.splice(index, 0, windowId);
+          targetGroup.activeId = windowId;
+        } else {
+          this.removeWindowFromTree(windowId);
+          targetGroup.windowIds.splice(System50.Math.min(index, targetGroup.windowIds.length), 0, windowId);
+          targetGroup.activeId = windowId;
+        }
+      } else if (target.kind === "split") {
+        this.removeWindowFromTree(windowId);
+        this.splitBeside(target.group, target.side, windowId);
+        this.#tree = this.normalize(this.#tree);
+      } else if (target.kind === "root") {
+        this.removeWindowFromTree(windowId);
+        this.splitRoot(target.side, windowId);
+        this.#tree = this.normalize(this.#tree);
+      }
+      this.save();
+      this.render();
+      this.#callbacks.activate(windowId);
+    }
+    //==============================================================================
+    // 시험용. (지금 나무)
+    //==============================================================================
+    /**
+     * @returns { object }
+     */
+    getTree() {
+      return this.#tree;
+    }
+  };
+  function rectOf(domRect) {
+    return { left: domRect.left, top: domRect.top, width: domRect.width, height: domRect.height };
+  }
+  __name(rectOf, "rectOf");
+
+  // tools/visualeditor/visualeditor.js
+  var System51 = globalThis;
   var UNDO_LIMIT = 200;
   var UNDO_MERGE_MILLISECONDS = 600;
   var CONSOLE_LINE_LIMIT = 500;
   var AUTOSAVE_STORAGE_KEY = "vanillaVisualEditor.autosave";
+  var DOCK_STORAGE_KEY = "vanillaVisualEditor.dockLayout";
+  var DEFAULT_DOCK_TREE = {
+    kind: "split",
+    direction: "row",
+    weights: [1150, 320],
+    children: [
+      {
+        kind: "split",
+        direction: "column",
+        weights: [3, 1.15],
+        children: [
+          {
+            kind: "split",
+            direction: "row",
+            weights: [250, 900],
+            children: [
+              { kind: "group", windowIds: ["hierarchy"], activeId: "hierarchy" },
+              { kind: "group", windowIds: ["scene", "game"], activeId: "scene" }
+            ]
+          },
+          { kind: "group", windowIds: ["project", "console"], activeId: "project" }
+        ]
+      },
+      { kind: "group", windowIds: ["inspector"], activeId: "inspector" }
+    ]
+  };
   var DEFAULT_SCENE_PATH = "scenes/untitled.scene.json";
   var NODE_PRESET_LIST = [
     {
@@ -25233,8 +26466,8 @@ html, body {
       }, "create")
     }
   ];
-  function createElement(tagName, className = "", text = "") {
-    const element = System50.document.createElement(tagName);
+  function createElement2(tagName, className = "", text = "") {
+    const element = System51.document.createElement(tagName);
     if (className !== "") {
       element.className = className;
     }
@@ -25243,7 +26476,7 @@ html, body {
     }
     return element;
   }
-  __name(createElement, "createElement");
+  __name(createElement2, "createElement");
   function formatByteCount(byteCount) {
     if (byteCount < 1024) {
       return `${byteCount} B`;
@@ -25306,6 +26539,9 @@ html, body {
     /** @private @type { object | null } */
     #savedCameraState;
     // 게임 뷰로 가기 전 씬 뷰 카메라.
+    /** @private @type { DockLayout | null } */
+    #dockLayout;
+    // 창 도킹 배치.
     //==============================================================================
     // 생성.
     //==============================================================================
@@ -25326,14 +26562,15 @@ html, body {
       this.#clipboardNodeData = null;
       this.#autosaveTimer = 0;
       this.#savedCameraState = null;
+      this.#dockLayout = null;
     }
     //==============================================================================
     // 시작. (화면 짓기, 패널, 엔진)
     //==============================================================================
     start() {
-      const styleElement = createElement("style");
+      const styleElement = createElement2("style");
       styleElement.textContent = EDITOR_STYLE_TEXT;
-      System50.document.head.append(styleElement);
+      System51.document.head.append(styleElement);
       this.#elements = this.buildLayout();
       this.hookConsole();
       const elements = this.#elements;
@@ -25394,43 +26631,48 @@ html, body {
         if (!this.restoreAutosave()) {
           this.createStarterScene();
         }
+        this.placeViewCanvas();
         this.refreshAll();
         this.log("\uC5D0\uB514\uD130\uB97C \uC2DC\uC791\uD588\uB2E4. File > \uD504\uB85C\uC81D\uD2B8 \uD3F4\uB354 \uC5F4\uAE30\uB85C \uC560\uC14B \uD3F4\uB354\uB97C \uC5F0\uB2E4.");
       });
       this.#engine.run(this.#scene);
-      const resizeObserver = new System50.ResizeObserver(() => {
-        this.#engine.resize();
+      const resizeObserver = new System51.ResizeObserver(() => {
+        if (elements.canvasHolder.clientWidth > 0 && elements.canvasHolder.clientHeight > 0) {
+          this.#engine.resize();
+        }
       });
       resizeObserver.observe(elements.canvasHolder);
       this.setupSceneInput();
       this.setupKeyboard();
-      this.setupSplitters();
-      System50.window.addEventListener("beforeunload", (beforeUnloadEvent) => {
+      System51.window.addEventListener("beforeunload", (beforeUnloadEvent) => {
         if (this.#isDirty) {
           beforeUnloadEvent.preventDefault();
         }
       });
-      System50.setInterval(() => {
+      System51.setInterval(() => {
         this.updateOverlay();
       }, 250);
     }
     //==============================================================================
-    // 화면 짓기.
+    // 화면 짓기. (위 메뉴와 도구 막대, 가운데 도킹 창들, 아래 상태 줄)
+    // - 창마다 내용 요소와 탭 줄 오른쪽 도구 요소를 만들어 도킹 배치에 넘긴다.
+    // - Scene 창과 Game 창은 캔버스 하나를 나누어 쓴다. 고른 쪽으로 캔버스를 옮겨 달고, 다른 쪽에는 안내를 둔다.
     //==============================================================================
     /**
      * @returns { object }
      */
     buildLayout() {
-      const rootElement = createElement("div", "editorRoot");
-      const menuBar = createElement("div", "menuBar");
-      const toolBar = createElement("div", "toolBar");
-      const hierarchyPanel = createElement("div", "panel hierarchyPanel");
-      const hierarchyHeader = createElement("div", "panelHeader", "Hierarchy");
-      const hierarchyAddButton = createElement("button", "smallButton", "\uFF0B");
+      const rootElement = createElement2("div", "editorRoot");
+      const menuBar = createElement2("div", "menuBar");
+      const toolBar = createElement2("div", "toolBar");
+      const dockRootElement = createElement2("div", "dockRoot");
+      const statusBar = createElement2("div", "statusBar");
+      rootElement.append(menuBar, toolBar, dockRootElement, statusBar);
+      System51.document.body.append(rootElement);
+      const hierarchyContent = createElement2("div", "panel hierarchyPanel");
+      const hierarchyAddButton = createElement2("button", "smallButton", "\uFF0B");
       hierarchyAddButton.title = "\uB178\uB4DC \uB9CC\uB4E4\uAE30";
-      hierarchyAddButton.style.marginLeft = "auto";
-      hierarchyHeader.append(hierarchyAddButton);
-      const hierarchySearch = createElement("input", "inspectorNameInput hierarchySearch");
+      const hierarchySearch = createElement2("input", "inspectorNameInput hierarchySearch");
       hierarchySearch.placeholder = "\uCC3E\uAE30";
       hierarchySearch.addEventListener("input", () => {
         this.#hierarchyPanel.setFilterText(hierarchySearch.value.trim());
@@ -25438,97 +26680,69 @@ html, body {
       hierarchySearch.addEventListener("keydown", (keyboardEvent) => {
         keyboardEvent.stopPropagation();
       });
-      const hierarchyBody = createElement("div", "panelBody");
-      hierarchyPanel.append(hierarchyHeader, hierarchySearch, hierarchyBody);
-      const scenePanel = createElement("div", "panel scenePanel");
-      const sceneHeader = createElement("div", "panelHeader");
-      const sceneTab = createElement("span", "panelTab isActive", "Scene");
-      const gameTab = createElement("span", "panelTab", "Game");
-      sceneTab.addEventListener("click", () => {
-        this.setGameView(false);
+      const hierarchyBody = createElement2("div", "panelBody");
+      hierarchyContent.append(hierarchySearch, hierarchyBody);
+      hierarchyAddButton.addEventListener("click", (mouseEvent) => {
+        mouseEvent.stopPropagation();
+        const buttonRect = hierarchyAddButton.getBoundingClientRect();
+        this.showNodeContextMenu(null, buttonRect.left, buttonRect.bottom);
       });
-      gameTab.addEventListener("click", () => {
-        this.setGameView(true);
-      });
-      sceneHeader.append(sceneTab, gameTab);
-      const sceneTitle = createElement("span", "", "");
-      sceneTitle.style.textTransform = "none";
-      sceneTitle.style.fontWeight = "400";
-      sceneHeader.append(sceneTitle);
-      const canvasHolder = createElement("div", "sceneCanvasHolder");
-      const canvasElement = createElement("canvas");
+      const canvasHolder = createElement2("div", "sceneCanvasHolder");
+      const canvasElement = createElement2("canvas");
       canvasElement.id = "editorCanvas";
       canvasElement.tabIndex = 0;
-      canvasHolder.append(canvasElement);
-      const sceneOverlay = createElement("div", "sceneOverlay");
-      scenePanel.append(sceneHeader, canvasHolder, sceneOverlay);
-      const inspectorPanel = createElement("div", "panel inspectorPanel");
-      const inspectorBody = createElement("div", "panelBody");
-      inspectorPanel.append(createElement("div", "panelHeader", "Inspector"), inspectorBody);
-      const bottomPanel = createElement("div", "panel bottomPanel");
-      const bottomHeader = createElement("div", "panelHeader");
-      const projectTab = createElement("span", "panelTab isActive", "Project");
-      const consoleTab = createElement("span", "panelTab", "Console");
-      const consoleClearButton = createElement("button", "smallButton", "\uC9C0\uC6B0\uAE30");
-      consoleClearButton.style.marginLeft = "auto";
-      consoleClearButton.style.display = "none";
-      const projectButtons = createElement("span", "projectButtons");
-      projectButtons.style.marginLeft = "auto";
-      projectButtons.style.display = "flex";
-      projectButtons.style.gap = "4px";
-      const openFolderButton = createElement("button", "smallButton", "\uD3F4\uB354 \uC5F4\uAE30");
+      const sceneTitle = createElement2("div", "sceneTitleOverlay");
+      const sceneOverlay = createElement2("div", "sceneOverlay");
+      canvasHolder.append(canvasElement, sceneTitle, sceneOverlay);
+      const viewHostTable = {};
+      for (const windowId of ["scene", "game"]) {
+        const viewContent = createElement2("div", `panel ${windowId}ViewPanel`);
+        const viewHost = createElement2("div", "viewHost");
+        const placeholder = createElement2("div", "viewPlaceholder", windowId === "scene" ? "\uC52C \uBDF0\uB294 \uC9C0\uAE08 Game \uCC3D\uC5D0 \uC788\uB2E4.\n\uB204\uB974\uBA74 \uC5EC\uAE30\uB85C \uC62E\uAE34\uB2E4." : "\uAC8C\uC784 \uBDF0\uB294 \uC9C0\uAE08 Scene \uCC3D\uC5D0 \uC788\uB2E4.\n\uB204\uB974\uBA74 \uC5EC\uAE30\uB85C \uC62E\uAE34\uB2E4.");
+        placeholder.style.whiteSpace = "pre-line";
+        placeholder.addEventListener("click", () => {
+          this.setGameView(windowId === "game");
+        });
+        viewHost.append(placeholder);
+        viewContent.append(viewHost);
+        viewHostTable[windowId] = { content: viewContent, host: viewHost, placeholder };
+      }
+      const inspectorContent = createElement2("div", "panel inspectorPanel");
+      const inspectorBody = createElement2("div", "panelBody");
+      inspectorContent.append(inspectorBody);
+      const projectContent = createElement2("div", "panel projectPanel");
+      const projectButtons = createElement2("div", "windowToolButtons");
+      const openFolderButton = createElement2("button", "smallButton", "\uD3F4\uB354 \uC5F4\uAE30");
       openFolderButton.addEventListener("click", () => {
         this.openProjectFolder();
       });
-      const importButton = createElement("button", "smallButton", "\uAC00\uC838\uC624\uAE30");
+      const importButton = createElement2("button", "smallButton", "\uAC00\uC838\uC624\uAE30");
       importButton.title = "\uD30C\uC77C\uC744 \uC9C0\uAE08 \uD3F4\uB354\uB85C \uAC00\uC838\uC628\uB2E4";
       importButton.addEventListener("click", () => {
         this.importAssetFiles();
       });
-      const rescanButton = createElement("button", "smallButton", "\uC0C8\uB85C \uACE0\uCE68");
+      const rescanButton = createElement2("button", "smallButton", "\uC0C8\uB85C \uACE0\uCE68");
       rescanButton.addEventListener("click", () => {
         this.#projectPanel.rescan();
       });
       projectButtons.append(openFolderButton, importButton, rescanButton);
-      bottomHeader.append(projectTab, consoleTab, projectButtons, consoleClearButton);
-      const projectBody = createElement("div", "panelBody projectBody");
-      const projectFolders = createElement("div", "projectFolders");
-      const projectAssets = createElement("div", "projectAssets");
+      const projectBody = createElement2("div", "panelBody projectBody");
+      const projectFolders = createElement2("div", "projectFolders");
+      const projectAssets = createElement2("div", "projectAssets");
       projectBody.append(projectFolders, projectAssets);
-      const consoleBody = createElement("div", "panelBody consoleBody");
-      consoleBody.style.display = "none";
-      bottomPanel.append(bottomHeader, projectBody, consoleBody);
-      const splitLeft = createElement("div", "splitter splitLeft");
-      const splitRight = createElement("div", "splitter splitRight");
-      const splitBottom = createElement("div", "splitter splitBottom");
-      const statusBar = createElement("div", "statusBar");
-      rootElement.append(menuBar, toolBar, hierarchyPanel, splitLeft, scenePanel, splitRight, inspectorPanel, splitBottom, bottomPanel, statusBar);
-      System50.document.body.append(rootElement);
-      const selectTab = /* @__PURE__ */ __name((isProject) => {
-        projectTab.classList.toggle("isActive", isProject);
-        consoleTab.classList.toggle("isActive", !isProject);
-        projectBody.style.display = isProject ? "" : "none";
-        consoleBody.style.display = isProject ? "none" : "";
-        consoleClearButton.style.display = isProject ? "none" : "";
-        projectButtons.style.display = isProject ? "flex" : "none";
-      }, "selectTab");
-      projectTab.addEventListener("click", () => {
-        selectTab(true);
-      });
-      consoleTab.addEventListener("click", () => {
-        selectTab(false);
-      });
+      projectContent.append(projectBody);
+      const consoleContent = createElement2("div", "panel consolePanel");
+      const consoleClearButton = createElement2("button", "smallButton", "\uC9C0\uC6B0\uAE30");
+      const consoleBody = createElement2("div", "panelBody consoleBody");
+      consoleContent.append(consoleBody);
       consoleClearButton.addEventListener("click", () => {
         consoleBody.textContent = "";
-      });
-      hierarchyAddButton.addEventListener("click", () => {
-        const buttonRect = hierarchyAddButton.getBoundingClientRect();
-        this.showNodeContextMenu(null, buttonRect.left, buttonRect.bottom);
       });
       const elements = {
         rootElement,
         menuBar,
         toolBar,
+        dockRootElement,
         hierarchyBody,
         sceneTitle,
         canvasHolder,
@@ -25538,16 +26752,74 @@ html, body {
         projectFolders,
         projectAssets,
         consoleBody,
-        consoleTab,
         statusBar,
         toolButtons: {},
         playButton: null,
-        sceneTab,
-        gameTab
+        viewHostTable,
+        viewWindowId: ""
       };
+      this.#elements = elements;
+      const windowList = [
+        { id: "hierarchy", title: "Hierarchy", contentElement: hierarchyContent, toolElement: hierarchyAddButton, homeSide: "left" },
+        { id: "scene", title: "Scene", contentElement: viewHostTable.scene.content, isClosable: false, homeSide: "center" },
+        { id: "game", title: "Game", contentElement: viewHostTable.game.content, homeSide: "center", homeNeighborId: "scene" },
+        { id: "inspector", title: "Inspector", contentElement: inspectorContent, homeSide: "right" },
+        { id: "project", title: "Project", contentElement: projectContent, toolElement: projectButtons, homeSide: "bottom", homeNeighborId: "console" },
+        { id: "console", title: "Console", contentElement: consoleContent, toolElement: consoleClearButton, homeSide: "bottom", homeNeighborId: "project" }
+      ];
+      this.#dockLayout = new DockLayout(dockRootElement, windowList, DEFAULT_DOCK_TREE, DOCK_STORAGE_KEY, {
+        activate: /* @__PURE__ */ __name((windowId) => {
+          if (windowId === "scene" || windowId === "game") {
+            this.attachViewCanvas(windowId);
+          }
+        }, "activate"),
+        rendered: /* @__PURE__ */ __name(() => {
+          this.placeViewCanvas();
+        }, "rendered")
+      });
+      this.#dockLayout.render();
       this.buildMenu(menuBar);
       this.buildToolBar(toolBar, elements);
       return elements;
+    }
+    //==============================================================================
+    // 캔버스를 둘 창 정하기. (지금 단 창이 가려졌는데 다른 쪽이 보이면 그쪽으로 옮긴다)
+    //==============================================================================
+    placeViewCanvas() {
+      const elements = this.#elements;
+      const dockLayout = this.#dockLayout;
+      if (!elements || !dockLayout) {
+        return;
+      }
+      let windowId = elements.viewWindowId || "scene";
+      if (!dockLayout.isWindowOpen(windowId)) {
+        windowId = "scene";
+      }
+      const otherId = windowId === "scene" ? "game" : "scene";
+      if (!dockLayout.isWindowVisible(windowId) && dockLayout.isWindowVisible(otherId)) {
+        windowId = otherId;
+      }
+      this.attachViewCanvas(windowId);
+    }
+    //==============================================================================
+    // 캔버스를 Scene 창이나 Game 창에 달기. (게임 뷰 여부도 맞춘다)
+    //==============================================================================
+    /**
+     * @param { string } windowId scene, game
+     */
+    attachViewCanvas(windowId) {
+      const elements = this.#elements;
+      const viewHostTable = elements.viewHostTable;
+      const host = viewHostTable[windowId].host;
+      if (elements.canvasHolder.parentElement !== host) {
+        host.append(elements.canvasHolder);
+      }
+      viewHostTable.scene.placeholder.style.display = windowId === "scene" ? "none" : "";
+      viewHostTable.game.placeholder.style.display = windowId === "game" ? "none" : "";
+      elements.viewWindowId = windowId;
+      if (this.#scene) {
+        this.applyGameView(windowId === "game");
+      }
     }
     //==============================================================================
     // 메뉴 짓기.
@@ -25600,6 +26872,19 @@ html, body {
             null,
             { label: "\uD654\uBA74 \uD2C0 \uD06C\uAE30", shortcut: "", run: /* @__PURE__ */ __name(() => this.askFrameSize(), "run") }
           ]
+        },
+        {
+          title: "Window",
+          commands: [
+            { label: "Hierarchy", shortcut: "", run: /* @__PURE__ */ __name(() => this.#dockLayout.activateWindow("hierarchy"), "run") },
+            { label: "Scene", shortcut: "", run: /* @__PURE__ */ __name(() => this.setGameView(false), "run") },
+            { label: "Game", shortcut: "", run: /* @__PURE__ */ __name(() => this.setGameView(true), "run") },
+            { label: "Inspector", shortcut: "", run: /* @__PURE__ */ __name(() => this.#dockLayout.activateWindow("inspector"), "run") },
+            { label: "Project", shortcut: "", run: /* @__PURE__ */ __name(() => this.#dockLayout.activateWindow("project"), "run") },
+            { label: "Console", shortcut: "", run: /* @__PURE__ */ __name(() => this.#dockLayout.activateWindow("console"), "run") },
+            null,
+            { label: "\uCC3D \uBC30\uCE58 \uB418\uB3CC\uB9AC\uAE30", shortcut: "", run: /* @__PURE__ */ __name(() => this.#dockLayout.resetLayout(), "run") }
+          ]
         }
       ];
       let openMenuElement = null;
@@ -25610,15 +26895,15 @@ html, body {
         }
       }, "closeMenu");
       for (const menu of menuList) {
-        const menuElement = createElement("div", "menuItem", menu.title);
-        const popupElement = createElement("div", "menuPopup");
+        const menuElement = createElement2("div", "menuItem", menu.title);
+        const popupElement = createElement2("div", "menuPopup");
         for (const command of menu.commands) {
           if (command === null) {
-            popupElement.append(createElement("div", "menuSeparator"));
+            popupElement.append(createElement2("div", "menuSeparator"));
             continue;
           }
-          const commandElement = createElement("div", "menuCommand");
-          commandElement.append(createElement("span", "", command.label), createElement("span", "menuShortcut", command.shortcut));
+          const commandElement = createElement2("div", "menuCommand");
+          commandElement.append(createElement2("span", "", command.label), createElement2("span", "menuShortcut", command.shortcut));
           commandElement.addEventListener("click", (mouseEvent) => {
             mouseEvent.stopPropagation();
             closeMenu();
@@ -25645,7 +26930,7 @@ html, body {
         });
         menuBar.append(menuElement);
       }
-      System50.document.addEventListener("click", () => {
+      System51.document.addEventListener("click", () => {
         closeMenu();
         this.closeContextMenu();
       });
@@ -25658,7 +26943,7 @@ html, body {
      * @param { object } elements
      */
     buildToolBar(toolBar, elements) {
-      const toolGroup = createElement("div", "toolGroup");
+      const toolGroup = createElement2("div", "toolGroup");
       const toolList = [
         { tool: EditorTool.hand, label: "\u270B", title: "\uBC00\uAE30 (Q)" },
         { tool: EditorTool.move, label: "\u2725", title: "\uC62E\uAE30\uAE30 (W)" },
@@ -25666,7 +26951,7 @@ html, body {
         { tool: EditorTool.scale, label: "\u2922", title: "\uD0A4\uC6B0\uAE30 (R)" }
       ];
       for (const toolItem of toolList) {
-        const buttonElement = createElement("button", "toolButton", toolItem.label);
+        const buttonElement = createElement2("button", "toolButton", toolItem.label);
         buttonElement.title = toolItem.title;
         buttonElement.addEventListener("click", () => {
           this.setTool(toolItem.tool);
@@ -25674,32 +26959,32 @@ html, body {
         elements.toolButtons[toolItem.tool] = buttonElement;
         toolGroup.append(buttonElement);
       }
-      const playGroup = createElement("div", "toolGroup");
-      const playButton = createElement("button", "toolButton", "\u25B6 \uC7AC\uC0DD");
+      const playGroup = createElement2("div", "toolGroup");
+      const playButton = createElement2("button", "toolButton", "\u25B6 \uC7AC\uC0DD");
       playButton.title = "\uC7AC\uC0DD / \uBA48\uCDA4 (Ctrl+P)";
       playButton.addEventListener("click", () => {
         this.togglePlay();
       });
       elements.playButton = playButton;
       playGroup.append(playButton);
-      const fileGroup = createElement("div", "toolGroup");
-      const saveButton = createElement("button", "toolButton", "\uC800\uC7A5");
+      const fileGroup = createElement2("div", "toolGroup");
+      const saveButton = createElement2("button", "toolButton", "\uC800\uC7A5");
       saveButton.title = "\uC52C \uC800\uC7A5 (Ctrl+S)";
       saveButton.addEventListener("click", () => {
         this.saveScene(false);
       });
-      const undoButton = createElement("button", "toolButton", "\u21B6");
+      const undoButton = createElement2("button", "toolButton", "\u21B6");
       undoButton.title = "\uB418\uB3CC\uB9AC\uAE30 (Ctrl+Z)";
       undoButton.addEventListener("click", () => {
         this.undo();
       });
-      const redoButton = createElement("button", "toolButton", "\u21B7");
+      const redoButton = createElement2("button", "toolButton", "\u21B7");
       redoButton.title = "\uB2E4\uC2DC \uD558\uAE30 (Ctrl+Shift+Z)";
       redoButton.addEventListener("click", () => {
         this.redo();
       });
       fileGroup.append(saveButton, undoButton, redoButton);
-      toolBar.append(toolGroup, createElement("div", "toolSpacer"), playGroup, createElement("div", "toolSpacer"), fileGroup);
+      toolBar.append(toolGroup, createElement2("div", "toolSpacer"), playGroup, createElement2("div", "toolSpacer"), fileGroup);
       toolGroup.querySelector("button:nth-child(2)").classList.add("isActive");
     }
     //==============================================================================
@@ -25738,7 +27023,7 @@ html, body {
      */
     change(label, apply, isStructural = false) {
       const selectedNode = this.#scene.getSelectedNode();
-      const now = System50.performance.now();
+      const now = System51.performance.now();
       const lastChange = this.#lastChange;
       const isMerged = !isStructural && lastChange.label === label && lastChange.node === selectedNode && now - lastChange.time < UNDO_MERGE_MILLISECONDS;
       if (!isMerged) {
@@ -25919,7 +27204,7 @@ html, body {
       const currentPosition = node.getPosition();
       const localDelta = this.worldDeltaToLocal(node, viewPosition.x - currentPosition.x, viewPosition.y - currentPosition.y);
       const localPosition = node.getLocalPosition();
-      node.setLocalPosition(Vector2.create(System50.Math.round(localPosition.x + localDelta.x), System50.Math.round(localPosition.y + localDelta.y)));
+      node.setLocalPosition(Vector2.create(System51.Math.round(localPosition.x + localDelta.x), System51.Math.round(localPosition.y + localDelta.y)));
     }
     //==============================================================================
     // 화면에서의 움직임을 부모 기준 움직임으로.
@@ -25935,9 +27220,9 @@ html, body {
       if (!parentNode) {
         return Vector2.create(deltaX, deltaY);
       }
-      const radian = -parentNode.getRotation() * System50.Math.PI / 180;
-      const cosine = System50.Math.cos(radian);
-      const sine = System50.Math.sin(radian);
+      const radian = -parentNode.getRotation() * System51.Math.PI / 180;
+      const cosine = System51.Math.cos(radian);
+      const sine = System51.Math.sin(radian);
       const parentScale = parentNode.getScale();
       const rotatedX = deltaX * cosine - deltaY * sine;
       const rotatedY = deltaX * sine + deltaY * cosine;
@@ -26048,13 +27333,13 @@ html, body {
      */
     showContextMenu(commandList, x, y) {
       this.closeContextMenu();
-      const menuElement = createElement("div", "contextMenu");
+      const menuElement = createElement2("div", "contextMenu");
       for (const command of commandList) {
         if (command === null) {
-          menuElement.append(createElement("div", "menuSeparator"));
+          menuElement.append(createElement2("div", "menuSeparator"));
           continue;
         }
-        const commandElement = createElement("div", "menuCommand", command.label);
+        const commandElement = createElement2("div", "menuCommand", command.label);
         commandElement.addEventListener("click", (mouseEvent) => {
           mouseEvent.stopPropagation();
           this.closeContextMenu();
@@ -26064,10 +27349,10 @@ html, body {
       }
       menuElement.style.left = `${x}px`;
       menuElement.style.top = `${y}px`;
-      System50.document.body.append(menuElement);
+      System51.document.body.append(menuElement);
       const menuRect = menuElement.getBoundingClientRect();
-      if (menuRect.bottom > System50.window.innerHeight) {
-        menuElement.style.top = `${System50.Math.max(0, y - menuRect.height)}px`;
+      if (menuRect.bottom > System51.window.innerHeight) {
+        menuElement.style.top = `${System51.Math.max(0, y - menuRect.height)}px`;
       }
       this.#contextMenuElement = menuElement;
       menuElement.addEventListener("click", (mouseEvent) => {
@@ -26131,7 +27416,7 @@ html, body {
           startLocalPosition: node.getLocalPosition().clone(),
           startLocalScale: node.getLocalScale().clone(),
           startLocalRotation: node.getLocalRotation(),
-          startAngle: System50.Math.atan2(viewPosition.y - node.getPosition().y, viewPosition.x - node.getPosition().x),
+          startAngle: System51.Math.atan2(viewPosition.y - node.getPosition().y, viewPosition.x - node.getPosition().x),
           isRecorded: false
         };
       });
@@ -26164,8 +27449,8 @@ html, body {
       canvasElement.addEventListener("wheel", (wheelEvent) => {
         wheelEvent.preventDefault();
         const viewPosition = readViewPosition(wheelEvent);
-        if (wheelEvent.ctrlKey || wheelEvent.metaKey || System50.Math.abs(wheelEvent.deltaX) < 1) {
-          const zoomRatio = System50.Math.exp(-wheelEvent.deltaY * (wheelEvent.ctrlKey ? 0.01 : 15e-4));
+        if (wheelEvent.ctrlKey || wheelEvent.metaKey || System51.Math.abs(wheelEvent.deltaX) < 1) {
+          const zoomRatio = System51.Math.exp(-wheelEvent.deltaY * (wheelEvent.ctrlKey ? 0.01 : 15e-4));
           this.#scene.zoomCamera(zoomRatio, viewPosition);
         } else {
           this.#scene.panCamera(-wheelEvent.deltaX, -wheelEvent.deltaY);
@@ -26209,7 +27494,7 @@ html, body {
       const deltaX = viewPosition.x - dragState.startPosition.x;
       const deltaY = viewPosition.y - dragState.startPosition.y;
       if (!dragState.isRecorded) {
-        if (System50.Math.abs(deltaX) + System50.Math.abs(deltaY) < 2) {
+        if (System51.Math.abs(deltaX) + System51.Math.abs(deltaY) < 2) {
           return;
         }
         this.recordUndo("\uC190\uC7A1\uC774\uB85C \uBC14\uAFB8\uAE30");
@@ -26222,18 +27507,18 @@ html, body {
         let nextX = dragState.startLocalPosition.x + localDelta.x;
         let nextY = dragState.startLocalPosition.y + localDelta.y;
         if (isSnap) {
-          nextX = System50.Math.round(nextX / 10) * 10;
-          nextY = System50.Math.round(nextY / 10) * 10;
+          nextX = System51.Math.round(nextX / 10) * 10;
+          nextY = System51.Math.round(nextY / 10) * 10;
         } else {
-          nextX = System50.Math.round(nextX);
-          nextY = System50.Math.round(nextY);
+          nextX = System51.Math.round(nextX);
+          nextY = System51.Math.round(nextY);
         }
         node.setLocalPosition(Vector2.create(nextX, nextY));
       } else if (handleKind === HandleKind.rotate) {
         const origin = node.getPosition();
-        const angle = System50.Math.atan2(viewPosition.y - origin.y, viewPosition.x - origin.x);
-        let nextRotation = dragState.startLocalRotation + (angle - dragState.startAngle) * 180 / System50.Math.PI;
-        nextRotation = pointerEvent.shiftKey ? System50.Math.round(nextRotation / 15) * 15 : System50.Math.round(nextRotation * 10) / 10;
+        const angle = System51.Math.atan2(viewPosition.y - origin.y, viewPosition.x - origin.x);
+        let nextRotation = dragState.startLocalRotation + (angle - dragState.startAngle) * 180 / System51.Math.PI;
+        nextRotation = pointerEvent.shiftKey ? System51.Math.round(nextRotation / 15) * 15 : System51.Math.round(nextRotation * 10) / 10;
         node.setLocalRotation(nextRotation);
       } else {
         const startScale = dragState.startLocalScale;
@@ -26248,7 +27533,7 @@ html, body {
           ratioY = ratioX;
         }
         const roundScale = /* @__PURE__ */ __name((value) => {
-          return isSnap ? System50.Math.round(value * 10) / 10 : System50.Math.round(value * 1e3) / 1e3;
+          return isSnap ? System51.Math.round(value * 10) / 10 : System51.Math.round(value * 1e3) / 1e3;
         }, "roundScale");
         node.setLocalScale(Vector2.create(roundScale(startScale.x * ratioX), roundScale(startScale.y * ratioY)));
       }
@@ -26286,7 +27571,7 @@ html, body {
     // 키보드. (도구, 단축키, 스페이스 밀기)
     //==============================================================================
     setupKeyboard() {
-      System50.document.addEventListener("keydown", (keyboardEvent) => {
+      System51.document.addEventListener("keydown", (keyboardEvent) => {
         const targetElement = keyboardEvent.target;
         if (targetElement && (targetElement.tagName === "INPUT" || targetElement.tagName === "TEXTAREA" || targetElement.tagName === "SELECT")) {
           return;
@@ -26354,7 +27639,7 @@ html, body {
           keyboardEvent.preventDefault();
         }
       });
-      System50.document.addEventListener("keyup", (keyboardEvent) => {
+      System51.document.addEventListener("keyup", (keyboardEvent) => {
         if (keyboardEvent.key === " ") {
           this.#isSpaceDown = false;
         }
@@ -26368,7 +27653,7 @@ html, body {
      */
     setTool(tool) {
       this.#scene.setTool(tool);
-      for (const [buttonTool, buttonElement] of System50.Object.entries(this.#elements.toolButtons)) {
+      for (const [buttonTool, buttonElement] of System51.Object.entries(this.#elements.toolButtons)) {
         buttonElement.classList.toggle("isActive", buttonTool === tool);
       }
     }
@@ -26402,7 +27687,7 @@ html, body {
     // 새 씬.
     //==============================================================================
     newScene() {
-      if (this.#isDirty && !System50.window.confirm("\uC800\uC7A5\uD558\uC9C0 \uC54A\uC740 \uBC14\uAFBC \uAC83\uC774 \uC788\uB2E4. \uC0C8 \uC52C\uC744 \uC5F4\uAE4C?")) {
+      if (this.#isDirty && !System51.window.confirm("\uC800\uC7A5\uD558\uC9C0 \uC54A\uC740 \uBC14\uAFBC \uAC83\uC774 \uC788\uB2E4. \uC0C8 \uC52C\uC744 \uC5F4\uAE4C?")) {
         return;
       }
       this.#scene.replaceDocumentRoot(this.#scene.createDocumentRoot());
@@ -26433,7 +27718,7 @@ html, body {
     // 씬 파일 열기. (파일 고르기)
     //==============================================================================
     openSceneFile() {
-      const inputElement = createElement("input");
+      const inputElement = createElement2("input");
       inputElement.type = "file";
       inputElement.accept = ".json";
       inputElement.addEventListener("change", async () => {
@@ -26453,9 +27738,9 @@ html, body {
      */
     loadSceneText(jsonText, path) {
       try {
-        const documentData = System50.JSON.parse(jsonText);
+        const documentData = System51.JSON.parse(jsonText);
         const documentRoot = UIDocument.fromJsonText(jsonText);
-        if (System50.Array.isArray(documentData.frameSize)) {
+        if (System51.Array.isArray(documentData.frameSize)) {
           this.#scene.setFrameSize(Vector2.create(documentData.frameSize[0], documentData.frameSize[1]));
         }
         if (this.#scene.isPlaying()) {
@@ -26482,7 +27767,7 @@ html, body {
     async saveScene(isSaveAs) {
       let scenePath = this.#scenePath;
       if (isSaveAs || scenePath === "") {
-        const answer = System50.window.prompt("\uC52C \uD30C\uC77C \uACBD\uB85C (\uD504\uB85C\uC81D\uD2B8 \uD3F4\uB354 \uAE30\uC900)", scenePath || DEFAULT_SCENE_PATH);
+        const answer = System51.window.prompt("\uC52C \uD30C\uC77C \uACBD\uB85C (\uD504\uB85C\uC81D\uD2B8 \uD3F4\uB354 \uAE30\uC900)", scenePath || DEFAULT_SCENE_PATH);
         if (!answer) {
           return;
         }
@@ -26506,10 +27791,10 @@ html, body {
      * @returns { string }
      */
     buildSceneJsonText() {
-      const documentData = System50.JSON.parse(UIDocument.toJsonText(this.#scene.getDocumentRoot(), false));
+      const documentData = System51.JSON.parse(UIDocument.toJsonText(this.#scene.getDocumentRoot(), false));
       const frameSize = this.#scene.getFrameSize();
       documentData.frameSize = [frameSize.x, frameSize.y];
-      return System50.JSON.stringify(documentData, null, "	");
+      return System51.JSON.stringify(documentData, null, "	");
     }
     //==============================================================================
     // 고른 노드 복사.
@@ -26586,11 +27871,11 @@ html, body {
     // 애셋 파일 가져오기. (파일 고르기, 프로젝트 패널의 지금 폴더로)
     //==============================================================================
     importAssetFiles() {
-      const inputElement = createElement("input");
+      const inputElement = createElement2("input");
       inputElement.type = "file";
       inputElement.multiple = true;
       inputElement.addEventListener("change", async () => {
-        const fileList = System50.Array.from(inputElement.files);
+        const fileList = System51.Array.from(inputElement.files);
         if (fileList.length === 0) {
           return;
         }
@@ -26610,6 +27895,17 @@ html, body {
      * @param { boolean } isGameView
      */
     setGameView(isGameView) {
+      const windowId = isGameView ? "game" : "scene";
+      this.#dockLayout.activateWindow(windowId);
+      this.attachViewCanvas(windowId);
+    }
+    //==============================================================================
+    // 씬 카메라를 게임 뷰나 씬 뷰로. (게임 뷰는 화면 틀을 꽉 채우고, 씬 뷰로 오면 전 카메라로 되돌린다)
+    //==============================================================================
+    /**
+     * @param { boolean } isGameView
+     */
+    applyGameView(isGameView) {
       const scene = this.#scene;
       if (scene.isGameView() === isGameView) {
         return;
@@ -26625,20 +27921,18 @@ html, body {
         cameraNode.setLocalPosition(this.#savedCameraState.position);
         cameraNode.setLocalScale(this.#savedCameraState.scale);
       }
-      this.#elements.sceneTab.classList.toggle("isActive", !isGameView);
-      this.#elements.gameTab.classList.toggle("isActive", isGameView);
     }
     //==============================================================================
     // 화면 틀 크기 묻기.
     //==============================================================================
     askFrameSize() {
       const frameSize = this.#scene.getFrameSize();
-      const answer = System50.window.prompt("\uD654\uBA74 \uD2C0 \uD06C\uAE30 (\uAC00\uB85Cx\uC138\uB85C)", `${frameSize.x}x${frameSize.y}`);
+      const answer = System51.window.prompt("\uD654\uBA74 \uD2C0 \uD06C\uAE30 (\uAC00\uB85Cx\uC138\uB85C)", `${frameSize.x}x${frameSize.y}`);
       const match = answer ? answer.match(/^\s*(\d+)\s*[x×*, ]\s*(\d+)\s*$/) : null;
       if (match === null) {
         return;
       }
-      this.#scene.setFrameSize(Vector2.create(System50.Number(match[1]), System50.Number(match[2])));
+      this.#scene.setFrameSize(Vector2.create(System51.Number(match[1]), System51.Number(match[2])));
       this.#scene.frameDocument();
       this.markDirty();
     }
@@ -26650,12 +27944,12 @@ html, body {
      */
     async openAsset(asset) {
       if (asset.kind === "scene") {
-        if (this.#isDirty && !System50.window.confirm("\uC800\uC7A5\uD558\uC9C0 \uC54A\uC740 \uBC14\uAFBC \uAC83\uC774 \uC788\uB2E4. \uC774 \uC52C\uC744 \uC5F4\uAE4C?")) {
+        if (this.#isDirty && !System51.window.confirm("\uC800\uC7A5\uD558\uC9C0 \uC54A\uC740 \uBC14\uAFBC \uAC83\uC774 \uC788\uB2E4. \uC774 \uC52C\uC744 \uC5F4\uAE4C?")) {
           return;
         }
         this.loadSceneText(await asset.file.text(), asset.path);
       } else if (asset.kind === "audio") {
-        new System50.Audio(asset.url).play();
+        new System51.Audio(asset.url).play();
       } else if (asset.kind === "prefab") {
         const viewSize = this.#engine.getViewManager().getViewSize();
         this.instantiatePrefab(asset, Vector2.create(viewSize.x * 0.5, viewSize.y * 0.5));
@@ -26674,8 +27968,8 @@ html, body {
       this.#hierarchyPanel.render(this.#scene.getDocumentRoot(), null);
       const inspectorBody = this.#elements.inspectorBody;
       inspectorBody.textContent = "";
-      const previewElement = createElement("div", "assetPreview");
-      const titleElement = createElement("div", "inspectorSectionHeader", asset.name);
+      const previewElement = createElement2("div", "assetPreview");
+      const titleElement = createElement2("div", "inspectorSectionHeader", asset.name);
       inspectorBody.append(titleElement, previewElement);
       const infoLines = [`\uACBD\uB85C: ${asset.path}`, `\uC885\uB958: ${asset.kind}`, `\uD06C\uAE30: ${formatByteCount(asset.file.size)}`];
       if (asset.kind === "image") {
@@ -26683,19 +27977,19 @@ html, body {
         if (image !== null) {
           infoLines.push(`\uD574\uC0C1\uB3C4: ${image.naturalWidth} x ${image.naturalHeight}`);
         }
-        const imageElement = createElement("img");
+        const imageElement = createElement2("img");
         imageElement.src = asset.url;
         previewElement.append(imageElement);
         infoLines.push("\uC52C \uBDF0\uB098 Sprite \uC758 Image \uCE78\uC5D0 \uB04C\uC5B4\uB2E4 \uB193\uB294\uB2E4.");
       } else if (asset.kind === "audio") {
-        const audioElement = createElement("audio");
+        const audioElement = createElement2("audio");
         audioElement.controls = true;
         audioElement.src = asset.url;
         audioElement.style.width = "100%";
         previewElement.append(audioElement);
       } else if (asset.kind === "json" || asset.kind === "scene" || asset.kind === "prefab" || asset.kind === "text") {
         const text = await asset.file.text();
-        const preElement = createElement("pre", "", text.length > 2e4 ? `${text.substring(0, 2e4)}
+        const preElement = createElement2("pre", "", text.length > 2e4 ? `${text.substring(0, 2e4)}
 \u2026` : text);
         previewElement.append(preElement);
         if (asset.kind === "scene") {
@@ -26704,12 +27998,12 @@ html, body {
           infoLines.push("\uC52C \uBDF0\uC5D0 \uB04C\uC5B4\uB2E4 \uB193\uAC70\uB098 \uB450 \uBC88 \uB204\uB974\uBA74 \uAEBC\uB0B8\uB2E4.");
         }
       } else if (asset.kind === "font") {
-        const fontName = `editorPreview${System50.Math.floor(System50.Math.random() * 1e9)}`;
+        const fontName = `editorPreview${System51.Math.floor(System51.Math.random() * 1e9)}`;
         try {
-          const fontFace = new System50.FontFace(fontName, `url(${asset.url})`);
+          const fontFace = new System51.FontFace(fontName, `url(${asset.url})`);
           await fontFace.load();
-          System50.document.fonts.add(fontFace);
-          const sampleElement = createElement("div", "", "\uAC00\uB098\uB2E4\uB77C ABC abc 0123");
+          System51.document.fonts.add(fontFace);
+          const sampleElement = createElement2("div", "", "\uAC00\uB098\uB2E4\uB77C ABC abc 0123");
           sampleElement.style.fontFamily = fontName;
           sampleElement.style.fontSize = "28px";
           sampleElement.style.padding = "8px 0";
@@ -26720,7 +28014,7 @@ html, body {
       } else if (asset.kind === "model") {
         infoLines.push(...await this.readModelInfo(asset));
         if (asset.name.toLowerCase().endsWith(".glb")) {
-          const previewCanvas = createElement("canvas", "modelPreviewCanvas");
+          const previewCanvas = createElement2("canvas", "modelPreviewCanvas");
           previewElement.append(previewCanvas);
           try {
             const modelPreview = new ModelPreview(previewCanvas);
@@ -26735,7 +28029,7 @@ html, body {
         }
       }
       for (const line of infoLines) {
-        previewElement.append(createElement("div", "fieldLabel", line));
+        previewElement.append(createElement2("div", "fieldLabel", line));
       }
     }
     //==============================================================================
@@ -26751,10 +28045,10 @@ html, body {
       }
       try {
         const arrayBuffer = await asset.file.arrayBuffer();
-        const dataView = new System50.DataView(arrayBuffer);
+        const dataView = new System51.DataView(arrayBuffer);
         const jsonLength = dataView.getUint32(12, true);
-        const jsonText = new System50.TextDecoder().decode(new System50.Uint8Array(arrayBuffer, 20, jsonLength));
-        const gltf = System50.JSON.parse(jsonText);
+        const jsonText = new System51.TextDecoder().decode(new System51.Uint8Array(arrayBuffer, 20, jsonLength));
+        const gltf = System51.JSON.parse(jsonText);
         const animationNameList = (gltf.animations || []).map((animation, animationIndex) => animation.name || `#${animationIndex}`);
         const jointCount = (gltf.skins || []).reduce((total, skin) => total + skin.joints.length, 0);
         return [
@@ -26781,8 +28075,8 @@ html, body {
     // 자동 보관 예약. (바꾸고 1 초 뒤 브라우저 저장소에, 재생 중에는 남기지 않는다)
     //==============================================================================
     scheduleAutosave() {
-      System50.clearTimeout(this.#autosaveTimer);
-      this.#autosaveTimer = System50.setTimeout(() => {
+      System51.clearTimeout(this.#autosaveTimer);
+      this.#autosaveTimer = System51.setTimeout(() => {
         if (this.#scene.isPlaying()) {
           return;
         }
@@ -26792,7 +28086,7 @@ html, body {
             isDirty: this.#isDirty,
             jsonText: this.buildSceneJsonText()
           };
-          System50.localStorage.setItem(AUTOSAVE_STORAGE_KEY, System50.JSON.stringify(autosaveData));
+          System51.localStorage.setItem(AUTOSAVE_STORAGE_KEY, System51.JSON.stringify(autosaveData));
         } catch (exception) {
         }
       }, 1e3);
@@ -26806,7 +28100,7 @@ html, body {
     restoreAutosave() {
       let autosaveText = null;
       try {
-        autosaveText = System50.localStorage.getItem(AUTOSAVE_STORAGE_KEY);
+        autosaveText = System51.localStorage.getItem(AUTOSAVE_STORAGE_KEY);
       } catch (exception) {
         return false;
       }
@@ -26814,7 +28108,7 @@ html, body {
         return false;
       }
       try {
-        const autosaveData = System50.JSON.parse(autosaveText);
+        const autosaveData = System51.JSON.parse(autosaveText);
         this.loadSceneText(autosaveData.jsonText, autosaveData.scenePath || "");
         this.#isDirty = autosaveData.isDirty === true;
         this.log("\uC9C0\uB09C\uBC88\uC5D0 \uD558\uB358 \uC52C\uC744 \uB418\uC0B4\uB838\uB2E4. (\uBE0C\uB77C\uC6B0\uC800 \uC790\uB3D9 \uBCF4\uAD00)");
@@ -26839,7 +28133,7 @@ html, body {
       const elements = this.#elements;
       const scenePath = this.#scenePath || "Untitled";
       elements.sceneTitle.textContent = `${scenePath}${this.#isDirty ? " *" : ""}`;
-      System50.document.title = `${scenePath}${this.#isDirty ? " *" : ""} - vanilla.js Editor`;
+      System51.document.title = `${scenePath}${this.#isDirty ? " *" : ""} - vanilla.js Editor`;
       let nodeCount = 0;
       const countNodes = /* @__PURE__ */ __name((node) => {
         for (const childNode of node.getChildren()) {
@@ -26868,7 +28162,7 @@ html, body {
       }
       const frameSize = scene.getFrameSize();
       const toolName = { hand: "\uBC00\uAE30", move: "\uC62E\uAE30\uAE30", rotate: "\uB3CC\uB9AC\uAE30", scale: "\uD0A4\uC6B0\uAE30" }[scene.getTool()];
-      this.#elements.sceneOverlay.textContent = `${System50.Math.round(scene.getZoom() * 100)}%   ${frameSize.x} x ${frameSize.y}   ${toolName}${scene.isPlaying() ? "   \uC7AC\uC0DD \uC911" : ""}`;
+      this.#elements.sceneOverlay.textContent = `${System51.Math.round(scene.getZoom() * 100)}%   ${frameSize.x} x ${frameSize.y}   ${toolName}${scene.isPlaying() ? "   \uC7AC\uC0DD \uC911" : ""}`;
     }
     //==============================================================================
     // 콘솔에 적기.
@@ -26879,81 +28173,42 @@ html, body {
      */
     log(text, level = "log") {
       const consoleBody = this.#elements.consoleBody;
-      const now = new System50.Date();
-      const timeText = `${System50.String(now.getHours()).padStart(2, "0")}:${System50.String(now.getMinutes()).padStart(2, "0")}:${System50.String(now.getSeconds()).padStart(2, "0")}`;
-      const lineElement = createElement("div", "consoleLine" + (level === "warning" ? " isWarning" : level === "error" ? " isError" : ""), `[${timeText}] ${text}`);
+      const now = new System51.Date();
+      const timeText = `${System51.String(now.getHours()).padStart(2, "0")}:${System51.String(now.getMinutes()).padStart(2, "0")}:${System51.String(now.getSeconds()).padStart(2, "0")}`;
+      const lineElement = createElement2("div", "consoleLine" + (level === "warning" ? " isWarning" : level === "error" ? " isError" : ""), `[${timeText}] ${text}`);
       consoleBody.append(lineElement);
       while (consoleBody.childElementCount > CONSOLE_LINE_LIMIT) {
         consoleBody.firstChild.remove();
       }
       consoleBody.scrollTop = consoleBody.scrollHeight;
-      if (level === "error") {
-        this.#elements.consoleTab.style.color = "var(--editor-danger)";
+      if (level === "error" && this.#dockLayout !== null) {
+        this.#dockLayout.setWindowAlert("console", true);
       }
     }
     //==============================================================================
     // 브라우저 콘솔의 경고와 오류도 에디터 콘솔에. (원래 출력은 그대로)
     //==============================================================================
     hookConsole() {
-      const originalWarn = System50.console.warn.bind(System50.console);
-      const originalError = System50.console.error.bind(System50.console);
+      const originalWarn = System51.console.warn.bind(System51.console);
+      const originalError = System51.console.error.bind(System51.console);
       const formatArguments = /* @__PURE__ */ __name((argumentList) => {
         return argumentList.map((argument) => {
-          if (argument instanceof System50.Error) {
+          if (argument instanceof System51.Error) {
             return argument.stack || argument.message;
           }
-          return typeof argument === "object" ? System50.String(argument) : System50.String(argument);
+          return typeof argument === "object" ? System51.String(argument) : System51.String(argument);
         }).join(" ");
       }, "formatArguments");
-      System50.console.warn = (...argumentList) => {
+      System51.console.warn = (...argumentList) => {
         originalWarn(...argumentList);
         this.log(formatArguments(argumentList), "warning");
       };
-      System50.console.error = (...argumentList) => {
+      System51.console.error = (...argumentList) => {
         originalError(...argumentList);
         this.log(formatArguments(argumentList), "error");
       };
-      System50.window.addEventListener("error", (errorEvent) => {
+      System51.window.addEventListener("error", (errorEvent) => {
         this.log(errorEvent.message, "error");
-      });
-      this.#elements.consoleTab.addEventListener("click", () => {
-        this.#elements.consoleTab.style.color = "";
-      });
-    }
-    //==============================================================================
-    // 패널 사이 막대 끌어 크기 바꾸기.
-    //==============================================================================
-    setupSplitters() {
-      const rootElement = this.#elements.rootElement;
-      const sizes = { left: 250, right: 300, bottom: 230 };
-      const applySizes = /* @__PURE__ */ __name(() => {
-        rootElement.style.gridTemplateColumns = `${sizes.left}px 6px 1fr 6px ${sizes.right}px`;
-        rootElement.style.gridTemplateRows = `26px 34px 1fr 6px ${sizes.bottom}px 22px`;
-      }, "applySizes");
-      const attach = /* @__PURE__ */ __name((className, update) => {
-        const splitterElement = rootElement.querySelector(className);
-        splitterElement.addEventListener("pointerdown", (pointerEvent) => {
-          splitterElement.setPointerCapture(pointerEvent.pointerId);
-          const moveListener = /* @__PURE__ */ __name((moveEvent) => {
-            update(moveEvent);
-            applySizes();
-          }, "moveListener");
-          const upListener = /* @__PURE__ */ __name(() => {
-            splitterElement.removeEventListener("pointermove", moveListener);
-            splitterElement.removeEventListener("pointerup", upListener);
-          }, "upListener");
-          splitterElement.addEventListener("pointermove", moveListener);
-          splitterElement.addEventListener("pointerup", upListener);
-        });
-      }, "attach");
-      attach(".splitLeft", (moveEvent) => {
-        sizes.left = System50.Math.max(140, System50.Math.min(600, moveEvent.clientX));
-      });
-      attach(".splitRight", (moveEvent) => {
-        sizes.right = System50.Math.max(200, System50.Math.min(700, System50.window.innerWidth - moveEvent.clientX));
-      });
-      attach(".splitBottom", (moveEvent) => {
-        sizes.bottom = System50.Math.max(80, System50.Math.min(System50.window.innerHeight - 200, System50.window.innerHeight - 22 - moveEvent.clientY));
       });
     }
     //==============================================================================
@@ -26981,14 +28236,15 @@ html, body {
         copy: /* @__PURE__ */ __name(() => this.copySelected(), "copy"),
         paste: /* @__PURE__ */ __name(() => this.pasteNode(), "paste"),
         setGameView: /* @__PURE__ */ __name((isGameView) => this.setGameView(isGameView), "setGameView"),
+        dockLayout: this.#dockLayout,
         instantiatePrefab: /* @__PURE__ */ __name((asset, position) => this.instantiatePrefab(asset, position), "instantiatePrefab")
       };
     }
   };
   var visualEditor = new VisualEditor();
-  System50.visualEditor = visualEditor;
-  if (System50.document.readyState === "loading") {
-    System50.document.addEventListener("DOMContentLoaded", () => {
+  System51.visualEditor = visualEditor;
+  if (System51.document.readyState === "loading") {
+    System51.document.addEventListener("DOMContentLoaded", () => {
       visualEditor.start();
     });
   } else {
