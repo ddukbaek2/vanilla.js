@@ -392,7 +392,12 @@ export class Engine extends Object {
 			if (pageTransitionEvent.persisted) {
 				console.log(`[Engine] pageshow: persisted`);
 
-				dispatchPageProcessRestored();
+				recoverEngineState();
+				const sceneManager = this.getSceneManager();
+				const loadedScenes = sceneManager.getAllLoadedScenes();
+				for (const loadedScene of loadedScenes) {
+					loadedScene.onPageProcessRestored();
+				}
 			}
 		});
 
