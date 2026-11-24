@@ -5463,6 +5463,8 @@ void main() {
       webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
       this.applyImageMipmapBias(shaderProgram);
       webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+      this.setSpriteBatchingEnabled(true);
+      this.setCullingEnabled(true);
     }
     //==============================================================================
     // 설정 반영. (매 프레임 시작 시 엔진이 호출)

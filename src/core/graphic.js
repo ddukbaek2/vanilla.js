@@ -427,6 +427,10 @@ export class Graphic extends Object {
 		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
 		this.applyImageMipmapBias(shaderProgram);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+
+		// 묶어 그리기와 화면 밖 거르기는 기본으로 켠다. (지금 엔진을 쓰는 게임들이 묶어 그리기를 켜고 돌았고, 거르기는 내용 영역 안에만 그린다고 알린 컴포넌트만 거른다)
+		this.setSpriteBatchingEnabled(true);
+		this.setCullingEnabled(true);
 	}
 
 	//==============================================================================
