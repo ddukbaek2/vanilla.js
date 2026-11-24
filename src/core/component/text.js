@@ -159,6 +159,31 @@ export function buildFontString(fontFace, fontSize, bold, italic) {
 
 
 //==============================================================================
+// 웹 글꼴의 조각이 받아진 횟수. (늘면 그릴 때 나눠 둔 줄을 다시 나눈다, ShadowText 와 같은 방식)
+//==============================================================================
+let fontLoadCount = 0;
+if (System.document !== undefined && System.document.fonts !== undefined) {
+	System.document.fonts.addEventListener("loadingdone", () => {
+		fontLoadCount += 1;
+	});
+}
+
+//==============================================================================
+// 문서에 올린 글꼴 얼굴 수 반환. (다 받은 얼굴을 나중에 올리면 loadingdone 이 오지 않아 이것으로 안다, 문서가 없으면 0)
+//==============================================================================
+/**
+ * @returns { number }
+ */
+function readFontFaceCount() {
+	const document = System.document;
+	if (document === undefined || document.fonts === undefined) {
+		return 0;
+	}
+	return document.fonts.size;
+}
+
+
+//==============================================================================
 // 원시(plain) 텍스트 출력기 컴포넌트.
 // - 단일 폰트 / 단일 크기 / 단일 색상으로 텍스트를 1 라인 그리는 컴포넌트.
 // - 볼드 / 이탤릭 / 밑줄 / 취소선은 텍스트 전체에 일괄 적용된다.
@@ -187,6 +212,7 @@ export class Text extends Component {
 	/** @private @type { string } */ #wrapMode; // "word": 공백 단위(넘치는 단어는 글자 분할) | "char": 글자 단위.
 	/** @private @type { number } */ #lineSpacing; // 줄 간격 배율.
 	/** @private @type { number } */ #visibleCharacterCount; // 표시 글자 수. -1 이면 전체.
+	/** @private @type { object } */ #wrapCache; // 그릴 때 나눈 줄과 그때의 글, 글꼴, 크기, 폭, 줄바꿈 방식. (같으면 다시 나누지 않는다)
 
 	//==============================================================================
 	// 생성.
@@ -194,6 +220,18 @@ export class Text extends Component {
 	constructor() {
 		super();
 		this.setComponentType("Text");
+		this.#wrapCache = {
+			text: "",
+			fontFace: null,
+			fontSize: 0,
+			bold: false,
+			italic: false,
+			wrapWidth: -1,
+			wrapMode: "",
+			fontLoadCount: -1,
+			fontFaceCount: -1,
+			lineList: null,
+		};
 		this.#fontFace = null;
 		this.#text = "";
 		this.#fontSize = 32;
@@ -280,7 +318,7 @@ export class Text extends Component {
 	 */
 	drawWrappedText(graphic, contentSize, fullText) {
 		const wrapWidth = (this.#wordWrapWidth > 0) ? this.#wordWrapWidth : contentSize.x;
-		const lineList = this.wrapTextToLines(fullText, wrapWidth);
+		const lineList = this.readWrappedLines(fullText, wrapWidth);
 		const lineHeight = this.#fontSize * this.#lineSpacing;
 		const blockHeight = lineList.length * lineHeight;
 
@@ -353,6 +391,46 @@ export class Text extends Component {
 				}
 			}
 		}
+	}
+
+	//==============================================================================
+	// 그릴 줄 배열 반환. (wrapTextToLines 의 결과를 기억해 두고 쓴다)
+	// - 글, 글꼴, 크기, 굵게, 기울임, 폭, 줄바꿈 방식이 바뀌거나 웹 글꼴이 받아지거나 올라갈 때만 다시 나눈다.
+	// - 돌려준 배열은 다음에 다시 나눌 때까지 이 컴포넌트가 들고 있으므로 고치지 않는다.
+	//==============================================================================
+	/**
+	 * @param { string } text
+	 * @param { number } wrapWidth
+	 * @returns { string[] }
+	 */
+	readWrappedLines(text, wrapWidth) {
+		const wrapCache = this.#wrapCache;
+		const fontFaceCount = readFontFaceCount();
+		const isSame = wrapCache.lineList !== null
+			&& wrapCache.text === text
+			&& wrapCache.fontFace === this.#fontFace
+			&& wrapCache.fontSize === this.#fontSize
+			&& wrapCache.bold === this.#bold
+			&& wrapCache.italic === this.#italic
+			&& wrapCache.wrapWidth === wrapWidth
+			&& wrapCache.wrapMode === this.#wrapMode
+			&& wrapCache.fontLoadCount === fontLoadCount
+			&& wrapCache.fontFaceCount === fontFaceCount;
+		if (isSame) {
+			return wrapCache.lineList;
+		}
+		const lineList = this.wrapTextToLines(text, wrapWidth);
+		wrapCache.text = text;
+		wrapCache.fontFace = this.#fontFace;
+		wrapCache.fontSize = this.#fontSize;
+		wrapCache.bold = this.#bold;
+		wrapCache.italic = this.#italic;
+		wrapCache.wrapWidth = wrapWidth;
+		wrapCache.wrapMode = this.#wrapMode;
+		wrapCache.fontLoadCount = fontLoadCount;
+		wrapCache.fontFaceCount = fontFaceCount;
+		wrapCache.lineList = lineList;
+		return lineList;
 	}
 
 	//==============================================================================

@@ -245,6 +245,7 @@ export class Graphic extends Object {
 	/** @private @type { string } */ #textBaseline;
 	/** @private @type { string } */ #textDirection;
 	/** @private @type { object[] } */ #clipStack;
+	/** @private @type { object[] } */ #clipEntryPool; // 클립 영역 칸. (클립 깊이마다 하나씩 만들어 두고 고쳐 쓴다)
 	/** @private @type { Float32Array } */ #projectionMatrixArray;
 	/** @private @type { Float32Array } */ #modelMatrixArray;
 	/** @private @type { ShaderProgram | null } */ #uniformLocationProgram; // 아래 유니폼 자리를 찾아 둔 셰이더 프로그램.
@@ -373,6 +374,7 @@ export class Graphic extends Object {
 		this.#textDirection = "inherit";
 		this.#textBaseline = "alphabetic";
 		this.#clipStack = [];
+		this.#clipEntryPool = [];
 		this.#projectionMatrixArray = new Float32Array(9);
 		this.#modelMatrixArray = new Float32Array(9);
 		this.#uniformLocationProgram = null;
@@ -1781,7 +1783,11 @@ export class Graphic extends Object {
 		}
 
 		if (imageRect === null || imageRect === undefined || imageRect.isZero()) {
-			imageRect = Rect.create(0, 0, image.width, image.height);
+			// 영역이 없으면 사각 영역을 새로 만들지 않고 그림 전체를 바로 그린다.
+			this.drawImageWithSourceAndDestination(image,
+				0, 0, image.width, image.height,
+				position.x, position.y, contentSize.x, contentSize.y);
+			return;
 		}
 
 		this.drawImageWithSourceAndDestination(image,
@@ -2265,11 +2271,22 @@ export class Graphic extends Object {
 
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const previousClipDepth = this.#clipStack.length;
-		this.#clipStack.push({
-			rect: rect.clone(),
-			roundSize: roundSize,
-			transformMatrix: this.#transformMatrix.clone(),
-		});
+
+		// 영역과 변환은 복제본을 새로 만들지 않고, 클립 깊이마다 만들어 둔 칸에 값을 적는다.
+		let clipEntry = this.#clipEntryPool[previousClipDepth];
+		if (clipEntry === undefined) {
+			clipEntry = {
+				rect: new Rect(),
+				roundSize: 0,
+				transformMatrix: new TransformMatrix(),
+			};
+			this.#clipEntryPool.push(clipEntry);
+		}
+		clipEntry.rect.position.set(rect.position.x, rect.position.y);
+		clipEntry.rect.size.set(rect.size.x, rect.size.y);
+		clipEntry.roundSize = roundSize;
+		clipEntry.transformMatrix.copyFrom(this.#transformMatrix);
+		this.#clipStack.push(clipEntry);
 
 		// 클리핑 전에 쌓인 것을 먼저 그린다. (스텐실 상태가 바뀌기 전)
 		this.flushSpriteBatch();
@@ -2306,8 +2323,9 @@ export class Graphic extends Object {
 
 		// 기록 시점의 변환 행렬로 같은 영역을 DECR 해 스텐실 원복.
 		// (begin 과 end 사이에 변환이 바뀌었을 수 있으므로 스냅샷 사용)
+		// 칸은 다음 클립이 고쳐 쓰므로 지금 행렬 객체로 삼지 않고 값만 옮겨 적는다. (아래 popState 가 begin 때의 행렬로 되돌린다)
 		this.flushSpriteBatch();
-		this.#transformMatrix = clipEntry.transformMatrix;
+		this.#transformMatrix.copyFrom(clipEntry.transformMatrix);
 		webGL2RenderingContext.colorMask(false, false, false, false);
 		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.ALWAYS, 0, 0xFF);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.DECR);

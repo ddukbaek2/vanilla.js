@@ -8,6 +8,13 @@ import { Graphic } from "../graphic.js";
 
 
 //==============================================================================
+// 전역 상수 목록.
+//==============================================================================
+// 클립할 때마다 고쳐 쓰는 사각 영역. (graphic.beginClipRect 는 받은 영역의 값을 제 칸에 옮겨 적고 들고 있지 않는다)
+const clipRect = new Rect();
+
+
+//==============================================================================
 // 마스크 컴포넌트.
 // - 부착된 노드의 contentSize 영역으로 자식 노드들의 그리기를 클리핑한다.
 // - 실제 begin/end 호출은 노드의 draw 가 자식 그리기 직전/직후에 한다.
@@ -42,8 +49,17 @@ export class Mask extends Component {
 		if (typeof node.getContentSize !== "function") {
 			return;
 		}
-		const contentSize = node.getContentSize();
-		const clipRect = Rect.create(0, 0, contentSize.x, contentSize.y);
+		const clipRectPosition = clipRect.position;
+		const clipRectSize = clipRect.size;
+		clipRectPosition.set(0, 0);
+		if (typeof node.copyContentSizeTo === "function") {
+			// 내용 크기를 복제본 없이 받는다.
+			node.copyContentSizeTo(clipRectSize);
+		}
+		else {
+			const contentSize = node.getContentSize();
+			clipRectSize.set(contentSize.x, contentSize.y);
+		}
 		const roundSize = this.getRoundSize();
 		graphic.beginClipRect(clipRect, roundSize);
 	}

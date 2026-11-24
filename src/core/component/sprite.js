@@ -54,6 +54,14 @@ export const SpriteBlendMode = {
 
 
 //==============================================================================
+// 그릴 때마다 고쳐 쓰는 벡터. (graphic 의 그리기 함수는 받은 벡터를 그 자리에서 읽기만 하고 들고 있지 않는다)
+//==============================================================================
+const spritePosition = Vector2.zero(); // 그리는 왼쪽 위. (늘 0, 0)
+const spriteContentSize = Vector2.zero(); // 노드의 내용 크기.
+const spriteImageSize = Vector2.zero(); // 뒤집기를 곱한 그리는 크기.
+
+
+//==============================================================================
 // 스프라이트 출력자 컴포넌트.
 //==============================================================================
 export class Sprite extends Paint {
@@ -116,10 +124,20 @@ export class Sprite extends Paint {
 		const node = this.getNode();
 		if (!node) return;
 
-		const position = Vector2.zero();
-		const contentSize = node.getContentSize();
-		const flip = this.getFlip();
-		const imageSize = contentSize.multiply(flip);
+		// 위치, 내용 크기, 그리는 크기는 복제본 없이 모듈의 벡터에 적는다.
+		const position = spritePosition;
+		const contentSize = spriteContentSize;
+		if (typeof node.copyContentSizeTo === "function") {
+			node.copyContentSizeTo(contentSize);
+		}
+		else {
+			const nodeContentSize = node.getContentSize();
+			contentSize.set(nodeContentSize.x, nodeContentSize.y);
+		}
+		const flipX = this.isHorizontalFlip() ? -1 : 1;
+		const flipY = this.isVerticalFlip() ? -1 : 1;
+		const imageSize = spriteImageSize;
+		imageSize.set(contentSize.x * flipX, contentSize.y * flipY);
 		const spriteBlendMode = this.getSpriteBlendMode();
 		const spriteDrawMode = this.getSpriteDrawMode();
 
@@ -147,12 +165,14 @@ export class Sprite extends Paint {
 		switch (spriteDrawMode) {
 			case SpriteDrawMode.simple: {
 					// 이미지 소스 조정.
-					let imageRect = this.getImageRect();
+					// 영역이 없으면 사각 영역을 새로 만들지 않고 그림 전체를 바로 그린다.
+					const imageRect = this.getImageRect();
 					if (imageRect === null || imageRect === undefined || imageRect.isZero()) {
-						imageRect = Rect.create(0, 0, image.width, image.height);
+						graphic.drawImageWithSourceAndDestination(image, 0, 0, image.width, image.height, position.x, position.y, imageSize.x, imageSize.y);
 					}
-
-					graphic.drawImageWithImageRect(image, position, imageSize, imageRect);
+					else {
+						graphic.drawImageWithImageRect(image, position, imageSize, imageRect);
+					}
 					break;
 				}
 			case SpriteDrawMode.sliced: {

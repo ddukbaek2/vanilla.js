@@ -60,6 +60,11 @@
 - Graphic: invalidateRenderStateCache(). 묶음 기억을 잊는다. Graphic 을 거치지 않고 WebGL 로 프로그램이나 텍스처를 바꾼 뒤 Graphic 출력을 이어갈 때 부른다. restoreRenderState, applySettings 와 컨텍스트를 잃거나 되살릴 때(webglcontextlost, webglcontextrestored)는 스스로 잊는다. (바깥 GL 을 끼우는 곳은 지금처럼 flushSpriteBatch 와 restoreRenderState 로 감싸면 된다)
 - Engine: 씬마다 그리기 전(preDraw, 로딩 중이면 drawOnLoad)에 Graphic 의 묶음 기억을 잊는다. (앞 씬의 그리기와 이 씬의 갱신 사이에 바깥 WebGL 이 텍스처를 바꿨을 수 있다)
 - ImageTextureCache, TextStringTextureCache: 생성자의 둘째 인자로 텍스처를 묶는 함수(textureBinder)를 받는다. Graphic 이 넘겨, 캐시가 텍스처를 올릴 때도 묶은 텍스처를 기억한다. 없으면 지금처럼 바로 묶는다. ImageTextureCache.getTexture 는 텍스처를 만들거나 필터를 다시 걸 때만 묶는다. (그리려고 묶는 것은 Graphic 이 한다)
+- Text: 줄바꿈한 줄 배열을 기억해 두고, 글, 글꼴, 크기, 굵게, 기울임, 폭, 줄바꿈 방식이 바뀌거나 웹 글꼴이 받아지거나(loadingdone) 문서에 글꼴 얼굴이 올라가고 빠질 때만 다시 나눈다. (readWrappedLines) 그릴 때마다 단어와 글자마다 measureText 하던 것이 없어진다
+- Sprite.draw: 그릴 때마다 만들던 Vector2 넷(위치, 내용 크기 복제, 뒤집기, 곱한 크기)과 그림 영역이 없을 때의 Rect 를 없앤다. 모듈의 벡터를 고쳐 쓰고 WorldNode.copyContentSizeTo 로 크기를 받으며, 영역이 없으면 그림 전체를 바로 그린다. Graphic.drawImageWithImageRect 도 영역이 없을 때 Rect 를 만들지 않는다
+- Graphic.beginClipRect: 영역과 변환 행렬의 복제본을 만들지 않고 클립 깊이마다 만들어 둔 칸에 값을 적는다. endClipRect 는 그 칸을 지금 행렬 객체로 삼지 않고 값만 옮겨 적는다. (popState 가 begin 때의 행렬로 되돌리는 것은 같다) Mask.beginClip 도 클립 영역을 새로 만들지 않는다
+- TextStringTextureCache.getEntry: 찾을 때마다 열쇠 문자열을 만들지 않고, 문자열별 엔트리 목록에서 나머지 값(방식, 방향, 배율, 선 두께, 색, 글꼴)을 견준다. 열쇠 문자열은 구울 때 한 번 만들어 엔트리에 둔다. (LRU 차례와 상한, invalidateFontFaces 는 같다)
+- ParticleSystem: 수명이 다한 파티클을 splice 로 하나씩 빼지 않고(뒤를 매번 당긴다) 살아 있는 것을 앞으로 당겨 담는다. (그리는 차례는 같다) 그림 파티클은 그릴 때마다 Vector2 둘을 만들지 않는다
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.

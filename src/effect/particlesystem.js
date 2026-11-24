@@ -280,14 +280,18 @@ export class ParticleSystem extends Component {
 		}
 
 		// 적분.
-		for (let particleIndex = this.#particleList.length - 1; particleIndex >= 0; --particleIndex) {
-			const particle = this.#particleList[particleIndex];
+		// 수명이 다한 것은 splice 로 하나씩 빼지 않고(뒤를 매번 당긴다), 살아 있는 것을 앞으로 당겨 담은 뒤 길이를 줄인다. (차례는 그대로)
+		const particleList = this.#particleList;
+		let aliveCount = 0;
+		for (let particleIndex = 0; particleIndex < particleList.length; ++particleIndex) {
+			const particle = particleList[particleIndex];
 			particle.age += timeDelta;
 			if (particle.age >= particle.lifetime) {
 				this.#freeList.push(particle);
-				this.#particleList.splice(particleIndex, 1);
 				continue;
 			}
+			particleList[aliveCount] = particle;
+			aliveCount += 1;
 			particle.velocityX += this.#gravity.x * timeDelta;
 			particle.velocityY += this.#gravity.y * timeDelta;
 			if (this.#attractorPosition) {
@@ -310,6 +314,7 @@ export class ParticleSystem extends Component {
 			particle.y += particle.velocityY * timeDelta;
 			particle.rotation += particle.angularVelocity * timeDelta;
 		}
+		particleList.length = aliveCount;
 	}
 
 	//==============================================================================
@@ -586,7 +591,9 @@ export class ParticleSystem extends Component {
 			graphic.translate(drawX, drawY);
 			graphic.rotate(particle.rotation);
 			graphic.multiplyGlobalAlpha(System.Math.max(0, System.Math.min(1, particle.alpha * (1 - lifeRatio))));
-			graphic.drawImage(this.#image, Vector2.create(-drawSize * 0.5, -drawSize * 0.5), Vector2.create(drawSize, drawSize));
+			// drawImage 와 같은 그리기를 벡터를 만들지 않고 한다.
+			const image = this.#image;
+			graphic.drawImageWithSourceAndDestination(image, 0, 0, image.width, image.height, -drawSize * 0.5, -drawSize * 0.5, drawSize, drawSize);
 			graphic.popState();
 		}
 	}

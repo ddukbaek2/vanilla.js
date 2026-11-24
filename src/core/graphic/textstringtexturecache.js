@@ -100,6 +100,7 @@ export class TextStringTextureCache extends Object {
 	//==============================================================================
 	/** @private @type { WebGL2RenderingContext } */ #webGL2RenderingContext;
 	/** @private @type { Map<string, object> } */ #entries;
+	/** @private @type { Map<string, object[]> } */ #entriesByText; // 문자열마다 그 문자열의 엔트리 목록. (찾을 때 열쇠 문자열을 만들지 않으려고)
 	/** @private @type { HTMLCanvasElement } */ #bakeCanvas;
 	/** @private @type { CanvasRenderingContext2D } */ #bakeCanvasRenderingContext;
 	/** @private @type { CanvasRenderingContext2D } */ #measurementCanvasRenderingContext;
@@ -118,6 +119,7 @@ export class TextStringTextureCache extends Object {
 
 		this.#webGL2RenderingContext = webGL2RenderingContext;
 		this.#entries = new Map();
+		this.#entriesByText = new Map();
 		this.#textureBinder = textureBinder;
 
 		const bakeCanvas = System.document.createElement("canvas");
@@ -183,30 +185,59 @@ export class TextStringTextureCache extends Object {
 			return null;
 		}
 
-		const entryKey = `${mode}|${textDirection}|${scale}|${lineWidth}|${colorString}|${fontString}|${text}`;
+		// 그릴 때마다 열쇠 문자열을 만들지 않고, 문자열로 엔트리 목록을 찾아 나머지 값을 견준다. (열쇠 문자열은 구울 때 한 번 만들어 엔트리에 둔다)
 		const entries = this.getEntries();
-		if (entries.has(entryKey)) {
-			// LRU 갱신. (재삽입으로 최신화)
-			const entry = entries.get(entryKey);
-			entries.delete(entryKey);
-			entries.set(entryKey, entry);
-			return entry;
+		const entryList = this.#entriesByText.get(text);
+		if (entryList !== undefined) {
+			for (const entry of entryList) {
+				if (entry.mode !== mode || entry.textDirection !== textDirection || entry.scale !== scale || entry.lineWidth !== lineWidth || entry.colorString !== colorString || entry.fontString !== fontString) {
+					continue;
+				}
+				// LRU 갱신. (재삽입으로 최신화)
+				const entryKey = entry.entryKey;
+				entries.delete(entryKey);
+				entries.set(entryKey, entry);
+				return entry;
+			}
 		}
 
+		const entryKey = `${mode}|${textDirection}|${scale}|${lineWidth}|${colorString}|${fontString}|${text}`;
 		const entry = this.bakeEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection);
 		if (!entry) {
 			return null;
 		}
 
+		entry.entryKey = entryKey;
+		entry.mode = mode;
+		entry.text = text;
+		entry.fontString = fontString;
+		entry.colorString = colorString;
+		entry.lineWidth = lineWidth;
+		entry.scale = scale;
+		entry.textDirection = textDirection;
+
+		// 값은 달라도 열쇠 문자열이 같은 엔트리(글꼴 문자열에 | 가 든 때 등)는 지금처럼 새 것으로 바꾼다.
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const collidedEntry = entries.get(entryKey);
+		if (collidedEntry !== undefined) {
+			webGL2RenderingContext.deleteTexture(collidedEntry.texture);
+			this.removeEntry(entryKey, collidedEntry);
+		}
 		entries.set(entryKey, entry);
+		const textEntryList = this.#entriesByText.get(text);
+		if (textEntryList !== undefined) {
+			textEntryList.push(entry);
+		}
+		else {
+			this.#entriesByText.set(text, [entry]);
+		}
 
 		// 상한 초과 시 가장 오래된 엔트리부터 퇴출. (GPU 텍스처 누수 방지)
-		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		while (entries.size > MAXIMUM_ENTRY_COUNT) {
 			const oldestEntryKey = entries.keys().next().value;
 			const oldestEntry = entries.get(oldestEntryKey);
 			webGL2RenderingContext.deleteTexture(oldestEntry.texture);
-			entries.delete(oldestEntryKey);
+			this.removeEntry(oldestEntryKey, oldestEntry);
 		}
 
 		return entry;
@@ -328,6 +359,30 @@ export class TextStringTextureCache extends Object {
 			webGL2RenderingContext.deleteTexture(entry.texture);
 		}
 		entries.clear();
+		this.#entriesByText.clear();
+	}
+
+	//==============================================================================
+	// 엔트리 하나를 맵과 문자열별 목록에서 뺀다. (텍스처는 부르는 쪽이 지운다)
+	//==============================================================================
+	/**
+	 * @param { string } entryKey
+	 * @param { object } entry
+	 */
+	removeEntry(entryKey, entry) {
+		const entries = this.getEntries();
+		entries.delete(entryKey);
+		const entryList = this.#entriesByText.get(entry.text);
+		if (entryList === undefined) {
+			return;
+		}
+		const entryIndex = entryList.indexOf(entry);
+		if (entryIndex >= 0) {
+			entryList.splice(entryIndex, 1);
+		}
+		if (entryList.length === 0) {
+			this.#entriesByText.delete(entry.text);
+		}
 	}
 
 	//==============================================================================
@@ -368,7 +423,7 @@ export class TextStringTextureCache extends Object {
 				continue;
 			}
 			webGL2RenderingContext.deleteTexture(entry.texture);
-			entries.delete(entryKey);
+			this.removeEntry(entryKey, entry);
 			removedCount += 1;
 		}
 		return removedCount;
