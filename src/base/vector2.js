@@ -273,13 +273,13 @@ export class Vector2 extends Object {
 	modulo(other) {
 		const origin = this.clone();
 		if (typeof other === "number") {
-			origin.x /= other;
-			origin.y /= other;
+			origin.x %= other;
+			origin.y %= other;
 			return origin;
 		}
 		else if (other instanceof Vector2) {
-			origin.x /= other.x;
-			origin.y /= other.y;
+			origin.x %= other.x;
+			origin.y %= other.y;
 			return origin;
 		}
 		
@@ -293,7 +293,7 @@ export class Vector2 extends Object {
 	 * @returns { Vector2 }
 	 */
 	half() {
-		const obj = this.divide(0.5);
+		const obj = this.divide(2);
 		return obj;
 	}
 	
