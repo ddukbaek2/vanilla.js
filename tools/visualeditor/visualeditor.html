@@ -46,16 +46,25 @@
   }
   __name(random, "random");
   function floor(value) {
+    if (!System2.Number.isFinite(value)) {
+      return value;
+    }
     const r = value % 1;
     return value < 0 && r !== 0 ? value - r - 1 : value - r;
   }
   __name(floor, "floor");
   function ceil(value) {
+    if (!System2.Number.isFinite(value)) {
+      return value;
+    }
     const r = value % 1;
     return value > 0 && r !== 0 ? value - r + 1 : value - r;
   }
   __name(ceil, "ceil");
   function round(value) {
+    if (!System2.Number.isFinite(value)) {
+      return value;
+    }
     const r = value % 1;
     if (value >= 0) {
       return r >= 0.5 ? value - r + 1 : value - r;
@@ -65,17 +74,7 @@
   }
   __name(round, "round");
   function sqrt(value) {
-    if (value < 0) {
-      return NaN;
-    }
-    if (value === 0) {
-      return 0;
-    }
-    let result = value > 1 ? value : 1;
-    for (let i = 0; i < 10; ++i) {
-      result = (result + value / result) / 2;
-    }
-    return result;
+    return System2.Math.sqrt(value);
   }
   __name(sqrt, "sqrt");
   function abs(value) {
@@ -117,38 +116,15 @@
   }
   __name(tan, "tan");
   function asin(value) {
-    if (value < -1 || value > 1) return NaN;
-    if (value === 1) return PI / 2;
-    if (value === -1) return -PI / 2;
-    let result = value;
-    let term = value;
-    for (let i = 1; i < 100; i++) {
-      term *= value * value * (2 * i - 1) * (2 * i - 1) / (2 * i * (2 * i + 1));
-      result += term;
-      if (abs(term) < 1e-15) break;
-    }
-    return result;
+    return System2.Math.asin(value);
   }
   __name(asin, "asin");
   function acos(value) {
-    if (value < -1 || value > 1) return NaN;
-    return PI / 2 - asin(value);
+    return System2.Math.acos(value);
   }
   __name(acos, "acos");
   function pow(base, exponent) {
-    if (exponent === 0) return 1;
-    if (exponent < 0) return 1 / pow(base, -exponent);
-    let result = 1;
-    let currentBase = base;
-    let currentExponent = exponent;
-    while (currentExponent > 0) {
-      if (currentExponent % 2 === 1) {
-        result *= currentBase;
-      }
-      currentBase *= currentBase;
-      currentExponent = floor(currentExponent / 2);
-    }
-    return result;
+    return System2.Math.pow(base, exponent);
   }
   __name(pow, "pow");
   function degreeToRadian(degree) {
@@ -912,12 +888,12 @@
     modulo(other) {
       const origin = this.clone();
       if (typeof other === "number") {
-        origin.x /= other;
-        origin.y /= other;
+        origin.x %= other;
+        origin.y %= other;
         return origin;
       } else if (other instanceof _Vector2) {
-        origin.x /= other.x;
-        origin.y /= other.y;
+        origin.x %= other.x;
+        origin.y %= other.y;
         return origin;
       }
       throw new Error('Invalid type: "other" must be a number or an instance of Vector2.');
@@ -929,7 +905,7 @@
      * @returns { Vector2 }
      */
     half() {
-      const obj = this.divide(0.5);
+      const obj = this.divide(2);
       return obj;
     }
     //==============================================================================
@@ -11240,7 +11216,12 @@ void main() {
       System20.window.addEventListener("pageshow", (pageTransitionEvent) => {
         if (pageTransitionEvent.persisted) {
           console.log(`[Engine] pageshow: persisted`);
-          dispatchPageProcessRestored();
+          recoverEngineState();
+          const sceneManager = this.getSceneManager();
+          const loadedScenes = sceneManager.getAllLoadedScenes();
+          for (const loadedScene of loadedScenes) {
+            loadedScene.onPageProcessRestored();
+          }
         }
       });
       System20.document.addEventListener("visibilitychange", () => {
