@@ -864,6 +864,7 @@ export class Engine extends Object {
 			try {
 				if (!loadedScene.isLoaded()) {
 					// 로딩 중: 로딩 전용 출력만 호출. 씬의 tick/draw는 호출하지 않음.
+					graphic.invalidateRenderStateCache();
 					loadedScene.drawOnLoad(graphic);
 					continue;
 				}
@@ -872,6 +873,8 @@ export class Engine extends Object {
 				loadedScene.tick(timeDelta);
 
 				// 출력.
+				// 앞 씬의 그리기와 이 씬의 갱신 사이에 바깥 WebGL 이 프로그램과 텍스처를 바꿨을 수 있으므로 Graphic 의 묶음 기억을 잊는다.
+				graphic.invalidateRenderStateCache();
 				loadedScene.preDraw(graphic);
 				loadedScene.draw(graphic);
 				loadedScene.postDraw(graphic);

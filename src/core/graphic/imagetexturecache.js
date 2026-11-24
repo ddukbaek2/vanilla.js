@@ -15,6 +15,7 @@ export class ImageTextureCache extends Object {
 	//==============================================================================
 	/** @private @type { WebGL2RenderingContext } */ #webGL2RenderingContext;
 	/** @private @type { WeakMap<object, { texture: WebGLTexture, isSmoothingApplied: boolean, isMipmapApplied: boolean, hasMipmap: boolean }> } */ #entries;
+	/** @private @type { ((texture: WebGLTexture) => void) | null } */ #textureBinder; // 텍스처를 묶는 함수. (주인 Graphic 이 묶은 텍스처를 기억하게 넘긴다, null 이면 바로 묶는다)
 
 	//==============================================================================
 	// 생성.
@@ -22,12 +23,14 @@ export class ImageTextureCache extends Object {
 	/**
 	 * @constructor
 	 * @param { WebGL2RenderingContext } webGL2RenderingContext
+	 * @param { ((texture: WebGLTexture) => void) | null } textureBinder - 텍스처를 묶는 함수. (null 이면 바로 묶는다)
 	 */
-	constructor(webGL2RenderingContext) {
+	constructor(webGL2RenderingContext, textureBinder = null) {
 		super();
 
 		this.#webGL2RenderingContext = webGL2RenderingContext;
 		this.#entries = new WeakMap();
+		this.#textureBinder = textureBinder;
 	}
 
 	//==============================================================================
@@ -53,7 +56,7 @@ export class ImageTextureCache extends Object {
 		let entry = this.#entries.get(image);
 		if (!entry) {
 			const texture = webGL2RenderingContext.createTexture();
-			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+			this.bindTexture(texture);
 			webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
 			webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, image);
 			webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
@@ -62,12 +65,11 @@ export class ImageTextureCache extends Object {
 			entry = { texture: texture, isSmoothingApplied: !isSmoothingEnabled, isMipmapApplied: isMipmapEnabled, hasMipmap: false };
 			this.#entries.set(image, entry);
 		}
-		else {
-			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, entry.texture);
-		}
 
 		// 스무딩이나 밉맵 설정이 바뀌었으면 바인드 시점에 필터를 지연 재적용.
+		// 이때만 묶는다. 그리기 위해 묶는 것은 그리는 쪽(Graphic)이 한다.
 		if (entry.isSmoothingApplied !== isSmoothingEnabled || entry.isMipmapApplied !== isMipmapEnabled) {
+			this.bindTexture(entry.texture);
 			const filter = isSmoothingEnabled ? webGL2RenderingContext.LINEAR : webGL2RenderingContext.NEAREST;
 			let minificationFilter = filter;
 			if (isSmoothingEnabled && isMipmapEnabled) {
@@ -84,6 +86,22 @@ export class ImageTextureCache extends Object {
 		}
 
 		return entry.texture;
+	}
+
+	//==============================================================================
+	// 텍스처 묶기. (받은 묶는 함수가 있으면 그것으로)
+	//==============================================================================
+	/**
+	 * @param { WebGLTexture } texture
+	 */
+	bindTexture(texture) {
+		const textureBinder = this.#textureBinder;
+		if (textureBinder) {
+			textureBinder(texture);
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
 	}
 
 	//==============================================================================

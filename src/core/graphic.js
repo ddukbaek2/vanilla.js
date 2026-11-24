@@ -263,6 +263,8 @@ export class Graphic extends Object {
 	/** @private @type { number } */ #drawVertexCount; // 이번 프레임에 그린 정점 수.
 	/** @private @type { number } */ #lastFrameDrawCallCount; // 지난 프레임의 드로우 콜 수.
 	/** @private @type { number } */ #lastFrameDrawVertexCount; // 지난 프레임에 그린 정점 수.
+	/** @private @type { ShaderProgram | null } */ #boundShaderProgram; // 마지막으로 쓰게 한 셰이더 프로그램. (null 이면 모른다)
+	/** @private @type { WebGLTexture | null } */ #boundTexture; // 0 번 텍스처 유닛에 마지막으로 묶은 텍스처. (null 이면 모른다)
 
 	//==============================================================================
 	// 생성.
@@ -288,6 +290,15 @@ export class Graphic extends Object {
 
 		this.#canvas = canvas;
 		this.#webGL2RenderingContext = webGL2RenderingContext;
+		this.#boundShaderProgram = null;
+		this.#boundTexture = null;
+
+		// 컨텍스트를 잃거나 되살리면 GL 의 묶음이 처음으로 돌아가므로 기억을 잊는다.
+		const contextChangeCallback = () => {
+			this.invalidateRenderStateCache();
+		};
+		canvas.addEventListener("webglcontextlost", contextChangeCallback);
+		canvas.addEventListener("webglcontextrestored", contextChangeCallback);
 		this.#isForceGizmosVisible = false;
 		this.#isImageSmoothingEnabled = true;
 		this.#isImageMipmapEnabled = false;
@@ -317,7 +328,7 @@ export class Graphic extends Object {
 
 		// 단색 도형용 1x1 흰색 텍스처.
 		this.#whiteTexture = webGL2RenderingContext.createTexture();
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#whiteTexture);
+		this.bindTexture(this.#whiteTexture);
 		const whitePixel = new Uint8Array([255, 255, 255, 255]);
 		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, whitePixel);
 		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
@@ -339,9 +350,12 @@ export class Graphic extends Object {
 		this.#batchVertexCount = 0;
 		this.#batchTexture = null;
 
-		// 캐시.
-		this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext);
-		this.#textStringTextureCache = new TextStringTextureCache(webGL2RenderingContext);
+		// 캐시. (캐시가 텍스처를 묶을 때도 이 Graphic 이 묶은 텍스처를 기억하게 묶는 함수를 넘긴다)
+		const textureBinder = (texture) => {
+			this.bindTexture(texture);
+		};
+		this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext, textureBinder);
+		this.#textStringTextureCache = new TextStringTextureCache(webGL2RenderingContext, textureBinder);
 
 		// 상태.
 		this.#transformMatrix = new TransformMatrix();
@@ -400,7 +414,7 @@ export class Graphic extends Object {
 		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
 
 		// 텍스처 유닛 고정.
-		shaderProgram.use();
+		this.useShaderProgram(shaderProgram);
 		const mainTextureLocation = shaderProgram.getUniformLocation("mainTexture");
 		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
 		this.applyImageMipmapBias(shaderProgram);
@@ -439,7 +453,9 @@ export class Graphic extends Object {
 		}
 
 		// 프로그램/버퍼 바인딩 및 프로젝션 업로드.
-		shaderProgram.use();
+		// 프레임 사이에 바깥 WebGL(3D 패스, 애셋 올리기 등)이 프로그램과 텍스처를 바꿨을 수 있으므로 기억을 잊고 시작한다.
+		this.invalidateRenderStateCache();
+		this.useShaderProgram(shaderProgram);
 		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.getVertexBuffer());
 		const projectionMatrixLocation = shaderProgram.getUniformLocation("projectionMatrix");
@@ -522,11 +538,11 @@ export class Graphic extends Object {
 			if (!shaderProgram) {
 				continue;
 			}
-			shaderProgram.use();
+			this.useShaderProgram(shaderProgram);
 			this.applyImageMipmapBias(shaderProgram);
 		}
 		const activeShaderProgram = this.getShaderProgram();
-		activeShaderProgram.use();
+		this.useShaderProgram(activeShaderProgram);
 	}
 
 	//==============================================================================
@@ -939,11 +955,12 @@ export class Graphic extends Object {
 		const vertexData = this.getVertexData();
 		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, vertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, vertexCount * FLOATS_PER_VERTEX);
 
-		// 유니폼 업로드.
+		// 유니폼 업로드. (묶어 그리기와 파티클 그리기는 제 프로그램을 쓰고 되돌리지 않으므로, 여기서 이 프로그램을 쓰게 한다)
+		this.useShaderProgram(shaderProgram);
 		this.uploadDrawUniforms(shaderProgram, color);
 
 		// 텍스처 바인드 및 출력.
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+		this.bindTexture(texture);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
 		this.#drawCallCount += 1;
 		this.#drawVertexCount += vertexCount;
@@ -1115,11 +1132,12 @@ export class Graphic extends Object {
 		webGL2RenderingContext.enableVertexAttribArray(tintColorLocation);
 		webGL2RenderingContext.vertexAttribPointer(tintColorLocation, 4, webGL2RenderingContext.FLOAT, false, strideBytes, 32);
 		webGL2RenderingContext.bindVertexArray(null);
-		this.#batchShaderProgram.use();
+		this.useShaderProgram(this.#batchShaderProgram);
 		const mainTextureLocation = this.#batchShaderProgram.getUniformLocation("mainTexture");
 		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
 		this.applyImageMipmapBias(this.#batchShaderProgram);
-		this.getShaderProgram().use();
+		const activeShaderProgram = this.getShaderProgram();
+		this.useShaderProgram(activeShaderProgram);
 		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
 	}
@@ -1200,14 +1218,14 @@ export class Graphic extends Object {
 		}
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 
-		this.#batchShaderProgram.use();
+		this.useShaderProgram(this.#batchShaderProgram);
 		webGL2RenderingContext.bindVertexArray(this.#batchVertexArray);
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexBuffer);
 		// drawVertices 와 같은 까닭으로 bufferSubData 대신 bufferData 로 새 저장소를 잡으며 올린다. (사파리 드로우 콜 동기 대기)
 		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, batchVertexCount * BATCH_FLOATS_PER_VERTEX);
 		const projectionMatrixLocation = this.#batchShaderProgram.getUniformLocation("projectionMatrix");
 		webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#batchTexture);
+		this.bindTexture(this.#batchTexture);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, batchVertexCount);
 		this.#drawCallCount += 1;
 		this.#drawVertexCount += batchVertexCount;
@@ -1215,7 +1233,7 @@ export class Graphic extends Object {
 		this.#batchTexture = null;
 
 		// 기본 경로 상태 복원.
-		this.getShaderProgram().use();
+		// 셰이더 프로그램은 되돌리지 않는다. 다음에 그리는 쪽이 제 프로그램을 쓰게 해, 묶음을 잇달아 그릴 때 프로그램을 오가지 않는다.
 		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
 	}
@@ -1249,11 +1267,12 @@ export class Graphic extends Object {
 		webGL2RenderingContext.enableVertexAttribArray(colorLocation);
 		webGL2RenderingContext.vertexAttribPointer(colorLocation, 4, webGL2RenderingContext.FLOAT, false, strideBytes, 16);
 		webGL2RenderingContext.bindVertexArray(null);
-		this.#particleShaderProgram.use();
+		this.useShaderProgram(this.#particleShaderProgram);
 		const mainTextureLocation = this.#particleShaderProgram.getUniformLocation("mainTexture");
 		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
 		this.applyImageMipmapBias(this.#particleShaderProgram);
-		this.getShaderProgram().use();
+		const activeShaderProgram = this.getShaderProgram();
+		this.useShaderProgram(activeShaderProgram);
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
 	}
 
@@ -1295,7 +1314,7 @@ export class Graphic extends Object {
 		this.ensureParticleBatchResources();
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 
-		this.#particleShaderProgram.use();
+		this.useShaderProgram(this.#particleShaderProgram);
 		webGL2RenderingContext.bindVertexArray(this.#particleVertexArray);
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#particleVertexBuffer);
 		// drawVertices 와 같은 까닭으로 bufferSubData 대신 bufferData 로 새 저장소를 잡으며 올린다. (사파리 드로우 콜 동기 대기)
@@ -1309,13 +1328,13 @@ export class Graphic extends Object {
 		const globalAlphaLocation = this.#particleShaderProgram.getUniformLocation("globalAlpha");
 		webGL2RenderingContext.uniform1f(globalAlphaLocation, this.getGlobalAlpha());
 
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+		this.bindTexture(texture);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
 		this.#drawCallCount += 1;
 		this.#drawVertexCount += vertexCount;
 
 		// 기본 경로 상태 복원.
-		this.getShaderProgram().use();
+		// 셰이더 프로그램은 되돌리지 않는다. (flushSpriteBatch 와 같다, 다음에 그리는 쪽이 제 프로그램을 쓰게 한다)
 		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
 	}
@@ -1353,7 +1372,7 @@ export class Graphic extends Object {
 			}
 		}
 		this.#softDiscTexture = webGL2RenderingContext.createTexture();
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#softDiscTexture);
+		this.bindTexture(this.#softDiscTexture);
 		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, textureSize, textureSize, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, pixels);
 		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR);
 		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.LINEAR);
@@ -2359,7 +2378,7 @@ export class Graphic extends Object {
 		this.#shaderProgramOverride = shaderProgram;
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const activeShaderProgram = this.getShaderProgram();
-		activeShaderProgram.use();
+		this.useShaderProgram(activeShaderProgram);
 		const projectionMatrixLocation = activeShaderProgram.getUniformLocation("projectionMatrix");
 		webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
 		const mainTextureLocation = activeShaderProgram.getUniformLocation("mainTexture");
@@ -2369,12 +2388,14 @@ export class Graphic extends Object {
 
 	//==============================================================================
 	// 렌더 상태 복구. (외부 WebGL 패스가 프로그램 / 버텍스 어레이 / 뷰포트를 바꾼 뒤 Graphic 출력을 이어갈 때)
+	// - 마지막으로 쓰게 한 프로그램과 묶은 텍스처의 기억도 잊는다. (invalidateRenderStateCache)
 	//==============================================================================
 	restoreRenderState() {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		webGL2RenderingContext.viewport(0, 0, this.#appliedViewportWidth, this.#appliedViewportHeight);
+		this.invalidateRenderStateCache();
 		const shaderProgram = this.getShaderProgram();
-		shaderProgram.use();
+		this.useShaderProgram(shaderProgram);
 		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.getVertexBuffer());
 		const projectionMatrixLocation = shaderProgram.getUniformLocation("projectionMatrix");
@@ -2387,6 +2408,46 @@ export class Graphic extends Object {
 		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
 		const blendMode = this.getBlendMode();
 		this.setBlendMode(blendMode);
+	}
+
+	//==============================================================================
+	// 셰이더 프로그램 쓰게 하기. (마지막으로 쓰게 한 것과 같으면 다시 걸지 않는다)
+	//==============================================================================
+	/**
+	 * @param { ShaderProgram } shaderProgram
+	 */
+	useShaderProgram(shaderProgram) {
+		if (shaderProgram === this.#boundShaderProgram) {
+			return;
+		}
+		shaderProgram.use();
+		this.#boundShaderProgram = shaderProgram;
+	}
+
+	//==============================================================================
+	// 0 번 텍스처 유닛에 텍스처 묶기. (마지막으로 묶은 것과 같으면 다시 묶지 않는다)
+	//==============================================================================
+	/**
+	 * @param { WebGLTexture } texture
+	 */
+	bindTexture(texture) {
+		if (texture === this.#boundTexture) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+		this.#boundTexture = texture;
+	}
+
+	//==============================================================================
+	// 묶음 기억 잊기.
+	// - Graphic 은 마지막으로 쓰게 한 셰이더 프로그램과 0 번 유닛에 묶은 텍스처를 기억해, 같으면 다시 걸지 않는다.
+	// - Graphic 을 거치지 않고 WebGL 로 프로그램이나 텍스처를 바꾼 뒤 Graphic 출력을 이어갈 때 부른다.
+	//   (restoreRenderState, applySettings 와 컨텍스트를 잃거나 되살릴 때는 스스로 잊는다)
+	//==============================================================================
+	invalidateRenderStateCache() {
+		this.#boundShaderProgram = null;
+		this.#boundTexture = null;
 	}
 
 	//==============================================================================

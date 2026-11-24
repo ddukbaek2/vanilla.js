@@ -103,6 +103,7 @@ export class TextStringTextureCache extends Object {
 	/** @private @type { HTMLCanvasElement } */ #bakeCanvas;
 	/** @private @type { CanvasRenderingContext2D } */ #bakeCanvasRenderingContext;
 	/** @private @type { CanvasRenderingContext2D } */ #measurementCanvasRenderingContext;
+	/** @private @type { ((texture: WebGLTexture) => void) | null } */ #textureBinder; // 텍스처를 묶는 함수. (주인 Graphic 이 묶은 텍스처를 기억하게 넘긴다, null 이면 바로 묶는다)
 
 	//==============================================================================
 	// 생성.
@@ -110,12 +111,14 @@ export class TextStringTextureCache extends Object {
 	/**
 	 * @constructor
 	 * @param { WebGL2RenderingContext } webGL2RenderingContext
+	 * @param { ((texture: WebGLTexture) => void) | null } textureBinder - 텍스처를 묶는 함수. (null 이면 바로 묶는다)
 	 */
-	constructor(webGL2RenderingContext) {
+	constructor(webGL2RenderingContext, textureBinder = null) {
 		super();
 
 		this.#webGL2RenderingContext = webGL2RenderingContext;
 		this.#entries = new Map();
+		this.#textureBinder = textureBinder;
 
 		const bakeCanvas = System.document.createElement("canvas");
 		this.#bakeCanvas = bakeCanvas;
@@ -291,7 +294,7 @@ export class TextStringTextureCache extends Object {
 		// 텍스처 업로드. (프리멀티플라이드 알파)
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const texture = webGL2RenderingContext.createTexture();
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+		this.bindTexture(texture);
 		webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
 		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, bakeCanvas);
 		webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
@@ -369,6 +372,22 @@ export class TextStringTextureCache extends Object {
 			removedCount += 1;
 		}
 		return removedCount;
+	}
+
+	//==============================================================================
+	// 텍스처 묶기. (받은 묶는 함수가 있으면 그것으로)
+	//==============================================================================
+	/**
+	 * @param { WebGLTexture } texture
+	 */
+	bindTexture(texture) {
+		const textureBinder = this.#textureBinder;
+		if (textureBinder) {
+			textureBinder(texture);
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
 	}
 
 	//==============================================================================

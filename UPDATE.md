@@ -56,6 +56,10 @@
   - 씬 저장과 열기: UIDocument 형식에 에디터 값 frameSize 를 얹은 .scene.json. 게임은 UIDocument.fromJsonText 로 그대로 읽는다. 폴더를 열었으면 그 안에 바로 쓰고, 아니면 내려받는다. Sprite 의 그림은 imagePath 로 적고 프로젝트에서 찾아 잇는다
   - 되돌리기와 다시 하기(200 칸, 같은 값을 잇달아 바꾸면 한 칸), 복사와 붙여넣기, 복제, 재생과 멈춤(멈추면 재생 전으로 되돌린다), 바꾸고 1 초 뒤 브라우저에 자동 보관하고 다시 열면 되살린다. 콘솔은 에디터 알림과 브라우저의 경고와 오류를 함께 보인다
   - 앞의 입자 스크립트 시연 에디터는 이것으로 바꿨다
+- 렌더링: 같은 셰이더 프로그램과 같은 텍스처를 다시 거는 호출을 거른다. Graphic 이 마지막으로 쓰게 한 프로그램과 0 번 텍스처 유닛에 묶은 텍스처를 기억해 같으면 useProgram, bindTexture 를 부르지 않는다. (useShaderProgram, bindTexture) 묶어 그리기(flushSpriteBatch)와 파티클 그리기(drawColoredQuads)는 그린 뒤 기본 프로그램으로 되돌리지 않고 다음에 그리는 쪽이 제 프로그램을 쓰게 해, 묶음을 잇달아 그릴 때 프로그램을 오가지 않는다. 그리는 결과는 같다. (예제 uishowcase, uisample, spriteeffects, particleeffects, timelineshowcase 와 바깥 GL, ShaderSprite, ScreenEffect, 씬 둘, 밉맵 바꾸기를 섞은 시험 장면을 시계와 난수를 고정해 같은 프레임에서 뜨면 묶기 끔, 켬 모두 고치기 전과 픽셀이 같다)
+- Graphic: invalidateRenderStateCache(). 묶음 기억을 잊는다. Graphic 을 거치지 않고 WebGL 로 프로그램이나 텍스처를 바꾼 뒤 Graphic 출력을 이어갈 때 부른다. restoreRenderState, applySettings 와 컨텍스트를 잃거나 되살릴 때(webglcontextlost, webglcontextrestored)는 스스로 잊는다. (바깥 GL 을 끼우는 곳은 지금처럼 flushSpriteBatch 와 restoreRenderState 로 감싸면 된다)
+- Engine: 씬마다 그리기 전(preDraw, 로딩 중이면 drawOnLoad)에 Graphic 의 묶음 기억을 잊는다. (앞 씬의 그리기와 이 씬의 갱신 사이에 바깥 WebGL 이 텍스처를 바꿨을 수 있다)
+- ImageTextureCache, TextStringTextureCache: 생성자의 둘째 인자로 텍스처를 묶는 함수(textureBinder)를 받는다. Graphic 이 넘겨, 캐시가 텍스처를 올릴 때도 묶은 텍스처를 기억한다. 없으면 지금처럼 바로 묶는다. ImageTextureCache.getTexture 는 텍스처를 만들거나 필터를 다시 걸 때만 묶는다. (그리려고 묶는 것은 Graphic 이 한다)
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.
