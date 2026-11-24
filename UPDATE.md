@@ -70,6 +70,7 @@
 - Graphic: isCullingEnabled(), isLocalRectVisible(rect) (지금 변환으로 옮긴 사각형이 드로잉 버퍼에 걸치는지), addCulledNodeCount(count), getLastFrameCulledNodeCount(). 엔진 통계(useStatistics)에 culledNodes 줄을 더했다
 - HeatHazeEffect(experimental): 없는 graphic.getCanvasRenderingContext() 를 부르던 Canvas2D 시절 코드를 지금 WebGL Graphic 으로 다시 짰다. 묶음을 먼저 그린 뒤 노드 영역의 화면 바운딩 박스를 copyTexSubImage2D 로 텍스처에 떠 오고, 줄마다 쿼드 한 장씩 정점 색 쿼드(drawColoredQuads)로 사인 곡선만큼 옮겨 그린다. (러스트 vanilla-engine 과 같은 방식, 흔들림 0 이면 효과가 없는 화면과 픽셀이 같다) 영역이 화면 밖으로 나가면 가장자리 픽셀을 늘인다. 내용 크기와 피봇을 쓰므로 TransformNode 대신 WorldNode 를 상속한다. (TransformNode 에는 setContentSize, getWorldBounds 가 없어 만들 때부터 죽었다) 떠 온 텍스처는 destroy() 가 지운다
 - Indicator(experimental): 없는 graphic.getCanvasRenderingContext() 와 isVisible() 을 부르고 import 경로("./graphic.js")가 깨져 있던 것을 고쳤다. Graphic 의 pushState, drawLine, drawStrokeCircle 로 그린다. (Graphic 의 선은 끝이 각져 Canvas2D 시절의 둥근 끝은 없다)
+- 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.

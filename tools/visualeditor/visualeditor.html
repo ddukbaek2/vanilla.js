@@ -3493,6 +3493,18 @@
       }
     }
     //==============================================================================
+    // 노드의 내용 영역(0, 0 ~ contentSize) 안에서만 그리는지 반환. (기본 false)
+    // - true 를 돌려주면 Graphic 의 화면 밖 거르기가 켜져 있을 때, 내용 영역이 화면 밖이면 엔진이 draw 를 건너뛴다.
+    // - 영역 밖(월드 좌표, 글자 넘침, 그림자 여백 등)에 조금이라도 그릴 수 있으면 false 로 둔다.
+    //==============================================================================
+    /**
+     * @virtual
+     * @returns { boolean }
+     */
+    isDrawnInsideContent() {
+      return false;
+    }
+    //==============================================================================
     // 의존 컴포넌트 목록 반환. (자식 클래스가 오버라이드)
     // - addComponent 가 본 컴포넌트를 부착하기 직전에 호출하여, 반환된 클래스 목록을
     //   같은 노드에 자동으로 추가한다 (이미 있으면 건너뜀).
@@ -4557,17 +4569,22 @@
     #webGL2RenderingContext;
     /** @private @type { WeakMap<object, { texture: WebGLTexture, isSmoothingApplied: boolean, isMipmapApplied: boolean, hasMipmap: boolean }> } */
     #entries;
+    /** @private @type { ((texture: WebGLTexture) => void) | null } */
+    #textureBinder;
+    // 텍스처를 묶는 함수. (주인 Graphic 이 묶은 텍스처를 기억하게 넘긴다, null 이면 바로 묶는다)
     //==============================================================================
     // 생성.
     //==============================================================================
     /**
      * @constructor
      * @param { WebGL2RenderingContext } webGL2RenderingContext
+     * @param { ((texture: WebGLTexture) => void) | null } textureBinder - 텍스처를 묶는 함수. (null 이면 바로 묶는다)
      */
-    constructor(webGL2RenderingContext) {
+    constructor(webGL2RenderingContext, textureBinder = null) {
       super();
       this.#webGL2RenderingContext = webGL2RenderingContext;
       this.#entries = /* @__PURE__ */ new WeakMap();
+      this.#textureBinder = textureBinder;
     }
     //==============================================================================
     // 이미지에 대응하는 텍스처 반환. (없으면 업로드 후 반환)
@@ -4591,7 +4608,7 @@
       let entry = this.#entries.get(image);
       if (!entry) {
         const texture = webGL2RenderingContext.createTexture();
-        webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+        this.bindTexture(texture);
         webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
         webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, image);
         webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
@@ -4599,10 +4616,9 @@
         webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
         entry = { texture, isSmoothingApplied: !isSmoothingEnabled, isMipmapApplied: isMipmapEnabled, hasMipmap: false };
         this.#entries.set(image, entry);
-      } else {
-        webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, entry.texture);
       }
       if (entry.isSmoothingApplied !== isSmoothingEnabled || entry.isMipmapApplied !== isMipmapEnabled) {
+        this.bindTexture(entry.texture);
         const filter = isSmoothingEnabled ? webGL2RenderingContext.LINEAR : webGL2RenderingContext.NEAREST;
         let minificationFilter = filter;
         if (isSmoothingEnabled && isMipmapEnabled) {
@@ -4618,6 +4634,21 @@
         entry.isMipmapApplied = isMipmapEnabled;
       }
       return entry.texture;
+    }
+    //==============================================================================
+    // 텍스처 묶기. (받은 묶는 함수가 있으면 그것으로)
+    //==============================================================================
+    /**
+     * @param { WebGLTexture } texture
+     */
+    bindTexture(texture) {
+      const textureBinder = this.#textureBinder;
+      if (textureBinder) {
+        textureBinder(texture);
+        return;
+      }
+      const webGL2RenderingContext = this.getWebGL2RenderingContext();
+      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
     }
     //==============================================================================
     // 렌더링 컨텍스트 반환.
@@ -4676,23 +4707,32 @@
     #webGL2RenderingContext;
     /** @private @type { Map<string, object> } */
     #entries;
+    /** @private @type { Map<string, object[]> } */
+    #entriesByText;
+    // 문자열마다 그 문자열의 엔트리 목록. (찾을 때 열쇠 문자열을 만들지 않으려고)
     /** @private @type { HTMLCanvasElement } */
     #bakeCanvas;
     /** @private @type { CanvasRenderingContext2D } */
     #bakeCanvasRenderingContext;
     /** @private @type { CanvasRenderingContext2D } */
     #measurementCanvasRenderingContext;
+    /** @private @type { ((texture: WebGLTexture) => void) | null } */
+    #textureBinder;
+    // 텍스처를 묶는 함수. (주인 Graphic 이 묶은 텍스처를 기억하게 넘긴다, null 이면 바로 묶는다)
     //==============================================================================
     // 생성.
     //==============================================================================
     /**
      * @constructor
      * @param { WebGL2RenderingContext } webGL2RenderingContext
+     * @param { ((texture: WebGLTexture) => void) | null } textureBinder - 텍스처를 묶는 함수. (null 이면 바로 묶는다)
      */
-    constructor(webGL2RenderingContext) {
+    constructor(webGL2RenderingContext, textureBinder = null) {
       super();
       this.#webGL2RenderingContext = webGL2RenderingContext;
       this.#entries = /* @__PURE__ */ new Map();
+      this.#entriesByText = /* @__PURE__ */ new Map();
+      this.#textureBinder = textureBinder;
       const bakeCanvas = System11.document.createElement("canvas");
       this.#bakeCanvas = bakeCanvas;
       this.#bakeCanvasRenderingContext = bakeCanvas.getContext("2d", { willReadFrequently: false });
@@ -4750,25 +4790,50 @@
       if (!text) {
         return null;
       }
-      const entryKey = `${mode}|${textDirection}|${scale}|${lineWidth}|${colorString}|${fontString}|${text}`;
       const entries = this.getEntries();
-      if (entries.has(entryKey)) {
-        const entry2 = entries.get(entryKey);
-        entries.delete(entryKey);
-        entries.set(entryKey, entry2);
-        return entry2;
+      const entryList = this.#entriesByText.get(text);
+      if (entryList !== void 0) {
+        for (const entry2 of entryList) {
+          if (entry2.mode !== mode || entry2.textDirection !== textDirection || entry2.scale !== scale || entry2.lineWidth !== lineWidth || entry2.colorString !== colorString || entry2.fontString !== fontString) {
+            continue;
+          }
+          const entryKey2 = entry2.entryKey;
+          entries.delete(entryKey2);
+          entries.set(entryKey2, entry2);
+          return entry2;
+        }
       }
+      const entryKey = `${mode}|${textDirection}|${scale}|${lineWidth}|${colorString}|${fontString}|${text}`;
       const entry = this.bakeEntry(mode, text, fontString, colorString, lineWidth, scale, textDirection);
       if (!entry) {
         return null;
       }
-      entries.set(entryKey, entry);
+      entry.entryKey = entryKey;
+      entry.mode = mode;
+      entry.text = text;
+      entry.fontString = fontString;
+      entry.colorString = colorString;
+      entry.lineWidth = lineWidth;
+      entry.scale = scale;
+      entry.textDirection = textDirection;
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
+      const collidedEntry = entries.get(entryKey);
+      if (collidedEntry !== void 0) {
+        webGL2RenderingContext.deleteTexture(collidedEntry.texture);
+        this.removeEntry(entryKey, collidedEntry);
+      }
+      entries.set(entryKey, entry);
+      const textEntryList = this.#entriesByText.get(text);
+      if (textEntryList !== void 0) {
+        textEntryList.push(entry);
+      } else {
+        this.#entriesByText.set(text, [entry]);
+      }
       while (entries.size > MAXIMUM_ENTRY_COUNT) {
         const oldestEntryKey = entries.keys().next().value;
         const oldestEntry = entries.get(oldestEntryKey);
         webGL2RenderingContext.deleteTexture(oldestEntry.texture);
-        entries.delete(oldestEntryKey);
+        this.removeEntry(oldestEntryKey, oldestEntry);
       }
       return entry;
     }
@@ -4836,7 +4901,7 @@
       }
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const texture = webGL2RenderingContext.createTexture();
-      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+      this.bindTexture(texture);
       webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
       webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, bakeCanvas);
       webGL2RenderingContext.pixelStorei(webGL2RenderingContext.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
@@ -4867,6 +4932,29 @@
         webGL2RenderingContext.deleteTexture(entry.texture);
       }
       entries.clear();
+      this.#entriesByText.clear();
+    }
+    //==============================================================================
+    // 엔트리 하나를 맵과 문자열별 목록에서 뺀다. (텍스처는 부르는 쪽이 지운다)
+    //==============================================================================
+    /**
+     * @param { string } entryKey
+     * @param { object } entry
+     */
+    removeEntry(entryKey, entry) {
+      const entries = this.getEntries();
+      entries.delete(entryKey);
+      const entryList = this.#entriesByText.get(entry.text);
+      if (entryList === void 0) {
+        return;
+      }
+      const entryIndex = entryList.indexOf(entry);
+      if (entryIndex >= 0) {
+        entryList.splice(entryIndex, 1);
+      }
+      if (entryList.length === 0) {
+        this.#entriesByText.delete(entry.text);
+      }
     }
     //==============================================================================
     // 받아진 웹 폰트로 다시 구울 엔트리 파기.
@@ -4905,10 +4993,25 @@
           continue;
         }
         webGL2RenderingContext.deleteTexture(entry.texture);
-        entries.delete(entryKey);
+        this.removeEntry(entryKey, entry);
         removedCount += 1;
       }
       return removedCount;
+    }
+    //==============================================================================
+    // 텍스처 묶기. (받은 묶는 함수가 있으면 그것으로)
+    //==============================================================================
+    /**
+     * @param { WebGLTexture } texture
+     */
+    bindTexture(texture) {
+      const textureBinder = this.#textureBinder;
+      if (textureBinder) {
+        textureBinder(texture);
+        return;
+      }
+      const webGL2RenderingContext = this.getWebGL2RenderingContext();
+      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
     }
     //==============================================================================
     // 렌더링 컨텍스트 반환.
@@ -5191,6 +5294,9 @@ void main() {
     #textDirection;
     /** @private @type { object[] } */
     #clipStack;
+    /** @private @type { object[] } */
+    #clipEntryPool;
+    // 클립 영역 칸. (클립 깊이마다 하나씩 만들어 두고 고쳐 쓴다)
     /** @private @type { Float32Array } */
     #projectionMatrixArray;
     /** @private @type { Float32Array } */
@@ -5237,6 +5343,21 @@ void main() {
     /** @private @type { number } */
     #lastFrameDrawVertexCount;
     // 지난 프레임에 그린 정점 수.
+    /** @private @type { boolean } */
+    #isCullingEnabled;
+    // 화면 밖 노드의 컴포넌트 그리기를 건너뛸지.
+    /** @private @type { number } */
+    #culledNodeCount;
+    // 이번 프레임에 화면 밖이라 컴포넌트를 건너뛴 노드 수.
+    /** @private @type { number } */
+    #lastFrameCulledNodeCount;
+    // 지난 프레임에 화면 밖이라 컴포넌트를 건너뛴 노드 수.
+    /** @private @type { ShaderProgram | null } */
+    #boundShaderProgram;
+    // 마지막으로 쓰게 한 셰이더 프로그램. (null 이면 모른다)
+    /** @private @type { WebGLTexture | null } */
+    #boundTexture;
+    // 0 번 텍스처 유닛에 마지막으로 묶은 텍스처. (null 이면 모른다)
     //==============================================================================
     // 생성.
     //==============================================================================
@@ -5257,6 +5378,13 @@ void main() {
       }
       this.#canvas = canvas;
       this.#webGL2RenderingContext = webGL2RenderingContext;
+      this.#boundShaderProgram = null;
+      this.#boundTexture = null;
+      const contextChangeCallback = /* @__PURE__ */ __name(() => {
+        this.invalidateRenderStateCache();
+      }, "contextChangeCallback");
+      canvas.addEventListener("webglcontextlost", contextChangeCallback);
+      canvas.addEventListener("webglcontextrestored", contextChangeCallback);
       this.#isForceGizmosVisible = false;
       this.#isImageSmoothingEnabled = true;
       this.#isImageMipmapEnabled = false;
@@ -5280,7 +5408,7 @@ void main() {
       webGL2RenderingContext.vertexAttribPointer(vertexTextureCoordinateLocation, 2, webGL2RenderingContext.FLOAT, false, strideBytes, 8);
       webGL2RenderingContext.bindVertexArray(null);
       this.#whiteTexture = webGL2RenderingContext.createTexture();
-      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#whiteTexture);
+      this.bindTexture(this.#whiteTexture);
       const whitePixel = new Uint8Array([255, 255, 255, 255]);
       webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, whitePixel);
       webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
@@ -5297,8 +5425,11 @@ void main() {
       this.#batchVertexData = null;
       this.#batchVertexCount = 0;
       this.#batchTexture = null;
-      this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext);
-      this.#textStringTextureCache = new TextStringTextureCache(webGL2RenderingContext);
+      const textureBinder = /* @__PURE__ */ __name((texture) => {
+        this.bindTexture(texture);
+      }, "textureBinder");
+      this.#imageTextureCache = new ImageTextureCache(webGL2RenderingContext, textureBinder);
+      this.#textStringTextureCache = new TextStringTextureCache(webGL2RenderingContext, textureBinder);
       this.#transformMatrix = new TransformMatrix();
       this.#stateStack = [];
       this.#stateSnapshotPool = [];
@@ -5314,6 +5445,7 @@ void main() {
       this.#textDirection = "inherit";
       this.#textBaseline = "alphabetic";
       this.#clipStack = [];
+      this.#clipEntryPool = [];
       this.#projectionMatrixArray = new Float32Array(9);
       this.#modelMatrixArray = new Float32Array(9);
       this.#uniformLocationProgram = null;
@@ -5332,6 +5464,9 @@ void main() {
       this.#drawVertexCount = 0;
       this.#lastFrameDrawCallCount = 0;
       this.#lastFrameDrawVertexCount = 0;
+      this.#isCullingEnabled = false;
+      this.#culledNodeCount = 0;
+      this.#lastFrameCulledNodeCount = 0;
       this.#blendFunctionTable = /* @__PURE__ */ new Map([
         ["source-over", [webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA]],
         ["lighter", [webGL2RenderingContext.ONE, webGL2RenderingContext.ONE]],
@@ -5347,7 +5482,7 @@ void main() {
       webGL2RenderingContext.blendFunc(webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
       webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
       webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
-      shaderProgram.use();
+      this.useShaderProgram(shaderProgram);
       const mainTextureLocation = shaderProgram.getUniformLocation("mainTexture");
       webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
       this.applyImageMipmapBias(shaderProgram);
@@ -5381,7 +5516,8 @@ void main() {
         this.#appliedViewportWidth = drawingBufferWidth;
         this.#appliedViewportHeight = drawingBufferHeight;
       }
-      shaderProgram.use();
+      this.invalidateRenderStateCache();
+      this.useShaderProgram(shaderProgram);
       webGL2RenderingContext.bindVertexArray(this.getVertexArray());
       webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.getVertexBuffer());
       const projectionMatrixLocation = shaderProgram.getUniformLocation("projectionMatrix");
@@ -5455,11 +5591,11 @@ void main() {
         if (!shaderProgram) {
           continue;
         }
-        shaderProgram.use();
+        this.useShaderProgram(shaderProgram);
         this.applyImageMipmapBias(shaderProgram);
       }
       const activeShaderProgram = this.getShaderProgram();
-      activeShaderProgram.use();
+      this.useShaderProgram(activeShaderProgram);
     }
     //==============================================================================
     // 이미지 밉맵 단계 보정 반환.
@@ -5829,8 +5965,9 @@ void main() {
       const shaderProgram = this.getShaderProgram();
       const vertexData = this.getVertexData();
       webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, vertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, vertexCount * FLOATS_PER_VERTEX);
+      this.useShaderProgram(shaderProgram);
       this.uploadDrawUniforms(shaderProgram, color);
-      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+      this.bindTexture(texture);
       webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
       this.#drawCallCount += 1;
       this.#drawVertexCount += vertexCount;
@@ -5898,8 +6035,10 @@ void main() {
     beginFrameStatistics() {
       this.#lastFrameDrawCallCount = this.#drawCallCount;
       this.#lastFrameDrawVertexCount = this.#drawVertexCount;
+      this.#lastFrameCulledNodeCount = this.#culledNodeCount;
       this.#drawCallCount = 0;
       this.#drawVertexCount = 0;
+      this.#culledNodeCount = 0;
     }
     //==============================================================================
     // 지난 프레임의 드로우 콜 수 반환.
@@ -5928,6 +6067,86 @@ void main() {
     getLastFrameTriangleCount() {
       const lastFrameVertexCount = this.getLastFrameVertexCount();
       return System12.Math.floor(lastFrameVertexCount / 3);
+    }
+    //==============================================================================
+    // 화면 밖 거르기 설정. (기본 false)
+    // - 켜면 WorldNode 가 컴포넌트를 그리기 전에, 켜진 컴포넌트가 모두 내용 영역 안에서만 그린다고 알리면(Component.isDrawnInsideContent)
+    //   내용 영역이 화면 밖일 때 그 노드의 컴포넌트 그리기를 건너뛴다. 자식은 저마다 따로 보고 그대로 그린다.
+    // - 판정은 그릴 때의 지금 변환(부모의 위치, 배율, 회전과 pushState 로 건 것 모두)으로 옮긴 영역의 경계 상자로 한다.
+    // - 알리지 않는 컴포넌트(기본, 글자, 파티클, 직접 만든 컴포넌트)가 하나라도 켜져 있으면 그 노드는 거르지 않는다. draw 를 덮어쓴 노드도 거르지 않는다.
+    //==============================================================================
+    /**
+     * @param { boolean } isCullingEnabled
+     */
+    setCullingEnabled(isCullingEnabled) {
+      this.#isCullingEnabled = isCullingEnabled === true;
+    }
+    //==============================================================================
+    // 화면 밖 거르기 여부 반환.
+    //==============================================================================
+    /**
+     * @returns { boolean }
+     */
+    isCullingEnabled() {
+      return this.#isCullingEnabled;
+    }
+    //==============================================================================
+    // 지금 변환으로 옮긴 사각형이 화면(드로잉 버퍼)에 걸치는지 반환. (네 꼭짓점을 옮긴 경계 상자로 본다)
+    // - 투영과 같은 디바이스 픽셀 좌표로 보므로 클립 공간 밖인지와 같다. (뷰포트를 줄여 그려도 맞다)
+    // - 뷰포트를 아직 정하지 않았으면(applySettings 전) 걸치는 것으로 본다.
+    //==============================================================================
+    /**
+     * @param { Rect } rect
+     * @returns { boolean }
+     */
+    isLocalRectVisible(rect) {
+      const viewportWidth = this.#appliedViewportWidth;
+      const viewportHeight = this.#appliedViewportHeight;
+      if (viewportWidth <= 0 || viewportHeight <= 0) {
+        return true;
+      }
+      const transformMatrix = this.#transformMatrix;
+      const matrixA = transformMatrix.a;
+      const matrixB = transformMatrix.b;
+      const matrixC = transformMatrix.c;
+      const matrixD = transformMatrix.d;
+      const matrixE = transformMatrix.e;
+      const matrixF = transformMatrix.f;
+      const leftX = rect.position.x;
+      const topY = rect.position.y;
+      const rightX = leftX + rect.size.x;
+      const bottomY = topY + rect.size.y;
+      const leftTopX = matrixA * leftX + matrixC * topY + matrixE;
+      const leftTopY = matrixB * leftX + matrixD * topY + matrixF;
+      const rightTopX = matrixA * rightX + matrixC * topY + matrixE;
+      const rightTopY = matrixB * rightX + matrixD * topY + matrixF;
+      const leftBottomX = matrixA * leftX + matrixC * bottomY + matrixE;
+      const leftBottomY = matrixB * leftX + matrixD * bottomY + matrixF;
+      const rightBottomX = matrixA * rightX + matrixC * bottomY + matrixE;
+      const rightBottomY = matrixB * rightX + matrixD * bottomY + matrixF;
+      const minimumX = System12.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX);
+      const maximumX = System12.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
+      const minimumY = System12.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
+      const maximumY = System12.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
+      return maximumX >= 0 && maximumY >= 0 && minimumX <= viewportWidth && minimumY <= viewportHeight;
+    }
+    //==============================================================================
+    // 이번 프레임에 화면 밖이라 컴포넌트를 건너뛴 노드 수 더하기. (WorldNode 가 부른다)
+    //==============================================================================
+    /**
+     * @param { number } culledNodeCount
+     */
+    addCulledNodeCount(culledNodeCount) {
+      this.#culledNodeCount += culledNodeCount;
+    }
+    //==============================================================================
+    // 지난 프레임에 화면 밖이라 컴포넌트를 건너뛴 노드 수 반환.
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    getLastFrameCulledNodeCount() {
+      return this.#lastFrameCulledNodeCount;
     }
     //==============================================================================
     // 스프라이트 묶어 그리기 설정.
@@ -5988,11 +6207,12 @@ void main() {
       webGL2RenderingContext.enableVertexAttribArray(tintColorLocation);
       webGL2RenderingContext.vertexAttribPointer(tintColorLocation, 4, webGL2RenderingContext.FLOAT, false, strideBytes, 32);
       webGL2RenderingContext.bindVertexArray(null);
-      this.#batchShaderProgram.use();
+      this.useShaderProgram(this.#batchShaderProgram);
       const mainTextureLocation = this.#batchShaderProgram.getUniformLocation("mainTexture");
       webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
       this.applyImageMipmapBias(this.#batchShaderProgram);
-      this.getShaderProgram().use();
+      const activeShaderProgram = this.getShaderProgram();
+      this.useShaderProgram(activeShaderProgram);
       webGL2RenderingContext.bindVertexArray(this.getVertexArray());
       webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
     }
@@ -6067,19 +6287,18 @@ void main() {
         return;
       }
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
-      this.#batchShaderProgram.use();
+      this.useShaderProgram(this.#batchShaderProgram);
       webGL2RenderingContext.bindVertexArray(this.#batchVertexArray);
       webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexBuffer);
       webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#batchVertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, batchVertexCount * BATCH_FLOATS_PER_VERTEX);
       const projectionMatrixLocation = this.#batchShaderProgram.getUniformLocation("projectionMatrix");
       webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
-      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#batchTexture);
+      this.bindTexture(this.#batchTexture);
       webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, batchVertexCount);
       this.#drawCallCount += 1;
       this.#drawVertexCount += batchVertexCount;
       this.#batchVertexCount = 0;
       this.#batchTexture = null;
-      this.getShaderProgram().use();
       webGL2RenderingContext.bindVertexArray(this.getVertexArray());
       webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
     }
@@ -6112,11 +6331,12 @@ void main() {
       webGL2RenderingContext.enableVertexAttribArray(colorLocation);
       webGL2RenderingContext.vertexAttribPointer(colorLocation, 4, webGL2RenderingContext.FLOAT, false, strideBytes, 16);
       webGL2RenderingContext.bindVertexArray(null);
-      this.#particleShaderProgram.use();
+      this.useShaderProgram(this.#particleShaderProgram);
       const mainTextureLocation = this.#particleShaderProgram.getUniformLocation("mainTexture");
       webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
       this.applyImageMipmapBias(this.#particleShaderProgram);
-      this.getShaderProgram().use();
+      const activeShaderProgram = this.getShaderProgram();
+      this.useShaderProgram(activeShaderProgram);
       webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
     }
     //==============================================================================
@@ -6155,7 +6375,7 @@ void main() {
       this.flushSpriteBatch();
       this.ensureParticleBatchResources();
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
-      this.#particleShaderProgram.use();
+      this.useShaderProgram(this.#particleShaderProgram);
       webGL2RenderingContext.bindVertexArray(this.#particleVertexArray);
       webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#particleVertexBuffer);
       webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#particleVertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, vertexCount * PARTICLE_FLOATS_PER_VERTEX);
@@ -6166,11 +6386,10 @@ void main() {
       webGL2RenderingContext.uniformMatrix3fv(modelMatrixLocation, false, this.#modelMatrixArray);
       const globalAlphaLocation = this.#particleShaderProgram.getUniformLocation("globalAlpha");
       webGL2RenderingContext.uniform1f(globalAlphaLocation, this.getGlobalAlpha());
-      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+      this.bindTexture(texture);
       webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
       this.#drawCallCount += 1;
       this.#drawVertexCount += vertexCount;
-      this.getShaderProgram().use();
       webGL2RenderingContext.bindVertexArray(this.getVertexArray());
       webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
     }
@@ -6205,7 +6424,7 @@ void main() {
         }
       }
       this.#softDiscTexture = webGL2RenderingContext.createTexture();
-      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#softDiscTexture);
+      this.bindTexture(this.#softDiscTexture);
       webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA, textureSize, textureSize, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, pixels);
       webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.LINEAR);
       webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.LINEAR);
@@ -6584,7 +6803,18 @@ void main() {
         throw new Error("image is null");
       }
       if (imageRect === null || imageRect === void 0 || imageRect.isZero()) {
-        imageRect = Rect.create(0, 0, image.width, image.height);
+        this.drawImageWithSourceAndDestination(
+          image,
+          0,
+          0,
+          image.width,
+          image.height,
+          position.x,
+          position.y,
+          contentSize.x,
+          contentSize.y
+        );
+        return;
       }
       this.drawImageWithSourceAndDestination(
         image,
@@ -7025,11 +7255,20 @@ void main() {
       this.pushState();
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const previousClipDepth = this.#clipStack.length;
-      this.#clipStack.push({
-        rect: rect.clone(),
-        roundSize,
-        transformMatrix: this.#transformMatrix.clone()
-      });
+      let clipEntry = this.#clipEntryPool[previousClipDepth];
+      if (clipEntry === void 0) {
+        clipEntry = {
+          rect: new Rect(),
+          roundSize: 0,
+          transformMatrix: new TransformMatrix()
+        };
+        this.#clipEntryPool.push(clipEntry);
+      }
+      clipEntry.rect.position.set(rect.position.x, rect.position.y);
+      clipEntry.rect.size.set(rect.size.x, rect.size.y);
+      clipEntry.roundSize = roundSize;
+      clipEntry.transformMatrix.copyFrom(this.#transformMatrix);
+      this.#clipStack.push(clipEntry);
       this.flushSpriteBatch();
       if (previousClipDepth === 0) {
         webGL2RenderingContext.enable(webGL2RenderingContext.STENCIL_TEST);
@@ -7057,7 +7296,7 @@ void main() {
       }
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       this.flushSpriteBatch();
-      this.#transformMatrix = clipEntry.transformMatrix;
+      this.#transformMatrix.copyFrom(clipEntry.transformMatrix);
       webGL2RenderingContext.colorMask(false, false, false, false);
       webGL2RenderingContext.stencilFunc(webGL2RenderingContext.ALWAYS, 0, 255);
       webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.DECR);
@@ -7119,7 +7358,7 @@ void main() {
       this.#shaderProgramOverride = shaderProgram;
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const activeShaderProgram = this.getShaderProgram();
-      activeShaderProgram.use();
+      this.useShaderProgram(activeShaderProgram);
       const projectionMatrixLocation = activeShaderProgram.getUniformLocation("projectionMatrix");
       webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
       const mainTextureLocation = activeShaderProgram.getUniformLocation("mainTexture");
@@ -7128,12 +7367,14 @@ void main() {
     }
     //==============================================================================
     // 렌더 상태 복구. (외부 WebGL 패스가 프로그램 / 버텍스 어레이 / 뷰포트를 바꾼 뒤 Graphic 출력을 이어갈 때)
+    // - 마지막으로 쓰게 한 프로그램과 묶은 텍스처의 기억도 잊는다. (invalidateRenderStateCache)
     //==============================================================================
     restoreRenderState() {
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       webGL2RenderingContext.viewport(0, 0, this.#appliedViewportWidth, this.#appliedViewportHeight);
+      this.invalidateRenderStateCache();
       const shaderProgram = this.getShaderProgram();
-      shaderProgram.use();
+      this.useShaderProgram(shaderProgram);
       webGL2RenderingContext.bindVertexArray(this.getVertexArray());
       webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.getVertexBuffer());
       const projectionMatrixLocation = shaderProgram.getUniformLocation("projectionMatrix");
@@ -7146,6 +7387,43 @@ void main() {
       webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
       const blendMode = this.getBlendMode();
       this.setBlendMode(blendMode);
+    }
+    //==============================================================================
+    // 셰이더 프로그램 쓰게 하기. (마지막으로 쓰게 한 것과 같으면 다시 걸지 않는다)
+    //==============================================================================
+    /**
+     * @param { ShaderProgram } shaderProgram
+     */
+    useShaderProgram(shaderProgram) {
+      if (shaderProgram === this.#boundShaderProgram) {
+        return;
+      }
+      shaderProgram.use();
+      this.#boundShaderProgram = shaderProgram;
+    }
+    //==============================================================================
+    // 0 번 텍스처 유닛에 텍스처 묶기. (마지막으로 묶은 것과 같으면 다시 묶지 않는다)
+    //==============================================================================
+    /**
+     * @param { WebGLTexture } texture
+     */
+    bindTexture(texture) {
+      if (texture === this.#boundTexture) {
+        return;
+      }
+      const webGL2RenderingContext = this.getWebGL2RenderingContext();
+      webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+      this.#boundTexture = texture;
+    }
+    //==============================================================================
+    // 묶음 기억 잊기.
+    // - Graphic 은 마지막으로 쓰게 한 셰이더 프로그램과 0 번 유닛에 묶은 텍스처를 기억해, 같으면 다시 걸지 않는다.
+    // - Graphic 을 거치지 않고 WebGL 로 프로그램이나 텍스처를 바꾼 뒤 Graphic 출력을 이어갈 때 부른다.
+    //   (restoreRenderState, applySettings 와 컨텍스트를 잃거나 되살릴 때는 스스로 잊는다)
+    //==============================================================================
+    invalidateRenderStateCache() {
+      this.#boundShaderProgram = null;
+      this.#boundTexture = null;
     }
     //==============================================================================
     // 버텍스 어레이 반환.
@@ -8387,7 +8665,8 @@ void main() {
   };
 
   // src/core/component/mask.js
-  var Mask = class extends Component {
+  var clipRect = new Rect();
+  var Mask = class _Mask extends Component {
     static {
       __name(this, "Mask");
     }
@@ -8419,8 +8698,15 @@ void main() {
       if (typeof node.getContentSize !== "function") {
         return;
       }
-      const contentSize = node.getContentSize();
-      const clipRect = Rect.create(0, 0, contentSize.x, contentSize.y);
+      const clipRectPosition = clipRect.position;
+      const clipRectSize = clipRect.size;
+      clipRectPosition.set(0, 0);
+      if (typeof node.copyContentSizeTo === "function") {
+        node.copyContentSizeTo(clipRectSize);
+      } else {
+        const contentSize = node.getContentSize();
+        clipRectSize.set(contentSize.x, contentSize.y);
+      }
       const roundSize = this.getRoundSize();
       graphic.beginClipRect(clipRect, roundSize);
     }
@@ -8432,6 +8718,18 @@ void main() {
      */
     endClip(graphic) {
       graphic.endClipRect();
+    }
+    //==============================================================================
+    // 내용 영역 안에서만 그리는지 반환. (컴포넌트 출력 단계에서는 아무것도 그리지 않는다)
+    // - 걸러져도 자식을 자르는 클립은 노드의 draw 가 그대로 건다.
+    // - draw 를 덮어쓴 하위 클래스는 어디에 그리는지 모르므로 false.
+    //==============================================================================
+    /**
+     * @override
+     * @returns { boolean }
+     */
+    isDrawnInsideContent() {
+      return this.draw === _Mask.prototype.draw;
     }
     //==============================================================================
     // 둥근 모서리 반지름 설정. (Paint 의 roundSize 와 같은 값을 주면 배경 모양대로 잘린다)
@@ -8454,6 +8752,8 @@ void main() {
   };
 
   // src/core/node/worldnode.js
+  var cullContentSize = Vector2.zero();
+  var cullRect = new Rect();
   var WorldNode = class _WorldNode extends TransformNode {
     static {
       __name(this, "WorldNode");
@@ -8524,12 +8824,18 @@ void main() {
         return;
       }
       const components = this.getAllComponents();
+      const isComponentDrawCulled = this.isComponentDrawCulled(graphic, components);
+      if (isComponentDrawCulled) {
+        graphic.addCulledNodeCount(1);
+      }
       let maskComponent = null;
       for (const component of components) {
         if (!component.isEnable()) {
           continue;
         }
-        component.draw(graphic);
+        if (!isComponentDrawCulled) {
+          component.draw(graphic);
+        }
         if (component instanceof Mask) {
           maskComponent = component;
         }
@@ -8544,6 +8850,46 @@ void main() {
       if (maskComponent) {
         maskComponent.endClip(graphic);
       }
+    }
+    //==============================================================================
+    // 화면 밖이라 이 노드의 컴포넌트 그리기를 건너뛸지 반환. (draw 가 부른다)
+    // - Graphic 의 화면 밖 거르기가 켜져 있고, 켜진 컴포넌트가 하나 이상이며 모두 내용 영역 안에서만 그린다고 알리고(Component.isDrawnInsideContent),
+    //   내용 영역을 지금 변환으로 옮긴 사각형이 화면에 걸치지 않으면 true.
+    // - 내용 영역은 한 단위씩 넓혀 본다. (나인 슬라이스가 크기를 올림해 한 단위 안쪽으로 넘칠 수 있다)
+    // - 자식은 여기서 보지 않는다. 자식은 저마다 따로 본다.
+    //==============================================================================
+    /**
+     * @param { Graphic } graphic
+     * @param { Component[] } components
+     * @returns { boolean }
+     */
+    isComponentDrawCulled(graphic, components) {
+      if (!graphic.isCullingEnabled()) {
+        return false;
+      }
+      let enabledComponentCount = 0;
+      for (const component of components) {
+        if (!component.isEnable()) {
+          continue;
+        }
+        if (!component.isDrawnInsideContent()) {
+          return false;
+        }
+        enabledComponentCount += 1;
+      }
+      if (enabledComponentCount === 0) {
+        return false;
+      }
+      const contentSize = cullContentSize;
+      this.copyContentSizeTo(contentSize);
+      if (!(contentSize.x > 0 && contentSize.y > 0)) {
+        return false;
+      }
+      const rect = cullRect;
+      rect.position.set(-1, -1);
+      rect.size.set(contentSize.x + 2, contentSize.y + 2);
+      const isVisible = graphic.isLocalRectVisible(rect);
+      return !isVisible;
     }
     //==============================================================================
     // 출력.
@@ -11131,6 +11477,8 @@ void main() {
       drawStatisticsText(`drawCalls: ${drawCallCount}`);
       drawStatisticsText(`vertices: ${vertexCount}`);
       drawStatisticsText(`triangles: ${triangleCount}`);
+      const culledNodeCount = graphic.getLastFrameCulledNodeCount();
+      drawStatisticsText(`culledNodes: ${culledNodeCount}`);
     }
     //==============================================================================
     // 엔진 갱신.
@@ -11173,10 +11521,12 @@ void main() {
       for (const loadedScene of loadedScenes) {
         try {
           if (!loadedScene.isLoaded()) {
+            graphic.invalidateRenderStateCache();
             loadedScene.drawOnLoad(graphic);
             continue;
           }
           loadedScene.tick(timeDelta);
+          graphic.invalidateRenderStateCache();
           loadedScene.preDraw(graphic);
           loadedScene.draw(graphic);
           loadedScene.postDraw(graphic);
@@ -11506,7 +11856,7 @@ void main() {
 
   // src/core/component/paint.js
   var paintRect = new Rect();
-  var Paint = class extends Component {
+  var Paint = class _Paint extends Component {
     static {
       __name(this, "Paint");
     }
@@ -11556,6 +11906,17 @@ void main() {
       } else {
         graphic.drawRect(rect);
       }
+    }
+    //==============================================================================
+    // 내용 영역 안에서만 그리는지 반환. (내용 크기의 사각형만 칠한다)
+    // - draw 를 덮어쓴 하위 클래스는 어디에 그리는지 모르므로 false. (그 클래스가 이 함수도 덮어써 알린다)
+    //==============================================================================
+    /**
+     * @override
+     * @returns { boolean }
+     */
+    isDrawnInsideContent() {
+      return this.draw === _Paint.prototype.draw;
     }
     //==============================================================================
     // 색상 설정.
@@ -13773,7 +14134,7 @@ void main() {
   var outlineRect = new Rect();
   var outlineContentSize = new Vector2();
   var outlineCenter = new Vector2();
-  var Outline = class extends Component {
+  var Outline = class _Outline extends Component {
     static {
       __name(this, "Outline");
     }
@@ -13847,6 +14208,17 @@ void main() {
       rect.size.set(width, height);
       const roundSize = System26.Math.max(0, this.getRoundSize() - halfLineWidth);
       graphic.drawStrokeRoundRect(rect, roundSize, lineWidth);
+    }
+    //==============================================================================
+    // 내용 영역 안에서만 그리는지 반환. (선은 내용 크기 안쪽으로 굵기의 반만큼 들여 그린다)
+    // - draw 를 덮어쓴 하위 클래스는 어디에 그리는지 모르므로 false.
+    //==============================================================================
+    /**
+     * @override
+     * @returns { boolean }
+     */
+    isDrawnInsideContent() {
+      return this.draw === _Outline.prototype.draw;
     }
     //==============================================================================
     // 색상 설정.
@@ -13948,7 +14320,7 @@ void main() {
     return ratio * ratio * (3 - 2 * ratio);
   }
   __name(readSmoothRise, "readSmoothRise");
-  var SoftShade = class extends Component {
+  var SoftShade = class _SoftShade extends Component {
     static {
       __name(this, "SoftShade");
     }
@@ -14031,6 +14403,17 @@ void main() {
         return;
       }
       graphic.drawImageWithSourceAndDestination(bakeCanvas, 0, 0, bakeCanvas.width, bakeCanvas.height, 0, 0, contentWidth, contentHeight);
+    }
+    //==============================================================================
+    // 내용 영역 안에서만 그리는지 반환. (구운 그늘을 내용 크기로 늘려 그린다)
+    // - draw 를 덮어쓴 하위 클래스는 어디에 그리는지 모르므로 false.
+    //==============================================================================
+    /**
+     * @override
+     * @returns { boolean }
+     */
+    isDrawnInsideContent() {
+      return this.draw === _SoftShade.prototype.draw;
     }
     //==============================================================================
     // 굽기. (픽셀마다 알파를 셈한다, 텍스처 캐시가 캔버스마다 한 번 올리므로 구울 때마다 새 캔버스)
@@ -14262,6 +14645,20 @@ void main() {
     return styleParts.join(" ");
   }
   __name(buildFontString, "buildFontString");
+  var fontLoadCount = 0;
+  if (System28.document !== void 0 && System28.document.fonts !== void 0) {
+    System28.document.fonts.addEventListener("loadingdone", () => {
+      fontLoadCount += 1;
+    });
+  }
+  function readFontFaceCount() {
+    const document2 = System28.document;
+    if (document2 === void 0 || document2.fonts === void 0) {
+      return 0;
+    }
+    return document2.fonts.size;
+  }
+  __name(readFontFaceCount, "readFontFaceCount");
   var Text = class extends Component {
     static {
       __name(this, "Text");
@@ -14308,12 +14705,27 @@ void main() {
     /** @private @type { number } */
     #visibleCharacterCount;
     // 표시 글자 수. -1 이면 전체.
+    /** @private @type { object } */
+    #wrapCache;
+    // 그릴 때 나눈 줄과 그때의 글, 글꼴, 크기, 폭, 줄바꿈 방식. (같으면 다시 나누지 않는다)
     //==============================================================================
     // 생성.
     //==============================================================================
     constructor() {
       super();
       this.setComponentType("Text");
+      this.#wrapCache = {
+        text: "",
+        fontFace: null,
+        fontSize: 0,
+        bold: false,
+        italic: false,
+        wrapWidth: -1,
+        wrapMode: "",
+        fontLoadCount: -1,
+        fontFaceCount: -1,
+        lineList: null
+      };
       this.#fontFace = null;
       this.#text = "";
       this.#fontSize = 32;
@@ -14396,7 +14808,7 @@ void main() {
      */
     drawWrappedText(graphic, contentSize, fullText) {
       const wrapWidth = this.#wordWrapWidth > 0 ? this.#wordWrapWidth : contentSize.x;
-      const lineList = this.wrapTextToLines(fullText, wrapWidth);
+      const lineList = this.readWrappedLines(fullText, wrapWidth);
       const lineHeight = this.#fontSize * this.#lineSpacing;
       const blockHeight = lineList.length * lineHeight;
       let blockTop;
@@ -14458,6 +14870,36 @@ void main() {
           }
         }
       }
+    }
+    //==============================================================================
+    // 그릴 줄 배열 반환. (wrapTextToLines 의 결과를 기억해 두고 쓴다)
+    // - 글, 글꼴, 크기, 굵게, 기울임, 폭, 줄바꿈 방식이 바뀌거나 웹 글꼴이 받아지거나 올라갈 때만 다시 나눈다.
+    // - 돌려준 배열은 다음에 다시 나눌 때까지 이 컴포넌트가 들고 있으므로 고치지 않는다.
+    //==============================================================================
+    /**
+     * @param { string } text
+     * @param { number } wrapWidth
+     * @returns { string[] }
+     */
+    readWrappedLines(text, wrapWidth) {
+      const wrapCache = this.#wrapCache;
+      const fontFaceCount = readFontFaceCount();
+      const isSame = wrapCache.lineList !== null && wrapCache.text === text && wrapCache.fontFace === this.#fontFace && wrapCache.fontSize === this.#fontSize && wrapCache.bold === this.#bold && wrapCache.italic === this.#italic && wrapCache.wrapWidth === wrapWidth && wrapCache.wrapMode === this.#wrapMode && wrapCache.fontLoadCount === fontLoadCount && wrapCache.fontFaceCount === fontFaceCount;
+      if (isSame) {
+        return wrapCache.lineList;
+      }
+      const lineList = this.wrapTextToLines(text, wrapWidth);
+      wrapCache.text = text;
+      wrapCache.fontFace = this.#fontFace;
+      wrapCache.fontSize = this.#fontSize;
+      wrapCache.bold = this.#bold;
+      wrapCache.italic = this.#italic;
+      wrapCache.wrapWidth = wrapWidth;
+      wrapCache.wrapMode = this.#wrapMode;
+      wrapCache.fontLoadCount = fontLoadCount;
+      wrapCache.fontFaceCount = fontFaceCount;
+      wrapCache.lineList = lineList;
+      return lineList;
     }
     //==============================================================================
     // 텍스트를 폭에 맞춰 줄 배열로 나누기.
@@ -15095,10 +15537,10 @@ void main() {
   // src/core/component/shadowtext.js
   var System29 = globalThis;
   var BAKE_PADDING = 2;
-  var fontLoadCount = 0;
+  var fontLoadCount2 = 0;
   if (System29.document !== void 0 && System29.document.fonts !== void 0) {
     System29.document.fonts.addEventListener("loadingdone", () => {
-      fontLoadCount += 1;
+      fontLoadCount2 += 1;
     });
   }
   function buildRGBAString(colorText, opacity) {
@@ -15203,7 +15645,7 @@ void main() {
       const textDirection = this.getTextDirection();
       const fontFace = this.getFontFace();
       const fontFamily = fontFace === null ? "" : fontFace.family;
-      const bakeKey = [text, this.#fontSize, this.#isBold, this.#textColor, this.#shadowColor, this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, this.#fitMinimumRatio, contentWidth, bakeScale, textDirection, fontFamily, fontLoadCount].join("|");
+      const bakeKey = [text, this.#fontSize, this.#isBold, this.#textColor, this.#shadowColor, this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, this.#fitMinimumRatio, contentWidth, bakeScale, textDirection, fontFamily, fontLoadCount2].join("|");
       if (bakeKey !== this.#bakeKey) {
         this.#bakeKey = bakeKey;
         this.bakeText(graphic, text, contentWidth, bakeScale, textDirection, fontFace);
@@ -15589,7 +16031,10 @@ void main() {
     luminosity: "luminosity"
     // 밝기만 적용.
   };
-  var Sprite = class extends Paint {
+  var spritePosition = Vector2.zero();
+  var spriteContentSize = Vector2.zero();
+  var spriteImageSize = Vector2.zero();
+  var Sprite = class _Sprite extends Paint {
     static {
       __name(this, "Sprite");
     }
@@ -15652,10 +16097,18 @@ void main() {
       }
       const node = this.getNode();
       if (!node) return;
-      const position = Vector2.zero();
-      const contentSize = node.getContentSize();
-      const flip = this.getFlip();
-      const imageSize = contentSize.multiply(flip);
+      const position = spritePosition;
+      const contentSize = spriteContentSize;
+      if (typeof node.copyContentSizeTo === "function") {
+        node.copyContentSizeTo(contentSize);
+      } else {
+        const nodeContentSize = node.getContentSize();
+        contentSize.set(nodeContentSize.x, nodeContentSize.y);
+      }
+      const flipX = this.isHorizontalFlip() ? -1 : 1;
+      const flipY = this.isVerticalFlip() ? -1 : 1;
+      const imageSize = spriteImageSize;
+      imageSize.set(contentSize.x * flipX, contentSize.y * flipY);
       const spriteBlendMode = this.getSpriteBlendMode();
       const spriteDrawMode = this.getSpriteDrawMode();
       if (spriteDrawMode === SpriteDrawMode.sliced) {
@@ -15674,11 +16127,12 @@ void main() {
       }
       switch (spriteDrawMode) {
         case SpriteDrawMode.simple: {
-          let imageRect = this.getImageRect();
+          const imageRect = this.getImageRect();
           if (imageRect === null || imageRect === void 0 || imageRect.isZero()) {
-            imageRect = Rect.create(0, 0, image.width, image.height);
+            graphic.drawImageWithSourceAndDestination(image, 0, 0, image.width, image.height, position.x, position.y, imageSize.x, imageSize.y);
+          } else {
+            graphic.drawImageWithImageRect(image, position, imageSize, imageRect);
           }
-          graphic.drawImageWithImageRect(image, position, imageSize, imageRect);
           break;
         }
         case SpriteDrawMode.sliced: {
@@ -15722,6 +16176,21 @@ void main() {
         graphic.setImageTintColor(null);
       }
       graphic.setBlendMode(SpriteBlendMode.normal);
+    }
+    //==============================================================================
+    // 내용 영역 안에서만 그리는지 반환.
+    // - 뒤집으면 내용 영역의 반대쪽(음의 크기)으로 그리므로, 뒤집지 않았을 때만 true. (조각, 나인 슬라이스, 타일은 영역 안이다)
+    // - draw 를 덮어쓴 하위 클래스는 어디에 그리는지 모르므로 false. (그 클래스가 이 함수도 덮어써 알린다)
+    //==============================================================================
+    /**
+     * @override
+     * @returns { boolean }
+     */
+    isDrawnInsideContent() {
+      if (this.draw !== _Sprite.prototype.draw) {
+        return false;
+      }
+      return !this.isHorizontalFlip() && !this.isVerticalFlip();
     }
     //==============================================================================
     // 스프라이트 출력 모드 설정.
@@ -18096,6 +18565,17 @@ void main() {
       }
       const partialPoints = this.readPartialPoints(points, ratio);
       graphic.drawLine(partialPoints, lineWidth);
+    }
+    //==============================================================================
+    // 내용 영역 안에서만 그리는지 반환. (고리는 내용 크기 안쪽으로 굵기의 반만큼 들여 그린다)
+    // - draw 를 덮어쓴 하위 클래스는 어디에 그리는지 모르므로 false.
+    //==============================================================================
+    /**
+     * @override
+     * @returns { boolean }
+     */
+    isDrawnInsideContent() {
+      return this.draw === _UIProgressRing.prototype.draw;
     }
     //==============================================================================
     // 둥근 네모 둘레의 점. (위 가운데에서 시작해 시계 방향, 닫는 점은 넣지 않는다)
