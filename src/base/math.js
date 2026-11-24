@@ -109,6 +109,10 @@ export function random() {
  * @returns { number }
  */
 export function floor(value) {
+	// 무한대는 그대로. (value % 1 이 NaN 이 된다)
+	if (!System.Number.isFinite(value)) {
+		return value;
+	}
 	const r = value % 1;
 	return value < 0 && r !== 0 ? value - r - 1 : value - r;
 };
@@ -121,6 +125,10 @@ export function floor(value) {
  * @returns { number }
  */
 export function ceil(value) {
+	// 무한대는 그대로. (value % 1 이 NaN 이 된다)
+	if (!System.Number.isFinite(value)) {
+		return value;
+	}
 	const r = value % 1;
 	return value > 0 && r !== 0 ? value - r + 1 : value - r;
 };
@@ -133,6 +141,10 @@ export function ceil(value) {
  * @returns { number }
  */
 export function round(value) {
+	// 무한대는 그대로. (value % 1 이 NaN 이 된다)
+	if (!System.Number.isFinite(value)) {
+		return value;
+	}
 	const r = value % 1;
 	if (value >= 0) {
 		return r >= 0.5 ? value - r + 1 : value - r;
@@ -150,19 +162,8 @@ export function round(value) {
  * @returns { number }
  */
 export function sqrt(value) {
-	if (value < 0) {
-		return NaN;
-	}
-	if (value === 0) {
-		return 0;
-	}
-
-	let result =value > 1 ? value : 1;
-	for (let i = 0; i < 10; ++i) {
-		result = (result + value / result) / 2; // 바빌로니아법.
-	}
-
-	return result;
+	// 내장 제곱근을 쓴다. (음수는 NaN, 반복 근사는 큰 수에서 정확하지 않다)
+	return System.Math.sqrt(value);
 };
 
 //==============================================================================
@@ -239,18 +240,8 @@ export function tan(value) {
  * @returns { number }
  */
 export function asin(value) {
-	if (value < -1 || value > 1) return NaN;
-	if (value === 1) return PI / 2;
-	if (value === -1) return -PI / 2;
-
-	let result = value;
-	let term = value;
-	for (let i = 1; i < 100; i++) {
-		term *= (value * value * (2 * i - 1) * (2 * i - 1)) / ((2 * i) * (2 * i + 1));
-		result += term;
-		if (abs(term) < 1e-15) break;
-	}
-	return result;
+	// 내장 아크사인을 쓴다. (범위 밖은 NaN, 급수 근사는 ±1 가까이에서 정확하지 않다)
+	return System.Math.asin(value);
 }
 
 //==============================================================================
@@ -261,8 +252,8 @@ export function asin(value) {
  * @returns { number }
  */
 export function acos(value) {
-	if (value < -1 || value > 1) return NaN;
-	return PI / 2 - asin(value);
+	// 내장 아크코사인을 쓴다. (범위 밖은 NaN)
+	return System.Math.acos(value);
 }
 
 //==============================================================================
@@ -274,22 +265,8 @@ export function acos(value) {
  * @returns { number }
  */
 export function pow(base, exponent) {
-	if (exponent === 0) return 1;
-	if (exponent < 0) return 1 / pow(base, -exponent);
-
-	let result = 1;
-	let currentBase = base;
-	let currentExponent = exponent;
-
-	while (currentExponent > 0) {
-		if (currentExponent % 2 === 1) {
-			result *= currentBase;
-		}
-		currentBase *= currentBase;
-		currentExponent = floor(currentExponent / 2);
-	}
-
-	return result;
+	// 내장 거듭제곱을 쓴다. (지수가 분수나 음수여도 맞다)
+	return System.Math.pow(base, exponent);
 }
 
 //==============================================================================
