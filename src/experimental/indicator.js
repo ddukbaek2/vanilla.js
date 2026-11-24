@@ -4,7 +4,7 @@
 const System = globalThis;
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
-import { Graphic } from "./graphic.js";
+import { Graphic } from "../core/graphic.js";
 
 
 //==============================================================================
@@ -41,7 +41,9 @@ export class Indicator extends Object {
 	 * @param { number } timeDelta 
 	 */
 	tick(timeDelta) {
-		if (!this.isVisible()) return;
+		if (!this.getVisible()) {
+			return;
+		}
 		
 		// 시간에 따라 회전 각도 누적
 		this.#rotation += this.#speed * timeDelta;
@@ -54,48 +56,44 @@ export class Indicator extends Object {
 	 * @param { Graphic } graphic 
 	 */
 	draw(graphic) {
-		if (!this.isVisible()) return;
+		if (!this.getVisible()) {
+			return;
+		}
 
-		const canvasRenderingContext = graphic.getCanvasRenderingContext();
-		
-		canvasRenderingContext.save();
+		graphic.pushState();
 		// 1. 지정된 위치로 이동 후 회전 적용
 		const position = this.getPosition();
-		canvasRenderingContext.translate(position.x, position.y);
-		canvasRenderingContext.rotate(this.#rotation);
+		graphic.translate(position.x, position.y);
+		graphic.rotate(this.#rotation);
 
 		// 2. 그리기 설정
-		canvasRenderingContext.fillStyle = this.#color;
-		canvasRenderingContext.strokeStyle = this.#color;
-		canvasRenderingContext.lineWidth = this.#radius * 0.2;
-		canvasRenderingContext.lineCap = "round";
-		canvasRenderingContext.lineJoin = "round";
+		// (Graphic 의 선은 끝이 각지다. Canvas2D 시절의 둥근 끝(lineCap round)은 없다)
+		graphic.setFillColor(this.#color);
+		graphic.setStrokeColor(this.#color);
+		const teethLineWidth = this.#radius * 0.2;
 
 		const teethCount = 8; // 톱니 개수
 		const innerRadius = this.#radius * 0.5; // 안쪽 구멍 크기
 		const outerRadius = this.#radius; // 바깥쪽 톱니 끝 크기
 
 		// 3. 톱니(Teeth) 그리기 (중심에서 바깥으로 뻗어나가는 선)
-		canvasRenderingContext.beginPath();
 		for (let i = 0; i < teethCount; i++) {
-			const angle = (i / teethCount) * Math.PI * 2;
-			const cosA = Math.cos(angle);
-			const sinA = Math.sin(angle);
-			
+			const angle = (i / teethCount) * System.Math.PI * 2;
+			const cosA = System.Math.cos(angle);
+			const sinA = System.Math.sin(angle);
+
 			// 안쪽 링보다 살짝 안쪽에서 시작해서 바깥으로 뻗음
-			canvasRenderingContext.moveTo(cosA * (innerRadius * 0.8), sinA * (innerRadius * 0.8));
-			canvasRenderingContext.lineTo(cosA * outerRadius, sinA * outerRadius);
+			const startPosition = Vector2.create(cosA * (innerRadius * 0.8), sinA * (innerRadius * 0.8));
+			const endPosition = Vector2.create(cosA * outerRadius, sinA * outerRadius);
+			graphic.drawLine([startPosition, endPosition], teethLineWidth);
 		}
-		canvasRenderingContext.stroke();
 
 		// 4. 안쪽 링(Ring) 그리기 (도넛 모양)
-		canvasRenderingContext.beginPath();
-		canvasRenderingContext.arc(0, 0, innerRadius, 0, Math.PI * 2);
 		// 가운데 구멍 뚫기 위해 이전 방식 대신 stroke 두껍게 칠하기
-		canvasRenderingContext.lineWidth = this.#radius * 0.3;
-		canvasRenderingContext.stroke();
+		const center = Vector2.zero();
+		graphic.drawStrokeCircle(center, innerRadius, this.#radius * 0.3);
 
-		canvasRenderingContext.restore();
+		graphic.popState();
 	}
 	
 	//==============================================================================

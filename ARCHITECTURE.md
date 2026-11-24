@@ -53,9 +53,9 @@ Object (base/object.js)
 │           ├── WorldNode (core) ──────── pivot/anchor/contentSize + 터치 (수동 배치 노선)
 │           │   ├── UIScrollBar, UIInputField (ui)
 │           │   ├── TouchEffect (misc)
+│           │   ├── HeatHazeEffect (experimental)
 │           │   └── AnchoredWorldNode (deprecated)
-│           ├── UINode (ui) ───────────── 오토레이아웃 제약 변수 (솔버 배치 노선)
-│           └── HeatHazeEffect (experimental)
+│           └── UINode (ui) ───────────── 오토레이아웃 제약 변수 (솔버 배치 노선)
 ├── Component (core) ─────────────────── 노드에 부착되는 기능 단위
 │   ├── Paint → Sprite
 │   ├── Text → RichText
