@@ -264,6 +264,9 @@ export class Graphic extends Object {
 	/** @private @type { number } */ #drawVertexCount; // 이번 프레임에 그린 정점 수.
 	/** @private @type { number } */ #lastFrameDrawCallCount; // 지난 프레임의 드로우 콜 수.
 	/** @private @type { number } */ #lastFrameDrawVertexCount; // 지난 프레임에 그린 정점 수.
+	/** @private @type { boolean } */ #isCullingEnabled; // 화면 밖 노드의 컴포넌트 그리기를 건너뛸지.
+	/** @private @type { number } */ #culledNodeCount; // 이번 프레임에 화면 밖이라 컴포넌트를 건너뛴 노드 수.
+	/** @private @type { number } */ #lastFrameCulledNodeCount; // 지난 프레임에 화면 밖이라 컴포넌트를 건너뛴 노드 수.
 	/** @private @type { ShaderProgram | null } */ #boundShaderProgram; // 마지막으로 쓰게 한 셰이더 프로그램. (null 이면 모른다)
 	/** @private @type { WebGLTexture | null } */ #boundTexture; // 0 번 텍스처 유닛에 마지막으로 묶은 텍스처. (null 이면 모른다)
 
@@ -393,6 +396,9 @@ export class Graphic extends Object {
 		this.#drawVertexCount = 0;
 		this.#lastFrameDrawCallCount = 0;
 		this.#lastFrameDrawVertexCount = 0;
+		this.#isCullingEnabled = false;
+		this.#culledNodeCount = 0;
+		this.#lastFrameCulledNodeCount = 0;
 
 		// 블렌드 함수 매핑 테이블. (프리멀티플라이드 알파 기준)
 		// - 고정 블렌딩으로 재현 가능한 모드만 등록. 그 외는 source-over 폴백.
@@ -1037,8 +1043,10 @@ export class Graphic extends Object {
 	beginFrameStatistics() {
 		this.#lastFrameDrawCallCount = this.#drawCallCount;
 		this.#lastFrameDrawVertexCount = this.#drawVertexCount;
+		this.#lastFrameCulledNodeCount = this.#culledNodeCount;
 		this.#drawCallCount = 0;
 		this.#drawVertexCount = 0;
+		this.#culledNodeCount = 0;
 	}
 
 	//==============================================================================
@@ -1070,6 +1078,93 @@ export class Graphic extends Object {
 	getLastFrameTriangleCount() {
 		const lastFrameVertexCount = this.getLastFrameVertexCount();
 		return System.Math.floor(lastFrameVertexCount / 3);
+	}
+
+	//==============================================================================
+	// 화면 밖 거르기 설정. (기본 false)
+	// - 켜면 WorldNode 가 컴포넌트를 그리기 전에, 켜진 컴포넌트가 모두 내용 영역 안에서만 그린다고 알리면(Component.isDrawnInsideContent)
+	//   내용 영역이 화면 밖일 때 그 노드의 컴포넌트 그리기를 건너뛴다. 자식은 저마다 따로 보고 그대로 그린다.
+	// - 판정은 그릴 때의 지금 변환(부모의 위치, 배율, 회전과 pushState 로 건 것 모두)으로 옮긴 영역의 경계 상자로 한다.
+	// - 알리지 않는 컴포넌트(기본, 글자, 파티클, 직접 만든 컴포넌트)가 하나라도 켜져 있으면 그 노드는 거르지 않는다. draw 를 덮어쓴 노드도 거르지 않는다.
+	//==============================================================================
+	/**
+	 * @param { boolean } isCullingEnabled
+	 */
+	setCullingEnabled(isCullingEnabled) {
+		this.#isCullingEnabled = isCullingEnabled === true;
+	}
+
+	//==============================================================================
+	// 화면 밖 거르기 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isCullingEnabled() {
+		return this.#isCullingEnabled;
+	}
+
+	//==============================================================================
+	// 지금 변환으로 옮긴 사각형이 화면(드로잉 버퍼)에 걸치는지 반환. (네 꼭짓점을 옮긴 경계 상자로 본다)
+	// - 투영과 같은 디바이스 픽셀 좌표로 보므로 클립 공간 밖인지와 같다. (뷰포트를 줄여 그려도 맞다)
+	// - 뷰포트를 아직 정하지 않았으면(applySettings 전) 걸치는 것으로 본다.
+	//==============================================================================
+	/**
+	 * @param { Rect } rect
+	 * @returns { boolean }
+	 */
+	isLocalRectVisible(rect) {
+		const viewportWidth = this.#appliedViewportWidth;
+		const viewportHeight = this.#appliedViewportHeight;
+		if (viewportWidth <= 0 || viewportHeight <= 0) {
+			return true;
+		}
+		const transformMatrix = this.#transformMatrix;
+		const matrixA = transformMatrix.a;
+		const matrixB = transformMatrix.b;
+		const matrixC = transformMatrix.c;
+		const matrixD = transformMatrix.d;
+		const matrixE = transformMatrix.e;
+		const matrixF = transformMatrix.f;
+		const leftX = rect.position.x;
+		const topY = rect.position.y;
+		const rightX = leftX + rect.size.x;
+		const bottomY = topY + rect.size.y;
+
+		// 네 꼭짓점. (왼쪽 위, 오른쪽 위, 왼쪽 아래, 오른쪽 아래)
+		const leftTopX = matrixA * leftX + matrixC * topY + matrixE;
+		const leftTopY = matrixB * leftX + matrixD * topY + matrixF;
+		const rightTopX = matrixA * rightX + matrixC * topY + matrixE;
+		const rightTopY = matrixB * rightX + matrixD * topY + matrixF;
+		const leftBottomX = matrixA * leftX + matrixC * bottomY + matrixE;
+		const leftBottomY = matrixB * leftX + matrixD * bottomY + matrixF;
+		const rightBottomX = matrixA * rightX + matrixC * bottomY + matrixE;
+		const rightBottomY = matrixB * rightX + matrixD * bottomY + matrixF;
+		const minimumX = System.Math.min(leftTopX, rightTopX, leftBottomX, rightBottomX);
+		const maximumX = System.Math.max(leftTopX, rightTopX, leftBottomX, rightBottomX);
+		const minimumY = System.Math.min(leftTopY, rightTopY, leftBottomY, rightBottomY);
+		const maximumY = System.Math.max(leftTopY, rightTopY, leftBottomY, rightBottomY);
+		return maximumX >= 0 && maximumY >= 0 && minimumX <= viewportWidth && minimumY <= viewportHeight;
+	}
+
+	//==============================================================================
+	// 이번 프레임에 화면 밖이라 컴포넌트를 건너뛴 노드 수 더하기. (WorldNode 가 부른다)
+	//==============================================================================
+	/**
+	 * @param { number } culledNodeCount
+	 */
+	addCulledNodeCount(culledNodeCount) {
+		this.#culledNodeCount += culledNodeCount;
+	}
+
+	//==============================================================================
+	// 지난 프레임에 화면 밖이라 컴포넌트를 건너뛴 노드 수 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getLastFrameCulledNodeCount() {
+		return this.#lastFrameCulledNodeCount;
 	}
 
 	//==============================================================================

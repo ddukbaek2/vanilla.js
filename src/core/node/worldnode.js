@@ -14,6 +14,14 @@ import { Mask } from "../component/mask.js";
 
 
 //==============================================================================
+// 전역 상수 목록.
+//==============================================================================
+// 화면 밖 거르기 판정에 고쳐 쓰는 칸. (graphic.isLocalRectVisible 은 받은 영역을 그 자리에서 읽기만 한다)
+const cullContentSize = Vector2.zero();
+const cullRect = new Rect();
+
+
+//==============================================================================
 // 계층적 영역 객체.
 // - Anchor, Pivot, ConetentSize 기능.
 //==============================================================================
@@ -96,13 +104,20 @@ export class WorldNode extends TransformNode {
         }
 
         // 컴포넌트 출력. 동시에 Mask 컴포넌트가 있는지 확인.
+        // 화면 밖이라 걸러진 노드는 컴포넌트만 건너뛴다. (마스크의 클립과 자식은 그대로)
         const components = this.getAllComponents();
+        const isComponentDrawCulled = this.isComponentDrawCulled(graphic, components);
+        if (isComponentDrawCulled) {
+            graphic.addCulledNodeCount(1);
+        }
         let maskComponent = null;
         for (const component of components) {
             if (!component.isEnable()) {
                 continue;
             }
-            component.draw(graphic);
+            if (!isComponentDrawCulled) {
+                component.draw(graphic);
+            }
             if (component instanceof Mask) {
                 maskComponent = component;
             }
@@ -123,6 +138,51 @@ export class WorldNode extends TransformNode {
         if (maskComponent) {
             maskComponent.endClip(graphic);
         }
+    }
+
+    //==============================================================================
+    // 화면 밖이라 이 노드의 컴포넌트 그리기를 건너뛸지 반환. (draw 가 부른다)
+    // - Graphic 의 화면 밖 거르기가 켜져 있고, 켜진 컴포넌트가 하나 이상이며 모두 내용 영역 안에서만 그린다고 알리고(Component.isDrawnInsideContent),
+    //   내용 영역을 지금 변환으로 옮긴 사각형이 화면에 걸치지 않으면 true.
+    // - 내용 영역은 한 단위씩 넓혀 본다. (나인 슬라이스가 크기를 올림해 한 단위 안쪽으로 넘칠 수 있다)
+    // - 자식은 여기서 보지 않는다. 자식은 저마다 따로 본다.
+    //==============================================================================
+    /**
+     * @param { Graphic } graphic
+     * @param { Component[] } components
+     * @returns { boolean }
+     */
+    isComponentDrawCulled(graphic, components) {
+        if (!graphic.isCullingEnabled()) {
+            return false;
+        }
+
+        // 켜진 컴포넌트가 모두 내용 영역 안에서만 그리는지.
+        let enabledComponentCount = 0;
+        for (const component of components) {
+            if (!component.isEnable()) {
+                continue;
+            }
+            if (!component.isDrawnInsideContent()) {
+                return false;
+            }
+            enabledComponentCount += 1;
+        }
+        if (enabledComponentCount === 0) {
+            return false;
+        }
+
+        // 내용 크기. (복제본 없이 읽는다)
+        const contentSize = cullContentSize;
+        this.copyContentSizeTo(contentSize);
+        if (!(contentSize.x > 0 && contentSize.y > 0)) {
+            return false;
+        }
+        const rect = cullRect;
+        rect.position.set(-1, -1);
+        rect.size.set(contentSize.x + 2, contentSize.y + 2);
+        const isVisible = graphic.isLocalRectVisible(rect);
+        return !isVisible;
     }
 
     //==============================================================================

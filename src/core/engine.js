@@ -754,6 +754,8 @@ export class Engine extends Object {
 		drawStatisticsText(`drawCalls: ${drawCallCount}`);
 		drawStatisticsText(`vertices: ${vertexCount}`);
 		drawStatisticsText(`triangles: ${triangleCount}`);
+		const culledNodeCount = graphic.getLastFrameCulledNodeCount();
+		drawStatisticsText(`culledNodes: ${culledNodeCount}`);
 		// drawOutlineText(``);
 
 		// // 메모리 사용 정보 출력.
