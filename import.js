@@ -233,3 +233,4 @@ export { ToastPhase } from "./src/ui/toastmotion.js";
 export { DynamicFont, GlyphInfo } from "./src/misc/dynamicfont.js";
 export { splitGraphemes, splitWords, countGraphemes, sliceGraphemes } from "./src/core/component/text.js";
 export { detectTextDirection } from "./src/core/graphic.js";
+export { MultiLevelBloomEffect } from "./src/experimental/graphics/multilevelbloomeffect.js";
