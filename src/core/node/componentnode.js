@@ -44,7 +44,10 @@ export class ComponentNode extends Node {
 			// 컴포넌트.
 			const components = this.getAllComponents();
 			for (const component of components) {
-				component.tick(timeDelta);
+				const isTickNeeded = component.isTickNeeded();
+				if (isTickNeeded) {
+					component.tick(timeDelta);
+				}
 			}
 
 			// 자식.
