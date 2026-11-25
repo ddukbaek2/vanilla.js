@@ -275,7 +275,7 @@ void main() {
 //==============================================================================
 // 스킨드 모델 렌더러. (스키닝 PBR 셰이더 템플릿 + 환경 상태 소유 — 씬당 하나)
 // - SkinnedModel 은 데이터/포즈만 갖고, 렌더링은 이 객체가 모델 인스턴스를 받아 수행한다.
-// - 환경 상태(섀도우 맵 / 태양 / 안개)는 모델이 아닌 렌더러에 설정한다.
+// - 환경 상태(섀도우 맵 / 태양 / 안개)는 모델이 아닌 렌더러에 설정한다. 섀도우 맵이 없으면 섀도우 유닛에 1x1 비교 깊이 텍스처를 묶는다.
 // - 프래그먼트 셰이더 소스를 주입하면 같은 스키닝/모프 버텍스 경로 위에 다른 셰이딩 템플릿을 세울 수 있다.
 //   (파생 렌더러는 use() 후 고유 유니폼을 설정하고 draw() 를 호출한다)
 //==============================================================================
@@ -288,6 +288,7 @@ export class SkinnedModelRenderer extends Object {
 	/** @private @type { ShaderProgram } */ #depthShaderProgram;
 	/** @private @type { ShaderProgram } */ #wireframeShaderProgram;
 	/** @private @type { WebGLTexture | null } */ #shadowMapTexture;
+	/** @private @type { WebGLTexture } */ #emptyShadowTexture; // 그림자를 받지 않을 때 섀도우 유닛에 묶는 1x1 비교 깊이 텍스처.
 	/** @private @type { Float32Array | null } */ #lightViewProjectionElements;
 	/** @private @type { number } */ #shadowStrength;
 	/** @private @type { number } */ #shadowTexelSize;
@@ -314,12 +315,37 @@ export class SkinnedModelRenderer extends Object {
 		this.#depthShaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_DEPTH_VERTEXSHADER_SOURCE.trim(), SKINNED_DEPTH_FRAGMENTSHADER_SOURCE.trim());
 		this.#wireframeShaderProgram = new ShaderProgram(webGL2RenderingContext, SKINNED_WIREFRAME_VERTEXSHADER_SOURCE.trim(), SKINNED_WIREFRAME_FRAGMENTSHADER_SOURCE.trim());
 		this.#shadowMapTexture = null;
+		this.#emptyShadowTexture = this.createEmptyShadowTexture();
 		this.#lightViewProjectionElements = null;
 		this.#shadowStrength = 0;
 		this.#shadowTexelSize = 1 / 2048;
 		this.#sunDirection = [0, 1, 0];
 		this.#fogColor = [0.8, 0.85, 0.92];
 		this.#fogRange = [55, 250];
+	}
+
+	//==============================================================================
+	// 빈 그림자 텍스처 짓기. (1x1 깊이 1, 비교 샘플링)
+	// - sampler2DShadow 유닛에 비교 모드가 없는 텍스처가 묶이면 WebGL 이 그리기를 거부하고, 깊이 텍스처가 없으면 맥 드라이버가 알린다.
+	//==============================================================================
+	/**
+	 * @returns { WebGLTexture }
+	 */
+	createEmptyShadowTexture() {
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		const texture = webGL2RenderingContext.createTexture();
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.DEPTH_COMPONENT24, 1, 1, 0, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, new System.Uint32Array([0xffffffff]));
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_COMPARE_MODE, webGL2RenderingContext.COMPARE_REF_TO_TEXTURE);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_COMPARE_FUNC, webGL2RenderingContext.LEQUAL);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		return texture;
 	}
 
 	//==============================================================================
@@ -368,6 +394,9 @@ export class SkinnedModelRenderer extends Object {
 			const shadowMapTextureLocation = shaderProgram.getUniformLocation("shadowMapTexture");
 			webGL2RenderingContext.uniform1i(shadowMapTextureLocation, 1);
 			webGL2RenderingContext.uniform1f(shadowStrengthLocation, 0);
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#emptyShadowTexture);
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		}
 
 		const jointMatricesLocation = shaderProgram.getUniformLocation("jointMatrices[0]");

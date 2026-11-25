@@ -198,9 +198,24 @@ export class Material extends Object {
 		}
 		const arrayBuffer = await response.arrayBuffer();
 		const contentType = response.headers.get("content-type");
+		const imageDescription = Material.createImageDescription(new System.Uint8Array(arrayBuffer), contentType ? contentType : null, options);
+		return imageDescription;
+	}
+
+	//==============================================================================
+	// 바이트로부터 이미지 서술 만들기. (정적, loadImageDescription 의 fetch 뒤 부분, 번들이나 BlobAsset 으로 이미 받은 바이트)
+	// - options: { flipY, isColorData, anisotropy }
+	//==============================================================================
+	/**
+	 * @param { Uint8Array } bytes
+	 * @param { string | null } mimeType
+	 * @param { object | null } options
+	 * @returns { object }
+	 */
+	static createImageDescription(bytes, mimeType = null, options = null) {
 		const imageDescription = {
-			bytes: new System.Uint8Array(arrayBuffer),
-			mimeType: contentType ? contentType : null,
+			bytes: bytes,
+			mimeType: mimeType,
 			flipY: options ? options.flipY === true : false,
 			isColorData: options ? options.isColorData === true : false,
 			anisotropy: options && options.anisotropy ? options.anisotropy : 0,
@@ -390,5 +405,26 @@ export class Material extends Object {
 	 */
 	getWebGL2RenderingContext() {
 		return this.#webGL2RenderingContext;
+	}
+
+	//==============================================================================
+	// 파괴. (기본 슬롯 텍스처를 지운다, setTexture 로 넣은 추가 텍스처는 넣은 쪽 것이라 남긴다)
+	//==============================================================================
+	destroy() {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const ownedTextureList = [this.#baseColorTexture, this.#normalTexture, this.#metallicRoughnessTexture, this.#glossinessTexture, this.#occlusionTexture, this.#emissiveTexture, this.#specularTexture, this.#opacityTexture];
+		for (const glTexture of ownedTextureList) {
+			if (glTexture) {
+				webGL2RenderingContext.deleteTexture(glTexture);
+			}
+		}
+		this.#baseColorTexture = null;
+		this.#normalTexture = null;
+		this.#metallicRoughnessTexture = null;
+		this.#glossinessTexture = null;
+		this.#occlusionTexture = null;
+		this.#emissiveTexture = null;
+		this.#specularTexture = null;
+		this.#opacityTexture = null;
 	}
 }

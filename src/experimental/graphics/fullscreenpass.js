@@ -113,4 +113,14 @@ export class FullscreenPass extends Object {
 	getVertexArray() {
 		return this.#vertexArray;
 	}
+
+	//==============================================================================
+	// 파괴. (셰이더 프로그램과 버텍스 어레이를 지운다)
+	//==============================================================================
+	destroy() {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const shaderProgram = this.getShaderProgram();
+		webGL2RenderingContext.deleteProgram(shaderProgram.getProgram());
+		webGL2RenderingContext.deleteVertexArray(this.#vertexArray);
+	}
 }

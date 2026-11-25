@@ -4,6 +4,8 @@
 const System = globalThis;
 import { ShaderProgram } from "../../../core/graphic/shaderprogram.js";
 import { SeededRandom } from "../../../base/seededrandom.js";
+import { Vector2 } from "../../../base/vector2.js";
+import { Shaker } from "../../../misc/shaker.js";
 
 
 //==============================================================================
@@ -77,6 +79,12 @@ const LIGHTNING_KINK_SECONDS = 0.08;
 const LIGHTNING_POINT_COUNT = 22;
 // 프레임마다 넘기는 빛 점의 수 상한.
 const MAXIMUM_GLINTS = 96;
+// 효과 테의 기본 색. (테를 두른 파티클과 번짐 리본의 가장자리, ToonRenderer 의 기본 바깥선 색과 같다)
+const DEFAULT_RIM_COLOR = System.Object.freeze([0.05, 0.05, 0.08]);
+// 카메라 흔들림을 Shaker 에 넣을 때 곱하는 몫. (Shaker 는 세기 0.05 아래에서 멈춘다. 그 문턱이 화면 픽셀 기준이라 장면 길이를 백 배로 넣는다)
+const SHAKE_UNIT_SCALE = 100;
+// 번개가 끝에 엷어지는 초.
+const LIGHTNING_FADE_SECONDS = 0.1;
 // 바닥 자국과 충격파 바닥 빛을 바닥 위로 띄우는 높이. (바닥과 겹쳐 깜빡이지 않게)
 const DECAL_LIFT = 0.014;
 const GROUND_GLOW_LIFT = 0.02;
@@ -163,6 +171,7 @@ out float particleProgress;
 out vec4 tintValue;
 out vec4 lookValue;
 out vec4 extraValue;
+out float rimValue;
 void main() {
 	float age = time - particleStart.w;
 	float life = particleVelocity.w;
@@ -205,9 +214,12 @@ void main() {
 	tintValue = particleColor;
 	lookValue = particleLook;
 	extraValue = particleExtra;
+	rimValue = particleShape.y;
 }
 `;
 // 파티클의 칠. (더하는 빛은 알파 0, 연기와 알갱이는 미리 곱한 알파, 색 램프가 있으면 나이로 흰 심에서 램프 색으로 식음)
+//   빛의 꼴(soft, streak, star, ember, glow)은 테(rim)를 받는다. rim 이 0 이면 더하는 빛만, 0 보다 크면 꼴의 몸을 테 색(rimColor)으로 덮고 심은 색,
+//   흰 심만 더하기로 겹친다(밝은 바탕에서도 보이게, 덮는 몫은 rim). 0 보다 작으면 테 없이 그 색으로 엷게 덮는다. (빛무리, 덮는 몫은 -rim)
 const PARTICLE_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 in vec2 cornerCoordinate;
@@ -215,8 +227,24 @@ in float particleProgress;
 in vec4 tintValue;
 in vec4 lookValue;
 in vec4 extraValue;
+in float rimValue;
+uniform vec3 rimColor;
 out vec4 fragmentColor;
 ${ATLAS_SHADER_CHUNK}
+vec4 shadeRimmed(vec3 color, float shapeAlpha, float fade, float brightness) {
+	float glow = shapeAlpha * fade;
+	if (rimValue < 0.0) {
+		return vec4(min(color * brightness, vec3(1.0)) * glow * -rimValue + color * glow * brightness * 0.2, glow * -rimValue);
+	}
+	if (rimValue <= 0.0) {
+		return vec4(color * glow * brightness, 0.0);
+	}
+	float body = smoothstep(0.03, 0.18, shapeAlpha) * fade;
+	float core = smoothstep(0.3, 0.72, shapeAlpha);
+	vec3 covered = mix(rimColor, min(color * brightness, vec3(1.0)), core);
+	float cover = clamp(body * rimValue, 0.0, 1.0);
+	return vec4(covered * cover + color * core * glow * brightness * 0.35, cover);
+}
 void main() {
 	float look = lookValue.x;
 	float progress = particleProgress;
@@ -228,12 +256,10 @@ void main() {
 	float alpha = extraValue.y * fadeIn;
 	float brightness = extraValue.x;
 	if (look < 0.5) {
-		alpha *= readSlot(0.0, cornerCoordinate).a * (1.0 - progress);
-		fragmentColor = vec4(color * alpha * brightness, 0.0);
+		fragmentColor = shadeRimmed(color, readSlot(0.0, cornerCoordinate).a, alpha * (1.0 - progress), brightness);
 	}
 	else if (look < 1.5) {
-		alpha *= readSlot(1.0, cornerCoordinate).a * (1.0 - progress * progress);
-		fragmentColor = vec4(color * alpha * brightness, 0.0);
+		fragmentColor = shadeRimmed(color, readSlot(1.0, cornerCoordinate).a, alpha * (1.0 - progress * progress), brightness);
 	}
 	else if (look < 2.5) {
 		vec4 smoke = readSmokeFrame(floor(progress * 15.99), cornerCoordinate);
@@ -241,17 +267,14 @@ void main() {
 		fragmentColor = vec4(color * smoke.rgb * density * brightness, density);
 	}
 	else if (look < 3.5) {
-		alpha *= readSlot(2.0, cornerCoordinate).a * (1.0 - progress);
-		fragmentColor = vec4(color * alpha * brightness, 0.0);
+		fragmentColor = shadeRimmed(color, readSlot(2.0, cornerCoordinate).a, alpha * (1.0 - progress), brightness);
 	}
 	else if (look < 4.5) {
 		float flicker = 0.6 + 0.4 * sin(progress * 46.0 + extraValue.z * 60.0);
-		alpha *= readSlot(0.0, cornerCoordinate).a * flicker * (1.0 - progress);
-		fragmentColor = vec4(color * alpha * brightness, 0.0);
+		fragmentColor = shadeRimmed(color, readSlot(0.0, cornerCoordinate).a, alpha * flicker * (1.0 - progress), brightness);
 	}
 	else if (look < 5.5) {
-		alpha *= readSlot(10.0, cornerCoordinate).a * (1.0 - progress) * (1.0 - progress);
-		fragmentColor = vec4(color * alpha * brightness, 0.0);
+		fragmentColor = shadeRimmed(color, readSlot(10.0, cornerCoordinate).a, alpha * (1.0 - progress) * (1.0 - progress), brightness);
 	}
 	else {
 		float body = smoothstep(0.05, 0.45, readSlot(0.0, cornerCoordinate).a);
@@ -585,24 +608,53 @@ void main() {
 `;
 // 리본의 칠. (가로로 밝은 심과 엷은 둘레, 빔 결이 길이 쪽으로 흐름, 램프가 있으면 가장자리로 갈수록 램프 색, 더하는 빛)
 //   ribbonLook 은 (램프, 알파, 밝기, 결의 자리), ribbonGrain 은 (결의 잘기, 비움) 이다.
+//   ribbonGlow 의 a 가 1 이면 번짐 색: 가운데 흰 심, 그 둘레를 ribbonGlow.rgb 로, 가장자리를 테 색(rimColor)으로 겹쳐 덮는다. (밝은 바탕에서도 보이게)
 const RIBBON_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 in vec2 ribbonCoordinate;
 uniform vec3 ribbonColor;
 uniform vec4 ribbonLook;
 uniform vec2 ribbonGrain;
+uniform vec4 ribbonGlow;
+uniform vec3 rimColor;
 out vec4 fragmentColor;
 ${ATLAS_SHADER_CHUNK}
 void main() {
 	float across = abs(ribbonCoordinate.y * 2.0 - 1.0);
 	float body = exp(-across * across * 7.0) * 0.75 + exp(-across * across * 50.0) * 0.9;
 	float grain = readSlot(4.0, vec2(0.3 + ribbonCoordinate.y * 0.4, fract(ribbonCoordinate.x * ribbonGrain.x - ribbonLook.w))).a;
+	if (ribbonGlow.a > 0.5) {
+		float white = 1.0 - smoothstep(0.24, 0.36, across);
+		float glowZone = 1.0 - smoothstep(0.58, 0.78, across);
+		float edge = 1.0 - smoothstep(0.82, 1.0, across);
+		float layered = clamp(edge * (0.7 + 0.3 * grain) * ribbonLook.y, 0.0, 1.0);
+		vec3 layeredColor = mix(rimColor, ribbonGlow.rgb, glowZone);
+		layeredColor = mix(layeredColor, vec3(1.0), white);
+		fragmentColor = vec4(layeredColor * layered + vec3(white * layered * 0.35 * ribbonLook.z), layered);
+		return;
+	}
 	vec3 color = ribbonColor;
 	if (ribbonLook.x >= 0.0) {
 		color *= readRamp(ribbonLook.x, across * 0.55 + (1.0 - grain) * 0.3);
 	}
 	float alpha = body * (0.45 + 0.75 * grain) * ribbonLook.y;
 	fragmentColor = vec4(color * alpha * ribbonLook.z, 0.0);
+}
+`;
+// 화면 섬광. (네 귀퉁이가 곧 뷰포트, 그 색으로 덮음, 미리 곱한 알파)
+const FLASH_VERTEX_SHADER = `#version 300 es
+precision highp float;
+in vec2 vertexCorner;
+void main() {
+	gl_Position = vec4(vertexCorner, 0.0, 1.0);
+}
+`;
+const FLASH_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+uniform vec4 flashColor;
+out vec4 fragmentColor;
+void main() {
+	fragmentColor = vec4(flashColor.rgb * flashColor.a, flashColor.a);
 }
 `;
 // 기본 색 램프. (흰빛에서 어둠으로 식는 한 줄, 테마 색은 setRamps 로 준다)
@@ -1009,7 +1061,10 @@ function readAxisSides(axis) {
 //   상한(setParticleCapacity)을 넘으면 가장 오래 전에 낸 것부터 덮고, setCountRatio 로 내는 수에 몫을 곱한다. (폰과 가벼운 길)
 // - 효과 메쉬: 잡음으로 끓다 연기로 식는 불덩이(addFireball), 바깥으로 흐르며 찢기고 말려 오르는 충격파 띠와 그 밑 바닥 빛(addShockwave),
 //   바닥 자국(addDecal, queueDecal), 말려 오르는 연기 기둥(addPlume), 결이 흐르고 겉이 일렁이는 회전체 빔(queueBeam),
-//   카메라 쪽으로 편 리본(queueRibbon)과 그것을 감아 내린 번개(queueLightning), 그 자리의 빛 점(queueGlint).
+//   카메라 쪽으로 편 리본(queueRibbon)과 그것을 감아 내린 번개(queueLightning), 사는 동안 다시 꺾이는 번개(addLightning), 그 자리의 빛 점(queueGlint).
+// - 테: 빛 파티클의 rim 과 리본의 glow 는 가장자리를 테 색(setRimColor)으로 덮어 밝은 바탕에서도 보이게 한다. (기본은 더하는 빛만)
+// - 화면: 섬광(addFlash)은 draw 끝에 지금 뷰포트(가위가 걸려 있으면 그 안)를 그 색으로 덮고 걷힌다.
+//   카메라 흔들림(addShake)은 엔진 Shaker 로 셈하고, readShake 가 준 오프셋을 게임이 카메라의 오른쪽과 위쪽으로 더한다.
 // - 어느 사건에 어느 효과를 어떤 값으로 낼지(처방)는 게임 몫이다. 엔진은 매개변수만 받는다.
 // - 바닥: setFloorHeightReader((x, z) => 높이) 로 게임이 바닥 높이를 알려 주면 자국, 충격파, 연기 기둥은 그 높이에, isGrounded 파티클은 그 높이에서 멈춘다. (없으면 0)
 // - 시계: update(초) 가 이 바탕의 시계를 나아가게 한다. 판이 멈추면 효과도 멈춘다. queue 로 넘긴 것은 그 프레임에 한 번 그리고 비운다.
@@ -1031,6 +1086,8 @@ export class ToonVfx {
 	/** @private @type { ShaderProgram } */ #beamProgram;
 	/** @private @type { ShaderProgram } */ #plumeProgram;
 	/** @private @type { ShaderProgram } */ #ribbonProgram;
+	/** @private @type { ShaderProgram } */ #flashProgram;
+	/** @private @type { Array<number> } */ #rimColor; // 효과 테의 색. ([r, g, b] 0 ~ 1)
 	/** @private @type { Array<WebGLBuffer> } */ #buffers; // 지울 버퍼.
 	/** @private @type { WebGLVertexArrayObject } */ #particleVertexArray;
 	/** @private @type { WebGLBuffer } */ #particleBuffer;
@@ -1055,6 +1112,9 @@ export class ToonVfx {
 	/** @private @type { Array<object> } */ #bands;
 	/** @private @type { Array<object> } */ #decals;
 	/** @private @type { Array<object> } */ #plumes;
+	/** @private @type { Array<object> } */ #lightnings; // 사는 동안 다시 꺾이는 번개. (addLightning 의 값과 age)
+	/** @private @type { Array<object> } */ #flashes; // 화면 섬광. ({ color, strength, life, age })
+	/** @private @type { Shaker } */ #shaker; // 카메라 흔들림. (장면 길이에 SHAKE_UNIT_SCALE 을 곱해 넣음)
 	/** @private @type { Array<object> } */ #queuedDecals; // 이번 프레임에만 그리는 바닥 자국.
 	/** @private @type { Array<object> } */ #queuedBeams;
 	/** @private @type { Array<object> } */ #queuedRibbons;
@@ -1084,6 +1144,8 @@ export class ToonVfx {
 		this.#beamProgram = new ShaderProgram(webGL2RenderingContext, BEAM_VERTEX_SHADER, BEAM_FRAGMENT_SHADER, GRID_ATTRIBUTE_LOCATIONS);
 		this.#plumeProgram = new ShaderProgram(webGL2RenderingContext, PLUME_VERTEX_SHADER, PLUME_FRAGMENT_SHADER, GRID_ATTRIBUTE_LOCATIONS);
 		this.#ribbonProgram = new ShaderProgram(webGL2RenderingContext, RIBBON_VERTEX_SHADER, RIBBON_FRAGMENT_SHADER, RIBBON_ATTRIBUTE_LOCATIONS);
+		this.#flashProgram = new ShaderProgram(webGL2RenderingContext, FLASH_VERTEX_SHADER, FLASH_FRAGMENT_SHADER, CORNER_ATTRIBUTE_LOCATIONS);
+		this.#rimColor = [DEFAULT_RIM_COLOR[0], DEFAULT_RIM_COLOR[1], DEFAULT_RIM_COLOR[2]];
 		this.#buffers = [];
 		this.#countRatio = 1;
 		const cornerData = new System.Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
@@ -1123,6 +1185,9 @@ export class ToonVfx {
 		this.#bands = [];
 		this.#decals = [];
 		this.#plumes = [];
+		this.#lightnings = [];
+		this.#flashes = [];
+		this.#shaker = new Shaker();
 		this.#queuedDecals = [];
 		this.#queuedBeams = [];
 		this.#queuedRibbons = [];
@@ -1150,6 +1215,7 @@ export class ToonVfx {
 			{ vertexShader: BEAM_VERTEX_SHADER, fragmentShader: BEAM_FRAGMENT_SHADER, attributeLocationTable: GRID_ATTRIBUTE_LOCATIONS },
 			{ vertexShader: PLUME_VERTEX_SHADER, fragmentShader: PLUME_FRAGMENT_SHADER, attributeLocationTable: GRID_ATTRIBUTE_LOCATIONS },
 			{ vertexShader: RIBBON_VERTEX_SHADER, fragmentShader: RIBBON_FRAGMENT_SHADER, attributeLocationTable: RIBBON_ATTRIBUTE_LOCATIONS },
+			{ vertexShader: FLASH_VERTEX_SHADER, fragmentShader: FLASH_FRAGMENT_SHADER, attributeLocationTable: CORNER_ATTRIBUTE_LOCATIONS },
 		];
 	}
 
@@ -1331,6 +1397,26 @@ export class ToonVfx {
 	}
 
 	//==============================================================================
+	// 효과 테의 색 설정. ([r, g, b] 0 ~ 1, 테를 두른 파티클과 번짐 리본의 가장자리, 기본은 ToonRenderer 의 기본 바깥선 색)
+	//==============================================================================
+	/**
+	 * @param { Array<number> } rimColor
+	 */
+	setRimColor(rimColor) {
+		this.#rimColor = [rimColor[0], rimColor[1], rimColor[2]];
+	}
+
+	//==============================================================================
+	// 효과 테의 색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Array<number> }
+	 */
+	getRimColor() {
+		return this.#rimColor;
+	}
+
+	//==============================================================================
 	// 바닥 높이를 읽는 함수 설정. ((x, z) → 높이, null 이면 0)
 	//==============================================================================
 	/**
@@ -1366,14 +1452,14 @@ export class ToonVfx {
 	}
 
 	//==============================================================================
-	// 떠 있는 효과의 수. ({ particleCount (아직 살아 있을 수 있는 칸), fireballCount, shockwaveCount, decalCount, plumeCount })
+	// 떠 있는 효과의 수. ({ particleCount (아직 살아 있을 수 있는 칸), fireballCount, shockwaveCount, decalCount, plumeCount, lightningCount, flashCount })
 	//==============================================================================
 	/**
 	 * @returns { object }
 	 */
 	getActiveCounts() {
 		const isParticleLive = this.#time < this.#particleLiveUntil;
-		return { particleCount: isParticleLive ? this.#particleUsedCount : 0, fireballCount: this.#fireballs.length, shockwaveCount: this.#bands.length, decalCount: this.#decals.length, plumeCount: this.#plumes.length };
+		return { particleCount: isParticleLive ? this.#particleUsedCount : 0, fireballCount: this.#fireballs.length, shockwaveCount: this.#bands.length, decalCount: this.#decals.length, plumeCount: this.#plumes.length, lightningCount: this.#lightnings.length, flashCount: this.#flashes.length };
 	}
 
 	//==============================================================================
@@ -1384,6 +1470,9 @@ export class ToonVfx {
 		this.#bands = [];
 		this.#decals = [];
 		this.#plumes = [];
+		this.#lightnings = [];
+		this.#flashes = [];
+		this.#shaker.stop();
 		this.#particleLiveUntil = this.#time;
 		this.clearQueue();
 	}
@@ -1399,14 +1488,14 @@ export class ToonVfx {
 	}
 
 	//==============================================================================
-	// 한 프레임 나이 먹이기. (시계를 나아가게 하고 다 된 불덩이, 띠, 자국, 기둥을 지움)
+	// 한 프레임 나이 먹이기. (시계를 나아가게 하고 다 된 불덩이, 띠, 자국, 기둥, 번개, 섬광을 지움, 흔들림을 잦아들게 함)
 	//==============================================================================
 	/**
 	 * @param { number } deltaTime 초.
 	 */
 	update(deltaTime) {
 		this.#time += deltaTime;
-		for (const effects of [this.#fireballs, this.#bands, this.#decals, this.#plumes]) {
+		for (const effects of [this.#fireballs, this.#bands, this.#decals, this.#plumes, this.#lightnings, this.#flashes]) {
 			for (let effectIndex = effects.length - 1; effectIndex >= 0; --effectIndex) {
 				const effect = effects[effectIndex];
 				effect.age += deltaTime;
@@ -1415,6 +1504,7 @@ export class ToonVfx {
 				}
 			}
 		}
+		this.#shaker.tick(deltaTime);
 	}
 
 	//==============================================================================
@@ -1438,7 +1528,7 @@ export class ToonVfx {
 	// 파티클 내기.
 	//   options: { count, x, y, z, shape(ToonVfxShape), radius, direction, spread(라디안), length, isUpward, isInward,
 	//              speed, rise, gravity, drag, size, sizeEnd(시작 크기에 곱함), sizeCurve, life, delay,
-	//              color, ramp, look(ToonVfxLook), stretch, spin, floor, isGrounded, brightness, alpha, fadeIn }
+	//              color, ramp, look(ToonVfxLook), stretch, spin, floor, isGrounded, brightness, alpha, fadeIn, rim(빛의 꼴의 테, 0 이면 더하는 빛만, 1 이면 테로 덮음, 음수면 엷게 덮는 빛무리) }
 	//   범위가 되는 값(speed, rise, size, sizeEnd, life, delay, spin)은 수 하나나 [최소, 최대] 다. 색은 0 ~ 1 의 [r, g, b], 램프는 줄 번호(없으면 -1)다.
 	//   floor 를 주면 그 높이에서, isGrounded 면 낸 자리의 바닥 높이에서 멈춘다. isInward 면 속도를 무시하고 나이가 다할 때 낸 자리로 빨려 든다.
 	//==============================================================================
@@ -1564,7 +1654,7 @@ export class ToonVfx {
 				[color[0], color[1], color[2], ramp],
 				[look, options.stretch !== undefined ? options.stretch : 0, spin, floor],
 				[options.brightness !== undefined ? options.brightness : 1, options.alpha !== undefined ? options.alpha : 1, random(), options.fadeIn !== undefined ? options.fadeIn : 0],
-				[options.sizeCurve !== undefined ? options.sizeCurve : 1, 0, 0, 0],
+				[options.sizeCurve !== undefined ? options.sizeCurve : 1, options.rim !== undefined ? options.rim : 0, 0, 0],
 			);
 		}
 	}
@@ -1579,7 +1669,7 @@ export class ToonVfx {
 	 * @param { Array<number> } color [r, g, b, 램프]
 	 * @param { Array<number> } look [꼴, 늘임, 돎, 바닥]
 	 * @param { Array<number> } extra [밝기, 알파, 씨앗, 나타나는 몫]
-	 * @param { Array<number> } shape [크기 곡선, 비움, 비움, 비움]
+	 * @param { Array<number> } shape [크기 곡선, 테, 비움, 비움]
 	 */
 	writeParticle(start, velocity, motion, color, look, extra, shape) {
 		const particleData = this.#particleData;
@@ -1743,7 +1833,8 @@ export class ToonVfx {
 
 	//==============================================================================
 	// 이번 프레임에만 그리는 리본 넘기기. (점열을 카메라 쪽으로 편 띠)
-	//   options: { points([[x, y, z], ...], 둘 이상), width, taper(0 이면 고른 너비, 1 이면 두 끝이 0), color, ramp, alpha, brightness, grainRepeat, flow }
+	//   options: { points([[x, y, z], ...], 둘 이상), width, taper(0 이면 고른 너비, 1 이면 두 끝이 0), color, ramp, alpha, brightness, grainRepeat, flow,
+	//              glow(번짐 색 [r, g, b], 주면 흰 심과 그 색 둘레와 테 색 가장자리로 덮는다, 없으면 더하는 빛) }
 	//==============================================================================
 	/**
 	 * @param { object } options
@@ -1757,7 +1848,7 @@ export class ToonVfx {
 
 	//==============================================================================
 	// 이번 프레임의 번개 넘기기. (축을 감아 내려가는 리본 여럿, 0.08 초마다 다시 꺾임, 같은 시각과 씨앗이면 같은 꼴)
-	//   options: { start, end, radius(감는 반지름), count, width, turns(감는 바퀴), color, ramp, alpha, brightness, time(주지 않으면 이 바탕의 시계), seed }
+	//   options: { start, end, radius(감는 반지름), count, width, turns(감는 바퀴), color, ramp, alpha, brightness, time(주지 않으면 이 바탕의 시계), seed, glow(리본의 번짐 색) }
 	//==============================================================================
 	/**
 	 * @param { object } options
@@ -1792,13 +1883,13 @@ export class ToonVfx {
 					start[2] + axis[2] * along + sides[0][2] * cosine + sides[1][2] * sine,
 				]);
 			}
-			this.queueRibbon({ points: points, width: options.width * (0.7 + random() * 0.6), taper: 0.6, color: options.color, ramp: options.ramp, alpha: options.alpha, brightness: options.brightness, grainRepeat: 1.5, flow: time * 6 + boltIndex });
+			this.queueRibbon({ points: points, width: options.width * (0.7 + random() * 0.6), taper: 0.6, color: options.color, ramp: options.ramp, alpha: options.alpha, brightness: options.brightness, grainRepeat: 1.5, flow: time * 6 + boltIndex, glow: options.glow });
 		}
 	}
 
 	//==============================================================================
 	// 이번 프레임에만 그리는 빛 점 넘기기. (파티클과 같은 꼴, 나이 없이 그 자리에 그대로, 96 개까지)
-	//   options: { x, y, z, size, color, ramp, look, brightness, alpha, angle }
+	//   options: { x, y, z, size, color, ramp, look, brightness, alpha, angle, rim(파티클의 rim 과 같음) }
 	//==============================================================================
 	/**
 	 * @param { object } options
@@ -1816,7 +1907,7 @@ export class ToonVfx {
 			[color[0], color[1], color[2], options.ramp !== undefined ? options.ramp : -1],
 			[options.look !== undefined ? options.look : ToonVfxLook.soft, 0, 0, NO_FLOOR],
 			[options.brightness !== undefined ? options.brightness : 1, options.alpha !== undefined ? options.alpha : 1, angle / (System.Math.PI * 2), 0],
-			[1, 0, 0, 0],
+			[1, options.rim !== undefined ? options.rim : 0, 0, 0],
 		];
 		const glintData = this.#glintData;
 		let offset = this.#queuedGlintCount * PARTICLE_FLOAT_COUNT;
@@ -1831,7 +1922,69 @@ export class ToonVfx {
 	}
 
 	//==============================================================================
-	// 그리기. (바닥 자국, 띠, 연기 기둥, 불덩이, 빔, 리본, 파티클 차례, 넘긴 것은 그린 뒤 비움)
+	// 사는 동안 다시 꺾이는 번개 더하기. (그릴 때마다 queueLightning 으로 넘긴다, 끝 0.1 초에 엷어짐, age 가 음수면 그만큼 늦게 나타남)
+	//   options: { start, end, life(초), age, radius, count, width, turns, color, ramp, alpha, brightness, seed(주지 않으면 무작위), glow }
+	//==============================================================================
+	/**
+	 * @param { object } options
+	 */
+	addLightning(options) {
+		const lightning = System.Object.assign({ radius: 0.05, count: 1, width: 0.05, turns: 1, color: [1, 1, 1], ramp: -1, alpha: 1, brightness: 1, glow: null }, options);
+		lightning.life = options.life !== undefined ? options.life : 0.5;
+		lightning.age = options.age !== undefined ? options.age : 0;
+		lightning.seed = options.seed !== undefined ? options.seed : this.#seededRandom.nextValue() * 1000;
+		this.#lightnings.push(lightning);
+	}
+
+	//==============================================================================
+	// 화면 섬광 더하기. (뷰포트를 그 색으로 잠깐 덮고 빠르게 걷힘)
+	//   options: { color([r, g, b], 기본 흰), strength(처음 덮는 몫, 기본 0.8), life(초, 기본 0.08), age }
+	//==============================================================================
+	/**
+	 * @param { object } options
+	 */
+	addFlash(options) {
+		this.#flashes.push({
+			color: options.color !== undefined ? options.color : [1, 1, 1],
+			strength: options.strength !== undefined ? options.strength : 0.8,
+			life: options.life !== undefined ? options.life : 0.08,
+			age: options.age !== undefined ? options.age : 0,
+		});
+	}
+
+	//==============================================================================
+	// 카메라 흔들림 더하기. (장면 길이의 최대 오프셋, 엔진 Shaker 가 위상이 다른 두 사인파와 지수 감쇠로 셈, 흔들리는 중이면 센 쪽)
+	//==============================================================================
+	/**
+	 * @param { number } strength
+	 */
+	addShake(strength) {
+		this.#shaker.addShake(strength * SHAKE_UNIT_SCALE);
+	}
+
+	//==============================================================================
+	// 지금의 카메라 흔들림. (장면 길이, x 는 카메라 오른쪽, y 는 카메라 위쪽으로 카메라 자리와 보는 곳에 같이 더한다)
+	//==============================================================================
+	/**
+	 * @returns { Vector2 }
+	 */
+	readShake() {
+		const offset = this.#shaker.getOffset();
+		return Vector2.create(offset.x / SHAKE_UNIT_SCALE, offset.y / SHAKE_UNIT_SCALE);
+	}
+
+	//==============================================================================
+	// 카메라가 흔들리는 중인지.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isShaking() {
+		return this.#shaker.isShaking();
+	}
+
+	//==============================================================================
+	// 그리기. (바닥 자국, 띠, 연기 기둥, 불덩이, 빔, 리본, 파티클, 섬광 차례, 사는 번개는 이번 프레임의 리본으로 넘김, 넘긴 것은 그린 뒤 비움)
 	//   보기 행렬에서 카메라 쪽, 오른쪽, 위쪽, 자리를 읽는다. 투영이 원근이면 빔과 리본은 카메라 자리를 향하고, 직교면 카메라 쪽을 향한다.
 	//==============================================================================
 	/**
@@ -1840,8 +1993,15 @@ export class ToonVfx {
 	 */
 	draw(viewMatrix, projectionMatrix) {
 		const isParticleLive = this.#particleUsedCount > 0 && this.#time < this.#particleLiveUntil;
+		for (const lightning of this.#lightnings) {
+			if (lightning.age < 0) {
+				continue;
+			}
+			const fade = System.Math.min(1, (lightning.life - lightning.age) / LIGHTNING_FADE_SECONDS);
+			this.queueLightning({ start: lightning.start, end: lightning.end, radius: lightning.radius, count: lightning.count, width: lightning.width, turns: lightning.turns, color: lightning.color, ramp: lightning.ramp, alpha: lightning.alpha * fade, brightness: lightning.brightness, time: this.#time, seed: lightning.seed, glow: lightning.glow });
+		}
 		const isQueued = this.#queuedDecals.length > 0 || this.#queuedBeams.length > 0 || this.#queuedRibbons.length > 0 || this.#queuedGlintCount > 0;
-		if (this.#decals.length === 0 && this.#bands.length === 0 && this.#fireballs.length === 0 && this.#plumes.length === 0 && !isParticleLive && !isQueued) {
+		if (this.#decals.length === 0 && this.#bands.length === 0 && this.#fireballs.length === 0 && this.#plumes.length === 0 && this.#flashes.length === 0 && !isParticleLive && !isQueued) {
 			return;
 		}
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
@@ -1852,6 +2012,7 @@ export class ToonVfx {
 			isDepthTestEnabled: webGL2RenderingContext.isEnabled(webGL2RenderingContext.DEPTH_TEST),
 			isCullFaceEnabled: webGL2RenderingContext.isEnabled(webGL2RenderingContext.CULL_FACE),
 			depthMask: webGL2RenderingContext.getParameter(webGL2RenderingContext.DEPTH_WRITEMASK),
+			depthFunction: webGL2RenderingContext.getParameter(webGL2RenderingContext.DEPTH_FUNC),
 			blendSourceRGB: webGL2RenderingContext.getParameter(webGL2RenderingContext.BLEND_SRC_RGB),
 			blendDestinationRGB: webGL2RenderingContext.getParameter(webGL2RenderingContext.BLEND_DST_RGB),
 			blendSourceAlpha: webGL2RenderingContext.getParameter(webGL2RenderingContext.BLEND_SRC_ALPHA),
@@ -1875,12 +2036,14 @@ export class ToonVfx {
 		this.drawBeams(frame);
 		this.drawRibbons(frame);
 		this.drawParticles(frame, isParticleLive);
+		this.drawFlashes();
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + VFX_TEXTURE_UNIT);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		webGL2RenderingContext.bindVertexArray(savedState.vertexArray);
 		webGL2RenderingContext.useProgram(savedState.program);
 		webGL2RenderingContext.depthMask(savedState.depthMask);
+		webGL2RenderingContext.depthFunc(savedState.depthFunction);
 		webGL2RenderingContext.blendFuncSeparate(savedState.blendSourceRGB, savedState.blendDestinationRGB, savedState.blendSourceAlpha, savedState.blendDestinationAlpha);
 		const capabilities = [
 			[webGL2RenderingContext.BLEND, savedState.isBlendEnabled],
@@ -2205,6 +2368,8 @@ export class ToonVfx {
 		}
 		const ribbonProgram = this.#ribbonProgram;
 		this.useProgram(ribbonProgram, frame);
+		const rimColor = this.#rimColor;
+		webGL2RenderingContext.uniform3f(ribbonProgram.getUniformLocation("rimColor"), rimColor[0], rimColor[1], rimColor[2]);
 		webGL2RenderingContext.bindVertexArray(this.#ribbonVertexArray);
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#ribbonBuffer);
 		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, ribbonData, webGL2RenderingContext.DYNAMIC_DRAW, 0, vertexCount * RIBBON_FLOAT_COUNT);
@@ -2215,6 +2380,8 @@ export class ToonVfx {
 			webGL2RenderingContext.uniform3f(ribbonProgram.getUniformLocation("ribbonColor"), color[0], color[1], color[2]);
 			webGL2RenderingContext.uniform4f(ribbonProgram.getUniformLocation("ribbonLook"), ribbon.ramp !== undefined ? ribbon.ramp : -1, ribbon.alpha, ribbon.brightness !== undefined ? ribbon.brightness : 1, ribbon.flow !== undefined ? ribbon.flow : this.#time);
 			webGL2RenderingContext.uniform2f(ribbonProgram.getUniformLocation("ribbonGrain"), ribbonLengths[ribbonIndex] * (ribbon.grainRepeat !== undefined ? ribbon.grainRepeat : 1), 0);
+			const glow = ribbon.glow !== undefined && ribbon.glow !== null ? ribbon.glow : null;
+			webGL2RenderingContext.uniform4f(ribbonProgram.getUniformLocation("ribbonGlow"), glow !== null ? glow[0] : 0, glow !== null ? glow[1] : 0, glow !== null ? glow[2] : 0, glow !== null ? 1 : 0);
 			webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLE_STRIP, firstVertex, pointCount);
 			firstVertex += pointCount;
 		});
@@ -2242,6 +2409,8 @@ export class ToonVfx {
 		webGL2RenderingContext.uniform3f(particleProgram.getUniformLocation("cameraRight"), cameraRight[0], cameraRight[1], cameraRight[2]);
 		webGL2RenderingContext.uniform3f(particleProgram.getUniformLocation("cameraUp"), cameraUp[0], cameraUp[1], cameraUp[2]);
 		webGL2RenderingContext.uniform1f(particleProgram.getUniformLocation("time"), this.#time);
+		const rimColor = this.#rimColor;
+		webGL2RenderingContext.uniform3f(particleProgram.getUniformLocation("rimColor"), rimColor[0], rimColor[1], rimColor[2]);
 		if (isParticleLive) {
 			webGL2RenderingContext.bindVertexArray(this.#particleVertexArray);
 			const usedCount = this.#particleUsedCount;
@@ -2262,6 +2431,29 @@ export class ToonVfx {
 	}
 
 	//==============================================================================
+	// 섬광 그리기. (뷰포트 전체의 네 귀퉁이를 깊이 시험 없이, 섬광마다 처음이 세고 나이로 빠르게 걷힘)
+	//==============================================================================
+	drawFlashes() {
+		if (this.#flashes.length === 0) {
+			return;
+		}
+		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		const flashProgram = this.#flashProgram;
+		flashProgram.use();
+		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
+		webGL2RenderingContext.bindVertexArray(this.#decalVertexArray);
+		for (const flash of this.#flashes) {
+			if (flash.age < 0) {
+				continue;
+			}
+			const fade = 1 - flash.age / flash.life;
+			webGL2RenderingContext.uniform4f(flashProgram.getUniformLocation("flashColor"), flash.color[0], flash.color[1], flash.color[2], flash.strength * fade * fade);
+			webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLE_STRIP, 0, 4);
+		}
+		webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+	}
+
+	//==============================================================================
 	// 다 쓴 뒤 지우기.
 	//==============================================================================
 	destroy() {
@@ -2272,7 +2464,7 @@ export class ToonVfx {
 		for (const vertexArray of [this.#particleVertexArray, this.#glintVertexArray, this.#ribbonVertexArray, this.#decalVertexArray, this.#sphereMesh.vertexArray, this.#bandMesh.vertexArray, this.#latheMesh.vertexArray]) {
 			webGL2RenderingContext.deleteVertexArray(vertexArray);
 		}
-		for (const shaderProgram of [this.#particleProgram, this.#fireballProgram, this.#bandProgram, this.#decalProgram, this.#beamProgram, this.#plumeProgram, this.#ribbonProgram]) {
+		for (const shaderProgram of [this.#particleProgram, this.#fireballProgram, this.#bandProgram, this.#decalProgram, this.#beamProgram, this.#plumeProgram, this.#ribbonProgram, this.#flashProgram]) {
 			webGL2RenderingContext.deleteProgram(shaderProgram.getProgram());
 		}
 		if (this.#atlasTexture !== null) {

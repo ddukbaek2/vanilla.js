@@ -13,6 +13,45 @@ const FBX_TIME_UNIT = 46186158000;
 
 
 //==============================================================================
+// 전역 함수 목록.
+//==============================================================================
+//==============================================================================
+// 64비트 정수 읽기. (Number 로 정확히 담기면 Number, 넘으면 BigInt 그대로, 오브젝트 id 가 2^53 을 넘어도 끝자리를 잃지 않는다)
+//==============================================================================
+/**
+ * @param { bigint } bigValue
+ * @returns { number | bigint }
+ */
+function readExactInteger(bigValue) {
+	if (bigValue <= System.BigInt(System.Number.MAX_SAFE_INTEGER) && bigValue >= System.BigInt(System.Number.MIN_SAFE_INTEGER)) {
+		return System.Number(bigValue);
+	}
+	return bigValue;
+}
+
+//==============================================================================
+// Properties70 레코드의 벡터 값 읽기. (P: 이름, 타입, 레이블, 플래그, x, y, z, 모자라면 null)
+//==============================================================================
+/**
+ * @param { object } propertyRecord
+ * @returns { number[] | null }
+ */
+function readPropertyVector(propertyRecord) {
+	const properties = propertyRecord.properties;
+	if (properties.length < 7) {
+		return null;
+	}
+	const vector = [properties[4].value, properties[5].value, properties[6].value];
+	for (const component of vector) {
+		if (typeof component !== "number") {
+			return null;
+		}
+	}
+	return vector;
+}
+
+
+//==============================================================================
 // FBX 로더. (바이너리 FBX → GL 무관 중간 표현 데이터)
 // - 저수준 노드/프로퍼티 파싱 후, 오브젝트/커넥션 그래프를 해석하여
 //   노드 계층 / 스키닝 메시 / 머티리얼 / 임베디드 텍스처 / 골격 애니메이션을 추출한다.
@@ -244,7 +283,7 @@ export class FbxLoader extends Object {
 				return { type: typeCode, value: value };
 			}
 			case "L": {
-				const value = System.Number(dataView.getBigInt64(this.#readCursor, true));
+				const value = readExactInteger(dataView.getBigInt64(this.#readCursor, true));
 				this.#readCursor += 8;
 				return { type: typeCode, value: value };
 			}
@@ -298,11 +337,20 @@ export class FbxLoader extends Object {
 	async interpret(topNodeList) {
 		const objectsNode = topNodeList.find((node) => node.name === "Objects");
 		const connectionsNode = topNodeList.find((node) => node.name === "Connections");
+		if (!objectsNode) {
+			throw new Error("FbxLoader: Objects node not found.");
+		}
+		if (!connectionsNode) {
+			throw new Error("FbxLoader: Connections node not found.");
+		}
 
 		// 커넥션 목록 구성. (OO: 오브젝트-오브젝트, OP: 오브젝트-프로퍼티)
 		const objectConnectionList = [];
 		const propertyConnectionList = [];
 		for (const connection of connectionsNode.children) {
+			if (connection.properties.length < 3) {
+				continue;
+			}
 			const connectionType = connection.properties[0].value;
 			const sourceId = connection.properties[1].value;
 			const destinationId = connection.properties[2].value;
@@ -310,7 +358,7 @@ export class FbxLoader extends Object {
 				objectConnectionList.push({ sourceId: sourceId, destinationId: destinationId });
 			}
 			else if (connectionType === "OP") {
-				const propertyName = connection.properties[3].value;
+				const propertyName = connection.properties.length > 3 ? connection.properties[3].value : "";
 				propertyConnectionList.push({ sourceId: sourceId, destinationId: destinationId, propertyName: propertyName });
 			}
 		}
@@ -360,21 +408,26 @@ export class FbxLoader extends Object {
 			}
 			const geometryId = objectNode.properties[0].value;
 			const geometry = this.interpretSingleGeometry(objectNode);
-			geometryById.set(geometryId, geometry);
+			if (geometry !== null) {
+				geometryById.set(geometryId, geometry);
+			}
 		}
 		return geometryById;
 	}
 
 	//==============================================================================
-	// 단일 지오메트리 해석.
+	// 단일 지오메트리 해석. (정점이나 폴리곤 배열이 없으면 null)
 	//==============================================================================
 	/**
 	 * @param { object } geometryNode
-	 * @returns { object }
+	 * @returns { object | null } 정점이나 폴리곤 배열이 없으면 null. (블렌드셰이프 Shape 같은)
 	 */
 	interpretSingleGeometry(geometryNode) {
 		const verticesNode = geometryNode.children.find((child) => child.name === "Vertices");
 		const polygonIndexNode = geometryNode.children.find((child) => child.name === "PolygonVertexIndex");
+		if (!verticesNode || verticesNode.properties.length === 0 || !polygonIndexNode || polygonIndexNode.properties.length === 0) {
+			return null;
+		}
 		const positions = verticesNode.properties[0].value;
 		const polygonVertexIndices = polygonIndexNode.properties[0].value;
 
@@ -475,10 +528,16 @@ export class FbxLoader extends Object {
 		const mappingNode = layerNode.children.find((child) => child.name === "MappingInformationType");
 		const referenceNode = layerNode.children.find((child) => child.name === "ReferenceInformationType");
 		const indexNode = layerNode.children.find((child) => child.name === (dataArrayName === "UV" ? "UVIndex" : dataArrayName + "Index"));
-		const dataArray = dataNode.properties[0].value;
-		const mappingType = mappingNode.properties[0].value;
-		const referenceType = referenceNode.properties[0].value;
-		const indexArray = indexNode ? indexNode.properties[0].value : null;
+		const dataArray = dataNode && dataNode.properties.length > 0 ? dataNode.properties[0].value : null;
+		const mappingType = mappingNode && mappingNode.properties.length > 0 ? mappingNode.properties[0].value : "";
+		const referenceType = referenceNode && referenceNode.properties.length > 0 ? referenceNode.properties[0].value : "";
+		const indexArray = indexNode && indexNode.properties.length > 0 ? indexNode.properties[0].value : null;
+		if (dataArray === null) {
+			return () => {
+				const zeroVector = new System.Array(componentCount).fill(0);
+				return zeroVector;
+			};
+		}
 
 		return (originalVertexIndex, polygonVertexPosition) => {
 			let mappedIndex = 0;
@@ -493,11 +552,12 @@ export class FbxLoader extends Object {
 			}
 			let dataIndex = mappedIndex;
 			if (referenceType === "IndexToDirect" && indexArray) {
-				dataIndex = indexArray[mappedIndex];
+				dataIndex = mappedIndex < indexArray.length ? indexArray[mappedIndex] : -1;
 			}
 			const componentValues = new System.Array(componentCount);
 			for (let componentIndex = 0; componentIndex < componentCount; ++componentIndex) {
-				componentValues[componentIndex] = dataArray[dataIndex * componentCount + componentIndex];
+				const value = dataIndex >= 0 ? dataArray[dataIndex * componentCount + componentIndex] : undefined;
+				componentValues[componentIndex] = value !== undefined ? value : 0;
 			}
 			return componentValues;
 		};
@@ -519,13 +579,14 @@ export class FbxLoader extends Object {
 		}
 		const mappingNode = layerNode.children.find((child) => child.name === "MappingInformationType");
 		const materialsNode = layerNode.children.find((child) => child.name === "Materials");
-		const mappingType = mappingNode.properties[0].value;
-		const materialArray = materialsNode.properties[0].value;
+		const mappingType = mappingNode && mappingNode.properties.length > 0 ? mappingNode.properties[0].value : "";
+		const materialArray = materialsNode && materialsNode.properties.length > 0 ? materialsNode.properties[0].value : null;
 		return (polygonVertexPosition) => {
-			if (mappingType === "AllSame") {
-				return materialArray[0];
+			if (materialArray === null) {
+				return 0;
 			}
-			return materialArray[polygonVertexPosition];
+			const materialIndex = mappingType === "AllSame" ? materialArray[0] : materialArray[polygonVertexPosition];
+			return materialIndex !== undefined ? materialIndex : 0;
 		};
 	}
 
@@ -702,15 +763,17 @@ export class FbxLoader extends Object {
 			};
 			if (properties70Node) {
 				for (const propertyRecord of properties70Node.children) {
-					const propertyKey = propertyRecord.properties[0].value;
+					const propertyKey = propertyRecord.properties.length > 0 ? propertyRecord.properties[0].value : "";
 					if (propertyKey === "DiffuseColor" || propertyKey === "Diffuse") {
-						material.diffuseColor = [propertyRecord.properties[4].value, propertyRecord.properties[5].value, propertyRecord.properties[6].value];
+						material.diffuseColor = readPropertyVector(propertyRecord) || material.diffuseColor;
 					}
 					else if (propertyKey === "SpecularColor" || propertyKey === "Specular") {
-						material.specularColor = [propertyRecord.properties[4].value, propertyRecord.properties[5].value, propertyRecord.properties[6].value];
+						material.specularColor = readPropertyVector(propertyRecord) || material.specularColor;
 					}
 					else if (propertyKey === "Shininess" || propertyKey === "ShininessExponent") {
-						material.shininess = propertyRecord.properties[4].value;
+						if (propertyRecord.properties.length > 4 && typeof propertyRecord.properties[4].value === "number") {
+							material.shininess = propertyRecord.properties[4].value;
+						}
 					}
 				}
 			}
@@ -781,18 +844,18 @@ export class FbxLoader extends Object {
 			const properties70Node = objectNode.children.find((child) => child.name === "Properties70");
 			if (properties70Node) {
 				for (const propertyRecord of properties70Node.children) {
-					const propertyKey = propertyRecord.properties[0].value;
+					const propertyKey = propertyRecord.properties.length > 0 ? propertyRecord.properties[0].value : "";
 					if (propertyKey === "Lcl Translation") {
-						node.translation = [propertyRecord.properties[4].value, propertyRecord.properties[5].value, propertyRecord.properties[6].value];
+						node.translation = readPropertyVector(propertyRecord) || node.translation;
 					}
 					else if (propertyKey === "Lcl Rotation") {
-						node.rotationEulerDegrees = [propertyRecord.properties[4].value, propertyRecord.properties[5].value, propertyRecord.properties[6].value];
+						node.rotationEulerDegrees = readPropertyVector(propertyRecord) || node.rotationEulerDegrees;
 					}
 					else if (propertyKey === "Lcl Scaling") {
-						node.scale = [propertyRecord.properties[4].value, propertyRecord.properties[5].value, propertyRecord.properties[6].value];
+						node.scale = readPropertyVector(propertyRecord) || node.scale;
 					}
 					else if (propertyKey === "PreRotation") {
-						node.preRotationDegrees = [propertyRecord.properties[4].value, propertyRecord.properties[5].value, propertyRecord.properties[6].value];
+						node.preRotationDegrees = readPropertyVector(propertyRecord) || node.preRotationDegrees;
 					}
 				}
 			}
