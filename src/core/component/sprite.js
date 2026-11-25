@@ -326,6 +326,23 @@ export class Sprite extends Paint {
 	}
 
 	//==============================================================================
+	// 조각 걸기. (Frame 의 그림과 그 안의 영역을 함께 건다, null 이면 그림을 비운다, SpriteAtlas.readFrame)
+	//==============================================================================
+	/**
+	 * @param { Frame | null } frame
+	 */
+	setFrame(frame) {
+		if (frame === null || frame === undefined) {
+			this.setImage(null);
+			return;
+		}
+		const image = frame.getImage();
+		const imageRect = frame.getImageRect();
+		this.setImage(image);
+		this.setImageRect(imageRect);
+	}
+
+	//==============================================================================
 	// 이미지 영역 설정.
 	//==============================================================================
 	/**
