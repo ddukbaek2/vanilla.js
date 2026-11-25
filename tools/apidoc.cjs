@@ -2879,10 +2879,19 @@ function checkExampleNames(example, engineModule, nameContext) {
 			}
 			const valueToken = tokenList[valueIndex];
 			const nameToken = tokenList[valueIndex + 1];
-			if (valueToken && valueToken.value === "new" && nameToken && bindingTable.has(nameToken.value) && typeof bindingTable.get(nameToken.value).value === "function") {
+			// 부른 뒤에 이어 부르지 않을 때만 꼴을 안다. (new 클래스(...).멤버() 나 클래스.정적함수(...).멤버() 의 사슬은 모른다)
+			const isCallEndingStatement = (openIndex) => {
+				if (!tokenList[openIndex] || tokenList[openIndex].value !== "(") {
+					return false;
+				}
+				const closeIndex = findMatchingIndex(tokenList, openIndex);
+				const afterToken = tokenList[closeIndex + 1];
+				return !afterToken || afterToken.value === ";" || afterToken.line > tokenList[closeIndex].endLine && afterToken.value !== "." && afterToken.value !== "?.";
+			};
+			if (valueToken && valueToken.value === "new" && nameToken && bindingTable.has(nameToken.value) && typeof bindingTable.get(nameToken.value).value === "function" && isCallEndingStatement(valueIndex + 2)) {
 				instanceTable.set(tokenList[tokenIndex + 1].value, bindingTable.get(nameToken.value).name);
 			}
-			else if (valueToken && bindingTable.has(valueToken.value) && nameToken && nameToken.value === "." && tokenList[valueIndex + 2] && tokenList[valueIndex + 3] && tokenList[valueIndex + 3].value === "(") {
+			else if (valueToken && bindingTable.has(valueToken.value) && nameToken && nameToken.value === "." && tokenList[valueIndex + 2] && isCallEndingStatement(valueIndex + 3)) {
 				const returnClassName = nameContext.staticReturnTable.get(bindingTable.get(valueToken.value).name + "." + tokenList[valueIndex + 2].value);
 				if (returnClassName && typeof engineModule[returnClassName] === "function") {
 					instanceTable.set(tokenList[tokenIndex + 1].value, returnClassName);
