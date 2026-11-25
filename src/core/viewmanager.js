@@ -57,6 +57,7 @@ export class ViewManager extends Object {
 	/** @private @type { number } */ #maxRenderPixelRatio; // 렌더에 쓸 devicePixelRatio 상한. (0 이면 제한 없음)
 	/** @private @type { object | null } */ #safeAreaOverride; // 세이프에어리어 강제값. (CSS px)
 	/** @private @type { HTMLElement | null } */ #safeAreaProbeElement; // env() 측정용 숨은 요소.
+	/** @private @type { string[] } */ #ignoredSafeAreaSides; // 무시할 세이프에어리어 쪽. ("top", "right", "bottom", "left")
 	/** @private @type { Vector2 } */ #clientNativeSize; // 웹페이지 전체 영역.
 	/** @private @type { Vector2 } */ #canvasNativeSize; // 캔버스의 전체 영역. (기본 좌표계 기준)
 	/** @private @type { Vector2 } */ #canvasPixelSize; // 캔버스 영역 내부의 픽셀 렌더링 기준 전체 화면 영역.
@@ -83,6 +84,7 @@ export class ViewManager extends Object {
 		this.#maxRenderPixelRatio = 0;
 		this.#safeAreaOverride = null;
 		this.#safeAreaProbeElement = null;
+		this.#ignoredSafeAreaSides = [];
 		this.#clientNativeSize = Vector2.zero();
 		this.#canvasNativeSize = Vector2.zero();
 		this.#canvasPixelSize = Vector2.zero();
@@ -604,12 +606,40 @@ export class ViewManager extends Object {
 		}
 		const targetResolutionScale = this.getTargetResolutionScale();
 		const scale = (targetResolutionScale > 0) ? (1 / targetResolutionScale) : 1;
-		return {
+		const insets = {
 			top: cssInsets.top * scale,
 			right: cssInsets.right * scale,
 			bottom: cssInsets.bottom * scale,
 			left: cssInsets.left * scale,
 		};
+		const ignoredSafeAreaSides = this.getIgnoredSafeAreaSides();
+		for (const side of ignoredSafeAreaSides) {
+			if (side in insets) {
+				insets[side] = 0;
+			}
+		}
+		return insets;
+	}
+
+	//==============================================================================
+	// 무시할 세이프에어리어 쪽 설정. (getSafeAreaInsets 가 그 쪽을 0 으로 돌려준다, 빈 목록이면 모두 쓴다)
+	// - 플랫폼의 앱이 그 쪽을 이미 비켜 그리는 웹뷰처럼, 어느 쪽을 무시할지는 게임이 정해 넘긴다.
+	//==============================================================================
+	/**
+	 * @param { string[] } sides "top", "right", "bottom", "left" 가운데.
+	 */
+	setIgnoredSafeAreaSides(sides) {
+		this.#ignoredSafeAreaSides = sides ? sides.slice() : [];
+	}
+
+	//==============================================================================
+	// 무시할 세이프에어리어 쪽 반환.
+	//==============================================================================
+	/**
+	 * @returns { string[] }
+	 */
+	getIgnoredSafeAreaSides() {
+		return this.#ignoredSafeAreaSides;
 	}
 
 	//==============================================================================

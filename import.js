@@ -213,3 +213,7 @@ export { LoadingProgress } from "./src/misc/loadingprogress.js";
 export { BuildInfo } from "./src/misc/buildinfo.js";
 export { ToonScreenOutline, ToonOutlineWidthUnit, TOON_SCREEN_OUTLINE_MAXIMUM_SAMPLES, TOON_SCREEN_OUTLINE_MAXIMUM_CREASE_SAMPLES } from "./src/experimental/graphics/toon/toonscreenoutline.js";
 export { ToonVfx, ToonVfxSlot, ToonVfxLook, ToonVfxShape, ToonVfxDecalMode, TOON_VFX_MAXIMUM_RAMPS, TOON_VFX_DEFAULT_PARTICLE_CAPACITY } from "./src/experimental/graphics/toon/toonvfx.js";
+export { UIScale } from "./src/ui/uiscale.js";
+export { UIWindow } from "./src/ui/uiwindow.js";
+export { UIWindowLayer } from "./src/ui/uiwindowlayer.js";
+export { UIConfirmWindow } from "./src/ui/uiconfirmwindow.js";

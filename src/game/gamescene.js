@@ -11,6 +11,7 @@ import { Graphic } from "../core/graphic.js";
 import { Scene } from "../core/scene.js";
 import { ViewScaleMode } from "../core/viewmanager.js";
 import { TouchRecognizer } from "../ui/touchrecognizer.js";
+import { UIWindowLayer } from "../ui/uiwindowlayer.js";
 import { WorldNode } from "../core/node/worldnode.js";
 import { DEVTools } from "../misc/devtools.js";
 import { ImageAsset } from "../resource/imageasset.js";
@@ -26,6 +27,9 @@ import { LoadingProgress } from "../misc/loadingprogress.js";
 // - 세이프 에어리어 노드 + env(safe-area-inset-*) 계산.
 // - viewSize 변화 자동 감지 → layout 재호출.
 // - 캔버스 배경 클리어.
+// - 화면 페이드 (fadeScreen, 어두운 동안 입력을 막음).
+// - UI 누름 판정 (isUserInterfaceAt) 과 UI 가 받지 않은 입력만 놀이로 넘기기 (setPlayInputHandler, 게임 영역 좌표).
+// - 세이프에어리어를 뺀 게임 영역의 고정 쪽 길이를 늘 같게 (setPlayAreaReference).
 //
 // 서브클래스 hook:
 // - loadAssets(): super 호출 후 자체 자산을 비동기 로드.
@@ -56,6 +60,16 @@ export class GameScene extends Scene {
 	/** @private @type { LoadingProgress } */ #loadingProgress;
 	/** @private @type { boolean } */ #isLoadingProgressReported; // 진행률을 알린 적이 있는지. (없으면 게이지는 경과 시간)
 	/** @private @type { Array<object> } */ #trackedAssetLoaderList;
+	/** @private @type { number } */ #screenFadeAlpha; // 어두워지는 막의 진하기. (0 ~ 1)
+	/** @private @type { number } */ #screenFadeDirection; // 1 이면 어두워지는 중, -1 이면 밝아지는 중, 0 이면 멈춤.
+	/** @private @type { boolean } */ #isScreenFadeWaiting; // 다 어두워진 뒤 onDark 가 끝나기를 기다리는 중인지.
+	/** @private @type { Function | null } */ #screenFadeEvent; // 다 어두워지면 부를 함수.
+	/** @private @type { Color } */ #screenFadeColor;
+	/** @private @type { number } */ #screenFadeSeconds; // 어두워지는 시간과 밝아지는 시간. (초)
+	/** @private @type { object | null } */ #playInputHandler; // { press, move, release, wheel } (UI 가 받지 않은 입력, 게임 영역 좌표)
+	/** @private @type { boolean } */ #isPlayPressActive; // 지금 누름이 놀이로 갔는지.
+	/** @private @type { number } */ #playAreaFixedLength; // 게임 영역의 고정 쪽 길이. (0 이면 쓰지 않음)
+	/** @private @type { boolean } */ #isPlayAreaLandscape; // 고정 쪽이 가로인지. (아니면 세로)
 
 	//==============================================================================
 	// 생성자.
@@ -77,6 +91,16 @@ export class GameScene extends Scene {
 		this.#loadingProgress = new LoadingProgress();
 		this.#isLoadingProgressReported = false;
 		this.#trackedAssetLoaderList = [];
+		this.#screenFadeAlpha = 0;
+		this.#screenFadeDirection = 0;
+		this.#isScreenFadeWaiting = false;
+		this.#screenFadeEvent = null;
+		this.#screenFadeColor = Color.black();
+		this.#screenFadeSeconds = 0.35;
+		this.#playInputHandler = null;
+		this.#isPlayPressActive = false;
+		this.#playAreaFixedLength = 0;
+		this.#isPlayAreaLandscape = false;
 	}
 
 	//==============================================================================
@@ -383,6 +407,7 @@ export class GameScene extends Scene {
 
 		// ViewScaleMode 적용.
 		engine.getViewManager().setViewScaleMode(this.#viewScaleMode);
+		this.applyPlayAreaReference();
 
 		// 개발자 도구. (EngineConfiguration.useDevTools 가 꺼져 있으면 만들지 않는다)
 		this.#devtools = null;
@@ -417,6 +442,7 @@ export class GameScene extends Scene {
 	 * @param { Vector2 } canvasNativeSize
 	 */
 	resize(canvasNativeSize) {
+		this.applyPlayAreaReference();
 		super.resize(canvasNativeSize);
 		this.layout();
 	}
@@ -442,35 +468,23 @@ export class GameScene extends Scene {
 		const engine = this.getEngine();
 		const viewManager = engine.getViewManager();
 		const viewSize = viewManager.getViewSize();
-		const targetScale = viewManager.getTargetResolutionScale();
+		const safeAreaInsets = viewManager.getSafeAreaInsets();
 
-		// CSS 픽셀 기준 세이프 에어리어 인셋.
-		const div = System.document.createElement("div");
-		div.style.position = "absolute";
-		div.style.visibility = "hidden";
-		div.style.paddingTop = "env(safe-area-inset-top)";
-		div.style.paddingRight = "env(safe-area-inset-right)";
-		div.style.paddingBottom = "env(safe-area-inset-bottom)";
-		div.style.paddingLeft = "env(safe-area-inset-left)";
-		System.document.body.appendChild(div);
-		const computedStyle = System.window.getComputedStyle(div);
-		const insetTopCss = System.Number.parseInt(computedStyle.paddingTop) || 0;
-		const insetRightCss = System.Number.parseInt(computedStyle.paddingRight) || 0;
-		const insetBottomCss = System.Number.parseInt(computedStyle.paddingBottom) || 0;
-		const insetLeftCss = System.Number.parseInt(computedStyle.paddingLeft) || 0;
-		System.document.body.removeChild(div);
+		// 게임 영역 기준을 쓰면 올림한 뷰 크기 대신 캔버스를 배율로 나눈 실제 크기로 셈해 고정 쪽이 딱 맞게 한다.
+		let viewWidth = viewSize.x;
+		let viewHeight = viewSize.y;
+		if (this.#playAreaFixedLength > 0) {
+			const canvasNativeSize = viewManager.getCanvasNativeSize();
+			const targetResolutionScale = viewManager.getTargetResolutionScale();
+			const viewScale = targetResolutionScale > 0 ? targetResolutionScale : 1;
+			viewWidth = canvasNativeSize.x / viewScale;
+			viewHeight = canvasNativeSize.y / viewScale;
+		}
 
-		// CSS 픽셀 → 뷰 좌표.
-		const scale = targetScale > 0 ? targetScale : 1;
-		const insetTop = insetTopCss / scale;
-		const insetRight = insetRightCss / scale;
-		const insetBottom = insetBottomCss / scale;
-		const insetLeft = insetLeftCss / scale;
-
-		const x = insetLeft;
-		const y = insetTop;
-		const width = System.Math.max(viewSize.x - insetLeft - insetRight, 0);
-		const height = System.Math.max(viewSize.y - insetTop - insetBottom, 0);
+		const x = safeAreaInsets.left;
+		const y = safeAreaInsets.top;
+		const width = System.Math.max(viewWidth - safeAreaInsets.left - safeAreaInsets.right, 0);
+		const height = System.Math.max(viewHeight - safeAreaInsets.top - safeAreaInsets.bottom, 0);
 		return Rect.create(x, y, width, height);
 	}
 
@@ -496,6 +510,8 @@ export class GameScene extends Scene {
 			this.#lastViewSizeY = viewSize.y;
 			this.layout();
 		}
+
+		this.updateScreenFade();
 
 		if (this.#devtools !== null) {
 			const timeManager = engine.getTimeManager();
@@ -525,10 +541,18 @@ export class GameScene extends Scene {
 	 * @param { Vector2 } viewInputPosition
 	 */
 	touchPress(viewInputPosition) {
-		if (this.isDevToolsCapturingInput()) {
+		this.#isPlayPressActive = false;
+		if (this.isDevToolsCapturingInput() || this.isScreenFading()) {
 			return;
 		}
+		// UI 판정은 누름을 넘기기 전에 한다. (누른 단추가 창을 띄워도 이 누름은 놀이로 가지 않게)
+		const isUserInterfacePressed = this.isUserInterfaceAt(viewInputPosition);
 		this.#touchRaycaster.touchPress(viewInputPosition);
+		if (isUserInterfacePressed || this.#playInputHandler === null) {
+			return;
+		}
+		this.#isPlayPressActive = true;
+		this.dispatchPlayInput("press", viewInputPosition, null);
 	}
 
 	//==============================================================================
@@ -543,6 +567,9 @@ export class GameScene extends Scene {
 			return;
 		}
 		this.#touchRaycaster.touchMove(viewInputPosition);
+		if (this.#isPlayPressActive) {
+			this.dispatchPlayInput("move", viewInputPosition, null);
+		}
 	}
 
 	//==============================================================================
@@ -557,6 +584,7 @@ export class GameScene extends Scene {
 			return;
 		}
 		this.#touchRaycaster.touchRelease(viewInputPosition);
+		this.releasePlayPress(viewInputPosition);
 	}
 
 	//==============================================================================
@@ -571,6 +599,7 @@ export class GameScene extends Scene {
 			return;
 		}
 		this.#touchRaycaster.touchCancel(viewInputPosition);
+		this.releasePlayPress(viewInputPosition);
 	}
 
 	//==============================================================================
@@ -582,10 +611,21 @@ export class GameScene extends Scene {
 	 * @param { Vector2 } wheelDelta
 	 */
 	touchWheel(viewInputPosition, wheelDelta) {
-		if (this.isDevToolsCapturingInput()) {
+		if (this.isDevToolsCapturingInput() || this.isScreenFading()) {
+			return;
+		}
+		// 창 층 안을 가리키면 맨 위의 창이 먼저 받는다.
+		const hitNode = this.#touchRaycaster.raycast(viewInputPosition);
+		const windowLayer = UIWindowLayer.findWindowLayerOf(hitNode);
+		if (windowLayer !== null) {
+			windowLayer.scrollWindowAt(viewInputPosition, wheelDelta);
 			return;
 		}
 		this.#touchRaycaster.touchWheel(viewInputPosition, wheelDelta);
+		if (hitNode !== null && hitNode !== undefined) {
+			return;
+		}
+		this.dispatchPlayInput("wheel", viewInputPosition, wheelDelta);
 	}
 
 	//==============================================================================
@@ -610,7 +650,7 @@ export class GameScene extends Scene {
 	}
 
 	//==============================================================================
-	// postDraw. DEVTools 를 화면 위에 그린다.
+	// postDraw. 어두워지는 막과 DEVTools 를 화면 위에 그린다.
 	//==============================================================================
 	/**
 	 * @override
@@ -618,8 +658,304 @@ export class GameScene extends Scene {
 	 */
 	postDraw(graphic) {
 		super.postDraw(graphic);
+		this.drawScreenFade(graphic);
 		if (this.#devtools !== null) {
 			this.#devtools.draw(graphic);
 		}
+	}
+
+	//==============================================================================
+	// 어두워졌다 밝아지기.
+	// - 다 어두워지면 onDark 를 부르고, 그것이 Promise 를 돌려주면 끝날 때까지(실패해도) 어둡게 두었다가 밝힌다.
+	// - 막이 걸린 동안(어두워지고, 기다리고, 밝아지는 동안)은 누름과 휠을 받지 않는다.
+	// - 이미 페이드 중이면 무시하고 false.
+	//==============================================================================
+	/**
+	 * @param { Function | null } onDark () => void | Promise
+	 * @returns { boolean } 시작했는지.
+	 */
+	fadeScreen(onDark) {
+		if (this.isScreenFading()) {
+			return false;
+		}
+		this.#screenFadeEvent = onDark;
+		this.#screenFadeDirection = 1;
+		return true;
+	}
+
+	//==============================================================================
+	// 페이드 중인지. (어두워지거나, onDark 를 기다리거나, 밝아지는 중)
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isScreenFading() {
+		return this.#screenFadeDirection !== 0 || this.#isScreenFadeWaiting || this.#screenFadeAlpha > 0;
+	}
+
+	//==============================================================================
+	// 어두워지는 막의 색 설정. (기본 검정)
+	//==============================================================================
+	/**
+	 * @param { Color } color
+	 */
+	setScreenFadeColor(color) {
+		this.#screenFadeColor = color;
+	}
+
+	//==============================================================================
+	// 어두워지는 시간과 밝아지는 시간 설정. (초, 기본 0.35, 0 이면 바로)
+	//==============================================================================
+	/**
+	 * @param { number } seconds
+	 */
+	setScreenFadeSeconds(seconds) {
+		this.#screenFadeSeconds = System.Math.max(0, seconds);
+	}
+
+	//==============================================================================
+	// 어두워지는 막의 진하기. (0 ~ 1)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getScreenFadeAlpha() {
+		return this.#screenFadeAlpha;
+	}
+
+	//==============================================================================
+	// 막 갱신. (tick 이 부른다, 배율을 곱하지 않은 시간으로 움직여 놀이를 멈춰도 돈다, 한 프레임은 0.1 초까지)
+	//==============================================================================
+	updateScreenFade() {
+		if (this.#screenFadeDirection === 0) {
+			return;
+		}
+		const engine = this.getEngine();
+		const timeManager = engine.getTimeManager();
+		const unscaledTimeDelta = System.Math.min(timeManager.getUnscaleDeltaTime(), 0.1);
+		const screenFadeSeconds = this.#screenFadeSeconds;
+		const fadeStep = screenFadeSeconds > 0 ? unscaledTimeDelta / screenFadeSeconds : 1;
+		if (this.#screenFadeDirection < 0) {
+			this.#screenFadeAlpha = System.Math.max(0, this.#screenFadeAlpha - fadeStep);
+			if (this.#screenFadeAlpha <= 0) {
+				this.#screenFadeDirection = 0;
+			}
+			return;
+		}
+		this.#screenFadeAlpha = System.Math.min(1, this.#screenFadeAlpha + fadeStep);
+		if (this.#screenFadeAlpha < 1) {
+			return;
+		}
+		// 다 어두워졌다. 맡긴 일을 하는 동안은 막을 그대로 두고, 끝난 뒤에 밝아진다.
+		this.#screenFadeDirection = 0;
+		const screenFadeEvent = this.#screenFadeEvent;
+		this.#screenFadeEvent = null;
+		if (screenFadeEvent === null) {
+			this.#screenFadeDirection = -1;
+			return;
+		}
+		this.#isScreenFadeWaiting = true;
+		const brighten = () => {
+			this.#isScreenFadeWaiting = false;
+			this.#screenFadeDirection = -1;
+		};
+		let result = null;
+		try {
+			result = screenFadeEvent();
+		}
+		catch (error) {
+			console.error(error);
+		}
+		if (result && typeof result.then === "function") {
+			result.then(brighten, (error) => {
+				console.error(error);
+				brighten();
+			});
+		}
+		else {
+			brighten();
+		}
+	}
+
+	//==============================================================================
+	// 어두워지는 막 그리기. (세이프에어리어까지 캔버스 전체를 덮는다)
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic
+	 */
+	drawScreenFade(graphic) {
+		const screenFadeAlpha = this.getScreenFadeAlpha();
+		if (screenFadeAlpha <= 0) {
+			return;
+		}
+		const engine = this.getEngine();
+		const viewManager = engine.getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		const globalAlpha = graphic.getGlobalAlpha();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setGlobalAlpha(globalAlpha * screenFadeAlpha);
+		graphic.setFillColor(this.#screenFadeColor);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		graphic.setGlobalAlpha(globalAlpha);
+		viewManager.applyViewRect(graphic);
+	}
+
+	//==============================================================================
+	// 그 자리에 UI(누를 수 있는 노드: 단추, 창의 어둠과 판, 스크롤 칸)가 있는지. (뷰 좌표)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewPosition
+	 * @returns { boolean }
+	 */
+	isUserInterfaceAt(viewPosition) {
+		if (!this.#touchRaycaster) {
+			return false;
+		}
+		const hitNode = this.#touchRaycaster.raycast(viewPosition);
+		return hitNode !== null && hitNode !== undefined;
+	}
+
+	//==============================================================================
+	// 놀이 입력 처리기 설정. (UI 가 받지 않은 누름과 그 누름의 이동, 뗌(취소 포함), UI 밖의 휠을 게임 영역 좌표로 넘긴다, null 이면 넘기지 않는다)
+	// - 게임 영역은 세이프에어리어 영역(getSafeAreaRect)이다. 좌표는 그 왼쪽 위가 0, 0 이다.
+	// - 페이드 중에는 누름과 휠을 넘기지 않는다. 개발자 도구가 입력을 가져가면 넘기지 않는다.
+	//==============================================================================
+	/**
+	 * @param { object | null } playInputHandler { press?(position), move?(position), release?(position), wheel?(position, wheelDelta) }
+	 */
+	setPlayInputHandler(playInputHandler) {
+		this.#playInputHandler = playInputHandler;
+		this.#isPlayPressActive = false;
+	}
+
+	//==============================================================================
+	// 뷰 좌표 → 게임 영역 좌표. (세이프에어리어 왼쪽 위가 0, 0)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewPosition
+	 * @returns { Vector2 }
+	 */
+	convertViewToPlayArea(viewPosition) {
+		const safeAreaRect = this.getSafeAreaRect();
+		if (!safeAreaRect) {
+			return viewPosition.clone();
+		}
+		return Vector2.create(viewPosition.x - safeAreaRect.position.x, viewPosition.y - safeAreaRect.position.y);
+	}
+
+	//==============================================================================
+	// 놀이 입력 넘기기. (kind 는 press, move, release, wheel, 처리기에 그 함수가 없으면 넘기지 않는다)
+	//==============================================================================
+	/**
+	 * @param { string } kind
+	 * @param { Vector2 } viewPosition
+	 * @param { Vector2 | null } wheelDelta
+	 */
+	dispatchPlayInput(kind, viewPosition, wheelDelta) {
+		const playInputHandler = this.#playInputHandler;
+		if (playInputHandler === null || typeof playInputHandler[kind] !== "function") {
+			return;
+		}
+		const playAreaPosition = this.convertViewToPlayArea(viewPosition);
+		playInputHandler[kind](playAreaPosition, wheelDelta);
+	}
+
+	//==============================================================================
+	// 놀이로 간 누름 끝내기. (뗌과 취소)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewPosition
+	 */
+	releasePlayPress(viewPosition) {
+		if (!this.#isPlayPressActive) {
+			return;
+		}
+		this.#isPlayPressActive = false;
+		this.dispatchPlayInput("release", viewPosition, null);
+	}
+
+	//==============================================================================
+	// 게임 영역 기준 설정. (세이프에어리어를 뺀 게임 영역의 고정 쪽 길이가 늘 fixedLength 가 되게 기준 해상도를 늘린다)
+	// - 엔진은 캔버스 전체의 길이를 기준 해상도에 맞추는데 캔버스는 세이프에어리어까지 덮는다. 그만큼 기준 해상도를 늘린다.
+	//   (캔버스 길이 : 세이프에어리어를 뺀 길이 = 기준 해상도 길이 : fixedLength)
+	// - isLandscape 면 가로, 아니면 세로가 고정 쪽이다. 뷰 배율 방식도 그에 맞춰 둔다. (가로 고정 stretchWidthExpandHeight, 세로 고정 stretchHeightExpandWidth)
+	// - 무시할 세이프에어리어 쪽은 ViewManager.setIgnoredSafeAreaSides 로 넘긴다. fixedLength 가 0 이면 끈다. (기준 해상도는 그대로 둔다)
+	//==============================================================================
+	/**
+	 * @param { number } fixedLength
+	 * @param { boolean } isLandscape
+	 */
+	setPlayAreaReference(fixedLength, isLandscape) {
+		this.#playAreaFixedLength = System.Math.max(0, fixedLength);
+		this.#isPlayAreaLandscape = isLandscape;
+		if (this.#playAreaFixedLength <= 0) {
+			return;
+		}
+		const viewScaleMode = isLandscape ? ViewScaleMode.stretchWidthExpandHeight : ViewScaleMode.stretchHeightExpandWidth;
+		this.setViewScaleMode(viewScaleMode);
+		this.applyPlayAreaReference();
+	}
+
+	//==============================================================================
+	// 게임 영역의 고정 쪽 길이. (0 이면 쓰지 않음)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getPlayAreaFixedLength() {
+		return this.#playAreaFixedLength;
+	}
+
+	//==============================================================================
+	// 게임 영역 기준을 기준 해상도에 걸기. (캔버스와 인셋 크기에서만 셈해 몇 번을 불러도 같다, 같으면 건드리지 않는다)
+	//==============================================================================
+	applyPlayAreaReference() {
+		const fixedLength = this.getPlayAreaFixedLength();
+		const engine = this.getEngine();
+		if (fixedLength <= 0 || !engine) {
+			return;
+		}
+		const viewManager = engine.getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		if (canvasNativeSize.x <= 0 || canvasNativeSize.y <= 0) {
+			return;
+		}
+		// 인셋은 지금 배율로 나눈 뷰 좌표로 나온다. 배율을 곱해 캔버스 단위로 되돌린다.
+		const safeAreaInsets = viewManager.getSafeAreaInsets();
+		const targetResolutionScale = viewManager.getTargetResolutionScale();
+		const insetScale = targetResolutionScale > 0 ? targetResolutionScale : 1;
+		const isLandscape = this.#isPlayAreaLandscape;
+		const referenceLength = GameScene.calculatePlayAreaReferenceLength(fixedLength, isLandscape, canvasNativeSize, safeAreaInsets, insetScale);
+		if (referenceLength <= 0) {
+			return;
+		}
+		const referenceResolutionSize = viewManager.getReferenceResolutionSize();
+		const currentReferenceLength = isLandscape ? referenceResolutionSize.x : referenceResolutionSize.y;
+		if (System.Math.abs(currentReferenceLength - referenceLength) < 0.0001) {
+			return;
+		}
+		// 고정하는 쪽만 뷰 계산에 쓰인다. 다른 쪽에도 같은 값을 넣어 둔다. (엔진이 계속 들고 있는 값이라 새 벡터로)
+		viewManager.applyReferenceResolutionSize(Vector2.create(referenceLength, referenceLength));
+	}
+
+	//==============================================================================
+	// 게임 영역 기준의 기준 해상도 길이 셈. (못 셈하면 0)
+	//==============================================================================
+	/**
+	 * @param { number } fixedLength
+	 * @param { boolean } isLandscape
+	 * @param { Vector2 } canvasNativeSize
+	 * @param { object } safeAreaInsets { top, right, bottom, left } (뷰 좌표)
+	 * @param { number } insetScale 뷰 좌표 → 캔버스 단위 배율.
+	 * @returns { number }
+	 */
+	static calculatePlayAreaReferenceLength(fixedLength, isLandscape, canvasNativeSize, safeAreaInsets, insetScale) {
+		const canvasLength = isLandscape ? canvasNativeSize.x : canvasNativeSize.y;
+		const insetSum = isLandscape ? safeAreaInsets.left + safeAreaInsets.right : safeAreaInsets.top + safeAreaInsets.bottom;
+		const safeAreaLength = canvasLength - insetSum * insetScale;
+		if (safeAreaLength <= 0 || canvasLength <= 0) {
+			return 0;
+		}
+		return fixedLength * canvasLength / safeAreaLength;
 	}
 }
