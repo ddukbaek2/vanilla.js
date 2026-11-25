@@ -24,5 +24,6 @@ export async function seconds(seconds) {
  * @returns { System.Promise<void> }
  */
 export async function nextFrame() {
-	new Promise(resolve => System.window.requestAnimationFrame(resolve));
+	const promise = new System.Promise(resolve => System.window.requestAnimationFrame(resolve));
+	await promise;
 }

@@ -295,6 +295,7 @@
   - tools/apidoc.cjs: 위 자료를 뽑는다. (node 내장 모듈만 쓰는 작은 토크나이저, --missing 은 표에 없는 ko 글, --check 는 꼴 검사와 수 세기) 쓰는 법은 tools/TOOLS.md
   - docs/guide/<판>/ko, en: 개요, 빠른 시작, 구조, 도구. (README, ARCHITECTURE, tools/TOOLS.md, NODE.md 에서 나눔, 저장소 상대 링크는 GitHub 주소로) docs/update/<판>.ko.md, .en.md: 이 판의 업데이트 기록
   - README: UI Editor 가 저장하는 파일은 .uiasset.json 이다. (.ui.json 이라 적혀 있었다) tools/excel.cjs 는 명령줄 진입점이 없는 함수 모음이라 혼자 실행하면 아무것도 하지 않고, tools/table.cjs 는 빈 파일이라고 바로 적었다. 명령줄 도구 표에 apidoc.cjs 를 더했다
+- Wait.nextFrame: 만든 Promise 를 기다리지 않아 바로 끝나던 것을 고쳤다. 이제 다음 requestAnimationFrame 까지 기다린다. (러스트 판 wait::next_frame 과 같다)
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.
