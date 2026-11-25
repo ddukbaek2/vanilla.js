@@ -9,9 +9,13 @@ import { MeshBuilder } from "./meshbuilder.js";
 //==============================================================================
 // 점토 모형(GLB) 읽기와 뼈대 자세. (툰 3D 의 MeshBuilder 꼭짓점 배열로, 외계행성 광부 키우기에서 왔다)
 //
-// 텍스처 없이 재질 색으로 칠하는 모형을 읽는다.
+// 재질 색으로 칠하는 모형을 읽는다. 텍스처 좌표와 재질 텍스처가 있으면 그것도 읽는다.
 //   - 부품 하나가 노드 하나이고, 노드의 메시는 색마다 프리미티브 하나이다. 꼭짓점은 위치와 노멀, 뼈대가 있으면 본 번호와 무게이다.
-//   - 재질의 baseColorFactor 는 선형 색이라 sRGB 로 바꿔 담고, emissiveFactor 가 있으면 빛남으로 담는다.
+//   - 재질의 baseColorFactor 는 선형 색이라 sRGB 로 바꿔 담고, emissiveFactor 가 있으면 빛남으로 담는다. (emissiveTexture 가 있으면 빛남은 재질 범위로만 넘긴다)
+//   - TEXCOORD_0 이 있으면 uvData 로 담는다. 프리미티브마다 재질 범위(materialRanges)를 담는다.
+//     { name 재질 이름, materialIndex, nodeName, indexStart, indexCount, extras 재질 extras, alphaMode, alphaCutoff, baseColorFactor 선형, emissiveFactor 선형, baseColorImage, emissiveImage (images 차례, 없으면 -1), hasUv }
+//     부품 안에서 칸을 갈라 칠할 때(강조색 칸, 표시판) 재질 이름이나 extras 로 고르고 ToonRenderer.drawMesh 의 indexStart, indexCount 로 그 칸만 그린다.
+//   - 그림은 readGlbImages 로 읽고 decodeGlbImage 로 풀어 ToonRenderer.createTexture 에 넘긴다.
 //   - 재질 extras 의 outline 은 바깥선 껍데기(뒷면만 그림), basic 은 빛을 받지 않는 부품이다.
 //     outlineOptions 를 주면 그 껍데기는 담지 않고, ".outline" 짝이 있는 노드의 몸으로 점마다 같은 굵기의 껍데기를 새로 짓는다. (MeshBuilder.addTriangleShell)
 //   - 뼈대(skin)가 있으면 본 노드와 그 거꾸로 묶는 행렬, 움직임(animations)과 그 extras(치기의 hitAt, 한 번만 트는 loop "once" 등)를 함께 읽는다. 자세는 writeSkinPose 가 셈한다.
@@ -185,6 +189,7 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
 		return;
 	}
 	const normals = readAccessor(json, binaryBuffer, attributes.NORMAL);
+	const uvs = attributes.TEXCOORD_0 !== undefined ? readWeightAccessor(json, binaryBuffer, attributes.TEXCOORD_0) : null;
 	const pbrMetallicRoughness = material.pbrMetallicRoughness !== undefined ? material.pbrMetallicRoughness : {};
 	const baseColor = pbrMetallicRoughness.baseColorFactor !== undefined ? pbrMetallicRoughness.baseColorFactor : [1, 1, 1, 1];
 	const color = [0, 1, 2].map((channelIndex) => {
@@ -192,12 +197,49 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
 	});
 	// 빛남은 바탕색에 곱하는 세기로 담는다. (셰이더는 바탕색 x 세기를 더함)
 	let glow = 0;
-	if (System.Array.isArray(material.emissiveFactor)) {
+	const emissiveImage = readTextureImage(json, material.emissiveTexture);
+	if (System.Array.isArray(material.emissiveFactor) && emissiveImage < 0) {
 		const emissiveMaximum = System.Math.max(material.emissiveFactor[0], material.emissiveFactor[1], material.emissiveFactor[2]);
 		const baseMaximum = System.Math.max(baseColor[0], baseColor[1], baseColor[2], 0.001);
 		glow = emissiveMaximum / baseMaximum;
 	}
-	builder.addTriangles(positions, normals, indices, partMatrix, color, glow, extras.basic === true, joints, weights);
+	const indexStart = builder.getIndexCount();
+	builder.addTriangles(positions, normals, indices, partMatrix, color, glow, extras.basic === true, joints, weights, uvs);
+	const emissiveFactor = System.Array.isArray(material.emissiveFactor) ? material.emissiveFactor.slice(0, 3) : [0, 0, 0];
+	builder.addMaterialRange({
+		name: typeof material.name === "string" ? material.name : "",
+		materialIndex: primitive.material !== undefined ? primitive.material : -1,
+		nodeName: typeof node.name === "string" ? node.name : "",
+		indexStart: indexStart,
+		indexCount: builder.getIndexCount() - indexStart,
+		extras: extras,
+		alphaMode: typeof material.alphaMode === "string" ? material.alphaMode : "OPAQUE",
+		alphaCutoff: typeof material.alphaCutoff === "number" ? material.alphaCutoff : 0.5,
+		baseColorFactor: baseColor.slice(0, 4),
+		emissiveFactor: emissiveFactor,
+		baseColorImage: readTextureImage(json, pbrMetallicRoughness.baseColorTexture),
+		emissiveImage: emissiveImage,
+		hasUv: uvs !== null,
+	});
+}
+
+//==============================================================================
+// 재질의 텍스처 정보가 가리키는 그림 차례. (textures[index].source, 없으면 -1)
+//==============================================================================
+/**
+ * @param { object } json
+ * @param { object | undefined } textureInfo { index, texCoord }
+ * @returns { number }
+ */
+function readTextureImage(json, textureInfo) {
+	if (textureInfo === undefined || textureInfo === null || typeof textureInfo.index !== "number" || json.textures === undefined) {
+		return -1;
+	}
+	const texture = json.textures[textureInfo.index];
+	if (texture === undefined || typeof texture.source !== "number") {
+		return -1;
+	}
+	return texture.source;
 }
 
 //==============================================================================
@@ -490,6 +532,43 @@ export function readGlbArrays(arrayBuffer, outlineOptions = null) {
 	arrays.innerOutlineRanges = innerOutlineRanges;
 	arrays.innerBodyRanges = innerNodes.length > 0 ? innerBodyRanges : [];
 	return arrays;
+}
+
+//==============================================================================
+// GLB 에 든 그림들. ([{ name, mimeType, data: Uint8Array }], images 의 차례, 재질 범위의 baseColorImage, emissiveImage 가 가리킴)
+//   - 바이너리 덩어리의 bufferView 로 담긴 그림만 읽는다. (바깥 파일 uri 는 data 가 빈 배열)
+//   - 텍스처로 쓰려면 decodeGlbImage 로 풀어 ToonRenderer.createTexture 에 넘긴다.
+//==============================================================================
+/**
+ * @param { ArrayBuffer } arrayBuffer
+ * @returns { Array<object> }
+ */
+export function readGlbImages(arrayBuffer) {
+	const chunks = readGlbChunks(arrayBuffer);
+	const json = chunks.json;
+	const images = System.Array.isArray(json.images) ? json.images : [];
+	return images.map((image) => {
+		const name = typeof image.name === "string" ? image.name : "";
+		const mimeType = typeof image.mimeType === "string" ? image.mimeType : "";
+		if (typeof image.bufferView !== "number") {
+			return { name: name, mimeType: mimeType, data: new System.Uint8Array(0) };
+		}
+		const bufferView = json.bufferViews[image.bufferView];
+		const byteOffset = bufferView.byteOffset !== undefined ? bufferView.byteOffset : 0;
+		return { name: name, mimeType: mimeType, data: new System.Uint8Array(chunks.binaryBuffer.slice(byteOffset, byteOffset + bufferView.byteLength)) };
+	});
+}
+
+//==============================================================================
+// readGlbImages 의 그림 하나를 풀기. (ImageBitmap, 알파를 미리 곱하지 않고 색 공간을 바꾸지 않음)
+//==============================================================================
+/**
+ * @param { object } image { mimeType, data }
+ * @returns { Promise<ImageBitmap> }
+ */
+export function decodeGlbImage(image) {
+	const blob = new System.Blob([image.data], { type: image.mimeType });
+	return System.createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
 }
 
 //==============================================================================
