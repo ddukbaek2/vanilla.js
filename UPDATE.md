@@ -244,6 +244,13 @@
 - SoundEffectPool: 보이스 수가 0 이면 play 가 0 으로 나눠 예외를 내던 것을 고쳐 아무것도 하지 않는다. (러스트 판과 같다)
 - AudioManager.getContextTime() (AudioContext 시계, 없으면 0), AudioAsset.getLoadError() (마지막 읽기 실패의 까닭, 없으면 null), AssetLoader.getInFlightCount() (일꾼이 집어 받는 중인 수). 러스트 판의 get_context_time, get_load_error, get_in_flight_count 와 같은 자리다
 - 비주얼 에디터를 위 엔진으로 다시 빌드했다
+- Graphic.setBlendMode: source-over 로 대신 그리던 17 가지를 제대로 그린다. 이제 SpriteBlendMode 26 가지가 모두 된다
+  - source-out, source-atop, destination-atop, xor 는 W3C Compositing and Blending Level 1 의 포터 더프 계수 그대로 blendFunc 로 건다
+  - overlay, darken, lighten, color-dodge, color-burn, hard-light, soft-light, difference, exclusion, hue, saturation, color, luminosity 는 그리기마다 그릴 영역(정점의 경계 상자)만 지금 프레임버퍼에서 blitFramebuffer 로 떠 와 셰이더로 섞는다. 공식은 W3C 그대로(분리 섞기, 비분리 섞기, Cs' = (1 - αb) x Cs + αb x B(Cb, Cs) 뒤 source-over 합성)이고 바탕 알파가 있는 렌더 타겟(RGBA8, RGBA16F)에서도 맞다. darken, lighten 은 blendEquation MIN / MAX 가 반투명에서 W3C 식과 달라 셰이더로 섞는다
+  - 셰이더 섞기 모드에서는 묶어 그리지 않는다. 그리기 하나에 영역 복사 한 번과 드로우 콜 한 번(M2 Pro, 1280x720 에서 그리기 하나에 0.065 ms 안팎, 대부분 복사가 렌더 패스를 끊는 값)
+  - 이미지, 도형, 글자, 나인슬라이스, 자르기, 파티클, 바꿔 끼운 셰이더(ShaderSprite) 모두 된다. 파티클은 서로 겹치지 않는 쿼드끼리 모아 한 번 떠 와 그려 Canvas2D 처럼 쿼드마다 앞 쿼드 위에 섞인다. 바꿔 끼운 셰이더는 섞기 함수를 모르므로 덧그림 칸(RGBA16F, 안 되면 RGBA8)에 먼저 그린 뒤 섞어 옮긴다
+  - 크롬 Canvas2D 와 같은 장면(여러 색 바탕 위에 반투명 그림, 사각형, 다각형)을 26 모드로 견주면 도형 안쪽 차이가 2 단계 안이다. Canvas2D 는 source-in, source-out, destination-in, destination-atop, copy 가 그린 도형 밖도 지우는데 Graphic 은 지금처럼 도형 안만 바꾼다
+  - 모르는 이름의 경고 글을 "unknown blend mode" 로 바꿨다
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.

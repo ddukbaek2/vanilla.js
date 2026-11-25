@@ -125,6 +125,218 @@ void main() {
 }
 `;
 
+// 셰이더 섞기 함수. (고정 블렌딩으로 안 되는 블렌드 모드에서 그릴 영역 아래와 섞는다, 러스트 판과 같은 글)
+// - backdropTexture 는 그리기 직전에 지금 프레임버퍼에서 그릴 영역만 떠 온 것이다. (프레임버퍼와 같은 크기와 형식, 프리멀티플라이드)
+// - 공식은 W3C Compositing and Blending Level 1 (https://www.w3.org/TR/compositing-1/, 2024-03-21 후보 권고안) 그대로다.
+//   10.1 분리 섞기: overlay = HardLight(Cs, Cb), darken = min, lighten = max, color-dodge, color-burn, hard-light, soft-light (D(Cb) 포함), difference, exclusion.
+//   10.2 비분리 섞기: hue, saturation, color, luminosity. (Lum = 0.3 R + 0.59 G + 0.11 B, ClipColor, SetLum, Sat, SetSat)
+//   섞은 색은 범위로 자른다. (10 장 "The result of the mixing formula must be clamped")
+// - 6 장 일반식대로 Cs' = (1 - αb) x Cs + αb x B(Cb, Cs) 로 섞은 색을 (Cs' x αs, αs) 로 내보내고,
+//   그 뒤 source-over 합성 co = cs' + cb x (1 - αs) 는 고정 블렌딩(ONE, ONE_MINUS_SRC_ALPHA)이 한다.
+// - blendModeIndex 는 SHADER_BLEND_MODE_INDEX_TABLE 의 번호다.
+const BLEND_FUNCTION_SOURCE = `uniform highp sampler2D backdropTexture;
+uniform int blendModeIndex;
+
+float blendColorDodge(float backdropValue, float sourceValue) {
+	if (backdropValue == 0.0) {
+		return 0.0;
+	}
+	if (sourceValue == 1.0) {
+		return 1.0;
+	}
+	return min(1.0, backdropValue / (1.0 - sourceValue));
+}
+
+float blendColorBurn(float backdropValue, float sourceValue) {
+	if (backdropValue == 1.0) {
+		return 1.0;
+	}
+	if (sourceValue == 0.0) {
+		return 0.0;
+	}
+	return 1.0 - min(1.0, (1.0 - backdropValue) / sourceValue);
+}
+
+float blendHardLight(float backdropValue, float sourceValue) {
+	if (sourceValue <= 0.5) {
+		return backdropValue * 2.0 * sourceValue;
+	}
+	float screenValue = 2.0 * sourceValue - 1.0;
+	return backdropValue + screenValue - backdropValue * screenValue;
+}
+
+float blendSoftLight(float backdropValue, float sourceValue) {
+	if (sourceValue <= 0.5) {
+		return backdropValue - (1.0 - 2.0 * sourceValue) * backdropValue * (1.0 - backdropValue);
+	}
+	float darkenedValue = sqrt(backdropValue);
+	if (backdropValue <= 0.25) {
+		darkenedValue = ((16.0 * backdropValue - 12.0) * backdropValue + 4.0) * backdropValue;
+	}
+	return backdropValue + (2.0 * sourceValue - 1.0) * (darkenedValue - backdropValue);
+}
+
+float getLuminosity(vec3 color) {
+	return 0.3 * color.r + 0.59 * color.g + 0.11 * color.b;
+}
+
+vec3 clipColor(vec3 color) {
+	float luminosity = getLuminosity(color);
+	float minimumValue = min(min(color.r, color.g), color.b);
+	float maximumValue = max(max(color.r, color.g), color.b);
+	vec3 clippedColor = color;
+	if (minimumValue < 0.0) {
+		clippedColor = luminosity + (clippedColor - luminosity) * luminosity / (luminosity - minimumValue);
+	}
+	if (maximumValue > 1.0) {
+		clippedColor = luminosity + (clippedColor - luminosity) * (1.0 - luminosity) / (maximumValue - luminosity);
+	}
+	return clippedColor;
+}
+
+vec3 setLuminosity(vec3 color, float luminosity) {
+	float luminosityDelta = luminosity - getLuminosity(color);
+	return clipColor(color + luminosityDelta);
+}
+
+float getSaturation(vec3 color) {
+	return max(max(color.r, color.g), color.b) - min(min(color.r, color.g), color.b);
+}
+
+vec3 setSaturation(vec3 color, float saturation) {
+	float minimumValue = min(min(color.r, color.g), color.b);
+	float maximumValue = max(max(color.r, color.g), color.b);
+	if (maximumValue > minimumValue) {
+		return (color - minimumValue) * saturation / (maximumValue - minimumValue);
+	}
+	return vec3(0.0);
+}
+
+vec3 blendColors(vec3 backdropColor, vec3 sourceColor) {
+	if (blendModeIndex == 1) {
+		return min(backdropColor, sourceColor);
+	}
+	if (blendModeIndex == 2) {
+		return max(backdropColor, sourceColor);
+	}
+	if (blendModeIndex == 3) {
+		return vec3(blendHardLight(sourceColor.r, backdropColor.r), blendHardLight(sourceColor.g, backdropColor.g), blendHardLight(sourceColor.b, backdropColor.b));
+	}
+	if (blendModeIndex == 4) {
+		return vec3(blendColorDodge(backdropColor.r, sourceColor.r), blendColorDodge(backdropColor.g, sourceColor.g), blendColorDodge(backdropColor.b, sourceColor.b));
+	}
+	if (blendModeIndex == 5) {
+		return vec3(blendColorBurn(backdropColor.r, sourceColor.r), blendColorBurn(backdropColor.g, sourceColor.g), blendColorBurn(backdropColor.b, sourceColor.b));
+	}
+	if (blendModeIndex == 6) {
+		return vec3(blendHardLight(backdropColor.r, sourceColor.r), blendHardLight(backdropColor.g, sourceColor.g), blendHardLight(backdropColor.b, sourceColor.b));
+	}
+	if (blendModeIndex == 7) {
+		return vec3(blendSoftLight(backdropColor.r, sourceColor.r), blendSoftLight(backdropColor.g, sourceColor.g), blendSoftLight(backdropColor.b, sourceColor.b));
+	}
+	if (blendModeIndex == 8) {
+		return abs(backdropColor - sourceColor);
+	}
+	if (blendModeIndex == 9) {
+		return backdropColor + sourceColor - 2.0 * backdropColor * sourceColor;
+	}
+	if (blendModeIndex == 10) {
+		return setLuminosity(setSaturation(sourceColor, getSaturation(backdropColor)), getLuminosity(backdropColor));
+	}
+	if (blendModeIndex == 11) {
+		return setLuminosity(setSaturation(backdropColor, getSaturation(sourceColor)), getLuminosity(backdropColor));
+	}
+	if (blendModeIndex == 12) {
+		return setLuminosity(sourceColor, getLuminosity(backdropColor));
+	}
+	if (blendModeIndex == 13) {
+		return setLuminosity(backdropColor, getLuminosity(sourceColor));
+	}
+	return sourceColor;
+}
+
+vec4 blendWithBackdrop(vec4 sourceColor) {
+	vec4 backdropColor = texelFetch(backdropTexture, ivec2(gl_FragCoord.xy), 0);
+	float sourceAlpha = clamp(sourceColor.a, 0.0, 1.0);
+	float backdropAlpha = clamp(backdropColor.a, 0.0, 1.0);
+	vec3 straightSourceColor = vec3(0.0);
+	if (sourceAlpha > 0.0) {
+		straightSourceColor = clamp(sourceColor.rgb / sourceAlpha, 0.0, 1.0);
+	}
+	vec3 straightBackdropColor = vec3(0.0);
+	if (backdropAlpha > 0.0) {
+		straightBackdropColor = clamp(backdropColor.rgb / backdropAlpha, 0.0, 1.0);
+	}
+	vec3 mixedColor = clamp(blendColors(straightBackdropColor, straightSourceColor), 0.0, 1.0);
+	vec3 blendedColor = (1.0 - backdropAlpha) * straightSourceColor + backdropAlpha * mixedColor;
+	return vec4(blendedColor * sourceAlpha, sourceAlpha);
+}
+`;
+
+// 셰이더 섞기 프래그먼트 셰이더. (기본 셰이더와 같은 색 셈 뒤 그릴 영역 아래와 섞는다)
+const BLEND_FRAGMENTSHADER_SOURCE = `#version 300 es
+precision highp float;
+in vec2 fragmentTextureCoordinate;
+uniform sampler2D mainTexture;
+uniform vec4 mainColor;
+uniform vec4 tintColor;
+uniform float globalAlpha;
+uniform float textureLodBias;
+out vec4 outputColor;
+${BLEND_FUNCTION_SOURCE}
+void main() {
+	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate, textureLodBias);
+	vec3 tintedColor = mix(textureColor.rgb, tintColor.rgb * textureColor.a, tintColor.a);
+	float finalAlpha = textureColor.a * mainColor.a * globalAlpha;
+	vec3 finalColor = tintedColor * mainColor.rgb * mainColor.a * globalAlpha;
+	outputColor = blendWithBackdrop(vec4(finalColor, finalAlpha));
+}
+`;
+
+// 파티클 셰이더 섞기 프래그먼트 셰이더. (파티클 셰이더와 같은 색 셈 뒤 그릴 영역 아래와 섞는다)
+const PARTICLE_BLEND_FRAGMENTSHADER_SOURCE = `#version 300 es
+precision highp float;
+in vec2 fragmentTextureCoordinate;
+in vec4 fragmentColor;
+uniform sampler2D mainTexture;
+uniform float globalAlpha;
+uniform float textureLodBias;
+out vec4 outputColor;
+${BLEND_FUNCTION_SOURCE}
+void main() {
+	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate, textureLodBias);
+	float finalAlpha = textureColor.a * fragmentColor.a * globalAlpha;
+	vec3 finalColor = textureColor.rgb * fragmentColor.rgb * fragmentColor.a * globalAlpha;
+	outputColor = blendWithBackdrop(vec4(finalColor, finalAlpha));
+}
+`;
+
+// 셰이더로 섞는 블렌드 모드와 그 번호. (BLEND_FUNCTION_SOURCE 의 blendModeIndex, 0 은 고정 블렌딩)
+// - darken, lighten 도 셰이더로 섞는다. blendEquation MIN / MAX 는 계수 없이 min(cs, cb), max(cs, cb) 를 내는데,
+//   W3C 식을 프리멀티플라이드로 풀면 darken 은 cs + cb - max(cs x αb, cb x αs), lighten 은 cs + cb - min(cs x αb, cb x αs) 라서 소스나 바탕이 반투명이면 같지 않다.
+//   (불투명한 바탕 cb = 0.2 에 검정을 알파 0.5 로 그리면 W3C darken 은 0.1, MIN 은 0. 흰색을 알파 0.5 로 그리면 W3C lighten 은 0.6, MAX 는 0.5)
+const SHADER_BLEND_MODE_INDEX_TABLE = new Map([
+	["darken", 1],
+	["lighten", 2],
+	["overlay", 3],
+	["color-dodge", 4],
+	["color-burn", 5],
+	["hard-light", 6],
+	["soft-light", 7],
+	["difference", 8],
+	["exclusion", 9],
+	["hue", 10],
+	["saturation", 11],
+	["color", 12],
+	["luminosity", 13],
+]);
+
+// 덧그림 칸을 비우는 색. (투명한 검정)
+const TRANSPARENT_CLEAR_VALUE_LIST = new Float32Array([0, 0, 0, 0]);
+
+// 셰이더 섞기로 파티클을 그릴 때 한 번에 그리는 쿼드 수 상한. (서로 겹치지 않는 쿼드끼리 한 번 떠 와 함께 그린다, 겹침을 따질 때 견주는 수)
+const SHADER_BLEND_PARTICLE_GROUP_CAPACITY = 32;
+
 const FLOATS_PER_VERTEX = 4;
 const PARTICLE_FLOATS_PER_VERTEX = 8; // x, y, u, v, r, g, b, a
 const PARTICLE_VERTEX_CAPACITY = 8192;
@@ -256,6 +468,17 @@ export class Graphic extends Object {
 	/** @private @type { string } */ #blendMode;
 	/** @private @type { Map<string, number[]> } */ #blendFunctionTable;
 	/** @private @type { Set<string> } */ #warnedBlendModes;
+	/** @private @type { number } */ #shaderBlendModeIndex; // 지금 블렌드 모드의 셰이더 섞기 번호. (0 이면 고정 블렌딩)
+	/** @private @type { ShaderProgram | null } */ #blendShaderProgram; // 셰이더 섞기 전용. (지연 생성)
+	/** @private @type { ShaderProgram | null } */ #particleBlendShaderProgram; // 파티클 셰이더 섞기 전용. (지연 생성)
+	/** @private @type { Map<number, object> } */ #backdropTargetTable; // 그릴 영역 아래를 떠 올 칸. (텍스처 형식 → { texture, framebuffer, width, height })
+	/** @private @type { Map<WebGLFramebuffer | null, number> } */ #framebufferFormatTable; // 프레임버퍼마다 색 텍스처 형식. (프레임마다 잊는다)
+	/** @private @type { object | null } */ #layerTarget; // 바꿔 끼운 셰이더로 먼저 그려 둘 칸. ({ texture, framebuffer, width, height }, 지연 생성)
+	/** @private @type { object } */ #backdropRect; // 떠 올 영역. ({ x, y, width, height } GL 픽셀, 왼쪽 아래 원점, 고쳐 쓴다)
+	/** @private @type { WebGLTexture | null } */ #boundBackdropTexture; // 1 번 텍스처 유닛에 마지막으로 묶은 텍스처. (null 이면 모른다)
+	/** @private @type { boolean } */ #isStencilRecording; // 스텐실에 자르기 영역을 적는 중인지. (색을 쓰지 않으므로 섞지 않는다)
+	/** @private @type { TransformMatrix } */ #identityTransformMatrix; // 덧그림 칸을 옮겨 그릴 때 쓰는 단위 행렬.
+	/** @private @type { object[] } */ #particleGroupRectList; // 셰이더 섞기로 함께 그릴 파티클 쿼드의 영역. (SHADER_BLEND_PARTICLE_GROUP_CAPACITY 칸, 고쳐 쓴다)
 	/** @private @type { Color } */ #fillColor;
 	/** @private @type { Color } */ #strokeColor;
 	/** @private @type { Color } */ #whiteColor;
@@ -390,6 +613,20 @@ export class Graphic extends Object {
 		this.#globalAlpha = 1.0;
 		this.#blendMode = "source-over";
 		this.#warnedBlendModes = new Set();
+		this.#shaderBlendModeIndex = 0;
+		this.#blendShaderProgram = null;
+		this.#particleBlendShaderProgram = null;
+		this.#backdropTargetTable = new Map();
+		this.#framebufferFormatTable = new Map();
+		this.#layerTarget = null;
+		this.#backdropRect = { x: 0, y: 0, width: 0, height: 0 };
+		this.#boundBackdropTexture = null;
+		this.#isStencilRecording = false;
+		this.#identityTransformMatrix = new TransformMatrix();
+		this.#particleGroupRectList = [];
+		for (let rectIndex = 0; rectIndex < SHADER_BLEND_PARTICLE_GROUP_CAPACITY; ++rectIndex) {
+			this.#particleGroupRectList.push({ x: 0, y: 0, width: 0, height: 0 });
+		}
 		this.#fillColor = Color.black();
 		this.#strokeColor = Color.black();
 		this.#whiteColor = Color.white();
@@ -425,8 +662,9 @@ export class Graphic extends Object {
 		this.#lastFrameCulledNodeCount = 0;
 
 		// 블렌드 함수 매핑 테이블. (프리멀티플라이드 알파 기준)
-		// - 고정 블렌딩으로 재현 가능한 모드만 등록. 그 외는 source-over 폴백.
-		// - 추후 셰이더 기반 블렌드를 추가할 때 이 테이블이 확장 지점이 된다.
+		// - 고정 블렌딩으로 재현 가능한 모드만 등록. 그 외(SHADER_BLEND_MODE_INDEX_TABLE)는 셰이더로 섞는다.
+		// - 포터 더프 연산자는 W3C Compositing and Blending Level 1 의 9.1 장 Fa, Fb 를 그대로 계수로 쓴다. (co = cs x Fa + cb x Fb, 알파도 같은 계수라 blendFunc 하나로 된다)
+		//   source-out: Fa = 1 - αb, Fb = 0 / source-atop: Fa = αb, Fb = 1 - αs / destination-atop: Fa = 1 - αb, Fb = αs / xor: Fa = 1 - αb, Fb = 1 - αs
 		this.#blendFunctionTable = new Map([
 			["source-over", [webGL2RenderingContext.ONE, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA]],
 			["lighter", [webGL2RenderingContext.ONE, webGL2RenderingContext.ONE]],
@@ -437,6 +675,10 @@ export class Graphic extends Object {
 			["source-in", [webGL2RenderingContext.DST_ALPHA, webGL2RenderingContext.ZERO]],
 			["destination-in", [webGL2RenderingContext.ZERO, webGL2RenderingContext.SRC_ALPHA]],
 			["copy", [webGL2RenderingContext.ONE, webGL2RenderingContext.ZERO]],
+			["source-out", [webGL2RenderingContext.ONE_MINUS_DST_ALPHA, webGL2RenderingContext.ZERO]],
+			["source-atop", [webGL2RenderingContext.DST_ALPHA, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA]],
+			["destination-atop", [webGL2RenderingContext.ONE_MINUS_DST_ALPHA, webGL2RenderingContext.SRC_ALPHA]],
+			["xor", [webGL2RenderingContext.ONE_MINUS_DST_ALPHA, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA]],
 		]);
 
 		// 고정 렌더 상태.
@@ -498,8 +740,10 @@ export class Graphic extends Object {
 		webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
 
 		// 프레임 시작 기준 상태로 리셋.
+		// 프레임버퍼의 색 형식은 프레임 사이에 렌더 타겟을 다시 만들었을 수 있어 잊는다.
 		this.#stateStack.length = 0;
 		this.#isUploadedUniformKnown = false;
+		this.#framebufferFormatTable.clear();
 		this.#transformMatrix.setIdentity();
 		this.#globalAlpha = 1.0;
 		this.#imageTintColor = null;
@@ -569,7 +813,7 @@ export class Graphic extends Object {
 	setImageMipmapBias(value) {
 		this.flushSpriteBatch();
 		this.#imageMipmapBias = value;
-		const shaderPrograms = [this.#shaderProgram, this.#batchShaderProgram, this.#particleShaderProgram, this.#shaderProgramOverride];
+		const shaderPrograms = [this.#shaderProgram, this.#batchShaderProgram, this.#particleShaderProgram, this.#blendShaderProgram, this.#particleBlendShaderProgram, this.#shaderProgramOverride];
 		for (const shaderProgram of shaderPrograms) {
 			if (!shaderProgram) {
 				continue;
@@ -810,8 +1054,12 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
-	// 블렌드 모드 설정. (SpriteBlendMode 문자열 수용)
-	// - 고정 블렌딩으로 재현 불가능한 모드는 source-over 로 폴백.
+	// 블렌드 모드 설정. (SpriteBlendMode 문자열 수용, Canvas2D globalCompositeOperation 26 가지)
+	// - 고정 블렌딩으로 되는 13 가지(포터 더프 연산자, lighter, multiply, screen)는 blendFunc 로 건다.
+	// - 나머지 13 가지(overlay, darken, lighten, color-dodge, color-burn, hard-light, soft-light, difference, exclusion, hue, saturation, color, luminosity)는
+	//   그리기마다 그릴 영역 아래를 떠 와 셰이더로 섞는다. 이 모드에서는 묶어 그리지 않고, 그리기 하나에 영역 복사 한 번과 드로우 콜 한 번이 든다.
+	//   (바꿔 끼운 셰이더로 그릴 때는 덧그림 칸에 먼저 그리고 옮기므로 드로우 콜이 두 번)
+	// - 모르는 이름은 source-over 로 그린다.
 	//==============================================================================
 	/**
 	 * @param { string } blendMode
@@ -819,11 +1067,17 @@ export class Graphic extends Object {
 	setBlendMode(blendMode) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		let blendFunction = this.#blendFunctionTable.get(blendMode);
+		let shaderBlendModeIndex = 0;
 		if (!blendFunction) {
-			if (!this.#warnedBlendModes.has(blendMode)) {
-				this.#warnedBlendModes.add(blendMode);
-				console.warn(`Graphic: unsupported blend mode "${blendMode}" — falling back to "source-over".`);
+			if (SHADER_BLEND_MODE_INDEX_TABLE.has(blendMode)) {
+				shaderBlendModeIndex = SHADER_BLEND_MODE_INDEX_TABLE.get(blendMode);
 			}
+			else if (!this.#warnedBlendModes.has(blendMode)) {
+				this.#warnedBlendModes.add(blendMode);
+				console.warn(`Graphic: unknown blend mode "${blendMode}", drawing with "source-over".`);
+			}
+
+			// 셰이더로 섞은 색은 source-over 로 합성한다.
 			blendFunction = this.#blendFunctionTable.get("source-over");
 		}
 
@@ -832,6 +1086,7 @@ export class Graphic extends Object {
 			this.flushSpriteBatch();
 		}
 		this.#blendMode = blendMode;
+		this.#shaderBlendModeIndex = shaderBlendModeIndex;
 		webGL2RenderingContext.blendFunc(blendFunction[0], blendFunction[1]);
 	}
 
@@ -973,12 +1228,19 @@ export class Graphic extends Object {
 			return;
 		}
 
+		// 셰이더 섞기 모드는 그리기마다 그 아래를 떠 와 섞으므로 묶지 않는다. (스텐실에 자르기 영역을 적을 때는 색을 쓰지 않으므로 그냥 그린다)
+		const isShaderBlendDraw = this.#shaderBlendModeIndex > 0 && !this.#isStencilRecording;
+
 		// 묶어 그리기가 켜져 있으면 쌓아 두었다가 텍스처나 상태가 바뀔 때 한 번에 그린다. (바꿔 끼운 셰이더는 제 유니폼을 쓰므로 바로 그린다)
-		if (this.#isSpriteBatchingEnabled && this.#shaderProgramOverride === null && vertexCount <= BATCH_VERTEX_CAPACITY) {
+		if (this.#isSpriteBatchingEnabled && this.#shaderProgramOverride === null && !isShaderBlendDraw && vertexCount <= BATCH_VERTEX_CAPACITY) {
 			this.appendSpriteBatch(vertexCount, texture, color);
 			return;
 		}
 		this.flushSpriteBatch();
+		if (isShaderBlendDraw) {
+			this.drawVerticesWithShaderBlend(vertexCount, texture, color);
+			return;
+		}
 
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const shaderProgram = this.getShaderProgram();
@@ -1000,6 +1262,375 @@ export class Graphic extends Object {
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
 		this.#drawCallCount += 1;
 		this.#drawVertexCount += vertexCount;
+	}
+
+	//==============================================================================
+	// 기록된 버텍스를 셰이더 섞기로 출력. (drawVertices 가 셰이더 섞기 모드에서 부른다)
+	// - 그릴 영역(정점의 경계 상자)만 지금 프레임버퍼에서 떠 온 뒤 섞기 셰이더로 그린다.
+	// - 바꿔 끼운 셰이더(ShaderSprite 등)는 섞기 함수를 모르므로, 그 셰이더로 덧그림 칸에 먼저 그리고 그 칸을 섞기 셰이더로 옮긴다.
+	//   덧그림 칸에는 스텐실이 없어 자르기는 옮겨 그릴 때 걸린다.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { number } vertexCount
+	 * @param { WebGLTexture } texture
+	 * @param { Color } color
+	 */
+	drawVerticesWithShaderBlend(vertexCount, texture, color) {
+		const vertexData = this.getVertexData();
+		const backdropRect = this.#backdropRect;
+		const isVisible = this.measureBackdropRect(vertexData, FLOATS_PER_VERTEX, 0, vertexCount, backdropRect);
+		if (!isVisible) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const framebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
+		this.copyBackdrop(framebuffer, backdropRect);
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, vertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, vertexCount * FLOATS_PER_VERTEX);
+
+		const shaderProgramOverride = this.#shaderProgramOverride;
+		if (shaderProgramOverride === null) {
+			this.drawWithBlendShaderProgram(vertexCount, texture, color);
+			return;
+		}
+
+		// 바꿔 끼운 셰이더로 덧그림 칸의 그릴 영역을 비우고 그린다.
+		const layerTarget = this.ensureLayerTarget(framebuffer);
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, layerTarget.framebuffer);
+		webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
+		webGL2RenderingContext.scissor(backdropRect.x, backdropRect.y, backdropRect.width, backdropRect.height);
+		webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, TRANSPARENT_CLEAR_VALUE_LIST);
+		webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
+		this.useShaderProgram(shaderProgramOverride);
+		this.uploadDrawUniforms(shaderProgramOverride, color);
+		this.bindTexture(texture);
+		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
+		this.#drawCallCount += 1;
+		this.#drawVertexCount += vertexCount;
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
+
+		// 덧그림 칸의 그릴 영역을 단위 행렬, 흰색, 틴트 없이 섞어 옮긴다. (칸은 화면과 같은 크기라 디바이스 픽셀 그대로 짚는다)
+		const viewportWidth = this.#appliedViewportWidth;
+		const viewportHeight = this.#appliedViewportHeight;
+		const leftX = backdropRect.x;
+		const rightX = backdropRect.x + backdropRect.width;
+		const topY = viewportHeight - (backdropRect.y + backdropRect.height);
+		const bottomY = viewportHeight - backdropRect.y;
+		const layerVertexCount = this.writeQuad(0, leftX, topY, rightX, bottomY, leftX / viewportWidth, (viewportHeight - topY) / viewportHeight, rightX / viewportWidth, (viewportHeight - bottomY) / viewportHeight) / FLOATS_PER_VERTEX;
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, vertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, layerVertexCount * FLOATS_PER_VERTEX);
+		const transformMatrix = this.#transformMatrix;
+		const globalAlpha = this.#globalAlpha;
+		const imageTintColor = this.#imageTintColor;
+		this.#transformMatrix = this.#identityTransformMatrix;
+		this.#globalAlpha = 1.0;
+		this.#imageTintColor = null;
+		const whiteColor = this.getWhiteColor();
+		this.drawWithBlendShaderProgram(layerVertexCount, layerTarget.texture, whiteColor);
+		this.#transformMatrix = transformMatrix;
+		this.#globalAlpha = globalAlpha;
+		this.#imageTintColor = imageTintColor;
+	}
+
+	//==============================================================================
+	// 올려 둔 버텍스를 섞기 셰이더로 그리기. (그릴 영역 아래는 이미 떠 와 1 번 유닛에 묶여 있다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { number } vertexCount
+	 * @param { WebGLTexture } texture
+	 * @param { Color } color
+	 */
+	drawWithBlendShaderProgram(vertexCount, texture, color) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const blendShaderProgram = this.ensureBlendShaderProgram();
+		this.useShaderProgram(blendShaderProgram);
+		const projectionMatrixLocation = blendShaderProgram.getUniformLocation("projectionMatrix");
+		webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
+		const blendModeIndexLocation = blendShaderProgram.getUniformLocation("blendModeIndex");
+		webGL2RenderingContext.uniform1i(blendModeIndexLocation, this.#shaderBlendModeIndex);
+		this.uploadDrawUniforms(blendShaderProgram, color);
+		this.bindTexture(texture);
+		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
+		this.#drawCallCount += 1;
+		this.#drawVertexCount += vertexCount;
+	}
+
+	//==============================================================================
+	// 정점들이 덮는 영역을 떠 올 영역으로 적기. (지금 변환으로 옮긴 경계 상자를 픽셀 경계로 넓히고 화면으로 자른다)
+	// - 적는 영역은 GL 픽셀(왼쪽 아래 원점)이다. 화면에 걸치지 않으면 false.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { Float32Array } vertexData
+	 * @param { number } floatsPerVertex
+	 * @param { number } firstVertexIndex
+	 * @param { number } vertexCount
+	 * @param { object } backdropRect
+	 * @returns { boolean }
+	 */
+	measureBackdropRect(vertexData, floatsPerVertex, firstVertexIndex, vertexCount, backdropRect) {
+		const transformMatrix = this.#transformMatrix;
+		const matrixA = transformMatrix.a;
+		const matrixB = transformMatrix.b;
+		const matrixC = transformMatrix.c;
+		const matrixD = transformMatrix.d;
+		const matrixE = transformMatrix.e;
+		const matrixF = transformMatrix.f;
+		let minimumX = System.Infinity;
+		let minimumY = System.Infinity;
+		let maximumX = -System.Infinity;
+		let maximumY = -System.Infinity;
+		let offset = firstVertexIndex * floatsPerVertex;
+		for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
+			const positionX = vertexData[offset];
+			const positionY = vertexData[offset + 1];
+			const deviceX = matrixA * positionX + matrixC * positionY + matrixE;
+			const deviceY = matrixB * positionX + matrixD * positionY + matrixF;
+			minimumX = System.Math.min(minimumX, deviceX);
+			minimumY = System.Math.min(minimumY, deviceY);
+			maximumX = System.Math.max(maximumX, deviceX);
+			maximumY = System.Math.max(maximumY, deviceY);
+			offset += floatsPerVertex;
+		}
+		const viewportWidth = this.#appliedViewportWidth;
+		const viewportHeight = this.#appliedViewportHeight;
+		const leftX = System.Math.max(0, System.Math.floor(minimumX));
+		const topY = System.Math.max(0, System.Math.floor(minimumY));
+		const rightX = System.Math.min(viewportWidth, System.Math.ceil(maximumX));
+		const bottomY = System.Math.min(viewportHeight, System.Math.ceil(maximumY));
+		if (!(rightX > leftX && bottomY > topY)) {
+			return false;
+		}
+		backdropRect.x = leftX;
+		backdropRect.y = viewportHeight - bottomY;
+		backdropRect.width = rightX - leftX;
+		backdropRect.height = bottomY - topY;
+		return true;
+	}
+
+	//==============================================================================
+	// 그릴 영역 아래 떠 오기. (지금 프레임버퍼의 그 영역을 같은 형식, 같은 자리의 칸에 blitFramebuffer 로 옮기고 1 번 유닛에 묶는다)
+	// - 같은 자리로 옮기므로 멀티샘플 기본 프레임버퍼(안티에일리어싱)에서도 된다. copyTexSubImage2D 는 멀티샘플에서 안 된다.
+	// - 렌더 타겟에 그리는 중이어도 그 색 텍스처를 바로 읽지 않고 떠 온다. 그리는 대상의 텍스처를 셰이더가 읽으면 피드백 루프라 WebGL 이 그리기를 막는다.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { WebGLFramebuffer | null } framebuffer
+	 * @param { object } backdropRect
+	 */
+	copyBackdrop(framebuffer, backdropRect) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const backdropTarget = this.ensureBackdropTarget(framebuffer);
+		const leftX = backdropRect.x;
+		const bottomY = backdropRect.y;
+		const rightX = backdropRect.x + backdropRect.width;
+		const topY = backdropRect.y + backdropRect.height;
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.READ_FRAMEBUFFER, framebuffer);
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.DRAW_FRAMEBUFFER, backdropTarget.framebuffer);
+		webGL2RenderingContext.blitFramebuffer(leftX, bottomY, rightX, topY, leftX, bottomY, rightX, topY, webGL2RenderingContext.COLOR_BUFFER_BIT, webGL2RenderingContext.NEAREST);
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
+		if (backdropTarget.texture !== this.#boundBackdropTexture) {
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, backdropTarget.texture);
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+			this.#boundBackdropTexture = backdropTarget.texture;
+		}
+	}
+
+	//==============================================================================
+	// 프레임버퍼의 색 텍스처 형식 읽기. (기본 프레임버퍼는 alpha: false 라 RGB8, 렌더 타겟은 RGBA8 이나 실수 RGBA16F / RGBA32F)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { WebGLFramebuffer | null } framebuffer
+	 * @returns { number }
+	 */
+	readFramebufferFormat(framebuffer) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const attachment = framebuffer === null ? webGL2RenderingContext.BACK : webGL2RenderingContext.COLOR_ATTACHMENT0;
+		const componentType = webGL2RenderingContext.getFramebufferAttachmentParameter(webGL2RenderingContext.FRAMEBUFFER, attachment, webGL2RenderingContext.FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE);
+		if (componentType === webGL2RenderingContext.FLOAT) {
+			const redSize = webGL2RenderingContext.getFramebufferAttachmentParameter(webGL2RenderingContext.FRAMEBUFFER, attachment, webGL2RenderingContext.FRAMEBUFFER_ATTACHMENT_RED_SIZE);
+			return redSize > 16 ? webGL2RenderingContext.RGBA32F : webGL2RenderingContext.RGBA16F;
+		}
+		const alphaSize = webGL2RenderingContext.getFramebufferAttachmentParameter(webGL2RenderingContext.FRAMEBUFFER, attachment, webGL2RenderingContext.FRAMEBUFFER_ATTACHMENT_ALPHA_SIZE);
+		return alphaSize > 0 ? webGL2RenderingContext.RGBA8 : webGL2RenderingContext.RGB8;
+	}
+
+	//==============================================================================
+	// 그릴 영역 아래를 떠 올 칸 준비. (지금 프레임버퍼와 같은 형식, 화면과 같은 크기. 형식마다 하나, 크기가 바뀌면 다시 만든다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { WebGLFramebuffer | null } framebuffer
+	 * @returns { object }
+	 */
+	ensureBackdropTarget(framebuffer) {
+		let internalFormat = this.#framebufferFormatTable.get(framebuffer);
+		if (internalFormat === undefined) {
+			internalFormat = this.readFramebufferFormat(framebuffer);
+			this.#framebufferFormatTable.set(framebuffer, internalFormat);
+		}
+		const viewportWidth = this.#appliedViewportWidth;
+		const viewportHeight = this.#appliedViewportHeight;
+		let backdropTarget = this.#backdropTargetTable.get(internalFormat);
+		if (backdropTarget === undefined || backdropTarget.width !== viewportWidth || backdropTarget.height !== viewportHeight) {
+			if (backdropTarget !== undefined) {
+				this.destroyOffscreenTarget(backdropTarget);
+			}
+			backdropTarget = this.createOffscreenTarget(framebuffer, internalFormat, viewportWidth, viewportHeight);
+			this.#backdropTargetTable.set(internalFormat, backdropTarget);
+		}
+		return backdropTarget;
+	}
+
+	//==============================================================================
+	// 바꿔 끼운 셰이더로 먼저 그려 둘 덧그림 칸 준비. (화면과 같은 크기, 크기가 바뀌면 다시 만든다)
+	// - 실수 색을 그릴 수 있으면(EXT_color_buffer_float) RGBA16F 로 만든다. RGBA8 이면 옮길 때 프리멀티플라이드를 되돌리며 알파가 작은 가장자리의 색이 8 비트로 뭉개져,
+	//   color-dodge, color-burn, hue 처럼 나눗셈이 든 섞기가 바꿔 끼우지 않은 그리기와 15 단계까지 달라졌다. (RGBA16F 는 거의 2 단계 안)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { WebGLFramebuffer | null } framebuffer
+	 * @returns { object }
+	 */
+	ensureLayerTarget(framebuffer) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const viewportWidth = this.#appliedViewportWidth;
+		const viewportHeight = this.#appliedViewportHeight;
+		let layerTarget = this.#layerTarget;
+		if (layerTarget === null || layerTarget.width !== viewportWidth || layerTarget.height !== viewportHeight) {
+			if (layerTarget !== null) {
+				this.destroyOffscreenTarget(layerTarget);
+			}
+			const colorBufferFloatExtension = webGL2RenderingContext.getExtension("EXT_color_buffer_float");
+			const internalFormat = colorBufferFloatExtension ? webGL2RenderingContext.RGBA16F : webGL2RenderingContext.RGBA8;
+			layerTarget = this.createOffscreenTarget(framebuffer, internalFormat, viewportWidth, viewportHeight);
+			this.#layerTarget = layerTarget;
+		}
+		return layerTarget;
+	}
+
+	//==============================================================================
+	// 오프스크린 칸 만들기. (색 텍스처 하나를 붙인 프레임버퍼, 거르기 NEAREST. 만든 뒤 framebuffer 를 다시 묶는다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { WebGLFramebuffer | null } framebuffer
+	 * @param { number } internalFormat
+	 * @param { number } width
+	 * @param { number } height
+	 * @returns { object }
+	 */
+	createOffscreenTarget(framebuffer, internalFormat, width, height) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		let pixelFormat = webGL2RenderingContext.RGBA;
+		let pixelType = webGL2RenderingContext.UNSIGNED_BYTE;
+		if (internalFormat === webGL2RenderingContext.RGB8) {
+			pixelFormat = webGL2RenderingContext.RGB;
+		}
+		else if (internalFormat === webGL2RenderingContext.RGBA16F) {
+			pixelType = webGL2RenderingContext.HALF_FLOAT;
+		}
+		else if (internalFormat === webGL2RenderingContext.RGBA32F) {
+			pixelType = webGL2RenderingContext.FLOAT;
+		}
+		const texture = webGL2RenderingContext.createTexture();
+		this.bindTexture(texture);
+		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, internalFormat, width, height, 0, pixelFormat, pixelType, null);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+		const targetFramebuffer = webGL2RenderingContext.createFramebuffer();
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, targetFramebuffer);
+		webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, texture, 0);
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
+		return { texture: texture, framebuffer: targetFramebuffer, width: width, height: height };
+	}
+
+	//==============================================================================
+	// 오프스크린 칸 지우기. (지운 텍스처를 묶었다고 기억하면 잊는다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { object } offscreenTarget
+	 */
+	destroyOffscreenTarget(offscreenTarget) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		if (offscreenTarget.texture === this.#boundTexture) {
+			this.#boundTexture = null;
+		}
+		if (offscreenTarget.texture === this.#boundBackdropTexture) {
+			this.#boundBackdropTexture = null;
+		}
+		webGL2RenderingContext.deleteFramebuffer(offscreenTarget.framebuffer);
+		webGL2RenderingContext.deleteTexture(offscreenTarget.texture);
+	}
+
+	//==============================================================================
+	// 섞기 셰이더 프로그램 준비. (기본 버텍스 셰이더, 어트리뷰트 위치를 기본 프로그램과 같게 고정해 기본 버텍스 어레이를 같이 쓴다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @returns { ShaderProgram }
+	 */
+	ensureBlendShaderProgram() {
+		if (this.#blendShaderProgram) {
+			return this.#blendShaderProgram;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const shaderProgram = this.#shaderProgram;
+		const attributeLocationTable = {
+			vertexPosition: shaderProgram.getAttributeLocation("vertexPosition"),
+			vertexTextureCoordinate: shaderProgram.getAttributeLocation("vertexTextureCoordinate"),
+		};
+		const blendShaderProgram = new ShaderProgram(webGL2RenderingContext, VERTEXSHADER_SOURCE, BLEND_FRAGMENTSHADER_SOURCE, attributeLocationTable);
+		this.useShaderProgram(blendShaderProgram);
+		this.applyBlendTextureUnits(blendShaderProgram);
+		this.#blendShaderProgram = blendShaderProgram;
+		return blendShaderProgram;
+	}
+
+	//==============================================================================
+	// 파티클 섞기 셰이더 프로그램 준비. (파티클 버텍스 셰이더, 어트리뷰트 위치를 파티클 프로그램과 같게 고정해 파티클 버텍스 어레이를 같이 쓴다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @returns { ShaderProgram }
+	 */
+	ensureParticleBlendShaderProgram() {
+		if (this.#particleBlendShaderProgram) {
+			return this.#particleBlendShaderProgram;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const particleShaderProgram = this.#particleShaderProgram;
+		const attributeLocationTable = {
+			vertexPosition: particleShaderProgram.getAttributeLocation("vertexPosition"),
+			vertexTextureCoordinate: particleShaderProgram.getAttributeLocation("vertexTextureCoordinate"),
+			vertexColor: particleShaderProgram.getAttributeLocation("vertexColor"),
+		};
+		const particleBlendShaderProgram = new ShaderProgram(webGL2RenderingContext, PARTICLE_VERTEXSHADER_SOURCE, PARTICLE_BLEND_FRAGMENTSHADER_SOURCE, attributeLocationTable);
+		this.useShaderProgram(particleBlendShaderProgram);
+		this.applyBlendTextureUnits(particleBlendShaderProgram);
+		this.#particleBlendShaderProgram = particleBlendShaderProgram;
+		return particleBlendShaderProgram;
+	}
+
+	//==============================================================================
+	// 사용 중인 섞기 셰이더 프로그램에 텍스처 유닛(그릴 그림 0 번, 떠 온 아래 1 번)과 밉맵 단계 보정 걸기.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { ShaderProgram } shaderProgram
+	 */
+	applyBlendTextureUnits(shaderProgram) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const mainTextureLocation = shaderProgram.getUniformLocation("mainTexture");
+		webGL2RenderingContext.uniform1i(mainTextureLocation, 0);
+		const backdropTextureLocation = shaderProgram.getUniformLocation("backdropTexture");
+		webGL2RenderingContext.uniform1i(backdropTextureLocation, 1);
+		this.applyImageMipmapBias(shaderProgram);
 	}
 
 	//==============================================================================
@@ -1439,29 +2070,113 @@ export class Graphic extends Object {
 		this.ensureParticleBatchResources();
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 
-		this.useShaderProgram(this.#particleShaderProgram);
+		// 셰이더 섞기 모드는 섞기 프로그램으로 그린다.
+		const isShaderBlendDraw = this.#shaderBlendModeIndex > 0;
+		const particleShaderProgram = isShaderBlendDraw ? this.ensureParticleBlendShaderProgram() : this.#particleShaderProgram;
+		this.useShaderProgram(particleShaderProgram);
 		webGL2RenderingContext.bindVertexArray(this.#particleVertexArray);
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#particleVertexBuffer);
 		// drawVertices 와 같은 까닭으로 bufferSubData 대신 bufferData 로 새 저장소를 잡으며 올린다. (사파리 드로우 콜 동기 대기)
 		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, this.#particleVertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, vertexCount * PARTICLE_FLOATS_PER_VERTEX);
 
-		const projectionMatrixLocation = this.#particleShaderProgram.getUniformLocation("projectionMatrix");
+		const projectionMatrixLocation = particleShaderProgram.getUniformLocation("projectionMatrix");
 		webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
 		this.#transformMatrix.writeToFloat32Array(this.#modelMatrixArray);
-		const modelMatrixLocation = this.#particleShaderProgram.getUniformLocation("modelMatrix");
+		const modelMatrixLocation = particleShaderProgram.getUniformLocation("modelMatrix");
 		webGL2RenderingContext.uniformMatrix3fv(modelMatrixLocation, false, this.#modelMatrixArray);
-		const globalAlphaLocation = this.#particleShaderProgram.getUniformLocation("globalAlpha");
+		const globalAlphaLocation = particleShaderProgram.getUniformLocation("globalAlpha");
 		webGL2RenderingContext.uniform1f(globalAlphaLocation, this.getGlobalAlpha());
 
-		this.bindTexture(texture);
-		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
-		this.#drawCallCount += 1;
-		this.#drawVertexCount += vertexCount;
+		if (isShaderBlendDraw) {
+			const blendModeIndexLocation = particleShaderProgram.getUniformLocation("blendModeIndex");
+			webGL2RenderingContext.uniform1i(blendModeIndexLocation, this.#shaderBlendModeIndex);
+			this.drawColoredQuadGroups(vertexCount, texture);
+		}
+		else {
+			this.bindTexture(texture);
+			webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
+			this.#drawCallCount += 1;
+			this.#drawVertexCount += vertexCount;
+		}
 
 		// 기본 경로 상태 복원.
 		// 셰이더 프로그램은 되돌리지 않는다. (flushSpriteBatch 와 같다, 다음에 그리는 쪽이 제 프로그램을 쓰게 한다)
 		webGL2RenderingContext.bindVertexArray(this.getVertexArray());
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, this.#vertexBuffer);
+	}
+
+	//==============================================================================
+	// 올려 둔 파티클 쿼드를 셰이더 섞기로 그리기. (drawColoredQuads 가 섞기 프로그램을 쓰게 한 뒤 부른다)
+	// - Canvas2D 처럼 쿼드마다 앞 쿼드가 그린 위에 섞이도록, 서로 겹치지 않는 쿼드를 앞에서부터 모아 그 영역을 한 번 떠 와 함께 그린다.
+	//   모은 쿼드와 겹치는 쿼드가 나오거나 SHADER_BLEND_PARTICLE_GROUP_CAPACITY 개가 차면 거기서 끊는다. (모두 겹치면 쿼드 하나에 복사 한 번, 드로우 콜 한 번)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { number } vertexCount
+	 * @param { WebGLTexture } texture
+	 */
+	drawColoredQuadGroups(vertexCount, texture) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const framebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
+		const particleVertexData = this.#particleVertexData;
+		const quadRect = this.#backdropRect;
+		const groupRectList = this.#particleGroupRectList;
+		const groupRect = { x: 0, y: 0, width: 0, height: 0 };
+		const quadCount = System.Math.floor(vertexCount / 6);
+		let groupStartQuadIndex = 0;
+		let groupRectCount = 0;
+		const drawGroup = (endQuadIndex) => {
+			if (groupRectCount > 0) {
+				// 떠 올 칸을 처음 만들 때 0 번 유닛을 쓰므로 그림은 떠 온 뒤에 묶는다.
+				this.copyBackdrop(framebuffer, groupRect);
+				this.bindTexture(texture);
+				const groupVertexCount = (endQuadIndex - groupStartQuadIndex) * 6;
+				webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, groupStartQuadIndex * 6, groupVertexCount);
+				this.#drawCallCount += 1;
+				this.#drawVertexCount += groupVertexCount;
+			}
+			groupStartQuadIndex = endQuadIndex;
+			groupRectCount = 0;
+		};
+		for (let quadIndex = 0; quadIndex < quadCount; ++quadIndex) {
+			const isVisible = this.measureBackdropRect(particleVertexData, PARTICLE_FLOATS_PER_VERTEX, quadIndex * 6, 6, quadRect);
+			if (!isVisible) {
+				continue;
+			}
+			let isOverlapped = groupRectCount >= SHADER_BLEND_PARTICLE_GROUP_CAPACITY;
+			for (let rectIndex = 0; rectIndex < groupRectCount && !isOverlapped; ++rectIndex) {
+				const rect = groupRectList[rectIndex];
+				isOverlapped = quadRect.x < rect.x + rect.width && rect.x < quadRect.x + quadRect.width && quadRect.y < rect.y + rect.height && rect.y < quadRect.y + quadRect.height;
+			}
+			if (isOverlapped) {
+				drawGroup(quadIndex);
+			}
+
+			// 영역을 모은다. (모은 영역 전체의 경계 상자를 떠 온다)
+			const rect = groupRectList[groupRectCount];
+			rect.x = quadRect.x;
+			rect.y = quadRect.y;
+			rect.width = quadRect.width;
+			rect.height = quadRect.height;
+			if (groupRectCount === 0) {
+				groupRect.x = quadRect.x;
+				groupRect.y = quadRect.y;
+				groupRect.width = quadRect.width;
+				groupRect.height = quadRect.height;
+			}
+			else {
+				const leftX = System.Math.min(groupRect.x, quadRect.x);
+				const bottomY = System.Math.min(groupRect.y, quadRect.y);
+				const rightX = System.Math.max(groupRect.x + groupRect.width, quadRect.x + quadRect.width);
+				const topY = System.Math.max(groupRect.y + groupRect.height, quadRect.y + quadRect.height);
+				groupRect.x = leftX;
+				groupRect.y = bottomY;
+				groupRect.width = rightX - leftX;
+				groupRect.height = topY - bottomY;
+			}
+			groupRectCount += 1;
+		}
+		drawGroup(quadCount);
 	}
 
 	//==============================================================================
@@ -2660,6 +3375,7 @@ export class Graphic extends Object {
 		webGL2RenderingContext.colorMask(false, false, false, false);
 		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.ALWAYS, 0, 0xFF);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.INCR);
+		this.#isStencilRecording = true;
 		if (roundSize > 0) {
 			this.drawRoundRect(rect, roundSize);
 		}
@@ -2667,6 +3383,7 @@ export class Graphic extends Object {
 			this.drawRect(rect);
 		}
 		this.flushSpriteBatch();
+		this.#isStencilRecording = false;
 		webGL2RenderingContext.colorMask(true, true, true, true);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
 		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.EQUAL, previousClipDepth + 1, 0xFF);
@@ -2691,6 +3408,7 @@ export class Graphic extends Object {
 		webGL2RenderingContext.colorMask(false, false, false, false);
 		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.ALWAYS, 0, 0xFF);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.DECR);
+		this.#isStencilRecording = true;
 		if (clipEntry.roundSize > 0) {
 			this.drawRoundRect(clipEntry.rect, clipEntry.roundSize);
 		}
@@ -2698,6 +3416,7 @@ export class Graphic extends Object {
 			this.drawRect(clipEntry.rect);
 		}
 		this.flushSpriteBatch();
+		this.#isStencilRecording = false;
 		webGL2RenderingContext.colorMask(true, true, true, true);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
 
@@ -2821,13 +3540,14 @@ export class Graphic extends Object {
 
 	//==============================================================================
 	// 묶음 기억 잊기.
-	// - Graphic 은 마지막으로 쓰게 한 셰이더 프로그램과 0 번 유닛에 묶은 텍스처를 기억해, 같으면 다시 걸지 않는다.
+	// - Graphic 은 마지막으로 쓰게 한 셰이더 프로그램과 0 번 유닛에 묶은 텍스처(셰이더 섞기 모드면 1 번 유닛에 묶은 떠 온 아래도)를 기억해, 같으면 다시 걸지 않는다.
 	// - Graphic 을 거치지 않고 WebGL 로 프로그램이나 텍스처를 바꾼 뒤 Graphic 출력을 이어갈 때 부른다.
 	//   (restoreRenderState, applySettings 와 컨텍스트를 잃거나 되살릴 때는 스스로 잊는다)
 	//==============================================================================
 	invalidateRenderStateCache() {
 		this.#boundShaderProgram = null;
 		this.#boundTexture = null;
+		this.#boundBackdropTexture = null;
 	}
 
 	//==============================================================================

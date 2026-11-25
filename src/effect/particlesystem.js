@@ -115,7 +115,7 @@ export class ParticleSystem extends Component {
 	// 렌더.
 	/** @private @type { string } */ #renderShape; // ParticleRenderShape 값.
 	/** @private @type { * } */ #image;
-	/** @private @type { string } */ #blendMode; // "source-over" | "lighter" | "multiply" | "screen"
+	/** @private @type { string } */ #blendMode; // Graphic.setBlendMode 가 받는 이름. ("source-over" | "lighter" | "multiply" | "screen" 등 SpriteBlendMode 26 가지)
 	/** @private @type { number } */ #streakScale; // streak 길이 = 속도 x 이 값.
 	/** @private @type { boolean } */ #isWorldSpace; // 참이면 방출 후 노드 이동의 영향을 받지 않는다.
 	/** @private @type { boolean } */ #isManualTick; // 참이면 노드 갱신에서 진행하지 않고 simulate() 로만 진행한다. (타임라인 등 외부 시간)
@@ -712,7 +712,7 @@ export class ParticleSystem extends Component {
 		this.#blendMode = isAdditive ? "lighter" : "source-over";
 	}
 
-	/** @param { string } blendMode "source-over" | "lighter" | "multiply" | "screen" */
+	/** @param { string } blendMode Graphic.setBlendMode 가 받는 이름. ("source-over" | "lighter" | "multiply" | "screen" 등 SpriteBlendMode 26 가지, 셰이더 섞기 모드는 서로 겹치지 않는 파티클끼리 모아 그린다) */
 	setBlendMode(blendMode) {
 		this.#blendMode = blendMode;
 	}
