@@ -287,6 +287,7 @@ function readBoundingSphere(positions, stride) {
 // - GPU 인스턴싱: drawMeshInstanced 로 같은 모형 여럿을 인스턴스마다 행렬과 틴트로 한 번에 그린다. (몸과 바깥선 모두)
 // - 화면 밖 거르기: 모형의 경계 구를 보기와 투영의 절두체에 대어 밖이면 그리지 않는다. (인스턴스는 하나씩 걸러 남은 것만 올린다)
 // - 그림자: ShadowMap 에 beginShadowPass 와 drawMesh 로 드리우고, setShadow 로 받는다. (3x3 PCF)
+//   그림자를 받지 않을 때도 그림자 유닛에 1x1 비교 깊이 텍스처를 묶는다. (sampler2DShadow 유닛에 깊이 텍스처가 없으면 맥 드라이버가 알리고, 색 텍스처가 묶여 있으면 WebGL 이 그리기를 거부한다)
 // - HDR: setHdrOutput(true) 면 감마를 걸지 않은 선형 색을 낸다. 실수 렌더 타겟(ToonPostProcess)에 그리고 블룸과 톤매핑으로 마무리한다.
 // - 사용: createMesh(arrays) → 매 프레임 beginFrame(보기와 투영) → drawMesh / drawMeshInstanced → endFrame() → 다 쓰면 deleteMesh.
 //   beginFrame 이 앞의 그리기 상태(섞기, 깊이, 면 가리기, 프로그램, 버텍스 어레이)를 적어 두고 깊이 시험과 면 가리기를 켜며, endFrame 이 적어 둔 상태로 돌린다.
@@ -306,6 +307,7 @@ export class ToonRenderer {
 	/** @private @type { ShaderProgram } */ #solidProgram;
 	/** @private @type { ShaderProgram } */ #outlineProgram;
 	/** @private @type { ShaderProgram } */ #depthProgram;
+	/** @private @type { WebGLTexture } */ #emptyShadowTexture; // 그림자를 받지 않을 때 그림자 유닛에 묶는 1x1 비교 깊이 텍스처. (깊이 1 이라 늘 빛을 받음)
 	/** @private @type { Float32Array } */ #viewProjectionElements; // 이번 프레임의 보기와 투영.
 	/** @private @type { Array<Array<number>> } */ #frustumPlanes; // 절두체의 면 여섯.
 	/** @private @type { Array<number> } */ #sunDirection; // 해가 비추는 쪽. (해에서 나오는 방향)
@@ -335,6 +337,7 @@ export class ToonRenderer {
 		this.#solidProgram = new ShaderProgram(webGL2RenderingContext, SOLID_VERTEX_SHADER, SOLID_FRAGMENT_SHADER, TOON_ATTRIBUTE_LOCATIONS);
 		this.#outlineProgram = new ShaderProgram(webGL2RenderingContext, OUTLINE_VERTEX_SHADER, OUTLINE_FRAGMENT_SHADER, TOON_ATTRIBUTE_LOCATIONS);
 		this.#depthProgram = new ShaderProgram(webGL2RenderingContext, DEPTH_VERTEX_SHADER, DEPTH_FRAGMENT_SHADER, TOON_ATTRIBUTE_LOCATIONS);
+		this.#emptyShadowTexture = this.createEmptyShadowTexture();
 		const identityMatrix = Matrix4.createIdentity();
 		this.#viewProjectionElements = new System.Float32Array(identityMatrix.getElements());
 		this.#frustumPlanes = extractFrustumPlanes(identityMatrix);
@@ -518,6 +521,40 @@ export class ToonRenderer {
 			webGL2RenderingContext.vertexAttribPointer(location, 4, webGL2RenderingContext.FLOAT, false, stride, columnIndex * 16);
 			webGL2RenderingContext.vertexAttribDivisor(location, 1);
 		}
+	}
+
+	//==============================================================================
+	// 빈 그림자 텍스처 짓기. (1x1 깊이 1, 비교 샘플링)
+	//==============================================================================
+	/**
+	 * @returns { WebGLTexture }
+	 */
+	createEmptyShadowTexture() {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const texture = webGL2RenderingContext.createTexture();
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + SHADOW_TEXTURE_UNIT);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
+		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.DEPTH_COMPONENT24, 1, 1, 0, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, new System.Uint32Array([0xffffffff]));
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_COMPARE_MODE, webGL2RenderingContext.COMPARE_REF_TO_TEXTURE);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_COMPARE_FUNC, webGL2RenderingContext.LEQUAL);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		return texture;
+	}
+
+	//==============================================================================
+	// 렌더러 지우기. (세 프로그램과 빈 그림자 텍스처, 모형은 deleteMesh 로 따로)
+	//==============================================================================
+	destroy() {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		webGL2RenderingContext.deleteProgram(this.#solidProgram.getProgram());
+		webGL2RenderingContext.deleteProgram(this.#outlineProgram.getProgram());
+		webGL2RenderingContext.deleteProgram(this.#depthProgram.getProgram());
+		webGL2RenderingContext.deleteTexture(this.#emptyShadowTexture);
 	}
 
 	//==============================================================================
@@ -945,6 +982,9 @@ export class ToonRenderer {
 			webGL2RenderingContext.uniformMatrix4fv(solidProgram.getUniformLocation("lightViewProjectionMatrix"), false, shadowInput.lightViewProjectionMatrix.getElements());
 		}
 		else {
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + SHADOW_TEXTURE_UNIT);
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.#emptyShadowTexture);
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 			webGL2RenderingContext.uniform1f(solidProgram.getUniformLocation("shadowEnabled"), 0);
 		}
 		webGL2RenderingContext.cullFace(webGL2RenderingContext.BACK);

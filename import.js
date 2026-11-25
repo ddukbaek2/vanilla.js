@@ -223,3 +223,12 @@ export { SpriteAtlas } from "./src/resource/spriteatlas.js";
 
 // 코어, 플랫폼, 기반 갈래. (러스트 판과 맞춘 페이지 이벤트)
 export { PageEvent } from "./src/core/engine.js";
+// 효과 갈래. (아지랑이 컴포넌트)
+export { HeatHazeEffect } from "./src/effect/heathazeeffect.js";
+export { TweenProperty, applyTweenProperty } from "./src/core/tween.js";
+export { Indicator } from "./src/experimental/indicator.js";
+export { ToastPhase } from "./src/ui/toastmotion.js";
+// 글자, 글꼴 갈래. (글자 아틀라스, 글자 묶음과 낱말 나누기, 글의 첫 강한 방향)
+export { DynamicFont, GlyphInfo } from "./src/misc/dynamicfont.js";
+export { splitGraphemes, splitWords, countGraphemes, sliceGraphemes } from "./src/core/component/text.js";
+export { detectTextDirection } from "./src/core/graphic.js";

@@ -329,6 +329,7 @@ export class SubsurfaceScatteringEffect extends Object {
 	destroy() {
 		this.#pingRenderTarget.destroy();
 		this.#pongRenderTarget.destroy();
+		this.#scatterPass.destroy();
 	}
 
 	//==============================================================================

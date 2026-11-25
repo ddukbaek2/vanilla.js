@@ -201,6 +201,8 @@ export class BloomEffect extends Object {
 	destroy() {
 		this.#pingRenderTarget.destroy();
 		this.#pongRenderTarget.destroy();
+		this.#brightPass.destroy();
+		this.#blurPass.destroy();
 	}
 
 	//==============================================================================

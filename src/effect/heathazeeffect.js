@@ -4,26 +4,32 @@
 const System = globalThis;
 import { Vector2 } from "../base/vector2.js";
 import { Graphic } from "../core/graphic.js";
-import { WorldNode } from "../core/node/worldnode.js";
+import { Component } from "../core/component.js";
+import { ComponentNode } from "../core/node/componentnode.js";
 
 
 //==============================================================================
 // 전역 상수 목록.
 //==============================================================================
 const PARTICLE_FLOATS_PER_VERTEX = 8; // Graphic 의 정점 색 쿼드 정점 하나의 값 수. (x, y, u, v, r, g, b, a)
+const DEFAULT_CONTENT_SIZE = 300; // 붙을 때 노드 내용 크기가 비어 있으면 쓰는 크기.
 
 
 //==============================================================================
-// 아지랑이 효과 노드.
-// - 이 노드가 그려지기 전까지의 캔버스 내용을 가져와서 일렁이는 효과를 줍니다.
-// - 따라서 씬의 가장 마지막(맨 위)에 추가되어야 효과가 보입니다.
-// - 내용 크기(contentSize)와 피봇을 쓰므로 WorldNode 를 상속한다. (Canvas2D 시절에는 TransformNode 였지만 그때도 WorldNode 의 함수를 불렀다)
+// 아지랑이 효과 컴포넌트.
+// - 붙은 노드가 그려지기 전까지의 캔버스 내용을 노드 영역만큼 가져와서 일렁이는 효과를 줍니다.
+// - 따라서 씬의 가장 마지막(맨 위)에 그려지는 노드에 붙여야 효과가 보입니다. 자식 노드는 효과 위에 그려진다.
+// - ParticleSystem, TrailRenderer 처럼 노드에 붙이는 컴포넌트다. 영역은 노드의 내용 크기(contentSize)와 피봇을 쓴다.
+//   붙을 때 노드 내용 크기가 비어 있으면 300 x 300 으로 정한다.
+// - 사용:
+//     const heatHazeEffect = node.addComponent(HeatHazeEffect);
+//     heatHazeEffect.setAmplitude(4);
 // - WebGL Graphic 에서는 묶음을 먼저 그린 뒤, 노드 영역의 화면 바운딩 박스(드로잉 버퍼 픽셀)를 copyTexSubImage2D 로 텍스처에 떠 오고,
 //   줄마다 쿼드 한 장씩 정점 색 쿼드(drawColoredQuads)로 사인 곡선만큼 옮겨 그린다. (러스트 vanilla-engine 과 같은 방식)
 // - 영역이 화면 밖으로 나가면 화면 가장자리 픽셀을 늘인다. (CLAMP_TO_EDGE)
 // - 떠 온 텍스처는 GL 자원이라 다 쓰면 destroy() 를 부른다.
 //==============================================================================
-export class HeatHazeEffect extends WorldNode {
+export class HeatHazeEffect extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
@@ -44,7 +50,7 @@ export class HeatHazeEffect extends WorldNode {
 	 */
 	constructor() {
 		super();
-		
+		this.setComponentType("HeatHazeEffect");
 		this.#timer = 0;
 		this.#speed = 2.0;
 		this.#amplitude = 3.0;
@@ -53,17 +59,30 @@ export class HeatHazeEffect extends WorldNode {
 		this.#captureTexture = null;
 		this.#captureTextureWidth = 0;
 		this.#captureTextureHeight = 0;
-		this.setContentSize(Vector2.create(300, 300));
+	}
+
+	//==============================================================================
+	// 노드에 붙음. (노드 내용 크기가 비어 있으면 300 x 300)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { ComponentNode } node
+	 */
+	attach(node) {
+		const contentSize = node.getContentSize();
+		if (contentSize.x <= 0 && contentSize.y <= 0) {
+			node.setContentSize(Vector2.create(DEFAULT_CONTENT_SIZE, DEFAULT_CONTENT_SIZE));
+		}
 	}
 
 	//==============================================================================
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta 
+	 * @override
+	 * @param { number } timeDelta
 	 */
 	tick(timeDelta) {
-		super.tick(timeDelta);
 		const speed = this.getSpeed();
 		this.#timer += timeDelta * speed;
 	}
@@ -72,15 +91,11 @@ export class HeatHazeEffect extends WorldNode {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic 
+	 * @override
+	 * @param { Graphic } graphic
 	 */
 	draw(graphic) {
-		// 노드 자체가 활성화 상태가 아니면 그리지 않음.
-		if (!this.isActive()) {
-			return;
-		}
-
-		const contentSize = this.getContentSize();
+		const contentSize = this.getNode().getContentSize();
 
 		// 영역 크기가 없다면 그리지 않음.
 		if (contentSize.x <= 0 || contentSize.y <= 0) {
@@ -126,8 +141,6 @@ export class HeatHazeEffect extends WorldNode {
 			// 성능을 위해 영역 내의 한 줄씩 잘라서 사인 곡선에 맞춰 좌우로 흔듭니다. (줄마다 쿼드 한 장, 줄 높이는 한 단위)
 			const rowCount = System.Math.max(1, System.Math.ceil(contentSize.y));
 			const rowHeight = contentSize.y / rowCount;
-			const amplitude = this.getAmplitude();
-			const frequency = this.getFrequency();
 			const leftU = (minimumX - regionX) / regionWidth;
 			const rightU = (maximumX - regionX) / regionWidth;
 			const vertexData = graphic.getParticleVertexData(rowCount * 6 * PARTICLE_FLOATS_PER_VERTEX);
@@ -145,7 +158,7 @@ export class HeatHazeEffect extends WorldNode {
 			for (let rowIndex = 0; rowIndex < rowCount; ++rowIndex) {
 				const topY = rowIndex * rowHeight;
 				const bottomY = topY + rowHeight;
-				const offsetX = System.Math.sin(this.#timer + (topY * frequency)) * amplitude;
+				const offsetX = this.calculateRowOffset(topY);
 
 				// 소스: 화면에 이미 그려진 바운딩 박스의 같은 높이 줄. 대상: 노드의 로컬 공간. (Sprite 처럼 변환이 이미 걸려 있으므로 0 부터)
 				const sourceTopY = minimumY + (topY / contentSize.y) * boundsHeight;
@@ -163,9 +176,6 @@ export class HeatHazeEffect extends WorldNode {
 			}
 			graphic.drawColoredQuads(floatOffset / PARTICLE_FLOATS_PER_VERTEX, captureTexture);
 		}
-
-		// 자식 노드가 있다면 마저 그립니다.
-		super.draw(graphic);
 	}
 
 	//==============================================================================
@@ -280,5 +290,26 @@ export class HeatHazeEffect extends WorldNode {
 	 */
 	getFrequency() { 
 		return this.#frequency; 
+	}
+
+	//==============================================================================
+	// 흔들림 시계 반환. (tick 마다 timeDelta * 속도씩 흐른다)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getTimer() {
+		return this.#timer;
+	}
+
+	//==============================================================================
+	// 줄의 좌우 흔들림. (sin(시계 + 줄 위치 * 빈도) * 폭)
+	//==============================================================================
+	/**
+	 * @param { number } localY
+	 * @returns { number }
+	 */
+	calculateRowOffset(localY) {
+		return System.Math.sin(this.#timer + (localY * this.getFrequency())) * this.getAmplitude();
 	}
 }

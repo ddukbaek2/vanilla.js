@@ -255,5 +255,6 @@ export class ToonPostProcess {
 	destroy() {
 		this.#sceneRenderTarget.destroy();
 		this.#bloomEffect.destroy();
+		this.#compositePass.destroy();
 	}
 }

@@ -451,6 +451,47 @@ export function readAllTexts() {
 
 
 //==============================================================================
+// 언어의 목록 넣기. (파일 없이 바로 줄 때, languages.json 과 같은 꼴, 읽었으면 true)
+//==============================================================================
+/**
+ * @param { object } data - { fallbackLanguage, languages: [...] }
+ * @returns { boolean }
+ */
+export function setLanguageList(data) {
+	if (data === null || typeof data !== "object" || !System.Array.isArray(data.languages)) {
+		return false;
+	}
+	for (const language of data.languages) {
+		if (!System.Array.isArray(language.aliases)) {
+			language.aliases = [];
+		}
+	}
+	languageList = data;
+	return true;
+}
+
+//==============================================================================
+// 지금 언어의 표 넣기. (파일 없이 바로 줄 때, 기본 언어 표도 함께. 언어가 목록에 없으면 false)
+//==============================================================================
+/**
+ * @param { string } languageCode
+ * @param { object } texts 열쇠 → 글자.
+ * @param { object } fallbackTextTable 기본 언어의 열쇠 → 글자.
+ * @returns { boolean }
+ */
+export function setLanguageTexts(languageCode, texts, fallbackTextTable) {
+	const language = findLanguage(languageCode);
+	if (language === null) {
+		return false;
+	}
+	currentTexts = texts;
+	fallbackTexts = fallbackTextTable;
+	currentLanguage = language;
+	return true;
+}
+
+
+//==============================================================================
 // 경로 정하기. (언어 목록 파일, 언어 파일들이 있는 폴더, 불러오기 전에 부른다)
 //==============================================================================
 /**

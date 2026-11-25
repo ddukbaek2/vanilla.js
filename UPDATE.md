@@ -146,6 +146,49 @@
 - Sprite.setFrame(frame): Frame 의 그림과 영역을 함께 건다. (null 이면 그림을 비운다)
 - tools/atlas.cjs: 여러 장(--max-size 를 넘으면 다음 쪽, 쪽마다 모두 들어가는 가장 작은 2 의 거듭제곱), 가장자리 늘여 붙이기(--extrude), 여백(--padding, 기본 2). 놓기를 선반에서 MaxRects 로 바꿔 같은 그림이라도 자리가 전과 다르다. (JSON 으로 읽으면 같다) JSON 의 images 에 page, meta 에 pages, extrude, padding 을 더했다. 쪽이 한 장이면 파일 이름이 전과 같다
 - 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
+- 효과, 3D, 애니메이션에서 러스트 vanilla-engine 과 다르던 것을 맞췄다. (러스트에만 있던 범용 기능을 넣고, 두 엔진에 같이 있던 버그를 같이 고쳤다)
+- ParticleSystem: isFinished(방출할 것이 더 없고 남은 입자도 없음, 루프가 아니면 duration 이 지나고 버스트를 다 냈을 때), getParticlePositionList(입자 자리 목록, 같은 씨앗 비교와 시험용). 러스트 판과 같은 씨앗이면 같은 입자 자리가 나온다
+- HeatHazeEffect: experimental 노드에서 effect 컴포넌트로 옮겼다. (src/effect/heathazeeffect.js, import.js 에서 내보냄) node.addComponent(HeatHazeEffect) 로 붙이고, 붙을 때 노드 내용 크기가 비어 있으면 300 x 300 으로 정한다. getTimer, calculateRowOffset
+- ScreenEffect: destroy 가 렌더 대상과 함께 패스 프로그램과 버텍스 어레이도 지운다
+- Material.createTexture: 이미지를 곧은 알파, 색 프로필 변환 없이 받는다. (createImageBitmap 의 premultiplyAlpha, colorSpaceConversion 을 "none" 으로) 지금까지 브라우저 기본값으로 알파가 곱해져 알파 0 텍셀 색이 검어지고, OLD FACE 의 머리카락과 수염 카드 가장자리가 어두웠다
+- ToonRenderer, SkinnedModelRenderer, HumanSkinRenderer: 그림자를 받지 않을 때 섀도우 유닛에 1x1 비교 깊이 텍스처를 묶는다. (맥 드라이버의 "sampler type (Depth)" 알림과 WebGL 의 샘플러 불일치를 막는다) SkinnedModelRenderer.getEmptyShadowTexture, ToonRenderer.destroy
+- ToonVfx: 빛 파티클과 빛 점의 rim(0 은 더하는 빛, 1 은 테로 덮기, 음수는 엷게 덮는 빛무리), 리본과 번개의 번짐 색 glow, setRimColor, 사는 동안 다시 꺾이는 번개 addLightning(life), 화면 섬광 addFlash, 엔진 Shaker 로 셈하는 카메라 흔들림 addShake, readShake, isShaking. getActiveCounts 에 lightningCount, flashCount. draw 가 깊이 함수도 되돌린다. (게임 aberrant 의 효과에서 범용 몫만, 게임 색과 처방은 매개변수로)
+- SkinnedModel: 바이트에서 읽기, 해석과 업로드 나누기, createWithoutShaderProgram(포즈 계산만), destroy. 기본 모프 가중치를 glTF 노드 weights 에서 읽는다. Material.createImageDescription, destroy. ShadowMap, FullscreenPass, 화면 공간 효과의 destroy(풀스크린 패스까지 지움). FbxLoader 가 2^53 을 넘는 64 비트 id 를 정확히 읽고 빠진 노드는 건너뛴다
+- Camera2D: 회전(setRotation, getRotation, 도, 화면 가운데 축). 그리기 변환, screenToWorld, worldToScreen, panByScreen, fling, zoomAt 이 회전을 따르고, 경계 클램프는 돌아간 뷰를 감싸는 상자(getVisibleHalfExtent)로 잰다. convertScreenDeltaToWorld, begin, end(pushState 와 applyTransform, popState). experimental/camera.js 의 기능을 모두 덮는다. (실험 Camera.setZoom 의 clamp 인자 버그도 고쳤다)
+- Tween: setTarget(node), getTarget, TweenProperty(localPosition, localScale, localRotation, localOpacity, contentSize) 값을 노드에 바로 쓴다, applyTweenProperty, Tween.createNodeTween. 대상이 처음 돈 노드 트리에서 떨어지면 콜백 없이 끝난다. duration 0 이하는 바로 끝. Scene.getTweenCount
+- Animation: 비어 있던 pause, resume 을 채웠다. (gotoAndStop 이 멈춘다) stop 은 멈춰 있어도 첫 프레임으로 돌아간다. (setFrames 뒤 예전 번호가 남던 버그) SpriteAnimator.getCurrentFrameIndex
+- Action: 조건 함수가 대상을 받는다. wait 의 duration 0 이하는 진행률 1(NaN 버그), repeat 0 번은 돌지 않는다
+- Animator: AnimationState setClip, getClip, AnimationTransition setFrom, setTo, getFrom, getTo(상태 번호), getAnimation, addState, getStates, addTransition, getTransitions
+- Timeline: 같은 이름 무대 노드를 버리던 버그(모두 붙이고 이름 표에는 뒤의 것), 부모가 자기 자신이거나 고리면 무대 부모에 붙인다. Timeline.loadFromText, createFromJsonAsset
+- Indicator: getRadius, getRotation, buildTeethSegments, import.js 에서 내보낸다. Visual.getLocation 의 쓰지 않는 인자를 뺐다. VisualAsset setVisual, getVisual
+- 예제 cameratour: 돌아가는 Camera2D(끌면 팬, 휠 줌), Tween.createNodeTween, Indicator
+- UI 갈래: 러스트 vanilla-engine 과 UI 기능 차이를 없앤다. 러스트에만 있던 범용 기능을 넣는다
+- UIButton.fireClickEvents(): 누르지 않고 클릭이 난 것처럼 clicked, click 알림을 차례로 부른다. UIHitArea 가 넓힌 자리의 클릭을 넘길 때 이것을 쓴다
+- UILineChart.calculatePoints(width, height), UIBarChart.calculateBarRects(width, height): 그리기와 같은 자리의 폴리라인 점과 막대 사각형을 셈한다. draw 가 이것을 쓴다
+- UISpinner: calculateDotOpacity(dotIndex), getDotColor, getRotationSpeed, getDotNodes
+- UIScrollBar: getAxis, getThumbRect (썸이 꺼져 있으면 null)
+- ToastMotion.getPhase(), ToastPhase 를 내보낸다. PopupMotion.isInstantEnabled(). UIImageView.getColor()
+- UILabel: getWrapMode, getVisibleCharacterCount. UIInputField: getPlaceholder, getMaxLength, getFontSize, getPadding, getBackgroundColor, getRoundSize, getTextColor, getPlaceholderColor, getCursorColor, getCursorIndex, getSelectionStart, getComposition, isComposing
+- UIWindow: setDimColor, setPanelColor (어둠과 판의 Paint 색)
+- UIListView: setCreateItemEvent(() => WorldNode) 로 템플릿 대신 항목 노드를 만드는 함수를 받는다. 항목 크기를 정하지 않았으면 처음 만든 항목의 크기를 읽는다. isHorizontal()
+- TouchRecognizer: getTouchTarget (드래그를 넘겼으면 스크롤 뷰 노드), isTouching
+- GameScene: setSafeAreaInsets({ top, right, bottom, left }) 로 세이프 에어리어 인셋을 CSS 픽셀로 직접 정한다. (null 이면 뷰 매니저의 값, 게임 영역 기준도 이 값을 쓴다) 정적 calculateSafeAreaRect(viewSize, targetResolutionScale, insets). setPlayInputEnabled(true) 로 놀이 입력을 모아 두고 takePlayInputs() 로 { kind, position, wheelDelta } 를 꺼낸다. (처리기와 함께 써도 된다) setLoadingOutsideColor, hasLoadingDrawer, isLoadTouchedToSkip, getDevTools
+- WebSocketClient: 수신 콜백이 없으면 받은 JSON 을 모아 두었다가(1024 개, 넘치면 오래된 것부터 버린다) takeReceivedMessages() 로 꺼낸다. getReceiveEvent 가 웹소켓을 돌려주던 버그를 고쳐 수신 콜백을 돌려준다
+- UIScene: EngineConfiguration.useDevTools 가 꺼져 있으면 GameScene 처럼 개발자 도구를 만들지 않는다. (지금까지는 늘 만들었다)
+- 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
+
+- 글자, 글꼴을 러스트 판(vanilla-engine)과 맞췄다:
+  - 표시 글자 수(Text.setVisibleCharacterCount)와 Typewriter 는 글자 묶음 단위로 센다. (전에는 UTF-16 단위라 이모지와 결합 부호가 쪼개졌다) 여러 줄 글에서 남은 수가 음수로 떨어지면 다음 줄을 통째로 그리던 것을 고쳤다. (0 이 되면 다음 줄부터 그리지 않는다) Typewriter 의 글자 공개 알림은 글자 묶음을 받는다. countGraphemes, sliceGraphemes
+  - Text.calculateDrawnRect: 줄을 바꾸는 글도 사각형을 안다. (화면 밖 거르기) getMeasuredLineCount
+  - RichText: 글자 방향을 쓴다. 조각을 이은 글로 문단 방향을 정하고(이 글자의 방향, "inherit" 면 Graphic 의 방향), 오른쪽에서 왼쪽이면 조각을 오른쪽부터 놓는다. 정렬 "start" / "end" 도 그 방향으로 푼다. (전에는 조각에 방향을 쓰지 않았다)
+  - ShadowText: setItalic, setUnderline, setStrikethrough 와 게터, isBold. 밑줄과 취소선도 그림자와 함께 굽는다. 글 방향에 "auto"(글의 첫 강한 글자로)
+  - UILabel.getVisibleCharacterCount
+  - Graphic: detectTextDirection(text) 를 내보낸다. (setTextDirection("auto") 와 같은 셈)
+  - DynamicFont: buildAtlas 로 글자를 더하면 든 글자를 모두 새 캔버스에 다시 놓는다. (전에는 새 글자만 새 캔버스에 놓아 앞서 구운 글자가 어긋났다) 글자 묶음 단위, rebuildAtlas, measureText. import.js 에서 DynamicFont, GlyphInfo 를 내보낸다
+  - Localization: selectLanguage(태그의 뒤 조각부터 떼며 코드와 별칭을 본다, detectLanguage 가 쓴다), setLanguageAliases, setRightToLeft, isRightToLeft, mirrorLayoutX, readLayoutTextAlign, isolateText, textNamed
+  - LanguagePack: setLanguageList(data), setLanguageTexts(code, texts, fallbackTexts) (파일 없이 바로 넣기)
+  - import.js: splitGraphemes, splitWords, countGraphemes, sliceGraphemes, detectTextDirection
+  - 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
 - 코어, 플랫폼, 기반 갈래. 러스트 판(vanilla-engine)에만 있던 범용 기능을 들여와 두 엔진의 공개 API 를 맞춘다.
 - Color.createFromBytes(red, green, blue, alpha) (0 ~ 255), withAlpha(alpha) (알파만 바꾼 새 색), Color.lerp(from, to, time)
 - Math.easeOutQuad(time)

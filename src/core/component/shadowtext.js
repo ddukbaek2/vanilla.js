@@ -4,6 +4,7 @@
 const System = globalThis;
 import { Graphic } from "../graphic.js";
 import { Component } from "../component.js";
+import { detectTextDirection } from "../graphic.js";
 import { buildFontString } from "./text.js";
 import { acquireSharedBake, releaseSharedBake } from "../graphic/sharedbakecache.js";
 
@@ -49,6 +50,8 @@ export function buildRGBAString(colorText, opacity) {
 // - 글이 노드 너비를 넘으면 처음 크기에서 최소 비율(setFitMinimumRatio)까지 줄여 맞춘다.
 // - 그리는 배율(기기의 DPR, 뷰 배율), 글, 꼴, 노드 너비가 바뀌거나 웹 글꼴의 조각이 새로 받아지면 다시 굽는다.
 // - 그림자는 캔버스의 그림자로 칠해 번지게 할 수 있다. 번지는 만큼 구운 캔버스의 가장자리를 넓힌다.
+// - 기울임, 밑줄, 취소선(setItalic, setUnderline, setStrikethrough): 선의 자리, 두께는 Text 의 가운데 기준선과 같고, 선도 글과 함께 구워 그림자가 깔린다.
+// - 글 방향은 "ltr", "rtl", "auto"(글의 첫 강한 글자로) 이다.
 //==============================================================================
 export class ShadowText extends Component {
 	//==============================================================================
@@ -58,8 +61,11 @@ export class ShadowText extends Component {
 	/** @private @type { FontFace | null } */ #fontFace; // 글꼴. (null 이면 시스템 글꼴)
 	/** @private @type { number } */ #fontSize; // 처음 크기. (넘치면 줄여 굽는다)
 	/** @private @type { boolean } */ #isBold;
+	/** @private @type { boolean } */ #isItalic;
+	/** @private @type { boolean } */ #isUnderline;
+	/** @private @type { boolean } */ #isStrikethrough;
 	/** @private @type { string } */ #textAlign; // "left", "center", "right", "start", "end"
-	/** @private @type { string } */ #textDirection; // "ltr", "rtl"
+	/** @private @type { string } */ #textDirection; // "ltr", "rtl", "auto"
 	/** @private @type { string } */ #textColor; // "#rrggbb" 나 CSS 색.
 	/** @private @type { string } */ #shadowColor; // "#rrggbb"
 	/** @private @type { number } */ #shadowOpacity;
@@ -83,6 +89,9 @@ export class ShadowText extends Component {
 		this.#fontFace = null;
 		this.#fontSize = 16;
 		this.#isBold = false;
+		this.#isItalic = false;
+		this.#isUnderline = false;
+		this.#isStrikethrough = false;
 		this.#textAlign = "center";
 		this.#textDirection = "ltr";
 		this.#textColor = "#ffffff";
@@ -112,10 +121,10 @@ export class ShadowText extends Component {
 		const contentWidth = contentSize.x;
 		const contentHeight = contentSize.y;
 		const bakeScale = graphic.calculateTextBakeScale();
-		const textDirection = this.getTextDirection();
+		const textDirection = this.resolveBakeTextDirection();
 		const fontFace = this.getFontFace();
 		const fontFamily = fontFace === null ? "" : fontFace.family;
-		const bakeKey = ["ShadowText", text, this.#fontSize, this.#isBold, this.#textColor, this.#shadowColor, this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, this.#fitMinimumRatio, contentWidth, bakeScale, textDirection, fontFamily, fontLoadCount].join("|");
+		const bakeKey = ["ShadowText", text, this.#fontSize, this.#isBold, this.#isItalic, this.#isUnderline, this.#isStrikethrough, this.#textColor, this.#shadowColor, this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, this.#fitMinimumRatio, contentWidth, bakeScale, textDirection, fontFamily, fontLoadCount].join("|");
 		if (bakeKey !== this.#bakeKey) {
 			// 같은 모양을 구운 것이 있으면 나눠 쓰고, 없으면 굽는다. (sharedbakecache.js)
 			releaseSharedBake(this.#bakeKey, this);
@@ -202,7 +211,7 @@ export class ShadowText extends Component {
 			const fitRatio = System.Math.max(this.#fitMinimumRatio, fitWidth / textWidth);
 			fontSize = System.Math.floor(this.#fontSize * fitRatio * 10) / 10;
 		}
-		const scaledFontString = buildFontString(fontFace, fontSize * bakeScale, this.#isBold, false);
+		const scaledFontString = buildFontString(fontFace, fontSize * bakeScale, this.#isBold, this.#isItalic);
 		canvasRenderingContext.font = scaledFontString;
 		canvasRenderingContext.direction = textDirection;
 		canvasRenderingContext.textAlign = "left";
@@ -227,7 +236,14 @@ export class ShadowText extends Component {
 		const scaledPenX = bakePadding + actualLeft;
 		const scaledBaselineY = bakePadding + System.Math.ceil(scaledFontAscent);
 		const bakeWidth = scaledPenX + actualRight + bakePadding;
-		const bakeHeight = scaledBaselineY + System.Math.ceil(scaledFontDescent + scaledShadowOffset) + bakePadding;
+		// 밑줄은 기준선 아래로 내려가므로 그만큼 여유를 더 둔다.
+		const scaledDecorationLineWidth = System.Math.max(1, fontSize / 16) * bakeScale;
+		const scaledMiddleY = scaledBaselineY - (scaledFontAscent - scaledFontDescent) * 0.5;
+		const scaledUnderlineY = scaledMiddleY + (fontSize * 0.5 + 2) * bakeScale;
+		let bakeHeight = scaledBaselineY + System.Math.ceil(scaledFontDescent + scaledShadowOffset) + bakePadding;
+		if (this.#isUnderline) {
+			bakeHeight = System.Math.max(bakeHeight, System.Math.ceil(scaledUnderlineY + scaledDecorationLineWidth * 0.5 + scaledShadowOffset) + bakePadding);
+		}
 		if (bakeWidth <= 0 || bakeHeight <= 0) {
 			this.#bakeCanvas = null;
 			return;
@@ -246,6 +262,13 @@ export class ShadowText extends Component {
 		canvasRenderingContext.shadowOffsetY = scaledShadowOffset;
 		canvasRenderingContext.fillStyle = this.#textColor;
 		canvasRenderingContext.fillText(text, scaledPenX, scaledBaselineY);
+		// 밑줄과 취소선도 같은 그림자로 칠한다. (길이는 전진폭, Text 의 가운데 기준선과 같은 자리)
+		if (this.#isUnderline) {
+			canvasRenderingContext.fillRect(scaledPenX, scaledUnderlineY - scaledDecorationLineWidth * 0.5, textMetrics.width, scaledDecorationLineWidth);
+		}
+		if (this.#isStrikethrough) {
+			canvasRenderingContext.fillRect(scaledPenX, scaledMiddleY - scaledDecorationLineWidth * 0.5, textMetrics.width, scaledDecorationLineWidth);
+		}
 		this.#bakeCanvas = bakeCanvas;
 		this.#bakeMetrics = {
 			scale: bakeScale,
@@ -271,7 +294,7 @@ export class ShadowText extends Component {
 		}
 		const textStringTextureCache = graphic.getTextStringTextureCache();
 		const fontFace = this.getFontFace();
-		const fontString = buildFontString(fontFace, this.#fontSize, this.#isBold, false);
+		const fontString = buildFontString(fontFace, this.#fontSize, this.#isBold, this.#isItalic);
 		const textMetrics = textStringTextureCache.measureText(fontString, text);
 		return textMetrics.width;
 	}
@@ -361,7 +384,7 @@ export class ShadowText extends Component {
 	}
 
 	//==============================================================================
-	// 글 방향 설정. ("ltr", "rtl")
+	// 글 방향 설정. ("ltr", "rtl", "auto")
 	//==============================================================================
 	/**
 	 * @param { string } textDirection
@@ -378,6 +401,92 @@ export class ShadowText extends Component {
 	 */
 	getTextDirection() {
 		return this.#textDirection;
+	}
+
+	//==============================================================================
+	// 굽는 실제 방향. ("rtl" 이면 오른쪽에서 왼쪽, "auto" 는 글의 첫 강한 글자로, 그 밖은 "ltr")
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	resolveBakeTextDirection() {
+		if (this.#textDirection === "rtl") {
+			return "rtl";
+		}
+		if (this.#textDirection === "auto") {
+			return detectTextDirection(this.#text);
+		}
+		return "ltr";
+	}
+
+	//==============================================================================
+	// 굵게 여부.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isBold() {
+		return this.#isBold;
+	}
+
+	//==============================================================================
+	// 기울임 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } isItalic
+	 */
+	setItalic(isItalic) {
+		this.#isItalic = isItalic === true;
+	}
+
+	//==============================================================================
+	// 기울임 여부.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isItalic() {
+		return this.#isItalic;
+	}
+
+	//==============================================================================
+	// 밑줄 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } isUnderline
+	 */
+	setUnderline(isUnderline) {
+		this.#isUnderline = isUnderline === true;
+	}
+
+	//==============================================================================
+	// 밑줄 여부.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isUnderline() {
+		return this.#isUnderline;
+	}
+
+	//==============================================================================
+	// 취소선 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } isStrikethrough
+	 */
+	setStrikethrough(isStrikethrough) {
+		this.#isStrikethrough = isStrikethrough === true;
+	}
+
+	//==============================================================================
+	// 취소선 여부.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isStrikethrough() {
+		return this.#isStrikethrough;
 	}
 
 	//==============================================================================

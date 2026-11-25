@@ -318,6 +318,8 @@ export class AmbientOcclusionEffect extends Object {
 		this.#occlusionRenderTarget.destroy();
 		this.#pingRenderTarget.destroy();
 		this.#pongRenderTarget.destroy();
+		this.#occlusionPass.destroy();
+		this.#blurPass.destroy();
 	}
 
 	//==============================================================================

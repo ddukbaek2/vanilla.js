@@ -153,4 +153,13 @@ export class ShadowMap extends Object {
 	getLightViewProjectionMatrix() {
 		return this.#lightViewProjectionMatrix;
 	}
+
+	//==============================================================================
+	// 파괴. (프레임버퍼와 깊이 텍스처를 지운다)
+	//==============================================================================
+	destroy() {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		webGL2RenderingContext.deleteFramebuffer(this.#framebuffer);
+		webGL2RenderingContext.deleteTexture(this.#depthTexture);
+	}
 }

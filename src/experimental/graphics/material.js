@@ -157,7 +157,12 @@ export class Material extends Object {
 			const blobOptions = imageDescription.mimeType ? { type: imageDescription.mimeType } : {};
 			imageSource = new System.Blob([imageDescription.bytes], blobOptions);
 		}
-		const bitmapOptions = imageDescription.flipY ? { imageOrientation: "flipY" } : {};
+		// 픽셀은 파일 그대로 받는다. (브라우저 기본값은 알파를 곱하고 색 프로필을 바꾼다. 셰이더는 곧은 알파를 기대하므로
+		// 그대로 두면 알파 0 텍셀 색이 검어져 머리카락 / 수염 카드 가장자리가 어두워진다)
+		const bitmapOptions = { premultiplyAlpha: "none", colorSpaceConversion: "none" };
+		if (imageDescription.flipY) {
+			bitmapOptions.imageOrientation = "flipY";
+		}
 		const imageBitmap = await System.createImageBitmap(imageSource, bitmapOptions);
 		const internalFormat = imageDescription.isColorData ? webGL2RenderingContext.SRGB8_ALPHA8 : webGL2RenderingContext.RGBA8;
 		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, internalFormat, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, imageBitmap);
@@ -193,9 +198,24 @@ export class Material extends Object {
 		}
 		const arrayBuffer = await response.arrayBuffer();
 		const contentType = response.headers.get("content-type");
+		const imageDescription = Material.createImageDescription(new System.Uint8Array(arrayBuffer), contentType ? contentType : null, options);
+		return imageDescription;
+	}
+
+	//==============================================================================
+	// 바이트로부터 이미지 서술 만들기. (정적, loadImageDescription 의 fetch 뒤 부분, 번들이나 BlobAsset 으로 이미 받은 바이트)
+	// - options: { flipY, isColorData, anisotropy }
+	//==============================================================================
+	/**
+	 * @param { Uint8Array } bytes
+	 * @param { string | null } mimeType
+	 * @param { object | null } options
+	 * @returns { object }
+	 */
+	static createImageDescription(bytes, mimeType = null, options = null) {
 		const imageDescription = {
-			bytes: new System.Uint8Array(arrayBuffer),
-			mimeType: contentType ? contentType : null,
+			bytes: bytes,
+			mimeType: mimeType,
 			flipY: options ? options.flipY === true : false,
 			isColorData: options ? options.isColorData === true : false,
 			anisotropy: options && options.anisotropy ? options.anisotropy : 0,
@@ -385,5 +405,26 @@ export class Material extends Object {
 	 */
 	getWebGL2RenderingContext() {
 		return this.#webGL2RenderingContext;
+	}
+
+	//==============================================================================
+	// 파괴. (기본 슬롯 텍스처를 지운다, setTexture 로 넣은 추가 텍스처는 넣은 쪽 것이라 남긴다)
+	//==============================================================================
+	destroy() {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const ownedTextureList = [this.#baseColorTexture, this.#normalTexture, this.#metallicRoughnessTexture, this.#glossinessTexture, this.#occlusionTexture, this.#emissiveTexture, this.#specularTexture, this.#opacityTexture];
+		for (const glTexture of ownedTextureList) {
+			if (glTexture) {
+				webGL2RenderingContext.deleteTexture(glTexture);
+			}
+		}
+		this.#baseColorTexture = null;
+		this.#normalTexture = null;
+		this.#metallicRoughnessTexture = null;
+		this.#glossinessTexture = null;
+		this.#occlusionTexture = null;
+		this.#emissiveTexture = null;
+		this.#specularTexture = null;
+		this.#opacityTexture = null;
 	}
 }

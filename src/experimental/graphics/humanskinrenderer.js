@@ -996,6 +996,9 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 		}
 		else {
 			webGL2RenderingContext.uniform1f(shadowStrengthLocation, 0);
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, this.getEmptyShadowTexture());
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
 		}
 	}
 

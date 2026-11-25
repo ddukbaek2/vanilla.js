@@ -27,6 +27,9 @@ const JOINED_PLACEHOLDER_PATTERN = /\{[a-zA-Z0-9]+\}(?:\s*\/\s*\{[a-zA-Z0-9]+\})
 //     Localization.setTable("en", { "확인": "OK", "{0}점 획득": "Got {0} points" });
 //     Localization.setLanguage(Localization.detectLanguage(["ko", "en"]));
 //     Localization.text("{0}점 획득", 120);
+// - 언어 태그를 뒤 조각부터 하나씩 떼며 맞추고 별칭도 본다. (setLanguageAliases)
+// - 오른쪽에서 왼쪽으로 쓰는 언어(isRightToLeft, setRightToLeft)면 배치를 뒤집고(mirrorLayoutX, readLayoutTextAlign),
+//   글 사이에 넣는 값을 방향 격리 문자로 묶는다. (isolateText, textNamed 의 "{이름}" 자리, 빗금으로만 이은 값들은 통째로 한 번 묶는다)
 //==============================================================================
 export class Localization extends Object {
 	/** @private @type { Map } */ static #tableByLanguage = new System.Map();

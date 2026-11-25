@@ -16,7 +16,7 @@ import { Object } from "../base/object.js";
 //             updated:   (progress, target) => { target.setLocalOpacity(progress); },
 //             completed: (target) => { }
 //         })
-//         .condition(() => gameState.isReady())
+//         .condition((target) => gameState.isReady())
 //         .call((target) => { target.playAnimation(); })
 //         .repeat(3, new Action().wait(0.5, { updated: (p, t) => { ... } }))
 //         .forever(new Action().wait(2.0));
@@ -75,6 +75,10 @@ export class Action extends Object {
 			step.callbacks.started(target);
 		}
 		if (step.type === "repeat") {
+			if (step.times <= 0) {
+				this.#advanceStep();
+				return;
+			}
 			this.#currentStepState.completedCount = 0;
 			step.innerAction.start(target);
 		}
@@ -82,7 +86,7 @@ export class Action extends Object {
 			step.innerAction.start(target);
 		}
 		else if (step.type === "loop") {
-			if (!step.conditionFn()) {
+			if (!step.conditionFn(target)) {
 				this.#advanceStep();
 				return;
 			}
@@ -116,7 +120,7 @@ export class Action extends Object {
 	}
 
 	//==============================================================================
-	// 조건이 참이 될 때까지 대기.
+	// 조건이 참이 될 때까지 대기. (조건 함수는 대상을 받는다)
 	// - callbacks.started(target)              : 스텝 시작 시 호출.
 	// - callbacks.updated(target)              : 조건 충족 전 매 프레임 호출.
 	// - callbacks.completed(target)            : 조건 충족 시 호출.
@@ -144,7 +148,7 @@ export class Action extends Object {
 	}
 
 	//==============================================================================
-	// 내부 액션을 N회 반복.
+	// 내부 액션을 N회 반복. (0 이하이면 돌지 않고 넘어간다)
 	//==============================================================================
 	/**
 	 * @param { number } times
@@ -169,7 +173,7 @@ export class Action extends Object {
 	}
 
 	//==============================================================================
-	// 조건이 참인 동안 내부 액션을 반복.
+	// 조건이 참인 동안 내부 액션을 반복. (조건 함수는 대상을 받는다)
 	//==============================================================================
 	/**
 	 * @param { Function } conditionFn
@@ -228,7 +232,7 @@ export class Action extends Object {
 		switch (step.type) {
 			case "wait": {
 				this.#currentStepElapsed += timeDelta;
-				const progress = Math.clamp(this.#currentStepElapsed / step.duration, 0, 1);
+				const progress = (step.duration > 0) ? Math.clamp(this.#currentStepElapsed / step.duration, 0, 1) : 1;
 				if (step.callbacks && step.callbacks.updated) {
 					step.callbacks.updated(progress, target);
 				}
@@ -244,7 +248,7 @@ export class Action extends Object {
 				if (step.callbacks && step.callbacks.updated) {
 					step.callbacks.updated(target);
 				}
-				if (step.conditionFn()) {
+				if (step.conditionFn(target)) {
 					if (step.callbacks && step.callbacks.completed) {
 						step.callbacks.completed(target);
 					}
@@ -278,7 +282,7 @@ export class Action extends Object {
 				const loopAction = step.innerAction;
 				loopAction.step(timeDelta);
 				if (loopAction.isDone()) {
-					if (step.conditionFn()) {
+					if (step.conditionFn(target)) {
 						loopAction.start(target);
 					}
 					else {

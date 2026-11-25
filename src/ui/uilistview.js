@@ -16,6 +16,7 @@ import { UIDocument } from "./uidocument.js";
 //   항목 내용은 setBindItemEvent 로 코드에서 채운다. (데이터 주도)
 // - 끝 근처에 닿으면 setReachEndEvent 알림을 한 번 보낸다. (무한 스크롤 / 더 불러오기)
 //   setItemCount 로 항목 수가 늘어나면 알림이 다시 무장된다.
+// - 템플릿 대신 항목 노드를 만드는 함수(setCreateItemEvent)를 줄 수도 있다. 항목 크기를 정하지 않았으면 처음 만든 항목의 크기를 읽는다.
 // - 사용:
 //     const listView = scrollNode.addComponent(UIListView);
 //     listView.setTemplateNode(templateNode);
@@ -28,6 +29,7 @@ export class UIListView extends Component {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { object | null } */ #templateData; // 직렬화된 템플릿.
+	/** @private @type { Function | null } */ #createItemEvent; // () => WorldNode, 템플릿 대신 항목 노드를 만든다.
 	/** @private @type { number } */ #itemCount;
 	/** @private @type { number } */ #itemSize; // 진행 축 방향 항목 크기.
 	/** @private @type { number } */ #spacing;
@@ -49,6 +51,7 @@ export class UIListView extends Component {
 	constructor() {
 		super();
 		this.#templateData = null;
+		this.#createItemEvent = null;
 		this.#itemCount = 0;
 		this.#itemSize = 0;
 		this.#spacing = 0;
@@ -82,6 +85,7 @@ export class UIListView extends Component {
 	 * @param { import("../core/node/worldnode.js").WorldNode } templateNode
 	 */
 	setTemplateNode(templateNode) {
+		this.#createItemEvent = null;
 		this.#templateData = UIDocument.serializeNode(templateNode);
 		this.#templateData.active = true;
 		templateNode.setActive(false);
@@ -90,6 +94,19 @@ export class UIListView extends Component {
 			this.#itemSize = this.#isHorizontal ? templateSize.x : templateSize.y;
 		}
 	}
+	//==============================================================================
+	// 항목 노드 만들기 함수 설정. (템플릿 대신, () => WorldNode. 만든 노드는 content 노드의 자식으로 붙인다)
+	//==============================================================================
+	/**
+	 * @param { Function | null } createItemEvent
+	 */
+	setCreateItemEvent(createItemEvent) {
+		this.#createItemEvent = createItemEvent;
+		if (createItemEvent !== null) {
+			this.#templateData = null;
+		}
+	}
+
 
 	//==============================================================================
 	// 항목 수 설정. (스크롤 영역 갱신 + 끝 알림 재무장)
@@ -115,12 +132,24 @@ export class UIListView extends Component {
 	 * @param { number } timeDelta
 	 */
 	tick(timeDelta) {
-		if (!this.#templateData) {
+		if (!this.#templateData && !this.#createItemEvent) {
 			return;
 		}
 		const scrollView = this.findScrollView();
 		if (!scrollView) {
 			return;
+		}
+		// 항목 크기를 정하지 않았으면 처음 만든 항목 노드의 크기를 읽는다. (그 노드는 회수 목록에 넣어 다시 쓴다)
+		if (this.#itemSize <= 0) {
+			const measuredItemNode = this.acquireItemNode(scrollView);
+			if (!measuredItemNode) {
+				return;
+			}
+			const measuredSize = measuredItemNode.getContentSize();
+			measuredItemNode.setActive(false);
+			this.#itemSize = this.#isHorizontal ? measuredSize.x : measuredSize.y;
+			this.#freeItemList.push(measuredItemNode);
+			this.updateScrollContentSize();
 		}
 		const node = this.getNode();
 		const contentSize = node.getContentSize();
@@ -189,7 +218,10 @@ export class UIListView extends Component {
 		if (freeItemNode) {
 			return freeItemNode;
 		}
-		const itemNode = UIDocument.deserializeNode(this.#templateData);
+		const itemNode = (this.#createItemEvent !== null) ? this.#createItemEvent() : UIDocument.deserializeNode(this.#templateData);
+		if (!itemNode) {
+			return null;
+		}
 		const contentNode = scrollView.getContent();
 		if (contentNode) {
 			contentNode.addChild(itemNode);
@@ -320,6 +352,11 @@ export class UIListView extends Component {
 	/** @returns { number } */
 	getSpacing() {
 		return this.#spacing;
+	}
+
+	/** @returns { boolean } */
+	isHorizontal() {
+		return this.#isHorizontal;
 	}
 
 	/** @returns { number } */

@@ -37,6 +37,9 @@ const TYPE_COMPONENT_COUNT_TABLE = {
 // 모프 타깃 텍스처 가로 크기. (정점 델타를 실수 텍스처에 행 단위로 적재 — 버텍스 셰이더가 gl_VertexID 로 조회)
 const MORPH_TEXTURE_WIDTH = 2048;
 
+// glTF 애니메이션 채널 경로. (이 밖의 경로는 버린다)
+const ANIMATION_PATH_SET = new System.Set(["translation", "rotation", "scale", "weights"]);
+
 // 드로어블당 모프 타깃 최대 개수. (셰이더 유니폼 배열 크기와 일치)
 export const MORPH_TARGET_MAXIMUM = 96;
 
@@ -53,7 +56,7 @@ export const MORPH_TARGET_MAXIMUM = 96;
  * @param { number } zDegree
  * @returns { Quaternion }
  */
-function createQuaternionFromFbxEuler(xDegree, yDegree, zDegree) {
+export function createQuaternionFromFbxEuler(xDegree, yDegree, zDegree) {
 	const degreeToRadian = System.Math.PI / 180;
 	const rotationX = Quaternion.createFromEuler(xDegree * degreeToRadian, 0, 0);
 	const rotationY = Quaternion.createFromEuler(0, yDegree * degreeToRadian, 0);
@@ -102,6 +105,61 @@ function convertFbxAnimationChannels(sceneData, fbxAnimation, resolveNodeIndex) 
 	return channels;
 }
 
+//==============================================================================
+// 접근자 CPU 읽기. (촘촘한 배치 + 인터리브(byteStride) 배치 + 희소(sparse) 접근자 지원, GL 무관)
+//==============================================================================
+/**
+ * @param { object } json glTF JSON.
+ * @param { ArrayBuffer } binaryBuffer GLB 의 BIN 청크.
+ * @param { number } accessorIndex
+ * @returns { Uint8Array | Uint16Array | Uint32Array | Float32Array }
+ */
+export function readAccessorArray(json, binaryBuffer, accessorIndex) {
+	const accessor = json.accessors[accessorIndex];
+	const componentCount = TYPE_COMPONENT_COUNT_TABLE[accessor.type];
+	const ArrayConstructor = COMPONENT_ARRAY_TABLE[accessor.componentType];
+	let resultArray = null;
+	if (accessor.bufferView === undefined) {
+		resultArray = new ArrayConstructor(accessor.count * componentCount);
+	}
+	else {
+		const bufferView = json.bufferViews[accessor.bufferView];
+		const elementOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
+		const tightByteSize = componentCount * ArrayConstructor.BYTES_PER_ELEMENT;
+		const byteStride = bufferView.byteStride || 0;
+		if (byteStride === 0 || byteStride === tightByteSize) {
+			const sourceArray = new ArrayConstructor(binaryBuffer, elementOffset, accessor.count * componentCount);
+			resultArray = new ArrayConstructor(sourceArray);
+		}
+		else {
+			resultArray = new ArrayConstructor(accessor.count * componentCount);
+			for (let elementIndex = 0; elementIndex < accessor.count; ++elementIndex) {
+				const sourceArray = new ArrayConstructor(binaryBuffer, elementOffset + elementIndex * byteStride, componentCount);
+				resultArray.set(sourceArray, elementIndex * componentCount);
+			}
+		}
+	}
+
+	// 희소 접근자. (인덱스 목록의 요소만 값으로 덮어쓴다 — 모프 타깃 델타에 흔히 쓰인다)
+	if (accessor.sparse) {
+		const sparse = accessor.sparse;
+		const indexBufferView = json.bufferViews[sparse.indices.bufferView];
+		const IndexArrayConstructor = COMPONENT_ARRAY_TABLE[sparse.indices.componentType];
+		const indexOffset = (indexBufferView.byteOffset || 0) + (sparse.indices.byteOffset || 0);
+		const sparseIndices = new IndexArrayConstructor(binaryBuffer, indexOffset, sparse.count);
+		const valueBufferView = json.bufferViews[sparse.values.bufferView];
+		const valueOffset = (valueBufferView.byteOffset || 0) + (sparse.values.byteOffset || 0);
+		const sparseValues = new ArrayConstructor(binaryBuffer, valueOffset, sparse.count * componentCount);
+		for (let sparseIndex = 0; sparseIndex < sparse.count; ++sparseIndex) {
+			const targetElement = sparseIndices[sparseIndex];
+			for (let componentIndex = 0; componentIndex < componentCount; ++componentIndex) {
+				resultArray[targetElement * componentCount + componentIndex] = sparseValues[sparseIndex * componentCount + componentIndex];
+			}
+		}
+	}
+	return resultArray;
+}
+
 
 //==============================================================================
 // 스킨드 모델. (모델 인스턴스 — 메시/본/스킨/머티리얼/애니메이션 데이터 + 포즈 상태)
@@ -129,6 +187,7 @@ export class SkinnedModel extends Object {
 	/** @private @type { number } */ #fadeElapsed;
 	/** @private @type { number } */ #timeScale;
 	/** @private @type { Map<number, Quaternion> } */ #jointRotationOffsets;
+	/** @private @type { Material[] } */ #ownedMaterialList; // 이 모델이 업로드에서 지은 머티리얼. (destroy 가 지운다)
 
 	//==============================================================================
 	// 생성.
@@ -156,6 +215,18 @@ export class SkinnedModel extends Object {
 		this.#fadeElapsed = 0;
 		this.#timeScale = 1;
 		this.#jointRotationOffsets = new System.Map();
+		this.#ownedMaterialList = [];
+	}
+
+	//==============================================================================
+	// 셰이더 없이 생성. (정적, 해석과 포즈 계산만 하는 모델, uploadMeshesAndMaterials 는 던진다)
+	// - 애니메이션 원본 모델이나 단위 시험처럼 GL 없이 interpretContent / interpretFbxContent 와 update 만 쓴다.
+	//==============================================================================
+	/**
+	 * @returns { SkinnedModel }
+	 */
+	static createWithoutShaderProgram() {
+		return new SkinnedModel(null, null);
 	}
 
 	//==============================================================================
@@ -173,6 +244,21 @@ export class SkinnedModel extends Object {
 			throw new Error(`SkinnedModel load failed: ${url}`);
 		}
 		const arrayBuffer = await response.arrayBuffer();
+		const model = await SkinnedModel.loadFromBytes(webGL2RenderingContext, arrayBuffer, skinnedModelRenderer);
+		return model;
+	}
+
+	//==============================================================================
+	// 바이트로부터 로드. (정적, GLB 바이너리 glTF, loadFromUrl 의 fetch 뒤 부분)
+	// - 번들에 담긴 바이트나 BlobAsset 처럼 이미 받은 데이터에서 짓는다.
+	//==============================================================================
+	/**
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext
+	 * @param { ArrayBuffer } arrayBuffer
+	 * @param { SkinnedModelRenderer } skinnedModelRenderer
+	 * @returns { Promise<SkinnedModel> }
+	 */
+	static async loadFromBytes(webGL2RenderingContext, arrayBuffer, skinnedModelRenderer) {
 		const shaderProgram = skinnedModelRenderer.getShaderProgram();
 		const model = new SkinnedModel(webGL2RenderingContext, shaderProgram);
 		await model.parseBinary(arrayBuffer);
@@ -197,14 +283,32 @@ export class SkinnedModel extends Object {
 	}
 
 	//==============================================================================
-	// GLB 바이너리 해석.
+	// 바이트로부터 로드. (정적, 바이너리 FBX, loadFromFbxUrl 의 fetch 뒤 부분)
+	//==============================================================================
+	/**
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext
+	 * @param { ArrayBuffer } arrayBuffer
+	 * @param { SkinnedModelRenderer } skinnedModelRenderer
+	 * @returns { Promise<SkinnedModel> }
+	 */
+	static async loadFromFbxBytes(webGL2RenderingContext, arrayBuffer, skinnedModelRenderer) {
+		const sceneData = await new FbxLoader().parse(arrayBuffer);
+		const shaderProgram = skinnedModelRenderer.getShaderProgram();
+		const model = new SkinnedModel(webGL2RenderingContext, shaderProgram);
+		await model.parseFbxContent(sceneData);
+		return model;
+	}
+
+	//==============================================================================
+	// GLB 청크 읽기. (정적, 머리 확인 + JSON 청크 + BIN 청크, GL 무관)
 	//==============================================================================
 	/**
 	 * @param { ArrayBuffer } arrayBuffer
+	 * @returns { { json: object, binaryBuffer: ArrayBuffer } }
 	 */
-	async parseBinary(arrayBuffer) {
+	static readGlbChunks(arrayBuffer) {
 		const dataView = new System.DataView(arrayBuffer);
-		if (dataView.getUint32(0, true) !== 0x46546c67) {
+		if (arrayBuffer.byteLength < 12 || dataView.getUint32(0, true) !== 0x46546c67) {
 			throw new Error("SkinnedModel: not a GLB file.");
 		}
 
@@ -213,9 +317,15 @@ export class SkinnedModel extends Object {
 		let binaryBuffer = null;
 		let chunkOffset = 12;
 		while (chunkOffset < arrayBuffer.byteLength) {
+			if (chunkOffset + 8 > arrayBuffer.byteLength) {
+				throw new Error("SkinnedModel: invalid GLB chunks.");
+			}
 			const chunkLength = dataView.getUint32(chunkOffset, true);
 			const chunkType = dataView.getUint32(chunkOffset + 4, true);
 			const chunkStart = chunkOffset + 8;
+			if (chunkStart + chunkLength > arrayBuffer.byteLength) {
+				throw new Error("SkinnedModel: invalid GLB chunks.");
+			}
 			if (chunkType === GLB_CHUNKTYPE_JSON) {
 				const jsonBytes = new System.Uint8Array(arrayBuffer, chunkStart, chunkLength);
 				const jsonText = new System.TextDecoder().decode(jsonBytes);
@@ -229,64 +339,42 @@ export class SkinnedModel extends Object {
 		if (!json || !binaryBuffer) {
 			throw new Error("SkinnedModel: invalid GLB chunks.");
 		}
-
-		await this.parseContent(json, binaryBuffer);
+		return { json: json, binaryBuffer: binaryBuffer };
 	}
 
 	//==============================================================================
-	// glTF 내용 해석. (노드 / 스킨 / 메시 / 애니메이션 / 텍스처)
+	// GLB 바이너리 해석.
+	//==============================================================================
+	/**
+	 * @param { ArrayBuffer } arrayBuffer
+	 */
+	async parseBinary(arrayBuffer) {
+		const glbChunks = SkinnedModel.readGlbChunks(arrayBuffer);
+		await this.parseContent(glbChunks.json, glbChunks.binaryBuffer);
+	}
+
+	//==============================================================================
+	// glTF 내용 해석. (노드 / 스킨 / 메시 / 애니메이션 / 텍스처 → GL 업로드)
 	//==============================================================================
 	/**
 	 * @param { object } json
 	 * @param { ArrayBuffer } binaryBuffer
 	 */
 	async parseContent(json, binaryBuffer) {
-		// 접근자 CPU 읽기. (촘촘한 배치 + 인터리브(byteStride) 배치 + 희소(sparse) 접근자 지원)
-		function readAccessorArray(accessorIndex) {
-			const accessor = json.accessors[accessorIndex];
-			const componentCount = TYPE_COMPONENT_COUNT_TABLE[accessor.type];
-			const ArrayConstructor = COMPONENT_ARRAY_TABLE[accessor.componentType];
-			let resultArray = null;
-			if (accessor.bufferView === undefined) {
-				resultArray = new ArrayConstructor(accessor.count * componentCount);
-			}
-			else {
-				const bufferView = json.bufferViews[accessor.bufferView];
-				const elementOffset = (bufferView.byteOffset || 0) + (accessor.byteOffset || 0);
-				const tightByteSize = componentCount * ArrayConstructor.BYTES_PER_ELEMENT;
-				const byteStride = bufferView.byteStride || 0;
-				if (byteStride === 0 || byteStride === tightByteSize) {
-					const sourceArray = new ArrayConstructor(binaryBuffer, elementOffset, accessor.count * componentCount);
-					resultArray = new ArrayConstructor(sourceArray);
-				}
-				else {
-					resultArray = new ArrayConstructor(accessor.count * componentCount);
-					for (let elementIndex = 0; elementIndex < accessor.count; ++elementIndex) {
-						const sourceArray = new ArrayConstructor(binaryBuffer, elementOffset + elementIndex * byteStride, componentCount);
-						resultArray.set(sourceArray, elementIndex * componentCount);
-					}
-				}
-			}
+		const interpretation = this.interpretContent(json, binaryBuffer);
+		await this.uploadMeshesAndMaterials(interpretation.meshDescriptionList, interpretation.materialDescriptionList);
+	}
 
-			// 희소 접근자. (인덱스 목록의 요소만 값으로 덮어쓴다 — 모프 타깃 델타에 흔히 쓰인다)
-			if (accessor.sparse) {
-				const sparse = accessor.sparse;
-				const indexBufferView = json.bufferViews[sparse.indices.bufferView];
-				const IndexArrayConstructor = COMPONENT_ARRAY_TABLE[sparse.indices.componentType];
-				const indexOffset = (indexBufferView.byteOffset || 0) + (sparse.indices.byteOffset || 0);
-				const sparseIndices = new IndexArrayConstructor(binaryBuffer, indexOffset, sparse.count);
-				const valueBufferView = json.bufferViews[sparse.values.bufferView];
-				const valueOffset = (valueBufferView.byteOffset || 0) + (sparse.values.byteOffset || 0);
-				const sparseValues = new ArrayConstructor(binaryBuffer, valueOffset, sparse.count * componentCount);
-				for (let sparseIndex = 0; sparseIndex < sparse.count; ++sparseIndex) {
-					const targetElement = sparseIndices[sparseIndex];
-					for (let componentIndex = 0; componentIndex < componentCount; ++componentIndex) {
-						resultArray[targetElement * componentCount + componentIndex] = sparseValues[sparseIndex * componentCount + componentIndex];
-					}
-				}
-			}
-			return resultArray;
-		}
+	//==============================================================================
+	// glTF 내용 해석. (GL 무관, 노드 / 스킨 / 애니메이션을 채우고 중립 메시 / 머티리얼 서술을 돌려준다)
+	// - 바깥(uri) 이미지는 텍스처 없음, inverseBindMatrices 가 없는 스킨은 단위 행렬, 노드가 없거나 모르는 경로의 채널은 버린다.
+	//==============================================================================
+	/**
+	 * @param { object } json
+	 * @param { ArrayBuffer } binaryBuffer
+	 * @returns { { meshDescriptionList: object[], materialDescriptionList: object[] } }
+	 */
+	interpretContent(json, binaryBuffer) {
 
 		// 노드 구성.
 		this.#nodeList = json.nodes.map((node) => {
@@ -310,12 +398,14 @@ export class SkinnedModel extends Object {
 
 		// 스킨 구성.
 		this.#skinList = (json.skins || []).map((skin) => {
-			const inverseBindArray = readAccessorArray(skin.inverseBindMatrices);
+			const inverseBindArray = skin.inverseBindMatrices !== undefined ? readAccessorArray(json, binaryBuffer, skin.inverseBindMatrices) : null;
 			const inverseBindMatrices = [];
 			for (let jointIndex = 0; jointIndex < skin.joints.length; ++jointIndex) {
 				const matrix = Matrix4.createIdentity();
-				const elements = matrix.getElements();
-				elements.set(inverseBindArray.subarray(jointIndex * 16, jointIndex * 16 + 16));
+				if (inverseBindArray !== null && inverseBindArray.length >= jointIndex * 16 + 16) {
+					const elements = matrix.getElements();
+					elements.set(inverseBindArray.subarray(jointIndex * 16, jointIndex * 16 + 16));
+				}
 				inverseBindMatrices.push(matrix);
 			}
 			return {
@@ -331,7 +421,10 @@ export class SkinnedModel extends Object {
 				return null;
 			}
 			const texture = json.textures[textureInfo.index];
-			const image = json.images[texture.source];
+			const image = texture ? json.images[texture.source] : undefined;
+			if (!image || image.bufferView === undefined) {
+				return null;
+			}
 			const bufferView = json.bufferViews[image.bufferView];
 			const imageBytes = new System.Uint8Array(binaryBuffer, bufferView.byteOffset || 0, bufferView.byteLength);
 			return { bytes: imageBytes, mimeType: image.mimeType, flipY: false };
@@ -378,12 +471,13 @@ export class SkinnedModel extends Object {
 				node.skinIndex = this.#skinList.length - 1;
 			}
 			const targetNameList = mesh.extras && mesh.extras.targetNames ? mesh.extras.targetNames : [];
-			const baseMorphWeights = node.weights ? node.weights : (mesh.weights ? mesh.weights : []);
+			const nodeValue = json.nodes[nodeIndex];
+			const baseMorphWeights = nodeValue.weights ? nodeValue.weights : (mesh.weights ? mesh.weights : []);
 			for (const primitive of mesh.primitives) {
-				const positions = new System.Float32Array(readAccessorArray(primitive.attributes.POSITION));
+				const positions = new System.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.POSITION));
 				const vertexCount = positions.length / 3;
-				const normals = primitive.attributes.NORMAL !== undefined ? new System.Float32Array(readAccessorArray(primitive.attributes.NORMAL)) : null;
-				const textureCoordinates = primitive.attributes.TEXCOORD_0 !== undefined ? new System.Float32Array(readAccessorArray(primitive.attributes.TEXCOORD_0)) : null;
+				const normals = primitive.attributes.NORMAL !== undefined ? new System.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.NORMAL)) : null;
+				const textureCoordinates = primitive.attributes.TEXCOORD_0 !== undefined ? new System.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.TEXCOORD_0)) : null;
 				let joints = null;
 				let weights = null;
 				if (isStaticMesh) {
@@ -394,9 +488,9 @@ export class SkinnedModel extends Object {
 					}
 				}
 				else {
-					joints = new System.Uint16Array(readAccessorArray(primitive.attributes.JOINTS_0));
+					joints = new System.Uint16Array(readAccessorArray(json, binaryBuffer, primitive.attributes.JOINTS_0));
 					const weightAccessor = json.accessors[primitive.attributes.WEIGHTS_0];
-					const weightSource = readAccessorArray(primitive.attributes.WEIGHTS_0);
+					const weightSource = readAccessorArray(json, binaryBuffer, primitive.attributes.WEIGHTS_0);
 					weights = new System.Float32Array(weightSource.length);
 					if (weightAccessor.componentType === 5126) {
 						weights.set(weightSource);
@@ -410,7 +504,7 @@ export class SkinnedModel extends Object {
 				}
 				let indices = null;
 				if (primitive.indices !== undefined) {
-					const indexSource = readAccessorArray(primitive.indices);
+					const indexSource = readAccessorArray(json, binaryBuffer, primitive.indices);
 					indices = indexSource instanceof System.Uint8Array ? new System.Uint16Array(indexSource) : indexSource;
 				}
 
@@ -422,8 +516,8 @@ export class SkinnedModel extends Object {
 					if (target.POSITION === undefined) {
 						continue;
 					}
-					const positionDeltas = new System.Float32Array(readAccessorArray(target.POSITION));
-					const normalDeltas = target.NORMAL !== undefined ? new System.Float32Array(readAccessorArray(target.NORMAL)) : null;
+					const positionDeltas = new System.Float32Array(readAccessorArray(json, binaryBuffer, target.POSITION));
+					const normalDeltas = target.NORMAL !== undefined ? new System.Float32Array(readAccessorArray(json, binaryBuffer, target.NORMAL)) : null;
 					const targetName = targetNameList[targetIndex] !== undefined ? targetNameList[targetIndex] : `target${targetIndex}`;
 					morphTargets.push({ name: targetName, positionDeltas: positionDeltas, normalDeltas: normalDeltas });
 				}
@@ -432,7 +526,8 @@ export class SkinnedModel extends Object {
 					morphWeights[weightIndex] = baseMorphWeights[weightIndex] !== undefined ? baseMorphWeights[weightIndex] : 0;
 				}
 
-				const materialName = primitive.material !== undefined && json.materials[primitive.material].name ? json.materials[primitive.material].name : "";
+				const primitiveMaterial = primitive.material !== undefined && json.materials ? json.materials[primitive.material] : undefined;
+				const materialName = primitiveMaterial && primitiveMaterial.name ? primitiveMaterial.name : "";
 				meshDescriptionList.push({
 					positions: positions,
 					normals: normals,
@@ -450,32 +545,36 @@ export class SkinnedModel extends Object {
 			}
 		}
 
-		await this.uploadMeshesAndMaterials(meshDescriptionList, materialDescriptionList);
-
-		// 애니메이션 구성.
+		// 애니메이션 구성. (노드가 없거나 모르는 경로의 채널은 버린다)
 		this.#animationList = (json.animations || []).map((animation) => {
 			let duration = 0;
-			const channels = animation.channels.map((channel) => {
+			const channels = [];
+			for (const channel of animation.channels) {
 				const sampler = animation.samplers[channel.sampler];
-				const times = readAccessorArray(sampler.input);
-				const values = readAccessorArray(sampler.output);
+				const times = readAccessorArray(json, binaryBuffer, sampler.input);
+				const values = readAccessorArray(json, binaryBuffer, sampler.output);
 				if (times.length > 0) {
 					duration = System.Math.max(duration, times[times.length - 1]);
 				}
-				return {
-					nodeIndex: channel.target.node,
-					path: channel.target.path,
+				const target = channel.target || {};
+				if (target.node === undefined || !ANIMATION_PATH_SET.has(target.path)) {
+					continue;
+				}
+				channels.push({
+					nodeIndex: target.node,
+					path: target.path,
 					times: times,
 					values: values,
 					cursor: 0,
-				};
-			});
+				});
+			}
 			return { name: animation.name || "", duration: duration, channels: channels };
 		});
 
 		if (this.#animationList.length > 0) {
 			this.#currentAnimation = this.#animationList[0];
 		}
+		return { meshDescriptionList: meshDescriptionList, materialDescriptionList: materialDescriptionList };
 	}
 
 	//==============================================================================
@@ -485,6 +584,19 @@ export class SkinnedModel extends Object {
 	 * @param { object } sceneData
 	 */
 	async parseFbxContent(sceneData) {
+		const interpretation = this.interpretFbxContent(sceneData);
+		await this.uploadMeshesAndMaterials(interpretation.meshDescriptionList, interpretation.materialDescriptionList);
+	}
+
+	//==============================================================================
+	// FBX 중간 표현 해석. (GL 무관, 노드 / 스킨 / 애니메이션을 채우고 중립 메시 / 머티리얼 서술을 돌려준다)
+	// - 본이 없는 클러스터는 단위 조인트, 배열 밖 정점 번호는 건너뛴다. 원본처럼 스킨이 붙은 메시만 담는다.
+	//==============================================================================
+	/**
+	 * @param { object } sceneData
+	 * @returns { { meshDescriptionList: object[], materialDescriptionList: object[] } }
+	 */
+	interpretFbxContent(sceneData) {
 		// 노드 구성. (오일러 도 → 쿼터니언, 사전회전 우측 누적)
 		this.#nodeList = sceneData.nodeList.map((fbxNode) => {
 			const rotationQuaternion = createQuaternionFromFbxEuler(fbxNode.rotationEulerDegrees[0], fbxNode.rotationEulerDegrees[1], fbxNode.rotationEulerDegrees[2]);
@@ -514,20 +626,19 @@ export class SkinnedModel extends Object {
 			const inverseBindMatrices = [];
 			for (const clusterId of skinDeformer.clusterIds) {
 				const cluster = sceneData.clusterById.get(clusterId);
-				const boneNodeIndex = sceneData.nodeIdToIndex.get(cluster.boneNodeId);
-				jointNodeIndices.push(boneNodeIndex);
+				const boneNodeIndex = cluster && cluster.boneNodeId !== null ? sceneData.nodeIdToIndex.get(cluster.boneNodeId) : undefined;
+				jointNodeIndices.push(boneNodeIndex !== undefined ? boneNodeIndex : -1);
 				// 클러스터 Transform = TransformLink^-1 x 메시 바인드 전역행렬 — 그 자체가 역바인드 행렬.
-				// 미보유 시 TransformLink 의 역행렬로 대체. (메시 전역 = 단위행렬 가정)
-				let inverseBindMatrix = null;
-				if (cluster.transform) {
-					inverseBindMatrix = Matrix4.createIdentity();
+				// 미보유 시 TransformLink 의 역행렬로 대체. (메시 전역 = 단위행렬 가정, 둘 다 없으면 단위 행렬)
+				let inverseBindMatrix = Matrix4.createIdentity();
+				if (cluster && cluster.transform && cluster.transform.length >= 16) {
 					const bindElements = inverseBindMatrix.getElements();
-					bindElements.set(cluster.transform);
+					bindElements.set(cluster.transform.slice(0, 16));
 				}
-				else {
+				else if (cluster && cluster.transformLink && cluster.transformLink.length >= 16) {
 					const linkMatrix = Matrix4.createIdentity();
 					const linkElements = linkMatrix.getElements();
-					linkElements.set(cluster.transformLink);
+					linkElements.set(cluster.transformLink.slice(0, 16));
 					inverseBindMatrix = Matrix4.createInverse(linkMatrix);
 				}
 				inverseBindMatrices.push(inverseBindMatrix);
@@ -595,10 +706,15 @@ export class SkinnedModel extends Object {
 			}
 			for (let clusterLocalIndex = 0; clusterLocalIndex < skinDeformer.clusterIds.length; ++clusterLocalIndex) {
 				const cluster = sceneData.clusterById.get(skinDeformer.clusterIds[clusterLocalIndex]);
+				if (!cluster) {
+					continue;
+				}
 				for (let influenceIndex = 0; influenceIndex < cluster.vertexIndices.length; ++influenceIndex) {
 					const vertexIndex = cluster.vertexIndices[influenceIndex];
-					const weight = cluster.weights[influenceIndex];
-					influencesPerVertex[vertexIndex].push({ jointIndex: clusterLocalIndex, weight: weight });
+					const weight = influenceIndex < cluster.weights.length ? cluster.weights[influenceIndex] : 0;
+					if (vertexIndex >= 0 && vertexIndex < geometry.originalVertexCount) {
+						influencesPerVertex[vertexIndex].push({ jointIndex: clusterLocalIndex, weight: weight });
+					}
 				}
 			}
 
@@ -628,6 +744,9 @@ export class SkinnedModel extends Object {
 			const cornerWeightArray = new System.Float32Array(cornerCount * 4);
 			for (let cornerIndex = 0; cornerIndex < cornerCount; ++cornerIndex) {
 				const originalVertexIndex = geometry.originalVertexIndices[cornerIndex];
+				if (originalVertexIndex < 0 || originalVertexIndex >= geometry.originalVertexCount) {
+					continue;
+				}
 				for (let slotIndex = 0; slotIndex < 4; ++slotIndex) {
 					cornerJointArray[cornerIndex * 4 + slotIndex] = vertexJointArray[originalVertexIndex * 4 + slotIndex];
 					cornerWeightArray[cornerIndex * 4 + slotIndex] = vertexWeightArray[originalVertexIndex * 4 + slotIndex];
@@ -656,8 +775,6 @@ export class SkinnedModel extends Object {
 			});
 		}
 
-		await this.uploadMeshesAndMaterials(meshDescriptionList, materialDescriptionList);
-
 		// 애니메이션 구성. (회전 채널은 오일러 도 → 사전회전 합성 쿼터니언 4성분으로 변환)
 		this.#animationList = sceneData.animationList.map((fbxAnimation) => {
 			const channels = convertFbxAnimationChannels(sceneData, fbxAnimation, (nodeIndex) => nodeIndex);
@@ -667,6 +784,7 @@ export class SkinnedModel extends Object {
 		if (this.#animationList.length > 0) {
 			this.#currentAnimation = this.#animationList[0];
 		}
+		return { meshDescriptionList: meshDescriptionList, materialDescriptionList: materialDescriptionList };
 	}
 
 	//==============================================================================
@@ -681,6 +799,31 @@ export class SkinnedModel extends Object {
 	 */
 	async addAnimationsFromFbxUrl(url, clipName, ignoreTranslation = false) {
 		const sceneData = await FbxLoader.loadFromUrl(url);
+		this.addAnimationsFromFbxSceneData(sceneData, clipName, ignoreTranslation);
+	}
+
+	//==============================================================================
+	// 애니메이션 FBX 추가. (바이트, addAnimationsFromFbxUrl 의 fetch 뒤 부분)
+	//==============================================================================
+	/**
+	 * @param { ArrayBuffer } arrayBuffer
+	 * @param { string } clipName
+	 * @param { boolean } ignoreTranslation
+	 */
+	async addAnimationsFromFbxBytes(arrayBuffer, clipName, ignoreTranslation = false) {
+		const sceneData = await new FbxLoader().parse(arrayBuffer);
+		this.addAnimationsFromFbxSceneData(sceneData, clipName, ignoreTranslation);
+	}
+
+	//==============================================================================
+	// 애니메이션 FBX 추가. (FbxLoader 가 읽은 중간 표현, 본 이름 매칭 리타게팅)
+	//==============================================================================
+	/**
+	 * @param { object } sceneData
+	 * @param { string } clipName
+	 * @param { boolean } ignoreTranslation
+	 */
+	addAnimationsFromFbxSceneData(sceneData, clipName, ignoreTranslation = false) {
 		const nodeList = this.getNodeList();
 		const nodeIndexByName = new System.Map();
 		for (let nodeIndex = 0; nodeIndex < nodeList.length; ++nodeIndex) {
@@ -691,8 +834,8 @@ export class SkinnedModel extends Object {
 				continue;
 			}
 			let channels = convertFbxAnimationChannels(sceneData, fbxAnimation, (nodeIndex) => {
-				const sourceName = sceneData.nodeList[nodeIndex].name;
-				return nodeIndexByName.get(sourceName);
+				const sourceNode = sceneData.nodeList[nodeIndex];
+				return sourceNode ? nodeIndexByName.get(sourceNode.name) : undefined;
 			});
 			if (ignoreTranslation) {
 				channels = channels.filter((channel) => channel.path !== "translation");
@@ -711,13 +854,18 @@ export class SkinnedModel extends Object {
 	async uploadMeshesAndMaterials(meshDescriptionList, materialDescriptionList) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const shaderProgram = this.getShaderProgram();
+		if (!webGL2RenderingContext || !shaderProgram) {
+			throw new Error("SkinnedModel: no shader program to upload with.");
+		}
 		const materialList = [];
 		for (const materialDescription of materialDescriptionList) {
 			const material = await Material.createFromDescription(webGL2RenderingContext, shaderProgram, materialDescription);
 			materialList.push(material);
+			this.#ownedMaterialList.push(material);
 		}
 		const defaultDescription = Material.createDefaultDescription();
 		const defaultMaterial = await Material.createFromDescription(webGL2RenderingContext, shaderProgram, defaultDescription);
+		this.#ownedMaterialList.push(defaultMaterial);
 
 		this.#drawableList = [];
 		for (const meshDescription of meshDescriptionList) {
@@ -727,13 +875,14 @@ export class SkinnedModel extends Object {
 			}
 			const vertexArray = webGL2RenderingContext.createVertexArray();
 			webGL2RenderingContext.bindVertexArray(vertexArray);
-			this.bindFloatAttribute(shaderProgram, "vertexPosition", meshDescription.positions, 3);
-			this.bindFloatAttribute(shaderProgram, "vertexNormal", normals, 3);
+			const vertexBufferList = [];
+			vertexBufferList.push(this.bindFloatAttribute(shaderProgram, "vertexPosition", meshDescription.positions, 3));
+			vertexBufferList.push(this.bindFloatAttribute(shaderProgram, "vertexNormal", normals, 3));
 			if (meshDescription.textureCoordinates) {
-				this.bindFloatAttribute(shaderProgram, "vertexTextureCoordinate", meshDescription.textureCoordinates, 2);
+				vertexBufferList.push(this.bindFloatAttribute(shaderProgram, "vertexTextureCoordinate", meshDescription.textureCoordinates, 2));
 			}
-			this.bindIntegerAttribute(shaderProgram, "vertexJoints", meshDescription.joints, 4);
-			this.bindFloatAttribute(shaderProgram, "vertexWeights", meshDescription.weights, 4);
+			vertexBufferList.push(this.bindIntegerAttribute(shaderProgram, "vertexJoints", meshDescription.joints, 4));
+			vertexBufferList.push(this.bindFloatAttribute(shaderProgram, "vertexWeights", meshDescription.weights, 4));
 
 			// 인덱스. (없는 메시는 drawArrays 로 출력)
 			let indexCount = 0;
@@ -753,6 +902,7 @@ export class SkinnedModel extends Object {
 			const morphTargetList = meshDescription.morphTargets ? meshDescription.morphTargets.slice() : [];
 			this.#drawableList.push({
 				vertexArray: vertexArray,
+				vertexBufferList: vertexBufferList.filter((vertexBuffer) => vertexBuffer !== null),
 				isIndexed: isIndexed,
 				indexBuffer: indexBuffer,
 				indexCount: indexCount,
@@ -786,8 +936,29 @@ export class SkinnedModel extends Object {
 	 */
 	uploadWireframeIndices(drawable) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		const triangleIndices = drawable.meshDescription.indices;
 		const vertexCount = drawable.vertexCount;
+		const edgeList = SkinnedModel.buildWireframeEdgeList(drawable.meshDescription.indices, vertexCount);
+		const useUnsignedInt = vertexCount > 65535;
+		const wireframeIndices = useUnsignedInt ? new System.Uint32Array(edgeList) : new System.Uint16Array(edgeList);
+		const wireframeIndexBuffer = webGL2RenderingContext.createBuffer();
+		webGL2RenderingContext.bindVertexArray(null);
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, wireframeIndexBuffer);
+		webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, wireframeIndices, webGL2RenderingContext.STATIC_DRAW);
+		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, null);
+		drawable.wireframeIndexBuffer = wireframeIndexBuffer;
+		drawable.wireframeIndexCount = wireframeIndices.length;
+		drawable.wireframeIndexComponentType = useUnsignedInt ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
+	}
+
+	//==============================================================================
+	// 와이어프레임 모서리 목록 만들기. (정적, GL 무관, 인덱스 쌍 목록)
+	//==============================================================================
+	/**
+	 * @param { Uint16Array | Uint32Array | null } triangleIndices
+	 * @param { number } vertexCount
+	 * @returns { number[] }
+	 */
+	static buildWireframeEdgeList(triangleIndices, vertexCount) {
 		const edgeList = [];
 		if (triangleIndices) {
 			const edgeKeySet = new System.Set();
@@ -812,16 +983,7 @@ export class SkinnedModel extends Object {
 				edgeList.push(vertexIndex, vertexIndex + 1, vertexIndex + 1, vertexIndex + 2, vertexIndex + 2, vertexIndex);
 			}
 		}
-		const useUnsignedInt = vertexCount > 65535;
-		const wireframeIndices = useUnsignedInt ? new System.Uint32Array(edgeList) : new System.Uint16Array(edgeList);
-		const wireframeIndexBuffer = webGL2RenderingContext.createBuffer();
-		webGL2RenderingContext.bindVertexArray(null);
-		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, wireframeIndexBuffer);
-		webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, wireframeIndices, webGL2RenderingContext.STATIC_DRAW);
-		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, null);
-		drawable.wireframeIndexBuffer = wireframeIndexBuffer;
-		drawable.wireframeIndexCount = wireframeIndices.length;
-		drawable.wireframeIndexComponentType = useUnsignedInt ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
+		return edgeList;
 	}
 
 	//==============================================================================
@@ -834,7 +996,8 @@ export class SkinnedModel extends Object {
 	uploadMorphTargets(drawable) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const targetCount = drawable.morphTargetList.length;
-		if (targetCount === 0) {
+		const vertexCount = drawable.vertexCount;
+		if (targetCount === 0 || vertexCount === 0) {
 			if (drawable.morphTexture) {
 				webGL2RenderingContext.deleteTexture(drawable.morphTexture);
 				drawable.morphTexture = null;
@@ -842,13 +1005,42 @@ export class SkinnedModel extends Object {
 			drawable.isMorphDirty = false;
 			return;
 		}
-		const vertexCount = drawable.vertexCount;
-		const textureWidth = System.Math.min(vertexCount, MORPH_TEXTURE_WIDTH);
+		const morphTexelData = SkinnedModel.buildMorphTexelData(drawable.morphTargetList, vertexCount);
+		const textureWidth = morphTexelData.textureWidth;
+		const rowsPerTarget = morphTexelData.rowsPerTarget;
+		const textureHeight = rowsPerTarget * 2 * targetCount;
+		const texelData = morphTexelData.texelData;
+		if (!drawable.morphTexture) {
+			drawable.morphTexture = webGL2RenderingContext.createTexture();
+		}
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, drawable.morphTexture);
+		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA32F, textureWidth, textureHeight, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.FLOAT, texelData);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
+		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+		drawable.morphRowsPerTarget = rowsPerTarget;
+		drawable.morphTextureWidth = textureWidth;
+		drawable.isMorphDirty = false;
+	}
+
+	//==============================================================================
+	// 모프 텍셀 데이터 만들기. (정적, GL 무관, 텍스처 가로, 타깃당 행 수, RGBA 실수 배열)
+	//==============================================================================
+	/**
+	 * @param { object[] } morphTargetList
+	 * @param { number } vertexCount
+	 * @returns { { textureWidth: number, rowsPerTarget: number, texelData: Float32Array } }
+	 */
+	static buildMorphTexelData(morphTargetList, vertexCount) {
+		const targetCount = morphTargetList.length;
+		const textureWidth = System.Math.max(1, System.Math.min(vertexCount, MORPH_TEXTURE_WIDTH));
 		const rowsPerTarget = System.Math.ceil(vertexCount / textureWidth);
 		const textureHeight = rowsPerTarget * 2 * targetCount;
 		const texelData = new System.Float32Array(textureWidth * textureHeight * 4);
 		for (let targetIndex = 0; targetIndex < targetCount; ++targetIndex) {
-			const morphTarget = drawable.morphTargetList[targetIndex];
+			const morphTarget = morphTargetList[targetIndex];
 			const positionBlockOffset = targetIndex * 2 * rowsPerTarget * textureWidth;
 			const normalBlockOffset = positionBlockOffset + rowsPerTarget * textureWidth;
 			for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
@@ -864,19 +1056,7 @@ export class SkinnedModel extends Object {
 				}
 			}
 		}
-		if (!drawable.morphTexture) {
-			drawable.morphTexture = webGL2RenderingContext.createTexture();
-		}
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, drawable.morphTexture);
-		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA32F, textureWidth, textureHeight, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.FLOAT, texelData);
-		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
-		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
-		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
-		webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
-		drawable.morphRowsPerTarget = rowsPerTarget;
-		drawable.morphTextureWidth = textureWidth;
-		drawable.isMorphDirty = false;
+		return { textureWidth: textureWidth, rowsPerTarget: rowsPerTarget, texelData: texelData };
 	}
 
 	//==============================================================================
@@ -1009,18 +1189,20 @@ export class SkinnedModel extends Object {
 	 * @param { string } attributeName
 	 * @param { Float32Array } dataArray
 	 * @param { number } componentCount
+	 * @returns { WebGLBuffer | null } 지은 버퍼. (셰이더에 없는 어트리뷰트면 null)
 	 */
 	bindFloatAttribute(shaderProgram, attributeName, dataArray, componentCount) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const attributeLocation = shaderProgram.getAttributeLocation(attributeName);
 		if (attributeLocation < 0) {
-			return;
+			return null;
 		}
 		const glBuffer = webGL2RenderingContext.createBuffer();
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, glBuffer);
 		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, dataArray, webGL2RenderingContext.STATIC_DRAW);
 		webGL2RenderingContext.enableVertexAttribArray(attributeLocation);
 		webGL2RenderingContext.vertexAttribPointer(attributeLocation, componentCount, webGL2RenderingContext.FLOAT, false, 0, 0);
+		return glBuffer;
 	}
 
 	//==============================================================================
@@ -1031,18 +1213,20 @@ export class SkinnedModel extends Object {
 	 * @param { string } attributeName
 	 * @param { Uint16Array } dataArray
 	 * @param { number } componentCount
+	 * @returns { WebGLBuffer | null } 지은 버퍼. (셰이더에 없는 어트리뷰트면 null)
 	 */
 	bindIntegerAttribute(shaderProgram, attributeName, dataArray, componentCount) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const attributeLocation = shaderProgram.getAttributeLocation(attributeName);
 		if (attributeLocation < 0) {
-			return;
+			return null;
 		}
 		const glBuffer = webGL2RenderingContext.createBuffer();
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, glBuffer);
 		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, dataArray, webGL2RenderingContext.STATIC_DRAW);
 		webGL2RenderingContext.enableVertexAttribArray(attributeLocation);
 		webGL2RenderingContext.vertexAttribIPointer(attributeLocation, componentCount, webGL2RenderingContext.UNSIGNED_SHORT, 0, 0);
+		return glBuffer;
 	}
 
 	//==============================================================================
@@ -1226,10 +1410,14 @@ export class SkinnedModel extends Object {
 			}
 		}
 
-		// 5. 조인트 행렬. (월드 x 역바인드)
+		// 5. 조인트 행렬. (월드 x 역바인드, 본이 없는 조인트는 단위 행렬)
 		for (const skin of this.getSkinList()) {
 			for (let jointIndex = 0; jointIndex < skin.jointNodeIndices.length; ++jointIndex) {
 				const jointNode = nodeList[skin.jointNodeIndices[jointIndex]];
+				if (!jointNode) {
+					skin.jointMatrixArray.set(Matrix4.createIdentity().getElements(), jointIndex * 16);
+					continue;
+				}
 				const jointMatrix = jointNode.worldMatrix.clone();
 				jointMatrix.multiply(skin.inverseBindMatrices[jointIndex]);
 				const jointElements = jointMatrix.getElements();
@@ -1347,5 +1535,47 @@ export class SkinnedModel extends Object {
 	 */
 	getDrawableList() {
 		return this.#drawableList;
+	}
+
+	//==============================================================================
+	// 애니메이션 클립 목록 반환.
+	//==============================================================================
+	/**
+	 * @returns { object[] }
+	 */
+	getAnimationList() {
+		return this.#animationList;
+	}
+
+	//==============================================================================
+	// 파괴. (GL 리소스 해제, 버텍스 어레이, 버퍼, 모프 텍스처, 이 모델이 업로드에서 지은 머티리얼의 텍스처)
+	// - setMaterial 로 바깥에서 넣은 머티리얼은 지우지 않는다. 이 모델이 지은 머티리얼을 다른 모델에 넣어 썼다면 함께 지워진다.
+	//==============================================================================
+	destroy() {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		if (!webGL2RenderingContext) {
+			this.#drawableList = [];
+			return;
+		}
+		for (const drawable of this.#drawableList) {
+			webGL2RenderingContext.deleteVertexArray(drawable.vertexArray);
+			for (const vertexBuffer of drawable.vertexBufferList) {
+				webGL2RenderingContext.deleteBuffer(vertexBuffer);
+			}
+			if (drawable.indexBuffer) {
+				webGL2RenderingContext.deleteBuffer(drawable.indexBuffer);
+			}
+			if (drawable.wireframeIndexBuffer) {
+				webGL2RenderingContext.deleteBuffer(drawable.wireframeIndexBuffer);
+			}
+			if (drawable.morphTexture) {
+				webGL2RenderingContext.deleteTexture(drawable.morphTexture);
+			}
+		}
+		this.#drawableList = [];
+		for (const material of this.#ownedMaterialList) {
+			material.destroy();
+		}
+		this.#ownedMaterialList = [];
 	}
 }
