@@ -211,3 +211,5 @@ export { FixedStepper } from "./src/misc/fixedstepper.js";
 export { AssetLoader } from "./src/resource/assetloader.js";
 export { LoadingProgress } from "./src/misc/loadingprogress.js";
 export { BuildInfo } from "./src/misc/buildinfo.js";
+export { ToonScreenOutline, ToonOutlineWidthUnit, TOON_SCREEN_OUTLINE_MAXIMUM_SAMPLES, TOON_SCREEN_OUTLINE_MAXIMUM_CREASE_SAMPLES } from "./src/experimental/graphics/toon/toonscreenoutline.js";
+export { ToonVfx, ToonVfxSlot, ToonVfxLook, ToonVfxShape, ToonVfxDecalMode, TOON_VFX_MAXIMUM_RAMPS, TOON_VFX_DEFAULT_PARTICLE_CAPACITY } from "./src/experimental/graphics/toon/toonvfx.js";
