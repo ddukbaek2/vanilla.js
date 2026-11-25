@@ -4,6 +4,7 @@
 const System = globalThis;
 import { Graphic } from "../graphic.js";
 import { Component } from "../component.js";
+import { acquireSharedBake, releaseSharedBake } from "../graphic/sharedbakecache.js";
 
 
 //==============================================================================
@@ -94,10 +95,16 @@ export class SoftShade extends Component {
 		const shape = this.getShape();
 		const color = this.getColor();
 		const fadeRatioText = fadeRatio.toFixed(3);
-		const bakeKey = `${shape}|${color}|${opacity}|${fadeRatioText}|${bakeWidth}|${bakeHeight}`;
+		const bakeKey = `SoftShade|${shape}|${color}|${opacity}|${fadeRatioText}|${bakeWidth}|${bakeHeight}`;
 		if (bakeKey !== this.#bakeKey) {
+			// 같은 모양을 구운 것이 있으면 나눠 쓰고, 없으면 굽는다. (sharedbakecache.js)
+			releaseSharedBake(this.#bakeKey, this);
 			this.#bakeKey = bakeKey;
-			this.bakeShade(bakeWidth, bakeHeight, fadeRatio);
+			const bake = acquireSharedBake(bakeKey, this, () => {
+				this.bakeShade(bakeWidth, bakeHeight, fadeRatio);
+				return { canvas: this.getBakeCanvas() };
+			});
+			this.#bakeCanvas = bake.canvas;
 		}
 		const bakeCanvas = this.getBakeCanvas();
 		if (bakeCanvas === null) {
@@ -116,6 +123,20 @@ export class SoftShade extends Component {
 	 */
 	isDrawnInsideContent() {
 		return this.draw === SoftShade.prototype.draw;
+	}
+
+	//==============================================================================
+	// 노드에서 떨어짐. (나눠 쓰던 구운 그림을 놓는다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { ComponentNode } node
+	 */
+	detach(node) {
+		releaseSharedBake(this.#bakeKey, this);
+		this.#bakeKey = "";
+		this.#bakeCanvas = null;
+		super.detach(node);
 	}
 
 	//==============================================================================
