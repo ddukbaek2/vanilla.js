@@ -12,6 +12,7 @@ export class Identifier extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
+	/** @private @type { number } */ #initialSerialNumber; // 처음 값.
 	/** @private @type { number } */ #serialNumber; // 누적.
 	/** @private @type { number } */ #increaseNumber; // 증가.
 
@@ -24,15 +25,16 @@ export class Identifier extends Object {
 	 */
 	constructor(initialSerialNumber = 0, initialIncreaseNumber = 1) {
 		super();
+		this.#initialSerialNumber = initialSerialNumber;
 		this.#serialNumber = initialSerialNumber;
 		this.#increaseNumber = initialIncreaseNumber;
 	}
 
 	//==============================================================================
-	// 초기 상태로 되돌림.
+	// 초기 상태로 되돌림. (처음 값부터 다시 센다)
 	//==============================================================================
 	reset() {
-		this.#serialNumber = this.#serialNumber;
+		this.#serialNumber = this.#initialSerialNumber;
 	}
 
 	//==============================================================================

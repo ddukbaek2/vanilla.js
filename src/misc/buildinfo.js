@@ -16,7 +16,7 @@ const DEFAULT_VERSION_JSON_PATH = "./version.json";
 //   1. 페이지 머리의 <meta name="build-version" content="..."> 의 content. (있으면 그 글 그대로)
 //   2. 없으면 version.json 을 캐시 없이(cache: "no-cache") 받는다. 새 판을 올려도 옛 판 표시가 남지 않게 한다.
 //      { version, date, time, hash, ... } 꼴이고, 글은 "날짜 시각 (해시)" 이다. 해시가 없으면 version, 그것도 없으면 빈 글.
-// - 읽지 못하면(파일이 없는 개발 실행 같은 것) 예외 없이 빈 글이다.
+// - 읽지 못하면(파일이 없는 개발 실행 같은 것) 예외 없이 빈 글이다. setPackageVersion 으로 넣은 판이 있으면 그 글이다.
 // - 게임마다 판을 쓰는 꼴이 다르면 readVersionData() 로 받은 값을 게임이 엮는다.
 //==============================================================================
 export class BuildInfo extends Object {
@@ -28,6 +28,7 @@ export class BuildInfo extends Object {
 	/** @private @type { string } */ #text;
 	/** @private @type { object | null } */ #versionData;
 	/** @private @type { boolean } */ #isLoaded;
+	/** @private @type { string } */ #packageVersion; // meta 도 version.json 도 없을 때의 판.
 
 	//==============================================================================
 	// 생성.
@@ -43,6 +44,7 @@ export class BuildInfo extends Object {
 		this.#text = "";
 		this.#versionData = null;
 		this.#isLoaded = false;
+		this.#packageVersion = "";
 	}
 
 	//==============================================================================
@@ -98,7 +100,7 @@ export class BuildInfo extends Object {
 			}
 		}
 		this.#isLoaded = true;
-		return this.#text;
+		return this.readText();
 	}
 
 	//==============================================================================
@@ -121,13 +123,36 @@ export class BuildInfo extends Object {
 	}
 
 	//==============================================================================
-	// 판의 글. (load 전이거나 읽지 못했으면 빈 글)
+	// 빌드 때 넣은 판 설정. (meta 도 version.json 도 없을 때의 글, 번들러가 넣은 판 등)
+	//==============================================================================
+	/**
+	 * @param { string } packageVersion
+	 */
+	setPackageVersion(packageVersion) {
+		this.#packageVersion = packageVersion;
+	}
+
+	//==============================================================================
+	// 빌드 때 넣은 판 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getPackageVersion() {
+		return this.#packageVersion;
+	}
+
+	//==============================================================================
+	// 판의 글. (meta > version.json > 빌드 때 넣은 판, 다 없으면 빈 글)
 	//==============================================================================
 	/**
 	 * @returns { string }
 	 */
 	readText() {
-		return this.#text;
+		if (this.#text !== "") {
+			return this.#text;
+		}
+		return this.getPackageVersion();
 	}
 
 	//==============================================================================
