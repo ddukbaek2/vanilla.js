@@ -283,16 +283,23 @@ export class UIButton extends UIControl {
 		const node = this.getNode();
 		const isInsideBounds = node.contains(viewInputPosition);
 		if (isInsideBounds && !this.#hasLongPressFired) {
-			const clickedEvent = this.getClickedEvent();
-			if (clickedEvent) {
-				clickedEvent(this);
-			}
-			const clickEvent = this.getClickEvent();
-			if (clickEvent) {
-				clickEvent(this);
-			}
+			this.fireClickEvents();
 		}
 		this.setButtonState(ButtonState.normal);
+	}
+
+	//==============================================================================
+	// 클릭 알림만 부르기. (누르지 않고 클릭이 난 것처럼 clicked, click 차례로, UIHitArea 가 넓힌 자리의 클릭을 넘길 때)
+	//==============================================================================
+	fireClickEvents() {
+		const clickedEvent = this.getClickedEvent();
+		if (clickedEvent) {
+			clickedEvent(this);
+		}
+		const clickEvent = this.getClickEvent();
+		if (clickEvent) {
+			clickEvent(this);
+		}
 	}
 
 	//==============================================================================

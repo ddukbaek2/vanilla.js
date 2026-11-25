@@ -83,9 +83,26 @@ export class UILineChart extends Component {
 			graphic.drawLine([Vector2.create(0, gridY), Vector2.create(width, gridY)], 1);
 		}
 
+		const points = this.calculatePoints(width, height);
+		if (points.length < 2) {
+			return;
+		}
+		graphic.setStrokeColor(this.#lineColor.toRGBAString());
+		graphic.drawLine(points, this.#lineWidth);
+	}
+
+	//==============================================================================
+	// 폴리라인 점 계산. (그리기와 같은 자리, 표본이 둘보다 적으면 빈 목록)
+	//==============================================================================
+	/**
+	 * @param { number } width
+	 * @param { number } height
+	 * @returns { Vector2[] }
+	 */
+	calculatePoints(width, height) {
 		const sampleCount = this.#valueList.length;
 		if (sampleCount < 2) {
-			return;
+			return [];
 		}
 
 		// 값 범위.
@@ -114,8 +131,7 @@ export class UILineChart extends Component {
 			const valueRatio = (this.#valueList[sampleIndex] - lowValue) / valueRange;
 			points.push(Vector2.create(ratio * width, height - valueRatio * (height - 4) - 2));
 		}
-		graphic.setStrokeColor(this.#lineColor.toRGBAString());
-		graphic.drawLine(points, this.#lineWidth);
+		return points;
 	}
 
 	//==============================================================================
@@ -204,15 +220,29 @@ export class UIBarChart extends Component {
 	 * @param { Graphic } graphic
 	 */
 	draw(graphic) {
-		const barCount = this.#valueList.length;
-		if (barCount === 0) {
-			return;
-		}
 		const node = this.getNode();
 		const contentSize = node.getContentSize();
-		const width = contentSize.x;
-		const height = contentSize.y;
+		const barRects = this.calculateBarRects(contentSize.x, contentSize.y);
+		for (let barIndex = 0; barIndex < barRects.length; ++barIndex) {
+			const barColor = (barIndex === this.#highlightIndex) ? this.#highlightColor : this.#barColor;
+			graphic.setFillColor(barColor.toRGBAString());
+			graphic.drawRect(barRects[barIndex]);
+		}
+	}
 
+	//==============================================================================
+	// 막대 사각형 목록 계산. (그리기와 같은 자리)
+	//==============================================================================
+	/**
+	 * @param { number } width
+	 * @param { number } height
+	 * @returns { Rect[] }
+	 */
+	calculateBarRects(width, height) {
+		const barCount = this.#valueList.length;
+		if (barCount === 0) {
+			return [];
+		}
 		let highValue = this.#maxValue;
 		if (highValue === null) {
 			highValue = 0.0001;
@@ -222,14 +252,14 @@ export class UIBarChart extends Component {
 		}
 
 		const barWidth = (width - this.#barGap * (barCount - 1)) / barCount;
+		const barRects = [];
 		for (let barIndex = 0; barIndex < barCount; ++barIndex) {
 			const valueRatio = System.Math.max(0, System.Math.min(1, this.#valueList[barIndex] / highValue));
 			const barHeight = System.Math.max(1, valueRatio * height);
 			const barX = barIndex * (barWidth + this.#barGap);
-			const barColor = (barIndex === this.#highlightIndex) ? this.#highlightColor : this.#barColor;
-			graphic.setFillColor(barColor.toRGBAString());
-			graphic.drawRect(Rect.create(barX, height - barHeight, barWidth, barHeight));
+			barRects.push(Rect.create(barX, height - barHeight, barWidth, barHeight));
 		}
+		return barRects;
 	}
 
 	//==============================================================================

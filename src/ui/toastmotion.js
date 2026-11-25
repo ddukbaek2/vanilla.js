@@ -24,7 +24,7 @@ const LONG_TEXT_EXTRA_SECONDS = 0.5;
 const MAXIMUM_STAY_SECONDS = 4;
 
 // 알림의 단계.
-const ToastPhase = System.Object.freeze({
+export const ToastPhase = System.Object.freeze({
 	hidden: "hidden",
 	enter: "enter",
 	stay: "stay",
@@ -129,6 +129,16 @@ export class ToastMotion extends Component {
 	 */
 	isShowing() {
 		return this.#phase !== ToastPhase.hidden;
+	}
+
+	//==============================================================================
+	// 단계 반환. (ToastPhase)
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getPhase() {
+		return this.#phase;
 	}
 
 	//==============================================================================

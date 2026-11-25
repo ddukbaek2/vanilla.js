@@ -13969,6 +13969,29 @@ void main() {
       this.#axis = axis;
     }
     //==============================================================================
+    // 축 반환.
+    //==============================================================================
+    /**
+     * @returns { string }
+     */
+    getAxis() {
+      return this.#axis;
+    }
+    //==============================================================================
+    // 지금 썸 사각형. (스크롤바 노드 영역 안, 썸이 꺼져 있으면 null)
+    //==============================================================================
+    /**
+     * @returns { Rect | null }
+     */
+    getThumbRect() {
+      if (!this.#thumbNode.isActive()) {
+        return null;
+      }
+      const thumbPosition = this.#thumbNode.getLocalPosition();
+      const thumbSize = this.#thumbNode.getContentSize();
+      return Rect.create(thumbPosition.x, thumbPosition.y, thumbSize.x, thumbSize.y);
+    }
+    //==============================================================================
     // 트랙 색 설정.
     //==============================================================================
     setTrackColor(color) {
@@ -19446,6 +19469,18 @@ void main() {
       }
     }
     //==============================================================================
+    // 색상 반환. (스프라이트 틴트, 스프라이트가 없으면 null)
+    //==============================================================================
+    /**
+     * @returns { Color | null }
+     */
+    getColor() {
+      if (this.#sprite) {
+        return this.#sprite.getColor();
+      }
+      return null;
+    }
+    //==============================================================================
     // 가로 플립 설정.
     //==============================================================================
     /**
@@ -19779,6 +19814,18 @@ void main() {
       }
     }
     //==============================================================================
+    // 줄바꿈 방식 반환. ("word" | "char", 글이 없으면 "word")
+    //==============================================================================
+    /**
+     * @returns { string }
+     */
+    getWrapMode() {
+      if (this.#text) {
+        return this.#text.getWrapMode();
+      }
+      return "word";
+    }
+    //==============================================================================
     // 줄 간격 배율 설정.
     //==============================================================================
     /**
@@ -19800,6 +19847,18 @@ void main() {
       if (this.#text) {
         this.#text.setVisibleCharacterCount(visibleCharacterCount);
       }
+    }
+    //==============================================================================
+    // 표시 글자 수 반환. (-1 이면 전체)
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    getVisibleCharacterCount() {
+      if (this.#text) {
+        return this.#text.getVisibleCharacterCount();
+      }
+      return -1;
     }
     setFont(font) {
       if (this.#text) {
@@ -20341,16 +20400,22 @@ void main() {
       const node = this.getNode();
       const isInsideBounds = node.contains(viewInputPosition);
       if (isInsideBounds && !this.#hasLongPressFired) {
-        const clickedEvent = this.getClickedEvent();
-        if (clickedEvent) {
-          clickedEvent(this);
-        }
-        const clickEvent = this.getClickEvent();
-        if (clickEvent) {
-          clickEvent(this);
-        }
+        this.fireClickEvents();
       }
       this.setButtonState(ButtonState.normal);
+    }
+    //==============================================================================
+    // 클릭 알림만 부르기. (누르지 않고 클릭이 난 것처럼 clicked, click 차례로, UIHitArea 가 넓힌 자리의 클릭을 넘길 때)
+    //==============================================================================
+    fireClickEvents() {
+      const clickedEvent = this.getClickedEvent();
+      if (clickedEvent) {
+        clickedEvent(this);
+      }
+      const clickEvent = this.getClickEvent();
+      if (clickEvent) {
+        clickEvent(this);
+      }
     }
     //==============================================================================
     // 터치 취소. (TouchRaycaster → WorldNode → Button)

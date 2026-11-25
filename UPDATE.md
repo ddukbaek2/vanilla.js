@@ -162,6 +162,21 @@
 - Timeline: 같은 이름 무대 노드를 버리던 버그(모두 붙이고 이름 표에는 뒤의 것), 부모가 자기 자신이거나 고리면 무대 부모에 붙인다. Timeline.loadFromText, createFromJsonAsset
 - Indicator: getRadius, getRotation, buildTeethSegments, import.js 에서 내보낸다. Visual.getLocation 의 쓰지 않는 인자를 뺐다. VisualAsset setVisual, getVisual
 - 예제 cameratour: 돌아가는 Camera2D(끌면 팬, 휠 줌), Tween.createNodeTween, Indicator
+- UI 갈래: 러스트 vanilla-engine 과 UI 기능 차이를 없앤다. 러스트에만 있던 범용 기능을 넣는다
+- UIButton.fireClickEvents(): 누르지 않고 클릭이 난 것처럼 clicked, click 알림을 차례로 부른다. UIHitArea 가 넓힌 자리의 클릭을 넘길 때 이것을 쓴다
+- UILineChart.calculatePoints(width, height), UIBarChart.calculateBarRects(width, height): 그리기와 같은 자리의 폴리라인 점과 막대 사각형을 셈한다. draw 가 이것을 쓴다
+- UISpinner: calculateDotOpacity(dotIndex), getDotColor, getRotationSpeed, getDotNodes
+- UIScrollBar: getAxis, getThumbRect (썸이 꺼져 있으면 null)
+- ToastMotion.getPhase(), ToastPhase 를 내보낸다. PopupMotion.isInstantEnabled(). UIImageView.getColor()
+- UILabel: getWrapMode, getVisibleCharacterCount. UIInputField: getPlaceholder, getMaxLength, getFontSize, getPadding, getBackgroundColor, getRoundSize, getTextColor, getPlaceholderColor, getCursorColor, getCursorIndex, getSelectionStart, getComposition, isComposing
+- UIWindow: setDimColor, setPanelColor (어둠과 판의 Paint 색)
+- UIListView: setCreateItemEvent(() => WorldNode) 로 템플릿 대신 항목 노드를 만드는 함수를 받는다. 항목 크기를 정하지 않았으면 처음 만든 항목의 크기를 읽는다. isHorizontal()
+- TouchRecognizer: getTouchTarget (드래그를 넘겼으면 스크롤 뷰 노드), isTouching
+- GameScene: setSafeAreaInsets({ top, right, bottom, left }) 로 세이프 에어리어 인셋을 CSS 픽셀로 직접 정한다. (null 이면 뷰 매니저의 값, 게임 영역 기준도 이 값을 쓴다) 정적 calculateSafeAreaRect(viewSize, targetResolutionScale, insets). setPlayInputEnabled(true) 로 놀이 입력을 모아 두고 takePlayInputs() 로 { kind, position, wheelDelta } 를 꺼낸다. (처리기와 함께 써도 된다) setLoadingOutsideColor, hasLoadingDrawer, isLoadTouchedToSkip, getDevTools
+- WebSocketClient: 수신 콜백이 없으면 받은 JSON 을 모아 두었다가(1024 개, 넘치면 오래된 것부터 버린다) takeReceivedMessages() 로 꺼낸다. getReceiveEvent 가 웹소켓을 돌려주던 버그를 고쳐 수신 콜백을 돌려준다
+- UIScene: EngineConfiguration.useDevTools 가 꺼져 있으면 GameScene 처럼 개발자 도구를 만들지 않는다. (지금까지는 늘 만들었다)
+- 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
+
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.

@@ -208,14 +208,7 @@ export class UIHitArea extends Component {
 
 		// 단추의 클릭 알림을 단추가 받은 것처럼 부른다.
 		hitButton.setClickedEvent(() => {
-			const clickedEvent = targetButton.getClickedEvent();
-			if (clickedEvent) {
-				clickedEvent(targetButton);
-			}
-			const clickEvent = targetButton.getClickEvent();
-			if (clickEvent) {
-				clickEvent(targetButton);
-			}
+			targetButton.fireClickEvents();
 		});
 		const hitArea = hitNode.addComponent(UIHitArea);
 		hitArea.setTarget(buttonNode, targetButton);

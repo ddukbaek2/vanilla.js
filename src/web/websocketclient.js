@@ -6,7 +6,14 @@ import { Object } from "../base/object.js";
 
 
 //==============================================================================
+// 받은 메시지를 모아 두는 수 한도. (수신 콜백이 없을 때, 넘치면 오래된 것부터 버린다)
+//==============================================================================
+const RECEIVED_MESSAGE_LIMIT = 1024;
+
+
+//==============================================================================
 // 웹소켓 통신 처리기.
+// - 받은 JSON 은 수신 콜백이 있으면 그것을 부르고, 없으면 모아 두었다가 takeReceivedMessages 로 꺼낸다. (매 프레임 꺼내 쓰는 게임용)
 //==============================================================================
 export class WebSocketClient extends Object {
 	//==============================================================================
@@ -15,6 +22,7 @@ export class WebSocketClient extends Object {
 	/** @private @type { WebSocket | null } */ #webSocket = null;
 	/** @private @type { boolean } */ #isConnected = false;
 	/** @private @type { Function | null } */ #receiveEvent = null;
+	/** @private @type { object[] } */ #receivedMessages = [];
 
 	//==============================================================================
 	// 생성.
@@ -28,6 +36,7 @@ export class WebSocketClient extends Object {
 		this.#webSocket = null;
 		this.#isConnected = false;
 		this.#receiveEvent = null;
+		this.#receivedMessages = [];
 	}
 
 	//==============================================================================
@@ -58,14 +67,18 @@ export class WebSocketClient extends Object {
 		};
 
 		webSocket.onmessage = (messageEvent) => {
-			if (this.#receiveEvent === null) {
-				return;
-			}
-			
 			try {
 				const text = messageEvent.data;
 				const obj = System.JSON.parse(text);
-				this.#receiveEvent(obj);
+				if (this.#receiveEvent !== null) {
+					this.#receiveEvent(obj);
+				}
+				else {
+					this.#receivedMessages.push(obj);
+					if (this.#receivedMessages.length > RECEIVED_MESSAGE_LIMIT) {
+						this.#receivedMessages.shift();
+					}
+				}
 			}
 			catch (error) {
 				console.error(error);
@@ -145,6 +158,18 @@ export class WebSocketClient extends Object {
 	 * @returns { Function | null }
 	 */
 	getReceiveEvent() {
-		return this.#webSocket;
+		return this.#receiveEvent;
+	}
+
+	//==============================================================================
+	// 모아 둔 받은 메시지 꺼내기. (온 차례대로, 꺼내면 비운다)
+	//==============================================================================
+	/**
+	 * @returns { object[] }
+	 */
+	takeReceivedMessages() {
+		const receivedMessages = this.#receivedMessages;
+		this.#receivedMessages = [];
+		return receivedMessages;
 	}
 }

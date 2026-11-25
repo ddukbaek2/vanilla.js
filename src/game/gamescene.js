@@ -29,6 +29,8 @@ import { LoadingProgress } from "../misc/loadingprogress.js";
 // - 캔버스 배경 클리어.
 // - 화면 페이드 (fadeScreen, 어두운 동안 입력을 막음).
 // - UI 누름 판정 (isUserInterfaceAt) 과 UI 가 받지 않은 입력만 놀이로 넘기기 (setPlayInputHandler, 게임 영역 좌표).
+//   처리기 대신 모아 두고 꺼내 쓸 수도 있다. (setPlayInputEnabled, takePlayInputs)
+// - 세이프 에어리어 인셋을 직접 정할 수 있다. (setSafeAreaInsets, CSS 픽셀. 정하지 않으면 뷰 매니저의 값)
 // - 세이프에어리어를 뺀 게임 영역의 고정 쪽 길이를 늘 같게 (setPlayAreaReference).
 //
 // 서브클래스 hook:
@@ -68,6 +70,9 @@ export class GameScene extends Scene {
 	/** @private @type { number } */ #screenFadeSeconds; // 어두워지는 시간과 밝아지는 시간. (초)
 	/** @private @type { object | null } */ #playInputHandler; // { press, move, release, wheel } (UI 가 받지 않은 입력, 게임 영역 좌표)
 	/** @private @type { boolean } */ #isPlayPressActive; // 지금 누름이 놀이로 갔는지.
+	/** @private @type { boolean } */ #isPlayInputEnabled; // 놀이 입력을 모아 두는지. (takePlayInputs 로 꺼낸다)
+	/** @private @type { Array<{ kind: string, position: Vector2, wheelDelta: Vector2 | null }> } */ #playInputs;
+	/** @private @type { { top: number, right: number, bottom: number, left: number } | null } */ #safeAreaInsetsOverride; // 직접 정한 세이프 에어리어 인셋. (CSS 픽셀)
 	/** @private @type { number } */ #playAreaFixedLength; // 게임 영역의 고정 쪽 길이. (0 이면 쓰지 않음)
 	/** @private @type { boolean } */ #isPlayAreaLandscape; // 고정 쪽이 가로인지. (아니면 세로)
 
@@ -99,6 +104,9 @@ export class GameScene extends Scene {
 		this.#screenFadeSeconds = 0.35;
 		this.#playInputHandler = null;
 		this.#isPlayPressActive = false;
+		this.#isPlayInputEnabled = false;
+		this.#playInputs = [];
+		this.#safeAreaInsetsOverride = null;
 		this.#playAreaFixedLength = 0;
 		this.#isPlayAreaLandscape = false;
 	}
@@ -188,6 +196,80 @@ export class GameScene extends Scene {
 		this.#loadingBarBackColor = barBackColor;
 		this.#loadingBarFillColor = barFillColor;
 		this.#loadingOutsideColor = outsideColor;
+	}
+
+	//==============================================================================
+	// 로딩 화면 뷰 바깥(캔버스 나머지)의 색 설정. (setLoadingColors 의 넷째 값만 바꾼다)
+	//==============================================================================
+	/**
+	 * @param { Color | string } outsideColor
+	 */
+	setLoadingOutsideColor(outsideColor) {
+		this.#loadingOutsideColor = outsideColor;
+	}
+
+	//==============================================================================
+	// 로딩 화면 그리기 함수가 있는지.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	hasLoadingDrawer() {
+		return this.#loadingDrawer !== null;
+	}
+
+	//==============================================================================
+	// 로딩 화면을 눌러 건너뛰었는지.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isLoadTouchedToSkip() {
+		return this.#loadTouchedToSkip;
+	}
+
+	//==============================================================================
+	// 개발자 도구 반환. (initialize 전이거나 EngineConfiguration.useDevTools 가 꺼져 있으면 null)
+	//==============================================================================
+	/**
+	 * @returns { DEVTools | null }
+	 */
+	getDevTools() {
+		return this.#devtools ?? null;
+	}
+
+	//==============================================================================
+	// 세이프 에어리어 인셋 직접 설정. (CSS 픽셀 { top, right, bottom, left }, null 이면 뷰 매니저의 getSafeAreaInsets 를 읽는다)
+	//==============================================================================
+	/**
+	 * @param { { top: number, right: number, bottom: number, left: number } | null } insets
+	 */
+	setSafeAreaInsets(insets) {
+		if (insets === null || insets === undefined) {
+			this.#safeAreaInsetsOverride = null;
+			return;
+		}
+		this.#safeAreaInsetsOverride = { top: insets.top, right: insets.right, bottom: insets.bottom, left: insets.left };
+	}
+
+	//==============================================================================
+	// 세이프 에어리어 계산. (정적, CSS 픽셀 인셋을 뷰 배율로 나눠 뷰 영역에서 뺀다)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewSize
+	 * @param { number } targetResolutionScale
+	 * @param { { top: number, right: number, bottom: number, left: number } } insets CSS 픽셀.
+	 * @returns { Rect }
+	 */
+	static calculateSafeAreaRect(viewSize, targetResolutionScale, insets) {
+		const scale = targetResolutionScale > 0 ? targetResolutionScale : 1;
+		const insetTop = insets.top / scale;
+		const insetRight = insets.right / scale;
+		const insetBottom = insets.bottom / scale;
+		const insetLeft = insets.left / scale;
+		const width = System.Math.max(viewSize.x - insetLeft - insetRight, 0);
+		const height = System.Math.max(viewSize.y - insetTop - insetBottom, 0);
+		return Rect.create(insetLeft, insetTop, width, height);
 	}
 
 	//==============================================================================
@@ -468,7 +550,6 @@ export class GameScene extends Scene {
 		const engine = this.getEngine();
 		const viewManager = engine.getViewManager();
 		const viewSize = viewManager.getViewSize();
-		const safeAreaInsets = viewManager.getSafeAreaInsets();
 
 		// 게임 영역 기준을 쓰면 올림한 뷰 크기 대신 캔버스를 배율로 나눈 실제 크기로 셈해 고정 쪽이 딱 맞게 한다.
 		let viewWidth = viewSize.x;
@@ -481,6 +562,11 @@ export class GameScene extends Scene {
 			viewHeight = canvasNativeSize.y / viewScale;
 		}
 
+		// 직접 정한 인셋은 CSS 픽셀이라 뷰 배율로 나눈다.
+		if (this.#safeAreaInsetsOverride !== null) {
+			return GameScene.calculateSafeAreaRect(Vector2.create(viewWidth, viewHeight), viewManager.getTargetResolutionScale(), this.#safeAreaInsetsOverride);
+		}
+		const safeAreaInsets = viewManager.getSafeAreaInsets();
 		const x = safeAreaInsets.left;
 		const y = safeAreaInsets.top;
 		const width = System.Math.max(viewWidth - safeAreaInsets.left - safeAreaInsets.right, 0);
@@ -548,7 +634,7 @@ export class GameScene extends Scene {
 		// UI 판정은 누름을 넘기기 전에 한다. (누른 단추가 창을 띄워도 이 누름은 놀이로 가지 않게)
 		const isUserInterfacePressed = this.isUserInterfaceAt(viewInputPosition);
 		this.#touchRaycaster.touchPress(viewInputPosition);
-		if (isUserInterfacePressed || this.#playInputHandler === null) {
+		if (isUserInterfacePressed || (this.#playInputHandler === null && !this.#isPlayInputEnabled)) {
 			return;
 		}
 		this.#isPlayPressActive = true;
@@ -833,6 +919,32 @@ export class GameScene extends Scene {
 	}
 
 	//==============================================================================
+	// 놀이 입력 모으기 켜기. (처리기 대신 모아 두었다가 takePlayInputs 로 꺼낸다, 끄면 모은 것을 버린다)
+	//==============================================================================
+	/**
+	 * @param { boolean } isPlayInputEnabled
+	 */
+	setPlayInputEnabled(isPlayInputEnabled) {
+		this.#isPlayInputEnabled = isPlayInputEnabled;
+		this.#isPlayPressActive = false;
+		if (!isPlayInputEnabled) {
+			this.#playInputs = [];
+		}
+	}
+
+	//==============================================================================
+	// 모은 놀이 입력 꺼내기. (온 차례대로 { kind, position, wheelDelta }, 꺼내면 비운다)
+	//==============================================================================
+	/**
+	 * @returns { Array<{ kind: string, position: Vector2, wheelDelta: Vector2 | null }> }
+	 */
+	takePlayInputs() {
+		const playInputs = this.#playInputs;
+		this.#playInputs = [];
+		return playInputs;
+	}
+
+	//==============================================================================
 	// 뷰 좌표 → 게임 영역 좌표. (세이프에어리어 왼쪽 위가 0, 0)
 	//==============================================================================
 	/**
@@ -856,11 +968,14 @@ export class GameScene extends Scene {
 	 * @param { Vector2 | null } wheelDelta
 	 */
 	dispatchPlayInput(kind, viewPosition, wheelDelta) {
+		const playAreaPosition = this.convertViewToPlayArea(viewPosition);
+		if (this.#isPlayInputEnabled) {
+			this.#playInputs.push({ kind: kind, position: playAreaPosition, wheelDelta: wheelDelta });
+		}
 		const playInputHandler = this.#playInputHandler;
 		if (playInputHandler === null || typeof playInputHandler[kind] !== "function") {
 			return;
 		}
-		const playAreaPosition = this.convertViewToPlayArea(viewPosition);
 		playInputHandler[kind](playAreaPosition, wheelDelta);
 	}
 
@@ -924,10 +1039,11 @@ export class GameScene extends Scene {
 		if (canvasNativeSize.x <= 0 || canvasNativeSize.y <= 0) {
 			return;
 		}
-		// 인셋은 지금 배율로 나눈 뷰 좌표로 나온다. 배율을 곱해 캔버스 단위로 되돌린다.
-		const safeAreaInsets = viewManager.getSafeAreaInsets();
+		// 인셋은 지금 배율로 나눈 뷰 좌표로 나온다. 배율을 곱해 캔버스 단위로 되돌린다. (직접 정한 인셋은 CSS 픽셀 그대로라 배율 1)
+		const isInsetsOverridden = this.#safeAreaInsetsOverride !== null;
+		const safeAreaInsets = isInsetsOverridden ? this.#safeAreaInsetsOverride : viewManager.getSafeAreaInsets();
 		const targetResolutionScale = viewManager.getTargetResolutionScale();
-		const insetScale = targetResolutionScale > 0 ? targetResolutionScale : 1;
+		const insetScale = isInsetsOverridden ? 1 : (targetResolutionScale > 0 ? targetResolutionScale : 1);
 		const isLandscape = this.#isPlayAreaLandscape;
 		const referenceLength = GameScene.calculatePlayAreaReferenceLength(fixedLength, isLandscape, canvasNativeSize, safeAreaInsets, insetScale);
 		if (referenceLength <= 0) {

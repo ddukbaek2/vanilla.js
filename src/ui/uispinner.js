@@ -80,14 +80,55 @@ export class UISpinner extends WorldNode {
 		super.tick(timeDelta);
 		this.#phase += timeDelta * this.#rotationSpeed;
 		for (let dotIndex = 0; dotIndex < this.#dotNodeList.length; ++dotIndex) {
-			const orderRatio = dotIndex / this.#dotCount;
-			let tailRatio = (orderRatio - this.#phase) % 1;
-			if (tailRatio < 0) {
-				tailRatio += 1;
-			}
-			const dotOpacity = 0.15 + 0.85 * (1 - tailRatio);
+			const dotOpacity = this.calculateDotOpacity(dotIndex);
 			this.#dotNodeList[dotIndex].setLocalOpacity(dotOpacity);
 		}
+	}
+
+	//==============================================================================
+	// 점 투명도 계산. (점 순서 비율에서 위상을 뺀 꼬리 비율이 작을수록 밝다)
+	//==============================================================================
+	/**
+	 * @param { number } dotIndex
+	 * @returns { number }
+	 */
+	calculateDotOpacity(dotIndex) {
+		const orderRatio = dotIndex / this.#dotCount;
+		let tailRatio = (orderRatio - this.#phase) % 1;
+		if (tailRatio < 0) {
+			tailRatio += 1;
+		}
+		return 0.15 + 0.85 * (1 - tailRatio);
+	}
+
+	//==============================================================================
+	// 점 색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color }
+	 */
+	getDotColor() {
+		return this.#dotColor;
+	}
+
+	//==============================================================================
+	// 회전 속도 반환. (초당 바퀴 수)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getRotationSpeed() {
+		return this.#rotationSpeed;
+	}
+
+	//==============================================================================
+	// 점 노드 목록 반환.
+	//==============================================================================
+	/**
+	 * @returns { WorldNode[] }
+	 */
+	getDotNodes() {
+		return this.#dotNodeList.slice();
 	}
 
 	//==============================================================================
