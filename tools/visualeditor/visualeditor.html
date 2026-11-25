@@ -7513,6 +7513,9 @@ void main() {
     /** @private @type { HTMLElement | null } */
     #safeAreaProbeElement;
     // env() 측정용 숨은 요소.
+    /** @private @type { string[] } */
+    #ignoredSafeAreaSides;
+    // 무시할 세이프에어리어 쪽. ("top", "right", "bottom", "left")
     /** @private @type { Vector2 } */
     #clientNativeSize;
     // 웹페이지 전체 영역.
@@ -7550,6 +7553,7 @@ void main() {
       this.#maxRenderPixelRatio = 0;
       this.#safeAreaOverride = null;
       this.#safeAreaProbeElement = null;
+      this.#ignoredSafeAreaSides = [];
       this.#clientNativeSize = Vector2.zero();
       this.#canvasNativeSize = Vector2.zero();
       this.#canvasPixelSize = Vector2.zero();
@@ -7990,12 +7994,38 @@ void main() {
       }
       const targetResolutionScale = this.getTargetResolutionScale();
       const scale = targetResolutionScale > 0 ? 1 / targetResolutionScale : 1;
-      return {
+      const insets = {
         top: cssInsets.top * scale,
         right: cssInsets.right * scale,
         bottom: cssInsets.bottom * scale,
         left: cssInsets.left * scale
       };
+      const ignoredSafeAreaSides = this.getIgnoredSafeAreaSides();
+      for (const side of ignoredSafeAreaSides) {
+        if (side in insets) {
+          insets[side] = 0;
+        }
+      }
+      return insets;
+    }
+    //==============================================================================
+    // 무시할 세이프에어리어 쪽 설정. (getSafeAreaInsets 가 그 쪽을 0 으로 돌려준다, 빈 목록이면 모두 쓴다)
+    // - 플랫폼의 앱이 그 쪽을 이미 비켜 그리는 웹뷰처럼, 어느 쪽을 무시할지는 게임이 정해 넘긴다.
+    //==============================================================================
+    /**
+     * @param { string[] } sides "top", "right", "bottom", "left" 가운데.
+     */
+    setIgnoredSafeAreaSides(sides) {
+      this.#ignoredSafeAreaSides = sides ? sides.slice() : [];
+    }
+    //==============================================================================
+    // 무시할 세이프에어리어 쪽 반환.
+    //==============================================================================
+    /**
+     * @returns { string[] }
+     */
+    getIgnoredSafeAreaSides() {
+      return this.#ignoredSafeAreaSides;
     }
     //==============================================================================
     // URL 쿼리에서 세이프에어리어 읽기. (?safeArea=44,0,34,0)
@@ -23064,6 +23094,15 @@ void main() {
     stay: "stay",
     exit: "exit"
   });
+
+  // src/ui/uiwindow.js
+  var DEFAULT_PANEL_COLOR = new Color(0.13, 0.15, 0.2, 1);
+  var DEFAULT_DIM_COLOR = new Color(0, 0, 0, 0.55);
+
+  // src/ui/uiconfirmwindow.js
+  var CONFIRM_TEXT_COLOR = new Color(0.96, 0.97, 1, 1);
+  var CONFIRM_CANCEL_COLOR = new Color(0.22, 0.25, 0.32, 1);
+  var CONFIRM_ACCENT_COLOR = new Color(0.23, 0.51, 0.96, 1);
 
   // tools/visualeditor/editorstyle.js
   var EDITOR_STYLE_TEXT = `
