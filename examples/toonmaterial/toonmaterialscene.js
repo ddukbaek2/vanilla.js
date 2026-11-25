@@ -44,7 +44,6 @@ export const ROCK_VERTEX_CHUNK = `void applyVertex(inout ToonVertex vertex) {
 	float scaleAcross = instanceShape.z;
 	float scaleUp = instanceShape.w;
 	vertex.modelMatrix = mat4(vec4(instanceShape.x * scaleAcross, 0.0, -instanceShape.y * scaleAcross, 0.0), vec4(0.0, scaleUp, 0.0, 0.0), vec4(instanceShape.y * scaleAcross, 0.0, instanceShape.x * scaleAcross, 0.0), vec4(instanceOffset, 1.0));
-	vertex.localNormal = vec3(vertex.localNormal.x / (scaleAcross * scaleAcross), vertex.localNormal.y / (scaleUp * scaleUp), vertex.localNormal.z / (scaleAcross * scaleAcross));
 	vertex.color *= instanceColor;
 }
 `;
@@ -119,36 +118,11 @@ function createDecalPixels() {
 }
 
 //==============================================================================
-// 3 수 벡터 길이를 1 로.
-//==============================================================================
-/**
- * @param { Array<number> } vector
- * @returns { Array<number> }
- */
-function normalize(vector) {
-	const length = System.Math.hypot(vector[0], vector[1], vector[2]);
-	return [vector[0] / length, vector[1] / length, vector[2] / length];
-}
-
-//==============================================================================
-// sRGB 를 선형으로 바꿔 세기를 곱한 색. (애버런트 readLinearColor)
-//==============================================================================
-/**
- * @param { Array<number> } color
- * @param { number } intensity
- * @returns { Array<number> }
- */
-function readLinearColor(color, intensity) {
-	return [System.Math.pow(color[0], 2.2) * intensity, System.Math.pow(color[1], 2.2) * intensity, System.Math.pow(color[2], 2.2) * intensity];
-}
-
-
-//==============================================================================
 // 툰 확장 자리와 빛 장면. (러스트 예제 toonmaterial 과 같은 장면, 같은 값)
 // - 왼쪽 판: 머티리얼의 표면 조각이 UV 로 칠 획 숫자를 그린다. (게임 고유 무늬는 조각으로 두는 자리, 숫자는 0.5 초마다 바뀜)
 // - 상자: 바탕색 텍스처(바둑판)와 데칼 묶음 그림의 한 칸(고리와 십자)을 덮고 그 색으로 빛난다.
 // - 고리: 그 그리기만 다른 빛 묶음(반 램버트 4 단 띠 0.3725 / 0.6471 / 0.8627 / 1.0)으로 칠한다.
-// - 오른쪽 공: 둘레를 도는 점광 셋(감쇠 (1 - 거리 / 범위)^2)과 정반사, 림 빛, 채움 빛을 받는다.
+// - 오른쪽 공: 둘레를 도는 점광 셋(감쇠 (1 - 거리 / 범위)^2)과 하이라이트, 림 빛, 채움 빛을 받는다. (기본 두 단계 그늘, 하이라이트와 림은 부드러운 꼴)
 // - 홀로그램 둘: 더하기 섞기와 소프트 엣지. 왼쪽은 깊이 선패스 없이(겹친 곳이 두 겹), 오른쪽은 한 덩어리로(묶음과 깊이 선패스).
 // - 바닥은 비치게 두고, 그리기 줄의 불투명 앞 단계에서 바닥에 비친 모습(createReflectionMatrix, 감기는 렌더러가 뒤집음)을 어둡게(colorScale) 그린다.
 // - 뒤의 바위 27 개는 영구 인스턴스 버퍼 하나(꼴: 돌림과 크기 4, 자리 3, 색 3)를 머티리얼 정점 조각이 읽어 놓는다.
@@ -182,8 +156,8 @@ export class ToonMaterialScene {
 		this.#renderer = renderer;
 		renderer.setLight([-0.4, -1.0, -0.3], [0.9, 0.85, 0.8], [0.32, 0.36, 0.46], [0.14, 0.12, 0.11]);
 		renderer.setFillLight([0.7, -0.2, 0.6], [0.12, 0.1, 0.16]);
-		renderer.setRimLight([0.22, 0.28, 0.4], 3);
-		renderer.setSpecular(0.35, 48);
+		renderer.setRimLight([0.22, 0.28, 0.4], 3, 1, 0);
+		renderer.setSpecular(0.35, 48, 1);
 		this.#bandLightSet = renderer.createLightSet();
 		this.#bandLightSet.setLight([-0.4, -1.0, -0.3], [0.9, 0.85, 0.8], [0.32, 0.36, 0.46], [0.14, 0.12, 0.11]);
 		this.#bandLightSet.setBandRamp([0.25, 0.5, 0.75], [0.3725, 0.6471, 0.8627, 1.0], true);
@@ -297,108 +271,3 @@ export class ToonMaterialScene {
 	}
 }
 
-
-//==============================================================================
-// 애버런트 몸 셰이딩(scenerenderer3d.js 583 ~ 651)과 엔진 옵션으로 같은 값이 나오는지. (직교 카메라로 z = 0 의 판을 실수 판에 그려 CPU 셈과 견줌)
-// - 엔진 쪽 바꾸기: 해와 되비친 빛(채움 빛)의 방향은 부호를 뒤집고, ÷π 는 setLightModel, 정반사 세기는 8 / (48 + 8) 배, 점광은 decay 0 과 rangeExponent 1, 빛남 배는 glowScale 에.
-//==============================================================================
-/**
- * @param { WebGL2RenderingContext } webGL2RenderingContext
- * @returns { object } { isSkipped, maximumError, maximumValue, isClampFree }
- */
-export function verifyAberrantShading(webGL2RenderingContext) {
-	if (webGL2RenderingContext.getExtension("EXT_color_buffer_float") === null) {
-		return { isSkipped: true };
-	}
-	const size = 64;
-	const sunToward = normalize([0.3, 0.8, 0.52]);
-	const rimToward = normalize([-0.6, 0.2, 0.77]);
-	const sunColor = readLinearColor([1.0, 0.95, 0.88], 1.4);
-	const skyColor = readLinearColor([0.55, 0.62, 0.8], 0.5);
-	const groundColor = readLinearColor([0.3, 0.25, 0.22], 0.5);
-	const rimColor = readLinearColor([0.5, 0.6, 1.0], 0.6);
-	const specular = 0.5;
-	const pointLights = [{ position: [0.3, 0.2, 0.6], color: readLinearColor([1.0, 0.5, 0.3], 1.8), range: 1.4 }, { position: [-0.5, -0.4, 0.5], color: readLinearColor([0.3, 0.8, 1.0], 1.2), range: 1.2 }];
-	const baseColor = [0.62, 0.55, 0.48];
-	const glow = 0;
-	const glowScale = 1;
-	const emissionScale = 1.6;
-	const renderer = new ToonRenderer(webGL2RenderingContext);
-	renderer.setLight([-sunToward[0], -sunToward[1], -sunToward[2]], sunColor, skyColor, groundColor);
-	renderer.setFillLight([-rimToward[0], -rimToward[1], -rimToward[2]], rimColor);
-	renderer.setSpecular(specular * 8 / 56, 48);
-	renderer.setLightModel({ isEnergyNormalized: true });
-	renderer.setPointLights(pointLights.map((pointLight) => {
-		return { position: pointLight.position, color: pointLight.color, intensity: 1, range: pointLight.range, decay: 0, rangeExponent: 1, wrap: 0 };
-	}));
-	renderer.setHdrOutput(true);
-	const builder = new ToonMesh.MeshBuilder();
-	builder.addQuad([[-1, -1, 0], [1, -1, 0], [1, 1, 0], [-1, 1, 0]], [0, 0, 1], baseColor, 0, null, false);
-	const mesh = renderer.createMesh(builder.readArrays());
-	const texture = webGL2RenderingContext.createTexture();
-	webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-	webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA32F, size, size, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.FLOAT, null);
-	const framebuffer = webGL2RenderingContext.createFramebuffer();
-	webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
-	webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, texture, 0);
-	const depthBuffer = webGL2RenderingContext.createRenderbuffer();
-	webGL2RenderingContext.bindRenderbuffer(webGL2RenderingContext.RENDERBUFFER, depthBuffer);
-	webGL2RenderingContext.renderbufferStorage(webGL2RenderingContext.RENDERBUFFER, webGL2RenderingContext.DEPTH_COMPONENT24, size, size);
-	webGL2RenderingContext.framebufferRenderbuffer(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.DEPTH_ATTACHMENT, webGL2RenderingContext.RENDERBUFFER, depthBuffer);
-	webGL2RenderingContext.viewport(0, 0, size, size);
-	webGL2RenderingContext.clearColor(0, 0, 0, 0);
-	webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
-	const projectionMatrix = Matrix4.createIdentity();
-	projectionMatrix.getElements()[10] = -1;
-	renderer.beginFrameWithMatrices(Matrix4.createIdentity(), projectionMatrix);
-	renderer.drawMesh(mesh, Matrix4.createIdentity(), { hasOutline: false, isCulled: false, glowScale: glowScale * emissionScale });
-	renderer.endFrame();
-	const pixels = new System.Float32Array(size * size * 4);
-	webGL2RenderingContext.readPixels(0, 0, size, size, webGL2RenderingContext.RGBA, webGL2RenderingContext.FLOAT, pixels);
-	webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
-	webGL2RenderingContext.deleteFramebuffer(framebuffer);
-	webGL2RenderingContext.deleteRenderbuffer(depthBuffer);
-	webGL2RenderingContext.deleteTexture(texture);
-	renderer.deleteMesh(mesh);
-	renderer.destroy();
-	// 애버런트 식을 CPU 로. (보는 쪽은 직교라 [0, 0, 1], 노멀도 [0, 0, 1])
-	const albedo = [System.Math.pow(baseColor[0], 2.2), System.Math.pow(baseColor[1], 2.2), System.Math.pow(baseColor[2], 2.2)];
-	const normal = [0, 0, 1];
-	const dot = (first, second) => {
-		return first[0] * second[0] + first[1] * second[1] + first[2] * second[2];
-	};
-	const halfway = normalize([sunToward[0], sunToward[1], sunToward[2] + 1]);
-	const specularTerm = System.Math.pow(System.Math.max(dot(normal, halfway), 0), 48) * specular / System.Math.PI;
-	let maximumError = 0;
-	let maximumValue = 0;
-	let isClampFree = true;
-	for (let pixelY = 0; pixelY < size; pixelY += 3) {
-		for (let pixelX = 0; pixelX < size; pixelX += 3) {
-			const worldPosition = [(pixelX + 0.5) / size * 2 - 1, (pixelY + 0.5) / size * 2 - 1, 0];
-			const irradiance = [0, 0, 0];
-			for (let channel = 0; channel < 3; ++channel) {
-				irradiance[channel] = sunColor[channel] * System.Math.max(dot(normal, sunToward), 0) + (groundColor[channel] * 0.5 + skyColor[channel] * 0.5) + rimColor[channel] * System.Math.max(dot(normal, rimToward), 0);
-			}
-			for (const pointLight of pointLights) {
-				const toLight = [pointLight.position[0] - worldPosition[0], pointLight.position[1] - worldPosition[1], pointLight.position[2] - worldPosition[2]];
-				const lightDistance = System.Math.max(System.Math.hypot(toLight[0], toLight[1], toLight[2]), 0.0001);
-				const falloff = System.Math.min(System.Math.max(1 - lightDistance / pointLight.range, 0), 1);
-				const facing = System.Math.max(dot(normal, [toLight[0] / lightDistance, toLight[1] / lightDistance, toLight[2] / lightDistance]), 0);
-				for (let channel = 0; channel < 3; ++channel) {
-					irradiance[channel] += pointLight.color[channel] * facing * falloff * falloff;
-				}
-			}
-			const offset = (pixelY * size + pixelX) * 4;
-			for (let channel = 0; channel < 3; ++channel) {
-				const lit = albedo[channel] / System.Math.PI * irradiance[channel] + sunColor[channel] * specularTerm;
-				if (lit > 1) {
-					isClampFree = false;
-				}
-				const expected = System.Math.min(lit, 1) + albedo[channel] * glow * glowScale * emissionScale;
-				maximumError = System.Math.max(maximumError, System.Math.abs(pixels[offset + channel] - expected));
-				maximumValue = System.Math.max(maximumValue, expected);
-			}
-		}
-	}
-	return { isSkipped: false, maximumError: maximumError, maximumValue: maximumValue, isClampFree: isClampFree };
-}
