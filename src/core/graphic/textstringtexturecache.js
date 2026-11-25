@@ -99,6 +99,18 @@ export function measureTextMetrics(fontString, text) {
 }
 
 //==============================================================================
+// Graphic 없이 글 재기. (measureTextMetrics 와 같다, 러스트 판 measure_text_without_graphic 과 같은 이름. 문서가 없으면 null)
+//==============================================================================
+/**
+ * @param { string } fontString
+ * @param { string } text
+ * @returns { TextMetrics | null }
+ */
+export function measureTextWithoutGraphic(fontString, text) {
+	return measureTextMetrics(fontString, text);
+}
+
+//==============================================================================
 // 글 재기 캐시에 든 수. (시험과 통계용)
 //==============================================================================
 /**

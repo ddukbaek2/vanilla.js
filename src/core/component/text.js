@@ -594,6 +594,21 @@ export class Text extends Component {
 	}
 
 	//==============================================================================
+	// Graphic 없이 나눈 줄 목록. (지금 글과 글꼴, 폭으로 나눈다, 잴 캔버스가 없으면 null)
+	// - 그리기 전에 줄 수가 필요한 레이아웃(창의 내용 놓기 같은)이 쓴다. (러스트 판 wrap_lines_without_graphic 과 같은 쓰임)
+	//==============================================================================
+	/**
+	 * @param { number } maximumWidth
+	 * @returns { string[] | null }
+	 */
+	wrapLinesWithoutGraphic(maximumWidth) {
+		if (getMeasurementCanvasRenderingContext() === null) {
+			return null;
+		}
+		return this.wrapTextToLines(this.#text, maximumWidth);
+	}
+
+	//==============================================================================
 	// 줄바꿈 반영 크기 측정. (레이아웃 용)
 	//==============================================================================
 	/**
@@ -794,6 +809,17 @@ export class Text extends Component {
 		fitCache.fontFaceCount = fontFaceCount;
 		fitCache.fittedFontSize = fittedFontSize;
 		return fittedFontSize;
+	}
+
+	//==============================================================================
+	// 그릴 때의 크기를 그 자리에서 재어 반환. (맞출 너비를 넘치면 줄인 크기, 러스트 판 calculate_fitted_font_size 와 같은 쓰임)
+	// - 이 판은 Graphic 없이 잴 수 있어 getFittedFontSize 와 같은 값이다. (글이나 글꼴이 바뀌었으면 다시 잰다)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	calculateFittedFontSize() {
+		return this.getFittedFontSize();
 	}
 
 	//==============================================================================

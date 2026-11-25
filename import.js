@@ -236,3 +236,5 @@ export { detectTextDirection } from "./src/core/graphic.js";
 // 입력 필드 문맥 메뉴 항목.
 export { UIInputFieldMenuAction } from "./src/ui/uiinputfield.js";
 export { MultiLevelBloomEffect } from "./src/experimental/graphics/multilevelbloomeffect.js";
+// 글자, 그리기 갈래. (러스트 판에만 있던 Graphic 없이 글 재기)
+export { measureTextWithoutGraphic } from "./src/core/graphic/textstringtexturecache.js";
