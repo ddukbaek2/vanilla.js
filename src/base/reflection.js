@@ -12,12 +12,28 @@ const accessorNameListTable = new System.WeakMap();
 
 
 //==============================================================================
+// 리플렉션 함수 모음. (값이 있는지, 꼴 검사, 클래스 상속 검사, 복제, 고유식별자)
+//==============================================================================
+
+/**
+ * @example <caption>꼴 검사하고 복제하기</caption>
+ * import { Reflection, Vector2 } from "./build/vanilla.js";
+ *
+ * const position = Vector2.create(3, 4);
+ * const copied = Reflection.clone(position);
+ * console.log(Reflection.isClassInstance(copied, Vector2), copied.x, copied.y);
+ * console.log(Reflection.isPrimitiveType(123), Reflection.isArrayType([1, 2]));
+ * console.log(Reflection.isValidate(null), Reflection.createGUID());
+ */
+
+
+//==============================================================================
 // 유효한 객체인지 여부 반환.
 //==============================================================================
 /**
  * @template T
- * @param { T } target
- * @returns { boolean }
+ * @param { T } target 검사할 값.
+ * @returns { boolean } undefined 나 null 이 아니면 참.
  */
 export function isValidate(target) {
 	if (target === undefined || target === null) {
@@ -33,8 +49,8 @@ export function isValidate(target) {
 //==============================================================================
 /**
  * @template T
- * @param { T } target
- * @returns { T }
+ * @param { T } target 복제할 객체. (객체가 아니거나 없으면 오류를 던진다)
+ * @returns { T } 같은 생성자를 인자 없이 불러 만든 새 객체. (자기 속성과 getter, setter 짝 속성을 얕게 옮긴다)
  */
 export function clone(target) {
 	// 오류 방어.
@@ -106,8 +122,22 @@ function getAccessorNameList(target) {
 //==============================================================================
 /**
  * @template T
- * @param { T } target
- * @returns { T }
+ * @param { T } target 복제할 객체. (객체가 아니거나 없으면 오류를 던진다)
+ * @returns { T } 같은 생성자를 인자 없이 불러 만든 새 객체. (배열과 일반 객체는 깊게, 클래스 인스턴스 값은 참조 그대로 옮긴다)
+  * @example <caption>얕은 복제와 깊은 복제의 차이</caption>
+  * import { Reflection } from "./build/vanilla.js";
+  *
+  * class Inventory {
+  * 	constructor() {
+  * 		this.itemList = ["sword"];
+  * 	}
+  * }
+  *
+  * const original = new Inventory();
+  * const shallowCopy = Reflection.clone(original);
+  * const deepCopy = Reflection.structuredClone(original);
+  * original.itemList.push("shield");
+  * console.log(shallowCopy.itemList.length, deepCopy.itemList.length);
  */
 export function structuredClone(target) {
 
@@ -187,7 +217,7 @@ export function structuredClone(target) {
 // - "0192a3f2-b1c4-4d8e-8f1a-0e5d4c3b2a19"
 //==============================================================================
 /**
- * @returns { string }
+ * @returns { string } "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx" 꼴의 36 글자 문자열. (앞 12 자리는 밀리초 시각)
  */
 export function createGUID() {
 
@@ -212,8 +242,8 @@ export function createGUID() {
 //==============================================================================
 /**
  * @template T
- * @param { T } target
- * @returns { boolean }
+ * @param { T } target 검사할 값.
+ * @returns { boolean } 원시 타입이면 참.
  */
 export function isPrimitiveType(target) {
 	if (target === null) {
@@ -234,8 +264,8 @@ export function isPrimitiveType(target) {
 //==============================================================================
 /**
  * @template T
- * @param { T } target
- * @returns { boolean }
+ * @param { T } target 검사할 값.
+ * @returns { boolean } 객체나 함수면 참. (null 은 거짓)
  */
 export function isReferenceType(target) {
 	if (target === null) {
@@ -255,8 +285,8 @@ export function isReferenceType(target) {
 //==============================================================================
 /**
  * @template T
- * @param { T } target
- * @returns { boolean }
+ * @param { T } target 검사할 값.
+ * @returns { boolean } 배열이면 참.
  */
 export function isArrayType(target) {
 	return System.Array.isArray(target);
@@ -270,8 +300,8 @@ export function isArrayType(target) {
 //==============================================================================
 /**
  * @template T
- * @param { T } target
- * @returns { boolean }
+ * @param { T } target 검사할 값.
+ * @returns { boolean } 함수면 참. (클래스 포함)
  */
 export function isFunctionType(target) {
 	return typeof target === "function";
@@ -285,8 +315,8 @@ export function isFunctionType(target) {
 //==============================================================================
 /**
  * @template T
- * @param { T } target
- * @returns { boolean }
+ * @param { T } target 검사할 값.
+ * @returns { boolean } prototype 을 가진 함수면 참.
  */
 export function isType(target) {
 	if (typeof target !== "function") {
@@ -306,9 +336,9 @@ export function isType(target) {
 //==============================================================================
 /**
  * @template T
- * @param { T } target
- * @param { Function } type
- * @returns { boolean }
+ * @param { T } target 검사할 값.
+ * @param { Function } type 클래스.
+ * @returns { boolean } target 이 type 이나 그 하위 클래스의 인스턴스면 참.
  */
 export function isClassInstance(target, type) {
 	if (!isReferenceType(target)) {
@@ -328,9 +358,9 @@ export function isClassInstance(target, type) {
 // - 예) isParent(TransformNode, WorldNode) → true
 //==============================================================================
 /**
- * @param { Function } parentType
- * @param { Function } targetType
- * @returns { boolean }
+ * @param { Function } parentType 부모인지 볼 클래스.
+ * @param { Function } targetType 자식 쪽 클래스.
+ * @returns { boolean } targetType 이 parentType 을 직간접으로 상속하면 참. (같은 클래스면 거짓)
  */
 export function isParent(parentType, targetType) {
 	if (!isType(parentType) || !isType(targetType)) {
@@ -350,9 +380,9 @@ export function isParent(parentType, targetType) {
 // - 예) isChildren(WorldNode, TransformNode) → true
 //==============================================================================
 /**
- * @param { Function } targetType
- * @param { Function } parentType
- * @returns { boolean }
+ * @param { Function } targetType 자식인지 볼 클래스.
+ * @param { Function } parentType 부모 쪽 클래스.
+ * @returns { boolean } targetType 이 parentType 을 직간접으로 상속하면 참. (같은 클래스면 거짓)
  */
 export function isChildren(targetType, parentType) {
 	if (!isType(targetType) || !isType(parentType)) {

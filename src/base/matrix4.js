@@ -8,10 +8,23 @@ import * as Math from "./math.js";
 
 
 //==============================================================================
-// 4x4 변환 행렬. (열우선 — WebGL uniformMatrix4fv 에 그대로 업로드 가능)
+// 4x4 변환 행렬. (열우선, WebGL uniformMatrix4fv 에 그대로 업로드 가능)
 // - 열우선 배열 인덱스: elements[column * 4 + row]
 // - 점 변환: transformed = matrix x (x, y, z, 1)
 //==============================================================================
+/**
+ * @example <caption>모델 행렬로 점 옮기고 되돌리기</caption>
+ * import { Matrix4 } from "./build/vanilla.js";
+ *
+ * const model = Matrix4.createTranslation(10, 0, 0);
+ * model.rotateY(Math.PI / 2);
+ * model.scale(2, 2, 2);
+ * const point = model.transformPoint(1, 0, 0);
+ * console.log(point.x, point.y, point.z, point.w);
+ * const inverse = Matrix4.createInverse(model);
+ * const restored = inverse.transformPoint(point.x, point.y, point.z);
+ * console.log(restored.x, restored.y, restored.z);
+ */
 export class Matrix4 extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -47,7 +60,7 @@ export class Matrix4 extends Object {
 	// 다른 행렬로부터 복사.
 	//==============================================================================
 	/**
-	 * @param { Matrix4 } other
+	 * @param { Matrix4 } other 복사해 올 행렬.
 	 */
 	copyFrom(other) {
 		const elements = this.getElements();
@@ -60,7 +73,7 @@ export class Matrix4 extends Object {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { this }
+	 * @returns { this } 요소가 같은 새 행렬.
 	 */
 	clone() {
 		const matrix = /** @type { this } */ (new Matrix4());
@@ -72,7 +85,7 @@ export class Matrix4 extends Object {
 	// 다른 행렬을 우측에 곱해 누적. (this = this x other)
 	//==============================================================================
 	/**
-	 * @param { Matrix4 } other
+	 * @param { Matrix4 } other 오른쪽에 곱할 행렬.
 	 */
 	multiply(other) {
 		const elements = this.getElements();
@@ -94,9 +107,9 @@ export class Matrix4 extends Object {
 	// 이동 변환 누적. (로컬 공간 우측 곱)
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } z
+	 * @param { number } x X 이동량.
+	 * @param { number } y Y 이동량.
+	 * @param { number } z Z 이동량.
 	 */
 	translate(x, y, z) {
 		const translationMatrix = Matrix4.createTranslation(x, y, z);
@@ -107,7 +120,7 @@ export class Matrix4 extends Object {
 	// X축 회전 변환 누적. (로컬 공간 우측 곱)
 	//==============================================================================
 	/**
-	 * @param { number } radian
+	 * @param { number } radian 회전 각도. (라디안)
 	 */
 	rotateX(radian) {
 		const rotationMatrix = Matrix4.createRotationX(radian);
@@ -118,7 +131,7 @@ export class Matrix4 extends Object {
 	// Y축 회전 변환 누적. (로컬 공간 우측 곱)
 	//==============================================================================
 	/**
-	 * @param { number } radian
+	 * @param { number } radian 회전 각도. (라디안)
 	 */
 	rotateY(radian) {
 		const rotationMatrix = Matrix4.createRotationY(radian);
@@ -129,7 +142,7 @@ export class Matrix4 extends Object {
 	// Z축 회전 변환 누적. (로컬 공간 우측 곱)
 	//==============================================================================
 	/**
-	 * @param { number } radian
+	 * @param { number } radian 회전 각도. (라디안)
 	 */
 	rotateZ(radian) {
 		const rotationMatrix = Matrix4.createRotationZ(radian);
@@ -140,9 +153,9 @@ export class Matrix4 extends Object {
 	// 크기 변환 누적. (로컬 공간 우측 곱)
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } z
+	 * @param { number } x X 배율.
+	 * @param { number } y Y 배율.
+	 * @param { number } z Z 배율.
 	 */
 	scale(x, y, z) {
 		const scaleMatrix = Matrix4.createScale(x, y, z);
@@ -150,13 +163,13 @@ export class Matrix4 extends Object {
 	}
 
 	//==============================================================================
-	// 점 변환. (w 성분 포함 — 원근 분할은 호출자가 수행)
+	// 점 변환. (w 성분 포함, 원근 분할은 호출자가 수행)
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } z
-	 * @returns { { x: number, y: number, z: number, w: number } }
+	 * @param { number } x 점의 X 좌표.
+	 * @param { number } y 점의 Y 좌표.
+	 * @param { number } z 점의 Z 좌표.
+	 * @returns { { x: number, y: number, z: number, w: number } } 변환한 동차 좌표. (w 로 나누지 않은 값)
 	 */
 	transformPoint(x, y, z) {
 		const elements = this.getElements();
@@ -168,13 +181,13 @@ export class Matrix4 extends Object {
 	}
 
 	//==============================================================================
-	// 방향 변환. (이동 성분 무시 — 회전/크기만 적용)
+	// 방향 변환. (이동 성분 무시, 회전/크기만 적용)
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } z
-	 * @returns { { x: number, y: number, z: number } }
+	 * @param { number } x 방향의 X 성분.
+	 * @param { number } y 방향의 Y 성분.
+	 * @param { number } z 방향의 Z 성분.
+	 * @returns { { x: number, y: number, z: number } } 변환한 방향. (정규화하지 않는다)
 	 */
 	transformDirection(x, y, z) {
 		const elements = this.getElements();
@@ -188,7 +201,7 @@ export class Matrix4 extends Object {
 	// 열우선 요소 배열 반환.
 	//==============================================================================
 	/**
-	 * @returns { Float32Array }
+	 * @returns { Float32Array } 열우선 요소 16 개. (복사본이 아니라 내부 배열이다)
 	 */
 	getElements() {
 		return this.#elements;
@@ -198,7 +211,7 @@ export class Matrix4 extends Object {
 	// 셰이더 mat4 (열 우선) 배열로 기록. (16 칸)
 	//==============================================================================
 	/**
-	 * @param { Float32Array | number[] } array
+	 * @param { Float32Array | number[] } array 적을 배열. (0 번 칸부터 16 칸)
 	 */
 	writeToArray(array) {
 		this.writeToSlice(array, 0);
@@ -208,8 +221,8 @@ export class Matrix4 extends Object {
 	// 큰 배열의 offset 자리부터 16 개를 기록. (관절 행렬 배열처럼 여러 행렬을 이어 담을 때)
 	//==============================================================================
 	/**
-	 * @param { Float32Array | number[] } array
-	 * @param { number } offset
+	 * @param { Float32Array | number[] } array 적을 배열.
+	 * @param { number } offset 적기 시작할 칸 번호.
 	 */
 	writeToSlice(array, offset) {
 		const elements = this.getElements();
@@ -222,7 +235,7 @@ export class Matrix4 extends Object {
 	// 단위 행렬 생성. (정적)
 	//==============================================================================
 	/**
-	 * @returns { Matrix4 }
+	 * @returns { Matrix4 } 단위 행렬.
 	 */
 	static createIdentity() {
 		const matrix = new Matrix4();
@@ -233,10 +246,10 @@ export class Matrix4 extends Object {
 	// 이동 행렬 생성. (정적)
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } z
-	 * @returns { Matrix4 }
+	 * @param { number } x X 이동량.
+	 * @param { number } y Y 이동량.
+	 * @param { number } z Z 이동량.
+	 * @returns { Matrix4 } 이동 행렬.
 	 */
 	static createTranslation(x, y, z) {
 		const matrix = new Matrix4();
@@ -251,8 +264,8 @@ export class Matrix4 extends Object {
 	// X축 회전 행렬 생성. (정적)
 	//==============================================================================
 	/**
-	 * @param { number } radian
-	 * @returns { Matrix4 }
+	 * @param { number } radian 회전 각도. (라디안)
+	 * @returns { Matrix4 } X 축 회전 행렬.
 	 */
 	static createRotationX(radian) {
 		const cosRadian = Math.cos(radian);
@@ -270,8 +283,8 @@ export class Matrix4 extends Object {
 	// Y축 회전 행렬 생성. (정적)
 	//==============================================================================
 	/**
-	 * @param { number } radian
-	 * @returns { Matrix4 }
+	 * @param { number } radian 회전 각도. (라디안)
+	 * @returns { Matrix4 } Y 축 회전 행렬.
 	 */
 	static createRotationY(radian) {
 		const cosRadian = Math.cos(radian);
@@ -289,8 +302,8 @@ export class Matrix4 extends Object {
 	// Z축 회전 행렬 생성. (정적)
 	//==============================================================================
 	/**
-	 * @param { number } radian
-	 * @returns { Matrix4 }
+	 * @param { number } radian 회전 각도. (라디안)
+	 * @returns { Matrix4 } Z 축 회전 행렬.
 	 */
 	static createRotationZ(radian) {
 		const cosRadian = Math.cos(radian);
@@ -308,8 +321,8 @@ export class Matrix4 extends Object {
 	// 쿼터니언 회전 행렬 생성. (정적)
 	//==============================================================================
 	/**
-	 * @param { { x: number, y: number, z: number, w: number } } quaternion
-	 * @returns { Matrix4 }
+	 * @param { { x: number, y: number, z: number, w: number } } quaternion 회전 쿼터니언. (Quaternion 이나 x, y, z, w 를 가진 객체, 길이가 1 이어야 한다)
+	 * @returns { Matrix4 } 회전 행렬.
 	 */
 	static createRotationFromQuaternion(quaternion) {
 		const x = quaternion.x;
@@ -334,10 +347,10 @@ export class Matrix4 extends Object {
 	// 크기 행렬 생성. (정적)
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } z
-	 * @returns { Matrix4 }
+	 * @param { number } x X 배율.
+	 * @param { number } y Y 배율.
+	 * @param { number } z Z 배율.
+	 * @returns { Matrix4 } 크기 행렬.
 	 */
 	static createScale(x, y, z) {
 		const matrix = new Matrix4();
@@ -352,11 +365,23 @@ export class Matrix4 extends Object {
 	// 원근 투영 행렬 생성. (정적)
 	//==============================================================================
 	/**
-	 * @param { number } fieldOfViewRadian
-	 * @param { number } aspectRatio
-	 * @param { number } nearDistance
-	 * @param { number } farDistance
-	 * @returns { Matrix4 }
+	 * @param { number } fieldOfViewRadian 세로 시야각. (라디안)
+	 * @param { number } aspectRatio 가로 나누기 세로 비율.
+	 * @param { number } nearDistance 가까운 자르기 면까지 거리. (0 보다 커야 한다)
+	 * @param { number } farDistance 먼 자르기 면까지 거리.
+	 * @returns { Matrix4 } 원근 투영 행렬. (카메라는 -Z 를 보고, 깊이를 -1 ~ 1 로 옮긴다)
+	 * @example <caption>원근 카메라의 뷰 투영 행렬 만들기</caption>
+	 * import { Matrix4, Vector3 } from "./build/vanilla.js";
+	 *
+	 * const projection = Matrix4.createPerspective(Math.PI / 3, 16 / 9, 0.1, 100);
+	 * const eyePosition = Vector3.create(0, 2, 5);
+	 * const targetPosition = Vector3.zero();
+	 * const upDirection = Vector3.up();
+	 * const view = Matrix4.createLookAt(eyePosition, targetPosition, upDirection);
+	 * const viewProjection = projection.clone();
+	 * viewProjection.multiply(view);
+	 * const clip = viewProjection.transformPoint(0, 0, 0);
+	 * console.log(clip.x / clip.w, clip.y / clip.w, clip.z / clip.w);
 	 */
 	static createPerspective(fieldOfViewRadian, aspectRatio, nearDistance, farDistance) {
 		const focalLength = 1.0 / Math.tan(fieldOfViewRadian / 2);
@@ -376,13 +401,13 @@ export class Matrix4 extends Object {
 	// 직교 투영 행렬 생성. (정적)
 	//==============================================================================
 	/**
-	 * @param { number } left
-	 * @param { number } right
-	 * @param { number } bottom
-	 * @param { number } top
-	 * @param { number } nearDistance
-	 * @param { number } farDistance
-	 * @returns { Matrix4 }
+	 * @param { number } left 왼쪽 경계.
+	 * @param { number } right 오른쪽 경계.
+	 * @param { number } bottom 아래 경계.
+	 * @param { number } top 위 경계.
+	 * @param { number } nearDistance 가까운 자르기 면까지 거리.
+	 * @param { number } farDistance 먼 자르기 면까지 거리.
+	 * @returns { Matrix4 } 직교 투영 행렬. (경계 상자 안을 -1 ~ 1 로 옮긴다)
 	 */
 	static createOrthographic(left, right, bottom, top, nearDistance, farDistance) {
 		const matrix = new Matrix4();
@@ -399,13 +424,13 @@ export class Matrix4 extends Object {
 	}
 
 	//==============================================================================
-	// 시점 행렬 생성. (정적 — 지정 위치에서 대상을 바라보는 뷰 행렬)
+	// 시점 행렬 생성. (정적, 지정 위치에서 대상을 바라보는 뷰 행렬)
 	//==============================================================================
 	/**
-	 * @param { Vector3 } eyePosition
-	 * @param { Vector3 } targetPosition
-	 * @param { Vector3 } upDirection
-	 * @returns { Matrix4 }
+	 * @param { Vector3 } eyePosition 카메라 위치.
+	 * @param { Vector3 } targetPosition 바라볼 점.
+	 * @param { Vector3 } upDirection 위쪽 방향. (바라보는 방향과 나란하면 안 된다)
+	 * @returns { Matrix4 } 뷰 행렬. (카메라가 -Z 를 보는 오른손 좌표계)
 	 */
 	static createLookAt(eyePosition, targetPosition, upDirection) {
 		const eyeToTarget = eyePosition.subtract(targetPosition);
@@ -436,11 +461,11 @@ export class Matrix4 extends Object {
 	}
 
 	//==============================================================================
-	// 역행렬 생성. (정적 — 일반 4x4 여인수 전개, 비가역 시 단위 행렬)
+	// 역행렬 생성. (정적, 일반 4x4 여인수 전개, 비가역 시 단위 행렬)
 	//==============================================================================
 	/**
-	 * @param { Matrix4 } matrix
-	 * @returns { Matrix4 }
+	 * @param { Matrix4 } matrix 역행렬을 구할 행렬.
+	 * @returns { Matrix4 } 역행렬. (역행렬이 없으면 단위 행렬)
 	 */
 	static createInverse(matrix) {
 		const sourceElements = matrix.getElements();

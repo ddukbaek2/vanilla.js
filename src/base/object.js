@@ -18,6 +18,24 @@ const instanceIdTable = new System.WeakMap();
 //==============================================================================
 /**
  * @class
+ * @example <caption>상속해서 복제하고 비교하기</caption>
+ * import { Object } from "./build/vanilla.js";
+ *
+ * class Inventory extends Object {
+ * 	constructor() {
+ * 		super();
+ * 		this.itemNameList = [];
+ * 	}
+ * }
+ *
+ * const inventory = new Inventory();
+ * inventory.itemNameList.push("sword");
+ * const shallowCopy = inventory.clone();
+ * const deepCopy = inventory.structuredClone();
+ * inventory.itemNameList.push("shield");
+ * console.log(shallowCopy.itemNameList.length, deepCopy.itemNameList.length);
+ * console.log(inventory.equals(inventory), inventory.equals(deepCopy), Object.isValidate(null));
+ * console.log(inventory.getInstanceId() === inventory.getInstanceId());
  */
 export class Object {
 	//==============================================================================
@@ -50,8 +68,8 @@ export class Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { any } other
-	 * @returns { boolean }
+	 * @param { any } other 비교할 값.
+	 * @returns { boolean } 자신과 같은 참조이면 참. (null 이면 거짓)
 	 */
 	equals(other) {
 		if (other === null) {
@@ -69,7 +87,7 @@ export class Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @returns { string }
+	 * @returns { string } GUID 꼴 고유식별자. (처음 부를 때 만들고 그 뒤로는 같은 글을 돌려준다)
 	 */
 	getInstanceId() {
 		let instanceId = instanceIdTable.get(this);
@@ -85,7 +103,7 @@ export class Object {
 	// - destroy() 가 파괴 표시를 남기지 않으므로 늘 false 다.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 파괴되었으면 참. (기반 오브젝트는 늘 false)
 	 */
 	isDestroyed() {
 		return false;
@@ -95,7 +113,7 @@ export class Object {
 	// 인스턴스 얕은 복제.
 	//==============================================================================
 	/**
-	 * @returns { this }
+	 * @returns { this } 인자 없이 같은 생성자로 만든 새 객체. (열거되는 자기 필드와 게터, 세터를 함께 가진 프로퍼티를 얕게 옮긴다)
 	 */
 	clone() {
 		const obj = Reflection.clone(this);
@@ -106,7 +124,7 @@ export class Object {
 	// 인스턴스 깊은 복제.
 	//==============================================================================
 	/**
-	 * @returns { this }
+	 * @returns { this } 인자 없이 같은 생성자로 만든 새 객체. (배열과 평범한 객체는 새로 만들어 옮기고 클래스 객체는 참조를 옮긴다)
 	 */
 	structuredClone() {
 		const obj = Reflection.structuredClone(this);
@@ -130,7 +148,8 @@ export class Object {
 	//==============================================================================
 	/**
 	 * @static
-	 * @returns { boolean }
+	 * @param { any } target 검사할 값.
+	 * @returns { boolean } undefined 도 null 도 아니면 참.
 	 */
 	static isValidate(target) {
 		return Reflection.isValidate(target);

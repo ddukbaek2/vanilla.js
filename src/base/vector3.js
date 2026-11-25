@@ -9,6 +9,18 @@ import * as Math from "./math.js";
 //==============================================================================
 // 3차원 벡터.
 //==============================================================================
+/**
+ * @example <caption>만들고 외적, 정규화하기</caption>
+ * import { Vector3 } from "./build/vanilla.js";
+ *
+ * const right = Vector3.create(1, 0, 0);
+ * const up = Vector3.up();
+ * const forward = right.cross(up);
+ * const offset = Vector3.create(3, 0, 4);
+ * const direction = offset.normalize();
+ * console.log(forward.x, forward.y, forward.z);
+ * console.log(direction.x, direction.z, direction.length());
+ */
 export class Vector3 extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -36,8 +48,8 @@ export class Vector3 extends Object {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { any } other
-	 * @returns { boolean }
+	 * @param { any } other 비교할 값.
+	 * @returns { boolean } 같은 객체이거나 x, y, z 가 모두 같은 Vector3 면 참.
 	 */
 	equals(other) {
 		if (super.equals(other)) {
@@ -60,7 +72,7 @@ export class Vector3 extends Object {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { this }
+	 * @returns { this } x, y, z 가 같은 새 벡터.
 	 */
 	clone() {
 		const obj = /** @type { this } */ (Vector3.create(this.x, this.y, this.z));
@@ -83,7 +95,7 @@ export class Vector3 extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } X 좌표.
 	 */
 	get x() {
 		return this.#x;
@@ -105,7 +117,7 @@ export class Vector3 extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } Y 좌표.
 	 */
 	get y() {
 		return this.#y;
@@ -127,7 +139,7 @@ export class Vector3 extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } Z 좌표.
 	 */
 	get z() {
 		return this.#z;
@@ -137,9 +149,9 @@ export class Vector3 extends Object {
 	// 대입.
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } z
+	 * @param { number } x X 좌표.
+	 * @param { number } y Y 좌표.
+	 * @param { number } z Z 좌표.
 	 */
 	set(x, y, z) {
 		this.x = x;
@@ -151,7 +163,7 @@ export class Vector3 extends Object {
 	// 가로축 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } X 좌표.
 	 */
 	getX() {
 		return this.x;
@@ -161,7 +173,7 @@ export class Vector3 extends Object {
 	// 세로축 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } Y 좌표.
 	 */
 	getY() {
 		return this.y;
@@ -171,7 +183,7 @@ export class Vector3 extends Object {
 	// 깊이축 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } Z 좌표.
 	 */
 	getZ() {
 		return this.z;
@@ -181,7 +193,7 @@ export class Vector3 extends Object {
 	// 길이.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 벡터의 길이.
 	 */
 	length() {
 		const length = Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
@@ -192,7 +204,7 @@ export class Vector3 extends Object {
 	// 길이 제곱.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 길이의 제곱.
 	 */
 	lengthSquared() {
 		const lengthSquared = this.x * this.x + this.y * this.y + this.z * this.z;
@@ -203,7 +215,7 @@ export class Vector3 extends Object {
 	// 정규화.
 	//==============================================================================
 	/**
-	 * @returns { Vector3 }
+	 * @returns { Vector3 } 길이를 1 로 맞춘 새 벡터. (길이가 0 이면 그대로 복사한다)
 	 */
 	normalize() {
 		const origin = Vector3.create(this.x, this.y, this.z);
@@ -222,8 +234,8 @@ export class Vector3 extends Object {
 	// 더하기.
 	//==============================================================================
 	/**
-	 * @param { Vector3 | number } other
-	 * @returns { Vector3 }
+	 * @param { Vector3 | number } other 더할 벡터나 수. (수면 세 성분에 같은 수를 더한다, 그 밖의 꼴이면 오류를 던진다)
+	 * @returns { Vector3 } 계산한 새 벡터. (자신은 바뀌지 않는다)
 	 */
 	add(other) {
 		const origin = this.clone();
@@ -247,8 +259,8 @@ export class Vector3 extends Object {
 	// 빼기.
 	//==============================================================================
 	/**
-	 * @param { Vector3 | number } other
-	 * @returns { Vector3 }
+	 * @param { Vector3 | number } other 뺄 벡터나 수. (수면 세 성분에 같은 수를 뺀다, 그 밖의 꼴이면 오류를 던진다)
+	 * @returns { Vector3 } 계산한 새 벡터. (자신은 바뀌지 않는다)
 	 */
 	subtract(other) {
 		const origin = this.clone();
@@ -272,8 +284,8 @@ export class Vector3 extends Object {
 	// 곱하기.
 	//==============================================================================
 	/**
-	 * @param { Vector3 | number } other
-	 * @returns { Vector3 }
+	 * @param { Vector3 | number } other 곱할 벡터나 수. (수면 세 성분에 같은 수를 곱한다, 그 밖의 꼴이면 오류를 던진다)
+	 * @returns { Vector3 } 계산한 새 벡터. (자신은 바뀌지 않는다)
 	 */
 	multiply(other) {
 		const origin = this.clone();
@@ -297,8 +309,8 @@ export class Vector3 extends Object {
 	// 나누기.
 	//==============================================================================
 	/**
-	 * @param { Vector3 | number } other
-	 * @returns { Vector3 }
+	 * @param { Vector3 | number } other 나눌 벡터나 수. (수면 세 성분을 같은 수로 나눈다, 그 밖의 꼴이면 오류를 던진다)
+	 * @returns { Vector3 } 계산한 새 벡터. (자신은 바뀌지 않는다)
 	 */
 	divide(other) {
 		const origin = this.clone();
@@ -322,8 +334,8 @@ export class Vector3 extends Object {
 	// 수 더하기. (모든 성분에 같은 수, add(number) 와 같다)
 	//==============================================================================
 	/**
-	 * @param { number } scalar
-	 * @returns { Vector3 }
+	 * @param { number } scalar 더할 수.
+	 * @returns { Vector3 } 계산한 새 벡터.
 	 */
 	addScalar(scalar) {
 		const result = this.add(scalar);
@@ -334,8 +346,8 @@ export class Vector3 extends Object {
 	// 수 빼기. (모든 성분에 같은 수, subtract(number) 와 같다)
 	//==============================================================================
 	/**
-	 * @param { number } scalar
-	 * @returns { Vector3 }
+	 * @param { number } scalar 뺄 수.
+	 * @returns { Vector3 } 계산한 새 벡터.
 	 */
 	subtractScalar(scalar) {
 		const result = this.subtract(scalar);
@@ -346,8 +358,8 @@ export class Vector3 extends Object {
 	// 수 곱하기. (모든 성분에 같은 수, multiply(number) 와 같다)
 	//==============================================================================
 	/**
-	 * @param { number } scalar
-	 * @returns { Vector3 }
+	 * @param { number } scalar 곱할 수.
+	 * @returns { Vector3 } 계산한 새 벡터.
 	 */
 	multiplyScalar(scalar) {
 		const result = this.multiply(scalar);
@@ -358,8 +370,8 @@ export class Vector3 extends Object {
 	// 수 나누기. (모든 성분에 같은 수, divide(number) 와 같다)
 	//==============================================================================
 	/**
-	 * @param { number } scalar
-	 * @returns { Vector3 }
+	 * @param { number } scalar 나눌 수.
+	 * @returns { Vector3 } 계산한 새 벡터.
 	 */
 	divideScalar(scalar) {
 		const result = this.divide(scalar);
@@ -370,8 +382,8 @@ export class Vector3 extends Object {
 	// 내적.
 	//==============================================================================
 	/**
-	 * @param { Vector3 } other
-	 * @returns { number }
+	 * @param { Vector3 } other 내적할 벡터.
+	 * @returns { number } 내적 값.
 	 */
 	dot(other) {
 		const dot = this.x * other.x + this.y * other.y + this.z * other.z;
@@ -382,8 +394,8 @@ export class Vector3 extends Object {
 	// 외적.
 	//==============================================================================
 	/**
-	 * @param { Vector3 } other
-	 * @returns { Vector3 }
+	 * @param { Vector3 } other 외적할 벡터.
+	 * @returns { Vector3 } this 와 other 에 수직인 새 벡터. (this × other)
 	 */
 	cross(other) {
 		const crossX = this.y * other.z - this.z * other.y;
@@ -397,8 +409,8 @@ export class Vector3 extends Object {
 	// 거리.
 	//==============================================================================
 	/**
-	 * @param { Vector3 } other
-	 * @returns { number }
+	 * @param { Vector3 } other 거리를 잴 벡터.
+	 * @returns { number } 두 점 사이의 거리.
 	 */
 	distance(other) {
 		const difference = this.subtract(other);
@@ -410,10 +422,10 @@ export class Vector3 extends Object {
 	// 생성. (정적)
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } z
-	 * @returns { Vector3 }
+	 * @param { number } x X 좌표.
+	 * @param { number } y Y 좌표.
+	 * @param { number } z Z 좌표.
+	 * @returns { Vector3 } 새 벡터.
 	 */
 	static create(x, y, z) {
 		const vector = new Vector3();
@@ -425,7 +437,7 @@ export class Vector3 extends Object {
 	// 영벡터 생성. (정적)
 	//==============================================================================
 	/**
-	 * @returns { Vector3 }
+	 * @returns { Vector3 } (0, 0, 0) 벡터.
 	 */
 	static zero() {
 		const vector = Vector3.create(0.0, 0.0, 0.0);
@@ -436,7 +448,7 @@ export class Vector3 extends Object {
 	// 일벡터 생성. (정적)
 	//==============================================================================
 	/**
-	 * @returns { Vector3 }
+	 * @returns { Vector3 } (1, 1, 1) 벡터.
 	 */
 	static one() {
 		const vector = Vector3.create(1.0, 1.0, 1.0);
@@ -447,7 +459,7 @@ export class Vector3 extends Object {
 	// 위쪽 단위벡터 생성. (정적)
 	//==============================================================================
 	/**
-	 * @returns { Vector3 }
+	 * @returns { Vector3 } (0, 1, 0) 벡터.
 	 */
 	static up() {
 		const vector = Vector3.create(0.0, 1.0, 0.0);
@@ -458,10 +470,10 @@ export class Vector3 extends Object {
 	// 선형 보간. (정적)
 	//==============================================================================
 	/**
-	 * @param { Vector3 } from
-	 * @param { Vector3 } to
-	 * @param { number } normalizedTime
-	 * @returns { Vector3 }
+	 * @param { Vector3 } from 시작 벡터.
+	 * @param { Vector3 } to 끝 벡터.
+	 * @param { number } normalizedTime 0 이면 from, 1 이면 to. (0 ~ 1 밖이어도 자르지 않고 늘여 보간한다)
+	 * @returns { Vector3 } 보간한 새 벡터.
 	 */
 	static lerp(from, to, normalizedTime) {
 		const lerpX = Math.lerp(from.x, to.x, normalizedTime);
