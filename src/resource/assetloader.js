@@ -30,6 +30,22 @@ const DEFAULT_CONCURRENCY = 6;
 //     gameScene.trackAssetLoader(assetLoader);     // GameScene 로딩 막대가 진행률을 따라간다
 //     await assetLoader.load();
 //==============================================================================
+/**
+ * @example <caption>그림, JSON, 소리, 글꼴을 함께 받기</caption>
+ * import { AssetLoader } from "./build/vanilla.js";
+ *
+ * const assetLoader = new AssetLoader();
+ * assetLoader.setConcurrency(4);
+ * const imageAsset = assetLoader.addImage("examples/assets/spritesheet.png");
+ * const jsonAsset = assetLoader.addJson("examples/oldface/assets/expressions.json");
+ * const audioAsset = assetLoader.addAudio("examples/assets/beep.wav");
+ * const fontAsset = assetLoader.addFont("DOSGothic", "examples/assets/DOSGothic.woff");
+ * assetLoader.setProgressHandler((progress, finishedCount, totalCount) => {
+ * 	console.log(progress, finishedCount, totalCount);
+ * });
+ * const failedList = await assetLoader.load();
+ * console.log(failedList.length, imageAsset.isLoaded(), jsonAsset.isLoaded(), audioAsset.getDuration(), fontAsset.family);
+ */
 export class AssetLoader extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -71,7 +87,7 @@ export class AssetLoader extends Object {
 	// 동시에 받는 수 설정. (1 이상, 소수는 버린다. 받는 중에 바꾸면 다음 load 부터)
 	//==============================================================================
 	/**
-	 * @param { number } concurrency
+	 * @param { number } concurrency 동시에 받는 수. (유한한 숫자가 아니면 무시한다)
 	 */
 	setConcurrency(concurrency) {
 		if (typeof concurrency !== "number" || !System.Number.isFinite(concurrency)) {
@@ -84,7 +100,7 @@ export class AssetLoader extends Object {
 	// 동시에 받는 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 동시에 받는 수. (기본 6)
 	 */
 	getConcurrency() {
 		return this.#concurrency;
@@ -94,8 +110,8 @@ export class AssetLoader extends Object {
 	// 그림 넣기.
 	//==============================================================================
 	/**
-	 * @param { string } path
-	 * @returns { ImageAsset }
+	 * @param { string } path 그림 파일 경로.
+	 * @returns { ImageAsset } 넣은 그림 애셋. (load 가 끝나면 읽혀 있다)
 	 */
 	addImage(path) {
 		const imageAsset = new ImageAsset();
@@ -107,8 +123,8 @@ export class AssetLoader extends Object {
 	// JSON 넣기.
 	//==============================================================================
 	/**
-	 * @param { string } path
-	 * @returns { JsonAsset }
+	 * @param { string } path JSON 파일 경로.
+	 * @returns { JsonAsset } 넣은 JSON 애셋.
 	 */
 	addJson(path) {
 		const jsonAsset = new JsonAsset();
@@ -120,8 +136,8 @@ export class AssetLoader extends Object {
 	// 글 넣기.
 	//==============================================================================
 	/**
-	 * @param { string } path
-	 * @returns { TextAsset }
+	 * @param { string } path 글 파일 경로.
+	 * @returns { TextAsset } 넣은 글 애셋.
 	 */
 	addText(path) {
 		const textAsset = new TextAsset();
@@ -133,8 +149,8 @@ export class AssetLoader extends Object {
 	// 바이너리 넣기.
 	//==============================================================================
 	/**
-	 * @param { string } path
-	 * @returns { BlobAsset }
+	 * @param { string } path 파일 경로.
+	 * @returns { BlobAsset } 넣은 블롭 애셋.
 	 */
 	addBlob(path) {
 		const blobAsset = new BlobAsset();
@@ -146,8 +162,8 @@ export class AssetLoader extends Object {
 	// 소리 넣기. (AudioContext 가 없는 브라우저에서는 실패로 친다)
 	//==============================================================================
 	/**
-	 * @param { string } path
-	 * @returns { AudioAsset }
+	 * @param { string } path 소리 파일 경로.
+	 * @returns { AudioAsset } 넣은 소리 애셋.
 	 */
 	addAudio(path) {
 		const audioAsset = new AudioAsset();
@@ -159,10 +175,10 @@ export class AssetLoader extends Object {
 	// 글꼴 넣기. (받으면 document.fonts 에 family 이름으로 오른다, FontAsset.loadFont)
 	//==============================================================================
 	/**
-	 * @param { string } family
-	 * @param { string } path
+	 * @param { string } family 등록할 글꼴 패밀리 이름.
+	 * @param { string } path 글꼴 파일 경로.
 	 * @param { object } descriptors FontFace 서술자. (weight, style 등, 없으면 생략)
-	 * @returns { FontAsset }
+	 * @returns { FontAsset } 넣은 글꼴 애셋.
 	 */
 	addFont(family, path, descriptors) {
 		const fontAsset = new FontAsset();
@@ -177,8 +193,8 @@ export class AssetLoader extends Object {
 	// 애셋 넣기. (asset.load(path) 로 받는 Asset 파생, 다 받은 뒤 isLoaded() 가 거짓이면 실패로 친다)
 	//==============================================================================
 	/**
-	 * @param { object } asset
-	 * @param { string } path
+	 * @param { object } asset asset.load(path) 로 받는 애셋.
+	 * @param { string } path 받을 경로.
 	 * @returns { object } 넣은 애셋.
 	 */
 	addAsset(asset, path) {
@@ -194,7 +210,21 @@ export class AssetLoader extends Object {
 	//==============================================================================
 	/**
 	 * @param { string } path 실패 목록과 진행에 보일 이름.
-	 * @param { () => Promise<any> } loadFunction
+	 * @param { () => Promise<any> } loadFunction 받기 함수. (Promise 를 돌려준다, 거부되면 실패로 친다)
+	 * @example <caption>애셋이 아닌 받기를 함께 받기</caption>
+	 * import { AssetLoader } from "./build/vanilla.js";
+	 *
+	 * const assetLoader = new AssetLoader();
+	 * const timelineList = [];
+	 * assetLoader.addTask("logo.timeline.json", async () => {
+	 * 	const response = await fetch("examples/timelineshowcase/assets/logo.timeline.json");
+	 * 	const timeline = await response.json();
+	 * 	timelineList.push(timeline);
+	 * });
+	 * assetLoader.setCompleteHandler((failedList) => {
+	 * 	console.log(failedList.length, timelineList.length);
+	 * });
+	 * await assetLoader.load();
 	 */
 	addTask(path, loadFunction) {
 		this.addEntry(path, loadFunction, null);
@@ -204,9 +234,9 @@ export class AssetLoader extends Object {
 	// 목록에 넣기.
 	//==============================================================================
 	/**
-	 * @param { string } path
-	 * @param { () => Promise<any> } loadFunction
-	 * @param { object | null } asset
+	 * @param { string } path 실패 목록과 진행에 보일 이름.
+	 * @param { () => Promise<any> } loadFunction 받기 함수. (Promise 를 돌려준다)
+	 * @param { object | null } asset 받은 뒤 isLoaded() 로 성공을 확인할 애셋. (null 이면 확인하지 않는다)
 	 */
 	addEntry(path, loadFunction, asset) {
 		this.#entryList.push({ path: path, loadFunction: loadFunction, asset: asset, isFinished: false });
@@ -221,7 +251,7 @@ export class AssetLoader extends Object {
 	// 받기. (넣은 것을 모두 받을 때까지 기다린다. 실패해도 예외를 내지 않고 실패 목록을 돌려준다)
 	//==============================================================================
 	/**
-	 * @returns { Promise<Array<{ path: string, error: any }>> }
+	 * @returns { Promise<Array<{ path: string, error: any }>> } 다 끝나면 실패 목록으로 풀리는 프로미스. (실패가 없으면 빈 배열, 받는 중에 다시 부르면 같은 프로미스)
 	 */
 	load() {
 		if (this.#loadPromise !== null) {
@@ -236,7 +266,7 @@ export class AssetLoader extends Object {
 	// 받는 일꾼들 돌리기. (동시에 받는 수만큼 일꾼이 목록의 다음 것을 집어 받는다)
 	//==============================================================================
 	/**
-	 * @returns { Promise<Array<object>> }
+	 * @returns { Promise<Array<object>> } 다 끝나면 실패 목록으로 풀리는 프로미스.
 	 */
 	async runWorkers() {
 		this.startWorkers();
@@ -280,7 +310,7 @@ export class AssetLoader extends Object {
 	// 일꾼 하나. (목록이 빌 때까지 하나씩 집어 받는다)
 	//==============================================================================
 	/**
-	 * @returns { Promise<void> }
+	 * @returns { Promise<void> } 목록이 비면 풀리는 프로미스.
 	 */
 	async runWorker() {
 		const entryList = this.#entryList;
@@ -336,7 +366,7 @@ export class AssetLoader extends Object {
 	// 진행 알림 함수 설정. ((progress, finishedCount, totalCount) => void, null 이면 끔)
 	//==============================================================================
 	/**
-	 * @param { ((progress: number, finishedCount: number, totalCount: number) => void) | null } progressHandler
+	 * @param { ((progress: number, finishedCount: number, totalCount: number) => void) | null } progressHandler 진행이 바뀔 때마다 진행률(0 ~ 1), 끝난 수, 전체 수를 받는 함수. (null 이면 끔)
 	 */
 	setProgressHandler(progressHandler) {
 		this.#progressHandler = progressHandler === undefined ? null : progressHandler;
@@ -346,7 +376,7 @@ export class AssetLoader extends Object {
 	// 다 받음 알림 함수 설정. ((failedList) => void, null 이면 끔)
 	//==============================================================================
 	/**
-	 * @param { ((failedList: Array<object>) => void) | null } completeHandler
+	 * @param { ((failedList: Array<object>) => void) | null } completeHandler 다 끝나면 실패 목록을 받는 함수. (null 이면 끔)
 	 */
 	setCompleteHandler(completeHandler) {
 		this.#completeHandler = completeHandler === undefined ? null : completeHandler;
@@ -371,7 +401,7 @@ export class AssetLoader extends Object {
 	// 전체 수.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 넣은 수.
 	 */
 	getTotalCount() {
 		return this.#entryList.length;
@@ -381,7 +411,7 @@ export class AssetLoader extends Object {
 	// 끝난 수. (받은 것과 실패한 것)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 끝난 수.
 	 */
 	getFinishedCount() {
 		return this.#finishedCount;
@@ -391,7 +421,7 @@ export class AssetLoader extends Object {
 	// 받은 수. (실패한 것은 빼고)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 받은 수.
 	 */
 	getLoadedCount() {
 		return this.#loadedCount;
@@ -401,7 +431,7 @@ export class AssetLoader extends Object {
 	// 실패 목록. ({ path, error } 의 복사본)
 	//==============================================================================
 	/**
-	 * @returns { Array<{ path: string, error: any }> }
+	 * @returns { Array<{ path: string, error: any }> } 실패 목록의 복사본.
 	 */
 	getFailedList() {
 		return this.#failedList.slice();
@@ -411,7 +441,7 @@ export class AssetLoader extends Object {
 	// 지금 받는 중인 수. (일꾼이 집어 받기 시작했고 아직 끝나지 않은 것)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 받는 중인 수.
 	 */
 	getInFlightCount() {
 		const entryList = this.#entryList;
@@ -429,7 +459,7 @@ export class AssetLoader extends Object {
 	// 넣은 것을 모두 받았는지. (실패 포함, 넣은 것이 없으면 true)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 모두 끝났으면 참.
 	 */
 	isFinished() {
 		const finishedCount = this.getFinishedCount();

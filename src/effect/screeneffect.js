@@ -13,7 +13,7 @@ import { FullscreenPass } from "../experimental/graphics/fullscreenpass.js";
 //==============================================================================
 export const ScreenEffectType = {
 	// --- 형태 왜곡 ---
-	lensDistortion: "lensDistortion", // 배럴 / 핀쿠션 렌즈 왜곡. (parameters = [세기 — 음수면 핀쿠션])
+	lensDistortion: "lensDistortion", // 배럴 / 핀쿠션 렌즈 왜곡. (parameters = [세기, 음수면 핀쿠션])
 	bulge: "bulge",                   // 볼록 / 오목. (parameters = [중심 x, 중심 y, 세기, 반지름])
 	swirl: "swirl",                   // 소용돌이. (parameters = [중심 x, 중심 y, 회전 수, 반지름])
 	kaleidoscope: "kaleidoscope",     // 만화경. (parameters = [조각 수])
@@ -41,7 +41,7 @@ export const ScreenEffectType = {
 	whiteBalance: "whiteBalance",     // 색온도 / 틴트. (parameters = [온도 -1 ~ 1, 틴트 -1 ~ 1])
 	liftGammaGain: "liftGammaGain",   // 리프트 / 감마 / 게인. (parameters = [리프트, 감마, 게인])
 	colorGrade: "colorGrade",         // 대비 / 채도 / 밝기 + 틴트. (parameters = [대비, 채도, 밝기], color = 틴트)
-	hueShift: "hueShift",             // 색상 회전. (parameters = [회전 수 — strength 와 곱])
+	hueShift: "hueShift",             // 색상 회전. (parameters = [회전 수, strength 와 곱])
 	splitToning: "splitToning",       // 스플릿 토닝. (parameters.xyz = 그림자 색, color = 하이라이트 색, w = 균형)
 	tonemap: "tonemap",               // ACES 톤매핑. (parameters = [노출])
 	gradientMap: "gradientMap",       // 밝기를 두 색 사이로 매핑. (parameters.xyz = 어두운 색, color = 밝은 색)
@@ -741,7 +741,7 @@ const EFFECT_BODY_TABLE = {
 
 
 //==============================================================================
-// 색 텍스처 생성. (RGBA8 — 화면 사본은 RGB8: 기본 프레임버퍼(alpha: false)에서 copyTexSubImage2D 로 떠 오려면 성분이 같아야 한다)
+// 색 텍스처 생성. (RGBA8, 화면 사본은 RGB8: 기본 프레임버퍼(alpha: false)에서 copyTexSubImage2D 로 떠 오려면 성분이 같아야 한다)
 //==============================================================================
 /**
  * @param { WebGL2RenderingContext } webGL2RenderingContext
@@ -827,6 +827,44 @@ function destroyRenderTarget(webGL2RenderingContext, renderTarget) {
 //     // tick 에서
 //     this.screenEffect.tick(timeDelta);
 //==============================================================================
+/**
+ * @example <caption>씬 영역에 비네트와 색수차 걸기</caption>
+ * import { Engine, EngineConfiguration, Scene, ScreenEffect, ScreenEffectType, Color, Colors, Rect } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const graphic = engine.getGraphic();
+ * 		this.screenEffect = new ScreenEffect(graphic);
+ * 		this.screenEffect.setRegion(40, 20, 560, 320, 24);
+ * 		this.screenEffect.setEnabled(ScreenEffectType.vignette, true);
+ * 		this.screenEffect.setColor(ScreenEffectType.vignette, new Color(0.1, 0, 0.2, 1));
+ * 		this.screenEffect.setEnabled(ScreenEffectType.chromatic, true);
+ * 		this.screenEffect.setStrength(ScreenEffectType.chromatic, 0.5);
+ * 	}
+ *
+ * 	tick(timeDelta) {
+ * 		super.tick(timeDelta);
+ * 		this.screenEffect.tick(timeDelta);
+ * 	}
+ *
+ * 	preDraw(graphic) {
+ * 		super.preDraw(graphic);
+ * 		this.screenEffect.begin(graphic);
+ * 		graphic.setFillColor(Colors.white);
+ * 		graphic.drawRect(Rect.create(220, 100, 200, 160));
+ * 	}
+ *
+ * 	postDraw(graphic) {
+ * 		super.postDraw(graphic);
+ * 		this.screenEffect.end(graphic);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class ScreenEffect extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -847,7 +885,7 @@ export class ScreenEffect extends Object {
 	// 생성.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 화면을 떠 올 그래픽. (그 WebGL2 컨텍스트를 쓴다)
 	 */
 	constructor(graphic) {
 		super();
@@ -866,7 +904,7 @@ export class ScreenEffect extends Object {
 	}
 
 	//==============================================================================
-	// 전부 기본값으로. (끄고, 세기 1, 파라미터 / 색 기본 — 모드 전환 때 이전 설정이 남지 않게)
+	// 전부 기본값으로. (끄고, 세기 1, 파라미터 / 색 기본, 모드 전환 때 이전 설정이 남지 않게)
 	//==============================================================================
 	resetAll() {
 		for (const effectType of EFFECT_ORDER) {
@@ -882,13 +920,13 @@ export class ScreenEffect extends Object {
 	}
 
 	//==============================================================================
-	// 적용 영역 설정. (캔버스 픽셀, 왼쪽 위 원점 — null 이면 화면 전체)
+	// 적용 영역 설정. (캔버스 픽셀, 왼쪽 위 원점, null 이면 화면 전체)
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } width
-	 * @param { number } height
+	 * @param { number } x 영역 왼쪽. (캔버스 픽셀)
+	 * @param { number } y 영역 위쪽. (캔버스 픽셀)
+	 * @param { number } width 영역 가로. (캔버스 픽셀)
+	 * @param { number } height 영역 세로. (캔버스 픽셀)
 	 * @param { number } cornerRadius - 둥근 모서리 반지름(픽셀). 0 이면 사각형.
 	 */
 	setRegion(x, y, width, height, cornerRadius = 0) {
@@ -906,7 +944,7 @@ export class ScreenEffect extends Object {
 	// 적용 영역 반환.
 	//==============================================================================
 	/**
-	 * @returns { object | null }
+	 * @returns { object | null } 적용 영역. ({ x, y, width, height, cornerRadius }, 화면 전체면 null)
 	 */
 	getRegion() {
 		return this.#region;
@@ -916,27 +954,27 @@ export class ScreenEffect extends Object {
 	// 갱신. (애니메이션 효과의 시간)
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 시간. (초, 효과 시간에 더한다)
 	 */
 	tick(timeDelta) {
 		this.#time += timeDelta;
 	}
 
 	//==============================================================================
-	// 시작. (씬 preDraw 첫머리 — 씬은 화면에 그대로 그린다. 켜진 효과가 있을 때만 end 가 일한다)
+	// 시작. (씬 preDraw 첫머리, 씬은 화면에 그대로 그린다. 켜진 효과가 있을 때만 end 가 일한다)
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 씬의 그래픽.
 	 */
 	begin(graphic) {
 		this.#isBound = this.hasActiveEffect();
 	}
 
 	//==============================================================================
-	// 효과 적용. (씬 postDraw 끝 — 화면의 영역을 떠 와 효과를 걸고 같은 자리에 되돌려 놓는다)
+	// 효과 적용. (씬 postDraw 끝, 화면의 영역을 떠 와 효과를 걸고 같은 자리에 되돌려 놓는다)
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 씬의 그래픽.
 	 */
 	end(graphic) {
 		if (!this.#isBound) {
@@ -1113,7 +1151,7 @@ export class ScreenEffect extends Object {
 	// 켜진 효과 여부. (세기 0 은 꺼진 것으로 본다)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 켜졌고 세기가 0 보다 큰 효과가 있으면 참.
 	 */
 	hasActiveEffect() {
 		for (const effectState of this.#effectTable.values()) {
@@ -1128,8 +1166,8 @@ export class ScreenEffect extends Object {
 	// 렌더 대상 준비. (크기가 바뀌면 다시 만든다)
 	//==============================================================================
 	/**
-	 * @param { number } width
-	 * @param { number } height
+	 * @param { number } width 가로. (드로잉 버퍼 픽셀)
+	 * @param { number } height 세로. (드로잉 버퍼 픽셀)
 	 */
 	ensureTargets(width, height) {
 		if (this.#sceneTarget && this.#sceneTarget.width === width && this.#sceneTarget.height === height) {
@@ -1154,8 +1192,8 @@ export class ScreenEffect extends Object {
 	// 패스 반환. (없으면 컴파일)
 	//==============================================================================
 	/**
-	 * @param { string } passName
-	 * @returns { FullscreenPass }
+	 * @param { string } passName 패스 이름. (효과 이름이나 copy, bloomBright 같은 내부 단계 이름)
+	 * @returns { FullscreenPass } 패스.
 	 */
 	resolvePass(passName) {
 		let pass = this.#passTable.get(passName);
@@ -1171,8 +1209,8 @@ export class ScreenEffect extends Object {
 	// 효과 켜기 / 끄기.
 	//==============================================================================
 	/**
-	 * @param { string } effectType
-	 * @param { boolean } isEnabled
+	 * @param { string } effectType ScreenEffectType 값. (모르는 값이면 무시한다)
+	 * @param { boolean } isEnabled 켜면 참.
 	 */
 	setEnabled(effectType, isEnabled) {
 		const effectState = this.#effectTable.get(effectType);
@@ -1185,8 +1223,8 @@ export class ScreenEffect extends Object {
 	// 효과 켜짐 여부 반환.
 	//==============================================================================
 	/**
-	 * @param { string } effectType
-	 * @returns { boolean }
+	 * @param { string } effectType ScreenEffectType 값.
+	 * @returns { boolean } 켜졌으면 참. (모르는 값이면 거짓)
 	 */
 	isEnabled(effectType) {
 		const effectState = this.#effectTable.get(effectType);
@@ -1197,8 +1235,8 @@ export class ScreenEffect extends Object {
 	// 세기 설정. (0 이면 꺼진 것과 같다)
 	//==============================================================================
 	/**
-	 * @param { string } effectType
-	 * @param { number } strength
+	 * @param { string } effectType ScreenEffectType 값. (모르는 값이면 무시한다)
+	 * @param { number } strength 세기. (기본 1, 0 이하이면 꺼진 것으로 본다)
 	 */
 	setStrength(effectType, strength) {
 		const effectState = this.#effectTable.get(effectType);
@@ -1211,8 +1249,8 @@ export class ScreenEffect extends Object {
 	// 세기 반환.
 	//==============================================================================
 	/**
-	 * @param { string } effectType
-	 * @returns { number }
+	 * @param { string } effectType ScreenEffectType 값.
+	 * @returns { number } 세기. (모르는 값이면 0)
 	 */
 	getStrength(effectType) {
 		const effectState = this.#effectTable.get(effectType);
@@ -1220,14 +1258,14 @@ export class ScreenEffect extends Object {
 	}
 
 	//==============================================================================
-	// 파라미터 설정. (효과마다 뜻이 다르다 — ScreenEffectType 주석 참고)
+	// 파라미터 설정. (효과마다 뜻이 다르다, ScreenEffectType 주석 참고)
 	//==============================================================================
 	/**
-	 * @param { string } effectType
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } z
-	 * @param { number } w
+	 * @param { string } effectType ScreenEffectType 값. (모르는 값이면 무시한다)
+	 * @param { number } x 첫째 파라미터.
+	 * @param { number } y 둘째 파라미터. (기본 0)
+	 * @param { number } z 셋째 파라미터. (기본 0)
+	 * @param { number } w 넷째 파라미터. (기본 0)
 	 */
 	setParameters(effectType, x, y = 0, z = 0, w = 0) {
 		const effectState = this.#effectTable.get(effectType);
@@ -1240,9 +1278,9 @@ export class ScreenEffect extends Object {
 	// 파라미터 하나 설정. (이름은 SCREEN_EFFECT_PARAMETER_NAMES)
 	//==============================================================================
 	/**
-	 * @param { string } effectType
-	 * @param { string } parameterName
-	 * @param { number } value
+	 * @param { string } effectType ScreenEffectType 값. (모르는 값이면 무시한다)
+	 * @param { string } parameterName 파라미터 이름. (SCREEN_EFFECT_PARAMETER_NAMES 의 것, 없는 이름이면 무시한다)
+	 * @param { number } value 값.
 	 */
 	setParameter(effectType, parameterName, value) {
 		const effectState = this.#effectTable.get(effectType);
@@ -1260,8 +1298,8 @@ export class ScreenEffect extends Object {
 	// 파라미터 반환.
 	//==============================================================================
 	/**
-	 * @param { string } effectType
-	 * @returns { number[] }
+	 * @param { string } effectType ScreenEffectType 값.
+	 * @returns { number[] } 파라미터. ([x, y, z, w], 복사하지 않은 배열, 모르는 값이면 0 넷)
 	 */
 	getParameters(effectType) {
 		const effectState = this.#effectTable.get(effectType);
@@ -1272,8 +1310,8 @@ export class ScreenEffect extends Object {
 	// 색 설정.
 	//==============================================================================
 	/**
-	 * @param { string } effectType
-	 * @param { Color } color
+	 * @param { string } effectType ScreenEffectType 값. (모르는 값이면 무시한다)
+	 * @param { Color } color 효과 색. (복사해 둔다, null 이면 무시한다)
 	 */
 	setColor(effectType, color) {
 		const effectState = this.#effectTable.get(effectType);
@@ -1286,8 +1324,8 @@ export class ScreenEffect extends Object {
 	// 색 반환.
 	//==============================================================================
 	/**
-	 * @param { string } effectType
-	 * @returns { Color }
+	 * @param { string } effectType ScreenEffectType 값.
+	 * @returns { Color } 효과 색. (모르는 값이면 흰색)
 	 */
 	getColor(effectType) {
 		const effectState = this.#effectTable.get(effectType);
@@ -1307,8 +1345,20 @@ export class ScreenEffect extends Object {
 	// 타임라인 속성 적용. ("vignette" = 세기(0 이면 끔), "shockwave.radius" = 파라미터, "fade.color" = 색)
 	//==============================================================================
 	/**
-	 * @param { string } propertyName
-	 * @param { * } value
+	 * @param { string } propertyName 속성 이름. ("효과" 는 세기, "효과.color" 는 색, "효과.enabled" 는 켜짐, "효과.파라미터 이름" 은 파라미터, 모르는 효과면 무시한다)
+	 * @param { * } value 값. (세기와 파라미터는 숫자로 바꾸고, 색은 HEX 글만 받는다)
+	 * @example <caption>타임라인 속성 이름으로 충격파와 페이드 바꾸기</caption>
+	 * import { Engine, EngineConfiguration, ScreenEffect, ScreenEffectType } from "./build/vanilla.js";
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * const graphic = engine.getGraphic();
+	 * const screenEffect = new ScreenEffect(graphic);
+	 * screenEffect.setTimelineProperty("shockwave", 1);
+	 * screenEffect.setTimelineProperty("shockwave.radius", 0.4);
+	 * screenEffect.setTimelineProperty("fade.color", "#ff8800");
+	 * screenEffect.setParameter(ScreenEffectType.shockwave, "width", 0.2);
+	 * console.log(screenEffect.isEnabled(ScreenEffectType.shockwave), screenEffect.getParameters(ScreenEffectType.shockwave));
 	 */
 	setTimelineProperty(propertyName, value) {
 		const separatorIndex = propertyName.indexOf(".");
@@ -1339,17 +1389,17 @@ export class ScreenEffect extends Object {
 	// 시간 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 효과 시간. (초)
 	 */
 	getTime() {
 		return this.#time;
 	}
 
 	//==============================================================================
-	// 씬 텍스처 반환. (end 이후 — 마지막 프레임에 떠 온 영역 원본)
+	// 씬 텍스처 반환. (end 이후, 마지막 프레임에 떠 온 영역 원본)
 	//==============================================================================
 	/**
-	 * @returns { WebGLTexture | null }
+	 * @returns { WebGLTexture | null } 떠 온 영역 텍스처. (아직 없으면 null)
 	 */
 	getSceneTexture() {
 		return this.#sceneTarget ? this.#sceneTarget.texture : null;
@@ -1359,7 +1409,7 @@ export class ScreenEffect extends Object {
 	// 적용 차례 반환. (정적)
 	//==============================================================================
 	/**
-	 * @returns { string[] }
+	 * @returns { string[] } 효과 이름의 적용 차례. (새 배열)
 	 */
 	static getEffectOrder() {
 		return EFFECT_ORDER.slice();

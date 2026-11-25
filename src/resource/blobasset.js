@@ -8,6 +8,15 @@ import { Asset, AssetType } from "../core/asset.js";
 //==============================================================================
 // 블롭 애셋. (바이너리)
 //==============================================================================
+/**
+ * @example <caption>파일을 블롭으로 받기</caption>
+ * import { BlobAsset } from "./build/vanilla.js";
+ *
+ * const blobAsset = new BlobAsset();
+ * await blobAsset.load("examples/assets/beep.wav");
+ * const blob = blobAsset.getBlob();
+ * console.log(blob.size, blob.type, blobAsset.isLoaded());
+ */
 export class BlobAsset extends Asset {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -28,7 +37,8 @@ export class BlobAsset extends Asset {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { string } assetPath 
+	 * @param { string } assetPath 파일 경로. (이미 읽혔으면 아무것도 하지 않는다)
+	 * @returns { Promise<void> } 다 받으면 풀리는 프로미스. (실패 응답이면 console.error 로 알리고 거부된다)
 	 */
 	async load(assetPath) {
 
@@ -54,7 +64,7 @@ export class BlobAsset extends Asset {
 	//==============================================================================
 	/**
 	 * @param { string } assetPath getAssetPath 에 쓸 이름.
-	 * @param { ArrayBuffer | ArrayBufferView | Blob } bytes
+	 * @param { ArrayBuffer | ArrayBufferView | Blob } bytes 파일의 바이트. (Blob 이면 그대로 쓰고, 아니면 Blob 으로 감싼다)
 	 */
 	loadFromBytes(assetPath, bytes) {
 		this.setAssetPath(assetPath);
@@ -66,7 +76,7 @@ export class BlobAsset extends Asset {
 	// 블롭 반환.
 	//==============================================================================
 	/**
-	 * @returns { Blob }
+	 * @returns { Blob } 받은 블롭. (읽기 전이면 null)
 	 */ 
     getBlob() {
         return this.#blob;

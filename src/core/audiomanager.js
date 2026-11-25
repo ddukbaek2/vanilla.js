@@ -19,7 +19,7 @@ import { PlatformType } from "../base/platform.js";
 //  - 그래서 AudioContext 는 lazy 생성 + user gesture 가 발생한 뒤에만 만든다.
 //  - resumeContext() 도 user gesture 이전에는 silently no-op 한다.
 //  - createAudioPlayer() 가 user gesture 전에 호출될 수 있는 경우를 위해
-//    플레이어 생성 시점에는 (마지못해) AudioContext 를 만든다 — 이때만 경고가 날 수 있음.
+//    플레이어 생성 시점에는 (마지못해) AudioContext 를 만든다, 이때만 경고가 날 수 있음.
 //
 // iOS 버전업 대응 (2026-10-22 03:41, iOS 26.6.2 에서 확인):
 //  - iOS 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 시계가 실제로 흐르는지 확인한다.
@@ -111,7 +111,7 @@ export class AudioManager extends Object {
 			return;
 		}
 		// iOS WebKit 은 표준 "suspended" 외에 비표준 "interrupted" 상태를 쓴다.
-		// (앱 전환·시스템 팝업·오디오 세션 경합 등) 두 상태만 명시적으로 재개를 시도한다 —
+		// (앱 전환, 시스템 팝업, 오디오 세션 경합 등) 두 상태만 명시적으로 재개를 시도한다,
 		// "interrupted" 는 iOS 에만 존재하는 값이라 다른 플랫폼 동작은 기존과 완전히 동일하다.
 		if (audioContext.state !== "suspended" && audioContext.state !== "interrupted") {
 			return;

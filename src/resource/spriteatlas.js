@@ -44,6 +44,38 @@ function removeExtension(fileName) {
 // - 쪽 경로에 빗금(/)이 없으면 JSON 이 있는 폴더를 기준으로, 있으면 적힌 그대로 읽는다.
 // - 여러 아틀라스를 addSearchAtlas 로 넣어 두면 findFrame, applyFrame(정적) 이 넣은 차례로 찾는다. (앞의 것이 이긴다)
 //==============================================================================
+/**
+ * @example <caption>찾을 아틀라스에 넣고 스프라이트에 조각 걸기</caption>
+ * import { Engine, EngineConfiguration, Scene, WorldNode, Sprite, SpriteAtlas, Vector2 } from "./build/vanilla.js";
+ *
+ * const spriteAtlas = new SpriteAtlas();
+ * await spriteAtlas.loadData({
+ * 	pagePaths: ["examples/assets/spritesheet.png"],
+ * 	frames: {
+ * 		"walk-0.png": [0, 0, 0, 200, 200],
+ * 		"walk-1.png": [0, 200, 0, 200, 200],
+ * 	},
+ * });
+ * SpriteAtlas.addSearchAtlas(spriteAtlas);
+ *
+ * class MainScene extends Scene {
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const node = new WorldNode();
+ * 		node.setContentSize(Vector2.create(200, 200));
+ * 		node.setLocalPosition(Vector2.create(100, 100));
+ * 		const root = this.getRoot();
+ * 		root.addChild(node);
+ * 		const sprite = node.addComponent(Sprite);
+ * 		const isFound = SpriteAtlas.applySearchFrame(sprite, "walk-1");
+ * 		console.log(isFound);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class SpriteAtlas extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -66,8 +98,8 @@ export class SpriteAtlas extends Object {
 	// 아틀라스 JSON 과 쪽 그림 불러오기. (쪽 그림은 한꺼번에 받는다)
 	//==============================================================================
 	/**
-	 * @param { string } jsonPath
-	 * @returns { Promise<void> }
+	 * @param { string } jsonPath 아틀라스 JSON 경로.
+	 * @returns { Promise<void> } 다 읽으면 풀리는 프로미스. (JSON 을 읽지 못하면 알리고 풀린다, 쪽 그림을 읽지 못하면 거부된다)
 	 */
 	async load(jsonPath) {
 		const jsonAsset = new JsonAsset();
@@ -81,9 +113,23 @@ export class SpriteAtlas extends Object {
 	// 아틀라스 자료로 불러오기. (JSON 을 읽은 객체나 코드에 둔 같은 꼴의 객체, 쪽 경로에 빗금이 없으면 baseDirectory 를 앞에 붙인다)
 	//==============================================================================
 	/**
-	 * @param { object } atlasData
-	 * @param { string } baseDirectory
-	 * @returns { Promise<void> }
+	 * @param { object } atlasData 아틀라스 자료. (tools/atlas.cjs 꼴이나 pagePaths, frames 꼴, 다른 꼴이면 알리고 아무것도 하지 않는다)
+	 * @param { string } baseDirectory 빗금 없는 쪽 경로 앞에 붙일 폴더. (끝의 빗금까지, 기본 빈 글)
+	 * @returns { Promise<void> } 쪽 그림을 다 읽으면 풀리는 프로미스. (읽지 못하면 거부된다)
+	 * @example <caption>코드에 둔 아틀라스 자료로 읽기</caption>
+	 * import { SpriteAtlas } from "./build/vanilla.js";
+	 *
+	 * const spriteAtlas = new SpriteAtlas();
+	 * await spriteAtlas.loadData({
+	 * 	pagePaths: ["examples/assets/spritesheet.png"],
+	 * 	frames: {
+	 * 		"walk-0.png": [0, 0, 0, 200, 200],
+	 * 		"walk-1.png": [0, 200, 0, 200, 200],
+	 * 	},
+	 * });
+	 * const frame = spriteAtlas.readFrame("walk-1");
+	 * const imageRect = frame.getImageRect();
+	 * console.log(spriteAtlas.getPageCount(), spriteAtlas.getFrameNames(), imageRect.x, spriteAtlas.hasFrame("walk-1.png"));
 	 */
 	async loadData(atlasData, baseDirectory = "") {
 		const pagePaths = [];
@@ -154,8 +200,8 @@ export class SpriteAtlas extends Object {
 	// 조각 읽기. (없으면 null)
 	//==============================================================================
 	/**
-	 * @param { string } frameName
-	 * @returns { Frame | null }
+	 * @param { string } frameName 그림 이름. (확장자를 떼어도 된다)
+	 * @returns { Frame | null } 조각. (없으면 null)
 	 */
 	readFrame(frameName) {
 		const frame = this.#frames.get(frameName);
@@ -169,8 +215,8 @@ export class SpriteAtlas extends Object {
 	// 조각이 있는지.
 	//==============================================================================
 	/**
-	 * @param { string } frameName
-	 * @returns { boolean }
+	 * @param { string } frameName 그림 이름.
+	 * @returns { boolean } 있으면 참.
 	 */
 	hasFrame(frameName) {
 		return this.#frames.has(frameName);
@@ -180,9 +226,9 @@ export class SpriteAtlas extends Object {
 	// 스프라이트에 조각 걸기. (없는 이름이면 그림을 비우고 false)
 	//==============================================================================
 	/**
-	 * @param { Sprite } sprite
-	 * @param { string } frameName
-	 * @returns { boolean }
+	 * @param { Sprite } sprite 조각을 걸 스프라이트.
+	 * @param { string } frameName 그림 이름.
+	 * @returns { boolean } 찾아 걸었으면 참.
 	 */
 	applyFrame(sprite, frameName) {
 		const frame = this.readFrame(frameName);
@@ -194,7 +240,7 @@ export class SpriteAtlas extends Object {
 	// 쪽 그림 목록 반환.
 	//==============================================================================
 	/**
-	 * @returns { HTMLImageElement[] }
+	 * @returns { HTMLImageElement[] } 쪽 그림 목록. (쪽 번호 차례)
 	 */
 	getPageImages() {
 		return this.#pageImages;
@@ -204,7 +250,7 @@ export class SpriteAtlas extends Object {
 	// 쪽 수.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 쪽 수.
 	 */
 	getPageCount() {
 		const pageImages = this.getPageImages();
@@ -215,7 +261,7 @@ export class SpriteAtlas extends Object {
 	// 이름 목록 반환. (확장자를 뗀 이름과 파일 이름이 함께 든다)
 	//==============================================================================
 	/**
-	 * @returns { string[] }
+	 * @returns { string[] } 이름 목록.
 	 */
 	getFrameNames() {
 		return System.Array.from(this.#frames.keys());
@@ -225,7 +271,7 @@ export class SpriteAtlas extends Object {
 	// 불러왔는지.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 불러왔으면 참.
 	 */
 	isLoaded() {
 		return this.#isLoaded;
@@ -235,7 +281,7 @@ export class SpriteAtlas extends Object {
 	// 찾을 아틀라스 넣기. (정적, 맨 뒤에 넣는다, 이미 들었으면 그대로)
 	//==============================================================================
 	/**
-	 * @param { SpriteAtlas } spriteAtlas
+	 * @param { SpriteAtlas } spriteAtlas 넣을 아틀라스.
 	 */
 	static addSearchAtlas(spriteAtlas) {
 		if (searchAtlasList.indexOf(spriteAtlas) >= 0) {
@@ -248,7 +294,7 @@ export class SpriteAtlas extends Object {
 	// 찾을 아틀라스 빼기. (정적)
 	//==============================================================================
 	/**
-	 * @param { SpriteAtlas } spriteAtlas
+	 * @param { SpriteAtlas } spriteAtlas 뺄 아틀라스. (들어 있지 않으면 아무것도 하지 않는다)
 	 */
 	static removeSearchAtlas(spriteAtlas) {
 		const atlasIndex = searchAtlasList.indexOf(spriteAtlas);
@@ -268,8 +314,8 @@ export class SpriteAtlas extends Object {
 	// 찾을 아틀라스들에서 조각 찾기. (정적, 넣은 차례로, 없으면 null)
 	//==============================================================================
 	/**
-	 * @param { string } frameName
-	 * @returns { Frame | null }
+	 * @param { string } frameName 그림 이름.
+	 * @returns { Frame | null } 처음 찾은 조각. (없으면 null)
 	 */
 	static findFrame(frameName) {
 		for (const spriteAtlas of searchAtlasList) {
@@ -285,9 +331,9 @@ export class SpriteAtlas extends Object {
 	// 찾을 아틀라스들에서 찾은 조각을 스프라이트에 걸기. (정적, 없으면 그림을 비우고 false)
 	//==============================================================================
 	/**
-	 * @param { Sprite } sprite
-	 * @param { string } frameName
-	 * @returns { boolean }
+	 * @param { Sprite } sprite 조각을 걸 스프라이트.
+	 * @param { string } frameName 그림 이름.
+	 * @returns { boolean } 찾아 걸었으면 참.
 	 */
 	static applySearchFrame(sprite, frameName) {
 		const frame = SpriteAtlas.findFrame(frameName);
@@ -299,9 +345,32 @@ export class SpriteAtlas extends Object {
 	// 넘긴 아틀라스들에서 차례로 조각 찾기. (정적, 앞의 것이 이긴다, 없으면 null, 찾을 아틀라스 목록을 쓰지 않는다)
 	//==============================================================================
 	/**
-	 * @param { SpriteAtlas[] } atlasList
-	 * @param { string } frameName
-	 * @returns { Frame | null }
+	 * @param { SpriteAtlas[] } atlasList 찾을 아틀라스 목록. (앞의 것이 이긴다)
+	 * @param { string } frameName 그림 이름.
+	 * @returns { Frame | null } 처음 찾은 조각. (없으면 null)
+	 * @example <caption>계절 아틀라스를 기본 아틀라스보다 먼저 찾기</caption>
+	 * import { SpriteAtlas } from "./build/vanilla.js";
+	 *
+	 * const baseAtlas = new SpriteAtlas();
+	 * await baseAtlas.loadData({
+	 * 	pagePaths: ["examples/assets/spritesheet.png"],
+	 * 	frames: {
+	 * 		"walk-0.png": [0, 0, 0, 200, 200],
+	 * 		"walk-1.png": [0, 200, 0, 200, 200],
+	 * 	},
+	 * });
+	 * const seasonAtlas = new SpriteAtlas();
+	 * await seasonAtlas.loadData({
+	 * 	pagePaths: ["examples/assets/spritesheet.png"],
+	 * 	frames: {
+	 * 		"walk-0": [0, 400, 400, 200, 200],
+	 * 	},
+	 * });
+	 * const frame = SpriteAtlas.findFrameInOrder([seasonAtlas, baseAtlas], "walk-0");
+	 * const imageRect = frame.getImageRect();
+	 * const fallbackFrame = SpriteAtlas.findFrameInOrder([seasonAtlas, baseAtlas], "walk-1");
+	 * const fallbackRect = fallbackFrame.getImageRect();
+	 * console.log(imageRect.x, fallbackRect.x);
 	 */
 	static findFrameInOrder(atlasList, frameName) {
 		for (const spriteAtlas of atlasList) {
@@ -317,10 +386,10 @@ export class SpriteAtlas extends Object {
 	// 넘긴 아틀라스들에서 차례로 찾은 조각을 스프라이트에 걸기. (정적, 없으면 그림을 비우고 false)
 	//==============================================================================
 	/**
-	 * @param { SpriteAtlas[] } atlasList
-	 * @param { Sprite } sprite
-	 * @param { string } frameName
-	 * @returns { boolean }
+	 * @param { SpriteAtlas[] } atlasList 찾을 아틀라스 목록. (앞의 것이 이긴다)
+	 * @param { Sprite } sprite 조각을 걸 스프라이트.
+	 * @param { string } frameName 그림 이름.
+	 * @returns { boolean } 찾아 걸었으면 참.
 	 */
 	static applyFrameInOrder(atlasList, sprite, frameName) {
 		const frame = SpriteAtlas.findFrameInOrder(atlasList, frameName);

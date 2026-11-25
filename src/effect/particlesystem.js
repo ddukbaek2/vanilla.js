@@ -20,11 +20,11 @@ import { SeededRandom } from "../base/seededrandom.js";
 // - edge: 가로 선분 위 무작위 위치, 위쪽 방향. (눈 / 비처럼 위에서 뿌릴 때)
 //==============================================================================
 export const ParticleEmitterShape = {
-	point: "point",
-	circle: "circle",
-	cone: "cone",
-	box: "box",
-	edge: "edge",
+	point: "point", // 노드 원점 한 점에서 무작위 방향.
+	circle: "circle", // 반지름 안 무작위 위치에서 중심 바깥 방향.
+	cone: "cone", // 반지름 안 위치에서 위쪽(-y) 기준 반각 안 부채꼴 방향.
+	box: "box", // 사각 영역 안 무작위 위치에서 위쪽(-y) 방향.
+	edge: "edge", // 가로 선분 위 무작위 위치에서 아래쪽(+y) 방향.
 };
 
 
@@ -36,10 +36,10 @@ export const ParticleEmitterShape = {
 // - image: setImage 로 넣은 이미지.
 //==============================================================================
 export const ParticleRenderShape = {
-	circle: "circle",
-	rect: "rect",
-	streak: "streak",
-	image: "image",
+	circle: "circle", // 부드러운 원. (기본)
+	rect: "rect", // 사각형. (회전하는 판)
+	streak: "streak", // 진행 방향으로 늘인 띠.
+	image: "image", // setImage 로 넣은 이미지.
 };
 
 
@@ -59,6 +59,39 @@ export const ParticleRenderShape = {
 //     ]);
 //     particleSystem.play();
 //==============================================================================
+/**
+ * @example <caption>노드에 붙여 불꽃 뿜기</caption>
+ * import { Engine, EngineConfiguration, Scene, WorldNode, ParticleSystem, ParticleEmitterShape, Color, Vector2 } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const node = new WorldNode();
+ * 		node.setLocalPosition(Vector2.create(320, 300));
+ * 		const root = this.getRoot();
+ * 		root.addChild(node);
+ * 		const particleSystem = node.addComponent(ParticleSystem);
+ * 		particleSystem.setEmitterShape(ParticleEmitterShape.cone);
+ * 		particleSystem.setShapeRadius(10);
+ * 		particleSystem.setConeAngle(0.3);
+ * 		particleSystem.setEmissionRate(60);
+ * 		particleSystem.setStartLifetime(0.6, 1.2);
+ * 		particleSystem.setStartSpeed(40, 120);
+ * 		particleSystem.setStartSize(10, 18);
+ * 		particleSystem.setSizeOverLifetime(1, 0.2);
+ * 		particleSystem.setColorOverLifetime([
+ * 			{ time: 0, color: new Color(1, 0.8, 0.3, 1) },
+ * 			{ time: 1, color: new Color(1, 0.2, 0, 0) },
+ * 		]);
+ * 		particleSystem.setAdditive(true);
+ * 		particleSystem.play();
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class ParticleSystem extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -119,7 +152,7 @@ export class ParticleSystem extends Component {
 	/** @private @type { number } */ #streakScale; // streak 길이 = 속도 x 이 값.
 	/** @private @type { boolean } */ #isWorldSpace; // 참이면 방출 후 노드 이동의 영향을 받지 않는다.
 	/** @private @type { boolean } */ #isManualTick; // 참이면 노드 갱신에서 진행하지 않고 simulate() 로만 진행한다. (타임라인 등 외부 시간)
-	/** @private @type { SeededRandom | null } */ #random; // 시드가 있으면 이 난수로 스폰한다. (stop(true) 로 비우면 시드로 되돌아가 같은 결과가 나온다 — 타임라인 스크럽)
+	/** @private @type { SeededRandom | null } */ #random; // 시드가 있으면 이 난수로 스폰한다. (stop(true) 로 비우면 시드로 되돌아가 같은 결과가 나온다, 타임라인 스크럽)
 	/** @private @type { number | null } */ #randomSeed;
 
 	//==============================================================================
@@ -195,6 +228,9 @@ export class ParticleSystem extends Component {
 		}
 	}
 
+	//==============================================================================
+	// 정지. (방출을 멈춘다, 살아 있는 파티클은 isClearing 이 아니면 수명까지 움직인다)
+	//==============================================================================
 	/**
 	 * @param { boolean } isClearing 참이면 살아 있는 파티클도 지운다.
 	 */
@@ -213,7 +249,7 @@ export class ParticleSystem extends Component {
 	// 한 번에 여러 개 방출. (버튼 클릭 등 이벤트성 연출)
 	//==============================================================================
 	/**
-	 * @param { number } count
+	 * @param { number } count 방출할 수. (최대 수에 닿으면 더 만들지 않는다)
 	 * @param { Vector2 | null } worldOffset 방출 원점 보정. (노드 로컬 기준)
 	 */
 	emit(count, worldOffset = null) {
@@ -223,11 +259,11 @@ export class ParticleSystem extends Component {
 	}
 
 	//==============================================================================
-	// 갱신. (노드 갱신 — 수동 틱이면 건너뛴다)
+	// 갱신. (노드 갱신, 수동 틱이면 건너뛴다)
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 시간. (초)
 	 */
 	tick(timeDelta) {
 		if (this.#isManualTick) {
@@ -237,10 +273,10 @@ export class ParticleSystem extends Component {
 	}
 
 	//==============================================================================
-	// 시간 진행. (방출 + 적분 — 수동 틱 모드에서는 외부가 부른다)
+	// 시간 진행. (방출 + 적분, 수동 틱 모드에서는 외부가 부른다)
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 진행할 시간. (초)
 	 */
 	simulate(timeDelta) {
 		// 방출.
@@ -437,13 +473,13 @@ export class ParticleSystem extends Component {
 	}
 
 	//==============================================================================
-	// 출력. (정점 색 배치 — 파티클 수와 무관하게 시스템당 드로우 한 번)
+	// 출력. (정점 색 배치, 파티클 수와 무관하게 시스템당 드로우 한 번)
 	// - circle 은 부드러운 원 텍스처, rect / streak 은 흰 텍스처 쿼드로 그린다.
 	//   image 는 파티클 수가 적다는 가정으로 개별 드로우를 유지한다.
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	draw(graphic) {
 		const particleCount = this.#particleList.length;
@@ -569,7 +605,7 @@ export class ParticleSystem extends Component {
 	}
 
 	//==============================================================================
-	// 이미지 파티클 출력. (개별 드로우 — 파티클 수가 적은 연출용)
+	// 이미지 파티클 출력. (개별 드로우, 파티클 수가 적은 연출용)
 	//==============================================================================
 	/**
 	 * @private
@@ -601,123 +637,275 @@ export class ParticleSystem extends Component {
 	//==============================================================================
 	// 설정 메서드 목록. (유니티 모듈 대응)
 	//==============================================================================
-	/** @param { number } emissionRate 초당 방출 수. */
+
+	//==============================================================================
+	// 초당 방출 수 설정. (기본 20)
+	//==============================================================================
+	/**
+	 * @param { number } emissionRate 초당 방출 수.
+	 */
 	setEmissionRate(emissionRate) {
 		this.#emissionRate = emissionRate;
 	}
 
-	/** @param { object[] } burstList [{ time, count }] */
+	//==============================================================================
+	// 버스트 목록 설정. (정한 때에 한꺼번에 방출한다, 루프면 duration 마다 되풀이)
+	//==============================================================================
+	/**
+	 * @param { object[] } burstList [{ time, count }]
+	 * @example <caption>한 번 터지고 끝나는 폭죽</caption>
+	 * import { Engine, EngineConfiguration, Scene, WorldNode, ParticleSystem, ParticleEmitterShape, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	initialize(engine) {
+	 * 		super.initialize(engine);
+	 * 		const node = new WorldNode();
+	 * 		node.setLocalPosition(Vector2.create(320, 180));
+	 * 		const root = this.getRoot();
+	 * 		root.addChild(node);
+	 * 		const particleSystem = node.addComponent(ParticleSystem);
+	 * 		particleSystem.setLooping(false);
+	 * 		particleSystem.setDuration(0.5);
+	 * 		particleSystem.setEmissionRate(0);
+	 * 		particleSystem.setBurstList([
+	 * 			{ time: 0, count: 40 },
+	 * 			{ time: 0.3, count: 20 },
+	 * 		]);
+	 * 		particleSystem.setEmitterShape(ParticleEmitterShape.circle);
+	 * 		particleSystem.setShapeRadius(4);
+	 * 		particleSystem.setStartSpeed(80, 200);
+	 * 		particleSystem.setGravity(0, 300);
+	 * 		particleSystem.play();
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
 	setBurstList(burstList) {
 		this.#burstList = burstList.map((burst) => {
 			return { time: burst.time, count: burst.count, fired: false };
 		});
 	}
 
-	/** @param { string } emitterShape ParticleEmitterShape 값. */
+	//==============================================================================
+	// 방출 모양 설정. (기본 point)
+	//==============================================================================
+	/**
+	 * @param { string } emitterShape ParticleEmitterShape 값.
+	 */
 	setEmitterShape(emitterShape) {
 		this.#emitterShape = emitterShape;
 	}
 
-	/** @param { number } shapeRadius circle / cone 반지름. */
+	//==============================================================================
+	// 방출 반지름 설정. (픽셀, 기본 0)
+	//==============================================================================
+	/**
+	 * @param { number } shapeRadius circle / cone 반지름.
+	 */
 	setShapeRadius(shapeRadius) {
 		this.#shapeRadius = shapeRadius;
 	}
 
-	/** @param { number } coneAngleRadian cone 반각. (라디안) */
+	//==============================================================================
+	// cone 반각 설정. (기본 0.5 라디안)
+	//==============================================================================
+	/**
+	 * @param { number } coneAngleRadian cone 반각. (라디안)
+	 */
 	setConeAngle(coneAngleRadian) {
 		this.#coneAngleRadian = coneAngleRadian;
 	}
 
-	/** @param { number } width @param { number } height box 크기. */
+	//==============================================================================
+	// box 크기 설정. (픽셀, 기본 0, 0)
+	//==============================================================================
+	/**
+	 * @param { number } width box 가로.
+	 * @param { number } height box 크기.
+	 */
 	setBoxSize(width, height) {
 		this.#boxSize = Vector2.create(width, height);
 	}
 
-	/** @param { number } edgeWidth edge 가로 길이. */
+	//==============================================================================
+	// edge 길이 설정. (픽셀, 기본 0)
+	//==============================================================================
+	/**
+	 * @param { number } edgeWidth edge 가로 길이.
+	 */
 	setEdgeWidth(edgeWidth) {
 		this.#edgeWidth = edgeWidth;
 	}
 
-	/** @param { number } minSeconds @param { number } maxSeconds */
+	//==============================================================================
+	// 시작 수명 범위 설정. (기본 1 초)
+	//==============================================================================
+	/**
+	 * @param { number } minSeconds 수명 최솟값. (초)
+	 * @param { number } maxSeconds 수명 최댓값. (초, 주지 않으면 최솟값)
+	 */
 	setStartLifetime(minSeconds, maxSeconds = minSeconds) {
 		this.#startLifetimeMin = minSeconds;
 		this.#startLifetimeMax = maxSeconds;
 	}
 
-	/** @param { number } minSpeed @param { number } maxSpeed */
+	//==============================================================================
+	// 시작 속력 범위 설정. (기본 60)
+	//==============================================================================
+	/**
+	 * @param { number } minSpeed 속력 최솟값. (초당 픽셀)
+	 * @param { number } maxSpeed 속력 최댓값. (초당 픽셀, 주지 않으면 최솟값)
+	 */
 	setStartSpeed(minSpeed, maxSpeed = minSpeed) {
 		this.#startSpeedMin = minSpeed;
 		this.#startSpeedMax = maxSpeed;
 	}
 
-	/** @param { number } minSize @param { number } maxSize */
+	//==============================================================================
+	// 시작 크기 범위 설정. (기본 6)
+	//==============================================================================
+	/**
+	 * @param { number } minSize 크기 최솟값. (픽셀)
+	 * @param { number } maxSize 크기 최댓값. (픽셀, 주지 않으면 최솟값)
+	 */
 	setStartSize(minSize, maxSize = minSize) {
 		this.#startSizeMin = minSize;
 		this.#startSizeMax = maxSize;
 	}
 
-	/** @param { number } minRadian @param { number } maxRadian */
+	//==============================================================================
+	// 시작 회전 범위 설정. (기본 0)
+	//==============================================================================
+	/**
+	 * @param { number } minRadian 회전 최솟값. (라디안)
+	 * @param { number } maxRadian 회전 최댓값. (라디안, 주지 않으면 최솟값)
+	 */
 	setStartRotation(minRadian, maxRadian = minRadian) {
 		this.#startRotationMin = minRadian;
 		this.#startRotationMax = maxRadian;
 	}
 
-	/** @param { Color } colorA @param { Color } colorB 둘 사이 무작위. */
+	//==============================================================================
+	// 시작 색 범위 설정. (기본 흰색)
+	//==============================================================================
+	/**
+	 * @param { Color } colorA 시작 색. (복사해 둔다)
+	 * @param { Color } colorB 둘 사이 무작위.
+	 */
 	setStartColor(colorA, colorB = colorA) {
 		this.#startColorA = colorA.clone();
 		this.#startColorB = colorB.clone();
 	}
 
-	/** @param { object[] } gradient [{ time: 0~1, color }] */
+	//==============================================================================
+	// 수명에 따른 색 설정. (시작 색에 곱한다, 키 사이는 선형 보간)
+	//==============================================================================
+	/**
+	 * @param { object[] } gradient [{ time: 0~1, color }]
+	 */
 	setColorOverLifetime(gradient) {
 		this.#colorOverLifetime = gradient.map((key) => {
 			return { time: key.time, color: key.color.clone() };
 		});
 	}
 
-	/** @param { number } startScale @param { number } endScale */
+	//==============================================================================
+	// 수명에 따른 크기 배율 설정. (시작에서 끝으로 선형, 기본 1, 1)
+	//==============================================================================
+	/**
+	 * @param { number } startScale 태어날 때의 크기 배율.
+	 * @param { number } endScale 수명이 다할 때의 크기 배율.
+	 */
 	setSizeOverLifetime(startScale, endScale) {
 		this.#sizeOverLifetimeStart = startScale;
 		this.#sizeOverLifetimeEnd = endScale;
 	}
 
-	/** @param { number } minRadianPerSecond @param { number } maxRadianPerSecond */
+	//==============================================================================
+	// 회전 속도 범위 설정. (기본 0)
+	//==============================================================================
+	/**
+	 * @param { number } minRadianPerSecond 회전 속도 최솟값. (초당 라디안)
+	 * @param { number } maxRadianPerSecond 회전 속도 최댓값. (초당 라디안, 주지 않으면 최솟값)
+	 */
 	setAngularVelocity(minRadianPerSecond, maxRadianPerSecond = minRadianPerSecond) {
 		this.#angularVelocityMin = minRadianPerSecond;
 		this.#angularVelocityMax = maxRadianPerSecond;
 	}
 
-	/** @param { number } gravityX @param { number } gravityY */
+	//==============================================================================
+	// 중력 설정. (기본 0, 0)
+	//==============================================================================
+	/**
+	 * @param { number } gravityX 가로 가속. (매초 속도에 더하는 초당 픽셀)
+	 * @param { number } gravityY 세로 가속. (매초 속도에 더하는 초당 픽셀, 양수가 아래)
+	 */
 	setGravity(gravityX, gravityY) {
 		this.#gravity = Vector2.create(gravityX, gravityY);
 	}
 
-	/** @param { number } damping 초당 감쇠 계수. (0 = 없음) */
+	//==============================================================================
+	// 감쇠 설정. (기본 0)
+	//==============================================================================
+	/**
+	 * @param { number } damping 초당 감쇠 계수. (0 = 없음)
+	 */
 	setDamping(damping) {
 		this.#damping = damping;
 	}
 
-	/** @param { string } renderShape ParticleRenderShape 값. */
+	//==============================================================================
+	// 렌더 모양 설정. (기본 circle)
+	//==============================================================================
+	/**
+	 * @param { string } renderShape ParticleRenderShape 값.
+	 */
 	setRenderShape(renderShape) {
 		this.#renderShape = renderShape;
 	}
 
-	/** @param { * } image 엔진 이미지. (renderShape image 전용) */
+	//==============================================================================
+	// 파티클 이미지 설정.
+	//==============================================================================
+	/**
+	 * @param { * } image 엔진 이미지. (renderShape image 전용)
+	 */
 	setImage(image) {
 		this.#image = image;
 	}
 
-	/** @param { boolean } isAdditive 가산 합성 여부. (setBlendMode("lighter") 의 설탕) */
+	//==============================================================================
+	// 가산 합성 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } isAdditive 가산 합성 여부. (setBlendMode("lighter") 의 설탕)
+	 */
 	setAdditive(isAdditive) {
 		this.#blendMode = isAdditive ? "lighter" : "source-over";
 	}
 
-	/** @param { string } blendMode Graphic.setBlendMode 가 받는 이름. ("source-over" | "lighter" | "multiply" | "screen" 등 SpriteBlendMode 26 가지, 셰이더 섞기 모드는 서로 겹치지 않는 파티클끼리 모아 그린다) */
+	//==============================================================================
+	// 블렌드 모드 설정. (기본 "source-over")
+	//==============================================================================
+	/**
+	 * @param { string } blendMode Graphic.setBlendMode 가 받는 이름. ("source-over" | "lighter" | "multiply" | "screen" 등 SpriteBlendMode 26 가지, 셰이더 섞기 모드는 서로 겹치지 않는 파티클끼리 모아 그린다)
+	 */
 	setBlendMode(blendMode) {
 		this.#blendMode = blendMode;
 	}
 
-	/** @param { number } x @param { number } y @param { number } strength 중심 가속. @param { number } swirl 접선 가속. */
+	//==============================================================================
+	// 끌개 설정. (중심으로 끌거나 밀고, 접선으로 돌린다)
+	//==============================================================================
+	/**
+	 * @param { number } x 끌림 중심 x. (노드 로컬 픽셀)
+	 * @param { number } y 끌림 중심 y. (노드 로컬 픽셀)
+	 * @param { number } strength 중심 가속.
+	 * @param { number } swirl 접선 가속.
+	 */
 	setAttractor(x, y, strength, swirl = 0) {
 		this.#attractorPosition = Vector2.create(x, y);
 		this.#attractorStrength = strength;
@@ -729,43 +917,96 @@ export class ParticleSystem extends Component {
 		this.#attractorPosition = null;
 	}
 
-	/** @param { number } amplitude 살랑임 폭. @param { number } frequency 초당 각속도. */
+	//==============================================================================
+	// 살랑임 설정. (그릴 때만 좌우로 흔들고 움직임에는 넣지 않는다)
+	//==============================================================================
+	/**
+	 * @param { number } amplitude 살랑임 폭.
+	 * @param { number } frequency 초당 각속도.
+	 */
 	setWobble(amplitude, frequency = 4) {
 		this.#wobbleAmplitude = amplitude;
 		this.#wobbleFrequency = frequency;
 	}
 
-	/** @param { number } streakScale streak 길이 = 속도 x 이 값. */
+	//==============================================================================
+	// streak 길이 배율 설정. (기본 0.06)
+	//==============================================================================
+	/**
+	 * @param { number } streakScale streak 길이 = 속도 x 이 값.
+	 */
 	setStreakScale(streakScale) {
 		this.#streakScale = streakScale;
 	}
 
-	/** @param { boolean } isWorldSpace 참이면 방출 뒤 노드 이동의 영향을 받지 않는다. */
+	//==============================================================================
+	// 월드 공간 설정. (기본 거짓)
+	//==============================================================================
+	/**
+	 * @param { boolean } isWorldSpace 참이면 방출 뒤 노드 이동의 영향을 받지 않는다.
+	 */
 	setWorldSpace(isWorldSpace) {
 		this.#isWorldSpace = isWorldSpace;
 	}
 
-	/** @param { boolean } isLooping */
+	//==============================================================================
+	// 반복 방출 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } isLooping 참이면 계속 방출한다. (기본 참, 거짓이면 duration 동안만)
+	 */
 	setLooping(isLooping) {
 		this.#isLooping = isLooping;
 	}
 
-	/** @param { number } duration 루프 꺼짐일 때 방출 시간. (버스트 반복 주기) */
+	//==============================================================================
+	// 방출 시간 설정. (초, 기본 1)
+	//==============================================================================
+	/**
+	 * @param { number } duration 루프 꺼짐일 때 방출 시간. (버스트 반복 주기)
+	 */
 	setDuration(duration) {
 		this.#duration = duration;
 	}
 
-	/** @param { number } maxParticleCount */
+	//==============================================================================
+	// 최대 파티클 수 설정.
+	//==============================================================================
+	/**
+	 * @param { number } maxParticleCount 살아 있을 수 있는 최대 수. (기본 512)
+	 */
 	setMaxParticleCount(maxParticleCount) {
 		this.#maxParticleCount = maxParticleCount;
 	}
 
 	//==============================================================================
-	// 서술(JSON) 적용. — vfx 애셋 로드 / 파티클 편집기 공용.
+	// 서술(JSON) 적용., vfx 애셋 로드 / 파티클 편집기 공용.
 	// - 모든 항목은 선택 사항이며 준 것만 반영한다. 색은 [r, g, b, a] 배열.
 	//==============================================================================
 	/**
-	 * @param { object } description
+	 * @param { object } description 서술 객체. (looping, duration, maxParticleCount, emissionRate, bursts, shape, shapeRadius, coneAngle, boxSize, edgeWidth, lifetime, speed, size, rotation, angularVelocity, startColorA, startColorB, colorOverLifetime, sizeOverLifetime, gravity, damping, attractor, wobble, renderShape, blendMode, streakScale, worldSpace)
+	 * @example <caption>JSON 서술로 설정하기</caption>
+	 * import { ParticleSystem } from "./build/vanilla.js";
+	 *
+	 * const particleSystem = new ParticleSystem();
+	 * particleSystem.applyDescription({
+	 * 	looping: false,
+	 * 	duration: 0.2,
+	 * 	emissionRate: 50,
+	 * 	shape: "box",
+	 * 	boxSize: [200, 10],
+	 * 	lifetime: [0.5, 1],
+	 * 	speed: [20, 40],
+	 * 	startColorA: [0.6, 0.8, 1, 1],
+	 * 	colorOverLifetime: [
+	 * 		{ time: 0, color: [1, 1, 1, 1] },
+	 * 		{ time: 1, color: [1, 1, 1, 0] },
+	 * 	],
+	 * 	gravity: [0, 98],
+	 * 	renderShape: "streak",
+	 * });
+	 * particleSystem.simulate(0.1);
+	 * console.log(particleSystem.getParticleCount());
 	 */
 	applyDescription(description) {
 		const toColor = (channels) => new Color(channels[0], channels[1], channels[2], (channels[3] !== undefined) ? channels[3] : 1);
@@ -859,7 +1100,13 @@ export class ParticleSystem extends Component {
 	//==============================================================================
 	// 조회 메서드 목록.
 	//==============================================================================
-	/** @returns { number } */
+
+	//==============================================================================
+	// 살아 있는 파티클 수 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 살아 있는 파티클 수.
+	 */
 	getParticleCount() {
 		return this.#particleList.length;
 	}
@@ -867,12 +1114,19 @@ export class ParticleSystem extends Component {
 	//==============================================================================
 	// 입자 자리 목록. (노드 로컬, 흔들림을 넣지 않은 적분 자리. 같은 씨앗 비교와 시험용)
 	//==============================================================================
-	/** @returns { Vector2[] } */
+	/**
+	 * @returns { Vector2[] } 파티클 자리 목록. (새로 만든 Vector2)
+	 */
 	getParticlePositionList() {
 		return this.#particleList.map((particle) => Vector2.create(particle.x, particle.y));
 	}
 
-	/** @returns { boolean } */
+	//==============================================================================
+	// 방출 중인지 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 방출 중이면 참. (생성 직후 참)
+	 */
 	isPlaying() {
 		return this.#isPlaying;
 	}
@@ -881,7 +1135,9 @@ export class ParticleSystem extends Component {
 	// 다 끝났는지. (방출할 것이 더 없고 남은 입자도 없음, 일회성 노드를 치울 때)
 	// - 정지했거나, 루프가 아니고 duration 이 지났으며 버스트를 다 냈으면 방출할 것이 없다.
 	//==============================================================================
-	/** @returns { boolean } */
+	/**
+	 * @returns { boolean } 다 끝났으면 참.
+	 */
 	isFinished() {
 		if (this.#particleList.length > 0) {
 			return false;
@@ -893,28 +1149,56 @@ export class ParticleSystem extends Component {
 	}
 
 	//==============================================================================
-	// 수동 틱 설정. (참이면 노드 갱신 대신 simulate() 로만 진행 — 타임라인이 시간을 다룬다)
+	// 수동 틱 설정. (참이면 노드 갱신 대신 simulate() 로만 진행, 타임라인이 시간을 다룬다)
 	//==============================================================================
-	/** @param { boolean } isManualTick */
+	/**
+	 * @param { boolean } isManualTick 참이면 노드 갱신에서 진행하지 않는다. (기본 거짓)
+	 */
 	setManualTick(isManualTick) {
 		this.#isManualTick = isManualTick;
 	}
 
-	/** @returns { boolean } */
+	//==============================================================================
+	// 수동 틱인지 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 수동 틱이면 참.
+	 */
 	isManualTick() {
 		return this.#isManualTick;
 	}
 
 	//==============================================================================
-	// 난수 시드 설정. (설정하면 스폰 난수가 시드 난수로 바뀌고 stop(true) 마다 시드로 되돌아간다 — 되감기 재현용)
+	// 난수 시드 설정. (설정하면 스폰 난수가 시드 난수로 바뀌고 stop(true) 마다 시드로 되돌아간다, 되감기 재현용)
 	//==============================================================================
-	/** @param { number } seed */
+	/**
+	 * @param { number } seed 난수 시드.
+	 * @example <caption>시드로 같은 방출 되풀이하기</caption>
+	 * import { ParticleSystem } from "./build/vanilla.js";
+	 *
+	 * const particleSystem = new ParticleSystem();
+	 * particleSystem.setManualTick(true);
+	 * particleSystem.setRandomSeed(7);
+	 * particleSystem.setEmissionRate(30);
+	 * particleSystem.simulate(0.5);
+	 * const firstPositionList = particleSystem.getParticlePositionList();
+	 * particleSystem.stop(true);
+	 * particleSystem.play();
+	 * particleSystem.simulate(0.5);
+	 * const secondPositionList = particleSystem.getParticlePositionList();
+	 * console.log(firstPositionList.length, secondPositionList[0].x === firstPositionList[0].x);
+	 */
 	setRandomSeed(seed) {
 		this.#randomSeed = seed;
 		this.#random = new SeededRandom(seed);
 	}
 
-	/** @returns { number | null } */
+	//==============================================================================
+	// 난수 시드 반환.
+	//==============================================================================
+	/**
+	 * @returns { number | null } 난수 시드. (설정하지 않았으면 null)
+	 */
 	getRandomSeed() {
 		return this.#randomSeed;
 	}
@@ -923,9 +1207,9 @@ export class ParticleSystem extends Component {
 	// 스폰용 난수. (시드가 있으면 시드 난수, 없으면 전역 난수)
 	//==============================================================================
 	/**
-	 * @param { number } minValue
-	 * @param { number } maxValue
-	 * @returns { number }
+	 * @param { number } minValue 최솟값.
+	 * @param { number } maxValue 최댓값.
+	 * @returns { number } 최솟값과 최댓값 사이의 난수.
 	 */
 	randomRange(minValue, maxValue) {
 		if (this.#random) {

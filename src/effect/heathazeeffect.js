@@ -29,6 +29,35 @@ const DEFAULT_CONTENT_SIZE = 300; // 붙을 때 노드 내용 크기가 비어 �
 // - 영역이 화면 밖으로 나가면 화면 가장자리 픽셀을 늘인다. (CLAMP_TO_EDGE)
 // - 떠 온 텍스처는 GL 자원이라 다 쓰면 destroy() 를 부른다.
 //==============================================================================
+/**
+ * @example <caption>앞서 그린 사각형 위에 아지랑이 얹기</caption>
+ * import { Engine, EngineConfiguration, Scene, WorldNode, HeatHazeEffect, Colors, Rect, Vector2 } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const hazeNode = new WorldNode();
+ * 		hazeNode.setLocalPosition(Vector2.create(320, 180));
+ * 		hazeNode.setContentSize(Vector2.create(300, 240));
+ * 		const root = this.getRoot();
+ * 		root.addChild(hazeNode);
+ * 		const heatHazeEffect = hazeNode.addComponent(HeatHazeEffect);
+ * 		heatHazeEffect.setAmplitude(4);
+ * 		heatHazeEffect.setFrequency(0.08);
+ * 		heatHazeEffect.setSpeed(3);
+ * 	}
+ *
+ * 	preDraw(graphic) {
+ * 		super.preDraw(graphic);
+ * 		graphic.setFillColor(Colors.white);
+ * 		graphic.drawRect(Rect.create(220, 100, 200, 160));
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class HeatHazeEffect extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -66,7 +95,7 @@ export class HeatHazeEffect extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { ComponentNode } node
+	 * @param { ComponentNode } node 붙는 노드.
 	 */
 	attach(node) {
 		const contentSize = node.getContentSize();
@@ -80,7 +109,7 @@ export class HeatHazeEffect extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 시간. (초, 속도를 곱해 흔들림 시계에 더한다)
 	 */
 	tick(timeDelta) {
 		const speed = this.getSpeed();
@@ -92,7 +121,7 @@ export class HeatHazeEffect extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	draw(graphic) {
 		const contentSize = this.getNode().getContentSize();
@@ -182,10 +211,10 @@ export class HeatHazeEffect extends Component {
 	// 떠 올 텍스처 준비. (크기가 바뀌면 다시 잡는다, 화면과 같은 RGB8)
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
-	 * @param { number } width
-	 * @param { number } height
-	 * @returns { WebGLTexture }
+	 * @param { Graphic } graphic 텍스처를 만들 그래픽.
+	 * @param { number } width 가로. (드로잉 버퍼 픽셀)
+	 * @param { number } height 세로. (드로잉 버퍼 픽셀)
+	 * @returns { WebGLTexture } 떠 올 텍스처.
 	 */
 	ensureCaptureTexture(graphic, width, height) {
 		const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
@@ -236,7 +265,7 @@ export class HeatHazeEffect extends Component {
 	// 속도 설정.
 	//==============================================================================
 	/**
-	 * @param { number } value 
+	 * @param { number } value 흔들림 시계가 흐르는 빠르기. (초당 라디안, 기본 2)
 	 */
 	setSpeed(value) { 
 		this.#speed = value; 
@@ -246,7 +275,7 @@ export class HeatHazeEffect extends Component {
 	// 속도 반환.
 	//==============================================================================
 	/**
-	 * @returns { number } 
+	 * @returns { number } 흔들림 빠르기. (초당 라디안)
 	 */
 	getSpeed() { 
 		return this.#speed; 
@@ -256,7 +285,7 @@ export class HeatHazeEffect extends Component {
 	// 강도 설정.
 	//==============================================================================
 	/**
-	 * @param { number } value 
+	 * @param { number } value 좌우로 옮기는 폭. (노드 로컬 픽셀, 기본 3)
 	 */
 	setAmplitude(value) { 
 		this.#amplitude = value; 
@@ -266,7 +295,7 @@ export class HeatHazeEffect extends Component {
 	// 강도 반환.
 	//==============================================================================
 	/**
-	 * @returns { number } 
+	 * @returns { number } 흔들림 폭. (노드 로컬 픽셀)
 	 */
 	getAmplitude() { 
 		return this.#amplitude; 
@@ -276,7 +305,7 @@ export class HeatHazeEffect extends Component {
 	// 빈도 설정.
 	//==============================================================================
 	/**
-	 * @param { number } value 
+	 * @param { number } value 줄 위치에 곱하는 빈도. (노드 로컬 픽셀당 라디안, 기본 0.05)
 	 */
 	setFrequency(value) { 
 		this.#frequency = value; 
@@ -286,7 +315,7 @@ export class HeatHazeEffect extends Component {
 	// 빈도 반환.
 	//==============================================================================
 	/**
-	 * @returns { number } 
+	 * @returns { number } 줄 위치에 곱하는 빈도. (노드 로컬 픽셀당 라디안)
 	 */
 	getFrequency() { 
 		return this.#frequency; 
@@ -296,7 +325,7 @@ export class HeatHazeEffect extends Component {
 	// 흔들림 시계 반환. (tick 마다 timeDelta * 속도씩 흐른다)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 흔들림 시계. (라디안)
 	 */
 	getTimer() {
 		return this.#timer;
@@ -306,8 +335,8 @@ export class HeatHazeEffect extends Component {
 	// 줄의 좌우 흔들림. (sin(시계 + 줄 위치 * 빈도) * 폭)
 	//==============================================================================
 	/**
-	 * @param { number } localY
-	 * @returns { number }
+	 * @param { number } localY 줄의 위쪽 위치. (노드 로컬 픽셀)
+	 * @returns { number } 좌우로 옮길 거리. (노드 로컬 픽셀)
 	 */
 	calculateRowOffset(localY) {
 		return System.Math.sin(this.#timer + (localY * this.getFrequency())) * this.getAmplitude();
