@@ -100,6 +100,35 @@ export class Collision2D extends Object {
 	}
 
 	//==============================================================================
+	// 반경 안 최근접 대상 번호 찾기. (정적, findNearestInRadius 와 같은 판정으로 번호를 돌려준다, 없으면 -1)
+	// - 거리가 같으면 뒤의 것이다.
+	//==============================================================================
+	/**
+	 * @template T
+	 * @param { T[] } targetList
+	 * @param { Function } getPositionHandler (target) => Vector2
+	 * @param { Vector2 } center
+	 * @param { number } radius
+	 * @returns { number }
+	 */
+	static findNearestIndexInRadius(targetList, getPositionHandler, center, radius) {
+		let nearestIndex = -1;
+		let nearestDistanceSquared = radius * radius;
+		for (let targetIndex = 0; targetIndex < targetList.length; ++targetIndex) {
+			const target = targetList[targetIndex];
+			const targetPosition = getPositionHandler(target);
+			const differenceX = targetPosition.x - center.x;
+			const differenceY = targetPosition.y - center.y;
+			const distanceSquared = differenceX * differenceX + differenceY * differenceY;
+			if (distanceSquared <= nearestDistanceSquared) {
+				nearestDistanceSquared = distanceSquared;
+				nearestIndex = targetIndex;
+			}
+		}
+		return nearestIndex;
+	}
+
+	//==============================================================================
 	// 점-원 포함 검사. (정적)
 	//==============================================================================
 	/**

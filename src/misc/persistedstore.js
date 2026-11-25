@@ -21,6 +21,7 @@ export class PersistedStore extends Object {
 	/** @private @type { object } */ #defaultState;
 	/** @private @type { object } */ #state;
 	/** @private @type { Set } */ #subscriberSet;
+	/** @private @type { Map<Function, Function> } */ #subscriberBySubscription; // subscribe 가 돌려준 해지 함수 → 구독자.
 	/** @private @type { { getItem: Function, setItem: Function, removeItem: Function } | null } */ #storageBackend; // 이 저장소만 쓰는 곳. (null 이면 LocalStorage)
 
 	//==============================================================================
@@ -41,6 +42,7 @@ export class PersistedStore extends Object {
 		this.#storageBackend = null;
 		this.#state = this.readFromStorage();
 		this.#subscriberSet = new System.Set();
+		this.#subscriberBySubscription = new System.Map();
 	}
 
 	//==============================================================================
@@ -93,9 +95,25 @@ export class PersistedStore extends Object {
 	 */
 	subscribe(subscriber) {
 		this.#subscriberSet.add(subscriber);
-		return () => {
+		const subscription = () => {
 			this.#subscriberSet.delete(subscriber);
+			this.#subscriberBySubscription.delete(subscription);
 		};
+		this.#subscriberBySubscription.set(subscription, subscriber);
+		return subscription;
+	}
+
+	//==============================================================================
+	// 구독 해지. (subscribe 가 돌려준 것을 넘긴다, 돌려받은 해지 함수를 부르는 것과 같다)
+	//==============================================================================
+	/**
+	 * @param { Function } subscription
+	 */
+	unsubscribe(subscription) {
+		if (!this.#subscriberBySubscription.has(subscription)) {
+			return;
+		}
+		subscription();
 	}
 
 	//==============================================================================

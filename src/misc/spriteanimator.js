@@ -204,4 +204,32 @@ export class SpriteAnimator extends Component {
 	hasClip(clipName) {
 		return this.#clipTable.has(clipName);
 	}
+
+	//==============================================================================
+	// 지금 프레임 번호. (클립 안에서 0 부터)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getCurrentFrameIndex() {
+		return this.#animation.getCurrentFrameIndex();
+	}
+
+	//==============================================================================
+	// 노드의 애니메이터로 재생. (정적, play 와 같다, 노드에 애니메이터가 없으면 false)
+	//==============================================================================
+	/**
+	 * @param { object } node SpriteAnimator 를 붙인 노드.
+	 * @param { string } clipName
+	 * @param { object } options { onComplete?, restartIfSame = false }
+	 * @returns { boolean } 재생 시작 여부.
+	 */
+	static playOnNode(node, clipName, options = {}) {
+		const spriteAnimator = node.getComponent(SpriteAnimator);
+		if (!spriteAnimator) {
+			return false;
+		}
+		const isStarted = spriteAnimator.play(clipName, options);
+		return isStarted;
+	}
 }
