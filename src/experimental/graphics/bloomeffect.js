@@ -48,6 +48,7 @@ void main() {
 //==============================================================================
 // 블룸 이펙트. (밝은 영역 추출 → 하프 해상도 가우시안 블러 핑퐁)
 // - render() 결과 텍스처를 최종 합성 패스에서 가산하는 방식으로 사용한다.
+// - 주고받는 판은 기본 RGBA8 이라 1 을 넘는 밝은 값이 잘린다. setUseFloatColor(true) 면 RGBA16F 로 지어 HDR 값을 그대로 흐린다.
 //==============================================================================
 export class BloomEffect extends Object {
 	//==============================================================================
@@ -180,6 +181,38 @@ export class BloomEffect extends Object {
 	 */
 	setIterationCount(iterationCount) {
 		this.#iterationCount = iterationCount;
+	}
+
+	//==============================================================================
+	// 실수 컬러 설정. (true 면 주고받는 판을 RGBA16F 로 다시 지어 1 을 넘는 밝은 값이 잘리지 않는다, 기본 false 는 RGBA8, 같으면 그대로)
+	//==============================================================================
+	/**
+	 * @param { boolean } useFloatColor
+	 */
+	setUseFloatColor(useFloatColor) {
+		if (this.getUseFloatColor() === useFloatColor) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const pingRenderTarget = this.getPingRenderTarget();
+		const pongRenderTarget = this.getPongRenderTarget();
+		const width = System.Math.max(1, pingRenderTarget.getWidth());
+		const height = System.Math.max(1, pingRenderTarget.getHeight());
+		pingRenderTarget.destroy();
+		pongRenderTarget.destroy();
+		this.#pingRenderTarget = new RenderTarget(webGL2RenderingContext, width, height, false, { useFloatColor: useFloatColor });
+		this.#pongRenderTarget = new RenderTarget(webGL2RenderingContext, width, height, false, { useFloatColor: useFloatColor });
+	}
+
+	//==============================================================================
+	// 실수 컬러 사용 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	getUseFloatColor() {
+		const pingRenderTarget = this.getPingRenderTarget();
+		return pingRenderTarget.getUseFloatColor();
 	}
 
 	//==============================================================================
