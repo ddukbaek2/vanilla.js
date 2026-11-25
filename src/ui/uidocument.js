@@ -15,6 +15,7 @@ import { Mask } from "../core/component/mask.js";
 import { Outline } from "../core/component/outline.js";
 import { SoftShade } from "../core/component/softshade.js";
 import { ShadowText } from "../core/component/shadowtext.js";
+import { ShadowImage } from "../core/component/shadowimage.js";
 import { UIView } from "./uiview.js";
 import { UILabel } from "./uilabel.js";
 import { UIImageView } from "./uiimageview.js";
@@ -65,6 +66,7 @@ const COMPONENT_TYPE_TABLE = {
 	UIProgressView: UIProgressView,
 	UISlider: UISlider,
 	UIScrollView: UIScrollView,
+	ShadowImage: ShadowImage,
 };
 
 
@@ -377,6 +379,24 @@ const COMPONENT_PROPERTY_TABLE = {
 			if (data.trackThickness !== undefined) {
 				component.setTrackThickness(data.trackThickness);
 			}
+		},
+	},
+	ShadowImage: {
+		// 그림 경로 뒤에 반사 저장 꼴. (그림 원본은 문서에 담지 않고 Sprite 처럼 경로만 적는다)
+		save(component) {
+			const componentData = { imagePath: component.imagePath || "" };
+			System.Object.assign(componentData, UIDocument.saveByReflection(component));
+			return componentData;
+		},
+		load(component, data) {
+			if (data.imagePath) {
+				component.imagePath = data.imagePath;
+				const resolvedImage = UIDocument.resolveImage(data.imagePath);
+				if (resolvedImage) {
+					component.setImage(resolvedImage);
+				}
+			}
+			UIDocument.loadByReflection(component, data);
 		},
 	},
 	UIScrollView: {
@@ -883,6 +903,8 @@ export class UIDocument extends Object {
 
 	//==============================================================================
 	// 짝이 맞는 get/set 속성으로 컴포넌트 복원.
+	// - 지금 값의 꼴로 받을지 가린다. 지금 값이 없으면(null) 저장할 때의 꼴로 받는다.
+	//   (saveByReflection 은 Color 만 수 넷 배열로, Vector2 만 수 둘 배열로, 그 밖은 수, 글, 불 그대로 적는다)
 	//==============================================================================
 	/**
 	 * @param { Component } component
@@ -909,16 +931,18 @@ export class UIDocument extends Object {
 				});
 				continue;
 			}
+			const isCurrentEmpty = currentValue === null || currentValue === undefined;
 			if (System.Array.isArray(storedValue)) {
-				if (currentValue instanceof Color && storedValue.length === 4) {
+				if ((currentValue instanceof Color || isCurrentEmpty) && storedValue.length === 4) {
 					component[property.setterName](arrayToColor(storedValue));
 				}
-				else if (currentValue instanceof Vector2 && storedValue.length === 2) {
+				else if ((currentValue instanceof Vector2 || isCurrentEmpty) && storedValue.length === 2) {
 					component[property.setterName](Vector2.create(storedValue[0], storedValue[1]));
 				}
 				continue;
 			}
-			if (typeof storedValue === typeof currentValue) {
+			const isStoredPrimitive = typeof storedValue === "number" || typeof storedValue === "string" || typeof storedValue === "boolean";
+			if (typeof storedValue === typeof currentValue || (isCurrentEmpty && isStoredPrimitive)) {
 				component[property.setterName](storedValue);
 			}
 		}

@@ -29479,6 +29479,44 @@
 						},
 						{
 							"kind": "method",
+							"name": "getTrackColor",
+							"signature": "getTrackColor()",
+							"params": [],
+							"returns": {
+								"type": "Color",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "트랙 색 반환. (트랙 Paint 의 색)",
+								"en": "Returns the track color. (the color of the track Paint)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiscrollbar.js"
+						},
+						{
+							"kind": "method",
+							"name": "getThumbColor",
+							"signature": "getThumbColor()",
+							"params": [],
+							"returns": {
+								"type": "Color",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "썸 색 반환. (썸 노드 Paint 의 색)",
+								"en": "Returns the thumb color. (the color of the thumb node's Paint)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiscrollbar.js"
+						},
+						{
+							"kind": "method",
 							"name": "setMinThumbSize",
 							"signature": "setMinThumbSize(size)",
 							"params": [
@@ -33970,8 +34008,8 @@
 								}
 							],
 							"description": {
-								"ko": "짝이 맞는 get/set 속성으로 컴포넌트 복원.",
-								"en": "Restores a component through matching get/set properties."
+								"ko": "짝이 맞는 get/set 속성으로 컴포넌트 복원.\n- 지금 값의 꼴로 받을지 가린다. 지금 값이 없으면(null) 저장할 때의 꼴로 받는다.\n  (saveByReflection 은 Color 만 수 넷 배열로, Vector2 만 수 둘 배열로, 그 밖은 수, 글, 불 그대로 적는다)",
+								"en": "Restores a component through matching get/set properties.\n- Decides whether to accept a value by the type of the current value. When there is no current value (null), it accepts the type as saved.\n  (saveByReflection writes only Color as an array of four numbers, only Vector2 as an array of two numbers, and everything else as a number, string or boolean as is)"
 							},
 							"since": "0.3.0",
 							"source": "src/ui/uidocument.js"
