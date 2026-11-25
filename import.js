@@ -207,3 +207,7 @@ export { Camera3D } from "./src/experimental/graphics/camera3d.js";
 export { ToonDrawQueue } from "./src/experimental/graphics/toon/toondrawqueue.js";
 export { ToonView3D } from "./src/experimental/graphics/toon/toonview3d.js";
 export { GraphicsQualityGovernor, GraphicsQuality } from "./src/misc/graphicsqualitygovernor.js";
+export { FixedStepper } from "./src/misc/fixedstepper.js";
+export { AssetLoader } from "./src/resource/assetloader.js";
+export { LoadingProgress } from "./src/misc/loadingprogress.js";
+export { BuildInfo } from "./src/misc/buildinfo.js";

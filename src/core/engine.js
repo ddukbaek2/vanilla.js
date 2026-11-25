@@ -1133,6 +1133,34 @@ export class Engine extends Object {
 	}
 
 	//==============================================================================
+	// 최대 FPS 설정. (실행 중에 바꿀 수 있다, 0 이면 제한하지 않는다)
+	// - EngineConfiguration.maximumFramePerSecond 에 적는다. 엔진은 프레임마다 그 값을 읽어, 바뀌면 그 프레임부터 다시 센다.
+	// - 0 보다 작거나 숫자가 아니면 0 으로 둔다.
+	//==============================================================================
+	/**
+	 * @param { number } maximumFramePerSecond
+	 */
+	setMaximumFramePerSecond(maximumFramePerSecond) {
+		const engineConfiguration = this.getEngineConfiguration();
+		if (typeof maximumFramePerSecond !== "number" || !System.Number.isFinite(maximumFramePerSecond) || maximumFramePerSecond < 0) {
+			engineConfiguration.maximumFramePerSecond = 0;
+			return;
+		}
+		engineConfiguration.maximumFramePerSecond = maximumFramePerSecond;
+	}
+
+	//==============================================================================
+	// 최대 FPS 반환. (0 이면 제한하지 않음)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getMaximumFramePerSecond() {
+		const engineConfiguration = this.getEngineConfiguration();
+		return engineConfiguration.maximumFramePerSecond;
+	}
+
+	//==============================================================================
 	// 엔진 설정 반환.
 	//==============================================================================
 	/**
