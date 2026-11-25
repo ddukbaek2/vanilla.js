@@ -34,7 +34,7 @@ const TYPE_COMPONENT_COUNT_TABLE = {
 	MAT4: 16,
 };
 
-// 모프 타깃 텍스처 가로 크기. (정점 델타를 실수 텍스처에 행 단위로 적재 — 버텍스 셰이더가 gl_VertexID 로 조회)
+// 모프 타깃 텍스처 가로 크기. (정점 델타를 실수 텍스처에 행 단위로 적재, 버텍스 셰이더가 gl_VertexID 로 조회)
 const MORPH_TEXTURE_WIDTH = 2048;
 
 // glTF 애니메이션 채널 경로. (이 밖의 경로는 버린다)
@@ -48,7 +48,7 @@ export const MORPH_TARGET_MAXIMUM = 96;
 // 전역 함수 목록.
 //==============================================================================
 //==============================================================================
-// FBX 오일러(도) → 쿼터니언. (eEulerXYZ = X 먼저 적용 — 열벡터 기준 Rz x Ry x Rx 합성)
+// FBX 오일러(도) → 쿼터니언. (eEulerXYZ = X 먼저 적용, 열벡터 기준 Rz x Ry x Rx 합성)
 //==============================================================================
 /**
  * @param { number } xDegree
@@ -140,7 +140,7 @@ export function readAccessorArray(json, binaryBuffer, accessorIndex) {
 		}
 	}
 
-	// 희소 접근자. (인덱스 목록의 요소만 값으로 덮어쓴다 — 모프 타깃 델타에 흔히 쓰인다)
+	// 희소 접근자. (인덱스 목록의 요소만 값으로 덮어쓴다, 모프 타깃 델타에 흔히 쓰인다)
 	if (accessor.sparse) {
 		const sparse = accessor.sparse;
 		const indexBufferView = json.bufferViews[sparse.indices.bufferView];
@@ -162,12 +162,57 @@ export function readAccessorArray(json, binaryBuffer, accessorIndex) {
 
 
 //==============================================================================
-// 스킨드 모델. (모델 인스턴스 — 메시/본/스킨/머티리얼/애니메이션 데이터 + 포즈 상태)
+// 스킨드 모델. (모델 인스턴스, 메시/본/스킨/머티리얼/애니메이션 데이터 + 포즈 상태)
 // - GLB(바이너리 glTF)와 바이너리 FBX 를 공통 중립 스키마로 해석해 GL 리소스를 구성한다.
 // - 스킨 없는 정적 메시는 합성 스킨(조인트 1개)으로, 모프 타깃은 실수 텍스처로 올려 같은 스키닝 경로로 그린다.
 // - 애니메이션 크로스페이드와 조인트 회전 오프셋(절차 포즈 가공), 모프 가중치(glTF weights / 프로그램)를 지원한다.
 // - 렌더링은 SkinnedModelRenderer 가 담당한다. (모델은 렌더 기능을 갖지 않는다)
 //==============================================================================
+/**
+ * @example <caption>GLB 모델을 불러와 걷는 애니메이션 돌리기</caption>
+ * import { SkinnedModel, SkinnedModelRenderer, Camera3D, Matrix4, Vector3 } from "./build/vanilla.js";
+ *
+ * const width = 640;
+ * const height = 360;
+ * const canvas = document.createElement("canvas");
+ * canvas.width = width;
+ * canvas.height = height;
+ * document.body.appendChild(canvas);
+ * const webGL2RenderingContext = canvas.getContext("webgl2");
+ * const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+ * const skinnedModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "examples/ancientmountain/assets/fox.glb", skinnedModelRenderer);
+ * const animationNameList = skinnedModel.getAnimationNameList();
+ * console.log(animationNameList.join(", "));
+ * skinnedModel.playAnimation("Walk", 0);
+ *
+ * const cameraX = 0;
+ * const cameraY = 80;
+ * const cameraZ = 220;
+ * const camera = new Camera3D();
+ * camera.setPerspective(Math.PI / 3, 1, 2000);
+ * camera.setAspectRatio(width / height);
+ * const eyePosition = Vector3.create(cameraX, cameraY, cameraZ);
+ * const targetPosition = Vector3.create(0, 45, 0);
+ * camera.lookAt(eyePosition, targetPosition);
+ * const viewProjectionMatrix = camera.getViewProjectionMatrix();
+ * const viewProjectionElements = viewProjectionMatrix.getElements();
+ * const modelMatrix = Matrix4.createIdentity();
+ * const modelMatrixElements = modelMatrix.getElements();
+ * webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+ *
+ * let previousTime = performance.now();
+ * function drawFrame(currentTime) {
+ * 	const deltaTime = Math.max(0, currentTime - previousTime) / 1000;
+ * 	previousTime = currentTime;
+ * 	skinnedModel.update(deltaTime);
+ * 	webGL2RenderingContext.viewport(0, 0, width, height);
+ * 	webGL2RenderingContext.clearColor(0.16, 0.2, 0.26, 1);
+ * 	webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+ * 	skinnedModelRenderer.draw(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ);
+ * 	requestAnimationFrame(drawFrame);
+ * }
+ * requestAnimationFrame(drawFrame);
+ */
 export class SkinnedModel extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -194,8 +239,8 @@ export class SkinnedModel extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
-	 * @param { ShaderProgram } shaderProgram
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트. (null 이면 GL 업로드를 하지 않는 모델)
+	 * @param { ShaderProgram } shaderProgram 어트리뷰트 위치와 머티리얼에 쓸 셰이더 프로그램. (보통 렌더러의 getShaderProgram, null 이면 업로드하지 않는다)
 	 */
 	constructor(webGL2RenderingContext, shaderProgram) {
 		super();
@@ -223,20 +268,32 @@ export class SkinnedModel extends Object {
 	// - 애니메이션 원본 모델이나 단위 시험처럼 GL 없이 interpretContent / interpretFbxContent 와 update 만 쓴다.
 	//==============================================================================
 	/**
-	 * @returns { SkinnedModel }
+	 * @returns { SkinnedModel } GL 과 셰이더가 없는 모델.
+	 * @example <caption>GL 없이 GLB 를 해석하고 포즈만 셈하기</caption>
+	 * import { SkinnedModel } from "./build/vanilla.js";
+	 *
+	 * const response = await fetch("examples/ancientmountain/assets/fox.glb");
+	 * const arrayBuffer = await response.arrayBuffer();
+	 * const glbChunks = SkinnedModel.readGlbChunks(arrayBuffer);
+	 * const skinnedModel = SkinnedModel.createWithoutShaderProgram();
+	 * const interpretation = skinnedModel.interpretContent(glbChunks.json, glbChunks.binaryBuffer);
+	 * skinnedModel.playAnimation("Run", 0);
+	 * skinnedModel.update(0.5);
+	 * const nodeList = skinnedModel.getNodeList();
+	 * console.log(interpretation.meshDescriptionList.length, nodeList.length);
 	 */
 	static createWithoutShaderProgram() {
 		return new SkinnedModel(null, null);
 	}
 
 	//==============================================================================
-	// URL 로부터 로드. (정적 — GLB 바이너리 glTF)
+	// URL 로부터 로드. (정적, GLB 바이너리 glTF)
 	//==============================================================================
 	/**
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
-	 * @param { string } url
-	 * @param { SkinnedModelRenderer } skinnedModelRenderer
-	 * @returns { Promise<SkinnedModel> }
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
+	 * @param { string } url GLB 파일 주소.
+	 * @param { SkinnedModelRenderer } skinnedModelRenderer 셰이더 프로그램을 빌려 올 렌더러.
+	 * @returns { Promise<SkinnedModel> } GL 리소스까지 올린 모델. (응답이 실패하거나 GLB 가 아니면 오류를 던진다)
 	 */
 	static async loadFromUrl(webGL2RenderingContext, url, skinnedModelRenderer) {
 		const response = await System.fetch(url);
@@ -253,10 +310,22 @@ export class SkinnedModel extends Object {
 	// - 번들에 담긴 바이트나 BlobAsset 처럼 이미 받은 데이터에서 짓는다.
 	//==============================================================================
 	/**
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
-	 * @param { ArrayBuffer } arrayBuffer
-	 * @param { SkinnedModelRenderer } skinnedModelRenderer
-	 * @returns { Promise<SkinnedModel> }
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
+	 * @param { ArrayBuffer } arrayBuffer GLB 파일 바이트.
+	 * @param { SkinnedModelRenderer } skinnedModelRenderer 셰이더 프로그램을 빌려 올 렌더러.
+	 * @returns { Promise<SkinnedModel> } GL 리소스까지 올린 모델. (GLB 가 아니면 오류를 던진다)
+	 * @example <caption>이미 받은 바이트로 모델 짓기</caption>
+	 * import { SkinnedModel, SkinnedModelRenderer } from "./build/vanilla.js";
+	 *
+	 * const canvas = document.createElement("canvas");
+	 * const webGL2RenderingContext = canvas.getContext("webgl2");
+	 * const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+	 * const response = await fetch("examples/ancientmountain/assets/fox.glb");
+	 * const arrayBuffer = await response.arrayBuffer();
+	 * const skinnedModel = await SkinnedModel.loadFromBytes(webGL2RenderingContext, arrayBuffer, skinnedModelRenderer);
+	 * const drawableList = skinnedModel.getDrawableList();
+	 * console.log(drawableList.length);
+	 * skinnedModel.destroy();
 	 */
 	static async loadFromBytes(webGL2RenderingContext, arrayBuffer, skinnedModelRenderer) {
 		const shaderProgram = skinnedModelRenderer.getShaderProgram();
@@ -266,13 +335,13 @@ export class SkinnedModel extends Object {
 	}
 
 	//==============================================================================
-	// URL 로부터 로드. (정적 — 바이너리 FBX)
+	// URL 로부터 로드. (정적, 바이너리 FBX)
 	//==============================================================================
 	/**
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
-	 * @param { string } url
-	 * @param { SkinnedModelRenderer } skinnedModelRenderer
-	 * @returns { Promise<SkinnedModel> }
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
+	 * @param { string } url 바이너리 FBX 파일 주소.
+	 * @param { SkinnedModelRenderer } skinnedModelRenderer 셰이더 프로그램을 빌려 올 렌더러.
+	 * @returns { Promise<SkinnedModel> } GL 리소스까지 올린 모델.
 	 */
 	static async loadFromFbxUrl(webGL2RenderingContext, url, skinnedModelRenderer) {
 		const sceneData = await FbxLoader.loadFromUrl(url);
@@ -286,10 +355,10 @@ export class SkinnedModel extends Object {
 	// 바이트로부터 로드. (정적, 바이너리 FBX, loadFromFbxUrl 의 fetch 뒤 부분)
 	//==============================================================================
 	/**
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
-	 * @param { ArrayBuffer } arrayBuffer
-	 * @param { SkinnedModelRenderer } skinnedModelRenderer
-	 * @returns { Promise<SkinnedModel> }
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
+	 * @param { ArrayBuffer } arrayBuffer 바이너리 FBX 파일 바이트.
+	 * @param { SkinnedModelRenderer } skinnedModelRenderer 셰이더 프로그램을 빌려 올 렌더러.
+	 * @returns { Promise<SkinnedModel> } GL 리소스까지 올린 모델.
 	 */
 	static async loadFromFbxBytes(webGL2RenderingContext, arrayBuffer, skinnedModelRenderer) {
 		const sceneData = await new FbxLoader().parse(arrayBuffer);
@@ -303,8 +372,8 @@ export class SkinnedModel extends Object {
 	// GLB 청크 읽기. (정적, 머리 확인 + JSON 청크 + BIN 청크, GL 무관)
 	//==============================================================================
 	/**
-	 * @param { ArrayBuffer } arrayBuffer
-	 * @returns { { json: object, binaryBuffer: ArrayBuffer } }
+	 * @param { ArrayBuffer } arrayBuffer GLB 파일 바이트.
+	 * @returns { { json: object, binaryBuffer: ArrayBuffer } } JSON 청크를 읽은 객체와 BIN 청크 바이트. (머리가 GLB 가 아니거나 청크가 깨졌거나 JSON, BIN 가운데 하나라도 없으면 오류를 던진다)
 	 */
 	static readGlbChunks(arrayBuffer) {
 		const dataView = new System.DataView(arrayBuffer);
@@ -346,7 +415,7 @@ export class SkinnedModel extends Object {
 	// GLB 바이너리 해석.
 	//==============================================================================
 	/**
-	 * @param { ArrayBuffer } arrayBuffer
+	 * @param { ArrayBuffer } arrayBuffer GLB 파일 바이트.
 	 */
 	async parseBinary(arrayBuffer) {
 		const glbChunks = SkinnedModel.readGlbChunks(arrayBuffer);
@@ -357,8 +426,8 @@ export class SkinnedModel extends Object {
 	// glTF 내용 해석. (노드 / 스킨 / 메시 / 애니메이션 / 텍스처 → GL 업로드)
 	//==============================================================================
 	/**
-	 * @param { object } json
-	 * @param { ArrayBuffer } binaryBuffer
+	 * @param { object } json glTF JSON.
+	 * @param { ArrayBuffer } binaryBuffer GLB 의 BIN 청크.
 	 */
 	async parseContent(json, binaryBuffer) {
 		const interpretation = this.interpretContent(json, binaryBuffer);
@@ -370,9 +439,9 @@ export class SkinnedModel extends Object {
 	// - 바깥(uri) 이미지는 텍스처 없음, inverseBindMatrices 가 없는 스킨은 단위 행렬, 노드가 없거나 모르는 경로의 채널은 버린다.
 	//==============================================================================
 	/**
-	 * @param { object } json
-	 * @param { ArrayBuffer } binaryBuffer
-	 * @returns { { meshDescriptionList: object[], materialDescriptionList: object[] } }
+	 * @param { object } json glTF JSON.
+	 * @param { ArrayBuffer } binaryBuffer GLB 의 BIN 청크.
+	 * @returns { { meshDescriptionList: object[], materialDescriptionList: object[] } } 중립 메시 서술 목록과 중립 머티리얼 서술 목록. (uploadMeshesAndMaterials 에 넘긴다)
 	 */
 	interpretContent(json, binaryBuffer) {
 
@@ -452,7 +521,7 @@ export class SkinnedModel extends Object {
 			return description;
 		});
 
-		// 중립 메시 서술 구성. (메시 노드의 프리미티브 — 접근자를 CPU 배열로 펼침)
+		// 중립 메시 서술 구성. (메시 노드의 프리미티브, 접근자를 CPU 배열로 펼침)
 		// - 스킨 없는 정적 메시는 노드 자신을 유일한 조인트로 갖는 합성 스킨을 붙여 같은 스키닝 경로로 그린다.
 		const meshDescriptionList = [];
 		for (let nodeIndex = 0; nodeIndex < this.#nodeList.length; ++nodeIndex) {
@@ -508,7 +577,7 @@ export class SkinnedModel extends Object {
 					indices = indexSource instanceof System.Uint8Array ? new System.Uint16Array(indexSource) : indexSource;
 				}
 
-				// 모프 타깃. (위치 델타 필수, 노멀 델타 선택 — 이름은 mesh.extras.targetNames)
+				// 모프 타깃. (위치 델타 필수, 노멀 델타 선택, 이름은 mesh.extras.targetNames)
 				const morphTargets = [];
 				const primitiveTargets = primitive.targets ? primitive.targets : [];
 				for (let targetIndex = 0; targetIndex < primitiveTargets.length; ++targetIndex) {
@@ -581,7 +650,7 @@ export class SkinnedModel extends Object {
 	// FBX 중간 표현 해석. (노드/스킨/메시/텍스처/애니메이션 → 기존 스키닝 파이프라인)
 	//==============================================================================
 	/**
-	 * @param { object } sceneData
+	 * @param { object } sceneData FbxLoader 가 읽은 중간 표현.
 	 */
 	async parseFbxContent(sceneData) {
 		const interpretation = this.interpretFbxContent(sceneData);
@@ -593,8 +662,8 @@ export class SkinnedModel extends Object {
 	// - 본이 없는 클러스터는 단위 조인트, 배열 밖 정점 번호는 건너뛴다. 원본처럼 스킨이 붙은 메시만 담는다.
 	//==============================================================================
 	/**
-	 * @param { object } sceneData
-	 * @returns { { meshDescriptionList: object[], materialDescriptionList: object[] } }
+	 * @param { object } sceneData FbxLoader 가 읽은 중간 표현.
+	 * @returns { { meshDescriptionList: object[], materialDescriptionList: object[] } } 중립 메시 서술 목록과 중립 머티리얼 서술 목록. (uploadMeshesAndMaterials 에 넘긴다)
 	 */
 	interpretFbxContent(sceneData) {
 		// 노드 구성. (오일러 도 → 쿼터니언, 사전회전 우측 누적)
@@ -628,7 +697,7 @@ export class SkinnedModel extends Object {
 				const cluster = sceneData.clusterById.get(clusterId);
 				const boneNodeIndex = cluster && cluster.boneNodeId !== null ? sceneData.nodeIdToIndex.get(cluster.boneNodeId) : undefined;
 				jointNodeIndices.push(boneNodeIndex !== undefined ? boneNodeIndex : -1);
-				// 클러스터 Transform = TransformLink^-1 x 메시 바인드 전역행렬 — 그 자체가 역바인드 행렬.
+				// 클러스터 Transform = TransformLink^-1 x 메시 바인드 전역행렬, 그 자체가 역바인드 행렬.
 				// 미보유 시 TransformLink 의 역행렬로 대체. (메시 전역 = 단위행렬 가정, 둘 다 없으면 단위 행렬)
 				let inverseBindMatrix = Matrix4.createIdentity();
 				if (cluster && cluster.transform && cluster.transform.length >= 16) {
@@ -788,14 +857,14 @@ export class SkinnedModel extends Object {
 	}
 
 	//==============================================================================
-	// 애니메이션 FBX 추가 로드. (본 이름 매칭 리타게팅 — Mixamo 애니메이션 전용 FBX)
+	// 애니메이션 FBX 추가 로드. (본 이름 매칭 리타게팅, Mixamo 애니메이션 전용 FBX)
 	// - 동일 스켈레톤을 전제로, 채널을 현재 모델의 노드 인덱스로 재지정해 클립을 추가한다.
 	// - ignoreTranslation: 루트 모션이 박힌 클립에서 이동 채널을 버린다. (게임 로직이 위치를 제어할 때)
 	//==============================================================================
 	/**
-	 * @param { string } url
-	 * @param { string } clipName
-	 * @param { boolean } ignoreTranslation
+	 * @param { string } url 애니메이션 FBX 파일 주소.
+	 * @param { string } clipName 더할 클립 이름. (채널이 있는 애니메이션마다 같은 이름이 붙는다)
+	 * @param { boolean } ignoreTranslation 참이면 이동 채널을 버린다. (기본 false)
 	 */
 	async addAnimationsFromFbxUrl(url, clipName, ignoreTranslation = false) {
 		const sceneData = await FbxLoader.loadFromUrl(url);
@@ -806,9 +875,9 @@ export class SkinnedModel extends Object {
 	// 애니메이션 FBX 추가. (바이트, addAnimationsFromFbxUrl 의 fetch 뒤 부분)
 	//==============================================================================
 	/**
-	 * @param { ArrayBuffer } arrayBuffer
-	 * @param { string } clipName
-	 * @param { boolean } ignoreTranslation
+	 * @param { ArrayBuffer } arrayBuffer 애니메이션 FBX 파일 바이트.
+	 * @param { string } clipName 더할 클립 이름. (채널이 있는 애니메이션마다 같은 이름이 붙는다)
+	 * @param { boolean } ignoreTranslation 참이면 이동 채널을 버린다. (기본 false)
 	 */
 	async addAnimationsFromFbxBytes(arrayBuffer, clipName, ignoreTranslation = false) {
 		const sceneData = await new FbxLoader().parse(arrayBuffer);
@@ -819,9 +888,9 @@ export class SkinnedModel extends Object {
 	// 애니메이션 FBX 추가. (FbxLoader 가 읽은 중간 표현, 본 이름 매칭 리타게팅)
 	//==============================================================================
 	/**
-	 * @param { object } sceneData
-	 * @param { string } clipName
-	 * @param { boolean } ignoreTranslation
+	 * @param { object } sceneData FbxLoader 가 읽은 중간 표현.
+	 * @param { string } clipName 더할 클립 이름. (채널이 있는 애니메이션마다 같은 이름이 붙는다)
+	 * @param { boolean } ignoreTranslation 참이면 이동 채널을 버린다. (기본 false)
 	 */
 	addAnimationsFromFbxSceneData(sceneData, clipName, ignoreTranslation = false) {
 		const nodeList = this.getNodeList();
@@ -845,11 +914,11 @@ export class SkinnedModel extends Object {
 	}
 
 	//==============================================================================
-	// 중립 메시/머티리얼 서술 업로드. (공용 — Material 생성 + VAO/드로어블 구성)
+	// 중립 메시/머티리얼 서술 업로드. (공용, Material 생성 + VAO/드로어블 구성)
 	//==============================================================================
 	/**
-	 * @param { object[] } meshDescriptionList
-	 * @param { object[] } materialDescriptionList
+	 * @param { object[] } meshDescriptionList 중립 메시 서술 목록.
+	 * @param { object[] } materialDescriptionList 중립 머티리얼 서술 목록. (메시의 materialIndex 가 가리키고, 없으면 기본 머티리얼)
 	 */
 	async uploadMeshesAndMaterials(meshDescriptionList, materialDescriptionList) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -932,7 +1001,7 @@ export class SkinnedModel extends Object {
 	// - 드로어블의 버텍스 어레이와 무관한 별도 엘리먼트 버퍼. 렌더러가 선 출력 시 잠시 바꿔 끼운다.
 	//==============================================================================
 	/**
-	 * @param { object } drawable
+	 * @param { object } drawable 선 인덱스를 올릴 드로어블.
 	 */
 	uploadWireframeIndices(drawable) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -954,9 +1023,9 @@ export class SkinnedModel extends Object {
 	// 와이어프레임 모서리 목록 만들기. (정적, GL 무관, 인덱스 쌍 목록)
 	//==============================================================================
 	/**
-	 * @param { Uint16Array | Uint32Array | null } triangleIndices
-	 * @param { number } vertexCount
-	 * @returns { number[] }
+	 * @param { Uint16Array | Uint32Array | null } triangleIndices 삼각형 인덱스. (null 이면 정점 셋씩 삼각형으로 본다)
+	 * @param { number } vertexCount 정점 수.
+	 * @returns { number[] } 중복 없는 모서리의 정점 인덱스 쌍을 이어 놓은 목록.
 	 */
 	static buildWireframeEdgeList(triangleIndices, vertexCount) {
 		const edgeList = [];
@@ -991,7 +1060,7 @@ export class SkinnedModel extends Object {
 	// - 텍셀 인덱스 = 정점 인덱스. 블록 시작 행 = 타깃 인덱스 x 2 x 타깃당 행 수.
 	//==============================================================================
 	/**
-	 * @param { object } drawable
+	 * @param { object } drawable 모프 텍스처를 올릴 드로어블. (타깃이 없으면 텍스처를 지운다)
 	 */
 	uploadMorphTargets(drawable) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -1029,9 +1098,9 @@ export class SkinnedModel extends Object {
 	// 모프 텍셀 데이터 만들기. (정적, GL 무관, 텍스처 가로, 타깃당 행 수, RGBA 실수 배열)
 	//==============================================================================
 	/**
-	 * @param { object[] } morphTargetList
-	 * @param { number } vertexCount
-	 * @returns { { textureWidth: number, rowsPerTarget: number, texelData: Float32Array } }
+	 * @param { object[] } morphTargetList 모프 타깃 목록. ([{ name, positionDeltas, normalDeltas }])
+	 * @param { number } vertexCount 정점 수.
+	 * @returns { { textureWidth: number, rowsPerTarget: number, texelData: Float32Array } } 텍스처 가로(정점 수와 2048 가운데 작은 값, 최소 1), 타깃당 행 수, RGBA 실수 텍셀 배열.
 	 */
 	static buildMorphTexelData(morphTargetList, vertexCount) {
 		const targetCount = morphTargetList.length;
@@ -1060,13 +1129,31 @@ export class SkinnedModel extends Object {
 	}
 
 	//==============================================================================
-	// 모프 타깃 추가. (프로그램 생성 — 정점별 위치 델타 [+ 노멀 델타], 다음 update() 에서 업로드)
+	// 모프 타깃 추가. (프로그램 생성, 정점별 위치 델타 [+ 노멀 델타], 다음 update() 에서 업로드)
 	//==============================================================================
 	/**
-	 * @param { number } drawableIndex
-	 * @param { string } targetName
-	 * @param { Float32Array } positionDeltas
-	 * @param { Float32Array | null } normalDeltas
+	 * @param { number } drawableIndex 드로어블 번호. (없으면 오류를 던진다)
+	 * @param { string } targetName 타깃 이름. (setMorphWeight 가 이 이름으로 찾는다)
+	 * @param { Float32Array } positionDeltas 정점마다 위치 델타 x, y, z. (길이가 정점 수 x 3 이 아니면 오류를 던진다)
+	 * @param { Float32Array | null } normalDeltas 정점마다 노멀 델타 x, y, z. (null 이면 노멀은 그대로)
+	 * @example <caption>코드로 모프 타깃을 만들어 반만 걸기</caption>
+	 * import { SkinnedModel, SkinnedModelRenderer } from "./build/vanilla.js";
+	 *
+	 * const canvas = document.createElement("canvas");
+	 * const webGL2RenderingContext = canvas.getContext("webgl2");
+	 * const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+	 * const skinnedModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "examples/ancientmountain/assets/fox.glb", skinnedModelRenderer);
+	 * const drawableList = skinnedModel.getDrawableList();
+	 * const vertexCount = drawableList[0].vertexCount;
+	 * const positionDeltas = new Float32Array(vertexCount * 3);
+	 * for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
+	 * 	positionDeltas[vertexIndex * 3 + 1] = 5;
+	 * }
+	 * skinnedModel.addMorphTarget(0, "lift", positionDeltas);
+	 * skinnedModel.setMorphWeight("lift", 0.5);
+	 * skinnedModel.update(0);
+	 * const weight = skinnedModel.getMorphWeight("lift");
+	 * console.log(weight);
 	 */
 	addMorphTarget(drawableIndex, targetName, positionDeltas, normalDeltas = null) {
 		const drawable = this.#drawableList[drawableIndex];
@@ -1087,11 +1174,11 @@ export class SkinnedModel extends Object {
 	}
 
 	//==============================================================================
-	// 모프 가중치 설정. (이름 일치 타깃 전부 — 드로어블 여러 개가 같은 이름을 가질 수 있음)
+	// 모프 가중치 설정. (이름 일치 타깃 전부, 드로어블 여러 개가 같은 이름을 가질 수 있음)
 	//==============================================================================
 	/**
-	 * @param { string } targetName
-	 * @param { number } weight
+	 * @param { string } targetName 타깃 이름.
+	 * @param { number } weight 가중치. (0 이면 꺼지고 1 이면 델타 그대로)
 	 */
 	setMorphWeight(targetName, weight) {
 		for (const drawable of this.#drawableList) {
@@ -1104,11 +1191,11 @@ export class SkinnedModel extends Object {
 	}
 
 	//==============================================================================
-	// 모프 가중치 반환. (첫 일치 타깃 — 없으면 0)
+	// 모프 가중치 반환. (첫 일치 타깃, 없으면 0)
 	//==============================================================================
 	/**
-	 * @param { string } targetName
-	 * @returns { number }
+	 * @param { string } targetName 타깃 이름.
+	 * @returns { number } 첫 일치 타깃의 가중치. (없으면 0)
 	 */
 	getMorphWeight(targetName) {
 		for (const drawable of this.#drawableList) {
@@ -1122,11 +1209,11 @@ export class SkinnedModel extends Object {
 	}
 
 	//==============================================================================
-	// 머티리얼 교체. (드로어블 단위 — 외부 텍스처로 만든 머티리얼 인스턴스 적용)
+	// 머티리얼 교체. (드로어블 단위, 외부 텍스처로 만든 머티리얼 인스턴스 적용)
 	//==============================================================================
 	/**
-	 * @param { number } drawableIndex
-	 * @param { Material } material
+	 * @param { number } drawableIndex 드로어블 번호. (없으면 오류를 던진다)
+	 * @param { Material } material 바꿔 넣을 머티리얼. (destroy 가 지우지 않는다)
 	 */
 	setMaterial(drawableIndex, material) {
 		const drawable = this.#drawableList[drawableIndex];
@@ -1137,12 +1224,12 @@ export class SkinnedModel extends Object {
 	}
 
 	//==============================================================================
-	// 스무스 노멀 생성. (노멀 미보유 메시 — 바인드 포즈 기준, 스키닝 회전은 셰이더에서 적용)
+	// 스무스 노멀 생성. (노멀 미보유 메시, 바인드 포즈 기준, 스키닝 회전은 셰이더에서 적용)
 	//==============================================================================
 	/**
-	 * @param { Float32Array } positions
-	 * @param { Uint16Array | Uint32Array | null } indices
-	 * @returns { Float32Array }
+	 * @param { Float32Array } positions 정점 위치 x, y, z 배열.
+	 * @param { Uint16Array | Uint32Array | null } indices 삼각형 인덱스. (null 이면 정점 셋씩 삼각형으로 본다)
+	 * @returns { Float32Array } 정점마다 면 노멀을 더해 정규화한 노멀 배열. (positions 와 같은 길이)
 	 */
 	generateSmoothNormals(positions, indices) {
 		const normals = new System.Float32Array(positions.length);
@@ -1185,10 +1272,10 @@ export class SkinnedModel extends Object {
 	// 실수형 어트리뷰트 바인드. (신규 버퍼 생성 + 포인터 설정)
 	//==============================================================================
 	/**
-	 * @param { ShaderProgram } shaderProgram
-	 * @param { string } attributeName
-	 * @param { Float32Array } dataArray
-	 * @param { number } componentCount
+	 * @param { ShaderProgram } shaderProgram 어트리뷰트 위치를 찾을 셰이더 프로그램.
+	 * @param { string } attributeName 어트리뷰트 이름.
+	 * @param { Float32Array } dataArray 정점 데이터.
+	 * @param { number } componentCount 정점당 성분 수.
 	 * @returns { WebGLBuffer | null } 지은 버퍼. (셰이더에 없는 어트리뷰트면 null)
 	 */
 	bindFloatAttribute(shaderProgram, attributeName, dataArray, componentCount) {
@@ -1209,10 +1296,10 @@ export class SkinnedModel extends Object {
 	// 정수형 어트리뷰트 바인드. (조인트 인덱스)
 	//==============================================================================
 	/**
-	 * @param { ShaderProgram } shaderProgram
-	 * @param { string } attributeName
-	 * @param { Uint16Array } dataArray
-	 * @param { number } componentCount
+	 * @param { ShaderProgram } shaderProgram 어트리뷰트 위치를 찾을 셰이더 프로그램.
+	 * @param { string } attributeName 어트리뷰트 이름.
+	 * @param { Uint16Array } dataArray 정점 데이터. (UNSIGNED_SHORT 로 읽는다)
+	 * @param { number } componentCount 정점당 성분 수.
 	 * @returns { WebGLBuffer | null } 지은 버퍼. (셰이더에 없는 어트리뷰트면 null)
 	 */
 	bindIntegerAttribute(shaderProgram, attributeName, dataArray, componentCount) {
@@ -1233,8 +1320,24 @@ export class SkinnedModel extends Object {
 	// 애니메이션 재생. (크로스페이드)
 	//==============================================================================
 	/**
-	 * @param { string } animationName
-	 * @param { number } fadeDuration
+	 * @param { string } animationName 클립 이름. (지금 클립과 같거나 없으면 아무것도 하지 않는다, 같은 이름이 여럿이면 마지막 것)
+	 * @param { number } fadeDuration 앞 클립에서 넘어가는 시간. (초, 기본 0.25)
+	 * @example <caption>걷기에서 달리기로 0.4 초 동안 넘어가기</caption>
+	 * import { SkinnedModel } from "./build/vanilla.js";
+	 *
+	 * const response = await fetch("examples/ancientmountain/assets/fox.glb");
+	 * const arrayBuffer = await response.arrayBuffer();
+	 * const glbChunks = SkinnedModel.readGlbChunks(arrayBuffer);
+	 * const skinnedModel = SkinnedModel.createWithoutShaderProgram();
+	 * skinnedModel.interpretContent(glbChunks.json, glbChunks.binaryBuffer);
+	 * skinnedModel.playAnimation("Walk", 0);
+	 * skinnedModel.update(1.0);
+	 * skinnedModel.playAnimation("Run", 0.4);
+	 * for (let frameIndex = 0; frameIndex < 30; ++frameIndex) {
+	 * 	skinnedModel.update(1 / 60);
+	 * }
+	 * const skinList = skinnedModel.getSkinList();
+	 * console.log(skinList[0].jointMatrixArray[12]);
 	 */
 	playAnimation(animationName, fadeDuration = 0.25) {
 		if (this.#currentAnimation && this.#currentAnimation.name === animationName) {
@@ -1261,9 +1364,9 @@ export class SkinnedModel extends Object {
 	// 애니메이션 샘플링. (현재 노드 포즈에 가중 블렌딩)
 	//==============================================================================
 	/**
-	 * @param { object } animation
-	 * @param { number } time
-	 * @param { number } blendWeight
+	 * @param { object } animation 애니메이션 클립. ({ name, duration, channels })
+	 * @param { number } time 클립 시간. (초, 클립 길이로 되감는다)
+	 * @param { number } blendWeight 지금 포즈에 섞을 가중치. (1 이면 덮어쓴다)
 	 */
 	sampleAnimation(animation, time, blendWeight) {
 		const nodeList = this.getNodeList();
@@ -1313,7 +1416,7 @@ export class SkinnedModel extends Object {
 				}
 			}
 			else if (channel.path === "weights") {
-				// 모프 가중치. (키마다 타깃 개수만큼의 값 — 해당 노드의 드로어블 전부에 적용)
+				// 모프 가중치. (키마다 타깃 개수만큼의 값, 해당 노드의 드로어블 전부에 적용)
 				for (const drawable of this.#drawableList) {
 					if (drawable.nodeIndex !== channel.nodeIndex) {
 						continue;
@@ -1336,7 +1439,7 @@ export class SkinnedModel extends Object {
 	// 갱신. (시간 전진 → 포즈 샘플링 → 월드/조인트 행렬 계산)
 	//==============================================================================
 	/**
-	 * @param { number } deltaTime
+	 * @param { number } deltaTime 지난 프레임에서 흐른 시간. (초, 재생 속도를 곱해 클립 시간을 나아간다)
 	 */
 	update(deltaTime) {
 		// 애니메이션이 없어도 기본 포즈로 월드/조인트 행렬은 계산한다. (정적 모델 지원)
@@ -1437,8 +1540,20 @@ export class SkinnedModel extends Object {
 	// 조인트 회전 오프셋 설정. (이름 부분 일치 노드에 로컬 회전 누적)
 	//==============================================================================
 	/**
-	 * @param { string } jointNamePart
-	 * @param { Quaternion } offsetRotation
+	 * @param { string } jointNamePart 노드 이름에 든 글. (든 노드 모두)
+	 * @param { Quaternion } offsetRotation 애니메이션 포즈 뒤에 로컬 회전으로 곱할 쿼터니언.
+	 * @example <caption>애니메이션 위에서 머리를 돌리기</caption>
+	 * import { SkinnedModel, Quaternion } from "./build/vanilla.js";
+	 *
+	 * const response = await fetch("examples/ancientmountain/assets/fox.glb");
+	 * const arrayBuffer = await response.arrayBuffer();
+	 * const glbChunks = SkinnedModel.readGlbChunks(arrayBuffer);
+	 * const skinnedModel = SkinnedModel.createWithoutShaderProgram();
+	 * skinnedModel.interpretContent(glbChunks.json, glbChunks.binaryBuffer);
+	 * const headTurn = Quaternion.createFromEuler(0, 0.6, 0);
+	 * skinnedModel.setJointRotationOffset("b_Head", headTurn);
+	 * skinnedModel.update(1 / 60);
+	 * skinnedModel.clearJointRotationOffsets();
 	 */
 	setJointRotationOffset(jointNamePart, offsetRotation) {
 		const nodeList = this.getNodeList();
@@ -1460,7 +1575,7 @@ export class SkinnedModel extends Object {
 	// 애니메이션 이름 목록 반환.
 	//==============================================================================
 	/**
-	 * @returns { string[] }
+	 * @returns { string[] } 클립 이름 목록. (클립 차례)
 	 */
 	getAnimationNameList() {
 		const nameList = this.#animationList.map((animation) => animation.name);
@@ -1471,7 +1586,7 @@ export class SkinnedModel extends Object {
 	// 재생 속도 설정.
 	//==============================================================================
 	/**
-	 * @param { number } timeScale
+	 * @param { number } timeScale 재생 속도 배율. (기본 1, 크로스페이드 시간에는 곱하지 않는다)
 	 */
 	setTimeScale(timeScale) {
 		this.#timeScale = timeScale;
@@ -1481,7 +1596,7 @@ export class SkinnedModel extends Object {
 	// 렌더링 컨텍스트 반환.
 	//==============================================================================
 	/**
-	 * @returns { WebGL2RenderingContext }
+	 * @returns { WebGL2RenderingContext } 렌더링 컨텍스트. (셰이더 없이 지었으면 null)
 	 */
 	getWebGL2RenderingContext() {
 		return this.#webGL2RenderingContext;
@@ -1491,7 +1606,7 @@ export class SkinnedModel extends Object {
 	// 셰이더 프로그램 반환.
 	//==============================================================================
 	/**
-	 * @returns { ShaderProgram }
+	 * @returns { ShaderProgram } 셰이더 프로그램. (셰이더 없이 지었으면 null)
 	 */
 	getShaderProgram() {
 		return this.#shaderProgram;
@@ -1501,7 +1616,7 @@ export class SkinnedModel extends Object {
 	// 노드 목록 반환.
 	//==============================================================================
 	/**
-	 * @returns { object[] }
+	 * @returns { object[] } 노드 목록. (이름, 자식 번호, 기본과 지금의 이동, 회전, 배율, 월드 행렬)
 	 */
 	getNodeList() {
 		return this.#nodeList;
@@ -1511,7 +1626,7 @@ export class SkinnedModel extends Object {
 	// 루트 노드 인덱스 목록 반환.
 	//==============================================================================
 	/**
-	 * @returns { number[] }
+	 * @returns { number[] } 장면 루트 노드 번호 목록.
 	 */
 	getRootNodeIndices() {
 		return this.#rootNodeIndices;
@@ -1521,7 +1636,7 @@ export class SkinnedModel extends Object {
 	// 스킨 목록 반환.
 	//==============================================================================
 	/**
-	 * @returns { object[] }
+	 * @returns { object[] } 스킨 목록. (조인트 노드 번호, 역바인드 행렬, 조인트 행렬 배열)
 	 */
 	getSkinList() {
 		return this.#skinList;
@@ -1531,7 +1646,7 @@ export class SkinnedModel extends Object {
 	// 드로어블 목록 반환.
 	//==============================================================================
 	/**
-	 * @returns { object[] }
+	 * @returns { object[] } 드로어블 목록. (버텍스 어레이, 인덱스, 머티리얼, 스킨 번호, 모프 상태)
 	 */
 	getDrawableList() {
 		return this.#drawableList;
@@ -1541,7 +1656,7 @@ export class SkinnedModel extends Object {
 	// 애니메이션 클립 목록 반환.
 	//==============================================================================
 	/**
-	 * @returns { object[] }
+	 * @returns { object[] } 애니메이션 클립 목록. ({ name, duration, channels })
 	 */
 	getAnimationList() {
 		return this.#animationList;

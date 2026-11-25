@@ -9,36 +9,36 @@ import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
 //==============================================================================
 // 전역 상수 목록.
 //==============================================================================
-// 셰이딩 모드. (머티리얼마다 setMaterialShading 으로 지정 — 같은 셰이더 안에서 분기)
+// 셰이딩 모드. (머티리얼마다 setMaterialShading 으로 지정, 같은 셰이더 안에서 분기)
 export const SKIN_SHADING_SKIN = 0;
-export const SKIN_SHADING_EYE = 1;
-export const SKIN_SHADING_HAIR = 2;
-export const SKIN_SHADING_OCCLUSION = 3;
-export const SKIN_SHADING_FLUID = 4;
-export const SKIN_SHADING_FACIALHAIR = 5;
+export const SKIN_SHADING_EYE = 1; // 눈. (각막 굴절, 홍채, 공막)
+export const SKIN_SHADING_HAIR = 2; // 머리카락. (이방성 하이라이트, 컷아웃과 프린지 블렌드, 흔들림)
+export const SKIN_SHADING_OCCLUSION = 3; // 눈꺼풀 차폐 메시. (블렌드 패스, 조도만 어둡게)
+export const SKIN_SHADING_FLUID = 4; // 눈물선, 침 같은 유체. (블렌드 패스, 스펙큘러만 얹는다)
+export const SKIN_SHADING_FACIALHAIR = 5; // 눈썹, 수염 같은 얼굴 털. (머리카락 셰이딩, 흔들림 없음)
 
 // 추가 텍스처 유닛. (머티리얼 기본 슬롯 0 / 2~8 과 섀도우 1, 모프 15 를 피한 9~14)
 // - 피부: 9 높이 디테일, 10 마이크로(노멀 rgb + 캐비티 a), 11 주름 마스크 아틀라스(4x4), 12 주름 노멀 아틀라스(2x2), 13 주름 색 아틀라스(2x2)
 // - 눈: 12 홍채 색, 13 홍채 노멀 / 머리카락: 12 카드 탄젠트(rgb) + 가닥 좌표(a)
 export const SKIN_TEXTURE_UNIT_DETAILHEIGHT = 9;
-export const SKIN_TEXTURE_UNIT_MICRO = 10;
-export const SKIN_TEXTURE_UNIT_MASKATLAS = 11;
-export const SKIN_TEXTURE_UNIT_LAYERNORMAL = 12;
-export const SKIN_TEXTURE_UNIT_LAYERCOLOR = 13;
-export const SKIN_TEXTURE_UNIT_AUXILIARY = 14;
+export const SKIN_TEXTURE_UNIT_MICRO = 10; // 유니폼 microTexture 의 유닛. (마이크로 노멀 rgb + 캐비티 a, 타일링)
+export const SKIN_TEXTURE_UNIT_MASKATLAS = 11; // 유니폼 maskAtlasTexture 의 유닛. (주름 마스크 아틀라스 4x4)
+export const SKIN_TEXTURE_UNIT_LAYERNORMAL = 12; // 유니폼 layerNormalTexture 의 유닛. (피부는 주름 노멀 아틀라스 2x2, 눈은 홍채 노멀, 머리카락은 카드 탄젠트 rgb + 가닥 좌표 a)
+export const SKIN_TEXTURE_UNIT_LAYERCOLOR = 13; // 유니폼 layerColorTexture 의 유닛. (피부는 주름 색 아틀라스 2x2, 눈은 홍채 색)
+export const SKIN_TEXTURE_UNIT_AUXILIARY = 14; // 유니폼 auxiliaryTexture 의 유닛. (셰이더에 선언만 있고 읽는 곳은 없다)
 
-// 주름 마스크 채널 수. (4x4 아틀라스 x RGBA — 채널마다 주름 맵 1 / 2 / 3 기여 가중치 vec3)
+// 주름 마스크 채널 수. (4x4 아틀라스 x RGBA, 채널마다 주름 맵 1 / 2 / 3 기여 가중치 vec3)
 export const WRINKLE_CHANNEL_COUNT = 64;
 
-// 섀도우 포아송 표본 최대치. (회전 노이즈로 흩어 부드러운 반영 — 실제 표본 수는 shadowSampleCount 유니폼)
+// 섀도우 포아송 표본 최대치. (회전 노이즈로 흩어 부드러운 반영, 실제 표본 수는 shadowSampleCount 유니폼)
 const SHADOW_SAMPLE_COUNT = 24;
 
-// 인체 피부 프래그먼트 셰이더. (선형 HDR — 화면 공간 SSS 를 위해 조도 / 알베도 / 스펙큘러를 분리 출력)
+// 인체 피부 프래그먼트 셰이더. (선형 HDR, 화면 공간 SSS 를 위해 조도 / 알베도 / 스펙큘러를 분리 출력)
 // - 조명: 방향광 3개(0번은 섀도우 맵 수신) + 3색 반구 앰비언트 + 조명 방향의 소프트박스 반사 환경.
 // - 피부: 노멀 맵 + 표정 주름 맵(마스크 아틀라스 가중 혼합) + 타일링 마이크로 노멀 / 캐비티 + 높이 미분 디테일, 이중 로브 GGX, 잔털.
 // - 눈: 각막 굴절 시차로 홍채를 샘플링, 홍채 노멀 / 림버스 / 동공, 각막 유리 하이라이트 + 환경 반사, 공막 정맥 노멀.
 // - 머리카락: 카드 탄젠트 아틀라스로 Kajiya-Kay 이중 로브 이방성 하이라이트, 뿌리 차폐, 투과 역광, 컷아웃 + 프린지 블렌드 2패스.
-// - 차폐 / 유체: 블렌드 패스 전용 — 눈꺼풀 차폐 메시는 조도만 어둡게, 눈물선 / 침은 스펙큘러만 얹는다.
+// - 차폐 / 유체: 블렌드 패스 전용, 눈꺼풀 차폐 메시는 조도만 어둡게, 눈물선 / 침은 스펙큘러만 얹는다.
 // - 얼굴 털(눈썹 / 수염): 머리카락과 같은 셰이딩이지만 흔들림은 적용하지 않는다.
 // - 출력 0: 확산 조도(rgb) + SSS 마스크(a) / 1: 선형 알베도(rgb) + 커버리지(a) / 2: 스펙큘러(rgb) / 3: 월드 노멀(rgb).
 const SKIN_FRAGMENTSHADER_SOURCE = `#version 300 es
@@ -557,7 +557,7 @@ void main() {
 }
 `;
 
-// 피부 버텍스 셰이더. (기본 스키닝 / 모프 경로 + 머리카락 흔들림 — 카드 탄젠트 아틀라스의 가닥 좌표(a)가 클수록(끝) 크게 흔든다)
+// 피부 버텍스 셰이더. (기본 스키닝 / 모프 경로 + 머리카락 흔들림, 카드 탄젠트 아틀라스의 가닥 좌표(a)가 클수록(끝) 크게 흔든다)
 const SKIN_VERTEXSHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 vertexPosition;
 layout(location = 1) in vec3 vertexNormal;
@@ -605,7 +605,7 @@ void main() {
 }
 `;
 
-// 컷아웃 깊이 버텍스 셰이더. (섀도우 맵 캐스팅 — 머리카락 / 속눈썹의 투명 영역을 오파시티로 제거하기 위해 UV 를 넘긴다)
+// 컷아웃 깊이 버텍스 셰이더. (섀도우 맵 캐스팅, 머리카락 / 속눈썹의 투명 영역을 오파시티로 제거하기 위해 UV 를 넘긴다)
 const CUTOUT_DEPTH_VERTEXSHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 vertexPosition;
 layout(location = 2) in vec2 vertexTextureCoordinate;
@@ -647,8 +647,56 @@ void main() {
 // - 선형 HDR 로 조도 / 알베도 / 스펙큘러 / 노멀을 MRT 로 나눠 출력하고, 합성은 SubsurfaceScatteringEffect 이후 호출자가 한다.
 // - 머티리얼마다 셰이딩 모드를 등록한다(setMaterialShading). 불투명 패스(draw)는 피부 / 눈 / 머리카락 컷아웃,
 //   블렌드 패스(drawBlended)는 머리카락 프린지 / 차폐 / 유체를 그린다 (호출자가 블렌드 상태를 잡는다).
-// - 환경 상태: 조명 3개(0번 = 키 라이트, 섀도우 수신) / 3색 반구 앰비언트 / 노멀·디테일·러프니스·스펙큘러·주름·마이크로·눈·머리카락 파라미터.
+// - 환경 상태: 조명 3개(0번 = 키 라이트, 섀도우 수신) / 3색 반구 앰비언트 / 노멀, 디테일, 러프니스, 스펙큘러, 주름, 마이크로, 눈, 머리카락 파라미터.
 //==============================================================================
+/**
+ * @example <caption>불투명 패스와 블렌드 패스를 MRT 렌더 타겟에 그리기</caption>
+ * import { HumanSkinRenderer, SkinnedModel, RenderTarget, Camera3D, Matrix4, Vector3, SKIN_SHADING_SKIN } from "./build/vanilla.js";
+ *
+ * const width = 640;
+ * const height = 360;
+ * const canvas = document.createElement("canvas");
+ * const webGL2RenderingContext = canvas.getContext("webgl2");
+ * const humanSkinRenderer = new HumanSkinRenderer(webGL2RenderingContext);
+ * humanSkinRenderer.setLight(0, 0.4, 0.7, 0.6, 1.0, 0.95, 0.9, 3.0);
+ * humanSkinRenderer.setAmbientColors([0.3, 0.32, 0.38], [0.15, 0.14, 0.15], [0.05, 0.04, 0.04]);
+ * const skinnedModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "examples/ancientmountain/assets/fox.glb", humanSkinRenderer);
+ * const drawableList = skinnedModel.getDrawableList();
+ * for (const drawable of drawableList) {
+ * 	humanSkinRenderer.setMaterialShading(drawable.material, SKIN_SHADING_SKIN);
+ * }
+ * skinnedModel.update(0);
+ *
+ * const geometryRenderTarget = new RenderTarget(webGL2RenderingContext, width, height, true, { colorAttachmentCount: 4, useFloatColor: true, useDepthTexture: true });
+ * geometryRenderTarget.bind();
+ * webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+ * webGL2RenderingContext.clearColor(0, 0, 0, 0);
+ * webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+ * const cameraX = 0;
+ * const cameraY = 60;
+ * const cameraZ = 200;
+ * const camera = new Camera3D();
+ * camera.setPerspective(0.8, 1, 1000);
+ * camera.setAspectRatio(width / height);
+ * const eyePosition = Vector3.create(cameraX, cameraY, cameraZ);
+ * const targetPosition = Vector3.create(0, 40, 0);
+ * camera.lookAt(eyePosition, targetPosition);
+ * const viewProjectionMatrix = camera.getViewProjectionMatrix();
+ * const viewProjectionElements = viewProjectionMatrix.getElements();
+ * const modelMatrix = Matrix4.createIdentity();
+ * const modelMatrixElements = modelMatrix.getElements();
+ * humanSkinRenderer.draw(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ);
+ *
+ * webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+ * webGL2RenderingContext.blendFunc(webGL2RenderingContext.SRC_ALPHA, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
+ * webGL2RenderingContext.depthMask(false);
+ * humanSkinRenderer.drawBlended(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ);
+ * webGL2RenderingContext.depthMask(true);
+ * webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+ * const irradianceTexture = geometryRenderTarget.getColorTexture(0);
+ * const albedoTexture = geometryRenderTarget.getColorTexture(1);
+ * console.log(irradianceTexture !== null, albedoTexture !== null);
+ */
 export class HumanSkinRenderer extends SkinnedModelRenderer {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -697,7 +745,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
 	 */
 	constructor(webGL2RenderingContext) {
 		super(webGL2RenderingContext, SKIN_FRAGMENTSHADER_SOURCE, SKIN_VERTEXSHADER_SOURCE);
@@ -748,46 +796,46 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	}
 
 	//==============================================================================
-	// 불투명 패스 출력. (피부 / 눈 / 머리카락 컷아웃 — 깊이 쓰기)
+	// 불투명 패스 출력. (피부 / 눈 / 머리카락 컷아웃, 깊이 쓰기)
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { SkinnedModel } skinnedModel
-	 * @param { Float32Array } viewProjectionElements
-	 * @param { Float32Array } modelMatrixElements
-	 * @param { number } cameraX
-	 * @param { number } cameraY
-	 * @param { number } cameraZ
+	 * @param { SkinnedModel } skinnedModel 그릴 모델. (update 로 포즈를 셈한 뒤)
+	 * @param { Float32Array } viewProjectionElements 보기와 투영을 곱한 행렬 원소. (열 우선 4x4)
+	 * @param { Float32Array } modelMatrixElements 모델 월드 행렬 원소. (열 우선 4x4)
+	 * @param { number } cameraX 카메라 월드 X.
+	 * @param { number } cameraY 카메라 월드 Y.
+	 * @param { number } cameraZ 카메라 월드 Z.
 	 */
 	draw(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ) {
 		this.drawPass(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ, 0);
 	}
 
 	//==============================================================================
-	// 블렌드 패스 출력. (머리카락 프린지 / 차폐 / 유체 — 호출자가 블렌드 켜고 깊이 쓰기를 끈 뒤 호출)
+	// 블렌드 패스 출력. (머리카락 프린지 / 차폐 / 유체, 호출자가 블렌드 켜고 깊이 쓰기를 끈 뒤 호출)
 	//==============================================================================
 	/**
-	 * @param { SkinnedModel } skinnedModel
-	 * @param { Float32Array } viewProjectionElements
-	 * @param { Float32Array } modelMatrixElements
-	 * @param { number } cameraX
-	 * @param { number } cameraY
-	 * @param { number } cameraZ
+	 * @param { SkinnedModel } skinnedModel 그릴 모델. (update 로 포즈를 셈한 뒤)
+	 * @param { Float32Array } viewProjectionElements 보기와 투영을 곱한 행렬 원소. (열 우선 4x4)
+	 * @param { Float32Array } modelMatrixElements 모델 월드 행렬 원소. (열 우선 4x4)
+	 * @param { number } cameraX 카메라 월드 X.
+	 * @param { number } cameraY 카메라 월드 Y.
+	 * @param { number } cameraZ 카메라 월드 Z.
 	 */
 	drawBlended(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ) {
 		this.drawPass(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ, 1);
 	}
 
 	//==============================================================================
-	// 패스 출력. (공통 유니폼 → 드로어블 순회 — 패스에 맞는 셰이딩 모드만)
+	// 패스 출력. (공통 유니폼 → 드로어블 순회, 패스에 맞는 셰이딩 모드만)
 	//==============================================================================
 	/**
-	 * @param { SkinnedModel } skinnedModel
-	 * @param { Float32Array } viewProjectionElements
-	 * @param { Float32Array } modelMatrixElements
-	 * @param { number } cameraX
-	 * @param { number } cameraY
-	 * @param { number } cameraZ
+	 * @param { SkinnedModel } skinnedModel 그릴 모델. (update 로 포즈를 셈한 뒤)
+	 * @param { Float32Array } viewProjectionElements 보기와 투영을 곱한 행렬 원소. (열 우선 4x4)
+	 * @param { Float32Array } modelMatrixElements 모델 월드 행렬 원소. (열 우선 4x4)
+	 * @param { number } cameraX 카메라 월드 X.
+	 * @param { number } cameraY 카메라 월드 Y.
+	 * @param { number } cameraZ 카메라 월드 Z.
 	 * @param { number } passMode 0 = 불투명, 1 = 블렌드.
 	 */
 	drawPass(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ, passMode) {
@@ -841,13 +889,13 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	}
 
 	//==============================================================================
-	// 깊이 패스 출력. (섀도우 맵 캐스팅 — 컷아웃 / 머리카락 머티리얼은 커버리지 텍스처로 투명 영역 제거, 차폐 / 유체는 제외)
+	// 깊이 패스 출력. (섀도우 맵 캐스팅, 컷아웃 / 머리카락 머티리얼은 커버리지 텍스처로 투명 영역 제거, 차폐 / 유체는 제외)
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { SkinnedModel } skinnedModel
-	 * @param { Float32Array } lightViewProjectionElements
-	 * @param { Float32Array } modelMatrixElements
+	 * @param { SkinnedModel } skinnedModel 그림자를 드리울 모델.
+	 * @param { Float32Array } lightViewProjectionElements 광원 뷰 투영 행렬 원소. (열 우선 4x4)
+	 * @param { Float32Array } modelMatrixElements 모델 월드 행렬 원소. (열 우선 4x4)
 	 */
 	drawDepth(skinnedModel, lightViewProjectionElements, modelMatrixElements) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -907,7 +955,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	// 환경 유니폼 적용. (조명 / 앰비언트 / 피부 / 주름 / 마이크로 / 눈 / 머리카락 파라미터)
 	//==============================================================================
 	/**
-	 * @param { ShaderProgram } shaderProgram
+	 * @param { ShaderProgram } shaderProgram 유니폼을 넣을 셰이더 프로그램. (use 한 뒤)
 	 */
 	applyEnvironmentUniforms(shaderProgram) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -973,7 +1021,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	// 섀도우 유니폼 적용. (섀도우 샘플러 타입 불일치로 드로우가 무효화되지 않도록 강도와 무관하게 항상 바인드)
 	//==============================================================================
 	/**
-	 * @param { ShaderProgram } shaderProgram
+	 * @param { ShaderProgram } shaderProgram 유니폼을 넣을 셰이더 프로그램. (use 한 뒤)
 	 */
 	applyShadowUniforms(shaderProgram) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -1003,13 +1051,13 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	}
 
 	//==============================================================================
-	// 섀도우 맵 설정. (본 패스에서 그림자 수신 — 기반 렌더러에도 전달)
+	// 섀도우 맵 설정. (본 패스에서 그림자 수신, 기반 렌더러에도 전달)
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { WebGLTexture | null } shadowMapTexture
-	 * @param { Float32Array | null } lightViewProjectionElements
-	 * @param { number } texelSize
+	 * @param { WebGLTexture | null } shadowMapTexture 섀도우 맵 깊이 텍스처. (비교 샘플링, null 이면 그림자를 받지 않는다)
+	 * @param { Float32Array | null } lightViewProjectionElements 광원 뷰 투영 행렬 원소. (null 이면 그림자를 받지 않는다)
+	 * @param { number } texelSize 섀도우 맵 한 텍셀의 텍스처 좌표 크기. (1 / 해상도, 표본 간격)
 	 */
 	setShadowMap(shadowMapTexture, lightViewProjectionElements, texelSize) {
 		super.setShadowMap(shadowMapTexture, lightViewProjectionElements, texelSize);
@@ -1023,7 +1071,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } shadowStrength
+	 * @param { number } shadowStrength 그림자 강도. (0 ~ 1, 기본 0)
 	 */
 	setShadowStrength(shadowStrength) {
 		super.setShadowStrength(shadowStrength);
@@ -1031,42 +1079,42 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	}
 
 	//==============================================================================
-	// 그림자 부드러움 설정. (포아송 반경 — 섀도우 텍셀 단위)
+	// 그림자 부드러움 설정. (포아송 반경, 섀도우 텍셀 단위)
 	//==============================================================================
 	/**
-	 * @param { number } shadowSoftness
+	 * @param { number } shadowSoftness 포아송 표본 반경. (섀도우 텍셀 단위, 기본 2.5)
 	 */
 	setShadowSoftness(shadowSoftness) {
 		this.#shadowSoftness = shadowSoftness;
 	}
 
 	//==============================================================================
-	// 그림자 표본 수 설정. (1 ~ 24 — 많을수록 부드럽고 느리다)
+	// 그림자 표본 수 설정. (1 ~ 24, 많을수록 부드럽고 느리다)
 	//==============================================================================
 	/**
-	 * @param { number } shadowSampleCount
+	 * @param { number } shadowSampleCount 표본 수. (소수는 버리고 1 ~ 24 로 자른다, 기본 12)
 	 */
 	setShadowSampleCount(shadowSampleCount) {
 		this.#shadowSampleCount = System.Math.max(1, System.Math.min(SHADOW_SAMPLE_COUNT, System.Math.floor(shadowSampleCount)));
 	}
 
 	//==============================================================================
-	// 머리카락 흔들림 설정. (진폭 m / 시간 초 / 주파수 — 진폭 0 이면 없음)
+	// 머리카락 흔들림 설정. (진폭 m / 시간 초 / 주파수, 진폭 0 이면 없음)
 	//==============================================================================
 	/**
-	 * @param { number } amplitude
-	 * @param { number } time
-	 * @param { number } frequency
+	 * @param { number } amplitude 흔들림 진폭. (미터, 가닥 끝일수록 크고 0 이면 없음, 기본 0)
+	 * @param { number } time 흐른 시간. (초, 매 프레임 넣는다)
+	 * @param { number } frequency 흔들림 주파수. (시간에 곱하는 배율, 기본 1.5)
 	 */
 	setHairSway(amplitude, time, frequency) {
 		this.#hairSway = [amplitude, time, frequency];
 	}
 
 	//==============================================================================
-	// 머리카락 프린지 블렌드 사용 설정. (false 면 컷아웃만 — 성능 위주)
+	// 머리카락 프린지 블렌드 사용 설정. (false 면 컷아웃만, 성능 위주)
 	//==============================================================================
 	/**
-	 * @param { boolean } useHairFringe
+	 * @param { boolean } useHairFringe 참이면 블렌드 패스에서 머리카락을 한 번 더 그린다. (기본 true)
 	 */
 	setHairFringe(useHairFringe) {
 		this.#useHairFringe = useHairFringe;
@@ -1076,8 +1124,8 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	// 머티리얼 셰이딩 모드 등록. (등록하지 않은 머티리얼은 피부)
 	//==============================================================================
 	/**
-	 * @param { Material } material
-	 * @param { number } shadingMode
+	 * @param { Material } material 셰이딩 모드를 정할 머티리얼.
+	 * @param { number } shadingMode 셰이딩 모드. (SKIN_SHADING_SKIN, EYE, HAIR, OCCLUSION, FLUID, FACIALHAIR)
 	 */
 	setMaterialShading(material, shadingMode) {
 		this.#materialShadingModes.set(material, shadingMode);
@@ -1087,8 +1135,8 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	// 머티리얼 셰이딩 모드 반환.
 	//==============================================================================
 	/**
-	 * @param { Material } material
-	 * @returns { number }
+	 * @param { Material } material 머티리얼.
+	 * @returns { number } 등록한 셰이딩 모드. (등록하지 않았으면 SKIN_SHADING_SKIN)
 	 */
 	getMaterialShadingMode(material) {
 		const shadingMode = this.#materialShadingModes.get(material);
@@ -1096,17 +1144,17 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	}
 
 	//==============================================================================
-	// 조명 설정. (0 = 키 라이트: 섀도우 맵 수신 / 1 = 필 / 2 = 림 — 방향은 표면에서 빛을 향하는 벡터)
+	// 조명 설정. (0 = 키 라이트: 섀도우 맵 수신 / 1 = 필 / 2 = 림, 방향은 표면에서 빛을 향하는 벡터)
 	//==============================================================================
 	/**
-	 * @param { number } lightIndex
-	 * @param { number } directionX
-	 * @param { number } directionY
-	 * @param { number } directionZ
-	 * @param { number } red
-	 * @param { number } green
-	 * @param { number } blue
-	 * @param { number } intensity
+	 * @param { number } lightIndex 조명 번호. (0 키, 1 필, 2 림)
+	 * @param { number } directionX 표면에서 빛을 향하는 방향 X. (정규화해 담는다)
+	 * @param { number } directionY 표면에서 빛을 향하는 방향 Y.
+	 * @param { number } directionZ 표면에서 빛을 향하는 방향 Z.
+	 * @param { number } red 빛 빨강. (선형)
+	 * @param { number } green 빛 초록. (선형)
+	 * @param { number } blue 빛 파랑. (선형)
+	 * @param { number } intensity 세기. (색에 곱한다)
 	 */
 	setLight(lightIndex, directionX, directionY, directionZ, red, green, blue, intensity) {
 		const directionLength = System.Math.sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ);
@@ -1120,12 +1168,12 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	}
 
 	//==============================================================================
-	// 앰비언트 3색 설정. (하늘 / 지평 / 바닥 — 선형 색)
+	// 앰비언트 3색 설정. (하늘 / 지평 / 바닥, 선형 색)
 	//==============================================================================
 	/**
-	 * @param { number[] } skyColor
-	 * @param { number[] } horizonColor
-	 * @param { number[] } groundColor
+	 * @param { number[] } skyColor 위쪽 하늘 색. ([r, g, b], 선형, 기본 [0.34, 0.36, 0.42])
+	 * @param { number[] } horizonColor 지평 색. ([r, g, b], 선형, 기본 [0.16, 0.15, 0.16])
+	 * @param { number[] } groundColor 아래쪽 바닥 색. ([r, g, b], 선형, 기본 [0.05, 0.04, 0.045])
 	 */
 	setAmbientColors(skyColor, horizonColor, groundColor) {
 		this.#ambientSkyColor = skyColor.slice(0, 3);
@@ -1137,7 +1185,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	// 노멀 맵 강도 설정. (1 = 원본, 크면 주름이 깊어진다)
 	//==============================================================================
 	/**
-	 * @param { number } normalStrength
+	 * @param { number } normalStrength 노멀 맵 xy 배율. (기본 1)
 	 */
 	setNormalStrength(normalStrength) {
 		this.#normalStrength = normalStrength;
@@ -1147,7 +1195,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	// 높이 디테일 강도 설정. (0 = 디테일 노멀 없음)
 	//==============================================================================
 	/**
-	 * @param { number } detailStrength
+	 * @param { number } detailStrength 높이 미분 디테일 배율. (기본 6)
 	 */
 	setDetailStrength(detailStrength) {
 		this.#detailStrength = detailStrength;
@@ -1157,7 +1205,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	// 높이 디테일 텍셀 크기 설정. (1 / 높이 맵 해상도)
 	//==============================================================================
 	/**
-	 * @param { number } detailTexelSize
+	 * @param { number } detailTexelSize 높이 맵 한 텍셀의 UV 크기. (기본 1 / 4096)
 	 */
 	setDetailTexelSize(detailTexelSize) {
 		this.#detailTexelSize = detailTexelSize;
@@ -1167,7 +1215,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	// 캐비티 강도 설정. (0 = 차폐 없음)
 	//==============================================================================
 	/**
-	 * @param { number } cavityStrength
+	 * @param { number } cavityStrength 캐비티 배율. (높이와 저역 높이의 차에 곱한다, 기본 6)
 	 */
 	setCavityStrength(cavityStrength) {
 		this.#cavityStrength = cavityStrength;
@@ -1177,8 +1225,8 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	// 러프니스 범위 설정. (스펙큘러 맵 1 → 최소, 0 → 최대)
 	//==============================================================================
 	/**
-	 * @param { number } minimumRoughness
-	 * @param { number } maximumRoughness
+	 * @param { number } minimumRoughness 스펙큘러 맵이 1 인 곳의 러프니스. (기본 0.32)
+	 * @param { number } maximumRoughness 스펙큘러 맵이 0 인 곳의 러프니스. (기본 0.62)
 	 */
 	setRoughnessRange(minimumRoughness, maximumRoughness) {
 		this.#roughnessRange = [minimumRoughness, maximumRoughness];
@@ -1188,7 +1236,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	// 스펙큘러 강도 설정. (피부 F0 배율)
 	//==============================================================================
 	/**
-	 * @param { number } specularStrength
+	 * @param { number } specularStrength 피부 F0 배율. (기본 1)
 	 */
 	setSpecularStrength(specularStrength) {
 		this.#specularStrength = specularStrength;
@@ -1198,28 +1246,28 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	// 잔털 산란 강도 설정.
 	//==============================================================================
 	/**
-	 * @param { number } sheenStrength
+	 * @param { number } sheenStrength 잔털 산란 세기. (기본 0.35)
 	 */
 	setSheenStrength(sheenStrength) {
 		this.#sheenStrength = sheenStrength;
 	}
 
 	//==============================================================================
-	// SSS 마스크 강도 설정. (조도 출력 알파 — 0 이면 화면 공간 산란에서 제외)
+	// SSS 마스크 강도 설정. (조도 출력 알파, 0 이면 화면 공간 산란에서 제외)
 	//==============================================================================
 	/**
-	 * @param { number } subsurfaceAmount
+	 * @param { number } subsurfaceAmount 산란 마스크 세기. (머티리얼의 서브서피스 팩터와 곱해 조도 출력 알파가 된다, 기본 1)
 	 */
 	setSubsurfaceAmount(subsurfaceAmount) {
 		this.#subsurfaceAmount = subsurfaceAmount;
 	}
 
 	//==============================================================================
-	// 마이크로 노멀 설정. (타일링 횟수 / 강도 — 0 이면 사용 안 함)
+	// 마이크로 노멀 설정. (타일링 횟수 / 강도, 0 이면 사용 안 함)
 	//==============================================================================
 	/**
-	 * @param { number } microTiling
-	 * @param { number } microStrength
+	 * @param { number } microTiling 마이크로 텍스처 타일링 횟수. (UV 에 곱한다, 기본 0)
+	 * @param { number } microStrength 마이크로 노멀과 캐비티 세기. (기본 0, 0 이면 쓰지 않는다)
 	 */
 	setMicroDetail(microTiling, microStrength) {
 		this.#microTiling = microTiling;
@@ -1230,9 +1278,9 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	// 주름 맵 사용 설정. (마스크 아틀라스 / 주름 노멀 / 색 아틀라스가 머티리얼에 붙어 있어야 한다)
 	//==============================================================================
 	/**
-	 * @param { boolean } useWrinkleMaps
-	 * @param { number } normalStrength
-	 * @param { number } colorStrength
+	 * @param { boolean } useWrinkleMaps 참이면 주름 맵을 쓴다. (기본 false)
+	 * @param { number } normalStrength 주름 노멀 배율. (기본 1)
+	 * @param { number } colorStrength 주름 색 배율. (기본 1)
 	 */
 	setWrinkleMaps(useWrinkleMaps, normalStrength, colorStrength) {
 		this.#useWrinkleMaps = useWrinkleMaps;
@@ -1244,10 +1292,22 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	// 주름 채널 가중치 설정. (채널 = 마스크 아틀라스 타일 x 4 + RGBA 순서, 값 = 주름 맵 1 / 2 / 3 기여)
 	//==============================================================================
 	/**
-	 * @param { number } channelIndex
-	 * @param { number } weight1
-	 * @param { number } weight2
-	 * @param { number } weight3
+	 * @param { number } channelIndex 채널 번호. (0 ~ 63, 타일 x 4 + RGBA 차례)
+	 * @param { number } weight1 주름 맵 1 기여.
+	 * @param { number } weight2 주름 맵 2 기여.
+	 * @param { number } weight3 주름 맵 3 기여.
+	 * @example <caption>표정 채널 가중치를 넣고 마무리하기</caption>
+	 * import { HumanSkinRenderer } from "./build/vanilla.js";
+	 *
+	 * const canvas = document.createElement("canvas");
+	 * const webGL2RenderingContext = canvas.getContext("webgl2");
+	 * const humanSkinRenderer = new HumanSkinRenderer(webGL2RenderingContext);
+	 * humanSkinRenderer.setWrinkleMaps(true, 1.0, 0.8);
+	 * const browRaiseWeight = 0.7;
+	 * const squintWeight = 0.4;
+	 * humanSkinRenderer.setWrinkleChannelWeight(0, browRaiseWeight, 0, 0);
+	 * humanSkinRenderer.setWrinkleChannelWeight(5, 0, squintWeight, 0);
+	 * humanSkinRenderer.finishWrinkleChannelWeights();
 	 */
 	setWrinkleChannelWeight(channelIndex, weight1, weight2, weight3) {
 		this.#wrinkleChannelWeights[channelIndex * 3] = weight1;
@@ -1256,7 +1316,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	}
 
 	//==============================================================================
-	// 주름 채널 가중치 적용 마무리. (가중치가 있는 타일만 골라 비트마스크로 — 셰이더가 빈 타일을 건너뛴다)
+	// 주름 채널 가중치 적용 마무리. (가중치가 있는 타일만 골라 비트마스크로, 셰이더가 빈 타일을 건너뛴다)
 	//==============================================================================
 	finishWrinkleChannelWeights() {
 		let tileMask = 0;
@@ -1270,12 +1330,12 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	}
 
 	//==============================================================================
-	// 눈 파라미터 설정. (UV 단위 — 홍채 반경 / 동공 반경 / 홍채 평면 깊이)
+	// 눈 파라미터 설정. (UV 단위, 홍채 반경 / 동공 반경 / 홍채 평면 깊이)
 	//==============================================================================
 	/**
-	 * @param { number } irisRadius
-	 * @param { number } pupilRadius
-	 * @param { number } irisDepth
+	 * @param { number } irisRadius 홍채 반경. (UV 단위, 기본 0.133)
+	 * @param { number } pupilRadius 동공 반경. (UV 단위, 기본 0.04)
+	 * @param { number } irisDepth 홍채 평면 깊이. (굴절 시차 세기, 기본 0.05)
 	 */
 	setEyeParameters(irisRadius, pupilRadius, irisDepth) {
 		this.#eyeIrisRadius = irisRadius;
@@ -1284,23 +1344,23 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	}
 
 	//==============================================================================
-	// 눈꺼풀 감김 정도 설정. (0 = 뜬 눈, 1 = 감은 눈 — 눈알을 눈꺼풀 그늘만큼 어둡게)
+	// 눈꺼풀 감김 정도 설정. (0 = 뜬 눈, 1 = 감은 눈, 눈알을 눈꺼풀 그늘만큼 어둡게)
 	//==============================================================================
 	/**
-	 * @param { number } eyeClosure
+	 * @param { number } eyeClosure 감긴 정도. (0 ~ 1 로 자른다, 0 뜬 눈, 1 감은 눈)
 	 */
 	setEyeClosure(eyeClosure) {
 		this.#eyeClosure = System.Math.max(0, System.Math.min(1, eyeClosure));
 	}
 
 	//==============================================================================
-	// 머리카락 파라미터 설정. (1차 / 2차 로브 시프트 · 지수 · 강도, 투과 강도, 뿌리 차폐)
+	// 머리카락 파라미터 설정. (1차 / 2차 로브 시프트, 지수, 강도, 투과 강도, 뿌리 차폐)
 	//==============================================================================
 	/**
 	 * @param { number[] } specularShift [1차, 2차]
 	 * @param { number[] } specularPower [1차, 2차]
 	 * @param { number[] } specularIntensity [1차, 2차, 투과]
-	 * @param { number } rootShade
+	 * @param { number } rootShade 뿌리 차폐 세기. (0 이면 없음, 기본 0.45)
 	 */
 	setHairParameters(specularShift, specularPower, specularIntensity, rootShade) {
 		this.#hairSpecularShift = [specularShift[0], specularShift[1], 0];
@@ -1313,7 +1373,7 @@ export class HumanSkinRenderer extends SkinnedModelRenderer {
 	// 컷아웃 깊이 셰이더 프로그램 반환.
 	//==============================================================================
 	/**
-	 * @returns { ShaderProgram }
+	 * @returns { ShaderProgram } 컷아웃 깊이 셰이더 프로그램.
 	 */
 	getCutoutDepthShaderProgram() {
 		return this.#cutoutDepthShaderProgram;

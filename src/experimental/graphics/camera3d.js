@@ -28,6 +28,23 @@ const MINIMUM_FRONT_DEPTH = 0.0001;
 //   보기 행렬은 월드 → 카메라의 강체 변환(카메라는 -Z 를 봄)으로 준다. 눈, 보는 곳(눈 앞 1), 위쪽과 isOrthographic 은 그 행렬에서 뽑는다.
 //   시야각, 보이는 높이, 가까운 거리, 먼 거리, 가로 세로 비는 마지막으로 준 값 그대로다. setPerspective, setOrthographic, lookAt 을 부르면 원 행렬을 버리고 셈하는 길로 돌아간다.
 //==============================================================================
+/**
+ * @example <caption>원근 카메라로 월드 점을 화면 자리로 옮기기</caption>
+ * import { Camera3D, Rect, Vector3 } from "./build/vanilla.js";
+ *
+ * const camera = new Camera3D();
+ * camera.setPerspective(Math.PI / 3, 0.1, 500);
+ * camera.setAspectRatio(640 / 360);
+ * const eyePosition = Vector3.create(0, 8, 12);
+ * const targetPosition = Vector3.create(0, 0, 0);
+ * camera.lookAt(eyePosition, targetPosition);
+ * const viewRect = Rect.create(0, 0, 640, 360);
+ * const screenPoint = camera.projectToView(0, 1, 0, viewRect);
+ * console.log(screenPoint.x, screenPoint.y, screenPoint.isInFront);
+ * const viewProjectionMatrix = camera.getViewProjectionMatrix();
+ * const elements = viewProjectionMatrix.getElements();
+ * console.log(elements.length);
+ */
 export class Camera3D {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -76,8 +93,8 @@ export class Camera3D {
 	//==============================================================================
 	/**
 	 * @param { number } fieldOfViewRadian 세로 시야각.
-	 * @param { number } nearDistance
-	 * @param { number } farDistance
+	 * @param { number } nearDistance 가까운 거리. (월드 단위)
+	 * @param { number } farDistance 먼 거리. (월드 단위)
 	 */
 	setPerspective(fieldOfViewRadian, nearDistance, farDistance) {
 		this.clearRawMatrices();
@@ -92,9 +109,9 @@ export class Camera3D {
 	// 직교 투영 설정. (보이는 높이, 너비는 높이 x 가로 세로 비)
 	//==============================================================================
 	/**
-	 * @param { number } orthographicHeight
-	 * @param { number } nearDistance
-	 * @param { number } farDistance
+	 * @param { number } orthographicHeight 보이는 높이. (월드 단위, 너비는 높이 x 가로 세로 비)
+	 * @param { number } nearDistance 가까운 거리. (월드 단위)
+	 * @param { number } farDistance 먼 거리. (월드 단위)
 	 */
 	setOrthographic(orthographicHeight, nearDistance, farDistance) {
 		this.clearRawMatrices();
@@ -109,7 +126,7 @@ export class Camera3D {
 	// 직교 투영인지.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 직교 투영이면 참.
 	 */
 	isOrthographic() {
 		return this.#isOrthographic;
@@ -119,7 +136,7 @@ export class Camera3D {
 	// 가로 세로 비 설정. (너비 / 높이, 같으면 그대로)
 	//==============================================================================
 	/**
-	 * @param { number } aspectRatio
+	 * @param { number } aspectRatio 가로 세로 비. (너비 / 높이, 0 이하나 NaN 이면 무시한다)
 	 */
 	setAspectRatio(aspectRatio) {
 		if (!(aspectRatio > 0) || aspectRatio === this.#aspectRatio) {
@@ -133,7 +150,7 @@ export class Camera3D {
 	// 가로 세로 비 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 가로 세로 비. (너비 / 높이)
 	 */
 	getAspectRatio() {
 		return this.#aspectRatio;
@@ -143,7 +160,7 @@ export class Camera3D {
 	// 원근의 세로 시야각 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 원근의 세로 시야각. (라디안)
 	 */
 	getFieldOfView() {
 		return this.#fieldOfViewRadian;
@@ -153,7 +170,7 @@ export class Camera3D {
 	// 직교의 보이는 높이 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 직교의 보이는 높이. (월드 단위)
 	 */
 	getOrthographicHeight() {
 		return this.#orthographicHeight;
@@ -163,7 +180,7 @@ export class Camera3D {
 	// 가까운 거리 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 가까운 거리. (월드 단위)
 	 */
 	getNearDistance() {
 		return this.#nearDistance;
@@ -173,7 +190,7 @@ export class Camera3D {
 	// 먼 거리 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 먼 거리. (월드 단위)
 	 */
 	getFarDistance() {
 		return this.#farDistance;
@@ -183,8 +200,8 @@ export class Camera3D {
 	// 보는 자리 설정. (값을 복사해 둔다)
 	//==============================================================================
 	/**
-	 * @param { Vector3 } eyePosition
-	 * @param { Vector3 } targetPosition
+	 * @param { Vector3 } eyePosition 눈의 월드 자리.
+	 * @param { Vector3 } targetPosition 보는 곳의 월드 자리.
 	 * @param { Vector3 } [upDirection] 기본 (0, 1, 0).
 	 */
 	lookAt(eyePosition, targetPosition, upDirection = Vector3.up()) {
@@ -199,7 +216,7 @@ export class Camera3D {
 	// 눈의 자리 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector3 }
+	 * @returns { Vector3 } 눈의 월드 자리. (담아 둔 벡터, 고치지 않는다)
 	 */
 	getEyePosition() {
 		return this.#eyePosition;
@@ -209,7 +226,7 @@ export class Camera3D {
 	// 보는 곳 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector3 }
+	 * @returns { Vector3 } 보는 곳의 월드 자리. (담아 둔 벡터, 고치지 않는다)
 	 */
 	getTargetPosition() {
 		return this.#targetPosition;
@@ -219,7 +236,7 @@ export class Camera3D {
 	// 위쪽 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector3 }
+	 * @returns { Vector3 } 위쪽 방향. (담아 둔 벡터, 고치지 않는다)
 	 */
 	getUpDirection() {
 		return this.#upDirection;
@@ -231,6 +248,22 @@ export class Camera3D {
 	/**
 	 * @param { Matrix4 } viewMatrix 월드 → 카메라.
 	 * @param { Matrix4 } projectionMatrix 카메라 → 클립.
+	 * @example <caption>게임이 셈한 직교 행렬을 그대로 쓰기</caption>
+	 * import { Camera3D, Matrix4, Vector3 } from "./build/vanilla.js";
+	 *
+	 * const eyePosition = Vector3.create(10, 10, 10);
+	 * const targetPosition = Vector3.create(0, 0, 0);
+	 * const upDirection = Vector3.up();
+	 * const viewMatrix = Matrix4.createLookAt(eyePosition, targetPosition, upDirection);
+	 * const projectionMatrix = Matrix4.createOrthographic(-8, 8, -4.5, 4.5, 0.1, 100);
+	 * const camera = new Camera3D();
+	 * camera.setMatrices(viewMatrix, projectionMatrix);
+	 * const recoveredEyePosition = camera.getEyePosition();
+	 * const isOrthographic = camera.isOrthographic();
+	 * console.log(isOrthographic, recoveredEyePosition.x, recoveredEyePosition.y, recoveredEyePosition.z);
+	 * camera.setPerspective(0.8, 0.1, 100);
+	 * const hasRawMatrices = camera.hasRawMatrices();
+	 * console.log(hasRawMatrices);
 	 */
 	setMatrices(viewMatrix, projectionMatrix) {
 		const rawViewMatrix = viewMatrix.clone();
@@ -256,7 +289,7 @@ export class Camera3D {
 	// 원 행렬을 쓰는지.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } setMatrices 로 받은 원 행렬을 쓰면 참.
 	 */
 	hasRawMatrices() {
 		return this.#rawViewMatrix !== null;
@@ -312,7 +345,7 @@ export class Camera3D {
 	// 보기 행렬 반환. (월드 → 카메라)
 	//==============================================================================
 	/**
-	 * @returns { Matrix4 }
+	 * @returns { Matrix4 } 보기 행렬. (담아 둔 행렬, 고칠 것은 clone)
 	 */
 	getViewMatrix() {
 		this.refreshMatrices();
@@ -323,7 +356,7 @@ export class Camera3D {
 	// 투영 행렬 반환. (카메라 → 클립)
 	//==============================================================================
 	/**
-	 * @returns { Matrix4 }
+	 * @returns { Matrix4 } 투영 행렬. (담아 둔 행렬, 고칠 것은 clone)
 	 */
 	getProjectionMatrix() {
 		this.refreshMatrices();
@@ -334,7 +367,7 @@ export class Camera3D {
 	// 보기와 투영 행렬 반환. (월드 → 클립)
 	//==============================================================================
 	/**
-	 * @returns { Matrix4 }
+	 * @returns { Matrix4 } 투영 x 보기 행렬. (담아 둔 행렬, 고칠 것은 clone)
 	 */
 	getViewProjectionMatrix() {
 		this.refreshMatrices();
@@ -345,7 +378,7 @@ export class Camera3D {
 	// 보기와 투영의 역행렬 반환. (클립 → 월드)
 	//==============================================================================
 	/**
-	 * @returns { Matrix4 }
+	 * @returns { Matrix4 } 보기와 투영의 역행렬. (담아 둔 행렬, 고칠 것은 clone)
 	 */
 	getInverseViewProjectionMatrix() {
 		this.refreshMatrices();
@@ -356,10 +389,10 @@ export class Camera3D {
 	// 월드 점의 카메라 앞 깊이. (보는 쪽으로 잰 거리, 눈의 면보다 뒤면 음수, 비치는 것을 먼 것부터 그릴 때)
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } z
-	 * @returns { number }
+	 * @param { number } x 월드 X.
+	 * @param { number } y 월드 Y.
+	 * @param { number } z 월드 Z.
+	 * @returns { number } 카메라가 보는 쪽으로 잰 깊이. (월드 단위, 눈의 면보다 뒤면 음수)
 	 */
 	readViewDepth(x, y, z) {
 		const viewElements = this.getViewMatrix().getElements();
@@ -372,12 +405,23 @@ export class Camera3D {
 	// - result 를 주면 거기에 담아 돌려준다. (매 프레임 새 객체를 만들지 않게)
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } z
-	 * @param { Rect } viewRect
+	 * @param { number } x 월드 X.
+	 * @param { number } y 월드 Y.
+	 * @param { number } z 월드 Z.
+	 * @param { Rect } viewRect 3D 를 그리는 사각형. (부르는 쪽 좌표, 보통 뷰 좌표)
 	 * @param { object } [result] { x, y, depth, isInFront }
 	 * @returns { object } { x, y, depth, isInFront }
+	 * @example <caption>결과 객체를 다시 쓰며 여러 점 옮기기</caption>
+	 * import { Camera3D, Rect } from "./build/vanilla.js";
+	 *
+	 * const camera = new Camera3D();
+	 * const viewRect = Rect.create(0, 0, 640, 360);
+	 * const projected = { x: 0, y: 0, depth: 0, isInFront: false };
+	 * const pointList = [[0, 0, 0], [2, 1, 0], [0, 0, 20]];
+	 * for (const point of pointList) {
+	 * 	camera.projectToView(point[0], point[1], point[2], viewRect, projected);
+	 * 	console.log(projected.x, projected.y, projected.depth, projected.isInFront);
+	 * }
 	 */
 	projectToView(x, y, z, viewRect, result = { x: 0, y: 0, depth: 0, isInFront: false }) {
 		const clip = this.getViewProjectionMatrix().transformPoint(x, y, z);
@@ -402,9 +446,23 @@ export class Camera3D {
 	//==============================================================================
 	/**
 	 * @param { Vector2 } viewPosition viewRect 와 같은 좌표.
-	 * @param { number } planeHeight
-	 * @param { Rect } viewRect
-	 * @returns { Vector3 | null }
+	 * @param { number } planeHeight 수평면의 높이. (월드 y)
+	 * @param { Rect } viewRect 3D 를 그리는 사각형. (viewPosition 과 같은 좌표)
+	 * @returns { Vector3 | null } 시선과 수평면이 만나는 월드 점. (나란하거나 눈 뒤에서 만나거나 viewRect 크기가 0 이하면 null)
+	 * @example <caption>화면 가운데가 가리키는 바닥 자리 찾기</caption>
+	 * import { Camera3D, Rect, Vector2, Vector3 } from "./build/vanilla.js";
+	 *
+	 * const camera = new Camera3D();
+	 * camera.setAspectRatio(640 / 360);
+	 * const eyePosition = Vector3.create(0, 10, 10);
+	 * const targetPosition = Vector3.create(0, 0, 0);
+	 * camera.lookAt(eyePosition, targetPosition);
+	 * const viewRect = Rect.create(0, 0, 640, 360);
+	 * const viewPosition = Vector2.create(320, 180);
+	 * const groundPoint = camera.unprojectToPlane(viewPosition, 0, viewRect);
+	 * if (groundPoint !== null) {
+	 * 	console.log(groundPoint.x, groundPoint.y, groundPoint.z);
+	 * }
 	 */
 	unprojectToPlane(viewPosition, planeHeight, viewRect) {
 		if (viewRect.size.x <= 0 || viewRect.size.y <= 0) {

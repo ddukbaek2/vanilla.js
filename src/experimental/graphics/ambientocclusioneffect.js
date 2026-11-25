@@ -13,7 +13,7 @@ import { FullscreenPass } from "./fullscreenpass.js";
 // 반구 표본 수. (프래그먼트마다 회전 노이즈로 흩는다)
 const SAMPLE_COUNT = 16;
 
-// 차폐 패스. (깊이 + 월드 노멀 → 뷰 공간 반구 표본으로 차폐율 — 결과 r 에 가시율)
+// 차폐 패스. (깊이 + 월드 노멀 → 뷰 공간 반구 표본으로 차폐율, 결과 r 에 가시율)
 const OCCLUSION_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -86,7 +86,7 @@ void main() {
 }
 `;
 
-// 분리형 깊이 인식 블러. (노이즈 제거 — 깊이 차가 큰 표본은 제외)
+// 분리형 깊이 인식 블러. (노이즈 제거, 깊이 차가 큰 표본은 제외)
 const BLUR_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -118,6 +118,44 @@ void main() {
 // - render() 입력은 본 패스의 깊이 텍스처와 월드 노멀 텍스처(알파 = 커버리지), 카메라의 뷰 회전 / 투영 파라미터.
 //   결과는 getResultTexture() 의 r 채널 가시율(1 = 차폐 없음).
 //==============================================================================
+/**
+ * @example <caption>깊이와 노멀 텍스처로 차폐 구하기</caption>
+ * import { AmbientOcclusionEffect, RenderTarget, Camera3D, Vector3 } from "./build/vanilla.js";
+ *
+ * const width = 640;
+ * const height = 360;
+ * const canvas = document.createElement("canvas");
+ * const webGL2RenderingContext = canvas.getContext("webgl2");
+ * const geometryRenderTarget = new RenderTarget(webGL2RenderingContext, width, height, true, { useDepthTexture: true });
+ * geometryRenderTarget.bind();
+ * webGL2RenderingContext.clearColor(0.0, 1.0, 0.0, 1.0);
+ * webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+ *
+ * const camera = new Camera3D();
+ * camera.setPerspective(0.8, 0.1, 100);
+ * camera.setAspectRatio(width / height);
+ * const eyePosition = Vector3.create(0, 2, 6);
+ * const targetPosition = Vector3.create(0, 0, 0);
+ * camera.lookAt(eyePosition, targetPosition);
+ * const viewMatrix = camera.getViewMatrix();
+ * const viewMatrixElements = viewMatrix.getElements();
+ * const fieldOfView = camera.getFieldOfView();
+ * const aspectRatio = camera.getAspectRatio();
+ * const nearDistance = camera.getNearDistance();
+ * const farDistance = camera.getFarDistance();
+ *
+ * const ambientOcclusionEffect = new AmbientOcclusionEffect(webGL2RenderingContext);
+ * ambientOcclusionEffect.setScale(0.5);
+ * ambientOcclusionEffect.resize(width, height);
+ * ambientOcclusionEffect.setParameters(0.5, 1.2, 0.01);
+ * const depthTexture = geometryRenderTarget.getDepthTexture();
+ * const normalTexture = geometryRenderTarget.getColorTexture();
+ * ambientOcclusionEffect.render(depthTexture, normalTexture, viewMatrixElements, fieldOfView, aspectRatio, nearDistance, farDistance);
+ * const visibilityTexture = ambientOcclusionEffect.getResultTexture();
+ * console.log(visibilityTexture !== null);
+ * ambientOcclusionEffect.destroy();
+ * geometryRenderTarget.destroy();
+ */
 export class AmbientOcclusionEffect extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -139,7 +177,7 @@ export class AmbientOcclusionEffect extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
 	 */
 	constructor(webGL2RenderingContext) {
 		super();
@@ -188,11 +226,11 @@ export class AmbientOcclusionEffect extends Object {
 	}
 
 	//==============================================================================
-	// 크기 변경. (본 패스 해상도 — 내부는 축소 배율 적용)
+	// 크기 변경. (본 패스 해상도, 내부는 축소 배율 적용)
 	//==============================================================================
 	/**
-	 * @param { number } width
-	 * @param { number } height
+	 * @param { number } width 본 패스 가로 크기. (픽셀, 내부 판은 배율을 곱해 내리고 최소 1)
+	 * @param { number } height 본 패스 세로 크기. (픽셀, 내부 판은 배율을 곱해 내리고 최소 1)
 	 */
 	resize(width, height) {
 		const scale = this.getScale();
@@ -204,7 +242,7 @@ export class AmbientOcclusionEffect extends Object {
 	}
 
 	//==============================================================================
-	// 차폐 렌더링. (차폐 → 가로 블러 → 세로 블러 — 결과는 getResultTexture())
+	// 차폐 렌더링. (차폐 → 가로 블러 → 세로 블러, 결과는 getResultTexture())
 	// - 부수 효과: 깊이/블렌드 비활성, TEXTURE0 활성, 프레임버퍼 바인드가 변경된다.
 	//==============================================================================
 	/**
@@ -212,9 +250,9 @@ export class AmbientOcclusionEffect extends Object {
 	 * @param { WebGLTexture } normalTexture 월드 노멀 텍스처. (알파 = 커버리지)
 	 * @param { Float32Array } viewMatrixElements 뷰 행렬 원소. (열 우선 4x4)
 	 * @param { number } fieldOfViewRadian 세로 시야각.
-	 * @param { number } aspectRatio
-	 * @param { number } nearDistance
-	 * @param { number } farDistance
+	 * @param { number } aspectRatio 가로 세로 비. (너비 / 높이)
+	 * @param { number } nearDistance 카메라의 가까운 거리. (깊이를 선형으로 풀 때 쓴다)
+	 * @param { number } farDistance 카메라의 먼 거리. (깊이를 선형으로 풀 때 쓴다)
 	 */
 	render(depthTexture, normalTexture, viewMatrixElements, fieldOfViewRadian, aspectRatio, nearDistance, farDistance) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -285,10 +323,10 @@ export class AmbientOcclusionEffect extends Object {
 	}
 
 	//==============================================================================
-	// 결과 텍스처 반환. (render() 이후 — r 가시율)
+	// 결과 텍스처 반환. (render() 이후, r 가시율)
 	//==============================================================================
 	/**
-	 * @returns { WebGLTexture | null }
+	 * @returns { WebGLTexture | null } 가시율 텍스처. (r 이 가시율 0 ~ 1 이고 1 이면 차폐 없음, g 는 선형 깊이)
 	 */
 	getResultTexture() {
 		const pongRenderTarget = this.getPongRenderTarget();
@@ -300,9 +338,9 @@ export class AmbientOcclusionEffect extends Object {
 	// 파라미터 설정. (표본 반경(월드) / 강도 / 깊이 바이어스)
 	//==============================================================================
 	/**
-	 * @param { number } radius
-	 * @param { number } intensity
-	 * @param { number } bias
+	 * @param { number } radius 표본 반경. (뷰 공간 월드 단위, 기본 0.03)
+	 * @param { number } intensity 차폐 세기 배율. (기본 1)
+	 * @param { number } bias 깊이 비교 바이어스. (월드 단위, 제 면 차폐를 막는다, 기본 0.002)
 	 */
 	setParameters(radius, intensity, bias) {
 		this.#radius = radius;
@@ -314,7 +352,7 @@ export class AmbientOcclusionEffect extends Object {
 	// 내부 해상도 배율 설정. (resize 전에 호출)
 	//==============================================================================
 	/**
-	 * @param { number } scale
+	 * @param { number } scale 내부 해상도 배율. (본 패스 크기에 곱한다, 기본 0.5, 다음 resize 부터 쓴다)
 	 */
 	setScale(scale) {
 		this.#scale = scale;
@@ -338,7 +376,7 @@ export class AmbientOcclusionEffect extends Object {
 	// 렌더링 컨텍스트 반환.
 	//==============================================================================
 	/**
-	 * @returns { WebGL2RenderingContext }
+	 * @returns { WebGL2RenderingContext } 렌더링 컨텍스트.
 	 */
 	getWebGL2RenderingContext() {
 		return this.#webGL2RenderingContext;
@@ -348,7 +386,7 @@ export class AmbientOcclusionEffect extends Object {
 	// 차폐 패스 반환.
 	//==============================================================================
 	/**
-	 * @returns { FullscreenPass }
+	 * @returns { FullscreenPass } 차폐 패스.
 	 */
 	getOcclusionPass() {
 		return this.#occlusionPass;
@@ -358,7 +396,7 @@ export class AmbientOcclusionEffect extends Object {
 	// 블러 패스 반환.
 	//==============================================================================
 	/**
-	 * @returns { FullscreenPass }
+	 * @returns { FullscreenPass } 깊이 인식 블러 패스.
 	 */
 	getBlurPass() {
 		return this.#blurPass;
@@ -368,7 +406,7 @@ export class AmbientOcclusionEffect extends Object {
 	// 차폐 렌더 타겟 반환.
 	//==============================================================================
 	/**
-	 * @returns { RenderTarget }
+	 * @returns { RenderTarget } 차폐 결과 렌더 타겟. (RGBA16F)
 	 */
 	getOcclusionRenderTarget() {
 		return this.#occlusionRenderTarget;
@@ -378,7 +416,7 @@ export class AmbientOcclusionEffect extends Object {
 	// 핑 렌더 타겟 반환. (가로 블러 결과)
 	//==============================================================================
 	/**
-	 * @returns { RenderTarget }
+	 * @returns { RenderTarget } 가로 블러 결과 렌더 타겟.
 	 */
 	getPingRenderTarget() {
 		return this.#pingRenderTarget;
@@ -388,7 +426,7 @@ export class AmbientOcclusionEffect extends Object {
 	// 퐁 렌더 타겟 반환. (최종 결과 보관)
 	//==============================================================================
 	/**
-	 * @returns { RenderTarget }
+	 * @returns { RenderTarget } 세로 블러 결과 렌더 타겟. (최종 결과)
 	 */
 	getPongRenderTarget() {
 		return this.#pongRenderTarget;
@@ -398,7 +436,7 @@ export class AmbientOcclusionEffect extends Object {
 	// 표본 반경 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 표본 반경. (뷰 공간 월드 단위)
 	 */
 	getRadius() {
 		return this.#radius;
@@ -408,7 +446,7 @@ export class AmbientOcclusionEffect extends Object {
 	// 강도 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 차폐 세기 배율.
 	 */
 	getIntensity() {
 		return this.#intensity;
@@ -418,7 +456,7 @@ export class AmbientOcclusionEffect extends Object {
 	// 깊이 바이어스 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 깊이 비교 바이어스. (월드 단위)
 	 */
 	getBias() {
 		return this.#bias;
@@ -428,7 +466,7 @@ export class AmbientOcclusionEffect extends Object {
 	// 내부 해상도 배율 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 내부 해상도 배율.
 	 */
 	getScale() {
 		return this.#scale;

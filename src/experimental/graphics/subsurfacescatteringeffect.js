@@ -10,13 +10,13 @@ import { FullscreenPass } from "./fullscreenpass.js";
 //==============================================================================
 // 전역 상수 목록.
 //==============================================================================
-// 커널 샘플 수. (중앙 1 + 양측 — 홀수)
+// 커널 샘플 수. (중앙 1 + 양측, 홀수)
 const KERNEL_SAMPLE_COUNT = 17;
 
-// 커널 오프셋 범위. (확산 프로파일 단위 — 셰이더에서 산란 폭으로 정규화)
+// 커널 오프셋 범위. (확산 프로파일 단위, 셰이더에서 산란 폭으로 정규화)
 const KERNEL_RANGE = 3;
 
-// 분리형 산란 블러 패스. (깊이 인식 — 표면이 갈라지는 곳은 중앙 색으로 되돌린다)
+// 분리형 산란 블러 패스. (깊이 인식, 표면이 갈라지는 곳은 중앙 색으로 되돌린다)
 const SCATTER_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -72,10 +72,43 @@ void main() {
 
 
 //==============================================================================
-// 화면 공간 서브서피스 스캐터링. (분리형 — 확산 조도 버퍼를 깊이 인식 가로/세로 블러)
+// 화면 공간 서브서피스 스캐터링. (분리형, 확산 조도 버퍼를 깊이 인식 가로/세로 블러)
 // - 피부 확산 프로파일(가우시안 합)로 채널별 커널을 만들고, 산란 폭(월드 단위)을 깊이에 맞춰 화면에 투영한다.
 // - render() 입력은 알파에 산란 마스크를 담은 조도 텍스처와 같은 패스의 깊이 텍스처. 결과는 getResultTexture().
 //==============================================================================
+/**
+ * @example <caption>조도 텍스처를 피부 프로파일로 흩기</caption>
+ * import { SubsurfaceScatteringEffect, RenderTarget, Camera3D } from "./build/vanilla.js";
+ *
+ * const width = 640;
+ * const height = 360;
+ * const canvas = document.createElement("canvas");
+ * const webGL2RenderingContext = canvas.getContext("webgl2");
+ * const irradianceRenderTarget = new RenderTarget(webGL2RenderingContext, width, height, true, { useFloatColor: true, useDepthTexture: true });
+ * irradianceRenderTarget.bind();
+ * webGL2RenderingContext.clearColor(0.8, 0.5, 0.4, 1.0);
+ * webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+ *
+ * const camera = new Camera3D();
+ * camera.setPerspective(0.6, 0.05, 50);
+ * camera.setAspectRatio(width / height);
+ * const fieldOfView = camera.getFieldOfView();
+ * const aspectRatio = camera.getAspectRatio();
+ * const nearDistance = camera.getNearDistance();
+ * const farDistance = camera.getFarDistance();
+ *
+ * const subsurfaceScatteringEffect = new SubsurfaceScatteringEffect(webGL2RenderingContext);
+ * subsurfaceScatteringEffect.resize(width, height);
+ * subsurfaceScatteringEffect.setScatterWidth(0.012);
+ * subsurfaceScatteringEffect.setProfile([1.0, 0.37, 0.3], [0.48, 0.41, 0.28]);
+ * const irradianceTexture = irradianceRenderTarget.getColorTexture();
+ * const depthTexture = irradianceRenderTarget.getDepthTexture();
+ * subsurfaceScatteringEffect.render(irradianceTexture, depthTexture, fieldOfView, aspectRatio, nearDistance, farDistance);
+ * const scatteredTexture = subsurfaceScatteringEffect.getResultTexture();
+ * console.log(scatteredTexture !== null);
+ * subsurfaceScatteringEffect.destroy();
+ * irradianceRenderTarget.destroy();
+ */
 export class SubsurfaceScatteringEffect extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -94,7 +127,7 @@ export class SubsurfaceScatteringEffect extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
 	 */
 	constructor(webGL2RenderingContext) {
 		super();
@@ -123,9 +156,14 @@ export class SubsurfaceScatteringEffect extends Object {
 	// 커널 만들기. (WebGL 무관, 표본마다 rgb 가중치 + w 오프셋)
 	//==============================================================================
 	/**
-	 * @param { number[] } falloffColor
-	 * @param { number[] } strengthColor
-	 * @returns { Float32Array }
+	 * @param { number[] } falloffColor 채널마다의 폴오프. ([r, g, b], 클수록 그 채널이 멀리 퍼진다)
+	 * @param { number[] } strengthColor 채널마다의 산란 강도. ([r, g, b], 0 이면 중앙 표본만, 1 이면 커널 가중치 그대로)
+	 * @returns { Float32Array } 표본 17 개마다 rgb 가중치와 w 오프셋을 담은 배열. (길이 68, 0 번이 중앙 표본)
+	 * @example <caption>GL 없이 커널 값 보기</caption>
+	 * import { SubsurfaceScatteringEffect } from "./build/vanilla.js";
+	 *
+	 * const kernel = SubsurfaceScatteringEffect.buildKernel([1.0, 0.37, 0.3], [0.48, 0.41, 0.28]);
+	 * console.log(kernel.length, kernel[0], kernel[1], kernel[2], kernel[3]);
 	 */
 	static buildKernel(falloffColor, strengthColor) {
 		const sampleCount = KERNEL_SAMPLE_COUNT;
@@ -198,11 +236,11 @@ export class SubsurfaceScatteringEffect extends Object {
 	}
 
 	//==============================================================================
-	// 크기 변경. (조도 버퍼 해상도 기준 — 전체 해상도 실수 타겟 2장)
+	// 크기 변경. (조도 버퍼 해상도 기준, 전체 해상도 실수 타겟 2장)
 	//==============================================================================
 	/**
-	 * @param { number } width
-	 * @param { number } height
+	 * @param { number } width 조도 버퍼 가로 크기. (픽셀)
+	 * @param { number } height 조도 버퍼 세로 크기. (픽셀)
 	 */
 	resize(width, height) {
 		this.#pingRenderTarget.resize(width, height);
@@ -210,16 +248,16 @@ export class SubsurfaceScatteringEffect extends Object {
 	}
 
 	//==============================================================================
-	// 산란 렌더링. (가로 → 핑, 세로 → 퐁 — 결과는 getResultTexture())
+	// 산란 렌더링. (가로 → 핑, 세로 → 퐁, 결과는 getResultTexture())
 	// - 부수 효과: 깊이/블렌드 비활성, TEXTURE0 활성, 프레임버퍼 바인드가 변경된다.
 	//==============================================================================
 	/**
 	 * @param { WebGLTexture } irradianceTexture 알파에 산란 마스크를 담은 조도 텍스처.
 	 * @param { WebGLTexture } depthTexture 같은 패스의 깊이 텍스처.
 	 * @param { number } fieldOfViewRadian 세로 시야각.
-	 * @param { number } aspectRatio
-	 * @param { number } nearDistance
-	 * @param { number } farDistance
+	 * @param { number } aspectRatio 가로 세로 비. (너비 / 높이)
+	 * @param { number } nearDistance 카메라의 가까운 거리. (깊이를 선형으로 풀 때 쓴다)
+	 * @param { number } farDistance 카메라의 먼 거리. (깊이를 선형으로 풀 때 쓴다)
 	 */
 	render(irradianceTexture, depthTexture, fieldOfViewRadian, aspectRatio, nearDistance, farDistance) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -263,7 +301,7 @@ export class SubsurfaceScatteringEffect extends Object {
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, pingColorTexture);
 		scatterPass.draw();
 
-		// 깊이 텍스처 해제. (유닛 1 은 섀도우 샘플러 전용 — 비교 모드 없는 텍스처가 남으면 이후 드로우가 무효화된다)
+		// 깊이 텍스처 해제. (유닛 1 은 섀도우 샘플러 전용, 비교 모드 없는 텍스처가 남으면 이후 드로우가 무효화된다)
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
@@ -273,7 +311,7 @@ export class SubsurfaceScatteringEffect extends Object {
 	// 결과 텍스처 반환. (render() 이후)
 	//==============================================================================
 	/**
-	 * @returns { WebGLTexture | null }
+	 * @returns { WebGLTexture | null } 산란 결과 텍스처. (퐁 판, RGBA16F, 알파는 산란 마스크)
 	 */
 	getResultTexture() {
 		const pongRenderTarget = this.getPongRenderTarget();
@@ -282,10 +320,10 @@ export class SubsurfaceScatteringEffect extends Object {
 	}
 
 	//==============================================================================
-	// 산란 폭 설정. (월드 단위 — 커널 전체 반경)
+	// 산란 폭 설정. (월드 단위, 커널 전체 반경)
 	//==============================================================================
 	/**
-	 * @param { number } scatterWidth
+	 * @param { number } scatterWidth 산란 폭. (월드 단위, 커널 전체 반경, 기본 0.2)
 	 */
 	setScatterWidth(scatterWidth) {
 		this.#scatterWidth = scatterWidth;
@@ -295,18 +333,18 @@ export class SubsurfaceScatteringEffect extends Object {
 	// 산란 폭 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 산란 폭. (월드 단위)
 	 */
 	getScatterWidth() {
 		return this.#scatterWidth;
 	}
 
 	//==============================================================================
-	// 확산 프로파일 설정. (채널별 폴오프 / 강도 — 피부 기본 (1, 0.37, 0.3) / (0.48, 0.41, 0.28))
+	// 확산 프로파일 설정. (채널별 폴오프 / 강도, 피부 기본 (1, 0.37, 0.3) / (0.48, 0.41, 0.28))
 	//==============================================================================
 	/**
-	 * @param { number[] } falloffColor
-	 * @param { number[] } strengthColor
+	 * @param { number[] } falloffColor 채널마다의 폴오프. ([r, g, b], 앞 세 값을 복사한다, 피부 기본 [1, 0.37, 0.3])
+	 * @param { number[] } strengthColor 채널마다의 산란 강도. ([r, g, b], 앞 세 값을 복사한다, 피부 기본 [0.48, 0.41, 0.28])
 	 */
 	setProfile(falloffColor, strengthColor) {
 		this.#falloffColor = falloffColor.slice(0, 3);
@@ -318,7 +356,7 @@ export class SubsurfaceScatteringEffect extends Object {
 	// 폴오프 색 반환.
 	//==============================================================================
 	/**
-	 * @returns { number[] }
+	 * @returns { number[] } 채널마다의 폴오프. ([r, g, b])
 	 */
 	getFalloffColor() {
 		return this.#falloffColor;
@@ -328,7 +366,7 @@ export class SubsurfaceScatteringEffect extends Object {
 	// 강도 색 반환.
 	//==============================================================================
 	/**
-	 * @returns { number[] }
+	 * @returns { number[] } 채널마다의 산란 강도. ([r, g, b])
 	 */
 	getStrengthColor() {
 		return this.#strengthColor;
@@ -350,7 +388,7 @@ export class SubsurfaceScatteringEffect extends Object {
 	// 렌더링 컨텍스트 반환.
 	//==============================================================================
 	/**
-	 * @returns { WebGL2RenderingContext }
+	 * @returns { WebGL2RenderingContext } 렌더링 컨텍스트.
 	 */
 	getWebGL2RenderingContext() {
 		return this.#webGL2RenderingContext;
@@ -360,7 +398,7 @@ export class SubsurfaceScatteringEffect extends Object {
 	// 산란 패스 반환.
 	//==============================================================================
 	/**
-	 * @returns { FullscreenPass }
+	 * @returns { FullscreenPass } 분리형 산란 블러 패스.
 	 */
 	getScatterPass() {
 		return this.#scatterPass;
@@ -370,7 +408,7 @@ export class SubsurfaceScatteringEffect extends Object {
 	// 핑 렌더 타겟 반환. (가로 블러 결과)
 	//==============================================================================
 	/**
-	 * @returns { RenderTarget }
+	 * @returns { RenderTarget } 가로 블러 결과 렌더 타겟.
 	 */
 	getPingRenderTarget() {
 		return this.#pingRenderTarget;
@@ -380,7 +418,7 @@ export class SubsurfaceScatteringEffect extends Object {
 	// 퐁 렌더 타겟 반환. (최종 결과 보관)
 	//==============================================================================
 	/**
-	 * @returns { RenderTarget }
+	 * @returns { RenderTarget } 세로 블러 결과 렌더 타겟. (최종 결과)
 	 */
 	getPongRenderTarget() {
 		return this.#pongRenderTarget;

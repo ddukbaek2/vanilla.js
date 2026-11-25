@@ -15,6 +15,24 @@ import { Object } from "../../base/object.js";
 //   멀티샘플이면 getFramebuffer 는 그리는 멀티샘플 프레임버퍼, getResolveFramebuffer 는 텍스처가 붙은 프레임버퍼다. 텍스처를 읽기 전에 resolve() 를 부른다.
 // - depthBits 는 깊이 렌더버퍼의 비트 수(16 이나 24)다. 깊이 텍스처는 늘 24 비트다. 멀티샘플이면서 깊이 텍스처를 쓰면 멀티샘플 깊이도 24 비트로 지어 그대로 푼다.
 //==============================================================================
+/**
+ * @example <caption>멀티샘플 렌더 타겟에 그리고 텍스처로 풀기</caption>
+ * import { RenderTarget } from "./build/vanilla.js";
+ *
+ * const canvas = document.createElement("canvas");
+ * const webGL2RenderingContext = canvas.getContext("webgl2");
+ * const renderTarget = new RenderTarget(webGL2RenderingContext, 256, 256, true, { useDepthTexture: true, sampleCount: 4 });
+ * renderTarget.bind();
+ * webGL2RenderingContext.clearColor(0.2, 0.4, 0.8, 1.0);
+ * webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+ * renderTarget.resolve();
+ * webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+ * const sampleCount = renderTarget.getSampleCount();
+ * const colorTexture = renderTarget.getColorTexture();
+ * const depthTexture = renderTarget.getDepthTexture();
+ * console.log(sampleCount, colorTexture !== null, depthTexture !== null);
+ * renderTarget.destroy();
+ */
 export class RenderTarget extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -42,11 +60,25 @@ export class RenderTarget extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
-	 * @param { number } width
-	 * @param { number } height
-	 * @param { boolean } useDepth
-	 * @param { object | null } options
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
+	 * @param { number } width 가로 크기. (픽셀)
+	 * @param { number } height 세로 크기. (픽셀)
+	 * @param { boolean } useDepth 깊이 어태치먼트를 붙일지.
+	 * @param { object | null } options { colorAttachmentCount = 1, useFloatColor = false, useDepthTexture = false, sampleCount = 0, depthBits = 16 } (null 이면 모두 기본값)
+	 * @example <caption>컬러 어태치먼트 둘(MRT)과 실수 컬러</caption>
+	 * import { RenderTarget } from "./build/vanilla.js";
+	 *
+	 * const canvas = document.createElement("canvas");
+	 * const webGL2RenderingContext = canvas.getContext("webgl2");
+	 * const renderTarget = new RenderTarget(webGL2RenderingContext, 320, 180, true, { colorAttachmentCount: 2, useFloatColor: true });
+	 * const firstTexture = renderTarget.getColorTexture(0);
+	 * const secondTexture = renderTarget.getColorTexture(1);
+	 * console.log(firstTexture !== null, secondTexture !== null);
+	 * renderTarget.resize(640, 360);
+	 * const width = renderTarget.getWidth();
+	 * const height = renderTarget.getHeight();
+	 * console.log(width, height);
+	 * renderTarget.destroy();
 	 */
 	constructor(webGL2RenderingContext, width, height, useDepth, options = null) {
 		super();
@@ -81,8 +113,8 @@ export class RenderTarget extends Object {
 	// 크기 변경. (같은 크기면 무시, 다르면 리소스 재생성)
 	//==============================================================================
 	/**
-	 * @param { number } width
-	 * @param { number } height
+	 * @param { number } width 새 가로 크기. (픽셀)
+	 * @param { number } height 새 세로 크기. (픽셀)
 	 */
 	resize(width, height) {
 		const currentWidth = this.getWidth();
@@ -143,7 +175,7 @@ export class RenderTarget extends Object {
 		const framebuffer = webGL2RenderingContext.createFramebuffer();
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
 
-		// 컬러 어태치먼트. (개수만큼 텍스처 생성 — 실수 컬러는 RGBA16F)
+		// 컬러 어태치먼트. (개수만큼 텍스처 생성, 실수 컬러는 RGBA16F)
 		const colorTextureList = [];
 		const drawBufferList = [];
 		for (let attachmentIndex = 0; attachmentIndex < colorAttachmentCount; ++attachmentIndex) {
@@ -163,7 +195,7 @@ export class RenderTarget extends Object {
 			webGL2RenderingContext.drawBuffers(drawBufferList);
 		}
 
-		// 깊이 어태치먼트. (텍스처 — 이후 패스에서 샘플링 가능 / 렌더버퍼 — 깊이 테스트 전용, 멀티샘플이면 깊이 시험은 멀티샘플 쪽이 맡아 렌더버퍼는 짓지 않는다)
+		// 깊이 어태치먼트. (텍스처, 이후 패스에서 샘플링 가능 / 렌더버퍼, 깊이 테스트 전용, 멀티샘플이면 깊이 시험은 멀티샘플 쪽이 맡아 렌더버퍼는 짓지 않는다)
 		let depthRenderbuffer = null;
 		let depthTexture = null;
 		if (this.#useDepth && (this.getUseDepthTexture() || sampleCount === 0)) {
@@ -199,9 +231,9 @@ export class RenderTarget extends Object {
 	// 기기가 받는 표본 수. (요청 수를 MAX_SAMPLES 와 포맷마다 받는 표본 수 밑의 가장 큰 수로, 2 밑이면 0)
 	//==============================================================================
 	/**
-	 * @param { number } requestedSampleCount
-	 * @param { Array<number> } internalFormatList
-	 * @returns { number }
+	 * @param { number } requestedSampleCount 요청한 표본 수.
+	 * @param { Array<number> } internalFormatList 렌더버퍼 내부 포맷 목록. (모든 포맷이 받는 수로 줄인다)
+	 * @returns { number } 기기가 받는 표본 수. (2 밑이면 0)
 	 */
 	readSupportedSampleCount(requestedSampleCount, internalFormatList) {
 		if (requestedSampleCount < 2) {
@@ -332,7 +364,7 @@ export class RenderTarget extends Object {
 	// 렌더링 컨텍스트 반환.
 	//==============================================================================
 	/**
-	 * @returns { WebGL2RenderingContext }
+	 * @returns { WebGL2RenderingContext } 렌더링 컨텍스트.
 	 */
 	getWebGL2RenderingContext() {
 		return this.#webGL2RenderingContext;
@@ -342,7 +374,7 @@ export class RenderTarget extends Object {
 	// 프레임버퍼 반환. (그리는 프레임버퍼, 멀티샘플이면 멀티샘플 프레임버퍼)
 	//==============================================================================
 	/**
-	 * @returns { WebGLFramebuffer | null }
+	 * @returns { WebGLFramebuffer | null } 그리는 프레임버퍼. (멀티샘플이면 멀티샘플 프레임버퍼, 파괴 뒤면 null)
 	 */
 	getFramebuffer() {
 		return this.#multisampleFramebuffer !== null ? this.#multisampleFramebuffer : this.#framebuffer;
@@ -352,7 +384,7 @@ export class RenderTarget extends Object {
 	// 텍스처가 붙은 프레임버퍼 반환. (멀티샘플이 아니면 getFramebuffer 와 같음)
 	//==============================================================================
 	/**
-	 * @returns { WebGLFramebuffer | null }
+	 * @returns { WebGLFramebuffer | null } 컬러 텍스처가 붙은 프레임버퍼. (파괴 뒤면 null)
 	 */
 	getResolveFramebuffer() {
 		return this.#framebuffer;
@@ -362,7 +394,7 @@ export class RenderTarget extends Object {
 	// 실제로 지은 표본 수 반환. (0 이면 멀티샘플 없음)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 실제로 지은 표본 수. (0 이면 멀티샘플 없음)
 	 */
 	getSampleCount() {
 		return this.#sampleCount;
@@ -372,18 +404,18 @@ export class RenderTarget extends Object {
 	// 깊이 렌더버퍼 비트 수 반환. (16 이나 24)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 깊이 렌더버퍼 비트 수. (16 이나 24)
 	 */
 	getDepthBits() {
 		return this.#depthBits;
 	}
 
 	//==============================================================================
-	// 컬러 텍스처 반환. (어태치먼트 인덱스 — 기본 0)
+	// 컬러 텍스처 반환. (어태치먼트 인덱스, 기본 0)
 	//==============================================================================
 	/**
-	 * @param { number } attachmentIndex
-	 * @returns { WebGLTexture | null }
+	 * @param { number } attachmentIndex 컬러 어태치먼트 번호. (기본 0)
+	 * @returns { WebGLTexture | null } 컬러 텍스처. (번호가 범위 밖이면 null)
 	 */
 	getColorTexture(attachmentIndex = 0) {
 		const colorTexture = this.#colorTextureList[attachmentIndex];
@@ -394,7 +426,7 @@ export class RenderTarget extends Object {
 	// 깊이 텍스처 반환. (useDepthTexture 옵션일 때만 존재)
 	//==============================================================================
 	/**
-	 * @returns { WebGLTexture | null }
+	 * @returns { WebGLTexture | null } 깊이 텍스처. (useDepth 와 useDepthTexture 를 함께 켰을 때만, 아니면 null)
 	 */
 	getDepthTexture() {
 		return this.#depthTexture;
@@ -404,7 +436,7 @@ export class RenderTarget extends Object {
 	// 컬러 어태치먼트 개수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 컬러 어태치먼트 개수.
 	 */
 	getColorAttachmentCount() {
 		return this.#colorAttachmentCount;
@@ -414,7 +446,7 @@ export class RenderTarget extends Object {
 	// 실수 컬러 사용 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 컬러가 RGBA16F 면 참.
 	 */
 	getUseFloatColor() {
 		return this.#useFloatColor;
@@ -424,7 +456,7 @@ export class RenderTarget extends Object {
 	// 깊이 텍스처 사용 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 깊이 텍스처를 쓰면 참.
 	 */
 	getUseDepthTexture() {
 		return this.#useDepthTexture;
@@ -434,7 +466,7 @@ export class RenderTarget extends Object {
 	// 가로 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 가로 크기. (픽셀, 파괴 뒤면 0)
 	 */
 	getWidth() {
 		return this.#width;
@@ -444,7 +476,7 @@ export class RenderTarget extends Object {
 	// 세로 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 세로 크기. (픽셀, 파괴 뒤면 0)
 	 */
 	getHeight() {
 		return this.#height;

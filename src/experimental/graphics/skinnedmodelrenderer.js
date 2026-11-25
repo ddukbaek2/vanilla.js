@@ -13,7 +13,7 @@ import { MORPH_TARGET_MAXIMUM } from "./skinnedmodel.js";
 // 모프 타깃 텍스처 유닛. (머티리얼 슬롯 0 / 2~8, 섀도우 맵 1, 추가 슬롯 9~ 와 겹치지 않는 값)
 const MORPH_TEXTURE_UNIT = 15;
 
-// 모프 타깃 GLSL. (버텍스 셰이더 삽입 — 실수 텍스처의 위치/노멀 델타를 가중 합산)
+// 모프 타깃 GLSL. (버텍스 셰이더 삽입, 실수 텍스처의 위치/노멀 델타를 가중 합산)
 // - 텍셀 인덱스 = gl_VertexID, 타깃 블록 = [위치 행들][노멀 행들] 순서.
 export const MORPH_GLSL = `
 uniform sampler2D morphTexture;
@@ -41,7 +41,7 @@ void applyMorphTargets(inout vec3 position, inout vec3 normal) {
 }
 `;
 
-// 스키닝 버텍스 셰이더. (모프 타깃 → 조인트 4개 가중 혼합 — 어트리뷰트 위치 고정)
+// 스키닝 버텍스 셰이더. (모프 타깃 → 조인트 4개 가중 혼합, 어트리뷰트 위치 고정)
 const SKINNED_VERTEXSHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 vertexPosition;
 layout(location = 1) in vec3 vertexNormal;
@@ -212,7 +212,7 @@ void main() {
 }
 `;
 
-// 깊이 전용 스키닝 버텍스 셰이더. (섀도우 맵 캐스팅 — 모프 타깃 포함)
+// 깊이 전용 스키닝 버텍스 셰이더. (섀도우 맵 캐스팅, 모프 타깃 포함)
 const SKINNED_DEPTH_VERTEXSHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 vertexPosition;
 layout(location = 3) in uvec4 vertexJoints;
@@ -273,12 +273,50 @@ void main() {
 
 
 //==============================================================================
-// 스킨드 모델 렌더러. (스키닝 PBR 셰이더 템플릿 + 환경 상태 소유 — 씬당 하나)
+// 스킨드 모델 렌더러. (스키닝 PBR 셰이더 템플릿 + 환경 상태 소유, 씬당 하나)
 // - SkinnedModel 은 데이터/포즈만 갖고, 렌더링은 이 객체가 모델 인스턴스를 받아 수행한다.
 // - 환경 상태(섀도우 맵 / 태양 / 안개)는 모델이 아닌 렌더러에 설정한다. 섀도우 맵이 없으면 섀도우 유닛에 1x1 비교 깊이 텍스처를 묶는다.
 // - 프래그먼트 셰이더 소스를 주입하면 같은 스키닝/모프 버텍스 경로 위에 다른 셰이딩 템플릿을 세울 수 있다.
 //   (파생 렌더러는 use() 후 고유 유니폼을 설정하고 draw() 를 호출한다)
 //==============================================================================
+/**
+ * @example <caption>GLB 모델 하나를 태양과 안개 아래 그리기</caption>
+ * import { SkinnedModel, SkinnedModelRenderer, Camera3D, Matrix4, Vector3 } from "./build/vanilla.js";
+ *
+ * const width = 640;
+ * const height = 360;
+ * const canvas = document.createElement("canvas");
+ * canvas.width = width;
+ * canvas.height = height;
+ * document.body.appendChild(canvas);
+ * const webGL2RenderingContext = canvas.getContext("webgl2");
+ * const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+ * skinnedModelRenderer.setSunDirection(0.45, 0.76, 0.47);
+ * skinnedModelRenderer.setFogColor(0.16, 0.2, 0.26);
+ * skinnedModelRenderer.setFogRange(300, 800);
+ * const skinnedModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "examples/ancientmountain/assets/fox.glb", skinnedModelRenderer);
+ * skinnedModel.update(0);
+ *
+ * const cameraX = 0;
+ * const cameraY = 80;
+ * const cameraZ = 220;
+ * const camera = new Camera3D();
+ * camera.setPerspective(Math.PI / 3, 1, 2000);
+ * camera.setAspectRatio(width / height);
+ * const eyePosition = Vector3.create(cameraX, cameraY, cameraZ);
+ * const targetPosition = Vector3.create(0, 45, 0);
+ * camera.lookAt(eyePosition, targetPosition);
+ * const viewProjectionMatrix = camera.getViewProjectionMatrix();
+ * const viewProjectionElements = viewProjectionMatrix.getElements();
+ * const modelMatrix = Matrix4.createIdentity();
+ * const modelMatrixElements = modelMatrix.getElements();
+ *
+ * webGL2RenderingContext.viewport(0, 0, width, height);
+ * webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+ * webGL2RenderingContext.clearColor(0.16, 0.2, 0.26, 1);
+ * webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+ * skinnedModelRenderer.draw(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ);
+ */
 export class SkinnedModelRenderer extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -301,9 +339,31 @@ export class SkinnedModelRenderer extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
 	 * @param { string | null } fragmentShaderSource 대체 프래그먼트 셰이더 소스. (null 이면 기본 PBR)
-	 * @param { string | null } vertexShaderSource 대체 버텍스 셰이더 소스. (null 이면 기본 스키닝 — 같은 어트리뷰트 / 출력 규약을 지켜야 한다)
+	 * @param { string | null } vertexShaderSource 대체 버텍스 셰이더 소스. (null 이면 기본 스키닝, 같은 어트리뷰트 / 출력 규약을 지켜야 한다)
+	 * @example <caption>같은 스키닝 경로 위에 다른 프래그먼트 셰이더 세우기</caption>
+	 * import { SkinnedModel, SkinnedModelRenderer } from "./build/vanilla.js";
+	 *
+	 * const canvas = document.createElement("canvas");
+	 * const webGL2RenderingContext = canvas.getContext("webgl2");
+	 * const unlitShaderSource = `#version 300 es
+	 * precision highp float;
+	 * in vec3 worldNormal;
+	 * in vec2 fragmentTextureCoordinate;
+	 * uniform sampler2D baseColorTexture;
+	 * uniform vec3 baseColorFactor;
+	 * out vec4 outputColor;
+	 * void main() {
+	 * 	vec3 albedo = texture(baseColorTexture, fragmentTextureCoordinate).rgb * baseColorFactor;
+	 * 	float light = max(dot(normalize(worldNormal), vec3(0.0, 1.0, 0.0)), 0.0) * 0.6 + 0.4;
+	 * 	outputColor = vec4(albedo * light, 1.0);
+	 * }
+	 * `;
+	 * const unlitRenderer = new SkinnedModelRenderer(webGL2RenderingContext, unlitShaderSource);
+	 * const skinnedModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "examples/ancientmountain/assets/fox.glb", unlitRenderer);
+	 * const drawableList = skinnedModel.getDrawableList();
+	 * console.log(drawableList.length);
 	 */
 	constructor(webGL2RenderingContext, fragmentShaderSource = null, vertexShaderSource = null) {
 		super();
@@ -329,7 +389,7 @@ export class SkinnedModelRenderer extends Object {
 	// - sampler2DShadow 유닛에 비교 모드가 없는 텍스처가 묶이면 WebGL 이 그리기를 거부하고, 깊이 텍스처가 없으면 맥 드라이버가 알린다.
 	//==============================================================================
 	/**
-	 * @returns { WebGLTexture }
+	 * @returns { WebGLTexture } 1x1 비교 깊이 텍스처.
 	 */
 	createEmptyShadowTexture() {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
@@ -349,15 +409,15 @@ export class SkinnedModelRenderer extends Object {
 	}
 
 	//==============================================================================
-	// 출력. (모델 인스턴스의 드로어블 순회 — 머티리얼 적용 + 조인트 행렬 업로드)
+	// 출력. (모델 인스턴스의 드로어블 순회, 머티리얼 적용 + 조인트 행렬 업로드)
 	//==============================================================================
 	/**
-	 * @param { SkinnedModel } skinnedModel
-	 * @param { Float32Array } viewProjectionElements
-	 * @param { Float32Array } modelMatrixElements
-	 * @param { number } cameraX
-	 * @param { number } cameraY
-	 * @param { number } cameraZ
+	 * @param { SkinnedModel } skinnedModel 그릴 모델. (update 로 포즈를 셈한 뒤)
+	 * @param { Float32Array } viewProjectionElements 보기와 투영을 곱한 행렬 원소. (열 우선 4x4)
+	 * @param { Float32Array } modelMatrixElements 모델 월드 행렬 원소. (열 우선 4x4)
+	 * @param { number } cameraX 카메라 월드 X.
+	 * @param { number } cameraY 카메라 월드 Y.
+	 * @param { number } cameraZ 카메라 월드 Z.
 	 */
 	draw(skinnedModel, viewProjectionElements, modelMatrixElements, cameraX, cameraY, cameraZ) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -419,12 +479,12 @@ export class SkinnedModelRenderer extends Object {
 	}
 
 	//==============================================================================
-	// 깊이 패스 출력. (섀도우 맵 캐스팅 — ShadowMap.beginRender() 이후 호출)
+	// 깊이 패스 출력. (섀도우 맵 캐스팅, ShadowMap.beginRender() 이후 호출)
 	//==============================================================================
 	/**
-	 * @param { SkinnedModel } skinnedModel
-	 * @param { Float32Array } lightViewProjectionElements
-	 * @param { Float32Array } modelMatrixElements
+	 * @param { SkinnedModel } skinnedModel 그림자를 드리울 모델.
+	 * @param { Float32Array } lightViewProjectionElements 광원 뷰 투영 행렬 원소. (열 우선 4x4)
+	 * @param { Float32Array } modelMatrixElements 모델 월드 행렬 원소. (열 우선 4x4)
 	 */
 	drawDepth(skinnedModel, lightViewProjectionElements, modelMatrixElements) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -453,17 +513,42 @@ export class SkinnedModelRenderer extends Object {
 	}
 
 	//==============================================================================
-	// 와이어프레임 출력. (모서리 선 — 모프 / 스키닝 반영, 블렌드 / 깊이 상태는 호출자가 잡는다)
+	// 와이어프레임 출력. (모서리 선, 모프 / 스키닝 반영, 블렌드 / 깊이 상태는 호출자가 잡는다)
 	// - 드로어블 버텍스 어레이의 엘리먼트 버퍼를 잠시 선 인덱스로 바꿔 그리고 원래 인덱스로 되돌린다.
 	//==============================================================================
 	/**
-	 * @param { SkinnedModel } skinnedModel
-	 * @param { Float32Array } viewProjectionElements
-	 * @param { Float32Array } modelMatrixElements
-	 * @param { number } red
-	 * @param { number } green
-	 * @param { number } blue
-	 * @param { number } alpha
+	 * @param { SkinnedModel } skinnedModel 선으로 그릴 모델. (처음 그릴 때 선 인덱스를 올린다)
+	 * @param { Float32Array } viewProjectionElements 보기와 투영을 곱한 행렬 원소. (열 우선 4x4)
+	 * @param { Float32Array } modelMatrixElements 모델 월드 행렬 원소. (열 우선 4x4)
+	 * @param { number } red 선 빨강. (0 ~ 1)
+	 * @param { number } green 선 초록. (0 ~ 1)
+	 * @param { number } blue 선 파랑. (0 ~ 1)
+	 * @param { number } alpha 선 알파. (0 ~ 1, 섞기는 호출자가 켠다)
+	 * @example <caption>본 패스 위에 반투명 선 얹기</caption>
+	 * import { SkinnedModel, SkinnedModelRenderer, Camera3D, Matrix4, Vector3 } from "./build/vanilla.js";
+	 *
+	 * const canvas = document.createElement("canvas");
+	 * const webGL2RenderingContext = canvas.getContext("webgl2");
+	 * const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+	 * const skinnedModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "examples/ancientmountain/assets/fox.glb", skinnedModelRenderer);
+	 * skinnedModel.update(0);
+	 * const camera = new Camera3D();
+	 * const eyePosition = Vector3.create(0, 80, 220);
+	 * const targetPosition = Vector3.create(0, 45, 0);
+	 * camera.setPerspective(1.0, 1, 2000);
+	 * camera.lookAt(eyePosition, targetPosition);
+	 * const viewProjectionMatrix = camera.getViewProjectionMatrix();
+	 * const viewProjectionElements = viewProjectionMatrix.getElements();
+	 * const modelMatrix = Matrix4.createIdentity();
+	 * const modelMatrixElements = modelMatrix.getElements();
+	 * webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
+	 * skinnedModelRenderer.draw(skinnedModel, viewProjectionElements, modelMatrixElements, 0, 80, 220);
+	 * webGL2RenderingContext.enable(webGL2RenderingContext.BLEND);
+	 * webGL2RenderingContext.blendFunc(webGL2RenderingContext.SRC_ALPHA, webGL2RenderingContext.ONE_MINUS_SRC_ALPHA);
+	 * webGL2RenderingContext.depthFunc(webGL2RenderingContext.LEQUAL);
+	 * skinnedModelRenderer.drawWireframe(skinnedModel, viewProjectionElements, modelMatrixElements, 0.2, 1.0, 0.6, 0.5);
+	 * webGL2RenderingContext.depthFunc(webGL2RenderingContext.LESS);
+	 * webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 	 */
 	drawWireframe(skinnedModel, viewProjectionElements, modelMatrixElements, red, green, blue, alpha) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -494,11 +579,11 @@ export class SkinnedModelRenderer extends Object {
 	}
 
 	//==============================================================================
-	// 모프 유니폼 적용. (드로어블의 모프 텍스처/가중치 — 타깃이 없으면 개수 0 으로 비활성)
+	// 모프 유니폼 적용. (드로어블의 모프 텍스처/가중치, 타깃이 없으면 개수 0 으로 비활성)
 	//==============================================================================
 	/**
-	 * @param { ShaderProgram } shaderProgram
-	 * @param { object } drawable
+	 * @param { ShaderProgram } shaderProgram 유니폼을 넣을 셰이더 프로그램. (use 한 뒤)
+	 * @param { object } drawable 모델의 드로어블.
 	 */
 	applyMorphUniforms(shaderProgram, drawable) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -525,9 +610,9 @@ export class SkinnedModelRenderer extends Object {
 	// 섀도우 맵 설정. (본 패스에서 그림자 수신)
 	//==============================================================================
 	/**
-	 * @param { WebGLTexture | null } shadowMapTexture
-	 * @param { Float32Array | null } lightViewProjectionElements
-	 * @param { number } texelSize
+	 * @param { WebGLTexture | null } shadowMapTexture 섀도우 맵 깊이 텍스처. (비교 샘플링, null 이면 그림자를 받지 않는다)
+	 * @param { Float32Array | null } lightViewProjectionElements 광원 뷰 투영 행렬 원소. (null 이면 그림자를 받지 않는다)
+	 * @param { number } texelSize 섀도우 맵 한 텍셀의 텍스처 좌표 크기. (1 / 해상도, 표본 간격)
 	 */
 	setShadowMap(shadowMapTexture, lightViewProjectionElements, texelSize) {
 		this.#shadowMapTexture = shadowMapTexture;
@@ -539,7 +624,7 @@ export class SkinnedModelRenderer extends Object {
 	// 그림자 강도 설정. (0 = 수신 안 함)
 	//==============================================================================
 	/**
-	 * @param { number } shadowStrength
+	 * @param { number } shadowStrength 그림자 강도. (0 ~ 1, 기본 0)
 	 */
 	setShadowStrength(shadowStrength) {
 		this.#shadowStrength = shadowStrength;
@@ -549,9 +634,9 @@ export class SkinnedModelRenderer extends Object {
 	// 태양 방향 설정.
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } z
+	 * @param { number } x 표면에서 태양을 향하는 방향 X. (셰이더가 정규화한다, 기본 (0, 1, 0))
+	 * @param { number } y 표면에서 태양을 향하는 방향 Y.
+	 * @param { number } z 표면에서 태양을 향하는 방향 Z.
 	 */
 	setSunDirection(x, y, z) {
 		this.#sunDirection = [x, y, z];
@@ -561,9 +646,9 @@ export class SkinnedModelRenderer extends Object {
 	// 안개 색 설정.
 	//==============================================================================
 	/**
-	 * @param { number } red
-	 * @param { number } green
-	 * @param { number } blue
+	 * @param { number } red 안개 빨강. (0 ~ 1, 기본 0.8)
+	 * @param { number } green 안개 초록. (0 ~ 1, 기본 0.85)
+	 * @param { number } blue 안개 파랑. (0 ~ 1, 기본 0.92)
 	 */
 	setFogColor(red, green, blue) {
 		this.#fogColor = [red, green, blue];
@@ -573,8 +658,8 @@ export class SkinnedModelRenderer extends Object {
 	// 안개 거리 범위 설정.
 	//==============================================================================
 	/**
-	 * @param { number } startDistance
-	 * @param { number } endDistance
+	 * @param { number } startDistance 안개가 끼기 시작하는 카메라 거리. (월드 단위, 기본 55)
+	 * @param { number } endDistance 안개가 다 덮는 카메라 거리. (월드 단위, 기본 250)
 	 */
 	setFogRange(startDistance, endDistance) {
 		this.#fogRange = [startDistance, endDistance];
@@ -584,7 +669,7 @@ export class SkinnedModelRenderer extends Object {
 	// 셰이더 프로그램 반환. (스키닝 PBR 템플릿)
 	//==============================================================================
 	/**
-	 * @returns { ShaderProgram }
+	 * @returns { ShaderProgram } 본 패스 셰이딩 프로그램.
 	 */
 	getShaderProgram() {
 		return this.#shaderProgram;
@@ -594,7 +679,7 @@ export class SkinnedModelRenderer extends Object {
 	// 깊이 셰이더 프로그램 반환.
 	//==============================================================================
 	/**
-	 * @returns { ShaderProgram }
+	 * @returns { ShaderProgram } 깊이 전용 스키닝 프로그램.
 	 */
 	getDepthShaderProgram() {
 		return this.#depthShaderProgram;
@@ -604,7 +689,7 @@ export class SkinnedModelRenderer extends Object {
 	// 와이어프레임 셰이더 프로그램 반환.
 	//==============================================================================
 	/**
-	 * @returns { ShaderProgram }
+	 * @returns { ShaderProgram } 와이어프레임 스키닝 프로그램.
 	 */
 	getWireframeShaderProgram() {
 		return this.#wireframeShaderProgram;
@@ -614,7 +699,7 @@ export class SkinnedModelRenderer extends Object {
 	// 렌더링 컨텍스트 반환.
 	//==============================================================================
 	/**
-	 * @returns { WebGL2RenderingContext }
+	 * @returns { WebGL2RenderingContext } 렌더링 컨텍스트.
 	 */
 	getWebGL2RenderingContext() {
 		return this.#webGL2RenderingContext;
@@ -624,7 +709,7 @@ export class SkinnedModelRenderer extends Object {
 	// 빈 그림자 텍스처 반환. (그림자를 받지 않을 때 섀도우 유닛에 묶는 1x1 비교 깊이 텍스처, 파생 렌더러가 같이 쓴다)
 	//==============================================================================
 	/**
-	 * @returns { WebGLTexture }
+	 * @returns { WebGLTexture } 1x1 비교 깊이 텍스처.
 	 */
 	getEmptyShadowTexture() {
 		return this.#emptyShadowTexture;
