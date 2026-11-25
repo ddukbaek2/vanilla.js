@@ -1366,10 +1366,15 @@ export class ScreenEffect extends Object {
 	}
 
 	//==============================================================================
-	// 파괴. (WebGL 자원 해제)
+	// 파괴. (WebGL 자원 해제: 렌더 대상과 패스 프로그램)
 	//==============================================================================
 	destroy() {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
+		for (const pass of this.#passTable.values()) {
+			webGL2RenderingContext.deleteProgram(pass.getShaderProgram().getProgram());
+			webGL2RenderingContext.deleteVertexArray(pass.getVertexArray());
+		}
+		this.#passTable.clear();
 		destroyRenderTarget(webGL2RenderingContext, this.#sceneTarget);
 		destroyRenderTarget(webGL2RenderingContext, this.#pingTarget);
 		destroyRenderTarget(webGL2RenderingContext, this.#pongTarget);
