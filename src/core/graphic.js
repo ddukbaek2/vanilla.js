@@ -1847,6 +1847,186 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// 고리(띠) 출력. (안쪽 반지름과 바깥 반지름 사이를 startRadian 부터 endRadian 까지 칠한다)
+	// - setFillColor()
+	// - 각도는 라디안, 0 이 오른쪽이고 화면에서 시계 방향으로 는다. (12 시에서 시작하려면 -PI / 2)
+	// - 조각마다 네모 하나를 겹치지 않게 이어 붙여 한 번에 그리므로, 반투명 색이어도 조각의 이음매가 짙어지지 않는다.
+	// - 조각 수는 drawCircle 처럼 화면에서의 바깥 반지름을 따라 정하고(한 바퀴 16 ~ 64), 그리는 각도만큼만 쓴다.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } center
+	 * @param { number } innerRadius
+	 * @param { number } outerRadius
+	 * @param { number } startRadian 기본 0.
+	 * @param { number } endRadian 기본 PI * 2.
+	 */
+	drawRing(center, innerRadius, outerRadius, startRadian = 0, endRadian = Math.PI * 2) {
+		const fillColor = this.getFillColor();
+		this.drawRingWithColor(center.x, center.y, innerRadius, outerRadius, startRadian, endRadian, fillColor);
+	}
+
+	//==============================================================================
+	// 호 출력. (반지름을 따라 lineWidth 두께의 선으로 startRadian 부터 endRadian 까지)
+	// - setStrokeColor()
+	// - 각도와 조각 수는 drawRing 과 같다. 선의 두께 가운데가 반지름에 온다.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } center
+	 * @param { number } radius
+	 * @param { number } startRadian
+	 * @param { number } endRadian
+	 * @param { number } lineWidth 기본 1.
+	 */
+	drawArc(center, radius, startRadian, endRadian, lineWidth = 1) {
+		const halfWidth = lineWidth * 0.5;
+		const strokeColor = this.getStrokeColor();
+		this.drawRingWithColor(center.x, center.y, System.Math.max(0, radius - halfWidth), radius + halfWidth, startRadian, endRadian, strokeColor);
+	}
+
+	//==============================================================================
+	// 고리 출력의 셈. (drawRing, drawArc 가 부른다)
+	//==============================================================================
+	/**
+	 * @param { number } centerX
+	 * @param { number } centerY
+	 * @param { number } innerRadius
+	 * @param { number } outerRadius
+	 * @param { number } startRadian
+	 * @param { number } endRadian
+	 * @param { Color } color
+	 */
+	drawRingWithColor(centerX, centerY, innerRadius, outerRadius, startRadian, endRadian, color) {
+		const spanRadian = endRadian - startRadian;
+		if (outerRadius <= 0 || outerRadius <= innerRadius || spanRadian === 0) {
+			return;
+		}
+		const fullRadian = Math.PI * 2;
+		const clampedSpanRadian = Math.clamp(spanRadian, -fullRadian, fullRadian);
+		const maximumScale = this.#transformMatrix.getMaximumScale();
+		const fullSegmentCount = Math.clamp(Math.ceil(outerRadius * maximumScale * 0.5), 16, 64);
+		const segmentCount = System.Math.max(1, Math.ceil(fullSegmentCount * System.Math.abs(clampedSpanRadian) / fullRadian));
+		const vertexData = this.getVertexData();
+		let offset = 0;
+		let vertexCount = 0;
+		let previousCosine = System.Math.cos(startRadian);
+		let previousSine = System.Math.sin(startRadian);
+		for (let segmentIndex = 1; segmentIndex <= segmentCount; ++segmentIndex) {
+			if ((vertexCount + 6) * FLOATS_PER_VERTEX > vertexData.length) {
+				break;
+			}
+			const radian = startRadian + clampedSpanRadian * (segmentIndex / segmentCount);
+			const cosine = System.Math.cos(radian);
+			const sine = System.Math.sin(radian);
+			const previousInnerX = centerX + previousCosine * innerRadius;
+			const previousInnerY = centerY + previousSine * innerRadius;
+			const previousOuterX = centerX + previousCosine * outerRadius;
+			const previousOuterY = centerY + previousSine * outerRadius;
+			const innerX = centerX + cosine * innerRadius;
+			const innerY = centerY + sine * innerRadius;
+			const outerX = centerX + cosine * outerRadius;
+			const outerY = centerY + sine * outerRadius;
+			vertexData[offset++] = previousInnerX;
+			vertexData[offset++] = previousInnerY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = previousOuterX;
+			vertexData[offset++] = previousOuterY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = outerX;
+			vertexData[offset++] = outerY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = previousInnerX;
+			vertexData[offset++] = previousInnerY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = outerX;
+			vertexData[offset++] = outerY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = innerX;
+			vertexData[offset++] = innerY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexCount += 6;
+			previousCosine = cosine;
+			previousSine = sine;
+		}
+		this.drawVertices(vertexCount, this.getWhiteTexture(), color);
+	}
+
+	//==============================================================================
+	// 선분 여럿 출력. (위치 배열 하나에 선분마다 x0, y0, x1, y1 넷씩, 한 번에 그린다)
+	// - setStrokeColor()
+	// - 선분마다 두께만큼 넓힌 네모 하나다. (drawLine 과 달리 이음새를 메우지 않는다, 따로 떨어진 선분 용)
+	// - Vector2 배열을 만들지 않고 숫자 배열(Array, Float32Array)을 그대로 읽는다. 길이가 0 인 선분은 건너뛴다.
+	// - 정점 버퍼가 차면 거기까지 그리고 이어서 담는다. (묶어 그리기가 켜져 있으면 같은 텍스처라 한 번의 드로우 콜로 이어진다)
+	//==============================================================================
+	/**
+	 * @param { number[] | Float32Array } positionValues
+	 * @param { number } size 기본 1.
+	 */
+	drawLineSegments(positionValues, size = 1) {
+		if (!positionValues || positionValues.length < 4) {
+			return;
+		}
+		const halfSize = size / 2;
+		const strokeColor = this.getStrokeColor();
+		const whiteTexture = this.getWhiteTexture();
+		const vertexData = this.getVertexData();
+		let offset = 0;
+		let vertexCount = 0;
+		const segmentCount = System.Math.floor(positionValues.length / 4);
+		for (let segmentIndex = 0; segmentIndex < segmentCount; ++segmentIndex) {
+			const valueIndex = segmentIndex * 4;
+			const startX = positionValues[valueIndex];
+			const startY = positionValues[valueIndex + 1];
+			const endX = positionValues[valueIndex + 2];
+			const endY = positionValues[valueIndex + 3];
+			const deltaX = endX - startX;
+			const deltaY = endY - startY;
+			const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+			if (!(length > 0)) {
+				continue;
+			}
+			if ((vertexCount + 6) * FLOATS_PER_VERTEX > vertexData.length) {
+				this.drawVertices(vertexCount, whiteTexture, strokeColor);
+				offset = 0;
+				vertexCount = 0;
+			}
+			const normalX = -deltaY / length * halfSize;
+			const normalY = deltaX / length * halfSize;
+			vertexData[offset++] = startX + normalX;
+			vertexData[offset++] = startY + normalY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = endX + normalX;
+			vertexData[offset++] = endY + normalY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = startX - normalX;
+			vertexData[offset++] = startY - normalY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = startX - normalX;
+			vertexData[offset++] = startY - normalY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = endX + normalX;
+			vertexData[offset++] = endY + normalY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = endX - normalX;
+			vertexData[offset++] = endY - normalY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexCount += 6;
+		}
+		this.drawVertices(vertexCount, whiteTexture, strokeColor);
+	}
+
+	//==============================================================================
 	// 이미지 출력.
 	// - setFillColor() Not Supported.
 	//==============================================================================
