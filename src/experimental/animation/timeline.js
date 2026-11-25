@@ -441,6 +441,34 @@ export class Timeline extends Object {
 	}
 
 	//==============================================================================
+	// JSON 글에서 만들기. (정적)
+	//==============================================================================
+	/**
+	 * @param { string } text
+	 * @returns { Timeline }
+	 */
+	static loadFromText(text) {
+		const description = System.JSON.parse(text);
+		return new Timeline(description);
+	}
+
+	//==============================================================================
+	// 읽은 JsonAsset 에서 만들기. (정적, 아직 안 읽혔거나 실패했으면 null. 문서는 복사해 쓴다)
+	//==============================================================================
+	/**
+	 * @param { JsonAsset } jsonAsset
+	 * @returns { Timeline | null }
+	 */
+	static createFromJsonAsset(jsonAsset) {
+		const isLoaded = jsonAsset.isLoaded();
+		if (!isLoaded || !jsonAsset.data) {
+			return null;
+		}
+		const description = System.structuredClone(jsonAsset.data);
+		return new Timeline(description);
+	}
+
+	//==============================================================================
 	// 서술 설정. (참조를 그대로 쓴다 — 편집기가 고친 뒤 invalidate() 로 다시 컴파일)
 	//==============================================================================
 	/**
@@ -672,6 +700,8 @@ export class Timeline extends Object {
 
 	//==============================================================================
 	// 무대 노드 생성. (서술의 stage.nodes 를 노드 트리로 만들고 대상으로 등록)
+	// - 같은 이름의 노드가 둘이면 모두 붙이고, 이름 표에는 뒤의 것이 남는다.
+	// - 부모가 자기 자신이거나 고리가 되면 parentNode 에 붙인다.
 	//==============================================================================
 	/**
 	 * @param { WorldNode } parentNode
@@ -681,15 +711,18 @@ export class Timeline extends Object {
 	buildStage(parentNode, imageResolver = null) {
 		const nodeTable = new System.Map();
 		const nodeDescriptions = this.#description.stage.nodes;
+		const createdList = [];
 		for (const nodeDescription of nodeDescriptions) {
 			const node = Timeline.createStageNode(nodeDescription, imageResolver);
 			nodeTable.set(nodeDescription.name, node);
 			this.#targetTable.set(nodeDescription.name, node);
+			createdList.push({ node: node, parentName: nodeDescription.parent });
 		}
-		for (const nodeDescription of nodeDescriptions) {
-			const node = nodeTable.get(nodeDescription.name);
-			const parentDescriptionNode = nodeDescription.parent ? nodeTable.get(nodeDescription.parent) : null;
-			if (parentDescriptionNode) {
+		for (const createdEntry of createdList) {
+			const node = createdEntry.node;
+			const parentDescriptionNode = createdEntry.parentName ? nodeTable.get(createdEntry.parentName) : null;
+			const isCycle = parentDescriptionNode ? Timeline.isAncestorOrSelf(node, parentDescriptionNode) : false;
+			if (parentDescriptionNode && !isCycle) {
 				parentDescriptionNode.addChild(node);
 			}
 			else {
@@ -698,6 +731,25 @@ export class Timeline extends Object {
 		}
 		this.invalidate();
 		return nodeTable;
+	}
+
+	//==============================================================================
+	// ancestorNode 가 node 자신이거나 그 조상인지. (정적)
+	//==============================================================================
+	/**
+	 * @param { WorldNode } ancestorNode
+	 * @param { WorldNode } node
+	 * @returns { boolean }
+	 */
+	static isAncestorOrSelf(ancestorNode, node) {
+		let currentNode = node;
+		while (currentNode) {
+			if (currentNode === ancestorNode) {
+				return true;
+			}
+			currentNode = currentNode.getParent();
+		}
+		return false;
 	}
 
 	//==============================================================================
