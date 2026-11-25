@@ -237,6 +237,12 @@
   - UIInputField.getDisplayText() (값의 커서 자리에 조합 글을 끼운 글), requestMenuAction(menuAction) (다음 tick 에 잘라내기 / 복사 / 붙여넣기), UIInputFieldMenuAction (import.js 에서 낸다)
   - AmbientOcclusionEffect.buildSampleKernel(), SubsurfaceScatteringEffect.buildKernel(falloffColor, strengthColor): WebGL 없이 커널을 짓는 정적 함수. computeKernel 이 이것을 쓴다
   - FbxLoader.parseNodeRecords(arrayBuffer) (머리 확인과 최상위 노드 레코드, parse 의 앞부분), FbxLoader.readVersion(arrayBuffer) (정적, 머리의 판 번호)
+- OBB.overlaps 가 늘 false 이던 버그를 고쳤다. (상대 꼭짓점을 other.length 로 돌아 상대 투영 범위가 비었다, 러스트 판과 같다)
+- Platform.getSafeAreaRect 가 Window.getComputedStyle(없는 정적 함수)을 불러 예외를 내던 것을 window.getComputedStyle 로 고쳤다. (헤드리스 크롬에서 typeof Window.getComputedStyle 이 "undefined" 인 것을 확인)
+- NodeLayout.arrangeFan: System 을 들여오지 않아 부르면 ReferenceError 로 멈추던 것과, 라디안 값을 도 단위 회전(setLocalRotation)에 넣던 것을 고쳤다. (러스트 판과 같다)
+- TextAsset, BlobAsset: 실패 응답(404 등)을 받은 것으로 치던 것을 고쳐 예외를 낸다. (AssetLoader 의 실패 목록에 든다) AudioAsset 도 실패 응답이면 디코딩 전에 실패로 친다
+- SoundEffectPool: 보이스 수가 0 이면 play 가 0 으로 나눠 예외를 내던 것을 고쳐 아무것도 하지 않는다. (러스트 판과 같다)
+- AudioManager.getContextTime() (AudioContext 시계, 없으면 0), AudioAsset.getLoadError() (마지막 읽기 실패의 까닭, 없으면 null), AssetLoader.getInFlightCount() (일꾼이 집어 받는 중인 수). 러스트 판의 get_context_time, get_load_error, get_in_flight_count 와 같은 자리다
 - 비주얼 에디터를 위 엔진으로 다시 빌드했다
 
 # 0.3.2 (2026-10-22)

@@ -68,7 +68,8 @@ export class OBB extends Object {
 	 */
 	overlaps(other) {
         const edges = this.getEdges();
-        const polygons = [edges, other.getEdges()];
+        const otherEdges = other.getEdges();
+        const polygons = [edges, otherEdges];
         for (let i = 0; i < polygons.length; ++i) {
             const polygon = polygons[i];
             
@@ -91,8 +92,8 @@ export class OBB extends Object {
 
                 let otherMin = Infinity;
                 let otherMax = -Infinity;
-                for (let k = 0; k < other.length; ++k) {
-                    const projection = (other[k].x * axisX) + (other[k].y * axisY);
+                for (let k = 0; k < otherEdges.length; ++k) {
+                    const projection = (otherEdges[k].x * axisX) + (otherEdges[k].y * axisY);
                     if (projection < otherMin) otherMin = projection;
                     if (projection > otherMax) otherMax = projection;
                 }

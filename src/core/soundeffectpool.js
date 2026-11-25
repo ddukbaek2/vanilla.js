@@ -58,7 +58,7 @@ export class SoundEffectPool extends Object {
 	 * @param { number } volume 이 재생의 음량. (0 ~ 1, 기본 1)
 	 */
 	play(audioAsset, volume = 1) {
-		if (this.#isMuted || !audioAsset) {
+		if (this.#isMuted || !audioAsset || this.#playerList.length === 0) {
 			return;
 		}
 		const playerIndex = this.#nextIndex;

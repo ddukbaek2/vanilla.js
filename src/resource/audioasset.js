@@ -17,6 +17,7 @@ export class AudioAsset extends Asset {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { AudioBuffer | null } */ #audioBuffer;
+	/** @private @type { string | null } */ #loadError; // 마지막 읽기 실패의 까닭. (없으면 null)
 
 	//==============================================================================
 	// 생성.
@@ -25,6 +26,7 @@ export class AudioAsset extends Asset {
 		super();
 		this.setAssetType(AssetType.audio);
 		this.#audioBuffer = null;
+		this.#loadError = null;
 	}
 
 	//==============================================================================
@@ -41,17 +43,24 @@ export class AudioAsset extends Asset {
 			return Promise.resolve();
 		}
 
+		this.#loadError = null;
 		if (!isAudioDecodingSupported()) {
+			this.#loadError = "AudioContext is not supported.";
 			console.error(`AudioContext is not supported.`);
 			return;
 		}
 
 		try {
 			const response = await System.fetch(assetPath);
+			// 실패 응답(404 등)은 디코딩 전에 실패로 친다.
+			if (!response.ok) {
+				throw new System.Error(`HTTP ${response.status}`);
+			}
 			const arrayBuffer = await response.arrayBuffer();
 			await this.decodeArrayBuffer(arrayBuffer);
 		}
 		catch (error) {
+			this.#loadError = `Error loading sound: ${assetPath} (${error})`;
 			console.error(`Error loading sound: ${assetPath}`, error);
 			throw error;
 		}
@@ -68,7 +77,9 @@ export class AudioAsset extends Asset {
 		if (isLoaded) {
 			return;
 		}
+		this.#loadError = null;
 		if (!isAudioDecodingSupported()) {
+			this.#loadError = "AudioContext is not supported.";
 			console.error(`AudioContext is not supported.`);
 			return;
 		}
@@ -77,6 +88,7 @@ export class AudioAsset extends Asset {
 			await this.decodeArrayBuffer(arrayBuffer);
 		}
 		catch (error) {
+			this.#loadError = `Error loading sound from memory (${error})`;
 			console.error(`Error loading sound from bytes`, error);
 			throw error;
 		}
@@ -103,6 +115,16 @@ export class AudioAsset extends Asset {
 			await tempAudioContext.close();
 		}
 		this.setLoaded(true);
+	}
+
+	//==============================================================================
+	// 마지막 읽기 실패의 까닭. (받기나 디코딩이 실패했으면 글, 아니면 null, 다시 읽기 시작하면 지운다)
+	//==============================================================================
+	/**
+	 * @returns { string | null }
+	 */
+	getLoadError() {
+		return this.#loadError;
 	}
 
 	//==============================================================================

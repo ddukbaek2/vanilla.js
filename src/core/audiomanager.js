@@ -207,6 +207,20 @@ export class AudioManager extends Object {
 	}
 
 	//==============================================================================
+	// 오디오 컨텍스트 시계. (초, audioContext.currentTime, AudioContext 가 없으면 0)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getContextTime() {
+		const audioContext = this.getAudioContext();
+		if (audioContext === null) {
+			return 0;
+		}
+		return audioContext.currentTime;
+	}
+
+	//==============================================================================
 	// 오디오 컨텍스트 반환. (없으면 null)
 	//==============================================================================
 	/**
