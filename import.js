@@ -203,3 +203,7 @@ export { UIDialog } from "./src/ui/uidialog.js";
 export { MouseButton, TouchPhase, TouchPoint, InputDevice } from "./src/core/inputmanager.js";
 export { InputActions } from "./src/core/inputactions.js";
 export { GamepadKind, readGamepadKind } from "./src/core/gamepadmanager.js";
+export { Camera3D } from "./src/experimental/graphics/camera3d.js";
+export { ToonDrawQueue } from "./src/experimental/graphics/toon/toondrawqueue.js";
+export { ToonView3D } from "./src/experimental/graphics/toon/toonview3d.js";
+export { GraphicsQualityGovernor, GraphicsQuality } from "./src/misc/graphicsqualitygovernor.js";

@@ -7404,6 +7404,41 @@ void main() {
       this.#boundTexture = null;
     }
     //==============================================================================
+    // 깊이 버퍼 비우기. (2D 그리기 사이에 3D 를 끼우기 전에)
+    // - 자르기(beginClipRect, 스텐실)를 건 뒤 그리는 도중에 깊이를 비우면 갤럭시 폴드3(Adreno 660)의 드라이버가 3D 를 하나도 그리지 못한 일이 있다.
+    //   자르기 안에 3D 를 그릴 노드는 beginClipRect 앞에서 이것을 부르고, runExternalPass 에는 clearDepth: false 를 준다.
+    //==============================================================================
+    clearDepthBuffer() {
+      this.flushSpriteBatch();
+      const webGL2RenderingContext = this.getWebGL2RenderingContext();
+      webGL2RenderingContext.depthMask(true);
+      webGL2RenderingContext.clear(webGL2RenderingContext.DEPTH_BUFFER_BIT);
+    }
+    //==============================================================================
+    // 2D 그리기 사이에 WebGL 패스 끼우기. (앞의 2D 묶음을 그리고, 상태 기억을 잊고, 깊이를 비운 뒤 callback, 끝나면 restoreRenderState)
+    // - callback 은 WebGL2 컨텍스트를 받아 프로그램, 버텍스 어레이, 뷰포트, 섞기, 깊이, 면 가리기를 마음대로 바꿔도 된다. (스텐실 자르기는 그대로 걸려 있고, 스텐실 상태는 되돌리지 않으므로 바꾸지 않는다)
+    // - callback 이 던지면 상태를 되돌린 뒤 다시 던진다.
+    //==============================================================================
+    /**
+     * @param { Function } callback (webGL2RenderingContext) => any
+     * @param { object } [options] { clearDepth 깊이를 비울지 (기본 true, 자르기 안이면 clearDepthBuffer 머리말) }
+     * @returns { any } callback 이 돌려준 것.
+     */
+    runExternalPass(callback, options = {}) {
+      const isDepthCleared = options.clearDepth !== false;
+      this.flushSpriteBatch();
+      if (isDepthCleared) {
+        this.clearDepthBuffer();
+      }
+      this.invalidateRenderStateCache();
+      const webGL2RenderingContext = this.getWebGL2RenderingContext();
+      try {
+        return callback(webGL2RenderingContext);
+      } finally {
+        this.restoreRenderState();
+      }
+    }
+    //==============================================================================
     // 버텍스 어레이 반환.
     //==============================================================================
     /**
@@ -21768,6 +21803,92 @@ void main() {
       const scaleZ = System39.Math.hypot(elements[8], elements[9], elements[10]);
       return System39.Math.max(scaleX, scaleY, scaleZ);
     }
+    //==============================================================================
+    // 지어 둔 배열 여럿을 옮겨 한 배열로 잇기. (움직이지 않는 조각을 한 메시로, 돌리거나 키우지 않음)
+    // - 조각마다 { arrays: readArrays 나 ToonGlb.readGlbArrays 의 결과, offset: [x, y, z] (없으면 옮기지 않음) }.
+    //   자리에 옮김을 더하고 번호에 앞 조각의 꼭짓점 수를 더한다. 바깥선 껍데기와 안쪽 범위(innerOutlineRanges, innerBodyRanges)도 같이 옮겨 잇는다.
+    // - 뼈대는 잇지 않는다. 뼈대가 있는 조각도 쉬는 자세 그대로 움직이지 않는 몸이 된다.
+    //==============================================================================
+    /**
+     * @static
+     * @param { Array<object> } pieces { arrays, offset }
+     * @returns { object } readArrays 의 꼴.
+     */
+    static combine(pieces) {
+      let vertexFloatCount = 0;
+      let indexCount = 0;
+      let outlineFloatCount = 0;
+      let outlineIndexCount = 0;
+      for (const piece of pieces) {
+        const arrays = piece.arrays;
+        vertexFloatCount += arrays.vertexData.length;
+        indexCount += arrays.indexData.length;
+        outlineFloatCount += arrays.outlineVertexData.length;
+        outlineIndexCount += arrays.outlineIndexData.length;
+      }
+      const vertexData = new System39.Float32Array(vertexFloatCount);
+      const indexData = new System39.Uint32Array(indexCount);
+      const outlineVertexData = new System39.Float32Array(outlineFloatCount);
+      const outlineBaseData = new System39.Float32Array(outlineFloatCount);
+      const outlineIndexData = new System39.Uint32Array(outlineIndexCount);
+      const innerOutlineRanges = [];
+      const innerBodyRanges = [];
+      let vertexOffset = 0;
+      let indexOffset = 0;
+      let outlineOffset = 0;
+      let outlineIndexOffset = 0;
+      for (const piece of pieces) {
+        const arrays = piece.arrays;
+        const offset = piece.offset !== void 0 && piece.offset !== null ? piece.offset : [0, 0, 0];
+        const startVertex = vertexOffset / VERTEX_FLOAT_COUNT;
+        vertexData.set(arrays.vertexData, vertexOffset);
+        for (let floatIndex = vertexOffset; floatIndex < vertexOffset + arrays.vertexData.length; floatIndex += VERTEX_FLOAT_COUNT) {
+          vertexData[floatIndex] += offset[0];
+          vertexData[floatIndex + 1] += offset[1];
+          vertexData[floatIndex + 2] += offset[2];
+        }
+        for (let index = 0; index < arrays.indexData.length; ++index) {
+          indexData[indexOffset + index] = arrays.indexData[index] + startVertex;
+        }
+        const startOutlineVertex = outlineOffset / 3;
+        const pieceOutlineBaseData = arrays.outlineBaseData !== void 0 && arrays.outlineBaseData.length === arrays.outlineVertexData.length ? arrays.outlineBaseData : arrays.outlineVertexData;
+        outlineVertexData.set(arrays.outlineVertexData, outlineOffset);
+        outlineBaseData.set(pieceOutlineBaseData, outlineOffset);
+        for (let floatIndex = outlineOffset; floatIndex < outlineOffset + arrays.outlineVertexData.length; floatIndex += 3) {
+          for (let axis = 0; axis < 3; ++axis) {
+            outlineVertexData[floatIndex + axis] += offset[axis];
+            outlineBaseData[floatIndex + axis] += offset[axis];
+          }
+        }
+        for (let index = 0; index < arrays.outlineIndexData.length; ++index) {
+          outlineIndexData[outlineIndexOffset + index] = arrays.outlineIndexData[index] + startOutlineVertex;
+        }
+        const pieceInnerOutlineRanges = arrays.innerOutlineRanges !== void 0 ? arrays.innerOutlineRanges : [];
+        for (const range of pieceInnerOutlineRanges) {
+          innerOutlineRanges.push({ start: range.start + outlineIndexOffset, count: range.count });
+        }
+        const pieceInnerBodyRanges = arrays.innerBodyRanges !== void 0 ? arrays.innerBodyRanges : [];
+        for (const range of pieceInnerBodyRanges) {
+          innerBodyRanges.push({ start: range.start + indexOffset, count: range.count });
+        }
+        vertexOffset += arrays.vertexData.length;
+        indexOffset += arrays.indexData.length;
+        outlineOffset += arrays.outlineVertexData.length;
+        outlineIndexOffset += arrays.outlineIndexData.length;
+      }
+      return {
+        vertexData,
+        indexData,
+        outlineVertexData,
+        outlineIndexData,
+        outlineBaseData,
+        skinData: new System39.Float32Array(0),
+        outlineSkinData: new System39.Float32Array(0),
+        skeleton: null,
+        innerOutlineRanges,
+        innerBodyRanges
+      };
+    }
   };
 
   // src/experimental/graphics/toon/glbmeshreader.js
@@ -22716,6 +22837,12 @@ void main() {
     /** @private @type { object } */
     #frameStatistics;
     // 한 프레임의 그린 수와 거른 수와 드로우콜.
+    /** @private @type { object | null } */
+    #screenRect;
+    // 그릴 화면 사각형. ({ x, y, width, height } 뷰포트 픽셀, 왼쪽 위 원점, null 이면 뷰포트 전체)
+    /** @private @type { boolean } */
+    #isScissorApplied;
+    // beginFrame 이 가위를 켰는지.
     //==============================================================================
     // 생성.
     //==============================================================================
@@ -22743,6 +22870,8 @@ void main() {
       this.#savedState = null;
       this.#instanceData = new System41.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
       this.#frameStatistics = { drawCallCount: 0, drawnObjectCount: 0, culledObjectCount: 0 };
+      this.#screenRect = null;
+      this.#isScissorApplied = false;
     }
     //==============================================================================
     // 셰이더 소스 반환. (ShaderWarmer 로 미리 링크할 때)
@@ -22992,6 +23121,7 @@ void main() {
       this.#frameStatistics = { drawCallCount: 0, drawnObjectCount: 0, culledObjectCount: 0 };
       this.#isShadowPass = false;
       this.saveState();
+      this.applyScreenRect();
       webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
       webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
       webGL2RenderingContext.depthFunc(webGL2RenderingContext.LEQUAL);
@@ -23003,7 +23133,87 @@ void main() {
     // 프레임 끝. (적어 둔 상태로 돌린다)
     //==============================================================================
     endFrame() {
+      this.releaseScreenRect();
       this.restoreState(false);
+    }
+    //==============================================================================
+    // 카메라로 프레임 시작. (Camera3D 의 보기와 투영으로 beginFrame)
+    //==============================================================================
+    /**
+     * @param { object } camera - Camera3D
+     */
+    beginFrameWithCamera(camera) {
+      const viewProjectionMatrix = camera.getViewProjectionMatrix();
+      this.beginFrame(viewProjectionMatrix);
+    }
+    //==============================================================================
+    // 그릴 화면 사각형 설정. (뷰포트 픽셀, 왼쪽 위 원점, 다음 beginFrame 부터)
+    //==============================================================================
+    /**
+     * @param { number } x
+     * @param { number } y
+     * @param { number } width
+     * @param { number } height
+     */
+    setScreenRect(x, y, width, height) {
+      this.#screenRect = { x, y, width: System41.Math.max(0, width), height: System41.Math.max(0, height) };
+    }
+    //==============================================================================
+    // 그릴 화면 사각형 풀기. (뷰포트 전체에 그림)
+    //==============================================================================
+    clearScreenRect() {
+      this.#screenRect = null;
+    }
+    //==============================================================================
+    // 그릴 화면 사각형 반환. (없으면 null)
+    //==============================================================================
+    /**
+     * @returns { object | null } { x, y, width, height }
+     */
+    getScreenRect() {
+      return this.#screenRect;
+    }
+    //==============================================================================
+    // 화면 사각형 걸기. (beginFrame 이 상태를 적은 뒤, 클립 x, y 에 사각형의 비를 곱하고 자리를 더한 뒤 가위를 켠다)
+    //==============================================================================
+    applyScreenRect() {
+      const screenRect = this.#screenRect;
+      const savedState = this.#savedState;
+      if (screenRect === null || savedState === null) {
+        return;
+      }
+      const viewport = savedState.viewport;
+      const viewportWidth = System41.Math.max(1, viewport[2]);
+      const viewportHeight = System41.Math.max(1, viewport[3]);
+      const scaleX = screenRect.width / viewportWidth;
+      const scaleY = screenRect.height / viewportHeight;
+      const offsetX = (screenRect.x * 2 + screenRect.width) / viewportWidth - 1;
+      const offsetY = 1 - (screenRect.y * 2 + screenRect.height) / viewportHeight;
+      const elements = this.#viewProjectionElements;
+      for (let columnIndex = 0; columnIndex < 4; ++columnIndex) {
+        const clipW = elements[columnIndex * 4 + 3];
+        elements[columnIndex * 4] = elements[columnIndex * 4] * scaleX + clipW * offsetX;
+        elements[columnIndex * 4 + 1] = elements[columnIndex * 4 + 1] * scaleY + clipW * offsetY;
+      }
+      const webGL2RenderingContext = this.getWebGL2RenderingContext();
+      const scissorLeft = System41.Math.floor(screenRect.x);
+      const scissorBottom = System41.Math.floor(viewportHeight - screenRect.y - screenRect.height);
+      const scissorRight = System41.Math.ceil(screenRect.x + screenRect.width);
+      const scissorTop = System41.Math.ceil(viewportHeight - screenRect.y);
+      webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
+      webGL2RenderingContext.scissor(viewport[0] + scissorLeft, viewport[1] + scissorBottom, scissorRight - scissorLeft, scissorTop - scissorBottom);
+      this.#isScissorApplied = true;
+    }
+    //==============================================================================
+    // 화면 사각형의 가위 풀기. (applyScreenRect 가 켰을 때만)
+    //==============================================================================
+    releaseScreenRect() {
+      if (!this.#isScissorApplied) {
+        return;
+      }
+      const webGL2RenderingContext = this.getWebGL2RenderingContext();
+      webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
+      this.#isScissorApplied = false;
     }
     //==============================================================================
     // 그림자 깊이 패스 시작. (ShadowMap 의 프레임버퍼에 빛의 보기와 투영으로, 앞의 프레임버퍼와 뷰포트는 endShadowPass 가 돌린다)
@@ -23117,6 +23327,21 @@ void main() {
       this.drawWithCount(mesh, identityElements, instanceCount, options);
     }
     //==============================================================================
+    // 모형 하나의 바깥선만 그리기. (거르지도 세지도 않는다, 껍데기가 없거나 hasOutline 이 false 면 그리지 않는다)
+    //==============================================================================
+    /**
+     * @param { object } mesh
+     * @param { Matrix4 } modelMatrix
+     * @param { object } [options] - drawMesh 와 같다.
+     */
+    drawMeshOutline(mesh, modelMatrix, options = {}) {
+      if (mesh === null || mesh.outlineVertexArray === null || options.hasOutline === false || this.#isShadowPass) {
+        return;
+      }
+      const outlineOptions = System41.Object.assign({}, options, { isBodyDrawn: false });
+      this.drawWithCount(mesh, modelMatrix.getElements(), 0, outlineOptions);
+    }
+    //==============================================================================
     // 그리기 본체. (instanceCount 가 0 이면 보통, 아니면 인스턴스로)
     //==============================================================================
     /**
@@ -23166,6 +23391,12 @@ void main() {
         webGL2RenderingContext.cullFace(webGL2RenderingContext.FRONT);
         webGL2RenderingContext.bindVertexArray(mesh.outlineVertexArray);
         drawElements(mesh.outlineIndexCount);
+      }
+      if (options.isBodyDrawn === false) {
+        if (isTransparent) {
+          webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+        }
+        return;
       }
       const solidProgram = this.getSolidProgram();
       solidProgram.use();
@@ -24236,6 +24467,14 @@ void main() {
     exit: "exit"
   });
 
+  // src/misc/graphicsqualitygovernor.js
+  var System47 = globalThis;
+  var GraphicsQuality = System47.Object.freeze({
+    auto: "auto",
+    high: "high",
+    low: "low"
+  });
+
   // tools/visualeditor/editorstyle.js
   var EDITOR_STYLE_TEXT = `
 :root {
@@ -24928,18 +25167,18 @@ body.isDockDragging, body.isDockDragging * {
 `;
 
   // tools/visualeditor/editorscene.js
-  var System47 = globalThis;
+  var System48 = globalThis;
   var HANDLE_LENGTH = 70;
   var HANDLE_WIDTH = 3;
   var HANDLE_PICK_DISTANCE = 9;
   var ROTATE_HANDLE_RADIUS = 60;
-  var EditorTool = System47.Object.freeze({
+  var EditorTool = System48.Object.freeze({
     hand: "hand",
     move: "move",
     rotate: "rotate",
     scale: "scale"
   });
-  var HandleKind = System47.Object.freeze({
+  var HandleKind = System48.Object.freeze({
     none: "none",
     moveX: "moveX",
     moveY: "moveY",
@@ -25112,19 +25351,19 @@ body.isDockDragging, body.isDockDragging * {
       while (gridStep * zoom < 24) {
         gridStep *= 10;
       }
-      const startX = System47.Math.floor(-cameraPosition.x / zoom / gridStep) * gridStep;
-      const startY = System47.Math.floor(-cameraPosition.y / zoom / gridStep) * gridStep;
+      const startX = System48.Math.floor(-cameraPosition.x / zoom / gridStep) * gridStep;
+      const startY = System48.Math.floor(-cameraPosition.y / zoom / gridStep) * gridStep;
       const endX = (viewSize.x - cameraPosition.x) / zoom;
       const endY = (viewSize.y - cameraPosition.y) / zoom;
       for (let worldX = startX; worldX <= endX; worldX += gridStep) {
         const screenX = cameraPosition.x + worldX * zoom;
-        const isMajor = System47.Math.round(worldX / gridStep) % 2 === 0;
+        const isMajor = System48.Math.round(worldX / gridStep) % 2 === 0;
         graphic.setStrokeColor(worldX === 0 ? AXIS_Y_COLOR : isMajor ? GRID_MAJOR_COLOR : GRID_COLOR);
         graphic.drawLine([Vector2.create(screenX, 0), Vector2.create(screenX, viewSize.y)], 1);
       }
       for (let worldY = startY; worldY <= endY; worldY += gridStep) {
         const screenY = cameraPosition.y + worldY * zoom;
-        const isMajor = System47.Math.round(worldY / gridStep) % 2 === 0;
+        const isMajor = System48.Math.round(worldY / gridStep) % 2 === 0;
         graphic.setStrokeColor(worldY === 0 ? AXIS_X_COLOR : isMajor ? GRID_MAJOR_COLOR : GRID_COLOR);
         graphic.drawLine([Vector2.create(0, screenY), Vector2.create(viewSize.x, screenY)], 1);
       }
@@ -25176,8 +25415,8 @@ body.isDockDragging, body.isDockDragging * {
       } else if (tool === EditorTool.rotate) {
         graphic.setStrokeColor(ROTATE_COLOR);
         graphic.drawStrokeCircle(origin, ROTATE_HANDLE_RADIUS, 2);
-        const radian = selectedNode.getRotation() * System47.Math.PI / 180;
-        graphic.drawLine([origin, Vector2.create(origin.x + System47.Math.cos(radian) * ROTATE_HANDLE_RADIUS, origin.y + System47.Math.sin(radian) * ROTATE_HANDLE_RADIUS)], 2);
+        const radian = selectedNode.getRotation() * System48.Math.PI / 180;
+        graphic.drawLine([origin, Vector2.create(origin.x + System48.Math.cos(radian) * ROTATE_HANDLE_RADIUS, origin.y + System48.Math.sin(radian) * ROTATE_HANDLE_RADIUS)], 2);
       }
     }
     //==============================================================================
@@ -25217,18 +25456,18 @@ body.isDockDragging, body.isDockDragging * {
       const deltaY = viewPosition.y - origin.y;
       const tool = this.#tool;
       if (tool === EditorTool.move || tool === EditorTool.scale) {
-        if (System47.Math.abs(deltaX) <= HANDLE_PICK_DISTANCE && System47.Math.abs(deltaY) <= HANDLE_PICK_DISTANCE) {
+        if (System48.Math.abs(deltaX) <= HANDLE_PICK_DISTANCE && System48.Math.abs(deltaY) <= HANDLE_PICK_DISTANCE) {
           return tool === EditorTool.scale ? HandleKind.scaleUniform : HandleKind.moveFree;
         }
-        if (deltaX >= 0 && deltaX <= HANDLE_LENGTH + HANDLE_PICK_DISTANCE && System47.Math.abs(deltaY) <= HANDLE_PICK_DISTANCE) {
+        if (deltaX >= 0 && deltaX <= HANDLE_LENGTH + HANDLE_PICK_DISTANCE && System48.Math.abs(deltaY) <= HANDLE_PICK_DISTANCE) {
           return tool === EditorTool.scale ? HandleKind.scaleX : HandleKind.moveX;
         }
-        if (-deltaY >= 0 && -deltaY <= HANDLE_LENGTH + HANDLE_PICK_DISTANCE && System47.Math.abs(deltaX) <= HANDLE_PICK_DISTANCE) {
+        if (-deltaY >= 0 && -deltaY <= HANDLE_LENGTH + HANDLE_PICK_DISTANCE && System48.Math.abs(deltaX) <= HANDLE_PICK_DISTANCE) {
           return tool === EditorTool.scale ? HandleKind.scaleY : HandleKind.moveY;
         }
       } else if (tool === EditorTool.rotate) {
-        const distance = System47.Math.hypot(deltaX, deltaY);
-        if (System47.Math.abs(distance - ROTATE_HANDLE_RADIUS) <= HANDLE_PICK_DISTANCE) {
+        const distance = System48.Math.hypot(deltaX, deltaY);
+        if (System48.Math.abs(distance - ROTATE_HANDLE_RADIUS) <= HANDLE_PICK_DISTANCE) {
           return HandleKind.rotate;
         }
       }
@@ -25296,7 +25535,7 @@ body.isDockDragging, body.isDockDragging * {
       const cameraNode = this.#cameraNode;
       const position = cameraNode.getLocalPosition();
       const zoom = cameraNode.getLocalScale().x;
-      const nextZoom = System47.Math.max(0.05, System47.Math.min(20, zoom * zoomRatio));
+      const nextZoom = System48.Math.max(0.05, System48.Math.min(20, zoom * zoomRatio));
       const appliedRatio = nextZoom / zoom;
       cameraNode.setLocalScale(Vector2.create(nextZoom, nextZoom));
       cameraNode.setLocalPosition(Vector2.create(viewPosition.x - (viewPosition.x - position.x) * appliedRatio, viewPosition.y - (viewPosition.y - position.y) * appliedRatio));
@@ -25313,7 +25552,7 @@ body.isDockDragging, body.isDockDragging * {
       const frameSize = this.#frameSize;
       const margin = this.#isGameView ? 0 : 60;
       const maximumZoom = this.#isGameView ? 20 : 1;
-      const zoom = System47.Math.max(0.05, System47.Math.min(maximumZoom, (viewSize.x - margin) / frameSize.x, (viewSize.y - margin) / frameSize.y));
+      const zoom = System48.Math.max(0.05, System48.Math.min(maximumZoom, (viewSize.x - margin) / frameSize.x, (viewSize.y - margin) / frameSize.y));
       this.#cameraNode.setLocalScale(Vector2.create(zoom, zoom));
       this.#cameraNode.setLocalPosition(Vector2.create((viewSize.x - frameSize.x * zoom) * 0.5, (viewSize.y - frameSize.y * zoom) * 0.5));
     }
@@ -25439,9 +25678,9 @@ body.isDockDragging, body.isDockDragging * {
   };
 
   // tools/visualeditor/projectpanel.js
-  var System48 = globalThis;
+  var System49 = globalThis;
   var ASSET_DRAG_TYPE = "application/x-vanilla-asset";
-  var ASSET_KIND_BY_EXTENSION = System48.Object.freeze({
+  var ASSET_KIND_BY_EXTENSION = System49.Object.freeze({
     png: "image",
     jpg: "image",
     jpeg: "image",
@@ -25468,7 +25707,7 @@ body.isDockDragging, body.isDockDragging * {
     js: "text",
     glsl: "text"
   });
-  var ASSET_KIND_ICON = System48.Object.freeze({
+  var ASSET_KIND_ICON = System49.Object.freeze({
     image: "\u25A3",
     audio: "\u266A",
     json: "{ }",
@@ -25479,7 +25718,7 @@ body.isDockDragging, body.isDockDragging * {
     text: "\u2261",
     other: "\xB7"
   });
-  var SKIPPED_FOLDER_NAMES = new System48.Set([".git", "node_modules", ".DS_Store", "target", "build"]);
+  var SKIPPED_FOLDER_NAMES = new System49.Set([".git", "node_modules", ".DS_Store", "target", "build"]);
   function readAssetKind(fileName) {
     const lowerName = fileName.toLowerCase();
     if (lowerName.endsWith(".scene.json")) {
@@ -25534,7 +25773,7 @@ body.isDockDragging, body.isDockDragging * {
       this.#folderElement = folderElement;
       this.#assetElement = assetElement;
       this.#assetList = [];
-      this.#imageByPath = new System48.Map();
+      this.#imageByPath = new System49.Map();
       this.#directoryHandle = null;
       this.#projectName = "";
       this.#currentFolder = "";
@@ -25550,10 +25789,10 @@ body.isDockDragging, body.isDockDragging * {
      * @returns { Promise<boolean> }
      */
     async openFolder() {
-      if (typeof System48.showDirectoryPicker !== "function") {
+      if (typeof System49.showDirectoryPicker !== "function") {
         return false;
       }
-      const directoryHandle = await System48.showDirectoryPicker({ mode: "readwrite" });
+      const directoryHandle = await System49.showDirectoryPicker({ mode: "readwrite" });
       this.#directoryHandle = directoryHandle;
       this.#projectName = directoryHandle.name;
       await this.rescan();
@@ -25609,7 +25848,7 @@ body.isDockDragging, body.isDockDragging * {
           const reader = entry.createReader();
           let childEntryList = [];
           do {
-            childEntryList = await new System48.Promise((resolve, reject) => {
+            childEntryList = await new System49.Promise((resolve, reject) => {
               reader.readEntries(resolve, reject);
             });
             for (const childEntry of childEntryList) {
@@ -25620,7 +25859,7 @@ body.isDockDragging, body.isDockDragging * {
           } while (childEntryList.length > 0);
           return;
         }
-        const file = await new System48.Promise((resolve, reject) => {
+        const file = await new System49.Promise((resolve, reject) => {
           entry.file(resolve, reject);
         });
         fileEntryList.push({ path: entryPath, file });
@@ -25648,7 +25887,7 @@ body.isDockDragging, body.isDockDragging * {
      */
     async replaceAssets(fileEntryList) {
       for (const asset of this.#assetList) {
-        System48.URL.revokeObjectURL(asset.url);
+        System49.URL.revokeObjectURL(asset.url);
       }
       this.#imageByPath.clear();
       const assetList = [];
@@ -25658,7 +25897,7 @@ body.isDockDragging, body.isDockDragging * {
         const slashIndex = path.lastIndexOf("/");
         const name = slashIndex >= 0 ? path.substring(slashIndex + 1) : path;
         const folder = slashIndex >= 0 ? path.substring(0, slashIndex) : "";
-        const url = System48.URL.createObjectURL(fileEntry.file);
+        const url = System49.URL.createObjectURL(fileEntry.file);
         const asset = { path, name, folder, kind: readAssetKind(name), file: fileEntry.file, url };
         assetList.push(asset);
         if (asset.kind === "image") {
@@ -25669,7 +25908,7 @@ body.isDockDragging, body.isDockDragging * {
         return first.path.localeCompare(second.path);
       });
       this.#assetList = assetList;
-      await System48.Promise.all(imageLoadList);
+      await System49.Promise.all(imageLoadList);
       this.render();
       const changedEvent = this.#eventHandlers.changed;
       if (changedEvent) {
@@ -25684,8 +25923,8 @@ body.isDockDragging, body.isDockDragging * {
      * @returns { Promise<void> }
      */
     loadImage(asset) {
-      return new System48.Promise((resolve) => {
-        const image = new System48.Image();
+      return new System49.Promise((resolve) => {
+        const image = new System49.Image();
         image.onload = () => {
           this.#imageByPath.set(asset.path, image);
           resolve();
@@ -25758,13 +25997,13 @@ body.isDockDragging, body.isDockDragging * {
     async writeTextFile(path, text) {
       const directoryHandle = this.#directoryHandle;
       if (directoryHandle === null) {
-        const blob = new System48.Blob([text], { type: "application/json" });
-        const anchor = System48.document.createElement("a");
-        anchor.href = System48.URL.createObjectURL(blob);
+        const blob = new System49.Blob([text], { type: "application/json" });
+        const anchor = System49.document.createElement("a");
+        anchor.href = System49.URL.createObjectURL(blob);
         anchor.download = path.substring(path.lastIndexOf("/") + 1);
         anchor.click();
-        System48.setTimeout(() => {
-          System48.URL.revokeObjectURL(anchor.href);
+        System49.setTimeout(() => {
+          System49.URL.revokeObjectURL(anchor.href);
         }, 1e3);
         return "download";
       }
@@ -25808,23 +26047,23 @@ body.isDockDragging, body.isDockDragging * {
     renderFolders() {
       const folderElement = this.#folderElement;
       folderElement.textContent = "";
-      const folderSet = new System48.Set([""]);
+      const folderSet = new System49.Set([""]);
       for (const asset of this.#assetList) {
         const partList = asset.folder === "" ? [] : asset.folder.split("/");
         for (let partIndex = 1; partIndex <= partList.length; ++partIndex) {
           folderSet.add(partList.slice(0, partIndex).join("/"));
         }
       }
-      const folderList = System48.Array.from(folderSet).sort();
+      const folderList = System49.Array.from(folderSet).sort();
       for (const folder of folderList) {
         const depth = folder === "" ? 0 : folder.split("/").length;
-        const itemElement = System48.document.createElement("div");
+        const itemElement = System49.document.createElement("div");
         itemElement.className = "treeItem" + (folder === this.#currentFolder ? " isSelected" : "");
         itemElement.style.paddingLeft = `${6 + depth * 12}px`;
-        const iconElement = System48.document.createElement("span");
+        const iconElement = System49.document.createElement("span");
         iconElement.className = "treeIcon";
         iconElement.textContent = "\u25B8";
-        const labelElement = System48.document.createElement("span");
+        const labelElement = System49.document.createElement("span");
         labelElement.className = "treeLabel";
         labelElement.textContent = folder === "" ? this.#projectName || "Assets" : folder.substring(folder.lastIndexOf("/") + 1);
         itemElement.append(iconElement, labelElement);
@@ -25845,31 +26084,31 @@ body.isDockDragging, body.isDockDragging * {
         return asset.folder === this.#currentFolder;
       });
       if (this.#assetList.length === 0) {
-        const noticeElement = System48.document.createElement("div");
+        const noticeElement = System49.document.createElement("div");
         noticeElement.className = "emptyNotice";
         noticeElement.textContent = "File > \uD504\uB85C\uC81D\uD2B8 \uD3F4\uB354 \uC5F4\uAE30\uB85C \uC560\uC14B \uD3F4\uB354\uB97C \uC5F4\uAC70\uB098, \uD30C\uC77C\uACFC \uD3F4\uB354\uB97C \uC5EC\uAE30\uC5D0 \uB04C\uC5B4\uB2E4 \uB193\uC73C\uC138\uC694.";
         assetElement.append(noticeElement);
         return;
       }
       for (const asset of visibleAssetList) {
-        const tileElement = System48.document.createElement("div");
+        const tileElement = System49.document.createElement("div");
         tileElement.className = "assetTile" + (asset.path === this.#selectedPath ? " isSelected" : "");
         tileElement.draggable = true;
         tileElement.title = asset.path;
-        const thumbnailElement = System48.document.createElement("div");
+        const thumbnailElement = System49.document.createElement("div");
         thumbnailElement.className = "assetThumbnail";
         if (asset.kind === "image") {
-          const imageElement = System48.document.createElement("img");
+          const imageElement = System49.document.createElement("img");
           imageElement.src = asset.url;
           imageElement.draggable = false;
           thumbnailElement.append(imageElement);
         } else {
           thumbnailElement.textContent = ASSET_KIND_ICON[asset.kind] || ASSET_KIND_ICON.other;
         }
-        const nameElement = System48.document.createElement("div");
+        const nameElement = System49.document.createElement("div");
         nameElement.className = "assetName";
         nameElement.textContent = asset.name;
-        const kindElement = System48.document.createElement("div");
+        const kindElement = System49.document.createElement("div");
         kindElement.className = "assetKind";
         kindElement.textContent = asset.kind;
         tileElement.append(thumbnailElement, nameElement, kindElement);
@@ -25967,7 +26206,7 @@ body.isDockDragging, body.isDockDragging * {
   };
 
   // tools/visualeditor/hierarchypanel.js
-  var System49 = globalThis;
+  var System50 = globalThis;
   var NODE_DRAG_TYPE = "application/x-vanilla-node";
   var HierarchyPanel = class {
     static {
@@ -26004,7 +26243,7 @@ body.isDockDragging, body.isDockDragging * {
       this.#bodyElement = bodyElement;
       this.#documentRoot = null;
       this.#selectedNode = null;
-      this.#collapsedNodeSet = new System49.WeakSet();
+      this.#collapsedNodeSet = new System50.WeakSet();
       this.#draggedNode = null;
       this.#filterText = "";
       this.#eventHandlers = eventHandlers;
@@ -26073,7 +26312,7 @@ body.isDockDragging, body.isDockDragging * {
       const childNodeList = node.getChildren();
       const hasChildren = !isFlat && childNodeList.length > 0;
       const isCollapsed = this.#collapsedNodeSet.has(node);
-      const itemElement = System49.document.createElement("div");
+      const itemElement = System50.document.createElement("div");
       itemElement.className = "treeItem";
       if (node === this.#selectedNode) {
         itemElement.classList.add("isSelected");
@@ -26083,7 +26322,7 @@ body.isDockDragging, body.isDockDragging * {
       }
       itemElement.style.paddingLeft = `${4 + depth * 14}px`;
       itemElement.draggable = true;
-      const toggleElement = System49.document.createElement("span");
+      const toggleElement = System50.document.createElement("span");
       toggleElement.className = "treeToggle";
       toggleElement.textContent = hasChildren ? isCollapsed ? "\u25B8" : "\u25BE" : "";
       toggleElement.addEventListener("click", (mouseEvent) => {
@@ -26095,10 +26334,10 @@ body.isDockDragging, body.isDockDragging * {
         }
         this.render(this.#documentRoot, this.#selectedNode);
       });
-      const iconElement = System49.document.createElement("span");
+      const iconElement = System50.document.createElement("span");
       iconElement.className = "treeIcon";
       iconElement.textContent = node.getAllComponents().length > 0 ? "\u25C6" : "\u25C7";
-      const labelElement = System49.document.createElement("span");
+      const labelElement = System50.document.createElement("span");
       labelElement.className = "treeLabel";
       labelElement.textContent = node.getName() || "(\uC774\uB984 \uC5C6\uC74C)";
       itemElement.append(toggleElement, iconElement, labelElement);
@@ -26155,7 +26394,7 @@ body.isDockDragging, body.isDockDragging * {
       });
       this.#bodyElement.append(itemElement);
       if (node === this.#selectedNode) {
-        System49.requestAnimationFrame(() => {
+        System50.requestAnimationFrame(() => {
           itemElement.scrollIntoView({ block: "nearest" });
         });
       }
@@ -26199,7 +26438,7 @@ body.isDockDragging, body.isDockDragging * {
      * @param { object } node
      */
     beginRename(itemElement, labelElement, node) {
-      const inputElement = System49.document.createElement("input");
+      const inputElement = System50.document.createElement("input");
       inputElement.className = "treeRename";
       inputElement.value = node.getName();
       labelElement.replaceWith(inputElement);
@@ -26250,8 +26489,8 @@ body.isDockDragging, body.isDockDragging * {
   };
 
   // tools/visualeditor/inspectorpanel.js
-  var System50 = globalThis;
-  var HIDDEN_PROPERTY_NAMES = new System50.Set([
+  var System51 = globalThis;
+  var HIDDEN_PROPERTY_NAMES = new System51.Set([
     "Active",
     "Enabled",
     "Name",
@@ -26263,33 +26502,33 @@ body.isDockDragging, body.isDockDragging * {
     "ComponentType"
   ]);
   var ENUM_VALUES_BY_PROPERTY = {
-    SpriteDrawMode: System50.Object.values(SpriteDrawMode),
-    SpriteBlendMode: System50.Object.values(SpriteBlendMode),
-    TextAlign: System50.Object.values(TextAlign),
-    TextBaseline: System50.Object.values(TextBaseline),
+    SpriteDrawMode: System51.Object.values(SpriteDrawMode),
+    SpriteBlendMode: System51.Object.values(SpriteBlendMode),
+    TextAlign: System51.Object.values(TextAlign),
+    TextBaseline: System51.Object.values(TextBaseline),
     TextDirection: ["inherit", "ltr", "rtl", "auto"],
     WrapMode: ["word", "char"],
-    Style: System50.Object.values(ButtonMotionStyle),
-    Direction: System50.Object.values(ProgressDirection),
-    ScrollMode: System50.Object.values(ScrollMode)
+    Style: System51.Object.values(ButtonMotionStyle),
+    Direction: System51.Object.values(ProgressDirection),
+    ScrollMode: System51.Object.values(ScrollMode)
   };
   function colorToHexText(color) {
     const toHex = /* @__PURE__ */ __name((value) => {
-      const byteValue = System50.Math.max(0, System50.Math.min(255, System50.Math.round(value * 255)));
+      const byteValue = System51.Math.max(0, System51.Math.min(255, System51.Math.round(value * 255)));
       return byteValue.toString(16).padStart(2, "0");
     }, "toHex");
     return `#${toHex(color.red)}${toHex(color.green)}${toHex(color.blue)}`;
   }
   __name(colorToHexText, "colorToHexText");
   function hexTextToColor(hexText, alpha) {
-    const red = System50.parseInt(hexText.substring(1, 3), 16) / 255;
-    const green = System50.parseInt(hexText.substring(3, 5), 16) / 255;
-    const blue = System50.parseInt(hexText.substring(5, 7), 16) / 255;
+    const red = System51.parseInt(hexText.substring(1, 3), 16) / 255;
+    const green = System51.parseInt(hexText.substring(3, 5), 16) / 255;
+    const blue = System51.parseInt(hexText.substring(5, 7), 16) / 255;
     return new Color(red, green, blue, alpha);
   }
   __name(hexTextToColor, "hexTextToColor");
   function formatNumber(value) {
-    return System50.String(System50.Math.round(value * 1e4) / 1e4);
+    return System51.String(System51.Math.round(value * 1e4) / 1e4);
   }
   __name(formatNumber, "formatNumber");
   var InspectorPanel = class {
@@ -26335,7 +26574,7 @@ body.isDockDragging, body.isDockDragging * {
       const bodyElement = this.#bodyElement;
       bodyElement.textContent = "";
       if (node === null) {
-        const noticeElement = System50.document.createElement("div");
+        const noticeElement = System51.document.createElement("div");
         noticeElement.className = "emptyNotice";
         noticeElement.textContent = "\uD558\uC774\uC5B4\uB77C\uD0A4\uB098 \uC52C \uBDF0\uC5D0\uC11C \uB178\uB4DC\uB97C \uACE0\uB974\uBA74 \uC5EC\uAE30\uC5D0\uC11C \uD3B8\uC9D1\uD55C\uB2E4.";
         bodyElement.append(noticeElement);
@@ -26365,7 +26604,7 @@ body.isDockDragging, body.isDockDragging * {
     renderNodeSection(node) {
       const sectionElement = this.createSection("", null);
       const headerElement = sectionElement.firstChild;
-      const activeElement = System50.document.createElement("input");
+      const activeElement = System51.document.createElement("input");
       activeElement.type = "checkbox";
       activeElement.checked = node.isActive();
       activeElement.addEventListener("change", () => {
@@ -26374,7 +26613,7 @@ body.isDockDragging, body.isDockDragging * {
           node.setActive(isActive);
         });
       });
-      const nameElement = System50.document.createElement("input");
+      const nameElement = System51.document.createElement("input");
       nameElement.className = "inspectorNameInput";
       nameElement.value = node.getName();
       nameElement.addEventListener("change", () => {
@@ -26388,7 +26627,7 @@ body.isDockDragging, body.isDockDragging * {
       headerElement.append(activeElement, nameElement);
       this.#refreshList.push(() => {
         activeElement.checked = node.isActive();
-        if (System50.document.activeElement !== nameElement) {
+        if (System51.document.activeElement !== nameElement) {
           nameElement.value = node.getName();
         }
       });
@@ -26422,7 +26661,7 @@ body.isDockDragging, body.isDockDragging * {
      */
     renderComponentSection(node, component) {
       const typeName = component.constructor.name;
-      const removeButton = System50.document.createElement("button");
+      const removeButton = System51.document.createElement("button");
       removeButton.className = "smallButton";
       removeButton.textContent = "\u2715";
       removeButton.title = "\uCEF4\uD3EC\uB10C\uD2B8 \uBE7C\uAE30";
@@ -26474,14 +26713,14 @@ body.isDockDragging, body.isDockDragging * {
      * @param { object } node
      */
     renderAddComponent(node) {
-      const selectElement = System50.document.createElement("select");
+      const selectElement = System51.document.createElement("select");
       selectElement.className = "smallButton wideButton";
-      const placeholderOption = System50.document.createElement("option");
+      const placeholderOption = System51.document.createElement("option");
       placeholderOption.textContent = "\uFF0B \uCEF4\uD3EC\uB10C\uD2B8 \uB354\uD558\uAE30";
       placeholderOption.value = "";
       selectElement.append(placeholderOption);
       for (const typeName of UIDocument.getComponentTypeNames()) {
-        const optionElement = System50.document.createElement("option");
+        const optionElement = System51.document.createElement("option");
         optionElement.textContent = typeName;
         optionElement.value = typeName;
         selectElement.append(optionElement);
@@ -26504,18 +26743,18 @@ body.isDockDragging, body.isDockDragging * {
      * @returns { HTMLElement }
      */
     createSection(title, headerExtraElement) {
-      const sectionElement = System50.document.createElement("div");
+      const sectionElement = System51.document.createElement("div");
       sectionElement.className = "inspectorSection";
-      const headerElement = System50.document.createElement("div");
+      const headerElement = System51.document.createElement("div");
       headerElement.className = "inspectorSectionHeader";
-      const titleElement = System50.document.createElement("span");
+      const titleElement = System51.document.createElement("span");
       titleElement.className = "sectionTitle";
       titleElement.textContent = title;
       headerElement.append(titleElement);
       if (headerExtraElement !== null) {
         headerElement.append(headerExtraElement);
       }
-      const bodyElement = System50.document.createElement("div");
+      const bodyElement = System51.document.createElement("div");
       bodyElement.className = "inspectorSectionBody";
       sectionElement.append(headerElement, bodyElement);
       this.#bodyElement.append(sectionElement);
@@ -26529,13 +26768,13 @@ body.isDockDragging, body.isDockDragging * {
      * @returns { { rowElement: HTMLElement, inputsElement: HTMLElement } }
      */
     createRow(label) {
-      const rowElement = System50.document.createElement("div");
+      const rowElement = System51.document.createElement("div");
       rowElement.className = "fieldRow";
-      const labelElement = System50.document.createElement("div");
+      const labelElement = System51.document.createElement("div");
       labelElement.className = "fieldLabel";
       labelElement.textContent = label;
       labelElement.title = label;
-      const inputsElement = System50.document.createElement("div");
+      const inputsElement = System51.document.createElement("div");
       inputsElement.className = "fieldInputs";
       rowElement.append(labelElement, inputsElement);
       return { rowElement, inputsElement };
@@ -26563,7 +26802,7 @@ body.isDockDragging, body.isDockDragging * {
         });
       });
       this.#refreshList.push(() => {
-        if (System50.document.activeElement !== inputElement) {
+        if (System51.document.activeElement !== inputElement) {
           inputElement.value = formatNumber(getter());
         }
       });
@@ -26593,19 +26832,19 @@ body.isDockDragging, body.isDockDragging * {
           setter(Vector2.create(currentValue.x, nextY));
         });
       });
-      const xAxis = System50.document.createElement("span");
+      const xAxis = System51.document.createElement("span");
       xAxis.className = "fieldAxis";
       xAxis.textContent = "X";
-      const yAxis = System50.document.createElement("span");
+      const yAxis = System51.document.createElement("span");
       yAxis.className = "fieldAxis";
       yAxis.textContent = "Y";
       inputsElement.append(xAxis, xInput, yAxis, yInput);
       this.#refreshList.push(() => {
         const currentValue = getter();
-        if (System50.document.activeElement !== xInput) {
+        if (System51.document.activeElement !== xInput) {
           xInput.value = formatNumber(currentValue.x);
         }
-        if (System50.document.activeElement !== yInput) {
+        if (System51.document.activeElement !== yInput) {
           yInput.value = formatNumber(currentValue.y);
         }
       });
@@ -26622,7 +26861,7 @@ body.isDockDragging, body.isDockDragging * {
      */
     createTextRow(label, getter, setter) {
       const { rowElement, inputsElement } = this.createRow(label);
-      const inputElement = System50.document.createElement("input");
+      const inputElement = System51.document.createElement("input");
       inputElement.type = "text";
       inputElement.value = getter();
       inputElement.addEventListener("change", () => {
@@ -26634,7 +26873,7 @@ body.isDockDragging, body.isDockDragging * {
       this.stopKeys(inputElement);
       inputsElement.append(inputElement);
       this.#refreshList.push(() => {
-        if (System50.document.activeElement !== inputElement) {
+        if (System51.document.activeElement !== inputElement) {
           inputElement.value = getter();
         }
       });
@@ -26652,11 +26891,11 @@ body.isDockDragging, body.isDockDragging * {
      */
     createEnumRow(label, valueList, getter, setter) {
       const { rowElement, inputsElement } = this.createRow(label);
-      const selectElement = System50.document.createElement("select");
+      const selectElement = System51.document.createElement("select");
       const currentValue = getter();
       const optionValueList = valueList.includes(currentValue) ? valueList : [currentValue, ...valueList];
       for (const optionValue of optionValueList) {
-        const optionElement = System50.document.createElement("option");
+        const optionElement = System51.document.createElement("option");
         optionElement.value = optionValue;
         optionElement.textContent = optionValue;
         selectElement.append(optionElement);
@@ -26685,7 +26924,7 @@ body.isDockDragging, body.isDockDragging * {
      */
     createBooleanRow(label, getter, setter) {
       const { rowElement, inputsElement } = this.createRow(label);
-      const inputElement = System50.document.createElement("input");
+      const inputElement = System51.document.createElement("input");
       inputElement.type = "checkbox";
       inputElement.checked = getter();
       inputElement.addEventListener("change", () => {
@@ -26712,13 +26951,13 @@ body.isDockDragging, body.isDockDragging * {
     createColorRow(label, getter, setter) {
       const { rowElement, inputsElement } = this.createRow(label);
       const color = getter();
-      const colorInput = System50.document.createElement("input");
+      const colorInput = System51.document.createElement("input");
       colorInput.type = "color";
       colorInput.value = colorToHexText(color);
       const alphaInput = this.createNumberInput(color.alpha, (alpha) => {
         const hexText = colorInput.value;
         this.#eventHandlers.change(label, () => {
-          setter(hexTextToColor(hexText, System50.Math.max(0, System50.Math.min(1, alpha))));
+          setter(hexTextToColor(hexText, System51.Math.max(0, System51.Math.min(1, alpha))));
         });
       });
       alphaInput.step = "0.05";
@@ -26734,7 +26973,7 @@ body.isDockDragging, body.isDockDragging * {
       this.#refreshList.push(() => {
         const currentColor = getter();
         colorInput.value = colorToHexText(currentColor);
-        if (System50.document.activeElement !== alphaInput) {
+        if (System51.document.activeElement !== alphaInput) {
           alphaInput.value = formatNumber(currentColor.alpha);
         }
       });
@@ -26749,7 +26988,7 @@ body.isDockDragging, body.isDockDragging * {
      */
     createImageRow(component) {
       const { rowElement, inputsElement } = this.createRow("Image");
-      const dropElement = System50.document.createElement("div");
+      const dropElement = System51.document.createElement("div");
       dropElement.className = "dropField";
       dropElement.textContent = component.imagePath || "\uADF8\uB9BC \uC560\uC14B\uC744 \uB04C\uC5B4\uB2E4 \uB193\uAE30";
       dropElement.addEventListener("dragover", (dragEvent) => {
@@ -26774,7 +27013,7 @@ body.isDockDragging, body.isDockDragging * {
           component.setImage(image);
         });
       });
-      const fitButton = System50.document.createElement("button");
+      const fitButton = System51.document.createElement("button");
       fitButton.className = "smallButton";
       fitButton.textContent = "\uC6D0\uB798 \uD06C\uAE30";
       fitButton.title = "\uB178\uB4DC\uC758 \uB0B4\uC6A9 \uD06C\uAE30\uB97C \uADF8\uB9BC \uD06C\uAE30\uB85C";
@@ -26800,13 +27039,13 @@ body.isDockDragging, body.isDockDragging * {
      * @returns { HTMLInputElement }
      */
     createNumberInput(value, commit) {
-      const inputElement = System50.document.createElement("input");
+      const inputElement = System51.document.createElement("input");
       inputElement.type = "number";
       inputElement.step = "any";
       inputElement.value = formatNumber(value);
       inputElement.addEventListener("change", () => {
-        const parsedValue = System50.parseFloat(inputElement.value);
-        if (System50.Number.isFinite(parsedValue)) {
+        const parsedValue = System51.parseFloat(inputElement.value);
+        if (System51.Number.isFinite(parsedValue)) {
           commit(parsedValue);
         }
       });
@@ -26826,7 +27065,7 @@ body.isDockDragging, body.isDockDragging * {
       labelElement.addEventListener("pointerdown", (pointerEvent) => {
         const startX = pointerEvent.clientX;
         const startValue = getter();
-        const step = pointerEvent.shiftKey ? 0.01 : System50.Math.abs(startValue) < 2 ? 0.01 : 1;
+        const step = pointerEvent.shiftKey ? 0.01 : System51.Math.abs(startValue) < 2 ? 0.01 : 1;
         labelElement.setPointerCapture(pointerEvent.pointerId);
         const moveListener = /* @__PURE__ */ __name((moveEvent) => {
           const deltaX = moveEvent.clientX - startX;
@@ -26865,9 +27104,9 @@ body.isDockDragging, body.isDockDragging * {
   };
 
   // tools/visualeditor/modelpreview.js
-  var System51 = globalThis;
+  var System52 = globalThis;
   var VERTEX_FLOAT_COUNT2 = 15;
-  var FIELD_OF_VIEW = 35 * System51.Math.PI / 180;
+  var FIELD_OF_VIEW = 35 * System52.Math.PI / 180;
   var ModelPreview = class {
     static {
       __name(this, "ModelPreview");
@@ -26925,7 +27164,7 @@ body.isDockDragging, body.isDockDragging * {
           return;
         }
         this.#yaw += pointerEvent.movementX * 0.01;
-        this.#pitch = System51.Math.max(-1.4, System51.Math.min(1.4, this.#pitch + pointerEvent.movementY * 0.01));
+        this.#pitch = System52.Math.max(-1.4, System52.Math.min(1.4, this.#pitch + pointerEvent.movementY * 0.01));
       });
       canvas.addEventListener("pointerup", () => {
         this.#isDragging = false;
@@ -26945,16 +27184,16 @@ body.isDockDragging, body.isDockDragging * {
       }
       const arrays = glbmeshreader_exports.readGlbArrays(arrayBuffer);
       const vertexData = arrays.vertexData;
-      const minimum = [System51.Infinity, System51.Infinity, System51.Infinity];
-      const maximum = [-System51.Infinity, -System51.Infinity, -System51.Infinity];
+      const minimum = [System52.Infinity, System52.Infinity, System52.Infinity];
+      const maximum = [-System52.Infinity, -System52.Infinity, -System52.Infinity];
       for (let offset = 0; offset < vertexData.length; offset += VERTEX_FLOAT_COUNT2) {
         for (let axis = 0; axis < 3; ++axis) {
-          minimum[axis] = System51.Math.min(minimum[axis], vertexData[offset + axis]);
-          maximum[axis] = System51.Math.max(maximum[axis], vertexData[offset + axis]);
+          minimum[axis] = System52.Math.min(minimum[axis], vertexData[offset + axis]);
+          maximum[axis] = System52.Math.max(maximum[axis], vertexData[offset + axis]);
         }
       }
       this.#center = [(minimum[0] + maximum[0]) * 0.5, (minimum[1] + maximum[1]) * 0.5, (minimum[2] + maximum[2]) * 0.5];
-      this.#radius = System51.Math.max(1e-4, System51.Math.hypot(maximum[0] - minimum[0], maximum[1] - minimum[1], maximum[2] - minimum[2]) * 0.5);
+      this.#radius = System52.Math.max(1e-4, System52.Math.hypot(maximum[0] - minimum[0], maximum[1] - minimum[1], maximum[2] - minimum[2]) * 0.5);
       this.#renderer = new ToonRenderer(webGL2RenderingContext);
       this.#mesh = this.#renderer.createMesh(arrays);
       this.requestFrame();
@@ -26969,7 +27208,7 @@ body.isDockDragging, body.isDockDragging * {
     // 다음 장 예약.
     //==============================================================================
     requestFrame() {
-      this.#frameRequest = System51.requestAnimationFrame(() => {
+      this.#frameRequest = System52.requestAnimationFrame(() => {
         if (this.#isDisposed) {
           return;
         }
@@ -26987,9 +27226,9 @@ body.isDockDragging, body.isDockDragging * {
         return;
       }
       const webGL2RenderingContext = this.#webGL2RenderingContext;
-      const pixelRatio = System51.window.devicePixelRatio || 1;
-      const width = System51.Math.max(1, System51.Math.round(canvas.clientWidth * pixelRatio));
-      const height = System51.Math.max(1, System51.Math.round(canvas.clientHeight * pixelRatio));
+      const pixelRatio = System52.window.devicePixelRatio || 1;
+      const width = System52.Math.max(1, System52.Math.round(canvas.clientWidth * pixelRatio));
+      const height = System52.Math.max(1, System52.Math.round(canvas.clientHeight * pixelRatio));
       if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width;
         canvas.height = height;
@@ -27006,12 +27245,12 @@ body.isDockDragging, body.isDockDragging * {
       }
       const center = this.#center;
       const radius = this.#radius;
-      const distance = radius / System51.Math.sin(FIELD_OF_VIEW * 0.5) * 1.1;
-      const cosinePitch = System51.Math.cos(this.#pitch);
+      const distance = radius / System52.Math.sin(FIELD_OF_VIEW * 0.5) * 1.1;
+      const cosinePitch = System52.Math.cos(this.#pitch);
       const eyePosition = Vector3.create(
-        center[0] + System51.Math.sin(this.#yaw) * cosinePitch * distance,
-        center[1] + System51.Math.sin(this.#pitch) * distance,
-        center[2] + System51.Math.cos(this.#yaw) * cosinePitch * distance
+        center[0] + System52.Math.sin(this.#yaw) * cosinePitch * distance,
+        center[1] + System52.Math.sin(this.#pitch) * distance,
+        center[2] + System52.Math.cos(this.#yaw) * cosinePitch * distance
       );
       const viewMatrix = Matrix4.createLookAt(eyePosition, Vector3.create(center[0], center[1], center[2]), Vector3.create(0, 1, 0));
       const viewProjectionMatrix = Matrix4.createPerspective(FIELD_OF_VIEW, width / height, distance * 0.01, distance * 4);
@@ -27025,7 +27264,7 @@ body.isDockDragging, body.isDockDragging * {
     //==============================================================================
     dispose() {
       this.#isDisposed = true;
-      System51.cancelAnimationFrame(this.#frameRequest);
+      System52.cancelAnimationFrame(this.#frameRequest);
       const loseContextExtension = this.#webGL2RenderingContext ? this.#webGL2RenderingContext.getExtension("WEBGL_lose_context") : null;
       if (loseContextExtension !== null) {
         loseContextExtension.loseContext();
@@ -27034,7 +27273,7 @@ body.isDockDragging, body.isDockDragging * {
   };
 
   // tools/visualeditor/docklayout.js
-  var System52 = globalThis;
+  var System53 = globalThis;
   var DRAG_START_DISTANCE = 6;
   var EDGE_ZONE_RATIO = 0.3;
   var ROOT_EDGE_PIXELS = 18;
@@ -27047,7 +27286,7 @@ body.isDockDragging, body.isDockDragging * {
     bottom: "column"
   };
   function createElement(tagName, className = "", text = "") {
-    const element = System52.document.createElement(tagName);
+    const element = System53.document.createElement(tagName);
     if (className !== "") {
       element.className = className;
     }
@@ -27058,7 +27297,7 @@ body.isDockDragging, body.isDockDragging * {
   }
   __name(createElement, "createElement");
   function cloneTree(node) {
-    return System52.JSON.parse(System52.JSON.stringify(node));
+    return System53.JSON.parse(System53.JSON.stringify(node));
   }
   __name(cloneTree, "cloneTree");
   var DockLayout = class {
@@ -27139,7 +27378,7 @@ body.isDockDragging, body.isDockDragging * {
       this.#markerElement = createElement("div", "dockTabMarker");
       this.#ghostElement = null;
       this.#groupElementTable = /* @__PURE__ */ new Map();
-      System52.document.body.append(this.#indicatorElement, this.#markerElement);
+      System53.document.body.append(this.#indicatorElement, this.#markerElement);
       this.load();
     }
     //==============================================================================
@@ -27148,14 +27387,14 @@ body.isDockDragging, body.isDockDragging * {
     load() {
       let savedData = null;
       try {
-        const savedText = System52.localStorage.getItem(this.#storageKey);
-        savedData = savedText ? System52.JSON.parse(savedText) : null;
+        const savedText = System53.localStorage.getItem(this.#storageKey);
+        savedData = savedText ? System53.JSON.parse(savedText) : null;
       } catch (error) {
         savedData = null;
       }
       if (savedData !== null && this.isValidTree(savedData.tree)) {
         this.#tree = savedData.tree;
-        this.#closedNeighborTable = new Map(System52.Object.entries(savedData.closedNeighbors || {}));
+        this.#closedNeighborTable = new Map(System53.Object.entries(savedData.closedNeighbors || {}));
       } else {
         this.#tree = cloneTree(this.#defaultTree);
         this.#closedNeighborTable = /* @__PURE__ */ new Map();
@@ -27171,9 +27410,9 @@ body.isDockDragging, body.isDockDragging * {
     //==============================================================================
     save() {
       try {
-        System52.localStorage.setItem(this.#storageKey, System52.JSON.stringify({
+        System53.localStorage.setItem(this.#storageKey, System53.JSON.stringify({
           tree: this.#tree,
-          closedNeighbors: System52.Object.fromEntries(this.#closedNeighborTable)
+          closedNeighbors: System53.Object.fromEntries(this.#closedNeighborTable)
         }));
       } catch (error) {
       }
@@ -27202,7 +27441,7 @@ body.isDockDragging, body.isDockDragging * {
           return false;
         }
         if (node.kind === "group") {
-          if (!System52.Array.isArray(node.windowIds) || node.windowIds.length === 0) {
+          if (!System53.Array.isArray(node.windowIds) || node.windowIds.length === 0) {
             return false;
           }
           for (const windowId of node.windowIds) {
@@ -27220,10 +27459,10 @@ body.isDockDragging, body.isDockDragging * {
           if (node.direction !== "row" && node.direction !== "column") {
             return false;
           }
-          if (!System52.Array.isArray(node.children) || node.children.length === 0) {
+          if (!System53.Array.isArray(node.children) || node.children.length === 0) {
             return false;
           }
-          if (!System52.Array.isArray(node.weights) || node.weights.length !== node.children.length) {
+          if (!System53.Array.isArray(node.weights) || node.weights.length !== node.children.length) {
             node.weights = node.children.map(() => 1);
           }
           return node.children.every(visit);
@@ -27314,7 +27553,7 @@ body.isDockDragging, body.isDockDragging * {
       const index = group.windowIds.indexOf(windowId);
       group.windowIds.splice(index, 1);
       if (group.activeId === windowId) {
-        group.activeId = group.windowIds[System52.Math.min(index, group.windowIds.length - 1)] || "";
+        group.activeId = group.windowIds[System53.Math.min(index, group.windowIds.length - 1)] || "";
       }
       if (this.#maximizedGroup === group && group.windowIds.length === 0) {
         this.#maximizedGroup = null;
@@ -27656,10 +27895,10 @@ body.isDockDragging, body.isDockDragging * {
         const pairSize = firstSize + secondSize;
         const pairWeight = split.weights[index] + split.weights[index + 1];
         const startPosition = isRow ? pointerEvent.clientX : pointerEvent.clientY;
-        const minimumSize = System52.Math.min(MINIMUM_GROUP_PIXELS, pairSize * 0.5);
+        const minimumSize = System53.Math.min(MINIMUM_GROUP_PIXELS, pairSize * 0.5);
         const moveListener = /* @__PURE__ */ __name((moveEvent) => {
           const delta = (isRow ? moveEvent.clientX : moveEvent.clientY) - startPosition;
-          const newFirstSize = System52.Math.max(minimumSize, System52.Math.min(pairSize - minimumSize, firstSize + delta));
+          const newFirstSize = System53.Math.max(minimumSize, System53.Math.min(pairSize - minimumSize, firstSize + delta));
           split.weights[index] = pairWeight * newFirstSize / pairSize;
           split.weights[index + 1] = pairWeight - split.weights[index];
           firstElement.style.flex = `${split.weights[index]} 1 0px`;
@@ -27758,7 +27997,7 @@ body.isDockDragging, body.isDockDragging * {
       tabElement.setPointerCapture(pointerId);
       const moveListener = /* @__PURE__ */ __name((moveEvent) => {
         if (!isDragging) {
-          if (System52.Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) < DRAG_START_DISTANCE) {
+          if (System53.Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) < DRAG_START_DISTANCE) {
             return;
           }
           isDragging = true;
@@ -27776,7 +28015,7 @@ body.isDockDragging, body.isDockDragging * {
         tabElement.removeEventListener("pointermove", moveListener);
         tabElement.removeEventListener("pointerup", upListener);
         tabElement.removeEventListener("pointercancel", cancelListener);
-        System52.window.removeEventListener("keydown", keyListener, true);
+        System53.window.removeEventListener("keydown", keyListener, true);
         if (tabElement.hasPointerCapture(pointerId)) {
           tabElement.releasePointerCapture(pointerId);
         }
@@ -27807,7 +28046,7 @@ body.isDockDragging, body.isDockDragging * {
       tabElement.addEventListener("pointermove", moveListener);
       tabElement.addEventListener("pointerup", upListener);
       tabElement.addEventListener("pointercancel", cancelListener);
-      System52.window.addEventListener("keydown", keyListener, true);
+      System53.window.addEventListener("keydown", keyListener, true);
     }
     //==============================================================================
     // 끌기 모습 시작과 끝. (탭 그림자, 놓을 자리 칸)
@@ -27817,16 +28056,16 @@ body.isDockDragging, body.isDockDragging * {
      */
     beginDragVisual(windowId) {
       const ghostElement = createElement("div", "dockGhost", this.#windowTable.get(windowId).title);
-      System52.document.body.append(ghostElement);
+      System53.document.body.append(ghostElement);
       this.#ghostElement = ghostElement;
-      System52.document.body.classList.add("isDockDragging");
+      System53.document.body.classList.add("isDockDragging");
     }
     endDragVisual() {
       if (this.#ghostElement !== null) {
         this.#ghostElement.remove();
         this.#ghostElement = null;
       }
-      System52.document.body.classList.remove("isDockDragging");
+      System53.document.body.classList.remove("isDockDragging");
       this.#indicatorElement.classList.remove("isVisible");
       this.#markerElement.classList.remove("isVisible");
     }
@@ -27909,8 +28148,8 @@ body.isDockDragging, body.isDockDragging * {
       }
       const groupRect = hitElement.getBoundingClientRect();
       const bodyTop = stripRect.bottom;
-      const bodyHeight = System52.Math.max(1, groupRect.bottom - bodyTop);
-      const ratioX = (clientX - groupRect.left) / System52.Math.max(1, groupRect.width);
+      const bodyHeight = System53.Math.max(1, groupRect.bottom - bodyTop);
+      const ratioX = (clientX - groupRect.left) / System53.Math.max(1, groupRect.width);
       const ratioY = (clientY - bodyTop) / bodyHeight;
       const sideList = [
         { side: "left", distance: ratioX },
@@ -27960,8 +28199,8 @@ body.isDockDragging, body.isDockDragging * {
       }
       indicatorElement.style.left = `${rect.left + 3}px`;
       indicatorElement.style.top = `${rect.top + 3}px`;
-      indicatorElement.style.width = `${System52.Math.max(0, rect.width - 6)}px`;
-      indicatorElement.style.height = `${System52.Math.max(0, rect.height - 6)}px`;
+      indicatorElement.style.width = `${System53.Math.max(0, rect.width - 6)}px`;
+      indicatorElement.style.height = `${System53.Math.max(0, rect.height - 6)}px`;
       if (isFirstShow) {
         void indicatorElement.offsetWidth;
         indicatorElement.classList.remove("isInstant");
@@ -28002,7 +28241,7 @@ body.isDockDragging, body.isDockDragging * {
           targetGroup.activeId = windowId;
         } else {
           this.removeWindowFromTree(windowId);
-          targetGroup.windowIds.splice(System52.Math.min(index, targetGroup.windowIds.length), 0, windowId);
+          targetGroup.windowIds.splice(System53.Math.min(index, targetGroup.windowIds.length), 0, windowId);
           targetGroup.activeId = windowId;
         }
       } else if (target.kind === "split") {
@@ -28034,7 +28273,7 @@ body.isDockDragging, body.isDockDragging * {
   __name(rectOf, "rectOf");
 
   // tools/visualeditor/visualeditor.js
-  var System53 = globalThis;
+  var System54 = globalThis;
   var UNDO_LIMIT = 200;
   var UNDO_MERGE_MILLISECONDS = 600;
   var CONSOLE_LINE_LIMIT = 500;
@@ -28101,7 +28340,7 @@ body.isDockDragging, body.isDockDragging * {
     }
   ];
   function createElement2(tagName, className = "", text = "") {
-    const element = System53.document.createElement(tagName);
+    const element = System54.document.createElement(tagName);
     if (className !== "") {
       element.className = className;
     }
@@ -28204,7 +28443,7 @@ body.isDockDragging, body.isDockDragging * {
     start() {
       const styleElement = createElement2("style");
       styleElement.textContent = EDITOR_STYLE_TEXT;
-      System53.document.head.append(styleElement);
+      System54.document.head.append(styleElement);
       this.#elements = this.buildLayout();
       this.hookConsole();
       const elements = this.#elements;
@@ -28270,7 +28509,7 @@ body.isDockDragging, body.isDockDragging * {
         this.log("\uC5D0\uB514\uD130\uB97C \uC2DC\uC791\uD588\uB2E4. File > \uD504\uB85C\uC81D\uD2B8 \uD3F4\uB354 \uC5F4\uAE30\uB85C \uC560\uC14B \uD3F4\uB354\uB97C \uC5F0\uB2E4.");
       });
       this.#engine.run(this.#scene);
-      const resizeObserver = new System53.ResizeObserver(() => {
+      const resizeObserver = new System54.ResizeObserver(() => {
         if (elements.canvasHolder.clientWidth > 0 && elements.canvasHolder.clientHeight > 0) {
           this.#engine.resize();
         }
@@ -28278,12 +28517,12 @@ body.isDockDragging, body.isDockDragging * {
       resizeObserver.observe(elements.canvasHolder);
       this.setupSceneInput();
       this.setupKeyboard();
-      System53.window.addEventListener("beforeunload", (beforeUnloadEvent) => {
+      System54.window.addEventListener("beforeunload", (beforeUnloadEvent) => {
         if (this.#isDirty) {
           beforeUnloadEvent.preventDefault();
         }
       });
-      System53.setInterval(() => {
+      System54.setInterval(() => {
         this.updateOverlay();
       }, 250);
     }
@@ -28302,7 +28541,7 @@ body.isDockDragging, body.isDockDragging * {
       const dockRootElement = createElement2("div", "dockRoot");
       const statusBar = createElement2("div", "statusBar");
       rootElement.append(menuBar, toolBar, dockRootElement, statusBar);
-      System53.document.body.append(rootElement);
+      System54.document.body.append(rootElement);
       const hierarchyContent = createElement2("div", "panel hierarchyPanel");
       const hierarchyAddButton = createElement2("button", "smallButton", "\uFF0B");
       hierarchyAddButton.title = "\uB178\uB4DC \uB9CC\uB4E4\uAE30";
@@ -28564,7 +28803,7 @@ body.isDockDragging, body.isDockDragging * {
         });
         menuBar.append(menuElement);
       }
-      System53.document.addEventListener("click", () => {
+      System54.document.addEventListener("click", () => {
         closeMenu();
         this.closeContextMenu();
       });
@@ -28657,7 +28896,7 @@ body.isDockDragging, body.isDockDragging * {
      */
     change(label, apply, isStructural = false) {
       const selectedNode = this.#scene.getSelectedNode();
-      const now = System53.performance.now();
+      const now = System54.performance.now();
       const lastChange = this.#lastChange;
       const isMerged = !isStructural && lastChange.label === label && lastChange.node === selectedNode && now - lastChange.time < UNDO_MERGE_MILLISECONDS;
       if (!isMerged) {
@@ -28838,7 +29077,7 @@ body.isDockDragging, body.isDockDragging * {
       const currentPosition = node.getPosition();
       const localDelta = this.worldDeltaToLocal(node, viewPosition.x - currentPosition.x, viewPosition.y - currentPosition.y);
       const localPosition = node.getLocalPosition();
-      node.setLocalPosition(Vector2.create(System53.Math.round(localPosition.x + localDelta.x), System53.Math.round(localPosition.y + localDelta.y)));
+      node.setLocalPosition(Vector2.create(System54.Math.round(localPosition.x + localDelta.x), System54.Math.round(localPosition.y + localDelta.y)));
     }
     //==============================================================================
     // 화면에서의 움직임을 부모 기준 움직임으로.
@@ -28854,9 +29093,9 @@ body.isDockDragging, body.isDockDragging * {
       if (!parentNode) {
         return Vector2.create(deltaX, deltaY);
       }
-      const radian = -parentNode.getRotation() * System53.Math.PI / 180;
-      const cosine = System53.Math.cos(radian);
-      const sine = System53.Math.sin(radian);
+      const radian = -parentNode.getRotation() * System54.Math.PI / 180;
+      const cosine = System54.Math.cos(radian);
+      const sine = System54.Math.sin(radian);
       const parentScale = parentNode.getScale();
       const rotatedX = deltaX * cosine - deltaY * sine;
       const rotatedY = deltaX * sine + deltaY * cosine;
@@ -28983,10 +29222,10 @@ body.isDockDragging, body.isDockDragging * {
       }
       menuElement.style.left = `${x}px`;
       menuElement.style.top = `${y}px`;
-      System53.document.body.append(menuElement);
+      System54.document.body.append(menuElement);
       const menuRect = menuElement.getBoundingClientRect();
-      if (menuRect.bottom > System53.window.innerHeight) {
-        menuElement.style.top = `${System53.Math.max(0, y - menuRect.height)}px`;
+      if (menuRect.bottom > System54.window.innerHeight) {
+        menuElement.style.top = `${System54.Math.max(0, y - menuRect.height)}px`;
       }
       this.#contextMenuElement = menuElement;
       menuElement.addEventListener("click", (mouseEvent) => {
@@ -29050,7 +29289,7 @@ body.isDockDragging, body.isDockDragging * {
           startLocalPosition: node.getLocalPosition().clone(),
           startLocalScale: node.getLocalScale().clone(),
           startLocalRotation: node.getLocalRotation(),
-          startAngle: System53.Math.atan2(viewPosition.y - node.getPosition().y, viewPosition.x - node.getPosition().x),
+          startAngle: System54.Math.atan2(viewPosition.y - node.getPosition().y, viewPosition.x - node.getPosition().x),
           isRecorded: false
         };
       });
@@ -29083,8 +29322,8 @@ body.isDockDragging, body.isDockDragging * {
       canvasElement.addEventListener("wheel", (wheelEvent) => {
         wheelEvent.preventDefault();
         const viewPosition = readViewPosition(wheelEvent);
-        if (wheelEvent.ctrlKey || wheelEvent.metaKey || System53.Math.abs(wheelEvent.deltaX) < 1) {
-          const zoomRatio = System53.Math.exp(-wheelEvent.deltaY * (wheelEvent.ctrlKey ? 0.01 : 15e-4));
+        if (wheelEvent.ctrlKey || wheelEvent.metaKey || System54.Math.abs(wheelEvent.deltaX) < 1) {
+          const zoomRatio = System54.Math.exp(-wheelEvent.deltaY * (wheelEvent.ctrlKey ? 0.01 : 15e-4));
           this.#scene.zoomCamera(zoomRatio, viewPosition);
         } else {
           this.#scene.panCamera(-wheelEvent.deltaX, -wheelEvent.deltaY);
@@ -29128,7 +29367,7 @@ body.isDockDragging, body.isDockDragging * {
       const deltaX = viewPosition.x - dragState.startPosition.x;
       const deltaY = viewPosition.y - dragState.startPosition.y;
       if (!dragState.isRecorded) {
-        if (System53.Math.abs(deltaX) + System53.Math.abs(deltaY) < 2) {
+        if (System54.Math.abs(deltaX) + System54.Math.abs(deltaY) < 2) {
           return;
         }
         this.recordUndo("\uC190\uC7A1\uC774\uB85C \uBC14\uAFB8\uAE30");
@@ -29141,18 +29380,18 @@ body.isDockDragging, body.isDockDragging * {
         let nextX = dragState.startLocalPosition.x + localDelta.x;
         let nextY = dragState.startLocalPosition.y + localDelta.y;
         if (isSnap) {
-          nextX = System53.Math.round(nextX / 10) * 10;
-          nextY = System53.Math.round(nextY / 10) * 10;
+          nextX = System54.Math.round(nextX / 10) * 10;
+          nextY = System54.Math.round(nextY / 10) * 10;
         } else {
-          nextX = System53.Math.round(nextX);
-          nextY = System53.Math.round(nextY);
+          nextX = System54.Math.round(nextX);
+          nextY = System54.Math.round(nextY);
         }
         node.setLocalPosition(Vector2.create(nextX, nextY));
       } else if (handleKind === HandleKind.rotate) {
         const origin = node.getPosition();
-        const angle = System53.Math.atan2(viewPosition.y - origin.y, viewPosition.x - origin.x);
-        let nextRotation = dragState.startLocalRotation + (angle - dragState.startAngle) * 180 / System53.Math.PI;
-        nextRotation = pointerEvent.shiftKey ? System53.Math.round(nextRotation / 15) * 15 : System53.Math.round(nextRotation * 10) / 10;
+        const angle = System54.Math.atan2(viewPosition.y - origin.y, viewPosition.x - origin.x);
+        let nextRotation = dragState.startLocalRotation + (angle - dragState.startAngle) * 180 / System54.Math.PI;
+        nextRotation = pointerEvent.shiftKey ? System54.Math.round(nextRotation / 15) * 15 : System54.Math.round(nextRotation * 10) / 10;
         node.setLocalRotation(nextRotation);
       } else {
         const startScale = dragState.startLocalScale;
@@ -29167,7 +29406,7 @@ body.isDockDragging, body.isDockDragging * {
           ratioY = ratioX;
         }
         const roundScale = /* @__PURE__ */ __name((value) => {
-          return isSnap ? System53.Math.round(value * 10) / 10 : System53.Math.round(value * 1e3) / 1e3;
+          return isSnap ? System54.Math.round(value * 10) / 10 : System54.Math.round(value * 1e3) / 1e3;
         }, "roundScale");
         node.setLocalScale(Vector2.create(roundScale(startScale.x * ratioX), roundScale(startScale.y * ratioY)));
       }
@@ -29205,7 +29444,7 @@ body.isDockDragging, body.isDockDragging * {
     // 키보드. (도구, 단축키, 스페이스 밀기)
     //==============================================================================
     setupKeyboard() {
-      System53.document.addEventListener("keydown", (keyboardEvent) => {
+      System54.document.addEventListener("keydown", (keyboardEvent) => {
         const targetElement = keyboardEvent.target;
         if (targetElement && (targetElement.tagName === "INPUT" || targetElement.tagName === "TEXTAREA" || targetElement.tagName === "SELECT")) {
           return;
@@ -29273,7 +29512,7 @@ body.isDockDragging, body.isDockDragging * {
           keyboardEvent.preventDefault();
         }
       });
-      System53.document.addEventListener("keyup", (keyboardEvent) => {
+      System54.document.addEventListener("keyup", (keyboardEvent) => {
         if (keyboardEvent.key === " ") {
           this.#isSpaceDown = false;
         }
@@ -29287,7 +29526,7 @@ body.isDockDragging, body.isDockDragging * {
      */
     setTool(tool) {
       this.#scene.setTool(tool);
-      for (const [buttonTool, buttonElement] of System53.Object.entries(this.#elements.toolButtons)) {
+      for (const [buttonTool, buttonElement] of System54.Object.entries(this.#elements.toolButtons)) {
         buttonElement.classList.toggle("isActive", buttonTool === tool);
       }
     }
@@ -29321,7 +29560,7 @@ body.isDockDragging, body.isDockDragging * {
     // 새 씬.
     //==============================================================================
     newScene() {
-      if (this.#isDirty && !System53.window.confirm("\uC800\uC7A5\uD558\uC9C0 \uC54A\uC740 \uBC14\uAFBC \uAC83\uC774 \uC788\uB2E4. \uC0C8 \uC52C\uC744 \uC5F4\uAE4C?")) {
+      if (this.#isDirty && !System54.window.confirm("\uC800\uC7A5\uD558\uC9C0 \uC54A\uC740 \uBC14\uAFBC \uAC83\uC774 \uC788\uB2E4. \uC0C8 \uC52C\uC744 \uC5F4\uAE4C?")) {
         return;
       }
       this.#scene.replaceDocumentRoot(this.#scene.createDocumentRoot());
@@ -29372,9 +29611,9 @@ body.isDockDragging, body.isDockDragging * {
      */
     loadSceneText(jsonText, path) {
       try {
-        const documentData = System53.JSON.parse(jsonText);
+        const documentData = System54.JSON.parse(jsonText);
         const documentRoot = UIDocument.fromJsonText(jsonText);
-        if (System53.Array.isArray(documentData.frameSize)) {
+        if (System54.Array.isArray(documentData.frameSize)) {
           this.#scene.setFrameSize(Vector2.create(documentData.frameSize[0], documentData.frameSize[1]));
         }
         if (this.#scene.isPlaying()) {
@@ -29401,7 +29640,7 @@ body.isDockDragging, body.isDockDragging * {
     async saveScene(isSaveAs) {
       let scenePath = this.#scenePath;
       if (isSaveAs || scenePath === "") {
-        const answer = System53.window.prompt("\uC52C \uD30C\uC77C \uACBD\uB85C (\uD504\uB85C\uC81D\uD2B8 \uD3F4\uB354 \uAE30\uC900)", scenePath || DEFAULT_SCENE_PATH);
+        const answer = System54.window.prompt("\uC52C \uD30C\uC77C \uACBD\uB85C (\uD504\uB85C\uC81D\uD2B8 \uD3F4\uB354 \uAE30\uC900)", scenePath || DEFAULT_SCENE_PATH);
         if (!answer) {
           return;
         }
@@ -29425,10 +29664,10 @@ body.isDockDragging, body.isDockDragging * {
      * @returns { string }
      */
     buildSceneJsonText() {
-      const documentData = System53.JSON.parse(UIDocument.toJsonText(this.#scene.getDocumentRoot(), false));
+      const documentData = System54.JSON.parse(UIDocument.toJsonText(this.#scene.getDocumentRoot(), false));
       const frameSize = this.#scene.getFrameSize();
       documentData.frameSize = [frameSize.x, frameSize.y];
-      return System53.JSON.stringify(documentData, null, "	");
+      return System54.JSON.stringify(documentData, null, "	");
     }
     //==============================================================================
     // 고른 노드 복사.
@@ -29509,7 +29748,7 @@ body.isDockDragging, body.isDockDragging * {
       inputElement.type = "file";
       inputElement.multiple = true;
       inputElement.addEventListener("change", async () => {
-        const fileList = System53.Array.from(inputElement.files);
+        const fileList = System54.Array.from(inputElement.files);
         if (fileList.length === 0) {
           return;
         }
@@ -29561,12 +29800,12 @@ body.isDockDragging, body.isDockDragging * {
     //==============================================================================
     askFrameSize() {
       const frameSize = this.#scene.getFrameSize();
-      const answer = System53.window.prompt("\uD654\uBA74 \uD2C0 \uD06C\uAE30 (\uAC00\uB85Cx\uC138\uB85C)", `${frameSize.x}x${frameSize.y}`);
+      const answer = System54.window.prompt("\uD654\uBA74 \uD2C0 \uD06C\uAE30 (\uAC00\uB85Cx\uC138\uB85C)", `${frameSize.x}x${frameSize.y}`);
       const match = answer ? answer.match(/^\s*(\d+)\s*[x×*, ]\s*(\d+)\s*$/) : null;
       if (match === null) {
         return;
       }
-      this.#scene.setFrameSize(Vector2.create(System53.Number(match[1]), System53.Number(match[2])));
+      this.#scene.setFrameSize(Vector2.create(System54.Number(match[1]), System54.Number(match[2])));
       this.#scene.frameDocument();
       this.markDirty();
     }
@@ -29578,12 +29817,12 @@ body.isDockDragging, body.isDockDragging * {
      */
     async openAsset(asset) {
       if (asset.kind === "scene") {
-        if (this.#isDirty && !System53.window.confirm("\uC800\uC7A5\uD558\uC9C0 \uC54A\uC740 \uBC14\uAFBC \uAC83\uC774 \uC788\uB2E4. \uC774 \uC52C\uC744 \uC5F4\uAE4C?")) {
+        if (this.#isDirty && !System54.window.confirm("\uC800\uC7A5\uD558\uC9C0 \uC54A\uC740 \uBC14\uAFBC \uAC83\uC774 \uC788\uB2E4. \uC774 \uC52C\uC744 \uC5F4\uAE4C?")) {
           return;
         }
         this.loadSceneText(await asset.file.text(), asset.path);
       } else if (asset.kind === "audio") {
-        new System53.Audio(asset.url).play();
+        new System54.Audio(asset.url).play();
       } else if (asset.kind === "prefab") {
         const viewSize = this.#engine.getViewManager().getViewSize();
         this.instantiatePrefab(asset, Vector2.create(viewSize.x * 0.5, viewSize.y * 0.5));
@@ -29632,11 +29871,11 @@ body.isDockDragging, body.isDockDragging * {
           infoLines.push("\uC52C \uBDF0\uC5D0 \uB04C\uC5B4\uB2E4 \uB193\uAC70\uB098 \uB450 \uBC88 \uB204\uB974\uBA74 \uAEBC\uB0B8\uB2E4.");
         }
       } else if (asset.kind === "font") {
-        const fontName = `editorPreview${System53.Math.floor(System53.Math.random() * 1e9)}`;
+        const fontName = `editorPreview${System54.Math.floor(System54.Math.random() * 1e9)}`;
         try {
-          const fontFace = new System53.FontFace(fontName, `url(${asset.url})`);
+          const fontFace = new System54.FontFace(fontName, `url(${asset.url})`);
           await fontFace.load();
-          System53.document.fonts.add(fontFace);
+          System54.document.fonts.add(fontFace);
           const sampleElement = createElement2("div", "", "\uAC00\uB098\uB2E4\uB77C ABC abc 0123");
           sampleElement.style.fontFamily = fontName;
           sampleElement.style.fontSize = "28px";
@@ -29679,10 +29918,10 @@ body.isDockDragging, body.isDockDragging * {
       }
       try {
         const arrayBuffer = await asset.file.arrayBuffer();
-        const dataView = new System53.DataView(arrayBuffer);
+        const dataView = new System54.DataView(arrayBuffer);
         const jsonLength = dataView.getUint32(12, true);
-        const jsonText = new System53.TextDecoder().decode(new System53.Uint8Array(arrayBuffer, 20, jsonLength));
-        const gltf = System53.JSON.parse(jsonText);
+        const jsonText = new System54.TextDecoder().decode(new System54.Uint8Array(arrayBuffer, 20, jsonLength));
+        const gltf = System54.JSON.parse(jsonText);
         const animationNameList = (gltf.animations || []).map((animation, animationIndex) => animation.name || `#${animationIndex}`);
         const jointCount = (gltf.skins || []).reduce((total, skin) => total + skin.joints.length, 0);
         return [
@@ -29709,8 +29948,8 @@ body.isDockDragging, body.isDockDragging * {
     // 자동 보관 예약. (바꾸고 1 초 뒤 브라우저 저장소에, 재생 중에는 남기지 않는다)
     //==============================================================================
     scheduleAutosave() {
-      System53.clearTimeout(this.#autosaveTimer);
-      this.#autosaveTimer = System53.setTimeout(() => {
+      System54.clearTimeout(this.#autosaveTimer);
+      this.#autosaveTimer = System54.setTimeout(() => {
         if (this.#scene.isPlaying()) {
           return;
         }
@@ -29720,7 +29959,7 @@ body.isDockDragging, body.isDockDragging * {
             isDirty: this.#isDirty,
             jsonText: this.buildSceneJsonText()
           };
-          System53.localStorage.setItem(AUTOSAVE_STORAGE_KEY, System53.JSON.stringify(autosaveData));
+          System54.localStorage.setItem(AUTOSAVE_STORAGE_KEY, System54.JSON.stringify(autosaveData));
         } catch (exception) {
         }
       }, 1e3);
@@ -29734,7 +29973,7 @@ body.isDockDragging, body.isDockDragging * {
     restoreAutosave() {
       let autosaveText = null;
       try {
-        autosaveText = System53.localStorage.getItem(AUTOSAVE_STORAGE_KEY);
+        autosaveText = System54.localStorage.getItem(AUTOSAVE_STORAGE_KEY);
       } catch (exception) {
         return false;
       }
@@ -29742,7 +29981,7 @@ body.isDockDragging, body.isDockDragging * {
         return false;
       }
       try {
-        const autosaveData = System53.JSON.parse(autosaveText);
+        const autosaveData = System54.JSON.parse(autosaveText);
         this.loadSceneText(autosaveData.jsonText, autosaveData.scenePath || "");
         this.#isDirty = autosaveData.isDirty === true;
         this.log("\uC9C0\uB09C\uBC88\uC5D0 \uD558\uB358 \uC52C\uC744 \uB418\uC0B4\uB838\uB2E4. (\uBE0C\uB77C\uC6B0\uC800 \uC790\uB3D9 \uBCF4\uAD00)");
@@ -29767,7 +30006,7 @@ body.isDockDragging, body.isDockDragging * {
       const elements = this.#elements;
       const scenePath = this.#scenePath || "Untitled";
       elements.sceneTitle.textContent = `${scenePath}${this.#isDirty ? " *" : ""}`;
-      System53.document.title = `${scenePath}${this.#isDirty ? " *" : ""} - vanilla.js Editor`;
+      System54.document.title = `${scenePath}${this.#isDirty ? " *" : ""} - vanilla.js Editor`;
       let nodeCount = 0;
       const countNodes = /* @__PURE__ */ __name((node) => {
         for (const childNode of node.getChildren()) {
@@ -29796,7 +30035,7 @@ body.isDockDragging, body.isDockDragging * {
       }
       const frameSize = scene.getFrameSize();
       const toolName = { hand: "\uBC00\uAE30", move: "\uC62E\uAE30\uAE30", rotate: "\uB3CC\uB9AC\uAE30", scale: "\uD0A4\uC6B0\uAE30" }[scene.getTool()];
-      this.#elements.sceneOverlay.textContent = `${System53.Math.round(scene.getZoom() * 100)}%   ${frameSize.x} x ${frameSize.y}   ${toolName}${scene.isPlaying() ? "   \uC7AC\uC0DD \uC911" : ""}`;
+      this.#elements.sceneOverlay.textContent = `${System54.Math.round(scene.getZoom() * 100)}%   ${frameSize.x} x ${frameSize.y}   ${toolName}${scene.isPlaying() ? "   \uC7AC\uC0DD \uC911" : ""}`;
     }
     //==============================================================================
     // 콘솔에 적기.
@@ -29807,8 +30046,8 @@ body.isDockDragging, body.isDockDragging * {
      */
     log(text, level = "log") {
       const consoleBody = this.#elements.consoleBody;
-      const now = new System53.Date();
-      const timeText = `${System53.String(now.getHours()).padStart(2, "0")}:${System53.String(now.getMinutes()).padStart(2, "0")}:${System53.String(now.getSeconds()).padStart(2, "0")}`;
+      const now = new System54.Date();
+      const timeText = `${System54.String(now.getHours()).padStart(2, "0")}:${System54.String(now.getMinutes()).padStart(2, "0")}:${System54.String(now.getSeconds()).padStart(2, "0")}`;
       const lineElement = createElement2("div", "consoleLine" + (level === "warning" ? " isWarning" : level === "error" ? " isError" : ""), `[${timeText}] ${text}`);
       consoleBody.append(lineElement);
       while (consoleBody.childElementCount > CONSOLE_LINE_LIMIT) {
@@ -29823,25 +30062,25 @@ body.isDockDragging, body.isDockDragging * {
     // 브라우저 콘솔의 경고와 오류도 에디터 콘솔에. (원래 출력은 그대로)
     //==============================================================================
     hookConsole() {
-      const originalWarn = System53.console.warn.bind(System53.console);
-      const originalError = System53.console.error.bind(System53.console);
+      const originalWarn = System54.console.warn.bind(System54.console);
+      const originalError = System54.console.error.bind(System54.console);
       const formatArguments = /* @__PURE__ */ __name((argumentList) => {
         return argumentList.map((argument) => {
-          if (argument instanceof System53.Error) {
+          if (argument instanceof System54.Error) {
             return argument.stack || argument.message;
           }
-          return typeof argument === "object" ? System53.String(argument) : System53.String(argument);
+          return typeof argument === "object" ? System54.String(argument) : System54.String(argument);
         }).join(" ");
       }, "formatArguments");
-      System53.console.warn = (...argumentList) => {
+      System54.console.warn = (...argumentList) => {
         originalWarn(...argumentList);
         this.log(formatArguments(argumentList), "warning");
       };
-      System53.console.error = (...argumentList) => {
+      System54.console.error = (...argumentList) => {
         originalError(...argumentList);
         this.log(formatArguments(argumentList), "error");
       };
-      System53.window.addEventListener("error", (errorEvent) => {
+      System54.window.addEventListener("error", (errorEvent) => {
         this.log(errorEvent.message, "error");
       });
     }
@@ -29876,9 +30115,9 @@ body.isDockDragging, body.isDockDragging * {
     }
   };
   var visualEditor = new VisualEditor();
-  System53.visualEditor = visualEditor;
-  if (System53.document.readyState === "loading") {
-    System53.document.addEventListener("DOMContentLoaded", () => {
+  System54.visualEditor = visualEditor;
+  if (System54.document.readyState === "loading") {
+    System54.document.addEventListener("DOMContentLoaded", () => {
       visualEditor.start();
     });
   } else {

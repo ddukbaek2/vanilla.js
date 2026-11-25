@@ -292,6 +292,11 @@ function readBoundingSphere(positions, stride) {
 //   beginFrame 이 앞의 그리기 상태(섞기, 깊이, 면 가리기, 프로그램, 버텍스 어레이)를 적어 두고 깊이 시험과 면 가리기를 켜며, endFrame 이 적어 둔 상태로 돌린다.
 //   (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushSpriteBatch)
 // - readProgramSources 로 ShaderWarmer 에 넘길 소스를 준다.
+// - 노드 사각형 안에 그리기: setScreenRect(x, y, 너비, 높이) 를 주면 beginFrame 이 보기와 투영의 클립 공간을 그 사각형으로 옮기고 가위로 밖을 자른다.
+//   사각형은 beginFrame 때의 뷰포트(보통 드로잉 버퍼 전체) 안의 픽셀이고 왼쪽 위가 원점이다. (2D 노드의 draw 에서 graphic.getTransformMatrix 로 셈한 자리)
+//   화면 밖 거르기는 옮기기 전의 절두체로 한다. endFrame 이 가위를 푼다. 카메라의 가로 세로 비는 사각형의 비로 맞춘다. (Camera3D.setAspectRatio)
+// - beginFrameWithCamera(Camera3D) 는 카메라의 보기와 투영으로 beginFrame 을 부른다. 2D 표시(Camera3D.projectToView)와 같은 카메라를 쓴다.
+// - drawMeshOutline 은 바깥선 껍데기만 그린다. (ToonDrawQueue 가 불투명한 몸을 다 그린 뒤 바깥선을 몰아 그릴 때, 그린 수는 세지 않는다)
 //==============================================================================
 export class ToonRenderer {
 	//==============================================================================
@@ -315,6 +320,8 @@ export class ToonRenderer {
 	/** @private @type { object | null } */ #savedState; // 앞의 그리기 상태. (끝이 돌린다)
 	/** @private @type { Float32Array } */ #instanceData; // 인스턴스 올리기 칸. (모자라면 늘린다)
 	/** @private @type { object } */ #frameStatistics; // 한 프레임의 그린 수와 거른 수와 드로우콜.
+	/** @private @type { object | null } */ #screenRect; // 그릴 화면 사각형. ({ x, y, width, height } 뷰포트 픽셀, 왼쪽 위 원점, null 이면 뷰포트 전체)
+	/** @private @type { boolean } */ #isScissorApplied; // beginFrame 이 가위를 켰는지.
 
 	//==============================================================================
 	// 생성.
@@ -343,6 +350,8 @@ export class ToonRenderer {
 		this.#savedState = null;
 		this.#instanceData = new System.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
 		this.#frameStatistics = { drawCallCount: 0, drawnObjectCount: 0, culledObjectCount: 0 };
+		this.#screenRect = null;
+		this.#isScissorApplied = false;
 	}
 
 	//==============================================================================
@@ -610,6 +619,7 @@ export class ToonRenderer {
 		this.#frameStatistics = { drawCallCount: 0, drawnObjectCount: 0, culledObjectCount: 0 };
 		this.#isShadowPass = false;
 		this.saveState();
+		this.applyScreenRect();
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 		webGL2RenderingContext.enable(webGL2RenderingContext.DEPTH_TEST);
 		webGL2RenderingContext.depthFunc(webGL2RenderingContext.LEQUAL);
@@ -622,7 +632,93 @@ export class ToonRenderer {
 	// 프레임 끝. (적어 둔 상태로 돌린다)
 	//==============================================================================
 	endFrame() {
+		this.releaseScreenRect();
 		this.restoreState(false);
+	}
+
+	//==============================================================================
+	// 카메라로 프레임 시작. (Camera3D 의 보기와 투영으로 beginFrame)
+	//==============================================================================
+	/**
+	 * @param { object } camera - Camera3D
+	 */
+	beginFrameWithCamera(camera) {
+		const viewProjectionMatrix = camera.getViewProjectionMatrix();
+		this.beginFrame(viewProjectionMatrix);
+	}
+
+	//==============================================================================
+	// 그릴 화면 사각형 설정. (뷰포트 픽셀, 왼쪽 위 원점, 다음 beginFrame 부터)
+	//==============================================================================
+	/**
+	 * @param { number } x
+	 * @param { number } y
+	 * @param { number } width
+	 * @param { number } height
+	 */
+	setScreenRect(x, y, width, height) {
+		this.#screenRect = { x: x, y: y, width: System.Math.max(0, width), height: System.Math.max(0, height) };
+	}
+
+	//==============================================================================
+	// 그릴 화면 사각형 풀기. (뷰포트 전체에 그림)
+	//==============================================================================
+	clearScreenRect() {
+		this.#screenRect = null;
+	}
+
+	//==============================================================================
+	// 그릴 화면 사각형 반환. (없으면 null)
+	//==============================================================================
+	/**
+	 * @returns { object | null } { x, y, width, height }
+	 */
+	getScreenRect() {
+		return this.#screenRect;
+	}
+
+	//==============================================================================
+	// 화면 사각형 걸기. (beginFrame 이 상태를 적은 뒤, 클립 x, y 에 사각형의 비를 곱하고 자리를 더한 뒤 가위를 켠다)
+	//==============================================================================
+	applyScreenRect() {
+		const screenRect = this.#screenRect;
+		const savedState = this.#savedState;
+		if (screenRect === null || savedState === null) {
+			return;
+		}
+		const viewport = savedState.viewport;
+		const viewportWidth = System.Math.max(1, viewport[2]);
+		const viewportHeight = System.Math.max(1, viewport[3]);
+		const scaleX = screenRect.width / viewportWidth;
+		const scaleY = screenRect.height / viewportHeight;
+		const offsetX = (screenRect.x * 2 + screenRect.width) / viewportWidth - 1;
+		const offsetY = 1 - (screenRect.y * 2 + screenRect.height) / viewportHeight;
+		const elements = this.#viewProjectionElements;
+		for (let columnIndex = 0; columnIndex < 4; ++columnIndex) {
+			const clipW = elements[columnIndex * 4 + 3];
+			elements[columnIndex * 4] = elements[columnIndex * 4] * scaleX + clipW * offsetX;
+			elements[columnIndex * 4 + 1] = elements[columnIndex * 4 + 1] * scaleY + clipW * offsetY;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const scissorLeft = System.Math.floor(screenRect.x);
+		const scissorBottom = System.Math.floor(viewportHeight - screenRect.y - screenRect.height);
+		const scissorRight = System.Math.ceil(screenRect.x + screenRect.width);
+		const scissorTop = System.Math.ceil(viewportHeight - screenRect.y);
+		webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
+		webGL2RenderingContext.scissor(viewport[0] + scissorLeft, viewport[1] + scissorBottom, scissorRight - scissorLeft, scissorTop - scissorBottom);
+		this.#isScissorApplied = true;
+	}
+
+	//==============================================================================
+	// 화면 사각형의 가위 풀기. (applyScreenRect 가 켰을 때만)
+	//==============================================================================
+	releaseScreenRect() {
+		if (!this.#isScissorApplied) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
+		this.#isScissorApplied = false;
 	}
 
 	//==============================================================================
@@ -742,6 +838,22 @@ export class ToonRenderer {
 	}
 
 	//==============================================================================
+	// 모형 하나의 바깥선만 그리기. (거르지도 세지도 않는다, 껍데기가 없거나 hasOutline 이 false 면 그리지 않는다)
+	//==============================================================================
+	/**
+	 * @param { object } mesh
+	 * @param { Matrix4 } modelMatrix
+	 * @param { object } [options] - drawMesh 와 같다.
+	 */
+	drawMeshOutline(mesh, modelMatrix, options = {}) {
+		if (mesh === null || mesh.outlineVertexArray === null || options.hasOutline === false || this.#isShadowPass) {
+			return;
+		}
+		const outlineOptions = System.Object.assign({}, options, { isBodyDrawn: false });
+		this.drawWithCount(mesh, modelMatrix.getElements(), 0, outlineOptions);
+	}
+
+	//==============================================================================
 	// 그리기 본체. (instanceCount 가 0 이면 보통, 아니면 인스턴스로)
 	//==============================================================================
 	/**
@@ -797,6 +909,12 @@ export class ToonRenderer {
 			webGL2RenderingContext.cullFace(webGL2RenderingContext.FRONT);
 			webGL2RenderingContext.bindVertexArray(mesh.outlineVertexArray);
 			drawElements(mesh.outlineIndexCount);
+		}
+		if (options.isBodyDrawn === false) {
+			if (isTransparent) {
+				webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
+			}
+			return;
 		}
 
 		// 몸.
