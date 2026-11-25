@@ -324,6 +324,55 @@ export function readTextDirection() {
 }
 
 //==============================================================================
+// 지금 언어가 오른쪽에서 왼쪽으로 쓰는지. (readTextDirection 이 "rtl" 이면 true)
+//==============================================================================
+/**
+ * @returns { boolean }
+ */
+export function isRightToLeft() {
+	const textDirection = readTextDirection();
+	return textDirection === "rtl";
+}
+
+//==============================================================================
+// 배치의 가로 자리. (오른쪽에서 왼쪽 언어면 부모 너비 안에서 좌우를 뒤집은 왼쪽, 아니면 그대로)
+//
+// 창과 표의 왼쪽, 오른쪽 배치를 언어 방향에 맞춰 뒤집을 때 쓴다. 화면 구석의 자리나 슬라이더의 방향처럼 뒤집지 않을 것은 부르지 않는다.
+//==============================================================================
+/**
+ * @param { number } x 왼쪽에서 오른쪽 언어일 때의 왼쪽.
+ * @param { number } width 놓을 것의 너비.
+ * @param { number } parentWidth 부모의 너비.
+ * @returns { number }
+ */
+export function mirrorLayoutX(x, width, parentWidth) {
+	if (!isRightToLeft()) {
+		return x;
+	}
+	return parentWidth - x - width;
+}
+
+//==============================================================================
+// 배치의 글자 정렬. (오른쪽에서 왼쪽 언어면 "left" 와 "right" 를 바꾸고, 나머지는 그대로)
+//==============================================================================
+/**
+ * @param { string } textAlign "left", "center", "right", "start", "end"
+ * @returns { string }
+ */
+export function readLayoutTextAlign(textAlign) {
+	if (!isRightToLeft()) {
+		return textAlign;
+	}
+	if (textAlign === "left") {
+		return "right";
+	}
+	if (textAlign === "right") {
+		return "left";
+	}
+	return textAlign;
+}
+
+//==============================================================================
 // 글 사이에 끼우는 값 묶기. (오른쪽에서 왼쪽 언어면 방향 격리 문자 FSI ... PDI 로 묶고, 아니면 그대로)
 //
 // 오른쪽에서 왼쪽으로 쓰는 글 안의 숫자와 단위(예: 123°/s, +60%, 88 / 1.5s)나 사람 이름이 앞뒤 글과 섞여 흩어지지 않게,

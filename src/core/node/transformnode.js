@@ -22,6 +22,7 @@ export class TransformNode extends ComponentNode {
 	/** @private @type { number } */ #localRotation; // 로컬 회전값. (degree)
 	/** @private @type { number } */ #localOpacity; // 투명도.
 	/** @private @type { boolean } */ #isGizmoVisible; // 기즈모 출력 여부.
+	/** @private @type { number } */ #lastDrawnMaximumScale; // 지난번 그릴 때 변환의 가장 큰 배율. (0 이면 아직 모른다, Graphic 이 글 굽기 배율에 쓴다)
 
 	//==============================================================================
 	// 생성.
@@ -37,6 +38,7 @@ export class TransformNode extends ComponentNode {
 		this.#localRotation = 0.0;
 		this.#isGizmoVisible = false;
 		this.#localOpacity = 1.0;
+		this.#lastDrawnMaximumScale = 0;
 	}
 
 	//==============================================================================
@@ -307,6 +309,24 @@ export class TransformNode extends ComponentNode {
 	}
 
 	//==============================================================================
+	// 로컬 위치 설정. (x, y 를 바로 받는다, Vector2 를 만들지 않는다)
+	// - getLocalPosition() / setLocalPosition() 을 덮어쓴 하위 클래스면 setLocalPosition 으로 넘긴다.
+	//==============================================================================
+	/**
+	 * @param { number } x
+	 * @param { number } y
+	 */
+	setLocalPositionXY(x, y) {
+		const isLocalPositionOverridden = this.setLocalPosition !== TransformNode.prototype.setLocalPosition;
+		if (isLocalPositionOverridden) {
+			this.setLocalPosition(Vector2.create(x, y));
+			return;
+		}
+		this.#localPosition.x = x;
+		this.#localPosition.y = y;
+	}
+
+	//==============================================================================
 	// 로컬 위치 반환.
 	//==============================================================================
 	/**
@@ -326,6 +346,24 @@ export class TransformNode extends ComponentNode {
 		// 복제본을 새로 만들지 않고 가진 벡터에 값을 옮겨 적는다. (getLocalScale() 은 복제해 준다)
 		this.#localScale.x = scale.x;
 		this.#localScale.y = scale.y;
+	}
+
+	//==============================================================================
+	// 로컬 크기 설정. (x, y 를 바로 받는다, Vector2 를 만들지 않는다)
+	// - setLocalScale() 을 덮어쓴 하위 클래스면 setLocalScale 로 넘긴다.
+	//==============================================================================
+	/**
+	 * @param { number } x
+	 * @param { number } y
+	 */
+	setLocalScaleXY(x, y) {
+		const isLocalScaleOverridden = this.setLocalScale !== TransformNode.prototype.setLocalScale;
+		if (isLocalScaleOverridden) {
+			this.setLocalScale(Vector2.create(x, y));
+			return;
+		}
+		this.#localScale.x = x;
+		this.#localScale.y = y;
 	}
 
 	//==============================================================================
@@ -442,6 +480,26 @@ export class TransformNode extends ComponentNode {
 	 */
 	getLocalOpacity() {
 		return this.#localOpacity;
+	}
+
+	//==============================================================================
+	// 지난번 그릴 때 변환의 가장 큰 배율 설정. (Graphic.drawNode 가 부른다)
+	//==============================================================================
+	/**
+	 * @param { number } maximumScale
+	 */
+	setLastDrawnMaximumScale(maximumScale) {
+		this.#lastDrawnMaximumScale = maximumScale;
+	}
+
+	//==============================================================================
+	// 지난번 그릴 때 변환의 가장 큰 배율 반환. (0 이면 아직 모른다)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getLastDrawnMaximumScale() {
+		return this.#lastDrawnMaximumScale;
 	}
 
 	//==============================================================================
