@@ -223,7 +223,7 @@ engine.run(scene)  → 기본 폰트 로드 + sceneManager.loadScene(scene) + rA
 - **WebGL2 기반**이다 (Canvas2D 아님, 폴백 없음). Canvas2D 시절의 API 표면(좌상 원점, save/restore 상태 스택, fillRect/drawImage/fillText)을 WebGL2 위에 재현한다.
 - 모든 드로우는 `drawVertices()` 한 지점으로 수렴한다 (배칭 삽입 지점). 단색 도형도 1x1 흰색 텍스처로 텍스처 경로와 통일.
 - 클리핑은 스텐실 버퍼 기반 (회전/스케일된 마스크 정확히 처리). 텍스트는 오프스크린 2D 캔버스에 구워 텍스처로 출력.
-- 블렌드는 Canvas2D 합성 문자열 9종만 고정 블렌딩으로 재현, 나머지는 source-over 폴백.
+- 블렌드는 Canvas2D 합성 문자열 26종을 모두 그린다. 13종(포터 더프 연산자, lighter, multiply, screen)은 고정 블렌딩, 나머지 13종(overlay, darken, lighten, color-dodge, color-burn, hard-light, soft-light, difference, exclusion, hue, saturation, color, luminosity)은 그리기마다 그릴 영역 아래를 지금 프레임버퍼에서 `blitFramebuffer` 로 떠 와 W3C Compositing and Blending Level 1 공식대로 셰이더로 섞는다(섞기 모드에서는 묶어 그리지 않음, 바꿔 끼운 셰이더는 덧그림 칸에 먼저 그린 뒤 섞어 옮김). Canvas2D 와 달리 source-in, source-out, destination-in, destination-atop, copy 는 그린 도형 안만 바꾼다.
 
 ### 6-2. 3D — experimental/graphics
 
@@ -273,5 +273,5 @@ soldier.glb ──> parseBinary ──> glTF JSON+BIN
 | `experimental/aabb.js`, `transform2d.js` | 전체 주석 처리 — 데드 파일 |
 | `experimental/camera.js` | misc/camera2d.js 의 Camera2D 가 회전과 begin/end 까지 모두 덮는 중복. 러스트 판에는 옮기지 않는다 |
 | `misc/uibuilder.js` | NodeLayout 으로 대체됨 (주석 1줄만 남음) |
-| Sprite 블렌드 | `SpriteBlendMode` 27종 중 Graphic 이 실제 재현하는 것은 9종, 나머지는 source-over 폴백 |
+| Graphic multiply | 고정 블렌딩(DST_COLOR, ONE_MINUS_SRC_ALPHA)이라 바탕 알파가 1 보다 작은 렌더 타겟에서는 W3C 식과 다르다(cs x (1 - αb) 항이 빠지고 알파가 바탕 알파로 남는다). 기본 캔버스(alpha: false)에서는 같다 |
 | 3D 머티리얼 공유 | 텍스처/머티리얼/클립의 모델 간 공유 캐시 없음 — 모델 단위 소유 (공유 소비자가 생기면 도입) |

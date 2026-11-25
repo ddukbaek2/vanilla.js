@@ -22,6 +22,9 @@ export const SpriteDrawMode = {
 
 //==============================================================================
 // 스프라이트 블렌드 모드. (Canvas2D globalCompositeOperation 대응)
+// - 26 가지 모두 Graphic.setBlendMode 가 그린다. 포터 더프 연산자, lighter, multiply, screen 은 고정 블렌딩,
+//   overlay 부터 luminosity 까지 13 가지는 그릴 영역 아래를 떠 와 셰이더로 섞는다. (W3C Compositing and Blending Level 1 공식, 그리기마다 영역 복사가 들고 묶어 그리지 않는다)
+// - Canvas2D 는 source-in, source-out, destination-in, destination-atop, copy 가 그린 도형 밖(자르기 안 전체)도 지우지만, Graphic 은 그린 도형 안만 바꾼다.
 //==============================================================================
 export const SpriteBlendMode = {
 	normal:          "source-over",      // 기본 알파 합성.
