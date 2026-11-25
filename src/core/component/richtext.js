@@ -219,6 +219,30 @@ function parseMarkupToSegments(input) {
 // - segment 별 미지정 속성은 부모 Text 의 전역 속성을 fallback.
 // - 비활성화 상태 (isEnable() === false) 면 draw / 측정에서 건너뛴다.
 //==============================================================================
+/**
+ * @example <caption>마크업으로 글 조각마다 꾸미기</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, WorldNode, RichText } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	async load(engine) {
+ * 		await super.load(engine);
+ * 		const labelNode = new WorldNode();
+ * 		labelNode.setContentSize(Vector2.create(560, 60));
+ * 		labelNode.setLocalPosition(Vector2.create(320, 180));
+ * 		const richText = labelNode.addComponent(RichText);
+ * 		richText.setFontSize(28);
+ * 		richText.setTextColor("#ffffff");
+ * 		richText.setText("Get <color=#ffcc00><b>100</b></color> gold and <i>a <u>key</u></i>");
+ * 		const root = this.getRoot();
+ * 		root.addChild(labelNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class RichText extends Text {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -239,21 +263,21 @@ export class RichText extends Text {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Rect } rect
-	 * @returns { boolean }
+	 * @param { Rect } rect 그리는 사각형을 적을 곳. (적지 않는다)
+	 * @returns { boolean } 늘 거짓. (거르지 않는다)
 	 */
 	calculateDrawnRect(rect) {
 		return false;
 	}
 
 	//==============================================================================
-	// 텍스트 설정 — 마크업 자동 파싱.
+	// 텍스트 설정, 마크업 자동 파싱.
 	// - 알려진 태그가 있으면 segment 배열로 분해해 보관.
 	// - 마크업이 없으면 segment 비우고 plain text 동작으로 fallback.
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { string } text
+	 * @param { string } text 보일 글. (알려진 마크업 태그가 있으면 segment 로 나눈다)
 	 */
 	setText(text) {
 		super.setText(text);
@@ -262,12 +286,38 @@ export class RichText extends Text {
 	}
 
 	//==============================================================================
-	// segment 1 개 추가. (편의 API — 마크업 외에 프로그래밍 방식으로 segment 쌓기)
+	// segment 1 개 추가. (편의 API, 마크업 외에 프로그래밍 방식으로 segment 쌓기)
 	//==============================================================================
 	/**
-	 * @param { string } text
-	 * @param { object } [attributes]
-	 * @returns { RichText }
+	 * @param { string } text segment 글.
+	 * @param { object } [attributes] segment 속성. ({ fontFace, fontSize, textColor, strokeColor, strokeWidth, bold, italic, underline, strikethrough }, 색은 Color, 빠진 것은 Text 의 속성을 쓴다)
+	 * @returns { RichText } 이 컴포넌트. (이어 부를 수 있다)
+	 * @example <caption>segment 를 코드로 쌓기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2, WorldNode, RichText, Color } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	async load(engine) {
+	 * 		await super.load(engine);
+	 * 		const labelNode = new WorldNode();
+	 * 		labelNode.setContentSize(Vector2.create(400, 60));
+	 * 		labelNode.setLocalPosition(Vector2.create(320, 180));
+	 * 		const richText = labelNode.addComponent(RichText);
+	 * 		richText.setFontSize(24);
+	 * 		const healthColor = Color.createFromHEX("#ff4444");
+	 * 		richText.appendSegment("HP ", { bold: true });
+	 * 		richText.appendSegment("42", { textColor: healthColor, fontSize: 32 });
+	 * 		richText.appendSegment(" / 100");
+	 * 		const segments = richText.getSegments();
+	 * 		console.log(segments.length);
+	 * 		const root = this.getRoot();
+	 * 		root.addChild(labelNode);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	appendSegment(text, attributes) {
 		const finalAttributes = (attributes !== null && attributes !== undefined) ? attributes : {};
@@ -286,7 +336,7 @@ export class RichText extends Text {
 	// segment 목록 반환. (사본)
 	//==============================================================================
 	/**
-	 * @returns { { text: string, attributes: object }[] }
+	 * @returns { { text: string, attributes: object }[] } segment 목록의 사본. ({ text, attributes } 배열)
 	 */
 	getSegments() {
 		return this.#segments.slice();
@@ -296,7 +346,7 @@ export class RichText extends Text {
 	// segment 보유 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 글이 있는 segment 가 하나라도 있으면 참.
 	 */
 	hasSegments() {
 		const segments = this.#segments;
@@ -316,7 +366,7 @@ export class RichText extends Text {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그래픽.
 	 */
 	draw(graphic) {
 		if (this.isEnable() === false) {
@@ -336,8 +386,8 @@ export class RichText extends Text {
 	// - 정렬 / baseline 은 합산 폭 / 최대 폰트 크기 기준.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
-	 * @param { Vector2 } contentSize
+	 * @param { Graphic } graphic 그래픽.
+	 * @param { Vector2 } contentSize 노드의 내용 크기.
 	 */
 	drawSegments(graphic, contentSize) {
 		const segments = this.#segments;
@@ -460,9 +510,9 @@ export class RichText extends Text {
 	// segment 의 fontFace 입력값을 해석해 적용 가능한 FontFace 로 변환.
 	//==============================================================================
 	/**
-	 * @param { FontFace | FontAsset | null | undefined } input
-	 * @param { FontFace | null } fallback
-	 * @returns { FontFace | null }
+	 * @param { FontFace | FontAsset | null | undefined } input segment 의 글꼴 값. (FontAsset 이면 그 글꼴, null 이나 undefined 면 fallback)
+	 * @param { FontFace | null } fallback 대신 쓸 글꼴.
+	 * @returns { FontFace | null } 쓸 글꼴. (null 이면 시스템 글꼴)
 	 */
 	resolveSegmentFontFace(input, fallback) {
 		if (input === null || input === undefined) {
@@ -481,7 +531,7 @@ export class RichText extends Text {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 자연 크기. (segment 너비 합과 가장 큰 글자 크기, 잴 수 없거나 비활성이면 (-1, -1))
 	 */
 	getIntrinsicContentSize() {
 		if (this.isEnable() === false) {

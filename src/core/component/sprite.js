@@ -67,6 +67,32 @@ const spriteImageSize = Vector2.zero(); // 뒤집기를 곱한 그리는 크기.
 //==============================================================================
 // 스프라이트 출력자 컴포넌트.
 //==============================================================================
+/**
+ * @example <caption>스프라이트 시트의 한 칸 그리기</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, Rect, WorldNode, Sprite, ImageAsset } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	async load(engine) {
+ * 		await super.load(engine);
+ * 		const imageAsset = new ImageAsset();
+ * 		await imageAsset.load("examples/assets/spritesheet.png");
+ * 		const spriteNode = new WorldNode();
+ * 		spriteNode.setContentSize(Vector2.create(200, 200));
+ * 		spriteNode.setLocalPosition(Vector2.create(320, 180));
+ * 		const sprite = spriteNode.addComponent(Sprite);
+ * 		sprite.setImage(imageAsset);
+ * 		sprite.setImageRect(Rect.create(0, 0, 200, 200));
+ * 		sprite.setHorizontalFlip(true);
+ * 		const root = this.getRoot();
+ * 		root.addChild(spriteNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class Sprite extends Paint {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -102,7 +128,7 @@ export class Sprite extends Paint {
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
@@ -113,7 +139,7 @@ export class Sprite extends Paint {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { boolean }
+	 * @returns { boolean } tick 이 할 일이 있으면 참.
 	 */
 	isTickNeeded() {
 		return this.tick !== Sprite.prototype.tick;
@@ -123,7 +149,7 @@ export class Sprite extends Paint {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그래픽.
 	 */
 	draw(graphic) {
 		const image = this.getImage();
@@ -242,7 +268,7 @@ export class Sprite extends Paint {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { boolean }
+	 * @returns { boolean } 내용 영역 안에서만 그리면 참.
 	 */
 	isDrawnInsideContent() {
 		if (this.draw !== Sprite.prototype.draw) {
@@ -255,7 +281,7 @@ export class Sprite extends Paint {
 	// 스프라이트 출력 모드 설정.
 	//==============================================================================
 	/**
-	 * @param { string } spriteDrawMode
+	 * @param { string } spriteDrawMode 그리는 방식. ("simple", "sliced", "tiled")
 	 */
 	setSpriteDrawMode(spriteDrawMode) {
 		this.#spriteDrawMode = spriteDrawMode;
@@ -265,7 +291,7 @@ export class Sprite extends Paint {
 	// 스프라이트 출력 모드 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 그리는 방식. ("simple", "sliced", "tiled")
 	 */
 	getSpriteDrawMode() {
 		return this.#spriteDrawMode;
@@ -275,7 +301,7 @@ export class Sprite extends Paint {
 	// 스프라이트 블렌드 모드 설정.
 	//==============================================================================
 	/**
-	 * @param { string } spriteBlendMode
+	 * @param { string } spriteBlendMode 섞는 방식. (Canvas2D globalCompositeOperation 이름, 처음은 "source-over")
 	 */
 	setSpriteBlendMode(spriteBlendMode) {
 		this.#spriteBlendMode = spriteBlendMode;
@@ -285,7 +311,7 @@ export class Sprite extends Paint {
 	// 스프라이트 블렌드 모드 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 섞는 방식. (Canvas2D globalCompositeOperation 이름)
 	 */
 	getSpriteBlendMode() {
 		return this.#spriteBlendMode;
@@ -295,7 +321,31 @@ export class Sprite extends Paint {
 	// 나인슬라이스 영역 설정.
 	//==============================================================================
 	/**
-	 * @param { Rect } nineSlice
+	 * @param { Rect } nineSlice 나인 슬라이스 경계. (position.x 왼쪽, position.y 위, size.x 오른쪽, size.y 아래 두께, 픽셀, "sliced" 에서 쓴다)
+	 * @example <caption>나인 슬라이스로 늘려 그리기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2, Rect, WorldNode, Sprite, ImageAsset } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	async load(engine) {
+	 * 		await super.load(engine);
+	 * 		const imageAsset = new ImageAsset();
+	 * 		await imageAsset.load("assets/icons/icon.png");
+	 * 		const panelNode = new WorldNode();
+	 * 		panelNode.setContentSize(Vector2.create(300, 120));
+	 * 		panelNode.setLocalPosition(Vector2.create(320, 180));
+	 * 		const sprite = panelNode.addComponent(Sprite);
+	 * 		sprite.setImage(imageAsset);
+	 * 		sprite.setSpriteDrawMode("sliced");
+	 * 		sprite.setNineSlice(Rect.create(40, 40, 40, 40));
+	 * 		const root = this.getRoot();
+	 * 		root.addChild(panelNode);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	setNineSlice(nineSlice) {
 		this.#nineSlice = nineSlice;
@@ -305,7 +355,7 @@ export class Sprite extends Paint {
 	// 나인슬라이스 영역 반환.
 	//==============================================================================
 	/**
-	 * @returns { Rect }
+	 * @returns { Rect } 나인 슬라이스 경계.
 	 */
 	getNineSlice() {
 		return this.#nineSlice;
@@ -315,7 +365,7 @@ export class Sprite extends Paint {
 	// 이미지 설정.
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement | ImageAsset } image
+	 * @param { HTMLImageElement | ImageAsset } image 그림. (HTMLImageElement 나 ImageAsset, null 이나 undefined 면 비운다, 그 밖의 꼴은 무시한다)
 	 */
 	setImage(image) {
 		if (image === null || image === undefined) {
@@ -333,7 +383,7 @@ export class Sprite extends Paint {
 	// 이미지 반환.
 	//==============================================================================
 	/**
-	 * @returns { HTMLImageElement }
+	 * @returns { HTMLImageElement } 그림. (없으면 null)
 	 */
 	getImage() {
 		return this.#image;
@@ -343,7 +393,30 @@ export class Sprite extends Paint {
 	// 조각 걸기. (Frame 의 그림과 그 안의 영역을 함께 건다, null 이면 그림을 비운다, SpriteAtlas.readFrame)
 	//==============================================================================
 	/**
-	 * @param { Frame | null } frame
+	 * @param { Frame | null } frame 걸 조각. (null 이면 그림을 비운다)
+	 * @example <caption>Frame 으로 조각 걸기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2, Rect, WorldNode, Sprite, Frame, ImageAsset } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	async load(engine) {
+	 * 		await super.load(engine);
+	 * 		const imageAsset = new ImageAsset();
+	 * 		await imageAsset.load("examples/assets/spritesheet.png");
+	 * 		const frame = new Frame(imageAsset.image, Rect.create(200, 0, 200, 200));
+	 * 		const spriteNode = new WorldNode();
+	 * 		spriteNode.setContentSize(Vector2.create(200, 200));
+	 * 		spriteNode.setLocalPosition(Vector2.create(320, 180));
+	 * 		const sprite = spriteNode.addComponent(Sprite);
+	 * 		sprite.setFrame(frame);
+	 * 		const root = this.getRoot();
+	 * 		root.addChild(spriteNode);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	setFrame(frame) {
 		if (frame === null || frame === undefined) {
@@ -360,7 +433,7 @@ export class Sprite extends Paint {
 	// 이미지 영역 설정.
 	//==============================================================================
 	/**
-	 * @param { Rect } imageRect
+	 * @param { Rect } imageRect 그림 안에서 그릴 영역. (픽셀, 비어 있으면 그림 전체)
 	 */
 	setImageRect(imageRect) {
 		this.#imageRect = imageRect;
@@ -370,7 +443,7 @@ export class Sprite extends Paint {
 	// 이미지 영역 반환.
 	//==============================================================================
 	/**
-	 * @returns { Rect }
+	 * @returns { Rect } 그림 안에서 그릴 영역.
 	 */
 	getImageRect() {
 		return this.#imageRect;
@@ -380,7 +453,7 @@ export class Sprite extends Paint {
 	// 이미지 뒤집기 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } flip
+	 * @param { boolean } flip 참이면 좌우로 뒤집는다.
 	 */
 	setHorizontalFlip(flip) {
 		this.#isHorizontalFlip = flip;
@@ -390,7 +463,7 @@ export class Sprite extends Paint {
 	// 이미지 뒤집기 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } flip
+	 * @param { boolean } flip 참이면 위아래로 뒤집는다.
 	 */
 	setVerticalFlip(flip) {
 		this.#isVerticalFlip = flip;
@@ -400,7 +473,7 @@ export class Sprite extends Paint {
 	// 이미지 뒤집기 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 좌우로 뒤집었으면 참.
 	 */
 	isHorizontalFlip() {
 		return this.#isHorizontalFlip;
@@ -410,7 +483,7 @@ export class Sprite extends Paint {
 	// 이미지 뒤집기 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 위아래로 뒤집었으면 참.
 	 */
 	isVerticalFlip() {
 		return this.#isVerticalFlip;
@@ -420,7 +493,7 @@ export class Sprite extends Paint {
 	// 이미지 뒤집히는 값 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 뒤집기 배율. (뒤집은 축은 -1, 아니면 1, 새 벡터)
 	 */
 	getFlip() {
 		const isHorizontalFlip = this.isHorizontalFlip();

@@ -39,6 +39,38 @@ function readSmoothRise(edge, value) {
 // - 부드러운 그라데이션이라 낮은 해상도로 구워 늘려도 자국이 보이지 않는다. (구운 한 픽셀이 굽기 단위만큼을 덮고, 가로세로 상한이 있다)
 // - 노드 크기, 모양, 색, 짙기, 양옆 흐림이 바뀌면 다시 굽는다. 노드의 불투명도는 한 장째로 먹는다.
 //==============================================================================
+/**
+ * @example <caption>글 뒤에 띠 그늘 깔기</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, WorldNode, Paint, SoftShade, SoftShadeShape, Text } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	async load(engine) {
+ * 		await super.load(engine);
+ * 		const root = this.getRoot();
+ * 		const backgroundNode = new WorldNode();
+ * 		backgroundNode.setContentSize(Vector2.create(640, 360));
+ * 		backgroundNode.setLocalPosition(Vector2.create(320, 180));
+ * 		const backgroundPaint = backgroundNode.addComponent(Paint);
+ * 		backgroundPaint.setColor("#f0e6c8");
+ * 		root.addChild(backgroundNode);
+ *
+ * 		const shadeNode = new WorldNode();
+ * 		shadeNode.setContentSize(Vector2.create(520, 90));
+ * 		shadeNode.setLocalPosition(Vector2.create(320, 180));
+ * 		const softShade = shadeNode.addComponent(SoftShade);
+ * 		softShade.setShade(SoftShadeShape.band, "#000000", 0.6, 80);
+ * 		const text = shadeNode.addComponent(Text);
+ * 		text.setFontSize(36);
+ * 		text.setText("Stage Clear");
+ * 		root.addChild(shadeNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class SoftShade extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -75,7 +107,7 @@ export class SoftShade extends Component {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그래픽.
 	 */
 	draw(graphic) {
 		const node = this.getNode();
@@ -119,7 +151,7 @@ export class SoftShade extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { boolean }
+	 * @returns { boolean } 내용 영역 안에서만 그리면 참.
 	 */
 	isDrawnInsideContent() {
 		return this.draw === SoftShade.prototype.draw;
@@ -130,7 +162,7 @@ export class SoftShade extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { ComponentNode } node
+	 * @param { ComponentNode } node 떨어지는 노드.
 	 */
 	detach(node) {
 		releaseSharedBake(this.#bakeKey, this);
@@ -143,9 +175,9 @@ export class SoftShade extends Component {
 	// 굽기. (픽셀마다 알파를 셈한다, 텍스처 캐시가 캔버스마다 한 번 올리므로 구울 때마다 새 캔버스)
 	//==============================================================================
 	/**
-	 * @param { number } bakeWidth
-	 * @param { number } bakeHeight
-	 * @param { number } fadeRatio
+	 * @param { number } bakeWidth 구울 캔버스 너비. (픽셀)
+	 * @param { number } bakeHeight 구울 캔버스 높이. (픽셀)
+	 * @param { number } fadeRatio 양옆이 엷어지는 너비의 내용 너비에 대한 비. (0 ~ 0.5, 0 이면 엷어지지 않는다, band 모양만 쓴다)
 	 */
 	bakeShade(bakeWidth, bakeHeight, fadeRatio) {
 		const bakeCanvas = System.document.createElement("canvas");
@@ -190,8 +222,8 @@ export class SoftShade extends Component {
 	/**
 	 * @param { string } shape - SoftShadeShape
 	 * @param { string } color - "#rrggbb"
-	 * @param { number } opacity
-	 * @param { number } fadeWidth
+	 * @param { number } opacity 가장 짙은 곳의 불투명도. (0 ~ 1, 0 이하면 그리지 않는다)
+	 * @param { number } fadeWidth 띠의 양옆이 엷어지는 너비. (내용 크기 단위, 내용 너비의 반까지, 0 이면 엷어지지 않는다)
 	 */
 	setShade(shape, color, opacity, fadeWidth = 0) {
 		this.#shape = shape;
@@ -204,8 +236,8 @@ export class SoftShade extends Component {
 	// 굽기 해상도 설정. (구운 한 픽셀이 덮는 단위, 가로세로 상한)
 	//==============================================================================
 	/**
-	 * @param { number } bakeUnit
-	 * @param { number } bakeMaximumSize
+	 * @param { number } bakeUnit 구운 한 픽셀이 덮는 내용 크기 단위. (1 보다 작으면 1, 처음은 4)
+	 * @param { number } bakeMaximumSize 구운 캔버스의 가로세로 상한. (픽셀, 2 보다 작으면 2, 처음은 256)
 	 */
 	setBakeResolution(bakeUnit, bakeMaximumSize) {
 		this.#bakeUnit = System.Math.max(1, bakeUnit);
@@ -216,7 +248,7 @@ export class SoftShade extends Component {
 	// 모양 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 모양. (SoftShadeShape)
 	 */
 	getShape() {
 		return this.#shape;
@@ -226,7 +258,7 @@ export class SoftShade extends Component {
 	// 색 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 색. ("#rrggbb")
 	 */
 	getColor() {
 		return this.#color;
@@ -236,7 +268,7 @@ export class SoftShade extends Component {
 	// 가장 짙은 곳의 불투명도 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 가장 짙은 곳의 불투명도.
 	 */
 	getOpacity() {
 		return this.#opacity;
@@ -246,7 +278,7 @@ export class SoftShade extends Component {
 	// 띠의 양옆이 엷어지는 너비 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 띠의 양옆이 엷어지는 너비. (내용 크기 단위)
 	 */
 	getFadeWidth() {
 		return this.#fadeWidth;
@@ -256,7 +288,7 @@ export class SoftShade extends Component {
 	// 구운 한 픽셀이 덮는 단위 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 구운 한 픽셀이 덮는 내용 크기 단위.
 	 */
 	getBakeUnit() {
 		return this.#bakeUnit;
@@ -266,7 +298,7 @@ export class SoftShade extends Component {
 	// 구운 캔버스의 가로세로 상한 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 구운 캔버스의 가로세로 상한. (픽셀)
 	 */
 	getBakeMaximumSize() {
 		return this.#bakeMaximumSize;
@@ -276,7 +308,7 @@ export class SoftShade extends Component {
 	// 구운 캔버스 반환. (아직 굽지 않았으면 null)
 	//==============================================================================
 	/**
-	 * @returns { HTMLCanvasElement | null }
+	 * @returns { HTMLCanvasElement | null } 구운 캔버스. (아직 굽지 않았으면 null)
 	 */
 	getBakeCanvas() {
 		return this.#bakeCanvas;

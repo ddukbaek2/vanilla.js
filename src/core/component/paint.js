@@ -18,6 +18,29 @@ const paintRect = new Rect();
 //==============================================================================
 // 내용의 색상과 투명도를 결정하는 컴포넌트.
 //==============================================================================
+/**
+ * @example <caption>둥근 판 하나 칠하기</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, WorldNode, Paint } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	async load(engine) {
+ * 		await super.load(engine);
+ * 		const node = new WorldNode();
+ * 		node.setContentSize(Vector2.create(200, 120));
+ * 		node.setLocalPosition(Vector2.create(320, 180));
+ * 		const paint = node.addComponent(Paint);
+ * 		paint.setColor("#3366ff");
+ * 		paint.setRoundSize(16);
+ * 		const root = this.getRoot();
+ * 		root.addChild(node);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class Paint extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -42,7 +65,7 @@ export class Paint extends Component {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그래픽.
 	 */
 	draw(graphic) {
 		// super.draw(graphic);
@@ -80,7 +103,7 @@ export class Paint extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { boolean }
+	 * @returns { boolean } 내용 영역 안에서만 그리면 참.
 	 */
 	isDrawnInsideContent() {
 		return this.draw === Paint.prototype.draw;
@@ -90,7 +113,7 @@ export class Paint extends Component {
 	// 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { Color | string | CanvasGradient | CanvasPattern } other
+	 * @param { Color | string | CanvasGradient | CanvasPattern } other 색. (Color 나 "#rrggbb(aa)", "rgb(a)(...)" 글, null 이나 undefined 면 투명, 그 밖의 값은 무시한다)
 	 */
 	setColor(other) {
 		if (other === null || other === undefined) {
@@ -113,7 +136,7 @@ export class Paint extends Component {
 	// 색상 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 색상.
 	 */
 	getColor() {
 		return this.#color;
@@ -123,7 +146,7 @@ export class Paint extends Component {
 	// 라운드 크기 설정.
 	//==============================================================================
 	/**
-	 * @param { number } roundSize
+	 * @param { number } roundSize 모서리 반지름. (내용 크기 단위, 0 이하면 각진 사각형, 짧은 변의 반을 넘으면 반으로 자른다)
 	 */
 	setRoundSize(roundSize) {
 		this.#roundSize = roundSize;
@@ -133,7 +156,7 @@ export class Paint extends Component {
 	// 라운드 사이즈 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 모서리 반지름.
 	 */
 	getRoundSize() {
 		return this.#roundSize;

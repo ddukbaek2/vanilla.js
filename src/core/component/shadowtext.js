@@ -53,6 +53,33 @@ export function buildRGBAString(colorText, opacity) {
 // - 기울임, 밑줄, 취소선(setItalic, setUnderline, setStrikethrough): 선의 자리, 두께는 Text 의 가운데 기준선과 같고, 선도 글과 함께 구워 그림자가 깔린다.
 // - 글 방향은 "ltr", "rtl", "auto"(글의 첫 강한 글자로) 이다.
 //==============================================================================
+/**
+ * @example <caption>그림자를 깐 제목 글</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, WorldNode, ShadowText, FontAsset } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	async load(engine) {
+ * 		await super.load(engine);
+ * 		const fontAsset = new FontAsset();
+ * 		await fontAsset.loadFont("DOSGothic", "examples/assets/DOSGothic.woff");
+ * 		const titleNode = new WorldNode();
+ * 		titleNode.setContentSize(Vector2.create(400, 60));
+ * 		titleNode.setLocalPosition(Vector2.create(320, 180));
+ * 		const shadowText = titleNode.addComponent(ShadowText);
+ * 		shadowText.setFontFace(fontAsset.fontFace);
+ * 		shadowText.setTextStyle(40, true, "#ffffff");
+ * 		shadowText.setShadow("#000000", 0.8, 3, 4);
+ * 		shadowText.setText("Vanilla Engine");
+ * 		const root = this.getRoot();
+ * 		root.addChild(titleNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class ShadowText extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -109,7 +136,7 @@ export class ShadowText extends Component {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그래픽.
 	 */
 	draw(graphic) {
 		const text = this.getText();
@@ -175,7 +202,7 @@ export class ShadowText extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { ComponentNode } node
+	 * @param { ComponentNode } node 떨어지는 노드.
 	 */
 	detach(node) {
 		releaseSharedBake(this.#bakeKey, this);
@@ -189,12 +216,12 @@ export class ShadowText extends Component {
 	// - 텍스처 캐시가 캔버스마다 한 번 올리므로 구울 때마다 새 캔버스를 만든다. (앞의 것은 수거되며 텍스처도 함께 수거된다)
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
-	 * @param { string } text
+	 * @param { Graphic } graphic 그래픽. (처음 크기의 글 너비를 잰다)
+	 * @param { string } text 구울 글.
 	 * @param { number } fitWidth - 맞출 너비. (0 이하면 맞추지 않는다)
-	 * @param { number } bakeScale
-	 * @param { string } textDirection
-	 * @param { FontFace | null } fontFace
+	 * @param { number } bakeScale 굽는 배율. (Graphic.calculateTextBakeScale)
+	 * @param { string } textDirection 굽는 방향. ("ltr" 또는 "rtl")
+	 * @param { FontFace | null } fontFace 글꼴. (null 이면 시스템 글꼴)
 	 */
 	bakeText(graphic, text, fitWidth, bakeScale, textDirection, fontFace) {
 		const bakeCanvas = System.document.createElement("canvas");
@@ -284,8 +311,8 @@ export class ShadowText extends Component {
 	// 글 너비 재기. (처음 크기로, Text 와 같은 재기, 내용 크기 단위)
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
-	 * @returns { number }
+	 * @param { Graphic } graphic 그래픽. (글 재기 캐시를 쓴다)
+	 * @returns { number } 글 너비. (내용 크기 단위, 글이 비었으면 0)
 	 */
 	measureTextWidth(graphic) {
 		const text = this.getText();
@@ -303,7 +330,7 @@ export class ShadowText extends Component {
 	// 글 설정.
 	//==============================================================================
 	/**
-	 * @param { string } text
+	 * @param { string } text 보일 한 줄 글.
 	 */
 	setText(text) {
 		this.#text = text;
@@ -313,7 +340,7 @@ export class ShadowText extends Component {
 	// 글 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 글.
 	 */
 	getText() {
 		return this.#text;
@@ -323,7 +350,7 @@ export class ShadowText extends Component {
 	// 글꼴 설정. (null 이면 시스템 글꼴)
 	//==============================================================================
 	/**
-	 * @param { FontFace | null } fontFace
+	 * @param { FontFace | null } fontFace 글꼴. (null 이면 시스템 글꼴)
 	 */
 	setFontFace(fontFace) {
 		this.#fontFace = fontFace;
@@ -333,7 +360,7 @@ export class ShadowText extends Component {
 	// 글꼴 반환.
 	//==============================================================================
 	/**
-	 * @returns { FontFace | null }
+	 * @returns { FontFace | null } 글꼴. (null 이면 시스템 글꼴)
 	 */
 	getFontFace() {
 		return this.#fontFace;
@@ -343,9 +370,9 @@ export class ShadowText extends Component {
 	// 글의 꼴 설정. (처음 크기, 굵기, 색)
 	//==============================================================================
 	/**
-	 * @param { number } fontSize
-	 * @param { boolean } isBold
-	 * @param { string } textColor
+	 * @param { number } fontSize 처음 글자 크기. (내용 크기 단위, 넘치면 줄여 굽는다)
+	 * @param { boolean } isBold 굵게 할지.
+	 * @param { string } textColor 글 색. ("#rrggbb" 나 CSS 색)
 	 */
 	setTextStyle(fontSize, isBold, textColor) {
 		this.#fontSize = fontSize;
@@ -357,7 +384,7 @@ export class ShadowText extends Component {
 	// 처음 글자 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 처음 글자 크기.
 	 */
 	getFontSize() {
 		return this.#fontSize;
@@ -377,7 +404,7 @@ export class ShadowText extends Component {
 	// 가로 정렬 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 가로 정렬. ("left", "center", "right", "start", "end")
 	 */
 	getTextAlign() {
 		return this.#textAlign;
@@ -387,7 +414,7 @@ export class ShadowText extends Component {
 	// 글 방향 설정. ("ltr", "rtl", "auto")
 	//==============================================================================
 	/**
-	 * @param { string } textDirection
+	 * @param { string } textDirection 글 방향. ("ltr", "rtl", "auto", 그 밖의 값은 "ltr" 로 굽는다)
 	 */
 	setTextDirection(textDirection) {
 		this.#textDirection = textDirection;
@@ -397,7 +424,7 @@ export class ShadowText extends Component {
 	// 글 방향 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 글 방향. ("ltr", "rtl", "auto")
 	 */
 	getTextDirection() {
 		return this.#textDirection;
@@ -407,7 +434,7 @@ export class ShadowText extends Component {
 	// 굽는 실제 방향. ("rtl" 이면 오른쪽에서 왼쪽, "auto" 는 글의 첫 강한 글자로, 그 밖은 "ltr")
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } "ltr" 또는 "rtl".
 	 */
 	resolveBakeTextDirection() {
 		if (this.#textDirection === "rtl") {
@@ -423,7 +450,7 @@ export class ShadowText extends Component {
 	// 굵게 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 굵게면 참.
 	 */
 	isBold() {
 		return this.#isBold;
@@ -433,7 +460,7 @@ export class ShadowText extends Component {
 	// 기울임 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } isItalic
+	 * @param { boolean } isItalic 기울일지. (true 일 때만 기울인다)
 	 */
 	setItalic(isItalic) {
 		this.#isItalic = isItalic === true;
@@ -443,7 +470,7 @@ export class ShadowText extends Component {
 	// 기울임 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 기울임이면 참.
 	 */
 	isItalic() {
 		return this.#isItalic;
@@ -453,7 +480,7 @@ export class ShadowText extends Component {
 	// 밑줄 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } isUnderline
+	 * @param { boolean } isUnderline 밑줄을 그을지. (true 일 때만 긋는다)
 	 */
 	setUnderline(isUnderline) {
 		this.#isUnderline = isUnderline === true;
@@ -463,7 +490,7 @@ export class ShadowText extends Component {
 	// 밑줄 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 밑줄이면 참.
 	 */
 	isUnderline() {
 		return this.#isUnderline;
@@ -473,7 +500,7 @@ export class ShadowText extends Component {
 	// 취소선 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } isStrikethrough
+	 * @param { boolean } isStrikethrough 취소선을 그을지. (true 일 때만 긋는다)
 	 */
 	setStrikethrough(isStrikethrough) {
 		this.#isStrikethrough = isStrikethrough === true;
@@ -483,7 +510,7 @@ export class ShadowText extends Component {
 	// 취소선 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 취소선이면 참.
 	 */
 	isStrikethrough() {
 		return this.#isStrikethrough;
@@ -494,8 +521,8 @@ export class ShadowText extends Component {
 	//==============================================================================
 	/**
 	 * @param { string } shadowColor - "#rrggbb"
-	 * @param { number } shadowOpacity
-	 * @param { number } shadowOffset
+	 * @param { number } shadowOpacity 그림자 불투명도. (0 ~ 1)
+	 * @param { number } shadowOffset 그림자가 글 아래로 내려가는 만큼. (내용 크기 단위)
 	 * @param { number } shadowBlur - 0 이면 번지지 않는다.
 	 */
 	setShadow(shadowColor, shadowOpacity, shadowOffset, shadowBlur = 0) {
@@ -509,7 +536,7 @@ export class ShadowText extends Component {
 	// 넘칠 때 줄이는 가장 작은 비율 설정. (1 이면 줄이지 않는다)
 	//==============================================================================
 	/**
-	 * @param { number } fitMinimumRatio
+	 * @param { number } fitMinimumRatio 넘칠 때 줄이는 가장 작은 비율. (0.01 ~ 1 로 자른다, 1 이면 줄이지 않는다)
 	 */
 	setFitMinimumRatio(fitMinimumRatio) {
 		this.#fitMinimumRatio = System.Math.max(0.01, System.Math.min(1, fitMinimumRatio));
@@ -519,7 +546,7 @@ export class ShadowText extends Component {
 	// 넘칠 때 줄이는 가장 작은 비율 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 넘칠 때 줄이는 가장 작은 비율.
 	 */
 	getFitMinimumRatio() {
 		return this.#fitMinimumRatio;
@@ -529,7 +556,7 @@ export class ShadowText extends Component {
 	// 구운 캔버스 반환. (아직 굽지 않았으면 null)
 	//==============================================================================
 	/**
-	 * @returns { HTMLCanvasElement | null }
+	 * @returns { HTMLCanvasElement | null } 구운 캔버스. (아직 굽지 않았으면 null)
 	 */
 	getBakeCanvas() {
 		return this.#bakeCanvas;

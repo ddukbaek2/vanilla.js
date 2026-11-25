@@ -8,6 +8,65 @@ import { Object } from "../../base/object.js";
 // 셰이더 프로그램.
 // - 버텍스/프래그먼트 셰이더의 컴파일과 링크, 로케이션 캐시를 담당.
 //==============================================================================
+/**
+ * @example <caption>셰이더를 바꿔 끼워 흑백으로 그리기</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, Rect, ShaderProgram } from "./build/vanilla.js";
+ *
+ * const VERTEX_SHADER_SOURCE = `#version 300 es
+ * in vec2 vertexPosition;
+ * in vec2 vertexTextureCoordinate;
+ * uniform mat3 projectionMatrix;
+ * uniform mat3 modelMatrix;
+ * out vec2 fragmentTextureCoordinate;
+ * void main() {
+ * 	vec3 transformedPosition = projectionMatrix * (modelMatrix * vec3(vertexPosition, 1.0));
+ * 	gl_Position = vec4(transformedPosition.xy, 0.0, 1.0);
+ * 	fragmentTextureCoordinate = vertexTextureCoordinate;
+ * }
+ * `;
+ * const GRAY_FRAGMENT_SHADER_SOURCE = `#version 300 es
+ * precision highp float;
+ * in vec2 fragmentTextureCoordinate;
+ * uniform sampler2D mainTexture;
+ * uniform vec4 mainColor;
+ * uniform float globalAlpha;
+ * out vec4 outputColor;
+ * void main() {
+ * 	vec4 textureColor = texture(mainTexture, fragmentTextureCoordinate);
+ * 	vec3 color = textureColor.rgb * mainColor.rgb;
+ * 	float gray = dot(color, vec3(0.299, 0.587, 0.114));
+ * 	float alpha = textureColor.a * mainColor.a * globalAlpha;
+ * 	outputColor = vec4(vec3(gray) * mainColor.a * globalAlpha, alpha);
+ * }
+ * `;
+ *
+ * class MainScene extends Scene {
+ * 	initialize(engine) {
+ * 		const graphic = engine.getGraphic();
+ * 		const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
+ * 		const defaultShaderProgram = graphic.getShaderProgram();
+ * 		const attributeLocationTable = {
+ * 			vertexPosition: defaultShaderProgram.getAttributeLocation("vertexPosition"),
+ * 			vertexTextureCoordinate: defaultShaderProgram.getAttributeLocation("vertexTextureCoordinate"),
+ * 		};
+ * 		this.grayShaderProgram = new ShaderProgram(webGL2RenderingContext, VERTEX_SHADER_SOURCE, GRAY_FRAGMENT_SHADER_SOURCE, attributeLocationTable);
+ * 	}
+ *
+ * 	draw(graphic) {
+ * 		super.draw(graphic);
+ * 		graphic.setFillColor("#ff6600");
+ * 		graphic.drawRect(Rect.create(60, 120, 200, 120));
+ * 		graphic.setShaderProgramOverride(this.grayShaderProgram);
+ * 		graphic.drawRect(Rect.create(380, 120, 200, 120));
+ * 		graphic.setShaderProgramOverride(null);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class ShaderProgram extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -22,10 +81,10 @@ export class ShaderProgram extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
-	 * @param { string } vertexShaderSource
-	 * @param { string } fragmentShaderSource
-	 * @param { object | null } attributeLocationTable - 링크 전에 고정할 어트리뷰트 위치. ({ 이름: 위치 } — 다른 프로그램의 버텍스 어레이를 함께 쓸 때)
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
+	 * @param { string } vertexShaderSource 버텍스 셰이더 GLSL 소스.
+	 * @param { string } fragmentShaderSource 프래그먼트 셰이더 GLSL 소스.
+	 * @param { object | null } attributeLocationTable - 링크 전에 고정할 어트리뷰트 위치. ({ 이름: 위치 }, 다른 프로그램의 버텍스 어레이를 함께 쓸 때)
 	 */
 	constructor(webGL2RenderingContext, vertexShaderSource, fragmentShaderSource, attributeLocationTable = null) {
 		super();
@@ -63,9 +122,9 @@ export class ShaderProgram extends Object {
 	// 셰이더 객체 생성.
 	//==============================================================================
 	/**
-	 * @param { GLenum } shaderType
-	 * @param { string } shaderSource
-	 * @returns { WebGLShader }
+	 * @param { GLenum } shaderType 셰이더 갈래. (VERTEX_SHADER 또는 FRAGMENT_SHADER)
+	 * @param { string } shaderSource GLSL 소스.
+	 * @returns { WebGLShader } 컴파일한 셰이더. (컴파일에 실패하면 오류를 던진다)
 	 */
 	createShader(shaderType, shaderSource) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -94,8 +153,8 @@ export class ShaderProgram extends Object {
 	// 어트리뷰트 로케이션 반환. (캐시)
 	//==============================================================================
 	/**
-	 * @param { string } attributeName
-	 * @returns { GLint }
+	 * @param { string } attributeName 어트리뷰트 이름.
+	 * @returns { GLint } 어트리뷰트 위치. (없으면 -1)
 	 */
 	getAttributeLocation(attributeName) {
 		if (this.#attributeLocations.has(attributeName)) {
@@ -113,8 +172,8 @@ export class ShaderProgram extends Object {
 	// 유니폼 로케이션 반환. (캐시)
 	//==============================================================================
 	/**
-	 * @param { string } uniformName
-	 * @returns { WebGLUniformLocation }
+	 * @param { string } uniformName 유니폼 이름.
+	 * @returns { WebGLUniformLocation } 유니폼 위치. (없으면 null)
 	 */
 	getUniformLocation(uniformName) {
 		if (this.#uniformLocations.has(uniformName)) {
@@ -132,7 +191,7 @@ export class ShaderProgram extends Object {
 	// 렌더링 컨텍스트 반환.
 	//==============================================================================
 	/**
-	 * @returns { WebGL2RenderingContext }
+	 * @returns { WebGL2RenderingContext } 렌더링 컨텍스트.
 	 */
 	getWebGL2RenderingContext() {
 		return this.#webGL2RenderingContext;
@@ -142,7 +201,7 @@ export class ShaderProgram extends Object {
 	// 프로그램 객체 반환.
 	//==============================================================================
 	/**
-	 * @returns { WebGLProgram }
+	 * @returns { WebGLProgram } 링크한 프로그램 객체.
 	 */
 	getProgram() {
 		return this.#program;
