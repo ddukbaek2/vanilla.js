@@ -173,7 +173,6 @@
 - UIListView: setCreateItemEvent(() => WorldNode) 로 템플릿 대신 항목 노드를 만드는 함수를 받는다. 항목 크기를 정하지 않았으면 처음 만든 항목의 크기를 읽는다. isHorizontal()
 - TouchRecognizer: getTouchTarget (드래그를 넘겼으면 스크롤 뷰 노드), isTouching
 - GameScene: setSafeAreaInsets({ top, right, bottom, left }) 로 세이프 에어리어 인셋을 CSS 픽셀로 직접 정한다. (null 이면 뷰 매니저의 값, 게임 영역 기준도 이 값을 쓴다) 정적 calculateSafeAreaRect(viewSize, targetResolutionScale, insets). setPlayInputEnabled(true) 로 놀이 입력을 모아 두고 takePlayInputs() 로 { kind, position, wheelDelta } 를 꺼낸다. (처리기와 함께 써도 된다) setLoadingOutsideColor, hasLoadingDrawer, isLoadTouchedToSkip, getDevTools
-- WebSocketClient: 수신 콜백이 없으면 받은 JSON 을 모아 두었다가(1024 개, 넘치면 오래된 것부터 버린다) takeReceivedMessages() 로 꺼낸다. getReceiveEvent 가 웹소켓을 돌려주던 버그를 고쳐 수신 콜백을 돌려준다
 - UIScene: EngineConfiguration.useDevTools 가 꺼져 있으면 GameScene 처럼 개발자 도구를 만들지 않는다. (지금까지는 늘 만들었다)
 - 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
 
@@ -182,10 +181,8 @@
   - Text.calculateDrawnRect: 줄을 바꾸는 글도 사각형을 안다. (화면 밖 거르기) getMeasuredLineCount
   - RichText: 글자 방향을 쓴다. 조각을 이은 글로 문단 방향을 정하고(이 글자의 방향, "inherit" 면 Graphic 의 방향), 오른쪽에서 왼쪽이면 조각을 오른쪽부터 놓는다. 정렬 "start" / "end" 도 그 방향으로 푼다. (전에는 조각에 방향을 쓰지 않았다)
   - ShadowText: setItalic, setUnderline, setStrikethrough 와 게터, isBold. 밑줄과 취소선도 그림자와 함께 굽는다. 글 방향에 "auto"(글의 첫 강한 글자로)
-  - UILabel.getVisibleCharacterCount
   - Graphic: detectTextDirection(text) 를 내보낸다. (setTextDirection("auto") 와 같은 셈)
   - DynamicFont: buildAtlas 로 글자를 더하면 든 글자를 모두 새 캔버스에 다시 놓는다. (전에는 새 글자만 새 캔버스에 놓아 앞서 구운 글자가 어긋났다) 글자 묶음 단위, rebuildAtlas, measureText. import.js 에서 DynamicFont, GlyphInfo 를 내보낸다
-  - Localization: selectLanguage(태그의 뒤 조각부터 떼며 코드와 별칭을 본다, detectLanguage 가 쓴다), setLanguageAliases, setRightToLeft, isRightToLeft, mirrorLayoutX, readLayoutTextAlign, isolateText, textNamed
   - LanguagePack: setLanguageList(data), setLanguageTexts(code, texts, fallbackTexts) (파일 없이 바로 넣기)
   - import.js: splitGraphemes, splitWords, countGraphemes, sliceGraphemes, detectTextDirection
   - 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
@@ -289,6 +286,10 @@
 - WorldNode.setPosition: getPosition 의 거꾸로를 더했다. 지금까지는 TransformNode.setPosition 이 부모 pivot 점의 자리(부모 contentSize x 부모 pivot)를 되돌리지 않아, 부모의 내용 크기와 피벗이 0 이 아니면 setPosition 으로 놓은 자리와 getPosition 이 달랐다. (부모 100x60, 피벗 가운데, 90 도, 크기 2 에서 (280, 200) 에 놓으면 (340, 100) 으로 읽혔다) 부모 스케일이 0 인 축은 부모 pivot 점에 놓는다. (러스트 판과 같이 고침)
 - multiply 를 렌더 타겟(프레임버퍼를 묶은 동안)에 그릴 때는 그릴 영역 아래를 떠 와 W3C 식(B(Cb, Cs) = Cb x Cs)대로 셰이더로 섞는다. 고정 블렌딩(DST_COLOR, ONE_MINUS_SRC_ALPHA)은 바탕 알파가 1 보다 작으면 cs x (1 - αb) 항이 빠지고 알파가 바탕 알파로 남아, 반투명 바탕 렌더 타겟에서 크롬 Canvas2D 와 최대 221 달랐다. (이제 도형 안쪽 0) 기본 프레임버퍼(alpha: false)는 바탕 알파가 늘 1 이라 지금처럼 고정 블렌딩과 묶어 그리기로 그려 화면과 드로우 콜, 복사 수가 그대로다. 렌더 타겟의 multiply 는 셰이더 섞기 13 가지처럼 그리기 하나에 영역 복사 한 번과 드로우 콜 한 번이 든다. 섞기 셰이더 글에 blendModeIndex 14 를 더했다. (러스트 판과 같이 고침)
 - KeyCode.audioplay 의 값 "MediaPlay" 는 W3C KeyboardEvent.code 표(2025-04-22 권고안)에 없는 이름이다. 표의 이름이고 크롬이 흔한 재생/멈춤 키(USB 0x0C00CD, 윈도우 스캔 코드 0xE022)에 내는 "MediaPlayPause" 로 고쳤다. 크롬은 "MediaPlay" 를 리눅스와 크롬OS 의 재생 키(USB 0x0C00B0)에만 낸다. (러스트 판과 같이 고침)
+- 문서를 지금 코드에 맞췄다. (코드는 그대로다)
+  - README: 소개(지금 소스를 묶은 번들 크기 약 765 KB, gzip 약 215 KB, 묶어 그리기와 거르기 기본 켬, 렌더 타겟 multiply), 주요 기능 표(입력 동작, 창 쌓기, 모션, 툰 3D, 애셋, 소리 표 같은 이번 판의 것), ShaderSprite 효과 수(none 을 빼면 49), 비주얼 에디터와 atlas.cjs 설명, 배포본이 없는 예제 cameratour, toonmaterial, 가운뎃점을 쉼표로
+  - ARCHITECTURE: 배치, 상속 계층(노드인 위젯, Object 를 상속하지 않는 것), 소유 구조(InputActions, PointerCursor, AssetLoader, 툰 3D), 프레임 루프(최대 FPS, 묶음 기억 잊기, 남은 묶음 그리기, 커서), 묶어 그리기와 거르기 기본 켬, multiply 는 렌더 타겟에서 셰이더로 섞음(알려진 공백 표에서 뺌), 미노출 목록(AudioPlayer, GamepadManager 는 이제 낸다), 9장 러스트 판과의 관계
+  - UPDATE.md 이 판 머리에서 두 갈래가 겹쳐 적은 줄(WebSocketClient, Localization, UILabel.getVisibleCharacterCount)을 하나씩 남겼다
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.
