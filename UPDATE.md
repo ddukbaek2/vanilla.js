@@ -76,6 +76,11 @@
 - Engine: 뒤로 가기 캐시에서 돌아올 때(pageshow 의 persisted) 없는 dispatchPageProcessRestored 를 불러 예외가 나던 것을 고쳤다. resume 때처럼 엔진 상태(오디오, 입력)를 되살리고 로드된 씬마다 onPageProcessRestored 를 부른다
 - 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
 - Graphic: 묶어 그리기(setSpriteBatchingEnabled)와 화면 밖 거르기(setCullingEnabled)를 기본으로 켠다. 지금 엔진을 쓰는 게임(외계행성 광부, 우주생물, aberrant, 찾았다, 종말 생존)이 모두 묶어 그리기를 켜고 돌았고, 거르기는 내용 영역 안에만 그린다고 알린 컴포넌트만 거른다(예제 일곱 장면에서 켬과 끔의 픽셀이 같았다). 예전처럼 쓰려면 setSpriteBatchingEnabled(false), setCullingEnabled(false)
+- 입력: 출시 게임들(찾았다, 종말 생존, 우주생물, aberrant, 외계행성 광부)이 게임 쪽에 따로 만들어 쓰던 입력을 엔진 기본으로 옮긴다. (게임 코드는 건드리지 않았다, 게임은 지금처럼 자기 것을 쓴다)
+- GamepadKind, readGamepadKind(gamepadId): 패드 이름(Gamepad.id)으로 종류를 가른다. 플레이스테이션(054c, playstation, dualshock, dualsense, sony), 닌텐도(057e, nintendo, joy-con, pro controller), 엑스박스(045e, xbox, xinput, microsoft), 그 밖은 other
+- GamepadManager.vibrate(strongMagnitude, weakMagnitude, seconds): 연결된 패드를 모두 브라우저 vibrationActuator 의 dual-rumble 로 떤다. 세기는 0 ~ 1 로 자른다. 진동 장치가 없는 패드와 브라우저는 건너뛴다
+- GamepadManager.getActiveGamepadId(): 마지막 갱신에 단추를 누르거나 축을 0.5 넘게 기울인 패드의 이름. (없으면 빈 글, 마지막으로 쓴 장치를 가릴 때)
+- GamepadManager.setInputLogEnabled, isInputLogEnabled: 단추와 축이 바뀔 때마다 찍던 console.log 를 끄고 켠다. 기본 동작을 바꿨다: 기본이 꺼짐이라 이제 단추와 축 로그는 찍지 않는다. (스틱을 조금만 움직여도 프레임마다 로그가 쏟아졌고, 로그에 기대는 게임이 없다) 연결과 해제 로그는 그대로 찍는다
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.
