@@ -172,6 +172,8 @@
 - SpriteAnimator.getCurrentFrameIndex(), SpriteAnimator.playOnNode(node, clipName, options) (노드의 애니메이터로 play)
 - WebSocketClient: 수신 콜백이 없으면 받은 JSON 을 모아 두고 takeReceivedMessages() 로 꺼낸다. (1024 개까지, 넘치면 오래된 것부터 버린다) 바이너리 메시지도 UTF-8 JSON 이면 받는다. tick() (할 일 없음, 다른 플랫폼과 같은 코드로 쓴다). getReceiveEvent() 가 웹소켓을 돌려주던 것을 고쳐 수신 콜백을 돌려준다
 - 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
+- BuildInfo: setPackageVersion, getPackageVersion. meta 도 version.json 도 없을 때 readText 가 돌려줄 판이다. (러스트 판의 빌드 때 판과 같은 자리, 넣지 않으면 지금처럼 빈 글) load 도 readText 와 같은 글을 돌려준다
+- Identifier.reset 이 처음 값으로 되돌린다. (자기 값을 자기에 다시 넣어 아무것도 하지 않던 버그, Enum.begin 이 열거마다 1 부터 센다)
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.
