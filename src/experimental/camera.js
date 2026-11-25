@@ -92,7 +92,7 @@ export class Camera extends Object {
 	 * @param { number } zoom 
 	 */
 	setZoom(zoom) {
-		this.#zoom = Math.clamp(0.001, zoom);
+		this.#zoom = Math.max(0.001, zoom);
 	}
 
 	//==============================================================================

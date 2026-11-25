@@ -11,7 +11,8 @@ import * as Math from "../base/math.js";
 //==============================================================================
 // 2D 카메라.
 // - 여러 게임이 제각각 만들던 "추적 + 월드 경계 클램프 + 드래그 팬 + 커서 고정 줌 + 관성" 을 모았다.
-// - position 은 카메라가 바라보는 월드 좌표(화면 가운데), zoom 은 확대 배율이다.
+// - position 은 카메라가 바라보는 월드 좌표(화면 가운데), zoom 은 확대 배율, rotation 은 화면 가운데를 축으로 도는 각도(도)다.
+//   rotation 만큼 월드가 화면에서 돈다. (experimental/camera.js 의 begin 이 scale 뒤 rotate 를 거는 것과 같은 방향)
 // - 사용:
 //     camera.setViewSize(viewSize);            // 매 프레임 또는 리사이즈 시
 //     camera.follow([heroPosition], 6);        // 추적 (선택)
@@ -19,6 +20,7 @@ import * as Math from "../base/math.js";
 //     camera.applyTransform(graphic);          // 월드 그리기 전에
 //     ...월드 렌더...
 //     graphic.popState 는 pushState 를 쓴 쪽에서.
+//     또는 camera.begin(graphic); ...월드 렌더... camera.end(graphic);   // pushState + applyTransform / popState
 //==============================================================================
 export class Camera2D extends Object {
 	//==============================================================================
@@ -26,6 +28,7 @@ export class Camera2D extends Object {
 	//==============================================================================
 	/** @private @type { Vector2 } */ #position;
 	/** @private @type { number } */ #zoom;
+	/** @private @type { number } */ #rotation;
 	/** @private @type { Vector2 } */ #viewSize;
 	/** @private @type { Rect | null } */ #worldBounds;
 	/** @private @type { Vector2 } */ #velocity;
@@ -45,6 +48,7 @@ export class Camera2D extends Object {
 
 		this.#position = Vector2.zero();
 		this.#zoom = 1;
+		this.#rotation = 0;
 		this.#viewSize = Vector2.create(960, 640);
 		this.#worldBounds = null;
 		this.#velocity = Vector2.zero();
@@ -117,16 +121,17 @@ export class Camera2D extends Object {
 	}
 
 	//==============================================================================
-	// 화면 픽셀 단위 팬. (드래그 팬 — 줌을 반영해 월드 이동량으로 환산)
+	// 화면 픽셀 단위 팬. (드래그 팬 — 줌과 회전을 반영해 월드 이동량으로 환산)
 	//==============================================================================
 	/**
 	 * @param { number } screenDeltaX
 	 * @param { number } screenDeltaY
 	 */
 	panByScreen(screenDeltaX, screenDeltaY) {
+		const worldDelta = this.convertScreenDeltaToWorld(screenDeltaX, screenDeltaY);
 		this.#position = Vector2.create(
-			this.#position.x - screenDeltaX / this.#zoom,
-			this.#position.y - screenDeltaY / this.#zoom);
+			this.#position.x - worldDelta.x,
+			this.#position.y - worldDelta.y);
 		this.clampToBounds();
 	}
 
@@ -138,7 +143,25 @@ export class Camera2D extends Object {
 	 * @param { number } screenVelocityY
 	 */
 	fling(screenVelocityX, screenVelocityY) {
-		this.#velocity = Vector2.create(-screenVelocityX / this.#zoom, -screenVelocityY / this.#zoom);
+		const worldVelocity = this.convertScreenDeltaToWorld(screenVelocityX, screenVelocityY);
+		this.#velocity = Vector2.create(-worldVelocity.x, -worldVelocity.y);
+	}
+
+	//==============================================================================
+	// 화면 픽셀 이동량 → 월드 이동량. (회전을 되돌리고 줌으로 나눈다)
+	//==============================================================================
+	/**
+	 * @param { number } screenDeltaX
+	 * @param { number } screenDeltaY
+	 * @returns { Vector2 }
+	 */
+	convertScreenDeltaToWorld(screenDeltaX, screenDeltaY) {
+		const radian = Math.degreeToRadian(this.#rotation);
+		const cosine = System.Math.cos(radian);
+		const sine = System.Math.sin(radian);
+		const unrotatedX = screenDeltaX * cosine + screenDeltaY * sine;
+		const unrotatedY = -screenDeltaX * sine + screenDeltaY * cosine;
+		return Vector2.create(unrotatedX / this.#zoom, unrotatedY / this.#zoom);
 	}
 
 	//==============================================================================
@@ -192,7 +215,29 @@ export class Camera2D extends Object {
 	applyTransform(graphic) {
 		graphic.translate(this.#viewSize.x * 0.5, this.#viewSize.y * 0.5);
 		graphic.scale(this.#zoom, this.#zoom);
+		graphic.rotate(Math.degreeToRadian(this.#rotation));
 		graphic.translate(-this.#position.x, -this.#position.y);
+	}
+
+	//==============================================================================
+	// 그리기 시작. (상태를 쌓고 변환을 건다, experimental/camera.js 의 begin)
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic
+	 */
+	begin(graphic) {
+		graphic.pushState();
+		this.applyTransform(graphic);
+	}
+
+	//==============================================================================
+	// 그리기 끝. (begin 이 쌓은 상태를 되돌린다, experimental/camera.js 의 end)
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic
+	 */
+	end(graphic) {
+		graphic.popState();
 	}
 
 	//==============================================================================
@@ -203,9 +248,10 @@ export class Camera2D extends Object {
 	 * @returns { Vector2 }
 	 */
 	screenToWorld(screenPosition) {
-		return Vector2.create(
-			(screenPosition.x - this.#viewSize.x * 0.5) / this.#zoom + this.#position.x,
-			(screenPosition.y - this.#viewSize.y * 0.5) / this.#zoom + this.#position.y);
+		const screenDeltaX = screenPosition.x - this.#viewSize.x * 0.5;
+		const screenDeltaY = screenPosition.y - this.#viewSize.y * 0.5;
+		const worldDelta = this.convertScreenDeltaToWorld(screenDeltaX, screenDeltaY);
+		return Vector2.create(worldDelta.x + this.#position.x, worldDelta.y + this.#position.y);
 	}
 
 	//==============================================================================
@@ -216,21 +262,43 @@ export class Camera2D extends Object {
 	 * @returns { Vector2 }
 	 */
 	worldToScreen(worldPosition) {
+		const radian = Math.degreeToRadian(this.#rotation);
+		const cosine = System.Math.cos(radian);
+		const sine = System.Math.sin(radian);
+		const scaledX = (worldPosition.x - this.#position.x) * this.#zoom;
+		const scaledY = (worldPosition.y - this.#position.y) * this.#zoom;
 		return Vector2.create(
-			(worldPosition.x - this.#position.x) * this.#zoom + this.#viewSize.x * 0.5,
-			(worldPosition.y - this.#position.y) * this.#zoom + this.#viewSize.y * 0.5);
+			scaledX * cosine - scaledY * sine + this.#viewSize.x * 0.5,
+			scaledX * sine + scaledY * cosine + this.#viewSize.y * 0.5);
+	}
+
+	//==============================================================================
+	// 화면에 보이는 월드 영역의 반 너비, 반 높이. (돌아간 뷰를 감싸는 축 정렬 상자)
+	//==============================================================================
+	/**
+	 * @returns { Vector2 }
+	 */
+	getVisibleHalfExtent() {
+		const halfViewWidth = this.#viewSize.x * 0.5 / this.#zoom;
+		const halfViewHeight = this.#viewSize.y * 0.5 / this.#zoom;
+		const radian = Math.degreeToRadian(this.#rotation);
+		const cosine = System.Math.abs(System.Math.cos(radian));
+		const sine = System.Math.abs(System.Math.sin(radian));
+		return Vector2.create(halfViewWidth * cosine + halfViewHeight * sine, halfViewWidth * sine + halfViewHeight * cosine);
 	}
 
 	//==============================================================================
 	// 월드 경계로 클램프.
-	// - 뷰가 경계보다 크면(줌아웃) 축 가운데에 맞춘다.
+	// - 보이는 영역이 경계 안에 들게 한다. 보이는 영역이 경계보다 크면(줌아웃) 축 가운데에 맞춘다.
+	// - 돌아가 있으면 돌아간 뷰를 감싸는 축 정렬 상자로 잰다.
 	//==============================================================================
 	clampToBounds() {
 		if (!this.#worldBounds) {
 			return;
 		}
-		const halfViewWidth = this.#viewSize.x * 0.5 / this.#zoom;
-		const halfViewHeight = this.#viewSize.y * 0.5 / this.#zoom;
+		const visibleHalfExtent = this.getVisibleHalfExtent();
+		const halfViewWidth = visibleHalfExtent.x;
+		const halfViewHeight = visibleHalfExtent.y;
 		const bounds = this.#worldBounds;
 		let clampedX;
 		if (halfViewWidth * 2 >= bounds.size.x) {
@@ -272,6 +340,17 @@ export class Camera2D extends Object {
 	/** @returns { number } */
 	getZoom() {
 		return this.#zoom;
+	}
+
+	/** @param { number } rotation 도. (화면 가운데를 축으로 돈다) */
+	setRotation(rotation) {
+		this.#rotation = rotation;
+		this.clampToBounds();
+	}
+
+	/** @returns { number } */
+	getRotation() {
+		return this.#rotation;
 	}
 
 	/** @param { Vector2 } viewSize */
