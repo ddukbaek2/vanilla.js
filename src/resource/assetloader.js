@@ -408,6 +408,24 @@ export class AssetLoader extends Object {
 	}
 
 	//==============================================================================
+	// 지금 받는 중인 수. (일꾼이 집어 받기 시작했고 아직 끝나지 않은 것)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getInFlightCount() {
+		const entryList = this.#entryList;
+		let inFlightCount = 0;
+		for (let entryIndex = 0; entryIndex < this.#nextEntryIndex; ++entryIndex) {
+			const entry = entryList[entryIndex];
+			if (!entry.isFinished) {
+				inFlightCount += 1;
+			}
+		}
+		return inFlightCount;
+	}
+
+	//==============================================================================
 	// 넣은 것을 모두 받았는지. (실패 포함, 넣은 것이 없으면 true)
 	//==============================================================================
 	/**

@@ -222,6 +222,13 @@
 - Platform.getResourceUsage(): 바른 이름을 더했다. 옛 이름 getResouceUsage() 는 같은 것을 부르는 별칭으로 남긴다
 - Color.fromHEXCached: fromCache 처럼 1024 개를 넘으면 가장 오래 안 쓴 것부터 버린다. (전에는 끝없이 쌓였다) Color.getCachedColorCount(): fromCache 캐시에 든 수 (러스트 판의 get_cached_color_count)
 - 비주얼 에디터를 위 엔진으로 다시 빌드했다
+- OBB.overlaps 가 늘 false 이던 버그를 고쳤다. (상대 꼭짓점을 other.length 로 돌아 상대 투영 범위가 비었다, 러스트 판과 같다)
+- Platform.getSafeAreaRect 가 Window.getComputedStyle(없는 정적 함수)을 불러 예외를 내던 것을 window.getComputedStyle 로 고쳤다. (헤드리스 크롬에서 typeof Window.getComputedStyle 이 "undefined" 인 것을 확인)
+- NodeLayout.arrangeFan: System 을 들여오지 않아 부르면 ReferenceError 로 멈추던 것과, 라디안 값을 도 단위 회전(setLocalRotation)에 넣던 것을 고쳤다. (러스트 판과 같다)
+- TextAsset, BlobAsset: 실패 응답(404 등)을 받은 것으로 치던 것을 고쳐 예외를 낸다. (AssetLoader 의 실패 목록에 든다) AudioAsset 도 실패 응답이면 디코딩 전에 실패로 친다
+- SoundEffectPool: 보이스 수가 0 이면 play 가 0 으로 나눠 예외를 내던 것을 고쳐 아무것도 하지 않는다. (러스트 판과 같다)
+- AudioManager.getContextTime() (AudioContext 시계, 없으면 0), AudioAsset.getLoadError() (마지막 읽기 실패의 까닭, 없으면 null), AssetLoader.getInFlightCount() (일꾼이 집어 받는 중인 수). 러스트 판의 get_context_time, get_load_error, get_in_flight_count 와 같은 자리다
+- 비주얼 에디터를 위 엔진으로 다시 빌드했다
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.

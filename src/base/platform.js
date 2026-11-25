@@ -247,7 +247,7 @@ export class Platform extends Object {
 		div.style.paddingLeft = "env(safe-area-inset-left)";
 		System.document.body.appendChild(div);
 
-		const style = Window.getComputedStyle(div);
+		const style = System.window.getComputedStyle(div);
 		const top = Number.parseInt(style.paddingTop) || 0;
 		const right = Number.parseInt(style.paddingRight) || 0;
 		const bottom = Number.parseInt(style.paddingBottom) || 0;

@@ -1,6 +1,8 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+const System = globalThis;
+import * as Math from "../base/math.js";
 import { WorldNode } from "../core/node/worldnode.js";
 import { Vector2 } from "../base/vector2.js";
 import { Object } from "../base/object.js";
@@ -58,7 +60,7 @@ export class NodeLayout extends Object {
 	//==============================================================================
 	// 부채꼴 배치. (정적 — 손패 카드처럼 노드들을 호 위에 펼친다)
 	// - 가운데 항목이 baseAngleRadian 방향(기본 위쪽)을 보도록 좌우 대칭으로 벌린다.
-	// - rotateNodes 가 참이면 각 노드의 회전도 호의 접선에 맞춘다.
+	// - rotateNodes 가 참이면 각 노드의 회전도 호의 접선에 맞춘다. (노드의 회전은 도 단위라 라디안을 도로 바꿔 건다)
 	//==============================================================================
 	/**
 	 * @param { WorldNode[] } nodeList
@@ -80,7 +82,8 @@ export class NodeLayout extends Object {
 			const positionY = options.centerY + System.Math.sin(angleRadian) * options.radius;
 			node.setLocalPosition(Vector2.create(positionX, positionY));
 			if (rotateNodes) {
-				node.setLocalRotation(angleRadian - baseAngleRadian);
+				const rotationDegree = Math.radianToDegree(angleRadian - baseAngleRadian);
+				node.setLocalRotation(rotationDegree);
 			}
 		}
 	}

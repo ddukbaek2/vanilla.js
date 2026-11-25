@@ -40,6 +40,11 @@ export class BlobAsset extends Asset {
 
 		await super.load(assetPath);
 		const response = await System.fetch(assetPath);
+		// 실패 응답(404 등)은 받지 못한 것으로 친다.
+		if (!response.ok) {
+			console.error(`Error loading blob: ${assetPath}`);
+			throw new System.Error(`HTTP ${response.status}`);
+		}
 		this.#blob = await response.blob();
         this.setLoaded(true);
 	}

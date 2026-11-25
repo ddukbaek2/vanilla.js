@@ -66,6 +66,10 @@ export class TextAsset extends Asset
 			// 로드.
 			await super.load(assetPath);
 			const response = await System.fetch(assetPath, this.isNoCache() ? { cache: "no-cache" } : undefined);
+			// 실패 응답(404 등)은 받지 못한 것으로 친다.
+			if (!response.ok) {
+				throw new System.Error(`HTTP ${response.status}`);
+			}
 			this.text = await response.text();
 			this.setLoaded(true);
 			// await Wait.nextFrame();
