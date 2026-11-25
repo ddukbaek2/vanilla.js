@@ -220,3 +220,6 @@ export { UIConfirmWindow } from "./src/ui/uiconfirmwindow.js";
 
 // 글자, 노드, 그리기 갈래. (출시 게임들이 따로 만들어 쓰던 아틀라스 읽기)
 export { SpriteAtlas } from "./src/resource/spriteatlas.js";
+
+// 코어, 플랫폼, 기반 갈래. (러스트 판과 맞춘 페이지 이벤트)
+export { PageEvent } from "./src/core/engine.js";

@@ -307,9 +307,10 @@ export class Scene extends Object {
 		const engine = this.getEngine();
 		const inputManager = engine.getInputManager();
 		const viewInputPosition = inputManager.getViewInputPosition();
+		const isTouchPressed = inputManager.isTouchPressed();
 
 		// 누름.
-		if (inputManager.isTouchPressed()) {
+		if (isTouchPressed) {
 			try {
 				this.touchPress(viewInputPosition);
 			}
@@ -317,8 +318,9 @@ export class Scene extends Object {
 				console.error(error);
 			}
 		}
-		// 뗌.
-		else if (inputManager.isTouchReleased()) {
+
+		// 뗌. (한 프레임 안에 눌렀다 뗐으면 누름 뒤에 바로 뗌을 넘긴다)
+		if (inputManager.isTouchReleased()) {
 			try {
 				this.touchRelease(viewInputPosition);
 			}
@@ -326,8 +328,8 @@ export class Scene extends Object {
 				console.error(error);
 			}
 		}
-		// 누르고 있음.
-		else if (inputManager.isTouchMoved()) {
+		// 누르고 있음. (누른 프레임에는 넘기지 않는다)
+		else if (inputManager.isTouchMoved() && !isTouchPressed) {
 			try {
 				this.touchMove(viewInputPosition);
 			}

@@ -31,6 +31,21 @@ const COMPATIBILITY_MOUSE_MILLISECONDS = 800;
 // 마우스가 이만큼(CSS 픽셀) 넘게 움직여야 마지막 장치를 마우스로 본다. (창이 흔들릴 때 나는 작은 움직임을 거른다)
 const MOUSE_DEVICE_MOVE_THRESHOLD = 6;
 
+// 검증용 화면 저장의 기본 파일 이름. ("{frame}" 은 프레임 번호로 바뀐다)
+const DEFAULT_CAPTURE_FILE_NAME = "capture_{frame}.png";
+
+
+//==============================================================================
+// 페이지 이벤트. (엔진이 리스너에 넘긴다, addPageEventListener)
+//==============================================================================
+export const PageEvent = System.Object.freeze({
+	hidden: "hidden", // 페이지가 가려짐. (다른 탭, 앱 전환)
+	visible: "visible", // 페이지가 다시 보임.
+	blurred: "blurred", // 창이 포커스를 잃음. (blur)
+	focused: "focused", // 창이 포커스를 얻음. (focus)
+	pointerDown: "pointerDown", // 창을 누름. (pointerdown, 포커스를 알리지 않아도 누르면 창은 포커스를 가진 것이다)
+});
+
 
 
 //==============================================================================
@@ -124,6 +139,10 @@ export class Engine extends Object {
 	/** @private @type { number } */ #frameLimitFramePerSecond; // 세고 있는 최대 FPS. (바뀌면 다시 센다)
 	/** @private @type { Rect } */ #statisticsTextRect;
 	/** @private @type { Version } */ #version;
+	/** @private @type { Map<number, Array<Function>> } */ #frameCaptureRequests; // 프레임 번호 → 화면을 받을 함수 목록. (검증용 화면 저장)
+	/** @private @type { boolean } */ #isExitRequested; // 종료를 요청했는지.
+	/** @private @type { boolean } */ #isPageHidden; // 페이지가 가려져 있는지.
+	/** @private @type { Array<Function> } */ #pageEventListeners; // 페이지 이벤트 리스너. ((pageEvent) => void)
 
 	//==============================================================================
 	// 생성.
@@ -171,6 +190,10 @@ export class Engine extends Object {
 
 		this.#statisticsTextRect = Rect.zero();
 		this.#version = Version.create(0, 3, 2);
+		this.#frameCaptureRequests = new System.Map();
+		this.#isExitRequested = false;
+		this.#isPageHidden = System.document.visibilityState === "hidden";
+		this.#pageEventListeners = [];
 
 		// 현재 엔진 인스턴스 글로벌 등록. (루트 노드 등 컨텍스트 없는 객체에서 ViewManager 등 접근용)
 		System.vanillaEngine = this;
@@ -178,6 +201,9 @@ export class Engine extends Object {
 		// 이벤트 설정.
 		this.setupAllDocumentEvents();
 		this.resize();
+
+		// 주소 쿼리로 건 검증용 화면 저장. (?capture=120,240&captureName=shot_{frame}.png&captureExit=1)
+		this.requestFrameCapturesFromUrl();
 	}
 
 	//==============================================================================
@@ -468,6 +494,7 @@ export class Engine extends Object {
 				if (isTouchButton) {
 					inputManager.setTouchPressed(true);
 					inputManager.setTouchMoved(true);
+					inputManager.setTouchDown(true);
 				}
 				this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
@@ -488,6 +515,7 @@ export class Engine extends Object {
 				const isTouchButton = !inputManager.isTouchFromLeftButtonOnly() || touchEvent.button === MouseButton.left;
 				if (isTouchButton) {
 					inputManager.setTouchMoved(false);
+					inputManager.setTouchDown(false);
 					inputManager.setTouchReleased(true);
 				}
 				this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
@@ -497,6 +525,7 @@ export class Engine extends Object {
 		canvas.addEventListener("wheel", (wheelEvent) => {
 				const inputManager = this.getInputManager();
 				inputManager.addWheelDelta(wheelEvent.deltaX, wheelEvent.deltaY);
+				inputManager.setWheelWithCtrl(wheelEvent.ctrlKey);
 				noteMouseDevice();
 				this.updateCanvasNativeInputPosition(wheelEvent.clientX, wheelEvent.clientY);
 				wheelEvent.preventDefault();
@@ -514,6 +543,7 @@ export class Engine extends Object {
 					return;
 				}
 				inputManager.setTouchMoved(false);
+				inputManager.setTouchDown(false);
 				inputManager.setTouchReleased(true);
 				this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
@@ -529,6 +559,7 @@ export class Engine extends Object {
 
 				const inputManager = this.getInputManager();
 				inputManager.setTouchMoved(true);
+				inputManager.setTouchDown(true);
 				inputManager.setTouchPressed(true);
 				this.updateCanvasNativeInputPosition(touch.clientX, touch.clientY);
 				touchEvent.preventDefault();
@@ -558,6 +589,7 @@ export class Engine extends Object {
 
 				const inputManager = this.getInputManager();
 				inputManager.setTouchMoved(false);
+				inputManager.setTouchDown(false);
 				inputManager.setTouchReleased(true);
 				touchEvent.preventDefault();
 			}, { passive: false });
@@ -572,6 +604,7 @@ export class Engine extends Object {
 				const y = touch.clientY;
 				if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) {
 					inputManager.setTouchMoved(false);
+					inputManager.setTouchDown(false);
 					inputManager.setTouchReleased(true);				
 				}
 			});
@@ -587,6 +620,7 @@ export class Engine extends Object {
 
 				const inputManager = this.getInputManager();
 				inputManager.setTouchMoved(false);
+				inputManager.setTouchDown(false);
 				inputManager.setTouchCancelled(true);
 			});
 
@@ -594,6 +628,7 @@ export class Engine extends Object {
 		System.window.addEventListener("blur", (focusEvent) => {
 			const inputManager = this.getInputManager();
 			inputManager.setTouchMoved(false);
+			inputManager.setTouchDown(false);
 			inputManager.setTouchReleased(true);
 			inputManager.setMouseButtonDown(MouseButton.left, false);
 			inputManager.setMouseButtonDown(MouseButton.middle, false);
@@ -627,6 +662,22 @@ export class Engine extends Object {
 			} else {
 				// console.log("커서가 다시 나타났습니다.");
 			}
+		});
+
+		// 페이지 이벤트. (가려짐과 보임, 포커스를 잃고 얻음, 창 누름을 리스너에 넘긴다)
+		System.document.addEventListener("visibilitychange", () => {
+			const isHidden = System.document.visibilityState === "hidden";
+			const pageEvent = isHidden ? PageEvent.hidden : PageEvent.visible;
+			this.dispatchPageEvent(pageEvent);
+		});
+		System.window.addEventListener("blur", () => {
+			this.dispatchPageEvent(PageEvent.blurred);
+		});
+		System.window.addEventListener("focus", () => {
+			this.dispatchPageEvent(PageEvent.focused);
+		});
+		System.window.addEventListener("pointerdown", () => {
+			this.dispatchPageEvent(PageEvent.pointerDown);
 		});
 
 		// 게임패드 연결됨.
@@ -1021,6 +1072,9 @@ export class Engine extends Object {
 		inputManager.clearWheelDelta();
 		inputManager.updateFrameSnapshot();
 
+		// 검증용 화면 저장. (요청한 프레임이면 그린 캔버스를 PNG 로 넘긴다)
+		this.captureFrameIfRequested();
+
 		// 다음 프레임 호출 요청.
 		++this.#frameNumber;
 		System.window.requestAnimationFrame(this.#updateEngineCallback);
@@ -1182,6 +1236,7 @@ export class Engine extends Object {
 	//   (둘 다 환경에 따라 거부될 수 있으며 실패해도 예외를 내지 않는다)
 	//==============================================================================
 	exitApplication() {
+		this.#isExitRequested = true;
 		try {
 			const capacitor = System.Capacitor;
 			if (capacitor && capacitor.Plugins && capacitor.Plugins.App && typeof capacitor.Plugins.App.exitApp === "function") {
@@ -1202,6 +1257,262 @@ export class Engine extends Object {
 
 	getFrameNumber() {
 		return this.#frameNumber;
+	}
+
+	//==============================================================================
+	// 종료를 요청했는지. (exitApplication 을 불렀으면 참, 브라우저가 창 닫기를 거부해도 참)
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isExitRequested() {
+		return this.#isExitRequested;
+	}
+
+	//==============================================================================
+	// 창 제목 설정. (탭 제목, document.title)
+	//==============================================================================
+	/**
+	 * @param { string } title
+	 */
+	setTitle(title) {
+		System.document.title = title;
+	}
+
+	//==============================================================================
+	// 시스템 클립보드에 글 쓰기. (navigator.clipboard.writeText, 기다리지 않는다. 막히거나 없으면 아무것도 하지 않는다)
+	//==============================================================================
+	/**
+	 * @param { string } text
+	 */
+	writeClipboardText(text) {
+		const clipboard = System.navigator ? System.navigator.clipboard : undefined;
+		if (!clipboard || typeof clipboard.writeText !== "function") {
+			return;
+		}
+		clipboard.writeText(text).catch((error) => {
+			console.warn(`[Engine] 클립보드 쓰기 실패`, error);
+		});
+	}
+
+	//==============================================================================
+	// 시스템 클립보드 글 읽기. (navigator.clipboard.readText, 브라우저는 비동기라 Promise. 글이 없거나 막히면 null)
+	// - 브라우저가 권한을 묻거나 사용자 입력 안에서만 허락할 수 있다.
+	//==============================================================================
+	/**
+	 * @returns { Promise<string | null> }
+	 */
+	async readClipboardText() {
+		const clipboard = System.navigator ? System.navigator.clipboard : undefined;
+		if (!clipboard || typeof clipboard.readText !== "function") {
+			return null;
+		}
+		try {
+			const text = await clipboard.readText();
+			return text;
+		}
+		catch (error) {
+			console.warn(`[Engine] 클립보드 읽기 실패`, error);
+			return null;
+		}
+	}
+
+	//==============================================================================
+	// 주된 손이 손가락인지. (CSS 의 pointer: coarse)
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isCoarsePointer() {
+		const platform = this.getPlatform();
+		return platform.isCoarsePointer();
+	}
+
+	//==============================================================================
+	// 씬 불러오기. (SceneManager.loadScene 과 같다)
+	//==============================================================================
+	/**
+	 * @param { Scene } scene
+	 * @returns { Promise<void> }
+	 */
+	loadScene(scene) {
+		const sceneManager = this.getSceneManager();
+		return sceneManager.loadScene(scene);
+	}
+
+	//==============================================================================
+	// 씬 하나 내리기. (SceneManager.unloadScene 과 같다)
+	//==============================================================================
+	/**
+	 * @param { Scene } scene
+	 * @returns { Promise<void> }
+	 */
+	unloadScene(scene) {
+		const sceneManager = this.getSceneManager();
+		return sceneManager.unloadScene(scene);
+	}
+
+	//==============================================================================
+	// 모든 씬 내리기. (SceneManager.unloadAllScenes 와 같다)
+	//==============================================================================
+	/**
+	 * @returns { Promise<void> }
+	 */
+	unloadAllScenes() {
+		const sceneManager = this.getSceneManager();
+		return sceneManager.unloadAllScenes();
+	}
+
+	//==============================================================================
+	// 페이지가 가려져 있는지. (다른 탭, 앱 전환)
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isPageHidden() {
+		return this.#isPageHidden;
+	}
+
+	//==============================================================================
+	// 페이지 이벤트 리스너 더하기. ((pageEvent) => void, PageEvent 의 값을 받는다)
+	//==============================================================================
+	/**
+	 * @param { Function } pageEventListener
+	 */
+	addPageEventListener(pageEventListener) {
+		if (this.#pageEventListeners.includes(pageEventListener)) {
+			return;
+		}
+		this.#pageEventListeners.push(pageEventListener);
+	}
+
+	//==============================================================================
+	// 페이지 이벤트 리스너 빼기.
+	//==============================================================================
+	/**
+	 * @param { Function } pageEventListener
+	 */
+	removePageEventListener(pageEventListener) {
+		const listenerIndex = this.#pageEventListeners.indexOf(pageEventListener);
+		if (listenerIndex < 0) {
+			return;
+		}
+		this.#pageEventListeners.splice(listenerIndex, 1);
+	}
+
+	//==============================================================================
+	// 페이지 이벤트 알리기. (가려짐을 적고 리스너에 그 자리에서 넘긴다, 리스너의 예외는 알리고 다음으로 간다)
+	//==============================================================================
+	/**
+	 * @param { string } pageEvent PageEvent 의 값.
+	 */
+	dispatchPageEvent(pageEvent) {
+		if (pageEvent === PageEvent.hidden) {
+			this.#isPageHidden = true;
+		}
+		else if (pageEvent === PageEvent.visible) {
+			this.#isPageHidden = false;
+		}
+		const pageEventListeners = this.#pageEventListeners.slice();
+		for (const pageEventListener of pageEventListeners) {
+			try {
+				pageEventListener(pageEvent);
+			}
+			catch (error) {
+				console.error(error);
+			}
+		}
+	}
+
+	//==============================================================================
+	// 검증용 화면 저장 요청. (그 프레임을 다 그린 뒤 캔버스를 PNG data URL 로 넘긴다)
+	// - 이미 지난 번호면 이번(프레임 사이에 부르면 다음) 프레임을 저장한다.
+	// - 주소 쿼리로도 건다. (?capture=120,240 은 그 프레임들을 내려받기로 저장, captureName 은 파일 이름("{frame}" 은 번호), captureExit=1 은 마지막 저장 뒤 exitApplication)
+	//==============================================================================
+	/**
+	 * @param { number } frameNumber
+	 * @returns { Promise<string> } PNG data URL.
+	 */
+	requestFrameCapture(frameNumber) {
+		const currentFrameNumber = this.getFrameNumber();
+		const targetFrameNumber = System.Math.max(System.Math.floor(frameNumber), currentFrameNumber);
+		const promise = new System.Promise((resolve) => {
+			let captureHandlers = this.#frameCaptureRequests.get(targetFrameNumber);
+			if (captureHandlers === undefined) {
+				captureHandlers = [];
+				this.#frameCaptureRequests.set(targetFrameNumber, captureHandlers);
+			}
+			captureHandlers.push(resolve);
+		});
+		return promise;
+	}
+
+	//==============================================================================
+	// 요청된 프레임이면 캔버스를 PNG 로 넘기기. (프레임 끝, 그린 것이 캔버스에 남아 있을 때 부른다)
+	//==============================================================================
+	captureFrameIfRequested() {
+		const frameNumber = this.getFrameNumber();
+		const captureHandlers = this.#frameCaptureRequests.get(frameNumber);
+		if (captureHandlers === undefined) {
+			return;
+		}
+		this.#frameCaptureRequests.delete(frameNumber);
+		const canvas = this.getCanvas();
+		const dataUrl = canvas.toDataURL("image/png");
+		for (const captureHandler of captureHandlers) {
+			try {
+				captureHandler(dataUrl);
+			}
+			catch (error) {
+				console.error(error);
+			}
+		}
+	}
+
+	//==============================================================================
+	// 주소 쿼리의 화면 저장 요청 걸기. (capture, captureName, captureExit)
+	//==============================================================================
+	requestFrameCapturesFromUrl() {
+		if (!System.location || typeof System.URLSearchParams !== "function") {
+			return;
+		}
+		const searchParameters = new System.URLSearchParams(System.location.search);
+		const captureText = searchParameters.get("capture");
+		if (captureText === null) {
+			return;
+		}
+		const frameNumbers = [];
+		for (const frameText of captureText.split(",")) {
+			const frameNumber = System.Number.parseInt(frameText.trim(), 10);
+			if (System.Number.isFinite(frameNumber) && !frameNumbers.includes(frameNumber)) {
+				frameNumbers.push(frameNumber);
+			}
+		}
+		if (frameNumbers.length === 0) {
+			frameNumbers.push(120);
+		}
+		const captureNameText = searchParameters.get("captureName");
+		const captureFileName = captureNameText !== null && captureNameText !== "" ? captureNameText : DEFAULT_CAPTURE_FILE_NAME;
+		const isExitAfterLastCapture = searchParameters.get("captureExit") === "1";
+		let remainingCount = frameNumbers.length;
+		for (const frameNumber of frameNumbers) {
+			const capturePromise = this.requestFrameCapture(frameNumber);
+			capturePromise.then((dataUrl) => {
+				const fileName = captureFileName.split("{frame}").join(System.String(frameNumber));
+				const anchorElement = System.document.createElement("a");
+				anchorElement.href = dataUrl;
+				anchorElement.download = fileName;
+				System.document.body.appendChild(anchorElement);
+				anchorElement.click();
+				anchorElement.remove();
+				const canvas = this.getCanvas();
+				console.log(`[Engine] 화면 저장 ${fileName} (${canvas.width}x${canvas.height})`);
+				remainingCount -= 1;
+				if (remainingCount === 0 && isExitAfterLastCapture) {
+					this.exitApplication();
+				}
+			});
+		}
 	}
 
 	//==============================================================================

@@ -239,6 +239,8 @@ export class InputManager extends Object {
 	/** @private @type { boolean } */ #isTouchReleased; // 입력시 딱 한번 뗌.
 	/** @private @type { boolean } */ #isTouchCancelled; // 입력시 딱 한번 취소됨.
 	/** @private @type { boolean } */ #isTouchMoved; // 입력시 뗄 때가지 계속 눌림.
+	/** @private @type { boolean } */ #isTouchDown; // 터치(손가락이나 터치로 넘기는 마우스 단추)가 눌린 채인지. (뗄 때까지 켜져 있다)
+	/** @private @type { boolean } */ #isWheelWithCtrl; // 마지막 휠을 Ctrl 과 함께 굴렸는지.
 	/** @private @type { Vector2 } */ #canvasNativeInputPosition; // canvasNativeSize 기반 위치값.
 	/** @private @type { Vector2 } */ #viewInputPosition; // referenceResolutionSize 기반 위치값.
 	/** @private @type { GamepadManager } */ #gamepadManager;
@@ -273,6 +275,8 @@ export class InputManager extends Object {
 		this.#isTouchReleased = false;
 		this.#isTouchCancelled = false;
 		this.#isTouchMoved = false;
+		this.#isTouchDown = false;
+		this.#isWheelWithCtrl = false;
 		this.#canvasNativeInputPosition = Vector2.zero();
 		this.#viewInputPosition = Vector2.zero();
 		this.#gamepadManager = new GamepadManager(engine);
@@ -330,6 +334,7 @@ export class InputManager extends Object {
 		this.#isTouchReleased = false;
 		this.#isTouchCancelled = false;
 		this.#isTouchMoved = false;
+		this.#isTouchDown = false;
 		this.#wheelDeltaX = 0;
 		this.#wheelDeltaY = 0;
 		this.#mouseButtonsDown.fill(false);
@@ -365,6 +370,26 @@ export class InputManager extends Object {
 	clearWheelDelta() {
 		this.#wheelDeltaX = 0;
 		this.#wheelDeltaY = 0;
+	}
+
+	//==============================================================================
+	// 마지막 휠을 Ctrl 과 함께 굴렸는지 설정. (엔진이 wheel 에서 부른다, 노트북 터치패드의 오므리기도 Ctrl 휠로 온다)
+	//==============================================================================
+	/**
+	 * @param { boolean } isWheelWithCtrl
+	 */
+	setWheelWithCtrl(isWheelWithCtrl) {
+		this.#isWheelWithCtrl = isWheelWithCtrl;
+	}
+
+	//==============================================================================
+	// 마지막 휠을 Ctrl 과 함께 굴렸는지 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isWheelWithCtrl() {
+		return this.#isWheelWithCtrl;
 	}
 
 	//==============================================================================
@@ -520,6 +545,26 @@ export class InputManager extends Object {
 	 */
 	isTouchMoved() {
 		return this.#isTouchMoved;
+	}
+
+	//==============================================================================
+	// 터치가 눌린 채인지 설정. (엔진이 누름과 뗌에서 부른다)
+	//==============================================================================
+	/**
+	 * @param { boolean } value
+	 */
+	setTouchDown(value) {
+		this.#isTouchDown = value;
+	}
+
+	//==============================================================================
+	// 터치가 눌린 채인지 반환. (누른 프레임부터 뗄 때까지 참, 누른 채 움직이지 않아도 참)
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isTouchDown() {
+		return this.#isTouchDown;
 	}
 
 	//==============================================================================
@@ -820,6 +865,17 @@ export class InputManager extends Object {
 	 */
 	getLastInputDevice() {
 		return this.#lastInputDevice;
+	}
+
+	//==============================================================================
+	// 마지막 입력이 손가락인지. (마우스, 키보드, 게임패드면 거짓)
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isTouchInput() {
+		const lastInputDevice = this.getLastInputDevice();
+		return lastInputDevice === InputDevice.touch;
 	}
 
 	//==============================================================================
