@@ -223,3 +223,5 @@ export { SpriteAtlas } from "./src/resource/spriteatlas.js";
 
 // 효과 갈래. (아지랑이 컴포넌트)
 export { HeatHazeEffect } from "./src/effect/heathazeeffect.js";
+export { TweenProperty, applyTweenProperty } from "./src/core/tween.js";
+export { Indicator } from "./src/experimental/indicator.js";

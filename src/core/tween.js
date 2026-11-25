@@ -8,7 +8,66 @@ import { Vector2 } from "../base/vector2.js";
 
 
 //==============================================================================
+// 트윈이 바로 쓰는 노드 속성 이름. (setTarget 으로 대상 노드를 정했을 때, 값 이름이 이 이름이면 그 노드에 쓴다)
+// - Vector2 속성에 숫자를 주면 두 축에 같이 쓴다. (예: { localScale: 0 } → setLocalScale(Vector2.create(0, 0)))
+// - 숫자 속성에 Vector2 를 주면 쓰지 않는다.
+//==============================================================================
+export const TweenProperty = System.Object.freeze({
+	localPosition: "localPosition",
+	localScale: "localScale",
+	localRotation: "localRotation",
+	localOpacity: "localOpacity",
+	contentSize: "contentSize",
+});
+
+
+//==============================================================================
+// 노드에 트윈 속성 값 쓰기. (노드 속성 이름이 아니면 아무것도 하지 않는다)
+//==============================================================================
+/**
+ * @param { WorldNode } node
+ * @param { string } tweenProperty TweenProperty 의 값.
+ * @param { number | Vector2 } value
+ */
+export function applyTweenProperty(node, tweenProperty, value) {
+	const vector = (typeof value === "number") ? Vector2.create(value, value) : value;
+	switch (tweenProperty) {
+		case TweenProperty.localPosition: {
+			node.setLocalPosition(vector);
+			break;
+		}
+		case TweenProperty.localScale: {
+			node.setLocalScale(vector);
+			break;
+		}
+		case TweenProperty.contentSize: {
+			node.setContentSize(vector);
+			break;
+		}
+		case TweenProperty.localRotation: {
+			if (typeof value === "number") {
+				node.setLocalRotation(value);
+			}
+			break;
+		}
+		case TweenProperty.localOpacity: {
+			if (typeof value === "number") {
+				node.setLocalOpacity(value);
+			}
+			break;
+		}
+		default: {
+			break;
+		}
+	}
+}
+
+
+//==============================================================================
 // 트윈.
+// - setTarget(node) 로 대상 노드를 정하면 값 이름이 TweenProperty 이름인 값을 tick 마다 그 노드에 바로 쓴다.
+//   대상 노드가 트윈이 처음 돈 때의 노드 트리에서 떨어지면(removeChild 등) 콜백 없이 조용히 끝난다.
+// - duration 이 0 이하이면 바로 끝(진행률 1)으로 친다.
 //==============================================================================
 export class Tween extends Object {
 	//==============================================================================
@@ -24,6 +83,8 @@ export class Tween extends Object {
     /** @private @type { Function } */ #completeCallback;
     /** @private @type { boolean } */ #isPlaying;
     /** @private @type { boolean } */ #isFinished;
+    /** @private @type { WorldNode | null } */ #targetNode;
+    /** @private @type { Node | null } */ #targetRootNode;
 
 	//==============================================================================
 	// 생성.
@@ -45,7 +106,46 @@ export class Tween extends Object {
 		this.#completeCallback = null;
 		this.#isPlaying = false;
 		this.#isFinished = false;
+		this.#targetNode = null;
+		this.#targetRootNode = null;
     }
+
+	//==============================================================================
+	// 노드 속성 하나를 움직이는 트윈 생성. (정적)
+	// - new Tween(시작값).to(목표값, duration).setTarget(node) 와 같다. 값 이름은 속성 이름이다.
+	//==============================================================================
+	/**
+	 * @param { WorldNode } node
+	 * @param { string } tweenProperty TweenProperty 의 값.
+	 * @param { number | Vector2 } startValue
+	 * @param { number | Vector2 } endValue
+	 * @param { number } duration
+	 * @returns { Tween }
+	 */
+	static createNodeTween(node, tweenProperty, startValue, endValue, duration) {
+		const initialValues = {};
+		initialValues[tweenProperty] = startValue;
+		const targetValues = {};
+		targetValues[tweenProperty] = endValue;
+		return new Tween(initialValues).to(targetValues, duration).setTarget(node);
+	}
+
+	//==============================================================================
+	// 노드의 맨 위 노드 반환.
+	//==============================================================================
+	/**
+	 * @param { Node } node
+	 * @returns { Node }
+	 */
+	static findRootNode(node) {
+		let currentNode = node;
+		let parentNode = currentNode.getParent();
+		while (parentNode) {
+			currentNode = parentNode;
+			parentNode = currentNode.getParent();
+		}
+		return currentNode;
+	}
 
 	//==============================================================================
 	// 갱신.
@@ -58,13 +158,29 @@ export class Tween extends Object {
             return;
         }
 
+		// 대상 노드가 처음 돈 때의 노드 트리에서 떨어졌으면 콜백 없이 끝낸다.
+		const targetNode = this.getTarget();
+		if (targetNode) {
+			const targetRootNode = Tween.findRootNode(targetNode);
+			if (this.#targetRootNode === null) {
+				this.#targetRootNode = targetRootNode;
+			}
+			else if (this.#targetRootNode !== targetRootNode) {
+				this.stop();
+				return;
+			}
+		}
+
         this.#elapsedTime += timeDelta;
         if (this.#elapsedTime < this.#delay) {
             return;
         }
 
-        let progress = (this.#elapsedTime - this.#delay) / this.#duration;
-        progress = Math.clamp(progress, 0, 1);
+        let progress = 1;
+        if (this.#duration > 0) {
+            progress = (this.#elapsedTime - this.#delay) / this.#duration;
+            progress = Math.clamp(progress, 0, 1);
+        }
         
         const easedProgress = this.#easingFunction(progress);
 
@@ -87,6 +203,13 @@ export class Tween extends Object {
             }
         }
         
+        // 대상 노드에 쓰기.
+        if (targetNode) {
+            for (const key in newValues) {
+                applyTweenProperty(targetNode, key, newValues[key]);
+            }
+        }
+
         if (this.#tickCallback) {
             this.#tickCallback(newValues);
         }
@@ -164,6 +287,29 @@ export class Tween extends Object {
     }
 
 	//==============================================================================
+	// 대상 노드 설정. (값 이름이 TweenProperty 이름이면 이 노드에 쓴다)
+	//==============================================================================
+	/**
+	 * @param { WorldNode | null } node
+	 * @returns { Tween }
+	 */
+    setTarget(node) {
+        this.#targetNode = node;
+        this.#targetRootNode = null;
+        return this;
+    }
+
+	//==============================================================================
+	// 대상 노드 반환. (setTarget 을 하지 않았으면 null)
+	//==============================================================================
+	/**
+	 * @returns { WorldNode | null }
+	 */
+    getTarget() {
+        return this.#targetNode;
+    }
+
+	//==============================================================================
 	// 시작.
 	//==============================================================================
     start() {
@@ -174,6 +320,7 @@ export class Tween extends Object {
         this.#isPlaying = true;
         this.#isFinished = false;
         this.#elapsedTime = 0;
+        this.#targetRootNode = null;
     }
 
 	//==============================================================================

@@ -31,7 +31,7 @@ export class Visual extends Component {
 		this.#location = location;
 	}
 
-	getLocation(location) {
+	getLocation() {
 		return this.#location;
 	}
 }

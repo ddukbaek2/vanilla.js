@@ -71,21 +71,12 @@ export class Indicator extends Object {
 		graphic.setFillColor(this.#color);
 		graphic.setStrokeColor(this.#color);
 		const teethLineWidth = this.#radius * 0.2;
-
-		const teethCount = 8; // 톱니 개수
 		const innerRadius = this.#radius * 0.5; // 안쪽 구멍 크기
-		const outerRadius = this.#radius; // 바깥쪽 톱니 끝 크기
 
 		// 3. 톱니(Teeth) 그리기 (중심에서 바깥으로 뻗어나가는 선)
-		for (let i = 0; i < teethCount; i++) {
-			const angle = (i / teethCount) * System.Math.PI * 2;
-			const cosA = System.Math.cos(angle);
-			const sinA = System.Math.sin(angle);
-
-			// 안쪽 링보다 살짝 안쪽에서 시작해서 바깥으로 뻗음
-			const startPosition = Vector2.create(cosA * (innerRadius * 0.8), sinA * (innerRadius * 0.8));
-			const endPosition = Vector2.create(cosA * outerRadius, sinA * outerRadius);
-			graphic.drawLine([startPosition, endPosition], teethLineWidth);
+		const teethSegments = this.buildTeethSegments();
+		for (const teethSegment of teethSegments) {
+			graphic.drawLine(teethSegment, teethLineWidth);
 		}
 
 		// 4. 안쪽 링(Ring) 그리기 (도넛 모양)
@@ -96,6 +87,30 @@ export class Indicator extends Object {
 		graphic.popState();
 	}
 	
+	//==============================================================================
+	// 톱니 선분 목록 반환. (회전 전 중심 기준, [시작, 끝] 의 목록)
+	//==============================================================================
+	/**
+	 * @returns { Vector2[][] }
+	 */
+	buildTeethSegments() {
+		const teethCount = 8; // 톱니 개수
+		const innerRadius = this.#radius * 0.5; // 안쪽 구멍 크기
+		const outerRadius = this.#radius; // 바깥쪽 톱니 끝 크기
+		const teethSegments = [];
+		for (let i = 0; i < teethCount; i++) {
+			const angle = (i / teethCount) * System.Math.PI * 2;
+			const cosA = System.Math.cos(angle);
+			const sinA = System.Math.sin(angle);
+
+			// 안쪽 링보다 살짝 안쪽에서 시작해서 바깥으로 뻗음
+			const startPosition = Vector2.create(cosA * (innerRadius * 0.8), sinA * (innerRadius * 0.8));
+			const endPosition = Vector2.create(cosA * outerRadius, sinA * outerRadius);
+			teethSegments.push([startPosition, endPosition]);
+		}
+		return teethSegments;
+	}
+
 	//==============================================================================
 	// 위치 설정.
 	//==============================================================================
@@ -132,7 +147,17 @@ export class Indicator extends Object {
 	// 크기 반환.
 	//==============================================================================
 	/**
-	 * @param { string } color (예: "#ff0000", "rgba(255,255,255,0.8)")
+	 * @returns { number }
+	 */
+	getRadius() {
+		return this.#radius;
+	}
+
+	//==============================================================================
+	// 색 설정.
+	//==============================================================================
+	/**
+	 * @param { string | Color } color (예: "#ff0000", "rgba(255,255,255,0.8)")
 	 */
 	setColor(color) {
 		this.#color = color;
@@ -146,6 +171,16 @@ export class Indicator extends Object {
 	 */
 	setSpeed(speedRadiansPerSecond) {
 		this.#speed = speedRadiansPerSecond;
+	}
+
+	//==============================================================================
+	// 지금 회전 각도 반환. (라디안)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getRotation() {
+		return this.#rotation;
 	}
 
 	//==============================================================================
