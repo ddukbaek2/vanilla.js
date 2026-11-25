@@ -11,19 +11,19 @@ import { MeshBuilder } from "./meshbuilder.js";
  * import { ToonRenderer, ToonGlb, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
  * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
  * const renderer = new ToonRenderer(webGL2RenderingContext);
- * const arrayBuffer = await (await fetch("model.glb")).arrayBuffer();
- * const arrays = ToonGlb.readGlbArrays(arrayBuffer, { width: 0.02 });
+ * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/fox.glb")).arrayBuffer();
+ * const arrays = ToonGlb.readGlbArrays(arrayBuffer, { width: 1.5, addedParts: ["fox"] });
  * const mesh = renderer.createMesh(arrays);
  * const skeleton = arrays.skeleton;
  * const jointMatrices = skeleton !== null ? new Float32Array(skeleton.joints.length * 16) : null;
  * if (skeleton !== null) {
- * 	ToonGlb.writeSkinPose(skeleton, "idle", 0.5, jointMatrices);
+ * 	ToonGlb.writeSkinPose(skeleton, "Survey", 0.5, jointMatrices);
  * }
  * const camera = new Camera3D();
  * camera.setPerspective(0.8, 0.1, 100);
- * camera.lookAt(Vector3.create(0, 1.5, 4), Vector3.create(0, 1, 0), Vector3.create(0, 1, 0));
+ * camera.lookAt(Vector3.create(0, 1, 3), Vector3.create(0, 0.4, 0), Vector3.create(0, 1, 0));
  * renderer.beginFrameWithCamera(camera);
- * renderer.drawMesh(mesh, Matrix4.createIdentity(), { jointMatrices: jointMatrices });
+ * renderer.drawMesh(mesh, Matrix4.createScale(0.01, 0.01, 0.01), { jointMatrices: jointMatrices });
  * renderer.endFrame();
  */
 
@@ -34,7 +34,7 @@ import { MeshBuilder } from "./meshbuilder.js";
 // 재질 색으로 칠하는 모형을 읽는다. 텍스처 좌표와 재질 텍스처가 있으면 그것도 읽는다.
 //   - 부품 하나가 노드 하나이고, 노드의 메시는 색마다 프리미티브 하나이다. 꼭짓점은 위치와 노멀, 뼈대가 있으면 본 번호와 무게이다.
 //   - 재질의 baseColorFactor 는 선형 색이라 sRGB 로 바꿔 담고, emissiveFactor 가 있으면 빛남으로 담는다. (emissiveTexture 가 있으면 빛남은 재질 범위로만 넘긴다)
-//   - TEXCOORD_0 이 있으면 uvData 로 담는다. 프리미티브마다 재질 범위(materialRanges)를 담는다.
+//   - TEXCOORD_0 이 있으면 uvData 로, TEXCOORD_1 이 있으면 uv1Data(2 번 UV, 천사 고리)로 담는다. 프리미티브마다 재질 범위(materialRanges)를 담는다.
 //     { name 재질 이름, materialIndex, nodeName, indexStart, indexCount, extras 재질 extras, alphaMode, alphaCutoff, baseColorFactor 선형, emissiveFactor 선형, baseColorImage, emissiveImage (images 차례, 없으면 -1), hasUv }
 //     부품 안에서 칸을 갈라 칠할 때(강조색 칸, 표시판) 재질 이름이나 extras 로 고르고 ToonRenderer.drawMesh 의 indexStart, indexCount 로 그 칸만 그린다.
 //   - 그림은 readGlbImages 로 읽고 decodeGlbImage 로 풀어 ToonRenderer.createTexture 에 넘긴다.
@@ -212,6 +212,7 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
 	}
 	const normals = readAccessor(json, binaryBuffer, attributes.NORMAL);
 	const uvs = attributes.TEXCOORD_0 !== undefined ? readWeightAccessor(json, binaryBuffer, attributes.TEXCOORD_0) : null;
+	const uvs1 = attributes.TEXCOORD_1 !== undefined ? readWeightAccessor(json, binaryBuffer, attributes.TEXCOORD_1) : null;
 	const pbrMetallicRoughness = material.pbrMetallicRoughness !== undefined ? material.pbrMetallicRoughness : {};
 	const baseColor = pbrMetallicRoughness.baseColorFactor !== undefined ? pbrMetallicRoughness.baseColorFactor : [1, 1, 1, 1];
 	const color = [0, 1, 2].map((channelIndex) => {
@@ -226,7 +227,7 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
 		glow = emissiveMaximum / baseMaximum;
 	}
 	const indexStart = builder.getIndexCount();
-	builder.addTriangles(positions, normals, indices, partMatrix, color, glow, extras.basic === true, joints, weights, uvs);
+	builder.addTriangles(positions, normals, indices, partMatrix, color, glow, extras.basic === true, joints, weights, uvs, uvs1);
 	const emissiveFactor = System.Array.isArray(material.emissiveFactor) ? material.emissiveFactor.slice(0, 3) : [0, 0, 0];
 	builder.addMaterialRange({
 		name: typeof material.name === "string" ? material.name : "",
@@ -506,18 +507,19 @@ function visitMeshNodes(json, visitEvent) {
  * import { ToonRenderer, ToonGlb, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
  * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
  * const renderer = new ToonRenderer(webGL2RenderingContext);
- * const arrayBuffer = await (await fetch("model.glb")).arrayBuffer();
- * const arrays = ToonGlb.readGlbArrays(arrayBuffer, { width: 0.015, partWidths: { helmet: 0.01 }, addedParts: ["body"] });
+ * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/soldier.glb")).arrayBuffer();
+ * const arrays = ToonGlb.readGlbArrays(arrayBuffer, { width: 1.5, partWidths: { vanguard_visor: 0.8 }, addedParts: ["vanguard_Mesh", "vanguard_visor"] });
  * const mesh = renderer.createMesh(arrays);
+ * const modelMatrix = Matrix4.createScale(0.01, 0.01, 0.01);
  * const camera = new Camera3D();
  * camera.setPerspective(0.8, 0.1, 100);
  * camera.lookAt(Vector3.create(0, 1.5, 4), Vector3.create(0, 1, 0), Vector3.create(0, 1, 0));
  * renderer.beginFrameWithCamera(camera);
  * for (const materialRange of arrays.materialRanges) {
- * 	const tintColor = materialRange.name === "accent" ? [1, 0.4, 0.3, 1] : [1, 1, 1, 1];
- * 	renderer.drawMesh(mesh, Matrix4.createIdentity(), { indexStart: materialRange.indexStart, indexCount: materialRange.indexCount, tintColor: tintColor, hasOutline: false });
+ * 	const tintColor = materialRange.name === "Vanguard_VisorMat" ? [1, 0.4, 0.3, 1] : [1, 1, 1, 1];
+ * 	renderer.drawMesh(mesh, modelMatrix, { indexStart: materialRange.indexStart, indexCount: materialRange.indexCount, tintColor: tintColor, hasOutline: false });
  * }
- * renderer.drawMeshOutline(mesh, Matrix4.createIdentity());
+ * renderer.drawMeshOutline(mesh, modelMatrix);
  * renderer.endFrame();
  */
 export function readGlbArrays(arrayBuffer, outlineOptions = null) {
@@ -585,7 +587,7 @@ export function readGlbArrays(arrayBuffer, outlineOptions = null) {
  * import { ToonRenderer, ToonGlb, Matrix4 } from "./vanilla.js";
  * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
  * const renderer = new ToonRenderer(webGL2RenderingContext);
- * const arrayBuffer = await (await fetch("model.glb")).arrayBuffer();
+ * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/soldier.glb")).arrayBuffer();
  * const arrays = ToonGlb.readGlbArrays(arrayBuffer);
  * const mesh = renderer.createMesh(arrays);
  * const images = ToonGlb.readGlbImages(arrayBuffer);
@@ -620,7 +622,7 @@ export function readGlbImages(arrayBuffer) {
  * @example <caption>첫 그림 하나를 풀어 텍스처로</caption>
  * import { ToonRenderer, ToonGlb } from "./vanilla.js";
  * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
- * const arrayBuffer = await (await fetch("model.glb")).arrayBuffer();
+ * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/soldier.glb")).arrayBuffer();
  * const images = ToonGlb.readGlbImages(arrayBuffer);
  * if (images.length > 0 && images[0].data.length > 0) {
  * 	const imageBitmap = await ToonGlb.decodeGlbImage(images[0]);
@@ -642,16 +644,29 @@ export function decodeGlbImage(image) {
  * @param { ArrayBuffer } arrayBuffer - GLB 파일 전체.
  * @param { object | null } [outlineOptions] readGlbArrays 와 같음.
  * @returns { object } { 노드 이름: MeshBuilder.readArrays 의 꼴과 extras, alpha } 부품마다의 배열.
- * @example <caption>부품마다 메시를 따로 올려 숨기거나 돌리기</caption>
- * import { ToonRenderer, ToonGlb, Matrix4 } from "./vanilla.js";
+ * @example <caption>부품마다 메시를 따로 올려 바이저만 숨기기</caption>
+ * import { ToonRenderer, ToonGlb, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
  * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
- * const arrayBuffer = await (await fetch("model.glb")).arrayBuffer();
- * const partArrays = ToonGlb.readGlbNodeArrays(arrayBuffer, { width: 0.02 });
+ * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/soldier.glb")).arrayBuffer();
+ * const partArrays = ToonGlb.readGlbNodeArrays(arrayBuffer, { width: 1.5, addedParts: ["vanguard_Mesh", "vanguard_visor"] });
  * const parts = Object.entries(partArrays).map(([partName, arrays]) => {
  * 	return { name: partName, mesh: renderer.createMesh(arrays), pivot: arrays.extras.pivot, alpha: arrays.alpha };
  * });
- * const doorPart = parts.find((part) => part.name === "door");
- * const doorMatrix = doorPart !== undefined && Array.isArray(doorPart.pivot) ? Matrix4.createTranslation(doorPart.pivot[0], doorPart.pivot[1], doorPart.pivot[2]) : Matrix4.createIdentity();
+ * const camera = new Camera3D();
+ * camera.setPerspective(0.8, 0.1, 100);
+ * camera.lookAt(Vector3.create(0, 1.5, 4), Vector3.create(0, 1, 0), Vector3.create(0, 1, 0));
+ * renderer.beginFrameWithCamera(camera);
+ * for (const part of parts) {
+ * 	if (part.name === "vanguard_visor") {
+ * 		continue;
+ * 	}
+ * 	const modelMatrix = Matrix4.createScale(0.01, 0.01, 0.01);
+ * 	if (Array.isArray(part.pivot)) {
+ * 		modelMatrix.multiply(Matrix4.createTranslation(part.pivot[0], part.pivot[1], part.pivot[2]));
+ * 	}
+ * 	renderer.drawMesh(part.mesh, modelMatrix);
+ * }
+ * renderer.endFrame();
  */
 export function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
 	const chunks = readGlbChunks(arrayBuffer);
@@ -709,17 +724,17 @@ export function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
 /**
  * @param { ArrayBuffer } arrayBuffer - GLB 파일 전체.
  * @returns { object } { 노드 이름: { extras, center [x, y, z], jointIndex } } 메시 노드마다의 정보.
- * @example <caption>움직이는 모형의 헬멧 불 자리 읽기</caption>
+ * @example <caption>걷는 모형의 바이저 자리 읽기</caption>
  * import { ToonGlb, Matrix4 } from "./vanilla.js";
- * const arrayBuffer = await (await fetch("model.glb")).arrayBuffer();
+ * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/soldier.glb")).arrayBuffer();
  * const skeleton = ToonGlb.readGlbArrays(arrayBuffer).skeleton;
- * const lampInfo = ToonGlb.readGlbNodeInfos(arrayBuffer)["lamp"];
- * if (skeleton !== null && lampInfo !== undefined && lampInfo.jointIndex >= 0) {
+ * const visorInfo = ToonGlb.readGlbNodeInfos(arrayBuffer)["vanguard_visor"];
+ * if (skeleton !== null && visorInfo !== undefined && visorInfo.jointIndex >= 0) {
  * 	const jointMatrices = new Float32Array(skeleton.joints.length * 16);
- * 	ToonGlb.writeSkinPose(skeleton, "walk", 0.25, jointMatrices);
+ * 	ToonGlb.writeSkinPose(skeleton, "Walk", 0.25, jointMatrices);
  * 	const jointMatrix = Matrix4.createIdentity();
- * 	jointMatrix.getElements().set(jointMatrices.subarray(lampInfo.jointIndex * 16, lampInfo.jointIndex * 16 + 16));
- * 	const lampPosition = jointMatrix.transformPoint(lampInfo.center[0], lampInfo.center[1], lampInfo.center[2]);
+ * 	jointMatrix.getElements().set(jointMatrices.subarray(visorInfo.jointIndex * 16, visorInfo.jointIndex * 16 + 16));
+ * 	const visorPosition = jointMatrix.transformPoint(visorInfo.center[0], visorInfo.center[1], visorInfo.center[2]);
  * }
  */
 export function readGlbNodeInfos(arrayBuffer) {
@@ -923,14 +938,14 @@ function mixRotation(rotation, otherRotation, ratio) {
  * @returns { number } 쉬는 자세에서 가장 벗어난 각. (라디안, 없으면 0)
  * @example <caption>꼬리가 크게 흔들리는 만큼만 줄여 자세 셈하기</caption>
  * import { ToonGlb } from "./vanilla.js";
- * const arrayBuffer = await (await fetch("model.glb")).arrayBuffer();
+ * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/fox.glb")).arrayBuffer();
  * const skeleton = ToonGlb.readGlbArrays(arrayBuffer).skeleton;
  * if (skeleton !== null) {
- * 	const tailIndex = skeleton.nodes.findIndex((node) => node.name === "tail");
- * 	const swing = ToonGlb.readAnimationSwing(skeleton, "run", tailIndex);
+ * 	const tailIndex = skeleton.nodes.findIndex((node) => node.name === "b_Tail01_012");
+ * 	const swing = ToonGlb.readAnimationSwing(skeleton, "Run", tailIndex);
  * 	const swingScale = swing > 0.5 ? 0.5 / swing : 1;
  * 	const jointMatrices = new Float32Array(skeleton.joints.length * 16);
- * 	ToonGlb.writeSkinPose(skeleton, "run", 0.3, jointMatrices, null, { run: [{ nodeIndex: tailIndex, scale: swingScale }] });
+ * 	ToonGlb.writeSkinPose(skeleton, "Run", 0.3, jointMatrices, null, { Run: [{ nodeIndex: tailIndex, scale: swingScale }] });
  * }
  */
 export function readAnimationSwing(skeleton, animationName, nodeIndex) {
@@ -1010,14 +1025,14 @@ function mixLocals(locals, otherLocals, ratio) {
  * @param { object | null } [swingScales] { 움직임 이름: [{ nodeIndex, scale }] } 흔들림 배율. (1 이면 그대로, 0 이면 쉬는 자세)
  * @example <caption>움직임이 바뀔 때 앞 자세를 잠깐 섞기</caption>
  * import { ToonGlb } from "./vanilla.js";
- * const arrayBuffer = await (await fetch("model.glb")).arrayBuffer();
+ * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/fox.glb")).arrayBuffer();
  * const skeleton = ToonGlb.readGlbArrays(arrayBuffer).skeleton;
  * if (skeleton !== null) {
  * 	const jointMatrices = new Float32Array(skeleton.joints.length * 16);
  * 	const blendDuration = 0.2;
  * 	const timeSinceChange = 0.05;
- * 	const blend = { animationName: "idle", time: 1.4, weight: 1 - timeSinceChange / blendDuration };
- * 	ToonGlb.writeSkinPose(skeleton, "run", timeSinceChange, jointMatrices, blend);
+ * 	const blend = { animationName: "Survey", time: 1.4, weight: 1 - timeSinceChange / blendDuration };
+ * 	ToonGlb.writeSkinPose(skeleton, "Run", timeSinceChange, jointMatrices, blend);
  * }
  */
 export function writeSkinPose(skeleton, animationName, time, target, blend = null, swingScales = null) {

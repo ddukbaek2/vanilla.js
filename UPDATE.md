@@ -352,6 +352,22 @@
 - 예제 toonmaterial: 애버런트 몸 셰이딩 식 대조(verifyAberrantShading)를 뺐다. (게임 하나의 식이라 엔진 예제에 둘 것이 아니고, 엔진의 빛 꼴이 정석으로 바뀌어 같은 값이 나오지 않는다) 바위 정점 조각의 노멀 크기 맞춤을 뺐다. (엔진이 역행렬의 전치로 옮긴다)
 - 예제 toonstyle: 그늘 셋, 단단한 하이라이트, 해 쪽 림, 스포트라이트, 매트캡, ?shell=1 로 껍데기 바깥선(그리기마다 색과 굵기, 거리 배)
 - 툰 폴더(experimental/graphics/toon)의 모든 파일에 주석과 예제를 채웠다. 공개 API 마다 머리 주석과 JSDoc @param, @returns 설명, 모듈과 클래스와 쓰는 법이 뻔하지 않은 멤버에 @example <caption>제목</caption> (예제는 import.js 이름만 쓰고 헤드리스 크롬에서 오류 없이 도는 것을 확인했다)
+- 툰을 유니티와 언리얼이 기본으로 갖춘 수준까지 채웠다. (유니티 툰 셰이더 소스의 식을 따랐다)
+  - ShadowMap: 모형을 지은 뒤에 ShadowMap 을 지으면 깊이 텍스처가 텍스처 유닛에 남아 그리기가 GL INVALID_OPERATION(되먹임 고리)이 되던 것을 고쳤다. 지을 때 앞의 텍스처와 프레임버퍼 묶음을 돌린다. 빛이 거의 바로 아래나 위로 나아가면 광원 행렬이 깨지던 것(위쪽 벡터가 빛과 나란함)을 고쳤다. 그때는 위쪽을 z 축으로 잡는다
+  - ShadowAtlas, SHADOW_ATLAS_MAXIMUM_LIGHTS(4): 점광과 스포트라이트의 실시간 그림자. 유니티 URP 의 추가 빛 그림자 아틀라스 꼴로 깊이 텍스처 한 장을 칸으로 나눠, 스포트라이트는 원근 한 칸, 점광은 큐브 여섯 면을 칸 여섯에 그린다. updateLights(점광 목록) 이 castsShadow 가 true 인 빛을 골라 칸과 칸마다의 보기와 투영을 셈한다. 툰 셰이더는 그 점광의 빛을 받는 몫에 그림자를 곱해 그늘 램프에 넣는다 (해와 같은 꼴, 3x3 PCF)
+  - ToonRenderer: setLocalShadows(ShadowAtlas, 세기), beginShadowAtlasPass(아틀라스), setShadowAtlasTile(아틀라스, 칸 번호) (끝은 endShadowPass). ToonDrawQueue.drawLocalShadows(렌더러, 아틀라스)
+  - 점광: castsShadow (기본 false), shadowNear (기본 0.05, 먼 거리는 range, 0 이면 30)
+  - 빛 색 쓰기: ToonLightSet.setLightColorUsage({ base, shade, highlight, rim, shadeRim, matcap, angelRing, outline }) (렌더러에도). 색마다 빛 색을 곱할지 고른다. 끄면 바탕, 그늘, 하이라이트는 빛의 휘도만 받고 나머지는 빛을 받지 않는다. (유니티 툰 셰이더의 Is_LightColor_*, 기본 모두 켬) 이제 림, 매트캡, 껍데기 바깥선도 기본으로 해의 색을 곱한다. 지금까지 모습은 setLightColorUsage({ rim: false, matcap: false, outline: false })
+  - 그늘 쪽 림: ToonLightSet.setShadeRimLight(색, 거듭제곱) (렌더러에도). 해와 등진 쪽에 테를 (테 - 반 램버트) 만큼 더한다. (유니티 툰 셰이더의 Antipodean Rim Light)
+  - 껍데기 바깥선: setOutlineFadeDistance(가까운 거리, 먼 거리) 로 멀면 굵기가 0 이 된다. (유니티 툰 셰이더의 Nearest, Farthest Distance, 모형의 자리에서 카메라까지) 그리기마다 outlineOffsetZ 로 카메라에서 먼 쪽으로 밀어 몸 앞으로 비치지 않게 한다. (Offset Z)
+  - 천사 고리: 그리기 꼴 angelRingTexture, angelRingColor (기본 흰색), angelRingOffsetU (기본 0), angelRingOffsetV (기본 0.3), isAngelRingAlpha. u 는 보기 공간 노멀의 x, v 는 2 번 UV 의 y 와 보기 노멀의 y 를 offsetV 로 섞은 것이다. (유니티 툰 셰이더의 Angel Ring, 카메라에 붙은 머리 반사 띠)
+  - 2 번 UV: MeshBuilder 의 도형 uvs1, addTriangles 의 uvs1, readArrays 의 uv1Data, ToonGlb 가 TEXCOORD_1 을 읽는다. 셰이더의 vertexUv 가 vec4(UV, 2 번 UV)이고 ToonVertex.uv1, ToonSurface.uv1 을 더했다. readUvData 를 내보낸다
+  - 텍스처 유닛: 점광 그림자 아틀라스가 유닛 0, 천사 고리가 7 을 쓴다. 머티리얼 텍스처는 8 ~ 15 이고 TOON_MAXIMUM_MATERIAL_TEXTURES 가 9 → 8 이 되었다. 유닛 0 은 엔진 2D 가 기억하는 유닛이라 beginFrame 이 그 묶음을 적어 두고 endFrame 이 돌린다
+  - 셰이더 유니폼: lightColorUsage, lightColorUsageExtra, shadeRimLight, angelRingSettings, angelRingColor, localShadow* , pointLightShadowSlots, 껍데기의 outlineFadeDistance, outlineOffsetZ, outlineLightColor, cameraForward
+- ToonScreenOutline: 반 크기(줄인) 판에서 남던 계단을 없앴다. 선의 판과 씨앗은 늘 그리는 영역 해상도로 잡고, 점프 플러딩만 줄인 판에서 한다. 줄인 판의 칸에 온 해상도 씨앗 가운데 가장 가까운 것을 모으고(모으기 패스), 씨앗 자리는 그리는 영역 화소 좌표 그대로 넓혀 섞을 때 거리를 그리는 영역에서 잰다. (Ben Golus 가 말한, 낮은 해상도에서 점프 플러딩을 돌리되 자리를 겹선형으로 늘이지 말고 거리로 푸는 꼴)
+  - setResolutionScale 의 뜻이 넓히기 판의 몫으로 바뀌었다. 선의 판 패스는 그리는 영역 해상도로 그린다
+  - getLineTarget(): seedTexture (온 해상도 씨앗), jumpFloodTextures, jumpFloodIndex, jumpFloodWidth, jumpFloodHeight. (seedTextures, seedIndex 는 없어졌다) readProgramSources 가 다섯을 준다 (모으기 패스)
+- 예제 toonstyle: 점광과 스포트라이트 그림자, 그늘 쪽 푸른 림, 짙은 공의 천사 고리, 껍데기 바깥선이 16 미터에서 사라지기와 카메라 쪽 밀기
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.

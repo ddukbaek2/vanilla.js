@@ -67,7 +67,8 @@ export const ToonDrawStage = System.Object.freeze({
 //   비치는 것은 선의 판에 그리지 않는다. 화면 사각형(ToonRenderer.setScreenRect)이 있으면 그 사각형을 선의 판의 그리는 영역으로 쓴다.
 // - 단계 콜백: addPass(stage, callback) 의 callback(renderer, webGL2RenderingContext) 를 그 자리에서 부른다. 부른 뒤 렌더러가 프레임의 그리기 상태를 다시 건다.
 // - 인스턴스 묶음(addMeshInstanced)은 불투명이면 몸과 바깥선 껍데기를 한 번에 그리고, 비치면 인스턴스 자리의 가운데로 한 덩어리로 정렬한다.
-// - 그림자: drawShadows(renderer, shadowMap) 가 castsShadow 가 false 가 아닌 불투명한 것만 그림자 깊이로 그린다. draw 보다 먼저 부른다.
+// - 그림자: drawShadows(renderer, shadowMap) 가 castsShadow 가 false 가 아닌 불투명한 것만 해의 그림자 깊이로 그린다. draw 보다 먼저 부른다.
+//   점광과 스포트라이트 그림자는 drawLocalShadows(renderer, shadowAtlas) 가 아틀라스의 칸마다 같은 것을 그린다. (렌더러에 setLocalShadows 로 건다)
 // - 사용: 매 프레임 clear() → addMesh / addMeshInstanced / addPass → (drawShadows) → draw(renderer, camera) 나 drawWithMatrices(renderer, 보기 행렬, 투영 행렬)
 //   draw 는 renderer.beginFrameWithCamera(camera) 와 endFrame 을 스스로 부른다. drawWithMatrices 는 beginFrameWithMatrices 를 부른다. (직교 원 행렬 카메라)
 //   화면 사각형(ToonRenderer.setScreenRect)은 그 전에 건다. clear 는 담은 모형과 단계 콜백을 모두 비운다. (화면 공간 바깥선은 그대로 둔다)
@@ -236,6 +237,46 @@ export class ToonDrawQueue {
 				continue;
 			}
 			this.drawItem(renderer, item, item.options);
+		}
+		renderer.endShadowPass();
+	}
+
+	//==============================================================================
+	// 점광과 스포트라이트 그림자 깊이 그리기. (불투명하고 castsShadow 가 false 가 아닌 것을 아틀라스의 칸마다, 앞의 프레임버퍼와 뷰포트는 되돌린다)
+	//==============================================================================
+	/**
+	 * @param { object } renderer - ToonRenderer.
+	 * @param { object } shadowAtlas - ShadowAtlas. (updateLights 를 부른 것)
+	 * @example <caption>점광 그림자를 굽고 받기</caption>
+	 * import { ToonRenderer, ToonDrawQueue, ToonMesh, ShadowAtlas, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const renderer = new ToonRenderer(webGL2RenderingContext);
+	 * const builder = new ToonMesh.MeshBuilder();
+	 * builder.addPart(ToonMesh.createBoxGeometry(4, 0.2, 4), Matrix4.createTranslation(0, -0.1, 0), "#8090a0", { hasOutline: false });
+	 * builder.addPart(ToonMesh.createSphereGeometry(0.5, 24, 16), Matrix4.createTranslation(0, 0.5, 0), "#f0e0d0", { hasOutline: false });
+	 * const mesh = renderer.createMesh(builder.readArrays());
+	 * renderer.setPointLights([{ position: [1, 2, 1], color: [1, 0.85, 0.6], intensity: 4, range: 8, castsShadow: true }]);
+	 * const shadowAtlas = new ShadowAtlas(webGL2RenderingContext, 1024);
+	 * shadowAtlas.updateLights(renderer.getLightSet().getPointLights());
+	 * renderer.setLocalShadows(shadowAtlas, 1);
+	 * const camera = new Camera3D();
+	 * camera.setPerspective(0.8, 0.1, 50);
+	 * camera.lookAt(Vector3.create(0, 3, 5), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
+	 * const queue = new ToonDrawQueue();
+	 * queue.addMesh(mesh, Matrix4.createIdentity());
+	 * queue.drawLocalShadows(renderer, shadowAtlas);
+	 * queue.draw(renderer, camera);
+	 */
+	drawLocalShadows(renderer, shadowAtlas) {
+		renderer.beginShadowAtlasPass(shadowAtlas);
+		for (let tileIndex = 0; tileIndex < shadowAtlas.getTileCount(); ++tileIndex) {
+			renderer.setShadowAtlasTile(shadowAtlas, tileIndex);
+			for (const item of this.#itemList) {
+				if (item.isTransparent || item.options.castsShadow === false) {
+					continue;
+				}
+				this.drawItem(renderer, item, item.options);
+			}
 		}
 		renderer.endShadowPass();
 	}

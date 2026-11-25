@@ -33,6 +33,7 @@ import { Matrix4 } from "../../../base/matrix4.js";
 //   - 도형은 가운데가 원점인 자기 좌표로 짓는다. 부품을 더할 때 자리, 돌림, 크기를 곱해 한 덩어리에 담는다.
 //   - 꼭짓점 하나는 자리 3, 노멀 3, 색 3(sRGB), 재질 2(빛남의 세기, 빛을 받지 않음), 무늬 4(무늬 번호, 무늬 색) 이다. 무늬 번호와 색의 뜻은 그리는 셰이더가 정한다. (0 이면 무늬 없음)
 //   - 텍스처 좌표(UV)는 꼭짓점 배열 밖의 uvData 에 꼭짓점마다 2 씩 따로 담는다. UV 를 준 꼭짓점이 하나라도 있으면 나머지는 0 으로 채운다. (도형의 uvs, addTriangles 의 uvs)
+//   - 2 번 UV 도 같은 꼴로 uv1Data 에 담는다. (도형의 uvs1, addTriangles 의 uvs1, GLB 의 TEXCOORD_1, 천사 고리처럼 두 번째 펼침을 읽는 것)
 //     (0, 0) 이 그림의 왼쪽 위다. (glTF 와 같음) 상자는 면마다 0 ~ 1, 구는 경도와 위도로 0 ~ 1 이다.
 //   - 재질 범위(materialRanges)는 몸의 꼭짓점 번호 가운데 한 재질이 든 자리다. GLB 읽기가 프리미티브마다 담는다. (재질 이름, extras, 텍스처, ToonRenderer.drawMesh 의 indexStart, indexCount)
 //   - 바깥선은 부품을 조금 키운 사본이다. 뒷면만 그리므로 따로 담는다. (inverted hull)
@@ -560,6 +561,7 @@ export class MeshBuilder {
 	/** @private @type { Array<number> } */ #skinValues; // 꼭짓점마다 뼈대 번호 넷과 무게 넷. (뼈대가 있는 모형만, SKIN_FLOAT_COUNT 씩)
 	/** @private @type { Array<number> } */ #outlineSkinValues;
 	/** @private @type { Array<number> } */ #uvValues; // 꼭짓점마다 텍스처 좌표 둘. (UV 를 준 꼭짓점이 있을 때만, 없는 꼭짓점은 0)
+	/** @private @type { Array<number> } */ #uv1Values; // 꼭짓점마다 2 번 텍스처 좌표 둘. (같은 꼴)
 	/** @private @type { Array<object> } */ #materialRanges; // 재질 범위. ({ name, indexStart, indexCount, ... })
 
 	//==============================================================================
@@ -574,6 +576,7 @@ export class MeshBuilder {
 		this.#skinValues = [];
 		this.#outlineSkinValues = [];
 		this.#uvValues = [];
+		this.#uv1Values = [];
 		this.#materialRanges = [];
 	}
 
@@ -625,7 +628,7 @@ export class MeshBuilder {
 	// 부품 하나 더하기. (도형에 행렬을 곱해 담고, 바깥선이면 조금 키운 사본도 담음)
 	//==============================================================================
 	/**
-	 * @param { object } geometry { positions, normals, indices, uvs (없어도 됨) }
+	 * @param { object } geometry { positions, normals, indices, uvs (없어도 됨), uvs1 (2 번 UV, 없어도 됨) }
 	 * @param { Matrix4 } matrix - 도형에 곱할 자리, 돌림, 크기 행렬.
 	 * @param { string } colorText "#rrggbb"
 	 * @param { object } [options] { glow 빛남(0 ~), isUnlit 빛을 받지 않음, hasOutline 바깥선(기본 있음), outlineWidth 바깥선 굵기 }
@@ -663,6 +666,7 @@ export class MeshBuilder {
 			this.#vertices.push(transformedPoint.x, transformedPoint.y, transformedPoint.z, unitX, unitY, unitZ, color[0], color[1], color[2], glow, unlit, 0, 0, 0, 0);
 		}
 		this.pushUvValues(geometry.uvs !== undefined && geometry.uvs.length >= positions.length / 3 * 2 ? geometry.uvs : null, positions.length / 3);
+		this.pushUv1Values(geometry.uvs1 !== undefined && geometry.uvs1.length >= positions.length / 3 * 2 ? geometry.uvs1 : null, positions.length / 3);
 		const flips = this.readTriangleFlips(geometry.indices, worldPositions, worldNormals);
 		this.pushTriangles(this.#indices, geometry.indices, flips, startIndex);
 		if (!hasOutline) {
@@ -708,6 +712,7 @@ export class MeshBuilder {
 			this.#vertices.push(corner[0], corner[1], corner[2], normal[0], normal[1], normal[2], color[0], color[1], color[2], 0, unlit, pattern, patternRed, patternGreen, patternBlue);
 		}
 		this.pushUvValues(null, 4);
+		this.pushUv1Values(null, 4);
 		// 첫 삼각형의 면 노멀이 주어진 노멀과 반대면 감기를 뒤집는다.
 		const firstEdge = [corners[1][0] - corners[0][0], corners[1][1] - corners[0][1], corners[1][2] - corners[0][2]];
 		const secondEdge = [corners[2][0] - corners[0][0], corners[2][1] - corners[0][1], corners[2][2] - corners[0][2]];
@@ -807,6 +812,7 @@ export class MeshBuilder {
 	 * @param { ArrayLike<number> | null } joints 꼭짓점마다 뼈대 번호 넷. (없으면 null)
 	 * @param { ArrayLike<number> | null } weights 꼭짓점마다 무게 넷.
 	 * @param { ArrayLike<number> | null } [uvs] 꼭짓점마다 텍스처 좌표 둘. (없으면 null)
+	 * @param { ArrayLike<number> | null } [uvs1] 꼭짓점마다 2 번 텍스처 좌표 둘. (없으면 null)
 	 * @example <caption>코드로 만든 세모 하나를 UV 와 함께 담기</caption>
 	 * import { ToonMesh, Matrix4 } from "./vanilla.js";
 	 * const builder = new ToonMesh.MeshBuilder();
@@ -816,7 +822,7 @@ export class MeshBuilder {
 	 * builder.addTriangles(positions, normals, [0, 1, 2], Matrix4.createIdentity(), [1, 0.8, 0.6], 0, false, null, null, uvs);
 	 * const arrays = builder.readArrays();
 	 */
-	addTriangles(positions, normals, indices, matrix, color, glow, isUnlit, joints, weights, uvs = null) {
+	addTriangles(positions, normals, indices, matrix, color, glow, isUnlit, joints, weights, uvs = null, uvs1 = null) {
 		const elements = matrix.getElements();
 		const normalMatrix = this.readNormalMatrix(elements);
 		const unlit = isUnlit ? 1 : 0;
@@ -833,6 +839,7 @@ export class MeshBuilder {
 			this.#vertices.push(transformedPoint.x, transformedPoint.y, transformedPoint.z, unitX, unitY, unitZ, color[0], color[1], color[2], glow, unlit, 0, 0, 0, 0);
 		}
 		this.pushUvValues(uvs, positions.length / 3);
+		this.pushUv1Values(uvs1, positions.length / 3);
 		for (const index of indices) {
 			this.#indices.push(startIndex + index);
 		}
@@ -927,16 +934,39 @@ export class MeshBuilder {
 	 * @param { number } vertexCount 방금 담은 꼭짓점 수.
 	 */
 	pushUvValues(uvs, vertexCount) {
-		if (uvs === null && this.#uvValues.length === 0) {
+		this.pushUvTarget(this.#uvValues, uvs, vertexCount);
+	}
+
+	//==============================================================================
+	// 방금 담은 꼭짓점들의 2 번 텍스처 좌표 담기. (pushUvValues 와 같은 꼴)
+	//==============================================================================
+	/**
+	 * @param { ArrayLike<number> | null } uvs1 - 꼭짓점마다 2 번 텍스처 좌표 둘. (없으면 null)
+	 * @param { number } vertexCount - 방금 담은 꼭짓점 수.
+	 */
+	pushUv1Values(uvs1, vertexCount) {
+		this.pushUvTarget(this.#uv1Values, uvs1, vertexCount);
+	}
+
+	//==============================================================================
+	// 텍스처 좌표 칸에 담기. (값이 null 이고 칸이 비면 아무것도 하지 않는다, 앞 꼭짓점의 빈자리는 0)
+	//==============================================================================
+	/**
+	 * @param { Array<number> } target - 담을 칸.
+	 * @param { ArrayLike<number> | null } uvs - 꼭짓점마다 둘. (없으면 null)
+	 * @param { number } vertexCount - 방금 담은 꼭짓점 수.
+	 */
+	pushUvTarget(target, uvs, vertexCount) {
+		if (uvs === null && target.length === 0) {
 			return;
 		}
 		const startVertex = this.#vertices.length / VERTEX_FLOAT_COUNT - vertexCount;
-		while (this.#uvValues.length < startVertex * 2) {
-			this.#uvValues.push(0);
+		while (target.length < startVertex * 2) {
+			target.push(0);
 		}
 		for (let valueIndex = 0; valueIndex < vertexCount * 2; ++valueIndex) {
 			const value = uvs !== null && valueIndex < uvs.length ? uvs[valueIndex] : 0;
-			this.#uvValues.push(value);
+			target.push(value);
 		}
 	}
 
@@ -981,7 +1011,7 @@ export class MeshBuilder {
 	// 다 지은 배열. ({ vertexData, indexData, outlineVertexData, outlineIndexData, outlineBaseData })
 	//==============================================================================
 	/**
-	 * @returns { object } { vertexData, indexData, outlineVertexData, outlineIndexData, outlineBaseData, skinData, outlineSkinData, skeleton, uvData, materialRanges }
+	 * @returns { object } { vertexData, indexData, outlineVertexData, outlineIndexData, outlineBaseData, skinData, outlineSkinData, skeleton, uvData, uv1Data, materialRanges }
 	 * @example <caption>지은 배열을 툰 렌더러에 올리기</caption>
 	 * import { ToonRenderer, ToonMesh, Matrix4 } from "./vanilla.js";
 	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
@@ -994,6 +1024,8 @@ export class MeshBuilder {
 		const vertexCount = this.#vertices.length / VERTEX_FLOAT_COUNT;
 		const uvData = new System.Float32Array(this.#uvValues.length > 0 ? vertexCount * 2 : 0);
 		uvData.set(this.#uvValues.slice(0, uvData.length));
+		const uv1Data = new System.Float32Array(this.#uv1Values.length > 0 ? vertexCount * 2 : 0);
+		uv1Data.set(this.#uv1Values.slice(0, uv1Data.length));
 		return {
 			vertexData: new System.Float32Array(this.#vertices),
 			indexData: new System.Uint32Array(this.#indices),
@@ -1004,6 +1036,7 @@ export class MeshBuilder {
 			outlineSkinData: new System.Float32Array(this.#outlineSkinValues),
 			skeleton: null,
 			uvData: uvData,
+			uv1Data: uv1Data,
 			materialRanges: this.#materialRanges.map((materialRange) => {
 				return System.Object.assign({}, materialRange);
 			}),
@@ -1308,6 +1341,10 @@ export class MeshBuilder {
 			return piece.arrays.uvData !== undefined && piece.arrays.uvData !== null && piece.arrays.uvData.length > 0;
 		});
 		const uvData = new System.Float32Array(hasUv ? vertexFloatCount / VERTEX_FLOAT_COUNT * 2 : 0);
+		const hasUv1 = pieces.some((piece) => {
+			return piece.arrays.uv1Data !== undefined && piece.arrays.uv1Data !== null && piece.arrays.uv1Data.length > 0;
+		});
+		const uv1Data = new System.Float32Array(hasUv1 ? vertexFloatCount / VERTEX_FLOAT_COUNT * 2 : 0);
 		let vertexOffset = 0;
 		let indexOffset = 0;
 		let outlineOffset = 0;
@@ -1327,6 +1364,9 @@ export class MeshBuilder {
 			}
 			if (hasUv && arrays.uvData !== undefined && arrays.uvData !== null && arrays.uvData.length > 0) {
 				uvData.set(arrays.uvData.subarray(0, System.Math.min(arrays.uvData.length, arrays.vertexData.length / VERTEX_FLOAT_COUNT * 2)), startVertex * 2);
+			}
+			if (hasUv1 && arrays.uv1Data !== undefined && arrays.uv1Data !== null && arrays.uv1Data.length > 0) {
+				uv1Data.set(arrays.uv1Data.subarray(0, System.Math.min(arrays.uv1Data.length, arrays.vertexData.length / VERTEX_FLOAT_COUNT * 2)), startVertex * 2);
 			}
 			const pieceMaterialRanges = arrays.materialRanges !== undefined ? arrays.materialRanges : [];
 			for (const range of pieceMaterialRanges) {
@@ -1370,6 +1410,7 @@ export class MeshBuilder {
 			innerOutlineRanges: innerOutlineRanges,
 			innerBodyRanges: innerBodyRanges,
 			uvData: uvData,
+			uv1Data: uv1Data,
 			materialRanges: materialRanges,
 		};
 	}

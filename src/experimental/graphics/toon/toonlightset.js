@@ -62,7 +62,10 @@ function normalizeDirection(direction) {
 // - 하이라이트(정반사): 블린 퐁 pow(max(dot(N, H), 0), exponent) 를 0.5 에서 가른 단단한 점(부드러움 0)에서 그대로의 부드러운 빛(부드러움 1)까지. 색 x 세기 x 빛 색 x 빛을 받는 단계.
 //   해와 점광, 스포트라이트 모두에 선다. 기본 세기 0 이면 없다.
 // - 림 빛(rim): pow(1 - max(dot(N, V), 0), power) 를 0.5 에서 가른 단단한 테(부드러움 0)에서 부드러운 테(1)까지. lightMask 가 1 이면 해를 받는 쪽에만. 바탕색과 상관없이 더한다.
-// - 점광과 스포트라이트: TOON_MAXIMUM_POINT_LIGHTS 까지. { position, color(선형), intensity, range, decay, rangeExponent, wrap, direction, innerConeAngle, outerConeAngle }
+//   그늘 쪽 림(setShadeRimLight)은 같은 테를 해와 등진 쪽에 (테 - (dot(N, L) x 0.5 + 0.5)) 만큼 더한다. (유니티 툰 셰이더의 Antipodean(Ap) Rim Light)
+// - 빛 색 쓰기(setLightColorUsage): 색마다 빛 색을 곱할지 고른다. 끄면 그 색은 빛의 밝기(휘도)만 받고, 림과 매트캡과 천사 고리와 바깥선은 빛을 받지 않는다. (유니티 툰 셰이더의 Is_LightColor_*, 기본 모두 켬)
+// - 점광과 스포트라이트: TOON_MAXIMUM_POINT_LIGHTS 까지. { position, color(선형), intensity, range, decay, rangeExponent, wrap, direction, innerConeAngle, outerConeAngle, castsShadow, shadowNear }
+//   castsShadow 가 true 인 빛은 ShadowAtlas.updateLights 가 그림자 칸을 준다. (점광은 큐브 여섯 면, 스포트라이트는 원근 한 칸, 먼 거리는 range, 가까운 거리는 shadowNear 기본 0.05)
 //   감쇠는 창 x 거리 감쇠다. 창은 range 가 0 보다 크면 (1 - (거리 / range)^rangeExponent) 를 0 ~ 1 로 막아 제곱, 0 이면 1. 거리 감쇠는 decay 가 0 보다 크면 1 / max(거리^decay, 0.01), 0 이면 1.
 //   기본(decay 2, rangeExponent 4)은 three.js 와 언리얼, 고도 4 의 점광 꼴이다.
 //   direction(빛이 나아가는 쪽)을 주면 스포트라이트다. 각 감쇠는 glTF KHR_lights_punctual 꼴로 clamp(cos 각 x scale + offset, 0, 1) 의 제곱이다. (innerConeAngle 기본 0, outerConeAngle 기본 π/4, 라디안)
@@ -101,6 +104,9 @@ export class ToonLightSet {
 	/** @private @type { number } */ #rimPower;
 	/** @private @type { number } */ #rimFeather;
 	/** @private @type { number } */ #rimLightMask;
+	/** @private @type { Array<number> } */ #shadeRimColor;
+	/** @private @type { number } */ #shadeRimPower;
+	/** @private @type { object } */ #lightColorUsage; // { base, shade, highlight, rim, shadeRim, matcap, angelRing, outline }
 	/** @private @type { number } */ #specularStrength;
 	/** @private @type { number } */ #specularExponent;
 	/** @private @type { number } */ #specularFeather;
@@ -131,6 +137,9 @@ export class ToonLightSet {
 		this.#rimPower = 0;
 		this.#rimFeather = 1;
 		this.#rimLightMask = 0;
+		this.#shadeRimColor = [0, 0, 0];
+		this.#shadeRimPower = 0;
+		this.#lightColorUsage = { base: true, shade: true, highlight: true, rim: true, shadeRim: true, matcap: true, angelRing: true, outline: true };
 		this.#specularStrength = 0;
 		this.#specularExponent = 48;
 		this.#specularFeather = 0;
@@ -296,6 +305,65 @@ export class ToonLightSet {
 	}
 
 	//==============================================================================
+	// 그늘 쪽 림 빛 설정. (해와 등진 쪽의 테, 선형 색, 거듭제곱, 부드러움은 setRimLight 의 것을 같이 쓴다, 거듭제곱이 0 이하면 없음)
+	//==============================================================================
+	/**
+	 * @param { Array<number> } shadeRimColor - 더할 선형 색. [r, g, b]
+	 * @param { number } shadeRimPower - 거듭제곱. (0 이면 없음)
+	 * @example <caption>그늘 쪽에 푸른 테</caption>
+	 * import { ToonLightSet } from "./vanilla.js";
+	 * const lightSet = new ToonLightSet();
+	 * lightSet.setRimLight([0.8, 0.75, 0.6], 3, 0.1, 1);
+	 * lightSet.setShadeRimLight([0.2, 0.3, 0.6], 2.5);
+	 */
+	setShadeRimLight(shadeRimColor, shadeRimPower) {
+		this.#shadeRimColor = shadeRimColor.slice();
+		this.#shadeRimPower = System.Math.max(0, shadeRimPower);
+		this.markChanged();
+	}
+
+	//==============================================================================
+	// 그늘 쪽 림 빛 반환.
+	//==============================================================================
+	/**
+	 * @returns { object } { color, power }
+	 */
+	getShadeRimLight() {
+		return { color: this.#shadeRimColor, power: this.#shadeRimPower };
+	}
+
+	//==============================================================================
+	// 빛 색 쓰기 설정. (색마다 빛 색을 곱할지, 주지 않은 것은 그대로)
+	// - base 바탕, shade 그늘, highlight 하이라이트, rim 림, shadeRim 그늘 쪽 림, matcap 매트캡, angelRing 천사 고리, outline 껍데기 바깥선.
+	// - 바탕, 그늘, 하이라이트는 끄면 빛의 휘도(회색)를 받고, 나머지는 끄면 빛을 받지 않는다. (유니티 툰 셰이더 소스의 lightIntensity 와 1)
+	//==============================================================================
+	/**
+	 * @param { object } lightColorUsage - { base, shade, highlight, rim, shadeRim, matcap, angelRing, outline } 의 참 거짓.
+	 * @example <caption>그늘과 바깥선은 빛 색에 물들지 않게</caption>
+	 * import { ToonLightSet } from "./vanilla.js";
+	 * const lightSet = new ToonLightSet();
+	 * lightSet.setLightColorUsage({ shade: false, outline: false });
+	 */
+	setLightColorUsage(lightColorUsage) {
+		for (const key of System.Object.keys(this.#lightColorUsage)) {
+			if (lightColorUsage[key] !== undefined) {
+				this.#lightColorUsage[key] = lightColorUsage[key] === true;
+			}
+		}
+		this.markChanged();
+	}
+
+	//==============================================================================
+	// 빛 색 쓰기 반환.
+	//==============================================================================
+	/**
+	 * @returns { object } { base, shade, highlight, rim, shadeRim, matcap, angelRing, outline }
+	 */
+	getLightColorUsage() {
+		return System.Object.assign({}, this.#lightColorUsage);
+	}
+
+	//==============================================================================
 	// 하이라이트(정반사) 설정. (세기 0 이면 없음, 지수가 클수록 작은 점, 부드러움 0 이면 단단한 툰 점, 1 이면 부드러운 블린 퐁)
 	//==============================================================================
 	/**
@@ -331,7 +399,7 @@ export class ToonLightSet {
 	//==============================================================================
 	/**
 	 * @param { Array<object> } pointLights - { position [x, y, z], color [r, g, b] 선형, intensity (기본 1), range (기본 0 = 끝없음), decay (기본 2), rangeExponent (기본 4), wrap (기본 0),
-	 *   direction [x, y, z] (빛이 나아가는 쪽, 주면 스포트라이트), innerConeAngle (기본 0), outerConeAngle (기본 π/4) } 의 배열.
+	 *   direction [x, y, z] (빛이 나아가는 쪽, 주면 스포트라이트), innerConeAngle (기본 0), outerConeAngle (기본 π/4), castsShadow (기본 false), shadowNear (기본 0.05) } 의 배열.
 	 * @example <caption>아래를 비추는 스포트라이트 하나</caption>
 	 * import { ToonLightSet } from "./vanilla.js";
 	 * const lightSet = new ToonLightSet();
@@ -350,6 +418,8 @@ export class ToonLightSet {
 				direction: pointLight.direction !== undefined && pointLight.direction !== null ? normalizeDirection(pointLight.direction) : null,
 				innerConeAngle: pointLight.innerConeAngle !== undefined ? System.Math.max(0, pointLight.innerConeAngle) : 0,
 				outerConeAngle: pointLight.outerConeAngle !== undefined ? System.Math.max(0.0001, pointLight.outerConeAngle) : System.Math.PI / 4,
+				castsShadow: pointLight.castsShadow === true,
+				shadowNear: pointLight.shadowNear !== undefined ? System.Math.max(0.001, pointLight.shadowNear) : 0.05,
 			};
 		});
 		this.markChanged();

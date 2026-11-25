@@ -209,6 +209,7 @@ UIWindowLayer (노드) ── UIWindow[] (맨 위 창만 보임, UIScale 만큼 
 ├── ToonDrawQueue ── 한 프레임에 그릴 모형을 담아 불투명, 바깥선, 비치는 것 차례로 + 단계 콜백
 ├── ToonScreenOutline ── 같은 모형을 한 번 더 그려 노멀, 선 번호, 깊이로 화면 공간 바깥선 (경계 잡기, 점프 플러딩, 거리로 섞기)
 ├── ToonVfx ── 코드로 짓는 아틀라스와 인스턴스 GPU 효과 (파티클, 불덩이, 충격파, 자국, 기둥, 빔, 리본, 번개, 빛 점)
+├── (ShadowMap, ShadowAtlas) ── 해 그림자 한 장, 점광과 스포트라이트 그림자 아틀라스 (점광은 큐브 여섯 칸, 스포트라이트는 원근 한 칸)
 ├── ToonPostProcess ── RenderTarget(멀티샘플, 실수 판) + BloomEffect 또는 MultiLevelBloomEffect + 톤매핑과 색 보정
 └── ToonView3D (Component) ── 노드 사각형 안에 runExternalPass 로 툰 3D 를 그린다 (렌더러는 여러 노드가 나눠 쓸 수 있다)
 ```
@@ -298,6 +299,8 @@ rim        = 색 x mix(0.5 를 가른 pow(1 - N.V, 거듭제곱), 그대로, 부
 
 - 그늘 색이 해의 색으로 물들고 그림자가 그늘 색으로 들어가는 것은 유니티 툰 셰이더의 바탕, 1 차, 2 차 그늘과 System Shadows 의 꼴이다. 다른 빛이 등진 면을 밝히지 않게 단계만 받는 것은 고도 diffuse_toon 처럼 빛마다 툰 경계를 거는 꼴이다.
 - 노멀은 모형 행렬과 본 행렬의 역행렬의 전치로 옮긴다.
+- 점광과 스포트라이트 그림자(setLocalShadows, ShadowAtlas)는 그 빛의 x 에 그림자를 곱한다. 셰이더가 빛에서 면으로의 쪽의 가장 큰 축으로 점광의 큐브 면을 고르고, 앞쪽, 위쪽, 오른쪽 바탕과 가까운 거리, 먼 거리로 칸 안 자리와 깊이를 셈해 3x3 PCF 로 견준다.
+- 색마다 빛 색을 곱할지(setLightColorUsage), 그늘 쪽 림, 천사 고리(보기 노멀 x 와 2 번 UV 의 y), 매트캡은 유니티 툰 셰이더 소스의 식이다.
 
 ### 6-4. 툰 바깥선
 
@@ -321,7 +324,7 @@ rim        = 색 x mix(0.5 를 가른 pow(1 - N.V, 거듭제곱), 그대로, 부
 ```
 
 - 선은 화소가 아니라 화소 사이의 경계 가운데에 서므로 한 경계를 두 번 긋지 않고, 꺾임 양쪽에 띠나 평행한 둘째 선이 서지 않는다.
-- 선의 판을 줄여도(setResolutionScale) 거리를 그리는 영역에서 재므로 늘인 선이 끊기지 않는다. (줄인 판의 계단은 남는다)
+- 선의 판과 씨앗은 늘 그리는 영역 해상도다. setResolutionScale 은 점프 플러딩 판만 줄이고(모으기 패스로 칸마다 가장 가까운 온 해상도 씨앗을 모음), 씨앗 자리를 그리는 영역 화소 좌표로 넓혀 거리를 그리는 영역에서 재므로 줄여도 계단과 점선이 없다.
 - 그리기 줄(ToonDrawQueue.setScreenOutline)에 맡기면 선의 판은 몸 앞에, 섞기는 바깥선 껍데기 뒤 afterOutline 앞에 한다. 모형마다 hasScreenOutline, hasCreaseLine.
 
 ---
