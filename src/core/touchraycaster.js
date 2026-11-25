@@ -14,6 +14,53 @@ import { WorldNode } from "./node/worldnode.js";
 //   활성 + isInteractable() 노드 중 가장 앞(높은 번호)의 노드에
 //   터치 이벤트를 전달한다.
 //==============================================================================
+/**
+ * @example <caption>씬의 누름을 맨 앞 노드에 넘기기</caption>
+ * import { Engine, EngineConfiguration, Scene, TouchRaycaster, WorldNode, Vector2 } from "./build/vanilla.js";
+ *
+ * class ButtonNode extends WorldNode {
+ * 	touchPress(viewInputPosition) {
+ * 		console.log("pressed", viewInputPosition.x, viewInputPosition.y);
+ * 	}
+ * }
+ *
+ * class MainScene extends Scene {
+ * 	initialize(engine) {
+ * 		const root = this.getRoot();
+ * 		const buttonNode = new ButtonNode();
+ * 		root.addChild(buttonNode);
+ * 		buttonNode.setRect(100, 100, 200, 80);
+ * 		buttonNode.setInteractable(true);
+ * 		this.touchRaycaster = new TouchRaycaster();
+ * 		this.touchRaycaster.setRootNode(root);
+ * 		this.touchRaycaster.setFirstTouchCallback(() => {
+ * 			console.log("first touch");
+ * 		});
+ * 		const hitNode = this.touchRaycaster.raycast(Vector2.create(150, 120));
+ * 		console.log(hitNode === buttonNode);
+ * 	}
+ *
+ * 	touchPress(viewInputPosition) {
+ * 		this.touchRaycaster.touchPress(viewInputPosition);
+ * 	}
+ *
+ * 	touchMove(viewInputPosition) {
+ * 		this.touchRaycaster.touchMove(viewInputPosition);
+ * 	}
+ *
+ * 	touchRelease(viewInputPosition) {
+ * 		this.touchRaycaster.touchRelease(viewInputPosition);
+ * 	}
+ *
+ * 	touchCancel(viewInputPosition) {
+ * 		this.touchRaycaster.touchCancel(viewInputPosition);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class TouchRaycaster extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -39,7 +86,7 @@ export class TouchRaycaster extends Object {
 	// - raycast로 대상을 결정하고 touchPress를 전달한다.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
 	 */
 	touchPress(viewInputPosition) {
 		if (!this.#hasEverTouched) {
@@ -60,7 +107,7 @@ export class TouchRaycaster extends Object {
 	// - press 시 결정된 대상에 touchMove를 전달한다.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
 	 */
 	touchMove(viewInputPosition) {
 		const touchTarget = this.getTouchTarget();
@@ -74,7 +121,7 @@ export class TouchRaycaster extends Object {
 	// - press 시 결정된 대상에 touchRelease를 전달하고 대상을 해제한다.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
 	 */
 	touchRelease(viewInputPosition) {
 		const currentTarget = this.getTouchTarget();
@@ -89,7 +136,7 @@ export class TouchRaycaster extends Object {
 	// - press 시 결정된 대상에 touchCancel을 전달하고 대상을 해제한다.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
 	 */
 	touchCancel(viewInputPosition) {
 		const currentTarget = this.getTouchTarget();
@@ -107,9 +154,9 @@ export class TouchRaycaster extends Object {
 	// - 받은 칸이 있으면 true.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
-	 * @param { Vector2 } wheelDelta
-	 * @returns { boolean }
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
+	 * @param { Vector2 } wheelDelta 휠 값. (스크롤 칸의 wheel 에 그대로 넘긴다)
+	 * @returns { boolean } 휠을 받은 스크롤 칸이 있으면 참.
 	 */
 	touchWheel(viewInputPosition, wheelDelta) {
 		const scrollView = this.findWheelScrollView(viewInputPosition);
@@ -125,8 +172,8 @@ export class TouchRaycaster extends Object {
 	// - raycast 와 같은 순서로 돌며 누를 수 있는 노드와 스크롤 칸 노드 가운데 가장 앞을 고른다.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
-	 * @returns { object | null }
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
+	 * @returns { object | null } 휠을 받을 스크롤 칸 컴포넌트. (없으면 null)
 	 */
 	findWheelScrollView(viewInputPosition) {
 		const rootNode = this.getRootNode();
@@ -186,8 +233,8 @@ export class TouchRaycaster extends Object {
 	// 노드에 붙은 스크롤 칸 컴포넌트 반환. (켜진 것만, 없으면 null, 닥 타이핑)
 	//==============================================================================
 	/**
-	 * @param { WorldNode } node
-	 * @returns { object | null }
+	 * @param { WorldNode } node 볼 노드.
+	 * @returns { object | null } 켜진 스크롤 칸 컴포넌트. (없으면 null)
 	 */
 	findScrollViewComponent(node) {
 		const components = node.getAllComponents();
@@ -204,6 +251,10 @@ export class TouchRaycaster extends Object {
 	// (TouchRecognizer 의 findAncestorScrollView 와 다른 점: target 자신도 후보)
 	// - UIScrollView import 를 피하기 위해 컴포넌트 타입은 닥 타이핑으로 검사한다.
 	//==============================================================================
+	/**
+	 * @param { WorldNode } target 찾기 시작할 노드. (자신도 후보)
+	 * @returns { object | null } 찾은 스크롤 칸 컴포넌트. (없으면 null)
+	 */
 	findAncestorScrollViewForWheel(target) {
 		let node = target;
 		while (node) {
@@ -228,8 +279,8 @@ export class TouchRaycaster extends Object {
 	// - Mask 가 붙은 노드의 자손은 그 노드 영역 안에서만 맞는다. (잘려 보이지 않는 곳은 눌리지 않는다)
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
-	 * @returns { WorldNode | null }
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
+	 * @returns { WorldNode | null } 그 자리를 품은 가장 앞의 누를 수 있는 노드. (없으면 null)
 	 */
 	raycast(viewInputPosition) {
 		const rootNode = this.getRootNode();
@@ -288,9 +339,9 @@ export class TouchRaycaster extends Object {
 	// Mask 가 붙은 노드인데 좌표가 그 영역 밖인지.
 	//==============================================================================
 	/**
-	 * @param { WorldNode } node
-	 * @param { Vector2 } viewInputPosition
-	 * @returns { boolean }
+	 * @param { WorldNode } node 볼 노드.
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
+	 * @returns { boolean } 켜진 Mask 가 붙어 있고 그 자리가 노드 밖이면 참.
 	 */
 	isMaskedOut(node, viewInputPosition) {
 		const components = node.getAllComponents();
@@ -306,7 +357,7 @@ export class TouchRaycaster extends Object {
 	// 루트 노드 설정.
 	//==============================================================================
 	/**
-	 * @param { * } rootNode
+	 * @param { * } rootNode 훑을 루트 노드. (보통 씬의 루트)
 	 */
 	setRootNode(rootNode) {
 		this.#rootNode = rootNode;
@@ -316,7 +367,7 @@ export class TouchRaycaster extends Object {
 	// 루트 노드 반환.
 	//==============================================================================
 	/**
-	 * @returns { * }
+	 * @returns { * } 훑는 루트 노드. (정하지 않았으면 null)
 	 */
 	getRootNode() {
 		return this.#rootNode;
@@ -326,7 +377,7 @@ export class TouchRaycaster extends Object {
 	// 현재 터치 대상 반환.
 	//==============================================================================
 	/**
-	 * @returns { WorldNode | null }
+	 * @returns { WorldNode | null } 누를 때 맞은 노드. (뗐거나 없으면 null)
 	 */
 	getTouchTarget() {
 		return this.#touchTarget;
@@ -336,7 +387,7 @@ export class TouchRaycaster extends Object {
 	// 한 번이라도 터치된 적 있는지 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 한 번이라도 눌렀으면 참.
 	 */
 	hasEverTouched() {
 		return this.#hasEverTouched;
@@ -346,7 +397,7 @@ export class TouchRaycaster extends Object {
 	// 첫 터치 콜백 설정.
 	//==============================================================================
 	/**
-	 * @param { Function } callback
+	 * @param { Function } callback 처음 누를 때 한 번 부를 함수. (인자 없음)
 	 */
 	setFirstTouchCallback(callback) {
 		this.#firstTouchCallback = callback;

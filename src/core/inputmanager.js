@@ -162,9 +162,9 @@ const Button = {
 //==============================================================================
 /** @enum { number } */
 export const MouseButton = System.Object.freeze({
-	left: 0,
-	middle: 1,
-	right: 2,
+	left: 0, // 왼쪽 단추.
+	middle: 1, // 가운데 단추. (휠 누름)
+	right: 2, // 오른쪽 단추.
 });
 
 // 마우스 단추 칸 수.
@@ -175,11 +175,11 @@ const MOUSE_BUTTON_COUNT = 3;
 //==============================================================================
 /** @enum { string } */
 export const TouchPhase = System.Object.freeze({
-	began: "began",
-	moved: "moved",
-	stationary: "stationary",
-	ended: "ended",
-	cancelled: "cancelled",
+	began: "began", // 이번 프레임에 닿음.
+	moved: "moved", // 움직임.
+	stationary: "stationary", // 가만히 있음.
+	ended: "ended", // 뗌.
+	cancelled: "cancelled", // 취소됨. (브라우저가 터치를 거둠)
 });
 
 //==============================================================================
@@ -187,16 +187,42 @@ export const TouchPhase = System.Object.freeze({
 //==============================================================================
 /** @enum { string } */
 export const InputDevice = System.Object.freeze({
-	keyboard: "keyboard",
-	mouse: "mouse",
-	touch: "touch",
-	gamepad: "gamepad",
+	keyboard: "keyboard", // 키보드.
+	mouse: "mouse", // 마우스.
+	touch: "touch", // 손가락.
+	gamepad: "gamepad", // 게임패드.
 });
 
 
 //==============================================================================
 // 손가락 하나. (identifier 는 브라우저의 Touch.identifier, 자리는 캔버스 기준과 뷰 기준)
 //==============================================================================
+/**
+ * @example <caption>닿은 손가락과 뗀 손가락 읽기</caption>
+ * import { Engine, EngineConfiguration, Scene, TouchPhase } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	tick(timeDelta) {
+ * 		super.tick(timeDelta);
+ * 		const engine = this.getEngine();
+ * 		const inputManager = engine.getInputManager();
+ * 		const touchPoints = inputManager.getTouchPoints();
+ * 		for (const touchPoint of touchPoints) {
+ * 			if (touchPoint.phase === TouchPhase.began) {
+ * 				console.log(touchPoint.identifier, touchPoint.viewPosition.x, touchPoint.viewPosition.y);
+ * 			}
+ * 		}
+ * 		const endedTouchPoints = inputManager.getEndedTouchPoints();
+ * 		for (const touchPoint of endedTouchPoints) {
+ * 			console.log(touchPoint.identifier, touchPoint.phase);
+ * 		}
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class TouchPoint extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -210,10 +236,10 @@ export class TouchPoint extends Object {
 	// 생성.
 	//==============================================================================
 	/**
-	 * @param { number } identifier
-	 * @param { string } phase
-	 * @param { Vector2 } canvasNativePosition
-	 * @param { Vector2 } viewPosition
+	 * @param { number } identifier 손가락 번호. (Touch.identifier)
+	 * @param { string } phase TouchPhase 의 값.
+	 * @param { Vector2 } canvasNativePosition 캔버스 왼쪽 위 기준 자리. (CSS 픽셀)
+	 * @param { Vector2 } viewPosition 뷰 좌표의 자리.
 	 */
 	constructor(identifier, phase, canvasNativePosition, viewPosition) {
 		super();
@@ -228,6 +254,35 @@ export class TouchPoint extends Object {
 //==============================================================================
 // 입력 매니저.
 //==============================================================================
+/**
+ * @example <caption>키와 마우스 단추 읽기</caption>
+ * import { Engine, EngineConfiguration, Scene, MouseButton } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	tick(timeDelta) {
+ * 		super.tick(timeDelta);
+ * 		const engine = this.getEngine();
+ * 		const inputManager = engine.getInputManager();
+ * 		if (inputManager.isKeyJustPressed("Space")) {
+ * 			console.log("jump");
+ * 		}
+ * 		if (inputManager.isKeyPressed("ArrowRight")) {
+ * 			console.log("move right");
+ * 		}
+ * 		if (inputManager.isMouseButtonJustPressed(MouseButton.right)) {
+ * 			const viewInputPosition = inputManager.getViewInputPosition();
+ * 			console.log(viewInputPosition.x, viewInputPosition.y);
+ * 		}
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const inputManager = engine.getInputManager();
+ * inputManager.setPreventedKeys(["Space", "Tab"]);
+ * inputManager.setTouchFromLeftButtonOnly(true);
+ * engine.run(new MainScene());
+ */
 export class InputManager extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -264,7 +319,7 @@ export class InputManager extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { Engine } engine 
+	 * @param { Engine } engine 이 매니저를 가진 엔진. (게임패드 매니저에 넘기고 글자 입력칸을 볼 때 쓴다)
 	 */
 	constructor(engine) {
 		super();
@@ -306,7 +361,7 @@ export class InputManager extends Object {
 	// 갱신. (게임패드 폴링, 패드를 썼으면 마지막 장치를 게임패드로, 입력 동작 갱신)
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		const gamepadManager = this.getGamepadManager();
@@ -350,23 +405,48 @@ export class InputManager extends Object {
 	// - addWheelDelta 로 들어온 값을 한 프레임 누적해서 들고 있다가, 프레임 종료 시
 	//   엔진이 clearWheelDelta() 로 비운다.
 	//==============================================================================
+	/**
+	 * @param { number } deltaX 더할 휠 가로 값. (WheelEvent.deltaX)
+	 * @param { number } deltaY 더할 휠 세로 값. (WheelEvent.deltaY, 아래로 굴리면 양수)
+	 */
 	addWheelDelta(deltaX, deltaY) {
 		this.#wheelDeltaX += deltaX;
 		this.#wheelDeltaY += deltaY;
 	}
 
+	//==============================================================================
+	// 이번 프레임에 쌓인 휠 가로 값 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 휠 가로 값. (WheelEvent.deltaX 의 합)
+	 */
 	getWheelDeltaX() {
 		return this.#wheelDeltaX;
 	}
 
+	//==============================================================================
+	// 이번 프레임에 쌓인 휠 세로 값 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 휠 세로 값. (WheelEvent.deltaY 의 합, 아래로 굴리면 양수)
+	 */
 	getWheelDeltaY() {
 		return this.#wheelDeltaY;
 	}
 
+	//==============================================================================
+	// 이번 프레임에 쌓인 휠 값이 있는지.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 가로나 세로가 0 이 아니면 참.
+	 */
 	hasWheelDelta() {
 		return this.#wheelDeltaX !== 0 || this.#wheelDeltaY !== 0;
 	}
 
+	//==============================================================================
+	// 쌓인 휠 값 비우기. (엔진이 프레임 끝에 부른다)
+	//==============================================================================
 	clearWheelDelta() {
 		this.#wheelDeltaX = 0;
 		this.#wheelDeltaY = 0;
@@ -376,7 +456,7 @@ export class InputManager extends Object {
 	// 마지막 휠을 Ctrl 과 함께 굴렸는지 설정. (엔진이 wheel 에서 부른다, 노트북 터치패드의 오므리기도 Ctrl 휠로 온다)
 	//==============================================================================
 	/**
-	 * @param { boolean } isWheelWithCtrl
+	 * @param { boolean } isWheelWithCtrl Ctrl 과 함께 굴렸는지.
 	 */
 	setWheelWithCtrl(isWheelWithCtrl) {
 		this.#isWheelWithCtrl = isWheelWithCtrl;
@@ -386,7 +466,7 @@ export class InputManager extends Object {
 	// 마지막 휠을 Ctrl 과 함께 굴렸는지 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } Ctrl 과 함께 굴렸으면 참.
 	 */
 	isWheelWithCtrl() {
 		return this.#isWheelWithCtrl;
@@ -396,7 +476,7 @@ export class InputManager extends Object {
 	// 키 누름 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } value
+	 * @param { string } key 누른 키 코드. (KeyboardEvent.code)
 	 */
 	pushKey(key) {
 		if (!this.#keys.has(key)) {
@@ -409,7 +489,7 @@ export class InputManager extends Object {
 	// 키 뗌 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } value
+	 * @param { string } key 뗀 키 코드. (KeyboardEvent.code)
 	 */
 	popKey(key) {
 		if (this.#keys.has(key)) {
@@ -422,7 +502,8 @@ export class InputManager extends Object {
 	// 키 누름 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @param { string } key 키 코드. (KeyboardEvent.code, 예: "KeyW", "Space")
+	 * @returns { boolean } 눌려 있으면 참.
 	 */
 	isKeyPressed(key) {
 		return this.#keys.has(key);
@@ -434,8 +515,8 @@ export class InputManager extends Object {
 	// - 지난 프레임 끝 뒤로 온 키 사건을 본다. 프레임 사이에 눌렀다 뗀 키도 참이다. (그때는 isKeyPressed 가 거짓이고 isKeyJustReleased 도 참)
 	//==============================================================================
 	/**
-	 * @param { string } key
-	 * @returns { boolean }
+	 * @param { string } key 키 코드. (KeyboardEvent.code, 예: "KeyW", "Space")
+	 * @returns { boolean } 이번 프레임에 눌렸으면 참.
 	 */
 	isKeyJustPressed(key) {
 		return this.#justPressedKeys.has(key);
@@ -445,8 +526,8 @@ export class InputManager extends Object {
 	// 이번 프레임에 방금 떼어진 키인지 여부.
 	//==============================================================================
 	/**
-	 * @param { string } key
-	 * @returns { boolean }
+	 * @param { string } key 키 코드. (KeyboardEvent.code, 예: "KeyW", "Space")
+	 * @returns { boolean } 이번 프레임에 떼어졌으면 참.
 	 */
 	isKeyJustReleased(key) {
 		return this.#justReleasedKeys.has(key);
@@ -471,7 +552,7 @@ export class InputManager extends Object {
 	// 누름 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } value
+	 * @param { boolean } value 이번 프레임에 눌렀는지.
 	 */
 	setTouchPressed(value) {
 		this.#isTouchPressed = value;
@@ -481,7 +562,7 @@ export class InputManager extends Object {
 	// 뗌 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } value
+	 * @param { boolean } value 이번 프레임에 뗐는지.
 	 */
 	setTouchReleased(value) {
 		this.#isTouchReleased = value;
@@ -491,7 +572,7 @@ export class InputManager extends Object {
 	// 취소 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } value
+	 * @param { boolean } value 이번 프레임에 취소됐는지.
 	 */
 	setTouchCancelled(value) {
 		this.#isTouchCancelled = value;
@@ -501,7 +582,7 @@ export class InputManager extends Object {
 	// 누르고 있는 중인지 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } value
+	 * @param { boolean } value 누르고 있는 중인지.
 	 */
 	setTouchMoved(value) {
 		this.#isTouchMoved = value;
@@ -511,7 +592,7 @@ export class InputManager extends Object {
 	// 누름 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean } 
+	 * @returns { boolean } 이번 프레임에 눌렀으면 참.
 	 */
 	isTouchPressed() {
 		return this.#isTouchPressed;
@@ -521,7 +602,7 @@ export class InputManager extends Object {
 	// 뗌 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 이번 프레임에 뗐으면 참.
 	 */
 	isTouchReleased() {
 		return this.#isTouchReleased;
@@ -531,7 +612,7 @@ export class InputManager extends Object {
 	// 취소 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 이번 프레임에 취소됐으면 참.
 	 */
 	isTouchCancelled() {
 		return this.#isTouchCancelled;
@@ -541,7 +622,7 @@ export class InputManager extends Object {
 	// 누르고 있는 중인지 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean } 
+	 * @returns { boolean } 누르고 있는 중이면 참.
 	 */
 	isTouchMoved() {
 		return this.#isTouchMoved;
@@ -551,7 +632,7 @@ export class InputManager extends Object {
 	// 터치가 눌린 채인지 설정. (엔진이 누름과 뗌에서 부른다)
 	//==============================================================================
 	/**
-	 * @param { boolean } value
+	 * @param { boolean } value 눌린 채인지.
 	 */
 	setTouchDown(value) {
 		this.#isTouchDown = value;
@@ -561,7 +642,7 @@ export class InputManager extends Object {
 	// 터치가 눌린 채인지 반환. (누른 프레임부터 뗄 때까지 참, 누른 채 움직이지 않아도 참)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 눌린 채면 참.
 	 */
 	isTouchDown() {
 		return this.#isTouchDown;
@@ -571,7 +652,7 @@ export class InputManager extends Object {
 	// canvasNativeSize 기반 입력 위치 갱신.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } position 
+	 * @param { Vector2 } position 캔버스 왼쪽 위 기준 자리. (CSS 픽셀, 받은 벡터를 반올림해 그대로 담는다)
 	 */
 	setCanvasNativeInputPosition(position) {
 		position.x = Math.round(position.x);
@@ -583,7 +664,7 @@ export class InputManager extends Object {
 	// canvasNativeSize 기반 입력 위치 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 } 
+	 * @returns { Vector2 } 캔버스 왼쪽 위 기준 입력 위치. (CSS 픽셀, 정수)
 	 */
 	getCanvasNativeInputPosition() {
 		return this.#canvasNativeInputPosition;
@@ -593,7 +674,7 @@ export class InputManager extends Object {
 	// 뷰의 입력 위치 갱신.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } position 
+	 * @param { Vector2 } position 뷰 좌표의 자리. (받은 벡터를 반올림해 그대로 담는다)
 	 */
 	setViewInputPosition(position) {
 		position.x = Math.round(position.x);
@@ -605,7 +686,7 @@ export class InputManager extends Object {
 	// 뷰의 입력 위치 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 } 
+	 * @returns { Vector2 } 뷰 좌표의 입력 위치. (정수)
 	 */
 	getViewInputPosition() {
 		return this.#viewInputPosition;
@@ -625,7 +706,7 @@ export class InputManager extends Object {
 	// 게임패드 연결.
 	//==============================================================================
 	/**
-	 * @param { Gamepad } gamepad
+	 * @param { Gamepad } gamepad 연결된 게임패드. (gamepadconnected 사건의 Gamepad)
 	 */
 	connectGamepad(gamepad) {
 		const gamepadManager = this.getGamepadManager();
@@ -638,7 +719,7 @@ export class InputManager extends Object {
 	// 게임패드 연결 해제.
 	//==============================================================================
 	/**
-	 * @param { Gamepad } gamepad
+	 * @param { Gamepad } gamepad 연결이 끊긴 게임패드. (gamepaddisconnected 사건의 Gamepad)
 	 */
 	disconnectGamepad(gamepad) {
 		const gamepadManager = this.getGamepadManager();
@@ -651,7 +732,7 @@ export class InputManager extends Object {
 	// 게임패드 매니저 반환.
 	//==============================================================================
 	/**
-	 * @returns { GamepadManager } 
+	 * @returns { GamepadManager } 게임패드 매니저.
 	 */
 	getGamepadManager() {
 		return this.#gamepadManager;
@@ -662,7 +743,7 @@ export class InputManager extends Object {
 	//==============================================================================
 	/**
 	 * @param { number } mouseButton MouseButton 의 값.
-	 * @param { boolean } isDown
+	 * @param { boolean } isDown 눌렸으면 참.
 	 */
 	setMouseButtonDown(mouseButton, isDown) {
 		if (mouseButton < 0 || mouseButton >= MOUSE_BUTTON_COUNT) {
@@ -683,7 +764,7 @@ export class InputManager extends Object {
 	//==============================================================================
 	/**
 	 * @param { number } mouseButton MouseButton 의 값.
-	 * @returns { boolean }
+	 * @returns { boolean } 눌려 있으면 참.
 	 */
 	isMouseButtonDown(mouseButton) {
 		return this.#mouseButtonsDown[mouseButton] === true;
@@ -694,7 +775,7 @@ export class InputManager extends Object {
 	//==============================================================================
 	/**
 	 * @param { number } mouseButton MouseButton 의 값.
-	 * @returns { boolean }
+	 * @returns { boolean } 이번 프레임에 눌렸으면 참.
 	 */
 	isMouseButtonJustPressed(mouseButton) {
 		return this.#mouseButtonsJustPressed[mouseButton] === true;
@@ -705,7 +786,7 @@ export class InputManager extends Object {
 	//==============================================================================
 	/**
 	 * @param { number } mouseButton MouseButton 의 값.
-	 * @returns { boolean }
+	 * @returns { boolean } 이번 프레임에 떼어졌으면 참.
 	 */
 	isMouseButtonJustReleased(mouseButton) {
 		return this.#mouseButtonsJustReleased[mouseButton] === true;
@@ -716,7 +797,7 @@ export class InputManager extends Object {
 	// - 오른쪽이나 가운데 끌기를 카메라에 쓰는 게임이 켜면 그 단추로 UI 가 눌리지 않는다.
 	//==============================================================================
 	/**
-	 * @param { boolean } isLeftButtonOnly
+	 * @param { boolean } isLeftButtonOnly 참이면 왼쪽 단추만 터치로 넘긴다.
 	 */
 	setTouchFromLeftButtonOnly(isLeftButtonOnly) {
 		this.#isTouchFromLeftButtonOnly = isLeftButtonOnly;
@@ -726,7 +807,7 @@ export class InputManager extends Object {
 	// 마우스 왼쪽 단추만 터치로 넘기는지 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 왼쪽 단추만 터치로 넘기면 참.
 	 */
 	isTouchFromLeftButtonOnly() {
 		return this.#isTouchFromLeftButtonOnly;
@@ -736,7 +817,7 @@ export class InputManager extends Object {
 	// 캔버스의 오른쪽 클릭 메뉴를 막을지 설정. (처음은 참, 지금까지와 같다)
 	//==============================================================================
 	/**
-	 * @param { boolean } isPrevented
+	 * @param { boolean } isPrevented 참이면 오른쪽 클릭 메뉴를 막는다.
 	 */
 	setContextMenuPrevented(isPrevented) {
 		this.#isContextMenuPrevented = isPrevented;
@@ -746,7 +827,7 @@ export class InputManager extends Object {
 	// 캔버스의 오른쪽 클릭 메뉴를 막는지 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 오른쪽 클릭 메뉴를 막으면 참.
 	 */
 	isContextMenuPrevented() {
 		return this.#isContextMenuPrevented;
@@ -756,9 +837,9 @@ export class InputManager extends Object {
 	// 손가락이 닿음. (엔진이 touchstart 의 바뀐 손가락마다 부른다, 이미 있는 번호면 움직임으로 본다)
 	//==============================================================================
 	/**
-	 * @param { number } identifier
-	 * @param { Vector2 } canvasNativePosition
-	 * @param { Vector2 } viewPosition
+	 * @param { number } identifier 손가락 번호. (Touch.identifier)
+	 * @param { Vector2 } canvasNativePosition 캔버스 왼쪽 위 기준 자리. (CSS 픽셀)
+	 * @param { Vector2 } viewPosition 뷰 좌표의 자리.
 	 */
 	beginTouchPoint(identifier, canvasNativePosition, viewPosition) {
 		const touchPoint = this.findTouchPoint(identifier);
@@ -773,9 +854,9 @@ export class InputManager extends Object {
 	// 손가락이 움직임. (이번 프레임에 닿은 손가락은 began 그대로)
 	//==============================================================================
 	/**
-	 * @param { number } identifier
-	 * @param { Vector2 } canvasNativePosition
-	 * @param { Vector2 } viewPosition
+	 * @param { number } identifier 손가락 번호. (Touch.identifier)
+	 * @param { Vector2 } canvasNativePosition 캔버스 왼쪽 위 기준 자리. (CSS 픽셀)
+	 * @param { Vector2 } viewPosition 뷰 좌표의 자리.
 	 */
 	moveTouchPoint(identifier, canvasNativePosition, viewPosition) {
 		const touchPoint = this.findTouchPoint(identifier);
@@ -793,10 +874,10 @@ export class InputManager extends Object {
 	// 손가락이 떨어짐. (닿은 목록에서 빼서 이번 프레임의 떨어진 목록에 둔다)
 	//==============================================================================
 	/**
-	 * @param { number } identifier
-	 * @param { Vector2 } canvasNativePosition
-	 * @param { Vector2 } viewPosition
-	 * @param { boolean } isCancelled
+	 * @param { number } identifier 손가락 번호. (Touch.identifier)
+	 * @param { Vector2 } canvasNativePosition 캔버스 왼쪽 위 기준 자리. (CSS 픽셀)
+	 * @param { Vector2 } viewPosition 뷰 좌표의 자리.
+	 * @param { boolean } isCancelled 참이면 취소, 거짓이면 뗌.
 	 */
 	endTouchPoint(identifier, canvasNativePosition, viewPosition, isCancelled) {
 		const touchPoint = this.findTouchPoint(identifier);
@@ -815,8 +896,8 @@ export class InputManager extends Object {
 	// 손가락 찾기. (없으면 null)
 	//==============================================================================
 	/**
-	 * @param { number } identifier
-	 * @returns { TouchPoint | null }
+	 * @param { number } identifier 손가락 번호. (Touch.identifier)
+	 * @returns { TouchPoint | null } 찾은 손가락. (없으면 null)
 	 */
 	findTouchPoint(identifier) {
 		for (const touchPoint of this.#touchPoints) {
@@ -831,7 +912,7 @@ export class InputManager extends Object {
 	// 닿아 있는 손가락 목록. (닿은 차례, 단계는 began, moved, stationary, 받은 배열을 바꾸지 않는다)
 	//==============================================================================
 	/**
-	 * @returns { TouchPoint[] }
+	 * @returns { TouchPoint[] } 닿아 있는 손가락 목록. (안의 배열 그대로)
 	 */
 	getTouchPoints() {
 		return this.#touchPoints;
@@ -841,7 +922,7 @@ export class InputManager extends Object {
 	// 이번 프레임에 떨어진 손가락 목록. (단계는 ended, cancelled, 자리는 뗀 자리)
 	//==============================================================================
 	/**
-	 * @returns { TouchPoint[] }
+	 * @returns { TouchPoint[] } 이번 프레임에 떨어진 손가락 목록.
 	 */
 	getEndedTouchPoints() {
 		return this.#endedTouchPoints;
@@ -871,7 +952,7 @@ export class InputManager extends Object {
 	// 마지막 입력이 손가락인지. (마우스, 키보드, 게임패드면 거짓)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 마지막 입력이 손가락이면 참.
 	 */
 	isTouchInput() {
 		const lastInputDevice = this.getLastInputDevice();
@@ -903,7 +984,7 @@ export class InputManager extends Object {
 	// - 글자 입력칸에 초점이 있으면 막지 않는다. (isTypingInTextField)
 	//==============================================================================
 	/**
-	 * @param { string[] } keys
+	 * @param { string[] } keys 막을 키 코드 목록. (KeyboardEvent.code)
 	 */
 	setPreventedKeys(keys) {
 		this.#preventedKeys = new Set(keys);
@@ -913,7 +994,7 @@ export class InputManager extends Object {
 	// 브라우저 기본 동작을 막을 키 목록 반환. (사본)
 	//==============================================================================
 	/**
-	 * @returns { string[] }
+	 * @returns { string[] } 막는 키 코드 목록의 사본.
 	 */
 	getPreventedKeys() {
 		return System.Array.from(this.#preventedKeys);
@@ -923,8 +1004,8 @@ export class InputManager extends Object {
 	// 그 키의 기본 동작을 막는지.
 	//==============================================================================
 	/**
-	 * @param { string } key
-	 * @returns { boolean }
+	 * @param { string } key 키 코드. (KeyboardEvent.code, 예: "KeyW", "Space")
+	 * @returns { boolean } 기본 동작을 막으면 참.
 	 */
 	isKeyPrevented(key) {
 		return this.#preventedKeys.has(key);
@@ -934,7 +1015,7 @@ export class InputManager extends Object {
 	// 글자 입력칸에 쓰는 중인지. (초점이 글자 input, textarea, contenteditable, select 에 있음)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 글자 입력칸에 쓰는 중이면 참.
 	 */
 	isTypingInTextField() {
 		const engine = this.#engine;
@@ -952,7 +1033,7 @@ export class InputManager extends Object {
 	// 입력 동작 반환. (동작 이름에 키, 패드 단추, 축을 묶어 읽는다, tick 마다 갱신된다)
 	//==============================================================================
 	/**
-	 * @returns { InputActions }
+	 * @returns { InputActions } 입력 동작.
 	 */
 	getInputActions() {
 		return this.#inputActions;

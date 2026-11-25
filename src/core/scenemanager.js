@@ -10,6 +10,28 @@ import { Scene } from "./scene.js";
 //==============================================================================
 // 씬 매니저.
 //==============================================================================
+/**
+ * @example <caption>씬을 겹쳐 불러오고 목록 보기</caption>
+ * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+ *
+ * class GameScene extends Scene {
+ * }
+ *
+ * class HudScene extends Scene {
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new GameScene());
+ * const sceneManager = engine.getSceneManager();
+ * const hudScene = new HudScene();
+ * await sceneManager.loadScene(hudScene);
+ * const loadedScenes = sceneManager.getAllLoadedScenes();
+ * const isHudSceneLoaded = hudScene.isLoaded();
+ * console.log(loadedScenes.length, isHudSceneLoaded);
+ * await sceneManager.unloadScene(hudScene);
+ * console.log(loadedScenes.length);
+ */
 export class SceneManager extends Object {
     //==============================================================================
     // 멤버 변수 목록.
@@ -22,7 +44,7 @@ export class SceneManager extends Object {
     //==============================================================================
     /**
      * @constructor
-     * @param { Engine } engine 
+     * @param { Engine } engine 씬을 불러올 때 넘길 엔진.
      */
     constructor(engine) {
         super();
@@ -35,7 +57,7 @@ export class SceneManager extends Object {
 	//==============================================================================
 	/**
 	 * 
-	 * @param { Scene } scene 
+	 * @param { Scene } scene 불러올 씬. (Scene 이 아니거나 이미 불러온 씬이면 아무것도 하지 않는다)
 	 */
 	async loadScene(scene) {
         const engine = this.getEngine();
@@ -59,7 +81,7 @@ export class SceneManager extends Object {
 	//==============================================================================
 	/**
 	 * 
-	 * @param { Scene } scene 
+	 * @param { Scene } scene 내릴 씬. (불러온 씬이 아니면 아무것도 하지 않는다)
 	 */
 	async unloadScene(scene) {
         const engine = this.getEngine();
@@ -88,7 +110,7 @@ export class SceneManager extends Object {
 	// 엔진 반환.
 	//==============================================================================
     /**
-     * @returns { Engine }
+     * @returns { Engine } 이 매니저를 가진 엔진.
      */
     getEngine() {
         return this.#engine;
@@ -98,7 +120,7 @@ export class SceneManager extends Object {
 	// 모든 로드된 씬 반환.
 	//==============================================================================
     /**
-     * @returns { Scene[] }
+     * @returns { Scene[] } 불러온 씬 목록. (불러오기 시작한 차례, 안의 배열 그대로)
      */
     getAllLoadedScenes() {
         return this.#loadedScenes;

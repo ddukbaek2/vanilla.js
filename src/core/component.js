@@ -9,6 +9,43 @@ import { Graphic } from "../core/graphic.js";
 //==============================================================================
 // 컴포넌트.
 //==============================================================================
+/**
+ * @example <caption>노드에 붙여 돌리고 그리는 컴포넌트</caption>
+ * import { Engine, EngineConfiguration, Scene, WorldNode, Component, Rect, Colors } from "./build/vanilla.js";
+ *
+ * class SpinningBox extends Component {
+ * 	tick(timeDelta) {
+ * 		const node = this.getNode();
+ * 		const rotation = node.getLocalRotation();
+ * 		node.setLocalRotation(rotation + 90 * timeDelta);
+ * 	}
+ *
+ * 	draw(graphic) {
+ * 		const node = this.getNode();
+ * 		const contentSize = node.getContentSize();
+ * 		graphic.setFillColor(Colors.white);
+ * 		graphic.drawRect(Rect.create(0, 0, contentSize.x, contentSize.y));
+ * 	}
+ *
+ * 	isDrawnInsideContent() {
+ * 		return true;
+ * 	}
+ * }
+ *
+ * class MainScene extends Scene {
+ * 	initialize(engine) {
+ * 		const root = this.getRoot();
+ * 		const node = new WorldNode();
+ * 		node.setRect(100, 100, 80, 80);
+ * 		node.addComponent(SpinningBox);
+ * 		root.addChild(node);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class Component extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -37,7 +74,7 @@ export class Component extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		// 갱신.
@@ -50,7 +87,7 @@ export class Component extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @returns { boolean }
+	 * @returns { boolean } 노드가 tick 을 불러야 하면 참.
 	 */
 	isTickNeeded() {
 		return this.tick !== Component.prototype.tick;
@@ -61,7 +98,7 @@ export class Component extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	draw(graphic) {
 		// 출력.
@@ -72,7 +109,7 @@ export class Component extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	drawGizmos(graphic) {
 		const isGizmoVisible = this.isGizmoVisible();
@@ -90,7 +127,7 @@ export class Component extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @returns { boolean }
+	 * @returns { boolean } 내용 영역 안에서만 그리면 참.
 	 */
 	isDrawnInsideContent() {
 		return false;
@@ -104,8 +141,27 @@ export class Component extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Rect } rect
-	 * @returns { boolean }
+	 * @param { Rect } rect 그리는 사각형을 적을 곳. (노드 내용 영역의 왼쪽 위가 원점)
+	 * @returns { boolean } rect 에 적었으면 참. (모르면 거짓)
+	 * @example <caption>내용 영역 밖으로 번지는 그리기 알리기</caption>
+	 * import { WorldNode, Component, Rect, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class Glow extends Component {
+	 * 	calculateDrawnRect(rect) {
+	 * 		const node = this.getNode();
+	 * 		const contentSize = node.getContentSize();
+	 * 		rect.position.set(-10, -10);
+	 * 		rect.size.set(contentSize.x + 20, contentSize.y + 20);
+	 * 		return true;
+	 * 	}
+	 * }
+	 *
+	 * const node = new WorldNode();
+	 * node.setContentSize(Vector2.create(100, 50));
+	 * const glow = node.addComponent(Glow);
+	 * const drawnRect = Rect.zero();
+	 * const isKnown = glow.calculateDrawnRect(drawnRect);
+	 * console.log(isKnown, drawnRect.size.x, drawnRect.size.y);
 	 */
 	calculateDrawnRect(rect) {
 		return false;
@@ -119,7 +175,7 @@ export class Component extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @returns { Function[] }
+	 * @returns { Function[] } 같은 노드에 먼저 붙일 컴포넌트 클래스 목록.
 	 */
 	require() {
 		return [];
@@ -130,7 +186,7 @@ export class Component extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { ComponentNode } node
+	 * @param { ComponentNode } node 붙은 노드.
 	 */
 	attach(node) {
 		// 코드.
@@ -141,7 +197,7 @@ export class Component extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { ComponentNode } node
+	 * @param { ComponentNode } node 떨어진 노드.
 	 */
 	detach(node) {
 		// 코드.
@@ -151,7 +207,7 @@ export class Component extends Object {
 	// 소유권자 설정.
 	//==============================================================================
 	/**
-	 * @param { ComponentNode } node
+	 * @param { ComponentNode } node 소유권자 노드. (떨어지면 null)
 	 */
 	setNode(node) {
 		this.#node = node;
@@ -161,7 +217,7 @@ export class Component extends Object {
 	// 소유권자 반환.
 	//==============================================================================
 	/**
-	 * @returns { ComponentNode }
+	 * @returns { ComponentNode } 소유권자 노드. (붙지 않았으면 null)
 	 */
 	getNode() {
 		return this.#node;
@@ -171,7 +227,7 @@ export class Component extends Object {
 	// 기즈모 그리기 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } isVisible
+	 * @param { boolean } isVisible 참이면 기즈모를 그린다.
 	 */
 	setGizmoVisible(isVisible) {
 		this.#isGizmoVisible = isVisible;
@@ -181,7 +237,7 @@ export class Component extends Object {
 	// 기즈모 그리기 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 기즈모를 그리면 참.
 	 */
 	isGizmoVisible() {
 		return this.#isGizmoVisible;
@@ -191,7 +247,7 @@ export class Component extends Object {
 	// 활성화 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } isEnable
+	 * @param { boolean } isEnable 켤지. (꺼지면 노드가 draw 를 부르지 않는다)
 	 */
 	setEnable(isEnable) {
 		this.#isEnable = isEnable;
@@ -201,7 +257,7 @@ export class Component extends Object {
 	// 활성화 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 켜져 있으면 참.
 	 */
 	isEnable() {
 		return this.#isEnable;
@@ -211,7 +267,7 @@ export class Component extends Object {
 	// 컴포넌트 타입 설정.
 	//==============================================================================
 	/**
-	 * @param { string } componentType
+	 * @param { string } componentType 컴포넌트 타입 이름. (처음은 "Component", Mask 같은 이름으로 종류를 가른다)
 	 */
 	setComponentType(componentType) {
 		this.#componentType = componentType;
@@ -221,7 +277,7 @@ export class Component extends Object {
 	// 컴포넌트 타입 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 컴포넌트 타입 이름.
 	 */
 	getComponentType() {
 		return this.#componentType;

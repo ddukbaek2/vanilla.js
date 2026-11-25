@@ -21,6 +21,21 @@ const SHOWN_CURSOR_NAMES = ["pointer", "crosshair", "not-allowed", "grab", "grab
 // - 그림 커서는 1 배와 2 배 그림을 같이 주고(-webkit-image-set), 그것을 못 읽는 브라우저는 1 배 그림, 그림을 못 받으면 함께 준 CSS 커서다.
 // - 손가락 기기(pointer: coarse)에서는 캔버스를 건드리지 않는다.
 //==============================================================================
+/**
+ * @example <caption>화면 커서와 단추 위 그림 커서 정하기</caption>
+ * import { Engine, EngineConfiguration, Scene, PointerCursor } from "./build/vanilla.js";
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const pointerCursor = PointerCursor.getInstance();
+ * pointerCursor.registerImageCursor("hand", "assets/icons/icon.png", "", 4, 4, "pointer");
+ * pointerCursor.setCursorNames("hand", "default");
+ * pointerCursor.setScreenCursor("crosshair");
+ * pointerCursor.setEnabled(true);
+ * engine.run(new Scene());
+ * const cursorValue = pointerCursor.readCursorValue("crosshair");
+ * console.log(cursorValue);
+ */
 export class PointerCursor extends Singleton {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -54,7 +69,7 @@ export class PointerCursor extends Singleton {
 	// 켜기 설정. (끄면 캔버스의 커서를 비운다)
 	//==============================================================================
 	/**
-	 * @param { boolean } isEnabled
+	 * @param { boolean } isEnabled 참이면 켠다.
 	 */
 	setEnabled(isEnabled) {
 		this.#isEnabled = isEnabled;
@@ -72,7 +87,7 @@ export class PointerCursor extends Singleton {
 	// 켜져 있는지 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 켜져 있으면 참.
 	 */
 	isEnabled() {
 		return this.#isEnabled;
@@ -99,7 +114,7 @@ export class PointerCursor extends Singleton {
 	// 화면의 커서 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 화면의 커서 이름.
 	 */
 	getScreenCursor() {
 		return this.#screenCursorName;
@@ -121,7 +136,7 @@ export class PointerCursor extends Singleton {
 	// 단추 위의 커서 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 단추 위의 커서 이름.
 	 */
 	getButtonCursorName() {
 		return this.#buttonCursorName;
@@ -131,7 +146,7 @@ export class PointerCursor extends Singleton {
 	// 기본의 커서 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 화면의 커서가 default 일 때의 커서 이름.
 	 */
 	getDefaultCursorName() {
 		return this.#defaultCursorName;
@@ -146,7 +161,7 @@ export class PointerCursor extends Singleton {
 	 * @param { string } url - 1 배 그림의 주소.
 	 * @param { string } url2x - 2 배 그림의 주소. (없으면 "")
 	 * @param { number } hotspotX - 1 배 그림의 핫스팟. (픽셀)
-	 * @param { number } hotspotY
+	 * @param { number } hotspotY 핫스팟의 Y. (픽셀, 1 배 그림 기준, 반올림)
 	 * @param { string } fallbackCursorName - 그림을 못 쓸 때의 CSS cursor 이름.
 	 */
 	registerImageCursor(name, url, url2x, hotspotX, hotspotY, fallbackCursorName) {
@@ -174,8 +189,8 @@ export class PointerCursor extends Singleton {
 	// 커서 이름을 캔버스에 쓸 값으로. (그림 커서면 그 CSS 값, 쓸 수 있는 CSS 이름이면 그대로, 아니면 "")
 	//==============================================================================
 	/**
-	 * @param { string } cursorName
-	 * @returns { string }
+	 * @param { string } cursorName 커서 이름.
+	 * @returns { string } 캔버스의 style.cursor 에 쓸 값. (모르는 이름이면 "")
 	 */
 	readCursorValue(cursorName) {
 		const imageCursorValue = this.#imageCursorValues.get(cursorName);
@@ -216,7 +231,7 @@ export class PointerCursor extends Singleton {
 	//==============================================================================
 	/**
 	 * @static
-	 * @returns { boolean }
+	 * @returns { boolean } 주된 손이 손가락이면 참.
 	 */
 	static isCoarsePointer() {
 		if (typeof System.matchMedia !== "function") {
@@ -231,7 +246,7 @@ export class PointerCursor extends Singleton {
 	//==============================================================================
 	/**
 	 * @static
-	 * @returns { HTMLCanvasElement | null }
+	 * @returns { HTMLCanvasElement | null } 엔진의 캔버스. (엔진이 없으면 null)
 	 */
 	static readEngineCanvas() {
 		const engine = System.vanillaEngine;

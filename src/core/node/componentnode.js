@@ -13,6 +13,36 @@ import { Node } from "../../base/node.js";
 // - 컴포넌트 기능.
 // - 주기적 갱신 기능. (컴포넌트 포함)
 //==============================================================================
+/**
+ * @example <caption>컴포넌트 붙이고 찾고 갱신하기</caption>
+ * import { ComponentNode, Component } from "./build/vanilla.js";
+ *
+ * class Health extends Component {
+ * 	constructor() {
+ * 		super();
+ * 		this.hitPoint = 100;
+ * 	}
+ * }
+ *
+ * class Poison extends Component {
+ * 	require() {
+ * 		return [Health];
+ * 	}
+ *
+ * 	tick(timeDelta) {
+ * 		const node = this.getNode();
+ * 		const health = node.getComponent(Health);
+ * 		health.hitPoint -= 10 * timeDelta;
+ * 	}
+ * }
+ *
+ * const node = new ComponentNode();
+ * node.addComponent(Poison);
+ * const health = node.getComponent(Health);
+ * node.tick(0.5);
+ * const hasHealth = node.hasComponent(Health);
+ * console.log(hasHealth, health.hitPoint);
+ */
 export class ComponentNode extends Node {
     //==============================================================================
     // 멤버 변수 목록.
@@ -36,7 +66,7 @@ export class ComponentNode extends Node {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { number } timeDelta 
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		const isActive = this.isActive();
@@ -65,7 +95,8 @@ export class ComponentNode extends Node {
 	// 타입으로 컴포넌트 추가.
 	//==============================================================================
 	/**
-	 * @param { Function } componentType  
+	 * @param { Function } componentType 컴포넌트 클래스. (없으면 붙인다)
+	 * @returns { Component | null } 있던 컴포넌트나 새로 붙인 컴포넌트. (componentType 이 없으면 null)
 	 */
 	getOrAddComponent(componentType) {
 		if (componentType === null || componentType === undefined) {
@@ -85,7 +116,8 @@ export class ComponentNode extends Node {
 	// 타입으로 컴포넌트 추가.
 	//==============================================================================
 	/**
-	 * @param { Function } componentType  
+	 * @param { Function } componentType 붙일 컴포넌트 클래스. (인자 없이 new 로 만들고, 같은 클래스가 있어도 또 붙인다)
+	 * @returns { Component | null } 새로 붙인 컴포넌트. (componentType 이 없으면 null)
 	 */
 	addComponent(componentType) {
 		if (componentType === null || componentType === undefined) {
@@ -116,7 +148,7 @@ export class ComponentNode extends Node {
 	// 객체로 컴포넌트 제거.
 	//==============================================================================
 	/**
-	 * @param { Component } component 
+	 * @param { Component } component 뗄 컴포넌트. (이 노드에 없으면 아무것도 하지 않는다)
 	 */
 	removeComponent(component) {
 		const components = this.getAllComponents();
@@ -136,7 +168,8 @@ export class ComponentNode extends Node {
 	// 컴포넌트 보유 여부..
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @param { Function } componentType 찾을 컴포넌트 클래스. (자식 클래스도 맞는다)
+	 * @returns { boolean } 있으면 참.
 	 */
 	hasComponent(componentType) {
 		const component = this.getComponent(componentType);
@@ -147,7 +180,7 @@ export class ComponentNode extends Node {
 	// 모든 컴포넌트 목록 반환.
 	//==============================================================================
 	/**
-	 * @returns { Component[] }
+	 * @returns { Component[] } 붙은 컴포넌트 목록. (붙인 차례, 안의 배열 그대로)
 	 */
 	getAllComponents() {
 		return this.#components;
@@ -157,8 +190,8 @@ export class ComponentNode extends Node {
 	// 타입에 대한 컴포넌트 반환.
 	//==============================================================================
 	/**
-	 * @param { Function } componentType 
-	 * @returns { Component | null }
+	 * @param { Function } componentType 찾을 컴포넌트 클래스. (자식 클래스도 맞는다)
+	 * @returns { Component | null } 처음 맞는 컴포넌트. (없으면 null)
 	 */
 	getComponent(componentType) {
 		const component = this.#components.find(component => component instanceof componentType);
@@ -172,8 +205,8 @@ export class ComponentNode extends Node {
 	// 타입에 대한 모든 컴포넌트 반환.
 	//==============================================================================
 	/**
-	 * @param { Function } componentType 
-	 * @returns { Component[] }
+	 * @param { Function } componentType 찾을 컴포넌트 클래스. (자식 클래스도 맞는다)
+	 * @returns { Component[] } 맞는 컴포넌트 모두. (새 배열)
 	 */
 	getComponents(componentType) {
 		const result = [];

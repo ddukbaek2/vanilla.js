@@ -51,12 +51,29 @@ export const PageEvent = System.Object.freeze({
 //==============================================================================
 // 엔진 설정.
 //==============================================================================
+/**
+ * @example <caption>설정을 채워 엔진 만들기</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.canvasId = "gameCanvas";
+ * engineConfiguration.title = "My Game";
+ * engineConfiguration.referenceResolutionSize = Vector2.create(1920, 1080);
+ * engineConfiguration.autoResizeOnWindowResize = true;
+ * engineConfiguration.maximumFramePerSecond = 60;
+ * engineConfiguration.useStatistics = true;
+ * engineConfiguration.useDevTools = false;
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new Scene());
+ */
 export class EngineConfiguration extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @type { Vector2 } */ referenceResolutionSize; // 기준 해상도.
 	// /** @type { ViewScaleMode } */ viewScaleMode; // 뷰 모드.
+
+	// 캔버스 식별자. 문서에 그 id 의 요소가 없으면 캔버스를 새로 만들어 그 id 를 주고 body 끝에 붙인다.
 	/** @type { string } */ canvasId; // 캔버스 식별자.
 	/** @type { boolean } */ useStatistics; // 정보창 출력 여부.
 	/** @type { boolean } */ autoResizeOnWindowResize; // 윈도우가 리사이즈 될 때 캔버스 사이즈 자동 반영.
@@ -117,6 +134,24 @@ export class EngineConfiguration extends Object {
 //==============================================================================
 // 엔진.
 //==============================================================================
+/**
+ * @example <caption>씬 하나로 엔진 돌리기</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, Rect, Colors } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	draw(graphic) {
+ * 		super.draw(graphic);
+ * 		graphic.setFillColor(Colors.white);
+ * 		graphic.drawRect(Rect.create(100, 100, 200, 120));
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+ * engineConfiguration.autoResizeOnWindowResize = true;
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class Engine extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -149,7 +184,7 @@ export class Engine extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { EngineConfiguration } engineConfiguration
+	 * @param { EngineConfiguration } engineConfiguration 엔진 설정. (EngineConfiguration 이 아니면 예외를 던진다)
 	 */
 	constructor(engineConfiguration) {
 		super();
@@ -179,7 +214,7 @@ export class Engine extends Object {
 
 		this.#resizeCallback = this.resize.bind(this);
 		this.#appliedClientNativeSize = null;
-		// 일반 resume (visibilitychange/focus 등) — user gesture 가 아닐 수 있으므로
+		// 일반 resume (visibilitychange/focus 등), user gesture 가 아닐 수 있으므로
 		// AudioManager 가 hasUserGesture 체크 후 silently skip.
 		this.#resumeCallback = this.resume.bind(this);
 		this.#updateEngineCallback = this.updateEngine.bind(this);
@@ -210,7 +245,7 @@ export class Engine extends Object {
 	// 시작.
 	//==============================================================================
 	/**
-	 * @param { Scene } scene
+	 * @param { Scene } scene 처음 불러올 씬. (Scene 이 아니면 예외를 던진다)
 	 */
 	run(scene) {
 		if (scene === null || scene === undefined || scene instanceof Scene === false) {
@@ -360,7 +395,7 @@ export class Engine extends Object {
 	// 글자 입력칸이 포커스되어 있는지. (input 의 글자 종류, textarea, contenteditable)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 글자 입력칸이 포커스되어 있으면 참.
 	 */
 	isTextInputFocused() {
 		const activeElement = System.document.activeElement;
@@ -701,7 +736,7 @@ export class Engine extends Object {
 	// 손가락 목록 갱신. (터치 사건의 바뀐 손가락마다 닿음, 움직임, 뗌을 적고, 사건의 touches 에 없는 손가락은 취소로 지운다)
 	//==============================================================================
 	/**
-	 * @param { TouchEvent } touchEvent
+	 * @param { TouchEvent } touchEvent 브라우저의 터치 사건.
 	 */
 	updateTouchPoints(touchEvent) {
 		const inputManager = this.getInputManager();
@@ -753,8 +788,8 @@ export class Engine extends Object {
 	// 입력 좌표 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
+	 * @param { number } x 클라이언트 X 좌표. (CSS 픽셀, clientX)
+	 * @param { number } y 클라이언트 Y 좌표. (CSS 픽셀, clientY)
 	 */
 	updateCanvasNativeInputPosition(x, y) {
 		const inputManager = this.getInputManager();
@@ -777,7 +812,7 @@ export class Engine extends Object {
 	// 개발 관련 정보 출력.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	drawStatistics(graphic) {
 		const timeManager = this.getTimeManager();
@@ -969,7 +1004,7 @@ export class Engine extends Object {
 	// 엔진 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } timestamp
+	 * @param { number } timestamp requestAnimationFrame 이 넘긴 시각. (밀리초)
 	 */
 	updateEngine(timestamp) {
 
@@ -1084,7 +1119,7 @@ export class Engine extends Object {
 	// 커서 보이기 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } visibled 
+	 * @param { boolean } visibled 참이면 body 의 커서를 기본 커서로, 거짓이면 숨긴다.
 	 */
 	setVisibleCursor(visibled) {
 		if (visibled) {
@@ -1099,7 +1134,7 @@ export class Engine extends Object {
 	// 캔버스 정보 반환.
 	//==============================================================================
 	/**
-	 * @returns { HTMLCanvasElement }
+	 * @returns { HTMLCanvasElement } 엔진이 그리는 캔버스.
 	 */
 	getCanvas() {
 		const viewManager = this.getViewManager();
@@ -1110,7 +1145,7 @@ export class Engine extends Object {
 	// 플랫폼 정보 반환.
 	//==============================================================================
 	/**
-	 * @returns { Platform }
+	 * @returns { Platform } 플랫폼 정보.
 	 */
 	getPlatform() {
 		return this.#platform;
@@ -1120,7 +1155,7 @@ export class Engine extends Object {
 	// 씬 매니저 반환.
 	//==============================================================================
 	/**
-	 * @returns { SceneManager }
+	 * @returns { SceneManager } 씬 매니저.
 	 */
 	getSceneManager() {
 		return this.#sceneManager;
@@ -1130,7 +1165,7 @@ export class Engine extends Object {
 	// 시간 매니저 반환.
 	//==============================================================================
 	/**
-	 * @returns { TimeManager }
+	 * @returns { TimeManager } 시간 매니저.
 	 */
 	getTimeManager() {
 		return this.#timeManager;
@@ -1140,7 +1175,7 @@ export class Engine extends Object {
 	// 뷰 매니저 반환.
 	//==============================================================================
 	/**
-	 * @returns { ViewManager }
+	 * @returns { ViewManager } 뷰 매니저.
 	 */
 	getViewManager() {
 		return this.#viewManager;
@@ -1150,7 +1185,7 @@ export class Engine extends Object {
 	// 입력 매니저 반환.
 	//==============================================================================
 	/**
-	 * @returns { InputManager }
+	 * @returns { InputManager } 입력 매니저.
 	 */
 	getInputManager() {
 		return this.#inputManager;
@@ -1160,7 +1195,7 @@ export class Engine extends Object {
 	// 오디오 매니저 반환.
 	//==============================================================================
 	/**
-	 * @returns { AudioManager }
+	 * @returns { AudioManager } 오디오 매니저.
 	 */
 	getAudioManager() {
 		return this.#audioManager;
@@ -1170,7 +1205,7 @@ export class Engine extends Object {
 	// 렌더러 반환.
 	//==============================================================================
 	/**
-	 * @returns { Graphic }
+	 * @returns { Graphic } 렌더러.
 	 */
 	getGraphic() {
 		return this.#graphic;
@@ -1180,7 +1215,7 @@ export class Engine extends Object {
 	// 버전 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 엔진 판 글. ("주.부.패치", 갈래가 있으면 "-갈래" 를 붙임)
 	 */
 	getVersionString() {
 		return this.#version.getVersionString();
@@ -1192,7 +1227,7 @@ export class Engine extends Object {
 	// - 0 보다 작거나 숫자가 아니면 0 으로 둔다.
 	//==============================================================================
 	/**
-	 * @param { number } maximumFramePerSecond
+	 * @param { number } maximumFramePerSecond 최대 FPS. (0 이면 제한하지 않는다)
 	 */
 	setMaximumFramePerSecond(maximumFramePerSecond) {
 		const engineConfiguration = this.getEngineConfiguration();
@@ -1207,7 +1242,7 @@ export class Engine extends Object {
 	// 최대 FPS 반환. (0 이면 제한하지 않음)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 최대 FPS. (0 이면 제한하지 않음)
 	 */
 	getMaximumFramePerSecond() {
 		const engineConfiguration = this.getEngineConfiguration();
@@ -1218,18 +1253,12 @@ export class Engine extends Object {
 	// 엔진 설정 반환.
 	//==============================================================================
 	/**
-	 * @returns { EngineConfiguration }
+	 * @returns { EngineConfiguration } 생성 때 받은 엔진 설정.
 	 */
 	getEngineConfiguration() {
 		return this.#engineConfiguration;
 	}
 
-	//==============================================================================
-	// 현재 프레임 번호 반환.
-	//==============================================================================
-	/**
-	 * @returns { number }
-	 */
 	//==============================================================================
 	// 응용 프로그램 종료.
 	// - Capacitor 네이티브면 App 플러그인으로 끝내고, 웹이면 창 닫기를 시도한다.
@@ -1255,6 +1284,12 @@ export class Engine extends Object {
 		}
 	}
 
+	//==============================================================================
+	// 현재 프레임 번호 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 지금 프레임 번호. (run 을 부르면 1 이 되고 프레임을 마칠 때마다 1 씩 는다)
+	 */
 	getFrameNumber() {
 		return this.#frameNumber;
 	}
@@ -1263,7 +1298,7 @@ export class Engine extends Object {
 	// 종료를 요청했는지. (exitApplication 을 불렀으면 참, 브라우저가 창 닫기를 거부해도 참)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } exitApplication 을 불렀으면 참.
 	 */
 	isExitRequested() {
 		return this.#isExitRequested;
@@ -1273,7 +1308,7 @@ export class Engine extends Object {
 	// 창 제목 설정. (탭 제목, document.title)
 	//==============================================================================
 	/**
-	 * @param { string } title
+	 * @param { string } title 창 제목.
 	 */
 	setTitle(title) {
 		System.document.title = title;
@@ -1283,7 +1318,7 @@ export class Engine extends Object {
 	// 시스템 클립보드에 글 쓰기. (navigator.clipboard.writeText, 기다리지 않는다. 막히거나 없으면 아무것도 하지 않는다)
 	//==============================================================================
 	/**
-	 * @param { string } text
+	 * @param { string } text 클립보드에 쓸 글.
 	 */
 	writeClipboardText(text) {
 		const clipboard = System.navigator ? System.navigator.clipboard : undefined;
@@ -1300,7 +1335,22 @@ export class Engine extends Object {
 	// - 브라우저가 권한을 묻거나 사용자 입력 안에서만 허락할 수 있다.
 	//==============================================================================
 	/**
-	 * @returns { Promise<string | null> }
+	 * @returns { Promise<string | null> } 클립보드의 글. (없거나 막히면 null)
+	 * @example <caption>클립보드에 쓰고 읽기</caption>
+	 * import { Engine, EngineConfiguration } from "./build/vanilla.js";
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.writeClipboardText("score: 100");
+	 * const readPromise = engine.readClipboardText();
+	 * readPromise.then((text) => {
+	 * 	if (text === null) {
+	 * 		console.log("clipboard blocked");
+	 * 	}
+	 * 	else {
+	 * 		console.log(text);
+	 * 	}
+	 * });
 	 */
 	async readClipboardText() {
 		const clipboard = System.navigator ? System.navigator.clipboard : undefined;
@@ -1321,7 +1371,7 @@ export class Engine extends Object {
 	// 주된 손이 손가락인지. (CSS 의 pointer: coarse)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 주된 손이 손가락이면 참.
 	 */
 	isCoarsePointer() {
 		const platform = this.getPlatform();
@@ -1332,8 +1382,31 @@ export class Engine extends Object {
 	// 씬 불러오기. (SceneManager.loadScene 과 같다)
 	//==============================================================================
 	/**
-	 * @param { Scene } scene
-	 * @returns { Promise<void> }
+	 * @param { Scene } scene 불러올 씬.
+	 * @returns { Promise<void> } load, initialize 까지 마치면 끝나는 Promise. (이미 불러온 씬이면 바로 끝난다)
+	 * @example <caption>씬 하나 더 불러오고 내리기</caption>
+	 * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+	 *
+	 * class GameScene extends Scene {
+	 * }
+	 *
+	 * class PauseScene extends Scene {
+	 * 	initialize(engine) {
+	 * 		console.log("pause scene ready");
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new GameScene());
+	 * const pauseScene = new PauseScene();
+	 * await engine.loadScene(pauseScene);
+	 * const isPauseSceneLoaded = pauseScene.isLoaded();
+	 * console.log(isPauseSceneLoaded);
+	 * await engine.unloadScene(pauseScene);
+	 * const sceneManager = engine.getSceneManager();
+	 * const loadedScenes = sceneManager.getAllLoadedScenes();
+	 * console.log(loadedScenes.length);
 	 */
 	loadScene(scene) {
 		const sceneManager = this.getSceneManager();
@@ -1344,8 +1417,8 @@ export class Engine extends Object {
 	// 씬 하나 내리기. (SceneManager.unloadScene 과 같다)
 	//==============================================================================
 	/**
-	 * @param { Scene } scene
-	 * @returns { Promise<void> }
+	 * @param { Scene } scene 내릴 씬.
+	 * @returns { Promise<void> } finalize, unload 를 마치고 목록에서 빼면 끝나는 Promise. (불러오지 않은 씬이면 바로 끝난다)
 	 */
 	unloadScene(scene) {
 		const sceneManager = this.getSceneManager();
@@ -1356,7 +1429,7 @@ export class Engine extends Object {
 	// 모든 씬 내리기. (SceneManager.unloadAllScenes 와 같다)
 	//==============================================================================
 	/**
-	 * @returns { Promise<void> }
+	 * @returns { Promise<void> } 불러온 씬을 차례로 모두 내리면 끝나는 Promise.
 	 */
 	unloadAllScenes() {
 		const sceneManager = this.getSceneManager();
@@ -1367,7 +1440,7 @@ export class Engine extends Object {
 	// 페이지가 가려져 있는지. (다른 탭, 앱 전환)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 페이지가 가려져 있으면 참.
 	 */
 	isPageHidden() {
 		return this.#isPageHidden;
@@ -1377,7 +1450,25 @@ export class Engine extends Object {
 	// 페이지 이벤트 리스너 더하기. ((pageEvent) => void, PageEvent 의 값을 받는다)
 	//==============================================================================
 	/**
-	 * @param { Function } pageEventListener
+	 * @param { Function } pageEventListener (pageEvent) => void. 같은 함수는 한 번만 더한다.
+	 * @example <caption>페이지가 가려지면 멈추기</caption>
+	 * import { Engine, EngineConfiguration, Scene, PageEvent } from "./build/vanilla.js";
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new Scene());
+	 * const timeManager = engine.getTimeManager();
+	 * const pageEventListener = (pageEvent) => {
+	 * 	if (pageEvent === PageEvent.hidden) {
+	 * 		timeManager.setTimeScale(0);
+	 * 	}
+	 * 	else if (pageEvent === PageEvent.visible) {
+	 * 		timeManager.setTimeScale(1);
+	 * 	}
+	 * };
+	 * engine.addPageEventListener(pageEventListener);
+	 * const isPageHidden = engine.isPageHidden();
+	 * console.log(isPageHidden);
 	 */
 	addPageEventListener(pageEventListener) {
 		if (this.#pageEventListeners.includes(pageEventListener)) {
@@ -1390,7 +1481,7 @@ export class Engine extends Object {
 	// 페이지 이벤트 리스너 빼기.
 	//==============================================================================
 	/**
-	 * @param { Function } pageEventListener
+	 * @param { Function } pageEventListener 더했던 리스너. (없으면 아무것도 하지 않는다)
 	 */
 	removePageEventListener(pageEventListener) {
 		const listenerIndex = this.#pageEventListeners.indexOf(pageEventListener);
@@ -1430,8 +1521,18 @@ export class Engine extends Object {
 	// - 주소 쿼리로도 건다. (?capture=120,240 은 그 프레임들을 내려받기로 저장, captureName 은 파일 이름("{frame}" 은 번호), captureExit=1 은 마지막 저장 뒤 exitApplication)
 	//==============================================================================
 	/**
-	 * @param { number } frameNumber
+	 * @param { number } frameNumber 저장할 프레임 번호. (소수는 버리고, 이미 지났으면 지금 프레임)
 	 * @returns { Promise<string> } PNG data URL.
+	 * @example <caption>30 번째 프레임을 PNG 로 받기</caption>
+	 * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new Scene());
+	 * const capturePromise = engine.requestFrameCapture(30);
+	 * capturePromise.then((dataUrl) => {
+	 * 	console.log(dataUrl.length);
+	 * });
 	 */
 	requestFrameCapture(frameNumber) {
 		const currentFrameNumber = this.getFrameNumber();
@@ -1519,7 +1620,7 @@ export class Engine extends Object {
 	// 전역 인스턴스 반환.
 	//==============================================================================
 	/**
-	 * @returns { Engine }
+	 * @returns { Engine } 마지막으로 만든 엔진. (만든 적이 없으면 undefined)
 	 */
 	static getEngine() {
 		return System.vanillaEngine;

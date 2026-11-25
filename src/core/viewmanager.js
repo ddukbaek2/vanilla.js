@@ -47,6 +47,23 @@ export const ViewScaleMode = {
 // - viewNativeRect:	실제 사용되는 뷰 영역. (클라이언트 영역 기준의 부분 영역)
 // - viewSize:			실제 사용되는 뷰 크기. 
 //==============================================================================
+/**
+ * @example <caption>뷰 스케일 모드를 정하고 좌표 바꾸기</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, ViewScaleMode } from "./build/vanilla.js";
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+ * engineConfiguration.autoResizeOnWindowResize = true;
+ * const engine = new Engine(engineConfiguration);
+ * const viewManager = engine.getViewManager();
+ * viewManager.setViewScaleMode(ViewScaleMode.stretchShort);
+ * engine.run(new Scene());
+ * const viewSize = viewManager.getViewSize();
+ * const viewNativeRect = viewManager.getViewNativeRect();
+ * console.log(viewSize.x, viewSize.y, viewNativeRect.size.x, viewNativeRect.size.y);
+ * const viewPosition = viewManager.convertClientToView(100, 100);
+ * console.log(viewPosition.x, viewPosition.y);
+ */
 export class ViewManager extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -74,7 +91,7 @@ export class ViewManager extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { Engine } engine
+	 * @param { Engine } engine 기준 해상도를 읽을 엔진. (엔진 설정의 referenceResolutionSize)
 	 */
 	constructor(engine) {
 		super();
@@ -268,13 +285,13 @@ export class ViewManager extends Object {
 	/**
 	 * @public
 	 * @method
-	 * @param { Graphic } graphic
-	 * @param { number } scaleX
-	 * @param { number } scaleY
-	 * @param { number } skewX
-	 * @param { number } skewY
-	 * @param { number } translateX
-	 * @param { number } translateY
+	 * @param { Graphic } graphic 변환을 걸 그래픽.
+	 * @param { number } scaleX 가로 배율. (a)
+	 * @param { number } scaleY 세로 배율. (d)
+	 * @param { number } skewX 가로 기울임. (c)
+	 * @param { number } skewY 세로 기울임. (b)
+	 * @param { number } translateX 가로 이동. (e, 캔버스 픽셀)
+	 * @param { number } translateY 세로 이동. (f, 캔버스 픽셀)
 	*
 	 */
 	applyTransform(graphic, scaleX, scaleY, skewX, skewY, translateX, translateY){
@@ -289,7 +306,7 @@ export class ViewManager extends Object {
 	/**
 	 * @public
 	 * @method
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 변환을 걸 그래픽.
 	 */
 	applyCanvasNativeRect(graphic) {
 		const devicePixelRatio = this.getDevicePixelRatio();
@@ -312,7 +329,7 @@ export class ViewManager extends Object {
 	/**
 	 * @public
 	 * @method
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 변환을 걸 그래픽.
 	 */
 	applyViewRect(graphic) {
 		const devicePixelRatio = this.getDevicePixelRatio();
@@ -331,7 +348,7 @@ export class ViewManager extends Object {
 	// 기준 해상도 크기 재설정.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } referenceResolutionSize
+	 * @param { Vector2 } referenceResolutionSize 새 기준 해상도.
 	 */
 	applyReferenceResolutionSize(referenceResolutionSize) {
 		this.#referenceResolutionSize = referenceResolutionSize;
@@ -342,7 +359,7 @@ export class ViewManager extends Object {
 	// 캔버스 설정.
 	//==============================================================================
 	/**
-	 * @param { HTMLCanvasElement } canvas 
+	 * @param { HTMLCanvasElement } canvas 엔진이 그리는 캔버스.
 	 */
 	setCanvas(canvas) {
 		this.#canvas = canvas;
@@ -352,7 +369,7 @@ export class ViewManager extends Object {
 	// 캔버스 반환.
 	//==============================================================================
 	/**
-	 * @returns { HTMLCanvasElement }
+	 * @returns { HTMLCanvasElement } 엔진이 그리는 캔버스.
 	 */
 	getCanvas() {
 		return this.#canvas;
@@ -362,7 +379,7 @@ export class ViewManager extends Object {
 	// 디바이스의 실제 픽셀 개수 비율을 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 렌더에 쓰는 장치 화면 배율. (상한을 걸었으면 그 값까지)
 	 */
 	getDevicePixelRatio() {
 		return this.#devicePixelRatio;
@@ -372,7 +389,7 @@ export class ViewManager extends Object {
 	// 뷰 스케일 모드 설정.
 	//==============================================================================
 	/**
-	 * @param { ViewScaleMode } viewScaleMode
+	 * @param { ViewScaleMode } viewScaleMode ViewScaleMode 의 값. (같으면 아무것도 하지 않고, 바뀌면 뷰 영역을 다시 셈한다)
 	 */
 	setViewScaleMode(viewScaleMode) {
 		if (this.#viewScaleMode === viewScaleMode) {
@@ -387,7 +404,7 @@ export class ViewManager extends Object {
 	// 뷰 스케일 모드 반환.
 	//==============================================================================
 	/**
-	 * @returns { ViewScaleMode }
+	 * @returns { ViewScaleMode } ViewScaleMode 의 값.
 	 */
 	getViewScaleMode() {
 		return this.#viewScaleMode;
@@ -397,7 +414,7 @@ export class ViewManager extends Object {
 	// 웹페이지의 전체 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 창의 안쪽 크기. (CSS 픽셀, innerWidth, innerHeight)
 	 */
 	getClientNativeSize() {
 		return this.#clientNativeSize;
@@ -407,7 +424,7 @@ export class ViewManager extends Object {
 	// 캔버스의 요소 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 캔버스 요소의 크기. (CSS 픽셀, 반올림)
 	 */
 	getCanvasNativeSize() {
 		return this.#canvasNativeSize;
@@ -417,7 +434,7 @@ export class ViewManager extends Object {
 	// 캔버스의 픽셀 렌더링용 화면 크기 반환. (실제 캔버스 내부 해상도. 엔진, 컨텐츠 로직에서는 사용할 필요 없음)
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 캔버스의 렌더 픽셀 크기. (CSS 크기 x 장치 화면 배율)
 	 */
 	getCanvasPixelSize() {
 		return this.#canvasPixelSize;
@@ -427,7 +444,7 @@ export class ViewManager extends Object {
 	// 기준 해상도 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 기준 해상도.
 	 */
 	getReferenceResolutionSize() {
 		return this.#referenceResolutionSize;
@@ -437,7 +454,7 @@ export class ViewManager extends Object {
 	// 실제 사용 해상도 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 뷰 크기. (뷰 좌표, 뷰 스케일 모드에 따라 정해진다)
 	 */
 	getViewSize() {
 		return this.#viewSize;
@@ -449,7 +466,7 @@ export class ViewManager extends Object {
 	//   UI 층만 키울 배율을 셈할 때 쓴다. (예: 최소 CSS 배율 / 이 값)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 뷰 한 단위의 CSS 픽셀 수. (못 재면 1)
 	 */
 	getCssPixelScale() {
 		const canvas = this.getCanvas();
@@ -475,7 +492,7 @@ export class ViewManager extends Object {
 	// 캔버스 안에서 뷰가 존재하는 실제 영역 반환. (값은 canvasNativeSize 기준)
 	//==============================================================================
 	/**
-	 * @returns { Rect }
+	 * @returns { Rect } 캔버스 안의 뷰 영역. (CSS 픽셀, 캔버스 왼쪽 위가 원점)
 	 */
 	getViewNativeRect() {
 		return this.#viewNativeRect;
@@ -485,7 +502,7 @@ export class ViewManager extends Object {
 	// 배율 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { number } 기준 해상도에서 캔버스로 늘인 배율. (none, referenceResolution 은 1)
 	 */
 	getTargetResolutionScale() {
 		return this.#targetResolutionScale;
@@ -497,8 +514,8 @@ export class ViewManager extends Object {
 	/**
 	 * @public
 	 * @method
-	 * @param { Vector2 } canvasPosition
-	 * @returns { Vector2 }
+	 * @param { Vector2 } canvasPosition 캔버스 좌표. (캔버스 왼쪽 위가 원점, CSS 픽셀)
+	 * @returns { Vector2 } 뷰 좌표. (반올림한 정수, 배율이 0 이면 (0, 0))
 	 */
 	canvasPositionToViewPosition(canvasPosition) {
 		const devicePixelRatio = this.getDevicePixelRatio();
@@ -518,9 +535,9 @@ export class ViewManager extends Object {
 	// 화면(client) 좌표를 뷰 좌표로. (DOM 사건의 clientX, clientY 를 캔버스의 지금 자리로 빼서 canvasPositionToViewPosition 으로 바꾼다)
 	//==============================================================================
 	/**
-	 * @param { number } clientX
-	 * @param { number } clientY
-	 * @returns { Vector2 }
+	 * @param { number } clientX 클라이언트 X 좌표. (CSS 픽셀, clientX)
+	 * @param { number } clientY 클라이언트 Y 좌표. (CSS 픽셀, clientY)
+	 * @returns { Vector2 } 뷰 좌표. (반올림한 정수, 배율이 0 이면 (0, 0))
 	 */
 	convertClientToView(clientX, clientY) {
 		const canvas = this.getCanvas();
@@ -534,7 +551,7 @@ export class ViewManager extends Object {
 	// - 고DPI 기기에서 캔버스가 과대해지는 것을 막는다. 0 이면 제한하지 않는다.
 	//==============================================================================
 	/**
-	 * @param { number } maxRenderPixelRatio
+	 * @param { number } maxRenderPixelRatio 렌더 배율 상한. (0 이면 제한하지 않고, 음수는 0)
 	 */
 	setMaxRenderPixelRatio(maxRenderPixelRatio) {
 		this.#maxRenderPixelRatio = Math.max(0, maxRenderPixelRatio);
@@ -545,7 +562,7 @@ export class ViewManager extends Object {
 	// 렌더 배율 상한 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 렌더 배율 상한. (0 이면 제한 없음)
 	 */
 	getMaxRenderPixelRatio() {
 		return this.#maxRenderPixelRatio;
@@ -579,7 +596,7 @@ export class ViewManager extends Object {
 	}
 
 	//==============================================================================
-	// 세이프에어리어 강제값 설정. (CSS px — 데스크톱에서 노치를 흉내 낼 때)
+	// 세이프에어리어 강제값 설정. (CSS px, 데스크톱에서 노치를 흉내 낼 때)
 	//==============================================================================
 	/**
 	 * @param { object | null } insets { top, right, bottom, left }
@@ -595,6 +612,18 @@ export class ViewManager extends Object {
 	//==============================================================================
 	/**
 	 * @returns { object } { top, right, bottom, left }
+	 * @example <caption>세이프에어리어를 흉내 내고 뷰 좌표로 읽기</caption>
+	 * import { Engine, EngineConfiguration, Vector2, ViewScaleMode } from "./build/vanilla.js";
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+	 * const engine = new Engine(engineConfiguration);
+	 * const viewManager = engine.getViewManager();
+	 * viewManager.setViewScaleMode(ViewScaleMode.stretchShortExpandLong);
+	 * viewManager.setSafeAreaOverride({ top: 44, right: 0, bottom: 34, left: 0 });
+	 * viewManager.setIgnoredSafeAreaSides(["bottom"]);
+	 * const insets = viewManager.getSafeAreaInsets();
+	 * console.log(insets.top, insets.right, insets.bottom, insets.left);
 	 */
 	getSafeAreaInsets() {
 		let cssInsets = this.#safeAreaOverride;
@@ -636,7 +665,7 @@ export class ViewManager extends Object {
 	// 무시할 세이프에어리어 쪽 반환.
 	//==============================================================================
 	/**
-	 * @returns { string[] }
+	 * @returns { string[] } 무시할 쪽 목록. ("top", "right", "bottom", "left" 가운데)
 	 */
 	getIgnoredSafeAreaSides() {
 		return this.#ignoredSafeAreaSides;

@@ -13,6 +13,24 @@ import { ComponentNode } from "./componentnode.js";
 // - Transform 기능.
 // - 렌더링 기능. (컴포넌트 포함)
 //==============================================================================
+/**
+ * @example <caption>부모를 거친 자리, 회전, 크기 읽기</caption>
+ * import { TransformNode, Vector2 } from "./build/vanilla.js";
+ *
+ * const parent = new TransformNode();
+ * parent.setLocalPosition(Vector2.create(100, 50));
+ * parent.setLocalRotation(90);
+ * parent.setLocalScale(Vector2.create(2, 2));
+ * const child = new TransformNode();
+ * child.setLocalPositionXY(10, 0);
+ * child.setLocalOpacity(0.5);
+ * parent.addChild(child);
+ * const position = child.getPosition();
+ * const rotation = child.getRotation();
+ * const scale = child.getScale();
+ * const opacity = child.getOpacity();
+ * console.log(position.x, position.y, rotation, scale.x, opacity);
+ */
 export class TransformNode extends ComponentNode {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -46,7 +64,7 @@ export class TransformNode extends ComponentNode {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 변환을 걸 그래픽.
 	 */
 	pushTransform(graphic) {
 		if (graphic) {
@@ -66,7 +84,7 @@ export class TransformNode extends ComponentNode {
 	// - 위치와 크기를 복제하지 않고 읽는다. getLocalPosition() / getLocalScale() 을 덮어쓴 하위 클래스면 그 함수로 읽는다.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 변환을 걸 그래픽.
 	 */
 	applyLocalTransform(graphic) {
 		const localRotation = this.getLocalRotation();
@@ -92,7 +110,7 @@ export class TransformNode extends ComponentNode {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	draw(graphic) {
 		const isVisible = this.isVisible();
@@ -119,7 +137,7 @@ export class TransformNode extends ComponentNode {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	drawGizmos(graphic) {
 		// const isGizmoVisible = this.isGizmoVisible();
@@ -153,7 +171,7 @@ export class TransformNode extends ComponentNode {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 상태를 되돌릴 그래픽.
 	 */
 	popTransform(graphic) {
 		if (graphic) {
@@ -165,7 +183,7 @@ export class TransformNode extends ComponentNode {
 	// 글로벌 위치 설정.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } position 
+	 * @param { Vector2 } position 부모들을 거친 월드 자리. (부모의 위치, 회전, 크기를 거꾸로 걸어 로컬 위치로 바꾼다)
 	 */
 	setPosition(position) {
 		const parent = this.getParent();
@@ -201,7 +219,7 @@ export class TransformNode extends ComponentNode {
 	// 글로벌 위치 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 } 
+	 * @returns { Vector2 } 부모들을 거친 월드 자리. (부모가 없으면 로컬 위치)
 	 */
 	getPosition() {
 		const parent = this.getParent();
@@ -230,7 +248,7 @@ export class TransformNode extends ComponentNode {
 	// 글로벌 크기 설정.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } scale 
+	 * @param { Vector2 } scale 부모들을 거친 크기 배율. (부모 배율로 나눠 로컬 크기로 바꾸고, 부모 배율이 0 인 축은 0)
 	 */
 	setScale(scale) {
 		const parent = this.getParent();
@@ -250,7 +268,7 @@ export class TransformNode extends ComponentNode {
 	// 글로벌 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 } 
+	 * @returns { Vector2 } 부모들을 거친 크기 배율.
 	 */
 	getScale() {
 		const parent = this.getParent();
@@ -266,7 +284,7 @@ export class TransformNode extends ComponentNode {
 	// 글로벌 회전 설정.
 	//==============================================================================
 	/**
-	 * @param { number } rotation 
+	 * @param { number } rotation 부모들을 거친 회전. (도)
 	 */
 	setRotation(rotation) {
 		const parent = this.getParent();
@@ -283,7 +301,7 @@ export class TransformNode extends ComponentNode {
 	// 글로벌 회전 반환.
 	//==============================================================================
 	/**
-	 * @returns { number } 
+	 * @returns { number } 부모들을 거친 회전. (도)
 	 */
 	getRotation() {
 		const parent = this.getParent();
@@ -300,7 +318,7 @@ export class TransformNode extends ComponentNode {
 	// 로컬 위치 설정.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } position 
+	 * @param { Vector2 } position 부모 기준 자리. (값을 옮겨 적고 받은 벡터는 들고 있지 않는다)
 	 */
 	setLocalPosition(position) {
 		// 복제본을 새로 만들지 않고 가진 벡터에 값을 옮겨 적는다. (가진 벡터는 밖으로 내주지 않는다, getLocalPosition() 은 복제해 준다)
@@ -313,8 +331,8 @@ export class TransformNode extends ComponentNode {
 	// - getLocalPosition() / setLocalPosition() 을 덮어쓴 하위 클래스면 setLocalPosition 으로 넘긴다.
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
+	 * @param { number } x 부모 기준 X.
+	 * @param { number } y 부모 기준 Y.
 	 */
 	setLocalPositionXY(x, y) {
 		const isLocalPositionOverridden = this.setLocalPosition !== TransformNode.prototype.setLocalPosition;
@@ -330,7 +348,7 @@ export class TransformNode extends ComponentNode {
 	// 로컬 위치 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 } 
+	 * @returns { Vector2 } 로컬 위치의 사본.
 	 */
 	getLocalPosition() {
 		return this.#localPosition.clone();
@@ -340,7 +358,7 @@ export class TransformNode extends ComponentNode {
 	// 로컬 크기 설정.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } scale 
+	 * @param { Vector2 } scale 로컬 크기 배율. (값을 옮겨 적는다)
 	 */
 	setLocalScale(scale) {
 		// 복제본을 새로 만들지 않고 가진 벡터에 값을 옮겨 적는다. (getLocalScale() 은 복제해 준다)
@@ -353,8 +371,8 @@ export class TransformNode extends ComponentNode {
 	// - setLocalScale() 을 덮어쓴 하위 클래스면 setLocalScale 로 넘긴다.
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
+	 * @param { number } x 로컬 가로 배율.
+	 * @param { number } y 로컬 세로 배율.
 	 */
 	setLocalScaleXY(x, y) {
 		const isLocalScaleOverridden = this.setLocalScale !== TransformNode.prototype.setLocalScale;
@@ -370,7 +388,7 @@ export class TransformNode extends ComponentNode {
 	// 로컬 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 } 
+	 * @returns { Vector2 } 로컬 크기의 사본.
 	 */
 	getLocalScale() {
 		return this.#localScale.clone();
@@ -380,7 +398,7 @@ export class TransformNode extends ComponentNode {
 	// 로컬 회전 설정.
 	//==============================================================================
 	/**
-	 * @param { number } rotation 
+	 * @param { number } rotation 로컬 회전. (도)
 	 */
 	setLocalRotation(rotation) {
 		this.#localRotation = rotation;
@@ -390,7 +408,7 @@ export class TransformNode extends ComponentNode {
 	// 로컬 회전 반환.
 	//==============================================================================
 	/**
-	 * @returns { number } 
+	 * @returns { number } 로컬 회전. (도)
 	 */
 	getLocalRotation() {
 		return this.#localRotation;
@@ -400,7 +418,7 @@ export class TransformNode extends ComponentNode {
 	// 가시 상태 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean } 
+	 * @returns { boolean } 켜져 있고 로컬 투명도가 0 보다 크면 참.
 	 */
 	isVisible() {
 		const isActive = this.isActive();
@@ -418,7 +436,7 @@ export class TransformNode extends ComponentNode {
 	// 현재부터 루트까지 계층 전체의 가시 상태 반환. (루트까지 하나라도 비활성화상태면 false 반환)
 	//==============================================================================
 	/**
-	 * @returns { boolean } 
+	 * @returns { boolean } 자신과 모든 부모가 보이면 참.
 	 */
 	isVisibleInHierarchy() {
 		const isVisible = this.isVisible();
@@ -444,7 +462,7 @@ export class TransformNode extends ComponentNode {
 	// 글로벌 투명도 반환.
 	//==============================================================================
 	/**
-	 * @returns { number } 
+	 * @returns { number } 부모들의 투명도를 곱한 투명도. (0 ~ 1)
 	 */
 	getOpacity() {
 		let globalOpacity = this.getLocalOpacity();
@@ -466,7 +484,7 @@ export class TransformNode extends ComponentNode {
 	// 로컬 투명도 설정.
 	//==============================================================================
 	/**
-	 * @param { number } opacity 
+	 * @param { number } opacity 로컬 투명도. (0 ~ 1 로 자른다)
 	 */
 	setLocalOpacity(opacity) {
 		this.#localOpacity = Math.clamp(opacity, 0, 1);
@@ -476,7 +494,7 @@ export class TransformNode extends ComponentNode {
 	// 로컬 투명도 반환.
 	//==============================================================================
 	/**
-	 * @returns { number } 
+	 * @returns { number } 로컬 투명도. (0 ~ 1)
 	 */
 	getLocalOpacity() {
 		return this.#localOpacity;
@@ -486,7 +504,7 @@ export class TransformNode extends ComponentNode {
 	// 지난번 그릴 때 변환의 가장 큰 배율 설정. (Graphic.drawNode 가 부른다)
 	//==============================================================================
 	/**
-	 * @param { number } maximumScale
+	 * @param { number } maximumScale 변환의 가장 큰 배율.
 	 */
 	setLastDrawnMaximumScale(maximumScale) {
 		this.#lastDrawnMaximumScale = maximumScale;
@@ -496,7 +514,7 @@ export class TransformNode extends ComponentNode {
 	// 지난번 그릴 때 변환의 가장 큰 배율 반환. (0 이면 아직 모른다)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 변환의 가장 큰 배율. (0 이면 아직 모른다)
 	 */
 	getLastDrawnMaximumScale() {
 		return this.#lastDrawnMaximumScale;
@@ -506,7 +524,7 @@ export class TransformNode extends ComponentNode {
 	// 기즈모 그리기 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } isVisible 
+	 * @param { boolean } isVisible 참이면 기즈모를 그린다.
 	 */
 	setGizmoVisible(isVisible) {
 		this.#isGizmoVisible = isVisible;
@@ -516,7 +534,7 @@ export class TransformNode extends ComponentNode {
 	// 기즈모 그리기 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 기즈모를 그리면 참.
 	 */
 	isGizmoVisible() {
 		return this.#isGizmoVisible;
