@@ -39,6 +39,41 @@ const NO_INTRINSIC_METRIC = -1;
 // - layoutMargins / layoutMarginsGuide 는 UIKit 의 UIView.layoutMargins /
 //   layoutMarginsGuide 와 동일 사상. 자식 UINode 형태의 가이드를 lazy 로 노출.
 //==============================================================================
+/**
+ * @example <caption>판의 여백 안쪽에 줄 하나 놓기</caption>
+ * import { UINode, LayoutSolver } from "./build/vanilla.js";
+ *
+ * const solver = new LayoutSolver();
+ * const panelNode = new UINode();
+ * panelNode.setSolver(solver);
+ * const panelLeftAnchor = panelNode.leftAnchor;
+ * const panelTopAnchor = panelNode.topAnchor;
+ * const panelWidthAnchor = panelNode.widthAnchor;
+ * const panelHeightAnchor = panelNode.heightAnchor;
+ * panelNode.addConstraint(panelLeftAnchor.equalTo(20));
+ * panelNode.addConstraint(panelTopAnchor.equalTo(20));
+ * panelNode.addConstraint(panelWidthAnchor.equalTo(400));
+ * panelNode.addConstraint(panelHeightAnchor.equalTo(300));
+ * panelNode.setLayoutMargins({ top: 16, left: 24, bottom: 16, right: 24 });
+ *
+ * const marginsGuide = panelNode.getLayoutMarginsGuide();
+ * const rowNode = new UINode();
+ * rowNode.setSolver(solver);
+ * const guideLeftAnchor = marginsGuide.leftAnchor;
+ * const guideRightAnchor = marginsGuide.rightAnchor;
+ * const guideTopAnchor = marginsGuide.topAnchor;
+ * const rowLeftAnchor = rowNode.leftAnchor;
+ * const rowRightAnchor = rowNode.rightAnchor;
+ * const rowTopAnchor = rowNode.topAnchor;
+ * const rowHeightAnchor = rowNode.heightAnchor;
+ * rowNode.addConstraint(rowLeftAnchor.equalTo(guideLeftAnchor));
+ * rowNode.addConstraint(rowRightAnchor.equalTo(guideRightAnchor));
+ * rowNode.addConstraint(rowTopAnchor.equalTo(guideTopAnchor));
+ * rowNode.addConstraint(rowHeightAnchor.equalTo(48));
+ *
+ * solver.updateVariables();
+ * console.log(rowNode.getLeft(), rowNode.getTop(), rowNode.getWidth(), rowNode.getHeight());
+ */
 export class UINode extends TransformNode {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -104,7 +139,7 @@ export class UINode extends TransformNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그래픽. (null 이면 아무것도 하지 않는다)
 	 */
 	pushTransform(graphic) {
 		if (graphic) {
@@ -138,7 +173,7 @@ export class UINode extends TransformNode {
 	// - WorldNode 의 getContentSize 와 동일 시그니처. Mask 등 컴포넌트가 그대로 사용 가능.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 솔버가 푼 너비와 높이.
 	 */
 	getContentSize() {
 		const width = this.getWidth();
@@ -154,7 +189,7 @@ export class UINode extends TransformNode {
 	// - centerY == top + height/2
 	//==============================================================================
 	/**
-	 * @returns { LayoutConstraint[] }
+	 * @returns { LayoutConstraint[] } 본질 제약 4 개. (솔버에 넣지 않고 돌려준다)
 	 */
 	buildIntrinsicConstraints() {
 		const leftExpression = this.leftAnchor;
@@ -180,7 +215,7 @@ export class UINode extends TransformNode {
 	// - compression: widthAnchor.greaterThanOrEqualTo(intrinsicWidth) @ compressionResistancePriority
 	//==============================================================================
 	/**
-	 * @returns { LayoutConstraint[] }
+	 * @returns { LayoutConstraint[] } 내재 크기 제약 목록. (축마다 둘, 내재 크기가 없는 축은 빠진다, 솔버에 넣지 않고 돌려준다)
 	 */
 	buildIntrinsicSizeConstraints() {
 		const intrinsicSize = this.getIntrinsicContentSize();
@@ -212,7 +247,7 @@ export class UINode extends TransformNode {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 내재 크기. (축마다 컴포넌트 값 가운데 가장 큰 것, 없는 축은 -1)
 	 */
 	getIntrinsicContentSize() {
 		let maxWidth = NO_INTRINSIC_METRIC;
@@ -259,8 +294,8 @@ export class UINode extends TransformNode {
 	// content hugging 우선순위 반환. (UIKit 의 contentHuggingPriority(for:))
 	//==============================================================================
 	/**
-	 * @param { string } axis
-	 * @returns { number }
+	 * @param { string } axis 축. (LayoutConstraintAxis 의 값, 그 밖이면 예외를 던진다)
+	 * @returns { number } 그 축의 content hugging 우선순위. (기본 LayoutPriority.defaultLow)
 	 */
 	getContentHuggingPriority(axis) {
 		if (axis === LayoutConstraintAxis.horizontal) {
@@ -277,8 +312,8 @@ export class UINode extends TransformNode {
 	// - intrinsicSize 제약을 즉시 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } priority
-	 * @param { string } axis
+	 * @param { number } priority 우선순위. (1 ~ 1000, LayoutPriority 의 값을 쓸 수 있다)
+	 * @param { string } axis 축. (LayoutConstraintAxis 의 값, 그 밖이면 예외를 던진다)
 	 */
 	setContentHuggingPriority(priority, axis) {
 		if (axis === LayoutConstraintAxis.horizontal) {
@@ -298,8 +333,8 @@ export class UINode extends TransformNode {
 	// (UIKit 의 contentCompressionResistancePriority(for:))
 	//==============================================================================
 	/**
-	 * @param { string } axis
-	 * @returns { number }
+	 * @param { string } axis 축. (LayoutConstraintAxis 의 값, 그 밖이면 예외를 던진다)
+	 * @returns { number } 그 축의 압축 저항 우선순위. (기본 LayoutPriority.defaultHigh)
 	 */
 	getContentCompressionResistancePriority(axis) {
 		if (axis === LayoutConstraintAxis.horizontal) {
@@ -317,8 +352,8 @@ export class UINode extends TransformNode {
 	// - intrinsicSize 제약을 즉시 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } priority
-	 * @param { string } axis
+	 * @param { number } priority 우선순위. (1 ~ 1000, LayoutPriority 의 값을 쓸 수 있다)
+	 * @param { string } axis 축. (LayoutConstraintAxis 의 값, 그 밖이면 예외를 던진다)
 	 */
 	setContentCompressionResistancePriority(priority, axis) {
 		if (axis === LayoutConstraintAxis.horizontal) {
@@ -337,7 +372,7 @@ export class UINode extends TransformNode {
 	// layoutMargins 반환. (UIKit 의 UIView.layoutMargins)
 	//==============================================================================
 	/**
-	 * @returns { { top: number, left: number, bottom: number, right: number } }
+	 * @returns { { top: number, left: number, bottom: number, right: number } } 레이아웃 여백의 사본. (기본 사방 8)
 	 */
 	getLayoutMargins() {
 		const layoutMargins = this.#layoutMargins;
@@ -354,7 +389,7 @@ export class UINode extends TransformNode {
 	// - layoutMarginsGuide 가 이미 생성됐다면 가이드 제약을 즉시 갱신.
 	//==============================================================================
 	/**
-	 * @param { { top: number, left: number, bottom: number, right: number } } layoutMargins
+	 * @param { { top: number, left: number, bottom: number, right: number } } layoutMargins 위, 왼쪽, 아래, 오른쪽 여백. (값을 복사해 담는다)
 	 */
 	setLayoutMargins(layoutMargins) {
 		this.#layoutMargins = {
@@ -374,7 +409,7 @@ export class UINode extends TransformNode {
 	// - 가이드는 트리에 들어가지 않아 렌더링되지 않으며, anchor 만 사용된다.
 	//==============================================================================
 	/**
-	 * @returns { UINode }
+	 * @returns { UINode } 여백만큼 안쪽으로 들어간 가이드 UINode.
 	 */
 	getLayoutMarginsGuide() {
 		if (this.#layoutMarginsGuide === null) {
@@ -425,7 +460,7 @@ export class UINode extends TransformNode {
 	// - solver 가 null 이면 모두 해제만 한다.
 	//==============================================================================
 	/**
-	 * @param { LayoutSolver | null } solver
+	 * @param { LayoutSolver | null } solver 붙일 솔버. (null 이면 지금 솔버에서 떼기만 한다)
 	 */
 	setSolver(solver) {
 		const previousSolver = this.#solver;
@@ -475,7 +510,7 @@ export class UINode extends TransformNode {
 	// 솔버 반환.
 	//==============================================================================
 	/**
-	 * @returns { LayoutSolver | null }
+	 * @returns { LayoutSolver | null } 붙은 솔버. (없으면 null)
 	 */
 	getSolver() {
 		return this.#solver;
@@ -485,7 +520,30 @@ export class UINode extends TransformNode {
 	// 사용자 제약 추가. 솔버에 즉시 등록.
 	//==============================================================================
 	/**
-	 * @param { LayoutConstraint } constraint
+	 * @param { LayoutConstraint } constraint 더할 제약.
+	 * @example <caption>약한 제약과 상한 제약 함께 쓰기</caption>
+	 * import { UINode, LayoutSolver, LayoutStrength } from "./build/vanilla.js";
+	 *
+	 * const solver = new LayoutSolver();
+	 * const node = new UINode();
+	 * node.setSolver(solver);
+	 * const leftAnchor = node.leftAnchor;
+	 * const topAnchor = node.topAnchor;
+	 * const widthAnchor = node.widthAnchor;
+	 * const heightAnchor = node.heightAnchor;
+	 * node.addConstraint(leftAnchor.equalTo(0));
+	 * node.addConstraint(topAnchor.equalTo(0));
+	 * node.addConstraint(heightAnchor.equalTo(40));
+	 * const preferredWidthConstraint = widthAnchor.equalTo(300).withStrength(LayoutStrength.weak);
+	 * const maximumWidthConstraint = widthAnchor.lessThanOrEqualTo(200);
+	 * node.addConstraint(preferredWidthConstraint);
+	 * node.addConstraint(maximumWidthConstraint);
+	 * solver.updateVariables();
+	 * console.log(node.getWidth());
+	 *
+	 * node.removeConstraint(maximumWidthConstraint);
+	 * solver.updateVariables();
+	 * console.log(node.getWidth());
 	 */
 	addConstraint(constraint) {
 		this.#userConstraints.push(constraint);
@@ -499,7 +557,7 @@ export class UINode extends TransformNode {
 	// 사용자 제약 제거. 솔버에서도 제거.
 	//==============================================================================
 	/**
-	 * @param { LayoutConstraint } constraint
+	 * @param { LayoutConstraint } constraint 뺄 제약. (더하지 않은 제약이면 아무것도 하지 않는다)
 	 */
 	removeConstraint(constraint) {
 		const index = this.#userConstraints.indexOf(constraint);
@@ -516,7 +574,7 @@ export class UINode extends TransformNode {
 	// 등록된 사용자 제약 목록 반환. (사본)
 	//==============================================================================
 	/**
-	 * @returns { LayoutConstraint[] }
+	 * @returns { LayoutConstraint[] } 사용자 제약 목록의 사본.
 	 */
 	getConstraints() {
 		return this.#userConstraints.slice();
@@ -526,7 +584,7 @@ export class UINode extends TransformNode {
 	// 좌측 변수 반환. (식 외 용도로 raw LayoutVariable 이 필요할 때)
 	//==============================================================================
 	/**
-	 * @returns { LayoutVariable }
+	 * @returns { LayoutVariable } 왼쪽 변수.
 	 */
 	getLeftVariable() {
 		return this.#leftVariable;
@@ -536,7 +594,7 @@ export class UINode extends TransformNode {
 	// 우측 변수 반환.
 	//==============================================================================
 	/**
-	 * @returns { LayoutVariable }
+	 * @returns { LayoutVariable } 오른쪽 변수.
 	 */
 	getRightVariable() {
 		return this.#rightVariable;
@@ -546,7 +604,7 @@ export class UINode extends TransformNode {
 	// 상단 변수 반환.
 	//==============================================================================
 	/**
-	 * @returns { LayoutVariable }
+	 * @returns { LayoutVariable } 위 변수.
 	 */
 	getTopVariable() {
 		return this.#topVariable;
@@ -556,7 +614,7 @@ export class UINode extends TransformNode {
 	// 하단 변수 반환.
 	//==============================================================================
 	/**
-	 * @returns { LayoutVariable }
+	 * @returns { LayoutVariable } 아래 변수.
 	 */
 	getBottomVariable() {
 		return this.#bottomVariable;
@@ -566,7 +624,7 @@ export class UINode extends TransformNode {
 	// 너비 변수 반환.
 	//==============================================================================
 	/**
-	 * @returns { LayoutVariable }
+	 * @returns { LayoutVariable } 너비 변수.
 	 */
 	getWidthVariable() {
 		return this.#widthVariable;
@@ -576,7 +634,7 @@ export class UINode extends TransformNode {
 	// 높이 변수 반환.
 	//==============================================================================
 	/**
-	 * @returns { LayoutVariable }
+	 * @returns { LayoutVariable } 높이 변수.
 	 */
 	getHeightVariable() {
 		return this.#heightVariable;
@@ -586,7 +644,7 @@ export class UINode extends TransformNode {
 	// 가로 중심 변수 반환.
 	//==============================================================================
 	/**
-	 * @returns { LayoutVariable }
+	 * @returns { LayoutVariable } 가로 중심 변수.
 	 */
 	getCenterXVariable() {
 		return this.#centerXVariable;
@@ -596,7 +654,7 @@ export class UINode extends TransformNode {
 	// 세로 중심 변수 반환.
 	//==============================================================================
 	/**
-	 * @returns { LayoutVariable }
+	 * @returns { LayoutVariable } 세로 중심 변수.
 	 */
 	getCenterYVariable() {
 		return this.#centerYVariable;
@@ -604,11 +662,11 @@ export class UINode extends TransformNode {
 
 	//==============================================================================
 	// 좌측 앵커 식 반환. (UIKit 의 leftAnchor 와 같은 사상)
-	// - 사용자 제약 작성 시 호출 — 새 LayoutExpression 인스턴스를 매 호출마다 반환.
+	// - 사용자 제약 작성 시 호출, 새 LayoutExpression 인스턴스를 매 호출마다 반환.
 	//   add / subtract / multiply / divide 가 불변이라 매번 새로 만들어도 안전.
 	//==============================================================================
 	/**
-	 * @returns { LayoutExpression }
+	 * @returns { LayoutExpression } 왼쪽 변수 하나로 된 새 식.
 	 */
 	get leftAnchor() {
 		return LayoutExpression.fromVariable(this.#leftVariable);
@@ -618,7 +676,7 @@ export class UINode extends TransformNode {
 	// 우측 앵커 식 반환. (UIKit 의 rightAnchor 와 같은 사상)
 	//==============================================================================
 	/**
-	 * @returns { LayoutExpression }
+	 * @returns { LayoutExpression } 오른쪽 변수 하나로 된 새 식.
 	 */
 	get rightAnchor() {
 		return LayoutExpression.fromVariable(this.#rightVariable);
@@ -628,7 +686,7 @@ export class UINode extends TransformNode {
 	// 상단 앵커 식 반환. (UIKit 의 topAnchor 와 같은 사상)
 	//==============================================================================
 	/**
-	 * @returns { LayoutExpression }
+	 * @returns { LayoutExpression } 위 변수 하나로 된 새 식.
 	 */
 	get topAnchor() {
 		return LayoutExpression.fromVariable(this.#topVariable);
@@ -638,7 +696,7 @@ export class UINode extends TransformNode {
 	// 하단 앵커 식 반환. (UIKit 의 bottomAnchor 와 같은 사상)
 	//==============================================================================
 	/**
-	 * @returns { LayoutExpression }
+	 * @returns { LayoutExpression } 아래 변수 하나로 된 새 식.
 	 */
 	get bottomAnchor() {
 		return LayoutExpression.fromVariable(this.#bottomVariable);
@@ -648,7 +706,7 @@ export class UINode extends TransformNode {
 	// 너비 앵커 식 반환. (UIKit 의 widthAnchor 와 같은 사상)
 	//==============================================================================
 	/**
-	 * @returns { LayoutExpression }
+	 * @returns { LayoutExpression } 너비 변수 하나로 된 새 식.
 	 */
 	get widthAnchor() {
 		return LayoutExpression.fromVariable(this.#widthVariable);
@@ -658,7 +716,7 @@ export class UINode extends TransformNode {
 	// 높이 앵커 식 반환. (UIKit 의 heightAnchor 와 같은 사상)
 	//==============================================================================
 	/**
-	 * @returns { LayoutExpression }
+	 * @returns { LayoutExpression } 높이 변수 하나로 된 새 식.
 	 */
 	get heightAnchor() {
 		return LayoutExpression.fromVariable(this.#heightVariable);
@@ -668,7 +726,7 @@ export class UINode extends TransformNode {
 	// 가로 중심 앵커 식 반환. (UIKit 의 centerXAnchor 와 같은 사상)
 	//==============================================================================
 	/**
-	 * @returns { LayoutExpression }
+	 * @returns { LayoutExpression } 가로 중심 변수 하나로 된 새 식.
 	 */
 	get centerXAnchor() {
 		return LayoutExpression.fromVariable(this.#centerXVariable);
@@ -678,7 +736,7 @@ export class UINode extends TransformNode {
 	// 세로 중심 앵커 식 반환. (UIKit 의 centerYAnchor 와 같은 사상)
 	//==============================================================================
 	/**
-	 * @returns { LayoutExpression }
+	 * @returns { LayoutExpression } 세로 중심 변수 하나로 된 새 식.
 	 */
 	get centerYAnchor() {
 		return LayoutExpression.fromVariable(this.#centerYVariable);
@@ -689,7 +747,7 @@ export class UINode extends TransformNode {
 	// - LTR 환경에서는 leftAnchor 와 동일. RTL 미지원이라 항상 leftAnchor 를 반환.
 	//==============================================================================
 	/**
-	 * @returns { LayoutExpression }
+	 * @returns { LayoutExpression } leftAnchor 와 같은 식.
 	 */
 	get leadingAnchor() {
 		return this.leftAnchor;
@@ -700,7 +758,7 @@ export class UINode extends TransformNode {
 	// - LTR 환경에서는 rightAnchor 와 동일. RTL 미지원이라 항상 rightAnchor 를 반환.
 	//==============================================================================
 	/**
-	 * @returns { LayoutExpression }
+	 * @returns { LayoutExpression } rightAnchor 와 같은 식.
 	 */
 	get trailingAnchor() {
 		return this.rightAnchor;
@@ -713,7 +771,7 @@ export class UINode extends TransformNode {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @returns { LayoutExpression }
+	 * @returns { LayoutExpression } topAnchor 와 같은 식. (하위 클래스가 바꿀 수 있다)
 	 */
 	get firstBaselineAnchor() {
 		return this.topAnchor;
@@ -726,7 +784,7 @@ export class UINode extends TransformNode {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @returns { LayoutExpression }
+	 * @returns { LayoutExpression } bottomAnchor 와 같은 식. (하위 클래스가 바꿀 수 있다)
 	 */
 	get lastBaselineAnchor() {
 		return this.bottomAnchor;
@@ -736,7 +794,7 @@ export class UINode extends TransformNode {
 	// 좌측 위치 반환. (LayoutSolver.updateVariables 호출 후 유효)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 솔버가 푼 왼쪽 위치. (UI 트리 루트의 좌표계)
 	 */
 	getLeft() {
 		return this.#leftVariable.getValue();
@@ -746,7 +804,7 @@ export class UINode extends TransformNode {
 	// 우측 위치 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 솔버가 푼 오른쪽 위치. (UI 트리 루트의 좌표계)
 	 */
 	getRight() {
 		return this.#rightVariable.getValue();
@@ -756,7 +814,7 @@ export class UINode extends TransformNode {
 	// 상단 위치 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 솔버가 푼 위쪽 위치. (UI 트리 루트의 좌표계)
 	 */
 	getTop() {
 		return this.#topVariable.getValue();
@@ -766,7 +824,7 @@ export class UINode extends TransformNode {
 	// 하단 위치 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 솔버가 푼 아래쪽 위치. (UI 트리 루트의 좌표계)
 	 */
 	getBottom() {
 		return this.#bottomVariable.getValue();
@@ -776,7 +834,7 @@ export class UINode extends TransformNode {
 	// 너비 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 솔버가 푼 너비.
 	 */
 	getWidth() {
 		return this.#widthVariable.getValue();
@@ -786,7 +844,7 @@ export class UINode extends TransformNode {
 	// 높이 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 솔버가 푼 높이.
 	 */
 	getHeight() {
 		return this.#heightVariable.getValue();
@@ -796,7 +854,7 @@ export class UINode extends TransformNode {
 	// 가로 중심 위치 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 솔버가 푼 가로 중심 위치. (UI 트리 루트의 좌표계)
 	 */
 	getCenterX() {
 		return this.#centerXVariable.getValue();
@@ -806,7 +864,7 @@ export class UINode extends TransformNode {
 	// 세로 중심 위치 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 솔버가 푼 세로 중심 위치. (UI 트리 루트의 좌표계)
 	 */
 	getCenterY() {
 		return this.#centerYVariable.getValue();

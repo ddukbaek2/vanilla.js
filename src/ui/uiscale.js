@@ -22,6 +22,16 @@ const DEFAULT_PORTRAIT_RATIO = 1.1;
 // - 사용: const uiScale = UIScale.read(viewWidth, viewHeight); layerNode.setLocalScale(Vector2.create(uiScale, uiScale));
 //   UIWindowLayer 가 이 배율로 창을 키운다.
 //==============================================================================
+/**
+ * @example <caption>화면 크기마다 UI 배율 셈하기</caption>
+ * import { UIScale } from "./build/vanilla.js";
+ *
+ * const smallScreenScale = UIScale.read(1280, 720, { cssPixelScale: 0.5 });
+ * const largeScreenScale = UIScale.read(1280, 720, { cssPixelScale: 1.2 });
+ * const portraitScale = UIScale.read(720, 1280, { cssPixelScale: 0.4 });
+ * const limitedScale = UIScale.read(1280, 720, { cssPixelScale: 0.25, maximumScale: 1.5 });
+ * console.log(smallScreenScale, largeScreenScale, portraitScale, limitedScale);
+ */
 export class UIScale {
 	//==============================================================================
 	// UI 배율 읽기.
@@ -30,7 +40,47 @@ export class UIScale {
 	 * @param { number } viewWidth UI 층이 덮는 영역의 너비. (뷰 단위)
 	 * @param { number } viewHeight UI 층이 덮는 영역의 높이. (뷰 단위)
 	 * @param { object } options { minimumCssScale = 0.8, maximumScale = 1.8, minimumLayerHeight = 0, portraitRatio = 1.1, cssPixelScale? (없으면 엔진의 ViewManager.getCssPixelScale) }
-	 * @returns { number }
+	 * @returns { number } UI 층에 곱할 배율. (1 이상, cssPixelScale 이 0 보다 크지 않으면 1)
+	 * @example <caption>UI 층 노드를 화면에 맞춰 키우기</caption>
+	 * import { Engine, EngineConfiguration, UIScene, UIScale, UILabel, WorldNode, Pivot, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends UIScene {
+	 * 	constructor() {
+	 * 		super();
+	 * 		this.setLoadingMinDurationMs(0);
+	 * 	}
+	 *
+	 * 	initialize(engine) {
+	 * 		super.initialize(engine);
+	 * 		const layerNode = new WorldNode();
+	 * 		layerNode.setPivot(Pivot.topLeft);
+	 * 		layerNode.setAnchor(Pivot.topLeft);
+	 * 		const labelNode = new WorldNode();
+	 * 		labelNode.setPivot(Pivot.topLeft);
+	 * 		labelNode.setAnchor(Pivot.topLeft);
+	 * 		labelNode.setLocalPosition(Vector2.create(16, 16));
+	 * 		labelNode.setContentSize(Vector2.create(240, 32));
+	 * 		const label = labelNode.addComponent(UILabel);
+	 * 		label.setText("Readable on small screens");
+	 * 		label.setFontSize(16);
+	 * 		layerNode.addChild(labelNode);
+	 * 		const root = this.getRoot();
+	 * 		root.addChild(layerNode);
+	 *
+	 * 		const viewManager = engine.getViewManager();
+	 * 		const viewSize = viewManager.getViewSize();
+	 * 		const uiScale = UIScale.read(viewSize.x, viewSize.y, { minimumLayerHeight: 320 });
+	 * 		layerNode.setLocalScale(Vector2.create(uiScale, uiScale));
+	 * 		console.log("ui scale", uiScale);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.canvasId = "mainCanvas";
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * engineConfiguration.autoResizeOnWindowResize = true;
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	static read(viewWidth, viewHeight, options = {}) {
 		const minimumCssScale = (options.minimumCssScale !== undefined) ? options.minimumCssScale : DEFAULT_MINIMUM_CSS_SCALE;
@@ -57,10 +107,10 @@ export class UIScale {
 	// 세로 화면인지. (가로가 세로의 portraitRatio 배 이하)
 	//==============================================================================
 	/**
-	 * @param { number } viewWidth
-	 * @param { number } viewHeight
-	 * @param { number } portraitRatio
-	 * @returns { boolean }
+	 * @param { number } viewWidth 영역의 너비. (뷰 단위)
+	 * @param { number } viewHeight 영역의 높이. (뷰 단위)
+	 * @param { number } portraitRatio 세로 화면으로 볼 가름. (가로가 세로의 이 배 이하면 세로, 기본 1.1)
+	 * @returns { boolean } 가로가 세로의 portraitRatio 배 이하면 참.
 	 */
 	static isPortrait(viewWidth, viewHeight, portraitRatio = DEFAULT_PORTRAIT_RATIO) {
 		return viewWidth <= viewHeight * portraitRatio;
@@ -70,7 +120,7 @@ export class UIScale {
 	// 뷰 한 단위가 화면에서 몇 CSS 픽셀인지. (엔진이 없으면 1)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 뷰 한 단위의 CSS 픽셀 수. (엔진이 없으면 1)
 	 */
 	static readCssPixelScale() {
 		const engine = Engine.getEngine();

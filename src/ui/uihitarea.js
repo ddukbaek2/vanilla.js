@@ -18,6 +18,47 @@ import { UIButton } from "./uibutton.js";
 //   자르기는 부모가 돌지 않을 때 맞는다.
 // - 사용: UIHitArea.attach(buttonNode, minimumSize) (단추가 부모에 붙은 뒤에 부른다)
 //==============================================================================
+/**
+ * @example <caption>작은 닫기 단추의 누르는 자리 넓히기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIButton, UIHitArea, Paint, WorldNode, Pivot, Vector2, Color } from "./build/vanilla.js";
+ *
+ * class MainScene extends UIScene {
+ * 	constructor() {
+ * 		super();
+ * 		this.setLoadingMinDurationMs(0);
+ * 	}
+ *
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const buttonNode = new WorldNode();
+ * 		buttonNode.setName("CloseButton");
+ * 		buttonNode.setPivot(Pivot.topLeft);
+ * 		buttonNode.setAnchor(Pivot.topLeft);
+ * 		buttonNode.setLocalPosition(Vector2.create(300, 20));
+ * 		buttonNode.setContentSize(Vector2.create(24, 24));
+ * 		const paint = buttonNode.addComponent(Paint);
+ * 		paint.setColor(new Color(0.85, 0.3, 0.3, 1));
+ * 		const button = buttonNode.addComponent(UIButton);
+ * 		button.setClickedEvent(() => {
+ * 			console.log("close");
+ * 		});
+ * 		const root = this.getRoot();
+ * 		root.addChild(buttonNode);
+ *
+ * 		const hitNode = UIHitArea.attach(buttonNode, 48);
+ * 		const hitArea = hitNode.getComponent(UIHitArea);
+ * 		hitArea.setClipNode(root);
+ * 		console.log(hitNode.getName(), hitArea.getMinimumSize());
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.canvasId = "mainCanvas";
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * engineConfiguration.autoResizeOnWindowResize = true;
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class UIHitArea extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -47,7 +88,7 @@ export class UIHitArea extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		const node = this.getNode();
@@ -113,8 +154,8 @@ export class UIHitArea extends Component {
 	// 넓혀 줄 단추 설정.
 	//==============================================================================
 	/**
-	 * @param { WorldNode } targetNode
-	 * @param { UIButton } targetButton
+	 * @param { WorldNode } targetNode 넓혀 줄 단추의 노드.
+	 * @param { UIButton } targetButton 그 노드에 붙은 단추.
 	 */
 	setTarget(targetNode, targetButton) {
 		this.#targetNode = targetNode;
@@ -125,7 +166,7 @@ export class UIHitArea extends Component {
 	// 넓혀 줄 단추의 노드 반환.
 	//==============================================================================
 	/**
-	 * @returns { WorldNode | null }
+	 * @returns { WorldNode | null } 넓혀 줄 단추의 노드. (정하지 않았으면 null)
 	 */
 	getTargetNode() {
 		return this.#targetNode;
@@ -135,7 +176,7 @@ export class UIHitArea extends Component {
 	// 넓혀 줄 단추 반환.
 	//==============================================================================
 	/**
-	 * @returns { UIButton | null }
+	 * @returns { UIButton | null } 넓혀 줄 단추. (정하지 않았으면 null)
 	 */
 	getTargetButton() {
 		return this.#targetButton;
@@ -145,7 +186,7 @@ export class UIHitArea extends Component {
 	// 누르는 자리의 가장 작은 가로세로 설정.
 	//==============================================================================
 	/**
-	 * @param { number } minimumSize
+	 * @param { number } minimumSize 누르는 자리의 가장 작은 가로세로. (부모 안의 단위, 단추가 이보다 큰 축은 넓히지 않는다)
 	 */
 	setMinimumSize(minimumSize) {
 		this.#minimumSize = minimumSize;
@@ -155,7 +196,7 @@ export class UIHitArea extends Component {
 	// 누르는 자리의 가장 작은 가로세로 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 누르는 자리의 가장 작은 가로세로. (기본 0)
 	 */
 	getMinimumSize() {
 		return this.#minimumSize;
@@ -165,7 +206,7 @@ export class UIHitArea extends Component {
 	// 넓힌 몫을 자르는 노드 설정. (null 이면 자르지 않는다)
 	//==============================================================================
 	/**
-	 * @param { WorldNode | null } clipNode
+	 * @param { WorldNode | null } clipNode 넓힌 몫을 자르는 노드. (null 이면 자르지 않는다)
 	 */
 	setClipNode(clipNode) {
 		this.#clipNode = clipNode;
@@ -175,7 +216,7 @@ export class UIHitArea extends Component {
 	// 넓힌 몫을 자르는 노드 반환.
 	//==============================================================================
 	/**
-	 * @returns { WorldNode | null }
+	 * @returns { WorldNode | null } 넓힌 몫을 자르는 노드. (없으면 null)
 	 */
 	getClipNode() {
 		return this.#clipNode;
@@ -187,8 +228,8 @@ export class UIHitArea extends Component {
 	/**
 	 * @static
 	 * @param { WorldNode } buttonNode - UIButton 이 붙은 노드.
-	 * @param { number } minimumSize
-	 * @returns { WorldNode | null }
+	 * @param { number } minimumSize 누르는 자리의 가장 작은 가로세로. (부모 안의 단위)
+	 * @returns { WorldNode | null } 만든 누름 자리 노드. (단추 노드에 부모가 없거나 UIButton 이 없으면 null)
 	 */
 	static attach(buttonNode, minimumSize) {
 		const parentNode = buttonNode.getParent();
