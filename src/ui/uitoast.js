@@ -20,6 +20,29 @@ import { UILabel } from "./uilabel.js";
 //     scene.getRoot().addChild(toast);
 //     toast.show("저장되었습니다.");
 //==============================================================================
+/**
+ * @example <caption>알림 두 개를 줄 세워 띄우기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIToast, Color } from "./build/vanilla.js";
+ *
+ * class ToastScene extends UIScene {
+ * 	create() {
+ * 		super.create();
+ * 		const toast = new UIToast({ width: 320, height: 40, restY: 300, holdSeconds: 1.2, backgroundColor: new Color(0.07, 0.09, 0.13, 0.95) });
+ * 		const root = this.getRoot();
+ * 		root.addChild(toast);
+ * 		toast.show("Game saved");
+ * 		toast.show("Achievement unlocked");
+ * 		const isShowing = toast.isShowing();
+ * 		console.log(isShowing);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new ToastScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class UIToast extends WorldNode {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -73,7 +96,7 @@ export class UIToast extends WorldNode {
 	// 토스트 표시. (표시 중이면 줄을 선다)
 	//==============================================================================
 	/**
-	 * @param { string } messageText
+	 * @param { string } messageText 알림 글. (떠 있는 것이 없으면 곧바로 띄우고, 있으면 줄 끝에 넣는다)
 	 */
 	show(messageText) {
 		this.#messageQueue.push(messageText);
@@ -108,7 +131,7 @@ export class UIToast extends WorldNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초, 나오기 0.24 초, 머물기 holdSeconds, 사라지기 0.2 초)
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
@@ -168,7 +191,7 @@ export class UIToast extends WorldNode {
 	// 표시 자리(가운데 세로 좌표) 설정.
 	//==============================================================================
 	/**
-	 * @param { number } restY
+	 * @param { number } restY 머무는 자리의 가운데 세로 좌표. (부모 로컬 픽셀, 나올 때 28 픽셀 아래에서 떠오른다)
 	 */
 	setRestY(restY) {
 		this.#restY = restY;
@@ -178,7 +201,7 @@ export class UIToast extends WorldNode {
 	// 표시 자리(가운데 가로 좌표) 설정. (null 이면 부모 가로 중앙)
 	//==============================================================================
 	/**
-	 * @param { number | null } restX
+	 * @param { number | null } restX 가운데 가로 좌표. (부모 로컬 픽셀, null 이면 부모 너비의 반, 부모 크기가 0 이면 480)
 	 */
 	setRestX(restX) {
 		this.#restX = restX;
@@ -188,7 +211,7 @@ export class UIToast extends WorldNode {
 	// 머무는 시간 설정.
 	//==============================================================================
 	/**
-	 * @param { number } holdSeconds
+	 * @param { number } holdSeconds 머무는 초. (다 나온 뒤부터 센다)
 	 */
 	setHoldSeconds(holdSeconds) {
 		this.#holdSeconds = holdSeconds;
@@ -198,7 +221,7 @@ export class UIToast extends WorldNode {
 	// 표시 중 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 나오는 중, 머무는 중, 사라지는 중이면 참.
 	 */
 	isShowing() {
 		return this.#phase !== "hidden";

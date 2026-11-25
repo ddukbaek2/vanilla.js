@@ -22,6 +22,35 @@ const CORNER_STEPS = 10;
 // - 붙인 노드의 내용 크기 전체가 고리의 바깥 꼴이고, 선의 가운데가 그 안쪽으로 굵기의 반만큼 들어온다.
 // - 둘레의 점은 크기, 둥근 정도, 굵기가 바뀔 때만 다시 셈한다.
 //==============================================================================
+/**
+ * @example <caption>동그란 진행 고리 그리기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIProgressRing, WorldNode, Pivot, Vector2 } from "./build/vanilla.js";
+ *
+ * class RingScene extends UIScene {
+ * 	create() {
+ * 		super.create();
+ * 		const ringNode = new WorldNode();
+ * 		ringNode.setPivot(Pivot.middleCenter.clone());
+ * 		ringNode.setAnchor(Pivot.topLeft.clone());
+ * 		ringNode.setContentSize(Vector2.create(96, 96));
+ * 		ringNode.setLocalPosition(Vector2.create(320, 180));
+ * 		const progressRing = ringNode.addComponent(UIProgressRing);
+ * 		progressRing.setRoundSize(48);
+ * 		progressRing.setLineWidth(6);
+ * 		progressRing.setFillColor("#4ade80");
+ * 		progressRing.setTrackColor("rgba(255, 255, 255, 0.15)");
+ * 		progressRing.setRatio(0.7);
+ * 		const root = this.getRoot();
+ * 		root.addChild(ringNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new RingScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class UIProgressRing extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -56,7 +85,7 @@ export class UIProgressRing extends Component {
 	// 출력. (바탕 고리 한 바퀴, 그 위에 채운 몫)
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽. (노드 로컬 좌표, 내용 영역 왼쪽 위가 원점)
 	 */
 	draw(graphic) {
 		const node = this.getNode();
@@ -98,7 +127,7 @@ export class UIProgressRing extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { boolean }
+	 * @returns { boolean } draw 를 덮어쓰지 않았으면 참.
 	 */
 	isDrawnInsideContent() {
 		return this.draw === UIProgressRing.prototype.draw;
@@ -108,12 +137,12 @@ export class UIProgressRing extends Component {
 	// 둥근 네모 둘레의 점. (위 가운데에서 시작해 시계 방향, 닫는 점은 넣지 않는다)
 	//==============================================================================
 	/**
-	 * @param { number } left
-	 * @param { number } top
-	 * @param { number } width
-	 * @param { number } height
-	 * @param { number } roundSize
-	 * @returns { Array<Vector2> }
+	 * @param { number } left 왼쪽. (픽셀)
+	 * @param { number } top 위쪽. (픽셀)
+	 * @param { number } width 너비. (픽셀)
+	 * @param { number } height 높이. (픽셀)
+	 * @param { number } roundSize 귀퉁이 반지름. (너비와 높이의 반으로 자른다)
+	 * @returns { Array<Vector2> } 둘레의 점. (위 가운데 점 하나와 귀퉁이마다 11 개, 모두 45 개)
 	 */
 	readPerimeterPoints(left, top, width, height, roundSize) {
 		const radius = System.Math.min(roundSize, width * 0.5, height * 0.5);
@@ -144,8 +173,8 @@ export class UIProgressRing extends Component {
 	//==============================================================================
 	/**
 	 * @param { Array<Vector2> } points - readPerimeterPoints 의 결과. (닫힌 꼴)
-	 * @param { number } ratio
-	 * @returns { Array<Vector2> }
+	 * @param { number } ratio 앞에서부터 잘라 낼 둘레 길이의 몫. (0 ~ 1)
+	 * @returns { Array<Vector2> } 첫 점에서 시작해 잘린 끝점으로 끝나는 열린 점 목록.
 	 */
 	readPartialPoints(points, ratio) {
 		const closedPoints = points.concat([points[0]]);
@@ -179,7 +208,7 @@ export class UIProgressRing extends Component {
 	// 채운 몫 설정. (0 ~ 1 로 자른다)
 	//==============================================================================
 	/**
-	 * @param { number } ratio
+	 * @param { number } ratio 채운 몫. (0 ~ 1)
 	 */
 	setRatio(ratio) {
 		this.#ratio = System.Math.max(0, System.Math.min(1, ratio));
@@ -189,7 +218,7 @@ export class UIProgressRing extends Component {
 	// 채운 몫 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 채운 몫. (0 ~ 1)
 	 */
 	getRatio() {
 		return this.#ratio;
@@ -199,7 +228,7 @@ export class UIProgressRing extends Component {
 	// 귀퉁이 둥근 정도 설정. (크기의 반 이상이면 동그라미)
 	//==============================================================================
 	/**
-	 * @param { number } roundSize
+	 * @param { number } roundSize 바깥 꼴 귀퉁이의 반지름. (픽셀, 0 이면 네모)
 	 */
 	setRoundSize(roundSize) {
 		this.#roundSize = roundSize;
@@ -209,7 +238,7 @@ export class UIProgressRing extends Component {
 	// 귀퉁이 둥근 정도 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 바깥 꼴 귀퉁이의 반지름. (픽셀)
 	 */
 	getRoundSize() {
 		return this.#roundSize;
@@ -219,7 +248,7 @@ export class UIProgressRing extends Component {
 	// 선 굵기 설정.
 	//==============================================================================
 	/**
-	 * @param { number } lineWidth
+	 * @param { number } lineWidth 선 굵기. (픽셀)
 	 */
 	setLineWidth(lineWidth) {
 		this.#lineWidth = lineWidth;
@@ -229,7 +258,7 @@ export class UIProgressRing extends Component {
 	// 선 굵기 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 선 굵기. (픽셀)
 	 */
 	getLineWidth() {
 		return this.#lineWidth;
@@ -239,7 +268,7 @@ export class UIProgressRing extends Component {
 	// 채운 몫의 색 설정.
 	//==============================================================================
 	/**
-	 * @param { Color | string } color
+	 * @param { Color | string } color 채운 몫의 색. (Color, "#rrggbb", "rgba(...)")
 	 */
 	setFillColor(color) {
 		this.#fillColor = UIProgressRing.parseColor(color);
@@ -249,7 +278,7 @@ export class UIProgressRing extends Component {
 	// 채운 몫의 색 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 채운 몫의 색.
 	 */
 	getFillColor() {
 		return this.#fillColor;
@@ -259,7 +288,7 @@ export class UIProgressRing extends Component {
 	// 나머지의 색 설정.
 	//==============================================================================
 	/**
-	 * @param { Color | string } color
+	 * @param { Color | string } color 나머지의 색. (Color, "#rrggbb", "rgba(...)")
 	 */
 	setTrackColor(color) {
 		this.#trackColor = UIProgressRing.parseColor(color);
@@ -269,7 +298,7 @@ export class UIProgressRing extends Component {
 	// 나머지의 색 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 나머지의 색.
 	 */
 	getTrackColor() {
 		return this.#trackColor;
@@ -279,7 +308,7 @@ export class UIProgressRing extends Component {
 	// 둘레의 점 반환. (마지막으로 그린 크기의 것)
 	//==============================================================================
 	/**
-	 * @returns { Array<Vector2> }
+	 * @returns { Array<Vector2> } 둘레의 점. (한 번도 그리지 않았으면 빈 배열)
 	 */
 	getPerimeterPoints() {
 		return this.#perimeterPoints;
@@ -289,8 +318,8 @@ export class UIProgressRing extends Component {
 	// 색 값 읽기. ("#rrggbb", "rgba(...)" 또는 Color)
 	//==============================================================================
 	/**
-	 * @param { Color | string } color
-	 * @returns { Color }
+	 * @param { Color | string } color 색 값. ("rgb" 로 시작하는 글은 rgba 로, 그 밖의 글은 16 진 색으로 읽는다)
+	 * @returns { Color } 읽은 색. (Color 를 주면 그대로)
 	 */
 	static parseColor(color) {
 		if (color instanceof Color) {

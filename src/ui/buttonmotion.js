@@ -16,8 +16,8 @@ import { PointerCursor } from "../core/pointercursor.js";
 //   - normal: 올리면 커지고, 누르는 동안 줄고, 떼면 통 튄다.
 //   - inset: 창 안의 단추. 1 배를 넘게 커지지 않아 창 안쪽 여백을 넘지 않는다. 올리면 바탕이 밝아지고 안쪽에 흰 테가 서며, 누르면 조금 줄었다 돌아온다.
 export const ButtonMotionStyle = System.Object.freeze({
-	normal: "normal",
-	inset: "inset",
+	normal: "normal", // 올리면 커지고, 누르는 동안 줄고, 떼면 통 튄다.
+	inset: "inset", // 창 안의 단추. (커지지 않고, 올리면 바탕이 밝아지고 안쪽에 흰 테가 서며, 누르면 조금 줄었다 돌아온다)
 });
 // 꼴마다 올렸을 때, 누르는 동안의 크기와 그리로 가는 초, 떼었을 때 통 튀는 크기(보통 크기에 더해 올라갔다 돌아옴, 1 이면 튀지 않음), 올렸을 때 밝히는지.
 const MOTION_STYLES = System.Object.freeze({
@@ -50,6 +50,47 @@ const areaStyles = new System.WeakMap();
 // 꼴은 setStyle 로 단추마다 정하거나, 비워 두면 위 노드 가운데 setButtonMotionArea 로 꼴을 건 가장 가까운 것을 따르고, 없으면 보통이다. (창 안은 inset)
 // inset 꼴에서 올린 동안은 단추 노드의 맨 밑 자식으로 흰 테 판과 밝힌 바탕 판을 둔다. (바탕이 보이지 않는 단추는 밝히지 않음, 그 둘만은 이 부품이 색을 정함)
 //==============================================================================
+/**
+ * @example <caption>눌러지는 단추와 누를 수 없을 때 흔들기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIButton, UILabel, Paint, WorldNode, Color, Pivot, Vector2, attachButtonMotion, shakeButton } from "./build/vanilla.js";
+ *
+ * class ButtonMotionScene extends UIScene {
+ * 	create() {
+ * 		super.create();
+ * 		const buttonNode = new WorldNode();
+ * 		buttonNode.setName("BuyButton");
+ * 		buttonNode.setPivot(Pivot.topLeft.clone());
+ * 		buttonNode.setAnchor(Pivot.topLeft.clone());
+ * 		buttonNode.setContentSize(Vector2.create(160, 48));
+ * 		buttonNode.setLocalPosition(Vector2.create(240, 156));
+ * 		const buttonPaint = buttonNode.addComponent(Paint);
+ * 		buttonPaint.setColor(new Color(0.36, 0.42, 1, 1));
+ * 		buttonPaint.setRoundSize(10);
+ * 		const button = buttonNode.addComponent(UIButton);
+ * 		const buttonLabel = buttonNode.addComponent(UILabel);
+ * 		buttonLabel.setText("Buy");
+ * 		buttonLabel.setFontSize(18);
+ * 		attachButtonMotion(buttonNode);
+ * 		let coinCount = 40;
+ * 		button.setClickedEvent(() => {
+ * 			if (coinCount < 100) {
+ * 				shakeButton(buttonNode);
+ * 				return;
+ * 			}
+ * 			coinCount -= 100;
+ * 		});
+ * 		const root = this.getRoot();
+ * 		root.addChild(buttonNode);
+ * 		shakeButton(buttonNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new ButtonMotionScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class ButtonMotion extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -103,7 +144,7 @@ export class ButtonMotion extends Component {
 	// 이 단추의 꼴 정하기. (ButtonMotionStyle, 빈 글이면 위 노드에 건 꼴을 따름)
 	//==============================================================================
 	/**
-	 * @param { string } style
+	 * @param { string } style 꼴. (ButtonMotionStyle 의 값, 빈 글이면 위 노드에 건 꼴)
 	 */
 	setStyle(style) {
 		this.#style = style;
@@ -113,8 +154,8 @@ export class ButtonMotion extends Component {
 	// 이 단추가 따를 꼴. (정한 것, 없으면 위 노드에 건 가장 가까운 꼴, 그것도 없으면 보통)
 	//==============================================================================
 	/**
-	 * @param { WorldNode } node
-	 * @returns { string }
+	 * @param { WorldNode } node 단추 노드. (부모부터 거슬러 오르며 setButtonMotionArea 로 건 꼴을 찾는다)
+	 * @returns { string } 따를 꼴. (ButtonMotionStyle 의 값)
 	 */
 	readMotionStyle(node) {
 		if (this.#style !== "") {
@@ -136,7 +177,7 @@ export class ButtonMotion extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { WorldNode } node
+	 * @param { WorldNode } node 붙을 노드. (그 노드에 UIButton 이 없으면 반응하지 않는다)
 	 */
 	attach(node) {
 		super.attach(node);
@@ -156,7 +197,7 @@ export class ButtonMotion extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		const button = this.#button;
@@ -218,7 +259,7 @@ export class ButtonMotion extends Component {
 	// 단추의 눌림 색을 투명으로 바꾸거나 되돌리기. (글로시 껍데기가 눌림을 그리는 동안 투명, 껍데기를 끄면 정한 색)
 	//==============================================================================
 	/**
-	 * @param { boolean } isMuted
+	 * @param { boolean } isMuted 참이면 눌림 색의 알파를 0 으로, 거짓이면 처음 읽어 둔 눌림 색으로 되돌린다.
 	 */
 	mutePressTint(isMuted) {
 		const button = this.#button;
@@ -239,9 +280,9 @@ export class ButtonMotion extends Component {
 	// 스크롤 칸 안에서 누르고 있는지. (엔진은 스크롤 칸 안 단추에 누르는 동안 눌림을 주지 않으므로, 누름이 이 단추 위에서 시작했고 손이 아직 단추 위이며 스크롤 칸이 밀리지 않았으면 눌린 것으로 그림, 밀리기 시작하면 풂)
 	//==============================================================================
 	/**
-	 * @param { WorldNode } node
-	 * @param { string } buttonState
-	 * @returns { boolean }
+	 * @param { WorldNode } node 단추 노드.
+	 * @param { string } buttonState 단추 상태. (ButtonState 의 값, disabled 면 거짓)
+	 * @returns { boolean } 눌린 것으로 그릴 때 참. (스크롤 칸이나 엔진(System.vanillaEngine)이 없으면 거짓)
 	 */
 	readScrollPressed(node, buttonState) {
 		const scrollView = this.readScrollView(node);
@@ -276,8 +317,8 @@ export class ButtonMotion extends Component {
 	// 단추를 담은 가장 가까운 스크롤 칸. (처음 한 번 위 노드를 거슬러 찾아 둠, 없으면 null)
 	//==============================================================================
 	/**
-	 * @param { WorldNode } node
-	 * @returns { UIScrollView | null }
+	 * @param { WorldNode } node 단추 노드.
+	 * @returns { UIScrollView | null } 가장 가까운 조상의 스크롤 칸. (없으면 null)
 	 */
 	readScrollView(node) {
 		if (this.#scrollView !== undefined) {
@@ -303,9 +344,9 @@ export class ButtonMotion extends Component {
 	// 밝힌 판 놓기. (흰 테 판은 단추 크기, 밝힌 바탕 판은 테 굵기만큼 안쪽, 둘 다 단추의 맨 밑 자식이라 글과 그림 밑)
 	//==============================================================================
 	/**
-	 * @param { WorldNode } node
-	 * @param { boolean } isLit
-	 * @param { boolean } isPressed
+	 * @param { WorldNode } node 단추 노드.
+	 * @param { boolean } isLit 참이면 밝힌다. (단추 바탕 Paint 의 알파가 0 이면 밝히지 않는다)
+	 * @param { boolean } isPressed 누르는 중인지. (밝히는 함수에만 넘긴다)
 	 */
 	placeLitParts(node, isLit, isPressed) {
 		// 밝히는 함수를 걸었으면 그 함수가 같은 꼴로 밝힌다. (단추에 얹은 꾸밈이 제 모양으로 밝힐 때, 판을 따로 그리면 꾸밈과 다른 꼴이 비친다)
@@ -358,7 +399,7 @@ export class ButtonMotion extends Component {
 	// 밝힌 판 만들기. (단추 노드의 맨 밑 자식 둘, 단추의 눌림 색은 받지 않음)
 	//==============================================================================
 	/**
-	 * @param { WorldNode } node
+	 * @param { WorldNode } node 단추 노드. (맨 밑 자식 둘을 더한다)
 	 * @returns { object } { ringNode, ringPaint, fillNode, fillPaint, fillColor }
 	 */
 	createLitParts(node) {
@@ -388,8 +429,8 @@ export class ButtonMotion extends Component {
 	// 손(마우스나 손가락)이 노드 위인지.
 	//==============================================================================
 	/**
-	 * @param { WorldNode } node
-	 * @returns { boolean }
+	 * @param { WorldNode } node 볼 노드.
+	 * @returns { boolean } 입력 위치가 노드 안이면 참. (엔진(System.vanillaEngine)이 없으면 거짓)
 	 */
 	isInputOver(node) {
 		const engine = System.vanillaEngine;
@@ -406,9 +447,9 @@ export class ButtonMotion extends Component {
 	//   - 그 사이 화면이 노드를 다시 놓았으면(자리가 이 부품이 놓은 것과 다르면) 그 자리를 새 기준으로 삼는다.
 	//==============================================================================
 	/**
-	 * @param { WorldNode } node
-	 * @param { number } scale
-	 * @param { number } shakeOffset
+	 * @param { WorldNode } node 단추 노드.
+	 * @param { number } scale 배율. (1 이 보통 크기)
+	 * @param { number } shakeOffset 가로로 밀 거리. (픽셀)
 	 */
 	placeAround(node, scale, shakeOffset) {
 		const localPosition = node.getLocalPosition();
@@ -441,7 +482,7 @@ export class ButtonMotion extends Component {
 	// 밝힘을 맡는 함수 반환.
 	//==============================================================================
 	/**
-	 * @returns { function(WorldNode, boolean, boolean): void | null }
+	 * @returns { function(WorldNode, boolean, boolean): void | null } 밝힘을 맡는 함수. (없으면 null)
 	 */
 	getLitHandler() {
 		return this.#litHandler;
@@ -452,8 +493,8 @@ export class ButtonMotion extends Component {
 // 단추 노드에 반응 붙이기. (UIButton 이 이미 붙은 노드, ButtonMotion 을 돌려줌)
 //==============================================================================
 /**
- * @param { WorldNode } node
- * @returns { ButtonMotion }
+ * @param { WorldNode } node UIButton 이 붙은 단추 노드.
+ * @returns { ButtonMotion } 붙인 반응 부품.
  */
 export function attachButtonMotion(node) {
 	return node.addComponent(ButtonMotion);
@@ -463,8 +504,22 @@ export function attachButtonMotion(node) {
 // 노드 밑의 단추가 따를 꼴 걸기. (창이 제 판에 inset 을 걸면 그 안의 단추는 커지지 않음, 단추가 setStyle 로 정한 꼴이 먼저)
 //==============================================================================
 /**
- * @param { WorldNode } node
+ * @param { WorldNode } node 꼴을 걸 노드. (그 아래 모든 단추가 따른다)
  * @param { string } style ButtonMotionStyle
+ * @example <caption>판 안의 단추를 inset 꼴로</caption>
+ * import { WorldNode, UIButton, ButtonMotionStyle, attachButtonMotion, setButtonMotionArea } from "./build/vanilla.js";
+ *
+ * const panelNode = new WorldNode();
+ * setButtonMotionArea(panelNode, ButtonMotionStyle.inset);
+ * const buttonNode = new WorldNode();
+ * buttonNode.addComponent(UIButton);
+ * panelNode.addChild(buttonNode);
+ * const buttonMotion = attachButtonMotion(buttonNode);
+ * const areaStyle = buttonMotion.readMotionStyle(buttonNode);
+ * console.log(areaStyle);
+ * buttonMotion.setStyle(ButtonMotionStyle.normal);
+ * const ownStyle = buttonMotion.readMotionStyle(buttonNode);
+ * console.log(ownStyle);
  */
 export function setButtonMotionArea(node, style) {
 	areaStyles.set(node, style);
@@ -474,7 +529,7 @@ export function setButtonMotionArea(node, style) {
 // 누를 수 없는 단추를 흔들기. (반응이 붙은 단추만, 그 밖은 아무 일도 없음)
 //==============================================================================
 /**
- * @param { WorldNode } node
+ * @param { WorldNode } node ButtonMotion 이 붙은 단추 노드.
  */
 export function shakeButton(node) {
 	const buttonMotion = node.getComponent(ButtonMotion);

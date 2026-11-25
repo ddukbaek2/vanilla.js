@@ -38,6 +38,59 @@ const DEFAULT_DIM_COLOR = new Color(0, 0, 0, 0.55);
 //     windowLayer.openWindow(window);
 //     window.close();
 //==============================================================================
+/**
+ * @example <caption>내용을 놓는 창을 상속해 띄우기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIWindow, UIWindowLayer, UILabel, WorldNode, Pivot, Vector2 } from "./build/vanilla.js";
+ *
+ * class NoticeWindow extends UIWindow {
+ * 	#messageNode;
+ *
+ * 	constructor(name, messageText) {
+ * 		super(name);
+ * 		const messageNode = new WorldNode();
+ * 		messageNode.setPivot(Pivot.topLeft.clone());
+ * 		messageNode.setAnchor(Pivot.topLeft.clone());
+ * 		const messageLabel = messageNode.addComponent(UILabel);
+ * 		messageLabel.setText(messageText);
+ * 		messageLabel.setFontSize(18);
+ * 		const panelNode = this.getPanelNode();
+ * 		panelNode.addChild(messageNode);
+ * 		this.#messageNode = messageNode;
+ * 	}
+ *
+ * 	getMessageNode() {
+ * 		return this.#messageNode;
+ * 	}
+ *
+ * 	layoutContent(panelWidth) {
+ * 		const messageNode = this.getMessageNode();
+ * 		messageNode.setLocalPosition(Vector2.create(24, 24));
+ * 		messageNode.setContentSize(Vector2.create(panelWidth - 48, 64));
+ * 		return 112;
+ * 	}
+ * }
+ *
+ * class WindowScene extends UIScene {
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const root = this.getRoot();
+ * 		const rootSize = root.getContentSize();
+ * 		const windowLayer = new UIWindowLayer();
+ * 		root.addChild(windowLayer);
+ * 		windowLayer.setViewSize(rootSize.x, rootSize.y);
+ * 		const noticeWindow = new NoticeWindow("notice", "New items arrived in the shop.");
+ * 		noticeWindow.setMaximumWidth(360);
+ * 		noticeWindow.setOutsideCloseEnabled(false);
+ * 		windowLayer.openWindow(noticeWindow);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new WindowScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class UIWindow extends WorldNode {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -131,7 +184,7 @@ export class UIWindow extends WorldNode {
 	// 판 노드 반환. (내용을 여기에 붙인다)
 	//==============================================================================
 	/**
-	 * @returns { WorldNode }
+	 * @returns { WorldNode } 판 노드.
 	 */
 	getPanelNode() {
 		return this.#panelNode;
@@ -141,7 +194,7 @@ export class UIWindow extends WorldNode {
 	// 판의 Paint 반환. (색, 둥근 정도를 바꾸거나 setEnable(false) 로 끄고 게임의 판을 쓴다)
 	//==============================================================================
 	/**
-	 * @returns { Paint }
+	 * @returns { Paint } 판의 Paint.
 	 */
 	getPanelPaint() {
 		return this.#panelPaint;
@@ -151,7 +204,7 @@ export class UIWindow extends WorldNode {
 	// 틀 노드 반환. (판과 함께 커지고 주는 꾸밈을 붙이는 곳)
 	//==============================================================================
 	/**
-	 * @returns { WorldNode }
+	 * @returns { WorldNode } 틀 노드. (판의 가운데가 피봇)
 	 */
 	getFrameNode() {
 		return this.#frameNode;
@@ -161,7 +214,7 @@ export class UIWindow extends WorldNode {
 	// 어둠 노드 반환.
 	//==============================================================================
 	/**
-	 * @returns { WorldNode }
+	 * @returns { WorldNode } 어둠 노드.
 	 */
 	getDimNode() {
 		return this.#dimNode;
@@ -171,7 +224,7 @@ export class UIWindow extends WorldNode {
 	// 어둠의 Paint 반환. (색을 바꾼다)
 	//==============================================================================
 	/**
-	 * @returns { Paint }
+	 * @returns { Paint } 어둠의 Paint.
 	 */
 	getDimPaint() {
 		return this.#dimPaint;
@@ -181,7 +234,7 @@ export class UIWindow extends WorldNode {
 	// 어둠 색 설정. (어둠의 Paint 색을 바꾼다)
 	//==============================================================================
 	/**
-	 * @param { Color | string } dimColor
+	 * @param { Color | string } dimColor 어둠 색. (기본 검정 알파 0.55, 움직임이 알파를 0 ~ 1 배로 곱한다)
 	 */
 	setDimColor(dimColor) {
 		this.#dimPaint.setColor(dimColor);
@@ -191,7 +244,7 @@ export class UIWindow extends WorldNode {
 	// 판 색 설정. (판의 Paint 색을 바꾼다)
 	//==============================================================================
 	/**
-	 * @param { Color | string } panelColor
+	 * @param { Color | string } panelColor 판 색.
 	 */
 	setPanelColor(panelColor) {
 		this.#panelPaint.setColor(panelColor);
@@ -201,7 +254,7 @@ export class UIWindow extends WorldNode {
 	// 움직임 반환. (setInstantEnabled 로 움직임 없이 열고 닫는다)
 	//==============================================================================
 	/**
-	 * @returns { PopupMotion }
+	 * @returns { PopupMotion } 이 창의 움직임.
 	 */
 	getPopupMotion() {
 		return this.#popupMotion;
@@ -211,7 +264,7 @@ export class UIWindow extends WorldNode {
 	// 바깥 누르기(와 창 층의 closeTopWindow)로 닫히는지 설정. (기본 true)
 	//==============================================================================
 	/**
-	 * @param { boolean } isOutsideCloseEnabled
+	 * @param { boolean } isOutsideCloseEnabled 참이면 바깥을 누르거나 closeTopWindow 로 닫힌다.
 	 */
 	setOutsideCloseEnabled(isOutsideCloseEnabled) {
 		this.#isOutsideCloseEnabled = isOutsideCloseEnabled;
@@ -221,7 +274,7 @@ export class UIWindow extends WorldNode {
 	// 바깥 누르기로 닫히는지.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 바깥 누르기로 닫히면 참.
 	 */
 	isOutsideCloseEnabled() {
 		return this.#isOutsideCloseEnabled;
@@ -241,7 +294,7 @@ export class UIWindow extends WorldNode {
 	// 창의 가로 한계 설정. (영역이 좁으면 그보다 좁아진다)
 	//==============================================================================
 	/**
-	 * @param { number } maximumWidth
+	 * @param { number } maximumWidth 판 너비의 한계. (UI 층 단위, 1 보다 작으면 1, 기본 480)
 	 */
 	setMaximumWidth(maximumWidth) {
 		this.#maximumWidth = System.Math.max(1, maximumWidth);
@@ -251,7 +304,7 @@ export class UIWindow extends WorldNode {
 	// 창의 가로 한계 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 판 너비의 한계. (UI 층 단위)
 	 */
 	getMaximumWidth() {
 		return this.#maximumWidth;
@@ -261,7 +314,7 @@ export class UIWindow extends WorldNode {
 	// 영역 가장자리와 판 사이 거리 설정.
 	//==============================================================================
 	/**
-	 * @param { number } margin
+	 * @param { number } margin 영역 가장자리와 판 사이 거리. (UI 층 단위, 음수면 0, 기본 16)
 	 */
 	setMargin(margin) {
 		this.#margin = System.Math.max(0, margin);
@@ -271,7 +324,7 @@ export class UIWindow extends WorldNode {
 	// 영역 가장자리와 판 사이 거리 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 영역 가장자리와 판 사이 거리. (UI 층 단위)
 	 */
 	getMargin() {
 		return this.#margin;
@@ -281,7 +334,7 @@ export class UIWindow extends WorldNode {
 	// 판의 세로 설정. (layoutContent 를 덮어쓰지 않은 창이 쓴다)
 	//==============================================================================
 	/**
-	 * @param { number } panelHeight
+	 * @param { number } panelHeight 판의 세로. (UI 층 단위, 1 보다 작으면 1, 기본 240)
 	 */
 	setPanelHeight(panelHeight) {
 		this.#panelHeight = System.Math.max(1, panelHeight);
@@ -291,7 +344,7 @@ export class UIWindow extends WorldNode {
 	// 판의 세로 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } setPanelHeight 로 정한 판의 세로. (UI 층 단위)
 	 */
 	getPanelHeight() {
 		return this.#panelHeight;
@@ -301,7 +354,7 @@ export class UIWindow extends WorldNode {
 	// 마지막으로 받은 영역의 너비. (UI 층 단위)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 영역의 너비. (UI 층 단위, 받기 전이면 1)
 	 */
 	getViewWidth() {
 		return this.#viewWidth;
@@ -311,7 +364,7 @@ export class UIWindow extends WorldNode {
 	// 마지막으로 받은 영역의 높이. (UI 층 단위, 내용이 세로를 채우는 창이 쓴다)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 영역의 높이. (UI 층 단위, 받기 전이면 1)
 	 */
 	getViewHeight() {
 		return this.#viewHeight;
@@ -321,7 +374,7 @@ export class UIWindow extends WorldNode {
 	// 영역 밖으로 더 덮는 너비 반환. { top, right, bottom, left }
 	//==============================================================================
 	/**
-	 * @returns { object }
+	 * @returns { object } 덮는 너비. ({ top, right, bottom, left }, UI 층 단위, 복사하지 않은 원본)
 	 */
 	getViewBleed() {
 		return this.#viewBleed;
@@ -331,7 +384,7 @@ export class UIWindow extends WorldNode {
 	// 마지막으로 놓은 판의 자리. (창 좌표, 움직임 전, 줄인 배율을 곱한 크기)
 	//==============================================================================
 	/**
-	 * @returns { Rect }
+	 * @returns { Rect } 판의 자리. (창 좌표)
 	 */
 	getPanelRect() {
 		return this.#panelRect;
@@ -341,7 +394,7 @@ export class UIWindow extends WorldNode {
 	// 판이 영역보다 커서 줄인 배율. (1 이하)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 줄인 배율. (0 초과 1 이하)
 	 */
 	getPanelScale() {
 		return this.#panelScale;
@@ -351,7 +404,7 @@ export class UIWindow extends WorldNode {
 	// 띄운 창 층 반환. (띄우기 전이나 내려간 뒤면 null)
 	//==============================================================================
 	/**
-	 * @returns { * }
+	 * @returns { * } 띄운 UIWindowLayer. (없으면 null)
 	 */
 	getWindowLayer() {
 		return this.#windowLayer;
@@ -361,7 +414,7 @@ export class UIWindow extends WorldNode {
 	// 띄운 창 층 설정. (창 층이 부른다)
 	//==============================================================================
 	/**
-	 * @param { * } windowLayer
+	 * @param { * } windowLayer 띄운 UIWindowLayer. (내려가면 null)
 	 */
 	setWindowLayer(windowLayer) {
 		this.#windowLayer = windowLayer;
@@ -393,10 +446,10 @@ export class UIWindow extends WorldNode {
 	// 영역 밖으로 더 덮는 너비 알리기. (세이프에어리어, UI 층 단위, 어둠이 그 밑까지 덮는다)
 	//==============================================================================
 	/**
-	 * @param { number } top
-	 * @param { number } right
-	 * @param { number } bottom
-	 * @param { number } left
+	 * @param { number } top 위로 더 덮는 너비. (UI 층 단위, 음수면 0)
+	 * @param { number } right 오른쪽으로 더 덮는 너비. (UI 층 단위, 음수면 0)
+	 * @param { number } bottom 아래로 더 덮는 너비. (UI 층 단위, 음수면 0)
+	 * @param { number } left 왼쪽으로 더 덮는 너비. (UI 층 단위, 음수면 0)
 	 */
 	setViewBleed(top, right, bottom, left) {
 		this.#viewBleed.top = System.Math.max(0, top);
@@ -423,7 +476,7 @@ export class UIWindow extends WorldNode {
 	//==============================================================================
 	/**
 	 * @param { number } viewWidth UI 층 단위.
-	 * @param { number } viewHeight
+	 * @param { number } viewHeight 영역의 높이. (UI 층 단위, 1 보다 작으면 1)
 	 */
 	setViewSize(viewWidth, viewHeight) {
 		this.#viewWidth = System.Math.max(1, viewWidth);
@@ -464,8 +517,8 @@ export class UIWindow extends WorldNode {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { number } panelWidth
-	 * @returns { number }
+	 * @param { number } panelWidth 판의 너비. (UI 층 단위, 영역 너비에서 여백을 뺀 값과 가로 한계 가운데 작은 것)
+	 * @returns { number } 판의 세로. (UI 층 단위, 기본은 getPanelHeight)
 	 */
 	layoutContent(panelWidth) {
 		return this.getPanelHeight();
@@ -476,8 +529,8 @@ export class UIWindow extends WorldNode {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { number } panelWidth
-	 * @param { number } panelHeight
+	 * @param { number } panelWidth 판의 너비. (UI 층 단위, 줄이기 전)
+	 * @param { number } panelHeight 판의 세로. (UI 층 단위, 줄이기 전)
 	 */
 	layoutPanel(panelWidth, panelHeight) {
 		const panelNode = this.getPanelNode();
@@ -526,7 +579,7 @@ export class UIWindow extends WorldNode {
 	// 닫는 움직임이 끝났는지. (창 층이 떼어 낼 때를 본다)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 움직임이 닫힘 상태면 참.
 	 */
 	isCloseMotionFinished() {
 		const popupMotion = this.getPopupMotion();
@@ -538,7 +591,7 @@ export class UIWindow extends WorldNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
@@ -555,7 +608,7 @@ export class UIWindow extends WorldNode {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { boolean } isCovered
+	 * @param { boolean } isCovered 참이면 다른 창에 덮였다.
 	 */
 	setCovered(isCovered) {
 		this.setActive(!isCovered);
@@ -566,9 +619,9 @@ export class UIWindow extends WorldNode {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } viewInputPosition
-	 * @param { Vector2 } wheelDelta
-	 * @returns { boolean }
+	 * @param { Vector2 } viewInputPosition 입력 위치. (뷰 좌표)
+	 * @param { Vector2 } wheelDelta 휠 누적값.
+	 * @returns { boolean } 받았으면 참. (기본은 늘 거짓)
 	 */
 	handleWheel(viewInputPosition, wheelDelta) {
 		return false;

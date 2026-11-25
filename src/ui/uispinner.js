@@ -17,6 +17,27 @@ import { Paint } from "../core/component/paint.js";
 //     someNode.addChild(spinner);
 //     spinner.setLocalPosition(Vector2.create(x, y));
 //==============================================================================
+/**
+ * @example <caption>화면 가운데에 스피너 돌리기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UISpinner, Color, Vector2 } from "./build/vanilla.js";
+ *
+ * class SpinnerScene extends UIScene {
+ * 	create() {
+ * 		super.create();
+ * 		const spinner = new UISpinner({ radius: 16, dotCount: 12, dotRadius: 3, color: new Color(0.4, 0.7, 1, 1), rotationSpeed: 0.8 });
+ * 		spinner.setLocalPosition(Vector2.create(320, 180));
+ * 		spinner.setDotColor(new Color(1, 0.8, 0.3, 1));
+ * 		const root = this.getRoot();
+ * 		root.addChild(spinner);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new SpinnerScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class UISpinner extends WorldNode {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -74,7 +95,7 @@ export class UISpinner extends WorldNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
@@ -89,8 +110,8 @@ export class UISpinner extends WorldNode {
 	// 점 투명도 계산. (점 순서 비율에서 위상을 뺀 꼬리 비율이 작을수록 밝다)
 	//==============================================================================
 	/**
-	 * @param { number } dotIndex
-	 * @returns { number }
+	 * @param { number } dotIndex 점 순서. (0 부터, 오른쪽에서 시작해 시계 방향)
+	 * @returns { number } 불투명도. (0.15 ~ 1, 밝기 꼬리의 머리 점이 1)
 	 */
 	calculateDotOpacity(dotIndex) {
 		const orderRatio = dotIndex / this.#dotCount;
@@ -105,7 +126,7 @@ export class UISpinner extends WorldNode {
 	// 점 색 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 점 색. (복제하지 않은 원본)
 	 */
 	getDotColor() {
 		return this.#dotColor;
@@ -115,7 +136,7 @@ export class UISpinner extends WorldNode {
 	// 회전 속도 반환. (초당 바퀴 수)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 초당 바퀴 수.
 	 */
 	getRotationSpeed() {
 		return this.#rotationSpeed;
@@ -125,7 +146,7 @@ export class UISpinner extends WorldNode {
 	// 점 노드 목록 반환.
 	//==============================================================================
 	/**
-	 * @returns { WorldNode[] }
+	 * @returns { WorldNode[] } 점 노드 목록의 복사본. (점 노드는 같은 것)
 	 */
 	getDotNodes() {
 		return this.#dotNodeList.slice();
@@ -135,7 +156,7 @@ export class UISpinner extends WorldNode {
 	// 점 색 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } dotColor
+	 * @param { Color } dotColor 점 색. (복제해 모든 점의 Paint 에 넣는다)
 	 */
 	setDotColor(dotColor) {
 		this.#dotColor = dotColor.clone();
@@ -151,7 +172,7 @@ export class UISpinner extends WorldNode {
 	// 회전 속도 설정. (초당 바퀴 수)
 	//==============================================================================
 	/**
-	 * @param { number } rotationSpeed
+	 * @param { number } rotationSpeed 초당 바퀴 수. (음수면 거꾸로 돈다)
 	 */
 	setRotationSpeed(rotationSpeed) {
 		this.#rotationSpeed = rotationSpeed;

@@ -25,10 +25,10 @@ const MAXIMUM_STAY_SECONDS = 4;
 
 // 알림의 단계.
 export const ToastPhase = System.Object.freeze({
-	hidden: "hidden",
-	enter: "enter",
-	stay: "stay",
-	exit: "exit",
+	hidden: "hidden", // 숨음. (노드가 꺼져 있다)
+	enter: "enter", // 나오는 중. (미끄러져 들어오며 보이고 살짝 커졌다 돌아온다)
+	stay: "stay", // 머무는 중. (머무는 초를 센다)
+	exit: "exit", // 사라지는 중. (떠오르며 투명해진다)
 });
 
 
@@ -36,9 +36,16 @@ export const ToastPhase = System.Object.freeze({
 // 알림 머무는 시간. (표의 시간에 긴 글이면 LONG_TEXT_CHARACTERS 자마다 LONG_TEXT_EXTRA_SECONDS 를 더하고 MAXIMUM_STAY_SECONDS 까지)
 //==============================================================================
 /**
- * @param { string } text
- * @param { number } baseSeconds
- * @returns { number }
+ * @param { string } text 알림 글. (글자 수는 코드 포인트로 센다)
+ * @param { number } baseSeconds 표의 머무는 초.
+ * @returns { number } 머무는 초. (20 자를 넘으면 20 자마다 0.5 초를 더하고, 4 초를 넘지 않는다)
+ * @example <caption>글 길이에 따른 머무는 초</caption>
+ * import { readToastSeconds } from "./build/vanilla.js";
+ *
+ * const shortSeconds = readToastSeconds("Saved", 1.5);
+ * const longSeconds = readToastSeconds("The cloud save finished uploading just now", 1.5);
+ * const cappedSeconds = readToastSeconds("x".repeat(200), 1.5);
+ * console.log(shortSeconds, longSeconds, cappedSeconds);
  */
 export function readToastSeconds(text, baseSeconds) {
 	const characterCount = System.Array.from(text).length;
@@ -54,6 +61,41 @@ export function readToastSeconds(text, baseSeconds) {
 // 떠 있는 동안 다른 글이 오면 앞 것이 빨리 비키고 새 글이 들어오며, 같은 글이 또 오면 시간만 다시 채우고 통 튄다.
 // 노드의 자리는 화면이 놓은 자리를 기준으로 그 둘레에서만 움직인다. (그 사이 화면이 다시 놓으면 그 자리가 새 기준)
 //==============================================================================
+/**
+ * @example <caption>게임이 만든 알림 노드 띄우기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UILabel, WorldNode, Paint, Color, Pivot, Vector2, attachToastMotion, readToastSeconds } from "./build/vanilla.js";
+ *
+ * class ToastScene extends UIScene {
+ * 	create() {
+ * 		super.create();
+ * 		const toastNode = new WorldNode();
+ * 		toastNode.setPivot(Pivot.topLeft.clone());
+ * 		toastNode.setAnchor(Pivot.topLeft.clone());
+ * 		toastNode.setContentSize(Vector2.create(240, 40));
+ * 		toastNode.setLocalPosition(Vector2.create(200, 24));
+ * 		toastNode.setActive(false);
+ * 		const toastPaint = toastNode.addComponent(Paint);
+ * 		toastPaint.setColor(new Color(0.08, 0.1, 0.14, 0.95));
+ * 		toastPaint.setRoundSize(20);
+ * 		const toastLabel = toastNode.addComponent(UILabel);
+ * 		const toastMotion = attachToastMotion(toastNode, -1);
+ * 		const root = this.getRoot();
+ * 		root.addChild(toastNode);
+ *
+ * 		const text = "Game saved";
+ * 		const seconds = readToastSeconds(text, 1.5);
+ * 		toastMotion.show(text, seconds, () => {
+ * 			toastLabel.setText(text);
+ * 		});
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new ToastScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class ToastMotion extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -91,7 +133,7 @@ export class ToastMotion extends Component {
 	// 들어오는 쪽 정하기. (-1 이면 위에서, 1 이면 아래에서)
 	//==============================================================================
 	/**
-	 * @param { number } enterSide
+	 * @param { number } enterSide 들어오는 쪽. (-1 이면 위에서, 1 이면 아래에서, 들어오는 거리 10 픽셀에 곱한다)
 	 */
 	setEnterSide(enterSide) {
 		this.#enterSide = enterSide;
@@ -101,9 +143,9 @@ export class ToastMotion extends Component {
 	// 띄우기. (applyText 가 노드에 글과 색을 넣음, 떠 있는 다른 글은 빨리 비킨 뒤 띄움)
 	//==============================================================================
 	/**
-	 * @param { string } text
+	 * @param { string } text 알림 글. (떠 있는 글과 같으면 머무는 초만 다시 채우고 통 튄다)
 	 * @param { number } seconds 머무는 초.
-	 * @param { function(): void } applyText
+	 * @param { function(): void } applyText 노드에 글과 색을 넣는 함수. (나오기 시작할 때 부른다)
 	 */
 	show(text, seconds, applyText) {
 		const node = this.getNode();
@@ -125,7 +167,7 @@ export class ToastMotion extends Component {
 	// 떠 있는지. (나오는 중, 머무는 중, 사라지는 중)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 숨음 단계가 아니면 참.
 	 */
 	isShowing() {
 		return this.#phase !== ToastPhase.hidden;
@@ -135,7 +177,7 @@ export class ToastMotion extends Component {
 	// 단계 반환. (ToastPhase)
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 단계. (ToastPhase 의 값)
 	 */
 	getPhase() {
 		return this.#phase;
@@ -160,9 +202,9 @@ export class ToastMotion extends Component {
 	// 나오기 시작.
 	//==============================================================================
 	/**
-	 * @param { string } text
-	 * @param { number } seconds
-	 * @param { function(): void } applyText
+	 * @param { string } text 알림 글.
+	 * @param { number } seconds 머무는 초.
+	 * @param { function(): void } applyText 노드에 글과 색을 넣는 함수. (곧바로 부른다)
 	 */
 	startEnter(text, seconds, applyText) {
 		applyText();
@@ -182,7 +224,7 @@ export class ToastMotion extends Component {
 	// 사라지기 시작.
 	//==============================================================================
 	/**
-	 * @param { number } exitLength
+	 * @param { number } exitLength 사라지는 초. (보통 0.25, 새 알림에 비킬 때 0.12)
 	 */
 	startExit(exitLength) {
 		this.#phase = ToastPhase.exit;
@@ -195,7 +237,7 @@ export class ToastMotion extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		const node = this.getNode();
@@ -268,10 +310,10 @@ export class ToastMotion extends Component {
 	// 화면이 놓은 자리를 기준으로 가운데를 두고 그 크기와 위아래 비킴, 불투명도로 놓기.
 	//==============================================================================
 	/**
-	 * @param { WorldNode } node
-	 * @param { number } scale
-	 * @param { number } offsetY
-	 * @param { number } opacity
+	 * @param { WorldNode } node 알림 노드.
+	 * @param { number } scale 배율. (1 이 보통 크기, 가운데를 두고 키운다)
+	 * @param { number } offsetY 기준 자리에서 세로로 비킬 거리. (픽셀, 아래가 +)
+	 * @param { number } opacity 불투명도. (0 ~ 1)
 	 */
 	placeAround(node, scale, offsetY, opacity) {
 		const localPosition = node.getLocalPosition();
@@ -295,9 +337,9 @@ export class ToastMotion extends Component {
 // 알림 노드에 나옴과 사라짐 붙이기. (ToastMotion 을 돌려줌)
 //==============================================================================
 /**
- * @param { WorldNode } node
+ * @param { WorldNode } node 알림 노드.
  * @param { number } enterSide -1 이면 위에서, 1 이면 아래에서 들어온다.
- * @returns { ToastMotion }
+ * @returns { ToastMotion } 붙인 컴포넌트.
  */
 export function attachToastMotion(node, enterSide) {
 	const toastMotion = node.addComponent(ToastMotion);

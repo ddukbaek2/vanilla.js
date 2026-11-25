@@ -14,12 +14,45 @@ import { Object } from "../base/object.js";
 //   노드 배율 / 막 알파에 적용한다. setInstantEnabled(true) 면 연출 없이 즉시 전환한다.
 //==============================================================================
 export const PopupMotionState = {
-	closed: "closed",
-	opening: "opening",
-	open: "open",
-	closing: "closing",
+	closed: "closed", // 닫힘. (배율 0, 가림 0)
+	opening: "opening", // 여는 중. (배율이 0.45 에서 1.18 로 부풀었다가 1 로)
+	open: "open", // 열림. (배율 1, 가림 1, 이때만 조작할 수 있다)
+	closing: "closing", // 닫는 중. (배율이 1.08 로 부풀었다가 0.08 로)
 };
 
+/**
+ * @example <caption>판의 배율과 막의 알파에 걸기</caption>
+ * import { PopupMotion, PopupMotionState, WorldNode, Paint, Color, Vector2 } from "./build/vanilla.js";
+ *
+ * const panelNode = new WorldNode();
+ * const dimNode = new WorldNode();
+ * const dimPaint = dimNode.addComponent(Paint);
+ * const popupMotion = new PopupMotion({ openDuration: 0.3, closeDuration: 0.2 });
+ * popupMotion.setOpenedEvent(() => {
+ * 	console.log("opened");
+ * });
+ * popupMotion.setClosedEvent(() => {
+ * 	console.log("closed");
+ * });
+ * const applyMotion = () => {
+ * 	const scale = popupMotion.getScale();
+ * 	const dimRatio = popupMotion.getDimRatio();
+ * 	panelNode.setLocalScale(Vector2.create(scale, scale));
+ * 	dimPaint.setColor(new Color(0, 0, 0, 0.5 * dimRatio));
+ * };
+ * popupMotion.open();
+ * for (let frameIndex = 0; frameIndex < 30; ++frameIndex) {
+ * 	popupMotion.tick(1 / 60);
+ * 	applyMotion();
+ * }
+ * const state = popupMotion.getState();
+ * console.log(state === PopupMotionState.open);
+ * popupMotion.close();
+ * for (let frameIndex = 0; frameIndex < 30; ++frameIndex) {
+ * 	popupMotion.tick(1 / 60);
+ * 	applyMotion();
+ * }
+ */
 export class PopupMotion extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -90,7 +123,7 @@ export class PopupMotion extends Object {
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		if (this.#state === PopupMotionState.opening) {
@@ -117,7 +150,7 @@ export class PopupMotion extends Object {
 	// 현재 배율 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 판에 걸 배율. (닫힘 0, 열림 1, 여닫는 중에는 되튕김 곡선)
 	 */
 	getScale() {
 		if (this.#state === PopupMotionState.open) {
@@ -151,7 +184,7 @@ export class PopupMotion extends Object {
 	// 어둡게 가리는 비율 반환. (0 ~ 1)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 가리는 비율. (0 ~ 1, 여닫는 시간에 곧게 비례)
 	 */
 	getDimRatio() {
 		if (this.#state === PopupMotionState.open) {
@@ -170,7 +203,7 @@ export class PopupMotion extends Object {
 	// 조작 가능 여부. (완전히 열린 뒤에만 참)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 열림 상태면 참.
 	 */
 	isInteractive() {
 		return this.#state === PopupMotionState.open;
@@ -179,12 +212,15 @@ export class PopupMotion extends Object {
 	//==============================================================================
 	// 상태 조회.
 	//==============================================================================
-	/** @returns { string } */
+	/** @returns { string } 상태. (PopupMotionState 의 값) */
 	getState() {
 		return this.#state;
 	}
 
-	/** @returns { boolean } */
+	//==============================================================================
+	// 보이는지 반환. (닫힘이 아니면 참)
+	//==============================================================================
+	/** @returns { boolean } 닫힘 상태가 아니면 참. */
 	isVisible() {
 		return this.#state !== PopupMotionState.closed;
 	}
@@ -193,7 +229,7 @@ export class PopupMotion extends Object {
 	// 즉시 전환 여부 설정. (연출 없는 UI 톤)
 	//==============================================================================
 	/**
-	 * @param { boolean } isInstantEnabled
+	 * @param { boolean } isInstantEnabled 참이면 open, close 가 곧바로 열림, 닫힘이 되고 알림도 그 자리에서 부른다.
 	 */
 	setInstantEnabled(isInstantEnabled) {
 		this.#isInstantEnabled = isInstantEnabled;
@@ -203,7 +239,7 @@ export class PopupMotion extends Object {
 	// 움직임 없이 바로 열고 닫는지.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 바로 열고 닫으면 참.
 	 */
 	isInstantEnabled() {
 		return this.#isInstantEnabled;
@@ -212,12 +248,15 @@ export class PopupMotion extends Object {
 	//==============================================================================
 	// 알림 설정.
 	//==============================================================================
-	/** @param { Function } openedEvent */
+	/** @param { Function } openedEvent 다 열렸을 때 부를 함수. (인자 없음) */
 	setOpenedEvent(openedEvent) {
 		this.#openedEvent = openedEvent;
 	}
 
-	/** @param { Function } closedEvent */
+	//==============================================================================
+	// 다 닫혔을 때 알림 설정.
+	//==============================================================================
+	/** @param { Function } closedEvent 다 닫혔을 때 부를 함수. (인자 없음) */
 	setClosedEvent(closedEvent) {
 		this.#closedEvent = closedEvent;
 	}
