@@ -200,4 +200,6 @@ export { UISpinner } from "./src/ui/uispinner.js";
 export { UIToast } from "./src/ui/uitoast.js";
 export { ToastMotion, attachToastMotion, readToastSeconds } from "./src/ui/toastmotion.js";
 export { UIDialog } from "./src/ui/uidialog.js";
+export { MouseButton, TouchPhase, TouchPoint, InputDevice } from "./src/core/inputmanager.js";
+export { InputActions } from "./src/core/inputactions.js";
 export { GamepadKind, readGamepadKind } from "./src/core/gamepadmanager.js";

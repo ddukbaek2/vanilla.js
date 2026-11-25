@@ -513,6 +513,21 @@ export class ViewManager extends Object {
 	}
 
 	//==============================================================================
+	// 화면(client) 좌표를 뷰 좌표로. (DOM 사건의 clientX, clientY 를 캔버스의 지금 자리로 빼서 canvasPositionToViewPosition 으로 바꾼다)
+	//==============================================================================
+	/**
+	 * @param { number } clientX
+	 * @param { number } clientY
+	 * @returns { Vector2 }
+	 */
+	convertClientToView(clientX, clientY) {
+		const canvas = this.getCanvas();
+		const canvasRect = canvas.getBoundingClientRect();
+		const canvasPosition = Vector2.create(clientX - canvasRect.left, clientY - canvasRect.top);
+		return this.canvasPositionToViewPosition(canvasPosition);
+	}
+
+	//==============================================================================
 	// 렌더 배율 상한 설정.
 	// - 고DPI 기기에서 캔버스가 과대해지는 것을 막는다. 0 이면 제한하지 않는다.
 	//==============================================================================

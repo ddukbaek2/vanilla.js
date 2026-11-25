@@ -8,7 +8,7 @@ import { Colors } from "../base/colors.js";
 import { Vector2 } from "../base/vector2.js";
 import { TimeManager } from "./timemanager.js";
 import { ViewManager, ViewScaleMode } from "./viewmanager.js";
-import { InputManager } from "./inputmanager.js";
+import { InputManager, InputDevice, MouseButton } from "./inputmanager.js";
 import { Platform, PlatformType, BrowserType, SYSTEM_FONT_STRING } from "../base/platform.js";
 import { Graphic } from "./graphic.js";
 import { Scene } from "./scene.js";
@@ -24,6 +24,12 @@ const FRAME_LIMIT_TOLERANCE_MILLISECONDS = 4;
 
 // 최대 FPS 제한에서 제 차례보다 이만큼 안쪽으로 일찍 온 프레임을 처리하면 그 시각부터 다시 센다. (밀리초) 주사율이 최대 FPS 와 거의 같은 화면(60.05 Hz 에서 60 FPS 등)에서 조금씩 앞서 간 것이 쌓여 가끔 한 프레임을 건너뛰지 않게 한다.
 const FRAME_LIMIT_RESYNC_MILLISECONDS = 1;
+
+// 손가락을 뗀 뒤 이 안에 온 마우스 사건은 마지막 장치를 마우스로 바꾸지 않는다. (밀리초, 브라우저가 흉내 내 보내는 마우스 사건)
+const COMPATIBILITY_MOUSE_MILLISECONDS = 800;
+
+// 마우스가 이만큼(CSS 픽셀) 넘게 움직여야 마지막 장치를 마우스로 본다. (창이 흔들릴 때 나는 작은 움직임을 거른다)
+const MOUSE_DEVICE_MOVE_THRESHOLD = 6;
 
 
 
@@ -416,10 +422,25 @@ export class Engine extends Object {
 			}
 		});
 
+		// 손가락을 마지막으로 댄 때. (흉내 낸 마우스 사건을 거른다)
+		let lastTouchTimestamp = -COMPATIBILITY_MOUSE_MILLISECONDS;
+		const noteMouseDevice = () => {
+			if (System.performance.now() - lastTouchTimestamp < COMPATIBILITY_MOUSE_MILLISECONDS) {
+				return;
+			}
+			inputManager.setLastInputDevice(InputDevice.mouse);
+		};
+
 		// 키보드 누름.
 		System.document.addEventListener("keydown", (keyboardEvent) => {
 			const key = keyboardEvent.code;
 			inputManager.pushKey(key);
+			inputManager.setLastInputDevice(InputDevice.keyboard);
+			// 막을 키의 브라우저 기본 동작. (글자 입력칸에 쓰는 중이면 그대로)
+			const isKeyPrevented = inputManager.isKeyPrevented(key);
+			if (isKeyPrevented && !inputManager.isTypingInTextField()) {
+				keyboardEvent.preventDefault();
+			}
 			// console.log(`keydown: ${key}`);
 		});
 
@@ -432,27 +453,43 @@ export class Engine extends Object {
 
 		// 마우스 우클릭시 컨텍스트 메뉴 출력 될 때.
 		canvas.addEventListener("contextmenu", (touchEvent) => {
-			touchEvent.preventDefault();
+			const inputManager = this.getInputManager();
+			if (inputManager.isContextMenuPrevented()) {
+				touchEvent.preventDefault();
+			}
 		});
 
-		// 마우스 누를 때.
+		// 마우스 누를 때. (단추 셋을 적고, 왼쪽만 터치로 넘기게 했으면 다른 단추는 터치가 아니다)
 		canvas.addEventListener("mousedown", (touchEvent) => {
 				const inputManager = this.getInputManager();
-				inputManager.setTouchPressed(true);
-				inputManager.setTouchMoved(true);
+				inputManager.setMouseButtonDown(touchEvent.button, true);
+				noteMouseDevice();
+				const isTouchButton = !inputManager.isTouchFromLeftButtonOnly() || touchEvent.button === MouseButton.left;
+				if (isTouchButton) {
+					inputManager.setTouchPressed(true);
+					inputManager.setTouchMoved(true);
+				}
 				this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
 		// 마우스 움직일 때.
 		canvas.addEventListener("mousemove", (touchEvent) => {
+				const movement = System.Math.abs(touchEvent.movementX) + System.Math.abs(touchEvent.movementY);
+				if (movement >= MOUSE_DEVICE_MOVE_THRESHOLD) {
+					noteMouseDevice();
+				}
 				this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
 		// 마우스 뗄 때.
 		canvas.addEventListener("mouseup", (touchEvent) => {
 				const inputManager = this.getInputManager();
-				inputManager.setTouchMoved(false);
-				inputManager.setTouchReleased(true);
+				inputManager.setMouseButtonDown(touchEvent.button, false);
+				const isTouchButton = !inputManager.isTouchFromLeftButtonOnly() || touchEvent.button === MouseButton.left;
+				if (isTouchButton) {
+					inputManager.setTouchMoved(false);
+					inputManager.setTouchReleased(true);
+				}
 				this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
 			});
 
@@ -460,6 +497,7 @@ export class Engine extends Object {
 		canvas.addEventListener("wheel", (wheelEvent) => {
 				const inputManager = this.getInputManager();
 				inputManager.addWheelDelta(wheelEvent.deltaX, wheelEvent.deltaY);
+				noteMouseDevice();
 				this.updateCanvasNativeInputPosition(wheelEvent.clientX, wheelEvent.clientY);
 				wheelEvent.preventDefault();
 			}, { passive: false });
@@ -467,7 +505,12 @@ export class Engine extends Object {
 		// 마우스 뗄 때 (캔버스 밖에서 뗄 때 처리).
 		System.window.addEventListener("mouseup", (touchEvent) => {
 				const inputManager = this.getInputManager();
+				inputManager.setMouseButtonDown(touchEvent.button, false);
 				if (!inputManager.isTouchMoved()) {
+					return;
+				}
+				const isTouchButton = !inputManager.isTouchFromLeftButtonOnly() || touchEvent.button === MouseButton.left;
+				if (!isTouchButton) {
 					return;
 				}
 				inputManager.setTouchMoved(false);
@@ -477,6 +520,8 @@ export class Engine extends Object {
 
 		// 터치 누를 때.
 		canvas.addEventListener("touchstart", (touchEvent) => {
+				lastTouchTimestamp = System.performance.now();
+				this.updateTouchPoints(touchEvent);
 				const touch = touchEvent.changedTouches[0];
 				if (!touch) {
 					return;
@@ -491,6 +536,8 @@ export class Engine extends Object {
 
 		// 터치 움직일 때.
 		canvas.addEventListener("touchmove", (touchEvent) => {
+				lastTouchTimestamp = System.performance.now();
+				this.updateTouchPoints(touchEvent);
 				const touch = touchEvent.changedTouches[0];
 				if (!touch) {
 					return;
@@ -502,6 +549,8 @@ export class Engine extends Object {
 
 		// 터치 뗄 때.
 		canvas.addEventListener("touchend", (touchEvent) => {
+				lastTouchTimestamp = System.performance.now();
+				this.updateTouchPoints(touchEvent);
 				const touch = touchEvent.changedTouches[0];
 				if (touch) {
 					this.updateCanvasNativeInputPosition(touch.clientX, touch.clientY);
@@ -529,6 +578,8 @@ export class Engine extends Object {
 
 		// 터치 취소 될 때.
 		canvas.addEventListener("touchcancel", (touchEvent) => {
+				lastTouchTimestamp = System.performance.now();
+				this.updateTouchPoints(touchEvent);
 				const touch = touchEvent.changedTouches[0];
 				if (touch) {
 					this.updateCanvasNativeInputPosition(touch.clientX, touch.clientY);
@@ -544,6 +595,9 @@ export class Engine extends Object {
 			const inputManager = this.getInputManager();
 			inputManager.setTouchMoved(false);
 			inputManager.setTouchReleased(true);
+			inputManager.setMouseButtonDown(MouseButton.left, false);
+			inputManager.setMouseButtonDown(MouseButton.middle, false);
+			inputManager.setMouseButtonDown(MouseButton.right, false);
 			focusEvent.preventDefault();
 		}, { passive: false });
 
@@ -590,6 +644,58 @@ export class Engine extends Object {
 			inputManager.disconnectGamepad(gamepad);
 			console.log(`gamepaddisconnected: ${gamepad.id}`);
 		});
+	}
+
+	//==============================================================================
+	// 손가락 목록 갱신. (터치 사건의 바뀐 손가락마다 닿음, 움직임, 뗌을 적고, 사건의 touches 에 없는 손가락은 취소로 지운다)
+	//==============================================================================
+	/**
+	 * @param { TouchEvent } touchEvent
+	 */
+	updateTouchPoints(touchEvent) {
+		const inputManager = this.getInputManager();
+		const viewManager = this.getViewManager();
+		const canvas = viewManager.getCanvas();
+		const canvasRect = canvas.getBoundingClientRect();
+		const eventType = touchEvent.type;
+		inputManager.setLastInputDevice(InputDevice.touch);
+		const changedTouches = touchEvent.changedTouches;
+		for (let touchIndex = 0; touchIndex < changedTouches.length; ++touchIndex) {
+			const touch = changedTouches[touchIndex];
+			const canvasNativePosition = Vector2.create(touch.clientX - canvasRect.left, touch.clientY - canvasRect.top);
+			const viewPosition = viewManager.canvasPositionToViewPosition(canvasNativePosition);
+			switch (eventType) {
+				case "touchstart": {
+					inputManager.beginTouchPoint(touch.identifier, canvasNativePosition, viewPosition);
+					break;
+				}
+				case "touchmove": {
+					inputManager.moveTouchPoint(touch.identifier, canvasNativePosition, viewPosition);
+					break;
+				}
+				case "touchend": {
+					inputManager.endTouchPoint(touch.identifier, canvasNativePosition, viewPosition, false);
+					break;
+				}
+				default: {
+					inputManager.endTouchPoint(touch.identifier, canvasNativePosition, viewPosition, true);
+					break;
+				}
+			}
+		}
+
+		// 놓친 뗌. (사건의 touches 는 지금 화면에 닿은 손가락 전부다)
+		const touchingIdentifiers = new System.Set();
+		const touches = touchEvent.touches;
+		for (let touchIndex = 0; touchIndex < touches.length; ++touchIndex) {
+			touchingIdentifiers.add(touches[touchIndex].identifier);
+		}
+		const touchPoints = inputManager.getTouchPoints().slice();
+		for (const touchPoint of touchPoints) {
+			if (!touchingIdentifiers.has(touchPoint.identifier)) {
+				inputManager.endTouchPoint(touchPoint.identifier, touchPoint.canvasNativePosition, touchPoint.viewPosition, true);
+			}
+		}
 	}
 
 	//==============================================================================
