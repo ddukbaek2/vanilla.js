@@ -864,9 +864,32 @@ export class ParticleSystem extends Component {
 		return this.#particleList.length;
 	}
 
+	//==============================================================================
+	// 입자 자리 목록. (노드 로컬, 흔들림을 넣지 않은 적분 자리. 같은 씨앗 비교와 시험용)
+	//==============================================================================
+	/** @returns { Vector2[] } */
+	getParticlePositionList() {
+		return this.#particleList.map((particle) => Vector2.create(particle.x, particle.y));
+	}
+
 	/** @returns { boolean } */
 	isPlaying() {
 		return this.#isPlaying;
+	}
+
+	//==============================================================================
+	// 다 끝났는지. (방출할 것이 더 없고 남은 입자도 없음, 일회성 노드를 치울 때)
+	// - 정지했거나, 루프가 아니고 duration 이 지났으며 버스트를 다 냈으면 방출할 것이 없다.
+	//==============================================================================
+	/** @returns { boolean } */
+	isFinished() {
+		if (this.#particleList.length > 0) {
+			return false;
+		}
+		if (!this.#isPlaying) {
+			return true;
+		}
+		return !this.#isLooping && this.#playElapsedSeconds > this.#duration && this.#burstList.every((burst) => burst.fired);
 	}
 
 	//==============================================================================
