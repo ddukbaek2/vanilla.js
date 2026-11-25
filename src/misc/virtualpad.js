@@ -25,6 +25,51 @@ const VirtualPadState = {
 //==============================================================================
 /**
  * @class
+ * @example <caption>장면의 터치를 넘겨 가상 패드로 방향 읽기</caption>
+ * import { Engine, EngineConfiguration, Scene, VirtualPad, Vector2, Color } from "./build/vanilla.js";
+ *
+ * const virtualPad = new VirtualPad();
+ * virtualPad.setPadPosition(Vector2.create(120, 240));
+ * virtualPad.setPadRadius(80);
+ * virtualPad.setBallRadius(30);
+ * virtualPad.setPadColor(new Color(0, 0, 0, 0.4));
+ * virtualPad.setBallColor(new Color(1, 1, 1, 0.8));
+ * virtualPad.setBallMoveEvent((normalizedDirection, pullStrength) => {
+ * 	const moveX = (normalizedDirection.x * 2 - 1) * pullStrength;
+ * 	const moveY = (normalizedDirection.y * 2 - 1) * pullStrength;
+ * 	console.log(moveX.toFixed(2), moveY.toFixed(2));
+ * });
+ *
+ * class MainScene extends Scene {
+ * 	tick(timeDelta) {
+ * 		super.tick(timeDelta);
+ * 		virtualPad.tick(timeDelta);
+ * 	}
+ *
+ * 	draw(graphic) {
+ * 		super.draw(graphic);
+ * 		virtualPad.draw(graphic);
+ * 	}
+ *
+ * 	touchPress(viewInputPosition) {
+ * 		super.touchPress(viewInputPosition);
+ * 		virtualPad.touchPress(viewInputPosition);
+ * 	}
+ *
+ * 	touchMove(viewInputPosition) {
+ * 		super.touchMove(viewInputPosition);
+ * 		virtualPad.touchMove(viewInputPosition);
+ * 	}
+ *
+ * 	touchRelease(viewInputPosition) {
+ * 		super.touchRelease(viewInputPosition);
+ * 		virtualPad.touchRelease(viewInputPosition);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
  */
 export class VirtualPad extends Object {
 	//==============================================================================
@@ -68,7 +113,7 @@ export class VirtualPad extends Object {
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		const virtualPadState = this.getVirtualPadState();
@@ -135,7 +180,7 @@ export class VirtualPad extends Object {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Grpahic } graphic
+	 * @param { Grpahic } graphic 그릴 그래픽.
 	 */
 	draw(graphic) {
 		const padPosition = this.getPadPosition();
@@ -161,7 +206,7 @@ export class VirtualPad extends Object {
 	// 터치 누름.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 누른 자리. (뷰 좌표, 구슬을 이 자리로 옮긴다)
 	 */
 	touchPress(viewInputPosition) {
 		this.#virtualPadState = VirtualPadState.pressed;
@@ -172,7 +217,7 @@ export class VirtualPad extends Object {
 	// 터치 드래그.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 끌고 있는 자리. (뷰 좌표, 패드 반지름 밖이면 tick 이 구슬을 테두리에 가둔다)
 	 */
 	touchMove(viewInputPosition) {
 		this.#virtualPadState = VirtualPadState.move;
@@ -183,7 +228,7 @@ export class VirtualPad extends Object {
 	// 터치 뗌.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뗀 자리. (쓰지 않는다, 구슬은 tick 에서 패드 가운데로 돌아간다)
 	 */
 	touchRelease(viewInputPosition) {
 		this.#virtualPadState = VirtualPadState.released;
@@ -202,7 +247,7 @@ export class VirtualPad extends Object {
 	// 가상 패드 상태 반환.
 	//==============================================================================
 	/**
-	 * @returns { VirtualPadState }
+	 * @returns { VirtualPadState } 지금 상태. ("wait", "pressed", "move", "released")
 	 */
 	getVirtualPadState() {
 		return this.#virtualPadState;
@@ -212,7 +257,23 @@ export class VirtualPad extends Object {
 	// 구슬 이동 이벤트 함수 설정.
 	//==============================================================================
 	/**
-	 * @param { Function } callback
+	 * @param { Function } callback 구슬이 움직일 때 부를 함수. (normalizedDirection, pullStrength) => void, 방향은 축마다 0 ~ 1 (0.5 가 가운데), 당김은 0 ~ 1
+	 * @example <caption>엔진 없이 끌고 놓아 알림 값 보기</caption>
+	 * import { VirtualPad, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const virtualPad = new VirtualPad();
+	 * virtualPad.setPadPosition(Vector2.create(100, 100));
+	 * virtualPad.setPadRadius(50);
+	 * virtualPad.setBallMoveEvent((normalizedDirection, pullStrength) => {
+	 * 	console.log(normalizedDirection.x.toFixed(2), normalizedDirection.y.toFixed(2), pullStrength.toFixed(2));
+	 * });
+	 * virtualPad.touchPress(Vector2.create(100, 100));
+	 * virtualPad.touchMove(Vector2.create(200, 100));
+	 * virtualPad.tick(1 / 60);
+	 * virtualPad.touchRelease(Vector2.create(200, 100));
+	 * virtualPad.tick(1 / 60);
+	 * virtualPad.tick(1 / 60);
+	 * console.log(virtualPad.getVirtualPadState());
 	 */
 	setBallMoveEvent(callback) {
 		this.#ballMoveEvent = callback;
@@ -222,7 +283,7 @@ export class VirtualPad extends Object {
 	// 패드 위치 설정.
 	//==============================================================================
 	/**
-	 * @param { Function } callback
+	 * @param { Function } callback 패드 가운데 자리. (구슬도 이 자리로 옮긴다)
 	 */
 	setPadPosition(padPosition) {
 		this.#padPosition = padPosition;
@@ -233,7 +294,7 @@ export class VirtualPad extends Object {
 	// 패드 위치 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 패드 가운데 자리.
 	 */
 	getPadPosition() {
 		return this.#padPosition;
@@ -243,7 +304,7 @@ export class VirtualPad extends Object {
 	// 패드 크기 설정.
 	//==============================================================================
 	/**
-	 * @param { Function } callback
+	 * @param { Function } callback 패드 반지름. (픽셀, 기본 200)
 	 */
 	setPadRadius(padRadius) {
 		this.#padRadius = padRadius;
@@ -253,7 +314,7 @@ export class VirtualPad extends Object {
 	// 패드 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 패드 반지름. (픽셀)
 	 */
 	getPadRadius() {
 		return this.#padRadius;
@@ -263,7 +324,7 @@ export class VirtualPad extends Object {
 	// 구슬 위치 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 구슬 가운데 자리.
 	 */
 	getBallPosition() {
 		return this.#ballPosition;
@@ -273,7 +334,7 @@ export class VirtualPad extends Object {
 	// 구슬 크기 설정.
 	//==============================================================================
 	/**
-	 * @param { Function } callback
+	 * @param { Function } callback 구슬 반지름. (픽셀, 기본 50)
 	 */
 	setBallRadius(ballRadius) {
 		this.#ballRadius = ballRadius;
@@ -283,7 +344,7 @@ export class VirtualPad extends Object {
 	// 구슬 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 구슬 반지름. (픽셀)
 	 */
 	getBallRadius() {
 		return this.#ballRadius;
@@ -293,7 +354,7 @@ export class VirtualPad extends Object {
 	// 패드 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } padColor
+	 * @param { Color } padColor 패드 색. (기본 검정)
 	 */
 	setPadColor(padColor) {
 		this.#padColor = padColor;
@@ -303,7 +364,7 @@ export class VirtualPad extends Object {
 	// 패드 색상 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 패드 색.
 	 */
 	getPadColor() {
 		return this.#padColor;
@@ -313,7 +374,7 @@ export class VirtualPad extends Object {
 	// 구슬 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } ballColor
+	 * @param { Color } ballColor 구슬 색. (기본 흰색)
 	 */
 	setBallColor(ballColor) {
 		this.#ballColor = ballColor;
@@ -323,7 +384,7 @@ export class VirtualPad extends Object {
 	// 구슬 색상 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 구슬 색.
 	 */
 	getBallColor() {
 		return this.#ballColor;

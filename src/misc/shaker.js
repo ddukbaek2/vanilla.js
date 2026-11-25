@@ -13,6 +13,23 @@ import { Vector2 } from "../base/vector2.js";
 // - addShake(strength) 로 세기를 더하고, 매 프레임 tick(dt) 후 getOffset() 을
 //   카메라나 노드 위치에 더해 쓴다.
 //==============================================================================
+/**
+ * @example <caption>흔들고 잦아드는 오프셋 읽기</caption>
+ * import { Shaker } from "./build/vanilla.js";
+ *
+ * const shaker = new Shaker({ decayRate: 9, frequency: 42 });
+ * shaker.addShake(12);
+ * for (let frame = 0; frame < 30; ++frame) {
+ * 	shaker.tick(1 / 60);
+ * 	const offset = shaker.getOffset();
+ * 	if (frame % 10 === 0) {
+ * 		console.log(offset.x.toFixed(2), offset.y.toFixed(2));
+ * 	}
+ * }
+ * console.log(shaker.isShaking());
+ * shaker.stop();
+ * console.log(shaker.isShaking());
+ */
 export class Shaker extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -53,7 +70,7 @@ export class Shaker extends Object {
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		this.#elapsedSeconds += timeDelta;
@@ -70,7 +87,7 @@ export class Shaker extends Object {
 	// - 두 축의 주파수 비를 다르게 두어(1 : 1.37) 궤적이 단조롭지 않게 한다.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } x, y 오프셋. (픽셀, 흔들리지 않으면 영 벡터)
 	 */
 	getOffset() {
 		if (this.#strength <= 0) {
@@ -86,7 +103,7 @@ export class Shaker extends Object {
 	// 흔들리는 중인지 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 흔들리는 중이면 참.
 	 */
 	isShaking() {
 		return this.#strength > 0;
@@ -103,7 +120,7 @@ export class Shaker extends Object {
 	// 감쇠율 설정. (클수록 빨리 잦아든다)
 	//==============================================================================
 	/**
-	 * @param { number } decayRate
+	 * @param { number } decayRate 감쇠율. (초당 지수 감쇠 계수, 기본 9)
 	 */
 	setDecayRate(decayRate) {
 		this.#decayRate = decayRate;
@@ -113,7 +130,7 @@ export class Shaker extends Object {
 	// 진동 주파수 설정.
 	//==============================================================================
 	/**
-	 * @param { number } frequency
+	 * @param { number } frequency 진동 각속도. (라디안 / 초, 기본 42)
 	 */
 	setFrequency(frequency) {
 		this.#frequency = frequency;

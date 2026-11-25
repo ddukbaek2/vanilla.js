@@ -13,6 +13,38 @@ import { Vector2 } from "../base/vector2.js";
 //   콜백(setTapEvent / setDragEvent / setLongPressEvent)으로 결과를 받는다.
 // - 여러 게임이 pressedTime / dragMoved 변수를 제각각 들고 다니던 것을 표준화했다.
 //==============================================================================
+/**
+ * @example <caption>탭, 드래그, 롱프레스 가려 받기</caption>
+ * import { PointerGesture } from "./build/vanilla.js";
+ *
+ * const pointerGesture = new PointerGesture({ dragThreshold: 12, longPressSeconds: 0.6 });
+ * pointerGesture.setTapEvent((position) => {
+ * 	console.log("tap", position.x, position.y);
+ * });
+ * pointerGesture.setDragEvent((currentPosition, pressPosition) => {
+ * 	console.log("drag", currentPosition.x - pressPosition.x);
+ * });
+ * pointerGesture.setDragEndEvent((currentPosition, pressPosition) => {
+ * 	console.log("drag end", currentPosition.x - pressPosition.x);
+ * });
+ * pointerGesture.setLongPressEvent((pressPosition) => {
+ * 	console.log("long press", pressPosition.x, pressPosition.y);
+ * });
+ *
+ * pointerGesture.press(100, 100);
+ * pointerGesture.release();
+ *
+ * pointerGesture.press(100, 100);
+ * pointerGesture.move(105, 100);
+ * pointerGesture.move(130, 100);
+ * pointerGesture.release();
+ *
+ * pointerGesture.press(50, 50);
+ * pointerGesture.tick(0.3);
+ * console.log(pointerGesture.getLongPressRatio());
+ * pointerGesture.tick(0.3);
+ * pointerGesture.release();
+ */
 export class PointerGesture extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -58,8 +90,8 @@ export class PointerGesture extends Object {
 	// 누름.
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
+	 * @param { number } x 포인터 X 좌표.
+	 * @param { number } y 포인터 Y 좌표.
 	 */
 	press(x, y) {
 		this.#isPressed = true;
@@ -75,8 +107,8 @@ export class PointerGesture extends Object {
 	// - 누른 지점에서 임계값을 넘으면 드래그로 확정하고 이후 매 이동마다 dragEvent 를 부른다.
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
+	 * @param { number } x 포인터 X 좌표.
+	 * @param { number } y 포인터 Y 좌표.
 	 */
 	move(x, y) {
 		if (!this.#isPressed) {
@@ -100,7 +132,7 @@ export class PointerGesture extends Object {
 	// - 드래그로 확정되지 않은 채 longPressSeconds 를 넘기면 롱프레스를 한 번 알린다.
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		if (!this.#isPressed || this.#isDragging || this.#isLongPressed) {
@@ -155,7 +187,7 @@ export class PointerGesture extends Object {
 	// 롱프레스 진행 비율 반환. (게이지 표시용, 0~1)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 롱프레스 진행 비율. (0 ~ 1, 누르지 않았거나 드래그 중이면 0)
 	 */
 	getLongPressRatio() {
 		if (!this.#isPressed || this.#isDragging || this.#longPressSeconds <= 0) {
@@ -168,14 +200,17 @@ export class PointerGesture extends Object {
 	// 상태 조회.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 누르고 있으면 참.
 	 */
 	isPressed() {
 		return this.#isPressed;
 	}
 
+	//==============================================================================
+	// 드래그 중인지 여부.
+	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 드래그로 확정되었으면 참.
 	 */
 	isDragging() {
 		return this.#isDragging;
@@ -189,16 +224,25 @@ export class PointerGesture extends Object {
 		this.#tapEvent = tapEvent;
 	}
 
+	//==============================================================================
+	// 드래그 알림 설정. (드래그로 확정된 뒤 이동마다)
+	//==============================================================================
 	/** @param { Function } dragEvent (currentPosition, pressPosition) => void */
 	setDragEvent(dragEvent) {
 		this.#dragEvent = dragEvent;
 	}
 
+	//==============================================================================
+	// 드래그 끝 알림 설정. (드래그 중에 뗄 때)
+	//==============================================================================
 	/** @param { Function } dragEndEvent (currentPosition, pressPosition) => void */
 	setDragEndEvent(dragEndEvent) {
 		this.#dragEndEvent = dragEndEvent;
 	}
 
+	//==============================================================================
+	// 롱프레스 알림 설정. (드래그 없이 longPressSeconds 를 넘길 때 한 번)
+	//==============================================================================
 	/** @param { Function } longPressEvent (pressPosition) => void */
 	setLongPressEvent(longPressEvent) {
 		this.#longPressEvent = longPressEvent;
@@ -207,12 +251,15 @@ export class PointerGesture extends Object {
 	//==============================================================================
 	// 임계값 설정.
 	//==============================================================================
-	/** @param { number } dragThreshold */
+	/** @param { number } dragThreshold 드래그로 볼 최소 이동 거리. (press 와 같은 좌표 단위, 기본 12) */
 	setDragThreshold(dragThreshold) {
 		this.#dragThreshold = dragThreshold;
 	}
 
-	/** @param { number } longPressSeconds */
+	//==============================================================================
+	// 길게 누름 판정 시간 설정. (초)
+	//==============================================================================
+	/** @param { number } longPressSeconds 롱프레스로 볼 누름 시간. (초, 기본 0.6) */
 	setLongPressSeconds(longPressSeconds) {
 		this.#longPressSeconds = longPressSeconds;
 	}

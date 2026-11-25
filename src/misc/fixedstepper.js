@@ -14,6 +14,21 @@ import { Object } from "../base/object.js";
 //   (느린 기기에서 멈칫한 뒤 밀린 것을 한꺼번에 몰아 돌다 더 느려지지 않게)
 // - stepFunction 이 false 를 돌려주면 이번 프레임의 걸음을 거기서 멈추고 남은 시간은 쌓아 둔다. (회의, 연출처럼 잠시 붙잡을 때)
 //==============================================================================
+/**
+ * @example <caption>들쭉날쭉한 프레임을 같은 걸음으로 돌리기</caption>
+ * import { FixedStepper } from "./build/vanilla.js";
+ *
+ * const fixedStepper = new FixedStepper(1 / 60, 5);
+ * let position = 0;
+ * const velocity = 120;
+ * const frameDeltaList = [0.016, 0.033, 0.008, 0.050];
+ * for (const timeDelta of frameDeltaList) {
+ * 	const alpha = fixedStepper.advance(timeDelta, (stepSeconds) => {
+ * 		position += velocity * stepSeconds;
+ * 	});
+ * 	console.log(fixedStepper.getLastStepCount(), alpha.toFixed(2), position.toFixed(2));
+ * }
+ */
 export class FixedStepper extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -45,7 +60,7 @@ export class FixedStepper extends Object {
 	// 한 걸음의 시간 설정. (초, 0 보다 커야 한다. 아니면 그대로 둔다)
 	//==============================================================================
 	/**
-	 * @param { number } stepSeconds
+	 * @param { number } stepSeconds 한 걸음의 시간. (초)
 	 */
 	setStepSeconds(stepSeconds) {
 		if (typeof stepSeconds !== "number" || !System.Number.isFinite(stepSeconds) || stepSeconds <= 0) {
@@ -58,7 +73,7 @@ export class FixedStepper extends Object {
 	// 한 걸음의 시간 반환. (초)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 한 걸음의 시간. (초)
 	 */
 	getStepSeconds() {
 		return this.#stepSeconds;
@@ -68,7 +83,7 @@ export class FixedStepper extends Object {
 	// 한 프레임에 도는 걸음의 상한 설정. (1 이상, 소수는 버린다)
 	//==============================================================================
 	/**
-	 * @param { number } maximumStepsPerFrame
+	 * @param { number } maximumStepsPerFrame 한 프레임에 도는 걸음의 상한.
 	 */
 	setMaximumStepsPerFrame(maximumStepsPerFrame) {
 		if (typeof maximumStepsPerFrame !== "number" || !System.Number.isFinite(maximumStepsPerFrame)) {
@@ -81,7 +96,7 @@ export class FixedStepper extends Object {
 	// 한 프레임에 도는 걸음의 상한 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 한 프레임에 도는 걸음의 상한.
 	 */
 	getMaximumStepsPerFrame() {
 		return this.#maximumStepsPerFrame;
@@ -94,6 +109,28 @@ export class FixedStepper extends Object {
 	 * @param { number } timeDelta 이번 프레임의 시간. (초, 음수나 숫자가 아니면 0)
 	 * @param { (stepSeconds: number) => (boolean | void) } stepFunction 한 걸음. false 를 돌려주면 이번 프레임은 거기서 멈춘다.
 	 * @returns { number } 남은 몫. (0 ~ 1)
+	 * @example <caption>남은 몫으로 섞어 그리고, false 로 걸음을 붙잡기</caption>
+	 * import { FixedStepper } from "./build/vanilla.js";
+	 *
+	 * const fixedStepper = new FixedStepper();
+	 * let previousPosition = 0;
+	 * let currentPosition = 0;
+	 * let isPaused = false;
+	 * const step = (stepSeconds) => {
+	 * 	if (isPaused) {
+	 * 		return false;
+	 * 	}
+	 * 	previousPosition = currentPosition;
+	 * 	currentPosition += 60 * stepSeconds;
+	 * 	return true;
+	 * };
+	 * const alpha = fixedStepper.advance(0.025, step);
+	 * const drawPosition = previousPosition + (currentPosition - previousPosition) * alpha;
+	 * console.log(fixedStepper.getLastStepCount(), drawPosition);
+	 *
+	 * isPaused = true;
+	 * fixedStepper.advance(0.1, step);
+	 * console.log(fixedStepper.getLastStepCount(), fixedStepper.getAlpha());
 	 */
 	advance(timeDelta, stepFunction) {
 		const stepSeconds = this.getStepSeconds();
@@ -124,7 +161,7 @@ export class FixedStepper extends Object {
 	// 남은 몫. (쌓인 시간 / 한 걸음, 0 ~ 1)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 남은 몫. (0 ~ 1)
 	 */
 	getAlpha() {
 		const stepSeconds = this.getStepSeconds();
@@ -136,7 +173,7 @@ export class FixedStepper extends Object {
 	// 지난 advance 에서 돈 걸음 수.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 지난 advance 에서 돈 걸음 수.
 	 */
 	getLastStepCount() {
 		return this.#lastStepCount;

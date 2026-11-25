@@ -25,6 +25,53 @@ const MOUSE_RIGHT_BUTTON = 2;
 // - 마지막 손이 손가락인지 마우스인지도 읽는다. 손가락을 뗀 바로 뒤에 브라우저가 흉내 내 보내는 마우스 사건은 무시한다.
 // - 생성하면 엔진의 캔버스에 사건을 붙인다. 다 쓰면 dispose().
 //==============================================================================
+/**
+ * @example <caption>두 손가락과 마우스 손짓으로 2D 카메라 돌리고 밀고 키우기</caption>
+ * import { Engine, EngineConfiguration, Scene, CameraGestures, Camera2D, Rect, Colors } from "./build/vanilla.js";
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const cameraGestures = new CameraGestures();
+ * const camera = new Camera2D();
+ *
+ * class MainScene extends Scene {
+ * 	tick(timeDelta) {
+ * 		super.tick(timeDelta);
+ * 		const viewManager = engine.getViewManager();
+ * 		const viewSize = viewManager.getViewSize();
+ * 		camera.setViewSize(viewSize);
+ * 		const pan = cameraGestures.takePan();
+ * 		camera.panByScreen(pan.x, pan.y);
+ * 		const rotation = cameraGestures.takeRotation();
+ * 		const currentRotation = camera.getRotation();
+ * 		camera.setRotation(currentRotation + rotation * 180 / Math.PI);
+ * 		const zoom = cameraGestures.takeZoom();
+ * 		const zoomAnchor = cameraGestures.getZoomAnchor();
+ * 		if (zoom !== 1 && zoomAnchor !== null) {
+ * 			camera.zoomAt(zoomAnchor, zoom);
+ * 		}
+ * 		camera.tick(timeDelta);
+ * 	}
+ *
+ * 	draw(graphic) {
+ * 		camera.begin(graphic);
+ * 		graphic.setFillColor(Colors.white);
+ * 		graphic.drawRect(Rect.create(-100, -100, 200, 200));
+ * 		camera.end(graphic);
+ * 		super.draw(graphic);
+ * 	}
+ *
+ * 	touchPress(viewInputPosition) {
+ * 		super.touchPress(viewInputPosition);
+ * 		if (cameraGestures.isGestureActive()) {
+ * 			return;
+ * 		}
+ * 		console.log("tap", viewInputPosition.x, viewInputPosition.y);
+ * 	}
+ * }
+ *
+ * engine.run(new MainScene());
+ */
 export class CameraGestures {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -135,10 +182,10 @@ export class CameraGestures {
 	// DOM 사건 붙이기. (dispose 가 뗍다)
 	//==============================================================================
 	/**
-	 * @param { EventTarget } target
-	 * @param { string } type
-	 * @param { Function } handler
-	 * @param { object | boolean } options
+	 * @param { EventTarget } target 사건을 붙일 대상.
+	 * @param { string } type 사건 이름.
+	 * @param { Function } handler 사건 처리 함수.
+	 * @param { object | boolean } options addEventListener 의 options. (dispose 가 뗄 때도 같은 것을 넘긴다)
 	 */
 	addListener(target, type, handler, options) {
 		target.addEventListener(type, handler, options);
@@ -160,7 +207,7 @@ export class CameraGestures {
 	// 손짓 중인지. (오른쪽이나 가운데 단추를 누르고 있거나 두 손가락, 이때 엔진의 누름은 놀이에 쓰지 않는다)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 손짓 중이면 참.
 	 */
 	isGestureActive() {
 		return this.#isRightButtonDown || this.#isMiddleButtonDown || this.#isMultiTouch;
@@ -170,7 +217,7 @@ export class CameraGestures {
 	// 마지막 손이 손가락인지. (처음에는 기기가 손가락이 주된 입력인지로)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 마지막 손이 손가락이면 참.
 	 */
 	isTouchInput() {
 		return this.#isTouchInput;
@@ -180,7 +227,7 @@ export class CameraGestures {
 	// 기기가 손가락이 주된 입력인지. (폰과 태블릿)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 손가락이 주된 입력인 기기면 참. (matchMedia 가 없으면 거짓)
 	 */
 	isCoarsePointer() {
 		if (typeof System.matchMedia !== "function") {
@@ -194,7 +241,7 @@ export class CameraGestures {
 	// 마지막 휠이 Ctrl 을 누른 휠이었는지. (휠로 밀기를 켰어도 그 휠은 키우기입다)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 마지막 휠이 Ctrl 을 누른 휠이면 참.
 	 */
 	isLastWheelCtrl() {
 		return this.#isLastWheelCtrl;
@@ -204,7 +251,7 @@ export class CameraGestures {
 	// 모인 밀기 꺼내기. ({ x, y } 뷰 단위, 꺼내면 비웁다)
 	//==============================================================================
 	/**
-	 * @returns { object }
+	 * @returns { object } 모인 밀기. ({ x, y }, 뷰 단위)
 	 */
 	takePan() {
 		const pan = { x: this.#panX, y: this.#panY };
@@ -217,7 +264,7 @@ export class CameraGestures {
 	// 모인 돌리기 꺼내기. (라디안, 꺼내면 비웁다)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 모인 돌리기. (라디안)
 	 */
 	takeRotation() {
 		const rotation = this.#rotation;
@@ -229,7 +276,7 @@ export class CameraGestures {
 	// 모인 기울이기 꺼내기. (라디안, 꺼내면 비웁다)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 모인 기울이기. (라디안, + 가 위에서 보는 쪽)
 	 */
 	takeTilt() {
 		const tilt = this.#tilt;
@@ -241,7 +288,7 @@ export class CameraGestures {
 	// 모인 키우기 꺼내기. (곱할 비, 꺼내면 1)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 모인 키우기. (곱할 비, 1 이면 그대로)
 	 */
 	takeZoom() {
 		const zoom = this.#zoom;
@@ -253,7 +300,7 @@ export class CameraGestures {
 	// 키우기의 가운데. (뷰 좌표, 두 손가락 가운데, 없으면 null)
 	//==============================================================================
 	/**
-	 * @returns { Vector2 | null }
+	 * @returns { Vector2 | null } 키우기의 가운데. (뷰 좌표, 두 손가락으로 키운 적이 없으면 null)
 	 */
 	getZoomAnchor() {
 		return this.#zoomAnchor;
@@ -263,7 +310,7 @@ export class CameraGestures {
 	// 오른쪽 클릭이 있었는지 꺼내기. (끌지 않고 뗀 오른쪽 단추, 꺼내면 지웁다)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 오른쪽 클릭이 있었으면 참.
 	 */
 	takeRightClick() {
 		const isRightClicked = this.#isRightClicked;
@@ -275,7 +322,7 @@ export class CameraGestures {
 	// 돌리기를 놓았는지 꺼내기. (꺼내면 지웁다)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 돌리기를 놓았으면 참. (오른쪽 단추를 떼거나 두 손가락을 모두 뗐을 때)
 	 */
 	takeRotationReleased() {
 		const isRotationReleased = this.#isRotationReleased;
@@ -287,7 +334,7 @@ export class CameraGestures {
 	// CSS 픽셀 하나가 뷰 단위로 얼마인지. (폰의 pt 와 같습다)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } CSS 픽셀 하나의 뷰 단위 크기. (엔진이 없으면 1)
 	 */
 	readUnitsPerCssPixel() {
 		const engine = System.vanillaEngine;
@@ -307,9 +354,9 @@ export class CameraGestures {
 	// 브라우저 창의 자리를 뷰 좌표로. (엔진이 누름의 자리를 바꾸는 것과 같게, 엔진이 없으면 null)
 	//==============================================================================
 	/**
-	 * @param { number } clientX
-	 * @param { number } clientY
-	 * @returns { Vector2 | null }
+	 * @param { number } clientX 브라우저 창 기준 X. (CSS 픽셀)
+	 * @param { number } clientY 브라우저 창 기준 Y. (CSS 픽셀)
+	 * @returns { Vector2 | null } 뷰 좌표. (엔진이나 캔버스가 없으면 null)
 	 */
 	readViewPosition(clientX, clientY) {
 		const engine = System.vanillaEngine;
@@ -327,7 +374,7 @@ export class CameraGestures {
 	// 손가락을 뗀 바로 뒤의 마우스 사건인지. (브라우저가 흉내 내 보내는 것)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 마지막 손가락 사건 뒤 무시하는 시간 안이면 참.
 	 */
 	isCompatibilityMouse() {
 		const now = System.performance.now();
@@ -338,7 +385,7 @@ export class CameraGestures {
 	// 마우스 누름. (오른쪽 단추면 돌리기, 가운데 단추면 밀기 시작)
 	//==============================================================================
 	/**
-	 * @param { MouseEvent } mouseEvent
+	 * @param { MouseEvent } mouseEvent 브라우저 마우스 사건.
 	 */
 	handleMouseDown(mouseEvent) {
 		if (this.isCompatibilityMouse()) {
@@ -363,7 +410,7 @@ export class CameraGestures {
 	// 마우스로 끄는 커서. (오른쪽 단추로 돌리거나 가운데 단추로 미는 중이면 grabbing, 오른쪽 단추를 누르고 아직 끌지 않았으면 grab, 아니면 빈 글)
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } CSS 커서 이름. ("grabbing", "grab", 빈 글)
 	 */
 	readMouseDragCursor() {
 		if (this.#isMiddleButtonDown || (this.#isRightButtonDown && this.#isRightDragged)) {
@@ -379,7 +426,7 @@ export class CameraGestures {
 	// 마우스 움직임. (오른쪽 단추를 누른 채면 가로로 움직인 만큼 돌리고 세로로 움직인 만큼 기울이고, 가운데 단추면 밉다)
 	//==============================================================================
 	/**
-	 * @param { MouseEvent } mouseEvent
+	 * @param { MouseEvent } mouseEvent 브라우저 마우스 사건.
 	 */
 	handleMouseMove(mouseEvent) {
 		if (!this.isCompatibilityMouse()) {
@@ -412,7 +459,7 @@ export class CameraGestures {
 	// 마우스 뗌. (오른쪽 단추면 돌리기 끝, 끌지 않았으면 오른쪽 클릭, 가운데 단추면 밀기 끝)
 	//==============================================================================
 	/**
-	 * @param { MouseEvent } mouseEvent
+	 * @param { MouseEvent } mouseEvent 브라우저 마우스 사건.
 	 */
 	handleMouseUp(mouseEvent) {
 		if (mouseEvent.button === MOUSE_RIGHT_BUTTON && this.#isRightButtonDown) {
@@ -431,7 +478,7 @@ export class CameraGestures {
 	// 휠. (Ctrl 을 눌렀는지만 적는다, 키우기와 밀기는 엔진이 넘긴 휠로 화면이 합다)
 	//==============================================================================
 	/**
-	 * @param { WheelEvent } wheelEvent
+	 * @param { WheelEvent } wheelEvent 브라우저 휠 사건.
 	 */
 	handleWheel(wheelEvent) {
 		this.#isLastWheelCtrl = wheelEvent.ctrlKey;
@@ -441,7 +488,7 @@ export class CameraGestures {
 	// 손가락 수가 바뀜. (둘 이상이면 손짓을 시작하고, 모두 떼면 끝냅다)
 	//==============================================================================
 	/**
-	 * @param { TouchEvent } touchEvent
+	 * @param { TouchEvent } touchEvent 브라우저 손가락 사건.
 	 */
 	handleTouchChange(touchEvent) {
 		this.#isTouchInput = true;
@@ -466,7 +513,7 @@ export class CameraGestures {
 	// 두 손가락의 가운데, 각도, 거리를 기준으로 잡기.
 	//==============================================================================
 	/**
-	 * @param { TouchList } touches
+	 * @param { TouchList } touches 지금 닿은 손가락 목록. (앞의 둘을 쓴다)
 	 */
 	captureTouchPose(touches) {
 		const firstTouch = touches[0];
@@ -481,7 +528,7 @@ export class CameraGestures {
 	// 두 손가락이 움직임. (가운데가 움직인 만큼 밀고, 거리가 바뀐 만큼 키우고, 문턱을 넘게 비틀면 돌립다)
 	//==============================================================================
 	/**
-	 * @param { TouchEvent } touchEvent
+	 * @param { TouchEvent } touchEvent 브라우저 손가락 사건.
 	 */
 	handleTouchMove(touchEvent) {
 		this.#lastTouchTime = System.performance.now();
@@ -526,10 +573,19 @@ export class CameraGestures {
 	// 문턱 설정. (비틀기를 시작하는 각도, 화면 높이의 반만큼 끌 때 기울어지는 각도, 오른쪽 클릭으로 보는 거리, 흉내 낸 마우스를 무시하는 밀리초)
 	//==============================================================================
 	/**
-	 * @param { number } twistStartRadians
-	 * @param { number } tiltPerHalfHeightRadians
-	 * @param { number } rightClickDistance
-	 * @param { number } compatibilityMouseMilliseconds
+	 * @param { number } twistStartRadians 두 손가락 비틀기가 돌리기를 시작하는 각도. (라디안, 기본 15 도)
+	 * @param { number } tiltPerHalfHeightRadians 오른쪽 끌기를 화면 높이의 반만큼 세로로 끌면 기울어지는 각도. (라디안, 기본 35 도)
+	 * @param { number } rightClickDistance 오른쪽 단추를 이만큼 안에서 떼면 오른쪽 클릭으로 본다. (CSS 픽셀, 기본 8)
+	 * @param { number } compatibilityMouseMilliseconds 손가락을 뗀 뒤 흉내 낸 마우스 사건을 무시하는 시간. (밀리초, 기본 800)
+	 * @example <caption>문턱을 도 단위로 바꿔 넣기</caption>
+	 * import { CameraGestures } from "./build/vanilla.js";
+	 *
+	 * const cameraGestures = new CameraGestures();
+	 * const twistStartRadians = 10 * Math.PI / 180;
+	 * const tiltPerHalfHeightRadians = 45 * Math.PI / 180;
+	 * cameraGestures.setThresholds(twistStartRadians, tiltPerHalfHeightRadians, 6, 600);
+	 * console.log(cameraGestures.isGestureActive(), cameraGestures.takeZoom());
+	 * cameraGestures.dispose();
 	 */
 	setThresholds(twistStartRadians, tiltPerHalfHeightRadians, rightClickDistance, compatibilityMouseMilliseconds) {
 		this.#twistStartRadians = twistStartRadians;

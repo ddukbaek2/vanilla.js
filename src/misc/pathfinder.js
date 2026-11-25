@@ -11,17 +11,33 @@ import { Object } from "../base/object.js";
 // - isBlockedHandler(column, row) 가 참이면 막힌 칸이다.
 // - 결과는 시작 칸을 제외하고 도착 칸까지의 { column, row } 배열. 길이 없으면 null.
 //==============================================================================
+/**
+ * @example <caption>벽을 돌아가는 길 찾기</caption>
+ * import { PathFinder } from "./build/vanilla.js";
+ *
+ * const mapRows = [
+ * 	"....",
+ * 	"###.",
+ * 	"....",
+ * ];
+ * const isBlocked = (column, row) => {
+ * 	return mapRows[row][column] === "#";
+ * };
+ * const path = PathFinder.findPath(4, 3, { column: 0, row: 0 }, { column: 0, row: 2 }, isBlocked);
+ * console.log(path.length);
+ * console.log(JSON.stringify(path));
+ */
 export class PathFinder extends Object {
 	//==============================================================================
 	// 경로 탐색. (정적)
 	//==============================================================================
 	/**
-	 * @param { number } columnCount
-	 * @param { number } rowCount
+	 * @param { number } columnCount 격자의 열 수.
+	 * @param { number } rowCount 격자의 행 수.
 	 * @param { object } start { column, row }
 	 * @param { object } goal { column, row }
 	 * @param { Function } isBlockedHandler (column, row) => boolean
-	 * @returns { object[] | null }
+	 * @returns { object[] | null } 시작 칸을 뺀 도착 칸까지의 { column, row } 배열. (시작과 도착이 같으면 빈 배열, 길이 없거나 시작이나 도착이 격자 밖이거나 도착 칸이 막혔으면 null)
 	 */
 	static findPath(columnCount, rowCount, start, goal, isBlockedHandler) {
 		const isInside = (column, row) => {
