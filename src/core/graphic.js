@@ -128,12 +128,12 @@ void main() {
 // 셰이더 섞기 함수. (고정 블렌딩으로 안 되는 블렌드 모드에서 그릴 영역 아래와 섞는다, 러스트 판과 같은 글)
 // - backdropTexture 는 그리기 직전에 지금 프레임버퍼에서 그릴 영역만 떠 온 것이다. (프레임버퍼와 같은 크기와 형식, 프리멀티플라이드)
 // - 공식은 W3C Compositing and Blending Level 1 (https://www.w3.org/TR/compositing-1/, 2024-03-21 후보 권고안) 그대로다.
-//   10.1 분리 섞기: overlay = HardLight(Cs, Cb), darken = min, lighten = max, color-dodge, color-burn, hard-light, soft-light (D(Cb) 포함), difference, exclusion.
+//   10.1 분리 섞기: multiply = Cb x Cs, overlay = HardLight(Cs, Cb), darken = min, lighten = max, color-dodge, color-burn, hard-light, soft-light (D(Cb) 포함), difference, exclusion.
 //   10.2 비분리 섞기: hue, saturation, color, luminosity. (Lum = 0.3 R + 0.59 G + 0.11 B, ClipColor, SetLum, Sat, SetSat)
 //   섞은 색은 범위로 자른다. (10 장 "The result of the mixing formula must be clamped")
 // - 6 장 일반식대로 Cs' = (1 - αb) x Cs + αb x B(Cb, Cs) 로 섞은 색을 (Cs' x αs, αs) 로 내보내고,
 //   그 뒤 source-over 합성 co = cs' + cb x (1 - αs) 는 고정 블렌딩(ONE, ONE_MINUS_SRC_ALPHA)이 한다.
-// - blendModeIndex 는 SHADER_BLEND_MODE_INDEX_TABLE 의 번호다.
+// - blendModeIndex 는 SHADER_BLEND_MODE_INDEX_TABLE 의 번호다. multiply 는 렌더 타겟에 그릴 때만 MULTIPLY_SHADER_BLEND_MODE_INDEX 로 섞는다.
 const BLEND_FUNCTION_SOURCE = `uniform highp sampler2D backdropTexture;
 uniform int blendModeIndex;
 
@@ -252,6 +252,9 @@ vec3 blendColors(vec3 backdropColor, vec3 sourceColor) {
 	if (blendModeIndex == 13) {
 		return setLuminosity(backdropColor, getLuminosity(sourceColor));
 	}
+	if (blendModeIndex == 14) {
+		return backdropColor * sourceColor;
+	}
 	return sourceColor;
 }
 
@@ -330,6 +333,11 @@ const SHADER_BLEND_MODE_INDEX_TABLE = new Map([
 	["color", 12],
 	["luminosity", 13],
 ]);
+
+// multiply 를 셰이더로 섞을 때의 번호. (BLEND_FUNCTION_SOURCE 의 blendModeIndex)
+// - multiply 는 고정 블렌딩(DST_COLOR, ONE_MINUS_SRC_ALPHA)이 바탕이 불투명할 때만 W3C 식과 같다. 바탕 알파가 1 보다 작으면 cs x (1 - αb) 항이 빠지고
+//   알파가 바탕 알파로 남는다. 기본 프레임버퍼(alpha: false)는 바탕 알파가 늘 1 이라 고정 블렌딩으로 그리고, 렌더 타겟에 그릴 때만 이 번호로 셰이더로 섞는다.
+const MULTIPLY_SHADER_BLEND_MODE_INDEX = 14;
 
 // 덧그림 칸을 비우는 색. (투명한 검정)
 const TRANSPARENT_CLEAR_VALUE_LIST = new Float32Array([0, 0, 0, 0]);
@@ -1069,6 +1077,7 @@ export class Graphic extends Object {
 	// - 나머지 13 가지(overlay, darken, lighten, color-dodge, color-burn, hard-light, soft-light, difference, exclusion, hue, saturation, color, luminosity)는
 	//   그리기마다 그릴 영역 아래를 떠 와 셰이더로 섞는다. 이 모드에서는 묶어 그리지 않고, 그리기 하나에 영역 복사 한 번과 드로우 콜 한 번이 든다.
 	//   (바꿔 끼운 셰이더로 그릴 때는 덧그림 칸에 먼저 그리고 옮기므로 드로우 콜이 두 번)
+	// - multiply 는 렌더 타겟(프레임버퍼를 묶은 동안)에 그릴 때만 셰이더로 섞는다. (getDrawShaderBlendModeIndex)
 	// - 모르는 이름은 source-over 로 그린다.
 	//==============================================================================
 	/**
@@ -1108,6 +1117,45 @@ export class Graphic extends Object {
 	 */
 	getBlendMode() {
 		return this.#blendMode;
+	}
+
+	//==============================================================================
+	// 이번 그리기의 셰이더 섞기 번호. (0 이면 고정 블렌딩)
+	// - multiply 는 기본 프레임버퍼에서는 고정 블렌딩으로 그리고(묶어 그리기도 그대로), 렌더 타겟에 그릴 때만 셰이더로 섞는다. (MULTIPLY_SHADER_BLEND_MODE_INDEX)
+	//==============================================================================
+	/**
+	 * @private
+	 * @returns { number }
+	 */
+	getDrawShaderBlendModeIndex() {
+		if (this.#blendMode !== "multiply") {
+			return this.#shaderBlendModeIndex;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const framebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
+		if (framebuffer === null) {
+			return 0;
+		}
+		return MULTIPLY_SHADER_BLEND_MODE_INDEX;
+	}
+
+	//==============================================================================
+	// 셰이더 섞기의 합성 계수로 바꾸거나 되돌리기. (셰이더로 섞은 색은 source-over 로 합성한다)
+	// - 셰이더로만 섞는 13 가지는 setBlendMode 가 이미 source-over 계수를 걸어 두므로 그대로 둔다.
+	//   multiply 는 고정 블렌딩 계수가 걸려 있어, 렌더 타겟에서 셰이더로 섞는 동안만 source-over 로 바꾸고(isShaderBlending 이 true) 다 그린 뒤 되돌린다.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { boolean } isShaderBlending
+	 */
+	applyShaderBlendCompositeFunction(isShaderBlending) {
+		const blendMode = this.#blendMode;
+		if (blendMode !== "multiply") {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const blendFunction = isShaderBlending ? this.#blendFunctionTable.get("source-over") : this.#blendFunctionTable.get(blendMode);
+		webGL2RenderingContext.blendFunc(blendFunction[0], blendFunction[1]);
 	}
 
 	//==============================================================================
@@ -1239,7 +1287,8 @@ export class Graphic extends Object {
 		}
 
 		// 셰이더 섞기 모드는 그리기마다 그 아래를 떠 와 섞으므로 묶지 않는다. (스텐실에 자르기 영역을 적을 때는 색을 쓰지 않으므로 그냥 그린다)
-		const isShaderBlendDraw = this.#shaderBlendModeIndex > 0 && !this.#isStencilRecording;
+		const shaderBlendModeIndex = this.#isStencilRecording ? 0 : this.getDrawShaderBlendModeIndex();
+		const isShaderBlendDraw = shaderBlendModeIndex > 0;
 
 		// 묶어 그리기가 켜져 있으면 쌓아 두었다가 텍스처나 상태가 바뀔 때 한 번에 그린다. (바꿔 끼운 셰이더는 제 유니폼을 쓰므로 바로 그린다)
 		if (this.#isSpriteBatchingEnabled && this.#shaderProgramOverride === null && !isShaderBlendDraw && vertexCount <= BATCH_VERTEX_CAPACITY) {
@@ -1248,7 +1297,9 @@ export class Graphic extends Object {
 		}
 		this.flushSpriteBatch();
 		if (isShaderBlendDraw) {
-			this.drawVerticesWithShaderBlend(vertexCount, texture, color);
+			this.applyShaderBlendCompositeFunction(true);
+			this.drawVerticesWithShaderBlend(vertexCount, texture, color, shaderBlendModeIndex);
+			this.applyShaderBlendCompositeFunction(false);
 			return;
 		}
 
@@ -1285,8 +1336,9 @@ export class Graphic extends Object {
 	 * @param { number } vertexCount
 	 * @param { WebGLTexture } texture
 	 * @param { Color } color
+	 * @param { number } shaderBlendModeIndex
 	 */
-	drawVerticesWithShaderBlend(vertexCount, texture, color) {
+	drawVerticesWithShaderBlend(vertexCount, texture, color, shaderBlendModeIndex) {
 		const vertexData = this.getVertexData();
 		const backdropRect = this.#backdropRect;
 		const isVisible = this.measureBackdropRect(vertexData, FLOATS_PER_VERTEX, 0, vertexCount, backdropRect);
@@ -1300,7 +1352,7 @@ export class Graphic extends Object {
 
 		const shaderProgramOverride = this.#shaderProgramOverride;
 		if (shaderProgramOverride === null) {
-			this.drawWithBlendShaderProgram(vertexCount, texture, color);
+			this.drawWithBlendShaderProgram(vertexCount, texture, color, shaderBlendModeIndex);
 			return;
 		}
 
@@ -1335,7 +1387,7 @@ export class Graphic extends Object {
 		this.#globalAlpha = 1.0;
 		this.#imageTintColor = null;
 		const whiteColor = this.getWhiteColor();
-		this.drawWithBlendShaderProgram(layerVertexCount, layerTarget.texture, whiteColor);
+		this.drawWithBlendShaderProgram(layerVertexCount, layerTarget.texture, whiteColor, shaderBlendModeIndex);
 		this.#transformMatrix = transformMatrix;
 		this.#globalAlpha = globalAlpha;
 		this.#imageTintColor = imageTintColor;
@@ -1349,15 +1401,16 @@ export class Graphic extends Object {
 	 * @param { number } vertexCount
 	 * @param { WebGLTexture } texture
 	 * @param { Color } color
+	 * @param { number } shaderBlendModeIndex
 	 */
-	drawWithBlendShaderProgram(vertexCount, texture, color) {
+	drawWithBlendShaderProgram(vertexCount, texture, color, shaderBlendModeIndex) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const blendShaderProgram = this.ensureBlendShaderProgram();
 		this.useShaderProgram(blendShaderProgram);
 		const projectionMatrixLocation = blendShaderProgram.getUniformLocation("projectionMatrix");
 		webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
 		const blendModeIndexLocation = blendShaderProgram.getUniformLocation("blendModeIndex");
-		webGL2RenderingContext.uniform1i(blendModeIndexLocation, this.#shaderBlendModeIndex);
+		webGL2RenderingContext.uniform1i(blendModeIndexLocation, shaderBlendModeIndex);
 		this.uploadDrawUniforms(blendShaderProgram, color);
 		this.bindTexture(texture);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
@@ -2081,7 +2134,8 @@ export class Graphic extends Object {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 
 		// 셰이더 섞기 모드는 섞기 프로그램으로 그린다.
-		const isShaderBlendDraw = this.#shaderBlendModeIndex > 0;
+		const shaderBlendModeIndex = this.getDrawShaderBlendModeIndex();
+		const isShaderBlendDraw = shaderBlendModeIndex > 0;
 		const particleShaderProgram = isShaderBlendDraw ? this.ensureParticleBlendShaderProgram() : this.#particleShaderProgram;
 		this.useShaderProgram(particleShaderProgram);
 		webGL2RenderingContext.bindVertexArray(this.#particleVertexArray);
@@ -2099,8 +2153,10 @@ export class Graphic extends Object {
 
 		if (isShaderBlendDraw) {
 			const blendModeIndexLocation = particleShaderProgram.getUniformLocation("blendModeIndex");
-			webGL2RenderingContext.uniform1i(blendModeIndexLocation, this.#shaderBlendModeIndex);
+			webGL2RenderingContext.uniform1i(blendModeIndexLocation, shaderBlendModeIndex);
+			this.applyShaderBlendCompositeFunction(true);
 			this.drawColoredQuadGroups(vertexCount, texture);
+			this.applyShaderBlendCompositeFunction(false);
 		}
 		else {
 			this.bindTexture(texture);

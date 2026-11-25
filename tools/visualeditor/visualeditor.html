@@ -5716,6 +5716,9 @@ vec3 blendColors(vec3 backdropColor, vec3 sourceColor) {
 	if (blendModeIndex == 13) {
 		return setLuminosity(backdropColor, getLuminosity(sourceColor));
 	}
+	if (blendModeIndex == 14) {
+		return backdropColor * sourceColor;
+	}
 	return sourceColor;
 }
 
@@ -5785,6 +5788,7 @@ void main() {
     ["color", 12],
     ["luminosity", 13]
   ]);
+  var MULTIPLY_SHADER_BLEND_MODE_INDEX = 14;
   var TRANSPARENT_CLEAR_VALUE_LIST = new Float32Array([0, 0, 0, 0]);
   var SHADER_BLEND_PARTICLE_GROUP_CAPACITY = 32;
   var FLOATS_PER_VERTEX = 4;
@@ -6528,6 +6532,7 @@ void main() {
     // - 나머지 13 가지(overlay, darken, lighten, color-dodge, color-burn, hard-light, soft-light, difference, exclusion, hue, saturation, color, luminosity)는
     //   그리기마다 그릴 영역 아래를 떠 와 셰이더로 섞는다. 이 모드에서는 묶어 그리지 않고, 그리기 하나에 영역 복사 한 번과 드로우 콜 한 번이 든다.
     //   (바꿔 끼운 셰이더로 그릴 때는 덧그림 칸에 먼저 그리고 옮기므로 드로우 콜이 두 번)
+    // - multiply 는 렌더 타겟(프레임버퍼를 묶은 동안)에 그릴 때만 셰이더로 섞는다. (getDrawShaderBlendModeIndex)
     // - 모르는 이름은 source-over 로 그린다.
     //==============================================================================
     /**
@@ -6561,6 +6566,43 @@ void main() {
      */
     getBlendMode() {
       return this.#blendMode;
+    }
+    //==============================================================================
+    // 이번 그리기의 셰이더 섞기 번호. (0 이면 고정 블렌딩)
+    // - multiply 는 기본 프레임버퍼에서는 고정 블렌딩으로 그리고(묶어 그리기도 그대로), 렌더 타겟에 그릴 때만 셰이더로 섞는다. (MULTIPLY_SHADER_BLEND_MODE_INDEX)
+    //==============================================================================
+    /**
+     * @private
+     * @returns { number }
+     */
+    getDrawShaderBlendModeIndex() {
+      if (this.#blendMode !== "multiply") {
+        return this.#shaderBlendModeIndex;
+      }
+      const webGL2RenderingContext = this.getWebGL2RenderingContext();
+      const framebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
+      if (framebuffer === null) {
+        return 0;
+      }
+      return MULTIPLY_SHADER_BLEND_MODE_INDEX;
+    }
+    //==============================================================================
+    // 셰이더 섞기의 합성 계수로 바꾸거나 되돌리기. (셰이더로 섞은 색은 source-over 로 합성한다)
+    // - 셰이더로만 섞는 13 가지는 setBlendMode 가 이미 source-over 계수를 걸어 두므로 그대로 둔다.
+    //   multiply 는 고정 블렌딩 계수가 걸려 있어, 렌더 타겟에서 셰이더로 섞는 동안만 source-over 로 바꾸고(isShaderBlending 이 true) 다 그린 뒤 되돌린다.
+    //==============================================================================
+    /**
+     * @private
+     * @param { boolean } isShaderBlending
+     */
+    applyShaderBlendCompositeFunction(isShaderBlending) {
+      const blendMode = this.#blendMode;
+      if (blendMode !== "multiply") {
+        return;
+      }
+      const webGL2RenderingContext = this.getWebGL2RenderingContext();
+      const blendFunction = isShaderBlending ? this.#blendFunctionTable.get("source-over") : this.#blendFunctionTable.get(blendMode);
+      webGL2RenderingContext.blendFunc(blendFunction[0], blendFunction[1]);
     }
     //==============================================================================
     // 이미지 틴트 색상 설정. (null 이면 해제)
@@ -6681,14 +6723,17 @@ void main() {
       if (vertexCount <= 0) {
         return;
       }
-      const isShaderBlendDraw = this.#shaderBlendModeIndex > 0 && !this.#isStencilRecording;
+      const shaderBlendModeIndex = this.#isStencilRecording ? 0 : this.getDrawShaderBlendModeIndex();
+      const isShaderBlendDraw = shaderBlendModeIndex > 0;
       if (this.#isSpriteBatchingEnabled && this.#shaderProgramOverride === null && !isShaderBlendDraw && vertexCount <= BATCH_VERTEX_CAPACITY) {
         this.appendSpriteBatch(vertexCount, texture, color);
         return;
       }
       this.flushSpriteBatch();
       if (isShaderBlendDraw) {
-        this.drawVerticesWithShaderBlend(vertexCount, texture, color);
+        this.applyShaderBlendCompositeFunction(true);
+        this.drawVerticesWithShaderBlend(vertexCount, texture, color, shaderBlendModeIndex);
+        this.applyShaderBlendCompositeFunction(false);
         return;
       }
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -6713,8 +6758,9 @@ void main() {
      * @param { number } vertexCount
      * @param { WebGLTexture } texture
      * @param { Color } color
+     * @param { number } shaderBlendModeIndex
      */
-    drawVerticesWithShaderBlend(vertexCount, texture, color) {
+    drawVerticesWithShaderBlend(vertexCount, texture, color, shaderBlendModeIndex) {
       const vertexData = this.getVertexData();
       const backdropRect = this.#backdropRect;
       const isVisible = this.measureBackdropRect(vertexData, FLOATS_PER_VERTEX, 0, vertexCount, backdropRect);
@@ -6727,7 +6773,7 @@ void main() {
       webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, vertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, vertexCount * FLOATS_PER_VERTEX);
       const shaderProgramOverride = this.#shaderProgramOverride;
       if (shaderProgramOverride === null) {
-        this.drawWithBlendShaderProgram(vertexCount, texture, color);
+        this.drawWithBlendShaderProgram(vertexCount, texture, color, shaderBlendModeIndex);
         return;
       }
       const layerTarget = this.ensureLayerTarget(framebuffer);
@@ -6758,7 +6804,7 @@ void main() {
       this.#globalAlpha = 1;
       this.#imageTintColor = null;
       const whiteColor = this.getWhiteColor();
-      this.drawWithBlendShaderProgram(layerVertexCount, layerTarget.texture, whiteColor);
+      this.drawWithBlendShaderProgram(layerVertexCount, layerTarget.texture, whiteColor, shaderBlendModeIndex);
       this.#transformMatrix = transformMatrix;
       this.#globalAlpha = globalAlpha;
       this.#imageTintColor = imageTintColor;
@@ -6771,15 +6817,16 @@ void main() {
      * @param { number } vertexCount
      * @param { WebGLTexture } texture
      * @param { Color } color
+     * @param { number } shaderBlendModeIndex
      */
-    drawWithBlendShaderProgram(vertexCount, texture, color) {
+    drawWithBlendShaderProgram(vertexCount, texture, color, shaderBlendModeIndex) {
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
       const blendShaderProgram = this.ensureBlendShaderProgram();
       this.useShaderProgram(blendShaderProgram);
       const projectionMatrixLocation = blendShaderProgram.getUniformLocation("projectionMatrix");
       webGL2RenderingContext.uniformMatrix3fv(projectionMatrixLocation, false, this.#projectionMatrixArray);
       const blendModeIndexLocation = blendShaderProgram.getUniformLocation("blendModeIndex");
-      webGL2RenderingContext.uniform1i(blendModeIndexLocation, this.#shaderBlendModeIndex);
+      webGL2RenderingContext.uniform1i(blendModeIndexLocation, shaderBlendModeIndex);
       this.uploadDrawUniforms(blendShaderProgram, color);
       this.bindTexture(texture);
       webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
@@ -7455,7 +7502,8 @@ void main() {
       this.flushSpriteBatch();
       this.ensureParticleBatchResources();
       const webGL2RenderingContext = this.getWebGL2RenderingContext();
-      const isShaderBlendDraw = this.#shaderBlendModeIndex > 0;
+      const shaderBlendModeIndex = this.getDrawShaderBlendModeIndex();
+      const isShaderBlendDraw = shaderBlendModeIndex > 0;
       const particleShaderProgram = isShaderBlendDraw ? this.ensureParticleBlendShaderProgram() : this.#particleShaderProgram;
       this.useShaderProgram(particleShaderProgram);
       webGL2RenderingContext.bindVertexArray(this.#particleVertexArray);
@@ -7470,8 +7518,10 @@ void main() {
       webGL2RenderingContext.uniform1f(globalAlphaLocation, this.getGlobalAlpha());
       if (isShaderBlendDraw) {
         const blendModeIndexLocation = particleShaderProgram.getUniformLocation("blendModeIndex");
-        webGL2RenderingContext.uniform1i(blendModeIndexLocation, this.#shaderBlendModeIndex);
+        webGL2RenderingContext.uniform1i(blendModeIndexLocation, shaderBlendModeIndex);
+        this.applyShaderBlendCompositeFunction(true);
         this.drawColoredQuadGroups(vertexCount, texture);
+        this.applyShaderBlendCompositeFunction(false);
       } else {
         this.bindTexture(texture);
         webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, vertexCount);
@@ -11836,6 +11886,38 @@ void main() {
       const rx = sx * cosRadian - sy * sinRadian;
       const ry = sx * sinRadian + sy * cosRadian;
       return Vector2.create(parentPosition.x + rx, parentPosition.y + ry);
+    }
+    //==============================================================================
+    // 글로벌 위치 설정. (getPosition 의 거꾸로)
+    // - parent.getPosition() (= 부모 pivot 점의 월드 좌표) 에서 본 차이를 부모 회전/스케일을 풀어 부모 pivot 점 기준 오프셋으로 되돌린 뒤
+    //   부모 content top-left 기준(localPosition)으로 옮긴다. 부모 스케일이 0 인 축은 부모 pivot 점에 놓는다.
+    //==============================================================================
+    /**
+     * @override
+     * @param { Vector2 } position
+     */
+    setPosition(position) {
+      const parent = this.getParent();
+      if (!(parent instanceof _WorldNode)) {
+        super.setPosition(position);
+        return;
+      }
+      const parentPosition = parent.getPosition();
+      const parentContentSize = parent.getContentSize();
+      const parentPivot = parent.getPivot();
+      const parentRotation = parent.getRotation();
+      const parentScale = parent.getScale();
+      const dx = position.x - parentPosition.x;
+      const dy = position.y - parentPosition.y;
+      const radian = degreeToRadian(-parentRotation);
+      const cosRadian = cos(radian);
+      const sinRadian = sin(radian);
+      const rx = dx * cosRadian - dy * sinRadian;
+      const ry = dx * sinRadian + dy * cosRadian;
+      const sx = parentScale.x !== 0 ? rx / parentScale.x : 0;
+      const sy = parentScale.y !== 0 ? ry / parentScale.y : 0;
+      const newLocalPosition = Vector2.create(sx + parentContentSize.x * parentPivot.x, sy + parentContentSize.y * parentPivot.y);
+      this.setLocalPosition(newLocalPosition);
     }
     //==============================================================================
     // 실제 화면에 그려지는 영역 반환. (OBB)

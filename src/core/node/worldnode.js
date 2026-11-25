@@ -505,6 +505,46 @@ export class WorldNode extends TransformNode {
     }
 
     //==============================================================================
+    // 글로벌 위치 설정. (getPosition 의 거꾸로)
+    // - parent.getPosition() (= 부모 pivot 점의 월드 좌표) 에서 본 차이를 부모 회전/스케일을 풀어 부모 pivot 점 기준 오프셋으로 되돌린 뒤
+    //   부모 content top-left 기준(localPosition)으로 옮긴다. 부모 스케일이 0 인 축은 부모 pivot 점에 놓는다.
+    //==============================================================================
+    /**
+     * @override
+     * @param { Vector2 } position
+     */
+    setPosition(position) {
+        const parent = this.getParent();
+        if (!(parent instanceof WorldNode)) {
+            super.setPosition(position);
+            return;
+        }
+
+        const parentPosition = parent.getPosition();
+        const parentContentSize = parent.getContentSize();
+        const parentPivot = parent.getPivot();
+        const parentRotation = parent.getRotation();
+        const parentScale = parent.getScale();
+
+        // 부모 pivot 점 기준 차이.
+        const dx = position.x - parentPosition.x;
+        const dy = position.y - parentPosition.y;
+
+        // 역회전, 역스케일.
+        const radian = Math.degreeToRadian(-parentRotation);
+        const cosRadian = Math.cos(radian);
+        const sinRadian = Math.sin(radian);
+        const rx = dx * cosRadian - dy * sinRadian;
+        const ry = dx * sinRadian + dy * cosRadian;
+        const sx = parentScale.x !== 0 ? rx / parentScale.x : 0;
+        const sy = parentScale.y !== 0 ? ry / parentScale.y : 0;
+
+        // 부모 content top-left 기준으로 옮김.
+        const newLocalPosition = Vector2.create(sx + parentContentSize.x * parentPivot.x, sy + parentContentSize.y * parentPivot.y);
+        this.setLocalPosition(newLocalPosition);
+    }
+
+    //==============================================================================
     // 실제 화면에 그려지는 영역 반환. (OBB)
     //==============================================================================
     /**

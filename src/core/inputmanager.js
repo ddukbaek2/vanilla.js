@@ -98,7 +98,7 @@ export const KeyCode = {
 	audiovolumeup: "AudioVolumeUp",
 	audiovolumedown: "AudioVolumeDown",
 	audiomute: "AudioVolumeMute", // 음소거. (W3C code 표의 이름)
-	audioplay: "MediaPlay",
+	audioplay: "MediaPlayPause", // 재생/멈춤. (W3C code 표의 이름, 표에 MediaPlay 는 없다)
 	audiostop: "MediaStop",
 	audioprev: "MediaTrackPrevious",
 	audionext: "MediaTrackNext",

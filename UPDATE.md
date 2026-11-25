@@ -286,6 +286,9 @@
   - 빛남 배: 꼭짓점 빛남은 glowScale(배우 배 x 부품 배 x HDR 배), 강조색 빛은 emissiveColor 와 emissiveIntensity(0.45 x 1.6). HDR 의 밝은 부품 키우기는 메시마다의 빛남 세기로
   - 색 키(#ff00ff 강조색, 표시판 키 0.02): GLB 프리미티브의 재질 범위로 갈라 그 칸만 tintAmount 1 과 강조색, 표시판은 UV 와 데칼 텍스처(로고, 숫자)로. 움직이는 얼굴 화면(표정, 시선, 깜빡임)은 표면 조각으로 둔다
 - 비주얼 에디터를 위 엔진으로 다시 빌드했다
+- WorldNode.setPosition: getPosition 의 거꾸로를 더했다. 지금까지는 TransformNode.setPosition 이 부모 pivot 점의 자리(부모 contentSize x 부모 pivot)를 되돌리지 않아, 부모의 내용 크기와 피벗이 0 이 아니면 setPosition 으로 놓은 자리와 getPosition 이 달랐다. (부모 100x60, 피벗 가운데, 90 도, 크기 2 에서 (280, 200) 에 놓으면 (340, 100) 으로 읽혔다) 부모 스케일이 0 인 축은 부모 pivot 점에 놓는다. (러스트 판과 같이 고침)
+- multiply 를 렌더 타겟(프레임버퍼를 묶은 동안)에 그릴 때는 그릴 영역 아래를 떠 와 W3C 식(B(Cb, Cs) = Cb x Cs)대로 셰이더로 섞는다. 고정 블렌딩(DST_COLOR, ONE_MINUS_SRC_ALPHA)은 바탕 알파가 1 보다 작으면 cs x (1 - αb) 항이 빠지고 알파가 바탕 알파로 남아, 반투명 바탕 렌더 타겟에서 크롬 Canvas2D 와 최대 221 달랐다. (이제 도형 안쪽 0) 기본 프레임버퍼(alpha: false)는 바탕 알파가 늘 1 이라 지금처럼 고정 블렌딩과 묶어 그리기로 그려 화면과 드로우 콜, 복사 수가 그대로다. 렌더 타겟의 multiply 는 셰이더 섞기 13 가지처럼 그리기 하나에 영역 복사 한 번과 드로우 콜 한 번이 든다. 섞기 셰이더 글에 blendModeIndex 14 를 더했다. (러스트 판과 같이 고침)
+- KeyCode.audioplay 의 값 "MediaPlay" 는 W3C KeyboardEvent.code 표(2025-04-22 권고안)에 없는 이름이다. 표의 이름이고 크롬이 흔한 재생/멈춤 키(USB 0x0C00CD, 윈도우 스캔 코드 0xE022)에 내는 "MediaPlayPause" 로 고쳤다. 크롬은 "MediaPlay" 를 리눅스와 크롬OS 의 재생 키(USB 0x0C00B0)에만 낸다. (러스트 판과 같이 고침)
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.
