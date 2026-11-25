@@ -314,6 +314,12 @@
   - readJumpFloodSteps(거리): 점프 플러딩 걸음 목록. (큰 것부터 1 까지)
 - ToonDrawQueue: setScreenOutline(ToonScreenOutline 이나 null), getScreenOutline(). 맡기면 draw 와 drawWithMatrices 가 몸 앞에 불투명한 것을 선의 판에 그리고(번호는 options.lineId, 주지 않으면 담은 차례 + 1, 인스턴스는 instances[i].lineId 가 먼저), 바깥선 껍데기 뒤 afterOutline 단계 앞에 섞는다. 모형마다 options.hasScreenOutline, options.hasCreaseLine. 비치는 것은 선의 판에 그리지 않는다. 화면 사각형(setScreenRect)이 있으면 그 사각형을 선의 판의 그리는 영역으로 쓴다. 지금까지 afterOutline 단계 콜백에서 drawOutline 을 부르던 코드는 이것으로 바꾸면 된다
 - 예제 toonstyle: 툰 셰이딩과 바깥선 견주기 장면. (각진 상자, 둥근 공, 큰 면 결정, 잔 면 결정 덩이, 고리, 비스듬한 판, 그림자, 점광, ?scale=0.5 로 반 크기 선의 판, ?toggles=1 로 모형마다의 꼴) 러스트 예제 toonstyle 과 같은 장면이다
+- 러스트 판 반사(#[reflect])와 맞추며 원본에서 고친 것
+  - Visual, UIListView: 생성자가 setComponentType 을 부르지 않아 getComponentType 이 "Component" 였고 UI 문서와 반사 저장에 ComponentType "Component" 로 적혔다. 이제 "Visual", "UIListView" 다
+  - UIScrollBar: getTrackColor, getThumbColor (트랙과 썸 Paint 의 색, 러스트 판과 같다)
+  - UIDocument: ShadowImage 를 표에 더했다. Sprite 처럼 imagePath 뒤에 반사 저장 꼴로 쓰고 읽는다. (지금까지는 기본 표에 없어, 에디터처럼 따로 등록하지 않으면 읽을 때 건너뛰었다)
+  - UIDocument.loadByReflection: 지금 값이 없는(null) 속성도 저장한 꼴로 읽는다. (수 넷 배열은 Color, 수 둘 배열은 Vector2, 수, 글, 불은 그대로) 지금까지는 지금 값이 null 인 속성의 수, 글, 불, 배열 값을 건너뛰었다
+  - docs/api/0.4.0.json 과 번역 표를 다시 뽑았다
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.

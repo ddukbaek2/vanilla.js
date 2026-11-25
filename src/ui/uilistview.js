@@ -50,6 +50,7 @@ export class UIListView extends Component {
 	 */
 	constructor() {
 		super();
+		this.setComponentType("UIListView");
 		this.#templateData = null;
 		this.#createItemEvent = null;
 		this.#itemCount = 0;

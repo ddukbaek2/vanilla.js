@@ -24,6 +24,7 @@ export class Visual extends Component {
 	 */
 	constructor() {
 		super();
+		this.setComponentType("Visual");
 		this.#location = Vector2.zero();
 	}
 

@@ -29479,6 +29479,44 @@
 						},
 						{
 							"kind": "method",
+							"name": "getTrackColor",
+							"signature": "getTrackColor()",
+							"params": [],
+							"returns": {
+								"type": "Color",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "트랙 색 반환. (트랙 Paint 의 색)",
+								"en": "Returns the track color. (the color of the track Paint)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiscrollbar.js"
+						},
+						{
+							"kind": "method",
+							"name": "getThumbColor",
+							"signature": "getThumbColor()",
+							"params": [],
+							"returns": {
+								"type": "Color",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "썸 색 반환. (썸 노드 Paint 의 색)",
+								"en": "Returns the thumb color. (the color of the thumb node's Paint)"
+							},
+							"since": "0.4.0",
+							"source": "src/ui/uiscrollbar.js"
+						},
+						{
+							"kind": "method",
 							"name": "setMinThumbSize",
 							"signature": "setMinThumbSize(size)",
 							"params": [
@@ -33970,8 +34008,8 @@
 								}
 							],
 							"description": {
-								"ko": "짝이 맞는 get/set 속성으로 컴포넌트 복원.",
-								"en": "Restores a component through matching get/set properties."
+								"ko": "짝이 맞는 get/set 속성으로 컴포넌트 복원.\n- 지금 값의 꼴로 받을지 가린다. 지금 값이 없으면(null) 저장할 때의 꼴로 받는다.\n  (saveByReflection 은 Color 만 수 넷 배열로, Vector2 만 수 둘 배열로, 그 밖은 수, 글, 불 그대로 적는다)",
+								"en": "Restores a component through matching get/set properties.\n- Decides whether to accept a value by the type of the current value. When there is no current value (null), it accepts the type as saved.\n  (saveByReflection writes only Color as an array of four numbers, only Vector2 as an array of two numbers, and everything else as a number, string or boolean as is)"
 							},
 							"since": "0.3.0",
 							"source": "src/ui/uidocument.js"
@@ -68700,8 +68738,8 @@
 				{
 					"name": "ToonDrawQueue",
 					"summary": {
-						"ko": "툰 그리기 줄. (한 프레임에 그릴 모형을 담아 두었다가 ToonRenderer 로 차례를 맞춰 그린다)\n- 차례: 단계 beforeOpaque → 불투명한 몸 → afterOpaque → 불투명한 것의 바깥선 → afterOutline → 비치는 것(카메라에서 먼 것부터, 깊이는 쓰지 않음) → afterTransparent.\n  몸을 다 그린 뒤 바깥선을 몰아 그려 프로그램을 덜 바꾸고, 비치는 것은 뒤의 것이 비쳐 보이게 맨 끝에 먼 것부터 섞는다.\n- 비치는 것: 그릴 때의 alpha 나 tintColor 의 알파가 1 보다 작거나 blendMode 가 alpha 가 아닌 것. 바깥선도 함께(hasOutline) 그린다.\n- 묶음: options.group 이 같은 비치는 것은 한 덩어리로 가운데 깊이(담긴 것의 평균)로 정렬하고 담은 차례로 그린다.\n  options.isDepthPrepassed 가 묶음 안에 하나라도 있으면 그 덩어리는 깊이만 먼저 그린 뒤 같은 깊이(LEQUAL)인 화소에만 색을 칠한다.\n  여러 부품이 겹친 홀로그램이 두 겹으로 밝지 않고 한 덩어리로 비친다. 덩어리끼리는 먼 것부터라 서로 비친다.\n- 단계 콜백: addPass(stage, callback) 의 callback(renderer, webGL2RenderingContext) 를 그 자리에서 부른다. 부른 뒤 렌더러가 프레임의 그리기 상태를 다시 건다.\n- 인스턴스 묶음(addMeshInstanced)은 불투명이면 몸과 바깥선을 한 번에 그리고, 비치면 인스턴스 자리의 가운데로 한 덩어리로 정렬한다.\n- 그림자: drawShadows(renderer, shadowMap) 가 castsShadow 가 false 가 아닌 불투명한 것만 그림자 깊이로 그린다. draw 보다 먼저 부른다.\n- 사용: 매 프레임 clear() → addMesh / addMeshInstanced / addPass → (drawShadows) → draw(renderer, camera) 나 drawWithMatrices(renderer, 보기 행렬, 투영 행렬)\n  draw 는 renderer.beginFrameWithCamera(camera) 와 endFrame 을 스스로 부른다. drawWithMatrices 는 beginFrameWithMatrices 를 부른다. (직교 원 행렬 카메라)\n  화면 사각형(ToonRenderer.setScreenRect)은 그 전에 건다. clear 는 담은 모형과 단계 콜백을 모두 비운다.\n- 담는 것은 행렬과 꼴의 참조다. draw 를 부를 때까지 고치지 않는다.",
-						"en": "Toon draw queue. (holds the models to draw in a frame, then draws them in order with ToonRenderer)\n- Order: stage beforeOpaque → opaque bodies → afterOpaque → outlines of opaque things → afterOutline → transparent things (farthest from the camera first, no depth writes) → afterTransparent.\n  Outlines are drawn together after all bodies to switch programs less, and transparent things are blended last, far first, so things behind show through.\n- Transparent: drawn alpha or tintColor alpha less than 1, or blendMode not alpha. Their outlines (hasOutline) are drawn with them.\n- Groups: transparent things with the same options.group are sorted as one lump by their center depth (average of the contents) and drawn in the order added.\n  If any in the group has options.isDepthPrepassed, that lump draws depth first, then paints color only on pixels at the same depth (LEQUAL).\n  A hologram of many overlapping parts shows through as one lump instead of being doubly bright. Lumps show through each other since they go far first.\n- Stage callbacks: callback(renderer, webGL2RenderingContext) of addPass(stage, callback) is called at that point. After the call, the renderer re-applies the frame's draw state.\n- Instanced groups (addMeshInstanced) draw bodies and outlines in one go when opaque, and when transparent are sorted as one lump by the center of the instance positions.\n- Shadows: drawShadows(renderer, shadowMap) draws only opaque things whose castsShadow is not false into shadow depth. Call it before draw.\n- Usage: every frame clear() → addMesh / addMeshInstanced / addPass → (drawShadows) → draw(renderer, camera) or drawWithMatrices(renderer, view matrix, projection matrix)\n  draw calls renderer.beginFrameWithCamera(camera) and endFrame itself. drawWithMatrices calls beginFrameWithMatrices. (orthographic raw matrix camera)\n  Set the screen rectangle (ToonRenderer.setScreenRect) before that. clear empties all queued models and stage callbacks.\n- What is queued are references to matrices and shapes. Do not modify them until draw is called."
+						"ko": "툰 그리기 줄. (한 프레임에 그릴 모형을 담아 두었다가 ToonRenderer 로 차례를 맞춰 그린다)\n- 차례: (화면 공간 바깥선의 선의 판) → 단계 beforeOpaque → 불투명한 몸 → afterOpaque → 불투명한 것의 바깥선 껍데기 → 화면 공간 바깥선 → afterOutline\n  → 비치는 것(카메라에서 먼 것부터, 깊이는 쓰지 않음) → afterTransparent.\n  몸을 다 그린 뒤 바깥선을 몰아 그려 프로그램을 덜 바꾸고, 비치는 것은 뒤의 것이 비쳐 보이게 맨 끝에 먼 것부터 섞는다.\n- 비치는 것: 그릴 때의 alpha 나 tintColor 의 알파가 1 보다 작거나 blendMode 가 alpha 가 아닌 것. 바깥선 껍데기도 함께(hasOutline) 그린다.\n- 묶음: options.group 이 같은 비치는 것은 한 덩어리로 가운데 깊이(담긴 것의 평균)로 정렬하고 담은 차례로 그린다.\n  options.isDepthPrepassed 가 묶음 안에 하나라도 있으면 그 덩어리는 깊이만 먼저 그린 뒤 같은 깊이(LEQUAL)인 화소에만 색을 칠한다.\n  여러 부품이 겹친 홀로그램이 두 겹으로 밝지 않고 한 덩어리로 비친다. 덩어리끼리는 먼 것부터라 서로 비친다.\n- 화면 공간 바깥선: setScreenOutline(ToonScreenOutline) 을 주면 draw 가 몸 앞에 불투명한 것을 선의 판에 그리고, 바깥선 껍데기 뒤에 섞는다.\n  번호는 options.lineId (주지 않으면 담은 차례 + 1, 인스턴스는 instances[i].lineId 가 먼저), 모형마다 options.hasScreenOutline, options.hasCreaseLine 으로 끄고 켠다.\n  비치는 것은 선의 판에 그리지 않는다. 화면 사각형(ToonRenderer.setScreenRect)이 있으면 그 사각형을 선의 판의 그리는 영역으로 쓴다.\n- 단계 콜백: addPass(stage, callback) 의 callback(renderer, webGL2RenderingContext) 를 그 자리에서 부른다. 부른 뒤 렌더러가 프레임의 그리기 상태를 다시 건다.\n- 인스턴스 묶음(addMeshInstanced)은 불투명이면 몸과 바깥선 껍데기를 한 번에 그리고, 비치면 인스턴스 자리의 가운데로 한 덩어리로 정렬한다.\n- 그림자: drawShadows(renderer, shadowMap) 가 castsShadow 가 false 가 아닌 불투명한 것만 그림자 깊이로 그린다. draw 보다 먼저 부른다.\n- 사용: 매 프레임 clear() → addMesh / addMeshInstanced / addPass → (drawShadows) → draw(renderer, camera) 나 drawWithMatrices(renderer, 보기 행렬, 투영 행렬)\n  draw 는 renderer.beginFrameWithCamera(camera) 와 endFrame 을 스스로 부른다. drawWithMatrices 는 beginFrameWithMatrices 를 부른다. (직교 원 행렬 카메라)\n  화면 사각형(ToonRenderer.setScreenRect)은 그 전에 건다. clear 는 담은 모형과 단계 콜백을 모두 비운다. (화면 공간 바깥선은 그대로 둔다)\n- 담는 것은 행렬과 꼴의 참조다. draw 를 부를 때까지 고치지 않는다.",
+						"en": ""
 					},
 					"members": [
 						{
@@ -68722,8 +68760,8 @@
 							"signature": "clear()",
 							"params": [],
 							"description": {
-								"ko": "비우기. (프레임마다 담기 전에, 단계 콜백도 비운다)",
-								"en": "Clears. (Before queueing each frame, also clears stage callbacks)"
+								"ko": "비우기. (프레임마다 담기 전에, 단계 콜백도 비운다, 화면 공간 바깥선은 그대로)",
+								"en": ""
 							},
 							"since": "0.4.0",
 							"source": "src/experimental/graphics/toon/toondrawqueue.js"
@@ -68749,6 +68787,46 @@
 						},
 						{
 							"kind": "method",
+							"name": "setScreenOutline",
+							"signature": "setScreenOutline(screenOutline)",
+							"params": [
+								{
+									"name": "screenOutline",
+									"type": "object | null",
+									"description": {
+										"ko": "ToonScreenOutline 이나 null.",
+										"en": ""
+									}
+								}
+							],
+							"description": {
+								"ko": "화면 공간 바깥선 맡기기. (draw 가 선의 판을 그리고 바깥선 껍데기 뒤에 섞는다, null 이면 맡기지 않음)",
+								"en": ""
+							},
+							"since": "0.4.0",
+							"source": "src/experimental/graphics/toon/toondrawqueue.js"
+						},
+						{
+							"kind": "method",
+							"name": "getScreenOutline",
+							"signature": "getScreenOutline()",
+							"params": [],
+							"returns": {
+								"type": "object | null",
+								"description": {
+									"ko": "ToonScreenOutline 이나 null.",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "맡긴 화면 공간 바깥선 반환. (없으면 null)",
+								"en": ""
+							},
+							"since": "0.4.0",
+							"source": "src/experimental/graphics/toon/toondrawqueue.js"
+						},
+						{
+							"kind": "method",
 							"name": "addPass",
 							"signature": "addPass(stage, callback)",
 							"params": [
@@ -68756,15 +68834,15 @@
 									"name": "stage",
 									"type": "string",
 									"description": {
-										"ko": "ToonDrawStage",
-										"en": "ToonDrawStage"
+										"ko": "ToonDrawStage.",
+										"en": "ToonDrawStage."
 									}
 								},
 								{
 									"name": "callback",
 									"type": "Function",
 									"description": {
-										"ko": "",
+										"ko": "(renderer, webGL2RenderingContext) 를 받는다. 부른 뒤 렌더러가 프레임의 그리기 상태를 다시 건다.",
 										"en": ""
 									}
 								}
@@ -68793,7 +68871,7 @@
 									"name": "modelMatrix",
 									"type": "Matrix4",
 									"description": {
-										"ko": "",
+										"ko": "모형 행렬. (draw 때까지 고치지 않는다)",
 										"en": ""
 									}
 								},
@@ -68801,8 +68879,8 @@
 									"name": "options",
 									"type": "object",
 									"description": {
-										"ko": "ToonRenderer.drawMesh 의 꼴과 castsShadow (기본 true), group, isDepthPrepassed",
-										"en": "Shape of ToonRenderer.drawMesh plus castsShadow (default true), group, isDepthPrepassed"
+										"ko": "ToonRenderer.drawMesh 의 꼴과 castsShadow (기본 true), group, isDepthPrepassed, lineId, hasScreenOutline (기본 true), hasCreaseLine (기본 true).",
+										"en": ""
 									}
 								}
 							],
@@ -68822,23 +68900,23 @@
 									"name": "mesh",
 									"type": "object | null",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "ToonRenderer.createMesh 의 결과.",
+										"en": "Result of ToonRenderer.createMesh."
 									}
 								},
 								{
 									"name": "instances",
 									"type": "Array<object>",
 									"description": {
-										"ko": "{ modelMatrix, tintColor } 의 배열.",
-										"en": "Array of { modelMatrix, tintColor }."
+										"ko": "{ modelMatrix, tintColor, lineId (선택) } 의 배열.",
+										"en": ""
 									}
 								},
 								{
 									"name": "options",
 									"type": "object",
 									"description": {
-										"ko": "",
+										"ko": "addMesh 와 같다.",
 										"en": ""
 									}
 								}
@@ -68859,7 +68937,7 @@
 									"name": "options",
 									"type": "object",
 									"description": {
-										"ko": "",
+										"ko": "그리기 꼴.",
 										"en": ""
 									}
 								}
@@ -68887,16 +68965,16 @@
 									"name": "renderer",
 									"type": "object",
 									"description": {
-										"ko": "ToonRenderer",
-										"en": "ToonRenderer"
+										"ko": "ToonRenderer.",
+										"en": "ToonRenderer."
 									}
 								},
 								{
 									"name": "shadowMap",
 									"type": "object",
 									"description": {
-										"ko": "ShadowMap",
-										"en": "ShadowMap"
+										"ko": "ShadowMap.",
+										"en": "ShadowMap."
 									}
 								}
 							],
@@ -68916,22 +68994,22 @@
 									"name": "renderer",
 									"type": "object",
 									"description": {
-										"ko": "ToonRenderer",
-										"en": "ToonRenderer"
+										"ko": "ToonRenderer.",
+										"en": "ToonRenderer."
 									}
 								},
 								{
 									"name": "camera",
 									"type": "object",
 									"description": {
-										"ko": "Camera3D",
-										"en": "Camera3D"
+										"ko": "Camera3D.",
+										"en": "Camera3D."
 									}
 								}
 							],
 							"description": {
-								"ko": "담은 것 그리기. (beginFrameWithCamera 와 endFrame 을 스스로 부른다)",
-								"en": "Draws the queued items. (Calls beginFrameWithCamera and endFrame itself)"
+								"ko": "담은 것 그리기. (화면 공간 바깥선이 있으면 선의 판부터, beginFrameWithCamera 와 endFrame 을 스스로 부른다)",
+								"en": ""
 							},
 							"since": "0.4.0",
 							"source": "src/experimental/graphics/toon/toondrawqueue.js"
@@ -68945,15 +69023,15 @@
 									"name": "renderer",
 									"type": "object",
 									"description": {
-										"ko": "ToonRenderer",
-										"en": "ToonRenderer"
+										"ko": "ToonRenderer.",
+										"en": "ToonRenderer."
 									}
 								},
 								{
 									"name": "viewMatrix",
 									"type": "Matrix4",
 									"description": {
-										"ko": "",
+										"ko": "보기 행렬.",
 										"en": ""
 									}
 								},
@@ -68961,7 +69039,7 @@
 									"name": "projectionMatrix",
 									"type": "Matrix4",
 									"description": {
-										"ko": "",
+										"ko": "투영 행렬.",
 										"en": ""
 									}
 								}
@@ -68975,6 +69053,43 @@
 						},
 						{
 							"kind": "method",
+							"name": "drawLineIds",
+							"signature": "drawLineIds(renderer, viewMatrix, projectionMatrix)",
+							"params": [
+								{
+									"name": "renderer",
+									"type": "object",
+									"description": {
+										"ko": "ToonRenderer.",
+										"en": "ToonRenderer."
+									}
+								},
+								{
+									"name": "viewMatrix",
+									"type": "Matrix4",
+									"description": {
+										"ko": "보기 행렬.",
+										"en": ""
+									}
+								},
+								{
+									"name": "projectionMatrix",
+									"type": "Matrix4",
+									"description": {
+										"ko": "투영 행렬.",
+										"en": ""
+									}
+								}
+							],
+							"description": {
+								"ko": "화면 공간 바깥선의 선의 판 그리기. (맡긴 것이 없으면 아무것도 하지 않음, 불투명한 것만, 화면 사각형이 있으면 그 사각형을 그리는 영역으로)",
+								"en": ""
+							},
+							"since": "0.4.0",
+							"source": "src/experimental/graphics/toon/toondrawqueue.js"
+						},
+						{
+							"kind": "method",
 							"name": "runPasses",
 							"signature": "runPasses(renderer, stage)",
 							"params": [
@@ -68982,16 +69097,16 @@
 									"name": "renderer",
 									"type": "object",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "ToonRenderer.",
+										"en": "ToonRenderer."
 									}
 								},
 								{
 									"name": "stage",
 									"type": "string",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "ToonDrawStage.",
+										"en": "ToonDrawStage."
 									}
 								}
 							],
@@ -69011,15 +69126,15 @@
 									"name": "renderer",
 									"type": "object",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "ToonRenderer.",
+										"en": "ToonRenderer."
 									}
 								},
 								{
 									"name": "readDepth",
 									"type": "Function",
 									"description": {
-										"ko": "",
+										"ko": "({ x, y, z }) 의 보기 깊이를 돌려준다.",
 										"en": ""
 									}
 								}
@@ -69040,15 +69155,15 @@
 									"name": "renderer",
 									"type": "object",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "ToonRenderer.",
+										"en": "ToonRenderer."
 									}
 								},
 								{
 									"name": "item",
 									"type": "object",
 									"description": {
-										"ko": "",
+										"ko": "담은 것 하나.",
 										"en": ""
 									}
 								},
@@ -69056,7 +69171,7 @@
 									"name": "options",
 									"type": "object",
 									"description": {
-										"ko": "",
+										"ko": "이번에 쓸 그리기 꼴.",
 										"en": ""
 									}
 								}
@@ -69076,8 +69191,8 @@
 				{
 					"name": "ToonDrawStage",
 					"summary": {
-						"ko": "그리기 줄의 단계. (addPass 의 콜백을 부를 자리)\n- beforeOpaque: 불투명한 몸 앞. (평면 거울에 비친 모습, 하늘)\n- afterOpaque: 불투명한 몸 뒤, 바깥선 껍데기 앞.\n- afterOutline: 바깥선 껍데기 뒤, 비치는 것 앞. (화면 공간 바깥선 ToonScreenOutline.drawOutline 을 섞을 자리)\n- afterTransparent: 비치는 것 뒤. (효과)",
-						"en": "Stages of the draw pipeline. (Positions where addPass callbacks are called)\n- beforeOpaque: Before opaque bodies. (Planar mirror reflections, sky)\n- afterOpaque: After opaque bodies, before outline shells.\n- afterOutline: After outline shells, before translucent ones. (Where to blend the screen-space outline ToonScreenOutline.drawOutline)\n- afterTransparent: After translucent ones. (Effects)"
+						"ko": "그리기 줄의 단계. (addPass 의 콜백을 부를 자리)\n- beforeOpaque: 불투명한 몸 앞. (평면 거울에 비친 모습, 하늘)\n- afterOpaque: 불투명한 몸 뒤, 바깥선 껍데기 앞.\n- afterOutline: 바깥선 껍데기와 화면 공간 바깥선 뒤, 비치는 것 앞.\n- afterTransparent: 비치는 것 뒤. (효과)",
+						"en": ""
 					},
 					"values": [
 						{
@@ -71064,15 +71179,15 @@
 		{
 			"name": "experimental/graphics/toon/toonscreenoutline",
 			"summary": {
-				"ko": "툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고 한 번 훑어 가면을 쓴 뒤 화면에 섞는다)",
-				"en": "Toon screen-space outline. (Draws normals, line IDs and depth into the line target, writes a mask in one sweep, then blends onto the screen)"
+				"ko": "툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)",
+				"en": ""
 			},
 			"classes": [
 				{
 					"name": "ToonScreenOutline",
 					"summary": {
-						"ko": "툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고 한 번 훑어 가면을 쓴 뒤 화면에 섞는다)\n- ToonRenderer 의 createMesh 결과를 같은 행렬로 한 번 더 그려 번호를 쓴다. 껍데기 바깥선(ToonRenderer)과 함께 써도 된다.\n- 선이 서는 곳: 앞에 있는 것의 실루엣 바깥, 다른 번호와 맞닿은 곳(먼 쪽, 깊이가 거의 같으면 번호가 큰 쪽), 한 번호 안에서 면이 꺾임 각보다 더 꺾이는 곳.\n  같은 번호끼리 맞닿은 곳은 긋지 않는다. 어느 모형, 어느 부품(indexStart, indexCount 범위)에 어떤 번호를 줄지는 부르는 쪽이 정한다.\n- 굵기: setWidth 로 월드 길이나 픽셀. 선의 판 픽셀로 셈해 한 픽셀 밑으로 내리지 않는다.\n- 깊이: 투영 행렬로 직교와 원근을 가린다. 원근은 깊이를 가까운 면과 먼 면으로 풀어 거리(미터)로 견준다.\n- 값: setResolutionScale 로 선의 판을 그리는 영역의 몫으로 줄이고(가면은 섞을 때 부드럽게 늘임), setSampleCount 로 볼 이웃 수를 줄인다(가벼운 길 4, 2).\n- 사용: 매 프레임 beginLineIds(보기, 투영) → drawMesh / drawMeshInstanced → endLineIds() (가면까지 셈) → 툰 몸 그리기 → drawOutline().\n  beginLineIds 는 그때의 뷰포트를 그리는 영역으로 적어 두고, 선의 판을 그 크기에 맞춰 짓는다. endLineIds 가 프레임버퍼, 뷰포트, 상태를 돌린다.\n  (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushSpriteBatch)",
-						"en": "Toon screen-space outline. (Draws normals, line IDs and depth into the line target, writes a mask in one sweep, then blends onto the screen)\n- Draws ToonRenderer's createMesh result once more with the same matrices to write IDs. Can be used together with the shell outline (ToonRenderer).\n- Where lines appear: outside the silhouette of what is in front, where it touches a different ID (the far side, or the larger ID if the depths are nearly equal), and where faces within one ID bend more than the crease angle.\n  Lines are not drawn where the same IDs touch. Which model and which part (indexStart, indexCount range) gets which ID is decided by the caller.\n- Width: world length or pixels via setWidth. Computed in line target pixels and never goes below one pixel.\n- Depth: tells orthographic and perspective apart by the projection matrix. Perspective unpacks depth with the near and far planes and compares distances (meters).\n- Cost: setResolutionScale shrinks the line target to a fraction of the drawing area (the mask is smoothly upscaled when blending), setSampleCount reduces the number of neighbors sampled (lite path 4, 2).\n- Usage: every frame beginLineIds(view, projection) → drawMesh / drawMeshInstanced → endLineIds() (computes up to the mask) → draw toon bodies → drawOutline().\n  beginLineIds records the current viewport as the drawing area and builds the line target to fit that size. endLineIds restores the framebuffer, viewport and state.\n  (When inserting between engine 2D draws, call Graphic.flushSpriteBatch before that)"
+						"ko": "툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)\n- 선의 판: ToonRenderer 의 createMesh 결과를 같은 행렬로 한 번 더 그려 노멀(팔면체 접기), 선 번호(14 비트), 꼴(바깥 선, 꺾임 선을 켤지)과 깊이를 쓴다.\n- 잡기: 화소와 바로 이웃 넷 사이의 경계마다 한 번 본다. 선은 화소가 아니라 화소 사이의 경계 가운데에 선다. (같은 경계를 두 번 긋지 않는다)\n  바깥 선은 빈 곳과 맞닿은 실루엣, 다른 번호와 맞닿은 곳, 같은 번호라도 서로의 접평면에서 깊이 문턱보다 떨어진 곳(가려진 실루엣)이다.\n  꺾임 선은 같은 번호 안에서 이웃한 두 노멀이 꺾임 각보다 더 벌어진 곳이다. 화소 하나 사이의 노멀만 보므로 둥근 면의 실루엣 둘레나 비스듬한 면에 띠가 서지 않는다.\n  깊이를 접평면 거리로 견주므로 비스듬히 보는 바닥에 가짜 선이 서지 않는다. 문턱에 그 깊이의 화소 크기 두 배를 더해 먼 것도 같은 뜻이 된다.\n- 넓히기: 경계 토막까지의 거리를 점프 플러딩으로 퍼뜨린다. 굵기에 상관없이 걸음 수는 log2 이고, 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다.\n- 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. (가장자리가 부드럽고, 선의 판을 줄여도 늘인 선이 점선이 되지 않는다)\n- 모형마다: drawMesh 의 hasScreenOutline 이 false 면 그 모형은 선을 내지 않고 뒤의 선만 가린다. hasCreaseLine 이 false 면 꺾임 선만 끈다.\n- 굵기: setWidth 와 setCrease 의 굵기는 선 하나의 굵기다. (경계를 가운데로 양쪽에 반씩) 단위는 ToonOutlineWidthUnit, 한 픽셀 밑으로 내리지 않는다.\n- 깊이: 투영 행렬로 직교와 원근을 가리고, 깊이를 보기 공간 자리로 풀어 견준다. (화면 사각형처럼 클립 x, y 를 옮긴 투영도 된다)\n- 값: setResolutionScale 로 선의 판을 그리는 영역의 몫으로 줄인다. (폰의 가벼운 길)\n- 사용: 매 프레임 beginLineIds(보기, 투영) → drawMesh / drawMeshInstanced → endLineIds() (씨앗과 넓히기까지 셈) → 툰 몸 그리기 → drawOutline().\n  beginLineIds 는 그때의 뷰포트를 그리는 영역으로 적어 두고, 선의 판을 그 크기에 맞춰 짓는다. endLineIds 와 drawOutline 이 프레임버퍼, 뷰포트, 상태를 돌린다.\n  ToonDrawQueue.setScreenOutline 으로 맡기면 그리기 줄이 이 차례를 스스로 한다. (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushSpriteBatch)",
+						"en": ""
 					},
 					"members": [
 						{
@@ -71084,14 +71199,14 @@
 									"name": "webGL2RenderingContext",
 									"type": "WebGL2RenderingContext",
 									"description": {
-										"ko": "",
+										"ko": "툰 렌더러와 같은 컨텍스트.",
 										"en": ""
 									}
 								}
 							],
 							"description": {
-								"ko": "생성.",
-								"en": "Constructor."
+								"ko": "생성. (네 프로그램과 빈 버텍스 어레이를 짓는다, 선의 판은 첫 beginLineIds 에서)",
+								"en": ""
 							},
 							"since": "0.4.0",
 							"source": "src/experimental/graphics/toon/toonscreenoutline.js"
@@ -71104,8 +71219,8 @@
 							"returns": {
 								"type": "Array<object>",
 								"description": {
-									"ko": "{ vertexShader, fragmentShader, attributeLocationTable } 의 배열.",
-									"en": "Array of { vertexShader, fragmentShader, attributeLocationTable }."
+									"ko": "{ vertexShader, fragmentShader, attributeLocationTable } 넷. (번호, 씨앗, 넓히기, 섞기)",
+									"en": ""
 								}
 							},
 							"description": {
@@ -71124,14 +71239,14 @@
 									"name": "color",
 									"type": "Array<number>",
 									"description": {
-										"ko": "[r, g, b, a]",
-										"en": "[r, g, b, a]"
+										"ko": "[r, g, b, a] 의 sRGB. (a 를 빼면 1)",
+										"en": ""
 									}
 								}
 							],
 							"description": {
-								"ko": "선 색 설정. (sRGB 0 ~ 1 과 알파)",
-								"en": "Sets the line color. (sRGB 0 ~ 1 and alpha)"
+								"ko": "선 색 설정. (sRGB 0 ~ 1 과 알파, 바깥 선과 꺾임 선이 같이 쓴다)",
+								"en": ""
 							},
 							"since": "0.4.0",
 							"source": "src/experimental/graphics/toon/toonscreenoutline.js"
@@ -71145,7 +71260,7 @@
 									"name": "width",
 									"type": "number",
 									"description": {
-										"ko": "",
+										"ko": "선 하나의 굵기. (경계를 가운데로 양쪽에 반씩)",
 										"en": ""
 									}
 								},
@@ -71153,14 +71268,51 @@
 									"name": "unit",
 									"type": "string",
 									"description": {
-										"ko": "ToonOutlineWidthUnit",
-										"en": "ToonOutlineWidthUnit"
+										"ko": "ToonOutlineWidthUnit. (기본 pixel)",
+										"en": ""
 									}
 								}
 							],
 							"description": {
-								"ko": "굵기 설정. (월드 길이나 픽셀, 반지름이 아니라 선 하나의 굵기)",
-								"en": "Sets the width. (World length or pixels, the width of one line, not a radius)"
+								"ko": "바깥 선 굵기 설정. (실루엣과 다른 번호와 맞닿은 곳의 선, 반지름이 아니라 선 하나의 굵기, 0 이면 긋지 않음)\n- 꺾임 선 굵기도 이 단위로 센다.",
+								"en": ""
+							},
+							"since": "0.4.0",
+							"source": "src/experimental/graphics/toon/toonscreenoutline.js"
+						},
+						{
+							"kind": "method",
+							"name": "setCrease",
+							"signature": "setCrease(angleDegrees, width = 1, opacity = 1)",
+							"params": [
+								{
+									"name": "angleDegrees",
+									"type": "number",
+									"description": {
+										"ko": "꺾임 각. (180 이면 꺾임 선을 긋지 않는다)",
+										"en": ""
+									}
+								},
+								{
+									"name": "width",
+									"type": "number",
+									"description": {
+										"ko": "꺾임 선 하나의 굵기. (기본 1, 0 이면 긋지 않는다)",
+										"en": ""
+									}
+								},
+								{
+									"name": "opacity",
+									"type": "number",
+									"description": {
+										"ko": "꺾임 선의 진하기. (기본 1, 선 색의 알파에 곱한다)",
+										"en": ""
+									}
+								}
+							],
+							"description": {
+								"ko": "꺾임 선 설정. (같은 번호 안에서 이웃한 면이 이 각(도)보다 더 꺾이면 선, 굵기는 setWidth 의 단위, 진하기 0 ~ 1)",
+								"en": ""
 							},
 							"since": "0.4.0",
 							"source": "src/experimental/graphics/toon/toonscreenoutline.js"
@@ -71174,7 +71326,7 @@
 									"name": "focusDistance",
 									"type": "number",
 									"description": {
-										"ko": "",
+										"ko": "카메라에서의 거리. (월드 길이)",
 										"en": ""
 									}
 								}
@@ -71189,65 +71341,20 @@
 						{
 							"kind": "method",
 							"name": "setDepthThreshold",
-							"signature": "setDepthThreshold(depthThreshold, contactTolerance)",
+							"signature": "setDepthThreshold(depthThreshold)",
 							"params": [
 								{
 									"name": "depthThreshold",
 									"type": "number",
 									"description": {
-										"ko": "면이 화면을 볼 때의 실루엣 깊이 차이. (비스듬하면 화면을 보는 정도로 나눔)",
-										"en": "Silhouette depth difference when a face looks at the screen. (Divided by how much it faces the screen when oblique)"
-									}
-								},
-								{
-									"name": "contactTolerance",
-									"type": "number",
-									"description": {
-										"ko": "다른 번호와 맞닿은 두 면의 깊이가 이만큼 안이면 번호가 큰 쪽에만 긋는다.",
-										"en": "If the depths of two faces touching a different ID are within this, the line is drawn only on the larger ID side."
-									}
-								}
-							],
-							"description": {
-								"ko": "깊이 문턱 설정. (실루엣으로 칠 깊이 차이와 맞닿음으로 칠 깊이 차이, 월드 길이, 장면의 크기에 맞춘다)",
-								"en": "Sets the depth thresholds. (Depth difference counted as silhouette and depth difference counted as contact, world length, match to the scene scale)"
-							},
-							"since": "0.4.0",
-							"source": "src/experimental/graphics/toon/toonscreenoutline.js"
-						},
-						{
-							"kind": "method",
-							"name": "setCrease",
-							"signature": "setCrease(angleDegrees, strength = 0.5, extentPixels = 2)",
-							"params": [
-								{
-									"name": "angleDegrees",
-									"type": "number",
-									"description": {
-										"ko": "180 이면 꺾임 선을 긋지 않는다.",
-										"en": "180 draws no crease lines."
-									}
-								},
-								{
-									"name": "strength",
-									"type": "number",
-									"description": {
-										"ko": "",
+										"ko": "접평면 거리 문턱. (월드 길이)",
 										"en": ""
 									}
-								},
-								{
-									"name": "extentPixels",
-									"type": "number",
-									"description": {
-										"ko": "0 이면 좁은 면도 긋는다.",
-										"en": "0 also draws narrow faces."
-									}
 								}
 							],
 							"description": {
-								"ko": "꺾임 선 설정. (면이 이 각(도)보다 더 꺾이면 선, 걸린 곳 하나의 진하기, 꺾인 면이 더 이어져야 할 픽셀)",
-								"en": "Sets crease lines. (A line where faces bend more than this angle (degrees), the strength of one hit, pixels the bent face must continue)"
+								"ko": "깊이 문턱 설정. (같은 번호의 이웃 화소가 서로의 접평면에서 이만큼 넘게 떨어지면 가려진 실루엣으로 긋는다, 월드 길이)\n- 그 깊이의 화소 크기 두 배를 더해 쓴다. 장면의 크기에 맞춘다. (사람 크기 장면이면 0.02 ~ 0.1)",
+								"en": ""
 							},
 							"since": "0.4.0",
 							"source": "src/experimental/graphics/toon/toonscreenoutline.js"
@@ -71261,43 +71368,14 @@
 									"name": "resolutionScale",
 									"type": "number",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "0.25 ~ 1.",
+										"en": "0.25 ~ 1."
 									}
 								}
 							],
 							"description": {
-								"ko": "선의 판 해상도 몫 설정. (그리는 영역에 대한 몫 0.25 ~ 1, 폰의 가벼운 길은 낮춰 셈하고 섞을 때 늘인다)",
-								"en": "Sets the line target resolution fraction. (Fraction of the drawing area 0.25 ~ 1, the phone lite path computes lower and upscales when blending)"
-							},
-							"since": "0.4.0",
-							"source": "src/experimental/graphics/toon/toonscreenoutline.js"
-						},
-						{
-							"kind": "method",
-							"name": "setSampleCount",
-							"signature": "setSampleCount(sampleCount, creaseSampleCount)",
-							"params": [
-								{
-									"name": "sampleCount",
-									"type": "number",
-									"description": {
-										"ko": "",
-										"en": ""
-									}
-								},
-								{
-									"name": "creaseSampleCount",
-									"type": "number",
-									"description": {
-										"ko": "",
-										"en": ""
-									}
-								}
-							],
-							"description": {
-								"ko": "볼 이웃 수 설정. (바깥선 4 ~ 28, 꺾임 선 0 ~ 4, 가벼운 길은 4 와 2)",
-								"en": "Sets the number of neighbors sampled. (Outline 4 ~ 28, crease lines 0 ~ 4, lite path 4 and 2)"
+								"ko": "선의 판 해상도 몫 설정. (그리는 영역에 대한 몫 0.25 ~ 1, 폰의 가벼운 길은 낮춰 셈한다, 선은 그리는 영역에서 거리로 섞어 끊기지 않는다)",
+								"en": ""
 							},
 							"since": "0.4.0",
 							"source": "src/experimental/graphics/toon/toonscreenoutline.js"
@@ -71325,19 +71403,19 @@
 						},
 						{
 							"kind": "method",
-							"name": "getOutlineRadius",
-							"signature": "getOutlineRadius()",
+							"name": "getLineWidths",
+							"signature": "getLineWidths()",
 							"params": [],
 							"returns": {
-								"type": "number",
+								"type": "Array<number>",
 								"description": {
-									"ko": "",
+									"ko": "[바깥 선 굵기, 꺾임 선 굵기]. (긋지 않으면 0)",
 									"en": ""
 								}
 							},
 							"description": {
-								"ko": "이번 프레임의 바깥선 반지름 반환. (선의 판 픽셀, endLineIds 뒤에 정해짐)",
-								"en": "Returns this frame's outline radius. (Line target pixels, determined after endLineIds)"
+								"ko": "이번 프레임의 선 굵기 반환. ([바깥 선, 꺾임 선] 의 그리는 영역 픽셀, endLineIds 뒤에 정해짐)",
+								"en": ""
 							},
 							"since": "0.4.0",
 							"source": "src/experimental/graphics/toon/toonscreenoutline.js"
@@ -71350,13 +71428,13 @@
 							"returns": {
 								"type": "object | null",
 								"description": {
-									"ko": "",
+									"ko": "{ lineTexture (노멀과 번호 RGBA8), depthTexture (깊이 24), seedTextures (RGBA16UI 둘), seedIndex (넓히기를 마친 쪽), width, height }",
 									"en": ""
 								}
 							},
 							"description": {
-								"ko": "선의 판 반환. (없으면 null, { lineTexture, depthTexture, maskTexture, width, height })",
-								"en": "Returns the line target. (null if none, { lineTexture, depthTexture, maskTexture, width, height })"
+								"ko": "선의 판 반환. (없으면 null)",
+								"en": ""
 							},
 							"since": "0.4.0",
 							"source": "src/experimental/graphics/toon/toonscreenoutline.js"
@@ -71370,7 +71448,7 @@
 									"name": "viewMatrix",
 									"type": "Matrix4",
 									"description": {
-										"ko": "",
+										"ko": "보기 행렬.",
 										"en": ""
 									}
 								},
@@ -71378,7 +71456,7 @@
 									"name": "projectionMatrix",
 									"type": "Matrix4",
 									"description": {
-										"ko": "",
+										"ko": "투영 행렬. (원근이나 직교)",
 										"en": ""
 									}
 								}
@@ -71414,7 +71492,7 @@
 									"name": "modelMatrix",
 									"type": "Matrix4",
 									"description": {
-										"ko": "",
+										"ko": "모형 행렬.",
 										"en": ""
 									}
 								},
@@ -71422,16 +71500,16 @@
 									"name": "lineId",
 									"type": "number",
 									"description": {
-										"ko": "1 ~ 65535. (0 은 빈 곳이라 쓰지 않는다)",
-										"en": "1 ~ 65535. (0 is empty space, so it is not used)"
+										"ko": "1 ~ TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID. (0 은 빈 곳이라 쓰지 않는다, 같은 번호끼리 맞닿은 곳은 긋지 않는다)",
+										"en": ""
 									}
 								},
 								{
 									"name": "options",
 									"type": "object",
 									"description": {
-										"ko": "{ jointMatrices Float32Array, isCulled (기본 true), indexStart, indexCount (몸 번호 버퍼의 일부만, 부품에 다른 번호를 줄 때) }",
-										"en": "{ jointMatrices Float32Array, isCulled (default true), indexStart, indexCount (only part of the mesh's index buffer, when giving parts different IDs) }"
+										"ko": "{ jointMatrices Float32Array, isCulled (기본 true), indexStart, indexCount (몸 번호 버퍼의 일부만), isMirrored (주지 않으면 행렬식으로), hasScreenOutline (기본 true, false 면 선은 내지 않고 가리기만), hasCreaseLine (기본 true) }",
+										"en": ""
 									}
 								}
 							],
@@ -71451,8 +71529,8 @@
 									"name": "mesh",
 									"type": "object | null",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "ToonRenderer.createMesh 의 결과.",
+										"en": "Result of ToonRenderer.createMesh."
 									}
 								},
 								{
@@ -71475,8 +71553,8 @@
 									"name": "options",
 									"type": "object",
 									"description": {
-										"ko": "drawMesh 와 같다.",
-										"en": "Same as drawMesh."
+										"ko": "drawMesh 와 같다. (꼴은 모든 인스턴스에 같다)",
+										"en": ""
 									}
 								}
 							],
@@ -71490,21 +71568,21 @@
 						{
 							"kind": "method",
 							"name": "drawWithCount",
-							"signature": "drawWithCount(mesh, modelElements, instanceCount, lineId, isInstanceLineId, options)",
+							"signature": "drawWithCount(mesh, modelElements, instanceCount, lineId, isInstanceLineId, isMirrored, options)",
 							"params": [
 								{
 									"name": "mesh",
 									"type": "object",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "ToonRenderer.createMesh 의 결과.",
+										"en": "Result of ToonRenderer.createMesh."
 									}
 								},
 								{
 									"name": "modelElements",
 									"type": "Float32Array",
 									"description": {
-										"ko": "",
+										"ko": "모형 행렬의 수 16.",
 										"en": ""
 									}
 								},
@@ -71520,8 +71598,8 @@
 									"name": "lineId",
 									"type": "number",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "공통 번호.",
+										"en": "Common ID."
 									}
 								},
 								{
@@ -71533,10 +71611,18 @@
 									}
 								},
 								{
+									"name": "isMirrored",
+									"type": "boolean",
+									"description": {
+										"ko": "감기를 뒤집어 그릴지.",
+										"en": ""
+									}
+								},
+								{
 									"name": "options",
 									"type": "object",
 									"description": {
-										"ko": "",
+										"ko": "drawMesh 의 꼴.",
 										"en": ""
 									}
 								}
@@ -71554,8 +71640,8 @@
 							"signature": "endLineIds()",
 							"params": [],
 							"description": {
-								"ko": "번호 그리기 끝. (선 찾기로 가면을 쓰고, 프레임버퍼와 뷰포트와 상태를 돌린다)",
-								"en": "Ends drawing IDs. (Writes the mask with line detection, restores the framebuffer, viewport and state)"
+								"ko": "번호 그리기 끝. (씨앗을 고르고 점프 플러딩으로 넓힌 뒤, 프레임버퍼와 뷰포트와 상태를 돌린다)",
+								"en": ""
 							},
 							"since": "0.4.0",
 							"source": "src/experimental/graphics/toon/toonscreenoutline.js"
@@ -71566,27 +71652,27 @@
 							"signature": "drawOutline()",
 							"params": [],
 							"description": {
-								"ko": "바깥선 긋기. (가면을 beginLineIds 때의 그리는 영역에 섞는다, 깊이는 보지도 쓰지도 않는다, 스텐실은 그대로)",
-								"en": "Draws the outline. (Blends the mask into the drawing area from beginLineIds, neither tests nor writes depth, stencil unchanged)"
+								"ko": "바깥선 긋기. (넓힌 씨앗 판으로 beginLineIds 때의 그리는 영역에 섞는다, 깊이는 보지도 쓰지도 않는다, 스텐실은 그대로)",
+								"en": ""
 							},
 							"since": "0.4.0",
 							"source": "src/experimental/graphics/toon/toonscreenoutline.js"
 						},
 						{
 							"kind": "method",
-							"name": "readOutlineRadius",
-							"signature": "readOutlineRadius()",
+							"name": "readLineWidths",
+							"signature": "readLineWidths()",
 							"params": [],
 							"returns": {
-								"type": "number",
+								"type": "Array<number>",
 								"description": {
-									"ko": "",
+									"ko": "[바깥 선 굵기, 꺾임 선 굵기].",
 									"en": ""
 								}
 							},
 							"description": {
-								"ko": "바깥선 반지름 셈. (선의 판 픽셀, 한 픽셀 밑으로 내리지 않음)",
-								"en": "Computes the outline radius. (Line target pixels, never below one pixel)"
+								"ko": "이번 프레임의 선 굵기 셈. ([바깥 선, 꺾임 선] 의 그리는 영역 픽셀, 0 이 아니면 한 픽셀 밑으로 내리지 않음)",
+								"en": ""
 							},
 							"since": "0.4.0",
 							"source": "src/experimental/graphics/toon/toonscreenoutline.js"
@@ -71600,15 +71686,15 @@
 									"name": "mesh",
 									"type": "object",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "ToonRenderer.createMesh 의 결과.",
+										"en": "Result of ToonRenderer.createMesh."
 									}
 								},
 								{
 									"name": "modelElements",
 									"type": "Float32Array",
 									"description": {
-										"ko": "",
+										"ko": "모형 행렬의 수 16.",
 										"en": ""
 									}
 								}
@@ -71629,15 +71715,15 @@
 									"name": "mesh",
 									"type": "object",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "ToonRenderer.createMesh 의 결과.",
+										"en": "Result of ToonRenderer.createMesh."
 									}
 								},
 								{
 									"name": "modelElements",
 									"type": "Float32Array",
 									"description": {
-										"ko": "",
+										"ko": "모형 행렬의 수 16.",
 										"en": ""
 									}
 								}
@@ -71665,7 +71751,7 @@
 									"name": "width",
 									"type": "number",
 									"description": {
-										"ko": "",
+										"ko": "선의 판 너비. (픽셀)",
 										"en": ""
 									}
 								},
@@ -71673,7 +71759,7 @@
 									"name": "height",
 									"type": "number",
 									"description": {
-										"ko": "",
+										"ko": "선의 판 높이. (픽셀)",
 										"en": ""
 									}
 								}
@@ -71686,8 +71772,8 @@
 								}
 							},
 							"description": {
-								"ko": "선의 판 읽기. (크기가 바뀌면 다시 지음, 노멀과 번호 RGBA8 과 깊이 24, 가면 R8, 짓지 못하면 null)",
-								"en": "Reads the line target. (Rebuilt if the size changes, normal and ID RGBA8 with depth 24, mask R8, null if it cannot be built)"
+								"ko": "선의 판 읽기. (크기가 바뀌면 다시 지음, 노멀과 번호 RGBA8 과 깊이 24, 씨앗 RGBA16UI 둘, 짓지 못하면 null)",
+								"en": ""
 							},
 							"since": "0.4.0",
 							"source": "src/experimental/graphics/toon/toonscreenoutline.js"
@@ -71734,8 +71820,8 @@
 							"signature": "destroy()",
 							"params": [],
 							"description": {
-								"ko": "다 쓴 뒤 지우기.",
-								"en": "Deletes after use."
+								"ko": "다 쓴 뒤 지우기. (선의 판, 버텍스 어레이, 프로그램 넷)",
+								"en": ""
 							},
 							"since": "0.4.0",
 							"source": "src/experimental/graphics/toon/toonscreenoutline.js"
@@ -71746,8 +71832,8 @@
 			"functions": [
 				{
 					"kind": "field",
-					"name": "TOON_SCREEN_OUTLINE_MAXIMUM_SAMPLES",
-					"signature": "TOON_SCREEN_OUTLINE_MAXIMUM_SAMPLES = 28",
+					"name": "TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID",
+					"signature": "TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID = 16383",
 					"params": [],
 					"returns": {
 						"type": "number",
@@ -71757,27 +71843,36 @@
 						}
 					},
 					"description": {
-						"ko": "볼 이웃의 수 상한. (OFFSETS 를 가까운 차례로, 3 픽셀 안)",
-						"en": "Maximum number of neighbors sampled. (OFFSETS in nearest order, within 3 pixels)"
+						"ko": "선 번호의 상한. (선의 판에 14 비트로 쓴다, 0 은 빈 곳)",
+						"en": ""
 					},
 					"since": "0.4.0",
 					"source": "src/experimental/graphics/toon/toonscreenoutline.js"
 				},
 				{
-					"kind": "field",
-					"name": "TOON_SCREEN_OUTLINE_MAXIMUM_CREASE_SAMPLES",
-					"signature": "TOON_SCREEN_OUTLINE_MAXIMUM_CREASE_SAMPLES = 4",
-					"params": [],
+					"kind": "method",
+					"name": "readJumpFloodSteps",
+					"signature": "readJumpFloodSteps(reach)",
+					"params": [
+						{
+							"name": "reach",
+							"type": "number",
+							"description": {
+								"ko": "씨앗을 옮길 거리. (선의 판 픽셀)",
+								"en": ""
+							}
+						}
+					],
 					"returns": {
-						"type": "number",
+						"type": "Array<number>",
 						"description": {
-							"ko": "",
+							"ko": "큰 것부터 1 까지의 걸음.",
 							"en": ""
 						}
 					},
 					"description": {
-						"ko": "꺾임 선을 볼 곧은 쪽의 수 상한.",
-						"en": "Maximum number of straight directions sampled for crease lines."
+						"ko": "점프 플러딩의 걸음 목록. (씨앗을 reach 화소까지 넓히는 데 드는 걸음, 큰 것부터 반씩 줄여 1 까지)\n- 걸음 k, k/2, ..., 1 은 씨앗을 2k - 1 화소까지 옮긴다. (Rong, Tan 2006)",
+						"en": ""
 					},
 					"since": "0.4.0",
 					"source": "src/experimental/graphics/toon/toonscreenoutline.js"
@@ -71787,24 +71882,24 @@
 				{
 					"name": "ToonOutlineWidthUnit",
 					"summary": {
-						"ko": "굵기의 단위.",
-						"en": "Width unit."
+						"ko": "굵기의 단위.\n- world: 월드 길이. (직교는 투영의 세로 배율로, 원근은 초점 거리에서 화면 픽셀로 셈해 멀수록 가늘어진다)\n- pixel: 그리는 영역의 픽셀. (거리와 상관없이 같은 굵기)",
+						"en": ""
 					},
 					"values": [
 						{
 							"name": "world",
 							"value": "world",
 							"description": {
-								"ko": "월드 길이. (직교는 투영의 세로 배율로, 원근은 초점 거리에서 화면 픽셀로 셈)",
-								"en": "World length. (Orthographic uses the projection's vertical scale, perspective converts to screen pixels at the focal distance)"
+								"ko": "",
+								"en": ""
 							}
 						},
 						{
 							"name": "pixel",
 							"value": "pixel",
 							"description": {
-								"ko": "그리는 버퍼의 픽셀.",
-								"en": "Pixels of the drawing buffer."
+								"ko": "",
+								"en": ""
 							}
 						}
 					]
