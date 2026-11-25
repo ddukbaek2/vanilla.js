@@ -76,6 +76,10 @@
 - Engine: 뒤로 가기 캐시에서 돌아올 때(pageshow 의 persisted) 없는 dispatchPageProcessRestored 를 불러 예외가 나던 것을 고쳤다. resume 때처럼 엔진 상태(오디오, 입력)를 되살리고 로드된 씬마다 onPageProcessRestored 를 부른다
 - 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
 - Graphic: 묶어 그리기(setSpriteBatchingEnabled)와 화면 밖 거르기(setCullingEnabled)를 기본으로 켠다. 지금 엔진을 쓰는 게임(외계행성 광부, 우주생물, aberrant, 찾았다, 종말 생존)이 모두 묶어 그리기를 켜고 돌았고, 거르기는 내용 영역 안에만 그린다고 알린 컴포넌트만 거른다(예제 일곱 장면에서 켬과 끔의 픽셀이 같았다). 예전처럼 쓰려면 setSpriteBatchingEnabled(false), setCullingEnabled(false)
+- 출시 게임들이 따로 만들어 쓰던 로딩, 저장, 시간 기능을 엔진 기본으로 넣는다. (게임의 화면 모양과 출시처 코드는 가져오지 않았다, 기본 동작은 LocalStorage 읽기 하나만 바꿨다)
+- TimeManager: setMaximumTimeDelta(seconds), getMaximumTimeDelta(). 한 프레임 간격의 상한을 바꾼다. (지금까지 0.25 초로 박혀 있었고 기본값은 그대로다) 물이나 물리가 한 번에 크게 나아가면 안 되는 게임이 0.1, 0.05 로 줄인다. 0 보다 작거나 숫자가 아니면 0.25
+- Engine: setMaximumFramePerSecond(n), getMaximumFramePerSecond(). 실행 중에 최대 FPS 를 바꾼다. EngineConfiguration.maximumFramePerSecond 에 적고, 엔진은 프레임마다 그 값을 읽어 바뀐 프레임부터 다시 센다. (게임들이 설정 객체를 직접 고치던 것과 결과가 같다) 0 보다 작거나 숫자가 아니면 0(제한 없음)
+- FixedStepper: 고정 걸음. new FixedStepper(stepSeconds, maximumStepsPerFrame) 의 advance(timeDelta, stepFunction) 가 쌓인 시간만큼 stepFunction(stepSeconds) 을 부르고 남은 몫(0 ~ 1, 앞 걸음과 지금 걸음을 섞어 그릴 때 쓴다)을 돌려준다. 한 프레임 상한만큼 돌고도 걸음이 남으면 남은 시간을 버리고(느린 기기에서 몰아 돌지 않게), stepFunction 이 false 를 돌려주면 그 프레임은 거기서 멈추고 시간을 쌓아 둔다. getAlpha, getLastStepCount, reset, setStepSeconds, setMaximumStepsPerFrame
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.

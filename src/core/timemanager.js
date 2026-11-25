@@ -20,6 +20,7 @@ export class TimeManager extends Object {
 	/** @private @type { number } */ #framesThisSecond;
 	/** @private @type { number } */ #previousFrameCheckTime;
 	/** @private @type { number } */ #timeScale;
+	/** @private @type { number } */ #maximumTimeDelta; // 한 프레임 간격의 상한. (초)
 
 	//==============================================================================
 	// 생성.
@@ -37,6 +38,7 @@ export class TimeManager extends Object {
 		this.#framesThisSecond = 0;
 		this.#previousFrameCheckTime = 0;
 		this.#timeScale = 1;
+		this.#maximumTimeDelta = 0.25;
 	}
 
 	//==============================================================================
@@ -57,9 +59,10 @@ export class TimeManager extends Object {
 		}
 
 		// 시간 반영.
-		// (타이머 역행 시 음수, 백그라운드 탭 복귀 시 거대 값이 들어올 수 있어 [0, 0.25초]로 막는다)
+		// (타이머 역행 시 음수, 백그라운드 탭 복귀 시 거대 값이 들어올 수 있어 [0, 상한]으로 막는다. 상한은 기본 0.25초, setMaximumTimeDelta)
 		const rawTimeDelta = (realtimeSinceStartup - this.#realtimeSinceStartup);
-		const unscaledTimeDelta = System.Math.min(0.25, System.Math.max(0, rawTimeDelta));
+		const maximumTimeDelta = this.getMaximumTimeDelta();
+		const unscaledTimeDelta = System.Math.min(maximumTimeDelta, System.Math.max(0, rawTimeDelta));
 		this.#realtimeSinceStartup = realtimeSinceStartup;
 		this.#time += unscaledTimeDelta;
 		this.#unscaledTimeDelta = unscaledTimeDelta;
@@ -145,5 +148,31 @@ export class TimeManager extends Object {
 	 */
 	getTimeScale() {
 		return this.#timeScale;
+	}
+
+	//==============================================================================
+	// 한 프레임 간격의 상한 설정. (초, 기본 0.25)
+	// - 창이 가려졌다 돌아오거나 오래 멈춘 뒤의 첫 프레임 간격을 이 값으로 자른다. 0 보다 작거나 숫자가 아니면 0.25 로 둔다.
+	// - 물리나 흐름이 한 번에 크게 나아가면 안 되는 게임은 0.1, 0.05 처럼 줄인다.
+	//==============================================================================
+	/**
+	 * @param { number } seconds
+	 */
+	setMaximumTimeDelta(seconds) {
+		if (typeof seconds !== "number" || !System.Number.isFinite(seconds) || seconds < 0) {
+			this.#maximumTimeDelta = 0.25;
+			return;
+		}
+		this.#maximumTimeDelta = seconds;
+	}
+
+	//==============================================================================
+	// 한 프레임 간격의 상한 반환. (초)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getMaximumTimeDelta() {
+		return this.#maximumTimeDelta;
 	}
 }
