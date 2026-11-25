@@ -13,10 +13,14 @@ const childProcess = require("child_process");
 // - 설명의 ko 는 소스 주석 원문 그대로, en 은 docs/api/translation.en.json (ko 원문 → en) 표에서 가져온다. 한글이 없는 원문은 그대로 en 이 된다.
 // - since 는 v0.0.8 부터 만들려는 판 앞까지의 태그를 훑어, 그 클래스(이름으로 찾음)에 그 멤버가 처음 있던 판이다. 어느 태그에도 없으면 만들려는 판.
 // - #이름, 밑줄로 시작하는 이름, JSDoc 에 @private 이 붙은 멤버는 뺀다.
+// - JSDoc 의 @example 은 examples 칸이 된다. (모듈은 어느 선언에도 붙지 않은 깊이 0 의 JSDoc 에서 읽는다)
 // 사용:
 //   node tools/apidoc.cjs <버전> [--date YYYY-MM-DD]   docs/api/<버전>.json 쓰기
 //   node tools/apidoc.cjs <버전> --missing             표에 없는 ko 글 목록 (JSON 배열)
 //   node tools/apidoc.cjs <버전> --check               docs/api/<버전>.json 꼴 검사와 수 세기
+//   node tools/apidoc.cjs <버전> --gaps                문서 빈 곳 (빈 설명, 빈 꼴, @returns 없는 함수, 예제 없는 클래스와 모듈, 머리 주석 없는 비공개 함수)
+//   node tools/apidoc.cjs <버전> --check-examples      예제 검사 (문법, 엔진 이름, node 와 헤드리스 크롬으로 돌려 보기)
+//   --missing, --gaps, --check-examples 는 --only <경로 앞>, --exclude <경로 앞> 으로 거른다. (여러 번 줄 수 있다)
 //==============================================================================
 
 
@@ -37,6 +41,12 @@ const MULTI_CHARACTER_PUNCTUATORS = [">>>=", "...", "===", "!==", "**=", "<<=", 
 const REGEX_PRECEDING_KEYWORDS = new Set(["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else", "yield", "await"]);
 const SCREAMING_NAME_PATTERN = /^[A-Z0-9_]+$/; // 대문자 이름의 객체는 열거가 아니라 상수 표로 둔다. (TIMELINE_NODE_DEFAULTS 등)
 const SHORT_VALUE_LENGTH = 60; // 시그니처에 값을 그대로 보일 상수의 글자 수 상한.
+const EXAMPLE_NODE_TIMEOUT_MILLISECONDS = 8000; // node 워커로 예제 하나를 돌릴 시간 상한.
+const EXAMPLE_NODE_SETTLE_MILLISECONDS = 100; // 예제 모듈이 다 돈 뒤 늦게 나는 오류를 기다리는 시간.
+const EXAMPLE_NODE_CONCURRENCY = 4; // 겹쳐 돌릴 node 워커 수의 상한.
+const EXAMPLE_CHROME_TIMEOUT_MILLISECONDS = 10000; // 크롬 iframe 에서 예제 하나가 끝날 시간 상한.
+const EXAMPLE_CHROME_SETTLE_MILLISECONDS = 1000; // 크롬 예제 모듈이 다 돈 뒤 몇 프레임이 도는 동안 오류를 기다리는 시간.
+const EXAMPLE_CHROME_CONCURRENCY = 4; // 크롬 한 페이지에서 겹쳐 돌릴 iframe 수.
 
 
 //==============================================================================
@@ -452,7 +462,8 @@ function needsSpace(previousToken, token) {
 
 //==============================================================================
 // JSDoc 읽기.
-// - { tags: [{ name, type, parameterName, text }], freeText }
+// - { tags: [{ name, type, parameterName, text, rawText }], freeText }
+// - rawText 는 태그 이름 뒤의 원문 그대로다. (@example 의 코드는 이것으로 읽는다)
 //==============================================================================
 /**
  * @param { string } commentText
@@ -529,7 +540,7 @@ function parseJsdoc(commentText) {
 			}
 		}
 		restText = restText.replace(/^-\s*/, "").trim();
-		return { name: tag.name, type: type, parameterName: parameterName, text: restText };
+		return { name: tag.name, type: type, parameterName: parameterName, text: restText, rawText: tag.rawText };
 	});
 	const freeText = freeLines.join("").split("\n").map((freeLine) => freeLine.replace(/\s+$/, "")).join("\n").trim();
 	return { tags: tags, freeText: freeText };
@@ -538,7 +549,7 @@ function parseJsdoc(commentText) {
 //==============================================================================
 // 선언 앞의 주석 모으기.
 // - 빈 줄을 만나거나, 앞 코드 줄 끝에 붙은 주석을 만나면 멈춘다.
-// - { description, jsdoc, headerTokenIndex, orphanHeaderTokenIndexList }
+// - { description, jsdoc, jsdocTokenIndex, headerTokenIndex, orphanHeaderList }
 //==============================================================================
 /**
  * @param { object[] } tokenList
@@ -582,12 +593,14 @@ function readCommentGroup(tokenList, commentIndexList) {
 	let lastHeader = null;
 	let looseLines = [];
 	let jsdoc = null;
+	let jsdocTokenIndex = -1;
 	const orphanHeaderList = [];
 	for (const tokenIndex of commentIndexList) {
 		const token = tokenList[tokenIndex];
 		if (token.type === "blockComment") {
 			if (token.value.startsWith("/**")) {
 				jsdoc = parseJsdoc(token.value);
+				jsdocTokenIndex = tokenIndex;
 			}
 			continue;
 		}
@@ -629,7 +642,7 @@ function readCommentGroup(tokenList, commentIndexList) {
 	if (description === "" && jsdoc && jsdoc.freeText !== "") {
 		description = jsdoc.freeText;
 	}
-	return { description: description, jsdoc: jsdoc, headerTokenIndex: headerTokenIndex, orphanHeaderList: orphanHeaderList };
+	return { description: description, jsdoc: jsdoc, jsdocTokenIndex: jsdocTokenIndex, headerTokenIndex: headerTokenIndex, orphanHeaderList: orphanHeaderList };
 }
 
 //==============================================================================
@@ -804,7 +817,7 @@ function readNumberLiteral(literalText) {
 
 //==============================================================================
 // 소스 파일 하나 읽기.
-// - { headerList, declarationList, exportList, reexportList }
+// - { fileSummary, fileExampleList, declarationList, reexportList }
 // - declaration: { kind: "class" | "function" | "variable", name, isExported, ... }
 //==============================================================================
 /**
@@ -817,6 +830,7 @@ function parseSourceFile(sourceText) {
 	const exportNameList = [];
 	const reexportList = [];
 	const usedHeaderIndexSet = new Set();
+	const usedJsdocIndexSet = new Set(); // 선언이 가져간 JSDoc 토큰 번호. (남은 깊이 0 의 JSDoc 이 파일의 예제다)
 	const staticAssignmentList = []; // 클래스 밖에서 붙인 정적 속성. (ClassName.name = 값;)
 	let firstDeclarationLine = Infinity;
 	let tokenIndex = 0;
@@ -877,6 +891,7 @@ function parseSourceFile(sourceText) {
 			declarationList.push(declaration);
 			firstDeclarationLine = Math.min(firstDeclarationLine, tokenList[startIndex].line);
 			markUsedHeader(declaration.document, usedHeaderIndexSet);
+			usedJsdocIndexSet.add(declaration.document.jsdocTokenIndex);
 			tokenIndex = declaration.endIndex + 1;
 			continue;
 		}
@@ -886,6 +901,7 @@ function parseSourceFile(sourceText) {
 			declarationList.push(declaration);
 			firstDeclarationLine = Math.min(firstDeclarationLine, tokenList[startIndex].line);
 			markUsedHeader(declaration.document, usedHeaderIndexSet);
+			usedJsdocIndexSet.add(declaration.document.jsdocTokenIndex);
 			tokenIndex = declaration.endIndex + 1;
 			continue;
 		}
@@ -893,6 +909,7 @@ function parseSourceFile(sourceText) {
 			const declaration = parseVariableDeclaration(tokenList, startIndex, cursorIndex);
 			declaration.isExported = isExported;
 			declarationList.push(declaration);
+			usedJsdocIndexSet.add(declaration.document.jsdocTokenIndex);
 			if (isExported) {
 				firstDeclarationLine = Math.min(firstDeclarationLine, tokenList[startIndex].line);
 				markUsedHeader(declaration.document, usedHeaderIndexSet);
@@ -914,6 +931,8 @@ function parseSourceFile(sourceText) {
 						valueTokenList.push(tokenList[valueIndex]);
 					}
 				}
+				const staticDocument = collectLeadingDocument(tokenList, startIndex);
+				usedJsdocIndexSet.add(staticDocument.jsdocTokenIndex);
 				staticAssignmentList.push({
 					className: keywordToken.value,
 					member: {
@@ -926,9 +945,11 @@ function parseSourceFile(sourceText) {
 						parameterList: [],
 						valueText: joinTokens(tokenList, valueStartIndex, valueEndIndex),
 						literalValue: readLiteralValue(valueTokenList),
-						document: collectLeadingDocument(tokenList, startIndex),
+						document: staticDocument,
 						trailingComment: readTrailingComment(tokenList, endIndex),
 						assignedNameList: [],
+						returnsValue: false,
+						line: tokenList[startIndex].line,
 					},
 				});
 				tokenIndex = endIndex + 1;
@@ -947,7 +968,9 @@ function parseSourceFile(sourceText) {
 	}
 
 	// 깊이 0 의 머리말 모으기. ({ lines, line, tokenIndex })
+	// - 어느 선언도 가져가지 않은 깊이 0 의 JSDoc 에 든 @example 은 파일(모듈)의 예제다.
 	const headerBlockList = [];
+	const fileExampleList = [];
 	let isInHeader = false;
 	let headerLines = [];
 	let headerStartIndex = -1;
@@ -960,6 +983,12 @@ function parseSourceFile(sourceText) {
 			}
 			else if (token.value === "}" || token.value === ")" || token.value === "]") {
 				--depth;
+			}
+			continue;
+		}
+		if (token.type === "blockComment" && depth === 0 && token.value.startsWith("/**") && !usedJsdocIndexSet.has(commentIndex)) {
+			for (const example of readExamples({ jsdoc: parseJsdoc(token.value) })) {
+				fileExampleList.push(example);
 			}
 			continue;
 		}
@@ -1021,7 +1050,7 @@ function parseSourceFile(sourceText) {
 			declaration.exportName = specifier.exportName;
 		}
 	}
-	return { fileSummary: fileSummary, declarationList: declarationList, reexportList: reexportList };
+	return { fileSummary: fileSummary, fileExampleList: fileExampleList, declarationList: declarationList, reexportList: reexportList };
 }
 
 //==============================================================================
@@ -1071,10 +1100,57 @@ function parseFunctionDeclaration(tokenList, startIndex, keywordIndex) {
 		isGenerator: isGenerator,
 		parameterList: readParameterList(tokenList, openIndex, closeIndex),
 		document: collectLeadingDocument(tokenList, startIndex),
+		returnsValue: !isGenerator && hasValueReturn(tokenList, bodyIndex, endIndex),
 		line: tokenList[startIndex].line,
 		endLine: tokenList[endIndex].endLine,
 		endIndex: endIndex,
 	};
+}
+
+//==============================================================================
+// 함수 몸에 값을 돌려주는 return 이 있는지. (안에 든 함수와 화살표 함수의 몸은 빼고 본다)
+//==============================================================================
+/**
+ * @param { object[] } tokenList
+ * @param { number } bodyOpenIndex
+ * @param { number } bodyCloseIndex
+ * @returns { boolean }
+ */
+function hasValueReturn(tokenList, bodyOpenIndex, bodyCloseIndex) {
+	let tokenIndex = bodyOpenIndex + 1;
+	while (tokenIndex < bodyCloseIndex) {
+		const token = tokenList[tokenIndex];
+		if (isComment(token)) {
+			++tokenIndex;
+			continue;
+		}
+		if (token.type === "identifier" && (token.value === "function" || token.value === "class")) {
+			let searchIndex = tokenIndex + 1;
+			while (searchIndex < bodyCloseIndex && tokenList[searchIndex].value !== "{") {
+				if (tokenList[searchIndex].value === "(") {
+					searchIndex = findMatchingIndex(tokenList, searchIndex);
+				}
+				++searchIndex;
+			}
+			tokenIndex = searchIndex < bodyCloseIndex ? findMatchingIndex(tokenList, searchIndex) + 1 : searchIndex;
+			continue;
+		}
+		if (token.type === "punctuator" && token.value === "=>") {
+			const arrowBodyIndex = nextSignificantIndex(tokenList, tokenIndex + 1);
+			if (tokenList[arrowBodyIndex] && tokenList[arrowBodyIndex].value === "{") {
+				tokenIndex = findMatchingIndex(tokenList, arrowBodyIndex) + 1;
+				continue;
+			}
+		}
+		if (token.type === "identifier" && token.value === "return") {
+			const valueToken = tokenList[nextSignificantIndex(tokenList, tokenIndex + 1)];
+			if (valueToken && valueToken.value !== ";" && valueToken.value !== "}" && valueToken.line === token.endLine) {
+				return true;
+			}
+		}
+		++tokenIndex;
+	}
+	return false;
 }
 
 //==============================================================================
@@ -1248,7 +1324,7 @@ function parseClassDeclaration(tokenList, startIndex, keywordIndex) {
 
 //==============================================================================
 // 클래스 몸의 멤버 읽기.
-// - member: { name, isStatic, isAsync, isGenerator, accessor: "get" | "set" | "", isMethod, parameterList, valueText, document, trailingComment, assignedNameList }
+// - member: { name, isStatic, isAsync, isGenerator, accessor: "get" | "set" | "", isMethod, parameterList, valueText, document, trailingComment, assignedNameList, returnsValue, line }
 //==============================================================================
 /**
  * @param { object[] } tokenList
@@ -1339,6 +1415,8 @@ function parseClassMembers(tokenList, openIndex, closeIndex) {
 				document: document,
 				trailingComment: "",
 				assignedNameList: assignedNameList,
+				returnsValue: !isGenerator && accessor !== "set" && name !== "constructor" && hasValueReturn(tokenList, bodyIndex, bodyCloseIndex),
+				line: tokenList[startIndex].line,
 			});
 			tokenIndex = nextSignificantIndex(tokenList, bodyCloseIndex + 1);
 			continue;
@@ -1373,6 +1451,8 @@ function parseClassMembers(tokenList, openIndex, closeIndex) {
 			document: document,
 			trailingComment: readTrailingComment(tokenList, endIndex),
 			assignedNameList: [],
+			returnsValue: false,
+			line: tokenList[startIndex].line,
 		});
 		if (endIndex <= cursorIndex) {
 			endIndex = cursorIndex;
@@ -1417,6 +1497,67 @@ function findTag(document, tagNames) {
 		return null;
 	}
 	return document.jsdoc.tags.find((tag) => tagNames.includes(tag.name)) || null;
+}
+
+//==============================================================================
+// JSDoc 의 @example 읽기. ([{ title: { ko, en }, code, language }], 없으면 빈 배열)
+// - "@example <caption>제목</caption>" 의 제목은 ko 원문이고 en 은 번역 표에서 채운다. 제목이 없으면 빈 글.
+// - 코드는 태그 다음 줄부터 다음 태그 앞까지다. 앞뒤 빈 줄과 모든 줄에 같이 붙은 들여쓰기는 뺀다.
+//==============================================================================
+/**
+ * @param { object } document
+ * @returns { object[] }
+ */
+function readExamples(document) {
+	if (!document || !document.jsdoc) {
+		return [];
+	}
+	const exampleList = [];
+	for (const tag of document.jsdoc.tags) {
+		if (tag.name !== "example") {
+			continue;
+		}
+		let exampleText = tag.rawText.replace(/^[ \t]+/, "");
+		let title = "";
+		const captionMatch = /^<caption>([\s\S]*?)<\/caption>/.exec(exampleText);
+		if (captionMatch) {
+			title = captionMatch[1].replace(/\s+/g, " ").trim();
+			exampleText = exampleText.slice(captionMatch[0].length);
+		}
+		const lineList = trimEmptyLines(exampleText.split("\n").map((exampleLine) => exampleLine.replace(/\s+$/, "")));
+		let commonIndent = null;
+		for (const exampleLine of lineList) {
+			if (exampleLine.trim() === "") {
+				continue;
+			}
+			const indent = /^[ \t]*/.exec(exampleLine)[0];
+			if (commonIndent === null || !indent.startsWith(commonIndent)) {
+				commonIndent = commonIndent === null ? indent : commonPrefix(commonIndent, indent);
+			}
+		}
+		const code = lineList.map((exampleLine) => exampleLine.slice((commonIndent || "").length)).join("\n");
+		if (code === "") {
+			continue;
+		}
+		exampleList.push({ title: createText(title), code: code, language: "javascript" });
+	}
+	return exampleList;
+}
+
+//==============================================================================
+// 두 글의 같은 앞부분.
+//==============================================================================
+/**
+ * @param { string } firstText
+ * @param { string } secondText
+ * @returns { string }
+ */
+function commonPrefix(firstText, secondText) {
+	let length = 0;
+	while (length < firstText.length && length < secondText.length && firstText[length] === secondText[length]) {
+		++length;
+	}
+	return firstText.slice(0, length);
 }
 
 //==============================================================================
@@ -1520,7 +1661,8 @@ function buildReturns(document) {
 }
 
 //==============================================================================
-// 멤버 칸 짓기. (칸 차례: kind, name, signature, params, returns, description, since, source, deprecated)
+// 멤버 칸 짓기. (칸 차례: kind, name, signature, params, returns, description, since, source, deprecated, examples)
+// - examples 는 fieldTable.examples 가 있으면 그것, 없으면 fieldTable.document 의 @example 이다. (하나도 없으면 칸을 두지 않는다)
 //==============================================================================
 /**
  * @param { object } fieldTable
@@ -1542,6 +1684,10 @@ function createMember(fieldTable) {
 	const deprecatedTag = fieldTable.document ? findTag(fieldTable.document, ["deprecated"]) : null;
 	if (deprecatedTag) {
 		member.deprecated = deprecatedTag.text || "deprecated";
+	}
+	const exampleList = fieldTable.examples || readExamples(fieldTable.document);
+	if (exampleList.length > 0) {
+		member.examples = exampleList;
 	}
 	return member;
 }
@@ -1576,9 +1722,15 @@ function buildClassMembers(classDeclaration, sourcePath, statistics) {
 				resultList.push(property);
 			}
 			property[member.accessor === "get" ? "getter" : "setter"] = member;
+			if (member.accessor === "get" && member.returnsValue && !findTag(member.document, ["returns", "return", "type"])) {
+				statistics.missingReturnsList.push({ source: sourcePath, line: member.line, name: classDeclaration.name + ".get " + member.name });
+			}
 			continue;
 		}
 		if (member.isMethod) {
+			if (member.returnsValue && !findTag(member.document, ["returns", "return"])) {
+				statistics.missingReturnsList.push({ source: sourcePath, line: member.line, name: classDeclaration.name + "." + member.name });
+			}
 			const asyncPrefix = member.isAsync ? "async " : "";
 			const generatorPrefix = member.isGenerator ? "*" : "";
 			const parameterText = member.parameterList.map((parameter) => parameter.text).join(", ");
@@ -1656,6 +1808,14 @@ function buildPropertyMember(property, sourcePath) {
 			descriptionList.push(accessorMember.document.description);
 		}
 	}
+	const exampleList = [];
+	for (const accessorMember of [property.getter, property.setter]) {
+		if (accessorMember) {
+			for (const example of readExamples(accessorMember.document)) {
+				exampleList.push(example);
+			}
+		}
+	}
 	return createMember({
 		kind: property.isStatic ? "static" : "property",
 		name: property.name,
@@ -1665,6 +1825,7 @@ function buildPropertyMember(property, sourcePath) {
 		description: descriptionList.join("\n"),
 		source: sourcePath,
 		document: property.getter ? property.getter.document : property.setter.document,
+		examples: exampleList,
 	});
 }
 
@@ -1674,9 +1835,13 @@ function buildPropertyMember(property, sourcePath) {
 /**
  * @param { object } declaration
  * @param { string } sourcePath
+ * @param { object } statistics
  * @returns { object }
  */
-function buildFunctionMember(declaration, sourcePath) {
+function buildFunctionMember(declaration, sourcePath, statistics) {
+	if (declaration.returnsValue && !findTag(declaration.document, ["returns", "return"])) {
+		statistics.missingReturnsList.push({ source: sourcePath, line: declaration.line, name: declaration.publicName });
+	}
 	const asyncPrefix = declaration.isAsync ? "async " : "";
 	const generatorPrefix = declaration.isGenerator ? "*" : "";
 	return createMember({
@@ -1722,11 +1887,16 @@ function buildConstantMember(declaration, sourcePath) {
  * @returns { object }
  */
 function buildEnum(declaration) {
-	return {
+	const enumEntry = {
 		name: declaration.publicName,
 		summary: createText(declaration.document.description || declaration.trailingComment),
 		values: declaration.entryList.map((entry) => ({ name: entry.name, value: entry.literalValue, description: createText(entry.description) })),
 	};
+	const exampleList = readExamples(declaration.document);
+	if (exampleList.length > 0) {
+		enumEntry.examples = exampleList;
+	}
+	return enumEntry;
 }
 
 //==============================================================================
@@ -1807,6 +1977,10 @@ function collectModules(statistics) {
 		for (const declaration of publicDeclarationList) {
 			if (declaration.kind === "class") {
 				const classEntry = { name: declaration.publicName, summary: createText(declaration.document.description) };
+				const classExampleList = readExamples(declaration.document);
+				if (classExampleList.length > 0) {
+					classEntry.examples = classExampleList;
+				}
 				if (declaration.extendsText !== "") {
 					classEntry.extends = declaration.extendsText;
 				}
@@ -1815,7 +1989,7 @@ function collectModules(statistics) {
 				classList.push(classEntry);
 			}
 			else if (declaration.kind === "function") {
-				const member = buildFunctionMember(declaration, sourcePath);
+				const member = buildFunctionMember(declaration, sourcePath, statistics);
 				member.sinceKey = declaration.name;
 				functionList.push(member);
 			}
@@ -1843,13 +2017,17 @@ function collectModules(statistics) {
 			}
 			moduleSummary = firstText.split("\n")[0];
 		}
-		moduleList.push({
+		const moduleEntryData = {
 			name: sourcePath.replace(/^src\//, "").replace(/\.js$/, ""),
 			summary: createText(moduleSummary),
-			classes: classList,
-			functions: functionList,
-			enums: enumList,
-		});
+		};
+		if (parsed.fileExampleList.length > 0) {
+			moduleEntryData.examples = parsed.fileExampleList;
+		}
+		moduleEntryData.classes = classList;
+		moduleEntryData.functions = functionList;
+		moduleEntryData.enums = enumList;
+		moduleList.push(moduleEntryData);
 	}
 	return moduleList;
 }
@@ -1962,9 +2140,10 @@ function readTagNames(tagName, statistics) {
  * @param { object[] } moduleList
  * @param { string } version
  * @param { object } statistics
+ * @param { string[] } [givenTagList] 훑을 태그를 정해 줄 때. (빈 배열이면 모두 그 판)
  */
-function fillSince(moduleList, version, statistics) {
-	const tagList = runGit(["tag", "--list"]).toString("utf8").split("\n").map((tagName) => tagName.trim()).filter((tagName) => /^v\d+\.\d+\.\d+$/.test(tagName)).filter((tagName) => compareVersions(tagName.slice(1), SINCE_FIRST_VERSION) >= 0 && compareVersions(tagName.slice(1), version) < 0).sort((first, second) => compareVersions(first.slice(1), second.slice(1)));
+function fillSince(moduleList, version, statistics, givenTagList) {
+	const tagList = givenTagList || runGit(["tag", "--list"]).toString("utf8").split("\n").map((tagName) => tagName.trim()).filter((tagName) => /^v\d+\.\d+\.\d+$/.test(tagName)).filter((tagName) => compareVersions(tagName.slice(1), SINCE_FIRST_VERSION) >= 0 && compareVersions(tagName.slice(1), version) < 0).sort((first, second) => compareVersions(first.slice(1), second.slice(1)));
 	statistics.sinceTagList = tagList;
 	const tagNamesList = tagList.map((tagName) => ({ version: tagName.slice(1), names: readTagNames(tagName, statistics) }));
 	for (const moduleEntry of moduleList) {
@@ -1990,13 +2169,18 @@ function fillSince(moduleList, version, statistics) {
 }
 
 //==============================================================================
-// 자료의 모든 설명 칸 돌기. (callback(textObject))
+// 자료의 모든 설명 칸 돌기. (callback(textObject), 예제 제목도 돈다)
 //==============================================================================
 /**
  * @param { object } apiDocument
  * @param { Function } callback
  */
 function forEachText(apiDocument, callback) {
+	const visitExamples = (owner) => {
+		for (const example of owner.examples || []) {
+			callback(example.title);
+		}
+	};
 	const visitMember = (member) => {
 		for (const parameter of member.params || []) {
 			callback(parameter.description);
@@ -2005,16 +2189,20 @@ function forEachText(apiDocument, callback) {
 			callback(member.returns.description);
 		}
 		callback(member.description);
+		visitExamples(member);
 	};
 	for (const moduleEntry of apiDocument.modules) {
 		callback(moduleEntry.summary);
+		visitExamples(moduleEntry);
 		for (const classEntry of moduleEntry.classes) {
 			callback(classEntry.summary);
+			visitExamples(classEntry);
 			classEntry.members.forEach(visitMember);
 		}
 		moduleEntry.functions.forEach(visitMember);
 		for (const enumEntry of moduleEntry.enums) {
 			callback(enumEntry.summary);
+			visitExamples(enumEntry);
 			for (const value of enumEntry.values) {
 				callback(value.description);
 			}
@@ -2102,12 +2290,18 @@ function resolveDate(version, dateOption, outputPath) {
  * @param { string } version
  * @param { string } dateOption
  * @param { string } outputPath
+ * @param { boolean } [isSinceEnabled] 거짓이면 태그를 훑지 않고 since 를 모두 그 판으로 둔다. (빈 곳 찾기와 예제 검사는 since 가 필요 없다)
  * @returns { object }
  */
-function buildApiDocument(version, dateOption, outputPath) {
-	const statistics = { unresolvedList: [], jsdocPrivateList: [], sinceParseFailureList: [], sinceTagList: [] };
+function buildApiDocument(version, dateOption, outputPath, isSinceEnabled = true) {
+	const statistics = { unresolvedList: [], jsdocPrivateList: [], sinceParseFailureList: [], sinceTagList: [], missingReturnsList: [] };
 	const moduleList = collectModules(statistics);
-	fillSince(moduleList, version, statistics);
+	if (isSinceEnabled) {
+		fillSince(moduleList, version, statistics);
+	}
+	else {
+		fillSince(moduleList, version, statistics, []);
+	}
 	const apiDocument = {
 		engine: ENGINE_NAME,
 		version: version,
@@ -2119,6 +2313,20 @@ function buildApiDocument(version, dateOption, outputPath) {
 }
 
 //==============================================================================
+// 값 멤버인지. (필드와 정적 필드, returns 는 값의 꼴만 담고 설명은 멤버 설명이 맡는다)
+//==============================================================================
+/**
+ * @param { object } member
+ * @returns { boolean }
+ */
+function isValueMember(member) {
+	if (member.kind === "field") {
+		return true;
+	}
+	return member.kind === "static" && !member.signature.includes("(") && !/^static (get|set|get\/set) /.test(member.signature);
+}
+
+//==============================================================================
 // 자료 꼴 검사와 수 세기. (꼴 오류 목록을 돌려준다)
 //==============================================================================
 /**
@@ -2127,12 +2335,12 @@ function buildApiDocument(version, dateOption, outputPath) {
  */
 function checkApiDocument(apiDocument) {
 	const errorList = [];
-	const counts = { modules: 0, classes: 0, members: 0, functions: 0, enums: 0, enumValues: 0, texts: 0, emptyEnglish: 0, emptyKorean: 0 };
+	const counts = { modules: 0, classes: 0, members: 0, functions: 0, enums: 0, enumValues: 0, texts: 0, emptyEnglish: 0, emptyKorean: 0, emptyValueSlots: 0, examples: 0, moduleExamples: 0, classExamples: 0, memberExamples: 0, enumExamples: 0, classesWithoutExample: 0, modulesWithoutExample: 0 };
 	const sinceTable = Object.create(null);
 	const kindTable = Object.create(null);
 
-	// 설명 칸인지.
-	const checkText = (textObject, where) => {
+	// 설명 칸인지. (emptyKind: "count" 는 빈 ko 를 ko 빈 칸으로, "valueSlot" 은 필드 값 칸으로 세고, "optional" 은 세지 않는다)
+	const checkText = (textObject, where, emptyKind) => {
 		if (!textObject || typeof textObject !== "object" || typeof textObject.ko !== "string" || typeof textObject.en !== "string" || Object.keys(textObject).length !== 2) {
 			errorList.push(where + ": 설명 칸이 { ko, en } 이 아니다");
 			return;
@@ -2142,8 +2350,38 @@ function checkApiDocument(apiDocument) {
 			++counts.emptyEnglish;
 		}
 		if (textObject.ko === "") {
-			++counts.emptyKorean;
+			if (emptyKind === "valueSlot") {
+				++counts.emptyValueSlots;
+			}
+			else if (emptyKind !== "optional") {
+				++counts.emptyKorean;
+			}
 		}
+	};
+	// 예제 칸인지. (없으면 0, 있으면 예제 수)
+	const checkExamples = (owner, where) => {
+		if (owner.examples === undefined) {
+			return 0;
+		}
+		if (!Array.isArray(owner.examples) || owner.examples.length === 0) {
+			errorList.push(where + ": examples 가 빈 배열이거나 배열이 아니다");
+			return 0;
+		}
+		owner.examples.forEach((example, exampleIndex) => {
+			const exampleWhere = where + " 예제 " + (exampleIndex + 1);
+			checkText(example.title, exampleWhere + " 제목", "optional");
+			if (typeof example.code !== "string" || example.code.trim() === "") {
+				errorList.push(exampleWhere + ": code 가 빈 글이다");
+			}
+			if (example.language !== "javascript") {
+				errorList.push(exampleWhere + ": language " + example.language);
+			}
+			if (Object.keys(example).length !== 3) {
+				errorList.push(exampleWhere + ": 칸이 { title, code, language } 가 아니다");
+			}
+			++counts.examples;
+		});
+		return owner.examples.length;
 	};
 	// 멤버 꼴인지.
 	const checkMember = (member, where) => {
@@ -2174,12 +2412,13 @@ function checkApiDocument(apiDocument) {
 			if (typeof member.returns.type !== "string") {
 				errorList.push(memberWhere + ": returns.type");
 			}
-			checkText(member.returns.description, memberWhere + " returns");
+			checkText(member.returns.description, memberWhere + " returns", isValueMember(member) ? "valueSlot" : "count");
 		}
 		if (member.deprecated !== undefined && typeof member.deprecated !== "string") {
 			errorList.push(memberWhere + ": deprecated");
 		}
 		checkText(member.description, memberWhere);
+		counts.memberExamples += checkExamples(member, memberWhere);
 	};
 
 	if (apiDocument.engine !== ENGINE_NAME) {
@@ -2194,6 +2433,11 @@ function checkApiDocument(apiDocument) {
 	for (const moduleEntry of apiDocument.modules || []) {
 		++counts.modules;
 		checkText(moduleEntry.summary, moduleEntry.name);
+		const moduleExampleCount = checkExamples(moduleEntry, moduleEntry.name);
+		counts.moduleExamples += moduleExampleCount;
+		if (moduleExampleCount === 0 && !(moduleEntry.classes || []).some((classEntry) => classEntry.examples !== undefined)) {
+			++counts.modulesWithoutExample;
+		}
 		for (const key of ["classes", "functions", "enums"]) {
 			if (!Array.isArray(moduleEntry[key])) {
 				errorList.push(moduleEntry.name + ": " + key + " 가 배열이 아니다");
@@ -2202,6 +2446,11 @@ function checkApiDocument(apiDocument) {
 		for (const classEntry of moduleEntry.classes || []) {
 			++counts.classes;
 			checkText(classEntry.summary, classEntry.name);
+			const classExampleCount = checkExamples(classEntry, classEntry.name);
+			counts.classExamples += classExampleCount;
+			if (classExampleCount === 0) {
+				++counts.classesWithoutExample;
+			}
 			if (classEntry.extends !== undefined && (typeof classEntry.extends !== "string" || classEntry.extends === "")) {
 				errorList.push(classEntry.name + ": extends");
 			}
@@ -2217,6 +2466,7 @@ function checkApiDocument(apiDocument) {
 		for (const enumEntry of moduleEntry.enums || []) {
 			++counts.enums;
 			checkText(enumEntry.summary, enumEntry.name);
+			counts.enumExamples += checkExamples(enumEntry, enumEntry.name);
 			for (const value of enumEntry.values || []) {
 				++counts.enumValues;
 				checkText(value.description, enumEntry.name + "." + value.name);
@@ -2227,14 +2477,916 @@ function checkApiDocument(apiDocument) {
 }
 
 //==============================================================================
-// 명령 줄 읽기. ({ version, mode, dateOption })
+// 경로가 거르개에 드는지. (onlyList 가 비면 모두 들고, excludeList 에 앞부분이 맞으면 빠진다)
+//==============================================================================
+/**
+ * @param { string } filePath
+ * @param { object } options
+ * @returns { boolean }
+ */
+function isPathSelected(filePath, options) {
+	if (options.excludeList.some((prefix) => filePath.startsWith(prefix))) {
+		return false;
+	}
+	return options.onlyList.length === 0 || options.onlyList.some((prefix) => filePath.startsWith(prefix));
+}
+
+//==============================================================================
+// src 아래 모든 .js 파일. (저장소 기준 경로, 이름 차례)
+//==============================================================================
+/**
+ * @returns { string[] }
+ */
+function listSourceFiles() {
+	const resultList = [];
+	const visit = (relativeDirectory) => {
+		const entryList = fs.readdirSync(path.join(REPOSITORY_ROOT, relativeDirectory), { withFileTypes: true }).sort((first, second) => (first.name < second.name ? -1 : 1));
+		for (const entry of entryList) {
+			const relativePath = relativeDirectory + "/" + entry.name;
+			if (entry.isDirectory()) {
+				visit(relativePath);
+			}
+			else if (entry.name.endsWith(".js")) {
+				resultList.push(relativePath);
+			}
+		}
+	};
+	visit("src");
+	return resultList;
+}
+
+//==============================================================================
+// 문서 빈 곳 모으기.
+// - 공개 API: 빈 ko 설명(모듈, 클래스, 멤버, 매개변수, 반환, 열거), 빈 매개변수 꼴, 값을 돌려주는데 @returns 가 없는 함수, 예제 없는 클래스와 모듈.
+// - src 의 모든 파일: 공개 API 가 아닌 함수와 메서드(#이름, 밑줄 이름, @private, 내보내지 않은 것) 가운데 머리 주석이 없는 것.
+// - [{ source, kind, name, line }] (line 은 알 때만)
+//==============================================================================
+/**
+ * @param { object } apiDocument
+ * @param { object } statistics
+ * @param { object } options
+ * @returns { object[] }
+ */
+function collectGaps(apiDocument, statistics, options) {
+	const gapList = [];
+	const addGap = (source, kind, name, line) => {
+		if (isPathSelected(source, options)) {
+			gapList.push({ source: source, kind: kind, name: name, line: line || 0 });
+		}
+	};
+	const visitMember = (source, ownerName, member) => {
+		const memberName = ownerName + "." + member.name;
+		if (member.description.ko === "") {
+			addGap(source, "멤버 설명", memberName);
+		}
+		for (const parameter of member.params) {
+			if (parameter.description.ko === "") {
+				addGap(source, "매개변수 설명", memberName + "(" + parameter.name + ")");
+			}
+			if (parameter.type === "") {
+				addGap(source, "매개변수 꼴", memberName + "(" + parameter.name + ")");
+			}
+		}
+		if (member.returns && member.returns.description.ko === "" && !isValueMember(member)) {
+			addGap(source, "반환 설명", memberName);
+		}
+	};
+	const publicClassKeySet = new Set();
+	for (const moduleEntry of apiDocument.modules) {
+		const source = "src/" + moduleEntry.name + ".js";
+		if (moduleEntry.summary.ko === "") {
+			addGap(source, "모듈 요약", moduleEntry.name);
+		}
+		if (moduleEntry.examples === undefined && !moduleEntry.classes.some((classEntry) => classEntry.examples !== undefined)) {
+			addGap(source, "예제 없는 모듈", moduleEntry.name);
+		}
+		for (const classEntry of moduleEntry.classes) {
+			publicClassKeySet.add(source + "|" + classEntry.name);
+			if (classEntry.summary.ko === "") {
+				addGap(source, "클래스 요약", classEntry.name);
+			}
+			if (classEntry.examples === undefined) {
+				addGap(source, "예제 없는 클래스", classEntry.name);
+			}
+			for (const member of classEntry.members) {
+				visitMember(source, classEntry.name, member);
+			}
+		}
+		for (const member of moduleEntry.functions) {
+			visitMember(source, moduleEntry.name, member);
+		}
+		for (const enumEntry of moduleEntry.enums) {
+			if (enumEntry.summary.ko === "") {
+				addGap(source, "열거 요약", enumEntry.name);
+			}
+			for (const value of enumEntry.values) {
+				if (value.description.ko === "") {
+					addGap(source, "열거 값 설명", enumEntry.name + "." + value.name);
+				}
+			}
+		}
+	}
+	for (const missingReturns of statistics.missingReturnsList) {
+		addGap(missingReturns.source, "@returns 없음", missingReturns.name, missingReturns.line);
+	}
+	for (const sourcePath of listSourceFiles()) {
+		if (!isPathSelected(sourcePath, options)) {
+			continue;
+		}
+		const parsed = parseSourceFile(fs.readFileSync(path.join(REPOSITORY_ROOT, sourcePath), "utf8"));
+		for (const declaration of parsed.declarationList) {
+			if (declaration.kind === "function" && declaration.document.description === "" && !(declaration.isExported && isPublicName(declaration.exportName || declaration.name))) {
+				addGap(sourcePath, "머리 주석 없는 비공개 함수", declaration.name, declaration.line);
+			}
+			if (declaration.kind !== "class") {
+				continue;
+			}
+			const isPublicClass = publicClassKeySet.has(sourcePath + "|" + declaration.name);
+			for (const member of declaration.memberList) {
+				if (!member.isMethod || member.document.description !== "") {
+					continue;
+				}
+				if (isPublicClass && isPublicName(member.name) && !isMarkedPrivate(member.document)) {
+					continue;
+				}
+				addGap(sourcePath, "머리 주석 없는 비공개 함수", (declaration.name || "(이름 없는 클래스)") + "." + (member.accessor !== "" ? member.accessor + " " : "") + member.name, member.line);
+			}
+		}
+	}
+	return gapList;
+}
+
+//==============================================================================
+// 빈 곳 찍기. (파일마다 갈래별로, 끝에 갈래별 합)
+//==============================================================================
+/**
+ * @param { object[] } gapList
+ */
+function printGaps(gapList) {
+	const fileTable = new Map();
+	const kindCountTable = new Map();
+	for (const gap of gapList) {
+		if (!fileTable.has(gap.source)) {
+			fileTable.set(gap.source, new Map());
+		}
+		const kindTable = fileTable.get(gap.source);
+		if (!kindTable.has(gap.kind)) {
+			kindTable.set(gap.kind, []);
+		}
+		kindTable.get(gap.kind).push(gap.line > 0 ? gap.name + ":" + gap.line : gap.name);
+		kindCountTable.set(gap.kind, (kindCountTable.get(gap.kind) || 0) + 1);
+	}
+	for (const [source, kindTable] of fileTable) {
+		let fileCount = 0;
+		for (const nameList of kindTable.values()) {
+			fileCount += nameList.length;
+		}
+		console.log(source + " (" + fileCount + ")");
+		for (const [kind, nameList] of kindTable) {
+			console.log("  " + kind + " " + nameList.length + ": " + nameList.join(", "));
+		}
+	}
+	console.log("[apidoc] 빈 곳 " + gapList.length + " 개, 파일 " + fileTable.size + " 개" + (gapList.length > 0 ? ": " + Array.from(kindCountTable).map((entry) => entry[0] + " " + entry[1]).join(", ") : ""));
+}
+
+//==============================================================================
+// 예제 모으기.
+// - 공개 API 의 @example 과 가이드(docs/guide/<버전>/<언어>/*.md)의 javascript, js, html 코드 칸.
+// - [{ source, where, title, code, page, kind: "api" | "guide", language }] (page 는 html 칸의 원문, code 는 그 안의 모듈 스크립트)
+//==============================================================================
+/**
+ * @param { object } apiDocument
+ * @param { object } options
+ * @returns { object[] }
+ */
+function collectExamples(apiDocument, options) {
+	const exampleList = [];
+	const addApiExamples = (source, where, owner) => {
+		for (const example of owner.examples || []) {
+			exampleList.push({ source: source, where: where, title: example.title.ko, code: example.code, page: "", kind: "api", language: "" });
+		}
+	};
+	for (const moduleEntry of apiDocument.modules) {
+		const source = "src/" + moduleEntry.name + ".js";
+		if (!isPathSelected(source, options)) {
+			continue;
+		}
+		addApiExamples(source, moduleEntry.name, moduleEntry);
+		for (const classEntry of moduleEntry.classes) {
+			addApiExamples(source, classEntry.name, classEntry);
+			for (const member of classEntry.members) {
+				addApiExamples(source, classEntry.name + "." + member.name, member);
+			}
+		}
+		for (const member of moduleEntry.functions) {
+			addApiExamples(source, moduleEntry.name + "." + member.name, member);
+		}
+		for (const enumEntry of moduleEntry.enums) {
+			addApiExamples(source, enumEntry.name, enumEntry);
+		}
+	}
+	const guideDirectoryPath = path.join(REPOSITORY_ROOT, "docs", "guide", apiDocument.version);
+	if (fs.existsSync(guideDirectoryPath)) {
+		for (const language of fs.readdirSync(guideDirectoryPath).sort()) {
+			const languageDirectoryPath = path.join(guideDirectoryPath, language);
+			if (!fs.statSync(languageDirectoryPath).isDirectory()) {
+				continue;
+			}
+			for (const fileName of fs.readdirSync(languageDirectoryPath).filter((name) => name.endsWith(".md")).sort()) {
+				const source = "docs/guide/" + apiDocument.version + "/" + language + "/" + fileName;
+				if (!isPathSelected(source, options)) {
+					continue;
+				}
+				for (const block of readCodeBlocks(fs.readFileSync(path.join(languageDirectoryPath, fileName), "utf8"))) {
+					if (block.language === "html") {
+						const scriptList = [];
+						const scriptPattern = /<script\s+type=["']module["'][^>]*>([\s\S]*?)<\/script>/g;
+						let scriptMatch = scriptPattern.exec(block.code);
+						while (scriptMatch) {
+							scriptList.push(scriptMatch[1]);
+							scriptMatch = scriptPattern.exec(block.code);
+						}
+						if (scriptList.length === 0) {
+							continue;
+						}
+						exampleList.push({ source: source, where: fileName + ":" + block.line, title: "", code: scriptList.join("\n"), page: block.code, kind: "guide", language: language });
+					}
+					else {
+						exampleList.push({ source: source, where: fileName + ":" + block.line, title: "", code: block.code, page: "", kind: "guide", language: language });
+					}
+				}
+			}
+		}
+	}
+	return exampleList;
+}
+
+//==============================================================================
+// 마크다운의 코드 칸 읽기. ([{ language, code, line }], javascript 와 js 는 javascript 로, html 만 따로, 그 밖은 뺀다)
+//==============================================================================
+/**
+ * @param { string } markdownText
+ * @returns { object[] }
+ */
+function readCodeBlocks(markdownText) {
+	const blockList = [];
+	const lineList = markdownText.split("\n");
+	let lineIndex = 0;
+	while (lineIndex < lineList.length) {
+		const fenceMatch = /^(\s*)```\s*([A-Za-z]*)/.exec(lineList[lineIndex]);
+		if (!fenceMatch) {
+			++lineIndex;
+			continue;
+		}
+		const startLine = lineIndex + 1;
+		const codeLineList = [];
+		++lineIndex;
+		while (lineIndex < lineList.length && !/^\s*```\s*$/.test(lineList[lineIndex])) {
+			codeLineList.push(lineList[lineIndex]);
+			++lineIndex;
+		}
+		++lineIndex;
+		const language = fenceMatch[2].toLowerCase();
+		if (language === "javascript" || language === "js") {
+			blockList.push({ language: "javascript", code: codeLineList.join("\n"), line: startLine });
+		}
+		else if (language === "html") {
+			blockList.push({ language: "html", code: codeLineList.join("\n"), line: startLine });
+		}
+	}
+	return blockList;
+}
+
+//==============================================================================
+// 엔진을 부르는 모듈 이름인지. (./build/vanilla.js, vanilla.min.js, import.js 처럼 끝 이름으로 본다)
+//==============================================================================
+/**
+ * @param { string } specifier
+ * @returns { boolean }
+ */
+function isEngineSpecifier(specifier) {
+	return /(^|\/)(vanilla(\.min)?\.js|import\.js)$/.test(specifier);
+}
+
+//==============================================================================
+// 예제의 import 읽기.
+// - { importList: [{ localName, exportName, isNamespace }], foreignList: [모듈 이름], strippedCode }
+// - strippedCode 는 엔진 import 를 const { ... } = __engine; 으로 바꾼 글이다. (줄 수는 그대로)
+//==============================================================================
+/**
+ * @param { string } code
+ * @returns { object }
+ */
+function readExampleImports(code) {
+	const importList = [];
+	const foreignList = [];
+	const importPattern = /\bimport\s*(\{[^}]*\}|\*\s*as\s+[A-Za-z_$][\w$]*)\s*from\s*(["'])([^"']+)\2\s*;?/g;
+	const strippedCode = code.replace(importPattern, (matchText, clauseText, quote, specifier) => {
+		const newlineText = "\n".repeat((matchText.match(/\n/g) || []).length);
+		if (!isEngineSpecifier(specifier)) {
+			foreignList.push(specifier);
+			return matchText;
+		}
+		if (clauseText.startsWith("*")) {
+			const localName = clauseText.replace(/^\*\s*as\s+/, "").trim();
+			importList.push({ localName: localName, exportName: "*", isNamespace: true });
+			return "const " + localName + " = __engine;" + newlineText;
+		}
+		const bindingList = [];
+		for (const specifierText of clauseText.slice(1, -1).split(",")) {
+			const parts = specifierText.trim().split(/\s+as\s+/);
+			if (parts[0] === "") {
+				continue;
+			}
+			const exportName = parts[0].trim();
+			const localName = (parts[1] || parts[0]).trim();
+			importList.push({ localName: localName, exportName: exportName, isNamespace: false });
+			bindingList.push(exportName === localName ? exportName : exportName + ": " + localName);
+		}
+		return "const { " + bindingList.join(", ") + " } = __engine;" + newlineText;
+	});
+	return { importList: importList, foreignList: foreignList, strippedCode: strippedCode };
+}
+
+//==============================================================================
+// 클래스 인스턴스가 가진 이름 표 짓기. (프로토타입 사슬의 메서드와 접근자, 문서의 필드, 생성자가 this 에 넣는 이름)
+//==============================================================================
+/**
+ * @param { Function } classValue
+ * @param { Map<string, Set<string>> } classFieldTable
+ * @returns { Set<string> }
+ */
+function readInstanceNames(classValue, classFieldTable) {
+	const nameSet = new Set();
+	let prototype = classValue.prototype;
+	while (prototype) {
+		for (const name of Object.getOwnPropertyNames(prototype)) {
+			nameSet.add(name);
+		}
+		const constructorFunction = prototype.constructor;
+		if (constructorFunction && classFieldTable.has(constructorFunction.name)) {
+			for (const name of classFieldTable.get(constructorFunction.name)) {
+				nameSet.add(name);
+			}
+		}
+		prototype = Object.getPrototypeOf(prototype);
+	}
+	return nameSet;
+}
+
+//==============================================================================
+// 예제 하나의 이름 검사. (오류 글 목록)
+// - 엔진에서 불러온 이름이 엔진에 있는지, 불러온이름.멤버 가 있는지.
+// - const 이름 = new 클래스(...) 나 const 이름 = 클래스.정적함수(...) (돌려주는 꼴이 엔진 클래스일 때) 로 만든 이름의 이름.멤버 가 그 클래스에 있는지.
+//==============================================================================
+/**
+ * @param { object } example
+ * @param { object } engineModule
+ * @param { object } nameContext { classFieldTable, staticReturnTable }
+ * @returns { string[] }
+ */
+function checkExampleNames(example, engineModule, nameContext) {
+	const errorList = [];
+	const importResult = readExampleImports(example.code);
+	for (const foreignSpecifier of importResult.foreignList) {
+		errorList.push("엔진 밖 모듈을 불러온다: " + foreignSpecifier);
+	}
+	const bindingTable = new Map();
+	for (const importEntry of importResult.importList) {
+		if (importEntry.isNamespace) {
+			bindingTable.set(importEntry.localName, { value: engineModule, name: "*" });
+			continue;
+		}
+		if (!Object.prototype.hasOwnProperty.call(engineModule, importEntry.exportName)) {
+			errorList.push("엔진에 없는 이름을 불러온다: " + importEntry.exportName);
+			continue;
+		}
+		bindingTable.set(importEntry.localName, { value: engineModule[importEntry.exportName], name: importEntry.exportName });
+	}
+	const tokenList = tokenize(importResult.strippedCode).filter((token) => !isComment(token));
+	const instanceTable = new Map();
+	for (let tokenIndex = 0; tokenIndex < tokenList.length; ++tokenIndex) {
+		const token = tokenList[tokenIndex];
+		const previousToken = tokenList[tokenIndex - 1];
+		const isMemberAccess = previousToken && previousToken.type === "punctuator" && (previousToken.value === "." || previousToken.value === "?.");
+		if (token.type !== "identifier" || isMemberAccess) {
+			continue;
+		}
+		if ((token.value === "const" || token.value === "let" || token.value === "var") && tokenList[tokenIndex + 1] && tokenList[tokenIndex + 1].type === "identifier" && tokenList[tokenIndex + 2] && tokenList[tokenIndex + 2].value === "=") {
+			let valueIndex = tokenIndex + 3;
+			if (tokenList[valueIndex] && tokenList[valueIndex].value === "await") {
+				++valueIndex;
+			}
+			const valueToken = tokenList[valueIndex];
+			const nameToken = tokenList[valueIndex + 1];
+			if (valueToken && valueToken.value === "new" && nameToken && bindingTable.has(nameToken.value) && typeof bindingTable.get(nameToken.value).value === "function") {
+				instanceTable.set(tokenList[tokenIndex + 1].value, bindingTable.get(nameToken.value).name);
+			}
+			else if (valueToken && bindingTable.has(valueToken.value) && nameToken && nameToken.value === "." && tokenList[valueIndex + 2] && tokenList[valueIndex + 3] && tokenList[valueIndex + 3].value === "(") {
+				const returnClassName = nameContext.staticReturnTable.get(bindingTable.get(valueToken.value).name + "." + tokenList[valueIndex + 2].value);
+				if (returnClassName && typeof engineModule[returnClassName] === "function") {
+					instanceTable.set(tokenList[tokenIndex + 1].value, returnClassName);
+				}
+			}
+		}
+		const dotToken = tokenList[tokenIndex + 1];
+		const memberToken = tokenList[tokenIndex + 2];
+		if (!dotToken || dotToken.value !== "." || !memberToken || memberToken.type !== "identifier") {
+			continue;
+		}
+		if (bindingTable.has(token.value)) {
+			const binding = bindingTable.get(token.value);
+			if (binding.value !== null && binding.value !== undefined && (typeof binding.value === "object" || typeof binding.value === "function") && !(memberToken.value in binding.value)) {
+				errorList.push("엔진에 없는 이름: " + (binding.name === "*" ? token.value : binding.name) + "." + memberToken.value);
+			}
+		}
+		else if (instanceTable.has(token.value)) {
+			const className = instanceTable.get(token.value);
+			const instanceNameSet = readInstanceNames(engineModule[className], nameContext.classFieldTable);
+			if (!instanceNameSet.has(memberToken.value)) {
+				errorList.push("엔진에 없는 이름: " + className + " 인스턴스의 " + memberToken.value + " (" + token.value + "." + memberToken.value + ")");
+			}
+		}
+	}
+	return errorList;
+}
+
+//==============================================================================
+// 이름 검사에 쓸 표 짓기.
+// - classFieldTable: 클래스 이름 → 필드와 생성자가 this 에 넣는 이름. (src 의 모든 클래스)
+// - staticReturnTable: "클래스.정적함수" → 돌려주는 엔진 클래스 이름. (@returns 꼴이 클래스 이름이나 this 하나일 때)
+//==============================================================================
+/**
+ * @param { object } apiDocument
+ * @returns { object }
+ */
+function buildNameContext(apiDocument) {
+	const classFieldTable = new Map();
+	for (const sourcePath of listSourceFiles()) {
+		const parsed = parseSourceFile(fs.readFileSync(path.join(REPOSITORY_ROOT, sourcePath), "utf8"));
+		for (const declaration of parsed.declarationList) {
+			if (declaration.kind !== "class" || declaration.name === "") {
+				continue;
+			}
+			const nameSet = classFieldTable.get(declaration.name) || new Set();
+			for (const member of declaration.memberList) {
+				if (!member.isMethod) {
+					nameSet.add(member.name);
+				}
+				for (const assignedName of member.assignedNameList) {
+					nameSet.add(assignedName);
+				}
+			}
+			classFieldTable.set(declaration.name, nameSet);
+		}
+	}
+	const staticReturnTable = new Map();
+	for (const moduleEntry of apiDocument.modules) {
+		for (const classEntry of moduleEntry.classes) {
+			for (const member of classEntry.members) {
+				if (member.kind !== "static" || !member.returns) {
+					continue;
+				}
+				const typeText = member.returns.type.replace(/\s*\|\s*null\b/g, "").trim();
+				staticReturnTable.set(classEntry.name + "." + member.name, typeText === "this" ? classEntry.name : typeText);
+			}
+		}
+	}
+	return { classFieldTable: classFieldTable, staticReturnTable: staticReturnTable };
+}
+
+//==============================================================================
+// 여러 일을 정한 수만큼 겹쳐 돌리기.
+//==============================================================================
+/**
+ * @param { any[] } itemList
+ * @param { number } limit
+ * @param { Function } runItem async (item, index) => void
+ * @returns { Promise<void> }
+ */
+async function runWithConcurrency(itemList, limit, runItem) {
+	let nextIndex = 0;
+	const runnerList = [];
+	for (let runnerIndex = 0; runnerIndex < Math.min(limit, itemList.length); ++runnerIndex) {
+		runnerList.push((async () => {
+			while (nextIndex < itemList.length) {
+				const itemIndex = nextIndex;
+				++nextIndex;
+				await runItem(itemList[itemIndex], itemIndex);
+			}
+		})());
+	}
+	await Promise.all(runnerList);
+}
+
+//==============================================================================
+// node 워커로 예제 하나 돌리기. (오류 글 목록, 빈 배열이면 통과)
+// - 엔진 import 를 import.js 의 파일 주소로 바꾼 .mjs 를 임시 폴더에 쓰고 워커에서 불러온다. (워커마다 엔진 모듈이 새로 읽힌다)
+// - 모듈이 다 돈 뒤 잠깐 더 기다려 늦게 난 오류와 console.error 도 잡는다. 시간 안에 끝나지 않으면 오류다.
+//==============================================================================
+/**
+ * @param { object } example
+ * @param { string } temporaryDirectoryPath
+ * @param { number } exampleIndex
+ * @returns { Promise<string[]> }
+ */
+function runExampleInNode(example, temporaryDirectoryPath, exampleIndex) {
+	const { Worker } = require("worker_threads");
+	const { pathToFileURL } = require("url");
+	const engineUrl = pathToFileURL(ENTRY_FILE_PATH).href;
+	const modulePath = path.join(temporaryDirectoryPath, "example-" + exampleIndex + ".mjs");
+	fs.writeFileSync(modulePath, rewriteEngineSpecifier(example.code, engineUrl));
+	const workerSource = [
+		"const { parentPort, workerData } = require(\"worker_threads\");",
+		"const errorList = [];",
+		"console.error = (...argumentList) => { errorList.push(\"console.error: \" + argumentList.map(String).join(\" \")); };",
+		"process.on(\"unhandledRejection\", (reason) => { errorList.push(\"unhandledRejection: \" + ((reason && reason.stack) || String(reason))); });",
+		"import(workerData.moduleUrl).then(() => {",
+		"	setTimeout(() => parentPort.postMessage(errorList), workerData.settleMilliseconds);",
+		"}, (error) => {",
+		"	errorList.push((error && error.stack) || String(error));",
+		"	parentPort.postMessage(errorList);",
+		"});",
+	].join("\n");
+	return new Promise((resolve) => {
+		const worker = new Worker(workerSource, { eval: true, workerData: { moduleUrl: pathToFileURL(modulePath).href, settleMilliseconds: EXAMPLE_NODE_SETTLE_MILLISECONDS }, stdout: true, stderr: true });
+		let isFinished = false;
+		const finish = (errorList) => {
+			if (isFinished) {
+				return;
+			}
+			isFinished = true;
+			clearTimeout(timeoutHandle);
+			worker.terminate();
+			resolve(errorList);
+		};
+		const timeoutHandle = setTimeout(() => finish(["시간 안에 끝나지 않음 (" + EXAMPLE_NODE_TIMEOUT_MILLISECONDS + " ms)"]), EXAMPLE_NODE_TIMEOUT_MILLISECONDS);
+		worker.stdout.resume();
+		worker.stderr.resume();
+		worker.on("message", (errorList) => finish(errorList));
+		worker.on("error", (error) => finish([(error && error.stack) || String(error)]));
+		worker.on("exit", () => finish(["워커가 결과 없이 끝남"]));
+	});
+}
+
+//==============================================================================
+// 엔진 import 의 모듈 이름 바꾸기.
+//==============================================================================
+/**
+ * @param { string } code
+ * @param { string } engineUrl
+ * @returns { string }
+ */
+function rewriteEngineSpecifier(code, engineUrl) {
+	return code.replace(/(\bfrom\s*)(["'])([^"']+)\2/g, (matchText, fromText, quote, specifier) => (isEngineSpecifier(specifier) ? fromText + "\"" + engineUrl + "\"" : matchText));
+}
+
+//==============================================================================
+// 크롬 경로 찾기. (--chrome, 환경 변수 CHROME_PATH, 흔한 설치 자리 차례로, 없으면 "")
+//==============================================================================
+/**
+ * @param { string } chromePathOption
+ * @returns { string }
+ */
+function findChromePath(chromePathOption) {
+	const candidateList = [chromePathOption, process.env.CHROME_PATH || "", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "C:/Program Files/Google/Chrome/Application/chrome.exe", "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe", "/usr/bin/google-chrome", "/usr/bin/chromium"];
+	return candidateList.find((candidatePath) => candidatePath !== "" && fs.existsSync(candidatePath)) || "";
+}
+
+//==============================================================================
+// 예제 하나를 iframe 에 넣을 html 로. (오류와 console.error 를 부모에게 보내고, 모듈 끝에서 done 을 보낸다)
+//==============================================================================
+/**
+ * @param { object } example
+ * @param { string } engineUrl
+ * @param { number } exampleIndex
+ * @returns { string }
+ */
+function buildExamplePage(example, engineUrl, exampleIndex) {
+	const hookScript = [
+		"<script>",
+		"const __exampleIndex = " + exampleIndex + ";",
+		"const __postExample = (type, text) => parent.postMessage({ index: __exampleIndex, type: type, text: String(text) }, \"*\");",
+		"addEventListener(\"error\", (event) => __postExample(\"error\", (event.message || \"error\") + (event.filename ? \" (\" + event.filename + \":\" + event.lineno + \")\" : \"\")));",
+		"addEventListener(\"unhandledrejection\", (event) => __postExample(\"error\", \"unhandledrejection: \" + ((event.reason && event.reason.stack) || event.reason)));",
+		"const __consoleError = console.error.bind(console);",
+		"console.error = (...argumentList) => { __postExample(\"error\", \"console.error: \" + argumentList.map(String).join(\" \")); __consoleError(...argumentList); };",
+		"</script>",
+	].join("\n");
+	const doneText = "\n__postExample(\"done\", \"\");\n";
+	if (example.page !== "") {
+		let pageText = example.page.replace(/(<script\s+type=["']module["'][^>]*>)([\s\S]*?)(<\/script>)/g, (matchText, openText, scriptText, closeText) => openText + rewriteEngineSpecifier(scriptText, engineUrl) + doneText + closeText);
+		if (/<head[^>]*>/i.test(pageText)) {
+			pageText = pageText.replace(/<head[^>]*>/i, (headText) => headText + hookScript);
+		}
+		else {
+			pageText = hookScript + pageText;
+		}
+		return pageText;
+	}
+	return "<!DOCTYPE html><html><head><meta charset=\"utf-8\">" + hookScript + "</head><body style=\"margin:0\"><script type=\"module\">\n" + rewriteEngineSpecifier(example.code, engineUrl).replace(/<\/script/gi, "<\\/script") + doneText + "</script></body></html>";
+}
+
+//==============================================================================
+// 헤드리스 크롬으로 예제들 돌리기. ([오류 글 목록] 을 예제 차례대로)
+// - 노드 내장 http 로 저장소를 루트로 하는 정적 서버를 띄우고, 실행 페이지가 예제마다 iframe 을 만들어 몇 개씩 겹쳐 돌린 뒤 결과를 POST 로 돌려준다.
+// - 크롬은 하나만, 창 없이(--headless=new), 임시 프로필로 띄우고 결과를 받으면 바로 끈다.
+//==============================================================================
+/**
+ * @param { object[] } exampleList
+ * @param { string } chromePath
+ * @returns { Promise<string[][]> }
+ */
+function runExamplesInChrome(exampleList, chromePath) {
+	const http = require("http");
+	const os = require("os");
+	const contentTypeTable = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8", ".json": "application/json; charset=utf-8", ".css": "text/css; charset=utf-8", ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".woff": "font/woff", ".woff2": "font/woff2", ".ttf": "font/ttf", ".glb": "model/gltf-binary", ".gltf": "model/gltf+json", ".ogg": "audio/ogg", ".mp3": "audio/mpeg", ".wav": "audio/wav", ".webm": "audio/webm", ".wasm": "application/wasm" };
+	const runnerScript = [
+		"const SETTLE_MILLISECONDS = " + EXAMPLE_CHROME_SETTLE_MILLISECONDS + ";",
+		"const TIMEOUT_MILLISECONDS = " + EXAMPLE_CHROME_TIMEOUT_MILLISECONDS + ";",
+		"const CONCURRENCY = " + EXAMPLE_CHROME_CONCURRENCY + ";",
+		"const runExample = (example) => new Promise((resolve) => {",
+		"	const iframe = document.createElement(\"iframe\");",
+		"	iframe.width = \"640\";",
+		"	iframe.height = \"360\";",
+		"	iframe.style.position = \"absolute\";",
+		"	iframe.style.left = \"0\";",
+		"	iframe.style.top = \"0\";",
+		"	const errorList = [];",
+		"	let isDone = false;",
+		"	let isFinished = false;",
+		"	let settleHandle = 0;",
+		"	const finish = () => {",
+		"		if (isFinished) {",
+		"			return;",
+		"		}",
+		"		isFinished = true;",
+		"		clearTimeout(timeoutHandle);",
+		"		clearTimeout(settleHandle);",
+		"		removeEventListener(\"message\", onMessage);",
+		"		iframe.remove();",
+		"		resolve({ index: example.index, errorList: errorList });",
+		"	};",
+		"	const onMessage = (event) => {",
+		"		if (!event.data || event.data.index !== example.index) {",
+		"			return;",
+		"		}",
+		"		if (event.data.type === \"error\") {",
+		"			errorList.push(event.data.text);",
+		"			if (!isDone && settleHandle === 0) {",
+		"				settleHandle = setTimeout(finish, SETTLE_MILLISECONDS);",
+		"			}",
+		"		}",
+		"		else if (event.data.type === \"done\") {",
+		"			isDone = true;",
+		"			clearTimeout(settleHandle);",
+		"			settleHandle = setTimeout(finish, SETTLE_MILLISECONDS);",
+		"		}",
+		"	};",
+		"	addEventListener(\"message\", onMessage);",
+		"	const timeoutHandle = setTimeout(() => {",
+		"		if (!isDone) {",
+		"			errorList.push(\"시간 안에 끝나지 않음 (\" + TIMEOUT_MILLISECONDS + \" ms)\");",
+		"		}",
+		"		finish();",
+		"	}, TIMEOUT_MILLISECONDS);",
+		"	iframe.srcdoc = example.page;",
+		"	document.body.appendChild(iframe);",
+		"});",
+		"(async () => {",
+		"	const exampleList = await (await fetch(\"/__examples.json\")).json();",
+		"	const resultList = [];",
+		"	let nextIndex = 0;",
+		"	const runnerList = [];",
+		"	for (let runnerIndex = 0; runnerIndex < CONCURRENCY; ++runnerIndex) {",
+		"		runnerList.push((async () => {",
+		"			while (nextIndex < exampleList.length) {",
+		"				const example = exampleList[nextIndex];",
+		"				++nextIndex;",
+		"				resultList.push(await runExample(example));",
+		"			}",
+		"		})());",
+		"	}",
+		"	await Promise.all(runnerList);",
+		"	await fetch(\"/__result\", { method: \"POST\", body: JSON.stringify(resultList) });",
+		"})();",
+	].join("\n");
+	return new Promise((resolve, reject) => {
+		let chromeProcess = null;
+		let profileDirectoryPath = "";
+		let overallHandle = 0;
+		const server = http.createServer((request, response) => {
+			const requestPath = decodeURIComponent(request.url.split("?")[0]);
+			if (request.method === "POST" && requestPath === "/__result") {
+				const chunkList = [];
+				request.on("data", (chunk) => chunkList.push(chunk));
+				request.on("end", () => {
+					response.writeHead(200);
+					response.end();
+					const resultList = JSON.parse(Buffer.concat(chunkList).toString("utf8"));
+					const errorTable = exampleList.map(() => ["결과 없음"]);
+					for (const result of resultList) {
+						errorTable[result.index] = result.errorList;
+					}
+					cleanUp();
+					resolve(errorTable);
+				});
+				return;
+			}
+			if (requestPath === "/__runner.html") {
+				response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+				response.end("<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body><script type=\"module\">\n" + runnerScript + "\n</script></body></html>");
+				return;
+			}
+			if (requestPath === "/__examples.json") {
+				const engineUrl = "http://127.0.0.1:" + server.address().port + "/import.js";
+				response.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+				response.end(JSON.stringify(exampleList.map((example, exampleIndex) => ({ index: exampleIndex, page: buildExamplePage(example, engineUrl, exampleIndex) }))));
+				return;
+			}
+			const filePath = path.join(REPOSITORY_ROOT, requestPath);
+			if (!filePath.startsWith(REPOSITORY_ROOT + path.sep)) {
+				response.writeHead(403);
+				response.end();
+				return;
+			}
+			fs.readFile(filePath, (error, data) => {
+				if (error) {
+					response.writeHead(404);
+					response.end();
+					return;
+				}
+				response.writeHead(200, { "Content-Type": contentTypeTable[path.extname(filePath).toLowerCase()] || "application/octet-stream", "Cache-Control": "no-store" });
+				response.end(data);
+			});
+		});
+		// 끊겨도 크롬이 남지 않게 신호를 받으면 치우고 끝낸다.
+		const onSignal = () => {
+			cleanUp();
+			process.exit(1);
+		};
+		const cleanUp = () => {
+			clearTimeout(overallHandle);
+			process.removeListener("SIGINT", onSignal);
+			process.removeListener("SIGTERM", onSignal);
+			if (chromeProcess && chromeProcess.exitCode === null) {
+				chromeProcess.kill("SIGKILL");
+			}
+			server.close();
+			if (profileDirectoryPath !== "") {
+				fs.rmSync(profileDirectoryPath, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+				profileDirectoryPath = "";
+			}
+		};
+		process.once("SIGINT", onSignal);
+		process.once("SIGTERM", onSignal);
+		server.listen(0, "127.0.0.1", () => {
+			profileDirectoryPath = fs.mkdtempSync(path.join(os.tmpdir(), "apidoc-chrome-"));
+			const runnerUrl = "http://127.0.0.1:" + server.address().port + "/__runner.html";
+			chromeProcess = childProcess.spawn(chromePath, ["--headless=new", "--user-data-dir=" + profileDirectoryPath, "--no-first-run", "--no-default-browser-check", "--enable-gpu", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required", "--mute-audio", "--window-size=1280,720", runnerUrl], { stdio: "ignore" });
+			chromeProcess.on("error", (error) => {
+				cleanUp();
+				reject(error);
+			});
+			const overallMilliseconds = 60000 + exampleList.length * EXAMPLE_CHROME_TIMEOUT_MILLISECONDS / EXAMPLE_CHROME_CONCURRENCY;
+			overallHandle = setTimeout(() => {
+				cleanUp();
+				reject(new Error("크롬이 " + overallMilliseconds + " ms 안에 결과를 돌려주지 않았다"));
+			}, overallMilliseconds);
+		});
+	});
+}
+
+//==============================================================================
+// 예제 검사.
+// - 모든 예제: 공개 API 예제와 en 가이드 예제에 한글이 없는지, 문법(모듈로 읽힘), 엔진 이름이 실제로 있는지.
+// - --no-run 이 아니면 node 워커로 돌려 보고, node 에서 오류가 난 것(DOM, WebGL, 소리 같은 브라우저 기능)과 html 칸은 헤드리스 크롬으로 돌린다.
+// - 크롬이 없거나 --no-chrome 이면 크롬 단계는 건너뛰고 "돌리지 못함" 으로 센다. (실패로 치지 않는다)
+// - 통과하면 참.
+//==============================================================================
+/**
+ * @param { object } apiDocument
+ * @param { object } options
+ * @returns { Promise<boolean> }
+ */
+async function checkExamples(apiDocument, options) {
+	const { pathToFileURL } = require("url");
+	const os = require("os");
+	const exampleList = collectExamples(apiDocument, options);
+	const engineModule = await import(pathToFileURL(ENTRY_FILE_PATH).href);
+	const nameContext = buildNameContext(apiDocument);
+	const AsyncFunction = (async () => {}).constructor;
+	const stateList = exampleList.map(() => ({ staticErrorList: [], runErrorList: [], ranIn: "" }));
+	exampleList.forEach((example, exampleIndex) => {
+		const state = stateList[exampleIndex];
+		if ((example.kind === "api" || example.language === "en") && HANGUL_PATTERN.test(example.code)) {
+			state.staticErrorList.push("예제 코드에 한글이 있다 (설명은 <caption> 제목으로, 영어는 번역 표로)");
+		}
+		const importResult = readExampleImports(example.code);
+		try {
+			new AsyncFunction("__engine", "\"use strict\";\n" + importResult.strippedCode);
+		}
+		catch (error) {
+			state.staticErrorList.push("문법: " + error.message);
+			return;
+		}
+		for (const errorText of checkExampleNames(example, engineModule, nameContext)) {
+			state.staticErrorList.push(errorText);
+		}
+	});
+	let nodePassCount = 0;
+	let chromePassCount = 0;
+	let notRunCount = 0;
+	let chromeMessage = "";
+	if (options.isRunEnabled) {
+		const runnableIndexList = [];
+		stateList.forEach((state, exampleIndex) => {
+			if (state.staticErrorList.length === 0) {
+				runnableIndexList.push(exampleIndex);
+			}
+		});
+		const temporaryDirectoryPath = fs.mkdtempSync(path.join(os.tmpdir(), "apidoc-examples-"));
+		const chromeIndexList = [];
+		try {
+			await runWithConcurrency(runnableIndexList.filter((exampleIndex) => exampleList[exampleIndex].page === ""), Math.max(1, Math.min(EXAMPLE_NODE_CONCURRENCY, os.cpus().length - 2)), async (exampleIndex) => {
+				const errorList = await runExampleInNode(exampleList[exampleIndex], temporaryDirectoryPath, exampleIndex);
+				if (errorList.length === 0) {
+					stateList[exampleIndex].ranIn = "node";
+					++nodePassCount;
+				}
+				else {
+					stateList[exampleIndex].runErrorList = errorList.map((errorText) => "node: " + errorText.split("\n")[0]);
+					chromeIndexList.push(exampleIndex);
+				}
+			});
+		}
+		finally {
+			fs.rmSync(temporaryDirectoryPath, { recursive: true, force: true });
+		}
+		for (const exampleIndex of runnableIndexList) {
+			if (exampleList[exampleIndex].page !== "") {
+				chromeIndexList.push(exampleIndex);
+			}
+		}
+		chromeIndexList.sort((first, second) => first - second);
+		const chromePath = options.isChromeEnabled ? findChromePath(options.chromePath) : "";
+		if (chromeIndexList.length > 0 && chromePath !== "") {
+			const chromeErrorTable = await runExamplesInChrome(chromeIndexList.map((exampleIndex) => exampleList[exampleIndex]), chromePath);
+			chromeIndexList.forEach((exampleIndex, chromeIndex) => {
+				const errorList = chromeErrorTable[chromeIndex];
+				if (errorList.length === 0) {
+					stateList[exampleIndex].ranIn = "chrome";
+					stateList[exampleIndex].runErrorList = [];
+					++chromePassCount;
+				}
+				else {
+					stateList[exampleIndex].runErrorList = stateList[exampleIndex].runErrorList.concat(errorList.map((errorText) => "chrome: " + errorText.split("\n")[0]));
+				}
+			});
+		}
+		else if (chromeIndexList.length > 0) {
+			chromeMessage = options.isChromeEnabled ? "크롬을 찾지 못해 크롬 단계를 건너뜀 (--chrome 이나 CHROME_PATH 로 정한다)" : "--no-chrome 이라 크롬 단계를 건너뜀";
+			for (const exampleIndex of chromeIndexList) {
+				stateList[exampleIndex].runErrorList = [];
+				stateList[exampleIndex].ranIn = "skipped";
+				++notRunCount;
+			}
+		}
+	}
+	let failureCount = 0;
+	stateList.forEach((state, exampleIndex) => {
+		const errorList = state.staticErrorList.concat(state.runErrorList);
+		if (errorList.length === 0) {
+			return;
+		}
+		++failureCount;
+		const example = exampleList[exampleIndex];
+		console.log("[apidoc] 예제 실패: " + example.source + " " + example.where + (example.title !== "" ? " (" + example.title + ")" : ""));
+		for (const errorText of errorList.slice(0, 6)) {
+			console.log("  " + errorText);
+		}
+	});
+	const apiCount = exampleList.filter((example) => example.kind === "api").length;
+	console.log("[apidoc] 예제 " + exampleList.length + " 개 (API " + apiCount + ", 가이드 " + (exampleList.length - apiCount) + "), 문법과 이름 통과 " + stateList.filter((state) => state.staticErrorList.length === 0).length);
+	if (options.isRunEnabled) {
+		console.log("[apidoc] 돌려 봄: node 통과 " + nodePassCount + ", 크롬 통과 " + chromePassCount + ", 돌리지 못함 " + notRunCount);
+	}
+	if (chromeMessage !== "") {
+		console.log("[apidoc] " + chromeMessage);
+	}
+	console.log("[apidoc] 예제 실패 " + failureCount + " 개");
+	return failureCount === 0;
+}
+
+//==============================================================================
+// 명령 줄 읽기. ({ version, mode, dateOption, onlyList, excludeList, isRunEnabled, isChromeEnabled, chromePath })
 //==============================================================================
 /**
  * @param { string[] } argumentList
  * @returns { object | null }
  */
 function readArguments(argumentList) {
-	const options = { version: "", mode: "write", dateOption: "" };
+	const options = { version: "", mode: "write", dateOption: "", onlyList: [], excludeList: [], isRunEnabled: true, isChromeEnabled: true, chromePath: "" };
 	for (let argumentIndex = 0; argumentIndex < argumentList.length; ++argumentIndex) {
 		const argument = argumentList[argumentIndex];
 		if (argument === "--missing") {
@@ -2242,6 +3394,34 @@ function readArguments(argumentList) {
 		}
 		else if (argument === "--check") {
 			options.mode = "check";
+		}
+		else if (argument === "--gaps") {
+			options.mode = "gaps";
+		}
+		else if (argument === "--check-examples") {
+			options.mode = "examples";
+		}
+		else if (argument === "--no-run") {
+			options.isRunEnabled = false;
+		}
+		else if (argument === "--no-chrome") {
+			options.isChromeEnabled = false;
+		}
+		else if (argument === "--only" || argument === "--exclude" || argument === "--chrome") {
+			const value = argumentList[argumentIndex + 1] || "";
+			argumentIndex += 1;
+			if (value === "") {
+				return null;
+			}
+			if (argument === "--only") {
+				options.onlyList.push(value);
+			}
+			else if (argument === "--exclude") {
+				options.excludeList.push(value);
+			}
+			else {
+				options.chromePath = value;
+			}
 		}
 		else if (argument === "--date") {
 			options.dateOption = argumentList[argumentIndex + 1] || "";
@@ -2269,7 +3449,8 @@ function readArguments(argumentList) {
 function printCheckResult(checkResult) {
 	const counts = checkResult.counts;
 	console.log("[apidoc] 모듈 " + counts.modules + ", 클래스 " + counts.classes + ", 멤버 " + counts.members + ", 함수와 상수 " + counts.functions + ", 열거 " + counts.enums + " (값 " + counts.enumValues + ")");
-	console.log("[apidoc] 설명 칸 " + counts.texts + ", ko 빈 칸 " + counts.emptyKorean + ", en 빈 칸(ko 는 있음) " + counts.emptyEnglish);
+	console.log("[apidoc] 설명 칸 " + counts.texts + ", ko 빈 칸 " + counts.emptyKorean + ", en 빈 칸(ko 는 있음) " + counts.emptyEnglish + ", 필드 값 칸(꼴만 두고 설명은 멤버 설명에) " + counts.emptyValueSlots);
+	console.log("[apidoc] 예제 " + counts.examples + " (모듈 " + counts.moduleExamples + ", 클래스 " + counts.classExamples + ", 멤버 " + counts.memberExamples + ", 열거 " + counts.enumExamples + "), 예제 없는 클래스 " + counts.classesWithoutExample + ", 제 예제도 클래스 예제도 없는 모듈 " + counts.modulesWithoutExample);
 	console.log("[apidoc] kind: " + Object.keys(checkResult.kindTable).map((kind) => kind + " " + checkResult.kindTable[kind]).join(", "));
 	const sinceList = Object.keys(checkResult.sinceTable).sort(compareVersions);
 	console.log("[apidoc] since: " + sinceList.map((since) => since + " " + checkResult.sinceTable[since]).join(", "));
@@ -2287,14 +3468,27 @@ function printCheckResult(checkResult) {
 //==============================================================================
 // 진입.
 //==============================================================================
-function main() {
+async function main() {
 	const options = readArguments(process.argv.slice(2));
 	if (!options) {
-		console.log("사용: node tools/apidoc.cjs <버전> [--date YYYY-MM-DD] | <버전> --missing | <버전> --check");
+		console.log("사용: node tools/apidoc.cjs <버전> [--date YYYY-MM-DD] | <버전> --missing | <버전> --check | <버전> --gaps [--only <경로 앞>] [--exclude <경로 앞>] | <버전> --check-examples [--only <경로 앞>] [--exclude <경로 앞>] [--no-run] [--no-chrome] [--chrome <크롬 경로>]");
 		process.exitCode = 1;
 		return;
 	}
 	const outputPath = path.join(API_DIRECTORY_PATH, options.version + ".json");
+	if (options.mode === "gaps") {
+		const gapBuildResult = buildApiDocument(options.version, options.dateOption, outputPath, false);
+		printGaps(collectGaps(gapBuildResult.apiDocument, gapBuildResult.statistics, options));
+		return;
+	}
+	if (options.mode === "examples") {
+		const exampleBuildResult = buildApiDocument(options.version, options.dateOption, outputPath, false);
+		const isPassed = await checkExamples(exampleBuildResult.apiDocument, options);
+		if (!isPassed) {
+			process.exitCode = 1;
+		}
+		return;
+	}
 	if (options.mode === "check") {
 		const checkResult = checkApiDocument(JSON.parse(fs.readFileSync(outputPath, "utf8")));
 		printCheckResult(checkResult);
@@ -2303,11 +3497,19 @@ function main() {
 		}
 		return;
 	}
-	const buildResult = buildApiDocument(options.version, options.dateOption, outputPath);
 	if (options.mode === "missing") {
-		process.stdout.write(JSON.stringify(buildResult.missingList, null, "\t") + "\n");
+		const missingBuildResult = buildApiDocument(options.version, options.dateOption, outputPath, false);
+		const selectedDocument = { modules: missingBuildResult.apiDocument.modules.filter((moduleEntry) => isPathSelected("src/" + moduleEntry.name + ".js", options)) };
+		const missingSet = new Set();
+		forEachText(selectedDocument, (textObject) => {
+			if (textObject.ko !== "" && textObject.en === "") {
+				missingSet.add(textObject.ko);
+			}
+		});
+		process.stdout.write(JSON.stringify(Array.from(missingSet), null, "\t") + "\n");
 		return;
 	}
+	const buildResult = buildApiDocument(options.version, options.dateOption, outputPath);
 	fs.mkdirSync(API_DIRECTORY_PATH, { recursive: true });
 	fs.writeFileSync(outputPath, JSON.stringify(buildResult.apiDocument, null, "\t") + "\n");
 	const statistics = buildResult.statistics;
@@ -2326,5 +3528,8 @@ function main() {
 }
 
 if (require.main === module) {
-	main();
+	main().catch((error) => {
+		console.error(error);
+		process.exitCode = 1;
+	});
 }
