@@ -159,7 +159,7 @@ UIScrollView ── Mask 를 require(), 스크롤바는 host 의 sibling 으로 
 
 ### 4-4. 애셋
 
-- **중앙 리소스 매니저는 없다** (`core/resources.js` 는 빈 파일). 애셋은 `new ImageAsset()` → `await load(path)` 하는 인스턴스 단위 소유이며, 보통 씬이 멤버로 든다.
+- **중앙 리소스 매니저는 없다** (`core/resources.js` 는 빈 파일). 애셋은 `new ImageAsset()` → `await load(path)` 하는 인스턴스 단위 소유이며, 보통 씬이 멤버로 든다. 이미 가진 바이트는 `loadFromBytes` 로 읽는다. (글꼴은 `loadFontFromBytes`)
 - 캐시는 GPU 리소스 레벨에만 존재하고 `Graphic` 이 소유한다 (ImageTextureCache / TextStringTextureCache).
 
 ### 4-5. 3D 스택 (experimental/graphics)
@@ -204,10 +204,10 @@ engine.run(scene)  → 기본 폰트 로드 + sceneManager.loadScene(scene) + rA
 3. inputManager.tick()          # 게임패드 폴링 포함
 4. 로드된 씬마다:
    - 미로드 씬 → drawOnLoad() 만 (로딩 화면)
-   - scene.tick(timeDelta)      # root.tick 재귀(컴포넌트 tick) → 터치 디스패치 → 트윈
+   - scene.tick(timeDelta)      # root.tick 재귀(isTickNeeded 가 참인 컴포넌트만 tick) → 터치 디스패치(한 프레임 안의 누름과 뗌은 둘 다) → 트윈
    - scene.preDraw / draw / postDraw   # draw 기본 구현 = graphic.drawNode(root) 재귀
    (씬마다 try/catch — 한 씬의 예외가 루프를 죽이지 않음)
-5. 통계 출력(옵션) → 1회성 입력 플래그 클리어 → 다음 rAF
+5. 통계 출력(옵션) → 1회성 입력 플래그 클리어 → 검증용 화면 저장(requestFrameCapture, ?capture=) → 다음 rAF
 ```
 
 노드 렌더 재귀: `drawNode` = pushTransform(로컬 TRS/pivot 보정) → 컴포넌트 draw → 자식 재귀 → popTransform. `Mask` 컴포넌트는 자식 그리기 전후로 스텐실 클립을 걸고 푼다.

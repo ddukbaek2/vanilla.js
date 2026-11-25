@@ -146,6 +146,32 @@
 - Sprite.setFrame(frame): Frame 의 그림과 영역을 함께 건다. (null 이면 그림을 비운다)
 - tools/atlas.cjs: 여러 장(--max-size 를 넘으면 다음 쪽, 쪽마다 모두 들어가는 가장 작은 2 의 거듭제곱), 가장자리 늘여 붙이기(--extrude), 여백(--padding, 기본 2). 놓기를 선반에서 MaxRects 로 바꿔 같은 그림이라도 자리가 전과 다르다. (JSON 으로 읽으면 같다) JSON 의 images 에 page, meta 에 pages, extrude, padding 을 더했다. 쪽이 한 장이면 파일 이름이 전과 같다
 - 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
+- 코어, 플랫폼, 기반 갈래. 러스트 판(vanilla-engine)에만 있던 범용 기능을 들여와 두 엔진의 공개 API 를 맞춘다.
+- Color.createFromBytes(red, green, blue, alpha) (0 ~ 255), withAlpha(alpha) (알파만 바꾼 새 색), Color.lerp(from, to, time)
+- Math.easeOutQuad(time)
+- Matrix4.writeToArray(array), writeToSlice(array, offset): 열 우선 16 칸을 배열(의 offset 자리)에 적는다
+- Vector2: addScalar, subtractScalar, multiplyScalar, divideScalar, moduloScalar. Vector3: addScalar, subtractScalar, multiplyScalar, divideScalar. (add(number) 와 같다)
+- Rect.intersects(other): 겹치는지. 변이 닿기만 한 것은 겹친 것이 아니다. (overlaps 는 닿기만 해도 겹친 것)
+- Cooldown.activate(): use() 와 같다
+- TransformMatrix.invert(): 역행렬을 새로 돌려준다. (행렬식이 0 이면 null)
+- Platform.applyUserAgent(userAgent): 넘긴 user agent 글로 플랫폼, 브라우저, 모바일 여부를 고른다. (getPlatformInfo 가 브라우저의 글로 부른다)
+- Engine: setTitle(title), writeClipboardText(text), readClipboardText() (Promise, 글이 없거나 막히면 null), isCoarsePointer(), loadScene, unloadScene, unloadAllScenes (SceneManager 와 같다), isExitRequested()
+- Engine 페이지 이벤트: PageEvent(hidden, visible, blurred, focused, pointerDown), addPageEventListener(listener), removePageEventListener(listener), isPageHidden()
+- Engine 검증용 화면 저장: requestFrameCapture(frameNumber) 는 그 프레임을 다 그린 뒤 캔버스를 PNG data URL 로 넘긴다. (Promise, 지난 번호면 이번 프레임) 주소 쿼리 ?capture=120,240 은 그 프레임들을 내려받기로 저장하고, captureName 은 파일 이름("{frame}" 은 번호, 기본 capture_{frame}.png), captureExit=1 은 마지막 저장 뒤 exitApplication 을 부른다
+- InputManager: isTouchDown() (누른 프레임부터 뗄 때까지 참, 누른 채 움직이지 않아도 참), isWheelWithCtrl() (마지막 휠을 Ctrl 과 함께 굴렸는지, 터치패드 오므리기), isTouchInput() (마지막 입력이 손가락인지)
+- Scene.tickTouch: 한 프레임 안에 누르고 뗀 것(빠른 탭, 클릭)의 뗌을 놓치던 것을 고쳤다. 지금은 touchPress 뒤 같은 프레임에 touchRelease 를 넘긴다. 누른 프레임에는 지금처럼 touchMove 를 넘기지 않는다
+- Component.isTickNeeded(): 거짓이면 노드가 그 컴포넌트의 tick 을 부르지 않는다. 기본은 tick 을 다시 정의했는지로 본다. Sprite, Text 는 그리기만 하므로 거짓(하위 클래스가 tick 을 다시 정의하면 참), Paint 처럼 tick 이 없는 컴포넌트도 거짓
+- ImageAsset.loadFromBytes(assetPath, bytes), TextAsset.loadFromBytes, JsonAsset.loadFromBytes, BlobAsset.loadFromBytes (assetPath, bytes), AudioAsset.loadFromBytes(bytes), FontAsset.loadFontFromBytes(family, bytes, descriptors): 이미 가진 바이트로 읽는다. (내장 자료나 직접 받은 것, 넘긴 바이트는 바뀌지 않는다)
+- AssetLoader: load() 를 부른 뒤 받는 동안 더한 것에 일꾼이 늘지 않던 것을 고쳤다. (처음 한 개로 load 하면 그 뒤에 더한 것을 일꾼 하나가 줄지어 받았다) 지금은 동시에 받는 수까지 일꾼을 더 띄운다
+- SpriteAtlas.getPageCount(), SpriteAtlas.findFrameInOrder(atlasList, name), applyFrameInOrder(atlasList, sprite, name): 찾을 아틀라스 목록을 쓰지 않고 넘긴 아틀라스들에서 차례로 찾는다
+- AudioPlayer.setPlaybackRate(playbackRate): 재생 빠르기. (1 이면 그대로, 음 높이도 같이 바뀐다, 다음 play 부터)
+- SoundSystem: addSoundAsset(soundId, audioAsset) (메모리에서 지은 소리를 그 id 의 녹음 무리에 덧붙인다, 크기와 간격은 소리 표의 줄을 따른다), getEffectVoiceCount()
+- Collision2D.findNearestIndexInRadius(targetList, getPositionHandler, center, radius): findNearestInRadius 의 번호판. (없으면 -1)
+- Localization: selectLanguage(candidateList, supported, default) (태그의 뒤 조각부터 떼며 맞추기, detectLanguage 도 이것을 쓴다. "zh-Hant-TW" 가 "zh-hant" 에 맞는다), setLanguageAliases, setRightToLeft, isRightToLeft, mirrorLayoutX, readLayoutTextAlign, isolateText, textNamed(key, values) (LanguagePack.formatText 와 같은 이름 자리 채우기), setTableFromJson(languageCode, tableJson)
+- PersistedStore.unsubscribe(subscription): subscribe 가 돌려준 것을 넘겨 해지한다. (돌려받은 해지 함수를 부르는 것과 같다)
+- SpriteAnimator.getCurrentFrameIndex(), SpriteAnimator.playOnNode(node, clipName, options) (노드의 애니메이터로 play)
+- WebSocketClient: 수신 콜백이 없으면 받은 JSON 을 모아 두고 takeReceivedMessages() 로 꺼낸다. (1024 개까지, 넘치면 오래된 것부터 버린다) 바이너리 메시지도 UTF-8 JSON 이면 받는다. tick() (할 일 없음, 다른 플랫폼과 같은 코드로 쓴다). getReceiveEvent() 가 웹소켓을 돌려주던 것을 고쳐 수신 콜백을 돌려준다
+- 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.

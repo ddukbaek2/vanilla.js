@@ -631,6 +631,51 @@
       return color;
     }
     //==============================================================================
+    // 0 ~ 255 정수 성분으로 생성.
+    //==============================================================================
+    /**
+     * @param { number } red
+     * @param { number } green
+     * @param { number } blue
+     * @param { number } alpha
+     * @returns { Color }
+     */
+    static createFromBytes(red, green, blue, alpha) {
+      const color = new _Color(red / 255, green / 255, blue / 255, alpha / 255);
+      return color;
+    }
+    //==============================================================================
+    // 알파만 바꾼 색. (새 색을 돌려주고 이 색은 그대로 둔다)
+    //==============================================================================
+    /**
+     * @param { number } alpha
+     * @returns { Color }
+     */
+    withAlpha(alpha) {
+      const red = this.red;
+      const green = this.green;
+      const blue = this.blue;
+      const color = new _Color(red, green, blue, alpha);
+      return color;
+    }
+    //==============================================================================
+    // 선형 보간. (정적, 성분마다)
+    //==============================================================================
+    /**
+     * @param { Color } from
+     * @param { Color } to
+     * @param { number } time
+     * @returns { Color }
+     */
+    static lerp(from, to, time) {
+      const red = lerp(from.red, to.red, time);
+      const green = lerp(from.green, to.green, time);
+      const blue = lerp(from.blue, to.blue, time);
+      const alpha = lerp(from.alpha, to.alpha, time);
+      const color = new _Color(red, green, blue, alpha);
+      return color;
+    }
+    //==============================================================================
     // 랜덤 색상 생성. (알파값은 1)
     //==============================================================================
     /**
@@ -932,6 +977,61 @@
         return origin;
       }
       throw new Error('Invalid type: "other" must be a number or an instance of Vector2.');
+    }
+    //==============================================================================
+    // 수 더하기. (모든 성분에 같은 수, add(number) 와 같다)
+    //==============================================================================
+    /**
+     * @param { number } scalar
+     * @returns { Vector2 }
+     */
+    addScalar(scalar) {
+      const result = this.add(scalar);
+      return result;
+    }
+    //==============================================================================
+    // 수 빼기. (모든 성분에 같은 수, subtract(number) 와 같다)
+    //==============================================================================
+    /**
+     * @param { number } scalar
+     * @returns { Vector2 }
+     */
+    subtractScalar(scalar) {
+      const result = this.subtract(scalar);
+      return result;
+    }
+    //==============================================================================
+    // 수 곱하기. (모든 성분에 같은 수, multiply(number) 와 같다)
+    //==============================================================================
+    /**
+     * @param { number } scalar
+     * @returns { Vector2 }
+     */
+    multiplyScalar(scalar) {
+      const result = this.multiply(scalar);
+      return result;
+    }
+    //==============================================================================
+    // 수 나누기. (모든 성분에 같은 수, divide(number) 와 같다)
+    //==============================================================================
+    /**
+     * @param { number } scalar
+     * @returns { Vector2 }
+     */
+    divideScalar(scalar) {
+      const result = this.divide(scalar);
+      return result;
+    }
+    //==============================================================================
+    // 수 나머지. (모든 성분에 같은 수, modulo(number) 와 같다)
+    //==============================================================================
+    /**
+     * @param { number } scalar
+     * @returns { Vector2 }
+     */
+    moduloScalar(scalar) {
+      const result = this.modulo(scalar);
+      return result;
     }
     //==============================================================================
     // 절반.
@@ -1369,6 +1469,50 @@
       throw new Error('Invalid type: "other" must be a number or an instance of Vector3.');
     }
     //==============================================================================
+    // 수 더하기. (모든 성분에 같은 수, add(number) 와 같다)
+    //==============================================================================
+    /**
+     * @param { number } scalar
+     * @returns { Vector3 }
+     */
+    addScalar(scalar) {
+      const result = this.add(scalar);
+      return result;
+    }
+    //==============================================================================
+    // 수 빼기. (모든 성분에 같은 수, subtract(number) 와 같다)
+    //==============================================================================
+    /**
+     * @param { number } scalar
+     * @returns { Vector3 }
+     */
+    subtractScalar(scalar) {
+      const result = this.subtract(scalar);
+      return result;
+    }
+    //==============================================================================
+    // 수 곱하기. (모든 성분에 같은 수, multiply(number) 와 같다)
+    //==============================================================================
+    /**
+     * @param { number } scalar
+     * @returns { Vector3 }
+     */
+    multiplyScalar(scalar) {
+      const result = this.multiply(scalar);
+      return result;
+    }
+    //==============================================================================
+    // 수 나누기. (모든 성분에 같은 수, divide(number) 와 같다)
+    //==============================================================================
+    /**
+     * @param { number } scalar
+     * @returns { Vector3 }
+     */
+    divideScalar(scalar) {
+      const result = this.divide(scalar);
+      return result;
+    }
+    //==============================================================================
     // 내적.
     //==============================================================================
     /**
@@ -1642,6 +1786,28 @@
      */
     getElements() {
       return this.#elements;
+    }
+    //==============================================================================
+    // 셰이더 mat4 (열 우선) 배열로 기록. (16 칸)
+    //==============================================================================
+    /**
+     * @param { Float32Array | number[] } array
+     */
+    writeToArray(array) {
+      this.writeToSlice(array, 0);
+    }
+    //==============================================================================
+    // 큰 배열의 offset 자리부터 16 개를 기록. (관절 행렬 배열처럼 여러 행렬을 이어 담을 때)
+    //==============================================================================
+    /**
+     * @param { Float32Array | number[] } array
+     * @param { number } offset
+     */
+    writeToSlice(array, offset) {
+      const elements = this.getElements();
+      for (let index = 0; index < 16; ++index) {
+        array[offset + index] = elements[index];
+      }
     }
     //==============================================================================
     // 단위 행렬 생성. (정적)
@@ -2148,6 +2314,20 @@
       return Vector2.create(this.position.x + this.size.x, this.position.y + this.size.y);
     }
     //==============================================================================
+    // 다른 사각형과 겹치는지. (변이 닿기만 한 것은 겹친 것이 아니다, overlaps 는 닿기만 해도 겹친 것으로 본다)
+    //==============================================================================
+    /**
+     * @param { Rect } other
+     * @returns { boolean }
+     */
+    intersects(other) {
+      const rightX = this.position.x + this.size.x;
+      const bottomY = this.position.y + this.size.y;
+      const otherRightX = other.position.x + other.size.x;
+      const otherBottomY = other.position.y + other.size.y;
+      return this.position.x < otherRightX && rightX > other.position.x && this.position.y < otherBottomY && bottomY > other.position.y;
+    }
+    //==============================================================================
     // 교집합 (두 사각형이 겹치는 영역 반환).
     //==============================================================================
     /**
@@ -2542,6 +2722,19 @@
     */
     getPlatformInfo() {
       const userAgent = System8.navigator.userAgent;
+      this.applyUserAgent(userAgent);
+      return {
+        platformName: this.platformName,
+        browserName: this.browserName
+      };
+    }
+    //==============================================================================
+    // user agent 글로 플랫폼, 브라우저, 모바일 여부 고르기. (getPlatformInfo 가 브라우저의 글로 부른다)
+    //==============================================================================
+    /**
+     * @param { string } userAgent
+     */
+    applyUserAgent(userAgent) {
       this.isMobile = /Mobi|Android|iPhone|iPad/i.test(userAgent);
       if (/Windows/i.test(userAgent)) this.platformName = PlatformType.windows;
       else if (/Valve Steam GameOverlay/i.test(userAgent)) this.platformName = PlatformType.steamDeck;
@@ -2557,10 +2750,6 @@
       else if (/Firefox/i.test(userAgent)) this.browserName = BrowserType.firefox;
       else if (/MSIE|Trident/i.test(userAgent)) this.browserName = BrowserType.internetExplorer;
       else this.browserName = BrowserType.unknown;
-      return {
-        platformName: this.platformName,
-        browserName: this.browserName
-      };
     }
     //==============================================================================
     // 데스크탑 웹인지 반환. (마우스 휠, 키보드 안내처럼 데스크탑에서만 보일 것을 가릴 때 쓴다)
@@ -3469,7 +3658,7 @@
   };
 
   // src/core/component.js
-  var Component = class extends Object2 {
+  var Component = class _Component extends Object2 {
     static {
       __name(this, "Component");
     }
@@ -3509,6 +3698,18 @@
      * @param { number } timeDelta
      */
     tick(timeDelta) {
+    }
+    //==============================================================================
+    // tick 이 할 일이 있는지. (거짓이면 노드가 이 컴포넌트의 tick 을 부르지 않는다)
+    // - 기본은 tick 을 다시 정의했는지로 본다. 그리기만 하는 컴포넌트는 매 프레임 부르는 비용이 없어진다.
+    // - tick 을 다시 정의했어도 할 일이 없는 때가 있으면 하위 클래스가 다시 정의한다.
+    //==============================================================================
+    /**
+     * @virtual
+     * @returns { boolean }
+     */
+    isTickNeeded() {
+      return this.tick !== _Component.prototype.tick;
     }
     //==============================================================================
     // 출력.
@@ -3696,7 +3897,10 @@
       if (isActive) {
         const components = this.getAllComponents();
         for (const component of components) {
-          component.tick(timeDelta);
+          const isTickNeeded = component.isTickNeeded();
+          if (isTickNeeded) {
+            component.tick(timeDelta);
+          }
         }
         const children = this.getChildren();
         for (const child of children) {
@@ -4490,6 +4694,28 @@
       this.#d = b * other.c + d * other.d;
       this.#e = a * other.e + c * other.f + e;
       this.#f = b * other.e + d * other.f + f;
+    }
+    //==============================================================================
+    // 역행렬. (새 행렬을 돌려주고 이 행렬은 그대로 둔다, 행렬식이 0 이면 null)
+    //==============================================================================
+    /**
+     * @returns { TransformMatrix | null }
+     */
+    invert() {
+      const determinant = this.#a * this.#d - this.#b * this.#c;
+      if (determinant === 0) {
+        return null;
+      }
+      const inverseDeterminant = 1 / determinant;
+      const inverseMatrix = new _TransformMatrix();
+      const a = this.#d * inverseDeterminant;
+      const b = -this.#b * inverseDeterminant;
+      const c = -this.#c * inverseDeterminant;
+      const d = this.#a * inverseDeterminant;
+      const e = (this.#c * this.#f - this.#d * this.#e) * inverseDeterminant;
+      const f = (this.#b * this.#e - this.#a * this.#f) * inverseDeterminant;
+      inverseMatrix.setTransform(a, b, c, d, e, f);
+      return inverseMatrix;
     }
     //==============================================================================
     // 점 변환.
@@ -9562,6 +9788,12 @@ void main() {
     /** @private @type { boolean } */
     #isTouchMoved;
     // 입력시 뗄 때가지 계속 눌림.
+    /** @private @type { boolean } */
+    #isTouchDown;
+    // 터치(손가락이나 터치로 넘기는 마우스 단추)가 눌린 채인지. (뗄 때까지 켜져 있다)
+    /** @private @type { boolean } */
+    #isWheelWithCtrl;
+    // 마지막 휠을 Ctrl 과 함께 굴렸는지.
     /** @private @type { Vector2 } */
     #canvasNativeInputPosition;
     // canvasNativeSize 기반 위치값.
@@ -9626,6 +9858,8 @@ void main() {
       this.#isTouchReleased = false;
       this.#isTouchCancelled = false;
       this.#isTouchMoved = false;
+      this.#isTouchDown = false;
+      this.#isWheelWithCtrl = false;
       this.#canvasNativeInputPosition = Vector2.zero();
       this.#viewInputPosition = Vector2.zero();
       this.#gamepadManager = new GamepadManager(engine);
@@ -9681,6 +9915,7 @@ void main() {
       this.#isTouchReleased = false;
       this.#isTouchCancelled = false;
       this.#isTouchMoved = false;
+      this.#isTouchDown = false;
       this.#wheelDeltaX = 0;
       this.#wheelDeltaY = 0;
       this.#mouseButtonsDown.fill(false);
@@ -9711,6 +9946,24 @@ void main() {
     clearWheelDelta() {
       this.#wheelDeltaX = 0;
       this.#wheelDeltaY = 0;
+    }
+    //==============================================================================
+    // 마지막 휠을 Ctrl 과 함께 굴렸는지 설정. (엔진이 wheel 에서 부른다, 노트북 터치패드의 오므리기도 Ctrl 휠로 온다)
+    //==============================================================================
+    /**
+     * @param { boolean } isWheelWithCtrl
+     */
+    setWheelWithCtrl(isWheelWithCtrl) {
+      this.#isWheelWithCtrl = isWheelWithCtrl;
+    }
+    //==============================================================================
+    // 마지막 휠을 Ctrl 과 함께 굴렸는지 반환.
+    //==============================================================================
+    /**
+     * @returns { boolean }
+     */
+    isWheelWithCtrl() {
+      return this.#isWheelWithCtrl;
     }
     //==============================================================================
     // 키 누름 여부 설정.
@@ -9852,6 +10105,24 @@ void main() {
      */
     isTouchMoved() {
       return this.#isTouchMoved;
+    }
+    //==============================================================================
+    // 터치가 눌린 채인지 설정. (엔진이 누름과 뗌에서 부른다)
+    //==============================================================================
+    /**
+     * @param { boolean } value
+     */
+    setTouchDown(value) {
+      this.#isTouchDown = value;
+    }
+    //==============================================================================
+    // 터치가 눌린 채인지 반환. (누른 프레임부터 뗄 때까지 참, 누른 채 움직이지 않아도 참)
+    //==============================================================================
+    /**
+     * @returns { boolean }
+     */
+    isTouchDown() {
+      return this.#isTouchDown;
     }
     //==============================================================================
     // canvasNativeSize 기반 입력 위치 갱신.
@@ -10128,6 +10399,16 @@ void main() {
      */
     getLastInputDevice() {
       return this.#lastInputDevice;
+    }
+    //==============================================================================
+    // 마지막 입력이 손가락인지. (마우스, 키보드, 게임패드면 거짓)
+    //==============================================================================
+    /**
+     * @returns { boolean }
+     */
+    isTouchInput() {
+      const lastInputDevice = this.getLastInputDevice();
+      return lastInputDevice === InputDevice.touch;
     }
     //==============================================================================
     // 마지막으로 쓴 게임패드의 종류 설정.
@@ -11486,19 +11767,21 @@ void main() {
       const engine = this.getEngine();
       const inputManager = engine.getInputManager();
       const viewInputPosition = inputManager.getViewInputPosition();
-      if (inputManager.isTouchPressed()) {
+      const isTouchPressed = inputManager.isTouchPressed();
+      if (isTouchPressed) {
         try {
           this.touchPress(viewInputPosition);
         } catch (error) {
           console.error(error);
         }
-      } else if (inputManager.isTouchReleased()) {
+      }
+      if (inputManager.isTouchReleased()) {
         try {
           this.touchRelease(viewInputPosition);
         } catch (error) {
           console.error(error);
         }
-      } else if (inputManager.isTouchMoved()) {
+      } else if (inputManager.isTouchMoved() && !isTouchPressed) {
         try {
           this.touchMove(viewInputPosition);
         } catch (error) {
@@ -11886,6 +12169,9 @@ void main() {
     /** @private @type { number } */
     #time;
     // 재생 위치 (초). play() 호출 시 이 위치부터 재생.
+    /** @private @type { number } */
+    #playbackRate;
+    // 재생 빠르기. (1 이면 그대로, 다음 play 부터)
     //==============================================================================
     // 생성.
     //==============================================================================
@@ -11903,6 +12189,7 @@ void main() {
       this.#volume = 1;
       this.#isLoop = false;
       this.#time = 0;
+      this.#playbackRate = 1;
       if (audioContext) {
         this.#gainNode = audioContext.createGain();
         this.#gainNode.connect(audioContext.destination);
@@ -11956,6 +12243,7 @@ void main() {
       this.#audioSource = audioContext.createBufferSource();
       this.#audioSource.buffer = audioBuffer;
       this.#audioSource.loop = loop;
+      this.#audioSource.playbackRate.value = this.#playbackRate;
       this.#audioSource.connect(this.#gainNode);
       this.#audioSource.onended = () => {
         this.#isPlaying = false;
@@ -11963,6 +12251,16 @@ void main() {
       };
       this.#audioSource.start(0, this.#time);
       this.#isPlaying = true;
+    }
+    //==============================================================================
+    // 재생 빠르기 설정. (1 이면 그대로, 음 높이도 같이 바뀐다, 다음 play 부터, 0 이하이거나 숫자가 아니면 1)
+    //==============================================================================
+    /**
+     * @param { number } playbackRate
+     */
+    setPlaybackRate(playbackRate) {
+      const isValid = typeof playbackRate === "number" && System20.Number.isFinite(playbackRate) && playbackRate > 0;
+      this.#playbackRate = isValid ? playbackRate : 1;
     }
     //==============================================================================
     // 정지.
@@ -12322,6 +12620,26 @@ void main() {
       this.setLoaded(true);
     }
     //==============================================================================
+    // 이미 가진 글꼴 바이트로 읽기. (ttf, otf, woff, woff2, 다 읽히면 document.fonts 에 family 이름으로 오른다)
+    //==============================================================================
+    /**
+     * @param { string } family
+     * @param { ArrayBuffer | ArrayBufferView } bytes 글꼴 파일의 바이트. (넘긴 것은 바뀌지 않는다)
+     * @param { object } descriptors FontFace 서술자. (weight, style 등, 없으면 생략)
+     */
+    async loadFontFromBytes(family, bytes, descriptors) {
+      if (this.fontFace) {
+        return;
+      }
+      this.family = family;
+      const fontFaceDescriptors = descriptors === void 0 || descriptors === null ? {} : descriptors;
+      const arrayBuffer = copyToArrayBuffer(bytes);
+      this.fontFace = new FontFace(this.family, arrayBuffer, fontFaceDescriptors);
+      await this.fontFace.load();
+      document.fonts.add(this.fontFace);
+      this.setLoaded(true);
+    }
+    //==============================================================================
     // 애셋 언로드.
     //==============================================================================
     /**
@@ -12337,6 +12655,15 @@ void main() {
       this.setLoaded(false);
     }
   };
+  function copyToArrayBuffer(bytes) {
+    if (bytes instanceof ArrayBuffer) {
+      return bytes.slice(0);
+    }
+    const byteOffset = bytes.byteOffset;
+    const byteLength = bytes.byteLength;
+    return bytes.buffer.slice(byteOffset, byteOffset + byteLength);
+  }
+  __name(copyToArrayBuffer, "copyToArrayBuffer");
 
   // src/core/pointercursor.js
   var System22 = globalThis;
@@ -12572,6 +12899,19 @@ void main() {
   var FRAME_LIMIT_RESYNC_MILLISECONDS = 1;
   var COMPATIBILITY_MOUSE_MILLISECONDS = 800;
   var MOUSE_DEVICE_MOVE_THRESHOLD = 6;
+  var DEFAULT_CAPTURE_FILE_NAME = "capture_{frame}.png";
+  var PageEvent = System23.Object.freeze({
+    hidden: "hidden",
+    // 페이지가 가려짐. (다른 탭, 앱 전환)
+    visible: "visible",
+    // 페이지가 다시 보임.
+    blurred: "blurred",
+    // 창이 포커스를 잃음. (blur)
+    focused: "focused",
+    // 창이 포커스를 얻음. (focus)
+    pointerDown: "pointerDown"
+    // 창을 누름. (pointerdown, 포커스를 알리지 않아도 누르면 창은 포커스를 가진 것이다)
+  });
   var EngineConfiguration = class extends Object2 {
     static {
       __name(this, "EngineConfiguration");
@@ -12698,6 +13038,18 @@ void main() {
     #statisticsTextRect;
     /** @private @type { Version } */
     #version;
+    /** @private @type { Map<number, Array<Function>> } */
+    #frameCaptureRequests;
+    // 프레임 번호 → 화면을 받을 함수 목록. (검증용 화면 저장)
+    /** @private @type { boolean } */
+    #isExitRequested;
+    // 종료를 요청했는지.
+    /** @private @type { boolean } */
+    #isPageHidden;
+    // 페이지가 가려져 있는지.
+    /** @private @type { Array<Function> } */
+    #pageEventListeners;
+    // 페이지 이벤트 리스너. ((pageEvent) => void)
     //==============================================================================
     // 생성.
     //==============================================================================
@@ -12734,9 +13086,14 @@ void main() {
       this.#frameLimitFramePerSecond = 0;
       this.#statisticsTextRect = Rect.zero();
       this.#version = Version.create(0, 3, 2);
+      this.#frameCaptureRequests = new System23.Map();
+      this.#isExitRequested = false;
+      this.#isPageHidden = System23.document.visibilityState === "hidden";
+      this.#pageEventListeners = [];
       System23.vanillaEngine = this;
       this.setupAllDocumentEvents();
       this.resize();
+      this.requestFrameCapturesFromUrl();
     }
     //==============================================================================
     // 시작.
@@ -12959,6 +13316,7 @@ void main() {
         if (isTouchButton) {
           inputManager2.setTouchPressed(true);
           inputManager2.setTouchMoved(true);
+          inputManager2.setTouchDown(true);
         }
         this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
       });
@@ -12975,6 +13333,7 @@ void main() {
         const isTouchButton = !inputManager2.isTouchFromLeftButtonOnly() || touchEvent.button === MouseButton.left;
         if (isTouchButton) {
           inputManager2.setTouchMoved(false);
+          inputManager2.setTouchDown(false);
           inputManager2.setTouchReleased(true);
         }
         this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
@@ -12982,6 +13341,7 @@ void main() {
       canvas.addEventListener("wheel", (wheelEvent) => {
         const inputManager2 = this.getInputManager();
         inputManager2.addWheelDelta(wheelEvent.deltaX, wheelEvent.deltaY);
+        inputManager2.setWheelWithCtrl(wheelEvent.ctrlKey);
         noteMouseDevice();
         this.updateCanvasNativeInputPosition(wheelEvent.clientX, wheelEvent.clientY);
         wheelEvent.preventDefault();
@@ -12997,6 +13357,7 @@ void main() {
           return;
         }
         inputManager2.setTouchMoved(false);
+        inputManager2.setTouchDown(false);
         inputManager2.setTouchReleased(true);
         this.updateCanvasNativeInputPosition(touchEvent.clientX, touchEvent.clientY);
       });
@@ -13009,6 +13370,7 @@ void main() {
         }
         const inputManager2 = this.getInputManager();
         inputManager2.setTouchMoved(true);
+        inputManager2.setTouchDown(true);
         inputManager2.setTouchPressed(true);
         this.updateCanvasNativeInputPosition(touch.clientX, touch.clientY);
         touchEvent.preventDefault();
@@ -13032,6 +13394,7 @@ void main() {
         }
         const inputManager2 = this.getInputManager();
         inputManager2.setTouchMoved(false);
+        inputManager2.setTouchDown(false);
         inputManager2.setTouchReleased(true);
         touchEvent.preventDefault();
       }, { passive: false });
@@ -13044,6 +13407,7 @@ void main() {
         const y = touch.clientY;
         if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) {
           inputManager.setTouchMoved(false);
+          inputManager.setTouchDown(false);
           inputManager.setTouchReleased(true);
         }
       });
@@ -13056,11 +13420,13 @@ void main() {
         }
         const inputManager2 = this.getInputManager();
         inputManager2.setTouchMoved(false);
+        inputManager2.setTouchDown(false);
         inputManager2.setTouchCancelled(true);
       });
       System23.window.addEventListener("blur", (focusEvent) => {
         const inputManager2 = this.getInputManager();
         inputManager2.setTouchMoved(false);
+        inputManager2.setTouchDown(false);
         inputManager2.setTouchReleased(true);
         inputManager2.setMouseButtonDown(MouseButton.left, false);
         inputManager2.setMouseButtonDown(MouseButton.middle, false);
@@ -13085,6 +13451,20 @@ void main() {
         if (document.pointerLockElement === canvas) {
         } else {
         }
+      });
+      System23.document.addEventListener("visibilitychange", () => {
+        const isHidden = System23.document.visibilityState === "hidden";
+        const pageEvent = isHidden ? PageEvent.hidden : PageEvent.visible;
+        this.dispatchPageEvent(pageEvent);
+      });
+      System23.window.addEventListener("blur", () => {
+        this.dispatchPageEvent(PageEvent.blurred);
+      });
+      System23.window.addEventListener("focus", () => {
+        this.dispatchPageEvent(PageEvent.focused);
+      });
+      System23.window.addEventListener("pointerdown", () => {
+        this.dispatchPageEvent(PageEvent.pointerDown);
       });
       System23.window.addEventListener("gamepadconnected", (gamepadEvent) => {
         const gamepad = gamepadEvent.gamepad;
@@ -13314,6 +13694,7 @@ void main() {
       inputManager.setTouchCancelled(false);
       inputManager.clearWheelDelta();
       inputManager.updateFrameSnapshot();
+      this.captureFrameIfRequested();
       ++this.#frameNumber;
       System23.window.requestAnimationFrame(this.#updateEngineCallback);
     }
@@ -13459,6 +13840,7 @@ void main() {
     //   (둘 다 환경에 따라 거부될 수 있으며 실패해도 예외를 내지 않는다)
     //==============================================================================
     exitApplication() {
+      this.#isExitRequested = true;
       try {
         const capacitor = System23.Capacitor;
         if (capacitor && capacitor.Plugins && capacitor.Plugins.App && typeof capacitor.Plugins.App.exitApp === "function") {
@@ -13474,6 +13856,243 @@ void main() {
     }
     getFrameNumber() {
       return this.#frameNumber;
+    }
+    //==============================================================================
+    // 종료를 요청했는지. (exitApplication 을 불렀으면 참, 브라우저가 창 닫기를 거부해도 참)
+    //==============================================================================
+    /**
+     * @returns { boolean }
+     */
+    isExitRequested() {
+      return this.#isExitRequested;
+    }
+    //==============================================================================
+    // 창 제목 설정. (탭 제목, document.title)
+    //==============================================================================
+    /**
+     * @param { string } title
+     */
+    setTitle(title) {
+      System23.document.title = title;
+    }
+    //==============================================================================
+    // 시스템 클립보드에 글 쓰기. (navigator.clipboard.writeText, 기다리지 않는다. 막히거나 없으면 아무것도 하지 않는다)
+    //==============================================================================
+    /**
+     * @param { string } text
+     */
+    writeClipboardText(text) {
+      const clipboard = System23.navigator ? System23.navigator.clipboard : void 0;
+      if (!clipboard || typeof clipboard.writeText !== "function") {
+        return;
+      }
+      clipboard.writeText(text).catch((error) => {
+        console.warn(`[Engine] \uD074\uB9BD\uBCF4\uB4DC \uC4F0\uAE30 \uC2E4\uD328`, error);
+      });
+    }
+    //==============================================================================
+    // 시스템 클립보드 글 읽기. (navigator.clipboard.readText, 브라우저는 비동기라 Promise. 글이 없거나 막히면 null)
+    // - 브라우저가 권한을 묻거나 사용자 입력 안에서만 허락할 수 있다.
+    //==============================================================================
+    /**
+     * @returns { Promise<string | null> }
+     */
+    async readClipboardText() {
+      const clipboard = System23.navigator ? System23.navigator.clipboard : void 0;
+      if (!clipboard || typeof clipboard.readText !== "function") {
+        return null;
+      }
+      try {
+        const text = await clipboard.readText();
+        return text;
+      } catch (error) {
+        console.warn(`[Engine] \uD074\uB9BD\uBCF4\uB4DC \uC77D\uAE30 \uC2E4\uD328`, error);
+        return null;
+      }
+    }
+    //==============================================================================
+    // 주된 손이 손가락인지. (CSS 의 pointer: coarse)
+    //==============================================================================
+    /**
+     * @returns { boolean }
+     */
+    isCoarsePointer() {
+      const platform = this.getPlatform();
+      return platform.isCoarsePointer();
+    }
+    //==============================================================================
+    // 씬 불러오기. (SceneManager.loadScene 과 같다)
+    //==============================================================================
+    /**
+     * @param { Scene } scene
+     * @returns { Promise<void> }
+     */
+    loadScene(scene) {
+      const sceneManager = this.getSceneManager();
+      return sceneManager.loadScene(scene);
+    }
+    //==============================================================================
+    // 씬 하나 내리기. (SceneManager.unloadScene 과 같다)
+    //==============================================================================
+    /**
+     * @param { Scene } scene
+     * @returns { Promise<void> }
+     */
+    unloadScene(scene) {
+      const sceneManager = this.getSceneManager();
+      return sceneManager.unloadScene(scene);
+    }
+    //==============================================================================
+    // 모든 씬 내리기. (SceneManager.unloadAllScenes 와 같다)
+    //==============================================================================
+    /**
+     * @returns { Promise<void> }
+     */
+    unloadAllScenes() {
+      const sceneManager = this.getSceneManager();
+      return sceneManager.unloadAllScenes();
+    }
+    //==============================================================================
+    // 페이지가 가려져 있는지. (다른 탭, 앱 전환)
+    //==============================================================================
+    /**
+     * @returns { boolean }
+     */
+    isPageHidden() {
+      return this.#isPageHidden;
+    }
+    //==============================================================================
+    // 페이지 이벤트 리스너 더하기. ((pageEvent) => void, PageEvent 의 값을 받는다)
+    //==============================================================================
+    /**
+     * @param { Function } pageEventListener
+     */
+    addPageEventListener(pageEventListener) {
+      if (this.#pageEventListeners.includes(pageEventListener)) {
+        return;
+      }
+      this.#pageEventListeners.push(pageEventListener);
+    }
+    //==============================================================================
+    // 페이지 이벤트 리스너 빼기.
+    //==============================================================================
+    /**
+     * @param { Function } pageEventListener
+     */
+    removePageEventListener(pageEventListener) {
+      const listenerIndex = this.#pageEventListeners.indexOf(pageEventListener);
+      if (listenerIndex < 0) {
+        return;
+      }
+      this.#pageEventListeners.splice(listenerIndex, 1);
+    }
+    //==============================================================================
+    // 페이지 이벤트 알리기. (가려짐을 적고 리스너에 그 자리에서 넘긴다, 리스너의 예외는 알리고 다음으로 간다)
+    //==============================================================================
+    /**
+     * @param { string } pageEvent PageEvent 의 값.
+     */
+    dispatchPageEvent(pageEvent) {
+      if (pageEvent === PageEvent.hidden) {
+        this.#isPageHidden = true;
+      } else if (pageEvent === PageEvent.visible) {
+        this.#isPageHidden = false;
+      }
+      const pageEventListeners = this.#pageEventListeners.slice();
+      for (const pageEventListener of pageEventListeners) {
+        try {
+          pageEventListener(pageEvent);
+        } catch (error) {
+          console.error(error);
+        }
+      }
+    }
+    //==============================================================================
+    // 검증용 화면 저장 요청. (그 프레임을 다 그린 뒤 캔버스를 PNG data URL 로 넘긴다)
+    // - 이미 지난 번호면 이번(프레임 사이에 부르면 다음) 프레임을 저장한다.
+    // - 주소 쿼리로도 건다. (?capture=120,240 은 그 프레임들을 내려받기로 저장, captureName 은 파일 이름("{frame}" 은 번호), captureExit=1 은 마지막 저장 뒤 exitApplication)
+    //==============================================================================
+    /**
+     * @param { number } frameNumber
+     * @returns { Promise<string> } PNG data URL.
+     */
+    requestFrameCapture(frameNumber) {
+      const currentFrameNumber = this.getFrameNumber();
+      const targetFrameNumber = System23.Math.max(System23.Math.floor(frameNumber), currentFrameNumber);
+      const promise = new System23.Promise((resolve) => {
+        let captureHandlers = this.#frameCaptureRequests.get(targetFrameNumber);
+        if (captureHandlers === void 0) {
+          captureHandlers = [];
+          this.#frameCaptureRequests.set(targetFrameNumber, captureHandlers);
+        }
+        captureHandlers.push(resolve);
+      });
+      return promise;
+    }
+    //==============================================================================
+    // 요청된 프레임이면 캔버스를 PNG 로 넘기기. (프레임 끝, 그린 것이 캔버스에 남아 있을 때 부른다)
+    //==============================================================================
+    captureFrameIfRequested() {
+      const frameNumber = this.getFrameNumber();
+      const captureHandlers = this.#frameCaptureRequests.get(frameNumber);
+      if (captureHandlers === void 0) {
+        return;
+      }
+      this.#frameCaptureRequests.delete(frameNumber);
+      const canvas = this.getCanvas();
+      const dataUrl = canvas.toDataURL("image/png");
+      for (const captureHandler of captureHandlers) {
+        try {
+          captureHandler(dataUrl);
+        } catch (error) {
+          console.error(error);
+        }
+      }
+    }
+    //==============================================================================
+    // 주소 쿼리의 화면 저장 요청 걸기. (capture, captureName, captureExit)
+    //==============================================================================
+    requestFrameCapturesFromUrl() {
+      if (!System23.location || typeof System23.URLSearchParams !== "function") {
+        return;
+      }
+      const searchParameters = new System23.URLSearchParams(System23.location.search);
+      const captureText = searchParameters.get("capture");
+      if (captureText === null) {
+        return;
+      }
+      const frameNumbers = [];
+      for (const frameText of captureText.split(",")) {
+        const frameNumber = System23.Number.parseInt(frameText.trim(), 10);
+        if (System23.Number.isFinite(frameNumber) && !frameNumbers.includes(frameNumber)) {
+          frameNumbers.push(frameNumber);
+        }
+      }
+      if (frameNumbers.length === 0) {
+        frameNumbers.push(120);
+      }
+      const captureNameText = searchParameters.get("captureName");
+      const captureFileName = captureNameText !== null && captureNameText !== "" ? captureNameText : DEFAULT_CAPTURE_FILE_NAME;
+      const isExitAfterLastCapture = searchParameters.get("captureExit") === "1";
+      let remainingCount = frameNumbers.length;
+      for (const frameNumber of frameNumbers) {
+        const capturePromise = this.requestFrameCapture(frameNumber);
+        capturePromise.then((dataUrl) => {
+          const fileName = captureFileName.split("{frame}").join(System23.String(frameNumber));
+          const anchorElement = System23.document.createElement("a");
+          anchorElement.href = dataUrl;
+          anchorElement.download = fileName;
+          System23.document.body.appendChild(anchorElement);
+          anchorElement.click();
+          anchorElement.remove();
+          const canvas = this.getCanvas();
+          console.log(`[Engine] \uD654\uBA74 \uC800\uC7A5 ${fileName} (${canvas.width}x${canvas.height})`);
+          remainingCount -= 1;
+          if (remainingCount === 0 && isExitAfterLastCapture) {
+            this.exitApplication();
+          }
+        });
+      }
     }
     //==============================================================================
     // 전역 인스턴스 반환.
@@ -16532,7 +17151,7 @@ void main() {
     return document2.fonts.size;
   }
   __name(readFontFaceCount, "readFontFaceCount");
-  var Text = class extends Component {
+  var Text = class _Text extends Component {
     static {
       __name(this, "Text");
     }
@@ -16653,6 +17272,16 @@ void main() {
      */
     tick(timeDelta) {
       super.tick(timeDelta);
+    }
+    //==============================================================================
+    // tick 이 할 일이 있는지. (그리기만 하므로 거짓, 하위 클래스가 tick 을 다시 정의하면 참)
+    //==============================================================================
+    /**
+     * @override
+     * @returns { boolean }
+     */
+    isTickNeeded() {
+      return this.tick !== _Text.prototype.tick;
     }
     //==============================================================================
     // 출력. (비활성화면 건너뜀)
@@ -18024,6 +18653,36 @@ void main() {
       });
     }
     //==============================================================================
+    // 이미 가진 바이트로 읽기. (png, jpeg, webp 처럼 브라우저가 푸는 그림, 이미 읽혔어도 새 바이트로 바꾼다)
+    // - 풀지 못하면 예외를 낸다. (load 와 같다)
+    //==============================================================================
+    /**
+     * @param { string } assetPath 실패 알림과 getAssetPath 에 쓸 이름.
+     * @param { ArrayBuffer | ArrayBufferView | Blob } bytes
+     */
+    async loadFromBytes(assetPath, bytes) {
+      this.setLoaded(false);
+      this.setAssetPath(assetPath);
+      const blob = bytes instanceof System35.Blob ? bytes : new System35.Blob([bytes]);
+      const objectUrl = System35.URL.createObjectURL(blob);
+      const image = new System35.window.Image();
+      this.image = image;
+      try {
+        await new Promise((resolve, reject) => {
+          image.onload = () => {
+            resolve();
+          };
+          image.onerror = () => {
+            reject(new Error(`Load fail: ${assetPath}`));
+          };
+          image.src = objectUrl;
+        });
+        this.setLoaded(true);
+      } finally {
+        System35.URL.revokeObjectURL(objectUrl);
+      }
+    }
+    //==============================================================================
     // 이미지 반환.
     //==============================================================================
     /**
@@ -18153,6 +18812,16 @@ void main() {
      */
     tick(timeDelta) {
       super.tick(timeDelta);
+    }
+    //==============================================================================
+    // tick 이 할 일이 있는지. (그리기만 하므로 거짓, 하위 클래스가 tick 을 다시 정의하면 참)
+    //==============================================================================
+    /**
+     * @override
+     * @returns { boolean }
+     */
+    isTickNeeded() {
+      return this.tick !== _Sprite.prototype.tick;
     }
     //==============================================================================
     // 출력.
@@ -25631,6 +26300,11 @@ void main() {
 
   // src/misc/localization.js
   var System46 = globalThis;
+  var DEFAULT_RIGHT_TO_LEFT_LANGUAGES = ["ar", "fa", "he", "ur", "ps", "yi", "dv"];
+  var FIRST_STRONG_ISOLATE = "\u2068";
+  var POP_DIRECTIONAL_ISOLATE = "\u2069";
+  var PLACEHOLDER_PATTERN = /\{([a-zA-Z0-9]+)\}/g;
+  var JOINED_PLACEHOLDER_PATTERN = /\{[a-zA-Z0-9]+\}(?:\s*\/\s*\{[a-zA-Z0-9]+\})*/g;
   var Localization = class _Localization extends Object2 {
     static {
       __name(this, "Localization");
@@ -25641,9 +26315,15 @@ void main() {
     static #languageCode = "ko";
     /** @private @type { string } */
     static #fallbackLanguageCode = "ko";
+    /** @private @type { Map<string, string> } */
+    static #aliasToLanguage = new System46.Map();
+    // 별칭 → 언어 코드.
+    /** @private @type { Set<string> } */
+    static #rightToLeftLanguages = new System46.Set(DEFAULT_RIGHT_TO_LEFT_LANGUAGES);
+    // 오른쪽에서 왼쪽으로 쓰는 언어의 첫 조각.
     //==============================================================================
     // 브라우저 언어 감지. (정적)
-    // - navigator.languages 우선순위를 훑어 지원 목록에 있는 첫 언어를 고른다.
+    // - navigator.languages 우선순위를 훑어 지원 목록에 있는 첫 언어를 고른다. (selectLanguage)
     //   "zh-TW" 같은 지역 표기는 "zh-tw" → "zh" 순으로 대조한다.
     //==============================================================================
     /**
@@ -25663,18 +26343,154 @@ void main() {
           candidateList.push(navigatorObject.language);
         }
       }
+      const languageCode = _Localization.selectLanguage(candidateList, supportedLanguageCodes, defaultLanguageCode);
+      return languageCode;
+    }
+    //==============================================================================
+    // 선호 언어 목록에서 지원하는 첫 언어 고르기. (정적, detectLanguage 의 대조 부분)
+    // - 태그의 뒤 조각부터 하나씩 떼며 지원 목록의 코드와 별칭을 본다. ("zh-Hant-TW" → "zh-hant-tw", "zh-hant", "zh", 밑줄은 하이픈으로)
+    //==============================================================================
+    /**
+     * @param { string[] } candidateList
+     * @param { string[] } supportedLanguageCodes
+     * @param { string } defaultLanguageCode
+     * @returns { string }
+     */
+    static selectLanguage(candidateList, supportedLanguageCodes, defaultLanguageCode = "ko") {
       const supportedSet = new System46.Set(supportedLanguageCodes.map((code) => code.toLowerCase()));
+      const aliasToLanguage = _Localization.#aliasToLanguage;
       for (const languageTag of candidateList) {
-        const loweredTag = languageTag.toLowerCase();
-        if (supportedSet.has(loweredTag)) {
-          return loweredTag;
-        }
-        const primaryCode = loweredTag.split("-")[0];
-        if (supportedSet.has(primaryCode)) {
-          return primaryCode;
+        const loweredTag = languageTag.toLowerCase().split("_").join("-");
+        const subtagList = loweredTag.split("-");
+        for (let subtagCount = subtagList.length; subtagCount >= 1; --subtagCount) {
+          const candidateTag = subtagList.slice(0, subtagCount).join("-");
+          if (supportedSet.has(candidateTag)) {
+            return candidateTag;
+          }
+          const aliasLanguage = aliasToLanguage.get(candidateTag);
+          if (aliasLanguage !== void 0 && supportedSet.has(aliasLanguage)) {
+            return aliasLanguage;
+          }
         }
       }
       return defaultLanguageCode;
+    }
+    //==============================================================================
+    // 언어의 별칭 설정. (정적, 예: "zh-hant" 에 "zh-tw", "zh-hk", 태그를 맞출 때 별칭도 그 언어로 본다)
+    //==============================================================================
+    /**
+     * @param { string } languageCode
+     * @param { string[] } aliasList
+     */
+    static setLanguageAliases(languageCode, aliasList) {
+      const loweredLanguageCode = languageCode.toLowerCase();
+      for (const alias of aliasList) {
+        const loweredAlias = alias.toLowerCase().split("_").join("-");
+        _Localization.#aliasToLanguage.set(loweredAlias, loweredLanguageCode);
+      }
+    }
+    //==============================================================================
+    // 오른쪽에서 왼쪽으로 쓰는 언어로 정하거나 풀기. (정적, 처음은 ar, fa, he, ur, ps, yi, dv)
+    //==============================================================================
+    /**
+     * @param { string } languageCode
+     * @param { boolean } isRightToLeft
+     */
+    static setRightToLeft(languageCode, isRightToLeft) {
+      const primaryCode = languageCode.toLowerCase().split("_").join("-").split("-")[0];
+      if (isRightToLeft) {
+        _Localization.#rightToLeftLanguages.add(primaryCode);
+      } else {
+        _Localization.#rightToLeftLanguages.delete(primaryCode);
+      }
+    }
+    //==============================================================================
+    // 지금 언어가 오른쪽에서 왼쪽으로 쓰는 언어인지. (정적, 글자를 그 방향으로 굽고 배치를 좌우로 뒤집을 때)
+    //==============================================================================
+    /**
+     * @returns { boolean }
+     */
+    static isRightToLeft() {
+      const languageCode = _Localization.getLanguage();
+      const primaryCode = languageCode.split("-")[0];
+      return _Localization.#rightToLeftLanguages.has(primaryCode);
+    }
+    //==============================================================================
+    // 배치의 가로 자리. (정적, 오른쪽에서 왼쪽 언어면 부모 너비 안에서 좌우를 뒤집은 왼쪽, 아니면 그대로)
+    // - 창과 표의 왼쪽, 오른쪽 배치를 언어 방향에 맞춰 뒤집을 때 쓴다. 화면 구석의 자리나 슬라이더의 방향처럼 뒤집지 않을 것은 부르지 않는다.
+    //==============================================================================
+    /**
+     * @param { number } x 왼쪽에서 오른쪽 언어일 때의 왼쪽.
+     * @param { number } width 놓을 것의 너비.
+     * @param { number } parentWidth 부모의 너비.
+     * @returns { number }
+     */
+    static mirrorLayoutX(x, width, parentWidth) {
+      if (!_Localization.isRightToLeft()) {
+        return x;
+      }
+      return parentWidth - x - width;
+    }
+    //==============================================================================
+    // 배치의 글자 정렬. (정적, 오른쪽에서 왼쪽 언어면 "left" 와 "right" 를 바꾸고, 나머지는 그대로)
+    //==============================================================================
+    /**
+     * @param { string } textAlign TextAlign 의 값.
+     * @returns { string }
+     */
+    static readLayoutTextAlign(textAlign) {
+      if (!_Localization.isRightToLeft()) {
+        return textAlign;
+      }
+      if (textAlign === "left") {
+        return "right";
+      }
+      if (textAlign === "right") {
+        return "left";
+      }
+      return textAlign;
+    }
+    //==============================================================================
+    // 글 사이에 끼우는 값 묶기. (정적, 오른쪽에서 왼쪽 언어면 방향 격리 문자로 묶고, 아니면 그대로)
+    // - 숫자와 단위(123°/s, +60%)나 사람 이름이 앞뒤 글과 섞여 흩어지지 않고 제 방향으로 한 덩어리로 놓이게 한다.
+    //==============================================================================
+    /**
+     * @param { string } text
+     * @returns { string }
+     */
+    static isolateText(text) {
+      if (text === "" || !_Localization.isRightToLeft()) {
+        return text;
+      }
+      return FIRST_STRONG_ISOLATE + text + POP_DIRECTIONAL_ISOLATE;
+    }
+    //==============================================================================
+    // 이름 자리 채우기. (정적, "Restart {seconds}" + { seconds: 3 } → "Restart 3")
+    // - 번역문을 찾은 뒤(text) 채운다. 오른쪽에서 왼쪽 언어면 넣은 값을 방향 격리 문자로 묶는다.
+    // - 빗금으로만 이은 값들("{count}/{limit}")은 값마다가 아니라 통째로 한 번 묶는다. (값마다 묶으면 1/40 이 40/1 로 보인다)
+    // - 이름이 없는 자리는 그대로 둔다.
+    //==============================================================================
+    /**
+     * @param { string } key
+     * @param { object } values 자리 이름 → 값.
+     * @returns { string }
+     */
+    static textNamed(key, values) {
+      const text = _Localization.text(key);
+      return text.replace(JOINED_PLACEHOLDER_PATTERN, (joinedText) => {
+        let isFilled = false;
+        const valueText = joinedText.replace(PLACEHOLDER_PATTERN, (matched, name) => {
+          if (!System46.Object.prototype.hasOwnProperty.call(values, name)) {
+            return matched;
+          }
+          isFilled = true;
+          return System46.String(values[name]);
+        });
+        if (!isFilled) {
+          return joinedText;
+        }
+        return _Localization.isolateText(valueText);
+      });
     }
     //==============================================================================
     // 번역 테이블 설정. (정적)
@@ -25685,6 +26501,27 @@ void main() {
      */
     static setTable(languageCode, table) {
       _Localization.#tableByLanguage.set(languageCode.toLowerCase(), table);
+    }
+    //==============================================================================
+    // JSON 객체로 번역 표 설정. (정적, JsonAsset 으로 읽은 data 같은 것, 값이 글이면 글, 글 배열이면 글만 모은 목록, 그 밖의 값은 건너뛴다)
+    //==============================================================================
+    /**
+     * @param { string } languageCode
+     * @param { object } tableJson
+     */
+    static setTableFromJson(languageCode, tableJson) {
+      const table = {};
+      if (tableJson !== null && typeof tableJson === "object" && !System46.Array.isArray(tableJson)) {
+        for (const key of System46.Object.keys(tableJson)) {
+          const value = tableJson[key];
+          if (typeof value === "string") {
+            table[key] = value;
+          } else if (System46.Array.isArray(value)) {
+            table[key] = value.filter((item) => typeof item === "string");
+          }
+        }
+      }
+      _Localization.setTable(languageCode, table);
     }
     //==============================================================================
     // 현재 언어 설정. (정적)
