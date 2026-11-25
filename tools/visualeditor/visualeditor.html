@@ -5334,6 +5334,23 @@ void main() {
   var DEFAULT_TEXT_BAKE_SCALE_STEP = 0.25;
   var RIGHT_TO_LEFT_CHARACTER_PATTERN = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u;
   var STRONG_DIRECTION_CHARACTER_PATTERN = /[\p{L}\u200E\u200F\u061C]/u;
+  function detectTextDirection(text) {
+    if (!text) {
+      return "ltr";
+    }
+    for (const character of text) {
+      if (!STRONG_DIRECTION_CHARACTER_PATTERN.test(character)) {
+        continue;
+      }
+      if (character === "\u200E") {
+        return "ltr";
+      }
+      const isRightToLeft = RIGHT_TO_LEFT_CHARACTER_PATTERN.test(character) || character === "\u200F" || character === "\u061C";
+      return isRightToLeft ? "rtl" : "ltr";
+    }
+    return "ltr";
+  }
+  __name(detectTextDirection, "detectTextDirection");
   function parseColorValue(colorValue) {
     if (colorValue instanceof Color) {
       return colorValue.clone();
@@ -7336,20 +7353,10 @@ void main() {
       if (textDirection === "rtl") {
         return "rtl";
       }
-      if (textDirection !== "auto" || !text) {
+      if (textDirection !== "auto") {
         return "ltr";
       }
-      for (const character of text) {
-        if (!STRONG_DIRECTION_CHARACTER_PATTERN.test(character)) {
-          continue;
-        }
-        if (character === "\u200E") {
-          return "ltr";
-        }
-        const isRightToLeft = RIGHT_TO_LEFT_CHARACTER_PATTERN.test(character) || character === "\u200F" || character === "\u061C";
-        return isRightToLeft ? "rtl" : "ltr";
-      }
-      return "ltr";
+      return detectTextDirection(text);
     }
     //==============================================================================
     // 실제 가로 정렬 계산. ("start" / "end" 를 방향에 따라 "left" / "right" 로)
@@ -16503,6 +16510,18 @@ void main() {
     return pieces;
   }
   __name(splitWords, "splitWords");
+  function countGraphemes(text) {
+    return splitGraphemes(text).length;
+  }
+  __name(countGraphemes, "countGraphemes");
+  function sliceGraphemes(text, count) {
+    const graphemes = splitGraphemes(text);
+    if (graphemes.length <= count) {
+      return text;
+    }
+    return graphemes.slice(0, count).join("");
+  }
+  __name(sliceGraphemes, "sliceGraphemes");
   function buildFontString(fontFace, fontSize, bold, italic) {
     const fontFamily = fontFace ? fontFace.family : SYSTEM_FONT_STRING;
     const styleParts = [];
@@ -16577,7 +16596,7 @@ void main() {
     // 줄 간격 배율.
     /** @private @type { number } */
     #visibleCharacterCount;
-    // 표시 글자 수. -1 이면 전체.
+    // 표시 글자 수. (글자 묶음 단위) -1 이면 전체.
     /** @private @type { object } */
     #wrapCache;
     // 그릴 때 나눈 줄과 그때의 글, 글꼴, 크기, 폭, 줄바꿈 방식. (같으면 다시 나누지 않는다)
@@ -16685,7 +16704,7 @@ void main() {
       this.drawPlainText(graphic, contentSize, visibleText);
     }
     //==============================================================================
-    // 표시 글자 수만큼 앞에서 자르기.
+    // 표시 글자 수만큼 앞에서 자르기. (글자 묶음 단위, 받침, 결합 부호, 이모지 묶음이 쪼개지지 않는다)
     //==============================================================================
     /**
      * @param { string } text
@@ -16695,7 +16714,7 @@ void main() {
       if (this.#visibleCharacterCount < 0) {
         return text;
       }
-      return text.slice(0, this.#visibleCharacterCount);
+      return sliceGraphemes(text, this.#visibleCharacterCount);
     }
     //==============================================================================
     // 여러 줄 텍스트 그리기. (자동 줄바꿈 + 명시적 개행 + 표시 글자 수)
@@ -16743,10 +16762,11 @@ void main() {
           if (remainCount <= 0) {
             break;
           }
-          if (lineText.length > remainCount) {
-            lineText = lineText.slice(0, remainCount);
+          const lineCharacterCount = countGraphemes(lineText);
+          if (lineCharacterCount > remainCount) {
+            lineText = sliceGraphemes(lineText, remainCount);
           }
-          remainCount -= lineList[lineIndex].length;
+          remainCount = System32.Math.max(0, remainCount - lineCharacterCount);
         }
         if (lineText.length === 0) {
           continue;
@@ -17066,9 +17086,10 @@ void main() {
     }
     //==============================================================================
     // 그리는 사각형을 rect 에 적기. (노드 내용 영역의 왼쪽 위가 원점, 화면 밖 거르기가 쓴다, 알면 true)
-    // - 한 줄 글만 안다. 정렬로 놓은 글의 너비(맞춘 크기, 넘쳐도 그 너비)에 외곽선과 글꼴 크기의 반만큼을 양옆에 더하고,
+    // - 한 줄 글: 정렬로 놓은 글의 너비(맞춘 크기, 넘쳐도 그 너비)에 외곽선과 글꼴 크기의 반만큼을 양옆에 더하고,
     //   세로는 베이스라인 자리에서 위아래로 글꼴 크기의 1.5 배씩 넉넉히 잡는다.
-    // - 줄을 바꾸는 글, 글이 없거나 잴 수 없으면 false. (거르지 않는다)
+    // - 줄을 바꾸는 글: 나눈 줄 가운데 가장 넓은 줄로 가로를 잡고, 세로는 줄 묶음(줄 수 × 줄 높이)에 글꼴 크기만큼씩 넉넉히 잡는다.
+    // - 글이 없거나 잴 수 없으면 false. (거르지 않는다)
     //==============================================================================
     /**
      * @param { Rect } rect
@@ -17076,7 +17097,7 @@ void main() {
      */
     calculateDrawnRect(rect) {
       const text = this.#text;
-      if (!text || this.#wordWrapWidth > 0 || text.indexOf("\n") >= 0) {
+      if (!text) {
         return false;
       }
       const node = this.getNode();
@@ -17088,6 +17109,9 @@ void main() {
       }
       const contentSize = drawnRectContentSize;
       node.copyContentSizeTo(contentSize);
+      if (this.#wordWrapWidth > 0 || text.indexOf("\n") >= 0) {
+        return this.calculateWrappedDrawnRect(rect, contentSize, text);
+      }
       const fontSize = this.getFittedFontSize();
       const textWidth = this.measureText(text, fontSize);
       const textAlign = this.#textAlign;
@@ -17119,6 +17143,77 @@ void main() {
       rect.position.set(leftX - horizontalMargin, anchorY - verticalMargin);
       rect.size.set(rightX - leftX + horizontalMargin * 2, verticalMargin * 2);
       return true;
+    }
+    //==============================================================================
+    // 줄을 바꾸는 글의 그리는 사각형을 rect 에 적기. (calculateDrawnRect 가 부른다)
+    //==============================================================================
+    /**
+     * @param { Rect } rect
+     * @param { Vector2 } contentSize
+     * @param { string } text
+     * @returns { boolean }
+     */
+    calculateWrappedDrawnRect(rect, contentSize, text) {
+      const wrapWidth = this.#wordWrapWidth > 0 ? this.#wordWrapWidth : contentSize.x;
+      const lineList = this.readWrappedLines(text, wrapWidth);
+      let maximumLineWidth = 0;
+      for (const lineText of lineList) {
+        maximumLineWidth = System32.Math.max(maximumLineWidth, this.measureText(lineText, this.#fontSize));
+      }
+      const textAlign = this.#textAlign;
+      let leftX;
+      let rightX;
+      if (textAlign === "left") {
+        leftX = 0;
+        rightX = maximumLineWidth;
+      } else if (textAlign === "right") {
+        leftX = contentSize.x - maximumLineWidth;
+        rightX = contentSize.x;
+      } else if (textAlign === "center") {
+        leftX = (contentSize.x - maximumLineWidth) * 0.5;
+        rightX = leftX + maximumLineWidth;
+      } else {
+        leftX = System32.Math.min(0, contentSize.x - maximumLineWidth);
+        rightX = System32.Math.max(maximumLineWidth, contentSize.x);
+      }
+      const lineHeight = this.#fontSize * this.#lineSpacing;
+      const blockHeight = lineList.length * lineHeight;
+      let blockTop;
+      if (this.#textBaseline === "top" || this.#textBaseline === "hanging") {
+        blockTop = 0;
+      } else if (this.#textBaseline === "bottom" || this.#textBaseline === "ideographic" || this.#textBaseline === "alphabetic") {
+        blockTop = contentSize.y - blockHeight;
+      } else {
+        blockTop = (contentSize.y - blockHeight) * 0.5;
+      }
+      const horizontalMargin = this.#fontSize * 0.5 + this.#strokeWidth;
+      const verticalMargin = this.#fontSize + this.#strokeWidth;
+      rect.position.set(leftX - horizontalMargin, blockTop - verticalMargin);
+      rect.size.set(rightX - leftX + horizontalMargin * 2, blockHeight + verticalMargin * 2);
+      return true;
+    }
+    //==============================================================================
+    // 마지막으로 나눈 줄의 수. (그린 뒤 글, 글꼴, 줄바꿈 폭이 그대로일 때만, 아니면 -1)
+    // - 줄은 그릴 때 나눈다. 그린 결과를 읽어 다시 놓는 레이아웃이 쓴다. 줄바꿈 폭(setWordWrapWidth)이 없는 여러 줄 글은 노드 폭으로 나누므로 -1 이다.
+    // - 한 줄 글은 1.
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    getMeasuredLineCount() {
+      const text = this.#text;
+      if (!text) {
+        return -1;
+      }
+      if (this.#wordWrapWidth <= 0 && text.indexOf("\n") < 0) {
+        return 1;
+      }
+      if (this.#wordWrapWidth <= 0) {
+        return -1;
+      }
+      const wrapCache = this.#wrapCache;
+      const isSame = wrapCache.lineList !== null && wrapCache.text === text && wrapCache.fontFace === this.#fontFace && wrapCache.fontSize === this.#fontSize && wrapCache.bold === this.#bold && wrapCache.italic === this.#italic && wrapCache.wrapWidth === this.#wordWrapWidth && wrapCache.wrapMode === this.#wrapMode && wrapCache.fontLoadCount === fontLoadCount && wrapCache.fontFaceCount === readFontFaceCount();
+      return isSame ? wrapCache.lineList.length : -1;
     }
     //==============================================================================
     // 밑줄 시작 X 좌표 계산. (textAlign 기준 캔버스 fillText 의 cursor 위치 보정)
@@ -17297,7 +17392,7 @@ void main() {
       return this.#lineSpacing;
     }
     //==============================================================================
-    // 표시 글자 수 설정. (-1 이면 전체 — 타자기 연출용)
+    // 표시 글자 수 설정. (-1 이면 전체, 타자기 연출용. 글자 묶음 단위)
     //==============================================================================
     /**
      * @param { number } visibleCharacterCount
@@ -17618,12 +17713,18 @@ void main() {
     // 처음 크기. (넘치면 줄여 굽는다)
     /** @private @type { boolean } */
     #isBold;
+    /** @private @type { boolean } */
+    #isItalic;
+    /** @private @type { boolean } */
+    #isUnderline;
+    /** @private @type { boolean } */
+    #isStrikethrough;
     /** @private @type { string } */
     #textAlign;
     // "left", "center", "right", "start", "end"
     /** @private @type { string } */
     #textDirection;
-    // "ltr", "rtl"
+    // "ltr", "rtl", "auto"
     /** @private @type { string } */
     #textColor;
     // "#rrggbb" 나 CSS 색.
@@ -17663,6 +17764,9 @@ void main() {
       this.#fontFace = null;
       this.#fontSize = 16;
       this.#isBold = false;
+      this.#isItalic = false;
+      this.#isUnderline = false;
+      this.#isStrikethrough = false;
       this.#textAlign = "center";
       this.#textDirection = "ltr";
       this.#textColor = "#ffffff";
@@ -17691,10 +17795,10 @@ void main() {
       const contentWidth = contentSize.x;
       const contentHeight = contentSize.y;
       const bakeScale = graphic.calculateTextBakeScale();
-      const textDirection = this.getTextDirection();
+      const textDirection = this.resolveBakeTextDirection();
       const fontFace = this.getFontFace();
       const fontFamily = fontFace === null ? "" : fontFace.family;
-      const bakeKey = ["ShadowText", text, this.#fontSize, this.#isBold, this.#textColor, this.#shadowColor, this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, this.#fitMinimumRatio, contentWidth, bakeScale, textDirection, fontFamily, fontLoadCount2].join("|");
+      const bakeKey = ["ShadowText", text, this.#fontSize, this.#isBold, this.#isItalic, this.#isUnderline, this.#isStrikethrough, this.#textColor, this.#shadowColor, this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, this.#fitMinimumRatio, contentWidth, bakeScale, textDirection, fontFamily, fontLoadCount2].join("|");
       if (bakeKey !== this.#bakeKey) {
         releaseSharedBake(this.#bakeKey, this);
         this.#bakeKey = bakeKey;
@@ -17771,7 +17875,7 @@ void main() {
         const fitRatio = System33.Math.max(this.#fitMinimumRatio, fitWidth / textWidth);
         fontSize = System33.Math.floor(this.#fontSize * fitRatio * 10) / 10;
       }
-      const scaledFontString = buildFontString(fontFace, fontSize * bakeScale, this.#isBold, false);
+      const scaledFontString = buildFontString(fontFace, fontSize * bakeScale, this.#isBold, this.#isItalic);
       canvasRenderingContext.font = scaledFontString;
       canvasRenderingContext.direction = textDirection;
       canvasRenderingContext.textAlign = "left";
@@ -17792,7 +17896,13 @@ void main() {
       const scaledPenX = bakePadding + actualLeft;
       const scaledBaselineY = bakePadding + System33.Math.ceil(scaledFontAscent);
       const bakeWidth = scaledPenX + actualRight + bakePadding;
-      const bakeHeight = scaledBaselineY + System33.Math.ceil(scaledFontDescent + scaledShadowOffset) + bakePadding;
+      const scaledDecorationLineWidth = System33.Math.max(1, fontSize / 16) * bakeScale;
+      const scaledMiddleY = scaledBaselineY - (scaledFontAscent - scaledFontDescent) * 0.5;
+      const scaledUnderlineY = scaledMiddleY + (fontSize * 0.5 + 2) * bakeScale;
+      let bakeHeight = scaledBaselineY + System33.Math.ceil(scaledFontDescent + scaledShadowOffset) + bakePadding;
+      if (this.#isUnderline) {
+        bakeHeight = System33.Math.max(bakeHeight, System33.Math.ceil(scaledUnderlineY + scaledDecorationLineWidth * 0.5 + scaledShadowOffset) + bakePadding);
+      }
       if (bakeWidth <= 0 || bakeHeight <= 0) {
         this.#bakeCanvas = null;
         return;
@@ -17809,6 +17919,12 @@ void main() {
       canvasRenderingContext.shadowOffsetY = scaledShadowOffset;
       canvasRenderingContext.fillStyle = this.#textColor;
       canvasRenderingContext.fillText(text, scaledPenX, scaledBaselineY);
+      if (this.#isUnderline) {
+        canvasRenderingContext.fillRect(scaledPenX, scaledUnderlineY - scaledDecorationLineWidth * 0.5, textMetrics.width, scaledDecorationLineWidth);
+      }
+      if (this.#isStrikethrough) {
+        canvasRenderingContext.fillRect(scaledPenX, scaledMiddleY - scaledDecorationLineWidth * 0.5, textMetrics.width, scaledDecorationLineWidth);
+      }
       this.#bakeCanvas = bakeCanvas;
       this.#bakeMetrics = {
         scale: bakeScale,
@@ -17833,7 +17949,7 @@ void main() {
       }
       const textStringTextureCache = graphic.getTextStringTextureCache();
       const fontFace = this.getFontFace();
-      const fontString = buildFontString(fontFace, this.#fontSize, this.#isBold, false);
+      const fontString = buildFontString(fontFace, this.#fontSize, this.#isBold, this.#isItalic);
       const textMetrics = textStringTextureCache.measureText(fontString, text);
       return textMetrics.width;
     }
@@ -17914,7 +18030,7 @@ void main() {
       return this.#textAlign;
     }
     //==============================================================================
-    // 글 방향 설정. ("ltr", "rtl")
+    // 글 방향 설정. ("ltr", "rtl", "auto")
     //==============================================================================
     /**
      * @param { string } textDirection
@@ -17930,6 +18046,84 @@ void main() {
      */
     getTextDirection() {
       return this.#textDirection;
+    }
+    //==============================================================================
+    // 굽는 실제 방향. ("rtl" 이면 오른쪽에서 왼쪽, "auto" 는 글의 첫 강한 글자로, 그 밖은 "ltr")
+    //==============================================================================
+    /**
+     * @returns { string }
+     */
+    resolveBakeTextDirection() {
+      if (this.#textDirection === "rtl") {
+        return "rtl";
+      }
+      if (this.#textDirection === "auto") {
+        return detectTextDirection(this.#text);
+      }
+      return "ltr";
+    }
+    //==============================================================================
+    // 굵게 여부.
+    //==============================================================================
+    /**
+     * @returns { boolean }
+     */
+    isBold() {
+      return this.#isBold;
+    }
+    //==============================================================================
+    // 기울임 설정.
+    //==============================================================================
+    /**
+     * @param { boolean } isItalic
+     */
+    setItalic(isItalic) {
+      this.#isItalic = isItalic === true;
+    }
+    //==============================================================================
+    // 기울임 여부.
+    //==============================================================================
+    /**
+     * @returns { boolean }
+     */
+    isItalic() {
+      return this.#isItalic;
+    }
+    //==============================================================================
+    // 밑줄 설정.
+    //==============================================================================
+    /**
+     * @param { boolean } isUnderline
+     */
+    setUnderline(isUnderline) {
+      this.#isUnderline = isUnderline === true;
+    }
+    //==============================================================================
+    // 밑줄 여부.
+    //==============================================================================
+    /**
+     * @returns { boolean }
+     */
+    isUnderline() {
+      return this.#isUnderline;
+    }
+    //==============================================================================
+    // 취소선 설정.
+    //==============================================================================
+    /**
+     * @param { boolean } isStrikethrough
+     */
+    setStrikethrough(isStrikethrough) {
+      this.#isStrikethrough = isStrikethrough === true;
+    }
+    //==============================================================================
+    // 취소선 여부.
+    //==============================================================================
+    /**
+     * @returns { boolean }
+     */
+    isStrikethrough() {
+      return this.#isStrikethrough;
     }
     //==============================================================================
     // 그림자 설정. (색, 불투명도, 글 아래로 내려가는 만큼, 번지는 만큼)
@@ -18711,8 +18905,15 @@ void main() {
       const fallbackItalic = this.isItalic();
       const fallbackUnderline = this.isUnderline();
       const fallbackStrikethrough = this.isStrikethrough();
-      const textAlign = this.getTextAlign();
       const textBaseline = this.getTextBaseline();
+      if (this.getTextDirection() !== "inherit") {
+        graphic.setTextDirection(this.getTextDirection());
+      }
+      const joinedText = segments.map((segment) => segment.text || "").join("");
+      const textDirection = graphic.resolveTextDirection(joinedText);
+      graphic.setTextDirection(textDirection);
+      const isRightToLeft = textDirection === "rtl";
+      const textAlign = graphic.resolveTextAlign(this.getTextAlign(), textDirection);
       let totalWidth = 0;
       let maxFontSize = 0;
       for (const segment of segments) {
@@ -18731,12 +18932,15 @@ void main() {
         }
       }
       let cursorX;
-      if (textAlign === "left" || textAlign === "start") {
+      if (textAlign === "left") {
         cursorX = 0;
-      } else if (textAlign === "right" || textAlign === "end") {
+      } else if (textAlign === "right") {
         cursorX = contentSize.x - totalWidth;
       } else {
         cursorX = (contentSize.x - totalWidth) * 0.5;
+      }
+      if (isRightToLeft) {
+        cursorX += totalWidth;
       }
       let baselineY;
       if (textBaseline === "top" || textBaseline === "hanging") {
@@ -18763,13 +18967,16 @@ void main() {
         const segmentUnderline = segment.attributes.underline === true || fallbackUnderline;
         const segmentStrikethrough = segment.attributes.strikethrough === true || fallbackStrikethrough;
         graphic.setFontString(buildFontString(segmentFontFace, segmentFontSize, segmentBold, segmentItalic));
+        const segmentWidth = graphic.measureText(segmentText).width;
+        if (isRightToLeft) {
+          cursorX -= segmentWidth;
+        }
         if (segmentStrokeColor && segmentStrokeWidth > 0) {
           graphic.setStrokeColor(segmentStrokeColor.toHEXString());
           graphic.drawStrokeText(segmentText, cursorX, baselineY, segmentStrokeWidth);
         }
         graphic.setFillColor(segmentTextColor.toHEXString());
         graphic.drawFillText(segmentText, cursorX, baselineY);
-        const segmentWidth = graphic.measureText(segmentText).width;
         const segmentLineWidth = System36.Math.max(1, segmentFontSize / 16);
         if (segmentUnderline) {
           const underlineY = baselineY + this.computeUnderlineOffsetY(segmentFontSize);
@@ -18781,7 +18988,9 @@ void main() {
           graphic.setStrokeColor(segmentTextColor.toHEXString());
           this.strokeHorizontalLine(graphic, cursorX, strikeY, segmentWidth, segmentLineWidth);
         }
-        cursorX += segmentWidth;
+        if (!isRightToLeft) {
+          cursorX += segmentWidth;
+        }
       }
     }
     //==============================================================================
@@ -19660,7 +19869,7 @@ void main() {
       this.invalidateIntrinsicContentSize();
     }
     //==============================================================================
-    // 표시 글자 수 설정. (-1 이면 전체 — 타자기 연출용, 일반 텍스트 모드 전용)
+    // 표시 글자 수 설정. (-1 이면 전체, 타자기 연출용, 일반 텍스트 모드 전용. 글자 묶음 단위)
     //==============================================================================
     /**
      * @param { number } visibleCharacterCount
@@ -19669,6 +19878,18 @@ void main() {
       if (this.#text) {
         this.#text.setVisibleCharacterCount(visibleCharacterCount);
       }
+    }
+    //==============================================================================
+    // 표시 글자 수 반환. (-1 이면 전체, 붙기 전이면 -1)
+    //==============================================================================
+    /**
+     * @returns { number }
+     */
+    getVisibleCharacterCount() {
+      if (this.#text) {
+        return this.#text.getVisibleCharacterCount();
+      }
+      return -1;
     }
     setFont(font) {
       if (this.#text) {
@@ -25631,6 +25852,11 @@ void main() {
 
   // src/misc/localization.js
   var System46 = globalThis;
+  var DEFAULT_RIGHT_TO_LEFT_LANGUAGES = ["ar", "fa", "he", "ur", "ps", "yi", "dv"];
+  var FIRST_STRONG_ISOLATE = "\u2068";
+  var POP_DIRECTIONAL_ISOLATE = "\u2069";
+  var PLACEHOLDER_PATTERN = /\{([a-zA-Z0-9]+)\}/g;
+  var JOINED_PLACEHOLDER_PATTERN = /\{[a-zA-Z0-9]+\}(?:\s*\/\s*\{[a-zA-Z0-9]+\})*/g;
   var Localization = class _Localization extends Object2 {
     static {
       __name(this, "Localization");
@@ -25641,6 +25867,10 @@ void main() {
     static #languageCode = "ko";
     /** @private @type { string } */
     static #fallbackLanguageCode = "ko";
+    /** @private @type { Map<string, string> } */
+    static #aliasToLanguage = new System46.Map();
+    /** @private @type { Set<string> } */
+    static #rightToLeftLanguages = new System46.Set(DEFAULT_RIGHT_TO_LEFT_LANGUAGES);
     //==============================================================================
     // 브라우저 언어 감지. (정적)
     // - navigator.languages 우선순위를 훑어 지원 목록에 있는 첫 언어를 고른다.
@@ -25663,18 +25893,146 @@ void main() {
           candidateList.push(navigatorObject.language);
         }
       }
+      return _Localization.selectLanguage(candidateList, supportedLanguageCodes, defaultLanguageCode);
+    }
+    //==============================================================================
+    // 선호 언어 목록에서 지원하는 첫 언어 고르기. (정적, detectLanguage 의 대조 부분)
+    // - 태그의 뒤 조각부터 하나씩 떼며 지원 목록의 코드와 별칭을 본다. ("zh-Hant-TW" → "zh-hant-tw", "zh-hant", "zh", 밑줄은 하이픈으로)
+    //==============================================================================
+    /**
+     * @param { string[] } candidateList
+     * @param { string[] } supportedLanguageCodes
+     * @param { string } defaultLanguageCode
+     * @returns { string }
+     */
+    static selectLanguage(candidateList, supportedLanguageCodes, defaultLanguageCode = "ko") {
       const supportedSet = new System46.Set(supportedLanguageCodes.map((code) => code.toLowerCase()));
       for (const languageTag of candidateList) {
-        const loweredTag = languageTag.toLowerCase();
-        if (supportedSet.has(loweredTag)) {
-          return loweredTag;
-        }
-        const primaryCode = loweredTag.split("-")[0];
-        if (supportedSet.has(primaryCode)) {
-          return primaryCode;
+        const subtags = languageTag.toLowerCase().replace(/_/g, "-").split("-");
+        for (let subtagCount = subtags.length; subtagCount > 0; --subtagCount) {
+          const candidateTag = subtags.slice(0, subtagCount).join("-");
+          if (supportedSet.has(candidateTag)) {
+            return candidateTag;
+          }
+          const aliasLanguage = _Localization.#aliasToLanguage.get(candidateTag);
+          if (aliasLanguage !== void 0 && supportedSet.has(aliasLanguage)) {
+            return aliasLanguage;
+          }
         }
       }
       return defaultLanguageCode;
+    }
+    //==============================================================================
+    // 언어의 별칭 설정. (정적, 예: "zh-hant" 에 "zh-tw", "zh-hk", 태그를 맞출 때 별칭도 그 언어로 본다)
+    //==============================================================================
+    /**
+     * @param { string } languageCode
+     * @param { string[] } aliasList
+     */
+    static setLanguageAliases(languageCode, aliasList) {
+      const loweredLanguageCode = languageCode.toLowerCase();
+      for (const alias of aliasList) {
+        _Localization.#aliasToLanguage.set(alias.toLowerCase().replace(/_/g, "-"), loweredLanguageCode);
+      }
+    }
+    //==============================================================================
+    // 오른쪽에서 왼쪽으로 쓰는 언어로 정하거나 풀기. (정적, 처음은 ar, fa, he, ur, ps, yi, dv)
+    //==============================================================================
+    /**
+     * @param { string } languageCode
+     * @param { boolean } isRightToLeft
+     */
+    static setRightToLeft(languageCode, isRightToLeft) {
+      const primaryCode = languageCode.toLowerCase().replace(/_/g, "-").split("-")[0];
+      if (isRightToLeft) {
+        _Localization.#rightToLeftLanguages.add(primaryCode);
+      } else {
+        _Localization.#rightToLeftLanguages.delete(primaryCode);
+      }
+    }
+    //==============================================================================
+    // 지금 언어가 오른쪽에서 왼쪽으로 쓰는 언어인지. (정적, 글자를 그 방향으로 굽고 배치를 좌우로 뒤집을 때)
+    //==============================================================================
+    /**
+     * @returns { boolean }
+     */
+    static isRightToLeft() {
+      const primaryCode = _Localization.#languageCode.split("-")[0];
+      return _Localization.#rightToLeftLanguages.has(primaryCode);
+    }
+    //==============================================================================
+    // 배치의 가로 자리. (정적, 오른쪽에서 왼쪽 언어면 부모 너비 안에서 좌우를 뒤집은 왼쪽, 아니면 그대로)
+    //==============================================================================
+    /**
+     * @param { number } x
+     * @param { number } width
+     * @param { number } parentWidth
+     * @returns { number }
+     */
+    static mirrorLayoutX(x, width, parentWidth) {
+      if (!_Localization.isRightToLeft()) {
+        return x;
+      }
+      return parentWidth - x - width;
+    }
+    //==============================================================================
+    // 배치의 글자 정렬. (정적, 오른쪽에서 왼쪽 언어면 "left" 와 "right" 를 바꾸고, 나머지는 그대로)
+    //==============================================================================
+    /**
+     * @param { string } textAlign
+     * @returns { string }
+     */
+    static readLayoutTextAlign(textAlign) {
+      if (!_Localization.isRightToLeft()) {
+        return textAlign;
+      }
+      if (textAlign === "left") {
+        return "right";
+      }
+      if (textAlign === "right") {
+        return "left";
+      }
+      return textAlign;
+    }
+    //==============================================================================
+    // 글 사이에 끼우는 값 묶기. (정적, 오른쪽에서 왼쪽 언어면 방향 격리 문자로 묶고, 아니면 그대로)
+    //==============================================================================
+    /**
+     * @param { string } text
+     * @returns { string }
+     */
+    static isolateText(text) {
+      if (text === "" || !_Localization.isRightToLeft()) {
+        return text;
+      }
+      return FIRST_STRONG_ISOLATE + text + POP_DIRECTIONAL_ISOLATE;
+    }
+    //==============================================================================
+    // 이름 자리 채우기. (정적, "Restart {seconds}" + { seconds: 3 } → "Restart 3")
+    // - 오른쪽에서 왼쪽 언어면 넣은 값을 방향 격리 문자로 묶는다. 빗금으로만 이은 값들("{count}/{limit}")은 통째로 한 번 묶는다.
+    // - 이름이 없는 자리는 그대로 둔다.
+    //==============================================================================
+    /**
+     * @param { string } key
+     * @param { object } values 자리 이름 → 값.
+     * @returns { string }
+     */
+    static textNamed(key, values) {
+      const text = _Localization.text(key);
+      return text.replace(JOINED_PLACEHOLDER_PATTERN, (joinedText) => {
+        let isFilled = false;
+        const valueText = joinedText.replace(PLACEHOLDER_PATTERN, (matched, name) => {
+          if (!System46.Object.prototype.hasOwnProperty.call(values, name)) {
+            return matched;
+          }
+          isFilled = true;
+          return System46.String(values[name]);
+        });
+        if (!isFilled) {
+          return joinedText;
+        }
+        return _Localization.isolateText(valueText);
+      });
     }
     //==============================================================================
     // 번역 테이블 설정. (정적)

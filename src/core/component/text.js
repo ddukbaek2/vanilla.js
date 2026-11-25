@@ -135,6 +135,34 @@ export function splitWords(text) {
 
 
 //==============================================================================
+// 글자 묶음 수. (표시 글자 수가 세는 단위, 받침, 결합 부호, 이모지 묶음을 한 자로)
+//==============================================================================
+/**
+ * @param { string } text
+ * @returns { number }
+ */
+export function countGraphemes(text) {
+	return splitGraphemes(text).length;
+}
+
+//==============================================================================
+// 앞에서 글자 묶음 count 개까지의 글. (글이 짧으면 글 전체)
+//==============================================================================
+/**
+ * @param { string } text
+ * @param { number } count
+ * @returns { string }
+ */
+export function sliceGraphemes(text, count) {
+	const graphemes = splitGraphemes(text);
+	if (graphemes.length <= count) {
+		return text;
+	}
+	return graphemes.slice(0, count).join("");
+}
+
+
+//==============================================================================
 // 폰트 문자열 합성 (canvas font property 형식).
 //==============================================================================
 /**
@@ -218,7 +246,7 @@ export class Text extends Component {
 	/** @private @type { number } */ #wordWrapWidth; // 0 이면 한 줄. 넘으면 이 폭에서 줄을 바꾼다.
 	/** @private @type { string } */ #wrapMode; // "word": 공백 단위(넘치는 단어는 글자 분할) | "char": 글자 단위.
 	/** @private @type { number } */ #lineSpacing; // 줄 간격 배율.
-	/** @private @type { number } */ #visibleCharacterCount; // 표시 글자 수. -1 이면 전체.
+	/** @private @type { number } */ #visibleCharacterCount; // 표시 글자 수. (글자 묶음 단위) -1 이면 전체.
 	/** @private @type { object } */ #wrapCache; // 그릴 때 나눈 줄과 그때의 글, 글꼴, 크기, 폭, 줄바꿈 방식. (같으면 다시 나누지 않는다)
 	/** @private @type { number } */ #fitWidth; // 한 줄 글을 맞출 너비. (0 이면 맞추지 않는다)
 	/** @private @type { number } */ #fitMinimumRatio; // 맞출 때 줄이는 가장 작은 비율.
@@ -320,7 +348,7 @@ export class Text extends Component {
 	}
 
 	//==============================================================================
-	// 표시 글자 수만큼 앞에서 자르기.
+	// 표시 글자 수만큼 앞에서 자르기. (글자 묶음 단위, 받침, 결합 부호, 이모지 묶음이 쪼개지지 않는다)
 	//==============================================================================
 	/**
 	 * @param { string } text
@@ -330,7 +358,7 @@ export class Text extends Component {
 		if (this.#visibleCharacterCount < 0) {
 			return text;
 		}
-		return text.slice(0, this.#visibleCharacterCount);
+		return sliceGraphemes(text, this.#visibleCharacterCount);
 	}
 
 	//==============================================================================
@@ -382,6 +410,7 @@ export class Text extends Component {
 		const textColor = this.getTextColor();
 		const decorationLineWidth = System.Math.max(1, this.#fontSize / 16);
 
+		// 보일 글자 수가 정해졌으면 줄마다 남은 수만큼만 그린다. (나눈 줄의 글자 묶음 수로 세고, 0 이 되면 다음 줄부터 그리지 않는다)
 		let remainCount = this.#visibleCharacterCount;
 		for (let lineIndex = 0; lineIndex < lineList.length; ++lineIndex) {
 			let lineText = lineList[lineIndex];
@@ -389,10 +418,11 @@ export class Text extends Component {
 				if (remainCount <= 0) {
 					break;
 				}
-				if (lineText.length > remainCount) {
-					lineText = lineText.slice(0, remainCount);
+				const lineCharacterCount = countGraphemes(lineText);
+				if (lineCharacterCount > remainCount) {
+					lineText = sliceGraphemes(lineText, remainCount);
 				}
-				remainCount -= lineList[lineIndex].length;
+				remainCount = System.Math.max(0, remainCount - lineCharacterCount);
 			}
 			if (lineText.length === 0) {
 				continue;
@@ -757,9 +787,10 @@ export class Text extends Component {
 
 	//==============================================================================
 	// 그리는 사각형을 rect 에 적기. (노드 내용 영역의 왼쪽 위가 원점, 화면 밖 거르기가 쓴다, 알면 true)
-	// - 한 줄 글만 안다. 정렬로 놓은 글의 너비(맞춘 크기, 넘쳐도 그 너비)에 외곽선과 글꼴 크기의 반만큼을 양옆에 더하고,
+	// - 한 줄 글: 정렬로 놓은 글의 너비(맞춘 크기, 넘쳐도 그 너비)에 외곽선과 글꼴 크기의 반만큼을 양옆에 더하고,
 	//   세로는 베이스라인 자리에서 위아래로 글꼴 크기의 1.5 배씩 넉넉히 잡는다.
-	// - 줄을 바꾸는 글, 글이 없거나 잴 수 없으면 false. (거르지 않는다)
+	// - 줄을 바꾸는 글: 나눈 줄 가운데 가장 넓은 줄로 가로를 잡고, 세로는 줄 묶음(줄 수 × 줄 높이)에 글꼴 크기만큼씩 넉넉히 잡는다.
+	// - 글이 없거나 잴 수 없으면 false. (거르지 않는다)
 	//==============================================================================
 	/**
 	 * @param { Rect } rect
@@ -767,7 +798,7 @@ export class Text extends Component {
 	 */
 	calculateDrawnRect(rect) {
 		const text = this.#text;
-		if (!text || this.#wordWrapWidth > 0 || text.indexOf("\n") >= 0) {
+		if (!text) {
 			return false;
 		}
 		const node = this.getNode();
@@ -779,6 +810,9 @@ export class Text extends Component {
 		}
 		const contentSize = drawnRectContentSize;
 		node.copyContentSizeTo(contentSize);
+		if (this.#wordWrapWidth > 0 || text.indexOf("\n") >= 0) {
+			return this.calculateWrappedDrawnRect(rect, contentSize, text);
+		}
 		const fontSize = this.getFittedFontSize();
 		const textWidth = this.measureText(text, fontSize);
 		const textAlign = this.#textAlign;
@@ -816,6 +850,93 @@ export class Text extends Component {
 		rect.position.set(leftX - horizontalMargin, anchorY - verticalMargin);
 		rect.size.set(rightX - leftX + horizontalMargin * 2, verticalMargin * 2);
 		return true;
+	}
+
+	//==============================================================================
+	// 줄을 바꾸는 글의 그리는 사각형을 rect 에 적기. (calculateDrawnRect 가 부른다)
+	//==============================================================================
+	/**
+	 * @param { Rect } rect
+	 * @param { Vector2 } contentSize
+	 * @param { string } text
+	 * @returns { boolean }
+	 */
+	calculateWrappedDrawnRect(rect, contentSize, text) {
+		const wrapWidth = (this.#wordWrapWidth > 0) ? this.#wordWrapWidth : contentSize.x;
+		const lineList = this.readWrappedLines(text, wrapWidth);
+		let maximumLineWidth = 0;
+		for (const lineText of lineList) {
+			maximumLineWidth = System.Math.max(maximumLineWidth, this.measureText(lineText, this.#fontSize));
+		}
+		const textAlign = this.#textAlign;
+		let leftX;
+		let rightX;
+		if (textAlign === "left") {
+			leftX = 0;
+			rightX = maximumLineWidth;
+		}
+		else if (textAlign === "right") {
+			leftX = contentSize.x - maximumLineWidth;
+			rightX = contentSize.x;
+		}
+		else if (textAlign === "center") {
+			leftX = (contentSize.x - maximumLineWidth) * 0.5;
+			rightX = leftX + maximumLineWidth;
+		}
+		else {
+			leftX = System.Math.min(0, contentSize.x - maximumLineWidth);
+			rightX = System.Math.max(maximumLineWidth, contentSize.x);
+		}
+		const lineHeight = this.#fontSize * this.#lineSpacing;
+		const blockHeight = lineList.length * lineHeight;
+		let blockTop;
+		if (this.#textBaseline === "top" || this.#textBaseline === "hanging") {
+			blockTop = 0;
+		}
+		else if (this.#textBaseline === "bottom" || this.#textBaseline === "ideographic" || this.#textBaseline === "alphabetic") {
+			blockTop = contentSize.y - blockHeight;
+		}
+		else {
+			blockTop = (contentSize.y - blockHeight) * 0.5;
+		}
+		const horizontalMargin = this.#fontSize * 0.5 + this.#strokeWidth;
+		const verticalMargin = this.#fontSize + this.#strokeWidth;
+		rect.position.set(leftX - horizontalMargin, blockTop - verticalMargin);
+		rect.size.set(rightX - leftX + horizontalMargin * 2, blockHeight + verticalMargin * 2);
+		return true;
+	}
+
+	//==============================================================================
+	// 마지막으로 나눈 줄의 수. (그린 뒤 글, 글꼴, 줄바꿈 폭이 그대로일 때만, 아니면 -1)
+	// - 줄은 그릴 때 나눈다. 그린 결과를 읽어 다시 놓는 레이아웃이 쓴다. 줄바꿈 폭(setWordWrapWidth)이 없는 여러 줄 글은 노드 폭으로 나누므로 -1 이다.
+	// - 한 줄 글은 1.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getMeasuredLineCount() {
+		const text = this.#text;
+		if (!text) {
+			return -1;
+		}
+		if (this.#wordWrapWidth <= 0 && text.indexOf("\n") < 0) {
+			return 1;
+		}
+		if (this.#wordWrapWidth <= 0) {
+			return -1;
+		}
+		const wrapCache = this.#wrapCache;
+		const isSame = wrapCache.lineList !== null
+			&& wrapCache.text === text
+			&& wrapCache.fontFace === this.#fontFace
+			&& wrapCache.fontSize === this.#fontSize
+			&& wrapCache.bold === this.#bold
+			&& wrapCache.italic === this.#italic
+			&& wrapCache.wrapWidth === this.#wordWrapWidth
+			&& wrapCache.wrapMode === this.#wrapMode
+			&& wrapCache.fontLoadCount === fontLoadCount
+			&& wrapCache.fontFaceCount === readFontFaceCount();
+		return isSame ? wrapCache.lineList.length : -1;
 	}
 
 	//==============================================================================
@@ -1010,7 +1131,7 @@ export class Text extends Component {
 	}
 
 	//==============================================================================
-	// 표시 글자 수 설정. (-1 이면 전체 — 타자기 연출용)
+	// 표시 글자 수 설정. (-1 이면 전체, 타자기 연출용. 글자 묶음 단위)
 	//==============================================================================
 	/**
 	 * @param { number } visibleCharacterCount

@@ -220,3 +220,8 @@ export { UIConfirmWindow } from "./src/ui/uiconfirmwindow.js";
 
 // 글자, 노드, 그리기 갈래. (출시 게임들이 따로 만들어 쓰던 아틀라스 읽기)
 export { SpriteAtlas } from "./src/resource/spriteatlas.js";
+
+// 글자, 글꼴 갈래. (글자 아틀라스, 글자 묶음과 낱말 나누기, 글의 첫 강한 방향)
+export { DynamicFont, GlyphInfo } from "./src/misc/dynamicfont.js";
+export { splitGraphemes, splitWords, countGraphemes, sliceGraphemes } from "./src/core/component/text.js";
+export { detectTextDirection } from "./src/core/graphic.js";

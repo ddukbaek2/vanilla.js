@@ -13,11 +13,27 @@ import { Object } from "../base/object.js";
 //     Localization.setTable("en", { "확인": "OK", "{0}점 획득": "Got {0} points" });
 //     Localization.setLanguage(Localization.detectLanguage(["ko", "en"]));
 //     Localization.text("{0}점 획득", 120);
+// - 언어 태그를 뒤 조각부터 하나씩 떼며 맞추고 별칭도 본다. (setLanguageAliases)
+// - 오른쪽에서 왼쪽으로 쓰는 언어(isRightToLeft, setRightToLeft)면 배치를 뒤집고(mirrorLayoutX, readLayoutTextAlign),
+//   글 사이에 넣는 값을 방향 격리 문자로 묶는다. (isolateText, textNamed 의 "{이름}" 자리, 빗금으로만 이은 값들은 통째로 한 번 묶는다)
 //==============================================================================
+
+// 처음부터 오른쪽에서 왼쪽으로 쓰는 언어. (아랍어, 페르시아어, 히브리어, 우르두어, 파슈토어, 이디시어, 디베히어)
+const DEFAULT_RIGHT_TO_LEFT_LANGUAGES = ["ar", "fa", "he", "ur", "ps", "yi", "dv"];
+// 방향 격리 문자. (처음 나오는 방향이 강한 글자로 방향을 정하는 격리의 시작과 끝)
+const FIRST_STRONG_ISOLATE = "\u2068";
+const POP_DIRECTIONAL_ISOLATE = "\u2069";
+// 넣는 값의 자리. ({이름})
+const PLACEHOLDER_PATTERN = /\{([a-zA-Z0-9]+)\}/g;
+// 빗금으로만 이은 자리들. ({count}/{limit} 처럼 값 둘을 잇는 것도 한 덩어리)
+const JOINED_PLACEHOLDER_PATTERN = /\{[a-zA-Z0-9]+\}(?:\s*\/\s*\{[a-zA-Z0-9]+\})*/g;
+
 export class Localization extends Object {
 	/** @private @type { Map } */ static #tableByLanguage = new System.Map();
 	/** @private @type { string } */ static #languageCode = "ko";
 	/** @private @type { string } */ static #fallbackLanguageCode = "ko";
+	/** @private @type { Map<string, string> } */ static #aliasToLanguage = new System.Map();
+	/** @private @type { Set<string> } */ static #rightToLeftLanguages = new System.Set(DEFAULT_RIGHT_TO_LEFT_LANGUAGES);
 
 	//==============================================================================
 	// 브라우저 언어 감지. (정적)
@@ -42,18 +58,155 @@ export class Localization extends Object {
 				candidateList.push(navigatorObject.language);
 			}
 		}
+		return Localization.selectLanguage(candidateList, supportedLanguageCodes, defaultLanguageCode);
+	}
+
+	//==============================================================================
+	// 선호 언어 목록에서 지원하는 첫 언어 고르기. (정적, detectLanguage 의 대조 부분)
+	// - 태그의 뒤 조각부터 하나씩 떼며 지원 목록의 코드와 별칭을 본다. ("zh-Hant-TW" → "zh-hant-tw", "zh-hant", "zh", 밑줄은 하이픈으로)
+	//==============================================================================
+	/**
+	 * @param { string[] } candidateList
+	 * @param { string[] } supportedLanguageCodes
+	 * @param { string } defaultLanguageCode
+	 * @returns { string }
+	 */
+	static selectLanguage(candidateList, supportedLanguageCodes, defaultLanguageCode = "ko") {
 		const supportedSet = new System.Set(supportedLanguageCodes.map((code) => code.toLowerCase()));
 		for (const languageTag of candidateList) {
-			const loweredTag = languageTag.toLowerCase();
-			if (supportedSet.has(loweredTag)) {
-				return loweredTag;
-			}
-			const primaryCode = loweredTag.split("-")[0];
-			if (supportedSet.has(primaryCode)) {
-				return primaryCode;
+			const subtags = languageTag.toLowerCase().replace(/_/g, "-").split("-");
+			for (let subtagCount = subtags.length; subtagCount > 0; --subtagCount) {
+				const candidateTag = subtags.slice(0, subtagCount).join("-");
+				if (supportedSet.has(candidateTag)) {
+					return candidateTag;
+				}
+				const aliasLanguage = Localization.#aliasToLanguage.get(candidateTag);
+				if (aliasLanguage !== undefined && supportedSet.has(aliasLanguage)) {
+					return aliasLanguage;
+				}
 			}
 		}
 		return defaultLanguageCode;
+	}
+
+	//==============================================================================
+	// 언어의 별칭 설정. (정적, 예: "zh-hant" 에 "zh-tw", "zh-hk", 태그를 맞출 때 별칭도 그 언어로 본다)
+	//==============================================================================
+	/**
+	 * @param { string } languageCode
+	 * @param { string[] } aliasList
+	 */
+	static setLanguageAliases(languageCode, aliasList) {
+		const loweredLanguageCode = languageCode.toLowerCase();
+		for (const alias of aliasList) {
+			Localization.#aliasToLanguage.set(alias.toLowerCase().replace(/_/g, "-"), loweredLanguageCode);
+		}
+	}
+
+	//==============================================================================
+	// 오른쪽에서 왼쪽으로 쓰는 언어로 정하거나 풀기. (정적, 처음은 ar, fa, he, ur, ps, yi, dv)
+	//==============================================================================
+	/**
+	 * @param { string } languageCode
+	 * @param { boolean } isRightToLeft
+	 */
+	static setRightToLeft(languageCode, isRightToLeft) {
+		const primaryCode = languageCode.toLowerCase().replace(/_/g, "-").split("-")[0];
+		if (isRightToLeft) {
+			Localization.#rightToLeftLanguages.add(primaryCode);
+		}
+		else {
+			Localization.#rightToLeftLanguages.delete(primaryCode);
+		}
+	}
+
+	//==============================================================================
+	// 지금 언어가 오른쪽에서 왼쪽으로 쓰는 언어인지. (정적, 글자를 그 방향으로 굽고 배치를 좌우로 뒤집을 때)
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	static isRightToLeft() {
+		const primaryCode = Localization.#languageCode.split("-")[0];
+		return Localization.#rightToLeftLanguages.has(primaryCode);
+	}
+
+	//==============================================================================
+	// 배치의 가로 자리. (정적, 오른쪽에서 왼쪽 언어면 부모 너비 안에서 좌우를 뒤집은 왼쪽, 아니면 그대로)
+	//==============================================================================
+	/**
+	 * @param { number } x
+	 * @param { number } width
+	 * @param { number } parentWidth
+	 * @returns { number }
+	 */
+	static mirrorLayoutX(x, width, parentWidth) {
+		if (!Localization.isRightToLeft()) {
+			return x;
+		}
+		return parentWidth - x - width;
+	}
+
+	//==============================================================================
+	// 배치의 글자 정렬. (정적, 오른쪽에서 왼쪽 언어면 "left" 와 "right" 를 바꾸고, 나머지는 그대로)
+	//==============================================================================
+	/**
+	 * @param { string } textAlign
+	 * @returns { string }
+	 */
+	static readLayoutTextAlign(textAlign) {
+		if (!Localization.isRightToLeft()) {
+			return textAlign;
+		}
+		if (textAlign === "left") {
+			return "right";
+		}
+		if (textAlign === "right") {
+			return "left";
+		}
+		return textAlign;
+	}
+
+	//==============================================================================
+	// 글 사이에 끼우는 값 묶기. (정적, 오른쪽에서 왼쪽 언어면 방향 격리 문자로 묶고, 아니면 그대로)
+	//==============================================================================
+	/**
+	 * @param { string } text
+	 * @returns { string }
+	 */
+	static isolateText(text) {
+		if (text === "" || !Localization.isRightToLeft()) {
+			return text;
+		}
+		return FIRST_STRONG_ISOLATE + text + POP_DIRECTIONAL_ISOLATE;
+	}
+
+	//==============================================================================
+	// 이름 자리 채우기. (정적, "Restart {seconds}" + { seconds: 3 } → "Restart 3")
+	// - 오른쪽에서 왼쪽 언어면 넣은 값을 방향 격리 문자로 묶는다. 빗금으로만 이은 값들("{count}/{limit}")은 통째로 한 번 묶는다.
+	// - 이름이 없는 자리는 그대로 둔다.
+	//==============================================================================
+	/**
+	 * @param { string } key
+	 * @param { object } values 자리 이름 → 값.
+	 * @returns { string }
+	 */
+	static textNamed(key, values) {
+		const text = Localization.text(key);
+		return text.replace(JOINED_PLACEHOLDER_PATTERN, (joinedText) => {
+			let isFilled = false;
+			const valueText = joinedText.replace(PLACEHOLDER_PATTERN, (matched, name) => {
+				if (!System.Object.prototype.hasOwnProperty.call(values, name)) {
+					return matched;
+				}
+				isFilled = true;
+				return System.String(values[name]);
+			});
+			if (!isFilled) {
+				return joinedText;
+			}
+			return Localization.isolateText(valueText);
+		});
 	}
 
 	//==============================================================================

@@ -214,6 +214,8 @@ function parseMarkupToSegments(input) {
 //   - <size=N>...</size>                    : 폰트 크기
 //   - 알 수 없는 태그는 그대로 텍스트로 출력.
 // - 마크업이 없는 plain text 면 부모 (Text) 의 draw 동작으로 fallback.
+// - 글자 방향: segment 를 이은 글로 문단 방향을 정하고 (이 글자의 방향, "inherit" 면 Graphic 의 방향), 오른쪽에서 왼쪽이면 segment 를 오른쪽부터 놓는다.
+//   segment 마다 그 방향으로 굽고, 정렬 "start" / "end" 도 그 방향으로 푼다.
 // - segment 별 미지정 속성은 부모 Text 의 전역 속성을 fallback.
 // - 비활성화 상태 (isEnable() === false) 면 draw / 측정에서 건너뛴다.
 //==============================================================================
@@ -349,8 +351,17 @@ export class RichText extends Text {
 		const fallbackItalic = this.isItalic();
 		const fallbackUnderline = this.isUnderline();
 		const fallbackStrikethrough = this.isStrikethrough();
-		const textAlign = this.getTextAlign();
 		const textBaseline = this.getTextBaseline();
+
+		// 문단의 방향은 segment 를 이은 글로 정한다. ("start" / "end" 정렬과 segment 를 놓는 차례가 그 방향을 따른다)
+		if (this.getTextDirection() !== "inherit") {
+			graphic.setTextDirection(this.getTextDirection());
+		}
+		const joinedText = segments.map((segment) => segment.text || "").join("");
+		const textDirection = graphic.resolveTextDirection(joinedText);
+		graphic.setTextDirection(textDirection);
+		const isRightToLeft = textDirection === "rtl";
+		const textAlign = graphic.resolveTextAlign(this.getTextAlign(), textDirection);
 
 		// 합산 폭 / 최대 폰트 크기 계산.
 		let totalWidth = 0;
@@ -371,16 +382,19 @@ export class RichText extends Text {
 			}
 		}
 
-		// 시작 X 좌표.
+		// 시작 X 좌표. (오른쪽에서 왼쪽이면 오른쪽 끝에서 왼쪽으로 놓아 간다)
 		let cursorX;
-		if (textAlign === "left" || textAlign === "start") {
+		if (textAlign === "left") {
 			cursorX = 0;
 		}
-		else if (textAlign === "right" || textAlign === "end") {
+		else if (textAlign === "right") {
 			cursorX = contentSize.x - totalWidth;
 		}
 		else {
 			cursorX = (contentSize.x - totalWidth) * 0.5;
+		}
+		if (isRightToLeft) {
+			cursorX += totalWidth;
 		}
 
 		// Y 좌표.
@@ -414,6 +428,10 @@ export class RichText extends Text {
 			const segmentStrikethrough = (segment.attributes.strikethrough === true) || fallbackStrikethrough;
 
 			graphic.setFontString(buildFontString(segmentFontFace, segmentFontSize, segmentBold, segmentItalic));
+			const segmentWidth = graphic.measureText(segmentText).width;
+			if (isRightToLeft) {
+				cursorX -= segmentWidth;
+			}
 			if (segmentStrokeColor && segmentStrokeWidth > 0) {
 				graphic.setStrokeColor(segmentStrokeColor.toHEXString());
 				graphic.drawStrokeText(segmentText, cursorX, baselineY, segmentStrokeWidth);
@@ -421,7 +439,6 @@ export class RichText extends Text {
 			graphic.setFillColor(segmentTextColor.toHEXString());
 			graphic.drawFillText(segmentText, cursorX, baselineY);
 
-			const segmentWidth = graphic.measureText(segmentText).width;
 			const segmentLineWidth = System.Math.max(1, segmentFontSize / 16);
 			if (segmentUnderline) {
 				const underlineY = baselineY + this.computeUnderlineOffsetY(segmentFontSize);
@@ -433,7 +450,9 @@ export class RichText extends Text {
 				graphic.setStrokeColor(segmentTextColor.toHEXString());
 				this.strokeHorizontalLine(graphic, cursorX, strikeY, segmentWidth, segmentLineWidth);
 			}
-			cursorX += segmentWidth;
+			if (!isRightToLeft) {
+				cursorX += segmentWidth;
+			}
 		}
 	}
 

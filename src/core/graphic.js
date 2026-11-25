@@ -168,6 +168,31 @@ const STRONG_DIRECTION_CHARACTER_PATTERN = /[\p{L}\u200E\u200F\u061C]/u;
 
 
 //==============================================================================
+// 글의 첫 강한 방향. ("ltr" 또는 "rtl", 글자 갈래 문자와 LRM, RLM, ALM 가운데 처음 것, 없으면 "ltr". setTextDirection("auto") 가 쓴다)
+//==============================================================================
+/**
+ * @param { string } text
+ * @returns { string }
+ */
+export function detectTextDirection(text) {
+	if (!text) {
+		return "ltr";
+	}
+	for (const character of text) {
+		if (!STRONG_DIRECTION_CHARACTER_PATTERN.test(character)) {
+			continue;
+		}
+		if (character === "\u200E") {
+			return "ltr";
+		}
+		const isRightToLeft = RIGHT_TO_LEFT_CHARACTER_PATTERN.test(character) || character === "\u200F" || character === "\u061C";
+		return isRightToLeft ? "rtl" : "ltr";
+	}
+	return "ltr";
+}
+
+
+//==============================================================================
 // 색상 값을 Color 인스턴스로 변환.
 // - Color / "#rrggbb(aa)" / "rgb(a)(...)" 지원. 그 외는 흰색.
 //==============================================================================
@@ -2265,20 +2290,10 @@ export class Graphic extends Object {
 		if (textDirection === "rtl") {
 			return "rtl";
 		}
-		if (textDirection !== "auto" || !text) {
+		if (textDirection !== "auto") {
 			return "ltr";
 		}
-		for (const character of text) {
-			if (!STRONG_DIRECTION_CHARACTER_PATTERN.test(character)) {
-				continue;
-			}
-			if (character === "\u200E") {
-				return "ltr";
-			}
-			const isRightToLeft = RIGHT_TO_LEFT_CHARACTER_PATTERN.test(character) || character === "\u200F" || character === "\u061C";
-			return isRightToLeft ? "rtl" : "ltr";
-		}
-		return "ltr";
+		return detectTextDirection(text);
 	}
 
 	//==============================================================================

@@ -3,6 +3,7 @@
 //==============================================================================
 const System = globalThis;
 import { Object } from "../base/object.js";
+import { splitGraphemes } from "../core/component/text.js";
 
 
 //==============================================================================
@@ -14,13 +15,14 @@ import { Object } from "../base/object.js";
 //     typewriter.start("안녕하세요. 모험을 시작합니다.");
 //     // 매 프레임: typewriter.tick(timeDelta);
 //     // 입력에서: typewriter.isFinished() ? next() : typewriter.skipToEnd();
+// - 글자는 글자 묶음(받침, 결합 부호, 이모지 묶음을 한 자로) 단위로 센다. 글자 공개 알림은 (글자 묶음, 번호) 를 받는다.
 //==============================================================================
 export class Typewriter extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { object } */ #target;
-	/** @private @type { string } */ #fullText;
+	/** @private @type { string[] } */ #fullText; // 글자 묶음 목록.
 	/** @private @type { number } */ #revealedCount;
 	/** @private @type { number } */ #charactersPerSecond;
 	/** @private @type { number } */ #fastForwardMultiplier;
@@ -41,7 +43,7 @@ export class Typewriter extends Object {
 		super();
 
 		this.#target = target;
-		this.#fullText = "";
+		this.#fullText = [];
 		this.#revealedCount = 0;
 		this.#charactersPerSecond = (options.charactersPerSecond !== undefined) ? options.charactersPerSecond : 30;
 		this.#fastForwardMultiplier = (options.fastForwardMultiplier !== undefined) ? options.fastForwardMultiplier : 8;
@@ -62,7 +64,7 @@ export class Typewriter extends Object {
 		if (text !== null && typeof this.#target.setText === "function") {
 			this.#target.setText(text);
 		}
-		this.#fullText = (typeof this.#target.getText === "function") ? this.#target.getText() : (text ? text : "");
+		this.#fullText = splitGraphemes((typeof this.#target.getText === "function") ? this.#target.getText() : (text ? text : ""));
 		this.#revealedCount = 0;
 		this.#isFinished = (this.#fullText.length === 0);
 		this.#isFastForward = false;

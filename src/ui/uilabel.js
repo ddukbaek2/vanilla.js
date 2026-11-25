@@ -327,7 +327,7 @@ export class UILabel extends UIView {
 	}
 
 	//==============================================================================
-	// 표시 글자 수 설정. (-1 이면 전체 — 타자기 연출용, 일반 텍스트 모드 전용)
+	// 표시 글자 수 설정. (-1 이면 전체, 타자기 연출용, 일반 텍스트 모드 전용. 글자 묶음 단위)
 	//==============================================================================
 	/**
 	 * @param { number } visibleCharacterCount
@@ -336,6 +336,19 @@ export class UILabel extends UIView {
 		if (this.#text) {
 			this.#text.setVisibleCharacterCount(visibleCharacterCount);
 		}
+	}
+
+	//==============================================================================
+	// 표시 글자 수 반환. (-1 이면 전체, 붙기 전이면 -1)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getVisibleCharacterCount() {
+		if (this.#text) {
+			return this.#text.getVisibleCharacterCount();
+		}
+		return -1;
 	}
 
 	setFont(font) {
