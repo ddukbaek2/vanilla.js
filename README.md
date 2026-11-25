@@ -81,7 +81,7 @@ esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify
 
 | 도구 | 설명 | 데모 | 소스 |
 | --- | --- | --- | --- |
-| UI Editor | 노드 트리, 인스펙터, 캔버스 편집으로 UI 화면을 짜고 `.ui.json` 으로 저장 | [열기](https://ddukbaek2.com/portfolio/uieditor/) | [`tools/uieditor`](tools/uieditor) |
+| UI Editor | 노드 트리, 인스펙터, 캔버스 편집으로 UI 화면을 짜고 `.uiasset.json` 으로 저장 | [열기](https://ddukbaek2.com/portfolio/uieditor/) | [`tools/uieditor`](tools/uieditor) |
 | Particle Editor | 파티클 프리셋 저작. 미리보기에서 값을 바꾸며 조정 | [열기](https://ddukbaek2.com/portfolio/particleeditor/) | [`tools/particleeditor`](tools/particleeditor) |
 | Timeline Editor | 유니티 타임라인 / 언리얼 시퀀서 쓰임새의 키프레임 저작. 도프 시트 + 커브, 자동 키, 이벤트 / 마커 | [열기](https://ddukbaek2.com/portfolio/timelineeditor/) | [`tools/timelineeditor`](tools/timelineeditor) |
 | Visual Editor | 유니티처럼 도킹 창(하이어라키, 씬, 게임, 인스펙터, 프로젝트, 콘솔)을 갖춘 통합 편집기. 폴더 열기, 프리팹, 되돌리기, 재생. 씬은 UIDocument 형식(`.scene.json`)으로 저장 | [열기](https://ddukbaek2.com/portfolio/visualeditor/) | [`tools/visualeditor`](tools/visualeditor) |
@@ -95,7 +95,9 @@ esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify
 | `node tools/project.cjs check --input <입력>` | 자산 현황 점검 |
 | `node tools/webm.cjs <폴더>` | 음원을 webm 으로 변환 |
 | `node tools/mangle.cjs <입력> <출력> <제외 문자열>` | 코드 내 문자열 정리 |
-| `node tools/excel.cjs` / `node tools/table.cjs` | 엑셀, 테이블 데이터 처리 |
+| `node tools/apidoc.cjs <버전>` | 공개 API 문서 자료(`docs/api/<버전>.json`) 뽑기 |
+
+`tools/excel.cjs` 는 엑셀(xlsx)과 JSON, 데이터 클래스 소스를 오가는 함수 모음입니다. `module.exports` 로 함수만 내보내고 명령줄 진입점이 없어서 `node tools/excel.cjs` 로 혼자 실행하면 아무것도 하지 않습니다. 다른 스크립트에서 `require` 로 불러 쓰고, 쓰는 프로젝트에 npm 패키지 `xlsx` 가 깔려 있어야 합니다. `tools/table.cjs` 는 지금 빈 파일입니다.
 
 ## 샘플
 

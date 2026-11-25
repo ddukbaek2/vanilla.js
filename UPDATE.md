@@ -290,6 +290,11 @@
   - README: 소개(지금 소스를 묶은 번들 크기 약 765 KB, gzip 약 215 KB, 묶어 그리기와 거르기 기본 켬, 렌더 타겟 multiply), 주요 기능 표(입력 동작, 창 쌓기, 모션, 툰 3D, 애셋, 소리 표 같은 이번 판의 것), ShaderSprite 효과 수(none 을 빼면 49), 비주얼 에디터와 atlas.cjs 설명, 배포본이 없는 예제 cameratour, toonmaterial, 가운뎃점을 쉼표로
   - ARCHITECTURE: 배치, 상속 계층(노드인 위젯, Object 를 상속하지 않는 것), 소유 구조(InputActions, PointerCursor, AssetLoader, 툰 3D), 프레임 루프(최대 FPS, 묶음 기억 잊기, 남은 묶음 그리기, 커서), 묶어 그리기와 거르기 기본 켬, multiply 는 렌더 타겟에서 셰이더로 섞음(알려진 공백 표에서 뺌), 미노출 목록(AudioPlayer, GamepadManager 는 이제 낸다), 9장 러스트 판과의 관계
   - UPDATE.md 이 판 머리에서 두 갈래가 겹쳐 적은 줄(WebSocketClient, Localization, UILabel.getVisibleCharacterCount)을 하나씩 남겼다
+- 문서 자료: 사이트가 판마다 문서를 지을 자료를 docs/ 에 둔다. (HTML 은 사이트가 짓는다)
+  - docs/api/<판>.json: import.js 가 내보내는 공개 API(모듈, 클래스, 멤버, 모듈 함수와 상수, 열거). 설명 칸은 { ko, en } 이고 ko 는 소스 주석 원문, en 은 docs/api/translation.en.json(ko 원문 → en) 표에서 온다. since 는 v0.0.8 부터의 태그를 훑어 그 클래스에 그 멤버가 처음 있던 판이다
+  - tools/apidoc.cjs: 위 자료를 뽑는다. (node 내장 모듈만 쓰는 작은 토크나이저, --missing 은 표에 없는 ko 글, --check 는 꼴 검사와 수 세기) 쓰는 법은 tools/TOOLS.md
+  - docs/guide/<판>/ko, en: 개요, 빠른 시작, 구조, 도구. (README, ARCHITECTURE, tools/TOOLS.md, NODE.md 에서 나눔, 저장소 상대 링크는 GitHub 주소로) docs/update/<판>.ko.md, .en.md: 이 판의 업데이트 기록
+  - README: UI Editor 가 저장하는 파일은 .uiasset.json 이다. (.ui.json 이라 적혀 있었다) tools/excel.cjs 는 명령줄 진입점이 없는 함수 모음이라 혼자 실행하면 아무것도 하지 않고, tools/table.cjs 는 빈 파일이라고 바로 적었다. 명령줄 도구 표에 apidoc.cjs 를 더했다
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.
