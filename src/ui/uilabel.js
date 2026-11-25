@@ -314,6 +314,19 @@ export class UILabel extends UIView {
 	}
 
 	//==============================================================================
+	// 줄바꿈 방식 반환. ("word" | "char", 글이 없으면 "word")
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getWrapMode() {
+		if (this.#text) {
+			return this.#text.getWrapMode();
+		}
+		return "word";
+	}
+
+	//==============================================================================
 	// 줄 간격 배율 설정.
 	//==============================================================================
 	/**
@@ -336,6 +349,19 @@ export class UILabel extends UIView {
 		if (this.#text) {
 			this.#text.setVisibleCharacterCount(visibleCharacterCount);
 		}
+	}
+
+	//==============================================================================
+	// 표시 글자 수 반환. (-1 이면 전체)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getVisibleCharacterCount() {
+		if (this.#text) {
+			return this.#text.getVisibleCharacterCount();
+		}
+		return -1;
 	}
 
 	setFont(font) {

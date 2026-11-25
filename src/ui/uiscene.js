@@ -36,7 +36,7 @@ export class UIScene extends Scene {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @private @type { DEVTools } */ #devtools;
+	/** @private @type { DEVTools | null } */ #devtools; // EngineConfiguration.useDevTools 가 꺼져 있으면 null.
 	/** @private @type { TouchRecognizer } */ #touchRaycaster;
 	/** @private @type { number } */ #lastViewSizeX;
 	/** @private @type { number } */ #lastViewSizeY;
@@ -283,9 +283,14 @@ export class UIScene extends Scene {
 		// ViewScaleMode 적용.
 		engine.getViewManager().setViewScaleMode(this.#viewScaleMode);
 
-		this.#devtools = new DEVTools();
-		this.#devtools.setEngine(engine);
-		this.#devtools.setRootNodes([this.getRoot()]);
+		// 개발자 도구. (EngineConfiguration.useDevTools 가 꺼져 있으면 만들지 않는다, GameScene 과 같음)
+		this.#devtools = null;
+		const engineConfiguration = engine.getEngineConfiguration();
+		if (engineConfiguration.useDevTools !== false) {
+			this.#devtools = new DEVTools();
+			this.#devtools.setEngine(engine);
+			this.#devtools.setRootNodes([this.getRoot()]);
+		}
 
 		this.#touchRaycaster = new TouchRecognizer();
 		this.#touchRaycaster.setRootNode(this.getRoot());
@@ -409,7 +414,9 @@ export class UIScene extends Scene {
 
 		const timeManager = engine.getTimeManager();
 		const unscaledTimeDelta = timeManager.getUnscaleDeltaTime();
-		this.#devtools.tick(unscaledTimeDelta);
+		if (this.#devtools !== null && this.#devtools !== undefined) {
+			this.#devtools.tick(unscaledTimeDelta);
+		}
 	}
 
 	//==============================================================================
@@ -528,6 +535,9 @@ export class UIScene extends Scene {
 	 * @returns { boolean }
 	 */
 	isDevToolsCapturingInput() {
+		if (this.#devtools === null || this.#devtools === undefined) {
+			return false;
+		}
 		return this.#devtools.isVisible() && this.#devtools.isPointerInsidePanel();
 	}
 
@@ -632,7 +642,9 @@ export class UIScene extends Scene {
 	 */
 	postDraw(graphic) {
 		super.postDraw(graphic);
-		this.#devtools.draw(graphic);
+		if (this.#devtools !== null && this.#devtools !== undefined) {
+			this.#devtools.draw(graphic);
+		}
 	}
 
 	//==============================================================================

@@ -239,6 +239,20 @@ export class UIInputField extends WorldNode {
 	setFocusBorderWidth(width) { this.#focusBorderWidth = width; }
 	setSelectionColor(color) { this.#selectionColor = color; }
 
+	getPlaceholder() { return this.#placeholder; }
+	getMaxLength() { return this.#maxLength; }
+	getFontSize() { return this.#fontSize; }
+	getPadding() { return this.#padding; }
+	getBackgroundColor() { return this.#bgPaint.getColor(); }
+	getRoundSize() { return this.#bgRoundSize; }
+	getTextColor() { return this.#textColor; }
+	getPlaceholderColor() { return this.#placeholderColor; }
+	getCursorColor() { return this.#cursorColor; }
+	getCursorIndex() { return this.#cursorIndex; }
+	getSelectionStart() { return this.#selectionStart; }
+	getComposition() { return this.#composition; }
+	isComposing() { return this.#isComposing; }
+
 	setOnChange(callback) { this.#onChangeCallback = callback; }
 	setOnSubmit(callback) { this.#onSubmitCallback = callback; }
 

@@ -3,6 +3,7 @@
 //==============================================================================
 const System = globalThis;
 import { Vector2 } from "../base/vector2.js";
+import { Rect } from "../base/rect.js";
 import { Pivot } from "../base/pivot.js";
 import { Color } from "../base/color.js";
 import * as Math from "../base/math.js";
@@ -96,6 +97,31 @@ export class UIScrollBar extends WorldNode {
 	//==============================================================================
 	setAxis(axis) {
 		this.#axis = axis;
+	}
+
+	//==============================================================================
+	// 축 반환.
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getAxis() {
+		return this.#axis;
+	}
+
+	//==============================================================================
+	// 지금 썸 사각형. (스크롤바 노드 영역 안, 썸이 꺼져 있으면 null)
+	//==============================================================================
+	/**
+	 * @returns { Rect | null }
+	 */
+	getThumbRect() {
+		if (!this.#thumbNode.isActive()) {
+			return null;
+		}
+		const thumbPosition = this.#thumbNode.getLocalPosition();
+		const thumbSize = this.#thumbNode.getContentSize();
+		return Rect.create(thumbPosition.x, thumbPosition.y, thumbSize.x, thumbSize.y);
 	}
 
 	//==============================================================================
