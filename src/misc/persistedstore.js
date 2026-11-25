@@ -21,6 +21,7 @@ export class PersistedStore extends Object {
 	/** @private @type { object } */ #defaultState;
 	/** @private @type { object } */ #state;
 	/** @private @type { Set } */ #subscriberSet;
+	/** @private @type { { getItem: Function, setItem: Function, removeItem: Function } | null } */ #storageBackend; // 이 저장소만 쓰는 곳. (null 이면 LocalStorage)
 
 	//==============================================================================
 	// 생성.
@@ -37,6 +38,7 @@ export class PersistedStore extends Object {
 		this.#storageKey = storageKey;
 		this.#version = version;
 		this.#defaultState = defaultState;
+		this.#storageBackend = null;
 		this.#state = this.readFromStorage();
 		this.#subscriberSet = new System.Set();
 	}
@@ -112,7 +114,7 @@ export class PersistedStore extends Object {
 	 * @returns { object }
 	 */
 	readFromStorage() {
-		const storedText = LocalStorage.getString(this.#storageKey, "");
+		const storedText = this.readStoredText();
 		if (storedText.length === 0) {
 			return System.Object.assign({}, this.#defaultState);
 		}
@@ -135,7 +137,61 @@ export class PersistedStore extends Object {
 	//==============================================================================
 	writeToStorage() {
 		const payload = { version: this.#version, state: this.#state };
-		LocalStorage.setString(this.#storageKey, System.JSON.stringify(payload));
+		const payloadText = System.JSON.stringify(payload);
+		const storageBackend = this.getStorageBackend();
+		if (storageBackend === null) {
+			LocalStorage.setString(this.#storageKey, payloadText);
+			return;
+		}
+		try {
+			storageBackend.setItem(this.#storageKey, payloadText);
+		}
+		catch (error) {
+			console.warn(`[PersistedStore] 저장소에 쓰지 못했습니다: ${this.#storageKey}`, error);
+		}
+	}
+
+	//==============================================================================
+	// 저장된 글 읽기. (없거나 못 읽으면 빈 글)
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	readStoredText() {
+		const storageBackend = this.getStorageBackend();
+		if (storageBackend === null) {
+			return LocalStorage.getString(this.#storageKey, "");
+		}
+		try {
+			const storedText = storageBackend.getItem(this.#storageKey);
+			return typeof storedText === "string" ? storedText : "";
+		}
+		catch (error) {
+			return "";
+		}
+	}
+
+	//==============================================================================
+	// 이 저장소만 쓰는 곳 갈아 끼우기. (null 이면 LocalStorage, 플랫폼의 저장소처럼 getItem, setItem, removeItem 을 가진 객체)
+	// - 갈아 끼운 곳에서 상태를 다시 읽고 구독자에게 알린다. 저장된 것이 없으면 기본값이다.
+	//==============================================================================
+	/**
+	 * @param { { getItem: Function, setItem: Function, removeItem: Function } | null } storageBackend
+	 */
+	setStorageBackend(storageBackend) {
+		this.#storageBackend = storageBackend === undefined ? null : storageBackend;
+		this.#state = this.readFromStorage();
+		this.notify();
+	}
+
+	//==============================================================================
+	// 이 저장소만 쓰는 곳 반환. (없으면 null)
+	//==============================================================================
+	/**
+	 * @returns { object | null }
+	 */
+	getStorageBackend() {
+		return this.#storageBackend;
 	}
 
 	//==============================================================================
