@@ -200,3 +200,4 @@ export { UISpinner } from "./src/ui/uispinner.js";
 export { UIToast } from "./src/ui/uitoast.js";
 export { ToastMotion, attachToastMotion, readToastSeconds } from "./src/ui/toastmotion.js";
 export { UIDialog } from "./src/ui/uidialog.js";
+export { ToonScreenOutline, ToonOutlineWidthUnit, TOON_SCREEN_OUTLINE_MAXIMUM_SAMPLES, TOON_SCREEN_OUTLINE_MAXIMUM_CREASE_SAMPLES } from "./src/experimental/graphics/toon/toonscreenoutline.js";
