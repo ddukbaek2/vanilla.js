@@ -539,7 +539,7 @@ function parseJsdoc(commentText) {
 				restText = restText.slice(nameMatch[0].length).trim();
 			}
 		}
-		restText = restText.replace(/^-\s*/, "").trim();
+		restText = restText.replace(/^-\s+/, "").trim(); // "이름 - 설명" 꼴의 하이픈만 뗀다. ("-1 이면" 처럼 붙은 음수는 그대로)
 		return { name: tag.name, type: type, parameterName: parameterName, text: restText, rawText: tag.rawText };
 	});
 	const freeText = freeLines.join("").split("\n").map((freeLine) => freeLine.replace(/\s+$/, "")).join("\n").trim();
