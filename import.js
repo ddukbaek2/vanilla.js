@@ -226,3 +226,7 @@ export { HeatHazeEffect } from "./src/effect/heathazeeffect.js";
 export { TweenProperty, applyTweenProperty } from "./src/core/tween.js";
 export { Indicator } from "./src/experimental/indicator.js";
 export { ToastPhase } from "./src/ui/toastmotion.js";
+// 글자, 글꼴 갈래. (글자 아틀라스, 글자 묶음과 낱말 나누기, 글의 첫 강한 방향)
+export { DynamicFont, GlyphInfo } from "./src/misc/dynamicfont.js";
+export { splitGraphemes, splitWords, countGraphemes, sliceGraphemes } from "./src/core/component/text.js";
+export { detectTextDirection } from "./src/core/graphic.js";

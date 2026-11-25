@@ -177,6 +177,18 @@
 - UIScene: EngineConfiguration.useDevTools 가 꺼져 있으면 GameScene 처럼 개발자 도구를 만들지 않는다. (지금까지는 늘 만들었다)
 - 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
 
+- 글자, 글꼴을 러스트 판(vanilla-engine)과 맞췄다:
+  - 표시 글자 수(Text.setVisibleCharacterCount)와 Typewriter 는 글자 묶음 단위로 센다. (전에는 UTF-16 단위라 이모지와 결합 부호가 쪼개졌다) 여러 줄 글에서 남은 수가 음수로 떨어지면 다음 줄을 통째로 그리던 것을 고쳤다. (0 이 되면 다음 줄부터 그리지 않는다) Typewriter 의 글자 공개 알림은 글자 묶음을 받는다. countGraphemes, sliceGraphemes
+  - Text.calculateDrawnRect: 줄을 바꾸는 글도 사각형을 안다. (화면 밖 거르기) getMeasuredLineCount
+  - RichText: 글자 방향을 쓴다. 조각을 이은 글로 문단 방향을 정하고(이 글자의 방향, "inherit" 면 Graphic 의 방향), 오른쪽에서 왼쪽이면 조각을 오른쪽부터 놓는다. 정렬 "start" / "end" 도 그 방향으로 푼다. (전에는 조각에 방향을 쓰지 않았다)
+  - ShadowText: setItalic, setUnderline, setStrikethrough 와 게터, isBold. 밑줄과 취소선도 그림자와 함께 굽는다. 글 방향에 "auto"(글의 첫 강한 글자로)
+  - UILabel.getVisibleCharacterCount
+  - Graphic: detectTextDirection(text) 를 내보낸다. (setTextDirection("auto") 와 같은 셈)
+  - DynamicFont: buildAtlas 로 글자를 더하면 든 글자를 모두 새 캔버스에 다시 놓는다. (전에는 새 글자만 새 캔버스에 놓아 앞서 구운 글자가 어긋났다) 글자 묶음 단위, rebuildAtlas, measureText. import.js 에서 DynamicFont, GlyphInfo 를 내보낸다
+  - Localization: selectLanguage(태그의 뒤 조각부터 떼며 코드와 별칭을 본다, detectLanguage 가 쓴다), setLanguageAliases, setRightToLeft, isRightToLeft, mirrorLayoutX, readLayoutTextAlign, isolateText, textNamed
+  - LanguagePack: setLanguageList(data), setLanguageTexts(code, texts, fallbackTexts) (파일 없이 바로 넣기)
+  - import.js: splitGraphemes, splitWords, countGraphemes, sliceGraphemes, detectTextDirection
+  - 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.
