@@ -250,6 +250,44 @@ export class Color extends Object {
 
 	/** @private @type { Map } */ static #hexCache = new System.Map();
 
+	//==============================================================================
+	// 색 문자열로 캐시한 색 반환. (정적, "#rgb", "#rgba", "#rrggbb", "#rrggbbaa", "rgb(...)", "rgba(...)", 그 밖은 흰색)
+	// - 같은 문자열이면 같은 인스턴스를 준다. 매 프레임 같은 문자열로 색을 정할 때 문자열을 다시 풀지 않는다.
+	// - 반환된 인스턴스는 공유되므로 절대 고쳐 쓰지 않는다. 고칠 거면 clone() 한다.
+	// - 오래 안 쓴 것부터 버린다. (1024 개까지)
+	//==============================================================================
+	/**
+	 * @param { string } colorString
+	 * @returns { Color }
+	 */
+	static fromCache(colorString) {
+		const colorCache = Color.#stringCache;
+		let cachedColor = colorCache.get(colorString);
+		if (cachedColor !== undefined) {
+			colorCache.delete(colorString);
+			colorCache.set(colorString, cachedColor);
+			return cachedColor;
+		}
+		const trimmedColorString = colorString.trim().toLowerCase();
+		if (trimmedColorString.startsWith("#")) {
+			cachedColor = Color.createFromHEX(trimmedColorString);
+		}
+		else if (trimmedColorString.startsWith("rgb")) {
+			cachedColor = Color.createFromRGBA(trimmedColorString);
+		}
+		else {
+			cachedColor = Color.white();
+		}
+		colorCache.set(colorString, cachedColor);
+		while (colorCache.size > 1024) {
+			const oldestColorString = colorCache.keys().next().value;
+			colorCache.delete(oldestColorString);
+		}
+		return cachedColor;
+	}
+
+	/** @private @type { Map<string, Color> } */ static #stringCache = new System.Map();
+
 	static createFromHEX(colorString) {
 		const color = new Color(1.0, 1.0, 1.0, 1.0);
 		colorString = colorString.trim().toLowerCase();

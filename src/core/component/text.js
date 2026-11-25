@@ -9,6 +9,7 @@ import { SYSTEM_FONT_STRING } from "../../base/platform.js";
 import { Component } from "../component.js";
 import { Graphic } from "../graphic.js";
 import { FontAsset } from "../../resource/fontasset.js";
+import { measureTextMetrics } from "../graphic/textstringtexturecache.js";
 
 
 //==============================================================================
@@ -159,6 +160,12 @@ export function buildFontString(fontFace, fontSize, bold, italic) {
 
 
 //==============================================================================
+// 그리는 사각형을 셀 때 내용 크기를 읽어 두는 칸. (Text.calculateDrawnRect)
+//==============================================================================
+const drawnRectContentSize = Vector2.zero();
+
+
+//==============================================================================
 // 웹 글꼴의 조각이 받아진 횟수. (늘면 그릴 때 나눠 둔 줄을 다시 나눈다, ShadowText 와 같은 방식)
 //==============================================================================
 let fontLoadCount = 0;
@@ -213,6 +220,10 @@ export class Text extends Component {
 	/** @private @type { number } */ #lineSpacing; // 줄 간격 배율.
 	/** @private @type { number } */ #visibleCharacterCount; // 표시 글자 수. -1 이면 전체.
 	/** @private @type { object } */ #wrapCache; // 그릴 때 나눈 줄과 그때의 글, 글꼴, 크기, 폭, 줄바꿈 방식. (같으면 다시 나누지 않는다)
+	/** @private @type { number } */ #fitWidth; // 한 줄 글을 맞출 너비. (0 이면 맞추지 않는다)
+	/** @private @type { number } */ #fitMinimumRatio; // 맞출 때 줄이는 가장 작은 비율.
+	/** @private @type { object } */ #fitCache; // 맞춘 크기와 그때의 글, 글꼴, 크기, 너비, 비율. (같으면 다시 재지 않는다)
+	/** @private @type { string | null } */ #textColorString; // 마지막으로 받은 색 문자열. (같은 문자열이면 다시 풀지 않는다, Color 로 받았으면 null)
 
 	//==============================================================================
 	// 생성.
@@ -232,6 +243,21 @@ export class Text extends Component {
 			fontFaceCount: -1,
 			lineList: null,
 		};
+		this.#fitWidth = 0;
+		this.#fitMinimumRatio = 0.55;
+		this.#fitCache = {
+			text: "",
+			fontFace: null,
+			fontSize: 0,
+			bold: false,
+			italic: false,
+			fitWidth: -1,
+			fitMinimumRatio: -1,
+			fontLoadCount: -1,
+			fontFaceCount: -1,
+			fittedFontSize: 0,
+		};
+		this.#textColorString = null;
 		this.#fontFace = null;
 		this.#text = "";
 		this.#fontSize = 32;
@@ -373,16 +399,16 @@ export class Text extends Component {
 			}
 			const lineY = blockTop + (lineIndex + 0.5) * lineHeight;
 			if (strokeColor && this.#strokeWidth > 0) {
-				graphic.setStrokeColor(strokeColor.toHEXString());
+				graphic.setStrokeColor(strokeColor);
 				graphic.drawStrokeText(lineText, drawX, lineY, this.#strokeWidth);
 			}
-			graphic.setFillColor(textColor.toHEXString());
+			graphic.setFillColor(textColor);
 			graphic.drawFillText(lineText, drawX, lineY);
 
 			if (this.#underline || this.#strikethrough) {
 				const lineWidth = this.measurePlainTextWidth(lineText);
 				const startX = this.computeUnderlineStartX(drawX, lineWidth, textAlign);
-				graphic.setStrokeColor(textColor.toHEXString());
+				graphic.setStrokeColor(textColor);
 				if (this.#underline) {
 					this.strokeHorizontalLine(graphic, startX, lineY + this.#fontSize * 0.5 + decorationLineWidth, lineWidth, decorationLineWidth);
 				}
@@ -583,25 +609,26 @@ export class Text extends Component {
 			drawY = contentSize.y * 0.5;
 		}
 
-		graphic.setFontString(buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic));
+		// 맞출 너비가 있으면 넘치지 않게 줄인 크기로 그린다. (표시 글자 수로 자른 글이 아니라 온 글로 잰다)
+		const fontSize = this.getFittedFontSize();
+		graphic.setFontString(buildFontString(this.#fontFace, fontSize, this.#bold, this.#italic));
 		graphic.setTextAlign(textAlign);
 		graphic.setTextBaseline(this.#textBaseline);
 
 		const strokeColor = this.getStrokeColor();
 		if (strokeColor && this.#strokeWidth > 0) {
-			graphic.setStrokeColor(strokeColor.toHEXString());
+			graphic.setStrokeColor(strokeColor);
 			graphic.drawStrokeText(text, drawX, drawY, this.#strokeWidth);
 		}
 
 		const textColor = this.getTextColor();
-		graphic.setFillColor(textColor.toHEXString());
+		graphic.setFillColor(textColor);
 		graphic.drawFillText(text, drawX, drawY);
 
 		if (this.#underline || this.#strikethrough) {
-			const textWidth = this.measurePlainTextWidth(text);
+			const textWidth = this.measureText(text, fontSize);
 			const startX = this.computeUnderlineStartX(drawX, textWidth, textAlign);
-			const fontSize = this.#fontSize;
-			graphic.setStrokeColor(textColor.toHEXString());
+			graphic.setStrokeColor(textColor);
 			const lineWidth = System.Math.max(1, fontSize / 16);
 			if (this.#underline) {
 				const underlineY = drawY + this.computeUnderlineOffsetY(fontSize);
@@ -622,15 +649,173 @@ export class Text extends Component {
 	 * @returns { number }
 	 */
 	measurePlainTextWidth(text) {
-		const measurementContext = getMeasurementCanvasRenderingContext();
-		if (measurementContext === null) {
+		return this.measureText(text, this.#fontSize);
+	}
+
+	//==============================================================================
+	// 글의 너비 재기. (이 글자의 글꼴, 굵게, 기울임으로, 주지 않으면 지금 글과 정한 크기로)
+	// - 글꼴 문자열과 글이 같으면 다시 재지 않는다. (measureTextMetrics 의 캐시, 웹 글꼴이 받아지면 비운다)
+	// - 문서가 없으면 0.
+	//==============================================================================
+	/**
+	 * @param { string } text
+	 * @param { number } fontSize
+	 * @returns { number }
+	 */
+	measureText(text = this.#text, fontSize = this.#fontSize) {
+		if (!text) {
 			return 0;
 		}
-		measurementContext.save();
-		measurementContext.font = buildFontString(this.#fontFace, this.#fontSize, this.#bold, this.#italic);
-		const width = measurementContext.measureText(text).width;
-		measurementContext.restore();
-		return width;
+		const fontString = buildFontString(this.#fontFace, fontSize, this.#bold, this.#italic);
+		const textMetrics = measureTextMetrics(fontString, text);
+		if (textMetrics === null) {
+			return 0;
+		}
+		return textMetrics.width;
+	}
+
+	//==============================================================================
+	// 한 줄 글을 너비에 맞추기 설정. (넘치면 처음 크기에서 최소 비율까지 줄여 그린다)
+	// - 언어마다 글의 길이가 달라 칸을 넘칠 때, 칸을 넓힐 수 없는 곳(단추, 줄 이름, 제목)에 쓴다.
+	// - 정한 크기(getFontSize)는 그대로 두고 그릴 때의 크기(getFittedFontSize)만 줄인다. 글이나 글꼴이 바뀌면 다시 맞춘다.
+	// - 최소 비율까지 줄여도 넘치면 넘친 채로 그린다. 화면 밖 거르기는 넘친 너비까지 본다. (calculateDrawnRect)
+	// - 줄을 바꾸는 글(setWordWrapWidth, 줄바꿈 문자)은 맞추지 않는다.
+	// - width 가 0 이하면 맞추지 않는다. (기본)
+	//==============================================================================
+	/**
+	 * @param { number } width
+	 * @param { number } minimumRatio 0 ~ 1, 기본 0.55.
+	 */
+	setFitWidth(width, minimumRatio = 0.55) {
+		this.#fitWidth = System.Math.max(0, width);
+		this.#fitMinimumRatio = System.Math.min(1, System.Math.max(0, minimumRatio));
+	}
+
+	//==============================================================================
+	// 맞출 너비 반환. (0 이면 맞추지 않는다)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getFitWidth() {
+		return this.#fitWidth;
+	}
+
+	//==============================================================================
+	// 맞출 때 줄이는 가장 작은 비율 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getFitMinimumRatio() {
+		return this.#fitMinimumRatio;
+	}
+
+	//==============================================================================
+	// 그릴 때의 크기 반환. (맞출 너비를 넘치면 줄인 크기, 0.1 단위로 내림, 아니면 정한 크기)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getFittedFontSize() {
+		const text = this.#text;
+		if (this.#fitWidth <= 0 || !text || this.#wordWrapWidth > 0 || text.indexOf("\n") >= 0) {
+			return this.#fontSize;
+		}
+		const fitCache = this.#fitCache;
+		const fontFaceCount = readFontFaceCount();
+		const isSame = fitCache.text === text
+			&& fitCache.fontFace === this.#fontFace
+			&& fitCache.fontSize === this.#fontSize
+			&& fitCache.bold === this.#bold
+			&& fitCache.italic === this.#italic
+			&& fitCache.fitWidth === this.#fitWidth
+			&& fitCache.fitMinimumRatio === this.#fitMinimumRatio
+			&& fitCache.fontLoadCount === fontLoadCount
+			&& fitCache.fontFaceCount === fontFaceCount;
+		if (isSame) {
+			return fitCache.fittedFontSize;
+		}
+		let fittedFontSize = this.#fontSize;
+		const textWidth = this.measureText(text, this.#fontSize);
+		if (textWidth > this.#fitWidth) {
+			const fitRatio = System.Math.max(this.#fitMinimumRatio, this.#fitWidth / textWidth);
+			fittedFontSize = System.Math.floor(this.#fontSize * fitRatio * 10) / 10;
+		}
+		fitCache.text = text;
+		fitCache.fontFace = this.#fontFace;
+		fitCache.fontSize = this.#fontSize;
+		fitCache.bold = this.#bold;
+		fitCache.italic = this.#italic;
+		fitCache.fitWidth = this.#fitWidth;
+		fitCache.fitMinimumRatio = this.#fitMinimumRatio;
+		fitCache.fontLoadCount = fontLoadCount;
+		fitCache.fontFaceCount = fontFaceCount;
+		fitCache.fittedFontSize = fittedFontSize;
+		return fittedFontSize;
+	}
+
+	//==============================================================================
+	// 그리는 사각형을 rect 에 적기. (노드 내용 영역의 왼쪽 위가 원점, 화면 밖 거르기가 쓴다, 알면 true)
+	// - 한 줄 글만 안다. 정렬로 놓은 글의 너비(맞춘 크기, 넘쳐도 그 너비)에 외곽선과 글꼴 크기의 반만큼을 양옆에 더하고,
+	//   세로는 베이스라인 자리에서 위아래로 글꼴 크기의 1.5 배씩 넉넉히 잡는다.
+	// - 줄을 바꾸는 글, 글이 없거나 잴 수 없으면 false. (거르지 않는다)
+	//==============================================================================
+	/**
+	 * @param { Rect } rect
+	 * @returns { boolean }
+	 */
+	calculateDrawnRect(rect) {
+		const text = this.#text;
+		if (!text || this.#wordWrapWidth > 0 || text.indexOf("\n") >= 0) {
+			return false;
+		}
+		const node = this.getNode();
+		if (node === null || node === undefined || typeof node.copyContentSizeTo !== "function") {
+			return false;
+		}
+		if (getMeasurementCanvasRenderingContext() === null) {
+			return false;
+		}
+		const contentSize = drawnRectContentSize;
+		node.copyContentSizeTo(contentSize);
+		const fontSize = this.getFittedFontSize();
+		const textWidth = this.measureText(text, fontSize);
+		const textAlign = this.#textAlign;
+		let leftX;
+		let rightX;
+		if (textAlign === "left") {
+			leftX = 0;
+			rightX = textWidth;
+		}
+		else if (textAlign === "right") {
+			leftX = contentSize.x - textWidth;
+			rightX = contentSize.x;
+		}
+		else if (textAlign === "center") {
+			leftX = (contentSize.x - textWidth) * 0.5;
+			rightX = leftX + textWidth;
+		}
+		else {
+			// "start" / "end" 는 그릴 때의 방향으로 왼쪽이나 오른쪽이 되므로 둘 다 품는다.
+			leftX = System.Math.min(0, contentSize.x - textWidth);
+			rightX = System.Math.max(textWidth, contentSize.x);
+		}
+		let anchorY;
+		if (this.#textBaseline === "top" || this.#textBaseline === "hanging") {
+			anchorY = 0;
+		}
+		else if (this.#textBaseline === "bottom" || this.#textBaseline === "ideographic" || this.#textBaseline === "alphabetic") {
+			anchorY = contentSize.y;
+		}
+		else {
+			anchorY = contentSize.y * 0.5;
+		}
+		const horizontalMargin = fontSize * 0.5 + this.#strokeWidth;
+		const verticalMargin = fontSize * 1.5 + this.#strokeWidth;
+		rect.position.set(leftX - horizontalMargin, anchorY - verticalMargin);
+		rect.size.set(rightX - leftX + horizontalMargin * 2, verticalMargin * 2);
+		return true;
 	}
 
 	//==============================================================================
@@ -845,6 +1030,9 @@ export class Text extends Component {
 	}
 
 	setText(text) {
+		if (this.#text === text) {
+			return;
+		}
 		this.#text = text;
 	}
 
@@ -885,6 +1073,15 @@ export class Text extends Component {
 	 * @param { Color | string | CanvasGradient | CanvasPattern } color
 	 */
 	setTextColor(color) {
+		// 같은 색 문자열이고 가진 색이 그 색 그대로면 새로 만들지 않는다. (매 프레임 같은 색을 넣는 게임, 가진 색을 밖에서 고쳤으면 다시 만든다)
+		if (typeof color === "string" && color === this.#textColorString) {
+			const cachedColor = Color.fromCache(color);
+			const textColor = this.#textColor;
+			if (textColor.red === cachedColor.red && textColor.green === cachedColor.green && textColor.blue === cachedColor.blue && textColor.alpha === cachedColor.alpha) {
+				return;
+			}
+		}
+		this.#textColorString = (typeof color === "string") ? color : null;
 		if (color === null || color === undefined) {
 			this.#textColor = Color.transparent();
 		}

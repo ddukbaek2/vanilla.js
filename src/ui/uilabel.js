@@ -130,6 +130,11 @@ export class UILabel extends UIView {
 	 * @param { string } text
 	 */
 	setText(text) {
+		// 같은 글이면 건너뛴다. (내재 크기를 다시 셈하게 하지 않는다, 리치텍스트는 조각을 따로 쌓았을 수 있어 늘 넣는다)
+		const isSameText = !this.#useRichText && this.#text !== null && this.#text.getText() === text && this.#richText !== null && this.#richText.getText() === text;
+		if (isSameText) {
+			return;
+		}
 		if (this.#text) {
 			this.#text.setText(text);
 		}
@@ -196,6 +201,72 @@ export class UILabel extends UIView {
 			this.#richText.setFontSize(fontSize);
 		}
 		this.invalidateIntrinsicContentSize();
+	}
+
+	//==============================================================================
+	// 한 줄 글을 너비에 맞추기 설정. (넘치면 처음 크기에서 최소 비율까지 줄여 그린다, Text.setFitWidth)
+	// - 리치텍스트 모드는 맞추지 않는다. width 가 0 이하면 맞추지 않는다.
+	//==============================================================================
+	/**
+	 * @param { number } width
+	 * @param { number } minimumRatio 0 ~ 1, 기본 0.55.
+	 */
+	setFitWidth(width, minimumRatio = 0.55) {
+		if (this.#text) {
+			this.#text.setFitWidth(width, minimumRatio);
+		}
+	}
+
+	//==============================================================================
+	// 맞출 너비 반환. (0 이면 맞추지 않는다)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getFitWidth() {
+		if (this.#text) {
+			return this.#text.getFitWidth();
+		}
+		return 0;
+	}
+
+	//==============================================================================
+	// 그릴 때의 크기 반환. (맞춰 줄였으면 줄인 크기)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getFittedFontSize() {
+		if (this.#text) {
+			return this.#text.getFittedFontSize();
+		}
+		return 0;
+	}
+
+	//==============================================================================
+	// 글의 너비 재기. (이 라벨의 글꼴, 굵게, 기울임으로, 주지 않으면 지금 글과 정한 크기로, Text.measureText)
+	//==============================================================================
+	/**
+	 * @param { string } text
+	 * @param { number } fontSize
+	 * @returns { number }
+	 */
+	measureText(text = this.getText(), fontSize = this.getFontSize()) {
+		if (this.#text) {
+			return this.#text.measureText(text, fontSize);
+		}
+		return 0;
+	}
+
+	//==============================================================================
+	// 내용 영역 안에서만 그리는지. (라벨 자신은 내용 영역에 바탕만 칠한다, 글은 Text 가 따로 알린다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @returns { boolean }
+	 */
+	isDrawnInsideContent() {
+		return true;
 	}
 
 	//==============================================================================

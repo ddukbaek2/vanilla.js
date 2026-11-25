@@ -41,6 +41,75 @@ export function isTextAntialiasOn() {
 
 
 //==============================================================================
+// 글 재기 캐시. (글꼴 문자열과 글이 같으면 다시 재지 않는다, measureTextMetrics)
+// - 오래 안 쓴 것부터 버린다. (MAXIMUM_MEASURE_COUNT 개까지)
+// - 웹 글꼴의 조각이 받아지거나(loadingdone) 문서의 글꼴 얼굴 수가 바뀌면 통째로 비운다. (받기 전에 잰 너비는 대신 쓴 글꼴의 너비다)
+//==============================================================================
+const MAXIMUM_MEASURE_COUNT = 2048;
+const measureCache = new System.Map();
+let measureCanvasRenderingContext = null;
+let measureFontLoadCount = 0;
+let measuredFontLoadCount = 0;
+let measuredFontFaceCount = -1;
+if (System.document !== undefined && System.document.fonts !== undefined) {
+	System.document.fonts.addEventListener("loadingdone", () => {
+		measureFontLoadCount += 1;
+	});
+}
+
+//==============================================================================
+// 글 재기. (캐시를 거친다, 문서가 없으면 null)
+// - 돌려준 TextMetrics 는 캐시가 나눠 쓰므로 고치지 않는다.
+//==============================================================================
+/**
+ * @param { string } fontString
+ * @param { string } text
+ * @returns { TextMetrics | null }
+ */
+export function measureTextMetrics(fontString, text) {
+	const document = System.document;
+	if (document === undefined || document === null) {
+		return null;
+	}
+	if (measureCanvasRenderingContext === null) {
+		const measureCanvas = document.createElement("canvas");
+		measureCanvasRenderingContext = measureCanvas.getContext("2d");
+	}
+	const fontFaceCount = document.fonts !== undefined ? document.fonts.size : 0;
+	if (measuredFontLoadCount !== measureFontLoadCount || measuredFontFaceCount !== fontFaceCount) {
+		measureCache.clear();
+		measuredFontLoadCount = measureFontLoadCount;
+		measuredFontFaceCount = fontFaceCount;
+	}
+	const cacheKey = fontString + "\u0000" + text;
+	const cachedTextMetrics = measureCache.get(cacheKey);
+	if (cachedTextMetrics !== undefined) {
+		measureCache.delete(cacheKey);
+		measureCache.set(cacheKey, cachedTextMetrics);
+		return cachedTextMetrics;
+	}
+	measureCanvasRenderingContext.font = fontString;
+	const textMetrics = measureCanvasRenderingContext.measureText(text);
+	measureCache.set(cacheKey, textMetrics);
+	while (measureCache.size > MAXIMUM_MEASURE_COUNT) {
+		const oldestKey = measureCache.keys().next().value;
+		measureCache.delete(oldestKey);
+	}
+	return textMetrics;
+}
+
+//==============================================================================
+// 글 재기 캐시에 든 수. (시험과 통계용)
+//==============================================================================
+/**
+ * @returns { number }
+ */
+export function readMeasureCacheCount() {
+	return measureCache.size;
+}
+
+
+//==============================================================================
 // unicode-range 글 → 코드 포인트 범위 목록. ("U+0-FF, U+4??" → [[0, 255], [1024, 1279]], 비었으면 전체)
 //==============================================================================
 /**
@@ -131,7 +200,8 @@ export class TextStringTextureCache extends Object {
 	}
 
 	//==============================================================================
-	// 문자열 측정. (화면에 보이지 않는 오프스크린 컨텍스트 사용)
+	// 문자열 측정. (화면에 보이지 않는 오프스크린 컨텍스트 사용, 글꼴 문자열과 글이 같으면 캐시한 것을 준다)
+	// - 돌려준 TextMetrics 는 캐시가 나눠 쓰므로 고치지 않는다. (measureTextMetrics)
 	//==============================================================================
 	/**
 	 * @param { string } fontString
@@ -139,10 +209,13 @@ export class TextStringTextureCache extends Object {
 	 * @returns { TextMetrics }
 	 */
 	measureText(fontString, text) {
+		const textMetrics = measureTextMetrics(fontString, text);
+		if (textMetrics !== null) {
+			return textMetrics;
+		}
 		const measurementCanvasRenderingContext = this.getMeasurementCanvasRenderingContext();
 		measurementCanvasRenderingContext.font = fontString;
-		const textMetrics = measurementCanvasRenderingContext.measureText(text);
-		return textMetrics;
+		return measurementCanvasRenderingContext.measureText(text);
 	}
 
 	//==============================================================================

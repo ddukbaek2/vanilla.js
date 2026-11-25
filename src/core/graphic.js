@@ -180,13 +180,8 @@ function parseColorValue(colorValue) {
 		return colorValue.clone();
 	}
 	if (typeof colorValue === "string") {
-		const trimmedColorString = colorValue.trim().toLowerCase();
-		if (trimmedColorString.startsWith("#")) {
-			return Color.createFromHEX(trimmedColorString);
-		}
-		if (trimmedColorString.startsWith("rgb")) {
-			return Color.createFromRGBA(trimmedColorString);
-		}
+		// 같은 문자열은 풀어 둔 색을 나눠 쓴다. (Graphic 은 받은 색을 고치지 않는다)
+		return Color.fromCache(colorValue);
 	}
 	return Color.white();
 }
@@ -259,6 +254,8 @@ export class Graphic extends Object {
 	/** @private @type { number } */ #appliedViewportWidth;
 	/** @private @type { number } */ #appliedViewportHeight;
 	/** @private @type { number } */ #textBakeScaleStep; // 텍스트 베이크 스케일 양자화 단위. (0 이면 양자화하지 않음)
+	/** @private @type { number } */ #textBakeMotionScaleStep; // 배율이 움직이는 노드의 텍스트 베이크 스케일 양자화 단위. (textBakeScaleStep 이 0 일 때만 쓴다)
+	/** @private @type { boolean } */ #isTextBakeScaleMoving; // 지금 그리는 노드의 배율이 지난 프레임과 달라 움직이는 중인지.
 	/** @private @type { boolean } */ #isTextPixelSnapEnabled; // 텍스트 쿼드를 디바이스 픽셀 격자에 맞출지.
 	/** @private @type { number } */ #drawCallCount; // 이번 프레임의 드로우 콜 수.
 	/** @private @type { number } */ #drawVertexCount; // 이번 프레임에 그린 정점 수.
@@ -391,6 +388,8 @@ export class Graphic extends Object {
 		this.#appliedViewportWidth = 0;
 		this.#appliedViewportHeight = 0;
 		this.#textBakeScaleStep = DEFAULT_TEXT_BAKE_SCALE_STEP;
+		this.#textBakeMotionScaleStep = DEFAULT_TEXT_BAKE_SCALE_STEP;
+		this.#isTextBakeScaleMoving = false;
 		this.#isTextPixelSnapEnabled = false;
 		this.#drawCallCount = 0;
 		this.#drawVertexCount = 0;
@@ -2181,6 +2180,69 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// 배율이 움직이는 노드의 텍스트 베이크 스케일 양자화 단위 설정. (기본 0.25)
+	// - 양자화 단위(setTextBakeScaleStep)가 0 일 때, 그리는 노드의 변환 배율이 지난 프레임과 다르면(확대 움직임, 팝업, 트윈, 카메라 확대)
+	//   이 단위로 묶은 배율로 굽는다. 프레임마다 다른 배율로 새로 굽지 않는다.
+	// - 배율이 멈추면(지난 프레임과 같으면) 정확한 배율로 다시 구워 1:1 로 또렷하다.
+	// - 0 이면 움직이는 동안에도 묶지 않는다. (지금까지와 같다)
+	//==============================================================================
+	/**
+	 * @param { number } textBakeMotionScaleStep
+	 */
+	setTextBakeMotionScaleStep(textBakeMotionScaleStep) {
+		this.#textBakeMotionScaleStep = Math.max(0, textBakeMotionScaleStep);
+	}
+
+	//==============================================================================
+	// 배율이 움직이는 노드의 텍스트 베이크 스케일 양자화 단위 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getTextBakeMotionScaleStep() {
+		return this.#textBakeMotionScaleStep;
+	}
+
+	//==============================================================================
+	// 지금 그리는 노드의 배율이 움직이는 중인지 설정. (drawNode 가 정한다, 노드 밖에서 직접 그릴 때 부르는 쪽이 정할 수 있다)
+	//==============================================================================
+	/**
+	 * @param { boolean } isTextBakeScaleMoving
+	 */
+	setTextBakeScaleMoving(isTextBakeScaleMoving) {
+		this.#isTextBakeScaleMoving = isTextBakeScaleMoving === true;
+	}
+
+	//==============================================================================
+	// 지금 그리는 노드의 배율이 움직이는 중인지 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isTextBakeScaleMoving() {
+		return this.#isTextBakeScaleMoving;
+	}
+
+	//==============================================================================
+	// 노드의 변환 배율이 지난 프레임과 달라 움직이는 중인지 셈하고 기억하기. (drawNode 가 pushTransform 뒤에 부른다)
+	// - 양자화 단위가 0 이 아니면 늘 묶어 굽으므로 셈하지 않는다.
+	// - 처음 그리는 노드는 움직이지 않는 것으로 본다. (첫 프레임에 두 번 굽지 않게)
+	//==============================================================================
+	/**
+	 * @param { TransformNode } node
+	 * @returns { boolean }
+	 */
+	readNodeTextBakeScaleMoving(node) {
+		if (this.#textBakeScaleStep > 0 || this.#textBakeMotionScaleStep <= 0 || typeof node.getLastDrawnMaximumScale !== "function") {
+			return false;
+		}
+		const maximumScale = this.#transformMatrix.getMaximumScale();
+		const lastDrawnMaximumScale = node.getLastDrawnMaximumScale();
+		node.setLastDrawnMaximumScale(maximumScale);
+		return lastDrawnMaximumScale > 0 && lastDrawnMaximumScale !== maximumScale;
+	}
+
+	//==============================================================================
 	// 텍스트 픽셀 스냅 설정.
 	// - 켜면 회전 / 기울임이 없는 변환에서 글자 쿼드의 왼쪽 위를 디바이스 픽셀 격자에 맞춘다.
 	// - 베이크 스케일이 실제 스케일과 같을 때(setTextBakeScaleStep(0)) 텍셀과 픽셀이 1:1 로 맞아 가장 선명하다.
@@ -2210,7 +2272,10 @@ export class Graphic extends Object {
 	 */
 	calculateTextBakeScale(){
 		const maximumScale = this.#transformMatrix.getMaximumScale();
-		const textBakeScaleStep = this.getTextBakeScaleStep();
+		let textBakeScaleStep = this.getTextBakeScaleStep();
+		if (textBakeScaleStep <= 0 && this.isTextBakeScaleMoving()) {
+			textBakeScaleStep = this.getTextBakeMotionScaleStep();
+		}
 		const quantizedScale = textBakeScaleStep > 0 ? Math.round(maximumScale / textBakeScaleStep) * textBakeScaleStep : maximumScale;
 		return Math.clamp(quantizedScale, 0.25, MAXIMUM_TEXT_BAKE_SCALE);
 	}
@@ -2341,7 +2406,10 @@ export class Graphic extends Object {
 
 		try {
 			node.pushTransform(this);
+			// 배율이 움직이는 노드의 글은 묶은 배율로 굽는다. (자식은 저마다 다시 정한다, 다 그리면 푼다)
+			this.#isTextBakeScaleMoving = this.readNodeTextBakeScaleMoving(node);
 			node.draw(this);
+			this.#isTextBakeScaleMoving = false;
 
 			const isForceGizmosVisible = this.isForceGizmosVisible();
 			const isGizmoVisible = isForceGizmosVisible || node.isGizmoVisible();
