@@ -619,4 +619,14 @@ export class SkinnedModelRenderer extends Object {
 	getWebGL2RenderingContext() {
 		return this.#webGL2RenderingContext;
 	}
+
+	//==============================================================================
+	// 빈 그림자 텍스처 반환. (그림자를 받지 않을 때 섀도우 유닛에 묶는 1x1 비교 깊이 텍스처, 파생 렌더러가 같이 쓴다)
+	//==============================================================================
+	/**
+	 * @returns { WebGLTexture }
+	 */
+	getEmptyShadowTexture() {
+		return this.#emptyShadowTexture;
+	}
 }
