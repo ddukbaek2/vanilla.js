@@ -78,6 +78,20 @@ export class TextAsset extends Asset
 	}
 
 	//==============================================================================
+	// 이미 가진 바이트로 읽기. (UTF-8 로 읽고, UTF-8 이 아닌 바이트는 대체 문자로 바꾼다, 이미 읽혔어도 새 바이트로 바꾼다)
+	//==============================================================================
+	/**
+	 * @param { string } assetPath getAssetPath 에 쓸 이름.
+	 * @param { ArrayBuffer | ArrayBufferView } bytes
+	 */
+	loadFromBytes(assetPath, bytes) {
+		this.setAssetPath(assetPath);
+		const textDecoder = new System.TextDecoder("utf-8");
+		this.text = textDecoder.decode(bytes);
+		this.setLoaded(true);
+	}
+
+	//==============================================================================
 	// 애셋 언로드.
 	//==============================================================================
 	/**

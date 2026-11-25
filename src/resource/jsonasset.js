@@ -52,6 +52,27 @@ export class JsonAsset extends TextAsset
 	}
 
 	//==============================================================================
+	// 이미 가진 바이트로 읽기. (UTF-8 JSON, 해석하지 못하면 알리고 읽히지 않은 것으로 둔다. load 와 같다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { string } assetPath getAssetPath 에 쓸 이름.
+	 * @param { ArrayBuffer | ArrayBufferView } bytes
+	 */
+	loadFromBytes(assetPath, bytes) {
+		super.loadFromBytes(assetPath, bytes);
+		this.setLoaded(false);
+		this.data = null;
+		try {
+			this.data = JSON.parse(this.text);
+			this.setLoaded(true);
+		}
+		catch (error) {
+			console.error(`Error loading json: ${assetPath}`, error);
+		}
+	}
+
+	//==============================================================================
 	// 애셋 언로드.
 	//==============================================================================
 	/**

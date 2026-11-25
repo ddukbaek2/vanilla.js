@@ -57,6 +57,38 @@ export class ImageAsset extends Asset {
 	}
 
 	//==============================================================================
+	// 이미 가진 바이트로 읽기. (png, jpeg, webp 처럼 브라우저가 푸는 그림, 이미 읽혔어도 새 바이트로 바꾼다)
+	// - 풀지 못하면 예외를 낸다. (load 와 같다)
+	//==============================================================================
+	/**
+	 * @param { string } assetPath 실패 알림과 getAssetPath 에 쓸 이름.
+	 * @param { ArrayBuffer | ArrayBufferView | Blob } bytes
+	 */
+	async loadFromBytes(assetPath, bytes) {
+		this.setLoaded(false);
+		this.setAssetPath(assetPath);
+		const blob = bytes instanceof System.Blob ? bytes : new System.Blob([bytes]);
+		const objectUrl = System.URL.createObjectURL(blob);
+		const image = new System.window.Image();
+		this.image = image;
+		try {
+			await new Promise((resolve, reject) => {
+				image.onload = () => {
+					resolve();
+				};
+				image.onerror = () => {
+					reject(new Error(`Load fail: ${assetPath}`));
+				};
+				image.src = objectUrl;
+			});
+			this.setLoaded(true);
+		}
+		finally {
+			System.URL.revokeObjectURL(objectUrl);
+		}
+	}
+
+	//==============================================================================
 	// 이미지 반환.
 	//==============================================================================
 	/**

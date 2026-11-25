@@ -201,6 +201,17 @@ export class SpriteAtlas extends Object {
 	}
 
 	//==============================================================================
+	// 쪽 수.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getPageCount() {
+		const pageImages = this.getPageImages();
+		return pageImages.length;
+	}
+
+	//==============================================================================
 	// 이름 목록 반환. (확장자를 뗀 이름과 파일 이름이 함께 든다)
 	//==============================================================================
 	/**
@@ -280,6 +291,39 @@ export class SpriteAtlas extends Object {
 	 */
 	static applySearchFrame(sprite, frameName) {
 		const frame = SpriteAtlas.findFrame(frameName);
+		sprite.setFrame(frame);
+		return frame !== null;
+	}
+
+	//==============================================================================
+	// 넘긴 아틀라스들에서 차례로 조각 찾기. (정적, 앞의 것이 이긴다, 없으면 null, 찾을 아틀라스 목록을 쓰지 않는다)
+	//==============================================================================
+	/**
+	 * @param { SpriteAtlas[] } atlasList
+	 * @param { string } frameName
+	 * @returns { Frame | null }
+	 */
+	static findFrameInOrder(atlasList, frameName) {
+		for (const spriteAtlas of atlasList) {
+			const frame = spriteAtlas.readFrame(frameName);
+			if (frame !== null) {
+				return frame;
+			}
+		}
+		return null;
+	}
+
+	//==============================================================================
+	// 넘긴 아틀라스들에서 차례로 찾은 조각을 스프라이트에 걸기. (정적, 없으면 그림을 비우고 false)
+	//==============================================================================
+	/**
+	 * @param { SpriteAtlas[] } atlasList
+	 * @param { Sprite } sprite
+	 * @param { string } frameName
+	 * @returns { boolean }
+	 */
+	static applyFrameInOrder(atlasList, sprite, frameName) {
+		const frame = SpriteAtlas.findFrameInOrder(atlasList, frameName);
 		sprite.setFrame(frame);
 		return frame !== null;
 	}

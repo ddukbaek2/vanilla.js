@@ -45,6 +45,19 @@ export class BlobAsset extends Asset {
 	}
 
 	//==============================================================================
+	// 이미 가진 바이트로 읽기. (이미 읽혔어도 새 바이트로 바꾼다)
+	//==============================================================================
+	/**
+	 * @param { string } assetPath getAssetPath 에 쓸 이름.
+	 * @param { ArrayBuffer | ArrayBufferView | Blob } bytes
+	 */
+	loadFromBytes(assetPath, bytes) {
+		this.setAssetPath(assetPath);
+		this.#blob = bytes instanceof System.Blob ? bytes : new System.Blob([bytes]);
+		this.setLoaded(true);
+	}
+
+	//==============================================================================
 	// 블롭 반환.
 	//==============================================================================
 	/**

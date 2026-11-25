@@ -73,6 +73,27 @@ export class FontAsset extends Asset
 	}
 
 	//==============================================================================
+	// 이미 가진 글꼴 바이트로 읽기. (ttf, otf, woff, woff2, 다 읽히면 document.fonts 에 family 이름으로 오른다)
+	//==============================================================================
+	/**
+	 * @param { string } family
+	 * @param { ArrayBuffer | ArrayBufferView } bytes 글꼴 파일의 바이트. (넘긴 것은 바뀌지 않는다)
+	 * @param { object } descriptors FontFace 서술자. (weight, style 등, 없으면 생략)
+	 */
+	async loadFontFromBytes(family, bytes, descriptors) {
+		if (this.fontFace) {
+			return;
+		}
+		this.family = family;
+		const fontFaceDescriptors = descriptors === undefined || descriptors === null ? {} : descriptors;
+		const arrayBuffer = copyToArrayBuffer(bytes);
+		this.fontFace = new FontFace(this.family, arrayBuffer, fontFaceDescriptors);
+		await this.fontFace.load();
+		document.fonts.add(this.fontFace);
+		this.setLoaded(true);
+	}
+
+	//==============================================================================
 	// 애셋 언로드.
 	//==============================================================================
 	/**
@@ -88,4 +109,20 @@ export class FontAsset extends Asset
 		this.fontFace = null;
 		this.setLoaded(false);
 	}
+}
+
+//==============================================================================
+// 바이트를 새 ArrayBuffer 로 복사. (ArrayBuffer 나 Uint8Array 같은 형식 배열, 디코딩이 받은 버퍼를 떼어 가도 넘긴 쪽은 그대로다)
+//==============================================================================
+/**
+ * @param { ArrayBuffer | ArrayBufferView } bytes
+ * @returns { ArrayBuffer }
+ */
+function copyToArrayBuffer(bytes) {
+	if (bytes instanceof ArrayBuffer) {
+		return bytes.slice(0);
+	}
+	const byteOffset = bytes.byteOffset;
+	const byteLength = bytes.byteLength;
+	return bytes.buffer.slice(byteOffset, byteOffset + byteLength);
 }

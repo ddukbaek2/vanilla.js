@@ -41,11 +41,7 @@ export class AudioAsset extends Asset {
 			return Promise.resolve();
 		}
 
-		// 디코딩은 OfflineAudioContext 로 한다. (스피커를 잡지 않고, user gesture 전에 만들어도 자동재생 경고가 없으며,
-		//  여러 애셋을 한꺼번에 받아도 실시간 AudioContext 의 개수 제한에 걸리지 않는다) 없으면 잠시 쓰는 AudioContext 로 한다.
-		const offlineAudioContextType = System.window.OfflineAudioContext || System.window.webkitOfflineAudioContext;
-		const audioContextType = System.window.AudioContext || System.window.webkitAudioContext;
-		if (!offlineAudioContextType && !audioContextType) {
+		if (!isAudioDecodingSupported()) {
 			console.error(`AudioContext is not supported.`);
 			return;
 		}
@@ -53,21 +49,60 @@ export class AudioAsset extends Asset {
 		try {
 			const response = await System.fetch(assetPath);
 			const arrayBuffer = await response.arrayBuffer();
-			if (offlineAudioContextType) {
-				const decodeAudioContext = new offlineAudioContextType(1, 1, DECODE_SAMPLE_RATE);
-				this.#audioBuffer = await decodeAudioContext.decodeAudioData(arrayBuffer);
-			}
-			else {
-				const tempAudioContext = new audioContextType();
-				this.#audioBuffer = await tempAudioContext.decodeAudioData(arrayBuffer);
-				await tempAudioContext.close();
-			}
-			this.setLoaded(true);
+			await this.decodeArrayBuffer(arrayBuffer);
 		}
 		catch (error) {
 			console.error(`Error loading sound: ${assetPath}`, error);
 			throw error;
 		}
+	}
+
+	//==============================================================================
+	// 이미 가진 바이트로 읽기. (내장 자료나 직접 받은 파일, 디코딩이 끝나면 isLoaded() 가 참, 이미 읽혔으면 아무것도 하지 않는다)
+	//==============================================================================
+	/**
+	 * @param { ArrayBuffer | ArrayBufferView } bytes 소리 파일의 바이트. (넘긴 것은 바뀌지 않는다)
+	 */
+	async loadFromBytes(bytes) {
+		const isLoaded = this.isLoaded();
+		if (isLoaded) {
+			return;
+		}
+		if (!isAudioDecodingSupported()) {
+			console.error(`AudioContext is not supported.`);
+			return;
+		}
+		try {
+			const arrayBuffer = copyToArrayBuffer(bytes);
+			await this.decodeArrayBuffer(arrayBuffer);
+		}
+		catch (error) {
+			console.error(`Error loading sound from bytes`, error);
+			throw error;
+		}
+	}
+
+	//==============================================================================
+	// 소리 바이트 디코딩. (다 되면 오디오 버퍼를 들고 읽힌 것으로 둔다)
+	// - 디코딩은 OfflineAudioContext 로 한다. (스피커를 잡지 않고, user gesture 전에 만들어도 자동재생 경고가 없으며,
+	//   여러 애셋을 한꺼번에 받아도 실시간 AudioContext 의 개수 제한에 걸리지 않는다) 없으면 잠시 쓰는 AudioContext 로 한다.
+	//==============================================================================
+	/**
+	 * @param { ArrayBuffer } arrayBuffer 디코딩이 떼어 가므로 뒤에 다시 쓰지 않는다.
+	 */
+	async decodeArrayBuffer(arrayBuffer) {
+		const offlineAudioContextType = System.window.OfflineAudioContext || System.window.webkitOfflineAudioContext;
+		const audioContextType = System.window.AudioContext || System.window.webkitAudioContext;
+		if (offlineAudioContextType) {
+			const decodeAudioContext = new offlineAudioContextType(1, 1, DECODE_SAMPLE_RATE);
+			this.#audioBuffer = await decodeAudioContext.decodeAudioData(arrayBuffer);
+		}
+		else {
+			const tempAudioContext = new audioContextType();
+			this.#audioBuffer = await tempAudioContext.decodeAudioData(arrayBuffer);
+			await tempAudioContext.close();
+		}
+		this.setLoaded(true);
 	}
 
 	//==============================================================================
@@ -92,4 +127,33 @@ export class AudioAsset extends Asset {
 		}
 		return 0.0;
 	}
+}
+
+//==============================================================================
+// 바이트를 새 ArrayBuffer 로 복사. (ArrayBuffer 나 Uint8Array 같은 형식 배열, 디코딩이 받은 버퍼를 떼어 가도 넘긴 쪽은 그대로다)
+//==============================================================================
+/**
+ * @param { ArrayBuffer | ArrayBufferView } bytes
+ * @returns { ArrayBuffer }
+ */
+function copyToArrayBuffer(bytes) {
+	if (bytes instanceof System.ArrayBuffer) {
+		return bytes.slice(0);
+	}
+	const byteOffset = bytes.byteOffset;
+	const byteLength = bytes.byteLength;
+	return bytes.buffer.slice(byteOffset, byteOffset + byteLength);
+}
+
+
+//==============================================================================
+// 소리를 디코딩할 수 있는지. (OfflineAudioContext 나 AudioContext 가 있으면)
+//==============================================================================
+/**
+ * @returns { boolean }
+ */
+function isAudioDecodingSupported() {
+	const offlineAudioContextType = System.window.OfflineAudioContext || System.window.webkitOfflineAudioContext;
+	const audioContextType = System.window.AudioContext || System.window.webkitAudioContext;
+	return offlineAudioContextType !== undefined || audioContextType !== undefined;
 }

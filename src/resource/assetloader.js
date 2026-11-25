@@ -21,7 +21,7 @@ const DEFAULT_CONCURRENCY = 6;
 // - 실패한 것도 끝난 것으로 쳐서 멈추지 않는다. 실패는 getFailedList() 에 { path, error } 로 남는다.
 // - 진행률은 끝난 수 / 전체 수다. (getProgress, 받은 수 getLoadedCount, 끝난 수 getFinishedCount, 전체 getTotalCount)
 //   바뀔 때마다 setProgressHandler 로 건 함수를, 다 끝나면 setCompleteHandler 로 건 함수를 부른다.
-// - 받는 동안 더 넣은 것도 같은 load 가 받는다. 다 끝난 뒤 더 넣으면 load() 를 다시 부른다.
+// - 받는 동안 더 넣은 것도 같은 load 가 받는다. (일꾼이 동시에 받는 수보다 적게 돌고 있으면 그만큼 더 띄운다) 다 끝난 뒤 더 넣으면 load() 를 다시 부른다.
 // - 쓰기:
 //     const assetLoader = new AssetLoader();
 //     assetLoader.setConcurrency(8);
@@ -41,6 +41,8 @@ export class AssetLoader extends Object {
 	/** @private @type { number } */ #loadedCount;
 	/** @private @type { Array<{ path: string, error: any }> } */ #failedList;
 	/** @private @type { Promise<Array<object>> | null } */ #loadPromise;
+	/** @private @type { Array<Promise<void>> } */ #workerPromiseList; // 아직 기다리지 않은 일꾼.
+	/** @private @type { number } */ #activeWorkerCount; // 돌고 있는 일꾼 수.
 	/** @private @type { ((progress: number, finishedCount: number, totalCount: number) => void) | null } */ #progressHandler;
 	/** @private @type { ((failedList: Array<object>) => void) | null } */ #completeHandler;
 
@@ -59,6 +61,8 @@ export class AssetLoader extends Object {
 		this.#loadedCount = 0;
 		this.#failedList = [];
 		this.#loadPromise = null;
+		this.#workerPromiseList = [];
+		this.#activeWorkerCount = 0;
 		this.#progressHandler = null;
 		this.#completeHandler = null;
 	}
@@ -206,6 +210,11 @@ export class AssetLoader extends Object {
 	 */
 	addEntry(path, loadFunction, asset) {
 		this.#entryList.push({ path: path, loadFunction: loadFunction, asset: asset, isFinished: false });
+
+		// 받는 중이면 일꾼을 더 띄운다. (처음 load 때 넣은 것이 적어 일꾼이 적게 떴어도 동시에 받는 수까지 늘린다)
+		if (this.#loadPromise !== null) {
+			this.startWorkers();
+		}
 	}
 
 	//==============================================================================
@@ -230,14 +239,14 @@ export class AssetLoader extends Object {
 	 * @returns { Promise<Array<object>> }
 	 */
 	async runWorkers() {
-		const concurrency = this.getConcurrency();
-		const remainingCount = this.#entryList.length - this.#nextEntryIndex;
-		const workerCount = System.Math.min(concurrency, remainingCount);
-		const workerList = [];
-		for (let workerIndex = 0; workerIndex < workerCount; ++workerIndex) {
-			workerList.push(this.runWorker());
+		this.startWorkers();
+
+		// 기다리는 동안 더 띄운 일꾼도 모두 끝날 때까지 기다린다.
+		while (this.#workerPromiseList.length > 0) {
+			const workerPromiseList = this.#workerPromiseList;
+			this.#workerPromiseList = [];
+			await System.Promise.all(workerPromiseList);
 		}
-		await System.Promise.all(workerList);
 		this.#loadPromise = null;
 		this.notifyProgress();
 		const failedList = this.getFailedList();
@@ -251,6 +260,20 @@ export class AssetLoader extends Object {
 			}
 		}
 		return failedList;
+	}
+
+	//==============================================================================
+	// 일꾼 띄우기. (돌고 있는 일꾼이 동시에 받는 수보다 적으면, 아직 아무도 집지 않은 것만큼 더 띄운다)
+	//==============================================================================
+	startWorkers() {
+		const concurrency = this.getConcurrency();
+		const unclaimedCount = this.#entryList.length - this.#nextEntryIndex;
+		const workerCount = System.Math.min(concurrency - this.#activeWorkerCount, unclaimedCount);
+		for (let workerIndex = 0; workerIndex < workerCount; ++workerIndex) {
+			this.#activeWorkerCount += 1;
+			const workerPromise = this.runWorker();
+			this.#workerPromiseList.push(workerPromise);
+		}
 	}
 
 	//==============================================================================
@@ -285,6 +308,9 @@ export class AssetLoader extends Object {
 			}
 			this.notifyProgress();
 		}
+
+		// 목록이 빈 것을 본 그 자리에서 빠진다. (그 뒤에 더 넣은 것은 startWorkers 가 새 일꾼으로 받는다)
+		this.#activeWorkerCount -= 1;
 	}
 
 	//==============================================================================
