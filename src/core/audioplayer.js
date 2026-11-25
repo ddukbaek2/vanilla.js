@@ -22,6 +22,7 @@ export class AudioPlayer {
 	/** @private @type { number } */ #volume; // 음량. (0 ~ 1, 음소거를 풀면 이 음량으로 돌아간다)
 	/** @private @type { boolean } */ #isLoop; // 루프 여부.
 	/** @private @type { number } */ #time; // 재생 위치 (초). play() 호출 시 이 위치부터 재생.
+	/** @private @type { number } */ #playbackRate; // 재생 빠르기. (1 이면 그대로, 다음 play 부터)
 
 	//==============================================================================
 	// 생성.
@@ -40,6 +41,7 @@ export class AudioPlayer {
 		this.#volume = 1;
 		this.#isLoop = false;
 		this.#time = 0;
+		this.#playbackRate = 1;
 
 		if (audioContext) {
 			this.#gainNode = audioContext.createGain();
@@ -102,6 +104,7 @@ export class AudioPlayer {
 		this.#audioSource = audioContext.createBufferSource();
 		this.#audioSource.buffer = audioBuffer;
 		this.#audioSource.loop = loop;
+		this.#audioSource.playbackRate.value = this.#playbackRate;
 		this.#audioSource.connect(this.#gainNode);
 
 		this.#audioSource.onended = () => {
@@ -111,6 +114,17 @@ export class AudioPlayer {
 
 		this.#audioSource.start(0, this.#time);
 		this.#isPlaying = true;
+	}
+
+	//==============================================================================
+	// 재생 빠르기 설정. (1 이면 그대로, 음 높이도 같이 바뀐다, 다음 play 부터, 0 이하이거나 숫자가 아니면 1)
+	//==============================================================================
+	/**
+	 * @param { number } playbackRate
+	 */
+	setPlaybackRate(playbackRate) {
+		const isValid = typeof playbackRate === "number" && System.Number.isFinite(playbackRate) && playbackRate > 0;
+		this.#playbackRate = isValid ? playbackRate : 1;
 	}
 
 	//==============================================================================
