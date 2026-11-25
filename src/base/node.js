@@ -370,6 +370,39 @@ export class Node extends Object {
 	}
 
 	//==============================================================================
+	// 이름으로 하위 계층 전체에서 찾기. (깊이 우선, findChildRecursiveByName 과 같다, 러스트 판 find_descendant_by_name 과 같은 이름)
+	//==============================================================================
+	/**
+	 * @param { string } name
+	 * @returns { Node | null }
+	 */
+	findDescendantByName(name) {
+		const descendant = this.findChildRecursiveByName(name);
+		return descendant;
+	}
+
+	//==============================================================================
+	// 조건에 맞는 직계 자식 떼어 파괴. (떼어 낸 수 반환, 러스트 판 destroy_children_where 와 같은 이름)
+	//==============================================================================
+	/**
+	 * @param { function(Node): boolean } predicate
+	 * @returns { number }
+	 */
+	destroyChildrenWhere(predicate) {
+		const children = this.getChildren().slice();
+		let destroyedCount = 0;
+		for (const child of children) {
+			if (!predicate(child)) {
+				continue;
+			}
+			this.removeChild(child);
+			child.destroy();
+			destroyedCount += 1;
+		}
+		return destroyedCount;
+	}
+
+	//==============================================================================
 	// 이름으로 직계 자식 제거.
 	//==============================================================================
 	/**

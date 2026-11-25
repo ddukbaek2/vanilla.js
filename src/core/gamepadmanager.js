@@ -169,9 +169,9 @@ export class GamepadManager extends Object {
 			axes: new Map(),    // key: index, value: number
 		};
 
-		// 버튼 초기화.
+		// 버튼 초기화. (previousPressed 는 지난 갱신의 눌림)
 		for (let i = 0; i < gamepad.buttons.length; i++) {
-			state.buttons.set(i, { pressed: false, value: 0 });
+			state.buttons.set(i, { pressed: false, value: 0, previousPressed: false });
 		}
 
 		// 축 초기화.
@@ -268,6 +268,7 @@ export class GamepadManager extends Object {
 				if (!lastButtonState) {
 					continue;
 				}
+				lastButtonState.previousPressed = lastButtonState.pressed;
 
 				// 눌림 상태 변화 감지.
 				if (lastButtonState.pressed !== currentButton.pressed) {
@@ -351,6 +352,46 @@ export class GamepadManager extends Object {
 		if (!state) return false;
 		const button = state.buttons.get(buttonIndex);
 		return button ? button.pressed : false;
+	}
+
+	//==============================================================================
+	// 이번 갱신에 방금 눌린 버튼인지. (키보드 isKeyJustPressed 와 같은 쓰임)
+	//==============================================================================
+	/**
+	 * @param { number } gamepadIndex
+	 * @param { number } buttonIndex
+	 * @returns { boolean }
+	 */
+	isButtonJustPressed(gamepadIndex, buttonIndex) {
+		const state = this.#connectedGamepadStates.get(gamepadIndex);
+		if (!state) {
+			return false;
+		}
+		const button = state.buttons.get(buttonIndex);
+		if (!button) {
+			return false;
+		}
+		return button.pressed && !button.previousPressed;
+	}
+
+	//==============================================================================
+	// 이번 갱신에 방금 떼어진 버튼인지.
+	//==============================================================================
+	/**
+	 * @param { number } gamepadIndex
+	 * @param { number } buttonIndex
+	 * @returns { boolean }
+	 */
+	isButtonJustReleased(gamepadIndex, buttonIndex) {
+		const state = this.#connectedGamepadStates.get(gamepadIndex);
+		if (!state) {
+			return false;
+		}
+		const button = state.buttons.get(buttonIndex);
+		if (!button) {
+			return false;
+		}
+		return !button.pressed && button.previousPressed;
 	}
 
 	//==============================================================================
