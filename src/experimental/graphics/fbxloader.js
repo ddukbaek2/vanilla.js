@@ -109,6 +109,19 @@ export class FbxLoader extends Object {
 	 * @returns { Promise<object> }
 	 */
 	async parse(arrayBuffer) {
+		const topNodeList = await this.parseNodeRecords(arrayBuffer);
+		const sceneData = await this.interpret(topNodeList);
+		return sceneData;
+	}
+
+	//==============================================================================
+	// 최상위 노드 목록 파싱. (머리 확인 + 버전별 오프셋 크기 + 노드 레코드들, parse 의 앞부분)
+	//==============================================================================
+	/**
+	 * @param { ArrayBuffer } arrayBuffer
+	 * @returns { Promise<object[]> } { name, properties, children } 의 배열.
+	 */
+	async parseNodeRecords(arrayBuffer) {
 		this.#fileBytes = new System.Uint8Array(arrayBuffer);
 		this.#dataView = new System.DataView(arrayBuffer);
 
@@ -116,7 +129,7 @@ export class FbxLoader extends Object {
 		if (!magicText.startsWith("Kaydara FBX Binary")) {
 			throw new Error("FbxLoader: not a binary FBX file.");
 		}
-		const fbxVersion = this.#dataView.getUint32(23, true);
+		const fbxVersion = FbxLoader.readVersion(arrayBuffer);
 		this.#useWideOffsets = fbxVersion >= 7500;
 		this.#readCursor = 27;
 
@@ -129,9 +142,19 @@ export class FbxLoader extends Object {
 			}
 			topNodeList.push(topNode);
 		}
+		return topNodeList;
+	}
 
-		const sceneData = await this.interpret(topNodeList);
-		return sceneData;
+	//==============================================================================
+	// FBX 버전 반환. (정적, 머리의 버전 번호, 7400 = 7.4)
+	//==============================================================================
+	/**
+	 * @param { ArrayBuffer } arrayBuffer
+	 * @returns { number }
+	 */
+	static readVersion(arrayBuffer) {
+		const dataView = new System.DataView(arrayBuffer);
+		return dataView.getUint32(23, true);
 	}
 
 	//==============================================================================

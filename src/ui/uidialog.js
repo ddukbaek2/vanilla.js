@@ -35,6 +35,7 @@ export class UIDialog extends WorldNode {
 	/** @private @type { WorldNode } */ #cancelNode;
 	/** @private @type { Function | null } */ #confirmHandler;
 	/** @private @type { Function | null } */ #cancelHandler;
+	/** @private @type { boolean | null } */ #pendingDismiss; // 다음 tick 에 닫을 때 확인인지. (null 이면 없음)
 
 	//==============================================================================
 	// 생성.
@@ -59,6 +60,7 @@ export class UIDialog extends WorldNode {
 		this.setActive(false);
 		this.#confirmHandler = null;
 		this.#cancelHandler = null;
+		this.#pendingDismiss = null;
 
 		// 어둡게 가리는 막. (누르면 취소)
 		this.#overlayNode = new WorldNode();
@@ -170,6 +172,7 @@ export class UIDialog extends WorldNode {
 		this.#messageLabel.setText(messageText);
 		this.#confirmHandler = options.onConfirm ? options.onConfirm : null;
 		this.#cancelHandler = options.onCancel ? options.onCancel : null;
+		this.#pendingDismiss = null;
 		if (options.confirmText) {
 			this.#confirmNode.getComponents(UILabel)[0].setText(options.confirmText);
 		}
@@ -216,6 +219,16 @@ export class UIDialog extends WorldNode {
 	}
 
 	//==============================================================================
+	// 다음 tick 에 닫기. (tick 밖에서 닫기를 미룰 때)
+	//==============================================================================
+	/**
+	 * @param { boolean } isConfirmed
+	 */
+	requestDismiss(isConfirmed) {
+		this.#pendingDismiss = isConfirmed;
+	}
+
+	//==============================================================================
 	// 갱신.
 	//==============================================================================
 	/**
@@ -224,6 +237,11 @@ export class UIDialog extends WorldNode {
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
+		if (this.#pendingDismiss !== null) {
+			const isConfirmed = this.#pendingDismiss;
+			this.#pendingDismiss = null;
+			this.dismiss(isConfirmed);
+		}
 		this.#popupMotion.tick(timeDelta);
 		this.applyMotion();
 	}

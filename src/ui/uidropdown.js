@@ -105,6 +105,9 @@ export class UIDropdown extends WorldNode {
 		popupPaint.setColor(this.#popupColor);
 		popupPaint.setRoundSize(8);
 		this.addChild(this.#popupNode);
+
+		// 머리 단추 틴트가 펼침 목록 행까지 닿지 않게 한다. (닿으면 머리 단추가 눌렀을 때 담아 둔 옛 행 색을 매 tick 다시 써서 선택 강조가 덮인다)
+		headerButton.excludeNodeFromTint(this.#popupNode);
 	}
 
 	//==============================================================================
@@ -268,6 +271,11 @@ export class UIDropdown extends WorldNode {
 			const paintComponents = rowList[rowIndex].getComponents(Paint);
 			if (paintComponents.length > 0) {
 				paintComponents[0].setColor(rowIndex === this.#selectedIndex ? this.#highlightColor.clone() : new Color(0, 0, 0, 0));
+			}
+			// 행 단추가 틴트 원래 색을 새 강조 색으로 다시 담게 한다. (다시 펼쳤을 때 옛 색으로 덮지 않게)
+			const rowButton = rowList[rowIndex].getComponent(UIButton);
+			if (rowButton) {
+				rowButton.collectColorTargets();
 			}
 		}
 	}

@@ -300,6 +300,109 @@ export class DEVTools extends Object {
 	}
 
 	//==============================================================================
+	// 보이기와 숨기기. (F2 와 같다. 보일 때 패널을 창 오른쪽 아래에 붙이고, 모든 기즈모 설정을 건다)
+	//==============================================================================
+	/**
+	 * @param { boolean } isVisible
+	 */
+	setVisible(isVisible) {
+		this.#isVisible = isVisible;
+		if (!this.#engine) {
+			return;
+		}
+		const graphic = this.#engine.getGraphic();
+		const isForceGizmosVisible = this.#isVisible && this.#isAllGizmosVisible;
+		graphic.setForceGizmosVisible(isForceGizmosVisible);
+		if (this.#isVisible) {
+			// 패널 좌표는 canvas-native 픽셀 기준, ViewScaleMode 와 무관하게 항상 동일한 사이즈로 우측하단에 고정.
+			const viewManager = this.#engine.getViewManager();
+			const canvasNativeSize = viewManager.getCanvasNativeSize();
+			this.#panelX = canvasNativeSize.x - this.#panelWidth;
+			this.#panelY = canvasNativeSize.y - this.#panelHeight;
+		}
+	}
+
+	//==============================================================================
+	// 지금 탭 반환. (0 Statistics, 1 Node Hierarchy, 2 Local Storage, 3 Settings)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getActiveTab() {
+		return this.#activeTab;
+	}
+
+	//==============================================================================
+	// 탭 설정. (없는 탭이면 무시)
+	//==============================================================================
+	/**
+	 * @param { number } tabIndex
+	 */
+	setActiveTab(tabIndex) {
+		if (tabIndex >= 0 && tabIndex < TABS.length) {
+			this.#activeTab = tabIndex;
+		}
+	}
+
+	//==============================================================================
+	// 고른 노드 반환.
+	//==============================================================================
+	/**
+	 * @returns { TransformNode | null }
+	 */
+	getSelectedNode() {
+		return this.#selectedNode;
+	}
+
+	//==============================================================================
+	// 노드 고르기. (인스펙터 스크롤은 맨 위로)
+	//==============================================================================
+	/**
+	 * @param { TransformNode | null } node
+	 */
+	setSelectedNode(node) {
+		this.#selectedNode = node;
+		this.#inspectorScrollY = 0;
+	}
+
+	//==============================================================================
+	// 트리에서 노드를 펼쳤는지.
+	//==============================================================================
+	/**
+	 * @param { TransformNode } node
+	 * @returns { boolean }
+	 */
+	isNodeExpanded(node) {
+		return this.#expandedNodes.has(node);
+	}
+
+	//==============================================================================
+	// 트리에서 노드 펼치기와 접기.
+	//==============================================================================
+	/**
+	 * @param { TransformNode } node
+	 * @param { boolean } isExpanded
+	 */
+	setNodeExpanded(node, isExpanded) {
+		if (isExpanded) {
+			this.#expandedNodes.add(node);
+		}
+		else {
+			this.#expandedNodes.delete(node);
+		}
+	}
+
+	//==============================================================================
+	// 패널 영역 반환. (창 안쪽 논리 좌표)
+	//==============================================================================
+	/**
+	 * @returns { Rect }
+	 */
+	getPanelRect() {
+		return Rect.create(this.#panelX, this.#panelY, this.#panelWidth, this.#panelHeight);
+	}
+
+	//==============================================================================
 	// 현재 터치 위치가 패널 내부에 있는지 반환.
 	//==============================================================================
 	/**
@@ -334,17 +437,8 @@ export class DEVTools extends Object {
 
 		// F2 just-pressed 감지.
 		if (isKeyF2 && !this.#prevIsKeyF2) {
-			this.#isVisible = !this.#isVisible;
-			const graphic = this.#engine.getGraphic();
-			const isForceGizmosVisible = this.#isVisible && this.#isAllGizmosVisible;
-			graphic.setForceGizmosVisible(isForceGizmosVisible);
-			if (this.#isVisible) {
-				// 패널 좌표는 canvas-native 픽셀 기준 — ViewScaleMode 와 무관하게 항상 동일한 사이즈로 우측하단에 고정.
-				const viewManager = this.#engine.getViewManager();
-				const canvasNativeSize = viewManager.getCanvasNativeSize();
-				this.#panelX = canvasNativeSize.x - this.#panelWidth;
-				this.#panelY = canvasNativeSize.y - this.#panelHeight;
-			}
+			const isNextVisible = !this.#isVisible;
+			this.setVisible(isNextVisible);
 		}
 		this.#prevIsKeyF2 = isKeyF2;
 

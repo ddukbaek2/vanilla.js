@@ -4,6 +4,7 @@
 const System = globalThis;
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
+import { Rect } from "../base/rect.js";
 import { Color } from "../base/color.js";
 import { WorldNode } from "../core/node/worldnode.js";
 import { Paint } from "../core/component/paint.js";
@@ -235,6 +236,14 @@ const COMPONENT_PROPERTY_TABLE = {
 				if (resolvedImage) {
 					component.setImage(resolvedImage);
 				}
+			}
+			// 쓸 때의 꼴(Rect 의 left, top, right, bottom = [왼쪽, 위, 왼쪽 + 오른쪽, 위 + 아래])을 거꾸로 풀어 읽는다.
+			if (System.Array.isArray(data.nineSlice) && data.nineSlice.length === 4) {
+				const nineSliceLeft = data.nineSlice[0];
+				const nineSliceTop = data.nineSlice[1];
+				const nineSliceRight = data.nineSlice[2] - nineSliceLeft;
+				const nineSliceBottom = data.nineSlice[3] - nineSliceTop;
+				component.setNineSlice(Rect.create(nineSliceLeft, nineSliceTop, nineSliceRight, nineSliceBottom));
 			}
 			if (data.spriteDrawMode !== undefined) {
 				component.setSpriteDrawMode(data.spriteDrawMode);
