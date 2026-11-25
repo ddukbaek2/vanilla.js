@@ -46,10 +46,10 @@ import { TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID } from "./toonscreenoutline.js";
  * });
  */
 export const ToonDrawStage = System.Object.freeze({
-	beforeOpaque: "beforeOpaque",
-	afterOpaque: "afterOpaque",
-	afterOutline: "afterOutline",
-	afterTransparent: "afterTransparent",
+	beforeOpaque: "beforeOpaque", // 불투명한 몸 앞.
+	afterOpaque: "afterOpaque", // 불투명한 몸 뒤, 바깥선 껍데기 앞.
+	afterOutline: "afterOutline", // 바깥선 껍데기와 화면 공간 바깥선 뒤, 비치는 것 앞.
+	afterTransparent: "afterTransparent", // 비치는 것 뒤.
 });
 
 
@@ -123,7 +123,7 @@ export class ToonDrawQueue {
 	// 담은 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 담은 모형과 인스턴스 묶음 수.
 	 */
 	getItemCount() {
 		return this.#itemList.length;
@@ -214,7 +214,7 @@ export class ToonDrawQueue {
 	//==============================================================================
 	/**
 	 * @param { object } options - 그리기 꼴.
-	 * @returns { boolean }
+	 * @returns { boolean } 비치면 true.
 	 */
 	isTransparentOptions(options) {
 		const alpha = options.alpha !== undefined ? options.alpha : 1;

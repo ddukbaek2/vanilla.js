@@ -97,9 +97,9 @@ export const TOON_ATTRIBUTE_LOCATIONS = System.Object.freeze({
  * renderer.endFrame();
  */
 export const ToonProgramKind = System.Object.freeze({
-	solid: "solid",
-	outline: "outline",
-	depth: "depth",
+	solid: "solid", // 몸.
+	outline: "outline", // 바깥선 껍데기.
+	depth: "depth", // 그림자 깊이.
 });
 
 // 세 정점 셰이더의 머리. (몸에만 있는 어트리뷰트도 모두 적는다, 바깥선 버텍스 어레이에 없는 것은 기본값으로 읽힘)
@@ -1903,7 +1903,7 @@ export class ToonRenderer {
 	// 유닛 0 에 묶인 텍스처 읽기. (지금 고른 유닛은 그대로 둔다)
 	//==============================================================================
 	/**
-	 * @returns { WebGLTexture | null }
+	 * @returns { WebGLTexture | null } 유닛 0 의 텍스처. (없으면 null)
 	 */
 	readFirstUnitTexture() {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();

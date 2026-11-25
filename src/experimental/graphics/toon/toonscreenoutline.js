@@ -45,8 +45,8 @@ import { TOON_ATTRIBUTE_LOCATIONS, TOON_MAXIMUM_JOINTS, TOON_INSTANCE_FLOAT_COUN
  * outline.setFocusDistance(6);
  */
 export const ToonOutlineWidthUnit = System.Object.freeze({
-	world: "world",
-	pixel: "pixel",
+	world: "world", // 월드 길이. (멀수록 가늘어진다)
+	pixel: "pixel", // 그리는 영역의 픽셀. (거리와 상관없이 같은 굵기)
 });
 
 // 선 번호의 상한. (선의 판에 14 비트로 쓴다, 0 은 빈 곳)
@@ -604,7 +604,7 @@ export class ToonScreenOutline {
 	// HDR 출력 설정. (true 면 선 색을 선형으로 바꿔 섞는다, ToonRenderer.setHdrOutput 과 맞춘다)
 	//==============================================================================
 	/**
-	 * @param { boolean } isHdrOutput
+	 * @param { boolean } isHdrOutput - true 면 선 색을 선형으로 바꿔 섞는다.
 	 */
 	setHdrOutput(isHdrOutput) {
 		this.#isHdrOutput = isHdrOutput;
@@ -993,7 +993,7 @@ export class ToonScreenOutline {
 	/**
 	 * @param { object } mesh - ToonRenderer.createMesh 의 결과.
 	 * @param { Float32Array } modelElements - 모형 행렬의 수 16.
-	 * @returns { boolean }
+	 * @returns { boolean } 절두체 안에 들면 true.
 	 */
 	isVisible(mesh, modelElements) {
 		const center = mesh.boundingCenter;
@@ -1020,7 +1020,7 @@ export class ToonScreenOutline {
 	 * @param { number } height - 선의 판 높이.
 	 * @param { number } jumpFloodWidth - 넓히기 판 너비.
 	 * @param { number } jumpFloodHeight - 넓히기 판 높이.
-	 * @returns { object | null }
+	 * @returns { object | null } 선의 판. (짓지 못하면 null)
 	 */
 	readLineTarget(width, height, jumpFloodWidth, jumpFloodHeight) {
 		const existingTarget = this.#lineTarget;

@@ -438,7 +438,7 @@ export class ShadowAtlas extends Object {
 	// 그림자를 받는 빛 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 칸을 받은 빛 수. (0 ~ SHADOW_ATLAS_MAXIMUM_LIGHTS)
 	 */
 	getLightCount() {
 		return this.#lights.length;
@@ -458,7 +458,7 @@ export class ShadowAtlas extends Object {
 	// 칸 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 지은 칸 수. (스포트라이트 하나, 점광 여섯)
 	 */
 	getTileCount() {
 		return this.#tiles.length;
@@ -479,7 +479,7 @@ export class ShadowAtlas extends Object {
 	// 격자 한 변의 칸 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 격자 한 변의 칸 수.
 	 */
 	getGridSize() {
 		return this.#gridSize;
@@ -489,7 +489,7 @@ export class ShadowAtlas extends Object {
 	// 칸 한 변 반환. (픽셀)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 칸 한 변. (픽셀)
 	 */
 	getTileSize() {
 		return this.#tileSize;
@@ -509,7 +509,7 @@ export class ShadowAtlas extends Object {
 	// 깊이 텍스처 반환. (비교 샘플링 sampler2DShadow)
 	//==============================================================================
 	/**
-	 * @returns { WebGLTexture }
+	 * @returns { WebGLTexture } 아틀라스의 깊이 텍스처.
 	 */
 	getDepthTexture() {
 		return this.#depthTexture;
@@ -519,7 +519,7 @@ export class ShadowAtlas extends Object {
 	// 프레임버퍼 반환.
 	//==============================================================================
 	/**
-	 * @returns { WebGLFramebuffer }
+	 * @returns { WebGLFramebuffer } 아틀라스의 깊이 프레임버퍼.
 	 */
 	getFramebuffer() {
 		return this.#framebuffer;

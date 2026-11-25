@@ -450,7 +450,7 @@ export class ToonLightSet {
 	// 셰이더에 넣을 점광 수. (설정한 수와 한도 가운데 작은 것)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 셰이더에 넣을 점광 수.
 	 */
 	getPointLightCount() {
 		return System.Math.min(this.#pointLights.length, this.#pointLightLimit);
@@ -608,7 +608,7 @@ export class ToonLightSet {
 	// 램프 텍스처 반환. (없으면 null)
 	//==============================================================================
 	/**
-	 * @returns { WebGLTexture | null }
+	 * @returns { WebGLTexture | null } 램프 텍스처. (없으면 null)
 	 */
 	getRampTexture() {
 		return this.#rampTexture;
