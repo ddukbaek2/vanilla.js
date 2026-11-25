@@ -19,6 +19,9 @@ import { Mask } from "../component/mask.js";
 // 화면 밖 거르기 판정에 고쳐 쓰는 칸. (graphic.isLocalRectVisible 은 받은 영역을 그 자리에서 읽기만 한다)
 const cullContentSize = Vector2.zero();
 const cullRect = new Rect();
+const cullDrawnRect = new Rect();
+// 뷰 좌표를 로컬 좌표로 바꿀 때 내용 크기를 읽어 두는 칸. (convertViewToLocal)
+const convertContentSize = Vector2.zero();
 
 
 //==============================================================================
@@ -142,9 +145,10 @@ export class WorldNode extends TransformNode {
 
     //==============================================================================
     // 화면 밖이라 이 노드의 컴포넌트 그리기를 건너뛸지 반환. (draw 가 부른다)
-    // - Graphic 의 화면 밖 거르기가 켜져 있고, 켜진 컴포넌트가 하나 이상이며 모두 내용 영역 안에서만 그린다고 알리고(Component.isDrawnInsideContent),
-    //   내용 영역을 지금 변환으로 옮긴 사각형이 화면에 걸치지 않으면 true.
-    // - 내용 영역은 한 단위씩 넓혀 본다. (나인 슬라이스가 크기를 올림해 한 단위 안쪽으로 넘칠 수 있다)
+    // - Graphic 의 화면 밖 거르기가 켜져 있고, 켜진 컴포넌트가 하나 이상이며 모두 그리는 곳을 알리고,
+    //   그 사각형들을 합쳐 지금 변환으로 옮긴 사각형이 화면에 걸치지 않으면 true.
+    // - 내용 영역 안에서만 그린다고 알리는 컴포넌트(Component.isDrawnInsideContent)는 내용 영역을 한 단위씩 넓혀 본다. (나인 슬라이스가 크기를 올림해 한 단위 안쪽으로 넘칠 수 있다)
+    // - 밖까지 그리는 컴포넌트는 Component.calculateDrawnRect 가 알려 준 사각형으로 본다. (넘친 글 등, 모르면 거르지 않는다)
     // - 자식은 여기서 보지 않는다. 자식은 저마다 따로 본다.
     //==============================================================================
     /**
@@ -157,30 +161,77 @@ export class WorldNode extends TransformNode {
             return false;
         }
 
-        // 켜진 컴포넌트가 모두 내용 영역 안에서만 그리는지.
+        // 켜진 컴포넌트가 모두 그리는 곳을 알리는지. (내용 영역 안이거나 알려 준 사각형)
         let enabledComponentCount = 0;
+        let isInsideContentReported = false;
+        let isDrawnRectFound = false;
+        let minimumX = 0;
+        let minimumY = 0;
+        let maximumX = 0;
+        let maximumY = 0;
+        const drawnRect = cullDrawnRect;
         for (const component of components) {
             if (!component.isEnable()) {
                 continue;
             }
-            if (!component.isDrawnInsideContent()) {
+            enabledComponentCount += 1;
+            if (component.isDrawnInsideContent()) {
+                isInsideContentReported = true;
+                continue;
+            }
+            if (!component.calculateDrawnRect(drawnRect)) {
                 return false;
             }
-            enabledComponentCount += 1;
+            if (!(drawnRect.size.x > 0 && drawnRect.size.y > 0)) {
+                continue;
+            }
+            const drawnRightX = drawnRect.position.x + drawnRect.size.x;
+            const drawnBottomY = drawnRect.position.y + drawnRect.size.y;
+            if (!isDrawnRectFound) {
+                minimumX = drawnRect.position.x;
+                minimumY = drawnRect.position.y;
+                maximumX = drawnRightX;
+                maximumY = drawnBottomY;
+                isDrawnRectFound = true;
+            }
+            else {
+                minimumX = System.Math.min(minimumX, drawnRect.position.x);
+                minimumY = System.Math.min(minimumY, drawnRect.position.y);
+                maximumX = System.Math.max(maximumX, drawnRightX);
+                maximumY = System.Math.max(maximumY, drawnBottomY);
+            }
         }
         if (enabledComponentCount === 0) {
             return false;
         }
 
-        // 내용 크기. (복제본 없이 읽는다)
-        const contentSize = cullContentSize;
-        this.copyContentSizeTo(contentSize);
-        if (!(contentSize.x > 0 && contentSize.y > 0)) {
+        // 내용 영역. (복제본 없이 읽는다)
+        if (isInsideContentReported) {
+            const contentSize = cullContentSize;
+            this.copyContentSizeTo(contentSize);
+            if (!(contentSize.x > 0 && contentSize.y > 0)) {
+                return false;
+            }
+            if (!isDrawnRectFound) {
+                minimumX = -1;
+                minimumY = -1;
+                maximumX = contentSize.x + 1;
+                maximumY = contentSize.y + 1;
+                isDrawnRectFound = true;
+            }
+            else {
+                minimumX = System.Math.min(minimumX, -1);
+                minimumY = System.Math.min(minimumY, -1);
+                maximumX = System.Math.max(maximumX, contentSize.x + 1);
+                maximumY = System.Math.max(maximumY, contentSize.y + 1);
+            }
+        }
+        if (!isDrawnRectFound) {
             return false;
         }
         const rect = cullRect;
-        rect.position.set(-1, -1);
-        rect.size.set(contentSize.x + 2, contentSize.y + 2);
+        rect.position.set(minimumX, minimumY);
+        rect.size.set(maximumX - minimumX, maximumY - minimumY);
         const isVisible = graphic.isLocalRectVisible(rect);
         return !isVisible;
     }
@@ -269,6 +320,49 @@ export class WorldNode extends TransformNode {
         // 복제본을 새로 만들지 않고 가진 벡터에 값을 옮겨 적는다. (getContentSize() 는 복제해 준다)
         this.#contentSize.x = contentSize.x;
         this.#contentSize.y = contentSize.y;
+    }
+
+    //==============================================================================
+    // 실제 내용 크기 설정. (너비, 높이를 바로 받는다, Vector2 를 만들지 않는다)
+    // - setContentSize() 를 덮어쓴 하위 클래스면 setContentSize 로 넘긴다.
+    //==============================================================================
+    /**
+     * @param { number } width
+     * @param { number } height
+     */
+    setContentSizeXY(width, height) {
+        const isContentSizeOverridden = this.setContentSize !== WorldNode.prototype.setContentSize;
+        if (isContentSizeOverridden) {
+            this.setContentSize(Vector2.create(width, height));
+            return;
+        }
+        this.#contentSize.x = width;
+        this.#contentSize.y = height;
+    }
+
+    //==============================================================================
+    // 부모 영역 안의 사각형에 놓기. (x, y 는 이 노드의 왼쪽 위, 부모 내용 영역의 왼쪽 위가 원점)
+    // - 내용 크기를 width, height 로 두고, 피봇이 어디든 왼쪽 위가 (x, y) 에 오게 로컬 위치를 정한다. (x + width * pivot.x, y + height * pivot.y)
+    // - 앵커는 바꾸지 않는다. 로컬 위치는 앵커와 무관하게 부모 왼쪽 위 기준이라 앵커가 어디든 같은 자리다. (getAnchoredPosition 은 그 앵커 기준으로 다시 셈해 준다)
+    // - 로컬 배율과 회전은 보지 않는다. (배율 1, 회전 0 일 때 화면에서도 그 사각형이다)
+    //==============================================================================
+    /**
+     * @param { number } x
+     * @param { number } y
+     * @param { number } width
+     * @param { number } height
+     */
+    setRect(x, y, width, height) {
+        this.setContentSizeXY(width, height);
+        const isPivotOverridden = this.getPivot !== WorldNode.prototype.getPivot;
+        let pivotX = this.#pivot.x;
+        let pivotY = this.#pivot.y;
+        if (isPivotOverridden) {
+            const pivot = this.getPivot();
+            pivotX = pivot.x;
+            pivotY = pivot.y;
+        }
+        this.setLocalPositionXY(x + width * pivotX, y + height * pivotY);
     }
 
     //==============================================================================
@@ -489,6 +583,41 @@ export class WorldNode extends TransformNode {
         obb.setEdges(worldCorners);
         const inside = obb.contains(viewPosition);
         return inside;
+    }
+
+    //==============================================================================
+    // 뷰 좌표 → 이 노드의 로컬 좌표. (내용 영역의 왼쪽 위가 원점, 오른쪽 아래가 내용 크기)
+    // - 부모들의 위치, 배율, 회전을 모두 거친 네 귀퉁이(getWorldCorners)로 셈하므로 contains 와 같은 판정이다.
+    // - 내용 크기가 0 인 축은 0 을 돌려준다.
+    //==============================================================================
+    /**
+     * @param { Vector2 } viewPosition
+     * @returns { Vector2 }
+     */
+    convertViewToLocal(viewPosition) {
+        const worldCorners = this.getWorldCorners();
+        const topLeft = worldCorners[0];
+        const topRight = worldCorners[1];
+        const bottomLeft = worldCorners[3];
+        const contentSize = convertContentSize;
+        this.copyContentSizeTo(contentSize);
+        const axisXX = topRight.x - topLeft.x;
+        const axisXY = topRight.y - topLeft.y;
+        const axisYX = bottomLeft.x - topLeft.x;
+        const axisYY = bottomLeft.y - topLeft.y;
+        const axisXLengthSquared = axisXX * axisXX + axisXY * axisXY;
+        const axisYLengthSquared = axisYX * axisYX + axisYY * axisYY;
+        const offsetX = viewPosition.x - topLeft.x;
+        const offsetY = viewPosition.y - topLeft.y;
+        let ratioX = 0;
+        if (axisXLengthSquared > 0) {
+            ratioX = (offsetX * axisXX + offsetY * axisXY) / axisXLengthSquared;
+        }
+        let ratioY = 0;
+        if (axisYLengthSquared > 0) {
+            ratioY = (offsetX * axisYX + offsetY * axisYY) / axisYLengthSquared;
+        }
+        return Vector2.create(ratioX * contentSize.x, ratioY * contentSize.y);
     }
 
     //==============================================================================

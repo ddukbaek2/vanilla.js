@@ -1,7 +1,7 @@
 # 개발 보조 도구
 
 ## 이미지 파일 목록을 하나의 텍스쳐로 묶어주는 도구.
-node tools/atlas.cjs <폴더경로>
+node tools/atlas.cjs <폴더경로> [--extrude 픽셀] [--padding 픽셀] [--max-size 쪽 상한]
 
 ## 프로젝트 도구. (빌드 / 자산 현황 체크)
 node tools/project.cjs build --script <진입파일> --input <입력디렉토리> --output <출력디렉토리>

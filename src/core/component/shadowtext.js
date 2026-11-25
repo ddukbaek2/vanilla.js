@@ -5,6 +5,7 @@ const System = globalThis;
 import { Graphic } from "../graphic.js";
 import { Component } from "../component.js";
 import { buildFontString } from "./text.js";
+import { acquireSharedBake, releaseSharedBake } from "../graphic/sharedbakecache.js";
 
 
 //==============================================================================
@@ -114,10 +115,17 @@ export class ShadowText extends Component {
 		const textDirection = this.getTextDirection();
 		const fontFace = this.getFontFace();
 		const fontFamily = fontFace === null ? "" : fontFace.family;
-		const bakeKey = [text, this.#fontSize, this.#isBold, this.#textColor, this.#shadowColor, this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, this.#fitMinimumRatio, contentWidth, bakeScale, textDirection, fontFamily, fontLoadCount].join("|");
+		const bakeKey = ["ShadowText", text, this.#fontSize, this.#isBold, this.#textColor, this.#shadowColor, this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, this.#fitMinimumRatio, contentWidth, bakeScale, textDirection, fontFamily, fontLoadCount].join("|");
 		if (bakeKey !== this.#bakeKey) {
+			// 같은 모양을 구운 것이 있으면 나눠 쓰고, 없으면 굽는다. (sharedbakecache.js)
+			releaseSharedBake(this.#bakeKey, this);
 			this.#bakeKey = bakeKey;
-			this.bakeText(graphic, text, contentWidth, bakeScale, textDirection, fontFace);
+			const bake = acquireSharedBake(bakeKey, this, () => {
+				this.bakeText(graphic, text, contentWidth, bakeScale, textDirection, fontFace);
+				return { canvas: this.getBakeCanvas(), metrics: this.#bakeMetrics };
+			});
+			this.#bakeCanvas = bake.canvas;
+			this.#bakeMetrics = bake.metrics;
 		}
 		const bakeCanvas = this.getBakeCanvas();
 		if (bakeCanvas === null) {
@@ -151,6 +159,20 @@ export class ShadowText extends Component {
 		const quadWidth = bakeCanvas.width / bakeMetrics.scale;
 		const quadHeight = bakeCanvas.height / bakeMetrics.scale;
 		graphic.drawImageWithSourceAndDestination(bakeCanvas, 0, 0, bakeCanvas.width, bakeCanvas.height, quadX, quadY, quadWidth, quadHeight);
+	}
+
+	//==============================================================================
+	// 노드에서 떨어짐. (나눠 쓰던 구운 그림을 놓는다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { ComponentNode } node
+	 */
+	detach(node) {
+		releaseSharedBake(this.#bakeKey, this);
+		this.#bakeKey = "";
+		this.#bakeCanvas = null;
+		super.detach(node);
 	}
 
 	//==============================================================================

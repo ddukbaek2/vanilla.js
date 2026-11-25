@@ -6,6 +6,7 @@ import { Rect } from "../../base/rect.js";
 import { Graphic } from "../graphic.js";
 import { Component } from "../component.js";
 import { buildRGBAString } from "./shadowtext.js";
+import { acquireSharedBake, releaseSharedBake } from "../graphic/sharedbakecache.js";
 
 
 //==============================================================================
@@ -13,6 +14,10 @@ import { buildRGBAString } from "./shadowtext.js";
 //==============================================================================
 // 구운 캔버스의 가장자리 여유. (안티앨리어싱, 픽셀)
 const BAKE_PADDING = 2;
+
+// 그림마다 붙이는 번호. (구운 그림을 나눠 쓰는 열쇠, setImage 할 때마다 새 번호를 붙여 그 그림을 다시 굽게 한다)
+const imageIdentifiers = new System.WeakMap();
+let nextImageIdentifier = 1;
 
 
 //==============================================================================
@@ -89,10 +94,23 @@ export class ShadowImage extends Component {
 		const imageWidth = sourceRect.width * fitScale;
 		const imageHeight = sourceRect.height * fitScale;
 		const bakeScale = graphic.calculateTextBakeScale();
-		const bakeKey = [this.#imageVersion, this.#imageColor, this.#shadowColor, this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, imageWidth, imageHeight, bakeScale].join("|");
+		let imageIdentifier = imageIdentifiers.get(image);
+		if (imageIdentifier === undefined) {
+			imageIdentifier = nextImageIdentifier;
+			nextImageIdentifier += 1;
+			imageIdentifiers.set(image, imageIdentifier);
+		}
+		const bakeKey = ["ShadowImage", imageIdentifier, sourceRect.left, sourceRect.top, sourceRect.width, sourceRect.height, this.#imageColor, this.#shadowColor, this.#shadowOpacity, this.#shadowOffset, this.#shadowBlur, imageWidth, imageHeight, bakeScale].join("|");
 		if (bakeKey !== this.#bakeKey) {
+			// 같은 그림과 모양을 구운 것이 있으면 나눠 쓰고, 없으면 굽는다. (sharedbakecache.js)
+			releaseSharedBake(this.#bakeKey, this);
 			this.#bakeKey = bakeKey;
-			this.bakeImage(image, sourceRect, imageWidth, imageHeight, bakeScale);
+			const bake = acquireSharedBake(bakeKey, this, () => {
+				this.bakeImage(image, sourceRect, imageWidth, imageHeight, bakeScale);
+				return { canvas: this.getBakeCanvas(), metrics: this.#bakeMetrics };
+			});
+			this.#bakeCanvas = bake.canvas;
+			this.#bakeMetrics = bake.metrics;
 		}
 		const bakeCanvas = this.getBakeCanvas();
 		if (bakeCanvas === null) {
@@ -104,6 +122,20 @@ export class ShadowImage extends Component {
 		const quadWidth = bakeCanvas.width / bakeMetrics.scale;
 		const quadHeight = bakeCanvas.height / bakeMetrics.scale;
 		graphic.drawImageWithSourceAndDestination(bakeCanvas, 0, 0, bakeCanvas.width, bakeCanvas.height, quadX, quadY, quadWidth, quadHeight);
+	}
+
+	//==============================================================================
+	// 노드에서 떨어짐. (나눠 쓰던 구운 그림을 놓는다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { ComponentNode } node
+	 */
+	detach(node) {
+		releaseSharedBake(this.#bakeKey, this);
+		this.#bakeKey = "";
+		this.#bakeCanvas = null;
+		super.detach(node);
 	}
 
 	//==============================================================================
@@ -205,6 +237,10 @@ export class ShadowImage extends Component {
 		this.#image = image;
 		this.#imageRect = imageRect === null ? null : imageRect.clone();
 		this.#imageVersion += 1;
+		if (image !== null && image !== undefined) {
+			imageIdentifiers.set(image, nextImageIdentifier);
+			nextImageIdentifier += 1;
+		}
 	}
 
 	//==============================================================================

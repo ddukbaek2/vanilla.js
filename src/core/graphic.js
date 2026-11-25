@@ -180,13 +180,8 @@ function parseColorValue(colorValue) {
 		return colorValue.clone();
 	}
 	if (typeof colorValue === "string") {
-		const trimmedColorString = colorValue.trim().toLowerCase();
-		if (trimmedColorString.startsWith("#")) {
-			return Color.createFromHEX(trimmedColorString);
-		}
-		if (trimmedColorString.startsWith("rgb")) {
-			return Color.createFromRGBA(trimmedColorString);
-		}
+		// 같은 문자열은 풀어 둔 색을 나눠 쓴다. (Graphic 은 받은 색을 고치지 않는다)
+		return Color.fromCache(colorValue);
 	}
 	return Color.white();
 }
@@ -259,6 +254,8 @@ export class Graphic extends Object {
 	/** @private @type { number } */ #appliedViewportWidth;
 	/** @private @type { number } */ #appliedViewportHeight;
 	/** @private @type { number } */ #textBakeScaleStep; // 텍스트 베이크 스케일 양자화 단위. (0 이면 양자화하지 않음)
+	/** @private @type { number } */ #textBakeMotionScaleStep; // 배율이 움직이는 노드의 텍스트 베이크 스케일 양자화 단위. (textBakeScaleStep 이 0 일 때만 쓴다)
+	/** @private @type { boolean } */ #isTextBakeScaleMoving; // 지금 그리는 노드의 배율이 지난 프레임과 달라 움직이는 중인지.
 	/** @private @type { boolean } */ #isTextPixelSnapEnabled; // 텍스트 쿼드를 디바이스 픽셀 격자에 맞출지.
 	/** @private @type { number } */ #drawCallCount; // 이번 프레임의 드로우 콜 수.
 	/** @private @type { number } */ #drawVertexCount; // 이번 프레임에 그린 정점 수.
@@ -391,6 +388,8 @@ export class Graphic extends Object {
 		this.#appliedViewportWidth = 0;
 		this.#appliedViewportHeight = 0;
 		this.#textBakeScaleStep = DEFAULT_TEXT_BAKE_SCALE_STEP;
+		this.#textBakeMotionScaleStep = DEFAULT_TEXT_BAKE_SCALE_STEP;
+		this.#isTextBakeScaleMoving = false;
 		this.#isTextPixelSnapEnabled = false;
 		this.#drawCallCount = 0;
 		this.#drawVertexCount = 0;
@@ -1848,6 +1847,186 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// 고리(띠) 출력. (안쪽 반지름과 바깥 반지름 사이를 startRadian 부터 endRadian 까지 칠한다)
+	// - setFillColor()
+	// - 각도는 라디안, 0 이 오른쪽이고 화면에서 시계 방향으로 는다. (12 시에서 시작하려면 -PI / 2)
+	// - 조각마다 네모 하나를 겹치지 않게 이어 붙여 한 번에 그리므로, 반투명 색이어도 조각의 이음매가 짙어지지 않는다.
+	// - 조각 수는 drawCircle 처럼 화면에서의 바깥 반지름을 따라 정하고(한 바퀴 16 ~ 64), 그리는 각도만큼만 쓴다.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } center
+	 * @param { number } innerRadius
+	 * @param { number } outerRadius
+	 * @param { number } startRadian 기본 0.
+	 * @param { number } endRadian 기본 PI * 2.
+	 */
+	drawRing(center, innerRadius, outerRadius, startRadian = 0, endRadian = Math.PI * 2) {
+		const fillColor = this.getFillColor();
+		this.drawRingWithColor(center.x, center.y, innerRadius, outerRadius, startRadian, endRadian, fillColor);
+	}
+
+	//==============================================================================
+	// 호 출력. (반지름을 따라 lineWidth 두께의 선으로 startRadian 부터 endRadian 까지)
+	// - setStrokeColor()
+	// - 각도와 조각 수는 drawRing 과 같다. 선의 두께 가운데가 반지름에 온다.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } center
+	 * @param { number } radius
+	 * @param { number } startRadian
+	 * @param { number } endRadian
+	 * @param { number } lineWidth 기본 1.
+	 */
+	drawArc(center, radius, startRadian, endRadian, lineWidth = 1) {
+		const halfWidth = lineWidth * 0.5;
+		const strokeColor = this.getStrokeColor();
+		this.drawRingWithColor(center.x, center.y, System.Math.max(0, radius - halfWidth), radius + halfWidth, startRadian, endRadian, strokeColor);
+	}
+
+	//==============================================================================
+	// 고리 출력의 셈. (drawRing, drawArc 가 부른다)
+	//==============================================================================
+	/**
+	 * @param { number } centerX
+	 * @param { number } centerY
+	 * @param { number } innerRadius
+	 * @param { number } outerRadius
+	 * @param { number } startRadian
+	 * @param { number } endRadian
+	 * @param { Color } color
+	 */
+	drawRingWithColor(centerX, centerY, innerRadius, outerRadius, startRadian, endRadian, color) {
+		const spanRadian = endRadian - startRadian;
+		if (outerRadius <= 0 || outerRadius <= innerRadius || spanRadian === 0) {
+			return;
+		}
+		const fullRadian = Math.PI * 2;
+		const clampedSpanRadian = Math.clamp(spanRadian, -fullRadian, fullRadian);
+		const maximumScale = this.#transformMatrix.getMaximumScale();
+		const fullSegmentCount = Math.clamp(Math.ceil(outerRadius * maximumScale * 0.5), 16, 64);
+		const segmentCount = System.Math.max(1, Math.ceil(fullSegmentCount * System.Math.abs(clampedSpanRadian) / fullRadian));
+		const vertexData = this.getVertexData();
+		let offset = 0;
+		let vertexCount = 0;
+		let previousCosine = System.Math.cos(startRadian);
+		let previousSine = System.Math.sin(startRadian);
+		for (let segmentIndex = 1; segmentIndex <= segmentCount; ++segmentIndex) {
+			if ((vertexCount + 6) * FLOATS_PER_VERTEX > vertexData.length) {
+				break;
+			}
+			const radian = startRadian + clampedSpanRadian * (segmentIndex / segmentCount);
+			const cosine = System.Math.cos(radian);
+			const sine = System.Math.sin(radian);
+			const previousInnerX = centerX + previousCosine * innerRadius;
+			const previousInnerY = centerY + previousSine * innerRadius;
+			const previousOuterX = centerX + previousCosine * outerRadius;
+			const previousOuterY = centerY + previousSine * outerRadius;
+			const innerX = centerX + cosine * innerRadius;
+			const innerY = centerY + sine * innerRadius;
+			const outerX = centerX + cosine * outerRadius;
+			const outerY = centerY + sine * outerRadius;
+			vertexData[offset++] = previousInnerX;
+			vertexData[offset++] = previousInnerY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = previousOuterX;
+			vertexData[offset++] = previousOuterY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = outerX;
+			vertexData[offset++] = outerY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = previousInnerX;
+			vertexData[offset++] = previousInnerY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = outerX;
+			vertexData[offset++] = outerY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = innerX;
+			vertexData[offset++] = innerY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexCount += 6;
+			previousCosine = cosine;
+			previousSine = sine;
+		}
+		this.drawVertices(vertexCount, this.getWhiteTexture(), color);
+	}
+
+	//==============================================================================
+	// 선분 여럿 출력. (위치 배열 하나에 선분마다 x0, y0, x1, y1 넷씩, 한 번에 그린다)
+	// - setStrokeColor()
+	// - 선분마다 두께만큼 넓힌 네모 하나다. (drawLine 과 달리 이음새를 메우지 않는다, 따로 떨어진 선분 용)
+	// - Vector2 배열을 만들지 않고 숫자 배열(Array, Float32Array)을 그대로 읽는다. 길이가 0 인 선분은 건너뛴다.
+	// - 정점 버퍼가 차면 거기까지 그리고 이어서 담는다. (묶어 그리기가 켜져 있으면 같은 텍스처라 한 번의 드로우 콜로 이어진다)
+	//==============================================================================
+	/**
+	 * @param { number[] | Float32Array } positionValues
+	 * @param { number } size 기본 1.
+	 */
+	drawLineSegments(positionValues, size = 1) {
+		if (!positionValues || positionValues.length < 4) {
+			return;
+		}
+		const halfSize = size / 2;
+		const strokeColor = this.getStrokeColor();
+		const whiteTexture = this.getWhiteTexture();
+		const vertexData = this.getVertexData();
+		let offset = 0;
+		let vertexCount = 0;
+		const segmentCount = System.Math.floor(positionValues.length / 4);
+		for (let segmentIndex = 0; segmentIndex < segmentCount; ++segmentIndex) {
+			const valueIndex = segmentIndex * 4;
+			const startX = positionValues[valueIndex];
+			const startY = positionValues[valueIndex + 1];
+			const endX = positionValues[valueIndex + 2];
+			const endY = positionValues[valueIndex + 3];
+			const deltaX = endX - startX;
+			const deltaY = endY - startY;
+			const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+			if (!(length > 0)) {
+				continue;
+			}
+			if ((vertexCount + 6) * FLOATS_PER_VERTEX > vertexData.length) {
+				this.drawVertices(vertexCount, whiteTexture, strokeColor);
+				offset = 0;
+				vertexCount = 0;
+			}
+			const normalX = -deltaY / length * halfSize;
+			const normalY = deltaX / length * halfSize;
+			vertexData[offset++] = startX + normalX;
+			vertexData[offset++] = startY + normalY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = endX + normalX;
+			vertexData[offset++] = endY + normalY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = startX - normalX;
+			vertexData[offset++] = startY - normalY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = startX - normalX;
+			vertexData[offset++] = startY - normalY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = endX + normalX;
+			vertexData[offset++] = endY + normalY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = endX - normalX;
+			vertexData[offset++] = endY - normalY;
+			vertexData[offset++] = 0.5;
+			vertexData[offset++] = 0.5;
+			vertexCount += 6;
+		}
+		this.drawVertices(vertexCount, whiteTexture, strokeColor);
+	}
+
+	//==============================================================================
 	// 이미지 출력.
 	// - setFillColor() Not Supported.
 	//==============================================================================
@@ -2181,6 +2360,69 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// 배율이 움직이는 노드의 텍스트 베이크 스케일 양자화 단위 설정. (기본 0.25)
+	// - 양자화 단위(setTextBakeScaleStep)가 0 일 때, 그리는 노드의 변환 배율이 지난 프레임과 다르면(확대 움직임, 팝업, 트윈, 카메라 확대)
+	//   이 단위로 묶은 배율로 굽는다. 프레임마다 다른 배율로 새로 굽지 않는다.
+	// - 배율이 멈추면(지난 프레임과 같으면) 정확한 배율로 다시 구워 1:1 로 또렷하다.
+	// - 0 이면 움직이는 동안에도 묶지 않는다. (지금까지와 같다)
+	//==============================================================================
+	/**
+	 * @param { number } textBakeMotionScaleStep
+	 */
+	setTextBakeMotionScaleStep(textBakeMotionScaleStep) {
+		this.#textBakeMotionScaleStep = Math.max(0, textBakeMotionScaleStep);
+	}
+
+	//==============================================================================
+	// 배율이 움직이는 노드의 텍스트 베이크 스케일 양자화 단위 반환.
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getTextBakeMotionScaleStep() {
+		return this.#textBakeMotionScaleStep;
+	}
+
+	//==============================================================================
+	// 지금 그리는 노드의 배율이 움직이는 중인지 설정. (drawNode 가 정한다, 노드 밖에서 직접 그릴 때 부르는 쪽이 정할 수 있다)
+	//==============================================================================
+	/**
+	 * @param { boolean } isTextBakeScaleMoving
+	 */
+	setTextBakeScaleMoving(isTextBakeScaleMoving) {
+		this.#isTextBakeScaleMoving = isTextBakeScaleMoving === true;
+	}
+
+	//==============================================================================
+	// 지금 그리는 노드의 배율이 움직이는 중인지 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean }
+	 */
+	isTextBakeScaleMoving() {
+		return this.#isTextBakeScaleMoving;
+	}
+
+	//==============================================================================
+	// 노드의 변환 배율이 지난 프레임과 달라 움직이는 중인지 셈하고 기억하기. (drawNode 가 pushTransform 뒤에 부른다)
+	// - 양자화 단위가 0 이 아니면 늘 묶어 굽으므로 셈하지 않는다.
+	// - 처음 그리는 노드는 움직이지 않는 것으로 본다. (첫 프레임에 두 번 굽지 않게)
+	//==============================================================================
+	/**
+	 * @param { TransformNode } node
+	 * @returns { boolean }
+	 */
+	readNodeTextBakeScaleMoving(node) {
+		if (this.#textBakeScaleStep > 0 || this.#textBakeMotionScaleStep <= 0 || typeof node.getLastDrawnMaximumScale !== "function") {
+			return false;
+		}
+		const maximumScale = this.#transformMatrix.getMaximumScale();
+		const lastDrawnMaximumScale = node.getLastDrawnMaximumScale();
+		node.setLastDrawnMaximumScale(maximumScale);
+		return lastDrawnMaximumScale > 0 && lastDrawnMaximumScale !== maximumScale;
+	}
+
+	//==============================================================================
 	// 텍스트 픽셀 스냅 설정.
 	// - 켜면 회전 / 기울임이 없는 변환에서 글자 쿼드의 왼쪽 위를 디바이스 픽셀 격자에 맞춘다.
 	// - 베이크 스케일이 실제 스케일과 같을 때(setTextBakeScaleStep(0)) 텍셀과 픽셀이 1:1 로 맞아 가장 선명하다.
@@ -2210,7 +2452,10 @@ export class Graphic extends Object {
 	 */
 	calculateTextBakeScale(){
 		const maximumScale = this.#transformMatrix.getMaximumScale();
-		const textBakeScaleStep = this.getTextBakeScaleStep();
+		let textBakeScaleStep = this.getTextBakeScaleStep();
+		if (textBakeScaleStep <= 0 && this.isTextBakeScaleMoving()) {
+			textBakeScaleStep = this.getTextBakeMotionScaleStep();
+		}
 		const quantizedScale = textBakeScaleStep > 0 ? Math.round(maximumScale / textBakeScaleStep) * textBakeScaleStep : maximumScale;
 		return Math.clamp(quantizedScale, 0.25, MAXIMUM_TEXT_BAKE_SCALE);
 	}
@@ -2341,7 +2586,10 @@ export class Graphic extends Object {
 
 		try {
 			node.pushTransform(this);
+			// 배율이 움직이는 노드의 글은 묶은 배율로 굽는다. (자식은 저마다 다시 정한다, 다 그리면 푼다)
+			this.#isTextBakeScaleMoving = this.readNodeTextBakeScaleMoving(node);
 			node.draw(this);
+			this.#isTextBakeScaleMoving = false;
 
 			const isForceGizmosVisible = this.isForceGizmosVisible();
 			const isGizmoVisible = isForceGizmosVisible || node.isGizmoVisible();

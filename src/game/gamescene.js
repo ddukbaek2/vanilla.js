@@ -603,29 +603,33 @@ export class GameScene extends Scene {
 	}
 
 	//==============================================================================
-	// touchWheel.
+	// touchWheel. (그 자리의 가장 앞 스크롤 칸에 넘긴다, 받은 칸이 있으면 true)
+	// - 덮어쓴 게임 씬은 super.touchWheel 이 false 일 때만 게임(지도 확대 등)으로 넘기면 창의 스크롤과 겹치지 않는다.
 	//==============================================================================
 	/**
 	 * @override
 	 * @param { Vector2 } viewInputPosition
 	 * @param { Vector2 } wheelDelta
+	 * @returns { boolean }
 	 */
 	touchWheel(viewInputPosition, wheelDelta) {
 		if (this.isDevToolsCapturingInput() || this.isScreenFading()) {
-			return;
+			return false;
 		}
 		// 창 층 안을 가리키면 맨 위의 창이 먼저 받는다.
 		const hitNode = this.#touchRaycaster.raycast(viewInputPosition);
 		const windowLayer = UIWindowLayer.findWindowLayerOf(hitNode);
 		if (windowLayer !== null) {
 			windowLayer.scrollWindowAt(viewInputPosition, wheelDelta);
-			return;
+			return true;
 		}
-		this.#touchRaycaster.touchWheel(viewInputPosition, wheelDelta);
-		if (hitNode !== null && hitNode !== undefined) {
-			return;
+		// 스크롤 칸이 받아 썼거나 UI 위면 놀이로 넘기지 않는다.
+		const isWheelHandled = this.#touchRaycaster.touchWheel(viewInputPosition, wheelDelta);
+		if (isWheelHandled || (hitNode !== null && hitNode !== undefined)) {
+			return isWheelHandled;
 		}
 		this.dispatchPlayInput("wheel", viewInputPosition, wheelDelta);
+		return false;
 	}
 
 	//==============================================================================

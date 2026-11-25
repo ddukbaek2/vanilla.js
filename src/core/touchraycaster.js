@@ -100,20 +100,103 @@ export class TouchRaycaster extends Object {
 	}
 
 	//==============================================================================
-	// 마우스 휠. (touchPress 와 무관하게 매번 viewInputPosition 으로 raycast 후
-	//  부모 체인에서 첫 ScrollView 를 찾아 wheel 을 전달.)
+	// 마우스 휠. (touchPress 와 무관하게 매번 viewInputPosition 으로 휠을 받을 스크롤 칸을 찾아 wheel 을 전달.)
+	// - 그 자리를 덮는 것 가운데 그리는 순서로 가장 앞이 스크롤 칸(노드가 그 자리를 품은)이면 그 칸이 받는다.
+	//   그 칸 안의 글이나 그림처럼 누를 수 없는 것 위에서 굴려도 칸이 받는다.
+	// - 가장 앞이 누를 수 있는 노드면 그 노드와 부모 체인에서 첫 스크롤 칸이 받는다. (스크롤 칸을 덮은 막이나 창이 휠을 가린다)
+	// - 받은 칸이 있으면 true.
 	//==============================================================================
 	/**
 	 * @param { Vector2 } viewInputPosition
 	 * @param { Vector2 } wheelDelta
+	 * @returns { boolean }
 	 */
 	touchWheel(viewInputPosition, wheelDelta) {
-		const hitNode = this.raycast(viewInputPosition);
-		if (!hitNode) return;
-		const scrollView = this.findAncestorScrollViewForWheel(hitNode);
+		const scrollView = this.findWheelScrollView(viewInputPosition);
 		if (scrollView && typeof scrollView.wheel === "function") {
 			scrollView.wheel(wheelDelta);
+			return true;
 		}
+		return false;
+	}
+
+	//==============================================================================
+	// 그 자리에서 휠을 받을 스크롤 칸 찾기. (touchWheel 의 셈, 없으면 null)
+	// - raycast 와 같은 순서로 돌며 누를 수 있는 노드와 스크롤 칸 노드 가운데 가장 앞을 고른다.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition
+	 * @returns { object | null }
+	 */
+	findWheelScrollView(viewInputPosition) {
+		const rootNode = this.getRootNode();
+		if (!rootNode) {
+			return null;
+		}
+
+		let drawOrderCounter = 0;
+		let hitNode = null;
+		let hitDrawOrder = -1;
+		let scrollView = null;
+		let scrollViewDrawOrder = -1;
+
+		const traverse = (node) => {
+			if (!node || !node.isActive()) {
+				return;
+			}
+			const currentDrawOrder = drawOrderCounter;
+			++drawOrderCounter;
+
+			if (node instanceof WorldNode) {
+				const nodeScrollView = this.findScrollViewComponent(node);
+				const isCandidate = node.isInteractable() || nodeScrollView !== null;
+				if (isCandidate && node.contains(viewInputPosition)) {
+					if (nodeScrollView !== null) {
+						scrollView = nodeScrollView;
+						scrollViewDrawOrder = currentDrawOrder;
+					}
+					if (node.isInteractable()) {
+						hitNode = node;
+						hitDrawOrder = currentDrawOrder;
+					}
+				}
+				if (this.isMaskedOut(node, viewInputPosition)) {
+					return;
+				}
+			}
+
+			const children = node.getChildren();
+			for (const child of children) {
+				traverse(child);
+			}
+		};
+
+		traverse(rootNode);
+
+		if (scrollView !== null && scrollViewDrawOrder >= hitDrawOrder) {
+			return scrollView;
+		}
+		if (hitNode === null) {
+			return null;
+		}
+		return this.findAncestorScrollViewForWheel(hitNode);
+	}
+
+	//==============================================================================
+	// 노드에 붙은 스크롤 칸 컴포넌트 반환. (켜진 것만, 없으면 null, 닥 타이핑)
+	//==============================================================================
+	/**
+	 * @param { WorldNode } node
+	 * @returns { object | null }
+	 */
+	findScrollViewComponent(node) {
+		const components = node.getAllComponents();
+		for (const component of components) {
+			if (component && typeof component.wheel === "function" && typeof component.getScrollContentSize === "function" && component.isEnable()) {
+				return component;
+			}
+		}
+		return null;
 	}
 
 	//==============================================================================
