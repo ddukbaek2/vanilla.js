@@ -20,7 +20,6 @@ const System = globalThis;
 //==============================================================================
 // 툰 확장 자리와 빛 시험 페이지. (러스트 예제 toonmaterial 과 같은 장면, 저장소의 import.js 를 바로 읽는 개발용 페이지)
 // - 주소 ?frame=90 이면 그 프레임의 시각(프레임 / 60 초)으로 멈춰 그린다. (러스트 TOON_MATERIAL_FRAME 과 화면 견주기)
-// - 처음에 애버런트 몸 셰이딩 식을 엔진 옵션으로 바꿔 실수 판에 그려 CPU 셈과 견준 가장 큰 차이를 아래에 적는다.
 //==============================================================================
 const sceneModule = await import("./toonmaterialscene.js");
 const canvas = System.document.getElementById("mainCanvas");
@@ -28,9 +27,6 @@ const statusLabel = System.document.getElementById("statusLabel");
 const webGL2RenderingContext = canvas.getContext("webgl2", { alpha: false, antialias: false, preserveDrawingBuffer: true });
 const query = new System.URLSearchParams(System.location.search);
 const fixedFrame = query.has("frame") ? System.Number(query.get("frame")) : null;
-const verifyResult = sceneModule.verifyAberrantShading(webGL2RenderingContext);
-const verifyText = verifyResult.isSkipped ? "애버런트 식 대조: 실수 판이 없어 건너뜀" : `애버런트 식 대조 가장 큰 차이 ${verifyResult.maximumError.toExponential(2)} (빛 받은 몫이 모두 1 밑 ${verifyResult.isClampFree})`;
-System.console.log(verifyText);
 const scene = new sceneModule.ToonMaterialScene(webGL2RenderingContext);
 let frameIndex = 0;
 
@@ -47,7 +43,7 @@ function drawFrame() {
 	}
 	const frame = fixedFrame !== null ? fixedFrame : frameIndex;
 	const statistics = scene.draw(frame / 60, width, height);
-	statusLabel.textContent = `${verifyText}\n그린 것 ${statistics.drawnObjectCount} 드로우콜 ${statistics.drawCallCount}`;
+	statusLabel.textContent = `그린 것 ${statistics.drawnObjectCount} 드로우콜 ${statistics.drawCallCount}`;
 	frameIndex += 1;
 	System.toonMaterialReady = true;
 	if (fixedFrame === null) {

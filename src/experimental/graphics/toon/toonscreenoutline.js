@@ -91,7 +91,7 @@ mat4 readSkinMatrix() {
 void main() {
 	mat4 skinMatrix = readSkinMatrix();
 	mat4 objectMatrix = instanced > 0.5 ? mat4(instanceMatrix0, instanceMatrix1, instanceMatrix2, instanceMatrix3) : modelMatrix;
-	worldNormal = mat3(objectMatrix) * mat3(skinMatrix) * vertexNormal;
+	worldNormal = transpose(inverse(mat3(objectMatrix) * mat3(skinMatrix))) * vertexNormal;
 	surfaceLineId = instanced > 0.5 && instanceLineIds > 0.5 ? instanceTint.x : lineId;
 	gl_Position = viewProjectionMatrix * objectMatrix * skinMatrix * vec4(vertexPosition, 1.0);
 }

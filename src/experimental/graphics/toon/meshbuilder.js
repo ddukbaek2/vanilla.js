@@ -5,6 +5,27 @@ const System = globalThis;
 import { Matrix4 } from "../../../base/matrix4.js";
 
 
+/**
+ * @example <caption>기본 도형을 이어 붙인 모형 하나를 짓고 그리기</caption>
+ * import { ToonRenderer, ToonMesh, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+ * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+ * const renderer = new ToonRenderer(webGL2RenderingContext);
+ * const builder = new ToonMesh.MeshBuilder();
+ * const bodyMatrix = ToonMesh.createPartMatrix(null, [0, 0.6, 0], null, null);
+ * builder.addPart(ToonMesh.createCapsuleGeometry(0.3, 0.5, 6, 16), bodyMatrix, "#f0c8a0");
+ * builder.addPart(ToonMesh.createSphereGeometry(0.28, 20, 14), ToonMesh.createPartMatrix(bodyMatrix, [0, 0.65, 0], null, null), "#f8e0c8", { outlineWidth: 0.015 });
+ * builder.addPart(ToonMesh.createCylinderGeometry(0, 0.12, 0.3, 12), ToonMesh.createPartMatrix(bodyMatrix, [0, 1.05, 0], null, null), "#d04040", { glow: 0.5 });
+ * builder.addPart(ToonMesh.createBoxGeometry(2, 0.1, 2), Matrix4.createTranslation(0, -0.05, 0), "#708060", { hasOutline: false });
+ * const mesh = renderer.createMesh(builder.readArrays());
+ * const camera = new Camera3D();
+ * camera.setPerspective(0.8, 0.1, 100);
+ * camera.lookAt(Vector3.create(0, 1.5, 3), Vector3.create(0, 0.8, 0), Vector3.create(0, 1, 0));
+ * renderer.beginFrameWithCamera(camera);
+ * renderer.drawMesh(mesh, Matrix4.createIdentity());
+ * renderer.endFrame();
+ */
+
+
 //==============================================================================
 // 3D 모형 짓기. (기본 도형을 코드로 지어 꼭짓점 배열 하나에 담음)
 //
@@ -38,8 +59,14 @@ const DEGENERATE_AREA = 1e-12;
 // 색 글자를 sRGB 세 수로. ("#rrggbb" → [r, g, b], 0 ~ 1)
 //==============================================================================
 /**
- * @param { string } colorText
- * @returns { Array<number> }
+ * @param { string } colorText - "#rrggbb" 색 글자.
+ * @returns { Array<number> } [r, g, b] sRGB. (0 ~ 1)
+ * @example <caption>색 글자를 addQuad 의 색으로</caption>
+ * import { ToonMesh } from "./vanilla.js";
+ * const color = ToonMesh.readColorValues("#80c040");
+ * const builder = new ToonMesh.MeshBuilder();
+ * builder.addQuad([[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], [0, 1, 0], color, 0, null, false);
+ * const arrays = builder.readArrays();
  */
 export function readColorValues(colorText) {
 	const value = System.parseInt(colorText.slice(1), 16);
@@ -50,11 +77,18 @@ export function readColorValues(colorText) {
 // 자리, 돌림, 크기로 변환 행렬 짓기. (부모 행렬 뒤에 곱함, 돌림은 three.js 의 기본 차례 XYZ)
 //==============================================================================
 /**
- * @param { Matrix4 | null } parentMatrix
+ * @param { Matrix4 | null } parentMatrix - 부모 행렬. (null 이면 단위 행렬)
  * @param { Array<number> } position [x, y, z]
  * @param { Array<number> | null } rotation [x, y, z] 라디안.
  * @param { Array<number> | null } scale [x, y, z]
- * @returns { Matrix4 }
+ * @returns { Matrix4 } 부모 x 자리 x 돌림 x 크기 행렬. (새 행렬)
+ * @example <caption>몸에 딸린 팔을 부모 행렬로 놓기</caption>
+ * import { ToonMesh } from "./vanilla.js";
+ * const builder = new ToonMesh.MeshBuilder();
+ * const bodyMatrix = ToonMesh.createPartMatrix(null, [0, 1, 0], [0, Math.PI / 4, 0], null);
+ * const armMatrix = ToonMesh.createPartMatrix(bodyMatrix, [0.4, 0.1, 0], [0, 0, -0.6], [1, 1.5, 1]);
+ * builder.addPart(ToonMesh.createBoxGeometry(0.5, 0.6, 0.3), bodyMatrix, "#4080c0");
+ * builder.addPart(ToonMesh.createCapsuleGeometry(0.08, 0.3, 4, 10), armMatrix, "#f0c8a0");
  */
 export function createPartMatrix(parentMatrix, position, rotation, scale) {
 	const matrix = parentMatrix !== null ? parentMatrix.clone() : Matrix4.createIdentity();
@@ -79,10 +113,16 @@ export function createPartMatrix(parentMatrix, position, rotation, scale) {
 // 네모 상자. (면마다 꼭짓점을 따로 두어 모서리가 날카로움)
 //==============================================================================
 /**
- * @param { number } width
- * @param { number } height
- * @param { number } depth
- * @returns { object }
+ * @param { number } width - X 축 길이.
+ * @param { number } height - Y 축 길이.
+ * @param { number } depth - Z 축 길이.
+ * @returns { object } { positions, normals, indices, uvs } 도형. (면마다 UV 0 ~ 1)
+ * @example <caption>바깥선 없는 바닥판</caption>
+ * import { ToonMesh, Matrix4 } from "./vanilla.js";
+ * const builder = new ToonMesh.MeshBuilder();
+ * const geometry = ToonMesh.createBoxGeometry(6, 0.2, 6);
+ * builder.addPart(geometry, Matrix4.createTranslation(0, -0.1, 0), "#607050", { hasOutline: false });
+ * const arrays = builder.readArrays();
  */
 export function createBoxGeometry(width, height, depth) {
 	const geometry = { positions: [], normals: [], indices: [], uvs: [] };
@@ -113,12 +153,18 @@ export function createBoxGeometry(width, height, depth) {
 // 모서리가 둥근 상자. (면마다 격자를 깔고 안쪽 상자에서 반지름만큼 밀어냄)
 //==============================================================================
 /**
- * @param { number } width
- * @param { number } height
- * @param { number } depth
+ * @param { number } width - X 축 길이.
+ * @param { number } height - Y 축 길이.
+ * @param { number } depth - Z 축 길이.
  * @param { number } segments 둥근 곳의 마디 수.
- * @param { number } radius
- * @returns { object }
+ * @param { number } radius - 모서리 반지름. (반 길이보다 크면 그 축은 다 둥글다)
+ * @returns { object } { positions, normals, indices } 도형.
+ * @example <caption>모서리가 둥근 상자</caption>
+ * import { ToonMesh, Matrix4 } from "./vanilla.js";
+ * const builder = new ToonMesh.MeshBuilder();
+ * builder.addPart(ToonMesh.createRoundedBoxGeometry(1, 0.6, 0.8, 4, 0.12), Matrix4.createIdentity(), "#e0a060");
+ * builder.addPart(ToonMesh.createRoundedBoxGeometry(0.3, 0.1, 0.3, 2, 0.04), Matrix4.createTranslation(0, 0.35, 0), "#c04040");
+ * const arrays = builder.readArrays();
  */
 export function createRoundedBoxGeometry(width, height, depth, segments, radius) {
 	const geometry = { positions: [], normals: [], indices: [] };
@@ -182,11 +228,17 @@ export function createRoundedBoxGeometry(width, height, depth, segments, radius)
 // 원기둥. (위와 아래 반지름이 다르면 깔때기, 위가 0 이면 원뿔, 위아래 뚜껑 포함)
 //==============================================================================
 /**
- * @param { number } radiusTop
- * @param { number } radiusBottom
- * @param { number } height
- * @param { number } radialSegments
- * @returns { object }
+ * @param { number } radiusTop - 위 반지름. (0 이면 원뿔)
+ * @param { number } radiusBottom - 아래 반지름.
+ * @param { number } height - 높이. (가운데가 원점)
+ * @param { number } radialSegments - 둘레 마디 수.
+ * @returns { object } { positions, normals, indices } 도형.
+ * @example <caption>나무 기둥과 원뿔 잎</caption>
+ * import { ToonMesh, Matrix4 } from "./vanilla.js";
+ * const builder = new ToonMesh.MeshBuilder();
+ * builder.addPart(ToonMesh.createCylinderGeometry(0.08, 0.1, 0.6, 10), Matrix4.createTranslation(0, 0.3, 0), "#806040");
+ * builder.addPart(ToonMesh.createCylinderGeometry(0, 0.4, 0.9, 12), Matrix4.createTranslation(0, 1, 0), "#40a050");
+ * const arrays = builder.readArrays();
  */
 export function createCylinderGeometry(radiusTop, radiusBottom, height, radialSegments) {
 	const geometry = { positions: [], normals: [], indices: [] };
@@ -232,11 +284,17 @@ export function createCylinderGeometry(radiusTop, radiusBottom, height, radialSe
 // 구. (위에서부터 thetaLength 까지, π/2 면 위쪽 반구)
 //==============================================================================
 /**
- * @param { number } radius
- * @param { number } widthSegments
- * @param { number } heightSegments
- * @param { number } [thetaLength]
- * @returns { object }
+ * @param { number } radius - 반지름.
+ * @param { number } widthSegments - 경도 마디 수.
+ * @param { number } heightSegments - 위도 마디 수.
+ * @param { number } [thetaLength] - 위에서부터 깎을 각. (라디안, 기본 π 면 온 구)
+ * @returns { object } { positions, normals, indices, uvs } 도형. (UV 는 경도와 위도로 0 ~ 1)
+ * @example <caption>위쪽 반구로 지붕 짓기</caption>
+ * import { ToonMesh, Matrix4 } from "./vanilla.js";
+ * const builder = new ToonMesh.MeshBuilder();
+ * builder.addPart(ToonMesh.createCylinderGeometry(0.6, 0.6, 1, 24), Matrix4.createTranslation(0, 0.5, 0), "#e0d0b0");
+ * builder.addPart(ToonMesh.createSphereGeometry(0.6, 24, 8, Math.PI / 2), Matrix4.createTranslation(0, 1, 0), "#c06050");
+ * const arrays = builder.readArrays();
  */
 export function createSphereGeometry(radius, widthSegments, heightSegments, thetaLength = System.Math.PI) {
 	const geometry = { positions: [], normals: [], indices: [], uvs: [] };
@@ -267,8 +325,14 @@ export function createSphereGeometry(radius, widthSegments, heightSegments, thet
 //==============================================================================
 /**
  * @param { Array<Array<number>> } points 아래에서 위로.
- * @param { number } segments
- * @returns { object }
+ * @param { number } segments - 둘레 마디 수.
+ * @returns { object } { positions, normals, indices } 도형.
+ * @example <caption>옆모습을 돌려 꽃병 짓기</caption>
+ * import { ToonMesh, Matrix4 } from "./vanilla.js";
+ * const builder = new ToonMesh.MeshBuilder();
+ * const profile = [[0.001, 0], [0.25, 0.05], [0.3, 0.3], [0.15, 0.6], [0.2, 0.75]];
+ * builder.addPart(ToonMesh.createLatheGeometry(profile, 20), Matrix4.createIdentity(), "#5080c0");
+ * const arrays = builder.readArrays();
  */
 export function createLatheGeometry(points, segments) {
 	const geometry = { positions: [], normals: [], indices: [] };
@@ -308,11 +372,17 @@ export function createLatheGeometry(points, segments) {
 // 캡슐. (가운데 길이 length 의 원기둥 위아래에 반구, 전체 높이는 length + 반지름 둘)
 //==============================================================================
 /**
- * @param { number } radius
- * @param { number } length
- * @param { number } capSegments
- * @param { number } radialSegments
- * @returns { object }
+ * @param { number } radius - 반지름.
+ * @param { number } length - 가운데 원기둥의 길이. (반구는 빼고)
+ * @param { number } capSegments - 반구 하나의 위도 마디 수.
+ * @param { number } radialSegments - 둘레 마디 수.
+ * @returns { object } { positions, normals, indices } 도형.
+ * @example <caption>눕힌 캡슐</caption>
+ * import { ToonMesh, Matrix4 } from "./vanilla.js";
+ * const builder = new ToonMesh.MeshBuilder();
+ * builder.addPart(ToonMesh.createCapsuleGeometry(0.2, 0.8, 6, 16), Matrix4.createRotationZ(Math.PI / 2), "#a0d0f0");
+ * builder.addPart(ToonMesh.createCapsuleGeometry(0.1, 0.3, 4, 12), Matrix4.createTranslation(0, 0.4, 0), "#80b0d0");
+ * const arrays = builder.readArrays();
  */
 export function createCapsuleGeometry(radius, length, capSegments, radialSegments) {
 	const points = [];
@@ -336,8 +406,14 @@ export function createCapsuleGeometry(radius, length, capSegments, radialSegment
  * @param { number } tube 관의 반지름.
  * @param { number } radialSegments 관을 도는 마디.
  * @param { number } tubularSegments 고리를 도는 마디.
- * @param { number } [arc]
- * @returns { object }
+ * @param { number } [arc] - 고리를 도는 각. (라디안, 기본 2π)
+ * @returns { object } { positions, normals, indices } 도형.
+ * @example <caption>바닥에 눕힌 반쪽 고리</caption>
+ * import { ToonMesh, Matrix4 } from "./vanilla.js";
+ * const builder = new ToonMesh.MeshBuilder();
+ * builder.addPart(ToonMesh.createTorusGeometry(0.5, 0.08, 8, 24, Math.PI), Matrix4.createRotationX(-Math.PI / 2), "#f0d060");
+ * builder.addPart(ToonMesh.createTorusGeometry(0.3, 0.05, 8, 20), Matrix4.createTranslation(0, 0.5, 0), "#e0b040");
+ * const arrays = builder.readArrays();
  */
 export function createTorusGeometry(radius, tube, radialSegments, tubularSegments, arc = System.Math.PI * 2) {
 	const geometry = { positions: [], normals: [], indices: [] };
@@ -368,8 +444,14 @@ export function createTorusGeometry(radius, tube, radialSegments, tubularSegment
 // 팔면체. (면마다 꼭짓점을 따로 두어 각진 결정)
 //==============================================================================
 /**
- * @param { number } radius
- * @returns { object }
+ * @param { number } radius - 가운데에서 꼭짓점까지.
+ * @returns { object } { positions, normals, indices } 도형.
+ * @example <caption>빛나는 결정</caption>
+ * import { ToonMesh, Matrix4 } from "./vanilla.js";
+ * const builder = new ToonMesh.MeshBuilder();
+ * builder.addPart(ToonMesh.createOctahedronGeometry(0.4), Matrix4.createScale(0.6, 1.4, 0.6), "#80e0ff", { glow: 0.8 });
+ * builder.addPart(ToonMesh.createCylinderGeometry(0.3, 0.35, 0.15, 8), Matrix4.createTranslation(0, -0.6, 0), "#605870");
+ * const arrays = builder.readArrays();
  */
 export function createOctahedronGeometry(radius) {
 	const geometry = { positions: [], normals: [], indices: [] };
@@ -394,10 +476,16 @@ export function createOctahedronGeometry(radius) {
 // 각진 돌덩이. (이십면체의 꼭짓점 열둘을 저마다 늘이고 줄여, 면마다 꼭짓점을 따로 둔 깎은 돌)
 //==============================================================================
 /**
- * @param { number } radius
+ * @param { number } radius - 기준 반지름.
  * @param { Array<number> } vertexScales 꼭짓점 열둘의 반지름 배. (모자라면 처음부터 되풀이)
  * @param { Array<number> } axisScale [x, y, z] 배.
  * @returns { object } { positions, normals, indices }
+ * @example <caption>납작하고 울퉁불퉁한 돌</caption>
+ * import { ToonMesh, Matrix4 } from "./vanilla.js";
+ * const builder = new ToonMesh.MeshBuilder();
+ * const vertexScales = [1, 0.85, 1.1, 0.9, 1.05, 0.8, 1, 0.95, 1.15, 0.9, 1, 0.85];
+ * builder.addPart(ToonMesh.createFacetedChunkGeometry(0.5, vertexScales, [1.2, 0.6, 1]), Matrix4.createIdentity(), "#908878");
+ * const arrays = builder.readArrays();
  */
 export function createFacetedChunkGeometry(radius, vertexScales, axisScale) {
 	const geometry = { positions: [], normals: [], indices: [] };
@@ -441,6 +529,25 @@ export function createFacetedChunkGeometry(radius, vertexScales, axisScale) {
 //==============================================================================
 // 모형 한 덩어리를 짓는 것.
 //==============================================================================
+/**
+ * @example <caption>부품 여럿을 한 메시로 짓고 몸의 한 부위만 따로 그리기</caption>
+ * import { ToonRenderer, ToonMesh, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+ * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+ * const renderer = new ToonRenderer(webGL2RenderingContext);
+ * const builder = new ToonMesh.MeshBuilder();
+ * builder.addPart(ToonMesh.createRoundedBoxGeometry(1, 0.5, 0.6, 3, 0.1), Matrix4.createTranslation(0, 0.25, 0), "#d0d8e0");
+ * const lampStart = builder.getIndexCount();
+ * builder.addPart(ToonMesh.createSphereGeometry(0.12, 12, 8), Matrix4.createTranslation(0.5, 0.35, 0), "#ffe080", { glow: 1.5, isUnlit: true });
+ * const lampCount = builder.getIndexCount() - lampStart;
+ * const mesh = renderer.createMesh(builder.readArrays());
+ * const camera = new Camera3D();
+ * camera.setPerspective(0.8, 0.1, 100);
+ * camera.lookAt(Vector3.create(1.5, 1.2, 2), Vector3.create(0, 0.2, 0), Vector3.create(0, 1, 0));
+ * renderer.beginFrameWithCamera(camera);
+ * renderer.drawMesh(mesh, Matrix4.createIdentity(), { indexStart: 0, indexCount: lampStart });
+ * renderer.drawMesh(mesh, Matrix4.createIdentity(), { indexStart: lampStart, indexCount: lampCount, tintColor: [1, 0.5, 0.5, 1], hasOutline: false });
+ * renderer.endFrame();
+ */
 export class MeshBuilder {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -474,7 +581,7 @@ export class MeshBuilder {
 	// 비었는지.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 몸의 삼각형이 하나도 없으면 true.
 	 */
 	isEmpty() {
 		return this.#indices.length === 0;
@@ -484,7 +591,14 @@ export class MeshBuilder {
 	// 지금까지 담은 몸의 꼭짓점 번호 수. (한 부위의 몸이 든 자리를 따로 그릴 때 그 앞뒤로 읽음)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 몸의 꼭짓점 번호 수. (indexData 의 길이)
+	 * @example <caption>바퀴 부위가 든 자리를 적어 두기</caption>
+	 * import { ToonMesh, Matrix4 } from "./vanilla.js";
+	 * const builder = new ToonMesh.MeshBuilder();
+	 * builder.addPart(ToonMesh.createBoxGeometry(1.2, 0.4, 0.6), Matrix4.createTranslation(0, 0.4, 0), "#c04040");
+	 * const wheelStart = builder.getIndexCount();
+	 * builder.addPart(ToonMesh.createCylinderGeometry(0.2, 0.2, 0.1, 16), ToonMesh.createPartMatrix(null, [0.4, 0.2, 0.35], [Math.PI / 2, 0, 0], null), "#303030");
+	 * const wheelRange = { indexStart: wheelStart, indexCount: builder.getIndexCount() - wheelStart };
 	 */
 	getIndexCount() {
 		return this.#indices.length;
@@ -494,7 +608,14 @@ export class MeshBuilder {
 	// 지금까지 담은 바깥선 껍데기의 꼭짓점 번호 수. (한 부위의 껍데기가 든 자리를 따로 그릴 때 그 앞뒤로 읽음)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 바깥선 껍데기의 꼭짓점 번호 수. (outlineIndexData 의 길이)
+	 * @example <caption>창의 바깥선 껍데기만 따로 그릴 자리</caption>
+	 * import { ToonMesh, Matrix4 } from "./vanilla.js";
+	 * const builder = new ToonMesh.MeshBuilder();
+	 * builder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#a0a0a0");
+	 * const windowOutlineStart = builder.getOutlineIndexCount();
+	 * builder.addPart(ToonMesh.createBoxGeometry(0.4, 0.3, 0.05), Matrix4.createTranslation(0, 0.1, 0.5), "#80c0ff", { outlineWidth: 0.01 });
+	 * const windowOutlineRange = { outlineIndexStart: windowOutlineStart, outlineIndexCount: builder.getOutlineIndexCount() - windowOutlineStart };
 	 */
 	getOutlineIndexCount() {
 		return this.#outlineIndices.length;
@@ -505,9 +626,15 @@ export class MeshBuilder {
 	//==============================================================================
 	/**
 	 * @param { object } geometry { positions, normals, indices, uvs (없어도 됨) }
-	 * @param { Matrix4 } matrix
+	 * @param { Matrix4 } matrix - 도형에 곱할 자리, 돌림, 크기 행렬.
 	 * @param { string } colorText "#rrggbb"
 	 * @param { object } [options] { glow 빛남(0 ~), isUnlit 빛을 받지 않음, hasOutline 바깥선(기본 있음), outlineWidth 바깥선 굵기 }
+	 * @example <caption>빛나는 눈과 바깥선 없는 그림자 판</caption>
+	 * import { ToonMesh, Matrix4 } from "./vanilla.js";
+	 * const builder = new ToonMesh.MeshBuilder();
+	 * builder.addPart(ToonMesh.createSphereGeometry(0.5, 24, 16), Matrix4.createTranslation(0, 0.5, 0), "#f0e0d0", { outlineWidth: 0.03 });
+	 * builder.addPart(ToonMesh.createSphereGeometry(0.06, 10, 8), Matrix4.createTranslation(0.15, 0.6, 0.45), "#40ffff", { glow: 2, isUnlit: true, hasOutline: false });
+	 * builder.addPart(ToonMesh.createCylinderGeometry(0.5, 0.5, 0.01, 24), Matrix4.createTranslation(0, 0.005, 0), "#202020", { hasOutline: false });
 	 */
 	addPart(geometry, matrix, colorText, options = {}) {
 		const color = readColorValues(colorText);
@@ -564,6 +691,12 @@ export class MeshBuilder {
 	 * @param { number } pattern 무늬 번호. (뜻은 셰이더가 정함, 0 이면 없음)
 	 * @param { Array<number> | null } patternColor [r, g, b] 무늬 색. (없으면 null)
 	 * @param { boolean } isUnlit 빛을 받지 않음.
+	 * @example <caption>무늬를 넣은 바닥 칸 두 개</caption>
+	 * import { ToonMesh } from "./vanilla.js";
+	 * const builder = new ToonMesh.MeshBuilder();
+	 * const grassColor = ToonMesh.readColorValues("#60a040");
+	 * builder.addQuad([[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], [0, 1, 0], grassColor, 0, null, false);
+	 * builder.addQuad([[1, 0, 0], [2, 0, 0], [2, 0, 1], [1, 0, 1]], [0, 1, 0], grassColor, 1, [0.4, 0.7, 0.3], false);
 	 */
 	addQuad(corners, normal, color, pattern, patternColor, isUnlit) {
 		const startIndex = this.#vertices.length / VERTEX_FLOAT_COUNT;
@@ -597,7 +730,18 @@ export class MeshBuilder {
 	//==============================================================================
 	/**
 	 * @param { Array<object> } quads { corners 네 점 [x, y, z], normal [x, y, z] }
-	 * @param { number } outlineWidth
+	 * @param { number } outlineWidth - 껍데기 굵기. (꼭짓점 좌표 길이)
+	 * @example <caption>블록 하나의 윗면과 옆면에 바깥선 껍데기</caption>
+	 * import { ToonMesh } from "./vanilla.js";
+	 * const builder = new ToonMesh.MeshBuilder();
+	 * const quads = [
+	 * 	{ corners: [[0, 1, 0], [1, 1, 0], [1, 1, 1], [0, 1, 1]], normal: [0, 1, 0] },
+	 * 	{ corners: [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], normal: [0, 0, 1] },
+	 * ];
+	 * for (const quad of quads) {
+	 * 	builder.addQuad(quad.corners, quad.normal, [0.5, 0.4, 0.3], 0, null, false);
+	 * }
+	 * builder.addQuadShell(quads, 0.02);
 	 */
 	addQuadShell(quads, outlineWidth) {
 		const readPointKey = (corner) => {
@@ -653,16 +797,24 @@ export class MeshBuilder {
 	// 받은 모형의 삼각형 담기. (GLB 의 프리미티브 하나, 감기는 그대로)
 	//==============================================================================
 	/**
-	 * @param { Float32Array } positions
-	 * @param { Float32Array } normals
-	 * @param { ArrayLike<number> } indices
-	 * @param { Matrix4 } matrix
+	 * @param { Float32Array } positions - 꼭짓점마다 [x, y, z].
+	 * @param { Float32Array } normals - 꼭짓점마다 [x, y, z] 노멀.
+	 * @param { ArrayLike<number> } indices - 삼각형마다 꼭짓점 번호 셋.
+	 * @param { Matrix4 } matrix - 꼭짓점에 곱할 행렬.
 	 * @param { Array<number> } color [r, g, b] sRGB.
-	 * @param { number } glow
-	 * @param { boolean } isUnlit
+	 * @param { number } glow - 빛남의 세기. (바탕색에 곱해 더함, 0 이면 없음)
+	 * @param { boolean } isUnlit - 빛을 받지 않음.
 	 * @param { ArrayLike<number> | null } joints 꼭짓점마다 뼈대 번호 넷. (없으면 null)
 	 * @param { ArrayLike<number> | null } weights 꼭짓점마다 무게 넷.
 	 * @param { ArrayLike<number> | null } [uvs] 꼭짓점마다 텍스처 좌표 둘. (없으면 null)
+	 * @example <caption>코드로 만든 세모 하나를 UV 와 함께 담기</caption>
+	 * import { ToonMesh, Matrix4 } from "./vanilla.js";
+	 * const builder = new ToonMesh.MeshBuilder();
+	 * const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+	 * const normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]);
+	 * const uvs = new Float32Array([0, 1, 1, 1, 0, 0]);
+	 * builder.addTriangles(positions, normals, [0, 1, 2], Matrix4.createIdentity(), [1, 0.8, 0.6], 0, false, null, null, uvs);
+	 * const arrays = builder.readArrays();
 	 */
 	addTriangles(positions, normals, indices, matrix, color, glow, isUnlit, joints, weights, uvs = null) {
 		const elements = matrix.getElements();
@@ -691,11 +843,18 @@ export class MeshBuilder {
 	// 받은 모형의 바깥선 껍데기 담기. (이미 부풀린 것, 감기는 그대로)
 	//==============================================================================
 	/**
-	 * @param { Float32Array } positions
-	 * @param { ArrayLike<number> } indices
-	 * @param { Matrix4 } matrix
-	 * @param { ArrayLike<number> | null } joints
-	 * @param { ArrayLike<number> | null } weights
+	 * @param { Float32Array } positions - 이미 부풀린 껍데기의 꼭짓점마다 [x, y, z].
+	 * @param { ArrayLike<number> } indices - 삼각형마다 꼭짓점 번호 셋. (감기는 그대로 담는다)
+	 * @param { Matrix4 } matrix - 꼭짓점에 곱할 행렬.
+	 * @param { ArrayLike<number> | null } joints - 꼭짓점마다 뼈대 번호 넷. (없으면 null)
+	 * @param { ArrayLike<number> | null } weights - 꼭짓점마다 무게 넷. (없으면 null)
+	 * @example <caption>미리 부풀린 껍데기를 그대로 담기</caption>
+	 * import { ToonMesh, Matrix4 } from "./vanilla.js";
+	 * const builder = new ToonMesh.MeshBuilder();
+	 * const body = ToonMesh.createFacetedChunkGeometry(0.5, [1], [1, 1, 1]);
+	 * const shell = ToonMesh.createFacetedChunkGeometry(0.53, [1], [1, 1, 1]);
+	 * builder.addTriangles(new Float32Array(body.positions), new Float32Array(body.normals), body.indices, Matrix4.createIdentity(), [0.6, 0.8, 1], 0, false, null, null);
+	 * builder.addOutlineTriangles(new Float32Array(shell.positions), shell.indices, Matrix4.createIdentity(), null, null);
 	 */
 	addOutlineTriangles(positions, indices, matrix, joints, weights) {
 		const startIndex = this.#outlinePositions.length / 3;
@@ -715,13 +874,20 @@ export class MeshBuilder {
 	//   - 여러 프리미티브를 이어 붙여 한 번에 넘기면 프리미티브 사이의 같은 자리 점도 함께 민다.
 	//==============================================================================
 	/**
-	 * @param { ArrayLike<number> } positions
-	 * @param { ArrayLike<number> } normals
-	 * @param { ArrayLike<number> } indices
-	 * @param { Matrix4 } matrix
-	 * @param { number } outlineWidth
-	 * @param { ArrayLike<number> | null } joints
-	 * @param { ArrayLike<number> | null } weights
+	 * @param { ArrayLike<number> } positions - 몸의 꼭짓점마다 [x, y, z].
+	 * @param { ArrayLike<number> } normals - 몸의 꼭짓점마다 [x, y, z] 노멀.
+	 * @param { ArrayLike<number> } indices - 삼각형마다 꼭짓점 번호 셋.
+	 * @param { Matrix4 } matrix - 꼭짓점에 곱할 행렬.
+	 * @param { number } outlineWidth - 껍데기 굵기. (행렬을 곱한 뒤의 길이)
+	 * @param { ArrayLike<number> | null } joints - 꼭짓점마다 뼈대 번호 넷. (없으면 null)
+	 * @param { ArrayLike<number> | null } weights - 꼭짓점마다 무게 넷. (없으면 null)
+	 * @example <caption>받은 몸으로 같은 굵기의 껍데기 짓기</caption>
+	 * import { ToonMesh, Matrix4 } from "./vanilla.js";
+	 * const builder = new ToonMesh.MeshBuilder();
+	 * const body = ToonMesh.createFacetedChunkGeometry(0.5, [1, 0.9, 1.1], [1, 0.8, 1]);
+	 * const matrix = Matrix4.createTranslation(0, 0.4, 0);
+	 * builder.addTriangles(new Float32Array(body.positions), new Float32Array(body.normals), body.indices, matrix, [0.6, 0.55, 0.5], 0, false, null, null);
+	 * builder.addTriangleShell(body.positions, body.normals, body.indices, matrix, 0.02, null, null);
 	 */
 	addTriangleShell(positions, normals, indices, matrix, outlineWidth, joints, weights) {
 		const elements = matrix.getElements();
@@ -757,7 +923,7 @@ export class MeshBuilder {
 	// 방금 담은 꼭짓점들의 텍스처 좌표 담기. (uvs 가 null 이면 UV 가 이미 있을 때만 0 으로 채운다, 앞 꼭짓점의 빈자리도 0 으로)
 	//==============================================================================
 	/**
-	 * @param { ArrayLike<number> | null } uvs
+	 * @param { ArrayLike<number> | null } uvs - 꼭짓점마다 텍스처 좌표 둘. (없으면 null)
 	 * @param { number } vertexCount 방금 담은 꼭짓점 수.
 	 */
 	pushUvValues(uvs, vertexCount) {
@@ -778,7 +944,15 @@ export class MeshBuilder {
 	// 재질 범위 담기. ({ name, indexStart, indexCount, ... } 몸의 꼭짓점 번호 자리, GLB 읽기가 프리미티브마다 담음)
 	//==============================================================================
 	/**
-	 * @param { object } materialRange
+	 * @param { object } materialRange - { name, indexStart, indexCount, ... } 몸의 꼭짓점 번호 자리. (readArrays 의 materialRanges 에 복사해 담긴다)
+	 * @example <caption>부위 하나를 이름 붙인 재질 범위로 담기</caption>
+	 * import { ToonMesh, Matrix4 } from "./vanilla.js";
+	 * const builder = new ToonMesh.MeshBuilder();
+	 * builder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#909090");
+	 * const screenStart = builder.getIndexCount();
+	 * builder.addPart(ToonMesh.createBoxGeometry(0.6, 0.4, 0.02), Matrix4.createTranslation(0, 0.1, 0.51), "#102030", { hasOutline: false });
+	 * builder.addMaterialRange({ name: "screen", indexStart: screenStart, indexCount: builder.getIndexCount() - screenStart, extras: {} });
+	 * const screenRange = builder.readArrays().materialRanges.find((materialRange) => materialRange.name === "screen");
 	 */
 	addMaterialRange(materialRange) {
 		this.#materialRanges.push(materialRange);
@@ -788,10 +962,10 @@ export class MeshBuilder {
 	// 뼈대 번호와 무게 담기. (뼈대가 없으면 담지 않음)
 	//==============================================================================
 	/**
-	 * @param { Array<number> } target
-	 * @param { ArrayLike<number> | null } joints
-	 * @param { ArrayLike<number> | null } weights
-	 * @param { number } vertexCount
+	 * @param { Array<number> } target - 담을 곳. (몸이나 바깥선의 뼈대 값)
+	 * @param { ArrayLike<number> | null } joints - 꼭짓점마다 뼈대 번호 넷. (없으면 담지 않음)
+	 * @param { ArrayLike<number> | null } weights - 꼭짓점마다 무게 넷. (없으면 담지 않음)
+	 * @param { number } vertexCount - 담을 꼭짓점 수.
 	 */
 	pushSkinValues(target, joints, weights, vertexCount) {
 		if (joints === null || weights === null) {
@@ -808,6 +982,13 @@ export class MeshBuilder {
 	//==============================================================================
 	/**
 	 * @returns { object } { vertexData, indexData, outlineVertexData, outlineIndexData, outlineBaseData, skinData, outlineSkinData, skeleton, uvData, materialRanges }
+	 * @example <caption>지은 배열을 툰 렌더러에 올리기</caption>
+	 * import { ToonRenderer, ToonMesh, Matrix4 } from "./vanilla.js";
+	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
+	 * const builder = new ToonMesh.MeshBuilder();
+	 * builder.addPart(ToonMesh.createTorusGeometry(0.4, 0.1, 10, 24), Matrix4.createIdentity(), "#e08060");
+	 * const arrays = builder.readArrays();
+	 * const mesh = builder.isEmpty() ? null : renderer.createMesh(arrays);
 	 */
 	readArrays() {
 		const vertexCount = this.#vertices.length / VERTEX_FLOAT_COUNT;
@@ -834,7 +1015,7 @@ export class MeshBuilder {
 	//==============================================================================
 	/**
 	 * @param { Float32Array } elements Matrix4 의 수.
-	 * @returns { Array<number> }
+	 * @returns { Array<number> } 노멀에 곱할 3x3 의 수 9. (행 차례, 행렬식이 0 에 가까우면 단위 행렬)
 	 */
 	readNormalMatrix(elements) {
 		const m00 = elements[0];
@@ -872,10 +1053,10 @@ export class MeshBuilder {
 	// 삼각형마다 감기를 뒤집을지. (면 노멀이 꼭짓점 노멀의 합과 반대면 뒤집음)
 	//==============================================================================
 	/**
-	 * @param { Array<number> } indices
-	 * @param { Array<number> } worldPositions
-	 * @param { Array<number> } worldNormals
-	 * @returns { Array<boolean> }
+	 * @param { Array<number> } indices - 삼각형마다 꼭짓점 번호 셋.
+	 * @param { Array<number> } worldPositions - 행렬을 곱한 꼭짓점 자리. (3 씩)
+	 * @param { Array<number> } worldNormals - 행렬을 곱한 단위 노멀. (3 씩)
+	 * @returns { Array<boolean> } 삼각형마다 뒤집을지.
 	 */
 	readTriangleFlips(indices, worldPositions, worldNormals) {
 		const flips = [];
@@ -909,10 +1090,10 @@ export class MeshBuilder {
 	// 삼각형 담기. (뒤집을 것은 둘째와 셋째를 바꿈)
 	//==============================================================================
 	/**
-	 * @param { Array<number> } target
-	 * @param { Array<number> } indices
-	 * @param { Array<boolean> } flips
-	 * @param { number } startIndex
+	 * @param { Array<number> } target - 담을 꼭짓점 번호 배열.
+	 * @param { Array<number> } indices - 도형의 삼각형마다 꼭짓점 번호 셋.
+	 * @param { Array<boolean> } flips - 삼각형마다 뒤집을지. (readTriangleFlips)
+	 * @param { number } startIndex - 번호에 더할 첫 꼭짓점 차례.
 	 */
 	pushTriangles(target, indices, flips, startIndex) {
 		for (let triangleIndex = 0; triangleIndex < indices.length; triangleIndex += 3) {
@@ -934,10 +1115,10 @@ export class MeshBuilder {
 	//     뒤집힌 면은 카메라 쪽을 뒷면으로 보여, 깊이와 함께 나중에 그리는 껍데기(건물, 바위)에서는 몸 위에 짙은 줄로 비친다.
 	//==============================================================================
 	/**
-	 * @param { Array<number> } target
-	 * @param { ArrayLike<number> } indices
+	 * @param { Array<number> } target - 담을 껍데기 꼭짓점 번호 배열.
+	 * @param { ArrayLike<number> } indices - 삼각형마다 꼭짓점 번호 셋.
 	 * @param { Array<boolean> | null } flips 없으면 감기 그대로.
-	 * @param { number } startIndex
+	 * @param { number } startIndex - 번호에 더할 첫 껍데기 꼭짓점 차례.
 	 * @param { Array<number> } worldPositions 밀기 전의 점.
 	 * @param { Array<number> } offsets 점마다 민 만큼.
 	 */
@@ -982,10 +1163,10 @@ export class MeshBuilder {
 	//     뾰족한 끝(원뿔 꼭대기)이 너무 튀지 않게 그 코사인은 MINIMUM_OUTLINE_MITER_COSINE 밑으로 내리지 않는다.
 	//==============================================================================
 	/**
-	 * @param { Array<number> } worldPositions
+	 * @param { Array<number> } worldPositions - 행렬을 곱한 꼭짓점 자리. (3 씩)
 	 * @param { Array<number> } worldNormals 단위 법선.
-	 * @param { number } outlineWidth
-	 * @returns { Array<number> }
+	 * @param { number } outlineWidth - 껍데기 굵기.
+	 * @returns { Array<number> } 점마다 밀어낼 [x, y, z]. (3 씩)
 	 */
 	readOutlineOffsets(worldPositions, worldNormals, outlineWidth) {
 		const pointKeys = [];
@@ -1048,8 +1229,8 @@ export class MeshBuilder {
 	// 도형의 둘레 반지름. (상자 가운데에서 가장 먼 점까지)
 	//==============================================================================
 	/**
-	 * @param { Array<number> } positions
-	 * @returns { number }
+	 * @param { Array<number> } positions - 꼭짓점 자리. (3 씩)
+	 * @returns { number } 감싸는 상자 가운데에서 가장 먼 점까지의 거리.
 	 */
 	readBoundingRadius(positions) {
 		const minimum = [System.Infinity, System.Infinity, System.Infinity];
@@ -1073,8 +1254,8 @@ export class MeshBuilder {
 	// 행렬의 가장 큰 크기. (세 축의 길이 가운데 큰 것)
 	//==============================================================================
 	/**
-	 * @param { Float32Array } elements
-	 * @returns { number }
+	 * @param { Float32Array } elements - Matrix4 의 수.
+	 * @returns { number } 세 축 길이 가운데 가장 큰 것.
 	 */
 	readMaximumScale(elements) {
 		const scaleX = System.Math.hypot(elements[0], elements[1], elements[2]);
@@ -1093,6 +1274,15 @@ export class MeshBuilder {
 	 * @static
 	 * @param { Array<object> } pieces { arrays, offset }
 	 * @returns { object } readArrays 의 꼴.
+	 * @example <caption>바위 조각 셋을 옮겨 한 메시로 잇기</caption>
+	 * import { ToonRenderer, ToonMesh, Matrix4 } from "./vanilla.js";
+	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
+	 * const builder = new ToonMesh.MeshBuilder();
+	 * builder.addPart(ToonMesh.createFacetedChunkGeometry(0.4, [1, 0.8, 1.1, 0.9], [1, 0.7, 1]), Matrix4.createIdentity(), "#8a8070");
+	 * const rockArrays = builder.readArrays();
+	 * const pieces = [{ arrays: rockArrays, offset: [0, 0, 0] }, { arrays: rockArrays, offset: [1.2, 0, 0.3] }, { arrays: rockArrays, offset: [-0.8, 0, 1] }];
+	 * const combinedArrays = ToonMesh.MeshBuilder.combine(pieces);
+	 * const rocksMesh = renderer.createMesh(combinedArrays);
 	 */
 	static combine(pieces) {
 		let vertexFloatCount = 0;

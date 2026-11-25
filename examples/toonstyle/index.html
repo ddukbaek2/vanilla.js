@@ -19,6 +19,7 @@ const System = globalThis;
 // 툰 셰이딩과 바깥선 견주기 페이지. (러스트 예제 toonstyle 과 같은 장면, 저장소의 import.js 를 바로 읽는 개발용 페이지)
 // - 주소 ?scale=0.5 면 화면 공간 바깥선의 선의 판을 그 몫으로 줄여 그린다. (러스트 TOON_STYLE_SCALE)
 // - 주소 ?toggles=1 이면 바닥은 선 없이 가리기만, 결정 덩이는 꺾임 선 없이 그린다. (러스트 TOON_STYLE_TOGGLES)
+// - 주소 ?shell=1 이면 화면 공간 바깥선 대신 껍데기 바깥선으로 그린다. (러스트 TOON_STYLE_SHELL)
 // - 한 번만 그린다. (움직이지 않는 견주기 장면)
 //==============================================================================
 const sceneModule = await import("./toonstylescene.js");
@@ -27,7 +28,8 @@ const webGL2RenderingContext = canvas.getContext("webgl2", { alpha: false, antia
 const query = new System.URLSearchParams(System.location.search);
 const lineScale = query.has("scale") ? System.Number(query.get("scale")) : 1;
 const isToggled = query.get("toggles") === "1";
-const scene = new sceneModule.ToonStyleScene(webGL2RenderingContext, lineScale, isToggled);
+const isShell = query.get("shell") === "1";
+const scene = new sceneModule.ToonStyleScene(webGL2RenderingContext, lineScale, isToggled, isShell);
 //==============================================================================
 // 한 프레임. (캔버스 크기를 화면 화소로 맞추고 그린다)
 //==============================================================================

@@ -204,7 +204,7 @@ UIWindowLayer (노드) ── UIWindow[] (맨 위 창만 보임, UIScale 만큼 
 툰 3D (experimental/graphics/toon)
 ├── ToonMesh(MeshBuilder), ToonGlb ── 꼭짓점 배열 짓기와 GLB 읽기 (UV, 재질 범위 포함, GL 무관)
 ├── ToonRenderer ── 몸, 바깥선 껍데기, 그림자 깊이 프로그램 + 머티리얼과 인스턴스 꼴마다 지은 프로그램
-│   ├── ToonLightSet (기본 빛 묶음: 해, 채움 빛, 림, 정반사, 점광 8 개, 띠 램프, 빛 꼴)
+│   ├── ToonLightSet (기본 빛 묶음: 해, 채움 빛, 점광과 스포트라이트 8 개, 그늘 램프나 램프 텍스처, 하이라이트, 림, 빛 꼴)
 │   └── ToonMaterial (참조, 셰이더 조각: uniform, surface, light, vertex)
 ├── ToonDrawQueue ── 한 프레임에 그릴 모형을 담아 불투명, 바깥선, 비치는 것 차례로 + 단계 콜백
 ├── ToonScreenOutline ── 같은 모형을 한 번 더 그려 노멀, 선 번호, 깊이로 화면 공간 바깥선 (경계 잡기, 점프 플러딩, 거리로 섞기)
@@ -281,11 +281,29 @@ soldier.glb ──> parseBinary ──> glTF JSON+BIN
 - 매 프레임: `model.update(dt)` 가 클립 샘플링(크로스페이드) → 조인트 오프셋 → 월드 행렬 → 조인트 행렬(월드 x 역바인드)까지 계산하고, `renderer.draw(model, ...)` 가 GL 상태를 잡고 드로어블을 순회한다.
 - 툰 3D 는 텍스처 없이 재질 색으로 칠하는 메시를 중심으로 하되, UV 와 바탕색, 빛남, 데칼 텍스처, 머티리얼 셰이더 조각을 받는다. 씬 판은 선형 색이다. (ToonRenderer.setHdrOutput, ToonPostProcess 가 톤매핑과 감마를 건다)
 
-### 6-3. 툰 바깥선
+### 6-3. 툰 셰이딩
+
+몸 조각 셰이더는 표면 → 표면 조각(applySurface) → 빛 → 빛 조각(applyLight) → 합치기 차례다.
+
+```
+x = (반 램버트 dot(N, L) x 0.5 + 0.5 나 max(dot, 0)) + shadeOffset        (해는 x 에 그림자 0 ~ 1 을 곱한다)
+램프(x) = 칸마다 mix(앞 칸 색, 이 칸 색, clamp((x - 자리 + f) / f, 0, 1)),  f = max(부드러움, fwidth(x))   (또는 램프 텍스처의 가로)
+단계(x) = (휘도(램프(x)) - 휘도(바닥 칸)) / (휘도(맨 위 칸) - 휘도(바닥 칸))
+
+irradiance = 해 색 x 램프(x 해) + 바탕빛(하늘색, 땅색을 N.y 로) + 채움 색 x 단계(x 채움) + Σ 점광 색 x 단계(x 점광) x 감쇠 (스포트라이트는 각 감쇠도)
+specular   = 색 x 세기 x Σ 빛 색 x mix(smoothstep 으로 0.5 를 가른 블린 퐁, 블린 퐁, 부드러움) x 단계
+rim        = 색 x mix(0.5 를 가른 pow(1 - N.V, 거듭제곱), 그대로, 부드러움) x mix(1, 해 단계, 해 쪽 가림)
+색         = 바탕색 x irradiance (÷π 꼴이면 ÷π) + specular x specularMask + rim x rimMask + 빛남        (매트캡은 그 뒤에 곱하거나 더한다)
+```
+
+- 그늘 색이 해의 색으로 물들고 그림자가 그늘 색으로 들어가는 것은 유니티 툰 셰이더의 바탕, 1 차, 2 차 그늘과 System Shadows 의 꼴이다. 다른 빛이 등진 면을 밝히지 않게 단계만 받는 것은 고도 diffuse_toon 처럼 빛마다 툰 경계를 거는 꼴이다.
+- 노멀은 모형 행렬과 본 행렬의 역행렬의 전치로 옮긴다.
+
+### 6-4. 툰 바깥선
 
 툰 3D 의 바깥선은 두 가지이고 함께 써도 된다.
 
-- 껍데기(inverted hull): MeshBuilder 가 점마다 같은 자리의 노멀을 모아 평균한 쪽(모서리는 덜 튀게 민 쪽)으로 민 사본을 짓고, ToonRenderer 가 그 뒷면만 그려 몸 둘레에 테로 보인다. 모형 하나의 실루엣에 맞고, 굵기를 꼭짓점마다 다르게 지을 수 있다.
+- 껍데기(inverted hull): MeshBuilder 가 점마다 같은 자리의 노멀을 모아 평균한 쪽(모서리는 덜 튀게 민 쪽)으로 민 굵기를 짓고, ToonRenderer 가 바탕 자리에서 그 쪽으로 그리기마다의 굵기 배(outlineWidthScale)와 거리 배(setOutlineDistanceScale)만큼 밀어 뒷면만 그린다. 모형 하나의 실루엣에 맞고, 굵기를 꼭짓점마다 다르게 지을 수 있다. 색은 그리기마다(outlineColor).
 - 화면 공간(ToonScreenOutline): 장면 전체의 실루엣, 물체가 맞닿은 곳, 꺾인 모서리를 한 번에 긋는다.
 
 ```

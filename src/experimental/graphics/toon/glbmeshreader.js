@@ -6,6 +6,28 @@ import { Matrix4 } from "../../../base/matrix4.js";
 import { MeshBuilder } from "./meshbuilder.js";
 
 
+/**
+ * @example <caption>GLB 모형을 읽어 움직임 자세로 그리기</caption>
+ * import { ToonRenderer, ToonGlb, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+ * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+ * const renderer = new ToonRenderer(webGL2RenderingContext);
+ * const arrayBuffer = await (await fetch("model.glb")).arrayBuffer();
+ * const arrays = ToonGlb.readGlbArrays(arrayBuffer, { width: 0.02 });
+ * const mesh = renderer.createMesh(arrays);
+ * const skeleton = arrays.skeleton;
+ * const jointMatrices = skeleton !== null ? new Float32Array(skeleton.joints.length * 16) : null;
+ * if (skeleton !== null) {
+ * 	ToonGlb.writeSkinPose(skeleton, "idle", 0.5, jointMatrices);
+ * }
+ * const camera = new Camera3D();
+ * camera.setPerspective(0.8, 0.1, 100);
+ * camera.lookAt(Vector3.create(0, 1.5, 4), Vector3.create(0, 1, 0), Vector3.create(0, 1, 0));
+ * renderer.beginFrameWithCamera(camera);
+ * renderer.drawMesh(mesh, Matrix4.createIdentity(), { jointMatrices: jointMatrices });
+ * renderer.endFrame();
+ */
+
+
 //==============================================================================
 // 점토 모형(GLB) 읽기와 뼈대 자세. (툰 3D 의 MeshBuilder 꼭짓점 배열로, 외계행성 광부 키우기에서 왔다)
 //
@@ -62,10 +84,10 @@ const LOOP_ONCE = "once";
 // 접근자 하나 읽기. (촘촘한 것과 byteStride 로 띄운 것)
 //==============================================================================
 /**
- * @param { object } json
- * @param { ArrayBuffer } binaryBuffer
- * @param { number } accessorIndex
- * @returns { ArrayLike<number> }
+ * @param { object } json - glTF 의 JSON 덩어리.
+ * @param { ArrayBuffer } binaryBuffer - GLB 의 바이너리 덩어리.
+ * @param { number } accessorIndex - 접근자 차례.
+ * @returns { ArrayLike<number> } 접근자의 수. (촘촘히 이은 형식 배열)
  */
 function readAccessor(json, binaryBuffer, accessorIndex) {
 	const accessor = json.accessors[accessorIndex];
@@ -90,10 +112,10 @@ function readAccessor(json, binaryBuffer, accessorIndex) {
 // 무게 접근자 읽기. (정수로 담겼으면 0 ~ 1 로)
 //==============================================================================
 /**
- * @param { object } json
- * @param { ArrayBuffer } binaryBuffer
- * @param { number } accessorIndex
- * @returns { ArrayLike<number> }
+ * @param { object } json - glTF 의 JSON 덩어리.
+ * @param { ArrayBuffer } binaryBuffer - GLB 의 바이너리 덩어리.
+ * @param { number } accessorIndex - 접근자 차례.
+ * @returns { ArrayLike<number> } 무게. (정수로 담겼으면 0 ~ 1 로 나눈 Float32Array)
  */
 function readWeightAccessor(json, binaryBuffer, accessorIndex) {
 	const values = readAccessor(json, binaryBuffer, accessorIndex);
@@ -110,10 +132,10 @@ function readWeightAccessor(json, binaryBuffer, accessorIndex) {
 // 자리, 돌림(사원수), 크기로 행렬 짓기.
 //==============================================================================
 /**
- * @param { ArrayLike<number> } translation
- * @param { ArrayLike<number> } rotation
- * @param { ArrayLike<number> } scale
- * @returns { Matrix4 }
+ * @param { ArrayLike<number> } translation - [x, y, z] 자리.
+ * @param { ArrayLike<number> } rotation - [x, y, z, w] 사원수.
+ * @param { ArrayLike<number> } scale - [x, y, z] 크기.
+ * @returns { Matrix4 } 자리 x 돌림 x 크기 행렬.
  */
 function createTransformMatrix(translation, rotation, scale) {
 	const matrix = Matrix4.createTranslation(translation[0], translation[1], translation[2]);
@@ -127,8 +149,8 @@ function createTransformMatrix(translation, rotation, scale) {
 // 노드의 자기 행렬. (matrix 가 있으면 그것, 아니면 자리, 돌림, 크기)
 //==============================================================================
 /**
- * @param { object } node
- * @returns { Matrix4 }
+ * @param { object } node - glTF 노드.
+ * @returns { Matrix4 } 노드의 자기 행렬. (부모 행렬은 곱하지 않음)
  */
 function readNodeMatrix(node) {
 	if (System.Array.isArray(node.matrix)) {
@@ -148,12 +170,12 @@ function readNodeMatrix(node) {
 //   - 뼈대로 움직이는 프리미티브는 노드 행렬을 쓰지 않는다. (glTF 의 약속, 자리는 본이 정함)
 //==============================================================================
 /**
- * @param { MeshBuilder } builder
- * @param { object } json
- * @param { ArrayBuffer } binaryBuffer
- * @param { object } node
- * @param { object } primitive
- * @param { Matrix4 } matrix
+ * @param { MeshBuilder } builder - 담을 MeshBuilder.
+ * @param { object } json - glTF 의 JSON 덩어리.
+ * @param { ArrayBuffer } binaryBuffer - GLB 의 바이너리 덩어리.
+ * @param { object } node - 프리미티브가 든 노드.
+ * @param { object } primitive - glTF 프리미티브.
+ * @param { Matrix4 } matrix - 부모까지 곱한 노드 행렬. (뼈대 프리미티브는 쓰지 않음)
  * @param { boolean } [isOutlineRebuilt] 바깥선 껍데기를 몸으로 새로 지으면 GLB 의 껍데기는 담지 않는다.
  */
 function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOutlineRebuilt = false) {
@@ -227,9 +249,9 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
 // 재질의 텍스처 정보가 가리키는 그림 차례. (textures[index].source, 없으면 -1)
 //==============================================================================
 /**
- * @param { object } json
+ * @param { object } json - glTF 의 JSON 덩어리.
  * @param { object | undefined } textureInfo { index, texCoord }
- * @returns { number }
+ * @returns { number } images 의 차례. (없으면 -1)
  */
 function readTextureImage(json, textureInfo) {
 	if (textureInfo === undefined || textureInfo === null || typeof textureInfo.index !== "number" || json.textures === undefined) {
@@ -246,10 +268,10 @@ function readTextureImage(json, textureInfo) {
 // 몸으로 새로 지을 바깥선 껍데기의 굵기. (그 노드에 이름 끝이 ".outline" 인 짝이 없고 addedParts 에도 없으면 null, 부품마다 따로 준 굵기가 있으면 그것, 굵기가 0 이하면 짓지 않아 null)
 //==============================================================================
 /**
- * @param { object } node
- * @param { Set<string> } nodeNames
+ * @param { object } node - glTF 노드.
+ * @param { Set<string> } nodeNames - GLB 의 모든 노드 이름.
  * @param { object } outlineOptions { width, partWidths, addedParts }
- * @returns { number | null }
+ * @returns { number | null } 껍데기 굵기. (짓지 않으면 null)
  */
 function readRebuiltOutlineWidth(node, nodeNames, outlineOptions) {
 	const nodeName = typeof node.name === "string" ? node.name : "";
@@ -267,12 +289,12 @@ function readRebuiltOutlineWidth(node, nodeNames, outlineOptions) {
 // 노드의 몸으로 바깥선 껍데기 짓기. (색마다 나뉜 프리미티브를 이어 붙여 한 번에 넘김, 바깥선 재질과 노멀이 없는 것은 뺌)
 //==============================================================================
 /**
- * @param { MeshBuilder } builder
- * @param { object } json
- * @param { ArrayBuffer } binaryBuffer
- * @param { object } node
- * @param { Matrix4 } matrix
- * @param { number } outlineWidth
+ * @param { MeshBuilder } builder - 담을 MeshBuilder.
+ * @param { object } json - glTF 의 JSON 덩어리.
+ * @param { ArrayBuffer } binaryBuffer - GLB 의 바이너리 덩어리.
+ * @param { object } node - 껍데기를 지을 메시 노드.
+ * @param { Matrix4 } matrix - 부모까지 곱한 노드 행렬. (뼈대 노드는 쓰지 않음)
+ * @param { number } outlineWidth - 껍데기 굵기. (모형 좌표)
  */
 function addRebuiltOutline(builder, json, binaryBuffer, node, matrix, outlineWidth) {
 	const positions = [];
@@ -331,8 +353,8 @@ function addRebuiltOutline(builder, json, binaryBuffer, node, matrix, outlineWid
 // 노드 이름 모음. (이름이 없는 노드는 빈 글자)
 //==============================================================================
 /**
- * @param { object } json
- * @returns { Set<string> }
+ * @param { object } json - glTF 의 JSON 덩어리.
+ * @returns { Set<string> } 노드 이름 모음.
  */
 function readNodeNames(json) {
 	const nodeNames = json.nodes.map((node) => {
@@ -346,9 +368,9 @@ function readNodeNames(json) {
 //   - { joints: 본 노드 번호, inverseBindMatrices: 본마다 16, nodes: [{ name, parentIndex, translation, rotation, scale, matrix }], animations: { 이름: { duration, channels, extras } } }
 //==============================================================================
 /**
- * @param { object } json
- * @param { ArrayBuffer } binaryBuffer
- * @returns { object | null }
+ * @param { object } json - glTF 의 JSON 덩어리.
+ * @param { ArrayBuffer } binaryBuffer - GLB 의 바이너리 덩어리.
+ * @returns { object | null } { joints, inverseBindMatrices, nodes, animations } 뼈대와 움직임. (skin 이 없으면 null)
  */
 function readSkeleton(json, binaryBuffer) {
 	if (!System.Array.isArray(json.skins) || json.skins.length === 0) {
@@ -408,8 +430,8 @@ function readSkeleton(json, binaryBuffer) {
 // GLB 의 덩어리 읽기. ({ json, binaryBuffer })
 //==============================================================================
 /**
- * @param { ArrayBuffer } arrayBuffer
- * @returns { object }
+ * @param { ArrayBuffer } arrayBuffer - GLB 파일 전체.
+ * @returns { object } { json, binaryBuffer } 풀어 읽은 JSON 과 바이너리 덩어리.
  */
 function readGlbChunks(arrayBuffer) {
 	const dataView = new System.DataView(arrayBuffer);
@@ -443,8 +465,8 @@ function readGlbChunks(arrayBuffer) {
 // 장면의 메시 노드를 차례로 돌기. (노드마다 부모까지 곱한 행렬과 함께 visitEvent(node, matrix) 를 부름)
 //==============================================================================
 /**
- * @param { object } json
- * @param { Function } visitEvent
+ * @param { object } json - glTF 의 JSON 덩어리.
+ * @param { Function } visitEvent - (node, matrix) => void. 메시가 있는 노드마다 부른다.
  */
 function visitMeshNodes(json, visitEvent) {
 	const sceneIndex = json.scene !== undefined ? json.scene : 0;
@@ -474,12 +496,29 @@ function visitMeshNodes(json, visitEvent) {
 // GLB 하나를 꼭짓점 배열로. (MeshBuilder.readArrays 의 꼴, 뼈대가 있으면 skeleton 도)
 //==============================================================================
 /**
- * @param { ArrayBuffer } arrayBuffer
+ * @param { ArrayBuffer } arrayBuffer - GLB 파일 전체.
  * @param { object | null } [outlineOptions] { width, partWidths, addedParts, innerParts, innerOverParts, innerWidth } 주면 GLB 의 바깥선 껍데기 대신 ".outline" 짝이 있는 노드의 몸으로 껍데기를 새로 짓는다. (모형 좌표의 굵기, partWidths 는 노드 이름마다, addedParts 는 짝이 없어도 껍데기를 지을 노드 이름)
  *   width 가 0 이면 껍데기를 하나도 짓지 않는다. (GLB 의 껍데기도 담지 않음)
  *   innerParts(노드 이름들)는 innerWidth 가 0 보다 크면 그 굵기의 껍데기를 하나 더 지어 바깥선 껍데기 끝에 담고, 그 자리를 innerOutlineRanges({ start, count } 들)로 돌려준다. (몸을 그린 뒤 그 부위를 둘레의 가는 선과 함께 한 번 더 그림)
  *   innerParts 와 그 위에 얹힌 innerOverParts(노드 이름들, 유리 위의 빛 반사 등)의 몸이 든 자리는 GLB 의 노드 차례대로 innerBodyRanges 로 돌려준다. (innerParts 가 없으면 빔)
- * @returns { object }
+ * @returns { object } MeshBuilder.readArrays 의 꼴과 skeleton (없으면 null), innerOutlineRanges, innerBodyRanges. (ToonRenderer.createMesh 에 넘긴다)
+ * @example <caption>재질 범위마다 따로 칠하기</caption>
+ * import { ToonRenderer, ToonGlb, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+ * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+ * const renderer = new ToonRenderer(webGL2RenderingContext);
+ * const arrayBuffer = await (await fetch("model.glb")).arrayBuffer();
+ * const arrays = ToonGlb.readGlbArrays(arrayBuffer, { width: 0.015, partWidths: { helmet: 0.01 }, addedParts: ["body"] });
+ * const mesh = renderer.createMesh(arrays);
+ * const camera = new Camera3D();
+ * camera.setPerspective(0.8, 0.1, 100);
+ * camera.lookAt(Vector3.create(0, 1.5, 4), Vector3.create(0, 1, 0), Vector3.create(0, 1, 0));
+ * renderer.beginFrameWithCamera(camera);
+ * for (const materialRange of arrays.materialRanges) {
+ * 	const tintColor = materialRange.name === "accent" ? [1, 0.4, 0.3, 1] : [1, 1, 1, 1];
+ * 	renderer.drawMesh(mesh, Matrix4.createIdentity(), { indexStart: materialRange.indexStart, indexCount: materialRange.indexCount, tintColor: tintColor, hasOutline: false });
+ * }
+ * renderer.drawMeshOutline(mesh, Matrix4.createIdentity());
+ * renderer.endFrame();
  */
 export function readGlbArrays(arrayBuffer, outlineOptions = null) {
 	const chunks = readGlbChunks(arrayBuffer);
@@ -540,8 +579,21 @@ export function readGlbArrays(arrayBuffer, outlineOptions = null) {
 //   - 텍스처로 쓰려면 decodeGlbImage 로 풀어 ToonRenderer.createTexture 에 넘긴다.
 //==============================================================================
 /**
- * @param { ArrayBuffer } arrayBuffer
- * @returns { Array<object> }
+ * @param { ArrayBuffer } arrayBuffer - GLB 파일 전체.
+ * @returns { Array<object> } [{ name, mimeType, data: Uint8Array }] images 차례의 그림.
+ * @example <caption>재질의 바탕 그림을 텍스처로 올려 그리기</caption>
+ * import { ToonRenderer, ToonGlb, Matrix4 } from "./vanilla.js";
+ * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+ * const renderer = new ToonRenderer(webGL2RenderingContext);
+ * const arrayBuffer = await (await fetch("model.glb")).arrayBuffer();
+ * const arrays = ToonGlb.readGlbArrays(arrayBuffer);
+ * const mesh = renderer.createMesh(arrays);
+ * const images = ToonGlb.readGlbImages(arrayBuffer);
+ * const textures = await Promise.all(images.map(async (image) => image.data.length > 0 ? renderer.createTexture(await ToonGlb.decodeGlbImage(image)) : null));
+ * const texturedRange = arrays.materialRanges.find((materialRange) => materialRange.hasUv && materialRange.baseColorImage >= 0);
+ * if (texturedRange !== undefined) {
+ * 	renderer.drawMesh(mesh, Matrix4.createIdentity(), { indexStart: texturedRange.indexStart, indexCount: texturedRange.indexCount, baseColorTexture: textures[texturedRange.baseColorImage] });
+ * }
  */
 export function readGlbImages(arrayBuffer) {
 	const chunks = readGlbChunks(arrayBuffer);
@@ -564,7 +616,16 @@ export function readGlbImages(arrayBuffer) {
 //==============================================================================
 /**
  * @param { object } image { mimeType, data }
- * @returns { Promise<ImageBitmap> }
+ * @returns { Promise<ImageBitmap> } 풀어 낸 그림. (ToonRenderer.createTexture 에 넘긴다)
+ * @example <caption>첫 그림 하나를 풀어 텍스처로</caption>
+ * import { ToonRenderer, ToonGlb } from "./vanilla.js";
+ * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
+ * const arrayBuffer = await (await fetch("model.glb")).arrayBuffer();
+ * const images = ToonGlb.readGlbImages(arrayBuffer);
+ * if (images.length > 0 && images[0].data.length > 0) {
+ * 	const imageBitmap = await ToonGlb.decodeGlbImage(images[0]);
+ * 	const texture = renderer.createTexture(imageBitmap, { isRepeated: false });
+ * }
  */
 export function decodeGlbImage(image) {
 	const blob = new System.Blob([image.data], { type: image.mimeType });
@@ -578,9 +639,19 @@ export function decodeGlbImage(image) {
 //   - 부품마다 비치는 재질(alphaMode BLEND)의 가장 작은 불투명도를 alpha 로 담는다. (없으면 1)
 //==============================================================================
 /**
- * @param { ArrayBuffer } arrayBuffer
+ * @param { ArrayBuffer } arrayBuffer - GLB 파일 전체.
  * @param { object | null } [outlineOptions] readGlbArrays 와 같음.
- * @returns { object }
+ * @returns { object } { 노드 이름: MeshBuilder.readArrays 의 꼴과 extras, alpha } 부품마다의 배열.
+ * @example <caption>부품마다 메시를 따로 올려 숨기거나 돌리기</caption>
+ * import { ToonRenderer, ToonGlb, Matrix4 } from "./vanilla.js";
+ * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
+ * const arrayBuffer = await (await fetch("model.glb")).arrayBuffer();
+ * const partArrays = ToonGlb.readGlbNodeArrays(arrayBuffer, { width: 0.02 });
+ * const parts = Object.entries(partArrays).map(([partName, arrays]) => {
+ * 	return { name: partName, mesh: renderer.createMesh(arrays), pivot: arrays.extras.pivot, alpha: arrays.alpha };
+ * });
+ * const doorPart = parts.find((part) => part.name === "door");
+ * const doorMatrix = doorPart !== undefined && Array.isArray(doorPart.pivot) ? Matrix4.createTranslation(doorPart.pivot[0], doorPart.pivot[1], doorPart.pivot[2]) : Matrix4.createIdentity();
  */
 export function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
 	const chunks = readGlbChunks(arrayBuffer);
@@ -636,8 +707,20 @@ export function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
 //     자세를 세운 뒤의 자리는 그 본 행렬로 center 를 옮긴 것이다.
 //==============================================================================
 /**
- * @param { ArrayBuffer } arrayBuffer
- * @returns { object }
+ * @param { ArrayBuffer } arrayBuffer - GLB 파일 전체.
+ * @returns { object } { 노드 이름: { extras, center [x, y, z], jointIndex } } 메시 노드마다의 정보.
+ * @example <caption>움직이는 모형의 헬멧 불 자리 읽기</caption>
+ * import { ToonGlb, Matrix4 } from "./vanilla.js";
+ * const arrayBuffer = await (await fetch("model.glb")).arrayBuffer();
+ * const skeleton = ToonGlb.readGlbArrays(arrayBuffer).skeleton;
+ * const lampInfo = ToonGlb.readGlbNodeInfos(arrayBuffer)["lamp"];
+ * if (skeleton !== null && lampInfo !== undefined && lampInfo.jointIndex >= 0) {
+ * 	const jointMatrices = new Float32Array(skeleton.joints.length * 16);
+ * 	ToonGlb.writeSkinPose(skeleton, "walk", 0.25, jointMatrices);
+ * 	const jointMatrix = Matrix4.createIdentity();
+ * 	jointMatrix.getElements().set(jointMatrices.subarray(lampInfo.jointIndex * 16, lampInfo.jointIndex * 16 + 16));
+ * 	const lampPosition = jointMatrix.transformPoint(lampInfo.center[0], lampInfo.center[1], lampInfo.center[2]);
+ * }
  */
 export function readGlbNodeInfos(arrayBuffer) {
 	const chunks = readGlbChunks(arrayBuffer);
@@ -708,8 +791,8 @@ export function readGlbNodeInfos(arrayBuffer) {
 //==============================================================================
 /**
  * @param { object } channel { times, values, path, isStep }
- * @param { number } time
- * @returns { Array<number> }
+ * @param { number } time - 움직임 안의 시각. (초)
+ * @returns { Array<number> } 그 시각의 값. (돌림은 사원수 4, 자리와 크기는 3)
  */
 function sampleChannel(channel, time) {
 	const times = channel.times;
@@ -762,8 +845,8 @@ function sampleChannel(channel, time) {
 // 움직임을 그 시각에서 읽은 노드마다의 자리, 돌림, 크기. (움직임이 없으면 쉬는 자세)
 //==============================================================================
 /**
- * @param { object } skeleton
- * @param { string } animationName
+ * @param { object } skeleton - readSkeleton 의 결과.
+ * @param { string } animationName - 움직임 이름. (없으면 쉬는 자세)
  * @param { number } time 초. (움직임 길이로 되풀이, extras.loop 가 "once" 면 끝 시각에 묶음)
  * @param { object | null } [swingScales] 흔들림 배율. (writeSkinPose)
  * @returns { Array<object> } [{ translation, rotation, scale, matrix }]
@@ -807,10 +890,10 @@ function readAnimationLocals(skeleton, animationName, time, swingScales = null) 
 // 두 돌림 섞기. (가까운 쪽으로 섞어 정규화, ratio 가 1 이면 other)
 //==============================================================================
 /**
- * @param { Array<number> } rotation
- * @param { Array<number> } otherRotation
- * @param { number } ratio
- * @returns { Array<number> }
+ * @param { Array<number> } rotation - [x, y, z, w] 앞 돌림.
+ * @param { Array<number> } otherRotation - [x, y, z, w] 뒤 돌림.
+ * @param { number } ratio - 섞는 몫. (0 이면 rotation, 1 이면 otherRotation)
+ * @returns { Array<number> } 섞은 단위 사원수.
  */
 function mixRotation(rotation, otherRotation, ratio) {
 	let dot = 0;
@@ -835,9 +918,20 @@ function mixRotation(rotation, otherRotation, ratio) {
 //==============================================================================
 /**
  * @param { object } skeleton readGlbArrays 의 skeleton.
- * @param { string } animationName
- * @param { number } nodeIndex
- * @returns { number }
+ * @param { string } animationName - 움직임 이름.
+ * @param { number } nodeIndex - skeleton.nodes 의 차례.
+ * @returns { number } 쉬는 자세에서 가장 벗어난 각. (라디안, 없으면 0)
+ * @example <caption>꼬리가 크게 흔들리는 만큼만 줄여 자세 셈하기</caption>
+ * import { ToonGlb } from "./vanilla.js";
+ * const arrayBuffer = await (await fetch("model.glb")).arrayBuffer();
+ * const skeleton = ToonGlb.readGlbArrays(arrayBuffer).skeleton;
+ * if (skeleton !== null) {
+ * 	const tailIndex = skeleton.nodes.findIndex((node) => node.name === "tail");
+ * 	const swing = ToonGlb.readAnimationSwing(skeleton, "run", tailIndex);
+ * 	const swingScale = swing > 0.5 ? 0.5 / swing : 1;
+ * 	const jointMatrices = new Float32Array(skeleton.joints.length * 16);
+ * 	ToonGlb.writeSkinPose(skeleton, "run", 0.3, jointMatrices, null, { run: [{ nodeIndex: tailIndex, scale: swingScale }] });
+ * }
  */
 export function readAnimationSwing(skeleton, animationName, nodeIndex) {
 	const animation = skeleton.animations[animationName];
@@ -869,8 +963,8 @@ export function readAnimationSwing(skeleton, animationName, nodeIndex) {
 //==============================================================================
 /**
  * @param { Array<object> } locals 섞은 것을 여기에 씀.
- * @param { Array<object> } otherLocals
- * @param { number } ratio
+ * @param { Array<object> } otherLocals - 섞을 자세. (readAnimationLocals 의 결과)
+ * @param { number } ratio - 섞는 몫. (0 ~ 1)
  */
 function mixLocals(locals, otherLocals, ratio) {
 	for (let nodeIndex = 0; nodeIndex < locals.length; ++nodeIndex) {
@@ -909,11 +1003,22 @@ function mixLocals(locals, otherLocals, ratio) {
 //==============================================================================
 /**
  * @param { object } skeleton readGlbArrays 의 skeleton.
- * @param { string } animationName
+ * @param { string } animationName - 움직임 이름. (없으면 쉬는 자세)
  * @param { number } time 초. (움직임 길이로 되풀이, 한 번만 트는 움직임은 끝 시각에 묶음)
- * @param { Float32Array } target
+ * @param { Float32Array } target - 본마다 16 씩 쓸 곳. (skeleton.joints.length x 16 이상, ToonRenderer.drawMesh 의 jointMatrices)
  * @param { object | null } [blend] { animationName, time, weight } 섞을 앞 자세와 그 무게. (0 ~ 1)
  * @param { object | null } [swingScales] { 움직임 이름: [{ nodeIndex, scale }] } 흔들림 배율. (1 이면 그대로, 0 이면 쉬는 자세)
+ * @example <caption>움직임이 바뀔 때 앞 자세를 잠깐 섞기</caption>
+ * import { ToonGlb } from "./vanilla.js";
+ * const arrayBuffer = await (await fetch("model.glb")).arrayBuffer();
+ * const skeleton = ToonGlb.readGlbArrays(arrayBuffer).skeleton;
+ * if (skeleton !== null) {
+ * 	const jointMatrices = new Float32Array(skeleton.joints.length * 16);
+ * 	const blendDuration = 0.2;
+ * 	const timeSinceChange = 0.05;
+ * 	const blend = { animationName: "idle", time: 1.4, weight: 1 - timeSinceChange / blendDuration };
+ * 	ToonGlb.writeSkinPose(skeleton, "run", timeSinceChange, jointMatrices, blend);
+ * }
  */
 export function writeSkinPose(skeleton, animationName, time, target, blend = null, swingScales = null) {
 	const locals = readAnimationLocals(skeleton, animationName, time, swingScales);

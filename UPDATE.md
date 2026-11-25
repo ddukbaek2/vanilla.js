@@ -308,7 +308,7 @@
   - 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. 선의 판을 줄여도 거리를 그리는 영역에서 재므로 늘인 선이 끊기지 않는다
   - 모형마다: drawMesh, drawMeshInstanced 의 options.hasScreenOutline (false 면 선은 내지 않고 뒤의 선만 가린다), options.hasCreaseLine, options.isMirrored (주지 않으면 행렬식으로 감기를 뒤집는다)
   - 옮기는 법 (공개 API 를 바꿨다)
-    - setCrease(각, 진하기, 이어짐 픽셀) → setCrease(각, 굵기, 진하기). 굵기는 setWidth 의 단위이고 기본 1, 진하기는 0 ~ 1 이고 기본 1. 이어짐 픽셀(creaseExtent)은 없어졌다. (화소 하나 사이만 보므로 필요 없다) 옛 setCrease(60, 0.5, 2) 와 비슷한 모습은 setCrease(60, 1, 0.8)
+    - setCrease(각, 진하기, 이어짐 픽셀) → setCrease(각, 굵기, 진하기). 굵기는 setWidth 의 단위이고 기본 1, 진하기는 0 ~ 1 이고 기본 1. 이어짐 픽셀(creaseExtent)은 없어졌다. (화소 하나 사이만 보므로 필요 없다) 옛 setCrease(60, 0.5, 2) 와 비슷한 모습은 픽셀 단위면 setCrease(60, 1, 0.8), 월드 단위면 굵기를 바깥 선 굵기의 반쯤으로 (setWidth(0.022, world) 면 setCrease(60, 0.011, 0.8)). 굵기가 setWidth 의 단위라 월드 단위에 1 을 주면 1 미터 굵기가 된다
     - setDepthThreshold(깊이 문턱, 맞닿음 문턱) → setDepthThreshold(깊이 문턱). 뜻이 접평면 거리로 바뀌었다. (월드 길이, 같은 값을 그대로 넣으면 된다) 맞닿음 문턱(contactTolerance)은 없어졌다. 선을 경계 가운데에 세우므로 어느 쪽에 그을지 가릴 일이 없다
     - setWidth 의 뜻: 선 하나의 굵기이고, 경계를 가운데로 양쪽에 반씩 덮는다. (지금까지는 실루엣 바깥쪽에만 그 굵기) 기본 1.5 → 2 픽셀. 옛 모습의 바깥 두께를 맞추려면 두 배를 준다
     - setSampleCount, TOON_SCREEN_OUTLINE_MAXIMUM_SAMPLES, TOON_SCREEN_OUTLINE_MAXIMUM_CREASE_SAMPLES 는 없어졌다. (점프 플러딩은 굵기에 따라 걸음 수가 스스로 정해진다) 가벼운 길은 setResolutionScale 만 낮춘다
@@ -325,6 +325,33 @@
   - UIDocument: ShadowImage 를 표에 더했다. Sprite 처럼 imagePath 뒤에 반사 저장 꼴로 쓰고 읽는다. (지금까지는 기본 표에 없어, 에디터처럼 따로 등록하지 않으면 읽을 때 건너뛰었다)
   - UIDocument.loadByReflection: 지금 값이 없는(null) 속성도 저장한 꼴로 읽는다. (수 넷 배열은 Color, 수 둘 배열은 Vector2, 수, 글, 불은 그대로) 지금까지는 지금 값이 null 인 속성의 수, 글, 불, 배열 값을 건너뛰었다
   - docs/api/0.4.0.json 과 번역 표를 다시 뽑았다
+- 툰 셰이딩을 실시간 툰 렌더링의 정석 꼴로 다시 지었다. (유니티 툰 셰이더, 언리얼 Substrate Toon BSDF, 고도의 diffuse_toon, 팀 포트리스 2, 길티기어 Xrd 를 견줘 고른 꼴, 게임 하나에 맞추지 않았다)
+  - 그늘 램프: 빛을 받는 몫(반 램버트 기본)에 그림자를 곱해 램프에 대어 색을 고른다. 칸마다 자리, 선형 색, 부드러움(Step 과 Feather), 경계는 fwidth 로 계단 없이 막는다. 그림자는 검정이 아니라 그늘 색으로 들어간다
+    - ToonLightSet.setShade({ step, feather, color, secondStep, secondFeather, secondColor, isHalfLambert }): 바탕, 1 차 그늘, 2 차 그늘. 기본은 반 램버트 0.5 에서 갈리는 두 단계(서늘한 보라 그늘)
+    - setShadeRamp(자리, 색, 부드러움, 반 램버트): 칸을 바로 (8 칸까지), clearShadeRamp(): 부드러운 램버트
+    - setRampTexture(텍스처, 반 램버트): 칸 대신 램프 텍스처의 가로를 읽는다. (팀 포트리스 2 의 warp, 원신과 붕괴의 램프 텍스처 꼴)
+    - setBandCount, setBandRamp 는 그대로 쓰되 같은 램프로 짓는다. (회색 칸, 경계가 계단지지 않는다)
+  - 빛마다: 해는 램프 색을 통째로 받아 그늘도 해의 색으로 물든다. 채움 빛, 점광, 스포트라이트는 램프의 밝기 단계(바닥 칸 0, 맨 위 칸 1)를 받아 등진 면을 밝히지 않는다. 지금까지 채움 빛은 띠를 거치지 않았다
+  - 하이라이트: setSpecular(세기, 지수, 부드러움, 색). 블린 퐁을 0.5 에서 가른 단단한 툰 점(부드러움 0, 기본)에서 부드러운 빛(1)까지. 해와 점광, 스포트라이트 모두에 서고 빛을 받는 단계로 가린다. (지금까지는 해만, 부드러운 꼴만, 빛 쪽 가림 없이 그림자만)
+  - 림 빛: setRimLight(색, 거듭제곱, 부드러움, 해 쪽 가림). 단단한 테에서 부드러운 테까지, 해를 받는 쪽에만 둘 수 있다. 바탕색에 곱하지 않고 더한다. (유니티 툰 셰이더의 Rim Light 와 같다, 지금까지는 빛처럼 바탕색에 곱했다)
+  - 스포트라이트: 점광에 direction, innerConeAngle, outerConeAngle 을 주면 스포트라이트다. (glTF KHR_lights_punctual 의 각 감쇠)
+  - 그리기 꼴: receivesShadow (기본 true), shadeOffset (그늘 경계 옮기기), specularScale, rimScale (재질마다 하이라이트와 림 배), matcapTexture, matcapStrength, matcapBlend (ToonMatcapBlend.multiply, add), outlineColor, outlineWidthScale (껍데기 바깥선의 그리기마다 색과 굵기 배)
+  - 표면 조각(ToonSurface)에 shadeOffset, specularMask, rimMask, 빛 조각(ToonLighting)에 rim, sunLevel 을 더했다. 합치기는 바탕색 x irradiance + specular x specularMask + rim x rimMask + 빛남
+  - 노멀을 모형 행렬과 본 행렬의 역행렬의 전치로 옮긴다. 늘이고 줄인 모형(크기가 축마다 다른 것)의 빛과 화면 공간 바깥선의 꺾임이 틀렸던 것을 바로잡았다. 정점 조각에서 노멀을 크기의 제곱으로 나눠 맞추던 코드는 빼야 한다
+  - 기본 빛을 바꿨다. 해 [0.9, 0.85, 0.8] → [0.84, 0.8, 0.74], 하늘 [0.45, 0.5, 0.6] → [0.3, 0.33, 0.42], 땅 [0.2, 0.18, 0.16] → [0.17, 0.16, 0.15]. (빛을 받는 면이 1 을 크게 넘지 않게, 두 단계 그늘과 맞춤)
+  - 옮기는 법 (공개 API 를 바꿨다)
+    - 부드러운 램버트(지금까지의 기본)를 그대로 쓰려면 clearShadeRamp() 나 setBandCount(0)
+    - clearBandRamp() → clearShadeRamp(). getBandRamp(), getBandCount() 는 없어졌다. getShadeRamp() 가 { positions, colors, feathers, isHalfLambert } 를 준다
+    - setSpecular(세기, 지수) 는 이제 단단한 툰 점이다. 지금까지의 부드러운 하이라이트는 setSpecular(세기, 지수, 1). getSpecular() 는 { strength, exponent, feather, color }
+    - setRimLight(색, 거듭제곱) 은 부드러운 테 그대로지만 바탕색에 곱하지 않고 더한다. 지금까지와 비슷한 밝기는 색에 바탕색의 대표 색을 곱해 준다. getRimLight() 는 { color, power, feather, lightMask }
+    - 점광의 뒷면이 밝지 않다. (그늘 램프가 있을 때) 지금처럼 램버트로 받게 하려면 clearShadeRamp()
+- ToonRenderer: 껍데기 바깥선을 셰이더에서 민다. 꼭짓점에 바탕 자리와 미는 쪽(MeshBuilder 가 같은 자리의 노멀을 평균하고 모서리를 덜 튀게 지은 굵기)을 올리고, 그리기마다 outlineColor, outlineWidthScale, setOutlineDistanceScale(기준 거리, 가장 작은 배, 가장 큰 배) 로 거리에 따라 굵기를 맞춘다. (원근만, 길티기어 Xrd 처럼 화면 굵기를 맞춤) 바탕 자리가 없는 껍데기(GLB 에 지어 둔 것)는 지은 자리 그대로 그린다
+  - 껍데기 버텍스 어레이의 어트리뷰트 1(vertexNormal 자리)에 미는 쪽이 든다. 정점 조각이 바깥선 프로그램에서 vertex.localNormal 을 고치면 껍데기 굵기가 바뀐다
+  - 프레임 유니폼 viewRotation (매트캡), 함수 readViewRotation, readOutlineVertexData 를 내보낸다
+- ToonMatcapBlend: 매트캡을 섞는 방식. (multiply, add)
+- 예제 toonmaterial: 애버런트 몸 셰이딩 식 대조(verifyAberrantShading)를 뺐다. (게임 하나의 식이라 엔진 예제에 둘 것이 아니고, 엔진의 빛 꼴이 정석으로 바뀌어 같은 값이 나오지 않는다) 바위 정점 조각의 노멀 크기 맞춤을 뺐다. (엔진이 역행렬의 전치로 옮긴다)
+- 예제 toonstyle: 그늘 셋, 단단한 하이라이트, 해 쪽 림, 스포트라이트, 매트캡, ?shell=1 로 껍데기 바깥선(그리기마다 색과 굵기, 거리 배)
+- 툰 폴더(experimental/graphics/toon)의 모든 파일에 주석과 예제를 채웠다. 공개 API 마다 머리 주석과 JSDoc @param, @returns 설명, 모듈과 클래스와 쓰는 법이 뻔하지 않은 멤버에 @example <caption>제목</caption> (예제는 import.js 이름만 쓰고 헤드리스 크롬에서 오류 없이 도는 것을 확인했다)
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.

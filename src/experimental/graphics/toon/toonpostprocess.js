@@ -8,6 +8,31 @@ import { MultiLevelBloomEffect } from "../multilevelbloomeffect.js";
 import { FullscreenPass } from "../fullscreenpass.js";
 
 
+/**
+ * @example <caption>툰 장면을 실수 판에 그리고 블룸과 톤매핑으로 내기</caption>
+ * import { ToonRenderer, ToonPostProcess, ToonMesh, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
+ * const canvas = Object.assign(document.createElement("canvas"), { width: 640, height: 360 });
+ * const webGL2RenderingContext = canvas.getContext("webgl2");
+ * const postProcess = new ToonPostProcess(webGL2RenderingContext, canvas.width, canvas.height, { sampleCount: 4 });
+ * postProcess.setExposure(1.2);
+ * postProcess.setBloom(true, 0.8, 0.9, 1.6);
+ * const renderer = new ToonRenderer(webGL2RenderingContext);
+ * renderer.setHdrOutput(postProcess.getUseFloatColor());
+ * const builder = new ToonMesh.MeshBuilder();
+ * builder.addPart(ToonMesh.createSphereGeometry(0.5, 32, 20), Matrix4.createIdentity(), "#ffd080", { glow: 2 });
+ * const mesh = renderer.createMesh(builder.readArrays());
+ * const camera = new Camera3D();
+ * camera.setPerspective(0.8, 0.1, 100);
+ * camera.setAspectRatio(canvas.width / canvas.height);
+ * camera.lookAt(Vector3.create(0, 1, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
+ * postProcess.begin([0.02, 0.02, 0.04]);
+ * renderer.beginFrameWithCamera(camera);
+ * renderer.drawMesh(mesh, Matrix4.createIdentity());
+ * renderer.endFrame();
+ * postProcess.end(null, [0, 0, canvas.width, canvas.height]);
+ */
+
+
 //==============================================================================
 // 전역 상수 목록.
 //==============================================================================
@@ -81,6 +106,18 @@ void main() {
 // - 해상도 배율: setResolutionScale(배율) 이면 씬 판을 출력 크기 x 배율로 짓고 end 의 뷰포트로 키워(선형 거르기) 낸다. (3D 만 낮춰 그리고 UI 는 기기 화소 그대로 둘 때, 기본 1)
 // - 노드 사각형 안에 낼 때: resize(사각형 너비, 높이) → begin → 그리기(ToonRenderer 의 화면 사각형은 풀어 둔다) → end(null, [x, 드로잉 버퍼 높이 - y - 높이, 너비, 높이]).
 //==============================================================================
+/**
+ * @example <caption>3D 만 낮춰 그리고 색 보정 걸기</caption>
+ * import { ToonRenderer, ToonPostProcess } from "./vanilla.js";
+ * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+ * const postProcess = new ToonPostProcess(webGL2RenderingContext, 1280, 720, { depthBits: 24, useDepthTexture: true });
+ * postProcess.setResolutionScale(0.75);
+ * postProcess.setBloomLevels(5, 1, 0.25);
+ * postProcess.setColorGrade(1.1, 1.05, [1, 0.9, 0.8], 0.3, [0.2, 0.25, 0.35], 0.15);
+ * postProcess.setVignette(0.3);
+ * const renderer = new ToonRenderer(webGL2RenderingContext);
+ * renderer.setHdrOutput(postProcess.getUseFloatColor());
+ */
 export class ToonPostProcess {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -117,10 +154,10 @@ export class ToonPostProcess {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
-	 * @param { number } width
-	 * @param { number } height
-	 * @param { object | null } [options]
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext - 툰 렌더러와 같은 컨텍스트.
+	 * @param { number } width - 출력 너비. (픽셀)
+	 * @param { number } height - 출력 높이. (픽셀)
+	 * @param { object | null } [options] - { sampleCount (기본 0), useFloatColor (기본 true), depthBits (16 이나 24), useDepthTexture (기본 false) }
 	 */
 	constructor(webGL2RenderingContext, width, height, options = null) {
 		this.#webGL2RenderingContext = webGL2RenderingContext;
@@ -161,8 +198,15 @@ export class ToonPostProcess {
 	//==============================================================================
 	/**
 	 * @static
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
-	 * @returns { boolean }
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext - 알아볼 컨텍스트.
+	 * @returns { boolean } RGBA16F 판에 그릴 수 있으면 true.
+	 * @example <caption>기기에 맞춰 HDR 길과 LDR 길 고르기</caption>
+	 * import { ToonRenderer, ToonPostProcess } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const isHdr = ToonPostProcess.isFloatColorSupported(webGL2RenderingContext);
+	 * const postProcess = new ToonPostProcess(webGL2RenderingContext, 640, 360, { useFloatColor: isHdr });
+	 * const renderer = new ToonRenderer(webGL2RenderingContext);
+	 * renderer.setHdrOutput(isHdr);
 	 */
 	static isFloatColorSupported(webGL2RenderingContext) {
 		const floatExtension = webGL2RenderingContext.getExtension("EXT_color_buffer_float");
@@ -190,7 +234,7 @@ export class ToonPostProcess {
 	// 씬 렌더 타겟 짓기. (출력 크기 x 해상도 배율, 지금 옵션으로)
 	//==============================================================================
 	/**
-	 * @returns { RenderTarget }
+	 * @returns { RenderTarget } 새로 지은 씬 렌더 타겟.
 	 */
 	createSceneRenderTarget() {
 		const sceneWidth = this.readSceneWidth();
@@ -203,7 +247,7 @@ export class ToonPostProcess {
 	// 씬 판의 너비. (출력 너비 x 해상도 배율, 1 이상)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 씬 판의 너비. (픽셀)
 	 */
 	readSceneWidth() {
 		return System.Math.max(1, System.Math.round(this.#outputWidth * this.#resolutionScale));
@@ -213,7 +257,7 @@ export class ToonPostProcess {
 	// 씬 판의 높이. (출력 높이 x 해상도 배율, 1 이상)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 씬 판의 높이. (픽셀)
 	 */
 	readSceneHeight() {
 		return System.Math.max(1, System.Math.round(this.#outputHeight * this.#resolutionScale));
@@ -223,8 +267,16 @@ export class ToonPostProcess {
 	// 크기 바꾸기. (출력 크기, 씬 판은 해상도 배율을 곱함, 같으면 그대로)
 	//==============================================================================
 	/**
-	 * @param { number } width
-	 * @param { number } height
+	 * @param { number } width - 출력 너비. (픽셀)
+	 * @param { number } height - 출력 높이. (픽셀)
+	 * @example <caption>캔버스 크기가 바뀔 때 맞추기</caption>
+	 * import { ToonPostProcess } from "./vanilla.js";
+	 * const canvas = document.createElement("canvas");
+	 * const webGL2RenderingContext = canvas.getContext("webgl2");
+	 * const postProcess = new ToonPostProcess(webGL2RenderingContext, canvas.width, canvas.height);
+	 * canvas.width = 1280;
+	 * canvas.height = 720;
+	 * postProcess.resize(canvas.width, canvas.height);
 	 */
 	resize(width, height) {
 		this.#outputWidth = System.Math.max(1, width);
@@ -247,7 +299,13 @@ export class ToonPostProcess {
 	// 해상도 배율 설정. (씬 판 = 출력 크기 x 배율, 0.05 ~ 4, 기본 1)
 	//==============================================================================
 	/**
-	 * @param { number } resolutionScale
+	 * @param { number } resolutionScale - 씬 판의 배율. (0.05 ~ 4)
+	 * @example <caption>폰에서 3D 만 반 해상도로</caption>
+	 * import { ToonPostProcess } from "./vanilla.js";
+	 * const postProcess = new ToonPostProcess(document.createElement("canvas").getContext("webgl2"), 1080, 1920);
+	 * postProcess.setResolutionScale(0.5);
+	 * const resolutionScale = postProcess.getResolutionScale();
+	 * const sceneWidth = postProcess.getSceneRenderTarget().getWidth();
 	 */
 	setResolutionScale(resolutionScale) {
 		this.#resolutionScale = System.Math.max(0.05, System.Math.min(4, resolutionScale));
@@ -258,7 +316,7 @@ export class ToonPostProcess {
 	// 해상도 배율 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 씬 판의 배율.
 	 */
 	getResolutionScale() {
 		return this.#resolutionScale;
@@ -268,7 +326,13 @@ export class ToonPostProcess {
 	// 멀티샘플 표본 수 설정. (2 밑이면 없음, 바뀌면 씬 판을 다시 짓는다)
 	//==============================================================================
 	/**
-	 * @param { number } sampleCount
+	 * @param { number } sampleCount - 멀티샘플 표본 수. (2 밑이면 멀티샘플 없음)
+	 * @example <caption>설정에서 계단 줄이기를 켜고 실제 표본 수 읽기</caption>
+	 * import { ToonPostProcess } from "./vanilla.js";
+	 * const postProcess = new ToonPostProcess(document.createElement("canvas").getContext("webgl2"), 640, 360);
+	 * postProcess.setSampleCount(4);
+	 * const sampleCount = postProcess.getSampleCount();
+	 * const isMultisampled = sampleCount >= 2;
 	 */
 	setSampleCount(sampleCount) {
 		const safeSampleCount = System.Math.max(0, System.Math.floor(sampleCount));
@@ -284,7 +348,7 @@ export class ToonPostProcess {
 	// 실제로 쓰는 멀티샘플 표본 수 반환. (0 이면 없음)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 씬 판이 실제로 쓰는 표본 수. (기기가 받는 수로 줄인 것, 0 이면 없음)
 	 */
 	getSampleCount() {
 		return this.#sceneRenderTarget.getSampleCount();
@@ -294,7 +358,7 @@ export class ToonPostProcess {
 	// 씬 판이 실수인지 반환. (false 면 LDR 길)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 씬 판이 실수면 true. (ToonRenderer.setHdrOutput 에 그대로 넘긴다)
 	 */
 	getUseFloatColor() {
 		return this.#useFloatColor;
@@ -304,7 +368,7 @@ export class ToonPostProcess {
 	// 씬 그리기 시작. (씬 렌더 타겟을 묶고 바탕 색과 깊이로 비운다, HDR 길은 선형 색, LDR 길은 화면 색)
 	//==============================================================================
 	/**
-	 * @param { Array<number> } clearColor - [r, g, b]
+	 * @param { Array<number> } clearColor - [r, g, b] 바탕 색. (HDR 길은 선형 색, LDR 길은 화면 색)
 	 */
 	begin(clearColor) {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
@@ -320,8 +384,16 @@ export class ToonPostProcess {
 	// 마무리. (멀티샘플이면 풂 → 블룸 → 톤매핑해 낼 프레임버퍼에, viewport 는 [x, y, 너비, 높이])
 	//==============================================================================
 	/**
-	 * @param { WebGLFramebuffer | null } outputFramebuffer
-	 * @param { Array<number> } viewport
+	 * @param { WebGLFramebuffer | null } outputFramebuffer - 낼 프레임버퍼. (null 이면 화면)
+	 * @param { Array<number> } viewport - [x, y, 너비, 높이] 낼 자리. (드로잉 버퍼 픽셀, 왼쪽 아래가 원점)
+	 * @example <caption>왼쪽 위 원점의 사각형 안에 내기</caption>
+	 * import { ToonPostProcess } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const screenRect = { x: 40, y: 20, width: 200, height: 120 };
+	 * const postProcess = new ToonPostProcess(webGL2RenderingContext, screenRect.width, screenRect.height);
+	 * postProcess.begin([0.05, 0.05, 0.08]);
+	 * const bottomY = webGL2RenderingContext.drawingBufferHeight - screenRect.y - screenRect.height;
+	 * postProcess.end(null, [screenRect.x, bottomY, screenRect.width, screenRect.height]);
 	 */
 	end(outputFramebuffer, viewport) {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
@@ -393,7 +465,7 @@ export class ToonPostProcess {
 	// 노출 설정. (톤매핑 전에 곱한다, 1 이 기본)
 	//==============================================================================
 	/**
-	 * @param { number } exposure
+	 * @param { number } exposure - 노출 배. (0 이상, 1 이 기본)
 	 */
 	setExposure(exposure) {
 		this.#exposure = System.Math.max(0, exposure);
@@ -403,10 +475,16 @@ export class ToonPostProcess {
 	// 블룸 설정. (켜기, 세기, 밝은 곳을 뽑는 문턱의 시작과 끝, 문턱은 기본 9 탭 블룸에만 쓴다)
 	//==============================================================================
 	/**
-	 * @param { boolean } isBloomEnabled
-	 * @param { number } bloomStrength
-	 * @param { number } thresholdStart
-	 * @param { number } thresholdEnd
+	 * @param { boolean } isBloomEnabled - 블룸을 켤지.
+	 * @param { number } bloomStrength - 블룸 세기. (씬 색에 더하는 배, 기본 0.6)
+	 * @param { number } thresholdStart - 밝은 곳을 뽑기 시작하는 선형 밝기. (기본 0.9)
+	 * @param { number } thresholdEnd - 다 뽑는 선형 밝기. (기본 1.6)
+	 * @example <caption>빛나는 것만 은은하게 번지게</caption>
+	 * import { ToonPostProcess } from "./vanilla.js";
+	 * const postProcess = new ToonPostProcess(document.createElement("canvas").getContext("webgl2"), 640, 360);
+	 * postProcess.setExposure(1.1);
+	 * postProcess.setBloom(true, 0.5, 1.2, 2.5);
+	 * postProcess.setBloomFloatColor(true);
 	 */
 	setBloom(isBloomEnabled, bloomStrength, thresholdStart, thresholdEnd) {
 		this.#isBloomEnabled = isBloomEnabled;
@@ -419,9 +497,15 @@ export class ToonPostProcess {
 	// - 다단 블룸 판은 씬 판과 같은 정밀도다. (HDR 길은 RGBA16F)
 	//==============================================================================
 	/**
-	 * @param { number } levelCount
-	 * @param { number } threshold
-	 * @param { number } knee
+	 * @param { number } levelCount - 단 수. (0 이면 기본 9 탭 블룸으로 돌린다)
+	 * @param { number } threshold - 다단 블룸의 문턱. (선형 밝기)
+	 * @param { number } knee - 문턱 둘레를 부드럽게 넘기는 폭. (선형 밝기)
+	 * @example <caption>넓게 번지는 다단 블룸으로 바꿨다 되돌리기</caption>
+	 * import { ToonPostProcess } from "./vanilla.js";
+	 * const postProcess = new ToonPostProcess(document.createElement("canvas").getContext("webgl2"), 640, 360);
+	 * postProcess.setBloomLevels(6, 1, 0.3);
+	 * const levelCount = postProcess.getBloomLevelCount();
+	 * postProcess.setBloomLevels(0, 1, 0.3);
 	 */
 	setBloomLevels(levelCount, threshold, knee) {
 		this.#bloomThreshold = System.Math.max(0, threshold);
@@ -448,7 +532,7 @@ export class ToonPostProcess {
 	// 블룸 단 수 반환. (0 이면 기본 9 탭 블룸)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 다단 블룸의 단 수. (0 이면 기본 9 탭 블룸)
 	 */
 	getBloomLevelCount() {
 		const multiLevelBloomEffect = this.#multiLevelBloomEffect;
@@ -459,7 +543,7 @@ export class ToonPostProcess {
 	// 기본 9 탭 블룸의 주고받는 판을 실수로. (true 면 RGBA16F, 기본 false 는 RGBA8, 씬 판이 실수가 아니면 무시)
 	//==============================================================================
 	/**
-	 * @param { boolean } isFloatColor
+	 * @param { boolean } isFloatColor - true 면 RGBA16F, false 면 RGBA8.
 	 */
 	setBloomFloatColor(isFloatColor) {
 		this.#bloomEffect.setUseFloatColor(isFloatColor && this.#useFloatColor);
@@ -469,7 +553,7 @@ export class ToonPostProcess {
 	// 밝기 설정. (색 보정 맨 앞에서 곱한다, 1 이 그대로)
 	//==============================================================================
 	/**
-	 * @param { number } brightness
+	 * @param { number } brightness - 밝기 배. (0 이상, 1 이 그대로)
 	 */
 	setBrightness(brightness) {
 		this.#brightness = System.Math.max(0, brightness);
@@ -482,9 +566,18 @@ export class ToonPostProcess {
 	//==============================================================================
 	/**
 	 * @param { Array<number> } center [x, y, z]
-	 * @param { number } innerRadius
-	 * @param { number } outerRadius
-	 * @param { Matrix4 } inverseViewProjectionMatrix
+	 * @param { number } innerRadius - 밝기 1 인 수평 반지름. (월드 길이)
+	 * @param { number } outerRadius - 이 밖은 setBrightness 의 밝기인 수평 반지름. (월드 길이)
+	 * @param { Matrix4 } inverseViewProjectionMatrix - 이번 프레임 보기와 투영의 역행렬.
+	 * @example <caption>어두운 장면에서 손전등 둘레만 밝히기</caption>
+	 * import { ToonPostProcess, Camera3D, Vector3 } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const postProcess = new ToonPostProcess(webGL2RenderingContext, 640, 360, { useDepthTexture: true });
+	 * const camera = new Camera3D();
+	 * camera.setPerspective(0.8, 0.1, 100);
+	 * camera.lookAt(Vector3.create(0, 6, 8), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
+	 * postProcess.setBrightness(0.35);
+	 * postProcess.setLitArea([0, 0, 0], 2, 4, camera.getInverseViewProjectionMatrix());
 	 */
 	setLitArea(center, innerRadius, outerRadius, inverseViewProjectionMatrix) {
 		const safeOuterRadius = System.Math.max(0.0001, outerRadius);
@@ -509,12 +602,18 @@ export class ToonPostProcess {
 	// - 안개빛은 어두운 곳일수록 그 색 쪽으로 끌어올린다. (양 x (1 - 밝기))
 	//==============================================================================
 	/**
-	 * @param { number } saturation
-	 * @param { number } contrast
-	 * @param { Array<number> } toneColor
-	 * @param { number } toneAmount
-	 * @param { Array<number> } hazeColor
-	 * @param { number } hazeAmount
+	 * @param { number } saturation - 채도. (1 이 그대로, 0 이면 흑백)
+	 * @param { number } contrast - 대비. (1 이 그대로)
+	 * @param { Array<number> } toneColor - [r, g, b] 색조 색. (sRGB 0 ~ 1, 밝기를 1 로 맞춰 곱한다)
+	 * @param { number } toneAmount - 색조를 섞는 양. (0 ~ 1)
+	 * @param { Array<number> } hazeColor - [r, g, b] 안개빛 색. (sRGB 0 ~ 1)
+	 * @param { number } hazeAmount - 안개빛을 섞는 양. (0 ~ 1, 어두운 곳일수록 세다)
+	 * @example <caption>해 질 녘처럼 따뜻하고 뿌연 색</caption>
+	 * import { ToonPostProcess } from "./vanilla.js";
+	 * const postProcess = new ToonPostProcess(document.createElement("canvas").getContext("webgl2"), 640, 360);
+	 * postProcess.setBrightness(0.95);
+	 * postProcess.setColorGrade(0.9, 1.1, [1, 0.75, 0.55], 0.35, [0.35, 0.25, 0.4], 0.2);
+	 * postProcess.setVignette(0.25);
 	 */
 	setColorGrade(saturation, contrast, toneColor, toneAmount, hazeColor, hazeAmount) {
 		const toneLuminance = toneColor[0] * 0.2126 + toneColor[1] * 0.7152 + toneColor[2] * 0.0722;
@@ -531,7 +630,7 @@ export class ToonPostProcess {
 	// 가장자리 어둡게 설정. (0 이 없음, 1 이면 구석이 까맣게)
 	//==============================================================================
 	/**
-	 * @param { number } vignetteStrength
+	 * @param { number } vignetteStrength - 가장자리를 어둡게 하는 세기. (0 이 없음, 1 이면 구석이 까맣게)
 	 */
 	setVignette(vignetteStrength) {
 		this.#vignetteStrength = System.Math.max(0, vignetteStrength);
@@ -541,7 +640,14 @@ export class ToonPostProcess {
 	// 씬 렌더 타겟 반환. (다른 후처리를 끼울 때)
 	//==============================================================================
 	/**
-	 * @returns { RenderTarget }
+	 * @returns { RenderTarget } 씬을 그리는 렌더 타겟. (해상도 배율이나 표본 수를 바꾸면 다시 지어질 수 있다)
+	 * @example <caption>씬 색 텍스처를 다른 후처리에 넘기기</caption>
+	 * import { ToonPostProcess } from "./vanilla.js";
+	 * const postProcess = new ToonPostProcess(document.createElement("canvas").getContext("webgl2"), 640, 360);
+	 * postProcess.begin([0, 0, 0]);
+	 * const sceneRenderTarget = postProcess.getSceneRenderTarget();
+	 * sceneRenderTarget.resolve();
+	 * const sceneTexture = sceneRenderTarget.getColorTexture(0);
 	 */
 	getSceneRenderTarget() {
 		return this.#sceneRenderTarget;
