@@ -12,6 +12,20 @@ import { Object } from "../base/object.js";
 //   이 페이지가 살아 있는 동안 메모리에 대신 둔다. (그 값은 다시 켜면 없다, isMemoryFallback)
 // - 읽기(getString, getBoolean, getNumber, getJson)는 없는 키에 기본값을 써 넣지 않는다.
 //==============================================================================
+/**
+ * @example <caption>점수와 설정 저장하고 읽기</caption>
+ * import { LocalStorage } from "./build/vanilla.js";
+ *
+ * LocalStorage.setNumber("example.bestScore", 1200);
+ * LocalStorage.setBoolean("example.isMuted", true);
+ * LocalStorage.setJson("example.settings", { volume: 0.8, language: "en" });
+ * const bestScore = LocalStorage.getNumber("example.bestScore", 0);
+ * const isMuted = LocalStorage.getBoolean("example.isMuted", false);
+ * const settings = LocalStorage.getJson("example.settings", {});
+ * console.log(bestScore, isMuted, settings.volume, LocalStorage.containsKey("example.bestScore"));
+ * const removedCount = LocalStorage.clearByPrefix("example.");
+ * console.log(removedCount, LocalStorage.isMemoryFallback());
+ */
 export class LocalStorage extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -38,7 +52,28 @@ export class LocalStorage extends Object {
 	// - 갈아 끼우면 메모리에 대신 둔 값은 버린다.
 	//==============================================================================
 	/**
-	 * @param { { getItem: Function, setItem: Function, removeItem: Function, getKeys?: Function, clear?: Function } | null } backend
+	 * @param { { getItem: Function, setItem: Function, removeItem: Function, getKeys?: Function, clear?: Function } | null } backend 갈아 끼울 저장소. (null 이나 undefined 면 window.localStorage)
+	 * @example <caption>내 저장소로 갈아 끼우기</caption>
+	 * import { LocalStorage } from "./build/vanilla.js";
+	 *
+	 * const itemMap = new Map();
+	 * LocalStorage.setBackend({
+	 * 	getItem: (key) => {
+	 * 		return itemMap.has(key) ? itemMap.get(key) : null;
+	 * 	},
+	 * 	setItem: (key, value) => {
+	 * 		itemMap.set(key, value);
+	 * 	},
+	 * 	removeItem: (key) => {
+	 * 		itemMap.delete(key);
+	 * 	},
+	 * 	getKeys: () => {
+	 * 		return Array.from(itemMap.keys());
+	 * 	}
+	 * });
+	 * LocalStorage.setString("profile.name", "Player");
+	 * console.log(itemMap.get("profile.name"), LocalStorage.getKeys());
+	 * LocalStorage.setBackend(null);
 	 */
 	static setBackend(backend) {
 		LocalStorage.#backend = backend === undefined ? null : backend;
@@ -50,7 +85,7 @@ export class LocalStorage extends Object {
 	// 갈아 끼운 저장소 반환. (없으면 null)
 	//==============================================================================
 	/**
-	 * @returns { object | null }
+	 * @returns { object | null } 갈아 끼운 저장소. 없으면 null.
 	 */
 	static getBackend() {
 		return LocalStorage.#backend;
@@ -60,7 +95,7 @@ export class LocalStorage extends Object {
 	// 저장소를 못 써서 메모리로 대신한 적이 있는지.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 메모리로 대신한 적이 있으면 참. (setBackend 를 부르면 거짓으로 돌아간다)
 	 */
 	static isMemoryFallback() {
 		return LocalStorage.#isMemoryFallback;
@@ -70,7 +105,7 @@ export class LocalStorage extends Object {
 	// 지금 쓰는 저장소 반환. (갈아 끼운 것, 없으면 window.localStorage, 그것도 막혀 있으면 null)
 	//==============================================================================
 	/**
-	 * @returns { object | null }
+	 * @returns { object | null } 지금 쓰는 저장소. 못 쓰면 null.
 	 */
 	static readStorage() {
 		const backend = LocalStorage.getBackend();
@@ -90,8 +125,8 @@ export class LocalStorage extends Object {
 	// 값 하나 읽기. (없으면 null, 메모리에 대신 둔 값이 앞선다)
 	//==============================================================================
 	/**
-	 * @param { string } key
-	 * @returns { string | null }
+	 * @param { string } key 키.
+	 * @returns { string | null } 저장된 글. 없거나 못 읽으면 null.
 	 */
 	static getItem(key) {
 		const memoryItemMap = LocalStorage.#memoryItemMap;
@@ -118,9 +153,9 @@ export class LocalStorage extends Object {
 	// 값 하나 쓰기. (저장소에 썼으면 true, 못 써서 메모리에 대신 뒀으면 false)
 	//==============================================================================
 	/**
-	 * @param { string } key
-	 * @param { string } value
-	 * @returns { boolean }
+	 * @param { string } key 키.
+	 * @param { string } value 쓸 글.
+	 * @returns { boolean } 저장소에 썼으면 참. 메모리에 대신 뒀으면 거짓.
 	 */
 	static setItem(key, value) {
 		const memoryItemMap = LocalStorage.#memoryItemMap;
@@ -144,7 +179,7 @@ export class LocalStorage extends Object {
 	// 값 하나 지우기. (메모리에 대신 둔 값도 지운다)
 	//==============================================================================
 	/**
-	 * @param { string } key
+	 * @param { string } key 지울 키.
 	 */
 	static removeItem(key) {
 		LocalStorage.#memoryItemMap.delete(key);
@@ -189,8 +224,8 @@ export class LocalStorage extends Object {
 	// 문자열 값 설정.
 	//==============================================================================
 	/**
-	 * @param { string } key 
-	 * @param { string } stringValue
+	 * @param { string } key 키.
+	 * @param { string } stringValue 쓸 글.
 	 */
 	static setString(key, stringValue) {
 		LocalStorage.setItem(key, stringValue);
@@ -200,8 +235,8 @@ export class LocalStorage extends Object {
 	// 논리 값 설정.
 	//==============================================================================
 	/**
-	 * @param { string } key 
-	 * @param { boolean } booleanValue
+	 * @param { string } key 키.
+	 * @param { boolean } booleanValue 쓸 값. ("true" 나 "false" 글로 쓴다)
 	 */
 	static setBoolean(key, booleanValue) {
 		LocalStorage.setString(key, booleanValue ? "true" : "false");
@@ -211,8 +246,8 @@ export class LocalStorage extends Object {
 	// 숫자 값 설정.
 	//==============================================================================
 	/**
-	 * @param { string } key 
-	 * @param { number } numberValue
+	 * @param { string } key 키.
+	 * @param { number } numberValue 쓸 값. (String 으로 바꿔 쓴다)
 	 */
 	static setNumber(key, numberValue) {
 		LocalStorage.setString(key, String(numberValue));
@@ -222,7 +257,7 @@ export class LocalStorage extends Object {
 	// 값 제거.
 	//==============================================================================
 	/**
-	 * @param { string } key 
+	 * @param { string } key 지울 키.
 	 */
 	static remove(key) {
 		LocalStorage.removeItem(key);
@@ -232,9 +267,9 @@ export class LocalStorage extends Object {
 	// 문자열 값 반환. (없으면 기본값, 저장소에는 쓰지 않는다)
 	//==============================================================================
 	/**
-	 * @param { string } key 
-	 * @param { string } defaultStringValue 
-	 * @returns { string }
+	 * @param { string } key 키.
+	 * @param { string } defaultStringValue 없을 때 돌려줄 값.
+	 * @returns { string } 저장된 글. 없으면 기본값.
 	 */
 	static getString(key, defaultStringValue = "") {
 		const value = LocalStorage.getItem(key);
@@ -249,9 +284,9 @@ export class LocalStorage extends Object {
 	// 논리 값 반환.
 	//==============================================================================
 	/**
-	 * @param { string } key 
-	 * @param { boolean } defaultBooleanValue 
-	 * @returns { boolean }
+	 * @param { string } key 키.
+	 * @param { boolean } defaultBooleanValue 없거나 빈 글일 때 돌려줄 값.
+	 * @returns { boolean } 저장된 글이 "true" 면 참. 없거나 빈 글이면 기본값.
 	 */
 	static getBoolean(key, defaultBooleanValue = false) {
 		const stringValue = LocalStorage.getString(key);
@@ -267,9 +302,9 @@ export class LocalStorage extends Object {
 	// 숫자 값 반환.
 	//==============================================================================
 	/**
-	 * @param { string } key 
-	 * @param { number } defaultNumberValue 
-	 * @returns { number }
+	 * @param { string } key 키.
+	 * @param { number } defaultNumberValue 없거나 빈 글일 때 돌려줄 값.
+	 * @returns { number } 저장된 글을 Number 로 바꾼 값. (없거나 빈 글이면 기본값, 숫자가 아니면 NaN)
 	 */
 	static getNumber(key, defaultNumberValue = 0) {
 		const stringValue = LocalStorage.getString(key);
@@ -293,7 +328,7 @@ export class LocalStorage extends Object {
 	// - 게임 네임스페이스의 저장 데이터를 통째로 지울 때 쓴다.
 	//==============================================================================
 	/**
-	 * @param { string } prefix
+	 * @param { string } prefix 지울 키의 접두사. (빈 글이면 아무것도 지우지 않는다)
 	 * @returns { number } 지운 키 수.
 	 */
 	static clearByPrefix(prefix) {
@@ -313,6 +348,13 @@ export class LocalStorage extends Object {
 		return removeKeyList.length;
 	}
 
+	//==============================================================================
+	// 키가 있는지 반환. (메모리에 대신 둔 값도 본다)
+	//==============================================================================
+	/**
+	 * @param { string } key 찾을 키.
+	 * @returns { boolean } 값이 있으면 참.
+	 */
 	static containsKey(key) {
 		return LocalStorage.getItem(key) !== null;
 	}
@@ -321,7 +363,7 @@ export class LocalStorage extends Object {
 	// 모든 키 반환.
 	//==============================================================================
 	/**
-	 * @returns { string[] }
+	 * @returns { string[] } 저장소와 메모리의 키를 합쳐 정렬한 배열.
 	 */
 	static getKeys() {
 		const keySet = new System.Set();
@@ -359,9 +401,9 @@ export class LocalStorage extends Object {
 	// JSON 값 반환. (없거나 풀 수 없으면 기본값, 저장소에는 쓰지 않는다)
 	//==============================================================================
 	/**
-	 * @param { string } key
-	 * @param { any } defaultValue
-	 * @returns { any }
+	 * @param { string } key 키.
+	 * @param { any } defaultValue 없거나 빈 글이거나 풀 수 없을 때 돌려줄 값.
+	 * @returns { any } 풀어 낸 값. 없거나 풀 수 없으면 기본값.
 	 */
 	static getJson(key, defaultValue = null) {
 		const stringValue = LocalStorage.getItem(key);
@@ -380,8 +422,8 @@ export class LocalStorage extends Object {
 	// JSON 값 설정. (JSON 글로 바꿔 쓴다. 바꿀 수 없는 값(순환 참조 등)이면 쓰지 않고 false)
 	//==============================================================================
 	/**
-	 * @param { string } key
-	 * @param { any } value
+	 * @param { string } key 키.
+	 * @param { any } value JSON 으로 바꿔 쓸 값.
 	 * @returns { boolean } 저장소에 썼는지. (메모리에 대신 뒀거나 바꿀 수 없으면 false)
 	 */
 	static setJson(key, value) {

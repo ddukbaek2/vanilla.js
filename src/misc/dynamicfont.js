@@ -20,6 +20,16 @@ const ATLAS_PADDING = 2;      // 글리프 간 여백 (px).
 //==============================================================================
 // 글리프 정보.
 //==============================================================================
+/**
+ * @example <caption>구운 글자의 글리프 정보 보기</caption>
+ * import { DynamicFont, GlyphInfo } from "./build/vanilla.js";
+ *
+ * const dynamicFont = new DynamicFont();
+ * dynamicFont.setFontSize(32);
+ * dynamicFont.buildAtlas("AB");
+ * const glyphInfo = dynamicFont.getGlyph("A");
+ * console.log(glyphInfo instanceof GlyphInfo, glyphInfo.char, glyphInfo.advance, glyphInfo.uvRect.size.x, glyphInfo.bearingY);
+ */
 export class GlyphInfo extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -55,6 +65,32 @@ export class GlyphInfo extends Object {
 // - 글자는 글자 묶음(받침, 결합 부호, 이모지 묶음) 단위로 센다. 아틀라스에 없는 글자는 글자 크기의 반만큼 비우고 넘어간다.
 // - buildAtlas 로 글자를 더하면 든 글자를 모두 새 캔버스에 다시 놓는다. (앞서 구운 글자의 자리가 새 캔버스와 어긋나지 않게)
 //==============================================================================
+/**
+ * @example <caption>숫자 아틀라스를 굽고 시계 그리기</caption>
+ * import { Engine, EngineConfiguration, Scene, DynamicFont, FontAsset, Vector2 } from "./build/vanilla.js";
+ *
+ * const fontAsset = new FontAsset();
+ * await fontAsset.loadFont("DOSGothic", "examples/assets/DOSGothic.woff");
+ * const dynamicFont = new DynamicFont();
+ * dynamicFont.setFontAsset(fontAsset);
+ * dynamicFont.setFontSize(48);
+ * dynamicFont.setLetterSpacing(2);
+ * dynamicFont.buildAtlas("0123456789:");
+ * console.log(dynamicFont.measureText("12:34"));
+ *
+ * class ClockScene extends Scene {
+ * 	draw(graphic) {
+ * 		super.draw(graphic);
+ * 		const position = Vector2.create(100, 200);
+ * 		dynamicFont.drawText("12:34", position, graphic);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new ClockScene());
+ */
 export class DynamicFont extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -86,7 +122,7 @@ export class DynamicFont extends Object {
 	// 폰트 애셋 설정.
 	//==============================================================================
 	/**
-	 * @param { FontAsset } fontAsset
+	 * @param { FontAsset } fontAsset 구울 때 쓸 폰트 애셋. (null 이면 시스템 글꼴, 바꾼 뒤에는 rebuildAtlas 로 다시 굽는다)
 	 */
 	setFontAsset(fontAsset) {
 		this.#fontAsset = fontAsset;
@@ -96,7 +132,7 @@ export class DynamicFont extends Object {
 	// 폰트 크기 설정.
 	//==============================================================================
 	/**
-	 * @param { number } fontSize
+	 * @param { number } fontSize 글자 크기. (픽셀, 처음은 32)
 	 */
 	setFontSize(fontSize) {
 		this.#fontSize = fontSize;
@@ -106,7 +142,7 @@ export class DynamicFont extends Object {
 	// 폰트 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 글자 크기. (픽셀)
 	 */
 	getFontSize() {
 		return this.#fontSize;
@@ -116,7 +152,7 @@ export class DynamicFont extends Object {
 	// 자간 설정.
 	//==============================================================================
 	/**
-	 * @param { number } letterSpacing
+	 * @param { number } letterSpacing 글자마다 더할 자간. (픽셀, 처음은 0)
 	 */
 	setLetterSpacing(letterSpacing) {
 		this.#letterSpacing = letterSpacing;
@@ -126,7 +162,7 @@ export class DynamicFont extends Object {
 	// 자간 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 더하는 자간. (픽셀)
 	 */
 	getLetterSpacing() {
 		return this.#letterSpacing;
@@ -136,7 +172,7 @@ export class DynamicFont extends Object {
 	// 아틀라스 캔버스 반환.
 	//==============================================================================
 	/**
-	 * @returns { HTMLCanvasElement }
+	 * @returns { HTMLCanvasElement } 글자 아틀라스 캔버스. 아직 굽지 않았으면 null.
 	 */
 	getAtlasCanvas() {
 		return this.#atlasCanvas;
@@ -146,8 +182,8 @@ export class DynamicFont extends Object {
 	// 글리프 정보 반환.
 	//==============================================================================
 	/**
-	 * @param { string } char
-	 * @returns { GlyphInfo | null }
+	 * @param { string } char 글자 하나. (글자 묶음 단위)
+	 * @returns { GlyphInfo | null } 그 글자의 글리프 정보. 아틀라스에 없으면 null.
 	 */
 	getGlyph(char) {
 		const glyphInfo = this.#glyphMap.get(char);
@@ -161,7 +197,7 @@ export class DynamicFont extends Object {
 	// 아틀라스 빌드. (charset 의 글자 가운데 아직 없는 글자를 더하고, 아틀라스를 든 글자 모두로 다시 굽는다)
 	//==============================================================================
 	/**
-	 * @param { string } charset
+	 * @param { string } charset 아틀라스에 넣을 글자들. (이미 든 글자는 건너뛴다)
 	 */
 	buildAtlas(charset) {
 		let isChanged = false;
@@ -261,9 +297,9 @@ export class DynamicFont extends Object {
 	// 텍스트 렌더링 (아틀라스에서 글리프 샘플링).
 	//==============================================================================
 	/**
-	 * @param { string } text
+	 * @param { string } text 그릴 글.
 	 * @param { Vector2 } position  베이스라인 기준 좌상단 위치.
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	drawText(text, position, graphic) {
 		const atlasCanvas = this.getAtlasCanvas();
@@ -297,8 +333,8 @@ export class DynamicFont extends Object {
 	// 글 너비 재기. (아틀라스의 전진폭 합, 없는 글자는 글자 크기의 반)
 	//==============================================================================
 	/**
-	 * @param { string } text
-	 * @returns { number }
+	 * @param { string } text 잴 글.
+	 * @returns { number } 글 너비. (픽셀)
 	 */
 	measureText(text) {
 		let width = 0;

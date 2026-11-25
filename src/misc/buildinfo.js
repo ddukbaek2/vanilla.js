@@ -19,6 +19,17 @@ const DEFAULT_VERSION_JSON_PATH = "./version.json";
 // - 읽지 못하면(파일이 없는 개발 실행 같은 것) 예외 없이 빈 글이다. setPackageVersion 으로 넣은 판이 있으면 그 글이다.
 // - 게임마다 판을 쓰는 꼴이 다르면 readVersionData() 로 받은 값을 게임이 엮는다.
 //==============================================================================
+/**
+ * @example <caption>판의 글 읽기</caption>
+ * import { BuildInfo } from "./build/vanilla.js";
+ *
+ * const buildInfo = new BuildInfo();
+ * buildInfo.setVersionJsonPath("");
+ * buildInfo.setPackageVersion("1.2.3");
+ * const versionText = await buildInfo.load();
+ * const composedText = BuildInfo.composeText({ version: "1.2.3", date: "2026-11-26", time: "07:30", hash: "a1b2c3d" });
+ * console.log(versionText, buildInfo.isLoaded(), composedText);
+ */
 export class BuildInfo extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -51,7 +62,7 @@ export class BuildInfo extends Object {
 	// meta 이름 설정. (기본 "build-version")
 	//==============================================================================
 	/**
-	 * @param { string } metaName
+	 * @param { string } metaName 판을 적은 meta 의 name.
 	 */
 	setMetaName(metaName) {
 		this.#metaName = metaName;
@@ -61,7 +72,7 @@ export class BuildInfo extends Object {
 	// 빌드 판 파일 주소 설정. (빈 글이면 파일을 받지 않는다)
 	//==============================================================================
 	/**
-	 * @param { string } versionJsonPath
+	 * @param { string } versionJsonPath 빌드 판 파일 주소. (빈 글이면 받지 않는다)
 	 */
 	setVersionJsonPath(versionJsonPath) {
 		this.#versionJsonPath = versionJsonPath;
@@ -107,7 +118,7 @@ export class BuildInfo extends Object {
 	// 페이지의 meta 에 적힌 판. (없으면 빈 글)
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } meta 의 content 를 앞뒤 공백을 떼어 돌려준 글. 없으면 빈 글.
 	 */
 	readMetaText() {
 		const document = System.document;
@@ -126,7 +137,7 @@ export class BuildInfo extends Object {
 	// 빌드 때 넣은 판 설정. (meta 도 version.json 도 없을 때의 글, 번들러가 넣은 판 등)
 	//==============================================================================
 	/**
-	 * @param { string } packageVersion
+	 * @param { string } packageVersion 빌드 때 넣은 판의 글.
 	 */
 	setPackageVersion(packageVersion) {
 		this.#packageVersion = packageVersion;
@@ -136,7 +147,7 @@ export class BuildInfo extends Object {
 	// 빌드 때 넣은 판 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 빌드 때 넣은 판의 글. (처음은 빈 글)
 	 */
 	getPackageVersion() {
 		return this.#packageVersion;
@@ -146,7 +157,7 @@ export class BuildInfo extends Object {
 	// 판의 글. (meta > version.json > 빌드 때 넣은 판, 다 없으면 빈 글)
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 판의 글. 다 없으면 빈 글.
 	 */
 	readText() {
 		if (this.#text !== "") {
@@ -159,7 +170,7 @@ export class BuildInfo extends Object {
 	// version.json 에서 읽은 값. (meta 로 읽었거나 읽지 못했으면 null)
 	//==============================================================================
 	/**
-	 * @returns { object | null }
+	 * @returns { object | null } version.json 의 값. 없으면 null.
 	 */
 	readVersionData() {
 		return this.#versionData;
@@ -169,7 +180,7 @@ export class BuildInfo extends Object {
 	// 읽기를 마쳤는지. (실패해도 마친 것)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } load 를 마쳤으면 참.
 	 */
 	isLoaded() {
 		return this.#isLoaded;
@@ -180,7 +191,7 @@ export class BuildInfo extends Object {
 	//==============================================================================
 	/**
 	 * @param { object } versionData { version, date, time, hash }
-	 * @returns { string }
+	 * @returns { string } 판의 글.
 	 */
 	static composeText(versionData) {
 		const hash = typeof versionData.hash === "string" ? versionData.hash.trim() : "";

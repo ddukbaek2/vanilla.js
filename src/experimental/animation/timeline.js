@@ -31,14 +31,14 @@ export const TIMELINE_EASING_NAMES = (() => {
 
 
 //==============================================================================
-// 3차 베지어 이징 생성. (CSS cubic-bezier 와 같은 제어점 — x 는 0 ~ 1)
+// 3차 베지어 이징 생성. (CSS cubic-bezier 와 같은 제어점, x 는 0 ~ 1)
 //==============================================================================
 /**
- * @param { number } x1
- * @param { number } y1
- * @param { number } x2
- * @param { number } y2
- * @returns { Function }
+ * @param { number } x1 첫 제어점 x. (0 ~ 1 로 자른다)
+ * @param { number } y1 첫 제어점 y.
+ * @param { number } x2 둘째 제어점 x. (0 ~ 1 로 자른다)
+ * @param { number } y2 둘째 제어점 y.
+ * @returns { Function } 0 ~ 1 진행률을 받아 이징한 값을 돌려주는 함수.
  */
 export function createBezierEasing(x1, y1, x2, y2) {
 	const clampedX1 = System.Math.max(0, System.Math.min(1, x1));
@@ -77,12 +77,19 @@ export function createBezierEasing(x1, y1, x2, y2) {
 
 
 //==============================================================================
-// 이징 함수 반환. (모르는 이름은 linear — "bezier" 는 curve [x1, y1, x2, y2] 를 쓴다)
+// 이징 함수 반환. (모르는 이름은 linear, "bezier" 는 curve [x1, y1, x2, y2] 를 쓴다)
 //==============================================================================
 /**
- * @param { string } easingName
- * @param { number[] | null } curve
- * @returns { Function }
+ * @param { string } easingName 이징 이름. (TIMELINE_EASING_NAMES 가운데, 비었으면 linear)
+ * @param { number[] | null } curve "bezier" 의 [x1, y1, x2, y2]. (넷이 안 되면 [0.42, 0, 0.58, 1])
+ * @returns { Function } 0 ~ 1 진행률을 받아 이징한 값을 돌려주는 함수.
+ * @example <caption>이름과 제어점으로 이징 얻기</caption>
+ * import { resolveTimelineEasing, createBezierEasing } from "./build/vanilla.js";
+ *
+ * const bounceOut = resolveTimelineEasing("bounce.out");
+ * const customCurve = resolveTimelineEasing("bezier", [0.25, 0.1, 0.25, 1]);
+ * const easeInOut = createBezierEasing(0.42, 0, 0.58, 1);
+ * console.log(bounceOut(0.5), customCurve(0.5), easeInOut(0.25));
  */
 export function resolveTimelineEasing(easingName, curve = null) {
 	if (!easingName || easingName === "linear") {
@@ -114,7 +121,7 @@ export function resolveTimelineEasing(easingName, curve = null) {
 //==============================================================================
 /**
  * @param { string } hexText - "#rrggbb" 또는 "#rrggbbaa"
- * @returns { number[] }
+ * @returns { number[] } 0 ~ 1 의 [빨강, 초록, 파랑, 알파]. (읽지 못한 채널은 1)
  */
 export function parseTimelineColor(hexText) {
 	const text = (typeof hexText === "string" && hexText.startsWith("#")) ? hexText.substring(1) : "ffffff";
@@ -130,15 +137,21 @@ export function parseTimelineColor(hexText) {
 	];
 }
 
+//==============================================================================
+// 채널을 색 문자열로. ("#rrggbbaa")
+//==============================================================================
 /**
- * @param { number[] } channels
- * @returns { string }
+ * @param { number[] } channels 0 ~ 1 의 [빨강, 초록, 파랑, 알파]. (0 ~ 1 로 자르고, 알파가 없으면 1)
+ * @returns { string } "#rrggbbaa" 색 문자열.
  */
 export function composeTimelineColor(channels) {
 	const toByte = (value) => System.Math.round(System.Math.max(0, System.Math.min(1, value)) * 255).toString(16).padStart(2, "0");
 	return "#" + toByte(channels[0]) + toByte(channels[1]) + toByte(channels[2]) + toByte(channels[3] === undefined ? 1 : channels[3]);
 }
 
+//==============================================================================
+// 색 문자열로 Color 만들기.
+//==============================================================================
 /**
  * @param { string } hexText
  * @returns { Color }
@@ -150,7 +163,7 @@ function createColorFromText(hexText) {
 
 
 //==============================================================================
-// 노드에서 색을 받는 컴포넌트 찾기. (Text → 글자색 / Paint · Sprite → 색)
+// 노드에서 색을 받는 컴포넌트 찾기. (Text → 글자색 / Paint, Sprite → 색)
 //==============================================================================
 /**
  * @param { WorldNode } node
@@ -252,7 +265,7 @@ export const TIMELINE_PROPERTY_DEFINITIONS = {
 
 
 //==============================================================================
-// 스프라이트 시트 격자 표. (스프라이트 → { columns, rows } — 노드 서술의 frameColumns / frameRows)
+// 스프라이트 시트 격자 표. (스프라이트 → { columns, rows }, 노드 서술의 frameColumns / frameRows)
 //==============================================================================
 const spriteFrameGridTable = new System.WeakMap();
 
@@ -365,6 +378,39 @@ export const TIMELINE_NODE_DEFAULTS = {
 const PARTICLE_RANDOM_SEED_BASE = 0x9E3779B1;
 const PARTICLE_RANDOM_SEED_STEP = 7919;
 
+/**
+ * @example <caption>문서를 읽어 무대를 짓고 재생하기</caption>
+ * import { Engine, EngineConfiguration, Scene, Timeline, Vector2 } from "./build/vanilla.js";
+ *
+ * const emblemImage = new Image();
+ * emblemImage.src = "examples/timelineshowcase/assets/emblem.png";
+ * await emblemImage.decode();
+ * const timeline = await Timeline.loadFromUrl("examples/timelineshowcase/assets/logo.timeline.json");
+ * timeline.setMarkerHandler((markerName) => {
+ * 	console.log("marker", markerName);
+ * });
+ *
+ * class TimelineScene extends Scene {
+ * 	async load(engine) {
+ * 		await super.load(engine);
+ * 		const root = this.getRoot();
+ * 		timeline.buildStage(root, (imageName) => {
+ * 			return imageName === "emblem.png" ? emblemImage : null;
+ * 		});
+ * 		timeline.play();
+ * 	}
+ *
+ * 	tick(timeDelta) {
+ * 		super.tick(timeDelta);
+ * 		timeline.tick(timeDelta);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(960, 540);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new TimelineScene());
+ */
 export class Timeline extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -388,7 +434,7 @@ export class Timeline extends Object {
 	// 생성.
 	//==============================================================================
 	/**
-	 * @param { object | null } description
+	 * @param { object | null } description 타임라인 문서. (null 이면 createEmptyDescription 의 빈 문서)
 	 */
 	constructor(description = null) {
 		super();
@@ -413,7 +459,7 @@ export class Timeline extends Object {
 	// 빈 서술 생성. (정적)
 	//==============================================================================
 	/**
-	 * @returns { object }
+	 * @returns { object } 빈 타임라인 문서. (3 초, 30 프레임, 반복, 960x540 무대)
 	 */
 	static createEmptyDescription() {
 		return {
@@ -431,8 +477,8 @@ export class Timeline extends Object {
 	// 주소에서 읽기. (정적)
 	//==============================================================================
 	/**
-	 * @param { string } url
-	 * @returns { Promise<Timeline> }
+	 * @param { string } url 타임라인 문서(*.timeline.json) 주소.
+	 * @returns { Promise<Timeline> } 읽은 문서로 만든 타임라인.
 	 */
 	static async loadFromUrl(url) {
 		const response = await System.fetch(url);
@@ -444,8 +490,8 @@ export class Timeline extends Object {
 	// JSON 글에서 만들기. (정적)
 	//==============================================================================
 	/**
-	 * @param { string } text
-	 * @returns { Timeline }
+	 * @param { string } text 타임라인 문서 JSON 글.
+	 * @returns { Timeline } 만든 타임라인.
 	 */
 	static loadFromText(text) {
 		const description = System.JSON.parse(text);
@@ -456,8 +502,15 @@ export class Timeline extends Object {
 	// 읽은 JsonAsset 에서 만들기. (정적, 아직 안 읽혔거나 실패했으면 null. 문서는 복사해 쓴다)
 	//==============================================================================
 	/**
-	 * @param { JsonAsset } jsonAsset
-	 * @returns { Timeline | null }
+	 * @param { JsonAsset } jsonAsset 타임라인 문서를 읽은 JsonAsset.
+	 * @returns { Timeline | null } 만든 타임라인. 아직 안 읽혔거나 실패했으면 null.
+	 * @example <caption>JsonAsset 으로 읽은 문서에서 만들기</caption>
+	 * import { JsonAsset, Timeline } from "./build/vanilla.js";
+	 *
+	 * const jsonAsset = new JsonAsset();
+	 * await jsonAsset.load("examples/timelineshowcase/assets/title.timeline.json");
+	 * const timeline = Timeline.createFromJsonAsset(jsonAsset);
+	 * console.log(timeline.getDuration(), timeline.getFrameRate(), timeline.isLoop());
 	 */
 	static createFromJsonAsset(jsonAsset) {
 		const isLoaded = jsonAsset.isLoaded();
@@ -469,10 +522,10 @@ export class Timeline extends Object {
 	}
 
 	//==============================================================================
-	// 서술 설정. (참조를 그대로 쓴다 — 편집기가 고친 뒤 invalidate() 로 다시 컴파일)
+	// 서술 설정. (참조를 그대로 쓴다, 편집기가 고친 뒤 invalidate() 로 다시 컴파일)
 	//==============================================================================
 	/**
-	 * @param { object } description
+	 * @param { object } description 타임라인 문서. (빠진 stage, tracks, markers 는 채워 넣는다)
 	 */
 	setDescription(description) {
 		this.#description = description;
@@ -495,7 +548,7 @@ export class Timeline extends Object {
 	// 서술 반환.
 	//==============================================================================
 	/**
-	 * @returns { object }
+	 * @returns { object } 타임라인 문서. (복사본이 아니다)
 	 */
 	getDescription() {
 		return this.#description;
@@ -562,7 +615,7 @@ export class Timeline extends Object {
 	// 파티클 시간 진행. (재생 중 매 프레임)
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 흘릴 시간. (초, 0 이하이면 아무것도 하지 않는다)
 	 */
 	simulateParticles(timeDelta) {
 		if (timeDelta <= 0) {
@@ -574,10 +627,10 @@ export class Timeline extends Object {
 	}
 
 	//==============================================================================
-	// 파티클 재시뮬레이션. (스크럽 / 되감기 — 비운 뒤 0초부터 이벤트를 다시 밟으며 진행)
+	// 파티클 재시뮬레이션. (스크럽 / 되감기, 비운 뒤 0초부터 이벤트를 다시 밟으며 진행)
 	//==============================================================================
 	/**
-	 * @param { number } time
+	 * @param { number } time 맞출 타임라인 시간. (초)
 	 */
 	resimulateParticles(time) {
 		if (this.#isDirty) {
@@ -629,8 +682,8 @@ export class Timeline extends Object {
 	// 대상 해석. (무대 노드 표 → 사용자 해석기)
 	//==============================================================================
 	/**
-	 * @param { string } targetName
-	 * @returns { object | null }
+	 * @param { string } targetName 트랙의 대상 이름.
+	 * @returns { object | null } 찾은 대상. 없으면 null.
 	 */
 	resolveTarget(targetName) {
 		if (this.#targetTable.has(targetName)) {
@@ -649,7 +702,7 @@ export class Timeline extends Object {
 	// 대상 해석기 설정. (이름 → 객체. 노드가 아니어도 setTimelineProperty(이름, 값) 이 있으면 된다)
 	//==============================================================================
 	/**
-	 * @param { Function | null } targetResolver
+	 * @param { Function | null } targetResolver 대상 이름을 받아 객체를 돌려주는 함수. (null 이면 끈다)
 	 */
 	setTargetResolver(targetResolver) {
 		this.#targetResolver = targetResolver;
@@ -660,8 +713,30 @@ export class Timeline extends Object {
 	// 대상 직접 등록.
 	//==============================================================================
 	/**
-	 * @param { string } targetName
-	 * @param { object } target
+	 * @param { string } targetName 트랙의 대상 이름.
+	 * @param { object } target 노드, 또는 setTimelineProperty(이름, 값) 이 있는 객체.
+	 * @example <caption>노드가 아닌 객체에 트랙 걸기</caption>
+	 * import { Timeline } from "./build/vanilla.js";
+	 *
+	 * const description = Timeline.createEmptyDescription();
+	 * description.duration = 2;
+	 * description.loop = false;
+	 * description.tracks.push({
+	 * 	target: "meter",
+	 * 	property: "level",
+	 * 	keys: [
+	 * 		{ time: 0, value: 0, easing: "quadratic.out" },
+	 * 		{ time: 2, value: 100 }
+	 * 	]
+	 * });
+	 * const timeline = new Timeline(description);
+	 * const meter = { level: 0 };
+	 * meter.setTimelineProperty = (name, value) => {
+	 * 	meter[name] = value;
+	 * };
+	 * timeline.setTarget("meter", meter);
+	 * timeline.seek(1);
+	 * console.log(timeline.getTime(), meter.level);
 	 */
 	setTarget(targetName, target) {
 		this.#targetTable.set(targetName, target);
@@ -672,8 +747,8 @@ export class Timeline extends Object {
 	// 대상 반환.
 	//==============================================================================
 	/**
-	 * @param { string } targetName
-	 * @returns { object | null }
+	 * @param { string } targetName 트랙의 대상 이름.
+	 * @returns { object | null } 등록된 대상. 없으면 null. (해석기는 보지 않는다)
 	 */
 	getTarget(targetName) {
 		return this.#targetTable.has(targetName) ? this.#targetTable.get(targetName) : null;
@@ -683,7 +758,7 @@ export class Timeline extends Object {
 	// 노드 트리에 이름으로 붙이기. (무대를 직접 만든 경우)
 	//==============================================================================
 	/**
-	 * @param { WorldNode } rootNode
+	 * @param { WorldNode } rootNode 이름으로 찾을 노드 트리의 뿌리. (뿌리 자신도 본다. 이미 등록된 이름은 건너뛴다)
 	 */
 	bind(rootNode) {
 		for (const track of this.#description.tracks) {
@@ -704,7 +779,7 @@ export class Timeline extends Object {
 	// - 부모가 자기 자신이거나 고리가 되면 parentNode 에 붙인다.
 	//==============================================================================
 	/**
-	 * @param { WorldNode } parentNode
+	 * @param { WorldNode } parentNode 무대 노드를 붙일 부모 노드. (서술에 부모가 없는 노드가 여기 붙는다)
 	 * @param { Function | null } imageResolver - (이미지 이름) → HTMLImageElement | HTMLCanvasElement | null
 	 * @returns { System.Map } 이름 → 노드
 	 */
@@ -737,9 +812,9 @@ export class Timeline extends Object {
 	// ancestorNode 가 node 자신이거나 그 조상인지. (정적)
 	//==============================================================================
 	/**
-	 * @param { WorldNode } ancestorNode
-	 * @param { WorldNode } node
-	 * @returns { boolean }
+	 * @param { WorldNode } ancestorNode 조상인지 볼 노드.
+	 * @param { WorldNode } node 부모를 거슬러 올라갈 노드.
+	 * @returns { boolean } ancestorNode 가 node 자신이거나 그 조상이면 참.
 	 */
 	static isAncestorOrSelf(ancestorNode, node) {
 		let currentNode = node;
@@ -756,9 +831,9 @@ export class Timeline extends Object {
 	// 무대 노드 한 개 생성. (정적)
 	//==============================================================================
 	/**
-	 * @param { object } nodeDescription
-	 * @param { Function | null } imageResolver
-	 * @returns { WorldNode }
+	 * @param { object } nodeDescription 무대 노드 서술. (빠진 값은 TIMELINE_NODE_DEFAULTS 로 채운다)
+	 * @param { Function | null } imageResolver 이미지 이름을 받아 그림을 돌려주는 함수. (없거나 null 을 돌려주면 data: 주소만 스스로 읽는다)
+	 * @returns { WorldNode } 서술의 이름을 단 새 노드.
 	 */
 	static createStageNode(nodeDescription, imageResolver = null) {
 		const description = System.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
@@ -769,12 +844,12 @@ export class Timeline extends Object {
 	}
 
 	//==============================================================================
-	// 노드에 서술 반영. (정적 — 편집기가 값을 고칠 때도 쓴다)
+	// 노드에 서술 반영. (정적, 편집기가 값을 고칠 때도 쓴다)
 	//==============================================================================
 	/**
-	 * @param { WorldNode } node
-	 * @param { object } nodeDescription
-	 * @param { Function | null } imageResolver
+	 * @param { WorldNode } node 서술을 반영할 노드. (종류에 맞는 컴포넌트가 없으면 더한다)
+	 * @param { object } nodeDescription 무대 노드 서술. (빠진 값은 TIMELINE_NODE_DEFAULTS 로 채운다)
+	 * @param { Function | null } imageResolver 이미지 이름을 받아 그림을 돌려주는 함수. (없거나 null 을 돌려주면 data: 주소만 스스로 읽는다)
 	 */
 	static applyStageNodeDescription(node, nodeDescription, imageResolver = null) {
 		const description = System.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
@@ -860,20 +935,20 @@ export class Timeline extends Object {
 	}
 
 	//==============================================================================
-	// 오디오 매니저 설정. (정적 — 사운드 노드가 플레이어를 만들 때 쓴다)
+	// 오디오 매니저 설정. (정적, 사운드 노드가 플레이어를 만들 때 쓴다)
 	//==============================================================================
 	/**
-	 * @param { object | null } audioManager
+	 * @param { object | null } audioManager 사운드 노드가 createAudioPlayer 로 플레이어를 만들 오디오 매니저. (null 이면 만들지 않는다)
 	 */
 	static setAudioManager(audioManager) {
 		timelineAudioManager = audioManager;
 	}
 
 	//==============================================================================
-	// 사운드 노드 정지. (정적 — 편집기가 정지 / 되감기 때 부른다)
+	// 사운드 노드 정지. (정적, 편집기가 정지 / 되감기 때 부른다)
 	//==============================================================================
 	/**
-	 * @param { WorldNode } node
+	 * @param { WorldNode } node 멈출 사운드 노드. (사운드 노드가 아니면 아무것도 하지 않는다)
 	 */
 	static stopSound(node) {
 		const soundEntry = soundPlayerTable.get(node);
@@ -920,7 +995,7 @@ export class Timeline extends Object {
 	// 시간 이동. (이벤트는 발생하지 않는다)
 	//==============================================================================
 	/**
-	 * @param { number } time
+	 * @param { number } time 옮길 시간. (초, 0 ~ 길이로 자른다)
 	 */
 	seek(time) {
 		this.#time = System.Math.max(0, System.Math.min(this.getDuration(), time));
@@ -932,7 +1007,35 @@ export class Timeline extends Object {
 	// 갱신. (시간을 흘리고 값을 적용, 지나친 이벤트 / 마커를 발생)
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초, 속도를 곱해 흘린다. 재생 중이 아니면 아무것도 하지 않는다)
+	 * @example <caption>재생하며 이벤트, 마커, 완료 받기</caption>
+	 * import { Timeline } from "./build/vanilla.js";
+	 *
+	 * const description = Timeline.createEmptyDescription();
+	 * description.duration = 1;
+	 * description.loop = false;
+	 * description.tracks.push({
+	 * 	target: "hero",
+	 * 	property: "event",
+	 * 	keys: [
+	 * 		{ time: 0.5, value: "jump" }
+	 * 	]
+	 * });
+	 * description.markers.push({ time: 0.25, name: "quarter" });
+	 * const timeline = new Timeline(description);
+	 * timeline.setEventHandler((targetName, eventName) => {
+	 * 	console.log("event", targetName, eventName);
+	 * });
+	 * timeline.setMarkerHandler((markerName) => {
+	 * 	console.log("marker", markerName);
+	 * });
+	 * timeline.setCompleteHandler(() => {
+	 * 	console.log("complete", timeline.getTime());
+	 * });
+	 * timeline.play();
+	 * for (let frame = 0; frame < 40; ++frame) {
+	 * 	timeline.tick(1 / 30);
+	 * }
 	 */
 	tick(timeDelta) {
 		if (!this.#isPlaying) {
@@ -970,7 +1073,7 @@ export class Timeline extends Object {
 		}
 		this.#time = nextTime;
 		this.evaluate(this.#time);
-		// 파티클은 타임라인 시간으로만 진행한다. (감기면 처음부터 다시 — 매 반복이 같게)
+		// 파티클은 타임라인 시간으로만 진행한다. (감기면 처음부터 다시, 매 반복이 같게)
 		if (isWrapped) {
 			this.resimulateParticles(this.#time);
 		}
@@ -983,8 +1086,8 @@ export class Timeline extends Object {
 	// 구간 안의 이벤트 키 / 마커 발생. (fromTime 초과 ~ toTime 이하)
 	//==============================================================================
 	/**
-	 * @param { number } fromTime
-	 * @param { number } toTime
+	 * @param { number } fromTime 구간 시작. (초, 이 시간의 키는 넣지 않는다)
+	 * @param { number } toTime 구간 끝. (초, 이 시간의 키는 넣는다)
 	 */
 	fireEventsBetween(fromTime, toTime) {
 		if (this.#isDirty) {
@@ -1019,8 +1122,8 @@ export class Timeline extends Object {
 	// 이벤트 키 처리. (파티클 대상은 play / stop / emit:N 을 스스로 처리, 그 외는 핸들러)
 	//==============================================================================
 	/**
-	 * @param { object } compiledTrack
-	 * @param { object } key
+	 * @param { object } compiledTrack 컴파일한 이벤트 트랙. (target 과 track 을 쓴다)
+	 * @param { object } key 이벤트 키. (value 가 이벤트 이름)
 	 * @param { boolean } isSilent - 재시뮬레이션용. (사운드 / 사용자 핸들러는 부르지 않고 파티클만)
 	 */
 	dispatchEvent(compiledTrack, key, isSilent = false) {
@@ -1064,10 +1167,10 @@ export class Timeline extends Object {
 	}
 
 	//==============================================================================
-	// 시간의 값 적용. (연속 속성만 — 이벤트는 tick 에서만 발생)
+	// 시간의 값 적용. (연속 속성만, 이벤트는 tick 에서만 발생)
 	//==============================================================================
 	/**
-	 * @param { number } time
+	 * @param { number } time 값을 적용할 시간. (초)
 	 */
 	evaluate(time) {
 		if (this.#isDirty) {
@@ -1092,13 +1195,13 @@ export class Timeline extends Object {
 	}
 
 	//==============================================================================
-	// 키 목록에서 시간의 값 표본. (정적 — 편집기의 커브 그리기도 쓴다)
+	// 키 목록에서 시간의 값 표본. (정적, 편집기의 커브 그리기도 쓴다)
 	//==============================================================================
 	/**
-	 * @param { object[] } sortedKeys
-	 * @param { string } kind
-	 * @param { number } time
-	 * @returns { * }
+	 * @param { object[] } sortedKeys 시간 차례로 정렬한 키 목록. ({ time, value, easing, curve })
+	 * @param { string } kind "number", "color", "string", "boolean" 가운데. (number 와 color 만 보간하고 나머지는 계단)
+	 * @param { number } time 표본 시간. (초)
+	 * @returns { * } 그 시간의 값. (키가 없으면 number 는 0, 그 밖은 null)
 	 */
 	static sampleKeys(sortedKeys, kind, time) {
 		const keyCount = sortedKeys.length;
@@ -1131,12 +1234,12 @@ export class Timeline extends Object {
 	}
 
 	//==============================================================================
-	// 트랙의 시간 값 표본. (서술 트랙 그대로 — 정렬은 여기서)
+	// 트랙의 시간 값 표본. (서술 트랙 그대로, 정렬은 여기서)
 	//==============================================================================
 	/**
-	 * @param { object } track
-	 * @param { number } time
-	 * @returns { * }
+	 * @param { object } track 서술의 트랙. (property 로 종류를 정하고, 모르는 속성은 number)
+	 * @param { number } time 표본 시간. (초)
+	 * @returns { * } 그 시간의 값.
 	 */
 	static sampleTrack(track, time) {
 		const definition = TIMELINE_PROPERTY_DEFINITIONS[track.property];
@@ -1149,7 +1252,7 @@ export class Timeline extends Object {
 	// 시간 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 지금 시간. (초)
 	 */
 	getTime() {
 		return this.#time;
@@ -1159,7 +1262,7 @@ export class Timeline extends Object {
 	// 재생 중 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 재생 중이면 참.
 	 */
 	isPlaying() {
 		return this.#isPlaying;
@@ -1169,7 +1272,7 @@ export class Timeline extends Object {
 	// 속도 설정. (1 = 실시간)
 	//==============================================================================
 	/**
-	 * @param { number } speed
+	 * @param { number } speed 재생 속도 배율. (1 = 실시간, 음수면 0 초에서 멈춰 선다)
 	 */
 	setSpeed(speed) {
 		this.#speed = speed;
@@ -1179,7 +1282,7 @@ export class Timeline extends Object {
 	// 속도 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 재생 속도 배율.
 	 */
 	getSpeed() {
 		return this.#speed;
@@ -1189,7 +1292,7 @@ export class Timeline extends Object {
 	// 반복 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } isLoop
+	 * @param { boolean } isLoop 반복하면 참. (문서의 loop 에 쓴다)
 	 */
 	setLoop(isLoop) {
 		this.#description.loop = isLoop;
@@ -1199,7 +1302,7 @@ export class Timeline extends Object {
 	// 반복 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 문서의 loop 가 true 면 참.
 	 */
 	isLoop() {
 		return this.#description.loop === true;
@@ -1209,7 +1312,7 @@ export class Timeline extends Object {
 	// 길이 반환. (초)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 길이. (초, 문서 값이 양수가 아니면 0)
 	 */
 	getDuration() {
 		const duration = System.Number(this.#description.duration);
@@ -1220,7 +1323,7 @@ export class Timeline extends Object {
 	// 초당 프레임 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 초당 프레임. (문서 값이 양수가 아니면 30)
 	 */
 	getFrameRate() {
 		const frameRate = System.Number(this.#description.frameRate);
@@ -1231,7 +1334,7 @@ export class Timeline extends Object {
 	// 이벤트 핸들러 설정. ((대상 이름, 이벤트 이름, 키, 타임라인))
 	//==============================================================================
 	/**
-	 * @param { Function | null } eventHandler
+	 * @param { Function | null } eventHandler (대상 이름, 이벤트 이름, 키, 타임라인) 을 받는 함수. (null 이면 끈다)
 	 */
 	setEventHandler(eventHandler) {
 		this.#eventHandler = eventHandler;
@@ -1241,7 +1344,7 @@ export class Timeline extends Object {
 	// 마커 핸들러 설정. ((마커 이름, 마커, 타임라인))
 	//==============================================================================
 	/**
-	 * @param { Function | null } markerHandler
+	 * @param { Function | null } markerHandler (마커 이름, 마커, 타임라인) 을 받는 함수. (null 이면 끈다)
 	 */
 	setMarkerHandler(markerHandler) {
 		this.#markerHandler = markerHandler;
@@ -1251,7 +1354,7 @@ export class Timeline extends Object {
 	// 완료 핸들러 설정. (반복이 아닐 때 끝에 닿으면)
 	//==============================================================================
 	/**
-	 * @param { Function | null } completeHandler
+	 * @param { Function | null } completeHandler 타임라인을 받는 함수. (null 이면 끈다)
 	 */
 	setCompleteHandler(completeHandler) {
 		this.#completeHandler = completeHandler;

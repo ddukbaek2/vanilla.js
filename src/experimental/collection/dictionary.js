@@ -11,6 +11,15 @@ import { Object } from "../../base/object.js";
 /**
  * @template K, V
  * @class
+ * @example <caption>키로 넣고 꺼내기</caption>
+ * import { Dictionary } from "./build/vanilla.js";
+ *
+ * const dictionary = new Dictionary();
+ * dictionary.add("hp", 100);
+ * dictionary.add("mp", 40);
+ * dictionary.add("hp", 80);
+ * dictionary.remove("mp");
+ * console.log(dictionary.get("hp"), dictionary.contains("mp"), dictionary.getCount(), dictionary.getKeys());
  */
 export class Dictionary extends Object {
 	//==============================================================================
@@ -40,8 +49,8 @@ export class Dictionary extends Object {
 	// 추가.
 	//==============================================================================
 	/**
-	 * @param { K } key
-	 * @param { V } value 
+	 * @param { K } key 키.
+	 * @param { V } value 값. (같은 키가 있으면 덮어쓴다)
 	 */
 	add(key, value) {
 		this.#items.set(key, value);
@@ -51,8 +60,8 @@ export class Dictionary extends Object {
 	// 제거.
 	//==============================================================================
 	/**
-	 * @param { K } key
-	 * @returns { boolean }
+	 * @param { K } key 지울 키.
+	 * @returns { boolean } 있어서 지웠으면 참.
 	 */
 	remove(key) {
 		return this.#items.delete(key);
@@ -62,8 +71,16 @@ export class Dictionary extends Object {
 	// 요소 검색.
 	//==============================================================================
 	/**
-	 * @param { function(K, V): boolean } predicate
-	 * @returns { { key: K, value: V } | null }
+	 * @param { function(K, V): boolean } predicate 맞는 항목에 참을 돌려주는 함수. (값을 첫 인자로 받고 키는 this 로 받는다)
+	 * @returns { { key: K, value: V } | null } 처음 맞는 항목의 키와 값. 없으면 null.
+	 * @example <caption>값으로 항목 찾기</caption>
+	 * import { Dictionary } from "./build/vanilla.js";
+	 *
+	 * const dictionary = new Dictionary();
+	 * dictionary.add("sword", 30);
+	 * dictionary.add("shield", 10);
+	 * const found = dictionary.find((value) => value > 20);
+	 * console.log(found.key, found.value);
 	 */
 	find(predicate) {
 		const items = this.getItems();
@@ -82,8 +99,8 @@ export class Dictionary extends Object {
 	// 요소 검색.
 	//==============================================================================
 	/**
-	 * @param { function(K, V): boolean } predicate
-	 * @returns { { key: K, value: V }[] }
+	 * @param { function(K, V): boolean } predicate 맞는 항목에 참을 돌려주는 함수. (값을 첫 인자로 받고 키는 this 로 받는다)
+	 * @returns { { key: K, value: V }[] } 맞는 항목의 키와 값을 모두 담은 새 배열.
 	 */
 	findAll(predicate) {
 		const result = [];
@@ -103,8 +120,8 @@ export class Dictionary extends Object {
 	// 요소가 포함되어있는지 여부 반환.
 	//==============================================================================
 	/**
-	 * @param { K } key 
-	 * @returns { boolean } 
+	 * @param { K } key 찾을 키.
+	 * @returns { boolean } 키가 있으면 참.
 	 */
 	contains(key) {
 		return this.#items.has(key);
@@ -114,8 +131,8 @@ export class Dictionary extends Object {
 	// 요소 반환.
 	//==============================================================================
 	/**
-	 * @param { K } key
-	 * @returns { V } 
+	 * @param { K } key 찾을 키.
+	 * @returns { V } 그 키의 값. 없으면 undefined.
 	 */
 	get(key) {
 		// if (typeof key !== "string") {
@@ -128,7 +145,7 @@ export class Dictionary extends Object {
 	// 요소 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 항목 수.
 	 */
 	getCount() {
 		return this.#items.size;
@@ -138,7 +155,7 @@ export class Dictionary extends Object {
 	// 전체 요소 반환.
 	//==============================================================================
 	/**
-	 * @returns { Map<K, V> } 
+	 * @returns { Map<K, V> } 안쪽 Map. (복사본이 아니다)
 	 */
 	getItems() {
 		return this.#items;
@@ -148,7 +165,7 @@ export class Dictionary extends Object {
 	// 전체 키 반환.
 	//==============================================================================
 	/**
-	 * @returns { K[] } 
+	 * @returns { K[] } 넣은 차례의 키를 담은 새 배열.
 	 */
 	getKeys() {
 		const items = this.getItems();
@@ -159,7 +176,7 @@ export class Dictionary extends Object {
 	// 전체 값 반환.
 	//==============================================================================
 	/**
-	 * @returns { V[] } 
+	 * @returns { V[] } 넣은 차례의 값을 담은 새 배열.
 	 */
 	getValues() {
 		const items = this.getItems();

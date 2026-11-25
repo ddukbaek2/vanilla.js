@@ -51,6 +51,15 @@ let representativeFontFace = null;
 // 미리 받기를 청한 글자. (같은 글자를 거듭 청하지 않는다)
 const requestedCharacters = new System.Set();
 
+/**
+ * @example <caption>UI 글꼴 설정하고 글꼴 문자열 만들기</caption>
+ * import { UIFont } from "./build/vanilla.js";
+ *
+ * UIFont.configureUiFont({ family: "ExampleUI", manifestPath: "./assets/fonts/fonts.json", directoryPath: "./assets/fonts/", weights: [500, 700], waitMilliseconds: 1000 });
+ * const fontString = UIFont.buildUiFontString(700, 24);
+ * console.log(UIFont.readUiFontFamily(), fontString, UIFont.readUiFontFace());
+ */
+
 
 //==============================================================================
 // 글자 범위 읽기. ("U+0000-00FF, U+0131" → [[0, 255], [305, 305]])
@@ -273,7 +282,7 @@ async function loadRemainingFontGroups() {
 // 고른 언어의 글꼴 묶음 앞세우기. (그 묶음을 라틴 바로 앞에 두고 모든 조각을 다시 올린다)
 //==============================================================================
 /**
- * @param { string } fontGroup
+ * @param { string } fontGroup 앞세울 글꼴 묶음. (languages.json 의 fontGroup, 올린 묶음이 하나도 없으면 아무것도 하지 않는다)
  */
 export function applyUiFontGroup(fontGroup) {
 	if (fontGroups.length === 0) {
@@ -318,7 +327,7 @@ export function applyUiFontGroup(fontGroup) {
 // 글자의 조각 받기. (그 글자가 든 조각만, 다 받을 때까지 기다린다)
 //==============================================================================
 /**
- * @param { string } text
+ * @param { string } text 그릴 글자. (빈 글이거나 올린 묶음이 없으면 아무것도 하지 않는다)
  */
 export async function loadUiFontText(text) {
 	if (fontGroups.length === 0 || typeof text !== "string" || text === "") {
@@ -354,7 +363,7 @@ export async function loadUiFontText(text) {
 // 글자의 조각 받기 청하기. (사람 이름처럼 그때그때 나오는 글자, 기다리지 않고 처음 보는 글자만)
 //==============================================================================
 /**
- * @param { string } text
+ * @param { string } text 그릴 글자. (전에 청하지 않은 글자만 받는다)
  */
 export function requestUiFontText(text) {
 	if (fontGroups.length === 0 || typeof text !== "string" || text === "") {
@@ -376,7 +385,7 @@ export function requestUiFontText(text) {
 // 불러온 UI 글꼴의 대표 FontFace 반환. (엔진의 UILabel, UIInputField 에 준다, 글꼴 이름만 쓰이다, 못 불러왔으면 null)
 //==============================================================================
 /**
- * @returns { FontFace | null }
+ * @returns { FontFace | null } 맨 뒤 묶음의 첫 조각. 못 불러왔으면 null.
  */
 export function readUiFontFace() {
 	return representativeFontFace;
@@ -386,9 +395,9 @@ export function readUiFontFace() {
 // UI 글꼴 문자열. (굵기, 크기)
 //==============================================================================
 /**
- * @param { number } fontWeight
- * @param { number } fontSize
- * @returns { string }
+ * @param { number } fontWeight 굵기. (500, 700 같은 수)
+ * @param { number } fontSize 크기. (픽셀)
+ * @returns { string } 캔버스 font 꼴의 글. (예: 700 24px "GameUI", sans-serif)
  */
 export function buildUiFontString(fontWeight, fontSize) {
 	return fontWeight + " " + fontSize + "px \"" + uiFontFamily + "\", sans-serif";
@@ -430,7 +439,7 @@ export function configureUiFont(options) {
 // UI 글꼴 이름 반환.
 //==============================================================================
 /**
- * @returns { string }
+ * @returns { string } UI 글꼴 이름. (처음은 "GameUI")
  */
 export function readUiFontFamily() {
 	return uiFontFamily;

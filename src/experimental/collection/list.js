@@ -11,6 +11,16 @@ import { Object } from "../../base/object.js";
 /**
  * @template T
  * @class
+ * @example <caption>더하고 지우고 찾기</caption>
+ * import { List } from "./build/vanilla.js";
+ *
+ * const list = new List();
+ * list.add(3);
+ * list.addRange([5, 8, 13]);
+ * list.remove(5);
+ * list.removeAt(0);
+ * const firstLarge = list.find((item) => item > 10);
+ * console.log(list.getCount(), list.getAt(0), list.indexOf(13), firstLarge, list.contains(3));
  */
 export class List extends Object {
 	//==============================================================================
@@ -40,7 +50,7 @@ export class List extends Object {
 	// 추가.
 	//==============================================================================
 	/**
-	 * @param { T } item 
+	 * @param { T } item 뒤에 더할 요소.
 	 */
 	add(item) {
 		this.#items.push(item);
@@ -50,7 +60,7 @@ export class List extends Object {
 	// 범위 추가.
 	//==============================================================================
 	/**
-	 * @param { T[] } items
+	 * @param { T[] } items 차례로 뒤에 더할 요소 배열.
 	 */
 	addRange(items) {
 		for (const item of items) {
@@ -62,8 +72,8 @@ export class List extends Object {
 	// 제거.
 	//==============================================================================
 	/**
-	 * @param { T } item
-	 * @returns { boolean }
+	 * @param { T } item 지울 요소. (같은 것이 여럿이면 맨 앞의 하나만)
+	 * @returns { boolean } 찾아서 지웠으면 참.
 	 */
 	remove(item) {
 		const index = this.#items.indexOf(item);
@@ -79,8 +89,8 @@ export class List extends Object {
 	// 제거.
 	//==============================================================================
 	/**
-	 * @param { number } index
-	 * @returns { boolean }
+	 * @param { number } index 지울 자리. (0 부터)
+	 * @returns { boolean } 범위 안이라 지웠으면 참.
 	 */
 	removeAt(index) {
 		if (index < 0 || index >= this.#items.length) {
@@ -95,8 +105,15 @@ export class List extends Object {
 	// 요소 검색.
 	//==============================================================================
 	/**
-	 * @param { function(number, T): boolean } predicate
-	 * @returns { T | undefined }
+	 * @param { function(number, T): boolean } predicate 맞는 요소에 참을 돌려주는 함수. (요소를 첫 인자로 받고 색인은 this 로 받는다)
+	 * @returns { T | undefined } 처음 맞는 요소. 없으면 undefined.
+	 * @example <caption>조건에 맞는 첫 요소 찾기</caption>
+	 * import { List } from "./build/vanilla.js";
+	 *
+	 * const list = new List();
+	 * list.addRange(["apple", "banana", "cherry"]);
+	 * const found = list.find((item) => item.startsWith("b"));
+	 * console.log(found);
 	 */
 	find(predicate) {
 		let index = 0;
@@ -114,8 +131,8 @@ export class List extends Object {
 	// 요소 검색.
 	//==============================================================================
 	/**
-	 * @param { function(number, T): boolean } predicate
-	 * @returns { T[] }
+	 * @param { function(number, T): boolean } predicate 맞는 요소에 참을 돌려주는 함수. (요소를 첫 인자로 받고 색인은 this 로 받는다)
+	 * @returns { T[] } 맞는 요소를 모두 담은 새 배열.
 	 */
 	findAll(predicate) {
 		let index = 0;
@@ -134,7 +151,8 @@ export class List extends Object {
 	// 요소가 포함되어있는지 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean } 
+	 * @param { T } item 찾을 요소.
+	 * @returns { boolean } 있으면 참.
 	 */
 	contains(item) {
 		return this.#items.includes(item);
@@ -144,7 +162,8 @@ export class List extends Object {
 	// 색인 반환.
 	//==============================================================================
 	/**
-	 * @returns { number } 
+	 * @param { T } item 찾을 요소.
+	 * @returns { number } 처음 나오는 자리. 없으면 -1.
 	 */
 	indexOf(item) {
 		return this.#items.indexOf(item);
@@ -154,7 +173,8 @@ export class List extends Object {
 	// 요소 반환.
 	//==============================================================================
 	/**
-	 * @returns { T } 
+	 * @param { number } index 자리. (0 부터)
+	 * @returns { T } 그 자리의 요소. 범위 밖이면 undefined.
 	 */
 	getAt(index) {
 		return this.#items[index];
@@ -164,7 +184,7 @@ export class List extends Object {
 	// 리스트가 비어있는지 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean } 
+	 * @returns { boolean } 비었으면 참.
 	 */
 	isEmpty() {
 		return this.#items.length === 0;
@@ -174,7 +194,7 @@ export class List extends Object {
 	// 리스트 요소 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 요소 수.
 	 */
 	getCount() {
 		return this.#items.length;
@@ -184,7 +204,7 @@ export class List extends Object {
 	// 전체 요소 반환.
 	//==============================================================================
 	/**
-	 * @returns { T[] } 
+	 * @returns { T[] } 안쪽 배열. (복사본이 아니다)
 	 */
 	all() {
 		return this.#items;

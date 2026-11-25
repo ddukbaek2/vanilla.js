@@ -9,9 +9,9 @@ import { FrameProbe } from "./frameprobe.js";
 // 그래픽 품질 설정 값.
 //==============================================================================
 export const GraphicsQuality = System.Object.freeze({
-	auto: "auto",
-	high: "high",
-	low: "low",
+	auto: "auto", // 자동. (프레임 재기로 정한다)
+	high: "high", // 높음. (늘 가벼운 길이 아니다)
+	low: "low", // 낮음. (늘 가벼운 길)
 });
 
 
@@ -25,6 +25,24 @@ export const GraphicsQuality = System.Object.freeze({
 // - 가벼운 길에서 무엇을 줄일지(그림자, 바깥선, 효과, 그리는 수)는 게임이 isLite 를 읽어 정한다.
 // - 엔진과 브라우저를 들여오지 않는다. 주소 글은 부르는 쪽이 applySearchText(location.search) 로 넘긴다.
 //==============================================================================
+/**
+ * @example <caption>설정과 프레임 재기로 가벼운 길 정하기</caption>
+ * import { GraphicsQualityGovernor, GraphicsQuality } from "./build/vanilla.js";
+ *
+ * const governor = new GraphicsQualityGovernor();
+ * governor.setQuality(GraphicsQuality.auto);
+ * governor.applySearchText("?mode=demo");
+ * governor.setRenderPixelRatioLimits(2, 1);
+ * const frameProbe = governor.getFrameProbe();
+ * frameProbe.setSeconds(0.5, 1);
+ * for (let frame = 0; frame < 120; ++frame) {
+ * 	const isChanged = governor.update(1 / 20, 60);
+ * 	if (isChanged) {
+ * 		console.log("lite", governor.isLite(), frame);
+ * 	}
+ * }
+ * console.log(governor.isLite(), governor.readMaxRenderPixelRatio());
+ */
 export class GraphicsQualityGovernor {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -54,7 +72,7 @@ export class GraphicsQualityGovernor {
 	// 품질 설정. (GraphicsQuality, 모르는 값이면 자동)
 	//==============================================================================
 	/**
-	 * @param { string } quality
+	 * @param { string } quality GraphicsQuality 값.
 	 */
 	setQuality(quality) {
 		const isKnown = quality === GraphicsQuality.high || quality === GraphicsQuality.low;
@@ -65,7 +83,7 @@ export class GraphicsQualityGovernor {
 	// 품질 설정 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } GraphicsQuality 값.
 	 */
 	getQuality() {
 		return this.#quality;
@@ -75,7 +93,7 @@ export class GraphicsQualityGovernor {
 	// 덮어쓰기 설정. (true 면 늘 가벼운 길, false 면 늘 아님, null 이면 풀기)
 	//==============================================================================
 	/**
-	 * @param { boolean | null } liteOverride
+	 * @param { boolean | null } liteOverride 늘 가벼운 길이면 true, 늘 아니면 false, 풀면 null.
 	 */
 	setLiteOverride(liteOverride) {
 		this.#liteOverride = liteOverride;
@@ -85,7 +103,7 @@ export class GraphicsQualityGovernor {
 	// 덮어쓰기 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean | null }
+	 * @returns { boolean | null } 덮어쓰기. 없으면 null.
 	 */
 	getLiteOverride() {
 		return this.#liteOverride;
@@ -96,7 +114,15 @@ export class GraphicsQualityGovernor {
 	//==============================================================================
 	/**
 	 * @param { string } searchText - location.search 꼴. ("?light", "?a=1&light=0")
-	 * @param { string } [liteKey]
+	 * @param { string } [liteKey] 볼 쿼리 이름. (처음은 "light")
+	 * @example <caption>주소의 쿼리로 가벼운 길 덮어쓰기</caption>
+	 * import { GraphicsQualityGovernor } from "./build/vanilla.js";
+	 *
+	 * const governor = new GraphicsQualityGovernor();
+	 * governor.applySearchText("?light");
+	 * console.log(governor.getLiteOverride(), governor.isLite());
+	 * governor.applySearchText("?a=1&light=0");
+	 * console.log(governor.getLiteOverride(), governor.isLite());
 	 */
 	applySearchText(searchText, liteKey = "light") {
 		const searchParameters = new System.URLSearchParams(searchText);
@@ -111,7 +137,7 @@ export class GraphicsQualityGovernor {
 	// 자동일 때 처음부터 가벼운 길인지 설정. (손가락 기기처럼 재기 전부터 가볍게 갈 때)
 	//==============================================================================
 	/**
-	 * @param { boolean } isAutoLiteDefault
+	 * @param { boolean } isAutoLiteDefault 자동일 때 재지 않고 처음부터 가벼운 길이면 참.
 	 */
 	setAutoLiteDefault(isAutoLiteDefault) {
 		this.#isAutoLiteDefault = isAutoLiteDefault;
@@ -121,7 +147,7 @@ export class GraphicsQualityGovernor {
 	// 자동일 때 처음부터 가벼운 길인지 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 자동일 때 처음부터 가벼운 길이면 참.
 	 */
 	isAutoLiteDefault() {
 		return this.#isAutoLiteDefault;
@@ -131,7 +157,7 @@ export class GraphicsQualityGovernor {
 	// 프레임 재기 반환. (기다리는 초, 판정 문턱을 바꾸거나 무거운 장면에서 measureAgain 할 때)
 	//==============================================================================
 	/**
-	 * @returns { FrameProbe }
+	 * @returns { FrameProbe } 이 품질 정하기가 쓰는 FrameProbe.
 	 */
 	getFrameProbe() {
 		return this.#frameProbe;
@@ -141,7 +167,7 @@ export class GraphicsQualityGovernor {
 	// 가벼운 길로 그리는지.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 가벼운 길이면 참.
 	 */
 	isLite() {
 		const liteOverride = this.#liteOverride;
@@ -163,9 +189,9 @@ export class GraphicsQualityGovernor {
 	// 한 프레임. (자동이고 아직 가벼운 길이 아니면 프레임을 잰다, 가벼운 길이 바뀐 프레임에 true)
 	//==============================================================================
 	/**
-	 * @param { number } frameSeconds
+	 * @param { number } frameSeconds 지난 프레임과의 간격. (초)
 	 * @param { number } maximumFramePerSecond - 엔진 설정의 최대 프레임. (0 이면 무제한)
-	 * @returns { boolean }
+	 * @returns { boolean } 지난 update 때와 가벼운 길이 달라졌으면 참.
 	 */
 	update(frameSeconds, maximumFramePerSecond) {
 		const isMeasured = this.#liteOverride === null && this.#quality === GraphicsQuality.auto && !this.#isAutoLiteDefault;
@@ -183,8 +209,8 @@ export class GraphicsQualityGovernor {
 	// 렌더 배율 상한 설정. (보통 길과 가벼운 길, 0 이면 제한 없음)
 	//==============================================================================
 	/**
-	 * @param { number } normalMaxRenderPixelRatio
-	 * @param { number } liteMaxRenderPixelRatio
+	 * @param { number } normalMaxRenderPixelRatio 보통 길의 렌더 배율 상한. (0 이면 제한 없음, 음수면 0)
+	 * @param { number } liteMaxRenderPixelRatio 가벼운 길의 렌더 배율 상한. (0 이면 제한 없음, 음수면 0)
 	 */
 	setRenderPixelRatioLimits(normalMaxRenderPixelRatio, liteMaxRenderPixelRatio) {
 		this.#normalMaxRenderPixelRatio = System.Math.max(0, normalMaxRenderPixelRatio);
@@ -195,7 +221,7 @@ export class GraphicsQualityGovernor {
 	// 지금 길의 렌더 배율 상한.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 지금 길의 렌더 배율 상한. (0 이면 제한 없음)
 	 */
 	readMaxRenderPixelRatio() {
 		return this.isLite() ? this.#liteMaxRenderPixelRatio : this.#normalMaxRenderPixelRatio;
@@ -206,7 +232,29 @@ export class GraphicsQualityGovernor {
 	//==============================================================================
 	/**
 	 * @param { object } viewManager - ViewManager
-	 * @returns { boolean }
+	 * @returns { boolean } 새 상한을 걸었으면 참. (같아서 그대로 두었으면 거짓)
+	 * @example <caption>씬에서 매 프레임 렌더 배율 상한 맞추기</caption>
+	 * import { Engine, EngineConfiguration, Scene, GraphicsQualityGovernor } from "./build/vanilla.js";
+	 *
+	 * const governor = new GraphicsQualityGovernor();
+	 * governor.setRenderPixelRatioLimits(2, 1);
+	 *
+	 * class QualityScene extends Scene {
+	 * 	tick(timeDelta) {
+	 * 		super.tick(timeDelta);
+	 * 		const isChanged = governor.update(timeDelta, 60);
+	 * 		if (isChanged) {
+	 * 			console.log("lite", governor.isLite());
+	 * 		}
+	 * 		const engine = this.getEngine();
+	 * 		const viewManager = engine.getViewManager();
+	 * 		governor.applyRenderPixelRatio(viewManager);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new QualityScene());
 	 */
 	applyRenderPixelRatio(viewManager) {
 		const maxRenderPixelRatio = this.readMaxRenderPixelRatio();

@@ -10,6 +10,33 @@ import { Graphic } from "../core/graphic.js";
 //==============================================================================
 // 인디케이터 클래스.
 //==============================================================================
+/**
+ * @example <caption>씬 위에 도는 톱니 그리기</caption>
+ * import { Engine, EngineConfiguration, Scene, Indicator, Vector2 } from "./build/vanilla.js";
+ *
+ * const indicator = new Indicator();
+ * indicator.setPosition(640, 360);
+ * indicator.setRadius(32);
+ * indicator.setColor("#ffd34dff");
+ * indicator.setSpeed(Math.PI);
+ *
+ * class IndicatorScene extends Scene {
+ * 	tick(timeDelta) {
+ * 		super.tick(timeDelta);
+ * 		indicator.tick(timeDelta);
+ * 	}
+ *
+ * 	draw(graphic) {
+ * 		super.draw(graphic);
+ * 		indicator.draw(graphic);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new IndicatorScene());
+ */
 export class Indicator extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -38,7 +65,7 @@ export class Indicator extends Object {
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta 
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초, 숨겨져 있으면 돌지 않는다)
 	 */
 	tick(timeDelta) {
 		if (!this.getVisible()) {
@@ -53,7 +80,7 @@ export class Indicator extends Object {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽. (숨겨져 있으면 그리지 않는다)
 	 */
 	draw(graphic) {
 		if (!this.getVisible()) {
@@ -91,7 +118,7 @@ export class Indicator extends Object {
 	// 톱니 선분 목록 반환. (회전 전 중심 기준, [시작, 끝] 의 목록)
 	//==============================================================================
 	/**
-	 * @returns { Vector2[][] }
+	 * @returns { Vector2[][] } 톱니 8 개의 [시작, 끝] 선분 목록.
 	 */
 	buildTeethSegments() {
 		const teethCount = 8; // 톱니 개수
@@ -116,8 +143,8 @@ export class Indicator extends Object {
 	//==============================================================================
 	/**
 	 * 인디케이터가 표시될 중심 좌표를 설정합니다.
-	 * @param { number } x 
-	 * @param { number } y 
+	 * @param { number } x 중심 x 좌표.
+	 * @param { number } y 중심 y 좌표.
 	 */
 	setPosition(x, y) {
 		this.#position.set(x, y);
@@ -127,7 +154,7 @@ export class Indicator extends Object {
 	// 위치 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 중심 위치. (복사본이 아니다)
 	 */
 	getPosition() {
 		return this.#position;
@@ -137,7 +164,7 @@ export class Indicator extends Object {
 	// 크기 설정.
 	//==============================================================================
 	/**
-	 * @param { number } radius 
+	 * @param { number } radius 톱니 끝까지의 반지름. (1 보다 작으면 1)
 	 */
 	setRadius(radius) {
 		this.#radius = Math.max(1, radius);
@@ -147,7 +174,7 @@ export class Indicator extends Object {
 	// 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 톱니 끝까지의 반지름.
 	 */
 	getRadius() {
 		return this.#radius;
@@ -167,7 +194,7 @@ export class Indicator extends Object {
 	// 회전 속도 설정.
 	//==============================================================================
 	/**
-	 * @param { number } speedRadiansPerSecond 
+	 * @param { number } speedRadiansPerSecond 회전 속도. (라디안/초, 음수면 반대로 돈다)
 	 */
 	setSpeed(speedRadiansPerSecond) {
 		this.#speed = speedRadiansPerSecond;
@@ -177,7 +204,7 @@ export class Indicator extends Object {
 	// 지금 회전 각도 반환. (라디안)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 지금 회전 각도. (라디안)
 	 */
 	getRotation() {
 		return this.#rotation;
@@ -187,7 +214,7 @@ export class Indicator extends Object {
 	// 출력 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } isVisible 
+	 * @param { boolean } isVisible 보이면 참. (거짓이면 tick 과 draw 가 아무것도 하지 않는다)
 	 */
 	setVisible(isVisible) {
 		this.#isVisible = isVisible;
@@ -197,7 +224,7 @@ export class Indicator extends Object {
 	// 출력 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 보이면 참.
 	 */
 	getVisible() {
 		return this.#isVisible;

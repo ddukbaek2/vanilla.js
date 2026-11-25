@@ -13,6 +13,23 @@ import { Vector2 } from "../base/vector2.js";
 /**
  * 게임 월드를 비추는 카메라 클래스입니다.
  * 위치, 줌, 회전 기능을 제공하며 렌더링 컨텍스트에 변환을 적용합니다.
+ * @example <caption>캔버스 그리기에 카메라 변환 씌우기</caption>
+ * import { Camera, Vector2 } from "./build/vanilla.js";
+ *
+ * const canvas = document.createElement("canvas");
+ * canvas.width = 320;
+ * canvas.height = 180;
+ * const canvasRenderingContext = canvas.getContext("2d");
+ * const camera = new Camera();
+ * const position = Vector2.create(40, 20);
+ * camera.setPosition(position);
+ * camera.setZoom(2);
+ * camera.setRotation(15);
+ * camera.begin(canvasRenderingContext);
+ * canvasRenderingContext.fillStyle = "#ff8800";
+ * canvasRenderingContext.fillRect(40, 20, 16, 16);
+ * camera.end(canvasRenderingContext);
+ * console.log(camera.getZoom(), camera.getRotation());
  */
 export class Camera extends Object {
 	//==============================================================================
@@ -36,7 +53,7 @@ export class Camera extends Object {
 	// 시작.
 	//==============================================================================
 	/**
-	 * @param { CanvasRenderingContext2D } canvasRenderingContext 
+	 * @param { CanvasRenderingContext2D } canvasRenderingContext 변환을 걸 2D 컨텍스트. (save 한 뒤 줌, 회전, 위치 차례로 건다. 없으면 아무것도 하지 않는다)
 	 */
 	begin(canvasRenderingContext) {
 		if (canvasRenderingContext) {
@@ -57,7 +74,7 @@ export class Camera extends Object {
 	// 종료.
 	//==============================================================================
 	/**
-	 * @param { CanvasRenderingContext2D } canvasRenderingContext 
+	 * @param { CanvasRenderingContext2D } canvasRenderingContext begin 에 넘긴 2D 컨텍스트. (restore 한다. 없으면 아무것도 하지 않는다)
 	 */
 	end(canvasRenderingContext) {
 		if (canvasRenderingContext) {
@@ -69,7 +86,7 @@ export class Camera extends Object {
 	// 이동 설정.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } position
+	 * @param { Vector2 } position 화면 왼쪽 위에 올 월드 위치. (픽셀, 복사하지 않고 그대로 쥔다)
 	 */
 	setPosition(position) {
 		this.#position = position;
@@ -79,7 +96,7 @@ export class Camera extends Object {
 	// 이동 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 카메라 위치. (복사본이 아니다)
 	 */
 	getPosition() {
 		return this.#position;
@@ -89,7 +106,7 @@ export class Camera extends Object {
 	// 줌 설정.
 	//==============================================================================
 	/**
-	 * @param { number } zoom 
+	 * @param { number } zoom 확대 배율. (1 이 원래 크기, 0.001 보다 작으면 0.001)
 	 */
 	setZoom(zoom) {
 		this.#zoom = Math.max(0.001, zoom);
@@ -99,7 +116,7 @@ export class Camera extends Object {
 	// 줌 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 확대 배율.
 	 */
 	getZoom() {
 		return this.#zoom;
@@ -109,7 +126,7 @@ export class Camera extends Object {
 	// 회전 설정.
 	//==============================================================================
 	/**
-	 * @param { number } rotation 
+	 * @param { number } rotation 회전 각도. (도)
 	 */
 	setRotation(rotation) {
 		this.#rotation = rotation;
@@ -119,7 +136,7 @@ export class Camera extends Object {
 	// 회전 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 회전 각도. (도)
 	 */
 	getRotation() {
 		return this.#rotation;
