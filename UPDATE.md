@@ -295,6 +295,11 @@
   - tools/apidoc.cjs: 위 자료를 뽑는다. (node 내장 모듈만 쓰는 작은 토크나이저, --missing 은 표에 없는 ko 글, --check 는 꼴 검사와 수 세기) 쓰는 법은 tools/TOOLS.md
   - docs/guide/<판>/ko, en: 개요, 빠른 시작, 구조, 도구. (README, ARCHITECTURE, tools/TOOLS.md, NODE.md 에서 나눔, 저장소 상대 링크는 GitHub 주소로) docs/update/<판>.ko.md, .en.md: 이 판의 업데이트 기록
   - README: UI Editor 가 저장하는 파일은 .uiasset.json 이다. (.ui.json 이라 적혀 있었다) tools/excel.cjs 는 명령줄 진입점이 없는 함수 모음이라 혼자 실행하면 아무것도 하지 않고, tools/table.cjs 는 빈 파일이라고 바로 적었다. 명령줄 도구 표에 apidoc.cjs 를 더했다
+  - 공개 API 주석과 예제: 공개 API 의 빈 ko 설명(모듈 요약, 멤버, 매개변수, 반환, 열거 값)과 빈 매개변수 꼴을 채우고, 값을 돌려주는데 @returns 가 없던 함수에 @returns 를, 머리 주석이 없던 비공개 함수에 머리 주석을 달았다. 설명은 코드를 읽고 실제 동작(단위, 범위, 기본값, null 일 때)대로 적었다. 모든 클래스와 클래스 없는 모듈에 @example 예제를 넣고, 쓰는 법이 이름만으로 뻔하지 않은 멤버에도 넣었다. (자료의 examples 칸, 314 개) 새 글의 영어는 번역 표에 더했다. 툰 3D 폴더(experimental/graphics/toon), visual.js, uilistview.js, uiscrollbar.js 는 따로 고치는 중이라 이번에 채우지 않았다
+  - tools/apidoc.cjs: --gaps(문서 빈 곳을 파일마다), --check-examples(API 예제와 가이드 코드 칸을 문법, 엔진 이름, node 워커, 헤드리스 크롬으로 돌려 검사, 외부 의존 없음), --missing, --gaps, --check-examples 의 --only, --exclude 거르개. 필드의 returns 는 값의 꼴만 담는 칸이라 ko 빈 칸으로 세지 않는다. 설명 앞의 하이픈은 "이름 - 설명" 꼴일 때만 뗀다. ("-1 이면" 이 "1 이면" 으로 읽히던 것)
+  - docs/guide/<판>/ko, en: 주제별 장 15 개를 더했다. 05 프로젝트 시작, 06 엔진과 씬, 07 노드와 컴포넌트, 08 그리기, 09 입력, 10 애셋 불러오기, 11 소리, 12 UI, 13 트윈과 애니메이션과 타임라인, 14 파티클, 15 3D, 16 저장, 17 언어, 18 개발자 도구, 19 저작 도구. (파일 이름 앞 두 자리 숫자가 차례, 장마다 도는 예제가 있고 모두 예제 검사에 걸린다)
+  - 고친 파일의 주석에서 긴 줄표와 가운뎃점을 쉼표로 바꿨다. (셰이더 문자열, 오류 글 같은 코드 안의 것은 그대로)
+  - examples/assets/beep.wav: 소리 예제에 쓰는 0.15 초 삑 소리. (스크립트로 지은 PCM)
 - Wait.nextFrame: 만든 Promise 를 기다리지 않아 바로 끝나던 것을 고쳤다. 이제 다음 requestAnimationFrame 까지 기다린다. (러스트 판 wait::next_frame 과 같다)
 - ToonScreenOutline: 화면 공간 바깥선을 실시간 툰 렌더링의 정석 꼴로 다시 지었다. (게임 하나에 맞춘 꼴이 아니라 엔진의 기준이다)
   - 잡기: 선의 판(노멀, 선 번호, 깊이)에서 화소와 바로 이웃 넷 사이의 경계마다 한 번 보고, 선은 그 경계 가운데에 세운다. (Saito, Takahashi 1990 의 G 버퍼 가장자리, 유니티 셰이더 그래프 예제의 이웃 넷 보기) 지금까지는 꺾임 선을 가운데 화소에서 creaseRadius 떨어진 한 점의 노멀로 보아, 꺾임 양쪽이 띠로 서고 반 크기 판을 키우면 점선과 평행한 둘째 선이 서고, 둥근 면의 실루엣 안쪽에 띠가 한 겹 더 섰다

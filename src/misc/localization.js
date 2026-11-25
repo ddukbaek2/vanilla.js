@@ -31,6 +31,18 @@ const JOINED_PLACEHOLDER_PATTERN = /\{[a-zA-Z0-9]+\}(?:\s*\/\s*\{[a-zA-Z0-9]+\})
 // - 오른쪽에서 왼쪽으로 쓰는 언어(isRightToLeft, setRightToLeft)면 배치를 뒤집고(mirrorLayoutX, readLayoutTextAlign),
 //   글 사이에 넣는 값을 방향 격리 문자로 묶는다. (isolateText, textNamed 의 "{이름}" 자리, 빗금으로만 이은 값들은 통째로 한 번 묶는다)
 //==============================================================================
+/**
+ * @example <caption>번역 표를 넣고 언어를 골라 글 얻기</caption>
+ * import { Localization } from "./build/vanilla.js";
+ *
+ * Localization.setTable("en", { "greeting": "Hello", "score": "Got {0} points", "restart": "Restart in {seconds}" });
+ * Localization.setTable("fr", { "greeting": "Bonjour", "score": "{0} points obtenus" });
+ * Localization.setFallbackLanguage("en");
+ * const languageCode = Localization.selectLanguage(["fr-CA", "en-US"], ["en", "fr"], "en");
+ * Localization.setLanguage(languageCode);
+ * console.log(languageCode, Localization.text("greeting"), Localization.text("score", 120));
+ * console.log(Localization.textNamed("restart", { seconds: 3 }));
+ */
 export class Localization extends Object {
 	/** @private @type { Map } */ static #tableByLanguage = new System.Map();
 	/** @private @type { string } */ static #languageCode = "ko";
@@ -44,9 +56,9 @@ export class Localization extends Object {
 	//   "zh-TW" 같은 지역 표기는 "zh-tw" → "zh" 순으로 대조한다.
 	//==============================================================================
 	/**
-	 * @param { string[] } supportedLanguageCodes
-	 * @param { string } defaultLanguageCode
-	 * @returns { string }
+	 * @param { string[] } supportedLanguageCodes 지원하는 언어 코드 목록. (대소문자는 가리지 않는다)
+	 * @param { string } defaultLanguageCode 맞는 것이 없을 때 돌려줄 코드.
+	 * @returns { string } 고른 언어 코드. (찾았으면 소문자, 없으면 기본 코드 그대로)
 	 */
 	static detectLanguage(supportedLanguageCodes, defaultLanguageCode = "ko") {
 		const navigatorObject = System.navigator;
@@ -70,10 +82,16 @@ export class Localization extends Object {
 	// - 태그의 뒤 조각부터 하나씩 떼며 지원 목록의 코드와 별칭을 본다. ("zh-Hant-TW" → "zh-hant-tw", "zh-hant", "zh", 밑줄은 하이픈으로)
 	//==============================================================================
 	/**
-	 * @param { string[] } candidateList
-	 * @param { string[] } supportedLanguageCodes
-	 * @param { string } defaultLanguageCode
-	 * @returns { string }
+	 * @param { string[] } candidateList 선호 차례의 언어 태그 목록. (navigator.languages 꼴)
+	 * @param { string[] } supportedLanguageCodes 지원하는 언어 코드 목록. (대소문자는 가리지 않는다)
+	 * @param { string } defaultLanguageCode 맞는 것이 없을 때 돌려줄 코드.
+	 * @returns { string } 고른 언어 코드. (찾았으면 소문자, 없으면 기본 코드 그대로)
+	 * @example <caption>별칭으로 지역 태그 맞추기</caption>
+	 * import { Localization } from "./build/vanilla.js";
+	 *
+	 * Localization.setLanguageAliases("zh-hant", ["zh-tw", "zh-hk"]);
+	 * const languageCode = Localization.selectLanguage(["zh-TW", "en-US"], ["en", "zh-hant"], "en");
+	 * console.log(languageCode);
 	 */
 	static selectLanguage(candidateList, supportedLanguageCodes, defaultLanguageCode = "ko") {
 		const supportedSet = new System.Set(supportedLanguageCodes.map((code) => code.toLowerCase()));
@@ -99,8 +117,8 @@ export class Localization extends Object {
 	// 언어의 별칭 설정. (정적, 예: "zh-hant" 에 "zh-tw", "zh-hk", 태그를 맞출 때 별칭도 그 언어로 본다)
 	//==============================================================================
 	/**
-	 * @param { string } languageCode
-	 * @param { string[] } aliasList
+	 * @param { string } languageCode 별칭이 가리킬 언어 코드.
+	 * @param { string[] } aliasList 별칭 태그 목록. (소문자로 바꾸고 밑줄은 하이픈으로 바꾼다)
 	 */
 	static setLanguageAliases(languageCode, aliasList) {
 		const loweredLanguageCode = languageCode.toLowerCase();
@@ -114,8 +132,8 @@ export class Localization extends Object {
 	// 오른쪽에서 왼쪽으로 쓰는 언어로 정하거나 풀기. (정적, 처음은 ar, fa, he, ur, ps, yi, dv)
 	//==============================================================================
 	/**
-	 * @param { string } languageCode
-	 * @param { boolean } isRightToLeft
+	 * @param { string } languageCode 언어 코드나 태그. (첫 조각만 쓴다)
+	 * @param { boolean } isRightToLeft 오른쪽에서 왼쪽으로 쓰면 참. (거짓이면 목록에서 뺀다)
 	 */
 	static setRightToLeft(languageCode, isRightToLeft) {
 		const primaryCode = languageCode.toLowerCase().split("_").join("-").split("-")[0];
@@ -131,7 +149,7 @@ export class Localization extends Object {
 	// 지금 언어가 오른쪽에서 왼쪽으로 쓰는 언어인지. (정적, 글자를 그 방향으로 굽고 배치를 좌우로 뒤집을 때)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 지금 언어의 첫 조각이 오른쪽에서 왼쪽 목록에 있으면 참.
 	 */
 	static isRightToLeft() {
 		const languageCode = Localization.getLanguage();
@@ -147,7 +165,7 @@ export class Localization extends Object {
 	 * @param { number } x 왼쪽에서 오른쪽 언어일 때의 왼쪽.
 	 * @param { number } width 놓을 것의 너비.
 	 * @param { number } parentWidth 부모의 너비.
-	 * @returns { number }
+	 * @returns { number } 지금 언어 방향에 맞춘 왼쪽.
 	 */
 	static mirrorLayoutX(x, width, parentWidth) {
 		if (!Localization.isRightToLeft()) {
@@ -161,7 +179,7 @@ export class Localization extends Object {
 	//==============================================================================
 	/**
 	 * @param { string } textAlign TextAlign 의 값.
-	 * @returns { string }
+	 * @returns { string } 지금 언어 방향에 맞춘 정렬 값.
 	 */
 	static readLayoutTextAlign(textAlign) {
 		if (!Localization.isRightToLeft()) {
@@ -181,8 +199,8 @@ export class Localization extends Object {
 	// - 숫자와 단위(123°/s, +60%)나 사람 이름이 앞뒤 글과 섞여 흩어지지 않고 제 방향으로 한 덩어리로 놓이게 한다.
 	//==============================================================================
 	/**
-	 * @param { string } text
-	 * @returns { string }
+	 * @param { string } text 묶을 값의 글.
+	 * @returns { string } 오른쪽에서 왼쪽 언어면 방향 격리 문자로 묶은 글, 아니면 그대로. (빈 글은 그대로)
 	 */
 	static isolateText(text) {
 		if (text === "" || !Localization.isRightToLeft()) {
@@ -198,9 +216,17 @@ export class Localization extends Object {
 	// - 이름이 없는 자리는 그대로 둔다.
 	//==============================================================================
 	/**
-	 * @param { string } key
+	 * @param { string } key 번역 키. (원문)
 	 * @param { object } values 자리 이름 → 값.
-	 * @returns { string }
+	 * @returns { string } 자리를 채운 번역문.
+	 * @example <caption>오른쪽에서 왼쪽 언어에서 값 묶기</caption>
+	 * import { Localization } from "./build/vanilla.js";
+	 *
+	 * Localization.setTable("ar", { "progress": "{count}/{limit}" });
+	 * Localization.setLanguage("ar");
+	 * const progressText = Localization.textNamed("progress", { count: 1, limit: 40 });
+	 * console.log(Localization.isRightToLeft(), progressText.length);
+	 * Localization.setLanguage("en");
 	 */
 	static textNamed(key, values) {
 		const text = Localization.text(key);
@@ -224,7 +250,7 @@ export class Localization extends Object {
 	// 번역 테이블 설정. (정적)
 	//==============================================================================
 	/**
-	 * @param { string } languageCode
+	 * @param { string } languageCode 언어 코드. (소문자로 바꿔 둔다)
 	 * @param { object } table 키(원문) → 번역문. 값은 문자열 또는 문자열 배열.
 	 */
 	static setTable(languageCode, table) {
@@ -235,8 +261,8 @@ export class Localization extends Object {
 	// JSON 객체로 번역 표 설정. (정적, JsonAsset 으로 읽은 data 같은 것, 값이 글이면 글, 글 배열이면 글만 모은 목록, 그 밖의 값은 건너뛴다)
 	//==============================================================================
 	/**
-	 * @param { string } languageCode
-	 * @param { object } tableJson
+	 * @param { string } languageCode 언어 코드. (소문자로 바꿔 둔다)
+	 * @param { object } tableJson 키 → 글 또는 글 배열인 JSON 객체. (객체가 아니면 빈 표)
 	 */
 	static setTableFromJson(languageCode, tableJson) {
 		const table = {};
@@ -258,7 +284,7 @@ export class Localization extends Object {
 	// 현재 언어 설정. (정적)
 	//==============================================================================
 	/**
-	 * @param { string } languageCode
+	 * @param { string } languageCode 언어 코드. (소문자로 바꿔 둔다)
 	 */
 	static setLanguage(languageCode) {
 		Localization.#languageCode = languageCode.toLowerCase();
@@ -268,17 +294,17 @@ export class Localization extends Object {
 	// 현재 언어 반환. (정적)
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 지금 언어 코드. (소문자, 처음은 "ko")
 	 */
 	static getLanguage() {
 		return Localization.#languageCode;
 	}
 
 	//==============================================================================
-	// 폴백 언어 설정. (정적 — 현재 언어 표에 없으면 이 언어 표를 본다)
+	// 폴백 언어 설정. (정적, 현재 언어 표에 없으면 이 언어 표를 본다)
 	//==============================================================================
 	/**
-	 * @param { string } languageCode
+	 * @param { string } languageCode 폴백 언어 코드. (소문자로 바꿔 둔다, 처음은 "ko")
 	 */
 	static setFallbackLanguage(languageCode) {
 		Localization.#fallbackLanguageCode = languageCode.toLowerCase();
@@ -290,9 +316,9 @@ export class Localization extends Object {
 	// - {0} {1} … 자리 표시자를 인자로 치환한다.
 	//==============================================================================
 	/**
-	 * @param { string } key
-	 * @param { ...* } substitutions
-	 * @returns { string }
+	 * @param { string } key 번역 키. (원문)
+	 * @param { ...* } substitutions {0}, {1} 자리에 차례로 넣을 값. (String 으로 바꾼다)
+	 * @returns { string } 번역문. 표에 없으면 키 원문에 자리만 채운 글.
 	 */
 	static text(key, ...substitutions) {
 		let resolvedText = Localization.lookup(key);
@@ -306,11 +332,11 @@ export class Localization extends Object {
 	}
 
 	//==============================================================================
-	// 배열형 번역 조회. (정적 — 대사 목록처럼 여러 줄인 항목)
+	// 배열형 번역 조회. (정적, 대사 목록처럼 여러 줄인 항목)
 	//==============================================================================
 	/**
-	 * @param { string } key
-	 * @returns { string[] }
+	 * @param { string } key 번역 키. (원문)
+	 * @returns { string[] } 번역문 목록. (글 하나면 그것만 담은 배열, 없으면 [키])
 	 */
 	static textList(key) {
 		const resolvedValue = Localization.lookup(key);
@@ -327,8 +353,8 @@ export class Localization extends Object {
 	// 원시 조회. (정적)
 	//==============================================================================
 	/**
-	 * @param { string } key
-	 * @returns { string | string[] | undefined }
+	 * @param { string } key 번역 키. (원문)
+	 * @returns { string | string[] | undefined } 현재 언어 표, 폴백 언어 표 차례로 찾은 값. 없으면 undefined.
 	 */
 	static lookup(key) {
 		const currentTable = Localization.#tableByLanguage.get(Localization.#languageCode);
@@ -343,7 +369,7 @@ export class Localization extends Object {
 	}
 
 	//==============================================================================
-	// 모든 테이블 비우기. (정적 — 테스트용)
+	// 모든 테이블 비우기. (정적, 테스트용)
 	//==============================================================================
 	static clear() {
 		Localization.#tableByLanguage.clear();

@@ -9,6 +9,17 @@ import * as Math from "../base/math.js";
 //==============================================================================
 // 색상.
 //==============================================================================
+/**
+ * @example <caption>문자열로 만들고 섞어 문자열로 내기</caption>
+ * import { Color } from "./build/vanilla.js";
+ *
+ * const red = Color.createFromHEX("#ff0000");
+ * const blue = Color.createFromRGBA("rgba(0, 0, 255, 0.5)");
+ * const purple = Color.lerp(red, blue, 0.5);
+ * console.log(purple.toHEXString(), purple.toRGBAString());
+ * const faded = red.withAlpha(0.25);
+ * console.log(faded.toRGBAString());
+ */
 export class Color extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -23,10 +34,10 @@ export class Color extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { number } red
-	 * @param { number } green
-	 * @param { number } blue
-	 * @param { number } alpha
+	 * @param { number } red 빨강. (0 ~ 1, 기본 1, 범위 밖은 자른다)
+	 * @param { number } green 초록. (0 ~ 1, 기본 1, 범위 밖은 자른다)
+	 * @param { number } blue 파랑. (0 ~ 1, 기본 1, 범위 밖은 자른다)
+	 * @param { number } alpha 알파. (0 ~ 1, 기본 1, 범위 밖은 자른다)
 	 */
 	constructor(red = 1.0, green = 1.0, blue = 1.0, alpha = 1.0) {
 		super();
@@ -52,7 +63,7 @@ export class Color extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } 빨강. (0 ~ 1)
 	 */
 	get red() {
 		return this.#red;
@@ -74,7 +85,7 @@ export class Color extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } 파랑. (0 ~ 1)
 	 */
 	get blue() {
 		return this.#blue;
@@ -96,7 +107,7 @@ export class Color extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } 초록. (0 ~ 1)
 	 */
 	get green() {
 		return this.#green;
@@ -118,7 +129,7 @@ export class Color extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } 알파. (0 ~ 1)
 	 */
 	get alpha() {
 		return this.#alpha;
@@ -129,7 +140,7 @@ export class Color extends Object {
 	// - rgba(255, 255, 255, 1.0)
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } "rgb(r, g, b)", 알파가 1 보다 작으면 "rgba(r, g, b, a)". (r, g, b 는 0 ~ 255 정수)
 	 */
 	toRGBAString() {
 		const red = Math.round(this.red * 255);
@@ -150,7 +161,7 @@ export class Color extends Object {
 	// - #ffffffff
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } "#rrggbb", 알파가 1 보다 작으면 "#rrggbbaa".
 	 */
 	toHEXString() {
 		const red = Math.round(this.red * 255).toString(16).padStart(2, "0");
@@ -169,7 +180,7 @@ export class Color extends Object {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { this }
+	 * @returns { this } 성분이 같은 새 색.
 	 */
 	clone() {
 		// 프로토타입을 훑는 Reflection.clone 을 거치지 않고 rgba 를 바로 옮긴다. (setFillColor 처럼 그릴 때마다 부르는 곳이 있다)
@@ -185,7 +196,7 @@ export class Color extends Object {
 	// 하얀색 생성.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } (1, 1, 1, 1) 새 색.
 	 */
 	static white() {
 		const color = new Color(1, 1, 1, 1);
@@ -196,7 +207,7 @@ export class Color extends Object {
 	// 검은색 생성.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } (0, 0, 0, 1) 새 색.
 	 */
 	static black() {
 		const color = new Color(0, 0, 0, 1);
@@ -207,7 +218,7 @@ export class Color extends Object {
 	// 투명색 생성.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } (0, 0, 0, 0) 새 색.
 	 */
 	static transparent() {
 		const color = new Color(0, 0, 0, 0);
@@ -233,9 +244,18 @@ export class Color extends Object {
 	// - fromCache 처럼 오래 안 쓴 것부터 버린다. (1024 개까지)
 	//==============================================================================
 	/**
-	 * @param { string } colorString
-	 * @param { number } alpha
-	 * @returns { Color }
+	 * @param { string } colorString HEX 색 문자열. (createFromHEX 와 같은 꼴)
+	 * @param { number } alpha 알파. (0 ~ 1, 기본 1, 문자열에 든 알파 대신 쓴다)
+	 * @returns { Color } 캐시에 든 공유 색. (고쳐 쓰지 않는다)
+	 * @example <caption>그릴 때마다 같은 색을 캐시에서 받기</caption>
+	 * import { Color } from "./build/vanilla.js";
+	 *
+	 * const first = Color.fromHEXCached("#336699", 0.5);
+	 * const second = Color.fromHEXCached("#336699", 0.5);
+	 * console.log(first === second);
+	 * const editable = first.clone();
+	 * editable.red = 1;
+	 * console.log(first.toHEXString(), editable.toHEXString());
 	 */
 	static fromHEXCached(colorString, alpha = 1) {
 		const quantizedAlpha = System.Math.round(alpha * 100) / 100;
@@ -266,8 +286,8 @@ export class Color extends Object {
 	// - 오래 안 쓴 것부터 버린다. (1024 개까지)
 	//==============================================================================
 	/**
-	 * @param { string } colorString
-	 * @returns { Color }
+	 * @param { string } colorString 색 문자열.
+	 * @returns { Color } 캐시에 든 공유 색. (고쳐 쓰지 않는다)
 	 */
 	static fromCache(colorString) {
 		const colorCache = Color.#stringCache;
@@ -299,7 +319,7 @@ export class Color extends Object {
 	// 색 문자열 캐시(fromCache)에 든 수. (정적, 시험과 통계용)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } fromCache 캐시에 든 색 수. (1024 개까지)
 	 */
 	static getCachedColorCount() {
 		return Color.#stringCache.size;
@@ -307,6 +327,13 @@ export class Color extends Object {
 
 	/** @private @type { Map<string, Color> } */ static #stringCache = new System.Map();
 
+	//==============================================================================
+	// HEX 문자열로 생성. (정적, "#rgb", "#rgba", "#rrggbb", "#rrggbbaa", "#" 로 시작하지 않으면 흰색)
+	//==============================================================================
+	/**
+	 * @param { string } colorString HEX 색 문자열. (앞뒤 공백과 대소문자는 가리지 않는다)
+	 * @returns { Color } 새 색. (알파가 없는 꼴이면 알파 1)
+	 */
 	static createFromHEX(colorString) {
 		const color = new Color(1.0, 1.0, 1.0, 1.0);
 		colorString = colorString.trim().toLowerCase();
@@ -333,11 +360,11 @@ export class Color extends Object {
 	// 0 ~ 255 정수 성분으로 생성.
 	//==============================================================================
 	/**
-	 * @param { number } red
-	 * @param { number } green
-	 * @param { number } blue
-	 * @param { number } alpha
-	 * @returns { Color }
+	 * @param { number } red 빨강. (0 ~ 255)
+	 * @param { number } green 초록. (0 ~ 255)
+	 * @param { number } blue 파랑. (0 ~ 255)
+	 * @param { number } alpha 알파. (0 ~ 255)
+	 * @returns { Color } 새 색.
 	 */
 	static createFromBytes(red, green, blue, alpha) {
 		const color = new Color(red / 255, green / 255, blue / 255, alpha / 255);
@@ -348,8 +375,8 @@ export class Color extends Object {
 	// 알파만 바꾼 색. (새 색을 돌려주고 이 색은 그대로 둔다)
 	//==============================================================================
 	/**
-	 * @param { number } alpha
-	 * @returns { Color }
+	 * @param { number } alpha 새 알파. (0 ~ 1)
+	 * @returns { Color } 빨강, 초록, 파랑은 같고 알파만 바꾼 새 색.
 	 */
 	withAlpha(alpha) {
 		const red = this.red;
@@ -363,10 +390,10 @@ export class Color extends Object {
 	// 선형 보간. (정적, 성분마다)
 	//==============================================================================
 	/**
-	 * @param { Color } from
-	 * @param { Color } to
-	 * @param { number } time
-	 * @returns { Color }
+	 * @param { Color } from 시작 색.
+	 * @param { Color } to 끝 색.
+	 * @param { number } time 0 이면 from, 1 이면 to.
+	 * @returns { Color } 성분마다 보간한 새 색. (성분은 0 ~ 1 로 자른다)
 	 */
 	static lerp(from, to, time) {
 		const red = Math.lerp(from.red, to.red, time);
@@ -381,7 +408,7 @@ export class Color extends Object {
 	// 랜덤 색상 생성. (알파값은 1)
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 빨강, 초록, 파랑이 0 ~ 1 난수이고 알파가 1 인 새 색.
 	 */
 	static random() {
 		const color = new Color(Math.random(), Math.random(), Math.random(), 1);
@@ -394,8 +421,8 @@ export class Color extends Object {
     // - rgba(255, 255, 255, 1.0)
     //==============================================================================
     /**
-     * @param { string } colorString 
-     * @returns { Color }
+     * @param { string } colorString "rgb(r, g, b)" 나 "rgba(r, g, b, a)" 문자열. (r, g, b 는 0 ~ 255 정수, a 는 0 ~ 1)
+     * @returns { Color } 새 색. (꼴이 맞지 않으면 흰색)
      */
     static createFromRGBA(colorString) {
         const color = new Color(1.0, 1.0, 1.0, 1.0);

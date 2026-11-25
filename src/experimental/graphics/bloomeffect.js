@@ -50,6 +50,57 @@ void main() {
 // - render() 결과 텍스처를 최종 합성 패스에서 가산하는 방식으로 사용한다.
 // - 주고받는 판은 기본 RGBA8 이라 1 을 넘는 밝은 값이 잘린다. setUseFloatColor(true) 면 RGBA16F 로 지어 HDR 값을 그대로 흐린다.
 //==============================================================================
+/**
+ * @example <caption>씬 텍스처에서 블룸을 뽑아 화면에 더하기</caption>
+ * import { BloomEffect, RenderTarget, FullscreenPass } from "./build/vanilla.js";
+ *
+ * const width = 320;
+ * const height = 180;
+ * const canvas = document.createElement("canvas");
+ * canvas.width = width;
+ * canvas.height = height;
+ * document.body.appendChild(canvas);
+ * const webGL2RenderingContext = canvas.getContext("webgl2");
+ * const sceneRenderTarget = new RenderTarget(webGL2RenderingContext, width, height, true);
+ * sceneRenderTarget.bind();
+ * webGL2RenderingContext.clearColor(1.0, 0.9, 0.6, 1.0);
+ * webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+ *
+ * const bloomEffect = new BloomEffect(webGL2RenderingContext);
+ * bloomEffect.resize(width, height);
+ * bloomEffect.setThreshold(0.6, 0.9);
+ * bloomEffect.setIterationCount(3);
+ * const sceneColorTexture = sceneRenderTarget.getColorTexture();
+ * bloomEffect.render(sceneColorTexture);
+ * const bloomTexture = bloomEffect.getResultTexture();
+ *
+ * const compositeShaderSource = `#version 300 es
+ * precision highp float;
+ * in vec2 fragmentTextureCoordinate;
+ * uniform sampler2D sceneTexture;
+ * uniform sampler2D bloomTexture;
+ * out vec4 outputColor;
+ * void main() {
+ * 	vec3 sceneColor = texture(sceneTexture, fragmentTextureCoordinate).rgb;
+ * 	vec3 bloomColor = texture(bloomTexture, fragmentTextureCoordinate).rgb;
+ * 	outputColor = vec4(sceneColor + bloomColor * 0.8, 1.0);
+ * }
+ * `;
+ * const compositePass = new FullscreenPass(webGL2RenderingContext, compositeShaderSource);
+ * webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
+ * webGL2RenderingContext.viewport(0, 0, width, height);
+ * compositePass.use();
+ * const sceneTextureLocation = compositePass.getUniformLocation("sceneTexture");
+ * const bloomTextureLocation = compositePass.getUniformLocation("bloomTexture");
+ * webGL2RenderingContext.uniform1i(sceneTextureLocation, 0);
+ * webGL2RenderingContext.uniform1i(bloomTextureLocation, 1);
+ * webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+ * webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, sceneColorTexture);
+ * webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
+ * webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, bloomTexture);
+ * compositePass.draw();
+ * webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+ */
 export class BloomEffect extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -68,7 +119,7 @@ export class BloomEffect extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
 	 */
 	constructor(webGL2RenderingContext) {
 		super();
@@ -84,11 +135,11 @@ export class BloomEffect extends Object {
 	}
 
 	//==============================================================================
-	// 크기 변경. (씬 해상도 기준 — 내부는 하프 해상도)
+	// 크기 변경. (씬 해상도 기준, 내부는 하프 해상도)
 	//==============================================================================
 	/**
-	 * @param { number } sceneWidth
-	 * @param { number } sceneHeight
+	 * @param { number } sceneWidth 씬 가로 크기. (픽셀, 내부 판은 그 반이고 최소 1)
+	 * @param { number } sceneHeight 씬 세로 크기. (픽셀, 내부 판은 그 반이고 최소 1)
 	 */
 	resize(sceneWidth, sceneHeight) {
 		const halfWidth = System.Math.max(1, sceneWidth >> 1);
@@ -102,7 +153,7 @@ export class BloomEffect extends Object {
 	// - 부수 효과: 깊이/블렌드 비활성, TEXTURE0 활성, 프레임버퍼 바인드가 변경된다.
 	//==============================================================================
 	/**
-	 * @param { WebGLTexture } sceneColorTexture
+	 * @param { WebGLTexture } sceneColorTexture 밝은 영역을 뽑을 씬 컬러 텍스처.
 	 */
 	render(sceneColorTexture) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -153,7 +204,7 @@ export class BloomEffect extends Object {
 	// 결과 텍스처 반환. (render() 이후)
 	//==============================================================================
 	/**
-	 * @returns { WebGLTexture | null }
+	 * @returns { WebGLTexture | null } 흐린 결과 텍스처. (핑 판의 컬러 텍스처)
 	 */
 	getResultTexture() {
 		const pingRenderTarget = this.getPingRenderTarget();
@@ -165,8 +216,8 @@ export class BloomEffect extends Object {
 	// 추출 임계값 설정. (씬 밝기 특성에 맞게 조정)
 	//==============================================================================
 	/**
-	 * @param { number } thresholdStart
-	 * @param { number } thresholdEnd
+	 * @param { number } thresholdStart 이 밝기부터 뽑기 시작한다. (세 채널 가운데 가장 큰 값, 기본 0.5)
+	 * @param { number } thresholdEnd 이 밝기 이상은 그대로 뽑는다. (사이는 smoothstep, 기본 0.95)
 	 */
 	setThreshold(thresholdStart, thresholdEnd) {
 		this.#thresholdStart = thresholdStart;
@@ -177,7 +228,7 @@ export class BloomEffect extends Object {
 	// 블러 반복 횟수 설정.
 	//==============================================================================
 	/**
-	 * @param { number } iterationCount
+	 * @param { number } iterationCount 가로, 세로 블러 한 쌍을 되풀이할 횟수. (기본 2, 0 이면 뽑기만)
 	 */
 	setIterationCount(iterationCount) {
 		this.#iterationCount = iterationCount;
@@ -187,7 +238,7 @@ export class BloomEffect extends Object {
 	// 실수 컬러 설정. (true 면 주고받는 판을 RGBA16F 로 다시 지어 1 을 넘는 밝은 값이 잘리지 않는다, 기본 false 는 RGBA8, 같으면 그대로)
 	//==============================================================================
 	/**
-	 * @param { boolean } useFloatColor
+	 * @param { boolean } useFloatColor 참이면 RGBA16F, 거짓이면 RGBA8.
 	 */
 	setUseFloatColor(useFloatColor) {
 		if (this.getUseFloatColor() === useFloatColor) {
@@ -208,7 +259,7 @@ export class BloomEffect extends Object {
 	// 실수 컬러 사용 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 주고받는 판이 RGBA16F 면 참.
 	 */
 	getUseFloatColor() {
 		const pingRenderTarget = this.getPingRenderTarget();
@@ -219,7 +270,7 @@ export class BloomEffect extends Object {
 	// 블러 반복 횟수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 블러 반복 횟수.
 	 */
 	getIterationCount() {
 		return this.#iterationCount;
@@ -242,7 +293,7 @@ export class BloomEffect extends Object {
 	// 렌더링 컨텍스트 반환.
 	//==============================================================================
 	/**
-	 * @returns { WebGL2RenderingContext }
+	 * @returns { WebGL2RenderingContext } 렌더링 컨텍스트.
 	 */
 	getWebGL2RenderingContext() {
 		return this.#webGL2RenderingContext;
@@ -252,7 +303,7 @@ export class BloomEffect extends Object {
 	// 밝은 영역 추출 패스 반환.
 	//==============================================================================
 	/**
-	 * @returns { FullscreenPass }
+	 * @returns { FullscreenPass } 밝은 영역 추출 패스.
 	 */
 	getBrightPass() {
 		return this.#brightPass;
@@ -262,7 +313,7 @@ export class BloomEffect extends Object {
 	// 블러 패스 반환.
 	//==============================================================================
 	/**
-	 * @returns { FullscreenPass }
+	 * @returns { FullscreenPass } 가우시안 블러 패스.
 	 */
 	getBlurPass() {
 		return this.#blurPass;
@@ -272,7 +323,7 @@ export class BloomEffect extends Object {
 	// 핑 렌더 타겟 반환. (최종 결과 보관)
 	//==============================================================================
 	/**
-	 * @returns { RenderTarget }
+	 * @returns { RenderTarget } 핑 렌더 타겟. (결과를 담는다)
 	 */
 	getPingRenderTarget() {
 		return this.#pingRenderTarget;
@@ -282,7 +333,7 @@ export class BloomEffect extends Object {
 	// 퐁 렌더 타겟 반환.
 	//==============================================================================
 	/**
-	 * @returns { RenderTarget }
+	 * @returns { RenderTarget } 퐁 렌더 타겟. (가로 블러 중간 결과)
 	 */
 	getPongRenderTarget() {
 		return this.#pongRenderTarget;

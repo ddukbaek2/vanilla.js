@@ -23,6 +23,33 @@ import { PopupMotion } from "./popupmotion.js";
 //     scene.getRoot().addChild(dialog);
 //     dialog.show("정말 삭제할까요?", { onConfirm: () => remove(), onCancel: () => {} });
 //==============================================================================
+/**
+ * @example <caption>확인과 취소를 묻는 대화 상자</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIDialog } from "./build/vanilla.js";
+ *
+ * class DialogScene extends UIScene {
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const dialog = new UIDialog({ width: 360, height: 200, confirmText: "Delete", cancelText: "Keep" });
+ * 		const root = this.getRoot();
+ * 		root.addChild(dialog);
+ * 		dialog.show("Delete this save file?", {
+ * 			onConfirm: () => {
+ * 				console.log("deleted");
+ * 			},
+ * 			onCancel: () => {
+ * 				console.log("kept");
+ * 			},
+ * 		});
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new DialogScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class UIDialog extends WorldNode {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -165,7 +192,7 @@ export class UIDialog extends WorldNode {
 	// - onCancel 을 넘기지 않으면 취소 단추를 감추고 확인 단추를 가운데로 넓힌다.
 	//==============================================================================
 	/**
-	 * @param { string } messageText
+	 * @param { string } messageText 본문 글. (카드 너비에 맞춰 줄을 바꾼다)
 	 * @param { object } options { onConfirm?, onCancel?, confirmText?, cancelText? }
 	 */
 	show(messageText, options = {}) {
@@ -203,7 +230,7 @@ export class UIDialog extends WorldNode {
 	// 닫기. (isConfirmed 에 따라 확인 / 취소 처리를 부른다)
 	//==============================================================================
 	/**
-	 * @param { boolean } isConfirmed
+	 * @param { boolean } isConfirmed 참이면 onConfirm, 거짓이면 onCancel 을 부른다. (다 열리기 전이면 아무것도 하지 않는다)
 	 */
 	dismiss(isConfirmed) {
 		if (!this.#popupMotion.isInteractive()) {
@@ -222,7 +249,7 @@ export class UIDialog extends WorldNode {
 	// 다음 tick 에 닫기. (tick 밖에서 닫기를 미룰 때)
 	//==============================================================================
 	/**
-	 * @param { boolean } isConfirmed
+	 * @param { boolean } isConfirmed 참이면 확인, 거짓이면 취소로 닫는다.
 	 */
 	requestDismiss(isConfirmed) {
 		this.#pendingDismiss = isConfirmed;
@@ -233,7 +260,7 @@ export class UIDialog extends WorldNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
@@ -285,7 +312,7 @@ export class UIDialog extends WorldNode {
 	// 표시 중 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 닫힘 상태가 아니면 참. (여는 중, 닫는 중도 참)
 	 */
 	isShowing() {
 		return this.#popupMotion.isVisible();
@@ -295,7 +322,7 @@ export class UIDialog extends WorldNode {
 	// 즉시 전환 여부 설정. (연출 없는 UI 톤)
 	//==============================================================================
 	/**
-	 * @param { boolean } isInstantEnabled
+	 * @param { boolean } isInstantEnabled 참이면 연출 없이 바로 열고 닫는다.
 	 */
 	setInstantEnabled(isInstantEnabled) {
 		this.#popupMotion.setInstantEnabled(isInstantEnabled);

@@ -34,6 +34,44 @@ const MOVE_DOWN_KEYS = ["KeyS", "ArrowDown"];
 //     readGamepadKind() → GamepadKind 의 값. (없어도 된다, 이 입력원이 입력을 넣은 프레임에 마지막 장치를 게임패드와 그 종류로 적는다)
 // - 글자 입력칸에 쓰는 동안은 키를 듣지 않는다. (setKeysIgnoredWhileTyping 으로 끈다)
 //==============================================================================
+/**
+ * @example <caption>동작에 키, 단추, 축 묶고 읽기</caption>
+ * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	initialize(engine) {
+ * 		const inputManager = engine.getInputManager();
+ * 		const inputActions = inputManager.getInputActions();
+ * 		inputActions.bindKey("confirm", "Enter");
+ * 		inputActions.bindKey("confirm", "Space");
+ * 		inputActions.bindGamepadButton("confirm", 0);
+ * 		inputActions.bindKey("down", "ArrowDown");
+ * 		inputActions.bindAxis("down", 1, 1);
+ * 		inputActions.setRepeat("down", 0.4, 0.1);
+ * 	}
+ *
+ * 	tick(timeDelta) {
+ * 		super.tick(timeDelta);
+ * 		const engine = this.getEngine();
+ * 		const inputManager = engine.getInputManager();
+ * 		const inputActions = inputManager.getInputActions();
+ * 		if (inputActions.isJustPressed("confirm")) {
+ * 			console.log("confirm");
+ * 		}
+ * 		if (inputActions.isJustPressed("down")) {
+ * 			console.log("next item");
+ * 		}
+ * 		const moveAxis = inputActions.readMoveAxis();
+ * 		if (moveAxis.x !== 0 || moveAxis.y !== 0) {
+ * 			console.log(moveAxis.x, moveAxis.y);
+ * 		}
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class InputActions extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -74,8 +112,8 @@ export class InputActions extends Object {
 	// 동작의 상태 칸 반환. (없으면 만든다)
 	//==============================================================================
 	/**
-	 * @param { string } action
-	 * @returns { object }
+	 * @param { string } action 동작 이름. (게임이 정한 글)
+	 * @returns { object } 동작의 상태. { isPressed, wasPressed, value, repeatSeconds, isRepeatFired }
 	 */
 	createActionState(action) {
 		let state = this.#states.get(action);
@@ -90,8 +128,8 @@ export class InputActions extends Object {
 	// 키 묶기. (KeyboardEvent.code, KeyCode 의 값)
 	//==============================================================================
 	/**
-	 * @param { string } action
-	 * @param { string } key
+	 * @param { string } action 동작 이름. (게임이 정한 글)
+	 * @param { string } key 묶을 키 코드. (KeyboardEvent.code, 같은 키는 한 번만)
 	 */
 	bindKey(action, key) {
 		this.createActionState(action);
@@ -106,8 +144,8 @@ export class InputActions extends Object {
 	// 게임패드 단추 묶기. (GamepadButtonCode, 연결된 패드 모두)
 	//==============================================================================
 	/**
-	 * @param { string } action
-	 * @param { number } buttonCode
+	 * @param { string } action 동작 이름. (게임이 정한 글)
+	 * @param { number } buttonCode 묶을 단추 번호. (W3C 표준 매핑, 0 이 A 나 크로스 단추)
 	 */
 	bindGamepadButton(action, buttonCode) {
 		this.createActionState(action);
@@ -123,9 +161,9 @@ export class InputActions extends Object {
 	// - 그쪽으로 setAxisPressThreshold 만큼 기울면 눌린 것이고, 값(readValue)은 죽은 구역을 뺀 기울기다.
 	//==============================================================================
 	/**
-	 * @param { string } action
-	 * @param { number } axisIndex
-	 * @param { number } direction
+	 * @param { string } action 동작 이름. (게임이 정한 글)
+	 * @param { number } axisIndex 축 번호. (0 왼쪽 가로, 1 왼쪽 세로, 2 오른쪽 가로, 3 오른쪽 세로)
+	 * @param { number } direction 묶을 쪽. (0 이상이면 + 쪽, 음수면 - 쪽)
 	 */
 	bindAxis(action, axisIndex, direction) {
 		this.createActionState(action);
@@ -144,7 +182,7 @@ export class InputActions extends Object {
 	// 동작에 묶은 것 모두 풀기. (키 바꾸기 화면에서 다시 묶기 전에, 반복 설정은 남는다)
 	//==============================================================================
 	/**
-	 * @param { string } action
+	 * @param { string } action 동작 이름. (게임이 정한 글)
 	 */
 	unbindAction(action) {
 		this.#keyBindings.delete(action);
@@ -156,8 +194,8 @@ export class InputActions extends Object {
 	// 동작에 묶은 키 목록 반환. (사본, 단추 안내를 그릴 때)
 	//==============================================================================
 	/**
-	 * @param { string } action
-	 * @returns { string[] }
+	 * @param { string } action 동작 이름. (게임이 정한 글)
+	 * @returns { string[] } 묶은 키 코드 목록의 사본. (없으면 빈 배열)
 	 */
 	getBoundKeys(action) {
 		const keys = this.#keyBindings.get(action) || [];
@@ -168,9 +206,9 @@ export class InputActions extends Object {
 	// 누르고 있으면 반복 설정. (기다리는 초 뒤부터 간격 초마다 isJustPressed 가 참, 간격이 0 이하면 반복을 끈다)
 	//==============================================================================
 	/**
-	 * @param { string } action
-	 * @param { number } delaySeconds
-	 * @param { number } intervalSeconds
+	 * @param { string } action 동작 이름. (게임이 정한 글)
+	 * @param { number } delaySeconds 첫 반복까지 기다리는 시간. (초, 음수는 0)
+	 * @param { number } intervalSeconds 반복 간격. (초, 0 이하면 반복을 끈다)
 	 */
 	setRepeat(action, delaySeconds, intervalSeconds) {
 		this.createActionState(action);
@@ -185,7 +223,7 @@ export class InputActions extends Object {
 	// 죽은 구역 설정. (0 ~ 1 미만, 처음은 0.2)
 	//==============================================================================
 	/**
-	 * @param { number } deadZone
+	 * @param { number } deadZone 죽은 구역. (0 ~ 0.99 로 자른다)
 	 */
 	setDeadZone(deadZone) {
 		this.#deadZone = System.Math.min(0.99, System.Math.max(0, deadZone));
@@ -195,7 +233,7 @@ export class InputActions extends Object {
 	// 죽은 구역 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 죽은 구역. (0 ~ 0.99)
 	 */
 	getDeadZone() {
 		return this.#deadZone;
@@ -205,7 +243,7 @@ export class InputActions extends Object {
 	// 축에 묶은 동작을 눌린 것으로 보는 기울기 설정. (0 ~ 1, 처음은 0.5)
 	//==============================================================================
 	/**
-	 * @param { number } axisPressThreshold
+	 * @param { number } axisPressThreshold 눌린 것으로 보는 기울기. (0 ~ 1 로 자른다)
 	 */
 	setAxisPressThreshold(axisPressThreshold) {
 		this.#axisPressThreshold = System.Math.min(1, System.Math.max(0, axisPressThreshold));
@@ -215,7 +253,7 @@ export class InputActions extends Object {
 	// 축에 묶은 동작을 눌린 것으로 보는 기울기 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 눌린 것으로 보는 기울기. (0 ~ 1)
 	 */
 	getAxisPressThreshold() {
 		return this.#axisPressThreshold;
@@ -225,7 +263,7 @@ export class InputActions extends Object {
 	// 글자 입력칸에 쓰는 동안 키를 듣지 않을지 설정. (처음은 참)
 	//==============================================================================
 	/**
-	 * @param { boolean } isIgnored
+	 * @param { boolean } isIgnored 참이면 글자 입력칸에 쓰는 동안 키를 듣지 않는다.
 	 */
 	setKeysIgnoredWhileTyping(isIgnored) {
 		this.#isKeysIgnoredWhileTyping = isIgnored;
@@ -235,7 +273,7 @@ export class InputActions extends Object {
 	// 글자 입력칸에 쓰는 동안 키를 듣지 않는지 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 글자 입력칸에 쓰는 동안 키를 듣지 않으면 참.
 	 */
 	isKeysIgnoredWhileTyping() {
 		return this.#isKeysIgnoredWhileTyping;
@@ -246,6 +284,35 @@ export class InputActions extends Object {
 	//==============================================================================
 	/**
 	 * @param { object } source { readActionValue(action), readMoveAxis(), readGamepadKind() }
+	 * @example <caption>바깥 입력원 끼우기</caption>
+	 * import { Engine, EngineConfiguration, GamepadKind } from "./build/vanilla.js";
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * const inputManager = engine.getInputManager();
+	 * const inputActions = inputManager.getInputActions();
+	 * inputActions.bindKey("confirm", "Enter");
+	 * const platformSource = {
+	 * 	readActionValue(action) {
+	 * 		if (action === "confirm") {
+	 * 			return 1;
+	 * 		}
+	 * 		return 0;
+	 * 	},
+	 * 	readMoveAxis() {
+	 * 		return { x: 0.5, y: 0 };
+	 * 	},
+	 * 	readGamepadKind() {
+	 * 		return GamepadKind.xbox;
+	 * 	},
+	 * };
+	 * inputActions.addSource(platformSource);
+	 * inputActions.update(inputManager, 0);
+	 * const moveAxis = inputActions.readMoveAxis();
+	 * const isConfirmPressed = inputActions.isPressed("confirm");
+	 * const lastInputDevice = inputManager.getLastInputDevice();
+	 * console.log(isConfirmPressed, moveAxis.x, lastInputDevice);
+	 * inputActions.removeSource(platformSource);
 	 */
 	addSource(source) {
 		if (source === null || source === undefined || this.#sources.includes(source)) {
@@ -258,7 +325,7 @@ export class InputActions extends Object {
 	// 바깥 입력원 빼기.
 	//==============================================================================
 	/**
-	 * @param { object } source
+	 * @param { object } source 더했던 입력원. (없으면 아무것도 하지 않는다)
 	 */
 	removeSource(source) {
 		const sourceIndex = this.#sources.indexOf(source);
@@ -272,7 +339,7 @@ export class InputActions extends Object {
 	//==============================================================================
 	/**
 	 * @param { object } inputManager InputManager
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	update(inputManager, timeDelta) {
 		this.#inputManager = inputManager;
@@ -413,8 +480,8 @@ export class InputActions extends Object {
 	// 동작이 눌려 있는지.
 	//==============================================================================
 	/**
-	 * @param { string } action
-	 * @returns { boolean }
+	 * @param { string } action 동작 이름. (게임이 정한 글)
+	 * @returns { boolean } 눌려 있으면 참. (없는 동작이면 거짓)
 	 */
 	isPressed(action) {
 		const state = this.#states.get(action);
@@ -425,8 +492,8 @@ export class InputActions extends Object {
 	// 이번 프레임에 눌렸는지. (setRepeat 를 건 동작은 반복 때도 참)
 	//==============================================================================
 	/**
-	 * @param { string } action
-	 * @returns { boolean }
+	 * @param { string } action 동작 이름. (게임이 정한 글)
+	 * @returns { boolean } 이번 프레임에 눌렸거나 반복이 왔으면 참.
 	 */
 	isJustPressed(action) {
 		const state = this.#states.get(action);
@@ -440,8 +507,8 @@ export class InputActions extends Object {
 	// 이번 프레임에 떼어졌는지.
 	//==============================================================================
 	/**
-	 * @param { string } action
-	 * @returns { boolean }
+	 * @param { string } action 동작 이름. (게임이 정한 글)
+	 * @returns { boolean } 이번 프레임에 떼어졌으면 참.
 	 */
 	isJustReleased(action) {
 		const state = this.#states.get(action);
@@ -452,8 +519,8 @@ export class InputActions extends Object {
 	// 동작의 값. (0 ~ 1, 키와 디지털 단추는 1, 트리거와 축은 기운 만큼)
 	//==============================================================================
 	/**
-	 * @param { string } action
-	 * @returns { number }
+	 * @param { string } action 동작 이름. (게임이 정한 글)
+	 * @returns { number } 동작의 값. (0 ~ 1, 없는 동작이면 0)
 	 */
 	readValue(action) {
 		const state = this.#states.get(action);
@@ -464,9 +531,9 @@ export class InputActions extends Object {
 	// 두 동작으로 만든 축. (-1 ~ 1, 양쪽 동작의 값의 차)
 	//==============================================================================
 	/**
-	 * @param { string } negativeAction
-	 * @param { string } positiveAction
-	 * @returns { number }
+	 * @param { string } negativeAction 음수 쪽 동작 이름. (값을 뺀다)
+	 * @param { string } positiveAction 양수 쪽 동작 이름. (값을 더한다)
+	 * @returns { number } 양수 쪽 값에서 음수 쪽 값을 뺀 축 값. (-1 ~ 1)
 	 */
 	readAxis(negativeAction, positiveAction) {
 		const negativeValue = this.readValue(negativeAction);
@@ -480,7 +547,7 @@ export class InputActions extends Object {
 	/**
 	 * @param { number } xAxisIndex GamepadAnalogStickCode
 	 * @param { number } yAxisIndex GamepadAnalogStickCode
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 스틱 벡터. (길이 0 ~ 1, 오른쪽 +x 아래 +y, update 전이면 (0, 0))
 	 */
 	readGamepadStick(xAxisIndex, yAxisIndex) {
 		const inputManager = this.#inputManager;
@@ -509,7 +576,7 @@ export class InputActions extends Object {
 	// - 키는 대각선도 길이 1 이다. 글자 입력칸에 쓰는 동안은 키를 듣지 않는다.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 이동 벡터. (길이 0 ~ 1, 오른쪽 +x 아래 +y, update 전이면 (0, 0))
 	 */
 	readMoveAxis() {
 		const inputManager = this.#inputManager;
@@ -549,8 +616,8 @@ export class InputActions extends Object {
 	// 죽은 구역 빼기. (죽은 구역 이하면 0, 나머지를 0 ~ 1 로 다시 펴서 조금 기울였을 때 튀지 않게)
 	//==============================================================================
 	/**
-	 * @param { number } value
-	 * @returns { number }
+	 * @param { number } value 거를 값. (0 이상의 길이나 한쪽 기울기)
+	 * @returns { number } 죽은 구역을 뺀 값. (0 ~ 1)
 	 */
 	applyDeadZone(value) {
 		if (!System.Number.isFinite(value) || value <= this.#deadZone) {
@@ -564,9 +631,9 @@ export class InputActions extends Object {
 	// 길이 1 로 자르기.
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @returns { Vector2 }
+	 * @param { number } x X 성분. (유한한 수가 아니면 0)
+	 * @param { number } y Y 성분. (유한한 수가 아니면 0)
+	 * @returns { Vector2 } 길이가 1 이하인 새 벡터.
 	 */
 	clampLength(x, y) {
 		const vectorX = System.Number.isFinite(x) ? x : 0;

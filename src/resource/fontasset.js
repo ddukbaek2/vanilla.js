@@ -7,13 +7,21 @@ import { Asset, AssetType } from "../core/asset.js";
 //==============================================================================
 // 폰트 애셋.
 //==============================================================================
+/**
+ * @example <caption>글꼴 파일을 읽어 글꼴 목록에 올리기</caption>
+ * import { FontAsset } from "./build/vanilla.js";
+ *
+ * const fontAsset = new FontAsset();
+ * await fontAsset.loadFont("DOSGothic", "examples/assets/DOSGothic.woff", { weight: "normal", style: "normal" });
+ * console.log(fontAsset.family, fontAsset.isLoaded(), document.fonts.check("16px DOSGothic"));
+ */
 export class FontAsset extends Asset
 {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { string } */ family = "";
-	/** @type { FontFace } */ fontFace = null;
+	/** @type { string } */ family = ""; // 등록한 글꼴 패밀리 이름. (읽기 전에는 빈 글)
+	/** @type { FontFace } */ fontFace = null; // 등록한 FontFace. (읽기 전이나 언로드 뒤에는 null)
 
 	//==============================================================================
 	// 생성.
@@ -30,7 +38,8 @@ export class FontAsset extends Asset
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { string } assetPath 
+	 * @param { string } assetPath 글꼴 파일 경로. (경로만 정하고 글꼴은 읽지 않는다, 글꼴은 loadFont 로 읽는다)
+	 * @returns { Promise<void> } 경로를 정하면 풀리는 프로미스.
 	 */
 	async load(assetPath) {
 		await super.load(assetPath);
@@ -46,9 +55,10 @@ export class FontAsset extends Asset
 	// 비동기 애셋 로드.
 	//==============================================================================
 	/**
-	 * @param { string } family
-	 * @param { string } assetPath
+	 * @param { string } family 등록할 글꼴 패밀리 이름. (CSS font-family 로 쓴다)
+	 * @param { string } assetPath 글꼴 파일 경로.
 	 * @param { object } descriptors FontFace 서술자. (weight, style, stretch, unicodeRange, display 등)
+	 * @returns { Promise<void> } 글꼴을 읽어 document.fonts 에 올리면 풀리는 프로미스. (이미 읽었으면 바로 풀린다, 읽지 못하면 거부된다)
 	 */
 	async loadFont(family, assetPath, descriptors) {
 
@@ -76,9 +86,17 @@ export class FontAsset extends Asset
 	// 이미 가진 글꼴 바이트로 읽기. (ttf, otf, woff, woff2, 다 읽히면 document.fonts 에 family 이름으로 오른다)
 	//==============================================================================
 	/**
-	 * @param { string } family
+	 * @param { string } family 등록할 글꼴 패밀리 이름. (CSS font-family 로 쓴다)
 	 * @param { ArrayBuffer | ArrayBufferView } bytes 글꼴 파일의 바이트. (넘긴 것은 바뀌지 않는다)
 	 * @param { object } descriptors FontFace 서술자. (weight, style 등, 없으면 생략)
+	 * @example <caption>받아 둔 바이트로 글꼴 올리기</caption>
+	 * import { FontAsset } from "./build/vanilla.js";
+	 *
+	 * const response = await fetch("examples/assets/DOSGothic.woff");
+	 * const bytes = await response.arrayBuffer();
+	 * const fontAsset = new FontAsset();
+	 * await fontAsset.loadFontFromBytes("DOSGothicBytes", bytes);
+	 * console.log(fontAsset.family, fontAsset.isLoaded());
 	 */
 	async loadFontFromBytes(family, bytes, descriptors) {
 		if (this.fontFace) {

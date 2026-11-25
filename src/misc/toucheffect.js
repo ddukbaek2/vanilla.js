@@ -43,15 +43,30 @@ function getParticleGradientCanvas() {
 //==============================================================================
 // 터치 입자.
 //==============================================================================
+/**
+ * @example <caption>입자 하나의 수명과 자리를 한 걸음 줄이고 옮기기</caption>
+ * import { TouchParticle, Vector2 } from "./build/vanilla.js";
+ *
+ * const touchParticle = new TouchParticle();
+ * touchParticle.position = Vector2.create(100, 100);
+ * touchParticle.velocity = Vector2.create(30, -60);
+ * touchParticle.radius = 20;
+ * const timeDelta = 0.1;
+ * touchParticle.life -= timeDelta * 2.5;
+ * const step = touchParticle.velocity.multiply(timeDelta);
+ * touchParticle.position = touchParticle.position.add(step);
+ * const opacity = touchParticle.life / touchParticle.maxLife;
+ * console.log(opacity, touchParticle.position.x, touchParticle.position.y);
+ */
 export class TouchParticle extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { Vector2 } */ position;
-	/** @type { Vector2 } */ velocity;
-	/** @type { number } */ life;
-	/** @type { number } */ maxLife;
-	/** @type { number } */ radius;
+	/** @type { Vector2 } */ position; // 자리. (픽셀, TouchEffect 노드 기준)
+	/** @type { Vector2 } */ velocity; // 속도. (픽셀 / 초)
+	/** @type { number } */ life; // 남은 수명. (1 에서 시작해 초당 2.5 씩 줄고 0 이하면 지운다)
+	/** @type { number } */ maxLife; // 처음 수명. (불투명도는 life / maxLife)
+	/** @type { number } */ radius; // 반지름. (픽셀)
 
 	//==============================================================================
 	// 생성.
@@ -73,6 +88,34 @@ export class TouchParticle extends Object {
 //==============================================================================
 // 터치 효과.
 //==============================================================================
+/**
+ * @example <caption>누른 자리에 빛 입자 뿌리기</caption>
+ * import { Engine, EngineConfiguration, Scene, TouchEffect } from "./build/vanilla.js";
+ *
+ * const touchEffect = new TouchEffect();
+ *
+ * class MainScene extends Scene {
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const root = this.getRoot();
+ * 		root.addChild(touchEffect);
+ * 		for (let index = 0; index < 8; ++index) {
+ * 			touchEffect.createTouchParticle(320, 180);
+ * 		}
+ * 	}
+ *
+ * 	touchPress(viewInputPosition) {
+ * 		super.touchPress(viewInputPosition);
+ * 		for (let index = 0; index < 8; ++index) {
+ * 			touchEffect.createTouchParticle(viewInputPosition.x, viewInputPosition.y);
+ * 		}
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class TouchEffect extends WorldNode {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -97,7 +140,7 @@ export class TouchEffect extends WorldNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta 
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
@@ -109,7 +152,7 @@ export class TouchEffect extends WorldNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	pushTransform(graphic) {
 		super.pushTransform(graphic);
@@ -125,7 +168,7 @@ export class TouchEffect extends WorldNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	draw(graphic) {
 		super.draw(graphic);
@@ -137,7 +180,7 @@ export class TouchEffect extends WorldNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	popTransform(graphic) {
 		if (graphic) {
@@ -151,6 +194,10 @@ export class TouchEffect extends WorldNode {
 	//==============================================================================
 	// 터치 파티클 생성.
 	//==============================================================================
+	/**
+	 * @param { number } x 입자를 낼 X. (이 노드 기준 좌표, 10 픽셀 안에서 흔든다)
+	 * @param { number } y 입자를 낼 Y. (이 노드 기준 좌표, 10 픽셀 안에서 흔든다)
+	 */
 	createTouchParticle(x, y) {
 		const particle = new TouchParticle();
 		particle.position = Vector2.create(x + (Math.random() - 0.5) * 10, y + (Math.random() - 0.5) * 10);
@@ -165,7 +212,7 @@ export class TouchEffect extends WorldNode {
 	// 터치 파티클 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta 
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	updateTouchParticles(timeDelta) {
 		for (let i = this.#touchParticles.length - 1; i >= 0; --i) {
@@ -183,7 +230,7 @@ export class TouchEffect extends WorldNode {
 	// 터치 파티클 출력.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	drawTouchParticles(graphic) {
 		if (this.#touchParticles.length === 0) {

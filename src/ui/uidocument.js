@@ -143,7 +143,7 @@ function arrayToColor(values) {
 }
 
 //==============================================================================
-// 텍스트 속성 저장. (UILabel / Text 공용 — 같은 표현을 공유한다)
+// 텍스트 속성 저장. (UILabel / Text 공용, 같은 표현을 공유한다)
 //==============================================================================
 /**
  * @param { * } component
@@ -434,7 +434,7 @@ const COMPONENT_PROPERTY_TABLE = {
 	},
 };
 
-// 이미지 경로 해석기. (런타임이 등록한다 — 미등록이면 이미지 없이 복원)
+// 이미지 경로 해석기. (런타임이 등록한다, 미등록이면 이미지 없이 복원)
 let imageResolver = null;
 
 
@@ -445,12 +445,58 @@ let imageResolver = null;
 //   따라서 문서에는 위젯만 기록하고, 사용자가 content 안에 넣은 자식은
 //   contentChildren 으로 따로 보존한다. (스크롤뷰의 목록 항목 등)
 //==============================================================================
+/**
+ * @example <caption>UI Editor 가 저장한 uiasset 불러와 단추 잇기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIDocument, UIButton } from "./build/vanilla.js";
+ *
+ * class DocumentScene extends UIScene {
+ * 	async loadAssets() {
+ * 		await super.loadAssets();
+ * 		const response = await fetch("examples/uisample/assets/title.uiasset.json");
+ * 		const jsonText = await response.text();
+ * 		const documentRootNode = UIDocument.fromJsonText(jsonText);
+ * 		const root = this.getRoot();
+ * 		root.addChild(documentRootNode);
+ * 		const startButtonNode = UIDocument.findNodeByPath(documentRootNode, "/Panel/StartButton");
+ * 		const startButton = startButtonNode.getComponent(UIButton);
+ * 		startButton.setClickedEvent(() => {
+ * 			console.log("start");
+ * 		});
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new DocumentScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class UIDocument extends Object {
 	//==============================================================================
-	// 이미지 경로 해석기 등록. (정적 — 경로 → HTMLImageElement)
+	// 이미지 경로 해석기 등록. (정적, 경로 → HTMLImageElement)
 	//==============================================================================
 	/**
-	 * @param { function(string): HTMLImageElement | null } resolver
+	 * @param { function(string): HTMLImageElement | null } resolver 문서의 이미지 경로를 받아 그림을 돌려주는 함수. (복원할 때 부르므로 fromJsonText 앞에 건다, null 을 돌려주면 그림 없이 복원)
+	 * @example <caption>미리 받은 그림으로 이미지 경로 잇기</caption>
+	 * import { UIDocument, Sprite } from "./build/vanilla.js";
+	 *
+	 * const imagePath = "examples/assets/spritesheet.png";
+	 * const image = new Image();
+	 * image.src = imagePath;
+	 * await image.decode();
+	 * const imageTable = new Map([[imagePath, image]]);
+	 * UIDocument.setImageResolver((path) => {
+	 * 	const foundImage = imageTable.get(path);
+	 * 	return foundImage !== undefined ? foundImage : null;
+	 * });
+	 * const documentData = {
+	 * 	version: 1,
+	 * 	root: { type: "WorldNode", name: "Root", contentSize: [128, 128], components: [{ type: "Sprite", imagePath: imagePath }], children: [] },
+	 * };
+	 * const jsonText = JSON.stringify(documentData);
+	 * const rootNode = UIDocument.fromJsonText(jsonText);
+	 * const sprite = rootNode.getComponent(Sprite);
+	 * console.log(sprite.imagePath);
 	 */
 	static setImageResolver(resolver) {
 		imageResolver = resolver;
@@ -460,8 +506,8 @@ export class UIDocument extends Object {
 	// 이미지 경로 해석. (정적)
 	//==============================================================================
 	/**
-	 * @param { string } imagePath
-	 * @returns { HTMLImageElement | null }
+	 * @param { string } imagePath 문서에 적힌 이미지 경로.
+	 * @returns { HTMLImageElement | null } 해석기가 돌려준 그림. (해석기가 없으면 null)
 	 */
 	static resolveImage(imagePath) {
 		if (!imageResolver) {
@@ -472,11 +518,11 @@ export class UIDocument extends Object {
 	}
 
 	//==============================================================================
-	// 노드 트리 → 문서 데이터. (정적 — 재귀)
+	// 노드 트리 → 문서 데이터. (정적, 재귀)
 	//==============================================================================
 	/**
-	 * @param { WorldNode } node
-	 * @returns { object }
+	 * @param { WorldNode } node 적을 노드. (자식까지)
+	 * @returns { object } 노드 데이터. ({ type, name, active, position, scale, rotation, opacity, pivot, anchor, contentSize, interactable, components, children, contentChildren? })
 	 */
 	static serializeNode(node) {
 		const pivot = node.getPivot();
@@ -542,11 +588,11 @@ export class UIDocument extends Object {
 	}
 
 	//==============================================================================
-	// 위젯이 생성한 컴포넌트 타입 수집. (정적 — UIView 계열의 require 목록)
+	// 위젯이 생성한 컴포넌트 타입 수집. (정적, UIView 계열의 require 목록)
 	//==============================================================================
 	/**
-	 * @param { object[] } componentList
-	 * @returns { Set<string> }
+	 * @param { object[] } componentList 한 노드의 컴포넌트 목록.
+	 * @returns { Set<string> } UIView 계열이 require 로 함께 붙이는 컴포넌트의 클래스 이름 모음.
 	 */
 	static collectGeneratedComponentTypes(componentList) {
 		const generatedTypeSet = new System.Set();
@@ -566,11 +612,11 @@ export class UIDocument extends Object {
 	}
 
 	//==============================================================================
-	// 문서 데이터 → 노드 트리. (정적 — 재귀)
+	// 문서 데이터 → 노드 트리. (정적, 재귀)
 	//==============================================================================
 	/**
-	 * @param { object } nodeData
-	 * @returns { WorldNode }
+	 * @param { object } nodeData serializeNode 꼴의 노드 데이터. (모르는 노드 종류는 WorldNode 로 만들고, 모르는 컴포넌트는 건너뛴다)
+	 * @returns { WorldNode } 만든 노드. (노드 참조는 아직 잇지 않는다)
 	 */
 	static deserializeNode(nodeData) {
 		const nodeType = NODE_TYPE_TABLE[nodeData.type] || WorldNode;
@@ -647,9 +693,33 @@ export class UIDocument extends Object {
 	// 노드 트리 → JSON 문자열. (정적)
 	//==============================================================================
 	/**
-	 * @param { WorldNode } rootNode
-	 * @param { boolean } isPretty
-	 * @returns { string }
+	 * @param { WorldNode } rootNode 문서의 뿌리 노드. (노드 참조 경로의 기준)
+	 * @param { boolean } isPretty 참이면 탭으로 들여 쓴다. (기본 참)
+	 * @returns { string } { version, root } 꼴의 JSON 글.
+	 * @example <caption>노드 트리를 글로 적고 되살리기</caption>
+	 * import { UIDocument, UILabel, WorldNode, Paint, Color, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const rootNode = new WorldNode();
+	 * rootNode.setName("Root");
+	 * const panelNode = new WorldNode();
+	 * panelNode.setName("Panel");
+	 * panelNode.setContentSize(Vector2.create(300, 200));
+	 * const panelPaint = panelNode.addComponent(Paint);
+	 * panelPaint.setColor(new Color(0.1, 0.12, 0.16, 1));
+	 * rootNode.addChild(panelNode);
+	 * const titleNode = new WorldNode();
+	 * titleNode.setName("Title");
+	 * const titleLabel = titleNode.addComponent(UILabel);
+	 * titleLabel.setText("Hello");
+	 * panelNode.addChild(titleNode);
+	 *
+	 * const jsonText = UIDocument.toJsonText(rootNode, false);
+	 * const restoredRootNode = UIDocument.fromJsonText(jsonText);
+	 * const restoredTitleNode = UIDocument.findNodeByPath(restoredRootNode, "/Panel/Title");
+	 * const restoredTitleLabel = restoredTitleNode.getComponent(UILabel);
+	 * const restoredText = restoredTitleLabel.getText();
+	 * const restoredPath = UIDocument.findNodePath(restoredRootNode, restoredTitleNode);
+	 * console.log(restoredText, restoredPath);
 	 */
 	static toJsonText(rootNode, isPretty = true) {
 		// 노드 참조를 절대 경로로 적기 위해 기준 뿌리를 잡아 둔다.
@@ -667,8 +737,8 @@ export class UIDocument extends Object {
 	// JSON 문자열 → 노드 트리. (정적)
 	//==============================================================================
 	/**
-	 * @param { string } jsonText
-	 * @returns { WorldNode }
+	 * @param { string } jsonText { version, root } 꼴의 JSON 글. (root 가 없으면 예외를 던진다)
+	 * @returns { WorldNode } 되살린 뿌리 노드. (노드 참조까지 이은 것)
 	 */
 	static fromJsonText(jsonText) {
 		const documentData = System.JSON.parse(jsonText);
@@ -690,10 +760,10 @@ export class UIDocument extends Object {
 	}
 
 	//==============================================================================
-	// 지원 컴포넌트 타입 이름 목록 반환. (정적 — 편집 도구의 컴포넌트 추가 메뉴용)
+	// 지원 컴포넌트 타입 이름 목록 반환. (정적, 편집 도구의 컴포넌트 추가 메뉴용)
 	//==============================================================================
 	/**
-	 * @returns { string[] }
+	 * @returns { string[] } 문서가 다루는 컴포넌트 이름 목록. (registerComponentType 으로 더한 것 포함)
 	 */
 	static getComponentTypeNames() {
 		const typeNames = System.Object.keys(COMPONENT_TYPE_TABLE);
@@ -704,7 +774,7 @@ export class UIDocument extends Object {
 	// 컴포넌트의 편집할 수 있는 속성 목록. (짝이 맞는 get 또는 is 와 set, 에디터의 인스펙터가 쓴다)
 	//==============================================================================
 	/**
-	 * @param { * } component
+	 * @param { * } component 볼 컴포넌트.
 	 * @returns { Array<object> } { name, getterName, setterName } 의 배열.
 	 */
 	static getReflectedProperties(component) {
@@ -715,8 +785,8 @@ export class UIDocument extends Object {
 	// 컴포넌트 타입 이름으로 생성자 반환. (정적)
 	//==============================================================================
 	/**
-	 * @param { string } typeName
-	 * @returns { * }
+	 * @param { string } typeName 문서에 적힌 컴포넌트 이름.
+	 * @returns { * } 컴포넌트 클래스. (없으면 undefined)
 	 */
 	static getComponentType(typeName) {
 		const componentType = COMPONENT_TYPE_TABLE[typeName];
@@ -727,8 +797,8 @@ export class UIDocument extends Object {
 	// 노드를 가리키는 속성만 따로 적는다.
 	//==============================================================================
 	/**
-	 * @param { Component } component
-	 * @param { object } componentData
+	 * @param { Component } component 적을 컴포넌트.
+	 * @param { object } componentData 덧붙일 컴포넌트 데이터. (노드를 돌려주는 속성을 { $nodeRef: 경로 } 로 적는다)
 	 */
 	static saveNodeReferences(component, componentData) {
 		for (const property of collectReflectedProperties(component)) {
@@ -753,8 +823,8 @@ export class UIDocument extends Object {
 	// 노드를 가리키는 속성만 따로 잇는다.
 	//==============================================================================
 	/**
-	 * @param { Component } component
-	 * @param { object } componentData
+	 * @param { Component } component 되살릴 컴포넌트.
+	 * @param { object } componentData 컴포넌트 데이터. ({ $nodeRef } 값을 찾아 트리를 다 만든 뒤 이을 목록에 넣는다)
 	 */
 	static loadNodeReferences(component, componentData) {
 		for (const propertyName of System.Object.keys(componentData)) {
@@ -778,9 +848,9 @@ export class UIDocument extends Object {
 	// UI 뿌리 기준 절대 경로 계산. (노드 참조를 문서에 적을 때 쓴다)
 	//==============================================================================
 	/**
-	 * @param { WorldNode } rootNode
-	 * @param { WorldNode } node
-	 * @returns { string | null }
+	 * @param { WorldNode } rootNode 기준 뿌리 노드. (경로에 넣지 않는다)
+	 * @param { WorldNode } node 경로를 구할 노드.
+	 * @returns { string | null } /Panel/Title 꼴의 경로. (뿌리 자신이면 /, 뿌리 아래가 아니면 null)
 	 */
 	static findNodePath(rootNode, node) {
 		if (!rootNode || !node) {
@@ -802,9 +872,9 @@ export class UIDocument extends Object {
 	// UI 뿌리 기준 절대 경로로 노드 찾기.
 	//==============================================================================
 	/**
-	 * @param { WorldNode } rootNode
-	 * @param { string } pathText
-	 * @returns { WorldNode | null }
+	 * @param { WorldNode } rootNode 기준 뿌리 노드.
+	 * @param { string } pathText /Panel/Title 꼴의 경로. (앞의 / 는 없어도 된다, 이름이 같은 형제가 있으면 앞의 것)
+	 * @returns { WorldNode | null } 찾은 노드. (빈 경로면 뿌리, 없으면 null)
 	 */
 	static findNodeByPath(rootNode, pathText) {
 		if (!rootNode || typeof pathText !== "string") {
@@ -835,7 +905,7 @@ export class UIDocument extends Object {
 	// 경로 계산 기준이 되는 뿌리 반환.
 	//==============================================================================
 	/**
-	 * @returns { WorldNode }
+	 * @returns { WorldNode } toJsonText 가 적고 있는 뿌리. (그 밖에는 null)
 	 */
 	static getSerializeRootNode() {
 		return deserializeRootNode;
@@ -846,8 +916,8 @@ export class UIDocument extends Object {
 	// - 엔진에 노드가 늘어나면 등록만으로 문서가 그 종류를 다룬다.
 	//==============================================================================
 	/**
-	 * @param { string } typeName
-	 * @param { * } nodeType
+	 * @param { string } typeName 문서에 적힐 이름. (적을 때 constructor.name 을 쓰므로 클래스 이름과 같게 준다)
+	 * @param { * } nodeType 노드 클래스. (인자 없이 new 한다)
 	 */
 	static registerNodeType(typeName, nodeType) {
 		NODE_TYPE_TABLE[typeName] = nodeType;
@@ -857,8 +927,36 @@ export class UIDocument extends Object {
 	// 컴포넌트 종류 등록.
 	//==============================================================================
 	/**
-	 * @param { string } typeName
-	 * @param { * } componentType
+	 * @param { string } typeName 문서에 적힐 이름. (적을 때 constructor.name 을 쓰므로 클래스 이름과 같게 준다)
+	 * @param { * } componentType 컴포넌트 클래스. (전용 입출력이 없으므로 짝이 맞는 get, set 속성으로 적고 되살린다)
+	 * @example <caption>게임의 컴포넌트를 문서에 담기</caption>
+	 * import { UIDocument, Component, WorldNode } from "./build/vanilla.js";
+	 *
+	 * class Blinker extends Component {
+	 * 	#speed = 1;
+	 *
+	 * 	getSpeed() {
+	 * 		return this.#speed;
+	 * 	}
+	 *
+	 * 	setSpeed(speed) {
+	 * 		this.#speed = speed;
+	 * 	}
+	 * }
+	 *
+	 * UIDocument.registerComponentType("Blinker", Blinker);
+	 * const rootNode = new WorldNode();
+	 * const lampNode = new WorldNode();
+	 * lampNode.setName("Lamp");
+	 * const blinker = lampNode.addComponent(Blinker);
+	 * blinker.setSpeed(3);
+	 * rootNode.addChild(lampNode);
+	 * const jsonText = UIDocument.toJsonText(rootNode);
+	 * const restoredRootNode = UIDocument.fromJsonText(jsonText);
+	 * const restoredLampNode = UIDocument.findNodeByPath(restoredRootNode, "/Lamp");
+	 * const restoredBlinker = restoredLampNode.getComponent(Blinker);
+	 * const speed = restoredBlinker.getSpeed();
+	 * console.log(speed);
 	 */
 	static registerComponentType(typeName, componentType) {
 		COMPONENT_TYPE_TABLE[typeName] = componentType;
@@ -869,8 +967,8 @@ export class UIDocument extends Object {
 	// - 전용 핸들러가 없는 컴포넌트에 쓴다. 옮길 수 있는 값만 담는다.
 	//==============================================================================
 	/**
-	 * @param { Component } component
-	 * @returns { object }
+	 * @param { Component } component 적을 컴포넌트.
+	 * @returns { object } 속성 이름과 값. (수, 글, 참거짓은 그대로, Color 와 Vector2 는 배열, 노드는 { $nodeRef })
 	 */
 	static saveByReflection(component) {
 		const componentData = {};
@@ -907,8 +1005,8 @@ export class UIDocument extends Object {
 	//   (saveByReflection 은 Color 만 수 넷 배열로, Vector2 만 수 둘 배열로, 그 밖은 수, 글, 불 그대로 적는다)
 	//==============================================================================
 	/**
-	 * @param { Component } component
-	 * @param { object } componentData
+	 * @param { Component } component 되살릴 컴포넌트.
+	 * @param { object } componentData saveByReflection 꼴의 데이터. (지금 값과 꼴이 같은 것만 넣는다)
 	 */
 	static loadByReflection(component, componentData) {
 		for (const property of collectReflectedProperties(component)) {

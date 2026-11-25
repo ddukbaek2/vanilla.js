@@ -13,10 +13,10 @@ import { ShaderProgram } from "../core/graphic/shaderprogram.js";
 // 셰이더 스프라이트 효과 종류.
 //==============================================================================
 export const ShaderSpriteEffect = {
-	none: "none",
+	none: "none", // 효과 없음. (Sprite 와 같게 그린다)
 	// --- 색 ---
-	flash: "flash",                 // 실루엣을 단색으로 덮음. (피격 섬광 — progress = 세기, color = 덮을 색)
-	silhouette: "silhouette",       // 실루엣 단색. (progress = 세기, color = 색 — 그림자 / 잔상)
+	flash: "flash",                 // 실루엣을 단색으로 덮음. (피격 섬광, progress = 세기, color = 덮을 색)
+	silhouette: "silhouette",       // 실루엣 단색. (progress = 세기, color = 색, 그림자 / 잔상)
 	colorize: "colorize",           // 곱셈 틴트. (progress = 세기, color = 곱할 색)
 	grayscale: "grayscale",         // 무채색. (progress = 세기, color = 틴트)
 	sepia: "sepia",                 // 세피아.
@@ -44,7 +44,7 @@ export const ShaderSpriteEffect = {
 	flag: "flag",                   // 깃발 펄럭임. (parameters = [빈도, 속도, 진폭])
 	ripple: "ripple",               // 중심 파문. (parameters = [빈도, 속도, 진폭])
 	heatHaze: "heatHaze",           // 아지랑이. (parameters = [노이즈 배율, 속도, 진폭])
-	bulge: "bulge",                 // 볼록 / 오목. (parameters = [세기 — 음수면 오목])
+	bulge: "bulge",                 // 볼록 / 오목. (parameters = [세기, 음수면 오목])
 	swirl: "swirl",                 // 소용돌이. (parameters = [회전 수])
 	mirror: "mirror",               // 좌우 대칭. (parameters = [0 가로 / 1 세로])
 	kaleidoscope: "kaleidoscope",   // 만화경. (parameters = [조각 수])
@@ -179,7 +179,7 @@ const DEFAULT_COLOR_TABLE = {
 	checkerWipe: [1, 1, 1, 1],
 };
 
-// 효과별 프래그먼트 본문. (uv / local / textureColor 를 바꾸거나 다시 샘플한다 — 텍스처는 프리멀티플라이드 알파)
+// 효과별 프래그먼트 본문. (uv / local / textureColor 를 바꾸거나 다시 샘플한다, 텍스처는 프리멀티플라이드 알파)
 // - 공용: sampleSprite(uv) / sampleLocal(local) / unpremultiply(color) / luminanceAt(uv) / hash21 / valueNoise.
 const EFFECT_BODY_TABLE = {
 	flash: `
@@ -650,6 +650,37 @@ function resolveEffectProgram(graphic, effect) {
 //     sprite.setEffect(ShaderSpriteEffect.dissolve);
 //     sprite.setEffectProgress(0.5);
 //==============================================================================
+/**
+ * @example <caption>그림을 디졸브로 사라지게 하기</caption>
+ * import { Engine, EngineConfiguration, Scene, WorldNode, ImageAsset, ShaderSprite, ShaderSpriteEffect, Tween, Vector2 } from "./build/vanilla.js";
+ *
+ * const imageAsset = new ImageAsset();
+ * await imageAsset.load("examples/assets/spritesheet.png");
+ *
+ * class MainScene extends Scene {
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const node = new WorldNode();
+ * 		node.setLocalPosition(Vector2.create(320, 180));
+ * 		node.setContentSize(Vector2.create(300, 300));
+ * 		const root = this.getRoot();
+ * 		root.addChild(node);
+ * 		const shaderSprite = node.addComponent(ShaderSprite);
+ * 		shaderSprite.setImage(imageAsset);
+ * 		shaderSprite.setEffect(ShaderSpriteEffect.dissolve);
+ * 		const tween = new Tween({ progress: 0 });
+ * 		tween.to({ progress: 1 }, 0.8);
+ * 		tween.setUpdate((values) => {
+ * 			shaderSprite.setEffectProgress(values.progress);
+ * 		});
+ * 		this.startTween(tween);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class ShaderSprite extends Sprite {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -679,7 +710,7 @@ export class ShaderSprite extends Sprite {
 	// 갱신. (효과 시간 누적)
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 시간. (초, 효과 시간에 더한다)
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
@@ -690,7 +721,7 @@ export class ShaderSprite extends Sprite {
 	// 출력. (효과가 있으면 프로그램을 바꿔 끼우고 Sprite 출력 경로를 그대로 탄다)
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	draw(graphic) {
 		const image = this.getImage();
@@ -732,7 +763,7 @@ export class ShaderSprite extends Sprite {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { boolean }
+	 * @returns { boolean } 뒤집지 않았고 draw 를 덮어쓰지 않았으면 참.
 	 */
 	isDrawnInsideContent() {
 		if (this.draw !== ShaderSprite.prototype.draw) {
@@ -745,7 +776,7 @@ export class ShaderSprite extends Sprite {
 	// 효과 설정. (효과별 기본 파라미터 / 색으로 되돌린다)
 	//==============================================================================
 	/**
-	 * @param { string } effect
+	 * @param { string } effect ShaderSpriteEffect 값. (모르는 값이면 none)
 	 */
 	setEffect(effect) {
 		const isKnownEffect = EFFECT_BODY_TABLE[effect] !== undefined || effect === ShaderSpriteEffect.none;
@@ -760,7 +791,7 @@ export class ShaderSprite extends Sprite {
 	// 효과 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } ShaderSpriteEffect 값. (기본 none)
 	 */
 	getEffect() {
 		return this.#effect;
@@ -770,7 +801,7 @@ export class ShaderSprite extends Sprite {
 	// 진행도 설정. (0 ~ 1)
 	//==============================================================================
 	/**
-	 * @param { number } effectProgress
+	 * @param { number } effectProgress 진행도. (0 ~ 1 로 자른다)
 	 */
 	setEffectProgress(effectProgress) {
 		this.#effectProgress = System.Math.max(0, System.Math.min(1, effectProgress));
@@ -780,7 +811,7 @@ export class ShaderSprite extends Sprite {
 	// 진행도 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 진행도. (0 ~ 1)
 	 */
 	getEffectProgress() {
 		return this.#effectProgress;
@@ -790,7 +821,7 @@ export class ShaderSprite extends Sprite {
 	// 효과 시간 설정.
 	//==============================================================================
 	/**
-	 * @param { number } effectTime
+	 * @param { number } effectTime 효과 시간. (초)
 	 */
 	setEffectTime(effectTime) {
 		this.#effectTime = effectTime;
@@ -800,7 +831,7 @@ export class ShaderSprite extends Sprite {
 	// 효과 시간 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 효과 시간. (초)
 	 */
 	getEffectTime() {
 		return this.#effectTime;
@@ -810,7 +841,7 @@ export class ShaderSprite extends Sprite {
 	// 시드 설정. (같은 노이즈 무늬를 원할 때 고정)
 	//==============================================================================
 	/**
-	 * @param { number } effectSeed
+	 * @param { number } effectSeed 노이즈 시드. (기본은 0 ~ 100 의 무작위)
 	 */
 	setEffectSeed(effectSeed) {
 		this.#effectSeed = effectSeed;
@@ -820,7 +851,7 @@ export class ShaderSprite extends Sprite {
 	// 시드 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 노이즈 시드.
 	 */
 	getEffectSeed() {
 		return this.#effectSeed;
@@ -830,7 +861,7 @@ export class ShaderSprite extends Sprite {
 	// 효과 색 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } color
+	 * @param { Color } color 효과 색. (복사해 둔다, null 이면 무시한다)
 	 */
 	setEffectColor(color) {
 		if (color === null || color === undefined) {
@@ -843,20 +874,30 @@ export class ShaderSprite extends Sprite {
 	// 효과 색 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 효과 색.
 	 */
 	getEffectColor() {
 		return this.#effectColor;
 	}
 
 	//==============================================================================
-	// 효과 파라미터 설정. (효과마다 뜻이 다르다 — ShaderSpriteEffect 주석 참고)
+	// 효과 파라미터 설정. (효과마다 뜻이 다르다, ShaderSpriteEffect 주석 참고)
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } z
-	 * @param { number } w
+	 * @param { number } x 첫째 파라미터.
+	 * @param { number } y 둘째 파라미터. (기본 0)
+	 * @param { number } z 셋째 파라미터. (기본 0)
+	 * @param { number } w 넷째 파라미터. (기본 0)
+	 * @example <caption>외곽선의 색과 두께 바꾸기</caption>
+	 * import { ShaderSprite, ShaderSpriteEffect, Color } from "./build/vanilla.js";
+	 *
+	 * const shaderSprite = new ShaderSprite();
+	 * shaderSprite.setEffect(ShaderSpriteEffect.outline);
+	 * console.log(shaderSprite.getEffectParameters());
+	 * shaderSprite.setEffectColor(new Color(1, 0.9, 0.2, 1));
+	 * shaderSprite.setEffectParameters(3);
+	 * const defaultParameters = ShaderSprite.getDefaultParameters(ShaderSpriteEffect.outline);
+	 * console.log(shaderSprite.getEffectParameters(), defaultParameters);
 	 */
 	setEffectParameters(x, y = 0, z = 0, w = 0) {
 		this.#effectParameters = [x, y, z, w];
@@ -866,7 +907,7 @@ export class ShaderSprite extends Sprite {
 	// 효과 파라미터 반환.
 	//==============================================================================
 	/**
-	 * @returns { number[] }
+	 * @returns { number[] } 효과 파라미터. ([x, y, z, w])
 	 */
 	getEffectParameters() {
 		return this.#effectParameters;
@@ -876,8 +917,8 @@ export class ShaderSprite extends Sprite {
 	// 효과 기본 파라미터 반환. (정적)
 	//==============================================================================
 	/**
-	 * @param { string } effect
-	 * @returns { number[] }
+	 * @param { string } effect ShaderSpriteEffect 값. (모르는 값이면 none 의 것)
+	 * @returns { number[] } 기본 파라미터의 새 배열. ([x, y, z, w])
 	 */
 	static getDefaultParameters(effect) {
 		const defaultParameters = DEFAULT_PARAMETER_TABLE[effect] ? DEFAULT_PARAMETER_TABLE[effect] : DEFAULT_PARAMETER_TABLE.none;
@@ -888,8 +929,8 @@ export class ShaderSprite extends Sprite {
 	// 효과 기본 색 반환. (정적)
 	//==============================================================================
 	/**
-	 * @param { string } effect
-	 * @returns { Color }
+	 * @param { string } effect ShaderSpriteEffect 값. (모르는 값이면 none 의 것)
+	 * @returns { Color } 기본 색. (새 Color)
 	 */
 	static getDefaultColor(effect) {
 		const defaultColor = DEFAULT_COLOR_TABLE[effect] ? DEFAULT_COLOR_TABLE[effect] : DEFAULT_COLOR_TABLE.none;

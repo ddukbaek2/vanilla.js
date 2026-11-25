@@ -12,6 +12,15 @@ const DECODE_SAMPLE_RATE = 44100;
 //==============================================================================
 // 오디오 애셋.
 //==============================================================================
+/**
+ * @example <caption>소리 파일 읽고 길이 보기</caption>
+ * import { AudioAsset } from "./build/vanilla.js";
+ *
+ * const audioAsset = new AudioAsset();
+ * await audioAsset.load("examples/assets/beep.wav");
+ * const audioBuffer = audioAsset.getAudioBuffer();
+ * console.log(audioAsset.getDuration(), audioBuffer.sampleRate, audioAsset.getLoadError());
+ */
 export class AudioAsset extends Asset {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -34,7 +43,8 @@ export class AudioAsset extends Asset {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { string } assetPath
+	 * @param { string } assetPath 소리 파일 경로. (이미 읽혔으면 아무것도 하지 않는다)
+	 * @returns { Promise<void> } 다 읽으면 풀리는 프로미스. (받기나 디코딩이 실패하면 getLoadError 에 까닭을 남기고 거부된다, 디코딩할 수 없는 환경이면 까닭만 남기고 풀린다)
 	 */
 	async load(assetPath) {
 		// 이미 로드 된 상태라면.
@@ -71,6 +81,14 @@ export class AudioAsset extends Asset {
 	//==============================================================================
 	/**
 	 * @param { ArrayBuffer | ArrayBufferView } bytes 소리 파일의 바이트. (넘긴 것은 바뀌지 않는다)
+	 * @example <caption>받아 둔 바이트로 소리 읽기</caption>
+	 * import { AudioAsset } from "./build/vanilla.js";
+	 *
+	 * const response = await fetch("examples/assets/beep.wav");
+	 * const bytes = await response.arrayBuffer();
+	 * const audioAsset = new AudioAsset();
+	 * await audioAsset.loadFromBytes(bytes);
+	 * console.log(audioAsset.isLoaded(), audioAsset.getDuration(), bytes.byteLength);
 	 */
 	async loadFromBytes(bytes) {
 		const isLoaded = this.isLoaded();
@@ -121,7 +139,7 @@ export class AudioAsset extends Asset {
 	// 마지막 읽기 실패의 까닭. (받기나 디코딩이 실패했으면 글, 아니면 null, 다시 읽기 시작하면 지운다)
 	//==============================================================================
 	/**
-	 * @returns { string | null }
+	 * @returns { string | null } 실패 까닭. (없으면 null)
 	 */
 	getLoadError() {
 		return this.#loadError;
@@ -131,7 +149,7 @@ export class AudioAsset extends Asset {
 	// 오디오 버퍼 반환.
 	//==============================================================================
 	/**
-	 * @returns { AudioBuffer | null }
+	 * @returns { AudioBuffer | null } 디코딩한 오디오 버퍼. (읽기 전이면 null)
 	 */
 	getAudioBuffer() {
 		return this.#audioBuffer;
@@ -141,7 +159,7 @@ export class AudioAsset extends Asset {
 	// 재생 시간 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 재생 시간. (초, 읽기 전이면 0)
 	 */
 	getDuration() {
 		if (this.#audioBuffer !== null && this.#audioBuffer !== undefined) {

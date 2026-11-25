@@ -51,6 +51,36 @@ const MAXIMUM_PAN = 1;
 let currentSoundSystem = null;
 
 
+/**
+ * @example <caption>소리 표로 효과음과 배경음악 틀기</caption>
+ * import { Engine, EngineConfiguration, Scene, SoundSystem, setSoundSystem, readSoundSystem } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	tick(timeDelta) {
+ * 		super.tick(timeDelta);
+ * 		const soundSystem = readSoundSystem();
+ * 		if (soundSystem !== null) {
+ * 			soundSystem.update();
+ * 		}
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const audioManager = engine.getAudioManager();
+ * const soundSystem = new SoundSystem(audioManager, [
+ * 	{ id: "beep", path: "examples/assets/beep.wav", volume: 1, minimumInterval: 0.05, maximumVoices: 4, pitchVariation: 0.05 },
+ * 	{ id: "music", path: "examples/assets/beep.wav", volume: 0.6, isMusic: true },
+ * ]);
+ * setSoundSystem(soundSystem);
+ * soundSystem.setSoundEffectVolume(0.8);
+ * soundSystem.setMusicVolume(0.5);
+ * await soundSystem.loadSounds();
+ * soundSystem.playMusic("music", 0.5);
+ * soundSystem.playEffect("beep", 0.5, -0.3);
+ * console.log(soundSystem.getMusicId(), soundSystem.getEffectVoiceCount());
+ * engine.run(new MainScene());
+ */
 export class SoundSystem {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -152,7 +182,7 @@ export class SoundSystem {
 	// 소리 표의 줄 더하기. (같은 id 는 바꿈, 받기는 loadSounds 가 함)
 	//==============================================================================
 	/**
-	 * @param { object[] } soundTable
+	 * @param { object[] } soundTable 소리 표의 줄 목록. (생성자의 soundTable 과 같은 꼴)
 	 */
 	addSounds(soundTable) {
 		for (const soundRow of soundTable) {
@@ -165,8 +195,23 @@ export class SoundSystem {
 	// - 크기와 간격은 소리 표(addSounds)의 같은 id 줄을 따른다. (줄이 없으면 내지 않는다) 받기(loadSounds)는 이 id 를 다시 받지 않는다.
 	//==============================================================================
 	/**
-	 * @param { string } soundId
-	 * @param { AudioAsset } audioAsset
+	 * @param { string } soundId 소리 표의 id.
+	 * @param { AudioAsset } audioAsset 읽어 둔 오디오 애셋. (그 id 의 녹음 무리 끝에 붙인다)
+	 * @example <caption>파일로 받지 않은 소리를 소리 표에 걸기</caption>
+	 * import { Engine, EngineConfiguration, AudioAsset, SoundSystem } from "./build/vanilla.js";
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * const audioManager = engine.getAudioManager();
+	 * const soundSystem = new SoundSystem(audioManager, []);
+	 * const response = await fetch("examples/assets/beep.wav");
+	 * const bytes = await response.arrayBuffer();
+	 * const audioAsset = new AudioAsset();
+	 * await audioAsset.loadFromBytes(bytes);
+	 * soundSystem.addSounds([{ id: "generated", volume: 1 }]);
+	 * soundSystem.addSoundAsset("generated", audioAsset);
+	 * soundSystem.update();
+	 * soundSystem.playEffect("generated");
 	 */
 	addSoundAsset(soundId, audioAsset) {
 		let assets = this.#assetsById.get(soundId);
@@ -183,7 +228,21 @@ export class SoundSystem {
 	// 바깥의 음소거를 읽는 함수 설정. (플랫폼 SDK 의 음소거, 보상형 광고를 보이는 동안 등, 매 프레임 읽는다, null 이면 없음)
 	//==============================================================================
 	/**
-	 * @param { function(): boolean | null } externalMuteProvider
+	 * @param { function(): boolean | null } externalMuteProvider 참을 돌려주면 음소거하는 함수. (null 이면 없음)
+	 * @example <caption>광고를 보이는 동안 소리 끄기</caption>
+	 * import { Engine, EngineConfiguration, SoundSystem } from "./build/vanilla.js";
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * const audioManager = engine.getAudioManager();
+	 * const soundSystem = new SoundSystem(audioManager, []);
+	 * let isAdvertisementShowing = false;
+	 * soundSystem.setExternalMuteProvider(() => {
+	 * 	return isAdvertisementShowing;
+	 * });
+	 * isAdvertisementShowing = true;
+	 * soundSystem.update();
+	 * console.log(soundSystem.readMuted());
 	 */
 	setExternalMuteProvider(externalMuteProvider) {
 		this.#externalMuteProvider = externalMuteProvider;
@@ -193,7 +252,7 @@ export class SoundSystem {
 	// 바깥의 음소거를 읽는 함수 반환.
 	//==============================================================================
 	/**
-	 * @returns { function(): boolean | null }
+	 * @returns { function(): boolean | null } 바깥의 음소거를 읽는 함수. (없으면 null)
 	 */
 	getExternalMuteProvider() {
 		return this.#externalMuteProvider;
@@ -203,7 +262,7 @@ export class SoundSystem {
 	// 누르기 전에 깨워 봐도 되는지 읽는 함수 설정. (웹뷰가 막는 플랫폼이면 false 를 돌려주는 함수, null 이면 허락)
 	//==============================================================================
 	/**
-	 * @param { function(): boolean | null } autoplayAllowedProvider
+	 * @param { function(): boolean | null } autoplayAllowedProvider 누르기 전에 깨워 봐도 되면 참을 돌려주는 함수. (null 이면 허락)
 	 */
 	setAutoplayAllowedProvider(autoplayAllowedProvider) {
 		this.#autoplayAllowedProvider = autoplayAllowedProvider;
@@ -213,15 +272,17 @@ export class SoundSystem {
 	// 누르기 전에 깨워 봐도 되는지 읽는 함수 반환.
 	//==============================================================================
 	/**
-	 * @returns { function(): boolean | null }
+	 * @returns { function(): boolean | null } 누르기 전에 깨워 봐도 되는지 읽는 함수. (없으면 null)
 	 */
 	getAutoplayAllowedProvider() {
 		return this.#autoplayAllowedProvider;
 	}
 
 	//==============================================================================
+	// 엔진의 AudioManager 반환. (생성자에 넘긴 것)
+	//==============================================================================
 	/**
-	 * @returns { object }
+	 * @returns { object } 엔진의 AudioManager.
 	 */
 	getAudioManager() {
 		return this.#audioManager;
@@ -231,14 +292,17 @@ export class SoundSystem {
 	// 배경음악과 효과음의 버스. (첫 누름 전에는 null)
 	//==============================================================================
 	/**
-	 * @returns { AudioBus | null }
+	 * @returns { AudioBus | null } 배경음악의 버스. (첫 누름 전에는 null)
 	 */
 	getMusicBus() {
 		return this.#musicBus;
 	}
 
+	//==============================================================================
+	// 효과음의 버스. (첫 누름 전에는 null)
+	//==============================================================================
 	/**
-	 * @returns { AudioBus | null }
+	 * @returns { AudioBus | null } 효과음의 버스. (첫 누름 전에는 null)
 	 */
 	getEffectBus() {
 		return this.#effectBus;
@@ -248,7 +312,7 @@ export class SoundSystem {
 	// 틀어 달라고 한 배경음악. (없으면 "")
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 틀어 달라고 한 배경음악 id. (없으면 "")
 	 */
 	getMusicId() {
 		return this.#musicId;
@@ -258,7 +322,7 @@ export class SoundSystem {
 	// 설정의 음악 크기.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 음악 크기. (0 ~ 1, 기본 1)
 	 */
 	getMusicVolume() {
 		return this.#musicVolume;
@@ -268,7 +332,7 @@ export class SoundSystem {
 	// 음악의 비. (멈춤 창의 반 크기 등)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 음악의 비. (0 ~ 1, 기본 1)
 	 */
 	getMusicScale() {
 		return this.#musicScale;
@@ -278,7 +342,7 @@ export class SoundSystem {
 	// 설정의 효과음 크기.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 효과음 크기. (0 ~ 1, 기본 1)
 	 */
 	getSoundEffectVolume() {
 		return this.#soundEffectVolume;
@@ -288,7 +352,7 @@ export class SoundSystem {
 	// 사용자의 음소거 단추를 눌러 두었는지.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 사용자가 음소거했으면 참.
 	 */
 	isUserMuted() {
 		return this.#isUserMuted;
@@ -298,7 +362,7 @@ export class SoundSystem {
 	// 페이지가 가려져 있는지.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 페이지가 가려져 있으면 참.
 	 */
 	isPageHidden() {
 		return this.#isPageHidden;
@@ -308,7 +372,7 @@ export class SoundSystem {
 	// 창이 포커스를 잃으면 음소거하는지. (터치가 주된 기기)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 창이 포커스를 잃으면 음소거하는 기기면 참. (pointer: coarse)
 	 */
 	isBlurMuteEnabled() {
 		return this.#isBlurMuteEnabled;
@@ -318,7 +382,7 @@ export class SoundSystem {
 	// 창이 포커스를 잃었는지. (음소거하는 기기에서만 true)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 창이 포커스를 잃었으면 참.
 	 */
 	isWindowBlurred() {
 		return this.#isWindowBlurred;
@@ -328,7 +392,7 @@ export class SoundSystem {
 	// 음소거로 AudioContext 를 멈춰 두었는지.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 음소거로 AudioContext 를 멈춰 두었으면 참.
 	 */
 	isContextPaused() {
 		return this.#isContextPaused;
@@ -338,7 +402,7 @@ export class SoundSystem {
 	// 마지막으로 다시 깨워 본 때. (초)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 마지막으로 다시 깨워 본 때. (초, performance.now 기준, 아직 없으면 음의 무한대)
 	 */
 	getLastContextResumeTime() {
 		return this.#lastContextResumeTime;
@@ -348,7 +412,7 @@ export class SoundSystem {
 	// 지금 음소거여야 하는지. (플랫폼의 음소거, 사용자의 음소거 단추, 페이지가 가려짐, 창이 포커스를 잃음, 설정한 크기보다 먼저이다)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 음소거여야 하면 참.
 	 */
 	readMuted() {
 		const externalMuteProvider = this.getExternalMuteProvider();
@@ -363,7 +427,7 @@ export class SoundSystem {
 	// AudioContext 가 돌고 있는지. (돌지 않으면 소리를 내지 않는다)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } AudioContext 가 있고 "running" 이면 참.
 	 */
 	isContextRunning() {
 		const audioManager = this.getAudioManager();
@@ -402,7 +466,7 @@ export class SoundSystem {
 	// 소리 하나 받기. (무리면 모두, 못 받은 것은 null 로 두고 건너뜀)
 	//==============================================================================
 	/**
-	 * @param { object } soundRow
+	 * @param { object } soundRow 소리 표의 줄.
 	 */
 	async loadSound(soundRow) {
 		const paths = readSoundPaths(soundRow);
@@ -427,7 +491,7 @@ export class SoundSystem {
 	// 설정의 음악 크기. (0 ~ 1)
 	//==============================================================================
 	/**
-	 * @param { number } volume
+	 * @param { number } volume 음악 크기. (0 ~ 1 로 자르고, 숫자가 아니면 0)
 	 */
 	setMusicVolume(volume) {
 		this.#musicVolume = clampVolume(volume);
@@ -438,7 +502,7 @@ export class SoundSystem {
 	// 음악의 비. (0 ~ 1, 멈춤 창이 떠 있는 동안 반 크기처럼 설정과 따로 줄일 때)
 	//==============================================================================
 	/**
-	 * @param { number } scale
+	 * @param { number } scale 음악의 비. (0 ~ 1 로 자르고, 숫자가 아니면 0)
 	 */
 	setMusicScale(scale) {
 		this.#musicScale = clampVolume(scale);
@@ -449,7 +513,7 @@ export class SoundSystem {
 	// 설정의 효과음 크기. (0 ~ 1)
 	//==============================================================================
 	/**
-	 * @param { number } volume
+	 * @param { number } volume 효과음 크기. (0 ~ 1 로 자르고, 숫자가 아니면 0)
 	 */
 	setSoundEffectVolume(volume) {
 		this.#soundEffectVolume = clampVolume(volume);
@@ -460,7 +524,7 @@ export class SoundSystem {
 	// 사용자의 음소거 단추. (음악과 효과음을 한꺼번에)
 	//==============================================================================
 	/**
-	 * @param { boolean } isMuted
+	 * @param { boolean } isMuted 참이면 음소거. (true 가 아닌 값은 거짓으로 친다)
 	 */
 	setUserMuted(isMuted) {
 		this.#isUserMuted = isMuted === true;
@@ -474,9 +538,9 @@ export class SoundSystem {
 	//   - isResumed 면 그 음악을 멈췄던 자리에서 잇는다. (아니면 처음부터)
 	//==============================================================================
 	/**
-	 * @param { string } soundId
-	 * @param { number } [fadeSeconds]
-	 * @param { boolean } [isResumed]
+	 * @param { string } soundId 소리 표의 배경음악 id. ("" 이면 끈다, 지금 틀어 달라고 한 것과 같으면 아무것도 하지 않는다)
+	 * @param { number } [fadeSeconds] 겹쳐 바꾸는 시간. (초, 기본 0, 음수는 0)
+	 * @param { boolean } [isResumed] 참이면 그 음악을 멈췄던 자리에서 잇는다. (기본 거짓)
 	 */
 	playMusic(soundId, fadeSeconds = 0, isResumed = false) {
 		if (soundId === this.#musicId) {
@@ -492,7 +556,7 @@ export class SoundSystem {
 	// 효과음 내기. (음소거, 첫 누름 전, 받기 전, 다시 낼 간격 안이면 내지 않는다)
 	//==============================================================================
 	/**
-	 * @param { string } soundId
+	 * @param { string } soundId 소리 표의 효과음 id. (표에 없거나 받지 않았으면 내지 않는다)
 	 * @param { number } volume 이번의 크기. (0 ~ 1, 소리의 크기와 설정의 효과음 크기에 곱한다)
 	 * @param { number } [pan] 좌우. (-1 왼쪽 ~ 1 오른쪽, 0 가운데)
 	 */
@@ -573,9 +637,9 @@ export class SoundSystem {
 	// 무리에서 하나 고르기. (받은 것 가운데 바로 앞과 다른 것, 하나뿐이면 그것, 없으면 null)
 	//==============================================================================
 	/**
-	 * @param { string } soundId
-	 * @param { Array<AudioAsset | null> } assets
-	 * @returns { AudioAsset | null }
+	 * @param { string } soundId 소리 표의 id. (바로 앞에 고른 번호를 기억하는 열쇠)
+	 * @param { Array<AudioAsset | null> } assets 녹음 무리. (못 받은 것은 null)
+	 * @returns { AudioAsset | null } 고른 애셋. (받은 것이 없으면 null)
 	 */
 	pickVariant(soundId, assets) {
 		const loadedIndices = [];
@@ -600,8 +664,8 @@ export class SoundSystem {
 	// 나는 효과음을 그 수까지 줄이기. (오래된 것부터 끊음, soundId 가 "" 이면 모든 효과음)
 	//==============================================================================
 	/**
-	 * @param { string } soundId
-	 * @param { number } keepCount
+	 * @param { string } soundId 줄일 효과음 id. ("" 이면 모든 효과음)
+	 * @param { number } keepCount 남길 수. (음수는 0)
 	 */
 	trimVoices(soundId, keepCount) {
 		const matchingVoices = this.#voices.filter((voice) => {
@@ -617,7 +681,7 @@ export class SoundSystem {
 	// 효과음 하나 끊기.
 	//==============================================================================
 	/**
-	 * @param { object } voice
+	 * @param { object } voice 나고 있는 효과음. ({ soundId, source, gainNode, startTime })
 	 */
 	stopVoice(voice) {
 		const voiceIndex = this.#voices.indexOf(voice);
@@ -637,8 +701,8 @@ export class SoundSystem {
 	// 나는 효과음을 줄여 끄기. (soundId 가 "" 이면 모든 효과음, 줄이는 초가 0 이면 바로 끊음)
 	//==============================================================================
 	/**
-	 * @param { string } soundId
-	 * @param { number } fadeSeconds
+	 * @param { string } soundId 줄일 효과음 id. ("" 이면 모든 효과음)
+	 * @param { number } fadeSeconds 줄이는 시간. (초, 0 이하이면 바로 끊는다)
 	 */
 	fadeOutEffects(soundId, fadeSeconds) {
 		const matchingVoices = this.#voices.filter((voice) => {
@@ -678,7 +742,7 @@ export class SoundSystem {
 	// 나고 있는 효과음 수. (시험과 기록용)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 나고 있는 효과음 수.
 	 */
 	getEffectVoiceCount() {
 		return this.#voices.length;
@@ -891,8 +955,8 @@ export class SoundSystem {
 	// 틀던 배경음악을 줄여 끄기. (fadeSeconds 동안, 다 줄어든 때의 자리를 기억)
 	//==============================================================================
 	/**
-	 * @param { object } playingMusic
-	 * @param { number } fadeSeconds
+	 * @param { object } playingMusic 틀던 배경음악. ({ soundId, source, gain, startTime, offset, duration })
+	 * @param { number } fadeSeconds 줄이는 시간. (초, 0 이면 바로 끈다)
 	 */
 	fadeOutMusic(playingMusic, fadeSeconds) {
 		const audioContext = playingMusic.gain.context;
@@ -955,7 +1019,7 @@ function clampVolume(volume) {
 // 함께 쓰는 소리 정하기.
 //==============================================================================
 /**
- * @param { SoundSystem } soundSystem
+ * @param { SoundSystem } soundSystem 함께 쓸 소리. (null 이면 비운다)
  */
 export function setSoundSystem(soundSystem) {
 	currentSoundSystem = soundSystem;
@@ -965,7 +1029,7 @@ export function setSoundSystem(soundSystem) {
 // 함께 쓰는 소리. (아직 없으면 null)
 //==============================================================================
 /**
- * @returns { SoundSystem | null }
+ * @returns { SoundSystem | null } 함께 쓰는 소리. (setSoundSystem 전이면 null)
  */
 export function readSoundSystem() {
 	return currentSoundSystem;

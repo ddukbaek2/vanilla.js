@@ -88,6 +88,9 @@ class DEVToolsFlatItem {
 	/** @type { number } */ depth;
 	/** @type { boolean } */ effectiveActive;
 
+	//==============================================================================
+	// 생성.
+	//==============================================================================
 	/**
 	 * @param { TransformNode } node
 	 * @param { number } depth
@@ -114,6 +117,9 @@ class InspectorLine {
 	/** @type { Component | null } */ componentRef;
 	/** @type { boolean } */ isComponentProperty;
 
+	//==============================================================================
+	// 생성.
+	//==============================================================================
 	/**
 	 * @param { string | null } text
 	 * @param { string } value

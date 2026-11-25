@@ -72,10 +72,10 @@ export const GamepadButtonCode = {
 //==============================================================================
 /** @enum { string } */
 export const GamepadKind = System.Object.freeze({
-	xbox: "xbox",
-	playstation: "playstation",
-	nintendo: "nintendo",
-	other: "other",
+	xbox: "xbox", // 엑스박스 패드.
+	playstation: "playstation", // 플레이스테이션 패드.
+	nintendo: "nintendo", // 닌텐도 패드.
+	other: "other", // 그 밖의 패드, 또는 모름.
 });
 
 // 패드 이름(Gamepad.id)에 이것이 있으면 그 종류다. (소문자, 브라우저가 이름에 붙이는 USB 제조사 번호와 흔한 이름)
@@ -117,6 +117,38 @@ export function readGamepadKind(gamepadId) {
 //==============================================================================
 // 입력 매니저.
 //==============================================================================
+/**
+ * @example <caption>패드 단추와 스틱 읽기</caption>
+ * import { Engine, EngineConfiguration, Scene } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	tick(timeDelta) {
+ * 		super.tick(timeDelta);
+ * 		const engine = this.getEngine();
+ * 		const inputManager = engine.getInputManager();
+ * 		const gamepadManager = inputManager.getGamepadManager();
+ * 		const gamepads = gamepadManager.getAllConnectedGamepads();
+ * 		for (const gamepad of gamepads) {
+ * 			if (gamepadManager.isButtonJustPressed(gamepad.index, 0)) {
+ * 				console.log("jump", gamepad.id);
+ * 			}
+ * 			const horizontal = gamepadManager.getAxisValue(gamepad.index, 0);
+ * 			if (Math.abs(horizontal) > 0.2) {
+ * 				console.log("move", horizontal);
+ * 			}
+ * 		}
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const inputManager = engine.getInputManager();
+ * const gamepadManager = inputManager.getGamepadManager();
+ * gamepadManager.setCallback((gamepadIndex, inputType, inputIndex, value) => {
+ * 	console.log(gamepadIndex, inputType, inputIndex, value);
+ * });
+ * engine.run(new MainScene());
+ */
 export class GamepadManager extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -132,7 +164,7 @@ export class GamepadManager extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { Engine } engine 
+	 * @param { Engine } engine 이 매니저를 가진 엔진. (쓰지 않는다)
 	 */
 	constructor(engine) {
 		super();
@@ -147,7 +179,7 @@ export class GamepadManager extends Object {
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		this.updateAllGamepads();
@@ -157,7 +189,7 @@ export class GamepadManager extends Object {
 	// 게임패드 연결.
 	//==============================================================================
 	/**
-	 * @param { Gamepad } gamepad
+	 * @param { Gamepad } gamepad 붙일 게임패드. (null 이거나 이미 붙은 번호면 아무것도 하지 않는다)
 	 */
 	connect(gamepad) {
 		if (gamepad === null || gamepad === undefined || this.#connectedGamepadIndices.indexOf(gamepad.index) !== -1) {
@@ -188,7 +220,7 @@ export class GamepadManager extends Object {
 	// 게임패드 연결 해제.
 	//==============================================================================
 	/**
-	 * @param { Gamepad } gamepad
+	 * @param { Gamepad } gamepad 놓을 게임패드. (붙지 않은 번호면 아무것도 하지 않는다)
 	 */
 	disconnect(gamepad) {
 		if (gamepad === null || gamepad === undefined) {
@@ -208,7 +240,7 @@ export class GamepadManager extends Object {
 	// 콜백 설정.
 	//==============================================================================
 	/**
-	 * @param { (gamepadIndex: number, inputType: "button" | "value" | "axis", inputIndex: number, value: any) => void } callback
+	 * @param { (gamepadIndex: number, inputType: "button" | "value" | "axis", inputIndex: number, value: any) => void } callback 단추나 축이 바뀔 때 부를 함수. (button 은 눌림 참 거짓, value 는 0 보다 큰 아날로그 값, axis 는 -1 ~ 1, null 이면 부르지 않는다)
 	 */
 	setCallback(callback) {
 		this.#inputEventCallback = callback;
@@ -343,9 +375,9 @@ export class GamepadManager extends Object {
 	// 버튼 눌림 상태 반환.
 	//==============================================================================
 	/**
-	 * @param { number } gamepadIndex 
-	 * @param { number } buttonIndex 
-	 * @returns { boolean }
+	 * @param { number } gamepadIndex 패드 번호. (Gamepad.index)
+	 * @param { number } buttonIndex 단추 번호. (W3C 표준 매핑, 0 이 A 나 크로스 단추)
+	 * @returns { boolean } 눌려 있으면 참. (없는 패드나 단추면 거짓)
 	 */
 	isButtonPressed(gamepadIndex, buttonIndex) {
 		const state = this.#connectedGamepadStates.get(gamepadIndex);
@@ -358,9 +390,9 @@ export class GamepadManager extends Object {
 	// 이번 갱신에 방금 눌린 버튼인지. (키보드 isKeyJustPressed 와 같은 쓰임)
 	//==============================================================================
 	/**
-	 * @param { number } gamepadIndex
-	 * @param { number } buttonIndex
-	 * @returns { boolean }
+	 * @param { number } gamepadIndex 패드 번호. (Gamepad.index)
+	 * @param { number } buttonIndex 단추 번호. (W3C 표준 매핑, 0 이 A 나 크로스 단추)
+	 * @returns { boolean } 이번 갱신에 눌렸으면 참.
 	 */
 	isButtonJustPressed(gamepadIndex, buttonIndex) {
 		const state = this.#connectedGamepadStates.get(gamepadIndex);
@@ -378,9 +410,9 @@ export class GamepadManager extends Object {
 	// 이번 갱신에 방금 떼어진 버튼인지.
 	//==============================================================================
 	/**
-	 * @param { number } gamepadIndex
-	 * @param { number } buttonIndex
-	 * @returns { boolean }
+	 * @param { number } gamepadIndex 패드 번호. (Gamepad.index)
+	 * @param { number } buttonIndex 단추 번호. (W3C 표준 매핑, 0 이 A 나 크로스 단추)
+	 * @returns { boolean } 이번 갱신에 떼어졌으면 참.
 	 */
 	isButtonJustReleased(gamepadIndex, buttonIndex) {
 		const state = this.#connectedGamepadStates.get(gamepadIndex);
@@ -398,9 +430,9 @@ export class GamepadManager extends Object {
 	// 버튼/트리거 아날로그 값 반환 (0.0 ~ 1.0).
 	//==============================================================================
 	/**
-	 * @param { number } gamepadIndex 
-	 * @param { number } buttonIndex 
-	 * @returns { number }
+	 * @param { number } gamepadIndex 패드 번호. (Gamepad.index)
+	 * @param { number } buttonIndex 단추 번호. (W3C 표준 매핑, 0 이 A 나 크로스 단추)
+	 * @returns { number } 아날로그 값. (0 ~ 1, 소수 둘째 자리까지, 없으면 0)
 	 */
 	getButtonValue(gamepadIndex, buttonIndex) {
 		const state = this.#connectedGamepadStates.get(gamepadIndex);
@@ -413,9 +445,9 @@ export class GamepadManager extends Object {
 	// 아날로그 스틱 축 값 반환 (-1.0 ~ 1.0).
 	//==============================================================================
 	/**
-	 * @param { number } gamepadIndex 
-	 * @param { number } axisIndex 
-	 * @returns { number }
+	 * @param { number } gamepadIndex 패드 번호. (Gamepad.index)
+	 * @param { number } axisIndex 축 번호. (0 왼쪽 가로, 1 왼쪽 세로, 2 오른쪽 가로, 3 오른쪽 세로)
+	 * @returns { number } 축 값. (-1 ~ 1, 소수 둘째 자리까지, 없으면 0)
 	 */
 	getAxisValue(gamepadIndex, axisIndex) {
 		const state = this.#connectedGamepadStates.get(gamepadIndex);
@@ -427,7 +459,7 @@ export class GamepadManager extends Object {
 	// 연결된 모든 게임패드 반환.
 	//==============================================================================
 	/**
-	 * @returns { Gamepad[] }
+	 * @returns { Gamepad[] } 연결된 게임패드 목록. (브라우저의 지금 Gamepad)
 	 */
 	getAllConnectedGamepads() {
 		const gamepads = System.navigator.getGamepads();
@@ -445,7 +477,7 @@ export class GamepadManager extends Object {
 	// 연결된 게임패드 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 연결된 게임패드 수.
 	 */
 	getConnectedGamepadCount() {
 		return this.#connectedGamepadIndices.length;
@@ -455,7 +487,8 @@ export class GamepadManager extends Object {
 	// 연결된 게임패드 반환.
 	//==============================================================================
 	/**
-	 * @returns { Gamepad | undefined }
+	 * @param { number } gamepadIndex 연결된 차례의 번호. (0 ~ 연결 수 - 1, Gamepad.index 가 아니다)
+	 * @returns { Gamepad | undefined } 그 차례의 게임패드. (범위 밖이면 undefined)
 	 */
 	getConnectedGamepad(gamepadIndex) {
 		if (gamepadIndex < 0 || gamepadIndex >= this.#connectedGamepadIndices.length) {
@@ -471,7 +504,7 @@ export class GamepadManager extends Object {
 	// 단추와 축이 바뀔 때마다 콘솔에 찍을지 설정. (기본은 끔, 연결과 해제는 늘 찍는다)
 	//==============================================================================
 	/**
-	 * @param { boolean } isEnabled
+	 * @param { boolean } isEnabled 참이면 콘솔에 찍는다.
 	 */
 	setInputLogEnabled(isEnabled) {
 		this.#isInputLogEnabled = isEnabled;
@@ -481,7 +514,7 @@ export class GamepadManager extends Object {
 	// 단추와 축이 바뀔 때마다 콘솔에 찍는지 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 콘솔에 찍으면 참.
 	 */
 	isInputLogEnabled() {
 		return this.#isInputLogEnabled;
@@ -491,7 +524,7 @@ export class GamepadManager extends Object {
 	// 마지막 갱신에 단추를 누르거나 축을 크게 기울인 패드의 이름 반환. (없으면 빈 글, 마지막으로 쓴 장치를 가릴 때)
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 패드 이름. (Gamepad.id, 없으면 빈 글)
 	 */
 	getActiveGamepadId() {
 		return this.#activeGamepadId;
@@ -506,6 +539,16 @@ export class GamepadManager extends Object {
 	 * @param { number } strongMagnitude 무거운 모터의 세기. (묵직한 울림)
 	 * @param { number } weakMagnitude 가벼운 모터의 세기. (잘게 떨림)
 	 * @param { number } seconds 떠는 시간. (초)
+	 * @example <caption>연결된 패드를 0.25 초 떨기</caption>
+	 * import { Engine, EngineConfiguration } from "./build/vanilla.js";
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * const inputManager = engine.getInputManager();
+	 * const gamepadManager = inputManager.getGamepadManager();
+	 * gamepadManager.vibrate(1, 0.3, 0.25);
+	 * const connectedGamepadCount = gamepadManager.getConnectedGamepadCount();
+	 * console.log(connectedGamepadCount);
 	 */
 	vibrate(strongMagnitude, weakMagnitude, seconds) {
 		if (typeof System.navigator.getGamepads !== "function") {

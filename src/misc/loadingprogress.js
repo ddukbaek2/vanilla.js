@@ -16,6 +16,26 @@ const SNAP_DISTANCE = 0.0005;
 //   받기가 몰려 진행률이 한 번에 뛰어도 막대가 튀지 않고 미끄러진다.
 // - 매 프레임 update(timeDelta) 를 부른다. 따라가는 몫은 1 - exp(-빠르기 * 시간) 이라 프레임 간격이 달라도 같은 빠르기다.
 //==============================================================================
+/**
+ * @example <caption>알려 준 정도를 보이는 정도가 따라가기</caption>
+ * import { LoadingProgress } from "./build/vanilla.js";
+ *
+ * const loadingProgress = new LoadingProgress(6);
+ * loadingProgress.setProgress(0.5);
+ * for (let frame = 0; frame < 30; ++frame) {
+ * 	loadingProgress.update(1 / 60);
+ * }
+ * console.log(loadingProgress.getProgress(), loadingProgress.getShownProgress().toFixed(3));
+ *
+ * loadingProgress.setProgress(0.3);
+ * console.log(loadingProgress.getProgress());
+ *
+ * loadingProgress.setProgress(1);
+ * while (!loadingProgress.isFinished()) {
+ * 	loadingProgress.update(1 / 60);
+ * }
+ * console.log(loadingProgress.getShownProgress());
+ */
 export class LoadingProgress extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -43,7 +63,7 @@ export class LoadingProgress extends Object {
 	// 알려 준 정도 설정. (0 ~ 1 로 자르고, 앞서 알린 것보다 작으면 무시한다)
 	//==============================================================================
 	/**
-	 * @param { number } progress
+	 * @param { number } progress 알려 줄 정도. (0 ~ 1)
 	 */
 	setProgress(progress) {
 		if (typeof progress !== "number" || System.Number.isNaN(progress)) {
@@ -96,7 +116,7 @@ export class LoadingProgress extends Object {
 	// 따라가는 빠르기 설정. (초당 남은 거리의 비율, 0 보다 커야 한다. 아니면 그대로 둔다)
 	//==============================================================================
 	/**
-	 * @param { number } followRate
+	 * @param { number } followRate 따라가는 빠르기. (초당 남은 거리의 비율)
 	 */
 	setFollowRate(followRate) {
 		if (typeof followRate !== "number" || !System.Number.isFinite(followRate) || followRate <= 0) {
@@ -109,7 +129,7 @@ export class LoadingProgress extends Object {
 	// 따라가는 빠르기 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 따라가는 빠르기. (초당 남은 거리의 비율)
 	 */
 	getFollowRate() {
 		return this.#followRate;
@@ -119,7 +139,7 @@ export class LoadingProgress extends Object {
 	// 보이는 정도가 끝(1)에 닿았는지.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 보이는 정도가 1 에 닿았으면 참.
 	 */
 	isFinished() {
 		return this.#shownProgress >= 1;

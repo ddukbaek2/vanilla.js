@@ -31,6 +31,47 @@ export const ButtonState = {
 //==============================================================================
 // 버튼.
 //==============================================================================
+/**
+ * @example <caption>글자가 있는 단추 만들기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIButton, UILabel, Paint, WorldNode, Pivot, Vector2, Color } from "./build/vanilla.js";
+ *
+ * class MainScene extends UIScene {
+ * 	constructor() {
+ * 		super();
+ * 		this.setLoadingMinDurationMs(0);
+ * 	}
+ *
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const buttonNode = new WorldNode();
+ * 		buttonNode.setPivot(Pivot.topLeft);
+ * 		buttonNode.setAnchor(Pivot.topLeft);
+ * 		buttonNode.setLocalPosition(Vector2.create(40, 40));
+ * 		buttonNode.setContentSize(Vector2.create(200, 60));
+ * 		const paint = buttonNode.addComponent(Paint);
+ * 		paint.setColor(new Color(0.2, 0.45, 0.85, 1));
+ * 		paint.setRoundSize(12);
+ * 		const label = buttonNode.addComponent(UILabel);
+ * 		label.setText("Start");
+ * 		label.setFontSize(24);
+ * 		const button = buttonNode.addComponent(UIButton);
+ * 		button.setPressedTintColor(new Color(0, 0, 0, 0.35));
+ * 		button.setTransitionDuration(0.15);
+ * 		button.setClickedEvent((clickedButton) => {
+ * 			console.log("start", clickedButton.getButtonState());
+ * 		});
+ * 		const root = this.getRoot();
+ * 		root.addChild(buttonNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.canvasId = "mainCanvas";
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * engineConfiguration.autoResizeOnWindowResize = true;
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class UIButton extends UIControl {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -95,6 +136,51 @@ export class UIButton extends UIControl {
 	// 트랜지션 대상에서 노드를 제외. 해당 노드 자신과 모든 자손 노드의 컴포넌트가
 	// 색상 수집에서 제외된다.
 	//==============================================================================
+	/**
+	 * @param { ComponentNode } node 틴트에서 뺄 노드. (자손 노드까지 빠진다)
+	 * @example <caption>단추 안의 배지는 틴트하지 않기</caption>
+	 * import { Engine, EngineConfiguration, UIScene, UIButton, Paint, WorldNode, Pivot, Vector2, Color } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends UIScene {
+	 * 	constructor() {
+	 * 		super();
+	 * 		this.setLoadingMinDurationMs(0);
+	 * 	}
+	 *
+	 * 	initialize(engine) {
+	 * 		super.initialize(engine);
+	 * 		const buttonNode = new WorldNode();
+	 * 		buttonNode.setPivot(Pivot.topLeft);
+	 * 		buttonNode.setAnchor(Pivot.topLeft);
+	 * 		buttonNode.setLocalPosition(Vector2.create(40, 40));
+	 * 		buttonNode.setContentSize(Vector2.create(200, 60));
+	 * 		const paint = buttonNode.addComponent(Paint);
+	 * 		paint.setColor(new Color(0.2, 0.45, 0.85, 1));
+	 *
+	 * 		const badgeNode = new WorldNode();
+	 * 		badgeNode.setPivot(Pivot.topLeft);
+	 * 		badgeNode.setAnchor(Pivot.topLeft);
+	 * 		badgeNode.setLocalPosition(Vector2.create(176, -8));
+	 * 		badgeNode.setContentSize(Vector2.create(24, 24));
+	 * 		const badgePaint = badgeNode.addComponent(Paint);
+	 * 		badgePaint.setColor(new Color(0.9, 0.2, 0.2, 1));
+	 * 		badgePaint.setRoundSize(12);
+	 * 		buttonNode.addChild(badgeNode);
+	 *
+	 * 		const button = buttonNode.addComponent(UIButton);
+	 * 		button.excludeNodeFromTint(badgeNode);
+	 * 		const root = this.getRoot();
+	 * 		root.addChild(buttonNode);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.canvasId = "mainCanvas";
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * engineConfiguration.autoResizeOnWindowResize = true;
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
 	excludeNodeFromTint(node) {
 		this.#tintExcludedNodes.add(node);
 	}
@@ -102,6 +188,9 @@ export class UIButton extends UIControl {
 	//==============================================================================
 	// 트랜지션 대상에서 특정 컴포넌트만 제외.
 	//==============================================================================
+	/**
+	 * @param { Component } component 틴트에서 뺄 컴포넌트.
+	 */
 	excludeComponentFromTint(component) {
 		this.#tintExcludedComponents.add(component);
 	}
@@ -119,7 +208,7 @@ export class UIButton extends UIControl {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { ComponentNode } node
+	 * @param { ComponentNode } node 붙을 노드.
 	 */
 	attach(node) {
 		super.attach(node);
@@ -133,7 +222,7 @@ export class UIButton extends UIControl {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
@@ -212,7 +301,7 @@ export class UIButton extends UIControl {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그래픽.
 	 */
 	draw(graphic) {
 		// super.draw(graphic);
@@ -222,7 +311,7 @@ export class UIButton extends UIControl {
 	// 터치 누름. (TouchRaycaster → WorldNode → Button)
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 누른 자리. (뷰 좌표)
 	 */
 	touchPress(viewInputPosition) {
 		if (!this.getInteractable()) {
@@ -244,7 +333,7 @@ export class UIButton extends UIControl {
 	// 터치 뗌. (TouchRaycaster → WorldNode → Button)
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뗀 자리. (뷰 좌표)
 	 */
 	touchRelease(viewInputPosition) {
 		if (!this.getInteractable()) {
@@ -270,7 +359,7 @@ export class UIButton extends UIControl {
 	// 뗌 처리 본문.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뗀 자리. (뷰 좌표, 노드 안이면 클릭으로 친다)
 	 */
 	performRelease(viewInputPosition) {
 		this.setButtonState(ButtonState.released);
@@ -306,7 +395,7 @@ export class UIButton extends UIControl {
 	// 터치 취소. (TouchRaycaster → WorldNode → Button)
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 취소된 때의 자리. (뷰 좌표)
 	 */
 	touchCancel(viewInputPosition) {
 		this.#pendingRelease = null;
@@ -346,6 +435,9 @@ export class UIButton extends UIControl {
 	//==============================================================================
 	// 틴트 적용.
 	//==============================================================================
+	/**
+	 * @param { number } progress 틴트 정도. (0 이면 원래 색, 1 이면 틴트 색을 다 씌운다)
+	 */
 	applyTintProgress(progress) {
 		const pressedTintColor = this.getButtonState() === ButtonState.hover ? this.getHoverTintColor() : this.getPressedTintColor();
 		for (const colorEntry of this.#colorEntries) {
@@ -404,6 +496,9 @@ export class UIButton extends UIControl {
 	// - excludeNodeFromTint 로 등록된 노드는 자신과 자손까지 통째로 건너뛴다.
 	// - excludeComponentFromTint 로 등록된 컴포넌트는 개별적으로 제외한다.
 	//==============================================================================
+	/**
+	 * @param { ComponentNode } node 훑을 노드. (자식들도 차례로 훑는다)
+	 */
 	collectFromNode(node) {
 		if (this.#tintExcludedNodes.has(node)) {
 			return;
@@ -466,7 +561,7 @@ export class UIButton extends UIControl {
 	// 버튼 상태 변경.
 	//==============================================================================
 	/**
-	 * @param { ButtonState } buttonState
+	 * @param { ButtonState } buttonState 버튼 상태. (ButtonState 의 값)
 	 */
 	setButtonState(buttonState) {
 		if (this.getButtonState() === buttonState) {
@@ -480,7 +575,7 @@ export class UIButton extends UIControl {
 	// 버튼 상태 반환.
 	//==============================================================================
 	/**
-	 * @returns { ButtonState }
+	 * @returns { ButtonState } 지금 버튼 상태. (ButtonState 의 값)
 	 */
 	getButtonState() {
 		return this.#buttonState;
@@ -499,7 +594,58 @@ export class UIButton extends UIControl {
 	// 길게 누름 알림 설정. (임계 시간을 넘기면 한 번 알리고, 그 누름의 클릭은 삼킨다)
 	//==============================================================================
 	/**
-	 * @param { function(UIButton): void } longPressedEvent
+	 * @param { function(UIButton): void } longPressedEvent 길게 누르면 한 번 부를 함수. (인자는 이 버튼, null 이면 길게 누름을 보지 않는다)
+	 * @example <caption>길게 누르면 지우고 짧게 누르면 열기</caption>
+	 * import { Engine, EngineConfiguration, UIScene, UIButton, Paint, WorldNode, Pivot, Vector2, Color } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends UIScene {
+	 * 	constructor() {
+	 * 		super();
+	 * 		this.setLoadingMinDurationMs(0);
+	 * 		this.button = null;
+	 * 	}
+	 *
+	 * 	initialize(engine) {
+	 * 		super.initialize(engine);
+	 * 		const itemNode = new WorldNode();
+	 * 		itemNode.setPivot(Pivot.topLeft);
+	 * 		itemNode.setAnchor(Pivot.topLeft);
+	 * 		itemNode.setLocalPosition(Vector2.create(40, 40));
+	 * 		itemNode.setContentSize(Vector2.create(96, 96));
+	 * 		const paint = itemNode.addComponent(Paint);
+	 * 		paint.setColor(new Color(0.3, 0.3, 0.35, 1));
+	 * 		const button = itemNode.addComponent(UIButton);
+	 * 		button.setLongPressSeconds(0.8);
+	 * 		button.setLongPressedEvent(() => {
+	 * 			console.log("delete item");
+	 * 		});
+	 * 		button.setClickedEvent(() => {
+	 * 			console.log("open item");
+	 * 		});
+	 * 		this.button = button;
+	 * 		const root = this.getRoot();
+	 * 		root.addChild(itemNode);
+	 * 	}
+	 *
+	 * 	tick(timeDelta) {
+	 * 		super.tick(timeDelta);
+	 * 		if (this.button !== null) {
+	 * 			const pressedSeconds = this.button.getPressedElapsedSeconds();
+	 * 			const longPressSeconds = this.button.getLongPressSeconds();
+	 * 			const gaugeRatio = Math.min(1, pressedSeconds / longPressSeconds);
+	 * 			if (gaugeRatio > 0) {
+	 * 				console.log("hold", gaugeRatio);
+	 * 			}
+	 * 		}
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.canvasId = "mainCanvas";
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * engineConfiguration.autoResizeOnWindowResize = true;
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	setLongPressedEvent(longPressedEvent) {
 		this.#longPressedEvent = longPressedEvent;
@@ -509,7 +655,7 @@ export class UIButton extends UIControl {
 	// 길게 누름 판정 시간 설정. (초)
 	//==============================================================================
 	/**
-	 * @param { number } longPressSeconds
+	 * @param { number } longPressSeconds 길게 누름으로 볼 시간. (초, 기본 0.5)
 	 */
 	setLongPressSeconds(longPressSeconds) {
 		this.#longPressSeconds = longPressSeconds;
@@ -519,7 +665,7 @@ export class UIButton extends UIControl {
 	// 이번 누름이 이어진 시간 반환. (게이지 연출용)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 이번 누름이 이어진 시간. (초, 누르고 있지 않으면 0)
 	 */
 	getPressedElapsedSeconds() {
 		return this.#isPressTracking ? this.#pressedElapsedSeconds : 0;
@@ -529,15 +675,17 @@ export class UIButton extends UIControl {
 	// 길게 누름 판정 시간 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 길게 누름 판정 시간. (초)
 	 */
 	getLongPressSeconds() {
 		return this.#longPressSeconds;
 	}
 
 	//==============================================================================
+	// 최소 눌림 표시 시간 설정. (짧게 톡 눌러도 이 시간만큼 눌린 모습을 보인 뒤 클릭을 부른다)
+	//==============================================================================
 	/**
-	 * @param { number } minimumPressedSeconds
+	 * @param { number } minimumPressedSeconds 눌린 모습을 보여 줄 가장 짧은 시간. (초, 0 보다 작으면 0, 기본 0 이면 바로)
 	 */
 	setMinimumPressedSeconds(minimumPressedSeconds) {
 		this.#minimumPressedSeconds = System.Math.max(0, minimumPressedSeconds);
@@ -547,12 +695,18 @@ export class UIButton extends UIControl {
 	// 최소 눌림 표시 시간 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 최소 눌림 표시 시간. (초)
 	 */
 	getMinimumPressedSeconds() {
 		return this.#minimumPressedSeconds;
 	}
 
+	//==============================================================================
+	// 클릭 이벤트 설정.
+	//==============================================================================
+	/**
+	 * @param { function(UIButton): boolean } callback 클릭이 나면 클릭됨 이벤트 다음에 부를 함수. (인자는 이 버튼, 돌려준 값은 쓰지 않는다, null 이면 부르지 않는다)
+	 */
 	setClickEvent(callback) {
 		this.#clickEvent = callback;
 	}
@@ -561,7 +715,8 @@ export class UIButton extends UIControl {
 	// 클릭 이벤트 설정.
 	//==============================================================================
 	/**
-	 * @param { function(UIButton): boolean } callback
+	 * @param { ButtonState } buttonState 버튼 상태. (지금은 쓰지 않는다)
+	 * @param { function(UIButton): boolean } callback 그 상태에 걸 함수. (지금은 담지 않는다)
 	 */
 	setStateEvent(buttonState, callback) {
 		// this.#clickEvent = callback;
@@ -576,7 +731,7 @@ export class UIButton extends UIControl {
 	// 클릭 이벤트 반환.
 	//==============================================================================
 	/**
-	 * @returns { function(UIButton): boolean }
+	 * @returns { function(UIButton): boolean } 클릭 이벤트 함수. (없으면 null)
 	 */
 	getClickEvent() {
 		return this.#clickEvent;
@@ -586,7 +741,7 @@ export class UIButton extends UIControl {
 	// 누름 이벤트 설정.
 	//==============================================================================
 	/**
-	 * @param { function(UIButton): void } callback
+	 * @param { function(UIButton): void } callback 누르면 부를 함수. (인자는 이 버튼, 누를 수 없는 상태면 부르지 않는다)
 	 */
 	setPressedEvent(callback) {
 		this.#pressedEvent = callback;
@@ -596,7 +751,7 @@ export class UIButton extends UIControl {
 	// 누름 이벤트 반환.
 	//==============================================================================
 	/**
-	 * @returns { function(UIButton): void }
+	 * @returns { function(UIButton): void } 누름 이벤트 함수. (없으면 null)
 	 */
 	getPressedEvent() {
 		return this.#pressedEvent;
@@ -606,7 +761,7 @@ export class UIButton extends UIControl {
 	// 뗌 이벤트 설정.
 	//==============================================================================
 	/**
-	 * @param { function(UIButton): void } callback
+	 * @param { function(UIButton): void } callback 누른 뒤 떼면 부를 함수. (인자는 이 버튼, 노드 밖에서 떼도 부른다)
 	 */
 	setReleasedEvent(callback) {
 		this.#releasedEvent = callback;
@@ -616,7 +771,7 @@ export class UIButton extends UIControl {
 	// 뗌 이벤트 반환.
 	//==============================================================================
 	/**
-	 * @returns { function(UIButton): void }
+	 * @returns { function(UIButton): void } 뗌 이벤트 함수. (없으면 null)
 	 */
 	getReleasedEvent() {
 		return this.#releasedEvent;
@@ -626,7 +781,7 @@ export class UIButton extends UIControl {
 	// 클릭됨 이벤트 설정.
 	//==============================================================================
 	/**
-	 * @param { function(UIButton): void } callback
+	 * @param { function(UIButton): void } callback 누른 뒤 노드 안에서 떼면 부를 함수. (인자는 이 버튼, 길게 누름을 알렸으면 부르지 않는다, null 이면 부르지 않는다)
 	 */
 	setClickedEvent(callback) {
 		this.#clickedEvent = callback;
@@ -636,7 +791,7 @@ export class UIButton extends UIControl {
 	// 클릭됨 이벤트 반환.
 	//==============================================================================
 	/**
-	 * @returns { function(UIButton): void }
+	 * @returns { function(UIButton): void } 클릭됨 이벤트 함수. (없으면 null)
 	 */
 	getClickedEvent() {
 		return this.#clickedEvent;
@@ -646,7 +801,7 @@ export class UIButton extends UIControl {
 	// 눌림 틴트 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } color
+	 * @param { Color } color 마우스가 올라 있을 때 덮을 틴트 색. (사본을 담는다, 기본 new Color(1, 1, 1, 0.12))
 	 */
 	setHoverTintColor(color) {
 		this.#hoverTintColor = color.clone();
@@ -656,7 +811,7 @@ export class UIButton extends UIControl {
 	// 오버 틴트 색상 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 오버 틴트 색.
 	 */
 	getHoverTintColor() {
 		return this.#hoverTintColor;
@@ -666,7 +821,7 @@ export class UIButton extends UIControl {
 	// 오버 진입 이벤트 설정.
 	//==============================================================================
 	/**
-	 * @param { function(UIButton): void } callback
+	 * @param { function(UIButton): void } callback 마우스가 노드 위로 들어오면 부를 함수. (인자는 이 버튼)
 	 */
 	setHoverEvent(callback) {
 		this.#hoverEvent = callback;
@@ -676,7 +831,7 @@ export class UIButton extends UIControl {
 	// 오버 진입 이벤트 반환.
 	//==============================================================================
 	/**
-	 * @returns { function(UIButton): void }
+	 * @returns { function(UIButton): void } 오버 진입 이벤트 함수. (없으면 null)
 	 */
 	getHoverEvent() {
 		return this.#hoverEvent;
@@ -686,7 +841,7 @@ export class UIButton extends UIControl {
 	// 눌림 틴트 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } color
+	 * @param { Color } color 누르는 동안 덮을 틴트 색. (기본 new Color(0, 0, 0, 0.3))
 	 */
 	setPressedTintColor(color) {
 		this.#pressedTintColor = color;
@@ -696,7 +851,7 @@ export class UIButton extends UIControl {
 	// 눌림 틴트 색상 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 눌림 틴트 색.
 	 */
 	getPressedTintColor() {
 		return this.#pressedTintColor;
@@ -706,7 +861,7 @@ export class UIButton extends UIControl {
 	// 트랜지션 지속 시간 설정.
 	//==============================================================================
 	/**
-	 * @param { number } duration
+	 * @param { number } duration 틴트가 다 씌워지거나 걷히는 데 걸리는 시간. (초, 기본 0.3)
 	 */
 	setTransitionDuration(duration) {
 		this.#transitionDuration = duration;
@@ -716,7 +871,7 @@ export class UIButton extends UIControl {
 	// 트랜지션 지속 시간 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 트랜지션 지속 시간. (초)
 	 */
 	getTransitionDuration() {
 		return this.#transitionDuration;
@@ -726,7 +881,7 @@ export class UIButton extends UIControl {
 	// 활성화 여부 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } isInteractable
+	 * @param { boolean } isInteractable 거짓이면 누름을 받지 않고 스프라이트에 비활성 틴트를 덮는다. (기본 참)
 	 */
 	setInteractable(isInteractable) {
 		if (this.getInteractable() === isInteractable) {
@@ -748,7 +903,7 @@ export class UIButton extends UIControl {
 	// 활성화 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 누름을 받으면 참.
 	 */
 	getInteractable() {
 		return this.#isInteractable;

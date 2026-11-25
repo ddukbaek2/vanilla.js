@@ -14,6 +14,47 @@ const System = globalThis;
 // - 사용: new ShaderWarmer(webGL2RenderingContext, [{ vertexShader, fragmentShader, attributeLocationTable }]) 뒤 매 프레임 update().
 //   어트리뷰트 위치는 ShaderProgram 에 넘길 것과 같게 줘야 캐시에 걸린다.
 //==============================================================================
+/**
+ * @example <caption>켤 때 셰이더 미리 링크하기</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, ShaderWarmer } from "./build/vanilla.js";
+ *
+ * const VERTEX_SHADER_SOURCE = `#version 300 es
+ * in vec2 vertexPosition;
+ * void main() {
+ * 	gl_Position = vec4(vertexPosition, 0.0, 1.0);
+ * }
+ * `;
+ * const FRAGMENT_SHADER_SOURCE = `#version 300 es
+ * precision highp float;
+ * out vec4 outputColor;
+ * void main() {
+ * 	outputColor = vec4(1.0);
+ * }
+ * `;
+ *
+ * class MainScene extends Scene {
+ * 	initialize(engine) {
+ * 		const graphic = engine.getGraphic();
+ * 		const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
+ * 		const programSources = [{ vertexShader: VERTEX_SHADER_SOURCE, fragmentShader: FRAGMENT_SHADER_SOURCE, attributeLocationTable: { vertexPosition: 0 } }];
+ * 		this.shaderWarmer = new ShaderWarmer(webGL2RenderingContext, programSources);
+ * 		const isSupported = this.shaderWarmer.isSupported();
+ * 		console.log(isSupported);
+ * 	}
+ *
+ * 	tick(timeDelta) {
+ * 		super.tick(timeDelta);
+ * 		if (!this.shaderWarmer.isFinished()) {
+ * 			this.shaderWarmer.update();
+ * 		}
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class ShaderWarmer {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -27,7 +68,7 @@ export class ShaderWarmer {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
 	 * @param { Array<object> } programSources - { vertexShader, fragmentShader, attributeLocationTable } 의 배열. (먼저 쓸 것부터)
 	 */
 	constructor(webGL2RenderingContext, programSources) {
@@ -104,7 +145,7 @@ export class ShaderWarmer {
 	// 다 링크했는지 반환. (확장이 없어 하지 않았으면 처음부터 true)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 다 링크했으면 참.
 	 */
 	isFinished() {
 		return this.#pendingPrograms.length === 0;
@@ -114,7 +155,7 @@ export class ShaderWarmer {
 	// 확장을 쓸 수 있는지 반환. (false 면 미리 링크를 하지 않는다)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 확장을 쓸 수 있으면 참.
 	 */
 	isSupported() {
 		return this.getParallelExtension() !== null;
@@ -124,7 +165,7 @@ export class ShaderWarmer {
 	// 렌더링 컨텍스트 반환.
 	//==============================================================================
 	/**
-	 * @returns { WebGL2RenderingContext }
+	 * @returns { WebGL2RenderingContext } 렌더링 컨텍스트.
 	 */
 	getWebGL2RenderingContext() {
 		return this.#webGL2RenderingContext;
@@ -134,7 +175,7 @@ export class ShaderWarmer {
 	// 병렬 링크 확장 반환. (없으면 null)
 	//==============================================================================
 	/**
-	 * @returns { object | null }
+	 * @returns { object | null } KHR_parallel_shader_compile 확장. (없으면 null)
 	 */
 	getParallelExtension() {
 		return this.#parallelExtension;

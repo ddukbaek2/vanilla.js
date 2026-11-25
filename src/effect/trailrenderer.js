@@ -18,6 +18,33 @@ import { Graphic } from "../core/graphic.js";
 //     trail.setWidth(14, 0);
 //     trail.setColors(new Color(0.4, 0.8, 1, 0.9), new Color(0.4, 0.8, 1, 0));
 //==============================================================================
+/**
+ * @example <caption>움직이는 노드 뒤에 빛나는 띠 남기기</caption>
+ * import { Engine, EngineConfiguration, Scene, WorldNode, TrailRenderer, Tween, TweenProperty, Color, Vector2 } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const node = new WorldNode();
+ * 		const root = this.getRoot();
+ * 		root.addChild(node);
+ * 		const trailRenderer = node.addComponent(TrailRenderer);
+ * 		trailRenderer.setTime(0.5);
+ * 		trailRenderer.setWidth(14, 0);
+ * 		trailRenderer.setColors(new Color(0.4, 0.8, 1, 0.9), new Color(0.4, 0.8, 1, 0));
+ * 		trailRenderer.setAdditive(true);
+ * 		const tween = Tween.createNodeTween(node, TweenProperty.localPosition, Vector2.create(40, 180), Vector2.create(600, 180), 0.8);
+ * 		tween.setComplete(() => {
+ * 			console.log(trailRenderer.getPointCount());
+ * 		});
+ * 		this.startTween(tween);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class TrailRenderer extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -57,7 +84,7 @@ export class TrailRenderer extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 시간. (초, 점이 늙고 수명이 지난 점은 빠진다)
 	 */
 	tick(timeDelta) {
 		const node = this.getNode();
@@ -86,11 +113,11 @@ export class TrailRenderer extends Component {
 	}
 
 	//==============================================================================
-	// 출력. (세그먼트마다 굵기 / 색 보간 — 노드 원점 기준 상대 좌표로 그린다)
+	// 출력. (세그먼트마다 굵기 / 색 보간, 노드 원점 기준 상대 좌표로 그린다)
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	draw(graphic) {
 		if (this.#pointList.length < 2) {
@@ -134,34 +161,67 @@ export class TrailRenderer extends Component {
 	//==============================================================================
 	// 설정 메서드 목록.
 	//==============================================================================
-	/** @param { number } pointLifetime 점이 남는 시간. (초) */
+
+	//==============================================================================
+	// 점이 남는 시간 설정. (띠의 길이를 정한다)
+	//==============================================================================
+	/**
+	 * @param { number } pointLifetime 점이 남는 시간. (초)
+	 */
 	setTime(pointLifetime) {
 		this.#pointLifetime = pointLifetime;
 	}
 
-	/** @param { number } minVertexDistance */
+	//==============================================================================
+	// 점 사이 최소 거리 설정.
+	//==============================================================================
+	/**
+	 * @param { number } minVertexDistance 이보다 가까이 움직이면 점을 더하지 않는다. (픽셀, 기본 3)
+	 */
 	setMinVertexDistance(minVertexDistance) {
 		this.#minVertexDistance = minVertexDistance;
 	}
 
-	/** @param { number } startWidth @param { number } endWidth */
+	//==============================================================================
+	// 굵기 설정. (갓 생긴 점의 굵기에서 끝 굵기로 줄어든다)
+	//==============================================================================
+	/**
+	 * @param { number } startWidth 갓 생긴 점의 굵기. (픽셀, 기본 10)
+	 * @param { number } endWidth 수명이 다한 점의 굵기. (픽셀, 기본 0)
+	 */
 	setWidth(startWidth, endWidth) {
 		this.#startWidth = startWidth;
 		this.#endWidth = endWidth;
 	}
 
-	/** @param { Color } startColor @param { Color } endColor */
+	//==============================================================================
+	// 색 설정. (갓 생긴 점의 색에서 끝 색으로 바뀐다)
+	//==============================================================================
+	/**
+	 * @param { Color } startColor 갓 생긴 점의 색. (복사해 둔다)
+	 * @param { Color } endColor 수명이 다한 점의 색. (복사해 둔다)
+	 */
 	setColors(startColor, endColor) {
 		this.#startColor = startColor.clone();
 		this.#endColor = endColor.clone();
 	}
 
-	/** @param { boolean } isAdditive */
+	//==============================================================================
+	// 가산 합성 여부 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } isAdditive 참이면 "lighter" 로 섞어 그린다. (기본 거짓)
+	 */
 	setAdditive(isAdditive) {
 		this.#isAdditive = isAdditive;
 	}
 
-	/** @param { boolean } isEmitting 거짓이면 새 점을 만들지 않는다. (남은 띠는 잦아든다) */
+	//==============================================================================
+	// 점 만들기 여부 설정.
+	//==============================================================================
+	/**
+	 * @param { boolean } isEmitting 거짓이면 새 점을 만들지 않는다. (남은 띠는 잦아든다)
+	 */
 	setEmitting(isEmitting) {
 		this.#isEmitting = isEmitting;
 	}
@@ -169,7 +229,13 @@ export class TrailRenderer extends Component {
 	//==============================================================================
 	// 조회 메서드 목록.
 	//==============================================================================
-	/** @returns { number } */
+
+	//==============================================================================
+	// 남은 점 수 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 남은 점 수.
+	 */
 	getPointCount() {
 		return this.#pointList.length;
 	}

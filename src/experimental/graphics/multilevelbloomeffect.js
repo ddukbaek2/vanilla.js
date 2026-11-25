@@ -75,6 +75,30 @@ void main() {
 // - 사용: resize(씬 너비, 높이) → render(씬 텍스처) → getResultTexture() 를 합성 패스에서 세기를 곱해 더한다.
 // - 부수 효과: 깊이 시험과 섞기를 끄고, TEXTURE0 을 활성으로, 프레임버퍼 바인드가 바뀐다. 섞기 함수는 앞의 것으로 돌린다.
 //==============================================================================
+/**
+ * @example <caption>HDR 씬 텍스처에서 다단 블룸 뽑기</caption>
+ * import { MultiLevelBloomEffect, RenderTarget } from "./build/vanilla.js";
+ *
+ * const width = 640;
+ * const height = 360;
+ * const canvas = document.createElement("canvas");
+ * const webGL2RenderingContext = canvas.getContext("webgl2");
+ * const sceneRenderTarget = new RenderTarget(webGL2RenderingContext, width, height, true, { useFloatColor: true });
+ * sceneRenderTarget.bind();
+ * webGL2RenderingContext.clearColor(2.0, 1.5, 0.5, 1.0);
+ * webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT | webGL2RenderingContext.DEPTH_BUFFER_BIT);
+ *
+ * const multiLevelBloomEffect = new MultiLevelBloomEffect(webGL2RenderingContext, 5, true);
+ * multiLevelBloomEffect.resize(width, height);
+ * multiLevelBloomEffect.setThreshold(1.0, 0.5);
+ * const sceneColorTexture = sceneRenderTarget.getColorTexture();
+ * multiLevelBloomEffect.render(sceneColorTexture);
+ * const bloomTexture = multiLevelBloomEffect.getResultTexture();
+ * const levelCount = multiLevelBloomEffect.getLevelCount();
+ * console.log(levelCount, bloomTexture !== null);
+ * multiLevelBloomEffect.destroy();
+ * sceneRenderTarget.destroy();
+ */
 export class MultiLevelBloomEffect extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -96,7 +120,7 @@ export class MultiLevelBloomEffect extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
 	 * @param { number } [levelCount] 기본 5.
 	 * @param { boolean } [useFloatColor] 기본 true.
 	 */
@@ -148,8 +172,8 @@ export class MultiLevelBloomEffect extends Object {
 	// 크기 변경. (씬 해상도 기준, 같으면 그대로)
 	//==============================================================================
 	/**
-	 * @param { number } sceneWidth
-	 * @param { number } sceneHeight
+	 * @param { number } sceneWidth 씬 가로 크기. (픽셀, 1 밑은 1, 첫 단은 그 반)
+	 * @param { number } sceneHeight 씬 세로 크기. (픽셀, 1 밑은 1, 첫 단은 그 반)
 	 */
 	resize(sceneWidth, sceneHeight) {
 		const safeWidth = System.Math.max(1, sceneWidth);
@@ -166,7 +190,7 @@ export class MultiLevelBloomEffect extends Object {
 	// 단 수 설정. (1 이상, 같으면 그대로)
 	//==============================================================================
 	/**
-	 * @param { number } levelCount
+	 * @param { number } levelCount 단 수. (소수는 버리고 1 밑은 1)
 	 */
 	setLevelCount(levelCount) {
 		const safeLevelCount = System.Math.max(1, System.Math.floor(levelCount));
@@ -181,7 +205,7 @@ export class MultiLevelBloomEffect extends Object {
 	// 단 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 단 수.
 	 */
 	getLevelCount() {
 		return this.#levelCount;
@@ -191,7 +215,7 @@ export class MultiLevelBloomEffect extends Object {
 	// 실수 판 사용 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 단마다의 판이 RGBA16F 면 참.
 	 */
 	getUseFloatColor() {
 		return this.#useFloatColor;
@@ -201,8 +225,8 @@ export class MultiLevelBloomEffect extends Object {
 	// 뽑는 문턱 설정. (밝기, 무릎은 문턱 둘레의 부드러운 폭, 0 이면 딱 자름)
 	//==============================================================================
 	/**
-	 * @param { number } threshold
-	 * @param { number } knee
+	 * @param { number } threshold 뽑는 문턱 밝기. (세 채널 가운데 가장 큰 값, 0 밑은 0, 기본 1)
+	 * @param { number } knee 문턱 둘레의 부드러운 폭. (0 밑은 0, 기본 0.25)
 	 */
 	setThreshold(threshold, knee) {
 		this.#threshold = System.Math.max(0, threshold);
@@ -213,7 +237,7 @@ export class MultiLevelBloomEffect extends Object {
 	// 블룸 렌더링. (호출 후 결과는 getResultTexture())
 	//==============================================================================
 	/**
-	 * @param { WebGLTexture } sceneColorTexture
+	 * @param { WebGLTexture } sceneColorTexture 밝은 몫을 뽑을 씬 컬러 텍스처.
 	 */
 	render(sceneColorTexture) {
 		const levelRenderTargetList = this.#levelRenderTargetList;
@@ -281,7 +305,7 @@ export class MultiLevelBloomEffect extends Object {
 	// 결과 텍스처 반환. (render() 이후, 첫 단)
 	//==============================================================================
 	/**
-	 * @returns { WebGLTexture | null }
+	 * @returns { WebGLTexture | null } 첫 단(씬의 반 크기)의 컬러 텍스처. (단이 없으면 null)
 	 */
 	getResultTexture() {
 		const levelRenderTargetList = this.#levelRenderTargetList;
@@ -309,7 +333,7 @@ export class MultiLevelBloomEffect extends Object {
 	// 렌더링 컨텍스트 반환.
 	//==============================================================================
 	/**
-	 * @returns { WebGL2RenderingContext }
+	 * @returns { WebGL2RenderingContext } 렌더링 컨텍스트.
 	 */
 	getWebGL2RenderingContext() {
 		return this.#webGL2RenderingContext;

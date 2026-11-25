@@ -10,6 +10,23 @@ import { AudioAsset } from "../resource/audioasset.js";
 // AudioAsset 에 로드된 오디오 버퍼를 재생한다.
 // 내보낼 노드를 주면(AudioBus.createAudioPlayer) 출력 대신 그 노드로 소리를 낸다.
 //==============================================================================
+/**
+ * @example <caption>소리 하나를 빠르기와 음량을 바꿔 틀기</caption>
+ * import { Engine, EngineConfiguration, AudioAsset } from "./build/vanilla.js";
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const audioManager = engine.getAudioManager();
+ * const audioAsset = new AudioAsset();
+ * await audioAsset.load("examples/assets/beep.wav");
+ *
+ * const audioPlayer = audioManager.createAudioPlayer();
+ * audioPlayer.setAudioAsset(audioAsset);
+ * audioPlayer.setVolume(0.8);
+ * audioPlayer.setPlaybackRate(1.5);
+ * audioPlayer.play(false);
+ * console.log(audioPlayer.getDuration(), audioPlayer.getVolume());
+ */
 export class AudioPlayer {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -30,7 +47,7 @@ export class AudioPlayer {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { AudioContext | null } audioContext
+	 * @param { AudioContext | null } audioContext 재생에 쓸 오디오 컨텍스트. (null 이면 소리를 내지 않는 플레이어)
 	 * @param { AudioNode | null } [outputNode] 소리를 내보낼 노드. (null 이면 audioContext.destination)
 	 */
 	constructor(audioContext, outputNode = null) {
@@ -55,7 +72,7 @@ export class AudioPlayer {
 	// 재생.
 	//==============================================================================
 	/**
-	 * @param { boolean } loop
+	 * @param { boolean } loop 반복 재생하면 참. (기본 거짓)
 	 */
 	play(loop = false) {
 		const audioContext = this.getAudioContext();
@@ -93,8 +110,8 @@ export class AudioPlayer {
 	// 내부 재생 시작.
 	//==============================================================================
 	/**
-	 * @param { AudioBuffer } audioBuffer
-	 * @param { boolean } loop
+	 * @param { AudioBuffer } audioBuffer 재생할 오디오 버퍼.
+	 * @param { boolean } loop 반복 재생하면 참.
 	 */
 	startPlayback(audioBuffer, loop) {
 		const audioContext = this.getAudioContext();
@@ -122,7 +139,7 @@ export class AudioPlayer {
 	// 재생 빠르기 설정. (1 이면 그대로, 음 높이도 같이 바뀐다, 다음 play 부터, 0 이하이거나 숫자가 아니면 1)
 	//==============================================================================
 	/**
-	 * @param { number } playbackRate
+	 * @param { number } playbackRate 재생 빠르기. (1 이면 그대로)
 	 */
 	setPlaybackRate(playbackRate) {
 		const isValid = typeof playbackRate === "number" && System.Number.isFinite(playbackRate) && playbackRate > 0;
@@ -165,7 +182,7 @@ export class AudioPlayer {
 	// 음량 설정. (0 ~ 1, 음소거 중이면 음소거를 풀 때 적용된다)
 	//==============================================================================
 	/**
-	 * @param { number } volume
+	 * @param { number } volume 음량. (0 ~ 1 로 자르고, 유한한 숫자가 아니면 1)
 	 */
 	setVolume(volume) {
 		const clampedVolume = System.Number.isFinite(volume) ? System.Math.max(0, System.Math.min(1, volume)) : 1;
@@ -179,7 +196,7 @@ export class AudioPlayer {
 	// 음량 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 음량. (0 ~ 1, 기본 1)
 	 */
 	getVolume() {
 		return this.#volume;
@@ -203,7 +220,7 @@ export class AudioPlayer {
 	// 오디오 애셋 설정.
 	//==============================================================================
 	/**
-	 * @param { AudioAsset } audioAsset
+	 * @param { AudioAsset } audioAsset 재생할 오디오 애셋. (다음 play 부터)
 	 */
 	setAudioAsset(audioAsset) {
 		this.#audioAsset = audioAsset;
@@ -213,7 +230,7 @@ export class AudioPlayer {
 	// 오디오 애셋 반환.
 	//==============================================================================
 	/**
-	 * @returns { AudioAsset | null }
+	 * @returns { AudioAsset | null } 오디오 애셋. (없으면 null)
 	 */
 	getAudioAsset() {
 		return this.#audioAsset;
@@ -223,7 +240,7 @@ export class AudioPlayer {
 	// 재생 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 재생 중이면 참. (끝까지 재생되면 거짓이 된다)
 	 */
 	isPlaying() {
 		return this.#isPlaying;
@@ -233,7 +250,7 @@ export class AudioPlayer {
 	// 음소거 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 음소거 중이면 참.
 	 */
 	isMuted() {
 		return this.#isMuted;
@@ -243,7 +260,7 @@ export class AudioPlayer {
 	// 현재 시간 반환. (0~duration)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } setTime 으로 정한 재생 시작 위치. (초, 재생 중에 늘지 않는다)
 	 */
 	getTime() {
 		return this.#time;
@@ -253,7 +270,7 @@ export class AudioPlayer {
 	// 재생 시간 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 애셋의 재생 시간. (초, 애셋이 없으면 0)
 	 */
 	getDuration() {
 		const audioAsset = this.getAudioAsset();
@@ -267,7 +284,7 @@ export class AudioPlayer {
 	// 오디오 컨텍스트 반환.
 	//==============================================================================
 	/**
-	 * @returns { AudioContext | null }
+	 * @returns { AudioContext | null } 오디오 컨텍스트. (없으면 null)
 	 */
 	getAudioContext() {
 		return this.#audioContext;

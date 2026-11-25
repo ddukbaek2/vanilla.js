@@ -21,6 +21,33 @@ import { UIButton } from "./uibutton.js";
 //     dropdown.setChangedEvent((self) => { self.getSelectedText(); });
 //     panelNode.addChild(dropdown);
 //==============================================================================
+/**
+ * @example <caption>화질 고르기 드롭다운</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIDropdown, Color, Vector2 } from "./build/vanilla.js";
+ *
+ * class DropdownScene extends UIScene {
+ * 	create() {
+ * 		super.create();
+ * 		const dropdown = new UIDropdown({ width: 200, height: 32, fontSize: 14, highlightColor: new Color(0.3, 0.8, 1, 0.3) });
+ * 		dropdown.setOptionList(["Low", "Medium", "High", "Ultra"]);
+ * 		dropdown.setSelectedIndex(2);
+ * 		dropdown.setChangedEvent((self) => {
+ * 			const selectedText = self.getSelectedText();
+ * 			console.log(selectedText);
+ * 		});
+ * 		dropdown.setLocalPosition(Vector2.create(220, 80));
+ * 		const root = this.getRoot();
+ * 		root.addChild(dropdown);
+ * 		dropdown.setOpen(true);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new DropdownScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class UIDropdown extends WorldNode {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -114,7 +141,7 @@ export class UIDropdown extends WorldNode {
 	// 선택지 목록 설정. (펼침 목록 행을 다시 만든다)
 	//==============================================================================
 	/**
-	 * @param { string[] } optionList
+	 * @param { string[] } optionList 선택지 글 목록. (복사해 쥔다, 선택 순서가 목록 밖이면 마지막으로 줄인다)
 	 */
 	setOptionList(optionList) {
 		this.#optionList = optionList.slice();
@@ -158,7 +185,7 @@ export class UIDropdown extends WorldNode {
 	// 선택 처리.
 	//==============================================================================
 	/**
-	 * @param { number } optionIndex
+	 * @param { number } optionIndex 고를 선택지 순서. (목록 밖이면 아무것도 하지 않는다, 고르면 목록을 접고 바뀌었을 때만 changedEvent 를 부른다)
 	 */
 	selectIndex(optionIndex) {
 		if (optionIndex < 0 || optionIndex >= this.#optionList.length) {
@@ -179,7 +206,7 @@ export class UIDropdown extends WorldNode {
 	// - 펼칠 때 목록을 트리 뿌리로 옮겨 나중에 그려지는 형제 노드에 가려지지 않게 한다. (접으면 되돌린다)
 	//==============================================================================
 	/**
-	 * @param { boolean } isOpen
+	 * @param { boolean } isOpen 참이면 펼친다.
 	 */
 	setOpen(isOpen) {
 		this.#isOpen = isOpen;
@@ -283,30 +310,59 @@ export class UIDropdown extends WorldNode {
 	//==============================================================================
 	// 설정 / 조회 메서드 목록.
 	//==============================================================================
-	/** @param { Function } changedEvent (self) */
+
+	//==============================================================================
+	// 선택이 바뀌었을 때 처리기 설정. (selectIndex 로 다른 것을 골랐을 때만, setSelectedIndex 로는 부르지 않는다)
+	//==============================================================================
+	/**
+	 * @param { Function } changedEvent (self)
+	 * @example <caption>고른 선택지 받기</caption>
+	 * import { UIDropdown } from "./build/vanilla.js";
+	 *
+	 * const dropdown = new UIDropdown({ width: 160 });
+	 * dropdown.setOptionList(["Low", "Medium", "High"]);
+	 * dropdown.setChangedEvent((self) => {
+	 * 	const selectedText = self.getSelectedText();
+	 * 	console.log(selectedText);
+	 * });
+	 * dropdown.setSelectedIndex(1);
+	 * dropdown.selectIndex(2);
+	 */
 	setChangedEvent(changedEvent) {
 		this.#changedEvent = changedEvent;
 	}
 
-	/** @param { number } selectedIndex */
+	//==============================================================================
+	// 선택 순서 설정. (처리기를 부르지 않고 머리 글과 강조만 바꾼다)
+	//==============================================================================
+	/** @param { number } selectedIndex 선택 순서. (0 ~ 선택지 수 - 1 로 자른다) */
 	setSelectedIndex(selectedIndex) {
 		this.#selectedIndex = System.Math.max(0, System.Math.min(selectedIndex, this.#optionList.length - 1));
 		this.refreshHeader();
 		this.refreshHighlight();
 	}
 
-	/** @returns { number } */
+	//==============================================================================
+	// 선택 순서 반환.
+	//==============================================================================
+	/** @returns { number } 선택 순서. (선택지가 없어도 0) */
 	getSelectedIndex() {
 		return this.#selectedIndex;
 	}
 
-	/** @returns { string } */
+	//==============================================================================
+	// 고른 선택지 글 반환.
+	//==============================================================================
+	/** @returns { string } 고른 선택지 글. (선택지가 없으면 빈 글) */
 	getSelectedText() {
 		const selectedText = this.#optionList[this.#selectedIndex];
 		return selectedText !== undefined ? selectedText : "";
 	}
 
-	/** @returns { boolean } */
+	//==============================================================================
+	// 펼쳐져 있는지 반환.
+	//==============================================================================
+	/** @returns { boolean } 펼쳐져 있으면 참. */
 	isOpen() {
 		return this.#isOpen;
 	}

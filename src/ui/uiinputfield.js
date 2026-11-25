@@ -17,9 +17,9 @@ import { SYSTEM_FONT_STRING } from "../base/platform.js";
 // 문맥 메뉴 항목. (잘라내기 / 복사 / 붙여넣기, requestMenuAction 이 받는다)
 //==============================================================================
 export const UIInputFieldMenuAction = {
-	cut: "cut",
-	copy: "copy",
-	paste: "paste",
+	cut: "cut", // 잘라내기.
+	copy: "copy", // 복사.
+	paste: "paste", // 붙여넣기.
 };
 
 
@@ -31,6 +31,45 @@ export const UIInputFieldMenuAction = {
 //   모바일 소프트 키보드 / 시스템 클립보드가 동작. false 면 ASCII 위주 키보드 직접 처리.
 // - 우클릭 시 컨텍스트 메뉴 (잘라내기 / 복사 / 붙여넣기).
 //==============================================================================
+/**
+ * @example <caption>이름 입력칸 만들기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIInputField, Vector2 } from "./build/vanilla.js";
+ *
+ * class MainScene extends UIScene {
+ * 	constructor() {
+ * 		super();
+ * 		this.setLoadingMinDurationMs(0);
+ * 	}
+ *
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const inputField = new UIInputField();
+ * 		inputField.setEngine(engine);
+ * 		inputField.setLocalPosition(Vector2.create(40, 40));
+ * 		inputField.setContentSize(Vector2.create(320, 56));
+ * 		inputField.setPlaceholder("Your name");
+ * 		inputField.setMaxLength(16);
+ * 		inputField.setOnChange((value) => {
+ * 			console.log("change", value);
+ * 		});
+ * 		inputField.setOnSubmit((value) => {
+ * 			console.log("submit", value);
+ * 		});
+ * 		const root = this.getRoot();
+ * 		root.addChild(inputField);
+ * 		inputField.attach();
+ * 		inputField.setText("Player");
+ * 		console.log(inputField.getText(), inputField.getCursorIndex());
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.canvasId = "mainCanvas";
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * engineConfiguration.autoResizeOnWindowResize = true;
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class UIInputField extends WorldNode {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -141,7 +180,7 @@ export class UIInputField extends WorldNode {
 		// 2) 선택 영역 하이라이트 (자식보다 먼저 그려져 텍스트 뒤에 깔리도록 컴포넌트로).
 		this.addComponent(BackgroundLayerRenderer);
 
-		// 3) 플레이스홀더 라벨 (자식 노드). 배경은 투명 — 안 그러면 UIView.draw 가
+		// 3) 플레이스홀더 라벨 (자식 노드). 배경은 투명, 안 그러면 UIView.draw 가
 		//    contentSize 전체를 흰색으로 채워서 그 아래 깔린 selection 하이라이트가 가려진다.
 		this.#placeholderTextNode = new WorldNode();
 		this.#placeholderTextNode.setPivot(Pivot.topLeft);
@@ -181,20 +220,90 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// 설정.
 	//==============================================================================
+	/**
+	 * @param { Engine } engine 엔진. (DOM 입력의 자리, 캔버스 사건, 문맥 메뉴에 쓴다, attach 전에 준다)
+	 */
 	setEngine(engine) { this.#engine = engine; }
+	//==============================================================================
+	// DOM 입력 사용 설정. (attach 때 보므로 그 전에 정한다)
+	//==============================================================================
+	/**
+	 * @param { boolean } use 참이면 숨은 DOM input 으로 글을 받는다. (한글 IME, 모바일 화면 키보드, 시스템 클립보드가 된다, 기본 거짓)
+	 * @example <caption>모바일 키보드와 IME 로 받는 입력칸</caption>
+	 * import { Engine, EngineConfiguration, UIScene, UIInputField, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends UIScene {
+	 * 	constructor() {
+	 * 		super();
+	 * 		this.setLoadingMinDurationMs(0);
+	 * 	}
+	 *
+	 * 	initialize(engine) {
+	 * 		super.initialize(engine);
+	 * 		const inputField = new UIInputField();
+	 * 		inputField.setEngine(engine);
+	 * 		inputField.setUseDOMInput(true);
+	 * 		inputField.setUseTouchEndFocus(true);
+	 * 		inputField.setLocalPosition(Vector2.create(40, 40));
+	 * 		inputField.setContentSize(Vector2.create(320, 56));
+	 * 		inputField.setPlaceholder("Message");
+	 * 		const root = this.getRoot();
+	 * 		root.addChild(inputField);
+	 * 		inputField.attach();
+	 * 		console.log(inputField.isUsingDOMInput(), inputField.isFocused());
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.canvasId = "mainCanvas";
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * engineConfiguration.autoResizeOnWindowResize = true;
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
 	setUseDOMInput(use) { this.#useDOMInput = !!use; }
+	//==============================================================================
+	// DOM 입력 사용 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } DOM 입력을 쓰면 참.
+	 */
 	isUsingDOMInput() { return this.#useDOMInput; }
 	// DOM 입력일 때 손을 뗄 때(touchend)도 포커스를 줄지. (기본 false, 꺼져 있으면 touchstart 에서만 준다)
 	// 켜면 사용자 활성화가 한 번도 없던 때(페이지의 첫 touchstart)에 얻은 포커스를 손을 뗄 때 다시 줘,
 	// 그런 포커스에 키보드를 띄우지 않는 브라우저(안드로이드 크롬, 웹뷰)에서도 키보드가 뜨게 한다.
+	/**
+	 * @param { boolean } use 참이면 touchend 에서도 포커스를 준다. (기본 거짓)
+	 */
 	setUseTouchEndFocus(use) { this.#useTouchEndFocus = !!use; }
+	//==============================================================================
+	// touchend 포커스 사용 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } touchend 에서도 포커스를 주면 참.
+	 */
 	isUsingTouchEndFocus() { return this.#useTouchEndFocus; }
 	// DOM 입력을 필드 위에서 손가락(마우스)이 직접 누르게 할지. (기본 false, 꺼져 있으면 DOM 입력은 누름을 받지 않고 캔버스가 포커스를 준다)
 	// 켜면 필드가 보이는 동안 투명한 DOM 입력이 필드 자리에서 누름을 받아, 브라우저의 기본 동작으로 포커스(다른 출처의 iframe 이면 그 프레임까지)와
 	// 키보드를 연다. 코드로 준 포커스를 받지 않는 웹뷰(앱 안의 iframe 등)에서 쓴다. 포커스를 받으면 커서는 글 끝에 둔다.
+	/**
+	 * @param { boolean } use 참이면 투명한 DOM 입력이 필드 자리에서 누름을 직접 받는다. (기본 거짓)
+	 */
 	setUseDirectTouch(use) { this.#useDirectTouch = !!use; }
+	//==============================================================================
+	// 직접 누름 사용 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } DOM 입력이 누름을 직접 받으면 참.
+	 */
 	isUsingDirectTouch() { return this.#useDirectTouch; }
 
+	//==============================================================================
+	// 값 설정. (최대 길이를 넘으면 자르고 커서를 끝에 둔다, 바뀜 콜백은 부르지 않는다)
+	//==============================================================================
+	/**
+	 * @param { string } text 넣을 글. (거짓 값이면 빈 글, 그 밖은 String 으로 바꾼다)
+	 */
 	setText(text) {
 		this.#value = String(text || "");
 		if (this.#maxLength > 0 && this.#value.length > this.#maxLength) {
@@ -205,12 +314,30 @@ export class UIInputField extends WorldNode {
 		if (this.#domInput) this.#domInput.value = this.#value;
 		this.refreshTexts();
 	}
+	//==============================================================================
+	// 값 반환.
+	//==============================================================================
+	/**
+	 * @returns { string } 입력한 글. (조합 중인 글은 빠진다)
+	 */
 	getText() { return this.#value; }
 
+	//==============================================================================
+	// 플레이스홀더 설정.
+	//==============================================================================
+	/**
+	 * @param { string } text 값이 비었을 때 보일 글. (거짓 값이면 빈 글)
+	 */
 	setPlaceholder(text) {
 		this.#placeholder = String(text || "");
 		this.refreshTexts();
 	}
+	//==============================================================================
+	// 최대 길이 설정.
+	//==============================================================================
+	/**
+	 * @param { number } n 최대 글자 수. (글의 length 로 센다, 소수는 버린다, 0 이하면 제한하지 않는다, 지금 값은 자르지 않는다)
+	 */
 	setMaxLength(n) {
 		this.#maxLength = n | 0;
 		if (this.#domInput) {
@@ -218,71 +345,230 @@ export class UIInputField extends WorldNode {
 			else this.#domInput.removeAttribute("maxlength");
 		}
 	}
+	//==============================================================================
+	// 글자 크기 설정.
+	//==============================================================================
+	/**
+	 * @param { number } size 글자 크기. (내용 크기 단위, 기본 28)
+	 */
 	setFontSize(size) {
 		this.#fontSize = size;
 		this.#textUILabel.setFontSize(size);
 		this.#placeholderUILabel.setFontSize(size);
 	}
+	//==============================================================================
+	// 글꼴 설정.
+	//==============================================================================
+	/**
+	 * @param { FontFace | null } fontFace 글꼴. (null 이면 시스템 글꼴)
+	 */
 	setFont(fontFace) {
 		this.#fontFace = fontFace;
 		this.#textUILabel.setFont(fontFace);
 		this.#placeholderUILabel.setFont(fontFace);
 	}
+	//==============================================================================
+	// 안쪽 여백 설정.
+	//==============================================================================
+	/**
+	 * @param { number } padding 왼쪽과 오른쪽 안쪽 여백. (내용 크기 단위, 기본 16)
+	 */
 	setPadding(padding) { this.#padding = padding; }
 
+	//==============================================================================
+	// 배경색 설정.
+	//==============================================================================
+	/**
+	 * @param { Color | string } color 배경색. (기본 흰색)
+	 */
 	setBackgroundColor(color) { this.#bgPaint.setColor(color); }
+	//==============================================================================
+	// 모서리 둥글기 설정.
+	//==============================================================================
+	/**
+	 * @param { number } roundSize 배경과 포커스 테두리의 모서리 반지름. (기본 8)
+	 */
 	setRoundSize(roundSize) {
 		this.#bgRoundSize = roundSize;
 		this.#bgPaint.setRoundSize(roundSize);
 	}
+	//==============================================================================
+	// 글자 색 설정.
+	//==============================================================================
+	/**
+	 * @param { Color } color 값 글자의 색. (기본 #222222)
+	 */
 	setTextColor(color) {
 		this.#textColor = color;
 		this.#textUILabel.setTextColor(color);
 	}
+	//==============================================================================
+	// 플레이스홀더 색 설정.
+	//==============================================================================
+	/**
+	 * @param { Color } color 플레이스홀더 글자의 색. (기본 #999999)
+	 */
 	setPlaceholderColor(color) {
 		this.#placeholderColor = color;
 		this.#placeholderUILabel.setTextColor(color);
 	}
+	//==============================================================================
+	// 커서 색 설정. (조합 중 밑줄 색도 함께 바꾼다)
+	//==============================================================================
+	/**
+	 * @param { Color } color 커서와 조합 밑줄의 색. (기본 #5b8def)
+	 */
 	setCursorColor(color) {
 		this.#cursorColor = color;
 		this.#compositionUnderlineColor = color;
 	}
+	//==============================================================================
+	// 포커스 테두리 색 설정.
+	//==============================================================================
+	/**
+	 * @param { Color } color 포커스 테두리 색. (기본 #f97316)
+	 */
 	setFocusBorderColor(color) { this.#focusBorderColor = color; }
+	//==============================================================================
+	// 포커스 테두리 두께 설정.
+	//==============================================================================
+	/**
+	 * @param { number } width 포커스 테두리 두께. (0 이하면 그리지 않는다, 기본 3)
+	 */
 	setFocusBorderWidth(width) { this.#focusBorderWidth = width; }
+	//==============================================================================
+	// 선택 영역 색 설정.
+	//==============================================================================
+	/**
+	 * @param { Color } color 선택 영역을 칠할 색. (기본 알파 0.35 의 파랑)
+	 */
 	setSelectionColor(color) { this.#selectionColor = color; }
 
+	//==============================================================================
+	// 플레이스홀더 반환.
+	//==============================================================================
+	/**
+	 * @returns { string } 플레이스홀더 글.
+	 */
 	getPlaceholder() { return this.#placeholder; }
+	//==============================================================================
+	// 최대 길이 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 최대 글자 수. (0 이면 제한하지 않는다)
+	 */
 	getMaxLength() { return this.#maxLength; }
+	//==============================================================================
+	// 글자 크기 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 글자 크기.
+	 */
 	getFontSize() { return this.#fontSize; }
+	//==============================================================================
+	// 안쪽 여백 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 왼쪽과 오른쪽 안쪽 여백.
+	 */
 	getPadding() { return this.#padding; }
+	//==============================================================================
+	// 배경색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color } 배경색.
+	 */
 	getBackgroundColor() { return this.#bgPaint.getColor(); }
+	//==============================================================================
+	// 모서리 둥글기 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 배경의 모서리 반지름.
+	 */
 	getRoundSize() { return this.#bgRoundSize; }
+	//==============================================================================
+	// 글자 색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color } 값 글자의 색.
+	 */
 	getTextColor() { return this.#textColor; }
+	//==============================================================================
+	// 플레이스홀더 색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color } 플레이스홀더 글자의 색.
+	 */
 	getPlaceholderColor() { return this.#placeholderColor; }
+	//==============================================================================
+	// 커서 색 반환.
+	//==============================================================================
+	/**
+	 * @returns { Color } 커서 색.
+	 */
 	getCursorColor() { return this.#cursorColor; }
+	//==============================================================================
+	// 커서 자리 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 커서 자리. (값 안의 글자 위치, 0 ~ 값 길이)
+	 */
 	getCursorIndex() { return this.#cursorIndex; }
+	//==============================================================================
+	// 선택 시작 자리 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 선택의 고정 끝. (커서 자리와 같으면 선택이 없다)
+	 */
 	getSelectionStart() { return this.#selectionStart; }
+	//==============================================================================
+	// 조합 중인 글 반환.
+	//==============================================================================
+	/**
+	 * @returns { string } IME 가 조합 중인 글. (없으면 빈 글)
+	 */
 	getComposition() { return this.#composition; }
 
 	//==============================================================================
 	// 보이는 글 반환. (값의 커서 자리에 조합 글을 끼운 것)
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 보이는 글.
 	 */
 	getDisplayText() {
 		const before = this.#value.slice(0, this.#cursorIndex);
 		const after = this.#value.slice(this.#cursorIndex);
 		return before + this.#composition + after;
 	}
+	//==============================================================================
+	// IME 조합 중인지.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 조합 중이면 참.
+	 */
 	isComposing() { return this.#isComposing; }
 
+	//==============================================================================
+	// 바뀜 콜백 설정.
+	//==============================================================================
+	/**
+	 * @param { (value: string) => void } callback 사용자 입력으로 값이 바뀔 때마다 부를 함수. (인자는 새 값, setText 로 바꿀 때는 부르지 않는다, null 이면 부르지 않는다)
+	 */
 	setOnChange(callback) { this.#onChangeCallback = callback; }
+	//==============================================================================
+	// 제출 콜백 설정.
+	//==============================================================================
+	/**
+	 * @param { (value: string) => void } callback 포커스된 채 Enter 를 누르면 부를 함수. (인자는 지금 값, null 이면 부르지 않는다)
+	 */
 	setOnSubmit(callback) { this.#onSubmitCallback = callback; }
 
 	//==============================================================================
 	// 렌더 상태 스냅샷 (오버레이/배경 렌더러가 읽음).
 	//==============================================================================
+	/**
+	 * @returns { object } 그릴 때 쓸 상태를 담은 새 객체. ({ value, composition, cursorIndex, selectionStart, focused, cursorVisible, fontSize, fontFace, padding, cursorColor, compositionUnderlineColor, focusBorderColor, focusBorderWidth, selectionColor, bgRoundSize })
+	 */
 	getRenderState() {
 		return {
 			value: this.#value,
@@ -311,6 +597,9 @@ export class UIInputField extends WorldNode {
 		else this.attachCanvasKeyboard();
 		this.attachContextMenuHandler();
 	}
+	//==============================================================================
+	// 입력 끄기. (DOM 입력, 키보드, 문맥 메뉴 사건을 떼고 메뉴를 닫는다)
+	//==============================================================================
 	detach() {
 		this.detachDOMInput();
 		this.detachCanvasKeyboard();
@@ -330,12 +619,24 @@ export class UIInputField extends WorldNode {
 			this.handleFocus();
 		}
 	}
+	//==============================================================================
+	// 포커스 풀기.
+	//==============================================================================
 	blur() {
 		if (this.#useDOMInput && this.#domInput) this.#domInput.blur();
 		else this.handleBlur();
 	}
+	//==============================================================================
+	// 포커스 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 포커스를 가졌으면 참.
+	 */
 	isFocused() { return this.#focused; }
 
+	//==============================================================================
+	// 모두 선택.
+	//==============================================================================
 	selectAll() {
 		this.#selectionStart = 0;
 		this.#cursorIndex = this.#value.length;
@@ -345,6 +646,9 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// 매 프레임: 라벨 위치 / 텍스트 동기, DOM 위치 동기, 커서 깜빡임, selection 폴링.
 	//==============================================================================
+	/**
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
+	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
 		// 부탁받은 문맥 메뉴 항목.
@@ -392,6 +696,9 @@ export class UIInputField extends WorldNode {
 	// 캔버스 측 터치 (포지션 기반 커서 / 드래그 선택). pointer-events: none 인 DOM input
 	// 이 클릭을 가로채지 않으므로 항상 여기로 들어옴.
 	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition 누른 자리. (뷰 좌표)
+	 */
 	touchPress(viewInputPosition) {
 		this.focus();
 		this.hideContextMenu();
@@ -404,6 +711,12 @@ export class UIInputField extends WorldNode {
 		this.#blinkTimer = 0;
 		this.#cursorVisible = true;
 	}
+	//==============================================================================
+	// 터치 이동. (누른 자리부터 지금 자리까지 선택한다)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition 옮긴 자리. (뷰 좌표)
+	 */
 	touchMove(viewInputPosition) {
 		if (this.#dragStartIndex < 0) return;
 		const localX = viewInputPosition.x - this.getPosition().x;
@@ -420,13 +733,23 @@ export class UIInputField extends WorldNode {
 		this.#blinkTimer = 0;
 		this.#cursorVisible = true;
 	}
+	//==============================================================================
+	// 터치 뗌. (끌어 선택하기를 끝낸다)
+	//==============================================================================
 	touchRelease() { this.#dragStartIndex = -1; }
+	//==============================================================================
+	// 터치 취소. (끌어 선택하기를 끝낸다)
+	//==============================================================================
 	touchCancel() { this.#dragStartIndex = -1; }
 
 	//==============================================================================
 	// localX(노드 로컬 X) → 문자 인덱스. 측정은 오프스크린 2D ctx 로.
 	//   (메인 캔버스는 WebGL2 컨텍스트라 2D 측정 불가)
 	//==============================================================================
+	/**
+	 * @param { number } localX 노드 안의 X. (내용 영역 왼쪽이 0)
+	 * @returns { number } 그 자리에 가장 가까운 글자 사이의 자리. (0 ~ 값 길이, 잴 컨텍스트가 없으면 값 길이)
+	 */
 	measureIndexAtLocalX(localX) {
 		const value = this.#value;
 		if (value.length === 0) return 0;
@@ -454,6 +777,12 @@ export class UIInputField extends WorldNode {
 		return result;
 	}
 
+	//==============================================================================
+	// 글 너비를 잴 2D 컨텍스트 반환. (모듈이 함께 쓰는 오프스크린 캔버스)
+	//==============================================================================
+	/**
+	 * @returns { CanvasRenderingContext2D | null } 2D 컨텍스트. (캔버스를 만들 수 없으면 null)
+	 */
 	getMeasureContext() {
 		return getOffscreenMeasureContext();
 	}
@@ -475,6 +804,9 @@ export class UIInputField extends WorldNode {
 		this.#placeholderUILabel.setText(this.#placeholder);
 	}
 
+	//==============================================================================
+	// 라벨과 오버레이 노드의 자리, 크기 맞추기. (내용 크기가 0 이면 하지 않는다)
+	//==============================================================================
 	refreshTextPositions() {
 		const size = this.getContentSize();
 		if (size.x <= 0 || size.y <= 0) return;
@@ -557,6 +889,9 @@ export class UIInputField extends WorldNode {
 		this.attachCanvasFocusHandler();
 	}
 
+	//==============================================================================
+	// DOM 입력 떼기. (캔버스 포커스 핸들러도 떼고 포커스와 조합을 푼다)
+	//==============================================================================
 	detachDOMInput() {
 		this.detachCanvasFocusHandler();
 		if (!this.#domInput) return;
@@ -648,6 +983,9 @@ export class UIInputField extends WorldNode {
 		this.#canvasFocusHandler = null;
 	}
 
+	//==============================================================================
+	// DOM 입력을 필드의 화면 자리에 맞추기. (직접 누름이면 보이는 동안만 누름을 받는다)
+	//==============================================================================
 	layoutDOMInput() {
 		if (!this.#domInput || !this.#engine) return;
 		const viewManager = this.#engine.getViewManager();
@@ -673,6 +1011,9 @@ export class UIInputField extends WorldNode {
 		}
 	}
 
+	//==============================================================================
+	// DOM 입력의 값 받기. (조합 중이 아니고 값이 바뀌었으면 담고 바뀜 콜백을 부른다)
+	//==============================================================================
 	handleDOMInputEvent() {
 		if (!this.#domInput) return;
 		if (this.#isComposing) return;
@@ -696,11 +1037,20 @@ export class UIInputField extends WorldNode {
 		this.#canvasKeydownHandler = (event) => this.handleCanvasKeydown(event);
 		System.document.addEventListener("keydown", this.#canvasKeydownHandler);
 	}
+	//==============================================================================
+	// 캔버스 모드 키보드 사건 떼기.
+	//==============================================================================
 	detachCanvasKeyboard() {
 		if (!this.#canvasKeydownHandler) return;
 		System.document.removeEventListener("keydown", this.#canvasKeydownHandler);
 		this.#canvasKeydownHandler = null;
 	}
+	//==============================================================================
+	// 캔버스 모드 키 입력 처리. (포커스일 때만, Ctrl 이나 Cmd 와 A, C, X, V, 지우기, 화살표, Home, End, Enter, 글자 한 개)
+	//==============================================================================
+	/**
+	 * @param { KeyboardEvent } event 문서의 keydown 사건.
+	 */
 	handleCanvasKeydown(event) {
 		if (!this.#focused) return;
 		const ctrl = event.ctrlKey || event.metaKey;
@@ -751,12 +1101,25 @@ export class UIInputField extends WorldNode {
 		this.#blinkTimer = 0;
 		this.#cursorVisible = true;
 	}
+	//==============================================================================
+	// 커서 옮기기.
+	//==============================================================================
+	/**
+	 * @param { number } newIndex 옮길 자리. (0 ~ 값 길이로 자른다)
+	 * @param { boolean } extendSelection 참이면 선택의 고정 끝을 두고 선택을 늘린다.
+	 */
 	moveCursor(newIndex, extendSelection) {
 		const clamped = System.Math.max(0, System.Math.min(this.#value.length, newIndex));
 		this.#cursorIndex = clamped;
 		if (!extendSelection) this.#selectionStart = clamped;
 		this.refreshTexts();
 	}
+	//==============================================================================
+	// 한 글자 지우기. (바뀜 콜백을 부른다)
+	//==============================================================================
+	/**
+	 * @param { number } index 지울 글자의 자리.
+	 */
 	deleteCharAt(index) {
 		this.#value = this.#value.slice(0, index) + this.#value.slice(index + 1);
 		if (this.#cursorIndex > index) this.#cursorIndex -= 1;
@@ -783,6 +1146,9 @@ export class UIInputField extends WorldNode {
 			}, 0);
 		}
 	}
+	//==============================================================================
+	// 포커스 잃음 처리. (문맥 메뉴를 닫는다)
+	//==============================================================================
 	handleBlur() {
 		this.#focused = false;
 		this.hideContextMenu();
@@ -791,7 +1157,16 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	// 선택 / 클립보드.
 	//==============================================================================
+	/**
+	 * @returns { boolean } 선택한 글이 있으면 참.
+	 */
 	hasSelection() { return this.#cursorIndex !== this.#selectionStart; }
+	//==============================================================================
+	// 선택 범위 반환.
+	//==============================================================================
+	/**
+	 * @returns { { start: number, end: number } | null } 선택 범위. (start 가 작은 쪽, 선택이 없으면 null)
+	 */
 	getSelectionRange() {
 		if (!this.hasSelection()) return null;
 		return {
@@ -799,11 +1174,23 @@ export class UIInputField extends WorldNode {
 			end: System.Math.max(this.#cursorIndex, this.#selectionStart),
 		};
 	}
+	//==============================================================================
+	// 선택한 글 반환.
+	//==============================================================================
+	/**
+	 * @returns { string } 선택한 글. (없으면 빈 글)
+	 */
 	getSelectionText() {
 		const range = this.getSelectionRange();
 		if (!range) return "";
 		return this.#value.slice(range.start, range.end);
 	}
+	//==============================================================================
+	// 선택을 글로 바꾸기. (선택이 없으면 커서 자리에 끼운다, 최대 길이로 자르고 바뀜 콜백을 부른다)
+	//==============================================================================
+	/**
+	 * @param { string } text 넣을 글. (빈 글이면 선택을 지운다)
+	 */
 	replaceSelection(text) {
 		const range = this.getSelectionRange() || { start: this.#cursorIndex, end: this.#cursorIndex };
 		let next = this.#value.slice(0, range.start) + text + this.#value.slice(range.end);
@@ -819,16 +1206,25 @@ export class UIInputField extends WorldNode {
 		if (this.#onChangeCallback) this.#onChangeCallback(this.#value);
 	}
 
+	//==============================================================================
+	// 잘라내기. (선택한 글을 클립보드에 쓰고 지운다, 선택이 없으면 아무것도 하지 않는다)
+	//==============================================================================
 	cut() {
 		if (!this.hasSelection()) return;
 		const text = this.getSelectionText();
 		this.writeClipboard(text);
 		this.replaceSelection("");
 	}
+	//==============================================================================
+	// 복사. (선택한 글을 클립보드에 쓴다, 선택이 없으면 아무것도 하지 않는다)
+	//==============================================================================
 	copy() {
 		if (!this.hasSelection()) return;
 		this.writeClipboard(this.getSelectionText());
 	}
+	//==============================================================================
+	// 붙여넣기. (클립보드 글을 비동기로 읽어 선택 자리에 넣는다, 읽지 못하거나 비었으면 무시한다)
+	//==============================================================================
 	paste() {
 		this.readClipboard().then((text) => {
 			if (typeof text === "string" && text.length > 0) {
@@ -841,7 +1237,38 @@ export class UIInputField extends WorldNode {
 	// 문맥 메뉴 항목 부탁. (다음 tick 에 한다, UIInputFieldMenuAction)
 	//==============================================================================
 	/**
-	 * @param { string } menuAction
+	 * @param { string } menuAction 할 항목. (UIInputFieldMenuAction 의 값)
+	 * @example <caption>게임의 메뉴에서 복사 부탁하기</caption>
+	 * import { Engine, EngineConfiguration, UIScene, UIInputField, UIInputFieldMenuAction, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends UIScene {
+	 * 	constructor() {
+	 * 		super();
+	 * 		this.setLoadingMinDurationMs(0);
+	 * 	}
+	 *
+	 * 	initialize(engine) {
+	 * 		super.initialize(engine);
+	 * 		const inputField = new UIInputField();
+	 * 		inputField.setEngine(engine);
+	 * 		inputField.setLocalPosition(Vector2.create(40, 40));
+	 * 		inputField.setContentSize(Vector2.create(320, 56));
+	 * 		const root = this.getRoot();
+	 * 		root.addChild(inputField);
+	 * 		inputField.attach();
+	 * 		inputField.setText("Invite code 1234");
+	 * 		inputField.selectAll();
+	 * 		inputField.requestMenuAction(UIInputFieldMenuAction.copy);
+	 * 		console.log(inputField.getSelectionText());
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.canvasId = "mainCanvas";
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * engineConfiguration.autoResizeOnWindowResize = true;
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	requestMenuAction(menuAction) {
 		this.#pendingMenuAction = menuAction;
@@ -851,7 +1278,7 @@ export class UIInputField extends WorldNode {
 	// 문맥 메뉴 항목 하기.
 	//==============================================================================
 	/**
-	 * @param { string } menuAction
+	 * @param { string } menuAction 할 항목. (UIInputFieldMenuAction 의 값, 그 밖이면 아무것도 하지 않는다)
 	 */
 	performMenuAction(menuAction) {
 		switch (menuAction) {
@@ -869,6 +1296,12 @@ export class UIInputField extends WorldNode {
 			}
 		}
 	}
+	//==============================================================================
+	// 클립보드에 쓰기. (navigator.clipboard 가 없거나 막히면 무시한다)
+	//==============================================================================
+	/**
+	 * @param { string } text 쓸 글.
+	 */
 	writeClipboard(text) {
 		try {
 			if (System.navigator && System.navigator.clipboard) {
@@ -877,6 +1310,12 @@ export class UIInputField extends WorldNode {
 		}
 		catch (error) { /* 무시 */ }
 	}
+	//==============================================================================
+	// 클립보드 읽기.
+	//==============================================================================
+	/**
+	 * @returns { Promise<string> } 클립보드 글로 풀리는 프로미스. (navigator.clipboard 가 없으면 빈 글, 읽기가 막히면 거부될 수 있다)
+	 */
 	readClipboard() {
 		try {
 			if (System.navigator && System.navigator.clipboard) {
@@ -897,12 +1336,21 @@ export class UIInputField extends WorldNode {
 		this.#contextMenuHandler = (event) => this.handleContextMenuEvent(event);
 		canvas.addEventListener("contextmenu", this.#contextMenuHandler);
 	}
+	//==============================================================================
+	// 캔버스의 contextmenu 사건 떼기.
+	//==============================================================================
 	detachContextMenuHandler() {
 		if (!this.#contextMenuHandler || !this.#engine) return;
 		const canvas = this.#engine.getViewManager().getCanvas();
 		if (canvas) canvas.removeEventListener("contextmenu", this.#contextMenuHandler);
 		this.#contextMenuHandler = null;
 	}
+	//==============================================================================
+	// 우클릭 처리. (필드 안이면 기본 메뉴를 막고 포커스한 뒤 문맥 메뉴를 띄운다)
+	//==============================================================================
+	/**
+	 * @param { MouseEvent } event 캔버스의 contextmenu 사건.
+	 */
 	handleContextMenuEvent(event) {
 		if (!this.#engine) return;
 		const viewManager = this.#engine.getViewManager();
@@ -917,6 +1365,13 @@ export class UIInputField extends WorldNode {
 		this.focus();
 		this.showContextMenu(event.clientX, event.clientY);
 	}
+	//==============================================================================
+	// 문맥 메뉴 띄우기. (잘라내기, 복사, 붙여넣기 DOM 메뉴, 메뉴 밖을 누르면 닫는다)
+	//==============================================================================
+	/**
+	 * @param { number } clientX 메뉴 왼쪽 위의 X. (CSS 픽셀, clientX)
+	 * @param { number } clientY 메뉴 왼쪽 위의 Y. (CSS 픽셀, clientY)
+	 */
 	showContextMenu(clientX, clientY) {
 		this.hideContextMenu();
 		const doc = System.document;
@@ -975,6 +1430,9 @@ export class UIInputField extends WorldNode {
 			doc.addEventListener("pointerdown", dismissHandler, true);
 		}, 0);
 	}
+	//==============================================================================
+	// 문맥 메뉴 닫기.
+	//==============================================================================
 	hideContextMenu() {
 		if (this.#contextMenuElement) {
 			try {
@@ -997,10 +1455,19 @@ export class UIInputField extends WorldNode {
 // 텍스트보다 먼저 그려지는 레이어 (선택 영역 하이라이트).
 //==============================================================================
 class BackgroundLayerRenderer extends Component {
+	//==============================================================================
+	// 생성.
+	//==============================================================================
 	constructor() {
 		super();
 		this.setComponentType("UIInputFieldBgLayer");
 	}
+	//==============================================================================
+	// 출력. (선택 영역 하이라이트, 조합 중이면 그리지 않는다)
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic 그래픽.
+	 */
 	draw(graphic) {
 		const node = this.getNode();
 		if (!node || typeof node.getRenderState !== "function") return;
@@ -1031,10 +1498,19 @@ class BackgroundLayerRenderer extends Component {
 // - UIInputField 의 자식 노드에 부착되어 텍스트 라벨보다 늦게 그려진다.
 //==============================================================================
 class OverlayLayerRenderer extends Component {
+	//==============================================================================
+	// 생성.
+	//==============================================================================
 	constructor() {
 		super();
 		this.setComponentType("UIInputFieldOverlayLayer");
 	}
+	//==============================================================================
+	// 출력. (조합 밑줄, 커서, 포커스 테두리)
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic 그래픽.
+	 */
 	draw(graphic) {
 		const node = this.getNode();
 		if (!node) return;
@@ -1111,6 +1587,12 @@ function hasStickyUserActivation() {
 // 측정용 오프스크린 캔버스 ctx (엔진 미주입 폴백).
 //==============================================================================
 let offscreenMeasureCanvas = null;
+//==============================================================================
+// 측정용 오프스크린 2D 컨텍스트 반환. (처음 부를 때 캔버스를 만든다, 못 만들면 null)
+//==============================================================================
+/**
+ * @returns { CanvasRenderingContext2D | null }
+ */
 function getOffscreenMeasureContext() {
 	if (!offscreenMeasureCanvas) {
 		try { offscreenMeasureCanvas = System.document.createElement("canvas"); }
@@ -1124,6 +1606,12 @@ function getOffscreenMeasureContext() {
 // 한 번만 주입되는 글로벌 스타일 (DOM input 의 하이라이트/플레이스홀더 등 차단).
 //==============================================================================
 const GLOBAL_STYLE_ID = "uiinputfield-hidden-style";
+//==============================================================================
+// 숨은 입력칸 스타일을 문서에 한 번만 넣기. (같은 id 의 style 이 있으면 넣지 않는다)
+//==============================================================================
+/**
+ * @param { Document } doc 문서.
+ */
 function ensureGlobalHiddenInputStyle(doc) {
 	if (doc.getElementById(GLOBAL_STYLE_ID)) return;
 	const style = doc.createElement("style");

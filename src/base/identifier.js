@@ -8,6 +8,20 @@ import { Object } from "./object.js";
 //==============================================================================
 // 식별자 생성기.
 //==============================================================================
+/**
+ * @example <caption>번호 차례로 나눠 주기</caption>
+ * import { Identifier } from "./build/vanilla.js";
+ *
+ * const identifier = new Identifier(1000, 1);
+ * const firstId = identifier.auto();
+ * const secondId = identifier.auto();
+ * const jumpedId = identifier.auto(10);
+ * console.log(firstId, secondId, jumpedId);
+ *
+ * identifier.reset();
+ * const restartedId = identifier.auto();
+ * console.log(restartedId);
+ */
 export class Identifier extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -20,8 +34,8 @@ export class Identifier extends Object {
 	// 생성.
 	//==============================================================================
 	/**
-	 * @param { number} initialSerialNumber  
-	 * @param { number} initialIncreaseNumber 
+	 * @param { number} initialSerialNumber 처음 값. (기본 0, 첫 auto() 는 이 값에 증가량을 더해 돌려준다)
+	 * @param { number} initialIncreaseNumber auto() 한 번에 더할 기본 증가량. (기본 1)
 	 */
 	constructor(initialSerialNumber = 0, initialIncreaseNumber = 1) {
 		super();
@@ -42,8 +56,8 @@ export class Identifier extends Object {
 	//==============================================================================
 	/**
 	 * @description 아이디 자동 생성 후 반환.
-	 * @param { number } increaseNumber
-	 * @returns { number }
+	 * @param { number } increaseNumber 이번에만 더할 증가량. (0 이거나 생략하면 기본 증가량)
+	 * @returns { number } 더한 뒤의 식별자.
 	 */
 	auto(increaseNumber = 0) {
 		if (increaseNumber) {
@@ -60,6 +74,18 @@ export class Identifier extends Object {
 //==============================================================================
 // 열거 식별자 생성기.
 //==============================================================================
+/**
+ * @example <caption>상태 열거 만들기</caption>
+ * import { Enum } from "./build/vanilla.js";
+ *
+ * const GameState = {
+ * 	ready: Enum.begin(),
+ * 	playing: Enum.auto(),
+ * 	gameOver: Enum.auto()
+ * };
+ * Enum.readonly(GameState);
+ * console.log(GameState.ready, GameState.gameOver, Object.isFrozen(GameState));
+ */
 export class Enum extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -71,7 +97,7 @@ export class Enum extends Object {
 	//==============================================================================
 	/**
 	 * @static
-	 * @returns { number }
+	 * @returns { number } 처음부터 다시 센 첫 값. (늘 1)
 	 */
 	static begin() {
 		Enum.#identifier.reset();
@@ -83,7 +109,7 @@ export class Enum extends Object {
 	//==============================================================================
 	/**
 	 * @static
-	 * @returns { number }
+	 * @returns { number } 하나 늘린 값.
 	 */
 	static auto() {
 		return Enum.#identifier.auto();
@@ -94,7 +120,8 @@ export class Enum extends Object {
 	//==============================================================================
 	/**
 	 * @static
-	 * @returns { System.Object }
+	 * @param { object } dictionary 얼릴 열거 객체. (그 자리에서 Object.freeze 한다)
+	 * @returns { System.Object } 돌려주는 값이 없어 undefined 다. (dictionary 를 그 자리에서 얼린다)
 	 */
 	static readonly(dictionary) {
 		System.Object.freeze(dictionary);

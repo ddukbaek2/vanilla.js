@@ -11,6 +11,13 @@ import { Object } from "../../base/object.js";
 /**
  * @template T
  * @class
+ * @example <caption>먼저 넣은 것부터 꺼내기</caption>
+ * import { Queue } from "./build/vanilla.js";
+ *
+ * const queue = new Queue();
+ * queue.enqueue("first");
+ * queue.enqueue("second");
+ * console.log(queue.peek(), queue.dequeue(), queue.getCount(), queue.toArray());
  */
 export class Queue extends Object {
 	//==============================================================================
@@ -33,7 +40,7 @@ export class Queue extends Object {
 	// 데이터 추가.
 	//==============================================================================
 	/**
-	 * @param { T } item 
+	 * @param { T } item 맨 뒤에 넣을 요소.
 	 */
 	enqueue(item) {
 		this.#items.push(item);
@@ -43,7 +50,7 @@ export class Queue extends Object {
 	// 데이터 추출 및 제거.
 	//==============================================================================
 	/**
-	 * @returns { T | undefined }
+	 * @returns { T | undefined } 맨 앞에서 뺀 요소. 비었으면 undefined.
 	 */
 	dequeue() {
 		return this.#items.shift();
@@ -53,7 +60,7 @@ export class Queue extends Object {
 	// 데이터 확인 (제거하지 않음).
 	//==============================================================================
 	/**
-	 * @returns { T | undefined }
+	 * @returns { T | undefined } 맨 앞의 요소. 비었으면 undefined.
 	 */
 	peek() {
 		return this.#items[0];
@@ -70,7 +77,7 @@ export class Queue extends Object {
 	// 비어있는지 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 비었으면 참.
 	 */
 	isEmpty() {
 		return this.#items.length === 0;
@@ -80,7 +87,7 @@ export class Queue extends Object {
 	// 요소 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 요소 수.
 	 */
 	getCount() {
 		return this.#items.length;
@@ -90,7 +97,7 @@ export class Queue extends Object {
 	// 전체 요소 배열 반환.
 	//==============================================================================
 	/**
-	 * @returns { T[] }
+	 * @returns { T[] } 맨 앞부터 담은 새 배열.
 	 */
 	toArray() {
 		return [...this.#items];

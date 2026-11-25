@@ -23,6 +23,51 @@ import { Tween } from "../core/tween.js";
 // [페이지 이동]
 // - pageTo(index, smooth): 지정 인덱스로 이동. smooth=true이면 트윈, false이면 즉시 이동.
 //==============================================================================
+/**
+ * @example <caption>가로로 넘기는 다섯 쪽</caption>
+ * import { Engine, EngineConfiguration, UIScene, UISnapScrollView, UILabel, WorldNode, Paint, Color, Pivot, Vector2 } from "./build/vanilla.js";
+ *
+ * class PagerScene extends UIScene {
+ * 	create() {
+ * 		super.create();
+ * 		const pageWidth = 360;
+ * 		const pageHeight = 200;
+ * 		const pageCount = 5;
+ * 		const viewportNode = new WorldNode();
+ * 		viewportNode.setPivot(Pivot.topLeft.clone());
+ * 		viewportNode.setAnchor(Pivot.topLeft.clone());
+ * 		viewportNode.setContentSize(Vector2.create(pageWidth, pageHeight));
+ * 		viewportNode.setLocalPosition(Vector2.create(140, 80));
+ * 		const snapScrollView = viewportNode.addComponent(UISnapScrollView);
+ * 		snapScrollView.setPageChangeThreshold(0.25);
+ *
+ * 		const content = snapScrollView.getContent();
+ * 		for (let pageIndex = 0; pageIndex < pageCount; ++pageIndex) {
+ * 			const pageNode = new WorldNode();
+ * 			pageNode.setPivot(Pivot.topLeft.clone());
+ * 			pageNode.setAnchor(Pivot.topLeft.clone());
+ * 			pageNode.setContentSize(Vector2.create(pageWidth, pageHeight));
+ * 			pageNode.setLocalPosition(Vector2.create(pageIndex * pageWidth, 0));
+ * 			const pagePaint = pageNode.addComponent(Paint);
+ * 			pagePaint.setColor(new Color(0.2 + pageIndex * 0.15, 0.3, 0.6, 1));
+ * 			const pageLabel = pageNode.addComponent(UILabel);
+ * 			pageLabel.setText("Page " + (pageIndex + 1));
+ * 			pageLabel.setFontSize(28);
+ * 			content.addChild(pageNode);
+ * 		}
+ * 		snapScrollView.setScrollContentSize(Vector2.create(pageWidth * pageCount, pageHeight));
+ * 		snapScrollView.pageTo(2, false);
+ * 		const root = this.getRoot();
+ * 		root.addChild(viewportNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new PagerScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class UISnapScrollView extends UIScrollView {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -57,7 +102,7 @@ export class UISnapScrollView extends UIScrollView {
 	// - true : 드래그 위치에서 가장 가까운 아이템으로 스냅.
 	//==============================================================================
 	/**
-	 * @param { boolean } isSnapToNearest
+	 * @param { boolean } isSnapToNearest 참이면 가장 가까운 아이템 모드. (값만 담아 두고 지금 스냅 계산은 이 값을 읽지 않는다)
 	 */
 	setSnapToNearest(isSnapToNearest) {
 		this.#isSnapToNearest = isSnapToNearest;
@@ -67,7 +112,7 @@ export class UISnapScrollView extends UIScrollView {
 	// 스냅 모드 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 가장 가까운 아이템 모드면 참. (기본 거짓)
 	 */
 	getSnapToNearest() {
 		return this.#isSnapToNearest;
@@ -77,7 +122,7 @@ export class UISnapScrollView extends UIScrollView {
 	// 방향성 스냅 발동 최소 속도 설정. (px/s, 1칸 모드에서만 사용)
 	//==============================================================================
 	/**
-	 * @param { number } velocityThreshold
+	 * @param { number } velocityThreshold 최소 속도. (초당 픽셀, 값만 담아 두고 지금 스냅 계산은 이 값을 읽지 않는다)
 	 */
 	setVelocityThreshold(velocityThreshold) {
 		this.#velocityThreshold = velocityThreshold;
@@ -87,7 +132,7 @@ export class UISnapScrollView extends UIScrollView {
 	// 방향성 스냅 발동 최소 속도 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 최소 속도. (초당 픽셀, 기본 200)
 	 */
 	getVelocityThreshold() {
 		return this.#velocityThreshold;
@@ -97,7 +142,7 @@ export class UISnapScrollView extends UIScrollView {
 	// 느린 스와이프 시 페이지 전환 임계값 설정. (아이템 크기 대비 비율, 기본값: 0.35)
 	//==============================================================================
 	/**
-	 * @param { number } pageChangeThreshold
+	 * @param { number } pageChangeThreshold 옆 아이템 크기에 대한 비율. (뗄 때 이만큼 넘게 끌었으면 그 아이템으로 넘긴다)
 	 */
 	setPageChangeThreshold(pageChangeThreshold) {
 		this.#pageChangeThreshold = pageChangeThreshold;
@@ -107,7 +152,7 @@ export class UISnapScrollView extends UIScrollView {
 	// 느린 스와이프 시 페이지 전환 임계값 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 옆 아이템 크기에 대한 비율. (기본 0.35)
 	 */
 	getPageChangeThreshold() {
 		return this.#pageChangeThreshold;
@@ -118,7 +163,7 @@ export class UISnapScrollView extends UIScrollView {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초, 스냅 트윈도 이만큼 나아간다)
 	 */
 	tick(timeDelta) {
 		const prevIsDragging = this.#prevIsDragging;
@@ -191,7 +236,7 @@ export class UISnapScrollView extends UIScrollView {
 	// - 아이템 크기가 불균일해도 올바르게 계산된다.
 	//==============================================================================
 	/**
-	 * @returns { number[] }
+	 * @returns { number[] } 콘텐츠 노드의 자식 차례대로 스크롤 오프셋. (스크롤하는 축의 값, 자식이 없거나 노드에 붙기 전이면 빈 배열)
 	 */
 	computeSnapOffsets() {
 		const node = this.getNode();
@@ -270,8 +315,31 @@ export class UISnapScrollView extends UIScrollView {
 	// - smooth: true이면 트윈으로 부드럽게, false이면 즉시 이동.
 	//==============================================================================
 	/**
-	 * @param { number } index
-	 * @param { boolean } smooth
+	 * @param { number } index 아이템 순서. (콘텐츠 노드의 자식 순서, 0 ~ 자식 수 - 1 로 자른다)
+	 * @param { boolean } smooth 참이면 0.3 초 트윈으로, 거짓이면 바로 옮긴다.
+	 * @example <caption>바로 옮기기와 트윈으로 옮기기</caption>
+	 * import { UISnapScrollView, WorldNode, Pivot, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const viewportNode = new WorldNode();
+	 * viewportNode.setContentSize(Vector2.create(200, 120));
+	 * const snapScrollView = viewportNode.addComponent(UISnapScrollView);
+	 * const content = snapScrollView.getContent();
+	 * for (let pageIndex = 0; pageIndex < 3; ++pageIndex) {
+	 * 	const pageNode = new WorldNode();
+	 * 	pageNode.setPivot(Pivot.topLeft.clone());
+	 * 	pageNode.setAnchor(Pivot.topLeft.clone());
+	 * 	pageNode.setContentSize(Vector2.create(200, 120));
+	 * 	pageNode.setLocalPosition(Vector2.create(pageIndex * 200, 0));
+	 * 	content.addChild(pageNode);
+	 * }
+	 * snapScrollView.setScrollContentSize(Vector2.create(600, 120));
+	 * snapScrollView.pageTo(2, false);
+	 * const jumpedOffset = snapScrollView.getScrollOffset();
+	 * console.log(jumpedOffset.x);
+	 * snapScrollView.pageTo(1, true);
+	 * snapScrollView.tick(0.5);
+	 * const tweenedOffset = snapScrollView.getScrollOffset();
+	 * console.log(tweenedOffset.x);
 	 */
 	pageTo(index, smooth) {
 		const contentNode = this.getContent();
@@ -312,7 +380,7 @@ export class UISnapScrollView extends UIScrollView {
 	// 특정 인덱스로 스냅 트윈 이동.
 	//==============================================================================
 	/**
-	 * @param { number } index
+	 * @param { number } index 아이템 순서. (0 ~ 자식 수 - 1 로 자른다, 자식이 없으면 아무것도 하지 않는다)
 	 */
 	setSnapCurrentIndex(index) {
 		const contentNode = this.getContent();
@@ -357,7 +425,7 @@ export class UISnapScrollView extends UIScrollView {
 	// 현재 스냅 인덱스 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 지금 스냅한(또는 트윈으로 가는) 아이템 순서.
 	 */
 	getSnapCurrentIndex() {
 		return this.#snapCurrentIndex;

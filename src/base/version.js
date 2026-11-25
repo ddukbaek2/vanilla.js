@@ -8,6 +8,17 @@ export { Object } from "./object.js";
 //==============================================================================
 // 버전 클래스.
 //==============================================================================
+/**
+ * @example <caption>버전 문자열 만들기</caption>
+ * import { Version } from "./build/vanilla.js";
+ *
+ * const version = Version.create(0, 4, 0, "dev");
+ * console.log(version.getVersionString());
+ *
+ * version.setBranch("");
+ * version.setPatch(1);
+ * console.log(version.getVersionString(), version.getMajor(), version.getMinor());
+ */
 export class Version extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -35,7 +46,7 @@ export class Version extends Object {
 	// 메이저 설정.
 	//==============================================================================
 	/**
-	 * @param { number } major
+	 * @param { number } major 메이저 번호.
 	 */
 	setMajor(major) {
 		this.#major = major;
@@ -45,7 +56,7 @@ export class Version extends Object {
 	// 메이저 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 메이저 번호.
 	 */
 	getMajor() {
 		return this.#major;
@@ -55,7 +66,7 @@ export class Version extends Object {
 	// 마이너 설정.
 	//==============================================================================
 	/**
-	 * @param { number } minor
+	 * @param { number } minor 마이너 번호.
 	 */
 	setMinor(minor) {
 		this.#minor = minor;
@@ -65,7 +76,7 @@ export class Version extends Object {
 	// 마이너 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 마이너 번호.
 	 */
 	getMinor() {
 		return this.#minor;
@@ -75,7 +86,7 @@ export class Version extends Object {
 	// 패치 설정.
 	//==============================================================================
 	/**
-	 * @param { number } patch
+	 * @param { number } patch 패치 번호.
 	 */
 	setPatch(patch) {
 		this.#patch = patch;
@@ -85,7 +96,7 @@ export class Version extends Object {
 	// 패치 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 패치 번호.
 	 */
 	getPatch() {
 		return this.#patch;
@@ -95,7 +106,7 @@ export class Version extends Object {
 	// 브랜치 설정.
 	//==============================================================================
 	/**
-	 * @param { string } branch
+	 * @param { string } branch 브랜치 이름. (빈 글이면 버전 문자열에 붙이지 않는다)
 	 */
 	setBranch(branch) {
 		this.#branch = branch;
@@ -105,7 +116,7 @@ export class Version extends Object {
 	// 브랜치 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 브랜치 이름. (없으면 빈 글)
 	 */
 	getBranch() {
 		return this.#branch;
@@ -115,7 +126,7 @@ export class Version extends Object {
 	// 버전 문자열 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } "major.minor.patch" 꼴 문자열. (브랜치가 있으면 "-branch" 를 붙인다)
 	 */
 	getVersionString() {
 		const major = this.getMajor();
@@ -135,10 +146,11 @@ export class Version extends Object {
 	// 생성.
 	//==============================================================================
 	/**
-	 * @param { number } major 
-	 * @param { number } minor
-	 * @param { number } patch
-	 * @param { string } branch
+	 * @param { number } major 메이저 번호.
+	 * @param { number } minor 마이너 번호.
+	 * @param { number } patch 패치 번호.
+	 * @param { string } branch 브랜치 이름. (기본 빈 글)
+	 * @returns { Version } 만든 버전.
 	 */
 	static create(major, minor, patch, branch = "") {
 		const version = new Version();

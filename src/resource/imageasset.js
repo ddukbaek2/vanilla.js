@@ -9,11 +9,20 @@ import { Asset, AssetType } from "../core/asset.js";
 //==============================================================================
 // 이미지 애셋.
 //==============================================================================
+/**
+ * @example <caption>그림 파일 읽고 크기 보기</caption>
+ * import { ImageAsset } from "./build/vanilla.js";
+ *
+ * const imageAsset = new ImageAsset();
+ * await imageAsset.load("examples/assets/spritesheet.png");
+ * const imageSize = imageAsset.getImageSize();
+ * console.log(imageSize.x, imageSize.y, imageAsset.isLoaded());
+ */
 export class ImageAsset extends Asset {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { HTMLImageElement } */ image = null;
+	/** @type { HTMLImageElement } */ image = null; // 이미지 요소. (생성할 때 빈 요소를 만들고, 읽을 때마다 새 요소로 바꾼다)
 
 
 	//==============================================================================
@@ -30,7 +39,8 @@ export class ImageAsset extends Asset {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { string } assetPath 
+	 * @param { string } assetPath 그림 파일 경로. (이미 읽혔으면 아무것도 하지 않는다)
+	 * @returns { Promise<void> } 그림이 다 읽히면 풀리는 프로미스. (읽지 못하면 거부된다)
 	 */
 	async load(assetPath) {
 
@@ -62,7 +72,17 @@ export class ImageAsset extends Asset {
 	//==============================================================================
 	/**
 	 * @param { string } assetPath 실패 알림과 getAssetPath 에 쓸 이름.
-	 * @param { ArrayBuffer | ArrayBufferView | Blob } bytes
+	 * @param { ArrayBuffer | ArrayBufferView | Blob } bytes 그림 파일의 바이트. (Blob 이면 그대로 쓰고, 아니면 Blob 으로 감싼다)
+	 * @returns { Promise<void> } 그림이 다 풀리면 풀리는 프로미스. (풀지 못하면 거부된다)
+	 * @example <caption>받아 둔 바이트로 그림 읽기</caption>
+	 * import { ImageAsset } from "./build/vanilla.js";
+	 *
+	 * const response = await fetch("assets/icons/icon.png");
+	 * const bytes = await response.arrayBuffer();
+	 * const imageAsset = new ImageAsset();
+	 * await imageAsset.loadFromBytes("icon.png", bytes);
+	 * const imageSize = imageAsset.getImageSize();
+	 * console.log(imageAsset.getAssetPath(), imageSize.x, imageSize.y);
 	 */
 	async loadFromBytes(assetPath, bytes) {
 		this.setLoaded(false);
@@ -92,7 +112,7 @@ export class ImageAsset extends Asset {
 	// 이미지 반환.
 	//==============================================================================
 	/**
-	 * @returns { HTMLImageElement }
+	 * @returns { HTMLImageElement } 이미지 요소.
 	 */
 	getImage() {
 		return this.image;
@@ -102,7 +122,7 @@ export class ImageAsset extends Asset {
 	// 이미지 크기 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 이미지 크기. (픽셀, 읽기 전이면 0, 0)
 	 */
 	getImageSize() {
 		return Vector2.create(this.image.width, this.image.height);

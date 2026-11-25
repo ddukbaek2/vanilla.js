@@ -20,6 +20,40 @@ import { Tween } from "./tween.js";
 // - touchPress(viewInputPosition) ==> touchMove(viewInputPosition) ==> touchRelease(viewInputPosition)
 // - reset()
 //==============================================================================
+/**
+ * @example <caption>불러오고, 갱신하고, 그리고, 누름 받기</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, Rect, Colors } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	async load(engine) {
+ * 		await super.load(engine);
+ * 		this.boxPosition = Vector2.create(100, 100);
+ * 	}
+ *
+ * 	initialize(engine) {
+ * 		console.log("initialized");
+ * 	}
+ *
+ * 	tick(timeDelta) {
+ * 		super.tick(timeDelta);
+ * 		this.boxPosition.x += 60 * timeDelta;
+ * 	}
+ *
+ * 	draw(graphic) {
+ * 		super.draw(graphic);
+ * 		graphic.setFillColor(Colors.white);
+ * 		graphic.drawRect(Rect.create(this.boxPosition.x, this.boxPosition.y, 80, 80));
+ * 	}
+ *
+ * 	touchPress(viewInputPosition) {
+ * 		this.boxPosition = viewInputPosition.clone();
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class Scene extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -57,7 +91,7 @@ export class Scene extends Object {
 	// 엔진 설정. (SceneManager가 load() 이전에 호출하여 drawOnLoad에서 접근 가능하게 함)
 	//==============================================================================
 	/**
-	 * @param { Engine } engine
+	 * @param { Engine } engine 이 씬을 불러온 엔진.
 	 */
 	setEngine(engine) {
 		this.#engine = engine;
@@ -67,7 +101,7 @@ export class Scene extends Object {
 	// 로딩 완료 여부 설정. (SceneManager가 load+initialize 이후 true로 전환)
 	//==============================================================================
 	/**
-	 * @param { boolean } isLoaded
+	 * @param { boolean } isLoaded 불러오기를 마쳤는지.
 	 */
 	setLoaded(isLoaded) {
 		this.#isLoaded = isLoaded;
@@ -77,7 +111,7 @@ export class Scene extends Object {
 	// 로딩 완료 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 불러오기를 마쳤으면 참. (initialize 바로 앞에 참이 된다)
 	 */
 	isLoaded() {
 		return this.#isLoaded;
@@ -88,7 +122,28 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그릴 그래픽.
+	 * @example <caption>불러오는 동안 글 띄우기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Colors } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	async load(engine) {
+	 * 		await super.load(engine);
+	 * 		await new Promise((resolve) => {
+	 * 			setTimeout(resolve, 500);
+	 * 		});
+	 * 	}
+	 *
+	 * 	drawOnLoad(graphic) {
+	 * 		graphic.setFillColor(Colors.white);
+	 * 		graphic.setFontString("24px sans-serif");
+	 * 		graphic.drawFillText("Loading", 40, 40);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	drawOnLoad(graphic) {
 
@@ -109,7 +164,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Engine } engine 
+	 * @param { Engine } engine 씬을 불러오는 엔진.
 	 */
 	async load(engine) {
 		this.#engine = engine;
@@ -128,7 +183,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Engine } engine 
+	 * @param { Engine } engine 씬을 불러온 엔진.
 	 */
 	initialize(engine) {
 
@@ -139,7 +194,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Engine } engine
+	 * @param { Engine } engine 씬을 내리는 엔진.
 	 */
 	finalize(engine) {
 
@@ -172,7 +227,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Engine } engine 
+	 * @param { Engine } engine 씬을 내리는 엔진.
 	 */
 	async unload(engine) {
 		await Promise.resolve();
@@ -183,7 +238,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } canvasNativeSize
+	 * @param { Vector2 } canvasNativeSize 바뀐 캔버스 요소의 크기. (CSS 픽셀)
 	 */
 	resize(canvasNativeSize) {
 
@@ -202,7 +257,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { number } timeDelta 
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		// 노드 갱신.
@@ -250,7 +305,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	preDraw(graphic) {
 		// 코드.
@@ -261,7 +316,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	draw(graphic) {
 		// 노드 출력.
@@ -274,7 +329,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	postDraw(graphic) {
 		// 코드.
@@ -285,7 +340,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	drawGizmos(graphic) {
 		const isGizmoVisible = this.isGizmoVisible();
@@ -301,7 +356,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { number } timeDelta 
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tickTouch(timeDelta) {
 		const engine = this.getEngine();
@@ -364,7 +419,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
 	 */
 	touchPress(viewInputPosition) {
 
@@ -375,7 +430,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
 	 */
 	touchMove(viewInputPosition) {
 
@@ -386,7 +441,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
 	 */
 	touchRelease(viewInputPosition) {
 
@@ -397,7 +452,7 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
 	 */
 	touchCancel(viewInputPosition) {
 
@@ -408,8 +463,8 @@ export class Scene extends Object {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } viewInputPosition
-	 * @param { Vector2 } wheelDelta
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
+	 * @param { Vector2 } wheelDelta 이번 프레임에 쌓인 휠 값. (WheelEvent 의 deltaX, deltaY 를 더한 것)
 	 */
 	touchWheel(viewInputPosition, wheelDelta) {
 
@@ -419,7 +474,26 @@ export class Scene extends Object {
 	// 트윈 시작.
 	//==============================================================================
 	/**
-	 * @param { Tween } tween 
+	 * @param { Tween } tween 시작할 트윈. (이미 도는 트윈이면 아무것도 하지 않는다)
+	 * @example <caption>노드를 0.5 초 동안 나타나게 하기</caption>
+	 * import { Engine, EngineConfiguration, Scene, WorldNode, Tween, TweenProperty, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	initialize(engine) {
+	 * 		const root = this.getRoot();
+	 * 		const node = new WorldNode();
+	 * 		node.setContentSize(Vector2.create(100, 100));
+	 * 		root.addChild(node);
+	 * 		const tween = Tween.createNodeTween(node, TweenProperty.localOpacity, 0, 1, 0.5);
+	 * 		this.startTween(tween);
+	 * 		const tweenCount = this.getTweenCount();
+	 * 		console.log(tweenCount);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	startTween(tween) {
 		const index = this.#tweens.indexOf(tween);
@@ -435,7 +509,7 @@ export class Scene extends Object {
 	// 트윈 중단.
 	//==============================================================================
 	/**
-	 * @param { Tween } tween 
+	 * @param { Tween } tween 멈출 트윈. (이 씬에서 돌지 않으면 아무것도 하지 않는다)
 	 */
 	stopTween(tween) {
 		const index = this.#tweens.indexOf(tween);
@@ -451,7 +525,7 @@ export class Scene extends Object {
 	// 도는 트윈 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 도는 트윈 수.
 	 */
 	getTweenCount() {
 		return this.#tweens.length;
@@ -472,7 +546,7 @@ export class Scene extends Object {
 	// 엔진 반환.
 	//==============================================================================
 	/**
-	 * @returns { Engine } 
+	 * @returns { Engine } 이 씬을 불러온 엔진. (불러오기 전에는 undefined)
 	 */
 	getEngine() {
 		return this.#engine;
@@ -482,7 +556,7 @@ export class Scene extends Object {
 	// 루트 노드 반환.
 	//==============================================================================
 	/**
-	 * @returns { WorldNode } 
+	 * @returns { WorldNode } 루트 노드. (create 에서 만들고, 크기는 뷰 크기)
 	 */
 	getRoot() {
 		return this.#root;
@@ -492,7 +566,7 @@ export class Scene extends Object {
 	// 기즈모 그리기 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } isVisible 
+	 * @param { boolean } isVisible 참이면 기즈모를 그린다.
 	 */
 	setGizmoVisible(isVisible) {
 		this.#isGizmoVisible = isVisible;
@@ -502,7 +576,7 @@ export class Scene extends Object {
 	// 기즈모 그리기 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 기즈모를 그리면 참.
 	 */
 	isGizmoVisible() {
 		return this.#isGizmoVisible;

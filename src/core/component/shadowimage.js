@@ -28,6 +28,31 @@ let nextImageIdentifier = 1;
 // - 그림 색을 주면 그림을 그 색 한 빛의 모양으로 칠한다. (같은 자리 위에 원래 그림을 얹어 그림자만 남기는 감쌈 등)
 // - 그리는 배율(기기의 DPR, 뷰 배율), 그림, 색, 그림자, 노드 크기가 바뀌면 다시 굽는다. 그림자가 번지는 만큼 가장자리를 넓힌다.
 //==============================================================================
+/**
+ * @example <caption>그림자를 깐 아이콘</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, WorldNode, ShadowImage, ImageAsset } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	async load(engine) {
+ * 		await super.load(engine);
+ * 		const imageAsset = new ImageAsset();
+ * 		await imageAsset.load("assets/icons/icon.png");
+ * 		const iconNode = new WorldNode();
+ * 		iconNode.setContentSize(Vector2.create(128, 128));
+ * 		iconNode.setLocalPosition(Vector2.create(320, 180));
+ * 		const shadowImage = iconNode.addComponent(ShadowImage);
+ * 		shadowImage.setImage(imageAsset.image);
+ * 		shadowImage.setShadow("#000000", 0.6, 6, 8);
+ * 		const root = this.getRoot();
+ * 		root.addChild(iconNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class ShadowImage extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -70,7 +95,7 @@ export class ShadowImage extends Component {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그래픽.
 	 */
 	draw(graphic) {
 		const image = this.getImage();
@@ -129,7 +154,7 @@ export class ShadowImage extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { ComponentNode } node
+	 * @param { ComponentNode } node 떨어지는 노드.
 	 */
 	detach(node) {
 		releaseSharedBake(this.#bakeKey, this);
@@ -142,7 +167,7 @@ export class ShadowImage extends Component {
 	// 그림 안의 조각 읽기. (조각이 없으면 그림 전체)
 	//==============================================================================
 	/**
-	 * @returns { { left: number, top: number, width: number, height: number } }
+	 * @returns { { left: number, top: number, width: number, height: number } } 그림 안의 조각. (픽셀, 조각이 없으면 그림 전체)
 	 */
 	readSourceRect() {
 		const imageRect = this.getImageRect();
@@ -160,11 +185,11 @@ export class ShadowImage extends Component {
 	// - 텍스처 캐시가 캔버스마다 한 번 올리므로 구울 때마다 새 캔버스를 만든다.
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement | HTMLCanvasElement } image
-	 * @param { object } sourceRect
-	 * @param { number } imageWidth
-	 * @param { number } imageHeight
-	 * @param { number } bakeScale
+	 * @param { HTMLImageElement | HTMLCanvasElement } image 그림.
+	 * @param { object } sourceRect 그림 안의 조각. ({ left, top, width, height }, 픽셀)
+	 * @param { number } imageWidth 그릴 너비. (내용 크기 단위)
+	 * @param { number } imageHeight 그릴 높이. (내용 크기 단위)
+	 * @param { number } bakeScale 굽는 배율. (Graphic.calculateTextBakeScale)
 	 */
 	bakeImage(image, sourceRect, imageWidth, imageHeight, bakeScale) {
 		const scaledImageWidth = System.Math.max(1, System.Math.round(imageWidth * bakeScale));
@@ -200,11 +225,11 @@ export class ShadowImage extends Component {
 	// 그릴 크기로 줄인 그림. (그림 색이 있으면 그 색 한 빛의 모양, 그림자 없이)
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement | HTMLCanvasElement } image
-	 * @param { object } sourceRect
-	 * @param { number } scaledImageWidth
-	 * @param { number } scaledImageHeight
-	 * @returns { HTMLCanvasElement | null }
+	 * @param { HTMLImageElement | HTMLCanvasElement } image 그림.
+	 * @param { object } sourceRect 그림 안의 조각. ({ left, top, width, height }, 픽셀)
+	 * @param { number } scaledImageWidth 줄인 너비. (픽셀)
+	 * @param { number } scaledImageHeight 줄인 높이. (픽셀)
+	 * @returns { HTMLCanvasElement | null } 줄인 그림을 담은 새 캔버스. (2D 컨텍스트를 얻지 못하면 null)
 	 */
 	readScaledImage(image, sourceRect, scaledImageWidth, scaledImageHeight) {
 		const scaledCanvas = System.document.createElement("canvas");
@@ -230,8 +255,8 @@ export class ShadowImage extends Component {
 	// 그림 설정. (조각을 주지 않으면 그림 전체)
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement | HTMLCanvasElement | null } image
-	 * @param { Rect | null } imageRect
+	 * @param { HTMLImageElement | HTMLCanvasElement | null } image 그림. (null 이면 그리지 않는다)
+	 * @param { Rect | null } imageRect 그림 안의 조각. (픽셀, 사본을 둔다, null 이면 그림 전체)
 	 */
 	setImage(image, imageRect = null) {
 		this.#image = image;
@@ -247,7 +272,7 @@ export class ShadowImage extends Component {
 	// 그림 반환.
 	//==============================================================================
 	/**
-	 * @returns { HTMLImageElement | HTMLCanvasElement | null }
+	 * @returns { HTMLImageElement | HTMLCanvasElement | null } 그림. (없으면 null)
 	 */
 	getImage() {
 		return this.#image;
@@ -257,7 +282,7 @@ export class ShadowImage extends Component {
 	// 그림 안의 조각 반환. (null 이면 그림 전체)
 	//==============================================================================
 	/**
-	 * @returns { Rect | null }
+	 * @returns { Rect | null } 그림 안의 조각. (null 이면 그림 전체)
 	 */
 	getImageRect() {
 		return this.#imageRect;
@@ -267,7 +292,7 @@ export class ShadowImage extends Component {
 	// 그림을 한 빛으로 칠할 색 설정. (null 이면 그림 그대로)
 	//==============================================================================
 	/**
-	 * @param { string | null } imageColor
+	 * @param { string | null } imageColor 그림을 한 빛으로 칠할 CSS 색. (null 이면 그림 그대로)
 	 */
 	setImageColor(imageColor) {
 		this.#imageColor = imageColor;
@@ -277,7 +302,7 @@ export class ShadowImage extends Component {
 	// 그림을 한 빛으로 칠할 색 반환.
 	//==============================================================================
 	/**
-	 * @returns { string | null }
+	 * @returns { string | null } 그림을 한 빛으로 칠할 색. (null 이면 그림 그대로)
 	 */
 	getImageColor() {
 		return this.#imageColor;
@@ -288,8 +313,8 @@ export class ShadowImage extends Component {
 	//==============================================================================
 	/**
 	 * @param { string } shadowColor - "#rrggbb"
-	 * @param { number } shadowOpacity
-	 * @param { number } shadowOffset
+	 * @param { number } shadowOpacity 그림자 불투명도. (0 ~ 1)
+	 * @param { number } shadowOffset 그림자가 그림 아래로 내려가는 만큼. (내용 크기 단위)
 	 * @param { number } shadowBlur - 0 이면 번지지 않는다.
 	 */
 	setShadow(shadowColor, shadowOpacity, shadowOffset, shadowBlur = 0) {
@@ -303,7 +328,7 @@ export class ShadowImage extends Component {
 	// 구운 캔버스 반환. (아직 굽지 않았으면 null)
 	//==============================================================================
 	/**
-	 * @returns { HTMLCanvasElement | null }
+	 * @returns { HTMLCanvasElement | null } 구운 캔버스. (아직 굽지 않았으면 null)
 	 */
 	getBakeCanvas() {
 		return this.#bakeCanvas;

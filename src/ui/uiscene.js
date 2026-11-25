@@ -32,6 +32,55 @@ import { ImageAsset } from "../resource/imageasset.js";
 //   layout() 단계에서 env() 인셋이 자동으로 setSafeAreaInsets 에 반영된다.
 // - 트리에 추가된 UINode 들은 tick 시 자동으로 솔버에 부착된다.
 //==============================================================================
+/**
+ * @example <caption>세이프 에어리어 안쪽에 머리띠 붙이기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UINode, UILabel, Paint, Vector2, Color } from "./build/vanilla.js";
+ *
+ * class MainScene extends UIScene {
+ * 	constructor() {
+ * 		super();
+ * 		this.setLoadingMinDurationMs(0);
+ * 		this.setSceneBackgroundColor(new Color(0.08, 0.09, 0.12, 1));
+ * 	}
+ *
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const headerNode = new UINode();
+ * 		headerNode.setName("header");
+ * 		const paint = headerNode.addComponent(Paint);
+ * 		paint.setColor(new Color(0.2, 0.45, 0.85, 1));
+ * 		const label = headerNode.addComponent(UILabel);
+ * 		label.setText("Header");
+ * 		label.setFontSize(20);
+ * 		const root = this.getRoot();
+ * 		root.addChild(headerNode);
+ *
+ * 		const safeAreaGuide = this.getSafeAreaLayoutGuide();
+ * 		const safeLeftAnchor = safeAreaGuide.leftAnchor;
+ * 		const safeRightAnchor = safeAreaGuide.rightAnchor;
+ * 		const safeTopAnchor = safeAreaGuide.topAnchor;
+ * 		const headerLeftAnchor = headerNode.leftAnchor;
+ * 		const headerRightAnchor = headerNode.rightAnchor;
+ * 		const headerTopAnchor = headerNode.topAnchor;
+ * 		const headerHeightAnchor = headerNode.heightAnchor;
+ * 		const leftConstraint = headerLeftAnchor.equalTo(safeLeftAnchor.add(16));
+ * 		const rightConstraint = headerRightAnchor.equalTo(safeRightAnchor.subtract(16));
+ * 		const topConstraint = headerTopAnchor.equalTo(safeTopAnchor.add(16));
+ * 		const heightConstraint = headerHeightAnchor.equalTo(56);
+ * 		headerNode.addConstraint(leftConstraint);
+ * 		headerNode.addConstraint(rightConstraint);
+ * 		headerNode.addConstraint(topConstraint);
+ * 		headerNode.addConstraint(heightConstraint);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.canvasId = "mainCanvas";
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * engineConfiguration.autoResizeOnWindowResize = true;
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class UIScene extends Scene {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -74,7 +123,7 @@ export class UIScene extends Scene {
 	//   아니면 initialize() 에서 일괄 적용된다.
 	//==============================================================================
 	/**
-	 * @param { string } viewScaleMode
+	 * @param { string } viewScaleMode 뷰 배율 모드. (ViewScaleMode 의 값, 기본 ViewScaleMode.none)
 	 */
 	setViewScaleMode(viewScaleMode) {
 		this.#viewScaleMode = viewScaleMode;
@@ -88,7 +137,7 @@ export class UIScene extends Scene {
 	// 현재 ViewScaleMode 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 지금 뷰 배율 모드. (ViewScaleMode 의 값)
 	 */
 	getViewScaleMode() {
 		return this.#viewScaleMode;
@@ -98,7 +147,7 @@ export class UIScene extends Scene {
 	// 로딩 화면 중앙 이미지 URL 설정. (빈 문자열이면 이미지 없이 게이지만 노출)
 	//==============================================================================
 	/**
-	 * @param { string } url
+	 * @param { string } url 로딩 화면 가운데에 그릴 그림 주소. (null 이나 빈 글이면 그림 없이 게이지만 그린다)
 	 */
 	setLoadingImageUrl(url) {
 		this.#loadingImageUrl = url || "";
@@ -108,7 +157,37 @@ export class UIScene extends Scene {
 	// 로딩 화면 최소 노출 시간 (ms) 설정.
 	//==============================================================================
 	/**
-	 * @param { number } milliseconds
+	 * @param { number } milliseconds 로딩 화면을 보여 줄 가장 짧은 시간. (밀리초, 기본 3000, 화면을 누르면 바로 넘긴다)
+	 * @example <caption>로딩 화면을 띄우고 애셋 읽기</caption>
+	 * import { Engine, EngineConfiguration, UIScene, ImageAsset, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends UIScene {
+	 * 	constructor() {
+	 * 		super();
+	 * 		this.setLoadingImageUrl("assets/icons/icon.png");
+	 * 		this.setLoadingMinDurationMs(500);
+	 * 		this.imageAsset = null;
+	 * 	}
+	 *
+	 * 	async loadAssets() {
+	 * 		await super.loadAssets();
+	 * 		const imageAsset = new ImageAsset();
+	 * 		await imageAsset.load("examples/assets/spritesheet.png");
+	 * 		this.imageAsset = imageAsset;
+	 * 	}
+	 *
+	 * 	initialize(engine) {
+	 * 		super.initialize(engine);
+	 * 		console.log("loaded", this.imageAsset.isLoaded());
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.canvasId = "mainCanvas";
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * engineConfiguration.autoResizeOnWindowResize = true;
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	setLoadingMinDurationMs(milliseconds) {
 		this.#loadMinDurationMs = milliseconds;
@@ -118,7 +197,7 @@ export class UIScene extends Scene {
 	// 캔버스 배경색 설정. (preDraw 단계에서 캔버스 전체에 적용)
 	//==============================================================================
 	/**
-	 * @param { Color } color
+	 * @param { Color } color 캔버스 전체를 칠할 색. (기본 검정)
 	 */
 	setSceneBackgroundColor(color) {
 		this.#sceneBackgroundColor = color;
@@ -170,7 +249,7 @@ export class UIScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Engine } engine
+	 * @param { Engine } engine 엔진.
 	 */
 	async load(engine) {
 		await super.load(engine);
@@ -222,7 +301,7 @@ export class UIScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그래픽.
 	 */
 	drawOnLoad(graphic) {
 		super.drawOnLoad(graphic);
@@ -275,7 +354,7 @@ export class UIScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Engine } engine
+	 * @param { Engine } engine 엔진.
 	 */
 	initialize(engine) {
 		super.initialize(engine);
@@ -304,7 +383,7 @@ export class UIScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } canvasNativeSize
+	 * @param { Vector2 } canvasNativeSize 캔버스의 실제 픽셀 크기.
 	 */
 	resize(canvasNativeSize) {
 		super.resize(canvasNativeSize);
@@ -346,7 +425,7 @@ export class UIScene extends Scene {
 	// env(safe-area-inset-*) 기준 영역 계산. (뷰 좌표계)
 	//==============================================================================
 	/**
-	 * @returns { Rect }
+	 * @returns { Rect } 세이프 에어리어 영역. (뷰 좌표, 너비와 높이는 0 이상)
 	 */
 	computeSafeAreaRect() {
 		const engine = this.getEngine();
@@ -394,7 +473,7 @@ export class UIScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
@@ -423,7 +502,7 @@ export class UIScene extends Scene {
 	// 트리를 순회하며 솔버가 부착되지 않은 UINode 들을 본 씬의 솔버에 부착.
 	//==============================================================================
 	/**
-	 * @param { TransformNode } node
+	 * @param { TransformNode } node 훑기 시작할 노드. (null 이나 undefined 면 아무것도 하지 않는다)
 	 */
 	attachPendingUINodes(node) {
 		if (node === null || node === undefined) {
@@ -445,7 +524,7 @@ export class UIScene extends Scene {
 	// 화면 가이드 UINode 의 너비/높이 값 제안.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } size
+	 * @param { Vector2 } size 화면 가이드에 줄 너비와 높이. (뷰 단위)
 	 */
 	suggestScreenSize(size) {
 		const screenWidthVariable = this.#screenNode.getWidthVariable();
@@ -458,7 +537,7 @@ export class UIScene extends Scene {
 	// safeAreaInsets 반환. (UIKit 의 UIView.safeAreaInsets)
 	//==============================================================================
 	/**
-	 * @returns { { top: number, left: number, bottom: number, right: number } }
+	 * @returns { { top: number, left: number, bottom: number, right: number } } 지금 세이프 에어리어 인셋의 사본. (뷰 단위)
 	 */
 	getSafeAreaInsets() {
 		const safeAreaInsets = this.#safeAreaInsets;
@@ -475,7 +554,7 @@ export class UIScene extends Scene {
 	// - safeAreaLayoutGuide 의 4 개 제약을 즉시 갱신한다.
 	//==============================================================================
 	/**
-	 * @param { { top: number, left: number, bottom: number, right: number } } insets
+	 * @param { { top: number, left: number, bottom: number, right: number } } insets 위, 왼쪽, 아래, 오른쪽 인셋. (뷰 단위)
 	 */
 	setSafeAreaInsets(insets) {
 		this.#safeAreaInsets = {
@@ -532,7 +611,7 @@ export class UIScene extends Scene {
 	// 디브툴이 입력을 가져가는 중인지 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 개발자 도구 패널이 보이고 포인터가 그 위에 있으면 참.
 	 */
 	isDevToolsCapturingInput() {
 		if (this.#devtools === null || this.#devtools === undefined) {
@@ -546,7 +625,7 @@ export class UIScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 누른 자리. (뷰 좌표)
 	 */
 	touchPress(viewInputPosition) {
 		if (this.isDevToolsCapturingInput()) {
@@ -560,7 +639,7 @@ export class UIScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 옮긴 자리. (뷰 좌표)
 	 */
 	touchMove(viewInputPosition) {
 		if (this.isDevToolsCapturingInput()) {
@@ -574,7 +653,7 @@ export class UIScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뗀 자리. (뷰 좌표)
 	 */
 	touchRelease(viewInputPosition) {
 		if (this.isDevToolsCapturingInput()) {
@@ -588,7 +667,7 @@ export class UIScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 취소된 때의 자리. (뷰 좌표)
 	 */
 	touchCancel(viewInputPosition) {
 		if (this.isDevToolsCapturingInput()) {
@@ -602,8 +681,8 @@ export class UIScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Vector2 } viewInputPosition
-	 * @param { Vector2 } wheelDelta
+	 * @param { Vector2 } viewInputPosition 휠을 굴린 자리. (뷰 좌표)
+	 * @param { Vector2 } wheelDelta 이번 프레임에 쌓인 휠 양. (WheelEvent 의 deltaX, deltaY)
 	 */
 	touchWheel(viewInputPosition, wheelDelta) {
 		if (this.isDevToolsCapturingInput()) {
@@ -617,7 +696,7 @@ export class UIScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그래픽.
 	 */
 	preDraw(graphic) {
 		super.preDraw(graphic);
@@ -638,7 +717,7 @@ export class UIScene extends Scene {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그래픽.
 	 */
 	postDraw(graphic) {
 		super.postDraw(graphic);
@@ -651,7 +730,7 @@ export class UIScene extends Scene {
 	// 솔버 반환.
 	//==============================================================================
 	/**
-	 * @returns { LayoutSolver }
+	 * @returns { LayoutSolver } 이 씬의 레이아웃 솔버. (create 전이면 undefined)
 	 */
 	getSolver() {
 		return this.#solver;
@@ -664,7 +743,7 @@ export class UIScene extends Scene {
 	// - 사용자가 자기 UINode 의 제약을 화면 기준으로 작성할 때 앵커 소스로 사용.
 	//==============================================================================
 	/**
-	 * @returns { UINode }
+	 * @returns { UINode } 화면 가이드 UINode.
 	 */
 	getScreenNode() {
 		return this.#screenNode;
@@ -676,7 +755,7 @@ export class UIScene extends Scene {
 	// - 사용자가 자기 UINode 의 제약을 safeArea 기준으로 작성할 때 앵커 소스로 사용.
 	//==============================================================================
 	/**
-	 * @returns { UINode }
+	 * @returns { UINode } 세이프 에어리어 가이드 UINode.
 	 */
 	getSafeAreaLayoutGuide() {
 		return this.#safeAreaLayoutGuide;

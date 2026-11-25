@@ -24,6 +24,42 @@ const outlineCenter = new Vector2();
 // - 둥근 네모 테는 노드의 내용 크기 그대로, 동그라미 테는 그 가운데에 짧은 변의 반을 반지름으로 그린다.
 // - 선은 내용 크기 안쪽에 들어온다. (선의 가운데가 굵기의 반만큼 안쪽)
 //==============================================================================
+/**
+ * @example <caption>비치는 판 위에 테 얹기</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, WorldNode, Paint, Outline } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	async load(engine) {
+ * 		await super.load(engine);
+ * 		const root = this.getRoot();
+ * 		const panelNode = new WorldNode();
+ * 		panelNode.setContentSize(Vector2.create(240, 140));
+ * 		panelNode.setLocalPosition(Vector2.create(200, 180));
+ * 		const paint = panelNode.addComponent(Paint);
+ * 		paint.setColor("rgba(0, 0, 0, 0.5)");
+ * 		paint.setRoundSize(20);
+ * 		const outline = panelNode.addComponent(Outline);
+ * 		outline.setColor("#ffffff");
+ * 		outline.setLineWidth(4);
+ * 		outline.setRoundSize(20);
+ * 		root.addChild(panelNode);
+ *
+ * 		const ringNode = new WorldNode();
+ * 		ringNode.setContentSize(Vector2.create(100, 100));
+ * 		ringNode.setLocalPosition(Vector2.create(480, 180));
+ * 		const ring = ringNode.addComponent(Outline);
+ * 		ring.setColor("#ffcc00");
+ * 		ring.setLineWidth(6);
+ * 		ring.setCircle(true);
+ * 		root.addChild(ringNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class Outline extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -52,7 +88,7 @@ export class Outline extends Component {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그래픽.
 	 */
 	draw(graphic) {
 		const lineWidth = this.getLineWidth();
@@ -98,7 +134,7 @@ export class Outline extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { boolean }
+	 * @returns { boolean } 내용 영역 안에서만 그리면 참.
 	 */
 	isDrawnInsideContent() {
 		return this.draw === Outline.prototype.draw;
@@ -108,7 +144,7 @@ export class Outline extends Component {
 	// 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { Color | string } other
+	 * @param { Color | string } other 테의 색. (Color 나 "#rrggbb(aa)", "rgb(a)(...)" 글, null 이나 undefined 면 투명, 그 밖의 값은 무시한다)
 	 */
 	setColor(other) {
 		if (other === null || other === undefined) {
@@ -131,7 +167,7 @@ export class Outline extends Component {
 	// 색상 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 테의 색.
 	 */
 	getColor() {
 		return this.#color;
@@ -141,7 +177,7 @@ export class Outline extends Component {
 	// 굵기 설정.
 	//==============================================================================
 	/**
-	 * @param { number } lineWidth
+	 * @param { number } lineWidth 테의 굵기. (내용 크기 단위, 0 이하면 그리지 않는다)
 	 */
 	setLineWidth(lineWidth) {
 		this.#lineWidth = lineWidth;
@@ -151,7 +187,7 @@ export class Outline extends Component {
 	// 굵기 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 테의 굵기.
 	 */
 	getLineWidth() {
 		return this.#lineWidth;
@@ -161,7 +197,7 @@ export class Outline extends Component {
 	// 귀퉁이 둥근 정도 설정. (바깥 꼴 기준)
 	//==============================================================================
 	/**
-	 * @param { number } roundSize
+	 * @param { number } roundSize 바깥 꼴의 귀퉁이 반지름. (내용 크기 단위, 동그라미 테면 쓰지 않는다)
 	 */
 	setRoundSize(roundSize) {
 		this.#roundSize = roundSize;
@@ -171,7 +207,7 @@ export class Outline extends Component {
 	// 귀퉁이 둥근 정도 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 바깥 꼴의 귀퉁이 반지름.
 	 */
 	getRoundSize() {
 		return this.#roundSize;
@@ -181,7 +217,7 @@ export class Outline extends Component {
 	// 동그라미 테로 그릴지 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } isCircle
+	 * @param { boolean } isCircle 참이면 동그라미 테, 거짓이면 둥근 네모 테.
 	 */
 	setCircle(isCircle) {
 		this.#isCircle = isCircle;
@@ -191,7 +227,7 @@ export class Outline extends Component {
 	// 동그라미 테인지 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 동그라미 테면 참.
 	 */
 	isCircle() {
 		return this.#isCircle;

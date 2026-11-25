@@ -8,6 +8,19 @@ import { Vector2 } from "./vector2.js";
 //==============================================================================
 // 사각 영역.
 //==============================================================================
+/**
+ * @example <caption>점과 영역 검사, 겹친 영역 구하기</caption>
+ * import { Rect, Vector2 } from "./build/vanilla.js";
+ *
+ * const panel = Rect.create(0, 0, 100, 50);
+ * const button = Rect.create(80, 40, 40, 20);
+ * const point = Vector2.create(10, 10);
+ * console.log(panel.contains(point), panel.overlaps(button));
+ * const overlap = panel.intersection(button);
+ * console.log(overlap.left, overlap.top, overlap.width, overlap.height);
+ * const bounds = panel.union(button);
+ * console.log(bounds.right, bounds.bottom);
+ */
 export class Rect extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -35,8 +48,8 @@ export class Rect extends Object {
 	// 동등성 비교.
 	//==============================================================================
 	/**
-	 * @param { any } other
-	 * @returns { boolean }
+	 * @param { any } other 비교할 값.
+	 * @returns { boolean } 같은 객체이거나 위치와 크기가 모두 같은 Rect 면 참.
 	 */
 	equals(other) {
 		if (super.equals(other)) {
@@ -59,7 +72,7 @@ export class Rect extends Object {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { this }
+	 * @returns { this } 위치와 크기가 같은 새 사각 영역.
 	 */
 	clone() {
 		// const obj = super.clone();
@@ -83,7 +96,7 @@ export class Rect extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 좌상단 위치. (내부 벡터를 그대로 돌려준다)
 	 */
 	get position() {
 		return this.#position;
@@ -105,7 +118,7 @@ export class Rect extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 가로, 세로 크기. (내부 벡터를 그대로 돌려준다)
 	 */
 	get size() {
 		return this.#size;
@@ -115,8 +128,8 @@ export class Rect extends Object {
 	// 겹치는지 여부.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } value
-	 * @returns { boolean }
+	 * @param { Vector2 } value 검사할 점.
+	 * @returns { boolean } 점이 영역 안이나 변 위에 있으면 참. (Vector2 가 아니면 거짓)
 	 */
 	contains(value) {
 		if (value !== null && value !== undefined && value instanceof Vector2) {
@@ -134,8 +147,8 @@ export class Rect extends Object {
 	// 겹치는지 여부.
 	//==============================================================================
 	/**
-	 * @param { Rect } value
-	 * @returns { boolean }
+	 * @param { Rect } value 검사할 사각 영역.
+	 * @returns { boolean } 겹치거나 변이 닿으면 참. (Rect 가 아니면 거짓)
 	 */
 	overlaps(value) {
 		if (value !== null && value !== undefined && value instanceof Rect) {
@@ -165,7 +178,7 @@ export class Rect extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } 가로 크기.
 	 */
 	get width() {
 		return this.size.x;
@@ -187,7 +200,7 @@ export class Rect extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } 세로 크기.
 	 */
 	get height() {
 		return this.size.y;
@@ -213,7 +226,7 @@ export class Rect extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 좌상단 좌표의 새 벡터.
 	 */
 	get min() {
 		return Vector2.create(this.position.x, this.position.y);
@@ -236,7 +249,7 @@ export class Rect extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 우하단 좌표의 새 벡터.
 	 */
 	get max() {
 		return Vector2.create(this.position.x + this.size.x, this.position.y + this.size.y);
@@ -246,8 +259,14 @@ export class Rect extends Object {
 	// 다른 사각형과 겹치는지. (변이 닿기만 한 것은 겹친 것이 아니다, overlaps 는 닿기만 해도 겹친 것으로 본다)
 	//==============================================================================
 	/**
-	 * @param { Rect } other
-	 * @returns { boolean }
+	 * @param { Rect } other 검사할 사각 영역.
+	 * @returns { boolean } 넓이가 있는 겹침이 있으면 참.
+	 * @example <caption>변이 닿은 두 사각 영역 비교하기</caption>
+	 * import { Rect } from "./build/vanilla.js";
+	 *
+	 * const leftRect = Rect.create(0, 0, 10, 10);
+	 * const rightRect = Rect.create(10, 0, 10, 10);
+	 * console.log(leftRect.overlaps(rightRect), leftRect.intersects(rightRect));
 	 */
 	intersects(other) {
 		const rightX = this.position.x + this.size.x;
@@ -261,8 +280,8 @@ export class Rect extends Object {
 	// 교집합 (두 사각형이 겹치는 영역 반환).
 	//==============================================================================
 	/**
-	 * @param { Rect } other
-	 * @returns { Rect }
+	 * @param { Rect } other 겹침을 구할 사각 영역.
+	 * @returns { Rect } 겹친 부분의 새 사각 영역. (겹치지 않으면 Rect.zero())
 	 */
 	intersection(other) {
 		if (!this.overlaps(other)) {
@@ -279,8 +298,8 @@ export class Rect extends Object {
 	// 합집합 (두 사각형을 모두 포함하는 최소 사각형 반환).
 	//==============================================================================
 	/**
-	 * @param { Rect } other
-	 * @returns { Rect }
+	 * @param { Rect } other 합칠 사각 영역.
+	 * @returns { Rect } 두 영역을 모두 담는 가장 작은 새 사각 영역.
 	 */
 	union(other) {
 		const x1 = Math.min(this.position.x, other.position.x);
@@ -307,7 +326,7 @@ export class Rect extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { Vector2 }
+	 * @returns { Vector2 } 가운데 좌표의 새 벡터.
 	 */
 	get center() {
 		const origin = this.position.clone();
@@ -332,7 +351,7 @@ export class Rect extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } 왼쪽 X 좌표.
 	 */
 	get left() {
 		return this.position.x;
@@ -354,7 +373,7 @@ export class Rect extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } 위쪽 Y 좌표.
 	 */
 	get top() {
 		return this.position.y;
@@ -376,7 +395,7 @@ export class Rect extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } 오른쪽 X 좌표.
 	 */
 	get right() {
 		return this.position.x + this.width;
@@ -398,7 +417,7 @@ export class Rect extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } 아래쪽 Y 좌표.
 	 */
 	get bottom() {
 		return this.position.y + this.height;
@@ -423,11 +442,11 @@ export class Rect extends Object {
 	// 새로운 사각 영역 생성.
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } width
-	 * @param { number } height
-	 * @returns { Rect }
+	 * @param { number } x 좌상단 X 좌표.
+	 * @param { number } y 좌상단 Y 좌표.
+	 * @param { number } width 가로 크기.
+	 * @param { number } height 세로 크기.
+	 * @returns { Rect } 새 사각 영역.
 	 */
 	static create(x, y, width, height) {
 		// 생성자가 만든 벡터에 값만 적는다. (Vector2 를 새로 만들어 setter 로 다시 복제하지 않는다)
@@ -441,7 +460,7 @@ export class Rect extends Object {
 	// 위치와 크기가 모두 0 인지. (Rect.zero() 와 같은지를 새 객체를 만들지 않고 본다)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 위치와 크기가 모두 0 이면 참.
 	 */
 	isZero() {
 		return this.position.x === 0 && this.position.y === 0 && this.size.x === 0 && this.size.y === 0;
@@ -451,7 +470,7 @@ export class Rect extends Object {
 	// 크기가 없는 빈 사각 영역 생성.
 	//==============================================================================
 	/**
-	 * @returns { Rect }
+	 * @returns { Rect } 위치와 크기가 모두 0 인 사각 영역.
 	 */
 	static zero() {
 		return Rect.create(0, 0, 0, 0);
@@ -461,10 +480,10 @@ export class Rect extends Object {
 	// 범위 제한.
 	//==============================================================================
 	/**
-	 * @param { Rect } value
-	 * @param { Rect } min
-	 * @param { Rect } max
-	 * @returns { Rect }
+	 * @param { Rect } value 자를 사각 영역.
+	 * @param { Rect } min 위치와 크기의 최솟값.
+	 * @param { Rect } max 위치와 크기의 최댓값.
+	 * @returns { Rect } 위치와 크기를 성분마다 자른 새 사각 영역.
 	 */
 	static clamp(value, min, max) {
 		const position = Vector2.clamp(value.position, min.position, max.position);

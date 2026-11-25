@@ -16,14 +16,14 @@ export const SYSTEM_FONT_STRING = "-apple-system, \"Segoe UI\", Roboto, \"Apple 
 // 플랫폼 타입.
 //==============================================================================
 export const PlatformType = { //System.Object.freeze({
-	windows: "Windows",
-	macOS: "macOS",
-	android: "Android",
+	windows: "Windows", // 윈도우.
+	macOS: "macOS", // 맥.
+	android: "Android", // 안드로이드.
 	steamDeck: "SteamDeck", // 스팀덱 추가
 	iPadOS: "iPadOS",       // iPadOS 추가
-	iOS: "iOS",
-	linux: "Linux",
-	unknown: "Unknown"
+	iOS: "iOS", // 아이폰, 아이팟.
+	linux: "Linux", // 리눅스.
+	unknown: "Unknown" // 알 수 없음.
 };
 // });
 
@@ -32,12 +32,12 @@ export const PlatformType = { //System.Object.freeze({
 // 브라우저 타입.
 //==============================================================================
 export const BrowserType = { //System.freeze({
-	chrome: "Chrome",
-	edge: "Edge",
-	firefox: "Firefox",
-	internetExplorer: "Internet Explorer",
-	safari: "Safari",
-	unknown: "Unknown"
+	chrome: "Chrome", // 크롬.
+	edge: "Edge", // 엣지.
+	firefox: "Firefox", // 파이어폭스.
+	internetExplorer: "Internet Explorer", // 인터넷 익스플로러.
+	safari: "Safari", // 사파리.
+	unknown: "Unknown" // 알 수 없음.
 };
 // });
 
@@ -45,13 +45,27 @@ export const BrowserType = { //System.freeze({
 //==============================================================================
 // 플랫폼 정보.
 //==============================================================================
+/**
+ * @example <caption>user agent 글로 플랫폼 가리기</caption>
+ * import { Platform, PlatformType, BrowserType } from "./build/vanilla.js";
+ *
+ * const platform = new Platform();
+ * platform.applyUserAgent("Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36");
+ * console.log(platform.platformName === PlatformType.android, platform.browserName === BrowserType.chrome, platform.isMobile);
+ * @example <caption>지금 기기 알아보기</caption>
+ * import { Platform } from "./build/vanilla.js";
+ *
+ * const platform = new Platform();
+ * const platformInfo = platform.getPlatformInfo();
+ * console.log(platformInfo.platformName, platformInfo.browserName, platform.isMobile, platform.isDesktopWeb());
+ */
 export class Platform extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
-	/** @type { string } */ platformName = PlatformType.unknown;
-	/** @type { string } */ browserName = BrowserType.unknown;
-	/** @type { boolean } */ isMobile = false;
+	/** @type { string } */ platformName = PlatformType.unknown; // 플랫폼 이름. (PlatformType 값, getPlatformInfo 나 applyUserAgent 가 채운다)
+	/** @type { string } */ browserName = BrowserType.unknown; // 브라우저 이름. (BrowserType 값, getPlatformInfo 나 applyUserAgent 가 채운다)
+	/** @type { boolean } */ isMobile = false; // 모바일 기기인지. (user agent 에 Mobi, Android, iPhone, iPad 가 있으면 참)
 
 
 	//==============================================================================
@@ -68,8 +82,8 @@ export class Platform extends Object {
 	// 캔버스 생성 or 반환.
 	//==============================================================================
 	/**
-	 * @param { string } canvasId
-	 * @returns { HTMLCanvasElement }
+	 * @param { string } canvasId 찾을 요소의 id.
+	 * @returns { HTMLCanvasElement } 그 id 의 요소. (없으면 캔버스를 만들어 id 를 주고 body 끝에 붙인다)
 	 */
 	getOrAddCanvas(canvasId) {
 		let canvas = document.getElementById(canvasId);
@@ -86,7 +100,7 @@ export class Platform extends Object {
 	// 플랫폼 정보 탐지 및 적용.
 	//==============================================================================
 	/**
-	 * @returns { { platformName: string, browserName: string } }
+	 * @returns { { platformName: string, browserName: string } } navigator.userAgent 로 고른 플랫폼 이름과 브라우저 이름. (platformName, browserName, isMobile 필드도 채운다)
 	*/
 	getPlatformInfo() {
 		// if (System.navigator.userAgentData && !/Valve Steam GameOverlay|iPad/i.test(System.navigator.userAgent))
@@ -128,7 +142,7 @@ export class Platform extends Object {
 	// user agent 글로 플랫폼, 브라우저, 모바일 여부 고르기. (getPlatformInfo 가 브라우저의 글로 부른다)
 	//==============================================================================
 	/**
-	 * @param { string } userAgent
+	 * @param { string } userAgent 브라우저의 user agent 글. (navigator.userAgent 꼴)
 	 */
 	applyUserAgent(userAgent) {
 		this.isMobile = /Mobi|Android|iPhone|iPad/i.test(userAgent);
@@ -158,7 +172,7 @@ export class Platform extends Object {
 	// - 플랫폼 정보를 새로 읽는다.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 데스크탑 웹이면 참.
 	 */
 	isDesktopWeb() {
 		this.getPlatformInfo();
@@ -176,7 +190,7 @@ export class Platform extends Object {
 	// 주된 손이 손가락인지 반환. (CSS 의 pointer: coarse, 단축키 안내처럼 마우스로 하는 화면에만 보일 것을 가릴 때 쓴다)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } (pointer: coarse) 미디어 질의가 맞으면 참. (matchMedia 가 없으면 거짓)
 	 */
 	isCoarsePointer() {
 		if (typeof System.matchMedia !== "function") {
@@ -190,7 +204,7 @@ export class Platform extends Object {
 	// 리소스 사용량 반환.
 	//==============================================================================
 	/**
-	 * @returns { { totalTransferSize: number, totalDecodedSize: number, loadedFiles: array } }
+	 * @returns { { totalTransferSize: number, totalDecodedSize: number, loadedFiles: array } } 네트워크로 받은 크기의 합, 풀린 크기의 합(바이트)과 불러온 파일 목록. (파일마다 path, name, type, transferSize, decodedSize, performance 의 resource 항목에서 읽는다)
 	*/
 	getResourceUsage() {
 		const resources = performance.getEntriesByType("resource");		
@@ -224,7 +238,7 @@ export class Platform extends Object {
 	// 리소스 사용량 반환. (옛 이름의 오타를 그대로 둔 별칭, getResourceUsage 와 같다)
 	//==============================================================================
 	/**
-	 * @returns { { totalTransferSize: number, totalDecodedSize: number, loadedFiles: array } }
+	 * @returns { { totalTransferSize: number, totalDecodedSize: number, loadedFiles: array } } getResourceUsage 의 결과.
 	*/
 	getResouceUsage() {
 		return this.getResourceUsage();
@@ -234,8 +248,17 @@ export class Platform extends Object {
 	// 세이프 에어리어 반환.
 	//==============================================================================
 	/**
-     * @param @type { HTMLCanvasElement | null } canvas
-	 * @returns { Rect }
+     * @param { HTMLCanvasElement | null } canvas 크기를 잴 캔버스. (null 이면 창의 innerWidth, innerHeight 를 쓴다)
+	 * @returns { Rect } 세이프 에어리어 여백을 뺀 사각형. (left, top 은 왼쪽, 위 여백, 여백은 CSS 의 env(safe-area-inset-*) 픽셀 값)
+	 * @example <caption>캔버스에서 노치를 피한 자리 구하기</caption>
+	 * import { Platform } from "./build/vanilla.js";
+	 *
+	 * const platform = new Platform();
+	 * const canvas = platform.getOrAddCanvas("gameCanvas");
+	 * canvas.width = 640;
+	 * canvas.height = 360;
+	 * const safeAreaRect = platform.getSafeAreaRect(canvas);
+	 * console.log(safeAreaRect.left, safeAreaRect.top, safeAreaRect.width, safeAreaRect.height);
 	*/
 	getSafeAreaRect(canvas) {
 		const div = System.document.createElement("div");

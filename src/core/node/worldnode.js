@@ -28,6 +28,24 @@ const convertContentSize = Vector2.zero();
 // 계층적 영역 객체.
 // - Anchor, Pivot, ConetentSize 기능.
 //==============================================================================
+/**
+ * @example <caption>부모 안에 사각형으로 놓고 맞는지 보기</caption>
+ * import { WorldNode, Vector2 } from "./build/vanilla.js";
+ *
+ * const panel = new WorldNode();
+ * panel.setPivot(Vector2.create(0, 0));
+ * panel.setContentSize(Vector2.create(400, 300));
+ * const button = new WorldNode();
+ * button.setRect(20, 20, 120, 40);
+ * button.setInteractable(true);
+ * panel.addChild(button);
+ * const corners = button.getWorldCorners();
+ * console.log(corners[0].x, corners[0].y, corners[2].x, corners[2].y);
+ * const touchPosition = Vector2.create(50, 30);
+ * const isInside = button.contains(touchPosition);
+ * const localPosition = button.convertViewToLocal(touchPosition);
+ * console.log(isInside, localPosition.x, localPosition.y);
+ */
 export class WorldNode extends TransformNode {
     //==============================================================================
     // 멤버 변수 목록.
@@ -57,7 +75,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @override
-     * @param { Graphic } graphic
+     * @param { Graphic } graphic 변환을 걸 그래픽.
      */
     pushTransform(graphic) {
 
@@ -98,7 +116,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @override
-     * @param { Graphic } graphic
+     * @param { Graphic } graphic 그릴 그래픽.
      */
     draw(graphic) {
         const isVisible = this.isVisible();
@@ -152,9 +170,9 @@ export class WorldNode extends TransformNode {
     // - 자식은 여기서 보지 않는다. 자식은 저마다 따로 본다.
     //==============================================================================
     /**
-     * @param { Graphic } graphic
-     * @param { Component[] } components
-     * @returns { boolean }
+     * @param { Graphic } graphic 화면 밖 거르기를 물을 그래픽.
+     * @param { Component[] } components 이 노드의 컴포넌트 목록.
+     * @returns { boolean } 컴포넌트 그리기를 건너뛰어도 되면 참.
      */
     isComponentDrawCulled(graphic, components) {
         if (!graphic.isCullingEnabled()) {
@@ -241,7 +259,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @override
-     * @param { Graphic } graphic
+     * @param { Graphic } graphic 그릴 그래픽.
      */
     drawGizmos(graphic) {
         // const isGizmoVisible = this.isGizmoVisible();
@@ -292,7 +310,7 @@ export class WorldNode extends TransformNode {
     // 기준점 설정.
     //==============================================================================
     /**
-     * @param { Vector2 } pivot
+     * @param { Vector2 } pivot 기준점. (내용 크기에 대한 비, 0 ~ 1 로 자르고, (0, 0) 이 왼쪽 위)
      */
     setPivot(pivot) {
         // 복제본을 새로 만들지 않고 가진 벡터에 값을 옮겨 적는다. (getPivot() 은 복제해 준다)
@@ -304,7 +322,7 @@ export class WorldNode extends TransformNode {
     // 기준점 반환.
     //==============================================================================
     /**
-     * @returns { Vector2 }
+     * @returns { Vector2 } 기준점의 사본.
      */
     getPivot() {
         return this.#pivot.clone();
@@ -314,7 +332,7 @@ export class WorldNode extends TransformNode {
     // 실제 내용 크기 설정.
     //==============================================================================
     /**
-     * @param { Vector2 } contentSize
+     * @param { Vector2 } contentSize 내용 크기. (값을 옮겨 적는다)
      */
     setContentSize(contentSize) {
         // 복제본을 새로 만들지 않고 가진 벡터에 값을 옮겨 적는다. (getContentSize() 는 복제해 준다)
@@ -327,8 +345,8 @@ export class WorldNode extends TransformNode {
     // - setContentSize() 를 덮어쓴 하위 클래스면 setContentSize 로 넘긴다.
     //==============================================================================
     /**
-     * @param { number } width
-     * @param { number } height
+     * @param { number } width 내용 너비.
+     * @param { number } height 내용 높이.
      */
     setContentSizeXY(width, height) {
         const isContentSizeOverridden = this.setContentSize !== WorldNode.prototype.setContentSize;
@@ -347,10 +365,10 @@ export class WorldNode extends TransformNode {
     // - 로컬 배율과 회전은 보지 않는다. (배율 1, 회전 0 일 때 화면에서도 그 사각형이다)
     //==============================================================================
     /**
-     * @param { number } x
-     * @param { number } y
-     * @param { number } width
-     * @param { number } height
+     * @param { number } x 왼쪽 위 X. (부모 내용 영역의 왼쪽 위가 원점)
+     * @param { number } y 왼쪽 위 Y. (부모 내용 영역의 왼쪽 위가 원점)
+     * @param { number } width 내용 너비.
+     * @param { number } height 내용 높이.
      */
     setRect(x, y, width, height) {
         this.setContentSizeXY(width, height);
@@ -370,7 +388,7 @@ export class WorldNode extends TransformNode {
     // - 부모가 없고(루트 노드) 명시적으로 설정된 적 없으면 현재 뷰 크기를 반환한다.
     //==============================================================================
     /**
-     * @returns { Vector2 }
+     * @returns { Vector2 } 내용 크기의 사본.
      */
     getContentSize() {
         return this.#contentSize.clone();
@@ -381,7 +399,7 @@ export class WorldNode extends TransformNode {
     // - getContentSize() 를 덮어쓴 하위 클래스면 그 함수가 주는 값을 적는다.
     //==============================================================================
     /**
-     * @param { Vector2 } target
+     * @param { Vector2 } target 내용 크기를 받을 벡터.
      */
     copyContentSizeTo(target) {
         const isContentSizeOverridden = this.getContentSize !== WorldNode.prototype.getContentSize;
@@ -400,7 +418,7 @@ export class WorldNode extends TransformNode {
     // 앵커 설정.
     //==============================================================================
     /**
-     * @param { Vector2 } anchor
+     * @param { Vector2 } anchor 앵커. (부모 내용 크기에 대한 비, 0 ~ 1 로 자른다)
      */
     setAnchor(anchor) {
         this.#anchor = anchor.clone();
@@ -412,7 +430,7 @@ export class WorldNode extends TransformNode {
     // 앵커 반환.
     //==============================================================================
     /**
-     * @returns { Vector2 }
+     * @returns { Vector2 } 앵커. (안의 벡터 그대로)
      */
     getAnchor() {
         return this.#anchor;
@@ -425,7 +443,19 @@ export class WorldNode extends TransformNode {
     //   (localPosition 은 anchor 와 무관하게 부모 영역 내 자기 중심점 좌표를 나타냄)
     //==============================================================================
     /**
-     * @param { Vector2 } anchoredPosition
+     * @param { Vector2 } anchoredPosition 앵커 기준 자리. (부모가 WorldNode 가 아니면 로컬 위치로 쓰고, null 이면 아무것도 하지 않는다)
+     * @example <caption>부모의 오른쪽 위 귀퉁이에서 띄워 놓기</caption>
+     * import { WorldNode, Vector2 } from "./build/vanilla.js";
+     *
+     * const parent = new WorldNode();
+     * parent.setContentSize(Vector2.create(800, 600));
+     * const closeButton = new WorldNode();
+     * parent.addChild(closeButton);
+     * closeButton.setAnchor(Vector2.create(1, 0));
+     * closeButton.setAnchoredPosition(Vector2.create(-50, 40));
+     * const localPosition = closeButton.getLocalPosition();
+     * const anchoredPosition = closeButton.getAnchoredPosition();
+     * console.log(localPosition.x, localPosition.y, anchoredPosition.x, anchoredPosition.y);
      */
     setAnchoredPosition(anchoredPosition) {
         if (anchoredPosition === null || anchoredPosition === undefined) {
@@ -451,7 +481,7 @@ export class WorldNode extends TransformNode {
     // - localPosition - anchorRef 로 역산해서 반환한다.
     //==============================================================================
     /**
-     * @returns { Vector2 }
+     * @returns { Vector2 } 앵커 기준 자리. (부모가 WorldNode 가 아니면 로컬 위치)
      */
     getAnchoredPosition() {
         const localPosition = this.getLocalPosition();
@@ -475,7 +505,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @override
-     * @returns { Vector2 }
+     * @returns { Vector2 } 월드 자리. (기준점의 자리)
      */
     getPosition() {
         const parent = this.getParent();
@@ -511,7 +541,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @override
-     * @param { Vector2 } position
+     * @param { Vector2 } position 월드 자리. (기준점의 자리, 부모의 회전과 배율을 풀어 로컬 위치로 바꾼다)
      */
     setPosition(position) {
         const parent = this.getParent();
@@ -548,7 +578,7 @@ export class WorldNode extends TransformNode {
     // 실제 화면에 그려지는 영역 반환. (OBB)
     //==============================================================================
     /**
-     * @returns { Vector2[] }
+     * @returns { Vector2[] } 네 귀퉁이. (왼쪽 위, 오른쪽 위, 오른쪽 아래, 왼쪽 아래 차례, 뷰 좌표)
      */
     getWorldCorners() {
         const position = this.getPosition();
@@ -581,7 +611,7 @@ export class WorldNode extends TransformNode {
     // getWorldCorners()를 기반으로 최소, 최대위치를 만들어 바운딩박스를 형성.
     //==============================================================================
     /**
-     * @returns { Rect }
+     * @returns { Rect } 네 귀퉁이를 감싸는 축 정렬 사각형.
      */
     getWorldBounds() {
         const worldCorners = this.getWorldCorners();
@@ -611,8 +641,8 @@ export class WorldNode extends TransformNode {
     // getWorldCorners() 를 통한 충돌 검출.
     //==============================================================================
     /**
-     * @param { Vector2 } viewPosition
-     * @returns { boolean }
+     * @param { Vector2 } viewPosition 볼 뷰 좌표.
+     * @returns { boolean } 네 귀퉁이 안이면 참. (null 이면 거짓)
      */
     contains(viewPosition) {
         if (viewPosition === null || viewPosition === undefined) {
@@ -631,8 +661,8 @@ export class WorldNode extends TransformNode {
     // - 내용 크기가 0 인 축은 0 을 돌려준다.
     //==============================================================================
     /**
-     * @param { Vector2 } viewPosition
-     * @returns { Vector2 }
+     * @param { Vector2 } viewPosition 바꿀 뷰 좌표.
+     * @returns { Vector2 } 로컬 좌표. (내용 영역의 왼쪽 위가 원점)
      */
     convertViewToLocal(viewPosition) {
         const worldCorners = this.getWorldCorners();
@@ -664,7 +694,7 @@ export class WorldNode extends TransformNode {
     // 터치 인터랙션 활성화 설정.
     //==============================================================================
     /**
-     * @param { boolean } isInteractable
+     * @param { boolean } isInteractable 참이면 TouchRaycaster 가 이 노드를 맞힌다.
      */
     setInteractable(isInteractable) {
         this.#isInteractable = isInteractable;
@@ -674,7 +704,7 @@ export class WorldNode extends TransformNode {
     // 터치 인터랙션 활성화 여부 반환.
     //==============================================================================
     /**
-     * @returns { boolean }
+     * @returns { boolean } 누를 수 있으면 참.
      */
     isInteractable() {
         return this.#isInteractable;
@@ -685,7 +715,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @virtual
-     * @param { Vector2 } viewInputPosition
+     * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
      */
     touchPress(viewInputPosition) {
         const components = this.getAllComponents();
@@ -701,7 +731,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @virtual
-     * @param { Vector2 } viewInputPosition
+     * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
      */
     touchMove(viewInputPosition) {
         const components = this.getAllComponents();
@@ -717,7 +747,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @virtual
-     * @param { Vector2 } viewInputPosition
+     * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
      */
     touchRelease(viewInputPosition) {
         const components = this.getAllComponents();
@@ -733,7 +763,7 @@ export class WorldNode extends TransformNode {
     //==============================================================================
     /**
      * @virtual
-     * @param { Vector2 } viewInputPosition
+     * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
      */
     touchCancel(viewInputPosition) {
         const components = this.getAllComponents();

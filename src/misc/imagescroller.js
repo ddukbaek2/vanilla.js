@@ -10,6 +10,35 @@ import { Rect } from "../base/rect.js";
 //==============================================================================
 // 이미지 스크롤러.
 //==============================================================================
+/**
+ * @example <caption>배경 이미지를 바둑판으로 이어 흘리기</caption>
+ * import { Engine, EngineConfiguration, Scene, ImageScroller, ImageAsset, Rect } from "./build/vanilla.js";
+ *
+ * const imageAsset = new ImageAsset();
+ * await imageAsset.load("examples/assets/spritesheet.png");
+ * const image = imageAsset.getImage();
+ * const imageScroller = new ImageScroller();
+ * imageScroller.setImage(image);
+ * imageScroller.setViewRect(Rect.create(0, 0, 640, 360));
+ * imageScroller.setHorizontalScrollSpeed(-60);
+ * imageScroller.setVerticalScrollSpeed(20);
+ *
+ * class MainScene extends Scene {
+ * 	tick(timeDelta) {
+ * 		super.tick(timeDelta);
+ * 		imageScroller.tick(timeDelta);
+ * 	}
+ *
+ * 	draw(graphic) {
+ * 		super.draw(graphic);
+ * 		imageScroller.draw(graphic);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class ImageScroller extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -37,7 +66,7 @@ export class ImageScroller extends Object {
 	// 갱신.
 	//==============================================================================
 	/**
-	 * @param { number } timeDelta 
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		const scrollPosition = this.getScrollPosition();
@@ -50,7 +79,7 @@ export class ImageScroller extends Object {
 	// 출력.
 	//==============================================================================
 	/**
-	 * @param { Graphic } graphic 
+	 * @param { Graphic } graphic 그릴 그래픽.
 	 */
 	draw(graphic) {
 		const image = this.getImage();
@@ -95,7 +124,7 @@ export class ImageScroller extends Object {
 	// 이미지 설정.
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement | ImageAsset } image 
+	 * @param { HTMLImageElement | ImageAsset } image 바둑판으로 이어 그릴 이미지. (null 이면 그리지 않는다)
 	 */
 	setImage(image) {
 		if (image === null || image === undefined) {
@@ -113,7 +142,7 @@ export class ImageScroller extends Object {
 	// 이미지 반환.
 	//==============================================================================
 	/**
-	 * @returns { HTMLImageElement }
+	 * @returns { HTMLImageElement } 이어 그릴 이미지. (없으면 null)
 	 */
 	getImage() {
 		return this.#image;
@@ -123,7 +152,7 @@ export class ImageScroller extends Object {
 	// 화면 가시 영역 설정.
 	//==============================================================================
 	/**
-	 * @param { Rect } rect 
+	 * @param { Rect } rect 이미지를 채워 그릴 화면 영역. (이 밖은 잘라낸다)
 	 */
 	setViewRect(rect) {
 		this.#viewRect = rect;
@@ -133,7 +162,7 @@ export class ImageScroller extends Object {
 	// 화면 가시 영역 반환.
 	//==============================================================================
 	/**
-	 * @returns { Rect }
+	 * @returns { Rect } 이미지를 채워 그릴 화면 영역.
 	 */
 	getViewRect() {
 		return this.#viewRect;
@@ -143,7 +172,7 @@ export class ImageScroller extends Object {
 	// 수직 스크롤 설정.
 	//==============================================================================
 	/**
-	 * @param { number } speed 
+	 * @param { number } speed 세로 스크롤 속도. (픽셀 / 초)
 	 */
 	setVerticalScrollSpeed(speed) {
 		this.#scrollSpeed.y = speed;
@@ -153,7 +182,7 @@ export class ImageScroller extends Object {
 	// 수평 스크롤 설정.
 	//==============================================================================
 	/**
-	 * @param { number } speed 
+	 * @param { number } speed 가로 스크롤 속도. (픽셀 / 초)
 	 */
 	setHorizontalScrollSpeed(value) {
 		this.#scrollSpeed.x = value;
@@ -163,7 +192,8 @@ export class ImageScroller extends Object {
 	// 스크롤 속도 반환.
 	//==============================================================================
 	/**
-	 * @returns { Vector2 } 
+	 * @param { any } speed 쓰지 않는다.
+	 * @returns { Vector2 } 스크롤 속도. (픽셀 / 초, 안에 쥔 벡터 그대로)
 	 */
 	getScrollSpeed(speed) {
 		return this.#scrollSpeed;
@@ -173,7 +203,7 @@ export class ImageScroller extends Object {
 	// 스크롤 위치 설정.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } position 
+	 * @param { Vector2 } position 스크롤 위치. (픽셀, 받은 벡터를 그대로 쥐고 tick 이 고친다)
 	 */
 	setScrollPosition(position) {
 		this.#scrollPosition = position;
@@ -183,7 +213,7 @@ export class ImageScroller extends Object {
 	// 스크롤 위치 반환.
 	//==============================================================================
 	/**
-	 * @returns { HTMLImageElement }
+	 * @returns { HTMLImageElement } 스크롤 위치. (픽셀, 안에 쥔 벡터 그대로)
 	 */
 	getScrollPosition() {
 		return this.#scrollPosition;

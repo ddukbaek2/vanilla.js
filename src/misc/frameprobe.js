@@ -14,6 +14,19 @@ const System = globalThis;
 //   처지지 않았으면 무거운 장면에서 measureAgain() 으로 한 번 더 잴 수 있다.
 // - 엔진과 브라우저를 들여오지 않는다. 프레임 간격과 최대 프레임은 부르는 쪽이 넘긴다.
 //==============================================================================
+/**
+ * @example <caption>프레임 간격을 넘겨 처지는 기기 가리기</caption>
+ * import { FrameProbe } from "./build/vanilla.js";
+ *
+ * const frameProbe = new FrameProbe();
+ * frameProbe.setSeconds(0.5, 1);
+ * let isFinished = false;
+ * for (let frame = 0; frame < 120 && !isFinished; ++frame) {
+ * 	const frameSeconds = frame % 3 === 0 ? 1 / 30 : 1 / 60;
+ * 	isFinished = frameProbe.measureFrame(frameSeconds, 60);
+ * }
+ * console.log(frameProbe.isFinished(), frameProbe.isSlow(), frameProbe.readSlowFrameShare());
+ */
 export class FrameProbe {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -54,7 +67,7 @@ export class FrameProbe {
 	/**
 	 * @param { number } frameSeconds - 지난 프레임과의 간격. (초)
 	 * @param { number } maximumFramePerSecond - 최대 프레임. (0 이면 무제한)
-	 * @returns { boolean }
+	 * @returns { boolean } 이 프레임에서 다 쟀으면 참. (다 쟀거나 간격이 0 이하이면 거짓)
 	 */
 	measureFrame(frameSeconds, maximumFramePerSecond) {
 		if (this.isFinished() || !(frameSeconds > 0)) {
@@ -113,7 +126,7 @@ export class FrameProbe {
 	// 다 쟀는지 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 다 쟀으면 참.
 	 */
 	isFinished() {
 		return this.#isFinished;
@@ -123,7 +136,7 @@ export class FrameProbe {
 	// 처지는 기기인지 반환. (다 재기 전에는 false)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 처지는 기기로 정했으면 참.
 	 */
 	isSlow() {
 		return this.#isSlow;
@@ -133,7 +146,7 @@ export class FrameProbe {
 	// 지금까지의 처진 프레임 몫 반환. (잰 프레임이 없으면 0)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 처진 프레임 수를 잰 프레임 수로 나눈 몫. (0 ~ 1)
 	 */
 	readSlowFrameShare() {
 		return this.#frameCount > 0 ? this.#slowFrameCount / this.#frameCount : 0;
@@ -143,8 +156,8 @@ export class FrameProbe {
 	// 기다리는 초와 재는 초 설정. (재기 전에 정한다)
 	//==============================================================================
 	/**
-	 * @param { number } warmupSeconds
-	 * @param { number } probeSeconds
+	 * @param { number } warmupSeconds 재기 전에 기다리는 초. (음수면 0, 처음은 2)
+	 * @param { number } probeSeconds 재는 초. (음수면 0, 처음은 4)
 	 */
 	setSeconds(warmupSeconds, probeSeconds) {
 		this.#warmupSeconds = System.Math.max(0, warmupSeconds);
@@ -155,7 +168,7 @@ export class FrameProbe {
 	// 기다리는 초 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 재기 전에 기다리는 초.
 	 */
 	getWarmupSeconds() {
 		return this.#warmupSeconds;
@@ -165,7 +178,7 @@ export class FrameProbe {
 	// 재는 초 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 재는 초.
 	 */
 	getProbeSeconds() {
 		return this.#probeSeconds;
@@ -175,8 +188,8 @@ export class FrameProbe {
 	// 처진 프레임의 판정 설정. (목표 간격의 배, 처지는 기기로 볼 몫)
 	//==============================================================================
 	/**
-	 * @param { number } slowFrameRatio
-	 * @param { number } slowFrameShare
+	 * @param { number } slowFrameRatio 처진 프레임으로 셀 간격. (목표 간격의 배, 처음은 1.4)
+	 * @param { number } slowFrameShare 처지는 기기로 볼 처진 프레임의 몫. (0 ~ 1, 처음은 0.25)
 	 */
 	setSlowFrameThreshold(slowFrameRatio, slowFrameShare) {
 		this.#slowFrameRatio = slowFrameRatio;
@@ -187,7 +200,7 @@ export class FrameProbe {
 	// 처진 프레임으로 셀 간격의 배 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 처진 프레임으로 셀 간격의 배.
 	 */
 	getSlowFrameRatio() {
 		return this.#slowFrameRatio;
@@ -197,7 +210,7 @@ export class FrameProbe {
 	// 처지는 기기로 볼 처진 프레임의 몫 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 처지는 기기로 볼 처진 프레임의 몫.
 	 */
 	getSlowFrameShare() {
 		return this.#slowFrameShare;
@@ -207,7 +220,7 @@ export class FrameProbe {
 	// 최대 프레임이 무제한일 때의 목표 설정.
 	//==============================================================================
 	/**
-	 * @param { number } unlimitedTargetFramePerSecond
+	 * @param { number } unlimitedTargetFramePerSecond 최대 프레임이 0(무제한)일 때 목표로 볼 초당 프레임. (처음은 60)
 	 */
 	setUnlimitedTargetFramePerSecond(unlimitedTargetFramePerSecond) {
 		this.#unlimitedTargetFramePerSecond = unlimitedTargetFramePerSecond;
@@ -217,7 +230,7 @@ export class FrameProbe {
 	// 최대 프레임이 무제한일 때의 목표 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 최대 프레임이 무제한일 때의 목표 초당 프레임.
 	 */
 	getUnlimitedTargetFramePerSecond() {
 		return this.#unlimitedTargetFramePerSecond;

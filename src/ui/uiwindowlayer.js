@@ -26,6 +26,44 @@ import { UIScale } from "./uiscale.js";
 //     windowLayer.setWindowChangeEvent(() => { game.setPaused(windowLayer.hasOpenWindow()); });
 //     windowLayer.openWindow(new UIConfirmWindow("quit", { title: "나가기", message: "정말 나갈까요?" }));
 //==============================================================================
+/**
+ * @example <caption>창 둘을 쌓고 맨 위 창 닫기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIWindow, UIWindowLayer } from "./build/vanilla.js";
+ *
+ * class WindowLayerScene extends UIScene {
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const root = this.getRoot();
+ * 		const rootSize = root.getContentSize();
+ * 		const windowLayer = new UIWindowLayer();
+ * 		root.addChild(windowLayer);
+ * 		windowLayer.setViewSize(rootSize.x, rootSize.y);
+ * 		windowLayer.setWindowChangeEvent(() => {
+ * 			const windowCount = windowLayer.getWindowCount();
+ * 			console.log(windowCount);
+ * 		});
+ *
+ * 		const settingsWindow = new UIWindow("settings");
+ * 		settingsWindow.setPanelHeight(220);
+ * 		windowLayer.openWindow(settingsWindow);
+ * 		const helpWindow = new UIWindow("help");
+ * 		helpWindow.setPanelHeight(140);
+ * 		helpWindow.setMaximumWidth(300);
+ * 		windowLayer.openWindow(helpWindow);
+ *
+ * 		const isClosed = windowLayer.closeTopWindow();
+ * 		const topWindow = windowLayer.getTopWindow();
+ * 		const topWindowName = topWindow.getName();
+ * 		console.log(isClosed, topWindowName);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new WindowLayerScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class UIWindowLayer extends WorldNode {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -71,7 +109,7 @@ export class UIWindowLayer extends WorldNode {
 	// UI 배율 설정. (UIScale.read 의 options, null 이면 키우지 않는다, 기본은 {} 로 UIScale 기본값)
 	//==============================================================================
 	/**
-	 * @param { object | null } uiScaleOptions
+	 * @param { object | null } uiScaleOptions UIScale.read 에 넘길 설정. (null 이면 배율 1, 바로 다시 놓는다)
 	 */
 	setUIScaleOptions(uiScaleOptions) {
 		this.#uiScaleOptions = uiScaleOptions;
@@ -82,7 +120,7 @@ export class UIWindowLayer extends WorldNode {
 	// 지금의 UI 배율.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 이 층에 건 UI 배율. (setViewSize 때 다시 읽는다)
 	 */
 	getUIScale() {
 		return this.#uiScale;
@@ -92,7 +130,7 @@ export class UIWindowLayer extends WorldNode {
 	// 창이 하나라도 떠 있는지. (닫는 움직임 중인 창은 셈하지 않는다)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 떠 있는 창이 있으면 참.
 	 */
 	hasOpenWindow() {
 		return this.#windows.length > 0;
@@ -102,7 +140,7 @@ export class UIWindowLayer extends WorldNode {
 	// 떠 있는 창의 수.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 떠 있는 창의 수. (닫는 움직임 중인 창은 빼고)
 	 */
 	getWindowCount() {
 		return this.#windows.length;
@@ -112,7 +150,7 @@ export class UIWindowLayer extends WorldNode {
 	// 맨 위의 창. (없으면 null)
 	//==============================================================================
 	/**
-	 * @returns { UIWindow | null }
+	 * @returns { UIWindow | null } 맨 위의 창. (없으면 null)
 	 */
 	getTopWindow() {
 		if (this.#windows.length === 0) {
@@ -125,8 +163,8 @@ export class UIWindowLayer extends WorldNode {
 	// 그 이름의 창. (떠 있는 것 가운데 위에서부터, 없으면 null)
 	//==============================================================================
 	/**
-	 * @param { string } windowName
-	 * @returns { UIWindow | null }
+	 * @param { string } windowName 창 이름. (UIWindow 생성자에 준 이름)
+	 * @returns { UIWindow | null } 찾은 창. (없으면 null)
 	 */
 	findWindow(windowName) {
 		for (let windowIndex = this.#windows.length - 1; windowIndex >= 0; --windowIndex) {
@@ -143,7 +181,7 @@ export class UIWindowLayer extends WorldNode {
 	//==============================================================================
 	/**
 	 * @param { number } viewWidth 부모 단위.
-	 * @param { number } viewHeight
+	 * @param { number } viewHeight 영역의 높이. (부모 단위, 1 보다 작으면 1)
 	 */
 	setViewSize(viewWidth, viewHeight) {
 		this.#viewWidth = System.Math.max(1, viewWidth);
@@ -160,10 +198,10 @@ export class UIWindowLayer extends WorldNode {
 	// 영역 밖으로 더 덮는 너비 알리기. (세이프에어리어, 부모 단위)
 	//==============================================================================
 	/**
-	 * @param { number } top
-	 * @param { number } right
-	 * @param { number } bottom
-	 * @param { number } left
+	 * @param { number } top 위로 더 덮는 너비. (부모 단위, 음수면 0)
+	 * @param { number } right 오른쪽으로 더 덮는 너비. (부모 단위, 음수면 0)
+	 * @param { number } bottom 아래로 더 덮는 너비. (부모 단위, 음수면 0)
+	 * @param { number } left 왼쪽으로 더 덮는 너비. (부모 단위, 음수면 0)
 	 */
 	setViewBleed(top, right, bottom, left) {
 		this.#viewBleed.top = System.Math.max(0, top);
@@ -189,7 +227,7 @@ export class UIWindowLayer extends WorldNode {
 	// 창 하나 놓기. (UI 배율로 나눈 영역의 크기와 덮는 너비를 알린다)
 	//==============================================================================
 	/**
-	 * @param { UIWindow } window
+	 * @param { UIWindow } window 놓을 창.
 	 */
 	placeWindow(window) {
 		const uiScale = this.getUIScale();
@@ -202,7 +240,7 @@ export class UIWindowLayer extends WorldNode {
 	// 창 띄우기. (맨 위에 쌓는다, 이미 떠 있으면 맨 위로 올린다)
 	//==============================================================================
 	/**
-	 * @param { UIWindow } window
+	 * @param { UIWindow } window 띄울 창. (닫는 움직임 중이었으면 다시 연다)
 	 */
 	openWindow(window) {
 		const windowIndex = this.#windows.indexOf(window);
@@ -229,7 +267,7 @@ export class UIWindowLayer extends WorldNode {
 	// 창 닫기. (목록에서 빼고 닫는 움직임을 시작한다, 떠 있지 않으면 아무 일도 없다)
 	//==============================================================================
 	/**
-	 * @param { UIWindow } window
+	 * @param { UIWindow } window 닫을 창.
 	 */
 	closeWindow(window) {
 		const windowIndex = this.#windows.indexOf(window);
@@ -265,7 +303,7 @@ export class UIWindowLayer extends WorldNode {
 	// 맨 위의 창 닫기. (기기의 뒤로 가기 자리, 바깥 닫기를 끈 창이면 닫지 않는다, 닫았으면 true)
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 닫았으면 참. (창이 없거나 바깥 닫기를 끈 창이면 거짓)
 	 */
 	closeTopWindow() {
 		const topWindow = this.getTopWindow();
@@ -280,7 +318,7 @@ export class UIWindowLayer extends WorldNode {
 	// 창 노드 떼어 내기.
 	//==============================================================================
 	/**
-	 * @param { UIWindow } window
+	 * @param { UIWindow } window 떼어 낼 창. (창 층을 null 로 하고 dispose 를 부른 뒤 자식에서 뺀다)
 	 */
 	removeWindowNode(window) {
 		window.setWindowLayer(null);
@@ -315,7 +353,7 @@ export class UIWindowLayer extends WorldNode {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } timeDelta
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	tick(timeDelta) {
 		super.tick(timeDelta);
@@ -332,9 +370,9 @@ export class UIWindowLayer extends WorldNode {
 	// 마우스 휠을 맨 위의 창에 넘기기. (창이 받지 않으면 그 자리의 스크롤 뷰, 받았으면 true)
 	//==============================================================================
 	/**
-	 * @param { Vector2 } viewInputPosition
-	 * @param { Vector2 } wheelDelta
-	 * @returns { boolean }
+	 * @param { Vector2 } viewInputPosition 입력 위치. (뷰 좌표)
+	 * @param { Vector2 } wheelDelta 휠 누적값.
+	 * @returns { boolean } 창이나 스크롤 뷰가 받았으면 참. (창이 없으면 거짓)
 	 */
 	scrollWindowAt(viewInputPosition, wheelDelta) {
 		const topWindow = this.getTopWindow();
@@ -358,9 +396,9 @@ export class UIWindowLayer extends WorldNode {
 	// - UIScrollView 를 들이지 않으려고 TouchRaycaster 처럼 wheel 과 getScrollContentSize 가 있는 컴포넌트로 본다.
 	//==============================================================================
 	/**
-	 * @param { WorldNode } node
-	 * @param { Vector2 } viewInputPosition
-	 * @returns { * }
+	 * @param { WorldNode } node 찾기 시작할 노드. (자식을 뒤에서부터 먼저 본다)
+	 * @param { Vector2 } viewInputPosition 입력 위치. (뷰 좌표)
+	 * @returns { * } wheel 과 getScrollContentSize 가 있는 켜진 컴포넌트. (없으면 null)
 	 */
 	static findScrollViewAt(node, viewInputPosition) {
 		if (!node.isActive()) {
@@ -392,8 +430,8 @@ export class UIWindowLayer extends WorldNode {
 	// 노드가 들어 있는 창 층 찾기. (자기부터 부모 쪽으로, 없으면 null)
 	//==============================================================================
 	/**
-	 * @param { * } node
-	 * @returns { UIWindowLayer | null }
+	 * @param { * } node 찾기 시작할 노드.
+	 * @returns { UIWindowLayer | null } 가장 가까운 창 층. (자기 자신일 수 있다, 없으면 null)
 	 */
 	static findWindowLayerOf(node) {
 		let currentNode = node;

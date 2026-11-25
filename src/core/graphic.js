@@ -391,8 +391,8 @@ const STRONG_DIRECTION_CHARACTER_PATTERN = /[\p{L}\u200E\u200F\u061C]/u;
 // 글의 첫 강한 방향. ("ltr" 또는 "rtl", 글자 갈래 문자와 LRM, RLM, ALM 가운데 처음 것, 없으면 "ltr". setTextDirection("auto") 가 쓴다)
 //==============================================================================
 /**
- * @param { string } text
- * @returns { string }
+ * @param { string } text 볼 글. (비었으면 "ltr")
+ * @returns { string } "ltr" 또는 "rtl".
  */
 export function detectTextDirection(text) {
 	if (!text) {
@@ -438,6 +438,30 @@ function parseColorValue(colorValue) {
 // - Canvas2D 시절의 좌표계(좌상 원점, 픽셀 단위)와 상태 모델(변환/알파 스택)을
 //   그대로 재현한다. 모든 드로우는 drawVertices() 한 지점으로 수렴한다.
 //==============================================================================
+/**
+ * @example <caption>씬의 draw 에서 도형과 글 그리기</caption>
+ * import { Engine, EngineConfiguration, Scene, Vector2, Rect } from "./build/vanilla.js";
+ *
+ * class MainScene extends Scene {
+ * 	draw(graphic) {
+ * 		super.draw(graphic);
+ * 		graphic.setFillColor("#203040");
+ * 		graphic.drawRoundRect(Rect.create(40, 40, 260, 160), 16);
+ * 		graphic.setStrokeColor("#ffcc00");
+ * 		graphic.drawStrokeCircle(Vector2.create(460, 120), 60, 4);
+ * 		graphic.setFillColor("#ffffff");
+ * 		graphic.setFontString("24px sans-serif");
+ * 		graphic.setTextAlign("center");
+ * 		graphic.setTextBaseline("middle");
+ * 		graphic.drawFillText("Graphic", 170, 120);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class Graphic extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -528,7 +552,8 @@ export class Graphic extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { HTMLCanvasElement } canvas
+	 * @param { HTMLCanvasElement } canvas 그릴 캔버스. (WebGL2 컨텍스트를 얻지 못하면 오류를 던진다)
+	 * @param { boolean } preserveDrawingBuffer 프레임이 끝난 뒤에도 그린 것을 캔버스에 남길지. (true 일 때만 남긴다)
 	 */
 	constructor(canvas, preserveDrawingBuffer) {
 		super();
@@ -713,7 +738,7 @@ export class Graphic extends Object {
 	// - 프레임 시작 기준 상태로 리셋.
 	//==============================================================================
 	/**
-	 * @param { Engine } engine
+	 * @param { Engine } engine 엔진.
 	 */
 	applySettings(engine) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -771,7 +796,7 @@ export class Graphic extends Object {
 	// - 도트(픽셀) 스프라이트 게임은 false 로 설정해 선명하게 렌더링.
 	//==============================================================================
 	/**
-	 * @param { boolean } value
+	 * @param { boolean } value 참이면 이미지를 부드럽게(LINEAR), 거짓이면 또렷하게(NEAREST) 뽑는다.
 	 */
 	setImageSmoothingEnabled(value) {
 		this.#isImageSmoothingEnabled = value;
@@ -781,7 +806,7 @@ export class Graphic extends Object {
 	// 이미지 스무딩 활성화 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 이미지 스무딩이 켜졌으면 참.
 	 */
 	isImageSmoothingEnabled() {
 		return this.#isImageSmoothingEnabled;
@@ -794,7 +819,7 @@ export class Graphic extends Object {
 	// - 아틀라스는 그림 둘레의 여백(늘여 붙인 가장자리)이 넉넉해야 작은 밉맵 단계에서 옆 그림이 번져 들지 않는다.
 	//==============================================================================
 	/**
-	 * @param { boolean } value
+	 * @param { boolean } value 이미지 밉맵을 켤지.
 	 */
 	setImageMipmapEnabled(value) {
 		this.#isImageMipmapEnabled = value;
@@ -804,7 +829,7 @@ export class Graphic extends Object {
 	// 이미지 밉맵 활성화 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 이미지 밉맵이 켜졌으면 참.
 	 */
 	isImageMipmapEnabled() {
 		return this.#isImageMipmapEnabled;
@@ -816,7 +841,7 @@ export class Graphic extends Object {
 	// - 기본 셰이더(낱장, 묶어 그리기, 파티클)에 적용한다. 바꿔 끼운 셰이더는 textureLodBias 유니폼이 있으면 받는다.
 	//==============================================================================
 	/**
-	 * @param { number } value
+	 * @param { number } value 밉맵 단계에 더할 값. (음수면 또렷해진다)
 	 */
 	setImageMipmapBias(value) {
 		this.flushSpriteBatch();
@@ -837,7 +862,7 @@ export class Graphic extends Object {
 	// 이미지 밉맵 단계 보정 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 밉맵 단계 보정 값.
 	 */
 	getImageMipmapBias() {
 		return this.#imageMipmapBias;
@@ -865,7 +890,7 @@ export class Graphic extends Object {
 	// - WebGL2 에서는 LINEAR/NEAREST 이분법이라 보관만 한다.
 	//==============================================================================
 	/**
-	 * @param { string } value
+	 * @param { string } value "low", "medium", "high" 가운데. (보관만 한다)
 	 */
 	setImageSmoothingQuality(value) {
 		this.#imageSmoothingQuality = value;
@@ -875,7 +900,7 @@ export class Graphic extends Object {
 	// 이미지 스무딩 퀄리티 반환. ("low", "medium", "high", 처음은 "high")
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 이미지 스무딩 퀄리티.
 	 */
 	getImageSmoothingQuality() {
 		return this.#imageSmoothingQuality;
@@ -885,7 +910,7 @@ export class Graphic extends Object {
 	// 모든 기즈모 강제 표시 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } isForceGizmosVisible
+	 * @param { boolean } isForceGizmosVisible 참이면 노드마다의 설정과 상관없이 모든 기즈모를 그린다.
 	 */
 	setForceGizmosVisible(isForceGizmosVisible) {
 		this.#isForceGizmosVisible = isForceGizmosVisible;
@@ -895,15 +920,37 @@ export class Graphic extends Object {
 	// 모든 기즈모 강제 표시 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 모든 기즈모를 강제로 그리면 참.
 	 */
 	isForceGizmosVisible() {
 		return this.#isForceGizmosVisible;
 	}
 
 	//==============================================================================
-	// 상태 저장. (변환/알파/블렌드/색상/폰트/틴트 — Canvas2D save 대응)
+	// 상태 저장. (변환/알파/블렌드/색상/폰트/틴트, Canvas2D save 대응)
 	//==============================================================================
+	/**
+	 * @example <caption>상태를 저장하고 돌려 그리기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2, Rect } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		graphic.pushState();
+	 * 		graphic.translate(320, 180);
+	 * 		graphic.rotate(Math.PI / 6);
+	 * 		graphic.setGlobalAlpha(0.5);
+	 * 		graphic.setFillColor("#ff6600");
+	 * 		graphic.drawRect(Rect.create(-50, -50, 100, 100));
+	 * 		graphic.popState();
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
 	pushState() {
 		// 저장할 때마다 행렬 복제본과 상태 객체를 새로 만들지 않고, 스택 깊이마다 만들어 둔 칸에 적는다.
 		const depth = this.#stateStack.length;
@@ -981,8 +1028,8 @@ export class Graphic extends Object {
 	// 이동 변환 누적.
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
+	 * @param { number } x X 이동량.
+	 * @param { number } y Y 이동량.
 	 */
 	translate(x, y) {
 		this.#transformMatrix.translate(x, y);
@@ -992,7 +1039,7 @@ export class Graphic extends Object {
 	// 회전 변환 누적.
 	//==============================================================================
 	/**
-	 * @param { number } radian
+	 * @param { number } radian 회전각. (라디안, 양수면 화면에서 시계 방향)
 	 */
 	rotate(radian) {
 		this.#transformMatrix.rotate(radian);
@@ -1002,8 +1049,8 @@ export class Graphic extends Object {
 	// 크기 변환 누적.
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
+	 * @param { number } x X 배율.
+	 * @param { number } y Y 배율.
 	 */
 	scale(x, y) {
 		this.#transformMatrix.scale(x, y);
@@ -1013,12 +1060,12 @@ export class Graphic extends Object {
 	// 변환 행렬 직접 설정. (Canvas2D setTransform(a, b, c, d, e, f) 대응)
 	//==============================================================================
 	/**
-	 * @param { number } a
-	 * @param { number } b
-	 * @param { number } c
-	 * @param { number } d
-	 * @param { number } e
-	 * @param { number } f
+	 * @param { number } a 가로 배율. (x' = a x + c y + e)
+	 * @param { number } b 세로 기울임. (y' = b x + d y + f)
+	 * @param { number } c 가로 기울임. (x' = a x + c y + e)
+	 * @param { number } d 세로 배율. (y' = b x + d y + f)
+	 * @param { number } e 가로 이동. (x' = a x + c y + e)
+	 * @param { number } f 세로 이동. (y' = b x + d y + f)
 	 */
 	setTransform(a, b, c, d, e, f) {
 		this.#transformMatrix.setTransform(a, b, c, d, e, f);
@@ -1035,7 +1082,7 @@ export class Graphic extends Object {
 	// 현재 변환 행렬 반환.
 	//==============================================================================
 	/**
-	 * @returns { TransformMatrix }
+	 * @returns { TransformMatrix } 지금 변환 행렬. (Graphic 이 들고 고쳐 쓰므로 값을 남기려면 복제한다)
 	 */
 	getTransformMatrix() {
 		return this.#transformMatrix;
@@ -1045,7 +1092,7 @@ export class Graphic extends Object {
 	// 전역 투명도 설정.
 	//==============================================================================
 	/**
-	 * @param { number } value
+	 * @param { number } value 전역 투명도. (0 ~ 1 로 자른다)
 	 */
 	setGlobalAlpha(value) {
 		this.#globalAlpha = Math.clamp01(value);
@@ -1055,7 +1102,7 @@ export class Graphic extends Object {
 	// 전역 투명도 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 전역 투명도. (0 ~ 1)
 	 */
 	getGlobalAlpha() {
 		return this.#globalAlpha;
@@ -1065,7 +1112,7 @@ export class Graphic extends Object {
 	// 전역 투명도 곱셈 누적. (노드 트리의 투명도 상속용)
 	//==============================================================================
 	/**
-	 * @param { number } value
+	 * @param { number } value 곱할 투명도. (곱한 값은 0 ~ 1 로 자른다)
 	 */
 	multiplyGlobalAlpha(value) {
 		this.#globalAlpha = Math.clamp01(this.#globalAlpha * value);
@@ -1081,7 +1128,26 @@ export class Graphic extends Object {
 	// - 모르는 이름은 source-over 로 그린다.
 	//==============================================================================
 	/**
-	 * @param { string } blendMode
+	 * @param { string } blendMode 블렌드 모드. (Canvas2D globalCompositeOperation 이름, 모르는 이름은 한 번 경고하고 source-over 로 그린다)
+	 * @example <caption>더하기 섞기로 빛 겹치기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		graphic.setBlendMode("lighter");
+	 * 		graphic.setFillColor("rgba(255, 80, 80, 0.8)");
+	 * 		graphic.drawCircle(Vector2.create(280, 180), 80);
+	 * 		graphic.setFillColor("rgba(80, 80, 255, 0.8)");
+	 * 		graphic.drawCircle(Vector2.create(360, 180), 80);
+	 * 		graphic.setBlendMode("source-over");
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	setBlendMode(blendMode) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -1113,7 +1179,7 @@ export class Graphic extends Object {
 	// 블렌드 모드 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 블렌드 모드. (프레임마다 "source-over" 로 돌아간다)
 	 */
 	getBlendMode() {
 		return this.#blendMode;
@@ -1163,7 +1229,7 @@ export class Graphic extends Object {
 	// - 이미지 실루엣(알파) 안쪽에만 tint.alpha 비율로 색을 덮는다.
 	//==============================================================================
 	/**
-	 * @param { Color | null } color
+	 * @param { Color | null } color 틴트 색. (사본을 둔다, Color 가 아니면 해제)
 	 */
 	setImageTintColor(color) {
 		if (color instanceof Color) {
@@ -1178,7 +1244,7 @@ export class Graphic extends Object {
 	// 이미지 틴트 색상 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color | null }
+	 * @returns { Color | null } 틴트 색. (없으면 null)
 	 */
 	getImageTintColor() {
 		return this.#imageTintColor;
@@ -1188,7 +1254,7 @@ export class Graphic extends Object {
 	// 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { Color | string } color
+	 * @param { Color | string } color 채우기 색. (Color 나 "#rrggbb(aa)", "rgb(a)(...)" 글, 거짓 값이면 바꾸지 않는다)
 	 */
 	setFillColor(color) {
 		if (color) {
@@ -1200,7 +1266,7 @@ export class Graphic extends Object {
 	// 채우기 색상 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 채우기 색. (처음은 검정)
 	 */
 	getFillColor() {
 		return this.#fillColor;
@@ -1210,7 +1276,7 @@ export class Graphic extends Object {
 	// 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { Color | string } color
+	 * @param { Color | string } color 선 색. (Color 나 "#rrggbb(aa)", "rgb(a)(...)" 글, 거짓 값이면 바꾸지 않는다)
 	 */
 	setStrokeColor(color) {
 		if (color) {
@@ -1222,7 +1288,7 @@ export class Graphic extends Object {
 	// 선 색상 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 선 색. (처음은 검정)
 	 */
 	getStrokeColor() {
 		return this.#strokeColor;
@@ -1233,16 +1299,16 @@ export class Graphic extends Object {
 	// - 기록 후의 오프셋(플로트 단위)을 반환.
 	//==============================================================================
 	/**
-	 * @param { number } offset
-	 * @param { number } leftX
-	 * @param { number } topY
-	 * @param { number } rightX
-	 * @param { number } bottomY
-	 * @param { number } leftU
-	 * @param { number } topV
-	 * @param { number } rightU
-	 * @param { number } bottomV
-	 * @returns { number }
+	 * @param { number } offset 적기 시작할 자리. (플로트 단위)
+	 * @param { number } leftX 왼쪽 X.
+	 * @param { number } topY 위 Y.
+	 * @param { number } rightX 오른쪽 X.
+	 * @param { number } bottomY 아래 Y.
+	 * @param { number } leftU 왼쪽 U. (0 ~ 1)
+	 * @param { number } topV 위 V. (0 ~ 1)
+	 * @param { number } rightU 오른쪽 U. (0 ~ 1)
+	 * @param { number } bottomV 아래 V. (0 ~ 1)
+	 * @returns { number } 적은 뒤의 자리. (플로트 단위, offset 에 24 를 더한 값)
 	 */
 	writeQuad(offset, leftX, topY, rightX, bottomY, leftU, topV, rightU, bottomV) {
 		const vertexData = this.getVertexData();
@@ -1274,12 +1340,29 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
-	// 기록된 버텍스 출력. (모든 드로우가 수렴하는 단일 지점 — 추후 배칭 삽입 지점)
+	// 기록된 버텍스 출력. (모든 드로우가 수렴하는 단일 지점, 추후 배칭 삽입 지점)
 	//==============================================================================
 	/**
-	 * @param { number } vertexCount
-	 * @param { WebGLTexture } texture
-	 * @param { Color } color
+	 * @param { number } vertexCount 그릴 정점 수. (getVertexData 에 적은 것, 0 이하면 그리지 않는다)
+	 * @param { WebGLTexture } texture 쓸 텍스처.
+	 * @param { Color } color 곱할 색.
+	 * @example <caption>정점을 직접 적어 그리기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2, Color } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		const floatCount = graphic.writeQuad(0, 100, 100, 300, 200, 0, 0, 1, 1);
+	 * 		const whiteTexture = graphic.getWhiteTexture();
+	 * 		const color = Color.createFromHEX("#ff00ff");
+	 * 		graphic.drawVertices(floatCount / 4, whiteTexture, color);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	drawVertices(vertexCount, texture, color) {
 		if (vertexCount <= 0) {
@@ -1308,8 +1391,8 @@ export class Graphic extends Object {
 
 		// 버텍스 업로드. bufferSubData 로 덮어쓰지 않고, 쓸 만큼만 새 저장소를 잡으며 올린다. (고아 처리)
 		// 드로우 콜마다 같은 버퍼를 오프셋 0 부터 덮어쓰면 GPU 가 지난 콜의 데이터를 아직 읽는 중이라,
-		// 사파리(ANGLE → Metal)는 콜마다 CPU 를 세워 GPU 가 끝나기를 기다린다. 드로우 콜 45 · 정점 1000 남짓에도
-		// 아이폰 10 fps · 맥 22 fps 가 나오고 크롬만 멀쩡한 증상이 이것이다. (크롬은 드라이버가 알아서 복사해 넘긴다)
+		// 사파리(ANGLE → Metal)는 콜마다 CPU 를 세워 GPU 가 끝나기를 기다린다. 드로우 콜 45, 정점 1000 남짓에도
+		// 아이폰 10 fps, 맥 22 fps 가 나오고 크롬만 멀쩡한 증상이 이것이다. (크롬은 드라이버가 알아서 복사해 넘긴다)
 		// bufferData 는 부를 때마다 새 저장소를 만들어 지난 콜과 겹치지 않고, 브라우저가 저장소를 돌려쓰므로 할당 비용은 작다.
 		const vertexData = this.getVertexData();
 		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, vertexData, webGL2RenderingContext.DYNAMIC_DRAW, 0, vertexCount * FLOATS_PER_VERTEX);
@@ -1703,8 +1786,8 @@ export class Graphic extends Object {
 	// - 바꿔 끼운 셰이더 프로그램에는 늘 올린다.
 	//==============================================================================
 	/**
-	 * @param { ShaderProgram } shaderProgram
-	 * @param { Color } color
+	 * @param { ShaderProgram } shaderProgram 올릴 셰이더 프로그램.
+	 * @param { Color } color mainColor 로 올릴 색.
 	 */
 	uploadDrawUniforms(shaderProgram, color) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -1775,7 +1858,7 @@ export class Graphic extends Object {
 	// 지난 프레임의 드로우 콜 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 지난 프레임의 드로우 콜 수.
 	 */
 	getLastFrameDrawCallCount() {
 		return this.#lastFrameDrawCallCount;
@@ -1785,7 +1868,7 @@ export class Graphic extends Object {
 	// 지난 프레임에 그린 정점 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 지난 프레임에 그린 정점 수.
 	 */
 	getLastFrameVertexCount() {
 		return this.#lastFrameDrawVertexCount;
@@ -1795,7 +1878,7 @@ export class Graphic extends Object {
 	// 지난 프레임에 그린 삼각형 수 반환. (모든 드로우 콜이 삼각형 목록이다)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 지난 프레임에 그린 삼각형 수.
 	 */
 	getLastFrameTriangleCount() {
 		const lastFrameVertexCount = this.getLastFrameVertexCount();
@@ -1810,7 +1893,7 @@ export class Graphic extends Object {
 	// - 알리지 않는 컴포넌트(기본, 글자, 파티클, 직접 만든 컴포넌트)가 하나라도 켜져 있으면 그 노드는 거르지 않는다. draw 를 덮어쓴 노드도 거르지 않는다.
 	//==============================================================================
 	/**
-	 * @param { boolean } isCullingEnabled
+	 * @param { boolean } isCullingEnabled 화면 밖 거르기를 켤지. (true 일 때만 켠다)
 	 */
 	setCullingEnabled(isCullingEnabled) {
 		this.#isCullingEnabled = isCullingEnabled === true;
@@ -1820,7 +1903,7 @@ export class Graphic extends Object {
 	// 화면 밖 거르기 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 화면 밖 거르기가 켜졌으면 참.
 	 */
 	isCullingEnabled() {
 		return this.#isCullingEnabled;
@@ -1832,8 +1915,8 @@ export class Graphic extends Object {
 	// - 뷰포트를 아직 정하지 않았으면(applySettings 전) 걸치는 것으로 본다.
 	//==============================================================================
 	/**
-	 * @param { Rect } rect
-	 * @returns { boolean }
+	 * @param { Rect } rect 지금 변환으로 옮기기 전의 사각형. (로컬 좌표)
+	 * @returns { boolean } 화면에 걸치면 참.
 	 */
 	isLocalRectVisible(rect) {
 		const viewportWidth = this.#appliedViewportWidth;
@@ -1873,7 +1956,7 @@ export class Graphic extends Object {
 	// 이번 프레임에 화면 밖이라 컴포넌트를 건너뛴 노드 수 더하기. (WorldNode 가 부른다)
 	//==============================================================================
 	/**
-	 * @param { number } culledNodeCount
+	 * @param { number } culledNodeCount 더할 노드 수.
 	 */
 	addCulledNodeCount(culledNodeCount) {
 		this.#culledNodeCount += culledNodeCount;
@@ -1883,7 +1966,7 @@ export class Graphic extends Object {
 	// 지난 프레임에 화면 밖이라 컴포넌트를 건너뛴 노드 수 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 지난 프레임에 건너뛴 노드 수.
 	 */
 	getLastFrameCulledNodeCount() {
 		return this.#lastFrameCulledNodeCount;
@@ -1897,7 +1980,7 @@ export class Graphic extends Object {
 	// - 켠 채로 WebGL 을 직접 다루는 패스(외부 렌더러 등)를 끼울 때는 그 전에 flushSpriteBatch() 를 부른다.
 	//==============================================================================
 	/**
-	 * @param { boolean } isSpriteBatchingEnabled
+	 * @param { boolean } isSpriteBatchingEnabled 묶어 그리기를 켤지. (true 일 때만 켠다, 끄면 쌓인 것을 먼저 그린다)
 	 */
 	setSpriteBatchingEnabled(isSpriteBatchingEnabled) {
 		if (!isSpriteBatchingEnabled) {
@@ -1913,7 +1996,7 @@ export class Graphic extends Object {
 	// 스프라이트 묶어 그리기 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 묶어 그리기가 켜졌으면 참.
 	 */
 	isSpriteBatchingEnabled() {
 		return this.#isSpriteBatchingEnabled;
@@ -2096,11 +2179,11 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
-	// 파티클 배치 버텍스 배열 반환. (필요 시 증설 — x, y, u, v, r, g, b, a 인터리브)
+	// 파티클 배치 버텍스 배열 반환. (필요 시 증설, x, y, u, v, r, g, b, a 인터리브)
 	//==============================================================================
 	/**
-	 * @param { number } minimumFloatCount
-	 * @returns { Float32Array }
+	 * @param { number } minimumFloatCount 적어도 필요한 플로트 수. (모자라면 두 배씩 늘린다)
+	 * @returns { Float32Array } 파티클 정점 배열. (정점마다 x, y, u, v, r, g, b, a, 늘리면 새 배열이다)
 	 */
 	getParticleVertexData(minimumFloatCount) {
 		this.ensureParticleBatchResources();
@@ -2122,8 +2205,45 @@ export class Graphic extends Object {
 	// 파티클 배치 출력. (getParticleVertexData 에 채운 정점을 한 번에 그린다)
 	//==============================================================================
 	/**
-	 * @param { number } vertexCount
-	 * @param { WebGLTexture } texture
+	 * @param { number } vertexCount 그릴 정점 수. (0 이하면 그리지 않는다)
+	 * @param { WebGLTexture } texture 쓸 텍스처. (getSoftDiscTexture 같은)
+	 * @example <caption>정점마다 색을 실은 쿼드 한 번에 그리기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const COLOR_LIST = [[1, 0.3, 0.3], [0.3, 1, 0.3], [0.3, 0.5, 1]];
+	 * const CORNER_LIST = [[0, 0], [1, 0], [0, 1], [0, 1], [1, 0], [1, 1]];
+	 *
+	 * class MainScene extends Scene {
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		const quadCount = COLOR_LIST.length;
+	 * 		const vertexData = graphic.getParticleVertexData(quadCount * 6 * 8);
+	 * 		let offset = 0;
+	 * 		for (let quadIndex = 0; quadIndex < quadCount; ++quadIndex) {
+	 * 			const leftX = 120 + quadIndex * 150;
+	 * 			const topY = 140;
+	 * 			const size = 80;
+	 * 			const color = COLOR_LIST[quadIndex];
+	 * 			for (const corner of CORNER_LIST) {
+	 * 				vertexData[offset++] = leftX + corner[0] * size;
+	 * 				vertexData[offset++] = topY + corner[1] * size;
+	 * 				vertexData[offset++] = corner[0];
+	 * 				vertexData[offset++] = corner[1];
+	 * 				vertexData[offset++] = color[0];
+	 * 				vertexData[offset++] = color[1];
+	 * 				vertexData[offset++] = color[2];
+	 * 				vertexData[offset++] = 1;
+	 * 			}
+	 * 		}
+	 * 		const softDiscTexture = graphic.getSoftDiscTexture();
+	 * 		graphic.drawColoredQuads(quadCount * 6, softDiscTexture);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	drawColoredQuads(vertexCount, texture) {
 		if (vertexCount <= 0) {
@@ -2246,10 +2366,10 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
-	// 부드러운 원 텍스처 반환. (가장자리가 잦아드는 64x64 원 — 파티클 기본 스프라이트)
+	// 부드러운 원 텍스처 반환. (가장자리가 잦아드는 64x64 원, 파티클 기본 스프라이트)
 	//==============================================================================
 	/**
-	 * @returns { WebGLTexture }
+	 * @returns { WebGLTexture } 부드러운 원 텍스처. (처음 부를 때 만든다)
 	 */
 	getSoftDiscTexture() {
 		if (this.#softDiscTexture) {
@@ -2292,7 +2412,8 @@ export class Graphic extends Object {
 	// - setStrokeColor()
 	//==============================================================================
 	/**
-	 * @param { Vector2[] } positions
+	 * @param { Vector2[] } positions 선이 지날 점 목록. (2 개보다 적으면 그리지 않는다)
+	 * @param { number } size 선 굵기. (기본 1)
 	 */
 	drawLine(positions, size = 1) {
 		this.drawPolyline(positions, size, false);
@@ -2303,7 +2424,8 @@ export class Graphic extends Object {
 	// - setStrokeColor()
 	//==============================================================================
 	/**
-	 * @param { Vector2[] } positions
+	 * @param { Vector2[] } positions 선이 지날 점 목록. (2 개보다 적으면 그리지 않는다)
+	 * @param { number } size 선 굵기. (기본 1)
 	 */
 	drawLineLoop(positions, size = 1) {
 		this.drawPolyline(positions, size, true);
@@ -2314,9 +2436,9 @@ export class Graphic extends Object {
 	// - 내부 조인트는 반두께 연장으로 이음새를 메운다.
 	//==============================================================================
 	/**
-	 * @param { Vector2[] } positions
-	 * @param { number } size
-	 * @param { boolean } isClosed
+	 * @param { Vector2[] } positions 선이 지날 점 목록. (2 개보다 적으면 그리지 않는다)
+	 * @param { number } size 선 굵기.
+	 * @param { boolean } isClosed 참이면 마지막 점과 첫 점을 잇는다.
 	 */
 	drawPolyline(positions, size, isClosed) {
 		if (!positions || positions.length < 2) {
@@ -2393,7 +2515,7 @@ export class Graphic extends Object {
 	// - setFillColor()
 	//==============================================================================
 	/**
-	 * @param { Rect } rect
+	 * @param { Rect } rect 칠할 사각형.
 	 */
 	drawRect(rect) {
 		const leftX = rect.position.x;
@@ -2406,12 +2528,12 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
-	// 사각형 외곽선 출력. (Canvas2D strokeRect 대응 — 선 중심이 경계선 위)
+	// 사각형 외곽선 출력. (Canvas2D strokeRect 대응, 선 중심이 경계선 위)
 	// - setStrokeColor()
 	//==============================================================================
 	/**
-	 * @param { Rect } rect
-	 * @param { number } lineWidth
+	 * @param { Rect } rect 테를 그릴 사각형.
+	 * @param { number } lineWidth 선 굵기. (기본 1)
 	 */
 	drawStrokeRect(rect, lineWidth = 1) {
 		const leftX = rect.position.x;
@@ -2431,9 +2553,9 @@ export class Graphic extends Object {
 	// 라운드 사각형 경로 좌표 목록 생성. (시계 방향, 볼록 다각형)
 	//==============================================================================
 	/**
-	 * @param { Rect } rect
-	 * @param { number } roundSize
-	 * @returns { Vector2[] }
+	 * @param { Rect } rect 사각형.
+	 * @param { number } roundSize 모서리 반지름. (짧은 변의 반을 넘으면 반으로 자른다)
+	 * @returns { Vector2[] } 경로의 점 목록. (새 배열)
 	 */
 	buildRoundRectPositions(rect, roundSize) {
 		this.writeRoundRectPositionData(rect, roundSize);
@@ -2451,8 +2573,8 @@ export class Graphic extends Object {
 	// - 점마다의 cos / sin 은 처음에 구해 둔 표를 쓴다.
 	//==============================================================================
 	/**
-	 * @param { Rect } rect
-	 * @param { number } roundSize
+	 * @param { Rect } rect 사각형.
+	 * @param { number } roundSize 모서리 반지름. (짧은 변의 반을 넘으면 반으로 자른다)
 	 */
 	writeRoundRectPositionData(rect, roundSize) {
 		const leftX = rect.position.x;
@@ -2487,8 +2609,8 @@ export class Graphic extends Object {
 	// 볼록 다각형 채움 출력. (첫 점 기준 팬 분할)
 	//==============================================================================
 	/**
-	 * @param { Vector2[] } positions
-	 * @param { Color } color
+	 * @param { Vector2[] } positions 볼록 다각형의 점 목록. (3 개보다 적으면 그리지 않는다)
+	 * @param { Color } color 칠할 색.
 	 */
 	drawConvexPolygon(positions, color) {
 		if (!positions || positions.length < 3) {
@@ -2528,8 +2650,8 @@ export class Graphic extends Object {
 	// - setFillColor()
 	//==============================================================================
 	/**
-	 * @param { Rect } rect
-	 * @param { number } roundSize
+	 * @param { Rect } rect 칠할 사각형.
+	 * @param { number } roundSize 모서리 반지름. (0 이하면 각진 사각형, 짧은 변의 반을 넘으면 반으로 자른다)
 	 */
 	drawRoundRect(rect, roundSize) {
 		if (roundSize > 0) {
@@ -2547,7 +2669,7 @@ export class Graphic extends Object {
 	// ROUND_RECT_POSITION_DATA 에 적힌 라운드 사각형 채움 출력. (첫 점 기준 팬 분할, drawConvexPolygon 과 같은 삼각형)
 	//==============================================================================
 	/**
-	 * @param { Color } color
+	 * @param { Color } color 칠할 색.
 	 */
 	drawRoundRectPositionData(color) {
 		const vertexData = this.getVertexData();
@@ -2582,9 +2704,9 @@ export class Graphic extends Object {
 	// - setStrokeColor()
 	//==============================================================================
 	/**
-	 * @param { Rect } rect
-	 * @param { number } roundSize
-	 * @param { number } lineWidth
+	 * @param { Rect } rect 테를 그릴 사각형.
+	 * @param { number } roundSize 모서리 반지름. (0 이하면 각진 사각형, 짧은 변의 반을 넘으면 반으로 자른다)
+	 * @param { number } lineWidth 선 굵기. (기본 1)
 	 */
 	drawStrokeRoundRect(rect, roundSize, lineWidth = 1) {
 		if (roundSize > 0) {
@@ -2601,8 +2723,8 @@ export class Graphic extends Object {
 	// - setFillColor()
 	//==============================================================================
 	/**
-	 * @param { Vector2 } center
-	 * @param { number } radius
+	 * @param { Vector2 } center 가운데.
+	 * @param { number } radius 반지름. (0 이하면 그리지 않는다)
 	 */
 	drawCircle(center, radius) {
 		if (radius <= 0) {
@@ -2629,9 +2751,9 @@ export class Graphic extends Object {
 	// - setStrokeColor()
 	//==============================================================================
 	/**
-	 * @param { Vector2 } center
-	 * @param { number } radius
-	 * @param { number } lineWidth
+	 * @param { Vector2 } center 가운데.
+	 * @param { number } radius 반지름. (0 이하면 그리지 않는다)
+	 * @param { number } lineWidth 선 굵기. (기본 1)
 	 */
 	drawStrokeCircle(center, radius, lineWidth = 1) {
 		if (radius <= 0) {
@@ -2660,11 +2782,31 @@ export class Graphic extends Object {
 	// - 조각 수는 drawCircle 처럼 화면에서의 바깥 반지름을 따라 정하고(한 바퀴 16 ~ 64), 그리는 각도만큼만 쓴다.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } center
-	 * @param { number } innerRadius
-	 * @param { number } outerRadius
+	 * @param { Vector2 } center 가운데.
+	 * @param { number } innerRadius 안쪽 반지름.
+	 * @param { number } outerRadius 바깥 반지름. (0 이하이거나 안쪽 반지름 이하면 그리지 않는다)
 	 * @param { number } startRadian 기본 0.
 	 * @param { number } endRadian 기본 PI * 2.
+	 * @example <caption>12 시부터 시계 방향으로 고리 채우기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		const center = Vector2.create(320, 180);
+	 * 		const progress = 0.7;
+	 * 		const startRadian = -Math.PI / 2;
+	 * 		graphic.setFillColor("#44dd88");
+	 * 		graphic.drawRing(center, 50, 70, startRadian, startRadian + Math.PI * 2 * progress);
+	 * 		graphic.setStrokeColor("#ffffff");
+	 * 		graphic.drawArc(center, 90, startRadian, startRadian + Math.PI, 3);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	drawRing(center, innerRadius, outerRadius, startRadian = 0, endRadian = Math.PI * 2) {
 		const fillColor = this.getFillColor();
@@ -2677,10 +2819,10 @@ export class Graphic extends Object {
 	// - 각도와 조각 수는 drawRing 과 같다. 선의 두께 가운데가 반지름에 온다.
 	//==============================================================================
 	/**
-	 * @param { Vector2 } center
-	 * @param { number } radius
-	 * @param { number } startRadian
-	 * @param { number } endRadian
+	 * @param { Vector2 } center 가운데.
+	 * @param { number } radius 반지름. (선 굵기의 가운데)
+	 * @param { number } startRadian 시작 각. (라디안)
+	 * @param { number } endRadian 끝 각. (라디안)
 	 * @param { number } lineWidth 기본 1.
 	 */
 	drawArc(center, radius, startRadian, endRadian, lineWidth = 1) {
@@ -2693,13 +2835,13 @@ export class Graphic extends Object {
 	// 고리 출력의 셈. (drawRing, drawArc 가 부른다)
 	//==============================================================================
 	/**
-	 * @param { number } centerX
-	 * @param { number } centerY
-	 * @param { number } innerRadius
-	 * @param { number } outerRadius
-	 * @param { number } startRadian
-	 * @param { number } endRadian
-	 * @param { Color } color
+	 * @param { number } centerX 가운데 X.
+	 * @param { number } centerY 가운데 Y.
+	 * @param { number } innerRadius 안쪽 반지름.
+	 * @param { number } outerRadius 바깥 반지름. (0 이하이거나 안쪽 반지름 이하면 그리지 않는다)
+	 * @param { number } startRadian 시작 각. (라디안)
+	 * @param { number } endRadian 끝 각. (라디안, 시작 각과 같으면 그리지 않는다, 한 바퀴를 넘으면 한 바퀴로 자른다)
+	 * @param { Color } color 칠할 색.
 	 */
 	drawRingWithColor(centerX, centerY, innerRadius, outerRadius, startRadian, endRadian, color) {
 		const spanRadian = endRadian - startRadian;
@@ -2770,8 +2912,30 @@ export class Graphic extends Object {
 	// - 정점 버퍼가 차면 거기까지 그리고 이어서 담는다. (묶어 그리기가 켜져 있으면 같은 텍스처라 한 번의 드로우 콜로 이어진다)
 	//==============================================================================
 	/**
-	 * @param { number[] | Float32Array } positionValues
+	 * @param { number[] | Float32Array } positionValues 선분마다 x0, y0, x1, y1 넷씩 놓인 숫자 배열. (넷보다 적으면 그리지 않는다)
 	 * @param { number } size 기본 1.
+	 * @example <caption>격자 선 한 번에 그리기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		const positionValues = [];
+	 * 		for (let x = 0; x <= 640; x += 40) {
+	 * 			positionValues.push(x, 0, x, 360);
+	 * 		}
+	 * 		for (let y = 0; y <= 360; y += 40) {
+	 * 			positionValues.push(0, y, 640, y);
+	 * 		}
+	 * 		graphic.setStrokeColor("rgba(255, 255, 255, 0.3)");
+	 * 		graphic.drawLineSegments(positionValues, 1);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	drawLineSegments(positionValues, size = 1) {
 		if (!positionValues || positionValues.length < 4) {
@@ -2837,9 +3001,9 @@ export class Graphic extends Object {
 	// - setFillColor() Not Supported.
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement | HTMLCanvasElement } image
-	 * @param { Vector2 } position
-	 * @param { Vector2 } contentSize
+	 * @param { HTMLImageElement | HTMLCanvasElement } image 그릴 그림. (null 이나 undefined 면 오류를 던진다)
+	 * @param { Vector2 } position 그릴 왼쪽 위.
+	 * @param { Vector2 } contentSize 그릴 크기. (음수면 뒤집힌다)
 	 */
 	drawImage(image, position, contentSize) {
 		if (image === null || image === undefined){
@@ -2856,10 +3020,10 @@ export class Graphic extends Object {
 	// - setFillColor() Not Supported.
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement | HTMLCanvasElement } image
-	 * @param { Vector2 } position
-	 * @param { Vector2 } contentSize
-	 * @param { Rect } imageRect
+	 * @param { HTMLImageElement | HTMLCanvasElement } image 그릴 그림. (null 이나 undefined 면 오류를 던진다)
+	 * @param { Vector2 } position 그릴 왼쪽 위.
+	 * @param { Vector2 } contentSize 그릴 크기. (음수면 뒤집힌다)
+	 * @param { Rect } imageRect 그림 안에서 그릴 영역. (픽셀, null 이거나 비었으면 그림 전체)
 	 */
 	drawImageWithImageRect(image, position, contentSize, imageRect) {
 		if (image === null || image === undefined){
@@ -2883,15 +3047,36 @@ export class Graphic extends Object {
 	// 이미지의 소스 영역을 지정 영역에 출력. (Canvas2D drawImage 9인자 대응)
 	//==============================================================================
 	/**
-	 * @param { HTMLImageElement | HTMLCanvasElement } image
-	 * @param { number } sourceX
-	 * @param { number } sourceY
-	 * @param { number } sourceWidth
-	 * @param { number } sourceHeight
-	 * @param { number } destinationX
-	 * @param { number } destinationY
-	 * @param { number } destinationWidth
-	 * @param { number } destinationHeight
+	 * @param { HTMLImageElement | HTMLCanvasElement } image 그릴 그림. (아직 불러오지 않아 크기가 0 이면 그리지 않는다)
+	 * @param { number } sourceX 그림 안의 왼쪽. (픽셀)
+	 * @param { number } sourceY 그림 안의 위. (픽셀)
+	 * @param { number } sourceWidth 그림 안의 너비. (픽셀)
+	 * @param { number } sourceHeight 그림 안의 높이. (픽셀)
+	 * @param { number } destinationX 그릴 왼쪽.
+	 * @param { number } destinationY 그릴 위.
+	 * @param { number } destinationWidth 그릴 너비. (음수면 뒤집힌다)
+	 * @param { number } destinationHeight 그릴 높이. (음수면 뒤집힌다)
+	 * @example <caption>그림의 한 조각 그리기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2, ImageAsset } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	async load(engine) {
+	 * 		await super.load(engine);
+	 * 		this.imageAsset = new ImageAsset();
+	 * 		await this.imageAsset.load("examples/assets/spritesheet.png");
+	 * 	}
+	 *
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		const image = this.imageAsset.image;
+	 * 		graphic.drawImageWithSourceAndDestination(image, 200, 0, 200, 200, 220, 80, 200, 200);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	drawImageWithSourceAndDestination(image, sourceX, sourceY, sourceWidth, sourceHeight, destinationX, destinationY, destinationWidth, destinationHeight) {
 		const imageTextureCache = this.getImageTextureCache();
@@ -2922,10 +3107,10 @@ export class Graphic extends Object {
 	//==============================================================================
 	/**
 	 * @static
-	 * @param { HTMLImageElement | HTMLCanvasElement } image
-	 * @param { Vector2 } position
-	 * @param { Vector2 } size
-	 * @param { Rect } nineSlice
+	 * @param { HTMLImageElement | HTMLCanvasElement } image 그릴 그림.
+	 * @param { Vector2 } position 그릴 왼쪽 위. (내림한다)
+	 * @param { Vector2 } size 그릴 크기. (올림한다, 경계 두께 합보다 작으면 그 합)
+	 * @param { Rect } nineSlice 나인 슬라이스 경계. (position.x 왼쪽, position.y 위, size.x 오른쪽, size.y 아래 두께, 픽셀)
 	 */
 	drawImageWithNineSlice(image, position, size, nineSlice) {
 		const sw = image.width;
@@ -2994,7 +3179,7 @@ export class Graphic extends Object {
 	// 폰트 문자열 설정. (Canvas2D font 대응, 예: "16px DOSGothic")
 	//==============================================================================
 	/**
-	 * @param { string } fontString
+	 * @param { string } fontString CSS 글꼴 글. (예: "16px DOSGothic", 비었으면 바꾸지 않는다)
 	 */
 	setFontString(fontString) {
 		if (fontString) {
@@ -3006,7 +3191,7 @@ export class Graphic extends Object {
 	// 폰트 문자열 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } CSS 글꼴 글. (처음은 "10px sans-serif")
 	 */
 	getFontString() {
 		return this.#fontString;
@@ -3016,7 +3201,7 @@ export class Graphic extends Object {
 	// 텍스트 가로 정렬 설정. ("left" | "center" | "right" | "start" | "end")
 	//==============================================================================
 	/**
-	 * @param { string } textAlign
+	 * @param { string } textAlign 가로 정렬. (비었으면 바꾸지 않는다)
 	 */
 	setTextAlign(textAlign) {
 		if (textAlign) {
@@ -3028,7 +3213,7 @@ export class Graphic extends Object {
 	// 텍스트 가로 정렬 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 가로 정렬. (처음은 "start")
 	 */
 	getTextAlign() {
 		return this.#textAlign;
@@ -3041,7 +3226,7 @@ export class Graphic extends Object {
 	// - "auto" 는 문자열마다 처음 나오는 방향이 강한 글자로 정한다. (HTML 의 dir="auto", 없으면 "ltr") 사용자가 쓴 글(닉네임 등)에 쓴다.
 	//==============================================================================
 	/**
-	 * @param { string } textDirection
+	 * @param { string } textDirection 글 방향. (비었으면 바꾸지 않는다)
 	 */
 	setTextDirection(textDirection) {
 		if (textDirection) {
@@ -3053,7 +3238,7 @@ export class Graphic extends Object {
 	// 텍스트 방향 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 글 방향. (처음은 "inherit")
 	 */
 	getTextDirection() {
 		return this.#textDirection;
@@ -3063,8 +3248,8 @@ export class Graphic extends Object {
 	// 문자열의 실제 방향 계산. ("ltr" 또는 "rtl", "auto" 는 처음 나오는 방향이 강한 글자로)
 	//==============================================================================
 	/**
-	 * @param { string } text
-	 * @returns { string }
+	 * @param { string } text 방향을 정할 글. ("auto" 일 때만 본다)
+	 * @returns { string } "ltr" 또는 "rtl".
 	 */
 	resolveTextDirection(text) {
 		const textDirection = this.getTextDirection();
@@ -3081,7 +3266,7 @@ export class Graphic extends Object {
 	// 실제 가로 정렬 계산. ("start" / "end" 를 방향에 따라 "left" / "right" 로)
 	//==============================================================================
 	/**
-	 * @param { string } textAlign
+	 * @param { string } textAlign 정렬. ("left", "center", "right", "start", "end", 모르는 값은 "left")
 	 * @param { string } textDirection "ltr" 또는 "rtl".
 	 * @returns { string } "left" | "center" | "right"
 	 */
@@ -3102,7 +3287,7 @@ export class Graphic extends Object {
 	// 텍스트 베이스라인 설정. ("top" | "hanging" | "middle" | "alphabetic" | "ideographic" | "bottom")
 	//==============================================================================
 	/**
-	 * @param { string } textBaseline
+	 * @param { string } textBaseline 세로 기준. (비었으면 바꾸지 않는다)
 	 */
 	setTextBaseline(textBaseline) {
 		if (textBaseline) {
@@ -3114,7 +3299,7 @@ export class Graphic extends Object {
 	// 텍스트 베이스라인 반환.
 	//==============================================================================
 	/**
-	 * @returns { string }
+	 * @returns { string } 세로 기준. (처음은 "alphabetic")
 	 */
 	getTextBaseline() {
 		return this.#textBaseline;
@@ -3124,8 +3309,8 @@ export class Graphic extends Object {
 	// 문자열 측정. (현재 폰트 기준, Canvas2D measureText 대응)
 	//==============================================================================
 	/**
-	 * @param { string } text
-	 * @returns { TextMetrics }
+	 * @param { string } text 잴 글.
+	 * @returns { TextMetrics } 지금 글꼴로 잰 치수. (캐시가 나눠 쓰므로 고치지 않는다)
 	 */
 	measureText(text) {
 		const textStringTextureCache = this.getTextStringTextureCache();
@@ -3139,7 +3324,7 @@ export class Graphic extends Object {
 	// - 0 이면 양자화하지 않고 실제 스케일 그대로 굽는다. (스케일이 고정된 UI 글자를 늘리지 않고 1:1 로 그릴 때)
 	//==============================================================================
 	/**
-	 * @param { number } textBakeScaleStep
+	 * @param { number } textBakeScaleStep 양자화 단위. (음수는 0, 0 이면 양자화하지 않는다)
 	 */
 	setTextBakeScaleStep(textBakeScaleStep) {
 		this.#textBakeScaleStep = Math.max(0, textBakeScaleStep);
@@ -3149,7 +3334,7 @@ export class Graphic extends Object {
 	// 텍스트 베이크 스케일 양자화 단위 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 양자화 단위.
 	 */
 	getTextBakeScaleStep() {
 		return this.#textBakeScaleStep;
@@ -3163,7 +3348,7 @@ export class Graphic extends Object {
 	// - 0 이면 움직이는 동안에도 묶지 않는다. (지금까지와 같다)
 	//==============================================================================
 	/**
-	 * @param { number } textBakeMotionScaleStep
+	 * @param { number } textBakeMotionScaleStep 움직이는 동안의 양자화 단위. (음수는 0, 0 이면 묶지 않는다)
 	 */
 	setTextBakeMotionScaleStep(textBakeMotionScaleStep) {
 		this.#textBakeMotionScaleStep = Math.max(0, textBakeMotionScaleStep);
@@ -3173,7 +3358,7 @@ export class Graphic extends Object {
 	// 배율이 움직이는 노드의 텍스트 베이크 스케일 양자화 단위 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 움직이는 동안의 양자화 단위.
 	 */
 	getTextBakeMotionScaleStep() {
 		return this.#textBakeMotionScaleStep;
@@ -3183,7 +3368,7 @@ export class Graphic extends Object {
 	// 지금 그리는 노드의 배율이 움직이는 중인지 설정. (drawNode 가 정한다, 노드 밖에서 직접 그릴 때 부르는 쪽이 정할 수 있다)
 	//==============================================================================
 	/**
-	 * @param { boolean } isTextBakeScaleMoving
+	 * @param { boolean } isTextBakeScaleMoving 배율이 움직이는 중인지. (true 일 때만 움직이는 것으로 본다)
 	 */
 	setTextBakeScaleMoving(isTextBakeScaleMoving) {
 		this.#isTextBakeScaleMoving = isTextBakeScaleMoving === true;
@@ -3193,7 +3378,7 @@ export class Graphic extends Object {
 	// 지금 그리는 노드의 배율이 움직이는 중인지 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 배율이 움직이는 중이면 참.
 	 */
 	isTextBakeScaleMoving() {
 		return this.#isTextBakeScaleMoving;
@@ -3205,8 +3390,8 @@ export class Graphic extends Object {
 	// - 처음 그리는 노드는 움직이지 않는 것으로 본다. (첫 프레임에 두 번 굽지 않게)
 	//==============================================================================
 	/**
-	 * @param { TransformNode } node
-	 * @returns { boolean }
+	 * @param { TransformNode } node 그리는 노드. (지금 배율을 노드에 적어 둔다)
+	 * @returns { boolean } 배율이 지난 프레임과 달라 움직이는 중이면 참.
 	 */
 	readNodeTextBakeScaleMoving(node) {
 		if (this.#textBakeScaleStep > 0 || this.#textBakeMotionScaleStep <= 0 || typeof node.getLastDrawnMaximumScale !== "function") {
@@ -3224,7 +3409,31 @@ export class Graphic extends Object {
 	// - 베이크 스케일이 실제 스케일과 같을 때(setTextBakeScaleStep(0)) 텍셀과 픽셀이 1:1 로 맞아 가장 선명하다.
 	//==============================================================================
 	/**
-	 * @param { boolean } isTextPixelSnapEnabled
+	 * @param { boolean } isTextPixelSnapEnabled 글자 쿼드를 디바이스 픽셀 격자에 맞출지.
+	 * @example <caption>UI 글자를 1:1 로 또렷하게</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2 } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	initialize(engine) {
+	 * 		const graphic = engine.getGraphic();
+	 * 		graphic.setTextBakeScaleStep(0);
+	 * 		graphic.setTextPixelSnapEnabled(true);
+	 * 	}
+	 *
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		graphic.setFillColor("#ffffff");
+	 * 		graphic.setFontString("16px sans-serif");
+	 * 		graphic.setTextAlign("left");
+	 * 		graphic.setTextBaseline("top");
+	 * 		graphic.drawFillText("Score 12345", 20, 20);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	setTextPixelSnapEnabled(isTextPixelSnapEnabled) {
 		this.#isTextPixelSnapEnabled = isTextPixelSnapEnabled;
@@ -3234,7 +3443,7 @@ export class Graphic extends Object {
 	// 텍스트 픽셀 스냅 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 텍스트 픽셀 스냅이 켜졌으면 참.
 	 */
 	isTextPixelSnapEnabled() {
 		return this.#isTextPixelSnapEnabled;
@@ -3244,7 +3453,7 @@ export class Graphic extends Object {
 	// 텍스트 베이크 스케일 계산. (현재 변환 행렬 기반, 양자화 단위는 setTextBakeScaleStep)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 굽는 배율. (0.25 ~ 8)
 	 */
 	calculateTextBakeScale(){
 		const maximumScale = this.#transformMatrix.getMaximumScale();
@@ -3260,9 +3469,9 @@ export class Graphic extends Object {
 	// 문자열 텍스처 엔트리를 정렬/베이스라인에 맞춰 쿼드로 출력.
 	//==============================================================================
 	/**
-	 * @param { object } entry
-	 * @param { number } x
-	 * @param { number } y
+	 * @param { object } entry 문자열 텍스처 엔트리. (TextStringTextureCache.getEntry)
+	 * @param { number } x 기준 X. (정렬의 기준점)
+	 * @param { number } y 기준 Y. (세로 기준의 자리)
 	 * @param { Color | null } color - 흰색으로 구운 글자에 곱할 색. (null 이면 흰색 그대로)
 	 * @param { string } textDirection - 정렬 "start" / "end" 를 가를 방향. ("ltr" 또는 "rtl", 기본 "ltr")
 	 */
@@ -3318,16 +3527,16 @@ export class Graphic extends Object {
 	// - setFillColor() / setFontString() / setTextAlign() / setTextBaseline()
 	//==============================================================================
 	/**
-	 * @param { string } text
-	 * @param { number } x
-	 * @param { number } y
+	 * @param { string } text 그릴 글. (비었으면 그리지 않는다)
+	 * @param { number } x 기준 X. (정렬의 기준점)
+	 * @param { number } y 기준 Y. (세로 기준의 자리)
 	 */
 	drawFillText(text, x, y) {
 		if (!text) {
 			return;
 		}
 
-		// 글자는 흰색으로 굽고 그릴 때 색을 곱한다. (색이 바뀌어도 다시 굽지 않는다 — 틴트 전환 / 색 애니메이션)
+		// 글자는 흰색으로 굽고 그릴 때 색을 곱한다. (색이 바뀌어도 다시 굽지 않는다, 틴트 전환 / 색 애니메이션)
 		const textStringTextureCache = this.getTextStringTextureCache();
 		const fontString = this.getFontString();
 		const fillColor = this.getFillColor();
@@ -3346,10 +3555,10 @@ export class Graphic extends Object {
 	// - setStrokeColor() / setFontString() / setTextAlign() / setTextBaseline()
 	//==============================================================================
 	/**
-	 * @param { string } text
-	 * @param { number } x
-	 * @param { number } y
-	 * @param { number } lineWidth
+	 * @param { string } text 그릴 글. (비었으면 그리지 않는다)
+	 * @param { number } x 기준 X. (정렬의 기준점)
+	 * @param { number } y 기준 Y. (세로 기준의 자리)
+	 * @param { number } lineWidth 선 굵기. (기본 1)
 	 */
 	drawStrokeText(text, x, y, lineWidth = 1) {
 		if (!text) {
@@ -3373,7 +3582,7 @@ export class Graphic extends Object {
 	// 노드 출력.
 	//==============================================================================
 	/**
-	 * @param { TransformNode } node
+	 * @param { TransformNode } node 그릴 노드. (null 이거나 꺼져 있으면 그리지 않는다)
 	 */
 	drawNode(node) {
 		if (node === null || node == undefined || !node.isActive()) {
@@ -3405,8 +3614,25 @@ export class Graphic extends Object {
 	// - roundSize 를 주면 둥근 사각형으로 잘린다. (Paint 의 roundSize 와 같은 값이면 배경과 정확히 맞는다)
 	//==============================================================================
 	/**
-	 * @param { Rect } rect
-	 * @param { number } roundSize
+	 * @param { Rect } rect 자를 사각형. (지금 변환으로 옮기기 전의 로컬 좌표)
+	 * @param { number } roundSize 모서리 반지름. (기본 0, 0 이하면 각진 사각형)
+	 * @example <caption>둥근 사각형 안으로 잘라 그리기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2, Rect } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		graphic.beginClipRect(Rect.create(100, 60, 200, 200), 24);
+	 * 		graphic.setFillColor("#3399ff");
+	 * 		graphic.drawCircle(Vector2.create(300, 160), 120);
+	 * 		graphic.endClipRect();
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	beginClipRect(rect, roundSize = 0) {
 		// 상태 저장. (Canvas2D save 대응)
@@ -3502,7 +3728,7 @@ export class Graphic extends Object {
 	// 캔버스 반환.
 	//==============================================================================
 	/**
-	 * @returns { HTMLCanvasElement }
+	 * @returns { HTMLCanvasElement } 캔버스.
 	 */
 	getCanvas() {
 		return this.#canvas;
@@ -3512,7 +3738,7 @@ export class Graphic extends Object {
 	// WebGL2 렌더링 컨텍스트 반환.
 	//==============================================================================
 	/**
-	 * @returns { WebGL2RenderingContext }
+	 * @returns { WebGL2RenderingContext } WebGL2 렌더링 컨텍스트.
 	 */
 	getWebGL2RenderingContext() {
 		return this.#webGL2RenderingContext;
@@ -3522,7 +3748,7 @@ export class Graphic extends Object {
 	// 드로잉 버퍼 너비 반환. (픽셀, 마지막으로 맞춘 뷰포트)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 드로잉 버퍼 너비. (픽셀)
 	 */
 	getDrawingBufferWidth() {
 		return this.#appliedViewportWidth;
@@ -3532,7 +3758,7 @@ export class Graphic extends Object {
 	// 드로잉 버퍼 높이 반환. (픽셀, 마지막으로 맞춘 뷰포트)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 드로잉 버퍼 높이. (픽셀)
 	 */
 	getDrawingBufferHeight() {
 		return this.#appliedViewportHeight;
@@ -3543,7 +3769,7 @@ export class Graphic extends Object {
 	// - 캔버스처럼 불투명으로 본다. (알파 255)
 	//==============================================================================
 	/**
-	 * @returns { { width: number, height: number, pixels: Uint8Array } }
+	 * @returns { { width: number, height: number, pixels: Uint8Array } } 화면 픽셀. ({ width, height, pixels }, pixels 는 위 줄부터 RGBA, 알파 255)
 	 */
 	readFramebufferPixels() {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
@@ -3568,7 +3794,7 @@ export class Graphic extends Object {
 	// 셰이더 프로그램 반환.
 	//==============================================================================
 	/**
-	 * @returns { ShaderProgram }
+	 * @returns { ShaderProgram } 지금 쓰는 셰이더 프로그램. (바꿔 끼운 것이 있으면 그것)
 	 */
 	getShaderProgram() {
 		if (this.#shaderProgramOverride) {
@@ -3582,7 +3808,7 @@ export class Graphic extends Object {
 	// - 기본 프로그램과 같은 어트리뷰트 위치 / 유니폼 이름(projectionMatrix, modelMatrix, mainColor, tintColor, globalAlpha, mainTexture)을 갖춰야 한다.
 	//==============================================================================
 	/**
-	 * @param { ShaderProgram | null } shaderProgram
+	 * @param { ShaderProgram | null } shaderProgram 바꿔 끼울 셰이더 프로그램. (null 이면 기본 프로그램)
 	 */
 	setShaderProgramOverride(shaderProgram) {
 		this.flushSpriteBatch();
@@ -3625,7 +3851,7 @@ export class Graphic extends Object {
 	// 셰이더 프로그램 쓰게 하기. (마지막으로 쓰게 한 것과 같으면 다시 걸지 않는다)
 	//==============================================================================
 	/**
-	 * @param { ShaderProgram } shaderProgram
+	 * @param { ShaderProgram } shaderProgram 쓸 셰이더 프로그램.
 	 */
 	useShaderProgram(shaderProgram) {
 		if (shaderProgram === this.#boundShaderProgram) {
@@ -3639,7 +3865,7 @@ export class Graphic extends Object {
 	// 0 번 텍스처 유닛에 텍스처 묶기. (마지막으로 묶은 것과 같으면 다시 묶지 않는다)
 	//==============================================================================
 	/**
-	 * @param { WebGLTexture } texture
+	 * @param { WebGLTexture } texture 묶을 텍스처.
 	 */
 	bindTexture(texture) {
 		if (texture === this.#boundTexture) {
@@ -3683,6 +3909,30 @@ export class Graphic extends Object {
 	 * @param { Function } callback (webGL2RenderingContext) => any
 	 * @param { object } [options] { clearDepth 깊이를 비울지 (기본 true, 자르기 안이면 clearDepthBuffer 머리말) }
 	 * @returns { any } callback 이 돌려준 것.
+	 * @example <caption>2D 사이에 WebGL 직접 그리기 끼우기</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2, Rect } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		graphic.setFillColor("#888888");
+	 * 		graphic.drawRect(Rect.create(0, 0, 640, 360));
+	 * 		graphic.runExternalPass((webGL2RenderingContext) => {
+	 * 			webGL2RenderingContext.enable(webGL2RenderingContext.SCISSOR_TEST);
+	 * 			webGL2RenderingContext.scissor(20, 20, 100, 100);
+	 * 			webGL2RenderingContext.clearColor(0.2, 0.4, 0.8, 1);
+	 * 			webGL2RenderingContext.clear(webGL2RenderingContext.COLOR_BUFFER_BIT);
+	 * 			webGL2RenderingContext.disable(webGL2RenderingContext.SCISSOR_TEST);
+	 * 		}, { clearDepth: false });
+	 * 		graphic.setFillColor("#ffffff");
+	 * 		graphic.drawCircle(Vector2.create(320, 180), 40);
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
 	 */
 	runExternalPass(callback, options = {}) {
 		const isDepthCleared = options.clearDepth !== false;
@@ -3704,7 +3954,7 @@ export class Graphic extends Object {
 	// 버텍스 어레이 반환.
 	//==============================================================================
 	/**
-	 * @returns { WebGLVertexArrayObject }
+	 * @returns { WebGLVertexArrayObject } 버텍스 어레이.
 	 */
 	getVertexArray() {
 		return this.#vertexArray;
@@ -3714,7 +3964,7 @@ export class Graphic extends Object {
 	// 버텍스 버퍼 반환.
 	//==============================================================================
 	/**
-	 * @returns { WebGLBuffer }
+	 * @returns { WebGLBuffer } 버텍스 버퍼.
 	 */
 	getVertexBuffer() {
 		return this.#vertexBuffer;
@@ -3724,7 +3974,7 @@ export class Graphic extends Object {
 	// 스크래치 버텍스 데이터 반환.
 	//==============================================================================
 	/**
-	 * @returns { Float32Array }
+	 * @returns { Float32Array } 스크래치 버텍스 데이터. (정점마다 x, y, u, v)
 	 */
 	getVertexData() {
 		return this.#vertexData;
@@ -3734,7 +3984,7 @@ export class Graphic extends Object {
 	// 흰색 텍스처 반환. (단색 도형용)
 	//==============================================================================
 	/**
-	 * @returns { WebGLTexture }
+	 * @returns { WebGLTexture } 1x1 흰색 텍스처.
 	 */
 	getWhiteTexture() {
 		return this.#whiteTexture;
@@ -3744,7 +3994,7 @@ export class Graphic extends Object {
 	// 흰색 색상 반환. (이미지/텍스트 출력용 기본 색상)
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 흰색. (나눠 쓰므로 고치지 않는다)
 	 */
 	getWhiteColor() {
 		return this.#whiteColor;
@@ -3754,7 +4004,7 @@ export class Graphic extends Object {
 	// 이미지 텍스처 캐시 반환.
 	//==============================================================================
 	/**
-	 * @returns { ImageTextureCache }
+	 * @returns { ImageTextureCache } 이미지 텍스처 캐시.
 	 */
 	getImageTextureCache() {
 		return this.#imageTextureCache;
@@ -3764,7 +4014,7 @@ export class Graphic extends Object {
 	// 문자열 텍스처 캐시 반환.
 	//==============================================================================
 	/**
-	 * @returns { TextStringTextureCache }
+	 * @returns { TextStringTextureCache } 문자열 텍스처 캐시.
 	 */
 	getTextStringTextureCache() {
 		return this.#textStringTextureCache;

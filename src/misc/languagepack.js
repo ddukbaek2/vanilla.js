@@ -41,6 +41,24 @@ let currentLanguage = null;
 let currentTexts = {};
 let fallbackTexts = {};
 
+/**
+ * @example <caption>파일 없이 목록과 표를 넣고 글자 얻기</caption>
+ * import { LanguagePack } from "./build/vanilla.js";
+ *
+ * LanguagePack.setLanguageList({
+ * 	fallbackLanguage: "en",
+ * 	languages: [
+ * 		{ code: "en", name: "English", englishName: "English", direction: "ltr", aliases: [], file: "en.json" },
+ * 		{ code: "ar", name: "Arabic", englishName: "Arabic", direction: "rtl", aliases: ["ar-eg"], file: "ar.json" }
+ * 	]
+ * });
+ * const englishTexts = { "hud.restart": "Restart {seconds}", "hud.ammo": "{count}/{limit}" };
+ * LanguagePack.setLanguageTexts("en", englishTexts, englishTexts);
+ * console.log(LanguagePack.readLanguageCode(), LanguagePack.translate("hud.restart"), LanguagePack.formatText("hud.restart", { seconds: 3 }));
+ * const matchedLanguage = LanguagePack.matchLanguageTag("ar-EG");
+ * console.log(matchedLanguage.code, LanguagePack.readTextDirection(), LanguagePack.resolveLanguageCode("ar"));
+ */
+
 
 //==============================================================================
 // JSON 읽기. (못 읽으면 null)
@@ -77,7 +95,7 @@ export async function loadLanguageList() {
 // 언어의 목록 반환. (못 읽었으면 빈 배열)
 //==============================================================================
 /**
- * @returns { object[] }
+ * @returns { object[] } 언어 목록의 줄 배열. (못 읽었으면 빈 배열)
  */
 export function readLanguages() {
 	if (languageList === null) {
@@ -90,8 +108,8 @@ export function readLanguages() {
 // 언어 찾기. (코드는 대소문자를 가리지 않는다, 없으면 null)
 //==============================================================================
 /**
- * @param { string } languageCode
- * @returns { object | null }
+ * @param { string } languageCode 찾을 언어 코드.
+ * @returns { object | null } 목록의 그 언어 줄. 없으면 null.
  */
 export function findLanguage(languageCode) {
 	if (typeof languageCode !== "string" || languageCode === "") {
@@ -111,8 +129,8 @@ export function findLanguage(languageCode) {
 // 언어 태그에 맞는 언어. ("pt-BR" → pt, "zh-Hant-TW" → zh-Hant, 뒤의 조각을 하나씩 떼며 코드와 별칭을 본다, 없으면 null)
 //==============================================================================
 /**
- * @param { string } languageTag
- * @returns { object | null }
+ * @param { string } languageTag 언어 태그. ("pt-BR" 같은 꼴, 밑줄도 받는다)
+ * @returns { object | null } 맞는 언어 줄. 없으면 null.
  */
 export function matchLanguageTag(languageTag) {
 	if (typeof languageTag !== "string" || languageTag === "") {
@@ -135,7 +153,7 @@ export function matchLanguageTag(languageTag) {
 // 앞세울 언어 태그 넣기. (플랫폼이 알려 준 사용자의 언어, 기기의 언어보다 먼저 본다, 없으면 "")
 //==============================================================================
 /**
- * @param { string } languageTag
+ * @param { string } languageTag 앞세울 언어 태그. (글이 아니면 "")
  */
 export function setPreferredLanguageTag(languageTag) {
 	preferredLanguageTag = typeof languageTag === "string" ? languageTag : "";
@@ -145,7 +163,7 @@ export function setPreferredLanguageTag(languageTag) {
 // 기기(브라우저)의 언어. (기기가 앞세우는 순서대로 목록에 있는 첫 언어, 없으면 기본 언어)
 //==============================================================================
 /**
- * @returns { string }
+ * @returns { string } 고른 언어 코드. (맞는 것이 없으면 기본 언어 코드)
  */
 export function resolveDeviceLanguageCode() {
 	const languageTags = [];
@@ -176,7 +194,7 @@ export function resolveDeviceLanguageCode() {
 // 기본 언어의 코드.
 //==============================================================================
 /**
- * @returns { string }
+ * @returns { string } 기본 언어 코드. (목록이 없거나 정하지 않았으면 "en")
  */
 export function readFallbackLanguageCode() {
 	if (languageList === null || typeof languageList.fallbackLanguage !== "string") {
@@ -189,8 +207,8 @@ export function readFallbackLanguageCode() {
 // 설정의 언어 → 쓸 언어의 코드. (비었거나 목록에 없으면 기기의 언어)
 //==============================================================================
 /**
- * @param { string } settingLanguageCode
- * @returns { string }
+ * @param { string } settingLanguageCode 설정에 저장된 언어 코드. (비었거나 목록에 없으면 기기의 언어)
+ * @returns { string } 쓸 언어 코드.
  */
 export function resolveLanguageCode(settingLanguageCode) {
 	const language = findLanguage(settingLanguageCode);
@@ -220,7 +238,7 @@ async function readLanguageTexts(language) {
 // 언어 불러오기. (그 언어의 표와 기본 언어의 표, 목록에 없는 코드면 기본 언어)
 //==============================================================================
 /**
- * @param { string } languageCode
+ * @param { string } languageCode 불러올 언어 코드. (목록에 없으면 기본 언어)
  */
 export async function loadLanguage(languageCode) {
 	await loadLanguageList();
@@ -289,7 +307,7 @@ export async function applyLanguageSetting(settingLanguageCode) {
 // 지금 언어. (목록의 한 줄, 아직 없으면 null)
 //==============================================================================
 /**
- * @returns { object | null }
+ * @returns { object | null } 지금 언어 줄. 아직 없으면 null.
  */
 export function readLanguage() {
 	return currentLanguage;
@@ -299,7 +317,7 @@ export function readLanguage() {
 // 지금 언어의 코드. (아직 없으면 기본 언어)
 //==============================================================================
 /**
- * @returns { string }
+ * @returns { string } 지금 언어 코드. 아직 없으면 기본 언어 코드.
  */
 export function readLanguageCode() {
 	if (currentLanguage === null) {
@@ -314,7 +332,7 @@ export function readLanguageCode() {
 // 오른쪽에서 왼쪽으로 쓰는 언어(아랍어, 페르시아어, 히브리어 등)면 화면의 글자를 그 방향으로 굽고 배치를 좌우로 뒤집는다.
 //==============================================================================
 /**
- * @returns { string }
+ * @returns { string } "ltr" 또는 "rtl".
  */
 export function readTextDirection() {
 	if (currentLanguage === null || currentLanguage.direction !== "rtl") {
@@ -327,7 +345,7 @@ export function readTextDirection() {
 // 지금 언어가 오른쪽에서 왼쪽으로 쓰는지. (readTextDirection 이 "rtl" 이면 true)
 //==============================================================================
 /**
- * @returns { boolean }
+ * @returns { boolean } 오른쪽에서 왼쪽으로 쓰면 참.
  */
 export function isRightToLeft() {
 	const textDirection = readTextDirection();
@@ -343,7 +361,7 @@ export function isRightToLeft() {
  * @param { number } x 왼쪽에서 오른쪽 언어일 때의 왼쪽.
  * @param { number } width 놓을 것의 너비.
  * @param { number } parentWidth 부모의 너비.
- * @returns { number }
+ * @returns { number } 지금 언어 방향에 맞춘 왼쪽.
  */
 export function mirrorLayoutX(x, width, parentWidth) {
 	if (!isRightToLeft()) {
@@ -357,7 +375,7 @@ export function mirrorLayoutX(x, width, parentWidth) {
 //==============================================================================
 /**
  * @param { string } textAlign "left", "center", "right", "start", "end"
- * @returns { string }
+ * @returns { string } 지금 언어 방향에 맞춘 정렬 값.
  */
 export function readLayoutTextAlign(textAlign) {
 	if (!isRightToLeft()) {
@@ -379,8 +397,8 @@ export function readLayoutTextAlign(textAlign) {
 // 묶은 값은 제 방향(처음 나오는 방향이 강한 글자, 숫자뿐이면 왼쪽에서 오른쪽)으로 한 덩어리로 놓인다.
 //==============================================================================
 /**
- * @param { string } text
- * @returns { string }
+ * @param { string } text 묶을 값의 글.
+ * @returns { string } 오른쪽에서 왼쪽 언어면 방향 격리 문자로 묶은 글, 아니면 그대로. (빈 글은 그대로)
  */
 export function isolateText(text) {
 	const textDirection = readTextDirection();
@@ -394,8 +412,8 @@ export function isolateText(text) {
 // 열쇠의 글자. (지금 언어 → 기본 언어 → 열쇠 그대로)
 //==============================================================================
 /**
- * @param { string } key
- * @returns { string }
+ * @param { string } key 글자의 열쇠.
+ * @returns { string } 지금 언어의 글자. 없으면 기본 언어의 글자, 거기에도 없으면 열쇠 그대로.
  */
 export function translate(key) {
 	const text = currentTexts[key];
@@ -416,9 +434,9 @@ export function translate(key) {
 // 빗금으로만 이은 값들("{count}/{limit}")은 값마다가 아니라 통째로 한 번 묶는다. 값마다 묶으면 두 덩어리가 오른쪽부터 놓여 1/40 이 40/1 로 보인다.
 //==============================================================================
 /**
- * @param { string } key
+ * @param { string } key 글자의 열쇠.
  * @param { object } values 자리 이름 → 값.
- * @returns { string }
+ * @returns { string } 자리를 채운 글자.
  */
 export function formatText(key, values) {
 	const text = translate(key);
@@ -442,7 +460,7 @@ export function formatText(key, values) {
 // 지금 언어의 글자 모두. (글꼴의 조각을 미리 받을 때 쓴다)
 //==============================================================================
 /**
- * @returns { string }
+ * @returns { string } 지금 언어 표의 글자를 모두 이은 글.
  */
 export function readAllTexts() {
 	const texts = System.Object.values(currentTexts);
@@ -455,7 +473,7 @@ export function readAllTexts() {
 //==============================================================================
 /**
  * @param { object } data - { fallbackLanguage, languages: [...] }
- * @returns { boolean }
+ * @returns { boolean } 목록을 넣었으면 참. (languages 배열이 없으면 거짓)
  */
 export function setLanguageList(data) {
 	if (data === null || typeof data !== "object" || !System.Array.isArray(data.languages)) {
@@ -474,10 +492,10 @@ export function setLanguageList(data) {
 // 지금 언어의 표 넣기. (파일 없이 바로 줄 때, 기본 언어 표도 함께. 언어가 목록에 없으면 false)
 //==============================================================================
 /**
- * @param { string } languageCode
+ * @param { string } languageCode 지금 언어로 정할 코드. (목록에 있어야 한다)
  * @param { object } texts 열쇠 → 글자.
  * @param { object } fallbackTextTable 기본 언어의 열쇠 → 글자.
- * @returns { boolean }
+ * @returns { boolean } 넣었으면 참. 언어가 목록에 없으면 거짓.
  */
 export function setLanguageTexts(languageCode, texts, fallbackTextTable) {
 	const language = findLanguage(languageCode);
@@ -495,7 +513,7 @@ export function setLanguageTexts(languageCode, texts, fallbackTextTable) {
 // 경로 정하기. (언어 목록 파일, 언어 파일들이 있는 폴더, 불러오기 전에 부른다)
 //==============================================================================
 /**
- * @param { string } listPath
+ * @param { string } listPath 언어 목록 파일(languages.json) 경로.
  * @param { string } directoryPath - "/" 로 끝난다.
  */
 export function setLanguagePaths(listPath, directoryPath) {
@@ -507,7 +525,7 @@ export function setLanguagePaths(listPath, directoryPath) {
 // 탭 제목이 될 글자의 열쇠 정하기. ("" 이면 탭 제목을 바꾸지 않는다)
 //==============================================================================
 /**
- * @param { string } titleKey
+ * @param { string } titleKey 탭 제목이 될 글자의 열쇠. ("" 이면 탭 제목을 바꾸지 않는다)
  */
 export function setDocumentTitleKey(titleKey) {
 	documentTitleKey = titleKey;

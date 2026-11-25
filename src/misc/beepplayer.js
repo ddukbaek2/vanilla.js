@@ -15,6 +15,24 @@ import { Object } from "../base/object.js";
 //     const beepPlayer = new BeepPlayer(engine.getAudioManager());
 //     beepPlayer.playPreset("confirm");
 //==============================================================================
+/**
+ * @example <caption>누를 때마다 프리셋 효과음 내기</caption>
+ * import { Engine, EngineConfiguration, Scene, BeepPlayer } from "./build/vanilla.js";
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const audioManager = engine.getAudioManager();
+ * const beepPlayer = new BeepPlayer(audioManager, 0.3);
+ *
+ * class MainScene extends Scene {
+ * 	touchPress(viewInputPosition) {
+ * 		super.touchPress(viewInputPosition);
+ * 		beepPlayer.playPreset("confirm");
+ * 	}
+ * }
+ *
+ * engine.run(new MainScene());
+ */
 export class BeepPlayer extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -28,7 +46,7 @@ export class BeepPlayer extends Object {
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { AudioManager } audioManager
+	 * @param { AudioManager } audioManager 소리를 낼 오디오 관리자. (engine.getAudioManager())
 	 * @param { number } volume 0 ~ 1.
 	 */
 	constructor(audioManager, volume = 0.35) {
@@ -89,7 +107,27 @@ export class BeepPlayer extends Object {
 	// - [{ frequency, duration, waveform?, volumeScale? }, ...] 를 차례로 이어 튼다.
 	//==============================================================================
 	/**
-	 * @param { object[] } toneList
+	 * @param { object[] } toneList 차례로 이어 틀 톤 목록. ({ frequency, duration, waveform?, volumeScale? }, duration 은 초)
+	 * @example <caption>도미솔 세 음을 이어 틀기</caption>
+	 * import { Engine, EngineConfiguration, Scene, BeepPlayer } from "./build/vanilla.js";
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * const audioManager = engine.getAudioManager();
+	 * const beepPlayer = new BeepPlayer(audioManager);
+	 *
+	 * class MainScene extends Scene {
+	 * 	touchPress(viewInputPosition) {
+	 * 		super.touchPress(viewInputPosition);
+	 * 		beepPlayer.playSequence([
+	 * 			{ frequency: 523, duration: 0.1 },
+	 * 			{ frequency: 659, duration: 0.1, waveform: "triangle" },
+	 * 			{ frequency: 784, duration: 0.2, volumeScale: 0.6 },
+	 * 		]);
+	 * 	}
+	 * }
+	 *
+	 * engine.run(new MainScene());
 	 */
 	playSequence(toneList) {
 		let delaySeconds = 0;
@@ -180,7 +218,7 @@ export class BeepPlayer extends Object {
 	// 기본 음량 반환.
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } 기본 음량. (0 ~ 1)
 	 */
 	getVolume() {
 		return this.#volume;
@@ -190,7 +228,7 @@ export class BeepPlayer extends Object {
 	// 음소거 설정.
 	//==============================================================================
 	/**
-	 * @param { boolean } isMuted
+	 * @param { boolean } isMuted 참이면 소리를 내지 않는다.
 	 */
 	setMuted(isMuted) {
 		this.#isMuted = isMuted;
@@ -200,7 +238,7 @@ export class BeepPlayer extends Object {
 	// 음소거 여부.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 음소거 중이면 참.
 	 */
 	isMuted() {
 		return this.#isMuted;

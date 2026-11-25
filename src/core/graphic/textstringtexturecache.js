@@ -5,6 +5,16 @@ const System = globalThis;
 import { Object } from "../../base/object.js";
 import * as Math from "../../base/math.js";
 
+/**
+ * @example <caption>Graphic 없이 글 너비 재기</caption>
+ * import { measureTextWithoutGraphic } from "./build/vanilla.js";
+ *
+ * const textMetrics = measureTextWithoutGraphic("bold 16px sans-serif", "Hello");
+ * if (textMetrics !== null) {
+ * 	console.log(textMetrics.width);
+ * }
+ */
+
 
 //==============================================================================
 // 전역 상수 목록.
@@ -102,9 +112,9 @@ export function measureTextMetrics(fontString, text) {
 // Graphic 없이 글 재기. (measureTextMetrics 와 같다, 러스트 판 measure_text_without_graphic 과 같은 이름. 문서가 없으면 null)
 //==============================================================================
 /**
- * @param { string } fontString
- * @param { string } text
- * @returns { TextMetrics | null }
+ * @param { string } fontString CSS 글꼴 글. (예: "bold 16px sans-serif")
+ * @param { string } text 잴 글.
+ * @returns { TextMetrics | null } 글의 치수. (캐시가 나눠 쓰므로 고치지 않는다, 문서가 없으면 null)
  */
 export function measureTextWithoutGraphic(fontString, text) {
 	return measureTextMetrics(fontString, text);

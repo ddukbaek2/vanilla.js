@@ -20,6 +20,49 @@ import { WorldNode } from "../core/node/worldnode.js";
 // - 컨테이너 역할을 하므로 UIControl 을 상속하지 않고 Component 직접 상속.
 //   대신 UIControl 이 갖던 setEngine/getEngine 를 자체적으로 보유한다.
 //==============================================================================
+/**
+ * @example <caption>배경색이 있는 판에 라벨 담기</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIView, UILabel, WorldNode, Pivot, Vector2, Color } from "./build/vanilla.js";
+ *
+ * class MainScene extends UIScene {
+ * 	constructor() {
+ * 		super();
+ * 		this.setLoadingMinDurationMs(0);
+ * 	}
+ *
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const panelNode = new WorldNode();
+ * 		panelNode.setPivot(Pivot.topLeft);
+ * 		panelNode.setAnchor(Pivot.topLeft);
+ * 		panelNode.setLocalPosition(Vector2.create(40, 40));
+ * 		panelNode.setContentSize(Vector2.create(240, 160));
+ * 		const view = panelNode.addComponent(UIView);
+ * 		view.setBackgroundColor(new Color(0.1, 0.12, 0.16, 1));
+ *
+ * 		const labelNode = new WorldNode();
+ * 		labelNode.setPivot(Pivot.topLeft);
+ * 		labelNode.setAnchor(Pivot.topLeft);
+ * 		labelNode.setLocalPosition(Vector2.create(16, 16));
+ * 		labelNode.setContentSize(Vector2.create(208, 32));
+ * 		const label = labelNode.addComponent(UILabel);
+ * 		label.setText("Panel");
+ * 		label.setFontSize(20);
+ * 		const content = view.getContent();
+ * 		content.addChild(labelNode);
+ *
+ * 		const root = this.getRoot();
+ * 		root.addChild(panelNode);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * engineConfiguration.canvasId = "mainCanvas";
+ * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+ * engineConfiguration.autoResizeOnWindowResize = true;
+ * const engine = new Engine(engineConfiguration);
+ * engine.run(new MainScene());
+ */
 export class UIView extends Component {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -46,7 +89,7 @@ export class UIView extends Component {
 	// 엔진 설정. (구 UIComponent 에서 이관)
 	//==============================================================================
 	/**
-	 * @param { Engine } engine
+	 * @param { Engine } engine 엔진.
 	 */
 	setEngine(engine) {
 		this.#engine = engine;
@@ -56,7 +99,7 @@ export class UIView extends Component {
 	// 엔진 반환. (구 UIComponent 에서 이관)
 	//==============================================================================
 	/**
-	 * @returns { Engine | null }
+	 * @returns { Engine | null } setEngine 으로 준 엔진. (주지 않았으면 null)
 	 */
 	getEngine() {
 		return this.#engine;
@@ -67,7 +110,7 @@ export class UIView extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { ComponentNode } node
+	 * @param { ComponentNode } node 붙을 노드.
 	 */
 	attach(node) {
 		super.attach(node);
@@ -87,7 +130,7 @@ export class UIView extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { ComponentNode } node
+	 * @param { ComponentNode } node 떨어질 노드.
 	 */
 	detach(node) {
 		super.detach(node);
@@ -98,7 +141,7 @@ export class UIView extends Component {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { Graphic } graphic
+	 * @param { Graphic } graphic 그래픽.
 	 */
 	draw(graphic) {
 		const node = this.getNode();
@@ -123,7 +166,7 @@ export class UIView extends Component {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 누른 자리. (뷰 좌표)
 	 */
 	touchPress(viewInputPosition) {
 	}
@@ -133,7 +176,7 @@ export class UIView extends Component {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 옮긴 자리. (뷰 좌표)
 	 */
 	touchMove(viewInputPosition) {
 		// if (this.isDragging()) {
@@ -146,7 +189,7 @@ export class UIView extends Component {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 뗀 자리. (뷰 좌표)
 	 */
 	touchRelease(viewInputPosition) {
 	}
@@ -156,7 +199,7 @@ export class UIView extends Component {
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @param { Vector2 } viewInputPosition
+	 * @param { Vector2 } viewInputPosition 취소된 때의 자리. (뷰 좌표)
 	 */
 	touchCancel(viewInputPosition) {
 	}
@@ -165,7 +208,7 @@ export class UIView extends Component {
 	// 콘텐츠 노드 반환. (자식 노드를 이 노드에 추가하면 스크롤 대상이 됨)
 	//==============================================================================
 	/**
-	 * @returns { WorldNode }
+	 * @returns { WorldNode } 컨텐트 노드. (노드에 붙기 전이면 null)
 	 */
 	getContent() {
 		return this.#content;
@@ -175,7 +218,7 @@ export class UIView extends Component {
 	// 배경색 설정.
 	//==============================================================================
 	/**
-	 * @param { Color | null } backgroundColor
+	 * @param { Color | null } backgroundColor 배경색. (사본을 담는다, 알파가 0 이면 그리지 않는다)
 	 */
 	setBackgroundColor(backgroundColor) {
 		this.#backgroundColor = backgroundColor.clone();
@@ -185,7 +228,7 @@ export class UIView extends Component {
 	// 배경색 반환.
 	//==============================================================================
 	/**
-	 * @returns { Color }
+	 * @returns { Color } 배경색. (기본은 알파가 0 인 흰색)
 	 */
 	getBackgroundColor() {
 		return this.#backgroundColor;

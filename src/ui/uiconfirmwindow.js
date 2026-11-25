@@ -43,6 +43,36 @@ const CONFIRM_ACCENT_COLOR = new Color(0.23, 0.51, 0.96, 1);
 //     confirmWindow.setConfirmEvent(() => { leave(); });
 //     windowLayer.openWindow(confirmWindow);
 //==============================================================================
+/**
+ * @example <caption>나가기를 묻는 확인 창</caption>
+ * import { Engine, EngineConfiguration, UIScene, UIConfirmWindow, UIWindowLayer } from "./build/vanilla.js";
+ *
+ * class ConfirmScene extends UIScene {
+ * 	initialize(engine) {
+ * 		super.initialize(engine);
+ * 		const root = this.getRoot();
+ * 		const rootSize = root.getContentSize();
+ * 		const windowLayer = new UIWindowLayer();
+ * 		root.addChild(windowLayer);
+ * 		windowLayer.setViewSize(rootSize.x, rootSize.y);
+ *
+ * 		const confirmWindow = new UIConfirmWindow("quit", { title: "Quit", message: "Your progress is saved. Quit the game now?", cancelText: "Stay", confirmText: "Quit" });
+ * 		confirmWindow.setConfirmEvent(() => {
+ * 			console.log("quit");
+ * 		});
+ * 		confirmWindow.setCancelEvent(() => {
+ * 			console.log("stay");
+ * 		});
+ * 		windowLayer.openWindow(confirmWindow);
+ * 	}
+ * }
+ *
+ * const engineConfiguration = new EngineConfiguration();
+ * const engine = new Engine(engineConfiguration);
+ * const scene = new ConfirmScene();
+ * scene.setLoadingMinDurationMs(0);
+ * engine.run(scene);
+ */
 export class UIConfirmWindow extends UIWindow {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -123,8 +153,8 @@ export class UIConfirmWindow extends UIWindow {
 	// 왼쪽 위 피봇의 빈 노드 만들기.
 	//==============================================================================
 	/**
-	 * @param { string } nodeName
-	 * @returns { WorldNode }
+	 * @param { string } nodeName 노드 이름.
+	 * @returns { WorldNode } 피봇과 앵커가 왼쪽 위인 새 노드.
 	 */
 	static createBoxNode(nodeName) {
 		const node = new WorldNode();
@@ -138,10 +168,10 @@ export class UIConfirmWindow extends UIWindow {
 	// 단추 노드 만들기. (둥근 Paint + UIButton + UILabel)
 	//==============================================================================
 	/**
-	 * @param { string } nodeName
-	 * @param { string } labelText
-	 * @param { Color } fillColor
-	 * @returns { WorldNode }
+	 * @param { string } nodeName 노드 이름.
+	 * @param { string } labelText 단추 글.
+	 * @param { Color } fillColor 단추 바탕 색.
+	 * @returns { WorldNode } 단추 노드. (세로 52, 가로는 layoutContent 가 정한다)
 	 */
 	static createButtonNode(nodeName, labelText, fillColor) {
 		const buttonNode = UIConfirmWindow.createBoxNode(nodeName);
@@ -162,7 +192,7 @@ export class UIConfirmWindow extends UIWindow {
 	// 제목 설정. (빈 글이면 제목 줄을 없앤다, 떠 있으면 다시 놓는다)
 	//==============================================================================
 	/**
-	 * @param { string } title
+	 * @param { string } title 제목 글.
 	 */
 	setTitle(title) {
 		this.#titleLabel.setText(title);
@@ -174,7 +204,7 @@ export class UIConfirmWindow extends UIWindow {
 	// 묻는 글 설정. (떠 있으면 다시 놓는다)
 	//==============================================================================
 	/**
-	 * @param { string } message
+	 * @param { string } message 묻는 글. (판의 너비에서 줄을 바꾼다)
 	 */
 	setMessage(message) {
 		this.#messageLabel.setText(message);
@@ -185,8 +215,8 @@ export class UIConfirmWindow extends UIWindow {
 	// 단추 글 설정.
 	//==============================================================================
 	/**
-	 * @param { string } cancelText
-	 * @param { string } confirmText
+	 * @param { string } cancelText 취소 단추 글.
+	 * @param { string } confirmText 확인 단추 글.
 	 */
 	setButtonTexts(cancelText, confirmText) {
 		const cancelLabel = this.#cancelButtonNode.getComponent(UILabel);
@@ -199,7 +229,7 @@ export class UIConfirmWindow extends UIWindow {
 	// 오른쪽에서 왼쪽 언어인지 설정. (참이면 취소가 오른쪽, 확인이 왼쪽, 글은 오른쪽에서 왼쪽으로)
 	//==============================================================================
 	/**
-	 * @param { boolean } isRightToLeft
+	 * @param { boolean } isRightToLeft 참이면 오른쪽에서 왼쪽 언어.
 	 */
 	setRightToLeft(isRightToLeft) {
 		this.#isRightToLeft = isRightToLeft;
@@ -213,7 +243,7 @@ export class UIConfirmWindow extends UIWindow {
 	// 오른쪽에서 왼쪽 언어인지.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } 오른쪽에서 왼쪽 언어면 참.
 	 */
 	isRightToLeft() {
 		return this.#isRightToLeft;
@@ -281,7 +311,7 @@ export class UIConfirmWindow extends UIWindow {
 	// 제목 노드 반환.
 	//==============================================================================
 	/**
-	 * @returns { WorldNode }
+	 * @returns { WorldNode } 제목 노드. (UILabel 이 붙어 있다)
 	 */
 	getTitleNode() {
 		return this.#titleNode;
@@ -291,7 +321,7 @@ export class UIConfirmWindow extends UIWindow {
 	// 묻는 글 노드 반환.
 	//==============================================================================
 	/**
-	 * @returns { WorldNode }
+	 * @returns { WorldNode } 묻는 글 노드. (UILabel 이 붙어 있다)
 	 */
 	getMessageNode() {
 		return this.#messageNode;
@@ -301,7 +331,7 @@ export class UIConfirmWindow extends UIWindow {
 	// 묻는 글의 스크롤 칸 반환.
 	//==============================================================================
 	/**
-	 * @returns { UIScrollView }
+	 * @returns { UIScrollView } 묻는 글의 스크롤 칸. (세로로만 끈다)
 	 */
 	getMessageScrollView() {
 		return this.#messageScrollView;
@@ -311,7 +341,7 @@ export class UIConfirmWindow extends UIWindow {
 	// 취소 단추 노드 반환.
 	//==============================================================================
 	/**
-	 * @returns { WorldNode }
+	 * @returns { WorldNode } 취소 단추 노드. (Paint, UIButton, UILabel 이 붙어 있다)
 	 */
 	getCancelButtonNode() {
 		return this.#cancelButtonNode;
@@ -321,7 +351,7 @@ export class UIConfirmWindow extends UIWindow {
 	// 확인 단추 노드 반환.
 	//==============================================================================
 	/**
-	 * @returns { WorldNode }
+	 * @returns { WorldNode } 확인 단추 노드. (Paint, UIButton, UILabel 이 붙어 있다)
 	 */
 	getConfirmButtonNode() {
 		return this.#confirmButtonNode;
@@ -331,8 +361,8 @@ export class UIConfirmWindow extends UIWindow {
 	// 그 너비로 줄을 바꿨을 때 묻는 글의 세로.
 	//==============================================================================
 	/**
-	 * @param { number } textWidth
-	 * @returns { number }
+	 * @param { number } textWidth 줄을 바꿀 너비. (UI 층 단위, 글의 줄바꿈 너비로도 넣는다)
+	 * @returns { number } 묻는 글의 세로. (UI 층 단위, 올림)
 	 */
 	measureMessageHeight(textWidth) {
 		this.#messageLabel.setWordWrapWidth(textWidth);
@@ -346,8 +376,8 @@ export class UIConfirmWindow extends UIWindow {
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { number } panelWidth
-	 * @returns { number }
+	 * @param { number } panelWidth 판의 너비. (UI 층 단위)
+	 * @returns { number } 판의 세로. (UI 층 단위, 여백, 제목, 글 칸, 단추 줄을 더한 값)
 	 */
 	layoutContent(panelWidth) {
 		const innerWidth = System.Math.max(1, panelWidth - CONFIRM_PADDING * 2);
