@@ -14,10 +14,13 @@ import { TouchRecognizer } from "../ui/touchrecognizer.js";
 import { WorldNode } from "../core/node/worldnode.js";
 import { DEVTools } from "../misc/devtools.js";
 import { ImageAsset } from "../resource/imageasset.js";
+import { LoadingProgress } from "../misc/loadingprogress.js";
 
 //==============================================================================
 // 게임 공통 베이스 씬.
 // - 로딩 화면 (중앙 이미지 + 게이지 + 터치 단축).
+//   색은 setLoadingColors, 그림 전체는 setLoadingDrawer 로 바꾼다. 게이지는 기본으로 최소 노출 시간의 경과를 보이고,
+//   setLoadingProgress 나 trackAssetLoader 로 진행률을 알리면 그 진행률을 부드럽게 따라간다. (LoadingProgress)
 // - 개발자 도구 (DEVTools).
 // - 터치 입력 라우팅 (TouchRecognizer + DEVTools 캡처 시 무시).
 // - 세이프 에어리어 노드 + env(safe-area-inset-*) 계산.
@@ -45,6 +48,14 @@ export class GameScene extends Scene {
 	/** @private @type { boolean } */ #loadTouchedToSkip;
 	/** @private @type { Color } */ #sceneBackgroundColor;
 	/** @private @type { string } */ #viewScaleMode;
+	/** @private @type { ((graphic: Graphic, viewSize: Vector2, progress: number, elapsedSeconds: number) => void) | null } */ #loadingDrawer;
+	/** @private @type { Color | string } */ #loadingBackgroundColor;
+	/** @private @type { Color | string } */ #loadingBarBackColor;
+	/** @private @type { Color | string } */ #loadingBarFillColor;
+	/** @private @type { Color | string } */ #loadingOutsideColor; // 뷰 바깥(캔버스 나머지)의 색.
+	/** @private @type { LoadingProgress } */ #loadingProgress;
+	/** @private @type { boolean } */ #isLoadingProgressReported; // 진행률을 알린 적이 있는지. (없으면 게이지는 경과 시간)
+	/** @private @type { Array<object> } */ #trackedAssetLoaderList;
 
 	//==============================================================================
 	// 생성자.
@@ -58,6 +69,14 @@ export class GameScene extends Scene {
 		this.#loadTouchedToSkip = false;
 		this.#sceneBackgroundColor = Color.black();
 		this.#viewScaleMode = ViewScaleMode.none;
+		this.#loadingDrawer = null;
+		this.#loadingBackgroundColor = Color.black();
+		this.#loadingBarBackColor = "#333333";
+		this.#loadingBarFillColor = "#ffffff";
+		this.#loadingOutsideColor = Color.black();
+		this.#loadingProgress = new LoadingProgress();
+		this.#isLoadingProgressReported = false;
+		this.#trackedAssetLoaderList = [];
 	}
 
 	//==============================================================================
@@ -105,6 +124,98 @@ export class GameScene extends Scene {
 	 */
 	setLoadingMinDurationMs(milliseconds) {
 		this.#loadMinDurationMs = milliseconds;
+	}
+
+	//==============================================================================
+	// 로딩 화면 그리기 함수 설정. (null 이면 기본 그림: 가운데 로딩 이미지 + 아래 게이지)
+	// - 엔진이 캔버스를 바깥 색으로, 뷰를 바탕색으로 칠하고 뷰 좌표계를 건 뒤 drawer(graphic, viewSize, progress, elapsedSeconds) 를 부른다.
+	//   progress 는 보이는 진행률(0 ~ 1, 알린 것이 없으면 최소 노출 시간의 경과), elapsedSeconds 는 로딩을 시작한 뒤의 초다.
+	// - 그림과 글꼴을 받기 전에도 그려지므로 도형과 시스템 글꼴로 그린다.
+	//==============================================================================
+	/**
+	 * @param { ((graphic: Graphic, viewSize: Vector2, progress: number, elapsedSeconds: number) => void) | null } drawer
+	 */
+	setLoadingDrawer(drawer) {
+		this.#loadingDrawer = drawer === undefined ? null : drawer;
+	}
+
+	//==============================================================================
+	// 로딩 화면 그리기 함수 반환. (없으면 null)
+	//==============================================================================
+	/**
+	 * @returns { Function | null }
+	 */
+	getLoadingDrawer() {
+		return this.#loadingDrawer;
+	}
+
+	//==============================================================================
+	// 로딩 화면 색 설정. (Color 나 "#rrggbb" 같은 색 글, 기본은 검은 바탕, #333333 게이지 바탕, #ffffff 게이지)
+	// - outsideColor 는 뷰 바깥(캔버스 나머지)의 색이다. 주지 않으면 바탕색과 같다.
+	//==============================================================================
+	/**
+	 * @param { Color | string } backgroundColor
+	 * @param { Color | string } barBackColor
+	 * @param { Color | string } barFillColor
+	 * @param { Color | string } outsideColor
+	 */
+	setLoadingColors(backgroundColor, barBackColor, barFillColor, outsideColor = backgroundColor) {
+		this.#loadingBackgroundColor = backgroundColor;
+		this.#loadingBarBackColor = barBackColor;
+		this.#loadingBarFillColor = barFillColor;
+		this.#loadingOutsideColor = outsideColor;
+	}
+
+	//==============================================================================
+	// 로딩 진행률 알리기. (0 ~ 1, 줄어들지 않는다. 알린 뒤로 게이지가 경과 시간 대신 이 값을 따라간다)
+	//==============================================================================
+	/**
+	 * @param { number } progress
+	 */
+	setLoadingProgress(progress) {
+		this.#isLoadingProgressReported = true;
+		this.#loadingProgress.setProgress(progress);
+	}
+
+	//==============================================================================
+	// 로딩 진행률 반환. (알린 정도와 부드럽게 따라가는 보이는 정도)
+	//==============================================================================
+	/**
+	 * @returns { LoadingProgress }
+	 */
+	getLoadingProgress() {
+		return this.#loadingProgress;
+	}
+
+	//==============================================================================
+	// 애셋 함께 받기 맡기기. (로딩 화면이 프레임마다 맡긴 것들의 끝난 수 / 전체 수를 진행률로 알린다)
+	//==============================================================================
+	/**
+	 * @param { AssetLoader } assetLoader
+	 */
+	trackAssetLoader(assetLoader) {
+		if (this.#trackedAssetLoaderList.indexOf(assetLoader) < 0) {
+			this.#trackedAssetLoaderList.push(assetLoader);
+		}
+		this.#isLoadingProgressReported = true;
+	}
+
+	//==============================================================================
+	// 맡긴 애셋 함께 받기의 진행률을 알린다. (맡긴 것이 없으면 아무것도 하지 않는다)
+	//==============================================================================
+	updateTrackedAssetLoaderProgress() {
+		const trackedAssetLoaderList = this.#trackedAssetLoaderList;
+		if (trackedAssetLoaderList.length === 0) {
+			return;
+		}
+		let finishedCount = 0;
+		let totalCount = 0;
+		for (const assetLoader of trackedAssetLoaderList) {
+			finishedCount += assetLoader.getFinishedCount();
+			totalCount += assetLoader.getTotalCount();
+		}
+		const progress = totalCount === 0 ? 1 : finishedCount / totalCount;
+		this.#loadingProgress.setProgress(progress);
 	}
 
 	//==============================================================================
@@ -160,6 +271,9 @@ export class GameScene extends Scene {
 
 		try {
 			await this.loadAssets();
+			if (this.#isLoadingProgressReported) {
+				this.#loadingProgress.setProgress(1);
+			}
 			while (System.Date.now() - this.#loadStartTime < this.#loadMinDurationMs && !this.#loadTouchedToSkip) {
 				await new Promise((resolve) => System.setTimeout(resolve, 50));
 			}
@@ -188,7 +302,7 @@ export class GameScene extends Scene {
 
 	//==============================================================================
 	// 로딩 화면 출력. (엔진이 isLoaded() === false 인 동안 매 프레임 호출)
-	// - 검은 배경 + 중앙 로딩 이미지 + 하단 게이지.
+	// - 바깥 색 캔버스 + 바탕색 뷰 + (그리기 함수, 없으면 중앙 로딩 이미지 + 하단 게이지).
 	//==============================================================================
 	/**
 	 * @override
@@ -205,15 +319,34 @@ export class GameScene extends Scene {
 		const canvasNativeSize = viewManager.getCanvasNativeSize();
 		const viewSize = viewManager.getViewSize();
 
-		// 캔버스 전체 검은색.
+		// 진행률. (맡긴 애셋 함께 받기를 읽고, 보이는 정도를 따라가게 한다)
+		const timeManager = engine.getTimeManager();
+		const unscaledTimeDelta = timeManager.getUnscaleDeltaTime();
+		this.updateTrackedAssetLoaderProgress();
+		const loadingProgress = this.#loadingProgress;
+		loadingProgress.update(unscaledTimeDelta);
+		const elapsed = System.Date.now() - this.#loadStartTime;
+		let progress = System.Math.min(1, System.Math.max(0, elapsed / this.#loadMinDurationMs));
+		if (this.#isLoadingProgressReported) {
+			progress = loadingProgress.getShownProgress();
+		}
+
+		// 캔버스 전체 바깥 색. (기본 검은색)
 		viewManager.applyCanvasNativeRect(graphic);
-		graphic.setFillColor(Color.black());
+		graphic.setFillColor(this.#loadingOutsideColor);
 		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
 
 		// 뷰 좌표계 적용.
 		viewManager.applyViewRect(graphic);
-		graphic.setFillColor(Color.black());
+		graphic.setFillColor(this.#loadingBackgroundColor);
 		graphic.drawRect(Rect.create(0, 0, viewSize.x, viewSize.y));
+
+		// 그리기 함수.
+		const loadingDrawer = this.#loadingDrawer;
+		if (loadingDrawer !== null) {
+			loadingDrawer(graphic, viewSize, progress, elapsed / 1000);
+			return;
+		}
 
 		// 중앙 로딩 이미지 (가로 70%, 비율 유지).
 		const loadingImageAsset = this.#loadingImageAsset;
@@ -228,15 +361,13 @@ export class GameScene extends Scene {
 		}
 
 		// 하단 로딩 게이지.
-		const elapsed = System.Date.now() - this.#loadStartTime;
-		const progress = System.Math.min(1, System.Math.max(0, elapsed / this.#loadMinDurationMs));
 		const barWidth = viewSize.x * 0.6;
 		const barHeight = 24;
 		const barX = (viewSize.x - barWidth) * 0.5;
 		const barY = viewSize.y * 0.78;
-		graphic.setFillColor("#333333");
+		graphic.setFillColor(this.#loadingBarBackColor);
 		graphic.drawRect(Rect.create(barX, barY, barWidth, barHeight));
-		graphic.setFillColor("#ffffff");
+		graphic.setFillColor(this.#loadingBarFillColor);
 		graphic.drawRect(Rect.create(barX, barY, barWidth * progress, barHeight));
 	}
 

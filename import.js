@@ -201,3 +201,5 @@ export { UIToast } from "./src/ui/uitoast.js";
 export { ToastMotion, attachToastMotion, readToastSeconds } from "./src/ui/toastmotion.js";
 export { UIDialog } from "./src/ui/uidialog.js";
 export { FixedStepper } from "./src/misc/fixedstepper.js";
+export { AssetLoader } from "./src/resource/assetloader.js";
+export { LoadingProgress } from "./src/misc/loadingprogress.js";
