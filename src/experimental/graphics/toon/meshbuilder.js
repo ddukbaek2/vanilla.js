@@ -385,6 +385,53 @@ export function createOctahedronGeometry(radius) {
 	return geometry;
 }
 
+//==============================================================================
+// 각진 돌덩이. (이십면체의 꼭짓점 열둘을 저마다 늘이고 줄여, 면마다 꼭짓점을 따로 둔 깎은 돌)
+//==============================================================================
+/**
+ * @param { number } radius
+ * @param { Array<number> } vertexScales 꼭짓점 열둘의 반지름 배. (모자라면 처음부터 되풀이)
+ * @param { Array<number> } axisScale [x, y, z] 배.
+ * @returns { object } { positions, normals, indices }
+ */
+export function createFacetedChunkGeometry(radius, vertexScales, axisScale) {
+	const geometry = { positions: [], normals: [], indices: [] };
+	const golden = (1 + System.Math.sqrt(5)) / 2;
+	const baseCorners = [[-1, golden, 0], [1, golden, 0], [-1, -golden, 0], [1, -golden, 0], [0, -1, golden], [0, 1, golden], [0, -1, -golden], [0, 1, -golden], [golden, 0, -1], [golden, 0, 1], [-golden, 0, -1], [-golden, 0, 1]];
+	const faces = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
+	const scaleCount = vertexScales.length;
+	const corners = baseCorners.map((corner, cornerIndex) => {
+		const length = System.Math.hypot(corner[0], corner[1], corner[2]);
+		const vertexScale = scaleCount > 0 ? vertexScales[cornerIndex % scaleCount] : 1;
+		const scale = radius * vertexScale / length;
+		return [corner[0] * scale * axisScale[0], corner[1] * scale * axisScale[1], corner[2] * scale * axisScale[2]];
+	});
+	for (const face of faces) {
+		const first = corners[face[0]];
+		let second = corners[face[1]];
+		let third = corners[face[2]];
+		const edgeA = [second[0] - first[0], second[1] - first[1], second[2] - first[2]];
+		const edgeB = [third[0] - first[0], third[1] - first[1], third[2] - first[2]];
+		let normal = [edgeA[1] * edgeB[2] - edgeA[2] * edgeB[1], edgeA[2] * edgeB[0] - edgeA[0] * edgeB[2], edgeA[0] * edgeB[1] - edgeA[1] * edgeB[0]];
+		const centroid = [first[0] + second[0] + third[0], first[1] + second[1] + third[1], first[2] + second[2] + third[2]];
+		// 바깥을 보게 차례를 맞춘다.
+		if (normal[0] * centroid[0] + normal[1] * centroid[1] + normal[2] * centroid[2] < 0) {
+			const swapped = second;
+			second = third;
+			third = swapped;
+			normal = [-normal[0], -normal[1], -normal[2]];
+		}
+		const normalLength = System.Math.max(0.000001, System.Math.hypot(normal[0], normal[1], normal[2]));
+		const startIndex = geometry.positions.length / 3;
+		for (const corner of [first, second, third]) {
+			geometry.positions.push(corner[0], corner[1], corner[2]);
+			geometry.normals.push(normal[0] / normalLength, normal[1] / normalLength, normal[2] / normalLength);
+		}
+		geometry.indices.push(startIndex, startIndex + 1, startIndex + 2);
+	}
+	return geometry;
+}
+
 
 //==============================================================================
 // 모형 한 덩어리를 짓는 것.
@@ -983,5 +1030,92 @@ export class MeshBuilder {
 		const scaleY = System.Math.hypot(elements[4], elements[5], elements[6]);
 		const scaleZ = System.Math.hypot(elements[8], elements[9], elements[10]);
 		return System.Math.max(scaleX, scaleY, scaleZ);
+	}
+
+	//==============================================================================
+	// 지어 둔 배열 여럿을 옮겨 한 배열로 잇기. (움직이지 않는 조각을 한 메시로, 돌리거나 키우지 않음)
+	// - 조각마다 { arrays: readArrays 나 ToonGlb.readGlbArrays 의 결과, offset: [x, y, z] (없으면 옮기지 않음) }.
+	//   자리에 옮김을 더하고 번호에 앞 조각의 꼭짓점 수를 더한다. 바깥선 껍데기와 안쪽 범위(innerOutlineRanges, innerBodyRanges)도 같이 옮겨 잇는다.
+	// - 뼈대는 잇지 않는다. 뼈대가 있는 조각도 쉬는 자세 그대로 움직이지 않는 몸이 된다.
+	//==============================================================================
+	/**
+	 * @static
+	 * @param { Array<object> } pieces { arrays, offset }
+	 * @returns { object } readArrays 의 꼴.
+	 */
+	static combine(pieces) {
+		let vertexFloatCount = 0;
+		let indexCount = 0;
+		let outlineFloatCount = 0;
+		let outlineIndexCount = 0;
+		for (const piece of pieces) {
+			const arrays = piece.arrays;
+			vertexFloatCount += arrays.vertexData.length;
+			indexCount += arrays.indexData.length;
+			outlineFloatCount += arrays.outlineVertexData.length;
+			outlineIndexCount += arrays.outlineIndexData.length;
+		}
+		const vertexData = new System.Float32Array(vertexFloatCount);
+		const indexData = new System.Uint32Array(indexCount);
+		const outlineVertexData = new System.Float32Array(outlineFloatCount);
+		const outlineBaseData = new System.Float32Array(outlineFloatCount);
+		const outlineIndexData = new System.Uint32Array(outlineIndexCount);
+		const innerOutlineRanges = [];
+		const innerBodyRanges = [];
+		let vertexOffset = 0;
+		let indexOffset = 0;
+		let outlineOffset = 0;
+		let outlineIndexOffset = 0;
+		for (const piece of pieces) {
+			const arrays = piece.arrays;
+			const offset = piece.offset !== undefined && piece.offset !== null ? piece.offset : [0, 0, 0];
+			const startVertex = vertexOffset / VERTEX_FLOAT_COUNT;
+			vertexData.set(arrays.vertexData, vertexOffset);
+			for (let floatIndex = vertexOffset; floatIndex < vertexOffset + arrays.vertexData.length; floatIndex += VERTEX_FLOAT_COUNT) {
+				vertexData[floatIndex] += offset[0];
+				vertexData[floatIndex + 1] += offset[1];
+				vertexData[floatIndex + 2] += offset[2];
+			}
+			for (let index = 0; index < arrays.indexData.length; ++index) {
+				indexData[indexOffset + index] = arrays.indexData[index] + startVertex;
+			}
+			const startOutlineVertex = outlineOffset / 3;
+			const pieceOutlineBaseData = arrays.outlineBaseData !== undefined && arrays.outlineBaseData.length === arrays.outlineVertexData.length ? arrays.outlineBaseData : arrays.outlineVertexData;
+			outlineVertexData.set(arrays.outlineVertexData, outlineOffset);
+			outlineBaseData.set(pieceOutlineBaseData, outlineOffset);
+			for (let floatIndex = outlineOffset; floatIndex < outlineOffset + arrays.outlineVertexData.length; floatIndex += 3) {
+				for (let axis = 0; axis < 3; ++axis) {
+					outlineVertexData[floatIndex + axis] += offset[axis];
+					outlineBaseData[floatIndex + axis] += offset[axis];
+				}
+			}
+			for (let index = 0; index < arrays.outlineIndexData.length; ++index) {
+				outlineIndexData[outlineIndexOffset + index] = arrays.outlineIndexData[index] + startOutlineVertex;
+			}
+			const pieceInnerOutlineRanges = arrays.innerOutlineRanges !== undefined ? arrays.innerOutlineRanges : [];
+			for (const range of pieceInnerOutlineRanges) {
+				innerOutlineRanges.push({ start: range.start + outlineIndexOffset, count: range.count });
+			}
+			const pieceInnerBodyRanges = arrays.innerBodyRanges !== undefined ? arrays.innerBodyRanges : [];
+			for (const range of pieceInnerBodyRanges) {
+				innerBodyRanges.push({ start: range.start + indexOffset, count: range.count });
+			}
+			vertexOffset += arrays.vertexData.length;
+			indexOffset += arrays.indexData.length;
+			outlineOffset += arrays.outlineVertexData.length;
+			outlineIndexOffset += arrays.outlineIndexData.length;
+		}
+		return {
+			vertexData: vertexData,
+			indexData: indexData,
+			outlineVertexData: outlineVertexData,
+			outlineIndexData: outlineIndexData,
+			outlineBaseData: outlineBaseData,
+			skinData: new System.Float32Array(0),
+			outlineSkinData: new System.Float32Array(0),
+			skeleton: null,
+			innerOutlineRanges: innerOutlineRanges,
+			innerBodyRanges: innerBodyRanges,
+		};
 	}
 }
