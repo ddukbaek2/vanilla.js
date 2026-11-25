@@ -311,6 +311,54 @@ export class Color extends Object {
 	}
 
 	//==============================================================================
+	// 0 ~ 255 정수 성분으로 생성.
+	//==============================================================================
+	/**
+	 * @param { number } red
+	 * @param { number } green
+	 * @param { number } blue
+	 * @param { number } alpha
+	 * @returns { Color }
+	 */
+	static createFromBytes(red, green, blue, alpha) {
+		const color = new Color(red / 255, green / 255, blue / 255, alpha / 255);
+		return color;
+	}
+
+	//==============================================================================
+	// 알파만 바꾼 색. (새 색을 돌려주고 이 색은 그대로 둔다)
+	//==============================================================================
+	/**
+	 * @param { number } alpha
+	 * @returns { Color }
+	 */
+	withAlpha(alpha) {
+		const red = this.red;
+		const green = this.green;
+		const blue = this.blue;
+		const color = new Color(red, green, blue, alpha);
+		return color;
+	}
+
+	//==============================================================================
+	// 선형 보간. (정적, 성분마다)
+	//==============================================================================
+	/**
+	 * @param { Color } from
+	 * @param { Color } to
+	 * @param { number } time
+	 * @returns { Color }
+	 */
+	static lerp(from, to, time) {
+		const red = Math.lerp(from.red, to.red, time);
+		const green = Math.lerp(from.green, to.green, time);
+		const blue = Math.lerp(from.blue, to.blue, time);
+		const alpha = Math.lerp(from.alpha, to.alpha, time);
+		const color = new Color(red, green, blue, alpha);
+		return color;
+	}
+
+	//==============================================================================
 	// 랜덤 색상 생성. (알파값은 1)
 	//==============================================================================
 	/**

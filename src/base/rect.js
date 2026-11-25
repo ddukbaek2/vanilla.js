@@ -243,6 +243,21 @@ export class Rect extends Object {
 	}
 
 	//==============================================================================
+	// 다른 사각형과 겹치는지. (변이 닿기만 한 것은 겹친 것이 아니다, overlaps 는 닿기만 해도 겹친 것으로 본다)
+	//==============================================================================
+	/**
+	 * @param { Rect } other
+	 * @returns { boolean }
+	 */
+	intersects(other) {
+		const rightX = this.position.x + this.size.x;
+		const bottomY = this.position.y + this.size.y;
+		const otherRightX = other.position.x + other.size.x;
+		const otherBottomY = other.position.y + other.size.y;
+		return this.position.x < otherRightX && rightX > other.position.x && this.position.y < otherBottomY && bottomY > other.position.y;
+	}
+
+	//==============================================================================
 	// 교집합 (두 사각형이 겹치는 영역 반환).
 	//==============================================================================
 	/**

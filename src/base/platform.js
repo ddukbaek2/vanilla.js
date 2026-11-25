@@ -116,6 +116,21 @@ export class Platform extends Object {
 		// }
 
 		const userAgent = System.navigator.userAgent;
+		this.applyUserAgent(userAgent);
+
+		return {
+			platformName: this.platformName,
+			browserName: this.browserName,
+		};
+	}
+
+	//==============================================================================
+	// user agent 글로 플랫폼, 브라우저, 모바일 여부 고르기. (getPlatformInfo 가 브라우저의 글로 부른다)
+	//==============================================================================
+	/**
+	 * @param { string } userAgent
+	 */
+	applyUserAgent(userAgent) {
 		this.isMobile = /Mobi|Android|iPhone|iPad/i.test(userAgent);
 
 		// 플랫폼 감지.
@@ -135,11 +150,6 @@ export class Platform extends Object {
 		else if (/Firefox/i.test(userAgent)) this.browserName = BrowserType.firefox;
 		else if (/MSIE|Trident/i.test(userAgent)) this.browserName = BrowserType.internetExplorer;
 		else this.browserName = BrowserType.unknown;
-
-		return {
-			platformName: this.platformName,
-			browserName: this.browserName,
-		};
 	}
 
 	//==============================================================================

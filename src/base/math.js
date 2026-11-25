@@ -388,3 +388,14 @@ export function moveTowards(currentValue, targetValue, maxDelta) {
 	}
 	return currentValue + (difference > 0 ? maxDelta : -maxDelta);
 }
+
+//==============================================================================
+// 이징: 바깥으로 감속하는 2차 곡선. (0 이면 0, 1 이면 1)
+//==============================================================================
+/**
+ * @param { number } time
+ * @returns { number }
+ */
+export function easeOutQuad(time) {
+	return 1 - (1 - time) * (1 - time);
+}

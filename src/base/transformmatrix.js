@@ -242,6 +242,29 @@ export class TransformMatrix extends Object {
 	}
 
 	//==============================================================================
+	// 역행렬. (새 행렬을 돌려주고 이 행렬은 그대로 둔다, 행렬식이 0 이면 null)
+	//==============================================================================
+	/**
+	 * @returns { TransformMatrix | null }
+	 */
+	invert() {
+		const determinant = this.#a * this.#d - this.#b * this.#c;
+		if (determinant === 0) {
+			return null;
+		}
+		const inverseDeterminant = 1 / determinant;
+		const inverseMatrix = new TransformMatrix();
+		const a = this.#d * inverseDeterminant;
+		const b = -this.#b * inverseDeterminant;
+		const c = -this.#c * inverseDeterminant;
+		const d = this.#a * inverseDeterminant;
+		const e = (this.#c * this.#f - this.#d * this.#e) * inverseDeterminant;
+		const f = (this.#b * this.#e - this.#a * this.#f) * inverseDeterminant;
+		inverseMatrix.setTransform(a, b, c, d, e, f);
+		return inverseMatrix;
+	}
+
+	//==============================================================================
 	// 점 변환.
 	//==============================================================================
 	/**
