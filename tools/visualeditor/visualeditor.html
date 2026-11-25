@@ -27476,8 +27476,14 @@ void main() {
     // 알파로 어둡게 덮고 빨간 채널의 금에서 열기가 식는다.
     glow: 1,
     // 칸의 알파만큼 더하는 빛.
-    ring: 2
+    ring: 2,
     // 둘레로 흐르는 잡음 테. (ring 이 (테 반지름, 테 너비, 잡음 잘기, 흐르는 빠르기) 의 반지름 몫)
+    stain: 3,
+    // 칸의 알파만큼 tint 색으로 덮고, 칸의 가운데 짙기(테 둘레)는 테 색(setRimColor) 쪽으로 물든다. (밝은 바닥의 얼룩, 서리)
+    sheen: 4,
+    // 칸의 알파 몸을 tint 로 덮고 몸 가장자리에 흰 윤을 두른다. (기름 윤)
+    shade: 5
+    // 가운데에서 바깥으로 둥글게 엷어지는 그늘. (알파만큼 어둡게 덮음, 칸은 보지 않음, 발밑 그늘 queueBlobShadow)
   });
   var DEFAULT_RIM_COLOR = System55.Object.freeze([0.05, 0.05, 0.08]);
   var PARTICLE_ATTRIBUTE_LOCATIONS = System55.Object.freeze({
@@ -27545,6 +27551,7 @@ in vec4 lookValue;
 in vec4 extraValue;
 in float rimValue;
 uniform vec3 rimColor;
+uniform float lookGains[7];
 out vec4 fragmentColor;
 ${ATLAS_SHADER_CHUNK}
 vec4 shadeRimmed(vec3 color, float shapeAlpha, float fade, float brightness) {
@@ -27570,7 +27577,7 @@ void main() {
 	}
 	float fadeIn = extraValue.w > 0.0 ? clamp(progress / extraValue.w, 0.0, 1.0) : 1.0;
 	float alpha = extraValue.y * fadeIn;
-	float brightness = extraValue.x;
+	float brightness = extraValue.x * lookGains[int(clamp(look, 0.0, 6.0) + 0.5)];
 	if (look < 0.5) {
 		fragmentColor = shadeRimmed(color, readSlot(0.0, cornerCoordinate).a, alpha * (1.0 - progress), brightness);
 	}
@@ -27632,6 +27639,8 @@ uniform float ballHeat;
 uniform float ballAlpha;
 uniform float ballRamp;
 uniform vec3 smokeColor;
+uniform float ballRim;
+uniform vec3 rimColor;
 out vec4 fragmentColor;
 ${NOISE_SHADER_CHUNK}
 ${ATLAS_SHADER_CHUNK}
@@ -27650,6 +27659,13 @@ void main() {
 	vec3 emitted = fireColor * hot * (0.8 + temperature * 0.9);
 	float smoke = (1.0 - hot) * cover * 0.8;
 	fragmentColor = vec4(emitted * cover + smokeColor * smoke * (0.6 + detail * 0.4), smoke);
+	if (ballRim > 0.0) {
+		float fireCover = hot * cover * 0.9;
+		float rimDark = 1.0 - smoothstep(0.06, 0.38, facing);
+		vec3 fireBody = mix(min(fireColor * (0.85 + temperature * 0.4), vec3(1.0)), rimColor, rimDark * 0.85);
+		vec4 covered = vec4(fireBody * fireCover + emitted * cover * 0.3 + smokeColor * smoke * (0.6 + detail * 0.4), max(fireCover, smoke));
+		fragmentColor = mix(fragmentColor, covered, min(ballRim, 1.0));
+	}
 }
 `;
   var BAND_FRAGMENT_SHADER = `#version 300 es
@@ -27662,6 +27678,8 @@ uniform vec3 bandColor;
 uniform float bandAlpha;
 uniform float bandFlat;
 uniform float bandSeed;
+uniform float bandRim;
+uniform vec3 rimColor;
 out vec4 fragmentColor;
 ${NOISE_SHADER_CHUNK}
 ${ATLAS_SHADER_CHUNK}
@@ -27680,6 +27698,11 @@ void main() {
 	float rampPosition = clamp(0.12 + bandProgress * 0.65 + (1.0 - strength) * 0.3, 0.0, 0.95);
 	vec3 color = bandColor * readRamp(bandRamp, rampPosition);
 	fragmentColor = vec4(color * alpha * 1.5, alpha * 0.12);
+	if (bandRim > 0.0) {
+		float core = smoothstep(0.35, 0.8, strength);
+		vec3 covered = mix(rimColor, min(color * 1.2, vec3(1.0)), core);
+		fragmentColor = mix(fragmentColor, vec4(covered * alpha * 0.85 + color * core * alpha * 0.4, alpha * 0.85), min(bandRim, 1.0));
+	}
 }
 `;
   var DECAL_FRAGMENT_SHADER = `#version 300 es
@@ -27694,6 +27717,7 @@ uniform float decalMode;
 uniform vec4 decalRing;
 uniform float decalTime;
 uniform float decalSeed;
+uniform vec3 rimColor;
 out vec4 fragmentColor;
 ${NOISE_SHADER_CHUNK}
 ${ATLAS_SHADER_CHUNK}
@@ -27709,7 +27733,7 @@ void main() {
 		float alpha = texel.a * decalAlpha;
 		fragmentColor = vec4(decalTint * readRamp(decalRamp, 1.0 - decalHeat) * alpha, 0.0);
 	}
-	else {
+	else if (decalMode < 2.5) {
 		vec2 centered = decalCoordinate * 2.0 - 1.0;
 		float distance = length(centered);
 		float offset = (distance - decalRing.x) / decalRing.y;
@@ -27723,6 +27747,25 @@ void main() {
 		float strength = clamp(0.2 + (flow * 0.7 + drift * 0.5 - 0.35) * 1.6, 0.0, 1.4);
 		float alpha = ring * strength * decalAlpha;
 		fragmentColor = vec4(decalTint * readRamp(decalRamp, 1.0 - decalHeat) * alpha, 0.0);
+	}
+	else if (decalMode < 3.5) {
+		vec4 texel = readSlot(decalSlot, decalCoordinate);
+		float alpha = texel.a * decalAlpha;
+		float edge = smoothstep(0.15, 0.55, texel.a) * (1.0 - smoothstep(0.55, 0.95, texel.a));
+		vec3 color = mix(decalTint, rimColor, edge * 0.35);
+		fragmentColor = vec4(color * alpha, alpha);
+	}
+	else if (decalMode < 4.5) {
+		vec4 texel = readSlot(decalSlot, decalCoordinate);
+		float body = smoothstep(0.1, 0.28, texel.a) * decalAlpha;
+		float sheen = (smoothstep(0.1, 0.15, texel.a) - smoothstep(0.17, 0.24, texel.a)) * 0.85;
+		vec3 color = mix(decalTint, vec3(1.0), sheen);
+		float alpha = max(body, sheen * decalAlpha);
+		fragmentColor = vec4(color * alpha, alpha);
+	}
+	else {
+		float alpha = decalAlpha * (1.0 - smoothstep(0.25, 1.0, length(decalCoordinate * 2.0 - 1.0)));
+		fragmentColor = vec4(0.0, 0.0, 0.0, alpha);
 	}
 }
 `;
@@ -27894,6 +27937,13 @@ void main() {
 	}
 	float alpha = body * (0.45 + 0.75 * grain) * ribbonLook.y;
 	fragmentColor = vec4(color * alpha * ribbonLook.z, 0.0);
+	if (ribbonGrain.y > 0.0) {
+		float coverBody = exp(-across * across * 7.0);
+		float core = exp(-across * across * 50.0);
+		float cover = clamp(coverBody * (0.55 + 0.6 * grain) * ribbonLook.y, 0.0, 1.0);
+		vec3 covered = mix(rimColor, min(color * ribbonLook.z, vec3(1.0)), smoothstep(0.15, 0.6, core));
+		fragmentColor = mix(fragmentColor, vec4(covered * cover + color * core * cover * 0.35 * ribbonLook.z, cover), min(ribbonGrain.y, 1.0));
+	}
 }
 `;
 

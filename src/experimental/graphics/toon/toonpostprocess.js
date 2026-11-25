@@ -356,8 +356,9 @@ export class ToonPostProcess {
 		const litArea = this.#litArea;
 		const depthTexture = sceneRenderTarget.getDepthTexture();
 		const isLitAreaApplied = litArea !== null && depthTexture !== null;
+		// 깊이 칸. (밝힌 자리를 쓰지 않으면 읽지 않지만 빈 칸이면 드라이버가 알리므로 씬 텍스처를 묶어 둔다)
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE2);
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, isLitAreaApplied ? depthTexture : null);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, isLitAreaApplied ? depthTexture : sceneTexture);
 		webGL2RenderingContext.uniform1i(compositePass.getUniformLocation("depthTexture"), 2);
 		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("bloomStrength"), isBloomEnabled ? this.#bloomStrength : 0);
 		webGL2RenderingContext.uniform1f(compositePass.getUniformLocation("exposure"), this.#exposure);
