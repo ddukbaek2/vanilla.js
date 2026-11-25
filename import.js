@@ -203,3 +203,4 @@ export { UIDialog } from "./src/ui/uidialog.js";
 export { FixedStepper } from "./src/misc/fixedstepper.js";
 export { AssetLoader } from "./src/resource/assetloader.js";
 export { LoadingProgress } from "./src/misc/loadingprogress.js";
+export { BuildInfo } from "./src/misc/buildinfo.js";
