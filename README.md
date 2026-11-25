@@ -70,7 +70,7 @@ esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify
 | 효과 | `ParticleSystem`(방출 모양, 렌더 모양, 버스트, 수명 곡선, 끌개, 월드 공간), `TrailRenderer`, `ShaderSprite` 49 종, `ScreenEffect` 58 종, `HeatHazeEffect`, `Shaker`, `FloatingText` |
 | 애니메이션 | `Timeline` 런타임(트랙 보간, 이징 31 종 + 베지어, 이벤트 / 마커 / 사운드 / 파티클), `Animator` 상태 기계, `Tween`(노드 속성 트윈 포함), `SpriteAnimator` |
 | 3D (실험) | `SkinnedModel`(glTF / GLB / FBX, 스키닝, 모프 타깃), `SkinnedModelRenderer`, `HumanSkinRenderer`, `ShadowMap`, `BloomEffect`, `MultiLevelBloomEffect`, `AmbientOcclusionEffect`, `SubsurfaceScatteringEffect`, `Camera3D`, `Material` / `RenderTarget`(멀티샘플) / `FullscreenPass` |
-| 툰 3D (실험) | `ToonRenderer`(셀 셰이딩, 껍데기 바깥선, 인스턴싱, 그림자, `ToonLightSet` 빛 묶음과 점광, `ToonMaterial` 셰이더 조각, 인스턴스 꼴과 영구 인스턴스 버퍼), `ToonMesh` / `ToonGlb`, `ToonDrawQueue`(그리기 단계 콜백), `ToonScreenOutline`, `ToonVfx`, `ToonPostProcess`(MSAA, 다단 블룸, 색 보정), `ToonView3D` |
+| 툰 3D (실험) | `ToonRenderer`(셀 셰이딩, 껍데기 바깥선, 인스턴싱, 그림자, `ToonLightSet` 빛 묶음과 점광, `ToonMaterial` 셰이더 조각, 인스턴스 꼴과 영구 인스턴스 버퍼), `ToonMesh` / `ToonGlb`, `ToonDrawQueue`(그리기 단계 콜백, 화면 공간 바깥선 맡기기), `ToonScreenOutline`(바로 이웃 경계에서 잡고 점프 플러딩으로 넓히는 화면 공간 바깥선, 실루엣과 꺾임 선 굵기 따로, 모형마다 끄고 켜기), `ToonVfx`, `ToonPostProcess`(MSAA, 다단 블룸, 색 보정), `ToonView3D` |
 | 게임 보조 | `FiniteStateMachine`, `PathFinder`, `Grid`, `Collision2D`, `Steering2D`, `PlatformerBody`, `ObjectPool`, `SeededRandom`, `FixedStepper`, `Localization`, `LanguagePack`, `UIFont`, `DynamicFont`, `Format`, `PersistedStore`, `LocalStorage`, `DialogueRunner`, `Typewriter`, `CameraGestures`, `FrameProbe`, `GraphicsQualityGovernor`, `BuildInfo` |
 | 애셋 | `ImageAsset`, `TextAsset`, `JsonAsset`, `BlobAsset`, `FontAsset`, `AudioAsset`, `AssetLoader`(함께 받기, 진행률, 실패 목록), `LoadingProgress`, `SpriteAtlas` |
 | 오디오 | `AudioPlayer`, `AudioBus`, `SoundSystem`(소리 표, 배경음악, 효과음 버스, 음소거 규칙), `SoundEffectPool`, `BeepPlayer` |
@@ -114,7 +114,7 @@ esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify
 | Timeline Showcase | 타임라인 편집기로 만든 문서 8 종 재생. 트랜스포트, 스크럽, 마커 / 이벤트 | [열기](https://ddukbaek2.com/portfolio/timelineshowcase/) | [`examples/timelineshowcase`](examples/timelineshowcase) |
 | Sprite Effects | `ShaderSprite` 49 종, `ScreenEffect` 58 종, 게임 연출 조합 시연 | [열기](https://ddukbaek2.com/portfolio/spriteeffects/) | [`examples/spriteeffects`](examples/spriteeffects) |
 
-배포본이 없는 예제: [`examples/cameratour`](examples/cameratour)(돌아가는 `Camera2D`, 노드 트윈, `Indicator`), [`examples/toonmaterial`](examples/toonmaterial)(툰 확장 시험 장면: 머티리얼 셰이더 조각, 텍스처와 데칼, 점광, 반 램버트 띠, 더하기 홀로그램, 평면 거울, 영구 인스턴스 버퍼)
+배포본이 없는 예제: [`examples/cameratour`](examples/cameratour)(돌아가는 `Camera2D`, 노드 트윈, `Indicator`), [`examples/toonmaterial`](examples/toonmaterial)(툰 확장 시험 장면: 머티리얼 셰이더 조각, 텍스처와 데칼, 점광, 반 램버트 띠, 더하기 홀로그램, 평면 거울, 영구 인스턴스 버퍼), [`examples/toonstyle`](examples/toonstyle)(툰 셰이딩과 바깥선 견주기 장면, 러스트 예제 toonstyle 과 같은 장면)
 
 ## 게임
 

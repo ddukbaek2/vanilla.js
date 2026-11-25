@@ -3,28 +3,62 @@
 //==============================================================================
 const System = globalThis;
 import { ShaderProgram } from "../../../core/graphic/shaderprogram.js";
-import { TOON_ATTRIBUTE_LOCATIONS, TOON_MAXIMUM_JOINTS, TOON_INSTANCE_FLOAT_COUNT, extractFrustumPlanes } from "./toonrenderer.js";
+import { TOON_ATTRIBUTE_LOCATIONS, TOON_MAXIMUM_JOINTS, TOON_INSTANCE_FLOAT_COUNT, extractFrustumPlanes, readMatrixDeterminant } from "./toonrenderer.js";
+
+
+/**
+ * @example <caption>툰 화면 공간 바깥선을 한 프레임에 긋기</caption>
+ * import { ToonRenderer, ToonScreenOutline, ToonOutlineWidthUnit, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+ * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+ * const renderer = new ToonRenderer(webGL2RenderingContext);
+ * const outline = new ToonScreenOutline(webGL2RenderingContext);
+ * outline.setWidth(2, ToonOutlineWidthUnit.pixel);
+ * outline.setCrease(50, 1, 0.8);
+ * const builder = new ToonMesh.MeshBuilder();
+ * builder.addPart(ToonMesh.createBoxGeometry(1, 1, 1), Matrix4.createIdentity(), "#e0c8a8", { hasOutline: false });
+ * const mesh = renderer.createMesh(builder.readArrays());
+ * const viewMatrix = Matrix4.createLookAt(Vector3.create(2, 2, 3), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
+ * const projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);
+ * const modelMatrix = Matrix4.createIdentity();
+ * if (outline.beginLineIds(viewMatrix, projectionMatrix)) {
+ * 	outline.drawMesh(mesh, modelMatrix, 1);
+ * 	outline.endLineIds();
+ * }
+ * renderer.beginFrameWithMatrices(viewMatrix, projectionMatrix);
+ * renderer.drawMesh(mesh, modelMatrix);
+ * renderer.endFrame();
+ * outline.drawOutline();
+ */
 
 
 //==============================================================================
 // 전역 상수 목록.
 //==============================================================================
-// 굵기의 단위.
+/**
+ * 굵기의 단위.
+ * - world: 월드 길이. (직교는 투영의 세로 배율로, 원근은 초점 거리에서 화면 픽셀로 셈해 멀수록 가늘어진다)
+ * - pixel: 그리는 영역의 픽셀. (거리와 상관없이 같은 굵기)
+ * @example <caption>월드 길이로 굵기 주기</caption>
+ * import { ToonScreenOutline, ToonOutlineWidthUnit } from "./vanilla.js";
+ * const outline = new ToonScreenOutline(document.createElement("canvas").getContext("webgl2"));
+ * outline.setWidth(0.02, ToonOutlineWidthUnit.world);
+ * outline.setFocusDistance(6);
+ */
 export const ToonOutlineWidthUnit = System.Object.freeze({
-	world: "world", // 월드 길이. (직교는 투영의 세로 배율로, 원근은 초점 거리에서 화면 픽셀로 셈)
-	pixel: "pixel", // 그리는 버퍼의 픽셀.
+	world: "world",
+	pixel: "pixel",
 });
 
-// 볼 이웃의 수 상한. (OFFSETS 를 가까운 차례로, 3 픽셀 안)
-export const TOON_SCREEN_OUTLINE_MAXIMUM_SAMPLES = 28;
+// 선 번호의 상한. (선의 판에 14 비트로 쓴다, 0 은 빈 곳)
+export const TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID = 16383;
 
-// 꺾임 선을 볼 곧은 쪽의 수 상한.
-export const TOON_SCREEN_OUTLINE_MAXIMUM_CREASE_SAMPLES = 4;
+// 씨앗 판에서 씨앗이 없다는 값. (부호 없는 16 비트의 끝)
+const NO_SEED = 65535;
 
 // 인스턴스 그리기의 modelMatrix 자리. (단위 행렬)
 const IDENTITY_ELEMENTS = new System.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 
-// 선의 판과 가면을 묶는 텍스처 유닛. (툰 렌더러의 그림자 유닛 3 과 겹치지 않게)
+// 선의 판과 씨앗 판을 묶는 텍스처 유닛. (툰 렌더러의 그림자 유닛 3 과 겹치지 않게)
 const LINE_TEXTURE_UNIT = 5;
 const DEPTH_TEXTURE_UNIT = 6;
 
@@ -62,11 +96,12 @@ void main() {
 	gl_Position = viewProjectionMatrix * objectMatrix * skinMatrix * vec4(vertexPosition, 1.0);
 }
 `;
-// 노멀은 팔면체로 접어 rg, 번호는 낮은 자리 b 와 높은 자리 a. (번호 0 은 빈 곳, 65535 까지)
+// 노멀은 팔면체로 접어 rg, 번호는 낮은 8 비트를 b, 높은 6 비트와 꼴 2 비트(꺾임 선 64, 바깥 선 128)를 a 에 쓴다.
 const LINE_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 in vec3 worldNormal;
 flat in float surfaceLineId;
+uniform float lineFlags;
 out vec4 fragmentLine;
 vec2 wrapOctahedron(vec2 value) {
 	return (1.0 - abs(value.yx)) * vec2(value.x >= 0.0 ? 1.0 : -1.0, value.y >= 0.0 ? 1.0 : -1.0);
@@ -76,8 +111,8 @@ void main() {
 	normal /= abs(normal.x) + abs(normal.y) + abs(normal.z);
 	vec2 folded = normal.y >= 0.0 ? normal.xz : wrapOctahedron(normal.xz);
 	float lowPart = mod(surfaceLineId, 256.0);
-	float highPart = floor(surfaceLineId / 256.0);
-	fragmentLine = vec4(folded * 0.5 + 0.5, lowPart / 255.0, highPart / 255.0);
+	float highPart = mod(floor(surfaceLineId / 256.0), 64.0);
+	fragmentLine = vec4(folded * 0.5 + 0.5, lowPart / 255.0, (highPart + lineFlags * 64.0) / 255.0);
 }
 `;
 // 화면을 덮는 세모 하나.
@@ -87,142 +122,212 @@ void main() {
 	gl_Position = vec4(TRIANGLE_POINTS[gl_VertexID], 0.0, 1.0);
 }
 `;
-// 선의 판을 같은 크기로 한 번 훑어 선의 진하기를 가면에 쓰는 셰이더.
-// - 바깥 선: 가장 가까운 선 낼 이웃(실루엣 앞, 다른 번호와 맞닿은 먼 쪽)까지의 거리로 굵기만큼 덮고 가장자리는 덮인 몫만큼 엷게, 처음 걸리면 그친다.
-// - 몸의 맨 바깥 화소에도 반쯤 깐다. (MSAA 로 바탕과 섞인 가장자리가 선과 몸 사이에 비치지 않게)
-// - 꺾임 선: 같은 번호 안에서 면이 creaseCosine 보다 더 꺾이면 creaseStrength 씩, creaseExtent 가 0 보다 크면 그만큼 더 간 점도 꺾인 면이어야 센다.
-// - 깊이: 원근이면 가까운 면과 먼 면으로 풀어 거리로, 직교면 깊이 차에 depthRange 의 폭을 곱한다.
-const LINE_MASK_FRAGMENT_SHADER = `#version 300 es
+// 씨앗을 고르는 셰이더. (화소와 바로 이웃 넷 사이의 경계마다 선인지 보고, 선이면 그 경계의 가운데를 씨앗으로 쓴다)
+// - 씨앗은 반 화소 단위 자리다. (x 가 홀수면 가로 이웃 사이의 세로 경계, y 가 홀수면 세로 이웃 사이의 가로 경계) rg 는 바깥 선, ba 는 꺾임 선.
+// - 같은 경계를 양쪽 화소가 함께 씨앗으로 들어도 선은 경계 한가운데 하나다. (선을 화소가 아니라 화소 사이에 둔다)
+// - 바깥 선: 한쪽이 빈 곳, 번호가 다름, 같은 번호라도 서로의 접평면에서 깊이 문턱보다 떨어짐. (가린 쪽의 꼴을 따르고, 맞닿은 두 번호는 한쪽만 켜져 있어도 긋는다)
+// - 꺾임 선: 같은 번호이고 떨어지지 않았는데 두 노멀이 꺾임 각보다 더 벌어짐. (비스듬한 면과 둥근 면은 접평면 안이라 바깥 선으로 잡히지 않는다)
+const SEED_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
+precision highp int;
 uniform highp sampler2D lineTexture;
 uniform highp sampler2D depthTexture;
-uniform float outlineRadius;
-uniform float creaseRadius;
-uniform float creaseStrength;
-uniform float creaseCosine;
-uniform float creaseExtent;
-uniform float depthThreshold;
-uniform float contactTolerance;
+uniform mat3 viewRotation;
+uniform vec4 projectionScale;
+uniform vec4 projectionDepth;
 uniform float isPerspective;
-uniform vec2 depthRange;
-uniform int sampleCount;
-uniform int creaseCount;
-uniform vec3 viewDirection;
-out vec4 fragmentMask;
-const float FACING_MINIMUM = 0.25;
-const float INNER_STRENGTH = 0.5;
-const vec2 DIRECTIONS[4] = vec2[4](vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0));
-const ivec2 OFFSETS[28] = ivec2[28](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1), ivec2(1, 1), ivec2(-1, 1), ivec2(1, -1), ivec2(-1, -1), ivec2(2, 0), ivec2(-2, 0), ivec2(0, 2), ivec2(0, -2), ivec2(2, 1), ivec2(-2, 1), ivec2(2, -1), ivec2(-2, -1), ivec2(1, 2), ivec2(-1, 2), ivec2(1, -2), ivec2(-1, -2), ivec2(2, 2), ivec2(-2, 2), ivec2(2, -2), ivec2(-2, -2), ivec2(3, 0), ivec2(-3, 0), ivec2(0, 3), ivec2(0, -3));
-const float OFFSET_DISTANCES[28] = float[28](1.0000, 1.0000, 1.0000, 1.0000, 1.4142, 1.4142, 1.4142, 1.4142, 2.0000, 2.0000, 2.0000, 2.0000, 2.2361, 2.2361, 2.2361, 2.2361, 2.2361, 2.2361, 2.2361, 2.2361, 2.8284, 2.8284, 2.8284, 2.8284, 3.0000, 3.0000, 3.0000, 3.0000);
-float readLineId(vec4 value) {
-	return floor(value.b * 255.0 + 0.5) + floor(value.a * 255.0 + 0.5) * 256.0;
-}
-vec3 readNormal(vec4 value) {
-	vec2 folded = value.rg * 2.0 - 1.0;
+uniform float depthThreshold;
+uniform float creaseCosine;
+out uvec4 fragmentSeed;
+const uint NO_SEED = 65535u;
+const ivec2 SIDES[4] = ivec2[4](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1));
+struct LinePixel {
+	float id;
+	float flags;
+	vec3 normal;
+	vec3 position;
+	float footprint;
+};
+vec3 readNormal(vec2 encoded) {
+	vec2 folded = encoded * 2.0 - 1.0;
 	vec3 normal = vec3(folded.x, 1.0 - abs(folded.x) - abs(folded.y), folded.y);
 	float fold = max(-normal.y, 0.0);
 	normal.x += normal.x >= 0.0 ? -fold : fold;
 	normal.z += normal.z >= 0.0 ? -fold : fold;
 	return normalize(normal);
 }
-float readDistance(ivec2 pixel) {
-	float depth = texelFetch(depthTexture, pixel, 0).r;
-	if (isPerspective < 0.5) {
-		return depth * (depthRange.y - depthRange.x);
+LinePixel readPixel(ivec2 pixel, vec2 size) {
+	vec4 value = texelFetch(lineTexture, pixel, 0);
+	float highPart = floor(value.a * 255.0 + 0.5);
+	LinePixel result;
+	result.id = floor(value.b * 255.0 + 0.5) + mod(highPart, 64.0) * 256.0;
+	result.flags = floor(highPart / 64.0);
+	result.normal = normalize(viewRotation * readNormal(value.rg));
+	float clipDepth = texelFetch(depthTexture, pixel, 0).r * 2.0 - 1.0;
+	vec2 clipPoint = (vec2(pixel) + 0.5) / size * 2.0 - 1.0;
+	if (isPerspective > 0.5) {
+		float viewZ = -projectionDepth.y / (clipDepth + projectionDepth.x);
+		result.position = vec3(-viewZ * (clipPoint.x + projectionScale.z) / projectionScale.x, -viewZ * (clipPoint.y + projectionScale.w) / projectionScale.y, viewZ);
+		result.footprint = -viewZ * 2.0 / (projectionScale.y * size.y);
 	}
-	float clipDepth = depth * 2.0 - 1.0;
-	return 2.0 * depthRange.x * depthRange.y / (depthRange.y + depthRange.x - clipDepth * (depthRange.y - depthRange.x));
+	else {
+		float viewZ = (clipDepth - projectionDepth.y) / projectionDepth.x;
+		result.position = vec3((clipPoint.x - projectionDepth.z) / projectionScale.x, (clipPoint.y - projectionDepth.w) / projectionScale.y, viewZ);
+		result.footprint = 2.0 / (projectionScale.y * size.y);
+	}
+	return result;
 }
-bool readOutlineHit(vec4 sampleValue, float sampleDistance, float centerId, float centerDistance, float threshold) {
-	float id = readLineId(sampleValue);
-	if (id < 0.5) {
-		return false;
-	}
-	if (centerId < 0.5) {
-		return true;
-	}
-	float nearer = centerDistance - sampleDistance;
-	if (nearer > threshold) {
-		return true;
-	}
-	return abs(id - centerId) > 0.5 && nearer > -contactTolerance && (nearer > contactTolerance || centerId > id);
+bool hasContour(float flags) {
+	return flags >= 1.5;
 }
-float readThreshold(vec4 value, float id) {
-	float facing = id > 0.5 ? max(abs(dot(readNormal(value), viewDirection)), FACING_MINIMUM) : 1.0;
-	return depthThreshold / facing;
+bool hasCrease(float flags) {
+	return mod(flags, 2.0) > 0.5;
+}
+int readEdge(LinePixel first, LinePixel second) {
+	if (first.id < 0.5 && second.id < 0.5) {
+		return 0;
+	}
+	bool isFirstNearer = second.id < 0.5 || (first.id > 0.5 && first.position.z >= second.position.z);
+	float nearFlags = isFirstNearer ? first.flags : second.flags;
+	float farId = isFirstNearer ? second.id : first.id;
+	if (farId < 0.5) {
+		return hasContour(nearFlags) ? 2 : 0;
+	}
+	vec3 offset = second.position - first.position;
+	float planeDistance = min(abs(dot(offset, first.normal)), abs(dot(offset, second.normal)));
+	bool isSeparated = planeDistance > depthThreshold + 2.0 * max(first.footprint, second.footprint);
+	if (isSeparated) {
+		return hasContour(nearFlags) ? 2 : 0;
+	}
+	if (abs(first.id - second.id) > 0.5) {
+		return hasContour(first.flags) || hasContour(second.flags) ? 2 : 0;
+	}
+	if (hasCrease(nearFlags) && dot(first.normal, second.normal) < creaseCosine) {
+		return 1;
+	}
+	return 0;
 }
 void main() {
-	ivec2 lastPixel = textureSize(depthTexture, 0) - 1;
-	ivec2 center = ivec2(gl_FragCoord.xy);
-	vec4 centerValue = texelFetch(lineTexture, center, 0);
-	float centerId = readLineId(centerValue);
-	float centerDistance = readDistance(center);
-	vec3 centerNormal = readNormal(centerValue);
-	float threshold = readThreshold(centerValue, centerId);
-	float reach = outlineRadius + 1.0;
-	float outerStrength = 0.0;
-	float innerStrength = 0.0;
+	ivec2 size = textureSize(lineTexture, 0);
+	vec2 sizeValue = vec2(size);
+	ivec2 pixel = ivec2(gl_FragCoord.xy);
+	LinePixel center = readPixel(pixel, sizeValue);
+	uvec2 contourSeed = uvec2(NO_SEED);
+	uvec2 creaseSeed = uvec2(NO_SEED);
 	for (int index = 0; index < 4; ++index) {
-		ivec2 pixel = clamp(center + OFFSETS[index], ivec2(0), lastPixel);
-		vec4 value = texelFetch(lineTexture, pixel, 0);
-		float sampleDistance = readDistance(pixel);
-		if (outerStrength <= 0.0 && readOutlineHit(value, sampleDistance, centerId, centerDistance, threshold)) {
-			outerStrength = clamp(reach - OFFSET_DISTANCES[index], 0.0, 1.0);
+		ivec2 neighborPixel = pixel + SIDES[index];
+		if (neighborPixel.x < 0 || neighborPixel.y < 0 || neighborPixel.x >= size.x || neighborPixel.y >= size.y) {
+			continue;
 		}
-		float sampleId = readLineId(value);
-		if (centerId > 0.5 && readOutlineHit(centerValue, centerDistance, sampleId, sampleDistance, readThreshold(value, sampleId))) {
-			innerStrength = INNER_STRENGTH;
+		int edge = readEdge(center, readPixel(neighborPixel, sizeValue));
+		uvec2 seed = uvec2(pixel * 2 + SIDES[index]);
+		if (edge == 2 && contourSeed.x == NO_SEED) {
+			contourSeed = seed;
 		}
-	}
-	for (int index = 4; index < ${TOON_SCREEN_OUTLINE_MAXIMUM_SAMPLES}; ++index) {
-		if (outerStrength > 0.0 || index >= sampleCount || OFFSET_DISTANCES[index] >= reach) {
-			break;
-		}
-		ivec2 pixel = clamp(center + OFFSETS[index], ivec2(0), lastPixel);
-		vec4 value = texelFetch(lineTexture, pixel, 0);
-		if (readOutlineHit(value, readDistance(pixel), centerId, centerDistance, threshold)) {
-			outerStrength = clamp(reach - OFFSET_DISTANCES[index], 0.0, 1.0);
+		if (edge == 1 && creaseSeed.x == NO_SEED) {
+			creaseSeed = seed;
 		}
 	}
-	float creaseHitCount = 0.0;
-	if (outerStrength < 1.0 && centerId > 0.5) {
-		for (int index = 0; index < ${TOON_SCREEN_OUTLINE_MAXIMUM_CREASE_SAMPLES}; ++index) {
-			if (index >= creaseCount) {
-				break;
-			}
-			ivec2 pixel = clamp(center + ivec2(round(DIRECTIONS[index] * creaseRadius)), ivec2(0), lastPixel);
-			vec4 value = texelFetch(lineTexture, pixel, 0);
-			if (abs(readLineId(value) - centerId) > 0.5) {
-				continue;
-			}
-			float nearer = centerDistance - readDistance(pixel);
-			if (abs(nearer) < threshold * 2.0 && dot(readNormal(value), centerNormal) < creaseCosine) {
-				if (creaseExtent <= 0.0) {
-					creaseHitCount += 1.0;
-					continue;
-				}
-				ivec2 farPixel = clamp(center + ivec2(round(DIRECTIONS[index] * (creaseRadius + creaseExtent))), ivec2(0), lastPixel);
-				vec4 farValue = texelFetch(lineTexture, farPixel, 0);
-				if (abs(readLineId(farValue) - centerId) < 0.5 && dot(readNormal(farValue), centerNormal) < creaseCosine) {
-					creaseHitCount += 1.0;
-				}
-			}
-		}
-	}
-	fragmentMask = vec4(min(1.0, max(outerStrength, innerStrength) + creaseHitCount * creaseStrength), 0.0, 0.0, 1.0);
+	fragmentSeed = uvec4(contourSeed, creaseSeed);
 }
 `;
-// 가면을 그리는 영역 크기로 부드럽게 읽어 선인 곳만 섞는 셰이더. (미리 곱한 알파, 선이 아닌 곳은 버림)
+// 씨앗 판의 가까운 씨앗을 넓히는 점프 플러딩 한 번. (stepSize 떨어진 이웃 여덟과 자기를 보고 경계 토막까지 가장 가까운 씨앗을 남긴다)
+const JUMP_FLOOD_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+precision highp int;
+uniform highp usampler2D seedTexture;
+uniform int stepSize;
+out uvec4 fragmentSeed;
+const uint NO_SEED = 65535u;
+float readSeedDistance(vec2 point, uvec2 seed) {
+	if (seed.x == NO_SEED) {
+		return 1.0e9;
+	}
+	vec2 offset = abs(point - vec2(seed) * 0.5);
+	if ((seed.x & 1u) == 1u) {
+		offset.y = max(offset.y - 0.5, 0.0);
+	}
+	else {
+		offset.x = max(offset.x - 0.5, 0.0);
+	}
+	return length(offset);
+}
+void main() {
+	ivec2 size = textureSize(seedTexture, 0);
+	ivec2 pixel = ivec2(gl_FragCoord.xy);
+	vec2 point = vec2(pixel);
+	uvec4 best = uvec4(NO_SEED);
+	float bestContour = 1.0e9;
+	float bestCrease = 1.0e9;
+	for (int offsetY = -1; offsetY <= 1; ++offsetY) {
+		for (int offsetX = -1; offsetX <= 1; ++offsetX) {
+			ivec2 samplePixel = pixel + ivec2(offsetX, offsetY) * stepSize;
+			if (samplePixel.x < 0 || samplePixel.y < 0 || samplePixel.x >= size.x || samplePixel.y >= size.y) {
+				continue;
+			}
+			uvec4 seed = texelFetch(seedTexture, samplePixel, 0);
+			float contourDistance = readSeedDistance(point, seed.xy);
+			if (contourDistance < bestContour) {
+				bestContour = contourDistance;
+				best.xy = seed.xy;
+			}
+			float creaseDistance = readSeedDistance(point, seed.zw);
+			if (creaseDistance < bestCrease) {
+				bestCrease = creaseDistance;
+				best.zw = seed.zw;
+			}
+		}
+	}
+	fragmentSeed = best;
+}
+`;
+// 그리는 영역의 화소마다 가까운 씨앗까지의 거리(그리는 영역 픽셀)로 선이 덮는 몫을 셈해 섞는 셰이더. (미리 곱한 알파)
+// - 선의 판 좌표에서 둘레 2x2 칸의 씨앗을 보고 경계 토막까지의 거리를 잰다. 선의 판이 작아도 거리는 그리는 영역에서 재므로 늘인 선이 끊기지 않는다.
+// - 덮는 몫은 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 이다. (픽셀 상자로 거른 선, 가장자리가 부드럽다)
 const COMPOSITE_FRAGMENT_SHADER = `#version 300 es
-precision mediump float;
-uniform sampler2D maskTexture;
+precision highp float;
+precision highp int;
+uniform highp usampler2D seedTexture;
 uniform vec4 viewportRect;
+uniform vec2 lineWidths;
+uniform float creaseOpacity;
 uniform vec4 outlineColor;
 uniform float hdrOutput;
 out vec4 fragmentColor;
+const uint NO_SEED = 65535u;
+float readSeedDistance(vec2 point, uvec2 seed, vec2 toOutput) {
+	if (seed.x == NO_SEED) {
+		return 1.0e9;
+	}
+	vec2 offset = abs(point - vec2(seed) * 0.5);
+	if ((seed.x & 1u) == 1u) {
+		offset.y = max(offset.y - 0.5, 0.0);
+	}
+	else {
+		offset.x = max(offset.x - 0.5, 0.0);
+	}
+	return length(offset * toOutput);
+}
 void main() {
-	float strength = texture(maskTexture, (gl_FragCoord.xy - viewportRect.xy) / viewportRect.zw).r * outlineColor.a;
-	if (strength < 0.02) {
+	ivec2 size = textureSize(seedTexture, 0);
+	vec2 toLine = vec2(size) / viewportRect.zw;
+	vec2 toOutput = viewportRect.zw / vec2(size);
+	vec2 point = (gl_FragCoord.xy - viewportRect.xy) * toLine - 0.5;
+	ivec2 basePixel = ivec2(floor(point));
+	float contourDistance = 1.0e9;
+	float creaseDistance = 1.0e9;
+	for (int offsetY = 0; offsetY <= 1; ++offsetY) {
+		for (int offsetX = 0; offsetX <= 1; ++offsetX) {
+			ivec2 samplePixel = clamp(basePixel + ivec2(offsetX, offsetY), ivec2(0), size - 1);
+			uvec4 seed = texelFetch(seedTexture, samplePixel, 0);
+			contourDistance = min(contourDistance, readSeedDistance(point, seed.xy, toOutput));
+			creaseDistance = min(creaseDistance, readSeedDistance(point, seed.zw, toOutput));
+		}
+	}
+	float contour = lineWidths.x > 0.0 ? clamp(lineWidths.x * 0.5 - contourDistance + 0.5, 0.0, 1.0) : 0.0;
+	float crease = lineWidths.y > 0.0 ? clamp(lineWidths.y * 0.5 - creaseDistance + 0.5, 0.0, 1.0) * creaseOpacity : 0.0;
+	float strength = max(contour, crease) * outlineColor.a;
+	if (strength < 0.004) {
 		discard;
 	}
 	vec3 color = hdrOutput > 0.5 ? pow(outlineColor.rgb, vec3(2.2)) : outlineColor.rgb;
@@ -232,80 +337,116 @@ void main() {
 
 
 //==============================================================================
-// 툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고 한 번 훑어 가면을 쓴 뒤 화면에 섞는다)
-// - ToonRenderer 의 createMesh 결과를 같은 행렬로 한 번 더 그려 번호를 쓴다. 껍데기 바깥선(ToonRenderer)과 함께 써도 된다.
-// - 선이 서는 곳: 앞에 있는 것의 실루엣 바깥, 다른 번호와 맞닿은 곳(먼 쪽, 깊이가 거의 같으면 번호가 큰 쪽), 한 번호 안에서 면이 꺾임 각보다 더 꺾이는 곳.
-//   같은 번호끼리 맞닿은 곳은 긋지 않는다. 어느 모형, 어느 부품(indexStart, indexCount 범위)에 어떤 번호를 줄지는 부르는 쪽이 정한다.
-// - 굵기: setWidth 로 월드 길이나 픽셀. 선의 판 픽셀로 셈해 한 픽셀 밑으로 내리지 않는다.
-// - 깊이: 투영 행렬로 직교와 원근을 가린다. 원근은 깊이를 가까운 면과 먼 면으로 풀어 거리(미터)로 견준다.
-// - 값: setResolutionScale 로 선의 판을 그리는 영역의 몫으로 줄이고(가면은 섞을 때 부드럽게 늘임), setSampleCount 로 볼 이웃 수를 줄인다(가벼운 길 4, 2).
-// - 사용: 매 프레임 beginLineIds(보기, 투영) → drawMesh / drawMeshInstanced → endLineIds() (가면까지 셈) → 툰 몸 그리기 → drawOutline().
-//   beginLineIds 는 그때의 뷰포트를 그리는 영역으로 적어 두고, 선의 판을 그 크기에 맞춰 짓는다. endLineIds 가 프레임버퍼, 뷰포트, 상태를 돌린다.
-//   (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushSpriteBatch)
+// 점프 플러딩의 걸음 목록. (씨앗을 reach 화소까지 넓히는 데 드는 걸음, 큰 것부터 반씩 줄여 1 까지)
+// - 걸음 k, k/2, ..., 1 은 씨앗을 2k - 1 화소까지 옮긴다. (Rong, Tan 2006)
 //==============================================================================
+/**
+ * @param { number } reach - 씨앗을 옮길 거리. (선의 판 픽셀)
+ * @returns { Array<number> } 큰 것부터 1 까지의 걸음.
+ * @example <caption>4 화소까지 넓히는 걸음</caption>
+ * import { readJumpFloodSteps } from "./vanilla.js";
+ * const steps = readJumpFloodSteps(4);
+ */
+export function readJumpFloodSteps(reach) {
+	const distance = System.Math.max(1, System.Math.ceil(reach));
+	let step = 1;
+	while (step * 2 - 1 < distance) {
+		step *= 2;
+	}
+	const steps = [];
+	while (step >= 1) {
+		steps.push(step);
+		step = System.Math.floor(step / 2);
+	}
+	return steps;
+}
+
+
+//==============================================================================
+// 툰 화면 공간 바깥선. (노멀, 선 번호, 깊이를 선의 판에 그리고, 바로 이웃 사이의 경계에서 선을 잡아 점프 플러딩으로 넓힌 뒤 거리로 덮는 몫을 셈해 섞는다)
+// - 선의 판: ToonRenderer 의 createMesh 결과를 같은 행렬로 한 번 더 그려 노멀(팔면체 접기), 선 번호(14 비트), 꼴(바깥 선, 꺾임 선을 켤지)과 깊이를 쓴다.
+// - 잡기: 화소와 바로 이웃 넷 사이의 경계마다 한 번 본다. 선은 화소가 아니라 화소 사이의 경계 가운데에 선다. (같은 경계를 두 번 긋지 않는다)
+//   바깥 선은 빈 곳과 맞닿은 실루엣, 다른 번호와 맞닿은 곳, 같은 번호라도 서로의 접평면에서 깊이 문턱보다 떨어진 곳(가려진 실루엣)이다.
+//   꺾임 선은 같은 번호 안에서 이웃한 두 노멀이 꺾임 각보다 더 벌어진 곳이다. 화소 하나 사이의 노멀만 보므로 둥근 면의 실루엣 둘레나 비스듬한 면에 띠가 서지 않는다.
+//   깊이를 접평면 거리로 견주므로 비스듬히 보는 바닥에 가짜 선이 서지 않는다. 문턱에 그 깊이의 화소 크기 두 배를 더해 먼 것도 같은 뜻이 된다.
+// - 넓히기: 경계 토막까지의 거리를 점프 플러딩으로 퍼뜨린다. 굵기에 상관없이 걸음 수는 log2 이고, 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다.
+// - 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. (가장자리가 부드럽고, 선의 판을 줄여도 늘인 선이 점선이 되지 않는다)
+// - 모형마다: drawMesh 의 hasScreenOutline 이 false 면 그 모형은 선을 내지 않고 뒤의 선만 가린다. hasCreaseLine 이 false 면 꺾임 선만 끈다.
+// - 굵기: setWidth 와 setCrease 의 굵기는 선 하나의 굵기다. (경계를 가운데로 양쪽에 반씩) 단위는 ToonOutlineWidthUnit, 한 픽셀 밑으로 내리지 않는다.
+// - 깊이: 투영 행렬로 직교와 원근을 가리고, 깊이를 보기 공간 자리로 풀어 견준다. (화면 사각형처럼 클립 x, y 를 옮긴 투영도 된다)
+// - 값: setResolutionScale 로 선의 판을 그리는 영역의 몫으로 줄인다. (폰의 가벼운 길)
+// - 사용: 매 프레임 beginLineIds(보기, 투영) → drawMesh / drawMeshInstanced → endLineIds() (씨앗과 넓히기까지 셈) → 툰 몸 그리기 → drawOutline().
+//   beginLineIds 는 그때의 뷰포트를 그리는 영역으로 적어 두고, 선의 판을 그 크기에 맞춰 짓는다. endLineIds 와 drawOutline 이 프레임버퍼, 뷰포트, 상태를 돌린다.
+//   ToonDrawQueue.setScreenOutline 으로 맡기면 그리기 줄이 이 차례를 스스로 한다. (엔진 2D 그리기 사이에 끼울 때, 그 전에 Graphic.flushSpriteBatch)
+//==============================================================================
+/**
+ * @example <caption>꺾임 선 없이 실루엣만 굵게</caption>
+ * import { ToonScreenOutline, ToonOutlineWidthUnit } from "./vanilla.js";
+ * const outline = new ToonScreenOutline(document.createElement("canvas").getContext("webgl2"));
+ * outline.setColor([0.1, 0.08, 0.12, 1]);
+ * outline.setWidth(3, ToonOutlineWidthUnit.pixel);
+ * outline.setCrease(180);
+ * outline.setResolutionScale(0.5);
+ */
 export class ToonScreenOutline {
 	//==============================================================================
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { WebGL2RenderingContext } */ #webGL2RenderingContext;
 	/** @private @type { ShaderProgram } */ #lineProgram;
-	/** @private @type { ShaderProgram } */ #maskProgram;
+	/** @private @type { ShaderProgram } */ #seedProgram;
+	/** @private @type { ShaderProgram } */ #jumpFloodProgram;
 	/** @private @type { ShaderProgram } */ #compositeProgram;
 	/** @private @type { WebGLVertexArrayObject } */ #emptyVertexArray; // 화면 세모용 빈 버텍스 어레이.
-	/** @private @type { object | null } */ #lineTarget; // 선의 판. ({ framebuffer, lineTexture, depthTexture, maskFramebuffer, maskTexture, width, height })
+	/** @private @type { object | null } */ #lineTarget; // 선의 판. ({ framebuffer, lineTexture, depthTexture, seedFramebuffers, seedTextures, seedIndex, width, height })
 	/** @private @type { Array<number> } */ #color; // 선 색. (sRGB, 알파)
-	/** @private @type { number } */ #width;
+	/** @private @type { number } */ #width; // 바깥 선 굵기.
 	/** @private @type { string } */ #widthUnit;
 	/** @private @type { number } */ #focusDistance; // 원근에서 월드 굵기를 픽셀로 셀 거리. (0 이면 그린 모형의 평균 거리)
-	/** @private @type { number } */ #depthThreshold; // 실루엣으로 칠 깊이 차이. (월드 길이, 면이 화면을 볼 때)
-	/** @private @type { number } */ #contactTolerance; // 맞닿은 두 번호의 깊이가 이만큼 안이면 번호가 큰 쪽에 그음.
+	/** @private @type { number } */ #depthThreshold; // 같은 번호를 떨어진 것으로 칠 접평면 거리. (월드 길이)
 	/** @private @type { number } */ #creaseCosine;
-	/** @private @type { number } */ #creaseStrength;
-	/** @private @type { number } */ #creaseExtent; // 꺾인 면이 이만큼(픽셀) 더 이어져야 꺾임 선을 그음. (0 이면 보지 않음)
+	/** @private @type { number } */ #creaseWidth; // 꺾임 선 굵기. (바깥 선과 같은 단위)
+	/** @private @type { number } */ #creaseOpacity;
 	/** @private @type { number } */ #resolutionScale;
-	/** @private @type { number } */ #sampleCount;
-	/** @private @type { number } */ #creaseSampleCount;
 	/** @private @type { boolean } */ #isHdrOutput;
-	/** @private @type { object } */ #frame; // 이번 프레임의 카메라. ({ viewProjectionElements, viewElements, frustumPlanes, viewDirection, isPerspective, depthRange, projectionScale, viewport })
+	/** @private @type { object | null } */ #frame; // 이번 프레임의 카메라. ({ viewProjectionElements, viewElements, projectionElements, frustumPlanes, isPerspective, viewport })
 	/** @private @type { object | null } */ #savedState; // beginLineIds 앞의 그리기 상태.
 	/** @private @type { Float32Array } */ #instanceData;
 	/** @private @type { number } */ #drawnDistanceSum; // 이번 프레임에 그린 모형의 거리 합과 수. (초점 거리를 주지 않았을 때)
 	/** @private @type { number } */ #drawnDistanceCount;
-	/** @private @type { number } */ #outlineRadius; // 이번 프레임의 바깥선 반지름. (선의 판 픽셀)
+	/** @private @type { Array<number> } */ #lineWidths; // 이번 프레임의 바깥 선과 꺾임 선 굵기. (그리는 영역 픽셀)
 
 	//==============================================================================
-	// 생성.
+	// 생성. (네 프로그램과 빈 버텍스 어레이를 짓는다, 선의 판은 첫 beginLineIds 에서)
 	//==============================================================================
 	/**
 	 * @constructor
-	 * @param { WebGL2RenderingContext } webGL2RenderingContext
+	 * @param { WebGL2RenderingContext } webGL2RenderingContext - 툰 렌더러와 같은 컨텍스트.
 	 */
 	constructor(webGL2RenderingContext) {
 		this.#webGL2RenderingContext = webGL2RenderingContext;
 		this.#lineProgram = new ShaderProgram(webGL2RenderingContext, LINE_VERTEX_SHADER, LINE_FRAGMENT_SHADER, TOON_ATTRIBUTE_LOCATIONS);
-		this.#maskProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, LINE_MASK_FRAGMENT_SHADER, {});
+		this.#seedProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, SEED_FRAGMENT_SHADER, {});
+		this.#jumpFloodProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, JUMP_FLOOD_FRAGMENT_SHADER, {});
 		this.#compositeProgram = new ShaderProgram(webGL2RenderingContext, SCREEN_TRIANGLE_VERTEX_SHADER, COMPOSITE_FRAGMENT_SHADER, {});
 		this.#emptyVertexArray = webGL2RenderingContext.createVertexArray();
 		this.#lineTarget = null;
 		this.#color = [0.08, 0.07, 0.1, 1];
-		this.#width = 1.5;
+		this.#width = 2;
 		this.#widthUnit = ToonOutlineWidthUnit.pixel;
 		this.#focusDistance = 0;
 		this.#depthThreshold = 0.05;
-		this.#contactTolerance = 0.01;
 		this.#creaseCosine = System.Math.cos(System.Math.PI / 3);
-		this.#creaseStrength = 0.5;
-		this.#creaseExtent = 2;
+		this.#creaseWidth = 1;
+		this.#creaseOpacity = 1;
 		this.#resolutionScale = 1;
-		this.#sampleCount = TOON_SCREEN_OUTLINE_MAXIMUM_SAMPLES;
-		this.#creaseSampleCount = TOON_SCREEN_OUTLINE_MAXIMUM_CREASE_SAMPLES;
 		this.#isHdrOutput = false;
 		this.#frame = null;
 		this.#savedState = null;
 		this.#instanceData = new System.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
 		this.#drawnDistanceSum = 0;
 		this.#drawnDistanceCount = 0;
-		this.#outlineRadius = 1;
+		this.#lineWidths = [2, 1];
 	}
 
 	//==============================================================================
@@ -313,32 +454,38 @@ export class ToonScreenOutline {
 	//==============================================================================
 	/**
 	 * @static
-	 * @returns { Array<object> } { vertexShader, fragmentShader, attributeLocationTable } 의 배열.
+	 * @returns { Array<object> } { vertexShader, fragmentShader, attributeLocationTable } 넷. (번호, 씨앗, 넓히기, 섞기)
+	 * @example <caption>셰이더를 미리 링크할 목록에 넣기</caption>
+	 * import { ToonScreenOutline } from "./vanilla.js";
+	 * const sources = ToonScreenOutline.readProgramSources();
+	 * const vertexShaders = sources.map((source) => source.vertexShader);
 	 */
 	static readProgramSources() {
 		return [
 			{ vertexShader: LINE_VERTEX_SHADER, fragmentShader: LINE_FRAGMENT_SHADER, attributeLocationTable: TOON_ATTRIBUTE_LOCATIONS },
-			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: LINE_MASK_FRAGMENT_SHADER, attributeLocationTable: {} },
+			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: SEED_FRAGMENT_SHADER, attributeLocationTable: {} },
+			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: JUMP_FLOOD_FRAGMENT_SHADER, attributeLocationTable: {} },
 			{ vertexShader: SCREEN_TRIANGLE_VERTEX_SHADER, fragmentShader: COMPOSITE_FRAGMENT_SHADER, attributeLocationTable: {} },
 		];
 	}
 
 	//==============================================================================
-	// 선 색 설정. (sRGB 0 ~ 1 과 알파)
+	// 선 색 설정. (sRGB 0 ~ 1 과 알파, 바깥 선과 꺾임 선이 같이 쓴다)
 	//==============================================================================
 	/**
-	 * @param { Array<number> } color - [r, g, b, a]
+	 * @param { Array<number> } color - [r, g, b, a] 의 sRGB. (a 를 빼면 1)
 	 */
 	setColor(color) {
 		this.#color = [color[0], color[1], color[2], color.length > 3 ? color[3] : 1];
 	}
 
 	//==============================================================================
-	// 굵기 설정. (월드 길이나 픽셀, 반지름이 아니라 선 하나의 굵기)
+	// 바깥 선 굵기 설정. (실루엣과 다른 번호와 맞닿은 곳의 선, 반지름이 아니라 선 하나의 굵기, 0 이면 긋지 않음)
+	// - 꺾임 선 굵기도 이 단위로 센다.
 	//==============================================================================
 	/**
-	 * @param { number } width
-	 * @param { string } [unit] - ToonOutlineWidthUnit
+	 * @param { number } width - 선 하나의 굵기. (경계를 가운데로 양쪽에 반씩)
+	 * @param { string } [unit] - ToonOutlineWidthUnit. (기본 pixel)
 	 */
 	setWidth(width, unit = ToonOutlineWidthUnit.pixel) {
 		this.#width = System.Math.max(0, width);
@@ -346,61 +493,52 @@ export class ToonScreenOutline {
 	}
 
 	//==============================================================================
+	// 꺾임 선 설정. (같은 번호 안에서 이웃한 면이 이 각(도)보다 더 꺾이면 선, 굵기는 setWidth 의 단위, 진하기 0 ~ 1)
+	//==============================================================================
+	/**
+	 * @param { number } angleDegrees - 꺾임 각. (180 이면 꺾임 선을 긋지 않는다)
+	 * @param { number } [width] - 꺾임 선 하나의 굵기. (기본 1, 0 이면 긋지 않는다)
+	 * @param { number } [opacity] - 꺾임 선의 진하기. (기본 1, 선 색의 알파에 곱한다)
+	 * @example <caption>잔 면은 두고 큰 모서리만 엷게</caption>
+	 * import { ToonScreenOutline } from "./vanilla.js";
+	 * const outline = new ToonScreenOutline(document.createElement("canvas").getContext("webgl2"));
+	 * outline.setCrease(75, 1.5, 0.6);
+	 */
+	setCrease(angleDegrees, width = 1, opacity = 1) {
+		this.#creaseCosine = System.Math.cos(System.Math.min(180, System.Math.max(0, angleDegrees)) * System.Math.PI / 180);
+		this.#creaseWidth = System.Math.max(0, width);
+		this.#creaseOpacity = System.Math.max(0, System.Math.min(1, opacity));
+	}
+
+	//==============================================================================
 	// 초점 거리 설정. (원근 카메라에서 월드 굵기를 픽셀로 셀 거리, 보통 카메라에서 보는 점까지, 0 이면 그린 모형들의 평균 거리)
 	//==============================================================================
 	/**
-	 * @param { number } focusDistance
+	 * @param { number } focusDistance - 카메라에서의 거리. (월드 길이)
 	 */
 	setFocusDistance(focusDistance) {
 		this.#focusDistance = System.Math.max(0, focusDistance);
 	}
 
 	//==============================================================================
-	// 깊이 문턱 설정. (실루엣으로 칠 깊이 차이와 맞닿음으로 칠 깊이 차이, 월드 길이, 장면의 크기에 맞춘다)
+	// 깊이 문턱 설정. (같은 번호의 이웃 화소가 서로의 접평면에서 이만큼 넘게 떨어지면 가려진 실루엣으로 긋는다, 월드 길이)
+	// - 그 깊이의 화소 크기 두 배를 더해 쓴다. 장면의 크기에 맞춘다. (사람 크기 장면이면 0.02 ~ 0.1)
 	//==============================================================================
 	/**
-	 * @param { number } depthThreshold - 면이 화면을 볼 때의 실루엣 깊이 차이. (비스듬하면 화면을 보는 정도로 나눔)
-	 * @param { number } contactTolerance - 다른 번호와 맞닿은 두 면의 깊이가 이만큼 안이면 번호가 큰 쪽에만 긋는다.
+	 * @param { number } depthThreshold - 접평면 거리 문턱. (월드 길이)
 	 */
-	setDepthThreshold(depthThreshold, contactTolerance) {
+	setDepthThreshold(depthThreshold) {
 		this.#depthThreshold = System.Math.max(0, depthThreshold);
-		this.#contactTolerance = System.Math.max(0, contactTolerance);
 	}
 
 	//==============================================================================
-	// 꺾임 선 설정. (면이 이 각(도)보다 더 꺾이면 선, 걸린 곳 하나의 진하기, 꺾인 면이 더 이어져야 할 픽셀)
+	// 선의 판 해상도 몫 설정. (그리는 영역에 대한 몫 0.25 ~ 1, 폰의 가벼운 길은 낮춰 셈한다, 선은 그리는 영역에서 거리로 섞어 끊기지 않는다)
 	//==============================================================================
 	/**
-	 * @param { number } angleDegrees - 180 이면 꺾임 선을 긋지 않는다.
-	 * @param { number } [strength]
-	 * @param { number } [extentPixels] - 0 이면 좁은 면도 긋는다.
-	 */
-	setCrease(angleDegrees, strength = 0.5, extentPixels = 2) {
-		this.#creaseCosine = System.Math.cos(System.Math.min(180, System.Math.max(0, angleDegrees)) * System.Math.PI / 180);
-		this.#creaseStrength = System.Math.max(0, strength);
-		this.#creaseExtent = System.Math.max(0, extentPixels);
-	}
-
-	//==============================================================================
-	// 선의 판 해상도 몫 설정. (그리는 영역에 대한 몫 0.25 ~ 1, 폰의 가벼운 길은 낮춰 셈하고 섞을 때 늘인다)
-	//==============================================================================
-	/**
-	 * @param { number } resolutionScale
+	 * @param { number } resolutionScale - 0.25 ~ 1.
 	 */
 	setResolutionScale(resolutionScale) {
 		this.#resolutionScale = System.Math.max(0.25, System.Math.min(1, resolutionScale));
-	}
-
-	//==============================================================================
-	// 볼 이웃 수 설정. (바깥선 4 ~ 28, 꺾임 선 0 ~ 4, 가벼운 길은 4 와 2)
-	//==============================================================================
-	/**
-	 * @param { number } sampleCount
-	 * @param { number } creaseSampleCount
-	 */
-	setSampleCount(sampleCount, creaseSampleCount) {
-		this.#sampleCount = System.Math.max(4, System.Math.min(TOON_SCREEN_OUTLINE_MAXIMUM_SAMPLES, System.Math.floor(sampleCount)));
-		this.#creaseSampleCount = System.Math.max(0, System.Math.min(TOON_SCREEN_OUTLINE_MAXIMUM_CREASE_SAMPLES, System.Math.floor(creaseSampleCount)));
 	}
 
 	//==============================================================================
@@ -414,20 +552,20 @@ export class ToonScreenOutline {
 	}
 
 	//==============================================================================
-	// 이번 프레임의 바깥선 반지름 반환. (선의 판 픽셀, endLineIds 뒤에 정해짐)
+	// 이번 프레임의 선 굵기 반환. ([바깥 선, 꺾임 선] 의 그리는 영역 픽셀, endLineIds 뒤에 정해짐)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { Array<number> } [바깥 선 굵기, 꺾임 선 굵기]. (긋지 않으면 0)
 	 */
-	getOutlineRadius() {
-		return this.#outlineRadius;
+	getLineWidths() {
+		return this.#lineWidths.slice();
 	}
 
 	//==============================================================================
-	// 선의 판 반환. (없으면 null, { lineTexture, depthTexture, maskTexture, width, height })
+	// 선의 판 반환. (없으면 null)
 	//==============================================================================
 	/**
-	 * @returns { object | null }
+	 * @returns { object | null } { lineTexture (노멀과 번호 RGBA8), depthTexture (깊이 24), seedTextures (RGBA16UI 둘), seedIndex (넓히기를 마친 쪽), width, height }
 	 */
 	getLineTarget() {
 		return this.#lineTarget;
@@ -437,8 +575,8 @@ export class ToonScreenOutline {
 	// 번호 그리기 시작. (지금 뷰포트를 그리는 영역으로 적고, 선의 판을 묶어 비운다)
 	//==============================================================================
 	/**
-	 * @param { Matrix4 } viewMatrix
-	 * @param { Matrix4 } projectionMatrix
+	 * @param { Matrix4 } viewMatrix - 보기 행렬.
+	 * @param { Matrix4 } projectionMatrix - 투영 행렬. (원근이나 직교)
 	 * @returns { boolean } 선의 판을 짓지 못했으면 false. (그때 drawMesh 는 아무것도 하지 않는다)
 	 */
 	beginLineIds(viewMatrix, projectionMatrix) {
@@ -448,26 +586,12 @@ export class ToonScreenOutline {
 		const viewport = webGL2RenderingContext.getParameter(webGL2RenderingContext.VIEWPORT);
 		const viewProjectionMatrix = projectionMatrix.clone();
 		viewProjectionMatrix.multiply(viewMatrix);
-		const isPerspective = System.Math.abs(projectionElements[11]) > 0.5;
-		let depthRange = [0, 1];
-		if (isPerspective) {
-			depthRange = [projectionElements[14] / (projectionElements[10] - 1), projectionElements[14] / (projectionElements[10] + 1)];
-		}
-		else {
-			const depthSpan = -2 / projectionElements[10];
-			const depthCenter = projectionElements[14] / projectionElements[10];
-			depthRange = [depthCenter - depthSpan * 0.5, depthCenter + depthSpan * 0.5];
-		}
-		const viewDirection = [-viewElements[2], -viewElements[6], -viewElements[10]];
-		const viewDirectionLength = System.Math.max(0.000001, System.Math.hypot(viewDirection[0], viewDirection[1], viewDirection[2]));
 		this.#frame = {
 			viewProjectionElements: new System.Float32Array(viewProjectionMatrix.getElements()),
 			viewElements: new System.Float32Array(viewElements),
+			projectionElements: new System.Float32Array(projectionElements),
 			frustumPlanes: extractFrustumPlanes(viewProjectionMatrix),
-			viewDirection: [viewDirection[0] / viewDirectionLength, viewDirection[1] / viewDirectionLength, viewDirection[2] / viewDirectionLength],
-			isPerspective: isPerspective,
-			depthRange: depthRange,
-			projectionScale: System.Math.abs(projectionElements[5]),
+			isPerspective: System.Math.abs(projectionElements[11]) > 0.5,
 			viewport: [viewport[0], viewport[1], viewport[2], viewport[3]],
 		};
 		this.#drawnDistanceSum = 0;
@@ -500,12 +624,30 @@ export class ToonScreenOutline {
 	//==============================================================================
 	/**
 	 * @param { object | null } mesh - ToonRenderer.createMesh 의 결과.
-	 * @param { Matrix4 } modelMatrix
-	 * @param { number } lineId - 1 ~ 65535. (0 은 빈 곳이라 쓰지 않는다)
-	 * @param { object } [options] - { jointMatrices Float32Array, isCulled (기본 true), indexStart, indexCount (몸 번호 버퍼의 일부만, 부품에 다른 번호를 줄 때) }
+	 * @param { Matrix4 } modelMatrix - 모형 행렬.
+	 * @param { number } lineId - 1 ~ TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID. (0 은 빈 곳이라 쓰지 않는다, 같은 번호끼리 맞닿은 곳은 긋지 않는다)
+	 * @param { object } [options] - { jointMatrices Float32Array, isCulled (기본 true), indexStart, indexCount (몸 번호 버퍼의 일부만), isMirrored (주지 않으면 행렬식으로), hasScreenOutline (기본 true, false 면 선은 내지 않고 가리기만), hasCreaseLine (기본 true) }
+	 * @example <caption>바닥은 선 없이 가리기만, 결정은 꺾임 선 없이</caption>
+	 * import { ToonRenderer, ToonScreenOutline, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const renderer = new ToonRenderer(webGL2RenderingContext);
+	 * const outline = new ToonScreenOutline(webGL2RenderingContext);
+	 * const floorBuilder = new ToonMesh.MeshBuilder();
+	 * floorBuilder.addPart(ToonMesh.createBoxGeometry(6, 0.2, 6), Matrix4.createTranslation(0, -0.1, 0), "#506070", { hasOutline: false });
+	 * const floorMesh = renderer.createMesh(floorBuilder.readArrays());
+	 * const crystalBuilder = new ToonMesh.MeshBuilder();
+	 * crystalBuilder.addPart(ToonMesh.createOctahedronGeometry(0.5), Matrix4.createTranslation(0, 0.5, 0), "#90d0ff", { hasOutline: false });
+	 * const crystalMesh = renderer.createMesh(crystalBuilder.readArrays());
+	 * const viewMatrix = Matrix4.createLookAt(Vector3.create(3, 3, 4), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
+	 * const projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);
+	 * if (outline.beginLineIds(viewMatrix, projectionMatrix)) {
+	 * 	outline.drawMesh(floorMesh, Matrix4.createIdentity(), 1, { hasScreenOutline: false });
+	 * 	outline.drawMesh(crystalMesh, Matrix4.createIdentity(), 2, { hasCreaseLine: false });
+	 * 	outline.endLineIds();
+	 * }
 	 */
 	drawMesh(mesh, modelMatrix, lineId, options = {}) {
-		if (mesh === null || this.#savedState === null) {
+		if (mesh === null || mesh === undefined || this.#savedState === null) {
 			return;
 		}
 		const modelElements = modelMatrix.getElements();
@@ -513,20 +655,36 @@ export class ToonScreenOutline {
 			return;
 		}
 		this.addDrawnDistance(mesh, modelElements);
-		this.drawWithCount(mesh, modelElements, 0, lineId, false, options);
+		const isMirrored = options.isMirrored !== undefined ? options.isMirrored : readMatrixDeterminant(modelElements) < 0;
+		this.drawWithCount(mesh, modelElements, 0, lineId, false, isMirrored, options);
 	}
 
 	//==============================================================================
 	// 같은 모형 여럿의 번호를 한 번에 그리기. (인스턴스에 lineId 가 있으면 그 번호, 없으면 공통 번호)
 	//==============================================================================
 	/**
-	 * @param { object | null } mesh
+	 * @param { object | null } mesh - ToonRenderer.createMesh 의 결과.
 	 * @param { Array<object> } instances - { modelMatrix: Matrix4, lineId: number (선택) } 의 배열.
 	 * @param { number } lineId - 공통 번호.
-	 * @param { object } [options] - drawMesh 와 같다.
+	 * @param { object } [options] - drawMesh 와 같다. (꼴은 모든 인스턴스에 같다)
+	 * @example <caption>돌마다 다른 번호로 맞닿은 곳에도 선</caption>
+	 * import { ToonRenderer, ToonScreenOutline, ToonMesh, Matrix4, Vector3 } from "./vanilla.js";
+	 * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
+	 * const renderer = new ToonRenderer(webGL2RenderingContext);
+	 * const outline = new ToonScreenOutline(webGL2RenderingContext);
+	 * const builder = new ToonMesh.MeshBuilder();
+	 * builder.addPart(ToonMesh.createOctahedronGeometry(0.3), Matrix4.createIdentity(), "#a89880", { hasOutline: false });
+	 * const rockMesh = renderer.createMesh(builder.readArrays());
+	 * const instances = [0, 1, 2].map((index) => ({ modelMatrix: Matrix4.createTranslation(index * 0.5, 0, 0), lineId: 10 + index }));
+	 * const viewMatrix = Matrix4.createLookAt(Vector3.create(0.5, 2, 3), Vector3.create(0.5, 0, 0), Vector3.create(0, 1, 0));
+	 * const projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);
+	 * if (outline.beginLineIds(viewMatrix, projectionMatrix)) {
+	 * 	outline.drawMeshInstanced(rockMesh, instances, 10);
+	 * 	outline.endLineIds();
+	 * }
 	 */
 	drawMeshInstanced(mesh, instances, lineId, options = {}) {
-		if (mesh === null || this.#savedState === null) {
+		if (mesh === null || mesh === undefined || this.#savedState === null) {
 			return;
 		}
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
@@ -555,30 +713,33 @@ export class ToonScreenOutline {
 		}
 		webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ARRAY_BUFFER, mesh.instanceBuffer);
 		webGL2RenderingContext.bufferData(webGL2RenderingContext.ARRAY_BUFFER, instanceData.subarray(0, instanceCount * TOON_INSTANCE_FLOAT_COUNT), webGL2RenderingContext.DYNAMIC_DRAW);
-		this.drawWithCount(mesh, IDENTITY_ELEMENTS, instanceCount, lineId, true, options);
+		this.drawWithCount(mesh, IDENTITY_ELEMENTS, instanceCount, lineId, true, options.isMirrored === true, options);
 	}
 
 	//==============================================================================
 	// 번호 그리기 본체.
 	//==============================================================================
 	/**
-	 * @param { object } mesh
-	 * @param { Float32Array } modelElements
+	 * @param { object } mesh - ToonRenderer.createMesh 의 결과.
+	 * @param { Float32Array } modelElements - 모형 행렬의 수 16.
 	 * @param { number } instanceCount - 0 이면 보통 그리기.
-	 * @param { number } lineId
+	 * @param { number } lineId - 공통 번호.
 	 * @param { boolean } isInstanceLineId - 인스턴스의 번호를 읽을지.
-	 * @param { object } options
+	 * @param { boolean } isMirrored - 감기를 뒤집어 그릴지.
+	 * @param { object } options - drawMesh 의 꼴.
 	 */
-	drawWithCount(mesh, modelElements, instanceCount, lineId, isInstanceLineId, options) {
+	drawWithCount(mesh, modelElements, instanceCount, lineId, isInstanceLineId, isMirrored, options) {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
 		const lineProgram = this.#lineProgram;
 		const jointMatrices = options.jointMatrices !== undefined ? options.jointMatrices : null;
 		const isSkinned = mesh.isSkinned && jointMatrices !== null;
+		const lineFlags = (options.hasCreaseLine !== false ? 1 : 0) + (options.hasScreenOutline !== false ? 2 : 0);
 		webGL2RenderingContext.uniformMatrix4fv(lineProgram.getUniformLocation("modelMatrix"), false, modelElements);
 		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("instanced"), instanceCount > 0 ? 1 : 0);
 		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("instanceLineIds"), isInstanceLineId ? 1 : 0);
 		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("skinned"), isSkinned ? 1 : 0);
-		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineId"), lineId);
+		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineId"), System.Math.max(0, System.Math.min(TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID, lineId)));
+		webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineFlags"), lineFlags);
 		if (isSkinned) {
 			const jointFloatCount = System.Math.floor(System.Math.min(jointMatrices.length, TOON_MAXIMUM_JOINTS * 16) / 16) * 16;
 			const jointValues = jointMatrices.length === jointFloatCount ? jointMatrices : jointMatrices.subarray(0, jointFloatCount);
@@ -589,6 +750,9 @@ export class ToonScreenOutline {
 		if (indexCount <= 0) {
 			return;
 		}
+		if (isMirrored) {
+			webGL2RenderingContext.frontFace(webGL2RenderingContext.CW);
+		}
 		webGL2RenderingContext.bindVertexArray(mesh.bodyVertexArray);
 		if (instanceCount > 0) {
 			webGL2RenderingContext.drawElementsInstanced(webGL2RenderingContext.TRIANGLES, indexCount, webGL2RenderingContext.UNSIGNED_INT, indexStart * 4, instanceCount);
@@ -596,10 +760,13 @@ export class ToonScreenOutline {
 		else {
 			webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, indexCount, webGL2RenderingContext.UNSIGNED_INT, indexStart * 4);
 		}
+		if (isMirrored) {
+			webGL2RenderingContext.frontFace(webGL2RenderingContext.CCW);
+		}
 	}
 
 	//==============================================================================
-	// 번호 그리기 끝. (선 찾기로 가면을 쓰고, 프레임버퍼와 뷰포트와 상태를 돌린다)
+	// 번호 그리기 끝. (씨앗을 고르고 점프 플러딩으로 넓힌 뒤, 프레임버퍼와 뷰포트와 상태를 돌린다)
 	//==============================================================================
 	endLineIds() {
 		if (this.#savedState === null) {
@@ -608,50 +775,62 @@ export class ToonScreenOutline {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
 		const lineTarget = this.#lineTarget;
 		const frame = this.#frame;
-		webGL2RenderingContext.bindVertexArray(null);
-		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.maskFramebuffer);
+		const lineWidths = this.readLineWidths();
+		this.#lineWidths = lineWidths;
+		webGL2RenderingContext.bindVertexArray(this.#emptyVertexArray);
 		webGL2RenderingContext.viewport(0, 0, lineTarget.width, lineTarget.height);
 		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
 		webGL2RenderingContext.depthMask(false);
 		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
-		const maskProgram = this.#maskProgram;
-		maskProgram.use();
+
+		// 1. 씨앗 고르기.
+		const seedProgram = this.#seedProgram;
+		const projectionElements = frame.projectionElements;
+		const viewElements = frame.viewElements;
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.seedFramebuffers[0]);
+		seedProgram.use();
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.lineTexture);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + DEPTH_TEXTURE_UNIT);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.depthTexture);
-		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
-		const outlineRadius = this.readOutlineRadius();
-		this.#outlineRadius = outlineRadius;
-		const viewDirection = frame.viewDirection;
-		webGL2RenderingContext.uniform1i(maskProgram.getUniformLocation("lineTexture"), LINE_TEXTURE_UNIT);
-		webGL2RenderingContext.uniform1i(maskProgram.getUniformLocation("depthTexture"), DEPTH_TEXTURE_UNIT);
-		webGL2RenderingContext.uniform1f(maskProgram.getUniformLocation("outlineRadius"), outlineRadius);
-		webGL2RenderingContext.uniform1f(maskProgram.getUniformLocation("creaseRadius"), System.Math.max(1, outlineRadius * 0.5));
-		webGL2RenderingContext.uniform1f(maskProgram.getUniformLocation("creaseStrength"), this.#creaseStrength);
-		webGL2RenderingContext.uniform1f(maskProgram.getUniformLocation("creaseCosine"), this.#creaseCosine);
-		webGL2RenderingContext.uniform1f(maskProgram.getUniformLocation("creaseExtent"), this.#creaseExtent);
-		webGL2RenderingContext.uniform1f(maskProgram.getUniformLocation("depthThreshold"), this.#depthThreshold);
-		webGL2RenderingContext.uniform1f(maskProgram.getUniformLocation("contactTolerance"), this.#contactTolerance);
-		webGL2RenderingContext.uniform1f(maskProgram.getUniformLocation("isPerspective"), frame.isPerspective ? 1 : 0);
-		webGL2RenderingContext.uniform2f(maskProgram.getUniformLocation("depthRange"), frame.depthRange[0], frame.depthRange[1]);
-		webGL2RenderingContext.uniform1i(maskProgram.getUniformLocation("sampleCount"), this.#sampleCount);
-		webGL2RenderingContext.uniform1i(maskProgram.getUniformLocation("creaseCount"), this.#creaseSampleCount);
-		webGL2RenderingContext.uniform3f(maskProgram.getUniformLocation("viewDirection"), viewDirection[0], viewDirection[1], viewDirection[2]);
-		webGL2RenderingContext.bindVertexArray(this.#emptyVertexArray);
+		webGL2RenderingContext.uniform1i(seedProgram.getUniformLocation("lineTexture"), LINE_TEXTURE_UNIT);
+		webGL2RenderingContext.uniform1i(seedProgram.getUniformLocation("depthTexture"), DEPTH_TEXTURE_UNIT);
+		webGL2RenderingContext.uniformMatrix3fv(seedProgram.getUniformLocation("viewRotation"), false, [viewElements[0], viewElements[1], viewElements[2], viewElements[4], viewElements[5], viewElements[6], viewElements[8], viewElements[9], viewElements[10]]);
+		webGL2RenderingContext.uniform4f(seedProgram.getUniformLocation("projectionScale"), projectionElements[0], projectionElements[5], projectionElements[8], projectionElements[9]);
+		webGL2RenderingContext.uniform4f(seedProgram.getUniformLocation("projectionDepth"), projectionElements[10], projectionElements[14], projectionElements[12], projectionElements[13]);
+		webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("isPerspective"), frame.isPerspective ? 1 : 0);
+		webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("depthThreshold"), this.#depthThreshold);
+		webGL2RenderingContext.uniform1f(seedProgram.getUniformLocation("creaseCosine"), lineWidths[1] > 0 ? this.#creaseCosine : -2);
 		webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
-		webGL2RenderingContext.bindVertexArray(null);
-		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + DEPTH_TEXTURE_UNIT);
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
+
+		// 2. 점프 플러딩. (그리는 영역 굵기의 반과 덮는 몫의 반 픽셀, 섞을 때 보는 2x2 칸만큼)
+		const jumpFloodProgram = this.#jumpFloodProgram;
+		jumpFloodProgram.use();
+		webGL2RenderingContext.uniform1i(jumpFloodProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
+		const lineScale = lineTarget.height / System.Math.max(1, frame.viewport[3]);
+		const reach = (System.Math.max(lineWidths[0], lineWidths[1]) * 0.5 + 0.5) * lineScale + 1;
+		let seedIndex = 0;
+		for (const stepSize of readJumpFloodSteps(reach)) {
+			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.seedFramebuffers[1 - seedIndex]);
+			webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
+			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.seedTextures[seedIndex]);
+			webGL2RenderingContext.uniform1i(jumpFloodProgram.getUniformLocation("stepSize"), stepSize);
+			webGL2RenderingContext.drawArrays(webGL2RenderingContext.TRIANGLES, 0, 3);
+			seedIndex = 1 - seedIndex;
+		}
+		lineTarget.seedIndex = seedIndex;
+		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, null);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
+		webGL2RenderingContext.bindVertexArray(null);
 		this.restoreState();
 	}
 
 	//==============================================================================
-	// 바깥선 긋기. (가면을 beginLineIds 때의 그리는 영역에 섞는다, 깊이는 보지도 쓰지도 않는다, 스텐실은 그대로)
+	// 바깥선 긋기. (넓힌 씨앗 판으로 beginLineIds 때의 그리는 영역에 섞는다, 깊이는 보지도 쓰지도 않는다, 스텐실은 그대로)
 	//==============================================================================
 	drawOutline() {
 		const lineTarget = this.#lineTarget;
@@ -661,6 +840,8 @@ export class ToonScreenOutline {
 		}
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
 		this.saveState();
+		const viewport = frame.viewport;
+		webGL2RenderingContext.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 		webGL2RenderingContext.disable(webGL2RenderingContext.DEPTH_TEST);
 		webGL2RenderingContext.depthMask(false);
 		webGL2RenderingContext.disable(webGL2RenderingContext.CULL_FACE);
@@ -669,12 +850,14 @@ export class ToonScreenOutline {
 		const compositeProgram = this.#compositeProgram;
 		compositeProgram.use();
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0 + LINE_TEXTURE_UNIT);
-		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.maskTexture);
+		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, lineTarget.seedTextures[lineTarget.seedIndex]);
 		webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE0);
-		const viewport = frame.viewport;
 		const color = this.#color;
-		webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("maskTexture"), LINE_TEXTURE_UNIT);
+		const lineWidths = this.#lineWidths;
+		webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
 		webGL2RenderingContext.uniform4f(compositeProgram.getUniformLocation("viewportRect"), viewport[0], viewport[1], System.Math.max(1, viewport[2]), System.Math.max(1, viewport[3]));
+		webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("lineWidths"), lineWidths[0], lineWidths[1]);
+		webGL2RenderingContext.uniform1f(compositeProgram.getUniformLocation("creaseOpacity"), this.#creaseOpacity);
 		webGL2RenderingContext.uniform4f(compositeProgram.getUniformLocation("outlineColor"), color[0], color[1], color[2], color[3]);
 		webGL2RenderingContext.uniform1f(compositeProgram.getUniformLocation("hdrOutput"), this.#isHdrOutput ? 1 : 0);
 		webGL2RenderingContext.bindVertexArray(this.#emptyVertexArray);
@@ -687,33 +870,34 @@ export class ToonScreenOutline {
 	}
 
 	//==============================================================================
-	// 바깥선 반지름 셈. (선의 판 픽셀, 한 픽셀 밑으로 내리지 않음)
+	// 이번 프레임의 선 굵기 셈. ([바깥 선, 꺾임 선] 의 그리는 영역 픽셀, 0 이 아니면 한 픽셀 밑으로 내리지 않음)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { Array<number> } [바깥 선 굵기, 꺾임 선 굵기].
 	 */
-	readOutlineRadius() {
+	readLineWidths() {
 		const frame = this.#frame;
-		const lineTarget = this.#lineTarget;
-		const scale = lineTarget.height / System.Math.max(1, frame.viewport[3]);
-		if (this.#widthUnit === ToonOutlineWidthUnit.pixel) {
-			return System.Math.max(1, this.#width * scale);
+		let pixelsPerUnit = 1;
+		if (this.#widthUnit === ToonOutlineWidthUnit.world) {
+			pixelsPerUnit = frame.viewport[3] * 0.5 * System.Math.abs(frame.projectionElements[5]);
+			if (frame.isPerspective) {
+				const averageDistance = this.#drawnDistanceCount > 0 ? this.#drawnDistanceSum / this.#drawnDistanceCount : 1;
+				const focusDistance = this.#focusDistance > 0 ? this.#focusDistance : averageDistance;
+				pixelsPerUnit /= System.Math.max(0.001, focusDistance);
+			}
 		}
-		let pixelsPerUnit = frame.viewport[3] * 0.5 * frame.projectionScale;
-		if (frame.isPerspective) {
-			const averageDistance = this.#drawnDistanceCount > 0 ? this.#drawnDistanceSum / this.#drawnDistanceCount : 1;
-			const focusDistance = this.#focusDistance > 0 ? this.#focusDistance : averageDistance;
-			pixelsPerUnit /= System.Math.max(0.001, focusDistance);
-		}
-		return System.Math.max(1, this.#width * pixelsPerUnit * scale);
+		const toPixels = (width) => {
+			return width > 0 ? System.Math.max(1, width * pixelsPerUnit) : 0;
+		};
+		return [toPixels(this.#width), toPixels(this.#creaseWidth)];
 	}
 
 	//==============================================================================
 	// 그린 모형의 거리 더하기. (초점 거리를 주지 않은 원근에서 쓴다, 보기 공간의 앞쪽 거리)
 	//==============================================================================
 	/**
-	 * @param { object } mesh
-	 * @param { Float32Array } modelElements
+	 * @param { object } mesh - ToonRenderer.createMesh 의 결과.
+	 * @param { Float32Array } modelElements - 모형 행렬의 수 16.
 	 */
 	addDrawnDistance(mesh, modelElements) {
 		const center = mesh.boundingCenter;
@@ -732,8 +916,8 @@ export class ToonScreenOutline {
 	// 경계 구가 이번 프레임의 절두체 안에 드는지.
 	//==============================================================================
 	/**
-	 * @param { object } mesh
-	 * @param { Float32Array } modelElements
+	 * @param { object } mesh - ToonRenderer.createMesh 의 결과.
+	 * @param { Float32Array } modelElements - 모형 행렬의 수 16.
 	 * @returns { boolean }
 	 */
 	isVisible(mesh, modelElements) {
@@ -754,11 +938,11 @@ export class ToonScreenOutline {
 	}
 
 	//==============================================================================
-	// 선의 판 읽기. (크기가 바뀌면 다시 지음, 노멀과 번호 RGBA8 과 깊이 24, 가면 R8, 짓지 못하면 null)
+	// 선의 판 읽기. (크기가 바뀌면 다시 지음, 노멀과 번호 RGBA8 과 깊이 24, 씨앗 RGBA16UI 둘, 짓지 못하면 null)
 	//==============================================================================
 	/**
-	 * @param { number } width
-	 * @param { number } height
+	 * @param { number } width - 선의 판 너비. (픽셀)
+	 * @param { number } height - 선의 판 높이. (픽셀)
 	 * @returns { object | null }
 	 */
 	readLineTarget(width, height) {
@@ -770,32 +954,42 @@ export class ToonScreenOutline {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
 		const previousTexture = webGL2RenderingContext.getParameter(webGL2RenderingContext.TEXTURE_BINDING_2D);
 		const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
-		const createTexture = (internalFormat, format, type, filter) => {
+		const createTexture = (internalFormat, format, type) => {
 			const texture = webGL2RenderingContext.createTexture();
 			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
 			webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, null);
-			webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, filter);
-			webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, filter);
+			webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
+			webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
 			webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
 			webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_T, webGL2RenderingContext.CLAMP_TO_EDGE);
 			return texture;
 		};
-		const lineTexture = createTexture(webGL2RenderingContext.RGBA8, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, webGL2RenderingContext.NEAREST);
-		const depthTexture = createTexture(webGL2RenderingContext.DEPTH_COMPONENT24, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, webGL2RenderingContext.NEAREST);
-		const maskTexture = createTexture(webGL2RenderingContext.R8, webGL2RenderingContext.RED, webGL2RenderingContext.UNSIGNED_BYTE, webGL2RenderingContext.LINEAR);
+		const createFramebuffer = (colorTexture, depthTexture) => {
+			const framebuffer = webGL2RenderingContext.createFramebuffer();
+			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
+			webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, colorTexture, 0);
+			if (depthTexture !== null) {
+				webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.DEPTH_ATTACHMENT, webGL2RenderingContext.TEXTURE_2D, depthTexture, 0);
+			}
+			return framebuffer;
+		};
+		const lineTexture = createTexture(webGL2RenderingContext.RGBA8, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE);
+		const depthTexture = createTexture(webGL2RenderingContext.DEPTH_COMPONENT24, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT);
+		const seedTextures = [
+			createTexture(webGL2RenderingContext.RGBA16UI, webGL2RenderingContext.RGBA_INTEGER, webGL2RenderingContext.UNSIGNED_SHORT),
+			createTexture(webGL2RenderingContext.RGBA16UI, webGL2RenderingContext.RGBA_INTEGER, webGL2RenderingContext.UNSIGNED_SHORT),
+		];
 		webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, previousTexture);
-		const framebuffer = webGL2RenderingContext.createFramebuffer();
-		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
-		webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, lineTexture, 0);
-		webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.DEPTH_ATTACHMENT, webGL2RenderingContext.TEXTURE_2D, depthTexture, 0);
-		const status = webGL2RenderingContext.checkFramebufferStatus(webGL2RenderingContext.FRAMEBUFFER);
-		const maskFramebuffer = webGL2RenderingContext.createFramebuffer();
-		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, maskFramebuffer);
-		webGL2RenderingContext.framebufferTexture2D(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.COLOR_ATTACHMENT0, webGL2RenderingContext.TEXTURE_2D, maskTexture, 0);
-		const maskStatus = webGL2RenderingContext.checkFramebufferStatus(webGL2RenderingContext.FRAMEBUFFER);
+		const framebuffer = createFramebuffer(lineTexture, depthTexture);
+		let isComplete = webGL2RenderingContext.checkFramebufferStatus(webGL2RenderingContext.FRAMEBUFFER) === webGL2RenderingContext.FRAMEBUFFER_COMPLETE;
+		const seedFramebuffers = [];
+		for (const seedTexture of seedTextures) {
+			seedFramebuffers.push(createFramebuffer(seedTexture, null));
+			isComplete = isComplete && webGL2RenderingContext.checkFramebufferStatus(webGL2RenderingContext.FRAMEBUFFER) === webGL2RenderingContext.FRAMEBUFFER_COMPLETE;
+		}
 		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, previousFramebuffer);
-		this.#lineTarget = { framebuffer: framebuffer, lineTexture: lineTexture, depthTexture: depthTexture, maskFramebuffer: maskFramebuffer, maskTexture: maskTexture, width: width, height: height };
-		if (status !== webGL2RenderingContext.FRAMEBUFFER_COMPLETE || maskStatus !== webGL2RenderingContext.FRAMEBUFFER_COMPLETE) {
+		this.#lineTarget = { framebuffer: framebuffer, lineTexture: lineTexture, depthTexture: depthTexture, seedFramebuffers: seedFramebuffers, seedTextures: seedTextures, seedIndex: 0, width: width, height: height };
+		if (!isComplete) {
 			this.deleteLineTarget();
 			return null;
 		}
@@ -812,10 +1006,14 @@ export class ToonScreenOutline {
 		}
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
 		webGL2RenderingContext.deleteFramebuffer(lineTarget.framebuffer);
-		webGL2RenderingContext.deleteFramebuffer(lineTarget.maskFramebuffer);
+		for (const seedFramebuffer of lineTarget.seedFramebuffers) {
+			webGL2RenderingContext.deleteFramebuffer(seedFramebuffer);
+		}
 		webGL2RenderingContext.deleteTexture(lineTarget.lineTexture);
 		webGL2RenderingContext.deleteTexture(lineTarget.depthTexture);
-		webGL2RenderingContext.deleteTexture(lineTarget.maskTexture);
+		for (const seedTexture of lineTarget.seedTextures) {
+			webGL2RenderingContext.deleteTexture(seedTexture);
+		}
 		this.#lineTarget = null;
 	}
 
@@ -831,6 +1029,7 @@ export class ToonScreenOutline {
 			isScissorTestEnabled: webGL2RenderingContext.isEnabled(webGL2RenderingContext.SCISSOR_TEST),
 			depthMask: webGL2RenderingContext.getParameter(webGL2RenderingContext.DEPTH_WRITEMASK),
 			depthFunction: webGL2RenderingContext.getParameter(webGL2RenderingContext.DEPTH_FUNC),
+			frontFace: webGL2RenderingContext.getParameter(webGL2RenderingContext.FRONT_FACE),
 			blendSourceRGB: webGL2RenderingContext.getParameter(webGL2RenderingContext.BLEND_SRC_RGB),
 			blendDestinationRGB: webGL2RenderingContext.getParameter(webGL2RenderingContext.BLEND_DST_RGB),
 			blendSourceAlpha: webGL2RenderingContext.getParameter(webGL2RenderingContext.BLEND_SRC_ALPHA),
@@ -861,6 +1060,7 @@ export class ToonScreenOutline {
 		webGL2RenderingContext.useProgram(savedState.program);
 		webGL2RenderingContext.depthMask(savedState.depthMask);
 		webGL2RenderingContext.depthFunc(savedState.depthFunction);
+		webGL2RenderingContext.frontFace(savedState.frontFace);
 		webGL2RenderingContext.cullFace(webGL2RenderingContext.BACK);
 		webGL2RenderingContext.blendFuncSeparate(savedState.blendSourceRGB, savedState.blendDestinationRGB, savedState.blendSourceAlpha, savedState.blendDestinationAlpha);
 		const capabilities = [
@@ -881,15 +1081,15 @@ export class ToonScreenOutline {
 	}
 
 	//==============================================================================
-	// 다 쓴 뒤 지우기.
+	// 다 쓴 뒤 지우기. (선의 판, 버텍스 어레이, 프로그램 넷)
 	//==============================================================================
 	destroy() {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
 		this.deleteLineTarget();
 		webGL2RenderingContext.deleteVertexArray(this.#emptyVertexArray);
 		webGL2RenderingContext.deleteProgram(this.#lineProgram.getProgram());
-		webGL2RenderingContext.deleteProgram(this.#maskProgram.getProgram());
+		webGL2RenderingContext.deleteProgram(this.#seedProgram.getProgram());
+		webGL2RenderingContext.deleteProgram(this.#jumpFloodProgram.getProgram());
 		webGL2RenderingContext.deleteProgram(this.#compositeProgram.getProgram());
 	}
 }
-

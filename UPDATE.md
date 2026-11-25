@@ -296,6 +296,24 @@
   - docs/guide/<판>/ko, en: 개요, 빠른 시작, 구조, 도구. (README, ARCHITECTURE, tools/TOOLS.md, NODE.md 에서 나눔, 저장소 상대 링크는 GitHub 주소로) docs/update/<판>.ko.md, .en.md: 이 판의 업데이트 기록
   - README: UI Editor 가 저장하는 파일은 .uiasset.json 이다. (.ui.json 이라 적혀 있었다) tools/excel.cjs 는 명령줄 진입점이 없는 함수 모음이라 혼자 실행하면 아무것도 하지 않고, tools/table.cjs 는 빈 파일이라고 바로 적었다. 명령줄 도구 표에 apidoc.cjs 를 더했다
 - Wait.nextFrame: 만든 Promise 를 기다리지 않아 바로 끝나던 것을 고쳤다. 이제 다음 requestAnimationFrame 까지 기다린다. (러스트 판 wait::next_frame 과 같다)
+- ToonScreenOutline: 화면 공간 바깥선을 실시간 툰 렌더링의 정석 꼴로 다시 지었다. (게임 하나에 맞춘 꼴이 아니라 엔진의 기준이다)
+  - 잡기: 선의 판(노멀, 선 번호, 깊이)에서 화소와 바로 이웃 넷 사이의 경계마다 한 번 보고, 선은 그 경계 가운데에 세운다. (Saito, Takahashi 1990 의 G 버퍼 가장자리, 유니티 셰이더 그래프 예제의 이웃 넷 보기) 지금까지는 꺾임 선을 가운데 화소에서 creaseRadius 떨어진 한 점의 노멀로 보아, 꺾임 양쪽이 띠로 서고 반 크기 판을 키우면 점선과 평행한 둘째 선이 서고, 둥근 면의 실루엣 안쪽에 띠가 한 겹 더 섰다
+  - 깊이: 이웃 두 화소를 보기 공간 자리로 풀어 서로의 접평면에서 떨어진 거리로 가려진 실루엣을 본다. 비스듬히 보는 바닥과 둥근 면의 둘레에 가짜 선이 서지 않는다. (보는 각도에 따라 문턱을 고치는 Roystan 식을 접평면으로 한 꼴) 문턱에 그 깊이의 화소 크기 두 배를 더한다
+  - 넓히기: 경계 토막까지의 거리를 점프 플러딩(Rong, Tan 2006)으로 퍼뜨린다. 굵기에 상관없이 걸음은 log2 번이다. (Ben Golus, The Quest for Very Wide Outlines) 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다. 지금까지의 3 픽셀 반지름 한도가 없어졌다
+  - 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. 선의 판을 줄여도 거리를 그리는 영역에서 재므로 늘인 선이 끊기지 않는다
+  - 모형마다: drawMesh, drawMeshInstanced 의 options.hasScreenOutline (false 면 선은 내지 않고 뒤의 선만 가린다), options.hasCreaseLine, options.isMirrored (주지 않으면 행렬식으로 감기를 뒤집는다)
+  - 옮기는 법 (공개 API 를 바꿨다)
+    - setCrease(각, 진하기, 이어짐 픽셀) → setCrease(각, 굵기, 진하기). 굵기는 setWidth 의 단위이고 기본 1, 진하기는 0 ~ 1 이고 기본 1. 이어짐 픽셀(creaseExtent)은 없어졌다. (화소 하나 사이만 보므로 필요 없다) 옛 setCrease(60, 0.5, 2) 와 비슷한 모습은 setCrease(60, 1, 0.8)
+    - setDepthThreshold(깊이 문턱, 맞닿음 문턱) → setDepthThreshold(깊이 문턱). 뜻이 접평면 거리로 바뀌었다. (월드 길이, 같은 값을 그대로 넣으면 된다) 맞닿음 문턱(contactTolerance)은 없어졌다. 선을 경계 가운데에 세우므로 어느 쪽에 그을지 가릴 일이 없다
+    - setWidth 의 뜻: 선 하나의 굵기이고, 경계를 가운데로 양쪽에 반씩 덮는다. (지금까지는 실루엣 바깥쪽에만 그 굵기) 기본 1.5 → 2 픽셀. 옛 모습의 바깥 두께를 맞추려면 두 배를 준다
+    - setSampleCount, TOON_SCREEN_OUTLINE_MAXIMUM_SAMPLES, TOON_SCREEN_OUTLINE_MAXIMUM_CREASE_SAMPLES 는 없어졌다. (점프 플러딩은 굵기에 따라 걸음 수가 스스로 정해진다) 가벼운 길은 setResolutionScale 만 낮춘다
+    - getOutlineRadius() → getLineWidths() ([바깥 선, 꺾임 선] 의 그리는 영역 픽셀)
+    - 선 번호 상한 65535 → TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID (16383). 선의 판의 a 칸 위 두 비트에 모형마다의 꼴을 쓴다
+    - getLineTarget() 의 maskTexture 는 없어졌다. 대신 seedTextures (RGBA16UI 둘), seedIndex (넓히기를 마친 쪽)
+    - drawOutline 이 뷰포트를 beginLineIds 때의 그리는 영역으로 스스로 건다. (지금까지는 부르는 쪽의 뷰포트가 같아야 했다)
+  - readJumpFloodSteps(거리): 점프 플러딩 걸음 목록. (큰 것부터 1 까지)
+- ToonDrawQueue: setScreenOutline(ToonScreenOutline 이나 null), getScreenOutline(). 맡기면 draw 와 drawWithMatrices 가 몸 앞에 불투명한 것을 선의 판에 그리고(번호는 options.lineId, 주지 않으면 담은 차례 + 1, 인스턴스는 instances[i].lineId 가 먼저), 바깥선 껍데기 뒤 afterOutline 단계 앞에 섞는다. 모형마다 options.hasScreenOutline, options.hasCreaseLine. 비치는 것은 선의 판에 그리지 않는다. 화면 사각형(setScreenRect)이 있으면 그 사각형을 선의 판의 그리는 영역으로 쓴다. 지금까지 afterOutline 단계 콜백에서 drawOutline 을 부르던 코드는 이것으로 바꾸면 된다
+- 예제 toonstyle: 툰 셰이딩과 바깥선 견주기 장면. (각진 상자, 둥근 공, 큰 면 결정, 잔 면 결정 덩이, 고리, 비스듬한 판, 그림자, 점광, ?scale=0.5 로 반 크기 선의 판, ?toggles=1 로 모형마다의 꼴) 러스트 예제 toonstyle 과 같은 장면이다
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.

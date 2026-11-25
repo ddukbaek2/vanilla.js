@@ -207,7 +207,7 @@ UIWindowLayer (노드) ── UIWindow[] (맨 위 창만 보임, UIScale 만큼 
 │   ├── ToonLightSet (기본 빛 묶음: 해, 채움 빛, 림, 정반사, 점광 8 개, 띠 램프, 빛 꼴)
 │   └── ToonMaterial (참조, 셰이더 조각: uniform, surface, light, vertex)
 ├── ToonDrawQueue ── 한 프레임에 그릴 모형을 담아 불투명, 바깥선, 비치는 것 차례로 + 단계 콜백
-├── ToonScreenOutline ── 같은 모형을 한 번 더 그려 노멀, 선 번호, 깊이로 화면 공간 바깥선
+├── ToonScreenOutline ── 같은 모형을 한 번 더 그려 노멀, 선 번호, 깊이로 화면 공간 바깥선 (경계 잡기, 점프 플러딩, 거리로 섞기)
 ├── ToonVfx ── 코드로 짓는 아틀라스와 인스턴스 GPU 효과 (파티클, 불덩이, 충격파, 자국, 기둥, 빔, 리본, 번개, 빛 점)
 ├── ToonPostProcess ── RenderTarget(멀티샘플, 실수 판) + BloomEffect 또는 MultiLevelBloomEffect + 톤매핑과 색 보정
 └── ToonView3D (Component) ── 노드 사각형 안에 runExternalPass 로 툰 3D 를 그린다 (렌더러는 여러 노드가 나눠 쓸 수 있다)
@@ -280,6 +280,31 @@ soldier.glb ──> parseBinary ──> glTF JSON+BIN
 - 애니메이션 추가 로드: `addAnimationsFromFbxUrl(url, clipName, ignoreTranslation)` 이 애니 전용 FBX 를 **본 이름 매칭으로 리타게팅**해 클립을 추가한다. 루트 모션이 박힌 클립은 이동 채널을 버릴 수 있다.
 - 매 프레임: `model.update(dt)` 가 클립 샘플링(크로스페이드) → 조인트 오프셋 → 월드 행렬 → 조인트 행렬(월드 x 역바인드)까지 계산하고, `renderer.draw(model, ...)` 가 GL 상태를 잡고 드로어블을 순회한다.
 - 툰 3D 는 텍스처 없이 재질 색으로 칠하는 메시를 중심으로 하되, UV 와 바탕색, 빛남, 데칼 텍스처, 머티리얼 셰이더 조각을 받는다. 씬 판은 선형 색이다. (ToonRenderer.setHdrOutput, ToonPostProcess 가 톤매핑과 감마를 건다)
+
+### 6-3. 툰 바깥선
+
+툰 3D 의 바깥선은 두 가지이고 함께 써도 된다.
+
+- 껍데기(inverted hull): MeshBuilder 가 점마다 같은 자리의 노멀을 모아 평균한 쪽(모서리는 덜 튀게 민 쪽)으로 민 사본을 짓고, ToonRenderer 가 그 뒷면만 그려 몸 둘레에 테로 보인다. 모형 하나의 실루엣에 맞고, 굵기를 꼭짓점마다 다르게 지을 수 있다.
+- 화면 공간(ToonScreenOutline): 장면 전체의 실루엣, 물체가 맞닿은 곳, 꺾인 모서리를 한 번에 긋는다.
+
+```
+불투명한 모형 ──(같은 행렬로 한 번 더)──> 선의 판 RGBA8 + 깊이 24
+                                          (노멀 팔면체 접기 rg, 선 번호 14 비트, 꼴 2 비트: 바깥 선, 꺾임 선)
+                                                   │
+씨앗 고르기 (화소와 바로 이웃 넷 사이 경계마다 한 번) ──> 씨앗 판 RGBA16UI (rg 바깥 선, ba 꺾임 선의 경계 가운데, 반 화소 단위)
+   - 바깥 선: 한쪽이 빈 곳 / 번호가 다름 / 같은 번호라도 서로의 접평면에서 깊이 문턱 + 화소 크기 2 배보다 떨어짐
+   - 꺾임 선: 같은 번호, 떨어지지 않음, 두 노멀이 꺾임 각보다 벌어짐
+   - 선은 가린 쪽의 꼴을 따르고, 맞닿은 두 번호는 한쪽만 켜져 있어도 긋는다
+                                                   │
+점프 플러딩 (걸음 k, k/2, ..., 1, 씨앗 판 둘을 번갈아) ──> 화소마다 가장 가까운 경계 토막
+                                                   │
+섞기 (그리는 영역 화소마다, 선의 판 2x2 칸의 씨앗까지 거리) ──> 덮는 몫 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) x 선 색
+```
+
+- 선은 화소가 아니라 화소 사이의 경계 가운데에 서므로 한 경계를 두 번 긋지 않고, 꺾임 양쪽에 띠나 평행한 둘째 선이 서지 않는다.
+- 선의 판을 줄여도(setResolutionScale) 거리를 그리는 영역에서 재므로 늘인 선이 끊기지 않는다. (줄인 판의 계단은 남는다)
+- 그리기 줄(ToonDrawQueue.setScreenOutline)에 맡기면 선의 판은 몸 앞에, 섞기는 바깥선 껍데기 뒤 afterOutline 앞에 한다. 모형마다 hasScreenOutline, hasCreaseLine.
 
 ---
 
