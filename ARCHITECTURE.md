@@ -53,13 +53,13 @@ Object (base/object.js)
 │           ├── WorldNode (core) ──────── pivot/anchor/contentSize + 터치 (수동 배치 노선)
 │           │   ├── UIScrollBar, UIInputField (ui)
 │           │   ├── TouchEffect (misc)
-│           │   ├── HeatHazeEffect (experimental)
 │           │   └── AnchoredWorldNode (deprecated)
 │           └── UINode (ui) ───────────── 오토레이아웃 제약 변수 (솔버 배치 노선)
 ├── Component (core) ─────────────────── 노드에 부착되는 기능 단위
 │   ├── Paint → Sprite
 │   ├── Text → RichText
 │   ├── Mask
+│   ├── ParticleSystem, TrailRenderer, HeatHazeEffect (effect)
 │   ├── Visual (experimental)
 │   └── UIView (ui) ──────────────────── UI 위젯 기반 (위젯 대부분은 노드가 아니라 컴포넌트)
 │       ├── UILabel, UIImageView, UIProgressView
@@ -271,7 +271,7 @@ soldier.glb ──> parseBinary ──> glTF JSON+BIN
 | `experimental/graphics/webgl2.js` | import 경로 깨짐 + 미노출 — 데드 코드 |
 | `experimental/graphics/gl2d.js` | export 없음 — 데드 코드 |
 | `experimental/aabb.js`, `transform2d.js` | 전체 주석 처리 — 데드 파일 |
-| `experimental/camera.js` | Canvas2D 시절 잔재 — 현 Graphic(WebGL2)과 불일치 |
+| `experimental/camera.js` | misc/camera2d.js 의 Camera2D 가 회전과 begin/end 까지 모두 덮는 중복. 러스트 판에는 옮기지 않는다 |
 | `misc/uibuilder.js` | NodeLayout 으로 대체됨 (주석 1줄만 남음) |
 | Sprite 블렌드 | `SpriteBlendMode` 27종 중 Graphic 이 실제 재현하는 것은 9종, 나머지는 source-over 폴백 |
 | 3D 머티리얼 공유 | 텍스처/머티리얼/클립의 모델 간 공유 캐시 없음 — 모델 단위 소유 (공유 소비자가 생기면 도입) |

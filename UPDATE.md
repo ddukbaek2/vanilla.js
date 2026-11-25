@@ -146,6 +146,22 @@
 - Sprite.setFrame(frame): Frame 의 그림과 영역을 함께 건다. (null 이면 그림을 비운다)
 - tools/atlas.cjs: 여러 장(--max-size 를 넘으면 다음 쪽, 쪽마다 모두 들어가는 가장 작은 2 의 거듭제곱), 가장자리 늘여 붙이기(--extrude), 여백(--padding, 기본 2). 놓기를 선반에서 MaxRects 로 바꿔 같은 그림이라도 자리가 전과 다르다. (JSON 으로 읽으면 같다) JSON 의 images 에 page, meta 에 pages, extrude, padding 을 더했다. 쪽이 한 장이면 파일 이름이 전과 같다
 - 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
+- 효과, 3D, 애니메이션에서 러스트 vanilla-engine 과 다르던 것을 맞췄다. (러스트에만 있던 범용 기능을 넣고, 두 엔진에 같이 있던 버그를 같이 고쳤다)
+- ParticleSystem: isFinished(방출할 것이 더 없고 남은 입자도 없음, 루프가 아니면 duration 이 지나고 버스트를 다 냈을 때), getParticlePositionList(입자 자리 목록, 같은 씨앗 비교와 시험용). 러스트 판과 같은 씨앗이면 같은 입자 자리가 나온다
+- HeatHazeEffect: experimental 노드에서 effect 컴포넌트로 옮겼다. (src/effect/heathazeeffect.js, import.js 에서 내보냄) node.addComponent(HeatHazeEffect) 로 붙이고, 붙을 때 노드 내용 크기가 비어 있으면 300 x 300 으로 정한다. getTimer, calculateRowOffset
+- ScreenEffect: destroy 가 렌더 대상과 함께 패스 프로그램과 버텍스 어레이도 지운다
+- Material.createTexture: 이미지를 곧은 알파, 색 프로필 변환 없이 받는다. (createImageBitmap 의 premultiplyAlpha, colorSpaceConversion 을 "none" 으로) 지금까지 브라우저 기본값으로 알파가 곱해져 알파 0 텍셀 색이 검어지고, OLD FACE 의 머리카락과 수염 카드 가장자리가 어두웠다
+- ToonRenderer, SkinnedModelRenderer, HumanSkinRenderer: 그림자를 받지 않을 때 섀도우 유닛에 1x1 비교 깊이 텍스처를 묶는다. (맥 드라이버의 "sampler type (Depth)" 알림과 WebGL 의 샘플러 불일치를 막는다) SkinnedModelRenderer.getEmptyShadowTexture, ToonRenderer.destroy
+- ToonVfx: 빛 파티클과 빛 점의 rim(0 은 더하는 빛, 1 은 테로 덮기, 음수는 엷게 덮는 빛무리), 리본과 번개의 번짐 색 glow, setRimColor, 사는 동안 다시 꺾이는 번개 addLightning(life), 화면 섬광 addFlash, 엔진 Shaker 로 셈하는 카메라 흔들림 addShake, readShake, isShaking. getActiveCounts 에 lightningCount, flashCount. draw 가 깊이 함수도 되돌린다. (게임 aberrant 의 효과에서 범용 몫만, 게임 색과 처방은 매개변수로)
+- SkinnedModel: 바이트에서 읽기, 해석과 업로드 나누기, createWithoutShaderProgram(포즈 계산만), destroy. 기본 모프 가중치를 glTF 노드 weights 에서 읽는다. Material.createImageDescription, destroy. ShadowMap, FullscreenPass, 화면 공간 효과의 destroy(풀스크린 패스까지 지움). FbxLoader 가 2^53 을 넘는 64 비트 id 를 정확히 읽고 빠진 노드는 건너뛴다
+- Camera2D: 회전(setRotation, getRotation, 도, 화면 가운데 축). 그리기 변환, screenToWorld, worldToScreen, panByScreen, fling, zoomAt 이 회전을 따르고, 경계 클램프는 돌아간 뷰를 감싸는 상자(getVisibleHalfExtent)로 잰다. convertScreenDeltaToWorld, begin, end(pushState 와 applyTransform, popState). experimental/camera.js 의 기능을 모두 덮는다. (실험 Camera.setZoom 의 clamp 인자 버그도 고쳤다)
+- Tween: setTarget(node), getTarget, TweenProperty(localPosition, localScale, localRotation, localOpacity, contentSize) 값을 노드에 바로 쓴다, applyTweenProperty, Tween.createNodeTween. 대상이 처음 돈 노드 트리에서 떨어지면 콜백 없이 끝난다. duration 0 이하는 바로 끝. Scene.getTweenCount
+- Animation: 비어 있던 pause, resume 을 채웠다. (gotoAndStop 이 멈춘다) stop 은 멈춰 있어도 첫 프레임으로 돌아간다. (setFrames 뒤 예전 번호가 남던 버그) SpriteAnimator.getCurrentFrameIndex
+- Action: 조건 함수가 대상을 받는다. wait 의 duration 0 이하는 진행률 1(NaN 버그), repeat 0 번은 돌지 않는다
+- Animator: AnimationState setClip, getClip, AnimationTransition setFrom, setTo, getFrom, getTo(상태 번호), getAnimation, addState, getStates, addTransition, getTransitions
+- Timeline: 같은 이름 무대 노드를 버리던 버그(모두 붙이고 이름 표에는 뒤의 것), 부모가 자기 자신이거나 고리면 무대 부모에 붙인다. Timeline.loadFromText, createFromJsonAsset
+- Indicator: getRadius, getRotation, buildTeethSegments, import.js 에서 내보낸다. Visual.getLocation 의 쓰지 않는 인자를 뺐다. VisualAsset setVisual, getVisual
+- 예제 cameratour: 돌아가는 Camera2D(끌면 팬, 휠 줌), Tween.createNodeTween, Indicator
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.
