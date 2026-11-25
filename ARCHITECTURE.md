@@ -88,7 +88,7 @@ Object (base/object.js)
 - `TransformNode` 아래에서 **WorldNode 노선**(pivot/anchor 수동 배치)과 **UINode 노선**(제약 솔버 자동 배치)이 갈리며, 둘은 상속 관계가 없다.
 - UI 위젯 대부분은 **노드가 아니라 Component** 다 (`UIView extends Component`). 노드인 위젯은 `UIScrollBar` / `UIInputField` 뿐이다.
 
-Object 를 상속하지 않는 예외: `AudioPlayer`, `Pane`, autolayout 전체(`LayoutSolver` 등 — 독립 수학 모듈).
+Object 를 상속하지 않는 예외: `AudioPlayer`, `AudioBus`, `Pane`, autolayout 전체(`LayoutSolver` 등 — 독립 수학 모듈).
 
 ---
 
@@ -112,7 +112,7 @@ Engine
 ├── ViewManager ──────────── canvas (참조) + 뷰 스케일/좌표 변환
 ├── InputManager
 │   └── GamepadManager ───── 게임패드는 Engine 직속이 아니라 InputManager 하위
-├── AudioManager ─────────── AudioContext lazy 생성. AudioPlayer 는 생성 후 소유권 이양
+├── AudioManager ─────────── AudioContext lazy 생성. AudioPlayer, AudioBus(createAudioBus, 그 버스로 트는 플레이어를 만든다) 는 생성 후 소유권 이양
 └── Version
 ```
 

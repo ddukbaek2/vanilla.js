@@ -5,6 +5,7 @@ const System = globalThis;
 import { Object } from "../base/object.js";
 import { Engine } from "./engine.js";
 import { AudioPlayer } from "./audioplayer.js";
+import { AudioBus } from "./audiobus.js";
 import { PlatformType } from "../base/platform.js";
 
 
@@ -192,6 +193,17 @@ export class AudioManager extends Object {
 	createAudioPlayer() {
 		const audioContext = this.ensureAudioContext();
 		return new AudioPlayer(audioContext);
+	}
+
+	//==============================================================================
+	// 오디오 버스 생성. (AudioContext 가 없으면 만든다, 만들지 못하면 소리 없는 버스)
+	//==============================================================================
+	/**
+	 * @returns { AudioBus }
+	 */
+	createAudioBus() {
+		const audioContext = this.ensureAudioContext();
+		return new AudioBus(audioContext);
 	}
 
 	//==============================================================================

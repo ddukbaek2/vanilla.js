@@ -3,6 +3,7 @@
 //==============================================================================
 const System = globalThis;
 import { AudioAsset } from "../resource/audioasset.js";
+import { AudioBus } from "./audiobus.js";
 
 
 //==============================================================================
@@ -32,7 +33,9 @@ import { AudioAsset } from "../resource/audioasset.js";
 //
 // 허락하면(setAutoplayAllowedProvider, 주지 않으면 허락) 누르기 전에도 한 번 깨워 본다. 막히면 아래처럼 첫 누름에 켜진다.
 // 브라우저는 사람이 처음 누르기 전에는 소리를 내지 못하게 한다. 엔진이 첫 누름에 AudioContext 를 만들고 깨우므로,
-// 그 뒤에 소리의 길(음악과 효과음의 크기 노드)을 만들고, AudioContext 가 돌고 있을 때만 소리를 낸다. (멈춘 동안 부른 소리가 깨어날 때 한꺼번에 나지 않게)
+// 그 뒤에 소리의 길(음악과 효과음의 버스, AudioBus)을 만들고, AudioContext 가 돌고 있을 때만 소리를 낸다. (멈춘 동안 부른 소리가 깨어날 때 한꺼번에 나지 않게)
+// 버스는 getMusicBus, getEffectBus 로 꺼낸다. 버스로 만든 플레이어(AudioBus.createAudioPlayer)도 설정 크기와 음소거를 따른다.
+// 설정 크기는 버스의 GainNode 에 직접 건다. 그래서 버스의 setVolume, mute 로 건 값은 SoundSystem 이 크기를 다시 걸 때까지 간다.
 // 소리 파일은 놀이를 막지 않게 뒤에서 받는다. 아직 못 받았거나 못 받은 소리는 나지 않을 뿐이다.
 //==============================================================================
 // 효과음을 동시에 낼 수 있는 수. (넘으면 가장 오래된 것을 끊음)
@@ -59,8 +62,8 @@ export class SoundSystem {
 	/** @private @type { Map<string, Array<AudioAsset | null>> } */ #assetsById; // 받은 소리. (무리의 차례대로, 못 받은 것은 null)
 	/** @private @type { Map<string, number> } */ #lastPlayTimeById; // 소리마다 마지막으로 낸 때. (초)
 	/** @private @type { Map<string, number> } */ #lastVariantById; // 소리마다 마지막으로 고른 무리의 번호.
-	/** @private @type { GainNode | null } */ #musicBus; // 배경음악의 크기 노드. (첫 누름 전에는 null)
-	/** @private @type { GainNode | null } */ #effectBus; // 효과음의 크기 노드.
+	/** @private @type { AudioBus | null } */ #musicBus; // 배경음악의 버스. (첫 누름 전에는 null)
+	/** @private @type { AudioBus | null } */ #effectBus; // 효과음의 버스.
 	/** @private @type { Array<object> } */ #voices; // 나고 있는 효과음. ({ soundId, source, startTime })
 	/** @private @type { string } */ #musicId; // 틀어 달라고 한 배경음악. (없으면 "")
 	/** @private @type { number } */ #musicFadeSeconds; // 그 음악으로 바꿀 때 겹치는 초.
@@ -225,17 +228,17 @@ export class SoundSystem {
 	}
 
 	//==============================================================================
-	// 배경음악과 효과음의 크기 노드. (첫 누름 전에는 null)
+	// 배경음악과 효과음의 버스. (첫 누름 전에는 null)
 	//==============================================================================
 	/**
-	 * @returns { GainNode | null }
+	 * @returns { AudioBus | null }
 	 */
 	getMusicBus() {
 		return this.#musicBus;
 	}
 
 	/**
-	 * @returns { GainNode | null }
+	 * @returns { AudioBus | null }
 	 */
 	getEffectBus() {
 		return this.#effectBus;
@@ -541,10 +544,10 @@ export class SoundSystem {
 			const pannerNode = audioContext.createStereoPanner();
 			pannerNode.pan.value = clampedPan;
 			gainNode.connect(pannerNode);
-			pannerNode.connect(effectBus);
+			pannerNode.connect(effectBus.getGainNode());
 		}
 		else {
-			gainNode.connect(effectBus);
+			gainNode.connect(effectBus.getGainNode());
 		}
 		const voice = { soundId: soundId, source: source, gainNode: gainNode, startTime: now };
 		source.onended = () => {
@@ -744,7 +747,7 @@ export class SoundSystem {
 
 	//==============================================================================
 	// 소리의 길 만들기. (첫 누름 뒤 한 번, AudioContext 를 그 전에 만들지 않게)
-	//   - 엔진은 플레이어를 만들 때 AudioContext 를 만든다. 그 플레이어는 쓰지 않고 AudioContext 만 쓴다.
+	//   - 엔진은 버스를 만들 때 AudioContext 를 만든다.
 	//==============================================================================
 	ensurePlayers() {
 		if (this.getEffectBus() !== null) {
@@ -754,15 +757,13 @@ export class SoundSystem {
 		if (!audioManager.hasUserGesture()) {
 			return;
 		}
-		audioManager.createAudioPlayer();
+		const musicBus = audioManager.createAudioBus();
 		const audioContext = audioManager.getAudioContext();
 		if (audioContext === null) {
 			return;
 		}
-		this.#musicBus = audioContext.createGain();
-		this.#musicBus.connect(audioContext.destination);
-		this.#effectBus = audioContext.createGain();
-		this.#effectBus.connect(audioContext.destination);
+		this.#musicBus = musicBus;
+		this.#effectBus = audioManager.createAudioBus();
 		this.#isMuted = false;
 		this.applyVolumes();
 	}
@@ -780,9 +781,11 @@ export class SoundSystem {
 		const musicVolume = this.getMusicVolume();
 		const musicScale = this.getMusicScale();
 		const soundEffectVolume = this.getSoundEffectVolume();
-		const currentTime = musicBus.context.currentTime;
-		musicBus.gain.setTargetAtTime(musicVolume * musicScale * muteScale, currentTime, VOLUME_SMOOTHING_SECONDS);
-		effectBus.gain.setTargetAtTime(soundEffectVolume * muteScale, currentTime, VOLUME_SMOOTHING_SECONDS);
+		const musicGainNode = musicBus.getGainNode();
+		const effectGainNode = effectBus.getGainNode();
+		const currentTime = musicGainNode.context.currentTime;
+		musicGainNode.gain.setTargetAtTime(musicVolume * musicScale * muteScale, currentTime, VOLUME_SMOOTHING_SECONDS);
+		effectGainNode.gain.setTargetAtTime(soundEffectVolume * muteScale, currentTime, VOLUME_SMOOTHING_SECONDS);
 	}
 
 	//==============================================================================
@@ -860,7 +863,8 @@ export class SoundSystem {
 		if (!audioBuffer) {
 			return;
 		}
-		const audioContext = musicBus.context;
+		const musicGainNode = musicBus.getGainNode();
+		const audioContext = musicGainNode.context;
 		const now = audioContext.currentTime;
 		const duration = audioBuffer.duration;
 		const storedPosition = this.#musicPositions.has(musicId) ? this.#musicPositions.get(musicId) : 0;
@@ -878,7 +882,7 @@ export class SoundSystem {
 			gainNode.gain.value = rowVolume;
 		}
 		source.connect(gainNode);
-		gainNode.connect(musicBus);
+		gainNode.connect(musicGainNode);
 		source.start(0, offset);
 		this.#playingMusic = { soundId: musicId, source: source, gain: gainNode, startTime: now, offset: offset, duration: duration };
 	}

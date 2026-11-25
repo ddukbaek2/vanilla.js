@@ -8,6 +8,7 @@ import { AudioAsset } from "../resource/audioasset.js";
 //==============================================================================
 // 오디오 플레이어.
 // AudioAsset 에 로드된 오디오 버퍼를 재생한다.
+// 내보낼 노드를 주면(AudioBus.createAudioPlayer) 출력 대신 그 노드로 소리를 낸다.
 //==============================================================================
 export class AudioPlayer {
 	//==============================================================================
@@ -30,8 +31,9 @@ export class AudioPlayer {
 	/**
 	 * @constructor
 	 * @param { AudioContext | null } audioContext
+	 * @param { AudioNode | null } [outputNode] 소리를 내보낼 노드. (null 이면 audioContext.destination)
 	 */
-	constructor(audioContext) {
+	constructor(audioContext, outputNode = null) {
 		this.#audioContext = audioContext;
 		this.#audioAsset = null;
 		this.#audioSource = null;
@@ -45,7 +47,7 @@ export class AudioPlayer {
 
 		if (audioContext) {
 			this.#gainNode = audioContext.createGain();
-			this.#gainNode.connect(audioContext.destination);
+			this.#gainNode.connect(outputNode !== null ? outputNode : audioContext.destination);
 		}
 	}
 

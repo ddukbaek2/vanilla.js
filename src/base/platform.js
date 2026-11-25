@@ -192,7 +192,7 @@ export class Platform extends Object {
 	/**
 	 * @returns { { totalTransferSize: number, totalDecodedSize: number, loadedFiles: array } }
 	*/
-	getResouceUsage() {
+	getResourceUsage() {
 		const resources = performance.getEntriesByType("resource");		
 		let totalTransferSize = 0; // 네트워크 전송량 (압축된 크기)
 		let totalDecodedSize = 0;  // 실제 압축 해제된 크기
@@ -218,6 +218,16 @@ export class Platform extends Object {
 			totalDecodedSize,
 			loadedFiles
 		};
+	}
+
+	//==============================================================================
+	// 리소스 사용량 반환. (옛 이름의 오타를 그대로 둔 별칭, getResourceUsage 와 같다)
+	//==============================================================================
+	/**
+	 * @returns { { totalTransferSize: number, totalDecodedSize: number, loadedFiles: array } }
+	*/
+	getResouceUsage() {
+		return this.getResourceUsage();
 	}
 
 	//==============================================================================

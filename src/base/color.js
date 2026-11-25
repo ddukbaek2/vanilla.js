@@ -230,6 +230,7 @@ export class Color extends Object {
 	// - 매 프레임 같은 문자열로 Color 를 새로 만들며 생기는 GC 압박을 줄인다.
 	// - 반환된 인스턴스는 공유되므로 절대 고쳐 쓰지 않는다. 고칠 거면 clone() 한다.
 	// - 알파는 0.01 단위로 양자화해 캐시가 불어나는 것을 막는다.
+	// - fromCache 처럼 오래 안 쓴 것부터 버린다. (1024 개까지)
 	//==============================================================================
 	/**
 	 * @param { string } colorString
@@ -239,11 +240,19 @@ export class Color extends Object {
 	static fromHEXCached(colorString, alpha = 1) {
 		const quantizedAlpha = System.Math.round(alpha * 100) / 100;
 		const cacheKey = colorString + "@" + quantizedAlpha;
-		let cachedColor = Color.#hexCache.get(cacheKey);
-		if (!cachedColor) {
-			cachedColor = Color.createFromHEX(colorString);
-			cachedColor.alpha = quantizedAlpha;
-			Color.#hexCache.set(cacheKey, cachedColor);
+		const colorCache = Color.#hexCache;
+		let cachedColor = colorCache.get(cacheKey);
+		if (cachedColor !== undefined) {
+			colorCache.delete(cacheKey);
+			colorCache.set(cacheKey, cachedColor);
+			return cachedColor;
+		}
+		cachedColor = Color.createFromHEX(colorString);
+		cachedColor.alpha = quantizedAlpha;
+		colorCache.set(cacheKey, cachedColor);
+		while (colorCache.size > 1024) {
+			const oldestCacheKey = colorCache.keys().next().value;
+			colorCache.delete(oldestCacheKey);
 		}
 		return cachedColor;
 	}
@@ -284,6 +293,16 @@ export class Color extends Object {
 			colorCache.delete(oldestColorString);
 		}
 		return cachedColor;
+	}
+
+	//==============================================================================
+	// 색 문자열 캐시(fromCache)에 든 수. (정적, 시험과 통계용)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	static getCachedColorCount() {
+		return Color.#stringCache.size;
 	}
 
 	/** @private @type { Map<string, Color> } */ static #stringCache = new System.Map();
