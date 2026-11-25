@@ -392,9 +392,15 @@ export class LayoutSolver {
 		this.#rows.set(artificialSymbol, row.copy());
 		this.#artificial = row.copy();
 
-		this.optimize(this.#artificial);
-		const success = nearZero(this.#artificial.getConstant());
-		this.#artificial = null;
+		// 최적화가 예외로 끝나도 인공 행을 비운다.
+		let success = false;
+		try {
+			this.optimize(this.#artificial);
+			success = nearZero(this.#artificial.getConstant());
+		}
+		finally {
+			this.#artificial = null;
+		}
 
 		// artificial 행이 아직 basic 이면 제거.
 		if (this.#rows.has(artificialSymbol)) {

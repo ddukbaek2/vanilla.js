@@ -159,9 +159,20 @@ export class AmbientOcclusionEffect extends Object {
 	}
 
 	//==============================================================================
-	// 표본 커널 계산. (반구 안에 고르게 — 중심 쪽에 더 촘촘히)
+	// 표본 커널 계산. (반구 안에 고르게, 중심 쪽에 더 촘촘히)
 	//==============================================================================
 	computeKernel() {
+		this.#sampleKernel = AmbientOcclusionEffect.buildSampleKernel();
+	}
+
+	//==============================================================================
+	// 표본 커널 만들기. (WebGL 무관, 황금각 나선, 높이 고르게, 크기 0.15 ~ 1 제곱 분포)
+	//==============================================================================
+	/**
+	 * @returns { Float32Array } 표본마다 x, y, z.
+	 */
+	static buildSampleKernel() {
+		const sampleKernel = new System.Float32Array(SAMPLE_COUNT * 3);
 		for (let sampleIndex = 0; sampleIndex < SAMPLE_COUNT; ++sampleIndex) {
 			const goldenAngle = 2.39996323;
 			const angle = sampleIndex * goldenAngle;
@@ -169,10 +180,11 @@ export class AmbientOcclusionEffect extends Object {
 			const ring = System.Math.sqrt(1 - height * height);
 			let scale = (sampleIndex + 1) / SAMPLE_COUNT;
 			scale = 0.15 + 0.85 * scale * scale;
-			this.#sampleKernel[sampleIndex * 3] = System.Math.cos(angle) * ring * scale;
-			this.#sampleKernel[sampleIndex * 3 + 1] = System.Math.sin(angle) * ring * scale;
-			this.#sampleKernel[sampleIndex * 3 + 2] = height * scale;
+			sampleKernel[sampleIndex * 3] = System.Math.cos(angle) * ring * scale;
+			sampleKernel[sampleIndex * 3 + 1] = System.Math.sin(angle) * ring * scale;
+			sampleKernel[sampleIndex * 3 + 2] = height * scale;
 		}
+		return sampleKernel;
 	}
 
 	//==============================================================================

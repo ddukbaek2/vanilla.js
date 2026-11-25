@@ -111,14 +111,27 @@ export class SubsurfaceScatteringEffect extends Object {
 	}
 
 	//==============================================================================
-	// 커널 계산. (피부 확산 프로파일을 오프셋 구간 넓이로 적분 — 중앙 샘플을 0번에)
+	// 커널 계산. (피부 확산 프로파일을 오프셋 구간 넓이로 적분, 중앙 샘플을 0번에)
 	//==============================================================================
 	computeKernel() {
-		const sampleCount = KERNEL_SAMPLE_COUNT;
 		const falloffColor = this.getFalloffColor();
 		const strengthColor = this.getStrengthColor();
+		this.#kernel = SubsurfaceScatteringEffect.buildKernel(falloffColor, strengthColor);
+	}
 
-		// 채널별 확산 프로파일. (가우시안 합 — 분산은 폴오프 색으로 채널마다 늘어난다)
+	//==============================================================================
+	// 커널 만들기. (WebGL 무관, 표본마다 rgb 가중치 + w 오프셋)
+	//==============================================================================
+	/**
+	 * @param { number[] } falloffColor
+	 * @param { number[] } strengthColor
+	 * @returns { Float32Array }
+	 */
+	static buildKernel(falloffColor, strengthColor) {
+		const sampleCount = KERNEL_SAMPLE_COUNT;
+		const kernel = new System.Float32Array(KERNEL_SAMPLE_COUNT * 4);
+
+		// 채널별 확산 프로파일. (가우시안 합, 분산은 폴오프 색으로 채널마다 늘어난다)
 		function evaluateGaussian(variance, distance, channelIndex) {
 			const scaledDistance = distance / (0.001 + falloffColor[channelIndex]);
 			return System.Math.exp(-(scaledDistance * scaledDistance) / (2 * variance)) / (2 * System.Math.PI * variance);
@@ -131,7 +144,7 @@ export class SubsurfaceScatteringEffect extends Object {
 				+ 0.078 * evaluateGaussian(7.41, distance, channelIndex);
 		}
 
-		// 오프셋. (중앙에 촘촘하게 — 부호 있는 제곱 분포)
+		// 오프셋. (중앙에 촘촘하게, 부호 있는 제곱 분포)
 		const offsets = [];
 		const step = (KERNEL_RANGE * 2) / (sampleCount - 1);
 		for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
@@ -175,12 +188,13 @@ export class SubsurfaceScatteringEffect extends Object {
 				const normalizedWeight = orderedWeights[sampleIndex][channelIndex] / weightSum;
 				const strength = strengthColor[channelIndex];
 				const finalWeight = sampleIndex === 0 ? (1 - strength) + strength * normalizedWeight : strength * normalizedWeight;
-				this.#kernel[sampleIndex * 4 + channelIndex] = finalWeight;
+				kernel[sampleIndex * 4 + channelIndex] = finalWeight;
 			}
 		}
 		for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
-			this.#kernel[sampleIndex * 4 + 3] = orderedOffsets[sampleIndex];
+			kernel[sampleIndex * 4 + 3] = orderedOffsets[sampleIndex];
 		}
+		return kernel;
 	}
 
 	//==============================================================================

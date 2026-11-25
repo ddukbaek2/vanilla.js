@@ -225,6 +225,18 @@
 - KeyCode.audiomute 의 값 "AudioMute" 는 W3C KeyboardEvent.code 표에 없는 이름이라 음소거 키를 눌러도 맞지 않았다. "AudioVolumeMute" 로 고쳤다. (러스트 판과 같이 고침)
 - Node.findDescendantByName(name): findChildRecursiveByName 과 같다. Node.destroyChildrenWhere(predicate): 조건에 맞는 직계 자식을 떼어 destroy 하고 그 수를 돌려준다. (러스트 판 find_descendant_by_name, destroy_children_where 와 같은 이름)
 - GamepadManager.isButtonJustPressed, isButtonJustReleased: 이번 갱신에 방금 눌리거나 떼어진 버튼인지. (러스트 판과 같다)
+- UI 원본 버그를 러스트 판과 같게 고쳤다:
+  - UIDocument 가 Sprite 의 nineSlice 를 쓰기만 하고 읽지 않던 것. 쓰는 꼴([왼쪽, 위, 왼쪽 + 오른쪽, 위 + 아래])을 거꾸로 풀어 읽는다
+  - UIDropdown: 머리 단추 틴트가 펼침 목록 행까지 잡아 고른 뒤 선택 강조가 옛 색으로 덮이던 것. 머리 단추 틴트에서 펼침 목록을 빼고(excludeNodeFromTint), 강조를 바꾸면 행 단추가 틴트 원래 색을 다시 담는다
+  - UIInputField: maxLength 로 잘린 붙여넣기에서 커서가 글 끝을 넘던 것. 글 끝으로 자른다
+  - LayoutSolver: 인공 변수 최적화가 예외로 끝나면 인공 행을 비우지 않고 남기던 것. try / finally 로 비운다
+  - UILabel 의 배경 그리는 차례는 이미 맞았다. (UILabel 이 require 한 Text, RichText 보다 앞 차례로 붙어 배경을 먼저 그린다)
+- 러스트 판에만 있던 범용 기능:
+  - DEVTools: setVisible, getActiveTab, setActiveTab, getSelectedNode, setSelectedNode, isNodeExpanded, setNodeExpanded, getPanelRect. (F2 는 setVisible 을 부른다)
+  - UIDialog.requestDismiss(isConfirmed): 다음 tick 에 닫는다
+  - UIInputField.getDisplayText() (값의 커서 자리에 조합 글을 끼운 글), requestMenuAction(menuAction) (다음 tick 에 잘라내기 / 복사 / 붙여넣기), UIInputFieldMenuAction (import.js 에서 낸다)
+  - AmbientOcclusionEffect.buildSampleKernel(), SubsurfaceScatteringEffect.buildKernel(falloffColor, strengthColor): WebGL 없이 커널을 짓는 정적 함수. computeKernel 이 이것을 쓴다
+  - FbxLoader.parseNodeRecords(arrayBuffer) (머리 확인과 최상위 노드 레코드, parse 의 앞부분), FbxLoader.readVersion(arrayBuffer) (정적, 머리의 판 번호)
 - 비주얼 에디터를 위 엔진으로 다시 빌드했다
 
 # 0.3.2 (2026-10-22)

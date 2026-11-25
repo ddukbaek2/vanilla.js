@@ -14,6 +14,16 @@ import { SYSTEM_FONT_STRING } from "../base/platform.js";
 
 
 //==============================================================================
+// 문맥 메뉴 항목. (잘라내기 / 복사 / 붙여넣기, requestMenuAction 이 받는다)
+//==============================================================================
+export const UIInputFieldMenuAction = {
+	cut: "cut",
+	copy: "copy",
+	paste: "paste",
+};
+
+
+//==============================================================================
 // 입력 필드 (캔버스 기반).
 // - 텍스트 렌더링은 UILabel 자식 노드 두 개로 (값 라벨 + 플레이스홀더 라벨).
 // - 클릭/드래그/커서 이동/선택은 모두 캔버스 측에서 직접 처리.
@@ -35,6 +45,7 @@ export class UIInputField extends WorldNode {
 	/** @private @type { Function | null } */ #contextMenuHandler;
 	/** @private @type { HTMLElement | null } */ #contextMenuElement;
 	/** @private @type { Function | null } */ #contextMenuDismissHandler;
+	/** @private @type { string | null } */ #pendingMenuAction; // 다음 tick 에 할 문맥 메뉴 항목. (UIInputFieldMenuAction, null 이면 없음)
 
 	/** @private @type { string } */ #value;
 	/** @private @type { string } */ #composition;
@@ -91,6 +102,7 @@ export class UIInputField extends WorldNode {
 		this.#contextMenuHandler = null;
 		this.#contextMenuElement = null;
 		this.#contextMenuDismissHandler = null;
+		this.#pendingMenuAction = null;
 
 		this.#value = "";
 		this.#composition = "";
@@ -251,6 +263,18 @@ export class UIInputField extends WorldNode {
 	getCursorIndex() { return this.#cursorIndex; }
 	getSelectionStart() { return this.#selectionStart; }
 	getComposition() { return this.#composition; }
+
+	//==============================================================================
+	// 보이는 글 반환. (값의 커서 자리에 조합 글을 끼운 것)
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getDisplayText() {
+		const before = this.#value.slice(0, this.#cursorIndex);
+		const after = this.#value.slice(this.#cursorIndex);
+		return before + this.#composition + after;
+	}
 	isComposing() { return this.#isComposing; }
 
 	setOnChange(callback) { this.#onChangeCallback = callback; }
@@ -323,6 +347,12 @@ export class UIInputField extends WorldNode {
 	//==============================================================================
 	tick(timeDelta) {
 		super.tick(timeDelta);
+		// 부탁받은 문맥 메뉴 항목.
+		if (this.#pendingMenuAction !== null) {
+			const menuAction = this.#pendingMenuAction;
+			this.#pendingMenuAction = null;
+			this.performMenuAction(menuAction);
+		}
 		this.refreshTextPositions();
 		if (this.#domInput) {
 			this.layoutDOMInput();
@@ -779,7 +809,7 @@ export class UIInputField extends WorldNode {
 		let next = this.#value.slice(0, range.start) + text + this.#value.slice(range.end);
 		if (this.#maxLength > 0 && next.length > this.#maxLength) next = next.slice(0, this.#maxLength);
 		this.#value = next;
-		this.#cursorIndex = range.start + text.length;
+		this.#cursorIndex = System.Math.min(range.start + text.length, next.length);
 		this.#selectionStart = this.#cursorIndex;
 		if (this.#domInput) {
 			this.#domInput.value = this.#value;
@@ -805,6 +835,39 @@ export class UIInputField extends WorldNode {
 				this.replaceSelection(text);
 			}
 		}).catch(() => { /* 무시 */ });
+	}
+
+	//==============================================================================
+	// 문맥 메뉴 항목 부탁. (다음 tick 에 한다, UIInputFieldMenuAction)
+	//==============================================================================
+	/**
+	 * @param { string } menuAction
+	 */
+	requestMenuAction(menuAction) {
+		this.#pendingMenuAction = menuAction;
+	}
+
+	//==============================================================================
+	// 문맥 메뉴 항목 하기.
+	//==============================================================================
+	/**
+	 * @param { string } menuAction
+	 */
+	performMenuAction(menuAction) {
+		switch (menuAction) {
+			case UIInputFieldMenuAction.cut: {
+				this.cut();
+				break;
+			}
+			case UIInputFieldMenuAction.copy: {
+				this.copy();
+				break;
+			}
+			case UIInputFieldMenuAction.paste: {
+				this.paste();
+				break;
+			}
+		}
 	}
 	writeClipboard(text) {
 		try {
