@@ -157,7 +157,12 @@ export class Material extends Object {
 			const blobOptions = imageDescription.mimeType ? { type: imageDescription.mimeType } : {};
 			imageSource = new System.Blob([imageDescription.bytes], blobOptions);
 		}
-		const bitmapOptions = imageDescription.flipY ? { imageOrientation: "flipY" } : {};
+		// 픽셀은 파일 그대로 받는다. (브라우저 기본값은 알파를 곱하고 색 프로필을 바꾼다. 셰이더는 곧은 알파를 기대하므로
+		// 그대로 두면 알파 0 텍셀 색이 검어져 머리카락 / 수염 카드 가장자리가 어두워진다)
+		const bitmapOptions = { premultiplyAlpha: "none", colorSpaceConversion: "none" };
+		if (imageDescription.flipY) {
+			bitmapOptions.imageOrientation = "flipY";
+		}
 		const imageBitmap = await System.createImageBitmap(imageSource, bitmapOptions);
 		const internalFormat = imageDescription.isColorData ? webGL2RenderingContext.SRGB8_ALPHA8 : webGL2RenderingContext.RGBA8;
 		webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, internalFormat, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, imageBitmap);
