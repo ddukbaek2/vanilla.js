@@ -233,3 +233,5 @@ export { ToastPhase } from "./src/ui/toastmotion.js";
 export { DynamicFont, GlyphInfo } from "./src/misc/dynamicfont.js";
 export { splitGraphemes, splitWords, countGraphemes, sliceGraphemes } from "./src/core/component/text.js";
 export { detectTextDirection } from "./src/core/graphic.js";
+// 글자, 그리기 갈래. (러스트 판에만 있던 Graphic 없이 글 재기)
+export { measureTextWithoutGraphic } from "./src/core/graphic/textstringtexturecache.js";

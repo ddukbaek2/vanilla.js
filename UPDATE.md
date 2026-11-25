@@ -222,6 +222,8 @@
 - Platform.getResourceUsage(): 바른 이름을 더했다. 옛 이름 getResouceUsage() 는 같은 것을 부르는 별칭으로 남긴다
 - Color.fromHEXCached: fromCache 처럼 1024 개를 넘으면 가장 오래 안 쓴 것부터 버린다. (전에는 끝없이 쌓였다) Color.getCachedColorCount(): fromCache 캐시에 든 수 (러스트 판의 get_cached_color_count)
 - 비주얼 에디터를 위 엔진으로 다시 빌드했다
+- 러스트 판에만 있던 범용 기능을 넣었다. Text.calculateFittedFontSize(), UILabel.calculateFittedFontSize() (그릴 때의 크기를 그 자리에서 잼, 이 판은 Graphic 없이 재므로 getFittedFontSize 와 같은 값), Text.wrapLinesWithoutGraphic(maximumWidth) (지금 글과 글꼴로 나눈 줄 목록, 잴 캔버스가 없으면 null), measureTextWithoutGraphic(fontString, text) (import.js 에서 낸다, measureTextMetrics 와 같음)
+- Graphic.readFramebufferPixels() (지금 그린 화면을 { width, height, pixels } 로, 위에서 아래로 놓인 RGBA, 알파 255), getDrawingBufferWidth(), getDrawingBufferHeight() (마지막으로 맞춘 뷰포트), getImageSmoothingQuality()
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.

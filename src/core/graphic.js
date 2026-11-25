@@ -620,6 +620,16 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// 이미지 스무딩 퀄리티 반환. ("low", "medium", "high", 처음은 "high")
+	//==============================================================================
+	/**
+	 * @returns { string }
+	 */
+	getImageSmoothingQuality() {
+		return this.#imageSmoothingQuality;
+	}
+
+	//==============================================================================
 	// 모든 기즈모 강제 표시 설정.
 	//==============================================================================
 	/**
@@ -2731,6 +2741,52 @@ export class Graphic extends Object {
 	 */
 	getWebGL2RenderingContext() {
 		return this.#webGL2RenderingContext;
+	}
+
+	//==============================================================================
+	// 드로잉 버퍼 너비 반환. (픽셀, 마지막으로 맞춘 뷰포트)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getDrawingBufferWidth() {
+		return this.#appliedViewportWidth;
+	}
+
+	//==============================================================================
+	// 드로잉 버퍼 높이 반환. (픽셀, 마지막으로 맞춘 뷰포트)
+	//==============================================================================
+	/**
+	 * @returns { number }
+	 */
+	getDrawingBufferHeight() {
+		return this.#appliedViewportHeight;
+	}
+
+	//==============================================================================
+	// 지금 그린 화면 읽기. (너비, 높이, 위에서 아래로 놓인 RGBA. 화면을 넘기기 전에 부른다)
+	// - 캔버스처럼 불투명으로 본다. (알파 255)
+	//==============================================================================
+	/**
+	 * @returns { { width: number, height: number, pixels: Uint8Array } }
+	 */
+	readFramebufferPixels() {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const width = System.Math.max(0, this.#appliedViewportWidth);
+		const height = System.Math.max(0, this.#appliedViewportHeight);
+		const rowByteCount = width * 4;
+		const bottomUpPixels = new System.Uint8Array(rowByteCount * height);
+		webGL2RenderingContext.pixelStorei(webGL2RenderingContext.PACK_ALIGNMENT, 1);
+		webGL2RenderingContext.readPixels(0, 0, width, height, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, bottomUpPixels);
+		const topDownPixels = new System.Uint8Array(rowByteCount * height);
+		for (let rowIndex = 0; rowIndex < height; rowIndex++) {
+			const sourceStart = (height - 1 - rowIndex) * rowByteCount;
+			topDownPixels.set(bottomUpPixels.subarray(sourceStart, sourceStart + rowByteCount), rowIndex * rowByteCount);
+		}
+		for (let alphaIndex = 3; alphaIndex < topDownPixels.length; alphaIndex += 4) {
+			topDownPixels[alphaIndex] = 255;
+		}
+		return { width: width, height: height, pixels: topDownPixels };
 	}
 
 	//==============================================================================
