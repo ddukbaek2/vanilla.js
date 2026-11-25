@@ -2568,6 +2568,44 @@ export class Graphic extends Object {
 	}
 
 	//==============================================================================
+	// 깊이 버퍼 비우기. (2D 그리기 사이에 3D 를 끼우기 전에)
+	// - 자르기(beginClipRect, 스텐실)를 건 뒤 그리는 도중에 깊이를 비우면 갤럭시 폴드3(Adreno 660)의 드라이버가 3D 를 하나도 그리지 못한 일이 있다.
+	//   자르기 안에 3D 를 그릴 노드는 beginClipRect 앞에서 이것을 부르고, runExternalPass 에는 clearDepth: false 를 준다.
+	//==============================================================================
+	clearDepthBuffer() {
+		this.flushSpriteBatch();
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		webGL2RenderingContext.depthMask(true);
+		webGL2RenderingContext.clear(webGL2RenderingContext.DEPTH_BUFFER_BIT);
+	}
+
+	//==============================================================================
+	// 2D 그리기 사이에 WebGL 패스 끼우기. (앞의 2D 묶음을 그리고, 상태 기억을 잊고, 깊이를 비운 뒤 callback, 끝나면 restoreRenderState)
+	// - callback 은 WebGL2 컨텍스트를 받아 프로그램, 버텍스 어레이, 뷰포트, 섞기, 깊이, 면 가리기를 마음대로 바꿔도 된다. (스텐실 자르기는 그대로 걸려 있고, 스텐실 상태는 되돌리지 않으므로 바꾸지 않는다)
+	// - callback 이 던지면 상태를 되돌린 뒤 다시 던진다.
+	//==============================================================================
+	/**
+	 * @param { Function } callback (webGL2RenderingContext) => any
+	 * @param { object } [options] { clearDepth 깊이를 비울지 (기본 true, 자르기 안이면 clearDepthBuffer 머리말) }
+	 * @returns { any } callback 이 돌려준 것.
+	 */
+	runExternalPass(callback, options = {}) {
+		const isDepthCleared = options.clearDepth !== false;
+		this.flushSpriteBatch();
+		if (isDepthCleared) {
+			this.clearDepthBuffer();
+		}
+		this.invalidateRenderStateCache();
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		try {
+			return callback(webGL2RenderingContext);
+		}
+		finally {
+			this.restoreRenderState();
+		}
+	}
+
+	//==============================================================================
 	// 버텍스 어레이 반환.
 	//==============================================================================
 	/**

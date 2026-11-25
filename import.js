@@ -202,3 +202,4 @@ export { ToastMotion, attachToastMotion, readToastSeconds } from "./src/ui/toast
 export { UIDialog } from "./src/ui/uidialog.js";
 export { Camera3D } from "./src/experimental/graphics/camera3d.js";
 export { ToonDrawQueue } from "./src/experimental/graphics/toon/toondrawqueue.js";
+export { ToonView3D } from "./src/experimental/graphics/toon/toonview3d.js";
