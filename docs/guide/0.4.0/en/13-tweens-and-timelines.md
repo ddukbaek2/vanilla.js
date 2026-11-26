@@ -176,7 +176,7 @@ engine.run(new AnimationScene());
 - `addClip(clipName, image, frameRects, framesPerSecond, isLoop)` registers a clip (default 10 frames per second, looping). `image` is an `HTMLImageElement`.
 - `addClipFromAtlas(clipName, image, atlasJson, frameIds, framesPerSecond, isLoop)` takes frames from a TexturePacker-style table (`{ frames: { name: { frame: { x, y, w, h } } } }`).
 - `play(clipName, { restartIfSame, onComplete })` switches clips. If the same clip is already playing, it does not restart (unless `restartIfSame: true`) and only replaces the completion function. It returns `true` if it started the clip.
-- There are also `stop()`, `getClipName()`, `isPlaying()`, `getCurrentFrameIndex()`, `hasClip(clipName)`, the static `SpriteAnimator.play(node, clipName, options)` (plays with the node's animator, the same form as the Rust engine), and `playClip(clipName, options)` (the Rust `play_clip`, same as the instance `play`).
+- There are also `stop()`, `getClipName()`, `isPlaying()`, `getCurrentFrameIndex()`, `hasClip(clipName)`, the static `SpriteAnimator.play(node, clipName, options)` (plays with the node's animator, the same form as the Rust engine), and `playClip(clipName, options)` (the Rust `play_clip`).
 
 ```javascript
 import { Engine, EngineConfiguration, Scene, WorldNode, Sprite, SpriteAnimator, ImageAsset, Vector2, Rect } from "./build/vanilla.js";
@@ -207,7 +207,7 @@ class AnimatorScene extends Scene {
 		const spriteAnimator = node.addComponent(SpriteAnimator);
 		spriteAnimator.addClip("idle", image, idleRects, 4, true);
 		spriteAnimator.addClip("attack", image, attackRects, 12, false);
-		spriteAnimator.play("idle");
+		spriteAnimator.playClip("idle");
 		const root = this.getRoot();
 		root.addChild(node);
 		this.#spriteAnimator = spriteAnimator;
@@ -216,10 +216,10 @@ class AnimatorScene extends Scene {
 	touchPress(viewInputPosition) {
 		super.touchPress(viewInputPosition);
 		const spriteAnimator = this.#spriteAnimator;
-		spriteAnimator.play("attack", {
+		spriteAnimator.playClip("attack", {
 			restartIfSame: true,
 			onComplete: () => {
-				spriteAnimator.play("idle");
+				spriteAnimator.playClip("idle");
 			},
 		});
 	}
@@ -471,7 +471,7 @@ class StateScene extends Scene {
 		const stateMachine = this.#stateMachine;
 		stateMachine.addState("idle", {
 			enter: () => {
-				spriteAnimator.play("idle");
+				spriteAnimator.playClip("idle");
 			},
 			tick: (timeDelta, stateSeconds) => {
 				if (stateSeconds >= 2) {
@@ -481,7 +481,7 @@ class StateScene extends Scene {
 		});
 		stateMachine.addState("run", {
 			enter: () => {
-				spriteAnimator.play("run");
+				spriteAnimator.playClip("run");
 			},
 			tick: (timeDelta, stateSeconds) => {
 				if (stateSeconds >= 1) {

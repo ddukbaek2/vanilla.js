@@ -299,7 +299,7 @@ mannequin_female.glb ──> parseBinary ──> glTF JSON+BIN
 |---|---|
 | `core/resources.js` | 0 바이트. 중앙 애셋 캐시 계층 미구현 (현재는 인스턴스 단위 소유) |
 | `core/layer.js` | 빈 스텁. base/Object 미임포트로 전역 Object 상속. 미사용, 미노출 |
-| `Object.destroy()` | 파괴 표시를 남기지 않는 훅이라 `isDestroyed()` 는 항상 false (고유식별자는 처음 `getInstanceId()` 에서 모듈 WeakMap 에 넣는다) |
+| `Object.destroy()` | 파괴 표시를 남기지 않는 훅이다. 늘 false 이던 `isDestroyed()` 는 0.4.0 에서 뺐다 (러스트 판은 버린 값이 없어지고 지운 노드의 핸들이 None 이라 같은 함수가 없다. 고유식별자는 처음 `getInstanceId()` 에서 모듈 WeakMap 에 넣는다) |
 | `Scene` 초기화 | 루트 노드가 생성자가 아닌 `create()` 에서 생성됨. SceneManager 경유가 암묵 계약 |
 | `deprecated/webgl2.js` | 미노출. 데드 코드 (옛 자리 experimental/graphics 에서는 import 경로도 깨져 있었다) |
 | `deprecated/gl2d.js` | export 없음. 데드 코드 |

@@ -299,7 +299,7 @@ mannequin_female.glb ──> parseBinary ──> glTF JSON+BIN
 |---|---|
 | `core/resources.js` | 0 bytes. Central asset cache layer not implemented (currently per-instance ownership) |
 | `core/layer.js` | Empty stub. Does not import base/Object, so it inherits the global Object. Unused, unexposed |
-| `Object.destroy()` | A hook that leaves no destroyed mark, so `isDestroyed()` is always false (the unique identifier is put into a module WeakMap on the first `getInstanceId()`) |
+| `Object.destroy()` | A hook that leaves no destroyed mark. `isDestroyed()`, which was always false, is removed in 0.4.0 (the Rust engine has no such function because a dropped value is gone and the handle of a removed node is None. The unique identifier is put into a module WeakMap on the first `getInstanceId()`) |
 | `Scene` initialization | The root node is created in `create()`, not in the constructor. Going through SceneManager is an implicit contract |
 | `deprecated/webgl2.js` | Unexposed. Dead code (in its old place experimental/graphics its import paths were broken too) |
 | `deprecated/gl2d.js` | No exports. Dead code |

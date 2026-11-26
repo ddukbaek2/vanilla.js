@@ -10,8 +10,8 @@ import { Rect } from "../base/rect.js";
 
 //==============================================================================
 // 스프라이트 애니메이터 컴포넌트.
-// - 이름을 붙인 클립(프레임 시퀀스)을 등록해 두고 play("run") 으로 전환한다.
-// - 같은 클립을 다시 play 해도 재시작하지 않는다. (restartIfSame 옵션으로 바꿀 수 있다)
+// - 이름을 붙인 클립(프레임 시퀀스)을 등록해 두고 SpriteAnimator.play(node, "run") 이나 playClip("run") 으로 전환한다.
+// - 같은 클립을 다시 틀어도 재시작하지 않는다. (restartIfSame 옵션으로 바꿀 수 있다)
 // - 클립이 끝나면 onComplete 콜백으로 다음 상태를 이어 갈 수 있다. (FSM 과 결합)
 // - 같은 노드의 Sprite 컴포넌트에 현재 프레임(image + rect)을 반영한다.
 // - 사용:
@@ -20,7 +20,7 @@ import { Rect } from "../base/rect.js";
 //     animator.addClip("attack", image, attackRects, 12, false);
 //     SpriteAnimator.play(node, "attack", { onComplete: () => animator.playClip("idle") });
 // - 두 엔진이 같은 꼴: 정적 SpriteAnimator.play(node, clipName, options) 가 노드의 애니메이터로 틀고, 애니메이터만 있을 때(완료 콜백 안)는 playClip 이다.
-//   (러스트 판 SpriteAnimator::play, play_clip) 인스턴스 play 는 playClip 과 같다.
+//   (러스트 판 SpriteAnimator::play, play_clip)
 //==============================================================================
 /**
  * @example <caption>대기 클립을 돌리다 누르면 공격 한 번 뒤 대기로 돌아가기</caption>
@@ -41,7 +41,7 @@ import { Rect } from "../base/rect.js";
  * const spriteAnimator = characterNode.addComponent(SpriteAnimator);
  * spriteAnimator.addClip("idle", image, idleRects, 6, true);
  * spriteAnimator.addClip("attack", image, attackRects, 12, false);
- * spriteAnimator.play("idle");
+ * spriteAnimator.playClip("idle");
  *
  * class MainScene extends Scene {
  * 	initialize(engine) {
@@ -55,9 +55,9 @@ import { Rect } from "../base/rect.js";
  *
  * 	touchPress(viewInputPosition) {
  * 		super.touchPress(viewInputPosition);
- * 		spriteAnimator.play("attack", {
+ * 		spriteAnimator.playClip("attack", {
  * 			onComplete: () => {
- * 				spriteAnimator.play("idle");
+ * 				spriteAnimator.playClip("idle");
  * 			},
  * 		});
  * 	}
@@ -128,7 +128,7 @@ export class SpriteAnimator extends Component {
 	 * };
 	 * const spriteAnimator = new SpriteAnimator();
 	 * spriteAnimator.addClipFromAtlas("run", image, atlasJson, ["run_0", "run_1", "run_2"], 12, true);
-	 * console.log(spriteAnimator.hasClip("run"), spriteAnimator.play("run"));
+	 * console.log(spriteAnimator.hasClip("run"), spriteAnimator.playClip("run"));
 	 * spriteAnimator.tick(0.1);
 	 * console.log(spriteAnimator.getClipName(), spriteAnimator.getCurrentFrameIndex());
 	 */
@@ -145,18 +145,6 @@ export class SpriteAnimator extends Component {
 			frameRects.push(Rect.create(rectData.x, rectData.y, width, height));
 		}
 		this.addClip(clipName, image, frameRects, fps, isLoop);
-	}
-
-	//==============================================================================
-	// 재생. (playClip 과 같다)
-	//==============================================================================
-	/**
-	 * @param { string } clipName 재생할 클립 이름. (등록하지 않은 이름이면 false)
-	 * @param { object } options { onComplete?, restartIfSame = false }
-	 * @returns { boolean } 재생 시작 여부.
-	 */
-	play(clipName, options = {}) {
-		return this.playClip(clipName, options);
 	}
 
 	//==============================================================================

@@ -351,7 +351,7 @@
 				if (elapsed >= state.nextJump) {
 					state.nextJump = elapsed + 2.2;
 					state.jumpTime = elapsed;
-					scene.heroAnimator.play("jump", { onComplete: () => { scene.heroAnimator.play("idle"); } });
+					scene.heroAnimator.playClip("jump", { onComplete: () => { scene.heroAnimator.playClip("idle"); } });
 				}
 				if (state.jumpTime >= 0) {
 					const jumpPhase = System.Math.min(1, (elapsed - state.jumpTime) / 0.7);
@@ -1403,7 +1403,7 @@
 			}
 			this.heroAnimator.addClip("idle", slimeImage, idleRects, 10, true);
 			this.heroAnimator.addClip("jump", slimeImage, [idleRects[2], idleRects[3], idleRects[4], idleRects[5], idleRects[6], idleRects[7], idleRects[0]], 14, false);
-			this.heroAnimator.play("idle");
+			this.heroAnimator.playClip("idle");
 
 			this.worldNode.addChild(this.modeRoot);
 			this.floatingText = new FloatingText();
@@ -1439,7 +1439,7 @@
 			this.hero.setLocalOpacity(1);
 			this.heroSprite.setHorizontalFlip(false);
 			this.heroSprite.setEffect(ShaderSpriteEffect.none);
-			this.heroAnimator.play("idle");
+			this.heroAnimator.playClip("idle");
 			this.subjectTable.bat.node.setLocalPosition(Vector2.create(800, 220));
 			for (const subjectName of System.Object.keys(this.subjectTable)) {
 				this.subjectTable[subjectName].sprite.setEffect(ShaderSpriteEffect.none);

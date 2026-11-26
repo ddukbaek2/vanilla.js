@@ -176,7 +176,7 @@ engine.run(new AnimationScene());
 - `addClip(clipName, image, frameRects, framesPerSecond, isLoop)` 는 클립을 등록합니다(기본 10 프레임, 반복). `image` 는 `HTMLImageElement` 입니다.
 - `addClipFromAtlas(clipName, image, atlasJson, frameIds, framesPerSecond, isLoop)` 는 TexturePacker 꼴(`{ frames: { 이름: { frame: { x, y, w, h } } } }`) 표에서 프레임을 뽑습니다.
 - `play(clipName, { restartIfSame, onComplete })` 는 클립을 바꿉니다. 같은 클립이 이미 돌고 있으면 다시 시작하지 않고(`restartIfSame: true` 면 다시 시작) 완료 함수만 바꿉니다. 시작했으면 `true` 를 돌려줍니다.
-- `stop()`, `getClipName()`, `isPlaying()`, `getCurrentFrameIndex()`, `hasClip(clipName)`, 정적 `SpriteAnimator.play(node, clipName, options)`(노드의 애니메이터로 틀기, 러스트 판과 같은 꼴)와 `playClip(clipName, options)`(러스트 판 `play_clip`, 인스턴스 `play` 와 같음)가 있습니다.
+- `stop()`, `getClipName()`, `isPlaying()`, `getCurrentFrameIndex()`, `hasClip(clipName)`, 정적 `SpriteAnimator.play(node, clipName, options)`(노드의 애니메이터로 틀기, 러스트 판과 같은 꼴)와 `playClip(clipName, options)`(러스트 판 `play_clip`)가 있습니다.
 
 ```javascript
 import { Engine, EngineConfiguration, Scene, WorldNode, Sprite, SpriteAnimator, ImageAsset, Vector2, Rect } from "./build/vanilla.js";
@@ -207,7 +207,7 @@ class AnimatorScene extends Scene {
 		const spriteAnimator = node.addComponent(SpriteAnimator);
 		spriteAnimator.addClip("idle", image, idleRects, 4, true);
 		spriteAnimator.addClip("attack", image, attackRects, 12, false);
-		spriteAnimator.play("idle");
+		spriteAnimator.playClip("idle");
 		const root = this.getRoot();
 		root.addChild(node);
 		this.#spriteAnimator = spriteAnimator;
@@ -216,10 +216,10 @@ class AnimatorScene extends Scene {
 	touchPress(viewInputPosition) {
 		super.touchPress(viewInputPosition);
 		const spriteAnimator = this.#spriteAnimator;
-		spriteAnimator.play("attack", {
+		spriteAnimator.playClip("attack", {
 			restartIfSame: true,
 			onComplete: () => {
-				spriteAnimator.play("idle");
+				spriteAnimator.playClip("idle");
 			},
 		});
 	}
@@ -471,7 +471,7 @@ class StateScene extends Scene {
 		const stateMachine = this.#stateMachine;
 		stateMachine.addState("idle", {
 			enter: () => {
-				spriteAnimator.play("idle");
+				spriteAnimator.playClip("idle");
 			},
 			tick: (timeDelta, stateSeconds) => {
 				if (stateSeconds >= 2) {
@@ -481,7 +481,7 @@ class StateScene extends Scene {
 		});
 		stateMachine.addState("run", {
 			enter: () => {
-				spriteAnimator.play("run");
+				spriteAnimator.playClip("run");
 			},
 			tick: (timeDelta, stateSeconds) => {
 				if (stateSeconds >= 1) {
