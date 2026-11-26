@@ -9418,5 +9418,13 @@
 	"게임패드 버튼 식별자. (W3C Standard Gamepad 매핑 규격)": "Gamepad button identifiers. (W3C Standard Gamepad mapping)",
 	"Triggers (버튼으로도 인식됨)": "Triggers (also recognized as buttons)",
 	"패스. (셰이더 짓기에 실패했으면 null)": "Pass. (null if building the shader failed)",
-	"패스 반환. (없으면 컴파일. 실패도 담아 두고 한 번만 알린다, 실패한 패스의 단계는 건너뛴다)": "Returns a pass. (compiles it if missing. A failure is also cached and reported only once, and steps with a failed pass are skipped)"
+	"패스 반환. (없으면 컴파일. 실패도 담아 두고 한 번만 알린다, 실패한 패스의 단계는 건너뛴다)": "Returns a pass. (compiles it if missing. A failure is also cached and reported only once, and steps with a failed pass are skipped)",
+	"덩이 한 변의 칸 수. (러스트 판 DEFAULT_CHUNK_SIZE 와 같이 공개) (16 x 16 칸이면 쿼드 256 개, 꼭짓점 1536 개로 Graphic 한 번에 그릴 수 있다)": "Number of cells on one side of a chunk. (Public, like DEFAULT_CHUNK_SIZE in the Rust edition) (16 x 16 cells is 256 quads, 1536 vertices, drawn in one Graphic call)",
+	"덩이 한 변의 칸 수. (기본 DEFAULT_CHUNK_SIZE 16, 러스트 판은 create_layer_with_chunk_size)": "Number of cells on one side of a chunk. (Default DEFAULT_CHUNK_SIZE 16; create_layer_with_chunk_size in the Rust edition)",
+	"바이트. (틀린 글자가 있으면 \"TiledMapReader: invalid base64\" 를 던진다, 러스트 판과 같은 글)": "The bytes. (Throws \"TiledMapReader: invalid base64\" on an invalid character, the same message as the Rust edition)",
+	"푼 바이트. (압축이 없으면 그대로, 풀지 못하면 \"TiledMapReader: cannot decompress zlib\" 같은 글을 던진다, 러스트 판과 같은 글)": "The decompressed bytes. (Returned as is when uncompressed; throws a message such as \"TiledMapReader: cannot decompress zlib\" on failure, the same message as the Rust edition)",
+	"세이브 실패 까닭. (러스트 판 SaveGameError 의 이름과 같다)": "Why a save failed. (Same names as SaveGameError in the Rust edition)",
+	"자료를 JSON 으로 바꿀 수 없다. (순환, BigInt, 맨 위 undefined. 러스트는 Serialize 가 실패할 때) NaN, Infinity 는 두 엔진 모두 null 로 쓴다.": "The data cannot be converted to JSON. (A cycle, a BigInt, or a top-level undefined; in Rust, when Serialize fails) NaN and Infinity are written as null in both engines.",
+	"제약 번호. (없으면 -1)": "The constraint index. (-1 if not found)",
+	"IK 제약 번호 찾기. (없으면 -1, 러스트 판 find_ik_constraint_index 와 apply_ik_constraint(번호) 자리)": "Finds an IK constraint index. (-1 if not found; corresponds to find_ik_constraint_index and apply_ik_constraint(index) in the Rust edition)"
 }
