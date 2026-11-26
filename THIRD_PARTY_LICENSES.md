@@ -331,7 +331,34 @@ The files under `examples/` are not part of the bundles or the web tools. They c
 | `examples/ancientmountain/assets/grass.jpg`, `rock.jpg`, `dirt.jpg`, `boulder.jpg` | Made for this repository with Google generative AI (C2PA record in each file: "Created by Google Generative AI") | Google Terms of Service: "Google won't claim ownership over that content." |
 | `examples/toonshading/assets/VRM1_Constraint_Twist_Sample.vrm` | pixiv Inc., the VRM 1.0 sample of https://github.com/pixiv/three-vrm (packages/three-vrm/examples/models, same file) | VRM Public License 1.0, https://vrm.dev/licenses/1.0/ . The file's meta allows redistribution and modified redistribution, commercial use by corporations, and needs no credit ("(c) 2022 pixiv Inc.") |
 | `examples/assets/DOSGothic.woff` | See DOSGothic above | MIT |
-| `examples/oldface/assets/*`, `examples/oldface/favicon.*` | Exported from Epic Games MetaHuman (Walter preset) in Unreal Engine by `examples/oldface/tools/metahuman/` | Not covered by the MIT License of this repository. MetaHuman is used under the Unreal Engine EULA (https://www.metahuman.com/license). To be replaced with openly licensed assets |
+| `examples/oldface/assets/character_lod*.glb` | Face, eyes, teeth, eyelashes, eye occlusion and the 53 expression shapes (renamed to ARKit names) of ICT FaceKit (FaceXModel), https://github.com/USC-ICT/ICT-FaceKit , converted and reduced by `examples/oldface/tools/ictfacekit/` | MIT, Copyright (c) 2020 USC Institute for Creative Technologies (full text below) |
+| `examples/oldface/assets/*` other than the above (skin, wrinkle, eye, teeth and hair textures, `hair_lod*.glb` hair cards, `wrinkles.json`, `expressions.json`), `examples/oldface/favicon.*` | Made for this repository: baked procedurally by `examples/oldface/tools/ictfacekit/` (no source images), favicon captured from the example | MIT (this repository) |
 | `examples/assets/spritesheet.png`, `beep.wav`, `tabletemplate.xlsx`, `examples/spriteeffects/assets/*.png` (also in `examples/timelineshowcase/assets/`), `examples/tilemapshowcase/assets/*`, `examples/skeleton2d/assets/*`, `examples/neonhorizon/assets/*.glb`, the `.json` scenes, UI assets and timelines, and the favicons other than oldface | Made for this repository (the sprites by `examples/spriteeffects/tools/make_sprites.py`, the tiles by `examples/tilemapshowcase/generate.mjs`, the skeleton by `examples/skeleton2d/tools/makeassets.cjs`, the ships by the vanilla.js battlecruiser generator) | MIT, as the rest of this repository |
+
+ICT FaceKit license (for `examples/oldface/assets/character_lod*.glb`):
+
+````text
+MIT License
+
+Copyright (c) 2020 USC Institute for Creative Technologies
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+````
 
 Fox credit, as CC BY 4.0 asks: "Low poly fox" model by PixelMannen (https://opengameart.org/content/fox-and-shiba, CC0), rigged and animated by tomkranis (https://sketchfab.com/3d-models/low-poly-fox-by-pixelmannen-animated-371dea88d7e04a76af5763f2a36866bc, CC BY 4.0), converted to glTF by @AsoboStudio and @scurest (https://github.com/KhronosGroup/glTF-Sample-Models/pull/150#issuecomment-406300118, CC BY 4.0, https://creativecommons.org/licenses/by/4.0/).

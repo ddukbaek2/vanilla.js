@@ -391,7 +391,7 @@
 	<div id="contextMenu"></div>
 	<div id="footerNote">
 		DRAG TO ORBIT, WHEEL OR PINCH TO ZOOM<br>
-		CHARACTER: <a href="https://www.metahuman.com/" target="_blank" rel="noopener">EPIC METAHUMAN (WALTER PRESET, EXPRESSION WRINKLE MAPS, RIGLOGIC BAKED TO ARKIT SHAPES, GROOM CARDS)</a>, EXPRESSIONS: ARKIT BLENDSHAPE PRESETS
+		CHARACTER: <a href="https://github.com/USC-ICT/ICT-FaceKit" target="_blank" rel="noopener">ICT FACEKIT (MIT)</a> FACE AND ARKIT SHAPES, PROCEDURAL SKIN, WRINKLE MAPS AND HAIR CARDS, EXPRESSIONS: ARKIT BLENDSHAPE PRESETS
 	</div>
 	<a id="homeLink" href="https://vanillapunch.com/tools/" target="_blank" rel="noopener">VANILLAPUNCH.COM</a>
 	<div id="loadingOverlay"><div id="loadingLabel">LOADING</div><div id="loadingBar"><div id="loadingFill"></div></div><div id="loadingDetail"></div></div>
@@ -974,7 +974,7 @@
 	});
 
 	//==============================================================================
-	// 애셋 로드. (메타휴먼 얼굴 glb — DNA 의 RigLogic 을 굽은 ARKit 셰이프키, 부위별 텍스처는 직접 로드)
+	// 애셋 로드. (ICT FaceKit 얼굴 glb — ARKit 이름 셰이프키, 절차로 구운 부위별 텍스처는 직접 로드)
 	//==============================================================================
 	// 머리 LOD 와 머리카락 단계는 별도 glb — 슬라이더로 바꾸면 필요할 때 로드해 캐시한다.
 	const modelCache = new System.Map();
@@ -1304,7 +1304,7 @@
 	const expressionResponse = await System.fetch("./assets/expressions.json");
 	const expressionTable = await expressionResponse.json();
 	advanceLoading("expressions.json");
-	// 주름 맵 정의. (channels: 마스크 아틀라스 채널 → 영역 이름 / 주름 맵 기여, shapes: ARKit 셰이프 → 영역 값 — RigLogic 애니메이티드 맵 출력)
+	// 주름 맵 정의. (channels: 마스크 아틀라스 채널 → 영역 이름 / 주름 맵 기여, shapes: ARKit 셰이프 → 영역 값)
 	const wrinkleResponse = await System.fetch("./assets/wrinkles.json");
 	const wrinkleTable = await wrinkleResponse.json();
 	advanceLoading("wrinkles.json");
@@ -1644,7 +1644,7 @@
 				title: "SURFACE",
 				isActive: true,
 				lines: [
-					"normal = metahuman normal x 1.5 + wrinkle maps x mask weights + micro normal x38",
+					"normal = baked normal x 1.5 + wrinkle maps x mask weights + micro normal x38",
 					"cavity = height - blur(height) x micro cavity, roughness from cavity",
 					"skin F0 0.028, eyes 0.04 glossy",
 				],
@@ -1681,7 +1681,7 @@
 			{
 				title: "EXPRESSION",
 				isActive: true,
-				lines: ["preset " + expressionState.activeName + ", " + morphTargetCount + " ARKit shapes baked from RigLogic, " + activeUnitCount + " active", "blink from eye blink shapes"],
+				lines: ["preset " + expressionState.activeName + ", " + morphTargetCount + " ARKit shapes from ICT FaceKit, " + activeUnitCount + " active", "blink from eye blink shapes"],
 				thumbnails: [],
 			},
 			{
