@@ -52,8 +52,18 @@ The smallest page is one canvas and one module script.
 `build/vanilla.js` and `build/vanilla.min.js` are built with esbuild. Run these from the repository root.
 
 ```bash
-esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap
-esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify --keep-names
+esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap '--banner:js=/*! vanilla.js | (c) 2026 vanillapunch | MIT License | https://github.com/ddukbaek2/vanilla.js/blob/release/LICENSE | Third-party notices: https://github.com/ddukbaek2/vanilla.js/blob/release/THIRD_PARTY_LICENSES.md */'
+esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify --keep-names '--banner:js=/*! vanilla.js | (c) 2026 vanillapunch | MIT License | https://github.com/ddukbaek2/vanilla.js/blob/release/LICENSE | Third-party notices: https://github.com/ddukbaek2/vanilla.js/blob/release/THIRD_PARTY_LICENSES.md */'
+```
+
+- The `/*! ... */` line at the top of the bundles points to the engine license and the third-party notices file (THIRD_PARTY_LICENSES.md). It survives minification.
+- The drafts (2D physics, tilemap, 2D skeleton, spatial audio, save slots in src/experimental) are not part of the entry point `import.js` or the bundles. To use them, import the source instead of a bundle. The drafts import the engine modules under src, so import the engine from `import.js` too, not from a bundle, so there is one set of classes. Bundling your game with esbuild bundles the drafts along with it.
+
+```js
+import { Engine, Vector2 } from "./import.js";
+import * as Experimental from "./src/experimental/experimental.js";
+
+const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D(32));
 ```
 
 - `--format=esm` produces a module that can be loaded with `import { ... } from`.

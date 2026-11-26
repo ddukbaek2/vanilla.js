@@ -21,7 +21,7 @@
 vanilla.js 는 외부 라이브러리 없이 브라우저에서 바로 동작하는 웹게임 엔진입니다.
 번들 하나를 모듈로 불러오면 씬, 노드, 입력, UI, 파티클, 오디오가 모두 준비됩니다.
 
-- 런타임 의존성 0. 아래 명령으로 지금 소스(2026-11-26 dev)를 묶으면 `vanilla.min.js` 약 1011 KB, gzip 약 288 KB 입니다
+- 런타임 의존성 0. 아래 명령으로 지금 소스(2026-11-26 dev)를 묶으면 `vanilla.min.js` 약 829 KB, gzip 약 235 KB 입니다. (초안 src/experimental 은 묶음에 들지 않습니다)
 - WebGL2 렌더러. 스프라이트, 텍스트, 도형, 마스크가 같은 출력 경로를 쓰고, 묶어 그리기와 화면 밖 거르기가 기본으로 켜져 있습니다
 - 블렌드 모드는 Canvas2D 합성 26 가지를 모두 그립니다. overlay, soft-light, hue 같은 13 가지와 렌더 타겟에 그리는 multiply 는 그릴 영역 아래를 떠 와 W3C Compositing and Blending 공식대로 셰이더로 섞습니다
 - 노드 / 컴포넌트 구조, 해상도 대응 뷰, 제약 기반 레이아웃, 창 쌓기를 갖춘 UI 시스템
@@ -56,8 +56,18 @@ vanilla.js 는 외부 라이브러리 없이 브라우저에서 바로 동작하
 번들을 직접 만들 때는 esbuild 를 씁니다.
 
 ```bash
-esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap
-esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify --keep-names
+esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap '--banner:js=/*! vanilla.js | (c) 2026 vanillapunch | MIT License | https://github.com/ddukbaek2/vanilla.js/blob/release/LICENSE | Third-party notices: https://github.com/ddukbaek2/vanilla.js/blob/release/THIRD_PARTY_LICENSES.md */'
+esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify --keep-names '--banner:js=/*! vanilla.js | (c) 2026 vanillapunch | MIT License | https://github.com/ddukbaek2/vanilla.js/blob/release/LICENSE | Third-party notices: https://github.com/ddukbaek2/vanilla.js/blob/release/THIRD_PARTY_LICENSES.md */'
+```
+
+- 묶음 머리의 `/*! ... */` 한 줄은 엔진 라이선스와 제3자 고지 파일(THIRD_PARTY_LICENSES.md)을 가리킵니다. 줄여도 남습니다.
+- 초안(src/experimental 의 2D 물리, 타일맵, 2D 뼈대, 공간 소리, 세이브)은 진입점 `import.js` 와 묶음에 들지 않습니다. 쓰려면 묶음 대신 소스를 불러옵니다. 초안이 src 의 엔진 모듈을 불러오므로 엔진도 묶음이 아닌 `import.js` 로 불러야 클래스가 하나입니다. 게임을 esbuild 로 묶으면 초안도 함께 묶입니다.
+
+```js
+import { Engine, Vector2 } from "./import.js";
+import * as Experimental from "./src/experimental/experimental.js";
+
+const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D(32));
 ```
 
 ## 주요 기능
@@ -138,7 +148,7 @@ src/            엔진 소스
 	game/ misc/   게임 보조 기능
 	resource/     애셋 로더
 	web/          브라우저 연동
-	experimental/ 0.4.0 뒤 기능의 초안 (Experimental 이름 공간, API 가 바뀔 수 있음)
+	experimental/ 0.4.0 뒤 기능의 초안 (import.js 와 묶음에 들지 않음, experimental.js 를 직접 불러옴, API 가 바뀔 수 있음)
 	deprecated/   폐기와 폐기 예정
 examples/       샘플 (배포본과 같은 소스)
 tools/          웹 저작 도구와 명령줄 도구
@@ -165,4 +175,7 @@ UPDATE.md       업데이트 기록
 
 ## 라이선스
 
-[MIT](LICENSE) © ddukbaek2
+[MIT](LICENSE) © vanillapunch
+
+- 엔진에 들어간 제3자 코드와 표(크로미엄과 블링크, tween.js, Kiwi, gl-matrix, Separable SSS, 초안의 libtiled 와 Box2D)의 고지는 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) 에 모았습니다. 런타임 패키지 의존은 없습니다. 묶음과 웹 도구 html 머리의 한 줄 주석이 엔진 라이선스와 이 파일을 가리킵니다. 엔진을 묶어 낸 게임은 LICENSE 와 이 파일을 함께 냅니다.
+- 기본 글꼴 DOSGothic 은 묶음에 들지 않고 실행할 때 jsDelivr 에서 받습니다. (`src/core/engine.js`)

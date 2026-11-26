@@ -9,7 +9,7 @@
 
 /**
  * @example <caption>베지어 곡선과 회전 시간줄 하나를 자세에 걸기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const easedValue = Experimental.evaluateSkeleton2DCurve(Experimental.Skeleton2DCurveType.bezier, [0.42, 0, 0.58, 1], 0.5);
  * const skeletonData = Experimental.Skeleton2DData.createFromJson({
@@ -95,7 +95,7 @@ function evaluateBezierComponent(firstControl, secondControl, parameter) {
  * @param { number } percent 키 사이의 진행 몫. (0 ~ 1)
  * @returns { number } 곡선을 지난 몫. (베지어는 0 ~ 1 밖으로 넘을 수 있다)
  * @example <caption>세 곡선의 가운데 값</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const linearValue = Experimental.evaluateSkeleton2DCurve(Experimental.Skeleton2DCurveType.linear, null, 0.25);
  * const steppedValue = Experimental.evaluateSkeleton2DCurve(Experimental.Skeleton2DCurveType.stepped, null, 0.75);
@@ -155,7 +155,7 @@ function wrapDegree(degree) {
 //==============================================================================
 /**
  * @example <caption>사건 하나 만들기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const event = new Experimental.Skeleton2DEvent("step", 0.25, 1, 0.5, "left");
  * console.log(event.getName(), event.getTime(), event.getIntValue(), event.getFloatValue(), event.getStringValue());
@@ -249,7 +249,7 @@ export class Skeleton2DEvent extends Object {
 //==============================================================================
 /**
  * @example <caption>두 자세를 반씩 섞기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const fromPose = new Experimental.Skeleton2DPose(1, 0);
  * const toPose = new Experimental.Skeleton2DPose(1, 0);
@@ -466,7 +466,7 @@ function writeSetupBoneValues(boneData, boneValues, offset) {
 //==============================================================================
 /**
  * @example <caption>이동 시간줄을 만들어 가운데 시각의 값 읽기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const timeline = new Experimental.Skeleton2DTimeline(Experimental.Skeleton2DTimelineType.translate, 0);
  * timeline.addValueFrame(0, [0, 0], Experimental.Skeleton2DCurveType.linear, null);
@@ -883,7 +883,7 @@ export class Skeleton2DTimeline extends Object {
 //==============================================================================
 /**
  * @example <caption>코드로 클립을 지어 자세에 걸기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const skeletonData = Experimental.Skeleton2DData.createFromJson({ bones: [{ name: "root" }, { name: "body", parent: "root" }] });
  * const timeline = new Experimental.Skeleton2DTimeline(Experimental.Skeleton2DTimelineType.translate, 1);

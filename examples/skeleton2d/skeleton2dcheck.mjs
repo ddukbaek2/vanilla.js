@@ -5,8 +5,7 @@
 // - 모두 맞으면 "통과 N 개", 하나라도 틀리면 틀린 것을 찍고 끝 코드 1.
 //==============================================================================
 const System = globalThis;
-const engineModule = await import("../../import.js");
-const Experimental = engineModule.Experimental;
+const Experimental = await import("../../src/experimental/experimental.js");
 const fs = await import("node:fs");
 const path = await import("node:path");
 const url = await import("node:url");

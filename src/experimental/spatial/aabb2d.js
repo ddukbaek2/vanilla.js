@@ -13,7 +13,7 @@ import { Object } from "../../base/object.js";
 //==============================================================================
 /**
  * @example <caption>두 상자의 겹침과 합친 상자</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const first = Experimental.AABB2D.create(0, 0, 10, 10);
  * const second = Experimental.AABB2D.create(5, 5, 20, 12);

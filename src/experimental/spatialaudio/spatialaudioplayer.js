@@ -19,7 +19,8 @@ import { PannerSettings, calculateDistanceConeGain } from "./spatialaudiomath.js
 //==============================================================================
 /**
  * @example <caption>효과음 버스로 내는 공간 소리</caption>
- * import { Engine, EngineConfiguration, AudioAsset, Vector3, Experimental } from "./build/vanilla.js";
+ * import { Engine, EngineConfiguration, AudioAsset, Vector3 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const engineConfiguration = new EngineConfiguration();
  * const engine = new Engine(engineConfiguration);

@@ -2,7 +2,8 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Scene, WorldNode, Vector2, Color, Rect, Pivot, Text, TextAlign, SpriteAtlas, JsonAsset, Experimental } from "../../import.js";
+import { Scene, WorldNode, Vector2, Color, Rect, Pivot, Text, TextAlign, SpriteAtlas, JsonAsset } from "../../import.js";
+import * as Experimental from "../../src/experimental/experimental.js";
 
 
 //==============================================================================

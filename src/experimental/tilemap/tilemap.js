@@ -25,7 +25,8 @@ import { TilemapLayer } from "./tilemaplayer.js";
 //==============================================================================
 /**
  * @example <caption>코드로 만든 작은 정사각 타일맵</caption>
- * import { Engine, EngineConfiguration, Scene, WorldNode, Vector2, ImageAsset, Experimental } from "./build/vanilla.js";
+ * import { Engine, EngineConfiguration, Scene, WorldNode, Vector2, ImageAsset } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * class MainScene extends Scene {
  * 	async load(engine) {
@@ -456,7 +457,7 @@ function sortChunksInDrawOrder(layout, chunkList) {
 //==============================================================================
 /**
  * @example <caption>좌표 바꾸기와 칸의 충돌 모양</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const tilemap = new Experimental.Tilemap();
  * tilemap.setOrientation(Experimental.TilemapOrientation.isometric);

@@ -12,7 +12,7 @@ import { Object } from "../../base/object.js";
 //==============================================================================
 /**
  * @example <caption>몸 아이디로 몸 찾기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D(1));
  * const bodyId = world.createBody(new Experimental.BodyDefinition2D());
@@ -85,7 +85,7 @@ export class BodyId2D extends Object {
 //==============================================================================
 /**
  * @example <caption>모양 아이디로 모양 찾기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D(1));
  * const bodyId = world.createBody(new Experimental.BodyDefinition2D());
@@ -157,7 +157,8 @@ export class ShapeId2D extends Object {
 //==============================================================================
 /**
  * @example <caption>관절 아이디로 관절 찾기</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D(1));
  * const groundId = world.createBody(new Experimental.BodyDefinition2D());

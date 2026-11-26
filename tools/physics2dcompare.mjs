@@ -7,7 +7,8 @@
 //   충격과 순간 이동. 600 걸음(1/60 초, 하위 걸음 4) 동안 걸음마다 사건 수를 적고, 끝에 몸마다 자리, 회전, 속도를 f64 비트(16 진수)로 적는다.
 // - 러스트 쪽은 src/experimental/physics2d/tests.rs 의 같은 장면이 이 파일과 견준다. (cargo test)
 //==============================================================================
-import { Experimental, Vector2 } from "../import.js";
+import { Vector2 } from "../import.js";
+import * as Experimental from "../src/experimental/experimental.js";
 import * as fs from "node:fs";
 
 const System = globalThis;

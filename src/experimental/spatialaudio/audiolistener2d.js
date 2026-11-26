@@ -19,7 +19,8 @@ import { SpatialAudioListener } from "./spatialaudiolistener.js";
 //==============================================================================
 /**
  * @example <caption>카메라 노드에 리스너 붙이기</caption>
- * import { Engine, EngineConfiguration, WorldNode, Experimental } from "./build/vanilla.js";
+ * import { Engine, EngineConfiguration, WorldNode } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const engineConfiguration = new EngineConfiguration();
  * const engine = new Engine(engineConfiguration);

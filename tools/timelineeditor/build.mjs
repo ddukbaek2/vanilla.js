@@ -20,7 +20,9 @@ execFileSync("esbuild", [
 	"--keep-names",
 ], { stdio: "inherit", shell: true });
 
-const bundleSource = readFileSync(bundlePath, "utf-8");
+// 엔진 라이선스 한 줄. (묶음 build/vanilla.js, vanilla.min.js 머리와 같은 글, README 의 esbuild 명령)
+const licenseBanner = "/*! vanilla.js | (c) 2026 vanillapunch | MIT License | https://github.com/ddukbaek2/vanilla.js/blob/release/LICENSE | Third-party notices: https://github.com/ddukbaek2/vanilla.js/blob/release/THIRD_PARTY_LICENSES.md */";
+const bundleSource = licenseBanner + "\n" + readFileSync(bundlePath, "utf-8");
 const htmlText = `<!DOCTYPE html>
 <html lang="ko">
 <head>

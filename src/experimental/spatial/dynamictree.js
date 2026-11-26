@@ -48,7 +48,7 @@ class TreeNode extends Object {
 //==============================================================================
 /**
  * @example <caption>프록시를 넣고 상자와 광선으로 찾기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const tree = new Experimental.DynamicTree();
  * for (let index = 0; index < 10; ++index) {

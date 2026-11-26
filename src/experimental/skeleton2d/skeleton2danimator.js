@@ -13,7 +13,8 @@
 
 /**
  * @example <caption>노드에 뼈대를 붙여 걷기를 틀고 IK 목표 옮기기</caption>
- * import { Experimental, WorldNode, Vector2 } from "./build/vanilla.js";
+ * import { WorldNode, Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const skeletonData = Experimental.Skeleton2DData.createFromJson({
  * 	bones: [{ name: "root" }, { name: "leg", parent: "root", rotation: 90, length: 30 }, { name: "target", parent: "root", x: 20, y: 25 }],
@@ -62,7 +63,8 @@ const GIZMO_JOINT_COLOR = new Color(1, 0.8, 0.2, 1);
 //==============================================================================
 /**
  * @example <caption>아틀라스를 걸고 두 트랙을 섞어 그리기</caption>
- * import { Engine, EngineConfiguration, Scene, WorldNode, Vector2, SpriteAtlas, Experimental } from "./build/vanilla.js";
+ * import { Engine, EngineConfiguration, Scene, WorldNode, Vector2, SpriteAtlas } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const spriteAtlas = new SpriteAtlas();
  * await spriteAtlas.loadData({ pagePaths: ["examples/assets/spritesheet.png"], frames: { body: [0, 0, 0, 200, 200] } });

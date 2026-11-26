@@ -7,7 +7,8 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { Vector2, Vector3, WorldNode, Experimental } from "../../import.js";
+import { Vector2, Vector3, WorldNode } from "../../import.js";
+import * as Experimental from "../../src/experimental/experimental.js";
 
 const { calculateDistanceGain, calculateConeGain, calculateAzimuthElevation, calculateDistanceConeGain, calculateEqualPowerGains, convertViewPositionToAudioPosition, DistanceModel, PannerSettings, SpatialAudioPlayer, SpatialAudioListener, AudioSource2D, AudioListener2D } = Experimental;
 const fround = Math.fround;

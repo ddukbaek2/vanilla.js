@@ -17,7 +17,7 @@ import { ShapeId2D, BodyId2D } from "./physicsid2d.js";
 //==============================================================================
 /**
  * @example <caption>플레이어와 적만 부딪히게</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const playerFilter = new Experimental.CollisionFilter2D();
  * playerFilter.categoryBits = 0x0002;
@@ -101,7 +101,7 @@ export function shouldFiltersCollide(categoryBitsA, maskBitsA, groupIndexA, cate
 //==============================================================================
 /**
  * @example <caption>2 번 분류만 찾는 질의</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const queryFilter = new Experimental.QueryFilter2D();
  * queryFilter.maskBits = 0x0002;
@@ -134,7 +134,7 @@ export class QueryFilter2D extends Object {
 //==============================================================================
 /**
  * @example <caption>잘 튀는 센서 아닌 모양</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const shapeDefinition = new Experimental.ShapeDefinition2D();
  * shapeDefinition.density = 2;
@@ -182,7 +182,8 @@ export class ShapeDefinition2D extends Object {
 //==============================================================================
 /**
  * @example <caption>굽은 땅 사슬</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const chainDefinition = new Experimental.ChainDefinition2D();
  * chainDefinition.points = [Vector2.create(0, 300), Vector2.create(200, 320), Vector2.create(400, 300)];
@@ -266,7 +267,8 @@ export class ShapeData extends Object {
 //==============================================================================
 /**
  * @example <caption>모양의 재질 바꾸기</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D(1));
  * const bodyId = world.createBody(new Experimental.BodyDefinition2D());

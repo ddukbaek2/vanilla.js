@@ -35,7 +35,8 @@ export const JointType2D = System.Object.freeze({
 //==============================================================================
 /**
  * @example <caption>천장에 매단 추</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D(1));
  * const ceilingId = world.createBody(new Experimental.BodyDefinition2D());
@@ -105,7 +106,8 @@ export class DistanceJointDefinition2D extends Object {
 //==============================================================================
 /**
  * @example <caption>모터로 도는 바퀴</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D(1));
  * const groundId = world.createBody(new Experimental.BodyDefinition2D());
@@ -181,7 +183,8 @@ export class RevoluteJointDefinition2D extends Object {
 //==============================================================================
 /**
  * @example <caption>두 상자를 붙이기</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D(1));
  * const firstId = world.createBody(new Experimental.BodyDefinition2D());
@@ -247,7 +250,8 @@ export class WeldJointDefinition2D extends Object {
 //==============================================================================
 /**
  * @example <caption>수레 바퀴</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const jointDefinition = new Experimental.WheelJointDefinition2D();
  * jointDefinition.localAxisA = Vector2.create(0, 1);
@@ -394,7 +398,7 @@ export class JointData extends Object {
 //==============================================================================
 /**
  * @example <caption>모터 속도 바꾸기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D(1));
  * const groundId = world.createBody(new Experimental.BodyDefinition2D());

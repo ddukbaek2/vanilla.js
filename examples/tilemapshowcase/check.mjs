@@ -6,7 +6,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import url from "node:url";
-import { Experimental } from "../../import.js";
+import * as Experimental from "../../src/experimental/experimental.js";
 import { TransformMatrix } from "../../src/base/transformmatrix.js";
 
 const System = globalThis;

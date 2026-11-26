@@ -43,7 +43,7 @@ export const DistanceModel = System.Object.freeze({
 //==============================================================================
 /**
  * @example <caption>선형 거리 설정 만들기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const settings = new Experimental.PannerSettings();
  * settings.distanceModel = Experimental.DistanceModel.Linear;
@@ -210,7 +210,7 @@ function ensureFinite(value) {
  * @param { number } rolloffFactor 줄어드는 빠르기.
  * @returns { number } 거리 이득. (0 ~ 1)
  * @example <caption>거리 모델 셋의 이득</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const { calculateDistanceGain, DistanceModel } = Experimental;
  * console.log(calculateDistanceGain(DistanceModel.Inverse, 4, 1, 10000, 1));
@@ -253,7 +253,8 @@ export function calculateDistanceGain(distanceModel, distance, referenceDistance
  * @param { number } coneOuterGain 바깥 이득. (0 ~ 1)
  * @returns { number } 원뿔 이득.
  * @example <caption>소리 뒤에 선 리스너의 원뿔 이득</caption>
- * import { Experimental, Vector3 } from "./build/vanilla.js";
+ * import { Vector3 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const gain = Experimental.calculateConeGain(Vector3.create(0, 0, 0), Vector3.create(1, 0, 0), Vector3.create(-5, 0, 0), 60, 180, 0.25);
  * console.log(gain);
@@ -296,7 +297,8 @@ function calculateConeGainFloat(sourcePosition, sourceOrientation, listenerPosit
  * @param { Vector3 } listenerUp 리스너 위.
  * @returns { { azimuth: number, elevation: number } } 방위각과 높이. (도)
  * @example <caption>오른쪽 소리의 방위각</caption>
- * import { Experimental, Vector3 } from "./build/vanilla.js";
+ * import { Vector3 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const { azimuth, elevation } = Experimental.calculateAzimuthElevation(Vector3.create(3, 0, 0), Vector3.create(0, 0, 0), Vector3.create(0, 0, -1), Vector3.create(0, 1, 0));
  * console.log(azimuth, elevation);
@@ -352,7 +354,8 @@ function calculateAzimuthElevationFloat(sourcePosition, listenerPosition, listen
  * @param { Vector3 } listenerPosition 리스너 자리.
  * @returns { number } 거리 x 원뿔 이득.
  * @example <caption>기본 설정에서 2 만큼 떨어진 소리</caption>
- * import { Experimental, Vector3 } from "./build/vanilla.js";
+ * import { Vector3 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const gain = Experimental.calculateDistanceConeGain(new Experimental.PannerSettings(), Vector3.create(0, 0, -2), Vector3.create(1, 0, 0), Vector3.create(0, 0, 0));
  * console.log(gain);
@@ -378,7 +381,7 @@ export function calculateDistanceConeGain(settings, sourcePosition, sourceOrient
  * @param { number } inputChannelCount 입력 채널 수. (1 이나 2)
  * @returns { { left: number, right: number } } 왼쪽과 오른쪽 이득.
  * @example <caption>가운데와 오른쪽 끝의 이득</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const center = Experimental.calculateEqualPowerGains(0, 1);
  * const right = Experimental.calculateEqualPowerGains(90, 1);
@@ -416,7 +419,8 @@ export function calculateEqualPowerGains(azimuth, inputChannelCount) {
  * @param { number } depth Z 값.
  * @returns { Vector3 } WebAudio 좌표의 자리.
  * @example <caption>화면 자리 바꾸기</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const position = Experimental.convertViewPositionToAudioPosition(Vector2.create(200, 100), 100, 0);
  * console.log(position.x, position.y, position.z);

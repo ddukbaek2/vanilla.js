@@ -36,7 +36,8 @@ const FILL_ALPHA = 0.45;
 //==============================================================================
 /**
  * @example <caption>씬에서 월드 그리기</caption>
- * import { Engine, EngineConfiguration, Scene, Vector2, Experimental } from "./build/vanilla.js";
+ * import { Engine, EngineConfiguration, Scene, Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D(50));
  * const groundId = world.createBody(new Experimental.BodyDefinition2D());

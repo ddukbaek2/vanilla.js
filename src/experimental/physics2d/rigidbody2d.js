@@ -20,7 +20,8 @@ import { PhysicsWorld2D } from "./physicsworld2d.js";
 //==============================================================================
 /**
  * @example <caption>떨어지는 상자 노드</caption>
- * import { Engine, EngineConfiguration, Scene, WorldNode, Paint, Vector2, Pivot, Experimental } from "./build/vanilla.js";
+ * import { Engine, EngineConfiguration, Scene, WorldNode, Paint, Vector2, Pivot } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D(50));
  * const groundId = world.createBody(new Experimental.BodyDefinition2D());

@@ -17,7 +17,8 @@ import { SpatialAudioPlayer } from "./spatialaudioplayer.js";
 //==============================================================================
 /**
  * @example <caption>횃불 노드를 따라가는 소리</caption>
- * import { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Experimental } from "./build/vanilla.js";
+ * import { Engine, EngineConfiguration, Scene, WorldNode, Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const engineConfiguration = new EngineConfiguration();
  * const engine = new Engine(engineConfiguration);

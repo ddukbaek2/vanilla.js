@@ -9,7 +9,7 @@
 
 /**
  * @example <caption>팔 두 뼈를 IK 로 목표에 닿게 하기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const skeletonData = Experimental.Skeleton2DData.createFromJson({
  * 	bones: [
@@ -77,7 +77,7 @@ function wrapDegree(degree) {
 //==============================================================================
 /**
  * @example <caption>뼈를 돌리고 뼈 끝의 월드 자리 읽기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const skeletonData = Experimental.Skeleton2DData.createFromJson({ bones: [{ name: "root" }, { name: "arm", parent: "root", x: 10, length: 20 }] });
  * const skeleton = new Experimental.Skeleton2D(skeletonData);
@@ -471,7 +471,8 @@ export class Skeleton2DBone extends Object {
 //==============================================================================
 /**
  * @example <caption>슬롯 색 바꾸기</caption>
- * import { Experimental, Color } from "./build/vanilla.js";
+ * import { Color } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const skeletonData = Experimental.Skeleton2DData.createFromJson({ bones: [{ name: "root" }], slots: [{ name: "body", bone: "root" }] });
  * const skeleton = new Experimental.Skeleton2D(skeletonData);
@@ -608,7 +609,7 @@ export class Skeleton2DSlot extends Object {
 //==============================================================================
 /**
  * @example <caption>IK 세기를 반으로</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const skeletonData = Experimental.Skeleton2DData.createFromJson({
  * 	bones: [{ name: "root" }, { name: "arm", parent: "root", length: 10 }, { name: "target", parent: "root", y: 10 }],
@@ -718,7 +719,7 @@ export class Skeleton2DIkConstraint extends Object {
 //==============================================================================
 /**
  * @example <caption>스킨을 고르고 붙임을 바꾼 뒤 슬롯 꼭짓점 셈하기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const skeletonData = Experimental.Skeleton2DData.createFromJson({
  * 	bones: [{ name: "root" }, { name: "head", parent: "root", y: -50 }],

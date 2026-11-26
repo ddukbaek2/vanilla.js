@@ -55,7 +55,7 @@
 	const Pivot = engineModule.Pivot;
 	const JsonAsset = engineModule.JsonAsset;
 	const ImageAsset = engineModule.ImageAsset;
-	const Experimental = engineModule.Experimental;
+	const Experimental = await import("../../src/experimental/experimental.js");
 	const Tilemap = Experimental.Tilemap;
 	const TilemapLayer = Experimental.TilemapLayer;
 	const TileCollisionShapeKind = Experimental.TileCollisionShapeKind;

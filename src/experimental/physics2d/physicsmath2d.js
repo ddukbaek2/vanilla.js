@@ -26,7 +26,7 @@ const TANGENT_EIGHTH_PI = 0.414213562373095;
 //==============================================================================
 /**
  * @example <caption>결정론 코사인, 사인, 아크탄젠트</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const rotation = Experimental.PhysicsMath2D.computeRotation(1.0);
  * console.log(rotation.cosine.toFixed(12), rotation.sine.toFixed(12));
@@ -156,7 +156,7 @@ export class PhysicsMath2D extends Object {
 //==============================================================================
 /**
  * @example <caption>회전을 만들고 각도로 되돌리기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const rotation = Experimental.Rotation2D.fromAngle(0.5);
  * console.log(rotation.getAngle().toFixed(12));

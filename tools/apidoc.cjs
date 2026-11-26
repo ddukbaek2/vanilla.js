@@ -18,6 +18,8 @@ const childProcess = require("child_process");
 // - counterpart 는 러스트 판(vanilla-engine)의 짝이다. docs/api/counterpart.<버전>.json (러스트 판 도구가 이름으로 지은 짝 표를 옮겨 둔 것) 에서 읽는다.
 // - 초안 모듈(이름이 experimental 이거나 experimental/ 로 시작하는 것)은 자료에 넣지 않고, 초안을 가리키는 짝도 뺀다.
 //   --check(초안은 메모리에서 지어 따로 본다), --gaps, --missing, --check-examples 는 초안도 본다.
+//   초안은 진입점(import.js)과 묶음에 들지 않아, 초안 진입점(src/experimental/experimental.js)을 Experimental 이름 공간으로 따로 읽는다.
+//   초안 예제는 엔진을 ./import.js 로, 초안을 import * as Experimental from "./src/experimental/experimental.js" 로 불러온다.
 // 사용:
 //   node tools/apidoc.cjs <버전> [--date YYYY-MM-DD]   docs/api/<버전>.json 쓰기
 //   node tools/apidoc.cjs <버전> --counterpart <짝 표>  러스트 판의 docs/api/counterpart.<버전>.json 을 이 저장소로 옮기고 자료 쓰기
@@ -34,6 +36,8 @@ const childProcess = require("child_process");
 //==============================================================================
 const REPOSITORY_ROOT = path.resolve(__dirname, "..");
 const ENTRY_FILE_PATH = path.join(REPOSITORY_ROOT, "import.js");
+const DRAFT_ENTRY_MODULE_PATH = "src/experimental/experimental.js"; // 초안 진입점. (import.js 와 묶음에 들지 않는다)
+const DRAFT_NAMESPACE_NAME = "Experimental"; // 초안 진입점을 읽는 이름 공간 이름.
 const UPDATE_FILE_PATH = path.join(REPOSITORY_ROOT, "UPDATE.md");
 const API_DIRECTORY_PATH = path.join(REPOSITORY_ROOT, "docs", "api");
 const TRANSLATION_FILE_PATH = path.join(API_DIRECTORY_PATH, "translation.en.json");
@@ -1972,6 +1976,11 @@ function readEntryExports() {
 		}
 	}
 
+	// 초안 진입점. (진입점에 들지 않아 Experimental 이름 공간으로 따로 더한다)
+	if (!moduleTable.has(DRAFT_ENTRY_MODULE_PATH) && fs.existsSync(path.join(REPOSITORY_ROOT, DRAFT_ENTRY_MODULE_PATH))) {
+		moduleTable.set(DRAFT_ENTRY_MODULE_PATH, { modulePath: DRAFT_ENTRY_MODULE_PATH, isNamespace: true, namespaceName: DRAFT_NAMESPACE_NAME, nameList: [] });
+	}
+
 	// 이름 공간 모듈이 다시 내보내는 파일도 따라간다. (Experimental 처럼 그 파일에 선언 없이 export ... from 만 있는 모듈)
 	const pendingModulePathList = Array.from(moduleTable.values()).filter((moduleEntry) => moduleEntry.isNamespace).map((moduleEntry) => moduleEntry.modulePath);
 	while (pendingModulePathList.length > 0) {
@@ -3179,9 +3188,20 @@ function isEngineSpecifier(specifier) {
 }
 
 //==============================================================================
+// 초안 진입점을 부르는 모듈 이름인지. (./src/experimental/experimental.js 처럼 끝 이름으로 본다)
+//==============================================================================
+/**
+ * @param { string } specifier
+ * @returns { boolean }
+ */
+function isDraftSpecifier(specifier) {
+	return /(^|\/)experimental\/experimental\.js$/.test(specifier);
+}
+
+//==============================================================================
 // 예제의 import 읽기.
-// - { importList: [{ localName, exportName, isNamespace }], foreignList: [모듈 이름], strippedCode }
-// - strippedCode 는 엔진 import 를 const { ... } = __engine; 으로 바꾼 글이다. (줄 수는 그대로)
+// - { importList: [{ localName, exportName, isNamespace, isDraft }], foreignList: [모듈 이름], strippedCode }
+// - strippedCode 는 엔진 import 를 const { ... } = __engine; 으로, 초안 진입점 import 를 const { ... } = __engine.Experimental; 으로 바꾼 글이다. (줄 수는 그대로)
 //==============================================================================
 /**
  * @param { string } code
@@ -3193,14 +3213,16 @@ function readExampleImports(code) {
 	const importPattern = /\bimport\s*(\{[^}]*\}|\*\s*as\s+[A-Za-z_$][\w$]*)\s*from\s*(["'])([^"']+)\2\s*;?/g;
 	const strippedCode = code.replace(importPattern, (matchText, clauseText, quote, specifier) => {
 		const newlineText = "\n".repeat((matchText.match(/\n/g) || []).length);
-		if (!isEngineSpecifier(specifier)) {
+		const isDraft = isDraftSpecifier(specifier);
+		if (!isDraft && !isEngineSpecifier(specifier)) {
 			foreignList.push(specifier);
 			return matchText;
 		}
+		const sourceName = isDraft ? "__engine." + DRAFT_NAMESPACE_NAME : "__engine";
 		if (clauseText.startsWith("*")) {
 			const localName = clauseText.replace(/^\*\s*as\s+/, "").trim();
-			importList.push({ localName: localName, exportName: "*", isNamespace: true });
-			return "const " + localName + " = __engine;" + newlineText;
+			importList.push({ localName: localName, exportName: "*", isNamespace: true, isDraft: isDraft });
+			return "const " + localName + " = " + sourceName + ";" + newlineText;
 		}
 		const bindingList = [];
 		for (const specifierText of clauseText.slice(1, -1).split(",")) {
@@ -3210,10 +3232,10 @@ function readExampleImports(code) {
 			}
 			const exportName = parts[0].trim();
 			const localName = (parts[1] || parts[0]).trim();
-			importList.push({ localName: localName, exportName: exportName, isNamespace: false });
+			importList.push({ localName: localName, exportName: exportName, isNamespace: false, isDraft: isDraft });
 			bindingList.push(exportName === localName ? exportName : exportName + ": " + localName);
 		}
-		return "const { " + bindingList.join(", ") + " } = __engine;" + newlineText;
+		return "const { " + bindingList.join(", ") + " } = " + sourceName + ";" + newlineText;
 	});
 	return { importList: importList, foreignList: foreignList, strippedCode: strippedCode };
 }
@@ -3252,26 +3274,30 @@ function readInstanceNames(classValue, classFieldTable) {
 /**
  * @param { object } example
  * @param { object } engineModule
+ * @param { object } draftModule 초안 진입점 모듈.
  * @param { object } nameContext { classFieldTable, staticReturnTable }
  * @returns { string[] }
  */
-function checkExampleNames(example, engineModule, nameContext) {
+function checkExampleNames(example, engineModule, draftModule, nameContext) {
 	const errorList = [];
 	const importResult = readExampleImports(example.code);
 	for (const foreignSpecifier of importResult.foreignList) {
 		errorList.push("엔진 밖 모듈을 불러온다: " + foreignSpecifier);
 	}
 	const bindingTable = new Map();
+	// 클래스 이름으로 찾는 표. (엔진과 초안의 이름이 겹치지 않는다)
+	const classModule = Object.assign({}, draftModule, engineModule);
 	for (const importEntry of importResult.importList) {
+		const sourceModule = importEntry.isDraft ? draftModule : engineModule;
 		if (importEntry.isNamespace) {
-			bindingTable.set(importEntry.localName, { value: engineModule, name: "*" });
+			bindingTable.set(importEntry.localName, { value: sourceModule, name: "*" });
 			continue;
 		}
-		if (!Object.prototype.hasOwnProperty.call(engineModule, importEntry.exportName)) {
-			errorList.push("엔진에 없는 이름을 불러온다: " + importEntry.exportName);
+		if (!Object.prototype.hasOwnProperty.call(sourceModule, importEntry.exportName)) {
+			errorList.push((importEntry.isDraft ? "초안에 없는 이름을 불러온다: " : "엔진에 없는 이름을 불러온다: ") + importEntry.exportName);
 			continue;
 		}
-		bindingTable.set(importEntry.localName, { value: engineModule[importEntry.exportName], name: importEntry.exportName });
+		bindingTable.set(importEntry.localName, { value: sourceModule[importEntry.exportName], name: importEntry.exportName });
 	}
 	const tokenList = tokenize(importResult.strippedCode).filter((token) => !isComment(token));
 	const instanceTable = new Map();
@@ -3303,7 +3329,7 @@ function checkExampleNames(example, engineModule, nameContext) {
 			}
 			else if (valueToken && bindingTable.has(valueToken.value) && nameToken && nameToken.value === "." && tokenList[valueIndex + 2] && isCallEndingStatement(valueIndex + 3)) {
 				const returnClassName = nameContext.staticReturnTable.get(bindingTable.get(valueToken.value).name + "." + tokenList[valueIndex + 2].value);
-				if (returnClassName && typeof engineModule[returnClassName] === "function") {
+				if (returnClassName && typeof classModule[returnClassName] === "function") {
 					instanceTable.set(tokenList[tokenIndex + 1].value, returnClassName);
 				}
 			}
@@ -3321,7 +3347,7 @@ function checkExampleNames(example, engineModule, nameContext) {
 		}
 		else if (instanceTable.has(token.value)) {
 			const className = instanceTable.get(token.value);
-			const instanceNameSet = readInstanceNames(engineModule[className], nameContext.classFieldTable);
+			const instanceNameSet = readInstanceNames(classModule[className], nameContext.classFieldTable);
 			if (!instanceNameSet.has(memberToken.value)) {
 				errorList.push("엔진에 없는 이름: " + className + " 인스턴스의 " + memberToken.value + " (" + token.value + "." + memberToken.value + ")");
 			}
@@ -3457,7 +3483,13 @@ function runExampleInNode(example, temporaryDirectoryPath, exampleIndex) {
  * @returns { string }
  */
 function rewriteEngineSpecifier(code, engineUrl) {
-	return code.replace(/(\bfrom\s*)(["'])([^"']+)\2/g, (matchText, fromText, quote, specifier) => (isEngineSpecifier(specifier) ? fromText + "\"" + engineUrl + "\"" : matchText));
+	const draftUrl = engineUrl.replace(/import\.js$/, DRAFT_ENTRY_MODULE_PATH);
+	return code.replace(/(\bfrom\s*)(["'])([^"']+)\2/g, (matchText, fromText, quote, specifier) => {
+		if (isDraftSpecifier(specifier)) {
+			return fromText + "\"" + draftUrl + "\"";
+		}
+		return isEngineSpecifier(specifier) ? fromText + "\"" + engineUrl + "\"" : matchText;
+	});
 }
 
 //==============================================================================
@@ -3693,6 +3725,7 @@ async function checkExamples(apiDocument, options) {
 	const os = require("os");
 	const exampleList = collectExamples(apiDocument, options);
 	const engineModule = await import(pathToFileURL(ENTRY_FILE_PATH).href);
+	const draftModule = await import(pathToFileURL(path.join(REPOSITORY_ROOT, DRAFT_ENTRY_MODULE_PATH)).href);
 	const nameContext = buildNameContext(apiDocument);
 	const AsyncFunction = (async () => {}).constructor;
 	const stateList = exampleList.map(() => ({ staticErrorList: [], runErrorList: [], ranIn: "" }));
@@ -3709,7 +3742,7 @@ async function checkExamples(apiDocument, options) {
 			state.staticErrorList.push("문법: " + error.message);
 			return;
 		}
-		for (const errorText of checkExampleNames(example, engineModule, nameContext)) {
+		for (const errorText of checkExampleNames(example, engineModule, draftModule, nameContext)) {
 			state.staticErrorList.push(errorText);
 		}
 	});

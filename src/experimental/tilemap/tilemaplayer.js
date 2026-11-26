@@ -23,7 +23,7 @@ const DEFAULT_CHUNK_SIZE = 16; // 덩이 한 변의 칸 수. (16 x 16 칸이면 
 //==============================================================================
 /**
  * @example <caption>칸 쓰고 읽기, 쓴 범위</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const layer = new Experimental.TilemapLayer("ground");
  * layer.setTile(0, 0, 1);

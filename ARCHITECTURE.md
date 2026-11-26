@@ -30,7 +30,7 @@ src/graphics3d/            # 3D (WebGL2): FbxLoader, SkinnedModel, Material, Ski
                            #     AmbientOcclusionEffect, SubsurfaceScatteringEffect (FullscreenPass 는 core)
 src/graphics3d/toon/       # 툰 3D: MeshBuilder(ToonMesh), glbmeshreader(ToonGlb), ToonRenderer, ToonLightSet, ToonMaterial,
                            #     ToonDrawQueue, ToonScreenOutline, ToonVfx, ToonPostProcess, ToonView3D
-src/experimental/          # 0.4.0 뒤 기능의 초안 (import.js 의 Experimental 이름 공간, API 가 바뀔 수 있다)
+src/experimental/          # 0.4.0 뒤 기능의 초안 (import.js 와 묶음에 들지 않고 experimental.js 를 직접 불러온다, API 가 바뀔 수 있다)
 src/deprecated/            # AnchoredWorldNode (폐기), Camera (폐기 예정, Camera2D 가 덮는다), 죽은 코드 aabb, transform2d, gl2d, webgl2
 ```
 
@@ -335,7 +335,7 @@ rim        = 색 x mix(0.5 를 가른 pow(1 - N.V, 거듭제곱), 그대로, 부
 ## 7. 공개 API 표면 (import.js)
 
 - 저장소 루트의 단일 배럴 파일. 주석 섹션 13블록(내장/기반/코어/기본 컴포넌트/UI/리소스/기타/컬렉션/애니메이션/셰이더와 풀스크린 패스/3D 그래픽스/폐기 예정/실험)이 곧 논리 레이어 구분이고, 실험 블록 뒤에 갈래마다 한 줄 주석을 단 내보내기가 이어진다.
-- 실험 블록은 `export * as Experimental` 한 줄이다. 0.4.0 뒤 기능의 초안을 src/experimental/experimental.js 에 모아 `Experimental.이름` 으로 낸다. 초안은 API 가 바뀔 수 있고, 다 자라면 제자리 폴더로 옮겨 import.js 에서 바로 낸다.
+- 실험 블록은 주석뿐이다. 0.4.0 뒤 기능의 초안은 src/experimental/experimental.js 에 모으고, 진입점과 묶음에는 넣지 않는다. 쓰는 쪽이 `import * as Experimental from "./src/experimental/experimental.js"` 로 불러 `Experimental.이름` 으로 쓴다. (experimental.js 가 맨 먼저 import.js 를 불러 엔진 모듈의 차례를 맞춘다) 초안은 API 가 바뀔 수 있고, 다 자라면 제자리 폴더로 옮겨 import.js 에서 바로 낸다.
 - 열거는 클래스와 같은 줄에 함께 export 한다 (`export { ViewScaleMode, ViewManager }`).
 - 함수 묶음 모듈은 이름 공간으로 낸다 (`export * as Format`, `LanguagePack`, `UIFont`, `ToonMesh`, `ToonGlb`).
 - API 문서 자료(docs/api/<버전>.json)는 tools/apidoc.cjs 가 이 표면의 소스 주석과 JSDoc 에서 뽑는다. 예제는 `@example`, 그 바로 뒤의 `@exampleImage <파일 이름>` 이 예제 그림(docs/guide/<버전>/images/, 가이드와 같이 씀)이다. 자세한 꼴은 tools/TOOLS.md.

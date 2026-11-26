@@ -25,7 +25,8 @@ export const BodyType2D = System.Object.freeze({
 //==============================================================================
 /**
  * @example <caption>떨어지는 동적 몸 정의</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const bodyDefinition = new Experimental.BodyDefinition2D();
  * bodyDefinition.type = Experimental.BodyType2D.dynamic;
@@ -145,7 +146,8 @@ export function updateBodyCenter(data) {
 //==============================================================================
 /**
  * @example <caption>몸에 힘과 충격 주기</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D(1));
  * const bodyDefinition = new Experimental.BodyDefinition2D();

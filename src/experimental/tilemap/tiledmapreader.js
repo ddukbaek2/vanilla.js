@@ -23,7 +23,8 @@ import { TilemapLayer } from "./tilemaplayer.js";
 //==============================================================================
 /**
  * @example <caption>지도 JSON 을 읽어 타일맵 채우기</caption>
- * import { Experimental, WorldNode } from "./build/vanilla.js";
+ * import { WorldNode } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const mapData = {
  * 	type: "map", orientation: "orthogonal", renderorder: "right-down", infinite: false,
@@ -58,7 +59,7 @@ const BLEND_MODE_NAME_TABLE = {
 //==============================================================================
 /**
  * @example <caption>물체 자료 만들기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const tiledObject = new Experimental.TiledObject();
  * tiledObject.name = "chest";
@@ -97,7 +98,7 @@ export class TiledObject {
 //==============================================================================
 /**
  * @example <caption>물체 층에서 이름으로 찾기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const objectLayer = new Experimental.TiledObjectLayer();
  * const door = new Experimental.TiledObject();
@@ -136,7 +137,7 @@ export class TiledObjectLayer {
 //==============================================================================
 /**
  * @example <caption>빈 결과</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const tiledMap = new Experimental.TiledMap();
  * console.log(tiledMap.properties.size, tiledMap.backgroundColor, tiledMap.objectLayers.length);
@@ -165,7 +166,8 @@ export class TiledMap {
 //==============================================================================
 /**
  * @example <caption>저장소 예제 지도를 읽고 그림까지 걸기</caption>
- * import { Experimental, JsonAsset, ImageAsset, WorldNode } from "./build/vanilla.js";
+ * import { JsonAsset, ImageAsset, WorldNode } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const mapPath = "examples/tilemapshowcase/assets/orthogonal.tmj";
  * const mapAsset = new JsonAsset();

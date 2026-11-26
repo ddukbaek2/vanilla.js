@@ -20,7 +20,8 @@ const LISTENER_PARAM_NAME_LIST = ["positionX", "positionY", "positionZ", "forwar
 //==============================================================================
 /**
  * @example <caption>리스너를 옮기고 돌리기</caption>
- * import { Engine, EngineConfiguration, Vector3, Experimental } from "./build/vanilla.js";
+ * import { Engine, EngineConfiguration, Vector3 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const engineConfiguration = new EngineConfiguration();
  * const engine = new Engine(engineConfiguration);

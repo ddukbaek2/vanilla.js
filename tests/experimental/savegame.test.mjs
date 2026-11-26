@@ -3,7 +3,7 @@
 // - 칸 쓰기와 읽기, 판 옮기기 사슬, 원자적 쓰기 끊김 흉내, 체크섬, 내보내기와 들여오기, 자동 저장, 클라우드 자리. (러스트 판 시험과 같은 값)
 // - 기록 꼴이 러스트 판(vanilla-engine)과 글자까지 같은지 본다. (ORIGINAL_RECORD_TEXT 는 두 저장소의 시험에 같이 있다)
 //==============================================================================
-import { Experimental } from "../../import.js";
+import * as Experimental from "../../src/experimental/experimental.js";
 
 const { SaveGameManager, SaveGameError, SaveSlotOptions, SaveStorage, MemorySaveStorage, SaveCloudProvider, calculateCrc32 } = Experimental;
 let checkCount = 0;

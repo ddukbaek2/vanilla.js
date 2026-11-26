@@ -32,7 +32,8 @@ export const ShapeType2D = System.Object.freeze({
 //==============================================================================
 /**
  * @example <caption>몸 중심에서 오른쪽으로 비킨 원</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const circle = Experimental.Circle2D.create(Vector2.create(10, 0), 25);
  * console.log(circle.center.x, circle.radius);
@@ -79,7 +80,8 @@ export class Circle2D extends Object {
 //==============================================================================
 /**
  * @example <caption>가로로 누운 캡슐</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const capsule = Experimental.Capsule2D.create(Vector2.create(-20, 0), Vector2.create(20, 0), 10);
  * console.log(capsule.center1.x, capsule.center2.x, capsule.radius);
@@ -131,7 +133,8 @@ export class Capsule2D extends Object {
 //==============================================================================
 /**
  * @example <caption>땅 선분</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const segment = Experimental.Segment2D.create(Vector2.create(0, 400), Vector2.create(800, 400));
  * console.log(segment.point1.x, segment.point2.x);
@@ -181,7 +184,8 @@ export class Segment2D extends Object {
 //==============================================================================
 /**
  * @example <caption>상자와 점 무리의 볼록 껍질</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const box = Experimental.Polygon2D.makeBox(20, 10);
  * console.log(box.vertices.length, box.normals[0].x, box.normals[0].y);

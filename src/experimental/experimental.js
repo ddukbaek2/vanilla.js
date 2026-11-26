@@ -1,16 +1,21 @@
 //==============================================================================
 // 실험 기능. (0.4.0 뒤 기능의 초안, API 가 바뀔 수 있음)
-// - 다음 판에 넣을 기능의 초안을 모아 내보낸다. import.js 가 Experimental 이름 공간으로 다시 내보낸다. (Experimental.이름)
+// - 다음 판에 넣을 기능의 초안을 모아 내보낸다. 진입점(import.js)과 묶음(build/vanilla.js, vanilla.min.js)에는 들지 않고, 쓰는 쪽이 이 파일을 직접 불러온다.
+//   (import * as Experimental from "./src/experimental/experimental.js" 로 Experimental.이름, 엔진은 묶음이 아닌 소스 import.js 로 불러야 초안과 클래스가 하나다)
 // - 초안 하나는 src/experimental/<이름>/ 폴더에 두고, 여기에 내보내기 한 줄을 더한다.
 // - 다 자란 기능은 제자리(base, core, misc, graphics3d 같은)로 옮기고 import.js 에서 바로 내보낸다.
 //==============================================================================
 
 /**
  * @example <caption>초안 이름 공간 둘러보기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * console.log(Object.keys(Experimental));
  */
+
+
+// 엔진 진입점을 먼저 읽는다. (엔진 모듈끼리 서로 부르는 차례를 import.js 가 맞춰 두어, 초안이 src 의 모듈을 먼저 부르면 덜 읽힌 클래스를 만난다)
+import "../../import.js";
 
 
 // 초안 내보내기 목록. (초안을 넣으면 아래에 한 줄씩 더한다. 예: export { 이름 } from "./<이름>/<파일>.js";)

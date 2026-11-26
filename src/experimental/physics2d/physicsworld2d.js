@@ -37,7 +37,7 @@ const TIME_TO_SLEEP = 0.5;
 //==============================================================================
 /**
  * @example <caption>화소 단위 월드 정의</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const worldDefinition = new Experimental.WorldDefinition2D(50);
  * console.log(worldDefinition.gravity.y, worldDefinition.restitutionThreshold, worldDefinition.contactHertz);
@@ -87,7 +87,8 @@ export class WorldDefinition2D extends Object {
 //==============================================================================
 /**
  * @example <caption>닿기 시작한 짝 읽기</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D(1));
  * const groundId = world.createBody(new Experimental.BodyDefinition2D());
@@ -133,7 +134,7 @@ export class ContactEvent2D extends Object {
 //==============================================================================
 /**
  * @example <caption>센서 사건 만들기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const sensorEvent = new Experimental.SensorEvent2D(new Experimental.ShapeId2D(0, 0), new Experimental.ShapeId2D(1, 0));
  * console.log(sensorEvent.sensorShapeId.getIndex(), sensorEvent.visitorShapeId.getIndex());
@@ -167,7 +168,8 @@ export class SensorEvent2D extends Object {
 //==============================================================================
 /**
  * @example <caption>광선 결과 만들기</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const rayResult = new Experimental.RayResult2D(new Experimental.ShapeId2D(0, 0), Vector2.create(1, 2), Vector2.create(0, -1), 0.5);
  * console.log(rayResult.point.x, rayResult.normal.y, rayResult.fraction);
@@ -274,7 +276,8 @@ class WorldState extends Object {
 //==============================================================================
 /**
  * @example <caption>상자를 떨어뜨려 땅에 쌓기</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D(1));
  * const groundId = world.createBody(new Experimental.BodyDefinition2D());

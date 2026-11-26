@@ -17,7 +17,8 @@ import { ImageAsset } from "../../resource/imageasset.js";
 //==============================================================================
 /**
  * @example <caption>격자 타일셋과 타일 속성, 애니메이션, 충돌 모양</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const tileset = new Experimental.Tileset();
  * tileset.setTileSize(16, 16);
@@ -74,7 +75,7 @@ export const TileCollisionShapeKind = {
 //==============================================================================
 /**
  * @example <caption>물결 타일 프레임 둘</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const firstFrame = new Experimental.TileAnimationFrame(10, 150);
  * const secondFrame = new Experimental.TileAnimationFrame(11, 150);
@@ -109,7 +110,8 @@ export class TileAnimationFrame {
 //==============================================================================
 /**
  * @example <caption>모양을 만들고 옮기기</caption>
- * import { Experimental, Vector2 } from "./build/vanilla.js";
+ * import { Vector2 } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const slope = Experimental.TileCollisionShape.createPolygon(0, 16, [Vector2.create(0, 0), Vector2.create(16, -16), Vector2.create(16, 0)]);
  * const moveRight = { a: 1, b: 0, c: 0, d: 1, e: 32, f: 0 };
@@ -360,7 +362,8 @@ function createTileData() {
 //==============================================================================
 /**
  * @example <caption>그림 한 장으로 격자 타일셋 만들기</caption>
- * import { Experimental, ImageAsset } from "./build/vanilla.js";
+ * import { ImageAsset } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const imageAsset = new ImageAsset();
  * await imageAsset.load("examples/tilemapshowcase/assets/terrain.png");

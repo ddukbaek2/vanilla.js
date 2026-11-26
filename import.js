@@ -178,8 +178,9 @@ export { Camera } from "./src/deprecated/camera.js";
 
 //==============================================================================
 // 실험 기능 목록. (src/experimental, 0.4.0 뒤 기능의 초안이라 API 가 바뀔 수 있다)
+// - 진입점과 묶음(build/vanilla.js, vanilla.min.js, 웹 도구 html)에는 넣지 않는다. 초안을 쓰는 쪽이 src/experimental/experimental.js 를 직접 불러온다.
+//   (import * as Experimental from "./src/experimental/experimental.js", 초안이 src 의 엔진 모듈을 불러오므로 엔진도 묶음이 아닌 이 import.js 로 불러야 클래스가 하나다)
 //==============================================================================
-export * as Experimental from "./src/experimental/experimental.js";
 
 
 // 이번 확장에서 추가 / 공개된 모듈. (게임 프로젝트들에서 반복 구현되던 범용 기능)

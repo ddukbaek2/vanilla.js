@@ -10,7 +10,7 @@
 
 /**
  * @example <caption>걷기 위에 손 흔들기를 반만 얹고 0.5 초 뒤 사건 꺼내기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const skeletonData = Experimental.Skeleton2DData.createFromJson({
  * 	bones: [{ name: "root" }, { name: "leg", parent: "root" }, { name: "arm", parent: "root" }],
@@ -44,7 +44,7 @@ import { Skeleton2DPose } from "./skeleton2danimation.js";
 //==============================================================================
 /**
  * @example <caption>트랙 항목 읽기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const skeletonData = Experimental.Skeleton2DData.createFromJson({
  * 	bones: [{ name: "root" }],
@@ -283,7 +283,7 @@ export class Skeleton2DTrackEntry extends Object {
 //==============================================================================
 /**
  * @example <caption>알린 사건 읽기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const event = new Experimental.Skeleton2DEvent("hit", 0.2);
  * const firedEvent = new Experimental.Skeleton2DFiredEvent(1, "attack", event);
@@ -349,7 +349,7 @@ export class Skeleton2DFiredEvent extends Object {
 //==============================================================================
 /**
  * @example <caption>대기에서 걷기로 0.2 초 동안 넘어가기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const skeletonData = Experimental.Skeleton2DData.createFromJson({
  * 	bones: [{ name: "root" }, { name: "body", parent: "root" }],

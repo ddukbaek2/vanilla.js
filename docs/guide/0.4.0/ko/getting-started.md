@@ -27,8 +27,8 @@
 번들을 직접 만들 때는 esbuild 를 씁니다.
 
 ```bash
-esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap
-esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify --keep-names
+esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap '--banner:js=/*! vanilla.js | (c) 2026 vanillapunch | MIT License | https://github.com/ddukbaek2/vanilla.js/blob/release/LICENSE | Third-party notices: https://github.com/ddukbaek2/vanilla.js/blob/release/THIRD_PARTY_LICENSES.md */'
+esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify --keep-names '--banner:js=/*! vanilla.js | (c) 2026 vanillapunch | MIT License | https://github.com/ddukbaek2/vanilla.js/blob/release/LICENSE | Third-party notices: https://github.com/ddukbaek2/vanilla.js/blob/release/THIRD_PARTY_LICENSES.md */'
 ```
 
 ## 샘플

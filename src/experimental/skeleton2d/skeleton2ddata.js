@@ -11,7 +11,7 @@
 
 /**
  * @example <caption>엔진 JSON 으로 자료를 지어 뼈와 슬롯 찾기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const skeletonData = Experimental.Skeleton2DData.createFromJson({
  * 	name: "hero",
@@ -63,7 +63,7 @@ export const Skeleton2DAttachmentType = {
 //==============================================================================
 /**
  * @example <caption>뼈 자료 하나 만들기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const boneData = new Experimental.Skeleton2DBoneData(1, "arm", 0);
  * boneData.setTransform(10, 0, 30, 1, 1, 0, 0);
@@ -258,7 +258,8 @@ export class Skeleton2DBoneData extends Object {
 //==============================================================================
 /**
  * @example <caption>슬롯 자료 하나 만들기</caption>
- * import { Experimental, Color } from "./build/vanilla.js";
+ * import { Color } from "./import.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const slotData = new Experimental.Skeleton2DSlotData(0, "body", 1);
  * slotData.setColor(new Color(1, 0.5, 0.5, 1));
@@ -392,7 +393,7 @@ export class Skeleton2DSlotData extends Object {
 //==============================================================================
 /**
  * @example <caption>두 뼈 IK 자료 하나 만들기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const ikConstraintData = new Experimental.Skeleton2DIkConstraintData(0, "armIk", [1, 2], 3);
  * ikConstraintData.setBendPositive(false);
@@ -516,7 +517,7 @@ export class Skeleton2DIkConstraintData extends Object {
 //==============================================================================
 /**
  * @example <caption>네모 붙임 하나 만들기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const regionAttachment = new Experimental.Skeleton2DRegionAttachment("head", "head.png");
  * regionAttachment.setTransform(0, -10, 0, 1, 1);
@@ -764,7 +765,7 @@ export class Skeleton2DRegionAttachment extends Object {
 //==============================================================================
 /**
  * @example <caption>무게 있는 네모 메시 하나 만들기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const meshAttachment = new Experimental.Skeleton2DMeshAttachment("cape", "cape.png");
  * meshAttachment.setGeometry([0, 0, 1, 0, 1, 1, 0, 1], [0, 1, 2, 0, 2, 3]);
@@ -960,7 +961,7 @@ export class Skeleton2DMeshAttachment extends Object {
 //==============================================================================
 /**
  * @example <caption>스킨에 붙임을 넣고 찾기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const skin = new Experimental.Skeleton2DSkin("armor");
  * const regionAttachment = new Experimental.Skeleton2DRegionAttachment("helmet", "helmet.png");
@@ -1072,7 +1073,7 @@ export class Skeleton2DSkin extends Object {
 //==============================================================================
 /**
  * @example <caption>코드로 뼈 둘을 짓고 처음 자세의 월드 행렬 셈하기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const skeletonData = new Experimental.Skeleton2DData("arm");
  * const rootBoneData = new Experimental.Skeleton2DBoneData(0, "root", -1);
@@ -1471,7 +1472,7 @@ export class Skeleton2DData extends Object {
 	 * @param { object } json JSON 을 읽은 객체.
 	 * @returns { Skeleton2DData } 지은 자료.
 	 * @example <caption>걷기 클립 하나를 가진 자료</caption>
-	 * import { Experimental } from "./build/vanilla.js";
+	 * import * as Experimental from "./src/experimental/experimental.js";
 	 *
 	 * const skeletonData = Experimental.Skeleton2DData.createFromJson({
 	 * 	bones: [{ name: "root" }, { name: "leg", parent: "root", rotation: 90, length: 30 }],
@@ -1503,7 +1504,7 @@ export class Skeleton2DData extends Object {
 	 * @param { string | null } armatureName 읽을 뼈대 이름. (null 이면 첫 뼈대)
 	 * @returns { Skeleton2DData } 지은 자료.
 	 * @example <caption>DragonBones 뼈대 하나 읽기</caption>
-	 * import { Experimental } from "./build/vanilla.js";
+	 * import * as Experimental from "./src/experimental/experimental.js";
 	 *
 	 * const skeletonData = Experimental.Skeleton2DData.createFromDragonBones({
 	 * 	frameRate: 24,

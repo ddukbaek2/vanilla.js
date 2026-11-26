@@ -52,8 +52,18 @@
 `build/vanilla.js` 와 `build/vanilla.min.js` 는 esbuild 로 묶습니다. 저장소 루트에서 실행합니다.
 
 ```bash
-esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap
-esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify --keep-names
+esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap '--banner:js=/*! vanilla.js | (c) 2026 vanillapunch | MIT License | https://github.com/ddukbaek2/vanilla.js/blob/release/LICENSE | Third-party notices: https://github.com/ddukbaek2/vanilla.js/blob/release/THIRD_PARTY_LICENSES.md */'
+esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify --keep-names '--banner:js=/*! vanilla.js | (c) 2026 vanillapunch | MIT License | https://github.com/ddukbaek2/vanilla.js/blob/release/LICENSE | Third-party notices: https://github.com/ddukbaek2/vanilla.js/blob/release/THIRD_PARTY_LICENSES.md */'
+```
+
+- 묶음 머리의 `/*! ... */` 한 줄은 엔진 라이선스와 제3자 고지 파일(THIRD_PARTY_LICENSES.md)을 가리킵니다. 줄여도 남습니다.
+- 초안(src/experimental 의 2D 물리, 타일맵, 2D 뼈대, 공간 소리, 세이브)은 진입점 `import.js` 와 묶음에 들지 않습니다. 쓰려면 묶음 대신 소스를 불러옵니다. 초안이 src 의 엔진 모듈을 불러오므로 엔진도 묶음이 아닌 `import.js` 로 불러야 클래스가 하나입니다. 게임을 esbuild 로 묶으면 초안도 함께 묶입니다.
+
+```js
+import { Engine, Vector2 } from "./import.js";
+import * as Experimental from "./src/experimental/experimental.js";
+
+const world = new Experimental.PhysicsWorld2D(new Experimental.WorldDefinition2D(32));
 ```
 
 - `--format=esm` 은 `import { ... } from` 으로 부를 수 있는 모듈로 묶습니다.

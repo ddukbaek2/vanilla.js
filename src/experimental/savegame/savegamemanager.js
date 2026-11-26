@@ -45,7 +45,7 @@ let crc32Table = null;
  * @param { string | Uint8Array } input 셀 글이나 바이트.
  * @returns { number } CRC-32 값. (0 ~ 0xFFFFFFFF)
  * @example <caption>잘 알려진 검사 값</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * console.log(Experimental.calculateCrc32("123456789").toString(16));
  */
@@ -74,7 +74,7 @@ export function calculateCrc32(input) {
 //==============================================================================
 /**
  * @example <caption>빈 머리</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const info = new Experimental.SaveSlotInfo();
  * console.log(info.slotId, info.isCorrupted);
@@ -97,7 +97,7 @@ export class SaveSlotInfo {
 //==============================================================================
 /**
  * @example <caption>이름과 놀이 시간을 단 저장 값</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const options = new Experimental.SaveSlotOptions();
  * options.name = "Chapter 1";
@@ -247,7 +247,7 @@ function createFailure(error, detail = null) {
 //==============================================================================
 /**
  * @example <caption>칸에 저장하고 판 옮겨 읽기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const saveGameManager = new Experimental.SaveGameManager("example", 2);
  * saveGameManager.setStorage(new Experimental.MemorySaveStorage());

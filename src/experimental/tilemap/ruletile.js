@@ -19,7 +19,7 @@ import { TilemapLayer } from "./tilemaplayer.js";
 //==============================================================================
 /**
  * @example <caption>길 자동 타일 (끝, 곧은 길, 모퉁이, 세 갈래, 네 갈래)</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const { RuleTile, RuleTileNeighbor, RuleTileTransform, TilemapLayer } = Experimental;
  * const any = RuleTileNeighbor.any;
@@ -74,7 +74,7 @@ const NEIGHBOR_OFFSETS = [-1, -1, 0, -1, 1, -1, -1, 0, 1, 0, -1, 1, 0, 1, 1, 1];
 //==============================================================================
 /**
  * @example <caption>오른쪽에 같은 타일이 있을 때의 규칙</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const { RuleTileRule, RuleTileNeighbor, RuleTileTransform } = Experimental;
  * const any = RuleTileNeighbor.any;
@@ -114,7 +114,7 @@ export class RuleTileRule {
 //==============================================================================
 /**
  * @example <caption>둘레를 직접 물어 고를 타일 셈하기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const { RuleTile, RuleTileNeighbor, RuleTileTransform } = Experimental;
  * const any = RuleTileNeighbor.any;

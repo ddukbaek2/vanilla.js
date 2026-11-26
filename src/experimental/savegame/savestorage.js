@@ -13,7 +13,7 @@ import { LocalStorage } from "../../misc/localstorage.js";
 //==============================================================================
 /**
  * @example <caption>내 저장소 만들기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * class ConsoleSaveStorage extends Experimental.SaveStorage {
  * 	writeText(key, text) {
@@ -82,7 +82,7 @@ export class SaveStorage {
 //==============================================================================
 /**
  * @example <caption>LocalStorage 에 쓰고 읽기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const storage = new Experimental.LocalSaveStorage();
  * storage.writeText("example.savestorage.key", "value");
@@ -141,7 +141,7 @@ export class LocalSaveStorage extends SaveStorage {
 //==============================================================================
 /**
  * @example <caption>메모리 저장소의 키 목록</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const storage = new Experimental.MemorySaveStorage();
  * storage.writeText("save.slot.a.0", "text");
@@ -220,7 +220,7 @@ export class MemorySaveStorage extends SaveStorage {
 //==============================================================================
 /**
  * @example <caption>메모리 클라우드</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * class MemoryCloud extends Experimental.SaveCloudProvider {
  * 	textBySlot = new Map();

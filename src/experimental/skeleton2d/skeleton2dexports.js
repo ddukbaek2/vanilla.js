@@ -7,7 +7,7 @@
 
 /**
  * @example <caption>엔진 JSON 으로 자료를 짓고 걷기를 반 초 돌린 뒤 뼈의 월드 자리 읽기</caption>
- * import { Experimental } from "./build/vanilla.js";
+ * import * as Experimental from "./src/experimental/experimental.js";
  *
  * const skeletonData = Experimental.Skeleton2DData.createFromJson({
  * 	bones: [{ name: "root" }, { name: "leg", parent: "root", rotation: 90, length: 30 }],
