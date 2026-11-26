@@ -354,7 +354,7 @@
 - 툰 폴더(experimental/graphics/toon)의 모든 파일에 주석과 예제를 채웠다. 공개 API 마다 머리 주석과 JSDoc @param, @returns 설명, 모듈과 클래스와 쓰는 법이 뻔하지 않은 멤버에 @example <caption>제목</caption> (예제는 import.js 이름만 쓰고 헤드리스 크롬에서 오류 없이 도는 것을 확인했다)
 - 툰을 유니티와 언리얼이 기본으로 갖춘 수준까지 채웠다. (유니티 툰 셰이더 소스의 식을 따랐다)
   - ShadowMap: 모형을 지은 뒤에 ShadowMap 을 지으면 깊이 텍스처가 텍스처 유닛에 남아 그리기가 GL INVALID_OPERATION(되먹임 고리)이 되던 것을 고쳤다. 지을 때 앞의 텍스처와 프레임버퍼 묶음을 돌린다. 빛이 거의 바로 아래나 위로 나아가면 광원 행렬이 깨지던 것(위쪽 벡터가 빛과 나란함)을 고쳤다. 그때는 위쪽을 z 축으로 잡는다
-  - ShadowAtlas, SHADOW_ATLAS_MAXIMUM_LIGHTS(4): 점광과 스포트라이트의 실시간 그림자. 유니티 URP 의 추가 빛 그림자 아틀라스 꼴로 깊이 텍스처 한 장을 칸으로 나눠, 스포트라이트는 원근 한 칸, 점광은 큐브 여섯 면을 칸 여섯에 그린다. updateLights(점광 목록) 이 castsShadow 가 true 인 빛을 골라 칸과 칸마다의 보기와 투영을 셈한다. 툰 셰이더는 그 점광의 빛을 받는 몫에 그림자를 곱해 그늘 램프에 넣는다 (해와 같은 꼴, 3x3 PCF)
+  - ShadowAtlas, SHADOW_ATLAS_MAXIMUM_LIGHTS(4): 점광과 스포트라이트의 실시간 그림자. 유니티 URP 의 추가 빛 그림자 아틀라스 꼴로 깊이 텍스처 한 장을 칸으로 나눠, 스포트라이트는 원근 한 칸, 점광은 큐브 여섯 면을 칸 여섯에 그린다. updateLights(점광 목록) 이 castsShadow 가 true 인 빛을 골라 칸과 칸마다의 보기와 투영을 셈한다. 툰 셰이더는 그 점광의 빛을 받는 몫에 그림자를 곱해 그늘 램프에 넣는다 (해와 같은 꼴, 3x3 PCF) 받는 자리는 노멀 쪽으로 칸 텍셀 (1 + 3 x (1 - dot(N, L))) 개만큼 밀어 빛에 비스듬한 면의 그림자 여드름을 막는다
   - ToonRenderer: setLocalShadows(ShadowAtlas, 세기), beginShadowAtlasPass(아틀라스), setShadowAtlasTile(아틀라스, 칸 번호) (끝은 endShadowPass). ToonDrawQueue.drawLocalShadows(렌더러, 아틀라스)
   - 점광: castsShadow (기본 false), shadowNear (기본 0.05, 먼 거리는 range, 0 이면 30)
   - 빛 색 쓰기: ToonLightSet.setLightColorUsage({ base, shade, highlight, rim, shadeRim, matcap, angelRing, outline }) (렌더러에도). 색마다 빛 색을 곱할지 고른다. 끄면 바탕, 그늘, 하이라이트는 빛의 휘도만 받고 나머지는 빛을 받지 않는다. (유니티 툰 셰이더의 Is_LightColor_*, 기본 모두 켬) 이제 림, 매트캡, 껍데기 바깥선도 기본으로 해의 색을 곱한다. 지금까지 모습은 setLightColorUsage({ rim: false, matcap: false, outline: false })
