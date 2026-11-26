@@ -264,12 +264,12 @@ crypts = smoothstep(0.62, 0.75, fractalNoise(np.stack([np.cos(angle) * 9, np.sin
 irisRadial = radius / 0.5
 # 나이 든 회청색 홍채: 동공 둘레는 호박빛(중심 이색), 바깥은 회청, 가는 방사 섬유와 움푹한 틈, 짙은 윤부 고리.
 outer = np.array([0.33, 0.39, 0.42])
-inner = np.array([0.46, 0.38, 0.24])
-iris = outer * (1 - gauss(irisRadial - 0.3, 0.16)[..., None]) + inner * gauss(irisRadial - 0.3, 0.16)[..., None]
+inner = np.array([0.40, 0.37, 0.30])
+iris = outer * (1 - gauss(irisRadial - 0.28, 0.11)[..., None] * 0.8) + inner * gauss(irisRadial - 0.28, 0.11)[..., None] * 0.8
 iris = iris * (0.62 + 0.38 * fiberNoise + 0.35 * (fineFiber - 0.5))[..., None]
 iris *= (1 - crypts * 0.35)[..., None]
 collarette = gauss(irisRadial - 0.42, 0.06)
-iris = iris * (1 - collarette[..., None] * 0.35) + collarette[..., None] * 0.35 * np.array([0.58, 0.52, 0.40])
+iris = iris * (1 - collarette[..., None] * 0.25) + collarette[..., None] * 0.25 * np.array([0.5, 0.48, 0.42])
 iris *= (1 - smoothstep(0.78, 1.0, irisRadial) * 0.7)[..., None]
 saveImage(os.path.join(assetDirectory, "eye_iris.png"), np.concatenate([np.clip(iris, 0, 1), np.ones_like(radius)[..., None]], -1))
 irisHeight = ndimage.gaussian_filter(fiberNoise * 0.5 + fineFiber * 0.3 - crypts * 0.3 - collarette * 0.3, 0.8)
@@ -284,25 +284,31 @@ lateral = np.abs(shellDelta[..., 0]) / 0.014
 darkness = np.clip(0.06 + 0.3 * smoothstep(0.0, 0.9, elevation) + 0.12 * smoothstep(0.6, 1.0, lateral), 0, 0.45) * shellCovered
 saveImage(os.path.join(assetDirectory, "eye_occlusion.png"), np.repeat(darkness[..., None], 4, -1))
 
-# 속눈썹. (ICT 속눈썹 UV 는 v 가 뿌리에서 끝 쪽: v 방향 가는 가닥, 짙은 갈색에 흰 가닥 섞임, 가닥마다 길이와 휨이 다르다)
+# 속눈썹. (ICT 속눈썹 UV: 띠 여섯(위 셋 v 0.012..0.484, 아래 셋 v 0.514..0.986), 띠마다 u 가 눈꺼풀 길이, v 띠 아래 끝이 뿌리, 위 끝이 끝)
+# 위 속눈썹은 짙고 촘촘하게, 아래는 짧고 성기게. 가닥마다 길이와 휨이 다르고 끝으로 갈수록 가늘다. 짙은 갈색에 흰 가닥이 섞인다.
 lashGenerator = np.random.default_rng(81)
 lashColor = np.zeros((1024, 1024, 3), dtype=np.float32)
 lashAlpha = np.zeros((1024, 1024), dtype=np.float32)
-lashV = (np.arange(1024) + 0.5) / 1024
 lashColumns = np.arange(1024)[None, :]
-for strand in range(900):
-	start = lashGenerator.uniform(0, 1024)
-	bend = lashGenerator.normal(0, 6)
-	segmentStart = lashGenerator.uniform(0, 1)
-	segmentLength = lashGenerator.uniform(0.08, 0.3)
-	path = start + bend * ((lashV - segmentStart) / segmentLength) ** 2
-	along = np.clip((lashV - segmentStart) / segmentLength, 0, 1)
-	inside = (lashV >= segmentStart) & (lashV <= segmentStart + segmentLength)
-	width = 1.6 * (1 - along * 0.7)
-	coverage = np.clip(1 - np.abs(lashColumns - path[:, None]) / width[:, None], 0, 1) * inside[:, None]
-	shade = lashGenerator.uniform(0.12, 0.22) if lashGenerator.random() > 0.25 else lashGenerator.uniform(0.5, 0.7)
-	lashColor = lashColor * (1 - coverage[..., None]) + np.array([shade, shade * 0.92, shade * 0.85]) * coverage[..., None]
-	lashAlpha = np.maximum(lashAlpha, coverage * 0.9)
+LASH_BANDS = [(0.012, 0.152, False), (0.178, 0.318, False), (0.344, 0.484, False), (0.514, 0.654, True), (0.680, 0.820, True), (0.846, 0.986, True)]
+for bandStart, bandEnd, lower in LASH_BANDS:
+	rowStart, rowEnd = int(bandStart * 1024), int(np.ceil(bandEnd * 1024))
+	bandV = (np.arange(rowStart, rowEnd) + 0.5) / 1024
+	for strand in range(110 if lower else 320):
+		rootU = lashGenerator.uniform(0.01, 0.99) * 1024
+		length = (bandEnd - bandStart) * (lashGenerator.uniform(0.3, 0.6) if lower else lashGenerator.uniform(0.6, 1.0))
+		along = (bandV - bandStart) / length
+		inside = (along >= 0) & (along <= 1)
+		path = rootU + lashGenerator.normal(0, 3) * along ** 2
+		# 눈 하나가 화면에서 수십 픽셀이라 밉맵에서 가닥이 사라지지 않게 뿌리를 굵게 둔다. (뿌리끼리 겹쳐 짙은 속눈썹 줄이 된다)
+		width = (4.0 if not lower else 2.0) * (1 - 0.75 * np.clip(along, 0, 1))
+		coverage = np.clip(1 - np.abs(lashColumns - path[:, None]) / width[:, None], 0, 1) * inside[:, None] * (1 - 0.5 * np.clip(along, 0, 1))[:, None]
+		if lower:
+			coverage *= 0.6
+		shade = lashGenerator.uniform(0.1, 0.2) if lashGenerator.random() > 0.3 else lashGenerator.uniform(0.5, 0.68)
+		block = slice(rowStart, rowEnd)
+		lashColor[block] = lashColor[block] * (1 - coverage[..., None]) + np.array([shade, shade * 0.92, shade * 0.85]) * coverage[..., None]
+		lashAlpha[block] = np.maximum(lashAlpha[block], coverage)
 lashColor[lashAlpha < 0.01] = np.array([0.2, 0.18, 0.16])
 saveImage(os.path.join(assetDirectory, "eyelash.png"), np.concatenate([lashColor, lashAlpha[..., None]], -1))
 print("done")

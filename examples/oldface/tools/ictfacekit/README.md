@@ -20,7 +20,7 @@
 5. `python -I bake_skin.py W/ict.npz <FaceXModel>/vertex_indices.json W A` : 머리 UV 에 삼각형을 래스터해 텍셀마다 3D 자리와 노멀을 얻고, ICT 얼굴 랜드마크 68 개로 영역(이마, 미간, 눈꼬리, 눈 밑, 팔자, 입술, 목)을 잡아 굽는다.
    - head_albedo, head_normal, head_roughness(R 차폐, G 거칠기), head_specular, skin_detail(모공과 나이 든 주름 높이), skin_micro(타일)
    - wrinkle_masks.png(4x4 타일 RGBA, 영역 16 채널), wrinkle_normal.jpg, wrinkle_color.jpg(2x2 타일, 주름 맵 셋), wrinkles.json(채널 -> 영역과 주름 맵, ARKit 셰이프 -> 영역 가중치)
-   - teeth_albedo, teeth_normal, eye_sclera, eye_sclera_normal, eye_iris(회청 바깥, 동공 둘레 호박빛, 방사 섬유와 틈), eye_iris_normal, eye_occlusion, eyelash(v 방향 가는 가닥)
+   - teeth_albedo, teeth_normal, eye_sclera, eye_sclera_normal, eye_iris(회청 바깥, 동공 둘레 호박빛, 방사 섬유와 틈), eye_iris_normal, eye_occlusion, eyelash(ICT 속눈썹 UV 의 띠 여섯마다 띠 아래 끝 뿌리에서 자라는 가닥, 위는 짙고 촘촘, 아래는 짧고 성김)
 5-1. `python -I bake_scan.py W W/scan.npz <lpshead>/lambertian.jpg <lpshead>/bump.png A` : 머리 텍셀마다 가장 가까운 스캔 겉면 텍셀(스캔 UV 에 위치를 래스터한 KD 트리)에서 색과 변위를 가져와 head_albedo, head_normal(변위 중간 띠), skin_detail(고운 띠), head_roughness, head_specular 를 덮어쓴다. 털 자국(수염, 눈썹)은 지우고 둘레 살빛으로 메우고, 수염 그늘을 걷고, 눈 둘레 붉은 기를 줄이고, 볼 평균을 (0.62, 0.47, 0.40) 으로 옮기고, 두피에 머리카락 빛을 섞는다. bake_skin 이 쓴 절차 맵은 처음 돌 때 `W/procedural_*.jpg` 로 옮겨 두고 읽는다.
 6. `python -I build_hair.py W/ict.npz <FaceXModel>/vertex_indices.json W A` : 머리 표면에 뿌리를 뿌려 가닥을 중력과 흐름 방향으로 뻗고 리본 카드(양면)를 지어 `hair_lod0..4.glb`(hair, beard, mustache, eyebrows). 카드 정점은 뿌리 얼굴 정점의 모프 델타를 받는다(머리카락은 4 mm 미만 움직이는 셰이프를 버림). 텍스처 hair, beard, mustache, eyebrows(rgb 색, a 커버리지: 칸 가운데로 몰린 가는 가닥, 가닥마다 뿌리와 끝이 다르고 끝으로 갈수록 가늘고 옅으며 뿌리는 조금 어둡고 누르스름하다)와 탄젠트(rgb 가닥 방향, a 뿌리 0 -> 끝 1). LOD0 카드는 머리 6000, 턱수염 2400, 콧수염 900, 눈썹 1000.
 
