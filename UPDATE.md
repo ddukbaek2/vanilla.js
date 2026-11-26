@@ -16,6 +16,7 @@
   - src/experimental/aabb.js, transform2d.js, graphics/gl2d.js, graphics/webgl2.js (죽은 코드, 내보내지 않음) → src/deprecated/
 - Camera(src/deprecated/camera.js): 폐기 예정. Camera2D(src/misc/camera2d.js)가 회전과 begin, end 까지 모두 덮는다. import.js 는 아직 Camera 로 내보내고, 다음 판에서 빠질 수 있다
 - Experimental: src/experimental 은 0.4.0 뒤 기능의 초안 자리다. src/experimental/experimental.js 가 초안을 모아 내보내고, import.js 가 Experimental 이름 공간으로 다시 내보낸다. (Experimental.이름) 초안은 API 가 바뀔 수 있다. 지금은 비어 있다
+- Experimental 초안, 타일맵(src/experimental/tilemap): Tileset(그림 한 장의 격자와 여백, 간격 또는 타일마다 그림, 타일마다 속성, 종류, 애니메이션, 충돌 모양), TilemapLayer(16 x 16 덩이 저장, 끝없는 지도, 색, 불투명도, 오프셋, 섞기), Tilemap 컴포넌트(정사각, 아이소, 엇갈림, 육각 배치, 덩이마다 화면 밖 거르기와 같은 그림끼리 묶어 그리기, Chunk 와 Individual 그리는 방식, 뒤집기와 돌리기 비트 TileFlag, 칸의 충돌 모양), RuleTile(유니티 RuleTile 규칙의 자동 타일), TiledMapReader(Tiled JSON .tmj, .tsj 읽기, base64, zlib, gzip, 덩이, 묶음 층, 물체 층). 좌표와 그리는 셈은 Tiled 렌더러와 같다. 예제 examples/tilemapshowcase(러스트 판과 같은 장면), 값 검사 examples/tilemapshowcase/check.mjs
 - import.js: 옛 "실험적 기능 목록" 묶음을 컬렉션, 애니메이션, 셰이더와 풀스크린 패스, 3D 그래픽스, 폐기 예정, 실험 묶음으로 나눴다. Visual 은 기타 기능 묶음, VisualAsset 과 BunchAsset 은 리소스 묶음으로 갔다. 내보내는 이름은 Experimental 하나가 늘었을 뿐 같다
 - README, 가이드, ARCHITECTURE: 새 폴더로 고치고, 3D 와 툰 3D 를 실험 기능이라 하던 글을 뺐다. (README 의 "3D (실험)" 은 "3D")
 - 외계행성 광부 키우기(webgame-rimminer)가 게임 쪽에 따로 만들어 쓰던 범용 기능을 엔진으로 옮긴다. (게임 코드는 건드리지 않았다, 게임은 지금처럼 자기 것을 쓴다)

@@ -15,4 +15,9 @@
 
 
 // 초안 내보내기 목록. (초안을 넣으면 아래에 한 줄씩 더한다. 예: export { 이름 } from "./<이름>/<파일>.js";)
+export { Tileset, TileAnimationFrame, TileCollisionShape, TileCollisionShapeKind, TileRenderSize, TileFillMode } from "./tilemap/tileset.js";
+export { TilemapLayer } from "./tilemap/tilemaplayer.js";
+export { Tilemap, TileFlag, TilemapOrientation, TilemapStaggerAxis, TilemapStaggerIndex, TilemapRenderOrder, TilemapRenderMode } from "./tilemap/tilemap.js";
+export { RuleTile, RuleTileRule, RuleTileNeighbor, RuleTileTransform } from "./tilemap/ruletile.js";
+export { TiledMapReader, TiledMap, TiledObjectLayer, TiledObject } from "./tilemap/tiledmapreader.js";
 export {};
