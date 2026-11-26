@@ -4,6 +4,7 @@
 const System = globalThis;
 import * as Math from "../base/math.js";
 import { Vector2 } from "../base/vector2.js";
+import { OBB } from "../base/obb.js";
 import { Graphic } from "../core/graphic.js";
 import { TransformNode } from "../core/node/transformnode.js";
 import { LayoutVariable } from "./autolayout/layoutvariable.js";
@@ -97,6 +98,7 @@ export class UINode extends TransformNode {
 	/** @private @type { { top: number, left: number, bottom: number, right: number } } */ #layoutMargins;
 	/** @private @type { UINode | null } */ #layoutMarginsGuide;
 	/** @private @type { LayoutConstraint[] } */ #layoutMarginsGuideConstraints;
+	/** @private @type { boolean } */ #isInteractable; // TouchRaycaster 가 맞힐지. (UIButton 이 붙으면 켠다)
 
 	//==============================================================================
 	// 생성.
@@ -126,6 +128,7 @@ export class UINode extends TransformNode {
 		this.#layoutMargins = { top: 8, left: 8, bottom: 8, right: 8 };
 		this.#layoutMarginsGuide = null;
 		this.#layoutMarginsGuideConstraints = [];
+		this.#isInteractable = false;
 	}
 
 	//==============================================================================
@@ -518,9 +521,10 @@ export class UINode extends TransformNode {
 
 	//==============================================================================
 	// 사용자 제약 추가. 솔버에 즉시 등록.
+	// - 솔버가 받지 않으면(이미 더한 제약, 모순 제약) 오류를 던지고 목록에도 남기지 않는다.
 	//==============================================================================
 	/**
-	 * @param { LayoutConstraint } constraint 더할 제약.
+	 * @param { LayoutConstraint } constraint 더할 제약. (솔버가 받지 않으면 오류를 던진다)
 	 * @example <caption>약한 제약과 상한 제약 함께 쓰기</caption>
 	 * import { UINode, LayoutSolver, LayoutStrength } from "./build/vanilla.js";
 	 *
@@ -546,11 +550,11 @@ export class UINode extends TransformNode {
 	 * console.log(node.getWidth());
 	 */
 	addConstraint(constraint) {
-		this.#userConstraints.push(constraint);
 		const solver = this.getSolver();
 		if (solver !== null) {
 			solver.addConstraint(constraint);
 		}
+		this.#userConstraints.push(constraint);
 	}
 
 	//==============================================================================
@@ -868,6 +872,187 @@ export class UINode extends TransformNode {
 	 */
 	getCenterY() {
 		return this.#centerYVariable.getValue();
+	}
+
+	//==============================================================================
+	// 터치 인터랙션 활성화 설정. (WorldNode 와 같다)
+	//==============================================================================
+	/**
+	 * @param { boolean } isInteractable 참이면 TouchRaycaster 가 이 노드를 맞힌다. (UIButton 이 붙으면 켠다)
+	 */
+	setInteractable(isInteractable) {
+		this.#isInteractable = isInteractable;
+	}
+
+	//==============================================================================
+	// 터치 인터랙션 활성화 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 누를 수 있으면 참.
+	 */
+	isInteractable() {
+		return this.#isInteractable;
+	}
+
+	//==============================================================================
+	// 이 노드의 로컬 자리 → 뷰 좌표.
+	// - pushTransform 이 거는 이동(솔버의 left, top, 부모가 UINode 면 부모의 left, top 을 뺀 값), 회전, 배율을 부모들까지 거슬러 올라가며 건다.
+	// - UINode 가 아닌 부모는 그 노드의 자식 좌표계로 본다. (피봇이 있는 WorldNode 는 내용 영역의 왼쪽 위가 원점)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } localPosition 이 노드의 로컬 자리. (내용 영역의 왼쪽 위가 원점)
+	 * @returns { Vector2 } 뷰 좌표의 자리.
+	 */
+	convertToViewPosition(localPosition) {
+		const localScale = this.getLocalScale();
+		const radian = Math.degreeToRadian(this.getLocalRotation());
+		const cosRadian = Math.cos(radian);
+		const sinRadian = Math.sin(radian);
+		const scaledX = localPosition.x * localScale.x;
+		const scaledY = localPosition.y * localScale.y;
+		let parentX = scaledX * cosRadian - scaledY * sinRadian + this.getLeft();
+		let parentY = scaledX * sinRadian + scaledY * cosRadian + this.getTop();
+		const parent = this.getParent();
+		if (parent instanceof UINode) {
+			parentX -= parent.getLeft();
+			parentY -= parent.getTop();
+			const parentLocalPosition = Vector2.create(parentX, parentY);
+			const viewPosition = parent.convertToViewPosition(parentLocalPosition);
+			return viewPosition;
+		}
+		if (!parent || typeof parent.getPosition !== "function") {
+			return Vector2.create(parentX, parentY);
+		}
+
+		// 피봇이 있는 부모(WorldNode)는 내용 영역의 왼쪽 위가 자식의 원점이다. (WorldNode.getPosition 과 같은 셈)
+		if (typeof parent.getPivot === "function" && typeof parent.getContentSize === "function") {
+			const parentPivot = parent.getPivot();
+			const parentContentSize = parent.getContentSize();
+			parentX -= parentContentSize.x * parentPivot.x;
+			parentY -= parentContentSize.y * parentPivot.y;
+		}
+		const parentPosition = parent.getPosition();
+		const parentScale = parent.getScale();
+		const parentRadian = Math.degreeToRadian(parent.getRotation());
+		const parentCosRadian = Math.cos(parentRadian);
+		const parentSinRadian = Math.sin(parentRadian);
+		const parentScaledX = parentX * parentScale.x;
+		const parentScaledY = parentY * parentScale.y;
+		return Vector2.create(parentPosition.x + parentScaledX * parentCosRadian - parentScaledY * parentSinRadian, parentPosition.y + parentScaledX * parentSinRadian + parentScaledY * parentCosRadian);
+	}
+
+	//==============================================================================
+	// 실제 화면에 그려지는 영역 반환. (OBB, WorldNode 와 같은 꼴)
+	//==============================================================================
+	/**
+	 * @returns { Vector2[] } 네 귀퉁이. (왼쪽 위, 오른쪽 위, 오른쪽 아래, 왼쪽 아래 차례, 뷰 좌표)
+	 */
+	getWorldCorners() {
+		const width = this.getWidth();
+		const height = this.getHeight();
+		const topLeft = this.convertToViewPosition(Vector2.create(0, 0));
+		const topRight = this.convertToViewPosition(Vector2.create(width, 0));
+		const bottomRight = this.convertToViewPosition(Vector2.create(width, height));
+		const bottomLeft = this.convertToViewPosition(Vector2.create(0, height));
+		return [topLeft, topRight, bottomRight, bottomLeft];
+	}
+
+	//==============================================================================
+	// 자리가 노드 안인지. (getWorldCorners 로 잰다, WorldNode 와 같다)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewPosition 볼 뷰 좌표.
+	 * @returns { boolean } 네 귀퉁이 안이면 참. (null 이면 거짓)
+	 * @example <caption>솔버로 놓은 단추 자리 누르기</caption>
+	 * import { UINode, UIButton, LayoutSolver, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const solver = new LayoutSolver();
+	 * const buttonNode = new UINode();
+	 * buttonNode.setSolver(solver);
+	 * buttonNode.addConstraint(buttonNode.leftAnchor.equalTo(40));
+	 * buttonNode.addConstraint(buttonNode.topAnchor.equalTo(20));
+	 * buttonNode.addConstraint(buttonNode.widthAnchor.equalTo(120));
+	 * buttonNode.addConstraint(buttonNode.heightAnchor.equalTo(48));
+	 * solver.updateVariables();
+	 * const button = buttonNode.addComponent(UIButton);
+	 * let clickCount = 0;
+	 * button.setClickEvent(() => {
+	 * 	++clickCount;
+	 * 	return true;
+	 * });
+	 * buttonNode.touchPress(Vector2.create(60, 40));
+	 * buttonNode.touchRelease(Vector2.create(60, 40));
+	 * console.log(buttonNode.isInteractable(), buttonNode.contains(Vector2.create(60, 40)), buttonNode.contains(Vector2.create(10, 10)), clickCount);
+	 */
+	contains(viewPosition) {
+		if (viewPosition === null || viewPosition === undefined) {
+			return false;
+		}
+		const worldCorners = this.getWorldCorners();
+		const obb = new OBB();
+		obb.setEdges(worldCorners);
+		const isInside = obb.contains(viewPosition);
+		return isInside;
+	}
+
+	//==============================================================================
+	// 터치 누름. (TouchRaycaster 가 부른다, 컴포넌트에 넘긴다)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
+	 */
+	touchPress(viewInputPosition) {
+		const components = this.getAllComponents();
+		for (const component of components) {
+			if (typeof component.touchPress === "function") {
+				component.touchPress(viewInputPosition);
+			}
+		}
+	}
+
+	//==============================================================================
+	// 터치 이동. (TouchRaycaster 가 부른다, 컴포넌트에 넘긴다)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
+	 */
+	touchMove(viewInputPosition) {
+		const components = this.getAllComponents();
+		for (const component of components) {
+			if (typeof component.touchMove === "function") {
+				component.touchMove(viewInputPosition);
+			}
+		}
+	}
+
+	//==============================================================================
+	// 터치 뗌. (TouchRaycaster 가 부른다, 컴포넌트에 넘긴다)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
+	 */
+	touchRelease(viewInputPosition) {
+		const components = this.getAllComponents();
+		for (const component of components) {
+			if (typeof component.touchRelease === "function") {
+				component.touchRelease(viewInputPosition);
+			}
+		}
+	}
+
+	//==============================================================================
+	// 터치 취소. (TouchRaycaster 가 부른다, 컴포넌트에 넘긴다)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition 뷰 좌표의 입력 위치.
+	 */
+	touchCancel(viewInputPosition) {
+		const components = this.getAllComponents();
+		for (const component of components) {
+			if (typeof component.touchCancel === "function") {
+				component.touchCancel(viewInputPosition);
+			}
+		}
 	}
 }
 

@@ -69,7 +69,13 @@ let fallbackTexts = {};
  */
 async function readJson(assetPath) {
 	const jsonAsset = new JsonAsset();
-	await jsonAsset.load(assetPath);
+	// 받기나 JSON 해석이 실패하면 load 가 거부된다. 못 읽은 것으로 친다.
+	try {
+		await jsonAsset.load(assetPath);
+	}
+	catch (error) {
+		return null;
+	}
 	if (jsonAsset.data === null || typeof jsonAsset.data !== "object") {
 		return null;
 	}

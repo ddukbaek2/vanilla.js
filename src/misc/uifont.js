@@ -8,7 +8,7 @@ import { JsonAsset } from "../resource/jsonasset.js";
 //==============================================================================
 // UI 글꼴. (화면 위의 모든 글자, 여러 문자의 글꼴 조각을 한 이름 아래 묶음, UIFont 로 들여온다)
 // - 글꼴 이름, 목록 파일과 폴더, 맨 뒤 묶음, 굵기, 기다리는 시간은 configureUiFont 로 정한다. (처음은 GameUI, ./assets/fonts/fonts.json, latin, 500 과 700)
-// - 목록은 fonts.json(색인 [{ group, manifest }])과 fonts-<묶음>.json(조각 [{ file, weight, unicodeRange }])이다.
+// - 목록은 fonts.json(색인 { fonts: [{ group, manifest }] })과 fonts-<묶음>.json(조각 { faces: [{ file, weight, style, unicodeRange }] })이다.
 //
 // 화면의 모든 언어를 한 글꼴 이름(configureUiFont 의 family) 아래에 모아 그린다.
 // 라틴, 키릴 문자는 기본 글꼴(Exo 2)이고, 그 밖의 문자는 그와 비슷한 느낌의 글꼴이다. 
@@ -195,7 +195,14 @@ async function loadFontIndex() {
 		return true;
 	}
 	const jsonAsset = new JsonAsset();
-	await jsonAsset.load(fontManifestPath);
+	// 받기나 JSON 해석이 실패하면 load 가 거부된다. 못 읽은 것으로 친다.
+	try {
+		await jsonAsset.load(fontManifestPath);
+	}
+	catch (error) {
+		console.warn("[uifont] 글꼴의 목록을 읽지 못했습니다.");
+		return false;
+	}
 	const manifest = jsonAsset.data;
 	if (manifest === null || !System.Array.isArray(manifest.fonts)) {
 		console.warn("[uifont] 글꼴의 목록을 읽지 못했습니다.");
@@ -230,7 +237,14 @@ async function loadFontGroup(group) {
 	}
 	const indexEntry = fontIndex[indexOrder];
 	const jsonAsset = new JsonAsset();
-	await jsonAsset.load(fontDirectoryPath + indexEntry.manifest);
+	// 받기나 JSON 해석이 실패하면 load 가 거부된다. 못 읽은 것으로 친다.
+	try {
+		await jsonAsset.load(fontDirectoryPath + indexEntry.manifest);
+	}
+	catch (error) {
+		console.warn("[uifont] 글꼴 묶음의 목록을 읽지 못했습니다: " + group);
+		return;
+	}
 	const font = jsonAsset.data;
 	if (font === null || !System.Array.isArray(font.faces)) {
 		console.warn("[uifont] 글꼴 묶음의 목록을 읽지 못했습니다: " + group);

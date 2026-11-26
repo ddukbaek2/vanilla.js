@@ -5,7 +5,6 @@ const System = globalThis;
 import { Enum } from "../base/identifier.js";
 import { Graphic } from "../core/graphic.js";
 import { UIControl } from "./uicontrol.js";
-import { WorldNode } from "../core/node/worldnode.js";
 import { Color } from "../base/color.js";
 import * as Math from "../base/math.js";
 import { Sprite } from "../core/component/sprite.js";
@@ -204,7 +203,7 @@ export class UIButton extends UIControl {
 	}
 
 	//==============================================================================
-	// 노드에 붙음. (WorldNode 의 isInteractable 을 자동 활성화)
+	// 노드에 붙음. (노드의 isInteractable 을 자동 활성화, WorldNode 와 UINode)
 	//==============================================================================
 	/**
 	 * @override
@@ -212,7 +211,7 @@ export class UIButton extends UIControl {
 	 */
 	attach(node) {
 		super.attach(node);
-		if (node instanceof WorldNode) {
+		if (typeof node.setInteractable === "function") {
 			node.setInteractable(true);
 		}
 	}

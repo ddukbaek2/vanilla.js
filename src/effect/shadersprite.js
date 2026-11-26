@@ -759,17 +759,17 @@ export class ShaderSprite extends Sprite {
 
 	//==============================================================================
 	// 내용 영역 안에서만 그리는지 반환. (효과는 Sprite 와 같은 사각형 안에서 셰이더로 그리므로 Sprite 와 같다)
-	// - 뒤집으면 내용 영역의 반대쪽으로 그리므로 false. draw 를 덮어쓴 하위 클래스도 false.
+	// - 뒤집어도 내용 영역 안에서 거울처럼 그린다. draw 를 덮어쓴 하위 클래스는 false.
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { boolean } 뒤집지 않았고 draw 를 덮어쓰지 않았으면 참.
+	 * @returns { boolean } draw 를 덮어쓰지 않았으면 참.
 	 */
 	isDrawnInsideContent() {
 		if (this.draw !== ShaderSprite.prototype.draw) {
 			return false;
 		}
-		return !this.isHorizontalFlip() && !this.isVerticalFlip();
+		return true;
 	}
 
 	//==============================================================================
