@@ -442,9 +442,18 @@ export class UIListView extends Component {
 	//==============================================================================
 	// 진행 방향 설정.
 	//==============================================================================
-	/** @param { boolean } isHorizontal 참이면 항목을 가로로 늘어놓는다. (기본 세로, 템플릿이나 항목 크기를 읽기 전에 정한다, 스크롤 뷰의 축은 따로 정한다) */
+	/** @param { boolean } isHorizontal 참이면 항목을 가로로 늘어놓는다. (기본 세로, 바뀌면 스크롤 영역을 다시 재고 보이는 항목을 새 축에 다시 놓는다, 템플릿이나 항목 크기를 읽기 전에 정한다, 스크롤 뷰의 축은 따로 정한다) */
 	setHorizontal(isHorizontal) {
+		if (this.#isHorizontal === isHorizontal) {
+			return;
+		}
 		this.#isHorizontal = isHorizontal;
+		for (const itemNode of this.#activeItemMap.values()) {
+			itemNode.setActive(false);
+			this.#freeItemList.push(itemNode);
+		}
+		this.#activeItemMap.clear();
+		this.updateScrollContentSize();
 	}
 
 	//==============================================================================
