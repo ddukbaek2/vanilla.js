@@ -5,7 +5,8 @@ This file collects the license notices for the third-party code and materials bu
 
 - The engine has no runtime package dependencies. The bundles (`build/vanilla.js`, `build/vanilla.min.js`) and the web tools (`tools/uieditor`, `particleeditor`, `timelineeditor`, `visualeditor`) contain only the engine source, which includes the code and tables from other projects listed below.
 - Files that are not in the bundles: the drafts in `src/experimental` (imported directly, see README), the examples and their assets, and the build tools (`tools/*.cjs`, which you install from npm yourself).
-- The default font DOSGothic is not bundled. The engine loads it at run time from https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff (`src/core/engine.js`).
+- The default font DOSGothic is not bundled. The engine loads it at run time from https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff (`src/core/engine.js`), and the examples keep the same file as `examples/assets/DOSGothic.woff`. Its notice is in DOSGothic below.
+- The example assets and where they come from are listed in Example Assets at the end.
 
 ## Bundled Materials
 
@@ -18,6 +19,7 @@ This file collects the license notices for the third-party code and materials bu
 | Separable SSS | `src/graphics3d/subsurfacescatteringeffect.js` | yes | UI editor |
 | libtiled | `src/experimental/tilemap/tilemap.js` (draft) | no | no |
 | Box2D | `src/experimental/physics2d/`, `src/experimental/spatial/dynamictree.js` (drafts) | no | no |
+| Public domain and CC0 code (MurmurHash3 fmix32, ACES curve fit) | `src/effect/screeneffect.js`, `src/effect/shadersprite.js`, `src/graphics3d/toon/toonvfx.js`, `src/graphics3d/toon/toonpostprocess.js` | yes | wherever these files are bundled (no notice required) |
 
 ### Chromium and Blink
 
@@ -280,3 +282,56 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
+
+### Public domain and CC0 code
+
+No notice is required for these. They are listed so that the origin of the code is clear.
+
+- `src/effect/screeneffect.js`, `src/effect/shadersprite.js`, `src/graphics3d/toon/toonvfx.js` (hash21, hashPoint): the fmix32 finalizer of MurmurHash3 by Austin Appleby (https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp): "MurmurHash3 was written by Austin Appleby, and is placed in the public domain. The author hereby disclaims copyright to this source code."
+- `src/effect/screeneffect.js` (tonemap), `src/graphics3d/toon/toonpostprocess.js`: the ACES filmic curve fit by Krzysztof Narkowicz (https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/): "Fitted curve's HLSL source code (free to use under public domain CC0 or MIT license)". Used under CC0.
+- The environment BRDF fit of `src/graphics3d/humanskinrenderer.js` and the shader hash above are written for this engine. (The split sum integral is fitted by the engine's own least squares, not taken from another fit)
+
+### DOSGothic
+
+- Default font, loaded at run time (not bundled), and `examples/assets/DOSGothic.woff`. Original font: https://github.com/hurss/fonts (WOFF conversion by noonnu, https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_eight@1.0/DOSGothic.woff, the same bytes as the example copy).
+
+````text
+The MIT License (MIT)
+Copyright (c) 2016-2022 Damheo Lee (이담허) (leedheo@gmail.com),
+with Reserved Font Name DOSMyungjo, DOSGothic, DOSSaemmul, Sam3KRFont, MiraeroNormal, and DOSIyagi,
+its OTF and BDF suffix name. (e.g. DOSMyungjo OTF)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+````
+
+## Example Assets
+
+The files under `examples/` are not part of the bundles or the web tools. They come from the sources below.
+
+| Files | Source | License |
+| --- | --- | --- |
+| `examples/ancientmountain/assets/mannequin.fbx`, `mannequin_female.glb`, `anims/*.fbx`; `examples/toonshading/assets/anims/*.fbx` | Quaternius, Universal Animation Library (Standard) and Universal Animation Library 2 (Standard), https://opengameart.org/content/universal-animation-library , https://opengameart.org/content/universal-animation-library-2 . Exported by `examples/ancientmountain/tools/export_quaternius.py` | CC0 1.0 ("License: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication", License.txt in the packs) |
+| `examples/ancientmountain/assets/fox.glb` | Khronos glTF-Sample-Assets, Fox (unmodified), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Fox | Model by PixelMannen, CC0 1.0. Rigging and animation by tomkranis, CC BY 4.0. glTF conversion by @AsoboStudio and @scurest, CC BY 4.0 |
+| `examples/ancientmountain/assets/grass.jpg`, `rock.jpg`, `dirt.jpg`, `boulder.jpg` | Made for this repository with Google generative AI (C2PA record in each file: "Created by Google Generative AI") | Google Terms of Service: "Google won't claim ownership over that content." |
+| `examples/toonshading/assets/VRM1_Constraint_Twist_Sample.vrm` | pixiv Inc., the VRM 1.0 sample of https://github.com/pixiv/three-vrm (packages/three-vrm/examples/models, same file) | VRM Public License 1.0, https://vrm.dev/licenses/1.0/ . The file's meta allows redistribution and modified redistribution, commercial use by corporations, and needs no credit ("(c) 2022 pixiv Inc.") |
+| `examples/assets/DOSGothic.woff` | See DOSGothic above | MIT |
+| `examples/oldface/assets/*`, `examples/oldface/favicon.*` | Exported from Epic Games MetaHuman (Walter preset) in Unreal Engine by `examples/oldface/tools/metahuman/` | Not covered by the MIT License of this repository. MetaHuman is used under the Unreal Engine EULA (https://www.metahuman.com/license). To be replaced with openly licensed assets |
+| `examples/assets/spritesheet.png`, `beep.wav`, `tabletemplate.xlsx`, `examples/spriteeffects/assets/*.png` (also in `examples/timelineshowcase/assets/`), `examples/tilemapshowcase/assets/*`, `examples/skeleton2d/assets/*`, `examples/neonhorizon/assets/*.glb`, the `.json` scenes, UI assets and timelines, and the favicons other than oldface | Made for this repository (the sprites by `examples/spriteeffects/tools/make_sprites.py`, the tiles by `examples/tilemapshowcase/generate.mjs`, the skeleton by `examples/skeleton2d/tools/makeassets.cjs`, the ships by the vanilla.js battlecruiser generator) | MIT, as the rest of this repository |
+
+Fox credit, as CC BY 4.0 asks: "Low poly fox" model by PixelMannen (https://opengameart.org/content/fox-and-shiba, CC0), rigged and animated by tomkranis (https://sketchfab.com/3d-models/low-poly-fox-by-pixelmannen-animated-371dea88d7e04a76af5763f2a36866bc, CC BY 4.0), converted to glTF by @AsoboStudio and @scurest (https://github.com/KhronosGroup/glTF-Sample-Models/pull/150#issuecomment-406300118, CC BY 4.0, https://creativecommons.org/licenses/by/4.0/).

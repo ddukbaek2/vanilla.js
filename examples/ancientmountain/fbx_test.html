@@ -30,7 +30,7 @@
 
 				await report("STAGE load");
 				const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
-				const model = await SkinnedModel.loadFromFbxUrl(webGL2RenderingContext, "./assets/Remy.fbx", skinnedModelRenderer);
+				const model = await SkinnedModel.loadFromFbxUrl(webGL2RenderingContext, "./assets/mannequin.fbx", skinnedModelRenderer);
 				await report("STAGE loaded anims=" + model.getAnimationNameList().join("|"));
 				const drawableList = model.getDrawableList();
 				const distinctMaterials = new System.Set(drawableList.map((drawable) => drawable.material));
@@ -70,22 +70,22 @@
 					await report(`SHOT ${shotName} drawError=${drawError} pixels ${sampleTexts.join(" ")}`);
 				}
 
-				// Mixamo FBX 는 cm 단위(Hips Y=209, 전신 ~350). 전신/상반신 뷰.
-				await drawAndCapture("fbx_face", 0, 352, 78, 350, 1.0);
-				await drawAndCapture("fbx_idle", 0, 175, 560, 175, 1.0);
+				// 마네킹 FBX 는 미터 단위(골반 높이 약 0.92, 키 약 1.83). 얼굴과 전신 뷰.
+				await drawAndCapture("fbx_face", 0, 1.65, 0.6, 1.6, 1.0);
+				await drawAndCapture("fbx_idle", 0, 0.9, 3.0, 0.9, 1.0);
 				model.playAnimation("Walk", 0);
 				model.update(0.45);
-				await drawAndCapture("fbx_walk", 0, 175, 560, 175, 1.0);
+				await drawAndCapture("fbx_walk", 0, 0.9, 3.0, 0.9, 1.0);
 				model.playAnimation("Run", 0);
 				model.update(0.3);
-				await drawAndCapture("fbx_run", 0, 175, 560, 175, 1.0);
+				await drawAndCapture("fbx_run", 0, 0.9, 3.0, 0.9, 1.0);
 
-				// 착지 클립 구간 확인. (도입부를 잘라낸 애셋 — 시작/중간 포즈)
+				// 착지 클립 구간 확인. (시작과 중간 포즈)
 				model.playAnimation("Land", 0);
 				model.update(0);
-				await drawAndCapture("fbx_land_start", 0, 175, 560, 175, 1.0);
+				await drawAndCapture("fbx_land_start", 0, 0.9, 3.0, 0.9, 1.0);
 				model.update(0.2);
-				await drawAndCapture("fbx_land_crouch", 0, 175, 560, 175, 1.0);
+				await drawAndCapture("fbx_land_crouch", 0, 0.9, 3.0, 0.9, 1.0);
 
 				await report("OK");
 			}

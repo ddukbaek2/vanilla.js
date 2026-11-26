@@ -81,6 +81,30 @@
 			transition: color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
 			animation: titleEntrance 3.2s cubic-bezier(0.16, 1, 0.3, 1) both;
 		}
+		#creditNote {
+			position: absolute;
+			left: 50%;
+			bottom: 4px;
+			transform: translateX(-50%);
+			width: max-content;
+			max-width: 96vw;
+			text-align: center;
+			font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+			font-size: 8.5px;
+			letter-spacing: 0.12em;
+			line-height: 1.7;
+			color: rgba(247, 243, 232, 0.42);
+			text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+			pointer-events: none;
+		}
+		#creditNote a {
+			color: rgba(247, 243, 232, 0.55);
+			text-decoration: none;
+			pointer-events: auto;
+		}
+		@media (max-width: 720px) {
+			#creditNote { font-size: 7px; letter-spacing: 0.04em; line-height: 1.5; }
+		}
 		#homeLink:hover {
 			color: #ffffff;
 			border-color: rgba(255, 236, 180, 0.85);
@@ -101,6 +125,10 @@
 		<div id="titleSub">VANILLA.JS</div>
 	</div>
 	<a id="homeLink" href="https://vanillapunch.com/tools/" target="_blank" rel="noopener">VANILLAPUNCH.COM</a>
+	<div id="creditNote">
+		CHARACTER: <a href="https://opengameart.org/content/universal-animation-library" target="_blank" rel="noopener">QUATERNIUS UNIVERSAL ANIMATION LIBRARY (CC0)</a><br>
+		FOX: <a href="https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Fox" target="_blank" rel="noopener">MODEL PIXELMANNEN (CC0), RIGGING AND ANIMATION TOMKRANIS (CC BY 4.0), GLTF CONVERSION ASOBOSTUDIO AND SCUREST (CC BY 4.0)</a>
+	</div>
 	<script type="module">
 	"use strict";
 	const System = globalThis;
@@ -996,8 +1024,8 @@
 	// 스킨드 모델 렌더러. (스키닝 PBR 셰이더 템플릿 + 환경 상태 소유 — 씬당 하나)
 	const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
 
-	// 캐릭터 스킨드 모델. (Mixamo Remy — 네이티브 FBX + PBR 풀맵, 애니메이션은 전용 FBX 클립으로 추가)
-	const characterModel = await SkinnedModel.loadFromFbxUrl(webGL2RenderingContext, "./assets/Remy.fbx", skinnedModelRenderer);
+	// 캐릭터 스킨드 모델. (Quaternius 마네킹, CC0 — 네이티브 FBX, 애니메이션은 클립마다 FBX 로 추가)
+	const characterModel = await SkinnedModel.loadFromFbxUrl(webGL2RenderingContext, "./assets/mannequin.fbx", skinnedModelRenderer);
 	await characterModel.addAnimationsFromFbxUrl("./assets/anims/idle.fbx", "Idle");
 	await characterModel.addAnimationsFromFbxUrl("./assets/anims/walk.fbx", "Walk");
 	await characterModel.addAnimationsFromFbxUrl("./assets/anims/run.fbx", "Run");
@@ -1006,10 +1034,10 @@
 	await characterModel.addAnimationsFromFbxUrl("./assets/anims/climb.fbx", "Climb", true);
 	characterModel.playAnimation("Idle", 0);
 
-	// Mixamo cm 단위(전신 약 370) → 월드 유닛(약 1.8) 축소 배율.
-	const CHARACTER_MODEL_SCALE = 0.0048;
+	// 모형 단위 → 월드 유닛 배율. (마네킹은 미터 단위, 키 약 1.83)
+	const CHARACTER_MODEL_SCALE = 1.0;
 
-	// 야생 여우. (Khronos 공식 샘플 Fox — CC0, 초원을 배회하는 환경 동물)
+	// 야생 여우. (Khronos glTF 샘플 Fox — 모형 PixelMannen CC0, 리깅과 애니메이션 tomkranis CC-BY 4.0, glTF 변환 AsoboStudio, scurest CC-BY 4.0, 초원을 배회하는 환경 동물)
 	const foxModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "./assets/fox.glb", skinnedModelRenderer);
 	foxModel.playAnimation("Walk", 0);
 	const FOX_LIST = [
@@ -2774,7 +2802,7 @@
 		viewProjectionMatrix.multiply(viewMatrix);
 		const viewProjectionElements = viewProjectionMatrix.getElements();
 
-		// 캐릭터 모델 행렬. (본 패스와 깊이 패스 공용 — Remy 는 로컬 +z 정면이라 -yaw + 180도, cm 스케일 축소)
+		// 캐릭터 모델 행렬. (본 패스와 깊이 패스 공용 — 마네킹은 로컬 +z 정면이라 -yaw + 180도)
 		const characterModelMatrix = Matrix4.createTranslation(playerX, playerY, playerZ);
 		characterModelMatrix.rotateY(-characterYaw + System.Math.PI);
 		characterModelMatrix.scale(CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE, CHARACTER_MODEL_SCALE);

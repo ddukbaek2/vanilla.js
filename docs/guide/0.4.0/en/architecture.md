@@ -261,9 +261,9 @@ Node render recursion: `drawNode` = pushTransform (local TRS/pivot correction) �
 Import pipeline (format neutralization is the key):
 
 ```
-Remy.fbx ──> FbxLoader.parse ──> FBX IR (raw structure of nodes/geometry/skin/materials/animation)
+mannequin.fbx ──> FbxLoader.parse ──> FBX IR (raw structure of nodes/geometry/skin/materials/animation)
                                      │
-soldier.glb ──> parseBinary ──> glTF JSON+BIN
+mannequin_female.glb ──> parseBinary ──> glTF JSON+BIN
                                      │
               SkinnedModel.parseFbxContent / parseContent  (per-format interpreters)
                                      ↓
