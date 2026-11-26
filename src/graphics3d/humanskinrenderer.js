@@ -696,6 +696,7 @@ void main() {
  * const irradianceTexture = geometryRenderTarget.getColorTexture(0);
  * const albedoTexture = geometryRenderTarget.getColorTexture(1);
  * console.log(irradianceTexture !== null, albedoTexture !== null);
+ * @exampleImage old-face.webp
  */
 export class HumanSkinRenderer extends SkinnedModelRenderer {
 	//==============================================================================

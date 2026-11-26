@@ -410,6 +410,7 @@ const PARTICLE_RANDOM_SEED_STEP = 7919;
  * engineConfiguration.referenceResolutionSize = Vector2.create(960, 540);
  * const engine = new Engine(engineConfiguration);
  * engine.run(new TimelineScene());
+ * @exampleImage timeline.webp
  */
 export class Timeline extends Object {
 	//==============================================================================

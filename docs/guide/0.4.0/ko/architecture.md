@@ -30,11 +30,10 @@ src/graphics3d/            # 3D (WebGL2): FbxLoader, SkinnedModel, Material, Ski
                            #     AmbientOcclusionEffect, SubsurfaceScatteringEffect (FullscreenPass 는 core)
 src/graphics3d/toon/       # 툰 3D: MeshBuilder(ToonMesh), glbmeshreader(ToonGlb), ToonRenderer, ToonLightSet, ToonMaterial,
                            #     ToonDrawQueue, ToonScreenOutline, ToonVfx, ToonPostProcess, ToonView3D
-src/experimental/          # 0.4.0 뒤 기능의 초안 (import.js 의 Experimental 이름 공간, API 가 바뀔 수 있다)
 src/deprecated/            # AnchoredWorldNode (폐기), Camera (폐기 예정, Camera2D 가 덮는다), 죽은 코드 aabb, transform2d, gl2d, webgl2
 ```
 
-레이어 방향은 아래에서 위로만 의존한다: `base` ← `core` ← (`resource`, `effect`, `ui`, `game`, `misc`, `animation`, `graphics3d`, `experimental`). `src/web` 은 엔진 노드 트리와 무관한 DOM 세계다.
+레이어 방향은 아래에서 위로만 의존한다: `base` ← `core` ← (`resource`, `effect`, `ui`, `game`, `misc`, `animation`, `graphics3d`). `src/web` 은 엔진 노드 트리와 무관한 DOM 세계다.
 
 ---
 
@@ -288,7 +287,6 @@ soldier.glb ──> parseBinary ──> glTF JSON+BIN
 ## 7. 공개 API 표면 (import.js)
 
 - 저장소 루트의 단일 배럴 파일. 주석 섹션 13블록(내장/기반/코어/기본 컴포넌트/UI/리소스/기타/컬렉션/애니메이션/셰이더와 풀스크린 패스/3D 그래픽스/폐기 예정/실험)이 곧 논리 레이어 구분이고, 실험 블록 뒤에 갈래마다 한 줄 주석을 단 내보내기가 이어진다.
-- 실험 블록은 `export * as Experimental` 한 줄이다. 0.4.0 뒤 기능의 초안을 src/experimental/experimental.js 에 모아 `Experimental.이름` 으로 낸다. 초안은 API 가 바뀔 수 있고, 다 자라면 제자리 폴더로 옮겨 import.js 에서 바로 낸다.
 - 열거는 클래스와 같은 줄에 함께 export 한다 (`export { ViewScaleMode, ViewManager }`).
 - 함수 묶음 모듈은 이름 공간으로 낸다 (`export * as Format`, `LanguagePack`, `UIFont`, `ToonMesh`, `ToonGlb`).
 - **의도적 미노출** = 내부 구현 취급: `AudioManager`(Engine 경유 사용), `Layer`, `DEVTools`, `GameScene`, `FbxLoader`(SkinnedModel 경유), 텍스처 캐시 2종과 sharedbakecache, autolayout 내부 타입(`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`), src/web 전체(`Pane`, `WebSocketClient`). 미노출 클래스가 필요한 프로젝트는 파일 경로로 직접 import 한다.
@@ -316,7 +314,7 @@ soldier.glb ──> parseBinary ──> glTF JSON+BIN
 ## 9. 러스트 판과의 관계
 
 - 러스트 판(vanilla-engine)은 이 엔진의 `src/` 200 파일(초안 자리 src/experimental 은 빼고) 가운데 182 파일을 옮겼다. 일부러 옮기지 않은 18 파일은 빈 파일(calculator, layer, resources, uibuilder), 데드 코드(deprecated 의 aabb, transform2d, gl2d, webgl2, anchoredworldmnode), 러스트 언어와 표준이 맡는 것(object, reflection, singleton, base/collection 다섯), Camera2D 가 덮는 deprecated/camera.js 다.
-- 폴더는 러스트 판과 같다. (graphics3d, graphics3d/toon, animation, misc, resource, 초안 자리 experimental) 원본 core/graphic/* 만 러스트 판에서 core/ 바로 아래에 있다.
+- 폴더는 러스트 판과 같다. (graphics3d, graphics3d/toon, animation, misc, resource) 원본 core/graphic/* 만 러스트 판에서 core/ 바로 아래에 있다.
 - 두 엔진의 공개 API 와 동작은 같게 둔다. 이름만 러스트 규칙(snake_case, UpperCamelCase, SCREAMING_SNAKE_CASE)으로 바뀐다. (setFillColor → set_fill_color)
 - 남은 차이(정말 맞출 수 없는 것과 러스트에 맞게 정한 꼴)는 러스트 판 저장소의 ARCHITECTURE.md 9장과 10장에 모았다. 요점: 러스트 판은 async 대신 받기 손잡이와 콜백, 리플렉션 대신 등록 표, 전역 엔진 대신 인자로 넘기기, 노드는 핸들(NodeId), 데스크탑에는 DOM 과 브라우저 설정과 세이프 에어리어가 없다.
 

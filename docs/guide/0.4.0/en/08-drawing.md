@@ -6,6 +6,8 @@ There are two ways to draw. Attach drawing components (`Paint`, `Sprite`, `Text`
 
 `Graphic` is a renderer that builds a Canvas2D style model (top left origin, pixel units, a state stack) on top of WebGL2. A scene's drawing methods receive it as an argument. The engine sets view coordinates (`viewManager.applyViewRect(graphic)`) before each scene draws, so a scene draws in view coordinates from the start. (see the "Engine and Scenes" chapter)
 
+![A rounded rectangle, circle, ring, polyline, outlined rectangle, triangle, a rotated translucent rectangle and text drawn directly with Graphic](../images/drawing.webp)
+
 | Group | Methods |
 | --- | --- |
 | Color | `setFillColor(color)`, `setStrokeColor(color)`. A `Color`, or a `"#rgb"`, `"#rgba"`, `"#rrggbb"`, `"#rrggbbaa"`, `"rgb(...)"` or `"rgba(...)"` string |
@@ -261,6 +263,8 @@ A `RichText` with segments draws them left to right on one line. Alignment and b
 
 Blend modes accept all 26 Canvas2D composite operation names. Components use `Sprite.setSpriteBlendMode(name)`, and direct drawing uses `graphic.setBlendMode(name)`. The default is `"source-over"`.
 
+![All 26 blend modes, one per cell: a translucent image and shapes over stripes and white, gray, black and purple backgrounds](../images/blend-modes.webp)
+
 - Fixed function blending: `source-over`, `source-in`, `source-out`, `source-atop`, `destination-over`, `destination-in`, `destination-out`, `destination-atop`, `lighter`, `copy`, `xor`, `multiply`, `screen`
 - Shader mixing: `overlay`, `darken`, `lighten`, `color-dodge`, `color-burn`, `hard-light`, `soft-light`, `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`
 
@@ -388,6 +392,8 @@ engine.run(new DecorationScene());
 ## Camera2D
 
 `Camera2D` is not a component but an object the scene holds. It has the world position it looks at (`position`, placed at the center of the screen), a zoom (`zoom`, default 1, clamped to the `setZoomRange` range, which defaults to 0.1 to 8) and a rotation (`rotation`, in degrees, around the center of the screen), and applies that transform to whatever is drawn between `begin(graphic)` and `end(graphic)`.
+
+![cameratour example: a world grid viewed by a tilted Camera2D, a square moved by a tween and an Indicator gear](../images/camera-tour.webp)
 
 | Method | Description |
 | --- | --- |

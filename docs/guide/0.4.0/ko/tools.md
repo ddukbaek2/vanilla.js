@@ -4,10 +4,10 @@
 
 | 도구 | 설명 | 데모 | 소스 |
 | --- | --- | --- | --- |
-| UI Editor | 노드 트리, 인스펙터, 캔버스 편집으로 UI 화면을 짜고 `.uiasset.json` 으로 저장 | [열기](https://ddukbaek2.com/portfolio/uieditor/) | [`tools/uieditor`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/uieditor) |
-| Particle Editor | 파티클 프리셋 저작. 미리보기에서 값을 바꾸며 조정 | [열기](https://ddukbaek2.com/portfolio/particleeditor/) | [`tools/particleeditor`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/particleeditor) |
-| Timeline Editor | 유니티 타임라인 / 언리얼 시퀀서 쓰임새의 키프레임 저작. 도프 시트 + 커브, 자동 키, 이벤트 / 마커 | [열기](https://ddukbaek2.com/portfolio/timelineeditor/) | [`tools/timelineeditor`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/timelineeditor) |
-| Visual Editor | 유니티처럼 도킹 창(하이어라키, 씬, 게임, 인스펙터, 프로젝트, 콘솔)을 갖춘 통합 편집기. 폴더 열기, 프리팹, 되돌리기, 재생. 씬은 UIDocument 형식(`.scene.json`)으로 저장 | [열기](https://ddukbaek2.com/portfolio/visualeditor/) | [`tools/visualeditor`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/visualeditor) |
+| UI Editor | 노드 트리, 인스펙터, 캔버스 편집으로 UI 화면을 짜고 `.uiasset.json` 으로 저장 | [열기](https://vanillapunch.com/tools/editor/uieditor/) | [`tools/uieditor`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/uieditor) |
+| Particle Editor | 파티클 프리셋 저작. 미리보기에서 값을 바꾸며 조정 | [열기](https://vanillapunch.com/tools/editor/particleeditor/) | [`tools/particleeditor`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/particleeditor) |
+| Timeline Editor | 유니티 타임라인 / 언리얼 시퀀서 쓰임새의 키프레임 저작. 도프 시트 + 커브, 자동 키, 이벤트 / 마커 | [열기](https://vanillapunch.com/tools/editor/timelineeditor/) | [`tools/timelineeditor`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/timelineeditor) |
+| Visual Editor | 유니티처럼 도킹 창(하이어라키, 씬, 게임, 인스펙터, 프로젝트, 콘솔)을 갖춘 통합 편집기. 폴더 열기, 프리팹, 되돌리기, 재생. 씬은 UIDocument 형식(`.scene.json`)으로 저장 | [열기](https://vanillapunch.com/tools/editor/visualeditor/) | [`tools/visualeditor`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/visualeditor) |
 
 명령줄 도구는 Node.js 로 실행합니다. 자세한 사용법은 [`tools/TOOLS.md`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/TOOLS.md) 에 있습니다.
 

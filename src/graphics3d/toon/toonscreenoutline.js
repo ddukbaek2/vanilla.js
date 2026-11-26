@@ -28,6 +28,7 @@ import { TOON_ATTRIBUTE_LOCATIONS, TOON_MAXIMUM_JOINTS, TOON_INSTANCE_FLOAT_COUN
  * renderer.drawMesh(mesh, modelMatrix);
  * renderer.endFrame();
  * outline.drawOutline();
+ * @exampleImage toon-style.webp
  */
 
 

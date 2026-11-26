@@ -6,6 +6,8 @@ This chapter covers particles such as flames, snow, and explosions, along with o
 
 `ParticleSystem` is a component that brings the commonly used parts of Unity's ParticleSystem to 2D. It starts emitting as soon as it is attached to a node (playing, looping, 20 per second by default), and particles are drawn relative to the node's origin.
 
+![The FIRE preset of the Particle Effects example: flames and smoke drawn with cone emission and additive blending, the preset list on the left and the settings code above](../images/particle-effects.webp)
+
 ```javascript
 import { Engine, EngineConfiguration, Scene, WorldNode, ParticleSystem, ParticleEmitterShape, Vector2, Color } from "./build/vanilla.js";
 
@@ -226,6 +228,8 @@ With `setManualTick(true)`, time does not advance with node updates, only when y
 
 Records the path a node travels as points and draws it as a band whose width and color fade out (the 2D counterpart of Unity's TrailRenderer). Points are recorded at the node's local position.
 
+![A comet flying with a tail drawn by TrailRenderer](../images/trail.webp)
+
 - `setTime(seconds)`: how long points remain, which is the length of the band (default 0.5).
 - `setWidth(startWidth, endWidth)`: width from the newest point to the end (default 10, 0).
 - `setColors(startColor, endColor)`: by default from `(1, 1, 1, 0.9)` to `(1, 1, 1, 0)`.
@@ -281,6 +285,8 @@ engine.run(new TrailScene());
 ## ShaderSprite
 
 A sprite derived from `Sprite` that applies fragment shader effects. `ShaderSpriteEffect` has 49 effects besides `none` (such as `flash`, `outline`, `shine`, `dissolve`, `hologram`, `wave`, `pixelate`, `glitch`, and `wipe`). Each effect has default parameters and a default color, and the `ShaderSpriteEffect` comments in the source describe what progress, color, and parameters mean for each effect.
+
+![Sprite Effects example: the ShaderSprite glow effect on shield, star, bat, slime, coin and gem images](../images/shader-sprite.webp)
 
 - `setEffect(effect)` changes the effect and resets to that effect's default parameters and color. With `none`, or without an image, it draws the same as `Sprite`.
 - `setEffectProgress(progress)` (0 to 1) is the progress pushed in by tweens or timelines. The effect time (`setEffectTime`) advances by itself in `tick`.
@@ -343,6 +349,8 @@ engine.run(new DissolveScene());
 ## ScreenEffect
 
 A post-processing chain applied to the whole scene. The scene draws to the screen as usual, and in `end` the screen (or a chosen region) is captured, the enabled effects are applied in order, and the result is put back in the same place. `ScreenEffectType` has 58 effects (such as `vignette`, `shockwave`, `bloom`, `colorGrade`, `chromatic`, `grain`, `fog`, and `fade`).
+
+![Sprite Effects example: ScreenEffect godRays light shafts over the whole screen](../images/screen-effect.webp)
 
 - Create it with `new ScreenEffect(engine.getGraphic())`, and call `begin(graphic)` at the start of the scene's `preDraw`, `end(graphic)` at the end of `postDraw`, and `tick(timeDelta)` in `tick`.
 - `setEnabled(type, isEnabled)`, `setStrength(type, strength)` (0 is the same as off), `setParameters(type, x, y, z, w)`, `setParameter(type, name, value)` (names are in `SCREEN_EFFECT_PARAMETER_NAMES`), `setColor(type, color)`, `disableAll()`, and `resetAll()`.

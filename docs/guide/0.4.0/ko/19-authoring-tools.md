@@ -6,10 +6,10 @@
 
 | 도구 | 데모 | 만드는 파일 | 엔진에서 읽는 곳 |
 | --- | --- | --- | --- |
-| UI Editor | [열기](https://ddukbaek2.com/portfolio/uieditor/) | `.uiasset.json` (처음 이름 `ui.uiasset.json`) | `UIDocument.fromJsonText` |
-| Timeline Editor | [열기](https://ddukbaek2.com/portfolio/timelineeditor/) | `.timeline.json` (처음 이름 `titlecard.timeline.json`) | `Timeline.loadFromUrl`, `loadFromText`, `createFromJsonAsset` |
-| Particle Editor | [열기](https://ddukbaek2.com/portfolio/particleeditor/) | `.vfx.json` (처음 이름 `effect.vfx.json`) | `ParticleSystem.applyDescription` |
-| Visual Editor | [열기](https://ddukbaek2.com/portfolio/visualeditor/) | `scenes/*.scene.json`, `prefabs/*.prefab.json` | `UIDocument.fromJsonText` |
+| UI Editor | [열기](https://vanillapunch.com/tools/editor/uieditor/) | `.uiasset.json` (처음 이름 `ui.uiasset.json`) | `UIDocument.fromJsonText` |
+| Timeline Editor | [열기](https://vanillapunch.com/tools/editor/timelineeditor/) | `.timeline.json` (처음 이름 `titlecard.timeline.json`) | `Timeline.loadFromUrl`, `loadFromText`, `createFromJsonAsset` |
+| Particle Editor | [열기](https://vanillapunch.com/tools/editor/particleeditor/) | `.vfx.json` (처음 이름 `effect.vfx.json`) | `ParticleSystem.applyDescription` |
+| Visual Editor | [열기](https://vanillapunch.com/tools/editor/visualeditor/) | `scenes/*.scene.json`, `prefabs/*.prefab.json` | `UIDocument.fromJsonText` |
 
 - 도구마다 `tools/<도구 이름>/<도구 이름>.html` 이 엔진까지 한 파일에 담은 빌드라서, 서버 없이 파일로 열어도 동작합니다. 소스를 고친 뒤에는 `node tools/<도구 이름>/build.mjs` 로 다시 만듭니다.
 - UI Editor, Timeline Editor, Particle Editor 는 저장하면 브라우저 내려받기로 파일을 받습니다. Visual Editor 는 크롬 계열 브라우저에서 폴더 열기로 연 폴더에 바로 쓰고, 그 밖의 브라우저에서는 내려받기로 받습니다.
@@ -18,6 +18,8 @@
 ## UI Editor 문서 불러오기
 
 `.uiasset.json` 은 노드 트리를 그대로 적은 UI 문서입니다. 판 번호와 뿌리 노드 하나로 되어 있고, 노드마다 종류, 이름, 위치, 배율, 회전, 투명도, 피벗, 앵커, 내용 크기, 컴포넌트, 자식을 적습니다.
+
+![UI Editor 에 UI Showcase 의 컴포넌트 문서를 연 화면: 왼쪽 컴포넌트 목록과 하이어라키, 가운데 문서, 오른쪽 인스펙터](../images/tool-ui-editor.webp)
 
 ```json
 {
@@ -127,6 +129,8 @@ console.log(componentTypeNames.includes("UISnapScrollView"), componentTypeNames.
 
 `.timeline.json` 은 무대 노드 목록, 트랙(대상 이름, 속성, 키), 마커로 이루어진 문서입니다. 맨 위에 `name`, `duration`(초), `frameRate`, `loop`, `stage`(`width`, `height`, `backgroundColor`, `nodes`), `tracks`, `markers` 가 있습니다.
 
+![Timeline Editor 에 컷신 문서를 연 화면: 레터박스와 대화 상자가 걸린 무대, 아래 트랙과 키, 오른쪽 인스펙터](../images/tool-timeline-editor.webp)
+
 ```javascript
 import { Engine, EngineConfiguration, Scene, Timeline, ImageAsset, Vector2 } from "./build/vanilla.js";
 
@@ -182,6 +186,8 @@ engine.run(new LogoScene());
 ## Particle Editor 애셋 쓰기
 
 `.vfx.json` 은 파티클 시스템 서술의 목록입니다. 시스템마다 이름과 `ParticleSystem.applyDescription` 이 받는 서술 칸을 함께 적습니다.
+
+![Particle Editor 처음 화면: Fire 프리셋이 도는 뷰, 왼쪽 프리셋 목록, 오른쪽 방출과 모양 설정](../images/tool-particle-editor.webp)
 
 ```json
 {
@@ -251,6 +257,8 @@ engine.run(new EffectScene());
 ## Visual Editor 씬 불러오기
 
 Visual Editor 는 씬을 UI 문서와 같은 꼴(`UIDocument`)로 저장합니다. 처음 저장 경로는 `scenes/untitled.scene.json` 이고, 편집기만 쓰는 틀 크기(`frameSize`)를 같은 JSON 에 함께 둡니다. `UIDocument` 는 모르는 키를 건너뛰므로 게임은 `UIDocument.fromJsonText` 로 그대로 읽습니다. 씬 뿌리는 이름이 `sceneRoot` 이고 피벗이 왼쪽 위인 `WorldNode` 입니다.
+
+![Visual Editor 에 UI Showcase 의 컴포넌트 문서를 씬으로 연 화면: 왼쪽 하이어라키, 가운데 씬 뷰와 이동 핸들, 오른쪽 인스펙터](../images/tool-visual-editor.webp)
 
 고른 노드를 프리팹으로 저장하면 `prefabs/<이름>.prefab.json` 에 그 노드 하나를 뿌리로 하는 UI 문서가 생깁니다. 게임에서 같은 프리팹을 여러 번 쓰려면 글을 한 번 받아 두고 `fromJsonText` 를 쓸 때마다 부릅니다. 부를 때마다 새 노드 트리가 나옵니다.
 

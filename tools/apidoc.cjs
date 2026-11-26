@@ -14,12 +14,15 @@ const childProcess = require("child_process");
 // - since 는 v0.0.8 부터 만들려는 판 앞까지의 태그를 훑어, 그 클래스(이름으로 찾음)에 그 멤버가 처음 있던 판이다. 어느 태그에도 없으면 만들려는 판.
 // - #이름, 밑줄로 시작하는 이름, JSDoc 에 @private 이 붙은 멤버는 뺀다.
 // - JSDoc 의 @example 은 examples 칸이 된다. (모듈은 어느 선언에도 붙지 않은 깊이 0 의 JSDoc 에서 읽는다)
+// - @example 바로 뒤의 @exampleImage <파일 이름> 은 그 예제의 image 칸이 된다. 그림은 docs/guide/<버전>/images/<파일 이름> 에 두고 --check 가 있는지 본다.
 // - counterpart 는 러스트 판(vanilla-engine)의 짝이다. docs/api/counterpart.<버전>.json (러스트 판 도구가 이름으로 지은 짝 표를 옮겨 둔 것) 에서 읽는다.
+// - 초안 모듈(이름이 experimental 이거나 experimental/ 로 시작하는 것)은 자료에 넣지 않고, 초안을 가리키는 짝도 뺀다.
+//   --check(초안은 메모리에서 지어 따로 본다), --gaps, --missing, --check-examples 는 초안도 본다.
 // 사용:
 //   node tools/apidoc.cjs <버전> [--date YYYY-MM-DD]   docs/api/<버전>.json 쓰기
 //   node tools/apidoc.cjs <버전> --counterpart <짝 표>  러스트 판의 docs/api/counterpart.<버전>.json 을 이 저장소로 옮기고 자료 쓰기
 //   node tools/apidoc.cjs <버전> --missing             표에 없는 ko 글 목록 (JSON 배열)
-//   node tools/apidoc.cjs <버전> --check               docs/api/<버전>.json 꼴 검사와 수 세기
+//   node tools/apidoc.cjs <버전> --check               docs/api/<버전>.json 꼴 검사와 수 세기, 예제 그림과 가이드 그림 파일 검사
 //   node tools/apidoc.cjs <버전> --gaps                문서 빈 곳 (빈 설명, 빈 꼴, @returns 없는 함수, 예제 없는 클래스와 모듈, 머리 주석 없는 비공개 함수, 떨어진 머리 주석)
 //   node tools/apidoc.cjs <버전> --check-examples      예제 검사 (문법, 엔진 이름, node 와 헤드리스 크롬으로 돌려 보기)
 //   --missing, --gaps, --check-examples 는 --only <경로 앞>, --exclude <경로 앞> 으로 거른다. (여러 번 줄 수 있다)
@@ -34,6 +37,7 @@ const ENTRY_FILE_PATH = path.join(REPOSITORY_ROOT, "import.js");
 const UPDATE_FILE_PATH = path.join(REPOSITORY_ROOT, "UPDATE.md");
 const API_DIRECTORY_PATH = path.join(REPOSITORY_ROOT, "docs", "api");
 const TRANSLATION_FILE_PATH = path.join(API_DIRECTORY_PATH, "translation.en.json");
+const GUIDE_DIRECTORY_PATH = path.join(REPOSITORY_ROOT, "docs", "guide");
 const ENGINE_NAME = "vanilla.js";
 const COUNTERPART_ENGINE_NAME = "vanilla-engine"; // 짝 엔진. (러스트 판)
 const SINCE_FIRST_VERSION = "0.0.8"; // since 를 훑기 시작하는 판. (이 판부터 소스가 src/ 아래 지금 꼴이다)
@@ -50,7 +54,27 @@ const EXAMPLE_NODE_CONCURRENCY = 4; // 겹쳐 돌릴 node 워커 수의 상한.
 const EXAMPLE_CHROME_TIMEOUT_MILLISECONDS = 10000; // 크롬 iframe 에서 예제 하나가 끝날 시간 상한.
 const EXAMPLE_CHROME_SETTLE_MILLISECONDS = 1000; // 크롬 예제 모듈이 다 돈 뒤 몇 프레임이 도는 동안 오류를 기다리는 시간.
 const EXAMPLE_CHROME_CONCURRENCY = 4; // 크롬 한 페이지에서 겹쳐 돌릴 iframe 수.
+const EXAMPLE_IMAGE_NAME_PATTERN = /^[a-z0-9._-]+\.(webp|png|jpg|gif)$/; // 예제와 가이드 그림 파일 이름. (사이트와 정한 꼴, docs/guide/<버전>/images/ 에 둔다)
+const DRAFT_MODULE_NAME = "experimental"; // 초안 모듈 이름. (이 이름이거나 "이름/" 으로 시작하는 모듈은 자료에 넣지 않는다, 러스트 판과 같음)
+const GUIDE_IMAGE_PATTERN = /!\[[^\]]*\]\(\.\.\/images\/([^)\s]+)\)/g; // 가이드 본문의 그림. (![설명](../images/<이름>))
 
+
+//==============================================================================
+// 전역 변수 목록.
+//==============================================================================
+const exampleImageWarningSet = new Set(); // 놓인 자리가 틀린 @exampleImage. (@example 바로 뒤가 아님, 뽑을 때 알린다)
+
+
+//==============================================================================
+// 초안 모듈인지. (experimental 이거나 experimental/ 로 시작, 두 엔진의 모듈 이름에 같이 쓴다)
+//==============================================================================
+/**
+ * @param { string } moduleName
+ * @returns { boolean }
+ */
+function isDraftModuleName(moduleName) {
+	return moduleName === DRAFT_MODULE_NAME || String(moduleName).startsWith(DRAFT_MODULE_NAME + "/");
+}
 
 //==============================================================================
 // 토큰 목록 만들기.
@@ -1503,9 +1527,10 @@ function findTag(document, tagNames) {
 }
 
 //==============================================================================
-// JSDoc 의 @example 읽기. ([{ title: { ko, en }, code, language }], 없으면 빈 배열)
+// JSDoc 의 @example 읽기. ([{ title: { ko, en }, code, language, image? }], 없으면 빈 배열)
 // - "@example <caption>제목</caption>" 의 제목은 ko 원문이고 en 은 번역 표에서 채운다. 제목이 없으면 빈 글.
 // - 코드는 태그 다음 줄부터 다음 태그 앞까지다. 앞뒤 빈 줄과 모든 줄에 같이 붙은 들여쓰기는 뺀다.
+// - @example 바로 뒤의 "@exampleImage 파일 이름" 은 그 예제의 image 칸이다. (파일 이름만, docs/guide/<버전>/images/ 에 둔다)
 //==============================================================================
 /**
  * @param { object } document
@@ -1516,7 +1541,21 @@ function readExamples(document) {
 		return [];
 	}
 	const exampleList = [];
+	let previousTag = null;
 	for (const tag of document.jsdoc.tags) {
+		const isAfterExample = previousTag !== null && previousTag.name === "example";
+		previousTag = tag;
+		if (tag.name === "exampleImage") {
+			const imageName = tag.text.trim();
+			const lastExample = exampleList[exampleList.length - 1];
+			if (isAfterExample && lastExample !== undefined && lastExample.image === undefined) {
+				lastExample.image = imageName;
+			}
+			else {
+				exampleImageWarningSet.add(imageName);
+			}
+			continue;
+		}
 		if (tag.name !== "example") {
 			continue;
 		}
@@ -2400,7 +2439,7 @@ function fillCounterparts(moduleList, version, statistics) {
 	for (const item of table.items || []) {
 		const ownKey = item[ENGINE_NAME];
 		const otherKey = item[COUNTERPART_ENGINE_NAME];
-		if (!ownKey || !otherKey) {
+		if (!ownKey || !otherKey || isDraftModuleName(ownKey.module) || isDraftModuleName(otherKey.module)) {
 			continue;
 		}
 		++statistics.counterpartTableItems;
@@ -2514,6 +2553,36 @@ function buildApiDocument(version, dateOption, outputPath, isSinceEnabled = true
 }
 
 //==============================================================================
+// 자료에서 초안 모듈 떼기. (자료의 modules 는 초안 아닌 것만 남기고, 뗀 초안 모듈 목록을 돌려준다)
+//==============================================================================
+/**
+ * @param { object } apiDocument
+ * @returns { object[] }
+ */
+function removeDraftModules(apiDocument) {
+	const draftModuleList = apiDocument.modules.filter((moduleEntry) => isDraftModuleName(moduleEntry.name));
+	apiDocument.modules = apiDocument.modules.filter((moduleEntry) => !isDraftModuleName(moduleEntry.name));
+	return draftModuleList;
+}
+
+//==============================================================================
+// 초안 모듈 검사 결과 찍기. (자료에 넣지 않는 초안도 꼴과 빈 칸을 본다, 꼴 오류 수를 돌려준다)
+//==============================================================================
+/**
+ * @param { object } apiDocument
+ * @param { object[] } draftModuleList
+ * @returns { number }
+ */
+function printDraftCheckResult(apiDocument, draftModuleList) {
+	const draftResult = checkApiDocument({ engine: apiDocument.engine, version: apiDocument.version, date: apiDocument.date, modules: draftModuleList }, true);
+	console.log("[apidoc] 초안 모듈(자료에 넣지 않음) " + draftResult.counts.modules + ", ko 빈 칸 " + draftResult.counts.emptyKorean + ", en 빈 칸 " + draftResult.counts.emptyEnglish + ", 꼴 오류 " + draftResult.errorList.length);
+	for (const error of draftResult.errorList.slice(0, 50)) {
+		console.log("  초안: " + error);
+	}
+	return draftResult.errorList.length;
+}
+
+//==============================================================================
 // 값 멤버인지. (필드와 정적 필드, returns 는 값의 꼴만 담고 설명은 멤버 설명이 맡는다)
 //==============================================================================
 /**
@@ -2529,14 +2598,16 @@ function isValueMember(member) {
 
 //==============================================================================
 // 자료 꼴 검사와 수 세기. (꼴 오류 목록을 돌려준다)
+// - isDraftOnly 면 초안 모듈만 든 자료다. (초안이 있어도 오류가 아니고, 소스의 그림 표시와 가이드 그림은 보지 않는다)
 //==============================================================================
 /**
  * @param { object } apiDocument
+ * @param { boolean } [isDraftOnly]
  * @returns { object }
  */
-function checkApiDocument(apiDocument) {
+function checkApiDocument(apiDocument, isDraftOnly = false) {
 	const errorList = [];
-	const counts = { modules: 0, classes: 0, members: 0, functions: 0, enums: 0, enumValues: 0, texts: 0, emptyEnglish: 0, emptyKorean: 0, emptyValueSlots: 0, examples: 0, moduleExamples: 0, classExamples: 0, memberExamples: 0, enumExamples: 0, classesWithoutExample: 0, modulesWithoutExample: 0, counterparts: 0, classCounterparts: 0, memberCounterparts: 0, functionCounterparts: 0, enumCounterparts: 0, enumValueCounterparts: 0 };
+	const counts = { modules: 0, classes: 0, members: 0, functions: 0, enums: 0, enumValues: 0, texts: 0, emptyEnglish: 0, emptyKorean: 0, emptyValueSlots: 0, examples: 0, exampleImages: 0, guideImages: 0, unusedImages: 0, moduleExamples: 0, classExamples: 0, memberExamples: 0, enumExamples: 0, classesWithoutExample: 0, modulesWithoutExample: 0, counterparts: 0, classCounterparts: 0, memberCounterparts: 0, functionCounterparts: 0, enumCounterparts: 0, enumValueCounterparts: 0 };
 	const sinceTable = Object.create(null);
 	const kindTable = Object.create(null);
 
@@ -2559,6 +2630,18 @@ function checkApiDocument(apiDocument) {
 			}
 		}
 	};
+	// 그림 파일 이름이 꼴에 맞고 docs/guide/<버전>/images/ 에 있는지.
+	const imageDirectoryPath = path.join(GUIDE_DIRECTORY_PATH, String(apiDocument.version), "images");
+	const usedImageSet = new Set();
+	const checkImage = (imageName, where) => {
+		if (typeof imageName !== "string" || !EXAMPLE_IMAGE_NAME_PATTERN.test(imageName)) {
+			errorList.push(where + ": 파일 이름 꼴 " + JSON.stringify(imageName) + " (영문 소문자, 숫자, 점, 밑줄, 하이픈과 .webp, .png, .jpg, .gif)");
+			return;
+		}
+		if (!fs.existsSync(path.join(imageDirectoryPath, imageName))) {
+			errorList.push(where + ": 파일 없음 docs/guide/" + apiDocument.version + "/images/" + imageName);
+		}
+	};
 	// 예제 칸인지. (없으면 0, 있으면 예제 수)
 	const checkExamples = (owner, where) => {
 		if (owner.examples === undefined) {
@@ -2577,8 +2660,13 @@ function checkApiDocument(apiDocument) {
 			if (example.language !== "javascript") {
 				errorList.push(exampleWhere + ": language " + example.language);
 			}
-			if (Object.keys(example).length !== 3) {
-				errorList.push(exampleWhere + ": 칸이 { title, code, language } 가 아니다");
+			if (example.image !== undefined) {
+				checkImage(example.image, exampleWhere + " 그림");
+				usedImageSet.add(example.image);
+				++counts.exampleImages;
+			}
+			if (Object.keys(example).length !== (example.image === undefined ? 3 : 4)) {
+				errorList.push(exampleWhere + ": 칸이 { title, code, language, image? } 가 아니다");
 			}
 			++counts.examples;
 		});
@@ -2593,6 +2681,9 @@ function checkApiDocument(apiDocument) {
 		if (!counterpart || typeof counterpart !== "object" || counterpart.engine !== COUNTERPART_ENGINE_NAME || typeof counterpart.module !== "string" || counterpart.module === "") {
 			errorList.push(where + ": counterpart 꼴");
 			return 0;
+		}
+		if (isDraftModuleName(counterpart.module)) {
+			errorList.push(where + ": 초안 모듈을 가리키는 짝 " + counterpart.module);
 		}
 		for (const key of Object.keys(counterpart)) {
 			if (!["engine", "module", "class", "name"].includes(key) || typeof counterpart[key] !== "string" || counterpart[key] === "") {
@@ -2652,6 +2743,9 @@ function checkApiDocument(apiDocument) {
 	}
 	for (const moduleEntry of apiDocument.modules || []) {
 		++counts.modules;
+		if (!isDraftOnly && isDraftModuleName(moduleEntry.name)) {
+			errorList.push(moduleEntry.name + ": 초안 모듈이 자료에 있다");
+		}
 		checkText(moduleEntry.summary, moduleEntry.name);
 		const moduleExampleCount = checkExamples(moduleEntry, moduleEntry.name);
 		counts.moduleExamples += moduleExampleCount;
@@ -2695,6 +2789,44 @@ function checkApiDocument(apiDocument) {
 				counts.enumValueCounterparts += checkCounterpart(value, enumEntry.name + "." + value.name);
 			}
 		}
+	}
+	if (isDraftOnly) {
+		return { errorList: errorList, counts: counts, sinceTable: sinceTable, kindTable: kindTable };
+	}
+	// 소스의 @exampleImage 가 모두 자료에 들었는지. (빠졌으면 공개 API 가 아닌 곳이나 초안, @example 바로 뒤가 아닌 곳에 놓였다)
+	for (const sourcePath of listSourceFiles()) {
+		const sourceText = fs.readFileSync(path.join(REPOSITORY_ROOT, sourcePath), "utf8");
+		for (const imageMatch of sourceText.matchAll(/@exampleImage[ \t]+([^\s*]+)/g)) {
+			if (!usedImageSet.has(imageMatch[1])) {
+				errorList.push(sourcePath + ": @exampleImage " + imageMatch[1] + " 이 자료에 없다 (@example 바로 뒤에 둔다)");
+			}
+		}
+	}
+	// 가이드 그림. (ko 와 en 이 같은 그림을 같은 차례로 쓰고, 파일이 있어야 한다)
+	const guideVersionPath = path.join(GUIDE_DIRECTORY_PATH, String(apiDocument.version));
+	const readGuideImages = (language, fileName) => {
+		const filePath = path.join(guideVersionPath, language, fileName);
+		if (!fs.existsSync(filePath)) {
+			return null;
+		}
+		return Array.from(fs.readFileSync(filePath, "utf8").matchAll(GUIDE_IMAGE_PATTERN), (imageMatch) => imageMatch[1]);
+	};
+	const koreanGuidePath = path.join(guideVersionPath, "ko");
+	const guideFileList = fs.existsSync(koreanGuidePath) ? fs.readdirSync(koreanGuidePath).filter((fileName) => fileName.endsWith(".md")).sort() : [];
+	for (const fileName of guideFileList) {
+		const koreanImageList = readGuideImages("ko", fileName);
+		const englishImageList = readGuideImages("en", fileName);
+		if (englishImageList !== null && koreanImageList.join("\n") !== englishImageList.join("\n")) {
+			errorList.push("가이드 " + fileName + ": ko 와 en 의 그림이 다르다 (ko " + koreanImageList.join(", ") + " / en " + englishImageList.join(", ") + ")");
+		}
+		for (const imageName of koreanImageList) {
+			checkImage(imageName, "가이드 ko/" + fileName + " 그림");
+			usedImageSet.add(imageName);
+			++counts.guideImages;
+		}
+	}
+	if (fs.existsSync(imageDirectoryPath)) {
+		counts.unusedImages = fs.readdirSync(imageDirectoryPath).filter((fileName) => !fileName.startsWith(".") && !usedImageSet.has(fileName)).length;
 	}
 	return { errorList: errorList, counts: counts, sinceTable: sinceTable, kindTable: kindTable };
 }
@@ -3745,6 +3877,7 @@ function printCheckResult(checkResult) {
 	console.log("[apidoc] 모듈 " + counts.modules + ", 클래스 " + counts.classes + ", 멤버 " + counts.members + ", 함수와 상수 " + counts.functions + ", 열거 " + counts.enums + " (값 " + counts.enumValues + ")");
 	console.log("[apidoc] 설명 칸 " + counts.texts + ", ko 빈 칸 " + counts.emptyKorean + ", en 빈 칸(ko 는 있음) " + counts.emptyEnglish + ", 필드 값 칸(꼴만 두고 설명은 멤버 설명에) " + counts.emptyValueSlots);
 	console.log("[apidoc] 예제 " + counts.examples + " (모듈 " + counts.moduleExamples + ", 클래스 " + counts.classExamples + ", 멤버 " + counts.memberExamples + ", 열거 " + counts.enumExamples + "), 예제 없는 클래스 " + counts.classesWithoutExample + ", 제 예제도 클래스 예제도 없는 모듈 " + counts.modulesWithoutExample);
+	console.log("[apidoc] 그림: 예제 " + counts.exampleImages + ", 가이드(ko) " + counts.guideImages + ", 아무도 쓰지 않는 그림 파일 " + counts.unusedImages + " (docs/guide/<버전>/images)");
 	console.log("[apidoc] 러스트 판 짝 " + counts.counterparts + " (클래스 " + counts.classCounterparts + ", 멤버 " + counts.memberCounterparts + ", 함수와 상수 " + counts.functionCounterparts + ", 열거 " + counts.enumCounterparts + ", 열거 값 " + counts.enumValueCounterparts + ")");
 	console.log("[apidoc] kind: " + Object.keys(checkResult.kindTable).map((kind) => kind + " " + checkResult.kindTable[kind]).join(", "));
 	const sinceList = Object.keys(checkResult.sinceTable).sort(compareVersions);
@@ -3787,7 +3920,9 @@ async function main() {
 	if (options.mode === "check") {
 		const checkResult = checkApiDocument(JSON.parse(fs.readFileSync(outputPath, "utf8")));
 		printCheckResult(checkResult);
-		if (checkResult.errorList.length > 0) {
+		const draftBuildResult = buildApiDocument(options.version, options.dateOption, outputPath, false);
+		const draftErrorCount = printDraftCheckResult(draftBuildResult.apiDocument, removeDraftModules(draftBuildResult.apiDocument));
+		if (checkResult.errorList.length > 0 || draftErrorCount > 0) {
 			process.exitCode = 1;
 		}
 		return;
@@ -3809,6 +3944,7 @@ async function main() {
 		console.log("[apidoc] 짝 표를 옮김: " + path.relative(REPOSITORY_ROOT, getCounterpartTablePath(options.version)));
 	}
 	const buildResult = buildApiDocument(options.version, options.dateOption, outputPath);
+	const draftModuleList = removeDraftModules(buildResult.apiDocument);
 	fs.mkdirSync(API_DIRECTORY_PATH, { recursive: true });
 	fs.writeFileSync(outputPath, JSON.stringify(buildResult.apiDocument, null, "\t") + "\n");
 	const statistics = buildResult.statistics;
@@ -3827,6 +3963,13 @@ async function main() {
 		console.log("[apidoc] 짝 표에 있지만 자료에 없는 이름 " + statistics.counterpartStaleList.length + " 개 (러스트 판 짝 표를 다시 지을 것): " + statistics.counterpartStaleList.slice(0, 20).join(", "));
 	}
 	printCheckResult(checkApiDocument(buildResult.apiDocument));
+	if (printDraftCheckResult(buildResult.apiDocument, draftModuleList) > 0) {
+		process.exitCode = 1;
+	}
+	if (exampleImageWarningSet.size > 0) {
+		console.log("[apidoc] @example 바로 뒤가 아니라 그림을 붙이지 못한 @exampleImage " + exampleImageWarningSet.size + " 개: " + Array.from(exampleImageWarningSet).join(", "));
+		process.exitCode = 1;
+	}
 	if (buildResult.missingList.length > 0) {
 		console.log("[apidoc] 번역 표에 없는 ko 글 " + buildResult.missingList.length + " 개 (en 을 빈 글로 둠). 목록: node tools/apidoc.cjs " + options.version + " --missing");
 	}

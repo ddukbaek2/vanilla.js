@@ -7,6 +7,8 @@
 vanilla.js 는 외부 라이브러리 없이 브라우저에서 바로 동작하는 웹게임 엔진입니다.
 번들 하나를 모듈로 불러오면 씬, 노드, 입력, UI, 파티클, 오디오가 모두 준비됩니다.
 
+![Toon Shading 예제: VRM 캐릭터를 3 톤 램프, 얼굴 그림자, 머리카락 하이라이트, 바깥선, 블룸으로 그린 툰 렌더링](../images/toon-shading.webp)
+
 - 런타임 의존성 0. 아래 명령으로 지금 소스(2026-11-26 dev)를 묶으면 `vanilla.min.js` 약 765 KB, gzip 약 215 KB 입니다
 - WebGL2 렌더러. 스프라이트, 텍스트, 도형, 마스크가 같은 출력 경로를 쓰고, 묶어 그리기와 화면 밖 거르기가 기본으로 켜져 있습니다
 - 블렌드 모드는 Canvas2D 합성 26 가지를 모두 그립니다. overlay, soft-light, hue 같은 13 가지와 렌더 타겟에 그리는 multiply 는 그릴 영역 아래를 떠 와 W3C Compositing and Blending 공식대로 셰이더로 섞습니다
@@ -36,9 +38,7 @@ vanilla.js 는 외부 라이브러리 없이 브라우저에서 바로 동작하
 
 | 게임 | 링크 |
 | --- | --- |
-| Tales of Cultivation | [열기](https://ddukbaek2.com/portfolio/talesofcultivation/) |
 | Pipe Mania | [열기](https://vanillapunch.com/games/#pipemania) |
-| Scramble Heroes | [열기](https://ddukbaek2.com/portfolio/scramble-heroes/) |
 
 ## 저장소 구조
 
@@ -53,7 +53,6 @@ src/            엔진 소스
 	game/ misc/   게임 보조 기능
 	resource/     애셋 로더
 	web/          브라우저 연동
-	experimental/ 0.4.0 뒤 기능의 초안 (Experimental 이름 공간, API 가 바뀔 수 있음)
 	deprecated/   폐기와 폐기 예정
 examples/       샘플 (배포본과 같은 소스)
 tools/          웹 저작 도구와 명령줄 도구

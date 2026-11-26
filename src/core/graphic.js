@@ -1148,6 +1148,7 @@ export class Graphic extends Object {
 	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
 	 * const engine = new Engine(engineConfiguration);
 	 * engine.run(new MainScene());
+	 * @exampleImage blend-modes.webp
 	 */
 	setBlendMode(blendMode) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();

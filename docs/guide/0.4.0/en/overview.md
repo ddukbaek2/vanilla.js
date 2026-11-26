@@ -7,6 +7,8 @@
 vanilla.js is a web game engine that runs directly in the browser without external libraries.
 Load a single bundle as a module and scenes, nodes, input, UI, particles and audio are all ready.
 
+![Toon Shading example: a VRM character rendered with a 3 tone ramp, face shadows, hair highlights, outlines and bloom](../images/toon-shading.webp)
+
 - Zero runtime dependencies. Bundling the current source (2026-11-26 dev) with the commands below gives `vanilla.min.js` at about 765 KB, about 215 KB gzipped
 - WebGL2 renderer. Sprites, text, shapes and masks share the same output path, and batching and off-screen culling are on by default
 - Blend modes cover all 26 Canvas2D compositing modes. 13 of them, such as overlay, soft-light and hue, plus multiply when drawing to a render target, copy the area under the draw region and blend in a shader following the W3C Compositing and Blending formulas
@@ -36,9 +38,7 @@ Playable results made with the engine.
 
 | Game | Link |
 | --- | --- |
-| Tales of Cultivation | [Open](https://ddukbaek2.com/portfolio/talesofcultivation/) |
 | Pipe Mania | [Open](https://vanillapunch.com/games/#pipemania) |
-| Scramble Heroes | [Open](https://ddukbaek2.com/portfolio/scramble-heroes/) |
 
 ## Repository Structure
 
@@ -53,7 +53,6 @@ src/            Engine source
 	game/ misc/   Game helper features
 	resource/     Asset loader
 	web/          Browser integration
-	experimental/ Drafts of features after 0.4.0 (Experimental namespace, the API may change)
 	deprecated/   Deprecated and to be deprecated
 examples/       Samples (same source as the deployed builds)
 tools/          Web authoring tools and command-line tools

@@ -235,6 +235,8 @@ engine.run(new AnimatorScene());
 
 `Timeline` plays documents (`*.timeline.json`) saved by the Timeline Editor. A document is JSON made of a list of stage nodes, tracks (target name, property, keys), and markers.
 
+![The Timeline Showcase example playing the TITLE REVEAL document: VANILLA text and a particle burst, the document list on the left and the playback bar below](../images/timeline.webp)
+
 ```json
 {
 	"name": "Title Reveal",

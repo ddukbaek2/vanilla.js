@@ -4,10 +4,10 @@ Web authoring tools used with the engine. They open directly in the browser, and
 
 | Tool | Description | Demo | Source |
 | --- | --- | --- | --- |
-| UI Editor | Build UI screens with node tree, inspector and canvas editing, and save them as `.uiasset.json` | [Open](https://ddukbaek2.com/portfolio/uieditor/) | [`tools/uieditor`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/uieditor) |
-| Particle Editor | Particle preset authoring. Tune values while watching the preview | [Open](https://ddukbaek2.com/portfolio/particleeditor/) | [`tools/particleeditor`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/particleeditor) |
-| Timeline Editor | Keyframe authoring for the same uses as Unity Timeline / Unreal Sequencer. Dope sheet + curves, auto key, events / markers | [Open](https://ddukbaek2.com/portfolio/timelineeditor/) | [`tools/timelineeditor`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/timelineeditor) |
-| Visual Editor | An integrated editor with Unity-like docking windows (hierarchy, scene, game, inspector, project, console). Open folder, prefabs, undo, play. Scenes are saved in UIDocument format (`.scene.json`) | [Open](https://ddukbaek2.com/portfolio/visualeditor/) | [`tools/visualeditor`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/visualeditor) |
+| UI Editor | Build UI screens with node tree, inspector and canvas editing, and save them as `.uiasset.json` | [Open](https://vanillapunch.com/tools/editor/uieditor/) | [`tools/uieditor`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/uieditor) |
+| Particle Editor | Particle preset authoring. Tune values while watching the preview | [Open](https://vanillapunch.com/tools/editor/particleeditor/) | [`tools/particleeditor`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/particleeditor) |
+| Timeline Editor | Keyframe authoring for the same uses as Unity Timeline / Unreal Sequencer. Dope sheet + curves, auto key, events / markers | [Open](https://vanillapunch.com/tools/editor/timelineeditor/) | [`tools/timelineeditor`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/timelineeditor) |
+| Visual Editor | An integrated editor with Unity-like docking windows (hierarchy, scene, game, inspector, project, console). Open folder, prefabs, undo, play. Scenes are saved in UIDocument format (`.scene.json`) | [Open](https://vanillapunch.com/tools/editor/visualeditor/) | [`tools/visualeditor`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/visualeditor) |
 
 Command-line tools run with Node.js. Detailed usage is in [`tools/TOOLS.md`](https://github.com/ddukbaek2/vanilla.js/blob/release/tools/TOOLS.md).
 
