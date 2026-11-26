@@ -5524,6 +5524,11 @@
 						"en": "2D affine transform matrix. (3x2 form compatible with Canvas2D)\n- | a c e |\n  | b d f |\n- Point transform: x' = a*x + c*y + e, y' = b*x + d*y + f"
 					},
 					"extends": "Object",
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "base/transformmatrix",
+						"class": "TransformMatrix"
+					},
 					"members": [
 						{
 							"kind": "constructor",
@@ -5554,7 +5559,13 @@
 								"en": "Property that returns the a component."
 							},
 							"since": "0.3.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "a"
+							}
 						},
 						{
 							"kind": "property",
@@ -5573,7 +5584,13 @@
 								"en": "Property that returns the b component."
 							},
 							"since": "0.3.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "b"
+							}
 						},
 						{
 							"kind": "property",
@@ -5592,7 +5609,13 @@
 								"en": "Property that returns the c component."
 							},
 							"since": "0.3.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "c"
+							}
 						},
 						{
 							"kind": "property",
@@ -5611,7 +5634,13 @@
 								"en": "Property that returns the d component."
 							},
 							"since": "0.3.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "d"
+							}
 						},
 						{
 							"kind": "property",
@@ -5630,7 +5659,13 @@
 								"en": "Property that returns the e component."
 							},
 							"since": "0.3.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "e"
+							}
 						},
 						{
 							"kind": "property",
@@ -5649,7 +5684,13 @@
 								"en": "Property that returns the f component."
 							},
 							"since": "0.3.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "f"
+							}
 						},
 						{
 							"kind": "method",
@@ -5661,7 +5702,13 @@
 								"en": "Resets to the identity matrix."
 							},
 							"since": "0.3.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "set_identity"
+							}
 						},
 						{
 							"kind": "method",
@@ -5722,7 +5769,13 @@
 								"en": "Sets the matrix components directly. (same argument order as Canvas2D setTransform)"
 							},
 							"since": "0.3.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "set_transform"
+							}
 						},
 						{
 							"kind": "method",
@@ -5743,7 +5796,13 @@
 								"en": "Copies the components of another matrix."
 							},
 							"since": "0.3.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "copy_from"
+							}
 						},
 						{
 							"kind": "method",
@@ -5791,7 +5850,13 @@
 								"en": "Accumulates a translation. (local-space right multiply, same as Canvas2D translate)"
 							},
 							"since": "0.3.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "translate"
+							}
 						},
 						{
 							"kind": "method",
@@ -5812,7 +5877,13 @@
 								"en": "Accumulates a rotation. (local-space right multiply, same as Canvas2D rotate)"
 							},
 							"since": "0.3.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "rotate"
+							}
 						},
 						{
 							"kind": "method",
@@ -5841,7 +5912,13 @@
 								"en": "Accumulates a scale. (local-space right multiply, same as Canvas2D scale)"
 							},
 							"since": "0.3.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "scale"
+							}
 						},
 						{
 							"kind": "method",
@@ -5862,7 +5939,13 @@
 								"en": "Accumulates by multiplying another matrix on the right. (this = this x other)"
 							},
 							"since": "0.3.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "multiply"
+							}
 						},
 						{
 							"kind": "method",
@@ -5881,7 +5964,13 @@
 								"en": "Inverse matrix. (returns a new matrix and leaves this one as is, null if the determinant is 0)"
 							},
 							"since": "0.4.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "invert"
+							}
 						},
 						{
 							"kind": "method",
@@ -5917,7 +6006,13 @@
 								"en": "Transforms a point."
 							},
 							"since": "0.3.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "transform_point"
+							}
 						},
 						{
 							"kind": "method",
@@ -5936,7 +6031,13 @@
 								"en": "Returns the largest of the per-axis scales in the matrix. (for text sharpness)"
 							},
 							"since": "0.3.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "get_maximum_scale"
+							}
 						},
 						{
 							"kind": "method",
@@ -5957,7 +6058,13 @@
 								"en": "Writes a column-major array for uploading a mat3 uniform."
 							},
 							"since": "0.3.0",
-							"source": "src/base/transformmatrix.js"
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "write_to_float32_array"
+							}
 						}
 					]
 				}
@@ -11807,6 +11914,11 @@
 						"ko": "애셋 타입.",
 						"en": "Asset type."
 					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/asset",
+						"class": "AssetType"
+					},
 					"values": [
 						{
 							"name": "none",
@@ -15071,6 +15183,11 @@
 						"ko": "",
 						"en": ""
 					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/inputmanager",
+						"class": "KeyCode"
+					},
 					"values": [
 						{
 							"name": "a",
@@ -15078,6 +15195,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "A"
 							}
 						},
 						{
@@ -15086,6 +15209,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "B"
 							}
 						},
 						{
@@ -15094,6 +15223,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "C"
 							}
 						},
 						{
@@ -15102,6 +15237,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "D"
 							}
 						},
 						{
@@ -15110,6 +15251,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "E"
 							}
 						},
 						{
@@ -15118,6 +15265,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F"
 							}
 						},
 						{
@@ -15126,6 +15279,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "G"
 							}
 						},
 						{
@@ -15134,6 +15293,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "H"
 							}
 						},
 						{
@@ -15142,6 +15307,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "I"
 							}
 						},
 						{
@@ -15150,6 +15321,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "J"
 							}
 						},
 						{
@@ -15158,6 +15335,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "K"
 							}
 						},
 						{
@@ -15166,6 +15349,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "L"
 							}
 						},
 						{
@@ -15174,6 +15363,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "M"
 							}
 						},
 						{
@@ -15182,6 +15377,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "N"
 							}
 						},
 						{
@@ -15190,6 +15391,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "O"
 							}
 						},
 						{
@@ -15198,6 +15405,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "P"
 							}
 						},
 						{
@@ -15206,6 +15419,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "Q"
 							}
 						},
 						{
@@ -15214,6 +15433,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "R"
 							}
 						},
 						{
@@ -15222,6 +15447,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "S"
 							}
 						},
 						{
@@ -15230,6 +15461,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "T"
 							}
 						},
 						{
@@ -15238,6 +15475,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "U"
 							}
 						},
 						{
@@ -15246,6 +15489,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "V"
 							}
 						},
 						{
@@ -15254,6 +15503,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "W"
 							}
 						},
 						{
@@ -15262,6 +15517,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "X"
 							}
 						},
 						{
@@ -15270,6 +15531,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "Y"
 							}
 						},
 						{
@@ -15278,6 +15545,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "Z"
 							}
 						},
 						{
@@ -15366,6 +15639,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "BACKSPACE"
 							}
 						},
 						{
@@ -15374,6 +15653,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "TAB"
 							}
 						},
 						{
@@ -15382,6 +15667,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "ENTER"
 							}
 						},
 						{
@@ -15390,6 +15681,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "SHIFT"
 							}
 						},
 						{
@@ -15398,6 +15695,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "CTRL"
 							}
 						},
 						{
@@ -15406,6 +15709,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "ALT"
 							}
 						},
 						{
@@ -15414,6 +15723,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "CAPSLOCK"
 							}
 						},
 						{
@@ -15422,6 +15737,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "ESCAPE"
 							}
 						},
 						{
@@ -15430,6 +15751,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "SPACE"
 							}
 						},
 						{
@@ -15438,6 +15765,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "PAGEUP"
 							}
 						},
 						{
@@ -15446,6 +15779,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "PAGEDOWN"
 							}
 						},
 						{
@@ -15454,6 +15793,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "END"
 							}
 						},
 						{
@@ -15462,6 +15807,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "HOME"
 							}
 						},
 						{
@@ -15470,6 +15821,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "ARROWLEFT"
 							}
 						},
 						{
@@ -15478,6 +15835,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "ARROWUP"
 							}
 						},
 						{
@@ -15486,6 +15849,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "ARROWRIGHT"
 							}
 						},
 						{
@@ -15494,6 +15863,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "ARROWDOWN"
 							}
 						},
 						{
@@ -15502,6 +15877,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "INSERT"
 							}
 						},
 						{
@@ -15510,6 +15891,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "DELETE"
 							}
 						},
 						{
@@ -15518,6 +15905,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F1"
 							}
 						},
 						{
@@ -15526,6 +15919,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F2"
 							}
 						},
 						{
@@ -15534,6 +15933,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F3"
 							}
 						},
 						{
@@ -15542,6 +15947,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F4"
 							}
 						},
 						{
@@ -15550,6 +15961,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F5"
 							}
 						},
 						{
@@ -15558,6 +15975,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F6"
 							}
 						},
 						{
@@ -15566,6 +15989,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F7"
 							}
 						},
 						{
@@ -15574,6 +16003,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F8"
 							}
 						},
 						{
@@ -15582,6 +16017,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F9"
 							}
 						},
 						{
@@ -15590,6 +16031,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F10"
 							}
 						},
 						{
@@ -15598,6 +16045,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F11"
 							}
 						},
 						{
@@ -15606,6 +16059,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F12"
 							}
 						},
 						{
@@ -15614,6 +16073,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "SCROLLLOCK"
 							}
 						},
 						{
@@ -15622,6 +16087,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "SEMICOLON"
 							}
 						},
 						{
@@ -15630,6 +16101,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "EQUAL"
 							}
 						},
 						{
@@ -15638,6 +16115,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "COMMA"
 							}
 						},
 						{
@@ -15646,6 +16129,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "MINUS"
 							}
 						},
 						{
@@ -15654,6 +16143,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "PERIOD"
 							}
 						},
 						{
@@ -15662,6 +16157,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "SLASH"
 							}
 						},
 						{
@@ -15670,6 +16171,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "BACKQUOTE"
 							}
 						},
 						{
@@ -15678,6 +16185,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "BRACKETLEFT"
 							}
 						},
 						{
@@ -15686,6 +16199,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "BACKSLASH"
 							}
 						},
 						{
@@ -15694,6 +16213,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "BRACKETRIGHT"
 							}
 						},
 						{
@@ -15702,6 +16227,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "QUOTE"
 							}
 						},
 						{
@@ -15710,6 +16241,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "META"
 							}
 						},
 						{
@@ -15718,6 +16255,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "COMMAND"
 							}
 						},
 						{
@@ -15726,6 +16269,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "PAUSE"
 							}
 						},
 						{
@@ -15734,6 +16283,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "AUDIOVOLUMEUP"
 							}
 						},
 						{
@@ -15742,6 +16297,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "AUDIOVOLUMEDOWN"
 							}
 						},
 						{
@@ -15750,6 +16311,12 @@
 							"description": {
 								"ko": "음소거. (W3C code 표의 이름)",
 								"en": "Mute. (name from the W3C code table)"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "AUDIOMUTE"
 							}
 						},
 						{
@@ -15758,6 +16325,12 @@
 							"description": {
 								"ko": "재생/멈춤. (W3C code 표의 이름, 표에 MediaPlay 는 없다)",
 								"en": "Play/pause. (name from the W3C code table, the table has no MediaPlay)"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "AUDIOPLAY"
 							}
 						},
 						{
@@ -15766,6 +16339,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "AUDIOSTOP"
 							}
 						},
 						{
@@ -15774,6 +16353,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "AUDIOPREV"
 							}
 						},
 						{
@@ -15782,6 +16367,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "AUDIONEXT"
 							}
 						},
 						{
@@ -15790,6 +16381,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUM_LOCK"
 							}
 						},
 						{
@@ -15798,6 +16395,12 @@
 							"description": {
 								"ko": "텐키 나누기.",
 								"en": "Numpad divide."
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD_DIVIDE"
 							}
 						},
 						{
@@ -15806,6 +16409,12 @@
 							"description": {
 								"ko": "텐키 곱하기.",
 								"en": "Numpad multiply."
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD_MULTIPLY"
 							}
 						},
 						{
@@ -15814,6 +16423,12 @@
 							"description": {
 								"ko": "텐키 빼기.",
 								"en": "Numpad subtract."
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD_SUBTRACT"
 							}
 						},
 						{
@@ -15822,6 +16437,12 @@
 							"description": {
 								"ko": "텐키 점.",
 								"en": "Numpad decimal point."
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD_DECIMAL"
 							}
 						},
 						{
@@ -15830,6 +16451,12 @@
 							"description": {
 								"ko": "텐키 더하기.",
 								"en": "Numpad add."
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD_ADD"
 							}
 						},
 						{
@@ -15838,6 +16465,12 @@
 							"description": {
 								"ko": "텐키 엔터.",
 								"en": "Numpad enter."
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD_ENTER"
 							}
 						},
 						{
@@ -15846,6 +16479,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD0"
 							}
 						},
 						{
@@ -15854,6 +16493,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD1"
 							}
 						},
 						{
@@ -15862,6 +16507,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD2"
 							}
 						},
 						{
@@ -15870,6 +16521,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD3"
 							}
 						},
 						{
@@ -15878,6 +16535,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD4"
 							}
 						},
 						{
@@ -15886,6 +16549,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD5"
 							}
 						},
 						{
@@ -15894,6 +16563,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD6"
 							}
 						},
 						{
@@ -15902,6 +16577,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD7"
 							}
 						},
 						{
@@ -15910,6 +16591,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD8"
 							}
 						},
 						{
@@ -15918,6 +16605,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD9"
 							}
 						}
 					]
@@ -29728,6 +30421,11 @@
 						"ko": "스프라이트 모드.",
 						"en": "Sprite mode."
 					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/component/sprite",
+						"class": "SpriteDrawMode"
+					},
 					"values": [
 						{
 							"name": "simple",
@@ -29760,6 +30458,11 @@
 					"summary": {
 						"ko": "스프라이트 블렌드 모드. (Canvas2D globalCompositeOperation 대응)\n- 26 가지 모두 Graphic.setBlendMode 가 그린다. 포터 더프 연산자, lighter, multiply, screen 은 고정 블렌딩,\n  overlay 부터 luminosity 까지 13 가지는 그릴 영역 아래를 떠 와 셰이더로 섞는다. (W3C Compositing and Blending Level 1 공식, 그리기마다 영역 복사가 들고 묶어 그리지 않는다)\n- Canvas2D 는 source-in, source-out, destination-in, destination-atop, copy 가 그린 도형 밖(자르기 안 전체)도 지우지만, Graphic 은 그린 도형 안만 바꾼다.",
 						"en": "Sprite blend mode. (maps to Canvas2D globalCompositeOperation)\n- Graphic.setBlendMode draws all 26. The Porter-Duff operators, lighter, multiply and screen use fixed blending,\n  and the 13 from overlay to luminosity copy the area under the drawing and mix it in a shader. (W3C Compositing and Blending Level 1 formulas, each draw copies the area and is not batched)\n- Canvas2D source-in, source-out, destination-in, destination-atop and copy also clear outside the drawn shape (the whole clip), but Graphic changes only inside the drawn shape."
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/component/sprite",
+						"class": "SpriteBlendMode"
 					},
 					"values": [
 						{
@@ -36447,6 +37150,11 @@
 						"ko": "버튼 상태.",
 						"en": "Button state."
 					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "ui/uibutton",
+						"class": "ButtonState"
+					},
 					"values": [
 						{
 							"name": "normal",
@@ -37696,6 +38404,11 @@
 						"ko": "스크롤 모드.\n- clamp: 경계를 초과하지 않는 기본 모드.\n- elastic: 경계를 초과하면 저항이 생기고 놓으면 스프링처럼 튕겨 돌아오는 모드.",
 						"en": "Scroll mode.\n- clamp: the default mode that does not go past the bounds.\n- elastic: resists past the bounds and springs back when released."
 					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "ui/uiscrollview",
+						"class": "ScrollMode"
+					},
 					"values": [
 						{
 							"name": "clamp",
@@ -38280,6 +38993,11 @@
 					"summary": {
 						"ko": "진행률 방향.",
 						"en": "Progress direction."
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "ui/uiprogressview",
+						"class": "ProgressDirection"
 					},
 					"values": [
 						{
@@ -53094,7 +53812,13 @@
 								"en": "Get all parameters."
 							},
 							"since": "0.4.0",
-							"source": "src/animation/animator.js"
+							"source": "src/animation/animator.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "animation/animator",
+								"class": "Animator",
+								"name": "get_parameters"
+							}
 						},
 						{
 							"kind": "method",
@@ -53927,7 +54651,13 @@
 								"en": "Returns the target."
 							},
 							"since": "0.0.9",
-							"source": "src/animation/action.js"
+							"source": "src/animation/action.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "animation/action",
+								"class": "Action",
+								"name": "get_target"
+							}
 						}
 					]
 				}
@@ -57209,7 +57939,12 @@
 						"en": "Maximum number of morph targets per drawable. (matches the shader uniform array size)"
 					},
 					"since": "0.3.0",
-					"source": "src/graphics3d/skinnedmodel.js"
+					"source": "src/graphics3d/skinnedmodel.js",
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "graphics3d/skinnedmodel",
+						"name": "MORPH_TARGET_MAXIMUM"
+					}
 				}
 			],
 			"enums": []
@@ -66260,7 +66995,12 @@
 						"en": "Number of wrinkle mask channels. (4x4 atlas x RGBA, each channel a vec3 of weights for wrinkle maps 1 / 2 / 3)"
 					},
 					"since": "0.3.0",
-					"source": "src/graphics3d/humanskinrenderer.js"
+					"source": "src/graphics3d/humanskinrenderer.js",
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "graphics3d/humanskinrenderer",
+						"name": "WRINKLE_CHANNEL_COUNT"
+					}
 				}
 			],
 			"enums": []
@@ -81353,6 +82093,11 @@
 						"ko": "게임패드 아날로그 스틱 식별자. (W3C Standard Gamepad 매핑 규격)",
 						"en": "Gamepad analog stick identifiers. (W3C Standard Gamepad mapping)"
 					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/gamepadmanager",
+						"class": "GamepadAnalogStickCode"
+					},
 					"values": [
 						{
 							"name": "LEFT_X",
@@ -81360,6 +82105,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadAnalogStickCode",
+								"name": "LEFT_X"
 							}
 						},
 						{
@@ -81368,6 +82119,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadAnalogStickCode",
+								"name": "LEFT_Y"
 							}
 						},
 						{
@@ -81376,6 +82133,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadAnalogStickCode",
+								"name": "RIGHT_X"
 							}
 						},
 						{
@@ -81384,6 +82147,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadAnalogStickCode",
+								"name": "RIGHT_Y"
 							}
 						}
 					]
@@ -81394,6 +82163,11 @@
 						"ko": "게임패드 트리거 식별자. (W3C Standard Gamepad 매핑 규격)",
 						"en": "Gamepad trigger identifiers. (W3C Standard Gamepad mapping)"
 					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/gamepadmanager",
+						"class": "GamepadTriggerCode"
+					},
 					"values": [
 						{
 							"name": "L2",
@@ -81401,6 +82175,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadTriggerCode",
+								"name": "L2"
 							}
 						},
 						{
@@ -81409,6 +82189,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadTriggerCode",
+								"name": "R2"
 							}
 						}
 					]
@@ -81419,6 +82205,11 @@
 						"ko": "게임패드 버튼 식별자. (W3C Standard Gamepad 매핑 규격)",
 						"en": "Gamepad button identifiers. (W3C Standard Gamepad mapping)"
 					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/gamepadmanager",
+						"class": "GamepadButtonCode"
+					},
 					"values": [
 						{
 							"name": "A_CROSS",
@@ -81426,6 +82217,12 @@
 							"description": {
 								"ko": "Face Buttons",
 								"en": "Face Buttons"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "A_CROSS"
 							}
 						},
 						{
@@ -81434,6 +82231,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "B_CIRCLE"
 							}
 						},
 						{
@@ -81442,6 +82245,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "X_SQUARE"
 							}
 						},
 						{
@@ -81450,6 +82259,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "Y_TRIANGLE"
 							}
 						},
 						{
@@ -81458,6 +82273,12 @@
 							"description": {
 								"ko": "Bumpers",
 								"en": "Bumpers"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "L1"
 							}
 						},
 						{
@@ -81466,6 +82287,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "R1"
 							}
 						},
 						{
@@ -81474,6 +82301,12 @@
 							"description": {
 								"ko": "Triggers (버튼으로도 인식됨)",
 								"en": "Triggers (also recognized as buttons)"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "L2"
 							}
 						},
 						{
@@ -81482,6 +82315,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "R2"
 							}
 						},
 						{
@@ -81490,6 +82329,12 @@
 							"description": {
 								"ko": "System",
 								"en": "System"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "SHARE_VIEW"
 							}
 						},
 						{
@@ -81498,6 +82343,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "OPTIONS_MENU"
 							}
 						},
 						{
@@ -81506,6 +82357,12 @@
 							"description": {
 								"ko": "Stick Clicks",
 								"en": "Stick Clicks"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "L3"
 							}
 						},
 						{
@@ -81514,6 +82371,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "R3"
 							}
 						},
 						{
@@ -81522,6 +82385,12 @@
 							"description": {
 								"ko": "D-Pad",
 								"en": "D-Pad"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "DPAD_UP"
 							}
 						},
 						{
@@ -81530,6 +82399,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "DPAD_DOWN"
 							}
 						},
 						{
@@ -81538,6 +82413,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "DPAD_LEFT"
 							}
 						},
 						{
@@ -81546,6 +82427,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "DPAD_RIGHT"
 							}
 						},
 						{
@@ -81554,6 +82441,12 @@
 							"description": {
 								"ko": "Center",
 								"en": "Center"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "HOME_PS"
 							}
 						},
 						{
@@ -81562,6 +82455,12 @@
 							"description": {
 								"ko": "",
 								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "TOUCHPAD"
 							}
 						}
 					]
