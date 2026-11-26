@@ -13,6 +13,7 @@ import { Paint } from "../core/component/paint.js";
 import { UILabel } from "./uilabel.js";
 import { buildFontString } from "../core/component/text.js";
 import { FontAsset } from "../resource/fontasset.js";
+import { BlurredRoundRectShadow, cssBlurRadiusToSigma } from "../core/blurshadow.js";
 
 
 //==============================================================================
@@ -88,8 +89,8 @@ export class UIInputField extends WorldNode {
 	/** @private @type { Function | null } */ #canvasKeydownHandler;
 	/** @private @type { Function | null } */ #canvasFocusHandler;
 	/** @private @type { Function | null } */ #contextMenuHandler;
-	/** @private @type { HTMLElement | null } */ #contextMenuElement;
-	/** @private @type { Function | null } */ #contextMenuDismissHandler;
+	/** @private @type { WorldNode | null } */ #contextMenuNode; // 엔진이 그린 문맥 메뉴 노드. (루트의 마지막 자식, 없으면 null)
+	/** @private @type { Function | null } */ #contextMenuMouseDownHandler; // 메뉴 위 mousedown 의 기본 동작(입력 칸 포커스 빼기)을 막는 손잡이.
 	/** @private @type { string | null } */ #pendingMenuAction; // 다음 tick 에 할 문맥 메뉴 항목. (UIInputFieldMenuAction, null 이면 없음)
 
 	/** @private @type { string } */ #value;
@@ -147,8 +148,8 @@ export class UIInputField extends WorldNode {
 		this.#canvasKeydownHandler = null;
 		this.#canvasFocusHandler = null;
 		this.#contextMenuHandler = null;
-		this.#contextMenuElement = null;
-		this.#contextMenuDismissHandler = null;
+		this.#contextMenuNode = null;
+		this.#contextMenuMouseDownHandler = null;
 		this.#pendingMenuAction = null;
 
 		this.#value = "";
@@ -1011,6 +1012,10 @@ export class UIInputField extends WorldNode {
 			const viewInputPosition = viewManager.canvasPositionToViewPosition(canvasPosition);
 			const isVisibleInHierarchy = (typeof this.isVisibleInHierarchy === "function") ? this.isVisibleInHierarchy() : true;
 			const isInside = isVisibleInHierarchy && this.contains(viewInputPosition);
+			// 문맥 메뉴 위는 밖으로 치지 않는다. (러스트 판 blur_on_outside_press 와 같다)
+			if (!isInside && this.#isViewPositionInsideContextMenu(viewInputPosition)) {
+				return;
+			}
 			if (isInside) {
 				if (isRelease && this.#focused && this.#isFocusedWithoutActivation) {
 					this.#domInput.blur();
@@ -1519,24 +1524,29 @@ export class UIInputField extends WorldNode {
 		this.#contextMenuHandler = null;
 	}
 	//==============================================================================
-	// 우클릭 처리. (필드 안이면 기본 메뉴를 막고 포커스한 뒤 문맥 메뉴를 띄운다)
+	// 우클릭 처리. (필드 안이면 기본 메뉴를 막고 포커스한 뒤 문맥 메뉴를 띄운다, 밖이면 띄운 메뉴를 닫는다)
 	//==============================================================================
 	/**
 	 * @param { MouseEvent } event 캔버스의 contextmenu 사건.
 	 */
 	handleContextMenuEvent(event) {
 		if (!this.#engine) return;
-		const viewManager = this.#engine.getViewManager();
-		const canvas = viewManager.getCanvas();
-		if (!canvas) return;
-		const rect = canvas.getBoundingClientRect();
-		const canvasNative = Vector2.create(event.clientX - rect.left, event.clientY - rect.top);
-		const viewPos = viewManager.canvasPositionToViewPosition(canvasNative);
-		if (!this.contains(viewPos)) return;
+		const viewPosition = this.#convertClientPositionToViewPosition(event.clientX, event.clientY);
+		if (viewPosition === null) return;
+		if (!this.contains(viewPosition)) {
+			// 메뉴 위의 오른쪽 클릭은 브라우저 메뉴를 막기만 하고, 그 밖이면 띄운 메뉴를 닫는다.
+			if (this.#isViewPositionInsideContextMenu(viewPosition)) {
+				event.preventDefault();
+			}
+			else {
+				this.hideContextMenu();
+			}
+			return;
+		}
 		event.preventDefault();
 		event.stopPropagation();
 		this.focus();
-		this.showContextMenu(event.clientX, event.clientY);
+		this.showContextMenu(viewPosition);
 	}
 	//==============================================================================
 	// 직접 누름 DOM 입력의 오른쪽 클릭 처리. (브라우저 편집 칸 메뉴를 막고 엔진 문맥 메뉴를 띄운다)
@@ -1548,95 +1558,288 @@ export class UIInputField extends WorldNode {
 		if (!this.#useDirectTouch) return;
 		event.preventDefault();
 		event.stopPropagation();
+		const viewPosition = this.#convertClientPositionToViewPosition(event.clientX, event.clientY);
+		if (viewPosition === null) return;
 		this.focus();
-		this.showContextMenu(event.clientX, event.clientY);
+		this.showContextMenu(viewPosition);
 	}
 	//==============================================================================
-	// 문맥 메뉴 띄우기. (잘라내기, 복사, 붙여넣기, 모두 선택 DOM 메뉴, 메뉴 밖을 누르면 닫는다)
-	// - 메뉴는 body 에 붙은 absolute 라 문서 좌표로 놓는다. (뷰포트 좌표인 clientX, clientY 에 스크롤한 만큼 더한다)
+	// 뷰포트 좌표(clientX, clientY)를 뷰 좌표로. (캔버스가 없으면 null)
 	//==============================================================================
 	/**
-	 * @param { number } clientX 메뉴 왼쪽 위의 X. (CSS 픽셀, 뷰포트 좌표 clientX)
-	 * @param { number } clientY 메뉴 왼쪽 위의 Y. (CSS 픽셀, 뷰포트 좌표 clientY)
+	 * @param { number } clientX 뷰포트 X. (CSS 픽셀)
+	 * @param { number } clientY 뷰포트 Y. (CSS 픽셀)
+	 * @returns { Vector2 | null } 뷰 좌표. (엔진이나 캔버스가 없으면 null)
 	 */
-	showContextMenu(clientX, clientY) {
-		this.hideContextMenu();
-		const doc = System.document;
-		const scrollX = System.scrollX || 0;
-		const scrollY = System.scrollY || 0;
-		const menu = doc.createElement("div");
-		menu.style.position = "absolute";
-		menu.style.left = `${clientX + scrollX}px`;
-		menu.style.top = `${clientY + scrollY}px`;
-		menu.style.zIndex = "10000";
-		menu.style.background = "#ffffff";
-		menu.style.color = "#222222";
-		menu.style.border = "1px solid #cccccc";
-		menu.style.borderRadius = "8px";
-		menu.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.18)";
-		menu.style.padding = "4px 0";
-		menu.style.fontFamily = "system-ui, -apple-system, sans-serif";
-		menu.style.fontSize = "14px";
-		menu.style.minWidth = "140px";
-		menu.style.userSelect = "none";
-
-		const hasSel = this.hasSelection();
-		const items = [
-			{ text: "잘라내기", enabled: hasSel,  action: () => this.cut() },
-			{ text: "복사",     enabled: hasSel,  action: () => this.copy() },
-			{ text: "붙여넣기", enabled: true,    action: () => this.paste() },
-			{ text: "모두 선택", enabled: this.#value.length > 0, action: () => this.selectAll() },
-		];
-		for (const item of items) {
-			const button = doc.createElement("div");
-			button.textContent = item.text;
-			button.style.padding = "8px 16px";
-			button.style.cursor = item.enabled ? "pointer" : "default";
-			button.style.color = item.enabled ? "#222222" : "#aaaaaa";
-			if (item.enabled) {
-				button.addEventListener("mouseenter", () => { button.style.background = "#eef2ff"; });
-				button.addEventListener("mouseleave", () => { button.style.background = "transparent"; });
-				button.addEventListener("mousedown", (event) => { event.preventDefault(); event.stopPropagation(); });
-				button.addEventListener("click", (event) => {
-					event.preventDefault();
-					event.stopPropagation();
-					item.action();
-					this.hideContextMenu();
-				});
-			}
-			menu.appendChild(button);
-		}
-		doc.body.appendChild(menu);
-		this.#contextMenuElement = menu;
-
-		// 메뉴 밖 클릭으로 닫기. 다음 tick 부터 (현재 클릭이 dismiss 로 처리되지 않게).
-		System.setTimeout(() => {
-			const dismissHandler = (event) => {
-				if (this.#contextMenuElement && !this.#contextMenuElement.contains(event.target)) {
-					this.hideContextMenu();
-				}
-			};
-			this.#contextMenuDismissHandler = dismissHandler;
-			doc.addEventListener("pointerdown", dismissHandler, true);
-		}, 0);
+	#convertClientPositionToViewPosition(clientX, clientY) {
+		if (!this.#engine) return null;
+		const viewManager = this.#engine.getViewManager();
+		const canvas = viewManager.getCanvas();
+		if (!canvas) return null;
+		const rect = canvas.getBoundingClientRect();
+		return viewManager.canvasPositionToViewPosition(Vector2.create(clientX - rect.left, clientY - rect.top));
 	}
 	//==============================================================================
-	// 문맥 메뉴 닫기.
+	// 문맥 메뉴 띄우기. (엔진이 그린 잘라내기, 복사, 붙여넣기, 모두 선택 메뉴, 러스트 판 show_context_menu 와 같다)
+	// - 루트의 마지막 자식 노드(UIInputFieldContextMenu 컴포넌트)로 만들어 위에 그린다. 메뉴 왼쪽 위가 누른 자리다.
+	// - 메뉴 밖을 누르거나, 필드가 포커스를 잃거나 트리에서 빠지면 닫힌다.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewPosition 메뉴 왼쪽 위. (뷰 좌표)
+	 */
+	showContextMenu(viewPosition) {
+		this.hideContextMenu();
+		let root = this;
+		while (root.getParent() !== null) {
+			root = root.getParent();
+		}
+		if (root === this || typeof root.convertViewToLocal !== "function") return;
+		const menuNode = new WorldNode();
+		menuNode.setName("uiInputFieldContextMenu");
+		menuNode.setPivot(Pivot.topLeft);
+		menuNode.setAnchor(Pivot.topLeft);
+		menuNode.setLocalPosition(root.convertViewToLocal(viewPosition));
+		menuNode.setContentSize(Vector2.create(CONTEXT_MENU_WIDTH, CONTEXT_MENU_PADDING_Y * 2 + CONTEXT_MENU_ITEM_HEIGHT * CONTEXT_MENU_ITEM_LIST.length));
+		root.addChild(menuNode);
+		const menu = menuNode.addComponent(UIInputFieldContextMenu);
+		menu.initialize(this, this.#engine, this.hasSelection(), this.#value.length > 0);
+		this.#contextMenuNode = menuNode;
+		// 메뉴 위 mousedown 은 입력 칸 포커스를 빼지 않게 기본 동작을 막는다. (메뉴 항목을 누르는 동안 입력 칸이 포커스를 잃어 메뉴가 닫히지 않게)
+		const canvas = this.#engine ? this.#engine.getViewManager().getCanvas() : null;
+		if (canvas && !this.#contextMenuMouseDownHandler) {
+			this.#contextMenuMouseDownHandler = (event) => {
+				const position = this.#convertClientPositionToViewPosition(event.clientX, event.clientY);
+				if (position !== null && this.#isViewPositionInsideContextMenu(position)) {
+					event.preventDefault();
+				}
+			};
+			canvas.addEventListener("mousedown", this.#contextMenuMouseDownHandler);
+		}
+	}
+	//==============================================================================
+	// 문맥 메뉴 닫기. (러스트 판 hide_context_menu 와 같다)
 	//==============================================================================
 	hideContextMenu() {
-		if (this.#contextMenuElement) {
-			try {
-				if (this.#contextMenuElement.parentNode) {
-					this.#contextMenuElement.parentNode.removeChild(this.#contextMenuElement);
-				}
+		const menuNode = this.#contextMenuNode;
+		this.#contextMenuNode = null;
+		if (menuNode && menuNode.getParent() !== null) {
+			menuNode.getParent().removeChild(menuNode);
+		}
+		if (this.#contextMenuMouseDownHandler) {
+			const canvas = this.#engine ? this.#engine.getViewManager().getCanvas() : null;
+			if (canvas) {
+				canvas.removeEventListener("mousedown", this.#contextMenuMouseDownHandler);
 			}
-			catch (error) { /* 무시 */ }
-			this.#contextMenuElement = null;
+			this.#contextMenuMouseDownHandler = null;
 		}
-		if (this.#contextMenuDismissHandler) {
-			System.document.removeEventListener("pointerdown", this.#contextMenuDismissHandler, true);
-			this.#contextMenuDismissHandler = null;
+	}
+	//==============================================================================
+	// 뷰 좌표가 띄운 문맥 메뉴 안인지.
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewPosition 볼 뷰 좌표.
+	 * @returns { boolean } 메뉴가 떠 있고 그 안이면 참.
+	 */
+	#isViewPositionInsideContextMenu(viewPosition) {
+		const menuNode = this.#contextMenuNode;
+		return menuNode !== null && menuNode.getParent() !== null && menuNode.contains(viewPosition);
+	}
+}
+
+
+//==============================================================================
+// 문맥 메뉴 크기. (러스트 판과 같다: 폭 140, 위아래 여백 4, 항목 높이 34(글자 14px 와 위아래 여백 8), 글 왼쪽 여백 16)
+//==============================================================================
+const CONTEXT_MENU_WIDTH = 140;
+const CONTEXT_MENU_PADDING_Y = 4;
+const CONTEXT_MENU_ITEM_HEIGHT = 34;
+const CONTEXT_MENU_ITEM_PADDING_X = 16;
+const CONTEXT_MENU_FONT_SIZE = 14;
+// 문맥 메뉴 항목. (글, 항목, 차례)
+const CONTEXT_MENU_ITEM_LIST = [
+	["잘라내기", UIInputFieldMenuAction.cut],
+	["복사", UIInputFieldMenuAction.copy],
+	["붙여넣기", UIInputFieldMenuAction.paste],
+	["모두 선택", UIInputFieldMenuAction.selectAll],
+];
+// 문맥 메뉴 그림자 색. (CSS box-shadow 0 4px 16px rgba(0, 0, 0, 0.18) 의 색)
+const CONTEXT_MENU_SHADOW_COLOR = new Color(0, 0, 0, 0.18);
+
+
+//==============================================================================
+// 엔진이 그린 문맥 메뉴. (러스트 판 UIInputFieldContextMenu 와 같다)
+// - 루트의 자식 노드에 붙는다. 항목을 누르면 주인 필드에 항목을 부탁하고(다음 tick 에 한다) 스스로 닫는다.
+// - 메뉴 밖을 누르거나, 다른 자리에 문맥 메뉴를 부르거나, 주인 필드가 포커스를 잃거나 트리에서 빠지면 스스로 닫는다.
+// - 그림자는 CSS box-shadow 0 4px 16px rgba(0, 0, 0, 0.18) 을 블링크처럼 시그마 8 의 가우스로 구워 그린다. (core/blurshadow.js)
+//==============================================================================
+class UIInputFieldContextMenu extends Component {
+	/** @private @type { UIInputField | null } */ #ownerField; // 주인 필드.
+	/** @private @type { Engine | null } */ #engine; // 입력을 읽을 엔진.
+	/** @private @type { boolean } */ #isSelectionAvailable; // 고른 글이 있는지. (잘라내기, 복사)
+	/** @private @type { boolean } */ #isTextAvailable; // 글이 있는지. (모두 선택)
+	/** @private @type { number } */ #hoveredItemIndex; // 마우스 아래 항목 자리. (없으면 -1)
+	/** @private @type { boolean } */ #isFirstTick; // 띄운 첫 tick 인지. (띄운 누름을 밖 누름으로 치지 않는다)
+	/** @private @type { BlurredRoundRectShadow } */ #shadow; // 그림자의 구운 그림.
+
+	//==============================================================================
+	// 생성.
+	//==============================================================================
+	constructor() {
+		super();
+		this.setComponentType("UIInputFieldContextMenu");
+		this.#ownerField = null;
+		this.#engine = null;
+		this.#isSelectionAvailable = false;
+		this.#isTextAvailable = false;
+		this.#hoveredItemIndex = -1;
+		this.#isFirstTick = true;
+		this.#shadow = new BlurredRoundRectShadow();
+	}
+
+	//==============================================================================
+	// 주인과 항목 상태 넣기. (선택이 없으면 잘라내기와 복사, 글이 없으면 모두 선택은 흐리게)
+	//==============================================================================
+	initialize(ownerField, engine, isSelectionAvailable, isTextAvailable) {
+		this.#ownerField = ownerField;
+		this.#engine = engine;
+		this.#isSelectionAvailable = isSelectionAvailable;
+		this.#isTextAvailable = isTextAvailable;
+		const node = this.getNode();
+		if (node) {
+			node.setInteractable(true);
 		}
+	}
+
+	//==============================================================================
+	// 항목을 쓸 수 있는지.
+	//==============================================================================
+	isItemEnabled(menuAction) {
+		if (menuAction === UIInputFieldMenuAction.cut || menuAction === UIInputFieldMenuAction.copy) {
+			return this.#isSelectionAvailable;
+		}
+		if (menuAction === UIInputFieldMenuAction.selectAll) {
+			return this.#isTextAvailable;
+		}
+		return true;
+	}
+
+	//==============================================================================
+	// 뷰 좌표 아래 항목 자리. (없으면 -1)
+	//==============================================================================
+	findItemIndex(viewPosition) {
+		const node = this.getNode();
+		if (!node || !node.contains(viewPosition)) {
+			return -1;
+		}
+		const localPosition = node.convertViewToLocal(viewPosition);
+		if (localPosition.x < 0 || localPosition.x > CONTEXT_MENU_WIDTH) {
+			return -1;
+		}
+		const itemY = localPosition.y - CONTEXT_MENU_PADDING_Y;
+		if (itemY < 0) {
+			return -1;
+		}
+		const itemIndex = System.Math.floor(itemY / CONTEXT_MENU_ITEM_HEIGHT);
+		if (itemIndex >= CONTEXT_MENU_ITEM_LIST.length) {
+			return -1;
+		}
+		return itemIndex;
+	}
+
+	//==============================================================================
+	// 메뉴 닫기. (주인 필드가 노드를 뗀다)
+	//==============================================================================
+	close() {
+		if (this.#ownerField) {
+			this.#ownerField.hideContextMenu();
+		}
+		const node = this.getNode();
+		if (node && node.getParent() !== null) {
+			node.getParent().removeChild(node);
+		}
+	}
+
+	//==============================================================================
+	// 갱신. (필드가 포커스를 잃었거나 메뉴 밖을 누르면 닫고, 마우스 아래 항목을 둔다)
+	//==============================================================================
+	/**
+	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
+	 */
+	tick(timeDelta) {
+		const ownerField = this.#ownerField;
+		const isOwnerReady = ownerField !== null && ownerField.isFocused() && ownerField.getParent() !== null;
+		if (!isOwnerReady || !this.#engine) {
+			this.close();
+			return;
+		}
+		const inputManager = this.#engine.getInputManager();
+		const viewInputPosition = inputManager.getViewInputPosition();
+		this.#hoveredItemIndex = this.findItemIndex(viewInputPosition);
+		if (!this.#isFirstTick) {
+			const node = this.getNode();
+			const isPressedOutside = inputManager.isTouchPressed() && !(node && node.contains(viewInputPosition));
+			if (isPressedOutside) {
+				this.close();
+				return;
+			}
+		}
+		this.#isFirstTick = false;
+	}
+
+	//==============================================================================
+	// 누름. (쓸 수 있는 항목이면 필드에 그 항목을 부탁하고 닫는다)
+	//==============================================================================
+	/**
+	 * @param { Vector2 } viewInputPosition 누른 자리. (뷰 좌표)
+	 */
+	touchPress(viewInputPosition) {
+		const itemIndex = this.findItemIndex(viewInputPosition);
+		if (itemIndex < 0) {
+			return;
+		}
+		const menuAction = CONTEXT_MENU_ITEM_LIST[itemIndex][1];
+		if (!this.isItemEnabled(menuAction)) {
+			return;
+		}
+		if (this.#ownerField) {
+			this.#ownerField.requestMenuAction(menuAction);
+		}
+		this.close();
+	}
+
+	//==============================================================================
+	// 그리기. (그림자, 흰 판, 테두리, 항목 글, 마우스 아래 항목 바탕)
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic 그래픽.
+	 */
+	draw(graphic) {
+		const node = this.getNode();
+		if (!node) return;
+		const contentSize = node.getContentSize();
+		const menuRect = Rect.create(0, 0, contentSize.x, contentSize.y);
+		graphic.pushState();
+		// CSS box-shadow 0 4px 16px rgba(0, 0, 0, 0.18) 을 블링크처럼 시그마 8 의 가우스로. (테두리 상자 모양)
+		this.#shadow.draw(graphic, menuRect, 8, Vector2.create(0, 4), cssBlurRadiusToSigma(16), CONTEXT_MENU_SHADOW_COLOR);
+		graphic.setFillColor("#ffffff");
+		graphic.drawRoundRect(menuRect, 8);
+		graphic.setStrokeColor("#cccccc");
+		graphic.drawStrokeRoundRect(Rect.create(0.5, 0.5, contentSize.x - 1, contentSize.y - 1), 7.5, 1);
+		graphic.setFontString(buildFontString(null, CONTEXT_MENU_FONT_SIZE, false, false));
+		graphic.setTextAlign("left");
+		graphic.setTextBaseline("middle");
+		for (let itemIndex = 0; itemIndex < CONTEXT_MENU_ITEM_LIST.length; ++itemIndex) {
+			const [itemText, menuAction] = CONTEXT_MENU_ITEM_LIST[itemIndex];
+			const itemTop = CONTEXT_MENU_PADDING_Y + itemIndex * CONTEXT_MENU_ITEM_HEIGHT;
+			const isEnabled = this.isItemEnabled(menuAction);
+			if (isEnabled && this.#hoveredItemIndex === itemIndex) {
+				graphic.setFillColor("#eef2ff");
+				graphic.drawRect(Rect.create(1, itemTop, contentSize.x - 2, CONTEXT_MENU_ITEM_HEIGHT));
+			}
+			graphic.setFillColor(isEnabled ? "#222222" : "#aaaaaa");
+			graphic.drawFillText(itemText, CONTEXT_MENU_ITEM_PADDING_X, itemTop + CONTEXT_MENU_ITEM_HEIGHT * 0.5);
+		}
+		graphic.popState();
 	}
 }
 
