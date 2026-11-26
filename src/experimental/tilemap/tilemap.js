@@ -9,7 +9,7 @@ import { Color } from "../../base/color.js";
 import { TransformMatrix } from "../../base/transformmatrix.js";
 import { Component } from "../../core/component.js";
 import { Tileset, TileRenderSize, TileFillMode, TileCollisionShape } from "./tileset.js";
-import { TilemapLayer } from "./tilemaplayer.js";
+import { TilemapLayer, DEFAULT_CHUNK_SIZE } from "./tilemaplayer.js";
 
 
 //==============================================================================
@@ -980,10 +980,10 @@ export class Tilemap extends Component {
 	//==============================================================================
 	/**
 	 * @param { string } name 이름.
-	 * @param { number } chunkSize 덩이 한 변의 칸 수. (기본 16)
+	 * @param { number } [chunkSize] 덩이 한 변의 칸 수. (기본 DEFAULT_CHUNK_SIZE 16, 러스트 판은 create_layer_with_chunk_size)
 	 * @returns { TilemapLayer } 새 층.
 	 */
-	createLayer(name, chunkSize = 16) {
+	createLayer(name, chunkSize = DEFAULT_CHUNK_SIZE) {
 		const layer = new TilemapLayer(name, chunkSize);
 		this.addLayer(layer);
 		return layer;
@@ -1359,10 +1359,11 @@ export class Tilemap extends Component {
 			sourceHeight = imageRect.height;
 		}
 		else {
-			const tilesetImage = tileset.getImage();
+			// 타일에 따로 건 그림이 없을 때만 격자 한 칸. (readTileImageRect, 러스트 판 has_own_tile_image 와 같은 기준, 타일셋과 같은 그림을 걸어도 그 그림 전체)
+			const tileData = tileset.findTileData(tileId);
 			const tileImage = tileset.getTileImage(tileId);
 			const columns = tileset.getColumns();
-			if (tileImage === tilesetImage && columns > 0) {
+			if ((tileData === null || tileData.image === null) && columns > 0) {
 				const tileWidth = tileset.getTileWidth();
 				const tileHeight = tileset.getTileHeight();
 				const margin = tileset.getMargin();
