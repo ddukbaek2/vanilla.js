@@ -11,6 +11,16 @@ import * as Math from "./math.js";
 //   | b d f |
 // - 점 변환: x' = a*x + c*y + e, y' = b*x + d*y + f
 //==============================================================================
+/**
+ * @example <caption>이동과 회전을 쌓아 점 변환하기</caption>
+ * import { TransformMatrix } from "./build/vanilla.js";
+ *
+ * const transformMatrix = new TransformMatrix();
+ * transformMatrix.translate(10, 20);
+ * transformMatrix.scale(2, 2);
+ * const point = transformMatrix.transformPoint(1, 1);
+ * console.log(point.x, point.y);
+ */
 export class TransformMatrix extends Object {
 	//==============================================================================
 	// 멤버 변수 목록.
@@ -44,7 +54,7 @@ export class TransformMatrix extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } a 성분. (x 의 x 방향 크기, 가로 배율 겸 회전 성분)
 	 */
 	get a() {
 		return this.#a;
@@ -55,7 +65,7 @@ export class TransformMatrix extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } b 성분. (x 의 y 방향 기울기, 회전 성분)
 	 */
 	get b() {
 		return this.#b;
@@ -66,7 +76,7 @@ export class TransformMatrix extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } c 성분. (y 의 x 방향 기울기, 회전 성분)
 	 */
 	get c() {
 		return this.#c;
@@ -77,7 +87,7 @@ export class TransformMatrix extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } d 성분. (y 의 y 방향 크기, 세로 배율 겸 회전 성분)
 	 */
 	get d() {
 		return this.#d;
@@ -88,7 +98,7 @@ export class TransformMatrix extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } e 성분. (x 방향 이동량)
 	 */
 	get e() {
 		return this.#e;
@@ -99,7 +109,7 @@ export class TransformMatrix extends Object {
 	//==============================================================================
 	/**
 	 * @property
-	 * @returns { number }
+	 * @returns { number } f 성분. (y 방향 이동량)
 	 */
 	get f() {
 		return this.#f;
@@ -121,12 +131,12 @@ export class TransformMatrix extends Object {
 	// 행렬 성분 직접 설정. (Canvas2D setTransform 인자 순서와 동일)
 	//==============================================================================
 	/**
-	 * @param { number } a
-	 * @param { number } b
-	 * @param { number } c
-	 * @param { number } d
-	 * @param { number } e
-	 * @param { number } f
+	 * @param { number } a 행렬의 a 성분.
+	 * @param { number } b 행렬의 b 성분.
+	 * @param { number } c 행렬의 c 성분.
+	 * @param { number } d 행렬의 d 성분.
+	 * @param { number } e 행렬의 e 성분. (x 방향 이동량)
+	 * @param { number } f 행렬의 f 성분. (y 방향 이동량)
 	 */
 	setTransform(a, b, c, d, e, f) {
 		this.#a = a;
@@ -141,7 +151,7 @@ export class TransformMatrix extends Object {
 	// 다른 행렬의 성분 복사.
 	//==============================================================================
 	/**
-	 * @param { TransformMatrix } other
+	 * @param { TransformMatrix } other 성분을 복사해 올 행렬.
 	 */
 	copyFrom(other) {
 		this.#a = other.a;
@@ -157,7 +167,7 @@ export class TransformMatrix extends Object {
 	//==============================================================================
 	/**
 	 * @override
-	 * @returns { this }
+	 * @returns { this } 같은 성분을 가진 새 행렬.
 	 */
 	clone() {
 		const transformMatrix = /** @type { this } */ (new TransformMatrix());
@@ -169,8 +179,8 @@ export class TransformMatrix extends Object {
 	// 이동 변환 누적. (Canvas2D translate 와 동일한 로컬 공간 우측 곱)
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
+	 * @param { number } x x 방향 이동량.
+	 * @param { number } y y 방향 이동량.
 	 */
 	translate(x, y) {
 		this.#e = this.#a * x + this.#c * y + this.#e;
@@ -181,7 +191,7 @@ export class TransformMatrix extends Object {
 	// 회전 변환 누적. (Canvas2D rotate 와 동일한 로컬 공간 우측 곱)
 	//==============================================================================
 	/**
-	 * @param { number } radian
+	 * @param { number } radian 회전각. (라디안)
 	 */
 	rotate(radian) {
 		// 회전이 없으면 행렬이 그대로다. (회전하지 않는 노드도 그릴 때마다 부른다)
@@ -205,8 +215,8 @@ export class TransformMatrix extends Object {
 	// 크기 변환 누적. (Canvas2D scale 과 동일한 로컬 공간 우측 곱)
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
+	 * @param { number } x x 방향 배율.
+	 * @param { number } y y 방향 배율.
 	 */
 	scale(x, y) {
 		// 크기가 그대로면 행렬도 그대로다.
@@ -224,7 +234,7 @@ export class TransformMatrix extends Object {
 	// 다른 행렬을 우측에 곱해 누적. (this = this x other)
 	//==============================================================================
 	/**
-	 * @param { TransformMatrix } other
+	 * @param { TransformMatrix } other 우측에 곱할 행렬.
 	 */
 	multiply(other) {
 		const a = this.#a;
@@ -245,7 +255,15 @@ export class TransformMatrix extends Object {
 	// 역행렬. (새 행렬을 돌려주고 이 행렬은 그대로 둔다, 행렬식이 0 이면 null)
 	//==============================================================================
 	/**
-	 * @returns { TransformMatrix | null }
+	 * @returns { TransformMatrix | null } 역행렬. 행렬식이 0 이면 null.
+	 * @example <caption>역행렬로 점을 되돌리기</caption>
+	 * import { TransformMatrix } from "./build/vanilla.js";
+	 *
+	 * const transformMatrix = new TransformMatrix();
+	 * transformMatrix.translate(10, 20);
+	 * const inverseMatrix = transformMatrix.invert();
+	 * const point = inverseMatrix.transformPoint(10, 20);
+	 * console.log(point.x, point.y);
 	 */
 	invert() {
 		const determinant = this.#a * this.#d - this.#b * this.#c;
@@ -268,9 +286,9 @@ export class TransformMatrix extends Object {
 	// 점 변환.
 	//==============================================================================
 	/**
-	 * @param { number } x
-	 * @param { number } y
-	 * @returns { { x: number, y: number } }
+	 * @param { number } x 변환할 점의 x 좌표.
+	 * @param { number } y 변환할 점의 y 좌표.
+	 * @returns { { x: number, y: number } } 변환된 점.
 	 */
 	transformPoint(x, y) {
 		const transformedX = this.#a * x + this.#c * y + this.#e;
@@ -282,7 +300,7 @@ export class TransformMatrix extends Object {
 	// 행렬이 담고 있는 축별 스케일 중 최대값 반환. (텍스트 선명도 계산용)
 	//==============================================================================
 	/**
-	 * @returns { number }
+	 * @returns { number } x 축과 y 축 배율 중 큰 값.
 	 */
 	getMaximumScale() {
 		const scaleX = Math.sqrt(this.#a * this.#a + this.#b * this.#b);
@@ -294,7 +312,7 @@ export class TransformMatrix extends Object {
 	// mat3 유니폼 업로드용 열우선(column-major) 배열 기록.
 	//==============================================================================
 	/**
-	 * @param { Float32Array } target
+	 * @param { Float32Array } target 기록할 길이 9 이상의 배열.
 	 */
 	writeToFloat32Array(target) {
 		target[0] = this.#a;

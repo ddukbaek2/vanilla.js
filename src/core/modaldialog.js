@@ -18,6 +18,14 @@ export const ModalDialogKind = System.Object.freeze({
 //==============================================================================
 // 질문 창의 답. (러스트 판 ModalDialogResult 의 Confirmed(글), Cancelled)
 //==============================================================================
+/**
+ * @example <caption>확인한 답과 취소한 답 읽기</caption>
+ * import { ModalDialogResult } from "./build/vanilla.js";
+ *
+ * const confirmed = ModalDialogResult.confirmed("hello");
+ * const cancelled = ModalDialogResult.cancelled();
+ * console.log(confirmed.isConfirmed(), confirmed.getText(), cancelled.isConfirmed());
+ */
 export class ModalDialogResult {
 	/** @private @type { boolean } */ #isConfirmed; // 확인했는지.
 	/** @private @type { string } */ #text; // 확인한 글. (prompt 는 입력한 글, alert 와 confirm 은 빈 글)

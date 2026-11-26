@@ -5523,6 +5523,16 @@
 						"ko": "2차원 어파인 변환 행렬. (Canvas2D 호환 3x2 형식)\n- | a c e |\n  | b d f |\n- 점 변환: x' = a*x + c*y + e, y' = b*x + d*y + f",
 						"en": "2D affine transform matrix. (3x2 form compatible with Canvas2D)\n- | a c e |\n  | b d f |\n- Point transform: x' = a*x + c*y + e, y' = b*x + d*y + f"
 					},
+					"examples": [
+						{
+							"title": {
+								"ko": "이동과 회전을 쌓아 점 변환하기",
+								"en": "Stacking translation and scale, then transforming a point"
+							},
+							"code": "import { TransformMatrix } from \"./build/vanilla.js\";\n\nconst transformMatrix = new TransformMatrix();\ntransformMatrix.translate(10, 20);\ntransformMatrix.scale(2, 2);\nconst point = transformMatrix.transformPoint(1, 1);\nconsole.log(point.x, point.y);",
+							"language": "javascript"
+						}
+					],
 					"extends": "Object",
 					"counterpart": {
 						"engine": "vanilla-engine",
@@ -5550,8 +5560,8 @@
 							"returns": {
 								"type": "number",
 								"description": {
-									"ko": "",
-									"en": ""
+									"ko": "a 성분. (x 의 x 방향 크기, 가로 배율 겸 회전 성분)",
+									"en": "The a component. (x scale and rotation part)"
 								}
 							},
 							"description": {
@@ -5575,8 +5585,8 @@
 							"returns": {
 								"type": "number",
 								"description": {
-									"ko": "",
-									"en": ""
+									"ko": "b 성분. (x 의 y 방향 기울기, 회전 성분)",
+									"en": "The b component. (y shear and rotation part)"
 								}
 							},
 							"description": {
@@ -5600,8 +5610,8 @@
 							"returns": {
 								"type": "number",
 								"description": {
-									"ko": "",
-									"en": ""
+									"ko": "c 성분. (y 의 x 방향 기울기, 회전 성분)",
+									"en": "The c component. (x shear and rotation part)"
 								}
 							},
 							"description": {
@@ -5625,8 +5635,8 @@
 							"returns": {
 								"type": "number",
 								"description": {
-									"ko": "",
-									"en": ""
+									"ko": "d 성분. (y 의 y 방향 크기, 세로 배율 겸 회전 성분)",
+									"en": "The d component. (y scale and rotation part)"
 								}
 							},
 							"description": {
@@ -5650,8 +5660,8 @@
 							"returns": {
 								"type": "number",
 								"description": {
-									"ko": "",
-									"en": ""
+									"ko": "e 성분. (x 방향 이동량)",
+									"en": "The e component. (x translation)"
 								}
 							},
 							"description": {
@@ -5675,8 +5685,8 @@
 							"returns": {
 								"type": "number",
 								"description": {
-									"ko": "",
-									"en": ""
+									"ko": "f 성분. (y 방향 이동량)",
+									"en": "The f component. (y translation)"
 								}
 							},
 							"description": {
@@ -5719,48 +5729,48 @@
 									"name": "a",
 									"type": "number",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "행렬의 a 성분.",
+										"en": "The a component of the matrix."
 									}
 								},
 								{
 									"name": "b",
 									"type": "number",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "행렬의 b 성분.",
+										"en": "The b component of the matrix."
 									}
 								},
 								{
 									"name": "c",
 									"type": "number",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "행렬의 c 성분.",
+										"en": "The c component of the matrix."
 									}
 								},
 								{
 									"name": "d",
 									"type": "number",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "행렬의 d 성분.",
+										"en": "The d component of the matrix."
 									}
 								},
 								{
 									"name": "e",
 									"type": "number",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "행렬의 e 성분. (x 방향 이동량)",
+										"en": "The e component of the matrix. (x translation)"
 									}
 								},
 								{
 									"name": "f",
 									"type": "number",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "행렬의 f 성분. (y 방향 이동량)",
+										"en": "The f component of the matrix. (y translation)"
 									}
 								}
 							],
@@ -5786,8 +5796,8 @@
 									"name": "other",
 									"type": "TransformMatrix",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "성분을 복사해 올 행렬.",
+										"en": "The matrix to copy the components from."
 									}
 								}
 							],
@@ -5812,8 +5822,8 @@
 							"returns": {
 								"type": "this",
 								"description": {
-									"ko": "",
-									"en": ""
+									"ko": "같은 성분을 가진 새 행렬.",
+									"en": "A new matrix with the same components."
 								}
 							},
 							"description": {
@@ -5832,16 +5842,16 @@
 									"name": "x",
 									"type": "number",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "x 방향 이동량.",
+										"en": "Translation along x."
 									}
 								},
 								{
 									"name": "y",
 									"type": "number",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "y 방향 이동량.",
+										"en": "Translation along y."
 									}
 								}
 							],
@@ -5867,8 +5877,8 @@
 									"name": "radian",
 									"type": "number",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "회전각. (라디안)",
+										"en": "Rotation angle. (radians)"
 									}
 								}
 							],
@@ -5894,16 +5904,16 @@
 									"name": "x",
 									"type": "number",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "x 방향 배율.",
+										"en": "Scale along x."
 									}
 								},
 								{
 									"name": "y",
 									"type": "number",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "y 방향 배율.",
+										"en": "Scale along y."
 									}
 								}
 							],
@@ -5929,8 +5939,8 @@
 									"name": "other",
 									"type": "TransformMatrix",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "우측에 곱할 행렬.",
+										"en": "The matrix multiplied on the right."
 									}
 								}
 							],
@@ -5955,8 +5965,8 @@
 							"returns": {
 								"type": "TransformMatrix | null",
 								"description": {
-									"ko": "",
-									"en": ""
+									"ko": "역행렬. 행렬식이 0 이면 null.",
+									"en": "The inverse matrix, or null when the determinant is 0."
 								}
 							},
 							"description": {
@@ -5970,7 +5980,17 @@
 								"module": "base/transformmatrix",
 								"class": "TransformMatrix",
 								"name": "invert"
-							}
+							},
+							"examples": [
+								{
+									"title": {
+										"ko": "역행렬로 점을 되돌리기",
+										"en": "Mapping a point back with the inverse matrix"
+									},
+									"code": "import { TransformMatrix } from \"./build/vanilla.js\";\n\nconst transformMatrix = new TransformMatrix();\ntransformMatrix.translate(10, 20);\nconst inverseMatrix = transformMatrix.invert();\nconst point = inverseMatrix.transformPoint(10, 20);\nconsole.log(point.x, point.y);",
+									"language": "javascript"
+								}
+							]
 						},
 						{
 							"kind": "method",
@@ -5981,24 +6001,24 @@
 									"name": "x",
 									"type": "number",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "변환할 점의 x 좌표.",
+										"en": "The x coordinate of the point to transform."
 									}
 								},
 								{
 									"name": "y",
 									"type": "number",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "변환할 점의 y 좌표.",
+										"en": "The y coordinate of the point to transform."
 									}
 								}
 							],
 							"returns": {
 								"type": "{ x: number, y: number }",
 								"description": {
-									"ko": "",
-									"en": ""
+									"ko": "변환된 점.",
+									"en": "The transformed point."
 								}
 							},
 							"description": {
@@ -6022,8 +6042,8 @@
 							"returns": {
 								"type": "number",
 								"description": {
-									"ko": "",
-									"en": ""
+									"ko": "x 축과 y 축 배율 중 큰 값.",
+									"en": "The larger of the x-axis and y-axis scales."
 								}
 							},
 							"description": {
@@ -6048,8 +6068,8 @@
 									"name": "target",
 									"type": "Float32Array",
 									"description": {
-										"ko": "",
-										"en": ""
+										"ko": "기록할 길이 9 이상의 배열.",
+										"en": "The array to write to, length 9 or more."
 									}
 								}
 							],
@@ -11343,6 +11363,16 @@
 						"ko": "질문 창의 답. (러스트 판 ModalDialogResult 의 Confirmed(글), Cancelled)",
 						"en": "The dialog answer. (Confirmed(text) and Cancelled of the Rust ModalDialogResult)"
 					},
+					"examples": [
+						{
+							"title": {
+								"ko": "확인한 답과 취소한 답 읽기",
+								"en": "Reading a confirmed and a cancelled result"
+							},
+							"code": "import { ModalDialogResult } from \"./build/vanilla.js\";\n\nconst confirmed = ModalDialogResult.confirmed(\"hello\");\nconst cancelled = ModalDialogResult.cancelled();\nconsole.log(confirmed.isConfirmed(), confirmed.getText(), cancelled.isConfirmed());",
+							"language": "javascript"
+						}
+					],
 					"counterpart": {
 						"engine": "vanilla-engine",
 						"module": "core/modaldialog",
@@ -11924,72 +11954,72 @@
 							"name": "none",
 							"value": "none",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "애셋 종류 없음.",
+								"en": "No asset type."
 							}
 						},
 						{
 							"name": "image",
 							"value": "image",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "이미지 애셋.",
+								"en": "Image asset."
 							}
 						},
 						{
 							"name": "audio",
 							"value": "audio",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "오디오 애셋.",
+								"en": "Audio asset."
 							}
 						},
 						{
 							"name": "json",
 							"value": "json",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "JSON 애셋.",
+								"en": "JSON asset."
 							}
 						},
 						{
 							"name": "text",
 							"value": "text",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "텍스트 애셋.",
+								"en": "Text asset."
 							}
 						},
 						{
 							"name": "font",
 							"value": "font",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "글꼴 애셋.",
+								"en": "Font asset."
 							}
 						},
 						{
 							"name": "blob",
 							"value": "blob",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "바이너리 덩어리 애셋.",
+								"en": "Binary blob asset."
 							}
 						},
 						{
 							"name": "bunch",
 							"value": "bunch",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "묶음 애셋.",
+								"en": "Bundle asset."
 							}
 						},
 						{
 							"name": "visual",
 							"value": "visual",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "비주얼 애셋.",
+								"en": "Visual asset."
 							}
 						}
 					]
@@ -15180,8 +15210,8 @@
 				{
 					"name": "KeyCode",
 					"summary": {
-						"ko": "",
-						"en": ""
+						"ko": "키보드 키 식별자. (KeyboardEvent.code 의 값)",
+						"en": "Keyboard key identifiers. (the KeyboardEvent.code values)"
 					},
 					"counterpart": {
 						"engine": "vanilla-engine",
@@ -15193,8 +15223,8 @@
 							"name": "a",
 							"value": "KeyA",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "A 키.",
+								"en": "Key A."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15207,8 +15237,8 @@
 							"name": "b",
 							"value": "KeyB",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "B 키.",
+								"en": "Key B."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15221,8 +15251,8 @@
 							"name": "c",
 							"value": "KeyC",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "C 키.",
+								"en": "Key C."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15235,8 +15265,8 @@
 							"name": "d",
 							"value": "KeyD",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "D 키.",
+								"en": "Key D."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15249,8 +15279,8 @@
 							"name": "e",
 							"value": "KeyE",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "E 키.",
+								"en": "Key E."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15263,8 +15293,8 @@
 							"name": "f",
 							"value": "KeyF",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "F 키.",
+								"en": "Key F."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15277,8 +15307,8 @@
 							"name": "g",
 							"value": "KeyG",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "G 키.",
+								"en": "Key G."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15291,8 +15321,8 @@
 							"name": "h",
 							"value": "KeyH",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "H 키.",
+								"en": "Key H."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15305,8 +15335,8 @@
 							"name": "i",
 							"value": "KeyI",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "I 키.",
+								"en": "Key I."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15319,8 +15349,8 @@
 							"name": "j",
 							"value": "KeyJ",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "J 키.",
+								"en": "Key J."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15333,8 +15363,8 @@
 							"name": "k",
 							"value": "KeyK",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "K 키.",
+								"en": "Key K."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15347,8 +15377,8 @@
 							"name": "l",
 							"value": "KeyL",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "L 키.",
+								"en": "Key L."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15361,8 +15391,8 @@
 							"name": "m",
 							"value": "KeyM",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "M 키.",
+								"en": "Key M."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15375,8 +15405,8 @@
 							"name": "n",
 							"value": "KeyN",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "N 키.",
+								"en": "Key N."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15389,8 +15419,8 @@
 							"name": "o",
 							"value": "KeyO",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "O 키.",
+								"en": "Key O."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15403,8 +15433,8 @@
 							"name": "p",
 							"value": "KeyP",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "P 키.",
+								"en": "Key P."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15417,8 +15447,8 @@
 							"name": "q",
 							"value": "KeyQ",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "Q 키.",
+								"en": "Key Q."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15431,8 +15461,8 @@
 							"name": "r",
 							"value": "KeyR",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "R 키.",
+								"en": "Key R."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15445,8 +15475,8 @@
 							"name": "s",
 							"value": "KeyS",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "S 키.",
+								"en": "Key S."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15459,8 +15489,8 @@
 							"name": "t",
 							"value": "KeyT",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "T 키.",
+								"en": "Key T."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15473,8 +15503,8 @@
 							"name": "u",
 							"value": "KeyU",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "U 키.",
+								"en": "Key U."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15487,8 +15517,8 @@
 							"name": "v",
 							"value": "KeyV",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "V 키.",
+								"en": "Key V."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15501,8 +15531,8 @@
 							"name": "w",
 							"value": "KeyW",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "W 키.",
+								"en": "Key W."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15515,8 +15545,8 @@
 							"name": "x",
 							"value": "KeyX",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "X 키.",
+								"en": "Key X."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15529,8 +15559,8 @@
 							"name": "y",
 							"value": "KeyY",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "Y 키.",
+								"en": "Key Y."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15543,8 +15573,8 @@
 							"name": "z",
 							"value": "KeyZ",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "Z 키.",
+								"en": "Key Z."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15557,88 +15587,88 @@
 							"name": "0",
 							"value": "Digit0",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "숫자 0 키. (글쇠 윗줄)",
+								"en": "Digit 0 key. (top row)"
 							}
 						},
 						{
 							"name": "1",
 							"value": "Digit1",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "숫자 1 키. (글쇠 윗줄)",
+								"en": "Digit 1 key. (top row)"
 							}
 						},
 						{
 							"name": "2",
 							"value": "Digit2",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "숫자 2 키. (글쇠 윗줄)",
+								"en": "Digit 2 key. (top row)"
 							}
 						},
 						{
 							"name": "3",
 							"value": "Digit3",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "숫자 3 키. (글쇠 윗줄)",
+								"en": "Digit 3 key. (top row)"
 							}
 						},
 						{
 							"name": "4",
 							"value": "Digit4",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "숫자 4 키. (글쇠 윗줄)",
+								"en": "Digit 4 key. (top row)"
 							}
 						},
 						{
 							"name": "5",
 							"value": "Digit5",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "숫자 5 키. (글쇠 윗줄)",
+								"en": "Digit 5 key. (top row)"
 							}
 						},
 						{
 							"name": "6",
 							"value": "Digit6",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "숫자 6 키. (글쇠 윗줄)",
+								"en": "Digit 6 key. (top row)"
 							}
 						},
 						{
 							"name": "7",
 							"value": "Digit7",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "숫자 7 키. (글쇠 윗줄)",
+								"en": "Digit 7 key. (top row)"
 							}
 						},
 						{
 							"name": "8",
 							"value": "Digit8",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "숫자 8 키. (글쇠 윗줄)",
+								"en": "Digit 8 key. (top row)"
 							}
 						},
 						{
 							"name": "9",
 							"value": "Digit9",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "숫자 9 키. (글쇠 윗줄)",
+								"en": "Digit 9 key. (top row)"
 							}
 						},
 						{
 							"name": "backspace",
 							"value": "Backspace",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "백스페이스 키.",
+								"en": "Backspace key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15651,8 +15681,8 @@
 							"name": "tab",
 							"value": "Tab",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "탭 키.",
+								"en": "Tab key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15665,8 +15695,8 @@
 							"name": "enter",
 							"value": "Enter",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "엔터 키.",
+								"en": "Enter key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15679,8 +15709,8 @@
 							"name": "shift",
 							"value": "ShiftLeft",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "왼쪽 시프트 키.",
+								"en": "Left Shift key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15693,8 +15723,8 @@
 							"name": "ctrl",
 							"value": "ControlLeft",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "왼쪽 컨트롤 키.",
+								"en": "Left Control key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15707,8 +15737,8 @@
 							"name": "alt",
 							"value": "AltLeft",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "왼쪽 알트 키.",
+								"en": "Left Alt key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15721,8 +15751,8 @@
 							"name": "capslock",
 							"value": "CapsLock",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "캡스락 키.",
+								"en": "Caps Lock key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15735,8 +15765,8 @@
 							"name": "escape",
 							"value": "Escape",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "이스케이프 키.",
+								"en": "Escape key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15749,8 +15779,8 @@
 							"name": "space",
 							"value": "Space",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "스페이스 키.",
+								"en": "Space key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15763,8 +15793,8 @@
 							"name": "pageup",
 							"value": "PageUp",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "페이지 업 키.",
+								"en": "Page Up key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15777,8 +15807,8 @@
 							"name": "pagedown",
 							"value": "PageDown",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "페이지 다운 키.",
+								"en": "Page Down key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15791,8 +15821,8 @@
 							"name": "end",
 							"value": "End",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "엔드 키.",
+								"en": "End key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15805,8 +15835,8 @@
 							"name": "home",
 							"value": "Home",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "홈 키.",
+								"en": "Home key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15819,8 +15849,8 @@
 							"name": "arrowleft",
 							"value": "ArrowLeft",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "왼쪽 화살표 키.",
+								"en": "Left arrow key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15833,8 +15863,8 @@
 							"name": "arrowup",
 							"value": "ArrowUp",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "위쪽 화살표 키.",
+								"en": "Up arrow key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15847,8 +15877,8 @@
 							"name": "arrowright",
 							"value": "ArrowRight",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "오른쪽 화살표 키.",
+								"en": "Right arrow key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15861,8 +15891,8 @@
 							"name": "arrowdown",
 							"value": "ArrowDown",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "아래쪽 화살표 키.",
+								"en": "Down arrow key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15875,8 +15905,8 @@
 							"name": "insert",
 							"value": "Insert",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "인서트 키.",
+								"en": "Insert key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15889,8 +15919,8 @@
 							"name": "delete",
 							"value": "Delete",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "딜리트 키.",
+								"en": "Delete key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15903,8 +15933,8 @@
 							"name": "f1",
 							"value": "F1",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "F1 키.",
+								"en": "F1 key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15917,8 +15947,8 @@
 							"name": "f2",
 							"value": "F2",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "F2 키.",
+								"en": "F2 key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15931,8 +15961,8 @@
 							"name": "f3",
 							"value": "F3",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "F3 키.",
+								"en": "F3 key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15945,8 +15975,8 @@
 							"name": "f4",
 							"value": "F4",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "F4 키.",
+								"en": "F4 key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15959,8 +15989,8 @@
 							"name": "f5",
 							"value": "F5",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "F5 키.",
+								"en": "F5 key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15973,8 +16003,8 @@
 							"name": "f6",
 							"value": "F6",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "F6 키.",
+								"en": "F6 key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -15987,8 +16017,8 @@
 							"name": "f7",
 							"value": "F7",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "F7 키.",
+								"en": "F7 key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16001,8 +16031,8 @@
 							"name": "f8",
 							"value": "F8",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "F8 키.",
+								"en": "F8 key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16015,8 +16045,8 @@
 							"name": "f9",
 							"value": "F9",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "F9 키.",
+								"en": "F9 key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16029,8 +16059,8 @@
 							"name": "f10",
 							"value": "F10",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "F10 키.",
+								"en": "F10 key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16043,8 +16073,8 @@
 							"name": "f11",
 							"value": "F11",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "F11 키.",
+								"en": "F11 key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16057,8 +16087,8 @@
 							"name": "f12",
 							"value": "F12",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "F12 키.",
+								"en": "F12 key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16071,8 +16101,8 @@
 							"name": "scrolllock",
 							"value": "ScrollLock",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "스크롤 락 키.",
+								"en": "Scroll Lock key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16085,8 +16115,8 @@
 							"name": "semicolon",
 							"value": "Semicolon",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "세미콜론 키.",
+								"en": "Semicolon key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16099,8 +16129,8 @@
 							"name": "equal",
 							"value": "Equal",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "등호 키.",
+								"en": "Equal key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16113,8 +16143,8 @@
 							"name": "comma",
 							"value": "Comma",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "쉼표 키.",
+								"en": "Comma key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16127,8 +16157,8 @@
 							"name": "minus",
 							"value": "Minus",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "빼기 키.",
+								"en": "Minus key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16141,8 +16171,8 @@
 							"name": "period",
 							"value": "Period",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "마침표 키.",
+								"en": "Period key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16155,8 +16185,8 @@
 							"name": "slash",
 							"value": "Slash",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "슬래시 키.",
+								"en": "Slash key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16169,8 +16199,8 @@
 							"name": "backquote",
 							"value": "Backquote",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "백쿼트 키.",
+								"en": "Backquote key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16183,8 +16213,8 @@
 							"name": "bracketleft",
 							"value": "BracketLeft",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "왼쪽 대괄호 키.",
+								"en": "Left bracket key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16197,8 +16227,8 @@
 							"name": "backslash",
 							"value": "Backslash",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "역슬래시 키.",
+								"en": "Backslash key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16211,8 +16241,8 @@
 							"name": "bracketright",
 							"value": "BracketRight",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "오른쪽 대괄호 키.",
+								"en": "Right bracket key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16225,8 +16255,8 @@
 							"name": "quote",
 							"value": "Quote",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "따옴표 키.",
+								"en": "Quote key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16239,8 +16269,8 @@
 							"name": "meta",
 							"value": "MetaLeft",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "왼쪽 메타 키. (윈도우 키, 맥의 커맨드 키)",
+								"en": "Left Meta key. (Windows key, Command key on Mac)"
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16253,8 +16283,8 @@
 							"name": "command",
 							"value": "MetaLeft",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "왼쪽 커맨드 키. (meta 와 같은 값)",
+								"en": "Left Command key. (same value as meta)"
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16267,8 +16297,8 @@
 							"name": "pause",
 							"value": "Pause",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "포즈 키.",
+								"en": "Pause key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16281,8 +16311,8 @@
 							"name": "audiovolumeup",
 							"value": "AudioVolumeUp",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "소리 키움 키.",
+								"en": "Volume up key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16295,8 +16325,8 @@
 							"name": "audiovolumedown",
 							"value": "AudioVolumeDown",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "소리 줄임 키.",
+								"en": "Volume down key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16337,8 +16367,8 @@
 							"name": "audiostop",
 							"value": "MediaStop",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "미디어 정지 키.",
+								"en": "Media stop key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16351,8 +16381,8 @@
 							"name": "audioprev",
 							"value": "MediaTrackPrevious",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "이전 곡 키.",
+								"en": "Previous track key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16365,8 +16395,8 @@
 							"name": "audionext",
 							"value": "MediaTrackNext",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "다음 곡 키.",
+								"en": "Next track key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16379,8 +16409,8 @@
 							"name": "numLock",
 							"value": "NumLock",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "텐키 넘 락 키.",
+								"en": "Num Lock key."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16477,8 +16507,8 @@
 							"name": "numpad0",
 							"value": "Numpad0",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "텐키 0.",
+								"en": "Numpad 0."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16491,8 +16521,8 @@
 							"name": "numpad1",
 							"value": "Numpad1",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "텐키 1.",
+								"en": "Numpad 1."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16505,8 +16535,8 @@
 							"name": "numpad2",
 							"value": "Numpad2",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "텐키 2.",
+								"en": "Numpad 2."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16519,8 +16549,8 @@
 							"name": "numpad3",
 							"value": "Numpad3",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "텐키 3.",
+								"en": "Numpad 3."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16533,8 +16563,8 @@
 							"name": "numpad4",
 							"value": "Numpad4",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "텐키 4.",
+								"en": "Numpad 4."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16547,8 +16577,8 @@
 							"name": "numpad5",
 							"value": "Numpad5",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "텐키 5.",
+								"en": "Numpad 5."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16561,8 +16591,8 @@
 							"name": "numpad6",
 							"value": "Numpad6",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "텐키 6.",
+								"en": "Numpad 6."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16575,8 +16605,8 @@
 							"name": "numpad7",
 							"value": "Numpad7",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "텐키 7.",
+								"en": "Numpad 7."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16589,8 +16619,8 @@
 							"name": "numpad8",
 							"value": "Numpad8",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "텐키 8.",
+								"en": "Numpad 8."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -16603,8 +16633,8 @@
 							"name": "numpad9",
 							"value": "Numpad9",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "텐키 9.",
+								"en": "Numpad 9."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -30431,24 +30461,24 @@
 							"name": "simple",
 							"value": "simple",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "이미지 영역을 그대로 그린다.",
+								"en": "Draws the image region as is."
 							}
 						},
 						{
 							"name": "sliced",
 							"value": "sliced",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "아홉 조각으로 잘라 모서리는 늘리지 않고 그린다.",
+								"en": "Draws as nine slices, corners are not stretched."
 							}
 						},
 						{
 							"name": "tiled",
 							"value": "tiled",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "이미지를 타일처럼 반복해 그린다.",
+								"en": "Draws the image repeated like tiles."
 							}
 						}
 					]
@@ -37160,40 +37190,40 @@
 							"name": "normal",
 							"value": "Enum.begin()",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "평상시 상태.",
+								"en": "Normal state."
 							}
 						},
 						{
 							"name": "hover",
 							"value": "Enum.auto()",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "포인터가 올라간 상태.",
+								"en": "Pointer is over the button."
 							}
 						},
 						{
 							"name": "pressed",
 							"value": "Enum.auto()",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "눌려 있는 상태.",
+								"en": "Pressed state."
 							}
 						},
 						{
 							"name": "released",
 							"value": "Enum.auto()",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "막 뗀 상태.",
+								"en": "Just released state."
 							}
 						},
 						{
 							"name": "disabled",
 							"value": "Enum.auto()",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "눌러도 반응하지 않는 상태.",
+								"en": "Disabled state, ignores input."
 							}
 						}
 					]
@@ -38414,16 +38444,16 @@
 							"name": "clamp",
 							"value": "clamp",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "경계를 넘지 않게 자른다.",
+								"en": "Clamps at the bounds."
 							}
 						},
 						{
 							"name": "elastic",
 							"value": "elastic",
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "경계를 넘으면 저항이 생기고 놓으면 튕겨 돌아온다.",
+								"en": "Resists past the bounds and springs back on release."
 							}
 						}
 					]
@@ -82132,8 +82162,8 @@
 							"name": "LEFT_X",
 							"value": 0,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "왼쪽 스틱 가로축.",
+								"en": "Left stick horizontal axis."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -82146,8 +82176,8 @@
 							"name": "LEFT_Y",
 							"value": 1,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "왼쪽 스틱 세로축.",
+								"en": "Left stick vertical axis."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -82160,8 +82190,8 @@
 							"name": "RIGHT_X",
 							"value": 2,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "오른쪽 스틱 가로축.",
+								"en": "Right stick horizontal axis."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -82174,8 +82204,8 @@
 							"name": "RIGHT_Y",
 							"value": 3,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "오른쪽 스틱 세로축.",
+								"en": "Right stick vertical axis."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -82202,8 +82232,8 @@
 							"name": "L2",
 							"value": 6,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "왼쪽 트리거.",
+								"en": "Left trigger."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -82216,8 +82246,8 @@
 							"name": "R2",
 							"value": 7,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "오른쪽 트리거.",
+								"en": "Right trigger."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -82258,8 +82288,8 @@
 							"name": "B_CIRCLE",
 							"value": 1,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "오른쪽 얼굴 단추. (엑스박스 B, 플레이스테이션 동그라미)",
+								"en": "Right face button. (Xbox B, PlayStation circle)"
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -82272,8 +82302,8 @@
 							"name": "X_SQUARE",
 							"value": 2,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "왼쪽 얼굴 단추. (엑스박스 X, 플레이스테이션 네모)",
+								"en": "Left face button. (Xbox X, PlayStation square)"
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -82286,8 +82316,8 @@
 							"name": "Y_TRIANGLE",
 							"value": 3,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "위쪽 얼굴 단추. (엑스박스 Y, 플레이스테이션 세모)",
+								"en": "Top face button. (Xbox Y, PlayStation triangle)"
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -82314,8 +82344,8 @@
 							"name": "R1",
 							"value": 5,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "오른쪽 범퍼.",
+								"en": "Right bumper."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -82342,8 +82372,8 @@
 							"name": "R2",
 							"value": 7,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "오른쪽 트리거 단추.",
+								"en": "Right trigger button."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -82370,8 +82400,8 @@
 							"name": "OPTIONS_MENU",
 							"value": 9,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "옵션, 메뉴 단추.",
+								"en": "Options, menu button."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -82398,8 +82428,8 @@
 							"name": "R3",
 							"value": 11,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "오른쪽 스틱 누름.",
+								"en": "Right stick click."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -82426,8 +82456,8 @@
 							"name": "DPAD_DOWN",
 							"value": 13,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "방향 패드 아래.",
+								"en": "D-pad down."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -82440,8 +82470,8 @@
 							"name": "DPAD_LEFT",
 							"value": 14,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "방향 패드 왼쪽.",
+								"en": "D-pad left."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -82454,8 +82484,8 @@
 							"name": "DPAD_RIGHT",
 							"value": 15,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "방향 패드 오른쪽.",
+								"en": "D-pad right."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",
@@ -82482,8 +82512,8 @@
 							"name": "TOUCHPAD",
 							"value": 17,
 							"description": {
-								"ko": "",
-								"en": ""
+								"ko": "터치패드 누름.",
+								"en": "Touchpad click."
 							},
 							"counterpart": {
 								"engine": "vanilla-engine",

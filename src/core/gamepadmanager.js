@@ -11,10 +11,10 @@ import { Engine } from "./engine.js";
 //==============================================================================
 /** @enum { number } */
 export const GamepadAnalogStickCode = {
-	LEFT_X: 0,
-	LEFT_Y: 1,
-	RIGHT_X: 2,
-	RIGHT_Y: 3,
+	LEFT_X: 0, // 왼쪽 스틱 가로축.
+	LEFT_Y: 1, // 왼쪽 스틱 세로축.
+	RIGHT_X: 2, // 오른쪽 스틱 가로축.
+	RIGHT_Y: 3, // 오른쪽 스틱 세로축.
 };
 
 
@@ -23,8 +23,8 @@ export const GamepadAnalogStickCode = {
 //==============================================================================
 /** @enum { number } */
 export const GamepadTriggerCode = {
-	L2: 6,
-	R2: 7,
+	L2: 6, // 왼쪽 트리거.
+	R2: 7, // 오른쪽 트리거.
 };
 
 
@@ -35,35 +35,35 @@ export const GamepadTriggerCode = {
 export const GamepadButtonCode = {
 	// Face Buttons
 	A_CROSS: 0,
-	B_CIRCLE: 1,
-	X_SQUARE: 2,
-	Y_TRIANGLE: 3,
+	B_CIRCLE: 1, // 오른쪽 얼굴 단추. (엑스박스 B, 플레이스테이션 동그라미)
+	X_SQUARE: 2, // 왼쪽 얼굴 단추. (엑스박스 X, 플레이스테이션 네모)
+	Y_TRIANGLE: 3, // 위쪽 얼굴 단추. (엑스박스 Y, 플레이스테이션 세모)
 
 	// Bumpers
 	L1: 4,
-	R1: 5,
+	R1: 5, // 오른쪽 범퍼.
 
 	// Triggers (버튼으로도 인식됨)
 	L2: 6,
-	R2: 7,
+	R2: 7, // 오른쪽 트리거 단추.
 
 	// System
 	SHARE_VIEW: 8,
-	OPTIONS_MENU: 9,
+	OPTIONS_MENU: 9, // 옵션, 메뉴 단추.
 
 	// Stick Clicks
 	L3: 10,
-	R3: 11,
+	R3: 11, // 오른쪽 스틱 누름.
 
 	// D-Pad
 	DPAD_UP: 12,
-	DPAD_DOWN: 13,
-	DPAD_LEFT: 14,
-	DPAD_RIGHT: 15,
+	DPAD_DOWN: 13, // 방향 패드 아래.
+	DPAD_LEFT: 14, // 방향 패드 왼쪽.
+	DPAD_RIGHT: 15, // 방향 패드 오른쪽.
 
 	// Center
 	HOME_PS: 16,
-	TOUCHPAD: 17,
+	TOUCHPAD: 17, // 터치패드 누름.
 };
 
 
