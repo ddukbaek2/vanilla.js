@@ -842,26 +842,35 @@ export class SkinnedModel extends Object {
 				}
 			}
 
-			// 머티리얼 인덱스 조회. (지오메트리 소유 노드의 첫 머티리얼)
+			// 머티리얼별 부분 메시. (삼각형의 머티리얼 번호는 소유 노드 materialIds 안의 자리, 번호마다 드로어블 하나)
 			const ownerNode = findNodeByGeometryId(skinDeformer.geometryId);
-			let materialIndex = -1;
-			if (ownerNode && ownerNode.materialIds.length > 0) {
-				materialIndex = materialIdList.indexOf(ownerNode.materialIds[0]);
-			}
-
-			meshDescriptionList.push({
+			const ownerMaterialIds = ownerNode ? ownerNode.materialIds : [];
+			const nodeIndex = ownerNode ? sceneData.nodeList.indexOf(ownerNode) : -1;
+			const subMeshList = SkinnedModel.splitFbxCornersByMaterial(geometry.materialIndexPerTriangle, {
 				positions: geometry.positions,
 				normals: geometry.normals,
 				textureCoordinates: geometry.textureCoordinates,
 				joints: cornerJointArray,
 				weights: cornerWeightArray,
-				indices: null,
-				skinIndex: skinListIndex,
-				materialIndex: materialIndex,
-				nodeIndex: ownerNode ? sceneData.nodeList.indexOf(ownerNode) : -1,
-				morphTargets: [],
-				morphWeights: new System.Float32Array(0),
 			});
+			for (const subMesh of subMeshList) {
+				const materialId = subMesh.localMaterialIndex < ownerMaterialIds.length ? ownerMaterialIds[subMesh.localMaterialIndex] : undefined;
+				const materialIndex = materialId !== undefined ? materialIdList.indexOf(materialId) : -1;
+				meshDescriptionList.push({
+					positions: subMesh.positions,
+					normals: subMesh.normals,
+					textureCoordinates: subMesh.textureCoordinates,
+					joints: subMesh.joints,
+					weights: subMesh.weights,
+					indices: null,
+					skinIndex: skinListIndex,
+					materialIndex: materialIndex,
+					materialName: materialIndex !== -1 ? sceneData.materialById.get(materialId).name : "",
+					nodeIndex: nodeIndex,
+					morphTargets: [],
+					morphWeights: new System.Float32Array(0),
+				});
+			}
 		}
 
 		// 애니메이션 구성. (회전 채널은 오일러 도 → 사전회전 합성 쿼터니언 4성분으로 변환)
@@ -874,6 +883,61 @@ export class SkinnedModel extends Object {
 			this.#currentAnimation = this.#animationList[0];
 		}
 		return { meshDescriptionList: meshDescriptionList, materialDescriptionList: materialDescriptionList };
+	}
+
+	//==============================================================================
+	// FBX 코너를 머티리얼별로 나누기. (정적, 비인덱스 코너 배열, GL 무관)
+	// - 메시 하나에 머티리얼이 여럿이면 머티리얼마다 부분 메시로 나눠 그린다. (three.js FBXLoader 의 그룹, 유니티와 언리얼의 서브메시)
+	// - 부분 메시는 머티리얼 번호가 작은 것부터, 삼각형 차례는 원래대로. 번호가 하나뿐이면 배열을 그대로 쓴다.
+	//==============================================================================
+	/**
+	 * @param { Int32Array } materialIndexPerTriangle 삼각형마다 머티리얼 번호. (소유 노드 materialIds 안의 자리)
+	 * @param { { positions: Float32Array, normals: Float32Array, textureCoordinates: Float32Array, joints: Uint16Array, weights: Float32Array } } cornerArrays 코너마다 위치 3, 노멀 3, UV 2, 조인트 4, 가중치 4.
+	 * @returns { object[] } 부분 메시 목록. (localMaterialIndex 와 cornerArrays 와 같은 칸)
+	 * @example <caption>삼각형 셋 가운데 가운데 것만 재질 1 (부분 메시 둘, 삼각형 2개와 1개)</caption>
+	 * import { SkinnedModel } from "./build/vanilla.js";
+	 * const cornerCount = 9;
+	 * const subMeshList = SkinnedModel.splitFbxCornersByMaterial(new Int32Array([0, 1, 0]), {
+	 * 	positions: new Float32Array(cornerCount * 3).map((value, index) => index),
+	 * 	normals: new Float32Array(cornerCount * 3),
+	 * 	textureCoordinates: new Float32Array(cornerCount * 2),
+	 * 	joints: new Uint16Array(cornerCount * 4),
+	 * 	weights: new Float32Array(cornerCount * 4),
+	 * });
+	 * console.log(subMeshList.length, subMeshList[0].localMaterialIndex, subMeshList[0].positions.length / 9, subMeshList[1].positions[0]); // 2 0 2 9
+	 */
+	static splitFbxCornersByMaterial(materialIndexPerTriangle, cornerArrays) {
+		const triangleCount = materialIndexPerTriangle.length;
+		const triangleCountByMaterial = new System.Map();
+		for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
+			const localMaterialIndex = materialIndexPerTriangle[triangleIndex];
+			triangleCountByMaterial.set(localMaterialIndex, (triangleCountByMaterial.get(localMaterialIndex) || 0) + 1);
+		}
+		const localMaterialIndexList = System.Array.from(triangleCountByMaterial.keys()).sort((left, right) => left - right);
+		if (localMaterialIndexList.length <= 1) {
+			return [{ localMaterialIndex: localMaterialIndexList.length === 1 ? localMaterialIndexList[0] : 0, ...cornerArrays }];
+		}
+		const componentCountByName = { positions: 3, normals: 3, textureCoordinates: 2, joints: 4, weights: 4 };
+		return localMaterialIndexList.map((localMaterialIndex) => {
+			const subCornerCount = triangleCountByMaterial.get(localMaterialIndex) * 3;
+			const subMesh = { localMaterialIndex: localMaterialIndex };
+			for (const arrayName of System.Object.keys(componentCountByName)) {
+				const componentCount = componentCountByName[arrayName];
+				const sourceArray = cornerArrays[arrayName];
+				const targetArray = new sourceArray.constructor(subCornerCount * componentCount);
+				const triangleStride = componentCount * 3;
+				let targetOffset = 0;
+				for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
+					if (materialIndexPerTriangle[triangleIndex] !== localMaterialIndex) {
+						continue;
+					}
+					targetArray.set(sourceArray.subarray(triangleIndex * triangleStride, (triangleIndex + 1) * triangleStride), targetOffset);
+					targetOffset += triangleStride;
+				}
+				subMesh[arrayName] = targetArray;
+			}
+			return subMesh;
+		});
 	}
 
 	//==============================================================================

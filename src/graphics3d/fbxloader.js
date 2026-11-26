@@ -469,10 +469,12 @@ export class FbxLoader extends Object {
 		const positions = verticesNode.properties[0].value;
 		const polygonVertexIndices = polygonIndexNode.properties[0].value;
 
-		// 폴리곤 → 팬 삼각화. (코너: 원본 정점 인덱스 + 폴리곤 정점 순번)
+		// 폴리곤 → 팬 삼각화. (코너: 원본 정점 인덱스 + 폴리곤 정점 순번, 삼각형: 폴리곤 순번)
 		const cornerVertexIndices = [];
 		const cornerPolygonVertexPositions = [];
+		const trianglePolygonIndices = [];
 		let polygonStart = 0;
+		let polygonIndex = 0;
 		for (let polygonVertexPosition = 0; polygonVertexPosition < polygonVertexIndices.length; ++polygonVertexPosition) {
 			let vertexIndex = polygonVertexIndices[polygonVertexPosition];
 			let isPolygonEnd = false;
@@ -493,8 +495,10 @@ export class FbxLoader extends Object {
 					cornerPolygonVertexPositions.push(triangleCorner);
 					cornerVertexIndices.push(thirdVertexIndex);
 					cornerPolygonVertexPositions.push(triangleCorner + 1);
+					trianglePolygonIndices.push(polygonIndex);
 				}
 				polygonStart = polygonVertexPosition + 1;
+				++polygonIndex;
 			}
 		}
 
@@ -528,8 +532,7 @@ export class FbxLoader extends Object {
 		}
 
 		for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
-			const firstCornerPolygonVertexPosition = cornerPolygonVertexPositions[triangleIndex * 3];
-			materialIndexPerTriangle[triangleIndex] = materialLayer(firstCornerPolygonVertexPosition);
+			materialIndexPerTriangle[triangleIndex] = materialLayer(trianglePolygonIndices[triangleIndex]);
 		}
 
 		const geometry = {
@@ -602,11 +605,21 @@ export class FbxLoader extends Object {
 	}
 
 	//==============================================================================
-	// 머티리얼 레이어 구성. (폴리곤 정점 순번 → 머티리얼 인덱스)
+	// 머티리얼 레이어 구성. (폴리곤 순번 → 머티리얼 인덱스)
+	// - LayerElementMaterial 의 Materials 는 폴리곤마다(ByPolygon) 하나, 또는 전체에 하나(AllSame) 있다. (FBX SDK FbxLayerElementMaterial)
+	// - 값은 지오메트리를 가진 모델에 이어진 머티리얼 목록(커넥션 순서) 안의 자리다. 레이어가 없으면 모두 0.
 	//==============================================================================
 	/**
 	 * @param { object } geometryNode
-	 * @returns { function(number): number }
+	 * @returns { function(number): number } 폴리곤 순번을 받아 머티리얼 인덱스를 돌려준다.
+	 * @example <caption>폴리곤 둘이 재질 0, 1 을 쓰는 지오메트리 (ByPolygon)</caption>
+	 * import { FbxLoader } from "./src/graphics3d/fbxloader.js";
+	 * const geometryNode = { name: "Geometry", children: [{ name: "LayerElementMaterial", children: [
+	 * 	{ name: "MappingInformationType", properties: [{ value: "ByPolygon" }], children: [] },
+	 * 	{ name: "Materials", properties: [{ value: new Int32Array([0, 1]) }], children: [] },
+	 * ] }] };
+	 * const materialLayer = new FbxLoader().buildMaterialLayer(geometryNode);
+	 * console.log(materialLayer(0), materialLayer(1)); // 0 1
 	 */
 	buildMaterialLayer(geometryNode) {
 		const layerNode = geometryNode.children.find((child) => child.name === "LayerElementMaterial");
@@ -619,12 +632,12 @@ export class FbxLoader extends Object {
 		const materialsNode = layerNode.children.find((child) => child.name === "Materials");
 		const mappingType = mappingNode && mappingNode.properties.length > 0 ? mappingNode.properties[0].value : "";
 		const materialArray = materialsNode && materialsNode.properties.length > 0 ? materialsNode.properties[0].value : null;
-		return (polygonVertexPosition) => {
-			if (materialArray === null) {
+		return (polygonIndex) => {
+			if (materialArray === null || materialArray.length === 0) {
 				return 0;
 			}
-			const materialIndex = mappingType === "AllSame" ? materialArray[0] : materialArray[polygonVertexPosition];
-			return materialIndex !== undefined ? materialIndex : 0;
+			const materialIndex = mappingType === "AllSame" ? materialArray[0] : materialArray[polygonIndex];
+			return materialIndex !== undefined && materialIndex >= 0 ? materialIndex : 0;
 		};
 	}
 
@@ -773,7 +786,7 @@ export class FbxLoader extends Object {
 	}
 
 	//==============================================================================
-	// 머티리얼 해석. (phong 색상/광택 + 슬롯별 텍스처 연결)
+	// 머티리얼 해석. (이름 + phong 색상/광택 + 슬롯별 텍스처 연결)
 	//==============================================================================
 	/**
 	 * @param { object } objectsNode
@@ -790,6 +803,7 @@ export class FbxLoader extends Object {
 			const materialId = objectNode.properties[0].value;
 			const properties70Node = objectNode.children.find((child) => child.name === "Properties70");
 			const material = {
+				name: objectNode.properties.length > 1 ? readFbxObjectName(objectNode.properties[1].value) : "",
 				diffuseColor: [1, 1, 1],
 				specularColor: [0.5, 0.5, 0.5],
 				shininess: 20,

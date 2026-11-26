@@ -16953,6 +16953,18 @@
 			"vanilla-engine": {
 				"module": "graphics3d/skinnedmodel",
 				"class": "SkinnedModel",
+				"name": "split_fbx_corners_by_material"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodel",
+				"class": "SkinnedModel",
+				"name": "splitFbxCornersByMaterial"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodel",
+				"class": "SkinnedModel",
 				"name": "build_wireframe_edge_list"
 			},
 			"vanilla.js": {

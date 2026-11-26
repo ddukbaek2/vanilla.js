@@ -1,6 +1,8 @@
 # 업데이트 기록
 
 # 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- FBX 재질 여럿: 메시 하나에 재질이 여럿인 FBX(LayerElementMaterial 의 Materials, MappingInformationType ByPolygon 이나 AllSame)를 폴리곤의 재질 번호대로 부분 메시로 나눠 재질마다 드로어블 하나로 그린다. (three.js FBXLoader 의 그룹, 유니티와 언리얼의 서브메시) 지금까지는 재질 번호를 폴리곤 순번이 아니라 폴리곤 정점 순번으로 찾았고, 메시마다 소유 노드의 첫 재질 하나로만 그려 Quaternius 마네킹(M_Main, M_Joints)이 온통 주황이었다. 새 정적 함수 SkinnedModel.splitFbxCornersByMaterial, FBX 메시 서술과 드로어블에 materialName(FBX Material 이름, glb 처럼), FbxLoader 재질에 name. 러스트 판과 같다. 문서 그림 ancient-mountain, 셰이더 해시를 바꾼 뒤의 shader-sprite, screen-effect 다시 찍음(1280 x 720, cwebp -q 85). 묶음과 UI 에디터 다시 지음.
+  - 옮기는 법: FBX 모델의 drawableList 가 재질 수만큼 늘어난다. drawableList[0] 하나가 메시 전체라고 기대하던 코드는 materialName 이나 materialIndex 로 찾는다.
 - Engine.alert, confirm, prompt(와 alertAsync, confirmAsync, promptAsync), isModalDialogOpen: 러스트 판 Engine 과 같은 이름과 동작으로 브라우저 window.alert, confirm, prompt 를 부르고 ModalDialogHandle(isFinished, getResult, isConfirmed, getPromptText, setCallback)을 돌려준다. 브라우저 창이 닫힌 뒤 끝난 손잡이라 isModalDialogOpen 은 늘 거짓(러스트 웹 판과 같다). 새 모듈 src/core/modaldialog.js(ModalDialogKind, ModalDialogResult, ModalDialogHandle).
   - 옮기는 법: window.alert(글) 은 engine.alert(글), window.confirm(글) 의 참거짓은 engine.confirm(글).isConfirmed() 나 await engine.confirmAsync(글), window.prompt(글, 기본값) 은 engine.prompt(글, 기본값).getPromptText() 나 await engine.promptAsync(글, 기본값). 같은 게임 코드가 러스트 판에서도 돈다.
 - Scene.setTouchDispatchEnabled(isEnabled), isTouchDispatchEnabled(): 씬 기본 터치 넘기기(tickTouch 가 레이캐스터로 노드에 넘기기)를 켜고 끄는 스위치. 러스트 판 SceneBase.set_touch_dispatch_enabled 와 같은 일이다. setTouchRaycaster(null) 과 같은 효과이고 레이캐스터는 그대로 둔다.
