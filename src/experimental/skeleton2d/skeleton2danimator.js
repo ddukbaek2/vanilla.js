@@ -338,6 +338,7 @@ export class Skeleton2DAnimator extends Component {
 	// 뼈대 원점 읽기. (노드 내용 영역 안의 축점 자리)
 	//==============================================================================
 	/**
+	 * @private
 	 * @returns { Vector2 } 뼈대 원점. (노드 내용 영역의 왼쪽 위 기준)
 	 */
 	readOrigin() {
