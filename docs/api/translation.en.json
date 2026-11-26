@@ -6825,6 +6825,7 @@
 	"트리거 걸기. (그 트리거를 조건으로 쓴 전이가 타면 풀린다)": "Set a trigger. (Cleared when a transition that uses it as a condition is taken)",
 	"트리거 풀기.": "Clear a trigger.",
 	"트리거가 걸려 있는지 반환.": "Get whether a trigger is set.",
+	"트리거로 어느 상태에서나(Any State) 넘어가는 피격과 종료 시각으로 돌아오기": "A trigger-driven hit from any state (Any State), returning by exit time",
 	"트리를 순회하며 솔버가 부착되지 않은 UINode 들을 본 씬의 솔버에 부착.": "Traverses the tree and attaches UINodes with no solver attached to this scene's solver.",
 	"트윈 시작.": "Starts a tween.",
 	"트윈 중단.": "Stops a tween.",
