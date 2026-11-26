@@ -1,6 +1,8 @@
 # 업데이트 기록
 
 # 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- 초안 Experimental.SpatialAudioPlayer, SpatialAudioListener, AudioSource2D, AudioListener2D (src/experimental/spatialaudio/, 0.4.0 뒤 기능, API 가 바뀔 수 있음): WebAudio PannerNode 와 AudioListener 그대로의 공간 소리. AudioPlayer 의 GainNode 뒤에 PannerNode 를 끼우고 버스(SoundSystem 의 효과음 버스 같은)로 낸다. 등력과 HRTF, 거리 모델 linear, inverse, exponential, 기준과 최대 거리, rolloff, 원뿔, 자리와 방향, 2D 노드의 전역 자리를 따라가는 컴포넌트(화면 Y 뒤집기, 한 단위 픽셀 수, 리스너 깊이와 회전). 크롬과 같은 셈 함수(calculateDistanceGain, calculateConeGain, calculateAzimuthElevation, calculateDistanceConeGain, calculateEqualPowerGains)는 크롬 158 OfflineAudioContext 와 표본까지 같다. 도플러는 WebAudio 가 명세에서 빼서 없다. 시험 node tests/experimental/spatialaudio.test.mjs
+- 초안 Experimental.SaveGameManager, SaveStorage, LocalSaveStorage, MemorySaveStorage, SaveCloudProvider (src/experimental/savegame/): 여러 칸 저장(이름, 저장 시각, 판, 미리보기 그림 자리, 크기, metadata), 판 옮기기 함수 사슬, 두 키 번갈아 쓰는 원자적 쓰기와 순번, CRC-32 로 깨진 기록 알아보기, 자동 저장(update), JSON 내보내기와 들여오기, 클라우드를 꽂을 자리(인터페이스만). 저장소는 LocalStorage 위, 기록 꼴과 키가 러스트 판과 글자까지 같다. 시험 node tests/experimental/savegame.test.mjs
 - 폴더 정리: src/experimental 에 있던 다 자란 기능을 제자리로 옮겼다. 러스트 vanilla-engine 과 같은 폴더다. import.js 로 쓰던 게임은 그대로 돌고, 파일 경로로 직접 import 하던 게임은 새 경로로 바꾼다. (옛 경로 → 새 경로, 내용은 그대로)
   - src/experimental/graphics/*.js (3D) → src/graphics3d/*.js
   - src/experimental/graphics/toon/*.js (툰 3D) → src/graphics3d/toon/*.js

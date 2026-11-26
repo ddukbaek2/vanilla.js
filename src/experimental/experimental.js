@@ -15,4 +15,11 @@
 
 
 // 초안 내보내기 목록. (초안을 넣으면 아래에 한 줄씩 더한다. 예: export { 이름 } from "./<이름>/<파일>.js";)
+export { PanningModel, DistanceModel, PannerSettings, calculateDistanceGain, calculateConeGain, calculateAzimuthElevation, calculateDistanceConeGain, calculateEqualPowerGains, convertViewPositionToAudioPosition } from "./spatialaudio/spatialaudiomath.js";
+export { SpatialAudioPlayer } from "./spatialaudio/spatialaudioplayer.js";
+export { SpatialAudioListener } from "./spatialaudio/spatialaudiolistener.js";
+export { AudioSource2D } from "./spatialaudio/audiosource2d.js";
+export { AudioListener2D } from "./spatialaudio/audiolistener2d.js";
+export { SaveGameManager, SaveGameError, SaveSlotInfo, SaveSlotOptions, calculateCrc32 } from "./savegame/savegamemanager.js";
+export { SaveStorage, LocalSaveStorage, MemorySaveStorage, SaveCloudProvider } from "./savegame/savestorage.js";
 export {};
