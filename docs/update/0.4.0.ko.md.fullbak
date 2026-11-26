@@ -1,0 +1,509 @@
+# 0.4.0
+
+## 요약
+
+- 폴더 정리: src/experimental 에 있던 다 자란 기능(3D, 툰 3D, 애니메이션, 컬렉션 등)을 러스트 vanilla-engine 과 같은 폴더로 옮겼다. import.js 로 쓰던 게임은 그대로 돌고, 파일 경로로 직접 import 하던 게임은 새 경로로 바꾼다.
+- 게임에서 엔진으로: 출시 게임들(외계행성 광부, aberrant, 종말 생존, 우주생물, 찾았다)이 따로 만들어 쓰던 범용 기능을 엔진 기본으로 넣었다. 창 쌓기(UIWindowLayer, UIWindow, UIConfirmWindow), 로딩, 저장, 시간(AssetLoader, LoadingProgress, LocalStorage, PersistedStore, FixedStepper), 입력 동작(InputActions), 소리 표(SoundSystem), 언어 묶음과 글꼴(LanguagePack, UIFont), 단추와 알림 모션(ButtonMotion, ToastMotion), 마우스 커서(PointerCursor) 같은 것이다.
+- 툰 3D: 툰 셰이딩과 화면 공간 바깥선(ToonScreenOutline)을 실시간 툰 렌더링의 정석 꼴로 다시 지었다. 툰 효과(ToonVfx), HDR 마무리(ToonPostProcess), 그림자 아틀라스(ShadowAtlas)도 있다.
+- 렌더링: 묶어 그리기와 화면 밖 거르기를 기본으로 켰다. 엔진 루프 밖에서 Graphic 을 직접 쓰는 코드는 그린 뒤 flushSpriteBatch() 를 부른다.
+- 러스트 판과 맞추기: 러스트 판에만 있던 범용 기능을 들여와 두 엔진의 공개 API 를 맞췄고, 두 엔진에 같이 있던 버그를 같이 고쳤다.
+- UI: UIInputField 가 크롬처럼 낱말 이동과 지우기, 낱말 경계를 다룬다. UIDocument 는 등록한 이름으로 적어 줄인 번들에서도 같은 문서가 되고, registerEditorTypes() 로 UI 에디터의 종류를 한 번에 등록한다.
+- Scene 과 Engine: 씬 꼴과 상관없이 노드의 위젯이 터치를 받는다. 씬마다 그리기 앞에 뷰 좌표를 걸어, Scene 을 바로 이은 씬이 기기 픽셀 배율 2 화면에서 캔버스 왼쪽 위 1/4 에만 그리던 것을 고쳤다.
+- 문서: 사이트가 판마다 문서를 지을 자료(공개 API docs/api/0.4.0.json, 가이드 docs/guide/0.4.0)와 뽑는 도구 tools/apidoc.cjs 를 둔다.
+- 옮길 것: 공개 API 나 쓰임이 바뀐 곳은 그 줄에 옮기는 법을 적었다. (Scene 터치, FbxLoader 이름, 씬 그리기 좌표, Singleton, Color, JsonAsset.load, List 와 Dictionary 의 콜백, ToonScreenOutline, 툰 셰이딩)
+
+## 바뀐 것
+
+- GameScene 로딩(러스트 판과 같게): 로딩 최소 시간을 Date.now 대신 엔진 시계(TimeManager.getRealtimeSinceStartup)로 재고, 엔진 시계가 아직 돌지 않았으면(첫 프레임 전) 첫 로딩 화면 프레임부터 잰다. 로딩 화면 누름은 window pointerdown 대신 엔진 입력(InputManager.isTouchPressed)으로 drawOnLoad 가 프레임마다 본다.
+  - 옮기는 법: 없다. 캔버스 밖을 눌러도 로딩이 건너뛰어지던 것은 엔진 입력이 받는 누름만 건너뛴다.
+- 개발자 도구 메모리 칸(러스트 판과 같은 규칙): performance.memory 의 쓰는 중과 잡아 둔 힙을 못 읽으면 셋 다, 한도(jsHeapSizeLimit)만 못 읽으면 그 칸만 "(N/A)" 다. 러스트 데스크탑은 같은 칸에 운영체제 API 로 읽은 같은 뜻의 값을 적는다.
+  - 옮기는 법: 없다.
+- 3D 자산 공유 캐시(SkinnedModelAsset): 같은 파일에서 지은 스킨드 모델 인스턴스들이 메시 버퍼와 버텍스 어레이, 머티리얼 원형과 그 텍스처, 모프 텍스처, 노드와 스킨 원형, 애니메이션 클립을 한 벌만 참조 수로 나눠 쓴다. (유니티의 메시와 sharedMaterial, three.js 복제본처럼) SkinnedModel.loadFromUrl, loadFromFbxUrl 은 셰이더 프로그램과 정규화한 주소(SkinnedModelAsset.normalizeKey)로 캐시를 찾아, 있으면 받지도 풀지도 않고 인스턴스를 돌려주고, 함께 받는 중이면 한 번만 받는다. 새로 createInstance(), createFromAsset(자산), getAsset(), getMaterial(번호)(유니티 Renderer.material, 처음 부르면 사본으로 갈라지고 텍스처는 빌려 씀), getSharedMaterial(번호), Material.createInstance(), setBaseColorFactor, getTextureByteCount, SkinnedModelAsset(find, register, clearCache, getCachedCount, normalizeKey, retain, release, getReferenceCount, getGpuByteCount 들)을 더했다. 인스턴스의 destroy 는 제 것(와이어프레임 버퍼, 갈라진 모프 텍스처와 머티리얼)만 지우고 자산을 놓으며, 마지막 인스턴스가 놓을 때 자산이 GPU 자원을 지우고 캐시에서 빠진다. 클립 목록은 인스턴스들이 나눠 쓰고 addAnimationsFromFbx* 로 같은 이름 클립을 더하면 그 자리를 바꾼다. addMorphTarget 은 그 인스턴스의 타깃 목록과 모프 텍스처만 갈라 낸다. 잰 값(헤드리스 크롬, examples/ancientmountain/assetcache_test.html, 같은 모형 20 개): fox.glb 421 ms, GPU 113.8 MB 에서 20 ms, 5.7 MB 로, mannequin_female.glb 250 ms, 32.0 MB 에서 9 ms, 1.6 MB 로. examples/ancientmountain 의 여우 여섯은 인스턴스마다 걸음 시점이 다르다. 러스트 판과 같은 API, 같은 시험(tests/graphics3d/skinnedmodelasset.test.mjs)이다.
+  - 옮기는 법: 같은 주소를 여러 번 받아 모델마다 머티리얼 값을 다르게 바꾸던 코드는 getMaterial(번호) 로 사본을 받아 바꾼다. (drawableList[i].material 이나 getSharedMaterial 을 고치면 같은 자산의 모든 인스턴스가 바뀐다) 받을 때마다 따로 풀린 자원이 필요하면 받기 전에 SkinnedModelAsset.clearCache() 를 부르거나 loadFromBytes 를 쓴다. 여러 인스턴스가 같은 FBX 클립을 더해도 한 벌만 남는다.
+- Action: 대상을 들지 않고 매번 넘기는 startWith(target), stepWith(target, timeDelta) 를 더했다(러스트 판 start_with, step_with 와 짝). start(target), step(timeDelta), getTarget 은 그대로 대상을 들고, 러스트 판 start(node_tree, Some(node_id)), step(node_tree, time_delta), get_target 과 짝이다. repeat, forever, loop 의 안쪽 액션은 러스트 판처럼 startWith, stepWith 로 돌아 대상을 들지 않는다.
+  - 옮기는 법: 안쪽 액션의 getTarget() 이 바깥 대상을 돌려준다고 보던 코드는 콜백이 받는 대상 인자를 쓴다. (안쪽 액션의 getTarget 은 그 액션에 따로 start 한 대상, 없으면 null)
+- 입력 필드 문맥 메뉴: 직접 누름 필드(setUseDirectTouch)의 오른쪽 클릭이 브라우저 편집 칸 메뉴 대신 다른 필드와 같은 엔진 문맥 메뉴다. (DOM 입력의 contextmenu 기본 동작을 막는다) 메뉴에 모두 선택(글이 있을 때)을 더했고, UIInputFieldMenuAction.selectAll 이 생겼다. 러스트 판과 같은 네 항목이다
+  - 옮기는 법: 없다. 직접 누름 필드에서 브라우저 메뉴(맞춤법, 번역, 검사 같은 것)를 쓰던 게임은 엔진 메뉴를 쓴다.
+- 셰이더 짓기 실패: ShaderSprite, ScreenEffect 가 효과 셰이더 짓기에 실패하면 예외를 던져 프레임을 멈추지 않고, 러스트 판처럼 한 번 알리고(console.error) 건너뛴다. (ShaderSprite 는 효과 없이 Sprite 로 그리고, ScreenEffect 는 그 단계를 건너뛴다) ScreenEffect.resolvePass 는 실패하면 null 이다.
+  - 옮기는 법: 짓기 예외를 try 로 받던 코드는 그 검사를 지운다. resolvePass 를 직접 부르면 null 을 본다.
+- import.js: 러스트 판이 맨 위로 내는 것과 같게 TransformMatrix, KeyCode, GamepadButtonCode, GamepadAnalogStickCode, GamepadTriggerCode, ScrollMode, ButtonState, ProgressDirection, SpriteDrawMode, SpriteBlendMode, AssetType, MORPH_TARGET_MAXIMUM, VERTEX_FLOAT_COUNT, SKIN_FLOAT_COUNT, WRINKLE_CHANNEL_COUNT 를 낸다. (묶음 build/vanilla.js 에서도 바로 받는다)
+- Engine.alert, confirm, prompt(와 alertAsync, confirmAsync, promptAsync), isModalDialogOpen: 러스트 판 Engine 과 같은 이름과 동작으로 브라우저 window.alert, confirm, prompt 를 부르고 ModalDialogHandle(isFinished, getResult, isConfirmed, getPromptText, setCallback)을 돌려준다. 브라우저 창이 닫힌 뒤 끝난 손잡이라 isModalDialogOpen 은 늘 거짓(러스트 웹 판과 같다). 새 모듈 src/core/modaldialog.js(ModalDialogKind, ModalDialogResult, ModalDialogHandle).
+  - 옮기는 법: window.alert(글) 은 engine.alert(글), window.confirm(글) 의 참거짓은 engine.confirm(글).isConfirmed() 나 await engine.confirmAsync(글), window.prompt(글, 기본값) 은 engine.prompt(글, 기본값).getPromptText() 나 await engine.promptAsync(글, 기본값). 같은 게임 코드가 러스트 판에서도 돈다.
+- Scene.setTouchDispatchEnabled(isEnabled), isTouchDispatchEnabled(): 씬 기본 터치 넘기기(tickTouch 가 레이캐스터로 노드에 넘기기)를 켜고 끄는 스위치. 러스트 판 SceneBase.set_touch_dispatch_enabled 와 같은 일이다. setTouchRaycaster(null) 과 같은 효과이고 레이캐스터는 그대로 둔다.
+- SpriteAnimator: 러스트 판과 같은 꼴로 정적 SpriteAnimator.play(node, clipName, options)(옛 playOnNode, 노드의 애니메이터로 틀고 그 자리에서 첫 프레임을 넣음)와 인스턴스 playClip(clipName, options)(러스트 판 play_clip)을 둔다. 인스턴스 play 는 뺐다. (옮기는 법: 인스턴스 animator.play(clipName, options) 는 animator.playClip(clipName, options) 로)
+  - 옮기는 법: SpriteAnimator.playOnNode(node, ...) 는 SpriteAnimator.play(node, ...) 로 바꾼다.
+- InputActions: 유니티 Input System 처럼 프레임 처음의 update 에서 한 번 갱신하고 그 프레임 안에서는 같은 값을 읽는다. readGamepadStick, readMoveAxis 도 읽을 때 입력 매니저를 다시 보지 않고 update 때 적은 이동 키와 패드 축을 읽는다. (러스트 판과 같다)
+  - 옮기는 법: update 와 같은 프레임 안에서 키나 패드를 바꾼 뒤 바로 readMoveAxis 로 새 값을 기대하던 코드(시험)는 update 를 한 번 더 부른 뒤 읽는다.
+- 사인, 코사인, 탄젠트: 엔진 Math.sin, cos(테일러 급수 10 항 근사)와 tan(sin / cos)이 브라우저 Math.sin, cos, tan 을 그대로 부른다. 크롬 158 은 바르게 반올림한 값(참값에 가장 가까운 수)을 내고, 러스트 판이 같은 셈을 해 두 엔진이 같은 입력에 같은 비트를 낸다. 끝자리가 바뀐다. (예: sinusoidal.inOut 의 0.5 는 0.5000000000000017 이 아니라 0.49999999999999994, 타임라인 색 #ff000080 → #0000ffff 의 1 초는 #7f0080c0 이 아니라 #80007fc0)
+  - 옮기는 법: 엔진 Math 의 sin, cos, tan 끝자리 값을 기대값으로 적은 시험은 다시 뽑는다. 부르는 코드는 그대로다.
+- 묶음에서 초안 빼기: import.js 가 초안(src/experimental 의 2D 물리, 타일맵, 2D 뼈대, 공간 소리, 세이브)을 Experimental 이름 공간으로 내보내던 줄을 뺐다. 기본 묶음과 웹 도구에 초안이 실리지 않는다. build/vanilla.min.js 1,035,048 바이트 → 849,276 바이트(약 1011 KB → 약 829 KB, gzip 약 288 KB → 약 235 KB), build/vanilla.js 4,075,155 → 3,324,094 바이트, UI 에디터 4,453,945 → 3,666,226 바이트, 비주얼 에디터 2,340,587 → 2,335,558 바이트. (파티클, 타임라인 에디터는 초안을 싣지 않았고 머리 주석만큼 늘었다) 초안은 src/experimental/experimental.js 를 직접 불러온다. experimental.js 는 맨 먼저 import.js 를 불러 엔진 모듈끼리의 차례를 맞춘다. (초안 모듈을 먼저 부르면 덜 읽힌 클래스를 만났다) tools/apidoc.cjs 는 초안 진입점을 Experimental 이름 공간으로 따로 읽어 --check, --check-examples 가 초안을 그대로 보고(문서 자료에는 지금처럼 넣지 않음), 초안 예제는 엔진을 ./import.js 로, 초안을 ./src/experimental/experimental.js 로 불러온다. 묶음과 웹 도구 html 머리에 엔진 라이선스 한 줄(/*! vanilla.js | (c) 2026 vanillapunch | MIT License | LICENSE 와 THIRD_PARTY_LICENSES.md 주소 */)을 넣었다. (README 와 가이드의 esbuild 명령에 --banner:js)
+  - 옮기는 법: `import { Experimental } from "./import.js"`(또는 묶음)를 쓰던 코드는 `import * as Experimental from "./src/experimental/experimental.js"` 로 바꾸고, 엔진은 묶음이 아닌 `./import.js` 로 불러온다. (초안과 엔진의 클래스가 하나여야 한다) 게임을 esbuild 로 묶으면 초안도 함께 묶인다.
+- 라이선스: 엔진 저작권자를 vanillapunch 로 적었다. (LICENSE 의 "Copyright (c) 2026 vanillapunch", README 와 가이드 개요의 "© vanillapunch", MIT 그대로) 제3자 라이선스 고지는 THIRD_PARTY_LICENSES.md 한 파일에 모았다. (README 의 라이선스 절)
+- 묶음 다시 짓기: build/vanilla.js, vanilla.min.js 와 웹 도구 넷(tools/uieditor, particleeditor, timelineeditor, visualeditor 의 한 파일 html)을 지금 소스로 다시 지었다. (저장소의 묶음은 9월 것이었다) UI 에디터의 편집 화면과 결과 화면, 예제 ancientmountain, oldface, toonshading 의 HUD 는 엔진 루프 없이 Graphic 을 직접 쓰므로 그린 뒤 flushSpriteBatch() 를 부른다. (묶어 그리기가 기본으로 켜진 뒤 다시 지은 UI 에디터의 화면이 검게 비었고, HUD 의 마지막 묶음은 다음 프레임으로 밀릴 수 있었다) 배포 예제 여덟(ancientmountain, neonhorizon, oldface, particleeffects, spriteeffects, timelineshowcase, toonshading, uishowcase)이 엔진 주소에 붙이는 캐시 스탬프를 20261126a 로 바꿨다. README 와 가이드 개요의 vanilla.min.js 크기를 지금 소스로 다시 쟀다. (약 1011 KB, gzip 약 288 KB)
+- Scene 터치: 씬 꼴과 상관없이 노드의 위젯이 터치를 받는다. (유니티 EventSystem 처럼, 러스트 판 SceneBase.tick 과 같다) Scene.tickTouch 가 씬의 터치 레이캐스터(create 에서 만드는 TouchRaycaster)로 가장 앞의 누를 수 있는 노드에 먼저 넘기고, 그 뒤에 터치 훅(touchPress, touchMove, touchRelease, touchCancel, touchWheel)을 부른다. 휠도 그 자리의 가장 앞 스크롤 칸에 넘긴다. Scene.setTouchRaycaster(touchRaycaster 나 null), getTouchRaycaster() 를 더했다. UIScene 과 GameScene 은 지금처럼 터치 훅에서 제 TouchRecognizer 로 넘기고(개발자 도구, 페이드, 놀이 입력 판정이 넘기기 앞뒤에 낀다) 씬 기본 넘기기는 꺼서 두 번 넘기지 않는다. (두 씬의 getTouchRaycaster 는 그 TouchRecognizer)
+  - 옮기는 법: Scene 을 바로 이은 씬이 TouchRaycaster 나 TouchRecognizer 를 만들어 터치 훅에서 넘기던 코드는 이제 위젯이 두 번 눌린다. 만든 것을 setTouchRaycaster(그것) 으로 씬에 맡기고, 훅의 넘기기와 스크롤 칸을 찾아 wheel 을 부르던 touchWheel 을 지운다. 훅에서 터치를 가로채야 하면(막대 끌기 같은) setTouchRaycaster(null) 로 끄고 지금처럼 훅에서 넘긴다. (examples 의 uisample, uishowcase, particleeffects, spriteeffects 는 앞의 꼴로, timelineshowcase 는 뒤의 꼴로 바꿨다)
+- FbxLoader: 노드(Model)와 애니메이션 스택 이름에서 바이너리 FBX 의 종류 꼬리("\u0000\u0001Model", "\u0000\u0001AnimStack")를 뗀다. 클립 이름은 "Take 001\u0000\u0001AnimStack" 이 아니라 "Take 001", 본 이름은 "mixamorig:Hips" 다. (three.js FBXLoader 는 BinaryReader.getString 이 첫 널 바이트에서 자르고, Assimp 는 "AnimStack::Take 001" 로 바꾼 뒤 FBXConverter 가 "AnimStack::", "Model::" 를 뗀다, 러스트 판도 같이 바꿨다) glTF 로 읽은 모델에 FBX 애니메이션을 더할 때(addAnimationsFromFbx*)의 본 이름 맞추기도 이 이름으로 맞는다.
+  - 옮기는 법: 꼬리가 붙은 이름으로 playAnimation 하거나 노드를 찾던 코드는 꼬리를 뗀 이름을 쓴다.
+- tools/apidoc.cjs: 자료에 러스트 판의 짝(counterpart: { engine: "vanilla-engine", module, class, name })을 넣는다. 클래스, 열거, 멤버, 모듈 함수와 상수, 열거 값. 짝 표는 docs/api/counterpart.<판>.json 이고(러스트 판 도구가 이름으로 지은 표를 --counterpart 로 옮긴다), --check 가 짝 꼴과 수를 본다.
+- 폴더 정리: src/experimental 에 있던 다 자란 기능을 제자리로 옮겼다. 러스트 vanilla-engine 과 같은 폴더다. import.js 로 쓰던 게임은 그대로 돌고, 파일 경로로 직접 import 하던 게임은 새 경로로 바꾼다. (옛 경로 → 새 경로, 내용은 그대로)
+  - src/experimental/graphics/*.js (3D) → src/graphics3d/*.js
+  - src/experimental/graphics/toon/*.js (툰 3D) → src/graphics3d/toon/*.js
+  - src/experimental/graphics/fullscreenpass.js → src/core/fullscreenpass.js
+  - src/experimental/animation/animator.js, timeline.js → src/animation/animator.js, timeline.js
+  - src/experimental/action.js → src/animation/action.js
+  - src/experimental/indicator.js → src/misc/indicator.js
+  - src/experimental/visual/visual.js → src/misc/visual.js
+  - src/experimental/bunchasset.js → src/resource/bunchasset.js
+  - src/experimental/visual/visualasset.js → src/resource/visualasset.js
+  - src/experimental/collection/*.js (List, Dictionary, Queue, Set, Stack) → src/base/collection/*.js
+  - src/experimental/camera.js → src/deprecated/camera.js
+  - src/experimental/aabb.js, transform2d.js, graphics/gl2d.js, graphics/webgl2.js (죽은 코드, 내보내지 않음) → src/deprecated/
+- Engine: 씬마다 그리기 앞(preDraw, 로딩 중이면 drawOnLoad 앞)에 뷰 좌표(viewManager.applyViewRect)를 걸어 둔다. 지금까지는 변환을 걸지 않은 채 씬을 불러, Scene 을 바로 이은 씬(UIScene, GameScene 이 아닌)은 그리기 버퍼의 실제 픽셀로 그려 기기 픽셀 배율이 2 인 화면(레티나 맥, 고밀도 휴대폰)에서 캔버스 왼쪽 위 1/4 에만 그려졌고 터치 좌표와도 어긋났다. 배율 1 화면과 UIScene, GameScene 은 그대로다. 옮기는 법: 실제 픽셀로 그리던 씬은 preDraw 에서 graphic.setTransform(1, 0, 0, 1, 0, 0) 을 부른다
+- UIInputField 캔버스 모드 낱말 이동과 지우기: 크롬처럼 윈도우와 리눅스는 Ctrl, 맥은 Option 과 왼쪽, 오른쪽 화살표(Shift 와 함께면 고르기를 넓힌다), Backspace, Delete 로 낱말 단위로 옮기고 지운다. (맥은 Option + Ctrl + Backspace, B, F 도) 자리는 블링크 NextWordPosition, PreviousWordPosition 대로, 오른쪽은 윈도우만 다음 낱말 앞(맥과 리눅스는 지금 낱말 끝), 맥은 넓히던 고르기가 고정 끝을 넘지 않는다. 고른 것이 있으면 고른 것만 지운다. (전에는 Ctrl + 화살표가 아무것도 하지 않고, 맥 Option + 화살표는 한 글자씩 움직였다)
+- UIInputField 낱말 경계: 크롬처럼 마침표는 숫자 사이에서만 잇고("www.example.com" 은 다섯 조각, "3.14" 는 한 낱말), 쌍점은 잇지 않는다. (크로미엄 ICU wordbrk.patch, 크롬 밖의 브라우저에서도 DOM 입력의 두 번 누르기가 크롬과 같은 낱말을 고른다)
+- UIDocument: 문서에 적는 노드와 컴포넌트 종류 이름을 클래스 이름(constructor.name) 대신 표에 등록한 이름으로 적는다. 번들러가 클래스 이름을 줄여도(esbuild --minify) 같은 문서가 된다. (등록하지 않은 종류만 지금처럼 클래스 이름, 지금까지는 줄인 번들에서 WorldNode 가 "o" 처럼 적혀 다시 읽지 못했다)
+- UIDocument.registerEditorTypes(): UI 에디터가 등록하는 종류(컴포넌트 35, 노드 종류 12)를 한 번에 등록한다. 에디터가 저장한 문서를 읽는 게임은 fromJsonText 앞에 한 번 부른다. 이미 등록한 이름은 그대로 둔다. (러스트 register_editor_types 와 같다) 표에 없는 노드 종류와 컴포넌트를 읽으면 console.warn 으로 알린다. (지금까지는 말없이 WorldNode 로 읽거나 건너뛰어 UIInputField, UIScrollBar 가 빈 노드가 되고 UISnapScrollView 가 빠졌다)
+- UIDocument: 다시 읽을 때 노드 생성자나 위젯이 만든 컴포넌트와 자식(UIWindow 의 제목 막대, UIImageView 가 붙이는 Sprite 같은)은 문서의 앞에서부터 차례와 종류(자식은 이름)가 맞으면 그것에 문서 값을 넣고 겹쳐 만들지 않는다. 읽고 다시 쓰면 같은 문서다. (지금까지는 겹쳐 만들어 UIWindow 를 읽으면 노드와 컴포넌트가 두 벌이었다, 러스트와 같다)
+- tools/project.cjs build 와 README, 가이드의 vanilla.min.js 명령이 --minify 에 --keep-names 를 붙인다. (개발자 도구와 등록하지 않은 UIDocument 종류가 클래스 이름을 읽는다) project.cjs 머리 주석, 사용법 출력, TOOLS.md, 가이드의 도구 장을 코드와 맞췄다. (node tools/project.cjs, 빌드 템플릿의 기본 자리 tools/buildtemplate, -t 와 --template, stage 명령)
+- tools/webm.cjs: fluent-ffmpeg, ffmpeg-static 이 없으면 설치 안내를 보이고 끝낸다. (지금까지는 안내를 보이기 전에 맨 위 require 에서 죽었다)
+- tools/apidoc.cjs --gaps: 떨어진 머리 주석(머리 주석과 JSDoc 뒤에 선언 없이 다른 머리 주석이 오는 옛 덩이, "목록" 으로 끝나지 않는 머리 주석 바로 뒤의 머리 주석)을 찾는다. 찾은 옛 덩이를 지우고(UIButton, UIProgressView, UILabel, Text, Color, LocalStorage, NodeLayout, AnimationClip, SoundSystem) 절 머리처럼 쓰던 머리를 멤버 머리로 바꿨다(UISlider, PlatformerBody, Camera2D). API 문서의 그 멤버 설명이 바로잡힌다
+- Version: 엔진 Object 를 잇는다. (version.js 가 Object 를 import 하지 않고 다시 내보내기만 해서 자바스크립트 내장 Object 를 이었다)
+- Enum.readonly(dictionary): 얼린 dictionary 를 돌려준다. (Object.freeze 처럼, 지금까지는 undefined)
+- Format.formatCompactNumber: 반올림해 1000 이 되면 다음 단위로 올린다. (999999 는 "1000K" 가 아니라 "1M", Intl 의 compact 표기와 같다)
+- Singleton: 인스턴스가 이미 있는 클래스를 다시 new 하면 던진다. getInstance() 로 받는다. (하위 클래스 생성자는 super() 가 돌려준 첫 인스턴스에 제 필드와 생성자 몸통을 다시 돌려 첫 인스턴스를 덮어썼고, 비공개 필드가 있으면 TypeError 였다)
+- Node.setParent, addChild: 자신이나 자기 자손 밑으로는 붙이지 않고 false 를 돌려준다. (고리가 되면 isActiveInHierarchy 같은 위로 오르는 셈이 끝나지 않았다, 자신이면 빈 오류를 던지던 것도 false) 붙였거나 떼었으면 true. removeChild 는 제 자식일 때만 뗀다. (러스트 NodeTree 와 같다)
+- ObjectPool.release: 이미 되돌려 놀고 있는 객체를 또 놓으면 무시한다. (두 번 놓으면 다음에 두 쓰임이 한 객체를 빌렸다)
+- Platform.getSafeAreaRect(canvas): 캔버스의 CSS 크기(clientWidth, clientHeight)로 잰다. 돌려주는 사각형은 모두 CSS 픽셀이고 너비와 높이는 0 이상이다. (여백은 CSS 픽셀인데 그리기 버퍼 크기 width, height 에서 빼서 고해상도 화면에서 섞인 단위였다)
+- 옮기는 법: Singleton 하위 클래스를 new 로 다시 만들던 코드는 getInstance() 로 받는다. 제 자식이 아닌 노드를 removeChild 로 떼던 코드는 node.setParent(null) 로 뗀다. 에디터가 저장한 문서를 읽는 게임은 UIDocument.registerEditorTypes() 를 한 번 부른다
+- Color: 성분을 0 ~ 1 로 자르지 않고 그대로 담는다. (빛나는 색처럼 1 을 넘는 HDR 색, 유니티 Color 처럼, 러스트 판과 같다) 0 ~ 255 글(toRGBAString, toHEXString)로 낼 때만 성분은 0 ~ 255, rgba 의 알파는 0 ~ 1 로 자른다. 옮기는 법: 0 ~ 255 값으로 new Color(255, 128, 0) 처럼 만들던 코드는 Color.createFromBytes 나 0 ~ 1 값으로 바꾼다. (전에는 1 로 잘려 흰색이었고 이제는 그대로 담긴다)
+- UINode: isInteractable, setInteractable, contains, getWorldCorners, convertToViewPosition, touchPress, touchMove, touchRelease, touchCancel. UINode 에 붙인 UIButton 이 솔버가 푼 자리로 눌린다. (TouchRaycaster 가 WorldNode 만 맞히고 UINode 는 누름 판정이 없어 눌리지 않았다, 러스트는 UINode 가 WorldNode 의 컴포넌트라 원래 눌렸다) UIButton 은 setInteractable 이 있는 노드면 붙을 때 켠다
+- UIScrollBar: 자동 숨김이 노드를 끄지 않고 켜 둔 채 숨긴다. (끄면 갱신이 멈춰 콘텐트가 길어져도, setAutoHide(false) 를 해도 다시 나오지 않았다) 숨은 동안 그리지 않고 누름도 받지 않는다. isAutoHidden() 추가
+- LanguagePack, UIFont: JsonAsset.load 가 실패를 거부하게 되어 받기 실패를 못 읽은 것으로 받는다. (지금처럼 경고를 내고 null, false) UIFont 머리 주석의 목록 꼴을 코드와 맞췄다({ fonts: [...] }, { faces: [...] })
+- ShaderSprite.isDrawnInsideContent: 뒤집어도 참이다. (Sprite 가 뒤집어도 내용 영역 안에 그리게 되어 같게)
+- 가이드: 05, 12, 13, 19 장과 도구 장(ko, en)을 바뀐 것(--keep-names, UIDocument 등록 이름과 registerEditorTypes, UINode 누름, Animator 상태 기계)에 맞췄다
+- Engine: 창이 포커스를 잃으면(blur) 터치와 마우스 단추만이 아니라 키도 놓는다. (InputManager.clear 뒤 터치를 뗀 것으로, 러스트와 같다) keyup 이 오지 않아 키가 눌린 채 남던 것을 고쳤다.
+- Sprite: 뒤집기(setHorizontalFlip, setVerticalFlip)가 내용 영역 밖(음의 크기 쪽)에 그리던 것을 내용 영역 안에서 거울처럼 뒤집게 고쳤다. 조각, 나인 슬라이스, 타일 모두 뒤집힌다. (나인 슬라이스는 작게 깨져 그려지고 타일은 뒤집히지 않던 것도 같이) 뒤집어도 isDrawnInsideContent 가 참이라 화면 밖 거르기를 받는다.
+- Sprite.setImage: HTMLCanvasElement, OffscreenCanvas 도 받는다. (전에는 HTMLImageElement 와 ImageAsset 말고는 무시했다, UIImageView.setImage 로 넘긴 OffscreenCanvas 도 이제 그려진다)
+- Graphic.drawNode: 그리다 예외가 나도 try/finally 로 넣은 변환을 꺼내 변환 스택이 어긋나지 않는다.
+- Graphic.drawPolyline, drawLine, drawLineLoop, drawStrokeRoundRect, drawConvexPolygon: 정점 버퍼(4096 정점)가 차면 쌓인 것을 그리고 이어 적는다. 전에는 683 번째 선분(볼록 다각형은 1366 번째 삼각형)부터 버렸다.
+- Graphic.setCullingEnabled: 머리 주석의 기본값을 실제(켬, true)에 맞췄다.
+- AudioPlayer: 멈춘 AudioContext 를 깨우는 동안 stop 하거나 play 를 다시 하면 늦게 끝난 지난 요청이 소리를 내던 것을 고쳤다. (요청 번호, 소리는 늘 하나) resume 거부를 잡아 처리되지 않은 거부가 남지 않는다. getTime 이 재생 중에 오디오 컨텍스트 시계로 흐른다. (재생 빠르기를 곱하고, 루프면 길이로 되감고, 아니면 길이에서 멈춘다, 멈췄거나 끝났으면 setTime 의 시작 위치)
+- SoundSystem: 소리 표 줄에 volume 이 없으면 1 로 낸다. (전에는 NaN 이 되어 0, 소리가 나지 않았다)
+- TouchRaycaster: WorldNode 만 맞히던 것을 노드 종류를 가리지 않게 했다. isInteractable 과 contains 가 있는 노드는 모두 맞고 누름을 받는다.
+- ParticleSystem: 루프 이음매(되풀이 경계)의 버스트가 첫 주기에만 터지던 것을 고쳤다. 0 초 버스트와 경계 바로 앞 버스트도 주기마다 터지고, 한 프레임에 여러 주기를 건너면 그 수만큼 터진다. (시간이 멈춘 0 초 프레임에는 다시 터지지 않는다)
+- ParticleSystem.applyDescription: 서술의 imageDataUrl(파티클 편집기가 고른 그림의 data: 주소)을 읽어 입자 이미지로 건다. (null 이나 빈 글이면 그림을 뗀다) 저장한 서술을 게임에서 다시 불러도 고른 그림이 되살아난다.
+- ParticleEmitterShape: 머리 주석의 edge 방향을 실제(아래쪽 +y)에 맞췄다.
+- FontAsset.load(assetPath): 경로만 정하고 읽지 않던 것을 실제로 읽게 했다. 파일 이름에서 확장자를 뗀 것을 패밀리 이름으로 loadFont 한다. ("assets/DOSGothic.woff" 면 "DOSGothic")
+- JsonAsset.load: 받기나 해석이 실패하면 거부한다. (TextAsset, ImageAsset 과 같다) 옮기는 법: 실패해도 풀린다고 보고 await 뒤 data 가 null 인지 보던 코드는 try/catch 로 감싼다. SpriteAtlas.load 는 그대로 JSON 실패에도 알리고 풀린다.
+- AnimationClip: 프레임 목록의 꼴을 실제로 담는 Rect 로 바로잡았다. (setFrames, getFrame, getFrames 의 JSDoc, 쓰지 않던 Frame 가져오기를 뺐다)
+- Asset.unload: 로드되었을 때는 undefined, 아닐 때는 풀린 프로미스를 돌려주던 것을 두 갈래 모두 아무것도 돌려주지 않게 맞췄다. (덮어쓴 하위 클래스, 러스트와 같다)
+- LayoutSolver: 변수가 없는 항(LayoutTerm(null), 값 0)이 든 식을 받으면 updateVariables 에서 TypeError 를 냈다. 이제 그런 항은 계수가 0 인 항처럼 건너뛴다. (그런 항만 남은 5 == 0 은 모순 제약, 0 == 0 은 받는다)
+- UISnapScrollView: setSnapToNearest, setVelocityThreshold 가 값만 담고 스냅 계산에 쓰이지 않았다. 이제 한 칸 모드(기본)는 놓을 때 드래그 속도가 setVelocityThreshold(기본 200, 스크롤 오프셋의 초당 픽셀) 이상이면 끈 거리와 상관없이 속도 방향으로 한 칸 넘기고(플링), 아니면 지금처럼 setPageChangeThreshold 비율로 정한다. setSnapToNearest(true) 는 끄는 동안 칸 범위를 자르지 않고, 놓으면 스냅 오프셋이 가장 가까운 아이템으로 간다. getDragVelocity() 를 더했다. (마지막으로 끈 tick 의 스크롤 축 오프셋 속도, 다음 칸 쪽이 음수) 느리게 끄는 기존 동작은 그대로다
+- UILineChart: setMaxSampleCount 로 상한을 줄이면 이미 든 표본을 오래된 것부터 버린다. (전에는 다음 pushValue 까지 남아 점이 그래프 폭 밖으로 나갔다)
+- UIView: setBackgroundColor(null 또는 undefined) 가 던지던 것을 고쳤다. 배경을 지운다. (처음 값인 알파 0 흰색으로 돌려 그리지 않는다)
+- ImageScroller: setImage(ImageAsset) 이 import 없는 ImageAsset 을 써서 ReferenceError 였다. 이제 ImageAsset 이면 그 getImage() 를, 그 밖의 그림(HTMLImageElement, 캔버스 등)은 그대로 쥔다. (HTMLImageElement 전역이 없는 곳에서도 된다)
+- NodeLayout: 빌더의 anchoredPosition 이 부모에 붙기 전에 걸려 앵커를 무시했다. 이제 build 에서 부모에 붙인 뒤 부모 contentSize 의 앵커 점 기준으로 건다. (앵커는 anchoredPosition 을 부를 때의 앵커, 나중에 부른 localPosition 이 이긴다, 러스트 판과 같다) 선언 없이 남은 옛 "레이아웃 인스턴스 생성" 주석 덩이를 지웠다
+- Camera2D: 머리 주석의 사용 줄 camera.follow([heroPosition], 6) 에 timeDelta 가 빠져 그대로 쓰면 위치가 NaN 이었다. camera.follow([heroPosition], 6, timeDelta) 로 고쳤다. setPosition 에 제 머리 주석을 달았다. (전에는 "접근자." 절 머리가 설명으로 읽혔다)
+- LanguagePack: loadLanguageList 가 읽은 languages.json 의 줄에 aliases 가 없으면 matchLanguageTag 가 TypeError 였다. 이제 파일에서 읽은 목록도 setLanguageList 를 거친다. code 가 글이 아닌 줄은 빼고, aliases 와 countries 가 없으면 빈 배열, 글은 소문자로 맞춘다. (러스트 판과 같다)
+- DEVTools: Settings 의 Show FPS 가 저장만 되고 쓰이지 않았다. 켜면 패널을 닫아도 창 왼쪽 위에 "FPS 값" 상자(지난 1 초의 프레임 수, canvas-native 좌표)를 그린다. 패널이 보이면 패널 위에 그린다
+- UIScrollBar: 썸 기본 색이 0 ~ 255 를 섞은 Color(255, 255, 255, 0.6) 이던 것을 Color(1, 1, 1, 0.6) 으로 고쳤다. (그려지는 모습은 같고 getThumbColor 값이 러스트 판과 같아진다) 공개 API 의 설명, @param, @returns, 예제를 채웠다
+- UIListView: 공개 API 의 설명, @param, @returns, 예제(500 줄 템플릿 목록, 만들기 함수, 끝 알림)를 채웠다
+- UIInputField 커서와 지우기: 왼쪽, 오른쪽 화살표와 Delete 가 크롬처럼 글자 묶음(확장 자소 묶음, Intl.Segmenter) 단위로 움직이고 지운다. 뒤로 지우기는 블링크 BackspaceStateMachine 을 옮겨 코드 포인트 하나씩 지우되 CR LF, 이모지 표현 선택자와 바탕, 피부색 조정자, ZWJ 이모지, 국기, 키캡, 태그 묶음은 통째로 지운다. 서로게이트 쌍을 쪼개던 버그를 고쳤다. (헤드리스 크롬 textarea 의 execCommand 결과와 같음)
+- UIInputField 선택이 있을 때 Shift 없는 왼쪽, 오른쪽 화살표는 크롬처럼 선택의 앞, 뒤로 접는다. 누른 자리(measureIndexAtLocalX)는 글자 묶음 경계에만 선다. moveCursor 에 서로게이트 쌍 가운데 자리를 주면 그 글자 뒤로 본다.
+- UIInputField.deleteRange(startIndex, endIndex) 추가. deleteCharAt(index) 는 그 자리부터 글자 묶음 하나를 지운다. (전에는 UTF-16 한 칸)
+- UIInputField 최대 길이: setText 는 서로게이트 쌍을 쪼개지 않는 데까지 자르고, 넣기(replaceSelection, 붙여넣기, 글자 치기)는 블링크 입력 칸처럼 넣는 글을 남은 길이까지만 넣는다. (전에는 값 전체를 잘라 커서 뒤 글이 지워질 수 있었다)
+- UIInputField.setFont 에 FontAsset 을 주면 그 fontFace 를 쓴다. (전에는 FontAsset 을 그대로 들어 글꼴을 읽기 전이면 글 재기의 CSS font 가 깨졌다) 글 재기와 선택, 커서 그리기는 UILabel 과 같은 buildFontString 으로 짓는다.
+- UIInputField 문맥 메뉴와 숨은 DOM 입력의 자리: 페이지를 스크롤하면 어긋나던 버그를 고쳤다. body 에 붙은 absolute 요소라 뷰포트 좌표(getBoundingClientRect, clientX)에 window.scrollX, scrollY 를 더해 문서 좌표로 놓는다.
+- UIInputField DOM 입력은 크롬 입력 칸처럼 마우스로 두 번 누르면 낱말(윈도우는 뒤 공백까지), 세 번 누르면 글 전체를 고르고, 그 뒤 끌면 낱말 단위로 넓힌다. 누름 수는 캔버스 mousedown 의 detail 이다.
+- List, Dictionary: find, findAll 의 콜백이 색인이나 키를 this 로 받던 것을 정석 꼴로 바꿈. List 는 콜백(요소, 색인, 리스트)(Array.prototype.find 처럼), Dictionary 는 콜백(값, 키, 딕셔너리)(Map.prototype.forEach 처럼). 옮기는 법: function 콜백에서 this 로 색인이나 키를 읽던 곳은 두 번째 인자로 받는다. (첫 인자만 쓰던 콜백은 그대로 돈다)
+- Animator: 상태를 바꾸지 않던 뼈대를 정석 상태 기계로 완성. AnimationState 에 속도(setSpeed, getSpeed), 되풀이(setLoop, isLoop, null 이면 클립을 따름), getDuration, getNormalizedTime, getFrameIndex. AnimationTransition 에 종료 시각(setExitTime, getExitTime, 정규화 시간, 되풀이 상태의 1 미만은 바퀴마다), 섞는 시간(setDuration, getDuration, 크로스페이드), setCanTransitionToSelf, canTransitionToSelf, 조건(addCondition(이름, 견주는 법, 기준 값), getConditions), isExitTimeReached, from 이 null 이면 어느 상태에서나(Any State). 새 AnimationConditionMode(if, ifNot, greater, less, equals, notEqual). Animator 에 매개변수(setFloat, getFloat, setInteger, getInteger, setBool, getBool, setTrigger, resetTrigger, getTrigger, getParameters), play, findTransition, startTransition, isConditionSatisfied, getCurrentStateIndex, getCurrentNormalizedTime, getCurrentFrame, isInTransition, getNextStateIndex, getNextNormalizedTime, getNextFrame, getTransitionWeight. tick 이 상태 시간을 흘리고 Any State 를 먼저, 그다음 지금 상태의 전이를 넣은 차례로 보고 처음 맞는 하나를 탄다(조건으로 쓴 트리거는 풀림, 섞는 동안은 새 전이를 보지 않음). 처음 더한 상태에서 시작한다. 옮기는 법: setProperty, getProperty, getProperties 는 없어졌다. 종류에 맞게 setFloat, setInteger, setBool, setTrigger 와 그 게터로 바꾼다. 안의 Animation 처리기(getAnimation)도 없어졌다. 고른 프레임은 getCurrentFrame, getNextFrame 과 getTransitionWeight 로 읽는다.
+- VisualAsset: load 가 파일을 읽지 않던 것을 고침. fetch 로 비주얼 에디터가 저장한 UIDocument JSON(씬, 프리팹)을 받아 꼴을 보고, 그 글을 든 Visual 을 담은 뒤 읽힌 것으로 친다. 실패 응답이나 꼴이 틀린 문서는 거부된다. 정적 createVisualFromText 추가, unload 는 담은 Visual 도 비운다.
+- Visual: 문서 글(setDocumentText, getDocumentText)과 createNode 추가. createNode 가 문서로 새 노드 트리를 지어 뿌리의 로컬 위치를 location 으로 둔다. 공개 API 의 설명과 예제를 채움.
+- Timeline: loadFromUrl 이 실패 응답(404 등)을 보지 않던 것을 고침. 이제 거부된다.
+- SkinnedModel: 애니메이션 FBX 에 채널이 있는 스택이 여럿이면 모두 같은 클립 이름이 붙어 playAnimation 이 마지막 것만 틀던 것을 고침. 스택이 여럿이면 스택마다 "클립 이름/스택 이름"(스택 이름이 비면 차례 번호)이다. 스택이 하나면 전처럼 받은 이름이다.
+- HumanSkinRenderer: 텍스처 유닛 주석의 눈 홍채 차례가 뒤바뀐 것을 바로잡음. (12 홍채 노멀, 13 홍채 색. 동작은 원래 맞았다)
+- SkinnedModel: uploadMeshesAndMaterials 를 다시 부르면 예전 드로어블의 VAO, 버퍼, 모프 텍스처와 이 모델이 지은 머티리얼이 남아 새던 것을 고침. (먼저 destroy) uploadWireframeIndices 도 이미 올린 선 버퍼를 지우고 새로 올린다.
+- Localization.isRightToLeft: setRightToLeft 처럼 소문자로, 밑줄을 하이픈으로 읽는다. ("ar_EG" 를 오른쪽에서 왼쪽 언어로 못 잡던 것)
+- Material.createFromDescription: 중간 이미지를 풀지 못하면 그때까지 지은 텍스처를 지우고 거절된다. createTexture 는 그림을 다 푼 뒤에 텍스처를 지어, 풀지 못하면 텍스처를 남기지 않고 기다리는 동안 다른 텍스처가 묶여도 제 텍스처에 올린다. (예전에는 기다리기 전에 묶어, 그사이 묶인 다른 텍스처에 올릴 수 있었다)
+- ShaderProgram: 프래그먼트 셰이더 컴파일이나 링크에 실패하면 먼저 지은 셰이더(와 프로그램)를 지운다
+- UINode.addConstraint: 솔버가 받지 않은 제약(이미 더한 것, 모순)은 목록에 남기지 않는다. (다음 setSolver 가 같은 오류로 멈추던 것)
+- UISpinner.calculateDotOpacity: 점이 없으면(dotCount 0) 0 나누기로 NaN 이 되지 않는다
+- UIListView.setHorizontal: 바뀌면 스크롤 영역을 다시 재고 보이는 항목을 새 축에 다시 놓는다
+- Camera(src/deprecated/camera.js): 폐기 예정. Camera2D(src/misc/camera2d.js)가 회전과 begin, end 까지 모두 덮는다. import.js 는 아직 Camera 로 내보내고, 다음 판에서 빠질 수 있다
+- import.js: 옛 "실험적 기능 목록" 묶음을 컬렉션, 애니메이션, 셰이더와 풀스크린 패스, 3D 그래픽스, 폐기 예정, 실험 묶음으로 나눴다. Visual 은 기타 기능 묶음, VisualAsset 과 BunchAsset 은 리소스 묶음으로 갔다. 내보내는 이름은 같다. (실험 묶음 자리는 주석뿐이고 초안은 src/experimental/experimental.js 에서 직접 불러온다)
+- README, 가이드, ARCHITECTURE: 새 폴더로 고치고, 3D 와 툰 3D 를 실험 기능이라 하던 글을 뺐다. (README 의 "3D (실험)" 은 "3D")
+- 외계행성 광부 키우기(webgame-rimminer)가 게임 쪽에 따로 만들어 쓰던 범용 기능을 엔진으로 옮긴다. (게임 코드는 건드리지 않았다, 게임은 지금처럼 자기 것을 쓴다)
+- ShaderWarmer: 셰이더 미리 링크. 켤 때 같은 소스를 KHR_parallel_shader_compile 로 뒤에서 링크해 브라우저 프로그램 캐시에 남겨, 나중에 ShaderProgram 이 같은 소스를 지을 때 주 스레드가 멈추지 않게 한다. 확장이 없으면 아무것도 하지 않는다. 매 프레임 update(), isFinished(), isSupported(). 어트리뷰트 위치는 ShaderProgram 과 같은 attributeLocationTable 로 준다
+- Outline: 테만 그리는 컴포넌트. (Paint 는 속을 채우기만 한다) 둥근 네모 테(setRoundSize) 또는 동그라미 테(setCircle), 선은 내용 크기 안쪽에 들어온다. setColor(Color 나 "#rrggbb", "rgba(...)"), setLineWidth
+- UIProgressRing: 진행 고리 컴포넌트. 노드의 꼴(둥근 네모, 둥근 정도가 크기의 반이면 동그라미)을 따라 위 가운데에서 시계 방향으로 채운 몫(setRatio)만큼 채운 색, 나머지는 바탕 색으로 그린다. 둘레의 점은 크기, 둥근 정도, 굵기가 바뀔 때만 셈한다
+- UIHitArea: 누르는 자리 넓히기. UIHitArea.attach(buttonNode, minimumSize) 로 단추 바로 뒤 형제로 투명한 누름 자리를 두어 가로세로를 minimumSize 이상으로 넓힌다. 넓힌 몫을 누르면 단추의 클릭 알림을 부르고, 단추가 꺼지거나 누를 수 없으면 따른다. 단추의 자리, 크기, 피봇을 프레임마다 따라간다. setClipNode 로 넓힌 몫을 창이나 스크롤 칸 안으로 자를 수 있다
+- FrameProbe: 처지는 기기 가리기. 기다리는 초 뒤 재는 초 동안 프레임 간격을 보아, 목표 간격의 1.4 배를 넘긴 프레임이 25% 이상이면 처지는 기기다. (90 Hz 화면의 60 FPS 처럼 늘 한 장 걸러 그리는 것은 처진 것으로 보지 않는다) restart, measureAgain, 값은 setSeconds, setSlowFrameThreshold 로 바꾼다
+- PointerCursor: 마우스 커서. 켜면(PointerCursor.getInstance().setEnabled(true)) 엔진이 프레임 끝마다 캔버스의 커서를 정한다. UIButton 위(누르는 중 포함)면 단추의 커서(처음은 pointer), 아니면 setScreenCursor 로 정한 커서다. registerImageCursor 로 1 배와 2 배 그림 커서를 더한다. 손가락 기기에서는 건드리지 않는다. 꺼져 있으면(기본) 지금까지와 같다
+- UIButton: 마우스가 올라 있거나 누르는 중이면 PointerCursor 에 알린다. (PointerCursor 가 꺼져 있으면 아무 일도 없다)
+- Engine: 프레임 끝(묶어 그리기를 그린 뒤)에 PointerCursor.apply() 를 부른다
+- Platform: isDesktopWeb() (모바일이 아니고, 손가락 입력이 여럿 되는 맥인 아이패드도 아님), isCoarsePointer() (CSS pointer: coarse)
+- ViewManager: getCssPixelScale(). 뷰 한 단위가 화면에서 몇 CSS 픽셀인지. (작은 화면에서 UI 층만 키울 배율을 셈할 때 쓴다)
+- SoftShade, SoftShadeShape: 부드러운 그늘 컴포넌트. 글 뒤를 어둡게 눌러 밝은 바탕 위에서도 읽히게 한다. 띠(가운데가 가장 짙고 위아래와 양옆으로 엷어짐) 또는 바닥(아래가 가장 짙은 세로 그라데이션)을 작은 캔버스에 구워 내용 크기로 늘려 그린다. 크기, 모양, 색, 짙기가 바뀔 때만 다시 굽는다
+- ShadowText: 그림자를 깐 한 줄 글 컴포넌트. 그림자 위에 글을 얹은 모습을 캔버스 한 장에 구워 그리므로 노드의 불투명도가 글과 그림자에 한 장째로 먹는다. (Text 두 벌로 깔면 흐리게 할 때 밑의 그림자가 비친다) 그림자는 번지게(setShadow 의 shadowBlur) 할 수 있고, 넘치면 setFitMinimumRatio 까지 줄여 맞춘다. 가로 정렬과 자리는 Graphic.drawTextEntry 와 같은 셈, 세로는 가운데. setFontFace, setTextDirection
+- ShadowImage: 그림자를 깐 그림 컴포넌트. 그림(또는 setImage(image, imageRect) 로 아틀라스의 조각)을 노드 안에 비를 지켜 가운데로 그리고, 그림의 모양 밑에 그림자를 칠해 한 장으로 굽는다. setImageColor 로 그림을 한 빛으로 칠할 수 있다
+- buildRGBAString(colorText, opacity): "#rrggbb" 와 불투명도로 캔버스의 rgba 색 글을 만든다. (shadowtext.js)
+- CameraGestures: 카메라 손짓. 3D 판이나 지도를 돌리고 밀고 키우는 손짓을 캔버스의 DOM 사건에서 따로 읽는다. 마우스 오른쪽 끌기(가로는 돌리기, 화면 너비가 한 바퀴, 세로는 기울이기, 끌지 않고 떼면 오른쪽 클릭), 가운데 끌기(밀기), 두 손가락(밀기, 오므려 키우기, 문턱을 넘게 비틀면 돌리기). 모인 양은 takePan, takeRotation, takeTilt, takeZoom, getZoomAnchor 로 매 프레임 꺼낸다. 손짓 중이면 isGestureActive. 손가락을 뗀 바로 뒤의 흉내 낸 마우스 사건은 무시한다. setThresholds 로 문턱을 바꾸고 dispose 로 뗀다
+- SoundSystem, setSoundSystem, readSoundSystem: 소리 표로 다루는 배경음악과 효과음. (AudioManager 의 공유 AudioContext 와 AudioAsset 을 쓴다) 줄마다 { id, path 나 paths, volume, minimumInterval, isMusic, maximumVoices, pitchVariation, playSeconds, fadeOutSeconds }. 여러 녹음 중 바로 앞과 다른 것 고르기, 같은 소리 동시 수 제한, 음 높이 흔들기, 앞 몇 초만 틀고 줄여 끄기, 배경음악 겹쳐 바꾸기와 이어 틀기, 음악과 효과음 버스. 음소거는 사용자 단추, 페이지 가려짐, 터치 기기의 창 포커스 잃음(아이폰이 앱 전환 때 오디오가 얼어 되풀이되는 것을 막는다), setExternalMuteProvider 로 준 바깥 음소거(플랫폼 SDK, 광고) 가운데 하나라도 맞으면 걸리고, 그동안 AudioContext 를 멈춘다. 풀린 뒤 돌지 않으면 잠깐마다 다시 깨운다. setAutoplayAllowedProvider 로 누르기 전 깨우기를 막을 수 있다. 매 프레임 update()
+- LanguagePack: 자산의 JSON 으로 두는 언어 묶음. (import 의 LanguagePack 이름 아래 함수들) languages.json(언어 목록, fallbackLanguage, 언어마다 code, name, englishName, fontGroup, direction, aliases, countries, file)과 언어마다의 표를 읽는다. 설정의 언어가 비면 setPreferredLanguageTag 로 준 언어(플랫폼이 알려 준 것), 그다음 기기의 언어, 목록에 없으면 기본 언어. 없는 열쇠는 기본 언어의 글자, 거기도 없으면 열쇠 그대로. translate, formatText({이름}), readTextDirection, isolateText(방향 격리), html 의 lang 과 탭 제목(setDocumentTitleKey). setLanguagePaths 로 경로를, setLanguageLoadedHandler 로 언어를 불러온 뒤 할 일(그 언어의 글꼴 받기)을 건다. Localization(코드 안의 표)은 그대로다
+- UIFont: 여러 문자의 글꼴 조각을 한 글꼴 이름 아래 묶는다. (import 의 UIFont 이름 아래 함수들) Google Fonts 가 나눠 둔 조각마다 FontFace 를 그 조각의 글자 범위(unicode-range)로 올려, 화면에 쓰는 글자가 든 조각만 받는다. 고른 언어의 묶음을 라틴 바로 앞에 올려 한자가 그 언어의 글꼴로 나오고, 숫자와 영문은 늘 라틴 글꼴이다. 굵기는 두 가지로만 올려 범위로 함께 고르게 한다. 쓸 글자의 조각을 미리 받고(loadUiFontText, requestUiFontText), 처음 조각은 정한 시간까지만 기다린다. 나머지 묶음은 조금 뒤에 받는다. configureUiFont 로 이름, 목록 경로, 굵기, 기다리는 시간을 정하고 readUiFontFace 로 Text 와 ShadowText 에 줄 FontFace 를 읽는다
+- ToastMotion, attachToastMotion, readToastSeconds: 알림 노드에 붙이는 나옴과 사라짐 모션. show(text, seconds, applyText) 로 바깥쪽(setEnterSide, 위나 아래)에서 미끄러져 들어오며 살짝 커졌다 돌아오고, 머문 뒤 떠오르며 사라지고 노드를 끈다. 떠 있는 동안 다른 글이 오면 앞 것이 빨리 비키고, 같은 글이 또 오면 시간만 다시 채우고 통 튄다. 자리는 놓인 자리를 기준으로 그 둘레에서만 움직인다. readToastSeconds 는 긴 글일수록 머무는 시간을 늘린다. (UIToast 는 줄 세운 알약 알림을 스스로 만들고, 이것은 게임이 만든 알림 노드를 움직인다)
+- ButtonMotion, ButtonMotionStyle, attachButtonMotion, setButtonMotionArea, shakeButton: 단추 반응. UIButton 다음으로 붙이면 단추의 상태를 읽어 노드를 가운데를 두고 키우고 줄인다. normal 꼴은 올리면 커지고 누르는 동안 줄고 떼면 통 튄다. inset 꼴(창 안)은 커지지 않고, 올린 동안 바탕을 밝히고 안쪽에 흰 테를 둔다. 누를 수 없으면 shakeButton 으로 좌우로 흔든다. 꼴은 단추마다(setStyle) 또는 위 노드에 setButtonMotionArea 로 건다. 손가락 기기는 올림을 쓰지 않는다. 반응이 없을 때는 노드를 건드리지 않아 다른 연출과 겹치지 않는다. 단추에 얹은 꾸밈이 제 모양으로 밝히게 하려면 setLitHandler 로 함수를 건다
+- ToonMesh(graphics3d/toon/meshbuilder.js): 툰 3D(점토 같은 한 색 재질과 바깥선)를 그릴 꼭짓점 배열 짓기. MeshBuilder 에 상자, 둥근 상자, 원기둥, 구, 회전체, 캡슐, 도넛, 팔면체 도형을 자리, 돌림, 크기를 곱해 한 덩어리로 담는다. 꼭짓점은 자리 3, 노멀 3, 색 3(sRGB), 재질 2(빛남, 빛을 받지 않음), 무늬 4(무늬 번호와 색, 뜻은 셰이더가 정함). 바깥선은 점마다 같은 굵기로 민 껍데기(inverted hull)를 따로 담고, 모서리에서 너무 튀지 않게 민다. 삼각형의 감기는 노멀을 보고 바깥이 앞면이 되게 맞춘다. 뼈대 모형은 본 번호와 무게를 따로 담는다
+- ToonGlb(graphics3d/toon/glbmeshreader.js): 텍스처 없이 재질 색으로 칠하는 GLB 를 MeshBuilder 배열로 읽는다. (readGlbArrays, 노드마다 따로 readGlbNodeArrays, 노드 정보 readGlbNodeInfos) baseColorFactor 는 sRGB 로, emissiveFactor 는 빛남으로, 재질 extras 의 outline 과 basic 을 읽는다. 뼈대(skin)와 움직임(animations, extras)을 읽고 writeSkinPose 로 한 순간의 본 행렬을 셈한다. (앞 자세와 섞기, 흔들림 배율) 엔진의 SkinnedModel(텍스처 PBR)과는 따로다
+- ToonRenderer(graphics3d/toon/toonrenderer.js): ToonMesh 와 ToonGlb 의 배열을 그리는 툰 렌더러. 해(방향, 색)와 하늘색, 땅색을 섞은 바탕빛, setBandCount 로 셀 셰이딩 칸, 꼭짓점의 빛남과 빛을 받지 않음, 모형마다 틴트와 불투명도, 바깥선 껍데기는 뒷면만 그린다. 뼈대는 writeSkinPose 의 본 행렬을 drawMesh 의 jointMatrices 로 넘긴다. (96 개까지, 엔진 SkinnedModelRenderer 와 같다) beginFrame 이 앞의 그리기 상태를 적어 두고 endFrame 이 돌려, 엔진 2D 그리기 사이(flushSpriteBatch 뒤)에 끼울 수 있다. readProgramSources 로 ShaderWarmer 에 넘길 소스를 준다. 외계행성 광부 키우기의 판 렌더러에서 땅 무늬와 화면 공간 선 같은 게임 몫은 빼고 새로 지었다
+- ToonRenderer: GPU 인스턴싱(drawMeshInstanced, 인스턴스마다 { modelMatrix, tintColor }, 몸과 바깥선 모두), 화면 밖 거르기(모형의 경계 구를 절두체에, 인스턴스는 하나씩 걸러 남은 것만 올린다, options.isCulled), 그림자(beginShadowPass, drawMesh 가 깊이만, endShadowPass 가 프레임버퍼와 뷰포트를 돌린다, setShadow(ShadowMap) 로 3x3 PCF 로 받는다), HDR 출력(setHdrOutput), 한 프레임의 그린 수와 거른 수와 드로우콜(getFrameStatistics), extractFrustumPlanes
+- ToonPostProcess: HDR 마무리. 반정밀 실수 RenderTarget 에 그린 씬을 BloomEffect 로 번지게 하고, 노출과 ACES 근사 톤매핑과 sRGB 감마로 화면에 낸다. (begin, end, setExposure, setBloom) 러스트 vanilla-engine 과 같은 구성이다
+- 렌더링: 노드와 Paint 를 그릴 때 프레임마다 생기던 객체와 드로우 콜마다의 일을 줄인다. 그리는 결과는 같고 부르는 쪽의 사용법도 같다. (아래 벤치 장면과 예제 uishowcase, uisample, spriteeffects, particleeffects, timelineshowcase 를 시계를 고정해 같은 프레임에서 뜨면 화면 픽셀이 고치기 전과 같다) 크롬(헤드리스, 실제 GPU)에서 Paint 로 둥근 사각형을 그리는 노드 8천 개가 움직이는 장면(rustgame-test 의 같은 스펙 비교 벤치)을 같은 때에 재면 그리기가 78.0 ms 에서 13.0 ~ 14.4 ms, 프레임이 90.1 ms 에서 23.9 ~ 26.3 ms 가 되고, 60 FPS 를 지키는 노드 수는 1천에서 4천 ~ 6천이 된다. (한 PC 의 측정, 게임 로직 시간은 그대로다)
+- Graphic.drawRoundRect: 꼭짓점 36 개의 cos / sin 을 모듈을 읽을 때 한 번 구해 둔 표로 셈하고, Vector2 배열을 만들지 않고 고쳐 쓰는 칸에 적은 좌표로 바로 버텍스를 쓴다. (노드마다 프레임마다 삼각함수 72 번, Vector2 36 개, 코너 객체 4 개가 없어진다) 표는 지금까지와 같은 식(엔진 base/math.js 의 cos / sin)으로 구해 꼭짓점 값이 비트까지 같다. buildRoundRectPositions 도 표를 쓴다. (돌려주는 Vector2 배열은 지금처럼 새로 만든다) drawRoundRect 는 이제 buildRoundRectPositions 를 거치지 않는다
+- Graphic: writeRoundRectPositionData(rect, roundSize), drawRoundRectPositionData(color). 라운드 사각형 좌표를 모듈의 칸에 적고, 그 칸으로 채움을 그린다. (drawRoundRect 가 쓴다)
+- Paint.draw: 그릴 때마다 Rect 하나(안의 Vector2 포함)와 내용 크기 복제본을 만들던 것을, 모듈에 하나 둔 사각 영역을 고쳐 쓰고 WorldNode.copyContentSizeTo 로 크기를 받게 바꾼다. graphic 의 그리기 함수에 넘긴 사각 영역은 다음 Paint 를 그릴 때 바뀐다. (엔진 안에서 받은 사각 영역을 들고 있는 곳은 없다)
+- WorldNode: copyContentSizeTo(target). 내용 크기를 복제본 없이 target 에 적는다. getContentSize 를 덮어쓴 하위 클래스(UINode 등)면 그 함수가 주는 값을 적는다
+- TransformNode, WorldNode 의 pushTransform: 위치, 크기, 피봇, 내용 크기를 복제본 없이 읽는다. (노드마다 프레임마다 Vector2 넷) TransformNode.applyLocalTransform(graphic) 이 로컬 위치, 회전, 크기를 건다. 그 getter 들을 덮어쓴 하위 클래스면 지금처럼 getter 를 불러 읽는다
+- TransformMatrix: rotate(0) 과 scale(1, 1) 은 행렬을 셈하지 않고 돌아간다. (결과는 같다, 회전하지 않는 노드도 그릴 때마다 부른다)
+- Graphic.pushState / popState: 저장할 때마다 행렬 복제본과 상태 객체를 만들지 않고, 스택 깊이마다 만들어 둔 칸에 지금 행렬 객체와 그 값을 적는다. 복원하면 저장할 때의 행렬 객체에 그 값을 되돌려 적고 다시 지금 행렬로 삼는다. 그래서 getTransformMatrix() 로 받아 둔 행렬은 복원 뒤에도 지금 행렬이다. (지금까지는 복원하면 저장해 둔 복제본으로 바뀌어, 받아 둔 행렬은 더는 지금 행렬이 아니었다)
+- TransformNode.setLocalPosition / setLocalScale, WorldNode.setPivot / setContentSize: 받은 벡터를 복제하지 않고 가진 벡터에 값을 옮겨 적는다. getter 는 지금처럼 복제해 주므로 가진 벡터는 밖으로 나가지 않는다
+- Rect: 생성자와 create() 가 갓 만든 Vector2 를 setter 로 한 번 더 복제하지 않는다. (Rect.create 하나에 Vector2 여덟 개이던 것이 두 개)
+- Color.clone(): Reflection.clone 을 거치지 않고 rgba 를 바로 옮긴 새 Color 를 만든다. (Rect.clone 처럼 하위 클래스가 아니라 Color 를 돌려준다, 엔진 안에 Color 의 하위 클래스는 없다) setFillColor 처럼 그릴 때마다 부르는 곳이 있다
+- Reflection.clone: getter 와 setter 를 함께 가진 프로퍼티 이름 목록을 프로토타입마다 처음 한 번만 훑어 두고 쓴다. (부를 때마다 프로토타입 사슬을 훑었다) 복사하는 차례와 값은 같다
+- Object: 비공개 필드(#instanceId, #isDestroyed)를 뺀다. 고유식별자는 처음 getInstanceId() 를 부를 때 모듈의 WeakMap 에 넣는다. 늘 false 이던 isDestroyed() 는 뺐다. (destroy() 가 파괴 표시를 남기지 않았고, 러스트 판은 버린 값이 없어지고 지운 노드의 핸들이 None 이라 같은 함수가 없다. 옮기는 법: isDestroyed() 를 부르던 곳은 늘 false 였으므로 그 검사를 지운다. 노드가 아직 트리에 있는지는 getParent() 로 본다) 모든 엔진 객체가 만들어질 때마다 채우던 칸 둘이 없어진다
+- Graphic.drawVertices: 유니폼 자리(modelMatrix, mainColor, tintColor, globalAlpha)를 드로우 콜마다 이름으로 찾지 않고 셰이더 프로그램이 바뀔 때만 찾는다. (uploadDrawUniforms) 기본 프로그램의 틴트와 전역 투명도는 지난번에 올린 값과 같으면 다시 올리지 않는다. 프레임 시작(applySettings)과 프로그램이 바뀔 때 올린 값을 잊고, 바꿔 끼운 프로그램(setShaderProgramOverride)에는 늘 올린다. 게임이 기본 프로그램의 tintColor, globalAlpha 유니폼을 직접 올리면 다음 드로우 콜이 그 값을 바로잡지 않을 수 있다. (엔진 안에는 그런 곳이 없다)
+- Engine: 최대 FPS 제한(EngineConfiguration.maximumFramePerSecond)을 처리한 프레임 수로 센다. 세기 시작한 때부터 처리한 프레임 수로 다음 프레임의 차례(시작 시각 + 수 × 간격)를 정하고, 차례보다 4 ms 넘게 일찍 온 프레임만 건너뛴다. 밀린 것은 다음 프레임에 처리해 평균이 최대 FPS 가 된다. 지금까지는 마지막으로 처리한 프레임 뒤로 간격보다 4 ms 덜 지났으면 건너뛰고 기준을 처리한 프레임의 시각으로 다시 잡아 밀린 것을 잊었으므로, 주사율이 최대 FPS 로 나누어떨어지지 않으면 제한이 어긋났다. (60 FPS 에서 90 Hz 는 한 프레임 걸러 45, 144 Hz 는 72, 75 Hz 는 하나도 건너뛰지 않아 75) 한 프레임 넘게 밀리면(창이 가려졌다 돌아옴 등) 몰아서 처리하지 않고 그 시각부터 다시 센다. 차례보다 1 ms 안쪽으로 일찍 온 프레임을 처리하면 그 시각부터 다시 세어, 주사율이 최대 FPS 와 거의 같은 화면(60.05 Hz 등)에서 조금씩 앞서 간 것이 쌓여 가끔 한 프레임을 건너뛰지 않는다. 최대 FPS 를 바꾸면 다시 센다. 60 Hz 화면의 60 FPS, 주사율의 약수인 최대 FPS(90 Hz 의 30 FPS 등)는 지금까지와 같다.
+- UIDocument: getReflectedProperties(component) 로 컴포넌트의 짝 맞는 get(또는 is)/set 속성 목록을 연다. (에디터의 인스펙터가 쓴다) 컴포넌트 종류 표에 Outline, SoftShade, ShadowText, UIProgressRing 을 더했다
+- 비주얼 에디터(tools/visualeditor)를 유니티처럼 새로 지었다. 위 메뉴(File, Edit, Node, View, Window)와 도구 막대 밑에 도킹 창들(Hierarchy, Scene, Game, Inspector, Project, Console). 처음 배치는 왼쪽 하이어라키, 가운데 씬과 게임, 오른쪽 인스펙터, 아래 프로젝트와 콘솔
+  - 도킹(docklayout.js): 유니티나 VS Code 처럼 창 탭을 끌어 다른 창의 탭 줄이나 가운데에 놓으면 탭으로 합치고, 창 가장자리(30%)에 놓으면 그쪽으로 나누어 붙이고, 도킹 전체 가장자리에 놓으면 전체 바깥쪽에 붙인다. 끄는 동안 붙을 자리를 파란 칸으로 미끄러지듯 보여 주고, 탭 사이에 넣을 자리는 막대로 보인다. Esc 는 그만두기. 사이 막대를 끌어 크기를 바꾸고, 탭을 두 번 누르면 그 묶음을 크게 펼친다. 탭의 X 나 가운데 단추로 창을 닫고 Window 메뉴로 다시 연다(닫을 때 같이 있던 창 옆으로 돌아간다). Window > 창 배치 되돌리기. 배치는 브라우저에 남겨 두고 다시 열면 되살린다
+  - Scene 창과 Game 창은 캔버스 하나를 나누어 쓴다. 둘이 따로 보이면 고른 쪽에 캔버스를 달고 다른 쪽에는 누르면 옮겨 오는 안내를 둔다. 씬 뷰는 창 크기가 바뀌어도 보던 가운데를 지킨다
+  - 레티나처럼 픽셀 배율이 1 이 아닌 화면에서 씬 뷰가 왼쪽 위 일부에만 그려지던 것을 고쳤다 (EditorScene preDraw 에서 applyViewRect)
+  - 씬 뷰: 엔진 캔버스에 격자와 화면 틀(기준 해상도)을 깔고 실제 WorldNode 를 그린다. 누르면 고르고, 손잡이로 옮기기(W), 돌리기(E), 키우기(R), 밀기(Q, 스페이스, 가운데와 오른쪽 끌기), 마우스 바퀴와 Ctrl 바퀴(트랙패드 모으기)로 키우기, 트랙패드 두 손가락으로 밀기. Ctrl 은 10 단위, Shift 는 15 도에 맞춘다. 화살표로 1 칸(Shift 10 칸), F 는 고른 노드로, Home 은 화면 틀로
+  - 게임 뷰(Tab): 격자와 손잡이 없이 화면 틀을 뷰에 꽉 맞추고 틀 밖을 가린다. 재생하면 게임 뷰로, 멈추면 씬 뷰로 돌아온다
+  - 하이어라키: 펼치기와 접기, 두 번 눌러 이름 바꾸기, 끌어서 자식으로 넣거나 앞뒤 형제로 옮기기(화면 위치는 지킨다), 찾기 칸, 오른쪽 클릭으로 만들기, 복사, 붙여넣기, 복제, 지우기, 프리팹으로 저장
+  - 인스펙터: 켜기와 이름, 변환(위치, 회전, 크기, 내용 크기, 피봇, 앵커, 불투명도), 컴포넌트마다 반사로 모은 속성 칸(숫자, 글, 참거짓, 색과 알파, Vector2, 정해진 값은 고르기 칸). 숫자 이름표를 좌우로 끌면 값이 바뀐다. Sprite 의 그림은 프로젝트의 그림 애셋을 끌어다 놓고, 원래 크기 단추로 내용 크기를 그림에 맞춘다. 컴포넌트 더하기와 빼기
+  - 프로젝트: 폴더 열기(showDirectoryPicker, 크롬 계열)로 실제 애셋 폴더를 읽고 쓴다. 그 밖의 브라우저는 파일과 폴더를 끌어다 놓아 가져온다. 폴더 나무와 애셋 격자(그림 썸네일), 종류(그림, 소리, JSON, 씬, 프리팹, 모델, 글꼴, 글) 가르기, 가져오기 단추로 지금 폴더에 파일 복사. 애셋을 고르면 인스펙터에 미리보기(그림과 해상도, 소리 재생, JSON 과 글 내용, 글꼴 견본, GLB 는 메시와 뼈와 애니메이션 수와 툰 렌더러로 그려 끌어 돌리는 3D 미리보기)
+  - 그림 애셋을 씬 뷰에 놓으면 그 자리에 그림 크기의 Sprite 노드를 만든다. 프리팹(.prefab.json, UIDocument 문서 하나)은 놓거나 두 번 눌러 꺼내고, 씬(.scene.json)은 두 번 눌러 연다
+  - 씬 저장과 열기: UIDocument 형식에 에디터 값 frameSize 를 얹은 .scene.json. 게임은 UIDocument.fromJsonText 로 그대로 읽는다. 폴더를 열었으면 그 안에 바로 쓰고, 아니면 내려받는다. Sprite 의 그림은 imagePath 로 적고 프로젝트에서 찾아 잇는다
+  - 되돌리기와 다시 하기(200 칸, 같은 값을 잇달아 바꾸면 한 칸), 복사와 붙여넣기, 복제, 재생과 멈춤(멈추면 재생 전으로 되돌린다), 바꾸고 1 초 뒤 브라우저에 자동 보관하고 다시 열면 되살린다. 콘솔은 에디터 알림과 브라우저의 경고와 오류를 함께 보인다
+  - 앞의 입자 스크립트 시연 에디터는 이것으로 바꿨다
+- 렌더링: 같은 셰이더 프로그램과 같은 텍스처를 다시 거는 호출을 거른다. Graphic 이 마지막으로 쓰게 한 프로그램과 0 번 텍스처 유닛에 묶은 텍스처를 기억해 같으면 useProgram, bindTexture 를 부르지 않는다. (useShaderProgram, bindTexture) 묶어 그리기(flushSpriteBatch)와 파티클 그리기(drawColoredQuads)는 그린 뒤 기본 프로그램으로 되돌리지 않고 다음에 그리는 쪽이 제 프로그램을 쓰게 해, 묶음을 잇달아 그릴 때 프로그램을 오가지 않는다. 그리는 결과는 같다. (예제 uishowcase, uisample, spriteeffects, particleeffects, timelineshowcase 와 바깥 GL, ShaderSprite, ScreenEffect, 씬 둘, 밉맵 바꾸기를 섞은 시험 장면을 시계와 난수를 고정해 같은 프레임에서 뜨면 묶기 끔, 켬 모두 고치기 전과 픽셀이 같다)
+- Graphic: invalidateRenderStateCache(). 묶음 기억을 잊는다. Graphic 을 거치지 않고 WebGL 로 프로그램이나 텍스처를 바꾼 뒤 Graphic 출력을 이어갈 때 부른다. restoreRenderState, applySettings 와 컨텍스트를 잃거나 되살릴 때(webglcontextlost, webglcontextrestored)는 스스로 잊는다. (바깥 GL 을 끼우는 곳은 지금처럼 flushSpriteBatch 와 restoreRenderState 로 감싸면 된다)
+- Engine: 씬마다 그리기 전(preDraw, 로딩 중이면 drawOnLoad)에 Graphic 의 묶음 기억을 잊는다. (앞 씬의 그리기와 이 씬의 갱신 사이에 바깥 WebGL 이 텍스처를 바꿨을 수 있다)
+- ImageTextureCache, TextStringTextureCache: 생성자의 둘째 인자로 텍스처를 묶는 함수(textureBinder)를 받는다. Graphic 이 넘겨, 캐시가 텍스처를 올릴 때도 묶은 텍스처를 기억한다. 없으면 지금처럼 바로 묶는다. ImageTextureCache.getTexture 는 텍스처를 만들거나 필터를 다시 걸 때만 묶는다. (그리려고 묶는 것은 Graphic 이 한다)
+- Text: 줄바꿈한 줄 배열을 기억해 두고, 글, 글꼴, 크기, 굵게, 기울임, 폭, 줄바꿈 방식이 바뀌거나 웹 글꼴이 받아지거나(loadingdone) 문서에 글꼴 얼굴이 올라가고 빠질 때만 다시 나눈다. (readWrappedLines) 그릴 때마다 단어와 글자마다 measureText 하던 것이 없어진다
+- Sprite.draw: 그릴 때마다 만들던 Vector2 넷(위치, 내용 크기 복제, 뒤집기, 곱한 크기)과 그림 영역이 없을 때의 Rect 를 없앤다. 모듈의 벡터를 고쳐 쓰고 WorldNode.copyContentSizeTo 로 크기를 받으며, 영역이 없으면 그림 전체를 바로 그린다. Graphic.drawImageWithImageRect 도 영역이 없을 때 Rect 를 만들지 않는다
+- Graphic.beginClipRect: 영역과 변환 행렬의 복제본을 만들지 않고 클립 깊이마다 만들어 둔 칸에 값을 적는다. endClipRect 는 그 칸을 지금 행렬 객체로 삼지 않고 값만 옮겨 적는다. (popState 가 begin 때의 행렬로 되돌리는 것은 같다) Mask.beginClip 도 클립 영역을 새로 만들지 않는다
+- TextStringTextureCache.getEntry: 찾을 때마다 열쇠 문자열을 만들지 않고, 문자열별 엔트리 목록에서 나머지 값(방식, 방향, 배율, 선 두께, 색, 글꼴)을 견준다. 열쇠 문자열은 구울 때 한 번 만들어 엔트리에 둔다. (LRU 차례와 상한, invalidateFontFaces 는 같다)
+- ParticleSystem: 수명이 다한 파티클을 splice 로 하나씩 빼지 않고(뒤를 매번 당긴다) 살아 있는 것을 앞으로 당겨 담는다. (그리는 차례는 같다) 그림 파티클은 그릴 때마다 Vector2 둘을 만들지 않는다
+- 화면 밖 거르기: Graphic.setCullingEnabled(true) 면(기본 false, 지금까지와 같다) WorldNode 가 컴포넌트를 그리기 전에, 켜진 컴포넌트가 모두 내용 영역 안에서만 그린다고 알리면 내용 영역(한 단위씩 넓혀)을 지금 변환으로 옮긴 경계 상자가 화면에 걸치지 않을 때 그 노드의 컴포넌트 그리기를 건너뛴다. 판정은 그릴 때 Graphic 의 지금 변환(부모의 배율과 회전, pushState 로 건 것까지)으로 한다. 자식은 저마다 따로 보고 그대로 그리며, Mask 의 클립도 그대로 건다. draw 를 덮어쓴 노드와 TransformNode, UINode 는 거르지 않는다. (러스트 vanilla-engine 과 같은 방식이다, 러스트는 기본 켬)
+- Component.isDrawnInsideContent(): 노드 내용 영역 안에서만 그리는지. 기본 false 라 알리지 않는 컴포넌트가 하나라도 켜진 노드는 거르지 않는다. Paint, Sprite 와 ShaderSprite(뒤집지 않았을 때, 조각과 나인 슬라이스와 타일 포함), Mask, Outline, SoftShade, UIProgressRing 만 true 를 알린다. draw 를 덮어쓴 하위 클래스는 false 로 돌아간다. 글자(Text, RichText, ShadowText 는 칸을 넘칠 수 있다), ShadowImage(그림자 여백), ParticleSystem, TrailRenderer, UI 위젯은 알리지 않는다
+- Graphic: isCullingEnabled(), isLocalRectVisible(rect) (지금 변환으로 옮긴 사각형이 드로잉 버퍼에 걸치는지), addCulledNodeCount(count), getLastFrameCulledNodeCount(). 엔진 통계(useStatistics)에 culledNodes 줄을 더했다
+- HeatHazeEffect(experimental): 없는 graphic.getCanvasRenderingContext() 를 부르던 Canvas2D 시절 코드를 지금 WebGL Graphic 으로 다시 짰다. 묶음을 먼저 그린 뒤 노드 영역의 화면 바운딩 박스를 copyTexSubImage2D 로 텍스처에 떠 오고, 줄마다 쿼드 한 장씩 정점 색 쿼드(drawColoredQuads)로 사인 곡선만큼 옮겨 그린다. (러스트 vanilla-engine 과 같은 방식, 흔들림 0 이면 효과가 없는 화면과 픽셀이 같다) 영역이 화면 밖으로 나가면 가장자리 픽셀을 늘인다. 내용 크기와 피봇을 쓰므로 TransformNode 대신 WorldNode 를 상속한다. (TransformNode 에는 setContentSize, getWorldBounds 가 없어 만들 때부터 죽었다) 떠 온 텍스처는 destroy() 가 지운다
+- Indicator(misc): 없는 graphic.getCanvasRenderingContext() 와 isVisible() 을 부르고 import 경로("./graphic.js")가 깨져 있던 것을 고쳤다. Graphic 의 pushState, drawLine, drawStrokeCircle 로 그린다. (Graphic 의 선은 끝이 각져 Canvas2D 시절의 둥근 끝은 없다)
+- 수학(base/math.js): sqrt 가 바빌로니아법 10 번으로 셈해 1 만을 넘으면 틀리던 것을 내장 제곱근으로 고쳤다. (sqrt(1e5) 가 317.2, sqrt(1e6) 이 1296, 2026-03-21 부터) 이 sqrt 를 쓰는 길이가 100 넘는 벡터의 length, normalize, distance(Vector2, Vector3)와 Quaternion, TransformMatrix, Graphic 의 긴 선(굵기와 이음새가 가늘고 짧았다), ParticleSystem 의 셈이 틀리던 것이라 게임에서 동작이 바뀔 수 있다
+- 수학: asin, acos 가 급수 100 항으로 ±1 가까이에서 틀리던 것(asin(0.9999) 가 1.5132, 정답 1.5567)과 pow 가 지수가 분수면 틀리던 것(pow(4, 0.5) 가 1, pow(2, 2.2) 가 4)을 내장으로 고쳤다. Tween 의 exponential, elastic 이징과 Vector2.angle 이 바뀐다. floor, ceil, round 는 무한대를 NaN 으로 돌려주던 것을 그대로 돌려준다. (sin, cos, tan 은 내장과 4e-9 안으로 같아 그대로 둔다)
+- Vector2: modulo 가 나머지 대신 나누기를 하던 것, half 가 반이 아니라 두 배를 돌려주던 것을 고쳤다
+- Engine: 뒤로 가기 캐시에서 돌아올 때(pageshow 의 persisted) 없는 dispatchPageProcessRestored 를 불러 예외가 나던 것을 고쳤다. resume 때처럼 엔진 상태(오디오, 입력)를 되살리고 로드된 씬마다 onPageProcessRestored 를 부른다
+- 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
+- Graphic: 묶어 그리기(setSpriteBatchingEnabled)와 화면 밖 거르기(setCullingEnabled)를 기본으로 켠다. 지금 엔진을 쓰는 게임(외계행성 광부, 우주생물, aberrant, 찾았다, 종말 생존)이 모두 묶어 그리기를 켜고 돌았고, 거르기는 내용 영역 안에만 그린다고 알린 컴포넌트만 거른다(예제 일곱 장면에서 켬과 끔의 픽셀이 같았다). 예전처럼 쓰려면 setSpriteBatchingEnabled(false), setCullingEnabled(false)
+- 입력: 출시 게임들(찾았다, 종말 생존, 우주생물, aberrant, 외계행성 광부)이 게임 쪽에 따로 만들어 쓰던 입력을 엔진 기본으로 옮긴다. (게임 코드는 건드리지 않았다, 게임은 지금처럼 자기 것을 쓴다)
+- GamepadKind, readGamepadKind(gamepadId): 패드 이름(Gamepad.id)으로 종류를 가른다. 플레이스테이션(054c, playstation, dualshock, dualsense, sony), 닌텐도(057e, nintendo, joy-con, pro controller), 엑스박스(045e, xbox, xinput, microsoft), 그 밖은 other
+- GamepadManager.vibrate(strongMagnitude, weakMagnitude, seconds): 연결된 패드를 모두 브라우저 vibrationActuator 의 dual-rumble 로 떤다. 세기는 0 ~ 1 로 자른다. 진동 장치가 없는 패드와 브라우저는 건너뛴다
+- GamepadManager.getActiveGamepadId(): 마지막 갱신에 단추를 누르거나 축을 0.5 넘게 기울인 패드의 이름. (없으면 빈 글, 마지막으로 쓴 장치를 가릴 때)
+- GamepadManager.setInputLogEnabled, isInputLogEnabled: 단추와 축이 바뀔 때마다 찍던 console.log 를 끄고 켠다. 기본 동작을 바꿨다: 기본이 꺼짐이라 이제 단추와 축 로그는 찍지 않는다. (스틱을 조금만 움직여도 프레임마다 로그가 쏟아졌고, 로그에 기대는 게임이 없다) 연결과 해제 로그는 그대로 찍는다
+- InputManager: 마우스 단추 셋(MouseButton.left, middle, right)의 눌림과 이번 프레임의 누름과 뗌(setMouseButtonDown, isMouseButtonDown, isMouseButtonJustPressed, isMouseButtonJustReleased). 프레임 사이에 눌렀다 뗀 것도 그 프레임에 잡힌다. 러스트 vanilla-engine 과 같은 꼴이다
+- InputManager.setTouchFromLeftButtonOnly: 켜면 마우스 왼쪽 단추만 터치로 넘긴다. 끄면(기본) 지금까지처럼 어느 단추든 터치다
+- InputManager.setContextMenuPrevented, isContextMenuPrevented: 캔버스의 오른쪽 클릭 메뉴를 막을지. 처음은 참으로 지금까지와 같다
+- InputManager.isKeyJustPressed, isKeyJustReleased 의 바뀐 동작: 프레임 끝의 키 사진을 견주지 않고, 지난 프레임 끝 뒤로 온 키 사건(pushKey, popKey)을 쌓아 본다. 프레임 사이에 눌렀다 뗀 키를 놓치던 것을 고쳤다. (그때는 isKeyPressed 가 거짓이고 isKeyJustPressed 와 isKeyJustReleased 가 함께 참이다) 눌린 채 오는 키 되풀이(keydown repeat)는 새 누름이 아니다. updateFrameSnapshot 은 쌓인 사건을 비운다
+- TouchPoint, TouchPhase, InputManager.getTouchPoints(), getEndedTouchPoints(): 닿아 있는 손가락 목록. 손가락마다 identifier(Touch.identifier), phase(began, moved, stationary), canvasNativePosition, viewPosition. 이번 프레임에 떨어진 손가락은 getEndedTouchPoints 에 ended 나 cancelled 로 한 프레임 남는다. 엔진이 touchstart, touchmove, touchend, touchcancel 의 바뀐 손가락마다 beginTouchPoint, moveTouchPoint, endTouchPoint 를 부르고, 사건의 touches 에 없는 손가락은 취소로 지운다. 첫 손가락이 터치로 가는 것은 그대로다
+- ViewManager.convertClientToView(clientX, clientY): DOM 사건의 화면 좌표를 뷰 좌표로 바꾼다
+- InputDevice, InputManager.getLastInputDevice, getLastGamepadKind (setLastInputDevice, setLastGamepadKind): 마지막으로 쓴 장치(keyboard, mouse, touch, gamepad)와 패드 종류. 키를 누르면 keyboard, 마우스 단추와 휠과 6 픽셀 넘는 움직임은 mouse(손가락을 뗀 뒤 0.8 초 안의 흉내 낸 마우스 사건은 빼고), 손가락은 touch, 패드는 getActiveGamepadId 로 gamepad 와 그 종류. 처음은 손가락 기기(pointer: coarse)면 touch, 아니면 keyboard
+- InputManager.setPreventedKeys(keys), getPreventedKeys, isKeyPrevented, isTypingInTextField: 브라우저 기본 동작을 막을 키(Tab 의 초점 옮기기, Space 의 쪽 넘기기 같은 것). 글자 입력칸(Engine.isTextInputFocused 의 글자 input, textarea, contenteditable 와 select)에 초점이 있으면 막지 않는다. 처음은 비어 있어 지금까지와 같다
+- InputActions(inputactions.js): 입력 동작. InputManager 가 하나 들고(getInputActions) tick 에서 갱신한다. 동작 이름에 키(bindKey), 게임패드 단추(bindGamepadButton), 게임패드 축의 한쪽(bindAxis(action, axisIndex, direction), setAxisPressThreshold 만큼 기울면 눌림)을 묶고 unbindAction 으로 푼다. isPressed, isJustPressed, isJustReleased, readValue(0 ~ 1), readAxis(negativeAction, positiveAction), readGamepadStick(xAxisIndex, yAxisIndex), readMoveAxis(WASD 와 방향키, 왼쪽 스틱, 바깥 입력원 가운데 가장 긴 것, 길이 1 이하). 죽은 구역(setDeadZone, 처음 0.2)은 빼고 나머지를 0 ~ 1 로 다시 편다. setRepeat(action, delaySeconds, intervalSeconds) 를 건 동작은 누르고 있으면 반복 때도 isJustPressed 가 참이고, 프레임이 길게 끊기면 몰아서 반복하지 않는다. 바깥 입력원(addSource, removeSource)은 readActionValue(action), readMoveAxis(), readGamepadKind() 를 가진 객체로, 플랫폼 SDK 의 패드를 게임이 끼운다. 글자 입력칸에 쓰는 동안은 키를 듣지 않는다(setKeysIgnoredWhileTyping). 키는 프레임 사이에 눌렀다 뗀 것도 한 번 눌린 것이다
+- Engine: 창이 포커스를 잃으면(blur) 마우스 단추 셋도 뗀다. (InputManager.clear 는 손가락 목록과 마우스 단추, 입력 동작도 비운다)
+- 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 입력 엔진으로 다시 빌드했다
+- Camera3D(graphics3d): 원근(setPerspective)과 직교(setOrthographic), 가로 세로 비(setAspectRatio), lookAt, 보기와 투영 행렬을 값이 바뀔 때만 다시 셈해 담아 둔다(getViewProjectionMatrix, getInverseViewProjectionMatrix). projectToView(x, y, z, viewRect) 는 월드 점을 3D 를 그리는 사각형 안의 자리와 카메라 앞인지(isInFront)로, unprojectToPlane(viewPosition, planeHeight, viewRect) 는 사각형 안의 자리에서 나간 시선이 수평면 y = planeHeight 와 만나는 점으로, readViewDepth 는 보는 쪽 깊이로 셈한다. 렌더러와 2D 표시가 같은 카메라를 쓴다. (외계행성 광부, aberrant, 종말 생존이 화면마다 createLookAt, createPerspective 를 다시 짓고 투영을 손으로 셈하던 것)
+- ToonRenderer: setScreenRect(x, y, 너비, 높이), clearScreenRect, getScreenRect. 노드 사각형 안에만 그린다. beginFrame 이 보기와 투영의 클립 공간을 사각형으로 옮기고 가위로 밖을 자르며, endFrame 이 가위를 푼다. 화면 밖 거르기는 옮기기 전의 절두체로 한다. beginFrameWithCamera(Camera3D), drawMeshOutline(바깥선만 그리고 세지 않음). 화면 사각형을 주지 않으면 지금과 같다
+- ToonDrawQueue: 한 프레임에 그릴 모형을 담아 두었다가 불투명한 몸, 불투명한 것의 바깥선, 비치는 것(카메라에서 먼 것부터, 깊이 쓰기 끔) 차례로 그린다. addMesh, addMeshInstanced, drawShadows(renderer, shadowMap), draw(renderer, camera). (종말 생존 ModelRenderer3D 의 담아 그리기에서)
+- Graphic: runExternalPass(callback, { clearDepth }) 와 clearDepthBuffer(). 2D 그리기 사이에 WebGL 패스를 끼운다. 앞의 2D 묶음을 그리고(flushSpriteBatch), 상태 기억을 잊고(invalidateRenderStateCache), 깊이를 비운 뒤 callback 을 부르고, 끝나면(던져도) restoreRenderState 를 부른다. 자르기(스텐실)를 건 뒤 깊이를 비우면 갤럭시 폴드3(Adreno 660)에서 3D 가 하나도 안 그려진 일이 있어(외계행성 광부), 자르기 안에 3D 를 그릴 노드는 beginClipRect 앞에서 clearDepthBuffer 를 부르고 clearDepth: false 를 준다. (게임 노드 넷이 같은 차례를 손으로 쓰던 것)
+- ToonView3D(컴포넌트): 노드 사각형 안에 툰 3D 를 그린다. 내용 영역을 지금 변환으로 드로잉 버퍼 사각형으로 옮기고, runExternalPass 안에서 렌더러의 화면 사각형을 걸고 그리기 함수(setDrawCallback)를 부른다. 렌더러는 처음 그릴 때 짓고, 짓지 못하는 기기면 다시 짓지 않고 setFallbackDrawCallback 의 2D 로 그린다. 여러 노드가 렌더러 하나를 함께 쓰려면 setRenderer. 카메라(getCamera)의 가로 세로 비는 그릴 때마다 사각형에 맞춘다. 부모 Mask 안이면 setDepthCleared(false) 와 clearDepthBuffer 로 위 함정을 피한다
+- ToonPostProcess: setColorGrade(채도, 대비, 색조 색, 색조 양, 안개빛 색, 안개빛 양), setVignette(가장자리 어둡게). 톤매핑과 감마 뒤에 건다. 색조 색은 밝기를 1 로 맞춰 곱하고, 안개빛은 어두운 곳일수록 그 색 쪽으로 끌어올린다. 기본 값(채도 1, 대비 1, 나머지 0)이면 보정이 없어 지금과 같다. 노드 사각형에 낼 때는 resize(사각형 크기) 뒤 end 의 뷰포트로 사각형을 준다. 번짐은 이미 있는 setBloom 이다. (종말 생존 SceneEffects3D 의 색 고르기에서)
+- ToonMesh: MeshBuilder.combine(pieces) 는 움직이지 않는 조각 여럿({ arrays, offset: [x, y, z] })을 옮겨 한 배열로 잇는다. 바깥선 껍데기와 껍데기 기준 자리, 안쪽 범위도 옮겨 잇고 뼈대는 잇지 않는다. createFacetedChunkGeometry(반지름, 꼭짓점 배, 축 배) 는 이십면체의 꼭짓점 열둘을 저마다 늘이고 줄여 면마다 꼭짓점을 따로 둔 각진 돌덩이다. (종말 생존 combineMeshArrays, 외계행성 광부 meshbuilder.js)
+- GraphicsQualityGovernor, GraphicsQuality(auto, high, low): 가벼운 길(isLite)을 덮어쓰기(applySearchText 의 ?light, setLiteOverride) → 설정(낮음은 늘, 높음은 아님) → 자동(setAutoLiteDefault 이거나 FrameProbe 가 처지는 기기로 잼) 차례로 정한다. update(프레임 초, 최대 프레임) 는 자동일 때만 재고 가벼운 길이 바뀐 프레임에 true 를 돌려준다. setRenderPixelRatioLimits(보통, 가벼운 길) 와 applyRenderPixelRatio(viewManager) 로 렌더 배율 상한을 바뀔 때만 건다. 가벼운 길에서 무엇을 줄일지는 게임이 정한다. (외계행성 광부 readIsLite, aberrant isLight)
+- 출시 게임들이 따로 만들어 쓰던 로딩, 저장, 시간 기능을 엔진 기본으로 넣는다. (게임의 화면 모양과 출시처 코드는 가져오지 않았다, 기본 동작은 LocalStorage 읽기 하나만 바꿨다)
+- TimeManager: setMaximumTimeDelta(seconds), getMaximumTimeDelta(). 한 프레임 간격의 상한을 바꾼다. (지금까지 0.25 초로 박혀 있었고 기본값은 그대로다) 물이나 물리가 한 번에 크게 나아가면 안 되는 게임이 0.1, 0.05 로 줄인다. 0 보다 작거나 숫자가 아니면 0.25
+- Engine: setMaximumFramePerSecond(n), getMaximumFramePerSecond(). 실행 중에 최대 FPS 를 바꾼다. EngineConfiguration.maximumFramePerSecond 에 적고, 엔진은 프레임마다 그 값을 읽어 바뀐 프레임부터 다시 센다. (게임들이 설정 객체를 직접 고치던 것과 결과가 같다) 0 보다 작거나 숫자가 아니면 0(제한 없음)
+- FixedStepper: 고정 걸음. new FixedStepper(stepSeconds, maximumStepsPerFrame) 의 advance(timeDelta, stepFunction) 가 쌓인 시간만큼 stepFunction(stepSeconds) 을 부르고 남은 몫(0 ~ 1, 앞 걸음과 지금 걸음을 섞어 그릴 때 쓴다)을 돌려준다. 한 프레임 상한만큼 돌고도 걸음이 남으면 남은 시간을 버리고(느린 기기에서 몰아 돌지 않게), stepFunction 이 false 를 돌려주면 그 프레임은 거기서 멈추고 시간을 쌓아 둔다. getAlpha, getLastStepCount, reset, setStepSeconds, setMaximumStepsPerFrame
+- LocalStorage: 모든 접근을 try 로 감싼다. 저장소가 막혀 있거나(사생활 보호 창, window.localStorage 접근 예외) 가득 차 못 쓰면 예외 없이 이 페이지가 살아 있는 동안 메모리에 대신 둔다. (isMemoryFallback) setBackend({ getItem, setItem, removeItem, getKeys, clear }) 로 저장소를 갈아 끼운다. (플랫폼 SDK 의 저장소 같은 것, getKeys 와 clear 는 없어도 된다, null 이면 브라우저로) getBackend, getItem, setItem(저장소에 썼는지), removeItem, getJson(key, defaultValue), setJson(key, value)
+- LocalStorage: 읽기(getString, getBoolean, getNumber)가 없는 키에 기본값을 써 넣지 않는다. (기본 동작을 바꾼 것이다) 읽기만 해도 저장소에 키가 생겨서, 새 판에서 기본값을 바꿔도 옛 기본값이 저장된 값처럼 남고 containsKey 가 늘 참이 됐다. 출시 게임 여섯 가운데 엔진 LocalStorage 를 쓰는 곳은 pipemania 하나이고, 읽은 값만 쓰며 키가 있는지(containsKey, getKeys)는 보지 않아 이 동작에 기대지 않는다. (2026-11-25 게임 코드 grep) 개발자 도구의 저장소 창에는 읽기만 한 키가 더는 보이지 않는다
+- PersistedStore: setStorageBackend(backend), getStorageBackend(). 저장소 하나만 다른 곳(getItem, setItem, removeItem 을 가진 객체)에 둔다. 갈아 끼우면 그곳에서 다시 읽고 구독자에게 알리며, 그곳의 접근도 try 로 감싼다. 생성할 때 읽기가 저장소에 빈 키를 만들던 것도 위 LocalStorage 바뀜으로 없어졌다
+- AssetLoader: 애셋 함께 받기. addImage, addJson, addText, addBlob, addAudio, addFont(family, path, descriptors), addAsset(asset, path), addTask(path, loadFunction) 로 넣고 await load() 로 setConcurrency(기본 6) 개씩 함께 받는다. 실패해도 멈추지 않고 실패 목록({ path, error })을 돌려준다. getProgress(끝난 수 / 전체 수), getLoadedCount, getFinishedCount, getTotalCount, getFailedList, isFinished, setProgressHandler, setCompleteHandler
+- LoadingProgress: 알려 준 진행률(setProgress, 0 ~ 1, 줄지 않음)을 보이는 값(getShownProgress)이 부드럽게 따라간다. 매 프레임 update(timeDelta), 따라가는 빠르기 setFollowRate(기본 초당 남은 거리의 6 배), isFinished, reset
+- GameScene: 로딩 화면 바꾸기. setLoadingColors(바탕, 게이지 바탕, 게이지, 바깥) 로 색만, setLoadingDrawer((graphic, viewSize, progress, elapsedSeconds) => ...) 로 바탕 위의 그림 전체를 바꾼다. setLoadingProgress(progress) 나 trackAssetLoader(assetLoader) 로 진행률을 알리면 게이지가 최소 노출 시간의 경과 대신 그 진행률을 부드럽게 따라가고(getLoadingProgress 의 LoadingProgress), loadAssets 가 끝나면 1 로 채운다. 아무것도 정하지 않으면 지금과 같다. (검은 바탕, #333333 과 #ffffff 게이지, 경과 시간 게이지)
+- BuildInfo: 빌드 판 읽기. await load() 가 페이지의 <meta name="build-version"> 을 먼저 읽고, 없으면 version.json 을 캐시 없이(cache: "no-cache") 받는다. readText() 는 meta 의 글 그대로, 또는 version.json 의 "날짜 시각 (해시)" (해시가 없으면 version), 못 읽으면 빈 글. readVersionData(), isLoaded(), setMetaName, setVersionJsonPath, BuildInfo.composeText(versionData)
+- 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
+- ToonScreenOutline, ToonOutlineWidthUnit: 툰 화면 공간 바깥선. (외계행성 광부 키우기 boardrenderer3d.js 와 애버런트 scenerenderer3d.js 가 따로 쓰던 셰이더 바깥선을 엔진으로) ToonRenderer 의 모형을 같은 행렬로 한 번 더 그려 노멀, 선 번호, 깊이를 선의 판에 쓰고(beginLineIds, drawMesh, drawMeshInstanced, endLineIds), 한 번 훑어 선의 진하기 가면을 쓴 뒤 drawOutline 으로 화면에 섞는다. 실루엣 바깥, 다른 번호와 맞닿은 곳, 한 번호 안에서 꺾인 곳에 선다. 어느 모형과 부품(indexStart, indexCount)에 어떤 번호를 줄지, 인스턴스마다의 번호(instances[i].lineId)는 부르는 쪽이 정한다. 굵기는 월드 길이나 픽셀(setWidth, 원근의 월드 굵기는 setFocusDistance 의 거리에서, 주지 않으면 그린 모형의 평균 거리), 깊이는 투영 행렬로 직교와 원근을 가려 원근이면 미터로 푼다. setDepthThreshold, setCrease(각, 진하기, 이어짐 픽셀), setResolutionScale(0.25 ~ 1), setSampleCount(바깥선 4 ~ 28, 꺾임 0 ~ 4), setColor, setHdrOutput. beginLineIds 때의 뷰포트를 그리는 영역으로 삼아 화면 일부에 그린 3D 에도 맞는다. 껍데기 바깥선과 함께 써도 된다
+- ToonVfx, ToonVfxSlot, ToonVfxLook, ToonVfxShape, ToonVfxDecalMode: 툰 3D GPU 효과의 바탕. (외계행성 광부 키우기 boardvfx.js 와 애버런트 effects.js 의 범용 부분, 효과 처방과 램프 색은 게임 몫이라 가져오지 않았다) 그림 파일 없이 코드로 짓는 아틀라스(연기 플립북 16 칸, 알갱이, 줄기, 빛살, 충격 띠, 빔 결, 그을음, 패인 땅, 둘레 빛, 색 램프 여덟 줄), 인스턴스 GPU 파티클(emitParticles: 꼴 point, sphere, ring, disc, cone, line, 끌림, 중력, 바닥에서 멈춤, 속도 쪽 늘임, 램프, 일곱 꼴), 불덩이(addFireball), 충격파 띠와 바닥 빛(addShockwave), 바닥 자국(addDecal, queueDecal, 그을음, 빛, 흐르는 테, 퍼지며 커짐), 연기 기둥(addPlume), 회전체 빔(queueBeam), 리본(queueRibbon)과 감아 내린 번개(queueLightning), 빛 점(queueGlint). update(초) 로 나아가는 자체 시계, 파티클 상한(생성자, setParticleCapacity, 넘으면 오래된 것부터 덮음)과 내는 수의 몫(setCountRatio, 폰과 가벼운 길), 램프 색(setRamps), 바닥 높이 콜백(setFloorHeightReader, 자국, 충격파, 기둥이 그 높이에 놓이고 isGrounded 파티클이 멈춤). draw(보기, 투영) 는 원근이면 빔과 리본이 카메라 자리를, 직교면 카메라 쪽을 향하고 그리기 상태를 돌린다
+- 출시 게임들(외계행성 광부, aberrant, 종말 생존, 우주생물)이 따로 만들어 쓰던 창 쌓기와 화면 틀을 엔진 기본으로 옮겼다. (판 모양, 테마, 연출, 출시처 코드는 가져오지 않았다, 게임은 지금처럼 자기 것을 쓴다)
+- UIWindowLayer: 창 쌓기. openWindow 로 맨 위에 쌓고 맨 위 창만 보인다. closeWindow 는 목록에서 바로 빼고(누름과 덮임이 바로 풀림) PopupMotion 닫는 움직임이 끝난 뒤 떼어 낸다. (덮여 있던 창은 바로) closeAllWindows, closeTopWindow(뒤로 가기, 바깥 닫기를 끈 창은 닫지 않음), getTopWindow, findWindow, hasOpenWindow, getWindowCount. 창이 뜨고 닫힐 때 setWindowChangeEvent 의 함수를 부른다(놀이 멈춤). 층은 UIScale.read 만큼 커지고(setUIScaleOptions, null 이면 키우지 않음, getUIScale) 창에는 그만큼 나눈 영역 크기(setViewSize)와 세이프에어리어 너비(setViewBleed)를 알린다. 휠은 맨 위 창의 handleWheel, 받지 않으면 그 자리의 스크롤 뷰(scrollWindowAt)
+- UIWindow: 창 하나. 영역 전체와 세이프에어리어까지 덮는 어둠(누름을 삼킴) 위 가운데에 판을 띄운다. 판은 영역 가로에 맞춰 넓어지되 setMaximumWidth(기본 480)를 넘지 않고, 세로는 layoutContent(panelWidth) 가 돌려준 값(기본 setPanelHeight), 영역보다 크면 판을 통째로 줄인다. 바깥을 누르면 닫힌다(setOutsideCloseEnabled 로 창마다 끔). close, setCloseEvent(내려갈 때 알림). 판 모양은 Paint 한 장이고 게임은 상속해 틀(getFrameNode)에 꾸밈을 붙이고 layoutPanel, applyMotion, setCovered, handleWheel, dispose 를 덮어써 바꿔 끼운다. getPanelNode, getPanelPaint, getDimPaint, getPopupMotion
+- UIConfirmWindow: 확인 창. 제목, 묻는 글, 취소와 확인 두 단추. 글은 판 너비에서 줄을 바꾸고, 영역 세로를 넘으면 글 칸만 스크롤된다. setRightToLeft(true) 면 단추 차례를 뒤집는다(확인이 왼쪽). 확인은 setConfirmEvent 뒤 닫히고, 취소 단추, 바깥 누르기, closeTopWindow, closeAllWindows 로 닫히면 setCancelEvent. setTitle, setMessage, setButtonTexts. (UIDialog 는 그대로 둔다)
+- UIScale.read(viewWidth, viewHeight, options): 뷰 한 단위가 minimumCssScale(0.8) CSS 픽셀보다 작으면 UI 층만 키울 배율. (1 ~ maximumScale 1.8, 낮은 화면은 minimumLayerHeight 아래로 키우지 않음(기본 0 이면 보지 않음), 세로 화면(가로가 세로의 portraitRatio 1.1 배 이하)은 상한 없음, cssPixelScale 을 주지 않으면 ViewManager.getCssPixelScale) UIScale.isPortrait
+- GameScene: fadeScreen(onDark). 다 어두워지면 onDark 를 부르고, 그것이 Promise 를 돌려주면 끝날 때까지(실패해도) 어둡게 두었다가 밝힌다. 이미 페이드 중이면 false. setScreenFadeColor(기본 검정), setScreenFadeSeconds(기본 0.35), isScreenFading, getScreenFadeAlpha. 막은 postDraw 에서 세이프에어리어까지 캔버스 전체에 그리고, 배율을 곱하지 않은 시간으로 움직인다. 막이 걸린 동안은 누름과 휠을 받지 않는다
+- GameScene: isUserInterfaceAt(viewPosition) (그 자리에 누를 수 있는 노드가 있는지, 감춰져 있던 터치 인식기의 raycast), setPlayInputHandler({ press, move, release, wheel }) (UI 가 받지 않은 누름과 그 누름의 이동과 뗌(취소 포함), UI 밖의 휠을 세이프에어리어 왼쪽 위 기준 게임 영역 좌표로 넘긴다), convertViewToPlayArea. 창 층 안을 가리킨 휠은 UIWindowLayer.scrollWindowAt 으로 넘긴다
+- GameScene: setPlayAreaReference(fixedLength, isLandscape). 세이프에어리어를 뺀 게임 영역의 고정 쪽 길이가 늘 fixedLength 가 되게 기준 해상도를 늘린다. (캔버스 길이 : 세이프에어리어를 뺀 길이 = 기준 해상도 길이 : fixedLength, 뷰 배율 방식도 가로 고정 stretchWidthExpandHeight, 세로 고정 stretchHeightExpandWidth 로 둔다, resize 와 initialize 에서 다시 셈)
+- ViewManager: setIgnoredSafeAreaSides(sides), getIgnoredSafeAreaSides. getSafeAreaInsets 가 그 쪽을 0 으로 돌려준다. (어느 쪽을 무시할지는 게임이 넘긴다)
+- GameScene 의 바뀐 동작: computeSafeAreaRect 가 env(safe-area-inset-*) 를 따로 재던 것을 ViewManager.getSafeAreaInsets 로 읽는다. 지금까지는 setSafeAreaOverride, 주소의 ?safeArea=, (새) setIgnoredSafeAreaSides 가 GameScene 의 세이프에어리어 노드에 닿지 않았다. env 값만 쓰는 게임은 인셋이 정수로 잘리지 않는 것 말고 같다. (computeSafeAreaRect 를 덮어쓴 게임은 그대로)
+- 출시 게임들(외계행성 광부, 우주생물, aberrant, 찾았다, 종말 생존)이 따로 만들어 쓰던 글자, 노드 편의, 그리기 기능과 최적화를 엔진 기본으로 넣는다. (게임의 화면 모양과 연출은 가져오지 않았다, 게임 코드는 그대로다)
+- Text, UILabel: setFitWidth(width, minimumRatio = 0.55), getFitWidth, getFittedFontSize. 한 줄 글이 맞출 너비를 넘치면 처음 크기에서 최소 비율까지 0.1 단위로 줄여 그린다. 정한 크기(getFontSize)는 그대로이고 글, 글꼴, 굵기, 너비가 바뀌거나 웹 글꼴이 받아지면 다시 맞춘다. 최소 비율로도 넘치면 넘친 채 그린다. 줄을 바꾸는 글과 리치텍스트는 맞추지 않는다
+- Text, UILabel: measureText(text, fontSize) (주지 않으면 지금 글과 정한 크기). 그 글자의 글꼴, 굵게, 기울임으로 잰 너비
+- 글 재기 캐시: TextStringTextureCache.measureText 와 Text 의 재기가 글꼴 문자열과 글이 같으면 다시 재지 않는다. (2048 개, 오래 안 쓴 것부터 버림, 웹 글꼴이 받아지거나 문서의 글꼴 얼굴 수가 바뀌면 비움) measureTextMetrics(fontString, text) (textstringtexturecache.js). 돌려준 TextMetrics 는 나눠 쓰므로 고치지 않는다
+- Component.calculateDrawnRect(rect): 내용 영역 밖까지 그리는 컴포넌트가 그리는 사각형을 알려 준다. (기본 false, 모름) WorldNode 의 화면 밖 거르기가 내용 영역 안에 그린다는 컴포넌트와 이 사각형을 합쳐 본다. Text 는 한 줄 글의 사각형(맞춘 크기, 넘쳐도 그 너비, 외곽선과 글꼴 크기 반만큼 양옆, 세로는 글꼴 크기의 1.5 배씩)을 알려 준다. RichText 는 모른다. UILabel 은 내용 영역 안에만(바탕) 그린다고 알린다
+- 바뀐 동작: 지금까지 거르지 않던 한 줄 Text 와 UILabel 노드도 화면 밖이면 거른다. (거르기가 켜진 때, 줄을 바꾸는 글과 리치텍스트는 그대로 거르지 않는다) 노드 안에 직접 그리는 컴포넌트를 함께 붙였으면 그 컴포넌트는 지금처럼 알리지 않아 노드를 거르지 않는다
+- Text.setText, UILabel.setText: 같은 글이면 건너뛴다. (UILabel 은 리치텍스트 모드가 아닐 때, 내재 크기를 다시 셈하게 하지 않는다) Text.setTextColor: 같은 색 문자열이고 가진 색이 그대로면 다시 풀지 않는다
+- Text 그리기: 색을 "#rrggbb" 글로 바꿔 Graphic 에 넘기던 것을 Color 로 바로 넘긴다. (프레임마다 글 만들기와 풀기가 없어진다) 8 비트로 떨어지지 않는 색(rgba 의 0.5 알파 등)은 1/255 안쪽으로 다를 수 있다
+- Color.fromCache(colorString): 색 문자열("#..", "rgb(..)", "rgba(..)", 그 밖은 흰색)로 캐시한 색. 같은 문자열이면 같은 인스턴스(1024 개, 오래 안 쓴 것부터 버림), 고쳐 쓰지 않는다. Graphic.setFillColor, setStrokeColor 가 문자열을 받으면 이 캐시를 쓴다
+- Graphic: setTextBakeMotionScaleStep, getTextBakeMotionScaleStep(기본 0.25), setTextBakeScaleMoving, isTextBakeScaleMoving, readNodeTextBakeScaleMoving. 글자 굽기 배율 단계(setTextBakeScaleStep)가 0 일 때, 그리는 노드의 변환 배율이 지난 프레임과 다르면(ButtonMotion, PopupMotion, 트윈, 카메라 확대) 이 단계로 묶은 배율로 굽고, 멈추면 정확한 배율로 다시 굽는다. (확대 움직임 동안 프레임마다 글을 새로 굽지 않는다, 1 에서 1.09 로 커지는 단추가 굽는 수가 프레임 수만큼에서 2 장) 처음 그리는 노드는 움직이지 않는 것으로 본다. 단계가 0 이 아니면(기본) 아무것도 셈하지 않는다. ShadowText, ShadowImage 도 같은 배율을 쓴다
+- TransformNode: setLastDrawnMaximumScale, getLastDrawnMaximumScale (Graphic.drawNode 가 쓴다)
+- ShadowText, ShadowImage, SoftShade: 같은 모양이면 구운 그림을 열쇠별로 나눠 쓴다. 열쇠마다 쓰는 컴포넌트 수를 세어 쓰는 것은 버리지 않고, 아무도 쓰지 않게 된 것은 128 개까지 남겨 두었다 오래 안 쓴 것부터 버린다. 노드에서 떨어질 때(detach) 놓고, 놓지 않고 수거된 컴포넌트는 FinalizationRegistry 가 놓는다. (sharedbakecache.js 의 acquireSharedBake, releaseSharedBake, readSharedBakeCount) ShadowImage 는 그림마다 번호를 붙여 열쇠로 쓰고 setImage 할 때 새 번호를 붙인다
+- WorldNode: setContentSizeXY(width, height), setRect(x, y, width, height) (왼쪽 위가 (x, y) 에 오게 피봇까지 셈해 로컬 위치와 내용 크기를 둔다, 앵커는 로컬 위치 셈에 들지 않아 그대로), convertViewToLocal(viewPosition) (뷰 좌표를 부모 변환까지 거쳐 내용 영역 왼쪽 위 기준 좌표로, contains 와 같은 네 귀퉁이 셈). TransformNode: setLocalPositionXY(x, y), setLocalScaleXY(x, y). XY 함수는 Vector2 를 만들지 않는다
+- LanguagePack: isRightToLeft(), mirrorLayoutX(x, width, parentWidth), readLayoutTextAlign(align). 지금 언어가 오른쪽에서 왼쪽으로 쓰면 배치의 가로 자리와 정렬의 왼쪽, 오른쪽을 뒤집는다
+- TouchRaycaster.touchWheel: 휠을 그 자리를 덮는 것 가운데 그리는 순서로 가장 앞인 스크롤 칸이 받는다. (칸 안의 글이나 그림처럼 누를 수 없는 것 위에서 굴려도 받는다, 지금까지는 누를 수 있는 노드의 조상만 찾아 칸 안 글 위의 휠이 사라졌다) 가장 앞이 누를 수 있는 노드면 지금처럼 그 노드와 조상의 스크롤 칸이 받는다. 받은 칸이 있으면 true. findWheelScrollView, findScrollViewComponent
+- GameScene.touchWheel: 받은 스크롤 칸이 있으면 true 를 돌려준다. 덮어쓴 게임 씬은 super.touchWheel 이 false 일 때만 게임(지도 확대 등)으로 넘기면 창의 스크롤과 겹치지 않는다
+- Graphic: drawRing(center, innerRadius, outerRadius, startRadian, endRadian) (setFillColor), drawArc(center, radius, startRadian, endRadian, lineWidth) (setStrokeColor). 조각마다 네모 하나를 겹치지 않게 이어 한 번에 그려 반투명이어도 이음매가 짙어지지 않는다. 조각 수는 drawCircle 처럼 화면에서의 반지름을 따라(한 바퀴 16 ~ 64) 그리는 각도만큼. 각도는 0 이 오른쪽, 시계 방향
+- Graphic: drawLineSegments(positionValues, size) (setStrokeColor). 숫자 배열 하나(선분마다 x0, y0, x1, y1)로 선분 여럿을 한 번에 그린다. Vector2 를 만들지 않고, 정점 버퍼가 차면 거기까지 그리고 이어 담는다
+- SpriteAtlas: 아틀라스 읽기. load(jsonPath), loadData(data, baseDirectory), readFrame(name) (Frame, 없으면 null), hasFrame, applyFrame(sprite, name), getPageImages, getFrameNames. tools/atlas.cjs 의 JSON 과 { pagePaths, frames: { 이름: [쪽, x, y, 가로, 세로] } } 꼴을 읽는다. 이름은 확장자를 떼고도 찾는다. 여러 아틀라스는 SpriteAtlas.addSearchAtlas 로 넣은 차례로 찾는다(findFrame, applySearchFrame, removeSearchAtlas, clearSearchAtlases)
+- Sprite.setFrame(frame): Frame 의 그림과 영역을 함께 건다. (null 이면 그림을 비운다)
+- tools/atlas.cjs: 여러 장(--max-size 를 넘으면 다음 쪽, 쪽마다 모두 들어가는 가장 작은 2 의 거듭제곱), 가장자리 늘여 붙이기(--extrude), 여백(--padding, 기본 2). 놓기를 선반에서 MaxRects 로 바꿔 같은 그림이라도 자리가 전과 다르다. (JSON 으로 읽으면 같다) JSON 의 images 에 page, meta 에 pages, extrude, padding 을 더했다. 쪽이 한 장이면 파일 이름이 전과 같다
+- 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
+- 효과, 3D, 애니메이션에서 러스트 vanilla-engine 과 다르던 것을 맞췄다. (러스트에만 있던 범용 기능을 넣고, 두 엔진에 같이 있던 버그를 같이 고쳤다)
+- ParticleSystem: isFinished(방출할 것이 더 없고 남은 입자도 없음, 루프가 아니면 duration 이 지나고 버스트를 다 냈을 때), getParticlePositionList(입자 자리 목록, 같은 씨앗 비교와 시험용). 러스트 판과 같은 씨앗이면 같은 입자 자리가 나온다
+- HeatHazeEffect: experimental 노드에서 effect 컴포넌트로 옮겼다. (src/effect/heathazeeffect.js, import.js 에서 내보냄) node.addComponent(HeatHazeEffect) 로 붙이고, 붙을 때 노드 내용 크기가 비어 있으면 300 x 300 으로 정한다. getTimer, calculateRowOffset
+- ScreenEffect: destroy 가 렌더 대상과 함께 패스 프로그램과 버텍스 어레이도 지운다
+- Material.createTexture: 이미지를 곧은 알파, 색 프로필 변환 없이 받는다. (createImageBitmap 의 premultiplyAlpha, colorSpaceConversion 을 "none" 으로) 지금까지 브라우저 기본값으로 알파가 곱해져 알파 0 텍셀 색이 검어지고, OLD FACE 의 머리카락과 수염 카드 가장자리가 어두웠다
+- ToonRenderer, SkinnedModelRenderer, HumanSkinRenderer: 그림자를 받지 않을 때 섀도우 유닛에 1x1 비교 깊이 텍스처를 묶는다. (맥 드라이버의 "sampler type (Depth)" 알림과 WebGL 의 샘플러 불일치를 막는다) SkinnedModelRenderer.getEmptyShadowTexture, ToonRenderer.destroy
+- ToonVfx: 빛 파티클과 빛 점의 rim(0 은 더하는 빛, 1 은 테로 덮기, 음수는 엷게 덮는 빛무리), 리본과 번개의 번짐 색 glow, setRimColor, 사는 동안 다시 꺾이는 번개 addLightning(life), 화면 섬광 addFlash, 엔진 Shaker 로 셈하는 카메라 흔들림 addShake, readShake, isShaking. getActiveCounts 에 lightningCount, flashCount. draw 가 깊이 함수도 되돌린다. (게임 aberrant 의 효과에서 범용 몫만, 게임 색과 처방은 매개변수로)
+- SkinnedModel: 바이트에서 읽기, 해석과 업로드 나누기, createWithoutShaderProgram(포즈 계산만), destroy. 기본 모프 가중치를 glTF 노드 weights 에서 읽는다. Material.createImageDescription, destroy. ShadowMap, FullscreenPass, 화면 공간 효과의 destroy(풀스크린 패스까지 지움). FbxLoader 가 2^53 을 넘는 64 비트 id 를 정확히 읽고 빠진 노드는 건너뛴다
+- Camera2D: 회전(setRotation, getRotation, 도, 화면 가운데 축). 그리기 변환, screenToWorld, worldToScreen, panByScreen, fling, zoomAt 이 회전을 따르고, 경계 클램프는 돌아간 뷰를 감싸는 상자(getVisibleHalfExtent)로 잰다. convertScreenDeltaToWorld, begin, end(pushState 와 applyTransform, popState). deprecated/camera.js(옛 experimental/camera.js)의 기능을 모두 덮는다. (Camera.setZoom 의 clamp 인자 버그도 고쳤다)
+- Tween: setTarget(node), getTarget, TweenProperty(localPosition, localScale, localRotation, localOpacity, contentSize) 값을 노드에 바로 쓴다, applyTweenProperty, Tween.createNodeTween. 대상이 처음 돈 노드 트리에서 떨어지면 콜백 없이 끝난다. duration 0 이하는 바로 끝. Scene.getTweenCount
+- Animation: 비어 있던 pause, resume 을 채웠다. (gotoAndStop 이 멈춘다) stop 은 멈춰 있어도 첫 프레임으로 돌아간다. (setFrames 뒤 예전 번호가 남던 버그) SpriteAnimator.getCurrentFrameIndex
+- Action: 조건 함수가 대상을 받는다. wait 의 duration 0 이하는 진행률 1(NaN 버그), repeat 0 번은 돌지 않는다
+- Animator: AnimationState setClip, getClip, AnimationTransition setFrom, setTo, getFrom, getTo(상태 번호), getAnimation, addState, getStates, addTransition, getTransitions
+- Timeline: 같은 이름 무대 노드를 버리던 버그(모두 붙이고 이름 표에는 뒤의 것), 부모가 자기 자신이거나 고리면 무대 부모에 붙인다. Timeline.loadFromText, createFromJsonAsset
+- Indicator: getRadius, getRotation, buildTeethSegments, import.js 에서 내보낸다. Visual.getLocation 의 쓰지 않는 인자를 뺐다. VisualAsset setVisual, getVisual
+- 예제 cameratour: 돌아가는 Camera2D(끌면 팬, 휠 줌), Tween.createNodeTween, Indicator
+- UI 갈래: 러스트 vanilla-engine 과 UI 기능 차이를 없앤다. 러스트에만 있던 범용 기능을 넣는다
+- UIButton.fireClickEvents(): 누르지 않고 클릭이 난 것처럼 clicked, click 알림을 차례로 부른다. UIHitArea 가 넓힌 자리의 클릭을 넘길 때 이것을 쓴다
+- UILineChart.calculatePoints(width, height), UIBarChart.calculateBarRects(width, height): 그리기와 같은 자리의 폴리라인 점과 막대 사각형을 셈한다. draw 가 이것을 쓴다
+- UISpinner: calculateDotOpacity(dotIndex), getDotColor, getRotationSpeed, getDotNodes
+- UIScrollBar: getAxis, getThumbRect (썸이 꺼져 있으면 null)
+- ToastMotion.getPhase(), ToastPhase 를 내보낸다. PopupMotion.isInstantEnabled(). UIImageView.getColor()
+- UILabel: getWrapMode, getVisibleCharacterCount. UIInputField: getPlaceholder, getMaxLength, getFontSize, getPadding, getBackgroundColor, getRoundSize, getTextColor, getPlaceholderColor, getCursorColor, getCursorIndex, getSelectionStart, getComposition, isComposing
+- UIWindow: setDimColor, setPanelColor (어둠과 판의 Paint 색)
+- UIListView: setCreateItemEvent(() => WorldNode) 로 템플릿 대신 항목 노드를 만드는 함수를 받는다. 항목 크기를 정하지 않았으면 처음 만든 항목의 크기를 읽는다. isHorizontal()
+- TouchRecognizer: getTouchTarget (드래그를 넘겼으면 스크롤 뷰 노드), isTouching
+- GameScene: setSafeAreaInsets({ top, right, bottom, left }) 로 세이프 에어리어 인셋을 CSS 픽셀로 직접 정한다. (null 이면 뷰 매니저의 값, 게임 영역 기준도 이 값을 쓴다) 정적 calculateSafeAreaRect(viewSize, targetResolutionScale, insets). setPlayInputEnabled(true) 로 놀이 입력을 모아 두고 takePlayInputs() 로 { kind, position, wheelDelta } 를 꺼낸다. (처리기와 함께 써도 된다) setLoadingOutsideColor, hasLoadingDrawer, isLoadTouchedToSkip, getDevTools
+- UIScene: EngineConfiguration.useDevTools 가 꺼져 있으면 GameScene 처럼 개발자 도구를 만들지 않는다. (지금까지는 늘 만들었다)
+- 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
+
+- 글자, 글꼴을 러스트 판(vanilla-engine)과 맞췄다:
+  - 표시 글자 수(Text.setVisibleCharacterCount)와 Typewriter 는 글자 묶음 단위로 센다. (전에는 UTF-16 단위라 이모지와 결합 부호가 쪼개졌다) 여러 줄 글에서 남은 수가 음수로 떨어지면 다음 줄을 통째로 그리던 것을 고쳤다. (0 이 되면 다음 줄부터 그리지 않는다) Typewriter 의 글자 공개 알림은 글자 묶음을 받는다. countGraphemes, sliceGraphemes
+  - Text.calculateDrawnRect: 줄을 바꾸는 글도 사각형을 안다. (화면 밖 거르기) getMeasuredLineCount
+  - RichText: 글자 방향을 쓴다. 조각을 이은 글로 문단 방향을 정하고(이 글자의 방향, "inherit" 면 Graphic 의 방향), 오른쪽에서 왼쪽이면 조각을 오른쪽부터 놓는다. 정렬 "start" / "end" 도 그 방향으로 푼다. (전에는 조각에 방향을 쓰지 않았다)
+  - ShadowText: setItalic, setUnderline, setStrikethrough 와 게터, isBold. 밑줄과 취소선도 그림자와 함께 굽는다. 글 방향에 "auto"(글의 첫 강한 글자로)
+  - Graphic: detectTextDirection(text) 를 내보낸다. (setTextDirection("auto") 와 같은 셈)
+  - DynamicFont: buildAtlas 로 글자를 더하면 든 글자를 모두 새 캔버스에 다시 놓는다. (전에는 새 글자만 새 캔버스에 놓아 앞서 구운 글자가 어긋났다) 글자 묶음 단위, rebuildAtlas, measureText. import.js 에서 DynamicFont, GlyphInfo 를 내보낸다
+  - LanguagePack: setLanguageList(data), setLanguageTexts(code, texts, fallbackTexts) (파일 없이 바로 넣기)
+  - import.js: splitGraphemes, splitWords, countGraphemes, sliceGraphemes, detectTextDirection
+  - 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
+- 코어, 플랫폼, 기반 갈래. 러스트 판(vanilla-engine)에만 있던 범용 기능을 들여와 두 엔진의 공개 API 를 맞춘다.
+- Color.createFromBytes(red, green, blue, alpha) (0 ~ 255), withAlpha(alpha) (알파만 바꾼 새 색), Color.lerp(from, to, time)
+- Math.easeOutQuad(time)
+- Matrix4.writeToArray(array), writeToSlice(array, offset): 열 우선 16 칸을 배열(의 offset 자리)에 적는다
+- Vector2: addScalar, subtractScalar, multiplyScalar, divideScalar, moduloScalar. Vector3: addScalar, subtractScalar, multiplyScalar, divideScalar. (add(number) 와 같다)
+- Rect.intersects(other): 겹치는지. 변이 닿기만 한 것은 겹친 것이 아니다. (overlaps 는 닿기만 해도 겹친 것)
+- Cooldown.activate(): use() 와 같다
+- TransformMatrix.invert(): 역행렬을 새로 돌려준다. (행렬식이 0 이면 null)
+- Platform.applyUserAgent(userAgent): 넘긴 user agent 글로 플랫폼, 브라우저, 모바일 여부를 고른다. (getPlatformInfo 가 브라우저의 글로 부른다)
+- Engine: setTitle(title), writeClipboardText(text), readClipboardText() (Promise, 글이 없거나 막히면 null), isCoarsePointer(), loadScene, unloadScene, unloadAllScenes (SceneManager 와 같다), isExitRequested()
+- Engine 페이지 이벤트: PageEvent(hidden, visible, blurred, focused, pointerDown), addPageEventListener(listener), removePageEventListener(listener), isPageHidden()
+- Engine 검증용 화면 저장: requestFrameCapture(frameNumber) 는 그 프레임을 다 그린 뒤 캔버스를 PNG data URL 로 넘긴다. (Promise, 지난 번호면 이번 프레임) 주소 쿼리 ?capture=120,240 은 그 프레임들을 내려받기로 저장하고, captureName 은 파일 이름("{frame}" 은 번호, 기본 capture_{frame}.png), captureExit=1 은 마지막 저장 뒤 exitApplication 을 부른다
+- InputManager: isTouchDown() (누른 프레임부터 뗄 때까지 참, 누른 채 움직이지 않아도 참), isWheelWithCtrl() (마지막 휠을 Ctrl 과 함께 굴렸는지, 터치패드 오므리기), isTouchInput() (마지막 입력이 손가락인지)
+- Scene.tickTouch: 한 프레임 안에 누르고 뗀 것(빠른 탭, 클릭)의 뗌을 놓치던 것을 고쳤다. 지금은 touchPress 뒤 같은 프레임에 touchRelease 를 넘긴다. 누른 프레임에는 지금처럼 touchMove 를 넘기지 않는다
+- Component.isTickNeeded(): 거짓이면 노드가 그 컴포넌트의 tick 을 부르지 않는다. 기본은 tick 을 다시 정의했는지로 본다. Sprite, Text 는 그리기만 하므로 거짓(하위 클래스가 tick 을 다시 정의하면 참), Paint 처럼 tick 이 없는 컴포넌트도 거짓
+- ImageAsset.loadFromBytes(assetPath, bytes), TextAsset.loadFromBytes, JsonAsset.loadFromBytes, BlobAsset.loadFromBytes (assetPath, bytes), AudioAsset.loadFromBytes(bytes), FontAsset.loadFontFromBytes(family, bytes, descriptors): 이미 가진 바이트로 읽는다. (내장 자료나 직접 받은 것, 넘긴 바이트는 바뀌지 않는다)
+- AssetLoader: load() 를 부른 뒤 받는 동안 더한 것에 일꾼이 늘지 않던 것을 고쳤다. (처음 한 개로 load 하면 그 뒤에 더한 것을 일꾼 하나가 줄지어 받았다) 지금은 동시에 받는 수까지 일꾼을 더 띄운다
+- SpriteAtlas.getPageCount(), SpriteAtlas.findFrameInOrder(atlasList, name), applyFrameInOrder(atlasList, sprite, name): 찾을 아틀라스 목록을 쓰지 않고 넘긴 아틀라스들에서 차례로 찾는다
+- AudioPlayer.setPlaybackRate(playbackRate): 재생 빠르기. (1 이면 그대로, 음 높이도 같이 바뀐다, 다음 play 부터)
+- SoundSystem: addSoundAsset(soundId, audioAsset) (메모리에서 지은 소리를 그 id 의 녹음 무리에 덧붙인다, 크기와 간격은 소리 표의 줄을 따른다), getEffectVoiceCount()
+- Collision2D.findNearestIndexInRadius(targetList, getPositionHandler, center, radius): findNearestInRadius 의 번호판. (없으면 -1)
+- Localization: selectLanguage(candidateList, supported, default) (태그의 뒤 조각부터 떼며 맞추기, detectLanguage 도 이것을 쓴다. "zh-Hant-TW" 가 "zh-hant" 에 맞는다), setLanguageAliases, setRightToLeft, isRightToLeft, mirrorLayoutX, readLayoutTextAlign, isolateText, textNamed(key, values) (LanguagePack.formatText 와 같은 이름 자리 채우기), setTableFromJson(languageCode, tableJson)
+- PersistedStore.unsubscribe(subscription): subscribe 가 돌려준 것을 넘겨 해지한다. (돌려받은 해지 함수를 부르는 것과 같다)
+- SpriteAnimator.getCurrentFrameIndex(), SpriteAnimator.playOnNode(node, clipName, options) (노드의 애니메이터로 play)
+- WebSocketClient: 수신 콜백이 없으면 받은 JSON 을 모아 두고 takeReceivedMessages() 로 꺼낸다. (1024 개까지, 넘치면 오래된 것부터 버린다) 바이너리 메시지도 UTF-8 JSON 이면 받는다. tick() (할 일 없음, 다른 플랫폼과 같은 코드로 쓴다). getReceiveEvent() 가 웹소켓을 돌려주던 것을 고쳐 수신 콜백을 돌려준다
+- 비주얼 에디터(tools/visualeditor/visualeditor.html)를 위 엔진으로 다시 빌드했다
+- BuildInfo: setPackageVersion, getPackageVersion. meta 도 version.json 도 없을 때 readText 가 돌려줄 판이다. (러스트 판의 빌드 때 판과 같은 자리, 넣지 않으면 지금처럼 빈 글) load 도 readText 와 같은 글을 돌려준다
+- Identifier.reset 이 처음 값으로 되돌린다. (자기 값을 자기에 다시 넣어 아무것도 하지 않던 버그, Enum.begin 이 열거마다 1 부터 센다)
+- AudioBus(src/core/audiobus.js, import.js 에서 낸다): AudioManager.createAudioBus(), AudioBus.createAudioPlayer() (그 버스로 트는 플레이어), setVolume, getVolume, mute, unmute, isMuted, isAvailable, getGainNode. 출력에 이은 GainNode 하나이고, 버스로 만든 플레이어는 출력 대신 버스에 잇는다. AudioPlayer 생성자는 둘째 인자로 내보낼 노드(outputNode)를 받는다. (없으면 audioContext.destination) 러스트 판과 같은 꼴이다
+- SoundSystem.getMusicBus(), getEffectBus() 는 GainNode 대신 AudioBus 를 돌려준다. (노드는 getGainNode()) 설정 크기는 전처럼 그 GainNode 에 setTargetAtTime 으로 건다. 버스로 만든 플레이어도 설정 크기와 음소거를 따른다
+- Platform.getResourceUsage(): 바른 이름을 더했다. 옛 이름 getResouceUsage() 는 같은 것을 부르는 별칭으로 남긴다
+- Color.fromHEXCached: fromCache 처럼 1024 개를 넘으면 가장 오래 안 쓴 것부터 버린다. (전에는 끝없이 쌓였다) Color.getCachedColorCount(): fromCache 캐시에 든 수 (러스트 판의 get_cached_color_count)
+- 비주얼 에디터를 위 엔진으로 다시 빌드했다
+- KeyCode.audiomute 의 값 "AudioMute" 는 W3C KeyboardEvent.code 표에 없는 이름이라 음소거 키를 눌러도 맞지 않았다. "AudioVolumeMute" 로 고쳤다. (러스트 판과 같이 고침)
+- Node.findDescendantByName(name): findChildRecursiveByName 과 같다. Node.destroyChildrenWhere(predicate): 조건에 맞는 직계 자식을 떼어 destroy 하고 그 수를 돌려준다. (러스트 판 find_descendant_by_name, destroy_children_where 와 같은 이름)
+- GamepadManager.isButtonJustPressed, isButtonJustReleased: 이번 갱신에 방금 눌리거나 떼어진 버튼인지. (러스트 판과 같다)
+- UI 원본 버그를 러스트 판과 같게 고쳤다:
+  - UIDocument 가 Sprite 의 nineSlice 를 쓰기만 하고 읽지 않던 것. 쓰는 꼴([왼쪽, 위, 왼쪽 + 오른쪽, 위 + 아래])을 거꾸로 풀어 읽는다
+  - UIDropdown: 머리 단추 틴트가 펼침 목록 행까지 잡아 고른 뒤 선택 강조가 옛 색으로 덮이던 것. 머리 단추 틴트에서 펼침 목록을 빼고(excludeNodeFromTint), 강조를 바꾸면 행 단추가 틴트 원래 색을 다시 담는다
+  - UIInputField: maxLength 로 잘린 붙여넣기에서 커서가 글 끝을 넘던 것. 글 끝으로 자른다
+  - LayoutSolver: 인공 변수 최적화가 예외로 끝나면 인공 행을 비우지 않고 남기던 것. try / finally 로 비운다
+  - UILabel 의 배경 그리는 차례는 이미 맞았다. (UILabel 이 require 한 Text, RichText 보다 앞 차례로 붙어 배경을 먼저 그린다)
+- 러스트 판에만 있던 범용 기능:
+  - DEVTools: setVisible, getActiveTab, setActiveTab, getSelectedNode, setSelectedNode, isNodeExpanded, setNodeExpanded, getPanelRect. (F2 는 setVisible 을 부른다)
+  - UIDialog.requestDismiss(isConfirmed): 다음 tick 에 닫는다
+  - UIInputField.getDisplayText() (값의 커서 자리에 조합 글을 끼운 글), requestMenuAction(menuAction) (다음 tick 에 잘라내기 / 복사 / 붙여넣기), UIInputFieldMenuAction (import.js 에서 낸다)
+  - AmbientOcclusionEffect.buildSampleKernel(), SubsurfaceScatteringEffect.buildKernel(falloffColor, strengthColor): WebGL 없이 커널을 짓는 정적 함수. computeKernel 이 이것을 쓴다
+  - FbxLoader.parseNodeRecords(arrayBuffer) (머리 확인과 최상위 노드 레코드, parse 의 앞부분), FbxLoader.readVersion(arrayBuffer) (정적, 머리의 판 번호)
+- OBB.overlaps 가 늘 false 이던 버그를 고쳤다. (상대 꼭짓점을 other.length 로 돌아 상대 투영 범위가 비었다, 러스트 판과 같다)
+- Platform.getSafeAreaRect 가 Window.getComputedStyle(없는 정적 함수)을 불러 예외를 내던 것을 window.getComputedStyle 로 고쳤다. (헤드리스 크롬에서 typeof Window.getComputedStyle 이 "undefined" 인 것을 확인)
+- NodeLayout.arrangeFan: System 을 들여오지 않아 부르면 ReferenceError 로 멈추던 것과, 라디안 값을 도 단위 회전(setLocalRotation)에 넣던 것을 고쳤다. (러스트 판과 같다)
+- TextAsset, BlobAsset: 실패 응답(404 등)을 받은 것으로 치던 것을 고쳐 예외를 낸다. (AssetLoader 의 실패 목록에 든다) AudioAsset 도 실패 응답이면 디코딩 전에 실패로 친다
+- SoundEffectPool: 보이스 수가 0 이면 play 가 0 으로 나눠 예외를 내던 것을 고쳐 아무것도 하지 않는다. (러스트 판과 같다)
+- AudioManager.getContextTime() (AudioContext 시계, 없으면 0), AudioAsset.getLoadError() (마지막 읽기 실패의 까닭, 없으면 null), AssetLoader.getInFlightCount() (일꾼이 집어 받는 중인 수). 러스트 판의 get_context_time, get_load_error, get_in_flight_count 와 같은 자리다
+- 비주얼 에디터를 위 엔진으로 다시 빌드했다
+- Graphic.setBlendMode: source-over 로 대신 그리던 17 가지를 제대로 그린다. 이제 SpriteBlendMode 26 가지가 모두 된다
+  - source-out, source-atop, destination-atop, xor 는 W3C Compositing and Blending Level 1 의 포터 더프 계수 그대로 blendFunc 로 건다
+  - overlay, darken, lighten, color-dodge, color-burn, hard-light, soft-light, difference, exclusion, hue, saturation, color, luminosity 는 그리기마다 그릴 영역(정점의 경계 상자)만 지금 프레임버퍼에서 blitFramebuffer 로 떠 와 셰이더로 섞는다. 공식은 W3C 그대로(분리 섞기, 비분리 섞기, Cs' = (1 - αb) x Cs + αb x B(Cb, Cs) 뒤 source-over 합성)이고 바탕 알파가 있는 렌더 타겟(RGBA8, RGBA16F)에서도 맞다. darken, lighten 은 blendEquation MIN / MAX 가 반투명에서 W3C 식과 달라 셰이더로 섞는다
+  - 셰이더 섞기 모드에서는 묶어 그리지 않는다. 그리기 하나에 영역 복사 한 번과 드로우 콜 한 번(M2 Pro, 1280x720 에서 그리기 하나에 0.065 ms 안팎, 대부분 복사가 렌더 패스를 끊는 값)
+  - 이미지, 도형, 글자, 나인슬라이스, 자르기, 파티클, 바꿔 끼운 셰이더(ShaderSprite) 모두 된다. 파티클은 서로 겹치지 않는 쿼드끼리 모아 한 번 떠 와 그려 Canvas2D 처럼 쿼드마다 앞 쿼드 위에 섞인다. 바꿔 끼운 셰이더는 섞기 함수를 모르므로 덧그림 칸(RGBA16F, 안 되면 RGBA8)에 먼저 그린 뒤 섞어 옮긴다
+  - 크롬 Canvas2D 와 같은 장면(여러 색 바탕 위에 반투명 그림, 사각형, 다각형)을 26 모드로 견주면 도형 안쪽 차이가 2 단계 안이다. Canvas2D 는 source-in, source-out, destination-in, destination-atop, copy 가 그린 도형 밖도 지우는데 Graphic 은 지금처럼 도형 안만 바꾼다
+  - 모르는 이름의 경고 글을 "unknown blend mode" 로 바꿨다
+- 툰 후처리, 효과, 카메라를 애버런트와 광부 키우기가 엔진 그대로 쓰게 넓힌다. (새 옵션이 기본값이면 지금 화면과 화소까지 같다, 두 엔진 같은 API 와 같은 셰이더 글, 게임의 처방과 색 값은 매개변수로 받는다)
+- RenderTarget: options 의 sampleCount(2 이상이면 멀티샘플 렌더버퍼에 그리고 resolve() 가 컬러 텍스처마다와 깊이 텍스처로 푼다, MAX_SAMPLES 와 포맷마다 받는 표본 수 밑으로 줄이고 못 받거나 프레임버퍼가 완성되지 않으면 멀티샘플 없이), depthBits(깊이 렌더버퍼 16 이나 24), getSampleCount, getResolveFramebuffer, readSupportedSampleCount. 멀티샘플이면 getFramebuffer 는 그리는 멀티샘플 프레임버퍼다
+- BloomEffect.setUseFloatColor: 주고받는 판을 RGBA16F 로 지어 1 을 넘는 밝은 값이 잘리지 않게 한다. (기본 RGBA8 그대로)
+- MultiLevelBloomEffect: 다단 블룸. 반 크기로 뽑으며 부드러운 무릎 문턱(밝기는 세 채널 가운데 큰 값), 반씩 줄이는 이중 거르개, 천막 꼴 아홉 점으로 두 배씩 키우며 위 단에 더한다. 단 수(setLevelCount), 문턱과 무릎(setThreshold), 판 정밀도
+- ToonPostProcess: 생성 옵션 { sampleCount, useFloatColor, depthBits, useDepthTexture }, isFloatColorSupported(실수 판을 못 쓰는 기기는 RGBA8 판의 LDR 길로, 그때 씬에는 화면 색을 그리고 합성은 톤매핑과 감마 없이 블룸과 색 보정만 건다), setSampleCount, setResolutionScale(3D 판만 출력 크기 x 배율로 그리고 end 의 뷰포트로 키운다, UI 는 기기 화소 그대로), setBloomLevels(단 수, 문턱, 무릎, 0 이면 기본 반 해상도 9 탭), setBloomFloatColor, setBrightness, setLitArea 와 clearLitArea(씬 깊이 텍스처로 화소마다 월드 자리를 되짚어 그 자리에서 수평 거리 안쪽은 밝기 1), getSampleCount, getUseFloatColor, getResolutionScale, getBloomLevelCount. 광부 키우기가 셰이더 안에서 LDR 로 걸던 밝기, 채도, 밝힌 자리를 LDR 길의 후처리로 걸 수 있다. (채도의 밝기 무게는 엔진의 Rec. 709 다, 광부는 Rec. 601)
+- 툰 색 공간 규약: 씬 판은 선형이다. (ToonRenderer.setHdrOutput(true), ToonScreenOutline.setHdrOutput(true), ToonVfx 의 색도 선형으로 본다) 애버런트처럼 감마를 건 값 g 를 실수 판에 쓰고 합성에서 g^2.2 로 되돌리던 게임은 옮길 때 값을 선형으로 바꾼다. 색은 c^2.2, 감마 쪽에서 곱하던 밝기 배 k 는 선형 k^2.2 다. (1.37 은 2, 1.6 은 2.81, 2.08 은 5, 밝기 1.6 에 배 1.6 은 7.9) 블룸 문턱 1 과 무릎 0.25, 노출 1, 세기 0.6 은 애버런트가 선형으로 되돌린 뒤 쓰던 값이라 그대로다
+- Camera3D.setMatrices(보기, 투영): 게임이 셈한 원 행렬을 그대로 쓴다. (광부 키우기의 기울인 직교처럼) 눈, 보는 곳, 위쪽, 직교인지를 행렬에서 뽑고 projectToView, unprojectToPlane, readViewDepth, ToonRenderer.beginFrameWithCamera 가 그 행렬로 돈다. hasRawMatrices, clearRawMatrices, setPerspective 와 setOrthographic 과 lookAt 은 원 행렬을 버린다
+- ToonVfx: emitParticles, addFireball, addShockwave, addDecal, addPlume, addLightning, addFlash 의 options.age(이미 지난 초, 늦게 보인 효과를 그 나이부터, 음수면 그만큼 늦게) 와 options.key(사건 열쇠, 이미 낸 열쇠면 다시 내지 않음, clear 가 잊음, registerEventKey), setLookGain 과 getLookGain(파티클과 빛 점의 꼴마다 밝기 배, 기본 1), setGlintCapacity 와 getGlintCapacity(프레임마다 빛 점 상한, 기본 96), 바닥 자국 꼴 stain(tint 로 덮고 테 둘레가 테 색으로 물듦), sheen(기름 윤), shade(둥글게 엷어지는 그늘) 와 자국 options.flicker(깜빡이는 반주기 초), queueBlobShadow({ x, z, radius, alpha })(발밑 그늘), 불덩이, 충격파, 리본, 번개의 options.rim(몸을 덮고 가장자리를 테 색으로 두르는 꼴의 몫, 밝은 바탕용, 0 이면 지금의 더하는 빛). 흔들림(addShake)은 Shaker 의 지수 감쇠라 늦게 보인 사건이면 세기 x exp(-9 x 나이) 로 넘긴다
+- 러스트 판에만 있던 범용 기능을 넣었다. Text.calculateFittedFontSize(), UILabel.calculateFittedFontSize() (그릴 때의 크기를 그 자리에서 잼, 이 판은 Graphic 없이 재므로 getFittedFontSize 와 같은 값), Text.wrapLinesWithoutGraphic(maximumWidth) (지금 글과 글꼴로 나눈 줄 목록, 잴 캔버스가 없으면 null), measureTextWithoutGraphic(fontString, text) (import.js 에서 낸다, measureTextMetrics 와 같음)
+- Graphic.readFramebufferPixels() (지금 그린 화면을 { width, height, pixels } 로, 위에서 아래로 놓인 RGBA, 알파 255), getDrawingBufferWidth(), getDrawingBufferHeight() (마지막으로 맞춘 뷰포트), getImageSmoothingQuality()
+- ToonRenderer 확장 자리와 빛 모델: 애버런트와 광부 키우기가 게임마다 렌더러를 고치지 않고 엔진 툰 위로 옮겨 올 수 있게 표준 기능을 먼저 갖추고, 표준으로 안 되는 무늬만 셰이더 조각으로 넣는 자리를 둔다. 새 옵션이 기본값이면 지금과 같은 화면이다. (옛 렌더러와 같은 멈춘 장면을 그려 LDR, 셀 3 칸은 화소 차이 0, HDR 실수 판은 최대 3.8e-4 로 확인)
+  - ToonLightSet(toonlightset.js): 빛 값 한 덩어리. 렌더러가 기본 묶음을 들고 setLight, setSunDirection, setFillLight, setRimLight, setSpecular, setPointLights, setPointLightLimit, setBandCount, setBandRamp, clearBandRamp, setLightModel 이 그것을 고친다. createLightSet, getLightSet, 그리기마다 options.lightSet. 고칠 때마다 판 번호가 올라 바뀔 때만 올린다
+  - 해 방향의 뜻: 빛이 나아가는 쪽(해에서 면으로, three.js DirectionalLight 와 같음). 받는 몫은 max(dot(N, -sunDirection), 0). 면에서 해 쪽 방향을 쓰던 쪽은 부호를 뒤집어 넘긴다
+  - 채움 빛 setFillLight(방향, 색): 그림자 없는 둘째 방향광. 림 빛 setRimLight(색, 거듭제곱): pow(1 - max(dot(N, V), 0), power) 를 빛처럼 더한다. 정반사 setSpecular(세기, 지수 기본 48): 해의 블린-퐁, 그림자를 받는다
+  - 점광 setPointLights([{ position, color 선형, intensity, range, decay, rangeExponent, wrap }]): 8 개까지(TOON_MAXIMUM_POINT_LIGHTS), setPointLightLimit 로 가벼운 길에서 줄인다. 감쇠 = 창 (1 - (d / range)^rangeExponent) 를 막아 제곱 x 1 / max(d^decay, 0.01). 기본 decay 2, rangeExponent 4 는 three.js, 언리얼, 고도 4 의 꼴이고 decay 0, rangeExponent 1 이면 (1 - d / range)^2. 받는 몫은 감싸기 빛 (dot + wrap) / (1 + wrap)
+  - 띠: setBandCount 는 그대로(해 몫을 n 칸으로 반올림). setBandRamp(문턱, 값, 반 램버트) 는 문턱으로 갈라 칸마다의 값(8 칸까지, TOON_MAXIMUM_BAND_STEPS), 점광 몫에도 건다. 광부 키우기의 반 램버트 4 단은 setBandRamp([0.25, 0.5, 0.75], [0.3725, 0.6471, 0.8627, 1], true)
+  - 빛 꼴 setLightModel({ isEnergyNormalized }): 바탕색 x 빛을 π 로 나눈다(램버트 BRDF, 빛 세기를 조도로 주는 three.js 물리 빛, glTF 빛과 같은 약속). 그때 정반사는 정규화한 블린-퐁 (지수 + 8) / 8π. 기본 false 는 지금과 같다
+  - 그리기 꼴(drawMesh, drawMeshInstanced, drawMeshInstanceBuffer, ToonDrawQueue.addMesh): tintAmount(틴트를 곱하지 않고 sRGB 로 섞음), glowScale(꼭짓점 빛남의 배), colorScale(마지막 선형 색의 배), emissiveColor 와 emissiveIntensity, baseColorTexture(바탕색에 곱하고 알파는 불투명도에), emissiveTexture, uvTransform([u 옮김, v 옮김, u 배, v 배]), decalTexture, decalColor, decalEmission, decalUvTransform(바탕색 위에 알파로 덮고 그 색으로 빛남, 묶음 그림의 한 칸), alphaCutoff, blendMode(ToonBlendMode.alpha 기본, premultiplied, additive, alpha 가 아니면 비치는 것), softEdge(pow(|dot(N, V)|, softEdge) 를 불투명도에), isMirrored(주지 않으면 모형 행렬의 행렬식이 음수일 때 스스로 감기를 뒤집음, 보기 행렬이 거울에 비쳤으면 그것도), indexStart, indexCount, outlineIndexStart, outlineIndexCount
+  - ToonMaterial(toonmaterial.js): createMaterial({ name, uniformChunk, surfaceChunk, lightChunk, vertexChunk }) 를 options.material 로. 표면 조각 applySurface(inout ToonSurface), 빛 조각 applyLight(ToonSurface, inout ToonLighting), 정점 조각 applyVertex(inout ToonVertex, 몸, 바깥선, 그림자 깊이 셋 모두). ToonSurface 에 sRGB 바탕색, 알파, 선형 빛남, 월드 노멀, 꼭짓점 빛남, 빛을 받지 않음, 무늬 넷(vertexDetail), UV, 지역 위치, 월드 위치, 보는 방향이 있다. options.textures({ 유니폼 이름: 텍스처 }, 유닛 7 부터, TOON_MAXIMUM_MATERIAL_TEXTURES 9), options.onBeforeDraw(program, gl, ToonProgramKind). 머티리얼과 인스턴스 꼴마다 프로그램을 짓고 기억한다(짓지 못하면 알리고 그 그리기는 건너뜀). prepareMaterial, deleteMaterial, getSolidProgram(material). readProgramSources(material, instanceLayout) 와 composeToonProgramSources 로 ShaderWarmer 에 넘긴다
+  - 인스턴스 꼴: createInstanceLayout([{ name, size }]) (instanceMatrix 16, instanceTint 4 는 엔진이 읽고, 그 밖의 사용자 어트리뷰트는 셋까지 자리 13 ~ 15, 정점 조각이 그 이름으로 읽음), createInstanceBuffer(꼴, 수, ToonBufferUsage.static | dynamic) 영구 버퍼, updateInstanceBuffer, deleteInstanceBuffer, drawMeshInstanceBuffer(모형, 버퍼, 수, 꼴). 모형과 버퍼를 묶은 버텍스 어레이는 처음 그릴 때 지어 둔다. 지금의 drawMeshInstanced(매 프레임 거르고 올림)는 그대로다
+  - 텍스처: createTexture(ImageBitmap, 캔버스, 이미지, ImageData 나 { width, height, data }, { isMipmapped, isRepeated, isFiltered }), deleteTexture. UV (0, 0) 이 그림의 왼쪽 위(glTF 와 같음). 그림자 3, 바탕색 4, 빛남 5, 데칼 6, 머티리얼 7 ~ 15 유닛을 쓰고 주지 않은 칸에는 1x1 흰 텍스처를 묶는다
+  - 프레임: beginFrameWithMatrices(보기, 투영) (Camera3D 없이, 직교 원 행렬), getFrameCamera, readFrameCamera(보기와 투영에서 눈의 자리, 직교면 보는 방향, 거울 여부), applyFrameState, createReflectionMatrix(평면 위 점, 노멀), readMatrixDeterminant
+  - 성능: 프로그램마다 프레임 값(보기와 투영, 카메라, 그림자, HDR, 바깥선 색)과 빛 묶음은 바뀔 때만 올리고, 그리기마다 바뀌는 값만 매번 올린다. 텍스처 유닛은 몸 프로그램을 지을 때 한 번 정한다
+  - 셰이더: 세 정점 셰이더가 같은 머리(자리, 노멀, 색, 재질, 무늬, UV)와 ToonVertex 를 쓰고, 몸 셰이더가 지역 위치, 월드 위치, 무늬 넷, UV 를 조각으로 넘긴다. TOON_ATTRIBUTE_LOCATIONS 에 vertexUv(12). 러스트 판과 셰이더 글이 같다
+- ToonDrawQueue: addPass(ToonDrawStage.beforeOpaque | afterOpaque | afterOutline | afterTransparent, callback(renderer, gl)) 단계 콜백(평면 거울, 화면 공간 바깥선 섞기, 효과 자리, 부른 뒤 그리기 상태를 다시 건다), addMesh 꼴의 group 과 isDepthPrepassed(비치는 것을 한 덩어리로 가운데 깊이로 정렬하고, 깊이만 먼저 그린 뒤 같은 깊이에만 색을 칠해 겹친 부품이 두 겹으로 밝지 않음), blendMode 가 alpha 가 아니면 비치는 차례, drawWithMatrices(renderer, 보기, 투영). clear 가 단계 콜백도 비운다
+- ToonMesh: 텍스처 좌표 uvData(꼭짓점마다 2, 준 꼭짓점이 없으면 빈 배열, 섞이면 없는 꼭짓점은 0). createBoxGeometry(면마다 0 ~ 1)와 createSphereGeometry(경도와 위도)가 uvs 를 짓고 addPart 가 담는다. addTriangles 의 마지막 선택 인자 uvs, addMaterialRange, combine 이 uvData 와 materialRanges 를 잇는다
+- ToonGlb: TEXCOORD_0 을 uvData 로, 프리미티브마다 재질 범위 materialRanges({ name, materialIndex, nodeName, indexStart, indexCount, extras, alphaMode, alphaCutoff, baseColorFactor, emissiveFactor, baseColorImage, emissiveImage, hasUv }) 를 담는다. emissiveTexture 가 있으면 꼭짓점 빛남은 0 으로 두고 재질 범위로 넘긴다. readGlbImages(그림의 name, mimeType, data), decodeGlbImage(ImageBitmap). 부품 안 칸(강조색, 표시판)은 재질 이름이나 extras 로 고르고 indexStart, indexCount 로 그린다
+- 애버런트를 옮길 때 값 바꾸기(엔진은 정석 그대로, 게임 값을 이렇게 바꾸면 같은 몸 셰이딩이 나온다, 시험 페이지에서 점광, ÷π, 해, 되비친 빛, 정반사를 넣고 실수 판에서 CPU 셈과 견줘 최대 차이 4.1e-8):
+  - 해와 되비친 빛(rim) 방향은 '면에서 빛 쪽'이라 부호를 뒤집어 setLight, setFillLight 로. ÷π 는 setLightModel({ isEnergyNormalized: true }). 정반사 세기는 8 / (48 + 8) 배(정규화한 블린-퐁)
+  - 점광은 decay 0, rangeExponent 1, color 는 readLinearColor 값 그대로(intensity 1)
+  - 빛 받은 몫을 1 로 막던 min(lit, 1) 은 엔진에 넣지 않았다. 빛 세기와 노출, 블룸 문턱을 다시 맞춘다. (막지 않는 곳에서는 값이 같다)
+  - HDR 판에 감마 값을 쓰던 것: 엔진은 선형으로 쓴다. 빛 받는 몸은 같은 값이 나오고, 빛을 받지 않는 몸의 min(색 x 배, 1) 은 sRGB 에서 곱하던 것이라 엔진의 colorScale 이나 빛남 배를 그 배의 2.2 제곱으로 준다. colorScale(거울 0.6)도 엔진 값은 0.6^2.2
+  - 빛남 배: 꼭짓점 빛남은 glowScale(배우 배 x 부품 배 x HDR 배), 강조색 빛은 emissiveColor 와 emissiveIntensity(0.45 x 1.6). HDR 의 밝은 부품 키우기는 메시마다의 빛남 세기로
+  - 색 키(#ff00ff 강조색, 표시판 키 0.02): GLB 프리미티브의 재질 범위로 갈라 그 칸만 tintAmount 1 과 강조색, 표시판은 UV 와 데칼 텍스처(로고, 숫자)로. 움직이는 얼굴 화면(표정, 시선, 깜빡임)은 표면 조각으로 둔다
+- 비주얼 에디터를 위 엔진으로 다시 빌드했다
+- WorldNode.setPosition: getPosition 의 거꾸로를 더했다. 지금까지는 TransformNode.setPosition 이 부모 pivot 점의 자리(부모 contentSize x 부모 pivot)를 되돌리지 않아, 부모의 내용 크기와 피벗이 0 이 아니면 setPosition 으로 놓은 자리와 getPosition 이 달랐다. (부모 100x60, 피벗 가운데, 90 도, 크기 2 에서 (280, 200) 에 놓으면 (340, 100) 으로 읽혔다) 부모 스케일이 0 인 축은 부모 pivot 점에 놓는다. (러스트 판과 같이 고침)
+- multiply 를 렌더 타겟(프레임버퍼를 묶은 동안)에 그릴 때는 그릴 영역 아래를 떠 와 W3C 식(B(Cb, Cs) = Cb x Cs)대로 셰이더로 섞는다. 고정 블렌딩(DST_COLOR, ONE_MINUS_SRC_ALPHA)은 바탕 알파가 1 보다 작으면 cs x (1 - αb) 항이 빠지고 알파가 바탕 알파로 남아, 반투명 바탕 렌더 타겟에서 크롬 Canvas2D 와 최대 221 달랐다. (이제 도형 안쪽 0) 기본 프레임버퍼(alpha: false)는 바탕 알파가 늘 1 이라 지금처럼 고정 블렌딩과 묶어 그리기로 그려 화면과 드로우 콜, 복사 수가 그대로다. 렌더 타겟의 multiply 는 셰이더 섞기 13 가지처럼 그리기 하나에 영역 복사 한 번과 드로우 콜 한 번이 든다. 섞기 셰이더 글에 blendModeIndex 14 를 더했다. (러스트 판과 같이 고침)
+- KeyCode.audioplay 의 값 "MediaPlay" 는 W3C KeyboardEvent.code 표(2025-04-22 권고안)에 없는 이름이다. 표의 이름이고 크롬이 흔한 재생/멈춤 키(USB 0x0C00CD, 윈도우 스캔 코드 0xE022)에 내는 "MediaPlayPause" 로 고쳤다. 크롬은 "MediaPlay" 를 리눅스와 크롬OS 의 재생 키(USB 0x0C00B0)에만 낸다. (러스트 판과 같이 고침)
+- 문서를 지금 코드에 맞췄다. (코드는 그대로다)
+  - README: 소개(지금 소스를 묶은 번들 크기 약 765 KB, gzip 약 215 KB, 묶어 그리기와 거르기 기본 켬, 렌더 타겟 multiply), 주요 기능 표(입력 동작, 창 쌓기, 모션, 툰 3D, 애셋, 소리 표 같은 이번 판의 것), ShaderSprite 효과 수(none 을 빼면 49), 비주얼 에디터와 atlas.cjs 설명, 배포본이 없는 예제 cameratour, toonmaterial, 가운뎃점을 쉼표로
+  - ARCHITECTURE: 배치, 상속 계층(노드인 위젯, Object 를 상속하지 않는 것), 소유 구조(InputActions, PointerCursor, AssetLoader, 툰 3D), 프레임 루프(최대 FPS, 묶음 기억 잊기, 남은 묶음 그리기, 커서), 묶어 그리기와 거르기 기본 켬, multiply 는 렌더 타겟에서 셰이더로 섞음(알려진 공백 표에서 뺌), 미노출 목록(AudioPlayer, GamepadManager 는 이제 낸다), 9장 러스트 판과의 관계
+  - UPDATE.md 이 판 머리에서 두 갈래가 겹쳐 적은 줄(WebSocketClient, Localization, UILabel.getVisibleCharacterCount)을 하나씩 남겼다
+- 문서 자료: 사이트가 판마다 문서를 지을 자료를 docs/ 에 둔다. (HTML 은 사이트가 짓는다)
+  - docs/api/<판>.json: import.js 가 내보내는 공개 API(모듈, 클래스, 멤버, 모듈 함수와 상수, 열거). 설명 칸은 { ko, en } 이고 ko 는 소스 주석 원문, en 은 docs/api/translation.en.json(ko 원문 → en) 표에서 온다. since 는 v0.0.8 부터의 태그를 훑어 그 클래스에 그 멤버가 처음 있던 판이다
+  - tools/apidoc.cjs: 위 자료를 뽑는다. (node 내장 모듈만 쓰는 작은 토크나이저, --missing 은 표에 없는 ko 글, --check 는 꼴 검사와 수 세기) 쓰는 법은 tools/TOOLS.md
+  - docs/guide/<판>/ko, en: 개요, 빠른 시작, 구조, 도구. (README, ARCHITECTURE, tools/TOOLS.md, NODE.md 에서 나눔, 저장소 상대 링크는 GitHub 주소로) docs/update/<판>.ko.md, .en.md: 이 판의 업데이트 기록
+  - README: UI Editor 가 저장하는 파일은 .uiasset.json 이다. (.ui.json 이라 적혀 있었다) tools/excel.cjs 는 명령줄 진입점이 없는 함수 모음이라 혼자 실행하면 아무것도 하지 않고, tools/table.cjs 는 빈 파일이라고 바로 적었다. 명령줄 도구 표에 apidoc.cjs 를 더했다
+  - 공개 API 주석과 예제: 공개 API 의 빈 ko 설명(모듈 요약, 멤버, 매개변수, 반환, 열거 값)과 빈 매개변수 꼴을 채우고, 값을 돌려주는데 @returns 가 없던 함수에 @returns 를, 머리 주석이 없던 비공개 함수에 머리 주석을 달았다. 설명은 코드를 읽고 실제 동작(단위, 범위, 기본값, null 일 때)대로 적었다. 모든 클래스와 클래스 없는 모듈에 @example 예제를 넣고, 쓰는 법이 이름만으로 뻔하지 않은 멤버에도 넣었다. (자료의 examples 칸, 314 개) 새 글의 영어는 번역 표에 더했다. 툰 3D 폴더(graphics3d/toon), visual.js, uilistview.js, uiscrollbar.js 는 따로 고치는 중이라 이번에 채우지 않았다
+  - tools/apidoc.cjs: --gaps(문서 빈 곳을 파일마다), --check-examples(API 예제와 가이드 코드 칸을 문법, 엔진 이름, node 워커, 헤드리스 크롬으로 돌려 검사, 외부 의존 없음), --missing, --gaps, --check-examples 의 --only, --exclude 거르개. 필드의 returns 는 값의 꼴만 담는 칸이라 ko 빈 칸으로 세지 않는다. 설명 앞의 하이픈은 "이름 - 설명" 꼴일 때만 뗀다. ("-1 이면" 이 "1 이면" 으로 읽히던 것)
+  - docs/guide/<판>/ko, en: 주제별 장 15 개를 더했다. 05 프로젝트 시작, 06 엔진과 씬, 07 노드와 컴포넌트, 08 그리기, 09 입력, 10 애셋 불러오기, 11 소리, 12 UI, 13 트윈과 애니메이션과 타임라인, 14 파티클, 15 3D, 16 저장, 17 언어, 18 개발자 도구, 19 저작 도구. (파일 이름 앞 두 자리 숫자가 차례, 장마다 도는 예제가 있고 모두 예제 검사에 걸린다)
+  - 고친 파일의 주석에서 긴 줄표와 가운뎃점을 쉼표로 바꿨다. (셰이더 문자열, 오류 글 같은 코드 안의 것은 그대로)
+  - examples/assets/beep.wav: 소리 예제에 쓰는 0.15 초 삑 소리. (스크립트로 지은 PCM)
+- Wait.nextFrame: 만든 Promise 를 기다리지 않아 바로 끝나던 것을 고쳤다. 이제 다음 requestAnimationFrame 까지 기다린다. (러스트 판 wait::next_frame 과 같다)
+- ToonScreenOutline: 화면 공간 바깥선을 실시간 툰 렌더링의 정석 꼴로 다시 지었다. (게임 하나에 맞춘 꼴이 아니라 엔진의 기준이다)
+  - 잡기: 선의 판(노멀, 선 번호, 깊이)에서 화소와 바로 이웃 넷 사이의 경계마다 한 번 보고, 선은 그 경계 가운데에 세운다. (Saito, Takahashi 1990 의 G 버퍼 가장자리, 유니티 셰이더 그래프 예제의 이웃 넷 보기) 지금까지는 꺾임 선을 가운데 화소에서 creaseRadius 떨어진 한 점의 노멀로 보아, 꺾임 양쪽이 띠로 서고 반 크기 판을 키우면 점선과 평행한 둘째 선이 서고, 둥근 면의 실루엣 안쪽에 띠가 한 겹 더 섰다
+  - 깊이: 이웃 두 화소를 보기 공간 자리로 풀어 서로의 접평면에서 떨어진 거리로 가려진 실루엣을 본다. 비스듬히 보는 바닥과 둥근 면의 둘레에 가짜 선이 서지 않는다. (보는 각도에 따라 문턱을 고치는 Roystan 식을 접평면으로 한 꼴) 문턱에 그 깊이의 화소 크기 두 배를 더한다
+  - 넓히기: 경계 토막까지의 거리를 점프 플러딩(Rong, Tan 2006)으로 퍼뜨린다. 굵기에 상관없이 걸음은 log2 번이다. (Ben Golus, The Quest for Very Wide Outlines) 바깥 선과 꺾임 선은 따로 퍼뜨려 굵기를 따로 준다. 지금까지의 3 픽셀 반지름 한도가 없어졌다
+  - 섞기: 그리는 영역의 화소마다 가장 가까운 경계까지의 거리로 clamp(굵기 / 2 - 거리 + 0.5, 0, 1) 만큼 덮는다. 선의 판을 줄여도 거리를 그리는 영역에서 재므로 늘인 선이 끊기지 않는다
+  - 모형마다: drawMesh, drawMeshInstanced 의 options.hasScreenOutline (false 면 선은 내지 않고 뒤의 선만 가린다), options.hasCreaseLine, options.isMirrored (주지 않으면 행렬식으로 감기를 뒤집는다)
+  - 옮기는 법 (공개 API 를 바꿨다)
+    - setCrease(각, 진하기, 이어짐 픽셀) → setCrease(각, 굵기, 진하기). 굵기는 setWidth 의 단위이고 기본 1, 진하기는 0 ~ 1 이고 기본 1. 이어짐 픽셀(creaseExtent)은 없어졌다. (화소 하나 사이만 보므로 필요 없다) 옛 setCrease(60, 0.5, 2) 와 비슷한 모습은 픽셀 단위면 setCrease(60, 1, 0.8), 월드 단위면 굵기를 바깥 선 굵기의 반쯤으로 (setWidth(0.022, world) 면 setCrease(60, 0.011, 0.8)). 굵기가 setWidth 의 단위라 월드 단위에 1 을 주면 1 미터 굵기가 된다
+    - setDepthThreshold(깊이 문턱, 맞닿음 문턱) → setDepthThreshold(깊이 문턱). 뜻이 접평면 거리로 바뀌었다. (월드 길이, 같은 값을 그대로 넣으면 된다) 맞닿음 문턱(contactTolerance)은 없어졌다. 선을 경계 가운데에 세우므로 어느 쪽에 그을지 가릴 일이 없다
+    - setWidth 의 뜻: 선 하나의 굵기이고, 경계를 가운데로 양쪽에 반씩 덮는다. (지금까지는 실루엣 바깥쪽에만 그 굵기) 기본 1.5 → 2 픽셀. 옛 모습의 바깥 두께를 맞추려면 두 배를 준다
+    - setSampleCount, TOON_SCREEN_OUTLINE_MAXIMUM_SAMPLES, TOON_SCREEN_OUTLINE_MAXIMUM_CREASE_SAMPLES 는 없어졌다. (점프 플러딩은 굵기에 따라 걸음 수가 스스로 정해진다) 가벼운 길은 setResolutionScale 만 낮춘다
+    - getOutlineRadius() → getLineWidths() ([바깥 선, 꺾임 선] 의 그리는 영역 픽셀)
+    - 선 번호 상한 65535 → TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID (16383). 선의 판의 a 칸 위 두 비트에 모형마다의 꼴을 쓴다
+    - getLineTarget() 의 maskTexture 는 없어졌다. 대신 seedTextures (RGBA16UI 둘), seedIndex (넓히기를 마친 쪽)
+    - drawOutline 이 뷰포트를 beginLineIds 때의 그리는 영역으로 스스로 건다. (지금까지는 부르는 쪽의 뷰포트가 같아야 했다)
+  - readJumpFloodSteps(거리): 점프 플러딩 걸음 목록. (큰 것부터 1 까지)
+- ToonDrawQueue: setScreenOutline(ToonScreenOutline 이나 null), getScreenOutline(). 맡기면 draw 와 drawWithMatrices 가 몸 앞에 불투명한 것을 선의 판에 그리고(번호는 options.lineId, 주지 않으면 담은 차례 + 1, 인스턴스는 instances[i].lineId 가 먼저), 바깥선 껍데기 뒤 afterOutline 단계 앞에 섞는다. 모형마다 options.hasScreenOutline, options.hasCreaseLine. 비치는 것은 선의 판에 그리지 않는다. 화면 사각형(setScreenRect)이 있으면 그 사각형을 선의 판의 그리는 영역으로 쓴다. 지금까지 afterOutline 단계 콜백에서 drawOutline 을 부르던 코드는 이것으로 바꾸면 된다
+- 예제 toonstyle: 툰 셰이딩과 바깥선 견주기 장면. (각진 상자, 둥근 공, 큰 면 결정, 잔 면 결정 덩이, 고리, 비스듬한 판, 그림자, 점광, ?scale=0.5 로 반 크기 선의 판, ?toggles=1 로 모형마다의 꼴) 러스트 예제 toonstyle 과 같은 장면이다
+- 러스트 판 반사(#[reflect])와 맞추며 원본에서 고친 것
+  - Visual, UIListView: 생성자가 setComponentType 을 부르지 않아 getComponentType 이 "Component" 였고 UI 문서와 반사 저장에 ComponentType "Component" 로 적혔다. 이제 "Visual", "UIListView" 다
+  - UIScrollBar: getTrackColor, getThumbColor (트랙과 썸 Paint 의 색, 러스트 판과 같다)
+  - UIDocument: ShadowImage 를 표에 더했다. Sprite 처럼 imagePath 뒤에 반사 저장 꼴로 쓰고 읽는다. (지금까지는 기본 표에 없어, 에디터처럼 따로 등록하지 않으면 읽을 때 건너뛰었다)
+  - UIDocument.loadByReflection: 지금 값이 없는(null) 속성도 저장한 꼴로 읽는다. (수 넷 배열은 Color, 수 둘 배열은 Vector2, 수, 글, 불은 그대로) 지금까지는 지금 값이 null 인 속성의 수, 글, 불, 배열 값을 건너뛰었다
+  - docs/api/0.4.0.json 과 번역 표를 다시 뽑았다
+- 툰 셰이딩을 실시간 툰 렌더링의 정석 꼴로 다시 지었다. (유니티 툰 셰이더, 언리얼 Substrate Toon BSDF, 고도의 diffuse_toon, 팀 포트리스 2, 길티기어 Xrd 를 견줘 고른 꼴, 게임 하나에 맞추지 않았다)
+  - 그늘 램프: 빛을 받는 몫(반 램버트 기본)에 그림자를 곱해 램프에 대어 색을 고른다. 칸마다 자리, 선형 색, 부드러움(Step 과 Feather), 경계는 fwidth 로 계단 없이 막는다. 그림자는 검정이 아니라 그늘 색으로 들어간다
+    - ToonLightSet.setShade({ step, feather, color, secondStep, secondFeather, secondColor, isHalfLambert }): 바탕, 1 차 그늘, 2 차 그늘. 기본은 반 램버트 0.5 에서 갈리는 두 단계(서늘한 보라 그늘)
+    - setShadeRamp(자리, 색, 부드러움, 반 램버트): 칸을 바로 (8 칸까지), clearShadeRamp(): 부드러운 램버트
+    - setRampTexture(텍스처, 반 램버트): 칸 대신 램프 텍스처의 가로를 읽는다. (팀 포트리스 2 의 warp, 원신과 붕괴의 램프 텍스처 꼴)
+    - setBandCount, setBandRamp 는 그대로 쓰되 같은 램프로 짓는다. (회색 칸, 경계가 계단지지 않는다)
+  - 빛마다: 해는 램프 색을 통째로 받아 그늘도 해의 색으로 물든다. 채움 빛, 점광, 스포트라이트는 램프의 밝기 단계(바닥 칸 0, 맨 위 칸 1)를 받아 등진 면을 밝히지 않는다. 지금까지 채움 빛은 띠를 거치지 않았다
+  - 하이라이트: setSpecular(세기, 지수, 부드러움, 색). 블린 퐁을 0.5 에서 가른 단단한 툰 점(부드러움 0, 기본)에서 부드러운 빛(1)까지. 해와 점광, 스포트라이트 모두에 서고 빛을 받는 단계로 가린다. (지금까지는 해만, 부드러운 꼴만, 빛 쪽 가림 없이 그림자만)
+  - 림 빛: setRimLight(색, 거듭제곱, 부드러움, 해 쪽 가림). 단단한 테에서 부드러운 테까지, 해를 받는 쪽에만 둘 수 있다. 바탕색에 곱하지 않고 더한다. (유니티 툰 셰이더의 Rim Light 와 같다, 지금까지는 빛처럼 바탕색에 곱했다)
+  - 스포트라이트: 점광에 direction, innerConeAngle, outerConeAngle 을 주면 스포트라이트다. (glTF KHR_lights_punctual 의 각 감쇠)
+  - 그리기 꼴: receivesShadow (기본 true), shadeOffset (그늘 경계 옮기기), specularScale, rimScale (재질마다 하이라이트와 림 배), matcapTexture, matcapStrength, matcapBlend (ToonMatcapBlend.multiply, add), outlineColor, outlineWidthScale (껍데기 바깥선의 그리기마다 색과 굵기 배)
+  - 표면 조각(ToonSurface)에 shadeOffset, specularMask, rimMask, 빛 조각(ToonLighting)에 rim, sunLevel 을 더했다. 합치기는 바탕색 x irradiance + specular x specularMask + rim x rimMask + 빛남
+  - 노멀을 모형 행렬과 본 행렬의 역행렬의 전치로 옮긴다. 늘이고 줄인 모형(크기가 축마다 다른 것)의 빛과 화면 공간 바깥선의 꺾임이 틀렸던 것을 바로잡았다. 정점 조각에서 노멀을 크기의 제곱으로 나눠 맞추던 코드는 빼야 한다
+  - 기본 빛을 바꿨다. 해 [0.9, 0.85, 0.8] → [0.84, 0.8, 0.74], 하늘 [0.45, 0.5, 0.6] → [0.3, 0.33, 0.42], 땅 [0.2, 0.18, 0.16] → [0.17, 0.16, 0.15]. (빛을 받는 면이 1 을 크게 넘지 않게, 두 단계 그늘과 맞춤)
+  - 옮기는 법 (공개 API 를 바꿨다)
+    - 부드러운 램버트(지금까지의 기본)를 그대로 쓰려면 clearShadeRamp() 나 setBandCount(0)
+    - clearBandRamp() → clearShadeRamp(). getBandRamp(), getBandCount() 는 없어졌다. getShadeRamp() 가 { positions, colors, feathers, isHalfLambert } 를 준다
+    - setSpecular(세기, 지수) 는 이제 단단한 툰 점이다. 지금까지의 부드러운 하이라이트는 setSpecular(세기, 지수, 1). getSpecular() 는 { strength, exponent, feather, color }
+    - setRimLight(색, 거듭제곱) 은 부드러운 테 그대로지만 바탕색에 곱하지 않고 더한다. 지금까지와 비슷한 밝기는 색에 바탕색의 대표 색을 곱해 준다. getRimLight() 는 { color, power, feather, lightMask }
+    - 점광의 뒷면이 밝지 않다. (그늘 램프가 있을 때) 지금처럼 램버트로 받게 하려면 clearShadeRamp()
+- ToonRenderer: 껍데기 바깥선을 셰이더에서 민다. 꼭짓점에 바탕 자리와 미는 쪽(MeshBuilder 가 같은 자리의 노멀을 평균하고 모서리를 덜 튀게 지은 굵기)을 올리고, 그리기마다 outlineColor, outlineWidthScale, setOutlineDistanceScale(기준 거리, 가장 작은 배, 가장 큰 배) 로 거리에 따라 굵기를 맞춘다. (원근만, 길티기어 Xrd 처럼 화면 굵기를 맞춤) 바탕 자리가 없는 껍데기(GLB 에 지어 둔 것)는 지은 자리 그대로 그린다
+  - 껍데기 버텍스 어레이의 어트리뷰트 1(vertexNormal 자리)에 미는 쪽이 든다. 정점 조각이 바깥선 프로그램에서 vertex.localNormal 을 고치면 껍데기 굵기가 바뀐다
+  - 프레임 유니폼 viewRotation (매트캡), 함수 readViewRotation, readOutlineVertexData 를 내보낸다
+- ToonMatcapBlend: 매트캡을 섞는 방식. (multiply, add)
+- 예제 toonmaterial: 애버런트 몸 셰이딩 식 대조(verifyAberrantShading)를 뺐다. (게임 하나의 식이라 엔진 예제에 둘 것이 아니고, 엔진의 빛 꼴이 정석으로 바뀌어 같은 값이 나오지 않는다) 바위 정점 조각의 노멀 크기 맞춤을 뺐다. (엔진이 역행렬의 전치로 옮긴다)
+- 예제 toonstyle: 그늘 셋, 단단한 하이라이트, 해 쪽 림, 스포트라이트, 매트캡, ?shell=1 로 껍데기 바깥선(그리기마다 색과 굵기, 거리 배)
+- 툰 폴더(graphics3d/toon)의 모든 파일에 주석과 예제를 채웠다. 공개 API 마다 머리 주석과 JSDoc @param, @returns 설명, 모듈과 클래스와 쓰는 법이 뻔하지 않은 멤버에 @example <caption>제목</caption> (예제는 import.js 이름만 쓰고 헤드리스 크롬에서 오류 없이 도는 것을 확인했다)
+- 툰을 유니티와 언리얼이 기본으로 갖춘 수준까지 채웠다. (유니티 툰 셰이더 소스의 식을 따랐다)
+  - ShadowMap: 모형을 지은 뒤에 ShadowMap 을 지으면 깊이 텍스처가 텍스처 유닛에 남아 그리기가 GL INVALID_OPERATION(되먹임 고리)이 되던 것을 고쳤다. 지을 때 앞의 텍스처와 프레임버퍼 묶음을 돌린다. 빛이 거의 바로 아래나 위로 나아가면 광원 행렬이 깨지던 것(위쪽 벡터가 빛과 나란함)을 고쳤다. 그때는 위쪽을 z 축으로 잡는다
+  - ShadowAtlas, SHADOW_ATLAS_MAXIMUM_LIGHTS(4): 점광과 스포트라이트의 실시간 그림자. 유니티 URP 의 추가 빛 그림자 아틀라스 꼴로 깊이 텍스처 한 장을 칸으로 나눠, 스포트라이트는 원근 한 칸, 점광은 큐브 여섯 면을 칸 여섯에 그린다. updateLights(점광 목록) 이 castsShadow 가 true 인 빛을 골라 칸과 칸마다의 보기와 투영을 셈한다. 툰 셰이더는 그 점광의 빛을 받는 몫에 그림자를 곱해 그늘 램프에 넣는다 (해와 같은 꼴, 3x3 PCF) 받는 자리는 노멀 쪽으로 칸 텍셀 (1 + 3 x (1 - dot(N, L))) 개만큼 밀어 빛에 비스듬한 면의 그림자 여드름을 막는다
+  - ToonRenderer: setLocalShadows(ShadowAtlas, 세기), beginShadowAtlasPass(아틀라스), setShadowAtlasTile(아틀라스, 칸 번호) (끝은 endShadowPass). ToonDrawQueue.drawLocalShadows(렌더러, 아틀라스)
+  - 점광: castsShadow (기본 false), shadowNear (기본 0.05, 먼 거리는 range, 0 이면 30)
+  - 빛 색 쓰기: ToonLightSet.setLightColorUsage({ base, shade, highlight, rim, shadeRim, matcap, angelRing, outline }) (렌더러에도). 색마다 빛 색을 곱할지 고른다. 끄면 바탕, 그늘, 하이라이트는 빛의 휘도만 받고 나머지는 빛을 받지 않는다. (유니티 툰 셰이더의 Is_LightColor_*, 기본 모두 켬) 이제 림, 매트캡, 껍데기 바깥선도 기본으로 해의 색을 곱한다. 지금까지 모습은 setLightColorUsage({ rim: false, matcap: false, outline: false })
+  - 그늘 쪽 림: ToonLightSet.setShadeRimLight(색, 거듭제곱) (렌더러에도). 해와 등진 쪽에 테를 (테 - 반 램버트) 만큼 더한다. (유니티 툰 셰이더의 Antipodean Rim Light)
+  - 껍데기 바깥선: setOutlineFadeDistance(가까운 거리, 먼 거리) 로 멀면 굵기가 0 이 된다. (유니티 툰 셰이더의 Nearest, Farthest Distance, 모형의 자리에서 카메라까지) 그리기마다 outlineOffsetZ 로 카메라에서 먼 쪽으로 밀어 몸 앞으로 비치지 않게 한다. (Offset Z)
+  - 천사 고리: 그리기 꼴 angelRingTexture, angelRingColor (기본 흰색), angelRingOffsetU (기본 0), angelRingOffsetV (기본 0.3), isAngelRingAlpha. u 는 보기 공간 노멀의 x, v 는 2 번 UV 의 y 와 보기 노멀의 y 를 offsetV 로 섞은 것이다. (유니티 툰 셰이더의 Angel Ring, 카메라에 붙은 머리 반사 띠)
+  - 2 번 UV: MeshBuilder 의 도형 uvs1, addTriangles 의 uvs1, readArrays 의 uv1Data, ToonGlb 가 TEXCOORD_1 을 읽는다. 셰이더의 vertexUv 가 vec4(UV, 2 번 UV)이고 ToonVertex.uv1, ToonSurface.uv1 을 더했다. readUvData 를 내보낸다
+  - 텍스처 유닛: 점광 그림자 아틀라스가 유닛 0, 천사 고리가 7 을 쓴다. 머티리얼 텍스처는 8 ~ 15 이고 TOON_MAXIMUM_MATERIAL_TEXTURES 가 9 → 8 이 되었다. 유닛 0 은 엔진 2D 가 기억하는 유닛이라 beginFrame 이 그 묶음을 적어 두고 endFrame 이 돌린다
+  - 셰이더 유니폼: lightColorUsage, lightColorUsageExtra, shadeRimLight, angelRingSettings, angelRingColor, localShadow* , pointLightShadowSlots, 껍데기의 outlineFadeDistance, outlineOffsetZ, outlineLightColor, cameraForward
+- ToonScreenOutline: 반 크기(줄인) 판에서 남던 계단을 없앴다. 선의 판과 씨앗은 늘 그리는 영역 해상도로 잡고, 점프 플러딩만 줄인 판에서 한다. 줄인 판의 칸에 온 해상도 씨앗 가운데 가장 가까운 것을 모으고(모으기 패스), 씨앗 자리는 그리는 영역 화소 좌표 그대로 넓혀 섞을 때 거리를 그리는 영역에서 잰다. (Ben Golus 가 말한, 낮은 해상도에서 점프 플러딩을 돌리되 자리를 겹선형으로 늘이지 말고 거리로 푸는 꼴)
+  - setResolutionScale 의 뜻이 넓히기 판의 몫으로 바뀌었다. 선의 판 패스는 그리는 영역 해상도로 그린다
+  - getLineTarget(): seedTexture (온 해상도 씨앗), jumpFloodTextures, jumpFloodIndex, jumpFloodWidth, jumpFloodHeight. (seedTextures, seedIndex 는 없어졌다) readProgramSources 가 다섯을 준다 (모으기 패스)
+- 예제 toonstyle: 점광과 스포트라이트 그림자, 그늘 쪽 푸른 림, 짙은 공의 천사 고리, 껍데기 바깥선이 16 미터에서 사라지기와 카메라 쪽 밀기
+- 천사 고리: 카메라 기울임만큼 UV 를 되돌려 돌린다. (유니티 툰 셰이더 소스의 Camera Rolling Stabilizer 와 같은 셈, readCameraRoll 을 내보낸다, 셰이더 유니폼 cameraRoll) 카메라를 기울여도 고리가 머리에 붙어 있다
+- 빛 세기 막기: ToonLightSet.setLightIntensityLimited(참 거짓), isLightIntensityLimited() (렌더러에도 setLightIntensityLimited). 유니티 툰 셰이더의 Limit Light Intensity 와 같은 셈이고 기본은 유니티 툰 셰이더 기본처럼 켬이다
+  - 해와 채움 빛은 채널마다 1 로 자르고, 점광과 스포트라이트는 감쇠까지 곱한 색의 세기(0.299 R + 0.587 G + 0.114 B)가 1 을 넘으면 세기로 나눈다. 빛 꼴이 isEnergyNormalized 면 π 로 나눈 뒤의 몫을 막는다
+  - 1 을 넘는 해나 센 점광을 쓰던 장면은 화면이 바뀐다. (HDR 블룸에 센 빛을 쓰던 것) 지금까지 모습은 setLightIntensityLimited(false)
+  - 빛 색 쓰기를 끈 색이 받는 세기도 유니티 툰 셰이더와 같은 0.299 R + 0.587 G + 0.114 B 로 바꿨다. 껍데기 바깥선에 곱하는 해의 색은 세기가 1 이상이면 세기로 나눈다 (유니티 툰 셰이더 바깥선)
+- ShadowAtlas: 칸 크기를 유니티 URP 기본과 같게 했다. new ShadowAtlas(컨텍스트, 해상도 기본 2048, 칸 해상도 기본 1024) 로 칸마다 1024 를 바라고, 다 들어가지 않으면 다 들어갈 때까지 반씩 줄인다 (URP 추가 빛 그림자 아틀라스 기본 2048, 해상도 단계 High 기본 1024, 빛의 기본 단계 High). getTileResolution
+  - 지금까지는 칸 수의 제곱근으로 격자를 나눠 점광 하나가 682 였는데 이제 512, 스포트라이트 하나는 2048 이었는데 이제 1024 다. 더 곱게 하려면 해상도와 칸 해상도를 올린다
+- 예제 toonstyle: ?roll=라디안 으로 카메라를 기울인다 (천사 고리 기울임 되돌리기)
