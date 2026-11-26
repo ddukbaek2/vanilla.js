@@ -42919,8 +42919,8 @@
 								}
 							],
 							"description": {
-								"ko": "우클릭 처리. (필드 안이면 기본 메뉴를 막고 포커스한 뒤 문맥 메뉴를 띄운다)",
-								"en": "Handles a right click. (inside the field, blocks the default menu, focuses and shows the context menu)"
+								"ko": "우클릭 처리. (필드 안이면 기본 메뉴를 막고 포커스한 뒤 문맥 메뉴를 띄운다, 밖이면 띄운 메뉴를 닫는다)",
+								"en": "Handles a right click. (Inside the field it blocks the default menu, focuses and opens the context menu; outside it closes an open menu)"
 							},
 							"since": "0.2.1",
 							"source": "src/ui/uiinputfield.js"
@@ -42949,28 +42949,20 @@
 						{
 							"kind": "method",
 							"name": "showContextMenu",
-							"signature": "showContextMenu(clientX, clientY)",
+							"signature": "showContextMenu(viewPosition)",
 							"params": [
 								{
-									"name": "clientX",
-									"type": "number",
+									"name": "viewPosition",
+									"type": "Vector2",
 									"description": {
-										"ko": "메뉴 왼쪽 위의 X. (CSS 픽셀, 뷰포트 좌표 clientX)",
-										"en": "X of the menu's top left corner. (CSS pixels, viewport coordinate clientX)"
-									}
-								},
-								{
-									"name": "clientY",
-									"type": "number",
-									"description": {
-										"ko": "메뉴 왼쪽 위의 Y. (CSS 픽셀, 뷰포트 좌표 clientY)",
-										"en": "Y of the menu's top left corner. (CSS pixels, viewport coordinate clientY)"
+										"ko": "메뉴 왼쪽 위. (뷰 좌표)",
+										"en": "Top left of the menu. (view coordinates)"
 									}
 								}
 							],
 							"description": {
-								"ko": "문맥 메뉴 띄우기. (잘라내기, 복사, 붙여넣기, 모두 선택 DOM 메뉴, 메뉴 밖을 누르면 닫는다)\n- 메뉴는 body 에 붙은 absolute 라 문서 좌표로 놓는다. (뷰포트 좌표인 clientX, clientY 에 스크롤한 만큼 더한다)",
-								"en": "Shows the context menu. (A cut, copy, paste and select all DOM menu, closes when pressed outside the menu)\n- The menu is an absolute element on body, so it is placed in document coordinates. (Adds the scroll offset to the viewport coordinates clientX and clientY)"
+								"ko": "문맥 메뉴 띄우기. (엔진이 그린 잘라내기, 복사, 붙여넣기, 모두 선택 메뉴, 러스트 판 show_context_menu 와 같다)\n- 루트의 마지막 자식 노드(UIInputFieldContextMenu 컴포넌트)로 만들어 위에 그린다. 메뉴 왼쪽 위가 누른 자리다.\n- 메뉴 밖을 누르거나, 필드가 포커스를 잃거나 트리에서 빠지면 닫힌다.",
+								"en": "Shows the context menu. (An engine-drawn cut, copy, paste and select all menu, same as show_context_menu in the Rust edition)\n- It is made as the last child node of the root (a UIInputFieldContextMenu component) and drawn on top. The menu top left is the pressed point.\n- It closes when pressed outside the menu, or when the field loses focus or leaves the tree."
 							},
 							"since": "0.2.1",
 							"source": "src/ui/uiinputfield.js"
@@ -42981,8 +42973,8 @@
 							"signature": "hideContextMenu()",
 							"params": [],
 							"description": {
-								"ko": "문맥 메뉴 닫기.",
-								"en": "Closes the context menu."
+								"ko": "문맥 메뉴 닫기. (러스트 판 hide_context_menu 와 같다)",
+								"en": "Closes the context menu. (same as hide_context_menu in the Rust edition)"
 							},
 							"since": "0.2.1",
 							"source": "src/ui/uiinputfield.js"
