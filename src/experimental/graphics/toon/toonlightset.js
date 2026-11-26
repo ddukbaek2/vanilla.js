@@ -63,7 +63,9 @@ function normalizeDirection(direction) {
 //   해와 점광, 스포트라이트 모두에 선다. 기본 세기 0 이면 없다.
 // - 림 빛(rim): pow(1 - max(dot(N, V), 0), power) 를 0.5 에서 가른 단단한 테(부드러움 0)에서 부드러운 테(1)까지. lightMask 가 1 이면 해를 받는 쪽에만. 바탕색과 상관없이 더한다.
 //   그늘 쪽 림(setShadeRimLight)은 같은 테를 해와 등진 쪽에 (테 - (dot(N, L) x 0.5 + 0.5)) 만큼 더한다. (유니티 툰 셰이더의 Antipodean(Ap) Rim Light)
-// - 빛 색 쓰기(setLightColorUsage): 색마다 빛 색을 곱할지 고른다. 끄면 그 색은 빛의 밝기(휘도)만 받고, 림과 매트캡과 천사 고리와 바깥선은 빛을 받지 않는다. (유니티 툰 셰이더의 Is_LightColor_*, 기본 모두 켬)
+// - 빛 색 쓰기(setLightColorUsage): 색마다 빛 색을 곱할지 고른다. 끄면 그 색은 빛의 세기(0.299 R + 0.587 G + 0.114 B)만 받고, 림과 매트캡과 천사 고리와 바깥선은 빛을 받지 않는다. (유니티 툰 셰이더의 Is_LightColor_*, 기본 모두 켬)
+// - 빛 세기 막기(setLightIntensityLimited): 빛마다 받은 몫을 1 로 막는다. 해와 채움 빛은 채널마다 1 로 자르고, 점광과 스포트라이트는 감쇠까지 곱한 색의 세기가 1 을 넘으면 세기로 나눈다.
+//   (유니티 툰 셰이더의 Limit Light Intensity, 기본 켬) HDR 블룸에 센 빛을 쓰려면 끈다.
 // - 점광과 스포트라이트: TOON_MAXIMUM_POINT_LIGHTS 까지. { position, color(선형), intensity, range, decay, rangeExponent, wrap, direction, innerConeAngle, outerConeAngle, castsShadow, shadowNear }
 //   castsShadow 가 true 인 빛은 ShadowAtlas.updateLights 가 그림자 칸을 준다. (점광은 큐브 여섯 면, 스포트라이트는 원근 한 칸, 먼 거리는 range, 가까운 거리는 shadowNear 기본 0.05)
 //   감쇠는 창 x 거리 감쇠다. 창은 range 가 0 보다 크면 (1 - (거리 / range)^rangeExponent) 를 0 ~ 1 로 막아 제곱, 0 이면 1. 거리 감쇠는 decay 가 0 보다 크면 1 / max(거리^decay, 0.01), 0 이면 1.
@@ -107,6 +109,7 @@ export class ToonLightSet {
 	/** @private @type { Array<number> } */ #shadeRimColor;
 	/** @private @type { number } */ #shadeRimPower;
 	/** @private @type { object } */ #lightColorUsage; // { base, shade, highlight, rim, shadeRim, matcap, angelRing, outline }
+	/** @private @type { boolean } */ #isLightIntensityLimited; // 빛마다 받은 몫을 1 로 막는지.
 	/** @private @type { number } */ #specularStrength;
 	/** @private @type { number } */ #specularExponent;
 	/** @private @type { number } */ #specularFeather;
@@ -140,6 +143,7 @@ export class ToonLightSet {
 		this.#shadeRimColor = [0, 0, 0];
 		this.#shadeRimPower = 0;
 		this.#lightColorUsage = { base: true, shade: true, highlight: true, rim: true, shadeRim: true, matcap: true, angelRing: true, outline: true };
+		this.#isLightIntensityLimited = true;
 		this.#specularStrength = 0;
 		this.#specularExponent = 48;
 		this.#specularFeather = 0;
@@ -361,6 +365,38 @@ export class ToonLightSet {
 	 */
 	getLightColorUsage() {
 		return System.Object.assign({}, this.#lightColorUsage);
+	}
+
+	//==============================================================================
+	// 빛 세기 막기 설정. (true 면 빛마다 받은 몫을 1 로 막아 하얗게 날지 않게 한다, 기본 true, 유니티 툰 셰이더의 Limit Light Intensity)
+	// - 해와 채움 빛은 색의 채널마다 1 로 자른다. (주광의 saturate)
+	// - 점광과 스포트라이트는 감쇠까지 곱한 색의 세기(0.299 R + 0.587 G + 0.114 B)가 1 을 넘으면 세기로 나눈다. (추가 빛의 min(색, 색 / 세기))
+	// - 빛 꼴이 isEnergyNormalized 면 π 로 나눈 뒤의 몫을 1 로 막는다.
+	//==============================================================================
+	/**
+	 * @param { boolean } isLimited - true 면 막는다.
+	 * @example <caption>센 해로 HDR 블룸을 내려고 막기를 끄기</caption>
+	 * import { ToonLightSet } from "./vanilla.js";
+	 * const lightSet = new ToonLightSet();
+	 * lightSet.setLight([-0.4, -1, -0.3], [4, 3.8, 3.5], [0.4, 0.45, 0.55], [0.2, 0.18, 0.16]);
+	 * lightSet.setLightIntensityLimited(false);
+	 * if (lightSet.isLightIntensityLimited()) {
+	 * 	throw new Error("unexpected limit");
+	 * }
+	 */
+	setLightIntensityLimited(isLimited) {
+		this.#isLightIntensityLimited = isLimited === true;
+		this.markChanged();
+	}
+
+	//==============================================================================
+	// 빛 세기를 막는지 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 막으면 true.
+	 */
+	isLightIntensityLimited() {
+		return this.#isLightIntensityLimited;
 	}
 
 	//==============================================================================

@@ -16,6 +16,28 @@ const CHUNK_SCALES = [1.0, 0.85, 1.1, 0.95, 1.05, 0.9, 1.0, 1.12, 0.88, 1.0, 0.9
 
 
 //==============================================================================
+// 기울인 카메라의 위쪽. (보는 쪽 둘레로 위쪽을 roll 만큼 돌린다, 오른쪽이 위로 들린다)
+//==============================================================================
+/**
+ * @param { Array<number> } eye - 눈의 자리.
+ * @param { Array<number> } target - 보는 곳.
+ * @param { number } roll - 기울임. (라디안)
+ * @returns { Vector3 } 위쪽.
+ */
+function createRolledUp(eye, target, roll) {
+	const forward = [target[0] - eye[0], target[1] - eye[1], target[2] - eye[2]];
+	const forwardLength = System.Math.hypot(forward[0], forward[1], forward[2]);
+	const front = [forward[0] / forwardLength, forward[1] / forwardLength, forward[2] / forwardLength];
+	const rightRaw = [-front[2], 0, front[0]];
+	const rightLength = System.Math.hypot(rightRaw[0], rightRaw[1], rightRaw[2]);
+	const right = [rightRaw[0] / rightLength, rightRaw[1] / rightLength, rightRaw[2] / rightLength];
+	const up = [right[1] * front[2] - right[2] * front[1], right[2] * front[0] - right[0] * front[2], right[0] * front[1] - right[1] * front[0]];
+	const cosine = System.Math.cos(roll);
+	const sine = System.Math.sin(roll);
+	return Vector3.create(up[0] * cosine - right[0] * sine, up[1] * cosine - right[1] * sine, up[2] * cosine - right[2] * sine);
+}
+
+//==============================================================================
 // 도형 하나로 지은 배열. (hasShell 이면 껍데기 바깥선도)
 //==============================================================================
 /**
@@ -112,6 +134,8 @@ function createPlaced(translation, rotationX, rotationY, scale) {
 // - 껍데기 바깥선은 8 미터에서 화면 굵기를 맞추고, 16 미터에서 사라지며, 카메라 쪽 깊이로 조금 민다.
 // - 화면 공간 바깥선은 그리기 줄에 맡긴다. lineScale 은 선의 판 해상도 몫, isToggled 면 바닥은 선 없이 가리기만, 덩이는 꺾임 선 없이.
 // - isShell 이면 화면 공간 바깥선 대신 껍데기 바깥선(거리 배를 건 inverted hull, 모형마다 색과 굵기 배)으로 그린다.
+// - cameraRoll 만큼 카메라를 기울인다. (라디안, 천사 고리의 기울임 되돌리기를 보일 때)
+// - 빛 세기 막기(유니티 툰 셰이더의 Limit Light Intensity)는 기본대로 켠다. 점광과 스포트라이트는 감쇠까지 곱한 세기가 1 을 넘지 않는다.
 //==============================================================================
 export class ToonStyleScene {
 	//==============================================================================
@@ -135,8 +159,9 @@ export class ToonStyleScene {
 	 * @param { number } lineScale - 선의 판 해상도 몫.
 	 * @param { boolean } isToggled - 모형마다 바깥선 꼴을 바꿔 보일지.
 	 * @param { boolean } isShell - 껍데기 바깥선으로 그릴지.
+	 * @param { number } [cameraRoll] - 카메라 기울임. (라디안, 기본 0)
 	 */
-	constructor(webGL2RenderingContext, lineScale, isToggled, isShell) {
+	constructor(webGL2RenderingContext, lineScale, isToggled, isShell, cameraRoll = 0) {
 		this.#webGL2RenderingContext = webGL2RenderingContext;
 		const renderer = new ToonRenderer(webGL2RenderingContext);
 		this.#renderer = renderer;
@@ -151,7 +176,7 @@ export class ToonStyleScene {
 		]);
 		renderer.setOutlineDistanceScale(8, 0.5, 3);
 		renderer.setOutlineFadeDistance(9, 16);
-		this.#shadowAtlas = new ShadowAtlas(webGL2RenderingContext, 2048);
+		this.#shadowAtlas = new ShadowAtlas(webGL2RenderingContext);
 		this.#shadowAtlas.updateLights(renderer.getLightSet().getPointLights());
 		renderer.setLocalShadows(this.#shadowAtlas, 1);
 		this.#angelRingTexture = renderer.createTexture(createAngelRingPixels(), { isMipmapped: false, isRepeated: false });
@@ -164,7 +189,7 @@ export class ToonStyleScene {
 		renderer.setShadow(this.#shadowMap, 1);
 		const camera = new Camera3D();
 		camera.setPerspective(0.7, 0.1, 100);
-		camera.lookAt(Vector3.create(0, 3.4, 7.8), Vector3.create(0, 0.55, 0.3), Vector3.create(0, 1, 0));
+		camera.lookAt(Vector3.create(0, 3.4, 7.8), Vector3.create(0, 0.55, 0.3), createRolledUp([0, 3.4, 7.8], [0, 0.55, 0.3], cameraRoll));
 		this.#camera = camera;
 		const meshOf = (geometry, colorText) => {
 			return renderer.createMesh(buildArrays(geometry, colorText, isShell));

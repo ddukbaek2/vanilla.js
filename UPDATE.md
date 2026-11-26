@@ -368,6 +368,14 @@
   - setResolutionScale 의 뜻이 넓히기 판의 몫으로 바뀌었다. 선의 판 패스는 그리는 영역 해상도로 그린다
   - getLineTarget(): seedTexture (온 해상도 씨앗), jumpFloodTextures, jumpFloodIndex, jumpFloodWidth, jumpFloodHeight. (seedTextures, seedIndex 는 없어졌다) readProgramSources 가 다섯을 준다 (모으기 패스)
 - 예제 toonstyle: 점광과 스포트라이트 그림자, 그늘 쪽 푸른 림, 짙은 공의 천사 고리, 껍데기 바깥선이 16 미터에서 사라지기와 카메라 쪽 밀기
+- 천사 고리: 카메라 기울임만큼 UV 를 되돌려 돌린다. (유니티 툰 셰이더 소스의 Camera Rolling Stabilizer 와 같은 셈, readCameraRoll 을 내보낸다, 셰이더 유니폼 cameraRoll) 카메라를 기울여도 고리가 머리에 붙어 있다
+- 빛 세기 막기: ToonLightSet.setLightIntensityLimited(참 거짓), isLightIntensityLimited() (렌더러에도 setLightIntensityLimited). 유니티 툰 셰이더의 Limit Light Intensity 와 같은 셈이고 기본은 유니티 툰 셰이더 기본처럼 켬이다
+  - 해와 채움 빛은 채널마다 1 로 자르고, 점광과 스포트라이트는 감쇠까지 곱한 색의 세기(0.299 R + 0.587 G + 0.114 B)가 1 을 넘으면 세기로 나눈다. 빛 꼴이 isEnergyNormalized 면 π 로 나눈 뒤의 몫을 막는다
+  - 1 을 넘는 해나 센 점광을 쓰던 장면은 화면이 바뀐다. (HDR 블룸에 센 빛을 쓰던 것) 지금까지 모습은 setLightIntensityLimited(false)
+  - 빛 색 쓰기를 끈 색이 받는 세기도 유니티 툰 셰이더와 같은 0.299 R + 0.587 G + 0.114 B 로 바꿨다. 껍데기 바깥선에 곱하는 해의 색은 세기가 1 이상이면 세기로 나눈다 (유니티 툰 셰이더 바깥선)
+- ShadowAtlas: 칸 크기를 유니티 URP 기본과 같게 했다. new ShadowAtlas(컨텍스트, 해상도 기본 2048, 칸 해상도 기본 1024) 로 칸마다 1024 를 바라고, 다 들어가지 않으면 다 들어갈 때까지 반씩 줄인다 (URP 추가 빛 그림자 아틀라스 기본 2048, 해상도 단계 High 기본 1024, 빛의 기본 단계 High). getTileResolution
+  - 지금까지는 칸 수의 제곱근으로 격자를 나눠 점광 하나가 682 였는데 이제 512, 스포트라이트 하나는 2048 이었는데 이제 1024 다. 더 곱게 하려면 해상도와 칸 해상도를 올린다
+- 예제 toonstyle: ?roll=라디안 으로 카메라를 기울인다 (천사 고리 기울임 되돌리기)
 
 # 0.3.2 (2026-10-22)
 - AudioManager: iOS(iPadOS 포함) 에서는 resumeContext() 로 복원된 컨텍스트가 "running" 이면 verifyContextClock() 으로 currentTime 이 흐르는지 0.5 초 동안 보고, 멈춰 있으면 suspend() 후 resume() 하고 다시 확인한다. (옵션이 아니라 iOS 에서 늘 한다. 다른 플랫폼은 지금까지와 같다) iOS 버전업으로 생긴 문제다. (2026-10-22 03:41, iOS 26.6.2, 아이폰 15 프로 맥스) 앱을 내렸다 돌아오면 WebKit 이 컨텍스트를 스스로 되살리지 않고 suspended 로 두며, 돌아온 직후의 resume() 은 "Failed to start the audio device" 로 거부되거나 "running" 이 되어도 시계가 흐르지 않아 소리가 나지 않았다. 그 전의 iOS 에서는 같은 앱이 돌아오면 소리가 났고, 2026-04 의 엔진(ef1b279)으로 만든 판도 지금은 같은 증상이라 엔진의 변화가 아니다.

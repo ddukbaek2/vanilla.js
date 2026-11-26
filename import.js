@@ -241,5 +241,5 @@ export { measureTextWithoutGraphic } from "./src/core/graphic/textstringtexturec
 // 툰 3D 확장 자리와 빛. (빛 묶음, 머티리얼 셰이더 조각, 인스턴스 꼴과 영구 버퍼, 섞는 방식, 그리기 단계, 평면 거울 행렬)
 export { ToonLightSet, TOON_MAXIMUM_POINT_LIGHTS, TOON_MAXIMUM_BAND_STEPS } from "./src/experimental/graphics/toon/toonlightset.js";
 export { ToonMaterial, ToonInstanceLayout, ToonBlendMode, ToonMatcapBlend, ToonBufferUsage, TOON_MAXIMUM_INSTANCE_ATTRIBUTES, TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION, TOON_INSTANCE_MATRIX_NAME, TOON_INSTANCE_TINT_NAME } from "./src/experimental/graphics/toon/toonmaterial.js";
-export { ToonProgramKind, TOON_MAXIMUM_MATERIAL_TEXTURES, composeToonProgramSources, createReflectionMatrix, readFrameCamera, readMatrixDeterminant, readViewRotation, readOutlineVertexData, readUvData } from "./src/experimental/graphics/toon/toonrenderer.js";
+export { ToonProgramKind, TOON_MAXIMUM_MATERIAL_TEXTURES, composeToonProgramSources, createReflectionMatrix, readFrameCamera, readMatrixDeterminant, readViewRotation, readCameraRoll, readOutlineVertexData, readUvData } from "./src/experimental/graphics/toon/toonrenderer.js";
 export { ToonDrawStage } from "./src/experimental/graphics/toon/toondrawqueue.js";

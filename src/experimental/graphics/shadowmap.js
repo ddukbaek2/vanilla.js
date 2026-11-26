@@ -293,7 +293,9 @@ export class ShadowMap extends Object {
 // - updateLights(빛 목록) 이 castsShadow 가 true 인 빛을 SHADOW_ATLAS_MAXIMUM_LIGHTS 까지 골라 칸을 나누고 칸마다 보기와 투영을 셈한다.
 //   빛은 ToonLightSet.setPointLights 의 꼴이다. { position, direction (있으면 스포트라이트), outerConeAngle, range (먼 거리, 0 이면 30), shadowNear (가까운 거리, 기본 0.05), castsShadow }
 //   목록에서의 차례(lightIndex)를 적어 두어, ToonRenderer 가 그 점광에 이 그림자를 붙인다. (아틀라스는 기본 빛 묶음의 점광 목록으로 짓는다)
-// - 칸은 한 변 gridSize 의 격자다. (gridSize = 올림(칸 수의 제곱근), 칸 한 변 = 내림(해상도 / gridSize))
+// - 칸 크기는 유니티 URP 기본과 같이 정한다. 칸마다 tileResolution(기본 1024, URP 추가 빛 그림자 해상도 단계 High 의 기본값이고 빛의 기본 단계가 High)을 바라고,
+//   아틀라스(기본 2048, URP 기본)에 다 들어가지 않으면 다 들어갈 때까지 칸 한 변을 반씩 줄인다. (URP 의 shadowSlicesScaleFactor 를 두 배씩)
+//   칸은 한 변 gridSize 의 격자에 차례로 놓는다. (gridSize = 내림(해상도 / 칸 한 변)) 점광 하나(여섯 칸)면 512, 스포트라이트 하나면 1024 다.
 // - 그리기: beginRender() 로 판을 비우고, 칸마다 beginTile(칸 번호) 로 뷰포트를 그 칸에 건 뒤 getTile(칸 번호).viewProjectionMatrix 로 깊이를 그린다. (ToonRenderer.beginShadowAtlasPass 와 setShadowAtlasTile 이 이 차례를 한다)
 // - 받기: 셰이더는 빛의 자리에서 면으로의 쪽으로 점광의 면을 고르고(가장 큰 축), 앞쪽, 위쪽, 오른쪽 바탕과 가까운 거리, 먼 거리로 칸 안 자리와 깊이를 셈해 3x3 PCF 로 견준다.
 //   받는 자리는 노멀 쪽으로 그 거리의 칸 텍셀 (1 + 3 x (1 - dot(N, L))) 개만큼 밀어 견준다. (빛에 비스듬한 면일수록 크게, 빛과 그늘 경계의 톱니 같은 그림자 여드름을 막는다)
@@ -320,6 +322,7 @@ export class ShadowAtlas extends Object {
 	/** @private @type { WebGLFramebuffer } */ #framebuffer;
 	/** @private @type { WebGLTexture } */ #depthTexture;
 	/** @private @type { number } */ #resolution;
+	/** @private @type { number } */ #tileResolution; // 칸마다 바라는 한 변. (픽셀)
 	/** @private @type { number } */ #gridSize; // 격자 한 변의 칸 수.
 	/** @private @type { number } */ #tileSize; // 칸 한 변. (픽셀)
 	/** @private @type { Array<object> } */ #lights; // { lightIndex, position, forward, up, tangent (0 이면 점광), near, far, firstTile }
@@ -332,11 +335,13 @@ export class ShadowAtlas extends Object {
 	 * @constructor
 	 * @param { WebGL2RenderingContext } webGL2RenderingContext - 렌더링 컨텍스트.
 	 * @param { number } [resolution] - 아틀라스 한 변의 크기. (픽셀, 기본 2048)
+	 * @param { number } [tileResolution] - 칸마다 바라는 한 변. (픽셀, 기본 1024, 다 들어가지 않으면 반씩 줄인다)
 	 */
-	constructor(webGL2RenderingContext, resolution = 2048) {
+	constructor(webGL2RenderingContext, resolution = 2048, tileResolution = 1024) {
 		super();
 		this.#webGL2RenderingContext = webGL2RenderingContext;
 		this.#resolution = resolution;
+		this.#tileResolution = System.Math.max(1, System.Math.min(tileResolution, resolution));
 		const depthTarget = createDepthTarget(webGL2RenderingContext, resolution);
 		this.#framebuffer = depthTarget.framebuffer;
 		this.#depthTexture = depthTarget.depthTexture;
@@ -378,8 +383,12 @@ export class ShadowAtlas extends Object {
 			}
 			this.#lights.push(light);
 		}
-		this.#gridSize = System.Math.max(1, System.Math.ceil(System.Math.sqrt(tileCount)));
-		this.#tileSize = System.Math.floor(this.#resolution / this.#gridSize);
+		let tileSize = this.#tileResolution;
+		while (tileSize > 1 && tileCount > System.Math.floor(this.#resolution / tileSize) * System.Math.floor(this.#resolution / tileSize)) {
+			tileSize = System.Math.floor(tileSize / 2);
+		}
+		this.#tileSize = tileSize;
+		this.#gridSize = System.Math.max(1, System.Math.floor(this.#resolution / tileSize));
 		this.#tiles = [];
 		for (const light of this.#lights) {
 			if (light.tangent > 0) {
@@ -484,6 +493,16 @@ export class ShadowAtlas extends Object {
 	 */
 	getGridSize() {
 		return this.#gridSize;
+	}
+
+	//==============================================================================
+	// 칸마다 바라는 한 변 반환. (픽셀, 생성 때 준 값)
+	//==============================================================================
+	/**
+	 * @returns { number } 칸마다 바라는 한 변. (픽셀)
+	 */
+	getTileResolution() {
+		return this.#tileResolution;
 	}
 
 	//==============================================================================

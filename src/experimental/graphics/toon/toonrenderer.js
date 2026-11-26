@@ -241,6 +241,7 @@ uniform vec2 rimShape;
 uniform vec3 specularLight;
 uniform vec3 specularColor;
 uniform float energyNormalized;
+uniform float lightIntensityLimit;
 uniform int shadeStopCount;
 uniform float shadeStopPositions[8];
 uniform float shadeStopFeathers[8];
@@ -267,6 +268,7 @@ uniform vec4 shadeRimLight;
 uniform vec4 cameraPosition;
 uniform vec3 cameraForward;
 uniform mat3 viewRotation;
+uniform vec2 cameraRoll;
 uniform vec4 tintColor;
 uniform float tintAmount;
 uniform float alpha;
@@ -333,6 +335,17 @@ vec3 toOutput(vec3 color) {
 }
 float readLuminance(vec3 color) {
 	return dot(color, vec3(0.2126, 0.7152, 0.0722));
+}
+float readLightIntensity(vec3 color) {
+	return dot(color, vec3(0.299, 0.587, 0.114));
+}
+vec3 readLimitedDirectionalColor(vec3 color) {
+	float energyScale = energyNormalized > 0.5 ? RECIPROCAL_PI : 1.0;
+	return lightIntensityLimit > 0.5 ? clamp(color * energyScale, 0.0, 1.0) / energyScale : color;
+}
+vec3 readLimitedLocalColor(vec3 color) {
+	float energyScale = energyNormalized > 0.5 ? RECIPROCAL_PI : 1.0;
+	return lightIntensityLimit > 0.5 ? color * min(1.0, 1.0 / max(0.001, readLightIntensity(color * energyScale))) : color;
 }
 float readShadow() {
 	if (shadowEnabled < 0.5) {
@@ -409,7 +422,7 @@ float readLocalShadow(int slot, vec3 position, vec3 normal) {
 	return mix(1.0, lit / 9.0, localShadowAtlas.w);
 }
 vec3 readLightColor(vec3 color, float usage) {
-	return mix(vec3(readLuminance(color)), color, usage);
+	return mix(vec3(readLightIntensity(color)), color, usage);
 }
 float readToonCoordinate(float cosine, float offset) {
 	return (shadeHalfLambert > 0.5 ? cosine * 0.5 + 0.5 : max(cosine, 0.0)) + offset;
@@ -508,18 +521,19 @@ ToonLighting readLighting(ToonSurface surface) {
 	float specularNormalization = energyNormalized > 0.5 ? (specularLight.y + 8.0) * RECIPROCAL_PI / 8.0 : 1.0;
 	bool hasSpecular = specularLight.x > 0.0;
 	vec3 specularSum = vec3(0.0);
+	vec3 sunLightColor = readLimitedDirectionalColor(sunColor);
 	vec3 toSun = -normalize(sunDirection);
 	float sunCosine = dot(normal, toSun);
 	vec3 sunRamp = readShadeRamp(readToonCoordinate(sunCosine, surface.shadeOffset) * shadow);
 	float sunLevel = readShadeLevel(sunRamp, sunCosine * shadow);
-	vec3 sunLight = sunRamp * mix(readLightColor(sunColor, lightColorUsage.y), readLightColor(sunColor, lightColorUsage.x), sunLevel);
+	vec3 sunLight = sunRamp * mix(readLightColor(sunLightColor, lightColorUsage.y), readLightColor(sunLightColor, lightColorUsage.x), sunLevel);
 	vec3 irradiance = sunLight + mix(groundColor, skyColor, normal.y * 0.5 + 0.5);
 	if (hasSpecular) {
-		specularSum += readLightColor(sunColor, lightColorUsage.z) * readToonSpecular(normal, toSun, viewDirection) * sunLevel;
+		specularSum += readLightColor(sunLightColor, lightColorUsage.z) * readToonSpecular(normal, toSun, viewDirection) * sunLevel;
 	}
 	vec3 toFill = -normalize(fillDirection);
 	float fillCosine = dot(normal, toFill);
-	irradiance += readLightColor(fillColor, lightColorUsage.x) * readShadeLevel(readShadeRamp(readToonCoordinate(fillCosine, surface.shadeOffset)), fillCosine);
+	irradiance += readLightColor(readLimitedDirectionalColor(fillColor), lightColorUsage.x) * readShadeLevel(readShadeRamp(readToonCoordinate(fillCosine, surface.shadeOffset)), fillCosine);
 	for (int index = 0; index < 8; ++index) {
 		if (index >= pointLightCount) {
 			break;
@@ -548,9 +562,10 @@ ToonLighting readLighting(ToonSurface surface) {
 		}
 		float cosine = (dot(normal, lightDirection) + shape.z) / (1.0 + shape.z);
 		float level = readShadeLevel(readShadeRamp(readToonCoordinate(cosine, surface.shadeOffset) * lightShadow), cosine * lightShadow);
-		irradiance += readLightColor(pointLightColors[index], lightColorUsage.x) * level * falloff;
+		vec3 pointColor = readLimitedLocalColor(pointLightColors[index] * falloff);
+		irradiance += readLightColor(pointColor, lightColorUsage.x) * level;
 		if (hasSpecular) {
-			specularSum += readLightColor(pointLightColors[index], lightColorUsage.z) * readToonSpecular(normal, lightDirection, viewDirection) * level * falloff;
+			specularSum += readLightColor(pointColor, lightColorUsage.z) * readToonSpecular(normal, lightDirection, viewDirection) * level;
 		}
 	}
 	lighting.irradiance = irradiance;
@@ -560,13 +575,13 @@ ToonLighting readLighting(ToonSurface surface) {
 		float rimTerm = pow(1.0 - clamp(dot(normal, viewDirection), 0.0, 1.0), rimLight.a);
 		float edgeWidth = max(fwidth(rimTerm), 0.0001);
 		float rim = mix(smoothstep(0.5 - edgeWidth, 0.5 + edgeWidth, rimTerm), rimTerm, rimShape.x);
-		lighting.rim = rimLight.rgb * mix(vec3(1.0), sunColor, lightColorUsage.w) * rim * mix(1.0, sunLevel, rimShape.y);
+		lighting.rim = rimLight.rgb * mix(vec3(1.0), sunLightColor, lightColorUsage.w) * rim * mix(1.0, sunLevel, rimShape.y);
 	}
 	if (shadeRimLight.a > 0.0) {
 		float shadeRimTerm = pow(1.0 - clamp(dot(normal, viewDirection), 0.0, 1.0), shadeRimLight.a);
 		float edgeWidth = max(fwidth(shadeRimTerm), 0.0001);
 		float shadeRim = mix(smoothstep(0.5 - edgeWidth, 0.5 + edgeWidth, shadeRimTerm), shadeRimTerm, rimShape.x);
-		lighting.rim += shadeRimLight.rgb * mix(vec3(1.0), sunColor, lightColorUsageExtra.x) * clamp(shadeRim - (sunCosine * 0.5 + 0.5), 0.0, 1.0);
+		lighting.rim += shadeRimLight.rgb * mix(vec3(1.0), sunLightColor, lightColorUsageExtra.x) * clamp(shadeRim - (sunCosine * 0.5 + 0.5), 0.0, 1.0);
 	}
 	lighting.shadow = shadow;
 	lighting.sunLevel = sunLevel;
@@ -592,15 +607,17 @@ void main() {
 		color = albedo * lighting.irradiance * diffuseScale + lighting.specular * surface.specularMask + lighting.rim * surface.rimMask + emission;
 	}
 	vec3 viewNormal = normalize(viewRotation * surface.normal);
+	vec3 sunLightColor = readLimitedDirectionalColor(sunColor);
 	if (matcapSettings.x > 0.5) {
-		vec3 matcap = toLinear(texture(matcapTexture, vec2(viewNormal.x * 0.5 + 0.5, 0.5 - viewNormal.y * 0.5)).rgb) * mix(vec3(1.0), sunColor, lightColorUsageExtra.y);
+		vec3 matcap = toLinear(texture(matcapTexture, vec2(viewNormal.x * 0.5 + 0.5, 0.5 - viewNormal.y * 0.5)).rgb) * mix(vec3(1.0), sunLightColor, lightColorUsageExtra.y);
 		color = matcapSettings.z > 0.5 ? color + matcap * matcapSettings.y : color * mix(vec3(1.0), matcap, matcapSettings.y);
 	}
 	if (angelRingSettings.x > 0.5) {
-		vec2 ringNormal = mix(viewNormal, vec3(0.0, 0.0, 1.0), angelRingSettings.y).xy * 0.5 + 0.5;
+		vec2 ringOffset = mix(viewNormal, vec3(0.0, 0.0, 1.0), angelRingSettings.y).xy * 0.5;
+		vec2 ringNormal = vec2(ringOffset.x * cameraRoll.x + ringOffset.y * cameraRoll.y, ringOffset.y * cameraRoll.x - ringOffset.x * cameraRoll.y) + 0.5;
 		vec2 ringUv = vec2(ringNormal.x, 1.0 - mix(1.0 - surface.uv1.y, ringNormal.y, angelRingSettings.z));
 		vec4 ring = texture(angelRingTexture, ringUv);
-		vec3 ringColor = toLinear(ring.rgb) * angelRingColor * mix(vec3(1.0), sunColor, lightColorUsageExtra.z);
+		vec3 ringColor = toLinear(ring.rgb) * angelRingColor * mix(vec3(1.0), sunLightColor, lightColorUsageExtra.z);
 		color = angelRingSettings.w > 0.5 ? color * (1.0 - ring.a) + ringColor * ring.a : color + ringColor;
 	}
 	float opacity = surface.alpha;
@@ -876,6 +893,53 @@ export function readViewRotation(elements, forward) {
 }
 
 //==============================================================================
+// 카메라 기울임을 되돌리는 각 읽기. (유니티 툰 셰이더의 천사 고리 Camera Rolling Stabilizer 와 같은 셈)
+// - 카메라 오른쪽(보기 돌림의 행 0)과 수평 오른쪽 축이 이루는 각 roll, 오른쪽의 y 가 음수면 쪽 dir 이 -1, 돌려주는 각은 -(dir x roll) 이다.
+// - 유니티는 왼손 좌표라 수평 오른쪽 축이 cross(뒤, 위) 이고, 엔진은 오른손 좌표라 같은 쪽이 cross(앞, 위) 다. 거울에 비친 프레임이면 축을 뒤집는다. (유니티 툰 셰이더의 mirrorFlag)
+// - 바로 위나 아래를 보면 수평 축이 없어 0 이다.
+//==============================================================================
+/**
+ * @param { Float32Array | Array<number> } viewRotationElements - mat3 의 수 9. (readViewRotation 의 결과, 열 차례)
+ * @param { boolean } isMirrored - 보기 행렬이 거울에 비쳤는지. (readFrameCamera 의 isMirrored)
+ * @returns { number } 천사 고리 UV 를 (0.5, 0.5) 둘레로 돌릴 각. (라디안)
+ * @example <caption>오른쪽으로 0.3 라디안 기운 카메라의 되돌림 각</caption>
+ * import { readCameraRoll } from "./vanilla.js";
+ * const roll = 0.3;
+ * const rotation = [Math.cos(roll), -Math.sin(roll), 0, Math.sin(roll), Math.cos(roll), 0, 0, 0, 1];
+ * const angle = readCameraRoll(rotation, false);
+ * if (Math.abs(angle + roll) > 0.0001) {
+ * 	throw new Error("unexpected camera roll");
+ * }
+ */
+export function readCameraRoll(viewRotationElements, isMirrored) {
+	const right = [viewRotationElements[0], viewRotationElements[3], viewRotationElements[6]];
+	const forward = [-viewRotationElements[2], -viewRotationElements[5], -viewRotationElements[8]];
+	const axisSign = isMirrored ? -1 : 1;
+	const rightAxis = [-forward[2] * axisSign, 0, forward[0] * axisSign];
+	const axisLength = System.Math.hypot(rightAxis[0], rightAxis[1], rightAxis[2]);
+	const rightLength = System.Math.hypot(right[0], right[1], right[2]);
+	if (axisLength < 0.000001 || rightLength < 0.000001) {
+		return 0;
+	}
+	const cosine = (rightAxis[0] * right[0] + rightAxis[1] * right[1] + rightAxis[2] * right[2]) / (axisLength * rightLength);
+	const roll = System.Math.acos(System.Math.max(-1, System.Math.min(1, cosine)));
+	const direction = right[1] < 0 ? -1 : 1;
+	return -(direction * roll);
+}
+
+//==============================================================================
+// 껍데기 바깥선에 곱할 해의 색 읽기. (유니티 툰 셰이더 바깥선과 같이 세기가 1 이상이면 세기로 나눈다, 세기는 0.299 R + 0.587 G + 0.114 B)
+//==============================================================================
+/**
+ * @param { Array<number> } sunColor - 해의 선형 색.
+ * @returns { Array<number> } 곱할 선형 색.
+ */
+function readOutlineLightColor(sunColor) {
+	const intensity = 0.299 * sunColor[0] + 0.587 * sunColor[1] + 0.114 * sunColor[2];
+	return intensity < 1 ? sunColor.slice() : [sunColor[0] / intensity, sunColor[1] / intensity, sunColor[2] / intensity];
+}
+
+//==============================================================================
 // UV 꼭짓점 배열 짓기. (2 번 UV 가 없으면 점마다 UV 2, 있으면 UV 와 2 번 UV 를 섞어 4)
 // - 셰이더의 vertexUv 는 vec4 다. 2 개만 올리면 zw 는 (0, 1) 로 읽힌다.
 //==============================================================================
@@ -1059,11 +1123,12 @@ function readBoundingSphere(positions, stride) {
 //   outlineOffsetZ (기본 0) 는 껍데기를 카메라에서 먼 쪽으로 미는 월드 길이다. (몸 앞으로 비치지 않게, 유니티 툰 셰이더의 Offset Z)
 //   angelRingTexture 는 천사 고리 텍스처다. u 는 보기 공간 노멀의 x, v 는 2 번 UV 의 y 와 보기 노멀의 y 를 angelRingOffsetV (기본 0.3) 로 섞은 것이다. (유니티 툰 셰이더의 Angel Ring)
 //   angelRingColor [r, g, b] (선형 배, 기본 흰색), angelRingOffsetU (0 ~ 0.5, 기본 0), isAngelRingAlpha (기본 false 면 더하고 true 면 텍스처 알파로 덮는다)
+//   천사 고리 UV 는 카메라 기울임만큼 되돌려 돌린다. (readCameraRoll, 유니티 툰 셰이더의 Camera Rolling Stabilizer, 카메라를 기울여도 고리는 머리에 붙어 있다)
 //   lineId, hasScreenOutline, hasCreaseLine 은 ToonDrawQueue 가 화면 공간 바깥선에 넘기는 값이다. (렌더러는 읽지 않는다)
 // - 바깥선 껍데기(inverted hull): MeshBuilder 가 지은 껍데기의 바탕 자리와 미는 쪽(지은 굵기, 같은 자리의 노멀을 평균한 쪽)을 올리고, 셰이더가 outlineWidthScale 만큼 밀어 뒷면만 그린다.
 //   setOutlineDistanceScale(기준 거리, 가장 작은 배, 가장 큰 배) 를 주면 카메라까지의 거리 / 기준 거리 를 굵기에 곱해 화면 굵기를 맞춘다. (원근만)
 //   setOutlineFadeDistance(가까운 거리, 먼 거리) 를 주면 모형의 자리에서 카메라까지가 먼 거리에 다가갈수록 굵기가 0 이 된다. (smoothstep, 유니티 툰 셰이더의 Nearest, Farthest Distance)
-//   껍데기 색은 빛 묶음의 outline 빛 색 쓰기가 켜져 있으면(기본) 해의 색을 곱한다.
+//   껍데기 색은 빛 묶음의 outline 빛 색 쓰기가 켜져 있으면(기본) 해의 색을 곱한다. (세기가 1 이상이면 세기로 나눈 색, 유니티 툰 셰이더 바깥선과 같다)
 // - 뼈대: writeSkinPose 가 셈한 본 행렬을 drawMesh 에 넘긴다. (TOON_MAXIMUM_JOINTS 까지)
 // - GPU 인스턴싱: drawMeshInstanced 로 같은 모형 여럿을 인스턴스마다 행렬과 틴트로 한 번에 그린다. (몸과 바깥선 모두, 그릴 때마다 걸러서 올림)
 //   오래 두는 인스턴스는 createInstanceLayout 과 createInstanceBuffer 로 영구 버퍼를 짓고 drawMeshInstanceBuffer 로 그린다. (거르지 않음, 머티리얼 정점 조각이 사용자 어트리뷰트를 읽음)
@@ -1087,7 +1152,7 @@ function readBoundingSphere(positions, stride) {
 // - 텍스처: createTexture(그림이나 { width, height, data }, { isMipmapped, isRepeated, isFiltered }) 로 RGBA 텍스처를 짓는다. UV (0, 0) 이 그림의 왼쪽 위다. (glTF 와 같음)
 // - 텍스처 유닛: 점광 그림자 아틀라스 0, 램프 1, 매트캡 2, 해 그림자 3, 바탕색 4, 빛남 5, 데칼 6, 천사 고리 7, 머티리얼 8 ~ 15. 유닛 0 의 묶음은 beginFrame 이 적어 두고 endFrame 이 돌린다.
 // - 2 번 UV: 배열에 uv1Data 가 있으면 vertexUv 가 (UV, 2 번 UV) 넷이다. 셰이더 조각은 ToonSurface.uv1 로 읽는다. (없으면 (0, 1))
-// - 빛 색 쓰기(setLightColorUsage)와 그늘 쪽 림(setShadeRimLight)은 빛 묶음(ToonLightSet)에 둔다.
+// - 빛 색 쓰기(setLightColorUsage), 그늘 쪽 림(setShadeRimLight), 빛 세기 막기(setLightIntensityLimited)는 빛 묶음(ToonLightSet)에 둔다.
 //==============================================================================
 /**
  * @example <caption>해와 바깥선 색을 정해 그린 뒤 통계를 읽고 치우기</caption>
@@ -1146,6 +1211,7 @@ export class ToonRenderer {
 	/** @private @type { Float32Array } */ #shadeFeatherValues;
 	/** @private @type { Float32Array } */ #shadeColorValues;
 	/** @private @type { Float32Array } */ #viewRotationElements; // 이번 프레임의 보기 돌림 3x3. (매트캡의 보기 공간 노멀)
+	/** @private @type { number } */ #cameraRoll; // 이번 프레임의 카메라 기울임을 되돌리는 각. (라디안, 천사 고리)
 	/** @private @type { Array<number> } */ #outlineDistanceScale; // 껍데기 바깥선의 거리 배. ([기준 거리 (0 이면 끔), 가장 작은 배, 가장 큰 배])
 	/** @private @type { Array<number> } */ #outlineFadeDistance; // 껍데기 바깥선이 사라지는 거리. ([가까운 거리 (지은 굵기), 먼 거리 (0), 먼 거리가 가까운 거리 이하면 끔])
 	/** @private @type { object | null } */ #localShadowInput; // 받을 점광과 스포트라이트 그림자. ({ depthTexture, lights, gridSize, tileSize, texelSize, strength })
@@ -1195,6 +1261,7 @@ export class ToonRenderer {
 		this.#shadeFeatherValues = new System.Float32Array(TOON_MAXIMUM_BAND_STEPS);
 		this.#shadeColorValues = new System.Float32Array(TOON_MAXIMUM_BAND_STEPS * 3);
 		this.#viewRotationElements = new System.Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+		this.#cameraRoll = 0;
 		this.#outlineDistanceScale = [0, 0.5, 4];
 		this.#outlineFadeDistance = [0, 0];
 		this.#localShadowInput = null;
@@ -1995,6 +2062,7 @@ export class ToonRenderer {
 		this.#cameraForward = frameCamera.forward;
 		this.#isFrameMirrored = frameCamera.isMirrored;
 		this.#viewRotationElements.set(readViewRotation(elements, frameCamera.forward));
+		this.#cameraRoll = readCameraRoll(this.#viewRotationElements, frameCamera.isMirrored);
 		this.#frameStatistics = { drawCallCount: 0, drawnObjectCount: 0, culledObjectCount: 0 };
 		this.#isShadowPass = false;
 		this.#frameSerial += 1;
@@ -2446,6 +2514,7 @@ export class ToonRenderer {
 		webGL2RenderingContext.uniform4f(shaderProgram.getUniformLocation("cameraPosition"), cameraPosition[0], cameraPosition[1], cameraPosition[2], cameraPosition[3]);
 		webGL2RenderingContext.uniform3f(shaderProgram.getUniformLocation("cameraForward"), cameraForward[0], cameraForward[1], cameraForward[2]);
 		webGL2RenderingContext.uniformMatrix3fv(shaderProgram.getUniformLocation("viewRotation"), false, this.#viewRotationElements);
+		webGL2RenderingContext.uniform2f(shaderProgram.getUniformLocation("cameraRoll"), System.Math.cos(this.#cameraRoll), System.Math.sin(this.#cameraRoll));
 		webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("hdrOutput"), this.#isHdrOutput ? 1 : 0);
 		const shadowInput = this.#shadowInput;
 		if (shadowInput !== null) {
@@ -2540,6 +2609,7 @@ export class ToonRenderer {
 		webGL2RenderingContext.uniform3f(shaderProgram.getUniformLocation("specularLight"), specular.strength, specular.exponent, specular.feather);
 		webGL2RenderingContext.uniform3f(shaderProgram.getUniformLocation("specularColor"), specular.color[0], specular.color[1], specular.color[2]);
 		webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("energyNormalized"), lightSet.getLightModel().isEnergyNormalized ? 1 : 0);
+		webGL2RenderingContext.uniform1f(shaderProgram.getUniformLocation("lightIntensityLimit"), lightSet.isLightIntensityLimited() ? 1 : 0);
 		const shadePositionValues = this.#shadePositionValues;
 		const shadeFeatherValues = this.#shadeFeatherValues;
 		const shadeColorValues = this.#shadeColorValues;
@@ -2725,8 +2795,7 @@ export class ToonRenderer {
 			webGL2RenderingContext.uniform1f(outlineProgram.getUniformLocation("outlineWidthScale"), options.outlineWidthScale !== undefined ? System.Math.max(0, options.outlineWidthScale) : 1);
 			webGL2RenderingContext.uniform1f(outlineProgram.getUniformLocation("outlineOffsetZ"), options.outlineOffsetZ !== undefined ? options.outlineOffsetZ : 0);
 			const outlineLightSet = options.lightSet !== undefined && options.lightSet !== null ? options.lightSet : this.#lightSet;
-			const outlineSunColor = outlineLightSet.getSunColor();
-			const outlineLightColor = outlineLightSet.getLightColorUsage().outline ? outlineSunColor : [1, 1, 1];
+			const outlineLightColor = outlineLightSet.getLightColorUsage().outline ? readOutlineLightColor(outlineLightSet.getSunColor()) : [1, 1, 1];
 			webGL2RenderingContext.uniform3f(outlineProgram.getUniformLocation("outlineLightColor"), outlineLightColor[0], outlineLightColor[1], outlineLightColor[2]);
 			webGL2RenderingContext.uniform1f(outlineProgram.getUniformLocation("alpha"), alpha);
 			webGL2RenderingContext.uniform1f(outlineProgram.getUniformLocation("premultipliedOutput"), premultipliedOutput);
@@ -3119,6 +3188,21 @@ export class ToonRenderer {
 	 */
 	setLightColorUsage(lightColorUsage) {
 		this.#lightSet.setLightColorUsage(lightColorUsage);
+	}
+
+	//==============================================================================
+	// 빛 세기 막기 설정. (ToonLightSet.setLightIntensityLimited)
+	//==============================================================================
+	/**
+	 * @param { boolean } isLimited - true 면 빛마다 받은 몫을 1 로 막는다. (기본 true)
+	 * @example <caption>HDR 블룸에 쓰려고 센 해를 막지 않기</caption>
+	 * import { ToonRenderer } from "./vanilla.js";
+	 * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
+	 * renderer.setLight([-0.4, -1, -0.3], [3, 2.8, 2.6], [0.4, 0.45, 0.55], [0.2, 0.18, 0.16]);
+	 * renderer.setLightIntensityLimited(false);
+	 */
+	setLightIntensityLimited(isLimited) {
+		this.#lightSet.setLightIntensityLimited(isLimited);
 	}
 
 	//==============================================================================
