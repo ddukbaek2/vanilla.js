@@ -14,9 +14,9 @@ import { Color } from "../../base/color.js";
 // 스프라이트 모드.
 //==============================================================================
 export const SpriteDrawMode = {
-	simple: "simple",
-	sliced: "sliced",
-	tiled: "tiled",
+	simple: "simple", // 이미지 영역을 그대로 그린다.
+	sliced: "sliced", // 아홉 조각으로 잘라 모서리는 늘리지 않고 그린다.
+	tiled: "tiled", // 이미지를 타일처럼 반복해 그린다.
 }
 
 

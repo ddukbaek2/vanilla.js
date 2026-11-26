@@ -24,8 +24,8 @@ const WHEEL_SCROLL_SCALE = 1.0;
 // - elastic: 경계를 초과하면 저항이 생기고 놓으면 스프링처럼 튕겨 돌아오는 모드.
 //==============================================================================
 export const ScrollMode = {
-	clamp: "clamp",
-	elastic: "elastic",
+	clamp: "clamp", // 경계를 넘지 않게 자른다.
+	elastic: "elastic", // 경계를 넘으면 저항이 생기고 놓으면 튕겨 돌아온다.
 };
 
 

@@ -19,11 +19,11 @@ import { PointerCursor } from "../core/pointercursor.js";
 // 버튼 상태.
 //==============================================================================
 export const ButtonState = {
-	normal: Enum.begin(),
-	hover: Enum.auto(),
-	pressed: Enum.auto(),
-	released: Enum.auto(),
-	disabled: Enum.auto()
+	normal: Enum.begin(), // 평상시 상태.
+	hover: Enum.auto(), // 포인터가 올라간 상태.
+	pressed: Enum.auto(), // 눌려 있는 상태.
+	released: Enum.auto(), // 막 뗀 상태.
+	disabled: Enum.auto() // 눌러도 반응하지 않는 상태.
 };
 
 
