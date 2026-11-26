@@ -4,11 +4,11 @@
 const System = globalThis;
 import { Rect } from "../base/rect.js";
 import { Object } from "../base/object.js";
-import { Frame } from "../core/frame.js";
 
 
 //==============================================================================
 // 애니메이션 클립.
+// - 프레임은 스프라이트 시트 안의 영역(Rect) 목록이다. (Animator 가 그 영역을 스프라이트의 setImageRect 로 건다)
 //==============================================================================
 /**
  * @example <caption>아틀라스 JSON 으로 걷기 클립 만들기</caption>
@@ -26,7 +26,7 @@ import { Frame } from "../core/frame.js";
  * console.log(clip.getFrameCount(), clip.getDuration(), clip.isLoop(), firstRect.width);
  */
 export class AnimationClip extends Object {
-	/** @private @type { Frame[] } */ #frames; // 프레임 목록.
+	/** @private @type { Rect[] } */ #frames; // 프레임 영역 목록.
 	/** @private @type { boolean } */ #isLoop; // 반복 재생 여부.
 	/** @private @type { number } */ #duration; // 총 애니메이션 재생 시간.
 
@@ -43,12 +43,6 @@ export class AnimationClip extends Object {
 		this.#isLoop = false;
 	}
 
-	//==============================================================================
-	// 프레임 목록 설정.
-	//==============================================================================
-	/**
-	 * @param { Frame[] } frames
-	 */
 	//==============================================================================
 	// 아틀라스 JSON 으로 클립 생성. (정적)
 	// - TexturePacker 형식({ frames: { 이름: { frame: {x,y,w,h} } } })과
@@ -91,7 +85,7 @@ export class AnimationClip extends Object {
 	// 프레임 목록 설정.
 	//==============================================================================
 	/**
-	 * @param { Frame[] | Rect[] } frames 프레임 목록. (fromAtlas 는 Rect 목록을 넣는다)
+	 * @param { Rect[] } frames 프레임 영역 목록. (스프라이트 시트 안의 픽셀 영역, fromAtlas 도 Rect 목록을 넣는다)
 	 */
 	setFrames(frames) {
 		this.#frames = frames;
@@ -132,7 +126,7 @@ export class AnimationClip extends Object {
 	//==============================================================================
 	/**
 	 * @param { number } index 프레임 번호. (0 부터)
-	 * @returns { Frame } 그 번호의 프레임. (범위 밖이면 undefined)
+	 * @returns { Rect } 그 번호의 프레임 영역. (범위 밖이면 undefined)
 	 */
 	getFrame(index) {
 		return this.#frames[index];
@@ -142,7 +136,7 @@ export class AnimationClip extends Object {
 	// 프레임 목록 반환.
 	//==============================================================================
 	/**
-	 * @returns { Frame[] } 프레임 목록.
+	 * @returns { Rect[] } 프레임 영역 목록.
 	 */
 	getFrames() {
 		return this.#frames;

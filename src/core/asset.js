@@ -74,15 +74,15 @@ export class Asset extends Object {
 
 	//==============================================================================
 	// 애셋 언로드.
+	// - 그 자리에서 끝나고 아무것도 돌려주지 않는다. (로드되어 있었든 아니든 같다, 덮어쓴 하위 클래스와 같다)
 	//==============================================================================
 	/**
 	 * @virtual
-	 * @returns { Promise<void> | undefined } 로드되지 않았으면 이미 풀린 프로미스, 로드되어 있었으면 undefined.
 	 */
 	unload() {
 		const isLoaded = this.isLoaded();
 		if (!isLoaded) {
-			return Promise.resolve();
+			return;
 		}
 
 		this.setAssetPath("");

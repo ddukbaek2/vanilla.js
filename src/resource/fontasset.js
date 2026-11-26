@@ -34,21 +34,22 @@ export class FontAsset extends Asset
 	}
 
 	//==============================================================================
-	// 비동기 애셋 로드.
+	// 비동기 애셋 로드. (파일 이름을 글꼴 패밀리 이름으로 loadFont 한다)
 	//==============================================================================
 	/**
 	 * @override
-	 * @param { string } assetPath 글꼴 파일 경로. (경로만 정하고 글꼴은 읽지 않는다, 글꼴은 loadFont 로 읽는다)
-	 * @returns { Promise<void> } 경로를 정하면 풀리는 프로미스.
+	 * @param { string } assetPath 글꼴 파일 경로. (파일 이름에서 확장자를 뗀 것이 패밀리 이름이 된다, "assets/DOSGothic.woff" 면 "DOSGothic")
+	 * @returns { Promise<void> } 글꼴을 읽어 document.fonts 에 올리면 풀리는 프로미스. (이미 읽었으면 바로 풀린다, 읽지 못하면 거부된다)
+	 * @example <caption>파일 이름을 패밀리 이름으로 글꼴 올리기</caption>
+	 * import { FontAsset } from "./build/vanilla.js";
+	 *
+	 * const fontAsset = new FontAsset();
+	 * await fontAsset.load("examples/assets/DOSGothic.woff");
+	 * console.log(fontAsset.family, fontAsset.isLoaded(), document.fonts.check("16px DOSGothic"));
 	 */
 	async load(assetPath) {
-		await super.load(assetPath);
-
-		// 이미 로드 된 상태라면.
-		const isLoaded = this.isLoaded();
-		if (isLoaded) {
-			return Promise.resolve();
-		}
+		const family = readFontFamilyFromPath(assetPath);
+		await this.loadFont(family, assetPath, null);
 	}
 
 	//==============================================================================
@@ -127,6 +128,22 @@ export class FontAsset extends Asset
 		this.fontFace = null;
 		this.setLoaded(false);
 	}
+}
+
+//==============================================================================
+// 글꼴 파일 경로의 패밀리 이름. (쿼리와 조각을 떼고 마지막 경로 조각에서 확장자를 뗀다)
+//==============================================================================
+/**
+ * @param { string } assetPath
+ * @returns { string }
+ */
+function readFontFamilyFromPath(assetPath) {
+	let path = assetPath.split("?")[0];
+	path = path.split("#")[0];
+	const slashIndex = path.lastIndexOf("/");
+	const fileName = slashIndex >= 0 ? path.substring(slashIndex + 1) : path;
+	const dotIndex = fileName.lastIndexOf(".");
+	return dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName;
 }
 
 //==============================================================================

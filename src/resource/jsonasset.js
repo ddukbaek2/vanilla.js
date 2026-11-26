@@ -42,7 +42,7 @@ export class JsonAsset extends TextAsset
 	/**
 	 * @override
 	 * @param { string } assetPath JSON 파일 경로. (이미 읽혔으면 아무것도 하지 않는다)
-	 * @returns { Promise<void> } 끝나면 풀리는 프로미스. (받기나 해석이 실패해도 거부하지 않고 console.error 로 알린 뒤 읽히지 않은 채로 둔다)
+	 * @returns { Promise<void> } 다 읽고 해석하면 풀리는 프로미스. (받기나 해석이 실패하면 console.error 로 알리고 읽히지 않은 채로 거부된다)
 	 */
 	async load(assetPath) {
 		// 이미 로드 된 상태라면.
@@ -60,6 +60,7 @@ export class JsonAsset extends TextAsset
 		}
 		catch (error) {
 			console.error(`Error loading json: ${assetPath}`, error);
+			throw error;
 		}
 	}
 

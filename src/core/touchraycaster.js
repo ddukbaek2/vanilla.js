@@ -4,7 +4,18 @@
 const System = globalThis;
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
-import { WorldNode } from "./node/worldnode.js";
+
+
+//==============================================================================
+// 맞을 수 있는 노드인지. (isInteractable 과 contains 가 있으면 WorldNode 가 아니어도 맞는다)
+//==============================================================================
+/**
+ * @param { object } node 볼 노드.
+ * @returns { boolean } 누를 수 있는지 묻고 자리를 품는지 잴 수 있으면 참.
+ */
+function isTouchableNode(node) {
+	return typeof node.isInteractable === "function" && typeof node.contains === "function";
+}
 
 
 //==============================================================================
@@ -13,6 +24,7 @@ import { WorldNode } from "./node/worldnode.js";
 //   루트 노드 트리를 draw() 순서로 순회하고,
 //   활성 + isInteractable() 노드 중 가장 앞(높은 번호)의 노드에
 //   터치 이벤트를 전달한다.
+// - 노드 종류는 가리지 않는다. isInteractable 과 contains 가 있는 노드는 WorldNode 가 아니어도(UINode 등) 맞을 수 있다.
 //==============================================================================
 /**
  * @example <caption>씬의 누름을 맨 앞 노드에 넘기기</caption>
@@ -194,7 +206,7 @@ export class TouchRaycaster extends Object {
 			const currentDrawOrder = drawOrderCounter;
 			++drawOrderCounter;
 
-			if (node instanceof WorldNode) {
+			if (isTouchableNode(node)) {
 				const nodeScrollView = this.findScrollViewComponent(node);
 				const isCandidate = node.isInteractable() || nodeScrollView !== null;
 				if (isCandidate && node.contains(viewInputPosition)) {
@@ -237,6 +249,9 @@ export class TouchRaycaster extends Object {
 	 * @returns { object | null } 켜진 스크롤 칸 컴포넌트. (없으면 null)
 	 */
 	findScrollViewComponent(node) {
+		if (typeof node.getAllComponents !== "function") {
+			return null;
+		}
 		const components = node.getAllComponents();
 		for (const component of components) {
 			if (component && typeof component.wheel === "function" && typeof component.getScrollContentSize === "function" && component.isEnable()) {
@@ -275,7 +290,7 @@ export class TouchRaycaster extends Object {
 	// 레이캐스트.
 	// - 루트 노드로부터 draw() 호출 순서대로 번호를 매기며 순회한다.
 	// - 활성화 상태이고 isInteractable()이 참이며 터치 좌표를 포함하는
-	//   노드 중 가장 높은 번호의 노드를 반환한다.
+	//   노드 중 가장 높은 번호의 노드를 반환한다. (노드 종류는 가리지 않는다)
 	// - Mask 가 붙은 노드의 자손은 그 노드 영역 안에서만 맞는다. (잘려 보이지 않는 곳은 눌리지 않는다)
 	//==============================================================================
 	/**
@@ -305,7 +320,7 @@ export class TouchRaycaster extends Object {
 			const currentDrawOrder = drawOrderCounter;
 			++drawOrderCounter;
 
-			if (node instanceof WorldNode) {
+			if (isTouchableNode(node)) {
 				const isInteractable = node.isInteractable();
 				if (isInteractable) {
 					const isInside = node.contains(viewInputPosition);
@@ -319,7 +334,7 @@ export class TouchRaycaster extends Object {
 			}
 
 			// 잘라 그리는 노드 밖이면 자손은 보이지 않으므로 맞지 않는다. (Mask 를 들이지 않으려고 컴포넌트 종류 이름으로 본다)
-			if (node instanceof WorldNode && this.isMaskedOut(node, viewInputPosition)) {
+			if (isTouchableNode(node) && this.isMaskedOut(node, viewInputPosition)) {
 				return;
 			}
 
@@ -344,6 +359,9 @@ export class TouchRaycaster extends Object {
 	 * @returns { boolean } 켜진 Mask 가 붙어 있고 그 자리가 노드 밖이면 참.
 	 */
 	isMaskedOut(node, viewInputPosition) {
+		if (typeof node.getAllComponents !== "function") {
+			return false;
+		}
 		const components = node.getAllComponents();
 		for (const component of components) {
 			if (component && typeof component.getComponentType === "function" && component.getComponentType() === "Mask" && component.isEnable()) {
