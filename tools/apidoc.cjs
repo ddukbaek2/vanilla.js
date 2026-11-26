@@ -1929,6 +1929,31 @@ function readEntryExports() {
 			}
 		}
 	}
+	// 이름 공간 모듈이 다른 파일에서 모아 다시 내보내는 이름도 따라간다. (src/experimental/experimental.js 처럼 초안 파일들을 모으는 모듈)
+	for (const namespaceEntry of Array.from(moduleTable.values())) {
+		const namespacePath = path.join(REPOSITORY_ROOT, namespaceEntry.modulePath);
+		if (!namespaceEntry.isNamespace || !fs.existsSync(namespacePath)) {
+			continue;
+		}
+		const namespaceSource = parseSourceFile(fs.readFileSync(namespacePath, "utf8"));
+		for (const reexport of namespaceSource.reexportList) {
+			const modulePath = path.posix.normalize(path.posix.join(path.posix.dirname(namespaceEntry.modulePath), reexport.modulePath));
+			let moduleEntry = moduleTable.get(modulePath);
+			if (!moduleEntry) {
+				moduleEntry = { modulePath: modulePath, isNamespace: false, namespaceName: "", nameList: [] };
+				moduleTable.set(modulePath, moduleEntry);
+			}
+			if (reexport.isNamespace) {
+				moduleEntry.isNamespace = true;
+				moduleEntry.namespaceName = namespaceEntry.namespaceName;
+			}
+			else {
+				for (const specifier of reexport.specifierList) {
+					moduleEntry.nameList.push(specifier);
+				}
+			}
+		}
+	}
 	return Array.from(moduleTable.values());
 }
 
