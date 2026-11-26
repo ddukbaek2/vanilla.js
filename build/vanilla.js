@@ -31764,8 +31764,10 @@ var UIInputFieldMenuAction = {
   // 잘라내기.
   copy: "copy",
   // 복사.
-  paste: "paste"
+  paste: "paste",
   // 붙여넣기.
+  selectAll: "selectAll"
+  // 모두 선택.
 };
 var UIInputField = class extends WorldNode {
   static {
@@ -32026,6 +32028,7 @@ var UIInputField = class extends WorldNode {
   // DOM 입력을 필드 위에서 손가락(마우스)이 직접 누르게 할지. (기본 false, 꺼져 있으면 DOM 입력은 누름을 받지 않고 캔버스가 포커스를 준다)
   // 켜면 필드가 보이는 동안 투명한 DOM 입력이 필드 자리에서 누름을 받아, 브라우저의 기본 동작으로 포커스(다른 출처의 iframe 이면 그 프레임까지)와
   // 키보드를 연다. 코드로 준 포커스를 받지 않는 웹뷰(앱 안의 iframe 등)에서 쓴다. 포커스를 받으면 커서는 글 끝에 둔다.
+  // 그 DOM 입력의 오른쪽 클릭은 브라우저 편집 칸 메뉴 대신 다른 필드와 같은 엔진 문맥 메뉴를 띄운다. (러스트 데스크탑과 같은 항목)
   /**
    * @param { boolean } use 참이면 투명한 DOM 입력이 필드 자리에서 누름을 직접 받는다. (기본 거짓)
    */
@@ -32676,6 +32679,7 @@ var UIInputField = class extends WorldNode {
         if (this.#onSubmitCallback) this.#onSubmitCallback(this.#value);
       }
     });
+    input.addEventListener("contextmenu", (event) => this.handleDOMInputContextMenuEvent(event));
     doc.body.appendChild(input);
     this.#domInput = input;
     this.layoutDOMInput();
@@ -33185,6 +33189,10 @@ var UIInputField = class extends WorldNode {
         this.paste();
         break;
       }
+      case UIInputFieldMenuAction.selectAll: {
+        this.selectAll();
+        break;
+      }
     }
   }
   //==============================================================================
@@ -33257,7 +33265,20 @@ var UIInputField = class extends WorldNode {
     this.showContextMenu(event.clientX, event.clientY);
   }
   //==============================================================================
-  // 문맥 메뉴 띄우기. (잘라내기, 복사, 붙여넣기 DOM 메뉴, 메뉴 밖을 누르면 닫는다)
+  // 직접 누름 DOM 입력의 오른쪽 클릭 처리. (브라우저 편집 칸 메뉴를 막고 엔진 문맥 메뉴를 띄운다)
+  //==============================================================================
+  /**
+   * @param { MouseEvent } event DOM 입력의 contextmenu 사건.
+   */
+  handleDOMInputContextMenuEvent(event) {
+    if (!this.#useDirectTouch) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.focus();
+    this.showContextMenu(event.clientX, event.clientY);
+  }
+  //==============================================================================
+  // 문맥 메뉴 띄우기. (잘라내기, 복사, 붙여넣기, 모두 선택 DOM 메뉴, 메뉴 밖을 누르면 닫는다)
   // - 메뉴는 body 에 붙은 absolute 라 문서 좌표로 놓는다. (뷰포트 좌표인 clientX, clientY 에 스크롤한 만큼 더한다)
   //==============================================================================
   /**
@@ -33288,7 +33309,8 @@ var UIInputField = class extends WorldNode {
     const items = [
       { text: "\uC798\uB77C\uB0B4\uAE30", enabled: hasSel, action: /* @__PURE__ */ __name(() => this.cut(), "action") },
       { text: "\uBCF5\uC0AC", enabled: hasSel, action: /* @__PURE__ */ __name(() => this.copy(), "action") },
-      { text: "\uBD99\uC5EC\uB123\uAE30", enabled: true, action: /* @__PURE__ */ __name(() => this.paste(), "action") }
+      { text: "\uBD99\uC5EC\uB123\uAE30", enabled: true, action: /* @__PURE__ */ __name(() => this.paste(), "action") },
+      { text: "\uBAA8\uB450 \uC120\uD0DD", enabled: this.#value.length > 0, action: /* @__PURE__ */ __name(() => this.selectAll(), "action") }
     ];
     for (const item of items) {
       const button = doc.createElement("div");
