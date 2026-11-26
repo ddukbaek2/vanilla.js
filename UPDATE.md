@@ -14,6 +14,9 @@
   - src/experimental/collection/*.js (List, Dictionary, Queue, Set, Stack) → src/base/collection/*.js
   - src/experimental/camera.js → src/deprecated/camera.js
   - src/experimental/aabb.js, transform2d.js, graphics/gl2d.js, graphics/webgl2.js (죽은 코드, 내보내지 않음) → src/deprecated/
+- Engine: 씬마다 그리기 앞(preDraw, 로딩 중이면 drawOnLoad 앞)에 뷰 좌표(viewManager.applyViewRect)를 걸어 둔다. 지금까지는 변환을 걸지 않은 채 씬을 불러, Scene 을 바로 이은 씬(UIScene, GameScene 이 아닌)은 그리기 버퍼의 실제 픽셀로 그려 기기 픽셀 배율이 2 인 화면(레티나 맥, 고밀도 휴대폰)에서 캔버스 왼쪽 위 1/4 에만 그려졌고 터치 좌표와도 어긋났다. 배율 1 화면과 UIScene, GameScene 은 그대로다. 옮기는 법: 실제 픽셀로 그리던 씬은 preDraw 에서 graphic.setTransform(1, 0, 0, 1, 0, 0) 을 부른다
+- UIInputField 캔버스 모드 낱말 이동과 지우기: 크롬처럼 윈도우와 리눅스는 Ctrl, 맥은 Option 과 왼쪽, 오른쪽 화살표(Shift 와 함께면 고르기를 넓힌다), Backspace, Delete 로 낱말 단위로 옮기고 지운다. (맥은 Option + Ctrl + Backspace, B, F 도) 자리는 블링크 NextWordPosition, PreviousWordPosition 대로, 오른쪽은 윈도우만 다음 낱말 앞(맥과 리눅스는 지금 낱말 끝), 맥은 넓히던 고르기가 고정 끝을 넘지 않는다. 고른 것이 있으면 고른 것만 지운다. (전에는 Ctrl + 화살표가 아무것도 하지 않고, 맥 Option + 화살표는 한 글자씩 움직였다)
+- UIInputField 낱말 경계: 크롬처럼 마침표는 숫자 사이에서만 잇고("www.example.com" 은 다섯 조각, "3.14" 는 한 낱말), 쌍점은 잇지 않는다. (크로미엄 ICU wordbrk.patch, 크롬 밖의 브라우저에서도 DOM 입력의 두 번 누르기가 크롬과 같은 낱말을 고른다)
 - UIDocument: 문서에 적는 노드와 컴포넌트 종류 이름을 클래스 이름(constructor.name) 대신 표에 등록한 이름으로 적는다. 번들러가 클래스 이름을 줄여도(esbuild --minify) 같은 문서가 된다. (등록하지 않은 종류만 지금처럼 클래스 이름, 지금까지는 줄인 번들에서 WorldNode 가 "o" 처럼 적혀 다시 읽지 못했다)
 - UIDocument.registerEditorTypes(): UI 에디터가 등록하는 종류(컴포넌트 35, 노드 종류 12)를 한 번에 등록한다. 에디터가 저장한 문서를 읽는 게임은 fromJsonText 앞에 한 번 부른다. 이미 등록한 이름은 그대로 둔다. (러스트 register_editor_types 와 같다) 표에 없는 노드 종류와 컴포넌트를 읽으면 console.warn 으로 알린다. (지금까지는 말없이 WorldNode 로 읽거나 건너뛰어 UIInputField, UIScrollBar 가 빈 노드가 되고 UISnapScrollView 가 빠졌다)
 - UIDocument: 다시 읽을 때 노드 생성자나 위젯이 만든 컴포넌트와 자식(UIWindow 의 제목 막대, UIImageView 가 붙이는 Sprite 같은)은 문서의 앞에서부터 차례와 종류(자식은 이름)가 맞으면 그것에 문서 값을 넣고 겹쳐 만들지 않는다. 읽고 다시 쓰면 같은 문서다. (지금까지는 겹쳐 만들어 UIWindow 를 읽으면 노드와 컴포넌트가 두 벌이었다, 러스트와 같다)
