@@ -831,21 +831,28 @@ export class DEVTools extends Object {
 		// + Add 버튼 클릭.
 		if (touchX >= addBtnX && touchX <= addBtnX + addBtnWidth &&
 		    touchY >= btnY && touchY <= btnY + btnHeight) {
-			const newKey = System.window.prompt("키 입력:");
-			if (newKey !== null && newKey.trim() !== "") {
-				const newValue = System.window.prompt("값 입력:") || "";
-				LocalStorage.setString(newKey.trim(), newValue);
-			}
+			// 엔진이 그린 질문 창으로 묻는다. (러스트 판 DevTools 와 같다)
+			this.#engine.prompt("키 입력:", "").setCallback((keyResult) => {
+				const newKey = keyResult.isConfirmed() ? keyResult.getText() : null;
+				if (newKey !== null && newKey.trim() !== "") {
+					this.#engine.prompt("값 입력:", "").setCallback((valueResult) => {
+						const newValue = valueResult.isConfirmed() ? valueResult.getText() : "";
+						LocalStorage.setString(newKey.trim(), newValue);
+					});
+				}
+			});
 			return;
 		}
 
 		// Clear 버튼 클릭.
 		if (touchX >= clearBtnX && touchX <= clearBtnX + clearBtnWidth &&
 		    touchY >= btnY && touchY <= btnY + btnHeight) {
-			if (System.window.confirm("모든 로컬 스토리지 항목을 삭제하시겠습니까?")) {
-				LocalStorage.clear();
-				this.#selectedLocalStorageKey = null;
-			}
+			this.#engine.confirm("모든 로컬 스토리지 항목을 삭제하시겠습니까?").setCallback((result) => {
+				if (result.isConfirmed()) {
+					LocalStorage.clear();
+					this.#selectedLocalStorageKey = null;
+				}
+			});
 			return;
 		}
 
@@ -870,22 +877,25 @@ export class DEVTools extends Object {
 					switch (buttonIndex) {
 						case 0: {
 							// Edit Key.
-							const newKey = System.window.prompt("키 이름 수정:", selectedKey);
-							if (newKey !== null && newKey.trim() !== "" && newKey.trim() !== selectedKey) {
-								const existingValue = LocalStorage.getString(selectedKey) || "";
-								LocalStorage.remove(selectedKey);
-								LocalStorage.setString(newKey.trim(), existingValue);
-								this.#selectedLocalStorageKey = newKey.trim();
-							}
+							this.#engine.prompt("키 이름 수정:", selectedKey).setCallback((result) => {
+								const newKey = result.isConfirmed() ? result.getText() : null;
+								if (newKey !== null && newKey.trim() !== "" && newKey.trim() !== selectedKey) {
+									const existingValue = LocalStorage.getString(selectedKey) || "";
+									LocalStorage.remove(selectedKey);
+									LocalStorage.setString(newKey.trim(), existingValue);
+									this.#selectedLocalStorageKey = newKey.trim();
+								}
+							});
 							break;
 						}
 						case 1: {
 							// Edit Value.
 							const currentValue = LocalStorage.getString(selectedKey) || "";
-							const newValue = System.window.prompt(`"${selectedKey}" 값 수정:`, currentValue);
-							if (newValue !== null) {
-								LocalStorage.setString(selectedKey, newValue);
-							}
+							this.#engine.prompt(`"${selectedKey}" 값 수정:`, currentValue).setCallback((result) => {
+								if (result.isConfirmed()) {
+									LocalStorage.setString(selectedKey, result.getText());
+								}
+							});
 							break;
 						}
 						case 2: {
@@ -898,10 +908,12 @@ export class DEVTools extends Object {
 						}
 						case 3: {
 							// Remove.
-							if (System.window.confirm(`"${selectedKey}" 항목을 삭제하시겠습니까?`)) {
-								LocalStorage.remove(selectedKey);
-								this.#selectedLocalStorageKey = null;
-							}
+							this.#engine.confirm(`"${selectedKey}" 항목을 삭제하시겠습니까?`).setCallback((result) => {
+								if (result.isConfirmed()) {
+									LocalStorage.remove(selectedKey);
+									this.#selectedLocalStorageKey = null;
+								}
+							});
 							break;
 						}
 					}
@@ -923,12 +935,14 @@ export class DEVTools extends Object {
 			// 삭제(×) 버튼 클릭.
 			const delBtnX = panelX + panelWidth - SCROLL_BAR_WIDTH - delColWidth;
 			if (touchX >= delBtnX) {
-				if (System.window.confirm(`"${clickedKey}" 항목을 삭제하시겠습니까?`)) {
-					LocalStorage.remove(clickedKey);
-					if (this.#selectedLocalStorageKey === clickedKey) {
-						this.#selectedLocalStorageKey = null;
+				this.#engine.confirm(`"${clickedKey}" 항목을 삭제하시겠습니까?`).setCallback((result) => {
+					if (result.isConfirmed()) {
+						LocalStorage.remove(clickedKey);
+						if (this.#selectedLocalStorageKey === clickedKey) {
+							this.#selectedLocalStorageKey = null;
+						}
 					}
-				}
+				});
 				return;
 			}
 
