@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>vanilla.js - Tilemap Showcase</title>
+<style>
+	html, body {
+		margin: 0;
+		padding: 0;
+		width: 100%;
+		height: 100%;
+		overflow: hidden;
+		background: #14171e;
+		touch-action: none;
+		user-select: none;
+	}
+	#mainCanvas {
+		position: absolute;
+		left: 0;
+		top: 0;
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+	"use strict";
+	const System = globalThis;
+
+	//==============================================================================
+	// 타일맵 쇼케이스. (러스트 판 examples/tilemapshowcase.rs 와 같은 장면)
+	// - Experimental 의 타일맵 초안을 보인다. Tiled JSON 지도 셋(정사각, 아이소, 육각)을 읽어 그린다.
+	//   정사각: 층 셋(땅, 묶음 층 안의 꾸밈과 색 입힌 강조), 물결 애니메이션, 뒤집기와 돌리기 여덟 가지, 16 x 32 큰 타일, 바깥 그림 모음 타일셋,
+	//   자동 타일(RuleTile)로 칠한 길 층, 꾸밈 층의 충돌 모양(노란 선).
+	//   아이소: 마름모 지도, 블록이 위로 넘친다. 육각: 끝없는 지도의 덩이, 60 도와 120 도 돌린 화살표.
+	// - 아래 띠는 코드로 만든 타일맵이다. (Tilemap.rotateTile, flipTileHorizontally)
+	// - 주소에 ?time=초 를 주면 애니메이션 시계를 그 시각에 멈춘다. (러스트 판과 화면을 견줄 때, 러스트는 TILEMAP_SHOWCASE_TIME)
+	// - 자산은 generate.mjs 로 만든다. 저장소의 소스(import.js)를 바로 읽는다.
+	//==============================================================================
+	const engineModule = await import("../../import.js");
+
+	const Engine = engineModule.Engine;
+	const EngineConfiguration = engineModule.EngineConfiguration;
+	const Scene = engineModule.Scene;
+	const WorldNode = engineModule.WorldNode;
+	const Component = engineModule.Component;
+	const Paint = engineModule.Paint;
+	const Vector2 = engineModule.Vector2;
+	const Rect = engineModule.Rect;
+	const Color = engineModule.Color;
+	const Pivot = engineModule.Pivot;
+	const JsonAsset = engineModule.JsonAsset;
+	const ImageAsset = engineModule.ImageAsset;
+	const Experimental = engineModule.Experimental;
+	const Tilemap = Experimental.Tilemap;
+	const TilemapLayer = Experimental.TilemapLayer;
+	const TileCollisionShapeKind = Experimental.TileCollisionShapeKind;
+	const TiledMapReader = Experimental.TiledMapReader;
+	const RuleTile = Experimental.RuleTile;
+	const RuleTileNeighbor = Experimental.RuleTileNeighbor;
+	const RuleTileTransform = Experimental.RuleTileTransform;
+
+	// 화면과 자산.
+	const VIEW_WIDTH = 1280;
+	const VIEW_HEIGHT = 720;
+	const ASSET_DIRECTORY = "assets/";
+	const MAP_FILE_LIST = ["orthogonal.tmj", "isometric.tmj", "hexagonal.tmj"];
+	const TILESET_FILE_LIST = ["props.tsj"];
+	const IMAGE_FILE_LIST = ["terrain.png", "trees.png", "chest.png", "sign.png", "isometric.png", "hexagon.png"];
+	// 지도마다 (패널 왼쪽, 위, 너비, 높이, 지도 노드 왼쪽, 위, 배율)
+	const PANEL_LAYOUT_LIST = [
+		[24, 40, 608, 416, 40, 56, 2],
+		[664, 40, 576, 312, 680, 88, 2],
+		[664, 368, 576, 336, 680, 384, 2],
+	];
+	// 자동 타일로 칠할 길 칸.
+	const ROAD_CELL_LIST = [[1, 6], [2, 6], [3, 6], [4, 6], [5, 6], [6, 6], [4, 7], [4, 8], [6, 7], [7, 7], [8, 7]];
+	const timeParameter = new URLSearchParams(System.location.search).get("time");
+	const FIXED_ANIMATION_TIME = timeParameter === null ? null : System.Number(timeParameter);
+
+	//==============================================================================
+	// 충돌 모양을 선으로 그리는 컴포넌트. (지도 노드의 자식에 붙여 같은 좌표로 그린다)
+	//==============================================================================
+	class CollisionOverlay extends Component {
+		/** @type { object[] } */ shapeList = [];
+
+		//==============================================================================
+		// 출력.
+		//==============================================================================
+		/**
+		 * @param { Graphic } graphic
+		 */
+		draw(graphic) {
+			graphic.setStrokeColor(new Color(1, 0.85, 0.2, 1));
+			for (const shape of this.shapeList) {
+				const positionList = [];
+				if (shape.kind === TileCollisionShapeKind.polygon || shape.kind === TileCollisionShapeKind.polyline) {
+					for (const point of shape.points) {
+						positionList.push(Vector2.create(shape.x + point.x, shape.y + point.y));
+					}
+				}
+				else if (shape.kind === TileCollisionShapeKind.ellipse) {
+					const radian = shape.rotation * System.Math.PI / 180;
+					for (let stepIndex = 0; stepIndex < 16; ++stepIndex) {
+						const angle = stepIndex / 16 * System.Math.PI * 2;
+						const localX = shape.width * 0.5 * (1 + System.Math.cos(angle));
+						const localY = shape.height * 0.5 * (1 + System.Math.sin(angle));
+						positionList.push(Vector2.create(shape.x + localX * System.Math.cos(radian) - localY * System.Math.sin(radian), shape.y + localX * System.Math.sin(radian) + localY * System.Math.cos(radian)));
+					}
+				}
+				else if (shape.kind === TileCollisionShapeKind.point) {
+					positionList.push(Vector2.create(shape.x - 1, shape.y));
+					positionList.push(Vector2.create(shape.x + 1, shape.y));
+				}
+				else {
+					const radian = shape.rotation * System.Math.PI / 180;
+					const cornerList = [[0, 0], [shape.width, 0], [shape.width, shape.height], [0, shape.height]];
+					for (const corner of cornerList) {
+						positionList.push(Vector2.create(shape.x + corner[0] * System.Math.cos(radian) - corner[1] * System.Math.sin(radian), shape.y + corner[0] * System.Math.sin(radian) + corner[1] * System.Math.cos(radian)));
+					}
+				}
+				if (shape.kind === TileCollisionShapeKind.polyline) {
+					graphic.drawLine(positionList, 0.5);
+				}
+				else {
+					graphic.drawLineLoop(positionList, 0.5);
+				}
+			}
+		}
+	}
+
+	//==============================================================================
+	// 타일맵 쇼케이스 씬.
+	//==============================================================================
+	class TilemapShowcaseScene extends Scene {
+		/** @type { Tilemap[] } */ #tilemapList = [];
+
+		//==============================================================================
+		// 읽기. (지도, 바깥 타일셋, 그림을 읽고 노드를 짓는다)
+		//==============================================================================
+		/**
+		 * @param { Engine } engine
+		 */
+		async load(engine) {
+			await super.load(engine);
+			const root = this.getRoot();
+			root.setPivot(Pivot.topLeft.clone());
+			root.setAnchor(Pivot.topLeft.clone());
+
+			const jsonTable = new System.Map();
+			for (const fileName of MAP_FILE_LIST.concat(TILESET_FILE_LIST)) {
+				const jsonAsset = new JsonAsset();
+				await jsonAsset.load(ASSET_DIRECTORY + fileName);
+				jsonTable.set(ASSET_DIRECTORY + fileName, jsonAsset.data);
+			}
+			const imageTable = new System.Map();
+			for (const fileName of IMAGE_FILE_LIST) {
+				const imageAsset = new ImageAsset();
+				await imageAsset.load(ASSET_DIRECTORY + fileName);
+				imageTable.set(ASSET_DIRECTORY + fileName, imageAsset.image);
+			}
+			const readTileset = (tilesetPath) => {
+				const tilesetData = jsonTable.get(tilesetPath);
+				return tilesetData === undefined ? null : tilesetData;
+			};
+			const readImage = (imagePath) => {
+				const image = imageTable.get(imagePath);
+				return image === undefined ? null : image;
+			};
+
+			for (let mapIndex = 0; mapIndex < MAP_FILE_LIST.length; ++mapIndex) {
+				const panelLayout = PANEL_LAYOUT_LIST[mapIndex];
+				const panelNode = new WorldNode();
+				panelNode.setPivot(Pivot.topLeft.clone());
+				panelNode.setAnchor(Pivot.topLeft.clone());
+				panelNode.setLocalPosition(Vector2.create(panelLayout[0], panelLayout[1]));
+				panelNode.setContentSize(Vector2.create(panelLayout[2], panelLayout[3]));
+				const panelPaint = panelNode.addComponent(Paint);
+				panelPaint.setColor(new Color(0.11, 0.13, 0.19, 1));
+				root.addChild(panelNode);
+
+				const mapPath = ASSET_DIRECTORY + MAP_FILE_LIST[mapIndex];
+				const mapNode = new WorldNode();
+				mapNode.setPivot(Pivot.topLeft.clone());
+				mapNode.setAnchor(Pivot.topLeft.clone());
+				mapNode.setLocalPosition(Vector2.create(panelLayout[4], panelLayout[5]));
+				mapNode.setLocalScale(Vector2.create(panelLayout[6], panelLayout[6]));
+				const tilemap = mapNode.addComponent(Tilemap);
+				const mapData = jsonTable.get(mapPath);
+				await TiledMapReader.readMap(mapData, tilemap, mapPath, readTileset);
+				TiledMapReader.attachImages(tilemap, readImage);
+				const mapPixelSize = tilemap.readMapPixelSize();
+				mapNode.setContentSize(mapPixelSize);
+				if (FIXED_ANIMATION_TIME !== null) {
+					tilemap.setAnimationSpeed(0);
+					tilemap.setAnimationTime(FIXED_ANIMATION_TIME);
+				}
+				root.addChild(mapNode);
+				this.#tilemapList.push(tilemap);
+				if (mapIndex === 0) {
+					this.decorateOrthogonalMap(mapNode, tilemap);
+				}
+			}
+			this.createFlipStrip(root);
+		}
+
+		//==============================================================================
+		// 정사각 지도 꾸미기. (자동 타일 길 층, 꾸밈 층의 충돌 모양)
+		//==============================================================================
+		/**
+		 * @param { WorldNode } mapNode
+		 * @param { Tilemap } tilemap
+		 */
+		decorateOrthogonalMap(mapNode, tilemap) {
+			const any = RuleTileNeighbor.any;
+			const same = RuleTileNeighbor.this;
+			const other = RuleTileNeighbor.notThis;
+			const roadTile = new RuleTile(17);
+			roadTile.addRule([any, same, any, same, same, any, same, any], 22, RuleTileTransform.fixed);
+			roadTile.addRule([any, other, any, same, same, any, same, any], 21, RuleTileTransform.rotated);
+			roadTile.addRule([any, other, any, same, same, any, other, any], 19, RuleTileTransform.rotated);
+			roadTile.addRule([any, other, any, other, same, any, same, any], 20, RuleTileTransform.rotated);
+			roadTile.addRule([any, other, any, other, same, any, other, any], 18, RuleTileTransform.rotated);
+			const roadLayer = new TilemapLayer("road");
+			for (const roadCell of ROAD_CELL_LIST) {
+				roadTile.paint(roadLayer, roadCell[0], roadCell[1]);
+			}
+			tilemap.insertLayer(1, roadLayer);
+
+			const decorationLayerIndex = tilemap.findLayerIndex("decoration");
+			const overlayNode = new WorldNode();
+			overlayNode.setPivot(Pivot.topLeft.clone());
+			overlayNode.setAnchor(Pivot.topLeft.clone());
+			const mapContentSize = mapNode.getContentSize();
+			overlayNode.setContentSize(mapContentSize);
+			const collisionOverlay = overlayNode.addComponent(CollisionOverlay);
+			collisionOverlay.shapeList = tilemap.readLayerCollisionShapes(decorationLayerIndex);
+			mapNode.addChild(overlayNode);
+		}
+
+		//==============================================================================
+		// 뒤집기와 돌리기 띠. (코드로 만든 타일맵, 화살표 여덟 방향과 나무 둘)
+		//==============================================================================
+		/**
+		 * @param { WorldNode } root
+		 */
+		createFlipStrip(root) {
+			const terrainTileset = this.#tilemapList[0].getTileset(0);
+			const treeTileset = this.#tilemapList[0].getTileset(1);
+			const stripNode = new WorldNode();
+			stripNode.setPivot(Pivot.topLeft.clone());
+			stripNode.setAnchor(Pivot.topLeft.clone());
+			stripNode.setLocalPosition(Vector2.create(40, 520));
+			stripNode.setLocalScale(Vector2.create(3, 3));
+			const stripMap = stripNode.addComponent(Tilemap);
+			stripMap.setTileSize(16, 16);
+			stripMap.setMapSize(12, 3);
+			stripMap.addTileset(terrainTileset, 1);
+			stripMap.addTileset(treeTileset, 25);
+			stripNode.setContentSize(stripMap.readMapPixelSize());
+			const stripLayer = stripMap.createLayer("strip");
+			for (let turnIndex = 0; turnIndex < 4; ++turnIndex) {
+				const rotatedTile = Tilemap.rotateTile(11, turnIndex);
+				stripLayer.setTile(turnIndex, 2, rotatedTile);
+				const mirroredTile = Tilemap.flipTileHorizontally(rotatedTile);
+				stripLayer.setTile(4 + turnIndex, 2, mirroredTile);
+			}
+			stripLayer.setTile(9, 2, 25);
+			const flippedTree = Tilemap.flipTileHorizontally(26);
+			stripLayer.setTile(10, 2, flippedTree);
+			const lyingTree = Tilemap.rotateTile(25, 1);
+			stripLayer.setTile(11, 2, lyingTree);
+			root.addChild(stripNode);
+		}
+
+		//==============================================================================
+		// 이전 출력. (바탕색, 점 그림이 번지지 않게 가장 가까운 화소로)
+		//==============================================================================
+		/**
+		 * @param { Graphic } graphic
+		 */
+		preDraw(graphic) {
+			super.preDraw(graphic);
+			const engine = this.getEngine();
+			const viewManager = engine.getViewManager();
+			const canvasNativeSize = viewManager.getCanvasNativeSize();
+			viewManager.applyCanvasNativeRect(graphic);
+			graphic.setFillColor(new Color(0.08, 0.09, 0.12, 1));
+			graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+			viewManager.applyViewRect(graphic);
+			graphic.setImageSmoothingEnabled(false);
+		}
+	}
+
+	//==============================================================================
+	// 엔진 실행.
+	//==============================================================================
+	const engineConfiguration = new EngineConfiguration();
+	engineConfiguration.referenceResolutionSize = Vector2.create(VIEW_WIDTH, VIEW_HEIGHT);
+	engineConfiguration.canvasId = "mainCanvas";
+	engineConfiguration.autoResizeOnWindowResize = true;
+	engineConfiguration.useDevTools = false;
+	engineConfiguration.defaultFontUrl = "";
+	const engine = new Engine(engineConfiguration);
+	engine.run(new TilemapShowcaseScene());
+</script>
+</body>
+</html>

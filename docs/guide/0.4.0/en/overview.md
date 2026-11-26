@@ -37,7 +37,7 @@ Playable results made with the engine.
 | Game | Link |
 | --- | --- |
 | Tales of Cultivation | [Open](https://ddukbaek2.com/portfolio/talesofcultivation/) |
-| Pipe Mania | [Open](https://ddukbaek2.com/portfolio/pipemania/) |
+| Pipe Mania | [Open](https://vanillapunch.com/games/#pipemania) |
 | Scramble Heroes | [Open](https://ddukbaek2.com/portfolio/scramble-heroes/) |
 
 ## Repository Structure
@@ -73,7 +73,10 @@ UPDATE.md       Update history
 ## Links
 
 - Repository: <https://github.com/ddukbaek2/vanilla.js>
-- Deployment page: <https://ddukbaek2.com>
+- Engine page: <https://vanillapunch.com/tools/#vanillajs>
+- Documentation: <https://vanillapunch.com/docs/vanilla.js/>
+- Update news: <https://vanillapunch.com/news/?kind=patch>
+- Contact: <https://vanillapunch.com/support/>
 
 ## License
 
