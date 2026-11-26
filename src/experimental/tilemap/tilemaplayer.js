@@ -148,7 +148,8 @@ export class TilemapLayer extends Object {
 	 * @returns { Color } 색. (처음은 흰색)
 	 */
 	getColor() {
-		return this.#color;
+		// 사본. (고치려면 setColor, 러스트 판과 같다)
+		return new Color(this.#color.red, this.#color.green, this.#color.blue, this.#color.alpha);
 	}
 
 	//==============================================================================
@@ -168,7 +169,8 @@ export class TilemapLayer extends Object {
 	 * @returns { Vector2 } 오프셋. (픽셀, 처음은 0, 0)
 	 */
 	getOffset() {
-		return this.#offset;
+		// 사본. (고치려면 setOffset, 러스트 판과 같다)
+		return Vector2.create(this.#offset.x, this.#offset.y);
 	}
 
 	//==============================================================================

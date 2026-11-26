@@ -658,7 +658,8 @@ export class Tileset extends Object {
 	 * @returns { Vector2 } 오프셋. (픽셀, 처음은 0, 0)
 	 */
 	getTileOffset() {
-		return this.#tileOffset;
+		// 사본. (밖에서 고쳐도 타일셋은 그대로, 러스트 판과 같다)
+		return Vector2.create(this.#tileOffset.x, this.#tileOffset.y);
 	}
 
 	//==============================================================================
@@ -1016,7 +1017,8 @@ export class Tileset extends Object {
 		if (tileData === null) {
 			return [];
 		}
-		return tileData.animation;
+		// 사본. (고치려면 setTileAnimation, 러스트 판과 같다)
+		return tileData.animation.map((frame) => new TileAnimationFrame(frame.tileId, frame.duration));
 	}
 
 	//==============================================================================
@@ -1079,7 +1081,8 @@ export class Tileset extends Object {
 		if (tileData === null) {
 			return [];
 		}
-		return tileData.collisionShapes;
+		// 사본. (고치려면 setTileCollisionShapes, 러스트 판과 같다)
+		return tileData.collisionShapes.map((shape) => shape.clone());
 	}
 
 	//==============================================================================

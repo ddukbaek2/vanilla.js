@@ -1,6 +1,8 @@
 # 업데이트 기록
 
 # 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- 초안 타일맵 게터(Experimental tilemap): Tilemap.getTilesets, getLayers 는 얼린 사본 배열, Tileset.getTileOffset, getTileAnimation, getTileCollisionShapes 와 TilemapLayer.getColor, getOffset 은 사본을 돌려준다(러스트 판의 조각과 사본처럼, 밖에서 고쳐 첫 gid 표나 그리기와 어긋나지 않게). 고치려면 set 함수를 부른다
+  - 옮기는 법: getLayers().push 같은 것은 addLayer, insertLayer, removeLayer 로, getOffset().x = 값 같은 것은 setOffset 으로 바꾼다.
 - 초안 2D 뼈대(Experimental skeleton2d): Skeleton2D.findIkConstraintIndex(이름) 을 더했다(러스트 판 find_ik_constraint_index, 없으면 -1). 안쪽 함수 Skeleton2DAnimationState.collectTrackEvents, Skeleton2DAnimator.readOrigin 을 문서상 @private 로 했다(러스트 판처럼 공개 API 가 아님). node 시험 tests/experimental/skeleton2d.test.mjs(예제 skeleton2dcheck.mjs 와 러스트 판과 같은 값)
 - 초안 타일맵(Experimental tilemap): 층 자료의 타일 값을 러스트 판과 같은 규칙(0 ~ 2^32 - 1 의 정수만, 아니면 0)으로 읽는다(지금까지 >>> 0 이라 -1 이 4294967295, 1.5 가 1). 모르는 Tiled 섞기 이름은 source-over 로 담는다(getBlendMode 가 러스트 판과 같다). base64 와 압축 풀기 실패는 러스트 판과 같은 글('TiledMapReader: invalid base64', 'TiledMapReader: cannot decompress zlib')로 던진다. 타일에 따로 건 그림이 없을 때만 격자 한 칸을 그린다(타일셋과 같은 그림을 setTileImage 로 걸면 그림 전체, readTileImageRect 와 러스트 판과 같다). DEFAULT_CHUNK_SIZE 를 내보내고 TilemapLayer 덩이 크기는 수가 아니면 1. node 시험 tests/experimental/tilemap.test.mjs(예제 check.mjs 와 러스트 판과 같은 값)
 - 초안 물리 비교 도구(tools/physics2dcompare.mjs): 장면에 100 걸음마다 모든 광선(castRay), 상자(overlapAabb), 점(overlapPoint), 모양(overlapShape) 질의를 더했다. 러스트 판은 실수 고르기를 원본 Math.max, Math.min 과 같은 뜻으로 바꿔 NaN 과 ±0 에서도 같고, 그 CI 가 이 도구의 --check 와 tests/experimental 시험을 함께 돌린다. RigidBody2D.setBody, getBody 자리는 러스트 판 set_body_on_node, with_body 다

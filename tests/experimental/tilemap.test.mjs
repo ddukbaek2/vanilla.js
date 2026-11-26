@@ -1,7 +1,7 @@
 //==============================================================================
 // 타일맵 초안 시험. (node tests/experimental/tilemap.test.mjs)
 // - examples/tilemapshowcase/check.mjs 의 값 검사(러스트 판 src/experimental/tilemap 시험과 같은 값)를 돌리고,
-//   층 자료 수 읽기, 섞기 이름, 오류 글, 덩이 크기를 러스트 판 시험(tiledmapreader.rs 의 layer_values_blend_and_errors_match_original)과 같은 값으로 본다.
+//   층 자료 수 읽기, 섞기 이름, 오류 글, 덩이 크기, 사본 게터를 러스트 판 시험(tiledmapreader.rs 의 layer_values_blend_and_errors_match_original)과 같은 값으로 본다.
 //==============================================================================
 import { spawnSync } from "node:child_process";
 import path from "node:path";
@@ -60,5 +60,15 @@ check([0, 1, 2].map((layerIndex) => blendTilemap.getLayer(layerIndex).getBlendMo
 const chunkTilemap = new Tilemap();
 check(DEFAULT_CHUNK_SIZE === 16 && chunkTilemap.createLayer("a").getChunkSize() === 16, "기본 덩이 크기");
 check(chunkTilemap.createLayer("b", 8).getChunkSize() === 8 && chunkTilemap.createLayer("c", 0).getChunkSize() === 1 && new TilemapLayer("d", NaN).getChunkSize() === 1, "덩이 크기 자르기");
+
+// 게터는 사본이나 얼린 배열이다. (밖에서 고쳐도 지도와 첫 gid 표가 그대로, 러스트 판의 조각과 사본과 같다)
+const copyTilemap = new Tilemap();
+copyTilemap.addTileset(new Tileset());
+const copyLayer = copyTilemap.createLayer("copy");
+check(Object.isFrozen(copyTilemap.getTilesets()) && Object.isFrozen(copyTilemap.getLayers()), "얼린 목록");
+copyLayer.getOffset().x = 99;
+copyLayer.getColor().red = 0;
+copyTilemap.getTileset(0).getTileOffset().x = 99;
+check(copyLayer.getOffset().x === 0 && copyLayer.getColor().red === 1 && copyTilemap.getTileset(0).getTileOffset().x === 0, "사본 게터");
 
 console.log(`타일맵 시험 ${checkCount} 개 통과`);
