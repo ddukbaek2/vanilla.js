@@ -176,7 +176,7 @@ engine.run(new AnimationScene());
 - `addClip(clipName, image, frameRects, framesPerSecond, isLoop)` 는 클립을 등록합니다(기본 10 프레임, 반복). `image` 는 `HTMLImageElement` 입니다.
 - `addClipFromAtlas(clipName, image, atlasJson, frameIds, framesPerSecond, isLoop)` 는 TexturePacker 꼴(`{ frames: { 이름: { frame: { x, y, w, h } } } }`) 표에서 프레임을 뽑습니다.
 - `play(clipName, { restartIfSame, onComplete })` 는 클립을 바꿉니다. 같은 클립이 이미 돌고 있으면 다시 시작하지 않고(`restartIfSame: true` 면 다시 시작) 완료 함수만 바꿉니다. 시작했으면 `true` 를 돌려줍니다.
-- `stop()`, `getClipName()`, `isPlaying()`, `getCurrentFrameIndex()`, `hasClip(clipName)`, 정적 `SpriteAnimator.playOnNode(node, clipName, options)` 가 있습니다.
+- `stop()`, `getClipName()`, `isPlaying()`, `getCurrentFrameIndex()`, `hasClip(clipName)`, 정적 `SpriteAnimator.play(node, clipName, options)`(노드의 애니메이터로 틀기, 러스트 판과 같은 꼴)와 `playClip(clipName, options)`(러스트 판 `play_clip`, 인스턴스 `play` 와 같음)가 있습니다.
 
 ```javascript
 import { Engine, EngineConfiguration, Scene, WorldNode, Sprite, SpriteAnimator, ImageAsset, Vector2, Rect } from "./build/vanilla.js";

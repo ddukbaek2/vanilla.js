@@ -176,7 +176,7 @@ engine.run(new AnimationScene());
 - `addClip(clipName, image, frameRects, framesPerSecond, isLoop)` registers a clip (default 10 frames per second, looping). `image` is an `HTMLImageElement`.
 - `addClipFromAtlas(clipName, image, atlasJson, frameIds, framesPerSecond, isLoop)` takes frames from a TexturePacker-style table (`{ frames: { name: { frame: { x, y, w, h } } } }`).
 - `play(clipName, { restartIfSame, onComplete })` switches clips. If the same clip is already playing, it does not restart (unless `restartIfSame: true`) and only replaces the completion function. It returns `true` if it started the clip.
-- There are also `stop()`, `getClipName()`, `isPlaying()`, `getCurrentFrameIndex()`, `hasClip(clipName)`, and the static `SpriteAnimator.playOnNode(node, clipName, options)`.
+- There are also `stop()`, `getClipName()`, `isPlaying()`, `getCurrentFrameIndex()`, `hasClip(clipName)`, the static `SpriteAnimator.play(node, clipName, options)` (plays with the node's animator, the same form as the Rust engine), and `playClip(clipName, options)` (the Rust `play_clip`, same as the instance `play`).
 
 ```javascript
 import { Engine, EngineConfiguration, Scene, WorldNode, Sprite, SpriteAnimator, ImageAsset, Vector2, Rect } from "./build/vanilla.js";

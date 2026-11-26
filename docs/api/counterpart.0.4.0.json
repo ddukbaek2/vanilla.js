@@ -24711,24 +24711,24 @@
 			"vanilla-engine": {
 				"module": "misc/spriteanimator",
 				"class": "SpriteAnimator",
-				"name": "play"
+				"name": "play_clip"
 			},
 			"vanilla.js": {
 				"module": "misc/spriteanimator",
 				"class": "SpriteAnimator",
-				"name": "play"
+				"name": "playClip"
 			}
 		},
 		{
 			"vanilla-engine": {
 				"module": "misc/spriteanimator",
 				"class": "SpriteAnimator",
-				"name": "play_on_node"
+				"name": "play"
 			},
 			"vanilla.js": {
 				"module": "misc/spriteanimator",
 				"class": "SpriteAnimator",
-				"name": "playOnNode"
+				"name": "play"
 			}
 		},
 		{

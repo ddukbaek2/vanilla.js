@@ -75460,8 +75460,8 @@
 				{
 					"name": "SpriteAnimator",
 					"summary": {
-						"ko": "스프라이트 애니메이터 컴포넌트.\n- 이름을 붙인 클립(프레임 시퀀스)을 등록해 두고 play(\"run\") 으로 전환한다.\n- 같은 클립을 다시 play 해도 재시작하지 않는다. (restartIfSame 옵션으로 바꿀 수 있다)\n- 클립이 끝나면 onComplete 콜백으로 다음 상태를 이어 갈 수 있다. (FSM 과 결합)\n- 같은 노드의 Sprite 컴포넌트에 현재 프레임(image + rect)을 반영한다.\n- 사용:\n    const animator = node.addComponent(SpriteAnimator);\n    animator.addClip(\"idle\", image, idleRects, 10, true);\n    animator.addClip(\"attack\", image, attackRects, 12, false);\n    animator.play(\"attack\", { onComplete: () => animator.play(\"idle\") });",
-						"en": "Sprite animator component.\n- Registers named clips (frame sequences) and switches with play(\"run\").\n- Playing the same clip again does not restart it. (can be changed with the restartIfSame option)\n- When a clip ends, the next state can follow via the onComplete callback. (combines with an FSM)\n- Applies the current frame (image + rect) to the Sprite component on the same node.\n- Usage:\n    const animator = node.addComponent(SpriteAnimator);\n    animator.addClip(\"idle\", image, idleRects, 10, true);\n    animator.addClip(\"attack\", image, attackRects, 12, false);\n    animator.play(\"attack\", { onComplete: () => animator.play(\"idle\") });"
+						"ko": "스프라이트 애니메이터 컴포넌트.\n- 이름을 붙인 클립(프레임 시퀀스)을 등록해 두고 play(\"run\") 으로 전환한다.\n- 같은 클립을 다시 play 해도 재시작하지 않는다. (restartIfSame 옵션으로 바꿀 수 있다)\n- 클립이 끝나면 onComplete 콜백으로 다음 상태를 이어 갈 수 있다. (FSM 과 결합)\n- 같은 노드의 Sprite 컴포넌트에 현재 프레임(image + rect)을 반영한다.\n- 사용:\n    const animator = node.addComponent(SpriteAnimator);\n    animator.addClip(\"idle\", image, idleRects, 10, true);\n    animator.addClip(\"attack\", image, attackRects, 12, false);\n    SpriteAnimator.play(node, \"attack\", { onComplete: () => animator.playClip(\"idle\") });\n- 두 엔진이 같은 꼴: 정적 SpriteAnimator.play(node, clipName, options) 가 노드의 애니메이터로 틀고, 애니메이터만 있을 때(완료 콜백 안)는 playClip 이다.\n  (러스트 판 SpriteAnimator::play, play_clip) 인스턴스 play 는 playClip 과 같다.",
+						"en": "Sprite animator component.\n- Registers named clips (frame sequences) and switches with play(\"run\").\n- Playing the same clip again does not restart it. (can be changed with the restartIfSame option)\n- When a clip ends, the next state can follow via the onComplete callback. (combines with an FSM)\n- Applies the current frame (image + rect) to the Sprite component on the same node.\n- Usage:\n    const animator = node.addComponent(SpriteAnimator);\n    animator.addClip(\"idle\", image, idleRects, 10, true);\n    animator.addClip(\"attack\", image, attackRects, 12, false);\n    SpriteAnimator.play(node, \"attack\", { onComplete: () => animator.playClip(\"idle\") });\n- Same form in both engines: the static SpriteAnimator.play(node, clipName, options) plays with the node's animator, and playClip is for when only the animator is at hand (inside the complete callback).\n  (the Rust SpriteAnimator::play, play_clip) The instance play is the same as playClip."
 					},
 					"examples": [
 						{
@@ -75664,8 +75664,8 @@
 								}
 							},
 							"description": {
-								"ko": "재생.\n- 같은 클립이 이미 도는 중이면 다시 시작하지 않는다. (restartIfSame 이 참이면 재시작)",
-								"en": "Play.\n- Does not restart if the same clip is already playing. (restarts if restartIfSame is true)"
+								"ko": "재생. (playClip 과 같다)",
+								"en": "Play. (same as playClip)"
 							},
 							"since": "0.3.0",
 							"source": "src/misc/spriteanimator.js",
@@ -75674,6 +75674,48 @@
 								"module": "misc/spriteanimator",
 								"class": "SpriteAnimator",
 								"name": "play"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "playClip",
+							"signature": "playClip(clipName, options = {})",
+							"params": [
+								{
+									"name": "clipName",
+									"type": "string",
+									"description": {
+										"ko": "재생할 클립 이름. (등록하지 않은 이름이면 false)",
+										"en": "Name of the clip to play. (false if the name is not registered)"
+									}
+								},
+								{
+									"name": "options",
+									"type": "object",
+									"description": {
+										"ko": "{ onComplete?, restartIfSame = false }",
+										"en": "{ onComplete?, restartIfSame = false }"
+									}
+								}
+							],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "재생 시작 여부.",
+									"en": "Whether playback started."
+								}
+							},
+							"description": {
+								"ko": "애니메이터로 재생. (러스트 판 play_clip)\n- 같은 클립이 이미 도는 중이면 다시 시작하지 않는다. (restartIfSame 이 참이면 재시작)\n- 같은 노드의 Sprite 에 그 자리에서 첫 프레임을 넣는다.",
+								"en": "Play with the animator. (the Rust play_clip)\n- If the same clip is already playing, it does not restart. (restarts if restartIfSame is true)\n- Puts the first frame into the Sprite on the same node right away."
+							},
+							"since": "0.4.0",
+							"source": "src/misc/spriteanimator.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "misc/spriteanimator",
+								"class": "SpriteAnimator",
+								"name": "play_clip"
 							}
 						},
 						{
@@ -75863,8 +75905,8 @@
 						},
 						{
 							"kind": "static",
-							"name": "playOnNode",
-							"signature": "static playOnNode(node, clipName, options = {})",
+							"name": "play",
+							"signature": "static play(node, clipName, options = {})",
 							"params": [
 								{
 									"name": "node",
@@ -75899,16 +75941,16 @@
 								}
 							},
 							"description": {
-								"ko": "노드의 애니메이터로 재생. (정적, play 와 같다, 노드에 애니메이터가 없으면 false)",
-								"en": "Plays with the node's animator. (static, same as play, false if the node has no animator)"
+								"ko": "노드의 애니메이터로 재생. (정적, 같은 노드의 Sprite 에 그 자리에서 첫 프레임을 넣는다, 노드에 애니메이터가 없으면 false)",
+								"en": "Play with the node's animator. (static, puts the first frame into the Sprite on the same node right away, false if the node has no animator)"
 							},
-							"since": "0.4.0",
+							"since": "0.3.0",
 							"source": "src/misc/spriteanimator.js",
 							"counterpart": {
 								"engine": "vanilla-engine",
 								"module": "misc/spriteanimator",
 								"class": "SpriteAnimator",
-								"name": "play_on_node"
+								"name": "play"
 							}
 						}
 					]

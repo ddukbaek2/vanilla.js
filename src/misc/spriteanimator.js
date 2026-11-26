@@ -18,7 +18,9 @@ import { Rect } from "../base/rect.js";
 //     const animator = node.addComponent(SpriteAnimator);
 //     animator.addClip("idle", image, idleRects, 10, true);
 //     animator.addClip("attack", image, attackRects, 12, false);
-//     animator.play("attack", { onComplete: () => animator.play("idle") });
+//     SpriteAnimator.play(node, "attack", { onComplete: () => animator.playClip("idle") });
+// - 두 엔진이 같은 꼴: 정적 SpriteAnimator.play(node, clipName, options) 가 노드의 애니메이터로 틀고, 애니메이터만 있을 때(완료 콜백 안)는 playClip 이다.
+//   (러스트 판 SpriteAnimator::play, play_clip) 인스턴스 play 는 playClip 과 같다.
 //==============================================================================
 /**
  * @example <caption>대기 클립을 돌리다 누르면 공격 한 번 뒤 대기로 돌아가기</caption>
@@ -146,8 +148,7 @@ export class SpriteAnimator extends Component {
 	}
 
 	//==============================================================================
-	// 재생.
-	// - 같은 클립이 이미 도는 중이면 다시 시작하지 않는다. (restartIfSame 이 참이면 재시작)
+	// 재생. (playClip 과 같다)
 	//==============================================================================
 	/**
 	 * @param { string } clipName 재생할 클립 이름. (등록하지 않은 이름이면 false)
@@ -155,6 +156,20 @@ export class SpriteAnimator extends Component {
 	 * @returns { boolean } 재생 시작 여부.
 	 */
 	play(clipName, options = {}) {
+		return this.playClip(clipName, options);
+	}
+
+	//==============================================================================
+	// 애니메이터로 재생. (러스트 판 play_clip)
+	// - 같은 클립이 이미 도는 중이면 다시 시작하지 않는다. (restartIfSame 이 참이면 재시작)
+	// - 같은 노드의 Sprite 에 그 자리에서 첫 프레임을 넣는다.
+	//==============================================================================
+	/**
+	 * @param { string } clipName 재생할 클립 이름. (등록하지 않은 이름이면 false)
+	 * @param { object } options { onComplete?, restartIfSame = false }
+	 * @returns { boolean } 재생 시작 여부.
+	 */
+	playClip(clipName, options = {}) {
 		const clip = this.#clipTable.get(clipName);
 		if (!clip) {
 			return false;
@@ -279,7 +294,7 @@ export class SpriteAnimator extends Component {
 	}
 
 	//==============================================================================
-	// 노드의 애니메이터로 재생. (정적, play 와 같다, 노드에 애니메이터가 없으면 false)
+	// 노드의 애니메이터로 재생. (정적, 같은 노드의 Sprite 에 그 자리에서 첫 프레임을 넣는다, 노드에 애니메이터가 없으면 false)
 	//==============================================================================
 	/**
 	 * @param { object } node SpriteAnimator 를 붙인 노드.
@@ -287,12 +302,12 @@ export class SpriteAnimator extends Component {
 	 * @param { object } options { onComplete?, restartIfSame = false }
 	 * @returns { boolean } 재생 시작 여부.
 	 */
-	static playOnNode(node, clipName, options = {}) {
+	static play(node, clipName, options = {}) {
 		const spriteAnimator = node.getComponent(SpriteAnimator);
 		if (!spriteAnimator) {
 			return false;
 		}
-		const isStarted = spriteAnimator.play(clipName, options);
+		const isStarted = spriteAnimator.playClip(clipName, options);
 		return isStarted;
 	}
 }

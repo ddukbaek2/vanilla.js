@@ -1,6 +1,8 @@
 # 업데이트 기록
 
 # 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- SpriteAnimator: 러스트 판과 같은 꼴로 정적 SpriteAnimator.play(node, clipName, options)(옛 playOnNode, 노드의 애니메이터로 틀고 그 자리에서 첫 프레임을 넣음)와 인스턴스 playClip(clipName, options)(러스트 판 play_clip)을 둔다. 인스턴스 play 는 playClip 과 같다.
+  - 옮기는 법: SpriteAnimator.playOnNode(node, ...) 는 SpriteAnimator.play(node, ...) 로 바꾼다.
 - InputActions: 유니티 Input System 처럼 프레임 처음의 update 에서 한 번 갱신하고 그 프레임 안에서는 같은 값을 읽는다. readGamepadStick, readMoveAxis 도 읽을 때 입력 매니저를 다시 보지 않고 update 때 적은 이동 키와 패드 축을 읽는다. (러스트 판과 같다)
   - 옮기는 법: update 와 같은 프레임 안에서 키나 패드를 바꾼 뒤 바로 readMoveAxis 로 새 값을 기대하던 코드(시험)는 update 를 한 번 더 부른 뒤 읽는다.
 - 사인, 코사인, 탄젠트: 엔진 Math.sin, cos(테일러 급수 10 항 근사)와 tan(sin / cos)이 브라우저 Math.sin, cos, tan 을 그대로 부른다. 크롬 158 은 바르게 반올림한 값(참값에 가장 가까운 수)을 내고, 러스트 판이 같은 셈을 해 두 엔진이 같은 입력에 같은 비트를 낸다. 끝자리가 바뀐다. (예: sinusoidal.inOut 의 0.5 는 0.5000000000000017 이 아니라 0.49999999999999994, 타임라인 색 #ff000080 → #0000ffff 의 1 초는 #7f0080c0 이 아니라 #80007fc0)
