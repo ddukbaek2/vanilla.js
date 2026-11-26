@@ -1,6 +1,7 @@
 # 업데이트 기록
 
 # 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- 초안 물리 시험: tests/experimental/physics2d.test.mjs 에 러스트 판 물리 시험 셋(결정론 삼각 함수, 상자 쌓기 수렴과 잠, 광선과 거르기와 겹침 질의)을 같은 입력, 같은 기댓값으로 옮겼다
 - 초안 공간 나누기 시험: tests/experimental/spatial.test.mjs 에 러스트 판 DynamicTree 시험 둘(넣고 옮기고 빼기와 질의, 광선)을 같은 난수와 같은 기댓값으로 옮겼다. 러스트 판 CI 가 tests/experimental 의 시험을 모두 돌린다
 - 초안 타일맵 게터(Experimental tilemap): Tilemap.getTilesets, getLayers 는 얼린 사본 배열, Tileset.getTileOffset, getTileAnimation, getTileCollisionShapes 와 TilemapLayer.getColor, getOffset 은 사본을 돌려준다(러스트 판의 조각과 사본처럼, 밖에서 고쳐 첫 gid 표나 그리기와 어긋나지 않게). 고치려면 set 함수를 부른다
   - 옮기는 법: getLayers().push 같은 것은 addLayer, insertLayer, removeLayer 로, getOffset().x = 값 같은 것은 setOffset 으로 바꾼다.
