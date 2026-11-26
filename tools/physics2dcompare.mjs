@@ -4,7 +4,8 @@
 //         node tools/physics2dcompare.mjs --write <파일>       덤프를 파일에 쓴다. (러스트 저장소의 src/experimental/physics2d/comparison.txt)
 //         node tools/physics2dcompare.mjs --check <파일>       파일과 견준다. 다르면 첫 다른 줄을 찍고 끝 코드 1.
 // - 장면: 땅 선분과 사슬, 상자 피라미드, 튀는 공, 캡슐, 둥근 육각형, 회전 관절 사슬, 바퀴 관절 수레, 거리 용수철, 용접, 센서, 운동학 발판,
-//   충격과 순간 이동. 600 걸음(1/60 초, 하위 걸음 4) 동안 걸음마다 사건 수를 적고, 끝에 몸마다 자리, 회전, 속도를 f64 비트(16 진수)로 적는다.
+//   충격과 순간 이동. 600 걸음(1/60 초, 하위 걸음 4) 동안 걸음마다 사건 수를 적고, 100 걸음마다 질의(가장 가까운 광선, 모든 광선, 상자, 점, 모양 겹침)를 적고,
+//   끝에 몸마다 자리, 회전, 속도를 f64 비트(16 진수)로 적는다.
 // - 러스트 쪽은 src/experimental/physics2d/tests.rs 의 같은 장면이 이 파일과 견준다. (cargo test)
 //==============================================================================
 import { Vector2 } from "../import.js";
@@ -209,6 +210,31 @@ export function runComparisonScene() {
 				lineList.push("step " + stepIndex + " ray " + hit.shapeId.getIndex() + " " + toBits(hit.fraction) + " " + toBits(hit.point.x) + " " + toBits(hit.normal.x) + " " + toBits(hit.normal.y));
 			}
 			lineList.push("step " + stepIndex + " awake " + world.getAwakeBodyCount() + " contacts " + world.getContactCount());
+			// 질의: 모든 광선 맞음(돌려준 값 1 로 끝까지), 상자, 점, 모양 겹침. (부른 차례대로 모양 번호)
+			const rayHitList = [];
+			world.castRay(Vector2.create(-8, -3), Vector2.create(20, 2.5), queryFilter, (shapeId, point, normal, fraction) => {
+				rayHitList.push(shapeId.getIndex() + ":" + toBits(fraction) + ":" + toBits(point.y) + ":" + toBits(normal.x));
+				return 1;
+			});
+			lineList.push("step " + stepIndex + " rays " + rayHitList.join(" "));
+			const aabbList = [];
+			world.overlapAabb(E.AABB2D.create(-3, -4, 3, 0.5), queryFilter, (shapeId) => {
+				aabbList.push(shapeId.getIndex());
+				return true;
+			});
+			lineList.push("step " + stepIndex + " aabb " + aabbList.join(" "));
+			const pointList = [];
+			world.overlapPoint(Vector2.create(0.2, -0.5), queryFilter, (shapeId) => {
+				pointList.push(shapeId.getIndex());
+				return true;
+			});
+			lineList.push("step " + stepIndex + " point " + pointList.join(" "));
+			const shapeList = [];
+			world.overlapShape(E.Circle2D.create(Vector2.zero(), 1.2), Vector2.create(-1, -1.5), 0.3, queryFilter, (shapeId) => {
+				shapeList.push(shapeId.getIndex());
+				return shapeList.length < 4;
+			});
+			lineList.push("step " + stepIndex + " shape " + shapeList.join(" "));
 		}
 	}
 	for (const bodyId of world.getBodyIds()) {
