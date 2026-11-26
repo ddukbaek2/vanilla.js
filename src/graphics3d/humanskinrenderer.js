@@ -116,6 +116,7 @@ const vec2 POISSON_DISK[${SHADOW_SAMPLE_COUNT}] = vec2[](
 	vec2(0.700, 0.240), vec2(-0.450, 0.780), vec2(0.020, 0.930), vec2(-0.950, -0.300),
 	vec2(0.630, -0.740), vec2(-0.240, 0.060), vec2(0.280, 0.520), vec2(-0.610, -0.250));
 
+// 인터리브드 그래디언트 잡음. (Jorge Jimenez, SIGGRAPH 2014 "Next Generation Post Processing in Call of Duty: Advanced Warfare" 발표에 실린 식)
 float interleavedGradientNoise(vec2 screenPosition) {
 	return fract(52.9829189 * fract(dot(screenPosition, vec2(0.06711056, 0.00583715))));
 }
@@ -187,13 +188,37 @@ vec3 studioEnvironment(vec3 direction, float roughness) {
 	return environment;
 }
 
-// 환경 BRDF 근사. (Karis)
+// 환경 BRDF. (분할 합의 F0 크기와 치우침)
+// - GGX 분포, Smith Schlick-GGX 가림(k = alpha / 2, alpha = 거칠기 제곱), Schlick 프레넬의 적분을 거칠기 41 x N.V 41 칸에서 직접 셈하고(GGX 중요도 표본 16384), 엔진이 고른 꼴로 최소 제곱 맞춤했다.
+// - 꼴: 기저 (1, v, v^2, (1 - v)^5, (1 - v)^10, exp(-v / (0.03 + 0.5 r^2))) 마다 거칠기 r 의 5 차 다항식. 표와의 오차 실효값은 크기 0.002, 치우침 0.006.
+const float ENVIRONMENT_BRDF_SCALE[36] = float[36](
+	1.01699, -0.462087, -4.78649, 10.9375, -13.0907, 8.23938,
+	-0.0482927, 1.36293, 8.33234, -24.4386, 23.2876, -10.5187,
+	0.0336012, -0.970407, -3.42552, 14.9976, -17.5714, 7.66053,
+	-1.07537, 2.77434, -12.4562, 31.4601, -31.45, 11.1884,
+	0.133159, -5.46128, 30.5112, -65.0372, 60.8288, -21.0635,
+	-0.110087, 3.88285, -4.01684, -3.5935, 9.59612, -7.3835);
+const float ENVIRONMENT_BRDF_BIAS[36] = float[36](
+	0.255199, -7.48498, 49.5645, -116.779, 111.03, -37.5437,
+	-0.647375, 19.0528, -127.332, 306.515, -301.688, 105.404,
+	0.39846, -11.7169, 78.5122, -190.809, 190.983, -67.8913,
+	0.263929, 20.7049, -128.3, 269.923, -244.066, 81.3211,
+	0.773071, -19.3793, 86.5221, -162.018, 140.409, -46.3276,
+	-0.368092, 1.32691, 8.47847, -23.211, 23.5474, -8.63813);
+
 vec2 environmentBrdf(float roughness, float normalDotView) {
-	vec4 coefficient0 = vec4(-1.0, -0.0275, -0.572, 0.022);
-	vec4 coefficient1 = vec4(1.0, 0.0425, 1.04, -0.04);
-	vec4 roughnessTerm = roughness * coefficient0 + coefficient1;
-	float a004 = min(roughnessTerm.x * roughnessTerm.x, exp2(-9.28 * normalDotView)) * roughnessTerm.x + roughnessTerm.y;
-	return vec2(-1.04, 1.04) * a004 + roughnessTerm.zw;
+	float clampedRoughness = clamp(roughness, 0.0, 1.0);
+	float fresnelTerm = pow(clamp(1.0 - normalDotView, 0.0, 1.0), 5.0);
+	float basisList[6] = float[6](1.0, normalDotView, normalDotView * normalDotView, fresnelTerm, fresnelTerm * fresnelTerm, exp(-normalDotView / (0.03 + 0.5 * clampedRoughness * clampedRoughness)));
+	vec2 result = vec2(0.0);
+	for (int basisIndex = 0; basisIndex < 6; basisIndex++) {
+		vec2 polynomial = vec2(0.0);
+		for (int powerIndex = 5; powerIndex >= 0; powerIndex--) {
+			polynomial = polynomial * clampedRoughness + vec2(ENVIRONMENT_BRDF_SCALE[basisIndex * 6 + powerIndex], ENVIRONMENT_BRDF_BIAS[basisIndex * 6 + powerIndex]);
+		}
+		result += polynomial * basisList[basisIndex];
+	}
+	return max(result, vec2(0.0));
 }
 
 vec3 hemisphereAmbient(vec3 direction) {

@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+// 옮긴 원문: 크로미엄 third_party/blink/renderer/modules/webaudio/panner_handler.cc, third_party/blink/renderer/platform/audio/distance_effect.cc, cone_effect.cc, equal_power_panner.cc, ui/gfx/geometry/vector3d_f.cc 에서 옮김, BSD-3-Clause, THIRD_PARTY_LICENSES.md
 const System = globalThis;
 import { Vector3 } from "../../base/vector3.js";
 

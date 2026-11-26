@@ -43,6 +43,7 @@ vec3 reconstructViewPosition(vec2 textureCoordinate, float linearDepth) {
 	return vec3(normalized * projectionScale * linearDepth, -linearDepth);
 }
 
+// 인터리브드 그래디언트 잡음. (Jorge Jimenez, SIGGRAPH 2014 "Next Generation Post Processing in Call of Duty: Advanced Warfare" 발표에 실린 식)
 float interleavedGradientNoise(vec2 screenPosition) {
 	return fract(52.9829189 * fract(dot(screenPosition, vec2(0.06711056, 0.00583715))));
 }

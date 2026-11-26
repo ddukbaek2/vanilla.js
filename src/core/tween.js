@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+// 옮긴 원문: tween.js 와 Robert Penner 의 이징 식에서 옮김, MIT 와 BSD-3-Clause, THIRD_PARTY_LICENSES.md
 const System = globalThis;
 import { Object } from "../base/object.js";
 import * as Math from "../base/math.js";

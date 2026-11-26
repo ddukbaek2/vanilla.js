@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+// 옮긴 원문: Separable SSS(Jorge Jimenez, Diego Gutierrez) 의 커널에서 옮김, BSD-2-Clause 꼴(표기 조건 있음), THIRD_PARTY_LICENSES.md
 const System = globalThis;
 import { Object } from "../base/object.js";
 import { RenderTarget } from "./rendertarget.js";

@@ -174,6 +174,24 @@ async function build(script, input, output, template) {
 	execSync(esbuildCommand, { stdio: 'inherit' });
 	console.log(`[3] 번들 완료: ${bundleDest}`);
 
+	// 4. 엔진 라이선스 두 파일 복사. (번들에 엔진 코드와 엔진이 옮긴 제3자 코드가 실리므로 고지를 같이 낸다)
+	// - 출력 맨 위에 LICENSE, THIRD_PARTY_LICENSES.md 로 둔다. 템플릿이나 게임이 같은 이름의 파일을 이미 냈으면 덮지 않고 licenses/vanilla.js/ 아래에 둔다.
+	const engineDir = path.resolve(__dirname, '..');
+	for (const licenseFileName of ['LICENSE', 'THIRD_PARTY_LICENSES.md']) {
+		const licenseSrc = path.join(engineDir, licenseFileName);
+		if (!fs.existsSync(licenseSrc)) {
+			console.warn(`[4] 엔진 라이선스 파일 없음 (건너뜀): ${licenseSrc}`);
+			continue;
+		}
+		let licenseDest = path.join(outputDir, licenseFileName);
+		if (fs.existsSync(licenseDest)) {
+			licenseDest = path.join(outputDir, 'licenses', 'vanilla.js', licenseFileName);
+			fs.mkdirSync(path.dirname(licenseDest), { recursive: true });
+		}
+		fs.copyFileSync(licenseSrc, licenseDest);
+		console.log(`[4] 엔진 라이선스 복사 완료: ${licenseSrc} -> ${licenseDest}`);
+	}
+
 	console.log(`\n빌드 완료: ${outputDir}`);
 }
 

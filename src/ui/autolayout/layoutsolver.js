@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+// 옮긴 원문: Kiwi(Nucleic Development Team) 의 dual simplex 솔버에서 옮김, BSD-3-Clause, THIRD_PARTY_LICENSES.md
 const System = globalThis;
 import { LayoutVariable } from "./layoutvariable.js";
 import { LayoutTerm } from "./layoutterm.js";
