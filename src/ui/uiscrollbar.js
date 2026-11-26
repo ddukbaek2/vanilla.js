@@ -94,6 +94,7 @@ export class UIScrollBar extends WorldNode {
 	/** @private @type { Vector2 } */ #dragStartScrollOffset;
 	/** @private @type { number } */ #minThumbSize;
 	/** @private @type { boolean } */ #autoHide;       // 콘텐트가 가시영역에 들어오면 트랙까지 숨길지.
+	/** @private @type { boolean } */ #isAutoHidden;   // 자동 숨김으로 숨어 있는지. (노드는 켜 둔 채 그리지 않고 누름도 받지 않는다)
 
 	//==============================================================================
 	// 생성.
@@ -107,6 +108,7 @@ export class UIScrollBar extends WorldNode {
 		this.#dragStartScrollOffset = Vector2.zero();
 		this.#minThumbSize = 24;
 		this.#autoHide = true;
+		this.#isAutoHidden = false;
 
 		this.setPivot(Pivot.topLeft);
 		this.setAnchor(Pivot.topLeft);
@@ -252,10 +254,49 @@ export class UIScrollBar extends WorldNode {
 	// 자동 숨김 설정. (콘텐트가 가시영역에 들어오면 트랙까지 숨김)
 	//==============================================================================
 	/**
-	 * @param { boolean } autoHide 참이면 스크롤할 것이 없을 때 스크롤바 노드까지 끈다. (기본 참, 거짓이면 썸만 끈다)
+	 * @param { boolean } autoHide 참이면 스크롤할 것이 없을 때 트랙까지 숨긴다. (기본 참, 거짓이면 썸만 끈다, 노드는 켜 둔 채 숨겨 콘텐트가 길어지거나 끄면 다음 갱신에 다시 보인다)
 	 */
 	setAutoHide(autoHide) {
 		this.#autoHide = autoHide;
+	}
+
+	//==============================================================================
+	// 자동 숨김으로 숨어 있는지 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 스크롤할 것이 없어 자동 숨김으로 트랙까지 숨어 있으면 참.
+	 */
+	isAutoHidden() {
+		return this.#isAutoHidden;
+	}
+
+	//==============================================================================
+	// 가시 상태 반환. (자동 숨김으로 숨어 있으면 거짓)
+	//==============================================================================
+	/**
+	 * @override
+	 * @returns { boolean } 켜져 있고 로컬 투명도가 0 보다 크고 자동 숨김으로 숨지 않았으면 참.
+	 */
+	isVisible() {
+		if (this.isAutoHidden()) {
+			return false;
+		}
+		return super.isVisible();
+	}
+
+	//==============================================================================
+	// 자리가 노드 안인지. (자동 숨김으로 숨어 있으면 누름을 받지 않는다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @param { Vector2 } viewPosition 볼 자리. (뷰 좌표)
+	 * @returns { boolean } 노드 안이면 참. (자동 숨김으로 숨어 있으면 늘 거짓)
+	 */
+	contains(viewPosition) {
+		if (this.isAutoHidden()) {
+			return false;
+		}
+		return super.contains(viewPosition);
 	}
 
 	//==============================================================================
@@ -296,14 +337,13 @@ export class UIScrollBar extends WorldNode {
 		const offsetAlongAxis = isVertical ? offset.y : offset.x;
 
 		// 콘텐트가 가시 영역 이내면 스크롤 불필요.
+		// 노드를 끄면 갱신이 멈춰 다시 켜지 못하므로, 켜 둔 채 숨긴다. (콘텐트가 길어지거나 자동 숨김을 끄면 다음 갱신에 다시 보인다)
 		if (contentLength <= viewportLength || trackLength <= 0) {
 			this.#thumbNode.setActive(false);
-			if (this.#autoHide) {
-				this.setActive(false);
-			}
+			this.#isAutoHidden = this.#autoHide;
 			return;
 		}
-		this.setActive(true);
+		this.#isAutoHidden = false;
 		this.#thumbNode.setActive(true);
 
 		const ratio = viewportLength / contentLength;
