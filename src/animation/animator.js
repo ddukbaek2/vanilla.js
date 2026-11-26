@@ -458,6 +458,53 @@ export class AnimationTransition extends Object {
  * animator.tick(0.125);
  * const frame = animator.getCurrentFrame();
  * console.log(animator.getCurrentStateIndex(), animator.isInTransition(), frame.position.y);
+ * @example <caption>트리거로 어느 상태에서나(Any State) 넘어가는 피격과 종료 시각으로 돌아오기</caption>
+ * import { Animator, AnimationState, AnimationTransition, AnimationClip, AnimationConditionMode, Rect } from "./build/vanilla.js";
+ *
+ * const createState = (duration, isLoop) => {
+ * 	const clip = new AnimationClip();
+ * 	clip.setFrames([Rect.create(0, 0, 32, 32), Rect.create(32, 0, 32, 32)]);
+ * 	clip.setDuration(duration);
+ * 	clip.setLoop(isLoop);
+ * 	const state = new AnimationState();
+ * 	state.setClip(clip);
+ * 	return state;
+ * };
+ *
+ * const animator = new Animator();
+ * const idleIndex = animator.addState(createState(1, true));
+ * const runIndex = animator.addState(createState(0.5, true));
+ * const hitIndex = animator.addState(createState(0.5, false));
+ * const toRun = new AnimationTransition();
+ * toRun.setFrom(idleIndex);
+ * toRun.setTo(runIndex);
+ * toRun.addCondition("isRunning", AnimationConditionMode.if);
+ * animator.addTransition(toRun);
+ * const anyToHit = new AnimationTransition();
+ * anyToHit.setTo(hitIndex);
+ * anyToHit.setCanTransitionToSelf(false);
+ * anyToHit.addCondition("hit", AnimationConditionMode.if);
+ * animator.addTransition(anyToHit);
+ * const hitToIdle = new AnimationTransition();
+ * hitToIdle.setFrom(hitIndex);
+ * hitToIdle.setTo(idleIndex);
+ * hitToIdle.setExitTime(1);
+ * animator.addTransition(hitToIdle);
+ *
+ * animator.setBool("isRunning", true);
+ * animator.tick(0.1);
+ * console.log(animator.getCurrentStateIndex() === runIndex);
+ * animator.setTrigger("hit");
+ * animator.tick(0.1);
+ * console.log(animator.getCurrentStateIndex() === hitIndex, animator.getTrigger("hit"));
+ *
+ * animator.setTrigger("hit");
+ * animator.tick(0.1);
+ * console.log(animator.getCurrentStateIndex() === hitIndex, animator.getTrigger("hit"));
+ * animator.resetTrigger("hit");
+ * animator.setBool("isRunning", false);
+ * animator.tick(0.5);
+ * console.log(animator.getCurrentStateIndex() === idleIndex);
  */
 export class Animator extends Object {
 	//==============================================================================
