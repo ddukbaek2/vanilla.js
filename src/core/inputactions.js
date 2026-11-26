@@ -25,6 +25,7 @@ const MOVE_DOWN_KEYS = ["KeyS", "ArrowDown"];
 // 입력 동작.
 // - 동작 이름("confirm", "left" 같은 게임이 정한 글)에 키, 게임패드 단추, 게임패드 축의 한쪽을 묶는다. 한 동작에 여럿을 묶을 수 있고, 하나라도 눌렸으면 눌린 것이다.
 // - 엔진의 InputManager 가 하나 들고(getInputActions) 프레임 첫머리의 tick 에서 update 를 부른다. 게임은 읽기만 한다.
+// - 유니티 Input System 처럼 프레임 처음의 update 에서 한 번 갱신하고, 그 프레임 안의 읽기(readGamepadStick, readMoveAxis 도)는 그때 적은 값이다. (러스트 판과 같다)
 // - 키는 프레임 사이에 눌렀다 뗀 것도 그 프레임에 한 번 눌린 것으로 본다. (InputManager.isKeyJustPressed)
 // - setRepeat 를 건 동작은 누르고 있으면 기다린 뒤부터 간격마다 isJustPressed 가 다시 참이 된다. (메뉴 고르기)
 // - 축은 죽은 구역(setDeadZone)을 빼고 나머지를 0 ~ 1 로 다시 편다. 스틱은 길이로, 묶은 축은 한쪽 값으로 거른다.
@@ -86,7 +87,8 @@ export class InputActions extends Object {
 	/** @private @type { number } */ #axisPressThreshold;
 	/** @private @type { boolean } */ #isKeysIgnoredWhileTyping;
 	/** @private @type { boolean } */ #isTyping; // 이번 프레임에 글자 입력칸에 쓰는 중인지.
-	/** @private @type { object | null } */ #inputManager; // 마지막 update 에 받은 입력 매니저.
+	/** @private @type { Vector2 } */ #keyMoveAxis; // 이번 프레임의 이동 키 축. (대각선도 길이 1)
+	/** @private @type { number[][] } */ #gamepadAxisList; // 이번 프레임에 연결된 패드마다 축 0 ~ 3 의 값.
 	/** @private @type { Vector2 } */ #sourceMoveAxis; // 이번 프레임에 바깥 입력원이 준 이동 축 가운데 가장 긴 것.
 
 	//==============================================================================
@@ -104,7 +106,8 @@ export class InputActions extends Object {
 		this.#axisPressThreshold = DEFAULT_AXIS_PRESS_THRESHOLD;
 		this.#isKeysIgnoredWhileTyping = true;
 		this.#isTyping = false;
-		this.#inputManager = null;
+		this.#keyMoveAxis = Vector2.zero();
+		this.#gamepadAxisList = [];
 		this.#sourceMoveAxis = Vector2.zero();
 	}
 
@@ -342,7 +345,6 @@ export class InputActions extends Object {
 	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
 	 */
 	update(inputManager, timeDelta) {
-		this.#inputManager = inputManager;
 		const isTypingInTextField = inputManager.isTypingInTextField();
 		this.#isTyping = this.#isKeysIgnoredWhileTyping && isTypingInTextField;
 		const gamepadManager = inputManager.getGamepadManager();
@@ -455,6 +457,37 @@ export class InputActions extends Object {
 		}
 		this.#sourceMoveAxis = sourceMoveAxis;
 
+		// 이동 키. (대각선도 길이 1)
+		let keyMoveAxis = Vector2.zero();
+		if (!this.#isTyping) {
+			const isAnyKeyPressed = (keys) => {
+				for (const key of keys) {
+					if (inputManager.isKeyPressed(key)) {
+						return true;
+					}
+				}
+				return false;
+			};
+			const directionX = (isAnyKeyPressed(MOVE_RIGHT_KEYS) ? 1 : 0) - (isAnyKeyPressed(MOVE_LEFT_KEYS) ? 1 : 0);
+			const directionY = (isAnyKeyPressed(MOVE_DOWN_KEYS) ? 1 : 0) - (isAnyKeyPressed(MOVE_UP_KEYS) ? 1 : 0);
+			const keyLength = System.Math.hypot(directionX, directionY);
+			if (keyLength > 0) {
+				keyMoveAxis = Vector2.create(directionX / keyLength, directionY / keyLength);
+			}
+		}
+		this.#keyMoveAxis = keyMoveAxis;
+
+		// 연결된 패드의 축. (readGamepadStick 이 읽는다)
+		const gamepadAxisList = [];
+		for (const gamepad of gamepads) {
+			const axisValueList = [];
+			for (let axisIndex = 0; axisIndex < 4; ++axisIndex) {
+				axisValueList.push(gamepadManager.getAxisValue(gamepad.index, axisIndex));
+			}
+			gamepadAxisList.push(axisValueList);
+		}
+		this.#gamepadAxisList = gamepadAxisList;
+
 		// 바깥 입력원이 입력을 넣었으면 마지막 장치는 그 패드다.
 		if (typeof sourceGamepadKind === "string" && sourceGamepadKind !== "") {
 			inputManager.setLastInputDevice(InputDevice.gamepad);
@@ -473,6 +506,8 @@ export class InputActions extends Object {
 			state.repeatSeconds = 0;
 			state.isRepeatFired = false;
 		}
+		this.#keyMoveAxis = Vector2.zero();
+		this.#gamepadAxisList = [];
 		this.#sourceMoveAxis = Vector2.zero();
 	}
 
@@ -550,17 +585,10 @@ export class InputActions extends Object {
 	 * @returns { Vector2 } 스틱 벡터. (길이 0 ~ 1, 오른쪽 +x 아래 +y, update 전이면 (0, 0))
 	 */
 	readGamepadStick(xAxisIndex, yAxisIndex) {
-		const inputManager = this.#inputManager;
 		let stickVector = Vector2.zero();
-		if (inputManager === null) {
-			return stickVector;
-		}
-		const gamepadManager = inputManager.getGamepadManager();
-		const gamepads = gamepadManager.getAllConnectedGamepads();
-		for (const gamepad of gamepads) {
-			const gamepadIndex = gamepad.index;
-			const axisX = gamepadManager.getAxisValue(gamepadIndex, xAxisIndex);
-			const axisY = gamepadManager.getAxisValue(gamepadIndex, yAxisIndex);
+		for (const axisValueList of this.#gamepadAxisList) {
+			const axisX = axisValueList[xAxisIndex] ?? 0;
+			const axisY = axisValueList[yAxisIndex] ?? 0;
 			const length = System.Math.hypot(axisX, axisY);
 			const scaledLength = this.applyDeadZone(length);
 			const currentLength = System.Math.hypot(stickVector.x, stickVector.y);
@@ -573,33 +601,13 @@ export class InputActions extends Object {
 
 	//==============================================================================
 	// 이동 축. (WASD 와 방향키, 왼쪽 스틱, 바깥 입력원의 이동 축 가운데 가장 긴 것, 길이 1 이하, 오른쪽 +x 아래 +y)
-	// - 키는 대각선도 길이 1 이다. 글자 입력칸에 쓰는 동안은 키를 듣지 않는다.
+	// - 키는 대각선도 길이 1 이다. 글자 입력칸에 쓰는 동안은 키를 듣지 않는다. 값은 이번 프레임 update 때 적은 것이다.
 	//==============================================================================
 	/**
 	 * @returns { Vector2 } 이동 벡터. (길이 0 ~ 1, 오른쪽 +x 아래 +y, update 전이면 (0, 0))
 	 */
 	readMoveAxis() {
-		const inputManager = this.#inputManager;
-		if (inputManager === null) {
-			return Vector2.zero();
-		}
-		let moveVector = Vector2.zero();
-		if (!this.#isTyping) {
-			const isAnyKeyPressed = (keys) => {
-				for (const key of keys) {
-					if (inputManager.isKeyPressed(key)) {
-						return true;
-					}
-				}
-				return false;
-			};
-			const directionX = (isAnyKeyPressed(MOVE_RIGHT_KEYS) ? 1 : 0) - (isAnyKeyPressed(MOVE_LEFT_KEYS) ? 1 : 0);
-			const directionY = (isAnyKeyPressed(MOVE_DOWN_KEYS) ? 1 : 0) - (isAnyKeyPressed(MOVE_UP_KEYS) ? 1 : 0);
-			const keyLength = System.Math.hypot(directionX, directionY);
-			if (keyLength > 0) {
-				moveVector = Vector2.create(directionX / keyLength, directionY / keyLength);
-			}
-		}
+		let moveVector = Vector2.create(this.#keyMoveAxis.x, this.#keyMoveAxis.y);
 		const stickVector = this.readGamepadStick(GamepadAnalogStickCode.LEFT_X, GamepadAnalogStickCode.LEFT_Y);
 		const candidateVectors = [stickVector, this.#sourceMoveAxis];
 		for (const candidateVector of candidateVectors) {
