@@ -1,6 +1,6 @@
 # 트윈과 타임라인
 
-시간에 따라 값을 바꾸는 방법을 다룹니다. 값이나 노드 속성을 시작값에서 목표값으로 옮기는 `Tween`, 프레임 그림을 넘기는 `Animation` 과 `SpriteAnimator`, Timeline Editor 가 저장한 문서를 재생하는 `Timeline`, 그리고 상태 묶음인 `Animator` 차례입니다. 노드 자체는 "노드와 컴포넌트" 장, 3D 모델의 본 애니메이션은 "3D" 장, 편집기는 "저작 도구" 장에서 다룹니다.
+시간에 따라 값을 바꾸는 방법을 다룹니다. 값이나 노드 속성을 시작값에서 목표값으로 옮기는 `Tween`, 프레임 그림을 넘기는 `Animation` 과 `SpriteAnimator`, Timeline Editor 가 저장한 문서를 재생하는 `Timeline`, 그리고 상태 기계인 `Animator` 차례입니다. 노드 자체는 "노드와 컴포넌트" 장, 3D 모델의 본 애니메이션은 "3D" 장, 편집기는 "저작 도구" 장에서 다룹니다.
 
 ## Tween
 
@@ -392,38 +392,53 @@ engine.run(new BindScene());
 
 ## Animator
 
-`Animator`, `AnimationState`, `AnimationTransition`, `AnimationClip` 은 실험 단계의 클래스입니다. 지금은 상태와 전환, 프로퍼티를 담아 두는 그릇입니다.
+`Animator`, `AnimationState`, `AnimationTransition`, `AnimationClip` 은 실험 단계의 클래스입니다. 상태마다 프레임 클립을 달고, 매개변수 조건으로 상태를 옮기며 두 상태를 섞는 상태 기계입니다. (유니티 Animator 의 상태 기계와 같은 뼈대)
 
-- `animator.addState(state)` 와 `addTransition(transition)` 은 목록에 넣고 번호를 돌려줍니다. `getStates()`, `getTransitions()` 는 엔진의 `List` 를 돌려줍니다.
-- `AnimationState.setClip(clip)` 은 상태에 `AnimationClip` 을 답니다. `AnimationTransition` 은 `setFrom(stateIndex)`, `setTo(stateIndex)` 로 두 상태 번호를 잇습니다.
-- `setProperty(name, value)`, `getProperty(name)` 은 이름 붙은 값을 담습니다.
+- `animator.addState(state)` 와 `addTransition(transition)` 은 목록에 넣고 번호를 돌려줍니다. `getStates()`, `getTransitions()` 는 엔진의 `List` 를 돌려줍니다. 처음 더한 상태에서 시작합니다.
+- `AnimationState` 는 클립(`setClip`), 속도(`setSpeed`), 되풀이(`setLoop`, `null` 이면 클립을 따름)를 담습니다.
+- `AnimationTransition` 은 `setFrom(stateIndex)`, `setTo(stateIndex)` 로 두 상태를 잇습니다. `setFrom(null)` 이면 어느 상태에서나 탑니다(Any State). `addCondition(이름, AnimationConditionMode, 기준 값)` 으로 조건을 더하고, `setExitTime(정규화 시간)` 이면 그 시각을 지날 때만, `setDuration(초)` 동안 두 상태를 섞습니다.
+- 매개변수는 `setFloat`, `setInteger`, `setBool`, `setTrigger` 로 넣습니다. 조건에 쓴 트리거는 전이를 타면 풀립니다.
+- `animator.tick(timeDelta)` 가 상태 시간을 흘리고, Any State 전이부터 넣은 차례로 보아 처음 맞는 하나를 탑니다. 섞는 동안에는 새 전이를 보지 않습니다.
+- 고른 프레임은 `getCurrentFrame()`, 섞는 중이면 `getNextFrame()` 과 `getTransitionWeight()` 로 읽습니다.
 - `AnimationClip` 은 프레임 영역 목록, 길이(초), 반복 여부를 담습니다. `AnimationClip.fromAtlas(atlasJson, frameIds, framesPerSecond, isLoop)` 는 아틀라스 표에서 영역을 뽑고 길이를 프레임 수 나누기 초당 프레임 수로 정합니다.
-- `animator.tick(timeDelta)` 는 안의 `Animation`(`getAnimation()`)만 갱신합니다. 전환에는 조건을 거는 자리가 없고, 상태를 스스로 바꾸지도 않습니다.
 
 ```javascript
-import { Animator, AnimationState, AnimationTransition, AnimationClip } from "./build/vanilla.js";
+import { Animator, AnimationState, AnimationTransition, AnimationClip, AnimationConditionMode, Rect } from "./build/vanilla.js";
+
+const walkClip = new AnimationClip();
+walkClip.setFrames([Rect.create(0, 0, 32, 32), Rect.create(32, 0, 32, 32)]);
+walkClip.setDuration(1);
+walkClip.setLoop(true);
+const runClip = AnimationClip.fromAtlas({ frames: { run0: { frame: { x: 0, y: 32, w: 32, h: 32 } }, run1: { frame: { x: 32, y: 32, w: 32, h: 32 } } } }, ["run0", "run1"], 4, true);
 
 const animator = new Animator();
-const idleClip = AnimationClip.fromAtlas({ frames: { idle0: { frame: { x: 0, y: 0, w: 200, h: 200 } } } }, ["idle0"], 10, true);
-const runClip = new AnimationClip();
-runClip.setLoop(true);
-const idleState = new AnimationState();
-idleState.setClip(idleClip);
+const walkState = new AnimationState();
+walkState.setClip(walkClip);
 const runState = new AnimationState();
 runState.setClip(runClip);
-const idleIndex = animator.addState(idleState);
+const walkIndex = animator.addState(walkState);
 const runIndex = animator.addState(runState);
-const transition = new AnimationTransition();
-transition.setFrom(idleIndex);
-transition.setTo(runIndex);
-animator.addTransition(transition);
-animator.setProperty("speed", 2);
-animator.tick(1 / 60);
-const states = animator.getStates();
-console.log(states.getCount(), idleClip.getDuration(), animator.getProperty("speed"));
+const toRun = new AnimationTransition();
+toRun.setFrom(walkIndex);
+toRun.setTo(runIndex);
+toRun.setDuration(0.25);
+toRun.addCondition("speed", AnimationConditionMode.greater, 3);
+animator.addTransition(toRun);
+const toWalk = new AnimationTransition();
+toWalk.setFrom(runIndex);
+toWalk.setTo(walkIndex);
+toWalk.addCondition("speed", AnimationConditionMode.less, 1);
+animator.addTransition(toWalk);
+
+animator.setFloat("speed", 5);
+animator.tick(0.125);
+console.log(animator.getCurrentStateIndex(), animator.getNextStateIndex(), animator.getTransitionWeight());
+animator.tick(0.25);
+const frame = animator.getCurrentFrame();
+console.log(animator.getCurrentStateIndex(), animator.isInTransition(), frame.position.y);
 ```
 
-캐릭터의 상태에 따라 클립을 바꾸는 일은 지금은 `FiniteStateMachine` 과 `SpriteAnimator` 를 함께 써서 합니다. 상태의 `enter` 에서 `play` 를 부르는 식입니다.
+`Animator` 는 프레임 영역만 고르고 그리지 않으므로, 고른 영역은 게임이 `Sprite` 에 겁니다. 캐릭터의 상태에 따라 클립만 바꾸는 간단한 일은 `FiniteStateMachine` 과 `SpriteAnimator` 를 함께 써도 됩니다. 상태의 `enter` 에서 `play` 를 부르는 식입니다.
 
 ```javascript
 import { Engine, EngineConfiguration, Scene, WorldNode, Sprite, SpriteAnimator, FiniteStateMachine, ImageAsset, Vector2, Rect } from "./build/vanilla.js";
