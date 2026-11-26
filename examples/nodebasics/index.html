@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../assets/favicon.svg">
+<title>Node Basics</title>
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #1e1915; touch-action: none; user-select: none; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 노드와 컴포넌트 예제. (러스트 예제 nodebasics 와 같은 장면, README 의 "노드와 컴포넌트" 코드를 사각형 셋과 제목으로 늘린 것)
+// - 씬의 노드 트리에 노드를 만들고 Paint, Text 와 직접 만든 Spin 컴포넌트를 붙인다.
+//==============================================================================
+const { Engine, EngineConfiguration, Scene, WorldNode, Component, Paint, Text, TextAlign, Pivot, Vector2, Rect } = await import("../../import.js");
+
+// 배경색.
+const BACKGROUND_COLOR = "#1e1915";
+
+//==============================================================================
+// 노드를 돌리는 컴포넌트.
+//==============================================================================
+class Spin extends Component {
+	/** @private @type { number } */ #degreesPerSecond;
+
+	/**
+	 * @constructor
+	 */
+	constructor() {
+		super();
+		this.setComponentType("Spin");
+		this.#degreesPerSecond = 0;
+	}
+
+	//==============================================================================
+	// 초당 도는 각도 설정.
+	//==============================================================================
+	/**
+	 * @param { number } degreesPerSecond
+	 */
+	setDegreesPerSecond(degreesPerSecond) {
+		this.#degreesPerSecond = degreesPerSecond;
+	}
+
+	//==============================================================================
+	// 주기적 갱신. (자기 노드를 돌린다)
+	//==============================================================================
+	/**
+	 * @param { number } timeDelta
+	 */
+	tick(timeDelta) {
+		const node = this.getNode();
+		node.setLocalRotation(node.getLocalRotation() + this.#degreesPerSecond * timeDelta);
+	}
+}
+
+//==============================================================================
+// 첫 씬.
+//==============================================================================
+class MainScene extends Scene {
+	//==============================================================================
+	// 생성. (노드 트리를 만든다)
+	//==============================================================================
+	create() {
+		super.create();
+		const root = this.getRoot();
+
+		// 도는 사각형 셋.
+		for (let squareIndex = 0; squareIndex < 3; squareIndex++) {
+			const squareNode = new WorldNode();
+			squareNode.setName("square");
+			squareNode.setLocalPosition(Vector2.create(340 + squareIndex * 300, 380));
+			squareNode.setContentSize(Vector2.create(160, 160));
+			squareNode.setPivot(Pivot.middleCenter);
+			const paint = squareNode.addComponent(Paint);
+			paint.setColor("#f3e5ab");
+			const spin = squareNode.addComponent(Spin);
+			spin.setDegreesPerSecond(45 * (squareIndex + 1));
+			root.addChild(squareNode);
+		}
+
+		// 제목 글자.
+		const titleNode = new WorldNode();
+		titleNode.setName("title");
+		titleNode.setLocalPosition(Vector2.create(64, 64));
+		titleNode.setPivot(Pivot.topLeft);
+		titleNode.setContentSize(Vector2.create(800, 60));
+		const titleText = titleNode.addComponent(Text);
+		titleText.setText("바닐라엔진");
+		titleText.setFontSize(48);
+		titleText.setTextColor("#f3e5ab");
+		titleText.setTextAlign(TextAlign.left);
+		root.addChild(titleNode);
+	}
+
+	//==============================================================================
+	// 이전 출력. (캔버스 전체를 배경색으로 칠하고 기준 해상도 좌표계를 건다)
+	//==============================================================================
+	/**
+	 * @param { object } graphic
+	 */
+	preDraw(graphic) {
+		super.preDraw(graphic);
+		const viewManager = this.getEngine().getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(BACKGROUND_COLOR);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		viewManager.applyViewRect(graphic);
+	}
+}
+
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.autoResizeOnWindowResize = true;
+engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+engineConfiguration.useStatistics = false;
+const engine = new Engine(engineConfiguration);
+engine.run(new MainScene());
+</script>
+</body>
+</html>
