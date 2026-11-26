@@ -7975,6 +7975,30 @@
 			"vanilla-engine": {
 				"module": "core/engine",
 				"class": "Engine",
+				"name": "get_graphic"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "getGraphic"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "get_graphic_mut"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "getGraphic"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
 				"name": "is_text_input_focused"
 			},
 			"vanilla.js": {

@@ -9883,7 +9883,13 @@
 								"en": "Returns the renderer."
 							},
 							"since": "0.0.9",
-							"source": "src/core/engine.js"
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "get_graphic"
+							}
 						},
 						{
 							"kind": "method",
