@@ -20,6 +20,25 @@ const TEXTURE_UNIT_OPACITY = 8;
 
 
 //==============================================================================
+// 밉맵까지 든 RGBA8 텍스처 바이트 수. (바닥 단계부터 1x1 까지 가로, 세로를 반씩 줄여 더한다)
+//==============================================================================
+function computeMipmapByteCount(width, height) {
+	let byteCount = 0;
+	let levelWidth = System.Math.max(1, width);
+	let levelHeight = System.Math.max(1, height);
+	while (true) {
+		byteCount += levelWidth * levelHeight * 4;
+		if (levelWidth === 1 && levelHeight === 1) {
+			break;
+		}
+		levelWidth = System.Math.max(1, System.Math.floor(levelWidth / 2));
+		levelHeight = System.Math.max(1, System.Math.floor(levelHeight / 2));
+	}
+	return byteCount;
+}
+
+
+//==============================================================================
 // 머티리얼. (셰이더 템플릿 참조 + metallic-roughness PBR 파라미터/텍스처, 포맷 중립)
 // - 셰이더(템플릿)를 참조하는 인스턴스로, 모델은 머티리얼 인스턴스를 적용만 한다.
 // - 임포터가 만든 중립 머티리얼 서술(팩터 + 이미지 바이트)로부터 GL 텍스처를 생성한다.
@@ -65,6 +84,8 @@ export class Material extends Object {
 	/** @private @type { WebGLTexture } */ #opacityTexture;
 	/** @private @type { Map<string, [number, WebGLTexture]> } */ #extraTextureBindings;
 	/** @private @type { number } */ #subsurfaceFactor;
+	/** @private @type { boolean } */ #ownsTextures; // 기본 슬롯 텍스처를 이 머티리얼이 지었는지. (createInstance 로 갈라진 사본은 원본 것을 빌려 쓴다)
+	/** @private @type { number } */ #textureByteCount; // 이 머티리얼이 지은 기본 슬롯 텍스처의 GPU 바이트 수. (밉맵 포함)
 
 	//==============================================================================
 	// 생성.
@@ -95,6 +116,8 @@ export class Material extends Object {
 		this.#emissiveTexture = null;
 		this.#specularTexture = null;
 		this.#opacityTexture = null;
+		this.#ownsTextures = true;
+		this.#textureByteCount = 0;
 	}
 
 	//==============================================================================
@@ -140,14 +163,14 @@ export class Material extends Object {
 		material.#useGlossiness = description.glossinessImage !== null;
 		material.#useAlphaCutout = description.opacityImage !== null;
 		try {
-			material.#baseColorTexture = await material.createTexture(description.baseColorImage, [255, 255, 255, 255]);
-			material.#normalTexture = await material.createTexture(description.normalImage, [128, 128, 255, 255]);
-			material.#metallicRoughnessTexture = await material.createTexture(description.metallicRoughnessImage, [255, 255, 255, 255]);
-			material.#glossinessTexture = await material.createTexture(description.glossinessImage, [255, 255, 255, 255]);
-			material.#occlusionTexture = await material.createTexture(description.occlusionImage, [255, 255, 255, 255]);
-			material.#emissiveTexture = await material.createTexture(description.emissiveImage, [255, 255, 255, 255]);
-			material.#specularTexture = await material.createTexture(description.specularImage, [255, 255, 255, 255]);
-			material.#opacityTexture = await material.createTexture(description.opacityImage, [255, 255, 255, 255]);
+			material.#baseColorTexture = await material.#createOwnedTexture(description.baseColorImage, [255, 255, 255, 255]);
+			material.#normalTexture = await material.#createOwnedTexture(description.normalImage, [128, 128, 255, 255]);
+			material.#metallicRoughnessTexture = await material.#createOwnedTexture(description.metallicRoughnessImage, [255, 255, 255, 255]);
+			material.#glossinessTexture = await material.#createOwnedTexture(description.glossinessImage, [255, 255, 255, 255]);
+			material.#occlusionTexture = await material.#createOwnedTexture(description.occlusionImage, [255, 255, 255, 255]);
+			material.#emissiveTexture = await material.#createOwnedTexture(description.emissiveImage, [255, 255, 255, 255]);
+			material.#specularTexture = await material.#createOwnedTexture(description.specularImage, [255, 255, 255, 255]);
+			material.#opacityTexture = await material.#createOwnedTexture(description.opacityImage, [255, 255, 255, 255]);
 		}
 		catch (error) {
 			material.destroy();
@@ -169,6 +192,23 @@ export class Material extends Object {
 	 * @returns { Promise<WebGLTexture> } 지은 GL 텍스처. (이미지면 밉맵과 반복 감싸기, 이미지를 풀지 못하면 거절된다)
 	 */
 	async createTexture(imageDescription, fallbackColor) {
+		const textureCreation = await this.#createTextureWithByteCount(imageDescription, fallbackColor);
+		return textureCreation.glTexture;
+	}
+
+	//==============================================================================
+	// 기본 슬롯 텍스처 생성. (createTexture 와 같고, 지은 GPU 바이트를 이 머티리얼의 텍스처 바이트 수에 더한다)
+	//==============================================================================
+	async #createOwnedTexture(imageDescription, fallbackColor) {
+		const textureCreation = await this.#createTextureWithByteCount(imageDescription, fallbackColor);
+		this.#textureByteCount += textureCreation.byteCount;
+		return textureCreation.glTexture;
+	}
+
+	//==============================================================================
+	// 텍스처 생성 본문. (GL 텍스처와 GPU 바이트 수, 단색은 1x1 4 바이트, 그림은 밉맵까지)
+	//==============================================================================
+	async #createTextureWithByteCount(imageDescription, fallbackColor) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const hasBytes = imageDescription && imageDescription.bytes && imageDescription.bytes.length > 0;
 		const hasSource = imageDescription && imageDescription.source;
@@ -176,7 +216,7 @@ export class Material extends Object {
 			const fallbackTexture = webGL2RenderingContext.createTexture();
 			webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, fallbackTexture);
 			webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System.Uint8Array(fallbackColor));
-			return fallbackTexture;
+			return { glTexture: fallbackTexture, byteCount: 4 };
 		}
 		let imageSource = imageDescription.source;
 		if (!hasSource) {
@@ -207,7 +247,7 @@ export class Material extends Object {
 				webGL2RenderingContext.texParameterf(webGL2RenderingContext.TEXTURE_2D, anisotropicExtension.TEXTURE_MAX_ANISOTROPY_EXT, anisotropy);
 			}
 		}
-		return glTexture;
+		return { glTexture: glTexture, byteCount: computeMipmapByteCount(imageBitmap.width, imageBitmap.height) };
 	}
 
 	//==============================================================================
@@ -385,6 +425,71 @@ export class Material extends Object {
 	}
 
 	//==============================================================================
+	// 베이스 컬러 팩터 설정. (선형 rgb 배율, 나눠 쓰는 머티리얼이면 그것을 쓰는 모든 모델이 바뀐다)
+	//==============================================================================
+	/**
+	 * @param { number[] } baseColorFactor 베이스 컬러 배율. ([r, g, b], 선형, 앞 세 값을 베껴 둔다)
+	 * @example <caption>머티리얼 사본만 붉게 물들이기</caption>
+	 * import { Material, SkinnedModelRenderer } from "./build/vanilla.js";
+	 *
+	 * const canvas = document.createElement("canvas");
+	 * const webGL2RenderingContext = canvas.getContext("webgl2");
+	 * const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+	 * const shaderProgram = skinnedModelRenderer.getShaderProgram();
+	 * const description = Material.createDefaultDescription();
+	 * const sharedMaterial = await Material.createFromDescription(webGL2RenderingContext, shaderProgram, description);
+	 * const instanceMaterial = sharedMaterial.createInstance();
+	 * instanceMaterial.setBaseColorFactor([1, 0.4, 0.4]);
+	 * console.log(sharedMaterial.getBaseColorFactor().join(", "), instanceMaterial.getBaseColorFactor().join(", "));
+	 * instanceMaterial.destroy();
+	 * sharedMaterial.destroy();
+	 */
+	setBaseColorFactor(baseColorFactor) {
+		this.#baseColorFactor = [baseColorFactor[0], baseColorFactor[1], baseColorFactor[2]];
+	}
+
+	//==============================================================================
+	// 머티리얼 사본 만들기. (유니티의 material 과 sharedMaterial 처럼 값만 갈라지고 텍스처는 원본 것을 빌려 쓴다)
+	// - 팩터, 플래그, 기본 슬롯 텍스처, setTexture 로 넣은 추가 텍스처를 그대로 베낀다. GPU 텍스처는 새로 올리지 않는다.
+	// - 사본의 destroy 는 빌린 텍스처를 지우지 않는다. 원본(텍스처를 지은 머티리얼)을 지우기 전에 사본을 다 쓴다.
+	//==============================================================================
+	/**
+	 * @returns { Material } 같은 셰이더와 텍스처를 쓰고 값은 따로 바꿀 수 있는 사본. (텍스처 바이트 수는 0)
+	 */
+	createInstance() {
+		const material = new Material(this.#webGL2RenderingContext, this.#shaderProgram);
+		material.#baseColorFactor = this.#baseColorFactor.slice();
+		material.#metallicFactor = this.#metallicFactor;
+		material.#roughnessFactor = this.#roughnessFactor;
+		material.#emissiveFactor = this.#emissiveFactor.slice();
+		material.#useGlossiness = this.#useGlossiness;
+		material.#useAlphaCutout = this.#useAlphaCutout;
+		material.#subsurfaceFactor = this.#subsurfaceFactor;
+		material.#baseColorTexture = this.#baseColorTexture;
+		material.#normalTexture = this.#normalTexture;
+		material.#metallicRoughnessTexture = this.#metallicRoughnessTexture;
+		material.#glossinessTexture = this.#glossinessTexture;
+		material.#occlusionTexture = this.#occlusionTexture;
+		material.#emissiveTexture = this.#emissiveTexture;
+		material.#specularTexture = this.#specularTexture;
+		material.#opacityTexture = this.#opacityTexture;
+		material.#extraTextureBindings = new System.Map(this.#extraTextureBindings);
+		material.#ownsTextures = false;
+		material.#textureByteCount = 0;
+		return material;
+	}
+
+	//==============================================================================
+	// 텍스처 바이트 수 반환. (이 머티리얼이 지은 기본 슬롯 텍스처의 GPU 바이트, 밉맵 포함, 사본은 0)
+	//==============================================================================
+	/**
+	 * @returns { number } GPU 텍스처 바이트 수. (RGBA8 로 셈, 단색 1x1 은 4)
+	 */
+	getTextureByteCount() {
+		return this.#textureByteCount;
+	}
+
+	//==============================================================================
 	// 서브서피스 팩터 설정. (피부 셰이더의 화면 공간 산란 마스크 배율, 눈 / 치아처럼 산란하지 않는 부위는 0)
 	//==============================================================================
 	/**
@@ -459,15 +564,17 @@ export class Material extends Object {
 
 	//==============================================================================
 	// 파괴. (기본 슬롯 텍스처를 지운다, setTexture 로 넣은 추가 텍스처는 넣은 쪽 것이라 남긴다)
+	// - createInstance 로 만든 사본은 빌린 텍스처를 지우지 않고 슬롯만 비운다.
 	//==============================================================================
 	destroy() {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
 		const ownedTextureList = [this.#baseColorTexture, this.#normalTexture, this.#metallicRoughnessTexture, this.#glossinessTexture, this.#occlusionTexture, this.#emissiveTexture, this.#specularTexture, this.#opacityTexture];
 		for (const glTexture of ownedTextureList) {
-			if (glTexture) {
+			if (glTexture && this.#ownsTextures) {
 				webGL2RenderingContext.deleteTexture(glTexture);
 			}
 		}
+		this.#textureByteCount = 0;
 		this.#baseColorTexture = null;
 		this.#normalTexture = null;
 		this.#metallicRoughnessTexture = null;

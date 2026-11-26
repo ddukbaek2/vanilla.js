@@ -7,6 +7,7 @@ import { Matrix4 } from "../base/matrix4.js";
 import { Quaternion } from "../base/quaternion.js";
 import { FbxLoader } from "./fbxloader.js";
 import { Material } from "./material.js";
+import { SkinnedModelAsset } from "./skinnedmodelasset.js";
 
 
 //==============================================================================
@@ -45,8 +46,52 @@ export const MORPH_TARGET_MAXIMUM = 96;
 
 
 //==============================================================================
+// 전역 변수 목록.
+//==============================================================================
+// 받는 중인 자산. (셰이더 프로그램 → 자산 키 → 첫 모델 프로미스, 같은 파일을 함께 받으면 한 번만 풀고 올린다)
+const pendingAssetLoadTable = new System.Map();
+
+
+//==============================================================================
 // 전역 함수 목록.
 //==============================================================================
+//==============================================================================
+// 인스턴스 노드 만들기. (원형 노드를 베끼고 포즈 칸은 따로, 이름, 자식, 바인드 값은 나눠 쓴다)
+//==============================================================================
+function createInstanceNode(templateNode) {
+	return {
+		...templateNode,
+		currentTranslation: templateNode.currentTranslation.slice(),
+		currentScale: templateNode.currentScale.slice(),
+		worldMatrix: templateNode.worldMatrix.clone(),
+	};
+}
+
+//==============================================================================
+// 인스턴스 스킨 만들기. (조인트와 역바인드 행렬은 나눠 쓰고 조인트 행렬 배열은 따로)
+//==============================================================================
+function createInstanceSkin(templateSkin) {
+	return {
+		...templateSkin,
+		jointMatrixArray: new System.Float32Array(templateSkin.jointMatrixArray.length),
+	};
+}
+
+//==============================================================================
+// 인스턴스 드로어블 만들기. (버퍼, 버텍스 어레이, 메시 서술, 모프 타깃, 머티리얼 원형은 나눠 쓰고 모프 가중치와 와이어프레임 버퍼는 따로)
+//==============================================================================
+function createInstanceDrawable(templateDrawable) {
+	return {
+		...templateDrawable,
+		wireframeIndexBuffer: null,
+		wireframeIndexCount: 0,
+		wireframeIndexComponentType: 0,
+		morphWeights: new System.Float32Array(templateDrawable.morphWeights),
+		isMorphTextureShared: templateDrawable.morphTexture !== null,
+		isMorphDirty: false,
+	};
+}
+
 //==============================================================================
 // FBX 오일러(도) → 쿼터니언. (eEulerXYZ = X 먼저 적용, 열벡터 기준 Rz x Ry x Rx 합성)
 //==============================================================================
@@ -252,7 +297,8 @@ export class SkinnedModel extends Object {
 	/** @private @type { number } */ #fadeElapsed;
 	/** @private @type { number } */ #timeScale;
 	/** @private @type { Map<number, Quaternion> } */ #jointRotationOffsets;
-	/** @private @type { Material[] } */ #ownedMaterialList; // 이 모델이 업로드에서 지은 머티리얼. (destroy 가 지운다)
+	/** @private @type { SkinnedModelAsset | null } */ #asset; // 나눠 쓰는 자산. (올리기 전이나 destroy 뒤에는 null)
+	/** @private @type { Material[] } */ #instanceMaterialList; // getMaterial 로 갈라진 이 인스턴스의 머티리얼. (destroy 가 지운다)
 
 	//==============================================================================
 	// 생성.
@@ -280,7 +326,8 @@ export class SkinnedModel extends Object {
 		this.#fadeElapsed = 0;
 		this.#timeScale = 1;
 		this.#jointRotationOffsets = new System.Map();
-		this.#ownedMaterialList = [];
+		this.#asset = null;
+		this.#instanceMaterialList = [];
 	}
 
 	//==============================================================================
@@ -314,15 +361,134 @@ export class SkinnedModel extends Object {
 	 * @param { string } url GLB 파일 주소.
 	 * @param { SkinnedModelRenderer } skinnedModelRenderer 셰이더 프로그램을 빌려 올 렌더러.
 	 * @returns { Promise<SkinnedModel> } GL 리소스까지 올린 모델. (응답이 실패하거나 GLB 가 아니면 오류를 던진다)
+	 * - 자산 캐시를 쓴다. 같은 셰이더 프로그램으로 같은 주소(SkinnedModelAsset.normalizeKey)를 이미 받았으면 받지도 풀지도 않고
+	 *   그 자산을 나눠 쓰는 새 인스턴스를 돌려준다. 함께 받는 중이면 끝나기를 기다려 나눠 쓴다.
 	 */
 	static async loadFromUrl(webGL2RenderingContext, url, skinnedModelRenderer) {
-		const response = await System.fetch(url);
-		if (!response.ok) {
-			throw new Error(`SkinnedModel load failed: ${url}`);
-		}
-		const arrayBuffer = await response.arrayBuffer();
-		const model = await SkinnedModel.loadFromBytes(webGL2RenderingContext, arrayBuffer, skinnedModelRenderer);
+		const model = await SkinnedModel.#loadCachedAsset(url, skinnedModelRenderer, async () => {
+			const response = await System.fetch(url);
+			if (!response.ok) {
+				throw new Error(`SkinnedModel load failed: ${url}`);
+			}
+			const arrayBuffer = await response.arrayBuffer();
+			const loadedModel = await SkinnedModel.loadFromBytes(webGL2RenderingContext, arrayBuffer, skinnedModelRenderer);
+			return loadedModel;
+		});
 		return model;
+	}
+
+	//==============================================================================
+	// 자산 캐시를 거쳐 짓기. (캐시에 있으면 인스턴스, 받는 중이면 기다려 인스턴스, 없으면 지어 캐시에 넣는다)
+	//==============================================================================
+	static async #loadCachedAsset(url, skinnedModelRenderer, createModel) {
+		const shaderProgram = skinnedModelRenderer.getShaderProgram();
+		const assetKey = SkinnedModelAsset.normalizeKey(url);
+		const cachedAsset = SkinnedModelAsset.find(assetKey, shaderProgram);
+		if (cachedAsset) {
+			return SkinnedModel.createFromAsset(cachedAsset);
+		}
+		let pendingTable = pendingAssetLoadTable.get(shaderProgram);
+		if (!pendingTable) {
+			pendingTable = new System.Map();
+			pendingAssetLoadTable.set(shaderProgram, pendingTable);
+		}
+		const pendingPromise = pendingTable.get(assetKey);
+		if (pendingPromise) {
+			await pendingPromise;
+			const loadedAsset = SkinnedModelAsset.find(assetKey, shaderProgram);
+			if (loadedAsset) {
+				return SkinnedModel.createFromAsset(loadedAsset);
+			}
+			// 기다리는 사이 첫 모델이 지워졌다. (다시 받는다)
+			return SkinnedModel.#loadCachedAsset(url, skinnedModelRenderer, createModel);
+		}
+		const loadPromise = createModel().then((model) => {
+			SkinnedModelAsset.register(assetKey, model.getAsset());
+			return model;
+		});
+		pendingTable.set(assetKey, loadPromise);
+		try {
+			const model = await loadPromise;
+			return model;
+		}
+		finally {
+			pendingTable.delete(assetKey);
+			if (pendingTable.size === 0) {
+				pendingAssetLoadTable.delete(shaderProgram);
+			}
+		}
+	}
+
+	//==============================================================================
+	// 자산으로부터 인스턴스 짓기. (정적, 자산의 버퍼, 머티리얼 원형, 클립을 나눠 쓰고 포즈와 재생 상태는 따로, GPU 업로드 없음)
+	//==============================================================================
+	/**
+	 * @param { SkinnedModelAsset } skinnedModelAsset 나눠 쓸 자산. (지워진 자산이면 오류를 던진다)
+	 * @returns { SkinnedModel } 자산의 참조 수를 하나 늘린 새 인스턴스. (노드는 자산을 올릴 때의 원형에서 베낀다)
+	 */
+	static createFromAsset(skinnedModelAsset) {
+		skinnedModelAsset.retain();
+		const model = new SkinnedModel(skinnedModelAsset.getWebGL2RenderingContext(), skinnedModelAsset.getShaderProgram());
+		model.#attachAsset(skinnedModelAsset);
+		return model;
+	}
+
+	//==============================================================================
+	// 자산 붙이기. (자산의 원형에서 노드, 스킨, 드로어블을 베끼고 클립 목록은 나눠 쓴다, 참조 수는 부른 쪽이 늘린다)
+	//==============================================================================
+	#attachAsset(skinnedModelAsset) {
+		this.#asset = skinnedModelAsset;
+		this.#nodeList = skinnedModelAsset.getNodeList().map(createInstanceNode);
+		this.#rootNodeIndices = skinnedModelAsset.getRootNodeIndices().slice();
+		this.#skinList = skinnedModelAsset.getSkinList().map(createInstanceSkin);
+		this.#drawableList = skinnedModelAsset.getDrawableList().map(createInstanceDrawable);
+		this.#animationList = skinnedModelAsset.getAnimationList();
+		// 해석할 때처럼 첫 클립을 돌린다.
+		this.#currentAnimation = this.#animationList.length > 0 ? this.#animationList[0] : null;
+		this.#previousAnimation = null;
+	}
+
+	//==============================================================================
+	// 인스턴스 짓기. (이 모델과 같은 자산을 나눠 쓰는 새 모델, 유니티의 Instantiate 처럼 GPU 자원을 다시 올리지 않는다)
+	//==============================================================================
+	/**
+	 * @returns { SkinnedModel } 새 인스턴스. (노드는 자산을 올릴 때의 원형에서 베끼고 재생 상태는 처음부터, 올리기 전이면 오류를 던진다)
+	 * @example <caption>여우 하나를 받아 열 마리 띄우기</caption>
+	 * import { SkinnedModel, SkinnedModelRenderer } from "./build/vanilla.js";
+	 *
+	 * const canvas = document.createElement("canvas");
+	 * const webGL2RenderingContext = canvas.getContext("webgl2");
+	 * const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+	 * const sourceModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "examples/ancientmountain/assets/fox.glb", skinnedModelRenderer);
+	 * const modelList = [sourceModel];
+	 * for (let modelIndex = 1; modelIndex < 10; ++modelIndex) {
+	 * 	const instanceModel = sourceModel.createInstance();
+	 * 	instanceModel.playAnimation(modelIndex % 2 === 0 ? "Walk" : "Run", 0);
+	 * 	modelList.push(instanceModel);
+	 * }
+	 * const skinnedModelAsset = sourceModel.getAsset();
+	 * console.log(skinnedModelAsset.getReferenceCount(), skinnedModelAsset.getGpuByteCount());
+	 * for (const model of modelList) {
+	 * 	model.destroy();
+	 * }
+	 * console.log(skinnedModelAsset.isDestroyed());
+	 */
+	createInstance() {
+		const skinnedModelAsset = this.#asset;
+		if (!skinnedModelAsset) {
+			throw new Error("SkinnedModel: no asset to instance (upload first).");
+		}
+		return SkinnedModel.createFromAsset(skinnedModelAsset);
+	}
+
+	//==============================================================================
+	// 자산 반환.
+	//==============================================================================
+	/**
+	 * @returns { SkinnedModelAsset | null } 나눠 쓰는 자산. (올리기 전이나 destroy 뒤에는 null)
+	 */
+	getAsset() {
+		return this.#asset;
 	}
 
 	//==============================================================================
@@ -361,13 +527,16 @@ export class SkinnedModel extends Object {
 	 * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
 	 * @param { string } url 바이너리 FBX 파일 주소.
 	 * @param { SkinnedModelRenderer } skinnedModelRenderer 셰이더 프로그램을 빌려 올 렌더러.
-	 * @returns { Promise<SkinnedModel> } GL 리소스까지 올린 모델.
+	 * @returns { Promise<SkinnedModel> } GL 리소스까지 올린 모델. (loadFromUrl 처럼 자산 캐시를 쓴다)
 	 */
 	static async loadFromFbxUrl(webGL2RenderingContext, url, skinnedModelRenderer) {
-		const sceneData = await FbxLoader.loadFromUrl(url);
-		const shaderProgram = skinnedModelRenderer.getShaderProgram();
-		const model = new SkinnedModel(webGL2RenderingContext, shaderProgram);
-		await model.parseFbxContent(sceneData);
+		const model = await SkinnedModel.#loadCachedAsset(url, skinnedModelRenderer, async () => {
+			const sceneData = await FbxLoader.loadFromUrl(url);
+			const shaderProgram = skinnedModelRenderer.getShaderProgram();
+			const loadedModel = new SkinnedModel(webGL2RenderingContext, shaderProgram);
+			await loadedModel.parseFbxContent(sceneData);
+			return loadedModel;
+		});
 		return model;
 	}
 
@@ -994,13 +1163,25 @@ export class SkinnedModel extends Object {
 				channels = channels.filter((channel) => channel.path !== "translation");
 			}
 			const animationName = createFbxClipName(clipName, fbxAnimation.name, stackIndex, channelAnimationList.length);
-			this.#animationList.push({ name: animationName, duration: fbxAnimation.duration, channels: channels });
+			const animation = { name: animationName, duration: fbxAnimation.duration, channels: channels };
+			// 같은 이름 클립은 그 자리를 바꾼다. (클립 목록은 자산의 인스턴스들이 나눠 써, 인스턴스마다 더해도 한 벌만 남는다)
+			const sameNameIndex = this.#animationList.findIndex((existingAnimation) => existingAnimation.name === animationName);
+			if (sameNameIndex >= 0) {
+				this.#animationList[sameNameIndex] = animation;
+				if (this.#currentAnimation && this.#currentAnimation.name === animationName) {
+					this.#currentAnimation = animation;
+				}
+			}
+			else {
+				this.#animationList.push(animation);
+			}
 		}
 	}
 
 	//==============================================================================
 	// 중립 메시/머티리얼 서술 업로드. (공용, Material 생성 + VAO/드로어블 구성)
-	// - 예전 드로어블의 GL 리소스와 이 모델이 지은 머티리얼은 먼저 지운다. (destroy, 다시 불러도 새지 않는다)
+	// - 예전 자산은 먼저 놓는다. (destroy, 다시 불러도 새지 않는다)
+	// - 올린 버퍼, 머티리얼, 모프 텍스처와 지금 노드, 스킨, 클립을 새 자산(SkinnedModelAsset, 참조 수 1)으로 묶고 이 모델이 그 첫 인스턴스가 된다.
 	//==============================================================================
 	/**
 	 * @param { object[] } meshDescriptionList 중립 메시 서술 목록.
@@ -1017,13 +1198,13 @@ export class SkinnedModel extends Object {
 		for (const materialDescription of materialDescriptionList) {
 			const material = await Material.createFromDescription(webGL2RenderingContext, shaderProgram, materialDescription);
 			materialList.push(material);
-			this.#ownedMaterialList.push(material);
 		}
 		const defaultDescription = Material.createDefaultDescription();
 		const defaultMaterial = await Material.createFromDescription(webGL2RenderingContext, shaderProgram, defaultDescription);
-		this.#ownedMaterialList.push(defaultMaterial);
+		const assetMaterialList = materialList.concat([defaultMaterial]);
 
-		this.#drawableList = [];
+		let bufferByteCount = 0;
+		const templateDrawableList = [];
 		for (const meshDescription of meshDescriptionList) {
 			let normals = meshDescription.normals;
 			if (!normals) {
@@ -1032,13 +1213,19 @@ export class SkinnedModel extends Object {
 			const vertexArray = webGL2RenderingContext.createVertexArray();
 			webGL2RenderingContext.bindVertexArray(vertexArray);
 			const vertexBufferList = [];
-			vertexBufferList.push(this.bindFloatAttribute(shaderProgram, "vertexPosition", meshDescription.positions, 3));
-			vertexBufferList.push(this.bindFloatAttribute(shaderProgram, "vertexNormal", normals, 3));
+			const addVertexBuffer = (vertexBuffer, dataArray) => {
+				if (vertexBuffer !== null) {
+					vertexBufferList.push(vertexBuffer);
+					bufferByteCount += dataArray.byteLength;
+				}
+			};
+			addVertexBuffer(this.bindFloatAttribute(shaderProgram, "vertexPosition", meshDescription.positions, 3), meshDescription.positions);
+			addVertexBuffer(this.bindFloatAttribute(shaderProgram, "vertexNormal", normals, 3), normals);
 			if (meshDescription.textureCoordinates) {
-				vertexBufferList.push(this.bindFloatAttribute(shaderProgram, "vertexTextureCoordinate", meshDescription.textureCoordinates, 2));
+				addVertexBuffer(this.bindFloatAttribute(shaderProgram, "vertexTextureCoordinate", meshDescription.textureCoordinates, 2), meshDescription.textureCoordinates);
 			}
-			vertexBufferList.push(this.bindIntegerAttribute(shaderProgram, "vertexJoints", meshDescription.joints, 4));
-			vertexBufferList.push(this.bindFloatAttribute(shaderProgram, "vertexWeights", meshDescription.weights, 4));
+			addVertexBuffer(this.bindIntegerAttribute(shaderProgram, "vertexJoints", meshDescription.joints, 4), meshDescription.joints);
+			addVertexBuffer(this.bindFloatAttribute(shaderProgram, "vertexWeights", meshDescription.weights, 4), meshDescription.weights);
 
 			// 인덱스. (없는 메시는 drawArrays 로 출력)
 			let indexCount = 0;
@@ -1051,14 +1238,15 @@ export class SkinnedModel extends Object {
 				webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, meshDescription.indices, webGL2RenderingContext.STATIC_DRAW);
 				indexCount = meshDescription.indices.length;
 				indexComponentType = meshDescription.indices instanceof System.Uint32Array ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
+				bufferByteCount += meshDescription.indices.byteLength;
 			}
 			webGL2RenderingContext.bindVertexArray(null);
 
 			const material = meshDescription.materialIndex >= 0 && materialList[meshDescription.materialIndex] ? materialList[meshDescription.materialIndex] : defaultMaterial;
 			const morphTargetList = meshDescription.morphTargets ? meshDescription.morphTargets.slice() : [];
-			this.#drawableList.push({
+			templateDrawableList.push({
 				vertexArray: vertexArray,
-				vertexBufferList: vertexBufferList.filter((vertexBuffer) => vertexBuffer !== null),
+				vertexBufferList: vertexBufferList,
 				isIndexed: isIndexed,
 				indexBuffer: indexBuffer,
 				indexCount: indexCount,
@@ -1078,9 +1266,32 @@ export class SkinnedModel extends Object {
 				morphTexture: null,
 				morphRowsPerTarget: 0,
 				morphTextureWidth: 0,
+				isMorphTextureShared: false,
 				isMorphDirty: morphTargetList.length > 0,
 			});
 		}
+
+		// 모프 텍스처는 원형에 한 번 올려 인스턴스들이 나눠 쓴다.
+		for (const templateDrawable of templateDrawableList) {
+			if (templateDrawable.isMorphDirty) {
+				this.uploadMorphTargets(templateDrawable);
+				if (templateDrawable.morphTexture) {
+					bufferByteCount += templateDrawable.morphTextureWidth * templateDrawable.morphRowsPerTarget * 2 * templateDrawable.morphTargetList.length * 16;
+				}
+			}
+		}
+
+		// 자산으로 묶고 첫 인스턴스로 붙는다.
+		const skinnedModelAsset = new SkinnedModelAsset(webGL2RenderingContext, shaderProgram, {
+			drawableList: templateDrawableList,
+			materialList: assetMaterialList,
+			nodeList: this.#nodeList.map(createInstanceNode),
+			rootNodeIndices: this.#rootNodeIndices.slice(),
+			skinList: this.#skinList.map(createInstanceSkin),
+			animationList: this.#animationList,
+			bufferByteCount: bufferByteCount,
+		});
+		this.#attachAsset(skinnedModelAsset);
 	}
 
 	//==============================================================================
@@ -1152,10 +1363,14 @@ export class SkinnedModel extends Object {
 	// - 텍셀 인덱스 = 정점 인덱스. 블록 시작 행 = 타깃 인덱스 x 2 x 타깃당 행 수.
 	//==============================================================================
 	/**
-	 * @param { object } drawable 모프 텍스처를 올릴 드로어블. (타깃이 없으면 텍스처를 지운다)
+	 * @param { object } drawable 모프 텍스처를 올릴 드로어블. (타깃이 없으면 텍스처를 지운다, 자산과 나눠 쓰던 텍스처면 건드리지 않고 이 드로어블 것을 새로 짓는다)
 	 */
 	uploadMorphTargets(drawable) {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		if (drawable.isMorphTextureShared) {
+			drawable.morphTexture = null;
+			drawable.isMorphTextureShared = false;
+		}
 		const targetCount = drawable.morphTargetList.length;
 		const vertexCount = drawable.vertexCount;
 		if (targetCount === 0 || vertexCount === 0) {
@@ -1258,7 +1473,8 @@ export class SkinnedModel extends Object {
 		if (positionDeltas.length !== drawable.vertexCount * 3) {
 			throw new Error(`SkinnedModel: morph target "${targetName}" delta count mismatch.`);
 		}
-		drawable.morphTargetList.push({ name: targetName, positionDeltas: positionDeltas, normalDeltas: normalDeltas });
+		// 타깃 목록은 자산과 나눠 쓰므로 베낀 뒤 더한다. (이 인스턴스만 갈라진다)
+		drawable.morphTargetList = drawable.morphTargetList.concat([{ name: targetName, positionDeltas: positionDeltas, normalDeltas: normalDeltas }]);
 		const morphWeights = new System.Float32Array(drawable.morphTargetList.length);
 		morphWeights.set(drawable.morphWeights);
 		drawable.morphWeights = morphWeights;
@@ -1313,6 +1529,55 @@ export class SkinnedModel extends Object {
 			throw new Error(`SkinnedModel: drawable ${drawableIndex} not found.`);
 		}
 		drawable.material = material;
+	}
+
+	//==============================================================================
+	// 이 인스턴스의 머티리얼 반환. (유니티 Renderer.material, 처음 부르면 지금 머티리얼의 사본으로 갈라져 이 드로어블에 낀다)
+	// - 사본은 텍스처를 빌려 쓰고 값만 따로다. 값을 바꿔도 같은 자산을 쓰는 다른 인스턴스는 그대로다. 사본은 이 모델의 destroy 가 지운다.
+	// - 이미 이 인스턴스의 사본이면 그것을 돌려준다.
+	//==============================================================================
+	/**
+	 * @param { number } drawableIndex 드로어블 번호. (없으면 오류를 던진다)
+	 * @returns { Material } 이 인스턴스만 쓰는 머티리얼.
+	 * @example <caption>여러 마리 가운데 한 마리만 붉게</caption>
+	 * import { SkinnedModel, SkinnedModelRenderer } from "./build/vanilla.js";
+	 *
+	 * const canvas = document.createElement("canvas");
+	 * const webGL2RenderingContext = canvas.getContext("webgl2");
+	 * const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+	 * const blueFox = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "examples/ancientmountain/assets/fox.glb", skinnedModelRenderer);
+	 * const redFox = blueFox.createInstance();
+	 * redFox.getMaterial(0).setBaseColorFactor([1, 0.3, 0.3]);
+	 * console.log(blueFox.getSharedMaterial(0).getBaseColorFactor().join(", "), redFox.getSharedMaterial(0).getBaseColorFactor().join(", "));
+	 * redFox.destroy();
+	 * blueFox.destroy();
+	 */
+	getMaterial(drawableIndex) {
+		const drawable = this.#drawableList[drawableIndex];
+		if (!drawable) {
+			throw new Error(`SkinnedModel: drawable ${drawableIndex} not found.`);
+		}
+		if (!this.#instanceMaterialList.includes(drawable.material)) {
+			const instanceMaterial = drawable.material.createInstance();
+			this.#instanceMaterialList.push(instanceMaterial);
+			drawable.material = instanceMaterial;
+		}
+		return drawable.material;
+	}
+
+	//==============================================================================
+	// 낀 머티리얼 반환. (유니티 Renderer.sharedMaterial, 갈라지지 않는다. 자산의 원형이면 값을 바꿀 때 그 자산을 쓰는 모든 인스턴스가 바뀐다)
+	//==============================================================================
+	/**
+	 * @param { number } drawableIndex 드로어블 번호. (없으면 오류를 던진다)
+	 * @returns { Material } 지금 드로어블에 낀 머티리얼. (getMaterial 로 갈라졌으면 그 사본, setMaterial 로 바꿨으면 그것)
+	 */
+	getSharedMaterial(drawableIndex) {
+		const drawable = this.#drawableList[drawableIndex];
+		if (!drawable) {
+			throw new Error(`SkinnedModel: drawable ${drawableIndex} not found.`);
+		}
+		return drawable.material;
 	}
 
 	//==============================================================================
@@ -1755,34 +2020,31 @@ export class SkinnedModel extends Object {
 	}
 
 	//==============================================================================
-	// 파괴. (GL 리소스 해제, 버텍스 어레이, 버퍼, 모프 텍스처, 이 모델이 업로드에서 지은 머티리얼의 텍스처)
-	// - setMaterial 로 바깥에서 넣은 머티리얼은 지우지 않는다. 이 모델이 지은 머티리얼을 다른 모델에 넣어 썼다면 함께 지워진다.
+	// 파괴. (이 인스턴스 것을 지우고 자산을 놓는다, 마지막 인스턴스면 자산이 버퍼, 버텍스 어레이, 모프 텍스처, 머티리얼 원형을 지운다)
+	// - 이 인스턴스 것: 와이어프레임 버퍼, addMorphTarget 으로 갈라진 모프 텍스처, getMaterial 로 갈라진 머티리얼.
+	// - setMaterial 로 바깥에서 넣은 머티리얼은 지우지 않는다. 자산의 머티리얼 원형을 다른 모델에 넣어 썼다면 자산이 지워질 때 함께 지워진다.
 	//==============================================================================
 	destroy() {
 		const webGL2RenderingContext = this.getWebGL2RenderingContext();
-		if (!webGL2RenderingContext) {
-			this.#drawableList = [];
-			return;
-		}
-		for (const drawable of this.#drawableList) {
-			webGL2RenderingContext.deleteVertexArray(drawable.vertexArray);
-			for (const vertexBuffer of drawable.vertexBufferList) {
-				webGL2RenderingContext.deleteBuffer(vertexBuffer);
+		if (webGL2RenderingContext) {
+			for (const drawable of this.#drawableList) {
+				if (drawable.wireframeIndexBuffer) {
+					webGL2RenderingContext.deleteBuffer(drawable.wireframeIndexBuffer);
+				}
+				if (drawable.morphTexture && !drawable.isMorphTextureShared) {
+					webGL2RenderingContext.deleteTexture(drawable.morphTexture);
+				}
 			}
-			if (drawable.indexBuffer) {
-				webGL2RenderingContext.deleteBuffer(drawable.indexBuffer);
-			}
-			if (drawable.wireframeIndexBuffer) {
-				webGL2RenderingContext.deleteBuffer(drawable.wireframeIndexBuffer);
-			}
-			if (drawable.morphTexture) {
-				webGL2RenderingContext.deleteTexture(drawable.morphTexture);
+			for (const material of this.#instanceMaterialList) {
+				material.destroy();
 			}
 		}
 		this.#drawableList = [];
-		for (const material of this.#ownedMaterialList) {
-			material.destroy();
+		this.#instanceMaterialList = [];
+		const skinnedModelAsset = this.#asset;
+		this.#asset = null;
+		if (skinnedModelAsset) {
+			skinnedModelAsset.release();
 		}
-		this.#ownedMaterialList = [];
 	}
 }

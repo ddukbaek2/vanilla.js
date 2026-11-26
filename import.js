@@ -159,6 +159,7 @@ export { FullscreenPass } from "./src/core/fullscreenpass.js";
 export { RenderTarget } from "./src/graphics3d/rendertarget.js";
 export { BloomEffect } from "./src/graphics3d/bloomeffect.js";
 export { SkinnedModel, MORPH_TARGET_MAXIMUM } from "./src/graphics3d/skinnedmodel.js";
+export { SkinnedModelAsset } from "./src/graphics3d/skinnedmodelasset.js";
 export { SkinnedModelRenderer, MORPH_GLSL } from "./src/graphics3d/skinnedmodelrenderer.js";
 export * as ToonMesh from "./src/graphics3d/toon/meshbuilder.js";
 export { VERTEX_FLOAT_COUNT, SKIN_FLOAT_COUNT } from "./src/graphics3d/toon/meshbuilder.js";
