@@ -145,9 +145,15 @@ zeroTween.tick(0);
 checkEqual(zeroTween.isFinished(), true, "길이 0 은 첫 tick 에 끝남");
 checkEqual(zeroValue, 8, "길이 0 은 목표값");
 
-// 노드 트윈은 tick 마다 노드 속성에 쓴다.
-const rootNode = new WorldNode("root");
-const moverNode = new WorldNode("mover");
+// 노드 트윈은 tick 마다 노드 속성에 쓴다. (원본 노드 생성자는 이름을 받지 않는다)
+function createNode(name) {
+	const node = new WorldNode();
+	node.setName(name);
+	return node;
+}
+
+const rootNode = createNode("root");
+const moverNode = createNode("mover");
 rootNode.addChild(moverNode);
 const nodeTween = Tween.createNodeTween(moverNode, TweenProperty.localPosition, Vector2.zero(), Vector2.create(100, 50), 1);
 checkEqual(nodeTween.getTarget(), moverNode, "노드 트윈 대상");
@@ -159,7 +165,7 @@ checkNear([moverNode.getLocalPosition().x, moverNode.getLocalPosition().y], [100
 checkEqual(nodeTween.isFinished(), true, "노드 트윈 끝남");
 
 // Vector2 속성에 숫자를 주면 두 축에 같이 쓰고, 숫자 속성에 Vector2 를 주면 쓰지 않는다.
-const targetNode = new WorldNode("target");
+const targetNode = createNode("target");
 rootNode.addChild(targetNode);
 let customValue = 0;
 const propertyTween = new Tween({ localScale: 0, localRotation: 0, localOpacity: 1, contentSize: Vector2.create(10, 20), custom: 0 })
@@ -175,15 +181,15 @@ checkNear(targetNode.getLocalRotation(), 45, 1e-4, "localRotation");
 checkNear(targetNode.getLocalOpacity(), 0.5, 1e-4, "localOpacity");
 checkNear([targetNode.getContentSize().x, targetNode.getContentSize().y], [20, 30], 1e-4, "contentSize");
 checkNear(customValue, 2, 1e-4, "노드 속성이 아닌 값");
-const rotationNode = new WorldNode("rotation");
+const rotationNode = createNode("rotation");
 applyTweenProperty(rotationNode, TweenProperty.localRotation, Vector2.one());
 checkEqual(rotationNode.getLocalRotation(), 0, "숫자 속성에 Vector2 는 쓰지 않음");
 checkEqual(TweenProperty.localOpacity, "localOpacity", "TweenProperty 이름");
 checkEqual(TweenProperty.custom, undefined, "없는 TweenProperty");
 
 // 대상 노드가 처음 돈 때의 트리에서 떨어지면 콜백 없이 끝난다. 맨 위 노드는 부모를 따라 올라간 끝이다.
-const parentNode = new WorldNode("parent");
-const detachedNode = new WorldNode("detached");
+const parentNode = createNode("parent");
+const detachedNode = createNode("detached");
 rootNode.addChild(parentNode);
 parentNode.addChild(detachedNode);
 checkEqual(Tween.findRootNode(detachedNode), rootNode, "맨 위 노드");
