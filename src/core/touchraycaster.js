@@ -20,7 +20,7 @@ function isTouchableNode(node) {
 
 //==============================================================================
 // 터치 레이캐스터.
-// - 씬의 touchPress / touchMove / touchRelease / touchCancel을 받아
+// - 씬의 터치(Scene.tickTouch 가 씬의 레이캐스터에 넘긴다, Scene.setTouchRaycaster)를 받아
 //   루트 노드 트리를 draw() 순서로 순회하고,
 //   활성 + isInteractable() 노드 중 가장 앞(높은 번호)의 노드에
 //   터치 이벤트를 전달한다.
@@ -43,29 +43,12 @@ function isTouchableNode(node) {
  * 		root.addChild(buttonNode);
  * 		buttonNode.setRect(100, 100, 200, 80);
  * 		buttonNode.setInteractable(true);
- * 		this.touchRaycaster = new TouchRaycaster();
- * 		this.touchRaycaster.setRootNode(root);
- * 		this.touchRaycaster.setFirstTouchCallback(() => {
+ * 		const touchRaycaster = this.getTouchRaycaster();
+ * 		touchRaycaster.setFirstTouchCallback(() => {
  * 			console.log("first touch");
  * 		});
- * 		const hitNode = this.touchRaycaster.raycast(Vector2.create(150, 120));
- * 		console.log(hitNode === buttonNode);
- * 	}
- *
- * 	touchPress(viewInputPosition) {
- * 		this.touchRaycaster.touchPress(viewInputPosition);
- * 	}
- *
- * 	touchMove(viewInputPosition) {
- * 		this.touchRaycaster.touchMove(viewInputPosition);
- * 	}
- *
- * 	touchRelease(viewInputPosition) {
- * 		this.touchRaycaster.touchRelease(viewInputPosition);
- * 	}
- *
- * 	touchCancel(viewInputPosition) {
- * 		this.touchRaycaster.touchCancel(viewInputPosition);
+ * 		const hitNode = touchRaycaster.raycast(Vector2.create(150, 120));
+ * 		console.log(hitNode === buttonNode, touchRaycaster instanceof TouchRaycaster);
  * 	}
  * }
  *

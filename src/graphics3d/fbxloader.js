@@ -50,12 +50,27 @@ function readPropertyVector(propertyRecord) {
 	return vector;
 }
 
+//==============================================================================
+// 오브젝트 이름 읽기. (바이너리 FBX 의 "이름\u0000\u0001종류" 꼴에서 종류 꼬리를 뗀다, "Take 001\u0000\u0001AnimStack" 은 "Take 001")
+// - three.js FBXLoader(BinaryReader.getString 이 첫 널 바이트에서 자른다)와 Assimp(FBXDocument 가 "종류::이름" 으로 바꾸고
+//   FBXConverter 가 "Model::", "AnimStack::" 를 뗀다)도 같은 이름을 낸다.
+//==============================================================================
+/**
+ * @param { string } fbxName FBX 오브젝트의 두 번째 프로퍼티 글.
+ * @returns { string } 종류 꼬리를 뗀 이름. (꼬리가 없으면 그대로)
+ */
+function readFbxObjectName(fbxName) {
+	const separatorIndex = fbxName.indexOf("\u0000");
+	return separatorIndex !== -1 ? fbxName.substring(0, separatorIndex) : fbxName;
+}
+
 
 //==============================================================================
 // FBX 로더. (바이너리 FBX → GL 무관 중간 표현 데이터)
 // - 저수준 노드/프로퍼티 파싱 후, 오브젝트/커넥션 그래프를 해석하여
 //   노드 계층 / 스키닝 메시 / 머티리얼 / 임베디드 텍스처 / 골격 애니메이션을 추출한다.
 // - 결과는 SkinnedModel 이 GL 리소스로 소비한다.
+// - 노드와 애니메이션 스택의 name 은 FBX 이름에서 종류 꼬리("\u0000\u0001Model", "\u0000\u0001AnimStack")를 뗀 것이다. (본 이름 맞추기도 이 이름으로 한다)
 //==============================================================================
 export class FbxLoader extends Object {
 	//==============================================================================
@@ -848,7 +863,7 @@ export class FbxLoader extends Object {
 				continue;
 			}
 			const modelId = objectNode.properties[0].value;
-			const modelName = objectNode.properties[1].value;
+			const modelName = readFbxObjectName(objectNode.properties[1].value);
 			const modelSubType = objectNode.properties[2].value;
 			const node = {
 				id: modelId,
@@ -963,7 +978,7 @@ export class FbxLoader extends Object {
 				layerIds.push(objectId);
 			}
 			else if (objectNode.name === "AnimationStack") {
-				stackById.set(objectId, { name: objectNode.properties[1].value, layerIds: [] });
+				stackById.set(objectId, { name: readFbxObjectName(objectNode.properties[1].value), layerIds: [] });
 			}
 		}
 

@@ -14,8 +14,10 @@ const childProcess = require("child_process");
 // - since 는 v0.0.8 부터 만들려는 판 앞까지의 태그를 훑어, 그 클래스(이름으로 찾음)에 그 멤버가 처음 있던 판이다. 어느 태그에도 없으면 만들려는 판.
 // - #이름, 밑줄로 시작하는 이름, JSDoc 에 @private 이 붙은 멤버는 뺀다.
 // - JSDoc 의 @example 은 examples 칸이 된다. (모듈은 어느 선언에도 붙지 않은 깊이 0 의 JSDoc 에서 읽는다)
+// - counterpart 는 러스트 판(vanilla-engine)의 짝이다. docs/api/counterpart.<버전>.json (러스트 판 도구가 이름으로 지은 짝 표를 옮겨 둔 것) 에서 읽는다.
 // 사용:
 //   node tools/apidoc.cjs <버전> [--date YYYY-MM-DD]   docs/api/<버전>.json 쓰기
+//   node tools/apidoc.cjs <버전> --counterpart <짝 표>  러스트 판의 docs/api/counterpart.<버전>.json 을 이 저장소로 옮기고 자료 쓰기
 //   node tools/apidoc.cjs <버전> --missing             표에 없는 ko 글 목록 (JSON 배열)
 //   node tools/apidoc.cjs <버전> --check               docs/api/<버전>.json 꼴 검사와 수 세기
 //   node tools/apidoc.cjs <버전> --gaps                문서 빈 곳 (빈 설명, 빈 꼴, @returns 없는 함수, 예제 없는 클래스와 모듈, 머리 주석 없는 비공개 함수, 떨어진 머리 주석)
@@ -33,6 +35,7 @@ const UPDATE_FILE_PATH = path.join(REPOSITORY_ROOT, "UPDATE.md");
 const API_DIRECTORY_PATH = path.join(REPOSITORY_ROOT, "docs", "api");
 const TRANSLATION_FILE_PATH = path.join(API_DIRECTORY_PATH, "translation.en.json");
 const ENGINE_NAME = "vanilla.js";
+const COUNTERPART_ENGINE_NAME = "vanilla-engine"; // 짝 엔진. (러스트 판)
 const SINCE_FIRST_VERSION = "0.0.8"; // since 를 훑기 시작하는 판. (이 판부터 소스가 src/ 아래 지금 꼴이다)
 const MEMBER_KINDS = ["method", "property", "constructor", "static", "field"];
 const HANGUL_PATTERN = /[ᄀ-ᇿ㄰-㆏가-힣]/;
@@ -2319,6 +2322,168 @@ function resolveDate(version, dateOption, outputPath) {
 }
 
 //==============================================================================
+// 짝 표 경로.
+//==============================================================================
+/**
+ * @param { string } version
+ * @returns { string }
+ */
+function getCounterpartTablePath(version) {
+	return path.join(API_DIRECTORY_PATH, "counterpart." + version + ".json");
+}
+
+//==============================================================================
+// 러스트 판 짝 표를 이 저장소로 옮기기.
+// - 표 꼴: { engine: "vanilla-engine", counterpartEngine: "vanilla.js", version, items: [ { "vanilla-engine": { module, class, name }, "vanilla.js": { module, class, name } } ] }
+// - 러스트 판 도구(cargo run -p vanilla-engine-apidoc -- <판> --counterpart <이 저장소 자료>)가 이 저장소 자료의 이름으로 짓는다. 짓는 일은 그쪽이 맡고 여기는 그대로 옮긴다.
+//==============================================================================
+/**
+ * @param { string } sourcePath
+ * @param { string } version
+ */
+function copyCounterpartTable(sourcePath, version) {
+	const table = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
+	if (table.engine !== COUNTERPART_ENGINE_NAME || table.counterpartEngine !== ENGINE_NAME || !Array.isArray(table.items)) {
+		throw new Error("러스트 판 짝 표가 아니다: " + sourcePath);
+	}
+	if (table.version !== version) {
+		throw new Error("짝 표의 판 " + table.version + " 이 " + version + " 이 아니다: " + sourcePath);
+	}
+	fs.mkdirSync(API_DIRECTORY_PATH, { recursive: true });
+	fs.writeFileSync(getCounterpartTablePath(version), JSON.stringify(table, null, "\t") + "\n");
+}
+
+//==============================================================================
+// 짝 열쇠. (모듈, 클래스, 이름)
+//==============================================================================
+/**
+ * @param { object } key
+ * @returns { string }
+ */
+function createCounterpartLookupKey(key) {
+	return (key.module || "") + "\u001f" + (key.class || "") + "\u001f" + (key.name || "");
+}
+
+//==============================================================================
+// 이름 견주기 꼴. (밑줄을 빼고 소문자, get_width 와 getWidth 가 같다)
+//==============================================================================
+/**
+ * @param { string } name
+ * @returns { string }
+ */
+function normalizeCounterpartName(name) {
+	return (name || "").replace(/_/g, "").toLowerCase();
+}
+
+//==============================================================================
+// 짝 채우기. (클래스, 열거, 멤버, 모듈 함수에 counterpart: { engine, module, class, name }, 없는 칸은 뺀다)
+// - 열거 값에도 짝이 있으면 둔다. (러스트 판이 연관 상수를 둔 구조체로 옮긴 열거, Colors, Pivot, TileFlag 같은 것)
+// - 러스트 판 짝이 여럿인 것(속성 하나가 get_ 와 set_ 둘, getDescription 이 get_description 과 get_description_mut 둘)은
+//   이름이 같은 것(밑줄과 대소문자를 빼고), 읽기(get_, is_, has_), 표 차례 순으로 하나를 고른다.
+// - 짝 표에 있지만 이 자료에 없는 것과, 짝이 없는 것의 수를 statistics 에 남긴다.
+//==============================================================================
+/**
+ * @param { object[] } moduleList
+ * @param { string } version
+ * @param { object } statistics
+ */
+function fillCounterparts(moduleList, version, statistics) {
+	statistics.counterpartTableItems = 0;
+	statistics.counterpartStaleList = [];
+	const tablePath = getCounterpartTablePath(version);
+	if (!fs.existsSync(tablePath)) {
+		statistics.counterpartTableMissing = true;
+		return;
+	}
+	const table = JSON.parse(fs.readFileSync(tablePath, "utf8"));
+	const candidateTable = new Map();
+	for (const item of table.items || []) {
+		const ownKey = item[ENGINE_NAME];
+		const otherKey = item[COUNTERPART_ENGINE_NAME];
+		if (!ownKey || !otherKey) {
+			continue;
+		}
+		++statistics.counterpartTableItems;
+		const lookupKey = createCounterpartLookupKey(ownKey);
+		if (!candidateTable.has(lookupKey)) {
+			candidateTable.set(lookupKey, []);
+		}
+		candidateTable.get(lookupKey).push(otherKey);
+	}
+	const usedKeySet = new Set();
+	const pickCounterpart = (ownKey) => {
+		const lookupKey = createCounterpartLookupKey(ownKey);
+		const candidateList = candidateTable.get(lookupKey);
+		if (!candidateList) {
+			return null;
+		}
+		usedKeySet.add(lookupKey);
+		const rankCandidate = (candidate) => {
+			if (normalizeCounterpartName(candidate.name) === normalizeCounterpartName(ownKey.name)) {
+				return 0;
+			}
+			if (/^(get|is|has)_/.test(candidate.name || "")) {
+				return 1;
+			}
+			return 2;
+		};
+		let best = candidateList[0];
+		for (const candidate of candidateList) {
+			if (rankCandidate(candidate) < rankCandidate(best)) {
+				best = candidate;
+			}
+		}
+		const counterpart = { engine: COUNTERPART_ENGINE_NAME, module: best.module };
+		if (best.class) {
+			counterpart.class = best.class;
+		}
+		if (best.name) {
+			counterpart.name = best.name;
+		}
+		return counterpart;
+	};
+	// 칸 차례를 지키며 counterpart 넣기. (beforeKey 앞, 없으면 끝)
+	const insertCounterpart = (owner, counterpart, beforeKey) => {
+		if (!counterpart) {
+			return owner;
+		}
+		const result = {};
+		for (const key of Object.keys(owner)) {
+			if (key === beforeKey) {
+				result.counterpart = counterpart;
+			}
+			result[key] = owner[key];
+		}
+		if (result.counterpart === undefined) {
+			result.counterpart = counterpart;
+		}
+		return result;
+	};
+	// 멤버는 source 다음. (러스트 판 자료와 같은 차례)
+	const memberBeforeKey = (member) => {
+		const keyList = Object.keys(member);
+		const sourceIndex = keyList.indexOf("source");
+		return sourceIndex >= 0 && sourceIndex + 1 < keyList.length ? keyList[sourceIndex + 1] : "";
+	};
+	for (const moduleEntry of moduleList) {
+		moduleEntry.classes = moduleEntry.classes.map((classEntry) => {
+			classEntry.members = classEntry.members.map((member) => insertCounterpart(member, pickCounterpart({ module: moduleEntry.name, class: classEntry.name, name: member.name }), memberBeforeKey(member)));
+			return insertCounterpart(classEntry, pickCounterpart({ module: moduleEntry.name, class: classEntry.name }), "members");
+		});
+		moduleEntry.functions = moduleEntry.functions.map((member) => insertCounterpart(member, pickCounterpart({ module: moduleEntry.name, name: member.name }), memberBeforeKey(member)));
+		moduleEntry.enums = moduleEntry.enums.map((enumEntry) => {
+			enumEntry.values = enumEntry.values.map((value) => insertCounterpart(value, pickCounterpart({ module: moduleEntry.name, class: enumEntry.name, name: value.name }), ""));
+			return insertCounterpart(enumEntry, pickCounterpart({ module: moduleEntry.name, class: enumEntry.name }), "values");
+		});
+	}
+	for (const lookupKey of candidateTable.keys()) {
+		if (!usedKeySet.has(lookupKey)) {
+			statistics.counterpartStaleList.push(lookupKey.split("\u001f").filter((part) => part !== "").join(" "));
+		}
+	}
+}
+
+//==============================================================================
 // 자료 짓기.
 //==============================================================================
 /**
@@ -2337,6 +2502,7 @@ function buildApiDocument(version, dateOption, outputPath, isSinceEnabled = true
 	else {
 		fillSince(moduleList, version, statistics, []);
 	}
+	fillCounterparts(moduleList, version, statistics);
 	const apiDocument = {
 		engine: ENGINE_NAME,
 		version: version,
@@ -2370,7 +2536,7 @@ function isValueMember(member) {
  */
 function checkApiDocument(apiDocument) {
 	const errorList = [];
-	const counts = { modules: 0, classes: 0, members: 0, functions: 0, enums: 0, enumValues: 0, texts: 0, emptyEnglish: 0, emptyKorean: 0, emptyValueSlots: 0, examples: 0, moduleExamples: 0, classExamples: 0, memberExamples: 0, enumExamples: 0, classesWithoutExample: 0, modulesWithoutExample: 0 };
+	const counts = { modules: 0, classes: 0, members: 0, functions: 0, enums: 0, enumValues: 0, texts: 0, emptyEnglish: 0, emptyKorean: 0, emptyValueSlots: 0, examples: 0, moduleExamples: 0, classExamples: 0, memberExamples: 0, enumExamples: 0, classesWithoutExample: 0, modulesWithoutExample: 0, counterparts: 0, classCounterparts: 0, memberCounterparts: 0, functionCounterparts: 0, enumCounterparts: 0, enumValueCounterparts: 0 };
 	const sinceTable = Object.create(null);
 	const kindTable = Object.create(null);
 
@@ -2418,6 +2584,24 @@ function checkApiDocument(apiDocument) {
 		});
 		return owner.examples.length;
 	};
+	// 짝 칸인지. (없으면 0, 있으면 1)
+	const checkCounterpart = (owner, where) => {
+		if (owner.counterpart === undefined) {
+			return 0;
+		}
+		const counterpart = owner.counterpart;
+		if (!counterpart || typeof counterpart !== "object" || counterpart.engine !== COUNTERPART_ENGINE_NAME || typeof counterpart.module !== "string" || counterpart.module === "") {
+			errorList.push(where + ": counterpart 꼴");
+			return 0;
+		}
+		for (const key of Object.keys(counterpart)) {
+			if (!["engine", "module", "class", "name"].includes(key) || typeof counterpart[key] !== "string" || counterpart[key] === "") {
+				errorList.push(where + ": counterpart 칸 " + key);
+			}
+		}
+		++counts.counterparts;
+		return 1;
+	};
 	// 멤버 꼴인지.
 	const checkMember = (member, where) => {
 		const memberWhere = where + "." + member.name;
@@ -2454,6 +2638,7 @@ function checkApiDocument(apiDocument) {
 		}
 		checkText(member.description, memberWhere);
 		counts.memberExamples += checkExamples(member, memberWhere);
+		return checkCounterpart(member, memberWhere);
 	};
 
 	if (apiDocument.engine !== ENGINE_NAME) {
@@ -2489,22 +2674,25 @@ function checkApiDocument(apiDocument) {
 			if (classEntry.extends !== undefined && (typeof classEntry.extends !== "string" || classEntry.extends === "")) {
 				errorList.push(classEntry.name + ": extends");
 			}
+			counts.classCounterparts += checkCounterpart(classEntry, classEntry.name);
 			for (const member of classEntry.members || []) {
 				++counts.members;
-				checkMember(member, classEntry.name);
+				counts.memberCounterparts += checkMember(member, classEntry.name);
 			}
 		}
 		for (const member of moduleEntry.functions || []) {
 			++counts.functions;
-			checkMember(member, moduleEntry.name);
+			counts.functionCounterparts += checkMember(member, moduleEntry.name);
 		}
 		for (const enumEntry of moduleEntry.enums || []) {
 			++counts.enums;
 			checkText(enumEntry.summary, enumEntry.name);
 			counts.enumExamples += checkExamples(enumEntry, enumEntry.name);
+			counts.enumCounterparts += checkCounterpart(enumEntry, enumEntry.name);
 			for (const value of enumEntry.values || []) {
 				++counts.enumValues;
 				checkText(value.description, enumEntry.name + "." + value.name);
+				counts.enumValueCounterparts += checkCounterpart(value, enumEntry.name + "." + value.name);
 			}
 		}
 	}
@@ -3485,7 +3673,7 @@ async function checkExamples(apiDocument, options) {
  * @returns { object | null }
  */
 function readArguments(argumentList) {
-	const options = { version: "", mode: "write", dateOption: "", onlyList: [], excludeList: [], isRunEnabled: true, isChromeEnabled: true, chromePath: "" };
+	const options = { version: "", mode: "write", dateOption: "", counterpartPath: "", onlyList: [], excludeList: [], isRunEnabled: true, isChromeEnabled: true, chromePath: "" };
 	for (let argumentIndex = 0; argumentIndex < argumentList.length; ++argumentIndex) {
 		const argument = argumentList[argumentIndex];
 		if (argument === "--missing") {
@@ -3505,6 +3693,13 @@ function readArguments(argumentList) {
 		}
 		else if (argument === "--no-chrome") {
 			options.isChromeEnabled = false;
+		}
+		else if (argument === "--counterpart") {
+			options.counterpartPath = argumentList[argumentIndex + 1] || "";
+			argumentIndex += 1;
+			if (options.counterpartPath === "") {
+				return null;
+			}
 		}
 		else if (argument === "--only" || argument === "--exclude" || argument === "--chrome") {
 			const value = argumentList[argumentIndex + 1] || "";
@@ -3550,6 +3745,7 @@ function printCheckResult(checkResult) {
 	console.log("[apidoc] 모듈 " + counts.modules + ", 클래스 " + counts.classes + ", 멤버 " + counts.members + ", 함수와 상수 " + counts.functions + ", 열거 " + counts.enums + " (값 " + counts.enumValues + ")");
 	console.log("[apidoc] 설명 칸 " + counts.texts + ", ko 빈 칸 " + counts.emptyKorean + ", en 빈 칸(ko 는 있음) " + counts.emptyEnglish + ", 필드 값 칸(꼴만 두고 설명은 멤버 설명에) " + counts.emptyValueSlots);
 	console.log("[apidoc] 예제 " + counts.examples + " (모듈 " + counts.moduleExamples + ", 클래스 " + counts.classExamples + ", 멤버 " + counts.memberExamples + ", 열거 " + counts.enumExamples + "), 예제 없는 클래스 " + counts.classesWithoutExample + ", 제 예제도 클래스 예제도 없는 모듈 " + counts.modulesWithoutExample);
+	console.log("[apidoc] 러스트 판 짝 " + counts.counterparts + " (클래스 " + counts.classCounterparts + ", 멤버 " + counts.memberCounterparts + ", 함수와 상수 " + counts.functionCounterparts + ", 열거 " + counts.enumCounterparts + ", 열거 값 " + counts.enumValueCounterparts + ")");
 	console.log("[apidoc] kind: " + Object.keys(checkResult.kindTable).map((kind) => kind + " " + checkResult.kindTable[kind]).join(", "));
 	const sinceList = Object.keys(checkResult.sinceTable).sort(compareVersions);
 	console.log("[apidoc] since: " + sinceList.map((since) => since + " " + checkResult.sinceTable[since]).join(", "));
@@ -3570,7 +3766,7 @@ function printCheckResult(checkResult) {
 async function main() {
 	const options = readArguments(process.argv.slice(2));
 	if (!options) {
-		console.log("사용: node tools/apidoc.cjs <버전> [--date YYYY-MM-DD] | <버전> --missing | <버전> --check | <버전> --gaps [--only <경로 앞>] [--exclude <경로 앞>] | <버전> --check-examples [--only <경로 앞>] [--exclude <경로 앞>] [--no-run] [--no-chrome] [--chrome <크롬 경로>]");
+		console.log("사용: node tools/apidoc.cjs <버전> [--date YYYY-MM-DD] [--counterpart <러스트 판 짝 표>] | <버전> --missing | <버전> --check | <버전> --gaps [--only <경로 앞>] [--exclude <경로 앞>] | <버전> --check-examples [--only <경로 앞>] [--exclude <경로 앞>] [--no-run] [--no-chrome] [--chrome <크롬 경로>]");
 		process.exitCode = 1;
 		return;
 	}
@@ -3608,6 +3804,10 @@ async function main() {
 		process.stdout.write(JSON.stringify(Array.from(missingSet), null, "\t") + "\n");
 		return;
 	}
+	if (options.counterpartPath !== "") {
+		copyCounterpartTable(path.resolve(options.counterpartPath), options.version);
+		console.log("[apidoc] 짝 표를 옮김: " + path.relative(REPOSITORY_ROOT, getCounterpartTablePath(options.version)));
+	}
 	const buildResult = buildApiDocument(options.version, options.dateOption, outputPath);
 	fs.mkdirSync(API_DIRECTORY_PATH, { recursive: true });
 	fs.writeFileSync(outputPath, JSON.stringify(buildResult.apiDocument, null, "\t") + "\n");
@@ -3620,6 +3820,12 @@ async function main() {
 		console.log("[apidoc] since 를 훑다 못 읽은 파일 " + statistics.sinceParseFailureList.length + " 개: " + statistics.sinceParseFailureList.join(", "));
 	}
 	console.log("[apidoc] JSDoc @private 이라 뺀 멤버 " + statistics.jsdocPrivateList.length + " 개");
+	if (statistics.counterpartTableMissing) {
+		console.log("[apidoc] 짝 표가 없어 counterpart 를 두지 않음: " + path.relative(REPOSITORY_ROOT, getCounterpartTablePath(options.version)) + " (--counterpart 로 러스트 판 짝 표를 옮긴다)");
+	}
+	else if (statistics.counterpartStaleList.length > 0) {
+		console.log("[apidoc] 짝 표에 있지만 자료에 없는 이름 " + statistics.counterpartStaleList.length + " 개 (러스트 판 짝 표를 다시 지을 것): " + statistics.counterpartStaleList.slice(0, 20).join(", "));
+	}
 	printCheckResult(checkApiDocument(buildResult.apiDocument));
 	if (buildResult.missingList.length > 0) {
 		console.log("[apidoc] 번역 표에 없는 ko 글 " + buildResult.missingList.length + " 개 (en 을 빈 글로 둠). 목록: node tools/apidoc.cjs " + options.version + " --missing");

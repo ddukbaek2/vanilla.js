@@ -503,6 +503,8 @@ export class GameScene extends Scene {
 		// 터치 레이캐스터.
 		this.#touchRaycaster = new TouchRecognizer();
 		this.#touchRaycaster.setRootNode(this.getRoot());
+		// 씬 기본 넘기기는 끈다. (터치 훅에서 이 TouchRecognizer 로 넘긴다, 개발자 도구, 페이드 막기, 놀이 입력 판정이 넘기기 앞뒤에 끼어서, 두 번 넘기지 않게)
+		this.setTouchRaycaster(null);
 
 		// 세이프 에어리어 컨테이너.
 		this.#safeAreaNode = new WorldNode();
@@ -617,6 +619,17 @@ export class GameScene extends Scene {
 			return false;
 		}
 		return this.#devtools.isVisible() && this.#devtools.isPointerInsidePanel();
+	}
+
+	//==============================================================================
+	// 터치 레이캐스터 반환. (터치 훅에서 노드로 넘기는 TouchRecognizer, 씬 기본 넘기기는 끄고 이것으로 넘긴다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @returns { TouchRecognizer } 터치 훅이 넘기는 TouchRecognizer. (initialize 전에는 undefined)
+	 */
+	getTouchRaycaster() {
+		return this.#touchRaycaster;
 	}
 
 	//==============================================================================

@@ -373,6 +373,8 @@ export class UIScene extends Scene {
 
 		this.#touchRaycaster = new TouchRecognizer();
 		this.#touchRaycaster.setRootNode(this.getRoot());
+		// 씬 기본 넘기기는 끈다. (터치 훅에서 이 TouchRecognizer 로 넘긴다, 개발자 도구가 입력을 가져가면 넘기지 않아서, 두 번 넘기지 않게)
+		this.setTouchRaycaster(null);
 
 		this.#lastViewSizeX = 0;
 		this.#lastViewSizeY = 0;
@@ -618,6 +620,17 @@ export class UIScene extends Scene {
 			return false;
 		}
 		return this.#devtools.isVisible() && this.#devtools.isPointerInsidePanel();
+	}
+
+	//==============================================================================
+	// 터치 레이캐스터 반환. (터치 훅에서 노드로 넘기는 TouchRecognizer, 씬 기본 넘기기는 끄고 이것으로 넘긴다)
+	//==============================================================================
+	/**
+	 * @override
+	 * @returns { TouchRecognizer } 터치 훅이 넘기는 TouchRecognizer. (initialize 전에는 undefined)
+	 */
+	getTouchRaycaster() {
+		return this.#touchRaycaster;
 	}
 
 	//==============================================================================

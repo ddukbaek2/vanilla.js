@@ -43,16 +43,11 @@ const DELAY_PRESS_MS = 150;
  * import { Engine, EngineConfiguration, Scene, TouchRecognizer, UIButton, Paint, WorldNode, Pivot, Vector2, Color } from "./build/vanilla.js";
  *
  * class MainScene extends Scene {
- * 	constructor() {
- * 		super();
- * 		this.touchRecognizer = new TouchRecognizer();
- * 	}
- *
  * 	initialize(engine) {
  * 		super.initialize(engine);
- * 		const root = this.getRoot();
- * 		this.touchRecognizer.setRootNode(root);
+ * 		this.setTouchRaycaster(new TouchRecognizer());
  *
+ * 		const root = this.getRoot();
  * 		const buttonNode = new WorldNode();
  * 		buttonNode.setPivot(Pivot.topLeft);
  * 		buttonNode.setAnchor(Pivot.topLeft);
@@ -65,26 +60,6 @@ const DELAY_PRESS_MS = 150;
  * 			console.log("clicked");
  * 		});
  * 		root.addChild(buttonNode);
- * 	}
- *
- * 	touchPress(viewInputPosition) {
- * 		this.touchRecognizer.touchPress(viewInputPosition);
- * 	}
- *
- * 	touchMove(viewInputPosition) {
- * 		this.touchRecognizer.touchMove(viewInputPosition);
- * 	}
- *
- * 	touchRelease(viewInputPosition) {
- * 		this.touchRecognizer.touchRelease(viewInputPosition);
- * 	}
- *
- * 	touchCancel(viewInputPosition) {
- * 		this.touchRecognizer.touchCancel(viewInputPosition);
- * 	}
- *
- * 	touchWheel(viewInputPosition, wheelDelta) {
- * 		this.touchRecognizer.touchWheel(viewInputPosition, wheelDelta);
  * 	}
  * }
  *

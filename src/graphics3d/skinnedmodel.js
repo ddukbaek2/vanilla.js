@@ -107,12 +107,12 @@ function convertFbxAnimationChannels(sceneData, fbxAnimation, resolveNodeIndex) 
 
 //==============================================================================
 // 애니메이션 FBX 의 클립 이름. (채널이 있는 스택이 하나면 받은 이름 그대로, 여럿이면 "받은 이름/스택 이름")
-// - 스택 이름은 FBX 이름에서 "\u0000\u0001AnimStack" 같은 종류 꼬리를 뗀 것이다. (비었으면 채널 있는 스택 사이의 차례 번호)
+// - 스택 이름은 FbxLoader 가 종류 꼬리를 뗀 이름이다. (비었으면 채널 있는 스택 사이의 차례 번호)
 // - 받은 이름이 비었으면 스택 이름만 쓴다.
 //==============================================================================
 /**
  * @param { string } clipName 부르는 쪽이 준 클립 이름.
- * @param { string } stackName FBX 스택 이름. (종류 꼬리가 붙은 그대로)
+ * @param { string } stackName FBX 스택 이름. (FbxLoader 가 종류 꼬리를 뗀 이름)
  * @param { number } stackIndex 채널이 있는 스택 사이의 차례. (0 부터)
  * @param { number } stackCount 채널이 있는 스택 수.
  * @returns { string } 클립 이름.
@@ -121,9 +121,7 @@ function createFbxClipName(clipName, stackName, stackIndex, stackCount) {
 	if (stackCount <= 1) {
 		return clipName;
 	}
-	const separatorIndex = stackName.indexOf("\u0000");
-	const displayName = separatorIndex !== -1 ? stackName.substring(0, separatorIndex) : stackName;
-	const stackLabel = displayName !== "" ? displayName : `${stackIndex}`;
+	const stackLabel = stackName !== "" ? stackName : `${stackIndex}`;
 	return clipName !== "" ? `${clipName}/${stackLabel}` : stackLabel;
 }
 

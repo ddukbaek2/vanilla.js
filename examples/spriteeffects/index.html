@@ -1046,7 +1046,7 @@
 			root.setPivot(Pivot.topLeft.clone());
 			root.setAnchor(Pivot.topLeft.clone());
 			this.#touchRecognizer = new TouchRecognizer();
-			this.#touchRecognizer.setRootNode(root);
+			this.setTouchRaycaster(this.#touchRecognizer); // 씬이 이것으로 위젯에 터치와 휠을 넘긴다. (스크롤 칸 끌기 손짓까지)
 		}
 
 		//==============================================================================
@@ -1527,70 +1527,6 @@
 				STAGE_WIDTH * pixelScale,
 				STAGE_HEIGHT * pixelScale,
 				14 * pixelScale);
-		}
-
-		//==============================================================================
-		// 터치 전달.
-		//==============================================================================
-		touchPress(viewInputPosition) {
-			if (this.#touchRecognizer) {
-				this.#touchRecognizer.touchPress(viewInputPosition);
-			}
-		}
-
-		touchMove(viewInputPosition) {
-			if (this.#touchRecognizer) {
-				this.#touchRecognizer.touchMove(viewInputPosition);
-			}
-		}
-
-		touchRelease(viewInputPosition) {
-			if (this.#touchRecognizer) {
-				this.#touchRecognizer.touchRelease(viewInputPosition);
-			}
-		}
-
-		//==============================================================================
-		// 마우스 휠. (포인터 아래 가장 안쪽 스크롤 뷰로 전달 — UIScene 이 아닌 씬은 직접 넘겨야 한다)
-		//==============================================================================
-		/**
-		 * @param { Vector2 } viewInputPosition
-		 * @param { Vector2 } wheelDelta
-		 */
-		touchWheel(viewInputPosition, wheelDelta) {
-			const scrollView = this.findScrollViewAt(this.getRoot(), viewInputPosition);
-			if (scrollView) {
-				scrollView.wheel(wheelDelta);
-			}
-		}
-
-		/**
-		 * @param { WorldNode } node
-		 * @param { Vector2 } viewInputPosition
-		 * @returns { UIScrollView | null }
-		 */
-		findScrollViewAt(node, viewInputPosition) {
-			if (!node.isActive()) {
-				return null;
-			}
-			const children = node.getChildren();
-			for (let childIndex = children.length - 1; childIndex >= 0; --childIndex) {
-				const found = this.findScrollViewAt(children[childIndex], viewInputPosition);
-				if (found) {
-					return found;
-				}
-			}
-			const scrollView = (typeof node.getComponent === "function") ? node.getComponent(UIScrollView) : null;
-			if (scrollView && typeof node.contains === "function" && node.contains(viewInputPosition)) {
-				return scrollView;
-			}
-			return null;
-		}
-
-		touchCancel(viewInputPosition) {
-			if (this.#touchRecognizer) {
-				this.#touchRecognizer.touchCancel(viewInputPosition);
-			}
 		}
 	}
 

@@ -101,7 +101,7 @@
 			root.setPivot(Pivot.topLeft.clone());
 			root.setAnchor(Pivot.topLeft.clone());
 			this.#touchRecognizer = new TouchRecognizer();
-			this.#touchRecognizer.setRootNode(root);
+			this.setTouchRaycaster(this.#touchRecognizer); // 씬이 이것으로 위젯에 터치와 휠을 넘긴다. (스크롤 칸 끌기 손짓까지)
 		}
 
 		//==============================================================================
@@ -227,36 +227,6 @@
 			graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
 
 			viewManager.applyViewRect(graphic);
-		}
-
-		//==============================================================================
-		// 터치 전달. (TouchRecognizer 로 위젯에 넘긴다)
-		//==============================================================================
-		/**
-		 * @param { Vector2 } viewInputPosition
-		 */
-		touchPress(viewInputPosition) {
-			if (this.#touchRecognizer) {
-				this.#touchRecognizer.touchPress(viewInputPosition);
-			}
-		}
-
-		/**
-		 * @param { Vector2 } viewInputPosition
-		 */
-		touchMove(viewInputPosition) {
-			if (this.#touchRecognizer) {
-				this.#touchRecognizer.touchMove(viewInputPosition);
-			}
-		}
-
-		/**
-		 * @param { Vector2 } viewInputPosition
-		 */
-		touchRelease(viewInputPosition) {
-			if (this.#touchRecognizer) {
-				this.#touchRecognizer.touchRelease(viewInputPosition);
-			}
 		}
 	}
 

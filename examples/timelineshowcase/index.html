@@ -178,6 +178,7 @@
 			root.setAnchor(Pivot.topLeft.clone());
 			this.#touchRecognizer = new TouchRecognizer();
 			this.#touchRecognizer.setRootNode(root);
+			this.setTouchRaycaster(null); // 씬 기본 넘기기는 끈다. (막대 끌기가 터치를 가로채므로 터치 훅에서 직접 넘긴다)
 		}
 
 		//==============================================================================

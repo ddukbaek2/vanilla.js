@@ -171,7 +171,7 @@ UIScrollView ── require()s Mask, the scrollbar is created as a sibling of ho
 UIWindowLayer (node) ── UIWindow[] (only the top window is visible, enlarges the layer by UIScale, detaches a window when its closing motion ends)
 ```
 
-Touch flow: DOM event → Engine → InputManager flags → Scene.tickTouch → TouchRecognizer traverses the root tree in draw order and selects the topmost interactable WorldNode → the node passes it to its components → a Component such as UIButton handles it. The wheel goes to the scroll area that is frontmost in draw order among those covering that spot. (TouchRaycaster.touchWheel)
+Touch flow: DOM event → Engine → InputManager flags → Scene.tickTouch → the scene's touch raycaster (TouchRaycaster; UIScene and GameScene use a TouchRecognizer from their touch hooks) traverses the root tree in draw order and selects the topmost interactable WorldNode → the node passes it to its components → a Component such as UIButton handles it. The wheel goes to the scroll area that is frontmost in draw order among those covering that spot. (TouchRaycaster.touchWheel)
 
 ### 4-4. Assets
 

@@ -7,6 +7,7 @@ import { Vector2 } from "../base/vector2.js";
 import { Engine } from "./engine.js";
 import { Graphic } from "./graphic.js";
 import { WorldNode } from "./node/worldnode.js";
+import { TouchRaycaster } from "./touchraycaster.js";
 import { Tween } from "./tween.js";
 
 
@@ -19,6 +20,8 @@ import { Tween } from "./tween.js";
 // - preDraw(graphic) ==> draw(graphic) ==> postDraw(graphic)
 // - touchPress(viewInputPosition) ==> touchMove(viewInputPosition) ==> touchRelease(viewInputPosition)
 // - reset()
+// - 터치는 씬 꼴과 상관없이 노드의 위젯이 받는다. tickTouch 가 씬의 터치 레이캐스터(처음은 TouchRaycaster, setTouchRaycaster 로 바꾼다)로
+//   가장 앞의 누를 수 있는 노드에 먼저 넘기고, 그 뒤에 씬의 터치 훅을 부른다. (유니티 EventSystem 처럼, 러스트 판 SceneBase.tick 과 같다)
 //==============================================================================
 /**
  * @example <caption>불러오고, 갱신하고, 그리고, 누름 받기</caption>
@@ -63,6 +66,7 @@ export class Scene extends Object {
 	/** @private @type { VTweeneen[] } */ #tweens;
 	/** @private @type { boolean } */ #isGizmoVisible; // 기즈모 출력 여부.
 	/** @private @type { boolean } */ #isLoaded; // 비동기 로딩 완료 여부.
+	/** @private @type { TouchRaycaster | null } */ #touchRaycaster; // 노드에 터치를 넘기는 레이캐스터. (null 이면 넘기지 않는다)
 
 	//==============================================================================
 	// 생성.
@@ -85,6 +89,8 @@ export class Scene extends Object {
 		this.#root = new WorldNode();
 		const root = this.getRoot();
 		root.setName("root");
+		this.#touchRaycaster = new TouchRaycaster();
+		this.#touchRaycaster.setRootNode(root);
 	}
 
 	//==============================================================================
@@ -363,9 +369,18 @@ export class Scene extends Object {
 		const inputManager = engine.getInputManager();
 		const viewInputPosition = inputManager.getViewInputPosition();
 		const isTouchPressed = inputManager.isTouchPressed();
+		const touchRaycaster = this.#touchRaycaster;
 
-		// 누름.
+		// 누름. (노드에 먼저 넘기고 훅을 부른다, 아래 모두 같다)
 		if (isTouchPressed) {
+			if (touchRaycaster) {
+				try {
+					touchRaycaster.touchPress(viewInputPosition);
+				}
+				catch (error) {
+					console.error(error);
+				}
+			}
 			try {
 				this.touchPress(viewInputPosition);
 			}
@@ -376,6 +391,14 @@ export class Scene extends Object {
 
 		// 뗌. (한 프레임 안에 눌렀다 뗐으면 누름 뒤에 바로 뗌을 넘긴다)
 		if (inputManager.isTouchReleased()) {
+			if (touchRaycaster) {
+				try {
+					touchRaycaster.touchRelease(viewInputPosition);
+				}
+				catch (error) {
+					console.error(error);
+				}
+			}
 			try {
 				this.touchRelease(viewInputPosition);
 			}
@@ -385,6 +408,14 @@ export class Scene extends Object {
 		}
 		// 누르고 있음. (누른 프레임에는 넘기지 않는다)
 		else if (inputManager.isTouchMoved() && !isTouchPressed) {
+			if (touchRaycaster) {
+				try {
+					touchRaycaster.touchMove(viewInputPosition);
+				}
+				catch (error) {
+					console.error(error);
+				}
+			}
 			try {
 				this.touchMove(viewInputPosition);
 			}
@@ -394,6 +425,14 @@ export class Scene extends Object {
 		}
 		// 취소됨.
 		else if (inputManager.isTouchCancelled()) {
+			if (touchRaycaster) {
+				try {
+					touchRaycaster.touchCancel(viewInputPosition);
+				}
+				catch (error) {
+					console.error(error);
+				}
+			}
 			try {
 				this.touchCancel(viewInputPosition);
 			}
@@ -402,10 +441,18 @@ export class Scene extends Object {
 			}
 		}
 
-		// 마우스 휠. (이번 프레임에 누적된 휠 값이 있으면 dispatch)
+		// 마우스 휠. (이번 프레임에 누적된 휠 값이 있으면 그 자리의 가장 앞 스크롤 칸에 넘기고 훅을 부른다)
 		if (typeof inputManager.hasWheelDelta === "function" && inputManager.hasWheelDelta()) {
+			const wheelDelta = Vector2.create(inputManager.getWheelDeltaX(), inputManager.getWheelDeltaY());
+			if (touchRaycaster) {
+				try {
+					touchRaycaster.touchWheel(viewInputPosition, wheelDelta);
+				}
+				catch (error) {
+					console.error(error);
+				}
+			}
 			try {
-				const wheelDelta = Vector2.create(inputManager.getWheelDeltaX(), inputManager.getWheelDeltaY());
 				this.touchWheel(viewInputPosition, wheelDelta);
 			}
 			catch (error) {
@@ -560,6 +607,44 @@ export class Scene extends Object {
 	 */
 	getRoot() {
 		return this.#root;
+	}
+
+	//==============================================================================
+	// 터치 레이캐스터 설정.
+	// - tickTouch 가 이 레이캐스터로 가장 앞의 누를 수 있는 노드에 터치를 넘긴다. 루트는 씬 루트로 건다.
+	// - TouchRecognizer 를 주면 스크롤 칸 안의 끌기 손짓(누름 늦추기, 끌면 스크롤 칸으로)도 넘긴다.
+	// - null 이면 노드에 넘기지 않는다. (씬이 터치 훅에서 직접 넘길 때, UIScene 과 GameScene 이 그렇게 한다)
+	//==============================================================================
+	/**
+	 * @param { TouchRaycaster | null } touchRaycaster 노드에 터치를 넘길 레이캐스터. (null 이면 넘기지 않는다)
+	 * @example <caption>스크롤 칸 끌기 손짓까지 넘기기</caption>
+	 * import { Engine, EngineConfiguration, Scene, TouchRecognizer } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	initialize(engine) {
+	 * 		this.setTouchRaycaster(new TouchRecognizer());
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	setTouchRaycaster(touchRaycaster) {
+		this.#touchRaycaster = touchRaycaster;
+		if (touchRaycaster) {
+			touchRaycaster.setRootNode(this.getRoot());
+		}
+	}
+
+	//==============================================================================
+	// 터치 레이캐스터 반환.
+	//==============================================================================
+	/**
+	 * @returns { TouchRaycaster | null } 노드에 터치를 넘기는 레이캐스터. (create 에서 TouchRaycaster 를 만든다, 넘기지 않으면 null)
+	 */
+	getTouchRaycaster() {
+		return this.#touchRaycaster;
 	}
 
 	//==============================================================================

@@ -1,6 +1,6 @@
 # 입력
 
-엔진은 캔버스의 마우스와 터치, 문서의 키보드, 게임패드를 받아 `InputManager` 에 담습니다. 마우스와 터치는 "터치" 한 갈래로 합쳐 씬에 넘기고, 노드로 넘길 때는 `TouchRecognizer` 를 씁니다. 이 장은 씬에서 터치 받기, 노드로 넘기기, 손가락 여럿, 마우스 단추와 휠, 키보드, 입력 동작(`InputActions`), 게임패드, 마우스 커서를 봅니다.
+엔진은 캔버스의 마우스와 터치, 문서의 키보드, 게임패드를 받아 `InputManager` 에 담습니다. 마우스와 터치는 "터치" 한 갈래로 합쳐 씬에 넘기고, 씬은 그것을 노드에 넘깁니다(`TouchRaycaster`, `TouchRecognizer`). 이 장은 씬에서 터치 받기, 노드로 넘기기, 손가락 여럿, 마우스 단추와 휠, 키보드, 입력 동작(`InputActions`), 게임패드, 마우스 커서를 봅니다.
 
 ## 씬에서 터치 받기
 
@@ -82,9 +82,9 @@ engine.run(new DragScene());
 
 1. `WorldNode.setInteractable(true)`
 2. 터치를 받을 메서드(`touchPress`, `touchMove`, `touchRelease`, `touchCancel`)를 가진 컴포넌트. 노드는 받은 터치를 그 메서드가 있는 컴포넌트 모두에 넘깁니다.
-3. 씬이 `TouchRecognizer` 를 만들어 `setRootNode(root)` 로 루트를 주고, 씬의 터치 메서드에서 그것에 넘기기.
+3. 그 노드가 씬 루트 아래에 있기. 씬은 씬 꼴과 상관없이 `tickTouch` 에서 씬의 터치 레이캐스터(처음은 `TouchRaycaster`)로 가장 앞의 노드에 먼저 넘기고, 그 뒤에 씬의 터치 메서드를 부릅니다.
 
-`TouchRaycaster` 는 누를 때 루트부터 그리는 차례로 트리를 돌아, 활성이고 `isInteractable()` 이 참이며 그 점을 품는(`contains`) 노드 가운데 가장 나중에 그리는(가장 위에 보이는) 노드를 고릅니다. `Mask` 가 붙은 노드 밖에 있는 자손은 고르지 않습니다. 고른 노드는 뗄 때까지 손가락이 밖으로 나가도 `touchMove`, `touchRelease` 를 받습니다. `TouchRecognizer` 는 이것을 이어받아, 고른 노드의 조상에 `UIScrollView` 가 있으면 누름을 0.15 초 늦춰 넘기고, 10 픽셀 넘게 끌면 노드에는 누름을 넘기지 않거나 취소하고 스크롤 칸에 끌기를 넘깁니다.
+`TouchRaycaster` 는 누를 때 루트부터 그리는 차례로 트리를 돌아, 활성이고 `isInteractable()` 이 참이며 그 점을 품는(`contains`) 노드 가운데 가장 나중에 그리는(가장 위에 보이는) 노드를 고릅니다. `Mask` 가 붙은 노드 밖에 있는 자손은 고르지 않습니다. 고른 노드는 뗄 때까지 손가락이 밖으로 나가도 `touchMove`, `touchRelease` 를 받습니다. `TouchRecognizer` 는 이것을 이어받아, 고른 노드의 조상에 `UIScrollView` 가 있으면 누름을 0.15 초 늦춰 넘기고, 10 픽셀 넘게 끌면 노드에는 누름을 넘기지 않거나 취소하고 스크롤 칸에 끌기를 넘깁니다. 스크롤 칸 안에 단추가 있으면 `setTouchRaycaster(new TouchRecognizer())` 로 씬의 레이캐스터를 바꿉니다. 씬이 터치를 가로채야 하면(막대 끌기 같은) `setTouchRaycaster(null)` 로 끄고 씬의 터치 메서드에서 직접 넘깁니다. `UIScene` 과 `GameScene` 이 그렇게 합니다.
 
 ```javascript
 import { Engine, EngineConfiguration, Scene, WorldNode, Component, Paint, TouchRecognizer, Vector2, Color } from "./build/vanilla.js";
@@ -128,13 +128,9 @@ class PressHighlight extends Component {
 }
 
 class ButtonScene extends Scene {
-	#touchRecognizer;
-
 	create() {
 		super.create();
-		const root = this.getRoot();
-		this.#touchRecognizer = new TouchRecognizer();
-		this.#touchRecognizer.setRootNode(root);
+		this.setTouchRaycaster(new TouchRecognizer());
 	}
 
 	initialize(engine) {
@@ -149,26 +145,6 @@ class ButtonScene extends Scene {
 		paint.setColor("#3366cc");
 		paint.setRoundSize(16);
 		root.addChild(button);
-	}
-
-	touchPress(viewInputPosition) {
-		this.#touchRecognizer.touchPress(viewInputPosition);
-	}
-
-	touchMove(viewInputPosition) {
-		this.#touchRecognizer.touchMove(viewInputPosition);
-	}
-
-	touchRelease(viewInputPosition) {
-		this.#touchRecognizer.touchRelease(viewInputPosition);
-	}
-
-	touchCancel(viewInputPosition) {
-		this.#touchRecognizer.touchCancel(viewInputPosition);
-	}
-
-	touchWheel(viewInputPosition, wheelDelta) {
-		this.#touchRecognizer.touchWheel(viewInputPosition, wheelDelta);
 	}
 
 	preDraw(graphic) {
@@ -528,7 +504,7 @@ engine.run(new CursorScene());
 ## 주의할 점
 
 - 씬의 터치 메서드와 `getViewInputPosition()` 은 자리 하나만 봅니다. 핀치처럼 손가락 여럿이 필요하면 `getTouchPoints()` 를 씁니다.
-- 아무 씬이나 노드로 터치를 넘기지는 않습니다. `Scene` 을 바로 이어받았으면 `TouchRecognizer` 를 직접 연결하고, `UIScene` 은 스스로 연결합니다.
+- 씬은 꼴과 상관없이 노드로 터치를 넘깁니다. 씬의 터치 메서드에서 레이캐스터에 또 넘기면 두 번 넘어가니, 직접 넘길 때는 `setTouchRaycaster(null)` 로 씬의 넘기기를 끕니다.
 - 키 이름(`KeyCode`)과 게임패드 번호(`GamepadButtonCode`, `GamepadAnalogStickCode`)의 표는 공개 이름에 없습니다. 키는 `KeyboardEvent.code` 글, 패드는 W3C 표준 배치의 번호로 줍니다.
 - 키는 문서(`document`)에서 받으므로 페이지에 초점이 있어야 들어옵니다. iframe 안의 게임은 iframe 을 한 번 눌러야 키를 받습니다.
 - 창이 초점을 잃으면 엔진은 터치와 마우스 단추를 뗀 것으로 돌리지만 키는 그대로 둡니다. 키 상태는 페이지가 다시 보일 때(`visibilitychange`) 지웁니다. 키가 눌린 채 남는 것이 문제면 `PageEvent.blurred` 를 받아 `inputManager.clear()` 를 부릅니다.

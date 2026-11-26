@@ -171,7 +171,7 @@ UIScrollView ── Mask 를 require(), 스크롤바는 host 의 sibling 으로 
 UIWindowLayer (노드) ── UIWindow[] (맨 위 창만 보임, UIScale 만큼 층을 키움, 닫는 움직임이 끝나면 떼어 냄)
 ```
 
-터치 흐름: DOM 이벤트 → Engine → InputManager 플래그 → Scene.tickTouch → TouchRecognizer 가 루트 트리를 draw 순서로 순회해 최상위 interactable WorldNode 선택 → 노드가 자기 컴포넌트들에 전달 → UIButton 등 Component 가 처리. 휠은 그 자리를 덮는 것 가운데 그리는 순서로 가장 앞인 스크롤 칸이 받는다. (TouchRaycaster.touchWheel)
+터치 흐름: DOM 이벤트 → Engine → InputManager 플래그 → Scene.tickTouch → 씬의 터치 레이캐스터(TouchRaycaster, UIScene 과 GameScene 은 터치 훅에서 TouchRecognizer)가 루트 트리를 draw 순서로 순회해 최상위 interactable WorldNode 선택 → 노드가 자기 컴포넌트들에 전달 → UIButton 등 Component 가 처리. 휠은 그 자리를 덮는 것 가운데 그리는 순서로 가장 앞인 스크롤 칸이 받는다. (TouchRaycaster.touchWheel)
 
 ### 4-4. 애셋
 

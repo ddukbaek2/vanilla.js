@@ -1,6 +1,6 @@
 # Input
 
-The engine receives mouse and touch input on the canvas, keyboard input on the document, and gamepads, and stores them in `InputManager`. Mouse and touch are merged into a single "touch" stream passed to the scene, and `TouchRecognizer` passes it on to nodes. This chapter covers receiving touches in a scene, passing them to nodes, multiple fingers, mouse buttons and the wheel, the keyboard, input actions (`InputActions`), gamepads, and the mouse cursor.
+The engine receives mouse and touch input on the canvas, keyboard input on the document, and gamepads, and stores them in `InputManager`. Mouse and touch are merged into a single "touch" stream passed to the scene, and the scene passes it on to nodes (`TouchRaycaster`, `TouchRecognizer`). This chapter covers receiving touches in a scene, passing them to nodes, multiple fingers, mouse buttons and the wheel, the keyboard, input actions (`InputActions`), gamepads, and the mouse cursor.
 
 ## Receiving touches in a scene
 
@@ -82,9 +82,9 @@ A node needs three things to receive touches.
 
 1. `WorldNode.setInteractable(true)`
 2. A component with touch methods (`touchPress`, `touchMove`, `touchRelease`, `touchCancel`). The node passes each touch to every component that has the method.
-3. The scene creates a `TouchRecognizer`, gives it the root with `setRootNode(root)`, and forwards to it from the scene's touch methods.
+3. The node is under the scene root. Whatever the kind of scene, `tickTouch` first passes the touch to the frontmost node through the scene's touch raycaster (a `TouchRaycaster` at first), then calls the scene's touch methods.
 
-On a press, `TouchRaycaster` walks the tree from the root in draw order and picks, among nodes that are active, have `isInteractable()` true and contain the point (`contains`), the one drawn last (the one visible on top). Descendants outside a node with a `Mask` are not picked. The picked node keeps receiving `touchMove` and `touchRelease` until release, even if the finger leaves it. `TouchRecognizer` extends this: if the picked node has a `UIScrollView` ancestor, it delays the press by 0.15 seconds, and once the drag goes beyond 10 pixels it withholds or cancels the press on the node and hands the drag to the scroll view.
+On a press, `TouchRaycaster` walks the tree from the root in draw order and picks, among nodes that are active, have `isInteractable()` true and contain the point (`contains`), the one drawn last (the one visible on top). Descendants outside a node with a `Mask` are not picked. The picked node keeps receiving `touchMove` and `touchRelease` until release, even if the finger leaves it. `TouchRecognizer` extends this: if the picked node has a `UIScrollView` ancestor, it delays the press by 0.15 seconds, and once the drag goes beyond 10 pixels it withholds or cancels the press on the node and hands the drag to the scroll view. If there are buttons inside a scroll view, replace the scene's raycaster with `setTouchRaycaster(new TouchRecognizer())`. If the scene has to intercept touches (such as dragging a bar), turn it off with `setTouchRaycaster(null)` and pass touches yourself from the scene's touch methods. `UIScene` and `GameScene` do this.
 
 ```javascript
 import { Engine, EngineConfiguration, Scene, WorldNode, Component, Paint, TouchRecognizer, Vector2, Color } from "./build/vanilla.js";
@@ -128,13 +128,9 @@ class PressHighlight extends Component {
 }
 
 class ButtonScene extends Scene {
-	#touchRecognizer;
-
 	create() {
 		super.create();
-		const root = this.getRoot();
-		this.#touchRecognizer = new TouchRecognizer();
-		this.#touchRecognizer.setRootNode(root);
+		this.setTouchRaycaster(new TouchRecognizer());
 	}
 
 	initialize(engine) {
@@ -149,26 +145,6 @@ class ButtonScene extends Scene {
 		paint.setColor("#3366cc");
 		paint.setRoundSize(16);
 		root.addChild(button);
-	}
-
-	touchPress(viewInputPosition) {
-		this.#touchRecognizer.touchPress(viewInputPosition);
-	}
-
-	touchMove(viewInputPosition) {
-		this.#touchRecognizer.touchMove(viewInputPosition);
-	}
-
-	touchRelease(viewInputPosition) {
-		this.#touchRecognizer.touchRelease(viewInputPosition);
-	}
-
-	touchCancel(viewInputPosition) {
-		this.#touchRecognizer.touchCancel(viewInputPosition);
-	}
-
-	touchWheel(viewInputPosition, wheelDelta) {
-		this.#touchRecognizer.touchWheel(viewInputPosition, wheelDelta);
 	}
 
 	preDraw(graphic) {
@@ -528,7 +504,7 @@ engine.run(new CursorScene());
 ## Things to watch
 
 - A scene's touch methods and `getViewInputPosition()` see only one position. When you need several fingers, such as for pinching, use `getTouchPoints()`.
-- Not every scene passes touches to nodes. If you extend `Scene` directly, connect a `TouchRecognizer` yourself; `UIScene` connects one by itself.
+- Every kind of scene passes touches to nodes. If the scene's touch methods also forward to a raycaster, touches are passed twice, so turn off the scene's passing with `setTouchRaycaster(null)` when you pass them yourself.
 - The tables of key names (`KeyCode`) and gamepad numbers (`GamepadButtonCode`, `GamepadAnalogStickCode`) are not public names. Pass keys as `KeyboardEvent.code` strings and pad inputs as W3C standard mapping numbers.
 - Keys are received on the document, so the page must have focus. A game inside an iframe receives keys only after the iframe is clicked once.
 - When the window loses focus, the engine releases touches and mouse buttons but leaves keys as they are. Key state is cleared when the page becomes visible again (`visibilitychange`). If keys staying pressed is a problem, listen for `PageEvent.blurred` and call `inputManager.clear()`.
