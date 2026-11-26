@@ -588,9 +588,10 @@ export class ModalDialog {
 	 * @param { InputManager } inputManager 입력.
 	 * @param { Graphic } graphic 글 폭을 잴 그래픽.
 	 * @param { number } timeDelta 지난 프레임부터의 시간. (초)
+	 * @param { Vector2 } canvasClientPosition 캔버스 왼쪽 위의 뷰포트 좌표. (숨긴 입력을 입력 칸 자리에 둔다)
 	 * @returns { boolean | null } 답. (확인이면 참, 취소면 거짓, 아직이면 null)
 	 */
-	tick(inputManager, graphic, timeDelta) {
+	tick(inputManager, graphic, timeDelta, canvasClientPosition) {
 		this.open();
 		let answer = this.#keyAnswer;
 		const input = this.#inputElement;
@@ -634,8 +635,8 @@ export class ModalDialog {
 		}
 		// 숨긴 입력을 입력 칸 자리에 둔다. (IME 후보 창 자리)
 		if (input && layout && layout.fieldRect) {
-			input.style.left = `${layout.fieldRect.left}px`;
-			input.style.top = `${layout.fieldRect.top}px`;
+			input.style.left = `${canvasClientPosition.x + layout.fieldRect.left}px`;
+			input.style.top = `${canvasClientPosition.y + layout.fieldRect.top}px`;
 		}
 		return answer;
 	}

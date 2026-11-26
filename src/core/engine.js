@@ -1458,7 +1458,9 @@ export class Engine extends Object {
 			return;
 		}
 		const inputManager = this.getInputManager();
-		const answer = dialog.tick(inputManager, graphic, timeDelta);
+		const canvas = this.getViewManager().getCanvas();
+		const canvasRect = canvas ? canvas.getBoundingClientRect() : null;
+		const answer = dialog.tick(inputManager, graphic, timeDelta, canvasRect ? Vector2.create(canvasRect.left, canvasRect.top) : Vector2.create(0, 0));
 		if (dialog.isPointerOverButton()) {
 			PointerCursor.getInstance().markOverButton();
 		}
