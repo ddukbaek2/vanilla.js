@@ -1,7 +1,7 @@
 //==============================================================================
 // 공간 소리 초안 시험. (node tests/experimental/spatialaudio.test.mjs)
-// - PannerNode 셈(spatialaudiomath.js)을 크롬 158 OfflineAudioContext 가 그린 값과 견준다. (chrome_spatial.json, 러스트 판 vanilla-engine 의
-//   tests/assets/spatialaudio/chromespatial.cjs 가 찍은 것과 같은 파일) 자동화와 멈춤이 없고 표본율이 같은 경우는 식으로 다시 그릴 수 있다.
+// - PannerNode 셈(spatialaudiomath.js)을 크롬 158 OfflineAudioContext 가 그린 값과 견준다. (chrome_spatial.json 은 러스트 판 vanilla-engine 의
+//   tests/assets/spatialaudio/chromespatial.cjs 가 찍은 파일을 그대로 옮긴 것, 다시 찍으면 같이 옮긴다) 자동화와 멈춤이 없고 표본율이 같은 경우는 식으로 다시 그릴 수 있다.
 // - 거리 모델, 원뿔, 방위각, 등력 좌우의 모서리 값과 설정 받기, 2D 컴포넌트의 자리 따라가기를 본다. (러스트 판 시험과 같은 값)
 //==============================================================================
 import fs from "fs";
@@ -100,7 +100,7 @@ for (const testCase of json.cases) {
 		check(Math.abs(energy - expectedEnergy) <= expectedEnergy * 1e-6 + 1e-9, `${testCase.name} 채널 ${channelIndex} 제곱합: ${energy} / ${expectedEnergy}`);
 	}
 }
-check(staticCaseCount === 5, "식으로 다시 그린 경우 수");
+check(staticCaseCount === 6, "식으로 다시 그린 경우 수");
 
 //==============================================================================
 // 거리 모델, 원뿔, 방위각, 등력 좌우. (러스트 판 pannermath 시험과 같은 값)
@@ -122,6 +122,10 @@ check(Math.abs(calculateConeGain(origin, facingX, Vector3.create(-5, 0, 0), 60, 
 check(Math.abs(calculateConeGain(origin, facingX, Vector3.create(0, 5, 0), 60, 300, 0.2) - 0.6) < 1e-6, "원뿔 사이");
 check(calculateConeGain(origin, origin, Vector3.create(-5, 0, 0), 60, 180, 0.2) === 1, "방향 0");
 check(calculateConeGain(origin, facingX, Vector3.create(-5, 0, 0), 360, 360, 0.2) === 1, "원뿔 360");
+// 크롬처럼 길이 0 의 사이 각은 0 이다. (fmin(NaN, 1) 이 1, chrome_spatial.json 의 static_same_position_cone 과 HRTF hrtf_listener_forward_parallel_up_44100)
+check(calculateConeGain(origin, facingX, origin, 30, 90, 0.1) === 1, "같은 자리 원뿔");
+const parallel = calculateAzimuthElevation(Vector3.create(2, 1, -1), origin, Vector3.create(0, 1, 0), Vector3.create(0, 1, 0));
+check(parallel.azimuth === 0 && parallel.elevation === 90, "앞과 위가 나란한 리스너");
 const forward = Vector3.create(0, 0, -1);
 const up = Vector3.create(0, 1, 0);
 check(Math.abs(calculateAzimuthElevation(Vector3.create(0, 0, -4), origin, forward, up).azimuth) < 1e-4, "앞");
@@ -155,6 +159,9 @@ check(settings.maximumDistance === 50 && settings.rolloffFactor === 1 && setting
 player.setPosition(Vector3.create(1, NaN, 3));
 check(player.getPosition().x === 1 && player.getPosition().y === 0 && player.getPosition().z === 3, "NaN 칸 유지");
 const audioPosition = convertViewPositionToAudioPosition(Vector2.create(200, 100), 100, 0);
+// f64 로 나눈 뒤 fround. (f32 끼리 나누면 23.333332, 러스트 판 view_position_divides_in_f64 와 같은 값)
+const dividedPosition = convertViewPositionToAudioPosition(Vector2.create(7, 7), 0.3, 1 / 3);
+check(dividedPosition.x === fround(23.333334) && dividedPosition.y === fround(-23.333334) && dividedPosition.z === fround(1 / 3), "f64 나눗셈");
 check(audioPosition.x === 2 && audioPosition.y === -1 && audioPosition.z === 0, "화면 자리 바꾸기");
 const sourceNode = new WorldNode();
 sourceNode.setLocalPosition(Vector2.create(300, 100));
