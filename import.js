@@ -131,7 +131,7 @@ export { Dictionary } from "./src/experimental/collection/dictionary.js";
 export { Queue } from "./src/experimental/collection/queue.js";
 export { Stack } from "./src/experimental/collection/stack.js";
 export { Set } from "./src/experimental/collection/set.js";
-export { Animator, AnimationState, AnimationTransition } from "./src/experimental/animation/animator.js";
+export { Animator, AnimationState, AnimationTransition, AnimationConditionMode } from "./src/experimental/animation/animator.js";
 export { Visual } from "./src/experimental/visual/visual.js";
 export { VisualAsset } from "./src/experimental/visual/visualasset.js";
 export { Camera } from "./src/experimental/camera.js";

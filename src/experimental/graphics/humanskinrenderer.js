@@ -19,7 +19,7 @@ export const SKIN_SHADING_FACIALHAIR = 5; // 눈썹, 수염 같은 얼굴 털. (
 
 // 추가 텍스처 유닛. (머티리얼 기본 슬롯 0 / 2~8 과 섀도우 1, 모프 15 를 피한 9~14)
 // - 피부: 9 높이 디테일, 10 마이크로(노멀 rgb + 캐비티 a), 11 주름 마스크 아틀라스(4x4), 12 주름 노멀 아틀라스(2x2), 13 주름 색 아틀라스(2x2)
-// - 눈: 12 홍채 색, 13 홍채 노멀 / 머리카락: 12 카드 탄젠트(rgb) + 가닥 좌표(a)
+// - 눈: 12 홍채 노멀, 13 홍채 색 / 머리카락: 12 카드 탄젠트(rgb) + 가닥 좌표(a)
 export const SKIN_TEXTURE_UNIT_DETAILHEIGHT = 9;
 export const SKIN_TEXTURE_UNIT_MICRO = 10; // 유니폼 microTexture 의 유닛. (마이크로 노멀 rgb + 캐비티 a, 타일링)
 export const SKIN_TEXTURE_UNIT_MASKATLAS = 11; // 유니폼 maskAtlasTexture 의 유닛. (주름 마스크 아틀라스 4x4)
@@ -336,7 +336,7 @@ void shadeSkin(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirection, 
 }
 
 //==============================================================================
-// 눈. (기본 색 = 공막, 12 = 홍채 색, 13 = 홍채 노멀, 노멀 맵 = 공막 정맥 — UV 중심이 동공)
+// 눈. (기본 색 = 공막, 12 = 홍채 노멀, 13 = 홍채 색, 노멀 맵 = 공막 정맥, UV 중심이 동공)
 //==============================================================================
 void shadeEye(vec2 textureCoordinate, vec3 geometryNormal, vec3 viewDirection, mat3 tangentFrame) {
 	vec2 centered = textureCoordinate - vec2(0.5);
