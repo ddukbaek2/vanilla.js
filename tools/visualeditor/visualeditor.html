@@ -2153,7 +2153,7 @@
     //==============================================================================
     /**
      * @property
-     * @returns { number }
+     * @returns { number } a 성분. (x 의 x 방향 크기, 가로 배율 겸 회전 성분)
      */
     get a() {
       return this.#a;
@@ -2163,7 +2163,7 @@
     //==============================================================================
     /**
      * @property
-     * @returns { number }
+     * @returns { number } b 성분. (x 의 y 방향 기울기, 회전 성분)
      */
     get b() {
       return this.#b;
@@ -2173,7 +2173,7 @@
     //==============================================================================
     /**
      * @property
-     * @returns { number }
+     * @returns { number } c 성분. (y 의 x 방향 기울기, 회전 성분)
      */
     get c() {
       return this.#c;
@@ -2183,7 +2183,7 @@
     //==============================================================================
     /**
      * @property
-     * @returns { number }
+     * @returns { number } d 성분. (y 의 y 방향 크기, 세로 배율 겸 회전 성분)
      */
     get d() {
       return this.#d;
@@ -2193,7 +2193,7 @@
     //==============================================================================
     /**
      * @property
-     * @returns { number }
+     * @returns { number } e 성분. (x 방향 이동량)
      */
     get e() {
       return this.#e;
@@ -2203,7 +2203,7 @@
     //==============================================================================
     /**
      * @property
-     * @returns { number }
+     * @returns { number } f 성분. (y 방향 이동량)
      */
     get f() {
       return this.#f;
@@ -2223,12 +2223,12 @@
     // 행렬 성분 직접 설정. (Canvas2D setTransform 인자 순서와 동일)
     //==============================================================================
     /**
-     * @param { number } a
-     * @param { number } b
-     * @param { number } c
-     * @param { number } d
-     * @param { number } e
-     * @param { number } f
+     * @param { number } a 행렬의 a 성분.
+     * @param { number } b 행렬의 b 성분.
+     * @param { number } c 행렬의 c 성분.
+     * @param { number } d 행렬의 d 성분.
+     * @param { number } e 행렬의 e 성분. (x 방향 이동량)
+     * @param { number } f 행렬의 f 성분. (y 방향 이동량)
      */
     setTransform(a, b, c, d, e, f) {
       this.#a = a;
@@ -2242,7 +2242,7 @@
     // 다른 행렬의 성분 복사.
     //==============================================================================
     /**
-     * @param { TransformMatrix } other
+     * @param { TransformMatrix } other 성분을 복사해 올 행렬.
      */
     copyFrom(other) {
       this.#a = other.a;
@@ -2257,7 +2257,7 @@
     //==============================================================================
     /**
      * @override
-     * @returns { this }
+     * @returns { this } 같은 성분을 가진 새 행렬.
      */
     clone() {
       const transformMatrix = (
@@ -2271,8 +2271,8 @@
     // 이동 변환 누적. (Canvas2D translate 와 동일한 로컬 공간 우측 곱)
     //==============================================================================
     /**
-     * @param { number } x
-     * @param { number } y
+     * @param { number } x x 방향 이동량.
+     * @param { number } y y 방향 이동량.
      */
     translate(x, y) {
       this.#e = this.#a * x + this.#c * y + this.#e;
@@ -2282,7 +2282,7 @@
     // 회전 변환 누적. (Canvas2D rotate 와 동일한 로컬 공간 우측 곱)
     //==============================================================================
     /**
-     * @param { number } radian
+     * @param { number } radian 회전각. (라디안)
      */
     rotate(radian) {
       if (radian === 0) {
@@ -2303,8 +2303,8 @@
     // 크기 변환 누적. (Canvas2D scale 과 동일한 로컬 공간 우측 곱)
     //==============================================================================
     /**
-     * @param { number } x
-     * @param { number } y
+     * @param { number } x x 방향 배율.
+     * @param { number } y y 방향 배율.
      */
     scale(x, y) {
       if (x === 1 && y === 1) {
@@ -2319,7 +2319,7 @@
     // 다른 행렬을 우측에 곱해 누적. (this = this x other)
     //==============================================================================
     /**
-     * @param { TransformMatrix } other
+     * @param { TransformMatrix } other 우측에 곱할 행렬.
      */
     multiply(other) {
       const a = this.#a;
@@ -2339,7 +2339,15 @@
     // 역행렬. (새 행렬을 돌려주고 이 행렬은 그대로 둔다, 행렬식이 0 이면 null)
     //==============================================================================
     /**
-     * @returns { TransformMatrix | null }
+     * @returns { TransformMatrix | null } 역행렬. 행렬식이 0 이면 null.
+     * @example <caption>역행렬로 점을 되돌리기</caption>
+     * import { TransformMatrix } from "./build/vanilla.js";
+     *
+     * const transformMatrix = new TransformMatrix();
+     * transformMatrix.translate(10, 20);
+     * const inverseMatrix = transformMatrix.invert();
+     * const point = inverseMatrix.transformPoint(10, 20);
+     * console.log(point.x, point.y);
      */
     invert() {
       const determinant = this.#a * this.#d - this.#b * this.#c;
@@ -2361,9 +2369,9 @@
     // 점 변환.
     //==============================================================================
     /**
-     * @param { number } x
-     * @param { number } y
-     * @returns { { x: number, y: number } }
+     * @param { number } x 변환할 점의 x 좌표.
+     * @param { number } y 변환할 점의 y 좌표.
+     * @returns { { x: number, y: number } } 변환된 점.
      */
     transformPoint(x, y) {
       const transformedX = this.#a * x + this.#c * y + this.#e;
@@ -2374,7 +2382,7 @@
     // 행렬이 담고 있는 축별 스케일 중 최대값 반환. (텍스트 선명도 계산용)
     //==============================================================================
     /**
-     * @returns { number }
+     * @returns { number } x 축과 y 축 배율 중 큰 값.
      */
     getMaximumScale() {
       const scaleX = sqrt(this.#a * this.#a + this.#b * this.#b);
@@ -2385,7 +2393,7 @@
     // mat3 유니폼 업로드용 열우선(column-major) 배열 기록.
     //==============================================================================
     /**
-     * @param { Float32Array } target
+     * @param { Float32Array } target 기록할 길이 9 이상의 배열.
      */
     writeToFloat32Array(target) {
       target[0] = this.#a;
@@ -10214,36 +10222,51 @@ void main() {
   var System14 = globalThis;
   var GamepadAnalogStickCode = {
     LEFT_X: 0,
+    // 왼쪽 스틱 가로축.
     LEFT_Y: 1,
+    // 왼쪽 스틱 세로축.
     RIGHT_X: 2,
+    // 오른쪽 스틱 가로축.
     RIGHT_Y: 3
+    // 오른쪽 스틱 세로축.
   };
   var GamepadButtonCode = {
     // Face Buttons
     A_CROSS: 0,
     B_CIRCLE: 1,
+    // 오른쪽 얼굴 단추. (엑스박스 B, 플레이스테이션 동그라미)
     X_SQUARE: 2,
+    // 왼쪽 얼굴 단추. (엑스박스 X, 플레이스테이션 네모)
     Y_TRIANGLE: 3,
+    // 위쪽 얼굴 단추. (엑스박스 Y, 플레이스테이션 세모)
     // Bumpers
     L1: 4,
     R1: 5,
+    // 오른쪽 범퍼.
     // Triggers (버튼으로도 인식됨)
     L2: 6,
     R2: 7,
+    // 오른쪽 트리거 단추.
     // System
     SHARE_VIEW: 8,
     OPTIONS_MENU: 9,
+    // 옵션, 메뉴 단추.
     // Stick Clicks
     L3: 10,
     R3: 11,
+    // 오른쪽 스틱 누름.
     // D-Pad
     DPAD_UP: 12,
     DPAD_DOWN: 13,
+    // 방향 패드 아래.
     DPAD_LEFT: 14,
+    // 방향 패드 왼쪽.
     DPAD_RIGHT: 15,
+    // 방향 패드 오른쪽.
     // Center
     HOME_PS: 16,
     TOUCHPAD: 17
+    // 터치패드 누름.
   };
   var GamepadKind = System14.Object.freeze({
     xbox: "xbox",
@@ -14263,14 +14286,23 @@ void main() {
   var System20 = globalThis;
   var AssetType = System20.Object.freeze({
     none: "none",
+    // 애셋 종류 없음.
     image: "image",
+    // 이미지 애셋.
     audio: "audio",
+    // 오디오 애셋.
     json: "json",
+    // JSON 애셋.
     text: "text",
+    // 텍스트 애셋.
     font: "font",
+    // 글꼴 애셋.
     blob: "blob",
+    // 바이너리 덩어리 애셋.
     bunch: "bunch",
+    // 묶음 애셋.
     visual: "visual"
+    // 비주얼 애셋.
   });
   var Asset = class extends Object2 {
     static {
@@ -17412,7 +17444,9 @@ void main() {
   var WHEEL_SCROLL_SCALE = 1;
   var ScrollMode = {
     clamp: "clamp",
+    // 경계를 넘지 않게 자른다.
     elastic: "elastic"
+    // 경계를 넘으면 저항이 생기고 놓으면 튕겨 돌아온다.
   };
   var UIScrollView = class extends UIView {
     static {
@@ -22692,8 +22726,11 @@ void main() {
   // src/core/component/sprite.js
   var SpriteDrawMode = {
     simple: "simple",
+    // 이미지 영역을 그대로 그린다.
     sliced: "sliced",
+    // 아홉 조각으로 잘라 모서리는 늘리지 않고 그린다.
     tiled: "tiled"
+    // 이미지를 타일처럼 반복해 그린다.
   };
   var SpriteBlendMode = {
     normal: "source-over",
@@ -24980,10 +25017,15 @@ void main() {
   var System41 = globalThis;
   var ButtonState = {
     normal: Enum.begin(),
+    // 평상시 상태.
     hover: Enum.auto(),
+    // 포인터가 올라간 상태.
     pressed: Enum.auto(),
+    // 눌려 있는 상태.
     released: Enum.auto(),
+    // 막 뗀 상태.
     disabled: Enum.auto()
+    // 눌러도 반응하지 않는 상태.
   };
   var UIButton = class extends UIControl {
     static {
