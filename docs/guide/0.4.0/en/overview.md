@@ -73,8 +73,6 @@ UPDATE.md       Update history
 ## Links
 
 - Repository: <https://github.com/ddukbaek2/vanilla.js>
-- Template: <https://github.com/ddukbaek2/playablegame-template>
-- Template: <https://github.com/ddukbaek2/retrogame-template>
 - Deployment page: <https://ddukbaek2.com>
 
 ## License

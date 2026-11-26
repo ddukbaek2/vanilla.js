@@ -49041,7 +49041,7 @@
 								"en": "Set the light intensity limit. (ToonLightSet.setLightIntensityLimited)"
 							},
 							"since": "0.4.0",
-							"source": "src/experimental/graphics/toon/toonrenderer.js",
+							"source": "src/graphics3d/toon/toonrenderer.js",
 							"examples": [
 								{
 									"title": {
@@ -49606,7 +49606,7 @@
 						"en": "Read the angle that undoes the camera roll. (Same math as the angel ring Camera Rolling Stabilizer of the Unity Toon Shader)\n- roll is the angle between the camera right (row 0 of the view rotation) and the horizontal right axis, the direction dir is -1 if the y of the right is negative, and the returned angle is -(dir x roll).\n- Unity uses left-handed coordinates so the horizontal right axis is cross(back, up), and the engine uses right-handed coordinates so the same axis is cross(forward, up). In a mirrored frame the axis is flipped. (mirrorFlag of the Unity Toon Shader)\n- When looking straight up or down there is no horizontal axis, so it is 0."
 					},
 					"since": "0.4.0",
-					"source": "src/experimental/graphics/toon/toonrenderer.js",
+					"source": "src/graphics3d/toon/toonrenderer.js",
 					"examples": [
 						{
 							"title": {
@@ -53866,7 +53866,7 @@
 								"en": "Return the side each tile asks for. (Pixels, the value given at construction)"
 							},
 							"since": "0.4.0",
-							"source": "src/experimental/graphics/shadowmap.js"
+							"source": "src/graphics3d/shadowmap.js"
 						},
 						{
 							"kind": "method",
@@ -83892,7 +83892,7 @@
 								"en": "Set the light intensity limit. (If true, limits what each light gives to 1 so it does not wash out to white, default true, Limit Light Intensity of the Unity Toon Shader)\n- The sun and fill light are clamped to 1 per color channel. (saturate of the main light)\n- Point lights and spotlights are divided by the intensity (0.299 R + 0.587 G + 0.114 B) of their color with attenuation applied when it exceeds 1. (min(color, color / intensity) of additional lights)\n- If the light model is isEnergyNormalized, the share after dividing by π is limited to 1."
 							},
 							"since": "0.4.0",
-							"source": "src/experimental/graphics/toon/toonlightset.js",
+							"source": "src/graphics3d/toon/toonlightset.js",
 							"examples": [
 								{
 									"title": {
@@ -83921,7 +83921,7 @@
 								"en": "Return whether the light intensity is limited."
 							},
 							"since": "0.4.0",
-							"source": "src/experimental/graphics/toon/toonlightset.js"
+							"source": "src/graphics3d/toon/toonlightset.js"
 						},
 						{
 							"kind": "method",
