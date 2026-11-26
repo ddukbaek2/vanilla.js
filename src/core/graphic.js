@@ -506,6 +506,8 @@ export class Graphic extends Object {
 	/** @private @type { Map<number, object> } */ #backdropTargetTable; // 그릴 영역 아래를 떠 올 칸. (텍스처 형식 → { texture, framebuffer, width, height })
 	/** @private @type { Map<WebGLFramebuffer | null, number> } */ #framebufferFormatTable; // 프레임버퍼마다 색 텍스처 형식. (프레임마다 잊는다)
 	/** @private @type { object | null } */ #layerTarget; // 바꿔 끼운 셰이더로 먼저 그려 둘 칸. ({ texture, framebuffer, width, height }, 지연 생성)
+	/** @private @type { object[] } */ #opacityLayerStack; // 열린 투명도 층. ({ target, previousFramebuffer, globalAlpha }, beginOpacityLayer 가 쌓는다)
+	/** @private @type { object[] } */ #opacityLayerTargetPool; // 다 쓴 투명도 층 칸. ({ texture, framebuffer, stencilRenderbuffer, width, height }, 다시 쓴다)
 	/** @private @type { object } */ #backdropRect; // 떠 올 영역. ({ x, y, width, height } GL 픽셀, 왼쪽 아래 원점, 고쳐 쓴다)
 	/** @private @type { WebGLTexture | null } */ #boundBackdropTexture; // 1 번 텍스처 유닛에 마지막으로 묶은 텍스처. (null 이면 모른다)
 	/** @private @type { boolean } */ #isStencilRecording; // 스텐실에 자르기 영역을 적는 중인지. (색을 쓰지 않으므로 섞지 않는다)
@@ -652,6 +654,8 @@ export class Graphic extends Object {
 		this.#backdropTargetTable = new Map();
 		this.#framebufferFormatTable = new Map();
 		this.#layerTarget = null;
+		this.#opacityLayerStack = [];
+		this.#opacityLayerTargetPool = [];
 		this.#backdropRect = { x: 0, y: 0, width: 0, height: 0 };
 		this.#boundBackdropTexture = null;
 		this.#isStencilRecording = false;
@@ -3689,6 +3693,138 @@ export class Graphic extends Object {
 		webGL2RenderingContext.colorMask(true, true, true, true);
 		webGL2RenderingContext.stencilOp(webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP, webGL2RenderingContext.KEEP);
 		webGL2RenderingContext.stencilFunc(webGL2RenderingContext.EQUAL, previousClipDepth + 1, 0xFF);
+	}
+
+	//==============================================================================
+	// 투명도 층 시작. (CSS opacity, 어도비 투명도 묶음처럼 endOpacityLayer 까지 그린 것을 따로 칸에 모았다가 지금 전역 알파로 한 번에 얹는다)
+	// - 층 안의 그림은 서로 겹친 자리가 비치지 않는다. (노드마다 투명도를 곱해 따로 얹으면 겹친 자리에서 아래 그림이 비친다)
+	// - 층 안은 전역 알파 1 에서 시작한다. 층 칸은 화면과 같은 크기의 RGBA8 이고 스텐실을 지금 자르기 깊이로 채워 둬 층 안의 자르기도 그대로 된다.
+	//   바깥 자르기는 얹을 때 걸린다. 층은 겹쳐 열 수 있다. 칸을 지을 수 없으면 층 없이 그대로 그린다.
+	// - 노드는 setOpacityLayer 를 켜고 투명도가 1 보다 작으면 그 노드와 자손을 층으로 그린다.
+	//==============================================================================
+	/**
+	 * @example <caption>겹친 두 사각형을 묶어 반투명하게 (겹친 자리에서 아래 사각형이 비치지 않는다)</caption>
+	 * import { Engine, EngineConfiguration, Scene, Vector2, Rect } from "./build/vanilla.js";
+	 *
+	 * class MainScene extends Scene {
+	 * 	draw(graphic) {
+	 * 		super.draw(graphic);
+	 * 		graphic.pushState();
+	 * 		graphic.setGlobalAlpha(0.5);
+	 * 		graphic.beginOpacityLayer();
+	 * 		graphic.setFillColor("#ff0000");
+	 * 		graphic.drawRect(Rect.create(100, 100, 200, 100));
+	 * 		graphic.setFillColor("#0000ff");
+	 * 		graphic.drawRect(Rect.create(200, 150, 200, 100));
+	 * 		graphic.endOpacityLayer();
+	 * 		graphic.popState();
+	 * 	}
+	 * }
+	 *
+	 * const engineConfiguration = new EngineConfiguration();
+	 * engineConfiguration.referenceResolutionSize = Vector2.create(640, 360);
+	 * const engine = new Engine(engineConfiguration);
+	 * engine.run(new MainScene());
+	 */
+	beginOpacityLayer() {
+		this.flushSpriteBatch();
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const previousFramebuffer = webGL2RenderingContext.getParameter(webGL2RenderingContext.FRAMEBUFFER_BINDING);
+		const globalAlpha = this.#globalAlpha;
+		const target = this.acquireOpacityLayerTarget(previousFramebuffer);
+		if (target !== null) {
+			webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.framebuffer);
+			webGL2RenderingContext.colorMask(true, true, true, true);
+			webGL2RenderingContext.stencilMask(0xFF);
+			webGL2RenderingContext.clearBufferfv(webGL2RenderingContext.COLOR, 0, TRANSPARENT_CLEAR_VALUE_LIST);
+			webGL2RenderingContext.clearBufferiv(webGL2RenderingContext.STENCIL, 0, new Int32Array([this.#clipStack.length]));
+			this.#globalAlpha = 1.0;
+		}
+		this.#opacityLayerStack.push({ target, previousFramebuffer, globalAlpha });
+	}
+
+	//==============================================================================
+	// 투명도 층 끝. (beginOpacityLayer 뒤에 그린 것을 앞 프레임버퍼에 층을 열 때의 전역 알파로 얹는다)
+	//==============================================================================
+	endOpacityLayer() {
+		const opacityLayer = this.#opacityLayerStack.pop();
+		if (opacityLayer === undefined) {
+			return;
+		}
+		this.flushSpriteBatch();
+		this.#globalAlpha = opacityLayer.globalAlpha;
+		const target = opacityLayer.target;
+		if (target === null) {
+			return;
+		}
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, opacityLayer.previousFramebuffer);
+
+		// 층 칸을 단위 행렬, 흰색, 틴트 없이 source-over 로 얹는다. (칸은 화면과 같은 크기라 디바이스 픽셀 그대로 짚는다, 텍스처는 아래가 0 행)
+		const viewportWidth = this.#appliedViewportWidth;
+		const viewportHeight = this.#appliedViewportHeight;
+		const transformMatrix = this.#transformMatrix;
+		const imageTintColor = this.#imageTintColor;
+		const blendMode = this.#blendMode;
+		this.#transformMatrix = this.#identityTransformMatrix;
+		this.#imageTintColor = null;
+		this.setBlendMode("source-over");
+		const vertexCount = this.writeQuad(0, 0, 0, viewportWidth, viewportHeight, 0, 1, 1, 0) / FLOATS_PER_VERTEX;
+		this.drawVertices(vertexCount, target.texture, this.getWhiteColor());
+		this.flushSpriteBatch();
+		this.setBlendMode(blendMode);
+		this.#transformMatrix = transformMatrix;
+		this.#imageTintColor = imageTintColor;
+		this.#opacityLayerTargetPool.push(target);
+	}
+
+	//==============================================================================
+	// 투명도 층 칸 꺼내기. (모아 둔 것에서 화면 크기와 같은 것, 없으면 짓는다. 못 지으면 null)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { WebGLFramebuffer | null } framebuffer 다 지은 뒤 다시 묶을 프레임버퍼.
+	 * @returns { object | null }
+	 */
+	acquireOpacityLayerTarget(framebuffer) {
+		const webGL2RenderingContext = this.getWebGL2RenderingContext();
+		const viewportWidth = this.#appliedViewportWidth;
+		const viewportHeight = this.#appliedViewportHeight;
+		while (this.#opacityLayerTargetPool.length > 0) {
+			const target = this.#opacityLayerTargetPool.pop();
+			if (target.width === viewportWidth && target.height === viewportHeight) {
+				return target;
+			}
+			this.destroyOpacityLayerTarget(target);
+		}
+		const target = this.createOffscreenTarget(framebuffer, webGL2RenderingContext.RGBA8, viewportWidth, viewportHeight);
+		const stencilRenderbuffer = webGL2RenderingContext.createRenderbuffer();
+		webGL2RenderingContext.bindRenderbuffer(webGL2RenderingContext.RENDERBUFFER, stencilRenderbuffer);
+		webGL2RenderingContext.renderbufferStorage(webGL2RenderingContext.RENDERBUFFER, webGL2RenderingContext.DEPTH24_STENCIL8, viewportWidth, viewportHeight);
+		webGL2RenderingContext.bindRenderbuffer(webGL2RenderingContext.RENDERBUFFER, null);
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, target.framebuffer);
+		webGL2RenderingContext.framebufferRenderbuffer(webGL2RenderingContext.FRAMEBUFFER, webGL2RenderingContext.DEPTH_STENCIL_ATTACHMENT, webGL2RenderingContext.RENDERBUFFER, stencilRenderbuffer);
+		const status = webGL2RenderingContext.checkFramebufferStatus(webGL2RenderingContext.FRAMEBUFFER);
+		webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, framebuffer);
+		const opacityLayerTarget = { texture: target.texture, framebuffer: target.framebuffer, stencilRenderbuffer, width: viewportWidth, height: viewportHeight };
+		if (status !== webGL2RenderingContext.FRAMEBUFFER_COMPLETE) {
+			console.error("Graphic: opacity layer failed: framebuffer status 0x" + status.toString(16));
+			this.destroyOpacityLayerTarget(opacityLayerTarget);
+			return null;
+		}
+		return opacityLayerTarget;
+	}
+
+	//==============================================================================
+	// 투명도 층 칸 지우기.
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { object } target
+	 */
+	destroyOpacityLayerTarget(target) {
+		this.destroyOffscreenTarget(target);
+		this.getWebGL2RenderingContext().deleteRenderbuffer(target.stencilRenderbuffer);
 	}
 
 	//==============================================================================

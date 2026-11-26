@@ -124,6 +124,12 @@ export class WorldNode extends TransformNode {
             return;
         }
 
+        // 투명도 층이면 이 노드와 자손을 층에 모아 그렸다가 한 번에 얹는다. (CSS opacity)
+        const isOpacityLayer = this.isOpacityLayer() && graphic.getGlobalAlpha() < 1;
+        if (isOpacityLayer) {
+            graphic.beginOpacityLayer();
+        }
+
         // 컴포넌트 출력. 동시에 Mask 컴포넌트가 있는지 확인.
         // 화면 밖이라 걸러진 노드는 컴포넌트만 건너뛴다. (마스크의 클립과 자식은 그대로)
         const components = this.getAllComponents();
@@ -158,6 +164,10 @@ export class WorldNode extends TransformNode {
         // 마스크가 있으면 클리핑 종료.
         if (maskComponent) {
             maskComponent.endClip(graphic);
+        }
+
+        if (isOpacityLayer) {
+            graphic.endOpacityLayer();
         }
     }
 
