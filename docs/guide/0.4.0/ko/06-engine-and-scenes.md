@@ -277,7 +277,7 @@ engine.run(new TimeScene());
 
 `applyAspectViewScaleMode()` 는 화면이 기준 해상도보다 세로로 길면 `stretchWidthExpandHeight`, 아니면 `stretchHeightExpandWidth` 를 고릅니다.
 
-`Graphic` 의 변환은 매 프레임 처음에 단위 행렬로 돌아갑니다. 그대로 그리면 좌표가 캔버스의 실제 픽셀입니다. 씬은 `preDraw` 에서 좌표계를 정합니다.
+엔진은 씬마다 `preDraw` 앞(로딩 중이면 `drawOnLoad` 앞)에 뷰 좌표(`applyViewRect`)를 걸어 둡니다. 씬이 받는 터치 좌표와 같은 좌표라, 기기 픽셀 배율이 2 인 화면(레티나 같은)에서도 같은 크기와 자리로 그려집니다. 씬은 `preDraw` 에서 좌표계를 바꿀 수 있고, 캔버스의 실제 픽셀로 그리려면 `graphic.setTransform(1, 0, 0, 1, 0, 0)` 을 부릅니다.
 
 - `viewManager.applyCanvasNativeRect(graphic)`: 캔버스 전체를 CSS 픽셀로. 바탕을 캔버스 끝까지 칠할 때 씁니다.
 - `viewManager.applyViewRect(graphic)`: 뷰 좌표로. (0, 0) 이 뷰의 왼쪽 위이고 오른쪽 아래가 `getViewSize()` 입니다. 씬이 받는 터치 좌표도 이 좌표입니다.

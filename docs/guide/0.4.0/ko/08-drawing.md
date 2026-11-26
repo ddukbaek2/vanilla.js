@@ -4,7 +4,7 @@
 
 ## Graphic 으로 바로 그리기
 
-`Graphic` 은 WebGL2 위에 Canvas2D 와 같은 꼴(왼쪽 위 원점, 픽셀 단위, 상태 스택)을 만든 렌더러입니다. 씬의 그리기 메서드가 인자로 받습니다. 변환은 매 프레임 처음에 단위 행렬로 돌아가므로 뷰 좌표로 그리려면 `preDraw` 에서 `viewManager.applyViewRect(graphic)` 를 부릅니다. ("엔진과 씬" 장)
+`Graphic` 은 WebGL2 위에 Canvas2D 와 같은 꼴(왼쪽 위 원점, 픽셀 단위, 상태 스택)을 만든 렌더러입니다. 씬의 그리기 메서드가 인자로 받습니다. 엔진이 씬마다 그리기 앞에 뷰 좌표(`viewManager.applyViewRect(graphic)`)를 걸어 두므로, 씬은 처음부터 뷰 좌표로 그립니다. ("엔진과 씬" 장)
 
 | 갈래 | 메서드 |
 | --- | --- |

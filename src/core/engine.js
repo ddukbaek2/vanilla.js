@@ -1054,13 +1054,17 @@ export class Engine extends Object {
 		graphic.beginFrameStatistics();
 
 		// 씬 처리.
+		// 씬마다 그리기 앞에 뷰 좌표를 걸어 둔다. (씬이 받는 터치 좌표와 같은 좌표, 기기 픽셀 배율이 1 이 아닌 화면에서도 같은 크기와 자리로 그린다)
+		// 캔버스의 실제 픽셀로 그리려면 씬에서 graphic.setTransform(1, 0, 0, 1, 0, 0) 을 부른다.
 		const sceneManager = this.getSceneManager();
+		const viewManager = this.getViewManager();
 		const loadedScenes = sceneManager.getAllLoadedScenes();
 		for (const loadedScene of loadedScenes) {
 			try {
 				if (!loadedScene.isLoaded()) {
 					// 로딩 중: 로딩 전용 출력만 호출. 씬의 tick/draw는 호출하지 않음.
 					graphic.invalidateRenderStateCache();
+					viewManager.applyViewRect(graphic);
 					loadedScene.drawOnLoad(graphic);
 					continue;
 				}
@@ -1071,6 +1075,7 @@ export class Engine extends Object {
 				// 출력.
 				// 앞 씬의 그리기와 이 씬의 갱신 사이에 바깥 WebGL 이 프로그램과 텍스처를 바꿨을 수 있으므로 Graphic 의 묶음 기억을 잊는다.
 				graphic.invalidateRenderStateCache();
+				viewManager.applyViewRect(graphic);
 				loadedScene.preDraw(graphic);
 				loadedScene.draw(graphic);
 				loadedScene.postDraw(graphic);

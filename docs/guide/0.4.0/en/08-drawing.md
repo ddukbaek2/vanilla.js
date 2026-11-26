@@ -4,7 +4,7 @@ There are two ways to draw. Attach drawing components (`Paint`, `Sprite`, `Text`
 
 ## Drawing directly with Graphic
 
-`Graphic` is a renderer that builds a Canvas2D style model (top left origin, pixel units, a state stack) on top of WebGL2. A scene's drawing methods receive it as an argument. The transform is reset to identity at the start of every frame, so to draw in view coordinates call `viewManager.applyViewRect(graphic)` in `preDraw`. (see the "Engine and Scenes" chapter)
+`Graphic` is a renderer that builds a Canvas2D style model (top left origin, pixel units, a state stack) on top of WebGL2. A scene's drawing methods receive it as an argument. The engine sets view coordinates (`viewManager.applyViewRect(graphic)`) before each scene draws, so a scene draws in view coordinates from the start. (see the "Engine and Scenes" chapter)
 
 | Group | Methods |
 | --- | --- |

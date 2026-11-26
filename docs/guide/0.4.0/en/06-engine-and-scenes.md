@@ -277,7 +277,7 @@ These are the sizes `ViewManager` deals with.
 
 `applyAspectViewScaleMode()` picks `stretchWidthExpandHeight` if the screen is taller than the reference resolution, and `stretchHeightExpandWidth` otherwise.
 
-The `Graphic` transform is reset to identity at the start of every frame. Drawing as is uses the canvas's real pixels as coordinates. A scene sets its coordinate system in `preDraw`.
+Before each scene's `preDraw` (before `drawOnLoad` while loading), the engine sets view coordinates (`applyViewRect`). These are the same coordinates as the touches a scene receives, so drawing keeps the same size and position on screens with a device pixel ratio of 2 (such as Retina). A scene can change the coordinate system in `preDraw`; to draw in the canvas's real pixels, call `graphic.setTransform(1, 0, 0, 1, 0, 0)`.
 
 - `viewManager.applyCanvasNativeRect(graphic)`: the whole canvas in CSS pixels. Use it to paint the background to the edges of the canvas.
 - `viewManager.applyViewRect(graphic)`: view coordinates. (0, 0) is the top left of the view and the bottom right is `getViewSize()`. The touch coordinates a scene receives are in these coordinates too.
