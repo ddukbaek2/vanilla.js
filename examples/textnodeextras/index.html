@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text Node Extras</title>
+<link rel="icon" href="../assets/favicon.svg">
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #151821; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 글자, 노드, 그리기 예제. (출시 게임들이 따로 만들어 쓰던 것을 엔진 기본으로 넣은 것, 러스트 예제 textnodeextras 와 같은 장면)
+// - 글자 칸 맞춤: Text, UILabel 의 setFitWidth. 넘치면 최소 비율까지 줄이고, 그래도 넘치면 넘친 채 그린다. (테가 맞출 칸)
+// - 노드 놓기: setRect(왼쪽 위 기준, 피봇이 가운데여도), convertViewToLocal(마우스 자리를 노드 좌표로)
+// - 그리기: Graphic.drawRing(반투명 띠), drawArc(재사용 대기 고리처럼 줄어드는 호), drawLineSegments(선분 수백 개를 한 번에)
+// - 아틀라스: tools/atlas.cjs 가 구운 atlas/icons.json 을 SpriteAtlas 로 읽어 조각을 스프라이트에 건다
+// - 그림자 글 셋 가운데 같은 둘은 구운 그림을 나눠 쓴다.
+//==============================================================================
+import { Engine, EngineConfiguration, Scene, WorldNode, Component, Vector2, Rect, Pivot, Paint, Outline, Sprite, SpriteAtlas, Text, ShadowText, TextAlign, TextBaseline, UILabel } from "../../import.js";
+
+const PI = System.Math.PI;
+const VIEW_WIDTH = 1280;
+const VIEW_HEIGHT = 720;
+const BACKGROUND_COLOR = "#151821";
+const TEXT_COLOR = "#e8ebf2";
+const CAPTION_COLOR = "#9aa2b2";
+const BOX_COLOR = "#262b38";
+const FIT_LINE_COLOR = "#6d7dff";
+const ATLAS_FRAME_NAMES = ["star", "heart", "leaf", "gem", "coin"];
+
+//==============================================================================
+// 상자 노드 만들기. (왼쪽 위 피봇, setRect)
+//==============================================================================
+function createBoxNode(parentNode, name, x, y, width, height) {
+	const node = new WorldNode();
+	node.setName(name);
+	parentNode.addChild(node);
+	node.setPivot(Pivot.topLeft);
+	node.setRect(x, y, width, height);
+	return node;
+}
+
+//==============================================================================
+// 글 붙이기. (글과 크기)
+//==============================================================================
+function addText(node, TextType, text, fontSize) {
+	const textComponent = node.addComponent(TextType);
+	textComponent.setText(text);
+	textComponent.setFontSize(fontSize);
+	return textComponent;
+}
+
+//==============================================================================
+// 설명 글 노드 만들기.
+//==============================================================================
+function createCaptionNode(parentNode, x, y, text) {
+	const captionNode = createBoxNode(parentNode, "caption", x, y, 560, 24);
+	const captionText = addText(captionNode, Text, text, 16);
+	captionText.setTextColor(CAPTION_COLOR);
+	captionText.setTextAlign(TextAlign.left);
+	captionText.setTextBaseline(TextBaseline.middle);
+	return captionNode;
+}
+
+//==============================================================================
+// 호와 고리, 선분을 그리는 컴포넌트. (노드 내용 영역 왼쪽 위가 원점)
+//==============================================================================
+class ShapeGallery extends Component {
+	#elapsedSeconds = 0;
+	#linePositionValues = [];
+
+	//==============================================================================
+	// 생성. (선분은 한 번 지어 두고 그릴 때마다 그대로 넘긴다)
+	//==============================================================================
+	constructor() {
+		super();
+		for (let lineIndex = 0; lineIndex < 600; lineIndex++) {
+			const column = lineIndex % 30;
+			const row = System.Math.floor(lineIndex / 30);
+			const x = 360 + column * 9;
+			const y = 10 + row * 9;
+			this.#linePositionValues.push(x, y, x + 6, y + 6);
+		}
+	}
+
+	tick(timeDelta) {
+		super.tick(timeDelta);
+		this.#elapsedSeconds += timeDelta;
+	}
+
+	draw(graphic) {
+		// 반투명 고리 둘이 겹친다. (조각 이음매가 짙어지지 않는다)
+		graphic.setFillColor("rgba(255, 90, 90, 0.55)");
+		graphic.drawRing(Vector2.create(70, 100), 40, 62, 0, PI * 2);
+		graphic.setFillColor("rgba(80, 200, 255, 0.55)");
+		graphic.drawRing(Vector2.create(115, 100), 40, 62, 0, PI * 2);
+
+		// 재사용 대기처럼 12 시에서 시계 방향으로 줄어드는 호와 바탕 고리.
+		const pulse = this.#elapsedSeconds * 0.25;
+		const remainRatio = 1 - (pulse - System.Math.floor(pulse));
+		graphic.setFillColor("rgba(255, 255, 255, 0.15)");
+		graphic.drawRing(Vector2.create(260, 100), 46, 56, 0, PI * 2);
+		graphic.setStrokeColor("#ffd166");
+		graphic.drawArc(Vector2.create(260, 100), 51, -PI * 0.5, -PI * 0.5 + PI * 2 * remainRatio, 10);
+
+		// 부채꼴 띠. (안쪽 반지름 0)
+		graphic.setFillColor("rgba(120, 255, 160, 0.6)");
+		graphic.drawRing(Vector2.create(70, 230), 0, 50, -PI * 0.5, PI * 0.75);
+		graphic.setFillColor("#ff9f43");
+		graphic.drawRing(Vector2.create(200, 230), 20, 50, PI, PI * 1.75);
+
+		// 선분 600 개를 숫자 배열 하나로.
+		graphic.setStrokeColor("rgba(140, 255, 140, 0.85)");
+		graphic.drawLineSegments(this.#linePositionValues, 1.5);
+	}
+}
+
+//==============================================================================
+// 첫 씬.
+//==============================================================================
+class MainScene extends Scene {
+	#spriteAtlas = new SpriteAtlas();
+	#spriteNodeList = [];
+	#pointerLabelNode = null;
+	#pointerTargetNode = null;
+	#pulseLabelNode = null;
+	#elapsedSeconds = 0;
+
+	//==============================================================================
+	// 읽기. (아틀라스 JSON 과 쪽 그림을 기다린다)
+	//==============================================================================
+	async load(engine) {
+		await super.load(engine);
+		await this.#spriteAtlas.load("atlas/icons.json");
+	}
+
+	//==============================================================================
+	// 글자 칸 맞춤 칸. (같은 너비의 칸 넷, 테가 맞출 칸)
+	//==============================================================================
+	createFitSection(root) {
+		createCaptionNode(root, 40, 90, "set_fit_width (칸 220, 최소 비율 0.55)");
+		const textList = ["짧은 글", "조금 길어서 줄여야 맞는 글", "아주아주 길어서 최소 비율까지 줄여도 넘치는 글입니다", "UILabel 도 같은 맞춤을 씁니다"];
+		for (let textIndex = 0; textIndex < textList.length; textIndex++) {
+			const y = 124 + textIndex * 56;
+			const boxNode = createBoxNode(root, "fitBox", 40, y, 220, 44);
+			const paint = boxNode.addComponent(Paint);
+			paint.setColor(BOX_COLOR);
+			paint.setRoundSize(8);
+			const outline = boxNode.addComponent(Outline);
+			outline.setColor(FIT_LINE_COLOR);
+			outline.setLineWidth(1);
+			outline.setRoundSize(8);
+			const labelNode = createBoxNode(boxNode, "fitText", 0, 0, 220, 44);
+			const fitText = addText(labelNode, textIndex === 3 ? UILabel : Text, textList[textIndex], 24);
+			fitText.setTextColor(TEXT_COLOR);
+			fitText.setFitWidth(220, 0.55);
+		}
+
+		// 배율이 움직이는 글. (굽기 배율 단계가 0 이어도 움직이는 동안은 묶은 배율로 굽는다)
+		const pulseNode = createBoxNode(root, "pulse", 40, 360, 220, 44);
+		pulseNode.setPivot(Pivot.middleCenter);
+		pulseNode.setRect(40, 360, 220, 44);
+		const pulseText = addText(pulseNode, Text, "커졌다 작아지는 글", 24);
+		pulseText.setTextColor("#ffd166");
+		this.#pulseLabelNode = pulseNode;
+	}
+
+	//==============================================================================
+	// 호와 고리, 선분 칸.
+	//==============================================================================
+	createShapeSection(root) {
+		createCaptionNode(root, 340, 90, "draw_ring, draw_arc, draw_line_segments");
+		const galleryNode = createBoxNode(root, "shapes", 340, 124, 640, 300);
+		galleryNode.addComponent(ShapeGallery);
+	}
+
+	//==============================================================================
+	// 아틀라스 칸.
+	//==============================================================================
+	createAtlasSection(root) {
+		createCaptionNode(root, 40, 440, "SpriteAtlas (atlas.cjs, 늘여 붙이기 2)");
+		for (let frameIndex = 0; frameIndex < ATLAS_FRAME_NAMES.length; frameIndex++) {
+			const spriteNode = createBoxNode(root, "atlasSprite", 40 + frameIndex * 76, 474, 64, 64);
+			const sprite = spriteNode.addComponent(Sprite);
+			this.#spriteAtlas.applyFrame(sprite, ATLAS_FRAME_NAMES[frameIndex]);
+			this.#spriteNodeList.push(spriteNode);
+		}
+
+		// 같은 모양의 그림자 글 둘은 구운 그림 하나를 나눠 쓴다.
+		createCaptionNode(root, 460, 440, "ShadowText (위 둘은 구운 그림 하나)");
+		const shadowTextList = ["같은 그림자 글", "같은 그림자 글", "다른 그림자 글"];
+		for (let shadowIndex = 0; shadowIndex < shadowTextList.length; shadowIndex++) {
+			const shadowNode = createBoxNode(root, "shadowText", 460, 474 + shadowIndex * 40, 300, 36);
+			const shadowText = shadowNode.addComponent(ShadowText);
+			shadowText.setText(shadowTextList[shadowIndex]);
+			shadowText.setTextStyle(24, true, TEXT_COLOR);
+			shadowText.setShadow("#000000", 1, 2, 3);
+		}
+	}
+
+	//==============================================================================
+	// 뷰 좌표 → 노드 좌표 칸. (마우스가 올라간 자리를 돌아간 노드의 좌표로)
+	//==============================================================================
+	createPointerSection(root) {
+		createCaptionNode(root, 820, 440, "convert_view_to_local (돌아간 판)");
+		const targetNode = new WorldNode();
+		targetNode.setName("pointerTarget");
+		root.addChild(targetNode);
+		targetNode.setPivot(Pivot.middleCenter);
+		targetNode.setRect(860, 490, 240, 120);
+		targetNode.setLocalRotation(12);
+		const paint = targetNode.addComponent(Paint);
+		paint.setColor("#2f3a55");
+		paint.setRoundSize(10);
+		const labelNode = createBoxNode(targetNode, "pointerLabel", 0, 0, 240, 120);
+		const labelText = addText(labelNode, Text, "마우스를 올려 보세요", 18);
+		labelText.setTextColor(TEXT_COLOR);
+		this.#pointerTargetNode = targetNode;
+		this.#pointerLabelNode = labelNode;
+	}
+
+	//==============================================================================
+	// 초기화.
+	//==============================================================================
+	initialize(engine) {
+		super.initialize(engine);
+		const root = this.getRoot();
+		root.setContentSize(Vector2.create(VIEW_WIDTH, VIEW_HEIGHT));
+		const titleNode = createBoxNode(root, "title", 40, 30, 900, 50);
+		const titleText = addText(titleNode, Text, "글자, 노드, 그리기", 34);
+		titleText.setTextColor(TEXT_COLOR);
+		titleText.setTextAlign(TextAlign.left);
+		this.createFitSection(root);
+		this.createShapeSection(root);
+		this.createAtlasSection(root);
+		this.createPointerSection(root);
+	}
+
+	//==============================================================================
+	// 주기적 갱신.
+	//==============================================================================
+	tick(timeDelta) {
+		this.#elapsedSeconds += timeDelta;
+		const pulseScale = 1 + 0.15 * System.Math.max(0, System.Math.sin(this.#elapsedSeconds * 2));
+		this.#pulseLabelNode.setLocalScaleXY(pulseScale, pulseScale);
+		const viewInputPosition = this.getEngine().getInputManager().getViewInputPosition();
+		const localPosition = this.#pointerTargetNode.convertViewToLocal(viewInputPosition);
+		const contentSize = this.#pointerTargetNode.getContentSize();
+		let label = "마우스를 올려 보세요";
+		if (localPosition !== null && localPosition.x >= 0 && localPosition.y >= 0 && localPosition.x <= contentSize.x && localPosition.y <= contentSize.y) {
+			label = `판 안 (${localPosition.x.toFixed(0)}, ${localPosition.y.toFixed(0)})`;
+		}
+		this.#pointerLabelNode.getComponent(Text).setText(label);
+		super.tick(timeDelta);
+	}
+
+	//==============================================================================
+	// 이전 출력. (글을 1:1 로 굽게 굽기 배율 단계를 0 으로 두고, 배경을 칠한다, 게임들과 같다)
+	//==============================================================================
+	preDraw(graphic) {
+		graphic.setTextBakeScaleStep(0);
+		const viewManager = this.getEngine().getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(BACKGROUND_COLOR);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		viewManager.applyViewRect(graphic);
+	}
+}
+
+//==============================================================================
+// 시작.
+//==============================================================================
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.title = "글자, 노드, 그리기 (바닐라엔진)";
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.referenceResolutionSize = Vector2.create(VIEW_WIDTH, VIEW_HEIGHT);
+engineConfiguration.autoResizeOnWindowResize = true;
+const engine = new Engine(engineConfiguration);
+engine.run(new MainScene());
+</script>
+</body>
+</html>
