@@ -3,7 +3,6 @@
 // - 다음 판에 넣을 기능의 초안을 모아 내보낸다. import.js 가 Experimental 이름 공간으로 다시 내보낸다. (Experimental.이름)
 // - 초안 하나는 src/experimental/<이름>/ 폴더에 두고, 여기에 내보내기 한 줄을 더한다.
 // - 다 자란 기능은 제자리(base, core, misc, graphics3d 같은)로 옮기고 import.js 에서 바로 내보낸다.
-// - 지금은 비어 있다.
 //==============================================================================
 
 /**
@@ -15,4 +14,5 @@
 
 
 // 초안 내보내기 목록. (초안을 넣으면 아래에 한 줄씩 더한다. 예: export { 이름 } from "./<이름>/<파일>.js";)
+export * from "./skeleton2d/skeleton2dexports.js";
 export {};

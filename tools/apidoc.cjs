@@ -1929,6 +1929,41 @@ function readEntryExports() {
 			}
 		}
 	}
+
+	// 이름 공간 모듈이 다시 내보내는 파일도 따라간다. (Experimental 처럼 그 파일에 선언 없이 export ... from 만 있는 모듈)
+	const pendingModulePathList = Array.from(moduleTable.values()).filter((moduleEntry) => moduleEntry.isNamespace).map((moduleEntry) => moduleEntry.modulePath);
+	while (pendingModulePathList.length > 0) {
+		const namespacePath = pendingModulePathList.shift();
+		const namespaceFullPath = path.join(REPOSITORY_ROOT, namespacePath);
+		if (!fs.existsSync(namespaceFullPath)) {
+			continue;
+		}
+		const namespaceEntry = moduleTable.get(namespacePath);
+		const parsed = parseSourceFile(fs.readFileSync(namespaceFullPath, "utf8"));
+		for (const reexport of parsed.reexportList) {
+			if (!reexport.modulePath.startsWith(".")) {
+				continue;
+			}
+			const modulePath = path.posix.normalize(path.posix.join(path.posix.dirname(namespacePath), reexport.modulePath));
+			let moduleEntry = moduleTable.get(modulePath);
+			if (!moduleEntry) {
+				moduleEntry = { modulePath: modulePath, isNamespace: false, namespaceName: "", nameList: [] };
+				moduleTable.set(modulePath, moduleEntry);
+			}
+			if (reexport.isNamespace) {
+				if (!moduleEntry.isNamespace) {
+					moduleEntry.isNamespace = true;
+					moduleEntry.namespaceName = namespaceEntry.namespaceName;
+					pendingModulePathList.push(modulePath);
+				}
+			}
+			else {
+				for (const specifier of reexport.specifierList) {
+					moduleEntry.nameList.push(specifier);
+				}
+			}
+		}
+	}
 	return Array.from(moduleTable.values());
 }
 

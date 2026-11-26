@@ -1,6 +1,7 @@
 # 업데이트 기록
 
 # 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- 초안(Experimental, 0.4.0 뒤 기능, API 가 바뀔 수 있다) 2D 뼈대 애니메이션 src/experimental/skeleton2d: 뼈(이동, 회전, 크기, 기울임을 물려받는 월드 행렬), 슬롯과 붙임(네모, 메시), 스킨 메시(꼭짓점마다 뼈 무게, 선형 블렌드 스키닝), 클립(뼈 회전, 이동, 크기, 기울임, 슬롯 색과 붙임, 그리기 차례, 사건, 곡선 선형, 계단, 베지어), 애니메이션 상태(트랙 층 섞기, 크로스페이드), 두 뼈와 한 뼈 IK, 엔진 자체 JSON 과 DragonBones 5.x JSON 읽기(Spine 은 런타임 라이선스 때문에 읽지 않는다), 노드에 붙는 Skeleton2DAnimator(SpriteAtlas 조각, Graphic.drawVertices 로 그린다, Graphic 은 고치지 않음). 예제 examples/skeleton2d(러스트 예제 skeleton2d 와 같은 장면, 셈 확인 skeleton2dcheck.mjs). apidoc 이 Experimental 처럼 다시 내보내기만 있는 이름 공간 모듈의 파일을 따라간다
 - 폴더 정리: src/experimental 에 있던 다 자란 기능을 제자리로 옮겼다. 러스트 vanilla-engine 과 같은 폴더다. import.js 로 쓰던 게임은 그대로 돌고, 파일 경로로 직접 import 하던 게임은 새 경로로 바꾼다. (옛 경로 → 새 경로, 내용은 그대로)
   - src/experimental/graphics/*.js (3D) → src/graphics3d/*.js
   - src/experimental/graphics/toon/*.js (툰 3D) → src/graphics3d/toon/*.js
