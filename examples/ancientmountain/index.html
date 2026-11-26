@@ -1038,8 +1038,8 @@
 	const CHARACTER_MODEL_SCALE = 1.0;
 
 	// 야생 여우. (Khronos glTF 샘플 Fox — 모형 PixelMannen CC0, 리깅과 애니메이션 tomkranis CC-BY 4.0, glTF 변환 AsoboStudio, scurest CC-BY 4.0, 초원을 배회하는 환경 동물)
+	// 여우마다 제 인스턴스를 둔다. (자산 캐시로 메시, 텍스처, 클립은 한 벌만 올리고 포즈와 재생 시점은 여우마다 따로)
 	const foxModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "./assets/fox.glb", skinnedModelRenderer);
-	foxModel.playAnimation("Walk", 0);
 	const FOX_LIST = [
 		{ orbitRadius: 62, orbitSpeed: 0.02, anglePhase: 0.8, bodyScale: 0.007 },
 		{ orbitRadius: 78, orbitSpeed: -0.016, anglePhase: 3.6, bodyScale: 0.0062 },
@@ -1048,6 +1048,12 @@
 		{ orbitRadius: 55, orbitSpeed: -0.021, anglePhase: 4.4, bodyScale: 0.0058 },
 		{ orbitRadius: 70, orbitSpeed: -0.018, anglePhase: 1.5, bodyScale: 0.0071 },
 	];
+	for (let foxIndex = 0; foxIndex < FOX_LIST.length; ++foxIndex) {
+		const fox = FOX_LIST[foxIndex];
+		fox.model = foxIndex === 0 ? foxModel : foxModel.createInstance();
+		fox.model.playAnimation("Walk", 0);
+		fox.model.update(foxIndex * 0.37); // 걸음 시점을 여우마다 엇갈린다.
+	}
 
 	// 여우 위치 갱신. (이동 충돌 판정보다 먼저 — 동물도 장애물로 취급)
 	function updateFoxPositions(elapsedTime) {
@@ -2718,10 +2724,10 @@
 		// 캐릭터 애니메이션 갱신. (클립 선택 + 조인트 오프셋 + 골격 계산)
 		updateCharacterAnimation(deltaTime);
 
-		// 여우 행렬 구성. (updateFoxPositions 에서 계산한 위치/방향 사용 — 같은 포즈를 여러 위치에 출력)
-		foxModel.update(deltaTime);
+		// 여우 행렬 구성. (updateFoxPositions 에서 계산한 위치/방향 사용, 포즈는 여우 인스턴스마다)
 		const foxMatrixList = [];
 		for (const fox of FOX_LIST) {
+			fox.model.update(deltaTime);
 			const foxMatrix = Matrix4.createTranslation(fox.currentX, fox.currentY, fox.currentZ);
 			foxMatrix.rotateY(System.Math.PI - fox.currentYaw);
 			foxMatrix.scale(fox.bodyScale, fox.bodyScale, fox.bodyScale);
@@ -2866,9 +2872,9 @@
 
 			// 캐릭터 / 여우.
 			skinnedModelRenderer.drawDepth(characterModel, lightViewProjectionElements, characterModelElements);
-			for (const foxMatrix of foxMatrixList) {
-				const foxElements = foxMatrix.getElements();
-				skinnedModelRenderer.drawDepth(foxModel, lightViewProjectionElements, foxElements);
+			for (let foxIndex = 0; foxIndex < foxMatrixList.length; ++foxIndex) {
+				const foxElements = foxMatrixList[foxIndex].getElements();
+				skinnedModelRenderer.drawDepth(FOX_LIST[foxIndex].model, lightViewProjectionElements, foxElements);
 			}
 			webGL2RenderingContext.bindVertexArray(null);
 		}
@@ -2976,9 +2982,9 @@
 		skinnedModelRenderer.draw(characterModel, viewProjectionElements, characterModelElements, cameraPositionX, cameraPositionY, cameraPositionZ);
 
 		// 여우.
-		for (const foxMatrix of foxMatrixList) {
-			const foxElements = foxMatrix.getElements();
-			skinnedModelRenderer.draw(foxModel, viewProjectionElements, foxElements, cameraPositionX, cameraPositionY, cameraPositionZ);
+		for (let foxIndex = 0; foxIndex < foxMatrixList.length; ++foxIndex) {
+			const foxElements = foxMatrixList[foxIndex].getElements();
+			skinnedModelRenderer.draw(FOX_LIST[foxIndex].model, viewProjectionElements, foxElements, cameraPositionX, cameraPositionY, cameraPositionZ);
 		}
 
 		// === 6. 블롭 그림자 (SIMPLE 모드 — 정적: 바위/깃발 + 동적: 캐릭터) ===

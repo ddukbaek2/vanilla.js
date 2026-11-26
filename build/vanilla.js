@@ -54736,6 +54736,21 @@ var TEXTURE_UNIT_OCCLUSION = 5;
 var TEXTURE_UNIT_EMISSIVE = 6;
 var TEXTURE_UNIT_SPECULAR = 7;
 var TEXTURE_UNIT_OPACITY = 8;
+function computeMipmapByteCount(width, height) {
+  let byteCount = 0;
+  let levelWidth = System94.Math.max(1, width);
+  let levelHeight = System94.Math.max(1, height);
+  while (true) {
+    byteCount += levelWidth * levelHeight * 4;
+    if (levelWidth === 1 && levelHeight === 1) {
+      break;
+    }
+    levelWidth = System94.Math.max(1, System94.Math.floor(levelWidth / 2));
+    levelHeight = System94.Math.max(1, System94.Math.floor(levelHeight / 2));
+  }
+  return byteCount;
+}
+__name(computeMipmapByteCount, "computeMipmapByteCount");
 var Material = class _Material extends Object2 {
   static {
     __name(this, "Material");
@@ -54779,6 +54794,12 @@ var Material = class _Material extends Object2 {
   #extraTextureBindings;
   /** @private @type { number } */
   #subsurfaceFactor;
+  /** @private @type { boolean } */
+  #ownsTextures;
+  // 기본 슬롯 텍스처를 이 머티리얼이 지었는지. (createInstance 로 갈라진 사본은 원본 것을 빌려 쓴다)
+  /** @private @type { number } */
+  #textureByteCount;
+  // 이 머티리얼이 지은 기본 슬롯 텍스처의 GPU 바이트 수. (밉맵 포함)
   //==============================================================================
   // 생성.
   //==============================================================================
@@ -54807,6 +54828,8 @@ var Material = class _Material extends Object2 {
     this.#emissiveTexture = null;
     this.#specularTexture = null;
     this.#opacityTexture = null;
+    this.#ownsTextures = true;
+    this.#textureByteCount = 0;
   }
   //==============================================================================
   // 기본 머티리얼 서술 생성. (정적, 흰색 무광 비금속)
@@ -54850,14 +54873,14 @@ var Material = class _Material extends Object2 {
     material.#useGlossiness = description.glossinessImage !== null;
     material.#useAlphaCutout = description.opacityImage !== null;
     try {
-      material.#baseColorTexture = await material.createTexture(description.baseColorImage, [255, 255, 255, 255]);
-      material.#normalTexture = await material.createTexture(description.normalImage, [128, 128, 255, 255]);
-      material.#metallicRoughnessTexture = await material.createTexture(description.metallicRoughnessImage, [255, 255, 255, 255]);
-      material.#glossinessTexture = await material.createTexture(description.glossinessImage, [255, 255, 255, 255]);
-      material.#occlusionTexture = await material.createTexture(description.occlusionImage, [255, 255, 255, 255]);
-      material.#emissiveTexture = await material.createTexture(description.emissiveImage, [255, 255, 255, 255]);
-      material.#specularTexture = await material.createTexture(description.specularImage, [255, 255, 255, 255]);
-      material.#opacityTexture = await material.createTexture(description.opacityImage, [255, 255, 255, 255]);
+      material.#baseColorTexture = await material.#createOwnedTexture(description.baseColorImage, [255, 255, 255, 255]);
+      material.#normalTexture = await material.#createOwnedTexture(description.normalImage, [128, 128, 255, 255]);
+      material.#metallicRoughnessTexture = await material.#createOwnedTexture(description.metallicRoughnessImage, [255, 255, 255, 255]);
+      material.#glossinessTexture = await material.#createOwnedTexture(description.glossinessImage, [255, 255, 255, 255]);
+      material.#occlusionTexture = await material.#createOwnedTexture(description.occlusionImage, [255, 255, 255, 255]);
+      material.#emissiveTexture = await material.#createOwnedTexture(description.emissiveImage, [255, 255, 255, 255]);
+      material.#specularTexture = await material.#createOwnedTexture(description.specularImage, [255, 255, 255, 255]);
+      material.#opacityTexture = await material.#createOwnedTexture(description.opacityImage, [255, 255, 255, 255]);
     } catch (error) {
       material.destroy();
       throw error;
@@ -54877,6 +54900,21 @@ var Material = class _Material extends Object2 {
    * @returns { Promise<WebGLTexture> } 지은 GL 텍스처. (이미지면 밉맵과 반복 감싸기, 이미지를 풀지 못하면 거절된다)
    */
   async createTexture(imageDescription, fallbackColor) {
+    const textureCreation = await this.#createTextureWithByteCount(imageDescription, fallbackColor);
+    return textureCreation.glTexture;
+  }
+  //==============================================================================
+  // 기본 슬롯 텍스처 생성. (createTexture 와 같고, 지은 GPU 바이트를 이 머티리얼의 텍스처 바이트 수에 더한다)
+  //==============================================================================
+  async #createOwnedTexture(imageDescription, fallbackColor) {
+    const textureCreation = await this.#createTextureWithByteCount(imageDescription, fallbackColor);
+    this.#textureByteCount += textureCreation.byteCount;
+    return textureCreation.glTexture;
+  }
+  //==============================================================================
+  // 텍스처 생성 본문. (GL 텍스처와 GPU 바이트 수, 단색은 1x1 4 바이트, 그림은 밉맵까지)
+  //==============================================================================
+  async #createTextureWithByteCount(imageDescription, fallbackColor) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const hasBytes = imageDescription && imageDescription.bytes && imageDescription.bytes.length > 0;
     const hasSource = imageDescription && imageDescription.source;
@@ -54884,7 +54922,7 @@ var Material = class _Material extends Object2 {
       const fallbackTexture = webGL2RenderingContext.createTexture();
       webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, fallbackTexture);
       webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.RGBA8, 1, 1, 0, webGL2RenderingContext.RGBA, webGL2RenderingContext.UNSIGNED_BYTE, new System94.Uint8Array(fallbackColor));
-      return fallbackTexture;
+      return { glTexture: fallbackTexture, byteCount: 4 };
     }
     let imageSource = imageDescription.source;
     if (!hasSource) {
@@ -54913,7 +54951,7 @@ var Material = class _Material extends Object2 {
         webGL2RenderingContext.texParameterf(webGL2RenderingContext.TEXTURE_2D, anisotropicExtension.TEXTURE_MAX_ANISOTROPY_EXT, anisotropy);
       }
     }
-    return glTexture;
+    return { glTexture, byteCount: computeMipmapByteCount(imageBitmap.width, imageBitmap.height) };
   }
   //==============================================================================
   // URL 로부터 이미지 서술 로드. (정적, 외부 텍스처 파일을 중립 이미지 서술로)
@@ -55079,6 +55117,68 @@ var Material = class _Material extends Object2 {
     return this.#useGlossiness;
   }
   //==============================================================================
+  // 베이스 컬러 팩터 설정. (선형 rgb 배율, 나눠 쓰는 머티리얼이면 그것을 쓰는 모든 모델이 바뀐다)
+  //==============================================================================
+  /**
+   * @param { number[] } baseColorFactor 베이스 컬러 배율. ([r, g, b], 선형, 앞 세 값을 베껴 둔다)
+   * @example <caption>머티리얼 사본만 붉게 물들이기</caption>
+   * import { Material, SkinnedModelRenderer } from "./build/vanilla.js";
+   *
+   * const canvas = document.createElement("canvas");
+   * const webGL2RenderingContext = canvas.getContext("webgl2");
+   * const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+   * const shaderProgram = skinnedModelRenderer.getShaderProgram();
+   * const description = Material.createDefaultDescription();
+   * const sharedMaterial = await Material.createFromDescription(webGL2RenderingContext, shaderProgram, description);
+   * const instanceMaterial = sharedMaterial.createInstance();
+   * instanceMaterial.setBaseColorFactor([1, 0.4, 0.4]);
+   * console.log(sharedMaterial.getBaseColorFactor().join(", "), instanceMaterial.getBaseColorFactor().join(", "));
+   * instanceMaterial.destroy();
+   * sharedMaterial.destroy();
+   */
+  setBaseColorFactor(baseColorFactor) {
+    this.#baseColorFactor = [baseColorFactor[0], baseColorFactor[1], baseColorFactor[2]];
+  }
+  //==============================================================================
+  // 머티리얼 사본 만들기. (유니티의 material 과 sharedMaterial 처럼 값만 갈라지고 텍스처는 원본 것을 빌려 쓴다)
+  // - 팩터, 플래그, 기본 슬롯 텍스처, setTexture 로 넣은 추가 텍스처를 그대로 베낀다. GPU 텍스처는 새로 올리지 않는다.
+  // - 사본의 destroy 는 빌린 텍스처를 지우지 않는다. 원본(텍스처를 지은 머티리얼)을 지우기 전에 사본을 다 쓴다.
+  //==============================================================================
+  /**
+   * @returns { Material } 같은 셰이더와 텍스처를 쓰고 값은 따로 바꿀 수 있는 사본. (텍스처 바이트 수는 0)
+   */
+  createInstance() {
+    const material = new _Material(this.#webGL2RenderingContext, this.#shaderProgram);
+    material.#baseColorFactor = this.#baseColorFactor.slice();
+    material.#metallicFactor = this.#metallicFactor;
+    material.#roughnessFactor = this.#roughnessFactor;
+    material.#emissiveFactor = this.#emissiveFactor.slice();
+    material.#useGlossiness = this.#useGlossiness;
+    material.#useAlphaCutout = this.#useAlphaCutout;
+    material.#subsurfaceFactor = this.#subsurfaceFactor;
+    material.#baseColorTexture = this.#baseColorTexture;
+    material.#normalTexture = this.#normalTexture;
+    material.#metallicRoughnessTexture = this.#metallicRoughnessTexture;
+    material.#glossinessTexture = this.#glossinessTexture;
+    material.#occlusionTexture = this.#occlusionTexture;
+    material.#emissiveTexture = this.#emissiveTexture;
+    material.#specularTexture = this.#specularTexture;
+    material.#opacityTexture = this.#opacityTexture;
+    material.#extraTextureBindings = new System94.Map(this.#extraTextureBindings);
+    material.#ownsTextures = false;
+    material.#textureByteCount = 0;
+    return material;
+  }
+  //==============================================================================
+  // 텍스처 바이트 수 반환. (이 머티리얼이 지은 기본 슬롯 텍스처의 GPU 바이트, 밉맵 포함, 사본은 0)
+  //==============================================================================
+  /**
+   * @returns { number } GPU 텍스처 바이트 수. (RGBA8 로 셈, 단색 1x1 은 4)
+   */
+  getTextureByteCount() {
+    return this.#textureByteCount;
+  }
+  //==============================================================================
   // 서브서피스 팩터 설정. (피부 셰이더의 화면 공간 산란 마스크 배율, 눈 / 치아처럼 산란하지 않는 부위는 0)
   //==============================================================================
   /**
@@ -55147,15 +55247,17 @@ var Material = class _Material extends Object2 {
   }
   //==============================================================================
   // 파괴. (기본 슬롯 텍스처를 지운다, setTexture 로 넣은 추가 텍스처는 넣은 쪽 것이라 남긴다)
+  // - createInstance 로 만든 사본은 빌린 텍스처를 지우지 않고 슬롯만 비운다.
   //==============================================================================
   destroy() {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
     const ownedTextureList = [this.#baseColorTexture, this.#normalTexture, this.#metallicRoughnessTexture, this.#glossinessTexture, this.#occlusionTexture, this.#emissiveTexture, this.#specularTexture, this.#opacityTexture];
     for (const glTexture of ownedTextureList) {
-      if (glTexture) {
+      if (glTexture && this.#ownsTextures) {
         webGL2RenderingContext.deleteTexture(glTexture);
       }
     }
+    this.#textureByteCount = 0;
     this.#baseColorTexture = null;
     this.#normalTexture = null;
     this.#metallicRoughnessTexture = null;
@@ -55167,15 +55269,400 @@ var Material = class _Material extends Object2 {
   }
 };
 
-// src/graphics3d/skinnedmodel.js
+// src/graphics3d/skinnedmodelasset.js
 var System95 = globalThis;
+var assetCacheTable = new System95.Map();
+var SkinnedModelAsset = class _SkinnedModelAsset extends Object2 {
+  static {
+    __name(this, "SkinnedModelAsset");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { WebGL2RenderingContext } */
+  #webGL2RenderingContext;
+  /** @private @type { ShaderProgram } */
+  #shaderProgram;
+  /** @private @type { string | null } */
+  #key;
+  /** @private @type { number } */
+  #referenceCount;
+  /** @private @type { boolean } */
+  #isDestroyed;
+  /** @private @type { object[] } */
+  #drawableList;
+  /** @private @type { Material[] } */
+  #materialList;
+  /** @private @type { object[] } */
+  #nodeList;
+  /** @private @type { number[] } */
+  #rootNodeIndices;
+  /** @private @type { object[] } */
+  #skinList;
+  /** @private @type { object[] } */
+  #animationList;
+  /** @private @type { number } */
+  #bufferByteCount;
+  //==============================================================================
+  // 생성. (SkinnedModel.uploadMeshesAndMaterials 가 올린 뒤 짓는다, 참조 수 1)
+  //==============================================================================
+  /**
+   * @constructor
+   * @param { WebGL2RenderingContext } webGL2RenderingContext 자원을 지은 렌더링 컨텍스트.
+   * @param { ShaderProgram } shaderProgram 버텍스 어레이와 머티리얼이 쓰는 셰이더 프로그램.
+   * @param { object } content 나눠 쓸 자료. ({ drawableList, materialList, nodeList, rootNodeIndices, skinList, animationList, bufferByteCount }, 드로어블은 원형으로 두고 인스턴스가 베낀다)
+   */
+  constructor(webGL2RenderingContext, shaderProgram, content) {
+    super();
+    this.#webGL2RenderingContext = webGL2RenderingContext;
+    this.#shaderProgram = shaderProgram;
+    this.#key = null;
+    this.#referenceCount = 1;
+    this.#isDestroyed = false;
+    this.#drawableList = content.drawableList;
+    this.#materialList = content.materialList;
+    this.#nodeList = content.nodeList;
+    this.#rootNodeIndices = content.rootNodeIndices;
+    this.#skinList = content.skinList;
+    this.#animationList = content.animationList;
+    this.#bufferByteCount = content.bufferByteCount;
+  }
+  //==============================================================================
+  // 자산 키 정규화. (정적, 역슬래시를 / 로, "." 과 ".." 마디를 풀고 빈 마디를 줄인다, 앞의 "주소틀://" 과 뒤의 ?, # 은 그대로)
+  // - 같은 파일을 "./a/b.glb", "a/c/../b.glb" 처럼 다르게 적어도 같은 키가 되게 한다. 기준 주소로 절대 주소를 만들지는 않는다.
+  //==============================================================================
+  /**
+   * @param { string } path 자산 주소나 이름.
+   * @returns { string } 정규화한 키.
+   * @example <caption>다르게 적은 같은 경로</caption>
+   * import { SkinnedModelAsset } from "./build/vanilla.js";
+   *
+   * console.log(SkinnedModelAsset.normalizeKey("./assets/models/../fox.glb"));
+   * console.log(SkinnedModelAsset.normalizeKey("assets\\fox.glb"));
+   * console.log(SkinnedModelAsset.normalizeKey("https://example.com/a/./b/../fox.glb?v=2"));
+   */
+  static normalizeKey(path) {
+    let text = path.replace(/\\/g, "/");
+    let suffix = "";
+    const suffixIndex = text.search(/[?#]/);
+    if (suffixIndex >= 0) {
+      suffix = text.substring(suffixIndex);
+      text = text.substring(0, suffixIndex);
+    }
+    let prefix = "";
+    const schemeMatch = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/]*/.exec(text);
+    if (schemeMatch) {
+      prefix = schemeMatch[0];
+      text = text.substring(prefix.length);
+    } else if (text.startsWith("/")) {
+      prefix = "/";
+    }
+    const segmentList = [];
+    for (const segment of text.split("/")) {
+      if (segment === "" || segment === ".") {
+        continue;
+      }
+      if (segment === ".." && segmentList.length > 0 && segmentList[segmentList.length - 1] !== "..") {
+        segmentList.pop();
+        continue;
+      }
+      segmentList.push(segment);
+    }
+    const joinedPath = segmentList.join("/");
+    if (prefix !== "" && prefix !== "/" && joinedPath !== "") {
+      return prefix + "/" + joinedPath + suffix;
+    }
+    return prefix + joinedPath + suffix;
+  }
+  //==============================================================================
+  // 캐시에서 찾기. (정적, 셰이더 프로그램과 키가 같고 살아 있는 자산)
+  //==============================================================================
+  /**
+   * @param { string } assetKey 자산 키. (normalizeKey 로 정규화한다)
+   * @param { ShaderProgram } shaderProgram 모델을 그릴 셰이더 프로그램. (렌더러의 getShaderProgram)
+   * @returns { SkinnedModelAsset | null } 찾은 자산. (없으면 null)
+   */
+  static find(assetKey, shaderProgram) {
+    const assetTable = assetCacheTable.get(shaderProgram);
+    if (!assetTable) {
+      return null;
+    }
+    const asset = assetTable.get(_SkinnedModelAsset.normalizeKey(assetKey));
+    return asset ? asset : null;
+  }
+  //==============================================================================
+  // 캐시에 넣기. (정적, 자산에 키를 붙인다. 같은 자리에 있던 자산은 캐시에서만 빠지고 쓰던 인스턴스는 그대로 쓴다)
+  //==============================================================================
+  /**
+   * @param { string } assetKey 자산 키. (normalizeKey 로 정규화한다)
+   * @param { SkinnedModelAsset } asset 넣을 자산. (지워진 자산이면 오류를 던진다)
+   * @example <caption>번들에서 꺼낸 바이트로 지은 모델을 이름으로 나눠 쓰기</caption>
+   * import { SkinnedModel, SkinnedModelAsset, SkinnedModelRenderer } from "./build/vanilla.js";
+   *
+   * const canvas = document.createElement("canvas");
+   * const webGL2RenderingContext = canvas.getContext("webgl2");
+   * const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+   * const response = await fetch("examples/ancientmountain/assets/fox.glb");
+   * const arrayBuffer = await response.arrayBuffer();
+   * const skinnedModel = await SkinnedModel.loadFromBytes(webGL2RenderingContext, arrayBuffer, skinnedModelRenderer);
+   * SkinnedModelAsset.register("fox", skinnedModel.getAsset());
+   * const shaderProgram = skinnedModelRenderer.getShaderProgram();
+   * const foundAsset = SkinnedModelAsset.find("fox", shaderProgram);
+   * const otherModel = SkinnedModel.createFromAsset(foundAsset);
+   * console.log(foundAsset.getReferenceCount(), otherModel.getDrawableList().length);
+   * otherModel.destroy();
+   * skinnedModel.destroy();
+   */
+  static register(assetKey, asset) {
+    if (asset.isDestroyed()) {
+      throw new Error("SkinnedModelAsset: destroyed asset cannot be registered.");
+    }
+    const normalizedKey = _SkinnedModelAsset.normalizeKey(assetKey);
+    const shaderProgram = asset.getShaderProgram();
+    let assetTable = assetCacheTable.get(shaderProgram);
+    if (!assetTable) {
+      assetTable = new System95.Map();
+      assetCacheTable.set(shaderProgram, assetTable);
+    }
+    const previousAsset = assetTable.get(normalizedKey);
+    if (previousAsset && previousAsset !== asset) {
+      previousAsset.#key = null;
+    }
+    if (asset.#key !== null && asset.#key !== normalizedKey) {
+      asset.#removeFromCache();
+    }
+    asset.#key = normalizedKey;
+    assetTable.set(normalizedKey, asset);
+  }
+  //==============================================================================
+  // 캐시 비우기. (정적, 모든 자산을 캐시에서 뺀다. 쓰던 인스턴스는 그대로 그리고, 마지막 인스턴스가 destroy 할 때 GPU 자원이 지워진다)
+  // - 다음 받기는 파일을 새로 풀어 새 자산을 짓는다.
+  //==============================================================================
+  /**
+   * @example <caption>판을 바꿀 때 캐시를 비우기</caption>
+   * import { SkinnedModelAsset } from "./build/vanilla.js";
+   *
+   * SkinnedModelAsset.clearCache();
+   * console.log(SkinnedModelAsset.getCachedCount());
+   */
+  static clearCache() {
+    for (const assetTable of assetCacheTable.values()) {
+      for (const asset of assetTable.values()) {
+        asset.#key = null;
+      }
+    }
+    assetCacheTable.clear();
+  }
+  //==============================================================================
+  // 캐시에 든 자산 수. (정적, 모든 셰이더 프로그램 합)
+  //==============================================================================
+  /**
+   * @returns { number } 캐시에 든 자산 수.
+   */
+  static getCachedCount() {
+    let cachedCount = 0;
+    for (const assetTable of assetCacheTable.values()) {
+      cachedCount += assetTable.size;
+    }
+    return cachedCount;
+  }
+  //==============================================================================
+  // 참조 늘리기. (인스턴스가 자산을 나눠 쓰기 시작할 때, SkinnedModel.createFromAsset 이 부른다)
+  //==============================================================================
+  /**
+   * @returns { void } (지워진 자산이면 오류를 던진다)
+   */
+  retain() {
+    if (this.#isDestroyed) {
+      throw new Error("SkinnedModelAsset: asset already destroyed.");
+    }
+    this.#referenceCount += 1;
+  }
+  //==============================================================================
+  // 참조 줄이기. (인스턴스가 destroy 할 때, 0 이 되면 GPU 자원을 지우고 캐시에서 빠진다)
+  //==============================================================================
+  /**
+   * @returns { boolean } 이번에 자원을 지웠으면 참.
+   */
+  release() {
+    if (this.#isDestroyed) {
+      return false;
+    }
+    this.#referenceCount -= 1;
+    if (this.#referenceCount > 0) {
+      return false;
+    }
+    this.#referenceCount = 0;
+    this.#removeFromCache();
+    this.#destroyResources();
+    return true;
+  }
+  //==============================================================================
+  // 캐시에서 이 자산 빼기. (같은 자리에 다른 자산이 들어 있으면 건드리지 않는다)
+  //==============================================================================
+  #removeFromCache() {
+    if (this.#key === null) {
+      return;
+    }
+    const assetTable = assetCacheTable.get(this.#shaderProgram);
+    if (assetTable && assetTable.get(this.#key) === this) {
+      assetTable.delete(this.#key);
+      if (assetTable.size === 0) {
+        assetCacheTable.delete(this.#shaderProgram);
+      }
+    }
+    this.#key = null;
+  }
+  //==============================================================================
+  // GPU 자원 지우기. (원형 드로어블의 버텍스 어레이, 버퍼, 모프 텍스처와 머티리얼 원형의 텍스처)
+  //==============================================================================
+  #destroyResources() {
+    const webGL2RenderingContext = this.#webGL2RenderingContext;
+    for (const drawable of this.#drawableList) {
+      webGL2RenderingContext.deleteVertexArray(drawable.vertexArray);
+      for (const vertexBuffer of drawable.vertexBufferList) {
+        webGL2RenderingContext.deleteBuffer(vertexBuffer);
+      }
+      if (drawable.indexBuffer) {
+        webGL2RenderingContext.deleteBuffer(drawable.indexBuffer);
+      }
+      if (drawable.morphTexture) {
+        webGL2RenderingContext.deleteTexture(drawable.morphTexture);
+      }
+    }
+    for (const material of this.#materialList) {
+      material.destroy();
+    }
+    this.#drawableList = [];
+    this.#materialList = [];
+    this.#isDestroyed = true;
+  }
+  //==============================================================================
+  // 자산 키 반환.
+  //==============================================================================
+  /**
+   * @returns { string | null } 캐시에 넣은 키. (넣지 않았거나 캐시에서 빠졌으면 null)
+   */
+  getKey() {
+    return this.#key;
+  }
+  //==============================================================================
+  // 참조 수 반환. (이 자산을 나눠 쓰는 살아 있는 인스턴스 수)
+  //==============================================================================
+  /**
+   * @returns { number } 참조 수. (지워졌으면 0)
+   */
+  getReferenceCount() {
+    return this.#referenceCount;
+  }
+  //==============================================================================
+  // 지워졌는지.
+  //==============================================================================
+  /**
+   * @returns { boolean } 마지막 인스턴스가 destroy 해 GPU 자원을 지웠으면 참.
+   */
+  isDestroyed() {
+    return this.#isDestroyed;
+  }
+  //==============================================================================
+  // GPU 바이트 수. (정점, 인덱스 버퍼와 모프 텍스처와 머티리얼 원형 텍스처, 밉맵 포함, 인스턴스 수와 상관없이 한 벌)
+  //==============================================================================
+  /**
+   * @returns { number } 이 자산이 GPU 에 올린 바이트 수. (지워졌으면 0)
+   */
+  getGpuByteCount() {
+    if (this.#isDestroyed) {
+      return 0;
+    }
+    let gpuByteCount = this.#bufferByteCount;
+    for (const material of this.#materialList) {
+      gpuByteCount += material.getTextureByteCount();
+    }
+    return gpuByteCount;
+  }
+  //==============================================================================
+  // 렌더링 컨텍스트 반환.
+  //==============================================================================
+  /**
+   * @returns { WebGL2RenderingContext } 자원을 지은 렌더링 컨텍스트.
+   */
+  getWebGL2RenderingContext() {
+    return this.#webGL2RenderingContext;
+  }
+  //==============================================================================
+  // 셰이더 프로그램 반환.
+  //==============================================================================
+  /**
+   * @returns { ShaderProgram } 버텍스 어레이와 머티리얼이 쓰는 셰이더 프로그램.
+   */
+  getShaderProgram() {
+    return this.#shaderProgram;
+  }
+  //==============================================================================
+  // 원형 드로어블 목록 반환. (인스턴스는 이것을 베껴 버퍼와 머티리얼 원형을 나눠 쓴다, 바꾸지 않는다)
+  //==============================================================================
+  /**
+   * @returns { object[] } 원형 드로어블 목록.
+   */
+  getDrawableList() {
+    return this.#drawableList;
+  }
+  //==============================================================================
+  // 머티리얼 원형 목록 반환. (기본 머티리얼이 마지막, 이 자산이 지었고 마지막 인스턴스가 destroy 할 때 지운다)
+  //==============================================================================
+  /**
+   * @returns { Material[] } 머티리얼 원형 목록. (sharedMaterial, 값을 바꾸면 이 자산을 쓰는 모든 인스턴스가 바뀐다)
+   */
+  getMaterialList() {
+    return this.#materialList;
+  }
+  //==============================================================================
+  // 노드 원형 목록 반환. (올릴 때의 노드, 인스턴스는 이것을 베껴 포즈를 따로 든다)
+  //==============================================================================
+  /**
+   * @returns { object[] } 노드 원형 목록.
+   */
+  getNodeList() {
+    return this.#nodeList;
+  }
+  //==============================================================================
+  // 루트 노드 목록 반환.
+  //==============================================================================
+  /**
+   * @returns { number[] } 루트 노드 번호 목록.
+   */
+  getRootNodeIndices() {
+    return this.#rootNodeIndices;
+  }
+  //==============================================================================
+  // 스킨 원형 목록 반환. (조인트와 역바인드 행렬은 나눠 쓰고, 조인트 행렬 배열은 인스턴스마다 따로)
+  //==============================================================================
+  /**
+   * @returns { object[] } 스킨 원형 목록.
+   */
+  getSkinList() {
+    return this.#skinList;
+  }
+  //==============================================================================
+  // 애니메이션 클립 목록 반환. (인스턴스가 모두 같은 목록을 나눠 쓴다, addAnimationsFromFbx* 로 더한 클립도 모두에게 보인다)
+  //==============================================================================
+  /**
+   * @returns { object[] } 애니메이션 클립 목록.
+   */
+  getAnimationList() {
+    return this.#animationList;
+  }
+};
+
+// src/graphics3d/skinnedmodel.js
+var System96 = globalThis;
 var GLB_CHUNKTYPE_JSON = 1313821514;
 var GLB_CHUNKTYPE_BINARY = 5130562;
 var COMPONENT_ARRAY_TABLE = {
-  5121: System95.Uint8Array,
-  5123: System95.Uint16Array,
-  5125: System95.Uint32Array,
-  5126: System95.Float32Array
+  5121: System96.Uint8Array,
+  5123: System96.Uint16Array,
+  5125: System96.Uint32Array,
+  5126: System96.Float32Array
 };
 var TYPE_COMPONENT_COUNT_TABLE = {
   SCALAR: 1,
@@ -55185,10 +55672,39 @@ var TYPE_COMPONENT_COUNT_TABLE = {
   MAT4: 16
 };
 var MORPH_TEXTURE_WIDTH = 2048;
-var ANIMATION_PATH_SET = new System95.Set(["translation", "rotation", "scale", "weights"]);
+var ANIMATION_PATH_SET = new System96.Set(["translation", "rotation", "scale", "weights"]);
 var MORPH_TARGET_MAXIMUM = 96;
+var pendingAssetLoadTable = new System96.Map();
+function createInstanceNode(templateNode) {
+  return {
+    ...templateNode,
+    currentTranslation: templateNode.currentTranslation.slice(),
+    currentScale: templateNode.currentScale.slice(),
+    worldMatrix: templateNode.worldMatrix.clone()
+  };
+}
+__name(createInstanceNode, "createInstanceNode");
+function createInstanceSkin(templateSkin) {
+  return {
+    ...templateSkin,
+    jointMatrixArray: new System96.Float32Array(templateSkin.jointMatrixArray.length)
+  };
+}
+__name(createInstanceSkin, "createInstanceSkin");
+function createInstanceDrawable(templateDrawable) {
+  return {
+    ...templateDrawable,
+    wireframeIndexBuffer: null,
+    wireframeIndexCount: 0,
+    wireframeIndexComponentType: 0,
+    morphWeights: new System96.Float32Array(templateDrawable.morphWeights),
+    isMorphTextureShared: templateDrawable.morphTexture !== null,
+    isMorphDirty: false
+  };
+}
+__name(createInstanceDrawable, "createInstanceDrawable");
 function createQuaternionFromFbxEuler(xDegree, yDegree, zDegree) {
-  const degreeToRadian2 = System95.Math.PI / 180;
+  const degreeToRadian2 = System96.Math.PI / 180;
   const rotationX = Quaternion.createFromEuler(xDegree * degreeToRadian2, 0, 0);
   const rotationY = Quaternion.createFromEuler(0, yDegree * degreeToRadian2, 0);
   const rotationZ = Quaternion.createFromEuler(0, 0, zDegree * degreeToRadian2);
@@ -55208,7 +55724,7 @@ function convertFbxAnimationChannels(sceneData, fbxAnimation, resolveNodeIndex) 
       const sourceFbxNode = sceneData.nodeList[fbxChannel.nodeIndex];
       const preRotationQuaternion = createQuaternionFromFbxEuler(sourceFbxNode.preRotationDegrees[0], sourceFbxNode.preRotationDegrees[1], sourceFbxNode.preRotationDegrees[2]);
       const keyCount = fbxChannel.times.length;
-      const quaternionValues = new System95.Float32Array(keyCount * 4);
+      const quaternionValues = new System96.Float32Array(keyCount * 4);
       for (let keyIndex = 0; keyIndex < keyCount; ++keyIndex) {
         const eulerQuaternion = createQuaternionFromFbxEuler(fbxChannel.values[keyIndex * 3], fbxChannel.values[keyIndex * 3 + 1], fbxChannel.values[keyIndex * 3 + 2]);
         const rotationQuaternion = preRotationQuaternion.multiply(eulerQuaternion);
@@ -55312,9 +55828,12 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
   #timeScale;
   /** @private @type { Map<number, Quaternion> } */
   #jointRotationOffsets;
+  /** @private @type { SkinnedModelAsset | null } */
+  #asset;
+  // 나눠 쓰는 자산. (올리기 전이나 destroy 뒤에는 null)
   /** @private @type { Material[] } */
-  #ownedMaterialList;
-  // 이 모델이 업로드에서 지은 머티리얼. (destroy 가 지운다)
+  #instanceMaterialList;
+  // getMaterial 로 갈라진 이 인스턴스의 머티리얼. (destroy 가 지운다)
   //==============================================================================
   // 생성.
   //==============================================================================
@@ -55339,8 +55858,9 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     this.#fadeDuration = 0;
     this.#fadeElapsed = 0;
     this.#timeScale = 1;
-    this.#jointRotationOffsets = new System95.Map();
-    this.#ownedMaterialList = [];
+    this.#jointRotationOffsets = new System96.Map();
+    this.#asset = null;
+    this.#instanceMaterialList = [];
   }
   //==============================================================================
   // 셰이더 없이 생성. (정적, 해석과 포즈 계산만 하는 모델, uploadMeshesAndMaterials 는 던진다)
@@ -55372,15 +55892,126 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    * @param { string } url GLB 파일 주소.
    * @param { SkinnedModelRenderer } skinnedModelRenderer 셰이더 프로그램을 빌려 올 렌더러.
    * @returns { Promise<SkinnedModel> } GL 리소스까지 올린 모델. (응답이 실패하거나 GLB 가 아니면 오류를 던진다)
+   * - 자산 캐시를 쓴다. 같은 셰이더 프로그램으로 같은 주소(SkinnedModelAsset.normalizeKey)를 이미 받았으면 받지도 풀지도 않고
+   *   그 자산을 나눠 쓰는 새 인스턴스를 돌려준다. 함께 받는 중이면 끝나기를 기다려 나눠 쓴다.
    */
   static async loadFromUrl(webGL2RenderingContext, url, skinnedModelRenderer) {
-    const response = await System95.fetch(url);
-    if (!response.ok) {
-      throw new Error(`SkinnedModel load failed: ${url}`);
-    }
-    const arrayBuffer = await response.arrayBuffer();
-    const model = await _SkinnedModel.loadFromBytes(webGL2RenderingContext, arrayBuffer, skinnedModelRenderer);
+    const model = await _SkinnedModel.#loadCachedAsset(url, skinnedModelRenderer, async () => {
+      const response = await System96.fetch(url);
+      if (!response.ok) {
+        throw new Error(`SkinnedModel load failed: ${url}`);
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      const loadedModel = await _SkinnedModel.loadFromBytes(webGL2RenderingContext, arrayBuffer, skinnedModelRenderer);
+      return loadedModel;
+    });
     return model;
+  }
+  //==============================================================================
+  // 자산 캐시를 거쳐 짓기. (캐시에 있으면 인스턴스, 받는 중이면 기다려 인스턴스, 없으면 지어 캐시에 넣는다)
+  //==============================================================================
+  static async #loadCachedAsset(url, skinnedModelRenderer, createModel) {
+    const shaderProgram = skinnedModelRenderer.getShaderProgram();
+    const assetKey = SkinnedModelAsset.normalizeKey(url);
+    const cachedAsset = SkinnedModelAsset.find(assetKey, shaderProgram);
+    if (cachedAsset) {
+      return _SkinnedModel.createFromAsset(cachedAsset);
+    }
+    let pendingTable = pendingAssetLoadTable.get(shaderProgram);
+    if (!pendingTable) {
+      pendingTable = new System96.Map();
+      pendingAssetLoadTable.set(shaderProgram, pendingTable);
+    }
+    const pendingPromise = pendingTable.get(assetKey);
+    if (pendingPromise) {
+      await pendingPromise;
+      const loadedAsset = SkinnedModelAsset.find(assetKey, shaderProgram);
+      if (loadedAsset) {
+        return _SkinnedModel.createFromAsset(loadedAsset);
+      }
+      return _SkinnedModel.#loadCachedAsset(url, skinnedModelRenderer, createModel);
+    }
+    const loadPromise = createModel().then((model) => {
+      SkinnedModelAsset.register(assetKey, model.getAsset());
+      return model;
+    });
+    pendingTable.set(assetKey, loadPromise);
+    try {
+      const model = await loadPromise;
+      return model;
+    } finally {
+      pendingTable.delete(assetKey);
+      if (pendingTable.size === 0) {
+        pendingAssetLoadTable.delete(shaderProgram);
+      }
+    }
+  }
+  //==============================================================================
+  // 자산으로부터 인스턴스 짓기. (정적, 자산의 버퍼, 머티리얼 원형, 클립을 나눠 쓰고 포즈와 재생 상태는 따로, GPU 업로드 없음)
+  //==============================================================================
+  /**
+   * @param { SkinnedModelAsset } skinnedModelAsset 나눠 쓸 자산. (지워진 자산이면 오류를 던진다)
+   * @returns { SkinnedModel } 자산의 참조 수를 하나 늘린 새 인스턴스. (노드는 자산을 올릴 때의 원형에서 베낀다)
+   */
+  static createFromAsset(skinnedModelAsset) {
+    skinnedModelAsset.retain();
+    const model = new _SkinnedModel(skinnedModelAsset.getWebGL2RenderingContext(), skinnedModelAsset.getShaderProgram());
+    model.#attachAsset(skinnedModelAsset);
+    return model;
+  }
+  //==============================================================================
+  // 자산 붙이기. (자산의 원형에서 노드, 스킨, 드로어블을 베끼고 클립 목록은 나눠 쓴다, 참조 수는 부른 쪽이 늘린다)
+  //==============================================================================
+  #attachAsset(skinnedModelAsset) {
+    this.#asset = skinnedModelAsset;
+    this.#nodeList = skinnedModelAsset.getNodeList().map(createInstanceNode);
+    this.#rootNodeIndices = skinnedModelAsset.getRootNodeIndices().slice();
+    this.#skinList = skinnedModelAsset.getSkinList().map(createInstanceSkin);
+    this.#drawableList = skinnedModelAsset.getDrawableList().map(createInstanceDrawable);
+    this.#animationList = skinnedModelAsset.getAnimationList();
+    this.#currentAnimation = this.#animationList.length > 0 ? this.#animationList[0] : null;
+    this.#previousAnimation = null;
+  }
+  //==============================================================================
+  // 인스턴스 짓기. (이 모델과 같은 자산을 나눠 쓰는 새 모델, 유니티의 Instantiate 처럼 GPU 자원을 다시 올리지 않는다)
+  //==============================================================================
+  /**
+   * @returns { SkinnedModel } 새 인스턴스. (노드는 자산을 올릴 때의 원형에서 베끼고 재생 상태는 처음부터, 올리기 전이면 오류를 던진다)
+   * @example <caption>여우 하나를 받아 열 마리 띄우기</caption>
+   * import { SkinnedModel, SkinnedModelRenderer } from "./build/vanilla.js";
+   *
+   * const canvas = document.createElement("canvas");
+   * const webGL2RenderingContext = canvas.getContext("webgl2");
+   * const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+   * const sourceModel = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "examples/ancientmountain/assets/fox.glb", skinnedModelRenderer);
+   * const modelList = [sourceModel];
+   * for (let modelIndex = 1; modelIndex < 10; ++modelIndex) {
+   * 	const instanceModel = sourceModel.createInstance();
+   * 	instanceModel.playAnimation(modelIndex % 2 === 0 ? "Walk" : "Run", 0);
+   * 	modelList.push(instanceModel);
+   * }
+   * const skinnedModelAsset = sourceModel.getAsset();
+   * console.log(skinnedModelAsset.getReferenceCount(), skinnedModelAsset.getGpuByteCount());
+   * for (const model of modelList) {
+   * 	model.destroy();
+   * }
+   * console.log(skinnedModelAsset.isDestroyed());
+   */
+  createInstance() {
+    const skinnedModelAsset = this.#asset;
+    if (!skinnedModelAsset) {
+      throw new Error("SkinnedModel: no asset to instance (upload first).");
+    }
+    return _SkinnedModel.createFromAsset(skinnedModelAsset);
+  }
+  //==============================================================================
+  // 자산 반환.
+  //==============================================================================
+  /**
+   * @returns { SkinnedModelAsset | null } 나눠 쓰는 자산. (올리기 전이나 destroy 뒤에는 null)
+   */
+  getAsset() {
+    return this.#asset;
   }
   //==============================================================================
   // 바이트로부터 로드. (정적, GLB 바이너리 glTF, loadFromUrl 의 fetch 뒤 부분)
@@ -55417,13 +56048,16 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    * @param { WebGL2RenderingContext } webGL2RenderingContext WebGL2 렌더링 컨텍스트.
    * @param { string } url 바이너리 FBX 파일 주소.
    * @param { SkinnedModelRenderer } skinnedModelRenderer 셰이더 프로그램을 빌려 올 렌더러.
-   * @returns { Promise<SkinnedModel> } GL 리소스까지 올린 모델.
+   * @returns { Promise<SkinnedModel> } GL 리소스까지 올린 모델. (loadFromUrl 처럼 자산 캐시를 쓴다)
    */
   static async loadFromFbxUrl(webGL2RenderingContext, url, skinnedModelRenderer) {
-    const sceneData = await FbxLoader.loadFromUrl(url);
-    const shaderProgram = skinnedModelRenderer.getShaderProgram();
-    const model = new _SkinnedModel(webGL2RenderingContext, shaderProgram);
-    await model.parseFbxContent(sceneData);
+    const model = await _SkinnedModel.#loadCachedAsset(url, skinnedModelRenderer, async () => {
+      const sceneData = await FbxLoader.loadFromUrl(url);
+      const shaderProgram = skinnedModelRenderer.getShaderProgram();
+      const loadedModel = new _SkinnedModel(webGL2RenderingContext, shaderProgram);
+      await loadedModel.parseFbxContent(sceneData);
+      return loadedModel;
+    });
     return model;
   }
   //==============================================================================
@@ -55450,7 +56084,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    * @returns { { json: object, binaryBuffer: ArrayBuffer } } JSON 청크를 읽은 객체와 BIN 청크 바이트. (머리가 GLB 가 아니거나 청크가 깨졌거나 JSON, BIN 가운데 하나라도 없으면 오류를 던진다)
    */
   static readGlbChunks(arrayBuffer) {
-    const dataView = new System95.DataView(arrayBuffer);
+    const dataView = new System96.DataView(arrayBuffer);
     if (arrayBuffer.byteLength < 12 || dataView.getUint32(0, true) !== 1179937895) {
       throw new Error("SkinnedModel: not a GLB file.");
     }
@@ -55468,9 +56102,9 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         throw new Error("SkinnedModel: invalid GLB chunks.");
       }
       if (chunkType === GLB_CHUNKTYPE_JSON) {
-        const jsonBytes = new System95.Uint8Array(arrayBuffer, chunkStart, chunkLength);
-        const jsonText = new System95.TextDecoder().decode(jsonBytes);
-        json = System95.JSON.parse(jsonText);
+        const jsonBytes = new System96.Uint8Array(arrayBuffer, chunkStart, chunkLength);
+        const jsonText = new System96.TextDecoder().decode(jsonBytes);
+        json = System96.JSON.parse(jsonText);
       } else if (chunkType === GLB_CHUNKTYPE_BINARY) {
         binaryBuffer = arrayBuffer.slice(chunkStart, chunkStart + chunkLength);
       }
@@ -55544,7 +56178,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return {
         jointNodeIndices: skin.joints.slice(),
         inverseBindMatrices,
-        jointMatrixArray: new System95.Float32Array(skin.joints.length * 16)
+        jointMatrixArray: new System96.Float32Array(skin.joints.length * 16)
       };
     });
     function createImageDescription(textureInfo) {
@@ -55557,7 +56191,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         return null;
       }
       const bufferView = json.bufferViews[image.bufferView];
-      const imageBytes = new System95.Uint8Array(binaryBuffer, bufferView.byteOffset || 0, bufferView.byteLength);
+      const imageBytes = new System96.Uint8Array(binaryBuffer, bufferView.byteOffset || 0, bufferView.byteLength);
       return { bytes: imageBytes, mimeType: image.mimeType, flipY: false };
     }
     __name(createImageDescription, "createImageDescription");
@@ -55593,7 +56227,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         this.#skinList.push({
           jointNodeIndices: [nodeIndex],
           inverseBindMatrices: [Matrix4.createIdentity()],
-          jointMatrixArray: new System95.Float32Array(16)
+          jointMatrixArray: new System96.Float32Array(16)
         });
         node.skinIndex = this.#skinList.length - 1;
       }
@@ -55601,23 +56235,23 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       const nodeValue = json.nodes[nodeIndex];
       const baseMorphWeights = nodeValue.weights ? nodeValue.weights : mesh.weights ? mesh.weights : [];
       for (const primitive of mesh.primitives) {
-        const positions = new System95.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.POSITION));
+        const positions = new System96.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.POSITION));
         const vertexCount = positions.length / 3;
-        const normals = primitive.attributes.NORMAL !== void 0 ? new System95.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.NORMAL)) : null;
-        const textureCoordinates = primitive.attributes.TEXCOORD_0 !== void 0 ? new System95.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.TEXCOORD_0)) : null;
+        const normals = primitive.attributes.NORMAL !== void 0 ? new System96.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.NORMAL)) : null;
+        const textureCoordinates = primitive.attributes.TEXCOORD_0 !== void 0 ? new System96.Float32Array(readAccessorArray(json, binaryBuffer, primitive.attributes.TEXCOORD_0)) : null;
         let joints = null;
         let weights = null;
         if (isStaticMesh) {
-          joints = new System95.Uint16Array(vertexCount * 4);
-          weights = new System95.Float32Array(vertexCount * 4);
+          joints = new System96.Uint16Array(vertexCount * 4);
+          weights = new System96.Float32Array(vertexCount * 4);
           for (let vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
             weights[vertexIndex * 4] = 1;
           }
         } else {
-          joints = new System95.Uint16Array(readAccessorArray(json, binaryBuffer, primitive.attributes.JOINTS_0));
+          joints = new System96.Uint16Array(readAccessorArray(json, binaryBuffer, primitive.attributes.JOINTS_0));
           const weightAccessor = json.accessors[primitive.attributes.WEIGHTS_0];
           const weightSource = readAccessorArray(json, binaryBuffer, primitive.attributes.WEIGHTS_0);
-          weights = new System95.Float32Array(weightSource.length);
+          weights = new System96.Float32Array(weightSource.length);
           if (weightAccessor.componentType === 5126) {
             weights.set(weightSource);
           } else {
@@ -55630,7 +56264,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         let indices = null;
         if (primitive.indices !== void 0) {
           const indexSource = readAccessorArray(json, binaryBuffer, primitive.indices);
-          indices = indexSource instanceof System95.Uint8Array ? new System95.Uint16Array(indexSource) : indexSource;
+          indices = indexSource instanceof System96.Uint8Array ? new System96.Uint16Array(indexSource) : indexSource;
         }
         const morphTargets = [];
         const primitiveTargets = primitive.targets ? primitive.targets : [];
@@ -55639,12 +56273,12 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
           if (target.POSITION === void 0) {
             continue;
           }
-          const positionDeltas = new System95.Float32Array(readAccessorArray(json, binaryBuffer, target.POSITION));
-          const normalDeltas = target.NORMAL !== void 0 ? new System95.Float32Array(readAccessorArray(json, binaryBuffer, target.NORMAL)) : null;
+          const positionDeltas = new System96.Float32Array(readAccessorArray(json, binaryBuffer, target.POSITION));
+          const normalDeltas = target.NORMAL !== void 0 ? new System96.Float32Array(readAccessorArray(json, binaryBuffer, target.NORMAL)) : null;
           const targetName = targetNameList[targetIndex] !== void 0 ? targetNameList[targetIndex] : `target${targetIndex}`;
           morphTargets.push({ name: targetName, positionDeltas, normalDeltas });
         }
-        const morphWeights = new System95.Float32Array(morphTargets.length);
+        const morphWeights = new System96.Float32Array(morphTargets.length);
         for (let weightIndex = 0; weightIndex < morphTargets.length; ++weightIndex) {
           morphWeights[weightIndex] = baseMorphWeights[weightIndex] !== void 0 ? baseMorphWeights[weightIndex] : 0;
         }
@@ -55674,7 +56308,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         const times = readAccessorArray(json, binaryBuffer, sampler.input);
         const values = readAccessorArray(json, binaryBuffer, sampler.output);
         if (times.length > 0) {
-          duration = System95.Math.max(duration, times[times.length - 1]);
+          duration = System96.Math.max(duration, times[times.length - 1]);
         }
         const target = channel.target || {};
         if (target.node === void 0 || !ANIMATION_PATH_SET.has(target.path)) {
@@ -55733,7 +56367,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       };
     });
     this.#rootNodeIndices = sceneData.rootNodeIndices.slice();
-    const skinIdList = System95.Array.from(sceneData.skinDeformerById.keys());
+    const skinIdList = System96.Array.from(sceneData.skinDeformerById.keys());
     this.#skinList = skinIdList.map((skinId) => {
       const skinDeformer = sceneData.skinDeformerById.get(skinId);
       const jointNodeIndices = [];
@@ -55757,7 +56391,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return {
         jointNodeIndices,
         inverseBindMatrices,
-        jointMatrixArray: new System95.Float32Array(jointNodeIndices.length * 16)
+        jointMatrixArray: new System96.Float32Array(jointNodeIndices.length * 16)
       };
     });
     function createFbxImageDescription(textureId) {
@@ -55775,7 +56409,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       return { bytes: video.contentBytes, mimeType: null, flipY: true };
     }
     __name(createFbxImageDescription, "createFbxImageDescription");
-    const materialIdList = System95.Array.from(sceneData.materialById.keys());
+    const materialIdList = System96.Array.from(sceneData.materialById.keys());
     const materialDescriptionList = materialIdList.map((materialId) => {
       const fbxMaterial = sceneData.materialById.get(materialId);
       const description = Material.createDefaultDescription();
@@ -55803,7 +56437,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       if (!geometry) {
         continue;
       }
-      const influencesPerVertex = new System95.Array(geometry.originalVertexCount);
+      const influencesPerVertex = new System96.Array(geometry.originalVertexCount);
       for (let vertexIndex = 0; vertexIndex < geometry.originalVertexCount; ++vertexIndex) {
         influencesPerVertex[vertexIndex] = [];
       }
@@ -55820,13 +56454,13 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
           }
         }
       }
-      const vertexJointArray = new System95.Uint16Array(geometry.originalVertexCount * 4);
-      const vertexWeightArray = new System95.Float32Array(geometry.originalVertexCount * 4);
+      const vertexJointArray = new System96.Uint16Array(geometry.originalVertexCount * 4);
+      const vertexWeightArray = new System96.Float32Array(geometry.originalVertexCount * 4);
       for (let vertexIndex = 0; vertexIndex < geometry.originalVertexCount; ++vertexIndex) {
         const influenceList = influencesPerVertex[vertexIndex];
         influenceList.sort((left, right) => right.weight - left.weight);
         let weightSum = 0;
-        const usedCount = System95.Math.min(4, influenceList.length);
+        const usedCount = System96.Math.min(4, influenceList.length);
         for (let slotIndex = 0; slotIndex < usedCount; ++slotIndex) {
           weightSum += influenceList[slotIndex].weight;
         }
@@ -55839,8 +56473,8 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         }
       }
       const cornerCount = geometry.cornerCount;
-      const cornerJointArray = new System95.Uint16Array(cornerCount * 4);
-      const cornerWeightArray = new System95.Float32Array(cornerCount * 4);
+      const cornerJointArray = new System96.Uint16Array(cornerCount * 4);
+      const cornerWeightArray = new System96.Float32Array(cornerCount * 4);
       for (let cornerIndex = 0; cornerIndex < cornerCount; ++cornerIndex) {
         const originalVertexIndex = geometry.originalVertexIndices[cornerIndex];
         if (originalVertexIndex < 0 || originalVertexIndex >= geometry.originalVertexCount) {
@@ -55876,7 +56510,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
           materialName: materialIndex !== -1 ? sceneData.materialById.get(materialId).name : "",
           nodeIndex,
           morphTargets: [],
-          morphWeights: new System95.Float32Array(0)
+          morphWeights: new System96.Float32Array(0)
         });
       }
     }
@@ -55912,12 +56546,12 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    */
   static splitFbxCornersByMaterial(materialIndexPerTriangle, cornerArrays) {
     const triangleCount = materialIndexPerTriangle.length;
-    const triangleCountByMaterial = new System95.Map();
+    const triangleCountByMaterial = new System96.Map();
     for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
       const localMaterialIndex = materialIndexPerTriangle[triangleIndex];
       triangleCountByMaterial.set(localMaterialIndex, (triangleCountByMaterial.get(localMaterialIndex) || 0) + 1);
     }
-    const localMaterialIndexList = System95.Array.from(triangleCountByMaterial.keys()).sort((left, right) => left - right);
+    const localMaterialIndexList = System96.Array.from(triangleCountByMaterial.keys()).sort((left, right) => left - right);
     if (localMaterialIndexList.length <= 1) {
       return [{ localMaterialIndex: localMaterialIndexList.length === 1 ? localMaterialIndexList[0] : 0, ...cornerArrays }];
     }
@@ -55925,7 +56559,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     return localMaterialIndexList.map((localMaterialIndex) => {
       const subCornerCount = triangleCountByMaterial.get(localMaterialIndex) * 3;
       const subMesh = { localMaterialIndex };
-      for (const arrayName of System95.Object.keys(componentCountByName)) {
+      for (const arrayName of System96.Object.keys(componentCountByName)) {
         const componentCount = componentCountByName[arrayName];
         const sourceArray = cornerArrays[arrayName];
         const targetArray = new sourceArray.constructor(subCornerCount * componentCount);
@@ -55979,7 +56613,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    */
   addAnimationsFromFbxSceneData(sceneData, clipName, ignoreTranslation = false) {
     const nodeList = this.getNodeList();
-    const nodeIndexByName = new System95.Map();
+    const nodeIndexByName = new System96.Map();
     for (let nodeIndex = 0; nodeIndex < nodeList.length; ++nodeIndex) {
       nodeIndexByName.set(nodeList[nodeIndex].name, nodeIndex);
     }
@@ -55994,12 +56628,22 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         channels = channels.filter((channel) => channel.path !== "translation");
       }
       const animationName = createFbxClipName(clipName, fbxAnimation.name, stackIndex, channelAnimationList.length);
-      this.#animationList.push({ name: animationName, duration: fbxAnimation.duration, channels });
+      const animation = { name: animationName, duration: fbxAnimation.duration, channels };
+      const sameNameIndex = this.#animationList.findIndex((existingAnimation) => existingAnimation.name === animationName);
+      if (sameNameIndex >= 0) {
+        this.#animationList[sameNameIndex] = animation;
+        if (this.#currentAnimation && this.#currentAnimation.name === animationName) {
+          this.#currentAnimation = animation;
+        }
+      } else {
+        this.#animationList.push(animation);
+      }
     }
   }
   //==============================================================================
   // 중립 메시/머티리얼 서술 업로드. (공용, Material 생성 + VAO/드로어블 구성)
-  // - 예전 드로어블의 GL 리소스와 이 모델이 지은 머티리얼은 먼저 지운다. (destroy, 다시 불러도 새지 않는다)
+  // - 예전 자산은 먼저 놓는다. (destroy, 다시 불러도 새지 않는다)
+  // - 올린 버퍼, 머티리얼, 모프 텍스처와 지금 노드, 스킨, 클립을 새 자산(SkinnedModelAsset, 참조 수 1)으로 묶고 이 모델이 그 첫 인스턴스가 된다.
   //==============================================================================
   /**
    * @param { object[] } meshDescriptionList 중립 메시 서술 목록.
@@ -56016,12 +56660,12 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     for (const materialDescription of materialDescriptionList) {
       const material = await Material.createFromDescription(webGL2RenderingContext, shaderProgram, materialDescription);
       materialList.push(material);
-      this.#ownedMaterialList.push(material);
     }
     const defaultDescription = Material.createDefaultDescription();
     const defaultMaterial = await Material.createFromDescription(webGL2RenderingContext, shaderProgram, defaultDescription);
-    this.#ownedMaterialList.push(defaultMaterial);
-    this.#drawableList = [];
+    const assetMaterialList = materialList.concat([defaultMaterial]);
+    let bufferByteCount = 0;
+    const templateDrawableList = [];
     for (const meshDescription of meshDescriptionList) {
       let normals = meshDescription.normals;
       if (!normals) {
@@ -56030,13 +56674,19 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       const vertexArray = webGL2RenderingContext.createVertexArray();
       webGL2RenderingContext.bindVertexArray(vertexArray);
       const vertexBufferList = [];
-      vertexBufferList.push(this.bindFloatAttribute(shaderProgram, "vertexPosition", meshDescription.positions, 3));
-      vertexBufferList.push(this.bindFloatAttribute(shaderProgram, "vertexNormal", normals, 3));
+      const addVertexBuffer = /* @__PURE__ */ __name((vertexBuffer, dataArray) => {
+        if (vertexBuffer !== null) {
+          vertexBufferList.push(vertexBuffer);
+          bufferByteCount += dataArray.byteLength;
+        }
+      }, "addVertexBuffer");
+      addVertexBuffer(this.bindFloatAttribute(shaderProgram, "vertexPosition", meshDescription.positions, 3), meshDescription.positions);
+      addVertexBuffer(this.bindFloatAttribute(shaderProgram, "vertexNormal", normals, 3), normals);
       if (meshDescription.textureCoordinates) {
-        vertexBufferList.push(this.bindFloatAttribute(shaderProgram, "vertexTextureCoordinate", meshDescription.textureCoordinates, 2));
+        addVertexBuffer(this.bindFloatAttribute(shaderProgram, "vertexTextureCoordinate", meshDescription.textureCoordinates, 2), meshDescription.textureCoordinates);
       }
-      vertexBufferList.push(this.bindIntegerAttribute(shaderProgram, "vertexJoints", meshDescription.joints, 4));
-      vertexBufferList.push(this.bindFloatAttribute(shaderProgram, "vertexWeights", meshDescription.weights, 4));
+      addVertexBuffer(this.bindIntegerAttribute(shaderProgram, "vertexJoints", meshDescription.joints, 4), meshDescription.joints);
+      addVertexBuffer(this.bindFloatAttribute(shaderProgram, "vertexWeights", meshDescription.weights, 4), meshDescription.weights);
       let indexCount = 0;
       let indexComponentType = 0;
       let indexBuffer = null;
@@ -56046,14 +56696,15 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, indexBuffer);
         webGL2RenderingContext.bufferData(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, meshDescription.indices, webGL2RenderingContext.STATIC_DRAW);
         indexCount = meshDescription.indices.length;
-        indexComponentType = meshDescription.indices instanceof System95.Uint32Array ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
+        indexComponentType = meshDescription.indices instanceof System96.Uint32Array ? webGL2RenderingContext.UNSIGNED_INT : webGL2RenderingContext.UNSIGNED_SHORT;
+        bufferByteCount += meshDescription.indices.byteLength;
       }
       webGL2RenderingContext.bindVertexArray(null);
       const material = meshDescription.materialIndex >= 0 && materialList[meshDescription.materialIndex] ? materialList[meshDescription.materialIndex] : defaultMaterial;
       const morphTargetList = meshDescription.morphTargets ? meshDescription.morphTargets.slice() : [];
-      this.#drawableList.push({
+      templateDrawableList.push({
         vertexArray,
-        vertexBufferList: vertexBufferList.filter((vertexBuffer) => vertexBuffer !== null),
+        vertexBufferList,
         isIndexed,
         indexBuffer,
         indexCount,
@@ -56069,13 +56720,32 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         nodeIndex: meshDescription.nodeIndex !== void 0 ? meshDescription.nodeIndex : -1,
         meshDescription,
         morphTargetList,
-        morphWeights: meshDescription.morphWeights ? new System95.Float32Array(meshDescription.morphWeights) : new System95.Float32Array(0),
+        morphWeights: meshDescription.morphWeights ? new System96.Float32Array(meshDescription.morphWeights) : new System96.Float32Array(0),
         morphTexture: null,
         morphRowsPerTarget: 0,
         morphTextureWidth: 0,
+        isMorphTextureShared: false,
         isMorphDirty: morphTargetList.length > 0
       });
     }
+    for (const templateDrawable of templateDrawableList) {
+      if (templateDrawable.isMorphDirty) {
+        this.uploadMorphTargets(templateDrawable);
+        if (templateDrawable.morphTexture) {
+          bufferByteCount += templateDrawable.morphTextureWidth * templateDrawable.morphRowsPerTarget * 2 * templateDrawable.morphTargetList.length * 16;
+        }
+      }
+    }
+    const skinnedModelAsset = new SkinnedModelAsset(webGL2RenderingContext, shaderProgram, {
+      drawableList: templateDrawableList,
+      materialList: assetMaterialList,
+      nodeList: this.#nodeList.map(createInstanceNode),
+      rootNodeIndices: this.#rootNodeIndices.slice(),
+      skinList: this.#skinList.map(createInstanceSkin),
+      animationList: this.#animationList,
+      bufferByteCount
+    });
+    this.#attachAsset(skinnedModelAsset);
   }
   //==============================================================================
   // 와이어프레임 인덱스 업로드. (삼각형 인덱스 → 중복 없는 모서리 선 인덱스, 비인덱스 메시는 삼각형별 3변)
@@ -56094,7 +56764,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     const vertexCount = drawable.vertexCount;
     const edgeList = _SkinnedModel.buildWireframeEdgeList(drawable.meshDescription.indices, vertexCount);
     const useUnsignedInt = vertexCount > 65535;
-    const wireframeIndices = useUnsignedInt ? new System95.Uint32Array(edgeList) : new System95.Uint16Array(edgeList);
+    const wireframeIndices = useUnsignedInt ? new System96.Uint32Array(edgeList) : new System96.Uint16Array(edgeList);
     const wireframeIndexBuffer = webGL2RenderingContext.createBuffer();
     webGL2RenderingContext.bindVertexArray(null);
     webGL2RenderingContext.bindBuffer(webGL2RenderingContext.ELEMENT_ARRAY_BUFFER, wireframeIndexBuffer);
@@ -56115,14 +56785,14 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
   static buildWireframeEdgeList(triangleIndices, vertexCount) {
     const edgeList = [];
     if (triangleIndices) {
-      const edgeKeySet = new System95.Set();
+      const edgeKeySet = new System96.Set();
       const triangleCount = triangleIndices.length / 3;
       for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
         for (let cornerIndex = 0; cornerIndex < 3; ++cornerIndex) {
           const indexA = triangleIndices[triangleIndex * 3 + cornerIndex];
           const indexB = triangleIndices[triangleIndex * 3 + (cornerIndex + 1) % 3];
-          const minimumIndex = System95.Math.min(indexA, indexB);
-          const maximumIndex = System95.Math.max(indexA, indexB);
+          const minimumIndex = System96.Math.min(indexA, indexB);
+          const maximumIndex = System96.Math.max(indexA, indexB);
           const edgeKey = minimumIndex * vertexCount + maximumIndex;
           if (edgeKeySet.has(edgeKey)) {
             continue;
@@ -56143,10 +56813,14 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
   // - 텍셀 인덱스 = 정점 인덱스. 블록 시작 행 = 타깃 인덱스 x 2 x 타깃당 행 수.
   //==============================================================================
   /**
-   * @param { object } drawable 모프 텍스처를 올릴 드로어블. (타깃이 없으면 텍스처를 지운다)
+   * @param { object } drawable 모프 텍스처를 올릴 드로어블. (타깃이 없으면 텍스처를 지운다, 자산과 나눠 쓰던 텍스처면 건드리지 않고 이 드로어블 것을 새로 짓는다)
    */
   uploadMorphTargets(drawable) {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
+    if (drawable.isMorphTextureShared) {
+      drawable.morphTexture = null;
+      drawable.isMorphTextureShared = false;
+    }
     const targetCount = drawable.morphTargetList.length;
     const vertexCount = drawable.vertexCount;
     if (targetCount === 0 || vertexCount === 0) {
@@ -56186,10 +56860,10 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    */
   static buildMorphTexelData(morphTargetList, vertexCount) {
     const targetCount = morphTargetList.length;
-    const textureWidth = System95.Math.max(1, System95.Math.min(vertexCount, MORPH_TEXTURE_WIDTH));
-    const rowsPerTarget = System95.Math.ceil(vertexCount / textureWidth);
+    const textureWidth = System96.Math.max(1, System96.Math.min(vertexCount, MORPH_TEXTURE_WIDTH));
+    const rowsPerTarget = System96.Math.ceil(vertexCount / textureWidth);
     const textureHeight = rowsPerTarget * 2 * targetCount;
-    const texelData = new System95.Float32Array(textureWidth * textureHeight * 4);
+    const texelData = new System96.Float32Array(textureWidth * textureHeight * 4);
     for (let targetIndex = 0; targetIndex < targetCount; ++targetIndex) {
       const morphTarget = morphTargetList[targetIndex];
       const positionBlockOffset = targetIndex * 2 * rowsPerTarget * textureWidth;
@@ -56247,8 +56921,8 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     if (positionDeltas.length !== drawable.vertexCount * 3) {
       throw new Error(`SkinnedModel: morph target "${targetName}" delta count mismatch.`);
     }
-    drawable.morphTargetList.push({ name: targetName, positionDeltas, normalDeltas });
-    const morphWeights = new System95.Float32Array(drawable.morphTargetList.length);
+    drawable.morphTargetList = drawable.morphTargetList.concat([{ name: targetName, positionDeltas, normalDeltas }]);
+    const morphWeights = new System96.Float32Array(drawable.morphTargetList.length);
     morphWeights.set(drawable.morphWeights);
     drawable.morphWeights = morphWeights;
     drawable.isMorphDirty = true;
@@ -56301,6 +56975,53 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     drawable.material = material;
   }
   //==============================================================================
+  // 이 인스턴스의 머티리얼 반환. (유니티 Renderer.material, 처음 부르면 지금 머티리얼의 사본으로 갈라져 이 드로어블에 낀다)
+  // - 사본은 텍스처를 빌려 쓰고 값만 따로다. 값을 바꿔도 같은 자산을 쓰는 다른 인스턴스는 그대로다. 사본은 이 모델의 destroy 가 지운다.
+  // - 이미 이 인스턴스의 사본이면 그것을 돌려준다.
+  //==============================================================================
+  /**
+   * @param { number } drawableIndex 드로어블 번호. (없으면 오류를 던진다)
+   * @returns { Material } 이 인스턴스만 쓰는 머티리얼.
+   * @example <caption>여러 마리 가운데 한 마리만 붉게</caption>
+   * import { SkinnedModel, SkinnedModelRenderer } from "./build/vanilla.js";
+   *
+   * const canvas = document.createElement("canvas");
+   * const webGL2RenderingContext = canvas.getContext("webgl2");
+   * const skinnedModelRenderer = new SkinnedModelRenderer(webGL2RenderingContext);
+   * const blueFox = await SkinnedModel.loadFromUrl(webGL2RenderingContext, "examples/ancientmountain/assets/fox.glb", skinnedModelRenderer);
+   * const redFox = blueFox.createInstance();
+   * redFox.getMaterial(0).setBaseColorFactor([1, 0.3, 0.3]);
+   * console.log(blueFox.getSharedMaterial(0).getBaseColorFactor().join(", "), redFox.getSharedMaterial(0).getBaseColorFactor().join(", "));
+   * redFox.destroy();
+   * blueFox.destroy();
+   */
+  getMaterial(drawableIndex) {
+    const drawable = this.#drawableList[drawableIndex];
+    if (!drawable) {
+      throw new Error(`SkinnedModel: drawable ${drawableIndex} not found.`);
+    }
+    if (!this.#instanceMaterialList.includes(drawable.material)) {
+      const instanceMaterial = drawable.material.createInstance();
+      this.#instanceMaterialList.push(instanceMaterial);
+      drawable.material = instanceMaterial;
+    }
+    return drawable.material;
+  }
+  //==============================================================================
+  // 낀 머티리얼 반환. (유니티 Renderer.sharedMaterial, 갈라지지 않는다. 자산의 원형이면 값을 바꿀 때 그 자산을 쓰는 모든 인스턴스가 바뀐다)
+  //==============================================================================
+  /**
+   * @param { number } drawableIndex 드로어블 번호. (없으면 오류를 던진다)
+   * @returns { Material } 지금 드로어블에 낀 머티리얼. (getMaterial 로 갈라졌으면 그 사본, setMaterial 로 바꿨으면 그것)
+   */
+  getSharedMaterial(drawableIndex) {
+    const drawable = this.#drawableList[drawableIndex];
+    if (!drawable) {
+      throw new Error(`SkinnedModel: drawable ${drawableIndex} not found.`);
+    }
+    return drawable.material;
+  }
+  //==============================================================================
   // 스무스 노멀 생성. (노멀 미보유 메시, 바인드 포즈 기준, 스키닝 회전은 셰이더에서 적용)
   //==============================================================================
   /**
@@ -56309,7 +57030,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
    * @returns { Float32Array } 정점마다 면 노멀을 더해 정규화한 노멀 배열. (positions 와 같은 길이)
    */
   generateSmoothNormals(positions, indices) {
-    const normals = new System95.Float32Array(positions.length);
+    const normals = new System96.Float32Array(positions.length);
     const triangleCount = indices ? indices.length / 3 : positions.length / 9;
     for (let triangleIndex = 0; triangleIndex < triangleCount; ++triangleIndex) {
       const indexA = (indices ? indices[triangleIndex * 3] : triangleIndex * 3) * 3;
@@ -56335,7 +57056,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
       normals[indexC + 2] += faceNormalZ;
     }
     for (let vertexIndex = 0; vertexIndex < normals.length; vertexIndex += 3) {
-      const normalLength = System95.Math.sqrt(normals[vertexIndex] * normals[vertexIndex] + normals[vertexIndex + 1] * normals[vertexIndex + 1] + normals[vertexIndex + 2] * normals[vertexIndex + 2]);
+      const normalLength = System96.Math.sqrt(normals[vertexIndex] * normals[vertexIndex] + normals[vertexIndex + 1] * normals[vertexIndex + 1] + normals[vertexIndex + 2] * normals[vertexIndex + 2]);
       if (normalLength > 0) {
         normals[vertexIndex] /= normalLength;
         normals[vertexIndex + 1] /= normalLength;
@@ -56458,9 +57179,9 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
         channel.cursor += 1;
       }
       const frameIndex = channel.cursor;
-      const nextIndex = System95.Math.min(frameIndex + 1, keyCount - 1);
+      const nextIndex = System96.Math.min(frameIndex + 1, keyCount - 1);
       const spanDuration = times[nextIndex] - times[frameIndex];
-      const factor = spanDuration > 0 ? System95.Math.max(0, System95.Math.min(1, (loopedTime - times[frameIndex]) / spanDuration)) : 0;
+      const factor = spanDuration > 0 ? System96.Math.max(0, System96.Math.min(1, (loopedTime - times[frameIndex]) / spanDuration)) : 0;
       if (channel.path === "rotation") {
         const baseOffset = frameIndex * 4;
         const nextOffset = nextIndex * 4;
@@ -56531,7 +57252,7 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     if (currentAnimation) {
       if (this.#previousAnimation) {
         this.sampleAnimation(this.#previousAnimation, this.#previousTime, 1);
-        const blendWeight = System95.Math.min(this.#fadeElapsed / System95.Math.max(this.#fadeDuration, 1e-4), 1);
+        const blendWeight = System96.Math.min(this.#fadeElapsed / System96.Math.max(this.#fadeDuration, 1e-4), 1);
         this.sampleAnimation(currentAnimation, this.#currentTime, blendWeight);
       } else {
         this.sampleAnimation(currentAnimation, this.#currentTime, 1);
@@ -56701,40 +57422,37 @@ var SkinnedModel = class _SkinnedModel extends Object2 {
     return this.#animationList;
   }
   //==============================================================================
-  // 파괴. (GL 리소스 해제, 버텍스 어레이, 버퍼, 모프 텍스처, 이 모델이 업로드에서 지은 머티리얼의 텍스처)
-  // - setMaterial 로 바깥에서 넣은 머티리얼은 지우지 않는다. 이 모델이 지은 머티리얼을 다른 모델에 넣어 썼다면 함께 지워진다.
+  // 파괴. (이 인스턴스 것을 지우고 자산을 놓는다, 마지막 인스턴스면 자산이 버퍼, 버텍스 어레이, 모프 텍스처, 머티리얼 원형을 지운다)
+  // - 이 인스턴스 것: 와이어프레임 버퍼, addMorphTarget 으로 갈라진 모프 텍스처, getMaterial 로 갈라진 머티리얼.
+  // - setMaterial 로 바깥에서 넣은 머티리얼은 지우지 않는다. 자산의 머티리얼 원형을 다른 모델에 넣어 썼다면 자산이 지워질 때 함께 지워진다.
   //==============================================================================
   destroy() {
     const webGL2RenderingContext = this.getWebGL2RenderingContext();
-    if (!webGL2RenderingContext) {
-      this.#drawableList = [];
-      return;
-    }
-    for (const drawable of this.#drawableList) {
-      webGL2RenderingContext.deleteVertexArray(drawable.vertexArray);
-      for (const vertexBuffer of drawable.vertexBufferList) {
-        webGL2RenderingContext.deleteBuffer(vertexBuffer);
+    if (webGL2RenderingContext) {
+      for (const drawable of this.#drawableList) {
+        if (drawable.wireframeIndexBuffer) {
+          webGL2RenderingContext.deleteBuffer(drawable.wireframeIndexBuffer);
+        }
+        if (drawable.morphTexture && !drawable.isMorphTextureShared) {
+          webGL2RenderingContext.deleteTexture(drawable.morphTexture);
+        }
       }
-      if (drawable.indexBuffer) {
-        webGL2RenderingContext.deleteBuffer(drawable.indexBuffer);
-      }
-      if (drawable.wireframeIndexBuffer) {
-        webGL2RenderingContext.deleteBuffer(drawable.wireframeIndexBuffer);
-      }
-      if (drawable.morphTexture) {
-        webGL2RenderingContext.deleteTexture(drawable.morphTexture);
+      for (const material of this.#instanceMaterialList) {
+        material.destroy();
       }
     }
     this.#drawableList = [];
-    for (const material of this.#ownedMaterialList) {
-      material.destroy();
+    this.#instanceMaterialList = [];
+    const skinnedModelAsset = this.#asset;
+    this.#asset = null;
+    if (skinnedModelAsset) {
+      skinnedModelAsset.release();
     }
-    this.#ownedMaterialList = [];
   }
 };
 
 // src/graphics3d/skinnedmodelrenderer.js
-var System96 = globalThis;
+var System97 = globalThis;
 var MORPH_TEXTURE_UNIT = 15;
 var MORPH_GLSL = `
 uniform sampler2D morphTexture;
@@ -57069,7 +57787,7 @@ var SkinnedModelRenderer = class extends Object2 {
     const texture = webGL2RenderingContext.createTexture();
     webGL2RenderingContext.activeTexture(webGL2RenderingContext.TEXTURE1);
     webGL2RenderingContext.bindTexture(webGL2RenderingContext.TEXTURE_2D, texture);
-    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.DEPTH_COMPONENT24, 1, 1, 0, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, new System96.Uint32Array([4294967295]));
+    webGL2RenderingContext.texImage2D(webGL2RenderingContext.TEXTURE_2D, 0, webGL2RenderingContext.DEPTH_COMPONENT24, 1, 1, 0, webGL2RenderingContext.DEPTH_COMPONENT, webGL2RenderingContext.UNSIGNED_INT, new System97.Uint32Array([4294967295]));
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MIN_FILTER, webGL2RenderingContext.NEAREST);
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_MAG_FILTER, webGL2RenderingContext.NEAREST);
     webGL2RenderingContext.texParameteri(webGL2RenderingContext.TEXTURE_2D, webGL2RenderingContext.TEXTURE_WRAP_S, webGL2RenderingContext.CLAMP_TO_EDGE);
@@ -57380,23 +58098,23 @@ __export(glbmeshreader_exports, {
   readGlbNodeInfos: () => readGlbNodeInfos,
   writeSkinPose: () => writeSkinPose
 });
-var System97 = globalThis;
+var System98 = globalThis;
 var GLB_MAGIC = 1179937895;
 var CHUNK_TYPE_JSON = 1313821514;
 var CHUNK_TYPE_BINARY = 5130562;
-var COMPONENT_ARRAYS = System97.Object.freeze({
-  5120: System97.Int8Array,
-  5121: System97.Uint8Array,
-  5122: System97.Int16Array,
-  5123: System97.Uint16Array,
-  5125: System97.Uint32Array,
-  5126: System97.Float32Array
+var COMPONENT_ARRAYS = System98.Object.freeze({
+  5120: System98.Int8Array,
+  5121: System98.Uint8Array,
+  5122: System98.Int16Array,
+  5123: System98.Uint16Array,
+  5125: System98.Uint32Array,
+  5126: System98.Float32Array
 });
-var NORMALIZED_DIVISORS = System97.Object.freeze({
+var NORMALIZED_DIVISORS = System98.Object.freeze({
   5121: 255,
   5123: 65535
 });
-var TYPE_COMPONENT_COUNTS = System97.Object.freeze({
+var TYPE_COMPONENT_COUNTS = System98.Object.freeze({
   SCALAR: 1,
   VEC2: 2,
   VEC3: 3,
@@ -57431,7 +58149,7 @@ function readWeightAccessor(json, binaryBuffer, accessorIndex) {
   if (divisor === void 0) {
     return values;
   }
-  return System97.Float32Array.from(values, (value) => {
+  return System98.Float32Array.from(values, (value) => {
     return value / divisor;
   });
 }
@@ -57445,7 +58163,7 @@ function createTransformMatrix(translation, rotation, scale) {
 }
 __name(createTransformMatrix, "createTransformMatrix");
 function readNodeMatrix(node) {
-  if (System97.Array.isArray(node.matrix)) {
+  if (System98.Array.isArray(node.matrix)) {
     const matrix = Matrix4.createIdentity();
     const elements = matrix.getElements();
     elements.set(node.matrix);
@@ -57468,7 +58186,7 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
   if (primitive.indices !== void 0) {
     indices = readAccessor(json, binaryBuffer, primitive.indices);
   } else {
-    indices = System97.Array.from({ length: positions.length / 3 }, (value, index) => {
+    indices = System98.Array.from({ length: positions.length / 3 }, (value, index) => {
       return index;
     });
   }
@@ -57494,18 +58212,18 @@ function addPrimitive(builder, json, binaryBuffer, node, primitive, matrix, isOu
   const pbrMetallicRoughness = material.pbrMetallicRoughness !== void 0 ? material.pbrMetallicRoughness : {};
   const baseColor = pbrMetallicRoughness.baseColorFactor !== void 0 ? pbrMetallicRoughness.baseColorFactor : [1, 1, 1, 1];
   const color = [0, 1, 2].map((channelIndex) => {
-    return System97.Math.pow(System97.Math.max(0, baseColor[channelIndex]), 1 / 2.2);
+    return System98.Math.pow(System98.Math.max(0, baseColor[channelIndex]), 1 / 2.2);
   });
   let glow = 0;
   const emissiveImage = readTextureImage(json, material.emissiveTexture);
-  if (System97.Array.isArray(material.emissiveFactor) && emissiveImage < 0) {
-    const emissiveMaximum = System97.Math.max(material.emissiveFactor[0], material.emissiveFactor[1], material.emissiveFactor[2]);
-    const baseMaximum = System97.Math.max(baseColor[0], baseColor[1], baseColor[2], 1e-3);
+  if (System98.Array.isArray(material.emissiveFactor) && emissiveImage < 0) {
+    const emissiveMaximum = System98.Math.max(material.emissiveFactor[0], material.emissiveFactor[1], material.emissiveFactor[2]);
+    const baseMaximum = System98.Math.max(baseColor[0], baseColor[1], baseColor[2], 1e-3);
     glow = emissiveMaximum / baseMaximum;
   }
   const indexStart = builder.getIndexCount();
   builder.addTriangles(positions, normals, indices, partMatrix, color, glow, extras.basic === true, joints, weights, uvs, uvs1);
-  const emissiveFactor = System97.Array.isArray(material.emissiveFactor) ? material.emissiveFactor.slice(0, 3) : [0, 0, 0];
+  const emissiveFactor = System98.Array.isArray(material.emissiveFactor) ? material.emissiveFactor.slice(0, 3) : [0, 0, 0];
   builder.addMaterialRange({
     name: typeof material.name === "string" ? material.name : "",
     materialIndex: primitive.material !== void 0 ? primitive.material : -1,
@@ -57602,11 +58320,11 @@ function readNodeNames(json) {
   const nodeNames = json.nodes.map((node) => {
     return typeof node.name === "string" ? node.name : "";
   });
-  return new System97.Set(nodeNames);
+  return new System98.Set(nodeNames);
 }
 __name(readNodeNames, "readNodeNames");
 function readSkeleton(json, binaryBuffer) {
-  if (!System97.Array.isArray(json.skins) || json.skins.length === 0) {
+  if (!System98.Array.isArray(json.skins) || json.skins.length === 0) {
     return null;
   }
   const skin = json.skins[0];
@@ -57614,7 +58332,7 @@ function readSkeleton(json, binaryBuffer) {
     return -1;
   });
   json.nodes.forEach((node, nodeIndex) => {
-    if (System97.Array.isArray(node.children)) {
+    if (System98.Array.isArray(node.children)) {
       for (const childIndex of node.children) {
         parentIndices[childIndex] = nodeIndex;
       }
@@ -57627,21 +58345,21 @@ function readSkeleton(json, binaryBuffer) {
       translation: node.translation !== void 0 ? node.translation : [0, 0, 0],
       rotation: node.rotation !== void 0 ? node.rotation : [0, 0, 0, 1],
       scale: node.scale !== void 0 ? node.scale : [1, 1, 1],
-      matrix: System97.Array.isArray(node.matrix) ? node.matrix : null
+      matrix: System98.Array.isArray(node.matrix) ? node.matrix : null
     };
   });
   let inverseBindMatrices = null;
   if (skin.inverseBindMatrices !== void 0) {
-    inverseBindMatrices = System97.Float32Array.from(readAccessor(json, binaryBuffer, skin.inverseBindMatrices));
+    inverseBindMatrices = System98.Float32Array.from(readAccessor(json, binaryBuffer, skin.inverseBindMatrices));
   } else {
-    inverseBindMatrices = new System97.Float32Array(skin.joints.length * 16);
+    inverseBindMatrices = new System98.Float32Array(skin.joints.length * 16);
     for (let jointIndex = 0; jointIndex < skin.joints.length; ++jointIndex) {
       const identityElements = Matrix4.createIdentity().getElements();
       inverseBindMatrices.set(identityElements, jointIndex * 16);
     }
   }
   const animations = {};
-  const sourceAnimations = System97.Array.isArray(json.animations) ? json.animations : [];
+  const sourceAnimations = System98.Array.isArray(json.animations) ? json.animations : [];
   for (const animation of sourceAnimations) {
     const channels = [];
     let duration = 0;
@@ -57649,7 +58367,7 @@ function readSkeleton(json, binaryBuffer) {
       const sampler = animation.samplers[channel.sampler];
       const times = readAccessor(json, binaryBuffer, sampler.input);
       const values = readAccessor(json, binaryBuffer, sampler.output);
-      duration = System97.Math.max(duration, times[times.length - 1]);
+      duration = System98.Math.max(duration, times[times.length - 1]);
       channels.push({ nodeIndex: channel.target.node, path: channel.target.path, times, values, isStep: sampler.interpolation === "STEP" });
     }
     const extras = animation.extras !== void 0 && animation.extras !== null ? animation.extras : {};
@@ -57659,9 +58377,9 @@ function readSkeleton(json, binaryBuffer) {
 }
 __name(readSkeleton, "readSkeleton");
 function readGlbChunks(arrayBuffer) {
-  const dataView = new System97.DataView(arrayBuffer);
+  const dataView = new System98.DataView(arrayBuffer);
   if (dataView.getUint32(0, true) !== GLB_MAGIC) {
-    throw new System97.Error("GLB \uAC00 \uC544\uB2D9\uB2C8\uB2E4.");
+    throw new System98.Error("GLB \uAC00 \uC544\uB2D9\uB2C8\uB2E4.");
   }
   let json = null;
   let binaryBuffer = null;
@@ -57671,16 +58389,16 @@ function readGlbChunks(arrayBuffer) {
     const chunkType = dataView.getUint32(chunkOffset + 4, true);
     const chunkStart = chunkOffset + 8;
     if (chunkType === CHUNK_TYPE_JSON) {
-      const jsonBytes = new System97.Uint8Array(arrayBuffer, chunkStart, chunkLength);
-      const jsonText = new System97.TextDecoder().decode(jsonBytes);
-      json = System97.JSON.parse(jsonText);
+      const jsonBytes = new System98.Uint8Array(arrayBuffer, chunkStart, chunkLength);
+      const jsonText = new System98.TextDecoder().decode(jsonBytes);
+      json = System98.JSON.parse(jsonText);
     } else if (chunkType === CHUNK_TYPE_BINARY) {
       binaryBuffer = arrayBuffer.slice(chunkStart, chunkStart + chunkLength);
     }
     chunkOffset = chunkStart + chunkLength;
   }
   if (json === null || binaryBuffer === null) {
-    throw new System97.Error("GLB \uC758 \uB369\uC5B4\uB9AC\uAC00 \uBAA8\uC790\uB78D\uB2C8\uB2E4.");
+    throw new System98.Error("GLB \uC758 \uB369\uC5B4\uB9AC\uAC00 \uBAA8\uC790\uB78D\uB2C8\uB2E4.");
   }
   return { json, binaryBuffer };
 }
@@ -57698,7 +58416,7 @@ function visitMeshNodes(json, visitEvent) {
     if (node.mesh !== void 0) {
       visitEvent(node, matrix);
     }
-    if (System97.Array.isArray(node.children)) {
+    if (System98.Array.isArray(node.children)) {
       for (const childIndex of node.children) {
         visit(childIndex, matrix);
       }
@@ -57765,22 +58483,22 @@ __name(readGlbArrays, "readGlbArrays");
 function readGlbImages(arrayBuffer) {
   const chunks = readGlbChunks(arrayBuffer);
   const json = chunks.json;
-  const images = System97.Array.isArray(json.images) ? json.images : [];
+  const images = System98.Array.isArray(json.images) ? json.images : [];
   return images.map((image) => {
     const name = typeof image.name === "string" ? image.name : "";
     const mimeType = typeof image.mimeType === "string" ? image.mimeType : "";
     if (typeof image.bufferView !== "number") {
-      return { name, mimeType, data: new System97.Uint8Array(0) };
+      return { name, mimeType, data: new System98.Uint8Array(0) };
     }
     const bufferView = json.bufferViews[image.bufferView];
     const byteOffset = bufferView.byteOffset !== void 0 ? bufferView.byteOffset : 0;
-    return { name, mimeType, data: new System97.Uint8Array(chunks.binaryBuffer.slice(byteOffset, byteOffset + bufferView.byteLength)) };
+    return { name, mimeType, data: new System98.Uint8Array(chunks.binaryBuffer.slice(byteOffset, byteOffset + bufferView.byteLength)) };
   });
 }
 __name(readGlbImages, "readGlbImages");
 function decodeGlbImage(image) {
-  const blob = new System97.Blob([image.data], { type: image.mimeType });
-  return System97.createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
+  const blob = new System98.Blob([image.data], { type: image.mimeType });
+  return System98.createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
 }
 __name(decodeGlbImage, "decodeGlbImage");
 function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
@@ -57808,7 +58526,7 @@ function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
         const pbrMetallicRoughness = material.pbrMetallicRoughness !== void 0 ? material.pbrMetallicRoughness : {};
         const baseColor = pbrMetallicRoughness.baseColorFactor !== void 0 ? pbrMetallicRoughness.baseColorFactor : [1, 1, 1, 1];
         const previousAlpha = partAlphas[partName] !== void 0 ? partAlphas[partName] : 1;
-        partAlphas[partName] = System97.Math.min(previousAlpha, baseColor[3]);
+        partAlphas[partName] = System98.Math.min(previousAlpha, baseColor[3]);
       }
     }
     if (!isOutlineRebuilt) {
@@ -57820,7 +58538,7 @@ function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
     }
   });
   const partArrays = {};
-  for (const [partName, builder] of System97.Object.entries(builders)) {
+  for (const [partName, builder] of System98.Object.entries(builders)) {
     const arrays = builder.readArrays();
     arrays.extras = partExtras[partName] !== void 0 ? partExtras[partName] : {};
     arrays.alpha = partAlphas[partName] !== void 0 ? partAlphas[partName] : 1;
@@ -57839,9 +58557,9 @@ function readGlbNodeInfos(arrayBuffer) {
     if (nodeName.endsWith(OUTLINE_NODE_SUFFIX)) {
       return;
     }
-    const minimum = [System97.Infinity, System97.Infinity, System97.Infinity];
-    const maximum = [-System97.Infinity, -System97.Infinity, -System97.Infinity];
-    const jointWeights = new System97.Map();
+    const minimum = [System98.Infinity, System98.Infinity, System98.Infinity];
+    const maximum = [-System98.Infinity, -System98.Infinity, -System98.Infinity];
+    const jointWeights = new System98.Map();
     for (const primitive of json.meshes[node.mesh].primitives) {
       const attributes = primitive.attributes;
       if (attributes.POSITION === void 0) {
@@ -57861,8 +58579,8 @@ function readGlbNodeInfos(arrayBuffer) {
           point = [transformedPoint.x, transformedPoint.y, transformedPoint.z];
         }
         for (let axis = 0; axis < 3; ++axis) {
-          minimum[axis] = System97.Math.min(minimum[axis], point[axis]);
-          maximum[axis] = System97.Math.max(maximum[axis], point[axis]);
+          minimum[axis] = System98.Math.min(minimum[axis], point[axis]);
+          maximum[axis] = System98.Math.max(maximum[axis], point[axis]);
         }
       }
       if (isSkinned) {
@@ -57898,11 +58616,11 @@ function sampleChannel(channel, time) {
   const componentCount = channel.path === "rotation" ? 4 : 3;
   const values = channel.values;
   if (time <= times[0] || times.length === 1) {
-    return System97.Array.from(values.slice(0, componentCount));
+    return System98.Array.from(values.slice(0, componentCount));
   }
   const lastIndex = times.length - 1;
   if (time >= times[lastIndex]) {
-    return System97.Array.from(values.slice(lastIndex * componentCount, lastIndex * componentCount + componentCount));
+    return System98.Array.from(values.slice(lastIndex * componentCount, lastIndex * componentCount + componentCount));
   }
   let keyIndex = 0;
   while (keyIndex < lastIndex - 1 && times[keyIndex + 1] <= time) {
@@ -57911,7 +58629,7 @@ function sampleChannel(channel, time) {
   const startOffset = keyIndex * componentCount;
   const endOffset = startOffset + componentCount;
   if (channel.isStep) {
-    return System97.Array.from(values.slice(startOffset, endOffset));
+    return System98.Array.from(values.slice(startOffset, endOffset));
   }
   const ratio = (time - times[keyIndex]) / (times[keyIndex + 1] - times[keyIndex]);
   const result = [];
@@ -57929,7 +58647,7 @@ function sampleChannel(channel, time) {
     result.push(startValue + (endValue - startValue) * ratio);
   }
   if (componentCount === 4) {
-    const length = System97.Math.hypot(result[0], result[1], result[2], result[3]);
+    const length = System98.Math.hypot(result[0], result[1], result[2], result[3]);
     if (length > 0) {
       return result.map((value) => {
         return value / length;
@@ -57948,7 +58666,7 @@ function readAnimationLocals(skeleton, animationName, time, swingScales = null) 
     const isOnce = animation.extras.loop === LOOP_ONCE;
     let localTime = 0;
     if (animation.duration > 0) {
-      localTime = isOnce ? System97.Math.max(0, System97.Math.min(animation.duration, time)) : time % animation.duration;
+      localTime = isOnce ? System98.Math.max(0, System98.Math.min(animation.duration, time)) : time % animation.duration;
     }
     for (const channel of animation.channels) {
       const local = locals[channel.nodeIndex];
@@ -57982,9 +58700,9 @@ function mixRotation(rotation, otherRotation, ratio) {
   const mixed = rotation.map((value, componentIndex) => {
     return value + (otherRotation[componentIndex] * sign - value) * ratio;
   });
-  const length = System97.Math.hypot(mixed[0], mixed[1], mixed[2], mixed[3]);
+  const length = System98.Math.hypot(mixed[0], mixed[1], mixed[2], mixed[3]);
   if (length <= 0) {
-    return System97.Array.from(rotation);
+    return System98.Array.from(rotation);
   }
   return mixed.map((value) => {
     return value / length;
@@ -58009,8 +58727,8 @@ function readAnimationSwing(skeleton, animationName, nodeIndex) {
       for (let componentIndex = 0; componentIndex < 4; ++componentIndex) {
         dot += values[offset + componentIndex] * restRotation[componentIndex];
       }
-      const angle = 2 * System97.Math.acos(System97.Math.min(1, System97.Math.abs(dot)));
-      largestAngle = System97.Math.max(largestAngle, angle);
+      const angle = 2 * System98.Math.acos(System98.Math.min(1, System98.Math.abs(dot)));
+      largestAngle = System98.Math.max(largestAngle, angle);
     }
   }
   return largestAngle;
@@ -58037,7 +58755,7 @@ function mixLocals(locals, otherLocals, ratio) {
     const rotation = local.rotation.map((value, componentIndex) => {
       return value + (other.rotation[componentIndex] * sign - value) * ratio;
     });
-    const length = System97.Math.hypot(rotation[0], rotation[1], rotation[2], rotation[3]);
+    const length = System98.Math.hypot(rotation[0], rotation[1], rotation[2], rotation[3]);
     if (length > 0) {
       local.rotation = rotation.map((value) => {
         return value / length;
@@ -58050,7 +58768,7 @@ function writeSkinPose(skeleton, animationName, time, target, blend = null, swin
   const locals = readAnimationLocals(skeleton, animationName, time, swingScales);
   if (blend !== null && blend.weight > 0) {
     const blendLocals = readAnimationLocals(skeleton, blend.animationName, blend.time, swingScales);
-    mixLocals(locals, blendLocals, System97.Math.min(1, blend.weight));
+    mixLocals(locals, blendLocals, System98.Math.min(1, blend.weight));
   }
   const globals = [];
   const readGlobal = /* @__PURE__ */ __name((nodeIndex) => {
@@ -58088,7 +58806,7 @@ function writeSkinPose(skeleton, animationName, time, target, blend = null, swin
 __name(writeSkinPose, "writeSkinPose");
 
 // src/graphics3d/multilevelbloomeffect.js
-var System98 = globalThis;
+var System99 = globalThis;
 var EXTRACT_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -58186,7 +58904,7 @@ var MultiLevelBloomEffect = class extends Object2 {
     this.#downsamplePass = new FullscreenPass(webGL2RenderingContext, DOWNSAMPLE_FRAGMENTSHADER_SOURCE);
     this.#upsamplePass = new FullscreenPass(webGL2RenderingContext, UPSAMPLE_FRAGMENTSHADER_SOURCE);
     this.#levelRenderTargetList = [];
-    this.#levelCount = System98.Math.max(1, System98.Math.floor(levelCount));
+    this.#levelCount = System99.Math.max(1, System99.Math.floor(levelCount));
     this.#useFloatColor = useFloatColor;
     this.#threshold = 1;
     this.#knee = 0.25;
@@ -58204,8 +58922,8 @@ var MultiLevelBloomEffect = class extends Object2 {
     let levelWidth = this.#sceneWidth;
     let levelHeight = this.#sceneHeight;
     for (let levelIndex = 0; levelIndex < this.#levelCount; ++levelIndex) {
-      levelWidth = System98.Math.max(1, System98.Math.floor(levelWidth / 2));
-      levelHeight = System98.Math.max(1, System98.Math.floor(levelHeight / 2));
+      levelWidth = System99.Math.max(1, System99.Math.floor(levelWidth / 2));
+      levelHeight = System99.Math.max(1, System99.Math.floor(levelHeight / 2));
       levelRenderTargetList.push(new RenderTarget(webGL2RenderingContext, levelWidth, levelHeight, false, { useFloatColor: this.#useFloatColor }));
     }
     this.#levelRenderTargetList = levelRenderTargetList;
@@ -58227,8 +58945,8 @@ var MultiLevelBloomEffect = class extends Object2 {
    * @param { number } sceneHeight 씬 세로 크기. (픽셀, 1 밑은 1, 첫 단은 그 반)
    */
   resize(sceneWidth, sceneHeight) {
-    const safeWidth = System98.Math.max(1, sceneWidth);
-    const safeHeight = System98.Math.max(1, sceneHeight);
+    const safeWidth = System99.Math.max(1, sceneWidth);
+    const safeHeight = System99.Math.max(1, sceneHeight);
     if (safeWidth === this.#sceneWidth && safeHeight === this.#sceneHeight) {
       return;
     }
@@ -58243,7 +58961,7 @@ var MultiLevelBloomEffect = class extends Object2 {
    * @param { number } levelCount 단 수. (소수는 버리고 1 밑은 1)
    */
   setLevelCount(levelCount) {
-    const safeLevelCount = System98.Math.max(1, System98.Math.floor(levelCount));
+    const safeLevelCount = System99.Math.max(1, System99.Math.floor(levelCount));
     if (safeLevelCount === this.#levelCount) {
       return;
     }
@@ -58276,8 +58994,8 @@ var MultiLevelBloomEffect = class extends Object2 {
    * @param { number } knee 문턱 둘레의 부드러운 폭. (0 밑은 0, 기본 0.25)
    */
   setThreshold(threshold, knee) {
-    this.#threshold = System98.Math.max(0, threshold);
-    this.#knee = System98.Math.max(0, knee);
+    this.#threshold = System99.Math.max(0, threshold);
+    this.#knee = System99.Math.max(0, knee);
   }
   //==============================================================================
   // 블룸 렌더링. (호출 후 결과는 getResultTexture())
@@ -58378,7 +59096,7 @@ var MultiLevelBloomEffect = class extends Object2 {
 };
 
 // src/graphics3d/toon/toonpostprocess.js
-var System99 = globalThis;
+var System100 = globalThis;
 var COMPOSITE_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 in vec2 fragmentTextureCoordinate;
@@ -58511,12 +59229,12 @@ var ToonPostProcess = class _ToonPostProcess {
     this.#requestedSampleCount = options !== null && options.sampleCount ? options.sampleCount : 0;
     this.#depthBits = options !== null && options.depthBits === 24 ? 24 : 16;
     this.#useDepthTexture = options !== null && options.useDepthTexture === true;
-    this.#outputWidth = System99.Math.max(1, width);
-    this.#outputHeight = System99.Math.max(1, height);
+    this.#outputWidth = System100.Math.max(1, width);
+    this.#outputHeight = System100.Math.max(1, height);
     this.#resolutionScale = 1;
     this.#sceneRenderTarget = this.createSceneRenderTarget();
     this.#bloomEffect = new BloomEffect(webGL2RenderingContext);
-    this.#bloomEffect.resize(System99.Math.max(1, width), System99.Math.max(1, height));
+    this.#bloomEffect.resize(System100.Math.max(1, width), System100.Math.max(1, height));
     this.#bloomEffect.setThreshold(0.9, 1.6);
     this.#multiLevelBloomEffect = null;
     this.#compositePass = new FullscreenPass(webGL2RenderingContext, COMPOSITE_FRAGMENT_SHADER);
@@ -58590,7 +59308,7 @@ var ToonPostProcess = class _ToonPostProcess {
    * @returns { number } 씬 판의 너비. (픽셀)
    */
   readSceneWidth() {
-    return System99.Math.max(1, System99.Math.round(this.#outputWidth * this.#resolutionScale));
+    return System100.Math.max(1, System100.Math.round(this.#outputWidth * this.#resolutionScale));
   }
   //==============================================================================
   // 씬 판의 높이. (출력 높이 x 해상도 배율, 1 이상)
@@ -58599,7 +59317,7 @@ var ToonPostProcess = class _ToonPostProcess {
    * @returns { number } 씬 판의 높이. (픽셀)
    */
   readSceneHeight() {
-    return System99.Math.max(1, System99.Math.round(this.#outputHeight * this.#resolutionScale));
+    return System100.Math.max(1, System100.Math.round(this.#outputHeight * this.#resolutionScale));
   }
   //==============================================================================
   // 크기 바꾸기. (출력 크기, 씬 판은 해상도 배율을 곱함, 같으면 그대로)
@@ -58617,8 +59335,8 @@ var ToonPostProcess = class _ToonPostProcess {
    * postProcess.resize(canvas.width, canvas.height);
    */
   resize(width, height) {
-    this.#outputWidth = System99.Math.max(1, width);
-    this.#outputHeight = System99.Math.max(1, height);
+    this.#outputWidth = System100.Math.max(1, width);
+    this.#outputHeight = System100.Math.max(1, height);
     const sceneRenderTarget = this.#sceneRenderTarget;
     const sceneWidth = this.readSceneWidth();
     const sceneHeight = this.readSceneHeight();
@@ -58645,7 +59363,7 @@ var ToonPostProcess = class _ToonPostProcess {
    * const sceneWidth = postProcess.getSceneRenderTarget().getWidth();
    */
   setResolutionScale(resolutionScale) {
-    this.#resolutionScale = System99.Math.max(0.05, System99.Math.min(4, resolutionScale));
+    this.#resolutionScale = System100.Math.max(0.05, System100.Math.min(4, resolutionScale));
     this.resize(this.#outputWidth, this.#outputHeight);
   }
   //==============================================================================
@@ -58670,7 +59388,7 @@ var ToonPostProcess = class _ToonPostProcess {
    * const isMultisampled = sampleCount >= 2;
    */
   setSampleCount(sampleCount) {
-    const safeSampleCount = System99.Math.max(0, System99.Math.floor(sampleCount));
+    const safeSampleCount = System100.Math.max(0, System100.Math.floor(sampleCount));
     if (safeSampleCount === this.#requestedSampleCount) {
       return;
     }
@@ -58795,7 +59513,7 @@ var ToonPostProcess = class _ToonPostProcess {
    * @param { number } exposure - 노출 배. (0 이상, 1 이 기본)
    */
   setExposure(exposure) {
-    this.#exposure = System99.Math.max(0, exposure);
+    this.#exposure = System100.Math.max(0, exposure);
   }
   //==============================================================================
   // 블룸 설정. (켜기, 세기, 밝은 곳을 뽑는 문턱의 시작과 끝, 문턱은 기본 9 탭 블룸에만 쓴다)
@@ -58814,7 +59532,7 @@ var ToonPostProcess = class _ToonPostProcess {
    */
   setBloom(isBloomEnabled, bloomStrength, thresholdStart, thresholdEnd) {
     this.#isBloomEnabled = isBloomEnabled;
-    this.#bloomStrength = System99.Math.max(0, bloomStrength);
+    this.#bloomStrength = System100.Math.max(0, bloomStrength);
     this.#bloomEffect.setThreshold(thresholdStart, thresholdEnd);
   }
   //==============================================================================
@@ -58833,9 +59551,9 @@ var ToonPostProcess = class _ToonPostProcess {
    * postProcess.setBloomLevels(0, 1, 0.3);
    */
   setBloomLevels(levelCount, threshold, knee) {
-    this.#bloomThreshold = System99.Math.max(0, threshold);
-    this.#bloomKnee = System99.Math.max(0, knee);
-    const safeLevelCount = System99.Math.max(0, System99.Math.floor(levelCount));
+    this.#bloomThreshold = System100.Math.max(0, threshold);
+    this.#bloomKnee = System100.Math.max(0, knee);
+    const safeLevelCount = System100.Math.max(0, System100.Math.floor(levelCount));
     let multiLevelBloomEffect = this.#multiLevelBloomEffect;
     if (safeLevelCount === 0) {
       if (multiLevelBloomEffect !== null) {
@@ -58878,7 +59596,7 @@ var ToonPostProcess = class _ToonPostProcess {
    * @param { number } brightness - 밝기 배. (0 이상, 1 이 그대로)
    */
   setBrightness(brightness) {
-    this.#brightness = System99.Math.max(0, brightness);
+    this.#brightness = System100.Math.max(0, brightness);
   }
   //==============================================================================
   // 밝힌 자리 설정. (그 자리에서 수평 거리 innerRadius 안은 밝기 1, outerRadius 밖은 setBrightness 의 밝기, 사이는 부드럽게)
@@ -58901,12 +59619,12 @@ var ToonPostProcess = class _ToonPostProcess {
    * postProcess.setLitArea([0, 0, 0], 2, 4, camera.getInverseViewProjectionMatrix());
    */
   setLitArea(center, innerRadius, outerRadius, inverseViewProjectionMatrix) {
-    const safeOuterRadius = System99.Math.max(1e-4, outerRadius);
+    const safeOuterRadius = System100.Math.max(1e-4, outerRadius);
     this.#litArea = {
       center: [center[0], center[1], center[2]],
-      innerRadius: System99.Math.max(0, System99.Math.min(innerRadius, safeOuterRadius)),
+      innerRadius: System100.Math.max(0, System100.Math.min(innerRadius, safeOuterRadius)),
       outerRadius: safeOuterRadius,
-      inverseViewProjectionElements: System99.Float32Array.from(inverseViewProjectionMatrix.getElements())
+      inverseViewProjectionElements: System100.Float32Array.from(inverseViewProjectionMatrix.getElements())
     };
   }
   //==============================================================================
@@ -58937,12 +59655,12 @@ var ToonPostProcess = class _ToonPostProcess {
   setColorGrade(saturation, contrast, toneColor, toneAmount, hazeColor, hazeAmount) {
     const toneLuminance = toneColor[0] * 0.2126 + toneColor[1] * 0.7152 + toneColor[2] * 0.0722;
     const toneScale = toneLuminance > 0 ? 1 / toneLuminance : 1;
-    this.#saturation = System99.Math.max(0, saturation);
-    this.#contrast = System99.Math.max(0, contrast);
+    this.#saturation = System100.Math.max(0, saturation);
+    this.#contrast = System100.Math.max(0, contrast);
     this.#toneColor = [toneColor[0] * toneScale, toneColor[1] * toneScale, toneColor[2] * toneScale];
-    this.#toneAmount = System99.Math.max(0, System99.Math.min(1, toneAmount));
+    this.#toneAmount = System100.Math.max(0, System100.Math.min(1, toneAmount));
     this.#hazeColor = [hazeColor[0], hazeColor[1], hazeColor[2]];
-    this.#hazeAmount = System99.Math.max(0, System99.Math.min(1, hazeAmount));
+    this.#hazeAmount = System100.Math.max(0, System100.Math.min(1, hazeAmount));
   }
   //==============================================================================
   // 가장자리 어둡게 설정. (0 이 없음, 1 이면 구석이 까맣게)
@@ -58951,7 +59669,7 @@ var ToonPostProcess = class _ToonPostProcess {
    * @param { number } vignetteStrength - 가장자리를 어둡게 하는 세기. (0 이 없음, 1 이면 구석이 까맣게)
    */
   setVignette(vignetteStrength) {
-    this.#vignetteStrength = System99.Math.max(0, vignetteStrength);
+    this.#vignetteStrength = System100.Math.max(0, vignetteStrength);
   }
   //==============================================================================
   // 씬 렌더 타겟 반환. (다른 후처리를 끼울 때)
@@ -58985,7 +59703,7 @@ var ToonPostProcess = class _ToonPostProcess {
 };
 
 // src/graphics3d/humanskinrenderer.js
-var System100 = globalThis;
+var System101 = globalThis;
 var SKIN_SHADING_SKIN = 0;
 var SKIN_SHADING_EYE = 1;
 var SKIN_SHADING_HAIR = 2;
@@ -59711,7 +60429,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
   constructor(webGL2RenderingContext) {
     super(webGL2RenderingContext, SKIN_FRAGMENTSHADER_SOURCE, SKIN_VERTEXSHADER_SOURCE);
     this.#cutoutDepthShaderProgram = new ShaderProgram(webGL2RenderingContext, CUTOUT_DEPTH_VERTEXSHADER_SOURCE.trim(), CUTOUT_DEPTH_FRAGMENTSHADER_SOURCE.trim());
-    this.#materialShadingModes = new System100.Map();
+    this.#materialShadingModes = new System101.Map();
     this.#shadowMapTexture = null;
     this.#lightViewProjectionElements = null;
     this.#shadowStrength = 0;
@@ -59720,8 +60438,8 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     this.#shadowSampleCount = 12;
     this.#hairSway = [0, 0, 1.5];
     this.#useHairFringe = true;
-    this.#lightDirections = new System100.Float32Array(9);
-    this.#lightColors = new System100.Float32Array(9);
+    this.#lightDirections = new System101.Float32Array(9);
+    this.#lightColors = new System101.Float32Array(9);
     this.#ambientSkyColor = [0.34, 0.36, 0.42];
     this.#ambientHorizonColor = [0.16, 0.15, 0.16];
     this.#ambientGroundColor = [0.05, 0.04, 0.045];
@@ -59736,7 +60454,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
     this.#microTiling = 0;
     this.#microStrength = 0;
     this.#useWrinkleMaps = false;
-    this.#wrinkleChannelWeights = new System100.Float32Array(WRINKLE_CHANNEL_COUNT * 3);
+    this.#wrinkleChannelWeights = new System101.Float32Array(WRINKLE_CHANNEL_COUNT * 3);
     this.#wrinkleTileMask = 0;
     this.#wrinkleNormalStrength = 1;
     this.#wrinkleColorStrength = 1;
@@ -60038,7 +60756,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
    * @param { number } shadowSampleCount 표본 수. (소수는 버리고 1 ~ 24 로 자른다, 기본 12)
    */
   setShadowSampleCount(shadowSampleCount) {
-    this.#shadowSampleCount = System100.Math.max(1, System100.Math.min(SHADOW_SAMPLE_COUNT, System100.Math.floor(shadowSampleCount)));
+    this.#shadowSampleCount = System101.Math.max(1, System101.Math.min(SHADOW_SAMPLE_COUNT, System101.Math.floor(shadowSampleCount)));
   }
   //==============================================================================
   // 머리카락 흔들림 설정. (진폭 m / 시간 초 / 주파수, 진폭 0 이면 없음)
@@ -60095,7 +60813,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
    * @param { number } intensity 세기. (색에 곱한다)
    */
   setLight(lightIndex, directionX, directionY, directionZ, red, green, blue, intensity) {
-    const directionLength = System100.Math.sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ);
+    const directionLength = System101.Math.sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ);
     const safeLength = directionLength > 0 ? directionLength : 1;
     this.#lightDirections[lightIndex * 3] = directionX / safeLength;
     this.#lightDirections[lightIndex * 3 + 1] = directionY / safeLength;
@@ -60273,7 +60991,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
    * @param { number } eyeClosure 감긴 정도. (0 ~ 1 로 자른다, 0 뜬 눈, 1 감은 눈)
    */
   setEyeClosure(eyeClosure) {
-    this.#eyeClosure = System100.Math.max(0, System100.Math.min(1, eyeClosure));
+    this.#eyeClosure = System101.Math.max(0, System101.Math.min(1, eyeClosure));
   }
   //==============================================================================
   // 머리카락 파라미터 설정. (1차 / 2차 로브 시프트, 지수, 강도, 투과 강도, 뿌리 차폐)
@@ -60302,7 +61020,7 @@ var HumanSkinRenderer = class extends SkinnedModelRenderer {
 };
 
 // src/graphics3d/ambientocclusioneffect.js
-var System101 = globalThis;
+var System102 = globalThis;
 var SAMPLE_COUNT = 16;
 var OCCLUSION_FRAGMENTSHADER_SOURCE = `#version 300 es
 precision highp float;
@@ -60448,7 +61166,7 @@ var AmbientOcclusionEffect = class _AmbientOcclusionEffect extends Object2 {
     this.#intensity = 1;
     this.#bias = 2e-3;
     this.#scale = 0.5;
-    this.#sampleKernel = new System101.Float32Array(SAMPLE_COUNT * 3);
+    this.#sampleKernel = new System102.Float32Array(SAMPLE_COUNT * 3);
     this.computeKernel();
   }
   //==============================================================================
@@ -60464,16 +61182,16 @@ var AmbientOcclusionEffect = class _AmbientOcclusionEffect extends Object2 {
    * @returns { Float32Array } 표본마다 x, y, z.
    */
   static buildSampleKernel() {
-    const sampleKernel = new System101.Float32Array(SAMPLE_COUNT * 3);
+    const sampleKernel = new System102.Float32Array(SAMPLE_COUNT * 3);
     for (let sampleIndex = 0; sampleIndex < SAMPLE_COUNT; ++sampleIndex) {
       const goldenAngle = 2.39996323;
       const angle = sampleIndex * goldenAngle;
       const height = (sampleIndex + 0.5) / SAMPLE_COUNT;
-      const ring = System101.Math.sqrt(1 - height * height);
+      const ring = System102.Math.sqrt(1 - height * height);
       let scale = (sampleIndex + 1) / SAMPLE_COUNT;
       scale = 0.15 + 0.85 * scale * scale;
-      sampleKernel[sampleIndex * 3] = System101.Math.cos(angle) * ring * scale;
-      sampleKernel[sampleIndex * 3 + 1] = System101.Math.sin(angle) * ring * scale;
+      sampleKernel[sampleIndex * 3] = System102.Math.cos(angle) * ring * scale;
+      sampleKernel[sampleIndex * 3 + 1] = System102.Math.sin(angle) * ring * scale;
       sampleKernel[sampleIndex * 3 + 2] = height * scale;
     }
     return sampleKernel;
@@ -60487,8 +61205,8 @@ var AmbientOcclusionEffect = class _AmbientOcclusionEffect extends Object2 {
    */
   resize(width, height) {
     const scale = this.getScale();
-    const scaledWidth = System101.Math.max(1, System101.Math.floor(width * scale));
-    const scaledHeight = System101.Math.max(1, System101.Math.floor(height * scale));
+    const scaledWidth = System102.Math.max(1, System102.Math.floor(width * scale));
+    const scaledHeight = System102.Math.max(1, System102.Math.floor(height * scale));
     this.#occlusionRenderTarget.resize(scaledWidth, scaledHeight);
     this.#pingRenderTarget.resize(scaledWidth, scaledHeight);
     this.#pongRenderTarget.resize(scaledWidth, scaledHeight);
@@ -60516,7 +61234,7 @@ var AmbientOcclusionEffect = class _AmbientOcclusionEffect extends Object2 {
     webGL2RenderingContext.uniform1i(depthTextureLocation, 0);
     const normalTextureLocation = occlusionPass.getUniformLocation("normalTexture");
     webGL2RenderingContext.uniform1i(normalTextureLocation, 2);
-    const viewRotation = new System101.Float32Array([
+    const viewRotation = new System102.Float32Array([
       viewMatrixElements[0],
       viewMatrixElements[1],
       viewMatrixElements[2],
@@ -60531,7 +61249,7 @@ var AmbientOcclusionEffect = class _AmbientOcclusionEffect extends Object2 {
     webGL2RenderingContext.uniformMatrix3fv(viewRotationLocation, false, viewRotation);
     const depthRangeLocation = occlusionPass.getUniformLocation("depthRange");
     webGL2RenderingContext.uniform2f(depthRangeLocation, nearDistance, farDistance);
-    const tangentHalfFieldOfView = System101.Math.tan(fieldOfViewRadian * 0.5);
+    const tangentHalfFieldOfView = System102.Math.tan(fieldOfViewRadian * 0.5);
     const projectionScaleLocation = occlusionPass.getUniformLocation("projectionScale");
     webGL2RenderingContext.uniform2f(projectionScaleLocation, tangentHalfFieldOfView * aspectRatio, tangentHalfFieldOfView);
     const sampleKernelLocation = occlusionPass.getUniformLocation("sampleKernel[0]");
@@ -60713,7 +61431,7 @@ var AmbientOcclusionEffect = class _AmbientOcclusionEffect extends Object2 {
 };
 
 // src/graphics3d/subsurfacescatteringeffect.js
-var System102 = globalThis;
+var System103 = globalThis;
 var KERNEL_SAMPLE_COUNT = 17;
 var KERNEL_RANGE = 3;
 var SCATTER_FRAGMENTSHADER_SOURCE = `#version 300 es
@@ -60807,7 +61525,7 @@ var SubsurfaceScatteringEffect = class _SubsurfaceScatteringEffect extends Objec
     this.#scatterWidth = 0.2;
     this.#falloffColor = [1, 0.37, 0.3];
     this.#strengthColor = [0.48, 0.41, 0.28];
-    this.#kernel = new System102.Float32Array(KERNEL_SAMPLE_COUNT * 4);
+    this.#kernel = new System103.Float32Array(KERNEL_SAMPLE_COUNT * 4);
     this.computeKernel();
   }
   //==============================================================================
@@ -60833,10 +61551,10 @@ var SubsurfaceScatteringEffect = class _SubsurfaceScatteringEffect extends Objec
    */
   static buildKernel(falloffColor, strengthColor) {
     const sampleCount = KERNEL_SAMPLE_COUNT;
-    const kernel = new System102.Float32Array(KERNEL_SAMPLE_COUNT * 4);
+    const kernel = new System103.Float32Array(KERNEL_SAMPLE_COUNT * 4);
     function evaluateGaussian(variance, distance, channelIndex) {
       const scaledDistance = distance / (1e-3 + falloffColor[channelIndex]);
-      return System102.Math.exp(-(scaledDistance * scaledDistance) / (2 * variance)) / (2 * System102.Math.PI * variance);
+      return System103.Math.exp(-(scaledDistance * scaledDistance) / (2 * variance)) / (2 * System103.Math.PI * variance);
     }
     __name(evaluateGaussian, "evaluateGaussian");
     function evaluateProfile(distance, channelIndex) {
@@ -60848,13 +61566,13 @@ var SubsurfaceScatteringEffect = class _SubsurfaceScatteringEffect extends Objec
     for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
       const linearOffset = -KERNEL_RANGE + sampleIndex * step;
       const sign = linearOffset < 0 ? -1 : 1;
-      const normalizedOffset = System102.Math.abs(linearOffset) / KERNEL_RANGE;
+      const normalizedOffset = System103.Math.abs(linearOffset) / KERNEL_RANGE;
       offsets.push(KERNEL_RANGE * sign * normalizedOffset * normalizedOffset);
     }
     const weights = [];
     for (let sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
-      const leftWidth = sampleIndex > 0 ? System102.Math.abs(offsets[sampleIndex] - offsets[sampleIndex - 1]) : 0;
-      const rightWidth = sampleIndex < sampleCount - 1 ? System102.Math.abs(offsets[sampleIndex] - offsets[sampleIndex + 1]) : 0;
+      const leftWidth = sampleIndex > 0 ? System103.Math.abs(offsets[sampleIndex] - offsets[sampleIndex - 1]) : 0;
+      const rightWidth = sampleIndex < sampleCount - 1 ? System103.Math.abs(offsets[sampleIndex] - offsets[sampleIndex + 1]) : 0;
       const area = (leftWidth + rightWidth) * 0.5;
       const weight = [];
       for (let channelIndex = 0; channelIndex < 3; ++channelIndex) {
@@ -60926,7 +61644,7 @@ var SubsurfaceScatteringEffect = class _SubsurfaceScatteringEffect extends Objec
     const scatterWidthLocation = scatterPass.getUniformLocation("scatterWidth");
     webGL2RenderingContext.uniform1f(scatterWidthLocation, this.getScatterWidth());
     const distanceToProjectionWindowLocation = scatterPass.getUniformLocation("distanceToProjectionWindow");
-    webGL2RenderingContext.uniform1f(distanceToProjectionWindowLocation, 1 / System102.Math.tan(fieldOfViewRadian * 0.5));
+    webGL2RenderingContext.uniform1f(distanceToProjectionWindowLocation, 1 / System103.Math.tan(fieldOfViewRadian * 0.5));
     const aspectRatioLocation = scatterPass.getUniformLocation("aspectRatio");
     webGL2RenderingContext.uniform1f(aspectRatioLocation, aspectRatio);
     const depthRangeLocation = scatterPass.getUniformLocation("depthRange");
@@ -61170,7 +61888,7 @@ var Camera = class extends Object2 {
 };
 
 // src/base/timer.js
-var System103 = globalThis;
+var System104 = globalThis;
 var Cooldown = class extends Object2 {
   static {
     __name(this, "Cooldown");
@@ -61191,7 +61909,7 @@ var Cooldown = class extends Object2 {
    */
   constructor(duration = 1) {
     super();
-    this.#duration = System103.Math.max(0, duration);
+    this.#duration = System104.Math.max(0, duration);
     this.#remainSeconds = 0;
   }
   //==============================================================================
@@ -61202,7 +61920,7 @@ var Cooldown = class extends Object2 {
    */
   tick(timeDelta) {
     if (this.#remainSeconds > 0) {
-      this.#remainSeconds = System103.Math.max(0, this.#remainSeconds - timeDelta);
+      this.#remainSeconds = System104.Math.max(0, this.#remainSeconds - timeDelta);
     }
   }
   //==============================================================================
@@ -61250,7 +61968,7 @@ var Cooldown = class extends Object2 {
    * @param { number } duration 쿨다운 시간. (초, 0 보다 작으면 0, 진행 중인 남은 시간은 바꾸지 않는다)
    */
   setDuration(duration) {
-    this.#duration = System103.Math.max(0, duration);
+    this.#duration = System104.Math.max(0, duration);
   }
   //==============================================================================
   // 쿨다운 시간 반환.
@@ -61308,7 +62026,7 @@ var RepeatTimer = class extends Object2 {
    */
   constructor(interval = 1, elapsedEvent = null) {
     super();
-    this.#interval = System103.Math.max(1e-6, interval);
+    this.#interval = System104.Math.max(1e-6, interval);
     this.#elapsedSeconds = 0;
     this.#elapsedEvent = elapsedEvent;
     this.#isRunning = true;
@@ -61357,7 +62075,7 @@ var RepeatTimer = class extends Object2 {
    * @param { number } interval 간격. (초, 0.000001 보다 작으면 0.000001)
    */
   setInterval(interval) {
-    this.#interval = System103.Math.max(1e-6, interval);
+    this.#interval = System104.Math.max(1e-6, interval);
   }
   //==============================================================================
   // 간격 반환.
@@ -61389,7 +62107,7 @@ var RepeatTimer = class extends Object2 {
 };
 
 // src/base/objectpool.js
-var System104 = globalThis;
+var System105 = globalThis;
 var ObjectPool = class extends Object2 {
   static {
     __name(this, "ObjectPool");
@@ -61422,7 +62140,7 @@ var ObjectPool = class extends Object2 {
     this.#createHandler = createHandler;
     this.#resetHandler = resetHandler;
     this.#freeList = [];
-    this.#freeSet = new System104.Set();
+    this.#freeSet = new System105.Set();
     this.#totalCount = 0;
     for (let index = 0; index < preloadCount; ++index) {
       const instance = this.#createHandler();
@@ -61493,7 +62211,7 @@ var ObjectPool = class extends Object2 {
 };
 
 // src/base/fsm.js
-var System105 = globalThis;
+var System106 = globalThis;
 var FiniteStateMachine = class extends Object2 {
   static {
     __name(this, "FiniteStateMachine");
@@ -61519,7 +62237,7 @@ var FiniteStateMachine = class extends Object2 {
    */
   constructor() {
     super();
-    this.#stateTable = new System105.Map();
+    this.#stateTable = new System106.Map();
     this.#stateName = null;
     this.#stateSeconds = 0;
     this.#transitionGuard = null;
@@ -61668,7 +62386,7 @@ __export(format_exports, {
   formatNumberWithUnit: () => formatNumberWithUnit,
   formatPaddedNumber: () => formatPaddedNumber
 });
-var System106 = globalThis;
+var System107 = globalThis;
 var COMPACT_UNIT_LIST = [
   { divisor: 1e3, suffix: "K" },
   { divisor: 1e6, suffix: "M" },
@@ -61683,7 +62401,7 @@ function formatNumberWithUnit(value, unitSuffix, locale = "ko-KR") {
 }
 __name(formatNumberWithUnit, "formatNumberWithUnit");
 function formatCompactNumber(value, fractionDigits = 1) {
-  const absoluteValue = System106.Math.abs(value);
+  const absoluteValue = System107.Math.abs(value);
   const sign = value < 0 ? "-" : "";
   let unitIndex = -1;
   for (let candidateIndex = COMPACT_UNIT_LIST.length - 1; candidateIndex >= 0; --candidateIndex) {
@@ -61696,7 +62414,7 @@ function formatCompactNumber(value, fractionDigits = 1) {
     return sign + String(absoluteValue);
   }
   let compactText = (absoluteValue / COMPACT_UNIT_LIST[unitIndex].divisor).toFixed(fractionDigits);
-  if (System106.Number.parseFloat(compactText) >= 1e3 && unitIndex < COMPACT_UNIT_LIST.length - 1) {
+  if (System107.Number.parseFloat(compactText) >= 1e3 && unitIndex < COMPACT_UNIT_LIST.length - 1) {
     ++unitIndex;
     compactText = (absoluteValue / COMPACT_UNIT_LIST[unitIndex].divisor).toFixed(fractionDigits);
   }
@@ -61704,7 +62422,7 @@ function formatCompactNumber(value, fractionDigits = 1) {
 }
 __name(formatCompactNumber, "formatCompactNumber");
 function formatPaddedNumber(value, digitCount, minValue = -Infinity, maxValue = Infinity) {
-  const clampedValue = System106.Math.min(maxValue, System106.Math.max(minValue, value));
+  const clampedValue = System107.Math.min(maxValue, System107.Math.max(minValue, value));
   if (clampedValue < 0) {
     const digitText = String(-clampedValue).padStart(digitCount - 1, "0");
     return "-" + digitText;
@@ -61713,8 +62431,8 @@ function formatPaddedNumber(value, digitCount, minValue = -Infinity, maxValue = 
 }
 __name(formatPaddedNumber, "formatPaddedNumber");
 function formatMinutesSeconds(totalSeconds) {
-  const flooredSeconds = System106.Math.max(0, System106.Math.floor(totalSeconds));
-  const minutes = System106.Math.floor(flooredSeconds / 60);
+  const flooredSeconds = System107.Math.max(0, System107.Math.floor(totalSeconds));
+  const minutes = System107.Math.floor(flooredSeconds / 60);
   const seconds2 = flooredSeconds % 60;
   return minutes + ":" + String(seconds2).padStart(2, "0");
 }
@@ -61735,7 +62453,7 @@ function trimTrailingZero(numberText) {
 __name(trimTrailingZero, "trimTrailingZero");
 
 // src/misc/persistedstore.js
-var System107 = globalThis;
+var System108 = globalThis;
 var PersistedStore = class extends Object2 {
   static {
     __name(this, "PersistedStore");
@@ -61775,8 +62493,8 @@ var PersistedStore = class extends Object2 {
     this.#defaultState = defaultState;
     this.#storageBackend = null;
     this.#state = this.readFromStorage();
-    this.#subscriberSet = new System107.Set();
-    this.#subscriberBySubscription = new System107.Map();
+    this.#subscriberSet = new System108.Set();
+    this.#subscriberBySubscription = new System108.Map();
   }
   //==============================================================================
   // 상태 반환. (복사본이 아니므로 직접 고치지 말고 set() 을 쓴다)
@@ -61794,7 +62512,7 @@ var PersistedStore = class extends Object2 {
    * @param { object } partialState 바꿀 키와 값만 담은 객체.
    */
   set(partialState) {
-    this.#state = System107.Object.assign({}, this.#state, partialState);
+    this.#state = System108.Object.assign({}, this.#state, partialState);
     this.writeToStorage();
     this.notify();
   }
@@ -61805,7 +62523,7 @@ var PersistedStore = class extends Object2 {
    * @param { object } nextState 새 상태. (얕게 복사해 쓴다)
    */
   replace(nextState) {
-    this.#state = System107.Object.assign({}, nextState);
+    this.#state = System108.Object.assign({}, nextState);
     this.writeToStorage();
     this.notify();
   }
@@ -61860,16 +62578,16 @@ var PersistedStore = class extends Object2 {
   readFromStorage() {
     const storedText = this.readStoredText();
     if (storedText.length === 0) {
-      return System107.Object.assign({}, this.#defaultState);
+      return System108.Object.assign({}, this.#defaultState);
     }
     try {
-      const parsed = System107.JSON.parse(storedText);
+      const parsed = System108.JSON.parse(storedText);
       if (!parsed || parsed.version !== this.#version || typeof parsed.state !== "object" || parsed.state === null) {
-        return System107.Object.assign({}, this.#defaultState);
+        return System108.Object.assign({}, this.#defaultState);
       }
-      return System107.Object.assign({}, this.#defaultState, parsed.state);
+      return System108.Object.assign({}, this.#defaultState, parsed.state);
     } catch (parseError) {
-      return System107.Object.assign({}, this.#defaultState);
+      return System108.Object.assign({}, this.#defaultState);
     }
   }
   //==============================================================================
@@ -61877,7 +62595,7 @@ var PersistedStore = class extends Object2 {
   //==============================================================================
   writeToStorage() {
     const payload = { version: this.#version, state: this.#state };
-    const payloadText = System107.JSON.stringify(payload);
+    const payloadText = System108.JSON.stringify(payload);
     const storageBackend = this.getStorageBackend();
     if (storageBackend === null) {
       LocalStorage.setString(this.#storageKey, payloadText);
@@ -61958,7 +62676,7 @@ var PersistedStore = class extends Object2 {
 };
 
 // src/misc/localization.js
-var System108 = globalThis;
+var System109 = globalThis;
 var DEFAULT_RIGHT_TO_LEFT_LANGUAGES = ["ar", "fa", "he", "ur", "ps", "yi", "dv"];
 var FIRST_STRONG_ISOLATE = "\u2068";
 var POP_DIRECTIONAL_ISOLATE = "\u2069";
@@ -61969,16 +62687,16 @@ var Localization = class _Localization extends Object2 {
     __name(this, "Localization");
   }
   /** @private @type { Map } */
-  static #tableByLanguage = new System108.Map();
+  static #tableByLanguage = new System109.Map();
   /** @private @type { string } */
   static #languageCode = "ko";
   /** @private @type { string } */
   static #fallbackLanguageCode = "ko";
   /** @private @type { Map<string, string> } */
-  static #aliasToLanguage = new System108.Map();
+  static #aliasToLanguage = new System109.Map();
   // 별칭 → 언어 코드.
   /** @private @type { Set<string> } */
-  static #rightToLeftLanguages = new System108.Set(DEFAULT_RIGHT_TO_LEFT_LANGUAGES);
+  static #rightToLeftLanguages = new System109.Set(DEFAULT_RIGHT_TO_LEFT_LANGUAGES);
   // 오른쪽에서 왼쪽으로 쓰는 언어의 첫 조각.
   //==============================================================================
   // 브라우저 언어 감지. (정적)
@@ -61991,7 +62709,7 @@ var Localization = class _Localization extends Object2 {
    * @returns { string } 고른 언어 코드. (찾았으면 소문자, 없으면 기본 코드 그대로)
    */
   static detectLanguage(supportedLanguageCodes, defaultLanguageCode = "ko") {
-    const navigatorObject = System108.navigator;
+    const navigatorObject = System109.navigator;
     const candidateList = [];
     if (navigatorObject) {
       if (navigatorObject.languages) {
@@ -62022,7 +62740,7 @@ var Localization = class _Localization extends Object2 {
    * console.log(languageCode);
    */
   static selectLanguage(candidateList, supportedLanguageCodes, defaultLanguageCode = "ko") {
-    const supportedSet = new System108.Set(supportedLanguageCodes.map((code) => code.toLowerCase()));
+    const supportedSet = new System109.Set(supportedLanguageCodes.map((code) => code.toLowerCase()));
     const aliasToLanguage = _Localization.#aliasToLanguage;
     for (const languageTag of candidateList) {
       const loweredTag = languageTag.toLowerCase().split("_").join("-");
@@ -62154,11 +62872,11 @@ var Localization = class _Localization extends Object2 {
     return text.replace(JOINED_PLACEHOLDER_PATTERN, (joinedText) => {
       let isFilled = false;
       const valueText = joinedText.replace(PLACEHOLDER_PATTERN, (matched, name) => {
-        if (!System108.Object.prototype.hasOwnProperty.call(values, name)) {
+        if (!System109.Object.prototype.hasOwnProperty.call(values, name)) {
           return matched;
         }
         isFilled = true;
-        return System108.String(values[name]);
+        return System109.String(values[name]);
       });
       if (!isFilled) {
         return joinedText;
@@ -62185,12 +62903,12 @@ var Localization = class _Localization extends Object2 {
    */
   static setTableFromJson(languageCode, tableJson) {
     const table = {};
-    if (tableJson !== null && typeof tableJson === "object" && !System108.Array.isArray(tableJson)) {
-      for (const key of System108.Object.keys(tableJson)) {
+    if (tableJson !== null && typeof tableJson === "object" && !System109.Array.isArray(tableJson)) {
+      for (const key of System109.Object.keys(tableJson)) {
         const value = tableJson[key];
         if (typeof value === "string") {
           table[key] = value;
-        } else if (System108.Array.isArray(value)) {
+        } else if (System109.Array.isArray(value)) {
           table[key] = value.filter((item) => typeof item === "string");
         }
       }
@@ -62253,7 +62971,7 @@ var Localization = class _Localization extends Object2 {
    */
   static textList(key) {
     const resolvedValue = _Localization.lookup(key);
-    if (System108.Array.isArray(resolvedValue)) {
+    if (System109.Array.isArray(resolvedValue)) {
       return resolvedValue;
     }
     if (typeof resolvedValue === "string") {
@@ -62288,7 +63006,7 @@ var Localization = class _Localization extends Object2 {
 };
 
 // src/misc/pathfinder.js
-var System109 = globalThis;
+var System110 = globalThis;
 var PathFinder = class extends Object2 {
   static {
     __name(this, "PathFinder");
@@ -62321,11 +63039,11 @@ var PathFinder = class extends Object2 {
     const toIndex = /* @__PURE__ */ __name((column, row) => {
       return row * columnCount + column;
     }, "toIndex");
-    const costFromStart = new System109.Float64Array(cellCount).fill(System109.Number.POSITIVE_INFINITY);
-    const cameFrom = new System109.Int32Array(cellCount).fill(-1);
-    const isClosed = new System109.Uint8Array(cellCount);
+    const costFromStart = new System110.Float64Array(cellCount).fill(System110.Number.POSITIVE_INFINITY);
+    const cameFrom = new System110.Int32Array(cellCount).fill(-1);
+    const isClosed = new System110.Uint8Array(cellCount);
     const heuristic = /* @__PURE__ */ __name((column, row) => {
-      return System109.Math.abs(column - goal.column) + System109.Math.abs(row - goal.row);
+      return System110.Math.abs(column - goal.column) + System110.Math.abs(row - goal.row);
     }, "heuristic");
     const heapScores = [];
     const heapIndices = [];
@@ -62390,7 +63108,7 @@ var PathFinder = class extends Object2 {
         const path = [];
         let traceIndex = goalIndex;
         while (traceIndex !== startIndex) {
-          path.push({ column: traceIndex % columnCount, row: System109.Math.floor(traceIndex / columnCount) });
+          path.push({ column: traceIndex % columnCount, row: System110.Math.floor(traceIndex / columnCount) });
           traceIndex = cameFrom[traceIndex];
         }
         path.reverse();
@@ -62401,7 +63119,7 @@ var PathFinder = class extends Object2 {
       }
       isClosed[currentIndex] = 1;
       const currentColumn = currentIndex % columnCount;
-      const currentRow = System109.Math.floor(currentIndex / columnCount);
+      const currentRow = System110.Math.floor(currentIndex / columnCount);
       for (const offset of neighborOffsets) {
         const nextColumn = currentColumn + offset[0];
         const nextRow = currentRow + offset[1];
@@ -62428,7 +63146,7 @@ var PathFinder = class extends Object2 {
 };
 
 // src/misc/grid.js
-var System110 = globalThis;
+var System111 = globalThis;
 var Grid = class _Grid extends Object2 {
   static {
     __name(this, "Grid");
@@ -62452,7 +63170,7 @@ var Grid = class _Grid extends Object2 {
     if (!isPassableHandler(start.column, start.row)) {
       return visitedList;
     }
-    const isVisited = new System110.Uint8Array(columnCount * rowCount);
+    const isVisited = new System111.Uint8Array(columnCount * rowCount);
     const pendingStack = [start.column, start.row];
     isVisited[start.row * columnCount + start.column] = 1;
     while (pendingStack.length > 0) {
@@ -62526,10 +63244,10 @@ var Grid = class _Grid extends Object2 {
    * console.log(Grid.testRectOverlap(freeRect, 32, isBlocked));
    */
   static testRectOverlap(worldRect, tileSize, isBlockedHandler) {
-    const startColumn = System110.Math.floor(worldRect.position.x / tileSize);
-    const endColumn = System110.Math.floor((worldRect.position.x + worldRect.size.x - 1e-6) / tileSize);
-    const startRow = System110.Math.floor(worldRect.position.y / tileSize);
-    const endRow = System110.Math.floor((worldRect.position.y + worldRect.size.y - 1e-6) / tileSize);
+    const startColumn = System111.Math.floor(worldRect.position.x / tileSize);
+    const endColumn = System111.Math.floor((worldRect.position.x + worldRect.size.x - 1e-6) / tileSize);
+    const startRow = System111.Math.floor(worldRect.position.y / tileSize);
+    const endRow = System111.Math.floor((worldRect.position.y + worldRect.size.y - 1e-6) / tileSize);
     for (let row = startRow; row <= endRow; ++row) {
       for (let column = startColumn; column <= endColumn; ++column) {
         if (isBlockedHandler(column, row)) {
@@ -62549,7 +63267,7 @@ var Grid = class _Grid extends Object2 {
    * @returns { object } { column, row }
    */
   static toCell(worldX, worldY, tileSize) {
-    return { column: System110.Math.floor(worldX / tileSize), row: System110.Math.floor(worldY / tileSize) };
+    return { column: System111.Math.floor(worldX / tileSize), row: System111.Math.floor(worldY / tileSize) };
   }
   //==============================================================================
   // 타일 좌표 → 타일 중심 월드 좌표. (정적)
@@ -62566,7 +63284,7 @@ var Grid = class _Grid extends Object2 {
 };
 
 // src/misc/collision2d.js
-var System111 = globalThis;
+var System112 = globalThis;
 var Collision2D = class extends Object2 {
   static {
     __name(this, "Collision2D");
@@ -62619,7 +63337,7 @@ var Collision2D = class extends Object2 {
     if (distanceSquared >= radiusSum * radiusSum) {
       return null;
     }
-    const distance = System111.Math.sqrt(distanceSquared);
+    const distance = System112.Math.sqrt(distanceSquared);
     let directionX = 1;
     let directionY = 0;
     if (distance > 1e-6) {
@@ -62722,7 +63440,7 @@ var Collision2D = class extends Object2 {
 };
 
 // src/misc/steering2d.js
-var System112 = globalThis;
+var System113 = globalThis;
 var Steering2D = class extends Object2 {
   static {
     __name(this, "Steering2D");
@@ -62739,7 +63457,7 @@ var Steering2D = class extends Object2 {
   static seek(position, targetPosition, speed) {
     const differenceX = targetPosition.x - position.x;
     const differenceY = targetPosition.y - position.y;
-    const distance = System112.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
+    const distance = System113.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
     if (distance < 1e-6) {
       return Vector2.zero();
     }
@@ -62776,7 +63494,7 @@ var Steering2D = class extends Object2 {
   static orbitAtRange(position, targetPosition, preferredRange, speed, elapsedSeconds, strafeRate = 1.7) {
     const differenceX = targetPosition.x - position.x;
     const differenceY = targetPosition.y - position.y;
-    const distance = System112.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
+    const distance = System113.Math.sqrt(differenceX * differenceX + differenceY * differenceY);
     if (distance < 1e-6) {
       return Vector2.create(speed, 0);
     }
@@ -62784,11 +63502,11 @@ var Steering2D = class extends Object2 {
     const forwardY = differenceY / distance;
     const sideX = -forwardY;
     const sideY = forwardX;
-    const rangeError = System112.Math.max(-1, System112.Math.min(1, (distance - preferredRange) / preferredRange));
-    const strafeAmount = System112.Math.sin(elapsedSeconds * strafeRate);
+    const rangeError = System113.Math.max(-1, System113.Math.min(1, (distance - preferredRange) / preferredRange));
+    const strafeAmount = System113.Math.sin(elapsedSeconds * strafeRate);
     const desiredX = forwardX * rangeError + sideX * strafeAmount;
     const desiredY = forwardY * rangeError + sideY * strafeAmount;
-    const desiredLength = System112.Math.sqrt(desiredX * desiredX + desiredY * desiredY);
+    const desiredLength = System113.Math.sqrt(desiredX * desiredX + desiredY * desiredY);
     if (desiredLength < 1e-6) {
       return Vector2.zero();
     }
@@ -62797,7 +63515,7 @@ var Steering2D = class extends Object2 {
 };
 
 // src/misc/pointergesture.js
-var System113 = globalThis;
+var System114 = globalThis;
 var PointerGesture = class extends Object2 {
   static {
     __name(this, "PointerGesture");
@@ -62953,7 +63671,7 @@ var PointerGesture = class extends Object2 {
     if (!this.#isPressed || this.#isDragging || this.#longPressSeconds <= 0) {
       return 0;
     }
-    return System113.Math.min(1, this.#pressedSeconds / this.#longPressSeconds);
+    return System114.Math.min(1, this.#pressedSeconds / this.#longPressSeconds);
   }
   //==============================================================================
   // 상태 조회.
@@ -63018,7 +63736,7 @@ var PointerGesture = class extends Object2 {
 };
 
 // src/misc/frameprobe.js
-var System114 = globalThis;
+var System115 = globalThis;
 var FrameProbe = class {
   static {
     __name(this, "FrameProbe");
@@ -63167,8 +63885,8 @@ var FrameProbe = class {
    * @param { number } probeSeconds 재는 초. (음수면 0, 처음은 4)
    */
   setSeconds(warmupSeconds, probeSeconds) {
-    this.#warmupSeconds = System114.Math.max(0, warmupSeconds);
-    this.#probeSeconds = System114.Math.max(0, probeSeconds);
+    this.#warmupSeconds = System115.Math.max(0, warmupSeconds);
+    this.#probeSeconds = System115.Math.max(0, probeSeconds);
   }
   //==============================================================================
   // 기다리는 초 반환.
@@ -63238,7 +63956,7 @@ var FrameProbe = class {
 };
 
 // src/misc/cameragestures.js
-var System115 = globalThis;
+var System116 = globalThis;
 var MOUSE_MIDDLE_BUTTON = 1;
 var MOUSE_RIGHT_BUTTON = 2;
 var CameraGestures = class {
@@ -63360,12 +64078,12 @@ var CameraGestures = class {
     this.#isLastWheelCtrl = false;
     this.#isTouchInput = this.isCoarsePointer();
     this.#compatibilityMouseMilliseconds = 800;
-    this.#twistStartRadians = 15 * System115.Math.PI / 180;
-    this.#tiltPerHalfHeightRadians = 35 * System115.Math.PI / 180;
+    this.#twistStartRadians = 15 * System116.Math.PI / 180;
+    this.#tiltPerHalfHeightRadians = 35 * System116.Math.PI / 180;
     this.#rightClickDistance = 8;
     this.#lastTouchTime = -this.#compatibilityMouseMilliseconds;
     this.#listeners = [];
-    const engine = System115.vanillaEngine;
+    const engine = System116.vanillaEngine;
     if (!engine) {
       return;
     }
@@ -63377,10 +64095,10 @@ var CameraGestures = class {
     this.addListener(canvas, "mousedown", (mouseEvent) => {
       this.handleMouseDown(mouseEvent);
     }, false);
-    this.addListener(System115.window, "mousemove", (mouseEvent) => {
+    this.addListener(System116.window, "mousemove", (mouseEvent) => {
       this.handleMouseMove(mouseEvent);
     }, false);
-    this.addListener(System115.window, "mouseup", (mouseEvent) => {
+    this.addListener(System116.window, "mouseup", (mouseEvent) => {
       this.handleMouseUp(mouseEvent);
     }, false);
     this.addListener(canvas, "wheel", (wheelEvent) => {
@@ -63447,10 +64165,10 @@ var CameraGestures = class {
    * @returns { boolean } 손가락이 주된 입력인 기기면 참. (matchMedia 가 없으면 거짓)
    */
   isCoarsePointer() {
-    if (typeof System115.matchMedia !== "function") {
+    if (typeof System116.matchMedia !== "function") {
       return false;
     }
-    const mediaQueryList = System115.matchMedia("(pointer: coarse)");
+    const mediaQueryList = System116.matchMedia("(pointer: coarse)");
     return mediaQueryList.matches;
   }
   //==============================================================================
@@ -63545,7 +64263,7 @@ var CameraGestures = class {
    * @returns { number } CSS 픽셀 하나의 뷰 단위 크기. (엔진이 없으면 1)
    */
   readUnitsPerCssPixel() {
-    const engine = System115.vanillaEngine;
+    const engine = System116.vanillaEngine;
     if (!engine) {
       return 1;
     }
@@ -63565,7 +64283,7 @@ var CameraGestures = class {
    * @returns { Vector2 | null } 뷰 좌표. (엔진이나 캔버스가 없으면 null)
    */
   readViewPosition(clientX, clientY) {
-    const engine = System115.vanillaEngine;
+    const engine = System116.vanillaEngine;
     const canvas = this.#canvas;
     if (!engine || canvas === null) {
       return null;
@@ -63582,7 +64300,7 @@ var CameraGestures = class {
    * @returns { boolean } 마지막 손가락 사건 뒤 무시하는 시간 안이면 참.
    */
   isCompatibilityMouse() {
-    const now = System115.performance.now();
+    const now = System116.performance.now();
     return now - this.#lastTouchTime < this.#compatibilityMouseMilliseconds;
   }
   //==============================================================================
@@ -63638,14 +64356,14 @@ var CameraGestures = class {
     this.#lastMouseX = mouseEvent.clientX;
     this.#lastMouseY = mouseEvent.clientY;
     if (this.#isRightButtonDown) {
-      const pressDistance = System115.Math.hypot(mouseEvent.clientX - this.#rightPressX, mouseEvent.clientY - this.#rightPressY);
+      const pressDistance = System116.Math.hypot(mouseEvent.clientX - this.#rightPressX, mouseEvent.clientY - this.#rightPressY);
       if (pressDistance > this.#rightClickDistance) {
         this.#isRightDragged = true;
       }
       const canvas = this.#canvas;
-      const canvasWidth = canvas !== null ? System115.Math.max(1, canvas.clientWidth) : 1e3;
-      const canvasHeight = canvas !== null ? System115.Math.max(1, canvas.clientHeight) : 1e3;
-      this.#rotation += deltaX / canvasWidth * System115.Math.PI * 2;
+      const canvasWidth = canvas !== null ? System116.Math.max(1, canvas.clientWidth) : 1e3;
+      const canvasHeight = canvas !== null ? System116.Math.max(1, canvas.clientHeight) : 1e3;
+      this.#rotation += deltaX / canvasWidth * System116.Math.PI * 2;
       this.#tilt -= deltaY / (canvasHeight * 0.5) * this.#tiltPerHalfHeightRadians;
     }
     if (this.#isMiddleButtonDown) {
@@ -63688,7 +64406,7 @@ var CameraGestures = class {
    */
   handleTouchChange(touchEvent) {
     this.#isTouchInput = true;
-    this.#lastTouchTime = System115.performance.now();
+    this.#lastTouchTime = System116.performance.now();
     const touches = touchEvent.touches;
     if (touches.length >= 2) {
       if (!this.#isMultiTouch) {
@@ -63715,8 +64433,8 @@ var CameraGestures = class {
     const secondTouch = touches[1];
     this.#lastTouchCenterX = (firstTouch.clientX + secondTouch.clientX) * 0.5;
     this.#lastTouchCenterY = (firstTouch.clientY + secondTouch.clientY) * 0.5;
-    this.#lastTouchAngle = System115.Math.atan2(secondTouch.clientY - firstTouch.clientY, secondTouch.clientX - firstTouch.clientX);
-    this.#lastTouchDistance = System115.Math.max(1, System115.Math.hypot(secondTouch.clientX - firstTouch.clientX, secondTouch.clientY - firstTouch.clientY));
+    this.#lastTouchAngle = System116.Math.atan2(secondTouch.clientY - firstTouch.clientY, secondTouch.clientX - firstTouch.clientX);
+    this.#lastTouchDistance = System116.Math.max(1, System116.Math.hypot(secondTouch.clientX - firstTouch.clientX, secondTouch.clientY - firstTouch.clientY));
   }
   //==============================================================================
   // 두 손가락이 움직임. (가운데가 움직인 만큼 밀고, 거리가 바뀐 만큼 키우고, 문턱을 넘게 비틀면 돌립다)
@@ -63725,7 +64443,7 @@ var CameraGestures = class {
    * @param { TouchEvent } touchEvent 브라우저 손가락 사건.
    */
   handleTouchMove(touchEvent) {
-    this.#lastTouchTime = System115.performance.now();
+    this.#lastTouchTime = System116.performance.now();
     const touches = touchEvent.touches;
     if (!this.#isMultiTouch || touches.length < 2) {
       return;
@@ -63734,25 +64452,25 @@ var CameraGestures = class {
     const secondTouch = touches[1];
     const centerX = (firstTouch.clientX + secondTouch.clientX) * 0.5;
     const centerY = (firstTouch.clientY + secondTouch.clientY) * 0.5;
-    const angle = System115.Math.atan2(secondTouch.clientY - firstTouch.clientY, secondTouch.clientX - firstTouch.clientX);
-    const distance = System115.Math.max(1, System115.Math.hypot(secondTouch.clientX - firstTouch.clientX, secondTouch.clientY - firstTouch.clientY));
+    const angle = System116.Math.atan2(secondTouch.clientY - firstTouch.clientY, secondTouch.clientX - firstTouch.clientX);
+    const distance = System116.Math.max(1, System116.Math.hypot(secondTouch.clientX - firstTouch.clientX, secondTouch.clientY - firstTouch.clientY));
     const unitsPerCssPixel = this.readUnitsPerCssPixel();
     this.#panX += (centerX - this.#lastTouchCenterX) * unitsPerCssPixel;
     this.#panY += (centerY - this.#lastTouchCenterY) * unitsPerCssPixel;
     this.#zoom *= distance / this.#lastTouchDistance;
     this.#zoomAnchor = this.readViewPosition(centerX, centerY);
     let angleDelta = angle - this.#lastTouchAngle;
-    while (angleDelta > System115.Math.PI) {
-      angleDelta -= System115.Math.PI * 2;
+    while (angleDelta > System116.Math.PI) {
+      angleDelta -= System116.Math.PI * 2;
     }
-    while (angleDelta < -System115.Math.PI) {
-      angleDelta += System115.Math.PI * 2;
+    while (angleDelta < -System116.Math.PI) {
+      angleDelta += System116.Math.PI * 2;
     }
     if (this.#isTwisting) {
       this.#rotation += angleDelta;
     } else {
       this.#twistSum += angleDelta;
-      if (System115.Math.abs(this.#twistSum) > this.#twistStartRadians) {
+      if (System116.Math.abs(this.#twistSum) > this.#twistStartRadians) {
         this.#isTwisting = true;
       }
     }
@@ -63816,7 +64534,7 @@ __export(languagepack_exports, {
   setPreferredLanguageTag: () => setPreferredLanguageTag,
   translate: () => translate
 });
-var System116 = globalThis;
+var System117 = globalThis;
 var languageListPath = "./assets/localization/languages.json";
 var documentTitleKey = "game.title";
 var preferredLanguageTag = "";
@@ -63856,7 +64574,7 @@ async function loadLanguageList() {
 __name(loadLanguageList, "loadLanguageList");
 function normalizeTextList(values) {
   const textList = [];
-  if (!System116.Array.isArray(values)) {
+  if (!System117.Array.isArray(values)) {
     return textList;
   }
   for (const value of values) {
@@ -63927,7 +64645,7 @@ function resolveDeviceLanguageCode() {
   if (preferredLanguageTag !== "") {
     languageTags.push(preferredLanguageTag);
   }
-  const navigator = System116.navigator;
+  const navigator = System117.navigator;
   if (navigator) {
     if (navigator.languages) {
       for (const languageTag of navigator.languages) {
@@ -63982,7 +64700,7 @@ async function loadLanguage(languageCode) {
     return;
   }
   const fallbackLanguage = findLanguage(fallbackLanguageCode);
-  const isFallbackLoaded = fallbackLanguage !== null && System116.Object.keys(fallbackTexts).length > 0;
+  const isFallbackLoaded = fallbackLanguage !== null && System117.Object.keys(fallbackTexts).length > 0;
   if (fallbackLanguage !== null && !isFallbackLoaded) {
     fallbackTexts = await readLanguageTexts(fallbackLanguage);
   }
@@ -63992,16 +64710,16 @@ async function loadLanguage(languageCode) {
 }
 __name(loadLanguage, "loadLanguage");
 function applyDocumentLanguage(language) {
-  if (typeof System116.document === "undefined") {
+  if (typeof System117.document === "undefined") {
     return;
   }
-  System116.document.documentElement.lang = language.code;
+  System117.document.documentElement.lang = language.code;
   if (documentTitleKey === "") {
     return;
   }
   const documentTitle = translate(documentTitleKey);
   if (documentTitle !== documentTitleKey) {
-    System116.document.title = documentTitle;
+    System117.document.title = documentTitle;
   }
 }
 __name(applyDocumentLanguage, "applyDocumentLanguage");
@@ -64088,11 +64806,11 @@ function formatText(key, values) {
   return text.replace(JOINED_PLACEHOLDER_PATTERN2, (joinedText) => {
     let isFilled = false;
     const valueText = joinedText.replace(PLACEHOLDER_PATTERN2, (matched, name) => {
-      if (!System116.Object.prototype.hasOwnProperty.call(values, name)) {
+      if (!System117.Object.prototype.hasOwnProperty.call(values, name)) {
         return matched;
       }
       isFilled = true;
-      return System116.String(values[name]);
+      return System117.String(values[name]);
     });
     if (!isFilled) {
       return joinedText;
@@ -64102,16 +64820,16 @@ function formatText(key, values) {
 }
 __name(formatText, "formatText");
 function readAllTexts() {
-  const texts = System116.Object.values(currentTexts);
+  const texts = System117.Object.values(currentTexts);
   return texts.join("");
 }
 __name(readAllTexts, "readAllTexts");
 function setLanguageList(data) {
-  if (data === null || typeof data !== "object" || !System116.Array.isArray(data.languages)) {
+  if (data === null || typeof data !== "object" || !System117.Array.isArray(data.languages)) {
     return false;
   }
   const languageEntries = normalizeLanguageEntries(data.languages);
-  languageList = System116.Object.assign({}, data, { languages: languageEntries });
+  languageList = System117.Object.assign({}, data, { languages: languageEntries });
   return true;
 }
 __name(setLanguageList, "setLanguageList");
@@ -64152,7 +64870,7 @@ __export(uifont_exports, {
   readUiFontFamily: () => readUiFontFamily,
   requestUiFontText: () => requestUiFontText
 });
-var System117 = globalThis;
+var System118 = globalThis;
 var uiFontFamily = "GameUI";
 var fontManifestPath = "./assets/fonts/fonts.json";
 var fontDirectoryPath = "./assets/fonts/";
@@ -64165,7 +64883,7 @@ var fontIndex = null;
 var currentFontGroup = primaryFontGroup;
 var isRemainingGroupsRequested = false;
 var representativeFontFace = null;
-var requestedCharacters = new System117.Set();
+var requestedCharacters = new System118.Set();
 function parseUnicodeRange2(unicodeRange) {
   const ranges = [];
   for (const rangeText of unicodeRange.split(",")) {
@@ -64175,14 +64893,14 @@ function parseUnicodeRange2(unicodeRange) {
     }
     const startText = rangeMatch[1].replace(/\?/g, "0");
     const endText = rangeMatch[2] !== void 0 ? rangeMatch[2] : rangeMatch[1].replace(/\?/g, "F");
-    ranges.push([System117.parseInt(startText, 16), System117.parseInt(endText, 16)]);
+    ranges.push([System118.parseInt(startText, 16), System118.parseInt(endText, 16)]);
   }
   return ranges;
 }
 __name(parseUnicodeRange2, "parseUnicodeRange");
 function readTargetWeights(weightDescriptor) {
   const weightValues = weightDescriptor.trim().split(/\s+/).map((weightText) => {
-    return System117.Number(weightText);
+    return System118.Number(weightText);
   });
   if (weightValues.length >= 2) {
     return uiFontWeights.filter((targetWeight) => {
@@ -64191,7 +64909,7 @@ function readTargetWeights(weightDescriptor) {
   }
   let nearestWeight = uiFontWeights[0];
   for (const targetWeight of uiFontWeights) {
-    if (System117.Math.abs(targetWeight - weightValues[0]) < System117.Math.abs(nearestWeight - weightValues[0])) {
+    if (System118.Math.abs(targetWeight - weightValues[0]) < System118.Math.abs(nearestWeight - weightValues[0])) {
       nearestWeight = targetWeight;
     }
   }
@@ -64216,7 +64934,7 @@ function findDrawingFontFace(codePoint, targetWeight) {
 }
 __name(findDrawingFontFace, "findDrawingFontFace");
 function clearTextCache() {
-  const engine = System117.vanillaEngine;
+  const engine = System118.vanillaEngine;
   if (!engine) {
     return;
   }
@@ -64233,19 +64951,19 @@ async function loadUiFont(fontGroup, text) {
   if (!isIndexLoaded) {
     return;
   }
-  await System117.Promise.all([loadFontGroup(fontGroup), loadFontGroup(primaryFontGroup)]);
+  await System118.Promise.all([loadFontGroup(fontGroup), loadFontGroup(primaryFontGroup)]);
   if (fontGroups.length === 0) {
     return;
   }
   applyUiFontGroup(fontGroup);
   const textLoad = loadUiFontText(text);
-  const waitLimit = new System117.Promise((resolve) => {
-    System117.setTimeout(resolve, uiFontWaitMilliseconds);
+  const waitLimit = new System118.Promise((resolve) => {
+    System118.setTimeout(resolve, uiFontWaitMilliseconds);
   });
-  await System117.Promise.race([textLoad, waitLimit]);
+  await System118.Promise.race([textLoad, waitLimit]);
   if (!isRemainingGroupsRequested) {
     isRemainingGroupsRequested = true;
-    System117.setTimeout(() => {
+    System118.setTimeout(() => {
       loadRemainingFontGroups();
     }, remainingGroupsDelayMilliseconds);
   }
@@ -64263,7 +64981,7 @@ async function loadFontIndex() {
     return false;
   }
   const manifest = jsonAsset.data;
-  if (manifest === null || !System117.Array.isArray(manifest.fonts)) {
+  if (manifest === null || !System118.Array.isArray(manifest.fonts)) {
     console.warn("[uifont] \uAE00\uAF34\uC758 \uBAA9\uB85D\uC744 \uC77D\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
     return false;
   }
@@ -64295,7 +65013,7 @@ async function loadFontGroup(group) {
     return;
   }
   const font = jsonAsset.data;
-  if (font === null || !System117.Array.isArray(font.faces)) {
+  if (font === null || !System118.Array.isArray(font.faces)) {
     console.warn("[uifont] \uAE00\uAF34 \uBB36\uC74C\uC758 \uBAA9\uB85D\uC744 \uC77D\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4: " + group);
     return;
   }
@@ -64310,8 +65028,8 @@ async function loadFontGroup(group) {
     const ranges = parseUnicodeRange2(face.unicodeRange);
     const targetWeights = readTargetWeights(face.weight);
     for (const targetWeight of targetWeights) {
-      const descriptors = { weight: System117.String(targetWeight), style: face.style, unicodeRange: face.unicodeRange, display: "swap" };
-      const fontFace = new System117.FontFace(uiFontFamily, "url(" + fontDirectoryPath + face.file + ")", descriptors);
+      const descriptors = { weight: System118.String(targetWeight), style: face.style, unicodeRange: face.unicodeRange, display: "swap" };
+      const fontFace = new System118.FontFace(uiFontFamily, "url(" + fontDirectoryPath + face.file + ")", descriptors);
       faces.push({ fontFace, weight: targetWeight, ranges });
     }
   }
@@ -64326,12 +65044,12 @@ async function loadRemainingFontGroups() {
     return loadFontGroup(indexEntry.group);
   });
   try {
-    await System117.Promise.all(groupLoads);
+    await System118.Promise.all(groupLoads);
   } catch (error) {
     console.warn("[uifont] \uB098\uBA38\uC9C0 \uAE00\uAF34 \uBB36\uC74C\uC744 \uBC1B\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.", error);
   }
   applyUiFontGroup(currentFontGroup);
-  const requestedText = System117.Array.from(requestedCharacters).join("");
+  const requestedText = System118.Array.from(requestedCharacters).join("");
   loadUiFontText(requestedText);
 }
 __name(loadRemainingFontGroups, "loadRemainingFontGroups");
@@ -64356,7 +65074,7 @@ function applyUiFontGroup(fontGroup) {
       orderedGroups.push(fontGroupEntry);
     }
   }
-  const fontFaceSet = System117.document.fonts;
+  const fontFaceSet = System118.document.fonts;
   for (const fontGroupEntry of fontGroups) {
     for (const face of fontGroupEntry.faces) {
       fontFaceSet.delete(face.fontFace);
@@ -64377,7 +65095,7 @@ async function loadUiFontText(text) {
   if (fontGroups.length === 0 || typeof text !== "string" || text === "") {
     return;
   }
-  const fontFacesToLoad = new System117.Set();
+  const fontFacesToLoad = new System118.Set();
   for (const character of text) {
     requestedCharacters.add(character);
     const codePoint = character.codePointAt(0);
@@ -64391,11 +65109,11 @@ async function loadUiFontText(text) {
   if (fontFacesToLoad.size === 0) {
     return;
   }
-  const loads = System117.Array.from(fontFacesToLoad).map((fontFace) => {
+  const loads = System118.Array.from(fontFacesToLoad).map((fontFace) => {
     return fontFace.load();
   });
   try {
-    await System117.Promise.all(loads);
+    await System118.Promise.all(loads);
   } catch (error) {
     console.warn("[uifont] \uAE00\uAF34\uC758 \uC870\uAC01\uC744 \uBC1B\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.", error);
   }
@@ -64456,7 +65174,7 @@ function readUiFontFamily() {
 __name(readUiFontFamily, "readUiFontFamily");
 
 // src/misc/focusnavigator.js
-var System118 = globalThis;
+var System119 = globalThis;
 var FocusNavigator = class extends Object2 {
   static {
     __name(this, "FocusNavigator");
@@ -64553,7 +65271,7 @@ var FocusNavigator = class extends Object2 {
     const currentCenterX = currentItem.rect.position.x + currentItem.rect.size.x * 0.5;
     const currentCenterY = currentItem.rect.position.y + currentItem.rect.size.y * 0.5;
     let bestItem = null;
-    let bestScore = System118.Number.POSITIVE_INFINITY;
+    let bestScore = System119.Number.POSITIVE_INFINITY;
     for (const item of this.#itemList) {
       if (item.id === this.#focusedId) {
         continue;
@@ -64566,7 +65284,7 @@ var FocusNavigator = class extends Object2 {
       if (forwardDistance <= 0) {
         continue;
       }
-      const crossDistance = System118.Math.abs(deltaX * directionY) + System118.Math.abs(deltaY * directionX);
+      const crossDistance = System119.Math.abs(deltaX * directionY) + System119.Math.abs(deltaY * directionX);
       const score = forwardDistance + crossDistance * this.#crossAxisPenalty;
       if (score < bestScore) {
         bestScore = score;
@@ -64582,7 +65300,7 @@ var FocusNavigator = class extends Object2 {
 };
 
 // src/misc/shaker.js
-var System119 = globalThis;
+var System120 = globalThis;
 var Shaker = class extends Object2 {
   static {
     __name(this, "Shaker");
@@ -64620,7 +65338,7 @@ var Shaker = class extends Object2 {
    * @param { number } strength 최대 오프셋. (픽셀)
    */
   addShake(strength) {
-    this.#strength = System119.Math.max(this.#strength, strength);
+    this.#strength = System120.Math.max(this.#strength, strength);
   }
   //==============================================================================
   // 갱신.
@@ -64631,7 +65349,7 @@ var Shaker = class extends Object2 {
   tick(timeDelta) {
     this.#elapsedSeconds += timeDelta;
     if (this.#strength > 0) {
-      this.#strength *= System119.Math.exp(-this.#decayRate * timeDelta);
+      this.#strength *= System120.Math.exp(-this.#decayRate * timeDelta);
       if (this.#strength < 0.05) {
         this.#strength = 0;
       }
@@ -64649,8 +65367,8 @@ var Shaker = class extends Object2 {
       return Vector2.zero();
     }
     const time = this.#elapsedSeconds;
-    const offsetX = System119.Math.sin(time * this.#frequency) * this.#strength;
-    const offsetY = System119.Math.cos(time * this.#frequency * 1.37) * this.#strength;
+    const offsetX = System120.Math.sin(time * this.#frequency) * this.#strength;
+    const offsetY = System120.Math.cos(time * this.#frequency * 1.37) * this.#strength;
     return Vector2.create(offsetX, offsetY);
   }
   //==============================================================================
@@ -64689,7 +65407,7 @@ var Shaker = class extends Object2 {
 };
 
 // src/misc/camera2d.js
-var System120 = globalThis;
+var System121 = globalThis;
 var Camera2D = class extends Object2 {
   static {
     __name(this, "Camera2D");
@@ -64748,18 +65466,18 @@ var Camera2D = class extends Object2 {
         this.#position.x + this.#velocity.x * timeDelta,
         this.#position.y + this.#velocity.y * timeDelta
       );
-      const damping = System120.Math.exp(-this.#inertiaDamping * timeDelta);
+      const damping = System121.Math.exp(-this.#inertiaDamping * timeDelta);
       this.#velocity = Vector2.create(this.#velocity.x * damping, this.#velocity.y * damping);
-      if (System120.Math.abs(this.#velocity.x) < 1 && System120.Math.abs(this.#velocity.y) < 1) {
+      if (System121.Math.abs(this.#velocity.x) < 1 && System121.Math.abs(this.#velocity.y) < 1) {
         this.#velocity = Vector2.zero();
       }
     }
     if (this.#tweenState) {
       const tween = this.#tweenState;
       tween.elapsedSeconds += timeDelta;
-      const linearRatio = System120.Math.min(1, tween.elapsedSeconds / tween.duration);
-      const easedRatio = 1 - System120.Math.pow(1 - linearRatio, 3);
-      this.#zoom = tween.fromZoom * System120.Math.pow(tween.toZoom / tween.fromZoom, easedRatio);
+      const linearRatio = System121.Math.min(1, tween.elapsedSeconds / tween.duration);
+      const easedRatio = 1 - System121.Math.pow(1 - linearRatio, 3);
+      this.#zoom = tween.fromZoom * System121.Math.pow(tween.toZoom / tween.fromZoom, easedRatio);
       this.#position = Vector2.create(
         lerp(tween.fromPosition.x, tween.toPosition.x, easedRatio),
         lerp(tween.fromPosition.y, tween.toPosition.y, easedRatio)
@@ -64843,8 +65561,8 @@ var Camera2D = class extends Object2 {
    */
   convertScreenDeltaToWorld(screenDeltaX, screenDeltaY) {
     const radian = degreeToRadian(this.#rotation);
-    const cosine = System120.Math.cos(radian);
-    const sine = System120.Math.sin(radian);
+    const cosine = System121.Math.cos(radian);
+    const sine = System121.Math.sin(radian);
     const unrotatedX = screenDeltaX * cosine + screenDeltaY * sine;
     const unrotatedY = -screenDeltaX * sine + screenDeltaY * cosine;
     return Vector2.create(unrotatedX / this.#zoom, unrotatedY / this.#zoom);
@@ -64906,7 +65624,7 @@ var Camera2D = class extends Object2 {
       toPosition: Vector2.create(targetPosition.x, targetPosition.y),
       fromZoom: this.#zoom,
       toZoom: clamp(targetZoom, this.#minZoom, this.#maxZoom),
-      duration: System120.Math.max(1e-4, duration),
+      duration: System121.Math.max(1e-4, duration),
       elapsedSeconds: 0
     };
   }
@@ -64963,8 +65681,8 @@ var Camera2D = class extends Object2 {
    */
   worldToScreen(worldPosition) {
     const radian = degreeToRadian(this.#rotation);
-    const cosine = System120.Math.cos(radian);
-    const sine = System120.Math.sin(radian);
+    const cosine = System121.Math.cos(radian);
+    const sine = System121.Math.sin(radian);
     const scaledX = (worldPosition.x - this.#position.x) * this.#zoom;
     const scaledY = (worldPosition.y - this.#position.y) * this.#zoom;
     return Vector2.create(
@@ -64982,8 +65700,8 @@ var Camera2D = class extends Object2 {
     const halfViewWidth = this.#viewSize.x * 0.5 / this.#zoom;
     const halfViewHeight = this.#viewSize.y * 0.5 / this.#zoom;
     const radian = degreeToRadian(this.#rotation);
-    const cosine = System120.Math.abs(System120.Math.cos(radian));
-    const sine = System120.Math.abs(System120.Math.sin(radian));
+    const cosine = System121.Math.abs(System121.Math.cos(radian));
+    const sine = System121.Math.abs(System121.Math.sin(radian));
     return Vector2.create(halfViewWidth * cosine + halfViewHeight * sine, halfViewWidth * sine + halfViewHeight * cosine);
   }
   //==============================================================================
@@ -65119,7 +65837,7 @@ var Camera2D = class extends Object2 {
 };
 
 // src/misc/typewriter.js
-var System121 = globalThis;
+var System122 = globalThis;
 var Typewriter = class extends Object2 {
   static {
     __name(this, "Typewriter");
@@ -65197,9 +65915,9 @@ var Typewriter = class extends Object2 {
       return;
     }
     const speed = this.#charactersPerSecond * (this.#isFastForward ? this.#fastForwardMultiplier : 1);
-    const previousWholeCount = System121.Math.floor(this.#revealedCount);
-    this.#revealedCount = System121.Math.min(this.#fullText.length, this.#revealedCount + speed * timeDelta);
-    const currentWholeCount = System121.Math.floor(this.#revealedCount);
+    const previousWholeCount = System122.Math.floor(this.#revealedCount);
+    this.#revealedCount = System122.Math.min(this.#fullText.length, this.#revealedCount + speed * timeDelta);
+    const currentWholeCount = System122.Math.floor(this.#revealedCount);
     if (currentWholeCount !== previousWholeCount) {
       this.#target.setVisibleCharacterCount(currentWholeCount);
       if (this.#characterRevealedEvent) {
@@ -65308,7 +66026,7 @@ var Typewriter = class extends Object2 {
 };
 
 // src/misc/dialogue.js
-var System122 = globalThis;
+var System123 = globalThis;
 var DialogueRunner = class extends Object2 {
   static {
     __name(this, "DialogueRunner");
@@ -65330,7 +66048,7 @@ var DialogueRunner = class extends Object2 {
   constructor() {
     super();
     this.#entryList = [];
-    this.#labelTable = new System122.Map();
+    this.#labelTable = new System123.Map();
     this.#cursor = 0;
     this.#isFinished = true;
   }
@@ -65532,7 +66250,7 @@ var DialogueScriptParser = class extends Object2 {
 };
 
 // src/misc/beepplayer.js
-var System123 = globalThis;
+var System124 = globalThis;
 var BeepPlayer = class extends Object2 {
   static {
     __name(this, "BeepPlayer");
@@ -65581,16 +66299,16 @@ var BeepPlayer = class extends Object2 {
     }
     const startTime = audioContext.currentTime + delaySeconds;
     const endTime = startTime + durationSeconds;
-    const attackSeconds = System123.Math.min(5e-3, durationSeconds * 0.25);
-    const releaseSeconds = System123.Math.min(0.02, durationSeconds * 0.5);
-    const peakVolume = System123.Math.max(1e-4, this.#volume * volumeScale);
+    const attackSeconds = System124.Math.min(5e-3, durationSeconds * 0.25);
+    const releaseSeconds = System124.Math.min(0.02, durationSeconds * 0.5);
+    const peakVolume = System124.Math.max(1e-4, this.#volume * volumeScale);
     const oscillatorNode = audioContext.createOscillator();
     oscillatorNode.type = waveform;
     oscillatorNode.frequency.setValueAtTime(frequency, startTime);
     const gainNode = audioContext.createGain();
     gainNode.gain.setValueAtTime(1e-4, startTime);
     gainNode.gain.linearRampToValueAtTime(peakVolume, startTime + attackSeconds);
-    gainNode.gain.setValueAtTime(peakVolume, System123.Math.max(startTime + attackSeconds, endTime - releaseSeconds));
+    gainNode.gain.setValueAtTime(peakVolume, System124.Math.max(startTime + attackSeconds, endTime - releaseSeconds));
     gainNode.gain.exponentialRampToValueAtTime(1e-4, endTime);
     oscillatorNode.connect(gainNode);
     gainNode.connect(audioContext.destination);
@@ -65709,7 +66427,7 @@ var BeepPlayer = class extends Object2 {
    * @param { number } volume 0 ~ 1.
    */
   setVolume(volume) {
-    this.#volume = System123.Math.max(0, System123.Math.min(1, volume));
+    this.#volume = System124.Math.max(0, System124.Math.min(1, volume));
   }
   //==============================================================================
   // 기본 음량 반환.
@@ -65741,7 +66459,7 @@ var BeepPlayer = class extends Object2 {
 };
 
 // src/core/soundeffectpool.js
-var System124 = globalThis;
+var System125 = globalThis;
 var SoundEffectPool = class extends Object2 {
   static {
     __name(this, "SoundEffectPool");
@@ -65838,7 +66556,7 @@ var SoundEffectPool = class extends Object2 {
    * @param { number } volume 풀 전체의 음량. (0 ~ 1 로 자르고, 유한한 숫자가 아니면 1)
    */
   setVolume(volume) {
-    this.#volume = System124.Number.isFinite(volume) ? System124.Math.max(0, System124.Math.min(1, volume)) : 1;
+    this.#volume = System125.Number.isFinite(volume) ? System125.Math.max(0, System125.Math.min(1, volume)) : 1;
     for (let index = 0; index < this.#playerList.length; ++index) {
       this.#playerList[index].setVolume(this.#playerVolumeList[index] * this.#volume);
     }
@@ -65873,7 +66591,7 @@ var SoundEffectPool = class extends Object2 {
 };
 
 // src/core/soundsystem.js
-var System125 = globalThis;
+var System126 = globalThis;
 var EFFECT_VOICE_COUNT = 12;
 var CONTEXT_RESUME_RETRY_INTERVAL = 0.5;
 var VOLUME_SMOOTHING_SECONDS = 0.05;
@@ -65974,11 +66692,11 @@ var SoundSystem = class {
     this.#externalMuteProvider = null;
     this.#autoplayAllowedProvider = null;
     this.#audioManager = audioManager;
-    this.#soundById = new System125.Map();
-    this.#assetsById = new System125.Map();
+    this.#soundById = new System126.Map();
+    this.#assetsById = new System126.Map();
     this.addSounds(soundTable);
-    this.#lastPlayTimeById = new System125.Map();
-    this.#lastVariantById = new System125.Map();
+    this.#lastPlayTimeById = new System126.Map();
+    this.#lastVariantById = new System126.Map();
     this.#musicBus = null;
     this.#effectBus = null;
     this.#voices = [];
@@ -65986,21 +66704,21 @@ var SoundSystem = class {
     this.#musicFadeSeconds = 0;
     this.#isMusicResumed = false;
     this.#playingMusic = null;
-    this.#musicPositions = new System125.Map();
+    this.#musicPositions = new System126.Map();
     this.#musicVolume = 1;
     this.#musicScale = 1;
     this.#soundEffectVolume = 1;
     this.#isUserMuted = false;
-    this.#isPageHidden = System125.document.visibilityState === "hidden";
+    this.#isPageHidden = System126.document.visibilityState === "hidden";
     this.#isMuted = false;
     this.#isContextPaused = false;
-    const coarsePointerQuery = typeof System125.window.matchMedia === "function" ? System125.window.matchMedia("(pointer: coarse)") : null;
+    const coarsePointerQuery = typeof System126.window.matchMedia === "function" ? System126.window.matchMedia("(pointer: coarse)") : null;
     this.#isBlurMuteEnabled = coarsePointerQuery !== null && coarsePointerQuery.matches;
     this.#isWindowBlurred = false;
     this.#isAutoplayTried = false;
-    this.#lastContextResumeTime = System125.Number.NEGATIVE_INFINITY;
-    System125.document.addEventListener("visibilitychange", () => {
-      this.#isPageHidden = System125.document.visibilityState === "hidden";
+    this.#lastContextResumeTime = System126.Number.NEGATIVE_INFINITY;
+    System126.document.addEventListener("visibilitychange", () => {
+      this.#isPageHidden = System126.document.visibilityState === "hidden";
       const isPageHidden = this.isPageHidden();
       if (!isPageHidden) {
         this.#isWindowBlurred = false;
@@ -66008,7 +66726,7 @@ var SoundSystem = class {
       this.applyMute();
       this.applyContextPause();
     });
-    System125.window.addEventListener("blur", () => {
+    System126.window.addEventListener("blur", () => {
       if (!this.isBlurMuteEnabled()) {
         return;
       }
@@ -66024,8 +66742,8 @@ var SoundSystem = class {
       this.applyMute();
       this.applyContextPause();
     }, "clearWindowBlurred");
-    System125.window.addEventListener("focus", clearWindowBlurred);
-    System125.window.addEventListener("pointerdown", clearWindowBlurred);
+    System126.window.addEventListener("focus", clearWindowBlurred);
+    System126.window.addEventListener("pointerdown", clearWindowBlurred);
   }
   //==============================================================================
   // 소리 표의 줄 더하기. (같은 id 는 바꿈, 받기는 loadSounds 가 함)
@@ -66280,7 +66998,7 @@ var SoundSystem = class {
     const effectLoads = effectRows.map((soundRow) => {
       return this.loadSound(soundRow);
     });
-    await System125.Promise.all(effectLoads);
+    await System126.Promise.all(effectLoads);
     for (const musicRow of musicRows) {
       await this.loadSound(musicRow);
     }
@@ -66307,7 +67025,7 @@ var SoundSystem = class {
         console.warn("[sound] \uC18C\uB9AC\uB97C \uBC1B\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. " + path, error);
       }
     });
-    await System125.Promise.all(loads);
+    await System126.Promise.all(loads);
   }
   //==============================================================================
   // 설정의 음악 크기. (0 ~ 1)
@@ -66365,7 +67083,7 @@ var SoundSystem = class {
       return;
     }
     this.#musicId = soundId;
-    this.#musicFadeSeconds = System125.Math.max(0, fadeSeconds);
+    this.#musicFadeSeconds = System126.Math.max(0, fadeSeconds);
     this.#isMusicResumed = isResumed;
     this.update();
   }
@@ -66392,8 +67110,8 @@ var SoundSystem = class {
     if (effectVolume <= 1e-3) {
       return;
     }
-    const now = System125.performance.now() / 1e3;
-    const lastPlayTime = this.#lastPlayTimeById.has(soundId) ? this.#lastPlayTimeById.get(soundId) : System125.Number.NEGATIVE_INFINITY;
+    const now = System126.performance.now() / 1e3;
+    const lastPlayTime = this.#lastPlayTimeById.has(soundId) ? this.#lastPlayTimeById.get(soundId) : System126.Number.NEGATIVE_INFINITY;
     const minimumInterval = typeof soundRow.minimumInterval === "number" ? soundRow.minimumInterval : 0;
     if (now - lastPlayTime < minimumInterval) {
       return;
@@ -66415,12 +67133,12 @@ var SoundSystem = class {
     source.buffer = audioBuffer;
     const pitchVariation = typeof soundRow.pitchVariation === "number" ? soundRow.pitchVariation : 0;
     if (pitchVariation > 0) {
-      source.playbackRate.value = 1 + (System125.Math.random() * 2 - 1) * pitchVariation;
+      source.playbackRate.value = 1 + (System126.Math.random() * 2 - 1) * pitchVariation;
     }
     const gainNode = audioContext.createGain();
     gainNode.gain.value = effectVolume;
     source.connect(gainNode);
-    const clampedPan = System125.Math.max(-MAXIMUM_PAN, System125.Math.min(MAXIMUM_PAN, pan));
+    const clampedPan = System126.Math.max(-MAXIMUM_PAN, System126.Math.min(MAXIMUM_PAN, pan));
     if (clampedPan !== 0 && typeof audioContext.createStereoPanner === "function") {
       const pannerNode = audioContext.createStereoPanner();
       pannerNode.pan.value = clampedPan;
@@ -66440,7 +67158,7 @@ var SoundSystem = class {
     source.start(0);
     const playSeconds = typeof soundRow.playSeconds === "number" ? soundRow.playSeconds : 0;
     if (playSeconds > 0) {
-      const fadeOutSeconds = typeof soundRow.fadeOutSeconds === "number" ? System125.Math.max(0, soundRow.fadeOutSeconds) : 0;
+      const fadeOutSeconds = typeof soundRow.fadeOutSeconds === "number" ? System126.Math.max(0, soundRow.fadeOutSeconds) : 0;
       const fadeStartTime = audioContext.currentTime + playSeconds;
       gainNode.gain.setValueAtTime(effectVolume, fadeStartTime);
       gainNode.gain.linearRampToValueAtTime(0, fadeStartTime + fadeOutSeconds);
@@ -66469,7 +67187,7 @@ var SoundSystem = class {
     const candidates = loadedIndices.length > 1 ? loadedIndices.filter((assetIndex) => {
       return assetIndex !== lastIndex;
     }) : loadedIndices;
-    const pickedIndex = candidates[System125.Math.floor(System125.Math.random() * candidates.length)];
+    const pickedIndex = candidates[System126.Math.floor(System126.Math.random() * candidates.length)];
     this.#lastVariantById.set(soundId, pickedIndex);
     return assets[pickedIndex];
   }
@@ -66484,7 +67202,7 @@ var SoundSystem = class {
     const matchingVoices = this.#voices.filter((voice) => {
       return soundId === "" || voice.soundId === soundId;
     });
-    const removeCount = matchingVoices.length - System125.Math.max(0, keepCount);
+    const removeCount = matchingVoices.length - System126.Math.max(0, keepCount);
     for (let voiceIndex = 0; voiceIndex < removeCount; ++voiceIndex) {
       this.stopVoice(matchingVoices[voiceIndex]);
     }
@@ -66521,7 +67239,7 @@ var SoundSystem = class {
       return;
     }
     const audioContext = this.getAudioManager().getAudioContext();
-    const clampedFadeSeconds = System125.Math.max(0, fadeSeconds);
+    const clampedFadeSeconds = System126.Math.max(0, fadeSeconds);
     for (const voice of matchingVoices) {
       if (clampedFadeSeconds <= 0 || audioContext === null || audioContext === void 0) {
         this.stopVoice(voice);
@@ -66586,7 +67304,7 @@ var SoundSystem = class {
     if (audioContext === null || isContextPaused || audioContext.state === "running") {
       return;
     }
-    const now = System125.performance.now() / 1e3;
+    const now = System126.performance.now() / 1e3;
     const lastContextResumeTime = this.getLastContextResumeTime();
     if (now - lastContextResumeTime < CONTEXT_RESUME_RETRY_INTERVAL) {
       return;
@@ -66774,7 +67492,7 @@ var SoundSystem = class {
   }
 };
 function readSoundPaths(soundRow) {
-  if (System125.Array.isArray(soundRow.paths)) {
+  if (System126.Array.isArray(soundRow.paths)) {
     return soundRow.paths;
   }
   if (typeof soundRow.path === "string") {
@@ -66784,10 +67502,10 @@ function readSoundPaths(soundRow) {
 }
 __name(readSoundPaths, "readSoundPaths");
 function clampVolume(volume) {
-  if (typeof volume !== "number" || !System125.Number.isFinite(volume)) {
+  if (typeof volume !== "number" || !System126.Number.isFinite(volume)) {
     return 0;
   }
-  return System125.Math.max(0, System125.Math.min(1, volume));
+  return System126.Math.max(0, System126.Math.min(1, volume));
 }
 __name(clampVolume, "clampVolume");
 function readSoundRowVolume(soundRow) {
@@ -66807,7 +67525,7 @@ function readSoundSystem() {
 __name(readSoundSystem, "readSoundSystem");
 
 // src/effect/screeneffect.js
-var System126 = globalThis;
+var System127 = globalThis;
 var ScreenEffectType = {
   // --- 형태 왜곡 ---
   lensDistortion: "lensDistortion",
@@ -67722,8 +68440,8 @@ var ScreenEffect = class extends Object2 {
   constructor(graphic) {
     super();
     this.#webGL2RenderingContext = graphic.getWebGL2RenderingContext();
-    this.#passTable = new System126.Map();
-    this.#effectTable = new System126.Map();
+    this.#passTable = new System127.Map();
+    this.#effectTable = new System127.Map();
     this.#sceneTarget = null;
     this.#pingTarget = null;
     this.#pongTarget = null;
@@ -67760,7 +68478,7 @@ var ScreenEffect = class extends Object2 {
    * @param { number } cornerRadius - 둥근 모서리 반지름(픽셀). 0 이면 사각형.
    */
   setRegion(x, y, width, height, cornerRadius = 0) {
-    this.#region = { x, y, width, height, cornerRadius: System126.Math.max(0, cornerRadius) };
+    this.#region = { x, y, width, height, cornerRadius: System127.Math.max(0, cornerRadius) };
   }
   //==============================================================================
   // 적용 영역 해제. (화면 전체)
@@ -67819,10 +68537,10 @@ var ScreenEffect = class extends Object2 {
     let regionHeight = bufferHeight;
     let cornerRadius = 0;
     if (this.#region) {
-      regionX = System126.Math.max(0, System126.Math.round(this.#region.x));
-      regionY = System126.Math.max(0, System126.Math.round(this.#region.y));
-      regionWidth = System126.Math.min(bufferWidth - regionX, System126.Math.round(this.#region.width));
-      regionHeight = System126.Math.min(bufferHeight - regionY, System126.Math.round(this.#region.height));
+      regionX = System127.Math.max(0, System127.Math.round(this.#region.x));
+      regionY = System127.Math.max(0, System127.Math.round(this.#region.y));
+      regionWidth = System127.Math.min(bufferWidth - regionX, System127.Math.round(this.#region.width));
+      regionHeight = System127.Math.min(bufferHeight - regionY, System127.Math.round(this.#region.height));
       cornerRadius = this.#region.cornerRadius;
     }
     if (regionWidth <= 0 || regionHeight <= 0) {
@@ -67981,8 +68699,8 @@ var ScreenEffect = class extends Object2 {
     destroyRenderTarget(webGL2RenderingContext, this.#pongTarget);
     destroyRenderTarget(webGL2RenderingContext, this.#halfTargetA);
     destroyRenderTarget(webGL2RenderingContext, this.#halfTargetB);
-    const halfWidth = System126.Math.max(1, System126.Math.round(width / 2));
-    const halfHeight = System126.Math.max(1, System126.Math.round(height / 2));
+    const halfWidth = System127.Math.max(1, System127.Math.round(width / 2));
+    const halfHeight = System127.Math.max(1, System127.Math.round(height / 2));
     this.#sceneTarget = createRenderTarget(webGL2RenderingContext, width, height, false, true);
     this.#pingTarget = createRenderTarget(webGL2RenderingContext, width, height, false);
     this.#pongTarget = createRenderTarget(webGL2RenderingContext, width, height, false);
@@ -68166,7 +68884,7 @@ var ScreenEffect = class extends Object2 {
       return;
     }
     if (memberName === "") {
-      const strength = System126.Number(value);
+      const strength = System127.Number(value);
       effectState.strength = strength;
       effectState.isEnabled = strength > 0;
       return;
@@ -68179,7 +68897,7 @@ var ScreenEffect = class extends Object2 {
       effectState.isEnabled = value === true || value === "true";
       return;
     }
-    this.setParameter(effectType, memberName, System126.Number(value));
+    this.setParameter(effectType, memberName, System127.Number(value));
   }
   //==============================================================================
   // 시간 반환.
@@ -68236,7 +68954,7 @@ var ScreenEffect = class extends Object2 {
 };
 
 // src/animation/timeline.js
-var System127 = globalThis;
+var System128 = globalThis;
 var TIMELINE_EASING_NAMES = (() => {
   const nameList = ["linear", "step", "bezier"];
   for (const familyName of ["quadratic", "cubic", "quartic", "quintic", "sinusoidal", "exponential", "circular", "elastic", "back", "bounce"]) {
@@ -68247,8 +68965,8 @@ var TIMELINE_EASING_NAMES = (() => {
   return nameList;
 })();
 function createBezierEasing(x1, y1, x2, y2) {
-  const clampedX1 = System127.Math.max(0, System127.Math.min(1, x1));
-  const clampedX2 = System127.Math.max(0, System127.Math.min(1, x2));
+  const clampedX1 = System128.Math.max(0, System128.Math.min(1, x1));
+  const clampedX2 = System128.Math.max(0, System128.Math.min(1, x2));
   const sampleCurve = /* @__PURE__ */ __name((t, p1, p2) => {
     const oneMinus = 1 - t;
     return 3 * oneMinus * oneMinus * t * p1 + 3 * oneMinus * t * t * p2 + t * t * t;
@@ -68267,15 +68985,15 @@ function createBezierEasing(x1, y1, x2, y2) {
     let t = progress;
     for (let iteration = 0; iteration < 8; ++iteration) {
       const error = sampleCurve(t, clampedX1, clampedX2) - progress;
-      if (System127.Math.abs(error) < 1e-5) {
+      if (System128.Math.abs(error) < 1e-5) {
         break;
       }
       const derivative = sampleDerivative(t, clampedX1, clampedX2);
-      if (System127.Math.abs(derivative) < 1e-6) {
+      if (System128.Math.abs(derivative) < 1e-6) {
         break;
       }
       t -= error / derivative;
-      t = System127.Math.max(0, System127.Math.min(1, t));
+      t = System128.Math.max(0, System128.Math.min(1, t));
     }
     return sampleCurve(t, y1, y2);
   };
@@ -68289,7 +69007,7 @@ function resolveTimelineEasing(easingName, curve = null) {
     return (progress) => 0;
   }
   if (easingName === "bezier") {
-    const controlPoints = System127.Array.isArray(curve) && curve.length >= 4 ? curve : [0.42, 0, 0.58, 1];
+    const controlPoints = System128.Array.isArray(curve) && curve.length >= 4 ? curve : [0.42, 0, 0.58, 1];
     return createBezierEasing(controlPoints[0], controlPoints[1], controlPoints[2], controlPoints[3]);
   }
   const separatorIndex = easingName.indexOf(".");
@@ -68307,20 +69025,20 @@ function resolveTimelineEasing(easingName, curve = null) {
 __name(resolveTimelineEasing, "resolveTimelineEasing");
 function parseTimelineColor(hexText) {
   const text = typeof hexText === "string" && hexText.startsWith("#") ? hexText.substring(1) : "ffffff";
-  const red = System127.parseInt(text.substring(0, 2), 16) / 255;
-  const green = System127.parseInt(text.substring(2, 4), 16) / 255;
-  const blue = System127.parseInt(text.substring(4, 6), 16) / 255;
-  const alpha = text.length >= 8 ? System127.parseInt(text.substring(6, 8), 16) / 255 : 1;
+  const red = System128.parseInt(text.substring(0, 2), 16) / 255;
+  const green = System128.parseInt(text.substring(2, 4), 16) / 255;
+  const blue = System128.parseInt(text.substring(4, 6), 16) / 255;
+  const alpha = text.length >= 8 ? System128.parseInt(text.substring(6, 8), 16) / 255 : 1;
   return [
-    System127.Number.isFinite(red) ? red : 1,
-    System127.Number.isFinite(green) ? green : 1,
-    System127.Number.isFinite(blue) ? blue : 1,
-    System127.Number.isFinite(alpha) ? alpha : 1
+    System128.Number.isFinite(red) ? red : 1,
+    System128.Number.isFinite(green) ? green : 1,
+    System128.Number.isFinite(blue) ? blue : 1,
+    System128.Number.isFinite(alpha) ? alpha : 1
   ];
 }
 __name(parseTimelineColor, "parseTimelineColor");
 function composeTimelineColor(channels) {
-  const toByte = /* @__PURE__ */ __name((value) => System127.Math.round(System127.Math.max(0, System127.Math.min(1, value)) * 255).toString(16).padStart(2, "0"), "toByte");
+  const toByte = /* @__PURE__ */ __name((value) => System128.Math.round(System128.Math.max(0, System128.Math.min(1, value)) * 255).toString(16).padStart(2, "0"), "toByte");
   return "#" + toByte(channels[0]) + toByte(channels[1]) + toByte(channels[2]) + toByte(channels[3] === void 0 ? 1 : channels[3]);
 }
 __name(composeTimelineColor, "composeTimelineColor");
@@ -68370,7 +69088,7 @@ var TIMELINE_PROPERTY_DEFINITIONS = {
     node.setLocalRotation(value);
   }, "apply") },
   opacity: { kind: "number", label: "Opacity", apply: /* @__PURE__ */ __name((node, value) => {
-    node.setLocalOpacity(System127.Math.max(0, System127.Math.min(1, value)));
+    node.setLocalOpacity(System128.Math.max(0, System128.Math.min(1, value)));
   }, "apply") },
   visible: { kind: "boolean", label: "Visible", apply: /* @__PURE__ */ __name((node, value) => {
     node.setActive(value === true || value === "true");
@@ -68387,25 +69105,25 @@ var TIMELINE_PROPERTY_DEFINITIONS = {
   number: { kind: "number", label: "Number", apply: /* @__PURE__ */ __name((node, value) => {
     const textComponent = node.getComponent(Text);
     if (textComponent) {
-      textComponent.setText(String(System127.Math.round(value)));
+      textComponent.setText(String(System128.Math.round(value)));
     }
   }, "apply") },
   fontSize: { kind: "number", label: "Font Size", apply: /* @__PURE__ */ __name((node, value) => {
     const textComponent = node.getComponent(Text);
     if (textComponent) {
-      textComponent.setFontSize(System127.Math.round(value));
+      textComponent.setFontSize(System128.Math.round(value));
     }
   }, "apply") },
   visibleCharacters: { kind: "number", label: "Visible Characters", apply: /* @__PURE__ */ __name((node, value) => {
     const textComponent = node.getComponent(Text);
     if (textComponent) {
-      textComponent.setVisibleCharacterCount(System127.Math.round(value));
+      textComponent.setVisibleCharacterCount(System128.Math.round(value));
     }
   }, "apply") },
   frame: { kind: "number", label: "Frame", apply: /* @__PURE__ */ __name((node, value) => {
     const sprite = node.getComponent(ShaderSprite);
     if (sprite) {
-      applySpriteFrame(sprite, System127.Math.round(value));
+      applySpriteFrame(sprite, System128.Math.round(value));
     }
   }, "apply") },
   effect: { kind: "number", label: "Effect Progress", apply: /* @__PURE__ */ __name((node, value) => {
@@ -68416,8 +69134,8 @@ var TIMELINE_PROPERTY_DEFINITIONS = {
   }, "apply") },
   event: { kind: "string", label: "Event", apply: null }
 };
-var spriteFrameGridTable = new System127.WeakMap();
-var soundPlayerTable = new System127.WeakMap();
+var spriteFrameGridTable = new System128.WeakMap();
+var soundPlayerTable = new System128.WeakMap();
 var timelineAudioManager = null;
 function applySpriteFrame(sprite, frameIndex) {
   const image = sprite.getImage();
@@ -68432,7 +69150,7 @@ function applySpriteFrame(sprite, frameIndex) {
   const frameWidth = image.width / gridColumns;
   const frameHeight = image.height / gridRows;
   const column = wrappedIndex % gridColumns;
-  const row = System127.Math.floor(wrappedIndex / gridColumns);
+  const row = System128.Math.floor(wrappedIndex / gridColumns);
   sprite.setImageRect(Rect.create(column * frameWidth, row * frameHeight, frameWidth, frameHeight));
 }
 __name(applySpriteFrame, "applySpriteFrame");
@@ -68534,7 +69252,7 @@ var Timeline = class _Timeline extends Object2 {
     this.#description = null;
     this.#compiledTracks = [];
     this.#compiledMarkers = [];
-    this.#targetTable = new System127.Map();
+    this.#targetTable = new System128.Map();
     this.#targetResolver = null;
     this.#eventHandler = null;
     this.#markerHandler = null;
@@ -68544,7 +69262,7 @@ var Timeline = class _Timeline extends Object2 {
     this.#isPlaying = false;
     this.#isDirty = true;
     this.#particleSystems = [];
-    this.#particleFreeRunSet = new System127.Set();
+    this.#particleFreeRunSet = new System128.Set();
     this.setDescription(description ? description : _Timeline.createEmptyDescription());
   }
   //==============================================================================
@@ -68572,9 +69290,9 @@ var Timeline = class _Timeline extends Object2 {
    * @returns { Promise<Timeline> } 읽은 문서로 만든 타임라인. (실패 응답(404 등)이나 JSON 이 아니면 거부된다)
    */
   static async loadFromUrl(url) {
-    const response = await System127.fetch(url);
+    const response = await System128.fetch(url);
     if (!response.ok) {
-      throw new System127.Error(`Timeline: HTTP ${response.status}: ${url}`);
+      throw new System128.Error(`Timeline: HTTP ${response.status}: ${url}`);
     }
     const description = await response.json();
     return new _Timeline(description);
@@ -68587,7 +69305,7 @@ var Timeline = class _Timeline extends Object2 {
    * @returns { Timeline } 만든 타임라인.
    */
   static loadFromText(text) {
-    const description = System127.JSON.parse(text);
+    const description = System128.JSON.parse(text);
     return new _Timeline(description);
   }
   //==============================================================================
@@ -68609,7 +69327,7 @@ var Timeline = class _Timeline extends Object2 {
     if (!isLoaded || !jsonAsset.data) {
       return null;
     }
-    const description = System127.structuredClone(jsonAsset.data);
+    const description = System128.structuredClone(jsonAsset.data);
     return new _Timeline(description);
   }
   //==============================================================================
@@ -68623,13 +69341,13 @@ var Timeline = class _Timeline extends Object2 {
     if (!this.#description.stage) {
       this.#description.stage = { width: 960, height: 540, backgroundColor: "#101114ff", nodes: [] };
     }
-    if (!System127.Array.isArray(this.#description.stage.nodes)) {
+    if (!System128.Array.isArray(this.#description.stage.nodes)) {
       this.#description.stage.nodes = [];
     }
-    if (!System127.Array.isArray(this.#description.tracks)) {
+    if (!System128.Array.isArray(this.#description.tracks)) {
       this.#description.tracks = [];
     }
-    if (!System127.Array.isArray(this.#description.markers)) {
+    if (!System128.Array.isArray(this.#description.markers)) {
       this.#description.markers = [];
     }
     this.invalidate();
@@ -68656,7 +69374,7 @@ var Timeline = class _Timeline extends Object2 {
     this.#compiledTracks = [];
     for (const track of this.#description.tracks) {
       const definition = TIMELINE_PROPERTY_DEFINITIONS[track.property];
-      const keys = System127.Array.isArray(track.keys) ? track.keys.slice() : [];
+      const keys = System128.Array.isArray(track.keys) ? track.keys.slice() : [];
       keys.sort((left, right) => left.time - right.time);
       const target = this.resolveTarget(track.target);
       const kind = definition ? definition.kind : typeof (keys.length > 0 ? keys[0].value : 0) === "number" ? "number" : "string";
@@ -68672,8 +69390,8 @@ var Timeline = class _Timeline extends Object2 {
   //==============================================================================
   collectParticleSystems() {
     this.#particleSystems = [];
-    this.#particleFreeRunSet = new System127.Set();
-    const eventTargetSet = new System127.Set();
+    this.#particleFreeRunSet = new System128.Set();
+    const eventTargetSet = new System128.Set();
     for (const compiledTrack of this.#compiledTracks) {
       if (compiledTrack.track.property === "event" && compiledTrack.target) {
         eventTargetSet.add(compiledTrack.target);
@@ -68746,11 +69464,11 @@ var Timeline = class _Timeline extends Object2 {
       }
     }
     eventList.sort((left, right) => left.time - right.time);
-    const stepSeconds = System127.Math.max(1 / 60, time / 600);
+    const stepSeconds = System128.Math.max(1 / 60, time / 600);
     let currentTime = 0;
     const advanceTo = /* @__PURE__ */ __name((targetTime) => {
       while (currentTime < targetTime - 1e-6) {
-        const stepDelta = System127.Math.min(stepSeconds, targetTime - currentTime);
+        const stepDelta = System128.Math.min(stepSeconds, targetTime - currentTime);
         this.simulateParticles(stepDelta);
         currentTime += stepDelta;
       }
@@ -68862,7 +69580,7 @@ var Timeline = class _Timeline extends Object2 {
    * @returns { System.Map } 이름 → 노드
    */
   buildStage(parentNode, imageResolver2 = null) {
-    const nodeTable = new System127.Map();
+    const nodeTable = new System128.Map();
     const nodeDescriptions = this.#description.stage.nodes;
     const createdList = [];
     for (const nodeDescription of nodeDescriptions) {
@@ -68911,7 +69629,7 @@ var Timeline = class _Timeline extends Object2 {
    * @returns { WorldNode } 서술의 이름을 단 새 노드.
    */
   static createStageNode(nodeDescription, imageResolver2 = null) {
-    const description = System127.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
+    const description = System128.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
     const node = new WorldNode();
     node.setName(description.name);
     _Timeline.applyStageNodeDescription(node, description, imageResolver2);
@@ -68926,7 +69644,7 @@ var Timeline = class _Timeline extends Object2 {
    * @param { Function | null } imageResolver 이미지 이름을 받아 그림을 돌려주는 함수. (없거나 null 을 돌려주면 data: 주소만 스스로 읽는다)
    */
   static applyStageNodeDescription(node, nodeDescription, imageResolver2 = null) {
-    const description = System127.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
+    const description = System128.Object.assign({}, TIMELINE_NODE_DEFAULTS, nodeDescription);
     node.setPivot(Vector2.create(description.pivotX, description.pivotY));
     node.setAnchor(Pivot.topLeft.clone());
     node.setContentSize(Vector2.create(description.width, description.height));
@@ -68941,13 +69659,13 @@ var Timeline = class _Timeline extends Object2 {
       paintComponent.setRoundSize(description.roundSize);
     } else if (description.type === "sprite") {
       const sprite = node.getOrAddComponent(ShaderSprite);
-      spriteFrameGridTable.set(sprite, { columns: System127.Math.max(1, description.frameColumns), rows: System127.Math.max(1, description.frameRows) });
+      spriteFrameGridTable.set(sprite, { columns: System128.Math.max(1, description.frameColumns), rows: System128.Math.max(1, description.frameRows) });
       let image = null;
       if (description.image && imageResolver2) {
         image = imageResolver2(description.image);
       }
       if (!image && description.image && description.image.startsWith("data:")) {
-        image = new System127.Image();
+        image = new System128.Image();
         image.onload = () => {
           applySpriteFrame(sprite, description.frame);
         };
@@ -69061,7 +69779,7 @@ var Timeline = class _Timeline extends Object2 {
    * @param { number } time 옮길 시간. (초, 0 ~ 길이로 자른다)
    */
   seek(time) {
-    this.#time = System127.Math.max(0, System127.Math.min(this.getDuration(), time));
+    this.#time = System128.Math.max(0, System128.Math.min(this.getDuration(), time));
     this.evaluate(this.#time);
     this.resimulateParticles(this.#time);
   }
@@ -69207,8 +69925,8 @@ var Timeline = class _Timeline extends Object2 {
           particleSystem.stop(true);
         } else if (eventName.startsWith("emit")) {
           const separatorIndex = eventName.indexOf(":");
-          const emitCount = separatorIndex >= 0 ? System127.Number(eventName.substring(separatorIndex + 1)) : 30;
-          particleSystem.emit(System127.Number.isFinite(emitCount) ? emitCount : 30);
+          const emitCount = separatorIndex >= 0 ? System128.Number(eventName.substring(separatorIndex + 1)) : 30;
+          particleSystem.emit(System128.Number.isFinite(emitCount) ? emitCount : 30);
         }
       }
     }
@@ -69277,7 +69995,7 @@ var Timeline = class _Timeline extends Object2 {
     }
     const easingFunction = resolveTimelineEasing(fromKey.easing, fromKey.curve);
     const progress = (time - fromKey.time) / segmentDuration;
-    const easedProgress = easingFunction(System127.Math.max(0, System127.Math.min(1, progress)));
+    const easedProgress = easingFunction(System128.Math.max(0, System128.Math.min(1, progress)));
     return interpolateValue(kind, fromKey.value, toKey.value, easedProgress);
   }
   //==============================================================================
@@ -69355,8 +70073,8 @@ var Timeline = class _Timeline extends Object2 {
    * @returns { number } 길이. (초, 문서 값이 양수가 아니면 0)
    */
   getDuration() {
-    const duration = System127.Number(this.#description.duration);
-    return System127.Number.isFinite(duration) && duration > 0 ? duration : 0;
+    const duration = System128.Number(this.#description.duration);
+    return System128.Number.isFinite(duration) && duration > 0 ? duration : 0;
   }
   //==============================================================================
   // 초당 프레임 반환.
@@ -69365,8 +70083,8 @@ var Timeline = class _Timeline extends Object2 {
    * @returns { number } 초당 프레임. (문서 값이 양수가 아니면 30)
    */
   getFrameRate() {
-    const frameRate = System127.Number(this.#description.frameRate);
-    return System127.Number.isFinite(frameRate) && frameRate > 0 ? frameRate : 30;
+    const frameRate = System128.Number(this.#description.frameRate);
+    return System128.Number.isFinite(frameRate) && frameRate > 0 ? frameRate : 30;
   }
   //==============================================================================
   // 이벤트 핸들러 설정. ((대상 이름, 이벤트 이름, 키, 타임라인))
@@ -69398,15 +70116,15 @@ var Timeline = class _Timeline extends Object2 {
 };
 
 // src/graphics3d/toon/toonscreenoutline.js
-var System128 = globalThis;
-var ToonOutlineWidthUnit = System128.Object.freeze({
+var System129 = globalThis;
+var ToonOutlineWidthUnit = System129.Object.freeze({
   world: "world",
   // 월드 길이. (멀수록 가늘어진다)
   pixel: "pixel"
   // 그리는 영역의 픽셀. (거리와 상관없이 같은 굵기)
 });
 var TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID = 16383;
-var IDENTITY_ELEMENTS = new System128.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+var IDENTITY_ELEMENTS = new System129.Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 var LINE_TEXTURE_UNIT = 5;
 var DEPTH_TEXTURE_UNIT = 6;
 var LINE_VERTEX_SHADER = `#version 300 es
@@ -69722,7 +70440,7 @@ void main() {
 }
 `;
 function readJumpFloodSteps(reach) {
-  const distance = System128.Math.max(1, System128.Math.ceil(reach));
+  const distance = System129.Math.max(1, System129.Math.ceil(reach));
   let step = 1;
   while (step * 2 - 1 < distance) {
     step *= 2;
@@ -69730,7 +70448,7 @@ function readJumpFloodSteps(reach) {
   const steps = [];
   while (step >= 1) {
     steps.push(step);
-    step = System128.Math.floor(step / 2);
+    step = System129.Math.floor(step / 2);
   }
   return steps;
 }
@@ -69822,14 +70540,14 @@ var ToonScreenOutline = class {
     this.#widthUnit = ToonOutlineWidthUnit.pixel;
     this.#focusDistance = 0;
     this.#depthThreshold = 0.05;
-    this.#creaseCosine = System128.Math.cos(System128.Math.PI / 3);
+    this.#creaseCosine = System129.Math.cos(System129.Math.PI / 3);
     this.#creaseWidth = 1;
     this.#creaseOpacity = 1;
     this.#resolutionScale = 1;
     this.#isHdrOutput = false;
     this.#frame = null;
     this.#savedState = null;
-    this.#instanceData = new System128.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
+    this.#instanceData = new System129.Float32Array(TOON_INSTANCE_FLOAT_COUNT * 64);
     this.#drawnDistanceSum = 0;
     this.#drawnDistanceCount = 0;
     this.#lineWidths = [2, 1];
@@ -69872,7 +70590,7 @@ var ToonScreenOutline = class {
    * @param { string } [unit] - ToonOutlineWidthUnit. (기본 pixel)
    */
   setWidth(width, unit = ToonOutlineWidthUnit.pixel) {
-    this.#width = System128.Math.max(0, width);
+    this.#width = System129.Math.max(0, width);
     this.#widthUnit = unit;
   }
   //==============================================================================
@@ -69888,9 +70606,9 @@ var ToonScreenOutline = class {
    * outline.setCrease(75, 1.5, 0.6);
    */
   setCrease(angleDegrees, width = 1, opacity = 1) {
-    this.#creaseCosine = System128.Math.cos(System128.Math.min(180, System128.Math.max(0, angleDegrees)) * System128.Math.PI / 180);
-    this.#creaseWidth = System128.Math.max(0, width);
-    this.#creaseOpacity = System128.Math.max(0, System128.Math.min(1, opacity));
+    this.#creaseCosine = System129.Math.cos(System129.Math.min(180, System129.Math.max(0, angleDegrees)) * System129.Math.PI / 180);
+    this.#creaseWidth = System129.Math.max(0, width);
+    this.#creaseOpacity = System129.Math.max(0, System129.Math.min(1, opacity));
   }
   //==============================================================================
   // 초점 거리 설정. (원근 카메라에서 월드 굵기를 픽셀로 셀 거리, 보통 카메라에서 보는 점까지, 0 이면 그린 모형들의 평균 거리)
@@ -69899,7 +70617,7 @@ var ToonScreenOutline = class {
    * @param { number } focusDistance - 카메라에서의 거리. (월드 길이)
    */
   setFocusDistance(focusDistance) {
-    this.#focusDistance = System128.Math.max(0, focusDistance);
+    this.#focusDistance = System129.Math.max(0, focusDistance);
   }
   //==============================================================================
   // 깊이 문턱 설정. (같은 번호의 이웃 화소가 서로의 접평면에서 이만큼 넘게 떨어지면 가려진 실루엣으로 긋는다, 월드 길이)
@@ -69909,7 +70627,7 @@ var ToonScreenOutline = class {
    * @param { number } depthThreshold - 접평면 거리 문턱. (월드 길이)
    */
   setDepthThreshold(depthThreshold) {
-    this.#depthThreshold = System128.Math.max(0, depthThreshold);
+    this.#depthThreshold = System129.Math.max(0, depthThreshold);
   }
   //==============================================================================
   // 넓히기 판의 해상도 몫 설정. (그리는 영역에 대한 몫 0.25 ~ 1, 폰의 가벼운 길은 낮춘다)
@@ -69920,7 +70638,7 @@ var ToonScreenOutline = class {
    * @param { number } resolutionScale - 0.25 ~ 1.
    */
   setResolutionScale(resolutionScale) {
-    this.#resolutionScale = System128.Math.max(0.25, System128.Math.min(1, resolutionScale));
+    this.#resolutionScale = System129.Math.max(0.25, System129.Math.min(1, resolutionScale));
   }
   //==============================================================================
   // HDR 출력 설정. (true 면 선 색을 선형으로 바꿔 섞는다, ToonRenderer.setHdrOutput 과 맞춘다)
@@ -69965,18 +70683,18 @@ var ToonScreenOutline = class {
     const viewProjectionMatrix = projectionMatrix.clone();
     viewProjectionMatrix.multiply(viewMatrix);
     this.#frame = {
-      viewProjectionElements: new System128.Float32Array(viewProjectionMatrix.getElements()),
-      viewElements: new System128.Float32Array(viewElements),
-      projectionElements: new System128.Float32Array(projectionElements),
+      viewProjectionElements: new System129.Float32Array(viewProjectionMatrix.getElements()),
+      viewElements: new System129.Float32Array(viewElements),
+      projectionElements: new System129.Float32Array(projectionElements),
       frustumPlanes: extractFrustumPlanes(viewProjectionMatrix),
-      isPerspective: System128.Math.abs(projectionElements[11]) > 0.5,
+      isPerspective: System129.Math.abs(projectionElements[11]) > 0.5,
       viewport: [viewport[0], viewport[1], viewport[2], viewport[3]]
     };
     this.#drawnDistanceSum = 0;
     this.#drawnDistanceCount = 0;
-    const width = System128.Math.max(1, viewport[2]);
-    const height = System128.Math.max(1, viewport[3]);
-    const lineTarget = this.readLineTarget(width, height, System128.Math.max(1, System128.Math.ceil(width * this.#resolutionScale)), System128.Math.max(1, System128.Math.ceil(height * this.#resolutionScale)));
+    const width = System129.Math.max(1, viewport[2]);
+    const height = System129.Math.max(1, viewport[3]);
+    const lineTarget = this.readLineTarget(width, height, System129.Math.max(1, System129.Math.ceil(width * this.#resolutionScale)), System129.Math.max(1, System129.Math.ceil(height * this.#resolutionScale)));
     if (lineTarget === null) {
       return false;
     }
@@ -70067,7 +70785,7 @@ var ToonScreenOutline = class {
     }
     const webGL2RenderingContext = this.#webGL2RenderingContext;
     if (this.#instanceData.length < instances.length * TOON_INSTANCE_FLOAT_COUNT) {
-      this.#instanceData = new System128.Float32Array(instances.length * TOON_INSTANCE_FLOAT_COUNT);
+      this.#instanceData = new System129.Float32Array(instances.length * TOON_INSTANCE_FLOAT_COUNT);
     }
     const instanceData = this.#instanceData;
     const isCulled = options.isCulled !== false;
@@ -70115,15 +70833,15 @@ var ToonScreenOutline = class {
     webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("instanced"), instanceCount > 0 ? 1 : 0);
     webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("instanceLineIds"), isInstanceLineId ? 1 : 0);
     webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("skinned"), isSkinned ? 1 : 0);
-    webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineId"), System128.Math.max(0, System128.Math.min(TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID, lineId)));
+    webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineId"), System129.Math.max(0, System129.Math.min(TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID, lineId)));
     webGL2RenderingContext.uniform1f(lineProgram.getUniformLocation("lineFlags"), lineFlags);
     if (isSkinned) {
-      const jointFloatCount = System128.Math.floor(System128.Math.min(jointMatrices.length, TOON_MAXIMUM_JOINTS * 16) / 16) * 16;
+      const jointFloatCount = System129.Math.floor(System129.Math.min(jointMatrices.length, TOON_MAXIMUM_JOINTS * 16) / 16) * 16;
       const jointValues = jointMatrices.length === jointFloatCount ? jointMatrices : jointMatrices.subarray(0, jointFloatCount);
       webGL2RenderingContext.uniformMatrix4fv(lineProgram.getUniformLocation("jointMatrices"), false, jointValues);
     }
-    const indexStart = options.indexStart !== void 0 ? System128.Math.max(0, options.indexStart) : 0;
-    const indexCount = options.indexCount !== void 0 ? System128.Math.min(options.indexCount, mesh.bodyIndexCount - indexStart) : mesh.bodyIndexCount - indexStart;
+    const indexStart = options.indexStart !== void 0 ? System129.Math.max(0, options.indexStart) : 0;
+    const indexCount = options.indexCount !== void 0 ? System129.Math.min(options.indexCount, mesh.bodyIndexCount - indexStart) : mesh.bodyIndexCount - indexStart;
     if (indexCount <= 0) {
       return;
     }
@@ -70193,7 +70911,7 @@ var ToonScreenOutline = class {
     jumpFloodProgram.use();
     webGL2RenderingContext.uniform1i(jumpFloodProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
     webGL2RenderingContext.uniform2f(jumpFloodProgram.getUniformLocation("pointScale"), pointScaleX, pointScaleY);
-    const reach = (System128.Math.max(lineWidths[0], lineWidths[1]) * 0.5 + 0.5) / System128.Math.min(pointScaleX, pointScaleY) + 1.5;
+    const reach = (System129.Math.max(lineWidths[0], lineWidths[1]) * 0.5 + 0.5) / System129.Math.min(pointScaleX, pointScaleY) + 1.5;
     let seedIndex = 0;
     for (const stepSize of readJumpFloodSteps(reach)) {
       webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, lineTarget.jumpFloodFramebuffers[1 - seedIndex]);
@@ -70236,7 +70954,7 @@ var ToonScreenOutline = class {
     const color = this.#color;
     const lineWidths = this.#lineWidths;
     webGL2RenderingContext.uniform1i(compositeProgram.getUniformLocation("seedTexture"), LINE_TEXTURE_UNIT);
-    webGL2RenderingContext.uniform4f(compositeProgram.getUniformLocation("viewportRect"), viewport[0], viewport[1], System128.Math.max(1, viewport[2]), System128.Math.max(1, viewport[3]));
+    webGL2RenderingContext.uniform4f(compositeProgram.getUniformLocation("viewportRect"), viewport[0], viewport[1], System129.Math.max(1, viewport[2]), System129.Math.max(1, viewport[3]));
     webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("pointScale"), lineTarget.width / lineTarget.jumpFloodWidth, lineTarget.height / lineTarget.jumpFloodHeight);
     webGL2RenderingContext.uniform2f(compositeProgram.getUniformLocation("lineWidths"), lineWidths[0], lineWidths[1]);
     webGL2RenderingContext.uniform1f(compositeProgram.getUniformLocation("creaseOpacity"), this.#creaseOpacity);
@@ -70260,15 +70978,15 @@ var ToonScreenOutline = class {
     const frame = this.#frame;
     let pixelsPerUnit = 1;
     if (this.#widthUnit === ToonOutlineWidthUnit.world) {
-      pixelsPerUnit = frame.viewport[3] * 0.5 * System128.Math.abs(frame.projectionElements[5]);
+      pixelsPerUnit = frame.viewport[3] * 0.5 * System129.Math.abs(frame.projectionElements[5]);
       if (frame.isPerspective) {
         const averageDistance = this.#drawnDistanceCount > 0 ? this.#drawnDistanceSum / this.#drawnDistanceCount : 1;
         const focusDistance = this.#focusDistance > 0 ? this.#focusDistance : averageDistance;
-        pixelsPerUnit /= System128.Math.max(1e-3, focusDistance);
+        pixelsPerUnit /= System129.Math.max(1e-3, focusDistance);
       }
     }
     const toPixels = /* @__PURE__ */ __name((width) => {
-      return width > 0 ? System128.Math.max(1, width * pixelsPerUnit) : 0;
+      return width > 0 ? System129.Math.max(1, width * pixelsPerUnit) : 0;
     }, "toPixels");
     return [toPixels(this.#width), toPixels(this.#creaseWidth)];
   }
@@ -70304,10 +71022,10 @@ var ToonScreenOutline = class {
     const centerX = modelElements[0] * center[0] + modelElements[4] * center[1] + modelElements[8] * center[2] + modelElements[12];
     const centerY = modelElements[1] * center[0] + modelElements[5] * center[1] + modelElements[9] * center[2] + modelElements[13];
     const centerZ = modelElements[2] * center[0] + modelElements[6] * center[1] + modelElements[10] * center[2] + modelElements[14];
-    const scaleX = System128.Math.hypot(modelElements[0], modelElements[1], modelElements[2]);
-    const scaleY = System128.Math.hypot(modelElements[4], modelElements[5], modelElements[6]);
-    const scaleZ = System128.Math.hypot(modelElements[8], modelElements[9], modelElements[10]);
-    const radius = mesh.boundingRadius * System128.Math.max(scaleX, scaleY, scaleZ);
+    const scaleX = System129.Math.hypot(modelElements[0], modelElements[1], modelElements[2]);
+    const scaleY = System129.Math.hypot(modelElements[4], modelElements[5], modelElements[6]);
+    const scaleZ = System129.Math.hypot(modelElements[8], modelElements[9], modelElements[10]);
+    const radius = mesh.boundingRadius * System129.Math.max(scaleX, scaleY, scaleZ);
     for (const plane of this.#frame.frustumPlanes) {
       if (plane[0] * centerX + plane[1] * centerY + plane[2] * centerZ + plane[3] < -radius) {
         return false;
@@ -70479,8 +71197,8 @@ var ToonScreenOutline = class {
 };
 
 // src/graphics3d/toon/toondrawqueue.js
-var System129 = globalThis;
-var ToonDrawStage = System129.Object.freeze({
+var System130 = globalThis;
+var ToonDrawStage = System130.Object.freeze({
   beforeOpaque: "beforeOpaque",
   // 불투명한 몸 앞.
   afterOpaque: "afterOpaque",
@@ -70723,9 +71441,9 @@ var ToonDrawQueue = class {
     const screenRect = renderer.getScreenRect();
     const viewport = webGL2RenderingContext.getParameter(webGL2RenderingContext.VIEWPORT);
     if (screenRect !== null) {
-      const left = System129.Math.floor(screenRect.x);
-      const bottom = System129.Math.floor(viewport[3] - screenRect.y - screenRect.height);
-      webGL2RenderingContext.viewport(viewport[0] + left, viewport[1] + bottom, System129.Math.max(1, System129.Math.round(screenRect.width)), System129.Math.max(1, System129.Math.round(screenRect.height)));
+      const left = System130.Math.floor(screenRect.x);
+      const bottom = System130.Math.floor(viewport[3] - screenRect.y - screenRect.height);
+      webGL2RenderingContext.viewport(viewport[0] + left, viewport[1] + bottom, System130.Math.max(1, System130.Math.round(screenRect.width)), System130.Math.max(1, System130.Math.round(screenRect.height)));
     }
     if (screenOutline.beginLineIds(viewMatrix, projectionMatrix)) {
       let itemIndex = 0;
@@ -70789,7 +71507,7 @@ var ToonDrawQueue = class {
         this.drawItem(renderer, item, item.options);
         continue;
       }
-      const bodyOptions = System129.Object.assign({}, item.options, { hasOutline: false });
+      const bodyOptions = System130.Object.assign({}, item.options, { hasOutline: false });
       this.drawItem(renderer, item, bodyOptions);
       if (item.options.hasOutline !== false && item.mesh.outlineVertexArray !== null) {
         outlineItemList.push(item);
@@ -70868,8 +71586,8 @@ var ToonDrawQueue = class {
 };
 
 // src/misc/graphicsqualitygovernor.js
-var System130 = globalThis;
-var GraphicsQuality = System130.Object.freeze({
+var System131 = globalThis;
+var GraphicsQuality = System131.Object.freeze({
   auto: "auto",
   // 자동. (프레임 재기로 정한다)
   high: "high",
@@ -70969,7 +71687,7 @@ var GraphicsQualityGovernor = class {
    * console.log(governor.getLiteOverride(), governor.isLite());
    */
   applySearchText(searchText, liteKey = "light") {
-    const searchParameters = new System130.URLSearchParams(searchText);
+    const searchParameters = new System131.URLSearchParams(searchText);
     if (!searchParameters.has(liteKey)) {
       return;
     }
@@ -71051,8 +71769,8 @@ var GraphicsQualityGovernor = class {
    * @param { number } liteMaxRenderPixelRatio 가벼운 길의 렌더 배율 상한. (0 이면 제한 없음, 음수면 0)
    */
   setRenderPixelRatioLimits(normalMaxRenderPixelRatio, liteMaxRenderPixelRatio) {
-    this.#normalMaxRenderPixelRatio = System130.Math.max(0, normalMaxRenderPixelRatio);
-    this.#liteMaxRenderPixelRatio = System130.Math.max(0, liteMaxRenderPixelRatio);
+    this.#normalMaxRenderPixelRatio = System131.Math.max(0, normalMaxRenderPixelRatio);
+    this.#liteMaxRenderPixelRatio = System131.Math.max(0, liteMaxRenderPixelRatio);
   }
   //==============================================================================
   // 지금 길의 렌더 배율 상한.
@@ -71104,7 +71822,7 @@ var GraphicsQualityGovernor = class {
 };
 
 // src/misc/fixedstepper.js
-var System131 = globalThis;
+var System132 = globalThis;
 var FixedStepper = class extends Object2 {
   static {
     __name(this, "FixedStepper");
@@ -71144,7 +71862,7 @@ var FixedStepper = class extends Object2 {
    * @param { number } stepSeconds 한 걸음의 시간. (초)
    */
   setStepSeconds(stepSeconds) {
-    if (typeof stepSeconds !== "number" || !System131.Number.isFinite(stepSeconds) || stepSeconds <= 0) {
+    if (typeof stepSeconds !== "number" || !System132.Number.isFinite(stepSeconds) || stepSeconds <= 0) {
       return;
     }
     this.#stepSeconds = stepSeconds;
@@ -71165,10 +71883,10 @@ var FixedStepper = class extends Object2 {
    * @param { number } maximumStepsPerFrame 한 프레임에 도는 걸음의 상한.
    */
   setMaximumStepsPerFrame(maximumStepsPerFrame) {
-    if (typeof maximumStepsPerFrame !== "number" || !System131.Number.isFinite(maximumStepsPerFrame)) {
+    if (typeof maximumStepsPerFrame !== "number" || !System132.Number.isFinite(maximumStepsPerFrame)) {
       return;
     }
-    this.#maximumStepsPerFrame = System131.Math.max(1, System131.Math.floor(maximumStepsPerFrame));
+    this.#maximumStepsPerFrame = System132.Math.max(1, System132.Math.floor(maximumStepsPerFrame));
   }
   //==============================================================================
   // 한 프레임에 도는 걸음의 상한 반환.
@@ -71212,7 +71930,7 @@ var FixedStepper = class extends Object2 {
   advance(timeDelta, stepFunction) {
     const stepSeconds = this.getStepSeconds();
     const maximumStepsPerFrame = this.getMaximumStepsPerFrame();
-    const isValidTimeDelta = typeof timeDelta === "number" && System131.Number.isFinite(timeDelta) && timeDelta > 0;
+    const isValidTimeDelta = typeof timeDelta === "number" && System132.Number.isFinite(timeDelta) && timeDelta > 0;
     if (isValidTimeDelta) {
       this.#accumulatedSeconds += timeDelta;
     }
@@ -71242,7 +71960,7 @@ var FixedStepper = class extends Object2 {
   getAlpha() {
     const stepSeconds = this.getStepSeconds();
     const alpha = this.#accumulatedSeconds / stepSeconds;
-    return System131.Math.max(0, System131.Math.min(1, alpha));
+    return System132.Math.max(0, System132.Math.min(1, alpha));
   }
   //==============================================================================
   // 지난 advance 에서 돈 걸음 수.
@@ -71263,7 +71981,7 @@ var FixedStepper = class extends Object2 {
 };
 
 // src/resource/assetloader.js
-var System132 = globalThis;
+var System133 = globalThis;
 var DEFAULT_CONCURRENCY = 6;
 var AssetLoader = class extends Object2 {
   static {
@@ -71324,10 +72042,10 @@ var AssetLoader = class extends Object2 {
    * @param { number } concurrency 동시에 받는 수. (유한한 숫자가 아니면 무시한다)
    */
   setConcurrency(concurrency) {
-    if (typeof concurrency !== "number" || !System132.Number.isFinite(concurrency)) {
+    if (typeof concurrency !== "number" || !System133.Number.isFinite(concurrency)) {
       return;
     }
-    this.#concurrency = System132.Math.max(1, System132.Math.floor(concurrency));
+    this.#concurrency = System133.Math.max(1, System133.Math.floor(concurrency));
   }
   //==============================================================================
   // 동시에 받는 수 반환.
@@ -71493,7 +72211,7 @@ var AssetLoader = class extends Object2 {
     while (this.#workerPromiseList.length > 0) {
       const workerPromiseList = this.#workerPromiseList;
       this.#workerPromiseList = [];
-      await System132.Promise.all(workerPromiseList);
+      await System133.Promise.all(workerPromiseList);
     }
     this.#loadPromise = null;
     this.notifyProgress();
@@ -71514,7 +72232,7 @@ var AssetLoader = class extends Object2 {
   startWorkers() {
     const concurrency = this.getConcurrency();
     const unclaimedCount = this.#entryList.length - this.#nextEntryIndex;
-    const workerCount = System132.Math.min(concurrency - this.#activeWorkerCount, unclaimedCount);
+    const workerCount = System133.Math.min(concurrency - this.#activeWorkerCount, unclaimedCount);
     for (let workerIndex = 0; workerIndex < workerCount; ++workerIndex) {
       this.#activeWorkerCount += 1;
       const workerPromise = this.runWorker();
@@ -71536,10 +72254,10 @@ var AssetLoader = class extends Object2 {
       try {
         await entry.loadFunction();
         if (entry.asset !== null && typeof entry.asset.isLoaded === "function" && !entry.asset.isLoaded()) {
-          loadError = new System132.Error(`Not loaded: ${entry.path}`);
+          loadError = new System133.Error(`Not loaded: ${entry.path}`);
         }
       } catch (error) {
-        loadError = error === void 0 || error === null ? new System132.Error(`Load fail: ${entry.path}`) : error;
+        loadError = error === void 0 || error === null ? new System133.Error(`Load fail: ${entry.path}`) : error;
       }
       entry.isFinished = true;
       this.#finishedCount += 1;
@@ -71669,7 +72387,7 @@ var AssetLoader = class extends Object2 {
 };
 
 // src/misc/loadingprogress.js
-var System133 = globalThis;
+var System134 = globalThis;
 var DEFAULT_FOLLOW_RATE = 6;
 var SNAP_DISTANCE = 5e-4;
 var LoadingProgress = class extends Object2 {
@@ -71708,11 +72426,11 @@ var LoadingProgress = class extends Object2 {
    * @param { number } progress 알려 줄 정도. (0 ~ 1)
    */
   setProgress(progress) {
-    if (typeof progress !== "number" || System133.Number.isNaN(progress)) {
+    if (typeof progress !== "number" || System134.Number.isNaN(progress)) {
       return;
     }
-    const clampedProgress = System133.Math.max(0, System133.Math.min(1, progress));
-    this.#targetProgress = System133.Math.max(this.#targetProgress, clampedProgress);
+    const clampedProgress = System134.Math.max(0, System134.Math.min(1, progress));
+    this.#targetProgress = System134.Math.max(this.#targetProgress, clampedProgress);
   }
   //==============================================================================
   // 알려 준 정도 반환.
@@ -71739,14 +72457,14 @@ var LoadingProgress = class extends Object2 {
    * @param { number } timeDelta 지난 프레임부터의 시간. (초)
    */
   update(timeDelta) {
-    if (typeof timeDelta !== "number" || !System133.Number.isFinite(timeDelta) || timeDelta <= 0) {
+    if (typeof timeDelta !== "number" || !System134.Number.isFinite(timeDelta) || timeDelta <= 0) {
       return;
     }
     const targetProgress = this.getProgress();
     const followRate = this.getFollowRate();
-    const followRatio = 1 - System133.Math.exp(-followRate * timeDelta);
+    const followRatio = 1 - System134.Math.exp(-followRate * timeDelta);
     this.#shownProgress += (targetProgress - this.#shownProgress) * followRatio;
-    if (System133.Math.abs(targetProgress - this.#shownProgress) < SNAP_DISTANCE) {
+    if (System134.Math.abs(targetProgress - this.#shownProgress) < SNAP_DISTANCE) {
       this.#shownProgress = targetProgress;
     }
   }
@@ -71757,7 +72475,7 @@ var LoadingProgress = class extends Object2 {
    * @param { number } followRate 따라가는 빠르기. (초당 남은 거리의 비율)
    */
   setFollowRate(followRate) {
-    if (typeof followRate !== "number" || !System133.Number.isFinite(followRate) || followRate <= 0) {
+    if (typeof followRate !== "number" || !System134.Number.isFinite(followRate) || followRate <= 0) {
       return;
     }
     this.#followRate = followRate;
@@ -71790,7 +72508,7 @@ var LoadingProgress = class extends Object2 {
 };
 
 // src/misc/buildinfo.js
-var System134 = globalThis;
+var System135 = globalThis;
 var DEFAULT_META_NAME = "build-version";
 var DEFAULT_VERSION_JSON_PATH = "./version.json";
 var BuildInfo = class _BuildInfo extends Object2 {
@@ -71865,7 +72583,7 @@ var BuildInfo = class _BuildInfo extends Object2 {
     const versionJsonPath = this.#versionJsonPath;
     if (versionJsonPath !== "") {
       try {
-        const response = await System134.fetch(versionJsonPath, { cache: "no-cache" });
+        const response = await System135.fetch(versionJsonPath, { cache: "no-cache" });
         if (response.ok) {
           const versionData = await response.json();
           if (versionData !== null && typeof versionData === "object") {
@@ -71888,7 +72606,7 @@ var BuildInfo = class _BuildInfo extends Object2 {
    * @returns { string } meta 의 content 를 앞뒤 공백을 떼어 돌려준 글. 없으면 빈 글.
    */
   readMetaText() {
-    const document2 = System134.document;
+    const document2 = System135.document;
     if (document2 === null || document2 === void 0) {
       return "";
     }
@@ -71972,12 +72690,12 @@ var BuildInfo = class _BuildInfo extends Object2 {
 };
 
 // src/graphics3d/toon/toonvfx.js
-var System135 = globalThis;
+var System136 = globalThis;
 var ATLAS_WIDTH = 1024;
 var ATLAS_HEIGHT = 512;
 var ATLAS_SLOT_SIZE = 128;
 var SMOKE_FRAME_COUNT = 16;
-var ToonVfxSlot = System135.Object.freeze({
+var ToonVfxSlot = System136.Object.freeze({
   soft: 0,
   // 부드러운 알갱이.
   streak: 1,
@@ -71998,7 +72716,7 @@ var ToonVfxSlot = System135.Object.freeze({
   // 넓은 둘레 빛.
 });
 var TOON_VFX_MAXIMUM_RAMPS = 8;
-var ToonVfxLook = System135.Object.freeze({
+var ToonVfxLook = System136.Object.freeze({
   soft: 0,
   // 부드러운 알갱이. (더하는 빛)
   streak: 1,
@@ -72014,7 +72732,7 @@ var ToonVfxLook = System135.Object.freeze({
   grit: 6
   // 빛을 내지 않는 돌과 흙 알갱이. (덮기)
 });
-var ToonVfxShape = System135.Object.freeze({
+var ToonVfxShape = System136.Object.freeze({
   point: "point",
   // 한 점에서 모든 쪽으로.
   sphere: "sphere",
@@ -72028,7 +72746,7 @@ var ToonVfxShape = System135.Object.freeze({
   line: "line"
   // direction 쪽으로 length 까지의 선 위(둘레 radius 안)에서 direction 쪽으로.
 });
-var ToonVfxDecalMode = System135.Object.freeze({
+var ToonVfxDecalMode = System136.Object.freeze({
   scorch: 0,
   // 알파로 어둡게 덮고 빨간 채널의 금에서 열기가 식는다.
   glow: 1,
@@ -72054,13 +72772,13 @@ var LIGHTNING_POINT_COUNT = 22;
 var DEFAULT_GLINT_CAPACITY = 96;
 var LOOK_COUNT = 7;
 var DEFAULT_BLOB_SHADOW_ALPHA = 0.45;
-var DEFAULT_RIM_COLOR = System135.Object.freeze([0.05, 0.05, 0.08]);
+var DEFAULT_RIM_COLOR = System136.Object.freeze([0.05, 0.05, 0.08]);
 var SHAKE_UNIT_SCALE = 100;
 var LIGHTNING_FADE_SECONDS = 0.1;
 var DECAL_LIFT = 0.014;
 var GROUND_GLOW_LIFT = 0.02;
 var VFX_TEXTURE_UNIT = 4;
-var PARTICLE_ATTRIBUTE_LOCATIONS = System135.Object.freeze({
+var PARTICLE_ATTRIBUTE_LOCATIONS = System136.Object.freeze({
   vertexCorner: 0,
   particleStart: 1,
   particleVelocity: 2,
@@ -72070,10 +72788,10 @@ var PARTICLE_ATTRIBUTE_LOCATIONS = System135.Object.freeze({
   particleExtra: 6,
   particleShape: 7
 });
-var SPHERE_ATTRIBUTE_LOCATIONS = System135.Object.freeze({ vertexPosition: 0 });
-var GRID_ATTRIBUTE_LOCATIONS = System135.Object.freeze({ vertexGrid: 0 });
-var CORNER_ATTRIBUTE_LOCATIONS = System135.Object.freeze({ vertexCorner: 0 });
-var RIBBON_ATTRIBUTE_LOCATIONS = System135.Object.freeze({ vertexPosition: 0, vertexRibbon: 1 });
+var SPHERE_ATTRIBUTE_LOCATIONS = System136.Object.freeze({ vertexPosition: 0 });
+var GRID_ATTRIBUTE_LOCATIONS = System136.Object.freeze({ vertexGrid: 0 });
+var CORNER_ATTRIBUTE_LOCATIONS = System136.Object.freeze({ vertexCorner: 0 });
+var RIBBON_ATTRIBUTE_LOCATIONS = System136.Object.freeze({ vertexPosition: 0, vertexRibbon: 1 });
 var NOISE_SHADER_CHUNK = `
 // \uC810 \uD574\uC2DC. \uC138 float \uC758 \uBE44\uD2B8\uB97C MurmurHash3 \uC758 fmix32 \uB9C8\uBB34\uB9AC(Austin Appleby, \uACF5\uAC1C \uB3C4\uBA54\uC778)\uB85C \uC11E\uC5B4 [0, 1) \uB85C \uB0B8\uB2E4.
 highp uint hashMix32(highp uint value) {
@@ -72658,7 +73376,7 @@ void main() {
 var DEFAULT_RAMPS = [["#ffffff", "#d8d8d8", "#a0a0a0", "#686868", "#343434", "#101010"]];
 function createNoiseGrid(seed) {
   const seededRandom = new SeededRandom(seed);
-  const grid = new System135.Float32Array(256 * 256);
+  const grid = new System136.Float32Array(256 * 256);
   for (let valueIndex = 0; valueIndex < grid.length; ++valueIndex) {
     grid[valueIndex] = seededRandom.nextValue();
   }
@@ -72666,8 +73384,8 @@ function createNoiseGrid(seed) {
 }
 __name(createNoiseGrid, "createNoiseGrid");
 function readGridNoise(grid, x, y, periodX, periodY) {
-  const column = System135.Math.floor(x);
-  const row = System135.Math.floor(y);
+  const column = System136.Math.floor(x);
+  const row = System136.Math.floor(y);
   const offsetX = x - column;
   const offsetY = y - row;
   const weightX = offsetX * offsetX * (3 - 2 * offsetX);
@@ -72700,7 +73418,7 @@ function readGridFbm(grid, x, y, periodX, periodY, octaveCount) {
 }
 __name(readGridFbm, "readGridFbm");
 function clampUnit(value) {
-  return System135.Math.min(1, System135.Math.max(0, value));
+  return System136.Math.min(1, System136.Math.max(0, value));
 }
 __name(clampUnit, "clampUnit");
 function smoothStep(edgeStart, edgeEnd, value) {
@@ -72712,7 +73430,7 @@ function readRampColor(color) {
   if (typeof color !== "string") {
     return [color[0], color[1], color[2]];
   }
-  const value = System135.parseInt(color.slice(1), 16);
+  const value = System136.parseInt(color.slice(1), 16);
   return [(value >> 16 & 255) / 255, (value >> 8 & 255) / 255, (value & 255) / 255];
 }
 __name(readRampColor, "readRampColor");
@@ -72728,16 +73446,16 @@ function paintCell(pixels, originX, originY, painter) {
       texel[3] = 0;
       painter(u, v, texel);
       const offset = ((originY + pixelY) * ATLAS_WIDTH + originX + pixelX) * 4;
-      pixels[offset] = System135.Math.round(clampUnit(texel[0]) * 255);
-      pixels[offset + 1] = System135.Math.round(clampUnit(texel[1]) * 255);
-      pixels[offset + 2] = System135.Math.round(clampUnit(texel[2]) * 255);
-      pixels[offset + 3] = System135.Math.round(clampUnit(texel[3]) * 255);
+      pixels[offset] = System136.Math.round(clampUnit(texel[0]) * 255);
+      pixels[offset + 1] = System136.Math.round(clampUnit(texel[1]) * 255);
+      pixels[offset + 2] = System136.Math.round(clampUnit(texel[2]) * 255);
+      pixels[offset + 3] = System136.Math.round(clampUnit(texel[3]) * 255);
     }
   }
 }
 __name(paintCell, "paintCell");
 function paintSlot(pixels, slot, painter) {
-  paintCell(pixels, ATLAS_WIDTH / 2 + slot % 4 * ATLAS_SLOT_SIZE, System135.Math.floor(slot / 4) * ATLAS_SLOT_SIZE, painter);
+  paintCell(pixels, ATLAS_WIDTH / 2 + slot % 4 * ATLAS_SLOT_SIZE, System136.Math.floor(slot / 4) * ATLAS_SLOT_SIZE, painter);
 }
 __name(paintSlot, "paintSlot");
 function paintRamps(pixels, ramps) {
@@ -72745,7 +73463,7 @@ function paintRamps(pixels, ramps) {
     return stops.map(readRampColor);
   });
   paintSlot(pixels, ToonVfxSlot.ramps, (u, v, color) => {
-    const rowIndex = System135.Math.min(rampColors.length - 1, System135.Math.floor(v * TOON_VFX_MAXIMUM_RAMPS));
+    const rowIndex = System136.Math.min(rampColors.length - 1, System136.Math.floor(v * TOON_VFX_MAXIMUM_RAMPS));
     const stops = rampColors[rowIndex];
     if (stops.length === 1) {
       color[0] = stops[0][0];
@@ -72755,7 +73473,7 @@ function paintRamps(pixels, ramps) {
       return;
     }
     const position = u * (stops.length - 1);
-    const stopIndex = System135.Math.min(stops.length - 2, System135.Math.floor(position));
+    const stopIndex = System136.Math.min(stops.length - 2, System136.Math.floor(position));
     const blend = position - stopIndex;
     for (let channel = 0; channel < 3; ++channel) {
       color[channel] = stops[stopIndex][channel] + (stops[stopIndex + 1][channel] - stops[stopIndex][channel]) * blend;
@@ -72765,21 +73483,21 @@ function paintRamps(pixels, ramps) {
 }
 __name(paintRamps, "paintRamps");
 function createAtlasPixels() {
-  const pixels = new System135.Uint8Array(ATLAS_WIDTH * ATLAS_HEIGHT * 4);
+  const pixels = new System136.Uint8Array(ATLAS_WIDTH * ATLAS_HEIGHT * 4);
   const grid = createNoiseGrid(4164);
   for (let frame = 0; frame < SMOKE_FRAME_COUNT; ++frame) {
     const progress = frame / (SMOKE_FRAME_COUNT - 1);
     const swirl = progress * 1.1;
-    const swirlCosine = System135.Math.cos(swirl);
-    const swirlSine = System135.Math.sin(swirl);
-    paintCell(pixels, frame % 4 * ATLAS_SLOT_SIZE, System135.Math.floor(frame / 4) * ATLAS_SLOT_SIZE, (u, v, color) => {
+    const swirlCosine = System136.Math.cos(swirl);
+    const swirlSine = System136.Math.sin(swirl);
+    paintCell(pixels, frame % 4 * ATLAS_SLOT_SIZE, System136.Math.floor(frame / 4) * ATLAS_SLOT_SIZE, (u, v, color) => {
       const centerX = u * 2 - 1;
       const centerY = v * 2 - 1;
       const turnedX = centerX * swirlCosine - centerY * swirlSine;
       const turnedY = centerX * swirlSine + centerY * swirlCosine;
       const warp = readGridFbm(grid, turnedX * 1.7 + 40, turnedY * 1.7 + 40, 256, 256, 3);
       const density = readGridFbm(grid, turnedX * 2.2 + warp * 1.4 + 90, turnedY * 2.2 - progress * 1.3 + 90, 256, 256, 4);
-      const distance = System135.Math.hypot(centerX, centerY);
+      const distance = System136.Math.hypot(centerX, centerY);
       const radius = 0.55 + 0.33 * progress;
       const shape = 1 - smoothStep(radius * 0.45, radius, distance + (density - 0.5) * 0.55);
       const shade = 0.55 + 0.4 * v + (density - 0.5) * 0.35;
@@ -72790,29 +73508,29 @@ function createAtlasPixels() {
     });
   }
   paintSlot(pixels, ToonVfxSlot.soft, (u, v, color) => {
-    const distance = System135.Math.hypot(u * 2 - 1, v * 2 - 1);
-    color[3] = System135.Math.pow(System135.Math.max(0, 1 - distance), 2.2) + System135.Math.exp(-distance * distance * 30) * 0.4;
+    const distance = System136.Math.hypot(u * 2 - 1, v * 2 - 1);
+    color[3] = System136.Math.pow(System136.Math.max(0, 1 - distance), 2.2) + System136.Math.exp(-distance * distance * 30) * 0.4;
   });
   paintSlot(pixels, ToonVfxSlot.streak, (u, v, color) => {
     const across = u * 2 - 1;
     const width = 0.16 * (0.3 + 0.7 * v);
-    const body = System135.Math.exp(-(across / width) * (across / width)) * System135.Math.pow(v, 1.6) * (1 - smoothStep(0.92, 1, v));
-    const head = System135.Math.exp(-(across * across * 40 + (v - 0.84) * (v - 0.84) * 60));
+    const body = System136.Math.exp(-(across / width) * (across / width)) * System136.Math.pow(v, 1.6) * (1 - smoothStep(0.92, 1, v));
+    const head = System136.Math.exp(-(across * across * 40 + (v - 0.84) * (v - 0.84) * 60));
     color[3] = body + head * 0.8;
   });
   paintSlot(pixels, ToonVfxSlot.star, (u, v, color) => {
     const centerX = u * 2 - 1;
     const centerY = v * 2 - 1;
-    const distance = System135.Math.hypot(centerX, centerY);
-    const angle = System135.Math.atan2(centerY, centerX);
-    const longRays = System135.Math.pow(System135.Math.abs(System135.Math.cos(angle * 2)), 60) * System135.Math.pow(System135.Math.max(0, 1 - distance), 1.4);
-    const shortRays = System135.Math.pow(System135.Math.abs(System135.Math.sin(angle * 2)), 90) * System135.Math.pow(System135.Math.max(0, 1 - distance * 1.5), 1.4) * 0.6;
-    const glow = System135.Math.exp(-distance * distance * 16) * 0.7 + System135.Math.exp(-distance * distance * 140) * 0.6;
+    const distance = System136.Math.hypot(centerX, centerY);
+    const angle = System136.Math.atan2(centerY, centerX);
+    const longRays = System136.Math.pow(System136.Math.abs(System136.Math.cos(angle * 2)), 60) * System136.Math.pow(System136.Math.max(0, 1 - distance), 1.4);
+    const shortRays = System136.Math.pow(System136.Math.abs(System136.Math.sin(angle * 2)), 90) * System136.Math.pow(System136.Math.max(0, 1 - distance * 1.5), 1.4) * 0.6;
+    const glow = System136.Math.exp(-distance * distance * 16) * 0.7 + System136.Math.exp(-distance * distance * 140) * 0.6;
     color[3] = longRays + shortRays + glow;
   });
   paintSlot(pixels, ToonVfxSlot.shockBand, (u, v, color) => {
     const torn = readGridFbm(grid, u * 12, v * 3 + 7, 12, 256, 4);
-    const lead = System135.Math.exp(-((v - 0.8) / 0.07) * ((v - 0.8) / 0.07));
+    const lead = System136.Math.exp(-((v - 0.8) / 0.07) * ((v - 0.8) / 0.07));
     const trail = v < 0.8 ? v / 0.8 * (v / 0.8) * 0.5 : 0;
     const outerCut = 1 - smoothStep(0.84 + (torn - 0.5) * 0.12, 0.96, v);
     color[3] = (lead + trail) * (0.45 + 0.75 * torn) * outerCut * smoothStep(0, 0.15, v);
@@ -72829,14 +73547,14 @@ function createAtlasPixels() {
   paintSlot(pixels, ToonVfxSlot.scorch, (u, v, color) => {
     const centerX = u * 2 - 1;
     const centerY = v * 2 - 1;
-    const distance = System135.Math.hypot(centerX, centerY);
+    const distance = System136.Math.hypot(centerX, centerY);
     const edgeNoise = readGridFbm(grid, centerX * 3 + 20, centerY * 3 + 20, 256, 256, 4);
     const threshold = 0.78 + (edgeNoise - 0.5) * 0.45;
     const grain = readGridFbm(grid, centerX * 9 + 50, centerY * 9 + 50, 256, 256, 3);
     const darkness = (1 - smoothStep(threshold - 0.32, threshold, distance)) * (0.7 + 0.3 * grain);
-    const ridge = 1 - System135.Math.abs(2 * readGridFbm(grid, centerX * 4.5 + 11, centerY * 4.5 + 3, 256, 256, 4) - 1);
+    const ridge = 1 - System136.Math.abs(2 * readGridFbm(grid, centerX * 4.5 + 11, centerY * 4.5 + 3, 256, 256, 4) - 1);
     const crack = smoothStep(0.82, 0.95, ridge) * (1 - smoothStep(0.2, threshold, distance));
-    color[0] = crack + System135.Math.exp(-distance * distance * 7) * 0.8;
+    color[0] = crack + System136.Math.exp(-distance * distance * 7) * 0.8;
     color[1] = 0;
     color[2] = 0;
     color[3] = darkness * 0.9;
@@ -72844,17 +73562,17 @@ function createAtlasPixels() {
   paintSlot(pixels, ToonVfxSlot.dent, (u, v, color) => {
     const centerX = u * 2 - 1;
     const centerY = v * 2 - 1;
-    const distance = System135.Math.hypot(centerX, centerY) + (readGridFbm(grid, centerX * 4 + 70, centerY * 4 + 70, 256, 256, 3) - 0.5) * 0.12;
-    const rim = System135.Math.exp(-((distance - 0.72) / 0.07) * ((distance - 0.72) / 0.07));
+    const distance = System136.Math.hypot(centerX, centerY) + (readGridFbm(grid, centerX * 4 + 70, centerY * 4 + 70, 256, 256, 3) - 0.5) * 0.12;
+    const rim = System136.Math.exp(-((distance - 0.72) / 0.07) * ((distance - 0.72) / 0.07));
     const inner = (1 - smoothStep(0.3, 0.76, distance)) * 0.55;
-    color[0] = rim * 0.8 + System135.Math.exp(-distance * distance * 10) * 0.5;
+    color[0] = rim * 0.8 + System136.Math.exp(-distance * distance * 10) * 0.5;
     color[1] = 0;
     color[2] = 0;
     color[3] = inner + rim * 0.3;
   });
   paintSlot(pixels, ToonVfxSlot.glow, (u, v, color) => {
-    const distance = System135.Math.hypot(u * 2 - 1, v * 2 - 1);
-    color[3] = System135.Math.exp(-distance * distance * 4.5) * (1 - smoothStep(0.85, 1, distance));
+    const distance = System136.Math.hypot(u * 2 - 1, v * 2 - 1);
+    color[3] = System136.Math.exp(-distance * distance * 4.5) * (1 - smoothStep(0.85, 1, distance));
   });
   return pixels;
 }
@@ -72865,10 +73583,10 @@ function createSphereArrays() {
   const positions = [];
   const indices = [];
   for (let downIndex = 0; downIndex <= downCount; ++downIndex) {
-    const polar = downIndex / downCount * System135.Math.PI;
+    const polar = downIndex / downCount * System136.Math.PI;
     for (let aroundIndex = 0; aroundIndex <= aroundCount; ++aroundIndex) {
-      const azimuth = aroundIndex / aroundCount * System135.Math.PI * 2;
-      positions.push(System135.Math.sin(polar) * System135.Math.cos(azimuth), System135.Math.cos(polar), System135.Math.sin(polar) * System135.Math.sin(azimuth));
+      const azimuth = aroundIndex / aroundCount * System136.Math.PI * 2;
+      positions.push(System136.Math.sin(polar) * System136.Math.cos(azimuth), System136.Math.cos(polar), System136.Math.sin(polar) * System136.Math.sin(azimuth));
     }
   }
   for (let downIndex = 0; downIndex < downCount; ++downIndex) {
@@ -72878,7 +73596,7 @@ function createSphereArrays() {
       indices.push(first, second, first + 1, second, second + 1, first + 1);
     }
   }
-  return { positions: new System135.Float32Array(positions), indices: new System135.Uint16Array(indices) };
+  return { positions: new System136.Float32Array(positions), indices: new System136.Uint16Array(indices) };
 }
 __name(createSphereArrays, "createSphereArrays");
 function createGridArrays(segments) {
@@ -72898,7 +73616,7 @@ function createGridArrays(segments) {
       indices.push(first, second, first + 1, second, second + 1, first + 1);
     }
   }
-  return { positions: new System135.Float32Array(positions), indices: new System135.Uint16Array(indices) };
+  return { positions: new System136.Float32Array(positions), indices: new System136.Uint16Array(indices) };
 }
 __name(createGridArrays, "createGridArrays");
 function readRangeValue(range, seededRandom) {
@@ -72909,18 +73627,18 @@ function readRangeValue(range, seededRandom) {
 }
 __name(readRangeValue, "readRangeValue");
 function readAxisSides(axis) {
-  const axisLength = System135.Math.hypot(axis[0], axis[1], axis[2]);
+  const axisLength = System136.Math.hypot(axis[0], axis[1], axis[2]);
   if (axisLength < 1e-6) {
     return [[1, 0, 0], [0, 0, 1]];
   }
   const axisX = axis[0] / axisLength;
   const axisY = axis[1] / axisLength;
   const axisZ = axis[2] / axisLength;
-  const helper = System135.Math.abs(axisY) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  const helper = System136.Math.abs(axisY) < 0.9 ? [0, 1, 0] : [1, 0, 0];
   let sideX = axisY * helper[2] - axisZ * helper[1];
   let sideY = axisZ * helper[0] - axisX * helper[2];
   let sideZ = axisX * helper[1] - axisY * helper[0];
-  const sideLength = System135.Math.hypot(sideX, sideY, sideZ);
+  const sideLength = System136.Math.hypot(sideX, sideY, sideZ);
   sideX /= sideLength;
   sideY /= sideLength;
   sideZ /= sideLength;
@@ -73086,9 +73804,9 @@ var ToonVfx = class {
     this.#rimColor = [DEFAULT_RIM_COLOR[0], DEFAULT_RIM_COLOR[1], DEFAULT_RIM_COLOR[2]];
     this.#buffers = [];
     this.#countRatio = 1;
-    const cornerData = new System135.Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
-    this.#particleCapacity = System135.Math.max(1, System135.Math.floor(particleCapacity));
-    this.#particleData = new System135.Float32Array(this.#particleCapacity * PARTICLE_FLOAT_COUNT);
+    const cornerData = new System136.Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+    this.#particleCapacity = System136.Math.max(1, System136.Math.floor(particleCapacity));
+    this.#particleData = new System136.Float32Array(this.#particleCapacity * PARTICLE_FLOAT_COUNT);
     this.#particleWriteIndex = 0;
     this.#particleUsedCount = 0;
     this.#isParticleDirty = false;
@@ -73096,12 +73814,12 @@ var ToonVfx = class {
     this.#particleBuffer = this.createBuffer();
     this.#particleVertexArray = this.createParticleVertexArray(cornerData, this.#particleBuffer);
     this.#glintCapacity = DEFAULT_GLINT_CAPACITY;
-    this.#glintData = new System135.Float32Array(DEFAULT_GLINT_CAPACITY * PARTICLE_FLOAT_COUNT);
-    this.#lookGains = new System135.Float32Array(LOOK_COUNT).fill(1);
-    this.#usedEventKeys = new System135.Set();
+    this.#glintData = new System136.Float32Array(DEFAULT_GLINT_CAPACITY * PARTICLE_FLOAT_COUNT);
+    this.#lookGains = new System136.Float32Array(LOOK_COUNT).fill(1);
+    this.#usedEventKeys = new System136.Set();
     this.#glintBuffer = this.createBuffer();
     this.#glintVertexArray = this.createParticleVertexArray(cornerData, this.#glintBuffer);
-    this.#ribbonData = new System135.Float32Array(RIBBON_FLOAT_COUNT * 256);
+    this.#ribbonData = new System136.Float32Array(RIBBON_FLOAT_COUNT * 256);
     this.#ribbonVertexArray = webGL2RenderingContext.createVertexArray();
     webGL2RenderingContext.bindVertexArray(this.#ribbonVertexArray);
     this.#ribbonBuffer = this.createBuffer();
@@ -73304,8 +74022,8 @@ var ToonVfx = class {
    * @param { number } particleCapacity - 한꺼번에 떠 있는 파티클의 상한. (1 이상)
    */
   setParticleCapacity(particleCapacity) {
-    this.#particleCapacity = System135.Math.max(1, System135.Math.floor(particleCapacity));
-    this.#particleData = new System135.Float32Array(this.#particleCapacity * PARTICLE_FLOAT_COUNT);
+    this.#particleCapacity = System136.Math.max(1, System136.Math.floor(particleCapacity));
+    this.#particleData = new System136.Float32Array(this.#particleCapacity * PARTICLE_FLOAT_COUNT);
     this.#particleWriteIndex = 0;
     this.#particleUsedCount = 0;
     this.#particleLiveUntil = this.#time;
@@ -73327,7 +74045,7 @@ var ToonVfx = class {
    * @param { number } countRatio - 내는 파티클 수에 곱하는 몫. (0 ~ 1)
    */
   setCountRatio(countRatio) {
-    this.#countRatio = System135.Math.max(0, System135.Math.min(1, countRatio));
+    this.#countRatio = System136.Math.max(0, System136.Math.min(1, countRatio));
   }
   //==============================================================================
   // 내는 파티클 수의 몫 반환.
@@ -73345,8 +74063,8 @@ var ToonVfx = class {
    * @param { number } glintCapacity - 프레임마다 넘기는 빛 점의 상한. (1 이상)
    */
   setGlintCapacity(glintCapacity) {
-    this.#glintCapacity = System135.Math.max(1, System135.Math.floor(glintCapacity));
-    this.#glintData = new System135.Float32Array(this.#glintCapacity * PARTICLE_FLOAT_COUNT);
+    this.#glintCapacity = System136.Math.max(1, System136.Math.floor(glintCapacity));
+    this.#glintData = new System136.Float32Array(this.#glintCapacity * PARTICLE_FLOAT_COUNT);
     this.#queuedGlintCount = 0;
   }
   //==============================================================================
@@ -73376,7 +74094,7 @@ var ToonVfx = class {
     if (look < 0 || look >= LOOK_COUNT) {
       return;
     }
-    this.#lookGains[look] = System135.Math.max(0, gain);
+    this.#lookGains[look] = System136.Math.max(0, gain);
   }
   //==============================================================================
   // 꼴마다 밝기 배 반환.
@@ -73561,7 +74279,7 @@ var ToonVfx = class {
     if (this.#countRatio >= 1) {
       return count;
     }
-    return System135.Math.max(1, System135.Math.round(count * this.#countRatio));
+    return System136.Math.max(1, System136.Math.round(count * this.#countRatio));
   }
   //==============================================================================
   // 파티클 내기.
@@ -73607,8 +74325,8 @@ var ToonVfx = class {
       floor2 = this.readFloorHeight(options.x, options.z);
     }
     const direction = options.direction !== void 0 ? options.direction : [0, 1, 0];
-    const spread = options.spread !== void 0 ? options.spread : System135.Math.PI;
-    const directionLength = System135.Math.max(1e-4, System135.Math.hypot(direction[0], direction[1], direction[2]));
+    const spread = options.spread !== void 0 ? options.spread : System136.Math.PI;
+    const directionLength = System136.Math.max(1e-4, System136.Math.hypot(direction[0], direction[1], direction[2]));
     const axisX = direction[0] / directionLength;
     const axisY = direction[1] / directionLength;
     const axisZ = direction[2] / directionLength;
@@ -73622,35 +74340,35 @@ var ToonVfx = class {
       let headingZ = 0;
       switch (shape) {
         case ToonVfxShape.ring: {
-          const angle = (particleIndex + random2() * 0.8) / count * System135.Math.PI * 2;
-          offsetX = System135.Math.cos(angle) * radius;
-          offsetZ = System135.Math.sin(angle) * radius;
-          headingX = System135.Math.cos(angle);
+          const angle = (particleIndex + random2() * 0.8) / count * System136.Math.PI * 2;
+          offsetX = System136.Math.cos(angle) * radius;
+          offsetZ = System136.Math.sin(angle) * radius;
+          headingX = System136.Math.cos(angle);
           headingY = 0;
-          headingZ = System135.Math.sin(angle);
+          headingZ = System136.Math.sin(angle);
           break;
         }
         case ToonVfxShape.disc: {
-          const angle = random2() * System135.Math.PI * 2;
-          const reach = System135.Math.sqrt(random2()) * radius;
-          offsetX = System135.Math.cos(angle) * reach;
-          offsetZ = System135.Math.sin(angle) * reach;
-          headingX = System135.Math.cos(angle);
+          const angle = random2() * System136.Math.PI * 2;
+          const reach = System136.Math.sqrt(random2()) * radius;
+          offsetX = System136.Math.cos(angle) * reach;
+          offsetZ = System136.Math.sin(angle) * reach;
+          headingX = System136.Math.cos(angle);
           headingY = 0;
-          headingZ = System135.Math.sin(angle);
+          headingZ = System136.Math.sin(angle);
           break;
         }
         case ToonVfxShape.cone: {
           const tilt = random2() * spread;
-          const turn = random2() * System135.Math.PI * 2;
-          const tiltSine = System135.Math.sin(tilt);
-          const tiltCosine = System135.Math.cos(tilt);
-          const turnCosine = System135.Math.cos(turn);
-          const turnSine = System135.Math.sin(turn);
+          const turn = random2() * System136.Math.PI * 2;
+          const tiltSine = System136.Math.sin(tilt);
+          const tiltCosine = System136.Math.cos(tilt);
+          const turnCosine = System136.Math.cos(turn);
+          const turnSine = System136.Math.sin(turn);
           headingX = axisX * tiltCosine + (sides[0][0] * turnCosine + sides[1][0] * turnSine) * tiltSine;
           headingY = axisY * tiltCosine + (sides[0][1] * turnCosine + sides[1][1] * turnSine) * tiltSine;
           headingZ = axisZ * tiltCosine + (sides[0][2] * turnCosine + sides[1][2] * turnSine) * tiltSine;
-          const reach = System135.Math.sqrt(random2()) * radius;
+          const reach = System136.Math.sqrt(random2()) * radius;
           offsetX = (sides[0][0] * turnCosine + sides[1][0] * turnSine) * reach;
           offsetY = (sides[0][1] * turnCosine + sides[1][1] * turnSine) * reach;
           offsetZ = (sides[0][2] * turnCosine + sides[1][2] * turnSine) * reach;
@@ -73658,24 +74376,24 @@ var ToonVfx = class {
         }
         case ToonVfxShape.line: {
           const along = random2() * (options.length !== void 0 ? options.length : 1);
-          const turn = random2() * System135.Math.PI * 2;
-          const reach = System135.Math.sqrt(random2()) * radius;
+          const turn = random2() * System136.Math.PI * 2;
+          const reach = System136.Math.sqrt(random2()) * radius;
           headingX = axisX;
           headingY = axisY;
           headingZ = axisZ;
-          offsetX = axisX * along + (sides[0][0] * System135.Math.cos(turn) + sides[1][0] * System135.Math.sin(turn)) * reach;
-          offsetY = axisY * along + (sides[0][1] * System135.Math.cos(turn) + sides[1][1] * System135.Math.sin(turn)) * reach;
-          offsetZ = axisZ * along + (sides[0][2] * System135.Math.cos(turn) + sides[1][2] * System135.Math.sin(turn)) * reach;
+          offsetX = axisX * along + (sides[0][0] * System136.Math.cos(turn) + sides[1][0] * System136.Math.sin(turn)) * reach;
+          offsetY = axisY * along + (sides[0][1] * System136.Math.cos(turn) + sides[1][1] * System136.Math.sin(turn)) * reach;
+          offsetZ = axisZ * along + (sides[0][2] * System136.Math.cos(turn) + sides[1][2] * System136.Math.sin(turn)) * reach;
           break;
         }
         default: {
           const heightRatio = random2() * 2 - 1;
-          const angle = random2() * System135.Math.PI * 2;
-          const ringRatio = System135.Math.sqrt(1 - heightRatio * heightRatio);
-          headingX = System135.Math.cos(angle) * ringRatio;
+          const angle = random2() * System136.Math.PI * 2;
+          const ringRatio = System136.Math.sqrt(1 - heightRatio * heightRatio);
+          headingX = System136.Math.cos(angle) * ringRatio;
           headingY = heightRatio;
-          headingZ = System135.Math.sin(angle) * ringRatio;
-          const reach = System135.Math.cbrt(random2()) * radius;
+          headingZ = System136.Math.sin(angle) * ringRatio;
+          const reach = System136.Math.cbrt(random2()) * radius;
           offsetX = headingX * reach;
           offsetY = headingY * reach;
           offsetZ = headingZ * reach;
@@ -73684,13 +74402,13 @@ var ToonVfx = class {
       }
       if (options.isUpward === true && headingY < 0) {
         headingY = -headingY;
-        offsetY = System135.Math.abs(offsetY);
+        offsetY = System136.Math.abs(offsetY);
       }
       const speed = readRangeValue(options.speed !== void 0 ? options.speed : 1, seededRandom);
       const rise = readRangeValue(options.rise !== void 0 ? options.rise : 0, seededRandom);
       const size = readRangeValue(options.size !== void 0 ? options.size : 0.2, seededRandom);
       const sizeEnd = size * readRangeValue(options.sizeEnd !== void 0 ? options.sizeEnd : 1, seededRandom);
-      const life = System135.Math.max(1e-3, readRangeValue(options.life !== void 0 ? options.life : 1, seededRandom));
+      const life = System136.Math.max(1e-3, readRangeValue(options.life !== void 0 ? options.life : 1, seededRandom));
       const delay = readRangeValue(options.delay !== void 0 ? options.delay : 0, seededRandom);
       const spin = readRangeValue(options.spin !== void 0 ? options.spin : 0, seededRandom);
       let velocityX = headingX * speed;
@@ -73735,8 +74453,8 @@ var ToonVfx = class {
       offset += 4;
     }
     this.#particleWriteIndex = (this.#particleWriteIndex + 1) % this.#particleCapacity;
-    this.#particleUsedCount = System135.Math.min(this.#particleCapacity, this.#particleUsedCount + 1);
-    this.#particleLiveUntil = System135.Math.max(this.#particleLiveUntil, start[3] + velocity[3]);
+    this.#particleUsedCount = System136.Math.min(this.#particleCapacity, this.#particleUsedCount + 1);
+    this.#particleLiveUntil = System136.Math.max(this.#particleLiveUntil, start[3] + velocity[3]);
     this.#isParticleDirty = true;
   }
   //==============================================================================
@@ -73765,7 +74483,7 @@ var ToonVfx = class {
       ramp: options.ramp !== void 0 ? options.ramp : 0,
       smokeColor: options.smokeColor !== void 0 ? options.smokeColor : [0.16, 0.14, 0.13],
       rise: options.rise !== void 0 ? options.rise : 0.6,
-      growSeconds: System135.Math.max(1e-3, options.growSeconds !== void 0 ? options.growSeconds : 0.3),
+      growSeconds: System136.Math.max(1e-3, options.growSeconds !== void 0 ? options.growSeconds : 0.3),
       boil: options.boil !== void 0 ? options.boil : 0.32,
       rim: options.rim !== void 0 ? options.rim : 0,
       seed: this.#seededRandom.nextValue() * 40,
@@ -73826,7 +74544,7 @@ var ToonVfx = class {
       return;
     }
     const seededRandom = this.#seededRandom;
-    const decal = this.createDecal(options, seededRandom.nextValue() * System135.Math.PI * 2, seededRandom.nextValue() * 40);
+    const decal = this.createDecal(options, seededRandom.nextValue() * System136.Math.PI * 2, seededRandom.nextValue() * 40);
     decal.age = age;
     this.#decals.push(decal);
   }
@@ -73990,22 +74708,22 @@ var ToonVfx = class {
     const turns = options.turns !== void 0 ? options.turns : 1;
     const axis = [options.end[0] - start[0], options.end[1] - start[1], options.end[2] - start[2]];
     const sides = readAxisSides(axis);
-    const kinkStep = System135.Math.floor(time / LIGHTNING_KINK_SECONDS);
+    const kinkStep = System136.Math.floor(time / LIGHTNING_KINK_SECONDS);
     const seededRandom = new SeededRandom(1);
     for (let boltIndex = 0; boltIndex < count; ++boltIndex) {
-      seededRandom.setSeed(System135.Math.floor(seed * 7919) + kinkStep * 131 + boltIndex * 977 >>> 0);
+      seededRandom.setSeed(System136.Math.floor(seed * 7919) + kinkStep * 131 + boltIndex * 977 >>> 0);
       const random2 = /* @__PURE__ */ __name(() => {
         return seededRandom.nextValue();
       }, "random");
-      const phase = boltIndex / count * System135.Math.PI * 2 + random2() * 0.8;
+      const phase = boltIndex / count * System136.Math.PI * 2 + random2() * 0.8;
       const boltTurns = turns * (0.8 + random2() * 0.4) * (random2() < 0.5 ? -1 : 1);
       const points = [];
       for (let pointIndex = 0; pointIndex < LIGHTNING_POINT_COUNT; ++pointIndex) {
         const along = pointIndex / (LIGHTNING_POINT_COUNT - 1);
-        const angle = phase + along * boltTurns * System135.Math.PI * 2 + (random2() - 0.5) * 0.5;
+        const angle = phase + along * boltTurns * System136.Math.PI * 2 + (random2() - 0.5) * 0.5;
         const reach = options.radius * (0.75 + random2() * 0.5);
-        const cosine = System135.Math.cos(angle) * reach;
-        const sine = System135.Math.sin(angle) * reach;
+        const cosine = System136.Math.cos(angle) * reach;
+        const sine = System136.Math.sin(angle) * reach;
         points.push([
           start[0] + axis[0] * along + sides[0][0] * cosine + sides[1][0] * sine,
           start[1] + axis[1] * along + sides[0][1] * cosine + sides[1][1] * sine,
@@ -74040,7 +74758,7 @@ var ToonVfx = class {
       [0, 0, options.size, options.size],
       [color[0], color[1], color[2], options.ramp !== void 0 ? options.ramp : -1],
       [options.look !== void 0 ? options.look : ToonVfxLook.soft, 0, 0, NO_FLOOR],
-      [options.brightness !== void 0 ? options.brightness : 1, options.alpha !== void 0 ? options.alpha : 1, angle / (System135.Math.PI * 2), 0],
+      [options.brightness !== void 0 ? options.brightness : 1, options.alpha !== void 0 ? options.alpha : 1, angle / (System136.Math.PI * 2), 0],
       [1, options.rim !== void 0 ? options.rim : 0, 0, 0]
     ];
     const glintData = this.#glintData;
@@ -74075,7 +74793,7 @@ var ToonVfx = class {
     if (!this.registerEventKey(options.key)) {
       return;
     }
-    const lightning = System135.Object.assign({ radius: 0.05, count: 1, width: 0.05, turns: 1, color: [1, 1, 1], ramp: -1, alpha: 1, brightness: 1, glow: null, rim: 0 }, options);
+    const lightning = System136.Object.assign({ radius: 0.05, count: 1, width: 0.05, turns: 1, color: [1, 1, 1], ramp: -1, alpha: 1, brightness: 1, glow: null, rim: 0 }, options);
     lightning.life = options.life !== void 0 ? options.life : 0.5;
     lightning.age = options.age !== void 0 ? options.age : 0;
     lightning.seed = options.seed !== void 0 ? options.seed : this.#seededRandom.nextValue() * 1e3;
@@ -74164,7 +74882,7 @@ var ToonVfx = class {
       if (lightning.age < 0) {
         continue;
       }
-      const fade = System135.Math.min(1, (lightning.life - lightning.age) / LIGHTNING_FADE_SECONDS);
+      const fade = System136.Math.min(1, (lightning.life - lightning.age) / LIGHTNING_FADE_SECONDS);
       this.queueLightning({ start: lightning.start, end: lightning.end, radius: lightning.radius, count: lightning.count, width: lightning.width, turns: lightning.turns, color: lightning.color, ramp: lightning.ramp, alpha: lightning.alpha * fade, brightness: lightning.brightness, time: this.#time, seed: lightning.seed, glow: lightning.glow, rim: lightning.rim });
     }
     const isQueued = this.#queuedDecals.length > 0 || this.#queuedBeams.length > 0 || this.#queuedRibbons.length > 0 || this.#queuedGlintCount > 0;
@@ -74240,7 +74958,7 @@ var ToonVfx = class {
     const viewProjectionMatrix = projectionMatrix.clone();
     viewProjectionMatrix.multiply(viewMatrix);
     const viewDirection = [viewElements[2], viewElements[6], viewElements[10]];
-    const isPerspective = System135.Math.abs(projectionElements[11]) > 0.5;
+    const isPerspective = System136.Math.abs(projectionElements[11]) > 0.5;
     let cameraPoint = [viewDirection[0], viewDirection[1], viewDirection[2], 0];
     if (isPerspective) {
       const translationX = viewElements[12];
@@ -74295,9 +75013,9 @@ var ToonVfx = class {
       if (decal.age < 0) {
         continue;
       }
-      const heat = decal.heatSeconds > 0 ? System135.Math.max(0, 1 - decal.age / decal.heatSeconds) : 0;
-      let fade = System135.Math.min(1, decal.life - decal.age) * decal.alpha;
-      if (decal.flicker > 0 && System135.Math.floor(decal.age / decal.flicker) % 2 === 1) {
+      const heat = decal.heatSeconds > 0 ? System136.Math.max(0, 1 - decal.age / decal.heatSeconds) : 0;
+      let fade = System136.Math.min(1, decal.life - decal.age) * decal.alpha;
+      if (decal.flicker > 0 && System136.Math.floor(decal.age / decal.flicker) % 2 === 1) {
         fade *= 0.3;
       }
       this.drawDecal(decal, fade, heat * heat);
@@ -74317,7 +75035,7 @@ var ToonVfx = class {
   drawDecal(decal, alpha, heat) {
     const webGL2RenderingContext = this.#webGL2RenderingContext;
     const decalProgram = this.#decalProgram;
-    const grow = decal.growSeconds > 0 ? 1 - System135.Math.pow(1 - System135.Math.min(1, System135.Math.max(0, decal.age) / decal.growSeconds), 2) : 1;
+    const grow = decal.growSeconds > 0 ? 1 - System136.Math.pow(1 - System136.Math.min(1, System136.Math.max(0, decal.age) / decal.growSeconds), 2) : 1;
     const radius = decal.startRadius + (decal.radius - decal.startRadius) * grow;
     webGL2RenderingContext.uniform4f(decalProgram.getUniformLocation("decalShape"), decal.x, decal.z, radius, decal.angle);
     webGL2RenderingContext.uniform1f(decalProgram.getUniformLocation("decalHeight"), decal.floorHeight + DECAL_LIFT);
@@ -74352,20 +75070,20 @@ var ToonVfx = class {
       if (activeAge < 0) {
         continue;
       }
-      const progress = System135.Math.min(1, activeAge / System135.Math.max(1e-3, band.life - band.delay));
-      const spread = 1 - System135.Math.pow(1 - progress, 3);
+      const progress = System136.Math.min(1, activeAge / System136.Math.max(1e-3, band.life - band.delay));
+      const spread = 1 - System136.Math.pow(1 - progress, 3);
       const radius = band.startRadius + (band.endRadius - band.startRadius) * spread;
-      const width = System135.Math.min(radius, band.width * (1 - 0.45 * progress));
-      const alpha = System135.Math.pow(1 - progress, 1.3);
+      const width = System136.Math.min(radius, band.width * (1 - 0.45 * progress));
+      const alpha = System136.Math.pow(1 - progress, 1.3);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandProgress"), progress);
-      webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandRepeat"), System135.Math.max(6, System135.Math.round(band.endRadius * 4)));
+      webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandRepeat"), System136.Math.max(6, System136.Math.round(band.endRadius * 4)));
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandRamp"), band.ramp);
       webGL2RenderingContext.uniform3f(bandProgram.getUniformLocation("bandColor"), band.color[0], band.color[1], band.color[2]);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandSeed"), band.seed);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandAlpha"), alpha);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandRim"), band.rim);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandFlat"), 1);
-      webGL2RenderingContext.uniform4f(bandProgram.getUniformLocation("bandShape"), band.x, band.z, radius, System135.Math.min(radius, width * 2.6));
+      webGL2RenderingContext.uniform4f(bandProgram.getUniformLocation("bandShape"), band.x, band.z, radius, System136.Math.min(radius, width * 2.6));
       webGL2RenderingContext.uniform2f(bandProgram.getUniformLocation("bandLift"), 0, band.floorHeight + GROUND_GLOW_LIFT);
       webGL2RenderingContext.drawElements(webGL2RenderingContext.TRIANGLES, this.#bandMesh.indexCount, webGL2RenderingContext.UNSIGNED_SHORT, 0);
       webGL2RenderingContext.uniform1f(bandProgram.getUniformLocation("bandFlat"), 0);
@@ -74394,9 +75112,9 @@ var ToonVfx = class {
       if (plume.age < 0) {
         continue;
       }
-      const progress = System135.Math.min(1, plume.age / plume.life);
+      const progress = System136.Math.min(1, plume.age / plume.life);
       const alpha = smoothStep(0, 0.08, progress) * (1 - smoothStep(0.6, 1, progress));
-      const heat = System135.Math.max(0, 1 - progress * 1.4);
+      const heat = System136.Math.max(0, 1 - progress * 1.4);
       webGL2RenderingContext.uniform4f(plumeProgram.getUniformLocation("plumeShape"), plume.x, plume.z, plume.height, plume.capRadius);
       webGL2RenderingContext.uniform4f(plumeProgram.getUniformLocation("plumeMotion"), progress, plume.age, plume.seed, plume.stemRadius);
       webGL2RenderingContext.uniform1f(plumeProgram.getUniformLocation("plumeBase"), plume.floorHeight);
@@ -74427,10 +75145,10 @@ var ToonVfx = class {
       if (fireball.age < 0) {
         continue;
       }
-      const progress = System135.Math.min(1, fireball.age / fireball.life);
-      const grow = 1 - System135.Math.pow(1 - System135.Math.min(1, fireball.age / fireball.growSeconds), 3);
+      const progress = System136.Math.min(1, fireball.age / fireball.life);
+      const grow = 1 - System136.Math.pow(1 - System136.Math.min(1, fireball.age / fireball.growSeconds), 3);
       const radius = fireball.radius * (0.25 + 0.75 * grow) * (1 + 0.25 * progress);
-      const heat = System135.Math.max(0, 1 - System135.Math.pow(progress, 1.4) * 1.25);
+      const heat = System136.Math.max(0, 1 - System136.Math.pow(progress, 1.4) * 1.25);
       const alpha = 1 - smoothStep(0.55, 1, progress);
       webGL2RenderingContext.uniform4f(fireballProgram.getUniformLocation("ballCenter"), fireball.x, fireball.y + fireball.rise * progress, fireball.z, radius);
       webGL2RenderingContext.uniform1f(fireballProgram.getUniformLocation("ballTime"), fireball.age);
@@ -74463,7 +75181,7 @@ var ToonVfx = class {
     for (const beam of this.#queuedBeams) {
       const start = beam.start;
       const axis = [beam.end[0] - start[0], beam.end[1] - start[1], beam.end[2] - start[2]];
-      const beamLength = System135.Math.hypot(axis[0], axis[1], axis[2]);
+      const beamLength = System136.Math.hypot(axis[0], axis[1], axis[2]);
       const sides = readAxisSides(axis);
       webGL2RenderingContext.uniform3f(beamProgram.getUniformLocation("beamStart"), start[0], start[1], start[2]);
       webGL2RenderingContext.uniform3f(beamProgram.getUniformLocation("beamAxis"), axis[0], axis[1], axis[2]);
@@ -74493,7 +75211,7 @@ var ToonVfx = class {
       vertexCount += ribbon.points.length * 2;
     }
     if (this.#ribbonData.length < vertexCount * RIBBON_FLOAT_COUNT) {
-      this.#ribbonData = new System135.Float32Array(vertexCount * RIBBON_FLOAT_COUNT * 2);
+      this.#ribbonData = new System136.Float32Array(vertexCount * RIBBON_FLOAT_COUNT * 2);
     }
     const ribbonData = this.#ribbonData;
     const ribbonLengths = [];
@@ -74505,10 +75223,10 @@ var ToonVfx = class {
       let ribbonLength = 0;
       for (let pointIndex = 0; pointIndex <= lastIndex; ++pointIndex) {
         const point = points[pointIndex];
-        const previous = points[System135.Math.max(0, pointIndex - 1)];
-        const next = points[System135.Math.min(lastIndex, pointIndex + 1)];
+        const previous = points[System136.Math.max(0, pointIndex - 1)];
+        const next = points[System136.Math.min(lastIndex, pointIndex + 1)];
         if (pointIndex > 0) {
-          ribbonLength += System135.Math.hypot(point[0] - previous[0], point[1] - previous[1], point[2] - previous[2]);
+          ribbonLength += System136.Math.hypot(point[0] - previous[0], point[1] - previous[1], point[2] - previous[2]);
         }
         const tangent = [next[0] - previous[0], next[1] - previous[1], next[2] - previous[2]];
         let towardX = cameraPoint[0];
@@ -74522,7 +75240,7 @@ var ToonVfx = class {
         let sideX = tangent[1] * towardZ - tangent[2] * towardY;
         let sideY = tangent[2] * towardX - tangent[0] * towardZ;
         let sideZ = tangent[0] * towardY - tangent[1] * towardX;
-        const sideLength = System135.Math.max(1e-6, System135.Math.hypot(sideX, sideY, sideZ));
+        const sideLength = System136.Math.max(1e-6, System136.Math.hypot(sideX, sideY, sideZ));
         const along = pointIndex / lastIndex;
         const edge = 2 * along - 1;
         const halfWidth = ribbon.width * 0.5 * (1 - taper * edge * edge);
@@ -74647,7 +75365,7 @@ var ToonVfx = class {
 };
 
 // src/resource/spriteatlas.js
-var System136 = globalThis;
+var System137 = globalThis;
 var searchAtlasList = [];
 function removeExtension(fileName) {
   const dotIndex = fileName.lastIndexOf(".");
@@ -74679,7 +75397,7 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
   constructor() {
     super();
     this.#pageImages = [];
-    this.#frames = new System136.Map();
+    this.#frames = new System137.Map();
     this.#isLoaded = false;
   }
   //==============================================================================
@@ -74726,14 +75444,14 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
     const frameValues = [];
     if (atlasData !== null && typeof atlasData === "object" && atlasData.images !== void 0) {
       const meta = atlasData.meta !== void 0 ? atlasData.meta : {};
-      if (System136.Array.isArray(meta.pages)) {
+      if (System137.Array.isArray(meta.pages)) {
         for (const page of meta.pages) {
           pagePaths.push(page.imageFileName);
         }
       } else if (typeof meta.imageFileName === "string") {
         pagePaths.push(meta.imageFileName);
       }
-      for (const fileName of System136.Object.keys(atlasData.images)) {
+      for (const fileName of System137.Object.keys(atlasData.images)) {
         const imageData = atlasData.images[fileName];
         const pageIndex = typeof imageData.page === "number" ? imageData.page : 0;
         frameValues.push([fileName, pageIndex, imageData.x, imageData.y, imageData.width, imageData.height]);
@@ -74742,7 +75460,7 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
       for (const pagePath of atlasData.pagePaths) {
         pagePaths.push(pagePath);
       }
-      for (const frameName of System136.Object.keys(atlasData.frames)) {
+      for (const frameName of System137.Object.keys(atlasData.frames)) {
         const values = atlasData.frames[frameName];
         frameValues.push([frameName, values[0], values[1], values[2], values[3], values[4]]);
       }
@@ -74761,7 +75479,7 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
       });
       loadPromises.push(loadPromise);
     }
-    await System136.Promise.all(loadPromises);
+    await System137.Promise.all(loadPromises);
     this.#pageImages = pageImages;
     this.#frames.clear();
     for (const values of frameValues) {
@@ -74842,7 +75560,7 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
    * @returns { string[] } 이름 목록.
    */
   getFrameNames() {
-    return System136.Array.from(this.#frames.keys());
+    return System137.Array.from(this.#frames.keys());
   }
   //==============================================================================
   // 불러왔는지.
@@ -74969,7 +75687,7 @@ var SpriteAtlas = class _SpriteAtlas extends Object2 {
 };
 
 // src/misc/indicator.js
-var System137 = globalThis;
+var System138 = globalThis;
 var Indicator = class extends Object2 {
   static {
     __name(this, "Indicator");
@@ -75057,9 +75775,9 @@ var Indicator = class extends Object2 {
     const outerRadius = this.#radius;
     const teethSegments = [];
     for (let i = 0; i < teethCount; i++) {
-      const angle = i / teethCount * System137.Math.PI * 2;
-      const cosA = System137.Math.cos(angle);
-      const sinA = System137.Math.sin(angle);
+      const angle = i / teethCount * System138.Math.PI * 2;
+      const cosA = System138.Math.cos(angle);
+      const sinA = System138.Math.sin(angle);
       const startPosition = Vector2.create(cosA * (innerRadius * 0.8), sinA * (innerRadius * 0.8));
       const endPosition = Vector2.create(cosA * outerRadius, sinA * outerRadius);
       teethSegments.push([startPosition, endPosition]);
@@ -75152,7 +75870,7 @@ var Indicator = class extends Object2 {
 };
 
 // src/misc/dynamicfont.js
-var System138 = globalThis;
+var System139 = globalThis;
 var ATLAS_MAX_WIDTH = 1024;
 var ATLAS_PADDING = 2;
 var GlyphInfo = class extends Object2 {
@@ -75324,7 +76042,7 @@ var DynamicFont = class extends Object2 {
   // 든 글자를 모두 다시 굽기. (글꼴, 크기, 자간을 바꾼 뒤 부른다)
   //==============================================================================
   rebuildAtlas() {
-    const document2 = System138.document;
+    const document2 = System139.document;
     const fontFamily = this.#fontAsset ? this.#fontAsset.fontFace.family : "-apple-system, sans-serif";
     const fontSize = this.getFontSize();
     const fontString = `${fontSize}px ${fontFamily}`;
@@ -75445,7 +76163,7 @@ var DynamicFont = class extends Object2 {
 };
 
 // import.js
-var System139 = globalThis;
+var System140 = globalThis;
 export {
   Action,
   AmbientOcclusionEffect,
@@ -75605,6 +76323,7 @@ export {
   Shaker,
   Singleton,
   SkinnedModel,
+  SkinnedModelAsset,
   SkinnedModelRenderer,
   SoftShade,
   SoftShadeShape,
@@ -75618,7 +76337,7 @@ export {
   Stack,
   Steering2D,
   SubsurfaceScatteringEffect,
-  System139 as System,
+  System140 as System,
   TIMELINE_EASING_NAMES,
   TIMELINE_NODE_DEFAULTS,
   TIMELINE_PROPERTY_DEFINITIONS,
