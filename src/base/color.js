@@ -287,6 +287,32 @@ export class Color extends Object {
 	/** @private @type { Map } */ static #hexCache = new System.Map();
 
 	//==============================================================================
+	// 색 인자 읽기. (정적, 러스트 판 From<&str> for Color 의 짝)
+	// - 색을 받는 설정 함수들이 이것으로 Color 와 색 글("#rrggbb", "#rgb", "rgba(...)" 같은)을 함께 받는다.
+	// - Color 를 주면 그 인스턴스를 그대로 돌려준다. (복사할지는 부른 쪽이 정한다) 색 글이면 fromCache 로 읽은 새 복사본을 준다.
+	//==============================================================================
+	/**
+	 * @param { Color | string } value 색이나 색 글. (fromCache 가 읽는 꼴, 그 밖의 글은 흰색)
+	 * @returns { Color } Color 면 그것, 색 글이면 새 Color.
+	 * @example <caption>색 글과 Color 를 같은 자리에 주기</caption>
+	 * import { Color, Paint } from "./build/vanilla.js";
+	 *
+	 * const fromText = Color.from("#ff8000");
+	 * console.log(fromText.toHEXString());
+	 * const red = new Color(1, 0, 0, 1);
+	 * console.log(Color.from(red) === red);
+	 * const paint = new Paint();
+	 * paint.setColor("#336699");
+	 * console.log(paint.getColor().toHEXString());
+	 */
+	static from(value) {
+		if (typeof value === "string") {
+			return Color.fromCache(value).clone();
+		}
+		return value;
+	}
+
+	//==============================================================================
 	// 색 문자열로 캐시한 색 반환. (정적, "#rgb", "#rgba", "#rrggbb", "#rrggbbaa", "rgb(...)", "rgba(...)", 그 밖은 흰색)
 	// - 같은 문자열이면 같은 인스턴스를 준다. 매 프레임 같은 문자열로 색을 정할 때 문자열을 다시 풀지 않는다.
 	// - 반환된 인스턴스는 공유되므로 절대 고쳐 쓰지 않는다. 고칠 거면 clone() 한다.

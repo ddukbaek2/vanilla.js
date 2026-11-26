@@ -48,6 +48,7 @@ export { TouchRaycaster } from "./src/core/touchraycaster.js";
 export { TouchRecognizer } from "./src/ui/touchrecognizer.js";
 export { Graphic } from "./src/core/graphic.js";
 export { Scene } from "./src/core/scene.js";
+export { GameScene } from "./src/game/gamescene.js";
 export { ComponentNode } from "./src/core/node/componentnode.js";
 export { TransformNode } from "./src/core/node/transformnode.js";
 export { WorldNode } from "./src/core/node/worldnode.js";
@@ -77,7 +78,7 @@ export { Mask } from "./src/core/component/mask.js";
 // UI/컴포넌트 목록.
 //==============================================================================
 export { UIScene } from "./src/ui/uiscene.js";
-export { UIView } from "./src/ui/uiview.js";
+export { UIView, isViewPositionInsideNode } from "./src/ui/uiview.js";
 export { UIImageView } from "./src/ui/uiimageview.js";
 export { UILabel } from "./src/ui/uilabel.js";
 export { UIControl } from "./src/ui/uicontrol.js";

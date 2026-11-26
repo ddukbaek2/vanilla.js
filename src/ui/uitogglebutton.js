@@ -150,9 +150,10 @@ export class UIToggleButton extends UIButton {
 	// 켜짐 틴트 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } color 켜져 있을 때 덮을 틴트 색. (눌림 틴트 색도 이 색이 된다, 기본 new Color(0, 0, 0, 0.3))
+	 * @param { Color | string } color 켜져 있을 때 덮을 틴트 색. (눌림 틴트 색도 이 색이 된다, 기본 new Color(0, 0, 0, 0.3))
 	 */
 	setOnTintColor(color) {
+		color = Color.from(color);
 		this.#onTintColor = color;
 		super.setPressedTintColor(color);
 	}

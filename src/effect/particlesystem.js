@@ -810,10 +810,12 @@ export class ParticleSystem extends Component {
 	// 시작 색 범위 설정. (기본 흰색)
 	//==============================================================================
 	/**
-	 * @param { Color } colorA 시작 색. (복사해 둔다)
-	 * @param { Color } colorB 둘 사이 무작위.
+	 * @param { Color | string } colorA 시작 색. (복사해 둔다)
+	 * @param { Color | string } colorB 둘 사이 무작위.
 	 */
 	setStartColor(colorA, colorB = colorA) {
+		colorA = Color.from(colorA);
+		colorB = Color.from(colorB);
 		this.#startColorA = colorA.clone();
 		this.#startColorB = colorB.clone();
 	}

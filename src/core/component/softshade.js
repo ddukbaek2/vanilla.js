@@ -2,6 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
+import { Color } from "../../base/color.js";
 import { Graphic } from "../graphic.js";
 import { Component } from "../component.js";
 import { acquireSharedBake, releaseSharedBake } from "../graphic/sharedbakecache.js";
@@ -226,6 +227,7 @@ export class SoftShade extends Component {
 	 * @param { number } fadeWidth 띠의 양옆이 엷어지는 너비. (내용 크기 단위, 내용 너비의 반까지, 0 이면 엷어지지 않는다)
 	 */
 	setShade(shape, color, opacity, fadeWidth = 0) {
+		color = Color.from(color);
 		this.#shape = shape;
 		this.#color = color;
 		this.#opacity = opacity;

@@ -118,6 +118,7 @@ export class Sprite extends Paint {
 	// 멤버 변수 목록.
 	//==============================================================================
 	/** @private @type { HTMLImageElement } */ #image;
+	/** @private @type { string } */ #imagePath; // 그림 경로. (UIDocument 가 그림 대신 적고 읽는다, 그리기에는 쓰지 않는다)
 	/** @private @type { Rect } */ #imageRect;
 	/** @private @type { boolean } */ #isHorizontalFlip;
 	/** @private @type { boolean } */ #isVerticalFlip;
@@ -134,6 +135,7 @@ export class Sprite extends Paint {
 	constructor() {
 		super();
 		this.setComponentType("Sprite");
+		this.#imagePath = "";
 		this.#image = null;
 		this.#imageRect = Rect.zero();
 		this.#isHorizontalFlip = false;
@@ -443,6 +445,33 @@ export class Sprite extends Paint {
 	 */
 	getImage() {
 		return this.#image;
+	}
+
+	//==============================================================================
+	// 그림 경로 설정. (적어 두기만 하고 그림을 읽지 않는다, UIDocument 가 그림 대신 이 경로를 적고 읽는다)
+	//==============================================================================
+	/**
+	 * @param { string } imagePath 그림 경로.
+	 */
+	setImagePath(imagePath) {
+		this.#imagePath = imagePath ?? "";
+	}
+
+	//==============================================================================
+	// 그림 경로 반환. (정하지 않았으면 빈 글)
+	//==============================================================================
+	/**
+	 * @returns { string } 그림 경로. (정하지 않았으면 빈 글)
+	 * @example <caption>그림 경로를 적고 다시 읽기</caption>
+	 * import { Sprite } from "./build/vanilla.js";
+	 *
+	 * const sprite = new Sprite();
+	 * console.log(sprite.getImagePath() === "");
+	 * sprite.setImagePath("images/coin.png");
+	 * console.log(sprite.getImagePath());
+	 */
+	getImagePath() {
+		return this.#imagePath;
 	}
 
 	//==============================================================================

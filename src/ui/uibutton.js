@@ -791,9 +791,10 @@ export class UIButton extends UIControl {
 	// 눌림 틴트 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } color 마우스가 올라 있을 때 덮을 틴트 색. (사본을 담는다, 기본 new Color(1, 1, 1, 0.12))
+	 * @param { Color | string } color 마우스가 올라 있을 때 덮을 틴트 색. (사본을 담는다, 기본 new Color(1, 1, 1, 0.12))
 	 */
 	setHoverTintColor(color) {
+		color = Color.from(color);
 		this.#hoverTintColor = color.clone();
 	}
 
@@ -831,9 +832,10 @@ export class UIButton extends UIControl {
 	// 눌림 틴트 색상 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } color 누르는 동안 덮을 틴트 색. (기본 new Color(0, 0, 0, 0.3))
+	 * @param { Color | string } color 누르는 동안 덮을 틴트 색. (기본 new Color(0, 0, 0, 0.3))
 	 */
 	setPressedTintColor(color) {
+		color = Color.from(color);
 		this.#pressedTintColor = color;
 	}
 

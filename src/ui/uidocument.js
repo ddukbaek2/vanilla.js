@@ -75,6 +75,7 @@ const NODE_REFERENCE_KEY = "$nodeRef";
 const REFLECTED_PROPERTY_EXCLUDE_NAMES = new System.Set([
 	"Parent", "Node", "Owner", "Scene", "Content", "Children", "AllComponents",
 	"Component", "Components", "Root", "Graphic", "Camera", "Target",
+	"ImagePath", // 그림 경로는 전용 핸들러가 imagePath 로 적는다. (러스트 판 #[reflect(skip)])
 ]);
 
 // 컴포넌트 타입 테이블. (문서에 기록되는 이름 → 생성자)
@@ -268,7 +269,7 @@ const COMPONENT_PROPERTY_TABLE = {
 			return {
 				color: colorToArray(component.getColor()),
 				roundSize: component.getRoundSize(),
-				imagePath: component.imagePath || "",
+				imagePath: component.getImagePath(),
 				nineSlice: nineSlice ? [nineSlice.left, nineSlice.top, nineSlice.right, nineSlice.bottom] : null,
 				spriteDrawMode: component.getSpriteDrawMode(),
 				spriteBlendMode: component.getSpriteBlendMode(),
@@ -282,7 +283,7 @@ const COMPONENT_PROPERTY_TABLE = {
 				component.setRoundSize(data.roundSize);
 			}
 			if (data.imagePath) {
-				component.imagePath = data.imagePath;
+				component.setImagePath(data.imagePath);
 				const resolvedImage = UIDocument.resolveImage(data.imagePath);
 				if (resolvedImage) {
 					component.setImage(resolvedImage);
@@ -361,11 +362,11 @@ const COMPONENT_PROPERTY_TABLE = {
 	},
 	UIImageView: {
 		save(component) {
-			return { imagePath: component.imagePath || "" };
+			return { imagePath: component.getImagePath() };
 		},
 		load(component, data) {
 			if (data.imagePath) {
-				component.imagePath = data.imagePath;
+				component.setImagePath(data.imagePath);
 				const resolvedImage = UIDocument.resolveImage(data.imagePath);
 				if (resolvedImage) {
 					component.setImage(resolvedImage);
@@ -433,13 +434,13 @@ const COMPONENT_PROPERTY_TABLE = {
 	ShadowImage: {
 		// 그림 경로 뒤에 반사 저장 꼴. (그림 원본은 문서에 담지 않고 Sprite 처럼 경로만 적는다)
 		save(component) {
-			const componentData = { imagePath: component.imagePath || "" };
+			const componentData = { imagePath: component.getImagePath() };
 			System.Object.assign(componentData, UIDocument.saveByReflection(component));
 			return componentData;
 		},
 		load(component, data) {
 			if (data.imagePath) {
-				component.imagePath = data.imagePath;
+				component.setImagePath(data.imagePath);
 				const resolvedImage = UIDocument.resolveImage(data.imagePath);
 				if (resolvedImage) {
 					component.setImage(resolvedImage);
@@ -545,7 +546,7 @@ export class UIDocument extends Object {
 	 * const jsonText = JSON.stringify(documentData);
 	 * const rootNode = UIDocument.fromJsonText(jsonText);
 	 * const sprite = rootNode.getComponent(Sprite);
-	 * console.log(sprite.imagePath);
+	 * console.log(sprite.getImagePath());
 	 */
 	static setImageResolver(resolver) {
 		imageResolver = resolver;

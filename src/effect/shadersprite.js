@@ -883,9 +883,10 @@ export class ShaderSprite extends Sprite {
 	// 효과 색 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } color 효과 색. (복사해 둔다, null 이면 무시한다)
+	 * @param { Color | string } color 효과 색. (복사해 둔다, null 이면 무시한다)
 	 */
 	setEffectColor(color) {
+		color = Color.from(color);
 		if (color === null || color === undefined) {
 			return;
 		}

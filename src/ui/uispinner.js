@@ -160,9 +160,10 @@ export class UISpinner extends WorldNode {
 	// 점 색 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } dotColor 점 색. (복제해 모든 점의 Paint 에 넣는다)
+	 * @param { Color | string } dotColor 점 색. (복제해 모든 점의 Paint 에 넣는다)
 	 */
 	setDotColor(dotColor) {
+		dotColor = Color.from(dotColor);
 		this.#dotColor = dotColor.clone();
 		for (const dotNode of this.#dotNodeList) {
 			const paintComponents = dotNode.getComponents(Paint);

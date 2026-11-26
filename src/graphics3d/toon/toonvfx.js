@@ -19,10 +19,10 @@ import { Shaker } from "../../misc/shaker.js";
  * const vfx = new ToonVfx(webGL2RenderingContext);
  * vfx.setRamps([["#ffffff", "#ffe080", "#ff8020", "#a02010", "#301008"]]);
  * vfx.prepare();
- * vfx.addFireball({ x: 0, y: 0.8, z: 0, radius: 0.9, life: 1.2, ramp: 0 });
+ * vfx.addFireball({ position: [0, 0.8, 0], radius: 0.9, life: 1.2, ramp: 0 });
  * vfx.addShockwave({ x: 0, z: 0, endRadius: 3, life: 0.6, ramp: 0 });
  * vfx.addDecal({ x: 0, z: 0, radius: 1.4, life: 8, heatSeconds: 1.5, mode: ToonVfxDecalMode.scorch, ramp: 0 });
- * vfx.emitParticles({ count: 40, x: 0, y: 0.6, z: 0, shape: ToonVfxShape.sphere, radius: 0.3, speed: [2, 5], gravity: 6, size: [0.05, 0.12], life: [0.4, 0.9], look: ToonVfxLook.streak, stretch: 0.05, ramp: 0, isGrounded: true });
+ * vfx.emitParticles({ count: 40, position: [0, 0.6, 0], shape: ToonVfxShape.sphere, radius: 0.3, speed: [2, 5], gravity: 6, size: [0.05, 0.12], life: [0.4, 0.9], look: ToonVfxLook.streak, stretch: 0.05, ramp: 0, isGrounded: true });
  * const viewMatrix = Matrix4.createLookAt(Vector3.create(4, 3, 5), Vector3.create(0, 0.5, 0), Vector3.create(0, 1, 0));
  * const projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);
  * vfx.update(1 / 60);
@@ -70,8 +70,8 @@ export const TOON_VFX_MAXIMUM_RAMPS = 8;
  * @example <caption>덮는 연기와 바닥에 멈추는 흙 알갱이</caption>
  * import { ToonVfx, ToonVfxLook } from "./vanilla.js";
  * const vfx = new ToonVfx(document.createElement("canvas").getContext("webgl2"));
- * vfx.emitParticles({ count: 8, x: 0, y: 0.5, z: 0, look: ToonVfxLook.smoke, color: [0.5, 0.48, 0.45], speed: 0.4, rise: 0.8, size: 0.6, sizeEnd: 2.5, life: [1.5, 2.5], spin: [-1, 1] });
- * vfx.emitParticles({ count: 20, x: 0, y: 0.2, z: 0, look: ToonVfxLook.grit, color: [0.35, 0.28, 0.2], speed: [2, 4], gravity: 9, isUpward: true, isGrounded: true, size: 0.06, life: 1.2 });
+ * vfx.emitParticles({ count: 8, position: [0, 0.5, 0], look: ToonVfxLook.smoke, color: [0.5, 0.48, 0.45], speed: 0.4, rise: 0.8, size: 0.6, sizeEnd: 2.5, life: [1.5, 2.5], spin: [-1, 1] });
+ * vfx.emitParticles({ count: 20, position: [0, 0.2, 0], look: ToonVfxLook.grit, color: [0.35, 0.28, 0.2], speed: [2, 4], gravity: 9, isUpward: true, isGrounded: true, size: 0.06, life: 1.2 });
  */
 export const ToonVfxLook = System.Object.freeze({
 	soft: 0, // 부드러운 알갱이. (더하는 빛)
@@ -88,8 +88,8 @@ export const ToonVfxLook = System.Object.freeze({
  * @example <caption>바닥 고리로 퍼지는 먼지와 선을 따라 늘어선 빛</caption>
  * import { ToonVfx, ToonVfxLook, ToonVfxShape } from "./vanilla.js";
  * const vfx = new ToonVfx(document.createElement("canvas").getContext("webgl2"));
- * vfx.emitParticles({ count: 32, x: 0, y: 0.1, z: 0, shape: ToonVfxShape.ring, radius: 0.5, speed: 3, drag: 4, look: ToonVfxLook.soft, size: 0.15, life: 0.5 });
- * vfx.emitParticles({ count: 40, x: 0, y: 1, z: 0, shape: ToonVfxShape.line, direction: [1, 0, 0], length: 5, radius: 0.05, speed: 0.5, look: ToonVfxLook.glow, size: 0.3, life: 0.4 });
+ * vfx.emitParticles({ count: 32, position: [0, 0.1, 0], shape: ToonVfxShape.ring, radius: 0.5, speed: 3, drag: 4, look: ToonVfxLook.soft, size: 0.15, life: 0.5 });
+ * vfx.emitParticles({ count: 40, position: [0, 1, 0], shape: ToonVfxShape.line, direction: [1, 0, 0], length: 5, radius: 0.05, speed: 0.5, look: ToonVfxLook.glow, size: 0.3, life: 0.4 });
  */
 export const ToonVfxShape = System.Object.freeze({
 	point: "point", // 한 점에서 모든 쪽으로.
@@ -1202,8 +1202,8 @@ function readAxisSides(axis) {
  * const viewMatrix = Matrix4.createLookAt(Vector3.create(0, 3, 6), Vector3.create(0, 0.5, 0), Vector3.create(0, 1, 0));
  * const projectionMatrix = Matrix4.createPerspective(Math.PI / 4, 1, 0.1, 100);
  * for (let frameIndex = 0; frameIndex < 3; ++frameIndex) {
- * 	vfx.addFireball({ x: 0, y: 0.8, z: 0, radius: 0.7, life: 1, ramp: 0, key: "explosion-1" });
- * 	vfx.emitParticles({ count: 24, x: 0, y: 0.8, z: 0, shape: ToonVfxShape.sphere, radius: 0.2, speed: [2, 4], look: ToonVfxLook.ember, ramp: 0, life: 0.8, key: "explosion-1-sparks" });
+ * 	vfx.addFireball({ position: [0, 0.8, 0], radius: 0.7, life: 1, ramp: 0, key: "explosion-1" });
+ * 	vfx.emitParticles({ count: 24, position: [0, 0.8, 0], shape: ToonVfxShape.sphere, radius: 0.2, speed: [2, 4], look: ToonVfxLook.ember, ramp: 0, life: 0.8, key: "explosion-1-sparks" });
  * 	vfx.queueBlobShadow({ x: 1, z: 0, radius: 0.4 });
  * 	vfx.update(1 / 60);
  * 	vfx.draw(viewMatrix, projectionMatrix);
@@ -1463,8 +1463,8 @@ export class ToonVfx {
 	 * 	["#ffffff", "#ffe080", "#ff8020", "#801808", "#200804"],
 	 * 	["#ffffff", [0.7, 0.95, 1], [0.3, 0.6, 1], [0.05, 0.1, 0.3]],
 	 * ]);
-	 * vfx.emitParticles({ count: 20, x: 0, y: 1, z: 0, ramp: 0, look: ToonVfxLook.ember, speed: [1, 3], life: 0.8 });
-	 * vfx.emitParticles({ count: 20, x: 2, y: 1, z: 0, ramp: 1, look: ToonVfxLook.star, speed: [0.5, 1], life: 0.6 });
+	 * vfx.emitParticles({ count: 20, position: [0, 1, 0], ramp: 0, look: ToonVfxLook.ember, speed: [1, 3], life: 0.8 });
+	 * vfx.emitParticles({ count: 20, position: [2, 1, 0], ramp: 1, look: ToonVfxLook.star, speed: [0.5, 1], life: 0.6 });
 	 */
 	setRamps(ramps) {
 		const validRamps = ramps.filter((stops) => {
@@ -1657,8 +1657,8 @@ export class ToonVfx {
 	 * import { ToonVfx, ToonVfxLook } from "./vanilla.js";
 	 * const vfx = new ToonVfx(document.createElement("canvas").getContext("webgl2"));
 	 * vfx.setRimColor([0.12, 0.06, 0.03]);
-	 * vfx.emitParticles({ count: 12, x: 0, y: 1, z: 0, look: ToonVfxLook.soft, color: [1, 0.8, 0.3], rim: 1, size: 0.3, speed: 1.5, life: 0.6 });
-	 * vfx.addFireball({ x: 0, y: 1, z: 0, radius: 0.8, life: 1, rim: 0.7 });
+	 * vfx.emitParticles({ count: 12, position: [0, 1, 0], look: ToonVfxLook.soft, color: [1, 0.8, 0.3], rim: 1, size: 0.3, speed: 1.5, life: 0.6 });
+	 * vfx.addFireball({ position: [0, 1, 0], radius: 0.8, life: 1, rim: 0.7 });
 	 */
 	setRimColor(rimColor) {
 		this.#rimColor = [rimColor[0], rimColor[1], rimColor[2]];
@@ -1686,7 +1686,7 @@ export class ToonVfx {
 	 * 	return Math.sin(x * 0.5) * 0.3 + Math.cos(z * 0.5) * 0.2;
 	 * });
 	 * vfx.addDecal({ x: 1, z: 2, radius: 1, life: 4 });
-	 * vfx.emitParticles({ count: 16, x: 1, y: 1, z: 2, isGrounded: true, gravity: 9, speed: [1, 2], look: ToonVfxLook.grit, color: [0.4, 0.3, 0.2] });
+	 * vfx.emitParticles({ count: 16, position: [1, 1, 2], isGrounded: true, gravity: 9, speed: [1, 2], look: ToonVfxLook.grit, color: [0.4, 0.3, 0.2] });
 	 * const floorHeight = vfx.readFloorHeight(1, 2);
 	 * vfx.setFloorHeightReader(null);
 	 */
@@ -1727,8 +1727,8 @@ export class ToonVfx {
 	 * @example <caption>효과가 다 사라졌는지 보기</caption>
 	 * import { ToonVfx } from "./vanilla.js";
 	 * const vfx = new ToonVfx(document.createElement("canvas").getContext("webgl2"));
-	 * vfx.addFireball({ x: 0, y: 1, z: 0, radius: 1, life: 0.5 });
-	 * vfx.emitParticles({ count: 10, x: 0, y: 1, z: 0, life: 0.3 });
+	 * vfx.addFireball({ position: [0, 1, 0], radius: 1, life: 0.5 });
+	 * vfx.emitParticles({ count: 10, position: [0, 1, 0], life: 0.3 });
 	 * vfx.update(1);
 	 * const counts = vfx.getActiveCounts();
 	 * const isQuiet = counts.particleCount === 0 && counts.fireballCount === 0;
@@ -1803,7 +1803,7 @@ export class ToonVfx {
 
 	//==============================================================================
 	// 파티클 내기.
-	//   options: { count, x, y, z, shape(ToonVfxShape), radius, direction, spread(라디안), length, isUpward, isInward,
+	//   options: { count, position([x, y, z], 기본 [0, 0, 0]), shape(ToonVfxShape), radius, direction, spread(라디안), length, isUpward, isInward,
 	//              speed, rise, gravity, drag, size, sizeEnd(시작 크기에 곱함), sizeCurve, life, delay,
 	//              color, ramp, look(ToonVfxLook), stretch, spin, floor, isGrounded, brightness, alpha, fadeIn, rim(빛의 꼴의 테, 0 이면 더하는 빛만, 1 이면 테로 덮음, 음수면 엷게 덮는 빛무리),
 	//              age(이미 지난 초, 음수면 그만큼 늦게), key(사건 열쇠, 이미 낸 열쇠면 내지 않음) }
@@ -1816,7 +1816,7 @@ export class ToonVfx {
 	 * import { ToonVfx, ToonVfxLook, ToonVfxShape } from "./vanilla.js";
 	 * const vfx = new ToonVfx(document.createElement("canvas").getContext("webgl2"));
 	 * const sparkOptions = {
-	 * 	count: 30, x: 0, y: 1, z: 0,
+	 * 	count: 30, position: [0, 1, 0],
 	 * 	shape: ToonVfxShape.cone, direction: [0, 1, 0], spread: 0.4,
 	 * 	speed: [3, 6], gravity: 9, drag: 1.5, size: [0.04, 0.08], sizeEnd: 0.3,
 	 * 	life: [0.5, 1], look: ToonVfxLook.streak, stretch: 0.04, color: [1, 0.7, 0.3],
@@ -1830,6 +1830,7 @@ export class ToonVfx {
 			return;
 		}
 		const age = options.age !== undefined ? options.age : 0;
+		const position = options.position !== undefined ? options.position : [0, 0, 0];
 		const seededRandom = this.#seededRandom;
 		const random = () => {
 			return seededRandom.nextValue();
@@ -1842,7 +1843,7 @@ export class ToonVfx {
 		const look = options.look !== undefined ? options.look : ToonVfxLook.soft;
 		let floor = options.floor !== undefined ? options.floor : NO_FLOOR;
 		if (options.floor === undefined && options.isGrounded === true) {
-			floor = this.readFloorHeight(options.x, options.z);
+			floor = this.readFloorHeight(position[0], position[2]);
 		}
 		const direction = options.direction !== undefined ? options.direction : [0, 1, 0];
 		const spread = options.spread !== undefined ? options.spread : System.Math.PI;
@@ -1942,7 +1943,7 @@ export class ToonVfx {
 				velocityZ = -offsetZ / life;
 			}
 			this.writeParticle(
-				[options.x + offsetX, options.y + offsetY, options.z + offsetZ, this.#time + delay - age],
+				[position[0] + offsetX, position[1] + offsetY, position[2] + offsetZ, this.#time + delay - age],
 				[velocityX, velocityY, velocityZ, life],
 				[options.gravity !== undefined ? options.gravity : 0, options.drag !== undefined ? options.drag : 0, size, sizeEnd],
 				[color[0], color[1], color[2], ramp],
@@ -1983,7 +1984,7 @@ export class ToonVfx {
 
 	//==============================================================================
 	// 불덩이 더하기. (잡음으로 끓는 구가 부풀며 식어 연기가 되고 위로 떠오름)
-	//   options: { x, y, z, radius, life, ramp, smokeColor, rise, growSeconds, boil, rim(덮는 꼴의 몫, 0 이면 더하는 빛만), age, key }
+	//   options: { position([x, y, z], 기본 [0, 0, 0]), radius, life, ramp, smokeColor, rise, growSeconds, boil, rim(덮는 꼴의 몫, 0 이면 더하는 빛만), age, key }
 	//==============================================================================
 	/**
 	 * @param { object } options - 불덩이 값. (꼴은 위 머리 주석의 options)
@@ -1991,17 +1992,18 @@ export class ToonVfx {
 	 * import { ToonVfx } from "./vanilla.js";
 	 * const vfx = new ToonVfx(document.createElement("canvas").getContext("webgl2"));
 	 * vfx.setRamps([["#ffffff", "#ffe080", "#ff8020", "#801808", "#200804"]]);
-	 * vfx.addFireball({ x: 0, y: 1, z: 0, radius: 1.2, life: 1.5, ramp: 0, rise: 1, growSeconds: 0.25, boil: 0.4, smokeColor: [0.2, 0.18, 0.16], key: "barrel-3" });
+	 * vfx.addFireball({ position: [0, 1, 0], radius: 1.2, life: 1.5, ramp: 0, rise: 1, growSeconds: 0.25, boil: 0.4, smokeColor: [0.2, 0.18, 0.16], key: "barrel-3" });
 	 */
 	addFireball(options) {
 		const age = options.age !== undefined ? options.age : 0;
 		if (!this.registerEventKey(options.key) || (age > 0 && age >= options.life)) {
 			return;
 		}
+		const position = options.position !== undefined ? options.position : [0, 0, 0];
 		this.#fireballs.push({
-			x: options.x,
-			y: options.y,
-			z: options.z,
+			x: position[0],
+			y: position[1],
+			z: position[2],
 			radius: options.radius,
 			life: options.life,
 			ramp: options.ramp !== undefined ? options.ramp : 0,
@@ -2179,7 +2181,7 @@ export class ToonVfx {
 
 	//==============================================================================
 	// 이번 프레임에만 그리는 회전체 빔 넘기기.
-	//   options: { start, end([x, y, z], 결은 start 에서 end 쪽으로 흐름), radius, isCore(심이면 흰빛, 아니면 램프의 겉집), alpha, brightness, ramp, wobble, flowSpeed, grainRepeat(길이 한 칸마다의 결), time, seed }
+	//   options: { start, end([x, y, z], 결은 start 에서 end 쪽으로 흐름), radius, isCore(심이면 흰빛, 아니면 램프의 겉집), alpha(기본 1), brightness, ramp, wobble, flowSpeed, grainRepeat(길이 한 칸마다의 결), time, seed }
 	//==============================================================================
 	/**
 	 * @param { object } options - 빔 값. (꼴은 위 머리 주석의 options, radius 와 alpha 가 0 보다 커야 넘어감)
@@ -2195,19 +2197,20 @@ export class ToonVfx {
 	 * vfx.draw(viewMatrix, projectionMatrix);
 	 */
 	queueBeam(options) {
-		if (!(options.radius > 0) || !(options.alpha > 0)) {
+		const beam = options.alpha !== undefined ? options : System.Object.assign({}, options, { alpha: 1 });
+		if (!(beam.radius > 0) || !(beam.alpha > 0)) {
 			return;
 		}
-		this.#queuedBeams.push(options);
+		this.#queuedBeams.push(beam);
 	}
 
 	//==============================================================================
 	// 이번 프레임에만 그리는 리본 넘기기. (점열을 카메라 쪽으로 편 띠)
-	//   options: { points([[x, y, z], ...], 둘 이상), width, taper(0 이면 고른 너비, 1 이면 두 끝이 0), color, ramp, alpha, brightness, grainRepeat, flow,
+	//   options: { points([[x, y, z], ...], 둘 이상), width, taper(0 이면 고른 너비, 1 이면 두 끝이 0), color, ramp, alpha(기본 1), brightness, grainRepeat, flow,
 	//              glow(번짐 색 [r, g, b], 주면 흰 심과 그 색 둘레와 테 색 가장자리로 덮는다, 없으면 더하는 빛), rim(glow 가 없을 때 몸을 테 색으로 덮고 심은 색인 꼴의 몫, 0 이면 더하는 빛만) }
 	//==============================================================================
 	/**
-	 * @param { object } options - 리본 값. (꼴은 위 머리 주석의 options, 점이 둘 이상이고 width 와 alpha 가 0 보다 커야 넘어감)
+	 * @param { object } options - 리본 값. (꼴은 위 머리 주석의 options, 점이 둘 이상이고 width 와 alpha(주지 않으면 1) 가 0 보다 커야 넘어감)
 	 * @example <caption>휘두른 자취를 번짐 리본과 더하는 빛 리본으로</caption>
 	 * import { ToonVfx } from "./vanilla.js";
 	 * const vfx = new ToonVfx(document.createElement("canvas").getContext("webgl2"));
@@ -2216,10 +2219,11 @@ export class ToonVfx {
 	 * vfx.queueRibbon({ points: trailPoints, width: 0.1, color: [1, 0.9, 0.6], alpha: 0.8, grainRepeat: 2, flow: vfx.getTime() * 4 });
 	 */
 	queueRibbon(options) {
-		if (options.points.length < 2 || !(options.width > 0) || !(options.alpha > 0)) {
+		const ribbon = options.alpha !== undefined ? options : System.Object.assign({}, options, { alpha: 1 });
+		if (ribbon.points.length < 2 || !(ribbon.width > 0) || !(ribbon.alpha > 0)) {
 			return;
 		}
-		this.#queuedRibbons.push(options);
+		this.#queuedRibbons.push(ribbon);
 	}
 
 	//==============================================================================
@@ -2269,7 +2273,7 @@ export class ToonVfx {
 
 	//==============================================================================
 	// 이번 프레임에만 그리는 빛 점 넘기기. (파티클과 같은 꼴, 나이 없이 그 자리에 그대로, setGlintCapacity 까지(기본 96))
-	//   options: { x, y, z, size, color, ramp, look, brightness, alpha, angle, rim(파티클의 rim 과 같음) }
+	//   options: { position([x, y, z], 기본 [0, 0, 0]), size(기본 0.2), color, ramp, look, brightness, alpha(기본 1), angle, rim(파티클의 rim 과 같음) }
 	//==============================================================================
 	/**
 	 * @param { object } options - 빛 점 값. (꼴은 위 머리 주석의 options, size 는 꼭 준다)
@@ -2278,18 +2282,20 @@ export class ToonVfx {
 	 * const vfx = new ToonVfx(document.createElement("canvas").getContext("webgl2"));
 	 * vfx.setGlintCapacity(32);
 	 * const twinkle = 0.5 + 0.5 * Math.sin(vfx.getTime() * 6);
-	 * vfx.queueGlint({ x: 0.5, y: 1.2, z: 0, size: 0.4 * twinkle, look: ToonVfxLook.star, color: [1, 0.95, 0.7], angle: 0.3, brightness: 1.5 });
+	 * vfx.queueGlint({ position: [0.5, 1.2, 0], size: 0.4 * twinkle, look: ToonVfxLook.star, color: [1, 0.95, 0.7], angle: 0.3, brightness: 1.5 });
 	 */
 	queueGlint(options) {
 		if (this.#queuedGlintCount >= this.#glintCapacity) {
 			return;
 		}
+		const position = options.position !== undefined ? options.position : [0, 0, 0];
+		const size = options.size !== undefined ? options.size : 0.2;
 		const color = options.color !== undefined ? options.color : [1, 1, 1];
 		const angle = options.angle !== undefined ? options.angle : 0;
 		const values = [
-			[options.x, options.y, options.z, this.#time],
+			[position[0], position[1], position[2], this.#time],
 			[0, 0, 0, 1000000],
-			[0, 0, options.size, options.size],
+			[0, 0, size, size],
 			[color[0], color[1], color[2], options.ramp !== undefined ? options.ramp : -1],
 			[options.look !== undefined ? options.look : ToonVfxLook.soft, 0, 0, NO_FLOOR],
 			[options.brightness !== undefined ? options.brightness : 1, options.alpha !== undefined ? options.alpha : 1, angle / (System.Math.PI * 2), 0],
@@ -2411,7 +2417,7 @@ export class ToonVfx {
 	 * const vfx = new ToonVfx(document.createElement("canvas").getContext("webgl2"));
 	 * const viewMatrix = Matrix4.createLookAt(Vector3.create(5, 5, 5), Vector3.create(0, 0, 0), Vector3.create(0, 1, 0));
 	 * const projectionMatrix = Matrix4.createOrthographic(-4, 4, -4, 4, 0.1, 50);
-	 * vfx.emitParticles({ count: 20, x: 0, y: 0.5, z: 0, look: ToonVfxLook.glow, color: [0.4, 0.8, 1], speed: 1, size: 0.4, life: 1 });
+	 * vfx.emitParticles({ count: 20, position: [0, 0.5, 0], look: ToonVfxLook.glow, color: [0.4, 0.8, 1], speed: 1, size: 0.4, life: 1 });
 	 * vfx.queueBeam({ start: [-2, 0.5, 0], end: [2, 0.5, 0], radius: 0.1, isCore: true, alpha: 1 });
 	 * vfx.update(0.1);
 	 * vfx.draw(viewMatrix, projectionMatrix);

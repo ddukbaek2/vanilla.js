@@ -218,7 +218,7 @@ export class InspectorPanel {
 		});
 		const sectionElement = this.createSection(typeName, removeButton);
 		const sectionBody = sectionElement.lastChild;
-		if (typeof component.setImage === "function") {
+		if (typeof component.setImage === "function" && typeof component.getImagePath === "function") {
 			sectionBody.append(this.createImageRow(component));
 		}
 		const propertyList = UIDocument.getReflectedProperties(component);
@@ -554,7 +554,7 @@ export class InspectorPanel {
 		const { rowElement, inputsElement } = this.createRow("Image");
 		const dropElement = System.document.createElement("div");
 		dropElement.className = "dropField";
-		dropElement.textContent = component.imagePath || "그림 애셋을 끌어다 놓기";
+		dropElement.textContent = component.getImagePath() || "그림 애셋을 끌어다 놓기";
 		dropElement.addEventListener("dragover", (dragEvent) => {
 			if (dragEvent.dataTransfer.types.includes(ASSET_DRAG_TYPE)) {
 				dragEvent.preventDefault();
@@ -573,7 +573,7 @@ export class InspectorPanel {
 			}
 			dragEvent.preventDefault();
 			this.#eventHandlers.change("그림 바꾸기", () => {
-				component.imagePath = path;
+				component.setImagePath(path);
 				component.setImage(image);
 			});
 		});
@@ -582,7 +582,7 @@ export class InspectorPanel {
 		fitButton.textContent = "원래 크기";
 		fitButton.title = "노드의 내용 크기를 그림 크기로";
 		fitButton.addEventListener("click", () => {
-			const image = component.imagePath ? this.#eventHandlers.readImage(component.imagePath) : null;
+			const image = component.getImagePath() ? this.#eventHandlers.readImage(component.getImagePath()) : null;
 			const node = this.#node;
 			if (image === null || node === null) {
 				return;

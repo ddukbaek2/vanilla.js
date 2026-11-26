@@ -2,6 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
+import { Color } from "../base/color.js";
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
 import { Graphic } from "../core/graphic.js";
@@ -187,6 +188,7 @@ export class Indicator extends Object {
 	 * @param { string | Color } color (예: "#ff0000", "rgba(255,255,255,0.8)")
 	 */
 	setColor(color) {
+		color = Color.from(color);
 		this.#color = color;
 	}
 

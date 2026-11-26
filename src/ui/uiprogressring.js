@@ -271,6 +271,7 @@ export class UIProgressRing extends Component {
 	 * @param { Color | string } color 채운 몫의 색. (Color, "#rrggbb", "rgba(...)")
 	 */
 	setFillColor(color) {
+		color = Color.from(color);
 		this.#fillColor = UIProgressRing.parseColor(color);
 	}
 
@@ -291,6 +292,7 @@ export class UIProgressRing extends Component {
 	 * @param { Color | string } color 나머지의 색. (Color, "#rrggbb", "rgba(...)")
 	 */
 	setTrackColor(color) {
+		color = Color.from(color);
 		this.#trackColor = UIProgressRing.parseColor(color);
 	}
 

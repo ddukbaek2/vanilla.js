@@ -135,9 +135,10 @@ export class TilemapLayer extends Object {
 	// 곱하는 색 설정. (Tiled 의 tintcolor, 유니티 Tilemap.color, 언리얼 layer color)
 	//==============================================================================
 	/**
-	 * @param { Color } color 색. (복사해 둔다)
+	 * @param { Color | string } color 색. (복사해 둔다)
 	 */
 	setColor(color) {
+		color = Color.from(color);
 		this.#color = new Color(color.red, color.green, color.blue, color.alpha);
 	}
 

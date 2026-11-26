@@ -2,6 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
+import { Color } from "../../base/color.js";
 import { Graphic } from "../graphic.js";
 import { Component } from "../component.js";
 import { detectTextDirection } from "../graphic.js";
@@ -375,6 +376,7 @@ export class ShadowText extends Component {
 	 * @param { string } textColor 글 색. ("#rrggbb" 나 CSS 색)
 	 */
 	setTextStyle(fontSize, isBold, textColor) {
+		textColor = Color.from(textColor);
 		this.#fontSize = fontSize;
 		this.#isBold = isBold;
 		this.#textColor = textColor;
@@ -526,6 +528,7 @@ export class ShadowText extends Component {
 	 * @param { number } shadowBlur - 0 이면 번지지 않는다.
 	 */
 	setShadow(shadowColor, shadowOpacity, shadowOffset, shadowBlur = 0) {
+		shadowColor = Color.from(shadowColor);
 		this.#shadowColor = shadowColor;
 		this.#shadowOpacity = shadowOpacity;
 		this.#shadowOffset = shadowOffset;

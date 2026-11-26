@@ -53,7 +53,6 @@ export class GameScene extends Scene {
 	/** @private @type { number } */ #loadMinDurationMs;
 	/** @private @type { boolean } */ #loadTouchedToSkip;
 	/** @private @type { boolean } */ #isLoadStartTimePending;
-	/** @private @type { Color } */ #sceneBackgroundColor;
 	/** @private @type { string } */ #viewScaleMode;
 	/** @private @type { ((graphic: Graphic, viewSize: Vector2, progress: number, elapsedSeconds: number) => void) | null } */ #loadingDrawer;
 	/** @private @type { Color | string } */ #loadingBackgroundColor;
@@ -88,7 +87,6 @@ export class GameScene extends Scene {
 		this.#loadMinDurationMs = 3000;
 		this.#loadTouchedToSkip = false;
 		this.#isLoadStartTimePending = false;
-		this.#sceneBackgroundColor = Color.black();
 		this.#viewScaleMode = ViewScaleMode.none;
 		this.#loadingDrawer = null;
 		this.#loadingBackgroundColor = Color.black();
@@ -194,6 +192,10 @@ export class GameScene extends Scene {
 	 * @param { Color | string } outsideColor
 	 */
 	setLoadingColors(backgroundColor, barBackColor, barFillColor, outsideColor = backgroundColor) {
+		backgroundColor = Color.from(backgroundColor);
+		barBackColor = Color.from(barBackColor);
+		barFillColor = Color.from(barFillColor);
+		outsideColor = Color.from(outsideColor);
 		this.#loadingBackgroundColor = backgroundColor;
 		this.#loadingBarBackColor = barBackColor;
 		this.#loadingBarFillColor = barFillColor;
@@ -207,6 +209,7 @@ export class GameScene extends Scene {
 	 * @param { Color | string } outsideColor
 	 */
 	setLoadingOutsideColor(outsideColor) {
+		outsideColor = Color.from(outsideColor);
 		this.#loadingOutsideColor = outsideColor;
 	}
 
@@ -324,16 +327,6 @@ export class GameScene extends Scene {
 		}
 		const progress = totalCount === 0 ? 1 : finishedCount / totalCount;
 		this.#loadingProgress.setProgress(progress);
-	}
-
-	//==============================================================================
-	// 캔버스 배경색 설정. (preDraw 단계에서 캔버스 전체에 적용)
-	//==============================================================================
-	/**
-	 * @param { Color } color
-	 */
-	setSceneBackgroundColor(color) {
-		this.#sceneBackgroundColor = color;
 	}
 
 	//==============================================================================
@@ -745,16 +738,7 @@ export class GameScene extends Scene {
 	 */
 	preDraw(graphic) {
 		super.preDraw(graphic);
-
-		const engine = this.getEngine();
-		const viewManager = engine.getViewManager();
-		const canvasNativeSize = viewManager.getCanvasNativeSize();
-
-		viewManager.applyCanvasNativeRect(graphic);
-		graphic.setFillColor(this.#sceneBackgroundColor);
-		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
-
-		viewManager.applyViewRect(graphic);
+		this.drawSceneBackground(graphic);
 	}
 
 	//==============================================================================
@@ -805,9 +789,10 @@ export class GameScene extends Scene {
 	// 어두워지는 막의 색 설정. (기본 검정)
 	//==============================================================================
 	/**
-	 * @param { Color } color
+	 * @param { Color | string } color
 	 */
 	setScreenFadeColor(color) {
+		color = Color.from(color);
 		this.#screenFadeColor = color;
 	}
 

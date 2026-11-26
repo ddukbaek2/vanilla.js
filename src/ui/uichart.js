@@ -244,16 +244,18 @@ export class UILineChart extends Component {
 	//==============================================================================
 	// 선 색 설정.
 	//==============================================================================
-	/** @param { Color } lineColor 선 색. (복제해 쥔다) */
+	/** @param { Color | string } lineColor 선 색. (복제해 쥔다) */
 	setLineColor(lineColor) {
+		lineColor = Color.from(lineColor);
 		this.#lineColor = lineColor.clone();
 	}
 
 	//==============================================================================
 	// 격자 색 설정. (가로 격자선 3 개)
 	//==============================================================================
-	/** @param { Color } gridColor 격자 색. (복제해 쥔다) */
+	/** @param { Color | string } gridColor 격자 색. (복제해 쥔다) */
 	setGridColor(gridColor) {
+		gridColor = Color.from(gridColor);
 		this.#gridColor = gridColor.clone();
 	}
 
@@ -410,16 +412,18 @@ export class UIBarChart extends Component {
 	//==============================================================================
 	// 막대 색 설정.
 	//==============================================================================
-	/** @param { Color } barColor 막대 색. (복제해 쥔다) */
+	/** @param { Color | string } barColor 막대 색. (복제해 쥔다) */
 	setBarColor(barColor) {
+		barColor = Color.from(barColor);
 		this.#barColor = barColor.clone();
 	}
 
 	//==============================================================================
 	// 강조 막대 색 설정.
 	//==============================================================================
-	/** @param { Color } highlightColor 강조 막대 색. (복제해 쥔다) */
+	/** @param { Color | string } highlightColor 강조 막대 색. (복제해 쥔다) */
 	setHighlightColor(highlightColor) {
+		highlightColor = Color.from(highlightColor);
 		this.#highlightColor = highlightColor.clone();
 	}
 

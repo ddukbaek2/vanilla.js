@@ -1333,9 +1333,10 @@ export class ScreenEffect extends Object {
 	//==============================================================================
 	/**
 	 * @param { string } effectType ScreenEffectType 값. (모르는 값이면 무시한다)
-	 * @param { Color } color 효과 색. (복사해 둔다, null 이면 무시한다)
+	 * @param { Color | string } color 효과 색. (복사해 둔다, null 이면 무시한다)
 	 */
 	setColor(effectType, color) {
+		color = Color.from(color);
 		const effectState = this.#effectTable.get(effectType);
 		if (effectState && color) {
 			effectState.color = color.clone();

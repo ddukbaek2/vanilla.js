@@ -327,4 +327,61 @@ export class UIDialog extends WorldNode {
 	setInstantEnabled(isInstantEnabled) {
 		this.#popupMotion.setInstantEnabled(isInstantEnabled);
 	}
+
+	//==============================================================================
+	// 연출 반환.
+	//==============================================================================
+	/**
+	 * @returns { PopupMotion } 여닫는 연출.
+	 */
+	getPopupMotion() {
+		return this.#popupMotion;
+	}
+
+	//==============================================================================
+	// 뒤를 덮는 막 노드 반환.
+	//==============================================================================
+	/**
+	 * @returns { WorldNode } 막 노드.
+	 */
+	getOverlayNode() {
+		return this.#overlayNode;
+	}
+
+	//==============================================================================
+	// 판 노드 반환.
+	//==============================================================================
+	/**
+	 * @returns { WorldNode } 판 노드.
+	 */
+	getPanelNode() {
+		return this.#panelNode;
+	}
+
+	//==============================================================================
+	// 확인 단추 노드 반환.
+	//==============================================================================
+	/**
+	 * @returns { WorldNode } 확인 단추 노드.
+	 * @example <caption>확인 단추 노드를 찾아 이름과 크기 읽기</caption>
+	 * import { UIDialog } from "./build/vanilla.js";
+	 *
+	 * const dialog = new UIDialog({ confirmText: "좋아요", cancelText: "아니요" });
+	 * const confirmNode = dialog.getConfirmNode();
+	 * const cancelNode = dialog.getCancelNode();
+	 * console.log(confirmNode.getName(), cancelNode.getName(), dialog.getPanelNode().getName());
+	 */
+	getConfirmNode() {
+		return this.#confirmNode;
+	}
+
+	//==============================================================================
+	// 취소 단추 노드 반환.
+	//==============================================================================
+	/**
+	 * @returns { WorldNode } 취소 단추 노드.
+	 */
+	getCancelNode() {
+		return this.#cancelNode;
+	}
 }

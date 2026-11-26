@@ -419,9 +419,10 @@ export class UIInputField extends WorldNode {
 	// 글자 색 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } color 값 글자의 색. (기본 #222222)
+	 * @param { Color | string } color 값 글자의 색. (기본 #222222)
 	 */
 	setTextColor(color) {
+		color = Color.from(color);
 		this.#textColor = color;
 		this.#textUILabel.setTextColor(color);
 	}
@@ -429,9 +430,10 @@ export class UIInputField extends WorldNode {
 	// 플레이스홀더 색 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } color 플레이스홀더 글자의 색. (기본 #999999)
+	 * @param { Color | string } color 플레이스홀더 글자의 색. (기본 #999999)
 	 */
 	setPlaceholderColor(color) {
+		color = Color.from(color);
 		this.#placeholderColor = color;
 		this.#placeholderUILabel.setTextColor(color);
 	}
@@ -439,9 +441,10 @@ export class UIInputField extends WorldNode {
 	// 커서 색 설정. (조합 중 밑줄 색도 함께 바꾼다)
 	//==============================================================================
 	/**
-	 * @param { Color } color 커서와 조합 밑줄의 색. (기본 #5b8def)
+	 * @param { Color | string } color 커서와 조합 밑줄의 색. (기본 #5b8def)
 	 */
 	setCursorColor(color) {
+		color = Color.from(color);
 		this.#cursorColor = color;
 		this.#compositionUnderlineColor = color;
 	}
@@ -449,9 +452,9 @@ export class UIInputField extends WorldNode {
 	// 포커스 테두리 색 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } color 포커스 테두리 색. (기본 #f97316)
+	 * @param { Color | string } color 포커스 테두리 색. (기본 #f97316)
 	 */
-	setFocusBorderColor(color) { this.#focusBorderColor = color; }
+	setFocusBorderColor(color) { this.#focusBorderColor = Color.from(color); }
 	//==============================================================================
 	// 포커스 테두리 두께 설정.
 	//==============================================================================
@@ -463,9 +466,9 @@ export class UIInputField extends WorldNode {
 	// 선택 영역 색 설정.
 	//==============================================================================
 	/**
-	 * @param { Color } color 선택 영역을 칠할 색. (기본 알파 0.35 의 파랑)
+	 * @param { Color | string } color 선택 영역을 칠할 색. (기본 알파 0.35 의 파랑)
 	 */
-	setSelectionColor(color) { this.#selectionColor = color; }
+	setSelectionColor(color) { this.#selectionColor = Color.from(color); }
 
 	//==============================================================================
 	// 플레이스홀더 반환.

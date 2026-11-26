@@ -1262,6 +1262,7 @@ export class Graphic extends Object {
 	 * @param { Color | string } color 채우기 색. (Color 나 "#rrggbb(aa)", "rgb(a)(...)" 글, 거짓 값이면 바꾸지 않는다)
 	 */
 	setFillColor(color) {
+		color = Color.from(color);
 		if (color) {
 			this.#fillColor = parseColorValue(color);
 		}
@@ -1284,6 +1285,7 @@ export class Graphic extends Object {
 	 * @param { Color | string } color 선 색. (Color 나 "#rrggbb(aa)", "rgb(a)(...)" 글, 거짓 값이면 바꾸지 않는다)
 	 */
 	setStrokeColor(color) {
+		color = Color.from(color);
 		if (color) {
 			this.#strokeColor = parseColorValue(color);
 		}
