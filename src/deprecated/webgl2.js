@@ -2,9 +2,9 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Color } from "../../base/color.js";
-import { Rect } from "../../base/rect.js";
-import { Engine } from "../../core/engine.js";
+import { Color } from "../base/color.js";
+import { Rect } from "../base/rect.js";
+import { Engine } from "../core/engine.js";
 import { Object } from "../base/object.js";
 import { Vector2 } from "../base/vector2.js";
 

@@ -12,7 +12,7 @@ import * as Math from "../base/math.js";
 // 2D 카메라.
 // - 여러 게임이 제각각 만들던 "추적 + 월드 경계 클램프 + 드래그 팬 + 커서 고정 줌 + 관성" 을 모았다.
 // - position 은 카메라가 바라보는 월드 좌표(화면 가운데), zoom 은 확대 배율, rotation 은 화면 가운데를 축으로 도는 각도(도)다.
-//   rotation 만큼 월드가 화면에서 돈다. (experimental/camera.js 의 begin 이 scale 뒤 rotate 를 거는 것과 같은 방향)
+//   rotation 만큼 월드가 화면에서 돈다. (deprecated/camera.js 의 begin 이 scale 뒤 rotate 를 거는 것과 같은 방향)
 // - 사용:
 //     camera.setViewSize(viewSize);            // 매 프레임 또는 리사이즈 시
 //     camera.follow([heroPosition], 6);        // 추적 (선택)
@@ -314,7 +314,7 @@ export class Camera2D extends Object {
 	}
 
 	//==============================================================================
-	// 그리기 시작. (상태를 쌓고 변환을 건다, experimental/camera.js 의 begin)
+	// 그리기 시작. (상태를 쌓고 변환을 건다, deprecated/camera.js 의 begin)
 	//==============================================================================
 	/**
 	 * @param { Graphic } graphic 그릴 그래픽.
@@ -325,7 +325,7 @@ export class Camera2D extends Object {
 	}
 
 	//==============================================================================
-	// 그리기 끝. (begin 이 쌓은 상태를 되돌린다, experimental/camera.js 의 end)
+	// 그리기 끝. (begin 이 쌓은 상태를 되돌린다, deprecated/camera.js 의 end)
 	//==============================================================================
 	/**
 	 * @param { Graphic } graphic 그릴 그래픽.

@@ -2,8 +2,8 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Object } from "../../base/object.js";
-import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
+import { Object } from "../base/object.js";
+import { ShaderProgram } from "../core/graphic/shaderprogram.js";
 import { MORPH_TARGET_MAXIMUM } from "./skinnedmodel.js";
 
 

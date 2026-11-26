@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Component } from "../../../core/component.js";
+import { Component } from "../../core/component.js";
 import { Camera3D } from "../camera3d.js";
 import { ToonRenderer } from "./toonrenderer.js";
 

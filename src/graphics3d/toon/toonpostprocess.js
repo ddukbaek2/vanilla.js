@@ -5,7 +5,7 @@ const System = globalThis;
 import { RenderTarget } from "../rendertarget.js";
 import { BloomEffect } from "../bloomeffect.js";
 import { MultiLevelBloomEffect } from "../multilevelbloomeffect.js";
-import { FullscreenPass } from "../fullscreenpass.js";
+import { FullscreenPass } from "../../core/fullscreenpass.js";
 
 
 /**

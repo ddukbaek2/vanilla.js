@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { ShaderProgram } from "../../../core/graphic/shaderprogram.js";
+import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
 import { TOON_ATTRIBUTE_LOCATIONS, TOON_MAXIMUM_JOINTS, TOON_INSTANCE_FLOAT_COUNT, extractFrustumPlanes, readMatrixDeterminant } from "./toonrenderer.js";
 
 

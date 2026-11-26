@@ -2,9 +2,9 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Object } from "../../base/object.js";
-import { Vector2 } from "../../base/vector2.js";
-import { Component } from "../../core/component.js";
+import { Object } from "../base/object.js";
+import { Vector2 } from "../base/vector2.js";
+import { Component } from "../core/component.js";
 
 
 //==============================================================================

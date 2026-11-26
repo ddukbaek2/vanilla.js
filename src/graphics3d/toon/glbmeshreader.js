@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Matrix4 } from "../../../base/matrix4.js";
+import { Matrix4 } from "../../base/matrix4.js";
 import { MeshBuilder } from "./meshbuilder.js";
 
 

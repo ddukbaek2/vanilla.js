@@ -3,7 +3,7 @@
 엔진 전체의 클래스 구성과 소유 구조를 정리한 설계 문서다. API 레퍼런스가 아니라 "무엇이 무엇을 만들고, 들고 있고, 어떤 순서로 굴러가는가"를 보기 위한 문서다.
 
 - 기준일: 2026-11-26 (dev)
-- 기준 소스: `src/` 전체(.js 200 파일) + `import.js`
+- 기준 소스: `src/` 전체(.js 200 파일, 초안 자리 src/experimental 은 빼고) + `import.js`
 
 ---
 
@@ -12,27 +12,29 @@
 ```
 import.js                  # 단일 공개 API 배럴. 소비자는 이 파일 하나만 import
 src/base/                  # 엔진 비의존 기반 타입 (Object, Node, 수학, 색, 플랫폼, Format, FSM, 타이머, 난수)
-src/core/                  # 엔진 본체 (Engine, 매니저, Scene, Node 계열, Graphic, Component, 입력, 소리)
+src/core/                  # 엔진 본체 (Engine, 매니저, Scene, Node 계열, Graphic, Component, 입력, 소리, FullscreenPass)
 src/core/node/             # ComponentNode → TransformNode → WorldNode
 src/core/component/        # Paint, Sprite, Text, RichText, Mask, Outline, SoftShade, ShadowText, ShadowImage
 src/core/graphic/          # ShaderProgram, ShaderWarmer, ImageTextureCache, TextStringTextureCache, sharedbakecache(구운 그림 나눠 쓰기)
-src/resource/              # Asset 파생 (Image/Audio/Text/Json/Font/Blob) + AnimationClip, AssetLoader, SpriteAtlas
+src/resource/              # Asset 파생 (Image/Audio/Text/Json/Font/Blob/Bunch/Visual) + AnimationClip, AssetLoader, SpriteAtlas
 src/effect/                # ParticleSystem, TrailRenderer, ShaderSprite, ScreenEffect, HeatHazeEffect
 src/ui/                    # 두 갈래 UI (Component 계열 UIView / Node 계열 UINode) + 창 쌓기, 모션 + autolayout/
 src/misc/                  # DEVTools, NodeLayout, DynamicFont, LanguagePack, UIFont, CameraGestures, FrameProbe,
-                           #     GraphicsQualityGovernor, FixedStepper, LoadingProgress, BuildInfo, VirtualPad 등 부가 기능
+                           #     GraphicsQualityGovernor, FixedStepper, LoadingProgress, BuildInfo, VirtualPad, Visual, Indicator 등 부가 기능
 src/web/                   # DOM 영역 유틸 (Pane, WebSocketClient). 캔버스 밖 세계
 src/game/                  # GameScene (게임용 공통 베이스 씬)
-src/experimental/          # 컬렉션, Action, Animator, Timeline, Visual, Indicator, Camera, BunchAsset + graphics/ (WebGL2 3D 스택)
-src/experimental/graphics/ # 3D: FbxLoader, SkinnedModel, Material, SkinnedModelRenderer, HumanSkinRenderer, Camera3D,
-                           #     ShadowMap, RenderTarget, FullscreenPass, BloomEffect, MultiLevelBloomEffect,
-                           #     AmbientOcclusionEffect, SubsurfaceScatteringEffect
-src/experimental/graphics/toon/ # 툰 3D: MeshBuilder(ToonMesh), glbmeshreader(ToonGlb), ToonRenderer, ToonLightSet, ToonMaterial,
+src/base/collection/       # List, Dictionary, Queue, Stack, Set (러스트 판은 표준 Vec, HashMap 같은 것이 맡는다)
+src/animation/             # Timeline, Animator, Action
+src/graphics3d/            # 3D (WebGL2): FbxLoader, SkinnedModel, Material, SkinnedModelRenderer, HumanSkinRenderer, Camera3D,
+                           #     ShadowMap, RenderTarget, BloomEffect, MultiLevelBloomEffect,
+                           #     AmbientOcclusionEffect, SubsurfaceScatteringEffect (FullscreenPass 는 core)
+src/graphics3d/toon/       # 툰 3D: MeshBuilder(ToonMesh), glbmeshreader(ToonGlb), ToonRenderer, ToonLightSet, ToonMaterial,
                            #     ToonDrawQueue, ToonScreenOutline, ToonVfx, ToonPostProcess, ToonView3D
-src/deprecated/            # AnchoredWorldNode (폐기)
+src/experimental/          # 0.4.0 뒤 기능의 초안 (import.js 의 Experimental 이름 공간, API 가 바뀔 수 있다)
+src/deprecated/            # AnchoredWorldNode (폐기), Camera (폐기 예정, Camera2D 가 덮는다), 죽은 코드 aabb, transform2d, gl2d, webgl2
 ```
 
-레이어 방향은 아래에서 위로만 의존한다: `base` ← `core` ← (`resource`, `effect`, `ui`, `game`, `misc`, `experimental`). `src/web` 은 엔진 노드 트리와 무관한 DOM 세계다.
+레이어 방향은 아래에서 위로만 의존한다: `base` ← `core` ← (`resource`, `effect`, `ui`, `game`, `misc`, `animation`, `graphics3d`, `experimental`). `src/web` 은 엔진 노드 트리와 무관한 DOM 세계다.
 
 ---
 
@@ -44,7 +46,7 @@ src/deprecated/            # AnchoredWorldNode (폐기)
 4. **임포터는 임포터일 뿐**: `FbxLoader` 는 파싱만 한다. GL 리소스나 셰이딩 로직을 갖지 않는다. 포맷별 해석 결과는 공통 중립 스키마로 수렴한 뒤 모델이 소비한다.
 5. **Shader, Material, Model 계층 (유니티/언리얼 사상)**: Material 은 셰이더(템플릿)를 참조하는 인스턴스이고, 모델은 드로어블별로 Material 인스턴스를 참조하며, 렌더러가 이를 그린다.
 6. **모델과 렌더 기능의 분리**: `SkinnedModel` 은 데이터 + 포즈 상태만 갖는다. 그리는 것은 `SkinnedModelRenderer` 라는 별도 객체다. 환경 상태(태양/안개/그림자)도 모델이 아닌 렌더러 소유다. 툰 3D 도 같아서 메시 배열(ToonMesh, ToonGlb)과 렌더러(ToonRenderer), 빛 값(ToonLightSet)이 따로다.
-7. **2D 와 3D 는 하나의 GL 컨텍스트를 공유**: core 의 `Graphic`(2D)과 experimental/graphics(3D)는 같은 `WebGL2RenderingContext` 위에 공존한다. 2D 그리기 사이에 끼우는 3D 는 `Graphic.runExternalPass` 로 감싼다.
+7. **2D 와 3D 는 하나의 GL 컨텍스트를 공유**: core 의 `Graphic`(2D)과 graphics3d(3D)는 같은 `WebGL2RenderingContext` 위에 공존한다. 2D 그리기 사이에 끼우는 3D 는 `Graphic.runExternalPass` 로 감싼다.
 8. **러스트 판과 같게**: 러스트 판 [vanilla-engine](https://github.com/ddukbaek2/vanilla-engine) 은 이 엔진을 옮긴 것이고, 두 엔진은 기능 차이를 두지 않는다. 한쪽에만 생긴 범용 기능과 한쪽에서 찾은 버그는 양쪽에 같이 넣는다. (9장)
 
 ---
@@ -68,7 +70,7 @@ Object (base/object.js)
 │   ├── Mask, Outline, SoftShade, ShadowText, ShadowImage
 │   ├── ParticleSystem, TrailRenderer, HeatHazeEffect (effect)
 │   ├── SpriteAnimator, PlatformerBody (misc)
-│   ├── Visual (experimental), ToonView3D (experimental/graphics/toon)
+│   ├── Visual (misc), ToonView3D (graphics3d/toon)
 │   ├── UIProgressRing, UIHitArea, UIListView, UILineChart, UIBarChart, ButtonMotion, ToastMotion (ui)
 │   └── UIView (ui): UI 위젯 기반
 │       ├── UILabel, UIImageView, UIProgressView
@@ -86,7 +88,7 @@ Object (base/object.js)
 ├── 엔진/매니저: Engine, EngineConfiguration, SceneManager, TimeManager,
 │                ViewManager, InputManager, InputActions, GamepadManager, AudioManager
 ├── 렌더: Graphic, ShaderProgram, ImageTextureCache, TextStringTextureCache
-├── 3D (experimental/graphics): FbxLoader, SkinnedModel, SkinnedModelRenderer → HumanSkinRenderer,
+├── 3D (graphics3d, FullscreenPass 는 core): FbxLoader, SkinnedModel, SkinnedModelRenderer → HumanSkinRenderer,
 │                Material, ShadowMap, RenderTarget, FullscreenPass, BloomEffect, MultiLevelBloomEffect,
 │                AmbientOcclusionEffect, SubsurfaceScatteringEffect
 ├── 수학/자료: Vector2/3, Matrix4, Quaternion, TransformMatrix, Rect, OBB, Color,
@@ -177,7 +179,7 @@ UIWindowLayer (노드) ── UIWindow[] (맨 위 창만 보임, UIScale 만큼 
 - 여럿을 함께 받을 때는 `AssetLoader` 가 동시 수(기본 6)만큼 받고 진행률과 실패 목록을 센다. 받은 애셋은 여전히 부르는 쪽이 든다. `SpriteAtlas` 는 tools/atlas.cjs 가 구운 JSON 과 쪽 그림을 읽는다.
 - 캐시는 GPU 리소스 레벨에만 존재하고 `Graphic` 이 소유한다 (ImageTextureCache / TextStringTextureCache). ShadowText, ShadowImage, SoftShade 가 구운 그림은 같은 모양끼리 sharedbakecache.js 에서 나눠 쓴다.
 
-### 4-5. 3D 스택 (experimental/graphics)
+### 4-5. 3D 스택 (graphics3d)
 
 ```
 씬(샘플 코드)
@@ -201,7 +203,7 @@ UIWindowLayer (노드) ── UIWindow[] (맨 위 창만 보임, UIScale 만큼 
 ├── FullscreenPass ── 풀스크린 삼각형 패스
 └── BloomEffect, MultiLevelBloomEffect ── 밝은 영역 추출 → 블러(다단은 반씩 줄이고 천막 꼴로 키움) → 합성 체인
 
-툰 3D (experimental/graphics/toon)
+툰 3D (graphics3d/toon)
 ├── ToonMesh(MeshBuilder), ToonGlb ── 꼭짓점 배열 짓기와 GLB 읽기 (UV, 재질 범위 포함, GL 무관)
 ├── ToonRenderer ── 몸, 바깥선 껍데기, 그림자 깊이 프로그램 + 머티리얼과 인스턴스 꼴마다 지은 프로그램
 │   ├── ToonLightSet (기본 빛 묶음: 해, 채움 빛, 림, 정반사, 점광 8 개, 띠 램프, 빛 꼴)
@@ -255,7 +257,7 @@ engine.run(scene)  → 기본 폰트 로드 + sceneManager.loadScene(scene) + rA
 - 클리핑은 스텐실 버퍼 기반 (회전/스케일된 마스크 정확히 처리). 텍스트는 오프스크린 2D 캔버스에 구워 텍스처로 출력.
 - 블렌드는 Canvas2D 합성 문자열 26종을 모두 그린다. 13종(포터 더프 연산자, lighter, multiply, screen)은 고정 블렌딩, 나머지 13종(overlay, darken, lighten, color-dodge, color-burn, hard-light, soft-light, difference, exclusion, hue, saturation, color, luminosity)은 그리기마다 그릴 영역 아래를 지금 프레임버퍼에서 `blitFramebuffer` 로 떠 와 W3C Compositing and Blending Level 1 공식대로 셰이더로 섞는다(섞기 모드에서는 묶어 그리지 않음, 바꿔 끼운 셰이더는 덧그림 칸에 먼저 그린 뒤 섞어 옮김). multiply 는 기본 프레임버퍼에서는 고정 블렌딩이고, 렌더 타겟(프레임버퍼를 묶은 동안)에 그릴 때만 셰이더로 섞는다(고정 블렌딩은 바탕이 반투명하면 W3C 식과 달라서). Canvas2D 와 달리 source-in, source-out, destination-in, destination-atop, copy 는 그린 도형 안만 바꾼다.
 
-### 6-2. 3D: experimental/graphics
+### 6-2. 3D: graphics3d
 
 임포트 파이프라인 (포맷 중립화가 핵심):
 
@@ -285,7 +287,8 @@ soldier.glb ──> parseBinary ──> glTF JSON+BIN
 
 ## 7. 공개 API 표면 (import.js)
 
-- 저장소 루트의 단일 배럴 파일. 주석 섹션 8블록(내장/기반/코어/기본 컴포넌트/UI/리소스/기타/실험)이 곧 논리 레이어 구분이고, 실험 블록 뒤에 갈래마다 한 줄 주석을 단 내보내기가 이어진다.
+- 저장소 루트의 단일 배럴 파일. 주석 섹션 13블록(내장/기반/코어/기본 컴포넌트/UI/리소스/기타/컬렉션/애니메이션/셰이더와 풀스크린 패스/3D 그래픽스/폐기 예정/실험)이 곧 논리 레이어 구분이고, 실험 블록 뒤에 갈래마다 한 줄 주석을 단 내보내기가 이어진다.
+- 실험 블록은 `export * as Experimental` 한 줄이다. 0.4.0 뒤 기능의 초안을 src/experimental/experimental.js 에 모아 `Experimental.이름` 으로 낸다. 초안은 API 가 바뀔 수 있고, 다 자라면 제자리 폴더로 옮겨 import.js 에서 바로 낸다.
 - 열거는 클래스와 같은 줄에 함께 export 한다 (`export { ViewScaleMode, ViewManager }`).
 - 함수 묶음 모듈은 이름 공간으로 낸다 (`export * as Format`, `LanguagePack`, `UIFont`, `ToonMesh`, `ToonGlb`).
 - **의도적 미노출** = 내부 구현 취급: `AudioManager`(Engine 경유 사용), `Layer`, `DEVTools`, `GameScene`, `FbxLoader`(SkinnedModel 경유), 텍스처 캐시 2종과 sharedbakecache, autolayout 내부 타입(`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`), src/web 전체(`Pane`, `WebSocketClient`). 미노출 클래스가 필요한 프로젝트는 파일 경로로 직접 import 한다.
@@ -300,10 +303,10 @@ soldier.glb ──> parseBinary ──> glTF JSON+BIN
 | `core/layer.js` | 빈 스텁. base/Object 미임포트로 전역 Object 상속. 미사용, 미노출 |
 | `Object.destroy()` | 파괴 표시를 남기지 않는 훅이라 `isDestroyed()` 는 항상 false (고유식별자는 처음 `getInstanceId()` 에서 모듈 WeakMap 에 넣는다) |
 | `Scene` 초기화 | 루트 노드가 생성자가 아닌 `create()` 에서 생성됨. SceneManager 경유가 암묵 계약 |
-| `experimental/graphics/webgl2.js` | import 경로 깨짐 + 미노출. 데드 코드 |
-| `experimental/graphics/gl2d.js` | export 없음. 데드 코드 |
-| `experimental/aabb.js`, `transform2d.js` | 전체 주석 처리. 데드 파일 |
-| `experimental/camera.js` | misc/camera2d.js 의 Camera2D 가 회전과 begin/end 까지 모두 덮는 중복. 러스트 판에는 옮기지 않는다 |
+| `deprecated/webgl2.js` | 미노출. 데드 코드 (옛 자리 experimental/graphics 에서는 import 경로도 깨져 있었다) |
+| `deprecated/gl2d.js` | export 없음. 데드 코드 |
+| `deprecated/aabb.js`, `transform2d.js` | 전체 주석 처리. 데드 파일 |
+| `deprecated/camera.js` | misc/camera2d.js 의 Camera2D 가 회전과 begin/end 까지 모두 덮는 중복. 폐기 예정 (import.js 는 아직 Camera 로 낸다). 러스트 판에는 옮기지 않는다 |
 | `misc/uibuilder.js` | NodeLayout 으로 대체됨 (주석 1줄만 남음) |
 | `base/calculator.js` | 0 을 돌려주는 빈 함수. 미노출 |
 | 3D 머티리얼 공유 | 텍스처/머티리얼/클립의 모델 간 공유 캐시 없음. 모델 단위 소유 (공유 소비자가 생기면 도입) |
@@ -312,7 +315,8 @@ soldier.glb ──> parseBinary ──> glTF JSON+BIN
 
 ## 9. 러스트 판과의 관계
 
-- 러스트 판(vanilla-engine)은 이 엔진의 `src/` 200 파일 가운데 181 파일을 옮겼다. 일부러 옮기지 않은 19 파일은 빈 파일과 데드 코드(calculator, layer, resources, uibuilder, aabb, transform2d, gl2d, webgl2, deprecated 의 anchoredworldmnode), 러스트 언어가 맡는 것(object, reflection, singleton, wait, collection 다섯), Camera2D 가 덮는 experimental/camera.js 다.
+- 러스트 판(vanilla-engine)은 이 엔진의 `src/` 200 파일(초안 자리 src/experimental 은 빼고) 가운데 182 파일을 옮겼다. 일부러 옮기지 않은 18 파일은 빈 파일(calculator, layer, resources, uibuilder), 데드 코드(deprecated 의 aabb, transform2d, gl2d, webgl2, anchoredworldmnode), 러스트 언어와 표준이 맡는 것(object, reflection, singleton, base/collection 다섯), Camera2D 가 덮는 deprecated/camera.js 다.
+- 폴더는 러스트 판과 같다. (graphics3d, graphics3d/toon, animation, misc, resource, 초안 자리 experimental) 원본 core/graphic/* 만 러스트 판에서 core/ 바로 아래에 있다.
 - 두 엔진의 공개 API 와 동작은 같게 둔다. 이름만 러스트 규칙(snake_case, UpperCamelCase, SCREAMING_SNAKE_CASE)으로 바뀐다. (setFillColor → set_fill_color)
 - 남은 차이(정말 맞출 수 없는 것과 러스트에 맞게 정한 꼴)는 러스트 판 저장소의 ARCHITECTURE.md 9장과 10장에 모았다. 요점: 러스트 판은 async 대신 받기 손잡이와 콜백, 리플렉션 대신 등록 표, 전역 엔진 대신 인자로 넘기기, 노드는 핸들(NodeId), 데스크탑에는 DOM 과 브라우저 설정과 세이프 에어리어가 없다.
 

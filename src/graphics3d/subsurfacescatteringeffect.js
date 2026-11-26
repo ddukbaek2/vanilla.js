@@ -2,9 +2,9 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Object } from "../../base/object.js";
+import { Object } from "../base/object.js";
 import { RenderTarget } from "./rendertarget.js";
-import { FullscreenPass } from "./fullscreenpass.js";
+import { FullscreenPass } from "../core/fullscreenpass.js";
 
 
 //==============================================================================

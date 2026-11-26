@@ -3,7 +3,7 @@
 This design document organizes the class composition and ownership structure of the whole engine. It is not an API reference but a document for seeing "what creates what, what holds what, and in what order things run".
 
 - Reference date: 2026-11-26 (dev)
-- Reference source: all of `src/` (200 .js files) + `import.js`
+- Reference source: all of `src/` (200 .js files, not counting the draft area src/experimental) + `import.js`
 
 ---
 
@@ -12,27 +12,29 @@ This design document organizes the class composition and ownership structure of 
 ```
 import.js                  # Single public API barrel. Consumers import only this one file
 src/base/                  # Engine-independent base types (Object, Node, math, color, platform, Format, FSM, timer, random)
-src/core/                  # Engine body (Engine, managers, Scene, Node family, Graphic, Component, input, sound)
+src/core/                  # Engine body (Engine, managers, Scene, Node family, Graphic, Component, input, sound, FullscreenPass)
 src/core/node/             # ComponentNode → TransformNode → WorldNode
 src/core/component/        # Paint, Sprite, Text, RichText, Mask, Outline, SoftShade, ShadowText, ShadowImage
 src/core/graphic/          # ShaderProgram, ShaderWarmer, ImageTextureCache, TextStringTextureCache, sharedbakecache(sharing baked images)
-src/resource/              # Asset derivatives (Image/Audio/Text/Json/Font/Blob) + AnimationClip, AssetLoader, SpriteAtlas
+src/resource/              # Asset derivatives (Image/Audio/Text/Json/Font/Blob/Bunch/Visual) + AnimationClip, AssetLoader, SpriteAtlas
 src/effect/                # ParticleSystem, TrailRenderer, ShaderSprite, ScreenEffect, HeatHazeEffect
 src/ui/                    # Two-branch UI (Component-family UIView / Node-family UINode) + window stacking, motion + autolayout/
 src/misc/                  # DEVTools, NodeLayout, DynamicFont, LanguagePack, UIFont, CameraGestures, FrameProbe,
-                           #     GraphicsQualityGovernor, FixedStepper, LoadingProgress, BuildInfo, VirtualPad and other add-on features
+                           #     GraphicsQualityGovernor, FixedStepper, LoadingProgress, BuildInfo, VirtualPad, Visual, Indicator and other add-on features
 src/web/                   # DOM-area utilities (Pane, WebSocketClient). The world outside the canvas
 src/game/                  # GameScene (common base scene for games)
-src/experimental/          # Collections, Action, Animator, Timeline, Visual, Indicator, Camera, BunchAsset + graphics/ (WebGL2 3D stack)
-src/experimental/graphics/ # 3D: FbxLoader, SkinnedModel, Material, SkinnedModelRenderer, HumanSkinRenderer, Camera3D,
-                           #     ShadowMap, RenderTarget, FullscreenPass, BloomEffect, MultiLevelBloomEffect,
-                           #     AmbientOcclusionEffect, SubsurfaceScatteringEffect
-src/experimental/graphics/toon/ # Toon 3D: MeshBuilder(ToonMesh), glbmeshreader(ToonGlb), ToonRenderer, ToonLightSet, ToonMaterial,
+src/base/collection/       # List, Dictionary, Queue, Stack, Set (in the Rust version the standard Vec, HashMap and the like do this)
+src/animation/             # Timeline, Animator, Action
+src/graphics3d/            # 3D (WebGL2): FbxLoader, SkinnedModel, Material, SkinnedModelRenderer, HumanSkinRenderer, Camera3D,
+                           #     ShadowMap, RenderTarget, BloomEffect, MultiLevelBloomEffect,
+                           #     AmbientOcclusionEffect, SubsurfaceScatteringEffect (FullscreenPass is in core)
+src/graphics3d/toon/       # Toon 3D: MeshBuilder(ToonMesh), glbmeshreader(ToonGlb), ToonRenderer, ToonLightSet, ToonMaterial,
                            #     ToonDrawQueue, ToonScreenOutline, ToonVfx, ToonPostProcess, ToonView3D
-src/deprecated/            # AnchoredWorldNode (deprecated)
+src/experimental/          # Drafts of features after 0.4.0 (the Experimental namespace of import.js, the API may change)
+src/deprecated/            # AnchoredWorldNode (deprecated), Camera (to be deprecated, Camera2D covers it), dead code aabb, transform2d, gl2d, webgl2
 ```
 
-Layers depend only from bottom to top: `base` ← `core` ← (`resource`, `effect`, `ui`, `game`, `misc`, `experimental`). `src/web` is a DOM world unrelated to the engine node tree.
+Layers depend only from bottom to top: `base` ← `core` ← (`resource`, `effect`, `ui`, `game`, `misc`, `animation`, `graphics3d`, `experimental`). `src/web` is a DOM world unrelated to the engine node tree.
 
 ---
 
@@ -44,7 +46,7 @@ Layers depend only from bottom to top: `base` ← `core` ← (`resource`, `effec
 4. **An importer is only an importer**: `FbxLoader` only parses. It holds no GL resources or shading logic. Per-format interpretation results converge into a common neutral schema, which the model then consumes.
 5. **Shader, Material, Model hierarchy (Unity/Unreal philosophy)**: A Material is an instance that references a shader (template), the model references a Material instance per drawable, and the renderer draws them.
 6. **Separation of model and render functionality**: `SkinnedModel` holds only data + pose state. Drawing is done by a separate object, `SkinnedModelRenderer`. Environment state (sun/fog/shadow) is also owned by the renderer, not the model. Toon 3D is the same: the mesh arrays (ToonMesh, ToonGlb), the renderer (ToonRenderer) and the light values (ToonLightSet) are separate.
-7. **2D and 3D share one GL context**: core's `Graphic` (2D) and experimental/graphics (3D) coexist on the same `WebGL2RenderingContext`. 3D inserted between 2D draws is wrapped with `Graphic.runExternalPass`.
+7. **2D and 3D share one GL context**: core's `Graphic` (2D) and graphics3d (3D) coexist on the same `WebGL2RenderingContext`. 3D inserted between 2D draws is wrapped with `Graphic.runExternalPass`.
 8. **Same as the Rust version**: The Rust version [vanilla-engine](https://github.com/ddukbaek2/vanilla-engine) is a port of this engine, and the two engines keep no feature differences. General-purpose features that appear on only one side and bugs found on one side are put into both. (Section 9)
 
 ---
@@ -68,7 +70,7 @@ Object (base/object.js)
 │   ├── Mask, Outline, SoftShade, ShadowText, ShadowImage
 │   ├── ParticleSystem, TrailRenderer, HeatHazeEffect (effect)
 │   ├── SpriteAnimator, PlatformerBody (misc)
-│   ├── Visual (experimental), ToonView3D (experimental/graphics/toon)
+│   ├── Visual (misc), ToonView3D (graphics3d/toon)
 │   ├── UIProgressRing, UIHitArea, UIListView, UILineChart, UIBarChart, ButtonMotion, ToastMotion (ui)
 │   └── UIView (ui): UI widget base
 │       ├── UILabel, UIImageView, UIProgressView
@@ -86,7 +88,7 @@ Object (base/object.js)
 ├── Engine/managers: Engine, EngineConfiguration, SceneManager, TimeManager,
 │                ViewManager, InputManager, InputActions, GamepadManager, AudioManager
 ├── Render: Graphic, ShaderProgram, ImageTextureCache, TextStringTextureCache
-├── 3D (experimental/graphics): FbxLoader, SkinnedModel, SkinnedModelRenderer → HumanSkinRenderer,
+├── 3D (graphics3d, FullscreenPass is in core): FbxLoader, SkinnedModel, SkinnedModelRenderer → HumanSkinRenderer,
 │                Material, ShadowMap, RenderTarget, FullscreenPass, BloomEffect, MultiLevelBloomEffect,
 │                AmbientOcclusionEffect, SubsurfaceScatteringEffect
 ├── Math/data: Vector2/3, Matrix4, Quaternion, TransformMatrix, Rect, OBB, Color,
@@ -177,7 +179,7 @@ Touch flow: DOM event → Engine → InputManager flags → Scene.tickTouch → 
 - When loading several together, `AssetLoader` loads up to a concurrency count (default 6) at a time and tracks progress and the failure list. The loaded assets are still held by the caller. `SpriteAtlas` reads the JSON and page images baked by tools/atlas.cjs.
 - Caches exist only at the GPU resource level and are owned by `Graphic` (ImageTextureCache / TextStringTextureCache). Images baked by ShadowText, ShadowImage and SoftShade are shared among identical shapes in sharedbakecache.js.
 
-### 4-5. 3D Stack (experimental/graphics)
+### 4-5. 3D Stack (graphics3d)
 
 ```
 Scene (sample code)
@@ -201,7 +203,7 @@ Scene (sample code)
 ├── FullscreenPass ── fullscreen triangle pass
 └── BloomEffect, MultiLevelBloomEffect ── bright area extraction → blur (multi-level halves down and scales up with a tent shape) → composite chain
 
-Toon 3D (experimental/graphics/toon)
+Toon 3D (graphics3d/toon)
 ├── ToonMesh(MeshBuilder), ToonGlb ── building vertex arrays and reading GLB (including UV and material ranges, GL-independent)
 ├── ToonRenderer ── body, outline shell and shadow depth programs + programs built per material and instance layout
 │   ├── ToonLightSet (default light set: sun, fill light, rim, specular, 8 point lights, band ramp, light shape)
@@ -255,7 +257,7 @@ Node render recursion: `drawNode` = pushTransform (local TRS/pivot correction) �
 - Clipping is stencil-buffer based (handles rotated/scaled masks accurately). Text is baked into an offscreen 2D canvas and output as a texture.
 - Blending draws all 26 Canvas2D composite strings. 13 of them (Porter-Duff operators, lighter, multiply, screen) use fixed blending, and the remaining 13 (overlay, darken, lighten, color-dodge, color-burn, hard-light, soft-light, difference, exclusion, hue, saturation, color, luminosity) copy the area under each draw from the current framebuffer with `blitFramebuffer` and mix in a shader following the W3C Compositing and Blending Level 1 formulas (no batching in mix modes; a swapped-in shader is first drawn to an overlay slot, then mixed and transferred). multiply uses fixed blending on the default framebuffer and mixes in a shader only when drawing to a render target (while a framebuffer is bound) (because fixed blending differs from the W3C formula when the backdrop is translucent). Unlike Canvas2D, source-in, source-out, destination-in, destination-atop and copy change only the inside of the drawn shape.
 
-### 6-2. 3D: experimental/graphics
+### 6-2. 3D: graphics3d
 
 Import pipeline (format neutralization is the key):
 
@@ -285,7 +287,8 @@ soldier.glb ──> parseBinary ──> glTF JSON+BIN
 
 ## 7. Public API Surface (import.js)
 
-- A single barrel file at the repository root. Its 8 comment-section blocks (built-in/base/core/basic components/UI/resources/other/experimental) are the logical layer divisions, and after the experimental block come exports with a one-line comment per branch.
+- A single barrel file at the repository root. Its 13 comment-section blocks (built-in/base/core/basic components/UI/resources/other/collections/animation/shaders and fullscreen pass/3D graphics/to be deprecated/experimental) are the logical layer divisions, and after the experimental block come exports with a one-line comment per branch.
+- The experimental block is the single line `export * as Experimental`. Drafts of features after 0.4.0 are gathered in src/experimental/experimental.js and exported as `Experimental.Name`. A draft's API may change, and once it has grown up it moves to its proper folder and is exported directly from import.js.
 - Enums are exported on the same line together with their class (`export { ViewScaleMode, ViewManager }`).
 - Function-collection modules are exported as namespaces (`export * as Format`, `LanguagePack`, `UIFont`, `ToonMesh`, `ToonGlb`).
 - **Intentionally unexposed** = treated as internal implementation: `AudioManager` (used via Engine), `Layer`, `DEVTools`, `GameScene`, `FbxLoader` (via SkinnedModel), the 2 texture caches and sharedbakecache, autolayout internal types (`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`), all of src/web (`Pane`, `WebSocketClient`). Projects that need an unexposed class import it directly by file path.
@@ -300,10 +303,10 @@ soldier.glb ──> parseBinary ──> glTF JSON+BIN
 | `core/layer.js` | Empty stub. Does not import base/Object, so it inherits the global Object. Unused, unexposed |
 | `Object.destroy()` | A hook that leaves no destroyed mark, so `isDestroyed()` is always false (the unique identifier is put into a module WeakMap on the first `getInstanceId()`) |
 | `Scene` initialization | The root node is created in `create()`, not in the constructor. Going through SceneManager is an implicit contract |
-| `experimental/graphics/webgl2.js` | Broken import path + unexposed. Dead code |
-| `experimental/graphics/gl2d.js` | No exports. Dead code |
-| `experimental/aabb.js`, `transform2d.js` | Entirely commented out. Dead files |
-| `experimental/camera.js` | Duplicate, since Camera2D in misc/camera2d.js covers everything including rotation and begin/end. Not ported to the Rust version |
+| `deprecated/webgl2.js` | Unexposed. Dead code (in its old place experimental/graphics its import paths were broken too) |
+| `deprecated/gl2d.js` | No exports. Dead code |
+| `deprecated/aabb.js`, `transform2d.js` | Entirely commented out. Dead files |
+| `deprecated/camera.js` | Duplicate, since Camera2D in misc/camera2d.js covers everything including rotation and begin/end. To be deprecated (import.js still exports it as Camera). Not ported to the Rust version |
 | `misc/uibuilder.js` | Replaced by NodeLayout (only 1 comment line remains) |
 | `base/calculator.js` | Empty function that returns 0. Unexposed |
 | 3D material sharing | No cross-model shared cache for textures/materials/clips. Per-model ownership (to be introduced when a consumer that shares them appears) |
@@ -312,7 +315,8 @@ soldier.glb ──> parseBinary ──> glTF JSON+BIN
 
 ## 9. Relationship with the Rust Version
 
-- The Rust version (vanilla-engine) ported 181 of this engine's 200 `src/` files. The 19 files intentionally not ported are empty files and dead code (calculator, layer, resources, uibuilder, aabb, transform2d, gl2d, webgl2, anchoredworldmnode in deprecated), things the Rust language takes care of (the five of object, reflection, singleton, wait, collection), and experimental/camera.js, which Camera2D covers.
+- The Rust version (vanilla-engine) ported 182 of this engine's 200 `src/` files (not counting the draft area src/experimental). The 18 files intentionally not ported are empty files (calculator, layer, resources, uibuilder), dead code (aabb, transform2d, gl2d, webgl2, anchoredworldmnode in deprecated), things the Rust language and standard library take care of (object, reflection, singleton and the five in base/collection), and deprecated/camera.js, which Camera2D covers.
+- The folders are the same as in the Rust version. (graphics3d, graphics3d/toon, animation, misc, resource, and the draft area experimental) Only the original core/graphic/* sits directly under core/ in the Rust version.
 - The public API and behavior of the two engines are kept the same. Only the names change to Rust conventions (snake_case, UpperCamelCase, SCREAMING_SNAKE_CASE). (setFillColor → set_fill_color)
 - The remaining differences (things that truly cannot be matched and forms decided to suit Rust) are collected in sections 9 and 10 of ARCHITECTURE.md in the Rust version repository. Key points: the Rust version uses load handles and callbacks instead of async, registration tables instead of reflection, passing as arguments instead of a global engine, nodes are handles (NodeId), and the desktop has no DOM, browser settings or safe area.
 

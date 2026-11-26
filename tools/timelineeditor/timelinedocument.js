@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { TIMELINE_NODE_DEFAULTS } from "../../src/experimental/animation/timeline.js";
+import { TIMELINE_NODE_DEFAULTS } from "../../src/animation/timeline.js";
 
 
 //==============================================================================

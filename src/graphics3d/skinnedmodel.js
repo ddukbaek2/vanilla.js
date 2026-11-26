@@ -2,9 +2,9 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Object } from "../../base/object.js";
-import { Matrix4 } from "../../base/matrix4.js";
-import { Quaternion } from "../../base/quaternion.js";
+import { Object } from "../base/object.js";
+import { Matrix4 } from "../base/matrix4.js";
+import { Quaternion } from "../base/quaternion.js";
 import { FbxLoader } from "./fbxloader.js";
 import { Material } from "./material.js";
 
