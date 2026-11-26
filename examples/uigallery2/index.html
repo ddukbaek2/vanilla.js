@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI Gallery 2</title>
+<link rel="icon" href="../assets/favicon.svg">
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #14171f; touch-action: none; user-select: none; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// UI 위젯 갤러리 2. (나머지 위젯 예제, 러스트 예제 uigallery2 와 같은 장면)
+// - 위젯을 한 화면에 놓는다: UIListView, UISnapScrollView, UIDropdown, UIDraggable, UILineChart, UIBarChart, UISpinner,
+//   UIToast, UIContextMenu, UIDialog.
+// - 터치는 TouchRecognizer 로 받는다.
+// - 사람이 없어도 확인할 수 있게, 정해 둔 프레임에 입력을 흉내 낸다:
+//   목록 휠 → 스냅 뷰 넘기기 → 드롭다운 열고 고르기 → 토스트 단추 → 칩 둘 끌기 → 드롭다운 열기 → 메뉴 단추 (90 프레임 화면)
+//   → 메뉴 바깥 누름 → 드롭다운 고르기 → 대화 상자 단추 → 토스트 (180 프레임 화면) → 확인 단추.
+// - 240 프레임이 지나면 멈춘다. (화면 저장: ?capture=90,180)
+// - 드롭다운 선택지 노드와 대화 상자 확인 단추는 이름으로 찾는다. (원본에 손잡이 함수가 없다)
+//==============================================================================
+import { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Rect, Color, Pivot, Paint, TextAlign, TextBaseline, TouchRecognizer, ViewScaleMode, UIView, UILabel, UIButton, UIScrollView, UIListView, UISnapScrollView, UIDropdown, UIDraggable, UILineChart, UIBarChart, UISpinner, UIToast, UIContextMenu, UIDialog } from "../../import.js";
+
+//==============================================================================
+// 전역 상수 목록.
+//==============================================================================
+const VIEW_WIDTH = 1280;
+const VIEW_HEIGHT = 720;
+const BACKGROUND_COLOR = "#14171f";
+const PANEL_COLOR = "#1d2230";
+const ACCENT_COLOR = "#6c7bff";
+const LIGHT_TEXT_COLOR = "#e8ecf4";
+const CAPTION_TEXT_COLOR = "#8d97ad";
+const LIST_ITEM_COUNT = 500;
+const LIST_ITEM_HEIGHT = 40;
+const SNAP_PAGE_WIDTH = 260;
+const SNAP_PAGE_GAP = 10;
+const SNAP_PAGE_COUNT = 5;
+const EXIT_FRAME_COUNT = 240;
+
+//==============================================================================
+// 왼쪽 위 기준 상자 노드 만들기.
+//==============================================================================
+function createBoxNode(parentNode, name, position, size) {
+	const node = new WorldNode();
+	node.setName(name);
+	parentNode.addChild(node);
+	node.setPivot(Pivot.topLeft);
+	node.setLocalPosition(position);
+	node.setContentSize(size);
+	return node;
+}
+
+//==============================================================================
+// 글자 붙이기. (UILabel)
+//==============================================================================
+function addLabel(node, text, fontSize, color) {
+	const label = node.addComponent(UILabel);
+	label.setText(text);
+	label.setFontSize(fontSize);
+	label.setTextColor(color);
+	return label;
+}
+
+//==============================================================================
+// 글자 노드 만들기. (UILabel)
+//==============================================================================
+function createLabelNode(parentNode, name, position, size, text, fontSize, color, textAlign) {
+	const labelNode = createBoxNode(parentNode, name, position, size);
+	const label = addLabel(labelNode, text, fontSize, color);
+	label.setTextAlign(textAlign);
+	label.setTextBaseline(TextBaseline.middle);
+	return labelNode;
+}
+
+//==============================================================================
+// 글자 단추 만들기. (둥근 Paint 바탕 + UILabel + UIButton)
+//==============================================================================
+function createTextButtonNode(parentNode, name, position, size, text) {
+	const buttonNode = createBoxNode(parentNode, name, position, size);
+	const buttonPaint = buttonNode.addComponent(Paint);
+	buttonPaint.setColor(ACCENT_COLOR);
+	buttonPaint.setRoundSize(10);
+	addLabel(buttonNode, text, 17, LIGHT_TEXT_COLOR).setBold(true);
+	buttonNode.addComponent(UIButton);
+	return buttonNode;
+}
+
+//==============================================================================
+// 구역 판 만들기. (배경색을 정한 UIView + 구역 이름)
+//==============================================================================
+function createSectionPanel(parentNode, name, position, size, caption) {
+	const panelNode = createBoxNode(parentNode, name, position, size);
+	panelNode.addComponent(UIView).setBackgroundColor(Color.createFromHEX(PANEL_COLOR));
+	createLabelNode(panelNode, "caption", Vector2.create(14, 6), Vector2.create(size.x - 28, 26), caption, 16, CAPTION_TEXT_COLOR, TextAlign.left);
+	return panelNode;
+}
+
+//==============================================================================
+// 노드 내용 좌표 → 뷰 좌표. (노드의 뷰 네 귀로 셈한다)
+//==============================================================================
+function convertNodePositionToViewPosition(node, localPosition) {
+	const worldCorners = node.getWorldCorners();
+	const topLeft = worldCorners[0];
+	const topRight = worldCorners[1];
+	const bottomLeft = worldCorners[3];
+	const contentSize = node.getContentSize();
+	const ratioX = contentSize.x > 0 ? localPosition.x / contentSize.x : 0;
+	const ratioY = contentSize.y > 0 ? localPosition.y / contentSize.y : 0;
+	return Vector2.create(topLeft.x + (topRight.x - topLeft.x) * ratioX + (bottomLeft.x - topLeft.x) * ratioY, topLeft.y + (topRight.y - topLeft.y) * ratioX + (bottomLeft.y - topLeft.y) * ratioY);
+}
+
+//==============================================================================
+// 노드 가운데의 뷰 좌표. (흉내 낸 입력이 누를 자리)
+//==============================================================================
+function calculateNodeCenter(node) {
+	const contentSize = node.getContentSize();
+	return convertNodePositionToViewPosition(node, Vector2.create(contentSize.x * 0.5, contentSize.y * 0.5));
+}
+
+//==============================================================================
+// 뷰 좌표가 노드 내용 영역 안인지.
+//==============================================================================
+function isViewPositionInsideNode(node, viewPosition) {
+	const localPosition = node.convertViewToLocal(viewPosition);
+	const contentSize = node.getContentSize();
+	return localPosition.x >= 0 && localPosition.y >= 0 && localPosition.x <= contentSize.x && localPosition.y <= contentSize.y;
+}
+
+//==============================================================================
+// 이름으로 노드 찾기. (깊이 먼저)
+//==============================================================================
+function findNodeByName(node, name) {
+	if (node.getName() === name) {
+		return node;
+	}
+	for (const child of node.getChildren()) {
+		const foundNode = findNodeByName(child, name);
+		if (foundNode !== null) {
+			return foundNode;
+		}
+	}
+	return null;
+}
+
+//==============================================================================
+// 갤러리 씬.
+//==============================================================================
+class UIGallery2Scene extends Scene {
+	#frameCount = 0;
+	#elapsedSeconds = 0;
+	#listNode = null;
+	#listCountLabelNode = null;
+	#snapNode = null;
+	#snapIndexLabelNode = null;
+	#dropdown = null;
+	#chipNodeList = [];
+	#lineChart = null;
+	#dialogButtonNode = null;
+	#toastButtonNode = null;
+	#menuButtonNode = null;
+	#dialog = null;
+	#toast = null;
+	#contextMenu = null;
+	#inputPosition = Vector2.create(-100, -100);
+	#dragStartPosition = Vector2.create(0, 0);
+
+	//==============================================================================
+	// 목록 구역. (500 줄 재활용 목록 + 세로 스크롤바 + 만든 노드 수)
+	//==============================================================================
+	createListSection(root) {
+		const panelNode = createSectionPanel(root, "listSection", Vector2.create(40, 90), Vector2.create(380, 380), "UIListView (500줄, 보이는 만큼만 노드)");
+		const listWidth = 352;
+		const listNode = createBoxNode(panelNode, "list", Vector2.create(14, 40), Vector2.create(listWidth, 290));
+		const listView = listNode.addComponent(UIListView);
+		listView.setSpacing(4);
+		listView.setCreateItemEvent(() => {
+			const itemNode = new WorldNode();
+			itemNode.setName("item");
+			itemNode.setPivot(Pivot.topLeft);
+			itemNode.setContentSize(Vector2.create(listWidth - 24, LIST_ITEM_HEIGHT));
+			const itemPaint = itemNode.addComponent(Paint);
+			itemPaint.setColor("#2a3145");
+			itemPaint.setRoundSize(6);
+			addLabel(itemNode, "", 16, LIGHT_TEXT_COLOR).setTextAlign(TextAlign.left);
+			return itemNode;
+		});
+		listView.setBindItemEvent((itemNode, itemIndex) => {
+			itemNode.getComponent(Paint).setColor(itemIndex % 2 === 0 ? "#2a3145" : "#323a52");
+			itemNode.getComponent(UILabel).setText(`   ${itemIndex + 1}번 항목`);
+		});
+		listView.setItemCount(LIST_ITEM_COUNT);
+		const scrollView = listNode.getComponent(UIScrollView);
+		scrollView.setHorizontal(false);
+		scrollView.setShowsVerticalScrollBar(true);
+		this.#listCountLabelNode = createLabelNode(panelNode, "listCount", Vector2.create(14, 338), Vector2.create(352, 30), "", 15, CAPTION_TEXT_COLOR, TextAlign.left);
+		this.#listNode = listNode;
+	}
+
+	//==============================================================================
+	// 스냅 뷰 구역. (가운데로 맞춰지는 칸 다섯)
+	//==============================================================================
+	createSnapSection(root) {
+		const panelNode = createSectionPanel(root, "snapSection", Vector2.create(440, 90), Vector2.create(400, 230), "UISnapScrollView (한 번에 한 칸)");
+		const snapWidth = 372;
+		const sidePadding = (snapWidth - SNAP_PAGE_WIDTH) * 0.5;
+		const snapNode = createBoxNode(panelNode, "snap", Vector2.create(14, 40), Vector2.create(snapWidth, 150));
+		const snapView = snapNode.addComponent(UISnapScrollView);
+		snapView.setBackgroundColor(Color.createFromHEX("#161a25"));
+		const contentWidth = sidePadding * 2 + SNAP_PAGE_COUNT * (SNAP_PAGE_WIDTH + SNAP_PAGE_GAP) - SNAP_PAGE_GAP;
+		snapView.setScrollContentSize(Vector2.create(contentWidth, 150));
+		const contentNode = snapView.getContent();
+		const pageColors = ["#ff7a7a", "#ffb35c", "#7fd38a", "#5cc8ff", "#b48cff"];
+		for (let pageIndex = 0; pageIndex < pageColors.length; pageIndex++) {
+			const pagePosition = Vector2.create(sidePadding + pageIndex * (SNAP_PAGE_WIDTH + SNAP_PAGE_GAP), 12);
+			const pageNode = createBoxNode(contentNode, "page", pagePosition, Vector2.create(SNAP_PAGE_WIDTH, 126));
+			const pagePaint = pageNode.addComponent(Paint);
+			pagePaint.setColor(pageColors[pageIndex]);
+			pagePaint.setRoundSize(14);
+			addLabel(pageNode, `${pageIndex + 1}`, 48, "#14171f").setBold(true);
+		}
+		this.#snapIndexLabelNode = createLabelNode(panelNode, "snapIndex", Vector2.create(14, 196), Vector2.create(372, 26), "", 15, CAPTION_TEXT_COLOR, TextAlign.left);
+		this.#snapNode = snapNode;
+	}
+
+	//==============================================================================
+	// 드롭다운 구역. (고르면 글자를 바꾼다)
+	//==============================================================================
+	createDropdownSection(root) {
+		const panelNode = createSectionPanel(root, "dropdownSection", Vector2.create(40, 490), Vector2.create(380, 140), "UIDropdown");
+		const selectionLabelNode = createLabelNode(panelNode, "selection", Vector2.create(14, 96), Vector2.create(352, 30), "고른 값: 어두운 테마", 15, CAPTION_TEXT_COLOR, TextAlign.left);
+		const dropdown = new UIDropdown({ width: 220, height: 36, optionHeight: 32, fontSize: 16 });
+		panelNode.addChild(dropdown);
+		dropdown.setLocalPosition(Vector2.create(14, 48));
+		dropdown.setOptionList(["어두운 테마", "밝은 테마", "시스템 설정", "고대비"]);
+		dropdown.setChangedEvent((changedDropdown) => {
+			selectionLabelNode.getComponent(UILabel).setText(`고른 값: ${changedDropdown.getSelectedText()}`);
+		});
+		this.#dropdown = dropdown;
+	}
+
+	//==============================================================================
+	// 끌기 구역. (칸에 놓으면 눌러앉고, 밖에 놓으면 돌아가는 칩 둘)
+	//==============================================================================
+	createDraggableSection(root) {
+		const panelNode = createSectionPanel(root, "dragSection", Vector2.create(440, 340), Vector2.create(400, 290), "UIDraggable (칸에 놓으면 남고, 밖이면 돌아감)");
+		const slotNode = createBoxNode(panelNode, "slot", Vector2.create(230, 70), Vector2.create(150, 150));
+		const slotPaint = slotNode.addComponent(Paint);
+		slotPaint.setColor("#262d40");
+		slotPaint.setRoundSize(16);
+		createLabelNode(slotNode, "slotCaption", Vector2.create(0, 110), Vector2.create(150, 30), "놓는 칸", 15, CAPTION_TEXT_COLOR, TextAlign.center);
+		const chipColors = ["#ffb35c", "#7fd38a"];
+		for (let chipIndex = 0; chipIndex < chipColors.length; chipIndex++) {
+			const chipNode = new WorldNode();
+			chipNode.setName("chip");
+			panelNode.addChild(chipNode);
+			chipNode.setLocalPosition(Vector2.create(70, 90 + chipIndex * 100));
+			chipNode.setContentSize(Vector2.create(96, 60));
+			const chipPaint = chipNode.addComponent(Paint);
+			chipPaint.setColor(chipColors[chipIndex]);
+			chipPaint.setRoundSize(12);
+			addLabel(chipNode, `칩 ${chipIndex + 1}`, 18, "#14171f").setBold(true);
+			const draggable = chipNode.addComponent(UIDraggable);
+			draggable.setSnapBackEnabled(true);
+			draggable.setDragEndEvent((endedDraggable, viewPosition) => {
+				if (isViewPositionInsideNode(slotNode, viewPosition)) {
+					endedDraggable.settleHere();
+				}
+			});
+			this.#chipNodeList.push(chipNode);
+		}
+	}
+
+	//==============================================================================
+	// 차트 / 스피너 / 단추 구역.
+	//==============================================================================
+	createChartSection(root) {
+		const panelNode = createSectionPanel(root, "chartSection", Vector2.create(860, 90), Vector2.create(380, 540), "UILineChart / UIBarChart / UISpinner");
+		// 실시간 라인 차트.
+		const lineChartNode = createBoxNode(panelNode, "lineChart", Vector2.create(14, 40), Vector2.create(352, 120));
+		lineChartNode.addComponent(Paint).setColor("#161a25");
+		const lineChart = lineChartNode.addComponent(UILineChart);
+		lineChart.setMaxSampleCount(90);
+		lineChart.setLineColor(Color.createFromHEX(ACCENT_COLOR));
+		lineChart.setLineWidth(2);
+		lineChart.setValueRange(0, 260);
+		const historyValues = [];
+		for (let sampleIndex = 0; sampleIndex < 60; sampleIndex++) {
+			historyValues.push(130 + System.Math.sin(sampleIndex * 0.35) * 60 + (sampleIndex * 37) % 23);
+		}
+		lineChart.setValueList(historyValues);
+		// 바 차트. (마지막 막대 강조)
+		const barChartNode = createBoxNode(panelNode, "barChart", Vector2.create(14, 176), Vector2.create(352, 110));
+		const barChart = barChartNode.addComponent(UIBarChart);
+		const barValues = [];
+		for (let dayIndex = 0; dayIndex < 12; dayIndex++) {
+			barValues.push(2400 + (dayIndex * 1733) % 2800);
+		}
+		barChart.setValueList(barValues);
+		barChart.setBarColor(new Color(0.357, 0.424, 1.0, 0.45));
+		barChart.setHighlightColor(Color.createFromHEX(ACCENT_COLOR));
+		barChart.setHighlightIndex(11);
+		// 스피너 둘.
+		createLabelNode(panelNode, "spinnerCaption", Vector2.create(14, 300), Vector2.create(200, 30), "UISpinner", 15, CAPTION_TEXT_COLOR, TextAlign.left);
+		const smallSpinner = new UISpinner({ radius: 10, dotRadius: 2.2, color: Color.createFromHEX(CAPTION_TEXT_COLOR) });
+		panelNode.addChild(smallSpinner);
+		smallSpinner.setLocalPosition(Vector2.create(130, 315));
+		const largeSpinner = new UISpinner({ radius: 18, dotCount: 12, dotRadius: 3.2, color: Color.createFromHEX(ACCENT_COLOR), rotationSpeed: 0.8 });
+		panelNode.addChild(largeSpinner);
+		largeSpinner.setLocalPosition(Vector2.create(190, 315));
+		// 대화 상자 / 토스트 / 메뉴 단추. (누름 처리는 겹 위젯을 만든 뒤 bindOverlayButtons 에서 건다)
+		this.#dialogButtonNode = createTextButtonNode(panelNode, "dialogButton", Vector2.create(14, 360), Vector2.create(352, 46), "대화 상자 열기");
+		this.#toastButtonNode = createTextButtonNode(panelNode, "toastButton", Vector2.create(14, 418), Vector2.create(352, 46), "토스트 두 개 띄우기");
+		this.#menuButtonNode = createTextButtonNode(panelNode, "menuButton", Vector2.create(14, 476), Vector2.create(352, 46), "컨텍스트 메뉴 열기");
+		this.#lineChart = lineChart;
+	}
+
+	//==============================================================================
+	// 겹 위젯. (뿌리의 마지막 자식들: 대화 상자, 컨텍스트 메뉴, 토스트)
+	//==============================================================================
+	createOverlays(root) {
+		this.#dialog = new UIDialog({});
+		root.addChild(this.#dialog);
+		this.#contextMenu = new UIContextMenu({ menuWidth: 200, itemHeight: 34, fontSize: 16 });
+		root.addChild(this.#contextMenu);
+		// 줄 선 토스트가 화면 저장 프레임 안에 차례로 보이도록 머무는 시간을 줄인다.
+		this.#toast = new UIToast({ restY: 660, holdSeconds: 0.8, fontSize: 17, backgroundColor: new Color(0.24, 0.28, 0.4, 0.95) });
+		root.addChild(this.#toast);
+	}
+
+	//==============================================================================
+	// 단추 누름 처리 걸기. (대화 상자 열기, 토스트 띄우기, 메뉴 열기)
+	//==============================================================================
+	bindOverlayButtons() {
+		const toast = this.#toast;
+		this.#dialogButtonNode.getComponent(UIButton).setClickedEvent(() => {
+			this.#dialog.show("이 항목을 정말 지울까요?\n지운 뒤에는 되돌릴 수 없어요.", {
+				onConfirm: () => {
+					toast.show("확인을 눌렀어요");
+				},
+				onCancel: () => {
+					toast.show("취소했어요");
+				},
+				confirmText: "지우기",
+			});
+		});
+		this.#toastButtonNode.getComponent(UIButton).setClickedEvent(() => {
+			toast.show("저장했어요");
+			toast.show("두 번째 알림은 줄을 서요");
+		});
+		this.#menuButtonNode.getComponent(UIButton).setClickedEvent(() => {
+			const menuPosition = this.getEngine().getInputManager().getViewInputPosition();
+			this.#contextMenu.show(menuPosition, [
+				{ text: "  복사", handler: () => { toast.show("복사했어요"); } },
+				{ text: "  붙여넣기", handler: () => { toast.show("붙여넣었어요"); } },
+				{ text: "  지우기 (쓸 수 없음)", isDisabled: true },
+			]);
+		});
+	}
+
+	//==============================================================================
+	// 흉내 낸 입력. (정해 둔 프레임에 누름 / 이동 / 뗌 / 휠)
+	//==============================================================================
+	simulateInput() {
+		const frameCount = this.#frameCount;
+		const root = this.getRoot();
+		let inputAction = "none";
+		let wheelDeltaY = 0;
+		// 목록 휠.
+		if (frameCount === 8) {
+			this.#inputPosition = calculateNodeCenter(this.#listNode);
+		}
+		if (frameCount === 10) {
+			wheelDeltaY = 1500;
+		}
+		// 스냅 뷰를 왼쪽으로 200 픽셀 끈다.
+		if (frameCount === 15) {
+			this.#dragStartPosition = calculateNodeCenter(this.#snapNode).add(Vector2.create(100, 0));
+			this.#inputPosition = this.#dragStartPosition;
+			inputAction = "press";
+		}
+		if (frameCount >= 16 && frameCount <= 25) {
+			this.#inputPosition = this.#dragStartPosition.add(Vector2.create(-20 * (frameCount - 15), 0));
+			inputAction = "moved";
+		}
+		if (frameCount === 28) {
+			inputAction = "release";
+		}
+		// 드롭다운을 열고 셋째 줄을 고른다.
+		if (frameCount === 34 || frameCount === 84) {
+			this.#inputPosition = calculateNodeCenter(this.#dropdown);
+			inputAction = "press";
+		}
+		if (frameCount === 36 || frameCount === 86) {
+			inputAction = "release";
+		}
+		if (frameCount === 42 || frameCount === 106) {
+			const optionNode = findNodeByName(root, "DropdownOption" + (frameCount === 42 ? 2 : 1));
+			if (optionNode !== null) {
+				this.#inputPosition = calculateNodeCenter(optionNode);
+				inputAction = "press";
+			}
+		}
+		if (frameCount === 44 || frameCount === 108) {
+			inputAction = "release";
+		}
+		// 토스트 단추.
+		if (frameCount === 48) {
+			this.#inputPosition = calculateNodeCenter(this.#toastButtonNode);
+			inputAction = "press";
+		}
+		if (frameCount === 50) {
+			inputAction = "release";
+		}
+		// 칩 1 은 칸 밖에, 칩 2 는 칸 안에 놓는다.
+		const startFrameList = [56, 70];
+		for (let chipIndex = 0; chipIndex < startFrameList.length; chipIndex++) {
+			const startFrame = startFrameList[chipIndex];
+			if (frameCount === startFrame) {
+				this.#dragStartPosition = calculateNodeCenter(this.#chipNodeList[chipIndex]);
+				this.#inputPosition = this.#dragStartPosition;
+				inputAction = "press";
+			}
+			if (frameCount > startFrame && frameCount <= startFrame + 8) {
+				const dragFrameCount = frameCount - startFrame;
+				const dragStep = chipIndex === 0 ? Vector2.create(6, -4) : Vector2.create(22, -8);
+				this.#inputPosition = this.#dragStartPosition.add(Vector2.create(dragStep.x * dragFrameCount, dragStep.y * dragFrameCount));
+				inputAction = "moved";
+			}
+			if (frameCount === startFrame + 10) {
+				inputAction = "release";
+			}
+		}
+		// 메뉴 단추. (메뉴는 누른 자리에 뜬다. 90 프레임 화면에 메뉴와 펼친 드롭다운이 함께 보인다)
+		if (frameCount === 87) {
+			this.#inputPosition = calculateNodeCenter(this.#menuButtonNode).add(Vector2.create(-120, 0));
+			inputAction = "press";
+		}
+		if (frameCount === 89) {
+			inputAction = "release";
+		}
+		// 메뉴 바깥을 눌러 닫는다.
+		if (frameCount === 100) {
+			this.#inputPosition = Vector2.create(1250, 700);
+			inputAction = "press";
+		}
+		if (frameCount === 102) {
+			inputAction = "release";
+		}
+		// 대화 상자 단추. (180 프레임 화면에 다 열린 대화 상자와 토스트)
+		if (frameCount === 120) {
+			this.#inputPosition = calculateNodeCenter(this.#dialogButtonNode);
+			inputAction = "press";
+		}
+		if (frameCount === 122) {
+			inputAction = "release";
+		}
+		// 확인 단추.
+		if (frameCount === 200) {
+			const confirmNode = findNodeByName(this.#dialog, "DialogConfirm");
+			if (confirmNode !== null) {
+				this.#inputPosition = calculateNodeCenter(confirmNode);
+				inputAction = "press";
+			}
+		}
+		if (frameCount === 202) {
+			inputAction = "release";
+		}
+		const inputManager = this.getEngine().getInputManager();
+		inputManager.setViewInputPosition(this.#inputPosition);
+		if (wheelDeltaY !== 0) {
+			inputManager.addWheelDelta(0, wheelDeltaY);
+		}
+		if (inputAction === "press") {
+			inputManager.setTouchPressed(true);
+			inputManager.setTouchDown(true);
+		}
+		else if (inputAction === "moved") {
+			inputManager.setTouchMoved(true);
+		}
+		else if (inputAction === "release") {
+			inputManager.setTouchReleased(true);
+			inputManager.setTouchDown(false);
+		}
+	}
+
+	//==============================================================================
+	// 보이는 상태 글자와 실시간 차트 갱신.
+	//==============================================================================
+	updateStatus() {
+		const listView = this.#listNode.getComponent(UIListView);
+		const contentNode = this.#listNode.getComponent(UIScrollView).getContent();
+		const contentChildCount = contentNode !== null ? contentNode.getChildren().length : 0;
+		this.#listCountLabelNode.getComponent(UILabel).setText(`500줄 가운데 보이는 ${listView.getActiveItemCount()}줄, 만든 항목 노드 ${contentChildCount}개`);
+		const snapIndex = this.#snapNode.getComponent(UISnapScrollView).getSnapCurrentIndex();
+		this.#snapIndexLabelNode.getComponent(UILabel).setText(`지금 칸: ${snapIndex + 1} / ${SNAP_PAGE_COUNT}`);
+		const liveValue = 130 + System.Math.sin(this.#elapsedSeconds * 4) * 60 + (this.#frameCount * 37) % 23;
+		this.#lineChart.pushValue(liveValue);
+		if (this.#frameCount === 150) {
+			this.#toast.show("대화 상자 위에도 토스트가 떠요");
+		}
+	}
+
+	//==============================================================================
+	// 초기화. (위젯을 모두 놓고, 겹 위젯을 맨 뒤에 붙인다)
+	//==============================================================================
+	initialize(engine) {
+		super.initialize(engine);
+		const root = this.getRoot();
+		root.setContentSize(Vector2.create(VIEW_WIDTH, VIEW_HEIGHT));
+		const touchRecognizer = new TouchRecognizer();
+		touchRecognizer.setRootNode(root);
+		this.setTouchRaycaster(touchRecognizer);
+		const titleNode = createLabelNode(root, "title", Vector2.create(40, 24), Vector2.create(900, 50), "바닐라엔진 UI 위젯 갤러리 2", 32, ACCENT_COLOR, TextAlign.left);
+		titleNode.getComponent(UILabel).setBold(true);
+		createLabelNode(root, "help", Vector2.create(40, 650), Vector2.create(1200, 40), "입력은 흉내 낸 것: 목록 휠 → 스냅 넘김 → 드롭다운 → 토스트 → 칩 끌기 → 메뉴 → 대화 상자 → 확인", 16, CAPTION_TEXT_COLOR, TextAlign.left);
+		this.createListSection(root);
+		this.createSnapSection(root);
+		this.createDraggableSection(root);
+		this.createDropdownSection(root);
+		this.createChartSection(root);
+		this.createOverlays(root);
+		this.bindOverlayButtons();
+	}
+
+	//==============================================================================
+	// 주기적 갱신. (흉내 낸 입력 → 상태 글자 → 노드 갱신 → TouchRecognizer)
+	//==============================================================================
+	tick(timeDelta) {
+		this.#frameCount += 1;
+		this.#elapsedSeconds += timeDelta;
+		if (this.#frameCount >= EXIT_FRAME_COUNT) {
+			return;
+		}
+		this.simulateInput();
+		this.updateStatus();
+		super.tick(timeDelta);
+	}
+
+	//==============================================================================
+	// 이전 출력. (배경 칠하기)
+	//==============================================================================
+	preDraw(graphic) {
+		const viewManager = this.getEngine().getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(BACKGROUND_COLOR);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		viewManager.applyViewRect(graphic);
+	}
+}
+
+//==============================================================================
+// 시작.
+//==============================================================================
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.title = "UI 위젯 갤러리 2 (바닐라엔진)";
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.referenceResolutionSize = Vector2.create(VIEW_WIDTH, VIEW_HEIGHT);
+engineConfiguration.autoResizeOnWindowResize = true;
+// 화면 저장 때도 프레임 간격이 일정하도록 60 FPS 로 묶는다.
+engineConfiguration.maximumFramePerSecond = 60;
+const engine = new Engine(engineConfiguration);
+// 뷰 모드는 엔진 설정에 칸이 없어 뷰 관리자에 건다.
+engine.getViewManager().setViewScaleMode(ViewScaleMode.stretchShort);
+engine.run(new UIGallery2Scene());
+</script>
+</body>
+</html>
