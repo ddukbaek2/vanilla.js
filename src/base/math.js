@@ -202,52 +202,36 @@ export function abs(value) {
 //==============================================================================
 /**
  * @param { number } value 각도. (라디안)
- * @returns { number } 사인 값. (테일러 급수 10 항으로 근사)
+ * @returns { number } 사인 값. (브라우저 Math.sin, 바르게 반올림한 값이라 러스트 판과 같은 비트)
  */
 export function sin(value) {
-	let val = value % (2 * PI);
-	if (val > PI) val -= 2 * PI;
-	if (val < -PI) val += 2 * PI;
-	let result = 0;
-	let term = val;
-	for (let i = 1; i <= 10; ++i) {
-		result += term;
-		term *= -val * val / (2 * i * (2 * i + 1));
-	}
-	return result;
-};
+	// 내장 사인을 쓴다. (크롬은 바르게 반올림한 값, 러스트 판 base/trigonometry.rs 가 같은 값을 낸다)
+	return System.Math.sin(value);
+}
 
 //==============================================================================
 // 코사인 반환.
 //==============================================================================
 /**
  * @param { number } value 각도. (라디안)
- * @returns { number } 코사인 값. (테일러 급수 10 항으로 근사)
+ * @returns { number } 코사인 값. (브라우저 Math.cos, 바르게 반올림한 값이라 러스트 판과 같은 비트)
  */
 export function cos(value) {
-	let val = value % (2 * PI);
-	if (val > PI) val -= 2 * PI;
-	if (val < -PI) val += 2 * PI;
-	let result = 0;
-	let term = 1;
-	for (let i = 1; i <= 10; ++i) {
-		result += term;
-		term *= -val * val / ((2 * i - 1) * 2 * i);
-	}
-	return result;
-};
+	// 내장 코사인을 쓴다. (크롬은 바르게 반올림한 값)
+	return System.Math.cos(value);
+}
 
 //==============================================================================
 // 탄젠트 반환.
 //==============================================================================
 /**
  * @param { number } value 각도. (라디안)
- * @returns { number } 탄젠트 값. (sin / cos)
+ * @returns { number } 탄젠트 값. (브라우저 Math.tan, 바르게 반올림한 값이라 러스트 판과 같은 비트)
  */
 export function tan(value) {
-	const result = sin(value) / cos(value);
-	return result;
-};
+	// 내장 탄젠트를 쓴다. (크롬은 바르게 반올림한 값)
+	return System.Math.tan(value);
+}
 
 //==============================================================================
 // 아크사인 반환.

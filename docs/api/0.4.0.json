@@ -600,8 +600,8 @@
 					"returns": {
 						"type": "number",
 						"description": {
-							"ko": "사인 값. (테일러 급수 10 항으로 근사)",
-							"en": "Sine. (approximated with 10 Taylor series terms)"
+							"ko": "사인 값. (브라우저 Math.sin, 바르게 반올림한 값이라 러스트 판과 같은 비트)",
+							"en": "Sine. (the browser Math.sin, correctly rounded, so it has the same bits as the Rust engine)"
 						}
 					},
 					"description": {
@@ -633,8 +633,8 @@
 					"returns": {
 						"type": "number",
 						"description": {
-							"ko": "코사인 값. (테일러 급수 10 항으로 근사)",
-							"en": "Cosine. (approximated with 10 Taylor series terms)"
+							"ko": "코사인 값. (브라우저 Math.cos, 바르게 반올림한 값이라 러스트 판과 같은 비트)",
+							"en": "Cosine. (the browser Math.cos, correctly rounded, so it has the same bits as the Rust engine)"
 						}
 					},
 					"description": {
@@ -666,8 +666,8 @@
 					"returns": {
 						"type": "number",
 						"description": {
-							"ko": "탄젠트 값. (sin / cos)",
-							"en": "Tangent. (sin / cos)"
+							"ko": "탄젠트 값. (브라우저 Math.tan, 바르게 반올림한 값이라 러스트 판과 같은 비트)",
+							"en": "Tangent. (the browser Math.tan, correctly rounded, so it has the same bits as the Rust engine)"
 						}
 					},
 					"description": {
