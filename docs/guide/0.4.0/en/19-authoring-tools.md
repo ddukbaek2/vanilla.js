@@ -93,6 +93,7 @@ engine.run(new TitleScene());
 - `UIScene.loadAssets()` is the hook `UIScene` calls while it shows its loading screen. Call `super.loadAssets()` when you override it. If you derive directly from `Scene`, read the file in `load`.
 - Widgets of the `UIView` family, such as scroll views, create their inner content node themselves when attached. So the document records only the widget, and children placed inside the content (list items and so on) are recorded separately as `contentChildren` and attached under the content when restored. The content node is named `content`, so include it in the path. (For example, `/Panel/ItemList/content/Item0`)
 - Values that point to other nodes (node references) are recorded as `$nodeRef` with a path from the root, and they are connected after the whole tree is built.
+- Components and children that a node constructor makes by itself (the title bar of `UIWindow`, the `Sprite` that `UIImageView` attaches, and so on) receive the document values when their order and type (name for children) match from the front of the document, instead of being created twice. So loading and saving again gives the same document.
 
 ### Resolving image paths
 
@@ -100,9 +101,9 @@ Documents record only image paths (`imagePath`), not the images themselves. `Spr
 
 ### Registering component and node types
 
-The components the game-side `UIDocument` knows from the start are `Paint`, `Sprite`, `Text`, `RichText`, `Mask`, `Outline`, `SoftShade`, `ShadowText`, `UIProgressRing`, `UILabel`, `UIImageView`, `UIButton`, `UIToggleButton`, `UIProgressView`, `UISlider`, and `UIScrollView` (`UIDocument.getComponentTypeNames()`), and the only node type is `WorldNode`. UI Editor registers every component and every `WorldNode`-derived node the engine exports with the document format. So when a type used in the editor is missing from the game-side table, that component is silently dropped on load and that node comes back as a plain `WorldNode`.
+The components the game-side `UIDocument` knows from the start are `Paint`, `Sprite`, `Text`, `RichText`, `Mask`, `Outline`, `SoftShade`, `ShadowText`, `UIProgressRing`, `UILabel`, `UIImageView`, `UIButton`, `UIToggleButton`, `UIProgressView`, `UISlider`, `UIScrollView`, and `ShadowImage` (`UIDocument.getComponentTypeNames()`), and the only node type is `WorldNode`. UI Editor and Visual Editor register every component and every `WorldNode`-derived node the engine exports with the document format. So when a type used in the editor is missing from the game-side table, that component is dropped on load with a warning and that node comes back as a plain `WorldNode` with a warning.
 
-If your documents use other types, register them under the same names in your game before calling `fromJsonText`. For example, the input field (`UIInputField`) and the scroll bar (`UIScrollBar`) are nodes derived from `WorldNode`, while the snap scroll view (`UISnapScrollView`) is a component.
+A game that loads documents saved by the editors calls `UIDocument.registerEditorTypes()` once before `fromJsonText`. It registers every type the editors register (35 components, 12 node types) under the same names and leaves names that are already registered as they are. To register types one at a time, use `registerNodeType` and `registerComponentType`. For example, the input field (`UIInputField`) and the scroll bar (`UIScrollBar`) are nodes derived from `WorldNode`, while the snap scroll view (`UISnapScrollView`) is a component.
 
 ```javascript
 import { UIDocument, UIInputField, UIScrollBar, UISnapScrollView, SoftShade } from "./build/vanilla.js";
@@ -110,16 +111,17 @@ import { UIDocument, UIInputField, UIScrollBar, UISnapScrollView, SoftShade } fr
 UIDocument.registerNodeType("UIInputField", UIInputField);
 UIDocument.registerNodeType("UIScrollBar", UIScrollBar);
 UIDocument.registerComponentType("UISnapScrollView", UISnapScrollView);
+UIDocument.registerEditorTypes();
 
 const componentTypeNames = UIDocument.getComponentTypeNames();
-console.log(componentTypeNames.includes("UISnapScrollView"), UIDocument.getComponentType("SoftShade") === SoftShade);
+console.log(componentTypeNames.includes("UISnapScrollView"), componentTypeNames.length, UIDocument.getComponentType("SoftShade") === SoftShade);
 ```
 
 Components without dedicated save rules are saved and restored through the values read and written by matching `get` and `set` methods (`saveByReflection`, `loadByReflection`).
 
 ### Saving documents from the game
 
-`UIDocument.toJsonText(rootNode, isPretty = true)` turns a node tree into text of the same shape. It records node and component type names as JavaScript class names (`constructor.name`), so the saving side must use a bundle that keeps class names (esbuild's `--keep-names`). The `vanilla.min.js` command in the README has no `--keep-names`, so class names change in that bundle. Loading (`fromJsonText`) looks up the table by the names in the document, so it works with any bundle.
+`UIDocument.toJsonText(rootNode, isPretty = true)` turns a node tree into text of the same shape. Node and component type names are written with the names registered in the tables, so the document is the same even in a bundle that shortens class names (esbuild's `--minify`). Only types that are not registered are written with their JavaScript class names (`constructor.name`), so to save such types as well, use a bundle that keeps class names (`--keep-names`). The README commands and `tools/project.cjs build` minify with `--keep-names`. Loading (`fromJsonText`) looks up the table by the names in the document, so it works with any bundle.
 
 ## Playing Timeline Editor documents
 

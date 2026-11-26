@@ -16,6 +16,7 @@ Command-line tools run with Node.js. Detailed usage is in [`tools/TOOLS.md`](htt
 | `node tools/atlas.cjs <folder>` | Pack multiple images into textures (MaxRects, multiple sheets on overflow, read by `SpriteAtlas`) |
 | `node tools/project.cjs build --script <entry> --input <input> --output <output>` | Template copy and esbuild bundling |
 | `node tools/project.cjs check --input <input>` | Asset status check |
+| `node tools/project.cjs stage --source <source> --destination <destination>` | Copy to the folder to deploy |
 | `node tools/webm.cjs <folder>` | Convert audio to webm |
 | `node tools/mangle.cjs <input> <output> <excluded strings>` | Clean up strings in code |
 | `node tools/apidoc.cjs <version>` | Generate public API documentation data (`docs/api/<version>.json`) |
@@ -29,11 +30,15 @@ Command-line tools run with Node.js. Detailed usage is in [`tools/TOOLS.md`](htt
 node tools/atlas.cjs <folder path> [--extrude pixels] [--padding pixels] [--max-size page size limit]
 ```
 
-### Project tool. (build / asset status check)
+### Project tool. (build / asset status check / deploy copy)
 ```bash
-node tools/project.cjs build --script <entry file> --input <input directory> --output <output directory>
+node tools/project.cjs build --script <entry file> --input <input directory> --output <output directory> [-t|--template <build template path>]
 node tools/project.cjs check --input <input directory>
+node tools/project.cjs stage --source <source directory> --destination <destination directory> [--skip <name1,name2,...>]
 ```
+- build: empties the output directory, copies the build template (tools/buildtemplate by default, changed with -t or --template) and <input>/assets, then bundles the entry file with esbuild into <output>/js/bundle.min.js. (iife, --minify --keep-names)
+- check: reports the images and atlases under <input>/assets/sprites. (needs the npm package canvas)
+- stage: copies the source directory to the destination directory. (the destination is emptied first, top-level names given to --skip separated by commas are skipped)
 
 ### A tool that converts various kinds of audio to webm format.
 ```bash

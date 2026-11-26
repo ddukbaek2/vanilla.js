@@ -5,6 +5,17 @@ const System = globalThis;
 
 
 //==============================================================================
+// 전역 상수 목록.
+//==============================================================================
+// 큰 수를 줄이는 단위. (작은 것부터)
+const COMPACT_UNIT_LIST = [
+	{ divisor: 1000, suffix: "K" },
+	{ divisor: 1000000, suffix: "M" },
+	{ divisor: 1000000000, suffix: "B" },
+];
+
+
+//==============================================================================
 // 표기 유틸.
 // - 재화 / 점수 표기처럼 어느 게임에서나 반복되는 숫자 문자열 처리를 모았다.
 //==============================================================================
@@ -50,21 +61,29 @@ export function formatNumberWithUnit(value, unitSuffix, locale = "ko-KR") {
 /**
  * @param { number } value 표기할 수. (절대값이 1000 미만이면 줄이지 않고, 음수는 앞에 - 를 붙인다)
  * @param { number } fractionDigits 소수 자릿수. (기본 1, 끝의 0 은 뺀다)
- * @returns { string } K, M, B 를 붙여 줄인 문자열.
+ * @returns { string } K, M, B 를 붙여 줄인 문자열. (반올림해 1000 이 되면 다음 단위로 올린다, 999999 는 "1M")
  */
 export function formatCompactNumber(value, fractionDigits = 1) {
 	const absoluteValue = System.Math.abs(value);
 	const sign = value < 0 ? "-" : "";
-	if (absoluteValue >= 1000000000) {
-		return sign + trimTrailingZero((absoluteValue / 1000000000).toFixed(fractionDigits)) + "B";
+	let unitIndex = -1;
+	for (let candidateIndex = COMPACT_UNIT_LIST.length - 1; candidateIndex >= 0; --candidateIndex) {
+		if (absoluteValue >= COMPACT_UNIT_LIST[candidateIndex].divisor) {
+			unitIndex = candidateIndex;
+			break;
+		}
 	}
-	if (absoluteValue >= 1000000) {
-		return sign + trimTrailingZero((absoluteValue / 1000000).toFixed(fractionDigits)) + "M";
+	if (unitIndex < 0) {
+		return sign + String(absoluteValue);
 	}
-	if (absoluteValue >= 1000) {
-		return sign + trimTrailingZero((absoluteValue / 1000).toFixed(fractionDigits)) + "K";
+
+	// 반올림한 글이 1000 이 되면(999999 → "1000.0K") Intl 의 compact 표기처럼 다음 단위로 올린다.
+	let compactText = (absoluteValue / COMPACT_UNIT_LIST[unitIndex].divisor).toFixed(fractionDigits);
+	if (System.Number.parseFloat(compactText) >= 1000 && unitIndex < COMPACT_UNIT_LIST.length - 1) {
+		++unitIndex;
+		compactText = (absoluteValue / COMPACT_UNIT_LIST[unitIndex].divisor).toFixed(fractionDigits);
 	}
-	return sign + String(absoluteValue);
+	return sign + trimTrailingZero(compactText) + COMPACT_UNIT_LIST[unitIndex].suffix;
 }
 
 //==============================================================================

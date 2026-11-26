@@ -248,8 +248,8 @@ export class Platform extends Object {
 	// 세이프 에어리어 반환.
 	//==============================================================================
 	/**
-     * @param { HTMLCanvasElement | null } canvas 크기를 잴 캔버스. (null 이면 창의 innerWidth, innerHeight 를 쓴다)
-	 * @returns { Rect } 세이프 에어리어 여백을 뺀 사각형. (left, top 은 왼쪽, 위 여백, 여백은 CSS 의 env(safe-area-inset-*) 픽셀 값)
+     * @param { HTMLCanvasElement | null } canvas 크기를 잴 캔버스. (CSS 크기 clientWidth, clientHeight 를 쓴다, null 이면 창의 innerWidth, innerHeight 를 쓴다)
+	 * @returns { Rect } 세이프 에어리어 여백을 뺀 사각형. (모두 CSS 픽셀, left, top 은 왼쪽, 위 여백, 여백은 CSS 의 env(safe-area-inset-*) 값, 너비와 높이는 0 이상)
 	 * @example <caption>캔버스에서 노치를 피한 자리 구하기</caption>
 	 * import { Platform } from "./build/vanilla.js";
 	 *
@@ -278,11 +278,15 @@ export class Platform extends Object {
 
 		System.document.body.removeChild(div);
 
-		if (canvas === null || canvas === undefined) {
-			return Rect.create(left, top, System.window.innerWidth - left - right, System.window.innerHeight - top - bottom);
+		// 여백은 CSS 픽셀이므로 캔버스도 그리기 버퍼 크기(width, height, 기기 픽셀일 수 있다)가 아니라 CSS 크기로 잰다.
+		let areaWidth = System.window.innerWidth;
+		let areaHeight = System.window.innerHeight;
+		if (canvas !== null && canvas !== undefined) {
+			areaWidth = canvas.clientWidth;
+			areaHeight = canvas.clientHeight;
 		}
-		else {
-			return Rect.create(left, top, canvas.width - left - right, canvas.height - top - bottom);
-		}
+		const safeWidth = System.Math.max(areaWidth - left - right, 0);
+		const safeHeight = System.Math.max(areaHeight - top - bottom, 0);
+		return Rect.create(left, top, safeWidth, safeHeight);
 	}
 }

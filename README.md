@@ -57,7 +57,7 @@ vanilla.js 는 외부 라이브러리 없이 브라우저에서 바로 동작하
 
 ```bash
 esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap
-esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify
+esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify --keep-names
 ```
 
 ## 주요 기능
@@ -93,6 +93,7 @@ esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify
 | `node tools/atlas.cjs <폴더>` | 이미지 여러 장을 텍스처로 묶기 (MaxRects, 넘치면 여러 장, `SpriteAtlas` 가 읽음) |
 | `node tools/project.cjs build --script <진입> --input <입력> --output <출력>` | 템플릿 복사와 esbuild 번들링 |
 | `node tools/project.cjs check --input <입력>` | 자산 현황 점검 |
+| `node tools/project.cjs stage --source <소스> --destination <대상>` | 배포할 폴더로 복사 |
 | `node tools/webm.cjs <폴더>` | 음원을 webm 으로 변환 |
 | `node tools/mangle.cjs <입력> <출력> <제외 문자열>` | 코드 내 문자열 정리 |
 | `node tools/apidoc.cjs <버전>` | 공개 API 문서 자료(`docs/api/<버전>.json`) 뽑기 |

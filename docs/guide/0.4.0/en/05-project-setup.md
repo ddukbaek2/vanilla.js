@@ -53,11 +53,11 @@ The smallest page is one canvas and one module script.
 
 ```bash
 esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap
-esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify
+esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify --keep-names
 ```
 
 - `--format=esm` produces a module that can be loaded with `import { ... } from`.
-- `--keep-names` keeps class and function names even when minifying. The engine reads class names at run time in a few places. (`UIDocument` writes the `constructor.name` of nodes and components when it saves a node tree as a document, and the developer tools show this name for nodes and components that do not set their own type name)
+- `--keep-names` keeps class and function names even when minifying. The engine reads class names at run time in a few places. (The developer tools show the `constructor.name` of nodes and components that do not set their own type name, and `UIDocument` writes this name for types that are not registered in its tables. Registered types are written with their registered names, so they stay the same in a minified bundle)
 - Install esbuild separately. (for example `npm install -g esbuild`)
 
 ## Project folder layout
@@ -121,7 +121,7 @@ It does the following, in order.
 1. If the output folder exists, it deletes it entirely and creates it again.
 2. It copies the template folder into the output folder. The template is the folder given with `-t` or `--template`, or `tools/buildtemplate` next to `project.cjs` if none is given.
 3. It copies `<input>/assets` to `<output>/assets`. (folders named `.buildignore` are skipped)
-4. It runs `esbuild <input>/<entry file> --bundle --outfile=<output>/js/bundle.min.js --format=iife --minify`.
+4. It runs `esbuild <input>/<entry file> --bundle --outfile=<output>/js/bundle.min.js --format=iife --minify --keep-names`.
 
 The output looks like this.
 
@@ -183,7 +183,7 @@ node tools/project.cjs stage --source build/web --destination ../deploy/mygame -
 ## Things to watch
 
 - `build` and `stage` delete the output (destination) folder entirely first. Do not keep hand-placed files in it.
-- `build` minifies without `--keep-names`. Inside the bundled game, class names (`constructor.name`) become short names, so a feature that saves the node tree with `UIDocument` at run time writes the minified names. Check such features with an unminified bundle.
+- `build` minifies with `--keep-names`. Class names (`constructor.name`) stay the same inside the bundled game, so the developer tools and `UIDocument` use the same names.
 - `build` calls esbuild directly on the command line, so esbuild must be on the PATH.
 - Using top-level await at the top level of the entry file makes the esbuild step of `build` fail.
 - If the page already has a canvas whose id equals `canvasId`, the engine uses it. A canvas without a CSS size has the browser's default size (300 x 150), so turn on `autoResizeOnWindowResize` or size it with CSS.

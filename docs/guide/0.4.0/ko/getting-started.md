@@ -26,7 +26,7 @@
 
 ```bash
 esbuild import.js --bundle --outfile=build/vanilla.js --format=esm --keep-names --sourcemap
-esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify
+esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify --keep-names
 ```
 
 ## 샘플

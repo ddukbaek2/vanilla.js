@@ -55,11 +55,17 @@ export class Node extends Object {
 	// 부모 설정.
 	//==============================================================================
 	/**
-	 * @param { Node } parent 새 부모. (null 이면 지금 부모에서 떼어 내기만 한다, 자신이면 오류를 던진다)
+	 * @param { Node | null } parent 새 부모. (null 이면 지금 부모에서 떼어 내기만 한다)
+	 * @returns { boolean } 붙였거나 떼었으면 참. (자신이나 자신의 자손 밑으로는 계층이 고리가 되므로 붙이지 않고 거짓)
 	 */
 	setParent(parent) {
-		if (this === parent) {
-			throw new Error("");
+		// 자신이나 자손 밑으로 붙이면 계층이 고리가 되어 위로 올라가는 셈(isActiveInHierarchy 등)이 끝나지 않는다.
+		let ancestor = parent;
+		while (ancestor) {
+			if (ancestor === this) {
+				return false;
+			}
+			ancestor = ancestor.getParent();
 		}
 
 		// 기존 부모가 존재 할 경우.
@@ -67,7 +73,7 @@ export class Node extends Object {
 		if (currentParent) {
 			// 동일 부모 일 경우 무시.
 			if (currentParent === parent) {
-				return;
+				return true;
 			}
 
 			// 기존 부모의 자식 제거.
@@ -84,6 +90,7 @@ export class Node extends Object {
 			const newParentChildren = parent.getChildren();
 			newParentChildren.push(this);
 		}
+		return true;
 	}
 
 	//==============================================================================
@@ -91,18 +98,24 @@ export class Node extends Object {
 	//==============================================================================
 	/**
 	 * @param { Node } child 붙일 노드. (다른 부모에 붙어 있었으면 거기서 떼어 와 자식 목록 맨 뒤에 붙인다)
+	 * @returns { boolean } 붙였으면 참. (이 노드 자신이나 이 노드의 조상이면 붙이지 않고 거짓)
 	 */
 	addChild(child) {
-		child.setParent(this);
+		const isAttached = child.setParent(this);
+		return isAttached;
 	}
 
 	//==============================================================================
 	// 자식 제거.
 	//==============================================================================
 	/**
-	 * @param { Node } child 뗄 노드. (child.setParent(null) 을 부르므로 이 노드의 자식이 아니어도 지금 부모에서 떼어 낸다)
+	 * @param { Node } child 뗄 노드. (이 노드의 자식일 때만 떼어 낸다, 아니면 아무것도 하지 않는다)
 	 */
 	removeChild(child) {
+		const childParent = child.getParent();
+		if (childParent !== this) {
+			return;
+		}
 		child.setParent(null);
 	}
 

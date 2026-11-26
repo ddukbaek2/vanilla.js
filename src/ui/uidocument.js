@@ -25,6 +25,34 @@ import { UIProgressView } from "./uiprogressview.js";
 import { UISlider } from "./uislider.js";
 import { UIScrollView } from "./uiscrollview.js";
 import { UIProgressRing } from "./uiprogressring.js";
+import { ButtonMotion } from "./buttonmotion.js";
+import { HeatHazeEffect } from "../effect/heathazeeffect.js";
+import { ParticleSystem } from "../effect/particlesystem.js";
+import { ShaderSprite } from "../effect/shadersprite.js";
+import { TrailRenderer } from "../effect/trailrenderer.js";
+import { PlatformerBody } from "../misc/platformerbody.js";
+import { SpriteAnimator } from "../misc/spriteanimator.js";
+import { FloatingText } from "../misc/floatingtext.js";
+import { TouchEffect } from "../misc/toucheffect.js";
+import { ToastMotion } from "./toastmotion.js";
+import { ToonView3D } from "../experimental/graphics/toon/toonview3d.js";
+import { Visual } from "../experimental/visual/visual.js";
+import { UIBarChart, UILineChart } from "./uichart.js";
+import { UIControl } from "./uicontrol.js";
+import { UIDraggable } from "./uidraggable.js";
+import { UIHitArea } from "./uihitarea.js";
+import { UIListView } from "./uilistview.js";
+import { UISnapScrollView } from "./uisnapscrollview.js";
+import { UIConfirmWindow } from "./uiconfirmwindow.js";
+import { UIContextMenu } from "./uicontextmenu.js";
+import { UIDialog } from "./uidialog.js";
+import { UIDropdown } from "./uidropdown.js";
+import { UIInputField } from "./uiinputfield.js";
+import { UIScrollBar } from "./uiscrollbar.js";
+import { UISpinner } from "./uispinner.js";
+import { UIToast } from "./uitoast.js";
+import { UIWindow } from "./uiwindow.js";
+import { UIWindowLayer } from "./uiwindowlayer.js";
 
 
 //==============================================================================
@@ -35,6 +63,7 @@ const UIDOCUMENT_VERSION = 1;
 
 // 노드 타입 테이블. (문서에 기록되는 이름 → 생성자)
 // - registerNodeType() 으로 바깥에서 종류를 더할 수 있다.
+// - 적을 때도 이 표의 이름을 쓴다. (클래스 이름은 번들러가 줄이면 바뀌므로 기대지 않는다)
 const NODE_TYPE_TABLE = {
 	WorldNode: WorldNode,
 };
@@ -49,6 +78,7 @@ const REFLECTED_PROPERTY_EXCLUDE_NAMES = new System.Set([
 ]);
 
 // 컴포넌트 타입 테이블. (문서에 기록되는 이름 → 생성자)
+// - 런타임이 늘 쓰는 종류만 둔다. 에디터가 다루는 나머지는 registerEditorTypes() 로 더한다.
 const COMPONENT_TYPE_TABLE = {
 	Paint: Paint,
 	Sprite: Sprite,
@@ -119,6 +149,25 @@ function collectReflectedProperties(targetObject) {
 	return propertyList;
 }
 
+
+//==============================================================================
+// 생성자로 표에 등록한 이름 찾기.
+// - 문서에 적는 종류 이름은 등록한 이름이다. 클래스 이름(constructor.name)은 번들러가 줄이면(--minify) 바뀌므로
+//   등록하지 않은 종류에만 쓴다. (같은 생성자를 여러 이름으로 등록했으면 먼저 등록한 이름)
+//==============================================================================
+/**
+ * @param { object } typeTable 이름 → 생성자 표.
+ * @param { Function } targetType 찾을 생성자.
+ * @returns { string }
+ */
+function findRegisteredTypeName(typeTable, targetType) {
+	for (const typeName of System.Object.keys(typeTable)) {
+		if (typeTable[typeName] === targetType) {
+			return typeName;
+		}
+	}
+	return targetType.name;
+}
 
 //==============================================================================
 // 색상 → 배열. (문서 기록용)
@@ -530,8 +579,9 @@ export class UIDocument extends Object {
 		const contentSize = node.getContentSize();
 		const localPosition = node.getLocalPosition();
 		const localScale = node.getLocalScale();
+		const nodeTypeName = findRegisteredTypeName(NODE_TYPE_TABLE, node.constructor);
 		const nodeData = {
-			type: node.constructor.name,
+			type: nodeTypeName,
 			name: node.getName(),
 			active: node.isActive(),
 			position: [localPosition.x, localPosition.y],
@@ -552,7 +602,7 @@ export class UIDocument extends Object {
 		// 위젯마다 content 노드를 하나씩 만들므로 전부 모아 둔다.
 		const widgetContentNodeSet = new System.Set();
 		for (const component of componentList) {
-			const componentTypeName = component.constructor.name;
+			const componentTypeName = findRegisteredTypeName(COMPONENT_TYPE_TABLE, component.constructor);
 			const propertyHandler = COMPONENT_PROPERTY_TABLE[componentTypeName];
 			if (component instanceof UIView) {
 				const contentNode = component.getContent();
@@ -592,7 +642,7 @@ export class UIDocument extends Object {
 	//==============================================================================
 	/**
 	 * @param { object[] } componentList 한 노드의 컴포넌트 목록.
-	 * @returns { Set<string> } UIView 계열이 require 로 함께 붙이는 컴포넌트의 클래스 이름 모음.
+	 * @returns { Set<string> } UIView 계열이 require 로 함께 붙이는 컴포넌트의 문서 이름 모음. (등록한 이름, 등록하지 않았으면 클래스 이름)
 	 */
 	static collectGeneratedComponentTypes(componentList) {
 		const generatedTypeSet = new System.Set();
@@ -605,7 +655,8 @@ export class UIDocument extends Object {
 				continue;
 			}
 			for (const requiredType of requiredTypes) {
-				generatedTypeSet.add(requiredType.name);
+				const requiredTypeName = findRegisteredTypeName(COMPONENT_TYPE_TABLE, requiredType);
+				generatedTypeSet.add(requiredTypeName);
 			}
 		}
 		return generatedTypeSet;
@@ -615,13 +666,35 @@ export class UIDocument extends Object {
 	// 문서 데이터 → 노드 트리. (정적, 재귀)
 	//==============================================================================
 	/**
-	 * @param { object } nodeData serializeNode 꼴의 노드 데이터. (모르는 노드 종류는 WorldNode 로 만들고, 모르는 컴포넌트는 건너뛴다)
-	 * @returns { WorldNode } 만든 노드. (노드 참조는 아직 잇지 않는다)
+	 * @param { object } nodeData serializeNode 꼴의 노드 데이터. (모르는 노드 종류는 WorldNode 로 만들고, 모르는 컴포넌트는 건너뛴다, 둘 다 경고를 낸다)
+	 * @returns { WorldNode } 만든 노드. (노드 참조는 아직 잇지 않는다, 노드 생성자가 만든 컴포넌트와 자식에는 문서 값을 넣고 겹쳐 만들지 않는다)
 	 */
 	static deserializeNode(nodeData) {
-		const nodeType = NODE_TYPE_TABLE[nodeData.type] || WorldNode;
+		let nodeType = NODE_TYPE_TABLE[nodeData.type];
+		if (!nodeType) {
+			if (nodeData.type !== undefined) {
+				System.console.warn(`UIDocument: unregistered node type "${nodeData.type}" is read as WorldNode. (call UIDocument.registerEditorTypes() for documents saved by the editor)`);
+			}
+			nodeType = WorldNode;
+		}
 		const node = new nodeType();
 		node.setName(nodeData.name || "");
+		UIDocument.fillNode(node, nodeData);
+		return node;
+	}
+
+	//==============================================================================
+	// 문서 값을 노드 하나에 넣기. (정적, 재귀)
+	// - 노드에 이미 있는 컴포넌트와 자식(노드 생성자나 위젯이 만든 것, 붙을 때 함께 붙은 것)은 문서의 앞에서부터
+	//   차례와 종류(자식은 이름)가 맞으면 그것에 문서 값을 넣고 다시 만들지 않는다. 맞지 않으면 새로 만들어 붙인다.
+	//   (새로 만들면 다시 읽을 때마다 생성자가 만든 것과 문서의 것이 겹친다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { WorldNode } node 값을 넣을 노드.
+	 * @param { object } nodeData serializeNode 꼴의 노드 데이터.
+	 */
+	static fillNode(node, nodeData) {
 		if (nodeData.active !== undefined) {
 			node.setActive(nodeData.active);
 		}
@@ -650,15 +723,56 @@ export class UIDocument extends Object {
 			node.setInteractable(nodeData.interactable);
 		}
 
-		const componentDataList = nodeData.components || [];
+		// 이미 있는 컴포넌트와 자식. (위젯이 require 로 붙인 컴포넌트와 위젯의 content 노드는 문서에 적히지 않으므로 뺀다)
+		const currentComponentList = node.getAllComponents().slice();
+		let generatedTypeSet = UIDocument.collectGeneratedComponentTypes(currentComponentList);
+		const existingComponentList = [];
+		const widgetContentNodeSet = new System.Set();
 		let widgetComponent = null;
-		for (const componentData of componentDataList) {
-			const componentType = COMPONENT_TYPE_TABLE[componentData.type];
-			const propertyHandler = COMPONENT_PROPERTY_TABLE[componentData.type];
-			if (!componentType) {
-				continue;
+		for (const component of currentComponentList) {
+			const componentTypeName = findRegisteredTypeName(COMPONENT_TYPE_TABLE, component.constructor);
+			if (!generatedTypeSet.has(componentTypeName)) {
+				existingComponentList.push(component);
 			}
-			const component = node.addComponent(componentType);
+			if (component instanceof UIView) {
+				const contentNode = component.getContent();
+				if (contentNode) {
+					widgetContentNodeSet.add(contentNode);
+				}
+				widgetComponent = component;
+			}
+		}
+		const existingChildList = node.getChildren().filter((childNode) => !widgetContentNodeSet.has(childNode));
+
+		// 컴포넌트. (이미 있는 것 가운데 맨 앞이 같은 종류면 그것에 넣고, 아니면 붙인 다음 문서 값을 넣는다)
+		const componentDataList = nodeData.components || [];
+		for (const componentData of componentDataList) {
+			const frontComponent = existingComponentList.length > 0 ? existingComponentList[0] : null;
+			const frontTypeName = frontComponent ? findRegisteredTypeName(COMPONENT_TYPE_TABLE, frontComponent.constructor) : "";
+			let component = null;
+			if (frontComponent && frontTypeName === componentData.type) {
+				component = existingComponentList.shift();
+			}
+			else {
+				const componentType = COMPONENT_TYPE_TABLE[componentData.type];
+				if (!componentType) {
+					System.console.warn(`UIDocument: unregistered component type "${componentData.type}" is skipped. (call UIDocument.registerEditorTypes() for documents saved by the editor)`);
+					continue;
+				}
+				const previousComponentCount = node.getAllComponents().length;
+				component = node.addComponent(componentType);
+
+				// 붙으면서 함께 붙은 컴포넌트는 뒤따르는 문서 값을 받을 자리다. (위젯이 require 로 붙여 문서에 적히지 않는 것은 뺀다)
+				const addedComponentList = node.getAllComponents().slice(previousComponentCount);
+				generatedTypeSet = UIDocument.collectGeneratedComponentTypes(node.getAllComponents());
+				for (const addedComponent of addedComponentList) {
+					const addedTypeName = findRegisteredTypeName(COMPONENT_TYPE_TABLE, addedComponent.constructor);
+					if (addedComponent !== component && !generatedTypeSet.has(addedTypeName)) {
+						existingComponentList.push(addedComponent);
+					}
+				}
+			}
+			const propertyHandler = COMPONENT_PROPERTY_TABLE[componentData.type];
 			if (propertyHandler) {
 				propertyHandler.load(component, componentData);
 				UIDocument.loadNodeReferences(component, componentData);
@@ -671,22 +785,44 @@ export class UIDocument extends Object {
 			}
 		}
 
+		// 자식.
 		const childDataList = nodeData.children || [];
-		for (const childData of childDataList) {
-			node.addChild(UIDocument.deserializeNode(childData));
-		}
+		UIDocument.fillChildren(node, childDataList, existingChildList);
 
 		// 위젯 content 안의 자식 복원. (스크롤뷰 목록 항목 등)
 		const contentChildDataList = nodeData.contentChildren || [];
 		if (widgetComponent && contentChildDataList.length > 0) {
 			const contentNode = widgetComponent.getContent();
 			if (contentNode) {
-				for (const contentChildData of contentChildDataList) {
-					contentNode.addChild(UIDocument.deserializeNode(contentChildData));
-				}
+				const existingContentChildList = contentNode.getChildren().slice();
+				UIDocument.fillChildren(contentNode, contentChildDataList, existingContentChildList);
 			}
 		}
-		return node;
+	}
+
+	//==============================================================================
+	// 자식 문서 값 넣기. (정적, 이미 있는 자식은 차례와 이름이 맞으면 그것에 넣고, 아니면 만들어 붙인다)
+	//==============================================================================
+	/**
+	 * @private
+	 * @param { WorldNode } parentNode 자식을 붙일 노드.
+	 * @param { object[] } childDataList 자식 노드 데이터 목록.
+	 * @param { WorldNode[] } existingChildList 이미 있던 자식 목록. (문서 값을 받을 자리)
+	 */
+	static fillChildren(parentNode, childDataList, existingChildList) {
+		let existingChildIndex = 0;
+		for (const childData of childDataList) {
+			const childName = childData.name || "";
+			const existingChild = existingChildIndex < existingChildList.length ? existingChildList[existingChildIndex] : null;
+			if (existingChild && existingChild.getName() === childName) {
+				++existingChildIndex;
+				UIDocument.fillNode(existingChild, childData);
+			}
+			else {
+				const childNode = UIDocument.deserializeNode(childData);
+				parentNode.addChild(childNode);
+			}
+		}
 	}
 
 	//==============================================================================
@@ -916,7 +1052,7 @@ export class UIDocument extends Object {
 	// - 엔진에 노드가 늘어나면 등록만으로 문서가 그 종류를 다룬다.
 	//==============================================================================
 	/**
-	 * @param { string } typeName 문서에 적힐 이름. (적을 때 constructor.name 을 쓰므로 클래스 이름과 같게 준다)
+	 * @param { string } typeName 문서에 적힐 이름. (읽을 때 이 이름으로 찾고, 적을 때도 이 이름을 쓴다)
 	 * @param { * } nodeType 노드 클래스. (인자 없이 new 한다)
 	 */
 	static registerNodeType(typeName, nodeType) {
@@ -927,7 +1063,7 @@ export class UIDocument extends Object {
 	// 컴포넌트 종류 등록.
 	//==============================================================================
 	/**
-	 * @param { string } typeName 문서에 적힐 이름. (적을 때 constructor.name 을 쓰므로 클래스 이름과 같게 준다)
+	 * @param { string } typeName 문서에 적힐 이름. (읽을 때 이 이름으로 찾고, 적을 때도 이 이름을 쓴다)
 	 * @param { * } componentType 컴포넌트 클래스. (전용 입출력이 없으므로 짝이 맞는 get, set 속성으로 적고 되살린다)
 	 * @example <caption>게임의 컴포넌트를 문서에 담기</caption>
 	 * import { UIDocument, Component, WorldNode } from "./build/vanilla.js";
@@ -960,6 +1096,97 @@ export class UIDocument extends Object {
 	 */
 	static registerComponentType(typeName, componentType) {
 		COMPONENT_TYPE_TABLE[typeName] = componentType;
+	}
+
+	//==============================================================================
+	// 에디터가 다루는 종류 모두 등록. (정적)
+	// - UI 에디터와 비주얼 에디터는 엔진이 내보내는 모든 Component 와 WorldNode 하위 클래스를 등록해 문서에 적는다.
+	//   기본 표에는 런타임이 늘 쓰는 종류만 있으므로, 에디터가 저장한 문서를 읽는 게임은 이것을 한 번 부른다.
+	// - 이름 차례(abc)로 등록하고, 이미 등록한 이름은 그대로 둔다. (기본 표의 전용 입출력과 게임이 등록한 종류를 지킨다)
+	//==============================================================================
+	/**
+	 * @example <caption>에디터가 저장한 입력 필드와 스냅 스크롤을 읽기</caption>
+	 * import { UIDocument, UIInputField, UISnapScrollView, WorldNode } from "./build/vanilla.js";
+	 *
+	 * UIDocument.registerEditorTypes();
+	 * const rootNode = new WorldNode();
+	 * const inputFieldNode = new UIInputField();
+	 * inputFieldNode.setName("Name");
+	 * rootNode.addChild(inputFieldNode);
+	 * const pageNode = new WorldNode();
+	 * pageNode.setName("Pages");
+	 * pageNode.addComponent(UISnapScrollView);
+	 * rootNode.addChild(pageNode);
+	 * const jsonText = UIDocument.toJsonText(rootNode);
+	 * const restoredRootNode = UIDocument.fromJsonText(jsonText);
+	 * const restoredInputFieldNode = UIDocument.findNodeByPath(restoredRootNode, "/Name");
+	 * const restoredPageNode = UIDocument.findNodeByPath(restoredRootNode, "/Pages");
+	 * const restoredSnapScrollView = restoredPageNode.getComponent(UISnapScrollView);
+	 * console.log(restoredInputFieldNode instanceof UIInputField, restoredSnapScrollView !== null);
+	 */
+	static registerEditorTypes() {
+		// 표를 함수 안에서 만든다. (uilistview.js 가 이 모듈을 불러 서로 부르므로 모듈을 읽을 때는 아직 클래스가 없을 수 있다)
+		const editorComponentTypeList = [
+			["ButtonMotion", ButtonMotion],
+			["HeatHazeEffect", HeatHazeEffect],
+			["Mask", Mask],
+			["Outline", Outline],
+			["Paint", Paint],
+			["ParticleSystem", ParticleSystem],
+			["PlatformerBody", PlatformerBody],
+			["RichText", RichText],
+			["ShaderSprite", ShaderSprite],
+			["ShadowImage", ShadowImage],
+			["ShadowText", ShadowText],
+			["SoftShade", SoftShade],
+			["Sprite", Sprite],
+			["SpriteAnimator", SpriteAnimator],
+			["Text", Text],
+			["ToastMotion", ToastMotion],
+			["ToonView3D", ToonView3D],
+			["TrailRenderer", TrailRenderer],
+			["UIBarChart", UIBarChart],
+			["UIButton", UIButton],
+			["UIControl", UIControl],
+			["UIDraggable", UIDraggable],
+			["UIHitArea", UIHitArea],
+			["UIImageView", UIImageView],
+			["UILabel", UILabel],
+			["UILineChart", UILineChart],
+			["UIListView", UIListView],
+			["UIProgressRing", UIProgressRing],
+			["UIProgressView", UIProgressView],
+			["UIScrollView", UIScrollView],
+			["UISlider", UISlider],
+			["UISnapScrollView", UISnapScrollView],
+			["UIToggleButton", UIToggleButton],
+			["UIView", UIView],
+			["Visual", Visual],
+		];
+		const editorNodeTypeList = [
+			["FloatingText", FloatingText],
+			["TouchEffect", TouchEffect],
+			["UIConfirmWindow", UIConfirmWindow],
+			["UIContextMenu", UIContextMenu],
+			["UIDialog", UIDialog],
+			["UIDropdown", UIDropdown],
+			["UIInputField", UIInputField],
+			["UIScrollBar", UIScrollBar],
+			["UISpinner", UISpinner],
+			["UIToast", UIToast],
+			["UIWindow", UIWindow],
+			["UIWindowLayer", UIWindowLayer],
+		];
+		for (const [typeName, componentType] of editorComponentTypeList) {
+			if (!System.Object.hasOwn(COMPONENT_TYPE_TABLE, typeName)) {
+				COMPONENT_TYPE_TABLE[typeName] = componentType;
+			}
+		}
+		for (const [typeName, nodeType] of editorNodeTypeList) {
+			if (!System.Object.hasOwn(NODE_TYPE_TABLE, typeName)) {
+				NODE_TYPE_TABLE[typeName] = nodeType;
+			}
+		}
 	}
 
 	//==============================================================================

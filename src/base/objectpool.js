@@ -32,6 +32,7 @@ export class ObjectPool extends Object {
 	/** @private @type { Function } */ #createHandler;
 	/** @private @type { Function | null } */ #resetHandler;
 	/** @private @type { object[] } */ #freeList;
+	/** @private @type { Set<object> } */ #freeSet; // 놀고 있는 객체 모음. (두 번 되돌리기를 가린다)
 	/** @private @type { number } */ #totalCount;
 
 	//==============================================================================
@@ -49,10 +50,13 @@ export class ObjectPool extends Object {
 		this.#createHandler = createHandler;
 		this.#resetHandler = resetHandler;
 		this.#freeList = [];
+		this.#freeSet = new System.Set();
 		this.#totalCount = 0;
 
 		for (let index = 0; index < preloadCount; ++index) {
-			this.#freeList.push(this.#createHandler());
+			const instance = this.#createHandler();
+			this.#freeList.push(instance);
+			this.#freeSet.add(instance);
 			this.#totalCount += 1;
 		}
 	}
@@ -65,7 +69,9 @@ export class ObjectPool extends Object {
 	 */
 	acquire() {
 		if (this.#freeList.length > 0) {
-			return this.#freeList.pop();
+			const instance = this.#freeList.pop();
+			this.#freeSet.delete(instance);
+			return instance;
 		}
 		this.#totalCount += 1;
 		return this.#createHandler();
@@ -75,16 +81,21 @@ export class ObjectPool extends Object {
 	// 되돌리기.
 	//==============================================================================
 	/**
-	 * @param { object } instance 되돌릴 객체. (null 이나 undefined 면 무시한다, 이미 되돌린 객체인지는 가리지 않는다)
+	 * @param { object } instance 되돌릴 객체. (null 이나 undefined 면 무시한다, 이미 되돌려 놀고 있는 객체도 무시한다)
 	 */
 	release(instance) {
 		if (instance === null || instance === undefined) {
+			return;
+		}
+		// 두 번 되돌리면 같은 객체가 두 번 빌려져 두 쓰임이 한 객체를 나눠 쓰게 된다.
+		if (this.#freeSet.has(instance)) {
 			return;
 		}
 		if (this.#resetHandler) {
 			this.#resetHandler(instance);
 		}
 		this.#freeList.push(instance);
+		this.#freeSet.add(instance);
 	}
 
 	//==============================================================================
@@ -112,5 +123,6 @@ export class ObjectPool extends Object {
 	//==============================================================================
 	clear() {
 		this.#freeList.length = 0;
+		this.#freeSet.clear();
 	}
 }
