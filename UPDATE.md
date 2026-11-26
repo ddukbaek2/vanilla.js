@@ -1,6 +1,7 @@
 # 업데이트 기록
 
 # 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- 초안 공간 나누기 시험: tests/experimental/spatial.test.mjs 에 러스트 판 DynamicTree 시험 둘(넣고 옮기고 빼기와 질의, 광선)을 같은 난수와 같은 기댓값으로 옮겼다. 러스트 판 CI 가 tests/experimental 의 시험을 모두 돌린다
 - 초안 타일맵 게터(Experimental tilemap): Tilemap.getTilesets, getLayers 는 얼린 사본 배열, Tileset.getTileOffset, getTileAnimation, getTileCollisionShapes 와 TilemapLayer.getColor, getOffset 은 사본을 돌려준다(러스트 판의 조각과 사본처럼, 밖에서 고쳐 첫 gid 표나 그리기와 어긋나지 않게). 고치려면 set 함수를 부른다
   - 옮기는 법: getLayers().push 같은 것은 addLayer, insertLayer, removeLayer 로, getOffset().x = 값 같은 것은 setOffset 으로 바꾼다.
 - 초안 2D 뼈대(Experimental skeleton2d): Skeleton2D.findIkConstraintIndex(이름) 을 더했다(러스트 판 find_ik_constraint_index, 없으면 -1). 안쪽 함수 Skeleton2DAnimationState.collectTrackEvents, Skeleton2DAnimator.readOrigin 을 문서상 @private 로 했다(러스트 판처럼 공개 API 가 아님). node 시험 tests/experimental/skeleton2d.test.mjs(예제 skeleton2dcheck.mjs 와 러스트 판과 같은 값)
