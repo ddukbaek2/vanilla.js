@@ -18,7 +18,7 @@ const childProcess = require("child_process");
 //   node tools/apidoc.cjs <버전> [--date YYYY-MM-DD]   docs/api/<버전>.json 쓰기
 //   node tools/apidoc.cjs <버전> --missing             표에 없는 ko 글 목록 (JSON 배열)
 //   node tools/apidoc.cjs <버전> --check               docs/api/<버전>.json 꼴 검사와 수 세기
-//   node tools/apidoc.cjs <버전> --gaps                문서 빈 곳 (빈 설명, 빈 꼴, @returns 없는 함수, 예제 없는 클래스와 모듈, 머리 주석 없는 비공개 함수)
+//   node tools/apidoc.cjs <버전> --gaps                문서 빈 곳 (빈 설명, 빈 꼴, @returns 없는 함수, 예제 없는 클래스와 모듈, 머리 주석 없는 비공개 함수, 떨어진 머리 주석)
 //   node tools/apidoc.cjs <버전> --check-examples      예제 검사 (문법, 엔진 이름, node 와 헤드리스 크롬으로 돌려 보기)
 //   --missing, --gaps, --check-examples 는 --only <경로 앞>, --exclude <경로 앞> 으로 거른다. (여러 번 줄 수 있다)
 //==============================================================================
@@ -2518,7 +2518,7 @@ function listSourceFiles() {
 //==============================================================================
 // 문서 빈 곳 모으기.
 // - 공개 API: 빈 ko 설명(모듈, 클래스, 멤버, 매개변수, 반환, 열거), 빈 매개변수 꼴, 값을 돌려주는데 @returns 가 없는 함수, 예제 없는 클래스와 모듈.
-// - src 의 모든 파일: 공개 API 가 아닌 함수와 메서드(#이름, 밑줄 이름, @private, 내보내지 않은 것) 가운데 머리 주석이 없는 것.
+// - src 의 모든 파일: 공개 API 가 아닌 함수와 메서드(#이름, 밑줄 이름, @private, 내보내지 않은 것) 가운데 머리 주석이 없는 것, 선언에 붙지 않은 머리 주석.
 // - [{ source, kind, name, line }] (line 은 알 때만)
 //==============================================================================
 /**
@@ -2593,7 +2593,11 @@ function collectGaps(apiDocument, statistics, options) {
 		if (!isPathSelected(sourcePath, options)) {
 			continue;
 		}
-		const parsed = parseSourceFile(fs.readFileSync(path.join(REPOSITORY_ROOT, sourcePath), "utf8"));
+		const sourceText = fs.readFileSync(path.join(REPOSITORY_ROOT, sourcePath), "utf8");
+		const parsed = parseSourceFile(sourceText);
+		for (const detachedHeader of findDetachedHeaders(sourceText)) {
+			addGap(sourcePath, "떨어진 머리 주석", detachedHeader.name, detachedHeader.line);
+		}
 		for (const declaration of parsed.declarationList) {
 			if (declaration.kind === "function" && declaration.document.description === "" && !(declaration.isExported && isPublicName(declaration.exportName || declaration.name))) {
 				addGap(sourcePath, "머리 주석 없는 비공개 함수", declaration.name, declaration.line);
@@ -2614,6 +2618,57 @@ function collectGaps(apiDocument, statistics, options) {
 		}
 	}
 	return gapList;
+}
+
+//==============================================================================
+// 선언에 붙지 않은 머리 주석 찾기. (--gaps 의 "떨어진 머리 주석")
+// - 머리 주석(//==== 로 감싼 줄)과 JSDoc 다음에 선언 없이 다른 머리 주석이 오면, 함수를 옮기거나 지우고 남은 옛 덩이다.
+// - 구획 머리말("멤버 변수 목록." 처럼 "목록" 으로 끝나는 한 줄)이 아닌 머리 주석 바로 뒤에 다른 머리 주석이 와도 떨어진 것이다.
+//   (구획 머리말이 아닌 머리 주석은 바로 뒤 선언의 설명으로 읽히므로, 절을 나누는 머리말은 "목록" 으로 끝내거나 선언마다 제 머리 주석을 둔다)
+// - [{ name, line }] (name 은 머리 주석의 첫 줄)
+//==============================================================================
+/**
+ * @param { string } sourceText
+ * @returns { object[] }
+ */
+function findDetachedHeaders(sourceText) {
+	const tokenList = tokenize(sourceText);
+	const detachedList = [];
+	const isRuleLine = (token) => token !== undefined && token.type === "lineComment" && /^=+$/.test(token.value.trim());
+	let tokenIndex = 0;
+	while (tokenIndex < tokenList.length) {
+		if (!isRuleLine(tokenList[tokenIndex])) {
+			++tokenIndex;
+			continue;
+		}
+		// 머리 주석 하나. (여는 줄, 글 줄, 닫는 줄)
+		const openIndex = tokenIndex;
+		let closeIndex = openIndex + 1;
+		const headerLines = [];
+		while (closeIndex < tokenList.length && tokenList[closeIndex].type === "lineComment" && !isRuleLine(tokenList[closeIndex])) {
+			headerLines.push(tokenList[closeIndex].value.trim());
+			++closeIndex;
+		}
+		if (!isRuleLine(tokenList[closeIndex]) || headerLines.length === 0) {
+			tokenIndex = closeIndex;
+			continue;
+		}
+		let nextIndex = closeIndex + 1;
+		let hasJsdoc = false;
+		const jsdocToken = tokenList[nextIndex];
+		if (jsdocToken !== undefined && jsdocToken.type === "blockComment" && jsdocToken.value.startsWith("/**") && jsdocToken.line === tokenList[closeIndex].endLine + 1) {
+			hasJsdoc = true;
+			++nextIndex;
+		}
+		const nextToken = tokenList[nextIndex];
+		const isAdjacent = nextToken !== undefined && nextToken.line === tokenList[nextIndex - 1].endLine + 1;
+		const isFollowedByHeader = isAdjacent && (isRuleLine(nextToken) || (nextToken.type === "lineComment" && isRuleLine(tokenList[nextIndex + 1])));
+		if (isFollowedByHeader && (hasJsdoc || !isSectionHeader(headerLines))) {
+			detachedList.push({ name: headerLines[0], line: tokenList[openIndex].line });
+		}
+		tokenIndex = closeIndex + 1;
+	}
+	return detachedList;
 }
 
 //==============================================================================
