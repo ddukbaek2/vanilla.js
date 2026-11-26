@@ -10581,6 +10581,30 @@
 			"vanilla-engine": {
 				"module": "core/graphic",
 				"class": "Graphic",
+				"name": "begin_opacity_layer"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "beginOpacityLayer"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "end_opacity_layer"
+			},
+			"vanilla.js": {
+				"module": "core/graphic",
+				"class": "Graphic",
+				"name": "endOpacityLayer"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/graphic",
+				"class": "Graphic",
 				"name": "end_clip_rect"
 			},
 			"vanilla.js": {
@@ -13517,6 +13541,30 @@
 				"module": "core/node/transformnode",
 				"class": "TransformNode",
 				"name": "isGizmoVisible"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
+				"name": "set_opacity_layer"
+			},
+			"vanilla.js": {
+				"module": "core/node/transformnode",
+				"class": "TransformNode",
+				"name": "setOpacityLayer"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/node/worldnode",
+				"class": "WorldNode",
+				"name": "is_opacity_layer"
+			},
+			"vanilla.js": {
+				"module": "core/node/transformnode",
+				"class": "TransformNode",
+				"name": "isOpacityLayer"
 			}
 		},
 		{

@@ -40,6 +40,7 @@ export class TransformNode extends ComponentNode {
 	/** @private @type { number } */ #localRotation; // 로컬 회전값. (degree)
 	/** @private @type { number } */ #localOpacity; // 투명도.
 	/** @private @type { boolean } */ #isGizmoVisible; // 기즈모 출력 여부.
+	/** @private @type { boolean } */ #isOpacityLayer; // 투명도를 노드와 자손에 묶어 한 번에 얹을지. (CSS opacity)
 	/** @private @type { number } */ #lastDrawnMaximumScale; // 지난번 그릴 때 변환의 가장 큰 배율. (0 이면 아직 모른다, Graphic 이 글 굽기 배율에 쓴다)
 
 	//==============================================================================
@@ -55,6 +56,7 @@ export class TransformNode extends ComponentNode {
 		this.#localScale = Vector2.one();
 		this.#localRotation = 0.0;
 		this.#isGizmoVisible = false;
+		this.#isOpacityLayer = false;
 		this.#localOpacity = 1.0;
 		this.#lastDrawnMaximumScale = 0;
 	}
@@ -538,5 +540,34 @@ export class TransformNode extends ComponentNode {
 	 */
 	isGizmoVisible() {
 		return this.#isGizmoVisible;
+	}
+
+	//==============================================================================
+	// 투명도 층 설정. (CSS opacity 처럼 투명도를 노드와 자손에 묶어 한 번에 얹을지)
+	// - 켜고 투명도(부모의 것을 곱한 값)가 1 보다 작으면 이 노드와 자손을 층에 모아 그렸다가 그 투명도로 한 번에 얹는다. (Graphic.beginOpacityLayer)
+	//   겹친 자식끼리 비치지 않는다. 끄면(처음) 노드마다 투명도를 곱해 따로 얹는다.
+	//==============================================================================
+	/**
+	 * @param { boolean } isOpacityLayer 투명도를 묶어 얹을지.
+	 * @example <caption>반투명한 묶음 노드 (겹친 자식이 서로 비치지 않는다)</caption>
+	 * import { WorldNode } from "./build/vanilla.js";
+	 *
+	 * const groupNode = new WorldNode();
+	 * groupNode.setLocalOpacity(0.5);
+	 * groupNode.setOpacityLayer(true);
+	 * console.log(groupNode.isOpacityLayer());
+	 */
+	setOpacityLayer(isOpacityLayer) {
+		this.#isOpacityLayer = isOpacityLayer;
+	}
+
+	//==============================================================================
+	// 투명도 층 여부 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 투명도를 노드와 자손에 묶어 얹으면 참.
+	 */
+	isOpacityLayer() {
+		return this.#isOpacityLayer;
 	}
 }

@@ -21127,6 +21127,52 @@
 						},
 						{
 							"kind": "method",
+							"name": "beginOpacityLayer",
+							"signature": "beginOpacityLayer()",
+							"params": [],
+							"description": {
+								"ko": "투명도 층 시작. (CSS opacity, 어도비 투명도 묶음처럼 endOpacityLayer 까지 그린 것을 따로 칸에 모았다가 지금 전역 알파로 한 번에 얹는다)\n- 층 안의 그림은 서로 겹친 자리가 비치지 않는다. (노드마다 투명도를 곱해 따로 얹으면 겹친 자리에서 아래 그림이 비친다)\n- 층 안은 전역 알파 1 에서 시작한다. 층 칸은 화면과 같은 크기의 RGBA8 이고 스텐실을 지금 자르기 깊이로 채워 둬 층 안의 자르기도 그대로 된다.\n  바깥 자르기는 얹을 때 걸린다. 층은 겹쳐 열 수 있다. 칸을 지을 수 없으면 층 없이 그대로 그린다.\n- 노드는 setOpacityLayer 를 켜고 투명도가 1 보다 작으면 그 노드와 자손을 층으로 그린다.",
+								"en": "Begins an opacity layer. (Like CSS opacity or an Adobe transparency group, everything drawn until endOpacityLayer is gathered in a separate buffer and laid down at once with the current global alpha)\n- Drawings inside the layer do not show through each other where they overlap. (Multiplying opacity per node and laying each down separately lets the drawing below show through at overlaps)\n- Inside the layer the global alpha starts at 1. The layer buffer is RGBA8 at the screen size, and its stencil is filled with the current clip depth so clips inside the layer still work.\n  Outer clips apply when the layer is laid down. Layers can be nested. If the buffer cannot be made, drawing goes straight through without a layer.\n- A node with setOpacityLayer turned on and opacity below 1 is drawn with its descendants as a layer."
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "begin_opacity_layer"
+							},
+							"examples": [
+								{
+									"title": {
+										"ko": "겹친 두 사각형을 묶어 반투명하게 (겹친 자리에서 아래 사각형이 비치지 않는다)",
+										"en": "Make two overlapping rectangles translucent as a group (the lower rectangle does not show through where they overlap)"
+									},
+									"code": "import { Engine, EngineConfiguration, Scene, Vector2, Rect } from \"./build/vanilla.js\";\n\nclass MainScene extends Scene {\n\tdraw(graphic) {\n\t\tsuper.draw(graphic);\n\t\tgraphic.pushState();\n\t\tgraphic.setGlobalAlpha(0.5);\n\t\tgraphic.beginOpacityLayer();\n\t\tgraphic.setFillColor(\"#ff0000\");\n\t\tgraphic.drawRect(Rect.create(100, 100, 200, 100));\n\t\tgraphic.setFillColor(\"#0000ff\");\n\t\tgraphic.drawRect(Rect.create(200, 150, 200, 100));\n\t\tgraphic.endOpacityLayer();\n\t\tgraphic.popState();\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nengineConfiguration.referenceResolutionSize = Vector2.create(640, 360);\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "endOpacityLayer",
+							"signature": "endOpacityLayer()",
+							"params": [],
+							"description": {
+								"ko": "투명도 층 끝. (beginOpacityLayer 뒤에 그린 것을 앞 프레임버퍼에 층을 열 때의 전역 알파로 얹는다)",
+								"en": "Ends an opacity layer. (Lays what was drawn after beginOpacityLayer onto the previous framebuffer with the global alpha at the time the layer was opened)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/graphic.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/graphic",
+								"class": "Graphic",
+								"name": "end_opacity_layer"
+							}
+						},
+						{
+							"kind": "method",
 							"name": "endClipRect",
 							"signature": "endClipRect()",
 							"params": [],
@@ -23695,6 +23741,68 @@
 								"module": "core/node/worldnode",
 								"class": "WorldNode",
 								"name": "is_gizmo_visible"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "setOpacityLayer",
+							"signature": "setOpacityLayer(isOpacityLayer)",
+							"params": [
+								{
+									"name": "isOpacityLayer",
+									"type": "boolean",
+									"description": {
+										"ko": "투명도를 묶어 얹을지.",
+										"en": "Whether to lay the opacity down as a group."
+									}
+								}
+							],
+							"description": {
+								"ko": "투명도 층 설정. (CSS opacity 처럼 투명도를 노드와 자손에 묶어 한 번에 얹을지)\n- 켜고 투명도(부모의 것을 곱한 값)가 1 보다 작으면 이 노드와 자손을 층에 모아 그렸다가 그 투명도로 한 번에 얹는다. (Graphic.beginOpacityLayer)\n  겹친 자식끼리 비치지 않는다. 끄면(처음) 노드마다 투명도를 곱해 따로 얹는다.",
+								"en": "Sets the opacity layer. (Whether to group the opacity over the node and its descendants and lay it down at once, like CSS opacity)\n- When on and the opacity (multiplied by the parent's) is below 1, this node and its descendants are drawn into a layer and laid down at once with that opacity. (Graphic.beginOpacityLayer)\n  Overlapping children do not show through each other. When off (the default), opacity is multiplied per node and each is laid down separately."
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/transformnode.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/node/worldnode",
+								"class": "WorldNode",
+								"name": "set_opacity_layer"
+							},
+							"examples": [
+								{
+									"title": {
+										"ko": "반투명한 묶음 노드 (겹친 자식이 서로 비치지 않는다)",
+										"en": "A translucent group node (overlapping children do not show through each other)"
+									},
+									"code": "import { WorldNode } from \"./build/vanilla.js\";\n\nconst groupNode = new WorldNode();\ngroupNode.setLocalOpacity(0.5);\ngroupNode.setOpacityLayer(true);\nconsole.log(groupNode.isOpacityLayer());",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "isOpacityLayer",
+							"signature": "isOpacityLayer()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "투명도를 노드와 자손에 묶어 얹으면 참.",
+									"en": "True if the opacity is grouped over the node and its descendants."
+								}
+							},
+							"description": {
+								"ko": "투명도 층 여부 반환.",
+								"en": "Returns whether the node is an opacity layer."
+							},
+							"since": "0.4.0",
+							"source": "src/core/node/transformnode.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/node/worldnode",
+								"class": "WorldNode",
+								"name": "is_opacity_layer"
 							}
 						}
 					]
