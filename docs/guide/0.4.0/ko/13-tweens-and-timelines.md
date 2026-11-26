@@ -392,7 +392,7 @@ engine.run(new BindScene());
 
 ## Animator
 
-`Animator`, `AnimationState`, `AnimationTransition`, `AnimationClip` 은 실험 단계의 클래스입니다. 상태마다 프레임 클립을 달고, 매개변수 조건으로 상태를 옮기며 두 상태를 섞는 상태 기계입니다. (유니티 Animator 의 상태 기계와 같은 뼈대)
+`Animator`, `AnimationState`, `AnimationTransition`, `AnimationClip` 은 상태마다 프레임 클립을 달고, 매개변수 조건으로 상태를 옮기며 두 상태를 섞는 상태 기계입니다. (유니티 Animator 의 상태 기계와 같은 뼈대)
 
 - `animator.addState(state)` 와 `addTransition(transition)` 은 목록에 넣고 번호를 돌려줍니다. `getStates()`, `getTransitions()` 는 엔진의 `List` 를 돌려줍니다. 처음 더한 상태에서 시작합니다.
 - `AnimationState` 는 클립(`setClip`), 속도(`setSpeed`), 되풀이(`setLoop`, `null` 이면 클립을 따름)를 담습니다.

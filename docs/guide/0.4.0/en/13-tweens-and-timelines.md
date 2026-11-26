@@ -392,7 +392,7 @@ engine.run(new BindScene());
 
 ## Animator
 
-`Animator`, `AnimationState`, `AnimationTransition`, and `AnimationClip` are experimental classes. They form a state machine that attaches a frame clip to each state, moves between states by parameter conditions, and blends two states. (the same structure as Unity's Animator state machine)
+`Animator`, `AnimationState`, `AnimationTransition`, and `AnimationClip` form a state machine that attaches a frame clip to each state, moves between states by parameter conditions, and blends two states. (the same structure as Unity's Animator state machine)
 
 - `animator.addState(state)` and `addTransition(transition)` add to their lists and return the index. `getStates()` and `getTransitions()` return the engine's `List`. It starts in the first state added.
 - `AnimationState` holds a clip (`setClip`), a speed (`setSpeed`), and looping (`setLoop`, `null` follows the clip).

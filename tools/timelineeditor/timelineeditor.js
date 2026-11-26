@@ -13,7 +13,7 @@ import { ParticleSystem } from "../../src/effect/particlesystem.js";
 import { ShaderSpriteEffect } from "../../src/effect/shadersprite.js";
 import {
 	Timeline, TIMELINE_EASING_NAMES, TIMELINE_PROPERTY_DEFINITIONS, TIMELINE_NODE_DEFAULTS, resolveTimelineEasing, parseTimelineColor, composeTimelineColor,
-} from "../../src/experimental/animation/timeline.js";
+} from "../../src/animation/timeline.js";
 import { Pane, PaneStyle, PaneTheme } from "../../src/web/pane.js";
 import {
 	EditorTheme, applyEditorTheme, setEditorCommandHandler, wrapEditorIconMarkup,

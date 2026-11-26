@@ -5,7 +5,7 @@ const System = globalThis;
 import { Object } from "../base/object.js";
 import { Color } from "../base/color.js";
 import { Graphic } from "../core/graphic.js";
-import { FullscreenPass } from "../experimental/graphics/fullscreenpass.js";
+import { FullscreenPass } from "../core/fullscreenpass.js";
 
 
 //==============================================================================

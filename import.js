@@ -112,6 +112,8 @@ export { FontAsset } from "./src/resource/fontasset.js";
 export { ImageAsset } from "./src/resource/imageasset.js";
 export { JsonAsset } from "./src/resource/jsonasset.js";
 export { TextAsset } from "./src/resource/textasset.js";
+export { VisualAsset } from "./src/resource/visualasset.js";
+export { BunchAsset } from "./src/resource/bunchasset.js";
 
 
 //==============================================================================
@@ -121,38 +123,64 @@ export { ImageScroller } from "./src/misc/imagescroller.js";
 export { TouchParticle, TouchEffect } from "./src/misc/toucheffect.js";
 export { VirtualPad } from "./src/misc/virtualpad.js";
 export { NodeLayout } from "./src/misc/nodelayout.js";
+export { Visual } from "./src/misc/visual.js";
 
 
 //==============================================================================
-// 실험적 기능 목록.
+// 컬렉션 목록. (src/base/collection, 러스트 판에서는 표준 Vec, HashMap 같은 것이 맡는다)
 //==============================================================================
-export { List } from "./src/experimental/collection/list.js";
-export { Dictionary } from "./src/experimental/collection/dictionary.js";
-export { Queue } from "./src/experimental/collection/queue.js";
-export { Stack } from "./src/experimental/collection/stack.js";
-export { Set } from "./src/experimental/collection/set.js";
-export { Animator, AnimationState, AnimationTransition, AnimationConditionMode } from "./src/experimental/animation/animator.js";
-export { Visual } from "./src/experimental/visual/visual.js";
-export { VisualAsset } from "./src/experimental/visual/visualasset.js";
-export { Camera } from "./src/experimental/camera.js";
+export { List } from "./src/base/collection/list.js";
+export { Dictionary } from "./src/base/collection/dictionary.js";
+export { Queue } from "./src/base/collection/queue.js";
+export { Stack } from "./src/base/collection/stack.js";
+export { Set } from "./src/base/collection/set.js";
+
+
+//==============================================================================
+// 애니메이션 목록. (src/animation)
+//==============================================================================
+export { Animator, AnimationState, AnimationTransition, AnimationConditionMode } from "./src/animation/animator.js";
+export { Action } from "./src/animation/action.js";
+
+
+//==============================================================================
+// 셰이더와 풀스크린 패스 목록. (src/core)
+//==============================================================================
 export { ShaderProgram } from "./src/core/graphic/shaderprogram.js";
 export { ShaderWarmer } from "./src/core/graphic/shaderwarmer.js";
-export { RenderTarget } from "./src/experimental/graphics/rendertarget.js";
-export { FullscreenPass } from "./src/experimental/graphics/fullscreenpass.js";
-export { BloomEffect } from "./src/experimental/graphics/bloomeffect.js";
-export { SkinnedModel } from "./src/experimental/graphics/skinnedmodel.js";
-export { SkinnedModelRenderer, MORPH_GLSL } from "./src/experimental/graphics/skinnedmodelrenderer.js";
-export * as ToonMesh from "./src/experimental/graphics/toon/meshbuilder.js";
-export * as ToonGlb from "./src/experimental/graphics/toon/glbmeshreader.js";
-export { ToonRenderer, extractFrustumPlanes, TOON_MAXIMUM_JOINTS, TOON_ATTRIBUTE_LOCATIONS, TOON_INSTANCE_FLOAT_COUNT } from "./src/experimental/graphics/toon/toonrenderer.js";
-export { ToonPostProcess } from "./src/experimental/graphics/toon/toonpostprocess.js";
-export { HumanSkinRenderer, SKIN_SHADING_SKIN, SKIN_SHADING_EYE, SKIN_SHADING_HAIR, SKIN_SHADING_OCCLUSION, SKIN_SHADING_FLUID, SKIN_SHADING_FACIALHAIR, SKIN_TEXTURE_UNIT_DETAILHEIGHT, SKIN_TEXTURE_UNIT_MICRO, SKIN_TEXTURE_UNIT_MASKATLAS, SKIN_TEXTURE_UNIT_LAYERNORMAL, SKIN_TEXTURE_UNIT_LAYERCOLOR, SKIN_TEXTURE_UNIT_AUXILIARY } from "./src/experimental/graphics/humanskinrenderer.js";
-export { AmbientOcclusionEffect } from "./src/experimental/graphics/ambientocclusioneffect.js";
-export { SubsurfaceScatteringEffect } from "./src/experimental/graphics/subsurfacescatteringeffect.js";
-export { Material } from "./src/experimental/graphics/material.js";
-export { ShadowMap } from "./src/experimental/graphics/shadowmap.js";
-export { Action } from "./src/experimental/action.js";
-export { BunchAsset } from "./src/experimental/bunchasset.js";
+export { FullscreenPass } from "./src/core/fullscreenpass.js";
+
+
+//==============================================================================
+// 3D 그래픽스 목록. (src/graphics3d, 툰 3D 는 src/graphics3d/toon)
+//==============================================================================
+export { RenderTarget } from "./src/graphics3d/rendertarget.js";
+export { BloomEffect } from "./src/graphics3d/bloomeffect.js";
+export { SkinnedModel } from "./src/graphics3d/skinnedmodel.js";
+export { SkinnedModelRenderer, MORPH_GLSL } from "./src/graphics3d/skinnedmodelrenderer.js";
+export * as ToonMesh from "./src/graphics3d/toon/meshbuilder.js";
+export * as ToonGlb from "./src/graphics3d/toon/glbmeshreader.js";
+export { ToonRenderer, extractFrustumPlanes, TOON_MAXIMUM_JOINTS, TOON_ATTRIBUTE_LOCATIONS, TOON_INSTANCE_FLOAT_COUNT } from "./src/graphics3d/toon/toonrenderer.js";
+export { ToonPostProcess } from "./src/graphics3d/toon/toonpostprocess.js";
+export { HumanSkinRenderer, SKIN_SHADING_SKIN, SKIN_SHADING_EYE, SKIN_SHADING_HAIR, SKIN_SHADING_OCCLUSION, SKIN_SHADING_FLUID, SKIN_SHADING_FACIALHAIR, SKIN_TEXTURE_UNIT_DETAILHEIGHT, SKIN_TEXTURE_UNIT_MICRO, SKIN_TEXTURE_UNIT_MASKATLAS, SKIN_TEXTURE_UNIT_LAYERNORMAL, SKIN_TEXTURE_UNIT_LAYERCOLOR, SKIN_TEXTURE_UNIT_AUXILIARY } from "./src/graphics3d/humanskinrenderer.js";
+export { AmbientOcclusionEffect } from "./src/graphics3d/ambientocclusioneffect.js";
+export { SubsurfaceScatteringEffect } from "./src/graphics3d/subsurfacescatteringeffect.js";
+export { Material } from "./src/graphics3d/material.js";
+export { ShadowMap, ShadowAtlas, SHADOW_ATLAS_MAXIMUM_LIGHTS } from "./src/graphics3d/shadowmap.js";
+
+
+//==============================================================================
+// 폐기 예정 목록. (src/deprecated, 다음 판에서 빠질 수 있다)
+//==============================================================================
+// Camera: Camera2D(src/misc/camera2d.js)가 회전과 begin, end 까지 모두 덮는다.
+export { Camera } from "./src/deprecated/camera.js";
+
+
+//==============================================================================
+// 실험 기능 목록. (src/experimental, 0.4.0 뒤 기능의 초안이라 API 가 바뀔 수 있다)
+//==============================================================================
+export * as Experimental from "./src/experimental/experimental.js";
+
 
 // 이번 확장에서 추가 / 공개된 모듈. (게임 프로젝트들에서 반복 구현되던 범용 기능)
 export { SeededRandom } from "./src/base/seededrandom.js";
@@ -191,7 +219,7 @@ export { ParticleSystem, ParticleEmitterShape, ParticleRenderShape } from "./src
 export { TrailRenderer } from "./src/effect/trailrenderer.js";
 export { ShaderSprite, ShaderSpriteEffect } from "./src/effect/shadersprite.js";
 export { ScreenEffect, ScreenEffectType, SCREEN_EFFECT_PARAMETER_NAMES } from "./src/effect/screeneffect.js";
-export { Timeline, TIMELINE_EASING_NAMES, TIMELINE_PROPERTY_DEFINITIONS, TIMELINE_NODE_DEFAULTS, resolveTimelineEasing, createBezierEasing, parseTimelineColor, composeTimelineColor } from "./src/experimental/animation/timeline.js";
+export { Timeline, TIMELINE_EASING_NAMES, TIMELINE_PROPERTY_DEFINITIONS, TIMELINE_NODE_DEFAULTS, resolveTimelineEasing, createBezierEasing, parseTimelineColor, composeTimelineColor } from "./src/animation/timeline.js";
 export { UIListView } from "./src/ui/uilistview.js";
 export { UILineChart, UIBarChart } from "./src/ui/uichart.js";
 export { UIDropdown } from "./src/ui/uidropdown.js";
@@ -204,16 +232,16 @@ export { UIDialog } from "./src/ui/uidialog.js";
 export { MouseButton, TouchPhase, TouchPoint, InputDevice } from "./src/core/inputmanager.js";
 export { InputActions } from "./src/core/inputactions.js";
 export { GamepadKind, readGamepadKind } from "./src/core/gamepadmanager.js";
-export { Camera3D } from "./src/experimental/graphics/camera3d.js";
-export { ToonDrawQueue } from "./src/experimental/graphics/toon/toondrawqueue.js";
-export { ToonView3D } from "./src/experimental/graphics/toon/toonview3d.js";
+export { Camera3D } from "./src/graphics3d/camera3d.js";
+export { ToonDrawQueue } from "./src/graphics3d/toon/toondrawqueue.js";
+export { ToonView3D } from "./src/graphics3d/toon/toonview3d.js";
 export { GraphicsQualityGovernor, GraphicsQuality } from "./src/misc/graphicsqualitygovernor.js";
 export { FixedStepper } from "./src/misc/fixedstepper.js";
 export { AssetLoader } from "./src/resource/assetloader.js";
 export { LoadingProgress } from "./src/misc/loadingprogress.js";
 export { BuildInfo } from "./src/misc/buildinfo.js";
-export { ToonScreenOutline, ToonOutlineWidthUnit, TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID, readJumpFloodSteps } from "./src/experimental/graphics/toon/toonscreenoutline.js";
-export { ToonVfx, ToonVfxSlot, ToonVfxLook, ToonVfxShape, ToonVfxDecalMode, TOON_VFX_MAXIMUM_RAMPS, TOON_VFX_DEFAULT_PARTICLE_CAPACITY } from "./src/experimental/graphics/toon/toonvfx.js";
+export { ToonScreenOutline, ToonOutlineWidthUnit, TOON_SCREEN_OUTLINE_MAXIMUM_LINE_ID, readJumpFloodSteps } from "./src/graphics3d/toon/toonscreenoutline.js";
+export { ToonVfx, ToonVfxSlot, ToonVfxLook, ToonVfxShape, ToonVfxDecalMode, TOON_VFX_MAXIMUM_RAMPS, TOON_VFX_DEFAULT_PARTICLE_CAPACITY } from "./src/graphics3d/toon/toonvfx.js";
 export { UIScale } from "./src/ui/uiscale.js";
 export { UIWindow } from "./src/ui/uiwindow.js";
 export { UIWindowLayer } from "./src/ui/uiwindowlayer.js";
@@ -227,7 +255,7 @@ export { PageEvent } from "./src/core/engine.js";
 // 효과 갈래. (아지랑이 컴포넌트)
 export { HeatHazeEffect } from "./src/effect/heathazeeffect.js";
 export { TweenProperty, applyTweenProperty } from "./src/core/tween.js";
-export { Indicator } from "./src/experimental/indicator.js";
+export { Indicator } from "./src/misc/indicator.js";
 export { ToastPhase } from "./src/ui/toastmotion.js";
 // 글자, 글꼴 갈래. (글자 아틀라스, 글자 묶음과 낱말 나누기, 글의 첫 강한 방향)
 export { DynamicFont, GlyphInfo } from "./src/misc/dynamicfont.js";
@@ -235,11 +263,11 @@ export { splitGraphemes, splitWords, countGraphemes, sliceGraphemes } from "./sr
 export { detectTextDirection } from "./src/core/graphic.js";
 // 입력 필드 문맥 메뉴 항목.
 export { UIInputFieldMenuAction } from "./src/ui/uiinputfield.js";
-export { MultiLevelBloomEffect } from "./src/experimental/graphics/multilevelbloomeffect.js";
+export { MultiLevelBloomEffect } from "./src/graphics3d/multilevelbloomeffect.js";
 // 글자, 그리기 갈래. (러스트 판에만 있던 Graphic 없이 글 재기)
 export { measureTextWithoutGraphic } from "./src/core/graphic/textstringtexturecache.js";
 // 툰 3D 확장 자리와 빛. (빛 묶음, 머티리얼 셰이더 조각, 인스턴스 꼴과 영구 버퍼, 섞는 방식, 그리기 단계, 평면 거울 행렬)
-export { ToonLightSet, TOON_MAXIMUM_POINT_LIGHTS, TOON_MAXIMUM_BAND_STEPS } from "./src/experimental/graphics/toon/toonlightset.js";
-export { ToonMaterial, ToonInstanceLayout, ToonBlendMode, ToonMatcapBlend, ToonBufferUsage, TOON_MAXIMUM_INSTANCE_ATTRIBUTES, TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION, TOON_INSTANCE_MATRIX_NAME, TOON_INSTANCE_TINT_NAME } from "./src/experimental/graphics/toon/toonmaterial.js";
-export { ToonProgramKind, TOON_MAXIMUM_MATERIAL_TEXTURES, composeToonProgramSources, createReflectionMatrix, readFrameCamera, readMatrixDeterminant, readViewRotation, readOutlineVertexData } from "./src/experimental/graphics/toon/toonrenderer.js";
-export { ToonDrawStage } from "./src/experimental/graphics/toon/toondrawqueue.js";
+export { ToonLightSet, TOON_MAXIMUM_POINT_LIGHTS, TOON_MAXIMUM_BAND_STEPS } from "./src/graphics3d/toon/toonlightset.js";
+export { ToonMaterial, ToonInstanceLayout, ToonBlendMode, ToonMatcapBlend, ToonBufferUsage, TOON_MAXIMUM_INSTANCE_ATTRIBUTES, TOON_FIRST_INSTANCE_ATTRIBUTE_LOCATION, TOON_INSTANCE_MATRIX_NAME, TOON_INSTANCE_TINT_NAME } from "./src/graphics3d/toon/toonmaterial.js";
+export { ToonProgramKind, TOON_MAXIMUM_MATERIAL_TEXTURES, composeToonProgramSources, createReflectionMatrix, readFrameCamera, readMatrixDeterminant, readViewRotation, readCameraRoll, readOutlineVertexData, readUvData } from "./src/graphics3d/toon/toonrenderer.js";
+export { ToonDrawStage } from "./src/graphics3d/toon/toondrawqueue.js";

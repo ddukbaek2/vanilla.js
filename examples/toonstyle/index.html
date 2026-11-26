@@ -20,6 +20,7 @@ const System = globalThis;
 // - 주소 ?scale=0.5 면 화면 공간 바깥선의 선의 판을 그 몫으로 줄여 그린다. (러스트 TOON_STYLE_SCALE)
 // - 주소 ?toggles=1 이면 바닥은 선 없이 가리기만, 결정 덩이는 꺾임 선 없이 그린다. (러스트 TOON_STYLE_TOGGLES)
 // - 주소 ?shell=1 이면 화면 공간 바깥선 대신 껍데기 바깥선으로 그린다. (러스트 TOON_STYLE_SHELL)
+// - 주소 ?roll=0.35 면 카메라를 그 각(라디안)만큼 기울인다. 천사 고리는 머리에 붙어 있다. (러스트 TOON_STYLE_ROLL)
 // - 한 번만 그린다. (움직이지 않는 견주기 장면)
 //==============================================================================
 const sceneModule = await import("./toonstylescene.js");
@@ -29,7 +30,8 @@ const query = new System.URLSearchParams(System.location.search);
 const lineScale = query.has("scale") ? System.Number(query.get("scale")) : 1;
 const isToggled = query.get("toggles") === "1";
 const isShell = query.get("shell") === "1";
-const scene = new sceneModule.ToonStyleScene(webGL2RenderingContext, lineScale, isToggled, isShell);
+const cameraRoll = query.has("roll") ? System.Number(query.get("roll")) : 0;
+const scene = new sceneModule.ToonStyleScene(webGL2RenderingContext, lineScale, isToggled, isShell, cameraRoll);
 //==============================================================================
 // 한 프레임. (캔버스 크기를 화면 화소로 맞추고 그린다)
 //==============================================================================
