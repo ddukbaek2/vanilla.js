@@ -16,12 +16,13 @@ import { FontAsset } from "../resource/fontasset.js";
 
 
 //==============================================================================
-// 문맥 메뉴 항목. (잘라내기 / 복사 / 붙여넣기, requestMenuAction 이 받는다)
+// 문맥 메뉴 항목. (잘라내기 / 복사 / 붙여넣기 / 모두 선택, requestMenuAction 이 받는다)
 //==============================================================================
 export const UIInputFieldMenuAction = {
 	cut: "cut", // 잘라내기.
 	copy: "copy", // 복사.
 	paste: "paste", // 붙여넣기.
+	selectAll: "selectAll", // 모두 선택.
 };
 
 
@@ -31,7 +32,7 @@ export const UIInputFieldMenuAction = {
 // - 클릭/드래그/커서 이동/선택은 모두 캔버스 측에서 직접 처리.
 // - DOM <input> 사용 여부는 옵션 (setUseDOMInput, 기본 false). true 일 때만 한글 IME /
 //   모바일 소프트 키보드 / 시스템 클립보드가 동작. false 면 ASCII 위주 키보드 직접 처리.
-// - 우클릭 시 컨텍스트 메뉴 (잘라내기 / 복사 / 붙여넣기).
+// - 우클릭 시 컨텍스트 메뉴 (잘라내기 / 복사 / 붙여넣기 / 모두 선택). 직접 누름(setUseDirectTouch) 필드도 브라우저 편집 칸 메뉴 대신 같은 메뉴다.
 // - 커서 이동과 Delete 는 크롬처럼 글자 묶음 단위, 뒤로 지우기는 블링크 BackspaceStateMachine 처럼 코드 포인트 하나(이모지 묶음은 통째로).
 // - DOM 입력은 크롬 입력 칸처럼 마우스로 두 번 누르면 낱말(윈도우는 뒤 공백까지), 세 번 누르면 글 전체를 고른다. (누름 수는 mousedown 의 detail)
 // - 캔버스 모드의 낱말 이동과 지우기는 크롬처럼 윈도우와 리눅스는 Ctrl, 맥은 Option 과 왼쪽, 오른쪽 화살표, Backspace, Delete 다. (블링크 NextWordPosition, PreviousWordPosition)
@@ -295,6 +296,7 @@ export class UIInputField extends WorldNode {
 	// DOM 입력을 필드 위에서 손가락(마우스)이 직접 누르게 할지. (기본 false, 꺼져 있으면 DOM 입력은 누름을 받지 않고 캔버스가 포커스를 준다)
 	// 켜면 필드가 보이는 동안 투명한 DOM 입력이 필드 자리에서 누름을 받아, 브라우저의 기본 동작으로 포커스(다른 출처의 iframe 이면 그 프레임까지)와
 	// 키보드를 연다. 코드로 준 포커스를 받지 않는 웹뷰(앱 안의 iframe 등)에서 쓴다. 포커스를 받으면 커서는 글 끝에 둔다.
+	// 그 DOM 입력의 오른쪽 클릭은 브라우저 편집 칸 메뉴 대신 다른 필드와 같은 엔진 문맥 메뉴를 띄운다. (러스트 데스크탑과 같은 항목)
 	/**
 	 * @param { boolean } use 참이면 투명한 DOM 입력이 필드 자리에서 누름을 직접 받는다. (기본 거짓)
 	 */
@@ -928,6 +930,8 @@ export class UIInputField extends WorldNode {
 				if (this.#onSubmitCallback) this.#onSubmitCallback(this.#value);
 			}
 		});
+		// 직접 누름이면 오른쪽 클릭이 이 DOM 입력에 온다. 브라우저 편집 칸 메뉴를 막고 캔버스 누름과 같은 엔진 문맥 메뉴를 띄운다.
+		input.addEventListener("contextmenu", (event) => this.handleDOMInputContextMenuEvent(event));
 
 		doc.body.appendChild(input);
 		this.#domInput = input;
@@ -1459,6 +1463,10 @@ export class UIInputField extends WorldNode {
 				this.paste();
 				break;
 			}
+			case UIInputFieldMenuAction.selectAll: {
+				this.selectAll();
+				break;
+			}
 		}
 	}
 	//==============================================================================
@@ -1531,7 +1539,20 @@ export class UIInputField extends WorldNode {
 		this.showContextMenu(event.clientX, event.clientY);
 	}
 	//==============================================================================
-	// 문맥 메뉴 띄우기. (잘라내기, 복사, 붙여넣기 DOM 메뉴, 메뉴 밖을 누르면 닫는다)
+	// 직접 누름 DOM 입력의 오른쪽 클릭 처리. (브라우저 편집 칸 메뉴를 막고 엔진 문맥 메뉴를 띄운다)
+	//==============================================================================
+	/**
+	 * @param { MouseEvent } event DOM 입력의 contextmenu 사건.
+	 */
+	handleDOMInputContextMenuEvent(event) {
+		if (!this.#useDirectTouch) return;
+		event.preventDefault();
+		event.stopPropagation();
+		this.focus();
+		this.showContextMenu(event.clientX, event.clientY);
+	}
+	//==============================================================================
+	// 문맥 메뉴 띄우기. (잘라내기, 복사, 붙여넣기, 모두 선택 DOM 메뉴, 메뉴 밖을 누르면 닫는다)
 	// - 메뉴는 body 에 붙은 absolute 라 문서 좌표로 놓는다. (뷰포트 좌표인 clientX, clientY 에 스크롤한 만큼 더한다)
 	//==============================================================================
 	/**
@@ -1564,6 +1585,7 @@ export class UIInputField extends WorldNode {
 			{ text: "잘라내기", enabled: hasSel,  action: () => this.cut() },
 			{ text: "복사",     enabled: hasSel,  action: () => this.copy() },
 			{ text: "붙여넣기", enabled: true,    action: () => this.paste() },
+			{ text: "모두 선택", enabled: this.#value.length > 0, action: () => this.selectAll() },
 		];
 		for (const item of items) {
 			const button = doc.createElement("div");

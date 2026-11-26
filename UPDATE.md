@@ -1,6 +1,8 @@
 # 업데이트 기록
 
 # 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- 입력 필드 문맥 메뉴: 직접 누름 필드(setUseDirectTouch)의 오른쪽 클릭이 브라우저 편집 칸 메뉴 대신 다른 필드와 같은 엔진 문맥 메뉴다. (DOM 입력의 contextmenu 기본 동작을 막는다) 메뉴에 모두 선택(글이 있을 때)을 더했고, UIInputFieldMenuAction.selectAll 이 생겼다. 러스트 판과 같은 네 항목이다
+  - 옮기는 법: 없다. 직접 누름 필드에서 브라우저 메뉴(맞춤법, 번역, 검사 같은 것)를 쓰던 게임은 엔진 메뉴를 쓴다.
 - FBX 재질 여럿: 메시 하나에 재질이 여럿인 FBX(LayerElementMaterial 의 Materials, MappingInformationType ByPolygon 이나 AllSame)를 폴리곤의 재질 번호대로 부분 메시로 나눠 재질마다 드로어블 하나로 그린다. (three.js FBXLoader 의 그룹, 유니티와 언리얼의 서브메시) 지금까지는 재질 번호를 폴리곤 순번이 아니라 폴리곤 정점 순번으로 찾았고, 메시마다 소유 노드의 첫 재질 하나로만 그려 Quaternius 마네킹(M_Main, M_Joints)이 온통 주황이었다. 새 정적 함수 SkinnedModel.splitFbxCornersByMaterial, FBX 메시 서술과 드로어블에 materialName(FBX Material 이름, glb 처럼), FbxLoader 재질에 name. 러스트 판과 같다. 문서 그림 ancient-mountain, 셰이더 해시를 바꾼 뒤의 shader-sprite, screen-effect 다시 찍음(1280 x 720, cwebp -q 85). 묶음과 UI 에디터 다시 지음.
   - 옮기는 법: FBX 모델의 drawableList 가 재질 수만큼 늘어난다. drawableList[0] 하나가 메시 전체라고 기대하던 코드는 materialName 이나 materialIndex 로 찾는다.
 - Engine.alert, confirm, prompt(와 alertAsync, confirmAsync, promptAsync), isModalDialogOpen: 러스트 판 Engine 과 같은 이름과 동작으로 브라우저 window.alert, confirm, prompt 를 부르고 ModalDialogHandle(isFinished, getResult, isConfirmed, getPromptText, setCallback)을 돌려준다. 브라우저 창이 닫힌 뒤 끝난 손잡이라 isModalDialogOpen 은 늘 거짓(러스트 웹 판과 같다). 새 모듈 src/core/modaldialog.js(ModalDialogKind, ModalDialogResult, ModalDialogHandle).
