@@ -2,8 +2,8 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Matrix4 } from "../../../base/matrix4.js";
-import { ShaderProgram } from "../../../core/graphic/shaderprogram.js";
+import { Matrix4 } from "../../base/matrix4.js";
+import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
 import { VERTEX_FLOAT_COUNT, SKIN_FLOAT_COUNT } from "./meshbuilder.js";
 import { ToonLightSet, TOON_MAXIMUM_POINT_LIGHTS, TOON_MAXIMUM_BAND_STEPS } from "./toonlightset.js";
 import { SHADOW_ATLAS_MAXIMUM_LIGHTS } from "../shadowmap.js";

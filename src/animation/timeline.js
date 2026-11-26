@@ -2,18 +2,18 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Object } from "../../base/object.js";
-import { Color } from "../../base/color.js";
-import { Vector2 } from "../../base/vector2.js";
-import { Pivot } from "../../base/pivot.js";
-import { Rect } from "../../base/rect.js";
-import { Tween } from "../../core/tween.js";
-import { WorldNode } from "../../core/node/worldnode.js";
-import { Paint } from "../../core/component/paint.js";
-import { Text } from "../../core/component/text.js";
-import { ParticleSystem } from "../../effect/particlesystem.js";
-import { ShaderSprite, ShaderSpriteEffect } from "../../effect/shadersprite.js";
-import { AudioAsset } from "../../resource/audioasset.js";
+import { Object } from "../base/object.js";
+import { Color } from "../base/color.js";
+import { Vector2 } from "../base/vector2.js";
+import { Pivot } from "../base/pivot.js";
+import { Rect } from "../base/rect.js";
+import { Tween } from "../core/tween.js";
+import { WorldNode } from "../core/node/worldnode.js";
+import { Paint } from "../core/component/paint.js";
+import { Text } from "../core/component/text.js";
+import { ParticleSystem } from "../effect/particlesystem.js";
+import { ShaderSprite, ShaderSpriteEffect } from "../effect/shadersprite.js";
+import { AudioAsset } from "../resource/audioasset.js";
 
 
 //==============================================================================

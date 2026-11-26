@@ -24,8 +24,8 @@ vanilla.js 는 외부 라이브러리 없이 브라우저에서 바로 동작하
 | UI | 버튼 / 토글 / 스크롤 뷰 / 스크롤 바 / 슬라이더 / 입력 필드 / 진행 바 / 진행 고리 / 리스트 뷰 / 드롭다운 / 컨텍스트 메뉴 / 다이얼로그 / 토스트 / 스피너 / 선, 막대 차트, 창 쌓기(`UIWindowLayer`, `UIWindow`, `UIConfirmWindow`), `ButtonMotion`, `ToastMotion`, `UIHitArea`, `UIScale`, `UIDocument`, 제약 기반 레이아웃(`LayoutSolver`) |
 | 효과 | `ParticleSystem`(방출 모양, 렌더 모양, 버스트, 수명 곡선, 끌개, 월드 공간), `TrailRenderer`, `ShaderSprite` 49 종, `ScreenEffect` 58 종, `HeatHazeEffect`, `Shaker`, `FloatingText` |
 | 애니메이션 | `Timeline` 런타임(트랙 보간, 이징 31 종 + 베지어, 이벤트 / 마커 / 사운드 / 파티클), `Animator` 상태 기계, `Tween`(노드 속성 트윈 포함), `SpriteAnimator` |
-| 3D (실험) | `SkinnedModel`(glTF / GLB / FBX, 스키닝, 모프 타깃), `SkinnedModelRenderer`, `HumanSkinRenderer`, `ShadowMap`, `BloomEffect`, `MultiLevelBloomEffect`, `AmbientOcclusionEffect`, `SubsurfaceScatteringEffect`, `Camera3D`, `Material` / `RenderTarget`(멀티샘플) / `FullscreenPass` |
-| 툰 3D (실험) | `ToonRenderer`(셀 셰이딩, 껍데기 바깥선, 인스턴싱, 그림자, `ToonLightSet` 빛 묶음과 점광, `ToonMaterial` 셰이더 조각, 인스턴스 꼴과 영구 인스턴스 버퍼), `ToonMesh` / `ToonGlb`, `ToonDrawQueue`(그리기 단계 콜백), `ToonScreenOutline`, `ToonVfx`, `ToonPostProcess`(MSAA, 다단 블룸, 색 보정), `ToonView3D` |
+| 3D | `SkinnedModel`(glTF / GLB / FBX, 스키닝, 모프 타깃), `SkinnedModelRenderer`, `HumanSkinRenderer`, `ShadowMap`, `BloomEffect`, `MultiLevelBloomEffect`, `AmbientOcclusionEffect`, `SubsurfaceScatteringEffect`, `Camera3D`, `Material` / `RenderTarget`(멀티샘플) / `FullscreenPass` |
+| 툰 3D | `ToonRenderer`(셀 셰이딩, 껍데기 바깥선, 인스턴싱, 그림자, `ToonLightSet` 빛 묶음과 점광, `ToonMaterial` 셰이더 조각, 인스턴스 꼴과 영구 인스턴스 버퍼), `ToonMesh` / `ToonGlb`, `ToonDrawQueue`(그리기 단계 콜백), `ToonScreenOutline`, `ToonVfx`, `ToonPostProcess`(MSAA, 다단 블룸, 색 보정), `ToonView3D` |
 | 게임 보조 | `FiniteStateMachine`, `PathFinder`, `Grid`, `Collision2D`, `Steering2D`, `PlatformerBody`, `ObjectPool`, `SeededRandom`, `FixedStepper`, `Localization`, `LanguagePack`, `UIFont`, `DynamicFont`, `Format`, `PersistedStore`, `LocalStorage`, `DialogueRunner`, `Typewriter`, `CameraGestures`, `FrameProbe`, `GraphicsQualityGovernor`, `BuildInfo` |
 | 애셋 | `ImageAsset`, `TextAsset`, `JsonAsset`, `BlobAsset`, `FontAsset`, `AudioAsset`, `AssetLoader`(함께 받기, 진행률, 실패 목록), `LoadingProgress`, `SpriteAtlas` |
 | 오디오 | `AudioPlayer`, `AudioBus`, `SoundSystem`(소리 표, 배경음악, 효과음 버스, 음소거 규칙), `SoundEffectPool`, `BeepPlayer` |
@@ -44,14 +44,17 @@ vanilla.js 는 외부 라이브러리 없이 브라우저에서 바로 동작하
 
 ```
 src/            엔진 소스
-	base/         수학, 색, 자료구조, 난수
+	base/         수학, 색, 자료구조(collection/), 난수
 	core/         엔진 루프, 씬, 노드, 입력, 렌더링(Graphic), 소리
 	ui/           UI 컴포넌트, 레이아웃
 	effect/       파티클, 트레일, ShaderSprite, ScreenEffect, HeatHazeEffect
-	experimental/ 3D 그래픽스(툰 3D 포함), 타임라인, 컬렉션
+	animation/    타임라인, Animator, Action
+	graphics3d/   3D 그래픽스 (툰 3D 는 toon/)
 	game/ misc/   게임 보조 기능
 	resource/     애셋 로더
 	web/          브라우저 연동
+	experimental/ 0.4.0 뒤 기능의 초안 (Experimental 이름 공간, API 가 바뀔 수 있음)
+	deprecated/   폐기와 폐기 예정
 examples/       샘플 (배포본과 같은 소스)
 tools/          웹 저작 도구와 명령줄 도구
 build/          번들 산출물 (vanilla.js / vanilla.min.js)

@@ -3,7 +3,7 @@
 //==============================================================================
 const System = globalThis;
 import { SkinnedModelRenderer, MORPH_GLSL } from "./skinnedmodelrenderer.js";
-import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
+import { ShaderProgram } from "../core/graphic/shaderprogram.js";
 
 
 //==============================================================================

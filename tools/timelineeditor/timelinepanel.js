@@ -2,7 +2,7 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { Timeline, TIMELINE_PROPERTY_DEFINITIONS } from "../../src/experimental/animation/timeline.js";
+import { Timeline, TIMELINE_PROPERTY_DEFINITIONS } from "../../src/animation/timeline.js";
 import { EditorTheme } from "../common/editorkit.js";
 
 

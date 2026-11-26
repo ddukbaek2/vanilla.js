@@ -2,10 +2,10 @@
 // 포함 모듈 목록.
 //==============================================================================
 const System = globalThis;
-import { ShaderProgram } from "../../../core/graphic/shaderprogram.js";
-import { SeededRandom } from "../../../base/seededrandom.js";
-import { Vector2 } from "../../../base/vector2.js";
-import { Shaker } from "../../../misc/shaker.js";
+import { ShaderProgram } from "../../core/graphic/shaderprogram.js";
+import { SeededRandom } from "../../base/seededrandom.js";
+import { Vector2 } from "../../base/vector2.js";
+import { Shaker } from "../../misc/shaker.js";
 
 
 /**

@@ -392,7 +392,7 @@ engine.run(new BindScene());
 
 ## Animator
 
-`Animator`, `AnimationState`, `AnimationTransition`, and `AnimationClip` are experimental classes. For now they are containers for states, transitions, and properties.
+`Animator`, `AnimationState`, `AnimationTransition`, and `AnimationClip` are still only a skeleton. For now they are containers for states, transitions, and properties.
 
 - `animator.addState(state)` and `addTransition(transition)` add to their lists and return the index. `getStates()` and `getTransitions()` return the engine's `List`.
 - `AnimationState.setClip(clip)` attaches an `AnimationClip` to a state. `AnimationTransition` connects two state indices with `setFrom(stateIndex)` and `setTo(stateIndex)`.

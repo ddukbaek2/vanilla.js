@@ -24,8 +24,8 @@ Load a single bundle as a module and scenes, nodes, input, UI, particles and aud
 | UI | Button / toggle / scroll view / scroll bar / slider / input field / progress bar / progress ring / list view / dropdown / context menu / dialog / toast / spinner / line and bar charts, window stacking (`UIWindowLayer`, `UIWindow`, `UIConfirmWindow`), `ButtonMotion`, `ToastMotion`, `UIHitArea`, `UIScale`, `UIDocument`, constraint-based layout (`LayoutSolver`) |
 | Effects | `ParticleSystem` (emission shapes, render shapes, bursts, lifetime curves, attractors, world space), `TrailRenderer`, 49 `ShaderSprite` types, 58 `ScreenEffect` types, `HeatHazeEffect`, `Shaker`, `FloatingText` |
 | Animation | `Timeline` runtime (track interpolation, 31 easings + Bezier, events / markers / sounds / particles), `Animator` state machine, `Tween` (including node property tweens), `SpriteAnimator` |
-| 3D (experimental) | `SkinnedModel` (glTF / GLB / FBX, skinning, morph targets), `SkinnedModelRenderer`, `HumanSkinRenderer`, `ShadowMap`, `BloomEffect`, `MultiLevelBloomEffect`, `AmbientOcclusionEffect`, `SubsurfaceScatteringEffect`, `Camera3D`, `Material` / `RenderTarget` (multisample) / `FullscreenPass` |
-| Toon 3D (experimental) | `ToonRenderer` (cel shading, shell outlines, instancing, shadows, `ToonLightSet` light sets and point lights, `ToonMaterial` shader snippets, instance formats and persistent instance buffers), `ToonMesh` / `ToonGlb`, `ToonDrawQueue` (draw stage callbacks), `ToonScreenOutline`, `ToonVfx`, `ToonPostProcess` (MSAA, multi-level bloom, color grading), `ToonView3D` |
+| 3D | `SkinnedModel` (glTF / GLB / FBX, skinning, morph targets), `SkinnedModelRenderer`, `HumanSkinRenderer`, `ShadowMap`, `BloomEffect`, `MultiLevelBloomEffect`, `AmbientOcclusionEffect`, `SubsurfaceScatteringEffect`, `Camera3D`, `Material` / `RenderTarget` (multisample) / `FullscreenPass` |
+| Toon 3D | `ToonRenderer` (cel shading, shell outlines, instancing, shadows, `ToonLightSet` light sets and point lights, `ToonMaterial` shader snippets, instance formats and persistent instance buffers), `ToonMesh` / `ToonGlb`, `ToonDrawQueue` (draw stage callbacks), `ToonScreenOutline`, `ToonVfx`, `ToonPostProcess` (MSAA, multi-level bloom, color grading), `ToonView3D` |
 | Game helpers | `FiniteStateMachine`, `PathFinder`, `Grid`, `Collision2D`, `Steering2D`, `PlatformerBody`, `ObjectPool`, `SeededRandom`, `FixedStepper`, `Localization`, `LanguagePack`, `UIFont`, `DynamicFont`, `Format`, `PersistedStore`, `LocalStorage`, `DialogueRunner`, `Typewriter`, `CameraGestures`, `FrameProbe`, `GraphicsQualityGovernor`, `BuildInfo` |
 | Assets | `ImageAsset`, `TextAsset`, `JsonAsset`, `BlobAsset`, `FontAsset`, `AudioAsset`, `AssetLoader` (concurrent loading, progress, failure list), `LoadingProgress`, `SpriteAtlas` |
 | Audio | `AudioPlayer`, `AudioBus`, `SoundSystem` (sound table, background music, sound effect bus, mute rules), `SoundEffectPool`, `BeepPlayer` |
@@ -44,14 +44,17 @@ Playable results made with the engine.
 
 ```
 src/            Engine source
-	base/         Math, color, data structures, random numbers
+	base/         Math, color, data structures (collection/), random numbers
 	core/         Engine loop, scenes, nodes, input, rendering (Graphic), sound
 	ui/           UI components, layout
 	effect/       Particles, trails, ShaderSprite, ScreenEffect, HeatHazeEffect
-	experimental/ 3D graphics (including toon 3D), timeline, collections
+	animation/    Timeline, Animator, Action
+	graphics3d/   3D graphics (toon 3D in toon/)
 	game/ misc/   Game helper features
 	resource/     Asset loader
 	web/          Browser integration
+	experimental/ Drafts of features after 0.4.0 (Experimental namespace, the API may change)
+	deprecated/   Deprecated and to be deprecated
 examples/       Samples (same source as the deployed builds)
 tools/          Web authoring tools and command-line tools
 build/          Bundle output (vanilla.js / vanilla.min.js)
