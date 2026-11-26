@@ -81,10 +81,10 @@ esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify 
 
 | 도구 | 설명 | 데모 | 소스 |
 | --- | --- | --- | --- |
-| UI Editor | 노드 트리, 인스펙터, 캔버스 편집으로 UI 화면을 짜고 `.uiasset.json` 으로 저장 | [열기](https://ddukbaek2.com/portfolio/uieditor/) | [`tools/uieditor`](tools/uieditor) |
-| Particle Editor | 파티클 프리셋 저작. 미리보기에서 값을 바꾸며 조정 | [열기](https://ddukbaek2.com/portfolio/particleeditor/) | [`tools/particleeditor`](tools/particleeditor) |
-| Timeline Editor | 유니티 타임라인 / 언리얼 시퀀서 쓰임새의 키프레임 저작. 도프 시트 + 커브, 자동 키, 이벤트 / 마커 | [열기](https://ddukbaek2.com/portfolio/timelineeditor/) | [`tools/timelineeditor`](tools/timelineeditor) |
-| Visual Editor | 유니티처럼 도킹 창(하이어라키, 씬, 게임, 인스펙터, 프로젝트, 콘솔)을 갖춘 통합 편집기. 폴더 열기, 프리팹, 되돌리기, 재생. 씬은 UIDocument 형식(`.scene.json`)으로 저장 | [열기](https://ddukbaek2.com/portfolio/visualeditor/) | [`tools/visualeditor`](tools/visualeditor) |
+| UI Editor | 노드 트리, 인스펙터, 캔버스 편집으로 UI 화면을 짜고 `.uiasset.json` 으로 저장 | [열기](https://vanillapunch.com/tools/editor/uieditor/) | [`tools/uieditor`](tools/uieditor) |
+| Particle Editor | 파티클 프리셋 저작. 미리보기에서 값을 바꾸며 조정 | [열기](https://vanillapunch.com/tools/editor/particleeditor/) | [`tools/particleeditor`](tools/particleeditor) |
+| Timeline Editor | 유니티 타임라인 / 언리얼 시퀀서 쓰임새의 키프레임 저작. 도프 시트 + 커브, 자동 키, 이벤트 / 마커 | [열기](https://vanillapunch.com/tools/editor/timelineeditor/) | [`tools/timelineeditor`](tools/timelineeditor) |
+| Visual Editor | 유니티처럼 도킹 창(하이어라키, 씬, 게임, 인스펙터, 프로젝트, 콘솔)을 갖춘 통합 편집기. 폴더 열기, 프리팹, 되돌리기, 재생. 씬은 UIDocument 형식(`.scene.json`)으로 저장 | [열기](https://vanillapunch.com/tools/editor/visualeditor/) | [`tools/visualeditor`](tools/visualeditor) |
 
 명령줄 도구는 Node.js 로 실행합니다. 자세한 사용법은 [`tools/TOOLS.md`](tools/TOOLS.md) 에 있습니다.
 
@@ -106,14 +106,14 @@ esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify 
 
 | 샘플 | 설명 | 데모 | 소스 |
 | --- | --- | --- | --- |
-| Toon Shading | VRM 1.0 캐릭터의 애니풍 렌더링. 3 톤 램프, 구면 노멀 얼굴 그림자, 앞머리 그림자, 천사 고리, 화면 공간 림, 아웃라인, 스프링 본, Mixamo 본 애니메이션 8 종 | [열기](https://ddukbaek2.com/portfolio/toonshading/) | [`examples/toonshading`](examples/toonshading) |
-| Old Face | 메타휴먼 얼굴 PBR. 서브서피스 스캐터링, 표정 주름 맵, 그룸 카드 머리카락, 눈 굴절, 머티리얼 그래프 패널 | [열기](https://ddukbaek2.com/portfolio/oldface/) | [`examples/oldface`](examples/oldface) |
-| Ancient Mountain | 절차 지형(경사, 고도 3 중 블렌딩)과 하늘, 구름, 섀도우 맵, 걷기 / 달리기 / 등반하는 캐릭터 | [열기](https://ddukbaek2.com/portfolio/ancientmountain/) | [`examples/ancientmountain`](examples/ancientmountain) |
-| Neon Horizon | 절차 하늘(초콜릿 하늘, 바닐라 태양)과 함대 3D 모델, 엔진 글로우, 기함 주포 연출 | [열기](https://ddukbaek2.com/portfolio/neonhorizon/) | [`examples/neonhorizon`](examples/neonhorizon) |
-| UI Showcase | UI 컴포넌트 전시. 버튼, 스크롤 뷰, 리스트, 차트, 다이얼로그, 레이아웃 | [열기](https://ddukbaek2.com/portfolio/uishowcase/) | [`examples/uishowcase`](examples/uishowcase) |
-| Particle Effects | 불 / 분수 / 눈 / 비 / 폭발 등 파티클 프리셋 18 종 | [열기](https://ddukbaek2.com/portfolio/particleeffects/) | [`examples/particleeffects`](examples/particleeffects) |
-| Timeline Showcase | 타임라인 편집기로 만든 문서 8 종 재생. 트랜스포트, 스크럽, 마커 / 이벤트 | [열기](https://ddukbaek2.com/portfolio/timelineshowcase/) | [`examples/timelineshowcase`](examples/timelineshowcase) |
-| Sprite Effects | `ShaderSprite` 49 종, `ScreenEffect` 58 종, 게임 연출 조합 시연 | [열기](https://ddukbaek2.com/portfolio/spriteeffects/) | [`examples/spriteeffects`](examples/spriteeffects) |
+| Toon Shading | VRM 1.0 캐릭터의 애니풍 렌더링. 3 톤 램프, 구면 노멀 얼굴 그림자, 앞머리 그림자, 천사 고리, 화면 공간 림, 아웃라인, 스프링 본, Mixamo 본 애니메이션 8 종 | [열기](https://vanillapunch.com/tools/demo/toonshading/) | [`examples/toonshading`](examples/toonshading) |
+| Old Face | 메타휴먼 얼굴 PBR. 서브서피스 스캐터링, 표정 주름 맵, 그룸 카드 머리카락, 눈 굴절, 머티리얼 그래프 패널 | [열기](https://vanillapunch.com/tools/demo/oldface/) | [`examples/oldface`](examples/oldface) |
+| Ancient Mountain | 절차 지형(경사, 고도 3 중 블렌딩)과 하늘, 구름, 섀도우 맵, 걷기 / 달리기 / 등반하는 캐릭터 | [열기](https://vanillapunch.com/tools/demo/ancientmountain/) | [`examples/ancientmountain`](examples/ancientmountain) |
+| Neon Horizon | 절차 하늘(초콜릿 하늘, 바닐라 태양)과 함대 3D 모델, 엔진 글로우, 기함 주포 연출 | [열기](https://vanillapunch.com/tools/demo/neonhorizon/) | [`examples/neonhorizon`](examples/neonhorizon) |
+| UI Showcase | UI 컴포넌트 전시. 버튼, 스크롤 뷰, 리스트, 차트, 다이얼로그, 레이아웃 | [열기](https://vanillapunch.com/tools/demo/uishowcase/) | [`examples/uishowcase`](examples/uishowcase) |
+| Particle Effects | 불 / 분수 / 눈 / 비 / 폭발 등 파티클 프리셋 18 종 | [열기](https://vanillapunch.com/tools/demo/particleeffects/) | [`examples/particleeffects`](examples/particleeffects) |
+| Timeline Showcase | 타임라인 편집기로 만든 문서 8 종 재생. 트랜스포트, 스크럽, 마커 / 이벤트 | [열기](https://vanillapunch.com/tools/demo/timelineshowcase/) | [`examples/timelineshowcase`](examples/timelineshowcase) |
+| Sprite Effects | `ShaderSprite` 49 종, `ScreenEffect` 58 종, 게임 연출 조합 시연 | [열기](https://vanillapunch.com/tools/demo/spriteeffects/) | [`examples/spriteeffects`](examples/spriteeffects) |
 
 배포본이 없는 예제: [`examples/cameratour`](examples/cameratour)(돌아가는 `Camera2D`, 노드 트윈, `Indicator`), [`examples/toonmaterial`](examples/toonmaterial)(툰 확장 시험 장면: 머티리얼 셰이더 조각, 텍스처와 데칼, 점광, 반 램버트 띠, 더하기 홀로그램, 평면 거울, 영구 인스턴스 버퍼), [`examples/toonstyle`](examples/toonstyle)(툰 셰이딩과 바깥선 견주기 장면, 러스트 예제 toonstyle 과 같은 장면)
 

@@ -6,10 +6,10 @@
 
 | 도구 | 데모 | 만드는 파일 | 엔진에서 읽는 곳 |
 | --- | --- | --- | --- |
-| UI Editor | [열기](https://ddukbaek2.com/portfolio/uieditor/) | `.uiasset.json` (처음 이름 `ui.uiasset.json`) | `UIDocument.fromJsonText` |
-| Timeline Editor | [열기](https://ddukbaek2.com/portfolio/timelineeditor/) | `.timeline.json` (처음 이름 `titlecard.timeline.json`) | `Timeline.loadFromUrl`, `loadFromText`, `createFromJsonAsset` |
-| Particle Editor | [열기](https://ddukbaek2.com/portfolio/particleeditor/) | `.vfx.json` (처음 이름 `effect.vfx.json`) | `ParticleSystem.applyDescription` |
-| Visual Editor | [열기](https://ddukbaek2.com/portfolio/visualeditor/) | `scenes/*.scene.json`, `prefabs/*.prefab.json` | `UIDocument.fromJsonText` |
+| UI Editor | [열기](https://vanillapunch.com/tools/editor/uieditor/) | `.uiasset.json` (처음 이름 `ui.uiasset.json`) | `UIDocument.fromJsonText` |
+| Timeline Editor | [열기](https://vanillapunch.com/tools/editor/timelineeditor/) | `.timeline.json` (처음 이름 `titlecard.timeline.json`) | `Timeline.loadFromUrl`, `loadFromText`, `createFromJsonAsset` |
+| Particle Editor | [열기](https://vanillapunch.com/tools/editor/particleeditor/) | `.vfx.json` (처음 이름 `effect.vfx.json`) | `ParticleSystem.applyDescription` |
+| Visual Editor | [열기](https://vanillapunch.com/tools/editor/visualeditor/) | `scenes/*.scene.json`, `prefabs/*.prefab.json` | `UIDocument.fromJsonText` |
 
 - 도구마다 `tools/<도구 이름>/<도구 이름>.html` 이 엔진까지 한 파일에 담은 빌드라서, 서버 없이 파일로 열어도 동작합니다. 소스를 고친 뒤에는 `node tools/<도구 이름>/build.mjs` 로 다시 만듭니다.
 - UI Editor, Timeline Editor, Particle Editor 는 저장하면 브라우저 내려받기로 파일을 받습니다. Visual Editor 는 크롬 계열 브라우저에서 폴더 열기로 연 폴더에 바로 쓰고, 그 밖의 브라우저에서는 내려받기로 받습니다.

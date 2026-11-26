@@ -6,10 +6,10 @@ This chapter covers how to load the files made by the engine's authoring tools i
 
 | Tool | Demo | File it makes | Read in the engine by |
 | --- | --- | --- | --- |
-| UI Editor | [Open](https://ddukbaek2.com/portfolio/uieditor/) | `.uiasset.json` (default name `ui.uiasset.json`) | `UIDocument.fromJsonText` |
-| Timeline Editor | [Open](https://ddukbaek2.com/portfolio/timelineeditor/) | `.timeline.json` (default name `titlecard.timeline.json`) | `Timeline.loadFromUrl`, `loadFromText`, `createFromJsonAsset` |
-| Particle Editor | [Open](https://ddukbaek2.com/portfolio/particleeditor/) | `.vfx.json` (default name `effect.vfx.json`) | `ParticleSystem.applyDescription` |
-| Visual Editor | [Open](https://ddukbaek2.com/portfolio/visualeditor/) | `scenes/*.scene.json`, `prefabs/*.prefab.json` | `UIDocument.fromJsonText` |
+| UI Editor | [Open](https://vanillapunch.com/tools/editor/uieditor/) | `.uiasset.json` (default name `ui.uiasset.json`) | `UIDocument.fromJsonText` |
+| Timeline Editor | [Open](https://vanillapunch.com/tools/editor/timelineeditor/) | `.timeline.json` (default name `titlecard.timeline.json`) | `Timeline.loadFromUrl`, `loadFromText`, `createFromJsonAsset` |
+| Particle Editor | [Open](https://vanillapunch.com/tools/editor/particleeditor/) | `.vfx.json` (default name `effect.vfx.json`) | `ParticleSystem.applyDescription` |
+| Visual Editor | [Open](https://vanillapunch.com/tools/editor/visualeditor/) | `scenes/*.scene.json`, `prefabs/*.prefab.json` | `UIDocument.fromJsonText` |
 
 - Each tool's `tools/<tool name>/<tool name>.html` is a build that bundles the engine into one file, so it works when opened as a file without a server. After changing the source, rebuild it with `node tools/<tool name>/build.mjs`.
 - UI Editor, Timeline Editor, and Particle Editor save by downloading the file through the browser. Visual Editor writes directly into a folder opened with Open Folder in Chromium-based browsers, and downloads in other browsers.
