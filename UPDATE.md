@@ -16,6 +16,7 @@
   - src/experimental/aabb.js, transform2d.js, graphics/gl2d.js, graphics/webgl2.js (죽은 코드, 내보내지 않음) → src/deprecated/
 - Camera(src/deprecated/camera.js): 폐기 예정. Camera2D(src/misc/camera2d.js)가 회전과 begin, end 까지 모두 덮는다. import.js 는 아직 Camera 로 내보내고, 다음 판에서 빠질 수 있다
 - Experimental: src/experimental 은 0.4.0 뒤 기능의 초안 자리다. src/experimental/experimental.js 가 초안을 모아 내보내고, import.js 가 Experimental 이름 공간으로 다시 내보낸다. (Experimental.이름) 초안은 API 가 바뀔 수 있다. 지금은 비어 있다
+- Experimental 초안, 2D 물리와 공간 나누기(src/experimental/physics2d/, spatial/): PhysicsWorld2D (강체 정적, 운동학, 동적, 모양 원, 캡슐, 선분, 볼록 다각형, 사슬, 관절 거리, 회전, 용접, 바퀴, 분류, 마스크, 무리 거르기, 센서, 닿음과 센서 사건, 광선과 점, 상자, 모양 질의, 하위 걸음과 웜 스타트의 부드러운 걸음 풀이기, 섬째 잠자기, advance 의 고정 걸음과 그리기 보간), RigidBody2D 컴포넌트, PhysicsDebugDraw2D, DynamicTree (표면적 휴리스틱과 나무 돌리기의 동적 AABB 나무, 노드 거르기와 터치 맞추기에도 쓴다), AABB2D. Box2D 3 과 유니티 2D 물리의 기능을 기준으로 공개된 셈법으로 직접 짰다. 셈은 f64 와 직접 짠 삼각 함수라 러스트 vanilla-engine 과 결과가 비트까지 같다. (tools/physics2dcompare.mjs, 예제 examples/physics2d) tools/apidoc.cjs 는 이름 공간 모듈이 다시 내보내는 파일도 따라가 Experimental 초안의 문서와 예제를 뽑는다
 - import.js: 옛 "실험적 기능 목록" 묶음을 컬렉션, 애니메이션, 셰이더와 풀스크린 패스, 3D 그래픽스, 폐기 예정, 실험 묶음으로 나눴다. Visual 은 기타 기능 묶음, VisualAsset 과 BunchAsset 은 리소스 묶음으로 갔다. 내보내는 이름은 Experimental 하나가 늘었을 뿐 같다
 - README, 가이드, ARCHITECTURE: 새 폴더로 고치고, 3D 와 툰 3D 를 실험 기능이라 하던 글을 뺐다. (README 의 "3D (실험)" 은 "3D")
 - 외계행성 광부 키우기(webgame-rimminer)가 게임 쪽에 따로 만들어 쓰던 범용 기능을 엔진으로 옮긴다. (게임 코드는 건드리지 않았다, 게임은 지금처럼 자기 것을 쓴다)
