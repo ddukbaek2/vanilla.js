@@ -1,0 +1,1234 @@
+{
+	"version": 1,
+	"root": {
+		"type": "WorldNode",
+		"name": "sceneRoot",
+		"active": true,
+		"position": [
+			0,
+			0
+		],
+		"scale": [
+			1,
+			1
+		],
+		"rotation": 0,
+		"opacity": 1,
+		"pivot": [
+			0,
+			0
+		],
+		"anchor": [
+			0.5,
+			0.5
+		],
+		"contentSize": [
+			0,
+			0
+		],
+		"interactable": false,
+		"components": [],
+		"children": [
+			{
+				"type": "WorldNode",
+				"name": "Panel",
+				"active": true,
+				"position": [
+					640,
+					380
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0.5,
+					0.5
+				],
+				"anchor": [
+					0.5,
+					0.5
+				],
+				"contentSize": [
+					1160,
+					600
+				],
+				"interactable": false,
+				"components": [
+					{
+						"color": [
+							0.16,
+							0.2,
+							0.3,
+							1
+						],
+						"roundSize": 28,
+						"type": "Paint"
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "Title",
+						"active": true,
+						"position": [
+							580,
+							52
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0.5,
+							0.5
+						],
+						"anchor": [
+							0.5,
+							0.5
+						],
+						"contentSize": [
+							1000,
+							60
+						],
+						"interactable": false,
+						"components": [
+							{
+								"text": "UIDocument 씬 문서",
+								"fontSize": 40,
+								"textColor": [
+									1,
+									0.9,
+									0.6,
+									1
+								],
+								"strokeColor": [
+									1,
+									1,
+									1,
+									1
+								],
+								"strokeWidth": 0,
+								"textAlign": "center",
+								"textBaseline": "middle",
+								"type": "Text"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "emblemFrame",
+						"active": true,
+						"position": [
+							170,
+							210
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0.5,
+							0.5
+						],
+						"anchor": [
+							0.5,
+							0.5
+						],
+						"contentSize": [
+							184,
+							184
+						],
+						"interactable": false,
+						"components": [
+							{
+								"Color": [
+									1,
+									0.8,
+									0.3,
+									1
+								],
+								"LineWidth": 4,
+								"RoundSize": 24,
+								"Circle": false,
+								"GizmoVisible": false,
+								"Enable": true,
+								"ComponentType": "Outline",
+								"type": "Outline"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "emblem",
+						"active": true,
+						"position": [
+							170,
+							210
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0.5,
+							0.5
+						],
+						"anchor": [
+							0.5,
+							0.5
+						],
+						"contentSize": [
+							160,
+							160
+						],
+						"interactable": false,
+						"components": [
+							{
+								"color": [
+									0,
+									0,
+									0,
+									0
+								],
+								"roundSize": 0,
+								"imagePath": "emblem.png",
+								"nineSlice": [
+									0,
+									0,
+									0,
+									0
+								],
+								"spriteDrawMode": "simple",
+								"spriteBlendMode": "source-over",
+								"type": "Sprite"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "tiltedStar",
+						"active": true,
+						"position": [
+							390,
+							210
+						],
+						"scale": [
+							1.25,
+							1.25
+						],
+						"rotation": 20,
+						"opacity": 1,
+						"pivot": [
+							0.5,
+							0.5
+						],
+						"anchor": [
+							0.5,
+							0.5
+						],
+						"contentSize": [
+							96,
+							96
+						],
+						"interactable": false,
+						"components": [
+							{
+								"color": [
+									0,
+									0,
+									0,
+									0
+								],
+								"roundSize": 0,
+								"imagePath": "star.png",
+								"nineSlice": [
+									0,
+									0,
+									0,
+									0
+								],
+								"spriteDrawMode": "simple",
+								"spriteBlendMode": "source-over",
+								"type": "Sprite"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "gem",
+						"active": true,
+						"position": [
+							570,
+							210
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0.5,
+							0.5
+						],
+						"anchor": [
+							0.5,
+							0.5
+						],
+						"contentSize": [
+							96,
+							96
+						],
+						"interactable": false,
+						"components": [
+							{
+								"imagePath": "gem.png",
+								"type": "UIImageView"
+							},
+							{
+								"color": [
+									0,
+									0,
+									0,
+									0
+								],
+								"roundSize": 0,
+								"imagePath": "",
+								"nineSlice": [
+									0,
+									0,
+									0,
+									0
+								],
+								"spriteDrawMode": "simple",
+								"spriteBlendMode": "source-over",
+								"type": "Sprite"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "ring",
+						"active": true,
+						"position": [
+							760,
+							210
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0.5,
+							0.5
+						],
+						"anchor": [
+							0.5,
+							0.5
+						],
+						"contentSize": [
+							120,
+							120
+						],
+						"interactable": false,
+						"components": [
+							{
+								"Ratio": 0.65,
+								"RoundSize": 60,
+								"LineWidth": 10,
+								"FillColor": [
+									0.4,
+									0.9,
+									0.6,
+									1
+								],
+								"TrackColor": [
+									0.2,
+									0.2,
+									0.25,
+									1
+								],
+								"GizmoVisible": false,
+								"Enable": true,
+								"ComponentType": "UIProgressRing",
+								"type": "UIProgressRing"
+							}
+						],
+						"children": [
+							{
+								"type": "WorldNode",
+								"name": "ringText",
+								"active": true,
+								"position": [
+									60,
+									60
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0.5,
+									0.5
+								],
+								"anchor": [
+									0.5,
+									0.5
+								],
+								"contentSize": [
+									120,
+									40
+								],
+								"interactable": false,
+								"components": [
+									{
+										"text": "65%",
+										"fontSize": 28,
+										"textColor": [
+											1,
+											1,
+											1,
+											1
+										],
+										"strokeColor": [
+											1,
+											1,
+											1,
+											1
+										],
+										"strokeWidth": 0,
+										"textAlign": "center",
+										"textBaseline": "middle",
+										"type": "Text"
+									}
+								],
+								"children": []
+							}
+						]
+					},
+					{
+						"type": "WorldNode",
+						"name": "label",
+						"active": true,
+						"position": [
+							980,
+							210
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0.5,
+							0.5
+						],
+						"anchor": [
+							0.5,
+							0.5
+						],
+						"contentSize": [
+							260,
+							56
+						],
+						"interactable": false,
+						"components": [
+							{
+								"text": "UILabel 라벨",
+								"fontSize": 26,
+								"textColor": [
+									1,
+									1,
+									1,
+									1
+								],
+								"backgroundColor": [
+									0,
+									0,
+									0,
+									0.35
+								],
+								"textAlign": "center",
+								"textBaseline": "middle",
+								"type": "UILabel"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "button",
+						"active": true,
+						"position": [
+							230,
+							420
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0.5,
+							0.5
+						],
+						"anchor": [
+							0.5,
+							0.5
+						],
+						"contentSize": [
+							260,
+							72
+						],
+						"interactable": true,
+						"components": [
+							{
+								"color": [
+									0.95,
+									0.55,
+									0.2,
+									1
+								],
+								"roundSize": 18,
+								"type": "Paint"
+							},
+							{
+								"pressedTintColor": [
+									0,
+									0,
+									0,
+									0.3
+								],
+								"type": "UIButton"
+							}
+						],
+						"children": [],
+						"contentChildren": [
+							{
+								"type": "WorldNode",
+								"name": "caption",
+								"active": true,
+								"position": [
+									130,
+									36
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0.5,
+									0.5
+								],
+								"anchor": [
+									0.5,
+									0.5
+								],
+								"contentSize": [
+									260,
+									72
+								],
+								"interactable": false,
+								"components": [
+									{
+										"text": "단추 UIButton",
+										"fontSize": 28,
+										"textColor": [
+											1,
+											1,
+											1,
+											1
+										],
+										"strokeColor": [
+											1,
+											1,
+											1,
+											1
+										],
+										"strokeWidth": 0,
+										"textAlign": "center",
+										"textBaseline": "middle",
+										"type": "Text"
+									}
+								],
+								"children": []
+							}
+						]
+					},
+					{
+						"type": "WorldNode",
+						"name": "slider",
+						"active": true,
+						"position": [
+							600,
+							400
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0.5,
+							0.5
+						],
+						"anchor": [
+							0.5,
+							0.5
+						],
+						"contentSize": [
+							320,
+							28
+						],
+						"interactable": true,
+						"components": [
+							{
+								"value": 0.4,
+								"thumbRadius": 16,
+								"trackThickness": 8,
+								"type": "UISlider"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "progress",
+						"active": true,
+						"position": [
+							600,
+							470
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0.5,
+							0.5
+						],
+						"anchor": [
+							0.5,
+							0.5
+						],
+						"contentSize": [
+							320,
+							22
+						],
+						"interactable": false,
+						"components": [
+							{
+								"value": 70,
+								"minValue": 0,
+								"maxValue": 100,
+								"type": "UIProgressView"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "scroll",
+						"active": true,
+						"position": [
+							980,
+							430
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0.5,
+							0.5
+						],
+						"anchor": [
+							0.5,
+							0.5
+						],
+						"contentSize": [
+							260,
+							180
+						],
+						"interactable": true,
+						"components": [
+							{
+								"scrollContentSize": [
+									260,
+									320
+								],
+								"scrollMode": "clamp",
+								"dragSensitivity": 1,
+								"horizontal": false,
+								"vertical": true,
+								"backgroundColor": [
+									0,
+									0,
+									0,
+									0.3
+								],
+								"type": "UIScrollView"
+							}
+						],
+						"children": [],
+						"contentChildren": [
+							{
+								"type": "WorldNode",
+								"name": "row0",
+								"active": true,
+								"position": [
+									130,
+									40
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0.5,
+									0.5
+								],
+								"anchor": [
+									0.5,
+									0.5
+								],
+								"contentSize": [
+									240,
+									68
+								],
+								"interactable": false,
+								"components": [
+									{
+										"color": [
+											0.3,
+											0.45,
+											0.7,
+											1
+										],
+										"roundSize": 12,
+										"type": "Paint"
+									}
+								],
+								"children": [
+									{
+										"type": "WorldNode",
+										"name": "rowText",
+										"active": true,
+										"position": [
+											120,
+											34
+										],
+										"scale": [
+											1,
+											1
+										],
+										"rotation": 0,
+										"opacity": 1,
+										"pivot": [
+											0.5,
+											0.5
+										],
+										"anchor": [
+											0.5,
+											0.5
+										],
+										"contentSize": [
+											240,
+											68
+										],
+										"interactable": false,
+										"components": [
+											{
+												"text": "줄 1",
+												"fontSize": 24,
+												"textColor": [
+													1,
+													1,
+													1,
+													1
+												],
+												"strokeColor": [
+													1,
+													1,
+													1,
+													1
+												],
+												"strokeWidth": 0,
+												"textAlign": "center",
+												"textBaseline": "middle",
+												"type": "Text"
+											}
+										],
+										"children": []
+									}
+								]
+							},
+							{
+								"type": "WorldNode",
+								"name": "row1",
+								"active": true,
+								"position": [
+									130,
+									120
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0.5,
+									0.5
+								],
+								"anchor": [
+									0.5,
+									0.5
+								],
+								"contentSize": [
+									240,
+									68
+								],
+								"interactable": false,
+								"components": [
+									{
+										"color": [
+											0.35,
+											0.6,
+											0.45,
+											1
+										],
+										"roundSize": 12,
+										"type": "Paint"
+									}
+								],
+								"children": [
+									{
+										"type": "WorldNode",
+										"name": "rowText",
+										"active": true,
+										"position": [
+											120,
+											34
+										],
+										"scale": [
+											1,
+											1
+										],
+										"rotation": 0,
+										"opacity": 1,
+										"pivot": [
+											0.5,
+											0.5
+										],
+										"anchor": [
+											0.5,
+											0.5
+										],
+										"contentSize": [
+											240,
+											68
+										],
+										"interactable": false,
+										"components": [
+											{
+												"text": "줄 2",
+												"fontSize": 24,
+												"textColor": [
+													1,
+													1,
+													1,
+													1
+												],
+												"strokeColor": [
+													1,
+													1,
+													1,
+													1
+												],
+												"strokeWidth": 0,
+												"textAlign": "center",
+												"textBaseline": "middle",
+												"type": "Text"
+											}
+										],
+										"children": []
+									}
+								]
+							},
+							{
+								"type": "WorldNode",
+								"name": "row2",
+								"active": true,
+								"position": [
+									130,
+									200
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0.5,
+									0.5
+								],
+								"anchor": [
+									0.5,
+									0.5
+								],
+								"contentSize": [
+									240,
+									68
+								],
+								"interactable": false,
+								"components": [
+									{
+										"color": [
+											0.7,
+											0.4,
+											0.4,
+											1
+										],
+										"roundSize": 12,
+										"type": "Paint"
+									}
+								],
+								"children": [
+									{
+										"type": "WorldNode",
+										"name": "rowText",
+										"active": true,
+										"position": [
+											120,
+											34
+										],
+										"scale": [
+											1,
+											1
+										],
+										"rotation": 0,
+										"opacity": 1,
+										"pivot": [
+											0.5,
+											0.5
+										],
+										"anchor": [
+											0.5,
+											0.5
+										],
+										"contentSize": [
+											240,
+											68
+										],
+										"interactable": false,
+										"components": [
+											{
+												"text": "줄 3",
+												"fontSize": 24,
+												"textColor": [
+													1,
+													1,
+													1,
+													1
+												],
+												"strokeColor": [
+													1,
+													1,
+													1,
+													1
+												],
+												"strokeWidth": 0,
+												"textAlign": "center",
+												"textBaseline": "middle",
+												"type": "Text"
+											}
+										],
+										"children": []
+									}
+								]
+							},
+							{
+								"type": "WorldNode",
+								"name": "row3",
+								"active": true,
+								"position": [
+									130,
+									280
+								],
+								"scale": [
+									1,
+									1
+								],
+								"rotation": 0,
+								"opacity": 1,
+								"pivot": [
+									0.5,
+									0.5
+								],
+								"anchor": [
+									0.5,
+									0.5
+								],
+								"contentSize": [
+									240,
+									68
+								],
+								"interactable": false,
+								"components": [
+									{
+										"color": [
+											0.6,
+											0.5,
+											0.25,
+											1
+										],
+										"roundSize": 12,
+										"type": "Paint"
+									}
+								],
+								"children": [
+									{
+										"type": "WorldNode",
+										"name": "rowText",
+										"active": true,
+										"position": [
+											120,
+											34
+										],
+										"scale": [
+											1,
+											1
+										],
+										"rotation": 0,
+										"opacity": 1,
+										"pivot": [
+											0.5,
+											0.5
+										],
+										"anchor": [
+											0.5,
+											0.5
+										],
+										"contentSize": [
+											240,
+											68
+										],
+										"interactable": false,
+										"components": [
+											{
+												"text": "줄 4",
+												"fontSize": 24,
+												"textColor": [
+													1,
+													1,
+													1,
+													1
+												],
+												"strokeColor": [
+													1,
+													1,
+													1,
+													1
+												],
+												"strokeWidth": 0,
+												"textAlign": "center",
+												"textBaseline": "middle",
+												"type": "Text"
+											}
+										],
+										"children": []
+									}
+								]
+							}
+						]
+					},
+					{
+						"type": "WorldNode",
+						"name": "star0",
+						"active": true,
+						"position": [
+							120,
+							530
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0.5,
+							0.5
+						],
+						"anchor": [
+							0.5,
+							0.5
+						],
+						"contentSize": [
+							56,
+							56
+						],
+						"interactable": false,
+						"components": [
+							{
+								"color": [
+									0,
+									0,
+									0,
+									0
+								],
+								"roundSize": 0,
+								"imagePath": "star.png",
+								"nineSlice": [
+									0,
+									0,
+									0,
+									0
+								],
+								"spriteDrawMode": "simple",
+								"spriteBlendMode": "source-over",
+								"type": "Sprite"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "star1",
+						"active": true,
+						"position": [
+							190,
+							530
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 0.7,
+						"pivot": [
+							0.5,
+							0.5
+						],
+						"anchor": [
+							0.5,
+							0.5
+						],
+						"contentSize": [
+							56,
+							56
+						],
+						"interactable": false,
+						"components": [
+							{
+								"color": [
+									0,
+									0,
+									0,
+									0
+								],
+								"roundSize": 0,
+								"imagePath": "star.png",
+								"nineSlice": [
+									0,
+									0,
+									0,
+									0
+								],
+								"spriteDrawMode": "simple",
+								"spriteBlendMode": "source-over",
+								"type": "Sprite"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "star2",
+						"active": true,
+						"position": [
+							260,
+							530
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 0.4,
+						"pivot": [
+							0.5,
+							0.5
+						],
+						"anchor": [
+							0.5,
+							0.5
+						],
+						"contentSize": [
+							56,
+							56
+						],
+						"interactable": false,
+						"components": [
+							{
+								"color": [
+									0,
+									0,
+									0,
+									0
+								],
+								"roundSize": 0,
+								"imagePath": "star.png",
+								"nineSlice": [
+									0,
+									0,
+									0,
+									0
+								],
+								"spriteDrawMode": "simple",
+								"spriteBlendMode": "source-over",
+								"type": "Sprite"
+							}
+						],
+						"children": []
+					}
+				]
+			}
+		]
+	},
+	"frameSize": [
+		1280,
+		720
+	]
+}

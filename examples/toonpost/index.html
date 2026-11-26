@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toon Post</title>
+<link rel="icon" href="../assets/favicon.svg">
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000000; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 툰 후처리와 효과 예제. (ToonPostProcess 옵션, 다단 블룸, ToonVfx 의 새 꼴, 러스트 예제 toonpost 와 같은 장면)
+// - 세 판에 같은 장면을 그린다. 시간은 프레임 수 / 60 이라 찍을 때마다 같은 그림이다.
+//   왼쪽: ToonPostProcess 기본(멀티샘플 없음, 반 해상도 9 탭 블룸).
+//   가운데: 멀티샘플 4, 깊이 24, 다단 블룸 5 단(문턱 1, 무릎 0.25). 가장자리 계단과 블룸 번짐을 왼쪽과 견준다.
+//   오른쪽: 실수 판을 쓰지 않는 LDR 길(화면 색을 그리고 톤매핑 없이), 밝기 0.45 에 상자 둘레 밝힌 자리(깊이 텍스처로 되짚은 수평 거리)와 채도 0.6.
+// - 효과: 물든 자국(stain), 기름 윤(sheen), 깜빡이는 그을음, 발밑 그늘(queueBlobShadow), 덮는 꼴(rim 1)의 불덩이와 충격파와 리본,
+//   빛 점 120 개(상한 160), 불꽃 줄기 밝기 배 5. 불덩이는 3 초마다 사건 열쇠와 나이로 한 번만 낸다.
+// - 원본 ToonVfx 는 자리를 x, y, z 로 받는다. (러스트는 position) 원본 그리기 함수의 화면 사각형은 { x, y, width, height } 다.
+//==============================================================================
+import { Engine, EngineConfiguration, Scene, WorldNode, Vector2, Vector3, Rect, Matrix4, Pivot, Paint, Text, TextAlign, ToonMesh, ToonPostProcess, ToonDrawQueue, ToonView3D, ToonVfx, ToonVfxSlot, ToonVfxLook, ToonVfxShape, ToonVfxDecalMode, TOON_VFX_DEFAULT_PARTICLE_CAPACITY } from "../../import.js";
+
+const PI = System.Math.PI;
+const BACKGROUND_COLOR = "#000000";
+// 한 프레임의 초. (찍을 때마다 같은 그림)
+const FRAME_SECONDS = 1 / 60;
+// 불덩이 사건의 되풀이 초.
+const BLAST_CYCLE_SECONDS = 3.0;
+// 판의 꼴.
+const PANEL_MODE_DEFAULT = 0;
+const PANEL_MODE_MULTISAMPLE = 1;
+const PANEL_MODE_LOW_DYNAMIC_RANGE = 2;
+
+//==============================================================================
+// 부품 하나의 배열.
+//==============================================================================
+function buildArrays(geometry, position, colorText, options) {
+	const builder = new ToonMesh.MeshBuilder();
+	builder.addPart(geometry, ToonMesh.createPartMatrix(null, position, null, null), colorText, options);
+	return builder.readArrays();
+}
+
+//==============================================================================
+// 판 하나의 그리기 상태.
+//==============================================================================
+class PanelDrawer {
+	#panelMode;
+	#meshes = null;
+	#postProcess = null;
+	#vfx = null;
+	#frameCount = 0;
+
+	constructor(panelMode) {
+		this.#panelMode = panelMode;
+	}
+
+	//==============================================================================
+	// 모형 짓기. (처음 그릴 때 한 번)
+	//==============================================================================
+	static createMeshes(renderer) {
+		const outlineOptions = { outlineWidth: 0.03 };
+		return {
+			ground: renderer.createMesh(buildArrays(ToonMesh.createBoxGeometry(8, 0.2, 6), [0, -0.1, 0], "#8a857b", { hasOutline: false })),
+			box: renderer.createMesh(buildArrays(ToonMesh.createBoxGeometry(1, 1, 1), [0, 0.5, 0], "#ff8844", outlineOptions)),
+			pole: renderer.createMesh(buildArrays(ToonMesh.createBoxGeometry(0.05, 2.0, 0.05), [0, 1.0, 0], "#30343c", { hasOutline: false })),
+			sphere: renderer.createMesh(buildArrays(ToonMesh.createSphereGeometry(0.4, 24, 16, PI), [0, 0.4, 0], "#ffd257", { glow: 2.5, outlineWidth: 0.02 })),
+		};
+	}
+
+	//==============================================================================
+	// 후처리 짓기. (판의 꼴마다)
+	//==============================================================================
+	createPostProcess(webGL2RenderingContext, width, height) {
+		if (this.#panelMode === PANEL_MODE_MULTISAMPLE) {
+			const postProcess = new ToonPostProcess(webGL2RenderingContext, width, height, { sampleCount: 4, depthBits: 24 });
+			postProcess.setBloomLevels(5, 1.0, 0.25);
+			return postProcess;
+		}
+		if (this.#panelMode === PANEL_MODE_LOW_DYNAMIC_RANGE) {
+			const postProcess = new ToonPostProcess(webGL2RenderingContext, width, height, { useFloatColor: false, useDepthTexture: true });
+			postProcess.setBloom(false, 0.0, 0.9, 1.6);
+			postProcess.setBrightness(0.45);
+			postProcess.setColorGrade(0.6, 1.0, [1.0, 1.0, 1.0], 0.0, [0.0, 0.0, 0.0], 0.0);
+			return postProcess;
+		}
+		return new ToonPostProcess(webGL2RenderingContext, width, height);
+	}
+
+	//==============================================================================
+	// 효과 짓기. (램프, 테 색, 꼴 밝기 배, 빛 점 상한, 오래 가는 바닥 자국)
+	//==============================================================================
+	static createVfx(webGL2RenderingContext) {
+		const vfx = new ToonVfx(webGL2RenderingContext, TOON_VFX_DEFAULT_PARTICLE_CAPACITY);
+		vfx.setRamps([["#ffffff", "#ffe08a", "#ff9a3c", "#d4441c", "#5a1a10", "#1a0a08"], ["#ffffff", "#bff6ff", "#5fd0ff", "#2a7ad8", "#123c7a", "#06142a"]]);
+		vfx.setRimColor([0.078, 0.086, 0.11]);
+		vfx.setLookGain(ToonVfxLook.streak, 5.0);
+		vfx.setGlintCapacity(160);
+		vfx.addDecal({ x: 1.6, z: 1.3, radius: 0.85, life: 100000.0, slot: ToonVfxSlot.scorch, mode: ToonVfxDecalMode.stain, tint: [0.35, 0.55, 0.85], alpha: 0.8, angle: 0.3, key: 1 });
+		vfx.addDecal({ x: -0.3, z: 1.6, radius: 0.75, life: 100000.0, slot: ToonVfxSlot.scorch, mode: ToonVfxDecalMode.sheen, tint: [0.12, 0.1, 0.09], alpha: 0.9, angle: 1.1, key: 2 });
+		vfx.addDecal({ x: 2.4, z: -0.9, radius: 0.7, life: 100000.0, slot: ToonVfxSlot.scorch, mode: ToonVfxDecalMode.scorch, alpha: 0.85, angle: 2.0, flicker: 0.5, key: 3 });
+		// 같은 열쇠라 다시 내지 않는다.
+		vfx.addDecal({ x: 1.6, z: 1.3, radius: 0.85, life: 100000.0, mode: ToonVfxDecalMode.stain, key: 1 });
+		return vfx;
+	}
+
+	//==============================================================================
+	// 이번 프레임의 효과. (불덩이 사건은 되풀이마다 열쇠 하나와 그 나이로, 프레임마다 다시 불러도 한 번만 난다)
+	//==============================================================================
+	static emitEffects(vfx, elapsedSeconds) {
+		const cycleIndex = System.Math.floor(elapsedSeconds / BLAST_CYCLE_SECONDS);
+		const age = elapsedSeconds - cycleIndex * BLAST_CYCLE_SECONDS;
+		const blast = [1.4, 0.6, -0.4];
+		vfx.addFireball({ x: blast[0], y: blast[1], z: blast[2], radius: 0.55, life: 2.4, ramp: 0, growSeconds: 0.4, rise: 0.5, rim: 1.0, age, key: 100 + cycleIndex });
+		vfx.addShockwave({ x: blast[0], z: blast[2], startRadius: 0.2, endRadius: 1.8, width: 0.45, life: 0.8, delay: 0.5, ramp: 0, rim: 1.0, age, key: 200 + cycleIndex });
+		vfx.emitParticles({ count: 48, x: blast[0], y: blast[1], z: blast[2], shape: ToonVfxShape.sphere, radius: 0.2, isUpward: true, speed: [2.5, 5.5], rise: [0.5, 2.0], gravity: 7.0, drag: 1.0, size: [0.05, 0.08], life: [0.8, 1.6], look: ToonVfxLook.streak, stretch: 0.05, ramp: 0, floor: 0.02, age, key: 300 + cycleIndex });
+		// 발밑 그늘.
+		vfx.queueBlobShadow({ x: -1.7, z: 0.2, radius: 0.85 });
+		vfx.queueBlobShadow({ x: -0.2, z: -0.9, radius: 0.6, alpha: 0.6 });
+		// 덮는 꼴 리본. (공 둘레의 고리)
+		const points = [];
+		for (let pointIndex = 0; pointIndex <= 40; pointIndex++) {
+			const angle = pointIndex / 40 * PI * 1.6 + elapsedSeconds;
+			points.push([-0.2 + System.Math.cos(angle) * 0.9, 1.1 + System.Math.sin(angle * 2.0) * 0.15, -0.9 + System.Math.sin(angle) * 0.9]);
+		}
+		vfx.queueRibbon({ points, width: 0.14, color: [0.6, 0.9, 1.0], ramp: 1, alpha: 1.0, brightness: 1.4, rim: 1.0 });
+		// 빛 점 120 개. (기본 상한 96 을 넘는다)
+		for (let glintIndex = 0; glintIndex < 120; glintIndex++) {
+			const angle = glintIndex / 120 * PI * 2.0;
+			vfx.queueGlint({ x: System.Math.cos(angle) * 3.4, y: 0.08, z: System.Math.sin(angle) * 2.5, size: 0.14, color: [1.0, 0.85, 0.4], brightness: 3.0 });
+		}
+	}
+
+	//==============================================================================
+	// 판 그리기. (ToonView3D 의 그리기 함수)
+	//==============================================================================
+	draw(renderer, camera, screenRect, webGL2RenderingContext) {
+		if (this.#meshes === null) {
+			this.#meshes = PanelDrawer.createMeshes(renderer);
+		}
+		const width = System.Math.max(1, System.Math.round(screenRect.width));
+		const height = System.Math.max(1, System.Math.round(screenRect.height));
+		if (this.#postProcess === null) {
+			this.#postProcess = this.createPostProcess(webGL2RenderingContext, width, height);
+		}
+		if (this.#vfx === null) {
+			this.#vfx = PanelDrawer.createVfx(webGL2RenderingContext);
+		}
+		const meshes = this.#meshes;
+		const postProcess = this.#postProcess;
+		const vfx = this.#vfx;
+		const elapsedSeconds = this.#frameCount * FRAME_SECONDS;
+		renderer.setBandCount(3);
+		renderer.setLight([-0.5, -1.0, -0.35], [0.85, 0.8, 0.75], [0.55, 0.6, 0.7], [0.25, 0.22, 0.2]);
+		const queue = new ToonDrawQueue();
+		queue.addMesh(meshes.ground, Matrix4.createIdentity(), {});
+		const boxMatrix = Matrix4.createTranslation(-1.7, 0, 0.2);
+		boxMatrix.rotateY(0.6 + elapsedSeconds * 0.4);
+		queue.addMesh(meshes.box, boxMatrix, {});
+		const poleMatrix = Matrix4.createTranslation(0.6, 0, -1.2);
+		poleMatrix.rotateZ(0.45);
+		queue.addMesh(meshes.pole, poleMatrix, {});
+		queue.addMesh(meshes.sphere, Matrix4.createTranslation(-0.2, 0, -0.9), {});
+
+		const isLowDynamicRange = this.#panelMode === PANEL_MODE_LOW_DYNAMIC_RANGE;
+		if (isLowDynamicRange) {
+			postProcess.setLitArea([-1.7, 0.0, 0.2], 0.9, 1.6, camera.getInverseViewProjectionMatrix());
+		}
+		postProcess.resize(width, height);
+		renderer.clearScreenRect();
+		renderer.setHdrOutput(!isLowDynamicRange && postProcess.getUseFloatColor());
+		const clearColor = isLowDynamicRange ? [0.25, 0.27, 0.33] : [0.05, 0.06, 0.09];
+		postProcess.begin(clearColor);
+		queue.draw(renderer, camera);
+		vfx.update(this.#frameCount === 0 ? 0 : FRAME_SECONDS);
+		PanelDrawer.emitEffects(vfx, elapsedSeconds);
+		vfx.draw(camera.getViewMatrix(), camera.getProjectionMatrix());
+		const bottom = webGL2RenderingContext.drawingBufferHeight - System.Math.round(screenRect.y) - height;
+		postProcess.end(null, [System.Math.round(screenRect.x), bottom, width, height]);
+		this.#frameCount += 1;
+		if (this.#frameCount === 30) {
+			System.console.log(`toonpost: 판 ${this.#panelMode} 표본 수 ${postProcess.getSampleCount()} 실수 판 ${postProcess.getUseFloatColor()} 블룸 단 ${postProcess.getBloomLevelCount()}`);
+		}
+	}
+}
+
+//==============================================================================
+// 렌더러를 짓지 못한 기기. (판에 글만, ToonView3D 의 대체 그리기 함수)
+//==============================================================================
+function drawFallback(graphic, contentSize) {
+	graphic.setFillColor("#ffffff");
+	graphic.drawFillText("3D 를 그릴 수 없는 기기", contentSize.x * 0.5, contentSize.y * 0.5);
+}
+
+//==============================================================================
+// 색 판 노드.
+//==============================================================================
+function createPanel(parentNode, rect, colorText) {
+	const node = new WorldNode();
+	node.setName("panel");
+	parentNode.addChild(node);
+	node.setPivot(Pivot.topLeft);
+	node.setLocalPosition(rect.position);
+	node.setContentSize(rect.size);
+	node.addComponent(Paint).setColor(colorText);
+	return node;
+}
+
+//==============================================================================
+// 글 노드.
+//==============================================================================
+function createText(parentNode, position, textValue) {
+	const node = new WorldNode();
+	node.setName("text");
+	parentNode.addChild(node);
+	node.setPivot(Pivot.topLeft);
+	node.setLocalPosition(position);
+	node.setContentSize(Vector2.create(1200, 24));
+	const text = node.addComponent(Text);
+	text.setText(textValue);
+	text.setFontSize(16);
+	text.setTextColor("#ffffff");
+	text.setTextAlign(TextAlign.left);
+	return node;
+}
+
+//==============================================================================
+// 툰 후처리 씬.
+//==============================================================================
+class ToonPostScene extends Scene {
+	//==============================================================================
+	// 바탕을 칠하고 화면 배율을 건다. (3D 판은 노드가 그린다)
+	//==============================================================================
+	preDraw(graphic) {
+		const viewManager = this.getEngine().getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(BACKGROUND_COLOR);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		viewManager.applyViewRect(graphic);
+	}
+
+	initialize(engine) {
+		super.initialize(engine);
+		const root = this.getRoot();
+		const panelList = [[PANEL_MODE_DEFAULT, "기본: 멀티샘플 없음, 9 탭 블룸"], [PANEL_MODE_MULTISAMPLE, "멀티샘플 4, 깊이 24, 다단 블룸 5 단"], [PANEL_MODE_LOW_DYNAMIC_RANGE, "LDR 길: 밝기 0.45, 밝힌 자리, 채도 0.6"]];
+		for (let panelIndex = 0; panelIndex < panelList.length; panelIndex++) {
+			const [panelMode, label] = panelList[panelIndex];
+			const panelX = 20 + panelIndex * 420;
+			const panel = createPanel(root, Rect.create(panelX, 80, 400, 420), "#000000");
+			const panelDrawer = new PanelDrawer(panelMode);
+			const toonView = panel.addComponent(ToonView3D);
+			toonView.setDrawCallback((renderer, camera, screenRect, webGL2RenderingContext) => {
+				panelDrawer.draw(renderer, camera, screenRect, webGL2RenderingContext);
+			});
+			toonView.setFallbackDrawCallback(drawFallback);
+			const camera = toonView.getCamera();
+			camera.setPerspective(0.8, 0.1, 100);
+			camera.lookAt(Vector3.create(1.0, 3.4, 5.6), Vector3.create(0, 0.4, 0), Vector3.create(0, 1, 0));
+			createText(root, Vector2.create(panelX, 54), label);
+		}
+		createText(root, Vector2.create(20, 16), "툰 후처리와 효과: 물든 자국, 기름 윤, 깜빡이는 그을음, 발밑 그늘, 덮는 꼴 불덩이와 충격파와 리본, 빛 점 120 (상한 160)");
+		createText(root, Vector2.create(20, 520), "불덩이는 3 초마다 사건 열쇠와 나이로 한 번만 낸다. 불꽃 줄기 밝기 배 5. 시간은 프레임 수 / 60.");
+	}
+}
+
+//==============================================================================
+// 시작.
+//==============================================================================
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.title = "툰 후처리와 효과 (바닐라엔진)";
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+engineConfiguration.autoResizeOnWindowResize = true;
+const engine = new Engine(engineConfiguration);
+engine.run(new ToonPostScene());
+</script>
+</body>
+</html>

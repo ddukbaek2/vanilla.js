@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Window Showcase</title>
+<link rel="icon" href="../assets/favicon.svg">
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #4a1f1f; touch-action: none; user-select: none; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 창 쌓기와 화면 틀 예제. (러스트 예제 windowshowcase 와 같은 장면)
+// - 게임 영역 기준(setPlayAreaReference): 세이프 에어리어(위 40, 아래 30 을 흉내 냄)를 뺀 게임 영역의 세로가 늘 720 이다.
+// - 창 층(UIWindowLayer)에 기본 창과 확인 창(UIConfirmWindow, 긴 글은 스크롤)을 쌓는다. 맨 위 창만 보이고, 어둠이 세이프 에어리어까지 덮는다.
+// - 화면 페이드(fadeScreen): 다 어두워지면 글을 바꾸고 돌려준 Promise 로 0.6 초 붙잡았다가 놓아 밝힌다. (러스트 fade_screen_with_hold 의 손잡이)
+// - UI 가 받지 않은 누름만 놀이 입력 처리기(setPlayInputHandler)로 받아 표시를 옮긴다. 단추와 창 위 누름은 놀이로 가지 않는다.
+// - 씬은 GameScene 을 잇는다.
+// - 처음 몇 초는 저절로 둘러본다: 창 둘 쌓기 → 확인 창 닫기 → 모두 닫기 → 페이드. 그 뒤로는 단추를 눌러 본다.
+// - 화면 저장: ?capture=60,150,300 (러스트 VANILLA_CAPTURE_FRAMES=60,150,300)
+//==============================================================================
+import { Engine, EngineConfiguration, WorldNode, Vector2, Pivot, Paint, Text, TextAlign, UIButton, UILabel, UIWindow, UIWindowLayer, UIConfirmWindow } from "../../import.js";
+// GameScene 은 진입점 import.js 가 내보내지 않아 소스에서 바로 읽는다.
+import { GameScene } from "../../src/game/gamescene.js";
+
+// 저절로 둘러보는 때. (초)
+const TOUR_CLOSE_CONFIRM_SECONDS = 2.5;
+const TOUR_CLOSE_ALL_SECONDS = 4.0;
+const TOUR_FADE_SECONDS = 4.6;
+// 페이드를 어둡게 붙잡는 시간. (초)
+const FADE_HOLD_SECONDS = 0.6;
+
+//==============================================================================
+// 왼쪽 위 피봇의 노드 만들기.
+//==============================================================================
+function createBoxNode(parentNode, name, position, size) {
+	const node = new WorldNode();
+	node.setName(name);
+	parentNode.addChild(node);
+	node.setPivot(Pivot.topLeft);
+	node.setAnchor(Pivot.topLeft);
+	node.setLocalPosition(position);
+	node.setContentSize(size);
+	return node;
+}
+
+//==============================================================================
+// 단추 만들기. (둥근 Paint + UIButton + UILabel)
+//==============================================================================
+function createButton(parentNode, name, labelText, position) {
+	const buttonNode = createBoxNode(parentNode, name, position, Vector2.create(220, 64));
+	buttonNode.setInteractable(true);
+	const paint = buttonNode.addComponent(Paint);
+	paint.setColor("#3a82f6");
+	paint.setRoundSize(14);
+	buttonNode.addComponent(UIButton);
+	const label = buttonNode.addComponent(UILabel);
+	label.setText(labelText);
+	label.setFontSize(24);
+	return buttonNode;
+}
+
+//==============================================================================
+// 첫 씬.
+//==============================================================================
+class MainScene extends GameScene {
+	#playArea = null;
+	#windowLayer = null;
+	#statusNode = null;
+	#markerNode = null;
+	#confirmWindow = null;
+	#elapsedSeconds = 0;
+	#tourStep = 0;
+	#isFadeRequested = false;
+	#darkCount = 0;
+	#releaseFadeHold = null;
+	#holdRemainSeconds = 0;
+	#pressCount = 0;
+	#markerPosition = null;
+	#confirmCount = 0;
+
+	//==============================================================================
+	// 확인 창 띄우기. (긴 글, 확인하면 횟수를 센다)
+	//==============================================================================
+	openConfirmWindow() {
+		const message = "아주 긴 글이 창 높이를 넘으면 글 칸만 스크롤되고 두 단추는 늘 보여요. ".repeat(30);
+		const confirmWindow = new UIConfirmWindow("confirmWindow", { title: "확인 창", message });
+		confirmWindow.setConfirmEvent(() => {
+			this.#confirmCount += 1;
+		});
+		this.#windowLayer.openWindow(confirmWindow);
+		return confirmWindow;
+	}
+
+	//==============================================================================
+	// 기본 창 띄우기. (판 세로만 정한 창, 안에 글 하나)
+	//==============================================================================
+	openPlainWindow() {
+		const plainWindow = new UIWindow("plainWindow");
+		plainWindow.setPanelHeight(200);
+		const textNode = createBoxNode(plainWindow.getPanelNode(), "plainText", Vector2.create(24, 24), Vector2.create(432, 152));
+		const text = textNode.addComponent(Text);
+		text.setText("기본 창 (바깥을 누르면 닫혀요)");
+		text.setFontSize(22);
+		text.setTextColor("#f5f7ff");
+		this.#windowLayer.openWindow(plainWindow);
+		return plainWindow;
+	}
+
+	//==============================================================================
+	// 레이아웃. (게임 영역 = 세이프 에어리어, 창 층에 크기와 세이프 에어리어 너비를 알린다)
+	//==============================================================================
+	layoutContent() {
+		if (this.#playArea === null || this.#windowLayer === null) {
+			return;
+		}
+		const safeAreaRect = this.getSafeAreaRect();
+		const safeAreaInsets = this.getEngine().getViewManager().getSafeAreaInsets();
+		this.#playArea.setContentSize(safeAreaRect.size);
+		this.#windowLayer.setViewSize(safeAreaRect.size.x, safeAreaRect.size.y);
+		this.#windowLayer.setViewBleed(safeAreaInsets.top, safeAreaInsets.right, safeAreaInsets.bottom, safeAreaInsets.left);
+	}
+
+	//==============================================================================
+	// 페이드 시작. (다 어두워지면 글을 바꾸고 Promise 로 붙잡는다)
+	//==============================================================================
+	startFade() {
+		const isStarted = this.fadeScreen(() => {
+			this.#darkCount += 1;
+			this.#statusNode.getComponent(Text).setTextColor("#ffd166");
+			return new System.Promise((resolve) => {
+				this.#releaseFadeHold = resolve;
+			});
+		});
+		if (isStarted) {
+			this.#holdRemainSeconds = FADE_HOLD_SECONDS;
+		}
+	}
+
+	//==============================================================================
+	// 저절로 둘러보기. (창 둘 쌓기 → 확인 창 닫기 → 모두 닫기 → 페이드)
+	//==============================================================================
+	updateTour() {
+		if (this.#windowLayer === null) {
+			return;
+		}
+		if (this.#tourStep === 0) {
+			this.#tourStep = 1;
+			this.openPlainWindow();
+			this.#confirmWindow = this.openConfirmWindow();
+		}
+		else if (this.#tourStep === 1 && this.#elapsedSeconds >= TOUR_CLOSE_CONFIRM_SECONDS) {
+			this.#tourStep = 2;
+			if (this.#confirmWindow !== null) {
+				this.#confirmWindow.close();
+				this.#confirmWindow = null;
+			}
+		}
+		else if (this.#tourStep === 2 && this.#elapsedSeconds >= TOUR_CLOSE_ALL_SECONDS) {
+			this.#tourStep = 3;
+			this.#windowLayer.closeAllWindows();
+		}
+		else if (this.#tourStep === 3 && this.#elapsedSeconds >= TOUR_FADE_SECONDS) {
+			this.#tourStep = 4;
+			this.startFade();
+		}
+	}
+
+	//==============================================================================
+	// 상태 글 고치기.
+	//==============================================================================
+	updateStatus() {
+		if (this.#statusNode === null || this.#windowLayer === null) {
+			return;
+		}
+		const safeAreaRect = this.getSafeAreaRect();
+		const statusLine = `게임 영역 ${safeAreaRect.size.x.toFixed(0)} x ${safeAreaRect.size.y.toFixed(0)}   창 ${this.#windowLayer.getWindowCount()}   UI 배율 ${this.#windowLayer.getUIScale().toFixed(2)}   놀이 누름 ${this.#pressCount}   확인 ${this.#confirmCount}   어두워짐 ${this.#darkCount}   막 ${this.getScreenFadeAlpha().toFixed(2)}`;
+		this.#statusNode.getComponent(Text).setText(statusLine);
+	}
+
+	//==============================================================================
+	// 애셋 읽기 자리. (세이프 에어리어를 흉내 내고 게임 영역 기준과 놀이 입력 처리기를 정한다)
+	//==============================================================================
+	async loadAssets() {
+		await super.loadAssets();
+		this.getEngine().getViewManager().setSafeAreaOverride({ top: 40, right: 0, bottom: 30, left: 0 });
+		this.setSceneBackgroundColor("#4a1f1f");
+		this.setPlayAreaReference(720, false);
+		this.setPlayInputHandler({
+			press: (playAreaPosition) => {
+				this.#pressCount += 1;
+				this.#markerPosition = playAreaPosition;
+			},
+		});
+	}
+
+	//==============================================================================
+	// 초기화. (게임 영역, 상태 글, 표시, 단추 둘, 창 층)
+	//==============================================================================
+	initialize(engine) {
+		super.initialize(engine);
+		const safeAreaNode = this.getSafeAreaNode();
+		const playArea = createBoxNode(safeAreaNode, "playArea", Vector2.create(0, 0), Vector2.create(1, 1));
+		playArea.addComponent(Paint).setColor("#1f3a2e");
+		const statusNode = createBoxNode(playArea, "status", Vector2.create(24, 20), Vector2.create(1200, 40));
+		const statusText = statusNode.addComponent(Text);
+		statusText.setFontSize(22);
+		statusText.setTextAlign(TextAlign.left);
+		statusText.setTextColor("#f5f7ff");
+		const markerNode = new WorldNode();
+		markerNode.setName("marker");
+		playArea.addChild(markerNode);
+		markerNode.setContentSize(Vector2.create(36, 36));
+		markerNode.setLocalPosition(Vector2.create(640, 360));
+		const markerPaint = markerNode.addComponent(Paint);
+		markerPaint.setColor("#ffd166");
+		markerPaint.setRoundSize(18);
+
+		// 창 층은 게임 영역의 맨 위 자식. 단추는 그 앞에 둔다.
+		const confirmButtonNode = createButton(playArea, "confirmButton", "확인 창", Vector2.create(24, 80));
+		const fadeButtonNode = createButton(playArea, "fadeButton", "페이드", Vector2.create(264, 80));
+		const windowLayer = new UIWindowLayer();
+		playArea.addChild(windowLayer);
+		confirmButtonNode.getComponent(UIButton).setClickedEvent(() => {
+			this.openConfirmWindow();
+		});
+		fadeButtonNode.getComponent(UIButton).setClickedEvent(() => {
+			this.#isFadeRequested = true;
+		});
+		this.#playArea = playArea;
+		this.#windowLayer = windowLayer;
+		this.#statusNode = statusNode;
+		this.#markerNode = markerNode;
+		this.layoutContent();
+	}
+
+	//==============================================================================
+	// 레이아웃. (바탕이 세이프 에어리어를 다시 계산한 뒤)
+	//==============================================================================
+	layout() {
+		super.layout();
+		this.layoutContent();
+	}
+
+	//==============================================================================
+	// 갱신. (둘러보기, 놀이 입력으로 표시 옮기기, 페이드 붙잡기 놓기)
+	//==============================================================================
+	tick(timeDelta) {
+		super.tick(timeDelta);
+		this.#elapsedSeconds += timeDelta;
+		this.updateTour();
+		if (this.#isFadeRequested) {
+			this.#isFadeRequested = false;
+			this.startFade();
+		}
+		if (this.#releaseFadeHold !== null) {
+			this.#holdRemainSeconds -= timeDelta;
+			if (this.#holdRemainSeconds <= 0) {
+				const releaseFadeHold = this.#releaseFadeHold;
+				this.#releaseFadeHold = null;
+				releaseFadeHold();
+			}
+		}
+		if (this.#markerPosition !== null) {
+			this.#markerNode.setLocalPosition(this.#markerPosition);
+			this.#markerPosition = null;
+		}
+		this.updateStatus();
+	}
+}
+
+//==============================================================================
+// 시작.
+//==============================================================================
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.title = "창 쌓기와 화면 틀 (바닐라엔진)";
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+engineConfiguration.autoResizeOnWindowResize = true;
+const engine = new Engine(engineConfiguration);
+// 로딩 화면 설정은 run 전에.
+const mainScene = new MainScene();
+mainScene.setLoadingMinDurationMs(0);
+engine.run(mainScene);
+</script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pane Layout</title>
+<link rel="icon" href="../assets/favicon.svg">
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000000; }
+</style>
+</head>
+<body>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 화면 분할 패널 예제. (파티클 에디터의 창 구성과 같은 꼴, 러스트 예제 panelayout 의 웹 판과 같은 구성)
+// - 위 도구 막대(끌 수 없는 고정 40), 아래 가로 패널: 왼쪽 고정 240(위 320 과 아래 flex 로 세로 분할, 최소 120) | 오른쪽 flex(엔진 화면).
+// - 도구 막대 단추: 왼쪽 패널 숨기기 / 보이기, 끌어서 바꾼 크기 지우기.
+// - Pane, PaneStyle 로 DOM 요소를 짓고 엔진 캔버스를 오른쪽 패널에 넣는다.
+// - 사람이 없어도 볼 수 있게 60 프레임에 왼쪽 리사이저를 오른쪽으로 80 끈다. (러스트 데스크탑 판과 같은 입력)
+//==============================================================================
+import { Engine, EngineConfiguration, Scene, Vector2, Rect, Colors } from "../../import.js";
+import { Pane, PaneStyle, PaneTheme } from "../../src/web/pane.js";
+
+//==============================================================================
+// 패널 위에 프리셋 패널 요소 하나와 제목 글을 붙인다.
+//==============================================================================
+function addPanelContent(pane, title) {
+	const panelElement = PaneStyle.create("div", "panel");
+	const titleElement = PaneStyle.create("div", "text", { text: title, style: { color: PaneTheme.color.textDim, fontSize: PaneTheme.font.sizeSmall, marginBottom: "8px" } });
+	panelElement.appendChild(titleElement);
+	pane.getContainer().appendChild(panelElement);
+	return panelElement;
+}
+
+//==============================================================================
+// 창 구성. (뿌리 패널을 body 에 단다)
+//==============================================================================
+function buildLayout() {
+	const rootPane = new Pane({ direction: "vertical" });
+
+	// 위: 도구 막대.
+	const toolbarPane = new Pane({ size: 40, minSize: 40, maxSize: 40, isResizable: false });
+	const toolbarElement = PaneStyle.create("div", "toolbar");
+	const titleElement = PaneStyle.create("span", "text", { text: "PANE LAYOUT" });
+	const toggleButtonElement = PaneStyle.create("button", "button", { id: "toggleLeftButton", text: "Toggle Left", accent: true });
+	const resetButtonElement = PaneStyle.create("button", "button", { id: "resetLayoutButton", text: "Reset Layout", warning: true });
+	toolbarElement.appendChild(titleElement);
+	toolbarElement.appendChild(toggleButtonElement);
+	toolbarElement.appendChild(resetButtonElement);
+	toolbarPane.getContainer().appendChild(toolbarElement);
+
+	// 아래: 가로 패널.
+	const mainPane = new Pane({ direction: "horizontal" });
+
+	// 왼쪽: 위아래 둘로 나눈 고정 폭 패널.
+	const leftPane = new Pane({ direction: "vertical", size: 240, minSize: 170 });
+	const topPane = new Pane({ size: 320, minSize: 120 });
+	addPanelContent(topPane, "PRESETS");
+	const bottomPane = new Pane({ minSize: 120 });
+	const bottomPanelElement = addPanelContent(bottomPane, "HIERARCHY");
+	const searchElement = PaneStyle.create("input", "input", { type: "text", placeholder: "Search" });
+	bottomPanelElement.appendChild(searchElement);
+	leftPane.addPane(topPane);
+	leftPane.addPane(bottomPane);
+
+	// 오른쪽: 엔진 캔버스를 담는 flex 패널. (엔진은 canvasId 로 이 캔버스를 찾는다)
+	const previewPane = new Pane({ minSize: 200 });
+	const canvasElement = PaneStyle.create("canvas", "", { id: "mainCanvas" });
+	previewPane.getContainer().appendChild(canvasElement);
+	mainPane.addPane(leftPane);
+	mainPane.addPane(previewPane);
+	rootPane.addPane(toolbarPane);
+	rootPane.addPane(mainPane);
+	rootPane.attachTo(System.document.body);
+
+	toggleButtonElement.addEventListener("click", () => {
+		leftPane.setVisible(!leftPane.isVisible());
+	});
+	resetButtonElement.addEventListener("click", () => {
+		rootPane.resetLayout();
+		rootPane.refresh();
+	});
+	return leftPane;
+}
+
+//==============================================================================
+// 마우스 사건 하나 보내기. (흉내 낸 끌기)
+//==============================================================================
+function dispatchMouseEvent(target, type, clientX, clientY) {
+	target.dispatchEvent(new System.MouseEvent(type, { bubbles: true, cancelable: true, clientX, clientY, button: 0, buttons: type === "mouseup" ? 0 : 1 }));
+}
+
+//==============================================================================
+// 캔버스에 그리는 씬. (오른쪽 패널 안에서 보인다)
+//==============================================================================
+class PreviewScene extends Scene {
+	#leftPane;
+	#frameCount = 0;
+	#resizerElement = null;
+
+	constructor(leftPane) {
+		super();
+		this.#leftPane = leftPane;
+	}
+
+	//==============================================================================
+	// 갱신. (60 프레임에 왼쪽 리사이저를 오른쪽으로 80 끈다)
+	//==============================================================================
+	tick(timeDelta) {
+		this.#frameCount += 1;
+		const leftRect = this.#leftPane.getContainer().getBoundingClientRect();
+		const resizerX = leftRect.width + 2;
+		if (this.#frameCount === 60) {
+			this.#resizerElement = System.document.elementFromPoint(resizerX, 300);
+			dispatchMouseEvent(this.#resizerElement, "mousedown", resizerX, 300);
+		}
+		else if (this.#frameCount === 61) {
+			dispatchMouseEvent(System.document, "mousemove", resizerX + 80, 300);
+		}
+		else if (this.#frameCount === 62) {
+			dispatchMouseEvent(System.document, "mouseup", resizerX + 80, 300);
+		}
+		super.tick(timeDelta);
+	}
+
+	//==============================================================================
+	// 이전 출력. (배경을 칠한다)
+	//==============================================================================
+	preDraw(graphic) {
+		const viewManager = this.getEngine().getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor("#000000");
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		viewManager.applyViewRect(graphic);
+	}
+
+	//==============================================================================
+	// 출력.
+	//==============================================================================
+	draw(graphic) {
+		super.draw(graphic);
+		graphic.setFillColor(Colors.vanilla);
+		graphic.drawRect(Rect.create(60, 60, 240, 140));
+	}
+}
+
+//==============================================================================
+// 시작.
+//==============================================================================
+const leftPane = buildLayout();
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.title = "바닐라엔진 패널 배치";
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.autoResizeOnWindowResize = true;
+engineConfiguration.referenceResolutionSize = Vector2.create(1280, 720);
+const engine = new Engine(engineConfiguration);
+engine.run(new PreviewScene(leftPane));
+</script>
+</body>
+</html>

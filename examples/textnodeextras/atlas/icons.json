@@ -1,0 +1,54 @@
+{
+	"images": {
+		"coin.png": {
+			"x": 84,
+			"y": 55,
+			"width": 30,
+			"height": 30,
+			"page": 0
+		},
+		"gem.png": {
+			"x": 2,
+			"y": 2,
+			"width": 56,
+			"height": 40,
+			"page": 0
+		},
+		"heart.png": {
+			"x": 39,
+			"y": 55,
+			"width": 40,
+			"height": 36,
+			"page": 0
+		},
+		"leaf.png": {
+			"x": 2,
+			"y": 47,
+			"width": 32,
+			"height": 56,
+			"page": 0
+		},
+		"star.png": {
+			"x": 63,
+			"y": 2,
+			"width": 48,
+			"height": 48,
+			"page": 0
+		}
+	},
+	"meta": {
+		"imageFileName": "icons.png",
+		"width": 128,
+		"height": 128,
+		"count": 5,
+		"pages": [
+			{
+				"imageFileName": "icons.png",
+				"width": 128,
+				"height": 128
+			}
+		],
+		"extrude": 2,
+		"padding": 1
+	}
+}
