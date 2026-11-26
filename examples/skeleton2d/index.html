@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skeleton 2D</title>
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #1c2230; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 2D 뼈대 애니메이션 초안 페이지. (러스트 예제 skeleton2d 와 같은 장면, 저장소의 import.js 를 바로 읽는 개발용 페이지)
+// - 주소 ?frame=135 면 135 프레임(1/60 초씩)만 흘리고 멈춘다. (러스트 SKELETON2D_FRAME 과 화면 견주기)
+// - 자산은 tools/makeassets.cjs 가 짓는다. 셈 확인은 node skeleton2dcheck.mjs.
+//==============================================================================
+const engineModule = await import("../../import.js");
+const sceneModule = await import("./skeleton2dscene.js");
+const query = new System.URLSearchParams(System.location.search);
+const frozenFrame = query.has("frame") ? System.Number(query.get("frame")) : null;
+const engineConfiguration = new engineModule.EngineConfiguration();
+engineConfiguration.referenceResolutionSize = engineModule.Vector2.create(960, 540);
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.autoResizeOnWindowResize = true;
+const engine = new engineModule.Engine(engineConfiguration);
+engine.run(new sceneModule.Skeleton2DScene(frozenFrame));
+System.skeleton2dEngine = engine;
+</script>
+</body>
+</html>

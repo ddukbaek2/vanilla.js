@@ -26,4 +26,5 @@ export { AudioSource2D } from "./spatialaudio/audiosource2d.js";
 export { AudioListener2D } from "./spatialaudio/audiolistener2d.js";
 export { SaveGameManager, SaveGameError, SaveSlotInfo, SaveSlotOptions, calculateCrc32 } from "./savegame/savegamemanager.js";
 export { SaveStorage, LocalSaveStorage, MemorySaveStorage, SaveCloudProvider } from "./savegame/savestorage.js";
+export * from "./skeleton2d/skeleton2dexports.js";
 export {};
