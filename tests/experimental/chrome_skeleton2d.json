@@ -1,0 +1,613 @@
+{
+	"chrome": "Chrome/158.0.8127.88",
+	"values": [
+		[
+			"world child a",
+			"3ff0000000000000"
+		],
+		[
+			"world child b",
+			"3c91a62633145c07"
+		],
+		[
+			"world child c",
+			"3c91a62633145c07"
+		],
+		[
+			"world child d",
+			"4000000000000000"
+		],
+		[
+			"world child x",
+			"4059000000000000"
+		],
+		[
+			"world child y",
+			"4051800000000000"
+		],
+		[
+			"world child rotation",
+			"3cef99b70cfba96e"
+		],
+		[
+			"world child scale x",
+			"3ff0000000000000"
+		],
+		[
+			"world child scale y",
+			"4000000000000000"
+		],
+		[
+			"world child applied",
+			"c056800000000000"
+		],
+		[
+			"world sheared a",
+			"3ff0000000000000"
+		],
+		[
+			"world sheared b",
+			"3c91a62633145c07"
+		],
+		[
+			"world sheared c",
+			"bfdffffffffffffe"
+		],
+		[
+			"world sheared d",
+			"3ffbb67ae8584cab"
+		],
+		[
+			"world sheared x",
+			"405a400000000000"
+		],
+		[
+			"world sheared y",
+			"4051800000000000"
+		],
+		[
+			"world sheared rotation",
+			"3cef99b70cfba96e"
+		],
+		[
+			"world sheared scale x",
+			"3ff0000000000000"
+		],
+		[
+			"world sheared scale y",
+			"3ffcd82b446159f4"
+		],
+		[
+			"world sheared applied",
+			"0000000000000000"
+		],
+		[
+			"world odd a",
+			"3fe26d0215cdd012"
+		],
+		[
+			"world odd b",
+			"4000e3311c507398"
+		],
+		[
+			"world odd c",
+			"bfe10e78b49e0dde"
+		],
+		[
+			"world odd d",
+			"3fede08316b67cc0"
+		],
+		[
+			"world odd x",
+			"405c566666666666"
+		],
+		[
+			"world odd y",
+			"405097365df9e716"
+		],
+		[
+			"world odd rotation",
+			"4052af83c587dbcb"
+		],
+		[
+			"world odd scale x",
+			"400181240caf711d"
+		],
+		[
+			"world odd scale y",
+			"3ff133929cb533df"
+		],
+		[
+			"world odd applied",
+			"4040a66666666666"
+		],
+		[
+			"ik positive upper a",
+			"3fefde7057d48a99"
+		],
+		[
+			"ik positive upper b",
+			"3fb726284424fbbf"
+		],
+		[
+			"ik positive upper c",
+			"bfb726284424fbbf"
+		],
+		[
+			"ik positive upper d",
+			"3fefde7057d48a99"
+		],
+		[
+			"ik positive upper x",
+			"0000000000000000"
+		],
+		[
+			"ik positive upper y",
+			"0000000000000000"
+		],
+		[
+			"ik positive upper rotation",
+			"4014c0a0fbf39570"
+		],
+		[
+			"ik positive upper scale x",
+			"3feffffffffffffe"
+		],
+		[
+			"ik positive upper scale y",
+			"3feffffffffffffe"
+		],
+		[
+			"ik positive upper applied",
+			"c0027ebe0818d520"
+		],
+		[
+			"ik positive lower a",
+			"3fba7de4331d170e"
+		],
+		[
+			"ik positive lower b",
+			"3fefd404c25a6ddb"
+		],
+		[
+			"ik positive lower c",
+			"bfefd404c25a6ddb"
+		],
+		[
+			"ik positive lower d",
+			"3fba7de4331d170e"
+		],
+		[
+			"ik positive lower x",
+			"4048e5c7c49e0c48"
+		],
+		[
+			"ik positive lower y",
+			"401215cf753ce4ad"
+		],
+		[
+			"ik positive lower rotation",
+			"405503da56a4c06c"
+		],
+		[
+			"ik positive lower scale x",
+			"3ff0000000000000"
+		],
+		[
+			"ik positive lower scale y",
+			"3ff0000000000000"
+		],
+		[
+			"ik positive lower applied",
+			"4053b7d046e58715"
+		],
+		[
+			"ik negative upper a",
+			"3fcc6026a7a268fa"
+		],
+		[
+			"ik negative upper b",
+			"3fef342bb20546bf"
+		],
+		[
+			"ik negative upper c",
+			"bfef342bb20546bf"
+		],
+		[
+			"ik negative upper d",
+			"3fcc6026a7a268fa"
+		],
+		[
+			"ik negative upper x",
+			"0000000000000000"
+		],
+		[
+			"ik negative upper y",
+			"0000000000000000"
+		],
+		[
+			"ik negative upper rotation",
+			"40534c4a1238d55d"
+		],
+		[
+			"ik negative upper scale x",
+			"3ff0000000000000"
+		],
+		[
+			"ik negative upper scale y",
+			"3ff0000000000000"
+		],
+		[
+			"ik negative upper applied",
+			"40516c4a1238d55d"
+		],
+		[
+			"ik negative lower a",
+			"3feffc7a7a5aa3b9"
+		],
+		[
+			"ik negative lower b",
+			"bf9e05aa4d8818f8"
+		],
+		[
+			"ik negative lower c",
+			"3f9e05aa4d8818f8"
+		],
+		[
+			"ik negative lower d",
+			"3feffc7a7a5aa3b9"
+		],
+		[
+			"ik negative lower x",
+			"40262b1e32f6e203"
+		],
+		[
+			"ik negative lower y",
+			"404860c223141f45"
+		],
+		[
+			"ik negative lower rotation",
+			"bffae18d2b2c6e25"
+		],
+		[
+			"ik negative lower scale x",
+			"3ff0000000000001"
+		],
+		[
+			"ik negative lower scale y",
+			"3ff0000000000001"
+		],
+		[
+			"ik negative lower applied",
+			"c053b7d046e58716"
+		],
+		[
+			"ik far upper a",
+			"bfc0b5150f6da2ce"
+		],
+		[
+			"ik far upper b",
+			"3fefb9ea92ec689b"
+		],
+		[
+			"ik far upper c",
+			"bfefb9ea92ec689b"
+		],
+		[
+			"ik far upper d",
+			"bfc0b5150f6da2ce"
+		],
+		[
+			"ik far upper x",
+			"0000000000000000"
+		],
+		[
+			"ik far upper y",
+			"0000000000000000"
+		],
+		[
+			"ik far upper rotation",
+			"4058600000000000"
+		],
+		[
+			"ik far upper scale x",
+			"3fefffffffffffff"
+		],
+		[
+			"ik far upper scale y",
+			"3fefffffffffffff"
+		],
+		[
+			"ik far upper applied",
+			"4056800000000000"
+		],
+		[
+			"ik far lower a",
+			"bfc0b5150f6da2d1"
+		],
+		[
+			"ik far lower b",
+			"3fefb9ea92ec689b"
+		],
+		[
+			"ik far lower c",
+			"bfefb9ea92ec689b"
+		],
+		[
+			"ik far lower d",
+			"bfc0b5150f6da2d1"
+		],
+		[
+			"ik far lower x",
+			"c01a1af0e81b4e62"
+		],
+		[
+			"ik far lower y",
+			"4048c93f42c8b1b9"
+		],
+		[
+			"ik far lower rotation",
+			"4058600000000000"
+		],
+		[
+			"ik far lower scale x",
+			"3fefffffffffffff"
+		],
+		[
+			"ik far lower scale y",
+			"3fefffffffffffff"
+		],
+		[
+			"ik far lower applied",
+			"3cf57c6513cad17a"
+		],
+		[
+			"ik odd upper a",
+			"3fe77e3e0e5e5180"
+		],
+		[
+			"ik odd upper b",
+			"bfe5ba2bea3cafc3"
+		],
+		[
+			"ik odd upper c",
+			"3fe5ba2bea3cafc3"
+		],
+		[
+			"ik odd upper d",
+			"3fe77e3e0e5e5180"
+		],
+		[
+			"ik odd upper x",
+			"0000000000000000"
+		],
+		[
+			"ik odd upper y",
+			"0000000000000000"
+		],
+		[
+			"ik odd upper rotation",
+			"c04561c02d00f360"
+		],
+		[
+			"ik odd upper scale x",
+			"3ff0000000000000"
+		],
+		[
+			"ik odd upper scale y",
+			"3ff0000000000000"
+		],
+		[
+			"ik odd upper applied",
+			"c04921c02d00f360"
+		],
+		[
+			"ik odd lower a",
+			"3fecdfd841eff3ac"
+		],
+		[
+			"ik odd lower b",
+			"3fdb966f3852db76"
+		],
+		[
+			"ik odd lower c",
+			"bfdb966f3852db76"
+		],
+		[
+			"ik odd lower d",
+			"3fecdfd841eff3ac"
+		],
+		[
+			"ik odd lower x",
+			"40425aa07b39afac"
+		],
+		[
+			"ik odd lower y",
+			"c040f9724eff6950"
+		],
+		[
+			"ik odd lower rotation",
+			"403988de85bc85d7"
+		],
+		[
+			"ik odd lower scale x",
+			"3ff0000000000000"
+		],
+		[
+			"ik odd lower scale y",
+			"3ff0000000000000"
+		],
+		[
+			"ik odd lower applied",
+			"40511317b7ef9b26"
+		],
+		[
+			"ik aim arm a",
+			"3fd0907dc1930693"
+		],
+		[
+			"ik aim arm b",
+			"3feee8dd4748bf14"
+		],
+		[
+			"ik aim arm c",
+			"bfeee8dd4748bf14"
+		],
+		[
+			"ik aim arm d",
+			"3fd0907dc1930693"
+		],
+		[
+			"ik aim arm x",
+			"0000000000000000"
+		],
+		[
+			"ik aim arm y",
+			"0000000000000000"
+		],
+		[
+			"ik aim arm rotation",
+			"4052bfffffffffff"
+		],
+		[
+			"ik aim arm scale x",
+			"3ff0000000000000"
+		],
+		[
+			"ik aim arm scale y",
+			"3ff0000000000000"
+		],
+		[
+			"ik aim arm applied",
+			"4046800000000000"
+		],
+		[
+			"fade body y",
+			"c039000000000000"
+		],
+		[
+			"fade leg rotation",
+			"4054000000000000"
+		],
+		[
+			"fade arm rotation",
+			"0000000000000000"
+		],
+		[
+			"fade end body y",
+			"c03e000000000000"
+		],
+		[
+			"fade end leg rotation",
+			"4051800000000000"
+		],
+		[
+			"fade end arm rotation",
+			"0000000000000000"
+		],
+		[
+			"bezier body y",
+			"c03e000000000000"
+		],
+		[
+			"bezier leg rotation",
+			"405a4fe8d258d566"
+		],
+		[
+			"bezier arm rotation",
+			"0000000000000000"
+		],
+		[
+			"layer body y",
+			"c03e000000000000"
+		],
+		[
+			"layer leg rotation",
+			"4051800000000000"
+		],
+		[
+			"layer arm rotation",
+			"403148b439581062"
+		],
+		[
+			"layer leg a",
+			"3fd5e3a8748a0bf7"
+		],
+		[
+			"layer leg b",
+			"3fee11f642522d1b"
+		],
+		[
+			"layer leg c",
+			"bfee11f642522d1b"
+		],
+		[
+			"layer leg d",
+			"3fd5e3a8748a0bf7"
+		],
+		[
+			"layer leg x",
+			"0000000000000000"
+		],
+		[
+			"layer leg y",
+			"0000000000000000"
+		],
+		[
+			"layer leg rotation",
+			"4051800000000000"
+		],
+		[
+			"layer leg scale x",
+			"3fefffffffffffff"
+		],
+		[
+			"layer leg scale y",
+			"3fefffffffffffff"
+		],
+		[
+			"layer leg applied",
+			"4051800000000000"
+		],
+		[
+			"layer arm a",
+			"3fee8e1498692520"
+		],
+		[
+			"layer arm b",
+			"3fd303d24abc7ed0"
+		],
+		[
+			"layer arm c",
+			"bfd303d24abc7ed0"
+		],
+		[
+			"layer arm d",
+			"3fee8e1498692520"
+		],
+		[
+			"layer arm x",
+			"0000000000000000"
+		],
+		[
+			"layer arm y",
+			"0000000000000000"
+		],
+		[
+			"layer arm rotation",
+			"403148b439581062"
+		],
+		[
+			"layer arm scale x",
+			"3fefffffffffffff"
+		],
+		[
+			"layer arm scale y",
+			"3fefffffffffffff"
+		],
+		[
+			"layer arm applied",
+			"403148b439581062"
+		]
+	]
+}
