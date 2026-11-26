@@ -54367,6 +54367,58 @@
 							}
 						},
 						{
+							"kind": "static",
+							"name": "splitFbxCornersByMaterial",
+							"signature": "static splitFbxCornersByMaterial(materialIndexPerTriangle, cornerArrays)",
+							"params": [
+								{
+									"name": "materialIndexPerTriangle",
+									"type": "Int32Array",
+									"description": {
+										"ko": "삼각형마다 머티리얼 번호. (소유 노드 materialIds 안의 자리)",
+										"en": "Material number per triangle. (A position in the owner node's materialIds)"
+									}
+								},
+								{
+									"name": "cornerArrays",
+									"type": "{ positions: Float32Array, normals: Float32Array, textureCoordinates: Float32Array, joints: Uint16Array, weights: Float32Array }",
+									"description": {
+										"ko": "코너마다 위치 3, 노멀 3, UV 2, 조인트 4, 가중치 4.",
+										"en": "Per corner: 3 position, 3 normal, 2 UV, 4 joint and 4 weight values."
+									}
+								}
+							],
+							"returns": {
+								"type": "object[]",
+								"description": {
+									"ko": "부분 메시 목록. (localMaterialIndex 와 cornerArrays 와 같은 칸)",
+									"en": "List of sub-meshes. (localMaterialIndex and the same fields as cornerArrays)"
+								}
+							},
+							"description": {
+								"ko": "FBX 코너를 머티리얼별로 나누기. (정적, 비인덱스 코너 배열, GL 무관)\n- 메시 하나에 머티리얼이 여럿이면 머티리얼마다 부분 메시로 나눠 그린다. (three.js FBXLoader 의 그룹, 유니티와 언리얼의 서브메시)\n- 부분 메시는 머티리얼 번호가 작은 것부터, 삼각형 차례는 원래대로. 번호가 하나뿐이면 배열을 그대로 쓴다.",
+								"en": "Split FBX corners by material. (Static, non-indexed corner arrays, GL independent)\n- When one mesh has several materials, it is drawn as one sub-mesh per material. (Groups in three.js FBXLoader, sub-meshes in Unity and Unreal)\n- Sub-meshes come in ascending material number and keep the original triangle order. With only one material number the arrays are used as they are."
+							},
+							"since": "0.4.0",
+							"source": "src/graphics3d/skinnedmodel.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "graphics3d/skinnedmodel",
+								"class": "SkinnedModel",
+								"name": "split_fbx_corners_by_material"
+							},
+							"examples": [
+								{
+									"title": {
+										"ko": "삼각형 셋 가운데 가운데 것만 재질 1 (부분 메시 둘, 삼각형 2개와 1개)",
+										"en": "Of three triangles only the middle one uses material 1 (two sub-meshes, with 2 triangles and 1)"
+									},
+									"code": "import { SkinnedModel } from \"./build/vanilla.js\";\nconst cornerCount = 9;\nconst subMeshList = SkinnedModel.splitFbxCornersByMaterial(new Int32Array([0, 1, 0]), {\n\tpositions: new Float32Array(cornerCount * 3).map((value, index) => index),\n\tnormals: new Float32Array(cornerCount * 3),\n\ttextureCoordinates: new Float32Array(cornerCount * 2),\n\tjoints: new Uint16Array(cornerCount * 4),\n\tweights: new Float32Array(cornerCount * 4),\n});\nconsole.log(subMeshList.length, subMeshList[0].localMaterialIndex, subMeshList[0].positions.length / 9, subMeshList[1].positions[0]); // 2 0 2 9",
+									"language": "javascript"
+								}
+							]
+						},
+						{
 							"kind": "method",
 							"name": "addAnimationsFromFbxUrl",
 							"signature": "async addAnimationsFromFbxUrl(url, clipName, ignoreTranslation = false)",
