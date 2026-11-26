@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../assets/favicon.svg">
+<title>Effect Gallery</title>
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #1b1f27; touch-action: none; user-select: none; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 효과 갤러리 예제. (러스트 예제 effectgallery 와 같은 장면, ShaderSprite, ScreenEffect, TrailRenderer, ParticleSystem)
+// - 왼쪽: ShaderSpriteEffect 50 가지를 칸마다 하나씩 건다. (none 은 원본)
+//   그림은 코드로 만든 두 칸짜리 시트이고 모든 칸이 왼쪽 칸(imageRect)만 쓴다. 오른쪽 칸은 (경계 두 줄을 빼고) 새빨간 사각형이라 자르기가 틀리면 빨강이 번져 보인다.
+// - 오른쪽: 둥근 모서리 무대에만 ScreenEffect 를 건다. (setRegion) 30 프레임마다 효과 묶음이 바뀌고, 120 프레임 묶음은 화면 전체(clearRegion)에 건다.
+//   3 프레임째에는 모든 효과를 한꺼번에 켜서 패스 셰이더가 다 컴파일되는지 본다.
+// - 아래 왼쪽: TrailRenderer 둘. (보통 합성, 더하기 합성) 무대 안에도 더하기 합성 트레일이 하나 돈다.
+// - 아래 오른쪽: ParticleSystem 칸 여덟. 렌더 모양 넷(circle 분수, rect 색종이, streak 불티, image 별)과 끌개(소용돌이), 흔들림(물방울), edge(눈), 월드 공간.
+//   수동 tick 으로 프레임마다 1/60 초씩, 씨앗을 고정해 흘리고, 처음 2 초를 미리 흘려 둔다.
+//==============================================================================
+const engineModule = await import("../../import.js");
+const { Engine, EngineConfiguration, Scene, WorldNode, Component, Color, Mask, Paint, ParticleEmitterShape, ParticleRenderShape, ParticleSystem, Pivot, Rect, ScreenEffect, ScreenEffectType, ShaderSprite, ShaderSpriteEffect, Sprite, Text, TextAlign, TrailRenderer, Vector2, ViewScaleMode } = engineModule;
+const MathUtility = engineModule.Math;
+
+// 전역 상수 목록.
+const VIEW_WIDTH = 1280;
+const VIEW_HEIGHT = 720;
+const BACKGROUND_COLOR = "#1b1f27";
+const CELL_COLOR = "#3a4150";
+const LABEL_COLOR = "#c9d1e0";
+const GRID_COLUMN_COUNT = 10;
+const GRID_LEFT = 15;
+const GRID_TOP = 44;
+const CELL_WIDTH = 84;
+const CELL_HEIGHT = 101;
+const SPRITE_SIZE = 64;
+const SHEET_FRAME_SIZE = 80;
+const SHEET_GUTTER_SIZE = 2;
+const STAGE_X = 870;
+const STAGE_Y = 44;
+const STAGE_WIDTH = 395;
+const STAGE_HEIGHT = 505;
+const STAGE_CORNER_RADIUS = 16;
+const EFFECT_SET_FRAME_COUNT = 30;
+const EFFECT_SET_COUNT = 8;
+const COMPILE_CHECK_FRAME = 3;
+const MOVER_FRAME_STEP = 1 / 60;
+const TRAIL_END_X = 410;
+const PARTICLE_ROW_LEFT = 455;
+const PARTICLE_ROW_TOP = 588;
+const PARTICLE_CELL_STEP = 101.25;
+const PARTICLE_CELL_WIDTH = 97;
+const PARTICLE_CELL_HEIGHT = 124;
+const PARTICLE_STAR_SIZE = 32;
+const PARTICLE_WARM_UP_SECONDS = 2;
+
+//==============================================================================
+// 원을 따라 도는 노드. (무대 안 트레일)
+//==============================================================================
+class OrbitMover extends Component {
+	/** @private */ #center;
+	/** @private */ #radius;
+	/** @private */ #angularSpeed;
+	/** @private */ #angle;
+
+	constructor() {
+		super();
+		this.setComponentType("OrbitMover");
+		this.#center = Vector2.create(0, 0);
+		this.#radius = 0;
+		this.#angularSpeed = 0;
+		this.#angle = 0;
+	}
+
+	setOrbit(center, radius, angularSpeed) {
+		this.#center = center;
+		this.#radius = radius;
+		this.#angularSpeed = angularSpeed;
+	}
+
+	tick(timeDelta) {
+		this.#angle += this.#angularSpeed * MOVER_FRAME_STEP;
+		const radiusScale = 1 + 0.25 * System.Math.sin(this.#angle * 2);
+		const positionX = this.#center.x + System.Math.cos(this.#angle) * this.#radius * radiusScale;
+		const positionY = this.#center.y + System.Math.sin(this.#angle) * this.#radius * 0.8;
+		this.getNode().setLocalPosition(Vector2.create(positionX, positionY));
+	}
+}
+
+//==============================================================================
+// 물결치며 좌우로 오가는 노드. (아래 트레일)
+//==============================================================================
+class WaveMover extends Component {
+	/** @private */ #elapsedTime;
+	/** @private */ #setting;
+
+	constructor() {
+		super();
+		this.setComponentType("WaveMover");
+		this.#elapsedTime = 0;
+		this.#setting = null;
+	}
+
+	setWave(startX, endX, horizontalFrequency, baseY, amplitude, frequency) {
+		this.#setting = { startX, endX, horizontalFrequency, baseY, amplitude, frequency };
+	}
+
+	tick(timeDelta) {
+		const setting = this.#setting;
+		this.#elapsedTime += MOVER_FRAME_STEP;
+		const travelRatio = 0.5 - 0.5 * System.Math.cos(this.#elapsedTime * setting.horizontalFrequency);
+		const positionX = setting.startX + (setting.endX - setting.startX) * travelRatio;
+		const positionY = setting.baseY + System.Math.sin(this.#elapsedTime * setting.frequency) * setting.amplitude;
+		this.getNode().setLocalPosition(Vector2.create(positionX, positionY));
+	}
+}
+
+//==============================================================================
+// 화소로 그림 만들기. (캔버스에 RGBA 를 그대로 놓는다)
+//==============================================================================
+function createImageFromPixels(width, height, pixels) {
+	const canvas = System.document.createElement("canvas");
+	canvas.width = width;
+	canvas.height = height;
+	canvas.getContext("2d").putImageData(new System.ImageData(pixels, width, height), 0, 0);
+	return canvas;
+}
+
+//==============================================================================
+// 두 칸짜리 그림 시트 만들기. (왼쪽: 안테나 달린 둥근 캐릭터, 오른쪽: 새빨간 사각형)
+//==============================================================================
+function createCharacterSheet() {
+	const frameSize = SHEET_FRAME_SIZE;
+	const sheetWidth = frameSize * 2;
+	const pixels = new System.Uint8ClampedArray(sheetWidth * frameSize * 4);
+	const center = frameSize * 0.5;
+	for (let pixelY = 0; pixelY < frameSize; pixelY++) {
+		for (let pixelX = 0; pixelX < sheetWidth; pixelX++) {
+			const pixelIndex = (pixelY * sheetWidth + pixelX) * 4;
+			if (pixelX >= frameSize) {
+				// 맞닿은 두 줄은 비워 둔다. (쌍선형 필터가 칸 경계에서 옆 칸을 섞는 것은 효과와 상관없는 아틀라스 번짐이라 빼고 본다)
+				if (pixelX >= frameSize + SHEET_GUTTER_SIZE) {
+					pixels[pixelIndex] = 255;
+					pixels[pixelIndex + 3] = 255;
+				}
+				continue;
+			}
+			const sampleX = pixelX + 0.5;
+			const sampleY = pixelY + 0.5;
+			// 몸통. (가장자리 부드럽게, 위왼쪽 하늘색 → 아래오른쪽 보라)
+			const bodyDistance = System.Math.sqrt((sampleX - center) ** 2 + (sampleY - center - 4) ** 2);
+			const bodyCoverage = MathUtility.clamp01(28 - bodyDistance + 0.5);
+			const gradient = (sampleX + sampleY) / (frameSize * 2);
+			let color = Color.lerp(new Color(0.35, 0.88, 1, 1), new Color(0.78, 0.32, 0.95, 1), gradient);
+			if (bodyDistance > 23) {
+				color = new Color(color.red * 0.6, color.green * 0.6, color.blue * 0.6, 1);
+			}
+			// 하이라이트, 눈.
+			if (System.Math.sqrt((sampleX - 30) ** 2 + (sampleY - 30) ** 2) < 6) {
+				color = Color.lerp(color, Color.white(), 0.8);
+			}
+			const leftEyeDistance = System.Math.sqrt((sampleX - 32) ** 2 + (sampleY - 46) ** 2);
+			const rightEyeDistance = System.Math.sqrt((sampleX - 48) ** 2 + (sampleY - 46) ** 2);
+			if (leftEyeDistance < 4 || rightEyeDistance < 4) {
+				color = new Color(0.05, 0.05, 0.1, 1);
+			}
+			// 안테나. (줄기 + 노란 공)
+			const stemCoverage = System.Math.abs(sampleX - center) < 1.5 && sampleY > 8 && sampleY < 18 ? 1 : 0;
+			const ballDistance = System.Math.sqrt((sampleX - center) ** 2 + (sampleY - 9) ** 2);
+			const ballCoverage = MathUtility.clamp01(5 - ballDistance + 0.5);
+			let coverage = bodyCoverage;
+			if (stemCoverage > 0 && bodyCoverage < 1) {
+				color = new Color(0.9, 0.9, 0.95, 1);
+				coverage = 1;
+			}
+			if (ballCoverage > 0 && bodyCoverage <= 0) {
+				color = new Color(1, 0.85, 0.2, 1);
+				coverage = System.Math.max(coverage, ballCoverage);
+			}
+			if (coverage <= 0) {
+				continue;
+			}
+			pixels[pixelIndex] = System.Math.trunc(MathUtility.clamp01(color.red) * 255);
+			pixels[pixelIndex + 1] = System.Math.trunc(MathUtility.clamp01(color.green) * 255);
+			pixels[pixelIndex + 2] = System.Math.trunc(MathUtility.clamp01(color.blue) * 255);
+			pixels[pixelIndex + 3] = System.Math.trunc(coverage * 255);
+		}
+	}
+	return createImageFromPixels(sheetWidth, frameSize, pixels);
+}
+
+//==============================================================================
+// 별 그림 만들기. (다섯 뿔, 가장자리 부드럽게. 파티클 image 모양용)
+//==============================================================================
+function createStarImage() {
+	const imageSize = PARTICLE_STAR_SIZE;
+	const pixels = new System.Uint8ClampedArray(imageSize * imageSize * 4);
+	const center = imageSize * 0.5;
+	for (let pixelY = 0; pixelY < imageSize; pixelY++) {
+		for (let pixelX = 0; pixelX < imageSize; pixelX++) {
+			const deltaX = pixelX + 0.5 - center;
+			const deltaY = pixelY + 0.5 - center;
+			const distance = System.Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+			const angle = System.Math.atan2(deltaY, deltaX) + MathUtility.PI * 0.5;
+			const pointRatio = (0.5 + 0.5 * System.Math.cos(angle * 5)) ** 3;
+			const edgeDistance = center * (0.42 + 0.56 * pointRatio);
+			const coverage = MathUtility.clamp01(edgeDistance - distance + 0.5);
+			if (coverage <= 0) {
+				continue;
+			}
+			const pixelIndex = (pixelY * imageSize + pixelX) * 4;
+			const shine = MathUtility.clamp01(1 - distance / center);
+			pixels[pixelIndex] = 255;
+			pixels[pixelIndex + 1] = System.Math.trunc(200 + 55 * shine);
+			pixels[pixelIndex + 2] = System.Math.trunc(60 + 160 * shine);
+			pixels[pixelIndex + 3] = System.Math.trunc(coverage * 255);
+		}
+	}
+	return createImageFromPixels(imageSize, imageSize, pixels);
+}
+
+//==============================================================================
+// 칸 효과의 진행도. (사라짐 / 드러남은 절반, 광택은 띠가 가운데, 섬광은 조금 덜)
+//==============================================================================
+function getGalleryEffectProgress(effect) {
+	const halfEffectList = [ShaderSpriteEffect.dissolve, ShaderSpriteEffect.burn, ShaderSpriteEffect.noiseFade, ShaderSpriteEffect.pixelDissolve, ShaderSpriteEffect.wipe, ShaderSpriteEffect.iris, ShaderSpriteEffect.diamondWipe, ShaderSpriteEffect.clockWipe, ShaderSpriteEffect.blinds, ShaderSpriteEffect.checkerWipe];
+	if (halfEffectList.includes(effect)) {
+		return 0.5;
+	}
+	if (effect === ShaderSpriteEffect.shine) {
+		return 0.45;
+	}
+	if (effect === ShaderSpriteEffect.flash) {
+		return 0.7;
+	}
+	return 1;
+}
+
+//==============================================================================
+// 효과 갤러리 씬.
+//==============================================================================
+class EffectGalleryScene extends Scene {
+	/** @private @type { ScreenEffect } */ #screenEffect;
+	/** @private @type { number | null } */ #appliedEffectSetIndex;
+	/** @private @type { boolean } */ #isFullScreenEffect;
+	/** @private @type { Text | null } */ #effectSetText;
+	/** @private @type { Array<ParticleSystem> } */ #particleSystemList;
+
+	constructor() {
+		super();
+		this.#screenEffect = null;
+		this.#appliedEffectSetIndex = null;
+		this.#isFullScreenEffect = false;
+		this.#effectSetText = null;
+		this.#particleSystemList = [];
+	}
+
+	//==============================================================================
+	// 글 노드 하나 붙이기.
+	//==============================================================================
+	addLabel(parent, position, size, text, fontSize, textAlign) {
+		const labelNode = new WorldNode();
+		labelNode.setName("label");
+		if (textAlign === TextAlign.left) {
+			labelNode.setPivot(Pivot.middleLeft);
+		}
+		labelNode.setLocalPosition(position);
+		labelNode.setContentSize(size);
+		const label = labelNode.addComponent(Text);
+		label.setText(text);
+		label.setFontSize(fontSize);
+		label.setTextColor(LABEL_COLOR);
+		label.setTextAlign(textAlign);
+		parent.addChild(labelNode);
+		return label;
+	}
+
+	//==============================================================================
+	// ShaderSprite 칸 50 개.
+	//==============================================================================
+	createShaderSpriteGrid(root, sheetImage) {
+		const frameRect = Rect.create(0, 0, SHEET_FRAME_SIZE, SHEET_FRAME_SIZE);
+		const effectList = System.Object.values(ShaderSpriteEffect);
+		for (let effectIndex = 0; effectIndex < effectList.length; effectIndex++) {
+			const effect = effectList[effectIndex];
+			const cellLeft = GRID_LEFT + (effectIndex % GRID_COLUMN_COUNT) * CELL_WIDTH;
+			const cellTop = GRID_TOP + System.Math.floor(effectIndex / GRID_COLUMN_COUNT) * CELL_HEIGHT;
+			const cellCenterX = cellLeft + CELL_WIDTH * 0.5;
+			const cellNode = new WorldNode();
+			cellNode.setName("cell");
+			cellNode.setLocalPosition(Vector2.create(cellCenterX, cellTop + CELL_HEIGHT * 0.5));
+			cellNode.setContentSize(Vector2.create(CELL_WIDTH - 6, CELL_HEIGHT - 6));
+			const cellPaint = cellNode.addComponent(Paint);
+			cellPaint.setColor(CELL_COLOR);
+			cellPaint.setRoundSize(8);
+			root.addChild(cellNode);
+			const spriteNode = new WorldNode();
+			spriteNode.setName(effect);
+			spriteNode.setLocalPosition(Vector2.create(cellCenterX, cellTop + 42));
+			spriteNode.setContentSize(Vector2.create(SPRITE_SIZE, SPRITE_SIZE));
+			const shaderSprite = spriteNode.addComponent(ShaderSprite);
+			shaderSprite.setImage(sheetImage);
+			shaderSprite.setImageRect(frameRect);
+			shaderSprite.setEffect(effect);
+			shaderSprite.setEffectProgress(getGalleryEffectProgress(effect));
+			shaderSprite.setEffectSeed(effectIndex * 7.31);
+			root.addChild(spriteNode);
+			this.addLabel(root, Vector2.create(cellCenterX, cellTop + 86), Vector2.create(CELL_WIDTH, 14), effect, 11, TextAlign.center);
+		}
+	}
+
+	//==============================================================================
+	// ScreenEffect 무대. (둥근 판, 해, 땅, 캐릭터 셋, 도는 트레일)
+	//==============================================================================
+	createStage(root, sheetImage) {
+		const frameRect = Rect.create(0, 0, SHEET_FRAME_SIZE, SHEET_FRAME_SIZE);
+		const createPaintNode = (parent, name, position, size, color, roundSize) => {
+			const node = new WorldNode();
+			node.setName(name);
+			node.setLocalPosition(position);
+			node.setContentSize(size);
+			const paint = node.addComponent(Paint);
+			paint.setColor(color);
+			paint.setRoundSize(roundSize);
+			parent.addChild(node);
+			return node;
+		};
+		const stageNode = createPaintNode(root, "stage", Vector2.create(STAGE_X, STAGE_Y), Vector2.create(STAGE_WIDTH, STAGE_HEIGHT), "#16283c", STAGE_CORNER_RADIUS);
+		stageNode.setPivot(Pivot.topLeft);
+		createPaintNode(stageNode, "sun", Vector2.create(290, 110), Vector2.create(90, 90), "#fff2b0", 45);
+		createPaintNode(stageNode, "ground", Vector2.create(STAGE_WIDTH * 0.5, STAGE_HEIGHT - 45), Vector2.create(STAGE_WIDTH - 20, 70), "#2f5d3a", 10);
+		const characterList = [[90, 400, 96, ShaderSpriteEffect.none], [200, 330, 72, ShaderSpriteEffect.glow], [310, 400, 96, ShaderSpriteEffect.hologram]];
+		for (const [positionX, positionY, size, effect] of characterList) {
+			const characterNode = new WorldNode();
+			characterNode.setName("character");
+			characterNode.setLocalPosition(Vector2.create(positionX, positionY));
+			characterNode.setContentSize(Vector2.create(size, size));
+			if (effect === ShaderSpriteEffect.none) {
+				const sprite = characterNode.addComponent(Sprite);
+				sprite.setImage(sheetImage);
+				sprite.setImageRect(frameRect);
+			}
+			else {
+				const shaderSprite = characterNode.addComponent(ShaderSprite);
+				shaderSprite.setImage(sheetImage);
+				shaderSprite.setImageRect(frameRect);
+				shaderSprite.setEffect(effect);
+				shaderSprite.setEffectProgress(1);
+			}
+			stageNode.addChild(characterNode);
+		}
+		// 도는 트레일. (움직이는 컴포넌트를 먼저 붙여 트레일이 옮긴 뒤의 위치를 기록하게 한다)
+		const orbitCenter = Vector2.create(STAGE_WIDTH * 0.5, 220);
+		const orbitRadius = 130;
+		const orbitNode = new WorldNode();
+		orbitNode.setName("orbit");
+		orbitNode.setLocalPosition(Vector2.create(orbitCenter.x + orbitRadius, orbitCenter.y));
+		orbitNode.addComponent(OrbitMover).setOrbit(orbitCenter, orbitRadius, 3.2);
+		const trail = orbitNode.addComponent(TrailRenderer);
+		trail.setTime(0.6);
+		trail.setWidth(18, 0);
+		trail.setAdditive(true);
+		trail.setColors(new Color(0.4, 0.85, 1, 1), new Color(0.2, 0.3, 1, 0));
+		stageNode.addChild(orbitNode);
+		createPaintNode(orbitNode, "head", Vector2.create(0, 0), Vector2.create(14, 14), Color.white(), 7);
+		this.addLabel(stageNode, Vector2.create(STAGE_WIDTH * 0.5, 24), Vector2.create(STAGE_WIDTH, 20), "ScreenEffect 무대", 16, TextAlign.center);
+	}
+
+	//==============================================================================
+	// 아래 트레일 둘과 설명 글.
+	//==============================================================================
+	createTrailShowcase(root) {
+		const trailSettingList = [
+			[610, 32, 5, 16, false, new Color(0.4, 0.8, 1, 0.9), new Color(0.4, 0.8, 1, 0)],
+			[670, 28, 4, 26, true, new Color(1, 0.92, 0.6, 1), new Color(1, 0.55, 0.2, 0)],
+		];
+		for (const [baseY, amplitude, frequency, width, isAdditive, startColor, endColor] of trailSettingList) {
+			const moverNode = new WorldNode();
+			moverNode.setName("trailMover");
+			moverNode.setLocalPosition(Vector2.create(GRID_LEFT + 40, baseY));
+			moverNode.addComponent(WaveMover).setWave(GRID_LEFT + 40, TRAIL_END_X, 1.3, baseY, amplitude, frequency);
+			const trail = moverNode.addComponent(TrailRenderer);
+			trail.setTime(0.7);
+			trail.setWidth(width, 0);
+			trail.setAdditive(isAdditive);
+			trail.setColors(startColor, endColor);
+			root.addChild(moverNode);
+		}
+		this.addLabel(root, Vector2.create(GRID_LEFT + 4, 575), Vector2.create(400, 16), "TrailRenderer: 위 보통 합성, 아래 더하기 합성", 13, TextAlign.left);
+		this.#effectSetText = this.addLabel(root, Vector2.create(STAGE_X + 4, 575), Vector2.create(STAGE_WIDTH, 16), "", 13, TextAlign.left);
+	}
+
+	//==============================================================================
+	// 파티클 칸 하나. (둥근 바탕과 자르기, 아래 이름. 파티클 노드를 칸 왼쪽 위 기준 position 에 만들어 돌려준다)
+	//==============================================================================
+	addParticleCell(root, cellIndex, title, position) {
+		const cellNode = new WorldNode();
+		cellNode.setName("particleCell");
+		cellNode.setPivot(Pivot.topLeft);
+		cellNode.setLocalPosition(Vector2.create(PARTICLE_ROW_LEFT + cellIndex * PARTICLE_CELL_STEP, PARTICLE_ROW_TOP));
+		cellNode.setContentSize(Vector2.create(PARTICLE_CELL_WIDTH, PARTICLE_CELL_HEIGHT));
+		const cellPaint = cellNode.addComponent(Paint);
+		cellPaint.setColor(CELL_COLOR);
+		cellPaint.setRoundSize(8);
+		cellNode.addComponent(Mask).setRoundSize(8);
+		root.addChild(cellNode);
+		const particleNode = new WorldNode();
+		particleNode.setName("particle");
+		particleNode.setLocalPosition(position);
+		cellNode.addChild(particleNode);
+		this.addLabel(cellNode, Vector2.create(PARTICLE_CELL_WIDTH * 0.5, PARTICLE_CELL_HEIGHT - 10), Vector2.create(PARTICLE_CELL_WIDTH, 14), title, 12, TextAlign.center);
+		return particleNode;
+	}
+
+	//==============================================================================
+	// 파티클 붙이기. (수동 tick, 칸마다 다른 씨앗, 처음 몇 초를 미리 흘린다)
+	//==============================================================================
+	attachParticleSystem(particleNode, setup) {
+		const particleSystem = particleNode.addComponent(ParticleSystem);
+		setup(particleSystem);
+		particleSystem.setManualTick(true);
+		particleSystem.setRandomSeed(100 + this.#particleSystemList.length);
+		let warmUpSeconds = 0;
+		while (warmUpSeconds < PARTICLE_WARM_UP_SECONDS) {
+			particleSystem.simulate(MOVER_FRAME_STEP);
+			warmUpSeconds += MOVER_FRAME_STEP;
+		}
+		this.#particleSystemList.push(particleSystem);
+	}
+
+	//==============================================================================
+	// 파티클 칸 여덟. (렌더 모양 넷, 끌개, 흔들림, edge, 월드 공간)
+	//==============================================================================
+	createParticleShowcase(root) {
+		const cellCenterX = PARTICLE_CELL_WIDTH * 0.5;
+		const fadeOut = [{ time: 0, color: Color.white() }, { time: 0.7, color: Color.white() }, { time: 1, color: new Color(1, 1, 1, 0) }];
+		// circle: 위로 뿜었다 떨어지는 분수.
+		this.attachParticleSystem(this.addParticleCell(root, 0, "circle", Vector2.create(cellCenterX, 100)), (fountain) => {
+			fountain.setEmitterShape(ParticleEmitterShape.cone);
+			fountain.setConeAngle(MathUtility.degreeToRadian(15));
+			fountain.setEmissionRate(70);
+			fountain.setStartSpeed(150, 190);
+			fountain.setGravity(0, 260);
+			fountain.setStartLifetime(1, 1.3);
+			fountain.setStartSize(4, 7);
+			fountain.setStartColor(new Color(1, 0.85, 0.4, 1), new Color(1, 0.5, 0.2, 1));
+			fountain.setColorOverLifetime(fadeOut);
+		});
+		// rect: 돌며 떨어지는 색종이.
+		this.attachParticleSystem(this.addParticleCell(root, 1, "rect", Vector2.create(cellCenterX, -6)), (confetti) => {
+			confetti.setEmitterShape(ParticleEmitterShape.edge);
+			confetti.setEdgeWidth(90);
+			confetti.setEmissionRate(24);
+			confetti.setStartSpeed(15, 35);
+			confetti.setGravity(0, 30);
+			confetti.setStartLifetime(3, 3.5);
+			confetti.setStartSize(6, 9);
+			confetti.setStartRotation(0, MathUtility.PI * 2);
+			confetti.setAngularVelocity(-6, 6);
+			confetti.setStartColor(new Color(1, 0.35, 0.45, 1), new Color(0.35, 0.75, 1, 1));
+			confetti.setWobble(6, 3);
+			confetti.setRenderShape(ParticleRenderShape.rect);
+		});
+		// streak: 사방으로 튀는 불티. (더하기 합성)
+		this.attachParticleSystem(this.addParticleCell(root, 2, "streak", Vector2.create(cellCenterX, 56)), (sparks) => {
+			sparks.setEmissionRate(50);
+			sparks.setStartSpeed(90, 170);
+			sparks.setDamping(1.8);
+			sparks.setGravity(0, 60);
+			sparks.setStartLifetime(0.5, 0.9);
+			sparks.setStartSize(2, 3);
+			sparks.setStartColor(new Color(1, 0.9, 0.5, 1), new Color(1, 0.6, 0.2, 1));
+			sparks.setColorOverLifetime(fadeOut);
+			sparks.setRenderShape(ParticleRenderShape.streak);
+			sparks.setStreakScale(0.08);
+			sparks.setAdditive(true);
+		});
+		// image: 돌며 퍼지는 별 그림.
+		this.attachParticleSystem(this.addParticleCell(root, 3, "image", Vector2.create(cellCenterX, 56)), (stars) => {
+			stars.setEmitterShape(ParticleEmitterShape.circle);
+			stars.setShapeRadius(10);
+			stars.setEmissionRate(8);
+			stars.setStartSpeed(20, 40);
+			stars.setStartLifetime(1.4, 1.8);
+			stars.setStartSize(14, 22);
+			stars.setStartRotation(0, MathUtility.PI * 2);
+			stars.setAngularVelocity(-2, 2);
+			stars.setSizeOverLifetime(1, 0.6);
+			stars.setImage(createStarImage());
+			stars.setRenderShape(ParticleRenderShape.image);
+		});
+		// 끌개: 가운데로 빨려 들며 도는 소용돌이. (더하기 합성)
+		this.attachParticleSystem(this.addParticleCell(root, 4, "attractor", Vector2.create(cellCenterX, 54)), (vortex) => {
+			vortex.setEmitterShape(ParticleEmitterShape.circle);
+			vortex.setShapeRadius(46);
+			vortex.setEmissionRate(140);
+			vortex.setStartSpeed(0, 6);
+			vortex.setAttractor(0, 0, 260, 140);
+			vortex.setDamping(1.6);
+			vortex.setStartLifetime(1.6, 2.4);
+			vortex.setStartSize(2, 4);
+			vortex.setSizeOverLifetime(1, 0.5);
+			vortex.setStartColor(new Color(0.5, 0.7, 1, 1), new Color(0.8, 0.6, 1, 1));
+			vortex.setColorOverLifetime([{ time: 0, color: new Color(1, 1, 1, 0) }, { time: 0.15, color: Color.white() }, { time: 0.85, color: new Color(1, 1, 1, 0.9) }, { time: 1, color: new Color(1, 1, 1, 0) }]);
+			vortex.setAdditive(true);
+		});
+		// 흔들림: 살랑이며 오르는 물방울.
+		this.attachParticleSystem(this.addParticleCell(root, 5, "wobble", Vector2.create(cellCenterX, 108)), (bubbles) => {
+			bubbles.setEmitterShape(ParticleEmitterShape.box);
+			bubbles.setBoxSize(70, 0);
+			bubbles.setEmissionRate(12);
+			bubbles.setStartSpeed(25, 40);
+			bubbles.setWobble(10, 3);
+			bubbles.setStartLifetime(2.4, 3);
+			bubbles.setStartSize(5, 9);
+			bubbles.setSizeOverLifetime(0.6, 1.2);
+			bubbles.setStartColor(new Color(0.6, 0.85, 1, 0.75), new Color(0.8, 0.95, 1, 0.75));
+		});
+		// edge: 위 가로 선분에서 내리는 눈.
+		this.attachParticleSystem(this.addParticleCell(root, 6, "edge", Vector2.create(cellCenterX, -4)), (snow) => {
+			snow.setEmitterShape(ParticleEmitterShape.edge);
+			snow.setEdgeWidth(110);
+			snow.setEmissionRate(20);
+			snow.setStartSpeed(15, 30);
+			snow.setGravity(0, 8);
+			snow.setWobble(5, 1.4);
+			snow.setStartLifetime(4, 5);
+			snow.setStartSize(3, 5);
+			snow.setStartColor(new Color(1, 1, 1, 0.9), new Color(0.85, 0.92, 1, 0.9));
+		});
+		// 월드 공간: 도는 방출점이 남긴 입자가 제자리에 남아 자국이 된다. (더하기 합성, 도는 컴포넌트를 먼저 붙인다)
+		const orbitCenter = Vector2.create(cellCenterX, 54);
+		const orbitParticleNode = this.addParticleCell(root, 7, "world space", orbitCenter);
+		orbitParticleNode.addComponent(OrbitMover).setOrbit(orbitCenter, 26, 3);
+		this.attachParticleSystem(orbitParticleNode, (trailParticles) => {
+			trailParticles.setEmissionRate(70);
+			trailParticles.setStartSpeed(4, 12);
+			trailParticles.setStartLifetime(0.9, 1.2);
+			trailParticles.setStartSize(4, 7);
+			trailParticles.setStartColor(new Color(0.5, 1, 0.7, 1), new Color(0.4, 0.9, 1, 1));
+			trailParticles.setColorOverLifetime([{ time: 0, color: Color.white() }, { time: 1, color: new Color(1, 1, 1, 0) }]);
+			trailParticles.setWorldSpace(true);
+			trailParticles.setAdditive(true);
+		});
+		this.addLabel(root, Vector2.create(PARTICLE_ROW_LEFT + 4, 575), Vector2.create(400, 16), "ParticleSystem: 렌더 모양 넷과 끌개, 흔들림, edge, 월드 공간", 13, TextAlign.left);
+	}
+
+	//==============================================================================
+	// 효과 묶음 적용. (30 프레임마다 바뀐다. 4 번은 화면 전체)
+	//==============================================================================
+	applyEffectSet(effectSetIndex) {
+		const screenEffect = this.#screenEffect;
+		screenEffect.resetAll();
+		this.#isFullScreenEffect = false;
+		let description = "";
+		switch (effectSetIndex) {
+			case 0:
+				screenEffect.setEnabled(ScreenEffectType.bloom, true);
+				screenEffect.setStrength(ScreenEffectType.bloom, 0.9);
+				screenEffect.setEnabled(ScreenEffectType.vignette, true);
+				description = "bloom + vignette";
+				break;
+			case 1:
+				screenEffect.setEnabled(ScreenEffectType.glitch, true);
+				screenEffect.setEnabled(ScreenEffectType.chromatic, true);
+				screenEffect.setParameters(ScreenEffectType.chromatic, 2, 0, 0, 0);
+				description = "glitch + chromatic";
+				break;
+			case 2:
+				screenEffect.setEnabled(ScreenEffectType.bloom, true);
+				screenEffect.setEnabled(ScreenEffectType.chromatic, true);
+				screenEffect.setStrength(ScreenEffectType.chromatic, 0.8);
+				screenEffect.setEnabled(ScreenEffectType.vignette, true);
+				screenEffect.setEnabled(ScreenEffectType.colorGrade, true);
+				screenEffect.setParameters(ScreenEffectType.colorGrade, 1.15, 1.2, 1.05, 0);
+				description = "bloom + chromatic + vignette + colorGrade";
+				break;
+			case 3:
+				screenEffect.setEnabled(ScreenEffectType.pixelate, true);
+				screenEffect.setStrength(ScreenEffectType.pixelate, 0.7);
+				screenEffect.setEnabled(ScreenEffectType.posterize, true);
+				description = "pixelate + posterize";
+				break;
+			case 4:
+				this.#isFullScreenEffect = true;
+				screenEffect.setEnabled(ScreenEffectType.shockwave, true);
+				screenEffect.setEnabled(ScreenEffectType.scanline, true);
+				screenEffect.setStrength(ScreenEffectType.scanline, 0.6);
+				screenEffect.setEnabled(ScreenEffectType.vignette, true);
+				screenEffect.setStrength(ScreenEffectType.vignette, 0.8);
+				description = "화면 전체: shockwave + scanline + vignette";
+				break;
+			case 5:
+				screenEffect.setEnabled(ScreenEffectType.blur, true);
+				screenEffect.setEnabled(ScreenEffectType.colorGrade, true);
+				screenEffect.setParameters(ScreenEffectType.colorGrade, 1.2, 0.3, 1.05, 0);
+				description = "blur + colorGrade";
+				break;
+			case 6:
+				screenEffect.setEnabled(ScreenEffectType.godRays, true);
+				screenEffect.setParameters(ScreenEffectType.godRays, 0.73, 0.22, 0.5, 0.94);
+				screenEffect.setEnabled(ScreenEffectType.rain, true);
+				description = "godRays + rain";
+				break;
+			default:
+				screenEffect.setEnabled(ScreenEffectType.irisWipe, true);
+				screenEffect.setStrength(ScreenEffectType.irisWipe, 0.5);
+				screenEffect.setEnabled(ScreenEffectType.halftone, true);
+				screenEffect.setStrength(ScreenEffectType.halftone, 0.6);
+				description = "irisWipe + halftone";
+				break;
+		}
+		this.#effectSetText.setText(`ScreenEffect: ${description}`);
+	}
+
+	//==============================================================================
+	// 모든 효과 켜기. (한 프레임 동안 패스 셰이더를 다 컴파일해 본다)
+	//==============================================================================
+	enableAllEffects() {
+		for (const effectType of ScreenEffect.getEffectOrder()) {
+			this.#screenEffect.setEnabled(effectType, true);
+			this.#screenEffect.setStrength(effectType, 0.5);
+		}
+		this.#isFullScreenEffect = false;
+		this.#appliedEffectSetIndex = null;
+	}
+
+	//==============================================================================
+	// 무대 영역을 캔버스 픽셀로 바꿔 ScreenEffect 영역으로.
+	//==============================================================================
+	applyStageRegion() {
+		if (this.#isFullScreenEffect) {
+			this.#screenEffect.clearRegion();
+			return;
+		}
+		const viewManager = this.getEngine().getViewManager();
+		const viewNativeRect = viewManager.getViewNativeRect();
+		const devicePixelRatio = viewManager.getDevicePixelRatio();
+		const pixelScale = viewManager.getTargetResolutionScale() * devicePixelRatio;
+		this.#screenEffect.setRegion(viewNativeRect.position.x * devicePixelRatio + STAGE_X * pixelScale, viewNativeRect.position.y * devicePixelRatio + STAGE_Y * pixelScale, STAGE_WIDTH * pixelScale, STAGE_HEIGHT * pixelScale, STAGE_CORNER_RADIUS * pixelScale);
+	}
+
+	//==============================================================================
+	// 초기화. (화면 효과를 만들고, 그림은 코드로 만든다)
+	//==============================================================================
+	initialize(engine) {
+		super.initialize(engine);
+		// 원본 ScreenEffect 는 만들 때 그래픽의 WebGL 컨텍스트를 받는다.
+		this.#screenEffect = new ScreenEffect(engine.getGraphic());
+		const root = this.getRoot();
+		root.setContentSize(Vector2.create(VIEW_WIDTH, VIEW_HEIGHT));
+		const sheetImage = createCharacterSheet();
+		this.createShaderSpriteGrid(root, sheetImage);
+		this.createStage(root, sheetImage);
+		this.createTrailShowcase(root);
+		this.createParticleShowcase(root);
+		this.addLabel(root, Vector2.create(GRID_LEFT + 430, 26), Vector2.create(400, 18), "ShaderSpriteEffect 50 가지", 15, TextAlign.left);
+	}
+
+	//==============================================================================
+	// 갱신. (효과 묶음 바꾸기, 충격파 반지름 움직이기)
+	//==============================================================================
+	tick(timeDelta) {
+		const frameNumber = this.getEngine().getFrameNumber();
+		if (frameNumber === COMPILE_CHECK_FRAME) {
+			this.enableAllEffects();
+		}
+		else {
+			const effectSetIndex = System.Math.floor(frameNumber / EFFECT_SET_FRAME_COUNT) % EFFECT_SET_COUNT;
+			if (this.#appliedEffectSetIndex !== effectSetIndex) {
+				this.applyEffectSet(effectSetIndex);
+				this.#appliedEffectSetIndex = effectSetIndex;
+			}
+		}
+		const shockwaveRadius = (frameNumber % EFFECT_SET_FRAME_COUNT) / EFFECT_SET_FRAME_COUNT * 1.2 + 0.1;
+		const stageCenterX = (STAGE_X + STAGE_WIDTH * 0.5) / VIEW_WIDTH;
+		const stageCenterY = (STAGE_Y + STAGE_HEIGHT * 0.45) / VIEW_HEIGHT;
+		this.#screenEffect.setParameters(ScreenEffectType.shockwave, stageCenterX, stageCenterY, shockwaveRadius, 0.12);
+		this.#screenEffect.tick(timeDelta);
+		super.tick(timeDelta);
+		for (const particleSystem of this.#particleSystemList) {
+			particleSystem.simulate(MOVER_FRAME_STEP);
+		}
+	}
+
+	//==============================================================================
+	// 이전 출력. (영역을 정하고 효과 시작, 배경)
+	//==============================================================================
+	preDraw(graphic) {
+		super.preDraw(graphic);
+		this.applyStageRegion();
+		this.#screenEffect.begin(graphic);
+		const viewManager = this.getEngine().getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(BACKGROUND_COLOR);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		viewManager.applyViewRect(graphic);
+	}
+
+	//==============================================================================
+	// 이후 출력. (화면을 떠 와 효과를 건다)
+	//==============================================================================
+	postDraw(graphic) {
+		super.postDraw(graphic);
+		this.#screenEffect.end(graphic);
+	}
+}
+
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.autoResizeOnWindowResize = true;
+engineConfiguration.referenceResolutionSize = Vector2.create(VIEW_WIDTH, VIEW_HEIGHT);
+engineConfiguration.useStatistics = true;
+const engine = new Engine(engineConfiguration);
+engine.getViewManager().setViewScaleMode(ViewScaleMode.stretchShort);
+engine.run(new EffectGalleryScene());
+</script>
+</body>
+</html>
