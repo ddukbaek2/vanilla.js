@@ -67,6 +67,7 @@ export class Scene extends Object {
 	/** @private @type { boolean } */ #isGizmoVisible; // 기즈모 출력 여부.
 	/** @private @type { boolean } */ #isLoaded; // 비동기 로딩 완료 여부.
 	/** @private @type { TouchRaycaster | null } */ #touchRaycaster; // 노드에 터치를 넘기는 레이캐스터. (null 이면 넘기지 않는다)
+	/** @private @type { boolean } */ #isTouchDispatchEnabled; // 노드에 터치를 넘기는지. (러스트 판 SceneBase 와 같은 스위치)
 
 	//==============================================================================
 	// 생성.
@@ -91,6 +92,7 @@ export class Scene extends Object {
 		root.setName("root");
 		this.#touchRaycaster = new TouchRaycaster();
 		this.#touchRaycaster.setRootNode(root);
+		this.#isTouchDispatchEnabled = true;
 	}
 
 	//==============================================================================
@@ -369,7 +371,7 @@ export class Scene extends Object {
 		const inputManager = engine.getInputManager();
 		const viewInputPosition = inputManager.getViewInputPosition();
 		const isTouchPressed = inputManager.isTouchPressed();
-		const touchRaycaster = this.#touchRaycaster;
+		const touchRaycaster = this.#isTouchDispatchEnabled ? this.#touchRaycaster : null;
 
 		// 누름. (노드에 먼저 넘기고 훅을 부른다, 아래 모두 같다)
 		if (isTouchPressed) {
@@ -635,6 +637,33 @@ export class Scene extends Object {
 		if (touchRaycaster) {
 			touchRaycaster.setRootNode(this.getRoot());
 		}
+	}
+
+	//==============================================================================
+	// 노드에 터치 넘기기 켜고 끄기. (러스트 판 SceneBase.set_touch_dispatch_enabled 와 같다)
+	// - 끄면 tickTouch 가 레이캐스터로 노드에 넘기지 않고 씬의 터치 훅만 부른다. (훅에서 가로채 직접 넘길 때)
+	// - 레이캐스터는 그대로 두어 다시 켜면 이어서 넘긴다. setTouchRaycaster(null) 과 같은 효과다.
+	//==============================================================================
+	/**
+	 * @param { boolean } isEnabled 노드에 넘기면 참. (기본 참)
+	 * @example <caption>씬 기본 넘기기를 끄고 훅에서 직접 받기</caption>
+	 * import { Scene } from "./build/vanilla.js";
+	 * const scene = new Scene();
+	 * scene.setTouchDispatchEnabled(false);
+	 * console.log(scene.isTouchDispatchEnabled()); // false
+	 */
+	setTouchDispatchEnabled(isEnabled) {
+		this.#isTouchDispatchEnabled = isEnabled;
+	}
+
+	//==============================================================================
+	// 노드에 터치를 넘기는지 반환.
+	//==============================================================================
+	/**
+	 * @returns { boolean } 넘기면 참.
+	 */
+	isTouchDispatchEnabled() {
+		return this.#isTouchDispatchEnabled;
 	}
 
 	//==============================================================================

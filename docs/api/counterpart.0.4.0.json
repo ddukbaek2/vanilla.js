@@ -7795,6 +7795,90 @@
 			"vanilla-engine": {
 				"module": "core/engine",
 				"class": "Engine",
+				"name": "alert"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "alert"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "confirm"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "confirm"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "prompt"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "prompt"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "alert_async"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "alertAsync"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "confirm_async"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "confirmAsync"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "prompt_async"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "promptAsync"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "is_modal_dialog_open"
+			},
+			"vanilla.js": {
+				"module": "core/engine",
+				"class": "Engine",
+				"name": "isModalDialogOpen"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/engine",
+				"class": "Engine",
 				"name": "run"
 			},
 			"vanilla.js": {
@@ -8315,6 +8399,96 @@
 			"vanilla.js": {
 				"module": "core/engine",
 				"class": "PageEvent"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/modaldialog",
+				"class": "ModalDialogHandle"
+			},
+			"vanilla.js": {
+				"module": "core/modaldialog",
+				"class": "ModalDialogHandle"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/modaldialog",
+				"class": "ModalDialogHandle",
+				"name": "is_finished"
+			},
+			"vanilla.js": {
+				"module": "core/modaldialog",
+				"class": "ModalDialogHandle",
+				"name": "isFinished"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/modaldialog",
+				"class": "ModalDialogHandle",
+				"name": "get_result"
+			},
+			"vanilla.js": {
+				"module": "core/modaldialog",
+				"class": "ModalDialogHandle",
+				"name": "getResult"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/modaldialog",
+				"class": "ModalDialogHandle",
+				"name": "is_confirmed"
+			},
+			"vanilla.js": {
+				"module": "core/modaldialog",
+				"class": "ModalDialogHandle",
+				"name": "isConfirmed"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/modaldialog",
+				"class": "ModalDialogHandle",
+				"name": "get_prompt_text"
+			},
+			"vanilla.js": {
+				"module": "core/modaldialog",
+				"class": "ModalDialogHandle",
+				"name": "getPromptText"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/modaldialog",
+				"class": "ModalDialogHandle",
+				"name": "set_callback"
+			},
+			"vanilla.js": {
+				"module": "core/modaldialog",
+				"class": "ModalDialogHandle",
+				"name": "setCallback"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/modaldialog",
+				"class": "ModalDialogKind"
+			},
+			"vanilla.js": {
+				"module": "core/modaldialog",
+				"class": "ModalDialogKind"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/modaldialog",
+				"class": "ModalDialogResult"
+			},
+			"vanilla.js": {
+				"module": "core/modaldialog",
+				"class": "ModalDialogResult"
 			}
 		},
 		{
@@ -11979,6 +12153,30 @@
 				"module": "core/touchraycaster",
 				"class": "TouchRaycaster",
 				"name": "setFirstTouchCallback"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/scene",
+				"class": "SceneBase",
+				"name": "set_touch_dispatch_enabled"
+			},
+			"vanilla.js": {
+				"module": "core/scene",
+				"class": "Scene",
+				"name": "setTouchDispatchEnabled"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/scene",
+				"class": "SceneBase",
+				"name": "is_touch_dispatch_enabled"
+			},
+			"vanilla.js": {
+				"module": "core/scene",
+				"class": "Scene",
+				"name": "isTouchDispatchEnabled"
 			}
 		},
 		{

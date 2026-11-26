@@ -1,6 +1,9 @@
 # 업데이트 기록
 
 # 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- Engine.alert, confirm, prompt(와 alertAsync, confirmAsync, promptAsync), isModalDialogOpen: 러스트 판 Engine 과 같은 이름과 동작으로 브라우저 window.alert, confirm, prompt 를 부르고 ModalDialogHandle(isFinished, getResult, isConfirmed, getPromptText, setCallback)을 돌려준다. 브라우저 창이 닫힌 뒤 끝난 손잡이라 isModalDialogOpen 은 늘 거짓(러스트 웹 판과 같다). 새 모듈 src/core/modaldialog.js(ModalDialogKind, ModalDialogResult, ModalDialogHandle).
+  - 옮기는 법: window.alert(글) 은 engine.alert(글), window.confirm(글) 의 참거짓은 engine.confirm(글).isConfirmed() 나 await engine.confirmAsync(글), window.prompt(글, 기본값) 은 engine.prompt(글, 기본값).getPromptText() 나 await engine.promptAsync(글, 기본값). 같은 게임 코드가 러스트 판에서도 돈다.
+- Scene.setTouchDispatchEnabled(isEnabled), isTouchDispatchEnabled(): 씬 기본 터치 넘기기(tickTouch 가 레이캐스터로 노드에 넘기기)를 켜고 끄는 스위치. 러스트 판 SceneBase.set_touch_dispatch_enabled 와 같은 일이다. setTouchRaycaster(null) 과 같은 효과이고 레이캐스터는 그대로 둔다.
 - SpriteAnimator: 러스트 판과 같은 꼴로 정적 SpriteAnimator.play(node, clipName, options)(옛 playOnNode, 노드의 애니메이터로 틀고 그 자리에서 첫 프레임을 넣음)와 인스턴스 playClip(clipName, options)(러스트 판 play_clip)을 둔다. 인스턴스 play 는 playClip 과 같다.
   - 옮기는 법: SpriteAnimator.playOnNode(node, ...) 는 SpriteAnimator.play(node, ...) 로 바꾼다.
 - InputActions: 유니티 Input System 처럼 프레임 처음의 update 에서 한 번 갱신하고 그 프레임 안에서는 같은 값을 읽는다. readGamepadStick, readMoveAxis 도 읽을 때 입력 매니저를 다시 보지 않고 update 때 적은 이동 키와 패드 축을 읽는다. (러스트 판과 같다)

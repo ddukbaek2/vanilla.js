@@ -36,6 +36,7 @@ export { Node } from "./src/base/node.js";
 // 코어 목록.
 //==============================================================================
 export { EngineConfiguration, Engine } from "./src/core/engine.js";
+export { ModalDialogKind, ModalDialogResult, ModalDialogHandle } from "./src/core/modaldialog.js";
 export { Asset } from "./src/core/asset.js";
 export { SceneManager } from "./src/core/scenemanager.js";
 export { TimeManager } from "./src/core/timemanager.js";

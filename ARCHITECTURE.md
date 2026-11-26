@@ -125,8 +125,9 @@ Engine
 ├── ViewManager ──────────── canvas (참조) + 뷰 스케일/좌표 변환, 세이프 에어리어, 렌더 배율 상한
 ├── InputManager
 │   ├── GamepadManager ───── 게임패드는 Engine 직속이 아니라 InputManager 하위
-│   └── InputActions ─────── 입력 동작 (tick 에서 갱신)
+│   └── InputActions ─────── 입력 동작 (프레임 처음 tick 에서 한 번 갱신, 그 프레임 안의 읽기는 같은 값)
 ├── AudioManager ─────────── AudioContext lazy 생성. AudioPlayer, AudioBus(createAudioBus, 그 버스로 트는 플레이어를 만든다) 는 생성 후 소유권 이양
+├── 질문 창 ──────────────── alert, confirm, prompt(와 async 꼴)가 브라우저 창을 띄우고 ModalDialogHandle 을 돌려준다 (core/modaldialog.js, 러스트 판과 같은 이름)
 └── Version
 PointerCursor (Singleton) ── 엔진이 프레임 끝마다 apply() 로 캔버스 커서를 정한다 (켜져 있을 때만)
 ```

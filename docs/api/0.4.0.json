@@ -10090,6 +10090,251 @@
 						},
 						{
 							"kind": "method",
+							"name": "alert",
+							"signature": "alert(message)",
+							"params": [
+								{
+									"name": "message",
+									"type": "string",
+									"description": {
+										"ko": "알릴 글.",
+										"en": "The message to show."
+									}
+								}
+							],
+							"returns": {
+								"type": "ModalDialogHandle",
+								"description": {
+									"ko": "질문 창 손잡이.",
+									"en": "The dialog handle."
+								}
+							},
+							"description": {
+								"ko": "알림 창. (window.alert, 러스트 판 Engine::alert 와 같다)\n- 브라우저 창이 닫힌 뒤 끝난 손잡이를 돌려준다. (답은 늘 확인)",
+								"en": "Alert dialog. (window.alert, same as the Rust Engine::alert)\n- Returns a finished handle after the browser dialog closes. (the answer is always confirmed)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "alert"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "confirm",
+							"signature": "confirm(message)",
+							"params": [
+								{
+									"name": "message",
+									"type": "string",
+									"description": {
+										"ko": "물을 글.",
+										"en": "The question to ask."
+									}
+								}
+							],
+							"returns": {
+								"type": "ModalDialogHandle",
+								"description": {
+									"ko": "질문 창 손잡이. (확인하면 isConfirmed 가 참)",
+									"en": "The dialog handle. (isConfirmed is true if confirmed)"
+								}
+							},
+							"description": {
+								"ko": "확인 창. (window.confirm, 러스트 판 Engine::confirm 과 같다)",
+								"en": "Confirm dialog. (window.confirm, same as the Rust Engine::confirm)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "confirm"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "prompt",
+							"signature": "prompt(message, defaultValue = \"\")",
+							"params": [
+								{
+									"name": "message",
+									"type": "string",
+									"description": {
+										"ko": "물을 글.",
+										"en": "The question to ask."
+									}
+								},
+								{
+									"name": "defaultValue",
+									"type": "string",
+									"description": {
+										"ko": "입력 칸의 기본값.",
+										"en": "The default value of the input field."
+									}
+								}
+							],
+							"returns": {
+								"type": "ModalDialogHandle",
+								"description": {
+									"ko": "질문 창 손잡이. (확인하면 getPromptText 가 입력한 글)",
+									"en": "The dialog handle. (getPromptText is the entered text if confirmed)"
+								}
+							},
+							"description": {
+								"ko": "입력 창. (window.prompt, 러스트 판 Engine::prompt 와 같다)",
+								"en": "Prompt dialog. (window.prompt, same as the Rust Engine::prompt)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "prompt"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "alertAsync",
+							"signature": "alertAsync(message)",
+							"params": [
+								{
+									"name": "message",
+									"type": "string",
+									"description": {
+										"ko": "알릴 글.",
+										"en": "The message to show."
+									}
+								}
+							],
+							"returns": {
+								"type": "Promise<void>",
+								"description": {
+									"ko": "닫히면 풀린다.",
+									"en": "Resolves when closed."
+								}
+							},
+							"description": {
+								"ko": "알림 창을 띄우고 닫히면 풀리는 Promise. (러스트 판 Engine::alert_async)",
+								"en": "Shows an alert dialog and returns a Promise that resolves when it closes. (the Rust Engine::alert_async)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "alert_async"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "confirmAsync",
+							"signature": "confirmAsync(message)",
+							"params": [
+								{
+									"name": "message",
+									"type": "string",
+									"description": {
+										"ko": "물을 글.",
+										"en": "The question to ask."
+									}
+								}
+							],
+							"returns": {
+								"type": "Promise<boolean>",
+								"description": {
+									"ko": "확인하면 참.",
+									"en": "true if confirmed."
+								}
+							},
+							"description": {
+								"ko": "확인 창을 띄우고 답하면 풀리는 Promise. (러스트 판 Engine::confirm_async)",
+								"en": "Shows a confirm dialog and returns a Promise that resolves when answered. (the Rust Engine::confirm_async)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "confirm_async"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "promptAsync",
+							"signature": "promptAsync(message, defaultValue = \"\")",
+							"params": [
+								{
+									"name": "message",
+									"type": "string",
+									"description": {
+										"ko": "물을 글.",
+										"en": "The question to ask."
+									}
+								},
+								{
+									"name": "defaultValue",
+									"type": "string",
+									"description": {
+										"ko": "입력 칸의 기본값.",
+										"en": "The default value of the input field."
+									}
+								}
+							],
+							"returns": {
+								"type": "Promise<string | null>",
+								"description": {
+									"ko": "입력한 글. (취소하면 null)",
+									"en": "The entered text. (null if cancelled)"
+								}
+							},
+							"description": {
+								"ko": "입력 창을 띄우고 답하면 풀리는 Promise. (러스트 판 Engine::prompt_async)",
+								"en": "Shows a prompt dialog and returns a Promise that resolves when answered. (the Rust Engine::prompt_async)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "prompt_async"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "isModalDialogOpen",
+							"signature": "isModalDialogOpen()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "떠 있으면 참.",
+									"en": "True if shown."
+								}
+							},
+							"description": {
+								"ko": "질문 창이 떠 있는지. (브라우저 창은 떠 있는 동안 자바스크립트가 멈춰 늘 거짓, 러스트 웹 판과 같다)",
+								"en": "Whether a dialog is open. (always false because JavaScript stops while a browser dialog is open, same as the Rust web version)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/engine.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/engine",
+								"class": "Engine",
+								"name": "is_modal_dialog_open"
+							}
+						},
+						{
+							"kind": "method",
 							"name": "writeClipboardText",
 							"signature": "writeClipboardText(text)",
 							"params": [
@@ -10536,6 +10781,347 @@
 							"description": {
 								"ko": "창을 누름. (pointerdown, 포커스를 알리지 않아도 누르면 창은 포커스를 가진 것이다)",
 								"en": "The window was pressed. (pointerdown, once pressed the window has focus even without a focus notification)"
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "core/modaldialog",
+			"summary": {
+				"ko": "질문 창의 답. (러스트 판 ModalDialogResult 의 Confirmed(글), Cancelled)",
+				"en": "The dialog answer. (Confirmed(text) and Cancelled of the Rust ModalDialogResult)"
+			},
+			"classes": [
+				{
+					"name": "ModalDialogResult",
+					"summary": {
+						"ko": "질문 창의 답. (러스트 판 ModalDialogResult 의 Confirmed(글), Cancelled)",
+						"en": "The dialog answer. (Confirmed(text) and Cancelled of the Rust ModalDialogResult)"
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/modaldialog",
+						"class": "ModalDialogResult"
+					},
+					"members": [
+						{
+							"kind": "constructor",
+							"name": "constructor",
+							"signature": "constructor(isConfirmed, text)",
+							"params": [
+								{
+									"name": "isConfirmed",
+									"type": "boolean",
+									"description": {
+										"ko": "확인했으면 참.",
+										"en": "true if confirmed."
+									}
+								},
+								{
+									"name": "text",
+									"type": "string",
+									"description": {
+										"ko": "확인한 글.",
+										"en": "The confirmed text."
+									}
+								}
+							],
+							"description": {
+								"ko": "생성. (confirmed, cancelled 로 만든다)",
+								"en": "Constructor. (create with confirmed or cancelled)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/modaldialog.js"
+						},
+						{
+							"kind": "static",
+							"name": "confirmed",
+							"signature": "static confirmed(text)",
+							"params": [
+								{
+									"name": "text",
+									"type": "string",
+									"description": {
+										"ko": "확인한 글. (prompt 는 입력한 글, alert 와 confirm 은 빈 글)",
+										"en": "The confirmed text. (the entered text for prompt, an empty string for alert and confirm)"
+									}
+								}
+							],
+							"returns": {
+								"type": "ModalDialogResult",
+								"description": {
+									"ko": "확인한 답.",
+									"en": "A confirmed answer."
+								}
+							},
+							"description": {
+								"ko": "확인한 답.",
+								"en": "A confirmed answer."
+							},
+							"since": "0.4.0",
+							"source": "src/core/modaldialog.js"
+						},
+						{
+							"kind": "static",
+							"name": "cancelled",
+							"signature": "static cancelled()",
+							"params": [],
+							"returns": {
+								"type": "ModalDialogResult",
+								"description": {
+									"ko": "취소한 답.",
+									"en": "A cancelled answer."
+								}
+							},
+							"description": {
+								"ko": "취소한 답. (prompt 의 null, confirm 의 false)",
+								"en": "A cancelled answer. (null for prompt, false for confirm)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/modaldialog.js"
+						},
+						{
+							"kind": "method",
+							"name": "isConfirmed",
+							"signature": "isConfirmed()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "확인했으면 참.",
+									"en": "true if confirmed."
+								}
+							},
+							"description": {
+								"ko": "확인했는지 반환.",
+								"en": "Returns whether it was confirmed."
+							},
+							"since": "0.4.0",
+							"source": "src/core/modaldialog.js"
+						},
+						{
+							"kind": "method",
+							"name": "getText",
+							"signature": "getText()",
+							"params": [],
+							"returns": {
+								"type": "string",
+								"description": {
+									"ko": "확인한 글. (취소했으면 빈 글)",
+									"en": "The confirmed text. (an empty string if cancelled)"
+								}
+							},
+							"description": {
+								"ko": "확인한 글 반환.",
+								"en": "Returns the confirmed text."
+							},
+							"since": "0.4.0",
+							"source": "src/core/modaldialog.js"
+						}
+					]
+				},
+				{
+					"name": "ModalDialogHandle",
+					"summary": {
+						"ko": "질문 창 손잡이. (러스트 판 ModalDialogHandle)\n- 답하면 끝나고(isFinished), 답은 getResult, isConfirmed, getPromptText 로 읽는다.\n- Engine.alert, Engine.confirm, Engine.prompt 가 브라우저 window.alert, confirm, prompt 를 부르고 돌려준다. (러스트 판 Engine::alert, confirm, prompt 와 같다)\n- 브라우저가 창을 띄우고 답할 때까지 페이지를 멈춘 뒤 돌려준 값을 손잡이에 넣는다. (그 자리에서 끝난다, 러스트 웹 판과 같다)\n  러스트 데스크탑 판은 엔진이 창을 그려 답할 때 끝난다. 두 엔진 모두 끝난 뒤 부를 함수는 setCallback 으로 건다.\n- await 하는 꼴은 Engine.alertAsync, confirmAsync, promptAsync 다.\n- 브라우저 함수가 없는 곳(node)에서는 alert 는 확인, confirm 과 prompt 는 취소로 끝난다.",
+						"en": "Dialog handle. (the Rust ModalDialogHandle)\n- It finishes when answered (isFinished), and the answer is read with getResult, isConfirmed and getPromptText.\n- Engine.alert, Engine.confirm and Engine.prompt call the browser window.alert, confirm and prompt and return it. (same as the Rust Engine::alert, confirm and prompt)\n- The browser shows the dialog and stops the page until answered, then the returned value goes into the handle. (it finishes on the spot, same as the Rust web version)\n  The Rust desktop version finishes when the engine-drawn dialog is answered. In both engines the function to call after it finishes is set with setCallback.\n- The awaitable forms are Engine.alertAsync, confirmAsync and promptAsync.\n- Where the browser functions do not exist (node), alert finishes as confirmed, and confirm and prompt finish as cancelled."
+					},
+					"examples": [
+						{
+							"title": {
+								"ko": "단추를 누르면 확인 창을 띄우고 답에 따라 지우기 (await 꼴과 손잡이 꼴)",
+								"en": "Show a confirm dialog on a button press and delete depending on the answer (the await form and the handle form)"
+							},
+							"code": "import { Engine, EngineConfiguration } from \"./build/vanilla.js\";\nconst engine = new Engine(new EngineConfiguration());\nasync function deleteSaveData() {\n\tif (await engine.confirmAsync(\"Delete the save data?\")) {\n\t\tconsole.log(\"deleted\");\n\t}\n}\nfunction askName() {\n\tengine.prompt(\"Name?\", \"Hero\").setCallback((result) => {\n\t\tconsole.log(result.isConfirmed() ? result.getText() : \"cancelled\");\n\t});\n}\nconsole.log(typeof deleteSaveData, typeof askName, engine.isModalDialogOpen()); // function function false",
+							"language": "javascript"
+						}
+					],
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/modaldialog",
+						"class": "ModalDialogHandle"
+					},
+					"members": [
+						{
+							"kind": "constructor",
+							"name": "constructor",
+							"signature": "constructor()",
+							"params": [],
+							"description": {
+								"ko": "생성. (답을 기다리는 손잡이)",
+								"en": "Constructor. (a handle waiting for the answer)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/modaldialog.js"
+						},
+						{
+							"kind": "method",
+							"name": "isFinished",
+							"signature": "isFinished()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "답했으면 참.",
+									"en": "true if answered."
+								}
+							},
+							"description": {
+								"ko": "끝났는지 반환.",
+								"en": "Returns whether it has finished."
+							},
+							"since": "0.4.0",
+							"source": "src/core/modaldialog.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/modaldialog",
+								"class": "ModalDialogHandle",
+								"name": "is_finished"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "getResult",
+							"signature": "getResult()",
+							"params": [],
+							"returns": {
+								"type": "ModalDialogResult | null",
+								"description": {
+									"ko": "답. (끝나기 전이면 null)",
+									"en": "The answer. (null before it finishes)"
+								}
+							},
+							"description": {
+								"ko": "답 반환.",
+								"en": "Returns the answer."
+							},
+							"since": "0.4.0",
+							"source": "src/core/modaldialog.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/modaldialog",
+								"class": "ModalDialogHandle",
+								"name": "get_result"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "isConfirmed",
+							"signature": "isConfirmed()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "끝났고 확인했으면 참.",
+									"en": "true if finished and confirmed."
+								}
+							},
+							"description": {
+								"ko": "확인했는지 반환.",
+								"en": "Returns whether it was confirmed."
+							},
+							"since": "0.4.0",
+							"source": "src/core/modaldialog.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/modaldialog",
+								"class": "ModalDialogHandle",
+								"name": "is_confirmed"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "getPromptText",
+							"signature": "getPromptText()",
+							"params": [],
+							"returns": {
+								"type": "string | null",
+								"description": {
+									"ko": "확인한 글. (끝나기 전이거나 취소했으면 null)",
+									"en": "The confirmed text. (null before it finishes or if cancelled)"
+								}
+							},
+							"description": {
+								"ko": "입력한 글 반환. (prompt)",
+								"en": "Returns the entered text. (prompt)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/modaldialog.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/modaldialog",
+								"class": "ModalDialogHandle",
+								"name": "get_prompt_text"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "setCallback",
+							"signature": "setCallback(callback)",
+							"params": [
+								{
+									"name": "callback",
+									"type": "Function",
+									"description": {
+										"ko": "(result: ModalDialogResult) => void",
+										"en": "(result: ModalDialogResult) => void"
+									}
+								}
+							],
+							"description": {
+								"ko": "끝난 뒤 부를 함수 걸기. (이미 끝났으면 그 자리에서 부른다)",
+								"en": "Sets the function to call after it finishes. (called on the spot if already finished)"
+							},
+							"since": "0.4.0",
+							"source": "src/core/modaldialog.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/modaldialog",
+								"class": "ModalDialogHandle",
+								"name": "set_callback"
+							}
+						}
+					]
+				}
+			],
+			"functions": [],
+			"enums": [
+				{
+					"name": "ModalDialogKind",
+					"summary": {
+						"ko": "질문 창 종류. (window.alert, window.confirm, window.prompt)",
+						"en": "Dialog kind. (window.alert, window.confirm, window.prompt)"
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/modaldialog",
+						"class": "ModalDialogKind"
+					},
+					"values": [
+						{
+							"name": "alert",
+							"value": "alert",
+							"description": {
+								"ko": "알림 창. (확인만 있다)",
+								"en": "Alert dialog. (only OK)"
+							}
+						},
+						{
+							"name": "confirm",
+							"value": "confirm",
+							"description": {
+								"ko": "확인 창. (확인과 취소)",
+								"en": "Confirm dialog. (OK and Cancel)"
+							}
+						},
+						{
+							"name": "prompt",
+							"value": "prompt",
+							"description": {
+								"ko": "입력 창. (입력 칸과 확인과 취소)",
+								"en": "Prompt dialog. (an input field, OK and Cancel)"
 							}
 						}
 					]
@@ -19832,6 +20418,68 @@
 									"language": "javascript"
 								}
 							]
+						},
+						{
+							"kind": "method",
+							"name": "setTouchDispatchEnabled",
+							"signature": "setTouchDispatchEnabled(isEnabled)",
+							"params": [
+								{
+									"name": "isEnabled",
+									"type": "boolean",
+									"description": {
+										"ko": "노드에 넘기면 참. (기본 참)",
+										"en": "true to pass to nodes. (true by default)"
+									}
+								}
+							],
+							"description": {
+								"ko": "노드에 터치 넘기기 켜고 끄기. (러스트 판 SceneBase.set_touch_dispatch_enabled 와 같다)\n- 끄면 tickTouch 가 레이캐스터로 노드에 넘기지 않고 씬의 터치 훅만 부른다. (훅에서 가로채 직접 넘길 때)\n- 레이캐스터는 그대로 두어 다시 켜면 이어서 넘긴다. setTouchRaycaster(null) 과 같은 효과다.",
+								"en": "Turns passing touches to nodes on or off. (same as the Rust SceneBase.set_touch_dispatch_enabled)\n- When off, tickTouch does not pass to nodes through the raycaster and only calls the scene's touch hooks. (for intercepting in the hooks and passing directly)\n- The raycaster is kept, so turning it back on resumes passing. Same effect as setTouchRaycaster(null)."
+							},
+							"since": "0.4.0",
+							"source": "src/core/scene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/scene",
+								"class": "SceneBase",
+								"name": "set_touch_dispatch_enabled"
+							},
+							"examples": [
+								{
+									"title": {
+										"ko": "씬 기본 넘기기를 끄고 훅에서 직접 받기",
+										"en": "Turn off the scene's default passing and receive in the hooks directly"
+									},
+									"code": "import { Scene } from \"./build/vanilla.js\";\nconst scene = new Scene();\nscene.setTouchDispatchEnabled(false);\nconsole.log(scene.isTouchDispatchEnabled()); // false",
+									"language": "javascript"
+								}
+							]
+						},
+						{
+							"kind": "method",
+							"name": "isTouchDispatchEnabled",
+							"signature": "isTouchDispatchEnabled()",
+							"params": [],
+							"returns": {
+								"type": "boolean",
+								"description": {
+									"ko": "넘기면 참.",
+									"en": "true if it passes."
+								}
+							},
+							"description": {
+								"ko": "노드에 터치를 넘기는지 반환.",
+								"en": "Returns whether touches are passed to nodes."
+							},
+							"since": "0.4.0",
+							"source": "src/core/scene.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/scene",
+								"class": "SceneBase",
+								"name": "is_touch_dispatch_enabled"
+							}
 						},
 						{
 							"kind": "method",

@@ -3,6 +3,7 @@
 //==============================================================================
 const System = globalThis;
 import { Object } from "../base/object.js";
+import { ModalDialogKind, showBrowserDialog } from "./modaldialog.js";
 import { Version } from "../base/version.js";
 import { Colors } from "../base/colors.js";
 import { Vector2 } from "../base/vector2.js";
@@ -1314,6 +1315,97 @@ export class Engine extends Object {
 	 */
 	setTitle(title) {
 		System.document.title = title;
+	}
+
+	//==============================================================================
+	// 알림 창. (window.alert, 러스트 판 Engine::alert 와 같다)
+	// - 브라우저 창이 닫힌 뒤 끝난 손잡이를 돌려준다. (답은 늘 확인)
+	//==============================================================================
+	/**
+	 * @param { string } message 알릴 글.
+	 * @returns { ModalDialogHandle } 질문 창 손잡이.
+	 */
+	alert(message) {
+		return showBrowserDialog(ModalDialogKind.alert, message, "");
+	}
+
+	//==============================================================================
+	// 확인 창. (window.confirm, 러스트 판 Engine::confirm 과 같다)
+	//==============================================================================
+	/**
+	 * @param { string } message 물을 글.
+	 * @returns { ModalDialogHandle } 질문 창 손잡이. (확인하면 isConfirmed 가 참)
+	 */
+	confirm(message) {
+		return showBrowserDialog(ModalDialogKind.confirm, message, "");
+	}
+
+	//==============================================================================
+	// 입력 창. (window.prompt, 러스트 판 Engine::prompt 와 같다)
+	//==============================================================================
+	/**
+	 * @param { string } message 물을 글.
+	 * @param { string } defaultValue 입력 칸의 기본값.
+	 * @returns { ModalDialogHandle } 질문 창 손잡이. (확인하면 getPromptText 가 입력한 글)
+	 */
+	prompt(message, defaultValue = "") {
+		return showBrowserDialog(ModalDialogKind.prompt, message, defaultValue);
+	}
+
+	//==============================================================================
+	// 알림 창을 띄우고 닫히면 풀리는 Promise. (러스트 판 Engine::alert_async)
+	//==============================================================================
+	/**
+	 * @param { string } message 알릴 글.
+	 * @returns { Promise<void> } 닫히면 풀린다.
+	 */
+	alertAsync(message) {
+		return new System.Promise((resolve) => {
+			this.alert(message).setCallback(() => {
+				resolve();
+			});
+		});
+	}
+
+	//==============================================================================
+	// 확인 창을 띄우고 답하면 풀리는 Promise. (러스트 판 Engine::confirm_async)
+	//==============================================================================
+	/**
+	 * @param { string } message 물을 글.
+	 * @returns { Promise<boolean> } 확인하면 참.
+	 */
+	confirmAsync(message) {
+		return new System.Promise((resolve) => {
+			this.confirm(message).setCallback((result) => {
+				resolve(result.isConfirmed());
+			});
+		});
+	}
+
+	//==============================================================================
+	// 입력 창을 띄우고 답하면 풀리는 Promise. (러스트 판 Engine::prompt_async)
+	//==============================================================================
+	/**
+	 * @param { string } message 물을 글.
+	 * @param { string } defaultValue 입력 칸의 기본값.
+	 * @returns { Promise<string | null> } 입력한 글. (취소하면 null)
+	 */
+	promptAsync(message, defaultValue = "") {
+		return new System.Promise((resolve) => {
+			this.prompt(message, defaultValue).setCallback((result) => {
+				resolve(result.isConfirmed() ? result.getText() : null);
+			});
+		});
+	}
+
+	//==============================================================================
+	// 질문 창이 떠 있는지. (브라우저 창은 떠 있는 동안 자바스크립트가 멈춰 늘 거짓, 러스트 웹 판과 같다)
+	//==============================================================================
+	/**
+	 * @returns { boolean } 떠 있으면 참.
+	 */
+	isModalDialogOpen() {
+		return false;
 	}
 
 	//==============================================================================
