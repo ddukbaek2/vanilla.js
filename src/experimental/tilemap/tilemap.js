@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+// 옮긴 원문: libtiled 의 렌더러 셈에서 옮김, BSD-2-Clause, THIRD_PARTY_LICENSES.md
 const System = globalThis;
 import { Vector2 } from "../../base/vector2.js";
 import { Rect } from "../../base/rect.js";

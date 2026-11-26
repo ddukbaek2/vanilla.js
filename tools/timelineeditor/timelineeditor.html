@@ -18182,10 +18182,20 @@ uniform vec4 textureRect;
 uniform vec2 texelSize;
 out vec4 outputColor;
 
+// \uC810 \uD574\uC2DC. \uB450 float \uC758 \uBE44\uD2B8\uB97C MurmurHash3 \uC758 fmix32 \uB9C8\uBB34\uB9AC(Austin Appleby, \uACF5\uAC1C \uB3C4\uBA54\uC778)\uB85C \uC11E\uC5B4 [0, 1) \uB85C \uB0B8\uB2E4.
+highp uint hashMix32(highp uint value) {
+	value ^= value >> 16u;
+	value *= 0x85ebca6bu;
+	value ^= value >> 13u;
+	value *= 0xc2b2ae35u;
+	value ^= value >> 16u;
+	return value;
+}
+
 float hash21(vec2 point) {
-	vec3 scrambled = fract(vec3(point.xyx) * 0.1031);
-	scrambled += dot(scrambled, scrambled.yzx + 33.33);
-	return fract((scrambled.x + scrambled.y) * scrambled.z);
+	highp uvec2 bits = floatBitsToUint(point);
+	highp uint value = hashMix32(bits.x ^ hashMix32(bits.y + 0x9e3779b9u));
+	return float(value >> 8u) * (1.0 / 16777216.0);
 }
 
 float valueNoise(vec2 point) {

@@ -7,7 +7,7 @@ node tools/atlas.cjs <폴더경로> [--extrude 픽셀] [--padding 픽셀] [--max
 node tools/project.cjs build --script <진입파일> --input <입력디렉토리> --output <출력디렉토리> [-t|--template <빌드템플릿경로>]
 node tools/project.cjs check --input <입력디렉토리>
 node tools/project.cjs stage --source <소스디렉토리> --destination <대상디렉토리> [--skip <이름1,이름2,...>]
-- build: 출력 디렉토리를 비우고 빌드 템플릿(기본 tools/buildtemplate, -t 나 --template 로 바꿈)과 <입력>/assets 를 복사한 뒤 진입 파일을 esbuild 로 묶어 <출력>/js/bundle.min.js 에 쓴다. (iife, --minify --keep-names)
+- build: 출력 디렉토리를 비우고 빌드 템플릿(기본 tools/buildtemplate, -t 나 --template 로 바꿈)과 <입력>/assets 를 복사한 뒤 진입 파일을 esbuild 로 묶어 <출력>/js/bundle.min.js 에 쓴다. (iife, --minify --keep-names) 끝으로 엔진의 LICENSE 와 THIRD_PARTY_LICENSES.md 를 출력 맨 위에 복사한다. (같은 이름이 이미 있으면 licenses/vanilla.js/ 아래에)
 - check: <입력>/assets/sprites 아래 그림과 아틀라스 현황 보고. (npm 패키지 canvas 가 필요하다)
 - stage: 소스 디렉토리를 대상 디렉토리로 복사한다. (대상은 먼저 비운다, --skip 에 쉼표로 준 맨 위 이름은 건너뛴다)
 

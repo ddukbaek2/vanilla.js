@@ -100,7 +100,7 @@ void main() {
 //   그때와 useFloatColor: false 는 LDR 길이다. 씬에는 화면 색(감마를 건 색, ToonRenderer.setHdrOutput(false))을 그리고, 합성은 톤매핑과 감마 없이 블룸을 더해 색 보정만 건다.
 // - 블룸: 기본은 반 해상도 9 탭 가우시안(BloomEffect, 문턱 0.9 ~ 1.6, 주고받는 판 RGBA8, setBloomFloatColor 로 RGBA16F).
 //   setBloomLevels(단 수, 문턱, 무릎) 로 단 수를 1 이상 주면 MultiLevelBloomEffect(반씩 줄였다 천막 꼴로 키우며 더함, 씬과 같은 정밀도의 판)로 바꾼다. 0 이면 기본으로 돌린다. 세기는 setBloom 이 둘 다에 쓴다.
-// - 톤매핑은 ACES 근사(Narkowicz)다. 노출(setExposure)을 곱한 뒤 매핑하고 sRGB 감마를 건다.
+// - 톤매핑은 ACES 근사(Krzysztof Narkowicz 2016, 원문이 CC0 또는 MIT 로 쓰게 함)다. 노출(setExposure)을 곱한 뒤 매핑하고 sRGB 감마를 건다.
 // - 색 보정: 감마를 건 뒤 밝기(setBrightness, 밝힌 자리 setLitArea 안은 1 쪽으로), 채도, 색조(밝기 1 로 맞춘 색을 곱함), 안개빛(어두운 곳을 그 색 쪽으로), 대비, 가장자리 어둡게 차례로 건다. (setColorGrade, setVignette)
 //   기본은 밝기 1, 채도 1, 대비 1, 색조 0, 안개빛 0, 가장자리 0 이라 보정이 없다.
 // - 해상도 배율: setResolutionScale(배율) 이면 씬 판을 출력 크기 x 배율로 짓고 end 의 뷰포트로 키워(선형 거르기) 낸다. (3D 만 낮춰 그리고 UI 는 기기 화소 그대로 둘 때, 기본 1)

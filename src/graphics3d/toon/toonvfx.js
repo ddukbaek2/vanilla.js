@@ -168,8 +168,19 @@ const RIBBON_ATTRIBUTE_LOCATIONS = System.Object.freeze({ vertexPosition: 0, ver
 
 // 셰이더 공통: 3 차원 잇는 값 잡음과 네 겹 잡음.
 const NOISE_SHADER_CHUNK = `
+// 점 해시. 세 float 의 비트를 MurmurHash3 의 fmix32 마무리(Austin Appleby, 공개 도메인)로 섞어 [0, 1) 로 낸다.
+highp uint hashMix32(highp uint value) {
+	value ^= value >> 16u;
+	value *= 0x85ebca6bu;
+	value ^= value >> 13u;
+	value *= 0xc2b2ae35u;
+	value ^= value >> 16u;
+	return value;
+}
 float hashPoint(vec3 point) {
-	return fract(sin(dot(point, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+	highp uvec3 bits = floatBitsToUint(point);
+	highp uint value = hashMix32(bits.x ^ hashMix32(bits.y ^ hashMix32(bits.z + 0x9e3779b9u)));
+	return float(value >> 8u) * (1.0 / 16777216.0);
 }
 float readValueNoise(vec3 point) {
 	vec3 cell = floor(point);

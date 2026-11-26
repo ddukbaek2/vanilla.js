@@ -507,16 +507,16 @@ function visitMeshNodes(json, visitEvent) {
  * import { ToonRenderer, ToonGlb, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
  * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
  * const renderer = new ToonRenderer(webGL2RenderingContext);
- * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/soldier.glb")).arrayBuffer();
- * const arrays = ToonGlb.readGlbArrays(arrayBuffer, { width: 1.5, partWidths: { vanguard_visor: 0.8 }, addedParts: ["vanguard_Mesh", "vanguard_visor"] });
+ * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/mannequin_female.glb")).arrayBuffer();
+ * const arrays = ToonGlb.readGlbArrays(arrayBuffer, { width: 1.5, partWidths: { Mannequin_F: 0.8 }, addedParts: ["Mannequin_F"] });
  * const mesh = renderer.createMesh(arrays);
- * const modelMatrix = Matrix4.createScale(0.01, 0.01, 0.01);
+ * const modelMatrix = Matrix4.createIdentity();
  * const camera = new Camera3D();
  * camera.setPerspective(0.8, 0.1, 100);
  * camera.lookAt(Vector3.create(0, 1.5, 4), Vector3.create(0, 1, 0), Vector3.create(0, 1, 0));
  * renderer.beginFrameWithCamera(camera);
  * for (const materialRange of arrays.materialRanges) {
- * 	const tintColor = materialRange.name === "Vanguard_VisorMat" ? [1, 0.4, 0.3, 1] : [1, 1, 1, 1];
+ * 	const tintColor = materialRange.name === "M_Joints.001" ? [1, 0.4, 0.3, 1] : [1, 1, 1, 1];
  * 	renderer.drawMesh(mesh, modelMatrix, { indexStart: materialRange.indexStart, indexCount: materialRange.indexCount, tintColor: tintColor, hasOutline: false });
  * }
  * renderer.drawMeshOutline(mesh, modelMatrix);
@@ -587,7 +587,7 @@ export function readGlbArrays(arrayBuffer, outlineOptions = null) {
  * import { ToonRenderer, ToonGlb, Matrix4 } from "./vanilla.js";
  * const webGL2RenderingContext = document.createElement("canvas").getContext("webgl2");
  * const renderer = new ToonRenderer(webGL2RenderingContext);
- * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/soldier.glb")).arrayBuffer();
+ * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/mannequin_female.glb")).arrayBuffer();
  * const arrays = ToonGlb.readGlbArrays(arrayBuffer);
  * const mesh = renderer.createMesh(arrays);
  * const images = ToonGlb.readGlbImages(arrayBuffer);
@@ -622,7 +622,7 @@ export function readGlbImages(arrayBuffer) {
  * @example <caption>첫 그림 하나를 풀어 텍스처로</caption>
  * import { ToonRenderer, ToonGlb } from "./vanilla.js";
  * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
- * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/soldier.glb")).arrayBuffer();
+ * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/mannequin_female.glb")).arrayBuffer();
  * const images = ToonGlb.readGlbImages(arrayBuffer);
  * if (images.length > 0 && images[0].data.length > 0) {
  * 	const imageBitmap = await ToonGlb.decodeGlbImage(images[0]);
@@ -644,11 +644,11 @@ export function decodeGlbImage(image) {
  * @param { ArrayBuffer } arrayBuffer - GLB 파일 전체.
  * @param { object | null } [outlineOptions] readGlbArrays 와 같음.
  * @returns { object } { 노드 이름: MeshBuilder.readArrays 의 꼴과 extras, alpha } 부품마다의 배열.
- * @example <caption>부품마다 메시를 따로 올려 바이저만 숨기기</caption>
+ * @example <caption>부품마다 메시를 따로 올려 하나만 숨기기</caption>
  * import { ToonRenderer, ToonGlb, Camera3D, Matrix4, Vector3 } from "./vanilla.js";
  * const renderer = new ToonRenderer(document.createElement("canvas").getContext("webgl2"));
- * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/soldier.glb")).arrayBuffer();
- * const partArrays = ToonGlb.readGlbNodeArrays(arrayBuffer, { width: 1.5, addedParts: ["vanguard_Mesh", "vanguard_visor"] });
+ * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/mannequin_female.glb")).arrayBuffer();
+ * const partArrays = ToonGlb.readGlbNodeArrays(arrayBuffer, { width: 1.5, addedParts: ["Mannequin_F"] });
  * const parts = Object.entries(partArrays).map(([partName, arrays]) => {
  * 	return { name: partName, mesh: renderer.createMesh(arrays), pivot: arrays.extras.pivot, alpha: arrays.alpha };
  * });
@@ -657,7 +657,7 @@ export function decodeGlbImage(image) {
  * camera.lookAt(Vector3.create(0, 1.5, 4), Vector3.create(0, 1, 0), Vector3.create(0, 1, 0));
  * renderer.beginFrameWithCamera(camera);
  * for (const part of parts) {
- * 	if (part.name === "vanguard_visor") {
+ * 	if (part.name === "Mannequin_F") {
  * 		continue;
  * 	}
  * 	const modelMatrix = Matrix4.createScale(0.01, 0.01, 0.01);
@@ -724,17 +724,17 @@ export function readGlbNodeArrays(arrayBuffer, outlineOptions = null) {
 /**
  * @param { ArrayBuffer } arrayBuffer - GLB 파일 전체.
  * @returns { object } { 노드 이름: { extras, center [x, y, z], jointIndex } } 메시 노드마다의 정보.
- * @example <caption>걷는 모형의 바이저 자리 읽기</caption>
+ * @example <caption>걷는 모형의 몸 부품 자리 읽기</caption>
  * import { ToonGlb, Matrix4 } from "./vanilla.js";
- * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/soldier.glb")).arrayBuffer();
+ * const arrayBuffer = await (await fetch("examples/ancientmountain/assets/mannequin_female.glb")).arrayBuffer();
  * const skeleton = ToonGlb.readGlbArrays(arrayBuffer).skeleton;
- * const visorInfo = ToonGlb.readGlbNodeInfos(arrayBuffer)["vanguard_visor"];
- * if (skeleton !== null && visorInfo !== undefined && visorInfo.jointIndex >= 0) {
+ * const bodyInfo = ToonGlb.readGlbNodeInfos(arrayBuffer)["Mannequin_F"];
+ * if (skeleton !== null && bodyInfo !== undefined && bodyInfo.jointIndex >= 0) {
  * 	const jointMatrices = new Float32Array(skeleton.joints.length * 16);
  * 	ToonGlb.writeSkinPose(skeleton, "Walk", 0.25, jointMatrices);
  * 	const jointMatrix = Matrix4.createIdentity();
- * 	jointMatrix.getElements().set(jointMatrices.subarray(visorInfo.jointIndex * 16, visorInfo.jointIndex * 16 + 16));
- * 	const visorPosition = jointMatrix.transformPoint(visorInfo.center[0], visorInfo.center[1], visorInfo.center[2]);
+ * 	jointMatrix.getElements().set(jointMatrices.subarray(bodyInfo.jointIndex * 16, bodyInfo.jointIndex * 16 + 16));
+ * 	const bodyPosition = jointMatrix.transformPoint(bodyInfo.center[0], bodyInfo.center[1], bodyInfo.center[2]);
  * }
  */
 export function readGlbNodeInfos(arrayBuffer) {

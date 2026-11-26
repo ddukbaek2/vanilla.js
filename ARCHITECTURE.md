@@ -264,9 +264,9 @@ engine.run(scene)  → 기본 폰트 로드 + sceneManager.loadScene(scene) + rA
 임포트 파이프라인 (포맷 중립화가 핵심):
 
 ```
-Remy.fbx ──> FbxLoader.parse ──> FBX IR (노드/지오메트리/스킨/머티리얼/애니 원본 구조)
+mannequin.fbx ──> FbxLoader.parse ──> FBX IR (노드/지오메트리/스킨/머티리얼/애니 원본 구조)
                                      │
-soldier.glb ──> parseBinary ──> glTF JSON+BIN
+mannequin_female.glb ──> parseBinary ──> glTF JSON+BIN
                                      │
               SkinnedModel.parseFbxContent / parseContent  (포맷별 해석기)
                                      ↓

@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+// 옮긴 원문: Box2D 의 b2DynamicTree 에서 옮김, MIT, THIRD_PARTY_LICENSES.md
 const System = globalThis;
 import { Object } from "../../base/object.js";
 import { AABB2D } from "./aabb2d.js";

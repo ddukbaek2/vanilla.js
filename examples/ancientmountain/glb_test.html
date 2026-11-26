@@ -57,8 +57,8 @@
 					await report(`SHOT ${shotName} drawError=${drawError}`);
 				}
 
-				// soldier: 키 약 1.8 유닛. fox: 키 약 80cm 스케일(원본 단위 큼).
-				await loadDrawAndCapture("glb_soldier", "./assets/soldier.glb", "Idle", 0, 1.4, 3.2, 1.0);
+				// 여자 마네킹: 키 약 1.8 유닛. fox: 키 약 80cm 스케일(원본 단위 큼).
+				await loadDrawAndCapture("glb_mannequin_female", "./assets/mannequin_female.glb", "Idle", 0, 1.4, 3.2, 1.0);
 				await loadDrawAndCapture("glb_fox", "./assets/fox.glb", "Walk", 0, 80, 220, 45);
 
 				await report("OK");

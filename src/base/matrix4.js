@@ -1,6 +1,7 @@
 //==============================================================================
 // 포함 모듈 목록.
 //==============================================================================
+// 옮긴 원문: gl-matrix 에서 옮김, MIT, THIRD_PARTY_LICENSES.md
 const System = globalThis;
 import { Object } from "./object.js";
 import { Vector3 } from "./vector3.js";
