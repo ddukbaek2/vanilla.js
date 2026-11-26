@@ -70,6 +70,7 @@ export class NodeLayout extends Object {
 	/** @private @type { * } */ #node;
 	/** @private @type { NodeLayout[] } */ #childLayouts;
 	/** @private @type { * } */ #parentNode;
+	/** @private @type { { position: Vector2, anchor: Vector2 } | null } */ #pendingAnchoredPosition; // build 때 부모에 붙인 뒤 걸 앵커 기준 위치와 그때의 앵커.
 
 	//==============================================================================
 	// 생성.
@@ -83,15 +84,9 @@ export class NodeLayout extends Object {
 		this.#node = new NodeClass();
 		this.#childLayouts = [];
 		this.#parentNode = null;
+		this.#pendingAnchoredPosition = null;
 	}
 
-	//==============================================================================
-	// 레이아웃 인스턴스 생성.
-	//==============================================================================
-	/**
-	 * @param { Function } [nodeClass]
-	 * @returns { NodeLayout }
-	 */
 	//==============================================================================
 	// 부채꼴 배치. (정적, 손패 카드처럼 노드들을 호 위에 펼친다)
 	// - 가운데 항목이 baseAngleRadian 방향(기본 위쪽)을 보도록 좌우 대칭으로 벌린다.
@@ -221,11 +216,12 @@ export class NodeLayout extends Object {
 	//==============================================================================
 	/**
 	 * @param { number } x 지역 X 좌표.
-	 * @param { number } y 지역 Y 좌표.
+	 * @param { number } y 지역 Y 좌표. (앞서 부른 anchoredPosition 은 버린다, 나중에 부른 것이 이긴다)
 	 * @returns { NodeLayout } 이 레이아웃. (이어 부르기용)
 	 */
 	localPosition(x, y) {
 		this.#node.setLocalPosition(Vector2.create(x, y));
+		this.#pendingAnchoredPosition = null;
 		return this;
 	}
 
@@ -294,14 +290,32 @@ export class NodeLayout extends Object {
 
 	//==============================================================================
 	// 앵커 기준 위치 오프셋 설정.
+	// - build 때 노드를 부모에 붙인 뒤 부모 contentSize 의 앵커 점 기준으로 건다. (빌드 중에는 노드에 아직 부모가 없다)
+	// - 앵커는 이 메서드를 부를 때의 앵커를 쓴다. (앵커는 먼저 정한다, 나중에 부른 localPosition 이 이긴다)
 	//==============================================================================
 	/**
-	 * @param { number } x 앵커 기준 X. (픽셀, 부모가 없을 때 부르면 지역 X 로 들어간다)
-	 * @param { number } y 앵커 기준 Y. (픽셀, 부모가 없을 때 부르면 지역 Y 로 들어간다)
+	 * @param { number } x 앵커 기준 X. (픽셀, build 에서 붙일 부모가 없으면 지역 X 로 들어간다)
+	 * @param { number } y 앵커 기준 Y. (픽셀, build 에서 붙일 부모가 없으면 지역 Y 로 들어간다)
 	 * @returns { NodeLayout } 이 레이아웃. (이어 부르기용)
+	 * @example <caption>부모의 오른쪽 아래 귀퉁이에서 띄워 놓기</caption>
+	 * import { NodeLayout, WorldNode } from "./build/vanilla.js";
+	 *
+	 * const panelNode = NodeLayout.create(WorldNode)
+	 * 	.contentSize(680, 900)
+	 * 	.children(
+	 * 		NodeLayout.create(WorldNode)
+	 * 			.name("corner")
+	 * 			.anchor(1, 1)
+	 * 			.anchoredPosition(-10, -20)
+	 * 	)
+	 * 	.build();
+	 * const cornerNode = panelNode.findChildByName("corner");
+	 * const localPosition = cornerNode.getLocalPosition();
+	 * console.log(localPosition.x, localPosition.y);
 	 */
 	anchoredPosition(x, y) {
-		this.#node.setAnchoredPosition(Vector2.create(x, y));
+		const anchor = this.#node.getAnchor();
+		this.#pendingAnchoredPosition = { position: Vector2.create(x, y), anchor: anchor.clone() };
 		return this;
 	}
 
@@ -343,6 +357,21 @@ export class NodeLayout extends Object {
 		const targetParent = parent ?? this.#parentNode;
 		if (targetParent) {
 			targetParent.addChild(this.#node);
+		}
+
+		// 앵커 기준 위치. (부모에 붙은 뒤라 부모 contentSize 의 앵커 점을 안다, 부모가 WorldNode 가 아니면 지역 위치 그대로)
+		const pendingAnchoredPosition = this.#pendingAnchoredPosition;
+		if (pendingAnchoredPosition !== null) {
+			const parentNode = this.#node.getParent();
+			let anchorReferenceX = 0;
+			let anchorReferenceY = 0;
+			if (parentNode instanceof WorldNode) {
+				const parentContentSize = parentNode.getContentSize();
+				anchorReferenceX = parentContentSize.x * pendingAnchoredPosition.anchor.x;
+				anchorReferenceY = parentContentSize.y * pendingAnchoredPosition.anchor.y;
+			}
+			const localPosition = Vector2.create(anchorReferenceX + pendingAnchoredPosition.position.x, anchorReferenceY + pendingAnchoredPosition.position.y);
+			this.#node.setLocalPosition(localPosition);
 		}
 		return this.#node;
 	}

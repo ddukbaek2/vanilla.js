@@ -17,8 +17,10 @@ import { Tween } from "../core/tween.js";
 //
 // [스냅 동작 설정]
 // - setSnapToNearest(false) : 1회 스와이프 시 1칸만 이동. (기본값)
-// - setSnapToNearest(true)  : 드래그한 위치에서 가장 가까운 아이템으로 스냅.
-// - setVelocityThreshold(px/s): 1칸 모드에서 방향을 결정할 최소 속도. (기본값: 200)
+//   끄는 동안 오프셋은 지금 칸 ±1 칸 범위를 넘지 않는다. 놓을 때 드래그 속도가 setVelocityThreshold 이상이면
+//   그 방향으로 한 칸 넘기고(플링), 아니면 끈 거리가 옆 칸 크기의 setPageChangeThreshold 비율 이상일 때 넘긴다.
+// - setSnapToNearest(true)  : 드래그한 위치에서 가장 가까운 아이템으로 스냅. (끄는 동안 칸 범위를 자르지 않아 여러 칸을 지날 수 있다)
+// - setVelocityThreshold(px/s): 1칸 모드에서 방향을 결정할 최소 속도. (기본값: 200, 스크롤 오프셋이 움직인 초당 픽셀)
 //
 // [페이지 이동]
 // - pageTo(index, smooth): 지정 인덱스로 이동. smooth=true이면 트윈, false이면 즉시 이동.
@@ -78,6 +80,8 @@ export class UISnapScrollView extends UIScrollView {
 	/** @private @type { boolean } */ #isSnapToNearest;
 	/** @private @type { number } */ #velocityThreshold;
 	/** @private @type { number } */ #pageChangeThreshold; // 느린 스와이프 시 페이지 전환 임계값 (아이템 크기 대비 비율).
+	/** @private @type { number } */ #dragVelocity; // 끄는 동안 스크롤 축 오프셋이 움직인 속도. (초당 픽셀)
+	/** @private @type { number } */ #previousDragAxisOffset; // 지난 tick 의 칸 범위 자르기 전 스크롤 축 오프셋.
 
 	//==============================================================================
 	// 생성.
@@ -94,6 +98,8 @@ export class UISnapScrollView extends UIScrollView {
 		this.#isSnapToNearest = false;
 		this.#velocityThreshold = 200;
 		this.#pageChangeThreshold = 0.35;
+		this.#dragVelocity = 0;
+		this.#previousDragAxisOffset = 0;
 	}
 
 	//==============================================================================
@@ -102,7 +108,32 @@ export class UISnapScrollView extends UIScrollView {
 	// - true : 드래그 위치에서 가장 가까운 아이템으로 스냅.
 	//==============================================================================
 	/**
-	 * @param { boolean } isSnapToNearest 참이면 가장 가까운 아이템 모드. (값만 담아 두고 지금 스냅 계산은 이 값을 읽지 않는다)
+	 * @param { boolean } isSnapToNearest 참이면 가장 가까운 아이템 모드. (끄는 동안 칸 범위를 자르지 않고, 놓으면 스냅 오프셋이 가장 가까운 아이템으로 간다)
+	 * @example <caption>여러 칸을 끌고 놓으면 가장 가까운 칸으로 붙기</caption>
+	 * import { UISnapScrollView, WorldNode, Pivot, Vector2 } from "./build/vanilla.js";
+	 *
+	 * const viewportNode = new WorldNode();
+	 * viewportNode.setContentSize(Vector2.create(200, 120));
+	 * const snapScrollView = viewportNode.addComponent(UISnapScrollView);
+	 * snapScrollView.setSnapToNearest(true);
+	 * const content = snapScrollView.getContent();
+	 * for (let pageIndex = 0; pageIndex < 5; ++pageIndex) {
+	 * 	const pageNode = new WorldNode();
+	 * 	pageNode.setPivot(Pivot.topLeft.clone());
+	 * 	pageNode.setAnchor(Pivot.topLeft.clone());
+	 * 	pageNode.setContentSize(Vector2.create(200, 120));
+	 * 	pageNode.setLocalPosition(Vector2.create(pageIndex * 200, 0));
+	 * 	content.addChild(pageNode);
+	 * }
+	 * snapScrollView.setScrollContentSize(Vector2.create(1000, 120));
+	 * snapScrollView.touchPress(Vector2.create(190, 60));
+	 * snapScrollView.tick(0.016);
+	 * snapScrollView.touchMove(Vector2.create(-300, 60));
+	 * snapScrollView.tick(0.016);
+	 * snapScrollView.touchRelease(Vector2.create(-300, 60));
+	 * snapScrollView.tick(0.5);
+	 * const scrollOffset = snapScrollView.getScrollOffset();
+	 * console.log(snapScrollView.getSnapCurrentIndex(), scrollOffset.x);
 	 */
 	setSnapToNearest(isSnapToNearest) {
 		this.#isSnapToNearest = isSnapToNearest;
@@ -122,7 +153,7 @@ export class UISnapScrollView extends UIScrollView {
 	// 방향성 스냅 발동 최소 속도 설정. (px/s, 1칸 모드에서만 사용)
 	//==============================================================================
 	/**
-	 * @param { number } velocityThreshold 최소 속도. (초당 픽셀, 값만 담아 두고 지금 스냅 계산은 이 값을 읽지 않는다)
+	 * @param { number } velocityThreshold 최소 속도. (스크롤 오프셋이 움직인 초당 픽셀, 1칸 모드에서 놓을 때 드래그 속도가 이 이상이면 끈 거리와 상관없이 그 방향으로 한 칸 넘긴다)
 	 */
 	setVelocityThreshold(velocityThreshold) {
 		this.#velocityThreshold = velocityThreshold;
@@ -159,6 +190,16 @@ export class UISnapScrollView extends UIScrollView {
 	}
 
 	//==============================================================================
+	// 드래그 속도 반환.
+	//==============================================================================
+	/**
+	 * @returns { number } 끄는 동안 스크롤 축 오프셋이 움직인 속도. (초당 픽셀, 다음 칸 쪽이 음수, 마지막으로 끈 tick 의 값이고 끌기를 시작하면 0)
+	 */
+	getDragVelocity() {
+		return this.#dragVelocity;
+	}
+
+	//==============================================================================
 	// 갱신.
 	//==============================================================================
 	/**
@@ -176,8 +217,21 @@ export class UISnapScrollView extends UIScrollView {
 			this.#snapTween = null;
 		}
 
-		// 드래그 중 스크롤 오프셋을 현재 페이지 ±1 범위로 제한.
+		// 드래그 속도. (칸 범위로 자르기 전 오프셋이 tick 사이에 움직인 거리, 끌기를 시작한 tick 은 0)
 		if (currentIsDragging) {
+			const scrollOffset = this.getScrollOffset();
+			const dragAxisOffset = this.isHorizontal() ? scrollOffset.x : scrollOffset.y;
+			if (prevIsDragging && timeDelta > 0) {
+				this.#dragVelocity = (dragAxisOffset - this.#previousDragAxisOffset) / timeDelta;
+			}
+			else if (!prevIsDragging) {
+				this.#dragVelocity = 0;
+			}
+			this.#previousDragAxisOffset = dragAxisOffset;
+		}
+
+		// 드래그 중 스크롤 오프셋을 현재 페이지 ±1 범위로 제한. (가장 가까운 아이템 모드는 자르지 않는다)
+		if (currentIsDragging && !this.getSnapToNearest()) {
 			this.clampScrollOffsetToAdjacentPages();
 		}
 
@@ -269,6 +323,8 @@ export class UISnapScrollView extends UIScrollView {
 
 	//==============================================================================
 	// 현재 오프셋과 속도를 기반으로 스냅 인덱스를 결정하고 트윈을 시작한다.
+	// - 가장 가까운 아이템 모드: 스냅 오프셋이 지금 오프셋과 가장 가까운 아이템.
+	// - 1칸 모드: 드래그 속도가 setVelocityThreshold 이상이면 속도 방향으로 한 칸, 아니면 끈 방향으로 끈 거리가 옆 칸 크기의 비율 이상일 때 한 칸.
 	//==============================================================================
 	playSnapTween() {
 		const contentNode = this.getContent();
@@ -284,11 +340,35 @@ export class UISnapScrollView extends UIScrollView {
 		const isHorizontal = this.isHorizontal();
 		const currentAxisOffset = isHorizontal ? currentOffset.x : currentOffset.y;
 
-		// 목표 인덱스 결정: 드래그 방향으로 최대 1칸, 목표 페이지 35% 이상 노출 시 전환.
+		// 가장 가까운 아이템 모드: 스냅 오프셋과의 거리가 가장 짧은 아이템. (같으면 앞 아이템)
+		if (this.getSnapToNearest()) {
+			let nearestIndex = 0;
+			let nearestDistance = System.Math.abs(snapOffsets[0] - currentAxisOffset);
+			for (let snapOffsetIndex = 1; snapOffsetIndex < snapOffsets.length; ++snapOffsetIndex) {
+				const distance = System.Math.abs(snapOffsets[snapOffsetIndex] - currentAxisOffset);
+				if (distance < nearestDistance) {
+					nearestDistance = distance;
+					nearestIndex = snapOffsetIndex;
+				}
+			}
+			this.setSnapCurrentIndex(nearestIndex);
+			return;
+		}
+
+		// 1칸 모드의 목표 인덱스: 빠르게 튕겼으면 속도 방향으로 1칸, 아니면 드래그 방향으로 최대 1칸 (옆 칸이 비율 이상 드러나면 전환).
 		const snapCurrentIndex = this.getSnapCurrentIndex();
 		const currentSnapOffset = snapOffsets[snapCurrentIndex];
 		const dragAmount = currentAxisOffset - currentSnapOffset;
-		const direction = dragAmount < 0 ? 1 : -1;
+		const dragVelocity = this.getDragVelocity();
+		const velocityThreshold = this.getVelocityThreshold();
+		const isFling = System.Math.abs(dragVelocity) >= velocityThreshold && dragVelocity !== 0;
+		let direction;
+		if (isFling) {
+			direction = dragVelocity < 0 ? 1 : -1;
+		}
+		else {
+			direction = dragAmount < 0 ? 1 : -1;
+		}
 		const candidateIndex = Math.clamp(snapCurrentIndex + direction, 0, children.length - 1);
 		let targetIndex;
 		if (candidateIndex !== snapCurrentIndex) {
@@ -296,7 +376,7 @@ export class UISnapScrollView extends UIScrollView {
 			const candidateChildContentSize = candidateChild.getContentSize();
 			const targetItemSize = isHorizontal ? candidateChildContentSize.x : candidateChildContentSize.y;
 			const pageChangeThreshold = this.getPageChangeThreshold();
-			if (System.Math.abs(dragAmount) >= targetItemSize * pageChangeThreshold) {
+			if (isFling || System.Math.abs(dragAmount) >= targetItemSize * pageChangeThreshold) {
 				targetIndex = candidateIndex;
 			}
 			else {

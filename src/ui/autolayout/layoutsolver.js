@@ -360,6 +360,7 @@ export class LayoutSolver {
 		const row = new LayoutRow(expression.getConstant());
 
 		// 외부 변수 항 추가. basic 인 항은 substitute.
+		// 변수가 없는 항(LayoutTerm 의 값이 늘 0)과 계수가 0 인 항은 식에 아무것도 더하지 않으므로 건너뛴다.
 		const terms = expression.getTerms();
 		for (const term of terms) {
 			const coefficient = term.getCoefficient();
@@ -367,6 +368,9 @@ export class LayoutSolver {
 				continue;
 			}
 			const variable = term.getVariable();
+			if (variable === null) {
+				continue;
+			}
 			const symbol = this.getOrCreateSymbol(variable);
 			if (this.#rows.has(symbol)) {
 				const basicRow = this.#rows.get(symbol);

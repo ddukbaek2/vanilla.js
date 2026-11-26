@@ -215,12 +215,25 @@ export class UIView extends Component {
 	}
 
 	//==============================================================================
-	// 배경색 설정.
+	// 배경색 설정. (null 이면 배경을 지운다)
 	//==============================================================================
 	/**
-	 * @param { Color | null } backgroundColor 배경색. (사본을 담는다, 알파가 0 이면 그리지 않는다)
+	 * @param { Color | null } backgroundColor 배경색. (사본을 담는다, 알파가 0 이면 그리지 않는다, null 이나 undefined 면 처음 값인 알파 0 흰색으로 돌려 그리지 않는다)
+	 * @example <caption>배경을 칠했다가 지우기</caption>
+	 * import { UIView, Color } from "./build/vanilla.js";
+	 *
+	 * const view = new UIView();
+	 * view.setBackgroundColor(new Color(0.1, 0.12, 0.16, 1));
+	 * const paintedColor = view.getBackgroundColor();
+	 * view.setBackgroundColor(null);
+	 * const clearedColor = view.getBackgroundColor();
+	 * console.log(paintedColor.alpha, clearedColor.alpha);
 	 */
 	setBackgroundColor(backgroundColor) {
+		if (backgroundColor === null || backgroundColor === undefined) {
+			this.#backgroundColor = new Color(1, 1, 1, 0);
+			return;
+		}
 		this.#backgroundColor = backgroundColor.clone();
 	}
 

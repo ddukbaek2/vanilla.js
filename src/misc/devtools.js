@@ -1219,6 +1219,8 @@ export class DEVTools extends Object {
 	 */
 	draw(graphic) {
 		if (!this.#isVisible) {
+			// 패널을 닫아도 FPS 표시는 그린다.
+			this.drawFramePerSecond(graphic);
 			return;
 		}
 
@@ -1342,6 +1344,41 @@ export class DEVTools extends Object {
 		graphic.setStrokeColor(isResizing ? COLOR_BORDER_ACTIVE : COLOR_BORDER_NORMAL);
 		graphic.drawStrokeRect(Rect.create(panelX + 0.5, panelY + 0.5, panelWidth - 1, panelHeight - 1), isResizing ? 2 : 1);
 
+		graphic.popState();
+
+		// FPS 표시. (패널 위에)
+		this.drawFramePerSecond(graphic);
+	}
+
+	//==============================================================================
+	// FPS 표시 출력. (Settings 의 Show FPS 를 켜면 패널을 닫아도 창 왼쪽 위에 지난 1 초의 프레임 수를 그린다)
+	// - 패널처럼 ViewScaleMode 와 무관하게 canvas-native 좌표계에서 그린다.
+	//==============================================================================
+	/**
+	 * @param { Graphic } graphic 그릴 그래픽. (끝나면 들어올 때의 그리기 상태로 돌린다)
+	 */
+	drawFramePerSecond(graphic) {
+		if (!this.#isFramePerSecondVisible || !this.#engine) {
+			return;
+		}
+		const timeManager = this.#engine.getTimeManager();
+		const framePerSecond = timeManager.getFramePerSecond();
+		const framePerSecondText = `FPS ${framePerSecond}`;
+
+		graphic.pushState();
+		const viewManager = this.#engine.getViewManager();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFontString(`${FONT_SIZE}px monospace`);
+		graphic.setTextAlign("left");
+		graphic.setTextBaseline("middle");
+		const textMetrics = graphic.measureText(framePerSecondText);
+		const boxWidth = System.Math.ceil(textMetrics.width) + PADDING * 2;
+		graphic.setFillColor(COLOR_BACKGROUND);
+		graphic.drawRect(Rect.create(PADDING, PADDING, boxWidth, ITEM_HEIGHT));
+		graphic.setStrokeColor(COLOR_BORDER_NORMAL);
+		graphic.drawStrokeRect(Rect.create(PADDING + 0.5, PADDING + 0.5, boxWidth - 1, ITEM_HEIGHT - 1), 1);
+		graphic.setFillColor(COLOR_TRUE);
+		graphic.drawFillText(framePerSecondText, PADDING * 2, PADDING + ITEM_HEIGHT * 0.5);
 		graphic.popState();
 	}
 
@@ -2124,7 +2161,7 @@ export class DEVTools extends Object {
 	// FPS 표시 여부 반환.
 	//==============================================================================
 	/**
-	 * @returns { boolean }
+	 * @returns { boolean } Settings 의 Show FPS 가 켜졌으면 참. (켜지면 draw 가 패널을 닫아도 창 왼쪽 위에 FPS 를 그린다)
 	 */
 	isFramePerSecondVisible() {
 		return this.#isFramePerSecondVisible;

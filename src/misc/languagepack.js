@@ -84,11 +84,50 @@ export async function loadLanguageList() {
 		return;
 	}
 	const data = await readJson(languageListPath);
-	if (data === null || !System.Array.isArray(data.languages)) {
+	const isLanguageListSet = setLanguageList(data);
+	if (!isLanguageListSet) {
 		console.warn("[localization] 언어의 목록을 읽지 못했습니다.");
-		return;
 	}
-	languageList = data;
+}
+
+//==============================================================================
+// 글 목록 고르기. (글만 소문자로 남긴다, 배열이 아니면 빈 배열)
+//==============================================================================
+/**
+ * @param { * } values 목록 파일의 aliases 나 countries 칸.
+ * @returns { string[] } 소문자 글 배열.
+ */
+function normalizeTextList(values) {
+	const textList = [];
+	if (!System.Array.isArray(values)) {
+		return textList;
+	}
+	for (const value of values) {
+		if (typeof value === "string") {
+			textList.push(value.toLowerCase());
+		}
+	}
+	return textList;
+}
+
+//==============================================================================
+// 언어 목록의 줄 고르기. (code 가 글이 아닌 줄은 빼고, aliases 와 countries 는 없으면 빈 배열, 글은 소문자로)
+//==============================================================================
+/**
+ * @param { object[] } languages 목록 파일의 languages 배열.
+ * @returns { object[] } 쓸 수 있는 줄 배열. (줄 객체는 그대로 쓰고 aliases, countries 칸만 고친다)
+ */
+function normalizeLanguageEntries(languages) {
+	const languageEntries = [];
+	for (const language of languages) {
+		if (language === null || typeof language !== "object" || typeof language.code !== "string") {
+			continue;
+		}
+		language.aliases = normalizeTextList(language.aliases);
+		language.countries = normalizeTextList(language.countries);
+		languageEntries.push(language);
+	}
+	return languageEntries;
 }
 
 //==============================================================================
@@ -470,21 +509,31 @@ export function readAllTexts() {
 
 //==============================================================================
 // 언어의 목록 넣기. (파일 없이 바로 줄 때, languages.json 과 같은 꼴, 읽었으면 true)
+// - loadLanguageList 가 읽은 파일도 여기로 넣는다. code 가 글이 아닌 줄은 빼고, aliases 와 countries 가 없으면 빈 배열, 글은 소문자로 맞춘다.
 //==============================================================================
 /**
  * @param { object } data - { fallbackLanguage, languages: [...] }
  * @returns { boolean } 목록을 넣었으면 참. (languages 배열이 없으면 거짓)
+ * @example <caption>aliases 가 없는 줄도 받기</caption>
+ * import { LanguagePack } from "./build/vanilla.js";
+ *
+ * const isLanguageListSet = LanguagePack.setLanguageList({
+ * 	fallbackLanguage: "en",
+ * 	languages: [
+ * 		{ code: "en", name: "English", file: "en.json" },
+ * 		{ code: "pt", name: "Portugues", aliases: ["PT-BR"], file: "pt.json" }
+ * 	]
+ * });
+ * const englishLanguage = LanguagePack.matchLanguageTag("en-US");
+ * const portugueseLanguage = LanguagePack.matchLanguageTag("pt_BR");
+ * console.log(isLanguageListSet, englishLanguage.code, englishLanguage.aliases.length, portugueseLanguage.code);
  */
 export function setLanguageList(data) {
 	if (data === null || typeof data !== "object" || !System.Array.isArray(data.languages)) {
 		return false;
 	}
-	for (const language of data.languages) {
-		if (!System.Array.isArray(language.aliases)) {
-			language.aliases = [];
-		}
-	}
-	languageList = data;
+	const languageEntries = normalizeLanguageEntries(data.languages);
+	languageList = System.Object.assign({}, data, { languages: languageEntries });
 	return true;
 }
 
