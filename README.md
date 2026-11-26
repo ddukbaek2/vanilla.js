@@ -123,9 +123,7 @@ esbuild import.js --bundle --outfile=build/vanilla.min.js --format=esm --minify 
 
 | 게임 | 링크 |
 | --- | --- |
-| Tales of Cultivation | [열기](https://ddukbaek2.com/portfolio/talesofcultivation/) |
 | Pipe Mania | [열기](https://vanillapunch.com/games/#pipemania) |
-| Scramble Heroes | [열기](https://ddukbaek2.com/portfolio/scramble-heroes/) |
 
 ## 저장소 구조
 

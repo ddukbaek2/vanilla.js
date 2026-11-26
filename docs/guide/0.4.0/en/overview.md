@@ -36,9 +36,7 @@ Playable results made with the engine.
 
 | Game | Link |
 | --- | --- |
-| Tales of Cultivation | [Open](https://ddukbaek2.com/portfolio/talesofcultivation/) |
 | Pipe Mania | [Open](https://vanillapunch.com/games/#pipemania) |
-| Scramble Heroes | [Open](https://ddukbaek2.com/portfolio/scramble-heroes/) |
 
 ## Repository Structure
 

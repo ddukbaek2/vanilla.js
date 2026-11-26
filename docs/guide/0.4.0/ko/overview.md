@@ -36,9 +36,7 @@ vanilla.js 는 외부 라이브러리 없이 브라우저에서 바로 동작하
 
 | 게임 | 링크 |
 | --- | --- |
-| Tales of Cultivation | [열기](https://ddukbaek2.com/portfolio/talesofcultivation/) |
 | Pipe Mania | [열기](https://vanillapunch.com/games/#pipemania) |
-| Scramble Heroes | [열기](https://ddukbaek2.com/portfolio/scramble-heroes/) |
 
 ## 저장소 구조
 
