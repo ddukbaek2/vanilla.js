@@ -32,6 +32,7 @@
 const System = globalThis;
 import { Object } from "../../base/object.js";
 import { Color } from "../../base/color.js";
+import { checkSkeleton2DWritable } from "./skeleton2danimation.js";
 import { readSkeleton2DJson } from "./skeleton2djsonreader.js";
 import { readDragonBonesJson } from "./dragonbonesreader.js";
 
@@ -152,6 +153,7 @@ export class Skeleton2DBoneData extends Object {
 	 * @param { number } shearY 기울임 y. (도, y 축만 더 돈다)
 	 */
 	setTransform(x, y, rotation, scaleX, scaleY, shearX, shearY) {
+		checkSkeleton2DWritable(this);
 		this.#x = x;
 		this.#y = y;
 		this.#rotation = rotation;
@@ -238,6 +240,7 @@ export class Skeleton2DBoneData extends Object {
 	 * @param { number } length 뼈 길이. (지역 x 축 쪽)
 	 */
 	setLength(length) {
+		checkSkeleton2DWritable(this);
 		this.#length = length;
 	}
 
@@ -333,6 +336,7 @@ export class Skeleton2DSlotData extends Object {
 	 * @param { Color } color 처음 색.
 	 */
 	setColor(color) {
+		checkSkeleton2DWritable(this);
 		this.#color = color;
 	}
 
@@ -353,6 +357,7 @@ export class Skeleton2DSlotData extends Object {
 	 * @param { string | null } attachmentName 처음 붙임 이름. (null 이면 비운다)
 	 */
 	setAttachmentName(attachmentName) {
+		checkSkeleton2DWritable(this);
 		this.#attachmentName = attachmentName;
 	}
 
@@ -373,6 +378,7 @@ export class Skeleton2DSlotData extends Object {
 	 * @param { string } blendMode 섞기 방식. ("source-over", "lighter", "multiply", "screen" 같은)
 	 */
 	setBlendMode(blendMode) {
+		checkSkeleton2DWritable(this);
 		this.#blendMode = blendMode;
 	}
 
@@ -477,6 +483,7 @@ export class Skeleton2DIkConstraintData extends Object {
 	 * @param { boolean } isBendPositive 양의 쪽으로 꺾으면 참.
 	 */
 	setBendPositive(isBendPositive) {
+		checkSkeleton2DWritable(this);
 		this.#isBendPositive = isBendPositive;
 	}
 
@@ -497,6 +504,7 @@ export class Skeleton2DIkConstraintData extends Object {
 	 * @param { number } mix 세기. (0 이면 걸지 않고 1 이면 끝까지)
 	 */
 	setMix(mix) {
+		checkSkeleton2DWritable(this);
 		this.#mix = mix;
 	}
 
@@ -604,6 +612,7 @@ export class Skeleton2DRegionAttachment extends Object {
 	 * @param { number } scaleY 크기 y.
 	 */
 	setTransform(x, y, rotation, scaleX, scaleY) {
+		checkSkeleton2DWritable(this);
 		this.#x = x;
 		this.#y = y;
 		this.#rotation = rotation;
@@ -669,6 +678,7 @@ export class Skeleton2DRegionAttachment extends Object {
 	 * @param { number } height 높이.
 	 */
 	setSize(width, height) {
+		checkSkeleton2DWritable(this);
 		this.#width = width;
 		this.#height = height;
 	}
@@ -701,6 +711,7 @@ export class Skeleton2DRegionAttachment extends Object {
 	 * @param { number } pivotY 축점 y 몫.
 	 */
 	setPivot(pivotX, pivotY) {
+		checkSkeleton2DWritable(this);
 		this.#pivotX = pivotX;
 		this.#pivotY = pivotY;
 	}
@@ -842,6 +853,7 @@ export class Skeleton2DMeshAttachment extends Object {
 	 * @param { number[] } triangles 삼각형마다 꼭짓점 번호 셋.
 	 */
 	setGeometry(uvs, triangles) {
+		checkSkeleton2DWritable(this);
 		this.#uvs = uvs;
 		this.#triangles = triangles;
 	}
@@ -883,6 +895,7 @@ export class Skeleton2DMeshAttachment extends Object {
 	 * @param { number[] } vertices 꼭짓점마다 x, y.
 	 */
 	setVertices(vertices) {
+		checkSkeleton2DWritable(this);
 		this.#vertices = vertices;
 		this.#influenceCounts = [];
 		this.#influenceBoneIndices = [];
@@ -908,6 +921,7 @@ export class Skeleton2DMeshAttachment extends Object {
 	 * @param { number[] } influenceValues 영향마다 그 뼈 기준 묶은 자리 x, y 와 무게.
 	 */
 	setWeights(influenceCounts, influenceBoneIndices, influenceValues) {
+		checkSkeleton2DWritable(this);
 		this.#vertices = [];
 		this.#influenceCounts = influenceCounts;
 		this.#influenceBoneIndices = influenceBoneIndices;
@@ -1007,6 +1021,7 @@ export class Skeleton2DSkin extends Object {
 	 * @param { Skeleton2DRegionAttachment | Skeleton2DMeshAttachment } attachment 붙임.
 	 */
 	setAttachment(slotIndex, attachmentName, attachment) {
+		checkSkeleton2DWritable(this);
 		let attachmentTable = this.#slotAttachmentTable.get(slotIndex);
 		if (attachmentTable === undefined) {
 			attachmentTable = new System.Map();
@@ -1130,6 +1145,7 @@ export class Skeleton2DData extends Object {
 	 * @param { number } frameRate 초당 프레임.
 	 */
 	setFrameRate(frameRate) {
+		checkSkeleton2DWritable(this);
 		this.#frameRate = frameRate;
 	}
 
@@ -1150,6 +1166,7 @@ export class Skeleton2DData extends Object {
 	 * @param { Skeleton2DBoneData } boneData 더할 뼈. (번호는 지금 뼈 수와 같아야 한다)
 	 */
 	addBone(boneData) {
+		checkSkeleton2DWritable(this);
 		this.#bones.push(boneData);
 	}
 
@@ -1170,6 +1187,7 @@ export class Skeleton2DData extends Object {
 	 * @param { Skeleton2DSlotData } slotData 더할 슬롯. (번호는 지금 슬롯 수와 같아야 한다)
 	 */
 	addSlot(slotData) {
+		checkSkeleton2DWritable(this);
 		this.#slots.push(slotData);
 	}
 
@@ -1190,6 +1208,7 @@ export class Skeleton2DData extends Object {
 	 * @param { Skeleton2DIkConstraintData } ikConstraintData 더할 제약.
 	 */
 	addIkConstraint(ikConstraintData) {
+		checkSkeleton2DWritable(this);
 		this.#ikConstraints.push(ikConstraintData);
 	}
 
@@ -1210,6 +1229,7 @@ export class Skeleton2DData extends Object {
 	 * @param { Skeleton2DSkin } skin 더할 스킨.
 	 */
 	addSkin(skin) {
+		checkSkeleton2DWritable(this);
 		this.#skins.push(skin);
 	}
 
@@ -1230,6 +1250,7 @@ export class Skeleton2DData extends Object {
 	 * @param { object } animation 더할 클립. (Skeleton2DAnimation)
 	 */
 	addAnimation(animation) {
+		checkSkeleton2DWritable(this);
 		this.#animations.push(animation);
 	}
 

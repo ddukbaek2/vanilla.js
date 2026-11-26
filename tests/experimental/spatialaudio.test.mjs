@@ -2,7 +2,9 @@
 // 공간 소리 초안 시험. (node tests/experimental/spatialaudio.test.mjs)
 // - PannerNode 셈(spatialaudiomath.js)을 크롬 158 OfflineAudioContext 가 그린 값과 견준다. (chrome_spatial.json 은 러스트 판 vanilla-engine 의
 //   tests/assets/spatialaudio/chromespatial.cjs 가 찍은 파일을 그대로 옮긴 것, 다시 찍으면 같이 옮긴다) 자동화와 멈춤이 없고 표본율이 같은 경우는 식으로 다시 그릴 수 있다.
+// - 좌우 섞기는 엔진 함수 panEqualPowerSample(러스트 판 데스크탑 믹서와 같은 함수)로 한다.
 // - 거리 모델, 원뿔, 방위각, 등력 좌우의 모서리 값과 설정 받기, 2D 컴포넌트의 자리 따라가기를 본다. (러스트 판 시험과 같은 값)
+// - SpatialAudioPlayer, SpatialAudioListener 가 PannerNode 와 AudioListener 에 값을 거는 것은 spatialaudiochrome.test.mjs 가 헤드리스 크롬으로 본다.
 //==============================================================================
 import fs from "fs";
 import path from "path";
@@ -10,7 +12,7 @@ import { fileURLToPath } from "url";
 import { Vector2, Vector3, WorldNode } from "../../import.js";
 import * as Experimental from "../../src/experimental/experimental.js";
 
-const { calculateDistanceGain, calculateConeGain, calculateAzimuthElevation, calculateDistanceConeGain, calculateEqualPowerGains, convertViewPositionToAudioPosition, DistanceModel, PannerSettings, SpatialAudioPlayer, SpatialAudioListener, AudioSource2D, AudioListener2D } = Experimental;
+const { calculateDistanceGain, calculateConeGain, calculateAzimuthElevation, calculateDistanceConeGain, calculateEqualPowerGains, panEqualPowerSample, convertViewPositionToAudioPosition, DistanceModel, PannerSettings, SpatialAudioPlayer, SpatialAudioListener, AudioSource2D, AudioListener2D } = Experimental;
 const fround = Math.fround;
 let checkCount = 0;
 function check(condition, message) {
@@ -54,29 +56,14 @@ for (const testCase of json.cases) {
 	const { azimuth } = calculateAzimuthElevation(position, listenerPosition, Vector3.create(...testCase.listener.forward), Vector3.create(...testCase.listener.up));
 	const totalGain = calculateDistanceConeGain(settings, position, orientation, listenerPosition);
 	const isStereo = testCase.player.channels === "stereo";
-	const gains = calculateEqualPowerGains(azimuth, isStereo ? 2 : 1);
-	let aliasedAzimuth = Math.max(-180, Math.min(180, azimuth));
-	aliasedAzimuth = aliasedAzimuth < -90 ? -180 - aliasedAzimuth : (aliasedAzimuth > 90 ? 180 - aliasedAzimuth : aliasedAzimuth);
 	const playerGain = fround(testCase.player.gain);
 	const busGain = testCase.player.busGain !== null ? fround(testCase.player.busGain) : null;
 	const output = [new Float32Array(json.renderLength), new Float32Array(json.renderLength)];
 	for (let frame = 0; frame < json.bufferLength; frame++) {
 		const inputLeft = fround((isStereo ? stereoChannelList[0] : monoChannelList[0])[frame] * playerGain);
 		const inputRight = isStereo ? fround(stereoChannelList[1][frame] * playerGain) : inputLeft;
-		let left;
-		let right;
-		if (!isStereo) {
-			left = fround(inputLeft * gains.left);
-			right = fround(inputLeft * gains.right);
-		}
-		else if (aliasedAzimuth <= 0) {
-			left = fround(inputLeft + inputRight * gains.left);
-			right = fround(inputRight * gains.right);
-		}
-		else {
-			left = fround(inputLeft * gains.left);
-			right = fround(inputRight + inputLeft * gains.right);
-		}
+		// 소스 → GainNode(playerGain) → PannerNode(엔진 셈 panEqualPowerSample, 거리 x 원뿔 이득) → 버스 GainNode.
+		let { left, right } = panEqualPowerSample(azimuth, isStereo ? 2 : 1, inputLeft, inputRight);
 		left = fround(left * totalGain);
 		right = fround(right * totalGain);
 		if (busGain !== null) {

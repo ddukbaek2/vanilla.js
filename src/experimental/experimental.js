@@ -24,7 +24,7 @@ export { TilemapLayer, DEFAULT_CHUNK_SIZE } from "./tilemap/tilemaplayer.js";
 export { Tilemap, TileFlag, TilemapOrientation, TilemapStaggerAxis, TilemapStaggerIndex, TilemapRenderOrder, TilemapRenderMode } from "./tilemap/tilemap.js";
 export { RuleTile, RuleTileRule, RuleTileNeighbor, RuleTileTransform } from "./tilemap/ruletile.js";
 export { TiledMapReader, TiledMap, TiledObjectLayer, TiledObject } from "./tilemap/tiledmapreader.js";
-export { PanningModel, DistanceModel, PannerSettings, calculateDistanceGain, calculateConeGain, calculateAzimuthElevation, calculateDistanceConeGain, calculateEqualPowerGains, convertViewPositionToAudioPosition } from "./spatialaudio/spatialaudiomath.js";
+export { PanningModel, DistanceModel, PannerSettings, calculateDistanceGain, calculateConeGain, calculateAzimuthElevation, calculateDistanceConeGain, calculateEqualPowerGains, panEqualPowerSample, convertViewPositionToAudioPosition } from "./spatialaudio/spatialaudiomath.js";
 export { SpatialAudioPlayer } from "./spatialaudio/spatialaudioplayer.js";
 export { SpatialAudioListener } from "./spatialaudio/spatialaudiolistener.js";
 export { AudioSource2D } from "./spatialaudio/audiosource2d.js";

@@ -439,6 +439,42 @@ export function calculateEqualPowerGains(azimuth, inputChannelCount) {
 
 
 //==============================================================================
+// 등력 좌우를 표본 하나에. (크로미엄 EqualPowerPanner::Pan 의 안쪽, 이득은 f64 로 곱해 f32 로)
+// - 모노는 왼쪽 = 입력 x 왼쪽 이득, 오른쪽 = 입력 x 오른쪽 이득. 스테레오는 접은 방위각이 0 이하면 왼쪽 = 왼쪽 + 오른쪽 x 왼쪽 이득, 오른쪽 = 오른쪽 x 오른쪽 이득, 아니면 거꾸로.
+// - 원본은 브라우저 PannerNode 가 섞고, 이 함수는 그 셈을 시험과 견주기에 쓴다. (러스트 판 데스크탑 믹서가 같은 함수로 섞는다)
+//==============================================================================
+/**
+ * @param { number } azimuth 방위각. (도)
+ * @param { number } inputChannelCount 입력 채널 수. (1 이나 2)
+ * @param { number } inputLeft 왼쪽 입력 표본. (모노는 이것만 쓴다, f32 값)
+ * @param { number } inputRight 오른쪽 입력 표본. (f32 값)
+ * @returns { { left: number, right: number } } 왼쪽과 오른쪽 출력 표본. (f32 값)
+ * @example <caption>오른쪽 끝 모노 표본</caption>
+ * import * as Experimental from "./src/experimental/experimental.js";
+ *
+ * const sample = Experimental.panEqualPowerSample(90, 1, 0.5, 0);
+ * console.log(sample.left, sample.right);
+ */
+export function panEqualPowerSample(azimuth, inputChannelCount, inputLeft, inputRight) {
+	const gains = calculateEqualPowerGains(azimuth, inputChannelCount);
+	if (inputChannelCount === 1) {
+		return { left: fround(inputLeft * gains.left), right: fround(inputLeft * gains.right) };
+	}
+	let aliasedAzimuth = clampTo(azimuth, -180, 180);
+	if (aliasedAzimuth < -90) {
+		aliasedAzimuth = -180 - aliasedAzimuth;
+	}
+	else if (aliasedAzimuth > 90) {
+		aliasedAzimuth = 180 - aliasedAzimuth;
+	}
+	if (aliasedAzimuth <= 0) {
+		return { left: fround(inputLeft + inputRight * gains.left), right: fround(inputRight * gains.right) };
+	}
+	return { left: fround(inputLeft * gains.left), right: fround(inputRight + inputLeft * gains.right) };
+}
+
+
+//==============================================================================
 // 화면 자리를 WebAudio 자리로. ((x / pixelsPerUnit, -y / pixelsPerUnit, depth), 화면은 아래가 +Y, WebAudio 는 위가 +Y)
 //==============================================================================
 /**

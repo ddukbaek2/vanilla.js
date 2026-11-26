@@ -40,6 +40,38 @@ import { Object } from "../../base/object.js";
 // 자세에서 뼈 하나가 차지하는 값 수. (x, y, 회전, 크기 x, 크기 y, 기울임 x, 기울임 y)
 export const SKELETON2D_BONE_VALUE_COUNT = 7;
 
+//==============================================================================
+// 인스턴스를 지은 자료 표. (자료는 인스턴스들이 나눠 쓰는 처음 자세라, 지은 뒤에는 고치지 않는다, 러스트 판은 Rc 로 나눠 들어 &mut 가 막힌다)
+//==============================================================================
+/** @private @type { WeakSet<object> } */
+const frozenSkeleton2DSet = new System.WeakSet();
+
+
+//==============================================================================
+// 자료 하나를 얼린다. (뒤로 세터와 더하기가 던진다)
+//==============================================================================
+/**
+ * @private
+ * @param { object } target 얼릴 자료.
+ */
+export function freezeSkeleton2DObject(target) {
+	frozenSkeleton2DSet.add(target);
+}
+
+
+//==============================================================================
+// 자료를 고쳐도 되는지 본다. (얼었으면 던진다)
+//==============================================================================
+/**
+ * @private
+ * @param { object } target 고칠 자료.
+ */
+export function checkSkeleton2DWritable(target) {
+	if (frozenSkeleton2DSet.has(target)) {
+		throw new System.Error("[Skeleton2D] 인스턴스를 지은 자료는 고칠 수 없다. (자료는 인스턴스들이 나눠 쓰는 처음 자세다)");
+	}
+}
+
 // 베지어 곡선에서 시간 x 로 매개변수 t 를 찾는 반 가르기 횟수. (2^-20 이면 t 의 오차가 백만분의 일쯤)
 const BEZIER_BISECTION_COUNT = 20;
 
@@ -599,6 +631,7 @@ export class Skeleton2DTimeline extends Object {
 	 * @param { number[] | null } curveValues 베지어 제어점 [x1, y1, x2, y2]. (x 는 0 ~ 1 로 자른다, 베지어가 아니면 null)
 	 */
 	addValueFrame(time, values, curveType = Skeleton2DCurveType.linear, curveValues = null) {
+		checkSkeleton2DWritable(this);
 		const valueStride = this.getValueStride();
 		this.#frameTimes.push(time);
 		for (let valueIndex = 0; valueIndex < valueStride; ++valueIndex) {
@@ -621,6 +654,7 @@ export class Skeleton2DTimeline extends Object {
 	 * @param { string | null } attachmentName 그 시각부터 보일 붙임 이름. (null 이면 숨긴다)
 	 */
 	addAttachmentFrame(time, attachmentName) {
+		checkSkeleton2DWritable(this);
 		this.#frameTimes.push(time);
 		this.#attachmentNames.push(attachmentName);
 	}
@@ -633,6 +667,7 @@ export class Skeleton2DTimeline extends Object {
 	 * @param { number[] | null } drawOrder 그리는 차례의 슬롯 번호 모두. (null 이면 처음 차례)
 	 */
 	addDrawOrderFrame(time, drawOrder) {
+		checkSkeleton2DWritable(this);
 		this.#frameTimes.push(time);
 		this.#drawOrders.push(drawOrder);
 	}
@@ -644,6 +679,7 @@ export class Skeleton2DTimeline extends Object {
 	 * @param { Skeleton2DEvent } event 사건. (시각은 사건이 든다, 앞 사건보다 늦거나 같아야 한다)
 	 */
 	addEventFrame(event) {
+		checkSkeleton2DWritable(this);
 		const time = event.getTime();
 		this.#frameTimes.push(time);
 		this.#events.push(event);
@@ -945,6 +981,7 @@ export class Skeleton2DAnimation extends Object {
 	 * @param { number } duration 길이. (초)
 	 */
 	setDuration(duration) {
+		checkSkeleton2DWritable(this);
 		this.#duration = duration;
 	}
 
@@ -955,6 +992,7 @@ export class Skeleton2DAnimation extends Object {
 	 * @param { Skeleton2DTimeline } timeline 더할 시간줄.
 	 */
 	addTimeline(timeline) {
+		checkSkeleton2DWritable(this);
 		this.#timelines.push(timeline);
 	}
 

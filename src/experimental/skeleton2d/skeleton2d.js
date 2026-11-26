@@ -5,6 +5,7 @@
 // - IK 는 지역 값을 바꾸지 않고 '걸린 회전'(getAppliedRotation)만 바꾼다. 다음 셈은 다시 지역 값에서 시작해 쌓이지 않는다.
 // - 뼈 하나 IK 는 뼈 x 축이 목표를 보게 돌린다. 뼈 둘 IK 는 코사인 법칙으로 부모를 돌려 팔꿈치를 놓고 자식이 목표를 보게 돌린다.
 //   닿지 않으면 곧게 편다. 세기(mix)로 원래 회전과 섞는다. 할아버지 뼈가 뒤집혀 있으면(행렬식 음수) 꺾임 쪽을 뒤집는다. (DragonBones 와 같다)
+// - 자료(Skeleton2DData)는 인스턴스들이 나눠 쓰는 처음 자세라, 인스턴스를 지을 때 얼린다. 뒤로 자료의 세터와 더하기는 던진다. (러스트 판은 Rc 로 나눠 들어 &mut 가 막힌다)
 //==============================================================================
 
 /**
@@ -36,7 +37,7 @@ import { Object } from "../../base/object.js";
 import { Color } from "../../base/color.js";
 import { Vector2 } from "../../base/vector2.js";
 import { Skeleton2DAttachmentType } from "./skeleton2ddata.js";
-import { SKELETON2D_BONE_VALUE_COUNT } from "./skeleton2danimation.js";
+import { SKELETON2D_BONE_VALUE_COUNT, freezeSkeleton2DObject } from "./skeleton2danimation.js";
 
 
 //==============================================================================
@@ -50,6 +51,50 @@ const RADIAN_TO_DEGREE = 180 / System.Math.PI;
 
 // IK 가 길이 0 으로 보는 값.
 const IK_EPSILON = 0.00001;
+
+
+//==============================================================================
+// 뼈대 자료를 통째로 얼린다. (인스턴스를 지은 뒤 자료의 세터와 더하기가 던지고, 게터가 내준 목록도 바꿀 수 없다)
+// - 자료는 인스턴스들이 나눠 쓰는 처음 자세다. 인스턴스마다 바꿀 것은 인스턴스(뼈의 지역 값, 슬롯 색과 붙임)에서 바꾼다.
+// - 러스트 판은 Rc<Skeleton2DData> 로 나눠 들어 인스턴스가 있는 동안 자료를 고칠 수 없다. 두 엔진이 같은 규칙이다.
+//==============================================================================
+/**
+ * @param { object } skeletonData 뼈대 자료. (Skeleton2DData)
+ */
+function freezeSkeleton2DData(skeletonData) {
+	freezeSkeleton2DObject(skeletonData);
+	for (const boneData of System.Object.freeze(skeletonData.getBones())) {
+		freezeSkeleton2DObject(boneData);
+	}
+	for (const slotData of System.Object.freeze(skeletonData.getSlots())) {
+		freezeSkeleton2DObject(slotData);
+	}
+	for (const ikConstraintData of System.Object.freeze(skeletonData.getIkConstraints())) {
+		freezeSkeleton2DObject(ikConstraintData);
+		System.Object.freeze(ikConstraintData.getBoneIndices());
+	}
+	for (const skin of System.Object.freeze(skeletonData.getSkins())) {
+		freezeSkeleton2DObject(skin);
+		for (const attachment of skin.getAttachmentList()) {
+			freezeSkeleton2DObject(attachment);
+			System.Object.freeze(attachment.getUvs());
+			System.Object.freeze(attachment.getTriangles());
+			if (attachment.getAttachmentType() === Skeleton2DAttachmentType.mesh) {
+				System.Object.freeze(attachment.getVertices());
+				System.Object.freeze(attachment.getInfluenceCounts());
+				System.Object.freeze(attachment.getInfluenceBoneIndices());
+				System.Object.freeze(attachment.getInfluenceValues());
+			}
+		}
+	}
+	for (const animation of System.Object.freeze(skeletonData.getAnimations())) {
+		freezeSkeleton2DObject(animation);
+		for (const timeline of System.Object.freeze(animation.getTimelines())) {
+			freezeSkeleton2DObject(timeline);
+			System.Object.freeze(timeline.getEvents());
+		}
+	}
+}
 
 
 //==============================================================================
@@ -756,6 +801,7 @@ export class Skeleton2D extends Object {
 	 */
 	constructor(skeletonData) {
 		super();
+		freezeSkeleton2DData(skeletonData);
 		this.#data = skeletonData;
 		this.#bones = [];
 		const boneDataList = skeletonData.getBones();
