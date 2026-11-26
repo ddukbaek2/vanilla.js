@@ -518,6 +518,7 @@ export class Skeleton2DAnimationState extends Object {
 	// 한 항목이 지난 시각의 사건 모으기. (되풀이하면 접힌 구간마다)
 	//==============================================================================
 	/**
+	 * @private
 	 * @param { number } trackIndex 트랙 번호.
 	 * @param { Skeleton2DTrackEntry } trackEntry 항목.
 	 */

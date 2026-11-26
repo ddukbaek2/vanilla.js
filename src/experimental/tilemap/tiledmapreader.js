@@ -52,6 +52,12 @@ const BLEND_MODE_NAME_TABLE = {
 	normal: "source-over",
 	add: "lighter",
 };
+// 엔진 Graphic 이 아는 섞기 이름. (모르는 이름은 source-over 로 담는다, 러스트 판 BlendMode::from_name 과 같은 목록)
+const KNOWN_BLEND_MODE_NAME_SET = new System.Set(["source-over", "source-in", "source-out", "source-atop", "destination-over", "destination-in", "destination-out", "destination-atop", "lighter", "copy", "xor", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference", "exclusion", "hue", "saturation", "color", "luminosity"]);
+// 층 자료의 타일 값 읽기. (0 ~ 2^32 - 1 의 정수만, 아니면 0. 러스트 판과 같은 규칙)
+function readTileValue(value) {
+	return typeof value === "number" && System.Number.isInteger(value) && value >= 0 && value <= 0xFFFFFFFF ? value : 0;
+}
 
 
 //==============================================================================
@@ -300,7 +306,7 @@ export class TiledMapReader {
 						layer.setOffset(Vector2.create(offsetX, offsetY));
 						const modeName = TiledMapReader.readString(layerEntry, "mode", "normal");
 						const blendMode = BLEND_MODE_NAME_TABLE[modeName] !== undefined ? BLEND_MODE_NAME_TABLE[modeName] : modeName;
-						layer.setBlendMode(blendMode);
+						layer.setBlendMode(KNOWN_BLEND_MODE_NAME_SET.has(blendMode) ? blendMode : "source-over");
 						for (const [propertyName, propertyValue] of properties) {
 							layer.setProperty(propertyName, propertyValue);
 						}
@@ -513,7 +519,7 @@ export class TiledMapReader {
 		if (System.Array.isArray(data)) {
 			const copyCount = System.Math.min(data.length, tileList.length);
 			for (let tileIndex = 0; tileIndex < copyCount; ++tileIndex) {
-				tileList[tileIndex] = data[tileIndex] >>> 0;
+				tileList[tileIndex] = readTileValue(data[tileIndex]);
 			}
 			return tileList;
 		}
@@ -533,8 +539,7 @@ export class TiledMapReader {
 		const valueTextList = data.split(",");
 		const copyCount = System.Math.min(valueTextList.length, tileList.length);
 		for (let tileIndex = 0; tileIndex < copyCount; ++tileIndex) {
-			const value = System.Number(valueTextList[tileIndex].trim());
-			tileList[tileIndex] = System.Number.isFinite(value) ? value >>> 0 : 0;
+			tileList[tileIndex] = readTileValue(System.Number(valueTextList[tileIndex]));
 		}
 		return tileList;
 	}
@@ -544,11 +549,17 @@ export class TiledMapReader {
 	//==============================================================================
 	/**
 	 * @param { string } text base64 글.
-	 * @returns { Uint8Array } 바이트. (틀린 글자가 있으면 던진다)
+	 * @returns { Uint8Array } 바이트. (틀린 글자가 있으면 "TiledMapReader: invalid base64" 를 던진다, 러스트 판과 같은 글)
 	 */
 	static decodeBase64(text) {
 		const compactText = text.replace(/\s+/g, "");
-		const binaryText = System.atob(compactText);
+		let binaryText;
+		try {
+			binaryText = System.atob(compactText);
+		}
+		catch (error) {
+			throw new Error("TiledMapReader: invalid base64");
+		}
 		const bytes = new System.Uint8Array(binaryText.length);
 		for (let byteIndex = 0; byteIndex < binaryText.length; ++byteIndex) {
 			bytes[byteIndex] = binaryText.charCodeAt(byteIndex);
@@ -562,7 +573,7 @@ export class TiledMapReader {
 	/**
 	 * @param { Uint8Array } bytes 압축된 바이트.
 	 * @param { string } compression "", "zlib", "gzip". ("zstd" 와 그 밖은 범위 밖이라 던진다)
-	 * @returns { Promise<Uint8Array> } 푼 바이트. (압축이 없으면 그대로)
+	 * @returns { Promise<Uint8Array> } 푼 바이트. (압축이 없으면 그대로, 풀지 못하면 "TiledMapReader: cannot decompress zlib" 같은 글을 던진다, 러스트 판과 같은 글)
 	 */
 	static async decompress(bytes, compression) {
 		if (compression === "" || compression === undefined || compression === null) {
@@ -578,13 +589,18 @@ export class TiledMapReader {
 		else {
 			throw new Error("TiledMapReader: unsupported compression " + compression);
 		}
-		const decompressionStream = new System.DecompressionStream(streamFormat);
-		const blob = new System.Blob([bytes]);
-		const blobStream = blob.stream();
-		const decompressedStream = blobStream.pipeThrough(decompressionStream);
-		const response = new System.Response(decompressedStream);
-		const arrayBuffer = await response.arrayBuffer();
-		return new System.Uint8Array(arrayBuffer);
+		try {
+			const decompressionStream = new System.DecompressionStream(streamFormat);
+			const blob = new System.Blob([bytes]);
+			const blobStream = blob.stream();
+			const decompressedStream = blobStream.pipeThrough(decompressionStream);
+			const response = new System.Response(decompressedStream);
+			const arrayBuffer = await response.arrayBuffer();
+			return new System.Uint8Array(arrayBuffer);
+		}
+		catch (error) {
+			throw new Error("TiledMapReader: cannot decompress " + compression);
+		}
 	}
 
 	//==============================================================================

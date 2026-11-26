@@ -1085,6 +1085,9 @@ export class ScreenEffect extends Object {
 		for (let stepIndex = 0; stepIndex < stepList.length; ++stepIndex) {
 			const step = stepList[stepIndex];
 			const pass = this.resolvePass(step.passName);
+			if (pass === null) {
+				continue;
+			}
 
 			// 대상 바인드.
 			let targetTexture = null;
@@ -1200,19 +1203,27 @@ export class ScreenEffect extends Object {
 	}
 
 	//==============================================================================
-	// 패스 반환. (없으면 컴파일)
+	// 패스 반환. (없으면 컴파일. 실패도 담아 두고 한 번만 알린다, 실패한 패스의 단계는 건너뛴다)
 	//==============================================================================
 	/**
 	 * @param { string } passName 패스 이름. (효과 이름이나 copy, bloomBright 같은 내부 단계 이름)
-	 * @returns { FullscreenPass } 패스.
+	 * @returns { FullscreenPass | null } 패스. (셰이더 짓기에 실패했으면 null)
 	 */
 	resolvePass(passName) {
-		let pass = this.#passTable.get(passName);
-		if (!pass) {
-			const fragmentShaderSource = FRAGMENTSHADER_HEADER + EFFECT_BODY_TABLE[passName] + FRAGMENTSHADER_FOOTER;
-			pass = new FullscreenPass(this.#webGL2RenderingContext, fragmentShaderSource);
-			this.#passTable.set(passName, pass);
+		if (this.#passTable.has(passName)) {
+			return this.#passTable.get(passName);
 		}
+		const effectBody = EFFECT_BODY_TABLE[passName] !== undefined ? EFFECT_BODY_TABLE[passName] : "";
+		const fragmentShaderSource = FRAGMENTSHADER_HEADER + effectBody + FRAGMENTSHADER_FOOTER;
+		let pass = null;
+		try {
+			pass = new FullscreenPass(this.#webGL2RenderingContext, fragmentShaderSource);
+		}
+		catch (error) {
+			console.error(`ScreenEffect: pass "${passName}" failed: ${error && error.message !== undefined ? error.message : error}`);
+			pass = null;
+		}
+		this.#passTable.set(passName, pass);
 		return pass;
 	}
 
@@ -1432,6 +1443,9 @@ export class ScreenEffect extends Object {
 	destroy() {
 		const webGL2RenderingContext = this.#webGL2RenderingContext;
 		for (const pass of this.#passTable.values()) {
+			if (pass === null) {
+				continue;
+			}
 			webGL2RenderingContext.deleteProgram(pass.getShaderProgram().getProgram());
 			webGL2RenderingContext.deleteVertexArray(pass.getVertexArray());
 		}

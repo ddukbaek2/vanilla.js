@@ -11,7 +11,7 @@ import { Color } from "../../base/color.js";
 //==============================================================================
 // 전역 상수 목록.
 //==============================================================================
-const DEFAULT_CHUNK_SIZE = 16; // 덩이 한 변의 칸 수. (16 x 16 칸이면 쿼드 256 개, 꼭짓점 1536 개로 Graphic 한 번에 그릴 수 있다)
+export const DEFAULT_CHUNK_SIZE = 16; // 덩이 한 변의 칸 수. (러스트 판 DEFAULT_CHUNK_SIZE 와 같이 공개) (16 x 16 칸이면 쿼드 256 개, 꼭짓점 1536 개로 Graphic 한 번에 그릴 수 있다)
 
 
 //==============================================================================
@@ -64,7 +64,9 @@ export class TilemapLayer extends Object {
 		this.#offset = Vector2.zero();
 		this.#blendMode = "source-over";
 		this.#properties = new System.Map();
-		this.#chunkSize = System.Math.max(1, System.Math.floor(chunkSize));
+		// 1 보다 작거나 수가 아니면 1. (러스트 판 i32 의 max(1) 과 같다)
+		const flooredChunkSize = System.Math.floor(chunkSize);
+		this.#chunkSize = System.Number.isFinite(flooredChunkSize) ? System.Math.max(1, flooredChunkSize) : 1;
 		this.#chunkTable = new System.Map();
 		this.#sortedChunkList = null;
 	}
@@ -146,7 +148,8 @@ export class TilemapLayer extends Object {
 	 * @returns { Color } 색. (처음은 흰색)
 	 */
 	getColor() {
-		return this.#color;
+		// 사본. (고치려면 setColor, 러스트 판과 같다)
+		return new Color(this.#color.red, this.#color.green, this.#color.blue, this.#color.alpha);
 	}
 
 	//==============================================================================
@@ -166,7 +169,8 @@ export class TilemapLayer extends Object {
 	 * @returns { Vector2 } 오프셋. (픽셀, 처음은 0, 0)
 	 */
 	getOffset() {
-		return this.#offset;
+		// 사본. (고치려면 setOffset, 러스트 판과 같다)
+		return Vector2.create(this.#offset.x, this.#offset.y);
 	}
 
 	//==============================================================================

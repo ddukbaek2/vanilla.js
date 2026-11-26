@@ -902,6 +902,17 @@ export class Skeleton2D extends Object {
 	}
 
 	//==============================================================================
+	// IK 제약 번호 찾기. (없으면 -1, 러스트 판 find_ik_constraint_index 와 apply_ik_constraint(번호) 자리)
+	//==============================================================================
+	/**
+	 * @param { string } ikConstraintName 제약 이름.
+	 * @returns { number } 제약 번호. (없으면 -1)
+	 */
+	findIkConstraintIndex(ikConstraintName) {
+		return this.#ikConstraints.findIndex((ikConstraint) => ikConstraint.getName() === ikConstraintName);
+	}
+
+	//==============================================================================
 	// 스킨 고르기. (없는 이름이면 false, 고른 스킨에 없는 붙임은 처음 스킨에서 찾는다)
 	//==============================================================================
 	/**

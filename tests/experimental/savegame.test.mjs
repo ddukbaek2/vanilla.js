@@ -82,6 +82,32 @@ const ORIGINAL_RECORD_TEXT = "VSAVE1 08bf5351\n{\"format\":\"vanilla-save\",\"fo
 }
 
 //==============================================================================
+// 수 글꼴(String(number)), 객체 칸 차례, 음수 시각, 머리 검사가 러스트 판과 같다. (NUMBER_RECORD_TEXT 는 두 저장소의 시험에 같이 있다)
+//==============================================================================
+const NUMBER_RECORD_TEXT = "VSAVE1 7e16634d\n{\"format\":\"vanilla-save\",\"formatVersion\":1,\"slotId\":\"slot1\",\"sequence\":1,\"name\":\"수\",\"savedTime\":0,\"version\":2,\"previewImage\":\"\",\"byteSize\":144,\"metadata\":{\"2\":3,\"10\":2,\"b\":1}}\n{\"7\":\"seven\",\"whole\":1,\"negativeZero\":0,\"large\":1e+21,\"small\":1.5e-7,\"big\":123456789012345680000,\"01\":\"zero one\",\"fraction\":0.30000000000000004}";
+function replaceRecordHeader(recordText, fromText, toText) {
+	const content = recordText.slice(recordText.indexOf("\n") + 1).replace(fromText, toText);
+	return "VSAVE1 " + calculateCrc32(content).toString(16).padStart(8, "0") + "\n" + content;
+}
+{
+	const storage = new SharedStorage();
+	const saveGameManager = new SaveGameManager("numbers", 2);
+	saveGameManager.setStorage(storage);
+	saveGameManager.setTimeProvider(() => -5.5);
+	const result = saveGameManager.save("slot1", { whole: 1.0, negativeZero: -0, large: 1e21, small: 1.5e-7, big: 123456789012345678901, "7": "seven", "01": "zero one", fraction: 0.1 + 0.2 }, createOptions("수", "", { "b": 1.0, "10": 2, "2": 3 }));
+	check(result.isSuccess && result.info.savedTime === 0, "음수 시각은 0");
+	check(storage.readText("numbers.slot.slot1.0") === NUMBER_RECORD_TEXT, "러스트 판과 같은 수 글꼴");
+	check(saveGameManager.load("slot1").data.large === 1e21, "수 기록 읽기");
+	const fractionTime = replaceRecordHeader(NUMBER_RECORD_TEXT, "\"savedTime\":0", "\"savedTime\":1.5");
+	storage.storage.writeText("numbers.slot.fraction.0", fractionTime.replace("\"slotId\":\"slot1\"", "\"slotId\":\"fraction\""));
+	check(saveGameManager.load("fraction").error === SaveGameError.Corrupted, "소수 시각 거절");
+	const bigVersion = replaceRecordHeader(replaceRecordHeader(NUMBER_RECORD_TEXT, "\"version\":2", "\"version\":4294967296"), "\"sequence\":1", "\"sequence\":2");
+	storage.storage.writeText("numbers.slot.slot1.1", bigVersion);
+	check(saveGameManager.load("slot1").info.sequence === 1, "u32 밖 판 거절");
+	check(saveGameManager.save("slot5", { value: NaN, list: [Infinity] }).isSuccess && storage.readText("numbers.slot.slot5.0").endsWith("{\"value\":null,\"list\":[null]}"), "NaN, Infinity 는 null");
+}
+
+//==============================================================================
 // 칸 쓰기와 읽기, 두 키 번갈아 쓰기, 목록 차례, 지우기.
 //==============================================================================
 {

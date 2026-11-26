@@ -9,7 +9,7 @@ import { Color } from "../../base/color.js";
 import { TransformMatrix } from "../../base/transformmatrix.js";
 import { Component } from "../../core/component.js";
 import { Tileset, TileRenderSize, TileFillMode, TileCollisionShape } from "./tileset.js";
-import { TilemapLayer } from "./tilemaplayer.js";
+import { TilemapLayer, DEFAULT_CHUNK_SIZE } from "./tilemaplayer.js";
 
 
 //==============================================================================
@@ -860,7 +860,7 @@ export class Tilemap extends Component {
 	 * @returns { number } 정한 첫 gid.
 	 */
 	addTileset(tileset, firstGid = 0) {
-		const tilesets = this.getTilesets();
+		const tilesets = this.#tilesets;
 		const tilesetFirstGids = this.#tilesetFirstGids;
 		let resolvedFirstGid = firstGid;
 		if (resolvedFirstGid <= 0) {
@@ -893,7 +893,8 @@ export class Tilemap extends Component {
 	 * @returns { Tileset[] } 타일셋. (첫 gid 차례)
 	 */
 	getTilesets() {
-		return this.#tilesets;
+		// 얼린 사본. (안쪽 배열을 밖에서 고쳐 첫 gid 표와 어긋나지 않게, 러스트 판의 &[Tileset] 자리)
+		return System.Object.freeze([...this.#tilesets]);
 	}
 
 	//==============================================================================
@@ -904,7 +905,7 @@ export class Tilemap extends Component {
 	 * @returns { Tileset | null } 타일셋. (없으면 null)
 	 */
 	getTileset(tilesetIndex) {
-		const tilesets = this.getTilesets();
+		const tilesets = this.#tilesets;
 		if (tilesetIndex < 0 || tilesetIndex >= tilesets.length) {
 			return null;
 		}
@@ -955,7 +956,7 @@ export class Tilemap extends Component {
 	 * @returns { number } 층 번호.
 	 */
 	addLayer(layer) {
-		const layers = this.getLayers();
+		const layers = this.#layers;
 		layers.push(layer);
 		return layers.length - 1;
 	}
@@ -969,7 +970,7 @@ export class Tilemap extends Component {
 	 * @returns { number } 끼운 층 번호.
 	 */
 	insertLayer(layerIndex, layer) {
-		const layers = this.getLayers();
+		const layers = this.#layers;
 		const insertIndex = System.Math.max(0, System.Math.min(layers.length, layerIndex));
 		layers.splice(insertIndex, 0, layer);
 		return insertIndex;
@@ -980,10 +981,10 @@ export class Tilemap extends Component {
 	//==============================================================================
 	/**
 	 * @param { string } name 이름.
-	 * @param { number } chunkSize 덩이 한 변의 칸 수. (기본 16)
+	 * @param { number } [chunkSize] 덩이 한 변의 칸 수. (기본 DEFAULT_CHUNK_SIZE 16, 러스트 판은 create_layer_with_chunk_size)
 	 * @returns { TilemapLayer } 새 층.
 	 */
-	createLayer(name, chunkSize = 16) {
+	createLayer(name, chunkSize = DEFAULT_CHUNK_SIZE) {
 		const layer = new TilemapLayer(name, chunkSize);
 		this.addLayer(layer);
 		return layer;
@@ -996,7 +997,7 @@ export class Tilemap extends Component {
 	 * @param { number } layerIndex 층 번호. (없으면 아무것도 하지 않는다)
 	 */
 	removeLayer(layerIndex) {
-		const layers = this.getLayers();
+		const layers = this.#layers;
 		if (layerIndex < 0 || layerIndex >= layers.length) {
 			return;
 		}
@@ -1010,7 +1011,8 @@ export class Tilemap extends Component {
 	 * @returns { TilemapLayer[] } 층. (그리는 차례)
 	 */
 	getLayers() {
-		return this.#layers;
+		// 얼린 사본. (넣고 빼기는 addLayer, insertLayer, removeLayer 로, 러스트 판의 &[TilemapLayer] 자리)
+		return System.Object.freeze([...this.#layers]);
 	}
 
 	//==============================================================================
@@ -1020,7 +1022,7 @@ export class Tilemap extends Component {
 	 * @returns { number } 층 수.
 	 */
 	getLayerCount() {
-		const layers = this.getLayers();
+		const layers = this.#layers;
 		return layers.length;
 	}
 
@@ -1032,7 +1034,7 @@ export class Tilemap extends Component {
 	 * @returns { TilemapLayer | null } 층. (없으면 null)
 	 */
 	getLayer(layerIndex) {
-		const layers = this.getLayers();
+		const layers = this.#layers;
 		if (layerIndex < 0 || layerIndex >= layers.length) {
 			return null;
 		}
@@ -1047,7 +1049,7 @@ export class Tilemap extends Component {
 	 * @returns { number } 처음 맞는 층 번호. (없으면 -1)
 	 */
 	findLayerIndex(name) {
-		const layers = this.getLayers();
+		const layers = this.#layers;
 		for (let layerIndex = 0; layerIndex < layers.length; ++layerIndex) {
 			const layerName = layers[layerIndex].getName();
 			if (layerName === name) {
@@ -1359,10 +1361,11 @@ export class Tilemap extends Component {
 			sourceHeight = imageRect.height;
 		}
 		else {
-			const tilesetImage = tileset.getImage();
+			// 타일에 따로 건 그림이 없을 때만 격자 한 칸. (readTileImageRect, 러스트 판 has_own_tile_image 와 같은 기준, 타일셋과 같은 그림을 걸어도 그 그림 전체)
+			const tileData = tileset.findTileData(tileId);
 			const tileImage = tileset.getTileImage(tileId);
 			const columns = tileset.getColumns();
-			if (tileImage === tilesetImage && columns > 0) {
+			if ((tileData === null || tileData.image === null) && columns > 0) {
 				const tileWidth = tileset.getTileWidth();
 				const tileHeight = tileset.getTileHeight();
 				const margin = tileset.getMargin();
@@ -1559,8 +1562,8 @@ export class Tilemap extends Component {
 	draw(graphic) {
 		this.#lastDrawnChunkCount = 0;
 		this.#lastCulledChunkCount = 0;
-		const layers = this.getLayers();
-		const tilesets = this.getTilesets();
+		const layers = this.#layers;
+		const tilesets = this.#tilesets;
 		if (layers.length === 0 || tilesets.length === 0) {
 			return;
 		}

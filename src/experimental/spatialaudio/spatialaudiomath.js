@@ -174,11 +174,38 @@ function scale(vector, scaleValue) {
 }
 
 //==============================================================================
+// C fmin. (한쪽이 NaN 이면 다른 쪽, Math.min 과 달리 NaN 을 퍼뜨리지 않는다)
+//==============================================================================
+function fmin(left, right) {
+	if (System.Number.isNaN(left)) {
+		return right;
+	}
+	if (System.Number.isNaN(right)) {
+		return left;
+	}
+	return System.Math.min(left, right);
+}
+
+//==============================================================================
+// C fmax. (한쪽이 NaN 이면 다른 쪽)
+//==============================================================================
+function fmax(left, right) {
+	if (System.Number.isNaN(left)) {
+		return right;
+	}
+	if (System.Number.isNaN(right)) {
+		return left;
+	}
+	return System.Math.max(left, right);
+}
+
+//==============================================================================
 // 두 벡터 사이 각. (도, gfx AngleBetweenVectorsInDegrees, float 로 셈한다)
 //==============================================================================
 function angleBetweenVectorsInDegrees(base, other) {
 	const cosine = fround(fround(dot(base, other) / length(base)) / length(other));
-	const clampedCosine = System.Math.max(System.Math.min(cosine, 1), -1);
+	// 크롬은 C fmax(fmin(cosine, 1), -1) 이라 길이 0 의 NaN 은 1 이 되어 각이 0 이다. (같은 자리 원뿔 이득 1, 리스너 앞과 위가 나란하면 높이 90)
+	const clampedCosine = fmax(fmin(cosine, 1), -1);
 	return fround(fround(System.Math.acos(clampedCosine)) * RADIAN_TO_DEGREE_F32);
 }
 
