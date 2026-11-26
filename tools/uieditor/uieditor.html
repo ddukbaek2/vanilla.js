@@ -29255,13 +29255,14 @@ void main() {
       items.push({ key: "timeDelta", value: timeDeltaText, isSeparator: false, isSectionHeader: false });
       items.push({ key: "Memory (Chrome Only)", value: "", isSeparator: false, isSectionHeader: true });
       const performanceMemory = System48.window.performance ? System48.window.performance.memory : null;
-      if (performanceMemory) {
+      const isHeapRead = !!performanceMemory && typeof performanceMemory.usedJSHeapSize === "number" && typeof performanceMemory.totalJSHeapSize === "number";
+      if (isHeapRead) {
         const usedHeapMegabytes = (performanceMemory.usedJSHeapSize / (1024 * 1024)).toFixed(2);
         items.push({ key: "usedJSHeapSize", value: `${usedHeapMegabytes} MB`, isSeparator: false, isSectionHeader: false });
         const totalHeapMegabytes = (performanceMemory.totalJSHeapSize / (1024 * 1024)).toFixed(2);
         items.push({ key: "totalJSHeapSize", value: `${totalHeapMegabytes} MB`, isSeparator: false, isSectionHeader: false });
-        const heapLimitMegabytes = (performanceMemory.jsHeapSizeLimit / (1024 * 1024)).toFixed(2);
-        items.push({ key: "jsHeapSizeLimit", value: `${heapLimitMegabytes} MB`, isSeparator: false, isSectionHeader: false });
+        const heapLimitText = typeof performanceMemory.jsHeapSizeLimit === "number" ? `${(performanceMemory.jsHeapSizeLimit / (1024 * 1024)).toFixed(2)} MB` : "(N/A)";
+        items.push({ key: "jsHeapSizeLimit", value: heapLimitText, isSeparator: false, isSectionHeader: false });
       } else {
         items.push({ key: "usedJSHeapSize", value: "(N/A)", isSeparator: false, isSectionHeader: false });
         items.push({ key: "totalJSHeapSize", value: "(N/A)", isSeparator: false, isSectionHeader: false });

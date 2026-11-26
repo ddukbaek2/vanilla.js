@@ -52,6 +52,7 @@ export class GameScene extends Scene {
 	/** @private @type { number } */ #loadStartTime;
 	/** @private @type { number } */ #loadMinDurationMs;
 	/** @private @type { boolean } */ #loadTouchedToSkip;
+	/** @private @type { boolean } */ #isLoadStartTimePending;
 	/** @private @type { Color } */ #sceneBackgroundColor;
 	/** @private @type { string } */ #viewScaleMode;
 	/** @private @type { ((graphic: Graphic, viewSize: Vector2, progress: number, elapsedSeconds: number) => void) | null } */ #loadingDrawer;
@@ -86,6 +87,7 @@ export class GameScene extends Scene {
 		this.#loadStartTime = 0;
 		this.#loadMinDurationMs = 3000;
 		this.#loadTouchedToSkip = false;
+		this.#isLoadStartTimePending = false;
 		this.#sceneBackgroundColor = Color.black();
 		this.#viewScaleMode = ViewScaleMode.none;
 		this.#loadingDrawer = null;
@@ -357,8 +359,9 @@ export class GameScene extends Scene {
 	//==============================================================================
 	// 비동기 로드.
 	// - loadAssets() hook 호출 + 최소 노출 시간 보장.
-	// - 화면 터치 시 즉시 단축. drawOnLoad 단계에서는 씬의 touchPress 가
-	//   호출된다는 보장이 없어 window 이벤트로 직접 캡처한다.
+	// - 시간은 엔진 시계(TimeManager.getRealtimeSinceStartup)로 잰다. 엔진 시계가 아직 돌지 않았으면(첫 프레임 전, 0) 첫 로딩 화면 프레임의 시각부터 잰다.
+	// - 화면을 누르면 바로 단축한다. 누름은 엔진 입력(InputManager.isTouchPressed)으로 drawOnLoad 가 프레임마다 본다.
+	//   (러스트 판과 같은 시계, 같은 입력)
 	//==============================================================================
 	/**
 	 * @override
@@ -367,25 +370,17 @@ export class GameScene extends Scene {
 	async load(engine) {
 		await super.load(engine);
 
-		this.#loadStartTime = System.Date.now();
+		const timeManager = engine.getTimeManager();
+		this.#loadStartTime = timeManager.getRealtimeSinceStartup();
+		this.#isLoadStartTimePending = this.#loadStartTime <= 0;
 		this.#loadTouchedToSkip = false;
 
-		const skipHandler = () => {
-			this.#loadTouchedToSkip = true;
-		};
-		System.window.addEventListener("pointerdown", skipHandler, { once: true });
-
-		try {
-			await this.loadAssets();
-			if (this.#isLoadingProgressReported) {
-				this.#loadingProgress.setProgress(1);
-			}
-			while (System.Date.now() - this.#loadStartTime < this.#loadMinDurationMs && !this.#loadTouchedToSkip) {
-				await new Promise((resolve) => System.setTimeout(resolve, 50));
-			}
+		await this.loadAssets();
+		if (this.#isLoadingProgressReported) {
+			this.#loadingProgress.setProgress(1);
 		}
-		finally {
-			System.window.removeEventListener("pointerdown", skipHandler);
+		while (!this.#loadTouchedToSkip && (this.#isLoadStartTimePending || (timeManager.getRealtimeSinceStartup() - this.#loadStartTime) * 1000 < this.#loadMinDurationMs)) {
+			await new Promise((resolve) => System.setTimeout(resolve, 50));
 		}
 	}
 
@@ -425,13 +420,23 @@ export class GameScene extends Scene {
 		const canvasNativeSize = viewManager.getCanvasNativeSize();
 		const viewSize = viewManager.getViewSize();
 
-		// 진행률. (맡긴 애셋 함께 받기를 읽고, 보이는 정도를 따라가게 한다)
+		// 로딩 시각과 건너뛰기. (엔진 시계와 엔진 입력, 첫 프레임 전에 load 가 불렸으면 이 프레임부터 잰다)
 		const timeManager = engine.getTimeManager();
+		const currentTime = timeManager.getRealtimeSinceStartup();
+		if (this.#isLoadStartTimePending) {
+			this.#loadStartTime = currentTime;
+			this.#isLoadStartTimePending = false;
+		}
+		if (engine.getInputManager().isTouchPressed()) {
+			this.#loadTouchedToSkip = true;
+		}
+
+		// 진행률. (맡긴 애셋 함께 받기를 읽고, 보이는 정도를 따라가게 한다)
 		const unscaledTimeDelta = timeManager.getUnscaleDeltaTime();
 		this.updateTrackedAssetLoaderProgress();
 		const loadingProgress = this.#loadingProgress;
 		loadingProgress.update(unscaledTimeDelta);
-		const elapsed = System.Date.now() - this.#loadStartTime;
+		const elapsed = (currentTime - this.#loadStartTime) * 1000;
 		let progress = System.Math.min(1, System.Math.max(0, elapsed / this.#loadMinDurationMs));
 		if (this.#isLoadingProgressReported) {
 			progress = loadingProgress.getShownProgress();
