@@ -1,6 +1,7 @@
 # 업데이트 기록
 
 # 아직 release 에 합치지 않은 것 (release 에 합칠 때 패치 판을 하나 올려 매긴다)
+- 초안 세이브(Experimental SaveGameManager): 저장 시각을 내림해 유한한 0 이상이 아니면 0 으로 쓴다(음수나 NaN 시각으로 쓴 기록을 다시 못 읽던 것). 머리의 version 은 러스트 판처럼 0 ~ 4294967295 의 정수만 받는다. SaveGameError.InvalidData 는 러스트 판에도 생겼다(Serialize 실패). NaN, Infinity 는 두 엔진 모두 null 로 쓴다. 러스트 판이 기록 JSON 을 원본 JSON.stringify 와 글자까지 같게 쓰게 되어(1.0 은 1, -0 은 0, 1e21 은 1e+21, 칸 차례) 같은 자료면 기록 글, byteSize, CRC 가 같다. 그 수 글꼴 기록을 두 저장소 시험에 같이 둔다
 - FBX 재질 여럿: 메시 하나에 재질이 여럿인 FBX(LayerElementMaterial 의 Materials, MappingInformationType ByPolygon 이나 AllSame)를 폴리곤의 재질 번호대로 부분 메시로 나눠 재질마다 드로어블 하나로 그린다. (three.js FBXLoader 의 그룹, 유니티와 언리얼의 서브메시) 지금까지는 재질 번호를 폴리곤 순번이 아니라 폴리곤 정점 순번으로 찾았고, 메시마다 소유 노드의 첫 재질 하나로만 그려 Quaternius 마네킹(M_Main, M_Joints)이 온통 주황이었다. 새 정적 함수 SkinnedModel.splitFbxCornersByMaterial, FBX 메시 서술과 드로어블에 materialName(FBX Material 이름, glb 처럼), FbxLoader 재질에 name. 러스트 판과 같다. 문서 그림 ancient-mountain, 셰이더 해시를 바꾼 뒤의 shader-sprite, screen-effect 다시 찍음(1280 x 720, cwebp -q 85). 묶음과 UI 에디터 다시 지음.
   - 옮기는 법: FBX 모델의 drawableList 가 재질 수만큼 늘어난다. drawableList[0] 하나가 메시 전체라고 기대하던 코드는 materialName 이나 materialIndex 로 찾는다.
 - Engine.alert, confirm, prompt(와 alertAsync, confirmAsync, promptAsync), isModalDialogOpen: 러스트 판 Engine 과 같은 이름과 동작으로 브라우저 window.alert, confirm, prompt 를 부르고 ModalDialogHandle(isFinished, getResult, isConfirmed, getPromptText, setCallback)을 돌려준다. 브라우저 창이 닫힌 뒤 끝난 손잡이라 isModalDialogOpen 은 늘 거짓(러스트 웹 판과 같다). 새 모듈 src/core/modaldialog.js(ModalDialogKind, ModalDialogResult, ModalDialogHandle).

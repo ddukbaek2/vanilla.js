@@ -17,7 +17,7 @@ const SLOT_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 
 //==============================================================================
-// 세이브 실패 까닭. (러스트 판 SaveGameError 의 이름과 같다, InvalidData 는 JS 만)
+// 세이브 실패 까닭. (러스트 판 SaveGameError 의 이름과 같다)
 //==============================================================================
 export const SaveGameError = System.Object.freeze({
 	InvalidSlotId: "InvalidSlotId", // 칸 이름이 비었거나 쓸 수 없는 글자가 있다.
@@ -28,7 +28,7 @@ export const SaveGameError = System.Object.freeze({
 	MigrationFailed: "MigrationFailed", // 판 옮기는 함수가 실패했다. (detail: { fromVersion, message })
 	WriteFailed: "WriteFailed", // 저장소에 쓰지 못했다. (LocalStorage 는 이 페이지가 살아 있는 동안 메모리에 대신 둔다)
 	InvalidImport: "InvalidImport", // 들여올 글이 내보낸 꼴이 아니거나 깨졌다.
-	InvalidData: "InvalidData", // 자료를 JSON 으로 바꿀 수 없다. (undefined, 순환, BigInt, JS 만)
+	InvalidData: "InvalidData", // 자료를 JSON 으로 바꿀 수 없다. (순환, BigInt, 맨 위 undefined. 러스트는 Serialize 가 실패할 때) NaN, Infinity 는 두 엔진 모두 null 로 쓴다.
 });
 
 
@@ -181,7 +181,9 @@ function parseRecordText(recordText, expectedSlotId) {
 	}
 	const isText = (value) => typeof value === "string";
 	const isInteger = (value) => System.Number.isInteger(value) && value >= 0;
-	if (!isText(header.slotId) || !isText(header.name) || !isText(header.previewImage) || !isInteger(header.savedTime) || !isInteger(header.version) || !isInteger(header.byteSize) || !isInteger(header.sequence)) {
+	// 판은 러스트 판의 u32 안이어야 한다. (두 엔진이 같은 기록을 같게 받는다)
+	const isVersion = (value) => isInteger(value) && value <= 0xFFFFFFFF;
+	if (!isText(header.slotId) || !isText(header.name) || !isText(header.previewImage) || !isInteger(header.savedTime) || !isVersion(header.version) || !isInteger(header.byteSize) || !isInteger(header.sequence)) {
 		return null;
 	}
 	if (expectedSlotId !== null && header.slotId !== expectedSlotId) {
@@ -423,7 +425,9 @@ export class SaveGameManager {
 		const info = new SaveSlotInfo();
 		info.slotId = slotId;
 		info.name = typeof options.name === "string" ? options.name : "";
-		info.savedTime = System.Math.floor(this.#readTime());
+		// 저장 시각은 내림, 유한한 0 이상이 아니면 0. (읽을 때 0 이상 정수만 받는다, 러스트 판과 같다)
+		const savedTime = System.Math.floor(this.#readTime());
+		info.savedTime = System.Number.isFinite(savedTime) && savedTime > 0 ? savedTime : 0;
 		info.version = this.#currentVersion;
 		info.previewImage = typeof options.previewImage === "string" ? options.previewImage : "";
 		info.byteSize = textEncoder.encode(bodyText).length;
