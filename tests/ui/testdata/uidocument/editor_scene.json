@@ -1,0 +1,177 @@
+{
+	"version": 1,
+	"root": {
+		"type": "WorldNode",
+		"name": "sceneRoot",
+		"active": true,
+		"position": [
+			0,
+			0
+		],
+		"scale": [
+			1,
+			1
+		],
+		"rotation": 0,
+		"opacity": 1,
+		"pivot": [
+			0,
+			0
+		],
+		"anchor": [
+			0.5,
+			0.5
+		],
+		"contentSize": [
+			0,
+			0
+		],
+		"interactable": false,
+		"components": [],
+		"children": [
+			{
+				"type": "WorldNode",
+				"name": "Panel",
+				"active": true,
+				"position": [
+					640,
+					360
+				],
+				"scale": [
+					1,
+					1
+				],
+				"rotation": 0,
+				"opacity": 1,
+				"pivot": [
+					0.5,
+					0.5
+				],
+				"anchor": [
+					0.5,
+					0.5
+				],
+				"contentSize": [
+					520,
+					300
+				],
+				"interactable": false,
+				"components": [
+					{
+						"color": [
+							0.22,
+							0.4,
+							0.75,
+							1
+						],
+						"roundSize": 24,
+						"type": "Paint"
+					}
+				],
+				"children": [
+					{
+						"type": "WorldNode",
+						"name": "Title",
+						"active": true,
+						"position": [
+							260,
+							110
+						],
+						"scale": [
+							1,
+							1
+						],
+						"rotation": 0,
+						"opacity": 1,
+						"pivot": [
+							0.5,
+							0.5
+						],
+						"anchor": [
+							0.5,
+							0.5
+						],
+						"contentSize": [
+							440,
+							60
+						],
+						"interactable": false,
+						"components": [
+							{
+								"text": "vanilla.js",
+								"fontSize": 48,
+								"textColor": [
+									1,
+									1,
+									1,
+									1
+								],
+								"strokeColor": [
+									1,
+									1,
+									1,
+									1
+								],
+								"strokeWidth": 0,
+								"textAlign": "center",
+								"textBaseline": "middle",
+								"type": "Text"
+							}
+						],
+						"children": []
+					},
+					{
+						"type": "WorldNode",
+						"name": "emblem",
+						"active": true,
+						"position": [
+							260,
+							210
+						],
+						"scale": [
+							1.5,
+							1.5
+						],
+						"rotation": 15,
+						"opacity": 0.75,
+						"pivot": [
+							0.5,
+							0.5
+						],
+						"anchor": [
+							0,
+							1
+						],
+						"contentSize": [
+							96,
+							96
+						],
+						"interactable": false,
+						"components": [
+							{
+								"color": [
+									0,
+									0,
+									0,
+									0
+								],
+								"roundSize": 0,
+								"imagePath": "emblem.png",
+								"nineSlice": [
+									0,
+									0,
+									0,
+									0
+								],
+								"spriteDrawMode": "simple",
+								"spriteBlendMode": "source-over",
+								"type": "Sprite"
+							}
+						],
+						"children": []
+					}
+				]
+			}
+		]
+	}
+}
