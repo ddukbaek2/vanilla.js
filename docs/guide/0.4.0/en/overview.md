@@ -9,7 +9,7 @@ Load a single bundle as a module and scenes, nodes, input, UI, particles and aud
 
 ![Toon Shading example: a VRM character rendered with a 3 tone ramp, face shadows, hair highlights, outlines and bloom](../images/toon-shading.webp)
 
-- Zero runtime dependencies. Bundling the current source (2026-11-26 dev) with the commands below gives `vanilla.min.js` at about 765 KB, about 215 KB gzipped
+- Zero runtime dependencies. Bundling the current source (2026-11-26 dev) with the commands below gives `vanilla.min.js` at about 1011 KB, about 288 KB gzipped
 - WebGL2 renderer. Sprites, text, shapes and masks share the same output path, and batching and off-screen culling are on by default
 - Blend modes cover all 26 Canvas2D compositing modes. 13 of them, such as overlay, soft-light and hue, plus multiply when drawing to a render target, copy the area under the draw region and blend in a shader following the W3C Compositing and Blending formulas
 - A UI system with a node / component structure, resolution-aware views, constraint-based layout and window stacking

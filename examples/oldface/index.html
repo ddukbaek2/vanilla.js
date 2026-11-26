@@ -405,7 +405,8 @@
 	let engineModule = null;
 	try {
 		try {
-			engineModule = await import("./vanilla.js");
+			// 배포 스탬프를 주소에 붙여 브라우저가 옛 엔진을 캐시에서 꺼내 쓰지 않게 한다. (엔진을 다시 올릴 때 값을 바꾼다)
+			engineModule = await import("./vanilla.js?v=20261126a");
 		}
 		catch (importError) {
 			engineModule = await import("../../build/vanilla.js");
@@ -2369,6 +2370,8 @@
 		else {
 			updatePanelLimits(System.window.innerHeight - 18);
 		}
+		// 묶어 그리기로 쌓여 남은 HUD 를 이 프레임 안에 그린다. (엔진 루프 밖에서 Graphic 을 직접 쓰므로 엔진 대신 부른다)
+		uiGraphic.flushSpriteBatch();
 		webGL2RenderingContext.disable(webGL2RenderingContext.BLEND);
 		statistics.cpuFrameMilliseconds = statistics.cpuFrameMilliseconds * 0.9 + (System.performance.now() - cpuFrameStart) * 0.1;
 

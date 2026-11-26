@@ -9,7 +9,7 @@ vanilla.js 는 외부 라이브러리 없이 브라우저에서 바로 동작하
 
 ![Toon Shading 예제: VRM 캐릭터를 3 톤 램프, 얼굴 그림자, 머리카락 하이라이트, 바깥선, 블룸으로 그린 툰 렌더링](../images/toon-shading.webp)
 
-- 런타임 의존성 0. 아래 명령으로 지금 소스(2026-11-26 dev)를 묶으면 `vanilla.min.js` 약 765 KB, gzip 약 215 KB 입니다
+- 런타임 의존성 0. 아래 명령으로 지금 소스(2026-11-26 dev)를 묶으면 `vanilla.min.js` 약 1011 KB, gzip 약 288 KB 입니다
 - WebGL2 렌더러. 스프라이트, 텍스트, 도형, 마스크가 같은 출력 경로를 쓰고, 묶어 그리기와 화면 밖 거르기가 기본으로 켜져 있습니다
 - 블렌드 모드는 Canvas2D 합성 26 가지를 모두 그립니다. overlay, soft-light, hue 같은 13 가지와 렌더 타겟에 그리는 multiply 는 그릴 영역 아래를 떠 와 W3C Compositing and Blending 공식대로 셰이더로 섞습니다
 - 노드 / 컴포넌트 구조, 해상도 대응 뷰, 제약 기반 레이아웃, 창 쌓기를 갖춘 UI 시스템
