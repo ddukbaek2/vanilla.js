@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text Shaping</title>
+<link rel="icon" href="../assets/favicon.svg">
+<style>
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #151821; }
+#mainCanvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script type="module">
+"use strict";
+const System = globalThis;
+
+//==============================================================================
+// 글자 모양 짓기 예제. (오른쪽에서 왼쪽 글, 아랍어 글자 잇기, 기울임과 굵게, 낱말 줄바꿈, 글자 아틀라스, 러스트 예제 textshaping 과 같은 장면)
+// - 아랍어는 오른쪽에서 왼쪽 문단(setTextDirection("rtl"))으로, 섞인 글은 "auto" 로 그린다. 정렬 start 는 오른쪽에서 왼쪽 문단에서 오른쪽이다.
+// - 아랍어 글꼴은 브라우저가 시스템 글꼴에서 대신 고른다. (러스트 데스크탑은 시스템 아랍어 글꼴 파일을 FontAsset 으로 올린다)
+// - 기울임과 굵게는 글꼴에 기울인 얼굴, 굵은 얼굴이 없으면 브라우저가 가짜 기울임, 가짜 굵게로 그린다.
+// - 줄바꿈은 공백이 없는 한중일 글도 낱말 사이에서 나눈다. 표시 글자 수는 글자 묶음 단위다.
+// - DynamicFont 는 숫자를 아틀라스 한 장에 모아 그린다. (글이 바뀌어도 다시 굽지 않는다)
+// - 색 이모지는 브라우저가 그린 것을 제 색으로 굽는다. ❤️ (FE0F) 는 색, 맨 ❤ 는 글 글꼴로, 국기, 피부색, 이음 문자 가족, 키캡, 그림자 글, 기울임, 글자 아틀라스의 ⭐ 를 보인다.
+//==============================================================================
+import { Engine, EngineConfiguration, Scene, WorldNode, Component, Vector2, Rect, Pivot, Text, RichText, ShadowText, TextAlign, TextBaseline, DynamicFont } from "../../import.js";
+
+const VIEW_WIDTH = 1280;
+const VIEW_HEIGHT = 720;
+const BACKGROUND_COLOR = "#151821";
+const TEXT_COLOR = "#e8ebf2";
+const CAPTION_COLOR = "#9aa2b2";
+
+//==============================================================================
+// 상자 노드 만들기. (왼쪽 위 피봇, setRect)
+//==============================================================================
+function createBoxNode(parentNode, name, x, y, width, height) {
+	const node = new WorldNode();
+	node.setName(name);
+	parentNode.addChild(node);
+	node.setPivot(Pivot.topLeft);
+	node.setRect(x, y, width, height);
+	return node;
+}
+
+//==============================================================================
+// 글 붙이기. (글과 크기)
+//==============================================================================
+function addText(node, TextType, text, fontSize) {
+	const textComponent = node.addComponent(TextType);
+	textComponent.setText(text);
+	textComponent.setFontSize(fontSize);
+	return textComponent;
+}
+
+//==============================================================================
+// 그림자 글 붙이기. (글과 크기, 색)
+//==============================================================================
+function addShadowText(node, text, fontSize, textColor) {
+	const shadowText = node.addComponent(ShadowText);
+	shadowText.setText(text);
+	shadowText.setTextStyle(fontSize, false, textColor);
+	return shadowText;
+}
+
+//==============================================================================
+// 설명 글 노드 만들기.
+//==============================================================================
+function createCaptionNode(parentNode, x, y, text) {
+	const captionNode = createBoxNode(parentNode, "caption", x, y, 560, 24);
+	const captionText = addText(captionNode, Text, text, 16);
+	captionText.setTextColor(CAPTION_COLOR);
+	captionText.setTextAlign(TextAlign.left);
+}
+
+//==============================================================================
+// 글자 아틀라스로 숫자를 그리는 컴포넌트. (처음 그릴 때 아틀라스를 굽는다)
+//==============================================================================
+class DynamicFontCounter extends Component {
+	/** @private @type { DynamicFont } */ #dynamicFont;
+	/** @private @type { number } */ #elapsedSeconds = 0;
+
+	constructor() {
+		super();
+		this.#dynamicFont = new DynamicFont();
+		this.#dynamicFont.setFontSize(36);
+	}
+
+	tick(timeDelta) {
+		super.tick(timeDelta);
+		this.#elapsedSeconds += timeDelta;
+	}
+
+	draw(graphic) {
+		this.#dynamicFont.buildAtlas("0123456789:.\u{2B50}");
+		const counterText = "\u{2B50}" + (1234.5 + this.#elapsedSeconds).toFixed(2).padStart(8, "0");
+		graphic.setImageTintColor(null);
+		this.#dynamicFont.drawText(counterText, Vector2.create(0, 32), graphic);
+	}
+}
+
+//==============================================================================
+// 첫 씬.
+//==============================================================================
+class MainScene extends Scene {
+	//==============================================================================
+	// 초기화.
+	//==============================================================================
+	initialize(engine) {
+		super.initialize(engine);
+		const root = this.getRoot();
+		root.setContentSize(Vector2.create(VIEW_WIDTH, VIEW_HEIGHT));
+		const titleNode = createBoxNode(root, "title", 40, 24, 900, 50);
+		const titleText = addText(titleNode, Text, "글자 모양 짓기", 34);
+		titleText.setTextColor(TEXT_COLOR);
+		titleText.setTextAlign(TextAlign.left);
+
+		// 오른쪽에서 왼쪽 글. (상자 오른쪽에 붙는다)
+		createCaptionNode(root, 40, 84, "Text Rtl + Start, Auto, RichText Rtl");
+		const arabicLines = [["مرحبا بالعالم 123", "rtl"], ["Hello مرحبا world", "auto"], ["سلام عليكم 2024/11", "rtl"]];
+		for (let lineIndex = 0; lineIndex < arabicLines.length; lineIndex++) {
+			const [text, textDirection] = arabicLines[lineIndex];
+			const lineNode = createBoxNode(root, "arabic", 40, 114 + lineIndex * 46, 520, 40);
+			const lineText = addText(lineNode, Text, text, 30);
+			lineText.setTextColor(TEXT_COLOR);
+			lineText.setTextAlign(TextAlign.start);
+			lineText.setTextDirection(textDirection);
+		}
+		const richNode = createBoxNode(root, "richArabic", 40, 254, 520, 40);
+		const richText = addText(richNode, RichText, "<b>مرحبا</b> <color=#ffd166>بالعالم</color> <u>نص</u>", 30);
+		richText.setTextColor(TEXT_COLOR);
+		richText.setTextAlign(TextAlign.start);
+		richText.setTextDirection("rtl");
+
+		// 기울임과 굵게.
+		createCaptionNode(root, 40, 310, "italic, bold, ShadowText italic + underline + strikethrough");
+		const styleList = [["보통 Regular AVA", false, false], ["기울임 Italic AVA", false, true], ["굵게 Bold AVA", true, false]];
+		for (let styleIndex = 0; styleIndex < styleList.length; styleIndex++) {
+			const [text, isBold, isItalic] = styleList[styleIndex];
+			const styleNode = createBoxNode(root, "style", 40, 340 + styleIndex * 40, 520, 36);
+			const styleText = addText(styleNode, Text, text, 28);
+			styleText.setTextColor(TEXT_COLOR);
+			styleText.setTextAlign(TextAlign.left);
+			styleText.setBold(isBold);
+			styleText.setItalic(isItalic);
+		}
+		const shadowNode = createBoxNode(root, "shadow", 40, 466, 520, 40);
+		const shadowText = addShadowText(shadowNode, "그림자 글 Shadow", 28, TEXT_COLOR);
+		shadowText.setTextAlign(TextAlign.left);
+		shadowText.setItalic(true);
+		shadowText.setUnderline(true);
+		shadowText.setStrikethrough(true);
+		shadowText.setShadow("#000000", 1, 3, 2);
+
+		// 낱말 줄바꿈과 표시 글자 수.
+		createCaptionNode(root, 640, 84, "word wrap 260 (한중일 낱말 사이), visible 12 (글자 묶음)");
+		const wrapList = ["Vanilla엔진은 JavaScript와 Rust로 만든 게임engine입니다.", "我们今天去公园玩吧，天气非常好，大家都很开心。", "今日はいい天気ですね。明日も晴れるといいですね。"];
+		for (let wrapIndex = 0; wrapIndex < wrapList.length; wrapIndex++) {
+			const wrapNode = createBoxNode(root, "wrap", 640, 114 + wrapIndex * 110, 260, 100);
+			const wrapText = addText(wrapNode, Text, wrapList[wrapIndex], 22);
+			wrapText.setTextColor(TEXT_COLOR);
+			wrapText.setTextAlign(TextAlign.left);
+			wrapText.setTextBaseline(TextBaseline.top);
+			wrapText.setWordWrapWidth(260);
+		}
+		const visibleNode = createBoxNode(root, "visible", 940, 114, 300, 100);
+		const visibleText = addText(visibleNode, Text, "e\u{301}가나다라마바사아자차카타파하", 22);
+		visibleText.setTextColor("#ffd166");
+		visibleText.setTextAlign(TextAlign.left);
+		visibleText.setTextBaseline(TextBaseline.top);
+		visibleText.setWordWrapWidth(150);
+		visibleText.setVisibleCharacterCount(12);
+
+		// 색 이모지. (글 색은 흰색, 구운 색에 글 색이 곱해진다)
+		createCaptionNode(root, 40, 520, "color emoji: Text, ShadowText, italic");
+		const emojiNode = createBoxNode(root, "emoji", 40, 550, 560, 40);
+		const emojiText = addText(emojiNode, Text, "이모지 \u{1F600}\u{1F44D}\u{1F3FD} \u{2764}\u{FE0F}\u{2764} \u{1F1F0}\u{1F1F7} \u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467} 1\u{FE0F}\u{20E3}", 30);
+		emojiText.setTextColor("#ffffff");
+		emojiText.setTextAlign(TextAlign.left);
+		const emojiShadowNode = createBoxNode(root, "emojiShadow", 40, 600, 560, 40);
+		const emojiShadowText = addShadowText(emojiShadowNode, "그림자 \u{1F389}\u{1F680}\u{1F308}", 30, "#ffffff");
+		emojiShadowText.setTextAlign(TextAlign.left);
+		emojiShadowText.setShadow("#000000", 1, 3, 2);
+		const emojiItalicNode = createBoxNode(root, "emojiItalic", 40, 650, 560, 40);
+		const emojiItalicText = addText(emojiItalicNode, Text, "기울임 \u{1F600}\u{1F431}", 30);
+		emojiItalicText.setTextColor("#ffffff");
+		emojiItalicText.setTextAlign(TextAlign.left);
+		emojiItalicText.setItalic(true);
+
+		// 글자 아틀라스.
+		createCaptionNode(root, 640, 466, "DynamicFont (숫자와 \u{2B50} 아틀라스 한 장)");
+		const counterNode = createBoxNode(root, "counter", 640, 496, 400, 48);
+		counterNode.addComponent(DynamicFontCounter);
+	}
+
+	//==============================================================================
+	// 이전 출력. (글을 1:1 로 굽고 배경을 칠한다)
+	//==============================================================================
+	preDraw(graphic) {
+		graphic.setTextBakeScaleStep(0);
+		const viewManager = this.getEngine().getViewManager();
+		const canvasNativeSize = viewManager.getCanvasNativeSize();
+		viewManager.applyCanvasNativeRect(graphic);
+		graphic.setFillColor(BACKGROUND_COLOR);
+		graphic.drawRect(Rect.create(0, 0, canvasNativeSize.x, canvasNativeSize.y));
+		viewManager.applyViewRect(graphic);
+	}
+}
+
+//==============================================================================
+// 시작.
+//==============================================================================
+const engineConfiguration = new EngineConfiguration();
+engineConfiguration.title = "글자 모양 짓기 (바닐라엔진)";
+engineConfiguration.canvasId = "mainCanvas";
+engineConfiguration.referenceResolutionSize = Vector2.create(VIEW_WIDTH, VIEW_HEIGHT);
+engineConfiguration.autoResizeOnWindowResize = true;
+const engine = new Engine(engineConfiguration);
+engine.run(new MainScene());
+</script>
+</body>
+</html>
