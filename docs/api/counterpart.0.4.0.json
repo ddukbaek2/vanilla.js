@@ -147,6 +147,18 @@
 		},
 		{
 			"vanilla-engine": {
+				"module": "animation/action",
+				"class": "Action",
+				"name": "get_target"
+			},
+			"vanilla.js": {
+				"module": "animation/action",
+				"class": "Action",
+				"name": "getTarget"
+			}
+		},
+		{
+			"vanilla-engine": {
 				"module": "animation/animator",
 				"class": "AnimationState"
 			},
@@ -641,6 +653,18 @@
 				"module": "animation/animator",
 				"class": "Animator",
 				"name": "getTrigger"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "animation/animator",
+				"class": "Animator",
+				"name": "get_parameters"
+			},
+			"vanilla.js": {
+				"module": "animation/animator",
+				"class": "Animator",
+				"name": "getParameters"
 			}
 		},
 		{
@@ -3801,6 +3825,220 @@
 		},
 		{
 			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "a"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "a"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "b"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "b"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "c"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "c"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "d"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "d"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "e"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "e"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "f"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "f"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "set_identity"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "setIdentity"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "set_transform"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "setTransform"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "copy_from"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "copyFrom"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "translate"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "translate"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "rotate"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "rotate"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "scale"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "scale"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "multiply"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "multiply"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "invert"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "invert"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "transform_point"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "transformPoint"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "get_maximum_scale"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "getMaximumScale"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "write_to_float32_array"
+			},
+			"vanilla.js": {
+				"module": "base/transformmatrix",
+				"class": "TransformMatrix",
+				"name": "writeToFloat32Array"
+			}
+		},
+		{
+			"vanilla-engine": {
 				"module": "base/vector2",
 				"class": "Vector2"
 			},
@@ -4995,6 +5233,16 @@
 				"module": "core/asset",
 				"class": "Asset",
 				"name": "getAssetPath"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/asset",
+				"class": "AssetType"
+			},
+			"vanilla.js": {
+				"module": "core/asset",
+				"class": "AssetType"
 			}
 		},
 		{
@@ -6754,6 +7002,16 @@
 		{
 			"vanilla-engine": {
 				"module": "core/component/sprite",
+				"class": "SpriteBlendMode"
+			},
+			"vanilla.js": {
+				"module": "core/component/sprite",
+				"class": "SpriteBlendMode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/component/sprite",
 				"class": "Sprite"
 			},
 			"vanilla.js": {
@@ -7011,6 +7269,16 @@
 				"module": "core/component/paint",
 				"class": "Paint",
 				"name": "getRoundSize"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/component/sprite",
+				"class": "SpriteDrawMode"
+			},
+			"vanilla.js": {
+				"module": "core/component/sprite",
+				"class": "SpriteDrawMode"
 			}
 		},
 		{
@@ -8622,6 +8890,324 @@
 		{
 			"vanilla-engine": {
 				"module": "core/gamepadmanager",
+				"class": "GamepadAnalogStickCode"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadAnalogStickCode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadAnalogStickCode",
+				"name": "LEFT_X"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadAnalogStickCode",
+				"name": "LEFT_X"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadAnalogStickCode",
+				"name": "LEFT_Y"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadAnalogStickCode",
+				"name": "LEFT_Y"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadAnalogStickCode",
+				"name": "RIGHT_X"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadAnalogStickCode",
+				"name": "RIGHT_X"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadAnalogStickCode",
+				"name": "RIGHT_Y"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadAnalogStickCode",
+				"name": "RIGHT_Y"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadTriggerCode"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadTriggerCode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadTriggerCode",
+				"name": "L2"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadTriggerCode",
+				"name": "L2"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadTriggerCode",
+				"name": "R2"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadTriggerCode",
+				"name": "R2"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "A_CROSS"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "A_CROSS"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "B_CIRCLE"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "B_CIRCLE"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "X_SQUARE"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "X_SQUARE"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "Y_TRIANGLE"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "Y_TRIANGLE"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "L1"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "L1"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "R1"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "R1"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "L2"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "L2"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "R2"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "R2"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "SHARE_VIEW"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "SHARE_VIEW"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "OPTIONS_MENU"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "OPTIONS_MENU"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "L3"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "L3"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "R3"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "R3"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "DPAD_UP"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "DPAD_UP"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "DPAD_DOWN"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "DPAD_DOWN"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "DPAD_LEFT"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "DPAD_LEFT"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "DPAD_RIGHT"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "DPAD_RIGHT"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "HOME_PS"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "HOME_PS"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "TOUCHPAD"
+			},
+			"vanilla.js": {
+				"module": "core/gamepadmanager",
+				"class": "GamepadButtonCode",
+				"name": "TOUCHPAD"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/gamepadmanager",
 				"class": "GamepadManager"
 			},
 			"vanilla.js": {
@@ -10163,6 +10749,1168 @@
 			"vanilla.js": {
 				"module": "core/graphic",
 				"name": "detectTextDirection"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "A"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "a"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "B"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "b"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "C"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "c"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "D"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "d"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "E"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "e"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "F"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "f"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "G"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "g"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "H"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "h"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "I"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "i"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "J"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "j"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "K"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "k"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "L"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "l"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "M"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "m"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "N"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "n"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "O"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "o"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "P"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "p"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "Q"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "q"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "R"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "r"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "S"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "s"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "T"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "t"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "U"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "u"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "V"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "v"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "W"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "w"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "X"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "x"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "Y"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "y"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "Z"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "z"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "BACKSPACE"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "backspace"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "TAB"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "tab"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "ENTER"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "enter"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "SHIFT"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "shift"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "CTRL"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "ctrl"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "ALT"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "alt"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "CAPSLOCK"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "capslock"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "ESCAPE"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "escape"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "SPACE"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "space"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "PAGEUP"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "pageup"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "PAGEDOWN"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "pagedown"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "END"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "end"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "HOME"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "home"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "INSERT"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "insert"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "DELETE"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "delete"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "F1"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "f1"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "F2"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "f2"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "F3"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "f3"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "F4"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "f4"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "F5"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "f5"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "F6"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "f6"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "F7"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "f7"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "F8"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "f8"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "F9"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "f9"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "F10"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "f10"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "F11"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "f11"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "F12"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "f12"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "ARROWLEFT"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "arrowleft"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "ARROWUP"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "arrowup"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "ARROWRIGHT"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "arrowright"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "ARROWDOWN"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "arrowdown"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "SCROLLLOCK"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "scrolllock"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "SEMICOLON"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "semicolon"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "EQUAL"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "equal"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "COMMA"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "comma"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "MINUS"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "minus"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "PERIOD"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "period"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "SLASH"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "slash"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "BACKQUOTE"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "backquote"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "BRACKETLEFT"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "bracketleft"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "BACKSLASH"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "backslash"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "BRACKETRIGHT"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "bracketright"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "QUOTE"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "quote"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "META"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "meta"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "COMMAND"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "command"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "PAUSE"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "pause"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "AUDIOVOLUMEUP"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "audiovolumeup"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "AUDIOVOLUMEDOWN"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "audiovolumedown"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "AUDIOMUTE"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "audiomute"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "AUDIOPLAY"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "audioplay"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "AUDIOSTOP"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "audiostop"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "AUDIOPREV"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "audioprev"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "AUDIONEXT"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "audionext"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUM_LOCK"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numLock"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUMPAD_DIVIDE"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numpadDivide"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUMPAD_MULTIPLY"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numpadMultiply"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUMPAD_SUBTRACT"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numpadSubtract"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUMPAD_DECIMAL"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numpadDecimal"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUMPAD_ADD"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numpadAdd"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUMPAD_ENTER"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numpadEnter"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUMPAD0"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numpad0"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUMPAD1"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numpad1"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUMPAD2"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numpad2"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUMPAD3"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numpad3"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUMPAD4"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numpad4"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUMPAD5"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numpad5"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUMPAD6"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numpad6"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUMPAD7"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numpad7"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUMPAD8"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numpad8"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "NUMPAD9"
+			},
+			"vanilla.js": {
+				"module": "core/inputmanager",
+				"class": "KeyCode",
+				"name": "numpad9"
 			}
 		},
 		{
@@ -17275,6 +19023,16 @@
 		},
 		{
 			"vanilla-engine": {
+				"module": "graphics3d/skinnedmodel",
+				"name": "MORPH_TARGET_MAXIMUM"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/skinnedmodel",
+				"name": "MORPH_TARGET_MAXIMUM"
+			}
+		},
+		{
+			"vanilla-engine": {
 				"module": "graphics3d/skinnedmodelrenderer",
 				"class": "SkinnedModelRenderer"
 			},
@@ -21887,6 +23645,16 @@
 			"vanilla.js": {
 				"module": "graphics3d/humanskinrenderer",
 				"name": "SKIN_TEXTURE_UNIT_AUXILIARY"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "graphics3d/humanskinrenderer",
+				"name": "WRINKLE_CHANNEL_COUNT"
+			},
+			"vanilla.js": {
+				"module": "graphics3d/humanskinrenderer",
+				"name": "WRINKLE_CHANNEL_COUNT"
 			}
 		},
 		{
@@ -28899,6 +30667,16 @@
 		},
 		{
 			"vanilla-engine": {
+				"module": "ui/uibutton",
+				"class": "ButtonState"
+			},
+			"vanilla.js": {
+				"module": "ui/uibutton",
+				"class": "ButtonState"
+			}
+		},
+		{
+			"vanilla-engine": {
 				"module": "ui/uichart",
 				"class": "UILineChart"
 			},
@@ -31595,6 +33373,16 @@
 		},
 		{
 			"vanilla-engine": {
+				"module": "ui/uiprogressview",
+				"class": "ProgressDirection"
+			},
+			"vanilla.js": {
+				"module": "ui/uiprogressview",
+				"class": "ProgressDirection"
+			}
+		},
+		{
+			"vanilla-engine": {
 				"module": "ui/uiprogressring",
 				"class": "UIProgressRing"
 			},
@@ -32315,6 +34103,16 @@
 				"module": "ui/uiscrollview",
 				"class": "UIScrollView",
 				"name": "setWheelScrollScale"
+			}
+		},
+		{
+			"vanilla-engine": {
+				"module": "ui/uiscrollview",
+				"class": "ScrollMode"
+			},
+			"vanilla.js": {
+				"module": "ui/uiscrollview",
+				"class": "ScrollMode"
 			}
 		},
 		{

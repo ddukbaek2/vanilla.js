@@ -1679,25 +1679,6 @@
 						},
 						{
 							"kind": "method",
-							"name": "isDestroyed",
-							"signature": "isDestroyed()",
-							"params": [],
-							"returns": {
-								"type": "boolean",
-								"description": {
-									"ko": "파괴되었으면 참. (기반 오브젝트는 늘 false)",
-									"en": "True if destroyed. (always false for the base object)"
-								}
-							},
-							"description": {
-								"ko": "파괴 여부 반환.\n- destroy() 가 파괴 표시를 남기지 않으므로 늘 false 다.",
-								"en": "Returns whether destroyed.\n- Always false, since destroy() leaves no destroyed mark."
-							},
-							"since": "0.0.9",
-							"source": "src/base/object.js"
-						},
-						{
-							"kind": "method",
 							"name": "clone",
 							"signature": "clone()",
 							"params": [],
@@ -5521,6 +5502,568 @@
 								"module": "base/matrix4",
 								"class": "Matrix4",
 								"name": "create_inverse"
+							}
+						}
+					]
+				}
+			],
+			"functions": [],
+			"enums": []
+		},
+		{
+			"name": "base/transformmatrix",
+			"summary": {
+				"ko": "2차원 어파인 변환 행렬. (Canvas2D 호환 3x2 형식)",
+				"en": "2D affine transform matrix. (3x2 form compatible with Canvas2D)"
+			},
+			"classes": [
+				{
+					"name": "TransformMatrix",
+					"summary": {
+						"ko": "2차원 어파인 변환 행렬. (Canvas2D 호환 3x2 형식)\n- | a c e |\n  | b d f |\n- 점 변환: x' = a*x + c*y + e, y' = b*x + d*y + f",
+						"en": "2D affine transform matrix. (3x2 form compatible with Canvas2D)\n- | a c e |\n  | b d f |\n- Point transform: x' = a*x + c*y + e, y' = b*x + d*y + f"
+					},
+					"extends": "Object",
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "base/transformmatrix",
+						"class": "TransformMatrix"
+					},
+					"members": [
+						{
+							"kind": "constructor",
+							"name": "constructor",
+							"signature": "constructor()",
+							"params": [],
+							"description": {
+								"ko": "생성.",
+								"en": "Constructor."
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js"
+						},
+						{
+							"kind": "property",
+							"name": "a",
+							"signature": "get a",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "a 성분 반환 프로퍼티.",
+								"en": "Property that returns the a component."
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "a"
+							}
+						},
+						{
+							"kind": "property",
+							"name": "b",
+							"signature": "get b",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "b 성분 반환 프로퍼티.",
+								"en": "Property that returns the b component."
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "b"
+							}
+						},
+						{
+							"kind": "property",
+							"name": "c",
+							"signature": "get c",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "c 성분 반환 프로퍼티.",
+								"en": "Property that returns the c component."
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "c"
+							}
+						},
+						{
+							"kind": "property",
+							"name": "d",
+							"signature": "get d",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "d 성분 반환 프로퍼티.",
+								"en": "Property that returns the d component."
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "d"
+							}
+						},
+						{
+							"kind": "property",
+							"name": "e",
+							"signature": "get e",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "e 성분 반환 프로퍼티.",
+								"en": "Property that returns the e component."
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "e"
+							}
+						},
+						{
+							"kind": "property",
+							"name": "f",
+							"signature": "get f",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "f 성분 반환 프로퍼티.",
+								"en": "Property that returns the f component."
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "f"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "setIdentity",
+							"signature": "setIdentity()",
+							"params": [],
+							"description": {
+								"ko": "항등 행렬로 재설정.",
+								"en": "Resets to the identity matrix."
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "set_identity"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "setTransform",
+							"signature": "setTransform(a, b, c, d, e, f)",
+							"params": [
+								{
+									"name": "a",
+									"type": "number",
+									"description": {
+										"ko": "",
+										"en": ""
+									}
+								},
+								{
+									"name": "b",
+									"type": "number",
+									"description": {
+										"ko": "",
+										"en": ""
+									}
+								},
+								{
+									"name": "c",
+									"type": "number",
+									"description": {
+										"ko": "",
+										"en": ""
+									}
+								},
+								{
+									"name": "d",
+									"type": "number",
+									"description": {
+										"ko": "",
+										"en": ""
+									}
+								},
+								{
+									"name": "e",
+									"type": "number",
+									"description": {
+										"ko": "",
+										"en": ""
+									}
+								},
+								{
+									"name": "f",
+									"type": "number",
+									"description": {
+										"ko": "",
+										"en": ""
+									}
+								}
+							],
+							"description": {
+								"ko": "행렬 성분 직접 설정. (Canvas2D setTransform 인자 순서와 동일)",
+								"en": "Sets the matrix components directly. (same argument order as Canvas2D setTransform)"
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "set_transform"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "copyFrom",
+							"signature": "copyFrom(other)",
+							"params": [
+								{
+									"name": "other",
+									"type": "TransformMatrix",
+									"description": {
+										"ko": "",
+										"en": ""
+									}
+								}
+							],
+							"description": {
+								"ko": "다른 행렬의 성분 복사.",
+								"en": "Copies the components of another matrix."
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "copy_from"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "clone",
+							"signature": "clone()",
+							"params": [],
+							"returns": {
+								"type": "this",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "복제.",
+								"en": "Clone."
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js"
+						},
+						{
+							"kind": "method",
+							"name": "translate",
+							"signature": "translate(x, y)",
+							"params": [
+								{
+									"name": "x",
+									"type": "number",
+									"description": {
+										"ko": "",
+										"en": ""
+									}
+								},
+								{
+									"name": "y",
+									"type": "number",
+									"description": {
+										"ko": "",
+										"en": ""
+									}
+								}
+							],
+							"description": {
+								"ko": "이동 변환 누적. (Canvas2D translate 와 동일한 로컬 공간 우측 곱)",
+								"en": "Accumulates a translation. (local-space right multiply, same as Canvas2D translate)"
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "translate"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "rotate",
+							"signature": "rotate(radian)",
+							"params": [
+								{
+									"name": "radian",
+									"type": "number",
+									"description": {
+										"ko": "",
+										"en": ""
+									}
+								}
+							],
+							"description": {
+								"ko": "회전 변환 누적. (Canvas2D rotate 와 동일한 로컬 공간 우측 곱)",
+								"en": "Accumulates a rotation. (local-space right multiply, same as Canvas2D rotate)"
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "rotate"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "scale",
+							"signature": "scale(x, y)",
+							"params": [
+								{
+									"name": "x",
+									"type": "number",
+									"description": {
+										"ko": "",
+										"en": ""
+									}
+								},
+								{
+									"name": "y",
+									"type": "number",
+									"description": {
+										"ko": "",
+										"en": ""
+									}
+								}
+							],
+							"description": {
+								"ko": "크기 변환 누적. (Canvas2D scale 과 동일한 로컬 공간 우측 곱)",
+								"en": "Accumulates a scale. (local-space right multiply, same as Canvas2D scale)"
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "scale"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "multiply",
+							"signature": "multiply(other)",
+							"params": [
+								{
+									"name": "other",
+									"type": "TransformMatrix",
+									"description": {
+										"ko": "",
+										"en": ""
+									}
+								}
+							],
+							"description": {
+								"ko": "다른 행렬을 우측에 곱해 누적. (this = this x other)",
+								"en": "Accumulates by multiplying another matrix on the right. (this = this x other)"
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "multiply"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "invert",
+							"signature": "invert()",
+							"params": [],
+							"returns": {
+								"type": "TransformMatrix | null",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "역행렬. (새 행렬을 돌려주고 이 행렬은 그대로 둔다, 행렬식이 0 이면 null)",
+								"en": "Inverse matrix. (returns a new matrix and leaves this one as is, null if the determinant is 0)"
+							},
+							"since": "0.4.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "invert"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "transformPoint",
+							"signature": "transformPoint(x, y)",
+							"params": [
+								{
+									"name": "x",
+									"type": "number",
+									"description": {
+										"ko": "",
+										"en": ""
+									}
+								},
+								{
+									"name": "y",
+									"type": "number",
+									"description": {
+										"ko": "",
+										"en": ""
+									}
+								}
+							],
+							"returns": {
+								"type": "{ x: number, y: number }",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "점 변환.",
+								"en": "Transforms a point."
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "transform_point"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "getMaximumScale",
+							"signature": "getMaximumScale()",
+							"params": [],
+							"returns": {
+								"type": "number",
+								"description": {
+									"ko": "",
+									"en": ""
+								}
+							},
+							"description": {
+								"ko": "행렬이 담고 있는 축별 스케일 중 최대값 반환. (텍스트 선명도 계산용)",
+								"en": "Returns the largest of the per-axis scales in the matrix. (for text sharpness)"
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "get_maximum_scale"
+							}
+						},
+						{
+							"kind": "method",
+							"name": "writeToFloat32Array",
+							"signature": "writeToFloat32Array(target)",
+							"params": [
+								{
+									"name": "target",
+									"type": "Float32Array",
+									"description": {
+										"ko": "",
+										"en": ""
+									}
+								}
+							],
+							"description": {
+								"ko": "mat3 유니폼 업로드용 열우선(column-major) 배열 기록.",
+								"en": "Writes a column-major array for uploading a mat3 uniform."
+							},
+							"since": "0.3.0",
+							"source": "src/base/transformmatrix.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "base/transformmatrix",
+								"class": "TransformMatrix",
+								"name": "write_to_float32_array"
 							}
 						}
 					]
@@ -11364,7 +11907,94 @@
 				}
 			],
 			"functions": [],
-			"enums": []
+			"enums": [
+				{
+					"name": "AssetType",
+					"summary": {
+						"ko": "애셋 타입.",
+						"en": "Asset type."
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/asset",
+						"class": "AssetType"
+					},
+					"values": [
+						{
+							"name": "none",
+							"value": "none",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "image",
+							"value": "image",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "audio",
+							"value": "audio",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "json",
+							"value": "json",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "text",
+							"value": "text",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "font",
+							"value": "font",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "blob",
+							"value": "blob",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "bunch",
+							"value": "bunch",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "visual",
+							"value": "visual",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						}
+					]
+				}
+			]
 		},
 		{
 			"name": "core/scenemanager",
@@ -14547,6 +15177,1444 @@
 			],
 			"functions": [],
 			"enums": [
+				{
+					"name": "KeyCode",
+					"summary": {
+						"ko": "",
+						"en": ""
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/inputmanager",
+						"class": "KeyCode"
+					},
+					"values": [
+						{
+							"name": "a",
+							"value": "KeyA",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "A"
+							}
+						},
+						{
+							"name": "b",
+							"value": "KeyB",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "B"
+							}
+						},
+						{
+							"name": "c",
+							"value": "KeyC",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "C"
+							}
+						},
+						{
+							"name": "d",
+							"value": "KeyD",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "D"
+							}
+						},
+						{
+							"name": "e",
+							"value": "KeyE",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "E"
+							}
+						},
+						{
+							"name": "f",
+							"value": "KeyF",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F"
+							}
+						},
+						{
+							"name": "g",
+							"value": "KeyG",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "G"
+							}
+						},
+						{
+							"name": "h",
+							"value": "KeyH",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "H"
+							}
+						},
+						{
+							"name": "i",
+							"value": "KeyI",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "I"
+							}
+						},
+						{
+							"name": "j",
+							"value": "KeyJ",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "J"
+							}
+						},
+						{
+							"name": "k",
+							"value": "KeyK",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "K"
+							}
+						},
+						{
+							"name": "l",
+							"value": "KeyL",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "L"
+							}
+						},
+						{
+							"name": "m",
+							"value": "KeyM",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "M"
+							}
+						},
+						{
+							"name": "n",
+							"value": "KeyN",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "N"
+							}
+						},
+						{
+							"name": "o",
+							"value": "KeyO",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "O"
+							}
+						},
+						{
+							"name": "p",
+							"value": "KeyP",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "P"
+							}
+						},
+						{
+							"name": "q",
+							"value": "KeyQ",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "Q"
+							}
+						},
+						{
+							"name": "r",
+							"value": "KeyR",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "R"
+							}
+						},
+						{
+							"name": "s",
+							"value": "KeyS",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "S"
+							}
+						},
+						{
+							"name": "t",
+							"value": "KeyT",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "T"
+							}
+						},
+						{
+							"name": "u",
+							"value": "KeyU",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "U"
+							}
+						},
+						{
+							"name": "v",
+							"value": "KeyV",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "V"
+							}
+						},
+						{
+							"name": "w",
+							"value": "KeyW",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "W"
+							}
+						},
+						{
+							"name": "x",
+							"value": "KeyX",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "X"
+							}
+						},
+						{
+							"name": "y",
+							"value": "KeyY",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "Y"
+							}
+						},
+						{
+							"name": "z",
+							"value": "KeyZ",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "Z"
+							}
+						},
+						{
+							"name": "0",
+							"value": "Digit0",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "1",
+							"value": "Digit1",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "2",
+							"value": "Digit2",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "3",
+							"value": "Digit3",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "4",
+							"value": "Digit4",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "5",
+							"value": "Digit5",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "6",
+							"value": "Digit6",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "7",
+							"value": "Digit7",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "8",
+							"value": "Digit8",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "9",
+							"value": "Digit9",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "backspace",
+							"value": "Backspace",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "BACKSPACE"
+							}
+						},
+						{
+							"name": "tab",
+							"value": "Tab",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "TAB"
+							}
+						},
+						{
+							"name": "enter",
+							"value": "Enter",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "ENTER"
+							}
+						},
+						{
+							"name": "shift",
+							"value": "ShiftLeft",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "SHIFT"
+							}
+						},
+						{
+							"name": "ctrl",
+							"value": "ControlLeft",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "CTRL"
+							}
+						},
+						{
+							"name": "alt",
+							"value": "AltLeft",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "ALT"
+							}
+						},
+						{
+							"name": "capslock",
+							"value": "CapsLock",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "CAPSLOCK"
+							}
+						},
+						{
+							"name": "escape",
+							"value": "Escape",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "ESCAPE"
+							}
+						},
+						{
+							"name": "space",
+							"value": "Space",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "SPACE"
+							}
+						},
+						{
+							"name": "pageup",
+							"value": "PageUp",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "PAGEUP"
+							}
+						},
+						{
+							"name": "pagedown",
+							"value": "PageDown",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "PAGEDOWN"
+							}
+						},
+						{
+							"name": "end",
+							"value": "End",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "END"
+							}
+						},
+						{
+							"name": "home",
+							"value": "Home",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "HOME"
+							}
+						},
+						{
+							"name": "arrowleft",
+							"value": "ArrowLeft",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "ARROWLEFT"
+							}
+						},
+						{
+							"name": "arrowup",
+							"value": "ArrowUp",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "ARROWUP"
+							}
+						},
+						{
+							"name": "arrowright",
+							"value": "ArrowRight",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "ARROWRIGHT"
+							}
+						},
+						{
+							"name": "arrowdown",
+							"value": "ArrowDown",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "ARROWDOWN"
+							}
+						},
+						{
+							"name": "insert",
+							"value": "Insert",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "INSERT"
+							}
+						},
+						{
+							"name": "delete",
+							"value": "Delete",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "DELETE"
+							}
+						},
+						{
+							"name": "f1",
+							"value": "F1",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F1"
+							}
+						},
+						{
+							"name": "f2",
+							"value": "F2",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F2"
+							}
+						},
+						{
+							"name": "f3",
+							"value": "F3",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F3"
+							}
+						},
+						{
+							"name": "f4",
+							"value": "F4",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F4"
+							}
+						},
+						{
+							"name": "f5",
+							"value": "F5",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F5"
+							}
+						},
+						{
+							"name": "f6",
+							"value": "F6",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F6"
+							}
+						},
+						{
+							"name": "f7",
+							"value": "F7",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F7"
+							}
+						},
+						{
+							"name": "f8",
+							"value": "F8",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F8"
+							}
+						},
+						{
+							"name": "f9",
+							"value": "F9",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F9"
+							}
+						},
+						{
+							"name": "f10",
+							"value": "F10",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F10"
+							}
+						},
+						{
+							"name": "f11",
+							"value": "F11",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F11"
+							}
+						},
+						{
+							"name": "f12",
+							"value": "F12",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "F12"
+							}
+						},
+						{
+							"name": "scrolllock",
+							"value": "ScrollLock",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "SCROLLLOCK"
+							}
+						},
+						{
+							"name": "semicolon",
+							"value": "Semicolon",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "SEMICOLON"
+							}
+						},
+						{
+							"name": "equal",
+							"value": "Equal",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "EQUAL"
+							}
+						},
+						{
+							"name": "comma",
+							"value": "Comma",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "COMMA"
+							}
+						},
+						{
+							"name": "minus",
+							"value": "Minus",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "MINUS"
+							}
+						},
+						{
+							"name": "period",
+							"value": "Period",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "PERIOD"
+							}
+						},
+						{
+							"name": "slash",
+							"value": "Slash",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "SLASH"
+							}
+						},
+						{
+							"name": "backquote",
+							"value": "Backquote",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "BACKQUOTE"
+							}
+						},
+						{
+							"name": "bracketleft",
+							"value": "BracketLeft",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "BRACKETLEFT"
+							}
+						},
+						{
+							"name": "backslash",
+							"value": "Backslash",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "BACKSLASH"
+							}
+						},
+						{
+							"name": "bracketright",
+							"value": "BracketRight",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "BRACKETRIGHT"
+							}
+						},
+						{
+							"name": "quote",
+							"value": "Quote",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "QUOTE"
+							}
+						},
+						{
+							"name": "meta",
+							"value": "MetaLeft",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "META"
+							}
+						},
+						{
+							"name": "command",
+							"value": "MetaLeft",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "COMMAND"
+							}
+						},
+						{
+							"name": "pause",
+							"value": "Pause",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "PAUSE"
+							}
+						},
+						{
+							"name": "audiovolumeup",
+							"value": "AudioVolumeUp",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "AUDIOVOLUMEUP"
+							}
+						},
+						{
+							"name": "audiovolumedown",
+							"value": "AudioVolumeDown",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "AUDIOVOLUMEDOWN"
+							}
+						},
+						{
+							"name": "audiomute",
+							"value": "AudioVolumeMute",
+							"description": {
+								"ko": "음소거. (W3C code 표의 이름)",
+								"en": "Mute. (name from the W3C code table)"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "AUDIOMUTE"
+							}
+						},
+						{
+							"name": "audioplay",
+							"value": "MediaPlayPause",
+							"description": {
+								"ko": "재생/멈춤. (W3C code 표의 이름, 표에 MediaPlay 는 없다)",
+								"en": "Play/pause. (name from the W3C code table, the table has no MediaPlay)"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "AUDIOPLAY"
+							}
+						},
+						{
+							"name": "audiostop",
+							"value": "MediaStop",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "AUDIOSTOP"
+							}
+						},
+						{
+							"name": "audioprev",
+							"value": "MediaTrackPrevious",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "AUDIOPREV"
+							}
+						},
+						{
+							"name": "audionext",
+							"value": "MediaTrackNext",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "AUDIONEXT"
+							}
+						},
+						{
+							"name": "numLock",
+							"value": "NumLock",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUM_LOCK"
+							}
+						},
+						{
+							"name": "numpadDivide",
+							"value": "NumpadDivide",
+							"description": {
+								"ko": "텐키 나누기.",
+								"en": "Numpad divide."
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD_DIVIDE"
+							}
+						},
+						{
+							"name": "numpadMultiply",
+							"value": "NumpadMultiply",
+							"description": {
+								"ko": "텐키 곱하기.",
+								"en": "Numpad multiply."
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD_MULTIPLY"
+							}
+						},
+						{
+							"name": "numpadSubtract",
+							"value": "NumpadSubtract",
+							"description": {
+								"ko": "텐키 빼기.",
+								"en": "Numpad subtract."
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD_SUBTRACT"
+							}
+						},
+						{
+							"name": "numpadDecimal",
+							"value": "NumpadDecimal",
+							"description": {
+								"ko": "텐키 점.",
+								"en": "Numpad decimal point."
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD_DECIMAL"
+							}
+						},
+						{
+							"name": "numpadAdd",
+							"value": "NumpadAdd",
+							"description": {
+								"ko": "텐키 더하기.",
+								"en": "Numpad add."
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD_ADD"
+							}
+						},
+						{
+							"name": "numpadEnter",
+							"value": "NumpadEnter",
+							"description": {
+								"ko": "텐키 엔터.",
+								"en": "Numpad enter."
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD_ENTER"
+							}
+						},
+						{
+							"name": "numpad0",
+							"value": "Numpad0",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD0"
+							}
+						},
+						{
+							"name": "numpad1",
+							"value": "Numpad1",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD1"
+							}
+						},
+						{
+							"name": "numpad2",
+							"value": "Numpad2",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD2"
+							}
+						},
+						{
+							"name": "numpad3",
+							"value": "Numpad3",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD3"
+							}
+						},
+						{
+							"name": "numpad4",
+							"value": "Numpad4",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD4"
+							}
+						},
+						{
+							"name": "numpad5",
+							"value": "Numpad5",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD5"
+							}
+						},
+						{
+							"name": "numpad6",
+							"value": "Numpad6",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD6"
+							}
+						},
+						{
+							"name": "numpad7",
+							"value": "Numpad7",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD7"
+							}
+						},
+						{
+							"name": "numpad8",
+							"value": "Numpad8",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD8"
+							}
+						},
+						{
+							"name": "numpad9",
+							"value": "Numpad9",
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/inputmanager",
+								"class": "KeyCode",
+								"name": "NUMPAD9"
+							}
+						}
+					]
+				},
 				{
 					"name": "MouseButton",
 					"summary": {
@@ -28346,7 +30414,268 @@
 				}
 			],
 			"functions": [],
-			"enums": []
+			"enums": [
+				{
+					"name": "SpriteDrawMode",
+					"summary": {
+						"ko": "스프라이트 모드.",
+						"en": "Sprite mode."
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/component/sprite",
+						"class": "SpriteDrawMode"
+					},
+					"values": [
+						{
+							"name": "simple",
+							"value": "simple",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "sliced",
+							"value": "sliced",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "tiled",
+							"value": "tiled",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						}
+					]
+				},
+				{
+					"name": "SpriteBlendMode",
+					"summary": {
+						"ko": "스프라이트 블렌드 모드. (Canvas2D globalCompositeOperation 대응)\n- 26 가지 모두 Graphic.setBlendMode 가 그린다. 포터 더프 연산자, lighter, multiply, screen 은 고정 블렌딩,\n  overlay 부터 luminosity 까지 13 가지는 그릴 영역 아래를 떠 와 셰이더로 섞는다. (W3C Compositing and Blending Level 1 공식, 그리기마다 영역 복사가 들고 묶어 그리지 않는다)\n- Canvas2D 는 source-in, source-out, destination-in, destination-atop, copy 가 그린 도형 밖(자르기 안 전체)도 지우지만, Graphic 은 그린 도형 안만 바꾼다.",
+						"en": "Sprite blend mode. (maps to Canvas2D globalCompositeOperation)\n- Graphic.setBlendMode draws all 26. The Porter-Duff operators, lighter, multiply and screen use fixed blending,\n  and the 13 from overlay to luminosity copy the area under the drawing and mix it in a shader. (W3C Compositing and Blending Level 1 formulas, each draw copies the area and is not batched)\n- Canvas2D source-in, source-out, destination-in, destination-atop and copy also clear outside the drawn shape (the whole clip), but Graphic changes only inside the drawn shape."
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/component/sprite",
+						"class": "SpriteBlendMode"
+					},
+					"values": [
+						{
+							"name": "normal",
+							"value": "source-over",
+							"description": {
+								"ko": "기본 알파 합성.",
+								"en": "Default alpha compositing."
+							}
+						},
+						{
+							"name": "sourceIn",
+							"value": "source-in",
+							"description": {
+								"ko": "교차 영역만 출력 (배경 알파 마스크).",
+								"en": "Outputs only the overlapping area (background alpha mask)."
+							}
+						},
+						{
+							"name": "sourceOut",
+							"value": "source-out",
+							"description": {
+								"ko": "교차 외 영역만 출력.",
+								"en": "Outputs only the area outside the overlap."
+							}
+						},
+						{
+							"name": "sourceAtop",
+							"value": "source-atop",
+							"description": {
+								"ko": "배경 위에 교차 영역만 합성.",
+								"en": "Composites only the overlapping area over the background."
+							}
+						},
+						{
+							"name": "destinationOver",
+							"value": "destination-over",
+							"description": {
+								"ko": "배경 아래에 합성.",
+								"en": "Composites under the background."
+							}
+						},
+						{
+							"name": "destinationIn",
+							"value": "destination-in",
+							"description": {
+								"ko": "배경에서 교차 영역만 유지.",
+								"en": "Keeps only the overlapping area of the background."
+							}
+						},
+						{
+							"name": "destinationOut",
+							"value": "destination-out",
+							"description": {
+								"ko": "배경에서 교차 외 영역만 유지.",
+								"en": "Keeps only the non-overlapping area of the background."
+							}
+						},
+						{
+							"name": "destinationAtop",
+							"value": "destination-atop",
+							"description": {
+								"ko": "배경 위에 교차 영역만 유지.",
+								"en": "Keeps only the overlapping area over the background."
+							}
+						},
+						{
+							"name": "lighter",
+							"value": "lighter",
+							"description": {
+								"ko": "색상 덧셈 (Add).",
+								"en": "Color addition (Add)."
+							}
+						},
+						{
+							"name": "copy",
+							"value": "copy",
+							"description": {
+								"ko": "소스만 출력 (배경 무시).",
+								"en": "Outputs only the source (ignores the background)."
+							}
+						},
+						{
+							"name": "xor",
+							"value": "xor",
+							"description": {
+								"ko": "교차 영역 제외.",
+								"en": "Excludes the overlapping area."
+							}
+						},
+						{
+							"name": "multiply",
+							"value": "multiply",
+							"description": {
+								"ko": "곱셈 합성 (어두워짐).",
+								"en": "Multiply compositing (darkens)."
+							}
+						},
+						{
+							"name": "screen",
+							"value": "screen",
+							"description": {
+								"ko": "스크린 합성 (밝아짐).",
+								"en": "Screen compositing (lightens)."
+							}
+						},
+						{
+							"name": "overlay",
+							"value": "overlay",
+							"description": {
+								"ko": "오버레이 (명암 강조).",
+								"en": "Overlay (emphasizes contrast)."
+							}
+						},
+						{
+							"name": "darken",
+							"value": "darken",
+							"description": {
+								"ko": "어두운 픽셀 선택.",
+								"en": "Picks the darker pixel."
+							}
+						},
+						{
+							"name": "lighten",
+							"value": "lighten",
+							"description": {
+								"ko": "밝은 픽셀 선택.",
+								"en": "Picks the lighter pixel."
+							}
+						},
+						{
+							"name": "colorDodge",
+							"value": "color-dodge",
+							"description": {
+								"ko": "컬러 닷지 (밝아짐).",
+								"en": "Color dodge (lightens)."
+							}
+						},
+						{
+							"name": "colorBurn",
+							"value": "color-burn",
+							"description": {
+								"ko": "컬러 번 (어두워짐).",
+								"en": "Color burn (darkens)."
+							}
+						},
+						{
+							"name": "hardLight",
+							"value": "hard-light",
+							"description": {
+								"ko": "하드 라이트.",
+								"en": "Hard light."
+							}
+						},
+						{
+							"name": "softLight",
+							"value": "soft-light",
+							"description": {
+								"ko": "소프트 라이트.",
+								"en": "Soft light."
+							}
+						},
+						{
+							"name": "difference",
+							"value": "difference",
+							"description": {
+								"ko": "차이값 합성.",
+								"en": "Difference compositing."
+							}
+						},
+						{
+							"name": "exclusion",
+							"value": "exclusion",
+							"description": {
+								"ko": "차이값 합성 (낮은 대비).",
+								"en": "Difference compositing (lower contrast)."
+							}
+						},
+						{
+							"name": "hue",
+							"value": "hue",
+							"description": {
+								"ko": "색조만 적용.",
+								"en": "Applies hue only."
+							}
+						},
+						{
+							"name": "saturation",
+							"value": "saturation",
+							"description": {
+								"ko": "채도만 적용.",
+								"en": "Applies saturation only."
+							}
+						},
+						{
+							"name": "color",
+							"value": "color",
+							"description": {
+								"ko": "색조+채도 적용.",
+								"en": "Applies hue and saturation."
+							}
+						},
+						{
+							"name": "luminosity",
+							"value": "luminosity",
+							"description": {
+								"ko": "밝기만 적용.",
+								"en": "Applies luminosity only."
+							}
+						}
+					]
+				}
+			]
 		},
 		{
 			"name": "core/component/text",
@@ -34814,7 +37143,62 @@
 				}
 			],
 			"functions": [],
-			"enums": []
+			"enums": [
+				{
+					"name": "ButtonState",
+					"summary": {
+						"ko": "버튼 상태.",
+						"en": "Button state."
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "ui/uibutton",
+						"class": "ButtonState"
+					},
+					"values": [
+						{
+							"name": "normal",
+							"value": "Enum.begin()",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "hover",
+							"value": "Enum.auto()",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "pressed",
+							"value": "Enum.auto()",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "released",
+							"value": "Enum.auto()",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "disabled",
+							"value": "Enum.auto()",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						}
+					]
+				}
+			]
 		},
 		{
 			"name": "ui/uitogglebutton",
@@ -36013,7 +38397,38 @@
 				}
 			],
 			"functions": [],
-			"enums": []
+			"enums": [
+				{
+					"name": "ScrollMode",
+					"summary": {
+						"ko": "스크롤 모드.\n- clamp: 경계를 초과하지 않는 기본 모드.\n- elastic: 경계를 초과하면 저항이 생기고 놓으면 스프링처럼 튕겨 돌아오는 모드.",
+						"en": "Scroll mode.\n- clamp: the default mode that does not go past the bounds.\n- elastic: resists past the bounds and springs back when released."
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "ui/uiscrollview",
+						"class": "ScrollMode"
+					},
+					"values": [
+						{
+							"name": "clamp",
+							"value": "clamp",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						},
+						{
+							"name": "elastic",
+							"value": "elastic",
+							"description": {
+								"ko": "",
+								"en": ""
+							}
+						}
+					]
+				}
+			]
 		},
 		{
 			"name": "ui/uiprogressview",
@@ -36572,7 +38987,38 @@
 				}
 			],
 			"functions": [],
-			"enums": []
+			"enums": [
+				{
+					"name": "ProgressDirection",
+					"summary": {
+						"ko": "진행률 방향.",
+						"en": "Progress direction."
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "ui/uiprogressview",
+						"class": "ProgressDirection"
+					},
+					"values": [
+						{
+							"name": "horizontal",
+							"value": "horizontal",
+							"description": {
+								"ko": "좌→우 채움",
+								"en": "Fills left to right"
+							}
+						},
+						{
+							"name": "vertical",
+							"value": "vertical",
+							"description": {
+								"ko": "하→상 채움",
+								"en": "Fills bottom to top"
+							}
+						}
+					]
+				}
+			]
 		},
 		{
 			"name": "ui/uiprogressring",
@@ -51366,7 +53812,13 @@
 								"en": "Get all parameters."
 							},
 							"since": "0.4.0",
-							"source": "src/animation/animator.js"
+							"source": "src/animation/animator.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "animation/animator",
+								"class": "Animator",
+								"name": "get_parameters"
+							}
 						},
 						{
 							"kind": "method",
@@ -52199,7 +54651,13 @@
 								"en": "Returns the target."
 							},
 							"since": "0.0.9",
-							"source": "src/animation/action.js"
+							"source": "src/animation/action.js",
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "animation/action",
+								"class": "Action",
+								"name": "get_target"
+							}
 						}
 					]
 				}
@@ -55463,7 +57921,32 @@
 					]
 				}
 			],
-			"functions": [],
+			"functions": [
+				{
+					"kind": "field",
+					"name": "MORPH_TARGET_MAXIMUM",
+					"signature": "MORPH_TARGET_MAXIMUM = 96",
+					"params": [],
+					"returns": {
+						"type": "number",
+						"description": {
+							"ko": "",
+							"en": ""
+						}
+					},
+					"description": {
+						"ko": "드로어블당 모프 타깃 최대 개수. (셰이더 유니폼 배열 크기와 일치)",
+						"en": "Maximum number of morph targets per drawable. (matches the shader uniform array size)"
+					},
+					"since": "0.3.0",
+					"source": "src/graphics3d/skinnedmodel.js",
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "graphics3d/skinnedmodel",
+						"name": "MORPH_TARGET_MAXIMUM"
+					}
+				}
+			],
 			"enums": []
 		},
 		{
@@ -64493,6 +66976,30 @@
 						"engine": "vanilla-engine",
 						"module": "graphics3d/humanskinrenderer",
 						"name": "SKIN_TEXTURE_UNIT_AUXILIARY"
+					}
+				},
+				{
+					"kind": "field",
+					"name": "WRINKLE_CHANNEL_COUNT",
+					"signature": "WRINKLE_CHANNEL_COUNT = 64",
+					"params": [],
+					"returns": {
+						"type": "number",
+						"description": {
+							"ko": "",
+							"en": ""
+						}
+					},
+					"description": {
+						"ko": "주름 마스크 채널 수. (4x4 아틀라스 x RGBA, 채널마다 주름 맵 1 / 2 / 3 기여 가중치 vec3)",
+						"en": "Number of wrinkle mask channels. (4x4 atlas x RGBA, each channel a vec3 of weights for wrinkle maps 1 / 2 / 3)"
+					},
+					"since": "0.3.0",
+					"source": "src/graphics3d/humanskinrenderer.js",
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "graphics3d/humanskinrenderer",
+						"name": "WRINKLE_CHANNEL_COUNT"
 					}
 				}
 			],
@@ -76160,8 +78667,8 @@
 				{
 					"name": "SpriteAnimator",
 					"summary": {
-						"ko": "스프라이트 애니메이터 컴포넌트.\n- 이름을 붙인 클립(프레임 시퀀스)을 등록해 두고 play(\"run\") 으로 전환한다.\n- 같은 클립을 다시 play 해도 재시작하지 않는다. (restartIfSame 옵션으로 바꿀 수 있다)\n- 클립이 끝나면 onComplete 콜백으로 다음 상태를 이어 갈 수 있다. (FSM 과 결합)\n- 같은 노드의 Sprite 컴포넌트에 현재 프레임(image + rect)을 반영한다.\n- 사용:\n    const animator = node.addComponent(SpriteAnimator);\n    animator.addClip(\"idle\", image, idleRects, 10, true);\n    animator.addClip(\"attack\", image, attackRects, 12, false);\n    SpriteAnimator.play(node, \"attack\", { onComplete: () => animator.playClip(\"idle\") });\n- 두 엔진이 같은 꼴: 정적 SpriteAnimator.play(node, clipName, options) 가 노드의 애니메이터로 틀고, 애니메이터만 있을 때(완료 콜백 안)는 playClip 이다.\n  (러스트 판 SpriteAnimator::play, play_clip) 인스턴스 play 는 playClip 과 같다.",
-						"en": "Sprite animator component.\n- Registers named clips (frame sequences) and switches with play(\"run\").\n- Playing the same clip again does not restart it. (can be changed with the restartIfSame option)\n- When a clip ends, the next state can follow via the onComplete callback. (combines with an FSM)\n- Applies the current frame (image + rect) to the Sprite component on the same node.\n- Usage:\n    const animator = node.addComponent(SpriteAnimator);\n    animator.addClip(\"idle\", image, idleRects, 10, true);\n    animator.addClip(\"attack\", image, attackRects, 12, false);\n    SpriteAnimator.play(node, \"attack\", { onComplete: () => animator.playClip(\"idle\") });\n- Same form in both engines: the static SpriteAnimator.play(node, clipName, options) plays with the node's animator, and playClip is for when only the animator is at hand (inside the complete callback).\n  (the Rust SpriteAnimator::play, play_clip) The instance play is the same as playClip."
+						"ko": "스프라이트 애니메이터 컴포넌트.\n- 이름을 붙인 클립(프레임 시퀀스)을 등록해 두고 SpriteAnimator.play(node, \"run\") 이나 playClip(\"run\") 으로 전환한다.\n- 같은 클립을 다시 틀어도 재시작하지 않는다. (restartIfSame 옵션으로 바꿀 수 있다)\n- 클립이 끝나면 onComplete 콜백으로 다음 상태를 이어 갈 수 있다. (FSM 과 결합)\n- 같은 노드의 Sprite 컴포넌트에 현재 프레임(image + rect)을 반영한다.\n- 사용:\n    const animator = node.addComponent(SpriteAnimator);\n    animator.addClip(\"idle\", image, idleRects, 10, true);\n    animator.addClip(\"attack\", image, attackRects, 12, false);\n    SpriteAnimator.play(node, \"attack\", { onComplete: () => animator.playClip(\"idle\") });\n- 두 엔진이 같은 꼴: 정적 SpriteAnimator.play(node, clipName, options) 가 노드의 애니메이터로 틀고, 애니메이터만 있을 때(완료 콜백 안)는 playClip 이다.\n  (러스트 판 SpriteAnimator::play, play_clip)",
+						"en": "Sprite animator component.\n- Registers named clips (frame sequences) and switches with SpriteAnimator.play(node, \"run\") or playClip(\"run\").\n- Playing the same clip again does not restart it. (can be changed with the restartIfSame option)\n- When a clip ends, the next state can follow via the onComplete callback. (combines with an FSM)\n- Applies the current frame (image + rect) to the Sprite component on the same node.\n- Usage:\n    const animator = node.addComponent(SpriteAnimator);\n    animator.addClip(\"idle\", image, idleRects, 10, true);\n    animator.addClip(\"attack\", image, attackRects, 12, false);\n    SpriteAnimator.play(node, \"attack\", { onComplete: () => animator.playClip(\"idle\") });\n- Same form in both engines: the static SpriteAnimator.play(node, clipName, options) plays with the node's animator, and playClip is for when only the animator is at hand (inside the complete callback).\n  (the Rust SpriteAnimator::play, play_clip)"
 					},
 					"examples": [
 						{
@@ -76169,7 +78676,7 @@
 								"ko": "대기 클립을 돌리다 누르면 공격 한 번 뒤 대기로 돌아가기",
 								"en": "Loop an idle clip, attack once on press, then return to idle"
 							},
-							"code": "import { Engine, EngineConfiguration, Scene, WorldNode, Sprite, SpriteAnimator, ImageAsset, Rect, Vector2, Pivot } from \"./build/vanilla.js\";\n\nconst imageAsset = new ImageAsset();\nawait imageAsset.load(\"examples/assets/spritesheet.png\");\nconst image = imageAsset.getImage();\nconst idleRects = [];\nconst attackRects = [];\nfor (let column = 0; column < 3; ++column) {\n\tidleRects.push(Rect.create(column * 200, 0, 200, 200));\n\tattackRects.push(Rect.create(column * 200, 200, 200, 200));\n}\n\nconst characterNode = new WorldNode();\ncharacterNode.addComponent(Sprite);\nconst spriteAnimator = characterNode.addComponent(SpriteAnimator);\nspriteAnimator.addClip(\"idle\", image, idleRects, 6, true);\nspriteAnimator.addClip(\"attack\", image, attackRects, 12, false);\nspriteAnimator.play(\"idle\");\n\nclass MainScene extends Scene {\n\tinitialize(engine) {\n\t\tsuper.initialize(engine);\n\t\tcharacterNode.setPivot(Pivot.middleCenter);\n\t\tcharacterNode.setLocalPosition(Vector2.create(320, 180));\n\t\tcharacterNode.setContentSize(Vector2.create(200, 200));\n\t\tconst root = this.getRoot();\n\t\troot.addChild(characterNode);\n\t}\n\n\ttouchPress(viewInputPosition) {\n\t\tsuper.touchPress(viewInputPosition);\n\t\tspriteAnimator.play(\"attack\", {\n\t\t\tonComplete: () => {\n\t\t\t\tspriteAnimator.play(\"idle\");\n\t\t\t},\n\t\t});\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
+							"code": "import { Engine, EngineConfiguration, Scene, WorldNode, Sprite, SpriteAnimator, ImageAsset, Rect, Vector2, Pivot } from \"./build/vanilla.js\";\n\nconst imageAsset = new ImageAsset();\nawait imageAsset.load(\"examples/assets/spritesheet.png\");\nconst image = imageAsset.getImage();\nconst idleRects = [];\nconst attackRects = [];\nfor (let column = 0; column < 3; ++column) {\n\tidleRects.push(Rect.create(column * 200, 0, 200, 200));\n\tattackRects.push(Rect.create(column * 200, 200, 200, 200));\n}\n\nconst characterNode = new WorldNode();\ncharacterNode.addComponent(Sprite);\nconst spriteAnimator = characterNode.addComponent(SpriteAnimator);\nspriteAnimator.addClip(\"idle\", image, idleRects, 6, true);\nspriteAnimator.addClip(\"attack\", image, attackRects, 12, false);\nspriteAnimator.playClip(\"idle\");\n\nclass MainScene extends Scene {\n\tinitialize(engine) {\n\t\tsuper.initialize(engine);\n\t\tcharacterNode.setPivot(Pivot.middleCenter);\n\t\tcharacterNode.setLocalPosition(Vector2.create(320, 180));\n\t\tcharacterNode.setContentSize(Vector2.create(200, 200));\n\t\tconst root = this.getRoot();\n\t\troot.addChild(characterNode);\n\t}\n\n\ttouchPress(viewInputPosition) {\n\t\tsuper.touchPress(viewInputPosition);\n\t\tspriteAnimator.playClip(\"attack\", {\n\t\t\tonComplete: () => {\n\t\t\t\tspriteAnimator.playClip(\"idle\");\n\t\t\t},\n\t\t});\n\t}\n}\n\nconst engineConfiguration = new EngineConfiguration();\nconst engine = new Engine(engineConfiguration);\nengine.run(new MainScene());",
 							"language": "javascript"
 						}
 					],
@@ -76329,52 +78836,10 @@
 										"ko": "아틀라스 JSON 의 프레임 이름으로 클립 만들기",
 										"en": "Make a clip from frame names in an atlas JSON"
 									},
-									"code": "import { SpriteAnimator, ImageAsset } from \"./build/vanilla.js\";\n\nconst imageAsset = new ImageAsset();\nawait imageAsset.load(\"examples/assets/spritesheet.png\");\nconst image = imageAsset.getImage();\nconst atlasJson = {\n\tframes: {\n\t\t\"run_0\": { frame: { x: 0, y: 400, w: 200, h: 200 } },\n\t\t\"run_1\": { frame: { x: 200, y: 400, w: 200, h: 200 } },\n\t\t\"run_2\": { frame: { x: 400, y: 400, w: 200, h: 200 } },\n\t},\n};\nconst spriteAnimator = new SpriteAnimator();\nspriteAnimator.addClipFromAtlas(\"run\", image, atlasJson, [\"run_0\", \"run_1\", \"run_2\"], 12, true);\nconsole.log(spriteAnimator.hasClip(\"run\"), spriteAnimator.play(\"run\"));\nspriteAnimator.tick(0.1);\nconsole.log(spriteAnimator.getClipName(), spriteAnimator.getCurrentFrameIndex());",
+									"code": "import { SpriteAnimator, ImageAsset } from \"./build/vanilla.js\";\n\nconst imageAsset = new ImageAsset();\nawait imageAsset.load(\"examples/assets/spritesheet.png\");\nconst image = imageAsset.getImage();\nconst atlasJson = {\n\tframes: {\n\t\t\"run_0\": { frame: { x: 0, y: 400, w: 200, h: 200 } },\n\t\t\"run_1\": { frame: { x: 200, y: 400, w: 200, h: 200 } },\n\t\t\"run_2\": { frame: { x: 400, y: 400, w: 200, h: 200 } },\n\t},\n};\nconst spriteAnimator = new SpriteAnimator();\nspriteAnimator.addClipFromAtlas(\"run\", image, atlasJson, [\"run_0\", \"run_1\", \"run_2\"], 12, true);\nconsole.log(spriteAnimator.hasClip(\"run\"), spriteAnimator.playClip(\"run\"));\nspriteAnimator.tick(0.1);\nconsole.log(spriteAnimator.getClipName(), spriteAnimator.getCurrentFrameIndex());",
 									"language": "javascript"
 								}
 							]
-						},
-						{
-							"kind": "method",
-							"name": "play",
-							"signature": "play(clipName, options = {})",
-							"params": [
-								{
-									"name": "clipName",
-									"type": "string",
-									"description": {
-										"ko": "재생할 클립 이름. (등록하지 않은 이름이면 false)",
-										"en": "Name of the clip to play. (false if the name is not registered)"
-									}
-								},
-								{
-									"name": "options",
-									"type": "object",
-									"description": {
-										"ko": "{ onComplete?, restartIfSame = false }",
-										"en": "{ onComplete?, restartIfSame = false }"
-									}
-								}
-							],
-							"returns": {
-								"type": "boolean",
-								"description": {
-									"ko": "재생 시작 여부.",
-									"en": "Whether playback started."
-								}
-							},
-							"description": {
-								"ko": "재생. (playClip 과 같다)",
-								"en": "Play. (same as playClip)"
-							},
-							"since": "0.3.0",
-							"source": "src/misc/spriteanimator.js",
-							"counterpart": {
-								"engine": "vanilla-engine",
-								"module": "misc/spriteanimator",
-								"class": "SpriteAnimator",
-								"name": "play"
-							}
 						},
 						{
 							"kind": "method",
@@ -79622,6 +82087,384 @@
 				}
 			],
 			"enums": [
+				{
+					"name": "GamepadAnalogStickCode",
+					"summary": {
+						"ko": "게임패드 아날로그 스틱 식별자. (W3C Standard Gamepad 매핑 규격)",
+						"en": "Gamepad analog stick identifiers. (W3C Standard Gamepad mapping)"
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/gamepadmanager",
+						"class": "GamepadAnalogStickCode"
+					},
+					"values": [
+						{
+							"name": "LEFT_X",
+							"value": 0,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadAnalogStickCode",
+								"name": "LEFT_X"
+							}
+						},
+						{
+							"name": "LEFT_Y",
+							"value": 1,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadAnalogStickCode",
+								"name": "LEFT_Y"
+							}
+						},
+						{
+							"name": "RIGHT_X",
+							"value": 2,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadAnalogStickCode",
+								"name": "RIGHT_X"
+							}
+						},
+						{
+							"name": "RIGHT_Y",
+							"value": 3,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadAnalogStickCode",
+								"name": "RIGHT_Y"
+							}
+						}
+					]
+				},
+				{
+					"name": "GamepadTriggerCode",
+					"summary": {
+						"ko": "게임패드 트리거 식별자. (W3C Standard Gamepad 매핑 규격)",
+						"en": "Gamepad trigger identifiers. (W3C Standard Gamepad mapping)"
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/gamepadmanager",
+						"class": "GamepadTriggerCode"
+					},
+					"values": [
+						{
+							"name": "L2",
+							"value": 6,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadTriggerCode",
+								"name": "L2"
+							}
+						},
+						{
+							"name": "R2",
+							"value": 7,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadTriggerCode",
+								"name": "R2"
+							}
+						}
+					]
+				},
+				{
+					"name": "GamepadButtonCode",
+					"summary": {
+						"ko": "게임패드 버튼 식별자. (W3C Standard Gamepad 매핑 규격)",
+						"en": "Gamepad button identifiers. (W3C Standard Gamepad mapping)"
+					},
+					"counterpart": {
+						"engine": "vanilla-engine",
+						"module": "core/gamepadmanager",
+						"class": "GamepadButtonCode"
+					},
+					"values": [
+						{
+							"name": "A_CROSS",
+							"value": 0,
+							"description": {
+								"ko": "Face Buttons",
+								"en": "Face Buttons"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "A_CROSS"
+							}
+						},
+						{
+							"name": "B_CIRCLE",
+							"value": 1,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "B_CIRCLE"
+							}
+						},
+						{
+							"name": "X_SQUARE",
+							"value": 2,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "X_SQUARE"
+							}
+						},
+						{
+							"name": "Y_TRIANGLE",
+							"value": 3,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "Y_TRIANGLE"
+							}
+						},
+						{
+							"name": "L1",
+							"value": 4,
+							"description": {
+								"ko": "Bumpers",
+								"en": "Bumpers"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "L1"
+							}
+						},
+						{
+							"name": "R1",
+							"value": 5,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "R1"
+							}
+						},
+						{
+							"name": "L2",
+							"value": 6,
+							"description": {
+								"ko": "Triggers (버튼으로도 인식됨)",
+								"en": "Triggers (also recognized as buttons)"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "L2"
+							}
+						},
+						{
+							"name": "R2",
+							"value": 7,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "R2"
+							}
+						},
+						{
+							"name": "SHARE_VIEW",
+							"value": 8,
+							"description": {
+								"ko": "System",
+								"en": "System"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "SHARE_VIEW"
+							}
+						},
+						{
+							"name": "OPTIONS_MENU",
+							"value": 9,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "OPTIONS_MENU"
+							}
+						},
+						{
+							"name": "L3",
+							"value": 10,
+							"description": {
+								"ko": "Stick Clicks",
+								"en": "Stick Clicks"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "L3"
+							}
+						},
+						{
+							"name": "R3",
+							"value": 11,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "R3"
+							}
+						},
+						{
+							"name": "DPAD_UP",
+							"value": 12,
+							"description": {
+								"ko": "D-Pad",
+								"en": "D-Pad"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "DPAD_UP"
+							}
+						},
+						{
+							"name": "DPAD_DOWN",
+							"value": 13,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "DPAD_DOWN"
+							}
+						},
+						{
+							"name": "DPAD_LEFT",
+							"value": 14,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "DPAD_LEFT"
+							}
+						},
+						{
+							"name": "DPAD_RIGHT",
+							"value": 15,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "DPAD_RIGHT"
+							}
+						},
+						{
+							"name": "HOME_PS",
+							"value": 16,
+							"description": {
+								"ko": "Center",
+								"en": "Center"
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "HOME_PS"
+							}
+						},
+						{
+							"name": "TOUCHPAD",
+							"value": 17,
+							"description": {
+								"ko": "",
+								"en": ""
+							},
+							"counterpart": {
+								"engine": "vanilla-engine",
+								"module": "core/gamepadmanager",
+								"class": "GamepadButtonCode",
+								"name": "TOUCHPAD"
+							}
+						}
+					]
+				},
 				{
 					"name": "GamepadKind",
 					"summary": {
@@ -83862,15 +86705,15 @@
 								}
 							],
 							"returns": {
-								"type": "FullscreenPass",
+								"type": "FullscreenPass | null",
 								"description": {
-									"ko": "패스.",
-									"en": "Pass."
+									"ko": "패스. (셰이더 짓기에 실패했으면 null)",
+									"en": "Pass. (null if building the shader failed)"
 								}
 							},
 							"description": {
-								"ko": "패스 반환. (없으면 컴파일)",
-								"en": "Returns the pass. (compiles it if missing)"
+								"ko": "패스 반환. (없으면 컴파일. 실패도 담아 두고 한 번만 알린다, 실패한 패스의 단계는 건너뛴다)",
+								"en": "Returns a pass. (compiles it if missing. A failure is also cached and reported only once, and steps with a failed pass are skipped)"
 							},
 							"since": "0.3.0",
 							"source": "src/effect/screeneffect.js"

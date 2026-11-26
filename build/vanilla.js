@@ -2296,6 +2296,293 @@ var Matrix4 = class _Matrix4 extends Object2 {
   }
 };
 
+// src/base/transformmatrix.js
+var TransformMatrix = class _TransformMatrix extends Object2 {
+  static {
+    __name(this, "TransformMatrix");
+  }
+  //==============================================================================
+  // 멤버 변수 목록.
+  //==============================================================================
+  /** @private @type { number } */
+  #a;
+  /** @private @type { number } */
+  #b;
+  /** @private @type { number } */
+  #c;
+  /** @private @type { number } */
+  #d;
+  /** @private @type { number } */
+  #e;
+  /** @private @type { number } */
+  #f;
+  //==============================================================================
+  // 생성.
+  //==============================================================================
+  /**
+   * @constructor
+   */
+  constructor() {
+    super();
+    this.#a = 1;
+    this.#b = 0;
+    this.#c = 0;
+    this.#d = 1;
+    this.#e = 0;
+    this.#f = 0;
+  }
+  //==============================================================================
+  // a 성분 반환 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @returns { number }
+   */
+  get a() {
+    return this.#a;
+  }
+  //==============================================================================
+  // b 성분 반환 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @returns { number }
+   */
+  get b() {
+    return this.#b;
+  }
+  //==============================================================================
+  // c 성분 반환 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @returns { number }
+   */
+  get c() {
+    return this.#c;
+  }
+  //==============================================================================
+  // d 성분 반환 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @returns { number }
+   */
+  get d() {
+    return this.#d;
+  }
+  //==============================================================================
+  // e 성분 반환 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @returns { number }
+   */
+  get e() {
+    return this.#e;
+  }
+  //==============================================================================
+  // f 성분 반환 프로퍼티.
+  //==============================================================================
+  /**
+   * @property
+   * @returns { number }
+   */
+  get f() {
+    return this.#f;
+  }
+  //==============================================================================
+  // 항등 행렬로 재설정.
+  //==============================================================================
+  setIdentity() {
+    this.#a = 1;
+    this.#b = 0;
+    this.#c = 0;
+    this.#d = 1;
+    this.#e = 0;
+    this.#f = 0;
+  }
+  //==============================================================================
+  // 행렬 성분 직접 설정. (Canvas2D setTransform 인자 순서와 동일)
+  //==============================================================================
+  /**
+   * @param { number } a
+   * @param { number } b
+   * @param { number } c
+   * @param { number } d
+   * @param { number } e
+   * @param { number } f
+   */
+  setTransform(a, b, c, d, e, f) {
+    this.#a = a;
+    this.#b = b;
+    this.#c = c;
+    this.#d = d;
+    this.#e = e;
+    this.#f = f;
+  }
+  //==============================================================================
+  // 다른 행렬의 성분 복사.
+  //==============================================================================
+  /**
+   * @param { TransformMatrix } other
+   */
+  copyFrom(other) {
+    this.#a = other.a;
+    this.#b = other.b;
+    this.#c = other.c;
+    this.#d = other.d;
+    this.#e = other.e;
+    this.#f = other.f;
+  }
+  //==============================================================================
+  // 복제.
+  //==============================================================================
+  /**
+   * @override
+   * @returns { this }
+   */
+  clone() {
+    const transformMatrix = (
+      /** @type { this } */
+      new _TransformMatrix()
+    );
+    transformMatrix.copyFrom(this);
+    return transformMatrix;
+  }
+  //==============================================================================
+  // 이동 변환 누적. (Canvas2D translate 와 동일한 로컬 공간 우측 곱)
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   */
+  translate(x, y) {
+    this.#e = this.#a * x + this.#c * y + this.#e;
+    this.#f = this.#b * x + this.#d * y + this.#f;
+  }
+  //==============================================================================
+  // 회전 변환 누적. (Canvas2D rotate 와 동일한 로컬 공간 우측 곱)
+  //==============================================================================
+  /**
+   * @param { number } radian
+   */
+  rotate(radian) {
+    if (radian === 0) {
+      return;
+    }
+    const cosRadian = cos(radian);
+    const sinRadian = sin(radian);
+    const a = this.#a;
+    const b = this.#b;
+    const c = this.#c;
+    const d = this.#d;
+    this.#a = a * cosRadian + c * sinRadian;
+    this.#b = b * cosRadian + d * sinRadian;
+    this.#c = -a * sinRadian + c * cosRadian;
+    this.#d = -b * sinRadian + d * cosRadian;
+  }
+  //==============================================================================
+  // 크기 변환 누적. (Canvas2D scale 과 동일한 로컬 공간 우측 곱)
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   */
+  scale(x, y) {
+    if (x === 1 && y === 1) {
+      return;
+    }
+    this.#a = this.#a * x;
+    this.#b = this.#b * x;
+    this.#c = this.#c * y;
+    this.#d = this.#d * y;
+  }
+  //==============================================================================
+  // 다른 행렬을 우측에 곱해 누적. (this = this x other)
+  //==============================================================================
+  /**
+   * @param { TransformMatrix } other
+   */
+  multiply(other) {
+    const a = this.#a;
+    const b = this.#b;
+    const c = this.#c;
+    const d = this.#d;
+    const e = this.#e;
+    const f = this.#f;
+    this.#a = a * other.a + c * other.b;
+    this.#b = b * other.a + d * other.b;
+    this.#c = a * other.c + c * other.d;
+    this.#d = b * other.c + d * other.d;
+    this.#e = a * other.e + c * other.f + e;
+    this.#f = b * other.e + d * other.f + f;
+  }
+  //==============================================================================
+  // 역행렬. (새 행렬을 돌려주고 이 행렬은 그대로 둔다, 행렬식이 0 이면 null)
+  //==============================================================================
+  /**
+   * @returns { TransformMatrix | null }
+   */
+  invert() {
+    const determinant = this.#a * this.#d - this.#b * this.#c;
+    if (determinant === 0) {
+      return null;
+    }
+    const inverseDeterminant = 1 / determinant;
+    const inverseMatrix = new _TransformMatrix();
+    const a = this.#d * inverseDeterminant;
+    const b = -this.#b * inverseDeterminant;
+    const c = -this.#c * inverseDeterminant;
+    const d = this.#a * inverseDeterminant;
+    const e = (this.#c * this.#f - this.#d * this.#e) * inverseDeterminant;
+    const f = (this.#b * this.#e - this.#a * this.#f) * inverseDeterminant;
+    inverseMatrix.setTransform(a, b, c, d, e, f);
+    return inverseMatrix;
+  }
+  //==============================================================================
+  // 점 변환.
+  //==============================================================================
+  /**
+   * @param { number } x
+   * @param { number } y
+   * @returns { { x: number, y: number } }
+   */
+  transformPoint(x, y) {
+    const transformedX = this.#a * x + this.#c * y + this.#e;
+    const transformedY = this.#b * x + this.#d * y + this.#f;
+    return { x: transformedX, y: transformedY };
+  }
+  //==============================================================================
+  // 행렬이 담고 있는 축별 스케일 중 최대값 반환. (텍스트 선명도 계산용)
+  //==============================================================================
+  /**
+   * @returns { number }
+   */
+  getMaximumScale() {
+    const scaleX = sqrt(this.#a * this.#a + this.#b * this.#b);
+    const scaleY = sqrt(this.#c * this.#c + this.#d * this.#d);
+    return max(scaleX, scaleY);
+  }
+  //==============================================================================
+  // mat3 유니폼 업로드용 열우선(column-major) 배열 기록.
+  //==============================================================================
+  /**
+   * @param { Float32Array } target
+   */
+  writeToFloat32Array(target) {
+    target[0] = this.#a;
+    target[1] = this.#b;
+    target[2] = 0;
+    target[3] = this.#c;
+    target[4] = this.#d;
+    target[5] = 0;
+    target[6] = this.#e;
+    target[7] = this.#f;
+    target[8] = 1;
+  }
+};
+
 // src/base/quaternion.js
 var Quaternion = class _Quaternion extends Object2 {
   static {
@@ -5301,293 +5588,6 @@ var TransformNode = class _TransformNode extends ComponentNode {
    */
   isGizmoVisible() {
     return this.#isGizmoVisible;
-  }
-};
-
-// src/base/transformmatrix.js
-var TransformMatrix = class _TransformMatrix extends Object2 {
-  static {
-    __name(this, "TransformMatrix");
-  }
-  //==============================================================================
-  // 멤버 변수 목록.
-  //==============================================================================
-  /** @private @type { number } */
-  #a;
-  /** @private @type { number } */
-  #b;
-  /** @private @type { number } */
-  #c;
-  /** @private @type { number } */
-  #d;
-  /** @private @type { number } */
-  #e;
-  /** @private @type { number } */
-  #f;
-  //==============================================================================
-  // 생성.
-  //==============================================================================
-  /**
-   * @constructor
-   */
-  constructor() {
-    super();
-    this.#a = 1;
-    this.#b = 0;
-    this.#c = 0;
-    this.#d = 1;
-    this.#e = 0;
-    this.#f = 0;
-  }
-  //==============================================================================
-  // a 성분 반환 프로퍼티.
-  //==============================================================================
-  /**
-   * @property
-   * @returns { number }
-   */
-  get a() {
-    return this.#a;
-  }
-  //==============================================================================
-  // b 성분 반환 프로퍼티.
-  //==============================================================================
-  /**
-   * @property
-   * @returns { number }
-   */
-  get b() {
-    return this.#b;
-  }
-  //==============================================================================
-  // c 성분 반환 프로퍼티.
-  //==============================================================================
-  /**
-   * @property
-   * @returns { number }
-   */
-  get c() {
-    return this.#c;
-  }
-  //==============================================================================
-  // d 성분 반환 프로퍼티.
-  //==============================================================================
-  /**
-   * @property
-   * @returns { number }
-   */
-  get d() {
-    return this.#d;
-  }
-  //==============================================================================
-  // e 성분 반환 프로퍼티.
-  //==============================================================================
-  /**
-   * @property
-   * @returns { number }
-   */
-  get e() {
-    return this.#e;
-  }
-  //==============================================================================
-  // f 성분 반환 프로퍼티.
-  //==============================================================================
-  /**
-   * @property
-   * @returns { number }
-   */
-  get f() {
-    return this.#f;
-  }
-  //==============================================================================
-  // 항등 행렬로 재설정.
-  //==============================================================================
-  setIdentity() {
-    this.#a = 1;
-    this.#b = 0;
-    this.#c = 0;
-    this.#d = 1;
-    this.#e = 0;
-    this.#f = 0;
-  }
-  //==============================================================================
-  // 행렬 성분 직접 설정. (Canvas2D setTransform 인자 순서와 동일)
-  //==============================================================================
-  /**
-   * @param { number } a
-   * @param { number } b
-   * @param { number } c
-   * @param { number } d
-   * @param { number } e
-   * @param { number } f
-   */
-  setTransform(a, b, c, d, e, f) {
-    this.#a = a;
-    this.#b = b;
-    this.#c = c;
-    this.#d = d;
-    this.#e = e;
-    this.#f = f;
-  }
-  //==============================================================================
-  // 다른 행렬의 성분 복사.
-  //==============================================================================
-  /**
-   * @param { TransformMatrix } other
-   */
-  copyFrom(other) {
-    this.#a = other.a;
-    this.#b = other.b;
-    this.#c = other.c;
-    this.#d = other.d;
-    this.#e = other.e;
-    this.#f = other.f;
-  }
-  //==============================================================================
-  // 복제.
-  //==============================================================================
-  /**
-   * @override
-   * @returns { this }
-   */
-  clone() {
-    const transformMatrix = (
-      /** @type { this } */
-      new _TransformMatrix()
-    );
-    transformMatrix.copyFrom(this);
-    return transformMatrix;
-  }
-  //==============================================================================
-  // 이동 변환 누적. (Canvas2D translate 와 동일한 로컬 공간 우측 곱)
-  //==============================================================================
-  /**
-   * @param { number } x
-   * @param { number } y
-   */
-  translate(x, y) {
-    this.#e = this.#a * x + this.#c * y + this.#e;
-    this.#f = this.#b * x + this.#d * y + this.#f;
-  }
-  //==============================================================================
-  // 회전 변환 누적. (Canvas2D rotate 와 동일한 로컬 공간 우측 곱)
-  //==============================================================================
-  /**
-   * @param { number } radian
-   */
-  rotate(radian) {
-    if (radian === 0) {
-      return;
-    }
-    const cosRadian = cos(radian);
-    const sinRadian = sin(radian);
-    const a = this.#a;
-    const b = this.#b;
-    const c = this.#c;
-    const d = this.#d;
-    this.#a = a * cosRadian + c * sinRadian;
-    this.#b = b * cosRadian + d * sinRadian;
-    this.#c = -a * sinRadian + c * cosRadian;
-    this.#d = -b * sinRadian + d * cosRadian;
-  }
-  //==============================================================================
-  // 크기 변환 누적. (Canvas2D scale 과 동일한 로컬 공간 우측 곱)
-  //==============================================================================
-  /**
-   * @param { number } x
-   * @param { number } y
-   */
-  scale(x, y) {
-    if (x === 1 && y === 1) {
-      return;
-    }
-    this.#a = this.#a * x;
-    this.#b = this.#b * x;
-    this.#c = this.#c * y;
-    this.#d = this.#d * y;
-  }
-  //==============================================================================
-  // 다른 행렬을 우측에 곱해 누적. (this = this x other)
-  //==============================================================================
-  /**
-   * @param { TransformMatrix } other
-   */
-  multiply(other) {
-    const a = this.#a;
-    const b = this.#b;
-    const c = this.#c;
-    const d = this.#d;
-    const e = this.#e;
-    const f = this.#f;
-    this.#a = a * other.a + c * other.b;
-    this.#b = b * other.a + d * other.b;
-    this.#c = a * other.c + c * other.d;
-    this.#d = b * other.c + d * other.d;
-    this.#e = a * other.e + c * other.f + e;
-    this.#f = b * other.e + d * other.f + f;
-  }
-  //==============================================================================
-  // 역행렬. (새 행렬을 돌려주고 이 행렬은 그대로 둔다, 행렬식이 0 이면 null)
-  //==============================================================================
-  /**
-   * @returns { TransformMatrix | null }
-   */
-  invert() {
-    const determinant = this.#a * this.#d - this.#b * this.#c;
-    if (determinant === 0) {
-      return null;
-    }
-    const inverseDeterminant = 1 / determinant;
-    const inverseMatrix = new _TransformMatrix();
-    const a = this.#d * inverseDeterminant;
-    const b = -this.#b * inverseDeterminant;
-    const c = -this.#c * inverseDeterminant;
-    const d = this.#a * inverseDeterminant;
-    const e = (this.#c * this.#f - this.#d * this.#e) * inverseDeterminant;
-    const f = (this.#b * this.#e - this.#a * this.#f) * inverseDeterminant;
-    inverseMatrix.setTransform(a, b, c, d, e, f);
-    return inverseMatrix;
-  }
-  //==============================================================================
-  // 점 변환.
-  //==============================================================================
-  /**
-   * @param { number } x
-   * @param { number } y
-   * @returns { { x: number, y: number } }
-   */
-  transformPoint(x, y) {
-    const transformedX = this.#a * x + this.#c * y + this.#e;
-    const transformedY = this.#b * x + this.#d * y + this.#f;
-    return { x: transformedX, y: transformedY };
-  }
-  //==============================================================================
-  // 행렬이 담고 있는 축별 스케일 중 최대값 반환. (텍스트 선명도 계산용)
-  //==============================================================================
-  /**
-   * @returns { number }
-   */
-  getMaximumScale() {
-    const scaleX = sqrt(this.#a * this.#a + this.#b * this.#b);
-    const scaleY = sqrt(this.#c * this.#c + this.#d * this.#d);
-    return max(scaleX, scaleY);
-  }
-  //==============================================================================
-  // mat3 유니폼 업로드용 열우선(column-major) 배열 기록.
-  //==============================================================================
-  /**
-   * @param { Float32Array } target
-   */
-  writeToFloat32Array(target) {
-    target[0] = this.#a;
-    target[1] = this.#b;
-    target[2] = 0;
-    target[3] = this.#c;
-    target[4] = this.#d;
-    target[5] = 0;
-    target[6] = this.#e;
-    target[7] = this.#f;
-    target[8] = 1;
   }
 };
 
@@ -10665,6 +10665,10 @@ var GamepadAnalogStickCode = {
   LEFT_Y: 1,
   RIGHT_X: 2,
   RIGHT_Y: 3
+};
+var GamepadTriggerCode = {
+  L2: 6,
+  R2: 7
 };
 var GamepadButtonCode = {
   // Face Buttons
@@ -36788,17 +36792,23 @@ function resolveEffectProgram(graphic, effect) {
     programTable = new System56.Map();
     programCacheByContext.set(webGL2RenderingContext, programTable);
   }
-  let shaderProgram = programTable.get(effect);
-  if (!shaderProgram) {
-    const defaultShaderProgram = graphic.getShaderProgram();
-    const attributeLocationTable = {
-      vertexPosition: defaultShaderProgram.getAttributeLocation("vertexPosition"),
-      vertexTextureCoordinate: defaultShaderProgram.getAttributeLocation("vertexTextureCoordinate")
-    };
-    const fragmentShaderSource = FRAGMENTSHADER_TEMPLATE.replace("EFFECT_BODY", EFFECT_BODY_TABLE[effect]);
-    shaderProgram = new ShaderProgram(webGL2RenderingContext, VERTEXSHADER_SOURCE2, fragmentShaderSource, attributeLocationTable);
-    programTable.set(effect, shaderProgram);
+  if (programTable.has(effect)) {
+    return programTable.get(effect);
   }
+  const defaultShaderProgram = graphic.getShaderProgram();
+  const attributeLocationTable = {
+    vertexPosition: defaultShaderProgram.getAttributeLocation("vertexPosition"),
+    vertexTextureCoordinate: defaultShaderProgram.getAttributeLocation("vertexTextureCoordinate")
+  };
+  const fragmentShaderSource = FRAGMENTSHADER_TEMPLATE.replace("EFFECT_BODY", EFFECT_BODY_TABLE[effect]);
+  let shaderProgram = null;
+  try {
+    shaderProgram = new ShaderProgram(webGL2RenderingContext, VERTEXSHADER_SOURCE2, fragmentShaderSource, attributeLocationTable);
+  } catch (error) {
+    console.error(`Graphic: shader program "ShaderSprite.${effect}" failed: ${error && error.message !== void 0 ? error.message : error}`);
+    shaderProgram = null;
+  }
+  programTable.set(effect, shaderProgram);
   return shaderProgram;
 }
 __name(resolveEffectProgram, "resolveEffectProgram");
@@ -36858,6 +36868,10 @@ var ShaderSprite = class _ShaderSprite extends Sprite {
       return;
     }
     const shaderProgram = resolveEffectProgram(graphic, effect);
+    if (shaderProgram === null) {
+      super.draw(graphic);
+      return;
+    }
     graphic.setShaderProgramOverride(shaderProgram);
     const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
     let imageRect = this.getImageRect();
@@ -37494,7 +37508,7 @@ var SpriteAnimator = class _SpriteAnimator extends Component {
    * };
    * const spriteAnimator = new SpriteAnimator();
    * spriteAnimator.addClipFromAtlas("run", image, atlasJson, ["run_0", "run_1", "run_2"], 12, true);
-   * console.log(spriteAnimator.hasClip("run"), spriteAnimator.play("run"));
+   * console.log(spriteAnimator.hasClip("run"), spriteAnimator.playClip("run"));
    * spriteAnimator.tick(0.1);
    * console.log(spriteAnimator.getClipName(), spriteAnimator.getCurrentFrameIndex());
    */
@@ -37511,17 +37525,6 @@ var SpriteAnimator = class _SpriteAnimator extends Component {
       frameRects.push(Rect.create(rectData.x, rectData.y, width, height));
     }
     this.addClip(clipName, image, frameRects, fps, isLoop);
-  }
-  //==============================================================================
-  // 재생. (playClip 과 같다)
-  //==============================================================================
-  /**
-   * @param { string } clipName 재생할 클립 이름. (등록하지 않은 이름이면 false)
-   * @param { object } options { onComplete?, restartIfSame = false }
-   * @returns { boolean } 재생 시작 여부.
-   */
-  play(clipName, options = {}) {
-    return this.playClip(clipName, options);
   }
   //==============================================================================
   // 애니메이터로 재생. (러스트 판 play_clip)
@@ -67826,6 +67829,9 @@ var ScreenEffect = class extends Object2 {
     for (let stepIndex = 0; stepIndex < stepList.length; ++stepIndex) {
       const step = stepList[stepIndex];
       const pass = this.resolvePass(step.passName);
+      if (pass === null) {
+        continue;
+      }
       let targetTexture = null;
       if (stepIndex === lastScreenIndex) {
         webGL2RenderingContext.bindFramebuffer(webGL2RenderingContext.FRAMEBUFFER, null);
@@ -67926,19 +67932,26 @@ var ScreenEffect = class extends Object2 {
     this.#halfTargetB = createRenderTarget(webGL2RenderingContext, halfWidth, halfHeight, false);
   }
   //==============================================================================
-  // 패스 반환. (없으면 컴파일)
+  // 패스 반환. (없으면 컴파일. 실패도 담아 두고 한 번만 알린다, 실패한 패스의 단계는 건너뛴다)
   //==============================================================================
   /**
    * @param { string } passName 패스 이름. (효과 이름이나 copy, bloomBright 같은 내부 단계 이름)
-   * @returns { FullscreenPass } 패스.
+   * @returns { FullscreenPass | null } 패스. (셰이더 짓기에 실패했으면 null)
    */
   resolvePass(passName) {
-    let pass = this.#passTable.get(passName);
-    if (!pass) {
-      const fragmentShaderSource = FRAGMENTSHADER_HEADER + EFFECT_BODY_TABLE2[passName] + FRAGMENTSHADER_FOOTER;
-      pass = new FullscreenPass(this.#webGL2RenderingContext, fragmentShaderSource);
-      this.#passTable.set(passName, pass);
+    if (this.#passTable.has(passName)) {
+      return this.#passTable.get(passName);
     }
+    const effectBody = EFFECT_BODY_TABLE2[passName] !== void 0 ? EFFECT_BODY_TABLE2[passName] : "";
+    const fragmentShaderSource = FRAGMENTSHADER_HEADER + effectBody + FRAGMENTSHADER_FOOTER;
+    let pass = null;
+    try {
+      pass = new FullscreenPass(this.#webGL2RenderingContext, fragmentShaderSource);
+    } catch (error) {
+      console.error(`ScreenEffect: pass "${passName}" failed: ${error && error.message !== void 0 ? error.message : error}`);
+      pass = null;
+    }
+    this.#passTable.set(passName, pass);
     return pass;
   }
   //==============================================================================
@@ -68143,6 +68156,9 @@ var ScreenEffect = class extends Object2 {
   destroy() {
     const webGL2RenderingContext = this.#webGL2RenderingContext;
     for (const pass of this.#passTable.values()) {
+      if (pass === null) {
+        continue;
+      }
       webGL2RenderingContext.deleteProgram(pass.getShaderProgram().getProgram());
       webGL2RenderingContext.deleteVertexArray(pass.getVertexArray());
     }
@@ -75383,6 +75399,7 @@ export {
   Animator,
   Asset,
   AssetLoader,
+  AssetType,
   AudioAsset,
   AudioBus,
   AudioPlayer,
@@ -75394,6 +75411,7 @@ export {
   BunchAsset,
   ButtonMotion,
   ButtonMotionStyle,
+  ButtonState,
   Camera,
   Camera2D,
   Camera3D,
@@ -75420,8 +75438,11 @@ export {
   Frame,
   FrameProbe,
   FullscreenPass,
+  GamepadAnalogStickCode,
+  GamepadButtonCode,
   GamepadKind,
   GamepadManager,
+  GamepadTriggerCode,
   GlyphInfo,
   Graphic,
   GraphicsQuality,
@@ -75437,6 +75458,7 @@ export {
   InputDevice,
   InputManager,
   JsonAsset,
+  KeyCode,
   languagepack_exports as LanguagePack,
   LayoutConstraint,
   LayoutConstraintAxis,
@@ -75452,6 +75474,7 @@ export {
   LocalStorage,
   Localization,
   MORPH_GLSL,
+  MORPH_TARGET_MAXIMUM,
   Mask,
   Material,
   math_exports as Math,
@@ -75482,6 +75505,7 @@ export {
   PointerGesture,
   PopupMotion,
   PopupMotionState,
+  ProgressDirection,
   Quaternion,
   Queue,
   Rect,
@@ -75491,6 +75515,7 @@ export {
   RichText,
   SCREEN_EFFECT_PARAMETER_NAMES,
   SHADOW_ATLAS_MAXIMUM_LIGHTS,
+  SKIN_FLOAT_COUNT,
   SKIN_SHADING_EYE,
   SKIN_SHADING_FACIALHAIR,
   SKIN_SHADING_FLUID,
@@ -75508,6 +75533,7 @@ export {
   ScreenEffect,
   ScreenEffectType,
   ScrollBarAxis,
+  ScrollMode,
   SeededRandom,
   Set2 as Set,
   ShaderProgram,
@@ -75529,6 +75555,8 @@ export {
   Sprite,
   SpriteAnimator,
   SpriteAtlas,
+  SpriteBlendMode,
+  SpriteDrawMode,
   Stack,
   Steering2D,
   SubsurfaceScatteringEffect,
@@ -75585,6 +75613,7 @@ export {
   TouchRaycaster,
   TouchRecognizer,
   TrailRenderer,
+  TransformMatrix,
   TransformNode,
   Tween,
   TweenProperty,
@@ -75621,6 +75650,7 @@ export {
   UIView,
   UIWindow,
   UIWindowLayer,
+  VERTEX_FLOAT_COUNT,
   Vector2,
   Vector3,
   Version,
@@ -75629,6 +75659,7 @@ export {
   VirtualPad,
   Visual,
   VisualAsset,
+  WRINKLE_CHANNEL_COUNT,
   wait_exports as Wait,
   WorldNode,
   applyTweenProperty,

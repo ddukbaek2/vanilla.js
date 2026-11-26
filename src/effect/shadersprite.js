@@ -621,12 +621,12 @@ const programCacheByContext = new System.WeakMap();
 
 
 //==============================================================================
-// 효과 프로그램 반환. (없으면 컴파일해 캐시)
+// 효과 프로그램 반환. (없으면 컴파일해 캐시. 실패도 담아 두고 한 번만 알린다)
 //==============================================================================
 /**
  * @param { Graphic } graphic
  * @param { string } effect
- * @returns { ShaderProgram }
+ * @returns { ShaderProgram | null } 효과 프로그램. (셰이더 짓기에 실패했으면 null)
  */
 function resolveEffectProgram(graphic, effect) {
 	const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
@@ -635,17 +635,24 @@ function resolveEffectProgram(graphic, effect) {
 		programTable = new System.Map();
 		programCacheByContext.set(webGL2RenderingContext, programTable);
 	}
-	let shaderProgram = programTable.get(effect);
-	if (!shaderProgram) {
-		const defaultShaderProgram = graphic.getShaderProgram();
-		const attributeLocationTable = {
-			vertexPosition: defaultShaderProgram.getAttributeLocation("vertexPosition"),
-			vertexTextureCoordinate: defaultShaderProgram.getAttributeLocation("vertexTextureCoordinate"),
-		};
-		const fragmentShaderSource = FRAGMENTSHADER_TEMPLATE.replace("EFFECT_BODY", EFFECT_BODY_TABLE[effect]);
-		shaderProgram = new ShaderProgram(webGL2RenderingContext, VERTEXSHADER_SOURCE, fragmentShaderSource, attributeLocationTable);
-		programTable.set(effect, shaderProgram);
+	if (programTable.has(effect)) {
+		return programTable.get(effect);
 	}
+	const defaultShaderProgram = graphic.getShaderProgram();
+	const attributeLocationTable = {
+		vertexPosition: defaultShaderProgram.getAttributeLocation("vertexPosition"),
+		vertexTextureCoordinate: defaultShaderProgram.getAttributeLocation("vertexTextureCoordinate"),
+	};
+	const fragmentShaderSource = FRAGMENTSHADER_TEMPLATE.replace("EFFECT_BODY", EFFECT_BODY_TABLE[effect]);
+	let shaderProgram = null;
+	try {
+		shaderProgram = new ShaderProgram(webGL2RenderingContext, VERTEXSHADER_SOURCE, fragmentShaderSource, attributeLocationTable);
+	}
+	catch (error) {
+		console.error(`Graphic: shader program "ShaderSprite.${effect}" failed: ${error && error.message !== undefined ? error.message : error}`);
+		shaderProgram = null;
+	}
+	programTable.set(effect, shaderProgram);
 	return shaderProgram;
 }
 
@@ -741,7 +748,12 @@ export class ShaderSprite extends Sprite {
 			return;
 		}
 
+		// 효과 셰이더 짓기에 실패했으면 효과 없이 Sprite 로 그린다. (한 효과 실패로 프레임이 멈추지 않게, 알림은 한 번)
 		const shaderProgram = resolveEffectProgram(graphic, effect);
+		if (shaderProgram === null) {
+			super.draw(graphic);
+			return;
+		}
 		graphic.setShaderProgramOverride(shaderProgram);
 
 		const webGL2RenderingContext = graphic.getWebGL2RenderingContext();
