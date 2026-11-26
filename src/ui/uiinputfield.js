@@ -33,6 +33,7 @@ export const UIInputFieldMenuAction = {
 // - 우클릭 시 컨텍스트 메뉴 (잘라내기 / 복사 / 붙여넣기).
 // - 커서 이동과 Delete 는 크롬처럼 글자 묶음 단위, 뒤로 지우기는 블링크 BackspaceStateMachine 처럼 코드 포인트 하나(이모지 묶음은 통째로).
 // - DOM 입력은 크롬 입력 칸처럼 마우스로 두 번 누르면 낱말(윈도우는 뒤 공백까지), 세 번 누르면 글 전체를 고른다. (누름 수는 mousedown 의 detail)
+// - 캔버스 모드의 낱말 이동과 지우기는 크롬처럼 윈도우와 리눅스는 Ctrl, 맥은 Option 과 왼쪽, 오른쪽 화살표, Backspace, Delete 다. (블링크 NextWordPosition, PreviousWordPosition)
 //==============================================================================
 /**
  * @example <caption>이름 입력칸 만들기</caption>
@@ -1113,6 +1114,14 @@ export class UIInputField extends WorldNode {
 	 */
 	handleCanvasKeydown(event) {
 		if (!this.#focused) return;
+		const wordCommand = findWordEditCommand(event);
+		if (wordCommand) {
+			event.preventDefault();
+			this.#performWordEditCommand(wordCommand, event.shiftKey);
+			this.#blinkTimer = 0;
+			this.#cursorVisible = true;
+			return;
+		}
 		const ctrl = event.ctrlKey || event.metaKey;
 
 		if (ctrl) {
@@ -1183,6 +1192,47 @@ export class UIInputField extends WorldNode {
 		}
 		this.#blinkTimer = 0;
 		this.#cursorVisible = true;
+	}
+	//==============================================================================
+	// 낱말 이동과 지우기 하기. (블링크 SelectionModifier 의 kWord 와 TypingCommand 의 낱말 지우기)
+	// - 옮기기는 선택이 있어도 커서(focus) 자리에서 찾는다. 오른쪽은 윈도우만 뒤 공백을 건너뛴다. (ShouldSkipSpaceWhenMovingRight)
+	// - 맥은 고른 것을 낱말로 넓히다 고정 끝을 넘으면 고정 끝에서 멈춘다. (ShouldExtendSelectionByWordOrLineAcrossCaret)
+	// - 지우기는 고른 것이 있으면 고른 것만 지운다. 없으면 커서에서 낱말 자리까지 지우고, 낱말 자리가 커서와 같으면 글자 묶음 하나를 지운다. (킬 링 지우기 규칙)
+	//==============================================================================
+	/**
+	 * @param { string } command 명령. ("moveWordLeft", "moveWordRight", "deleteWordBackward", "deleteWordForward")
+	 * @param { boolean } isShiftKey 옮기기에서 참이면 선택의 고정 끝을 두고 선택을 늘린다.
+	 */
+	#performWordEditCommand(command, isShiftKey) {
+		const value = this.#value;
+		const cursorIndex = this.#cursorIndex;
+		if (command === "moveWordLeft" || command === "moveWordRight") {
+			let targetIndex = command === "moveWordRight" ? findNextWordPosition(value, cursorIndex, isWindowsPlatform()) : findPreviousWordPosition(value, cursorIndex);
+			const anchorIndex = this.#selectionStart;
+			if (isShiftKey && isMacPlatform() && anchorIndex !== cursorIndex && (anchorIndex <= cursorIndex) !== (anchorIndex <= targetIndex)) {
+				targetIndex = anchorIndex;
+			}
+			this.moveCursor(targetIndex, isShiftKey);
+			return;
+		}
+		if (this.hasSelection()) {
+			this.replaceSelection("");
+			return;
+		}
+		if (command === "deleteWordForward") {
+			let endIndex = findNextWordPosition(value, cursorIndex, isWindowsPlatform());
+			if (endIndex === cursorIndex) {
+				endIndex = findNextGraphemeBoundary(value, cursorIndex);
+			}
+			this.deleteRange(cursorIndex, endIndex);
+		}
+		else {
+			let startIndex = findPreviousWordPosition(value, cursorIndex);
+			if (startIndex === cursorIndex) {
+				startIndex = findPreviousGraphemeBoundary(value, cursorIndex);
+			}
+			this.deleteRange(startIndex, cursorIndex);
+		}
 	}
 	//==============================================================================
 	// 커서 옮기기.
@@ -2030,6 +2080,44 @@ function findBackwardDeletionBoundary(text, index) {
 //==============================================================================
 let wordSegmenter = undefined;
 //==============================================================================
+// 낱말 경계 목록. (0 과 글 길이를 넣는다, 오름차순, 크롬 낱말 나누기와 같게)
+// - Intl.Segmenter 경계에 크로미엄 ICU 의 wordbrk.patch 규칙을 더한다. 크롬은 마침표(U+002E, U+FF0E)를 숫자 사이에서만 잇고, 쌍점(U+003A, U+FE55, U+FF1A)은 잇지 않는다.
+//   (크롬의 Intl.Segmenter 는 이미 그렇고, 다른 브라우저도 크롬과 같게 나눈다)
+// - 나누개가 없으면 0 과 글 길이만.
+//==============================================================================
+/**
+ * @param { string } text 글.
+ * @returns { number[] } 낱말 경계 자리 목록. (UTF-16 단위)
+ */
+function collectWordBoundaries(text) {
+	if (wordSegmenter === undefined) {
+		const intl = System.Intl;
+		const segmenterClass = intl ? intl.Segmenter : undefined;
+		wordSegmenter = typeof segmenterClass === "function" ? new segmenterClass(undefined, { granularity: "word" }) : null;
+	}
+	const boundarySet = new Set([0, text.length]);
+	if (!wordSegmenter) {
+		return Array.from(boundarySet).sort((left, right) => left - right);
+	}
+	for (const segment of wordSegmenter.segment(text)) {
+		boundarySet.add(segment.index);
+	}
+	for (let index = 0; index < text.length; index += 1) {
+		const codeUnit = text.charCodeAt(index);
+		const isFullStop = codeUnit === 0x2E || codeUnit === 0xFF0E;
+		const isColon = codeUnit === 0x3A || codeUnit === 0xFE55 || codeUnit === 0xFF1A;
+		if (!isFullStop && !isColon) {
+			continue;
+		}
+		if (isFullStop && /\p{Nd}/u.test(text.charAt(index - 1)) && /\p{Nd}/u.test(text.charAt(index + 1))) {
+			continue;
+		}
+		boundarySet.add(index);
+		boundarySet.add(index + 1);
+	}
+	return Array.from(boundarySet).sort((left, right) => left - right);
+}
+//==============================================================================
 // 자리의 낱말 범위. (블링크 selection_adjuster.cc 의 ExpandWithGranularity kWord)
 // - 공백 덩어리도 한 조각이라 공백을 누르면 공백을 고른다. 경계 자리는 뒤 조각을 고르고, 글 끝이면 앞 조각을 고른다. (ChooseWordSide)
 //==============================================================================
@@ -2039,20 +2127,17 @@ let wordSegmenter = undefined;
  * @returns { { start: number, end: number } } 낱말 범위. (UTF-16 단위, 나누개가 없으면 글 전체)
  */
 function findWordRangeAt(text, index) {
-	if (wordSegmenter === undefined) {
-		const intl = System.Intl;
-		const segmenterClass = intl ? intl.Segmenter : undefined;
-		wordSegmenter = typeof segmenterClass === "function" ? new segmenterClass(undefined, { granularity: "word" }) : null;
-	}
-	if (!wordSegmenter || text.length === 0) {
-		return { start: 0, end: text.length };
+	const boundaryList = collectWordBoundaries(text);
+	if (text.length === 0) {
+		return { start: 0, end: 0 };
 	}
 	const probeIndex = index >= text.length ? text.length - 1 : index;
-	const segment = wordSegmenter.segment(text).containing(probeIndex);
-	if (!segment) {
-		return { start: index, end: index };
+	for (let boundaryIndex = 0; boundaryIndex + 1 < boundaryList.length; boundaryIndex += 1) {
+		if (boundaryList[boundaryIndex] <= probeIndex && probeIndex < boundaryList[boundaryIndex + 1]) {
+			return { start: boundaryList[boundaryIndex], end: boundaryList[boundaryIndex + 1] };
+		}
 	}
-	return { start: segment.index, end: segment.index + segment.segment.length };
+	return { start: index, end: index };
 }
 
 //==============================================================================
@@ -2085,6 +2170,344 @@ function isWindowsPlatform() {
 	const navigator = System.navigator;
 	const platform = navigator && typeof navigator.platform === "string" ? navigator.platform : "";
 	return platform.startsWith("Win");
+}
+
+//==============================================================================
+// 맥인지. (navigator.platform 이 Mac 으로 시작, 크롬 맥의 키 묶음과 낱말 고르기 규칙)
+//==============================================================================
+/**
+ * @returns { boolean }
+ */
+function isMacPlatform() {
+	const navigator = System.navigator;
+	const platform = navigator && typeof navigator.platform === "string" ? navigator.platform : "";
+	return platform.startsWith("Mac");
+}
+
+//==============================================================================
+// 낱말 이동과 지우기 키의 명령. (없으면 null)
+// - 맥이 아니면 블링크 editing_behavior.cc 의 키 표: Ctrl 과 왼쪽, 오른쪽(Shift 와 함께면 고르기), Ctrl 과 Backspace, Delete.
+// - 맥은 키 묶음 StandardKeyBinding.dict: Option 과 왼쪽, 오른쪽(moveWordLeft, moveWordRight, Shift 와 함께면 고르기), Option 과 Backspace, Option, Ctrl 과 Backspace(deleteWordBackward),
+//   Option 과 Delete(deleteWordForward), Option, Ctrl 과 B, F(moveWordBackward, moveWordForward, Shift 와 함께면 고르기).
+//==============================================================================
+/**
+ * @param { KeyboardEvent } event 문서의 keydown 사건.
+ * @returns { string | null } 명령. ("moveWordLeft", "moveWordRight", "deleteWordBackward", "deleteWordForward")
+ */
+function findWordEditCommand(event) {
+	const key = event.key;
+	if (isMacPlatform()) {
+		if (!event.altKey || event.metaKey) {
+			return null;
+		}
+		if (event.ctrlKey) {
+			if (key === "Backspace" && !event.shiftKey) {
+				return "deleteWordBackward";
+			}
+			if (event.code === "KeyB") {
+				return "moveWordLeft";
+			}
+			if (event.code === "KeyF") {
+				return "moveWordRight";
+			}
+			return null;
+		}
+	}
+	else if (!event.ctrlKey || event.altKey || event.metaKey) {
+		return null;
+	}
+	if (key === "ArrowLeft") {
+		return "moveWordLeft";
+	}
+	if (key === "ArrowRight") {
+		return "moveWordRight";
+	}
+	if (key === "Backspace" && !event.shiftKey) {
+		return "deleteWordBackward";
+	}
+	if (key === "Delete" && !event.shiftKey) {
+		return "deleteWordForward";
+	}
+	return null;
+}
+
+//==============================================================================
+// 양방향 분류가 WS 인 글자. (유니코드 DerivedBidiClass.txt 의 WS 17 글자, 블링크 SkipWhitespaceIfNeeded 의 kWhiteSpaceNeutral)
+//==============================================================================
+const WHITESPACE_NEUTRAL_CODE_UNIT_SET = new Set([0x0C, 0x20, 0x1680, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200A, 0x2028, 0x205F, 0x3000]);
+//==============================================================================
+// 서로게이트 단위인지.
+//==============================================================================
+/**
+ * @param { number } codeUnit UTF-16 단위. (글 밖이면 0)
+ * @returns { boolean }
+ */
+function isSurrogateCodeUnit(codeUnit) {
+	return codeUnit >= 0xD800 && codeUnit <= 0xDFFF;
+}
+//==============================================================================
+// 줄바꿈인지. (블링크 position_units_word.cc 의 IsLineBreak: LF, CR)
+//==============================================================================
+/**
+ * @param { number } codeUnit UTF-16 단위. (글 밖이면 0)
+ * @returns { boolean }
+ */
+function isLineBreakCodeUnit(codeUnit) {
+	return codeUnit === 0x0A || codeUnit === 0x0D;
+}
+//==============================================================================
+// 편집 공백인지. (블링크 editing_utilities.h 의 IsWhitespace: NBSP, 공백, 줄바꿈, 탭)
+//==============================================================================
+/**
+ * @param { number } codeUnit UTF-16 단위. (글 밖이면 0)
+ * @returns { boolean }
+ */
+function isEditingWhitespaceCodeUnit(codeUnit) {
+	return codeUnit === 0xA0 || codeUnit === 0x20 || codeUnit === 0x0A || codeUnit === 0x09;
+}
+//==============================================================================
+// 낱말이 끊기는 글자인지. (블링크 IsWordBreak: 찍히는 글자(ICU u_isprint, 일반 범주 C 가 아님)이면서 편집 공백이 아니거나, 서로게이트, 줄바꿈, 밑줄)
+//==============================================================================
+/**
+ * @param { number } codeUnit UTF-16 단위. (글 밖이면 0)
+ * @returns { boolean }
+ */
+function isWordBreakCodeUnit(codeUnit) {
+	if (isSurrogateCodeUnit(codeUnit) || isLineBreakCodeUnit(codeUnit) || codeUnit === 0x5F) {
+		return true;
+	}
+	return !/\p{C}/u.test(System.String.fromCharCode(codeUnit)) && !isEditingWhitespaceCodeUnit(codeUnit);
+}
+//==============================================================================
+// 문장 부호나 기호인지. (블링크 IsWordBoundary: ICU u_ispunct(일반 범주 P), 기호(일반 범주 S), 서로게이트)
+//==============================================================================
+/**
+ * @param { number } codeUnit UTF-16 단위. (글 밖이면 0)
+ * @returns { boolean }
+ */
+function isWordBoundaryCodeUnit(codeUnit) {
+	return isSurrogateCodeUnit(codeUnit) || /[\p{P}\p{S}]/u.test(System.String.fromCharCode(codeUnit));
+}
+//==============================================================================
+// 글자나 숫자인지. (ICU u_isalnum: 일반 범주 L 과 Nd, 서로게이트는 아니다)
+//==============================================================================
+/**
+ * @param { number } codeUnit UTF-16 단위. (글 밖이면 0)
+ * @returns { boolean }
+ */
+function isAlphanumericCodeUnit(codeUnit) {
+	return !isSurrogateCodeUnit(codeUnit) && /[\p{L}\p{Nd}]/u.test(System.String.fromCharCode(codeUnit));
+}
+//==============================================================================
+// 글 자리의 UTF-16 단위. (글 밖이면 0, WTF::String 의 operator[] 처럼)
+//==============================================================================
+/**
+ * @param { string } text 글.
+ * @param { number } index 자리.
+ * @returns { number }
+ */
+function readCodeUnit(text, index) {
+	return index >= 0 && index < text.length ? text.charCodeAt(index) : 0;
+}
+
+//==============================================================================
+// 낱말 자리를 찾는 글 묶음의 시작 목록. (블링크 TextSegments 가 한 번에 보는 글 묶음)
+// - 크롬 textarea 는 줄바꿈을 br 로 두어, 줄바꿈 뒤에 글자가 오는 자리마다 묶음이 나뉜다. (헤드리스 크롬 158 textarea 의 Option + 화살표 자리와 같다)
+//==============================================================================
+/**
+ * @param { string } text 글.
+ * @returns { number[] } 묶음 시작 자리 목록. (UTF-16 단위, 0 부터 오름차순)
+ */
+function collectWordSearchRunStarts(text) {
+	const runStartList = [0];
+	for (let index = 1; index < text.length; index += 1) {
+		if (text.charCodeAt(index - 1) === 0x0A && text.charCodeAt(index) !== 0x0A) {
+			runStartList.push(index);
+		}
+	}
+	return runStartList;
+}
+//==============================================================================
+// 묶음 하나에서 다음 낱말 자리. (블링크 position_units_word.cc 의 NextWordPositionInternal 의 Finder::Find)
+// - 윈도우(isSkipSpaces)는 뒤 공백을 건너뛰고, 공백 뒤 문장 부호에서 멈춘다. (WordSkipSpacesPunctuationFix 는 stable)
+//==============================================================================
+/**
+ * @param { string } runText 묶음 글.
+ * @param { number[] } boundaryList 묶음 안의 낱말 경계. (0 과 묶음 길이를 넣는다)
+ * @param { number } offset 찾기 시작할 묶음 안 자리.
+ * @param { boolean } isSkipSpaces 뒤 공백을 건너뛸지. (PlatformWordBehavior::kWordSkipSpaces)
+ * @param { boolean } isFirstTime 커서가 든 묶음인지.
+ * @returns { number } 묶음 안 자리. (이 묶음에 없으면 -1)
+ */
+function findNextWordInRun(runText, boundaryList, offset, isSkipSpaces, isFirstTime) {
+	const length = runText.length;
+	const skipWhitespace = (position) => {
+		if (isSkipSpaces) {
+			for (let runner = position; runner < length; runner += 1) {
+				const codeUnit = runText.charCodeAt(runner);
+				if (!(isEditingWhitespaceCodeUnit(codeUnit) || WHITESPACE_NEUTRAL_CODE_UNIT_SET.has(codeUnit)) || isLineBreakCodeUnit(codeUnit)) {
+					return runner;
+				}
+			}
+		}
+		return position;
+	};
+	if (!isFirstTime && offset < length && isWordBreakCodeUnit(readCodeUnit(runText, offset))) {
+		return skipWhitespace(offset);
+	}
+	if (offset >= length) {
+		return -1;
+	}
+	let punctuationRunner = -1;
+	for (const runner of boundaryList) {
+		if (runner <= offset) {
+			continue;
+		}
+		const codeUnit = readCodeUnit(runText, runner);
+		const previousCodeUnit = readCodeUnit(runText, runner - 1);
+		if (isLineBreakCodeUnit(codeUnit)) {
+			return skipWhitespace(punctuationRunner >= 0 ? punctuationRunner : runner);
+		}
+		if (runner < length && isWordBoundaryCodeUnit(codeUnit)) {
+			if (isAlphanumericCodeUnit(previousCodeUnit)) {
+				return skipWhitespace(runner);
+			}
+			if (isSkipSpaces && punctuationRunner < 0 && isEditingWhitespaceCodeUnit(previousCodeUnit)) {
+				punctuationRunner = runner;
+			}
+			continue;
+		}
+		if (punctuationRunner >= 0) {
+			return skipWhitespace(punctuationRunner);
+		}
+		if (runner < length && isWordBreakCodeUnit(previousCodeUnit)) {
+			return skipWhitespace(runner);
+		}
+		if (isSkipSpaces && runner < length && isEditingWhitespaceCodeUnit(previousCodeUnit) && isWordBreakCodeUnit(codeUnit)) {
+			return skipWhitespace(runner);
+		}
+	}
+	return runText.charCodeAt(length - 1) !== 0x0A ? length : -1;
+}
+//==============================================================================
+// 묶음 하나에서 앞 낱말 자리. (블링크 position_units_word.cc 의 PreviousWordPositionInternal 의 Finder::Find)
+//==============================================================================
+/**
+ * @param { string } runText 묶음 글.
+ * @param { number[] } boundaryList 묶음 안의 낱말 경계. (0 과 묶음 길이를 넣는다)
+ * @param { number } offset 찾기 시작할 묶음 안 자리.
+ * @param { boolean } isFirstTime 커서가 든 묶음인지.
+ * @returns { number } 묶음 안 자리. (이 묶음에 없으면 -1)
+ */
+function findPreviousWordInRun(runText, boundaryList, offset, isFirstTime) {
+	const length = runText.length;
+	if (!isFirstTime && length > 0 && offset <= length && isWordBreakCodeUnit(readCodeUnit(runText, offset - 1))) {
+		return offset;
+	}
+	if (offset === 0 || length === 0) {
+		return -1;
+	}
+	let punctuationRunner = -1;
+	for (let boundaryIndex = boundaryList.length - 1; boundaryIndex >= 0; boundaryIndex -= 1) {
+		const runner = boundaryList[boundaryIndex];
+		if (runner >= offset) {
+			continue;
+		}
+		const codeUnit = readCodeUnit(runText, runner);
+		if (runner < length && isWordBoundaryCodeUnit(codeUnit)) {
+			if (isAlphanumericCodeUnit(readCodeUnit(runText, runner - 1))) {
+				return runner;
+			}
+			punctuationRunner = runner;
+			continue;
+		}
+		if (punctuationRunner >= 0) {
+			return punctuationRunner;
+		}
+		if (runner < length && isWordBreakCodeUnit(codeUnit)) {
+			return runner;
+		}
+	}
+	return 0;
+}
+//==============================================================================
+// 묶음 안의 낱말 경계. (묶음 시작을 0 으로, 0 과 묶음 길이를 넣는다)
+//==============================================================================
+/**
+ * @param { number[] } boundaryList 글 전체의 낱말 경계.
+ * @param { number } runStart 묶음 시작.
+ * @param { number } runEnd 묶음 끝.
+ * @returns { number[] }
+ */
+function collectRunBoundaries(boundaryList, runStart, runEnd) {
+	const runBoundaryList = [0];
+	for (const boundary of boundaryList) {
+		if (boundary > runStart && boundary < runEnd) {
+			runBoundaryList.push(boundary - runStart);
+		}
+	}
+	runBoundaryList.push(runEnd - runStart);
+	return runBoundaryList;
+}
+//==============================================================================
+// 다음 낱말 자리. (크롬 오른쪽 낱말 이동과 앞으로 낱말 지우기, 블링크 NextWordPosition)
+// - 맥과 리눅스는 지금 낱말의 끝("abc| def|"), 윈도우는 뒤 공백을 건너뛴 다음 낱말 앞("abc |def")이다. (editing_behavior.h 의 ShouldSkipSpaceWhenMovingRight)
+// - 줄 끝에서는 다음 줄 앞으로 간다. 글 끝이면 글 길이.
+//==============================================================================
+/**
+ * @param { string } text 글.
+ * @param { number } index 커서 자리. (UTF-16 단위)
+ * @param { boolean } isSkipSpaces 뒤 공백을 건너뛸지. (윈도우면 참)
+ * @returns { number } 다음 낱말 자리. (UTF-16 단위)
+ */
+function findNextWordPosition(text, index, isSkipSpaces) {
+	const position = System.Math.max(0, System.Math.min(text.length, index));
+	const boundaryList = collectWordBoundaries(text);
+	const runStartList = collectWordSearchRunStarts(text);
+	let runIndex = runStartList.length - 1;
+	while (runIndex > 0 && runStartList[runIndex] > position) {
+		runIndex -= 1;
+	}
+	for (let isFirstTime = true; runIndex < runStartList.length; runIndex += 1) {
+		const runStart = runStartList[runIndex];
+		const runEnd = runIndex + 1 < runStartList.length ? runStartList[runIndex + 1] : text.length;
+		const offset = isFirstTime ? position - runStart : 0;
+		const found = findNextWordInRun(text.slice(runStart, runEnd), collectRunBoundaries(boundaryList, runStart, runEnd), offset, isSkipSpaces, isFirstTime);
+		if (found >= 0) {
+			return runStart + found;
+		}
+		isFirstTime = false;
+	}
+	return text.length;
+}
+//==============================================================================
+// 앞 낱말 자리. (크롬 왼쪽 낱말 이동과 뒤로 낱말 지우기, 블링크 PreviousWordPosition, 모든 플랫폼에서 낱말 앞 "|abc |def")
+// - textarea 처럼 글자가 있는 줄의 앞에서는 앞 줄로 넘어가지 않는다. 글 앞이면 0.
+//==============================================================================
+/**
+ * @param { string } text 글.
+ * @param { number } index 커서 자리. (UTF-16 단위)
+ * @returns { number } 앞 낱말 자리. (UTF-16 단위)
+ */
+function findPreviousWordPosition(text, index) {
+	const position = System.Math.max(0, System.Math.min(text.length, index));
+	const boundaryList = collectWordBoundaries(text);
+	const runStartList = collectWordSearchRunStarts(text);
+	let runIndex = runStartList.length - 1;
+	while (runIndex > 0 && runStartList[runIndex] > position) {
+		runIndex -= 1;
+	}
+	for (let isFirstTime = true; runIndex >= 0; runIndex -= 1) {
+		const runStart = runStartList[runIndex];
+		const runEnd = runIndex + 1 < runStartList.length ? runStartList[runIndex + 1] : text.length;
+		const offset = isFirstTime ? position - runStart : runEnd - runStart;
+		const found = findPreviousWordInRun(text.slice(runStart, runEnd), collectRunBoundaries(boundaryList, runStart, runEnd), offset, isFirstTime);
+		if (found >= 0) {
+			return runStart + found;
+		}
+		isFirstTime = false;
+	}
+	return 0;
 }
 
 //==============================================================================
