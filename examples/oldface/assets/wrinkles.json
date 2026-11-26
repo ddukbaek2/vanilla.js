@@ -1,7 +1,7 @@
 {
  "channels": [
   {
-   "region": "head_wm1_browsRaiseInner_L",
+   "region": "forehead_L",
    "maps": [
     1,
     0,
@@ -9,7 +9,7 @@
    ]
   },
   {
-   "region": "head_wm1_browsRaiseInner_R",
+   "region": "forehead_R",
    "maps": [
     1,
     0,
@@ -17,7 +17,7 @@
    ]
   },
   {
-   "region": "head_wm1_browsRaiseOuter_L",
+   "region": "upperLid_L",
    "maps": [
     1,
     0,
@@ -25,7 +25,7 @@
    ]
   },
   {
-   "region": "head_wm1_browsRaiseOuter_R",
+   "region": "upperLid_R",
    "maps": [
     1,
     0,
@@ -33,7 +33,7 @@
    ]
   },
   {
-   "region": "head_wm1_blink_L",
+   "region": "neck_L",
    "maps": [
     1,
     0,
@@ -41,7 +41,7 @@
    ]
   },
   {
-   "region": "head_wm1_blink_R",
+   "region": "neck_R",
    "maps": [
     1,
     0,
@@ -49,7 +49,7 @@
    ]
   },
   {
-   "region": "head_wm1_chinRaise_L",
+   "region": "chin",
    "maps": [
     1,
     0,
@@ -57,79 +57,7 @@
    ]
   },
   {
-   "region": "head_wm1_chinRaise_R",
-   "maps": [
-    1,
-    0,
-    0
-   ]
-  },
-  {
-   "region": "head_wm1_jawOpen",
-   "maps": [
-    1,
-    0,
-    0
-   ]
-  },
-  {
-   "region": "head_wm1_purse_DL",
-   "maps": [
-    1,
-    0,
-    0
-   ]
-  },
-  {
-   "region": "head_wm1_purse_DR",
-   "maps": [
-    1,
-    0,
-    0
-   ]
-  },
-  {
-   "region": "head_wm1_purse_UL",
-   "maps": [
-    1,
-    0,
-    0
-   ]
-  },
-  {
-   "region": "head_wm1_purse_UR",
-   "maps": [
-    1,
-    0,
-    0
-   ]
-  },
-  {
-   "region": "head_wm1_squintInner_L",
-   "maps": [
-    1,
-    0,
-    0
-   ]
-  },
-  {
-   "region": "head_wm1_squintInner_R",
-   "maps": [
-    1,
-    0,
-    0
-   ]
-  },
-  {
-   "region": "",
-   "maps": [
-    0,
-    0,
-    0
-   ]
-  },
-  {
-   "region": "head_wm2_browsDown_L",
+   "region": "glabella",
    "maps": [
     0,
     1,
@@ -137,7 +65,7 @@
    ]
   },
   {
-   "region": "head_wm2_browsDown_R",
+   "region": "noseBridge",
    "maps": [
     0,
     1,
@@ -145,7 +73,7 @@
    ]
   },
   {
-   "region": "head_wm2_browsLateral_L",
+   "region": "lips",
    "maps": [
     0,
     1,
@@ -153,79 +81,7 @@
    ]
   },
   {
-   "region": "head_wm2_browsLateral_R",
-   "maps": [
-    0,
-    1,
-    0
-   ]
-  },
-  {
-   "region": "head_wm2_mouthStretch_L",
-   "maps": [
-    0,
-    1,
-    0
-   ]
-  },
-  {
-   "region": "head_wm2_mouthStretch_R",
-   "maps": [
-    0,
-    1,
-    0
-   ]
-  },
-  {
-   "region": "head_wm2_neckStretch_L",
-   "maps": [
-    0,
-    1,
-    0
-   ]
-  },
-  {
-   "region": "head_wm2_neckStretch_R",
-   "maps": [
-    0,
-    1,
-    0
-   ]
-  },
-  {
-   "region": "head_wm2_noseWrinkler_L",
-   "maps": [
-    0,
-    1,
-    0
-   ]
-  },
-  {
-   "region": "head_wm2_noseWrinkler_R",
-   "maps": [
-    0,
-    1,
-    0
-   ]
-  },
-  {
-   "region": "",
-   "maps": [
-    0,
-    0,
-    0
-   ]
-  },
-  {
-   "region": "",
-   "maps": [
-    0,
-    0,
-    0
-   ]
-  },
-  {
-   "region": "head_wm3_cheekRaiseInner_L",
+   "region": "crowsFeet_L",
    "maps": [
     0,
     0,
@@ -233,7 +89,7 @@
    ]
   },
   {
-   "region": "head_wm3_cheekRaiseInner_R",
+   "region": "crowsFeet_R",
    "maps": [
     0,
     0,
@@ -241,7 +97,7 @@
    ]
   },
   {
-   "region": "head_wm3_cheekRaiseOuter_L",
+   "region": "underEye_L",
    "maps": [
     0,
     0,
@@ -249,7 +105,7 @@
    ]
   },
   {
-   "region": "head_wm3_cheekRaiseOuter_R",
+   "region": "underEye_R",
    "maps": [
     0,
     0,
@@ -257,7 +113,7 @@
    ]
   },
   {
-   "region": "head_wm3_cheekRaiseUpper_L",
+   "region": "nasolabial_L",
    "maps": [
     0,
     0,
@@ -265,206 +121,122 @@
    ]
   },
   {
-   "region": "head_wm3_cheekRaiseUpper_R",
+   "region": "nasolabial_R",
    "maps": [
     0,
-    0,
-    1
-   ]
-  },
-  {
-   "region": "head_wm3_smile_L",
-   "maps": [
-    0,
-    0,
-    1
-   ]
-  },
-  {
-   "region": "head_wm3_smile_R",
-   "maps": [
-    0,
-    0,
-    1
-   ]
-  },
-  {
-   "region": "head_wm13_lips_DL",
-   "maps": [
-    1,
-    0,
-    1
-   ]
-  },
-  {
-   "region": "head_wm13_lips_DR",
-   "maps": [
-    1,
-    0,
-    1
-   ]
-  },
-  {
-   "region": "head_wm13_lips_UL",
-   "maps": [
-    1,
-    0,
-    1
-   ]
-  },
-  {
-   "region": "head_wm13_lips_UR",
-   "maps": [
-    1,
     0,
     1
    ]
   }
  ],
  "shapes": {
-  "EyeBlinkLeft": {
-   "head_wm1_blink_L": 1.0,
-   "head_wm1_squintInner_L": 0.3
-  },
-  "EyeLookDownLeft": {
-   "head_wm1_blink_L": 1.0
-  },
-  "EyeSquintLeft": {
-   "head_wm1_squintInner_L": 0.8
-  },
-  "EyeBlinkRight": {
-   "head_wm1_blink_R": 1.0,
-   "head_wm1_squintInner_R": 0.3
-  },
-  "EyeLookDownRight": {
-   "head_wm1_blink_R": 1.0
-  },
-  "EyeSquintRight": {
-   "head_wm1_squintInner_R": 0.8
-  },
-  "JawOpen": {
-   "head_wm1_jawOpen": 1.0
-  },
-  "MouthPucker": {
-   "head_wm13_lips_UL": 0.624,
-   "head_wm13_lips_UR": 0.624,
-   "head_wm13_lips_DL": 0.624,
-   "head_wm13_lips_DR": 0.624,
-   "head_wm1_purse_UL": 0.53,
-   "head_wm1_purse_UR": 0.53,
-   "head_wm1_purse_DL": 0.53,
-   "head_wm1_purse_DR": 0.53
-  },
-  "MouthLeft": {
-   "head_wm3_cheekRaiseInner_L": 0.5,
-   "head_wm3_cheekRaiseOuter_L": 0.5,
-   "head_wm3_smile_L": 1.0,
-   "head_wm13_lips_UL": 0.5,
-   "head_wm13_lips_UR": 0.5,
-   "head_wm13_lips_DL": 0.5,
-   "head_wm13_lips_DR": 0.5
-  },
-  "MouthRight": {
-   "head_wm3_cheekRaiseInner_R": 0.5,
-   "head_wm3_cheekRaiseOuter_R": 0.5,
-   "head_wm13_lips_UL": 0.5,
-   "head_wm13_lips_UR": 0.5,
-   "head_wm13_lips_DL": 0.5,
-   "head_wm13_lips_DR": 0.5,
-   "head_wm3_smile_R": 1.0
-  },
-  "MouthSmileLeft": {
-   "head_wm3_cheekRaiseInner_L": 0.8,
-   "head_wm3_cheekRaiseOuter_L": 0.8,
-   "head_wm3_smile_L": 1.0,
-   "head_wm13_lips_UL": 1.0,
-   "head_wm13_lips_DL": 1.0
-  },
-  "MouthSmileRight": {
-   "head_wm3_cheekRaiseInner_R": 0.8,
-   "head_wm3_cheekRaiseOuter_R": 0.8,
-   "head_wm3_smile_R": 1.0,
-   "head_wm13_lips_UR": 1.0,
-   "head_wm13_lips_DR": 1.0
-  },
-  "MouthDimpleLeft": {
-   "head_wm3_smile_L": 0.4,
-   "head_wm13_lips_UL": 0.5,
-   "head_wm13_lips_DL": 0.5
-  },
-  "MouthDimpleRight": {
-   "head_wm3_smile_R": 0.4,
-   "head_wm13_lips_UR": 0.5,
-   "head_wm13_lips_DR": 0.5
-  },
-  "MouthStretchLeft": {
-   "head_wm13_lips_UL": 1.0,
-   "head_wm13_lips_DL": 1.0,
-   "head_wm2_mouthStretch_L": 1.0
-  },
-  "MouthStretchRight": {
-   "head_wm13_lips_UR": 1.0,
-   "head_wm13_lips_DR": 1.0,
-   "head_wm2_mouthStretch_R": 1.0
-  },
-  "MouthShrugLower": {
-   "head_wm1_chinRaise_L": 1.0,
-   "head_wm1_chinRaise_R": 1.0
-  },
-  "BrowDownLeft": {
-   "head_wm2_browsDown_L": 1.0,
-   "head_wm2_browsLateral_L": 0.031
-  },
-  "BrowDownRight": {
-   "head_wm2_browsDown_R": 1.0,
-   "head_wm2_browsLateral_L": 0.031
-  },
   "BrowInnerUp": {
-   "head_wm2_browsLateral_L": 1.0,
-   "head_wm2_browsLateral_R": 1.0,
-   "head_wm1_browsRaiseInner_L": 1.0,
-   "head_wm1_browsRaiseInner_R": 1.0
+   "forehead_L": 0.7,
+   "forehead_R": 0.7
   },
   "BrowOuterUpLeft": {
-   "head_wm2_browsLateral_L": 0.031,
-   "head_wm1_browsRaiseInner_L": 1.0,
-   "head_wm1_browsRaiseOuter_L": 1.0,
-   "head_wm1_blink_L": 1.0
+   "forehead_L": 1.0
   },
   "BrowOuterUpRight": {
-   "head_wm2_browsLateral_L": 0.031,
-   "head_wm1_browsRaiseInner_R": 1.0,
-   "head_wm1_browsRaiseOuter_R": 1.0,
-   "head_wm1_blink_R": 1.0
+   "forehead_R": 1.0
   },
-  "CheekPuff": {
-   "head_wm2_browsLateral_L": 0.031
+  "EyeWideLeft": {
+   "forehead_L": 0.3
+  },
+  "EyeWideRight": {
+   "forehead_R": 0.3
+  },
+  "BrowDownLeft": {
+   "glabella": 0.8,
+   "noseBridge": 0.3
+  },
+  "BrowDownRight": {
+   "glabella": 0.8,
+   "noseBridge": 0.3
+  },
+  "EyeBlinkLeft": {
+   "upperLid_L": 1.0,
+   "crowsFeet_L": 0.2
+  },
+  "EyeBlinkRight": {
+   "upperLid_R": 1.0,
+   "crowsFeet_R": 0.2
+  },
+  "EyeLookDownLeft": {
+   "upperLid_L": 0.6
+  },
+  "EyeLookDownRight": {
+   "upperLid_R": 0.6
+  },
+  "EyeSquintLeft": {
+   "crowsFeet_L": 0.8,
+   "underEye_L": 0.6
+  },
+  "EyeSquintRight": {
+   "crowsFeet_R": 0.8,
+   "underEye_R": 0.6
   },
   "CheekSquintLeft": {
-   "head_wm2_browsLateral_L": 0.031,
-   "head_wm3_cheekRaiseInner_L": 0.8,
-   "head_wm3_cheekRaiseOuter_L": 0.8,
-   "head_wm3_cheekRaiseUpper_L": 0.8
+   "crowsFeet_L": 1.0,
+   "underEye_L": 0.8
   },
   "CheekSquintRight": {
-   "head_wm2_browsLateral_L": 0.031,
-   "head_wm3_cheekRaiseInner_R": 0.8,
-   "head_wm3_cheekRaiseOuter_R": 0.8,
-   "head_wm3_cheekRaiseUpper_R": 0.8
+   "crowsFeet_R": 1.0,
+   "underEye_R": 0.8
+  },
+  "MouthSmileLeft": {
+   "nasolabial_L": 1.0,
+   "crowsFeet_L": 0.5,
+   "underEye_L": 0.4
+  },
+  "MouthSmileRight": {
+   "nasolabial_R": 1.0,
+   "crowsFeet_R": 0.5,
+   "underEye_R": 0.4
   },
   "NoseSneerLeft": {
-   "head_wm2_browsDown_L": 0.2,
-   "head_wm2_browsLateral_L": 0.331,
-   "head_wm2_noseWrinkler_L": 1.0
+   "noseBridge": 1.0,
+   "nasolabial_L": 0.5
   },
   "NoseSneerRight": {
-   "head_wm2_browsDown_R": 0.2,
-   "head_wm2_browsLateral_L": 0.031,
-   "head_wm2_browsLateral_R": 0.3,
-   "head_wm2_noseWrinkler_R": 1.0
+   "noseBridge": 1.0,
+   "nasolabial_R": 0.5
   },
-  "TongueOut": {
-   "head_wm2_browsLateral_L": 0.031
+  "MouthPucker": {
+   "lips": 1.0
+  },
+  "MouthFunnel": {
+   "lips": 0.7
+  },
+  "MouthShrugLower": {
+   "chin": 1.0
+  },
+  "MouthPressLeft": {
+   "chin": 0.4
+  },
+  "MouthPressRight": {
+   "chin": 0.4
+  },
+  "MouthRollLower": {
+   "chin": 0.3
+  },
+  "MouthStretchLeft": {
+   "neck_L": 1.0
+  },
+  "MouthStretchRight": {
+   "neck_R": 1.0
+  },
+  "MouthFrownLeft": {
+   "neck_L": 0.6,
+   "chin": 0.3
+  },
+  "MouthFrownRight": {
+   "neck_R": 0.6,
+   "chin": 0.3
+  },
+  "JawOpen": {
+   "neck_L": 0.3,
+   "neck_R": 0.3
   }
  }
 }
