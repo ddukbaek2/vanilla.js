@@ -6,6 +6,8 @@
 
 `ParticleSystem` 은 유니티 ParticleSystem 의 자주 쓰는 부분을 2D 로 옮긴 컴포넌트입니다. 노드에 붙이면 바로 방출을 시작하고(기본 재생, 반복, 초당 20 개), 파티클은 노드 원점을 기준으로 그립니다.
 
+![Particle Effects 예제의 FIRE 프리셋: 원뿔 방출과 더하기 섞기로 그린 불꽃과 연기, 왼쪽 프리셋 목록과 위쪽 설정 코드](../images/particle-effects.webp)
+
 ```javascript
 import { Engine, EngineConfiguration, Scene, WorldNode, ParticleSystem, ParticleEmitterShape, Vector2, Color } from "./build/vanilla.js";
 
@@ -226,6 +228,8 @@ engine.run(new SnowScene());
 
 노드가 지나간 자리를 점으로 기록해, 굵기와 색이 잦아드는 띠로 그립니다(유니티 TrailRenderer 의 2D 대응). 점은 노드의 로컬 위치로 기록합니다.
 
+![TrailRenderer 로 꼬리를 그리며 날아가는 혜성](../images/trail.webp)
+
 - `setTime(seconds)`: 점이 남는 시간, 곧 띠의 길이(기본 0.5).
 - `setWidth(startWidth, endWidth)`: 갓 생긴 점에서 끝으로 가며 바뀌는 굵기(기본 10, 0).
 - `setColors(startColor, endColor)`: 기본 `(1, 1, 1, 0.9)` 에서 `(1, 1, 1, 0)`.
@@ -281,6 +285,8 @@ engine.run(new TrailScene());
 ## ShaderSprite
 
 `Sprite` 를 이어받아 프래그먼트 셰이더 효과를 거는 스프라이트입니다. `ShaderSpriteEffect` 에 `none` 을 빼고 49 가지 효과가 있습니다(섬광 `flash`, 외곽선 `outline`, 광택 `shine`, 디졸브 `dissolve`, 홀로그램 `hologram`, 물결 `wave`, 모자이크 `pixelate`, 글리치 `glitch`, 와이프 `wipe` 같은 것). 효과마다 기본 파라미터와 색이 있고, 소스의 `ShaderSpriteEffect` 주석에 효과마다 진행도, 색, 파라미터의 뜻이 적혀 있습니다.
+
+![Sprite Effects 예제: ShaderSprite 의 glow 효과를 방패, 별, 박쥐, 슬라임, 동전, 보석 그림에 건 화면](../images/shader-sprite.webp)
 
 - `setEffect(effect)` 는 효과를 바꾸고 그 효과의 기본 파라미터와 색으로 되돌립니다. `none` 이거나 그림이 없으면 `Sprite` 와 같게 그립니다.
 - `setEffectProgress(progress)`(0 ~ 1)는 트윈이나 타임라인이 밀어 넣는 진행도입니다. 효과 시간(`setEffectTime`)은 `tick` 에서 스스로 흐릅니다.
@@ -343,6 +349,8 @@ engine.run(new DissolveScene());
 ## ScreenEffect
 
 씬 전체에 거는 후처리 사슬입니다. 씬은 화면에 그대로 그리고, `end` 에서 화면(또는 정한 영역)을 떠 와 켜진 효과를 차례로 건 뒤 같은 자리에 되돌려 놓습니다. `ScreenEffectType` 에 58 가지 효과가 있습니다(비네트 `vignette`, 충격파 `shockwave`, 번짐 `bloom`, 색 보정 `colorGrade`, 색수차 `chromatic`, 그레인 `grain`, 안개 `fog`, 페이드 `fade` 같은 것).
+
+![Sprite Effects 예제: ScreenEffect 의 godRays 를 화면 전체에 건 빛줄기](../images/screen-effect.webp)
 
 - `new ScreenEffect(engine.getGraphic())` 로 만들고, 씬의 `preDraw` 첫머리에서 `begin(graphic)`, `postDraw` 끝에서 `end(graphic)`, `tick` 에서 `tick(timeDelta)` 를 부릅니다.
 - `setEnabled(type, isEnabled)`, `setStrength(type, strength)`(0 이면 꺼진 것과 같음), `setParameters(type, x, y, z, w)`, `setParameter(type, name, value)`(이름은 `SCREEN_EFFECT_PARAMETER_NAMES`), `setColor(type, color)`, `disableAll()`, `resetAll()`.

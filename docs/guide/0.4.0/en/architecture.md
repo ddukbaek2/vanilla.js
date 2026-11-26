@@ -30,11 +30,10 @@ src/graphics3d/            # 3D (WebGL2): FbxLoader, SkinnedModel, Material, Ski
                            #     AmbientOcclusionEffect, SubsurfaceScatteringEffect (FullscreenPass is in core)
 src/graphics3d/toon/       # Toon 3D: MeshBuilder(ToonMesh), glbmeshreader(ToonGlb), ToonRenderer, ToonLightSet, ToonMaterial,
                            #     ToonDrawQueue, ToonScreenOutline, ToonVfx, ToonPostProcess, ToonView3D
-src/experimental/          # Drafts of features after 0.4.0 (the Experimental namespace of import.js, the API may change)
 src/deprecated/            # AnchoredWorldNode (deprecated), Camera (to be deprecated, Camera2D covers it), dead code aabb, transform2d, gl2d, webgl2
 ```
 
-Layers depend only from bottom to top: `base` ← `core` ← (`resource`, `effect`, `ui`, `game`, `misc`, `animation`, `graphics3d`, `experimental`). `src/web` is a DOM world unrelated to the engine node tree.
+Layers depend only from bottom to top: `base` ← `core` ← (`resource`, `effect`, `ui`, `game`, `misc`, `animation`, `graphics3d`). `src/web` is a DOM world unrelated to the engine node tree.
 
 ---
 
@@ -288,7 +287,6 @@ soldier.glb ──> parseBinary ──> glTF JSON+BIN
 ## 7. Public API Surface (import.js)
 
 - A single barrel file at the repository root. Its 13 comment-section blocks (built-in/base/core/basic components/UI/resources/other/collections/animation/shaders and fullscreen pass/3D graphics/to be deprecated/experimental) are the logical layer divisions, and after the experimental block come exports with a one-line comment per branch.
-- The experimental block is the single line `export * as Experimental`. Drafts of features after 0.4.0 are gathered in src/experimental/experimental.js and exported as `Experimental.Name`. A draft's API may change, and once it has grown up it moves to its proper folder and is exported directly from import.js.
 - Enums are exported on the same line together with their class (`export { ViewScaleMode, ViewManager }`).
 - Function-collection modules are exported as namespaces (`export * as Format`, `LanguagePack`, `UIFont`, `ToonMesh`, `ToonGlb`).
 - **Intentionally unexposed** = treated as internal implementation: `AudioManager` (used via Engine), `Layer`, `DEVTools`, `GameScene`, `FbxLoader` (via SkinnedModel), the 2 texture caches and sharedbakecache, autolayout internal types (`LayoutRow`, `LayoutSymbol`, `LayoutSymbolType`), all of src/web (`Pane`, `WebSocketClient`). Projects that need an unexposed class import it directly by file path.
@@ -316,7 +314,7 @@ soldier.glb ──> parseBinary ──> glTF JSON+BIN
 ## 9. Relationship with the Rust Version
 
 - The Rust version (vanilla-engine) ported 182 of this engine's 200 `src/` files (not counting the draft area src/experimental). The 18 files intentionally not ported are empty files (calculator, layer, resources, uibuilder), dead code (aabb, transform2d, gl2d, webgl2, anchoredworldmnode in deprecated), things the Rust language and standard library take care of (object, reflection, singleton and the five in base/collection), and deprecated/camera.js, which Camera2D covers.
-- The folders are the same as in the Rust version. (graphics3d, graphics3d/toon, animation, misc, resource, and the draft area experimental) Only the original core/graphic/* sits directly under core/ in the Rust version.
+- The folders are the same as in the Rust version. (graphics3d, graphics3d/toon, animation, misc, resource) Only the original core/graphic/* sits directly under core/ in the Rust version.
 - The public API and behavior of the two engines are kept the same. Only the names change to Rust conventions (snake_case, UpperCamelCase, SCREAMING_SNAKE_CASE). (setFillColor → set_fill_color)
 - The remaining differences (things that truly cannot be matched and forms decided to suit Rust) are collected in sections 9 and 10 of ARCHITECTURE.md in the Rust version repository. Key points: the Rust version uses load handles and callbacks instead of async, registration tables instead of reflection, passing as arguments instead of a global engine, nodes are handles (NodeId), and the desktop has no DOM, browser settings or safe area.
 

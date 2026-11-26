@@ -6,6 +6,8 @@
 
 `EngineConfiguration.useDevTools` 가 켜져 있으면(처음 값 `true`) `UIScene` 이 초기화할 때 개발자 도구 패널을 만듭니다. 게임 화면에서 F2 를 누르면 패널이 캔버스 오른쪽 아래에 붙어 열리고, 다시 누르면 닫힙니다. 기본 `Scene` 은 패널을 만들지 않으므로 패널을 쓰려면 `UIScene` 을 이어받습니다.
 
+![F2 로 연 개발자 도구 패널: 노드 하이어라키에서 Title 을 고르면 인스펙터에 노드 값과 UILabel 값이 나온다](../images/dev-tools.webp)
+
 ```javascript
 import { Engine, EngineConfiguration, UIScene, WorldNode, Paint, UILabel, Pivot, Vector2, Color } from "./build/vanilla.js";
 

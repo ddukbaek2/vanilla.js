@@ -44,6 +44,7 @@ import { Graphic } from "../core/graphic.js";
  * const engineConfiguration = new EngineConfiguration();
  * const engine = new Engine(engineConfiguration);
  * engine.run(new MainScene());
+ * @exampleImage trail.webp
  */
 export class TrailRenderer extends Component {
 	//==============================================================================

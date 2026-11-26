@@ -118,6 +118,7 @@ function countBurstFires(burstTime, previousTime, currentTime, isStartIncluded, 
  * const engineConfiguration = new EngineConfiguration();
  * const engine = new Engine(engineConfiguration);
  * engine.run(new MainScene());
+ * @exampleImage particle-effects.webp
  */
 export class ParticleSystem extends Component {
 	//==============================================================================

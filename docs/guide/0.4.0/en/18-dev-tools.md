@@ -6,6 +6,8 @@ This chapter covers features for showing information on screen, inspecting nodes
 
 When `EngineConfiguration.useDevTools` is on (the default is `true`), `UIScene` creates the developer tools panel during initialization. Press F2 in the game and the panel opens docked to the bottom right of the canvas; press it again to close it. The base `Scene` does not create the panel, so derive from `UIScene` to use it.
 
+![The developer tools panel opened with F2: picking Title in the node hierarchy shows its node values and UILabel values in the inspector](../images/dev-tools.webp)
+
 ```javascript
 import { Engine, EngineConfiguration, UIScene, WorldNode, Paint, UILabel, Pivot, Vector2, Color } from "./build/vanilla.js";
 

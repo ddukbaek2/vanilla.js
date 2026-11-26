@@ -235,6 +235,8 @@ engine.run(new AnimatorScene());
 
 `Timeline` 은 Timeline Editor 가 저장한 문서(`*.timeline.json`)를 재생합니다. 문서는 무대 노드 목록, 트랙(대상 이름, 속성, 키), 마커로 이루어진 JSON 입니다.
 
+![Timeline Showcase 예제가 TITLE REVEAL 문서를 재생하는 화면: VANILLA 글자와 파티클 터짐, 왼쪽 문서 목록, 아래 재생 막대](../images/timeline.webp)
+
 ```json
 {
 	"name": "Title Reveal",

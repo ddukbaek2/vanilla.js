@@ -6,6 +6,8 @@
 
 `Graphic` 은 WebGL2 위에 Canvas2D 와 같은 꼴(왼쪽 위 원점, 픽셀 단위, 상태 스택)을 만든 렌더러입니다. 씬의 그리기 메서드가 인자로 받습니다. 엔진이 씬마다 그리기 앞에 뷰 좌표(`viewManager.applyViewRect(graphic)`)를 걸어 두므로, 씬은 처음부터 뷰 좌표로 그립니다. ("엔진과 씬" 장)
 
+![Graphic 으로 바로 그린 둥근 사각형, 원, 고리, 꺾인 선, 테두리 사각형, 삼각형, 돌리고 반투명하게 한 사각형과 글](../images/drawing.webp)
+
 | 갈래 | 메서드 |
 | --- | --- |
 | 색 | `setFillColor(color)`, `setStrokeColor(color)`. `Color` 또는 `"#rgb"`, `"#rgba"`, `"#rrggbb"`, `"#rrggbbaa"`, `"rgb(...)"`, `"rgba(...)"` 글 |
@@ -261,6 +263,8 @@ console.log(segments.length);
 
 블렌드 모드는 Canvas2D 의 합성 이름 26 가지를 모두 받습니다. 컴포넌트는 `Sprite.setSpriteBlendMode(name)`, 바로 그릴 때는 `graphic.setBlendMode(name)` 을 씁니다. 처음 값은 `"source-over"` 입니다.
 
+![블렌드 모드 26 가지를 칸마다 하나씩 건 장면: 줄무늬와 흰색, 회색, 검정, 보라 바탕 위의 반투명 그림과 도형](../images/blend-modes.webp)
+
 - 고정 블렌딩: `source-over`, `source-in`, `source-out`, `source-atop`, `destination-over`, `destination-in`, `destination-out`, `destination-atop`, `lighter`, `copy`, `xor`, `multiply`, `screen`
 - 셰이더로 섞기: `overlay`, `darken`, `lighten`, `color-dodge`, `color-burn`, `hard-light`, `soft-light`, `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`
 
@@ -388,6 +392,8 @@ engine.run(new DecorationScene());
 ## Camera2D
 
 `Camera2D` 는 컴포넌트가 아니라 씬이 들고 쓰는 객체입니다. 바라보는 월드 좌표(`position`, 화면 가운데에 옵니다), 확대 배율(`zoom`, 처음 1, `setZoomRange` 의 범위 안으로 자르며 처음 범위는 0.1 ~ 8), 회전(`rotation`, 도, 화면 가운데가 축)을 갖고, `begin(graphic)` 과 `end(graphic)` 사이에서 그린 것에 그 변환을 겁니다.
+
+![cameratour 예제: 기울어진 Camera2D 가 비추는 월드 격자, 트윈으로 움직이는 사각형, Indicator 톱니](../images/camera-tour.webp)
 
 | 메서드 | 내용 |
 | --- | --- |

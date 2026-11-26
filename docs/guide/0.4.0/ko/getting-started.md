@@ -22,6 +22,8 @@
 </script>
 ```
 
+![빠른 시작 코드를 돌린 화면: 검은 바탕에 흰 사각형 하나](../images/quickstart.webp)
+
 번들을 직접 만들 때는 esbuild 를 씁니다.
 
 ```bash

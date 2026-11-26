@@ -28,6 +28,7 @@ const System = globalThis;
  * 	onBeforeDraw: (program, context) => context.uniform1f(program.getUniformLocation("stripeShift"), 0.25),
  * });
  * renderer.endFrame();
+ * @exampleImage toon-material.webp
  */
 
 

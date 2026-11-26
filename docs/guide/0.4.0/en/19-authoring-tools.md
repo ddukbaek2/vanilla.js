@@ -19,6 +19,8 @@ This chapter covers how to load the files made by the engine's authoring tools i
 
 A `.uiasset.json` is a UI document that records a node tree as is. It holds a version number and one root node, and each node records its type, name, position, scale, rotation, opacity, pivot, anchor, content size, components, and children.
 
+![UI Editor with the UI Showcase components document open: component list and hierarchy on the left, the document in the middle, the inspector on the right](../images/tool-ui-editor.webp)
+
 ```json
 {
 	"version": 1,
@@ -127,6 +129,8 @@ Components without dedicated save rules are saved and restored through the value
 
 A `.timeline.json` is a document made of a list of stage nodes, tracks (target name, property, keys), and markers. At the top level are `name`, `duration` (seconds), `frameRate`, `loop`, `stage` (`width`, `height`, `backgroundColor`, `nodes`), `tracks`, and `markers`.
 
+![Timeline Editor with a cutscene document open: the stage with letterbox and dialogue box, tracks and keys below, the inspector on the right](../images/tool-timeline-editor.webp)
+
 ```javascript
 import { Engine, EngineConfiguration, Scene, Timeline, ImageAsset, Vector2 } from "./build/vanilla.js";
 
@@ -182,6 +186,8 @@ The detailed rules for tracks, easing, and keys are in the "Tweens and Timelines
 ## Using Particle Editor assets
 
 A `.vfx.json` is a list of particle system descriptions. Each system records its name together with the description fields accepted by `ParticleSystem.applyDescription`.
+
+![Particle Editor at start: the view running the Fire preset, the preset list on the left, emission and shape settings on the right](../images/tool-particle-editor.webp)
 
 ```json
 {
@@ -251,6 +257,8 @@ In a game, load the file with `JsonAsset` and loop over `jsonAsset.data.systems`
 ## Loading Visual Editor scenes
 
 Visual Editor saves scenes in the same shape as UI documents (`UIDocument`). The default save path is `scenes/untitled.scene.json`, and the frame size used only by the editor (`frameSize`) sits in the same JSON. `UIDocument` skips keys it does not know, so the game reads the file as is with `UIDocument.fromJsonText`. The scene root is a `WorldNode` named `sceneRoot` with its pivot at the top left.
+
+![Visual Editor with the UI Showcase components document open as a scene: hierarchy on the left, the scene view with move handles in the middle, the inspector on the right](../images/tool-visual-editor.webp)
 
 Saving the selected node as a prefab creates a UI document at `prefabs/<name>.prefab.json` with that node as its root. To use the same prefab many times in a game, load the text once and call `fromJsonText` each time; every call returns a new node tree.
 

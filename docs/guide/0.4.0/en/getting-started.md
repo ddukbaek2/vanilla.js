@@ -22,6 +22,8 @@
 </script>
 ```
 
+![The quick start code running: one white rectangle on a black background](../images/quickstart.webp)
+
 To build the bundle yourself, use esbuild.
 
 ```bash
